@@ -2,89 +2,64 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 68E21C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 16:58:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B0D73C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 16:59:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 34001217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 16:58:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 82C62214C6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 16:59:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FyTBkAkr";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="TcQZKlQv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 34001217D9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="In75Cpxz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 82C62214C6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DAzjXtv2H25F0KoMYSDP7+LyCniM6qSF94QQ8WgxEZs=; b=FyTBkAkr8L7M+W
-	f0Ijl7r8MlsK0OXje9idDWTevrwGFeOZXsG0um9g18LLSNr8ksxmOixMig+baxphB7VwqrZ3yezd6
-	tAFw/hE08HS8wnUHRg+F8VREnhyYboEsUEJH7LyfyviE/3Le72CTarTkez/LTID22x4nPykoSDIc7
-	7yPMZ1jEoIR/izJYw5Ni+Rjwklkod/KX9ydb49vAJ/Jb7mIFY52g0P7TZ7A/N+9chhTr8RGILwe8o
-	6ZMOM55d0/hCsTXmH7PtLA79CPtbWQ8W5aFMUSzG66jtWOKTmJxMTY/7BA8vRnipvZwQdkbtd1VWC
-	G2FnN1zPlafbtduhZXyA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=lkfDMM1+vnrr1BHstRRqe9mn5z12+e0h/VxtC881oQ0=; b=In75CpxzQYk1C4Zk5oQYec7lj
+	Imb2VNps9TmRO/v4RrbEEdy3f5KWAVd27cIbIFaXzEyayvXy8x45ZsmJHLan7/m1fle1uDkKRH54f
+	uWdH+cirQOsc7Jm48w+J+/R8Q1G9V+T5ghD0efM+VSxhkXx0NKIHKOMH8WuMjTu3oHc1ddiAy++z5
+	3a7gh/HbfVYhYQuhfRX8gopJrbPnrx+l57t9q6sZpn/nsFOxjmyDdr+GpAm2lYOMN2MYmzEzleado
+	h+otM44mDzFZ0FdrzlG0Wvz0NtBcHqmT1bTjMBnwc2YkSm6WraHzLO2onJtCpSZaJXwtOxGUpg9Ju
+	RFfDEqVag==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZfAc-0007wj-Ja; Wed, 19 Dec 2018 16:58:06 +0000
-Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZfAY-0007ty-4E
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 16:58:05 +0000
-Received: by mail-wr1-x442.google.com with SMTP id u4so19277161wrp.3
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 19 Dec 2018 08:57:51 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=ipk70XgawFq2DrKpbmaNeO7sDiuavgSWfwjNSok6DcE=;
- b=TcQZKlQvs15wtS/CjJG+zHvmHWgqRhWd5WtBB0rf1SA/d9trc8i9CNFsrsjzkCV08q
- cbuvtNAryuks1vQLynHEmEk76xrKaavnxOaIoDgn67BbsD0QKkAZqVy9G9NgQfitfhaW
- UobZwQ7I4D4Ea0fwx+sD+MtA3hohdf73Ol9L4=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=ipk70XgawFq2DrKpbmaNeO7sDiuavgSWfwjNSok6DcE=;
- b=j/bRbyOFVm9ry0cmD5AIWKsoneqn8vuYpi3IMxc4cQLbwakX6jAwZpjcR0Hl1z6yS5
- ypI7cwOv/0hYrOwMtlUeqIGuSrA6AuzswRdQ5U8As8LevSmtwQwc2CjCk65S78eg81qh
- csBT3QD+ggI4sJP+fbPdfJBoV7fVwsp6lHbok6WJ+yt3zM8KH8ex+7Dsua49ungrG41q
- Bw9jrb4JshHikazWroNU0I9L4p13XKX1Q2DKM/TNdCSVwSdUPFwUfN1Jwf3rUtvBc5WV
- ppyZexbPaypz6tL7w95S2fm0kF41E1NOViKmGpW3UGGrJ4IVOIBTHoNneJykPovsuQQ+
- ztrw==
-X-Gm-Message-State: AA+aEWatHm3ilbRNyWZv08MLbwvOQogx7pNEU7T2InpLouKsPE8LZ5Ux
- ny87rEb7ROaRretzVrZ1x2nNVw==
-X-Google-Smtp-Source: AFSGD/XjZvuL++qgyIW7v0Q2ysTDCEM2AfwE2T3EJAL2l/D6YqsYNA1o+odv8TMGq3csAsF4CgI6mw==
-X-Received: by 2002:adf:ed46:: with SMTP id u6mr20128419wro.262.1545238670653; 
- Wed, 19 Dec 2018 08:57:50 -0800 (PST)
-Received: from holly.lan (cpc141214-aztw34-2-0-cust773.18-1.cable.virginm.net.
- [86.9.19.6])
- by smtp.gmail.com with ESMTPSA id z9sm5494906wrs.63.2018.12.19.08.57.49
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 19 Dec 2018 08:57:49 -0800 (PST)
-Date: Wed, 19 Dec 2018 16:57:47 +0000
-From: Daniel Thompson <daniel.thompson@linaro.org>
-To: Christophe Leroy <christophe.leroy@c-s.fr>
-Subject: Re: [PATCH v2 2/2] kgdb/treewide: constify struct kgdb_arch
- arch_kgdb_ops
-Message-ID: <20181219165747.ltfs65vt3tycrl7x@holly.lan>
-References: <030d63848e4b0ef4d76ca24597ab8302a393d692.1544083483.git.christophe.leroy@c-s.fr>
- <5e130b11680be09537913aae9649c84ede763ec8.1544083483.git.christophe.leroy@c-s.fr>
+	id 1gZfBt-0008Cs-Nl; Wed, 19 Dec 2018 16:59:25 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZfBp-0008CP-Ts
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 16:59:24 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 74F46A78;
+ Wed, 19 Dec 2018 08:59:09 -0800 (PST)
+Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 6170F3F675;
+ Wed, 19 Dec 2018 08:59:08 -0800 (PST)
+Subject: Re: [PATCH dma-mapping tree] arm64: default to the direct mapping in
+ get_arch_dma_ops
+To: Christoph Hellwig <hch@lst.de>, catalin.marinas@arm.com,
+ will.deacon@arm.com
+References: <20181214150240.26427-1-hch@lst.de>
+From: Robin Murphy <robin.murphy@arm.com>
+Message-ID: <3a6c8eff-a5dd-6a17-71ed-f480df3801d8@arm.com>
+Date: Wed, 19 Dec 2018 16:59:03 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <5e130b11680be09537913aae9649c84ede763ec8.1544083483.git.christophe.leroy@c-s.fr>
-User-Agent: NeoMutt/20180716
+In-Reply-To: <20181214150240.26427-1-hch@lst.de>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_085802_166176_B87CA6F3 
-X-CRM114-Status: GOOD (  22.55  )
+X-CRM114-CacheID: sfid-20181219_085921_968889_D04EEE46 
+X-CRM114-Status: GOOD (  22.45  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,273 +71,49 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rich Felker <dalias@libc.org>,
- "Gustavo A. R. Silva" <gustavo@embeddedor.com>,
- Benjamin Herrenschmidt <benh@kernel.crashing.org>,
- Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
- Paul Mackerras <paulus@samba.org>, sparclinux@vger.kernel.org,
- linux-hexagon@vger.kernel.org, Yoshinori Sato <ysato@users.sourceforge.jp>,
- linux-sh@vger.kernel.org, Michael Ellerman <mpe@ellerman.id.au>,
- x86@kernel.org, Russell King <linux@armlinux.org.uk>,
- Ingo Molnar <mingo@redhat.com>, Catalin Marinas <catalin.marinas@arm.com>,
- James Hogan <jhogan@kernel.org>, linux-snps-arc@lists.infradead.org,
- uclinux-h8-devel@lists.sourceforge.jp, linux-mips@vger.kernel.org,
- Borislav Petkov <bp@alien8.de>, nios2-dev@lists.rocketboards.org,
- Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org,
- Michal Simek <monstr@monstr.eu>, Vineet Gupta <vgupta@synopsys.com>,
- Randy Dunlap <rdunlap@infradead.org>, Douglas Anderson <dianders@chromium.org>,
- Ralf Baechle <ralf@linux-mips.org>, Richard Kuo <rkuo@codeaurora.org>,
- Paul Burton <paul.burton@mips.com>, Jason Wessel <jason.wessel@windriver.com>,
- kgdb-bugreport@lists.sourceforge.net, Ley Foon Tan <lftan@altera.com>,
- linuxppc-dev@lists.ozlabs.org, "David S. Miller" <davem@davemloft.net>
-Content-Type: text/plain; charset="us-ascii"
+Cc: iommu@lists.linux-foundation.org, linux-arm-kernel@lists.infradead.org,
+ m.szyprowski@samsung.com
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Dec 06, 2018 at 08:07:40PM +0000, Christophe Leroy wrote:
-> checkpatch.pl reports the following:
-> 
->   WARNING: struct kgdb_arch should normally be const
->   #28: FILE: arch/mips/kernel/kgdb.c:397:
->   +struct kgdb_arch arch_kgdb_ops = {
-> 
-> This report makes sense, as all other ops struct, this
-> one should also be const. This patch does the change.
-> 
-> Cc: Vineet Gupta <vgupta@synopsys.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
-> Cc: Richard Kuo <rkuo@codeaurora.org>
-> Cc: Michal Simek <monstr@monstr.eu>
-> Cc: Ralf Baechle <ralf@linux-mips.org>
-> Cc: Paul Burton <paul.burton@mips.com>
-> Cc: James Hogan <jhogan@kernel.org>
-> Cc: Ley Foon Tan <lftan@altera.com>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Paul Mackerras <paulus@samba.org>
-> Cc: Michael Ellerman <mpe@ellerman.id.au>
-> Cc: Rich Felker <dalias@libc.org>
-> Cc: "David S. Miller" <davem@davemloft.net>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Ingo Molnar <mingo@redhat.com>
-> Cc: Borislav Petkov <bp@alien8.de>
-> Cc: x86@kernel.org
-> Acked-by: Daniel Thompson <daniel.thompson@linaro.org>
-> Acked-by: Paul Burton <paul.burton@mips.com>
-> Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
+On 14/12/2018 15:02, Christoph Hellwig wrote:
+> Otherwise the direct mapping won't work at all given that a NULL
+> dev->dma_ops causes a fallback.  Note that we already explicitly set
+> dev->dma_ops to dma_dummy_ops for dma-incapable devices, so this
+> fallback should not be needed anyway.
 
-I've not heard any objections from the arch/ maintainers so...
+Sorry, I'd somehow completely missed that you'd sent a proper patch for 
+this - indeed it looks like the right change to make.
 
-Applied! Thanks.
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
-
-> -
+> Fixes: 356da6d0cd ("dma-mapping: bypass indirect calls for dma-direct")
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> Reported-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > ---
->  v2: Added CCs to all maintainers/supporters identified by get_maintainer.pl and Acks from Daniel and Paul.
+>   arch/arm64/include/asm/dma-mapping.h | 6 +-----
+>   1 file changed, 1 insertion(+), 5 deletions(-)
 > 
->  arch/arc/kernel/kgdb.c        | 2 +-
->  arch/arm/kernel/kgdb.c        | 2 +-
->  arch/arm64/kernel/kgdb.c      | 2 +-
->  arch/h8300/kernel/kgdb.c      | 2 +-
->  arch/hexagon/kernel/kgdb.c    | 2 +-
->  arch/microblaze/kernel/kgdb.c | 2 +-
->  arch/mips/kernel/kgdb.c       | 2 +-
->  arch/nios2/kernel/kgdb.c      | 2 +-
->  arch/powerpc/kernel/kgdb.c    | 2 +-
->  arch/sh/kernel/kgdb.c         | 2 +-
->  arch/sparc/kernel/kgdb_32.c   | 2 +-
->  arch/sparc/kernel/kgdb_64.c   | 2 +-
->  arch/x86/kernel/kgdb.c        | 2 +-
->  include/linux/kgdb.h          | 2 +-
->  14 files changed, 14 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arc/kernel/kgdb.c b/arch/arc/kernel/kgdb.c
-> index 9a3c34af2ae8..bfd04b442e36 100644
-> --- a/arch/arc/kernel/kgdb.c
-> +++ b/arch/arc/kernel/kgdb.c
-> @@ -204,7 +204,7 @@ void kgdb_roundup_cpus(unsigned long flags)
->  	local_irq_disable();
->  }
->  
-> -struct kgdb_arch arch_kgdb_ops = {
-> +const struct kgdb_arch arch_kgdb_ops = {
->  	/* breakpoint instruction: TRAP_S 0x3 */
->  #ifdef CONFIG_CPU_BIG_ENDIAN
->  	.gdb_bpt_instr		= {0x78, 0x7e},
-> diff --git a/arch/arm/kernel/kgdb.c b/arch/arm/kernel/kgdb.c
-> index caa0dbe3dc61..21a6d5958955 100644
-> --- a/arch/arm/kernel/kgdb.c
-> +++ b/arch/arm/kernel/kgdb.c
-> @@ -274,7 +274,7 @@ int kgdb_arch_remove_breakpoint(struct kgdb_bkpt *bpt)
->   * and we handle the normal undef case within the do_undefinstr
->   * handler.
->   */
-> -struct kgdb_arch arch_kgdb_ops = {
-> +const struct kgdb_arch arch_kgdb_ops = {
->  #ifndef __ARMEB__
->  	.gdb_bpt_instr		= {0xfe, 0xde, 0xff, 0xe7}
->  #else /* ! __ARMEB__ */
-> diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
-> index a20de58061a8..fe1d1f935b90 100644
-> --- a/arch/arm64/kernel/kgdb.c
-> +++ b/arch/arm64/kernel/kgdb.c
-> @@ -357,7 +357,7 @@ void kgdb_arch_exit(void)
->  	unregister_die_notifier(&kgdb_notifier);
->  }
->  
-> -struct kgdb_arch arch_kgdb_ops;
-> +const struct kgdb_arch arch_kgdb_ops;
->  
->  int kgdb_arch_set_breakpoint(struct kgdb_bkpt *bpt)
->  {
-> diff --git a/arch/h8300/kernel/kgdb.c b/arch/h8300/kernel/kgdb.c
-> index 1a1d30cb0609..602e478afbd5 100644
-> --- a/arch/h8300/kernel/kgdb.c
-> +++ b/arch/h8300/kernel/kgdb.c
-> @@ -129,7 +129,7 @@ void kgdb_arch_exit(void)
->  	/* Nothing to do */
->  }
->  
-> -struct kgdb_arch arch_kgdb_ops = {
-> +const struct kgdb_arch arch_kgdb_ops = {
->  	/* Breakpoint instruction: trapa #2 */
->  	.gdb_bpt_instr = { 0x57, 0x20 },
->  };
-> diff --git a/arch/hexagon/kernel/kgdb.c b/arch/hexagon/kernel/kgdb.c
-> index 16c24b22d0b2..f1924d483e78 100644
-> --- a/arch/hexagon/kernel/kgdb.c
-> +++ b/arch/hexagon/kernel/kgdb.c
-> @@ -83,7 +83,7 @@ struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
->  	{ "syscall_nr", GDB_SIZEOF_REG, offsetof(struct pt_regs, syscall_nr)},
->  };
->  
-> -struct kgdb_arch arch_kgdb_ops = {
-> +const struct kgdb_arch arch_kgdb_ops = {
->  	/* trap0(#0xDB) 0x0cdb0054 */
->  	.gdb_bpt_instr = {0x54, 0x00, 0xdb, 0x0c},
->  };
-> diff --git a/arch/microblaze/kernel/kgdb.c b/arch/microblaze/kernel/kgdb.c
-> index 6366f69d118e..130cd0f064ce 100644
-> --- a/arch/microblaze/kernel/kgdb.c
-> +++ b/arch/microblaze/kernel/kgdb.c
-> @@ -143,7 +143,7 @@ void kgdb_arch_exit(void)
->  /*
->   * Global data
->   */
-> -struct kgdb_arch arch_kgdb_ops = {
-> +const struct kgdb_arch arch_kgdb_ops = {
->  #ifdef __MICROBLAZEEL__
->  	.gdb_bpt_instr = {0x18, 0x00, 0x0c, 0xba}, /* brki r16, 0x18 */
->  #else
-> diff --git a/arch/mips/kernel/kgdb.c b/arch/mips/kernel/kgdb.c
-> index 31eff1bec577..edfdc2ec2d16 100644
-> --- a/arch/mips/kernel/kgdb.c
-> +++ b/arch/mips/kernel/kgdb.c
-> @@ -394,7 +394,7 @@ int kgdb_arch_handle_exception(int vector, int signo, int err_code,
->  	return -1;
->  }
->  
-> -struct kgdb_arch arch_kgdb_ops = {
-> +const struct kgdb_arch arch_kgdb_ops = {
->  #ifdef CONFIG_CPU_BIG_ENDIAN
->  	.gdb_bpt_instr = { spec_op << 2, 0x00, 0x00, break_op },
->  #else
-> diff --git a/arch/nios2/kernel/kgdb.c b/arch/nios2/kernel/kgdb.c
-> index 117859122d1c..37b25f844a2d 100644
-> --- a/arch/nios2/kernel/kgdb.c
-> +++ b/arch/nios2/kernel/kgdb.c
-> @@ -165,7 +165,7 @@ void kgdb_arch_exit(void)
->  	/* Nothing to do */
->  }
->  
-> -struct kgdb_arch arch_kgdb_ops = {
-> +const struct kgdb_arch arch_kgdb_ops = {
->  	/* Breakpoint instruction: trap 30 */
->  	.gdb_bpt_instr = { 0xba, 0x6f, 0x3b, 0x00 },
->  };
-> diff --git a/arch/powerpc/kernel/kgdb.c b/arch/powerpc/kernel/kgdb.c
-> index 59c578f865aa..bdb588b1d8fb 100644
-> --- a/arch/powerpc/kernel/kgdb.c
-> +++ b/arch/powerpc/kernel/kgdb.c
-> @@ -477,7 +477,7 @@ int kgdb_arch_remove_breakpoint(struct kgdb_bkpt *bpt)
->  /*
->   * Global data
->   */
-> -struct kgdb_arch arch_kgdb_ops;
-> +const struct kgdb_arch arch_kgdb_ops;
->  
->  static int kgdb_not_implemented(struct pt_regs *regs)
->  {
-> diff --git a/arch/sh/kernel/kgdb.c b/arch/sh/kernel/kgdb.c
-> index 4f04c6638a4d..a24c48446e98 100644
-> --- a/arch/sh/kernel/kgdb.c
-> +++ b/arch/sh/kernel/kgdb.c
-> @@ -382,7 +382,7 @@ void kgdb_arch_exit(void)
->  	unregister_die_notifier(&kgdb_notifier);
->  }
->  
-> -struct kgdb_arch arch_kgdb_ops = {
-> +const struct kgdb_arch arch_kgdb_ops = {
->  	/* Breakpoint instruction: trapa #0x3c */
->  #ifdef CONFIG_CPU_LITTLE_ENDIAN
->  	.gdb_bpt_instr		= { 0x3c, 0xc3 },
-> diff --git a/arch/sparc/kernel/kgdb_32.c b/arch/sparc/kernel/kgdb_32.c
-> index 639c8e54530a..7580775a14b9 100644
-> --- a/arch/sparc/kernel/kgdb_32.c
-> +++ b/arch/sparc/kernel/kgdb_32.c
-> @@ -166,7 +166,7 @@ void kgdb_arch_set_pc(struct pt_regs *regs, unsigned long ip)
->  	regs->npc = regs->pc + 4;
->  }
->  
-> -struct kgdb_arch arch_kgdb_ops = {
-> +const struct kgdb_arch arch_kgdb_ops = {
->  	/* Breakpoint instruction: ta 0x7d */
->  	.gdb_bpt_instr		= { 0x91, 0xd0, 0x20, 0x7d },
->  };
-> diff --git a/arch/sparc/kernel/kgdb_64.c b/arch/sparc/kernel/kgdb_64.c
-> index a68bbddbdba4..5d6c2d287e85 100644
-> --- a/arch/sparc/kernel/kgdb_64.c
-> +++ b/arch/sparc/kernel/kgdb_64.c
-> @@ -195,7 +195,7 @@ void kgdb_arch_set_pc(struct pt_regs *regs, unsigned long ip)
->  	regs->tnpc = regs->tpc + 4;
->  }
->  
-> -struct kgdb_arch arch_kgdb_ops = {
-> +const struct kgdb_arch arch_kgdb_ops = {
->  	/* Breakpoint instruction: ta 0x72 */
->  	.gdb_bpt_instr		= { 0x91, 0xd0, 0x20, 0x72 },
->  };
-> diff --git a/arch/x86/kernel/kgdb.c b/arch/x86/kernel/kgdb.c
-> index 8e36f249646e..e7effc02f13c 100644
-> --- a/arch/x86/kernel/kgdb.c
-> +++ b/arch/x86/kernel/kgdb.c
-> @@ -804,7 +804,7 @@ int kgdb_arch_remove_breakpoint(struct kgdb_bkpt *bpt)
->  				  (char *)bpt->saved_instr, BREAK_INSTR_SIZE);
->  }
->  
-> -struct kgdb_arch arch_kgdb_ops = {
-> +const struct kgdb_arch arch_kgdb_ops = {
->  	/* Breakpoint instruction: */
->  	.gdb_bpt_instr		= { 0xcc },
->  	.flags			= KGDB_HW_BREAKPOINT,
-> diff --git a/include/linux/kgdb.h b/include/linux/kgdb.h
-> index e465bb15912d..3bf313311cca 100644
-> --- a/include/linux/kgdb.h
-> +++ b/include/linux/kgdb.h
-> @@ -281,7 +281,7 @@ struct kgdb_io {
->  	int			is_console;
->  };
->  
-> -extern struct kgdb_arch		arch_kgdb_ops;
-> +extern const struct kgdb_arch		arch_kgdb_ops;
->  
->  extern unsigned long kgdb_arch_pc(int exception, struct pt_regs *regs);
->  
-> -- 
-> 2.13.3
+> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+> index 273e778f7de2..95dbf3ef735a 100644
+> --- a/arch/arm64/include/asm/dma-mapping.h
+> +++ b/arch/arm64/include/asm/dma-mapping.h
+> @@ -26,11 +26,7 @@
+>   
+>   static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
+>   {
+> -	/*
+> -	 * We expect no ISA devices, and all other DMA masters are expected to
+> -	 * have someone call arch_setup_dma_ops at device creation time.
+> -	 */
+> -	return &dma_dummy_ops;
+> +	return NULL;
+>   }
+>   
+>   void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
 > 
 
 _______________________________________________
