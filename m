@@ -2,81 +2,79 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DAFA4C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 10:10:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 523A0C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 10:11:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A31C221871
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 10:10:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2144B21871
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 10:11:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gGImH35U";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="RQ3h4xZ8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A31C221871
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TMAabSXB";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="O1HlDlRZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2144B21871
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HQj5p7H/Per7gfpPD0ZMWK3Q0+aZ24EJvKt+hsli7zU=; b=gGImH35UwlaCIS
-	hSQWsOj2JNHSJEGC6+rv0cYdYDWeczMxiwEolzGyoTL0k3+9izzrxRNGA2NKPbIWmhEId+2vSxeAp
-	CqIQEKjL56vkQE7GIDXjuRnxRuw+tgpmliGVctmPyHzDNbk9Wylpc6LRSagRdrJIayc4CvlPTFIa1
-	Fvgs/w/2ZVnYWCcUpvriyrHQQXxOgYGSx4Qm9oCjbN+QyPlJ5rjDUhYNymKz5mYKKGXZJo6SsT2j/
-	8xEQnnj9S/LSXCgpXl9BT3gQ8EGMT1cLpQW4QXw33mDYQ/6iVnXrv80R02ncEUeKUtRrYUyndyZcp
-	xlgRe6/4BjBiolVrh+aQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=2mQ5c4Of5l6e7lg09xdevUNHiFAZ+xVXRmYUexwve5c=; b=TMAabSXBtb3lrk
+	/cbTYWXizFPaFeDkxZETRV2EoKES6wDfzVgAD9SEpWLNG07e9GXjn2gN/cnZgpmMRT/kL7q+PCBEF
+	DttKqk3MTqhV/CEGPgREjET+KrHZzajXfvaiAqo2e4pHEA3EqKQiM4FN3n0bqm8TKdgRXRFJFJGrD
+	d1ENpoPvwmlAQZ0IwyC6wZTk9re4k7cRuaddy9VR4bfEnyQZwEIHWHwo6YXbIVleUTMq+MocBwU9C
+	PrISKcPnpA4djg+31qVG+x1vO7ToGcXF8/vdya3G02pyME4Qyfx80kc7lckC7Px4YuOTmOTjU4GVb
+	6vKqU3+l8EERhB7yvI7g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZYo0-00081o-Ot; Wed, 19 Dec 2018 10:10:20 +0000
-Received: from mail-vs1-xe43.google.com ([2607:f8b0:4864:20::e43])
+	id 1gZYpN-0008Oe-2o; Wed, 19 Dec 2018 10:11:45 +0000
+Received: from fllv0015.ext.ti.com ([198.47.19.141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZYnx-00074T-6x
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 10:10:19 +0000
-Received: by mail-vs1-xe43.google.com with SMTP id x28so4257914vsh.12
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 19 Dec 2018 02:10:04 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=5/K3ksz2cOuGH+8ZePuFENnYOvHlfiSjHSQXc/PYJ2c=;
- b=RQ3h4xZ8xf011F6uO04XuKcLaR0eSLQf56kPf2PwCFf8encr5t4yZcsP2//ZUyeqZb
- 0XXXQmjZFkshO8WK7FK5I42B2gPtvDAJeSIXTVi/NmmtJ6ZrNE1Z7zS/bkzbmnlLRXbj
- HWW1rGq17p4uQiOt++oJtRbnnmPV1J0IvFiv4=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=5/K3ksz2cOuGH+8ZePuFENnYOvHlfiSjHSQXc/PYJ2c=;
- b=ODlG9Ib+Dw+zOp/Nwh4HZ64jISjPKDUTpP5/se/aFJRVvJMcL/6O95JPPG9FiQsQvz
- HqZo09HCnZ2n7dKVRu5vrCBUHlguiJZ2nabFRMDFyFcUkD8yYVF4kuJ9WAa1B7LIsiaI
- LGdQgb3sk9F9Gdkzbb6sTuSvaow/jYvuqSPQ8sa+cnPq85T6Vbh3m7HkAtcCGzeOsTg7
- IYuH66yFXdfn74BeOSw3P56mqX3pz9e7nWe4UIMxHlhzTtFeZsGkMbzE6hqClHiG2l+W
- fXElBmwyto5RKENDMNdkW3O80pKYx0IbMpX5mLJQoRI9ZtyRf2CYaKnbWexCzPBr4Kne
- jJkg==
-X-Gm-Message-State: AA+aEWbOiuorjUCgVH29mhihN4PIfKSmWS7y8X2Kl5uBfh0xKBz5ogts
- aStgVLyXhkqD2smupbDIFHy4ln7nt8KkQjJf3OETMA==
-X-Google-Smtp-Source: AFSGD/WwtGYT9ruDBSvX6LKMVI14aD24tA/A1hBTdZNZP1nRDiYXyKMWV01DtQ4Mro4VlMQdNoA1Zx3cqygYixgWxrk=
-X-Received: by 2002:a67:e002:: with SMTP id c2mr10059987vsl.34.1545214203976; 
- Wed, 19 Dec 2018 02:10:03 -0800 (PST)
+ id 1gZYpJ-0008NV-Md
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 10:11:43 +0000
+Received: from fllv0034.itg.ti.com ([10.64.40.246])
+ by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBJABMm2089599;
+ Wed, 19 Dec 2018 04:11:22 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1545214282;
+ bh=FT8vmqAs6IRlmx+c+T3AdN+h1ix4Rc2XFjv+OlTJ/qk=;
+ h=From:To:CC:Subject:Date;
+ b=O1HlDlRZqn/ZHXEo7J4zOc/6aOtXn829ETmLsjbajzMlFlbMdU6qrmgkWJTn4b+ZZ
+ Y0ESaEmKYNR0pWzjNyhL5d32auc+Ta6m/d8+nKOMsu96wtVW+iQLk6Xja8bWvqr54R
+ ehXt9Q4kHRTuW2DeCh5sqJ5w/qe75uZohF/9OaCE=
+Received: from DLEE109.ent.ti.com (dlee109.ent.ti.com [157.170.170.41])
+ by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBJABM3m035617
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Wed, 19 Dec 2018 04:11:22 -0600
+Received: from DLEE111.ent.ti.com (157.170.170.22) by DLEE109.ent.ti.com
+ (157.170.170.41) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Wed, 19
+ Dec 2018 04:11:21 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE111.ent.ti.com
+ (157.170.170.22) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Wed, 19 Dec 2018 04:11:21 -0600
+Received: from feketebors.ti.com (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBJABJP3007197;
+ Wed, 19 Dec 2018 04:11:20 -0600
+From: Peter Ujfalusi <peter.ujfalusi@ti.com>
+To: <tony@atomide.com>, <linux@armlinux.org.uk>, <nsekhar@ti.com>
+Subject: [PATCH] ARM: dts: da850-lcdk: Correct the audio codec regulators
+Date: Wed, 19 Dec 2018 12:13:05 +0200
+Message-ID: <20181219101305.20832-1-peter.ujfalusi@ti.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-References: <20181129174700.16585-1-ulf.hansson@linaro.org>
- <20181129174700.16585-5-ulf.hansson@linaro.org>
- <5529fc0a-af96-b10a-ca4a-f1417598f4ee@linaro.org>
-In-Reply-To: <5529fc0a-af96-b10a-ca4a-f1417598f4ee@linaro.org>
-From: Ulf Hansson <ulf.hansson@linaro.org>
-Date: Wed, 19 Dec 2018 11:09:28 +0100
-Message-ID: <CAPDyKFr4KmCMciLANLCEsTKj2Mz-B89BybSvX4Y8g=L5vim=fw@mail.gmail.com>
-Subject: Re: [PATCH v10 04/27] PM / Domains: Add genpd governor for CPUs
-To: Daniel Lezcano <daniel.lezcano@linaro.org>
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_021017_260750_F205A6DA 
-X-CRM114-Status: GOOD (  32.37  )
+X-CRM114-CacheID: sfid-20181219_021141_836183_E273EDEB 
+X-CRM114-Status: GOOD (  14.33  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,147 +86,87 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>,
- Vincent Guittot <vincent.guittot@linaro.org>,
- Geert Uytterhoeven <geert+renesas@glider.be>,
- Linux PM <linux-pm@vger.kernel.org>, Stephen Boyd <sboyd@kernel.org>,
- Viresh Kumar <viresh.kumar@linaro.org>,
- linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- Kevin Hilman <khilman@kernel.org>, "Rafael J . Wysocki" <rjw@rjwysocki.net>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Lina Iyer <ilina@codeaurora.org>, Frederic Weisbecker <fweisbec@gmail.com>,
- Tony Lindgren <tony@atomide.com>, Sudeep Holla <sudeep.holla@arm.com>,
- Thomas Gleixner <tglx@linutronix.de>,
- "Raju P . L . S . S . S . N" <rplsssn@codeaurora.org>,
- Ingo Molnar <mingo@kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: devicetree@vger.kernel.org, linux-omap@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, bcousson@baylibre.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 19 Dec 2018 at 10:54, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
->
-> On 29/11/2018 18:46, Ulf Hansson wrote:
-> > As it's now perfectly possible that a PM domain managed by genpd contains
-> > devices belonging to CPUs, we should start to take into account the
-> > residency values for the idle states during the state selection process.
-> > The residency value specifies the minimum duration of time, the CPU or a
-> > group of CPUs, needs to spend in an idle state to not waste energy entering
-> > it.
-> >
-> > To deal with this, let's add a new genpd governor, pm_domain_cpu_gov, that
-> > may be used for a PM domain that have CPU devices attached or if the CPUs
-> > are attached through subdomains.
-> >
-> > The new governor computes the minimum expected idle duration time for the
-> > online CPUs being attached to the PM domain and its subdomains. Then in the
-> > state selection process, trying the deepest state first, it verifies that
-> > the idle duration time satisfies the state's residency value.
-> >
-> > It should be noted that, when computing the minimum expected idle duration
-> > time, we use the information from tick_nohz_get_next_wakeup(), to find the
-> > next wakeup for the related CPUs. Future wise, this may deserve to be
-> > improved, as there are more reasons to why a CPU may be woken up from idle.
-> >
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > Cc: Lina Iyer <ilina@codeaurora.org>
-> > Cc: Frederic Weisbecker <fweisbec@gmail.com>
-> > Cc: Ingo Molnar <mingo@kernel.org>
-> > Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
-> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> > ---
-> >
-> > Changes in v10:
-> >       - Fold in patch that extended the new genpd CPU governor to cope with
-> >         QoS constraints, as to avoid confusion.
-> >       - Simplified the code according to suggestions from Rafael.
-> >
-> > ---
-> >  drivers/base/power/domain_governor.c | 61 +++++++++++++++++++++++++++-
-> >  include/linux/pm_domain.h            |  3 ++
-> >  2 files changed, 63 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/base/power/domain_governor.c b/drivers/base/power/domain_governor.c
-> > index 99896fbf18e4..61a7c3c03c98 100644
-> > --- a/drivers/base/power/domain_governor.c
-> > +++ b/drivers/base/power/domain_governor.c
-> > @@ -10,6 +10,9 @@
-> >  #include <linux/pm_domain.h>
-> >  #include <linux/pm_qos.h>
-> >  #include <linux/hrtimer.h>
-> > +#include <linux/cpumask.h>
-> > +#include <linux/ktime.h>
-> > +#include <linux/tick.h>
-> >
-> >  static int dev_update_qos_constraint(struct device *dev, void *data)
-> >  {
-> > @@ -211,8 +214,10 @@ static bool default_power_down_ok(struct dev_pm_domain *pd)
-> >       struct generic_pm_domain *genpd = pd_to_genpd(pd);
-> >       struct gpd_link *link;
-> >
-> > -     if (!genpd->max_off_time_changed)
-> > +     if (!genpd->max_off_time_changed) {
-> > +             genpd->state_idx = genpd->cached_power_down_state_idx;
-> >               return genpd->cached_power_down_ok;
-> > +     }
-> >
-> >       /*
-> >        * We have to invalidate the cached results for the masters, so
-> > @@ -237,6 +242,7 @@ static bool default_power_down_ok(struct dev_pm_domain *pd)
-> >               genpd->state_idx--;
-> >       }
-> >
-> > +     genpd->cached_power_down_state_idx = genpd->state_idx;
-> >       return genpd->cached_power_down_ok;
-> >  }
-> >
-> > @@ -245,6 +251,54 @@ static bool always_on_power_down_ok(struct dev_pm_domain *domain)
-> >       return false;
-> >  }
-> >
-> > +static bool cpu_power_down_ok(struct dev_pm_domain *pd)
-> > +{
-> > +     struct generic_pm_domain *genpd = pd_to_genpd(pd);
-> > +     ktime_t domain_wakeup, cpu_wakeup;
-> > +     s64 idle_duration_ns;
-> > +     int cpu, i;
-> > +
-> > +     /* Validate dev PM QoS constraints. */
-> > +     if (!default_power_down_ok(pd))
-> > +             return false;
-> > +
-> > +     if (!(genpd->flags & GENPD_FLAG_CPU_DOMAIN))
-> > +             return true;
->
-> Is it possible to have this function called without the
-> GENPD_FLAG_CPU_DOMAIN flag set in the genpd?
+Add the board level fixed regulators for 3.3V and 1.8V which is used to
+power - among other things - the tlv320aic3106 codec.
 
-Theoretically yes, however in practice, probably not.
+Apart from removing the following warning during boot:
+tlv320aic3x-codec 0-0018: Invalid supply voltage(s) AVDD: -22, DVDD: -22
 
-Do note, if the GENPD_FLAG_CPU_DOMAIN isn't set, then we haven't
-allocated the cpumask for the genpd, so then we shouldn't use it.
+With the correct voltages the driver can select correct OCMV value to
+reduce pop noise.
 
->
-> > +     /*
-> > +      * Find the next wakeup for any of the online CPUs within the PM domain
-> > +      * and its subdomains. Note, we only need the genpd->cpus, as it already
-> > +      * contains a mask of all CPUs from subdomains.
-> > +      */
-> > +     domain_wakeup = ktime_set(KTIME_SEC_MAX, 0);
-> > +     for_each_cpu_and(cpu, genpd->cpus, cpu_online_mask) {
-> > +             cpu_wakeup = tick_nohz_get_next_wakeup(cpu);
-> > +             if (ktime_before(cpu_wakeup, domain_wakeup))
-> > +                     domain_wakeup = cpu_wakeup;
-> > +     }
-> > +
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ arch/arm/boot/dts/da850-lcdk.dts | 36 ++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-[...]
+diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+index 0177e3ed20fe..c196e37606c4 100644
+--- a/arch/arm/boot/dts/da850-lcdk.dts
++++ b/arch/arm/boot/dts/da850-lcdk.dts
+@@ -39,6 +39,36 @@
+ 		};
+ 	};
+ 
++	vcc_5vd: fixedregulator-vcc_5vd {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc_5vd";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-boot-on;
++	};
++
++	vcc_3v3d: fixedregulator-vcc_3v3d {
++		/* TPS650250 - VDCDC1 */
++		compatible = "regulator-fixed";
++		regulator-name = "vcc_3v3d";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		vin-supply = <&vcc_5vd>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
++
++	vcc_1v8d: fixedregulator-vcc_1v8d {
++		/* TPS650250 - VDCDC2 */
++		compatible = "regulator-fixed";
++		regulator-name = "vcc_1v8d";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		vin-supply = <&vcc_5vd>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
++
+ 	sound {
+ 		compatible = "simple-audio-card";
+ 		simple-audio-card,name = "DA850/OMAP-L138 LCDK";
+@@ -221,6 +251,12 @@
+ 		compatible = "ti,tlv320aic3106";
+ 		reg = <0x18>;
+ 		status = "okay";
++
++		/* Regulators */
++		IOVDD-supply = <&vcc_3v3d>;
++		AVDD-supply = <&vcc_3v3d>;
++		DRVDD-supply = <&vcc_3v3d>;
++		DVDD-supply = <&vcc_1v8d>;
+ 	};
+ };
+ 
+-- 
+Peter
 
-Kind regards
-Uffe
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+
 
 _______________________________________________
 linux-arm-kernel mailing list
