@@ -2,84 +2,87 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A4C11C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 12:46:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 90679C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 12:47:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 288022080D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 12:46:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5CF032080D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 12:47:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pe0xj2QH";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="OXMtqA3D"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 288022080D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rQPE5usW";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="mrdfr0XX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5CF032080D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=80yEIPalw13Lsz5jsK258ooNkr7bW+BJ5SGvAxr1b6U=; b=pe0xj2QHxuiQ+z
-	Qg+RgS+f6qrurFtLaff5iChGKFe4LIKhEZiC5+Ngd6G1MHA759IcnAh95I40nTYVNRgrFVv0r+kwK
-	7o77zC6cSwI+eEduR/qtFfpcfVxiBP0y8AUy+1Dnx0vAf50oq7qPk0P8GmQee9LQTFAGwdEn+FMwb
-	YyEmT/5uOLtDq3veUATqho325sraOMilSaGF2RDFykdOJ6uqdapCGYtPrpzRob1tgFP3tdfsdxTTA
-	K+FzdlWQ70mZ/DAnJQdB0+byRZTBP82yfRC47jxAuV+zBwifv0a+mQ6QbW1OX4xxD6pyswG2w83aV
-	O2xzAUaKiycnm+9NIipg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=cBJ7GWzuQ5gtg9cZQBCB+5HJAae3aO7+Olo1mMGr9eM=; b=rQPE5usWFMXmIn
+	dL0fyAd0B4E2mTG+MRv1UspDrd5OuA6yY8RpOd/NU1dxq632Eu5GEwTlaNEjjW3CLQIEdMRbyiZK8
+	el3pkv7Vkz5Y2HDEZuWgdjG3foZt5z6HWiokFu2RGACpMdUQ2hSX9U9si58gnnT2RwsSMJVs8lzGg
+	wAn/Rn3GDUt94oQUQOxCMe2ICyZNdOMPQKsVFPNWiBITHzyQPsUA9c5Z+Gny7+w5PuMO64vdQZXDI
+	d7X2vjR0cJkkcw9338zRrgolAv6nNT5s5FcHHec3QnaIpzGZieVfpi+nkysp3xRdJGf/GDUGEdO3s
+	g6wdvDfKO+Nl6oNedd/g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZbEX-0003PV-05; Wed, 19 Dec 2018 12:45:53 +0000
+	id 1gZbFi-0004D1-2M; Wed, 19 Dec 2018 12:47:06 +0000
 Received: from fllv0016.ext.ti.com ([198.47.19.142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZbBt-00083u-2v
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 12:43:17 +0000
-Received: from lelv0266.itg.ti.com ([10.180.67.225])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBJCgsUI098529;
- Wed, 19 Dec 2018 06:42:54 -0600
+ id 1gZbBt-000859-OI; Wed, 19 Dec 2018 12:43:21 +0000
+Received: from fllv0035.itg.ti.com ([10.64.41.0])
+ by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBJCgoY8098519;
+ Wed, 19 Dec 2018 06:42:50 -0600
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1545223374;
- bh=eHM305ms/kyJ8xNolT8aiU6XbuWp3EwzvsUreGR0ytM=;
- h=From:To:CC:Subject:Date:In-Reply-To:References;
- b=OXMtqA3DShZcGrfBZkxGH/k0RKJHMNP2gD5G9Vw/gXivBogGDImELbYat3/5SNKQi
- a4OaCiLEvsFFJzCNJic4vTaQXpu7pqHKnwYPghWeu7BWuSMUey0Qcm8X2QliHimRZ6
- 5w5ssocZzC19Fax7b4lFCcxmWQg8IDgdF5VcKsS4=
-Received: from DLEE112.ent.ti.com (dlee112.ent.ti.com [157.170.170.23])
- by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBJCgs9R062459
+ s=ti-com-17Q1; t=1545223370;
+ bh=hOSSW/Fe3UvUR+FrL7a03PALPLMq3eLz4yJsqFMxDoc=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=mrdfr0XXm/f5HMraMzJuJQE7P79uLh/2YtX4lv0Z1jl+3bRWN/Um8PdULyHarDG5E
+ Dy5yIpCcFLM+W9ihzGe48tHudI5EBvL+puXXzJeT3ejyOt2uwujSNpZL6AHg9dEDY/
+ pnBtQuIMXym537Z5o06Z2HnRpbHbZZzYCRqxnKH4=
+Received: from DFLE102.ent.ti.com (dfle102.ent.ti.com [10.64.6.23])
+ by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBJCgowT034704
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Wed, 19 Dec 2018 06:42:54 -0600
-Received: from DLEE102.ent.ti.com (157.170.170.32) by DLEE112.ent.ti.com
- (157.170.170.23) with Microsoft SMTP Server (version=TLS1_2,
+ Wed, 19 Dec 2018 06:42:50 -0600
+Received: from DFLE109.ent.ti.com (10.64.6.30) by DFLE102.ent.ti.com
+ (10.64.6.23) with Microsoft SMTP Server (version=TLS1_2,
  cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Wed, 19
- Dec 2018 06:42:54 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE102.ent.ti.com
- (157.170.170.32) with Microsoft SMTP Server (version=TLS1_0,
+ Dec 2018 06:42:50 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE109.ent.ti.com
+ (10.64.6.30) with Microsoft SMTP Server (version=TLS1_0,
  cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Wed, 19 Dec 2018 06:42:54 -0600
-Received: from a0393678ub.india.ti.com (ileax41-snat.itg.ti.com
- [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBJCgNZs003940;
- Wed, 19 Dec 2018 06:42:52 -0600
-From: Kishon Vijay Abraham I <kishon@ti.com>
-To: Murali Karicheri <m-karicheri2@ti.com>, Lorenzo Pieralisi
- <lorenzo.pieralisi@arm.com>, Gustavo Pimentel
- <gustavo.pimentel@synopsys.com>, Marc Zyngier <marc.zyngier@arm.com>
-Subject: [PATCH 09/10] PCI: dwc: Remove Keystone specific dw_pcie_host_ops
-Date: Wed, 19 Dec 2018 18:12:06 +0530
-Message-ID: <20181219124207.13479-10-kishon@ti.com>
-X-Mailer: git-send-email 2.17.1
-In-Reply-To: <20181219124207.13479-1-kishon@ti.com>
-References: <20181219124207.13479-1-kishon@ti.com>
+ Wed, 19 Dec 2018 06:42:50 -0600
+Received: from [172.24.190.89] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBJCgjlF004104;
+ Wed, 19 Dec 2018 06:42:46 -0600
+Subject: Re: [PATCH v6 0/7] spi: add support for octal mode
+To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>,
+ "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
+ "boris.brezillon@bootlin.com" <boris.brezillon@bootlin.com>,
+ "broonie@kernel.org" <broonie@kernel.org>, "marek.vasut@gmail.com"
+ <marek.vasut@gmail.com>, "linux-spi@vger.kernel.org"
+ <linux-spi@vger.kernel.org>, "devicetree@vger.kernel.org"
+ <devicetree@vger.kernel.org>
+References: <1545214186-16987-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+From: Vignesh R <vigneshr@ti.com>
+Message-ID: <10b25865-b93d-382a-aa4d-b21fbd9c3ba9@ti.com>
+Date: Wed, 19 Dec 2018 18:13:42 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
+In-Reply-To: <1545214186-16987-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+Content-Language: en-US
 X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_044310_046061_60752526 
-X-CRM114-Status: GOOD (  18.92  )
+X-CRM114-CacheID: sfid-20181219_044310_274919_4F636126 
+X-CRM114-Status: GOOD (  18.97  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,128 +94,131 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jingoo Han <jingoohan1@gmail.com>, linux-kernel@vger.kernel.org,
- kishon@ti.com, linux-pci@vger.kernel.org, Bjorn Helgaas <bhelgaas@google.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "robh@kernel.org" <robh@kernel.org>,
+ "tudor.ambarus@microchip.com" <tudor.ambarus@microchip.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "frieder.schrempf@exceet.de" <frieder.schrempf@exceet.de>,
+ "computersforpeace@gmail.com" <computersforpeace@gmail.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Now that Keystone started using it's own msi_irq_chip, remove
-Keystone specific callback function defined in dw_pcie_host_ops.
+Hi,
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- .../pci/controller/dwc/pcie-designware-host.c | 45 ++++++-------------
- drivers/pci/controller/dwc/pcie-designware.h  |  5 ---
- 2 files changed, 14 insertions(+), 36 deletions(-)
+On 19/12/18 3:41 PM, Yogesh Narayan Gaur wrote:
+> Add support for octal mode IO data transfer.
+> Micron flash, mt35xu512aba, supports octal mode data transfer and
+> NXP FlexSPI controller supports 8 data lines for data transfer (Rx/Tx).
+> 
+> Patch series
+> * Add support for octal mode flags and parsing of same in spi driver.
+> * Add parsing logic for spi-mem framework and m25p80.c device file.
+> * Add opcodes for octal I/O commands in spi-nor framework, Read and Write proto for (1-1-8/1-8-8) mode.
+>   Opcodes are added as per octal data IO commands required for mt35xu512aba [1] flash.
+> * Add mode bit required for octal mode in nxp-fspi driver [2].
+> * Define binding property 'spi-rx/tx-bus-width' for LX2160ARDB target [2].
+> 
+> Tested on LX2160ARDB target with nxp-fspi driver, below are
+> Read performance number of 1-1-1 and 1-1-8 read protocol.
+> 
+>  root@lxxx:~# cat /proc/mtd
+>  dev:    size   erasesize  name
+>  mtd0: 04000000 00001000 "spi0.0"
+>  mtd1: 04000000 00001000 "spi0.1"
+>  root@lxxx:~# time mtd_debug read /dev/mtd0 0x0 0x1000000 0read
+>  Copied 16777216 bytes from address 0x00000000 in flash to 0read
+> 
+>  real    0m2.792s
+>  user    0m0.000s
+>  sys     0m2.790s
+>  root@lxxx:~# time mtd_debug read /dev/mtd1 0x0 0x1000000 0read
+>  Copied 16777216 bytes from address 0x00000000 in flash to 0read
+> 
+>  real    0m0.441s
+>  user    0m0.000s
+>  sys     0m0.440s
+>  root@ls1012ardb:~#
+> 
+> 
+>  Flash device MTD0 configured in 1-1-1 protocol.
+>  Flash device MTD1 configured in 1-1-8 protocol.
+> 
+> [1] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=70384&state=*
+> [2] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=76402
+> 
+> Yogesh Gaur (7):
+>   spi: add support for octal mode I/O data transfer
+>   spi: spi-mem: add support for octal mode I/O data transfer
 
-diff --git a/drivers/pci/controller/dwc/pcie-designware-host.c b/drivers/pci/controller/dwc/pcie-designware-host.c
-index db21bd11f153..dbc94f3be3d5 100644
---- a/drivers/pci/controller/dwc/pcie-designware-host.c
-+++ b/drivers/pci/controller/dwc/pcie-designware-host.c
-@@ -126,18 +126,12 @@ static void dw_pci_setup_msi_msg(struct irq_data *data, struct msi_msg *msg)
- 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
- 	u64 msi_target;
- 
--	if (pp->ops->get_msi_addr)
--		msi_target = pp->ops->get_msi_addr(pp);
--	else
--		msi_target = (u64)pp->msi_data;
-+	msi_target = (u64)pp->msi_data;
- 
- 	msg->address_lo = lower_32_bits(msi_target);
- 	msg->address_hi = upper_32_bits(msi_target);
- 
--	if (pp->ops->get_msi_data)
--		msg->data = pp->ops->get_msi_data(pp, data->hwirq);
--	else
--		msg->data = data->hwirq;
-+	msg->data = data->hwirq;
- 
- 	dev_dbg(pci->dev, "msi#%d address_hi %#x address_lo %#x\n",
- 		(int)data->hwirq, msg->address_hi, msg->address_lo);
-@@ -157,17 +151,13 @@ static void dw_pci_bottom_mask(struct irq_data *data)
- 
- 	raw_spin_lock_irqsave(&pp->lock, flags);
- 
--	if (pp->ops->msi_clear_irq) {
--		pp->ops->msi_clear_irq(pp, data->hwirq);
--	} else {
--		ctrl = data->hwirq / MAX_MSI_IRQS_PER_CTRL;
--		res = ctrl * MSI_REG_CTRL_BLOCK_SIZE;
--		bit = data->hwirq % MAX_MSI_IRQS_PER_CTRL;
-+	ctrl = data->hwirq / MAX_MSI_IRQS_PER_CTRL;
-+	res = ctrl * MSI_REG_CTRL_BLOCK_SIZE;
-+	bit = data->hwirq % MAX_MSI_IRQS_PER_CTRL;
- 
--		pp->irq_status[ctrl] &= ~(1 << bit);
--		dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_MASK + res, 4,
--				    ~pp->irq_status[ctrl]);
--	}
-+	pp->irq_status[ctrl] &= ~(1 << bit);
-+	dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_MASK + res, 4,
-+			    ~pp->irq_status[ctrl]);
- 
- 	raw_spin_unlock_irqrestore(&pp->lock, flags);
- }
-@@ -180,17 +170,13 @@ static void dw_pci_bottom_unmask(struct irq_data *data)
- 
- 	raw_spin_lock_irqsave(&pp->lock, flags);
- 
--	if (pp->ops->msi_set_irq) {
--		pp->ops->msi_set_irq(pp, data->hwirq);
--	} else {
--		ctrl = data->hwirq / MAX_MSI_IRQS_PER_CTRL;
--		res = ctrl * MSI_REG_CTRL_BLOCK_SIZE;
--		bit = data->hwirq % MAX_MSI_IRQS_PER_CTRL;
-+	ctrl = data->hwirq / MAX_MSI_IRQS_PER_CTRL;
-+	res = ctrl * MSI_REG_CTRL_BLOCK_SIZE;
-+	bit = data->hwirq % MAX_MSI_IRQS_PER_CTRL;
- 
--		pp->irq_status[ctrl] |= 1 << bit;
--		dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_MASK + res, 4,
--				    ~pp->irq_status[ctrl]);
--	}
-+	pp->irq_status[ctrl] |= 1 << bit;
-+	dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_MASK + res, 4,
-+			    ~pp->irq_status[ctrl]);
- 
- 	raw_spin_unlock_irqrestore(&pp->lock, flags);
- }
-@@ -209,9 +195,6 @@ static void dw_pci_bottom_ack(struct irq_data *d)
- 
- 	dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_STATUS + res, 4, 1 << bit);
- 
--	if (pp->ops->msi_irq_ack)
--		pp->ops->msi_irq_ack(d->hwirq, pp);
--
- 	raw_spin_unlock_irqrestore(&pp->lock, flags);
- }
- 
-diff --git a/drivers/pci/controller/dwc/pcie-designware.h b/drivers/pci/controller/dwc/pcie-designware.h
-index 0873ee4084aa..53cb6ab405b5 100644
---- a/drivers/pci/controller/dwc/pcie-designware.h
-+++ b/drivers/pci/controller/dwc/pcie-designware.h
-@@ -134,14 +134,9 @@ struct dw_pcie_host_ops {
- 	int (*wr_other_conf)(struct pcie_port *pp, struct pci_bus *bus,
- 			     unsigned int devfn, int where, int size, u32 val);
- 	int (*host_init)(struct pcie_port *pp);
--	void (*msi_set_irq)(struct pcie_port *pp, int irq);
--	void (*msi_clear_irq)(struct pcie_port *pp, int irq);
--	phys_addr_t (*get_msi_addr)(struct pcie_port *pp);
--	u32 (*get_msi_data)(struct pcie_port *pp, int pos);
- 	void (*scan_bus)(struct pcie_port *pp);
- 	void (*set_num_vectors)(struct pcie_port *pp);
- 	int (*msi_host_init)(struct pcie_port *pp);
--	void (*msi_irq_ack)(int irq, struct pcie_port *pp);
- };
- 
- struct pcie_port {
+
+These two patches are already merged and is now part of linux-next[1].
+Its preferred to send patches based on top of latest linux-next so as to
+avoid resending patches that have already been picked up by the maintainer.
+
+[1]
+commit 6b03061f882de49b83ccf44beb3a12c920a2da1b
+Author: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+Date:   Mon Dec 3 08:39:06 2018 +0000
+
+    spi: add support for octal mode I/O data transfer
+
+commit b12a084c8729ef423089bb9a5a143eed39cd94e7
+Author: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+Date:   Mon Dec 3 08:39:12 2018 +0000
+
+    spi: spi-mem: add support for octal mode I/O data transfer
+
+
+Regards
+Vignesh
+
+>   mtd: spi-nor: add opcodes for octal Read/Write commands
+>   mtd: spi-nor: add octal read flag for flash mt35xu512aba
+>   mtd: m25p80: add support of octal mode I/O transfer
+>   spi: nxp-fspi: add octal mode flag bit for octal support
+>   arm64: dts: lx2160a: update fspi node
+> 
+> Changes for v6:
+> - Correct S-o-b tag with full author name as 'Yogesh Narayan Gaur'.
+> - Rebase on top of v4.20-rc5.
+> Changes for v5:
+> - Modified string 'octo' as 'octal' in all patches.
+> Changes for v4:
+> - Rebase on top of v4.20-rc2.
+> - Modify octo entries enum value in spi.h.
+> Changes for v3:
+> - Add octo mode support in spi_setup().
+> - Rename all patches with 'octal' string modified as 'octo'.
+> Changes for v2:
+> - Incorporated review comments of Boris and Vignesh.
+> 
+> Yogesh Gaur (7):
+>   spi: add support for octal mode I/O data transfer
+>   spi: spi-mem: add support for octal mode I/O data transfer
+>   mtd: spi-nor: add opcodes for octal Read/Write commands
+>   mtd: spi-nor: add octal read flag for flash mt35xu512aba
+>   mtd: m25p80: add support of octal mode I/O transfer
+>   spi: nxp-fspi: add octal mode flag bit for octal support
+>   arm64: dts: lx2160a: update fspi node
+> 
+>  arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts |  4 ++++
+>  drivers/mtd/devices/m25p80.c                      |  9 ++++++++-
+>  drivers/mtd/spi-nor/spi-nor.c                     | 19 ++++++++++++++++---
+>  drivers/spi/spi-mem.c                             |  9 ++++++++-
+>  drivers/spi/spi-nxp-fspi.c                        |  4 ++--
+>  drivers/spi/spi.c                                 | 12 ++++++++++--
+>  include/linux/mtd/spi-nor.h                       | 16 ++++++++++++----
+>  include/linux/spi/spi.h                           |  4 +++-
+>  8 files changed, 63 insertions(+), 14 deletions(-)
+> 
+
 -- 
-2.17.1
-
+Regards
+Vignesh
 
 _______________________________________________
 linux-arm-kernel mailing list
