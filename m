@@ -2,23 +2,23 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 10234C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 11:47:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2334DC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 11:48:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D14A3217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 11:47:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E5B7E217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 11:48:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IGNGCvP1";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="PMD6pcGP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D14A3217D9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="L4UQ+TMN";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="JecUyX7C"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E5B7E217D9
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,64 +26,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Ckb894OYQo+bzSY7ajpj285f1ekEw/9nw+kOM2aGhMM=; b=IGNGCvP1UY/Yek
-	bdH/Kw1n8f2GSeb7N1TS/vMtiprT5Wc0ZZo3KP+WvR8b+1zkorAZxabkfQXmzWSTedW7n4X2EL70Y
-	lHUjGn60j3Hnz9bCrX9MbpJeWOg0SzHa6qM5Z+k/jrw2AV9kwg0jhYiNJa1n6OXQBYpu/db+A/aXa
-	fPLTOlOTOeh/P2B2stjv/1mFvHxA9DrdaKSUHnhq2SV6PBrYUq2eEGxz61mGx8NHS2t409CMqwqS7
-	eYnW6w4GhZcG9GO1YGTR6zgymfudVPccmQT8vHxvc/PlQEVADv6T+Q7B9GQFlUkgMg/YV8m+ON5T6
-	2nG0O2UUtd7Rc0j+nyIA==;
+	List-Owner; bh=ic2THcETsSvi+OH+7EUTF5rJGH8lgTiHC+XOcNHkl60=; b=L4UQ+TMN5O8bbI
+	h0h2TunhoP/lAegnvDkQXOG3nH5k/8tfs8vxlSvN+9ZXSpdatGUgS9VDtBHtyF6e3kk6acF/bVpK9
+	rUHhgEmSbo/SlK9SLV8hCbdWBfxoZigTTGvmTPbZwVdUUuP0iQ98P+LMRQra/Vr7IYcybHlYY5qLI
+	T/Yz5VuKSkG7MZ7MF19PmWekWXpjt3vKZ+B9K9tl9vriTVoutIw2y+i3PY4+0HjXVqR32Dwu67dPA
+	mwD74aVWOeoVLhjMCtlDdlh9vNxCDaGV+JFNtvmsDx/avVDF7NcaAlZzSK4ge7/rs9PaXohIcwhXO
+	yCNDvfQ98D1PSPLN0Qtg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZaKD-0002T6-9w; Wed, 19 Dec 2018 11:47:41 +0000
-Received: from mail-lf1-x141.google.com ([2a00:1450:4864:20::141])
+	id 1gZaLD-0002xQ-PF; Wed, 19 Dec 2018 11:48:43 +0000
+Received: from mail-ua1-x942.google.com ([2607:f8b0:4864:20::942])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZaJ8-0001TC-KX; Wed, 19 Dec 2018 11:47:01 +0000
-Received: by mail-lf1-x141.google.com with SMTP id u18so14793096lff.10;
- Wed, 19 Dec 2018 03:46:24 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ id 1gZaLA-0002wo-GB
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 11:48:42 +0000
+Received: by mail-ua1-x942.google.com with SMTP id d2so6875596ual.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 19 Dec 2018 03:48:29 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=MmCbkEW++YuRmQ+98HC/KWmVUv+08Nqy0oV8otnoXgY=;
- b=PMD6pcGPvYQfVlimSaQMVPyVS9d+bmeK2YP82iGQ6Q9WEC/vIZUlsdB7Zb5aO+youk
- hPWS/DlKkzVX4wy2WWPon5YsyTgt/SgdBOkmw7yJUbvDihm/AaGuxwH3ZwQuCvGdTdsa
- x1vVWzQRrQTj5uJonK8WHSz3lO/mogdkA2SjPHvFQQPjdgt55QdogVXp85JddezTvb7T
- M7OIkwdOUVO0LQhwng/AiRvMZ4F5RcbbuuRMc2FZic6HkzaVrpVaJCjOoQ9nctatB7Sa
- gK/ZeWqB25pTXvn/9P2rkwkeHnTpemgiz0fR1akMY/aE+kUlql7ui8WRUIxFgF/6Md2B
- JTfw==
+ :cc; bh=I7SDTVKItAO5FJGbZNOH6yIuLijvFxA7I0ahvnghE+w=;
+ b=JecUyX7C/oU0T3HlZiJMGON9FAvg1DhrdnqecXiFE09+x0yoErjRuuuL76SzecvR62
+ TbptUyzzvMB42kDRGWOukzihmEwxSWddkYWT5F6c3wANC1rYiYcXJVVZd2cxQppYXFS6
+ 9TGCu0nkGqdGw4X6A928dE/1zsG6vr3On3K8U=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=MmCbkEW++YuRmQ+98HC/KWmVUv+08Nqy0oV8otnoXgY=;
- b=NrZQWwttki7n45zPgDlqNFLYVZZXpqMDOtXyLYWMvgd083EWxTPOTtpK26Su1gQ3H3
- DJSXeKng5OjnhopaC+JYNOnW8LQD5TGR19OyvMT44RbeNhSA+TUQoFvQst7brJzxcIRe
- wxgudjh5hlU7Zg7o4kM7BvFZIJ4RQtAYIWdqTymFcotBIjsKn1FhHFL3cD/HyEmxVqvA
- PsrKypmkE+BCi7P0L/HjI94vG+qmlrARqBhJ3BOCZinUKO+Qj7xPInJDQvnLV3bRfyWd
- vxh8Era86eLL/rG1zSm1vec+A/7uo1chVxLr5vGYYStCLGPkOdujg7yaxmYhluW0h1yS
- 0Rrw==
-X-Gm-Message-State: AA+aEWa5fpFzEDS/I6yep0/9+3hj/MSXMTc79voD8CT0P8ZJbD/QL/kZ
- 8b3T0dkCYK4KWwfiNBEfAemco9zv0+OLqwwUs30=
-X-Google-Smtp-Source: AFSGD/WyJwigOdDbFFtb+6tDtKbqwFdOghf6Jj8C4veAjl5BzlO/G+VG+2Icas71vij5VrzGrNyxFLhq381+E0t8TJU=
-X-Received: by 2002:a19:2906:: with SMTP id p6mr4141635lfp.17.1545219982281;
- Wed, 19 Dec 2018 03:46:22 -0800 (PST)
+ bh=I7SDTVKItAO5FJGbZNOH6yIuLijvFxA7I0ahvnghE+w=;
+ b=XfMJfsxXrV6sHCM20O8+v3E756Gt7PfLh4O7BnDkaUJ/gn9ljRrI05RQ74aMnOLLen
+ fx0g0gHOfQzu8slDiqAeuxev65ATcdSSO74pwEchJp7GDIVMvzAQep8R8lCICrhQhRS2
+ Ar2gMn2PfhsGwD5+Zv0enxvUQci61BcI67/GXT+NanZDaBIjH+pqmXPULmd5SRCotYGf
+ +xElVfKEH9sGpEDnrmF+c6wHnzlc+y5eLq0/0YEpd0lO18qzZ6JPTog5ze5j2XQE2Ov/
+ y03Ix58jg3GRXep9hghpIUYqVKiXxlzb9YWAG/76d1fsAAfvOjKHgxEPOSQcJ7X7yO3W
+ owPQ==
+X-Gm-Message-State: AA+aEWbWaBx8efuJ5up072H7COJTFFnW/60KcyjF2k/8utu0H2F1YqGj
+ IuFp1GZ5tOVSU30onaPHUe7Ntv5fMlZpZq7eh6SR1A==
+X-Google-Smtp-Source: AFSGD/W5qQKUFuz8lfieLd7UcGi+i5QGT3GjMHpGMoLMSCtGNgd30SqVi0LduTzFKo0oRHlKEqithnHEjDpiqLrnzRM=
+X-Received: by 2002:ab0:2b0b:: with SMTP id e11mr3362455uar.77.1545220108824; 
+ Wed, 19 Dec 2018 03:48:28 -0800 (PST)
 MIME-Version: 1.0
-References: <20181217202334.GA11758@jordon-HP-15-Notebook-PC>
- <20181218095709.GJ26090@n2100.armlinux.org.uk>
- <CAFqt6zaVU-Fme6fErieBfBKwAm9xHUa7cXTOfqzwUJR__0JysQ@mail.gmail.com>
- <20181218123318.GN26090@n2100.armlinux.org.uk>
- <CAFqt6zbqaS-pFETyjRR2-1V57MiJuX65xoMjgkr-DjUnrJYzSg@mail.gmail.com>
- <20181218130146.GO26090@n2100.armlinux.org.uk>
- <CAFqt6zYnn76OdprSvA2Bj0v=xQqtJ6xJse6+iB+-=u3WsEv3pA@mail.gmail.com>
- <20181219093230.GS26090@n2100.armlinux.org.uk>
-In-Reply-To: <20181219093230.GS26090@n2100.armlinux.org.uk>
-From: Souptick Joarder <jrdr.linux@gmail.com>
-Date: Wed, 19 Dec 2018 17:16:09 +0530
-Message-ID: <CAFqt6zbLrw5HENBiLXxPFqo7kk8uBJd3z-+C9Fnkej7u3W2i1w@mail.gmail.com>
-Subject: Re: [PATCH v4 4/9] drm/rockchip/rockchip_drm_gem.c: Convert to use
- vm_insert_range
-To: Russell King - ARM Linux <linux@armlinux.org.uk>
+References: <20181129174700.16585-1-ulf.hansson@linaro.org>
+ <20181129174700.16585-25-ulf.hansson@linaro.org>
+ <20181219111744.GA23393@e107981-ln.cambridge.arm.com>
+In-Reply-To: <20181219111744.GA23393@e107981-ln.cambridge.arm.com>
+From: Ulf Hansson <ulf.hansson@linaro.org>
+Date: Wed, 19 Dec 2018 12:47:53 +0100
+Message-ID: <CAPDyKFoFn=3VzYLriROYEgCT=gbrsjbx8Fc1dktTJ1BdCBxniw@mail.gmail.com>
+Subject: Re: [PATCH v10 24/27] drivers: firmware: psci: Support CPU hotplug
+ for the hierarchical model
+To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_034635_155270_967D7AA5 
-X-CRM114-Status: GOOD (  35.52  )
+X-CRM114-CacheID: sfid-20181219_034840_534424_896659FF 
+X-CRM114-Status: GOOD (  30.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,180 +89,133 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Michal Hocko <mhocko@suse.com>, Heiko Stuebner <heiko@sntech.de>,
- linux-rockchip@lists.infradead.org, airlied@linux.ie, hjc@rock-chips.com,
- Matthew Wilcox <willy@infradead.org>, linux-kernel@vger.kernel.org,
- Linux-MM <linux-mm@kvack.org>, dri-devel@lists.freedesktop.org,
- Andrew Morton <akpm@linux-foundation.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Vincent Guittot <vincent.guittot@linaro.org>,
+ Geert Uytterhoeven <geert+renesas@glider.be>,
+ Linux PM <linux-pm@vger.kernel.org>, Stephen Boyd <sboyd@kernel.org>,
+ Viresh Kumar <viresh.kumar@linaro.org>,
+ linux-arm-msm <linux-arm-msm@vger.kernel.org>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ "Rafael J . Wysocki" <rjw@rjwysocki.net>, Kevin Hilman <khilman@kernel.org>,
+ Lina Iyer <ilina@codeaurora.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Tony Lindgren <tony@atomide.com>, Sudeep Holla <sudeep.holla@arm.com>,
+ "Raju P . L . S . S . S . N" <rplsssn@codeaurora.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 19, 2018 at 3:02 PM Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
+On Wed, 19 Dec 2018 at 12:17, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
 >
-> On Wed, Dec 19, 2018 at 09:01:09AM +0530, Souptick Joarder wrote:
-> > On Tue, Dec 18, 2018 at 6:31 PM Russell King - ARM Linux
-> > <linux@armlinux.org.uk> wrote:
-> > >
-> > > On Tue, Dec 18, 2018 at 06:24:29PM +0530, Souptick Joarder wrote:
-> > > > On Tue, Dec 18, 2018 at 6:03 PM Russell King - ARM Linux
-> > > > <linux@armlinux.org.uk> wrote:
-> > > > >
-> > > > > On Tue, Dec 18, 2018 at 05:36:04PM +0530, Souptick Joarder wrote:
-> > > > > > On Tue, Dec 18, 2018 at 3:27 PM Russell King - ARM Linux
-> > > > > > <linux@armlinux.org.uk> wrote:
-> > > > > > > This looks like a change in behaviour.
-> > > > > > >
-> > > > > > > If user_count is zero, and offset is zero, then we pass into
-> > > > > > > vm_insert_range() a page_count of zero, and vm_insert_range() does
-> > > > > > > nothing and returns zero.
-> > > > > > >
-> > > > > > > However, as we can see from the above code, the original behaviour
-> > > > > > > was to return -ENXIO in that case.
-> > > > > >
-> > > > > > I think these checks are not necessary. I am not sure if we get into mmap
-> > > > > > handlers of driver with user_count = 0.
-> > > > >
-> > > > > I'm not sure either, I'm just pointing out the change of behaviour.
-> > > >
-> > > > Ok. I think feedback from Heiko might be helpful here :)
-> > > >
-> > > > >
-> > > > > > > The other thing that I'm wondering is that if (eg) count is 8 (the
-> > > > > > > object is 8 pages), offset is 2, and the user requests mapping 6
-> > > > > > > pages (user_count = 6), then we call vm_insert_range() with a
-> > > > > > > pages of rk_obj->pages + 2, and a pages_count of 6 - 2 = 4. So we
-> > > > > > > end up inserting four pages.
-> > > > > >
-> > > > > > Considering the scenario, user_count will remain 8 (user_count =
-> > > > > > vma_pages(vma) ). ? No ?
-> > > > > > Then we call vm_insert_range() with a pages of rk_obj->pages + 2, and
-> > > > > > a pages_count
-> > > > > > of 8 - 2 = 6. So we end up inserting 6 pages.
-> > > > > >
-> > > > > > Please correct me if I am wrong.
-> > > > >
-> > > > > vma_pages(vma) is the number of pages that the user requested, it is
-> > > > > the difference between vma->vm_end and vma->vm_start in pages.  As I
-> > > > > said above, "the user requests mapping 6 pages", so vma_pages() will
-> > > > > be 6, and so user_count will also be 6.  You are passing
-> > > > > user_count - offset into vm_insert_range(), which will be 6 - 2 = 4
-> > > > > in my example.  This is two pages short of what the user requested.
-> > > > >
-> > > >
-> > > > So, this should be the correct behavior.
-> > > >
-> > > >                  return vm_insert_range(vma, vma->vm_start,
-> > > > rk_obj->pages + offset,
-> > > >                                                           user_count);
-> > >
-> > > ... and by doing so, you're introducing another instance of the same
-> > > bug I pointed out in patch 2.
+> On Thu, Nov 29, 2018 at 06:46:57PM +0100, Ulf Hansson wrote:
+> > When the hierarchical CPU topology is used and when a CPU has been put
+> > offline (hotplug), that same CPU prevents its PM domain and thus also
+> > potential master PM domains, from being powered off. This is because genpd
+> > observes the CPU's struct device to remain being active from a runtime PM
+> > point of view.
 > >
-> > Sorry but didn't get it ? How it will be similar to the bug pointed
-> > out in patch 2 ?
+> > To deal with this, let's decrease the runtime PM usage count by calling
+> > pm_runtime_put_sync_suspend() of the CPU's struct device when putting it
+> > offline. Consequentially, we must then increase the runtime PM usage for
+> > the CPU, while putting it online again.
+> >
+> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> > ---
+> >
+> > Changes in v10:
+> >       - Make it work when the hierarchical CPU topology is used, which may be
+> >         used both for OSI and PC mode.
+> >       - Rework the code to prevent "BUG: sleeping function called from
+> >         invalid context".
+> > ---
+> >  drivers/firmware/psci/psci.c | 20 ++++++++++++++++++++
+> >  1 file changed, 20 insertions(+)
+> >
+> > diff --git a/drivers/firmware/psci/psci.c b/drivers/firmware/psci/psci.c
+> > index b03bccce0a5d..f62c4963eb62 100644
+> > --- a/drivers/firmware/psci/psci.c
+> > +++ b/drivers/firmware/psci/psci.c
+> > @@ -15,6 +15,7 @@
+> >
+> >  #include <linux/acpi.h>
+> >  #include <linux/arm-smccc.h>
+> > +#include <linux/cpu.h>
+> >  #include <linux/cpuidle.h>
+> >  #include <linux/errno.h>
+> >  #include <linux/linkage.h>
+> > @@ -199,9 +200,20 @@ static int psci_cpu_suspend(u32 state, unsigned long entry_point)
+> >
+> >  static int psci_cpu_off(u32 state)
+> >  {
+> > +     struct device *dev;
+> >       int err;
+> >       u32 fn;
+> >
+> > +     /*
+> > +      * When the hierarchical CPU topology is used, decrease the runtime PM
+> > +      * usage count for the current CPU, as to allow other parts in the
+> > +      * topology to enter low power states.
+> > +      */
+> > +     if (psci_dt_topology) {
+> > +             dev = get_cpu_device(smp_processor_id());
+> > +             pm_runtime_put_sync_suspend(dev);
+> > +     }
+> > +
+> >       fn = psci_function_id[PSCI_FN_CPU_OFF];
+> >       err = invoke_psci_fn(fn, state, 0, 0);
+> >       return psci_to_linux_errno(err);
+> > @@ -209,6 +221,7 @@ static int psci_cpu_off(u32 state)
+> >
+> >  static int psci_cpu_on(unsigned long cpuid, unsigned long entry_point)
+> >  {
+> > +     struct device *dev;
+> >       int err;
+> >       u32 fn;
+> >
+> > @@ -216,6 +229,13 @@ static int psci_cpu_on(unsigned long cpuid, unsigned long entry_point)
+> >       err = invoke_psci_fn(fn, cpuid, entry_point, 0);
+> >       /* Clear the domain state to start fresh. */
+> >       psci_set_domain_state(0);
+> > +
+> > +     /* Increase runtime PM usage count if the hierarchical CPU toplogy. */
+> > +     if (!err && psci_dt_topology) {
+> > +             dev = get_cpu_device(cpuid);
 >
+> I do not like adding this code in the cpu_{on/off} method themselves, I will
+> have a look at the patchset as whole to see how we can restructure it.
 
-Thanks for the detail explanation.
+Any suggestions are welcome, of course. This was the best and most
+simple option I could come up with.
 
-> Towards the top of this function, you have:
->
->         unsigned long user_count = vma_pages(vma);
->
-> So what you are proposing does:
->
->         return vm_insert_range(vma, vma->vm_start, rk_obj->pages + offset,
->                                vma_pages(vma));
->
-> Now if we look inside vm_insert_range():
->
-> +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
-> +                       struct page **pages, unsigned long page_count)
-> +{
-> +       unsigned long uaddr = addr;
-> +       int ret = 0, i;
-> +
-> +       if (page_count > vma_pages(vma))
-> +               return -ENXIO;
-> +
-> +       for (i = 0; i < page_count; i++) {
-> +               ret = vm_insert_page(vma, uaddr, pages[i]);
-> +               if (ret < 0)
-> +                       return ret;
-> +               uaddr += PAGE_SIZE;
-> +       }
->
-> So, page_count _is_ vma_pages(vma).  So this code does these operations:
->
->         if (vma_pages(vma) > vma_pages(vma))
->                 return -ENXIO;
->
-> This will always be false.  I've already stated in my reply to patch 2
-> in paragraph 3 about the uselessness of this test.
-
-Agree, this will be always false for this particular/ similar instances.
-But there are places [3/9], [6/9], [9/9] where page_count is already set
-and it might be good to just cross check page_count > vma_pages(vma).
-
-This was discussed during review of v3 [1/9].
-https://patchwork.kernel.org/patch/10716601/
-
-We can discuss again and if not needed it can be removed in v5.
+Another option, could be to simply to remove the runtime PM deployment
+from psci_cpu_off|on() altogether and just live with that limitation
+for now. That works for me as well.
 
 >
->         for (i = 0; i < vma_pages(vma); i++) {
->                 ret = vm_insert_page(vma, uaddr, pages[i]);
->
-> So the loop will iterate over the number of pages that the user requested.
->
-> Now, taking another example.  The object is again 8 pages long, so
-> indexes 0 through 7 in its page array are valid.  The user requests
-> 8 pages at offset 2 into the object.  Also as already stated in
-> paragraph 3 of my reply to patch 2.
->
-> vma_pages(vma) is 8.  offset = 2.
->
-> So we end up _inside_ vm_insert_range() with:
->
->         if (8 > 8)
->                 return -ENXIO;
->
-> As stated, always false.
->
->         for (i = 0; i < 8; i++) {
->                 ret = vm_insert_page(vma, vaddr, rk_obj->pages[2 + i]);
->
-> Which means we iterate over rk_obj->pages indicies from 2 through 9
-> inclusive.
->
-> Since only 0 through 7 are valid, we have walked off the end of the
-> array, and attempted to map an invalid struct page pointer - we could
-> be lucky, and it could point at some struct page (potentially causing
-> us to map some sensitive page - maybe containing your bank details or
-> root password... Or it could oops the kernel.
+> More to the point, using cpuid as a logical cpu id is wrong, it is a
+> physical id that you should convert to a logical id through
+> get_logical_index().
 
-Consider the 2nd example.
-The object is again 8 pages long, so indexes 0 through 7 in
-its page array are valid.  The user requests 8 pages at offset 2
-into the object.
+Oh, didn't know that, thanks for pointing that out!
 
-The original code look like -
+>
+> Lorenzo
+>
+> > +             pm_runtime_get_sync(dev);
+> > +     }
+> > +
+> >       return psci_to_linux_errno(err);
+> >  }
+> >
+> > --
+> > 2.17.1
+> >
 
-             unsigned long user_count = vma_pages(vma); // 8
-             unsigned long end = user_count + offset // 8 + 2 = 10
-              ...
-              for (i = offset (2) ; i < end ( 10) ; i++) {
-                  ret = vm_insert_page(vma, uaddr, rk_obj->pages[i]);
-                  if (ret)
-                     return ret;
-                  uaddr += PAGE_SIZE;
-              }
-
-we iterate over rk_obj->pages indices from 2 through 9.
-Does it indicates the actual code have a bug when *offset != 0*.
+Kind regards
+Uffe
 
 _______________________________________________
 linux-arm-kernel mailing list
