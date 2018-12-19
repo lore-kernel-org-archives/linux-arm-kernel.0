@@ -2,64 +2,125 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 68314C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 19:08:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 06CAFC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 19:34:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 38A1A2080D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 19:08:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B748621841
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 19:34:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OOkqT38d";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=mail.ru header.i=@mail.ru header.b="X+sgDiP2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 38A1A2080D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=mail.ru
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cVUuhB8j"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B748621841
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=2/fGWTnWP7rzKw8JrkbLFKx95hX6vpxmGO1ralgKjoE=; b=OOk
-	qT38daD46kAKAexHpcu46q+mvPFG009TTm952g9ETA5EIlz6oyeSY30pS+vWe/KN03QMB81HUsvfS
-	8M8P93JVlGlrrmTwZaPgvF82tVx1bgh6lTx9toPX9ayO3VeX9LYU0OsWQ2/vJ/rBMiWt8rb0PcXEO
-	XDIwBztDmvc44NgG4p6IILSv6eD1W5LhDVd0QwPntRZWIldRKj30gIv2OJdjLLVLm7ZvSvzqp9JLB
-	DAokwx0MHTM1jWAMUwZ+BxRcPOSGVt+ekZ1u5j6vZFPQRdWvWDhQr2szGl7mDfT4YPBv+QzBoLqrn
-	aevmn7Ml4Hk5Kx8WdIWQ4csS93OPqZA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=PqMqXr8+RO/87mn0mGpVMBfz8Lw4DanywLQSLYPdAVY=; b=cVUuhB8jrIXDaP
+	qmVWh5HgQVNb09Etwvwv2WR1eOUGul2hk2/MzdftJ4P5A0aiWJ9e8u0lO0rjb9zQQGO9GD5me3nIV
+	R/lRrkwcaomsD0dTTJstIWz4VEzKOKwXdJ/Rz2scgUghM0NW3NqiZWT6XqULMBF3q+G9Thjux4i69
+	+pPpdaQjPSfCfWZqMWqXY2DYQoyI7xDJlE4tI1Ur29/OnM1F3D4nXh/zzFL7WC3hm3G4IRetvizjP
+	OGCT0mUrBmAeQpbDSmJzvCdfioFZs7zDYX9NiFPTttRXFSnzTwsuDvr9O8AlePmGmsWuNt2KUnrtm
+	xqxvbO9mTdFHfQ/YNLEw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZhCH-0003zs-IC; Wed, 19 Dec 2018 19:07:57 +0000
-Received: from smtp62.i.mail.ru ([217.69.128.42])
+	id 1gZhcL-0004sp-6K; Wed, 19 Dec 2018 19:34:53 +0000
+Received: from mx1.redhat.com ([209.132.183.28])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZhCD-0003zT-LD
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 19:07:55 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed; d=mail.ru;
- s=mail2; h=Message-Id:Date:Subject:Cc:To:From;
- bh=ISdM1HPJP9vUMZD+pcNKl9XxZWf7FRH+pqB7lTuffZw=; 
- b=X+sgDiP2kV/z9Nie39k+XSqi/fjpeGG9MH1W8pufASRzDuL2JBuOoPfgC9Uh7LJcPzYujB5Kr1EhHNmoxJIU6QSuGY7apqvzGds5j4dOT5M3PFYns2bpKBqYLcB/TtxoDe6bxOCa5YipmCq2hQFuHAIAZOhOqAYalGUGaHCyfcQ=;
-Received: by smtp62.i.mail.ru with esmtpa (envelope-from <shc_work@mail.ru>)
- id 1gZhBy-0003Ii-FS; Wed, 19 Dec 2018 22:07:38 +0300
-From: Alexander Shiyan <shc_work@mail.ru>
-To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH] ARM: dts: imx51: Add default bus-width property for esdhc1
-Date: Wed, 19 Dec 2018 22:07:34 +0300
-Message-Id: <20181219190734.23331-1-shc_work@mail.ru>
-X-Mailer: git-send-email 2.10.2
-Authentication-Results: smtp62.i.mail.ru; auth=pass smtp.auth=shc_work@mail.ru
- smtp.mailfrom=shc_work@mail.ru
-X-77F55803: BBE463BEF7A60BD05A78504BD2AC2941AC9F5C0DA9FA9AD2CA1AFAF90CF64ECD5E2877AFFD012BC1FCE52281FDD2ED3E
-X-7FA49CB5: 0D63561A33F958A52B1B1878898F5B1701FF91AAFED694226F7EF5F8CC530E2F8941B15DA834481FA18204E546F3947C51C368AE3DEE0FB9F6B57BC7E64490618DEB871D839B7333395957E7521B51C2545D4CF71C94A83E9FA2833FD35BB23D27C277FBC8AE2E8BDD7F4BCB486E2545A471835C12D1D977C4224003CC8364767815B9869FA544D8D32BA5DBAC0009BE9E8FC8737B5C224999B836357A5F2ED63AA81AA40904B5D9CF19DD082D7633A0E7DDDDC251EA7DABD81D268191BDAD3D78DA827A17800CE769E77FCA7B33833FCD04E86FAF290E2D40A5AABA2AD3711975ECD9A6C639B01B78DA827A17800CE71DCCDD4014BAD17D02552C6A286A30D575ECD9A6C639B01B4E70A05D1297E1BBC6867C52282FAC85D9B7C4F32B44FF57285124B2A10EEC6C00306258E7E6ABB4E4A6367B16DE6309
-X-Mailru-Sender: 139A7956A63CACCF2A18077BC60D2445FD9E314665D9B43E46E33EE1769C0EE03120E6DF4C9996C96B3B2BD4812BFD4DC77752E0C033A69E93554C27080790AB3B25A7FBAAF806F0AE208404248635DF
-X-Mras: OK
+ id 1gZhcH-0004gE-JA
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 19:34:51 +0000
+Received: from smtp.corp.redhat.com (int-mx06.intmail.prod.int.phx2.redhat.com
+ [10.5.11.16])
+ (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
+ (No client certificate requested)
+ by mx1.redhat.com (Postfix) with ESMTPS id 2714E2BE87;
+ Wed, 19 Dec 2018 19:34:37 +0000 (UTC)
+Received: from [10.36.112.16] (ovpn-112-16.ams2.redhat.com [10.36.112.16])
+ by smtp.corp.redhat.com (Postfix) with ESMTPS id 3F4B51802C;
+ Wed, 19 Dec 2018 19:34:29 +0000 (UTC)
+Subject: Re: [GIT PULL] KVM/arm updates for 4.21
+To: Marc Zyngier <marc.zyngier@arm.com>, =?UTF-8?B?UmFkaW0gS3LEjW3DocWZ?=
+ <rkrcmar@redhat.com>
+References: <20181219180349.242681-1-marc.zyngier@arm.com>
+From: Paolo Bonzini <pbonzini@redhat.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=pbonzini@redhat.com; prefer-encrypt=mutual; keydata=
+ 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
+ uUHgL9dKIfvpm+rNXRn9wAwGjk0X/A==
+Message-ID: <f6f55696-436a-5efa-e080-6abc09a08f5d@redhat.com>
+Date: Wed, 19 Dec 2018 20:34:28 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
+MIME-Version: 1.0
+In-Reply-To: <20181219180349.242681-1-marc.zyngier@arm.com>
+Content-Language: en-US
+X-Scanned-By: MIMEDefang 2.79 on 10.5.11.16
+X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
+ (mx1.redhat.com [10.5.110.39]); Wed, 19 Dec 2018 19:34:37 +0000 (UTC)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_110754_073021_A38113E1 
-X-CRM114-Status: GOOD (  13.59  )
+X-CRM114-CacheID: sfid-20181219_113449_676048_F5D96212 
+X-CRM114-Status: GOOD (  11.91  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,105 +132,25 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Shawn Guo <shawnguo@kernel.org>, Alexander Shiyan <shc_work@mail.ru>,
- kernel@pengutronix.de
-MIME-Version: 1.0
+Cc: Mark Rutland <mark.rutland@arm.com>, Punit Agrawal <punit.agrawal@arm.com>,
+ kvm@vger.kernel.org, Julien Thierry <julien.thierry@arm.com>,
+ "Gustavo A . R . Silva" <gustavo@embeddedor.com>,
+ Will Deacon <will.deacon@arm.com>, Christoffer Dall <christoffer.dall@arm.com>,
+ linux-arm-kernel@lists.infradead.org, punitagrawal@gmail.com,
+ =?UTF-8?Q?Alex_Benn=c3=a9e?= <alex.bennee@linaro.org>,
+ kvmarm@lists.cs.columbia.edu, Suzuki Poulose <suzuki.poulose@arm.com>,
+ Lukas Braun <koomi@moshbit.net>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch adds bus-width property for esdhc1 to avoid mmc
-core warning: "bus-width" property is missing, assuming 1 bit.
-Additionally, the patch removes this property for boards where
-4-bit width is already specified, and adds 1-bit width for
-boards where this property is omitted.
+On 19/12/18 19:03, Marc Zyngier wrote:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvmarm-for-v4.21
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/boot/dts/imx51-apf51dev.dts                   | 1 -
- arch/arm/boot/dts/imx51-babbage.dts                    | 1 +
- arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts | 1 +
- arch/arm/boot/dts/imx51-ts4800.dts                     | 1 +
- arch/arm/boot/dts/imx51-zii-rdu1.dts                   | 1 -
- arch/arm/boot/dts/imx51.dtsi                           | 1 +
- 6 files changed, 4 insertions(+), 2 deletions(-)
+Pulled, thanks.
 
-diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
-index 3e1846a..b26d92f 100644
---- a/arch/arm/boot/dts/imx51-apf51dev.dts
-+++ b/arch/arm/boot/dts/imx51-apf51dev.dts
-@@ -97,7 +97,6 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_esdhc1>;
- 	cd-gpios = <&gpio2 29 GPIO_ACTIVE_LOW>;
--	bus-width = <4>;
- 	status = "okay";
- };
- 
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index 35ee1b4..8e86116 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -322,6 +322,7 @@
- &esdhc1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_esdhc1>;
-+	bus-width = <1>;
- 	cd-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
- 	wp-gpios = <&gpio1 1 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
-diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-index e9e819f..f2c3c87 100644
---- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-+++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-@@ -101,6 +101,7 @@
- &esdhc1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_esdhc1 &pinctrl_esdhc1_cd>;
-+	bus-width = <1>;
- 	cd-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/imx51-ts4800.dts b/arch/arm/boot/dts/imx51-ts4800.dts
-index 39eb067..e6d25a5 100644
---- a/arch/arm/boot/dts/imx51-ts4800.dts
-+++ b/arch/arm/boot/dts/imx51-ts4800.dts
-@@ -82,6 +82,7 @@
- &esdhc1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_esdhc1>;
-+	bus-width = <1>;
- 	cd-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
- 	wp-gpios = <&gpio1 1 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
-diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-index 69d753c..1287b57 100644
---- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
-+++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-@@ -459,7 +459,6 @@
- &esdhc1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_esdhc1>;
--	bus-width = <4>;
- 	no-1-8-v;
- 	non-removable;
- 	no-sdio;
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 67d4627..eac432a 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -172,6 +172,7 @@
- 						 <&clks IMX5_CLK_DUMMY>,
- 						 <&clks IMX5_CLK_ESDHC1_PER_GATE>;
- 					clock-names = "ipg", "ahb", "per";
-+					bus-width = <4>;
- 					status = "disabled";
- 				};
- 
--- 
-2.10.2
-
+Paolo
 
 _______________________________________________
 linux-arm-kernel mailing list
