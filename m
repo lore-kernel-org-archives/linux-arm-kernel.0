@@ -2,114 +2,85 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E00DAC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 12:44:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D6539C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 12:44:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A49C72080D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 12:44:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 95BDB21479
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 12:44:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fRbFKOkW";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=toradex.com header.i=@toradex.com header.b="oq1w8LG1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A49C72080D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=toradex.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eRNYofV6";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="DHjXmfM1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 95BDB21479
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:Message-ID:Date
-	:Subject:To:From:Reply-To:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=O2swd03fsap+A8fv/Bwvb/2WMCckKfSXXD28GFVvuqo=; b=fRbFKOkWTOq4wi
-	47ordxi52JloAhiXtALdUnEs/rc6QuharYLlFYyPheja5tPIrCgT7aXztV6fVTyNawBpYvSecwP5M
-	TkCQ53CFXlrd6qpPy8E/30ZGtzNCvztGJTHLNGVDpKYTRt6xRkyRwuWc5dA7Bl7hrp3qQufPCM9qz
-	s4Oz7EuPug0sekRBBd3i2MEZobFdjACE6uCbCxB6bHdVtbKUjeovkaiDUxy27gaVA8SFfXtBtSuTI
-	vubVBS2klQwNEfZ9Cn/kip2+vr/Kr6ZGGiBVQLBq0wnFJqPQnIFlM8qBoRt/Ol1e8reloJku6xsnJ
-	DCxVf+cqszsJK8D+hWcw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=EhQKCy9j0BRsWboh3qTXqJJp011Hvow8xZ2XcmB3UdU=; b=eRNYofV63BPRDR
+	ZGgMp9FTzPJLVyL7PvuSvIQPlGWKooYSWqDhpCcurWJ9qx/u6gyh5AjX1fBGoNM92enL79n3BFfmD
+	Ma45+J2AgIvsaoNJ3VlxMQskCEv4Ea44spWXebXLOzs19lygOAoPYmntEDXIoWeTQjX6d779EGk7v
+	Dpi7QkRMWOjQIbRNAlT88Hu/WWCH4dkB01yDPhhbak6NGWu5QYenXY9AojsWN/e76zYEEcAfht9uh
+	AcxiT+4PAHuSDV+mE/fHSpwj7ZP/Jyrsh3PixvLrpGVHMxywRzAws2zLlIfLUNwu603l9iJ3ykyPd
+	Hm6J8rPfnFw3+Hc7MTCg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZbCi-0000Om-80; Wed, 19 Dec 2018 12:44:00 +0000
-Received: from mail-vi1eur04on071e.outbound.protection.outlook.com
- ([2a01:111:f400:fe0e::71e]
- helo=EUR04-VI1-obe.outbound.protection.outlook.com)
+	id 1gZbCz-0000jO-S4; Wed, 19 Dec 2018 12:44:17 +0000
+Received: from fllv0016.ext.ti.com ([198.47.19.142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZbBd-0007p3-Oc
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 12:42:58 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=toradex.com;
- s=selector1;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=apGt+XtV0MI7kiMokTRvCMV9IWX4fN4e2Ba7tzHE06c=;
- b=oq1w8LG1uwP2/a9X4sPZuwJcBQVzEC8XXfToyDxW552myOaTnmyqAtwYqvvD2BCE8jdxm5rtlZLjod4HhKpWYqTEfwOQhufrDayBJ74lY42Yf/ZQrIPt8e6Z0E5oMecwjHp1+BfhoXqS6IZWpEtASrjlggHkPs5mXwpItx14e6s=
-Received: from VI1PR0501MB2590.eurprd05.prod.outlook.com (10.168.137.14) by
- VI1PR0501MB2702.eurprd05.prod.outlook.com (10.172.15.139) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1446.19; Wed, 19 Dec 2018 12:42:36 +0000
-Received: from VI1PR0501MB2590.eurprd05.prod.outlook.com
- ([fe80::5808:701d:d1ac:9df8]) by VI1PR0501MB2590.eurprd05.prod.outlook.com
- ([fe80::5808:701d:d1ac:9df8%5]) with mapi id 15.20.1425.024; Wed, 19 Dec 2018
- 12:42:36 +0000
-From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-To: "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>
-Subject: [REGRESSION] imx_v6_v7_defconfig: undefined reference to
- `__hyp_stub_vectors'
-Thread-Topic: [REGRESSION] imx_v6_v7_defconfig: undefined reference to
- `__hyp_stub_vectors'
-Thread-Index: AQHUl5hS3YQwM2HAUkyF1f0Av+JOLQ==
-Date: Wed, 19 Dec 2018 12:42:36 +0000
-Message-ID: <fcbce8f7ba22014a8f06b7f52ad56faaa03b948b.camel@toradex.com>
-Accept-Language: en-GB, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=marcel.ziswiler@toradex.com; 
-x-originating-ip: [46.140.72.82]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; VI1PR0501MB2702;
- 6:ggct2AESZpc6aC8GUupy61ttqryXkEsHYmUxirTS6pUTB+n5P+UB99NWMIHlEh4g/kq2KhIxZuJsXLvliTRg91FVw6/APr7otWQRrq2eKs2DMpba/7ZKYyRu7L7uKuodjAspUDlz6PuG4FgnULI5pIS3wd7SWyhCFP0g0y+yFqhh/kyglPM1gZUFSTCi+dvTN03mMHpF2ZsTlDqMltpP1PIzSq5aZk3tGYXtp4GbLAddDTyY/4gu11O/dqmDZ6gvozJQx1qCnS0bb2/+8G9Yzf3cqauNTBa0ILdK9KTMfYe5OtuQ3i2Pw720Tm2JTvvaHV1dvk9+V2jIbWDC9QqdqMZZunhXDK4hP9QDVQGh7ZaSlB6Orl6EM2JMv7DJ4yGGWUjiPSJuy6KSy4cRgS5h8dIwpDXppwCCN4BmV+wj9Nqy/eoONRgHxC6hMR9XVkUEQZCDAI53Wn8AcWowpbKoUA==;
- 5:siBi8NQMmxnO/W9XApUq5K3ayPPKigCoDY5WJSo/OQMgbHWdF+sLoGK+jxaMLvNWEwtAQ+dLU/Rm7UzgBiA6Ox/iqWQxOLvaMvlg9QKXpE405Cnz6z1VASAZRjdvh7Gc/8kJ6p5FzgqUhJktrdO2zlEa+IpKfgEwhzxSsFFNJZ8=;
- 7:GlK4wGt4aUrtRNBQgS9rRN/Lg9+zfZzp9ZEmSoa2w/iKFjKtBayggNeTH0qIjayNhJeeD7zmzS5WJnXxwcTf7o0RTP5/oRlVE+S11J37CryffJ2eD/bK1mLKtUrJULvHmd7fzzmZOjEiGHIQtUpFvA==
-x-ms-exchange-antispam-srfa-diagnostics: SOS;
-x-ms-office365-filtering-correlation-id: 57f82807-f763-470b-69cf-08d665af7493
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(7021145)(8989299)(5600074)(711020)(4534185)(7022145)(4603075)(4627221)(201702281549075)(8990200)(7048125)(7024125)(7027125)(7023125)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR0501MB2702; 
-x-ms-traffictypediagnostic: VI1PR0501MB2702:
-x-microsoft-antispam-prvs: <VI1PR0501MB2702C2F31A974D8709CF712BFBBE0@VI1PR0501MB2702.eurprd05.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(5005006)(8121501046)(3231475)(944501520)(52105112)(93006095)(93001095)(3002001)(10201501046)(148016)(149066)(150057)(6041310)(2016111802025)(20161123560045)(20161123562045)(20161123564045)(20161123558120)(6043046)(201708071742011)(7699051)(76991095);
- SRVR:VI1PR0501MB2702; BCL:0; PCL:0; RULEID:; SRVR:VI1PR0501MB2702; 
-x-forefront-prvs: 0891BC3F3D
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10019020)(136003)(366004)(376002)(39850400004)(396003)(346002)(199004)(189003)(6506007)(7736002)(71200400001)(8936002)(71190400001)(53936002)(6512007)(256004)(86362001)(4326008)(68736007)(81156014)(81166006)(8676002)(36756003)(305945005)(316002)(6486002)(186003)(106356001)(476003)(110136005)(118296001)(105586002)(486006)(2616005)(5660300001)(6436002)(66066001)(99286004)(97736004)(102836004)(44832011)(2501003)(14454004)(508600001)(6116002)(3846002)(25786009)(2906002)(26005);
- DIR:OUT; SFP:1102; SCL:1; SRVR:VI1PR0501MB2702;
- H:VI1PR0501MB2590.eurprd05.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: toradex.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: DN+r3yZV5t7nt0pKLbpSD/GGzT9GZb/ZRXaR4Vwv1ZJoV3wt/4/cHkbtJiqYrAQjxjw6lN9nZqu4/4yC6C/mjfR+SfxA7wVm4bNP4u/Yi9wO/VLSJr/gIzngjBX9WidyJoLbuK9pgpyUWSD25y+yIqACgZ5OomWzruH2hHaoLblEgk3StvYinZZS6ifckmuqn9VrasSyRzgL0CmfLXD4e/YqzNKHVL+9sLThRcuYpHTAezCPGviLJC2C0c8juwCE4iGzTxbDhl4qHTjHHil5dIKkjrz/1+bGPaDE5MPe1JWcGmV7V4tI3f2YWbqFsaBk
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
-Content-ID: <0957F275A88F98419DD656D789A17155@eurprd05.prod.outlook.com>
+ id 1gZbBe-0007qb-ET
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 12:43:06 +0000
+Received: from lelv0266.itg.ti.com ([10.180.67.225])
+ by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBJCgdeJ098490;
+ Wed, 19 Dec 2018 06:42:39 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1545223359;
+ bh=mbbb79Ac8cqndqKQy/QFEfwpSj42VwCaCqlC/i9Zp2c=;
+ h=From:To:CC:Subject:Date:In-Reply-To:References;
+ b=DHjXmfM1Gctgvkg4S6lQC/uvJ9hHs2jAOBnAMEuyXSUHxQCEGztVY1WBSFqdeKXuj
+ hbidjtzBuVSc6j8jfkRN9NdQcT7MxzFCALRBTk1F0cANRsl1BdHnf2zq0ZA7NYkfmA
+ sRGwTftne+lzgFpJof4kNKakjfRBwNLgS2e/V5UI=
+Received: from DFLE102.ent.ti.com (dfle102.ent.ti.com [10.64.6.23])
+ by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBJCgd5u062324
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Wed, 19 Dec 2018 06:42:39 -0600
+Received: from DFLE103.ent.ti.com (10.64.6.24) by DFLE102.ent.ti.com
+ (10.64.6.23) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Wed, 19
+ Dec 2018 06:42:39 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE103.ent.ti.com
+ (10.64.6.24) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Wed, 19 Dec 2018 06:42:39 -0600
+Received: from a0393678ub.india.ti.com (ileax41-snat.itg.ti.com
+ [10.172.224.153])
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBJCgNZn003940;
+ Wed, 19 Dec 2018 06:42:36 -0600
+From: Kishon Vijay Abraham I <kishon@ti.com>
+To: Murali Karicheri <m-karicheri2@ti.com>, Lorenzo Pieralisi
+ <lorenzo.pieralisi@arm.com>, Gustavo Pimentel
+ <gustavo.pimentel@synopsys.com>, Marc Zyngier <marc.zyngier@arm.com>
+Subject: [PATCH 04/10] PCI: keystone: Add separate functions for configuring
+ MSI and legacy interrupt
+Date: Wed, 19 Dec 2018 18:12:01 +0530
+Message-ID: <20181219124207.13479-5-kishon@ti.com>
+X-Mailer: git-send-email 2.17.1
+In-Reply-To: <20181219124207.13479-1-kishon@ti.com>
+References: <20181219124207.13479-1-kishon@ti.com>
 MIME-Version: 1.0
-X-OriginatorOrg: toradex.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 57f82807-f763-470b-69cf-08d665af7493
-X-MS-Exchange-CrossTenant-originalarrivaltime: 19 Dec 2018 12:42:36.8066 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: d9995866-0d9b-4251-8315-093f062abab4
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR0501MB2702
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_044254_123510_2A391A30 
-X-CRM114-Status: UNSURE (   9.12  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181219_044255_099717_7A6D1ECD 
+X-CRM114-Status: GOOD (  26.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -121,29 +92,287 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "linux-imx@nxp.com" <linux-imx@nxp.com>
+Cc: Jingoo Han <jingoohan1@gmail.com>, linux-kernel@vger.kernel.org,
+ kishon@ti.com, linux-pci@vger.kernel.org, Bjorn Helgaas <bhelgaas@google.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi there
+ks_pcie_get_irq_controller_info() was used to configure both MSI and
+legacy interrupt. This will prevent MSI or legacy interrupt specific
+intializations. Add separate functions to configure MSI and legacy
+interrupts.
 
-I noticed that at least today's and yesterdays -next won't build with
-the imx_v6_v7_defconfig giving the following error:
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ drivers/pci/controller/dwc/pci-keystone.c | 188 +++++++++++-----------
+ 1 file changed, 96 insertions(+), 92 deletions(-)
 
-  LD      arch/arm/boot/compressed/vmlinux
-arch/arm/boot/compressed/head.o: In function `restart':
-(.text+0xa8): undefined reference to `__hyp_stub_vectors'
-(.text+0xac): undefined reference to `__hyp_stub_vectors'
+diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
+index e9f5387136f0..a8712804c891 100644
+--- a/drivers/pci/controller/dwc/pci-keystone.c
++++ b/drivers/pci/controller/dwc/pci-keystone.c
+@@ -87,11 +87,8 @@ struct keystone_pcie {
+ 	struct dw_pcie		*pci;
+ 	/* PCI Device ID */
+ 	u32			device_id;
+-	int			num_legacy_host_irqs;
+-	int			legacy_host_irqs[PCI_NUM_INTX];
+ 	struct			device_node *legacy_intc_np;
+ 
+-	int			num_msi_host_irqs;
+ 	int			msi_host_irqs[MAX_MSI_HOST_IRQS];
+ 	int			num_lanes;
+ 	u32			num_viewport;
+@@ -201,14 +198,6 @@ static int ks_pcie_msi_host_init(struct pcie_port *pp)
+ 	return dw_pcie_allocate_domains(pp);
+ }
+ 
+-static void ks_pcie_enable_legacy_irqs(struct keystone_pcie *ks_pcie)
+-{
+-	int i;
+-
+-	for (i = 0; i < PCI_NUM_INTX; i++)
+-		ks_pcie_app_writel(ks_pcie, IRQ_ENABLE_SET(i), 0x1);
+-}
+-
+ static void ks_pcie_handle_legacy_irq(struct keystone_pcie *ks_pcie,
+ 				      int offset)
+ {
+@@ -470,17 +459,6 @@ static int __init ks_pcie_dw_host_init(struct keystone_pcie *ks_pcie)
+ 
+ 	ks_pcie->app = *res;
+ 
+-	/* Create legacy IRQ domain */
+-	ks_pcie->legacy_irq_domain =
+-			irq_domain_add_linear(ks_pcie->legacy_intc_np,
+-					      PCI_NUM_INTX,
+-					      &ks_pcie_legacy_irq_domain_ops,
+-					      NULL);
+-	if (!ks_pcie->legacy_irq_domain) {
+-		dev_err(dev, "Failed to add irq domain for legacy irqs\n");
+-		return -EINVAL;
+-	}
+-
+ 	return dw_pcie_host_init(pp);
+ }
+ 
+@@ -604,85 +582,117 @@ static void ks_pcie_legacy_irq_handler(struct irq_desc *desc)
+ 	chained_irq_exit(chip, desc);
+ }
+ 
+-static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
+-					   char *controller, int *num_irqs)
++static int ks_pcie_config_msi_irq(struct keystone_pcie *ks_pcie)
+ {
+-	int temp, max_host_irqs, legacy = 1, *host_irqs;
+ 	struct device *dev = ks_pcie->pci->dev;
+-	struct device_node *np_pcie = dev->of_node, **np_temp;
+-
+-	if (!strcmp(controller, "msi-interrupt-controller"))
+-		legacy = 0;
+-
+-	if (legacy) {
+-		np_temp = &ks_pcie->legacy_intc_np;
+-		max_host_irqs = PCI_NUM_INTX;
+-		host_irqs = &ks_pcie->legacy_host_irqs[0];
+-	} else {
+-		np_temp = &ks_pcie->msi_intc_np;
+-		max_host_irqs = MAX_MSI_HOST_IRQS;
+-		host_irqs =  &ks_pcie->msi_host_irqs[0];
+-	}
++	struct device_node *np = ks_pcie->np;
++	struct device_node *intc_np;
++	int irq_count;
++	int irq;
++	int ret;
++	int i;
+ 
+-	/* interrupt controller is in a child node */
+-	*np_temp = of_get_child_by_name(np_pcie, controller);
+-	if (!(*np_temp)) {
+-		dev_err(dev, "Node for %s is absent\n", controller);
+-		return -EINVAL;
+-	}
++	if (!IS_ENABLED(CONFIG_PCI_MSI))
++		return 0;
+ 
+-	temp = of_irq_count(*np_temp);
+-	if (!temp) {
+-		dev_err(dev, "No IRQ entries in %s\n", controller);
+-		of_node_put(*np_temp);
++	intc_np = of_get_child_by_name(np, "msi-interrupt-controller");
++	if (!intc_np) {
++		dev_WARN(dev, "msi-interrupt-controller node is absent\n");
+ 		return -EINVAL;
+ 	}
+ 
+-	if (temp > max_host_irqs)
+-		dev_warn(dev, "Too many %s interrupts defined %u\n",
+-			(legacy ? "legacy" : "MSI"), temp);
++	irq_count = of_irq_count(intc_np);
++	if (!irq_count) {
++		dev_err(dev, "No IRQ entries in msi-interrupt-controller\n");
++		ret = -EINVAL;
++		goto err;
++	}
+ 
+-	/*
+-	 * support upto max_host_irqs. In dt from index 0 to 3 (legacy) or 0 to
+-	 * 7 (MSI)
+-	 */
+-	for (temp = 0; temp < max_host_irqs; temp++) {
+-		host_irqs[temp] = irq_of_parse_and_map(*np_temp, temp);
+-		if (!host_irqs[temp])
+-			break;
++	if (irq_count > MAX_MSI_HOST_IRQS) {
++		dev_warn(dev, "Too many MSI interrupt lines defined %u\n",
++			 irq_count);
++		irq_count = MAX_MSI_HOST_IRQS;
+ 	}
+ 
+-	of_node_put(*np_temp);
++	for (i = 0; i < irq_count; i++) {
++		irq = irq_of_parse_and_map(intc_np, i);
++		if (!irq) {
++			ret = -EINVAL;
++			goto err;
++		}
++		ks_pcie->msi_host_irqs[i] = irq;
+ 
+-	if (temp) {
+-		*num_irqs = temp;
+-		return 0;
++		irq_set_chained_handler_and_data(irq, ks_pcie_msi_irq_handler,
++						 ks_pcie);
+ 	}
+ 
+-	return -EINVAL;
++	of_node_put(intc_np);
++	return 0;
++
++err:
++	of_node_put(intc_np);
++	return ret;
+ }
+ 
+-static void ks_pcie_setup_interrupts(struct keystone_pcie *ks_pcie)
++static int ks_pcie_config_legacy_irq(struct keystone_pcie *ks_pcie)
+ {
++	struct device *dev = ks_pcie->pci->dev;
++	struct irq_domain *legacy_irq_domain;
++	struct device_node *np = ks_pcie->np;
++	struct device_node *intc_np;
++	int irq_count;
++	int irq;
++	int ret;
+ 	int i;
+ 
+-	/* Legacy IRQ */
+-	for (i = 0; i < ks_pcie->num_legacy_host_irqs; i++) {
+-		irq_set_chained_handler_and_data(ks_pcie->legacy_host_irqs[i],
++	intc_np = of_get_child_by_name(np, "legacy-interrupt-controller");
++	if (!intc_np) {
++		dev_WARN(dev, "legacy-interrupt-controller node is absent\n");
++		return -EINVAL;
++	}
++
++	irq_count = of_irq_count(intc_np);
++	if (!irq_count) {
++		dev_err(dev, "No IRQ entries in legacy-interrupt-controller\n");
++		ret = -EINVAL;
++		goto err;
++	}
++
++	for (i = 0; i < irq_count; i++) {
++		irq = irq_of_parse_and_map(intc_np, i);
++		if (!irq) {
++			ret = -EINVAL;
++			goto err;
++		}
++		irq_set_chained_handler_and_data(irq,
+ 						 ks_pcie_legacy_irq_handler,
+ 						 ks_pcie);
+ 	}
+-	ks_pcie_enable_legacy_irqs(ks_pcie);
+-
+-	/* MSI IRQ */
+-	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+-		for (i = 0; i < ks_pcie->num_msi_host_irqs; i++) {
+-			irq_set_chained_handler_and_data(ks_pcie->msi_host_irqs[i],
+-							 ks_pcie_msi_irq_handler,
+-							 ks_pcie);
+-		}
++
++	legacy_irq_domain =
++		irq_domain_add_linear(intc_np, PCI_NUM_INTX,
++				      &ks_pcie_legacy_irq_domain_ops, NULL);
++	if (!legacy_irq_domain) {
++		dev_err(dev, "Failed to add irq domain for legacy irqs\n");
++		ret = -EINVAL;
++		goto err;
+ 	}
++	ks_pcie->legacy_irq_domain = legacy_irq_domain;
++
++	for (i = 0; i < PCI_NUM_INTX; i++)
++		ks_pcie_app_writel(ks_pcie, IRQ_ENABLE_SET(i), INTx_EN);
++
++	of_node_put(intc_np);
++
++	return 0;
++
++err:
++	of_node_put(intc_np);
++	return ret;
++}
+ 
++static void ks_pcie_setup_interrupts(struct keystone_pcie *ks_pcie)
++{
+ 	if (ks_pcie->error_irq > 0)
+ 		ks_pcie_enable_error_irq(ks_pcie);
+ }
+@@ -736,6 +746,14 @@ static int __init ks_pcie_host_init(struct pcie_port *pp)
+ 	struct keystone_pcie *ks_pcie = to_keystone_pcie(pci);
+ 	int ret;
+ 
++	ret = ks_pcie_config_legacy_irq(ks_pcie);
++	if (ret)
++		return ret;
++
++	ret = ks_pcie_config_msi_irq(ks_pcie);
++	if (ret)
++		return ret;
++
+ 	dw_pcie_setup_rc(pp);
+ 
+ 	ks_pcie_establish_link(ks_pcie);
+@@ -785,20 +803,6 @@ static int __init ks_pcie_add_pcie_port(struct keystone_pcie *ks_pcie,
+ 	struct device *dev = &pdev->dev;
+ 	int ret;
+ 
+-	ret = ks_pcie_get_irq_controller_info(ks_pcie,
+-					"legacy-interrupt-controller",
+-					&ks_pcie->num_legacy_host_irqs);
+-	if (ret)
+-		return ret;
+-
+-	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+-		ret = ks_pcie_get_irq_controller_info(ks_pcie,
+-						"msi-interrupt-controller",
+-						&ks_pcie->num_msi_host_irqs);
+-		if (ret)
+-			return ret;
+-	}
+-
+ 	/*
+ 	 * Index 0 is the platform interrupt for error interrupt
+ 	 * from RC.  This is optional.
+-- 
+2.17.1
 
-Has anybody seen that as well and knows what is going on?
 
-Thanks!
-
-Cheers
-
-Marcel
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
