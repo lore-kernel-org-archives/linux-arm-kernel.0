@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D2B92C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:07:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 78011C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:08:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A4E8F217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:07:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4D9E9217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:08:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WTrgEDZb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A4E8F217D9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dwp7On9j"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4D9E9217D9
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=sXmaoO8nApQOhQY2GkjfSmByfPowBeLEgnF/ikBVjrU=; b=WTrgEDZbEzZ0p7
-	4d0QaFPNAAC/4/eH8LkX0E1L9YndkDrQBSrMPhCw/JtP1aFbrfSOdl29CJ8Brq8lc+mpOdn9M3Kjl
-	4I3Iee2PbBRUJv+jt5uE/RvaPmF+dckZWg+cGXuUo9em4gtVgpZ+spqOYdictihI0pzA4Qt8kHLeo
-	W/VJ0hVJ6xWlU24pxLb2KBjwDpTYBvlr8Dz4Y5lFCYncHuOpKRghRQyYxSV/kzV9Y+9FJylyhBvJQ
-	eSGkegQOV/wcVIfkx5ggV2q+RSb1rcB6mOa+gdHW6tR1mZmWAGBMhL+fUQWsIL/x3L27Z0gUfn7mb
-	lFH8Dt5SdIdLzlWPbRFg==;
+	List-Owner; bh=Y0Kua40D4u5qXVKF2FkYB4YE8V1/9TymukiP//RY3So=; b=dwp7On9jSJ007m
+	igVnNUseiIwW/Uri/tH5sv8fp6LxJi33MiKLgAT8zu/aGgrL5Oswk7IjFj91EsKnGzLzIsq0NGSFD
+	4KedAml8QDaug+se2xMFWZwhVNGvz3PwUF2r6mjl0zeDFWhasQYTTn0IGATn9PdOdnDi5ghxUBum5
+	UQSPdfxI3d2fEG60pjUlOgRw9AJ/lqjleixI3/Qcy6KvWMDvInPRYAqclpfcarWCFpEw3kf17yEI1
+	RNKeMZU5X1KNHCr8uxMaaHQ+eFxqKllLV8jUp0Kgkqpw+ubBxwHY7tEy+Hw4/FfWwaHmKYKkeGKgX
+	8uDA5VJ0XZMYMyvTnAag==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZgFy-0001eg-8O; Wed, 19 Dec 2018 18:07:42 +0000
+	id 1gZgGB-0001r9-Bt; Wed, 19 Dec 2018 18:07:55 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZgDF-0006AY-5R
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 18:05:01 +0000
+ id 1gZgDF-0006Ks-5Q
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 18:05:04 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id DE4E915AB;
- Wed, 19 Dec 2018 10:04:42 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 376F6165C;
+ Wed, 19 Dec 2018 10:04:51 -0800 (PST)
 Received: from filthy-habits.cambridge.arm.com
  (filthy-habits.cambridge.arm.com [10.1.196.62])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5F7CE3F675;
- Wed, 19 Dec 2018 10:04:40 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id AC53F3F675;
+ Wed, 19 Dec 2018 10:04:48 -0800 (PST)
 From: Marc Zyngier <marc.zyngier@arm.com>
 To: Paolo Bonzini <pbonzini@redhat.com>,
  =?UTF-8?q?Radim=20Kr=C4=8Dm=C3=A1=C5=99?= <rkrcmar@redhat.com>
-Subject: [PATCH 12/28] KVM: arm64: Update age handlers to support PUD hugepages
-Date: Wed, 19 Dec 2018 18:03:33 +0000
-Message-Id: <20181219180349.242681-13-marc.zyngier@arm.com>
+Subject: [PATCH 15/28] KVM: arm64: Clarify explanation of STAGE2_PGTABLE_LEVELS
+Date: Wed, 19 Dec 2018 18:03:36 +0000
+Message-Id: <20181219180349.242681-16-marc.zyngier@arm.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181219180349.242681-1-marc.zyngier@arm.com>
 References: <20181219180349.242681-1-marc.zyngier@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_100453_810509_1C56CBBB 
-X-CRM114-Status: GOOD (  15.71  )
+X-CRM114-CacheID: sfid-20181219_100454_139723_FD670EBD 
+X-CRM114-Status: GOOD (  15.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,147 +82,66 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Punit Agrawal <punit.agrawal@arm.com>
+From: Christoffer Dall <christoffer.dall@arm.com>
 
-In preparation for creating larger hugepages at Stage 2, add support
-to the age handling notifiers for PUD hugepages when encountered.
+In attempting to re-construct the logic for our stage 2 page table
+layout I found the reasoning in the comment explaining how we calculate
+the number of levels used for stage 2 page tables a bit backwards.
 
-Provide trivial helpers for arm32 to allow sharing code.
+This commit attempts to clarify the comment, to make it slightly easier
+to read without having the Arm ARM open on the right page.
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-[ Replaced BUG() => WARN_ON(1) for arm32 PUD helpers ]
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+While we're at it, fixup a typo in a comment that was recently changed.
+
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_mmu.h   |  6 +++++
- arch/arm64/include/asm/kvm_mmu.h |  5 ++++
- arch/arm64/include/asm/pgtable.h |  1 +
- virt/kvm/arm/mmu.c               | 39 ++++++++++++++++----------------
- 4 files changed, 32 insertions(+), 19 deletions(-)
+ arch/arm64/include/asm/stage2_pgtable.h | 16 +++++++---------
+ virt/kvm/arm/mmu.c                      |  2 +-
+ 2 files changed, 8 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 3a407204b957..4b4b2146e6a0 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -117,6 +117,12 @@ static inline pud_t kvm_s2pud_mkyoung(pud_t pud)
- 	return pud;
- }
+diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
+index d352f6df8d2c..5412fa40825e 100644
+--- a/arch/arm64/include/asm/stage2_pgtable.h
++++ b/arch/arm64/include/asm/stage2_pgtable.h
+@@ -30,16 +30,14 @@
+ #define pt_levels_pgdir_shift(lvls)	ARM64_HW_PGTABLE_LEVEL_SHIFT(4 - (lvls))
  
-+static inline bool kvm_s2pud_young(pud_t pud)
-+{
-+	WARN_ON(1);
-+	return false;
-+}
-+
- static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
- {
- 	pte_val(pte) |= L_PTE_S2_RDWR;
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 612032bbb428..9f941f70775c 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -273,6 +273,11 @@ static inline pud_t kvm_s2pud_mkyoung(pud_t pud)
- 	return pud_mkyoung(pud);
- }
- 
-+static inline bool kvm_s2pud_young(pud_t pud)
-+{
-+	return pud_young(pud);
-+}
-+
- #define hyp_pte_table_empty(ptep) kvm_page_empty(ptep)
- 
- #ifdef __PAGETABLE_PMD_FOLDED
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index f51e2271e6a3..bb0f3f17a7a9 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -386,6 +386,7 @@ static inline int pmd_protnone(pmd_t pmd)
- #define pfn_pmd(pfn,prot)	__pmd(__phys_to_pmd_val((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot))
- #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
- 
-+#define pud_young(pud)		pte_young(pud_pte(pud))
- #define pud_mkyoung(pud)	pte_pud(pte_mkyoung(pud_pte(pud)))
- #define pud_write(pud)		pte_write(pud_pte(pud))
- 
+ /*
+- * The hardware supports concatenation of up to 16 tables at stage2 entry level
+- * and we use the feature whenever possible.
++ * The hardware supports concatenation of up to 16 tables at stage2 entry
++ * level and we use the feature whenever possible, which means we resolve 4
++ * additional bits of address at the entry level.
+  *
+- * Now, the minimum number of bits resolved at any level is (PAGE_SHIFT - 3).
+- * On arm64, the smallest PAGE_SIZE supported is 4k, which means
+- *             (PAGE_SHIFT - 3) > 4 holds for all page sizes.
+- * This implies, the total number of page table levels at stage2 expected
+- * by the hardware is actually the number of levels required for (IPA_SHIFT - 4)
+- * in normal translations(e.g, stage1), since we cannot have another level in
+- * the range (IPA_SHIFT, IPA_SHIFT - 4).
++ * This implies, the total number of page table levels required for
++ * IPA_SHIFT at stage2 expected by the hardware can be calculated using
++ * the same logic used for the (non-collapsable) stage1 page tables but for
++ * (IPA_SHIFT - 4).
+  */
+ #define stage2_pgtable_levels(ipa)	ARM64_HW_PGTABLE_LEVELS((ipa) - 4)
+ #define kvm_stage2_levels(kvm)		VTCR_EL2_LVLS(kvm->arch.vtcr)
 diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index bd749601195f..3893ea6a50bf 100644
+index 2dcff38868d4..f605514395a1 100644
 --- a/virt/kvm/arm/mmu.c
 +++ b/virt/kvm/arm/mmu.c
-@@ -1225,6 +1225,11 @@ static int stage2_pmdp_test_and_clear_young(pmd_t *pmd)
- 	return stage2_ptep_test_and_clear_young((pte_t *)pmd);
- }
+@@ -1356,7 +1356,7 @@ static bool transparent_hugepage_adjust(kvm_pfn_t *pfnp, phys_addr_t *ipap)
+ 	struct page *page = pfn_to_page(pfn);
  
-+static int stage2_pudp_test_and_clear_young(pud_t *pud)
-+{
-+	return stage2_ptep_test_and_clear_young((pte_t *)pud);
-+}
-+
- /**
-  * kvm_phys_addr_ioremap - map a device range to guest IPA
-  *
-@@ -1932,42 +1937,38 @@ void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte)
- 
- static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
- {
-+	pud_t *pud;
- 	pmd_t *pmd;
- 	pte_t *pte;
- 
--	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE);
--	pmd = stage2_get_pmd(kvm, NULL, gpa);
--	if (!pmd || pmd_none(*pmd))	/* Nothing there */
-+	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE && size != PUD_SIZE);
-+	if (!stage2_get_leaf_entry(kvm, gpa, &pud, &pmd, &pte))
- 		return 0;
- 
--	if (pmd_thp_or_huge(*pmd))	/* THP, HugeTLB */
-+	if (pud)
-+		return stage2_pudp_test_and_clear_young(pud);
-+	else if (pmd)
- 		return stage2_pmdp_test_and_clear_young(pmd);
--
--	pte = pte_offset_kernel(pmd, gpa);
--	if (pte_none(*pte))
--		return 0;
--
--	return stage2_ptep_test_and_clear_young(pte);
-+	else
-+		return stage2_ptep_test_and_clear_young(pte);
- }
- 
- static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
- {
-+	pud_t *pud;
- 	pmd_t *pmd;
- 	pte_t *pte;
- 
--	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE);
--	pmd = stage2_get_pmd(kvm, NULL, gpa);
--	if (!pmd || pmd_none(*pmd))	/* Nothing there */
-+	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE && size != PUD_SIZE);
-+	if (!stage2_get_leaf_entry(kvm, gpa, &pud, &pmd, &pte))
- 		return 0;
- 
--	if (pmd_thp_or_huge(*pmd))		/* THP, HugeTLB */
-+	if (pud)
-+		return kvm_s2pud_young(*pud);
-+	else if (pmd)
- 		return pmd_young(*pmd);
--
--	pte = pte_offset_kernel(pmd, gpa);
--	if (!pte_none(*pte))		/* Just a page... */
-+	else
- 		return pte_young(*pte);
--
--	return 0;
- }
- 
- int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end)
+ 	/*
+-	 * PageTransCompoungMap() returns true for THP and
++	 * PageTransCompoundMap() returns true for THP and
+ 	 * hugetlbfs. Make sure the adjustment is done only for THP
+ 	 * pages.
+ 	 */
 -- 
 2.19.2
 
