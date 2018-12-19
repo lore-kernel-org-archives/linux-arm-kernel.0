@@ -2,119 +2,63 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9936FC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 05:42:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0B874C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 05:44:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6701B21852
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 05:42:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C874721871
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 05:44:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B+y74YRg";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="wlQ6x8au"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6701B21852
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MYadLtY3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C874721871
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=davemloft.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=Vr07xSMjy0AIdqZNNvj3Ix1yL05QMGmcm5NgwzX0UOw=; b=B+y74YRgpnQ8xZ
-	Y+F0NlN+YpO7GEPxfQcCpFrnQMWzsv9SIi0xON1pNjyHWjBM/FVr573CjJroIURGbuRu8NzQkSUxK
-	NvsBSBqe0EoAAS98UhJqjEV9nvpqXtx31otwslVh/6yNpAB6EVSInzUbgyklfc1wq4c+hd54GopJ8
-	NMx+XN2R+dof43ImadE2adkd9LTrdpgJSz3K8CYCPeCWAuE/MHL/4SxXDG5DP9HelZKUNTwr83y7N
-	Uy9Ey1McmOO9DvBMyoOo1hj/VzlOOID+gQl0PptJ/5j1QOzrHjKrLtbX8KxoLZrrKtc67/q5c2XOn
-	OFNyz3Ea9+twxsMdcHEA==;
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	From:Subject:To:Message-Id:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=uwFpjhOYZR6HJxoTleJIFRkstlwIkLVm8zE0PxSHcvU=; b=MYadLtY3wAYIwG
+	0U5/4br3piPymEp2dEFFrK+6CJHAi5F2OpYMq5ibBOv6YizmzUU/GPeKvXjWjj4o6/oIezrgaybTw
+	HvJ+aCCEvyCVEI4EOTsbi8pB1BwUavZY85UN4mk8AbZmt9sfm4s+Q0Dejpxg716SK4+INp6NltLyk
+	367dtlBgyjTyPE2Q+3Fu7emgn+UgL9moQ41nSZfQgI+YvgjSRilIZR28/1kE36iOn/Ah4HBvGsGXS
+	qcqAwW6jZpp2jV3h+UrXgB9phdx9Iv+oWc03qv6VBP+D58qKudTDgqOyqmDBZdcbpGGknZ+mJHLVz
+	rVUiQMmwskuW5vHRzPVA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZUcB-0005t3-6C; Wed, 19 Dec 2018 05:41:51 +0000
-Received: from mail-eopbgr70058.outbound.protection.outlook.com ([40.107.7.58]
- helo=EUR04-HE1-obe.outbound.protection.outlook.com)
+	id 1gZUeH-0006Yx-OB; Wed, 19 Dec 2018 05:44:01 +0000
+Received: from shards.monkeyblade.net ([2620:137:e000::1:9])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZUc7-0005h9-0n
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 05:41:48 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=8dyc1Tn6ytunnpbrR4rC5ZamakDhV6ZVgDJsfJ/u66A=;
- b=wlQ6x8auWbyyE4M8x8oNwZRcyNVZtyNuFcbG66Ql0qzmbpveA9vIpKO1P8i4iUpIGldY/r3xo5MwdgnKVt8S3PafcevuGUcMR774UHte8mv1jAAFFebGxjvfwxfDgkXv6k9Rn0wr7ijLasCIxJrwVLvPv/K1LppMXcG8KL1DmQM=
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
- DB3PR0402MB3850.eurprd04.prod.outlook.com (52.134.65.151) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1446.19; Wed, 19 Dec 2018 05:41:31 +0000
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::adf8:f49d:deb4:58fd]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::adf8:f49d:deb4:58fd%3]) with mapi id 15.20.1425.023; Wed, 19 Dec 2018
- 05:41:31 +0000
-From: Anson Huang <anson.huang@nxp.com>
-To: "shawnguo@kernel.org" <shawnguo@kernel.org>, "s.hauer@pengutronix.de"
- <s.hauer@pengutronix.de>, "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>, "robh+dt@kernel.org"
- <robh+dt@kernel.org>, "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "devicetree@vger.kernel.org"
- <devicetree@vger.kernel.org>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>
-Subject: [PATCH] ARM: dts: imx6sl: correct PWM ipg clock source
-Thread-Topic: [PATCH] ARM: dts: imx6sl: correct PWM ipg clock source
-Thread-Index: AQHUl11+amh7uXSlqkCpQPqjHNiM7g==
-Date: Wed, 19 Dec 2018 05:41:31 +0000
-Message-ID: <1545197799-9082-1-git-send-email-Anson.Huang@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-mailer: git-send-email 2.7.4
-x-clientproxiedby: HK2PR02CA0211.apcprd02.prod.outlook.com
- (2603:1096:201:20::23) To DB3PR0402MB3916.eurprd04.prod.outlook.com
- (2603:10a6:8:10::18)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=anson.huang@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [119.31.174.66]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; DB3PR0402MB3850;
- 6:n9SAJ3dStDmboF5vGxOeNP/xTzo6ixIHqM/Xr7L73+p7cyi4hmvQxmqqwz2DrDA7cG7jWExla+PQJThfMggIfuxhCwkfyQqOG6yKVMnE0HkSfGAnAO/gG71n31yGp44Q7HyNaSD7V3FUE0rbeFZUVdQ6PFJ0XrR2U4Z6cjsJ5CM8SgO9+MT6YTUc2UsX2vfzP5/SJahzTPcGWvZ2Mx0eqD0AXlroV6IaadwdUkzJYBDmqMUNSxx/o1qRdTeB8G1rIKB7m9cA60Wi6inW5VLPH9eieuH00J/6cs968QOV2feYBwCmt6M5l/lzPlH3RYot0d4Lph/ZblkCoQPCgMuXHMNlvHlYQaFq7XTaOXpUZiuy4F3jVbtFyaYn496W/pCKkTuoO8TUMPrPvQlmHSlM6SRR0Td7NS930nkxumiGQTT/l9ty0RIOVfUNPYDB/RSfwa4iDuFQhNVK1vGoo4/W9Q==;
- 5:QfchUaNhX87sJnWDUz1S7vdTpO7EmQIvWGQeO680Q8ZF1Oocuw1lI3sjUWB3gGf8Ccxj+qd32G40DZdev1sOuc8waOxkutcZZqOg+0DdCQKe7lWHhCSfjwR27NWR9uckj+WBUbBoWDTwbrrzCRzejetmFoJS5CG9gcbAPCk2wb4=;
- 7:AgPsr16mr0gZGx8mCEYgXc7D3ZM0DyHEqxg7MXMpxrg9qT5gBzWE408L1fwHhKIl6JtHXPQTj0OtxqsegikteUetBlbjt4Mkkk6BLmqm5PFn+IufKDYL3vs9Rf6uVlZAO9PwSHv3s1i2IV5J7OWWPQ==
-x-ms-office365-filtering-correlation-id: 7d5ccf52-afa8-4c0b-fb89-08d66574a0e7
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(5600074)(711020)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
- SRVR:DB3PR0402MB3850; 
-x-ms-traffictypediagnostic: DB3PR0402MB3850:
-x-microsoft-antispam-prvs: <DB3PR0402MB38504243FDC249292E3AC465F5BE0@DB3PR0402MB3850.eurprd04.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(3230021)(999002)(6040522)(2401047)(5005006)(8121501046)(10201501046)(3002001)(3231475)(944501520)(52105112)(93006095)(93001095)(6055026)(148016)(149066)(150057)(6041310)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123564045)(20161123558120)(20161123560045)(201708071742011)(7699051)(76991095);
- SRVR:DB3PR0402MB3850; BCL:0; PCL:0; RULEID:; SRVR:DB3PR0402MB3850; 
-x-forefront-prvs: 0891BC3F3D
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(979002)(346002)(136003)(39860400002)(366004)(376002)(396003)(189003)(199004)(102836004)(186003)(386003)(6506007)(4326008)(26005)(53936002)(6512007)(8936002)(316002)(110136005)(86362001)(99286004)(71190400001)(71200400001)(7736002)(81166006)(8676002)(2201001)(25786009)(81156014)(305945005)(52116002)(6436002)(476003)(2616005)(36756003)(6486002)(486006)(50226002)(105586002)(106356001)(5660300001)(2906002)(14454004)(68736007)(14444005)(478600001)(256004)(66066001)(97736004)(2501003)(6116002)(3846002)(32563001)(969003)(989001)(999001)(1009001)(1019001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3850;
- H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: 9WwDoD67TZCW5rfZ9W+yGvRFsKNEUauwqundoBBzfxIEKnkPLzpaybAbdHbhqNHi1G04Sa+teRQsF+CHMIef0xazsBevlcV/YATeM0GYP/ABrjxQpKMON9ktOziZMbmueKsyMzeXIBoPaph/QdQR/neCIAJCeDBX+dhE2/vvjbt36SzC34R1xIKoYXw0cUBZBuy3WkwCklz2VH336nluzKydffyRhbqOn3wAd0LtrlkBrYM4ETGU9U7+cTUXW8ikJRRjRsr0IPUJC43uBddp4qp0Dc0veBIKadXCPFSxnHXYLJkIP16wuoRfIIycxpLl
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
-MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 7d5ccf52-afa8-4c0b-fb89-08d66574a0e7
-X-MS-Exchange-CrossTenant-originalarrivaltime: 19 Dec 2018 05:41:31.2195 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3850
+ id 1gZUeE-0006Xo-Gn; Wed, 19 Dec 2018 05:44:00 +0000
+Received: from localhost (unknown [IPv6:2601:601:9f80:35cd::cf9])
+ (using TLSv1 with cipher AES256-SHA (256/256 bits))
+ (Client did not present a certificate)
+ (Authenticated sender: davem-davemloft)
+ by shards.monkeyblade.net (Postfix) with ESMTPSA id 9DFBF12640956;
+ Tue, 18 Dec 2018 21:43:45 -0800 (PST)
+Date: Tue, 18 Dec 2018 21:43:44 -0800 (PST)
+Message-Id: <20181218.214344.703245035605109815.davem@davemloft.net>
+To: biao.huang@mediatek.com
+Subject: Re: [v2, PATCH 0/2] add ethernet binding and modify ethernet
+ driver for mt2712
+From: David Miller <davem@davemloft.net>
+In-Reply-To: <1545112096-22737-1-git-send-email-biao.huang@mediatek.com>
+References: <1545112096-22737-1-git-send-email-biao.huang@mediatek.com>
+X-Mailer: Mew version 6.8 on Emacs 26.1
+Mime-Version: 1.0
+X-Greylist: Sender succeeded SMTP AUTH, not delayed by milter-greylist-4.5.12
+ (shards.monkeyblade.net [149.20.54.216]);
+ Tue, 18 Dec 2018 21:43:46 -0800 (PST)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_214147_068189_78AF2E27 
-X-CRM114-Status: GOOD (  11.97  )
+X-CRM114-CacheID: sfid-20181218_214358_561700_0A2DA5FB 
+X-CRM114-Status: UNSURE (   7.63  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -126,63 +70,36 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dl-linux-imx <linux-imx@nxp.com>
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, nelson.chang@mediatek.com,
+ andrew@lunn.ch, netdev@vger.kernel.org, liguo.zhang@mediatek.com,
+ joabreu@synopsys.com, linux-kernel@vger.kernel.org, matthias.bgg@gmail.com,
+ robh+dt@kernel.org, linux-mediatek@lists.infradead.org,
+ honghui.zhang@mediatek.com, yt.shen@mediatek.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From i.MX6SL Reference Manual, the PWMx's ipg clock
-for registers access is from perclk, correct them.
+From: Biao Huang <biao.huang@mediatek.com>
+Date: Tue, 18 Dec 2018 13:48:14 +0800
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- arch/arm/boot/dts/imx6sl.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+> changes in v2 as comments from Sean:
+> 1. fix typo.
+> 2. use capital letters for RMII/MII/RGMII in driver and bindings.
+> 
+> v1:
+> This new series is the result of discussion in:
+> http://lkml.org/lkml/2018/12/13/1007
+> http://lkml.org/lkml/2018/12/14/53
+> 
+> 1. ethernet binding file move to this series.
+> 2. remove fine tune property in device tree
+> 3. remove fine tune flow in ethernet driver
+> 4. set rgmii timing according to the value in device tree,
+> and don't care whether phy insert internal delay  or not.
 
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index e7524e7..4b4813f 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -338,7 +338,7 @@
- 				compatible = "fsl,imx6sl-pwm", "fsl,imx27-pwm";
- 				reg = <0x02080000 0x4000>;
- 				interrupts = <0 83 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&clks IMX6SL_CLK_PWM1>,
-+				clocks = <&clks IMX6SL_CLK_PERCLK>,
- 					 <&clks IMX6SL_CLK_PWM1>;
- 				clock-names = "ipg", "per";
- 			};
-@@ -348,7 +348,7 @@
- 				compatible = "fsl,imx6sl-pwm", "fsl,imx27-pwm";
- 				reg = <0x02084000 0x4000>;
- 				interrupts = <0 84 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&clks IMX6SL_CLK_PWM2>,
-+				clocks = <&clks IMX6SL_CLK_PERCLK>,
- 					 <&clks IMX6SL_CLK_PWM2>;
- 				clock-names = "ipg", "per";
- 			};
-@@ -358,7 +358,7 @@
- 				compatible = "fsl,imx6sl-pwm", "fsl,imx27-pwm";
- 				reg = <0x02088000 0x4000>;
- 				interrupts = <0 85 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&clks IMX6SL_CLK_PWM3>,
-+				clocks = <&clks IMX6SL_CLK_PERCLK>,
- 					 <&clks IMX6SL_CLK_PWM3>;
- 				clock-names = "ipg", "per";
- 			};
-@@ -368,7 +368,7 @@
- 				compatible = "fsl,imx6sl-pwm", "fsl,imx27-pwm";
- 				reg = <0x0208c000 0x4000>;
- 				interrupts = <0 86 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&clks IMX6SL_CLK_PWM4>,
-+				clocks = <&clks IMX6SL_CLK_PERCLK>,
- 					 <&clks IMX6SL_CLK_PWM4>;
- 				clock-names = "ipg", "per";
- 			};
--- 
-2.7.4
-
+This series doesn't apply cleanly to the net-next tree.
 
 _______________________________________________
 linux-arm-kernel mailing list
