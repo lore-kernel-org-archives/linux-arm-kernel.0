@@ -2,23 +2,22 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 63C71C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 08:32:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E786FC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 08:37:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 30D2121852
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 08:32:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ADF0C2054F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 08:37:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PJUTyzGI";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="PowPuAL+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 30D2121852
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ivspmY7N"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ADF0C2054F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,46 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=V/iKAvyOGHDwEOlofyJXs04SqS2OFSb/eTIDiZOAibI=; b=PJUTyzGIAyeKnN
-	2t1OcnCKIEUJabi37Ai8U21hGc3uA1xIO5Wp6Aht96J3kxeI/a/9vWhcbKdyFPVCUFuYEFcC4l0Ig
-	+/x5wG/RSM5Z7GvfmACM50VxMgCvbNshQSz9KdZgO1u7NELq5qgkmuskRNDMX3Y1K2jmL9iQ2HeJb
-	twRZM2Y8IgKv7uiBTfJJS5MbHJwEd2MXC+wC12vDrora5neejTRBxkCjxflkWnjIdQrivWOq/CwxW
-	JhFSQaC72h3BxXGtDf0g8wqhL1oP+SqsVO23Q0wjLFPYn95tsYDt9sYIYdT1EPKsvE1BZxvHsvPXA
-	zq34eNyK6g6Qa1IBSkqg==;
+	List-Owner; bh=Nsh2P7gLy516yHpvQNbB5Zhv3mKP+attJSX9AwDvGBw=; b=ivspmY7NZvxPAC
+	yOxMneusmZVqAdUYP4jCLjL7/UapN7SRGj+TgEMMP0HIp/vGeVzTkMSAYi7x2buo437RxfaD8Qikb
+	zR+Voto8jhRNMJuYuo6EuQ0eFHpRCoGkSPJ1lJuAhx7BDuT2ky38n6GhBUyiIGjxbMEXnee2ysQdD
+	Xs0FRScfvg0X97WAGDO7Ubnk7Vo2c3ySelKOzip7wvK6X63LfhaWxPspKv+ozVO+LttvuqUICpOkO
+	1q131QBGx/WwFUANFZByoQ6XPpijO2lxX7ndIvoWoLleHYQmBpJ00ZPMi5uNtL4RCooQ4+qAbhTYY
+	a6nGvA2prJAPVryQMCIA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZXGp-0001Aj-G1; Wed, 19 Dec 2018 08:31:59 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gZXLi-0002yK-3d; Wed, 19 Dec 2018 08:37:02 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZXGl-00019q-T9
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 08:31:57 +0000
-Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id DA3E020675;
- Wed, 19 Dec 2018 08:31:44 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1545208305;
- bh=25FcZrnyAaynEKlrH4g1Skgm/+mVZaVhvlWlJvYz72g=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=PowPuAL+EolvMno8YkcKQmssPmBdb9NY4utQB+xSIEdnsj3n4BI1xkAz+kqzRtH3G
- ephOW+dnQsBLxRXKOm0rzwuaoZ/OUCwWUoyAheOh2D6xzEfYkuc4mrVAj1R28coddm
- 26zDkZ3lExSJZeu70zS7APiwfmvLhJzlvzNeOv2w=
-Date: Wed, 19 Dec 2018 09:31:43 +0100
-From: Greg KH <gregkh@linuxfoundation.org>
-To: Mathieu Poirier <mathieu.poirier@linaro.org>
-Subject: Re: [RESEND PATCH v5 2/6] perf/core: Use ioctl to communicate driver
- configuration to kernel
-Message-ID: <20181219083143.GB31670@kroah.com>
-References: <1545067306-31687-1-git-send-email-mathieu.poirier@linaro.org>
- <1545067306-31687-3-git-send-email-mathieu.poirier@linaro.org>
+ id 1gZXLd-0002xf-Vt
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 08:37:00 +0000
+Received: from ptx.hi.pengutronix.de ([2001:67c:670:100:1d::c0])
+ by metis.ext.pengutronix.de with esmtps
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1gZXLO-00017y-UF; Wed, 19 Dec 2018 09:36:42 +0100
+Received: from ukl by ptx.hi.pengutronix.de with local (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1gZXLN-000828-1D; Wed, 19 Dec 2018 09:36:41 +0100
+Date: Wed, 19 Dec 2018 09:36:40 +0100
+From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
+To: Anson Huang <anson.huang@nxp.com>
+Subject: Re: [PATCH] ARM: dts: imx6sl: correct PWM ipg clock source
+Message-ID: <20181219083640.42jmibqzn2t3i4t2@pengutronix.de>
+References: <1545197799-9082-1-git-send-email-Anson.Huang@nxp.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1545067306-31687-3-git-send-email-mathieu.poirier@linaro.org>
-User-Agent: Mutt/1.11.1 (2018-12-01)
+In-Reply-To: <1545197799-9082-1-git-send-email-Anson.Huang@nxp.com>
+User-Agent: NeoMutt/20170113 (1.7.2)
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c0
+X-SA-Exim-Mail-From: ukl@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_003155_975178_8F7183B5 
-X-CRM114-Status: GOOD (  23.12  )
+X-CRM114-CacheID: sfid-20181219_003658_180673_1BC3D1DF 
+X-CRM114-Status: GOOD (  16.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,195 +75,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, linux-s390@vger.kernel.org, peterz@infradead.org,
- will.deacon@arm.com, heiko.carstens@de.ibm.com, adrian.hunter@intel.com,
- acme@kernel.org, ast@kernel.org, alexander.shishkin@linux.intel.com,
- mingo@redhat.com, linux-arm-kernel@lists.infradead.org, hpa@zytor.com,
- schwidefsky@de.ibm.com, namhyung@kernel.org, tglx@linutronix.de,
- suzuki.poulosi@arm.com, jolsa@redhat.com, linux-kernel@vger.kernel.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ linux-pwm@vger.kernel.org, "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 17, 2018 at 10:21:42AM -0700, Mathieu Poirier wrote:
-> This patch adds the mechanic needed for user space to send PMU specific
-> configuration to the kernel driver using an ioctl() command.  That way
-> events can keep track of options that don't fit in the perf_event_attr
-> structure like the selection of a CoreSight sink to use for the session.
-> 
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+[Cc: +=3D linux-pwm]
+
+Hello,
+
+On Wed, Dec 19, 2018 at 05:41:31AM +0000, Anson Huang wrote:
+> From i.MX6SL Reference Manual, the PWMx's ipg clock
+> for registers access is from perclk, correct them.
+
+I assume this is related to the patch "pwm: imx: add ipg clock
+operation"? This patch doesn't fix a real problem because in practise
+perclk is already enabled, right? (I don't question the patch, just
+wonder how urgent it is.)
+
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 > ---
->  include/linux/perf_event.h | 38 ++++++++++++++++++++++++++
->  kernel/events/core.c       | 67 ++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 105 insertions(+)
-> 
-> diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-> index 53c500f0ca79..8e69b7e309e7 100644
-> --- a/include/linux/perf_event.h
-> +++ b/include/linux/perf_event.h
-> @@ -114,6 +114,14 @@ struct hw_perf_event_extra {
->  	int		idx;	/* index in shared_regs->regs[] */
->  };
->  
-> +/*
-> + * PMU driver configuration
-> + */
-> +struct pmu_drv_config {
-> +	void		*config;
-> +	raw_spinlock_t	lock;
-> +};
-> +
->  /**
->   * struct hw_perf_event - performance event hardware details:
->   */
-> @@ -178,6 +186,9 @@ struct hw_perf_event {
->  	/* Last sync'ed generation of filters */
->  	unsigned long			addr_filters_gen;
->  
-> +	/* PMU driver configuration */
-> +	struct pmu_drv_config		drv_config;
-> +
->  /*
->   * hw_perf_event::state flags; used to track the PERF_EF_* state.
->   */
-> @@ -447,6 +458,17 @@ struct pmu {
->  	 * Filter events for PMU-specific reasons.
->  	 */
->  	int (*filter_match)		(struct perf_event *event); /* optional */
-> +
-> +	/*
-> +	 * Validate complex PMU configuration that don't fit in the
-> +	 * perf_event_attr struct.  Returns a PMU specific pointer or an error
-> +	 * value < 0.
-> +	 *
-> +	 * As with addr_filters_validate(), runs in the context of the ioctl()
-> +	 * process and is not serialized with the rest of the PMU callbacks.
-> +	 */
-> +	void *(*drv_config_validate)	(struct perf_event *event,
-> +					 u64 value);
->  };
->  
->  enum perf_addr_filter_action_t {
-> @@ -1235,6 +1257,11 @@ static inline bool has_addr_filter(struct perf_event *event)
->  	return event->pmu->nr_addr_filters;
->  }
->  
-> +static inline bool has_drv_config(struct perf_event *event)
-> +{
-> +	return event->pmu->drv_config_validate;
-> +}
-> +
->  /*
->   * An inherited event uses parent's filters
->   */
-> @@ -1249,6 +1276,17 @@ perf_event_addr_filters(struct perf_event *event)
->  	return ifh;
->  }
->  
-> +static inline struct pmu_drv_config *
-> +perf_event_get_drv_config(struct perf_event *event)
-> +{
-> +	struct pmu_drv_config *cfg = &event->hw.drv_config;
-> +
-> +	if (event->parent)
-> +		cfg = &event->parent->hw.drv_config;
-> +
-> +	return cfg;
-> +}
-> +
->  extern void perf_event_addr_filters_sync(struct perf_event *event);
->  
->  extern int perf_output_begin(struct perf_output_handle *handle,
-> diff --git a/kernel/events/core.c b/kernel/events/core.c
-> index 84530ab358c3..af7a53c97744 100644
-> --- a/kernel/events/core.c
-> +++ b/kernel/events/core.c
-> @@ -5003,6 +5003,8 @@ static inline int perf_fget_light(int fd, struct fd *p)
->  static int perf_event_set_output(struct perf_event *event,
->  				 struct perf_event *output_event);
->  static int perf_event_set_filter(struct perf_event *event, void __user *arg);
-> +static int perf_event_set_drv_config(struct perf_event *event,
-> +				     void __user *arg);
->  static int perf_event_set_bpf_prog(struct perf_event *event, u32 prog_fd);
->  static int perf_copy_attr(struct perf_event_attr __user *uattr,
->  			  struct perf_event_attr *attr);
-> @@ -5089,6 +5091,10 @@ static long _perf_ioctl(struct perf_event *event, unsigned int cmd, unsigned lon
->  
->  		return perf_event_modify_attr(event,  &new_attr);
->  	}
-> +
-> +	case PERF_EVENT_IOC_SET_DRV_CONFIG:
-> +		return perf_event_set_drv_config(event, (void __user *)arg);
-> +
->  	default:
->  		return -ENOTTY;
->  	}
-> @@ -9128,6 +9134,66 @@ static int perf_event_set_filter(struct perf_event *event, void __user *arg)
->  	return ret;
->  }
->  
-> +static void perf_drv_config_replace(struct perf_event *event, void *drv_data)
-> +{
-> +	unsigned long flags;
-> +	struct pmu_drv_config *drv_config = &event->hw.drv_config;
-> +
-> +	if (!has_drv_config(event))
-> +		return;
-> +
-> +	/* Children take their configuration from their parent */
-> +	if (event->parent)
-> +		return;
-> +
-> +	/* Make sure the PMU doesn't get a handle on the data */
-> +	raw_spin_lock_irqsave(&drv_config->lock, flags);
-> +	drv_config->config = drv_data;
-> +	raw_spin_unlock_irqrestore(&drv_config->lock, flags);
-> +}
-> +
-> +static int
-> +perf_event_process_drv_config(struct perf_event *event, u64 value)
-> +{
-> +	int ret = -EINVAL;
-> +	void *drv_data;
-> +
-> +	/* Make sure ctx.mutex is held */
-> +	lockdep_assert_held(&event->ctx->mutex);
-> +
-> +	/* Children take their configuration from their parent */
-> +	if (WARN_ON_ONCE(event->parent))
-> +		goto out;
-> +
-> +	drv_data = event->pmu->drv_config_validate(event, value);
-> +	if (IS_ERR(drv_data)) {
-> +		ret = PTR_ERR(drv_data);
-> +		goto out;
-> +	}
-> +
-> +	perf_drv_config_replace(event, drv_data);
-> +
-> +	ret = 0;
-> +out:
-> +	return ret;
-> +}
-> +
-> +static int perf_event_set_drv_config(struct perf_event *event, void __user *arg)
-> +{
-> +	int ret;
-> +	u64 value;
-> +
-> +	if (!has_drv_config(event))
-> +		return -EINVAL;
-> +
-> +	if (copy_from_user(&value, arg, sizeof(value)))
-> +		return -EFAULT;
+>  arch/arm/boot/dts/imx6sl.dtsi | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> =
 
-You are just sending in a pointer to a u64?  Why not just pass a u64
-directly instead?  Why is a pointer needed here?
+> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+> index e7524e7..4b4813f 100644
+> --- a/arch/arm/boot/dts/imx6sl.dtsi
+> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+> @@ -338,7 +338,7 @@
+>  				compatible =3D "fsl,imx6sl-pwm", "fsl,imx27-pwm";
+>  				reg =3D <0x02080000 0x4000>;
+>  				interrupts =3D <0 83 IRQ_TYPE_LEVEL_HIGH>;
+> -				clocks =3D <&clks IMX6SL_CLK_PWM1>,
+> +				clocks =3D <&clks IMX6SL_CLK_PERCLK>,
+>  					 <&clks IMX6SL_CLK_PWM1>;
+>  				clock-names =3D "ipg", "per";
 
-thanks,
+It's a bit irritating that IMX6SL_CLK_PERCLK is used for the "ipg" clk,
+not the "per" clk. Is this correct?
 
-greg k-h
+Best regards
+Uwe
+
+-- =
+
+Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 
 _______________________________________________
 linux-arm-kernel mailing list
