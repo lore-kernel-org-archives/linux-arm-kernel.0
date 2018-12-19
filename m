@@ -2,92 +2,108 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C94EFC43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 16:14:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3B0D1C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 16:14:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9986F2084A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 16:14:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0B4602084A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 16:14:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LZRoxH+b";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="OGbgnkVM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9986F2084A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=korsgaard.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P1xcAMkV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0B4602084A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:In-Reply-To:
-	Date:References:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=yUs0k3DTxNymdBHPDqcPtu7KR7it04w8Xh76cHv+z+8=; b=LZRoxH+bDldWmt
-	CVWCQuK+SykhJWRmFyLRjwhvx8uk7gkQmJcPrO1j0e+FeIB0e7c/c384lGqphnWBEv1wkhL+xe8qX
-	iMAQVaMMJAryhe5NYwQF/HhRbpYiO7fa59Lo1LYsSPpHRJ7SxvmhkQItbolMWVgUXMCuR7J7p8NA4
-	P4Nk5K5f+aOoi4rmO0nBhpXcaYPnkWsdUSHe0xfP+NKVNQlA7ztk7F/LTBbMXniWq2hj7WmtSzuc9
-	UNOLPFBTOElU5xDXMAWb0z67jtmdyZAwQmhY0Q3jsegF+sbUxh/4NUTOGxeULQ5vKykmI3PEMWG8j
-	Xv8iIzrC+mMeq5jP0LGg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=47gKBehQIyQNgtf9vkXF1DlSUvrC5sAc7R5KxZ6OTCk=; b=P1xcAMkVwiD/UA
+	9LXe5uLaHrZVnMgAwJEdifo/KOFAlYjkel0REgoOC+GVVz9btGS15MnOgsUR1UxzW/8cDGEvPR1W8
+	dkOPGHYlS5GvjjSTK4YcNC70EpwC50Otr06+sGVTY8qNvV9ghSj64YEKMWAXneOyuiTvlfXRfFEBe
+	DdYEHtBUzQAI9I38g5W+PzNMDWcLp3Gwzrve6o62JAnMP2M0AfVVEolTQWba7+iAHqczENZUM2Ybn
+	Fjk5ejYU0Up1r7rX2rklWiLUz6bk/J4MNdHbOL4OE1o233lqSJBQuXjGSP0Rm5PbAclASQ+tttWRr
+	ae0jNRWS88KtYvuPYYTA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZeTu-000538-Ro; Wed, 19 Dec 2018 16:13:58 +0000
-Received: from mail-ed1-x542.google.com ([2a00:1450:4864:20::542])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZeTq-00051E-FW; Wed, 19 Dec 2018 16:13:56 +0000
-Received: by mail-ed1-x542.google.com with SMTP id y20so11311919edw.9;
- Wed, 19 Dec 2018 08:13:43 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=sender:from:to:cc:subject:references:date:in-reply-to:message-id
- :user-agent:mime-version;
- bh=8oLwxm5kpQNbRjEQiLdYycEfgUMa8qdreVebJWXXSYo=;
- b=OGbgnkVMHCW7MiFeXFmLCZ3rv0Cq4ZxKE8wraoO2cKVtoyMDlesI0Kck/5+jiMdMxA
- ypaBwaNIMeX78ZlB+C5nS6k1drnR2Z2OFznk34Cv7Z3w2FxKha7v0w/9POqWzEVVz2FL
- YXWkJBuO5A7WKE7bWg7TgRPqJuoG8+5zdBLXuOGRNoRmk1jpGaZSOYubHUPYVu3iy3Io
- I5DJAcFgEN8llSlrPHXK7UOAXdVLVlfyQUzPcxzpnV1u9GY+DhUgl6UrPqdbIG5/7ODB
- IMuuxSZvozoP7at5IDmiA9plqE7AQRf9QtJnroPkeqNg1p5SHEzOf3xiiZBDNo/YwvyK
- 8l6Q==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:sender:from:to:cc:subject:references:date
- :in-reply-to:message-id:user-agent:mime-version;
- bh=8oLwxm5kpQNbRjEQiLdYycEfgUMa8qdreVebJWXXSYo=;
- b=eeZwdXAAakGG+M1l9egGjjtg0IAkECcC9NtDd+p+RAwA78OQCzfjVOt6e+7GrqtA9k
- NItkJPwptavAcFhPkaP9Bz/LhjUwU2TJtvlWUwi4CKDvYNV+7YmO52ihlqDBVSfvB4RT
- MNsK7R7bVmc1QMYa8dsJT4QCqjSgjIaIAG3osw5IpFBbfDadRhNchHW2DzgJ+Y/W7QDx
- rnBXHmmXLTquphif83GnWMS4k8ytWHz/KAJCeMZiRUzNEbPsdNAv/QVwrSWUtmz0IBVu
- qXw7PRVkUj1M1K0QzAG/lWtANDHv4FJ9dadcErVD9aOkGB7AC50ITcP5m0QONY6xjSYu
- A7Lw==
-X-Gm-Message-State: AA+aEWazvDg/zjAcEBFNq6ahvnYubGGv2RxPzII2xGvHWnG3YMmuOQO4
- WGOut8NcWM4PwRuGLNR2wuE=
-X-Google-Smtp-Source: AFSGD/Vr1oxySFbG6ytHgZX/xfmQlhhTI3e9kwXZEY6ik6DttQkATyKi0KESE0Kk29q9mJ0eOub2WA==
-X-Received: by 2002:a50:fc07:: with SMTP id i7mr20647605edr.153.1545236022007; 
- Wed, 19 Dec 2018 08:13:42 -0800 (PST)
-Received: from dell.be.48ers.dk (d51a5bc31.access.telenet.be. [81.165.188.49])
- by smtp.gmail.com with ESMTPSA id
- z6-v6sm2798957ejq.63.2018.12.19.08.13.40
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 19 Dec 2018 08:13:40 -0800 (PST)
-Received: from peko by dell.be.48ers.dk with local (Exim 4.89)
- (envelope-from <peter@korsgaard.com>)
- id 1gZeTb-0005XC-RZ; Wed, 19 Dec 2018 17:13:39 +0100
-From: Peter Korsgaard <peter@korsgaard.com>
-To: Kevin Hilman <khilman@baylibre.com>
-Subject: Re: [PATCH 2/2] arm64: dts: meson: add g12a x96 max board
-References: <20181219002620.12138-1-khilman@baylibre.com>
- <20181219002620.12138-2-khilman@baylibre.com>
-Date: Wed, 19 Dec 2018 17:13:39 +0100
-In-Reply-To: <20181219002620.12138-2-khilman@baylibre.com> (Kevin Hilman's
- message of "Tue, 18 Dec 2018 16:26:20 -0800")
-Message-ID: <877eg51olo.fsf@dell.be.48ers.dk>
-User-Agent: Gnus/5.13 (Gnus v5.13) Emacs/24.5 (gnu/linux)
+	id 1gZeUR-0005QA-CY; Wed, 19 Dec 2018 16:14:31 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZeUN-0005Je-8N
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 16:14:28 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 92D8180D;
+ Wed, 19 Dec 2018 08:14:14 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ 418993F675; Wed, 19 Dec 2018 08:14:13 -0800 (PST)
+Subject: Re: [WRONG] KVM: arm/arm64: vgic: fix off-by-one bug in vgic_get_irq()
+To: "Gustavo A. R. Silva" <gustavo@embeddedor.com>,
+ Christoffer Dall <christoffer.dall@arm.com>,
+ Mark Rutland <mark.rutland@arm.com>
+References: <20181219151149.GA6524@embeddedor>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ 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
+Organization: ARM Ltd
+Message-ID: <f87c9c81-37ab-48eb-4031-dca89f8fce37@arm.com>
+Date: Wed, 19 Dec 2018 16:14:10 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
+In-Reply-To: <20181219151149.GA6524@embeddedor>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_081354_553804_032D3DE9 
-X-CRM114-Status: GOOD (  16.70  )
+X-CRM114-CacheID: sfid-20181219_081427_301425_1E7B067F 
+X-CRM114-Status: GOOD (  23.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,51 +115,69 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org,
- devicetree@vger.kernel.org
+Cc: stable@vger.kernel.org, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
->>>>> "Kevin" == Kevin Hilman <khilman@baylibre.com> writes:
+Hi Gustavo,
 
- > Add the G12a (S905X2) based X96 Max board[1].
- > There is no branding for the manufacturer anywhere on the product, so it
- > took some digging to find the manufacturer.  But since there's nothing
- > about the maker on the product I've left it out of the DT name because
- > 1) nobody will no that name and 2) keeps the DT filename shorter.
+On 19/12/2018 15:11, Gustavo A. R. Silva wrote:
+> Hi Marc,
+> 
+> This is wrong: commit 6022fcc0e87a0eb5e9a72b15ed70dd29ebcb7343
+> 
+> The above is not my original patch and it should not be tagged for stable,
+> as it introduces the same kind of bug I intended to fix:
+> 
+> array_index_nospec() can now return kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS
+> and this is not what you want. So, in this case the following line of code
+> is just fine as it is:
+> 
+> intid = array_index_nospec(intid, kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS); 
+> 
+> 
+> As the commit log says, my patch fixes:
+> 
+> commit 41b87599c74300027f305d7b34368ec558978ff2
+> 
+> not both:
+> 
+> commit 41b87599c74300027f305d7b34368ec558978ff2
+> 
+> and 
+> 
+> commit bea2ef803ade3359026d5d357348842bca9edcf1
+> 
+> If you want to apply the fix on top of bea2ef803ade3359026d5d357348842bca9edcf1
+> then you should apply this instead:
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> index bb1a83345741..e607547c7bb0 100644
+> --- a/virt/kvm/arm/vgic/vgic.c
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -103,7 +103,7 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+>  {
+>         /* SGIs and PPIs */
+>         if (intid <= VGIC_MAX_PRIVATE) {
+> -               intid = array_index_nospec(intid, VGIC_MAX_PRIVATE);
+> +               intid = array_index_nospec(intid, VGIC_MAX_PRIVATE + 1);
+>                 return &vcpu->arch.vgic_cpu.private_irqs[intid];
+>         }
+>  
+> 
+> The commit log should remain the same.
 
-s/no/know/
+I indeed completely fscked up the conflict resolution, clearly not
+engaging my brain. I'll fix that quickly.
 
+Thanks for the heads up.
 
- > [1] https://www.cnx-software.com/2018/09/25/x96-max-amlogic-s905x2-tv-box/
-
- > Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
- > Signed-off-by: Kevin Hilman <khilman@baylibre.com>
- > ---
- > Special thanks to Martin Blumenstingl for extra digging for the manufacturer
-
- >  .../boot/dts/amlogic/meson-g12a-x96-max.dts   | 28 +++++++++++++++++++
- >  1 file changed, 28 insertions(+)
- >  create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a-x96-max.dts
-
- > diff --git a/arch/arm64/boot/dts/amlogic/meson-g12a-x96-max.dts
- > b/arch/arm64/boot/dts/amlogic/meson-g12a-x96-max.dts
- > new file mode 100644
- > index 000000000000..fe94765b671e
- > --- /dev/null
- > +++ b/arch/arm64/boot/dts/amlogic/meson-g12a-x96-max.dts
- > @@ -0,0 +1,28 @@
- > +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
- > +/*
- > + * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
-
-Amlogic? Shouldn't that be Baylibre?
-
+	M.
 -- 
-Bye, Peter Korsgaard
+Jazz is not dead. It just smells funny...
 
 _______________________________________________
 linux-arm-kernel mailing list
