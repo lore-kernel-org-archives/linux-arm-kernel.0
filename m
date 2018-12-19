@@ -2,63 +2,84 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0B874C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 05:44:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 536EDC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 06:24:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C874721871
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 05:44:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 223A1217D6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 06:24:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MYadLtY3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C874721871
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=davemloft.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UOufuSJu";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="aHDlkJni"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 223A1217D6
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	From:Subject:To:Message-Id:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=uwFpjhOYZR6HJxoTleJIFRkstlwIkLVm8zE0PxSHcvU=; b=MYadLtY3wAYIwG
-	0U5/4br3piPymEp2dEFFrK+6CJHAi5F2OpYMq5ibBOv6YizmzUU/GPeKvXjWjj4o6/oIezrgaybTw
-	HvJ+aCCEvyCVEI4EOTsbi8pB1BwUavZY85UN4mk8AbZmt9sfm4s+Q0Dejpxg716SK4+INp6NltLyk
-	367dtlBgyjTyPE2Q+3Fu7emgn+UgL9moQ41nSZfQgI+YvgjSRilIZR28/1kE36iOn/Ah4HBvGsGXS
-	qcqAwW6jZpp2jV3h+UrXgB9phdx9Iv+oWc03qv6VBP+D58qKudTDgqOyqmDBZdcbpGGknZ+mJHLVz
-	rVUiQMmwskuW5vHRzPVA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=zHVZOFAIb/ovuUUCiLu+2itYcNS7V+P/lR9w2FmO6yc=; b=UOufuSJuto8T249ANuMINmiWt
+	4jeIQWAlK/a2FgWueXfNDetSyUTIbqr+w2JY3CsSGqqu+13PhSW5fx2ZcrOUS/yrxNOlmplbax+Wh
+	NJ40lCrR8Z5WRvUZX9bqkK+DTP7pXFOdcDrIWZiudNgYRhFggvuevOHbnpK5ID99ZEro716y7Hq6s
+	S9jWIIUTUxILywhErYnv99HugJsrV/9JgZxu9qb7rkoTjIqqAg/wkBkq9rSV3Ox6RCmS63WWqcQ7v
+	3ukCFBosToZnTr3VBjZU8L71EbC5laESXwceL53xDVqTLSSl6qHTJTSzYqrQpVd3DnBA+hDyrMnxw
+	JieZttJ0w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZUeH-0006Yx-OB; Wed, 19 Dec 2018 05:44:01 +0000
-Received: from shards.monkeyblade.net ([2620:137:e000::1:9])
+	id 1gZVHQ-0003Bn-27; Wed, 19 Dec 2018 06:24:28 +0000
+Received: from hqemgate16.nvidia.com ([216.228.121.65])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZUeE-0006Xo-Gn; Wed, 19 Dec 2018 05:44:00 +0000
-Received: from localhost (unknown [IPv6:2601:601:9f80:35cd::cf9])
- (using TLSv1 with cipher AES256-SHA (256/256 bits))
- (Client did not present a certificate)
- (Authenticated sender: davem-davemloft)
- by shards.monkeyblade.net (Postfix) with ESMTPSA id 9DFBF12640956;
- Tue, 18 Dec 2018 21:43:45 -0800 (PST)
-Date: Tue, 18 Dec 2018 21:43:44 -0800 (PST)
-Message-Id: <20181218.214344.703245035605109815.davem@davemloft.net>
-To: biao.huang@mediatek.com
-Subject: Re: [v2, PATCH 0/2] add ethernet binding and modify ethernet
- driver for mt2712
-From: David Miller <davem@davemloft.net>
-In-Reply-To: <1545112096-22737-1-git-send-email-biao.huang@mediatek.com>
-References: <1545112096-22737-1-git-send-email-biao.huang@mediatek.com>
-X-Mailer: Mew version 6.8 on Emacs 26.1
-Mime-Version: 1.0
-X-Greylist: Sender succeeded SMTP AUTH, not delayed by milter-greylist-4.5.12
- (shards.monkeyblade.net [149.20.54.216]);
- Tue, 18 Dec 2018 21:43:46 -0800 (PST)
+ id 1gZVHN-0003Ar-Dw
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 06:24:26 +0000
+Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
+ hqemgate16.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c19e4050000>; Tue, 18 Dec 2018 22:24:05 -0800
+Received: from hqmail.nvidia.com ([172.20.161.6])
+ by hqpgpgate101.nvidia.com (PGP Universal service);
+ Tue, 18 Dec 2018 22:24:14 -0800
+X-PGP-Universal: processed;
+ by hqpgpgate101.nvidia.com on Tue, 18 Dec 2018 22:24:14 -0800
+Received: from [10.19.108.132] (10.124.1.5) by HQMAIL101.nvidia.com
+ (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Wed, 19 Dec
+ 2018 06:24:12 +0000
+Subject: Re: [PATCH V3 11/20] cpufreq: tegra124: do not handle the CPU rail
+To: "Rafael J. Wysocki" <rafael@kernel.org>
+References: <20181218091232.23532-1-josephl@nvidia.com>
+ <20181218091232.23532-12-josephl@nvidia.com>
+ <CAJZ5v0h0n2AXERvXFX_dQWMUw_89ap_LgB6dUK0ThJgZ+unkkQ@mail.gmail.com>
+From: Joseph Lo <josephl@nvidia.com>
+Message-ID: <312ac6e6-0480-b638-a26b-311013929c2c@nvidia.com>
+Date: Wed, 19 Dec 2018 14:24:09 +0800
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
+MIME-Version: 1.0
+In-Reply-To: <CAJZ5v0h0n2AXERvXFX_dQWMUw_89ap_LgB6dUK0ThJgZ+unkkQ@mail.gmail.com>
+X-Originating-IP: [10.124.1.5]
+X-ClientProxiedBy: HQMAIL101.nvidia.com (172.20.187.10) To
+ HQMAIL101.nvidia.com (172.20.187.10)
+Content-Language: en-US
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
+ t=1545200645; bh=BiTYUVA34jkJLRtNX4un/pBfxSssEgZGF8EyExGhoVw=;
+ h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
+ User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
+ X-ClientProxiedBy:Content-Type:Content-Language:
+ Content-Transfer-Encoding;
+ b=aHDlkJnieDuIkwJ9qagH6NB5QiCP30YcepD36J7sBHXeB8PUVGt4TNX0egTi3GxSn
+ qZHweyBYit350zwNJjllL+iTVwhUlOTA9KrMEooLkzY7he+2hH8QwTXxH7vM8hnrAw
+ PY+c5Bte52UfV9uKy+Khd/lxYhKwSAcdYLPL8sQw9mzfDp3DgpNPqykN7fsGNFaJJa
+ +kCt+CPwYTFTK4vXnFwnhPiHCohFjO33kuoNyvswm0RNbG/UKbAwBTyJ9biOOQKPEc
+ IM8bYAmtGo+StZ0uPkMvwxd9XWYbcJ7fuwHXyPzqr8LAqoEJz8+X1HjiYn6L49Hd7o
+ Ai/48n/rk5A8g==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_214358_561700_0A2DA5FB 
-X-CRM114-Status: UNSURE (   7.63  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181218_222425_480241_AC68A771 
+X-CRM114-Status: GOOD (  15.65  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,36 +91,48 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, nelson.chang@mediatek.com,
- andrew@lunn.ch, netdev@vger.kernel.org, liguo.zhang@mediatek.com,
- joabreu@synopsys.com, linux-kernel@vger.kernel.org, matthias.bgg@gmail.com,
- robh+dt@kernel.org, linux-mediatek@lists.infradead.org,
- honghui.zhang@mediatek.com, yt.shen@mediatek.com,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: Linux PM <linux-pm@vger.kernel.org>, Viresh Kumar <viresh.kumar@linaro.org>,
+ Peter De Schrijver <pdeschrijver@nvidia.com>,
+ Jon Hunter <jonathanh@nvidia.com>, Thierry Reding <thierry.reding@gmail.com>,
+ linux-tegra@vger.kernel.org, linux-clk <linux-clk@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Biao Huang <biao.huang@mediatek.com>
-Date: Tue, 18 Dec 2018 13:48:14 +0800
-
-> changes in v2 as comments from Sean:
-> 1. fix typo.
-> 2. use capital letters for RMII/MII/RGMII in driver and bindings.
+On 12/18/18 5:37 PM, Rafael J. Wysocki wrote:
+> On Tue, Dec 18, 2018 at 10:13 AM Joseph Lo <josephl@nvidia.com> wrote:
+>>
+>> The Tegra124 cpufreq driver has no information to handle the Vdd-CPU
+>> rail. So this driver shouldn't handle for the CPU clock switching from
+>> DFLL to other PLL clocks. It was designed to work on DFLL clock only,
+>> which handle the frequency/voltage scaling in the background.
+>>
+>> This patch removes the driver dependency of the CPU rail, as well as not
+>> allow it to be built as a module and remove the removal function. So it
+>> can keep working on DFLL clock.
+>>
+>> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+>> Cc: linux-pm@vger.kernel.org
+>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+>> Acked-by: Jon Hunter <jonathanh@nvidia.com>
+>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 > 
-> v1:
-> This new series is the result of discussion in:
-> http://lkml.org/lkml/2018/12/13/1007
-> http://lkml.org/lkml/2018/12/14/53
+> I'm assuming that this entire series will go in via arm-soc, so I
+> won't be picking up the cpufreq patches from it.
 > 
-> 1. ethernet binding file move to this series.
-> 2. remove fine tune property in device tree
-> 3. remove fine tune flow in ethernet driver
-> 4. set rgmii timing according to the value in device tree,
-> and don't care whether phy insert internal delay  or not.
+> Please let me know if that is not what you want.
+> 
+> Thanks,
+> Rafael
+> 
 
-This series doesn't apply cleanly to the net-next tree.
+Hi Rafael,
+
+Thanks, will check with Thierry.
+
+Joseph
 
 _______________________________________________
 linux-arm-kernel mailing list
