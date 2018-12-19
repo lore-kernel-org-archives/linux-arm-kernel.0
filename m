@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 294B2C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:07:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D2B92C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:07:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D072A218AE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:07:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A4E8F217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:07:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="os4VL5AF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D072A218AE
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WTrgEDZb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A4E8F217D9
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,41 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lvQzFld1SIlJiQX3AR1DYg5dO765c/WtqqRaPgrZde8=; b=os4VL5AFwNQ4PW
-	YseaoPEFKpZ7j9mZcoQtq8aQ48xQd8r9PLHLqOA5h5xmzl7HqgQkSo49ADqiozbRKmB9Y9Nsh0EIZ
-	U4nGcq87QdrMauWut7ESLJgGWHswD6dlU0PumOIcfvBg5VT2WxfGzL8oG+odsc1QdQ+V7sFYbPJ3q
-	0gYaa2oizJRueLwQMFV/3Qbmpts8fHdLNZ6vACvWRkgPA7WyawJvtNQ1ut8C8l+AYhsIGu6vsvMbD
-	ChCJrIuQpzQ45EeOEhitm7aFVxnMpPfr9VsxiWO/KXL9xGeHTJ1NcgNlutzJoyeJMvcJJhTRDtviW
-	TMOS2u5lJ+tF/WIHfJdQ==;
+	List-Owner; bh=sXmaoO8nApQOhQY2GkjfSmByfPowBeLEgnF/ikBVjrU=; b=WTrgEDZbEzZ0p7
+	4d0QaFPNAAC/4/eH8LkX0E1L9YndkDrQBSrMPhCw/JtP1aFbrfSOdl29CJ8Brq8lc+mpOdn9M3Kjl
+	4I3Iee2PbBRUJv+jt5uE/RvaPmF+dckZWg+cGXuUo9em4gtVgpZ+spqOYdictihI0pzA4Qt8kHLeo
+	W/VJ0hVJ6xWlU24pxLb2KBjwDpTYBvlr8Dz4Y5lFCYncHuOpKRghRQyYxSV/kzV9Y+9FJylyhBvJQ
+	eSGkegQOV/wcVIfkx5ggV2q+RSb1rcB6mOa+gdHW6tR1mZmWAGBMhL+fUQWsIL/x3L27Z0gUfn7mb
+	lFH8Dt5SdIdLzlWPbRFg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZgFj-0001P2-LA; Wed, 19 Dec 2018 18:07:27 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gZgFy-0001eg-8O; Wed, 19 Dec 2018 18:07:42 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZgD2-0005sV-JE
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 18:04:46 +0000
+ id 1gZgDF-0006AY-5R
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 18:05:01 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 228CAA78;
- Wed, 19 Dec 2018 10:04:40 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id DE4E915AB;
+ Wed, 19 Dec 2018 10:04:42 -0800 (PST)
 Received: from filthy-habits.cambridge.arm.com
  (filthy-habits.cambridge.arm.com [10.1.196.62])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 976A23F675;
- Wed, 19 Dec 2018 10:04:37 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5F7CE3F675;
+ Wed, 19 Dec 2018 10:04:40 -0800 (PST)
 From: Marc Zyngier <marc.zyngier@arm.com>
 To: Paolo Bonzini <pbonzini@redhat.com>,
  =?UTF-8?q?Radim=20Kr=C4=8Dm=C3=A1=C5=99?= <rkrcmar@redhat.com>
-Subject: [PATCH 11/28] KVM: arm64: Support handling access faults for PUD
- hugepages
-Date: Wed, 19 Dec 2018 18:03:32 +0000
-Message-Id: <20181219180349.242681-12-marc.zyngier@arm.com>
+Subject: [PATCH 12/28] KVM: arm64: Update age handlers to support PUD hugepages
+Date: Wed, 19 Dec 2018 18:03:33 +0000
+Message-Id: <20181219180349.242681-13-marc.zyngier@arm.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181219180349.242681-1-marc.zyngier@arm.com>
 References: <20181219180349.242681-1-marc.zyngier@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_100441_031182_4D2B3315 
-X-CRM114-Status: GOOD (  16.64  )
+X-CRM114-CacheID: sfid-20181219_100453_810509_1C56CBBB 
+X-CRM114-Status: GOOD (  15.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,150 +84,145 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Punit Agrawal <punit.agrawal@arm.com>
 
-In preparation for creating larger hugepages at Stage 2, extend the
-access fault handling at Stage 2 to support PUD hugepages when
-encountered.
+In preparation for creating larger hugepages at Stage 2, add support
+to the age handling notifiers for PUD hugepages when encountered.
 
-Provide trivial helpers for arm32 to allow sharing of code.
+Provide trivial helpers for arm32 to allow sharing code.
 
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
 Cc: Russell King <linux@armlinux.org.uk>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-[ Replaced BUG() => WARN_ON(1) in PUD helpers ]
+[ Replaced BUG() => WARN_ON(1) for arm32 PUD helpers ]
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_mmu.h   |  9 +++++++++
- arch/arm64/include/asm/kvm_mmu.h |  7 +++++++
- arch/arm64/include/asm/pgtable.h |  6 ++++++
- virt/kvm/arm/mmu.c               | 22 +++++++++++-----------
- 4 files changed, 33 insertions(+), 11 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   |  6 +++++
+ arch/arm64/include/asm/kvm_mmu.h |  5 ++++
+ arch/arm64/include/asm/pgtable.h |  1 +
+ virt/kvm/arm/mmu.c               | 39 ++++++++++++++++----------------
+ 4 files changed, 32 insertions(+), 19 deletions(-)
 
 diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index a49655fe7cd9..3a407204b957 100644
+index 3a407204b957..4b4b2146e6a0 100644
 --- a/arch/arm/include/asm/kvm_mmu.h
 +++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -85,6 +85,9 @@ void kvm_clear_hyp_idmap(void);
- #define kvm_pfn_pte(pfn, prot)	pfn_pte(pfn, prot)
- #define kvm_pfn_pmd(pfn, prot)	pfn_pmd(pfn, prot)
- 
-+#define kvm_pud_pfn(pud)	({ WARN_ON(1); 0; })
-+
-+
- #define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
- 
- /*
-@@ -108,6 +111,12 @@ static inline bool kvm_s2pud_exec(pud_t *pud)
- 	return false;
+@@ -117,6 +117,12 @@ static inline pud_t kvm_s2pud_mkyoung(pud_t pud)
+ 	return pud;
  }
  
-+static inline pud_t kvm_s2pud_mkyoung(pud_t pud)
++static inline bool kvm_s2pud_young(pud_t pud)
 +{
-+	BUG();
-+	return pud;
++	WARN_ON(1);
++	return false;
 +}
 +
  static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
  {
  	pte_val(pte) |= L_PTE_S2_RDWR;
 diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index c755b37b3f92..612032bbb428 100644
+index 612032bbb428..9f941f70775c 100644
 --- a/arch/arm64/include/asm/kvm_mmu.h
 +++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -187,6 +187,8 @@ void kvm_clear_hyp_idmap(void);
- #define kvm_pfn_pte(pfn, prot)		pfn_pte(pfn, prot)
- #define kvm_pfn_pmd(pfn, prot)		pfn_pmd(pfn, prot)
- 
-+#define kvm_pud_pfn(pud)		pud_pfn(pud)
-+
- #define kvm_pmd_mkhuge(pmd)		pmd_mkhuge(pmd)
- 
- static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
-@@ -266,6 +268,11 @@ static inline bool kvm_s2pud_exec(pud_t *pudp)
- 	return !(READ_ONCE(pud_val(*pudp)) & PUD_S2_XN);
+@@ -273,6 +273,11 @@ static inline pud_t kvm_s2pud_mkyoung(pud_t pud)
+ 	return pud_mkyoung(pud);
  }
  
-+static inline pud_t kvm_s2pud_mkyoung(pud_t pud)
++static inline bool kvm_s2pud_young(pud_t pud)
 +{
-+	return pud_mkyoung(pud);
++	return pud_young(pud);
 +}
 +
  #define hyp_pte_table_empty(ptep) kvm_page_empty(ptep)
  
  #ifdef __PAGETABLE_PMD_FOLDED
 diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 50b1ef8584c0..f51e2271e6a3 100644
+index f51e2271e6a3..bb0f3f17a7a9 100644
 --- a/arch/arm64/include/asm/pgtable.h
 +++ b/arch/arm64/include/asm/pgtable.h
-@@ -314,6 +314,11 @@ static inline pte_t pud_pte(pud_t pud)
- 	return __pte(pud_val(pud));
- }
- 
-+static inline pud_t pte_pud(pte_t pte)
-+{
-+	return __pud(pte_val(pte));
-+}
-+
- static inline pmd_t pud_pmd(pud_t pud)
- {
- 	return __pmd(pud_val(pud));
-@@ -381,6 +386,7 @@ static inline int pmd_protnone(pmd_t pmd)
+@@ -386,6 +386,7 @@ static inline int pmd_protnone(pmd_t pmd)
  #define pfn_pmd(pfn,prot)	__pmd(__phys_to_pmd_val((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot))
  #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
  
-+#define pud_mkyoung(pud)	pte_pud(pte_mkyoung(pud_pte(pud)))
++#define pud_young(pud)		pte_young(pud_pte(pud))
+ #define pud_mkyoung(pud)	pte_pud(pte_mkyoung(pud_pte(pud)))
  #define pud_write(pud)		pte_write(pud_pte(pud))
  
- #define __pud_to_phys(pud)	__pte_to_phys(pud_pte(pud))
 diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 8e44dccd1b47..bd749601195f 100644
+index bd749601195f..3893ea6a50bf 100644
 --- a/virt/kvm/arm/mmu.c
 +++ b/virt/kvm/arm/mmu.c
-@@ -1698,6 +1698,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
-  */
- static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
+@@ -1225,6 +1225,11 @@ static int stage2_pmdp_test_and_clear_young(pmd_t *pmd)
+ 	return stage2_ptep_test_and_clear_young((pte_t *)pmd);
+ }
+ 
++static int stage2_pudp_test_and_clear_young(pud_t *pud)
++{
++	return stage2_ptep_test_and_clear_young((pte_t *)pud);
++}
++
+ /**
+  * kvm_phys_addr_ioremap - map a device range to guest IPA
+  *
+@@ -1932,42 +1937,38 @@ void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte)
+ 
+ static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
  {
 +	pud_t *pud;
  	pmd_t *pmd;
  	pte_t *pte;
- 	kvm_pfn_t pfn;
-@@ -1707,24 +1708,23 @@ static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
  
- 	spin_lock(&vcpu->kvm->mmu_lock);
- 
--	pmd = stage2_get_pmd(vcpu->kvm, NULL, fault_ipa);
+-	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE);
+-	pmd = stage2_get_pmd(kvm, NULL, gpa);
 -	if (!pmd || pmd_none(*pmd))	/* Nothing there */
-+	if (!stage2_get_leaf_entry(vcpu->kvm, fault_ipa, &pud, &pmd, &pte))
- 		goto out;
++	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE && size != PUD_SIZE);
++	if (!stage2_get_leaf_entry(kvm, gpa, &pud, &pmd, &pte))
+ 		return 0;
  
--	if (pmd_thp_or_huge(*pmd)) {	/* THP, HugeTLB */
-+	if (pud) {		/* HugeTLB */
-+		*pud = kvm_s2pud_mkyoung(*pud);
-+		pfn = kvm_pud_pfn(*pud);
-+		pfn_valid = true;
-+	} else	if (pmd) {	/* THP, HugeTLB */
- 		*pmd = pmd_mkyoung(*pmd);
- 		pfn = pmd_pfn(*pmd);
- 		pfn_valid = true;
--		goto out;
-+	} else {
-+		*pte = pte_mkyoung(*pte);	/* Just a page... */
-+		pfn = pte_pfn(*pte);
-+		pfn_valid = true;
- 	}
- 
--	pte = pte_offset_kernel(pmd, fault_ipa);
--	if (pte_none(*pte))		/* Nothing there either */
--		goto out;
+-	if (pmd_thp_or_huge(*pmd))	/* THP, HugeTLB */
++	if (pud)
++		return stage2_pudp_test_and_clear_young(pud);
++	else if (pmd)
+ 		return stage2_pmdp_test_and_clear_young(pmd);
 -
--	*pte = pte_mkyoung(*pte);	/* Just a page... */
--	pfn = pte_pfn(*pte);
--	pfn_valid = true;
- out:
- 	spin_unlock(&vcpu->kvm->mmu_lock);
- 	if (pfn_valid)
+-	pte = pte_offset_kernel(pmd, gpa);
+-	if (pte_none(*pte))
+-		return 0;
+-
+-	return stage2_ptep_test_and_clear_young(pte);
++	else
++		return stage2_ptep_test_and_clear_young(pte);
+ }
+ 
+ static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
+ {
++	pud_t *pud;
+ 	pmd_t *pmd;
+ 	pte_t *pte;
+ 
+-	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE);
+-	pmd = stage2_get_pmd(kvm, NULL, gpa);
+-	if (!pmd || pmd_none(*pmd))	/* Nothing there */
++	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE && size != PUD_SIZE);
++	if (!stage2_get_leaf_entry(kvm, gpa, &pud, &pmd, &pte))
+ 		return 0;
+ 
+-	if (pmd_thp_or_huge(*pmd))		/* THP, HugeTLB */
++	if (pud)
++		return kvm_s2pud_young(*pud);
++	else if (pmd)
+ 		return pmd_young(*pmd);
+-
+-	pte = pte_offset_kernel(pmd, gpa);
+-	if (!pte_none(*pte))		/* Just a page... */
++	else
+ 		return pte_young(*pte);
+-
+-	return 0;
+ }
+ 
+ int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end)
 -- 
 2.19.2
 
