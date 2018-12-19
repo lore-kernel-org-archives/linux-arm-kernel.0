@@ -7,58 +7,74 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 300C9C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:24:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B666BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:31:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C97B720989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:24:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7C1452070B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:31:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SN1yPiVb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C97B720989
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JEaHw8Xw";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="Z7Y2Kz6Y"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7C1452070B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=UApyTdUEgYYkMA6dKtCvr4tl6bhR8Z2u/l1IJ1xUaTA=; b=SN1yPiVbh49X0jE3ar4b+brQGk
-	incDP2euyNAXvmPbqi8Y/Sy4czq/hM0wWY9sYJeywl2HGwUFJLkeuThfzQ3UvGiztDFaTiZYj+4U/
-	WJcn53ClyzpXTyLOGiuYzomf0V85cIq/stqLmhHHGXJqRYYDPqlpFLcZBzB+3uw32Mh26WWDq65HV
-	fG95KbDrc9i2aCDqo6jMc1guzjdF5JBnZivqthUQYz/7mr7CN9JTQDh/2wnyLTgUrpUCX3Jsx7fKa
-	aKtkzPGgl9Qih8htqf1EM83w3R8Cfq527SLyiNz57a+Ng8m8rtU0vywOw0o9dtPqNwchhyYzT3Pk+
-	/JqBML9w==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=/1Eu1zp1etKi28GWb19F0wx8FAYiBruqYePIH6qMcA8=; b=JEaHw8XweO9DCC
+	dszbPN9XoSNnZCKWD9eIjh2espPiNroFI+GdspLIHF4G1OtSacgZN4ORjpQca00pFr2Us9V9w9Fsq
+	hy3zsdY+6PlvMnh4Pmob24VPP7xN30QQ1Tkb9O0d+gq0aNBkCWkD4FzVrLEZ9LHLbCkrFUGAK7qp8
+	7aU+4+ZrFzWvK4nEhN3I9sh99S0qcf37mcDaLedUd1FewbCmV7zak5Fs9ilq4XzJMTbgqMrHFnPqr
+	3+labA65oN7U0PEaZ8cuLddFL3QEbo8aiB7esnGjz5Zkvnj6aW12tPQbcJSKi7H1qCVd7daKa9KA5
+	GeZPgBGp8lgg009/tmiw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZgWZ-0002yK-UK; Wed, 19 Dec 2018 18:24:51 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZgW2-0002Tq-84
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 18:24:20 +0000
+	id 1gZgdG-0006LW-Hq; Wed, 19 Dec 2018 18:31:46 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZgdE-0006KA-P5
+ for linux-arm-kernel@bombadil.infradead.org; Wed, 19 Dec 2018 18:31:44 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:MIME-Version:
+ References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
+ Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=eVscD0o+TLlHgKOb9EpPKu2KWCP7GAec8XwKON229Mw=; b=Z7Y2Kz6YT0+UOgzXz6OQAn3tGf
+ kHKnRQVPrjjOyWC5CQ9nceRL+bakfsIZ11lGR/tkih6SqWzTyFAAocXbXl2z+XBKnCSXTZhbmGz/w
+ kQV/zL+USaLXpC2+sc7D+/3D/eRVs8Rw5CWVXCWBasIibFmUinLWFMXI5MJCFJJnxqLQ81BRbck5h
+ WgilhOe63CAUMeRmFetQ1pNB/lUv0w4rxRSMYoW1gR/yUGdYtaUc2Im8dAg6fxfOY+++SpE4o6LLK
+ 9VNxz+4jdVnKDfx6AEcZdMzlKxnQ+lb5GaD0cQfUMpJsIDdJSwbLYfKUpTY2uXHDuMFHTiBIgIhVH
+ kx2QdDHw==;
+Received: from foss.arm.com ([217.140.101.70])
+ by merlin.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZgDs-0000VF-OR
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 18:05:33 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8F72F15BE;
- Wed, 19 Dec 2018 10:24:12 -0800 (PST)
-Received: from e113632-lin.cambridge.arm.com (e113632-lin.cambridge.arm.com
- [10.1.194.37])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 716353F59C;
- Wed, 19 Dec 2018 10:24:10 -0800 (PST)
-From: Valentin Schneider <valentin.schneider@arm.com>
-To: linux-kernel@vger.kernel.org
-Subject: [PATCH 2/2] Revert "sched/core: Take the hotplug lock in
- sched_init_smp()"
-Date: Wed, 19 Dec 2018 18:23:16 +0000
-Message-Id: <1545243796-23224-3-git-send-email-valentin.schneider@arm.com>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1545243796-23224-1-git-send-email-valentin.schneider@arm.com>
-References: <1545243796-23224-1-git-send-email-valentin.schneider@arm.com>
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 772CE1684;
+ Wed, 19 Dec 2018 10:05:24 -0800 (PST)
+Received: from filthy-habits.cambridge.arm.com
+ (filthy-habits.cambridge.arm.com [10.1.196.62])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id EBD5C3F675;
+ Wed, 19 Dec 2018 10:05:21 -0800 (PST)
+From: Marc Zyngier <marc.zyngier@arm.com>
+To: Paolo Bonzini <pbonzini@redhat.com>,
+ =?UTF-8?q?Radim=20Kr=C4=8Dm=C3=A1=C5=99?= <rkrcmar@redhat.com>
+Subject: [PATCH 27/28] arm/arm64: KVM: Add ARM_EXCEPTION_IS_TRAP macro
+Date: Wed, 19 Dec 2018 18:03:48 +0000
+Message-Id: <20181219180349.242681-28-marc.zyngier@arm.com>
+X-Mailer: git-send-email 2.19.2
+In-Reply-To: <20181219180349.242681-1-marc.zyngier@arm.com>
+References: <20181219180349.242681-1-marc.zyngier@arm.com>
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_102418_300607_D27DF19D 
-X-CRM114-Status: GOOD (  12.32  )
+X-CRM114-CacheID: sfid-20181219_130532_913815_CC5BBF22 
+X-CRM114-Status: GOOD (  13.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,48 +86,79 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, cai@gmx.us, marc.zyngier@arm.com,
- daniel.lezcano@linaro.org, dietmar.eggemann@arm.com, peterz@infradead.org,
- longman@redhat.com, tglx@linutronix.de, mingo@kernel.org,
- linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: Mark Rutland <mark.rutland@arm.com>, Punit Agrawal <punit.agrawal@arm.com>,
+ kvm@vger.kernel.org, Julien Thierry <julien.thierry@arm.com>,
+ "Gustavo A . R . Silva" <gustavo@embeddedor.com>,
+ Will Deacon <will.deacon@arm.com>, Christoffer Dall <christoffer.dall@arm.com>,
+ linux-arm-kernel@lists.infradead.org, punitagrawal@gmail.com,
+ =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>,
+ kvmarm@lists.cs.columbia.edu, Suzuki Poulose <suzuki.poulose@arm.com>,
+ Lukas Braun <koomi@moshbit.net>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This reverts commit 40fa3780bac2b654edf23f6b13f4e2dd550aea10.
+32 and 64bit use different symbols to identify the traps.
+32bit has a fine grained approach (prefetch abort, data abort and HVC),
+while 64bit is pretty happy with just "trap".
 
-Now that we have a system-wide muting of hotplug lockdep during init,
-this is no longer needed.
+This has been fine so far, except that we now need to decode some
+of that in tracepoints that are common to both architectures.
 
-Signed-off-by: Valentin Schneider <valentin.schneider@arm.com>
+Introduce ARM_EXCEPTION_IS_TRAP which abstracts the trap symbols
+and make the tracepoint use it.
+
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- kernel/sched/core.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ arch/arm/include/asm/kvm_asm.h   | 4 ++++
+ arch/arm64/include/asm/kvm_asm.h | 1 +
+ virt/kvm/arm/trace.h             | 2 +-
+ 3 files changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index e4ca15d..144b778 100644
---- a/kernel/sched/core.c
-+++ b/kernel/sched/core.c
-@@ -5854,14 +5854,11 @@ void __init sched_init_smp(void)
- 	/*
- 	 * There's no userspace yet to cause hotplug operations; hence all the
- 	 * CPU masks are stable and all blatant races in the below code cannot
--	 * happen. The hotplug lock is nevertheless taken to satisfy lockdep,
--	 * but there won't be any contention on it.
-+	 * happen.
- 	 */
--	cpus_read_lock();
- 	mutex_lock(&sched_domains_mutex);
- 	sched_init_domains(cpu_active_mask);
- 	mutex_unlock(&sched_domains_mutex);
--	cpus_read_unlock();
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 231e87ad45d5..35491af87985 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -23,6 +23,10 @@
  
- 	/* Move init over to a non-isolated CPU */
- 	if (set_cpus_allowed_ptr(current, housekeeping_cpumask(HK_FLAG_DOMAIN)) < 0)
---
-2.7.4
+ #define ARM_EXIT_WITH_ABORT_BIT  31
+ #define ARM_EXCEPTION_CODE(x)	  ((x) & ~(1U << ARM_EXIT_WITH_ABORT_BIT))
++#define ARM_EXCEPTION_IS_TRAP(x)					\
++	(ARM_EXCEPTION_CODE((x)) == ARM_EXCEPTION_PREF_ABORT	||	\
++	 ARM_EXCEPTION_CODE((x)) == ARM_EXCEPTION_DATA_ABORT	||	\
++	 ARM_EXCEPTION_CODE((x)) == ARM_EXCEPTION_HVC)
+ #define ARM_ABORT_PENDING(x)	  !!((x) & (1U << ARM_EXIT_WITH_ABORT_BIT))
+ 
+ #define ARM_EXCEPTION_RESET	  0
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index b2e12c99db7d..f5b79e995f40 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -25,6 +25,7 @@
+ 
+ #define ARM_EXIT_WITH_SERROR_BIT  31
+ #define ARM_EXCEPTION_CODE(x)	  ((x) & ~(1U << ARM_EXIT_WITH_SERROR_BIT))
++#define ARM_EXCEPTION_IS_TRAP(x)  (ARM_EXCEPTION_CODE((x)) == ARM_EXCEPTION_TRAP)
+ #define ARM_SERROR_PENDING(x)	  !!((x) & (1U << ARM_EXIT_WITH_SERROR_BIT))
+ 
+ #define ARM_EXCEPTION_IRQ	  0
+diff --git a/virt/kvm/arm/trace.h b/virt/kvm/arm/trace.h
+index f21f04f8036d..3828beab93f2 100644
+--- a/virt/kvm/arm/trace.h
++++ b/virt/kvm/arm/trace.h
+@@ -37,7 +37,7 @@ TRACE_EVENT(kvm_exit,
+ 
+ 	TP_fast_assign(
+ 		__entry->ret			= ARM_EXCEPTION_CODE(ret);
+-		__entry->esr_ec = (ARM_EXCEPTION_CODE(ret) == ARM_EXCEPTION_TRAP) ? esr_ec : 0;
++		__entry->esr_ec = ARM_EXCEPTION_IS_TRAP(ret) ? esr_ec : 0;
+ 		__entry->vcpu_pc		= vcpu_pc;
+ 	),
+ 
+-- 
+2.19.2
 
 
 _______________________________________________
