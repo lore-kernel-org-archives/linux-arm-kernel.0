@@ -2,65 +2,81 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-6.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 50036C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:17:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 106A0C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:20:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 22E09217D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:17:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D0192217D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:20:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EBXY1G7t";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="sGWRAJ2S"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 22E09217D7
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lFd+UwQK";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="uqdEB8MN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D0192217D7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=nN6OQNN9S2eDNaYkzAaazPOe8k8kwwQ2FACotFV4BcY=; b=EBXY1G7t0FsFNq
-	M9192r6nJBQ++A68YQ9YiaNSLq5A7sYMynTLkE+zvT+4AOsBgFadbhDz9c87ZWkATqF1wY2g/pBHA
-	l2AAom+rDiCO5w2dd2cJLK1cIOL35Ufvd7Ie8YTHC+SLw+zt0RBlzjmqszSlTeMyBdxynqAL08QXC
-	7BYTAndj28ZKq7bEWhbvyjBF7ntyNABqXvWFK1bT4UPUffI8qVEV3p73MUrGWCHQ26LmfGYKihQOu
-	EE8zJ6IyOvEzOC2INsayZUcTTzfs7AxV6qMoEJkwmHmFrI9BKelwrwOmIWkpXLyKK/fFFc2OxTA4X
-	CKzdwgWcNOTAjbo7BLkQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=3sY7seGvA0CcZANeF0dQE3fveqncWMYfspgFiBeU448=; b=lFd+UwQKPd+aK5
+	1tbc4X7fydq3ksFF4S2nvungSI0fQfn0QKX6y6tmi8rcE/QL0qhXRgLAh4YiZZ9Wl0T/IzzJ8DArO
+	qoN733UJU2wFs8F6nL5ltAHZbMQzMWfcujN6eE6/EY4H8BFE1RDHh6Ch53wiuhQX1OQhOEip1nTxf
+	jA4h1jgkSr4NQKYHfF2cySAtqGJMxeTGzVJuPeFKIUQh+5Ie4hAr0gNg8C4gLbt21NIQiDkU/cDn3
+	vc6xy88oZVU/cUubpU8ceLI0kc60ZplQZIrv/dGZoBYF21WWJFOlJN+/OeVLZlhkSxmR65a504WKn
+	36+sV5IwCiPuooQ8uFTw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZgPA-0007gA-4Y; Wed, 19 Dec 2018 18:17:12 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gZgSZ-00017m-JB; Wed, 19 Dec 2018 18:20:43 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZgP6-0007fW-FK; Wed, 19 Dec 2018 18:17:10 +0000
-Received: from ziggy.de (unknown [37.223.145.79])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id A0345217D9;
- Wed, 19 Dec 2018 18:16:53 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1545243415;
- bh=72fdjbNpxrOgaid6/wodsdGUd2NO2XEPMocUEpv/mR8=;
- h=From:To:Cc:Subject:Date:From;
- b=sGWRAJ2SndK7M/Ziwv0aivWhCtYKU3w3GNUo2Y2tJDkwbknoc0GVfB1MTLl8wB1Ev
- Y2u6zmf7AfzPJuuk+LYiiKnsmYE/52YASLeeVZX6xLnNeiMAbRu2F+1o0Bo7rNSrJA
- zYrr2wBnAqN0591OM6b9aB9IMwSdCIGotA3+C0/4=
-From: matthias.bgg@kernel.org
-To: mturquette@baylibre.com, sboyd@kernel.org, kevin-cw.chen@mediatek.com,
- mars.cheng@mediatek.com
-Subject: [PATCH] clk: mediatek: Mark bus and DRAM related clocks as critical
-Date: Wed, 19 Dec 2018 19:16:50 +0100
-Message-Id: <20181219181650.27105-1-matthias.bgg@kernel.org>
+ id 1gZgSX-00010P-K5
+ for linux-arm-kernel@bombadil.infradead.org; Wed, 19 Dec 2018 18:20:41 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
+ References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
+ Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=lJMAY8R3oKtt9r0RCoOQlxCzI33FL3L7bVo06MoarHA=; b=uqdEB8MNQCxmWrhBWZ5drXYLzR
+ GrAN6KgivtbImvCexQMEOGWQWOw/3O1DXUsxVsW/n4ls1wZWHySQUCJcVTd6VvC012ZQgdf7g8mux
+ 98LwJliw7wXJbG6qTHu/MCNj7omqTL2BshuYCaqoAe2Abdj64KOqoZF08/P+QKGII4SiIEYj/jrrJ
+ aq5FbOCSBtGR+UPggNfUo6KZPco0AQ3UmgL2cQhtFBM9/gyO7L5JB6zGgdPqxGVsIROn+lUineech
+ LQkOCPB/2OSqAM5whRhqlPk/+7tetrbpqr0EeahlncRCIfS1+qBvCT5JvZPzf56Joc/0C5QfucR6Q
+ AZZ+SKcQ==;
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by casper.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZgDy-0008Ig-1f
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 18:05:39 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 40DB2168F;
+ Wed, 19 Dec 2018 10:05:27 -0800 (PST)
+Received: from filthy-habits.cambridge.arm.com
+ (filthy-habits.cambridge.arm.com [10.1.196.62])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B43933F675;
+ Wed, 19 Dec 2018 10:05:24 -0800 (PST)
+From: Marc Zyngier <marc.zyngier@arm.com>
+To: Paolo Bonzini <pbonzini@redhat.com>,
+ =?UTF-8?q?Radim=20Kr=C4=8Dm=C3=A1=C5=99?= <rkrcmar@redhat.com>
+Subject: [PATCH 28/28] arm: KVM: Add S2_PMD_{MASK,SIZE} constants
+Date: Wed, 19 Dec 2018 18:03:49 +0000
+Message-Id: <20181219180349.242681-29-marc.zyngier@arm.com>
 X-Mailer: git-send-email 2.19.2
+In-Reply-To: <20181219180349.242681-1-marc.zyngier@arm.com>
+References: <20181219180349.242681-1-marc.zyngier@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_101708_546217_42099742 
-X-CRM114-Status: GOOD (  11.16  )
+X-CRM114-CacheID: sfid-20181219_180538_218554_54E7AA96 
+X-CRM114-Status: UNSURE (   9.43  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,131 +88,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-kernel@vger.kernel.org, linux-mediatek@lists.infradead.org,
- matthias.bgg@gmail.com, jasu@njomotys.info, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, Punit Agrawal <punit.agrawal@arm.com>,
+ kvm@vger.kernel.org, Julien Thierry <julien.thierry@arm.com>,
+ "Gustavo A . R . Silva" <gustavo@embeddedor.com>,
+ Will Deacon <will.deacon@arm.com>, Christoffer Dall <christoffer.dall@arm.com>,
+ linux-arm-kernel@lists.infradead.org, punitagrawal@gmail.com,
+ =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>,
+ kvmarm@lists.cs.columbia.edu, Suzuki Poulose <suzuki.poulose@arm.com>,
+ Lukas Braun <koomi@moshbit.net>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Jasper Mattsson <jasu@njomotys.info>
+They were missing, and it turns out that we do need them now.
 
-Currently, DRAM-related clocks are not marked with CLK_IS_CRITICAL
-for MT6797. This causes memory corruption when the system is
-booted without clk_ignore_unused.
-This patch marks MUX ddrphycfg_sel as well as gates infra_dramc_f26m
-and infra_dramc_b_f26m as CLK_IS_CRITICAL.
-
-Signed-off-by: Jasper Mattsson <jasu@njomotys.info>
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
-changes since v2 [1]:
-- first two patches of series are in clk-next, drop them
-- axi_sel is not needed, drop CLK_IS_CRITICAL for it.
-- update commit message
+ arch/arm/include/asm/stage2_pgtable.h | 3 +++
+ 1 file changed, 3 insertions(+)
 
-[1] https://patchwork.kernel.org/patch/10686759/ 
-
- drivers/clk/mediatek/clk-mt6797.c | 60 ++++++++++++++++++-------------
- 1 file changed, 35 insertions(+), 25 deletions(-)
-
-diff --git a/drivers/clk/mediatek/clk-mt6797.c b/drivers/clk/mediatek/clk-mt6797.c
-index 5702bc974ed9..a6e5408e0388 100644
---- a/drivers/clk/mediatek/clk-mt6797.c
-+++ b/drivers/clk/mediatek/clk-mt6797.c
-@@ -331,8 +331,8 @@ static const struct mtk_composite top_muxes[] = {
- 	    ulposc_axi_ck_mux_parents, 0x0040, 2, 1),
- 	MUX(CLK_TOP_MUX_AXI, "axi_sel", axi_parents,
- 	    0x0040, 0, 2),
--	MUX(CLK_TOP_MUX_DDRPHYCFG, "ddrphycfg_sel", ddrphycfg_parents,
--	    0x0040, 16, 2),
-+	MUX_FLAGS(CLK_TOP_MUX_DDRPHYCFG, "ddrphycfg_sel", ddrphycfg_parents,
-+		  0x0040, 16, 2, CLK_IS_CRITICAL | CLK_SET_RATE_PARENT),
- 	MUX(CLK_TOP_MUX_MM, "mm_sel", mm_parents,
- 	    0x0040, 24, 2),
- 	MUX_GATE(CLK_TOP_MUX_PWM, "pwm_sel", pwm_parents, 0x0050, 0, 3, 7),
-@@ -424,31 +424,39 @@ static const struct mtk_gate_regs infra2_cg_regs = {
- 	.sta_ofs = 0x00b0,
- };
- 
--#define GATE_ICG0(_id, _name, _parent, _shift) {	\
--	.id = _id,					\
--	.name = _name,					\
--	.parent_name = _parent,				\
--	.regs = &infra0_cg_regs,			\
--	.shift = _shift,				\
--	.ops = &mtk_clk_gate_ops_setclr,		\
-+#define GATE_ICG0(_id, _name, _parent, _shift) {		\
-+	.id = _id,						\
-+	.name = _name,						\
-+	.parent_name = _parent,					\
-+	.regs = &infra0_cg_regs,				\
-+	.shift = _shift,					\
-+	.ops = &mtk_clk_gate_ops_setclr,			\
+diff --git a/arch/arm/include/asm/stage2_pgtable.h b/arch/arm/include/asm/stage2_pgtable.h
+index f9017167a8d1..c4b1d4fb1797 100644
+--- a/arch/arm/include/asm/stage2_pgtable.h
++++ b/arch/arm/include/asm/stage2_pgtable.h
+@@ -73,4 +73,7 @@ static inline bool kvm_stage2_has_pud(struct kvm *kvm)
+ 	return false;
  }
  
--#define GATE_ICG1(_id, _name, _parent, _shift) {	\
--	.id = _id,					\
--	.name = _name,					\
--	.parent_name = _parent,				\
--	.regs = &infra1_cg_regs,			\
--	.shift = _shift,				\
--	.ops = &mtk_clk_gate_ops_setclr,		\
-+#define GATE_ICG1(_id, _name, _parent, _shift)			\
-+	GATE_ICG1_FLAGS(_id, _name, _parent, _shift, 0)
++#define S2_PMD_MASK				PMD_MASK
++#define S2_PMD_SIZE				PMD_SIZE
 +
-+#define GATE_ICG1_FLAGS(_id, _name, _parent, _shift, _flags) {	\
-+	.id = _id,						\
-+	.name = _name,						\
-+	.parent_name = _parent,					\
-+	.regs = &infra1_cg_regs,				\
-+	.shift = _shift,					\
-+	.ops = &mtk_clk_gate_ops_setclr,			\
-+	.flags = _flags,					\
- }
- 
--#define GATE_ICG2(_id, _name, _parent, _shift) {	\
--	.id = _id,					\
--	.name = _name,					\
--	.parent_name = _parent,				\
--	.regs = &infra2_cg_regs,			\
--	.shift = _shift,				\
--	.ops = &mtk_clk_gate_ops_setclr,		\
-+#define GATE_ICG2(_id, _name, _parent, _shift)			\
-+	GATE_ICG2_FLAGS(_id, _name, _parent, _shift, 0)
-+
-+#define GATE_ICG2_FLAGS(_id, _name, _parent, _shift, _flags) {	\
-+	.id = _id,						\
-+	.name = _name,						\
-+	.parent_name = _parent,					\
-+	.regs = &infra2_cg_regs,				\
-+	.shift = _shift,					\
-+	.ops = &mtk_clk_gate_ops_setclr,			\
-+	.flags = _flags,					\
- }
- 
- static const struct mtk_gate infra_clks[] = {
-@@ -505,7 +513,8 @@ static const struct mtk_gate infra_clks[] = {
- 	GATE_ICG1(CLK_INFRA_CCIF_AP, "infra_ccif_ap", "axi_sel", 23),
- 	GATE_ICG1(CLK_INFRA_AUDIO, "infra_audio", "axi_sel", 25),
- 	GATE_ICG1(CLK_INFRA_CCIF_MD, "infra_ccif_md", "axi_sel", 26),
--	GATE_ICG1(CLK_INFRA_DRAMC_F26M, "infra_dramc_f26m", "clk26m", 31),
-+	GATE_ICG1_FLAGS(CLK_INFRA_DRAMC_F26M, "infra_dramc_f26m",
-+			"clk26m", 31, CLK_IS_CRITICAL),
- 	GATE_ICG2(CLK_INFRA_I2C4, "infra_i2c4", "axi_sel", 0),
- 	GATE_ICG2(CLK_INFRA_I2C_APPM, "infra_i2c_appm", "axi_sel", 1),
- 	GATE_ICG2(CLK_INFRA_I2C_GPUPM, "infra_i2c_gpupm", "axi_sel", 2),
-@@ -516,7 +525,8 @@ static const struct mtk_gate infra_clks[] = {
- 	GATE_ICG2(CLK_INFRA_I2C5, "infra_i2c5", "axi_sel", 7),
- 	GATE_ICG2(CLK_INFRA_SYS_CIRQ, "infra_sys_cirq", "axi_sel", 8),
- 	GATE_ICG2(CLK_INFRA_SPI1, "infra_spi1", "spi_sel", 10),
--	GATE_ICG2(CLK_INFRA_DRAMC_B_F26M, "infra_dramc_b_f26m", "clk26m", 11),
-+	GATE_ICG2_FLAGS(CLK_INFRA_DRAMC_B_F26M, "infra_dramc_b_f26m",
-+			"clk26m", 11, CLK_IS_CRITICAL),
- 	GATE_ICG2(CLK_INFRA_ANC_MD32, "infra_anc_md32", "anc_md32_sel", 12),
- 	GATE_ICG2(CLK_INFRA_ANC_MD32_32K, "infra_anc_md32_32k", "clk26m", 13),
- 	GATE_ICG2(CLK_INFRA_DVFS_SPM1, "infra_dvfs_spm1", "axi_sel", 15),
+ #endif	/* __ARM_S2_PGTABLE_H_ */
 -- 
 2.19.2
 
