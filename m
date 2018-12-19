@@ -2,23 +2,22 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EA01DC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 22:35:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CF600C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 22:41:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B4FA120873
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 22:35:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 88E4820869
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 22:41:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QucDJuYi";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Up8owSfo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B4FA120873
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gGe588m1";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="cn1sx1Ka"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 88E4820869
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,61 +25,77 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=uCZNZMEl8NjCER2UWHhISJkX3yyfxHZ3rnVotf3EJkI=; b=QucDJuYi1KLmm8
-	AxRGHsZAkS3CbrCQP9PkD6Gely/rqmKbJxPyGPCd6M2q74U54eg3boepQFwEDtqKgnLVaSPziswE4
-	G+lE0hR7vrA5Y79ANGWKIFS03wXR5UP6UTIXksCOm9rg57FQ3rwd/eIenCOZc+8IOy2mG9lAVXzue
-	52runiILapvvMh3uQkWStMWrRd5fY2LzKeeUQMA8EQ1+XSw1800Tp+sTMWJWo2Y+BSZW0e7Qmk5e1
-	kuMgzIp0byFByy39t6OFxl0YzSkva95g56skDmf/OIPwfNs+HmW8ZBegU456DLrko3Nx8Oi7sb+fZ
-	dNC3hU+11S5tjA1B/55A==;
+	List-Owner; bh=XtsSbbSzTvhRFwbqZt25qO3a7JaS1zN5FIpgxLwyLVQ=; b=gGe588m1B9nOk+
+	pYCRvSPJYepd3UtV7rWal17y2uTBvVBHeS83vltD6Hegmx59fX2Ji7XEgM3uiOQslRWNzeyndz/9Y
+	DwMbDN7vAtNV/9o2MDGNafNpex18Kp3yPo0lsiXxuL1qfxQQBqs2W4goIHPBP85uEsN2Qibi5iEks
+	0sXNh75of8epb1EYDcewf6SQK+ZEO2h9+VtRy+ZicHtn6kpsr1w9RamCOlaNMVJdIcRj78C4YDNbF
+	AC2TfOsiE+LsnXgBZRmBWo9anavletFnaW3oLAVWMMrUCfK6C2+cACYW4XDWC27vJJ0QgsvMc6NDH
+	WctfUvdxueoykAlr6VWg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZkQb-0006lb-6E; Wed, 19 Dec 2018 22:34:57 +0000
-Received: from mail-ed1-x542.google.com ([2a00:1450:4864:20::542])
+	id 1gZkWc-0001JX-Kt; Wed, 19 Dec 2018 22:41:10 +0000
+Received: from mail-ua1-x943.google.com ([2607:f8b0:4864:20::943])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZkQX-0006l1-UC
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 22:34:55 +0000
-Received: by mail-ed1-x542.google.com with SMTP id b3so79841ede.1
+ id 1gZkWY-0001J0-US
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 22:41:08 +0000
+Received: by mail-ua1-x943.google.com with SMTP id z11so7529241uaa.10
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 19 Dec 2018 14:34:43 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ Wed, 19 Dec 2018 14:40:56 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=jKP2px27KTzzQrWhR+f/O0lmfHo7sDHuQhoWWp6cUhU=;
- b=Up8owSfoD5Ge7R2dE2jQHEALphgGJGPboAZrSiWAi3QkQPRcuEQJjZWIHEKYzmCC+t
- 2NMcOApwPCUVHrAfP08h4ZDze2hKsZ3XDI3tGK3dhbu005nfXXFkIFQxn2BxsVBTV40o
- +3jke85unc3vD1PAEErvdIsI08umwNH2rE1pXZl7qu05vGmT7OPavkzkfIJDStHsPEyP
- zF9xOSz5BnXfVfai8hpmR5pjcoMPQc4cC66JtoS35Af/tzMCA7TVTOTXhJscHr8RC162
- tZnqQTun7gURVJIFW14PZonCBFGNQrVi797qsUh2FgwlZljx0RqtXSOLrLAY+I1upBTe
- ixFQ==
+ :cc; bh=EqJQnGDcn94/m8lX7aGWzToSJlLn5UY02T7PMa1B8ys=;
+ b=cn1sx1KarhpIU5QXl9mdm7iL0XLi4nQIjzv7/ame6yWoOVRyjFAkThTC/XTlcO/hKh
+ 8zM1bxPI/LSAUgzRUYQNtc4O8AhrY8fNvtSHRQ5khATsLPNLOVwZbz5RwaTdVZ4lo01p
+ 4jF02IpaM26CXoBAdyhKXgg4h9Y+kok7Bp/tU=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=jKP2px27KTzzQrWhR+f/O0lmfHo7sDHuQhoWWp6cUhU=;
- b=BAvXkOzUBfcojAv4EVMu9eLZji1xmHAj5RP+lfjyTdhdc8EOcyb2SfyPqN93Z/sN5e
- 2EQ2DVbBh0APuTd561XxS8NLwG5IJ1gwC7tepMpuRheTg+x+i9eD9cKURZV8m1oiQYN6
- ooOm+yMxs0yAuqhVbMFud/kLSFWL8hc4J7is2gSKql7Rzw4RAbHb1QGke8JQ0fFvl0go
- ChLUhaPPCrGjQ3kCii5h2n8183iE8cpNEsB2SWGHkL84UVureQI+wfcCCXP40LNmiZPS
- EZ6/OzLOcbUvULEBpXR94M0WdSRYGFmddTYx/ntHX69QThYnDvXAWDLEIpU3zxu0p5WZ
- taLQ==
-X-Gm-Message-State: AA+aEWZR1ViAnGRG9EremRIJ7FRujLDQQ3YseMRIqcSzo7qkp5fa3mNa
- MKBayIJ2KluseAILGyj5yksEOkjuXzn7P/Z9Cwk=
-X-Google-Smtp-Source: AFSGD/XGOnQfbRbGeM8vgvUVuhlrlt9Sjthb/Vu2DvwMh/+geTxKGMKLuqGhmAf87aTz+OdEOSTN7s/XAyWcvlJV8bk=
-X-Received: by 2002:a17:906:753:: with SMTP id
- z19-v6mr17450015ejb.175.1545258882014; 
- Wed, 19 Dec 2018 14:34:42 -0800 (PST)
+ bh=EqJQnGDcn94/m8lX7aGWzToSJlLn5UY02T7PMa1B8ys=;
+ b=oGVf2nsD8V1rO4PHqqWzuXiz2s5VxbXaAjVWWn8O/oeUMQnywI9sQCS/RaFzDw0g59
+ gG1v7+qyQdQ5tkzRP2LhKmEhLngW8BzrwQYlC1oxFoBhQaqRaFdwy/EZ1EEH33cuXml+
+ J7Xm7RCpukuDr9rJUtUSfFGrKA0179WcYaJ1IUw927rE4GFFe7A3ylOxjCh7xdchPktu
+ ggFUnlLLX6heVeuAJtJsRlZDSSSV3WR022QgOhOf2uJqtUkfSCbeTidXLhZH56T4AK1Q
+ h8H6KueQu0CmhXSA7dvzlapt+7vCFzL+y8ww/JmbV2FSOiq4ERB5VgY7DzA5G50Hiz1z
+ 0l7g==
+X-Gm-Message-State: AA+aEWZu3xWXgKf/CdcSwhtW65Y9kQYXMoj6aY2G7vln0YmtjADR6zn9
+ rPcgmhe+OXY3bJbd3S0PCvH+NBmYGlk=
+X-Google-Smtp-Source: AFSGD/XGQUqY55DNVUxdlqYkJ0o/SJHocWMK6+cmmWI0aT48AWEXWmCQV1/5ddWzfEWF8z0d9JG1Qg==
+X-Received: by 2002:ab0:3259:: with SMTP id r25mr10333276uan.108.1545259255074; 
+ Wed, 19 Dec 2018 14:40:55 -0800 (PST)
+Received: from mail-vs1-f48.google.com (mail-vs1-f48.google.com.
+ [209.85.217.48])
+ by smtp.gmail.com with ESMTPSA id f68sm5605415uaf.9.2018.12.19.14.40.53
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 19 Dec 2018 14:40:54 -0800 (PST)
+Received: by mail-vs1-f48.google.com with SMTP id v205so13303123vsc.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 19 Dec 2018 14:40:53 -0800 (PST)
+X-Received: by 2002:a67:f598:: with SMTP id i24mr11059854vso.87.1545259253593; 
+ Wed, 19 Dec 2018 14:40:53 -0800 (PST)
 MIME-Version: 1.0
-References: <1545232888-9302-1-git-send-email-aisheng.dong@nxp.com>
- <1545232888-9302-5-git-send-email-aisheng.dong@nxp.com>
- <CAOMZO5DzMpMp-Tf74iM3SuHoFpji8z-dxM-UsC13GeDx2bZYgA@mail.gmail.com>
-In-Reply-To: <CAOMZO5DzMpMp-Tf74iM3SuHoFpji8z-dxM-UsC13GeDx2bZYgA@mail.gmail.com>
-From: Daniel Baluta <daniel.baluta@gmail.com>
-Date: Thu, 20 Dec 2018 00:34:30 +0200
-Message-ID: <CAEnQRZDiUcV5svjmQ=ofUsxy5y+YBgOwgbca+ExkvHv9AzJSEQ@mail.gmail.com>
-Subject: Re: [PATCH 4/5] clk: imx8qxp: make the name of clock ID generic
-To: Fabio Estevam <festevam@gmail.com>
+References: <20181212211848.26768-1-jcrouse@codeaurora.org>
+ <20181212211848.26768-3-jcrouse@codeaurora.org>
+ <20181214044057.wybv6wqg75qdnmic@vireshk-i7>
+ <CAD=FV=VQEtQtnPJyo6vLm7ndPjowZ35FY-cibJyN_imZMoVU3w@mail.gmail.com>
+ <20181217070647.xtvfgsixggua5yod@vireshk-i7>
+ <CAD=FV=WKfKyZe6sc4drfa9kLQVbG1b9nCe6qbPmUPQGNEKAh=Q@mail.gmail.com>
+ <154515840025.238328.5075439774176447808@swboyd.mtv.corp.google.com>
+ <CAD=FV=XeFYmOJx9Wxy7hLQwSq1GoF84eQ93Y4KgrO1JM-g9ZiA@mail.gmail.com>
+ <20181219044901.x76bd5vdsznhhrmz@vireshk-i7>
+ <CAL_JsqLs69=nr=2J_48N3VtD0qNRnxAgDU8uMRwY_Qqp6Dzs_Q@mail.gmail.com>
+ <CAD=FV=VMMYKoW4RU_TTjLdyrNcWZU-Gyou9b6qynKFX9wDn5Mw@mail.gmail.com>
+In-Reply-To: <CAD=FV=VMMYKoW4RU_TTjLdyrNcWZU-Gyou9b6qynKFX9wDn5Mw@mail.gmail.com>
+From: Doug Anderson <dianders@chromium.org>
+Date: Wed, 19 Dec 2018 14:40:41 -0800
+X-Gmail-Original-Message-ID: <CAD=FV=Utko6B6OycYpef3OQAF1v-rthcdgAKMm0GLxRM4=ummg@mail.gmail.com>
+Message-ID: <CAD=FV=Utko6B6OycYpef3OQAF1v-rthcdgAKMm0GLxRM4=ummg@mail.gmail.com>
+Subject: Re: [PATCH v6 2/2] arm64: dts: sdm845: Add gpu and gmu device nodes
+To: Rob Herring <robh@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_143453_969580_F74B1E0A 
-X-CRM114-Status: GOOD (  16.89  )
+X-CRM114-CacheID: sfid-20181219_144106_988432_BAB0480A 
+X-CRM114-Status: GOOD (  18.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,54 +107,59 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Aisheng Dong <aisheng.dong@nxp.com>, "sboyd@kernel.org" <sboyd@kernel.org>,
- "mturquette@baylibre.com" <mturquette@baylibre.com>,
- dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Nishanth Menon <nm@ti.com>, devicetree@vger.kernel.org,
+ Rajendra Nayak <rnayak@codeaurora.org>, linux-pm@vger.kernel.org,
+ Stephen Boyd <sboyd@kernel.org>, Viresh Kumar <viresh.kumar@linaro.org>,
+ dri-devel <dri-devel@lists.freedesktop.org>,
+ Jordan Crouse <jcrouse@codeaurora.org>,
+ linux-arm-msm <linux-arm-msm@vger.kernel.org>,
+ freedreno <freedreno@lists.freedesktop.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>, vireshk@kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 19, 2018 at 7:08 PM Fabio Estevam <festevam@gmail.com> wrote:
->
-> Hi Aisheng,
->
-> On Wed, Dec 19, 2018 at 1:29 PM Aisheng Dong <aisheng.dong@nxp.com> wrote:
-> >
-> > SCU clock can be used in a similar way by IMX8QXP and IMX8QM SoCs.
-> > Let's make the name of clock ID generic to allow other SoCs to reuse
-> > the common part.
-> >
-> > This patch only changes the clock id name and file name, so no
-> > functional change.
-> >
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > Cc: Stephen Boyd <sboyd@kernel.org>
-> > Cc: Michael Turquette <mturquette@baylibre.com>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> >  drivers/clk/imx/clk-imx8qxp-lpcg.c        | 146 +++++++--------
-> >  drivers/clk/imx/clk-imx8qxp.c             | 152 ++++++++--------
-> >  include/dt-bindings/clock/imx8-clock.h    | 289 ++++++++++++++++++++++++++++++
-> >  include/dt-bindings/clock/imx8qxp-clock.h | 289 ------------------------------
-> >  4 files changed, 438 insertions(+), 438 deletions(-)
->
-> This seems like unneeded churn. Just keep the existing naming and
-> other SoCs can reuse it without problem.
+Hi,
 
-Thanks for review Fabio.
+On Wed, Dec 19, 2018 at 12:40 PM Doug Anderson <dianders@chromium.org> wrote:
+>
+> Hi,
+>
+> On Wed, Dec 19, 2018 at 12:09 PM Rob Herring <robh@kernel.org> wrote:
+> >
+> > On Tue, Dec 18, 2018 at 10:49 PM Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> > >
+> > > On 18-12-18, 11:05, Doug Anderson wrote:
+> > > > OK, it's fine with me to have the fallback, but if we do we should be
+> > > > consistent about it and make sure it's in all the bindings and device
+> > > > tree files...
+> > >
+> > > Sure.
+> > >
+> > > I am not sure what's the right way to do it is, i.e. should we keep the
+> > > "operating-points-v2" string or not.
+> >
+> > Does having it buy you anything? Given the QCom one doesn't have any
+> > frequency or voltage, I don't see how it would be useful to have it.
+>
+> ...but it does have a frequency, doesn't it?
+>
+> +   compatible = "operating-points-v2-qcom-level";
+> +
+> +   opp-710000000 {
+> +     opp-hz = /bits/ 64 <710000000>;
+> +     qcom,level = <RPMH_REGULATOR_LEVEL_TURBO_L1>;
+> +   };
 
-I get your point with churn and touching git file history. Anyhow, I feel that
-the code is more clear this way.
+Ah, I perhaps see the confusion.  So Rajendra's usage of
+"operating-points-v2-qcom-level" [1] doesn't have a frequency but
+Jordan's do.  So I guess it makes sense that Jordan's have the
+fallback compatible but Rajendra's don't?
 
-Anyhow, it is not me to decide.
+[1] https://patchwork.kernel.org/patch/10725793/
+
+-Doug
 
 _______________________________________________
 linux-arm-kernel mailing list
