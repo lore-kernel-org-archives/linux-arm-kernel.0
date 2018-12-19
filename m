@@ -2,86 +2,68 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 80092C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 03:31:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CF548C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 04:09:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3D47721871
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 03:31:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9D02C217D6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 04:09:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d3gs+Ial";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="XQjLNi60"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3D47721871
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="V6xaCLKK";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="T+HpzBzI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9D02C217D6
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=jFhaQx+bHQFYgK3Bq/c/OVAAmQh4A0Dsl/1xP+hpRI0=; b=d3gs+IalN3Tyxo
-	jc90nNisnOvGyZQ09UeCruaHJgyzEcMqDyWB0bbe5IdT8fYvVZgo8rO/qAmzP9UZx+wyM+WeQhhWu
-	0wtcg0fQSbVlZ4tTxnW7/ibuSAJQJjTeiusyoE43Vd5r6HeV0sGSyNIKlGAgEFOGg/RP5ucIeqQOM
-	lvxwQfP8++Z/lU1yqS5dg9CR1HZCViwf1bY2X0YlrwWv36wmDTZ6e5wJW9/DbIRjsENBzI8iLVct3
-	0gECvUiM0d7dxvGFx3fbxdtTChpDxtSsWivJjpuPk4aOAepAD0M8ZPaq28Zs5q0nl38Hl2jrXNyHz
-	AWfcocHR0AtqXaGz20zw==;
+	List-Owner; bh=PSjvdbn9eNBCNngFuolj++6u1rmF+Az7lQqppKqOkOA=; b=V6xaCLKKqsUw0i
+	pcSwGtGID+Jo2W3O3T7WdnRgGHzmpBL9lwOhjf8p5fsuXEXfN1/kD5UQH5zuZREO8ALwcK9Cy2e09
+	DRK/bjjqJewvdypHzMOQVMsbeYJGm9OCOzokrKAuDffdH9IeOTV9Ajvz3XsVOjAfYFtpm+iQCjUlN
+	zyyZWH3tBASbglDX7es2NpZJctJR4aVptXUyK5WrqL8nuNE+g/kC4Hn5fQEVV2xgk12OIap7419g8
+	ViuXx8veqOOf1a28PlxcAEskDuyg+8i+T6wvR2l2pTSQti2TeCFvT81uneSBll+djgyKGk7m6a0Td
+	NeDz9+NXI9f64qji7J1g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZSa9-0004jQ-LN; Wed, 19 Dec 2018 03:31:37 +0000
-Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
+	id 1gZTB7-0007zk-J5; Wed, 19 Dec 2018 04:09:49 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZSa4-0004hw-Tg; Wed, 19 Dec 2018 03:31:34 +0000
-Received: by mail-lf1-x142.google.com with SMTP id z13so13884477lfe.11;
- Tue, 18 Dec 2018 19:31:22 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=hyoE9cQYj2vKKeNaKbEZn+1/rj10Ta2+2thIX+qo1mM=;
- b=XQjLNi60OQMSNl8uGp8JWoIVDx7+LLcQ46BFKojokG5wz4nId2PwPWwcYXF5ewHn3J
- EcIbxmYeWA4HepLPpx4EPwnahRNcOFM/gb/YtjrlmkiGbWKogwhtsCSNmG6+zmyNMq64
- cZMXW2seVxU61ZS9BxO1qv/KMIwEGFmTcLUJH+1CX1hXFo5/KZSIXcBORrgh/kWEa2aZ
- xRhd5+UeLSPi1AVXhaH4zM5axZtfevgWIlDx+ZaH7e2KaZlSWdrEBjWuN1ZqEXuyI13U
- YW0Thnebflvl6Xbj7DGnoCBE+iNrtmHWTjBXZGgZKDJyzOXYb59SpOLpy+EvdrS+AqZ3
- 6P0g==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=hyoE9cQYj2vKKeNaKbEZn+1/rj10Ta2+2thIX+qo1mM=;
- b=MJehTKdfWyCxiJEVRsb5vWTuYXMjNmpSNhKhy41u8Fo71IjW1R4XxGiZKa2+D2G1++
- 7Md73ngUsxheVpY1Z1Hf8TAk1FpvHYrnDmYOUEEJCSXagrSbAC5EIbrI9yQQIKhknEcy
- Pz+1Kiigsf31Dzfyk7q60Xjo5pWNSwPheC8+XgR22uV5/rL08003FCix3zJQHWsScZ65
- x3Ut+PpAPjd05AvRP9dZtnongfKvo3PEa3pbnn7FysF0WaQwuSjuQQXnESE9gDfetVY6
- kyL1feft7i+qFDXZ0VE9gob/uv4NRs7juZ2r5Vjbp9ORIupGdnQC/TMSnLIC31ghRaYI
- nbCw==
-X-Gm-Message-State: AA+aEWY75Gzu0p24bUaKO8nxt6NcNuK3AsiUS2w+unxl91DvHK3m+4OE
- bVFWr2zlwNdpa13CtpmBn3yhmIkCWMDYG1qkGjo=
-X-Google-Smtp-Source: AFSGD/XDXGEZjKZkD8gg6Kij5vdAu+Ms/qjx9Bu+i/tMgaufVgBZNtC0be8I7TrS0bbJWAI6cFCaXaYleSRgNHg75Qo=
-X-Received: by 2002:a19:24c6:: with SMTP id k189mr11910717lfk.77.1545190280199; 
- Tue, 18 Dec 2018 19:31:20 -0800 (PST)
+ id 1gZTB2-0007yo-TR
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 04:09:47 +0000
+Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
+ (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 90721217D6;
+ Wed, 19 Dec 2018 04:09:31 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1545192573;
+ bh=9z1vdxsKHK1NMWKam1ZY98y9lqdHp7yfFFZgwu4/YfU=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=T+HpzBzIZD7dUtvJxdIFUC9B8zCGWlMasPebNqFun5kPEF1N9u6Pw8Tpz/M0opzJb
+ g8+w6QpT9oRmM1O4J9xwd6KipPj3QqV5uMz2rLXF3UgvXRbfo2Ofs6l/GPjdcaiHAi
+ 6XfFpBWlEjVvxLIlPbIiaR7hK1pAb+sD4ngnzyFk=
+Date: Wed, 19 Dec 2018 12:08:22 +0800
+From: Shawn Guo <shawnguo@kernel.org>
+To: Andy Tang <andy.tang@nxp.com>
+Subject: Re: [PATCH] arm64: dts: nxp: ls208xa: add more thermal zone support
+Message-ID: <20181219040820.GA13728@dragon>
+References: <20181031044742.26327-1-andy.tang@nxp.com>
+ <VI1PR04MB433351E63826CC2128153943F3BD0@VI1PR04MB4333.eurprd04.prod.outlook.com>
 MIME-Version: 1.0
-References: <20181217202334.GA11758@jordon-HP-15-Notebook-PC>
- <20181218095709.GJ26090@n2100.armlinux.org.uk>
- <CAFqt6zaVU-Fme6fErieBfBKwAm9xHUa7cXTOfqzwUJR__0JysQ@mail.gmail.com>
- <20181218123318.GN26090@n2100.armlinux.org.uk>
- <CAFqt6zbqaS-pFETyjRR2-1V57MiJuX65xoMjgkr-DjUnrJYzSg@mail.gmail.com>
- <20181218130146.GO26090@n2100.armlinux.org.uk>
-In-Reply-To: <20181218130146.GO26090@n2100.armlinux.org.uk>
-From: Souptick Joarder <jrdr.linux@gmail.com>
-Date: Wed, 19 Dec 2018 09:01:09 +0530
-Message-ID: <CAFqt6zYnn76OdprSvA2Bj0v=xQqtJ6xJse6+iB+-=u3WsEv3pA@mail.gmail.com>
-Subject: Re: [PATCH v4 4/9] drm/rockchip/rockchip_drm_gem.c: Convert to use
- vm_insert_range
-To: Russell King - ARM Linux <linux@armlinux.org.uk>
+Content-Disposition: inline
+In-Reply-To: <VI1PR04MB433351E63826CC2128153943F3BD0@VI1PR04MB4333.eurprd04.prod.outlook.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_193132_962436_D690B4A9 
-X-CRM114-Status: GOOD (  26.09  )
+X-CRM114-CacheID: sfid-20181218_200945_305911_6384DC87 
+X-CRM114-Status: GOOD (  11.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,86 +75,35 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Michal Hocko <mhocko@suse.com>, Heiko Stuebner <heiko@sntech.de>,
- linux-rockchip@lists.infradead.org, airlied@linux.ie, hjc@rock-chips.com,
- Matthew Wilcox <willy@infradead.org>, linux-kernel@vger.kernel.org,
- Linux-MM <linux-mm@kvack.org>, dri-devel@lists.freedesktop.org,
- Andrew Morton <akpm@linux-foundation.org>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "daniel.lezcano@linaro.org" <daniel.lezcano@linaro.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Leo Li <leoyang.li@nxp.com>, "robh+dt@kernel.org" <robh+dt@kernel.org>,
+ "rui.zhang@intel.com" <rui.zhang@intel.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 18, 2018 at 6:31 PM Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
->
-> On Tue, Dec 18, 2018 at 06:24:29PM +0530, Souptick Joarder wrote:
-> > On Tue, Dec 18, 2018 at 6:03 PM Russell King - ARM Linux
-> > <linux@armlinux.org.uk> wrote:
-> > >
-> > > On Tue, Dec 18, 2018 at 05:36:04PM +0530, Souptick Joarder wrote:
-> > > > On Tue, Dec 18, 2018 at 3:27 PM Russell King - ARM Linux
-> > > > <linux@armlinux.org.uk> wrote:
-> > > > > This looks like a change in behaviour.
-> > > > >
-> > > > > If user_count is zero, and offset is zero, then we pass into
-> > > > > vm_insert_range() a page_count of zero, and vm_insert_range() does
-> > > > > nothing and returns zero.
-> > > > >
-> > > > > However, as we can see from the above code, the original behaviour
-> > > > > was to return -ENXIO in that case.
-> > > >
-> > > > I think these checks are not necessary. I am not sure if we get into mmap
-> > > > handlers of driver with user_count = 0.
-> > >
-> > > I'm not sure either, I'm just pointing out the change of behaviour.
-> >
-> > Ok. I think feedback from Heiko might be helpful here :)
-> >
-> > >
-> > > > > The other thing that I'm wondering is that if (eg) count is 8 (the
-> > > > > object is 8 pages), offset is 2, and the user requests mapping 6
-> > > > > pages (user_count = 6), then we call vm_insert_range() with a
-> > > > > pages of rk_obj->pages + 2, and a pages_count of 6 - 2 = 4. So we
-> > > > > end up inserting four pages.
-> > > >
-> > > > Considering the scenario, user_count will remain 8 (user_count =
-> > > > vma_pages(vma) ). ? No ?
-> > > > Then we call vm_insert_range() with a pages of rk_obj->pages + 2, and
-> > > > a pages_count
-> > > > of 8 - 2 = 6. So we end up inserting 6 pages.
-> > > >
-> > > > Please correct me if I am wrong.
-> > >
-> > > vma_pages(vma) is the number of pages that the user requested, it is
-> > > the difference between vma->vm_end and vma->vm_start in pages.  As I
-> > > said above, "the user requests mapping 6 pages", so vma_pages() will
-> > > be 6, and so user_count will also be 6.  You are passing
-> > > user_count - offset into vm_insert_range(), which will be 6 - 2 = 4
-> > > in my example.  This is two pages short of what the user requested.
-> > >
-> >
-> > So, this should be the correct behavior.
-> >
-> >                  return vm_insert_range(vma, vma->vm_start,
-> > rk_obj->pages + offset,
-> >                                                           user_count);
->
-> ... and by doing so, you're introducing another instance of the same
-> bug I pointed out in patch 2.
-
-Sorry but didn't get it ? How it will be similar to the bug pointed
-out in patch 2 ?
-
-
->
-> --
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-> According to speedtest.net: 11.9Mbps down 500kbps up
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gVHVlLCBEZWMgMTgsIDIwMTggYXQgMDc6MDE6MzJBTSArMDAwMCwgQW5keSBUYW5nIHdyb3Rl
+Ogo+IEhpLAo+IAo+IFBJTkcuCj4gCj4gQlIsCj4gQW5keQo+IAo+ID4gLS0tLS1PcmlnaW5hbCBN
+ZXNzYWdlLS0tLS0KPiA+IEZyb206IFl1YW50aWFuIFRhbmcgPGFuZHkudGFuZ0BueHAuY29tPgo+
+ID4gU2VudDogMjAxOOW5tDEw5pyIMzHml6UgMTI6NDgKPiA+IFRvOiBzaGF3bmd1b0BrZXJuZWwu
+b3JnCj4gPiBDYzogTGVvIExpIDxsZW95YW5nLmxpQG54cC5jb20+OyByb2JoK2R0QGtlcm5lbC5v
+cmc7IG1hcmsucnV0bGFuZEBhcm0uY29tOwo+ID4gbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZy
+YWRlYWQub3JnOyBkZXZpY2V0cmVlQHZnZXIua2VybmVsLm9yZzsKPiA+IGxpbnV4LWtlcm5lbEB2
+Z2VyLmtlcm5lbC5vcmc7IHJ1aS56aGFuZ0BpbnRlbC5jb207IGRhbmllbC5sZXpjYW5vQGxpbmFy
+by5vcmc7Cj4gPiBBbmR5IFRhbmcgPGFuZHkudGFuZ0BueHAuY29tPgo+ID4gU3ViamVjdDogW1BB
+VENIXSBhcm02NDogZHRzOiBueHA6IGxzMjA4eGE6IGFkZCBtb3JlIHRoZXJtYWwgem9uZSBzdXBw
+b3J0Cj4gPiAKPiA+IExzMjA4eGEgaGFzIHNldmVyYWwgdGhlcm1hbCBzZW5zb3JzLiBBZGQgYWxs
+IHRoZSBzZW5zb3IgaWQgdG8gZHRzIHRvIGVuYWJsZQo+ID4gdGhlbS4KPiA+IAo+ID4gVG8gbWFr
+ZSB0aGUgZHRzIGNsZWFuZXIsIHJlLW9yZ2FuaXplIHRoZSBub2RlcyB0byBzcGxpdCBvdXQgdGhl
+IGNvbW1vbiBwYXJ0IHNvCj4gPiB0aGF0IGl0IGNhbiBiZSBzaGFyZWQgd2l0aCBvdGhlciBTb0Nz
+Lgo+ID4gCj4gPiBTaWduZWQtb2ZmLWJ5OiBZdWFudGlhbiBUYW5nIDxhbmR5LnRhbmdAbnhwLmNv
+bT4KClBsZWFzZSB0YWtlIGEgbG9vayBhdCBwYXRjaCBiZWxvdy4KCmh0dHBzOi8vcGF0Y2h3b3Jr
+Lmtlcm5lbC5vcmcvcGF0Y2gvMTA2ODU4MTUvCgpTaGF3bgoKX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QK
+bGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRl
+YWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
