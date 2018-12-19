@@ -2,63 +2,62 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3F9A3C43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 07:55:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 481AAC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 08:04:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E0E6421852
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 07:55:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 17BEA2184C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 08:04:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LAHn2clY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E0E6421852
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iNGFo/w5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 17BEA2184C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=7bNgBD65Q5G53+o1r0bCkH645slY8gCLgMr+gRMAA8o=; b=LAHn2clYRFyjUb
-	3FLw+EJmt5WmsSLSOfpZLzGo4bedpc3v/olijEXWCQ649HoG4oMEXF4OU5ZI4otTHwRtrbQP5k9IQ
-	tJ5lmrEAyBitu1v75zFCFUgjUTRaeCj11k07u6MMSxglMd6BpZcaCvJQ6ntoGvEkDE+BcXOWB8Q1c
-	MzYZq6zFGr8lujYcb05Zo9YXGp3mfHT/EKdcIvmksgQb/nB1oNbgrOuRigRLNZ0UG/+pcBJ16cZ4U
-	xlbx/TrF/46sjltAm6x6nDMyXyv9fVujou2EYlSs1XV5oOgIt6VgUAtVMqnXLlMBYxFTxRHQqainR
-	sMzi3qceNJRntHJyIayA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=3TnGGWDoAk9RTVmkz+p1+qW3s0mft0CwuuY1dO8U2eo=; b=iNGFo/w5yah+DZ
+	jFyJRcW7Kr9/2uBs61YFitTlGEWvAwDyDJ29UKF6P9e67oeGN/dXrmmGuRvj0NoW3NU0ZP0KfV219
+	MwFzwuz4RDzmpviA+rm4Frs/UVOXXFplKXU2VOcF6sgbZcLsdpaPI14eevbaokLQS2TdBPrD9R+35
+	6ZqphyLY0ruLOCI7IWE593x2zKe8x3A1UaO4YJud0hWwwdXAe+LKnwYyBnS2W0aHCYidJ3Dxljl/m
+	N/TsCY4+ozzsWb+h43M25Y8GomqzMiKSxXFiWTjQiwOPHXe06LhLXlzTVh90DpfkQbEG6KH0iEShD
+	JJdK/oqhfWWazjZTmh2Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZWhJ-0002Uq-9H; Wed, 19 Dec 2018 07:55:17 +0000
-Received: from mail5.windriver.com ([192.103.53.11] helo=mail5.wrs.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZWgv-0000t9-ON
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 07:55:04 +0000
-Received: from ALA-HCB.corp.ad.wrs.com (ala-hcb.corp.ad.wrs.com
- [147.11.189.41])
- by mail5.wrs.com (8.15.2/8.15.2) with ESMTPS id wBJ7rG0j019467
- (version=TLSv1 cipher=AES128-SHA bits=128 verify=FAIL);
- Tue, 18 Dec 2018 23:53:37 -0800
-Received: from pek-lpggp4.wrs.com (128.224.153.77) by ALA-HCB.corp.ad.wrs.com
- (147.11.189.41) with Microsoft SMTP Server id 14.3.408.0;
- Tue, 18 Dec 2018 23:53:14 -0800
-From: Zumeng Chen <zumeng.chen@gmail.com>
-To: <linux-wireless@vger.kernel.org>, <linux-arm-kernel@lists.infradead.org>, 
- <linux-kernel@vger.kernel.org>
-Subject: [PATCH 1/1] wlcore: Fix memory leak in case wl12xx_fetch_firmware
- failure
-Date: Wed, 19 Dec 2018 15:50:29 +0800
-Message-ID: <1545205829-31979-1-git-send-email-zumeng.chen@gmail.com>
-X-Mailer: git-send-email 2.7.4
+	id 1gZWpi-0004ml-Aa; Wed, 19 Dec 2018 08:03:58 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZWpe-0004ko-Uy
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 08:03:56 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id EA08120A82; Wed, 19 Dec 2018 09:03:41 +0100 (CET)
+Received: from xps13 (aaubervilliers-681-1-38-38.w90-88.abo.wanadoo.fr
+ [90.88.157.38])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 9AACF207B8;
+ Wed, 19 Dec 2018 09:03:31 +0100 (CET)
+Date: Wed, 19 Dec 2018 09:03:31 +0100
+From: Miquel Raynal <miquel.raynal@bootlin.com>
+To: Stephen Boyd <sboyd@kernel.org>
+Subject: Re: [PATCH v3 1/4] clk: core: clarify the check for runtime PM
+Message-ID: <20181219090331.4c8c4852@xps13>
+In-Reply-To: <154517780935.238328.764268020422357561@swboyd.mtv.corp.google.com>
+References: <20181204192440.12125-1-miquel.raynal@bootlin.com>
+ <20181204192440.12125-2-miquel.raynal@bootlin.com>
+ <154517780935.238328.764268020422357561@swboyd.mtv.corp.google.com>
+Organization: Bootlin
+X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_235459_282863_46E78C14 
-X-CRM114-Status: GOOD (  10.82  )
+X-CRM114-CacheID: sfid-20181219_000355_134677_B7A38885 
+X-CRM114-Status: GOOD (  21.99  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,64 +69,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: tony@atomide.com, Zumeng Chen <zumeng.chen@gmail.com>, kvalo@codeaurora.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Gregory Clement <gregory.clement@bootlin.com>,
+ Antoine Tenart <antoine.tenart@bootlin.com>,
+ Michael Turquette <mturquette@baylibre.com>, linux-kernel@vger.kernel.org,
+ Russell King <linux@armlinux.org.uk>, Nadav Haklai <nadavh@marvell.com>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Release fw_status, raw_fw_status, and tx_res_if when wl12xx_fetch_firmware
-failed instead of meaningless goto out to avoid the following memory leak
-reports(Only the last one listed):
-
-unreferenced object 0xc28a9a00 (size 512):
-  comm "kworker/0:4", pid 31298, jiffies 2783204 (age 203.290s)
-  hex dump (first 32 bytes):
-    00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ................
-    00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ................
-  backtrace:
-    [<6624adab>] kmemleak_alloc+0x40/0x74
-    [<500ddb31>] kmem_cache_alloc_trace+0x1ac/0x270
-    [<db4d731d>] wl12xx_chip_wakeup+0xc4/0x1fc [wlcore]
-    [<76c5db53>] wl1271_op_add_interface+0x4a4/0x8f4 [wlcore]
-    [<cbf30777>] drv_add_interface+0xa4/0x1a0 [mac80211]
-    [<65bac325>] ieee80211_reconfig+0x9c0/0x1644 [mac80211]
-    [<2817c80e>] ieee80211_restart_work+0x90/0xc8 [mac80211]
-    [<7e1d425a>] process_one_work+0x284/0x42c
-    [<55f9432e>] worker_thread+0x2fc/0x48c
-    [<abb582c6>] kthread+0x148/0x160
-    [<63144b13>] ret_from_fork+0x14/0x2c
-    [< (null)>] (null)
-    [<1f6e7715>] 0xffffffff
-
-Signed-off-by: Zumeng Chen <zumeng.chen@gmail.com>
----
- drivers/net/wireless/ti/wlcore/main.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/net/wireless/ti/wlcore/main.c b/drivers/net/wireless/ti/wlcore/main.c
-index 26b1873..2e12de8 100644
---- a/drivers/net/wireless/ti/wlcore/main.c
-+++ b/drivers/net/wireless/ti/wlcore/main.c
-@@ -1085,8 +1085,11 @@ static int wl12xx_chip_wakeup(struct wl1271 *wl, bool plt)
- 		goto out;
- 
- 	ret = wl12xx_fetch_firmware(wl, plt);
--	if (ret < 0)
--		goto out;
-+	if (ret < 0) {
-+		kfree(wl->fw_status);
-+		kfree(wl->raw_fw_status);
-+		kfree(wl->tx_res_if);
-+	}
- 
- out:
- 	return ret;
--- 
-2.7.5
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgU3RlcGhlbiwKClN0ZXBoZW4gQm95ZCA8c2JveWRAa2VybmVsLm9yZz4gd3JvdGUgb24gVHVl
+LCAxOCBEZWMgMjAxOCAxNjowMzoyOQotMDgwMDoKCj4gUXVvdGluZyBNaXF1ZWwgUmF5bmFsICgy
+MDE4LTEyLTA0IDExOjI0OjM3KQo+ID4gQ3VycmVudGx5LCB0aGUgY29yZS0+ZGV2IGVudHJ5IGlz
+IHBvcHVsYXRlZCBvbmx5IGlmIHJ1bnRpbWUgUE0gaXMKPiA+IGVuYWJsZWQuIERvaW5nIHNvIHBy
+ZXZlbnRzIGFjY2Vzc2luZyB0aGUgZGV2aWNlIHN0cnVjdHVyZSBpbiBhbnkKPiA+IGNhc2UuCj4g
+PiAKPiA+IEtlZXAgdGhlIHNhbWUgbG9naWMgYnV0IGluc3RlYWQgb2YgdXNpbmcgdGhlIHByZXNl
+bmNlIG9mIGNvcmUtPmRldiBhcwo+ID4gdGhlIG9ubHkgY29uZGl0aW9uLCBhbHNvIGNoZWNrIHRo
+ZSBzdGF0dXMgb2YKPiA+IHBtX3J1bnRpbWVfZW5hYmxlZCgpLiBUaGVuLCB3ZSBjYW4gc2V0IHRo
+ZSBjb3JlLT5kZXYgcG9pbnRlciBhdCBhbnkKPiA+IHRpbWUgYXMgbG9uZyBhcyBhIGRldmljZSBz
+dHJ1Y3R1cmUgaXMgYXZhaWxhYmxlLgo+ID4gCj4gPiBUaGlzIGNoYW5nZSB3aWxsIGhlbHAgc3Vw
+cG9ydGluZyBkZXZpY2UgbGlua3MgaW4gdGhlIGNsb2NrIHN1YnN5c3RlbS4KPiA+IAo+ID4gU2ln
+bmVkLW9mZi1ieTogTWlxdWVsIFJheW5hbCA8bWlxdWVsLnJheW5hbEBib290bGluLmNvbT4KPiA+
+IC0tLQo+ID4gIGRyaXZlcnMvY2xrL2Nsay5jIHwgMTEgKysrKystLS0tLS0KPiA+ICAxIGZpbGUg
+Y2hhbmdlZCwgNSBpbnNlcnRpb25zKCspLCA2IGRlbGV0aW9ucygtKQo+ID4gCj4gPiBkaWZmIC0t
+Z2l0IGEvZHJpdmVycy9jbGsvY2xrLmMgYi9kcml2ZXJzL2Nsay9jbGsuYwo+ID4gaW5kZXggYWYw
+MTE5NzRkNGVjLi5iNzk5MzQ3YzVmZDYgMTAwNjQ0Cj4gPiAtLS0gYS9kcml2ZXJzL2Nsay9jbGsu
+Ywo+ID4gKysrIGIvZHJpdmVycy9jbGsvY2xrLmMKPiA+IEBAIC05Nyw3ICs5Nyw3IEBAIHN0YXRp
+YyBpbnQgY2xrX3BtX3J1bnRpbWVfZ2V0KHN0cnVjdCBjbGtfY29yZSAqY29yZSkKPiA+ICB7Cj4g
+PiAgICAgICAgIGludCByZXQgPSAwOwo+ID4gIAo+ID4gLSAgICAgICBpZiAoIWNvcmUtPmRldikK
+PiA+ICsgICAgICAgaWYgKCFjb3JlLT5kZXYgfHwgIXBtX3J1bnRpbWVfZW5hYmxlZChjb3JlLT5k
+ZXYpKSAgCj4gCj4gVGhpcyBsb29rcyBwb3RlbnRpYWxseSBkYW5nZXJvdXMuIFdoYXQgaWYgcnVu
+dGltZSBQTSBpcyBkaXNhYmxlZCBmb3IgdGhlCj4gY2xrIHdoZW4gdGhpcyBmdW5jdGlvbiBpcyBj
+YWxsZWQ/IFNob3VsZG4ndCB3ZSBqdXN0IHN0YXNoIGEgYm9vbCBhd2F5IGluCj4gdGhlIGNsa19j
+b3JlIHN0cnVjdHVyZSB3aGVuIGl0J3MgcmVnaXN0ZXJlZD8gQW5kIHRoZW4gd2UgY2FuIHJlcGxh
+Y2UgdGhlCj4gY2hlY2sgZm9yICFjb3JlLT5kZXYgd2l0aCBhIGNoZWNrIGZvciAnY29yZS0+cnBt
+X2VuYWJsZWQnIGluc3RlYWQuIFRoYXQKPiB3b3VsZCBiZSBhIG1vcmUgZXhhY3QgdHJhbnNmb3Jt
+YXRpb24uCgpTdXJlLCBJJ2xsIGRvIHRoYXQgaWYgeW91IHRoaW5rIHRoZXJlIGlzIGEgZGFuZ2Vy
+LgoKClRoYW5rcywKTWlxdcOobAoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5l
+bEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4v
+bGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
