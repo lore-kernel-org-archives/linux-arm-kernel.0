@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B666BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:31:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AC325C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:32:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7C1452070B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:31:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7FB4E20672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:32:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JEaHw8Xw";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="Z7Y2Kz6Y"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7C1452070B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GO5Q62Mo";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="TEaua6zE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7FB4E20672
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,55 +26,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/1Eu1zp1etKi28GWb19F0wx8FAYiBruqYePIH6qMcA8=; b=JEaHw8XweO9DCC
-	dszbPN9XoSNnZCKWD9eIjh2espPiNroFI+GdspLIHF4G1OtSacgZN4ORjpQca00pFr2Us9V9w9Fsq
-	hy3zsdY+6PlvMnh4Pmob24VPP7xN30QQ1Tkb9O0d+gq0aNBkCWkD4FzVrLEZ9LHLbCkrFUGAK7qp8
-	7aU+4+ZrFzWvK4nEhN3I9sh99S0qcf37mcDaLedUd1FewbCmV7zak5Fs9ilq4XzJMTbgqMrHFnPqr
-	3+labA65oN7U0PEaZ8cuLddFL3QEbo8aiB7esnGjz5Zkvnj6aW12tPQbcJSKi7H1qCVd7daKa9KA5
-	GeZPgBGp8lgg009/tmiw==;
+	List-Owner; bh=8Rym0nIs4MIUyqQWQPa1kDDVjU28dlIa4BnuJ5VinVM=; b=GO5Q62MoNceIL/
+	Nl/a0GxQ2hqno9u++a+RfQXhtE3JTK8krwTxbaf+asCTfb87q/aiRelFyDoBNkFlbh+v/SUpRD+km
+	TXFaACUmlXwMe4spgzBurhZjSjJFcOUhbD5TgAWxlHSc5LAoOOih4HCx8gW6j91BcRFpOopruoC39
+	9IFbDyeVMbweVJvtF70II1+a5EC/4Oy/VA8wm9v8sbU0kM8vU6Fij62LpMUpRLC82zQL611IyNZ29
+	vScNV8rHZpPIB+gTNuszoms0bOy+4iTL3T3ReRj0ESf7U4I/L7KpnHg6Hg4Akafn/kn/qJSFFMknp
+	5fVbSE4Pcb9FvoeXtapg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZgdG-0006LW-Hq; Wed, 19 Dec 2018 18:31:46 +0000
+	id 1gZgdc-0006dP-O2; Wed, 19 Dec 2018 18:32:08 +0000
 Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZgdE-0006KA-P5
- for linux-arm-kernel@bombadil.infradead.org; Wed, 19 Dec 2018 18:31:44 +0000
+ id 1gZgdH-0006KA-O3
+ for linux-arm-kernel@bombadil.infradead.org; Wed, 19 Dec 2018 18:31:47 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:MIME-Version:
  References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
  Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
  Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
  List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=eVscD0o+TLlHgKOb9EpPKu2KWCP7GAec8XwKON229Mw=; b=Z7Y2Kz6YT0+UOgzXz6OQAn3tGf
- kHKnRQVPrjjOyWC5CQ9nceRL+bakfsIZ11lGR/tkih6SqWzTyFAAocXbXl2z+XBKnCSXTZhbmGz/w
- kQV/zL+USaLXpC2+sc7D+/3D/eRVs8Rw5CWVXCWBasIibFmUinLWFMXI5MJCFJJnxqLQ81BRbck5h
- WgilhOe63CAUMeRmFetQ1pNB/lUv0w4rxRSMYoW1gR/yUGdYtaUc2Im8dAg6fxfOY+++SpE4o6LLK
- 9VNxz+4jdVnKDfx6AEcZdMzlKxnQ+lb5GaD0cQfUMpJsIDdJSwbLYfKUpTY2uXHDuMFHTiBIgIhVH
- kx2QdDHw==;
-Received: from foss.arm.com ([217.140.101.70])
+ bh=AWG3fphtnXdWG4VOONK2OtKx0zZx+n9tNVKBWveqIOs=; b=TEaua6zEeVwfnlKmmXbiQIiDg6
+ A9mM23DG1ul1duaIOqdOrbqSEDp9Q1YniqJJdSVzT10z9JaIlr9Jr9oCRrio2f7L5VHcUg+ilwOi9
+ +gY3K9eGPUpG0h0cBOo+o5p+zhmAALjOQbdvQ8eOMCNiLLl8m6r/mVsdL0XGlZ6zJ12+2Tnvifk0p
+ nbLRWTzAYS1cqpV/mnZgzQEUO7lO/Z6SA8Vifj8KYm4avonNprpLaccfqhg48HUZ1PxgPtskOJEZ9
+ q7LtKocjqbyQWDYX8c3QRd+1b+lnnW2Hf+QLuefyq8m1JS6WdRP/dGL2ljjdt6UkaBHuaL2HHuSl0
+ YvONU1fA==;
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by merlin.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZgDs-0000VF-OR
+ id 1gZgDs-0000VB-OR
  for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 18:05:33 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 772CE1684;
- Wed, 19 Dec 2018 10:05:24 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id AEBCC1713;
+ Wed, 19 Dec 2018 10:05:21 -0800 (PST)
 Received: from filthy-habits.cambridge.arm.com
  (filthy-habits.cambridge.arm.com [10.1.196.62])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id EBD5C3F675;
- Wed, 19 Dec 2018 10:05:21 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 2F55C3F675;
+ Wed, 19 Dec 2018 10:05:19 -0800 (PST)
 From: Marc Zyngier <marc.zyngier@arm.com>
 To: Paolo Bonzini <pbonzini@redhat.com>,
  =?UTF-8?q?Radim=20Kr=C4=8Dm=C3=A1=C5=99?= <rkrcmar@redhat.com>
-Subject: [PATCH 27/28] arm/arm64: KVM: Add ARM_EXCEPTION_IS_TRAP macro
-Date: Wed, 19 Dec 2018 18:03:48 +0000
-Message-Id: <20181219180349.242681-28-marc.zyngier@arm.com>
+Subject: [PATCH 26/28] arm64: KVM: Avoid setting the upper 32 bits of VTCR_EL2
+ to 1
+Date: Wed, 19 Dec 2018 18:03:47 +0000
+Message-Id: <20181219180349.242681-27-marc.zyngier@arm.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181219180349.242681-1-marc.zyngier@arm.com>
 References: <20181219180349.242681-1-marc.zyngier@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_130532_913815_CC5BBF22 
-X-CRM114-Status: GOOD (  13.47  )
+X-CRM114-CacheID: sfid-20181219_130532_925516_AB98F07A 
+X-CRM114-Status: GOOD (  14.67  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,64 +101,37 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-32 and 64bit use different symbols to identify the traps.
-32bit has a fine grained approach (prefetch abort, data abort and HVC),
-while 64bit is pretty happy with just "trap".
+From: Will Deacon <will.deacon@arm.com>
 
-This has been fine so far, except that we now need to decode some
-of that in tracepoints that are common to both architectures.
+Although bit 31 of VTCR_EL2 is RES1, we inadvertently end up setting all
+of the upper 32 bits to 1 as well because we define VTCR_EL2_RES1 as
+signed, which is sign-extended when assigning to kvm->arch.vtcr.
 
-Introduce ARM_EXCEPTION_IS_TRAP which abstracts the trap symbols
-and make the tracepoint use it.
+Lucky for us, the architecture currently treats these upper bits as RES0
+so, whilst we've been naughty, we haven't set fire to anything yet.
 
-Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+Cc: <stable@vger.kernel.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Christoffer Dall <christoffer.dall@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_asm.h   | 4 ++++
- arch/arm64/include/asm/kvm_asm.h | 1 +
- virt/kvm/arm/trace.h             | 2 +-
- 3 files changed, 6 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/kvm_arm.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 231e87ad45d5..35491af87985 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -23,6 +23,10 @@
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 9921bb7ab6d8..9c1a065b78ea 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -104,7 +104,7 @@
+ 			 TCR_EL2_ORGN0_MASK | TCR_EL2_IRGN0_MASK | TCR_EL2_T0SZ_MASK)
  
- #define ARM_EXIT_WITH_ABORT_BIT  31
- #define ARM_EXCEPTION_CODE(x)	  ((x) & ~(1U << ARM_EXIT_WITH_ABORT_BIT))
-+#define ARM_EXCEPTION_IS_TRAP(x)					\
-+	(ARM_EXCEPTION_CODE((x)) == ARM_EXCEPTION_PREF_ABORT	||	\
-+	 ARM_EXCEPTION_CODE((x)) == ARM_EXCEPTION_DATA_ABORT	||	\
-+	 ARM_EXCEPTION_CODE((x)) == ARM_EXCEPTION_HVC)
- #define ARM_ABORT_PENDING(x)	  !!((x) & (1U << ARM_EXIT_WITH_ABORT_BIT))
- 
- #define ARM_EXCEPTION_RESET	  0
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index b2e12c99db7d..f5b79e995f40 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -25,6 +25,7 @@
- 
- #define ARM_EXIT_WITH_SERROR_BIT  31
- #define ARM_EXCEPTION_CODE(x)	  ((x) & ~(1U << ARM_EXIT_WITH_SERROR_BIT))
-+#define ARM_EXCEPTION_IS_TRAP(x)  (ARM_EXCEPTION_CODE((x)) == ARM_EXCEPTION_TRAP)
- #define ARM_SERROR_PENDING(x)	  !!((x) & (1U << ARM_EXIT_WITH_SERROR_BIT))
- 
- #define ARM_EXCEPTION_IRQ	  0
-diff --git a/virt/kvm/arm/trace.h b/virt/kvm/arm/trace.h
-index f21f04f8036d..3828beab93f2 100644
---- a/virt/kvm/arm/trace.h
-+++ b/virt/kvm/arm/trace.h
-@@ -37,7 +37,7 @@ TRACE_EVENT(kvm_exit,
- 
- 	TP_fast_assign(
- 		__entry->ret			= ARM_EXCEPTION_CODE(ret);
--		__entry->esr_ec = (ARM_EXCEPTION_CODE(ret) == ARM_EXCEPTION_TRAP) ? esr_ec : 0;
-+		__entry->esr_ec = ARM_EXCEPTION_IS_TRAP(ret) ? esr_ec : 0;
- 		__entry->vcpu_pc		= vcpu_pc;
- 	),
- 
+ /* VTCR_EL2 Registers bits */
+-#define VTCR_EL2_RES1		(1 << 31)
++#define VTCR_EL2_RES1		(1U << 31)
+ #define VTCR_EL2_HD		(1 << 22)
+ #define VTCR_EL2_HA		(1 << 21)
+ #define VTCR_EL2_PS_SHIFT	TCR_EL2_PS_SHIFT
 -- 
 2.19.2
 
