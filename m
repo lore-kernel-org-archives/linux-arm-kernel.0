@@ -2,71 +2,72 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 75361C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:40:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2DD79C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:51:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 468D4217D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:40:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CD883217D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:51:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kvtbOQxo";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="tes1xi2N"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 468D4217D7
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PgeNqKJv"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CD883217D7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-m68k.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=CpRavzgIXwaG7CLv/gy7owOi7ZMi54m3sxCB5lvnidQ=; b=kvtbOQxoo5HLvdvzCrOkVSUkK
-	BDpB+w+c1jImHGGfdlHf6YJOIws+JZFjwI7kAR4sTQtVE9So319Aw5qdxwW5DuFaNFul4Mrql+adu
-	DSWZiDrPpRAqRijMFQm8im7EyJYkq7Md5hH7jseB8ZAIjGRt/ntKG2W8EO5MJKlaaVs4mNuOTFeEp
-	+sWE9Ss+et95/u5XQX7Ti5sX7FqDV3YwOt609pYrZrDA6kKwFVPwavdciGEiozb6HGzYzJe8zV9xx
-	jTZwUIrIaM2kT5jen1A5kM8AEODgXFRndIgRv5+YDEEdAqNUdy/qz2p3rYNx3wAKB+7RE+tSOMDdJ
-	anGNhsaLg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=CR3zP+66oq5DFFjL7uBtO8425DaJ7Ui/kIcmzZLKL7k=; b=PgeNqKJveXTvDO
+	UoQzFjj7PgY7cnT71UocYarYq0VmQWLtPtnNQ2KpcsOhI5Bxh1RCzWyjN5R79FEUkO6GVJysoWV3a
+	AvZFgF5baqHH214Vl3muGrT5It/pEDt90Eg/q9oMQmVdFcC8Swxvq5bUUdKnG2IZwCa3fOPYFgZ/C
+	m4CW/YQyR2lClAFuFiX9Vic4L4CWXttjqctYXhskhOviUCMpZkcd8HI+wacdtvw90l2EATklg4jGx
+	r0gJXpzCeZulANBqCmQ0bHLnqwGSFUnIHAJmOUt1d1LhZ/REmoR6nj+phLv2aAlSwE+JTvf6KgO+U
+	swDthZmAMg2s1m728DsA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZgly-0002fu-L2; Wed, 19 Dec 2018 18:40:46 +0000
-Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
+	id 1gZgwY-000750-3s; Wed, 19 Dec 2018 18:51:42 +0000
+Received: from mail-vs1-f66.google.com ([209.85.217.66])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZglp-0002Sl-Hq
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 18:40:42 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=sirena.org.uk; s=20170815-heliosphere; h=In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=2mo2BQGIfBqO0Nq+3x8dSCeKHAv6NdOKCAnayJnodpI=; b=tes1xi2NJtMSglXmqdulPQOH9
- EzBWOarvYN6pp6RHIKvX/72GG5Yeus7QV1ToOFfhRfGaw5JYv67U2SiFv2CiB3w93pQP+OCJX6ncd
- HQS5HsPy6j5+qtKxbgG1qeed0dTRDw4sgFLTR+X0d/pwBTQ1x7FoQBjsuzcQkmB8Pdf+w=;
-Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
- ([82.37.168.47] helo=debutante.sirena.org.uk)
- by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
- (envelope-from <broonie@sirena.org.uk>)
- id 1gZglc-0005Ls-8W; Wed, 19 Dec 2018 18:40:24 +0000
-Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id E1B3511259E9; Wed, 19 Dec 2018 18:40:23 +0000 (GMT)
-Date: Wed, 19 Dec 2018 18:40:23 +0000
-From: Mark Brown <broonie@kernel.org>
-To: Andrei.Stefanescu@microchip.com
-Subject: Re: [PATCH] regulator: mcp16502: code cleanup
-Message-ID: <20181219184023.GM8130@sirena.org.uk>
-References: <1545047086-30286-1-git-send-email-andrei.stefanescu@microchip.com>
+ id 1gZgwV-00073d-0K
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 18:51:40 +0000
+Received: by mail-vs1-f66.google.com with SMTP id b74so12887818vsd.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 19 Dec 2018 10:51:28 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=5TokM2+3ceSDd993kUoj1piT2WfOUEotHgursvSqn7U=;
+ b=Z5NkBqtSa5Hwy9z7o5e+2TmURb4eNJ8EVTczlv0BTIqkSC1/G+QzhEO6e2V9UiA/Ne
+ h5E6L2cBMMccvGjxx7tyZ6cHh1sWU595DUhOXkb7DSCjnL88s2MUiAwwHyYXORW72FSq
+ CRZrEjJgXU4YbfXXgqLsYpzMp1K5vmC5O+92IIO83NfHNj6+uhQ9XNvvfHlPKf8JRSCc
+ f8d+7cljtGnBSQbay8WuEvpXGhrDhiMMwoEI/vleqz1rpvN1m49XMXanivhu8xpayVii
+ XGxMFVapPmowLuWF/qQWBP1xmYOH4RWCnUUWVj2zEm2O2pHWnxMmUZ8ez95WvETRFWVr
+ y5Tg==
+X-Gm-Message-State: AA+aEWYfx0xznPHuv1S5w4UY9GyuGkznWnyejeY6rbKsnmbPNupc1fJb
+ 9/0aC4uSd896+ECtTRZI/VdXEkky2XwIheOnXho=
+X-Google-Smtp-Source: AFSGD/UPpm9AurcroU6T2utUMLC7hQtL57qd6KO8xucaimFsyH9yDa/aWc9kTo1YwtfBVAtUSlXD8pzkap7fXdFjTTw=
+X-Received: by 2002:a67:c202:: with SMTP id i2mr9840788vsj.11.1545245487507;
+ Wed, 19 Dec 2018 10:51:27 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <1545047086-30286-1-git-send-email-andrei.stefanescu@microchip.com>
-X-Cookie: <Manoj> I *like* the chicken
-User-Agent: Mutt/1.10.1 (2018-07-13)
+References: <20181218134743.13692-1-geert+renesas@glider.be>
+ <20181219174735.GJ8130@sirena.org.uk>
+In-Reply-To: <20181219174735.GJ8130@sirena.org.uk>
+From: Geert Uytterhoeven <geert@linux-m68k.org>
+Date: Wed, 19 Dec 2018 19:51:14 +0100
+Message-ID: <CAMuHMdXb5VcGB=0DiAXfvyoAMS-Yzctc5G_1_E3m_64tv9R1Kg@mail.gmail.com>
+Subject: Re: [PATCH trivial] ASoC: xlnx: Grammar s/the the/the/
+To: Mark Brown <broonie@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_104038_571018_88A19A2F 
-X-CRM114-Status: GOOD (  12.30  )
+X-CRM114-CacheID: sfid-20181219_105139_050395_C3A6FF23 
+X-CRM114-Status: GOOD (  10.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,72 +79,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Cristian.Birsan@microchip.com, lgirdwood@gmail.com,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
-Content-Type: multipart/mixed; boundary="===============4872145941286150437=="
+Cc: ALSA Development Mailing List <alsa-devel@alsa-project.org>,
+ Jiri Kosina <trivial@kernel.org>, Geert Uytterhoeven <geert+renesas@glider.be>,
+ Liam Girdwood <lgirdwood@gmail.com>,
+ Maruthi Srinivas Bayyavarapu <maruthi.srinivas.bayyavarapu@xilinx.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi Mark,
 
---===============4872145941286150437==
-Content-Type: multipart/signed; micalg=pgp-sha512;
-	protocol="application/pgp-signature"; boundary="+ARLBH93C7pgvpZY"
-Content-Disposition: inline
+On Wed, Dec 19, 2018 at 6:47 PM Mark Brown <broonie@kernel.org> wrote:
+> On Tue, Dec 18, 2018 at 02:47:43PM +0100, Geert Uytterhoeven wrote:
+> > Fixes: 33f8db9a89200c18 ("ASoC: xlnx: enable i2s driver build")
+> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+> I already applied a patch from someone else fixing this.
 
+Indeed, commit 3930bdad68d0fb1d ("ASoC: xlnx: Grammar s/the the/the/")
+in linux-next, authored by me ;-)
 
---+ARLBH93C7pgvpZY
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Thanks!
 
-On Mon, Dec 17, 2018 at 11:44:59AM +0000, Andrei.Stefanescu@microchip.com w=
-rote:
-> This patch does the following:
-> - align parameter with parenthesis
-> - fix compile error
->=20
-> If CONFIG_SUSPEND is not set the dummy pm_ops
-> callbacks are named mcp16502_suspend and mcp16502_resume
-> instead of mcp16502_suspend_noirq and mcp16502_resume_noirq.
+Gr{oetje,eeting}s,
 
-Thanks for fixing this.
+                        Geert
 
->=20
-> Excerpt from compile log (kbuild test robot):
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert@linux-m68k.org
 
-There's no need to include the entire output from the kbuild robot in
-your commit log, especially when it's much larger than either the change
-or description of the change - it gets in the way of reading things as
-it makes it harder to pick out relevant information.
-
---+ARLBH93C7pgvpZY
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAABCgAdFiEEreZoqmdXGLWf4p/qJNaLcl1Uh9AFAlwakJcACgkQJNaLcl1U
-h9CoOAf/YDh3uJaraY3r8ssIap/lGImSllU4UNm87DsRN6fgOMo3+WFyngmQyY3u
-VtSglDhnhpYbrf2XqqiCMjKnz4Ihuao1IdDYiL0LA1DBNFzzJY8Bljc1DDt+urm5
-LgL5chbBQjasZqWVAdKrDT/s8FBrSTSfhWsh9eZihN5GOfvGLp3DdPQXIr7SVTmx
-5ghqyonl4PM8d5ezcRfOZDyuWGImMPdDSVg/GjpReZ8Dn8604Woq6PX1KL9thFpT
-jc5Q5EJnMP1o8Ix5+JCkmdij2iza0OBUl7yEDN2hdoTERI5lrocly3CA9rv3MCkN
-EhyRiCNvC7oKbQ5GJjVyRkmGjHaz1Q==
-=hBVs
------END PGP SIGNATURE-----
-
---+ARLBH93C7pgvpZY--
-
-
---===============4872145941286150437==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============4872145941286150437==--
-
