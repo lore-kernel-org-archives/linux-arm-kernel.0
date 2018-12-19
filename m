@@ -2,20 +2,22 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BC3CAC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 14:05:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B9E22C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 14:13:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 87AFD218A6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 14:05:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 87AF0218AE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 14:13:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ELn8qVwb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 87AFD218A6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bQXtIAqg";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="ByvLzt4Y"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 87AF0218AE
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,58 +26,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/mTnvyAz8TLndHiiLtW/uH6jY/PSIKgXvA1qg4tL4oQ=; b=ELn8qVwb/+Bmf3
-	U5EmC0c95DVAr7dhv6qil5WIX8o6MpsXVBSCXwQTH0UxmdxuakaM2LwpuHZDqKmqUItxIRfNsIOoY
-	ZW2BfZUZ6IKseokyrrsb4G44wLSc/YIjLVGC3j7FAsqKKIJtoLbiP0NeMXWzHdQcdjxLrfl363k5f
-	i4DcescNUR9NmbJZMcfcobX2Kn8y6vMRWBHWdtjP1QAgEsRhU2G9v3mv+byoKKnWSO9ed+VJefdqf
-	knf15R8NA1u9MMEcQ+V2K2wTzGHzui477WQiRYfN0/xQUmoAMQTf7e8hgIENhY61vrC2p/Rw1kKe7
-	ZJfpN3I/Iiwers9DHFEQ==;
+	List-Owner; bh=F6WMXAdPlkGuxFHpBtIjw+jmPgsTjPkWpZB73+n8F84=; b=bQXtIAqgCwgiB9
+	DVKazYpSqxQsV5yuICvQpPKyQWtT9pYc4AdGcVZYL0XG+pTnelCYRETciX8a9LnVi7xYL2rZaX8FA
+	jYYb8cMFmgei4XfMG3T3hb6FdAkzPrNNmqVp5ZF2bvl9GIycCeVL84ANdBGZKD17IZJ9BldJloTFN
+	i66KXFV8U/o3jE+r0bL93YVNDHE8TSmBu6iIxZuRi3Nf/TUcm1uUBqcqkp/991CtCnCxUGUAR0LyM
+	Fx7GXjziJaiiGOJoOHRYuBh9hRjigcU4FsdErYv2CGy4hM2mvehDq0SDgTJ0Pq49rj69sE78QRLnd
+	R+trVxN1H+fKePpNGwWg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZcT1-0006Zk-88; Wed, 19 Dec 2018 14:04:55 +0000
-Received: from mail-ot1-f68.google.com ([209.85.210.68])
+	id 1gZcan-0001W6-SK; Wed, 19 Dec 2018 14:12:57 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZcSy-0006YJ-Ct
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 14:04:53 +0000
-Received: by mail-ot1-f68.google.com with SMTP id f18so19138283otl.11
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 19 Dec 2018 06:04:41 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=/+1iwZ1k09J4X6V9hU88xagJXDo8YzrEApBpau+WViU=;
- b=W5k73W20XhmR884tkdhUiFzaRVQ9QI8JnYitKyA9mtvOIR8ni0xWFgxA68NUUSqWkO
- S8ctJwgE5eiFgc7NXGoUZf/Fi0SWu2Xt2kKLIdlxQJxR8O0scVQS/nEupIdcMzuYVRLf
- 6ecgwBpqcIytUWD67N7kcAJJB2OCMSbK/19s1NNnBiJodmipkV8QjzpYb4f4ew17HpvI
- 2qcb3cH5RqZZ2gZlaVqvdCWYLTYR7KJ0UerzMj0myQVqz05sww4QBZWh4ilOtD7PBQ3e
- upkPVtTTPojDc9D91skSE9T2ZmQDS2WrLvsysJjtHSDT8Rzm6svaN9eWclGlWEkUg0np
- zF5g==
-X-Gm-Message-State: AA+aEWZl1zULJL+Zxwe+eNjhWX+sSC+37tmjLxAlqyaNK6wIRNkGVIh1
- WaNbmsmoyvoAeL9xR44rUQ==
-X-Google-Smtp-Source: AFSGD/WWh6dPcxJsDFkewPSdC4INOdBginIV9yDAw/W/qF6KfgqdRaJNwCFb94ed9d2faE9aByHSjw==
-X-Received: by 2002:a9d:1d43:: with SMTP id m61mr15886768otm.170.1545228280726; 
- Wed, 19 Dec 2018 06:04:40 -0800 (PST)
-Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
- [24.155.109.49])
- by smtp.gmail.com with ESMTPSA id d5sm8586713oth.78.2018.12.19.06.04.39
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 19 Dec 2018 06:04:39 -0800 (PST)
-Date: Wed, 19 Dec 2018 08:04:39 -0600
-From: Rob Herring <robh@kernel.org>
-To: Mesih Kilinc <mesihkilinc@gmail.com>
-Subject: Re: [RFC PATCH 07/10] dt-bindigs: sound: Add Allwinner suniv F1C100s
- Audio Codec
-Message-ID: <20181219140439.GA6820@bogus>
-References: <cover.1543782328.git.mesihkilinc@gmail.com>
- <d0ce4b1f2a89a319d6becb5f88d7ca4184aa5595.1543782328.git.mesihkilinc@gmail.com>
+ id 1gZcak-0001Ug-2l
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 14:12:55 +0000
+Received: from localhost (173-25-171-118.client.mchsi.com [173.25.171.118])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 669512084A;
+ Wed, 19 Dec 2018 14:12:43 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1545228763;
+ bh=mYSv6C/anEPEOntT611vVWNftpPDSMGVwZM4K2vIyl8=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=ByvLzt4YfomMJA54EMmSb1yQTm5xnxXrsuygozJeZ5oY5zmyIugwowSxbSaIjs0k7
+ WEWq/5bv8YbYMp8rBhUNcvtBtvW0kRl/4hzorhM+j6FYGYvR25WM0MqOZa6cAwOiuD
+ LibnrvKayjkp4raXjyz97OA3rX0H3qoqwfRNMFJo=
+Date: Wed, 19 Dec 2018 08:12:41 -0600
+From: Bjorn Helgaas <helgaas@kernel.org>
+To: Richard Zhu <hongxing.zhu@nxp.com>
+Subject: Re: [v4] PCI: imx: make msi work without CONFIG_PCIEPORTBUS=y
+Message-ID: <20181219141241.GB12763@google.com>
+References: <1544768762-18124-1-git-send-email-hongxing.zhu@nxp.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <d0ce4b1f2a89a319d6becb5f88d7ca4184aa5595.1543782328.git.mesihkilinc@gmail.com>
+In-Reply-To: <1544768762-18124-1-git-send-email-hongxing.zhu@nxp.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_060452_433458_0DBDD878 
-X-CRM114-Status: GOOD (  12.00  )
+X-CRM114-CacheID: sfid-20181219_061254_156734_079F6EA2 
+X-CRM114-Status: GOOD (  24.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,30 +75,124 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- alsa-devel@alsa-project.org, Vinod Koul <vkoul@kernel.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>, Takashi Iwai <tiwai@suse.com>,
- linux-kernel@vger.kernel.org, Liam Girdwood <lgirdwood@gmail.com>,
- linux-sunxi@googlegroups.com, Mark Brown <broonie@kernel.org>,
- dmaengine@vger.kernel.org, Chen-Yu Tsai <wens@csie.org>,
- Jaroslav Kysela <perex@perex.cz>, linux-arm-kernel@lists.infradead.org
+Cc: Sven Van Asbroeck <thesven73@gmail.com>,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Andrew Smirnov <andrew.smirnov@gmail.com>, linux-pci@vger.kernel.org,
+ Shawn Lin <shawn.lin@rock-chips.com>, linux-kernel@vger.kernel.org,
+ Kishon Vijay Abraham I <kishon@ti.com>, Niklas Cassel <niklas.cassel@axis.com>,
+ Trent Piepho <tpiepho@impinj.com>,
+ Gustavo Pimentel <gustavo.pimentel@synopsys.com>,
+ linux-arm-kernel@lists.infradead.org, Lucas Stach <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 03, 2018 at 12:23:14AM +0300, Mesih Kilinc wrote:
-> Add compatible string for Allwinner suniv F1C100s audio codec.
+[+cc Sven, Trent, et al from related report:
+https://lore.kernel.org/linux-pci/20181218210444.5950-1-TheSven73@googlemail.com]
 
-Typo in the subject. Otherwise,
-
-Reviewed-by: Rob Herring <robh@kernel.org>
-
+On Fri, Dec 14, 2018 at 06:44:15AM +0000, Richard Zhu wrote:
+> Assertion of the MSI Enable bit of RC's MSI CAP is mandatory required to
+> trigger MSI on i.MX6 PCIe.
+> This bit would be asserted when CONFIG_PCIEPORTBUS=y.
+> Thus, the MSI works fine on i.MX6 PCIe before the commit "f3fdfc4".
 > 
-> Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
+> Assert it unconditionally when MSI is enabled.
+> Otherwise, the MSI wouldn't be triggered although the EP is present and
+> the MSIs are assigned.
+
+OK, I think I finally understand most of what's going on.  Please
+check the following possible changelog text:
+
+  The MSI Enable bit in the MSI Capability (PCIe r4.0, sec 7.7.1.2)
+  controls whether a Function can request service using MSI.
+
+  i.MX6 Root Ports implement the MSI Capability and may use MSI to
+  request service for events like PME, hotplug, AER, etc.  In
+  addition, on i.MX6, the MSI Enable bit controls delivery of MSI
+  interrupts from components below the Root Port.
+
+  Prior to f3fdfc4ac3a2 ("PCI: Remove host driver Kconfig selection of
+  CONFIG_PCIEPORTBUS"), enabling CONFIG_PCI_IMX6 automatically also
+  enabled CONFIG_PCIEPORTBUS, and when portdrv claimed the Root Ports,
+  it set the MSI Enable bit so it could use PME, hotplug, AER, etc.
+  As a side effect, that also enabled delivery of MSI interrupts from
+  downstream components.
+
+  After f3fdfc4ac3a2, the imx6q-pcie driver can operate without
+  portdrv, but that means imx6q-pcie must set the MSI Enable bit
+  itself if downstream components use MSI.
+
+  Fixes: f3fdfc4ac3a2 ("PCI: Remove host driver Kconfig selection of CONFIG_PCIEPORTBUS")
+
+I still don't understand exactly *how* MSI Enable affects MSI from
+downstream components, since the downstream component just does a DMA
+write, and the Root Port can't tell whether the write is to memory or
+interrupt controller unless the Root Port knows where the MSI targets
+are, e.g., if the interrupt controller is actually part of the RC.
+
+Bjorn
+
+> Signed-off-by: Richard Zhu <hongxing.zhu@nxp.com>
+> Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 > ---
->  Documentation/devicetree/bindings/sound/sun4i-codec.txt | 5 +++++
->  1 file changed, 5 insertions(+)
+> Changes v1 -> v2:
+> * Assert the MSI_EN unconditionally when MSI is supported.
+> Changes v2 -> v3:
+> * Remove the IS_ENABLED(CONFIG_PCI_MSI) since the driver depends on
+> PCI_MSI_IRQ_DOMAIN
+> * Extended with a check for pci_msi_enabled() to see if the user
+> explicitly want legacy IRQs
+> Changes v3 -> v4:
+> * Refer to Bjorn's comments, refine the subject and commit log and change
+> the PCI_MSI_CAP to PCIE_RC_IMX6_MSI_CAP.
+> ---
+>  drivers/pci/controller/dwc/pci-imx6.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+> index 26087b3..639bb27 100644
+> --- a/drivers/pci/controller/dwc/pci-imx6.c
+> +++ b/drivers/pci/controller/dwc/pci-imx6.c
+> @@ -74,6 +74,7 @@ struct imx6_pcie {
+>  #define PHY_PLL_LOCK_WAIT_USLEEP_MAX	200
+>  
+>  /* PCIe Root Complex registers (memory-mapped) */
+> +#define PCIE_RC_IMX6_MSI_CAP			0x50
+>  #define PCIE_RC_LCR				0x7c
+>  #define PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1	0x1
+>  #define PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN2	0x2
+> @@ -926,6 +927,7 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+>  	struct resource *dbi_base;
+>  	struct device_node *node = dev->of_node;
+>  	int ret;
+> +	u16 val;
+>  
+>  	imx6_pcie = devm_kzalloc(dev, sizeof(*imx6_pcie), GFP_KERNEL);
+>  	if (!imx6_pcie)
+> @@ -1071,6 +1073,14 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+>  	if (ret < 0)
+>  		return ret;
+>  
+> +	if (pci_msi_enabled()) {
+> +		val = dw_pcie_readw_dbi(pci, PCIE_RC_IMX6_MSI_CAP +
+> +				PCI_MSI_FLAGS);
+> +		val |= PCI_MSI_FLAGS_ENABLE;
+> +		dw_pcie_writew_dbi(pci, PCIE_RC_MSI_IMX6_CAP +
+> +				PCI_MSI_FLAGS, val);
+> +	}
+> +
+>  	return 0;
+>  }
+>  
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel@lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 _______________________________________________
 linux-arm-kernel mailing list
