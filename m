@@ -2,62 +2,64 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6D98AC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 15:49:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BA68FC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 15:50:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3E201218C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 15:49:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 77D4020449
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 15:50:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="j/yoxwHe"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3E201218C3
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U4Pqe7RC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 77D4020449
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8+OP+evTf8Otivzi9n4YuVbREOf4FYtjSswwZD3HVFA=; b=j/yoxwHeNJMuT5
-	BD/um2mX7DTOeWskBSI8DFYdVCDCJRNIMLyrBMtLPbrccnAbWghNtmfCIRqrcjzwe+54SAnBeJsY6
-	RXr9RMNOJkhv7cuHe9wlNcQZN5b4zpbKCmiTtcBitk24l0UrGN9OMxx9NQirOJxmwnMIclRcF7N5q
-	6KAs5dCTVVsnGCzCmqth5uHuITRKbXWd5dzCDuk6xFBzVq/BEV2QqNQ1ndN9W5vh4PXhDVpbpM1hs
-	tHQorREGqN659m3mZwM7lUwsnUO1+t4C3jOiI+LHanTinWBAxNruLhtmnfpBYKyWccZ6Dcaq/bxus
-	GT4Jb5skteeNeSfn5lDA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=vMDlqVh7ztyerYQEnsETpJJhh0tQITMD8JE2AncB8ck=; b=U4Pqe7RCEU16hoeFJcIzJyHrt
+	pKqOwcUvaLc7qseICdCDZLH275l8gQL2WZ4JaUJW0CMu8dD8axqepSECUH8tMzQh8kwL86EIiq4Tv
+	GeI/KRSou6EN/+/LcI3zDRPb/WqlE9MITj9Z4+ToaP+NUJI8apfebvOiI6pokDzQU+LQxHuLiLku3
+	Z3CzyXg3KDdqxzIJTJCEtVqw2lfCnraDvxb0iGkFlt+luozpYfLAzfZblv3gN4TfLyAAl5ETVwvla
+	5+zer9fsgqOwElw1zKjc5EezcuRRp7VG1TWJoDzCh59gShLaYSnhpEsuOnx1yOZv60VCzncst+rB+
+	ZaYALh5bQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZe5t-0001Z0-1f; Wed, 19 Dec 2018 15:49:09 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gZe7Y-00034v-DC; Wed, 19 Dec 2018 15:50:52 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZe5p-0001CC-6x
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 15:49:06 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 68F0580D;
- Wed, 19 Dec 2018 07:48:54 -0800 (PST)
-Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
- [10.1.197.40])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 51CAC3F675;
- Wed, 19 Dec 2018 07:48:52 -0800 (PST)
-Date: Wed, 19 Dec 2018 15:48:49 +0000
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-To: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-Subject: Re: [PATCH v5 0/2] Add new UniPhier PCIe host driver
-Message-ID: <20181219154849.GB25410@e107981-ln.cambridge.arm.com>
-References: <1544143992-16385-1-git-send-email-hayashi.kunihiko@socionext.com>
+ id 1gZe7U-00034C-8X
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 15:50:50 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 1B82020A82; Wed, 19 Dec 2018 16:50:36 +0100 (CET)
+Received: from localhost (aaubervilliers-681-1-38-38.w90-88.abo.wanadoo.fr
+ [90.88.157.38])
+ by mail.bootlin.com (Postfix) with ESMTPSA id CD38F2037D;
+ Wed, 19 Dec 2018 16:50:25 +0100 (CET)
+Date: Wed, 19 Dec 2018 16:50:26 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Jagan Teki <jagan@amarulasolutions.com>
+Subject: Re: [PATCH v5 07/17] drm/sun4i: sun6i_mipi_dsi: Refactor vertical
+ video start delay
+Message-ID: <20181219155026.2mpnmdibs3i6ianh@flea>
+References: <20181210161729.29720-1-jagan@amarulasolutions.com>
+ <20181210161729.29720-8-jagan@amarulasolutions.com>
+ <20181211164900.wfmkmbrbj3nmlb3h@flea>
+ <CAMty3ZBzOyAGwgOZwArbvnqtcvwMkJrqwGQ-q7+XFX-BVs34RQ@mail.gmail.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1544143992-16385-1-git-send-email-hayashi.kunihiko@socionext.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+In-Reply-To: <CAMty3ZBzOyAGwgOZwArbvnqtcvwMkJrqwGQ-q7+XFX-BVs34RQ@mail.gmail.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_074905_261632_CF53987E 
-X-CRM114-Status: GOOD (  23.07  )
+X-CRM114-CacheID: sfid-20181219_075048_587827_14F39554 
+X-CRM114-Status: GOOD (  21.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,82 +71,113 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Masami Hiramatsu <masami.hiramatsu@linaro.org>,
- Jassi Brar <jaswinder.singh@linaro.org>, linux-pci@vger.kernel.org,
- linux-kernel@vger.kernel.org, Masahiro Yamada <yamada.masahiro@socionext.com>,
- Rob Herring <robh+dt@kernel.org>,
- Gustavo Pimentel <gustavo.pimentel@synopsys.com>,
- Bjorn Helgaas <bhelgaas@google.com>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Stephen Boyd <sboyd@kernel.org>,
+ Michael Turquette <mturquette@baylibre.com>,
+ linux-sunxi <linux-sunxi@googlegroups.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>,
+ dri-devel <dri-devel@lists.freedesktop.org>, Chen-Yu Tsai <wens@csie.org>,
+ Michael Trimarchi <michael@amarulasolutions.com>,
+ linux-amarula@amarulasolutions.com, linux-clk <linux-clk@vger.kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Content-Type: multipart/mixed; boundary="===============0945485541682835382=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 07, 2018 at 09:53:10AM +0900, Kunihiko Hayashi wrote:
-> This series adds PCIe host controller driver for Socionext UniPhier SoCs.
-> This controller is based on the DesignWare PCIe core. This driver
-> supports LD20 and PXs3 SoCs.
-> 
-> v4: https://www.spinics.net/lists/linux-pci/msg78278.html
-> 
-> About legacy IRQ, it might be necessary to share common view from
-> keystone driver that have been cleaned up[1].
-> 
-> [1] https://lore.kernel.org/patchwork/patch/989541/
-> 
-> Changes since v4:
-> - fix an issue of using the wrong value to mask IRQ mask register
-> 
-> Changes since v3:
-> - dt-bindings: fix INTX numbering of legacy interrupt map
-> - change interrupts to level ones
-> - remove .xlate function
-> - merge uniphier_pcie_ltssm_disable() into uniphier_pcie_ltssm_enable()
-> - remove an error message on uniphier_pcie_establish_link()
-> - change the order between irq_domain_add_liniear() and
->   irq_set_chained_handler_and_data()
-> - replace dummy_irq_chip with uniphier_pcie_irq_chip and its functions
-> - add dependency on CONFIG_HAS_IOMEM
-> - MAINTAINERS: add pcie-uniphier entry
-> 
-> Changes since v2:
-> - dt-bindings: remove a comment that the node name isn't important
-> - dt-bindings: remove "intx" interrupt
-> - dt-bindings: define 'legacy-interrupt-controller' node and its properties
-> - return an error value when link up fails
-> - remove devm_request_irq() and a handler for MSI IRQ
-> - use chained interrupt instead of devm_request_irq() for legacy IRQ
-> - add unipher_pcie_config_legacy_irq() to get legacy IRQ from
->   'legacy-interrupt controller' node
-> - replace 4 statments to handle INTX with for_each_set_bit()
-> - remove initialization of pp->root_bus_nr
-> - remove indivisual interrupt enable bit definitions
-> - rename 'irq_domain' member to 'legacy_irq_domain' in private structure
-> - use pci_irqd_intx_xlate() for irq_domain_ops.xlate function
-> 
-> Changes since v1:
-> - follow capitalization conventions in the descriptions
-> - use C style comments except for the SPDX line
-> 
-> Kunihiko Hayashi (2):
->   dt-bindings: PCI: Add UniPhier PCIe host controller description
->   PCI: uniphier: Add UniPhier PCIe host controller support
-> 
->  .../devicetree/bindings/pci/uniphier-pcie.txt      |  81 ++++
->  MAINTAINERS                                        |   7 +
->  drivers/pci/controller/dwc/Kconfig                 |  10 +
->  drivers/pci/controller/dwc/Makefile                |   1 +
->  drivers/pci/controller/dwc/pcie-uniphier.c         | 471 +++++++++++++++++++++
->  5 files changed, 570 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/uniphier-pcie.txt
->  create mode 100644 drivers/pci/controller/dwc/pcie-uniphier.c
 
-Applied to pci/uniphier, aiming for v4.21, thanks.
+--===============0945485541682835382==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="pabpp542fin7m244"
+Content-Disposition: inline
 
-Lorenzo
+
+--pabpp542fin7m244
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Tue, Dec 11, 2018 at 10:30:08PM +0530, Jagan Teki wrote:
+> On Tue, Dec 11, 2018 at 10:19 PM Maxime Ripard
+> <maxime.ripard@bootlin.com> wrote:
+> >
+> > On Mon, Dec 10, 2018 at 09:47:19PM +0530, Jagan Teki wrote:
+> > > Video start delay can be computed by subtracting total vertical
+> > > timing with front porch timing and with adding 1 delay line for TCON.
+> > >
+> > > BSP code form BPI-M64-bsp is computing video start delay as
+> > > (from linux-sunxi/
+> > > drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
+> > >
+> > > u32 vfp =3D panel->lcd_vt - panel->lcd_y - panel->lcd_vbp;
+> > > =3D> (panel->lcd_vt) - panel->lcd_y - (panel->lcd_vbp)
+> > > =3D> (timmings->ver_front_porch + panel->lcd_vbp + panel->lcd_y)
+> > >    - panel->lcd_y - (panel->lcd_vbp)
+> > > =3D> timmings->ver_front_porch + panel->lcd_vbp + panel->lcd_y
+> > >                            - panel->lcd_y - panel->lcd_vbp
+> > > =3D> timmings->ver_front_porch
+> > >
+> > > So, update the start delay computation accordingly.
+> > >
+> > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> >
+> > Even though it's a bit better now on my A33 board and I don't have the
+> > white stripes on the bottom of the display, there's still some
+> > flickering with your patches applied.
+> >
+> > Bisecting it seems to point at that patch, but reverting it doesn't
+> > make the issue go away, so it's not really clear which one exactly is
+> > at fault.
+> >
+> > So, just like I asked in your v4, twice,
+> >
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2018-November/615=
+339.html
+>=20
+> I don't know how can I comment here. Not quite clearly understand your
+> setup, because I have verified 3 different panels from different
+> vendors one with 2-lane, another with 4-lane and one with video format
+> and another one is burstmode format. I even verified with the clock
+> rate and register details.
+>
+> Please suggest me, what can look further on this.
+
+You had a reason to do these patches in the first place, yet you never
+mention it anywhere in your commit logs. it would address the first
+part of my comment.
+
+And I can help you nail down whatever is going on here, but I would
+need the panel datasheet for that. It is my second point.
+
+Maxime
+
+--=20
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+
+--pabpp542fin7m244
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXBpowgAKCRDj7w1vZxhR
+xS5mAPkBvCnKEMqNBzx1jl/H57Y26OfbClwFS5eU5c1rFTUIIwEA6cxvVrxQQtiz
+TkacBASu5Zw9+olpuqa2tKq8tAcJdw4=
+=GMM5
+-----END PGP SIGNATURE-----
+
+--pabpp542fin7m244--
+
+
+--===============0945485541682835382==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============0945485541682835382==--
+
