@@ -2,21 +2,22 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EC5C9C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 20:41:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B988EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 21:51:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ADDF620873
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 20:41:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 862ED20866
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 21:51:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U2RMF/4c";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="a4UW5Zk0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ADDF620873
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U0RXd+pt";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="d0UhBioK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 862ED20866
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,76 +26,70 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hr/JSbTJz+lB8lrhfoO4xY3Tz890jOYarQLmvB1Mn6c=; b=U2RMF/4cnUcAx4
-	Xjq2OZL5BQFuCVNTLvbbwKX/dqAPex9FFQEP/rauZIyjPAMHedkBt5AzttY3vfxLRSeTbfRS2M5Y7
-	ifsHKgaeMG6lfzfeDHRLGH5K8nZikPsBzwyL0vIXviuDNaHuefb0W1YODEMoqB7Ak7pVCv4EGv0+R
-	ImfcdN4AmSPd1Ebn8J8Ju1MBXI4tKIk4e83rO3FuB0zsKC6PJiWL36Gf+v45Gea8FKyIfrmPGwhHc
-	VyFAVlziSRjBxvvY2TWR576YK8TAqmNydonFe7CL+JOBvzqLLw920bdNcJwHCDtJ7iCcEttxqWi1j
-	SufUQQV7gRovYL4t5eLg==;
+	List-Owner; bh=rTvi4O9fzxQzVKARbsBuDmwam/KJw/u3gkFseSlyaLI=; b=U0RXd+ptytt+RX
+	mZeS2X0JzkrF/IZmT43MKGlxKaiW1B0vO0KjNYrFltrzChVKg3XIwFuNJiyaAFag0QpArMxoF7YNE
+	vDpPn8JrN3zsvIPWIk4Xk8jhvpTi04ORQGxHIQxTw+gZhjjZ9Nd2IVr/FLRtEGg6B5MAFOGOLa1nf
+	eGzfKWzKu8a8f+jx0ZDuiYPHDSb10YYNMd5B4L4Ql7WZqEfq0lg//qWcsJS36TIx8L3FcKlVRJvF+
+	q0rxZ647h7QHJzD70zdDAyGe0iFMJePG5c9E5WnFotRLjEBkMjZ10np0AtNpSnl7YC/tufa4gVDNM
+	4HpaNcoXUJP0FjH4iEMA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZieS-0002TE-Sz; Wed, 19 Dec 2018 20:41:08 +0000
-Received: from mail-vk1-xa43.google.com ([2607:f8b0:4864:20::a43])
+	id 1gZjkq-0001CD-3l; Wed, 19 Dec 2018 21:51:48 +0000
+Received: from mail-yw1-xc44.google.com ([2607:f8b0:4864:20::c44])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZieP-0002SX-E9
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 20:41:06 +0000
-Received: by mail-vk1-xa43.google.com with SMTP id j23so4810063vke.13
+ id 1gZjkm-0001BP-GJ
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 21:51:46 +0000
+Received: by mail-yw1-xc44.google.com with SMTP id d16so6235304ywa.5
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 19 Dec 2018 12:40:54 -0800 (PST)
+ Wed, 19 Dec 2018 13:51:33 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=LUjgM4oOk40T3klE6kpKvxcnvoJM5vX5IrI0GyvZdyM=;
- b=a4UW5Zk0k6NDion9D5AGgWwYcEHXajC2Km6cZmd/Yj9fwgvAqQUPRZMJIeLoJCrqkP
- gzpy0k7l2AnpCWfkf8sT5JjWQbrJQ8ya+YWTvVfDSJOk8MkfaTG7vk2NijUyttAOG3tW
- FuMyawnYxebkOVzRv6EdCV61pOHpa25kO5CIQ=
+ :cc:content-transfer-encoding;
+ bh=GM5hGu4M0G7cLJiG/Agci333y79vb/B6Mg/bPozxqbQ=;
+ b=d0UhBioKbOj3lUW4AGfleaR68HWYnVZ51nyMcG4O+WkRY3xIcpbjHL3t8lSkZPAkRg
+ cWh00QeeQeSnJZQ5dJk30aggq6GezcAXHtyUyz6B0UFLiG/a1VChq4/l+jcxjcnvOrzk
+ dj4vJSRiE4slCuvIBEKYqRGIZdIkmkPwvRxqg=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=LUjgM4oOk40T3klE6kpKvxcnvoJM5vX5IrI0GyvZdyM=;
- b=ZcXavzi3iuC7kKVHc0BO7gWq5IgxHpO4sR1QvQv/uGuZ+dgv7Kez4t7u4vV0t8d3nD
- JXcmpFrV0EnsKLy6o/Aklko8FQOPpmgqgwJjfHhwIkX5q80a4IduTBYPnH8lYLLqukN3
- JZM+ROuAkKtLqPG8EjXkKQIzwCB54KDBBdsdfBQwzuzFd2t5XgrnpxRUn03EoBSzYR0q
- RqjsLYTUJVDc2MSyWcBalIlnDGqLvFSsa1r/+k0O0Ccd4jszGK3bFCnFLa/Otz0V56ss
- PB/IHLz057axqX8PIqd+YhYlXkbFz8ZyYjRkvC9/amV7h6vyLT7MD2HyoJ0S8q04MPb3
- gSmQ==
-X-Gm-Message-State: AA+aEWa0NvyLAO1WK/DLME/eXUmDdCECO4er94vWvbjWa4oJGpUArP1B
- K6H2ePSh8UKw1UmUliOLykDRMBiZqjk=
-X-Google-Smtp-Source: AFSGD/W+lCyAIsFsYQH2Ljt/O+YTZ3makPeeePxs3UnzKlhuiN/z5yVB4rrozlDps/JHE9nAj57b7A==
-X-Received: by 2002:a1f:60c9:: with SMTP id u192mr9636684vkb.36.1545252053146; 
- Wed, 19 Dec 2018 12:40:53 -0800 (PST)
-Received: from mail-vs1-f51.google.com (mail-vs1-f51.google.com.
- [209.85.217.51])
- by smtp.gmail.com with ESMTPSA id i136sm17829749vka.18.2018.12.19.12.40.51
+ :message-id:subject:to:cc:content-transfer-encoding;
+ bh=GM5hGu4M0G7cLJiG/Agci333y79vb/B6Mg/bPozxqbQ=;
+ b=qjnhKnFvXIlInK77sdaVGW73xzqK7nsXX8o72wQ98llaq7khDmusvin0sYmdfpC2Kp
+ 4ajkVn8hD0GVO8NRJPGRJRp7oPvoVoiqDOWIwfJZTthem9D5qmN3z+sRDuVWwHUSKLLm
+ +YYCeD3k/b04njhpw4/lVRqK2ew7GYoikFzdR0Hy6UtfKoq9mdLNQPgQi60ruzkGBq+w
+ lpZ+/rNgCzYkXIKLfXMoPX5+gopy7ju8smOGz2rSIS2/dRyIKeiB7BZY+Id33d/BADip
+ r/Ad+qWJQeKNMDlYWv/vs/E5KqeRgg4C9Xo14lZpAnh0uT3laSuk6J+cUQVs/qvDVvoY
+ BvVQ==
+X-Gm-Message-State: AA+aEWaSKnGMGSZBy97rI3C4k807h2JlMcg3X1LRGS/Arj8RvuA+fkrm
+ t6eLKFjbrOmOCzWIZPRBSraeR1Yntjs=
+X-Google-Smtp-Source: AFSGD/WOKHe3d8ZFfCzT9Efg7z8XLApewV/2okJ1LuZRkGhDTkSlHr61aY0GfMBjQ9H8Y4ACRFyXOA==
+X-Received: by 2002:a81:2790:: with SMTP id
+ n138mr24006765ywn.128.1545256291839; 
+ Wed, 19 Dec 2018 13:51:31 -0800 (PST)
+Received: from mail-yb1-f177.google.com (mail-yb1-f177.google.com.
+ [209.85.219.177])
+ by smtp.gmail.com with ESMTPSA id k64sm5411436ywc.56.2018.12.19.13.51.29
  for <linux-arm-kernel@lists.infradead.org>
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 19 Dec 2018 12:40:52 -0800 (PST)
-Received: by mail-vs1-f51.google.com with SMTP id n10so909832vso.13
+ Wed, 19 Dec 2018 13:51:29 -0800 (PST)
+Received: by mail-yb1-f177.google.com with SMTP id m129so8496355ybf.9
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 19 Dec 2018 12:40:51 -0800 (PST)
-X-Received: by 2002:a67:da93:: with SMTP id w19mr11009460vsj.144.1545252051529; 
- Wed, 19 Dec 2018 12:40:51 -0800 (PST)
+ Wed, 19 Dec 2018 13:51:29 -0800 (PST)
+X-Received: by 2002:a25:a445:: with SMTP id
+ f63-v6mr21956262ybi.171.1545256289326; 
+ Wed, 19 Dec 2018 13:51:29 -0800 (PST)
 MIME-Version: 1.0
-References: <20181212211848.26768-1-jcrouse@codeaurora.org>
- <20181212211848.26768-3-jcrouse@codeaurora.org>
- <20181214044057.wybv6wqg75qdnmic@vireshk-i7>
- <CAD=FV=VQEtQtnPJyo6vLm7ndPjowZ35FY-cibJyN_imZMoVU3w@mail.gmail.com>
- <20181217070647.xtvfgsixggua5yod@vireshk-i7>
- <CAD=FV=WKfKyZe6sc4drfa9kLQVbG1b9nCe6qbPmUPQGNEKAh=Q@mail.gmail.com>
- <154515840025.238328.5075439774176447808@swboyd.mtv.corp.google.com>
- <CAD=FV=XeFYmOJx9Wxy7hLQwSq1GoF84eQ93Y4KgrO1JM-g9ZiA@mail.gmail.com>
- <20181219044901.x76bd5vdsznhhrmz@vireshk-i7>
- <CAL_JsqLs69=nr=2J_48N3VtD0qNRnxAgDU8uMRwY_Qqp6Dzs_Q@mail.gmail.com>
-In-Reply-To: <CAL_JsqLs69=nr=2J_48N3VtD0qNRnxAgDU8uMRwY_Qqp6Dzs_Q@mail.gmail.com>
-From: Doug Anderson <dianders@chromium.org>
-Date: Wed, 19 Dec 2018 12:40:39 -0800
-X-Gmail-Original-Message-ID: <CAD=FV=VMMYKoW4RU_TTjLdyrNcWZU-Gyou9b6qynKFX9wDn5Mw@mail.gmail.com>
-Message-ID: <CAD=FV=VMMYKoW4RU_TTjLdyrNcWZU-Gyou9b6qynKFX9wDn5Mw@mail.gmail.com>
-Subject: Re: [PATCH v6 2/2] arm64: dts: sdm845: Add gpu and gmu device nodes
-To: Rob Herring <robh@kernel.org>
+References: <ecb306ea6f4a83302e78884713ad7823@codeaurora.org>
+In-Reply-To: <ecb306ea6f4a83302e78884713ad7823@codeaurora.org>
+From: Kees Cook <keescook@chromium.org>
+Date: Wed, 19 Dec 2018 13:51:18 -0800
+X-Gmail-Original-Message-ID: <CAGXu5jK68J6xHMva1p6aM0ZoQDyY0QiEV3qW3K8UDoK-OeP5Ng@mail.gmail.com>
+Message-ID: <CAGXu5jK68J6xHMva1p6aM0ZoQDyY0QiEV3qW3K8UDoK-OeP5Ng@mail.gmail.com>
+Subject: Re: usercopy_warn in __copy_to_user
+To: rishabhb@codeaurora.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_124105_479251_47B0D1FF 
-X-CRM114-Status: GOOD (  16.04  )
+X-CRM114-CacheID: sfid-20181219_135144_542915_A747BA11 
+X-CRM114-Status: GOOD (  17.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,50 +101,48 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nishanth Menon <nm@ti.com>, devicetree@vger.kernel.org,
- Rajendra Nayak <rnayak@codeaurora.org>, linux-pm@vger.kernel.org,
- Stephen Boyd <sboyd@kernel.org>, Viresh Kumar <viresh.kumar@linaro.org>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- Jordan Crouse <jcrouse@codeaurora.org>,
- linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- freedreno <freedreno@lists.freedesktop.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>, vireshk@kernel.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: tsoni@codeaurora.org, linux-arm-msm@vger.kernel.org, ckadabi@codeaurora.org,
+ LKML <linux-kernel@vger.kernel.org>,
+ Linux-arm Kernel <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
-
-On Wed, Dec 19, 2018 at 12:09 PM Rob Herring <robh@kernel.org> wrote:
->
-> On Tue, Dec 18, 2018 at 10:49 PM Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> >
-> > On 18-12-18, 11:05, Doug Anderson wrote:
-> > > OK, it's fine with me to have the fallback, but if we do we should be
-> > > consistent about it and make sure it's in all the bindings and device
-> > > tree files...
-> >
-> > Sure.
-> >
-> > I am not sure what's the right way to do it is, i.e. should we keep the
-> > "operating-points-v2" string or not.
->
-> Does having it buy you anything? Given the QCom one doesn't have any
-> frequency or voltage, I don't see how it would be useful to have it.
-
-...but it does have a frequency, doesn't it?
-
-+   compatible = "operating-points-v2-qcom-level";
-+
-+   opp-710000000 {
-+     opp-hz = /bits/ 64 <710000000>;
-+     qcom,level = <RPMH_REGULATOR_LEVEL_TURBO_L1>;
-+   };
-
--Doug
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gV2VkLCBEZWMgMTksIDIwMTggYXQgMTE6NTEgQU0gPHJpc2hhYmhiQGNvZGVhdXJvcmEub3Jn
+PiB3cm90ZToKPgo+Cj4gSW4gdGhlIDQuMTkga2VybmVsLCB3ZSBhcmUgc2VlaW5nIGEgVVNFUkNP
+UFlfV0FSTiBpbiBfX2NvcHlfdG9fdXNlcgo+IGR1cmluZyBib290dXAuCj4gVGhlIGNvZGUtZmxv
+dyBpcyBzb21ldGhpbmcgbGlrZSB0aGlzOgo+Cj4gKGFyY2gvYXJtNjQva2VybmVsL3NpZ25hbC5j
+KQo+IHN0cnVjdCBzaWdzZXRfdCAqc2V0Owo+IF9fY29weV90b191c2VyKCZzZi0+dWMudWNfc2ln
+bWFzaywgc2V0LCBzaXplb2YoKnNldCkpCj4KPiAoaW5jbHVkZS9saW51eC91YWNjZXNzLmgpCj4g
+X19jb3B5X3RvX3VzZXIodm9pZCBfX3VzZXIgKnRvLCBjb25zdCB2b2lkICpmcm9tLCB1bnNpZ25l
+ZCBsb25nIG4pCj4gewo+ICAgICAgICAgICAgICAgICAgbWlnaHRfZmF1bHQoKTsKPiAgICAgICAg
+ICAgICAgICAgIGthc2FuX2NoZWNrX3JlYWQoZnJvbSwgbik7Cj4gICAgICAgICAgICAgICAgICBj
+aGVja19vYmplY3Rfc2l6ZShmcm9tLCBuLCB0cnVlKTsKPiAgICAgICAgICAgICAgICAgIHJldHVy
+biByYXdfY29weV90b191c2VyKHRvLCBmcm9tLCBuKTsKPiB9Cj4KPiAoaW5jbHVkZS9saW51eC90
+aHJlYWRfaW5mby5oKQo+IHN0YXRpYyBfX2Fsd2F5c19pbmxpbmUgdm9pZCBjaGVja19vYmplY3Rf
+c2l6ZShjb25zdCB2b2lkICpwdHIsCj4gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg
+IHVuc2lnbmVkIGxvbmcgbiwgYm9vbCB0b191c2VyKQo+IHsKPiAgICAgICAgICAgICAgICAgIGlm
+ICghX19idWlsdGluX2NvbnN0YW50X3AobikpCj4gICAgICAgICAgICAgICAgICAgICAgICAgICAg
+ICAgICAgX19jaGVja19vYmplY3Rfc2l6ZShwdHIsIG4sIHRvX3VzZXIpOwo+IH0KPgo+IFNpbmNl
+IHNpemVvZigqc2V0KSBpcyBjb25zdGFudCwgX19idWlsdGluX2NvbnN0YW50X3Aobikgc2hvdWxk
+IHJldHVybgo+IHRydWUuCj4gQnV0IHdlIGFyZSBzZWVpbmcgdGhhdCBpdHMgcmV0dXJuaW5nIHRo
+ZSB2YWx1ZSBhcyBmYWxzZS4gQmVjYXVzZSBvZgo+IHdoaWNoCj4gdGhlIGNvZGUgZ29lcyBvbiB0
+byBfX2NoZWNrX29iamVjdF9zaXplIGFuZCBnZW5lcmF0ZXMgYSBVU0VSQ09QWV9XQVJOCj4gKCJ1
+c2VyY29weTogV0FSTigpIG9uIHNsYWIgY2FjaGUgdXNlcmNvcHkKPiByZWdpb24gdmlvbGF0aW9u
+cyIpLgo+Cj4gV2UgYXJlIHVzaW5nIExMVk0gY2xhbmcgdmVyc2lvbiA2LjAgdG8gY29tcGlsZSB0
+aGUga2VybmVsIGFuZCBub3QgZ2NjLgoKVGhpcyBpcyBmaXhlZCBpbiB0aGUgbGF0ZXN0IExMVk0g
+YW5kIENsYW5nOgoKaHR0cHM6Ly9naXRodWIuY29tL0NsYW5nQnVpbHRMaW51eC9saW51eC9pc3N1
+ZXMvNwoKLUtlZXMKCj4gSW4gY2xhbmcsIF9fYnVpbHRpbl9jb25zdGFudF9wIGlzIGV2YWx1YXRl
+ZCBpbW1lZGlhdGVseSwgYmVmb3JlIGlubGluaW5nCj4gb3Igb3RoZXIgb3B0aW1pemF0aW9ucyBy
+dW4sIGdjYyBldmFsdWF0ZXMgaXQgbGF0ZXIuCj4gV2UgYmVsaWV2ZSB0aGF0IG1heWJlIGNhdXNp
+bmcgX19idWlsdGluX2NvbnN0YW50X3AobikgdG8gcmV0dXJuIGZhbHNlLgo+IFRoZXJl4oCZcyB1
+cHN0cmVhbSB3b3JrIHRvIGNoYW5nZSBMTFZNLCBzbyBfX2J1aWx0aW5fY29uc3RhbnRfcCB3b3Jr
+cyBtb3JlCj4gbGlrZSBnY2Mgd2hlbiBvcHRpbWl6YXRpb24gaXMgZW5hYmxlZCwgYnV0IGl0cyBz
+dGlsbCBpbiBwcm9ncmVzcy4KPgo+Cj4gRm9yIHRoaXMgc2NlbmFyaW8gaXMgdGhlcmUgYSB3YXkg
+dG8gYXZvaWQgdGhlIHdhcm5pbmc/IFNob3VsZCB0aGUgY29kZQo+IGJlCj4gd3JpdHRlbiBpbiBh
+IGRpZmZlcmVudCB0byBhdm9pZCBkZXBlbmRlbmN5IG9uIGNvbXBpbGVyPwo+Cj4gVGhhbmtzLAo+
+IFJpc2hhYmgKCgoKLS0gCktlZXMgQ29vawoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJt
+LWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21h
+aWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
