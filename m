@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B45D4C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:06:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 423A2C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:06:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6193C218C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:06:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E87CE218AE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:06:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lLhYEjGG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6193C218C3
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Eh627EQm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E87CE218AE
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,40 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=JdnXXMzs+CzhSJeEQf2pnJS0EH/dikr+8/ZGviXntuY=; b=lLhYEjGGgyPnuT
-	8Lcjlox4GQj6G9IBWDj4SHBWs1U4DweEIBWc7EuHPl0iHAx4cF6s40BrgXr9p4d9E1CNk8FvuW4fm
-	eXGa1ywxMHXgkILD8/huqfnlr4Tbhc85RzaI8vHUEojmxnhfaK23Mgf57676k4df8w/4VkoifJDrI
-	LVjh/yTM2e7j1f4PrIBt/QtIhQTIjio3giozpqNiGw8OQ0DqbS5K4BSm8mUpFkuysPrGibrRRP+gE
-	ZhRdgRddQK4BOF9FQvD3fdupQqB2ogNlTCAHQ4sedZ6LCCg7Tur0sCcSxKRIdt9BHR8SRvQahlgZC
-	eOuHygozpWrM4PhhP2Pg==;
+	List-Owner; bh=81OGLXC/PUR1rGOqgGyERZOKgr9O9Aig8UAIyP/G0u0=; b=Eh627EQmB1xUrb
+	Kcf+nw4KxG8sB1cxJbfBkfi2t8/rVp39BdYzywR3HeHgmV37/VNXeMUgTjv2qHgciGxhi4sHQMOSi
+	WLBhT9leGr9Y6ytzUUR+cSW6iqabuOCZJKjZ9tRPg9urFnT6EEl4km50C17GR39u1RodMHvborh05
+	dIAu2wOV1tAuDnlWEmE+H/pN6BNKcwLrYOcBfQ4iNMDZyAh7sdMMWYZeiH17vZ526VXvyYy+NPICc
+	fxjgrGGe/KYJKpl3C4c4Zqx0olGY/DsetKikeu0wJiDrhl8O0ZwI+xQe56E+6yn1So/D8/MRrZ/Zr
+	x8CU6kYMwX7zbiFqfnjA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZgEm-0000TG-Ad; Wed, 19 Dec 2018 18:06:28 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gZgF1-0000jI-Qe; Wed, 19 Dec 2018 18:06:43 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZgCx-00061r-Ny
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 18:04:37 +0000
+ id 1gZgCx-0005sV-Nu
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 18:04:40 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9163B165C;
- Wed, 19 Dec 2018 10:04:34 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 45843A78;
+ Wed, 19 Dec 2018 10:04:26 -0800 (PST)
 Received: from filthy-habits.cambridge.arm.com
  (filthy-habits.cambridge.arm.com [10.1.196.62])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 121D83F675;
- Wed, 19 Dec 2018 10:04:31 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id BA5063F675;
+ Wed, 19 Dec 2018 10:04:23 -0800 (PST)
 From: Marc Zyngier <marc.zyngier@arm.com>
 To: Paolo Bonzini <pbonzini@redhat.com>,
  =?UTF-8?q?Radim=20Kr=C4=8Dm=C3=A1=C5=99?= <rkrcmar@redhat.com>
-Subject: [PATCH 09/28] KVM: arm64: Support dirty page tracking for PUD
- hugepages
-Date: Wed, 19 Dec 2018 18:03:30 +0000
-Message-Id: <20181219180349.242681-10-marc.zyngier@arm.com>
+Subject: [PATCH 06/28] KVM: arm/arm64: Share common code in user_mem_abort()
+Date: Wed, 19 Dec 2018 18:03:27 +0000
+Message-Id: <20181219180349.242681-7-marc.zyngier@arm.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181219180349.242681-1-marc.zyngier@arm.com>
 References: <20181219180349.242681-1-marc.zyngier@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_100435_920427_1930AC83 
-X-CRM114-Status: GOOD (  15.19  )
+X-CRM114-CacheID: sfid-20181219_100435_915058_BEF7D5E9 
+X-CRM114-Status: GOOD (  18.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,104 +85,124 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Punit Agrawal <punit.agrawal@arm.com>
 
-In preparation for creating PUD hugepages at stage 2, add support for
-write protecting PUD hugepages when they are encountered. Write
-protecting guest tables is used to track dirty pages when migrating
-VMs.
+The code for operations such as marking the pfn as dirty, and
+dcache/icache maintenance during stage 2 fault handling is duplicated
+between normal pages and PMD hugepages.
 
-Also, provide trivial implementations of required kvm_s2pud_* helpers
-to allow sharing of code with arm32.
+Instead of creating another copy of the operations when we introduce
+PUD hugepages, let's share them across the different pagesizes.
 
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-[ Replaced BUG() => WARN_ON() in arm32 pud helpers ]
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_mmu.h   | 15 +++++++++++++++
- arch/arm64/include/asm/kvm_mmu.h | 10 ++++++++++
- virt/kvm/arm/mmu.c               | 11 +++++++----
- 3 files changed, 32 insertions(+), 4 deletions(-)
+ virt/kvm/arm/mmu.c | 49 ++++++++++++++++++++++++++++------------------
+ 1 file changed, 30 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index e6eff8bf5d7f..9fe6c30eb2fc 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -87,6 +87,21 @@ void kvm_clear_hyp_idmap(void);
- 
- #define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
- 
-+/*
-+ * The following kvm_*pud*() functions are provided strictly to allow
-+ * sharing code with arm64. They should never be called in practice.
-+ */
-+static inline void kvm_set_s2pud_readonly(pud_t *pud)
-+{
-+	WARN_ON(1);
-+}
-+
-+static inline bool kvm_s2pud_readonly(pud_t *pud)
-+{
-+	WARN_ON(1);
-+	return false;
-+}
-+
- static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
- {
- 	pte_val(pte) |= L_PTE_S2_RDWR;
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 13d482710292..8da6d1b2a196 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -251,6 +251,16 @@ static inline bool kvm_s2pmd_exec(pmd_t *pmdp)
- 	return !(READ_ONCE(pmd_val(*pmdp)) & PMD_S2_XN);
- }
- 
-+static inline void kvm_set_s2pud_readonly(pud_t *pudp)
-+{
-+	kvm_set_s2pte_readonly((pte_t *)pudp);
-+}
-+
-+static inline bool kvm_s2pud_readonly(pud_t *pudp)
-+{
-+	return kvm_s2pte_readonly((pte_t *)pudp);
-+}
-+
- #define hyp_pte_table_empty(ptep) kvm_page_empty(ptep)
- 
- #ifdef __PAGETABLE_PMD_FOLDED
 diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index fb5325f7a1ac..1c669c3c1208 100644
+index 5eca48bdb1a6..59595207c5e1 100644
 --- a/virt/kvm/arm/mmu.c
 +++ b/virt/kvm/arm/mmu.c
-@@ -1347,9 +1347,12 @@ static void  stage2_wp_puds(struct kvm *kvm, pgd_t *pgd,
- 	do {
- 		next = stage2_pud_addr_end(kvm, addr, end);
- 		if (!stage2_pud_none(kvm, *pud)) {
--			/* TODO:PUD not supported, revisit later if supported */
--			BUG_ON(stage2_pud_huge(kvm, *pud));
--			stage2_wp_pmds(kvm, pud, addr, next);
-+			if (stage2_pud_huge(kvm, *pud)) {
-+				if (!kvm_s2pud_readonly(pud))
-+					kvm_set_s2pud_readonly(pud);
-+			} else {
-+				stage2_wp_pmds(kvm, pud, addr, next);
-+			}
+@@ -1475,7 +1475,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			  unsigned long fault_status)
+ {
+ 	int ret;
+-	bool write_fault, exec_fault, writable, hugetlb = false, force_pte = false;
++	bool write_fault, exec_fault, writable, force_pte = false;
+ 	unsigned long mmu_seq;
+ 	gfn_t gfn = fault_ipa >> PAGE_SHIFT;
+ 	struct kvm *kvm = vcpu->kvm;
+@@ -1484,7 +1484,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	kvm_pfn_t pfn;
+ 	pgprot_t mem_type = PAGE_S2;
+ 	bool logging_active = memslot_is_logging(memslot);
+-	unsigned long flags = 0;
++	unsigned long vma_pagesize, flags = 0;
+ 
+ 	write_fault = kvm_is_write_fault(vcpu);
+ 	exec_fault = kvm_vcpu_trap_is_iabt(vcpu);
+@@ -1504,10 +1504,16 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		return -EFAULT;
+ 	}
+ 
+-	if (vma_kernel_pagesize(vma) == PMD_SIZE && !logging_active) {
+-		hugetlb = true;
++	vma_pagesize = vma_kernel_pagesize(vma);
++	if (vma_pagesize == PMD_SIZE && !logging_active) {
+ 		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+ 	} else {
++		/*
++		 * Fallback to PTE if it's not one of the Stage 2
++		 * supported hugepage sizes
++		 */
++		vma_pagesize = PAGE_SIZE;
++
+ 		/*
+ 		 * Pages belonging to memslots that don't have the same
+ 		 * alignment for userspace and IPA cannot be mapped using
+@@ -1573,23 +1579,33 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	if (mmu_notifier_retry(kvm, mmu_seq))
+ 		goto out_unlock;
+ 
+-	if (!hugetlb && !force_pte)
+-		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
++	if (vma_pagesize == PAGE_SIZE && !force_pte) {
++		/*
++		 * Only PMD_SIZE transparent hugepages(THP) are
++		 * currently supported. This code will need to be
++		 * updated to support other THP sizes.
++		 */
++		if (transparent_hugepage_adjust(&pfn, &fault_ipa))
++			vma_pagesize = PMD_SIZE;
++	}
++
++	if (writable)
++		kvm_set_pfn_dirty(pfn);
+ 
+-	if (hugetlb) {
++	if (fault_status != FSC_PERM)
++		clean_dcache_guest_page(pfn, vma_pagesize);
++
++	if (exec_fault)
++		invalidate_icache_guest_page(pfn, vma_pagesize);
++
++	if (vma_pagesize == PMD_SIZE) {
+ 		pmd_t new_pmd = pfn_pmd(pfn, mem_type);
+ 		new_pmd = pmd_mkhuge(new_pmd);
+-		if (writable) {
++		if (writable)
+ 			new_pmd = kvm_s2pmd_mkwrite(new_pmd);
+-			kvm_set_pfn_dirty(pfn);
+-		}
+-
+-		if (fault_status != FSC_PERM)
+-			clean_dcache_guest_page(pfn, PMD_SIZE);
+ 
+ 		if (exec_fault) {
+ 			new_pmd = kvm_s2pmd_mkexec(new_pmd);
+-			invalidate_icache_guest_page(pfn, PMD_SIZE);
+ 		} else if (fault_status == FSC_PERM) {
+ 			/* Preserve execute if XN was already cleared */
+ 			if (stage2_is_exec(kvm, fault_ipa))
+@@ -1602,16 +1618,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 
+ 		if (writable) {
+ 			new_pte = kvm_s2pte_mkwrite(new_pte);
+-			kvm_set_pfn_dirty(pfn);
+ 			mark_page_dirty(kvm, gfn);
  		}
- 	} while (pud++, addr = next, addr != end);
- }
-@@ -1392,7 +1395,7 @@ static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
-  *
-  * Called to start logging dirty pages after memory region
-  * KVM_MEM_LOG_DIRTY_PAGES operation is called. After this function returns
-- * all present PMD and PTEs are write protected in the memory region.
-+ * all present PUD, PMD and PTEs are write protected in the memory region.
-  * Afterwards read of dirty page log can be called.
-  *
-  * Acquires kvm_mmu_lock. Called with kvm->slots_lock mutex acquired,
+ 
+-		if (fault_status != FSC_PERM)
+-			clean_dcache_guest_page(pfn, PAGE_SIZE);
+-
+ 		if (exec_fault) {
+ 			new_pte = kvm_s2pte_mkexec(new_pte);
+-			invalidate_icache_guest_page(pfn, PAGE_SIZE);
+ 		} else if (fault_status == FSC_PERM) {
+ 			/* Preserve execute if XN was already cleared */
+ 			if (stage2_is_exec(kvm, fault_ipa))
 -- 
 2.19.2
 
