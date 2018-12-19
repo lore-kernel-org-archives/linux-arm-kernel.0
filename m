@@ -2,68 +2,87 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B9E22C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 14:13:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8A637C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 14:20:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 87AF0218AE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 14:13:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 57D772084A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 14:20:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bQXtIAqg";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="ByvLzt4Y"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 87AF0218AE
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cLLnVhrX";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="BDDr24EW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 57D772084A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=F6WMXAdPlkGuxFHpBtIjw+jmPgsTjPkWpZB73+n8F84=; b=bQXtIAqgCwgiB9
-	DVKazYpSqxQsV5yuICvQpPKyQWtT9pYc4AdGcVZYL0XG+pTnelCYRETciX8a9LnVi7xYL2rZaX8FA
-	jYYb8cMFmgei4XfMG3T3hb6FdAkzPrNNmqVp5ZF2bvl9GIycCeVL84ANdBGZKD17IZJ9BldJloTFN
-	i66KXFV8U/o3jE+r0bL93YVNDHE8TSmBu6iIxZuRi3Nf/TUcm1uUBqcqkp/991CtCnCxUGUAR0LyM
-	Fx7GXjziJaiiGOJoOHRYuBh9hRjigcU4FsdErYv2CGy4hM2mvehDq0SDgTJ0Pq49rj69sE78QRLnd
-	R+trVxN1H+fKePpNGwWg==;
+	List-Owner; bh=E7gDsPOhZCJcNLdcbPN+JeM7Ba7HbcodymnWCCYs4KI=; b=cLLnVhrXaK2NP2
+	0JSeWM/hSbo3iawPDLfYsxZSwgXUIdn6rlgrF6HwIaI2Re8FkTcr8JLJ3Ur8b/zw0YWw2wek/SIHj
+	mt2cBLtCMeOngAteKbXmeQGvUu24aPUkJM/QA5Mifw3PbSRw3l8mON/wn/YSDyR/EHuK0cPO87cln
+	pdIhD1V76XILc917dGumNqqAkHzZLYvmfNDtVQM7ksTjixm/mTwYEDNyFgP27IT4YE3M0MFgGK8H7
+	/aEpBhs6bTLRd0yub2+pRdAT3IJuNnnW60ZcePNFAcg2t3EvbyKllAl7oaBt+NpAEEMjv+DguWWla
+	ciNeVgq9sEUu62PCGkwg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZcan-0001W6-SK; Wed, 19 Dec 2018 14:12:57 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gZciD-00058W-Q5; Wed, 19 Dec 2018 14:20:37 +0000
+Received: from mail-oi1-x242.google.com ([2607:f8b0:4864:20::242])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZcak-0001Ug-2l
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 14:12:55 +0000
-Received: from localhost (173-25-171-118.client.mchsi.com [173.25.171.118])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 669512084A;
- Wed, 19 Dec 2018 14:12:43 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1545228763;
- bh=mYSv6C/anEPEOntT611vVWNftpPDSMGVwZM4K2vIyl8=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=ByvLzt4YfomMJA54EMmSb1yQTm5xnxXrsuygozJeZ5oY5zmyIugwowSxbSaIjs0k7
- WEWq/5bv8YbYMp8rBhUNcvtBtvW0kRl/4hzorhM+j6FYGYvR25WM0MqOZa6cAwOiuD
- LibnrvKayjkp4raXjyz97OA3rX0H3qoqwfRNMFJo=
-Date: Wed, 19 Dec 2018 08:12:41 -0600
-From: Bjorn Helgaas <helgaas@kernel.org>
-To: Richard Zhu <hongxing.zhu@nxp.com>
-Subject: Re: [v4] PCI: imx: make msi work without CONFIG_PCIEPORTBUS=y
-Message-ID: <20181219141241.GB12763@google.com>
-References: <1544768762-18124-1-git-send-email-hongxing.zhu@nxp.com>
+ id 1gZciA-00051e-D5
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 14:20:35 +0000
+Received: by mail-oi1-x242.google.com with SMTP id m6so1688192oig.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 19 Dec 2018 06:20:23 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=enBpW9z2Q8IDP1LWc6WGS6iQ8kJbCzIT6SFHV+eQdgE=;
+ b=BDDr24EWhuTYnFx0pv5ycZQ7z0WxedpC+1VJuvbJz7aeGO880GbRNMwR5bFpX7QPjn
+ qbMayO4/Ff3VMCin3leNIakB+9Xw8qGX09NONQnBUe0HwzYFV/sxnlmVAReVkvf74QSF
+ JzPhk5EymwyIL8PCECiQIOSY6WXgc8QnWpAbbLhYnTweH1r3wABlXzOJuKeWF8ZOlwlq
+ 3z5sfIZnELtVaW97pEUAA5Ij5VifrGJklO8knLcvse2tD8VymuCCrPpXzT/40VA0gybi
+ +A+ndZJnD04pIslS/CFP6cy4E9VLQgh8AAvT0lFH1qGtKnMyA3ZRw3/Zlx3sVd/tAF6u
+ 9u0A==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=enBpW9z2Q8IDP1LWc6WGS6iQ8kJbCzIT6SFHV+eQdgE=;
+ b=Ai5JzvUXG13VEhmSO9F0n57buLbf+odahcvLqL+k/N2/C6PsEvCJTa4rGrD7WDdkcR
+ rFRT4BoKVv7qfYTaXAKr3EIDOZIbvdoRVuyUs/ApSM93ohEhWTF8w76gRci1TAXrqFKP
+ 2e7Oid28m474Vk0kjmjemELWMhT83/uSHRg/7lt1JVuWf/MSyICKDWPMlaEvjKT7hD5f
+ W3Xk2zSTo7StIAfo9xToE3kjPwOH9g+pjuv0gA2Llp3fFOT+iMhu9KDFz5AqjKwkBFOk
+ Eeu3fFg35uY+IX2so/sJ0Sksjp1V8xyWq3KHBGnTPknx8qoa5EwqXeoJxhvHdhMKBn+Q
+ 2+UA==
+X-Gm-Message-State: AA+aEWa1eHoyMQR5b3fDwFKR5zd5vvlFzbtFIfmf9pext7ebXX1sbQGW
+ DLuhLK+avqk1Z1SbfEvKHKkpX/gMsWC9QJg0DPo=
+X-Google-Smtp-Source: AFSGD/V2VfVgcdu67cktBky77q+AnN6zdP2WRORfE+XWRlSe4o7dc4B7BdKQRJ/25Hb0n60Fve9IVzAbt2AnTlUfltE=
+X-Received: by 2002:aca:6155:: with SMTP id v82mr1236205oib.259.1545229222825; 
+ Wed, 19 Dec 2018 06:20:22 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1544768762-18124-1-git-send-email-hongxing.zhu@nxp.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+References: <fcbce8f7ba22014a8f06b7f52ad56faaa03b948b.camel@toradex.com>
+ <8d6905f9aed82a0181d1d8eb2259946c47825a7f.camel@nxp.com>
+ <CAEnQRZAHE77GsaES--LtWs3F4uHP2ePp3-KmP4xmZDh7NM4njw@mail.gmail.com>
+In-Reply-To: <CAEnQRZAHE77GsaES--LtWs3F4uHP2ePp3-KmP4xmZDh7NM4njw@mail.gmail.com>
+From: Fabio Estevam <festevam@gmail.com>
+Date: Wed, 19 Dec 2018 12:20:17 -0200
+Message-ID: <CAOMZO5AmaQgz+X_dYgafVYHooY649CBBP6ERbX6B+Gt_A-1s5A@mail.gmail.com>
+Subject: Re: [REGRESSION] imx_v6_v7_defconfig: undefined reference to
+ `__hyp_stub_vectors'
+To: Daniel Baluta <daniel.baluta@gmail.com>, Lukasz Majewski <lukma@denx.de>, 
+ Rob Herring <robh@kernel.org>,
+ Marcel Ziswiler <marcel.ziswiler@toradex.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_061254_156734_079F6EA2 
-X-CRM114-Status: GOOD (  24.14  )
+X-CRM114-CacheID: sfid-20181219_062034_438753_6B7B9FAD 
+X-CRM114-Status: GOOD (  15.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,124 +94,55 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Sven Van Asbroeck <thesven73@gmail.com>,
- Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- Andrew Smirnov <andrew.smirnov@gmail.com>, linux-pci@vger.kernel.org,
- Shawn Lin <shawn.lin@rock-chips.com>, linux-kernel@vger.kernel.org,
- Kishon Vijay Abraham I <kishon@ti.com>, Niklas Cassel <niklas.cassel@axis.com>,
- Trent Piepho <tpiepho@impinj.com>,
- Gustavo Pimentel <gustavo.pimentel@synopsys.com>,
- linux-arm-kernel@lists.infradead.org, Lucas Stach <l.stach@pengutronix.de>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>,
+ Daniel Baluta <daniel.baluta@nxp.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ dl-linux-imx <linux-imx@nxp.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-[+cc Sven, Trent, et al from related report:
-https://lore.kernel.org/linux-pci/20181218210444.5950-1-TheSven73@googlemail.com]
+Hi Daniel,
 
-On Fri, Dec 14, 2018 at 06:44:15AM +0000, Richard Zhu wrote:
-> Assertion of the MSI Enable bit of RC's MSI CAP is mandatory required to
-> trigger MSI on i.MX6 PCIe.
-> This bit would be asserted when CONFIG_PCIEPORTBUS=y.
-> Thus, the MSI works fine on i.MX6 PCIe before the commit "f3fdfc4".
-> 
-> Assert it unconditionally when MSI is enabled.
-> Otherwise, the MSI wouldn't be triggered although the EP is present and
-> the MSIs are assigned.
+On Wed, Dec 19, 2018 at 11:32 AM Daniel Baluta <daniel.baluta@gmail.com> wrote:
+>
+> On Wed, Dec 19, 2018 at 3:17 PM Daniel Baluta <daniel.baluta@nxp.com> wrote:
+> >
+> >
+> > On Wed, 2018-12-19 at 12:42 +0000, Marcel Ziswiler wrote:
+> > > Hi there
+> > >
+> > > I noticed that at least today's and yesterdays -next won't build with
+> > > the imx_v6_v7_defconfig giving the following error:
+> > >
+> > >   LD      arch/arm/boot/compressed/vmlinux
+> > > arch/arm/boot/compressed/head.o: In function `restart':
+> > > (.text+0xa8): undefined reference to `__hyp_stub_vectors'
+> > > (.text+0xac): undefined reference to `__hyp_stub_vectors'
+> > >
+> > > Has anybody seen that as well and knows what is going on?
+> >
+> > Hmm, works for me.
 
-OK, I think I finally understand most of what's going on.  Please
-check the following possible changelog text:
+Yes, I haven't seen build failures reported by the autobuilders:
+http://kisskb.ellerman.id.au/kisskb/target/7464/
 
-  The MSI Enable bit in the MSI Capability (PCIe r4.0, sec 7.7.1.2)
-  controls whether a Function can request service using MSI.
+> On the other hand I'm getting this warning:
+>
+> arch/arm/boot/dts/vfxxx.dtsi:550.24-563.6: Warning (spi_bus_bridge):
+> /soc/aips-bus@40080000/spi@400ad000: incorrect #address-cells for SPI
+> bus
+>   also defined at arch/arm/boot/dts/vf610-bk4.dts:107.8-119.3
+> arch/arm/boot/dts/vf610-bk4.dtb: Warning (spi_bus_reg): Failed
+> prerequisite 'spi_bus_bridge'
+>
+>
+> Maybe Rob can jump in?
 
-  i.MX6 Root Ports implement the MSI Capability and may use MSI to
-  request service for events like PME, hotplug, AER, etc.  In
-  addition, on i.MX6, the MSI Enable bit controls delivery of MSI
-  interrupts from components below the Root Port.
-
-  Prior to f3fdfc4ac3a2 ("PCI: Remove host driver Kconfig selection of
-  CONFIG_PCIEPORTBUS"), enabling CONFIG_PCI_IMX6 automatically also
-  enabled CONFIG_PCIEPORTBUS, and when portdrv claimed the Root Ports,
-  it set the MSI Enable bit so it could use PME, hotplug, AER, etc.
-  As a side effect, that also enabled delivery of MSI interrupts from
-  downstream components.
-
-  After f3fdfc4ac3a2, the imx6q-pcie driver can operate without
-  portdrv, but that means imx6q-pcie must set the MSI Enable bit
-  itself if downstream components use MSI.
-
-  Fixes: f3fdfc4ac3a2 ("PCI: Remove host driver Kconfig selection of CONFIG_PCIEPORTBUS")
-
-I still don't understand exactly *how* MSI Enable affects MSI from
-downstream components, since the downstream component just does a DMA
-write, and the Root Port can't tell whether the write is to memory or
-interrupt controller unless the Root Port knows where the MSI targets
-are, e.g., if the interrupt controller is actually part of the RC.
-
-Bjorn
-
-> Signed-off-by: Richard Zhu <hongxing.zhu@nxp.com>
-> Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
-> Changes v1 -> v2:
-> * Assert the MSI_EN unconditionally when MSI is supported.
-> Changes v2 -> v3:
-> * Remove the IS_ENABLED(CONFIG_PCI_MSI) since the driver depends on
-> PCI_MSI_IRQ_DOMAIN
-> * Extended with a check for pci_msi_enabled() to see if the user
-> explicitly want legacy IRQs
-> Changes v3 -> v4:
-> * Refer to Bjorn's comments, refine the subject and commit log and change
-> the PCI_MSI_CAP to PCIE_RC_IMX6_MSI_CAP.
-> ---
->  drivers/pci/controller/dwc/pci-imx6.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
-> index 26087b3..639bb27 100644
-> --- a/drivers/pci/controller/dwc/pci-imx6.c
-> +++ b/drivers/pci/controller/dwc/pci-imx6.c
-> @@ -74,6 +74,7 @@ struct imx6_pcie {
->  #define PHY_PLL_LOCK_WAIT_USLEEP_MAX	200
->  
->  /* PCIe Root Complex registers (memory-mapped) */
-> +#define PCIE_RC_IMX6_MSI_CAP			0x50
->  #define PCIE_RC_LCR				0x7c
->  #define PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1	0x1
->  #define PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN2	0x2
-> @@ -926,6 +927,7 @@ static int imx6_pcie_probe(struct platform_device *pdev)
->  	struct resource *dbi_base;
->  	struct device_node *node = dev->of_node;
->  	int ret;
-> +	u16 val;
->  
->  	imx6_pcie = devm_kzalloc(dev, sizeof(*imx6_pcie), GFP_KERNEL);
->  	if (!imx6_pcie)
-> @@ -1071,6 +1073,14 @@ static int imx6_pcie_probe(struct platform_device *pdev)
->  	if (ret < 0)
->  		return ret;
->  
-> +	if (pci_msi_enabled()) {
-> +		val = dw_pcie_readw_dbi(pci, PCIE_RC_IMX6_MSI_CAP +
-> +				PCI_MSI_FLAGS);
-> +		val |= PCI_MSI_FLAGS_ENABLE;
-> +		dw_pcie_writew_dbi(pci, PCIE_RC_MSI_IMX6_CAP +
-> +				PCI_MSI_FLAGS, val);
-> +	}
-> +
->  	return 0;
->  }
->  
-> -- 
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel@lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Yes, I have already reported this warning to Rob and Lukasz. Hopefully
+they could help fixing it.
 
 _______________________________________________
 linux-arm-kernel mailing list
