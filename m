@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2E400C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 07:53:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 69115C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 07:55:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F0B7B21852
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 07:53:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2E680204FD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 07:55:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fkOXcADW";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="YbrvZotH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F0B7B21852
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JP9pxdfu";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="hOj/wo+i"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2E680204FD
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,58 +26,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=bT9wZXHGRJIMsWoJkYR7GlVNVfnRGwACdn9KEjiEH34=; b=fkOXcADWaY8jXC
-	0OgGgC9Z9R1uqC2fXTPL3OfU4S5KLqh0WGKvqWi8zj/zGpeHessfL3sH2q6mVBlt8zO9G5phJcXva
-	mGtJOn6EN6XBICTgyMtHyJK21ErjGOWHAiR5jgs7PW7hUox8sdPd9DO4LtqiLhq80jrqsIFiwCZ4B
-	uOu3GMWvvEAgog+MZ4Z7lM3ZCS9mjrFL8Umu5p9lBDCukpX7DUTdS4J1T6XI1mSLyMU/fnuiHv8V8
-	wmBTbOyeyEGR950ZHvk69rKdYEDfW5TkDSws2rtxywvPrEZA1l8Mp6Zl1/da3Pq8NvsOkIPe0uBzj
-	iAx5XhTUcrDEV0uuhUxQ==;
+	List-Owner; bh=yYsbVjBXCZDQCQnmlADlM9BjV7Ga+mbwZiommv/Mi3U=; b=JP9pxdfubIU1JX
+	Le2OVLZnclc/HZdGfuqCnJTo4dNNyRA7I9z553i1I73WzpaFOBVyyyYnQlV4R7fPnMceuxwzsQEEh
+	5igCD7496wGLsToF6hFTySWhUdEfHDdh9PQsS1+F7sh/6Yiar6OVKgvgdMSk4NE2KMoK+brZTXkkn
+	iQQb52xZ8OH9sqGlOB8/tKIRgf6ID92xIvKqwm9ppxKgjwqU2gowqnw0Ekd6B4bnA51DerK85UEcQ
+	VEzro15cqQt2b4qYIbY9X2NiivVxi2cX/jDKUrdIbHwX8bDyqWgRONL4eSyDPYLU8bwzHDoqFsFob
+	n3WzOGFsx6VADkNwthHA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZWfh-0000Wf-L0; Wed, 19 Dec 2018 07:53:37 +0000
+	id 1gZWgy-00018i-Qv; Wed, 19 Dec 2018 07:54:56 +0000
 Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZWfd-0000Vm-QY; Wed, 19 Dec 2018 07:53:35 +0000
-Received: by mail-wm1-x342.google.com with SMTP id n190so5067858wmd.0;
- Tue, 18 Dec 2018 23:53:22 -0800 (PST)
+ id 1gZWgv-0000t7-Es; Wed, 19 Dec 2018 07:54:54 +0000
+Received: by mail-wm1-x342.google.com with SMTP id m1so5059496wml.2;
+ Tue, 18 Dec 2018 23:54:43 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=6K6EYOUe/E+VJRf7q6cwYceJD486XbsJi/37EkOFMuA=;
- b=YbrvZotH0kylnt81ATu3CQrSv3JMI9/aE90aQaSZ6ALaunb4qWLKSy+PW0Q6vdsixS
- I1gF2odcjX71MKE7VP5RmD8jHRmIxnwRl9K9DIbgobTsGp4EPu9s9AK2YhY8w3T1prR9
- ivw/YMV6r/y4dzsbwCvRqQQ8j3LWfQ6dqcNnHgqet9IDWSpdXxundGX8WexNMeMY7PLw
- 2GIs0+lPfBIvZ0eu7hcLiV8B8Urag42VaBJjHVqYgYVD2vq389jjr4VEcFwrRpqq3aPm
- CcUe/3RG1x3DXu1kfclZUhhPQ143NAaZrrzyKXb2WS8iSHlvzZihmpjVWsRZiid/mEvZ
- WzsQ==
+ :cc; bh=LVz8XQy8S3syubEB1IzYIOPAmIXQT9zLbADj52/Vct0=;
+ b=hOj/wo+iOJsCQ405ZhbFZzmxAzrCOTPjWNEziOGVtkZ/k65Zhiq5U5am/0Tu/EcJ+e
+ zSumNTvjLmVonOS4dHp7E0ru9rW9jh+cbvQHXut+atskJTKJtP+WyiF6yT6+VEatIGn1
+ h/RQF/e6Tam0+kPiRioO67N1hUyUE8Nwphi0lIutVtRoKecOgms2+iQG0IRqIRj5flLY
+ fq7/2WqkztD5oazTR2tZ2PdhwICITIAKU/c+w/5DfIjm3sC0hVhbtXKMx+1okQmGNCBw
+ W0m+WRPEGXVzHSOzbKmhFQf3vVtPZdwOLxP37wppOZBw9Ms0Yc1AElKVLMnL6aO3KjXI
+ WMrw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=6K6EYOUe/E+VJRf7q6cwYceJD486XbsJi/37EkOFMuA=;
- b=ldE3bSYdAFqi4/PHssbylDd7IcwACNocKVRjZqEehRf7o4KrOa5IGSn934TtvCMEKK
- 9TNneomHPjh3kgrmGNynHpiUXuMN6dwdZ1WNpz32oWYAYdY34lvqMIFETkc/9y+KFjP6
- FZIuX+Gto4nd1IzW1Iy8PSbIOTE+pNniwrSwjVWAC/Qx9Hc8MmExTRfdB7oMXNcCZSxj
- BHQpBXiljnVgUHgfAgt6O6A3v0swVVBWnFwuvGvSv2RA7aiovJ6ducxU7m0rVQsFBO33
- +BW4faU6IHxRGeWKc4g0VbEKZTDDuU5f34LassGVb3+xtbEF6gCCxfTFDfZ8CRcy8kot
- WMoA==
-X-Gm-Message-State: AA+aEWaFjlD2gZTDCcSIdGUcIrR0gwQ234Com1O5CvSiIwR4wQ0VRMyH
- BjVRYef/C8N5HkaC3ZDfKA/UpMBkImhqGcsliBE=
-X-Google-Smtp-Source: AFSGD/VpAMJAFK7KghK4IawgVpJvo28uO1thcsROp/wENdi7eQaD7BxmYctyZMUPwDBhaJd5sccIFS9e9TVPUUPbl3I=
-X-Received: by 2002:a1c:1593:: with SMTP id 141mr5922877wmv.85.1545206001244; 
- Tue, 18 Dec 2018 23:53:21 -0800 (PST)
+ bh=LVz8XQy8S3syubEB1IzYIOPAmIXQT9zLbADj52/Vct0=;
+ b=IqZ3udDinRWcLTG8fY1g34P03B/mjAZEwajKTULt8leYSWtJATbgCQ47asigMZCXSW
+ bGHGqwRsEv0L/VFlJrp92iie2o/nyOvvtf3l+3SM8yAMomW7GH9+NSKY+fdvll7EnYFC
+ 9jAOogSCS3gkcVxRZE2CGhJIQ5NhAsetsOWZEuB04fd6ZIKD1BSUNP3cjOTvbN0MNxQp
+ DR5YoJ0DIOigRZtrYqnnf8nzFDIWBPRrfI+Xoc2RIT43he/FNNXasDnj9/L4v7RiucKE
+ gMBYDvjjwprlPaCDDRmcEtqbO7eOrZzKmXvR9ZqfJu5//y5GX+vAGREbRXrgbaUUJYqL
+ zrIw==
+X-Gm-Message-State: AA+aEWatPl6RsdrSX2HuZoCGeiwe1kfaMsSzBdBJLnPwhthln1pc99AP
+ OxN5X7ShrsjLPm4o5Q4nsuWDaPOUvTd6qlrKae8=
+X-Google-Smtp-Source: AFSGD/W479tMpk0K0mrc59w0M7mOKbMyP7QEHyAwzvJvQgnXm5jSIOXpmC1OjfhYn1DlOPYp8MlDjJX7ebQshcY6xs8=
+X-Received: by 2002:a1c:be11:: with SMTP id o17mr5930812wmf.111.1545206081910; 
+ Tue, 18 Dec 2018 23:54:41 -0800 (PST)
 MIME-Version: 1.0
 References: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
- <1540481375-15952-4-git-send-email-stefan.wahren@i2se.com>
-In-Reply-To: <1540481375-15952-4-git-send-email-stefan.wahren@i2se.com>
+ <1540481375-15952-3-git-send-email-stefan.wahren@i2se.com>
+In-Reply-To: <1540481375-15952-3-git-send-email-stefan.wahren@i2se.com>
 From: Peter Robinson <pbrobinson@gmail.com>
-Date: Wed, 19 Dec 2018 07:53:09 +0000
-Message-ID: <CALeDE9O7i7ZDLSaGk6ZD_7ou2YUnNR_apAwwhgnikrFTU951=w@mail.gmail.com>
-Subject: Re: [PATCH RFC 03/11] staging: bcm2835-camera: Move module info to
- the end
+Date: Wed, 19 Dec 2018 07:54:30 +0000
+Message-ID: <CALeDE9McktTeHDpAuQJt_rYKJuDvHRXObEd9aStm=jXWhZZp-w@mail.gmail.com>
+Subject: Re: [PATCH RFC 02/11] staging: bcm2835-camera: fix module autoloading
 To: Stefan Wahren <stefan.wahren@i2se.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181218_235333_864613_028FCB66 
-X-CRM114-Status: GOOD (  14.67  )
+X-CRM114-CacheID: sfid-20181218_235453_503823_B7F05A35 
+X-CRM114-Status: GOOD (  14.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,46 +100,34 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 On Thu, Oct 25, 2018 at 4:30 PM Stefan Wahren <stefan.wahren@i2se.com> wrote:
 >
-> In order to have this more consistent between the vc04 services move
-> the module information to the end of the file.
+> In order to make the module bcm2835-camera load automatically, we need to
+> add a module alias.
 >
+> Fixes: 4bebb0312ea9 ("staging/bcm2835-camera: Set ourselves up as a platform driver.")
 > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+
 Reviewed-by: Peter Robinson <pbrobinson@gmail.com>
 Tested-by: Peter Robinson <pbrobinson@gmail.com>
 
-Tested with a v2 camera module.
+Tested with a v2 camera module and kernel module loads automatically
+as expected.
 
 > ---
->  .../staging/vc04_services/bcm2835-camera/bcm2835-camera.c    | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
+>  drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c | 1 +
+>  1 file changed, 1 insertion(+)
 >
 > diff --git a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
-> index 7d3222c..cd773eb 100644
+> index d6fbef7..7d3222c 100644
 > --- a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
 > +++ b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
-> @@ -43,12 +43,6 @@
+> @@ -47,6 +47,7 @@ MODULE_DESCRIPTION("Broadcom 2835 MMAL video capture");
+>  MODULE_AUTHOR("Vincent Sanders");
+>  MODULE_LICENSE("GPL");
+>  MODULE_VERSION(BM2835_MMAL_VERSION);
+> +MODULE_ALIAS("platform:bcm2835-camera");
 >
->  #define MAX_BCM2835_CAMERAS 2
->
-> -MODULE_DESCRIPTION("Broadcom 2835 MMAL video capture");
-> -MODULE_AUTHOR("Vincent Sanders");
-> -MODULE_LICENSE("GPL");
-> -MODULE_VERSION(BM2835_MMAL_VERSION);
-> -MODULE_ALIAS("platform:bcm2835-camera");
-> -
 >  int bcm2835_v4l2_debug;
 >  module_param_named(debug, bcm2835_v4l2_debug, int, 0644);
->  MODULE_PARM_DESC(bcm2835_v4l2_debug, "Debug level 0-2");
-> @@ -1976,3 +1970,9 @@ static struct platform_driver bcm2835_camera_driver = {
->  };
->
->  module_platform_driver(bcm2835_camera_driver)
-> +
-> +MODULE_DESCRIPTION("Broadcom 2835 MMAL video capture");
-> +MODULE_AUTHOR("Vincent Sanders");
-> +MODULE_LICENSE("GPL");
-> +MODULE_VERSION(BM2835_MMAL_VERSION);
-> +MODULE_ALIAS("platform:bcm2835-camera");
 > --
 > 2.7.4
 >
