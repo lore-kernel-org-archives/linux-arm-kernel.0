@@ -2,87 +2,68 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 90679C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 12:47:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 27142C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 12:53:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5CF032080D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 12:47:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EA89C21479
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 12:53:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rQPE5usW";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="mrdfr0XX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5CF032080D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pATraoUp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EA89C21479
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cBJ7GWzuQ5gtg9cZQBCB+5HJAae3aO7+Olo1mMGr9eM=; b=rQPE5usWFMXmIn
-	dL0fyAd0B4E2mTG+MRv1UspDrd5OuA6yY8RpOd/NU1dxq632Eu5GEwTlaNEjjW3CLQIEdMRbyiZK8
-	el3pkv7Vkz5Y2HDEZuWgdjG3foZt5z6HWiokFu2RGACpMdUQ2hSX9U9si58gnnT2RwsSMJVs8lzGg
-	wAn/Rn3GDUt94oQUQOxCMe2ICyZNdOMPQKsVFPNWiBITHzyQPsUA9c5Z+Gny7+w5PuMO64vdQZXDI
-	d7X2vjR0cJkkcw9338zRrgolAv6nNT5s5FcHHec3QnaIpzGZieVfpi+nkysp3xRdJGf/GDUGEdO3s
-	g6wdvDfKO+Nl6oNedd/g==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=l8g1dFVYIAbxKpqbt/1oIWoUmwfPHSPrEyJV61BPAqU=; b=pATraoUpuUnR9E
+	aEW1ereAueFyavq/6MgZmDT1Lyi7zHTf7BoZNFJxmgKbbMjFg4u7J9Wnp6p5ThjOIW1OHyBpK58w7
+	+FWYkSgxw36BD0yZdTu6eTAJT4G9Bcfx1Sxavtsq3Vo2hB0mA5dyrR6/8SlvrQuW+OYL+d9c37QG2
+	JVbpS9id6WJTGjdGWhtOnyDNmglkAMs1UPtpJXT7T+5Os07+CU7MU6CrAqGEap3ZYtVAeuqLsBT35
+	VyvCz8LF/7n8JPtLkuGhBn/587iZFNgBefcxgGmAJ+jp0VPuGbXyHhwM5CyocYMuIY6vaHJljj3H2
+	kLCp0MzOfs7mYxprD6jQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZbFi-0004D1-2M; Wed, 19 Dec 2018 12:47:06 +0000
-Received: from fllv0016.ext.ti.com ([198.47.19.142])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZbBt-000859-OI; Wed, 19 Dec 2018 12:43:21 +0000
-Received: from fllv0035.itg.ti.com ([10.64.41.0])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBJCgoY8098519;
- Wed, 19 Dec 2018 06:42:50 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1545223370;
- bh=hOSSW/Fe3UvUR+FrL7a03PALPLMq3eLz4yJsqFMxDoc=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=mrdfr0XXm/f5HMraMzJuJQE7P79uLh/2YtX4lv0Z1jl+3bRWN/Um8PdULyHarDG5E
- Dy5yIpCcFLM+W9ihzGe48tHudI5EBvL+puXXzJeT3ejyOt2uwujSNpZL6AHg9dEDY/
- pnBtQuIMXym537Z5o06Z2HnRpbHbZZzYCRqxnKH4=
-Received: from DFLE102.ent.ti.com (dfle102.ent.ti.com [10.64.6.23])
- by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBJCgowT034704
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Wed, 19 Dec 2018 06:42:50 -0600
-Received: from DFLE109.ent.ti.com (10.64.6.30) by DFLE102.ent.ti.com
- (10.64.6.23) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Wed, 19
- Dec 2018 06:42:50 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE109.ent.ti.com
- (10.64.6.30) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Wed, 19 Dec 2018 06:42:50 -0600
-Received: from [172.24.190.89] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBJCgjlF004104;
- Wed, 19 Dec 2018 06:42:46 -0600
-Subject: Re: [PATCH v6 0/7] spi: add support for octal mode
-To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>,
- "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
- "boris.brezillon@bootlin.com" <boris.brezillon@bootlin.com>,
- "broonie@kernel.org" <broonie@kernel.org>, "marek.vasut@gmail.com"
- <marek.vasut@gmail.com>, "linux-spi@vger.kernel.org"
- <linux-spi@vger.kernel.org>, "devicetree@vger.kernel.org"
- <devicetree@vger.kernel.org>
-References: <1545214186-16987-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-From: Vignesh R <vigneshr@ti.com>
-Message-ID: <10b25865-b93d-382a-aa4d-b21fbd9c3ba9@ti.com>
-Date: Wed, 19 Dec 2018 18:13:42 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gZbLf-0006cn-9U; Wed, 19 Dec 2018 12:53:15 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZbLc-0006c6-AG
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 12:53:13 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D18F7A78;
+ Wed, 19 Dec 2018 04:52:59 -0800 (PST)
+Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 47CD73F5C0;
+ Wed, 19 Dec 2018 04:52:55 -0800 (PST)
+Date: Wed, 19 Dec 2018 12:52:52 +0000
+From: Dave Martin <Dave.Martin@arm.com>
+To: Catalin Marinas <catalin.marinas@arm.com>
+Subject: Re: [RFC][PATCH 0/3] arm64 relaxed ABI
+Message-ID: <20181219125249.GB22067@e103592.cambridge.arm.com>
+References: <cover.1544445454.git.andreyknvl@google.com>
+ <20181210143044.12714-1-vincenzo.frascino@arm.com>
+ <CAAeHK+xPZ-Z9YUAq=3+hbjj4uyJk32qVaxZkhcSAHYC4mHAkvQ@mail.gmail.com>
+ <20181212150230.GH65138@arrakis.emea.arm.com>
+ <CAAeHK+zxYJDJ7DJuDAOuOMgGvckFwMAoVUTDJzb6MX3WsXhRTQ@mail.gmail.com>
+ <20181218175938.GD20197@arrakis.emea.arm.com>
 MIME-Version: 1.0
-In-Reply-To: <1545214186-16987-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+Content-Disposition: inline
+In-Reply-To: <20181218175938.GD20197@arrakis.emea.arm.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_044310_274919_4F636126 
-X-CRM114-Status: GOOD (  18.97  )
+X-CRM114-CacheID: sfid-20181219_045312_363768_DACE631F 
+X-CRM114-Status: GOOD (  35.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,131 +75,179 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "robh@kernel.org" <robh@kernel.org>,
- "tudor.ambarus@microchip.com" <tudor.ambarus@microchip.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "frieder.schrempf@exceet.de" <frieder.schrempf@exceet.de>,
- "computersforpeace@gmail.com" <computersforpeace@gmail.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Kate Stewart <kstewart@linuxfoundation.org>,
+ "open list:DOCUMENTATION" <linux-doc@vger.kernel.org>,
+ Will Deacon <will.deacon@arm.com>,
+ Linux Memory Management List <linux-mm@kvack.org>,
+ "open list:KERNEL SELFTEST FRAMEWORK" <linux-kselftest@vger.kernel.org>,
+ Chintan Pandya <cpandya@codeaurora.org>,
+ Vincenzo Frascino <vincenzo.frascino@arm.com>, Shuah Khan <shuah@kernel.org>,
+ Ingo Molnar <mingo@kernel.org>, linux-arch <linux-arch@vger.kernel.org>,
+ Jacob Bramley <Jacob.Bramley@arm.com>, Dmitry Vyukov <dvyukov@google.com>,
+ Evgenii Stepanov <eugenis@google.com>, Kees Cook <keescook@chromium.org>,
+ Ruben Ayrapetyan <Ruben.Ayrapetyan@arm.com>,
+ Andrey Konovalov <andreyknvl@google.com>, Lee Smith <Lee.Smith@arm.com>,
+ Alexander Viro <viro@zeniv.linux.org.uk>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Kostya Serebryany <kcc@google.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ LKML <linux-kernel@vger.kernel.org>,
+ "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>,
+ Ramana Radhakrishnan <Ramana.Radhakrishnan@arm.com>,
+ Andrew Morton <akpm@linux-foundation.org>, Robin Murphy <robin.murphy@arm.com>,
+ Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+On Tue, Dec 18, 2018 at 05:59:38PM +0000, Catalin Marinas wrote:
+> On Tue, Dec 18, 2018 at 04:03:38PM +0100, Andrey Konovalov wrote:
+> > On Wed, Dec 12, 2018 at 4:02 PM Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > > The summary of our internal discussions (mostly between kernel
+> > > developers) is that we can't properly describe a user ABI that covers
+> > > future syscalls or syscall extensions while not all syscalls accept
+> > > tagged pointers. So we tweaked the requirements slightly to only allow
+> > > tagged pointers back into the kernel *if* the originating address is
+> > > from an anonymous mmap() or below sbrk(0). This should cover some of the
+> > > ioctls or getsockopt(TCP_ZEROCOPY_RECEIVE) where the user passes a
+> > > pointer to a buffer obtained via mmap() on the device operations.
+> > >
+> > > (sorry for not being clear on what Vincenzo's proposal implies)
+> > 
+> > OK, I see. So I need to make the following changes to my patchset AFAIU.
+> > 
+> > 1. Make sure that we only allow tagged user addresses that originate
+> > from an anonymous mmap() or below sbrk(0). How exactly should this
+> > check be performed?
+> 
+> I don't think we should perform such checks. That's rather stating that
+> the kernel only guarantees that the tagged pointers work if they
+> originated from these memory ranges.
 
-On 19/12/18 3:41 PM, Yogesh Narayan Gaur wrote:
-> Add support for octal mode IO data transfer.
-> Micron flash, mt35xu512aba, supports octal mode data transfer and
-> NXP FlexSPI controller supports 8 data lines for data transfer (Rx/Tx).
-> 
-> Patch series
-> * Add support for octal mode flags and parsing of same in spi driver.
-> * Add parsing logic for spi-mem framework and m25p80.c device file.
-> * Add opcodes for octal I/O commands in spi-nor framework, Read and Write proto for (1-1-8/1-8-8) mode.
->   Opcodes are added as per octal data IO commands required for mt35xu512aba [1] flash.
-> * Add mode bit required for octal mode in nxp-fspi driver [2].
-> * Define binding property 'spi-rx/tx-bus-width' for LX2160ARDB target [2].
-> 
-> Tested on LX2160ARDB target with nxp-fspi driver, below are
-> Read performance number of 1-1-1 and 1-1-8 read protocol.
-> 
->  root@lxxx:~# cat /proc/mtd
->  dev:    size   erasesize  name
->  mtd0: 04000000 00001000 "spi0.0"
->  mtd1: 04000000 00001000 "spi0.1"
->  root@lxxx:~# time mtd_debug read /dev/mtd0 0x0 0x1000000 0read
->  Copied 16777216 bytes from address 0x00000000 in flash to 0read
-> 
->  real    0m2.792s
->  user    0m0.000s
->  sys     0m2.790s
->  root@lxxx:~# time mtd_debug read /dev/mtd1 0x0 0x1000000 0read
->  Copied 16777216 bytes from address 0x00000000 in flash to 0read
-> 
->  real    0m0.441s
->  user    0m0.000s
->  sys     0m0.440s
->  root@ls1012ardb:~#
-> 
-> 
->  Flash device MTD0 configured in 1-1-1 protocol.
->  Flash device MTD1 configured in 1-1-8 protocol.
-> 
-> [1] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=70384&state=*
-> [2] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=76402
-> 
-> Yogesh Gaur (7):
->   spi: add support for octal mode I/O data transfer
->   spi: spi-mem: add support for octal mode I/O data transfer
+I concur.
 
+Really, the kernel should do the expected thing with all "non-weird"
+memory.
 
-These two patches are already merged and is now part of linux-next[1].
-Its preferred to send patches based on top of latest linux-next so as to
-avoid resending patches that have already been picked up by the maintainer.
+In lieu of a proper definition of "non-weird", I think we should have
+some lists of things that are explicitly included, and also excluded:
 
-[1]
-commit 6b03061f882de49b83ccf44beb3a12c920a2da1b
-Author: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
-Date:   Mon Dec 3 08:39:06 2018 +0000
+OK:
+	kernel-allocated process stack
+	brk area
+	MAP_ANONYMOUS | MAP_PRIVATE
+	MAP_PRIVATE mappings of /dev/zero
 
-    spi: add support for octal mode I/O data transfer
+Not OK:
+	MAP_SHARED
+	mmaps of non-memory-like devices
+	mmaps of anything that is not a regular file
+	the VDSO
+	...
 
-commit b12a084c8729ef423089bb9a5a143eed39cd94e7
-Author: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
-Date:   Mon Dec 3 08:39:12 2018 +0000
-
-    spi: spi-mem: add support for octal mode I/O data transfer
+In general, userspace can tag memory that it "owns", and we do not assume
+a transfer of ownership except in the "OK" list above.  Otherwise, it's
+the kernel's memory, or the owner is simply not well defined.
 
 
-Regards
-Vignesh
+I would also like to see advice for userspace developers, particularly
+things like (strawman, please challenge!):
 
->   mtd: spi-nor: add opcodes for octal Read/Write commands
->   mtd: spi-nor: add octal read flag for flash mt35xu512aba
->   mtd: m25p80: add support of octal mode I/O transfer
->   spi: nxp-fspi: add octal mode flag bit for octal support
->   arm64: dts: lx2160a: update fspi node
-> 
-> Changes for v6:
-> - Correct S-o-b tag with full author name as 'Yogesh Narayan Gaur'.
-> - Rebase on top of v4.20-rc5.
-> Changes for v5:
-> - Modified string 'octo' as 'octal' in all patches.
-> Changes for v4:
-> - Rebase on top of v4.20-rc2.
-> - Modify octo entries enum value in spi.h.
-> Changes for v3:
-> - Add octo mode support in spi_setup().
-> - Rename all patches with 'octal' string modified as 'octo'.
-> Changes for v2:
-> - Incorporated review comments of Boris and Vignesh.
-> 
-> Yogesh Gaur (7):
->   spi: add support for octal mode I/O data transfer
->   spi: spi-mem: add support for octal mode I/O data transfer
->   mtd: spi-nor: add opcodes for octal Read/Write commands
->   mtd: spi-nor: add octal read flag for flash mt35xu512aba
->   mtd: m25p80: add support of octal mode I/O transfer
->   spi: nxp-fspi: add octal mode flag bit for octal support
->   arm64: dts: lx2160a: update fspi node
-> 
->  arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts |  4 ++++
->  drivers/mtd/devices/m25p80.c                      |  9 ++++++++-
->  drivers/mtd/spi-nor/spi-nor.c                     | 19 ++++++++++++++++---
->  drivers/spi/spi-mem.c                             |  9 ++++++++-
->  drivers/spi/spi-nxp-fspi.c                        |  4 ++--
->  drivers/spi/spi.c                                 | 12 ++++++++++--
->  include/linux/mtd/spi-nor.h                       | 16 ++++++++++++----
->  include/linux/spi/spi.h                           |  4 +++-
->  8 files changed, 63 insertions(+), 14 deletions(-)
-> 
+ * Userspace should set tags at the point of allocation only.
 
--- 
-Regards
-Vignesh
+ * If you don't know how an object was allocated, you cannot modify the
+   tag, period.
+
+ * A single C object should be accessed using a single, fixed pointer tag
+   throughout its entire lifetime.
+
+ * Tags can be changed only when there are no outstanding pointers to
+   the affected object or region that may be used to access the object
+   or region (i.e., if the object were allocated from the C heap and
+   is it safe to realloc() it, then it is safe to change the tag; for
+   other types of allocation, analogous arguments can be applied).
+
+ * When the kernel dereferences a pointer on userspace's behalf, it
+   shall behave equivalently to userspace dereferencing the same pointer,
+   including use of the same tag (where passed by userspace).
+
+ * Where the pointer tag affects pointer dereference behaviour (i.e.,
+   with hardware memory colouring) the kernel makes no guarantee to
+   honour pointer tags correctly for every location a buffer based on a
+   pointer passed by userspace to the kernel.
+
+   (This means for example that for a read(fd, buf, size), we can check
+   the tag for a single arbitrary location in *(char (*)[size])buf
+   before passing the buffer to get_user_pages().  Hopefully this could
+   be done in get_user_pages() itself rather than hunting call sites.
+   For userspace, it means that you're on your own if you ask the
+   kernel to operate on a buffer than spans multiple, independently-
+   allocated objects, or a deliberately striped single object.)
+
+ * The kernel shall not extend the lifetime of user pointers in ways
+   that are not clear from the specification of the syscall or
+   interface to which the pointer is passed (and in any case shall not
+   extend pointer lifetimes without good reason).
+
+   So no clever transparent caching between syscalls, unless it _really_
+   is transparent in the presence of tags.
+
+ * For purposes other than dereference, the kernel shall accept any
+   legitimately tagged pointer (according to the above rules) as
+   identifying the associated memory location.
+
+   So, mprotect(some_page_aligned_object, ...); is valid irrespective
+   of where page_aligned_object() came from.  There is no implicit
+   derefence by the kernel here, hence no tag check.
+
+   The kernel does not guarantee to work correctly if the wrong tag
+   is used, but there is not always a well-defined "right" tag, so
+   we can't really guarantee to check it.  So a pointer derived by
+   any reasonable means by userspace has to be treated as equally
+   valid.
+  
+
+We would need to get some cross-arch buy-in for this, otherwise core
+maintainers might just refuse to maintain the necessary guarantees.
+
+
+> > 2. Allow tagged addressed passed to memory syscalls (as long as (1) is
+> > satisfied). Do I understand correctly that this means that I need to
+> > locate all find_vma() callers outside of mm/ and fix them up as well?
+> 
+> Yes (unless anyone as a better idea or objections to this approach).
+
+Also, watch out for code that pokes about inside struct vma directly.
+
+I'm wondering, could we define an explicit type, say,
+
+	struct user_vaddr {
+		unsigned long addr;
+	};
+
+to replace the unsigned longs in struct vma the mm API?  This would
+turn ad-hoc (unsigned long) casts into build breaks.  We could have
+an explicit conversion functions, say,
+
+	struct user_vaddr __user_vaddr_unsafe(void __user *);
+	void __user *__user_ptr_unsafe(struct user_vaddr);
+
+that we robotically insert in all the relevant places to mark
+unaudited code.
+
+This allows us to keep the kernel buildable, while flagging things
+that will need review.  We would also need to warn the mm folks to
+reject any new code using these unsafe conversions.
+
+Of course, it would be a non-trivial effort...
+
+> 
+> BTW, I'll be off until the new year, so won't be able to follow up.
+
+Cheers
+---Dave
 
 _______________________________________________
 linux-arm-kernel mailing list
