@@ -2,83 +2,80 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DADD4C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 13:52:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DD270C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 14:03:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AADCF218A6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 13:52:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AA286218AF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 14:03:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bWJ8vMBM";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="j8oUCH9D"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AADCF218A6
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q7DVq/JS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AA286218AF
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=n8YYcCQTxoZjvignLXNHJoc9Sgs/hiEztgpoc7ltjck=; b=bWJ8vMBMmb1Kji
-	MMnMsHG789tvKruw+i/hZ27DVL/MMTQPplojFJWl+ccGmlOn465fbXSNJf9Cd8MxJnhk97yH2De26
-	SW/RXu2FPMDcSs98k32LlaSi50qdqfwvte7qv7fCzOU+0XtMo+cPtmjunyj0gobZD6leWMHZK2zWZ
-	qt9jTw+f9jwJFk9i5qhq3BJoAHgL3lz2l+eIaSMDrORGG7F4rR7Y5nH/t6bf/oudbOhXusDCBLxWZ
-	3vIiKJlSrnfwrUVjcr90yS9U6GosEkKjZf/BcxxcJCPGMtWdJVRSX93JtKht451rZSMdhpL7fnTwR
-	OW9AHpjSLQ8hGedPMrKA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=el02GHdafuWoX/kvYqVsmOZdsiH+BTCgQprZRHlDdQA=; b=Q7DVq/JSZ7AD3N
+	CxxowoXZtKulfjoRZndJYq+UWeTaHf/jqW4MCaU0o39tUZgA3sZnkz0ipgySldSmPtpPV9zyEdQWJ
+	1TiD6Ha6IKgQJg8tFwoqhlaoCAl3hLPNM97DG6O+DpAW/zIkUQwRhKqOb8IEFe8fokrJcOnQhbZAj
+	3gJ2FeqBY4yXtGPbIPuPjeO4XVE3RDBBo8TR5OAddvDcvtdXVyPUe/58Ted2XnjGXY7csxJYRxEyG
+	J0h2Gv69WLIU7W3ZaG6QAsN58jGe/cNKKDKdtPOAKf4f8DbRSvRmXYzut4jsrPZyv+qu06GRJXP7/
+	V5TYXrGLUVgpUpBnmsVA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZcGd-00026D-DF; Wed, 19 Dec 2018 13:52:07 +0000
-Received: from lelv0143.ext.ti.com ([198.47.23.248])
+	id 1gZcRr-0006HS-26; Wed, 19 Dec 2018 14:03:43 +0000
+Received: from mail-ot1-f65.google.com ([209.85.210.65])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZcGb-00025T-1A
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 13:52:06 +0000
-Received: from lelv0266.itg.ti.com ([10.180.67.225])
- by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBJDppD6023380;
- Wed, 19 Dec 2018 07:51:51 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1545227511;
- bh=/Eix+IZlCL1gsaTO0YgstxH4KN01VKKE/O7676ei4c0=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=j8oUCH9D8YgGxRyBiy27tD/5ixtBwzK8b/bUsDs1CJ4WFO13hTwWFry+n6FeAeoju
- fBJp4LOJSfOW6J0XaJSOvG1Hjp3GJAKutRqAruQMAXfXC/Pnng4JO+loNCyBezP7xn
- KMklIAoP12MLCnIiVVIz4vlej5Bdo0lpoCQzOOwU=
-Received: from DFLE105.ent.ti.com (dfle105.ent.ti.com [10.64.6.26])
- by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBJDppew004624
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Wed, 19 Dec 2018 07:51:51 -0600
-Received: from DFLE104.ent.ti.com (10.64.6.25) by DFLE105.ent.ti.com
- (10.64.6.26) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Wed, 19
- Dec 2018 07:51:51 -0600
-Received: from dflp33.itg.ti.com (10.64.6.16) by DFLE104.ent.ti.com
- (10.64.6.25) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Wed, 19 Dec 2018 07:51:51 -0600
-Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp33.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBJDpned008060;
- Wed, 19 Dec 2018 07:51:50 -0600
-Subject: Re: [PATCH v2 0/5] ARM: dts: da850-evm/lcdk: Fixes for audio
- descriptions
-To: Peter Ujfalusi <peter.ujfalusi@ti.com>
-References: <20181219114727.6865-1-peter.ujfalusi@ti.com>
-From: Sekhar Nori <nsekhar@ti.com>
-Message-ID: <c24b0b20-7b71-af1a-9cea-de61781b692d@ti.com>
-Date: Wed, 19 Dec 2018 19:21:49 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gZcRj-0006DR-1C
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 14:03:41 +0000
+Received: by mail-ot1-f65.google.com with SMTP id f18so19134273otl.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 19 Dec 2018 06:03:24 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=87Q7t3au6AiYONenqf5bXOf5YLbZmUmIIK0zrYw8Hcw=;
+ b=nYJpPLzUqljkjGbH1Jcf45PObukwSq/oN1uuavOKM3nYXDdqSf0YLeN2S6YN5Ax1Mf
+ 0IHca1N2039a9k7IR/PCFBQu/GBh/nOIaJcy+GapHY4Awlt/ihxX3BWnUFucHK4gk0DW
+ 0YVf2UfRO7U/Eur1WeGubGRauhX7juDySx9nMHqIogmojRoOQSVxMY9hgRiBfTYYmetQ
+ BlfA9oEgYsgYsm5RJoWbK7cjaxdqYBpjovU3eKilXjq6lAGI+L9HblUmtSk1IeMlgqPl
+ xn/D/z+GvevqkNWUQJ4lDIAfRLzdQwHXnPuT3XtcwAz+f8GnWu1XU+o/CCazrG35Gmit
+ 9prg==
+X-Gm-Message-State: AA+aEWZ+5VdF+n3adBkhfcBHFTo2PPvDIzjxTyUDOtzST10IGzrzqDNm
+ 3CnRb7Zy92xPmDc8N9S4IQ==
+X-Google-Smtp-Source: AFSGD/XzNGl2JnxcMIsUYgcd3IY+N80IVcHEYNvfAS8bHRjJBgUlUj1/b2jaHmLT2xiGS1vLmAdwXg==
+X-Received: by 2002:a9d:6c94:: with SMTP id c20mr14651848otr.251.1545228203951; 
+ Wed, 19 Dec 2018 06:03:23 -0800 (PST)
+Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.gmail.com with ESMTPSA id 4sm9109358otw.39.2018.12.19.06.03.22
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Wed, 19 Dec 2018 06:03:23 -0800 (PST)
+Date: Wed, 19 Dec 2018 08:03:22 -0600
+From: Rob Herring <robh@kernel.org>
+To: Mesih Kilinc <mesihkilinc@gmail.com>
+Subject: Re: [RFC PATCH 03/10] dt-bindings: dmaengine: Add Allwinner suniv
+ F1C100s DMA
+Message-ID: <20181219140322.GA6620@bogus>
+References: <cover.1543782328.git.mesihkilinc@gmail.com>
+ <7322bdfcd38cdcd8ccec56fea25492e4945d498f.1543782328.git.mesihkilinc@gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <20181219114727.6865-1-peter.ujfalusi@ti.com>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+Content-Disposition: inline
+In-Reply-To: <7322bdfcd38cdcd8ccec56fea25492e4945d498f.1543782328.git.mesihkilinc@gmail.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_055205_196220_9F172575 
-X-CRM114-Status: GOOD (  13.16  )
+X-CRM114-CacheID: sfid-20181219_060335_071399_198B8EAF 
+X-CRM114-Status: GOOD (  12.15  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,33 +87,26 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: devicetree@vger.kernel.org, alsa-devel@alsa-project.org,
+ Vinod Koul <vkoul@kernel.org>, Mesih Kilinc <mesihkilinc@gmail.com>,
+ Takashi Iwai <tiwai@suse.com>, linux-kernel@vger.kernel.org,
+ Jaroslav Kysela <perex@perex.cz>, linux-sunxi@googlegroups.com,
+ dmaengine@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Peter,
-
-On 19/12/18 5:17 PM, Peter Ujfalusi wrote:
-> Hi,
+On Mon,  3 Dec 2018 00:23:10 +0300, Mesih Kilinc wrote:
+> Add compatible string for Allwinner suniv F1C100s DMA.
 > 
-> Changes since v1s (regulator fixes):
-> - Card name fixes
-
-These look good to me. But since these issues are not v4.20 regressions,
-I will send them for v4.21 once -rc1 comes out.
-
-> - analog mic support for da850-lcdk
-
-This one I might hold till v4.22.
-
+> Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/dma/sun4i-dma.txt | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
 > 
-> The series fixes warnings regarding to regulator voltages and debugfs directory
-> creation.
 
-Thanks,
-Sekhar
+Reviewed-by: Rob Herring <robh@kernel.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
