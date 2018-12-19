@@ -2,61 +2,71 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7503BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:40:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 75361C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:40:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 460AE217D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:40:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 468D4217D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:40:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LD2pEHzP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 460AE217D7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=vanmierlo.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kvtbOQxo";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="tes1xi2N"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 468D4217D7
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:Message-ID:References:In-Reply-To:Subject:To:From:
-	Date:MIME-Version:Reply-To:Content-ID:Content-Description:Resent-Date:
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=I9e0Te+MyeTXH0qoBSzMjGSyvimRVqyCgGVrQIXPGX0=; b=LD2pEHzPYzDHNdCAJzQS3Igyc
-	Y6dYzetJC3nQc+WifxsHtWJp7DujkGuRVDJvnF9v/WbcOTjUDlRV0jR3t/nF0hT2RdaBzojPP4YSh
-	DxZVR3PJLcKaBxCCBrpqYwZxikR9gbKv7R+KT4oCHX2P0wngOW6am7Qc9AdGKy/ho6JCnlDCkMLeG
-	302u4uczo+QJLWlmZjkj3Tw5As7UDXwqEJCtxtsTs6nhOR1pTqUIOkJ5tM1+1aRXLcb46UUdyOiHp
-	MAJThRevsrbroOb0uYw9QK6LMZ1nj3rAFc4WIwk3N8jaRi4m4OQkiliUfHQNiomGncg89gvi/S3Zy
-	R/NMuP/eA==;
+	 bh=CpRavzgIXwaG7CLv/gy7owOi7ZMi54m3sxCB5lvnidQ=; b=kvtbOQxoo5HLvdvzCrOkVSUkK
+	BDpB+w+c1jImHGGfdlHf6YJOIws+JZFjwI7kAR4sTQtVE9So319Aw5qdxwW5DuFaNFul4Mrql+adu
+	DSWZiDrPpRAqRijMFQm8im7EyJYkq7Md5hH7jseB8ZAIjGRt/ntKG2W8EO5MJKlaaVs4mNuOTFeEp
+	+sWE9Ss+et95/u5XQX7Ti5sX7FqDV3YwOt609pYrZrDA6kKwFVPwavdciGEiozb6HGzYzJe8zV9xx
+	jTZwUIrIaM2kT5jen1A5kM8AEODgXFRndIgRv5+YDEEdAqNUdy/qz2p3rYNx3wAKB+7RE+tSOMDdJ
+	anGNhsaLg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZglk-0002T4-Lm; Wed, 19 Dec 2018 18:40:32 +0000
-Received: from fieber.vanmierlo.com ([84.243.197.177]
- helo=kerio9.vanmierlo.com)
+	id 1gZgly-0002fu-L2; Wed, 19 Dec 2018 18:40:46 +0000
+Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZglg-0002SZ-F6
- for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 18:40:30 +0000
-X-Footer: dmFubWllcmxvLmNvbQ==
-Received: from roundcube.vanmierlo.com ([192.168.37.37])
- (authenticated user m.brock@vanmierlo.com)
- by kerio9.vanmierlo.com (Kerio Connect 9.2.7) with ESMTPA;
- Wed, 19 Dec 2018 19:40:01 +0100
+ id 1gZglp-0002Sl-Hq
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 18:40:42 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=sirena.org.uk; s=20170815-heliosphere; h=In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=2mo2BQGIfBqO0Nq+3x8dSCeKHAv6NdOKCAnayJnodpI=; b=tes1xi2NJtMSglXmqdulPQOH9
+ EzBWOarvYN6pp6RHIKvX/72GG5Yeus7QV1ToOFfhRfGaw5JYv67U2SiFv2CiB3w93pQP+OCJX6ncd
+ HQS5HsPy6j5+qtKxbgG1qeed0dTRDw4sgFLTR+X0d/pwBTQ1x7FoQBjsuzcQkmB8Pdf+w=;
+Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
+ ([82.37.168.47] helo=debutante.sirena.org.uk)
+ by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
+ (envelope-from <broonie@sirena.org.uk>)
+ id 1gZglc-0005Ls-8W; Wed, 19 Dec 2018 18:40:24 +0000
+Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
+ id E1B3511259E9; Wed, 19 Dec 2018 18:40:23 +0000 (GMT)
+Date: Wed, 19 Dec 2018 18:40:23 +0000
+From: Mark Brown <broonie@kernel.org>
+To: Andrei.Stefanescu@microchip.com
+Subject: Re: [PATCH] regulator: mcp16502: code cleanup
+Message-ID: <20181219184023.GM8130@sirena.org.uk>
+References: <1545047086-30286-1-git-send-email-andrei.stefanescu@microchip.com>
 MIME-Version: 1.0
-Date: Wed, 19 Dec 2018 19:40:01 +0100
-From: Maarten Brock <m.brock@vanmierlo.com>
-To: Michal Simek <michal.simek@xilinx.com>
-Subject: Re: [PATCH v2 0/4] serial: uartps: Driver updates
-In-Reply-To: <cover.1545135519.git.michal.simek@xilinx.com>
-References: <cover.1545135519.git.michal.simek@xilinx.com>
-Message-ID: <06bcd18cb2e0e81d3051ef6305139d40@vanmierlo.com>
-X-Sender: m.brock@vanmierlo.com
-User-Agent: Roundcube Webmail/1.3.3
+In-Reply-To: <1545047086-30286-1-git-send-email-andrei.stefanescu@microchip.com>
+X-Cookie: <Manoj> I *like* the chicken
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_104028_647330_A517D307 
-X-CRM114-Status: UNSURE (   6.02  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181219_104038_571018_88A19A2F 
+X-CRM114-Status: GOOD (  12.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,39 +78,72 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: monstr@monstr.eu, linux-serial-owner@vger.kernel.org,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>,
- linux-kernel@vger.kernel.org, linux-serial@vger.kernel.org,
- Jiri Slaby <jslaby@suse.com>, linux-arm-kernel@lists.infradead.org
-Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
+Cc: Cristian.Birsan@microchip.com, lgirdwood@gmail.com,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
+Content-Type: multipart/mixed; boundary="===============4872145941286150437=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello Michal,
 
-On 2018-12-18 13:18, Michal Simek wrote:
-> Hi,
-> 
-> I am sending 4 patches in series to fix some issues we found.
-> Patches were sent separately but I have been asked to send them in
-> serial that's why I am also adding cover letter to explain this v2
-> version.
-> 
-> Thanks,
-> Michal
+--===============4872145941286150437==
+Content-Type: multipart/signed; micalg=pgp-sha512;
+	protocol="application/pgp-signature"; boundary="+ARLBH93C7pgvpZY"
+Content-Disposition: inline
 
-I'm wondering why, when reading the linux-serial mailing list, I can 
-only see this cover letter.
-Are you perhaps using a different To/Cc for the actual patches? And if 
-so, is that on purpose?
 
-Kind regards,
-Maarten
+--+ARLBH93C7pgvpZY
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
+On Mon, Dec 17, 2018 at 11:44:59AM +0000, Andrei.Stefanescu@microchip.com w=
+rote:
+> This patch does the following:
+> - align parameter with parenthesis
+> - fix compile error
+>=20
+> If CONFIG_SUSPEND is not set the dummy pm_ops
+> callbacks are named mcp16502_suspend and mcp16502_resume
+> instead of mcp16502_suspend_noirq and mcp16502_resume_noirq.
+
+Thanks for fixing this.
+
+>=20
+> Excerpt from compile log (kbuild test robot):
+
+There's no need to include the entire output from the kbuild robot in
+your commit log, especially when it's much larger than either the change
+or description of the change - it gets in the way of reading things as
+it makes it harder to pick out relevant information.
+
+--+ARLBH93C7pgvpZY
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAABCgAdFiEEreZoqmdXGLWf4p/qJNaLcl1Uh9AFAlwakJcACgkQJNaLcl1U
+h9CoOAf/YDh3uJaraY3r8ssIap/lGImSllU4UNm87DsRN6fgOMo3+WFyngmQyY3u
+VtSglDhnhpYbrf2XqqiCMjKnz4Ihuao1IdDYiL0LA1DBNFzzJY8Bljc1DDt+urm5
+LgL5chbBQjasZqWVAdKrDT/s8FBrSTSfhWsh9eZihN5GOfvGLp3DdPQXIr7SVTmx
+5ghqyonl4PM8d5ezcRfOZDyuWGImMPdDSVg/GjpReZ8Dn8604Woq6PX1KL9thFpT
+jc5Q5EJnMP1o8Ix5+JCkmdij2iza0OBUl7yEDN2hdoTERI5lrocly3CA9rv3MCkN
+EhyRiCNvC7oKbQ5GJjVyRkmGjHaz1Q==
+=hBVs
+-----END PGP SIGNATURE-----
+
+--+ARLBH93C7pgvpZY--
+
+
+--===============4872145941286150437==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============4872145941286150437==--
+
