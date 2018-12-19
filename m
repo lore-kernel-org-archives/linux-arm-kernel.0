@@ -2,90 +2,61 @@ Return-Path: <SRS0=AchV=O4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3AC3EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:22:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BBF54C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:24:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0B049217D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:22:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9138420989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 19 Dec 2018 18:24:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DOUwm1as";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="RtYLwGPN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0B049217D7
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E3aeBeW7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9138420989
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=N4HTJedr2xuCnNfqfd2nyx5dneCOQayM2PPRLWhTqgA=; b=DOUwm1asrXGVbn
-	J9v6dy7mMbGoMOEAOYaTSTNvLAfXYeM8EwbQ9BZrXh71Khf14sdXwVDjwHNdzjBjkzr7tcPk2Ei2f
-	7HMfS1f3kzNlAMqV27amdSS4N/mIgQUEq9SbPgZ6IiojAtMa8lx1eBKHSHnuIt19cK1rD3XOKG8Q6
-	TFlxhP31Az4W8h/QuYvyp4aCY4dcMk40B22TlAJIGIIBJb85T2ZXMa4jGQQsAhsZu23u+U9IOQyQC
-	s9wsvwMmLAIsiI/snPIqvU9yXBalBHCk28b8+9o9Ixn6tvJqTocnxN/KL5UDjOadQ/qJ6wgBHpwt+
-	ngnMiFrjkyhR2J0mY9Yg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=rkVbkm0F1dsKHR/Qmik7ZlS7E+1G8UAHitkD8i+p2q8=; b=E3aeBeW7LPS6j5sdWuPbW5c0fF
+	k5iyPwlZ+7j7cjI7IfBOiJmNaRNJuVryOuCvBaOr5SJ7nw78CuIziA6SPt2tZrnZBe/jYVQjsrjFv
+	XBsC/0IT8EDmaK+n2MSaSGqzIA2HexN5rqCgf+6uBl6q5B9z3Qm0R48O9KGlzMIpPbUJt/pJLOzaj
+	D7DBvLaWuUBskVEKIiO5d1DLiJE5Czxpgqf2f5UhPXeMJ1u9wfzm0lao6AxImgm6W1At94NQZeihk
+	GU6PUcF8c9YsooLukM0ueGnf6EvuMyIpw+tW6dEqNl734qHQas7pGqmoz3hsoiw0ZuKYzXELKkuDW
+	V53jnBhQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZgU6-0001vK-UG; Wed, 19 Dec 2018 18:22:18 +0000
-Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZgU2-0001tg-OP; Wed, 19 Dec 2018 18:22:16 +0000
-Received: by mail-lf1-x142.google.com with SMTP id c16so15755036lfj.8;
- Wed, 19 Dec 2018 10:22:04 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=3IeYs86iDq7cyOihStjMvz4mBBZbg0DAkNumcXcY+CM=;
- b=RtYLwGPNskfIKa/EMDkwMB+PIWKALxrop3oFU30S3La5SyWNrVAUKmBBlViQdbC/Gt
- xk6ZrXKRUXvXOLmC90uLdeB2WQAzD1cKAqseMtfqYmpVwtav+zdQgQHTl0Qdt1/iot1E
- FKER+UjtOUtGoSTlJKEnL8sQ6P+Qr6tFzlUcv03FRleyhQcpkmrGOOeOiMqMoj0WE6tR
- d/0vN//vacbeqObuZnqk+XSM5Wm/7/ueFq+k8q3QRN8Qf8KhMBc7yiXWW72cXCieR0wq
- FY/gX0UvKKshN5Omm9pnfA/9ASBHjyTwtqRarUsEQq+TuuPxl15a8HmuMKqiAoXc/Lsc
- QQjg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=3IeYs86iDq7cyOihStjMvz4mBBZbg0DAkNumcXcY+CM=;
- b=UAel3S6LOeE1lvYHxdslVJ7ppAiLVy7mYqEB/StZ82phwU88eSq6xfnOBAbjzeHdlJ
- p4eJc6aNZsei3zwRgmBGGWTbhJ3Ey1g2al8P8M0aL+6D/GeZ0TVJo9BXu59pot47sz6z
- T0YCUY2GVG+MjVcO0gkkWEFCVZ3C0CBDduxb+n5pCfN0G6Q86XqI8sNT8jLSuuUKpPrx
- chgXJdTlZlBDsQkwBFKktKQi1WtTVSZPHNP+7VstRD1RACS4/aiAWNLv1TwSyAm48h5N
- +VeG8jGDvpioANNaZy4Ef9nDKYStvVz+me6tO8OqFXE9rHEpeSE5TeUp6whvEFhaBbnL
- g5ew==
-X-Gm-Message-State: AA+aEWbl441fY2zeCBf1mJ/dBevV1n8uvMKnOnCuhH+vOw3ScHTr4opQ
- vr1ndoVB3dm137mLLgvuCJjTfYsuLhBKxdVusLg=
-X-Google-Smtp-Source: AFSGD/U4+etkcpwZmgu05EWcSRzsjyWLwn4L4YHtoom7ZiPxNh1XffCyXndSvLZWTDGNMKTez2MJTiOQOhQiBGD5ETs=
-X-Received: by 2002:a19:d90c:: with SMTP id q12mr12688363lfg.24.1545243722628; 
- Wed, 19 Dec 2018 10:22:02 -0800 (PST)
-MIME-Version: 1.0
-References: <20181217202334.GA11758@jordon-HP-15-Notebook-PC>
- <20181218095709.GJ26090@n2100.armlinux.org.uk>
- <CAFqt6zaVU-Fme6fErieBfBKwAm9xHUa7cXTOfqzwUJR__0JysQ@mail.gmail.com>
- <20181218123318.GN26090@n2100.armlinux.org.uk>
- <CAFqt6zbqaS-pFETyjRR2-1V57MiJuX65xoMjgkr-DjUnrJYzSg@mail.gmail.com>
- <20181218130146.GO26090@n2100.armlinux.org.uk>
- <CAFqt6zYnn76OdprSvA2Bj0v=xQqtJ6xJse6+iB+-=u3WsEv3pA@mail.gmail.com>
- <20181219093230.GS26090@n2100.armlinux.org.uk>
- <CAFqt6zbLrw5HENBiLXxPFqo7kk8uBJd3z-+C9Fnkej7u3W2i1w@mail.gmail.com>
- <20181219120623.GU26090@n2100.armlinux.org.uk>
-In-Reply-To: <20181219120623.GU26090@n2100.armlinux.org.uk>
-From: Souptick Joarder <jrdr.linux@gmail.com>
-Date: Wed, 19 Dec 2018 23:55:45 +0530
-Message-ID: <CAFqt6zaHuN3ZrYKAEFKY+Vqxz+pBDbLbeopc5ORos=MotyG=sQ@mail.gmail.com>
-Subject: Re: [PATCH v4 4/9] drm/rockchip/rockchip_drm_gem.c: Convert to use
- vm_insert_range
-To: Russell King - ARM Linux <linux@armlinux.org.uk>
+	id 1gZgW4-0002VJ-SW; Wed, 19 Dec 2018 18:24:20 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gZgW2-0002Lr-2A
+ for linux-arm-kernel@lists.infradead.org; Wed, 19 Dec 2018 18:24:19 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6B80015AB;
+ Wed, 19 Dec 2018 10:24:09 -0800 (PST)
+Received: from e113632-lin.cambridge.arm.com (e113632-lin.cambridge.arm.com
+ [10.1.194.37])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 55E5F3F59C;
+ Wed, 19 Dec 2018 10:24:07 -0800 (PST)
+From: Valentin Schneider <valentin.schneider@arm.com>
+To: linux-kernel@vger.kernel.org
+Subject: [PATCH 1/2] cpu/hotplug: Mute hotplug lockdep during init
+Date: Wed, 19 Dec 2018 18:23:15 +0000
+Message-Id: <1545243796-23224-2-git-send-email-valentin.schneider@arm.com>
+X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1545243796-23224-1-git-send-email-valentin.schneider@arm.com>
+References: <1545243796-23224-1-git-send-email-valentin.schneider@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_102214_793834_29D9FE9E 
-X-CRM114-Status: GOOD (  41.73  )
+X-CRM114-CacheID: sfid-20181219_102418_116009_44467760 
+X-CRM114-Status: GOOD (  13.98  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,239 +68,99 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Michal Hocko <mhocko@suse.com>, Heiko Stuebner <heiko@sntech.de>,
- linux-rockchip@lists.infradead.org, airlied@linux.ie, hjc@rock-chips.com,
- Matthew Wilcox <willy@infradead.org>, linux-kernel@vger.kernel.org,
- Linux-MM <linux-mm@kvack.org>, dri-devel@lists.freedesktop.org,
- Andrew Morton <akpm@linux-foundation.org>,
+Cc: mark.rutland@arm.com, cai@gmx.us, marc.zyngier@arm.com,
+ daniel.lezcano@linaro.org, dietmar.eggemann@arm.com, peterz@infradead.org,
+ longman@redhat.com, tglx@linutronix.de, mingo@kernel.org,
  linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 19, 2018 at 5:36 PM Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
->
-> On Wed, Dec 19, 2018 at 05:16:09PM +0530, Souptick Joarder wrote:
-> > On Wed, Dec 19, 2018 at 3:02 PM Russell King - ARM Linux
-> > <linux@armlinux.org.uk> wrote:
-> > >
-> > > On Wed, Dec 19, 2018 at 09:01:09AM +0530, Souptick Joarder wrote:
-> > > > On Tue, Dec 18, 2018 at 6:31 PM Russell King - ARM Linux
-> > > > <linux@armlinux.org.uk> wrote:
-> > > > >
-> > > > > On Tue, Dec 18, 2018 at 06:24:29PM +0530, Souptick Joarder wrote:
-> > > > > > On Tue, Dec 18, 2018 at 6:03 PM Russell King - ARM Linux
-> > > > > > <linux@armlinux.org.uk> wrote:
-> > > > > > >
-> > > > > > > On Tue, Dec 18, 2018 at 05:36:04PM +0530, Souptick Joarder wrote:
-> > > > > > > > On Tue, Dec 18, 2018 at 3:27 PM Russell King - ARM Linux
-> > > > > > > > <linux@armlinux.org.uk> wrote:
-> > > > > > > > > This looks like a change in behaviour.
-> > > > > > > > >
-> > > > > > > > > If user_count is zero, and offset is zero, then we pass into
-> > > > > > > > > vm_insert_range() a page_count of zero, and vm_insert_range() does
-> > > > > > > > > nothing and returns zero.
-> > > > > > > > >
-> > > > > > > > > However, as we can see from the above code, the original behaviour
-> > > > > > > > > was to return -ENXIO in that case.
-> > > > > > > >
-> > > > > > > > I think these checks are not necessary. I am not sure if we get into mmap
-> > > > > > > > handlers of driver with user_count = 0.
-> > > > > > >
-> > > > > > > I'm not sure either, I'm just pointing out the change of behaviour.
-> > > > > >
-> > > > > > Ok. I think feedback from Heiko might be helpful here :)
-> > > > > >
-> > > > > > >
-> > > > > > > > > The other thing that I'm wondering is that if (eg) count is 8 (the
-> > > > > > > > > object is 8 pages), offset is 2, and the user requests mapping 6
-> > > > > > > > > pages (user_count = 6), then we call vm_insert_range() with a
-> > > > > > > > > pages of rk_obj->pages + 2, and a pages_count of 6 - 2 = 4. So we
-> > > > > > > > > end up inserting four pages.
-> > > > > > > >
-> > > > > > > > Considering the scenario, user_count will remain 8 (user_count =
-> > > > > > > > vma_pages(vma) ). ? No ?
-> > > > > > > > Then we call vm_insert_range() with a pages of rk_obj->pages + 2, and
-> > > > > > > > a pages_count
-> > > > > > > > of 8 - 2 = 6. So we end up inserting 6 pages.
-> > > > > > > >
-> > > > > > > > Please correct me if I am wrong.
-> > > > > > >
-> > > > > > > vma_pages(vma) is the number of pages that the user requested, it is
-> > > > > > > the difference between vma->vm_end and vma->vm_start in pages.  As I
-> > > > > > > said above, "the user requests mapping 6 pages", so vma_pages() will
-> > > > > > > be 6, and so user_count will also be 6.  You are passing
-> > > > > > > user_count - offset into vm_insert_range(), which will be 6 - 2 = 4
-> > > > > > > in my example.  This is two pages short of what the user requested.
-> > > > > > >
-> > > > > >
-> > > > > > So, this should be the correct behavior.
-> > > > > >
-> > > > > >                  return vm_insert_range(vma, vma->vm_start,
-> > > > > > rk_obj->pages + offset,
-> > > > > >                                                           user_count);
-> > > > >
-> > > > > ... and by doing so, you're introducing another instance of the same
-> > > > > bug I pointed out in patch 2.
-> > > >
-> > > > Sorry but didn't get it ? How it will be similar to the bug pointed
-> > > > out in patch 2 ?
-> > >
-> >
-> > Thanks for the detail explanation.
-> >
-> > > Towards the top of this function, you have:
-> > >
-> > >         unsigned long user_count = vma_pages(vma);
-> > >
-> > > So what you are proposing does:
-> > >
-> > >         return vm_insert_range(vma, vma->vm_start, rk_obj->pages + offset,
-> > >                                vma_pages(vma));
-> > >
-> > > Now if we look inside vm_insert_range():
-> > >
-> > > +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
-> > > +                       struct page **pages, unsigned long page_count)
-> > > +{
-> > > +       unsigned long uaddr = addr;
-> > > +       int ret = 0, i;
-> > > +
-> > > +       if (page_count > vma_pages(vma))
-> > > +               return -ENXIO;
-> > > +
-> > > +       for (i = 0; i < page_count; i++) {
-> > > +               ret = vm_insert_page(vma, uaddr, pages[i]);
-> > > +               if (ret < 0)
-> > > +                       return ret;
-> > > +               uaddr += PAGE_SIZE;
-> > > +       }
-> > >
-> > > So, page_count _is_ vma_pages(vma).  So this code does these operations:
-> > >
-> > >         if (vma_pages(vma) > vma_pages(vma))
-> > >                 return -ENXIO;
-> > >
-> > > This will always be false.  I've already stated in my reply to patch 2
-> > > in paragraph 3 about the uselessness of this test.
-> >
-> > Agree, this will be always false for this particular/ similar instances.
-> > But there are places [3/9], [6/9], [9/9] where page_count is already set
-> > and it might be good to just cross check page_count > vma_pages(vma).
-> >
-> > This was discussed during review of v3 [1/9].
-> > https://patchwork.kernel.org/patch/10716601/
-> >
-> > We can discuss again and if not needed it can be removed in v5.
-> >
-> > >
-> > >         for (i = 0; i < vma_pages(vma); i++) {
-> > >                 ret = vm_insert_page(vma, uaddr, pages[i]);
-> > >
-> > > So the loop will iterate over the number of pages that the user requested.
-> > >
-> > > Now, taking another example.  The object is again 8 pages long, so
-> > > indexes 0 through 7 in its page array are valid.  The user requests
-> > > 8 pages at offset 2 into the object.  Also as already stated in
-> > > paragraph 3 of my reply to patch 2.
-> > >
-> > > vma_pages(vma) is 8.  offset = 2.
-> > >
-> > > So we end up _inside_ vm_insert_range() with:
-> > >
-> > >         if (8 > 8)
-> > >                 return -ENXIO;
-> > >
-> > > As stated, always false.
-> > >
-> > >         for (i = 0; i < 8; i++) {
-> > >                 ret = vm_insert_page(vma, vaddr, rk_obj->pages[2 + i]);
-> > >
-> > > Which means we iterate over rk_obj->pages indicies from 2 through 9
-> > > inclusive.
-> > >
-> > > Since only 0 through 7 are valid, we have walked off the end of the
-> > > array, and attempted to map an invalid struct page pointer - we could
-> > > be lucky, and it could point at some struct page (potentially causing
-> > > us to map some sensitive page - maybe containing your bank details or
-> > > root password... Or it could oops the kernel.
-> >
-> > Consider the 2nd example.
-> > The object is again 8 pages long, so indexes 0 through 7 in
-> > its page array are valid.  The user requests 8 pages at offset 2
-> > into the object.
-> >
-> > The original code look like -
-> >
-> >              unsigned long user_count = vma_pages(vma); // 8
-> >              unsigned long end = user_count + offset // 8 + 2 = 10
-> >               ...
-> >               for (i = offset (2) ; i < end ( 10) ; i++) {
-> >                   ret = vm_insert_page(vma, uaddr, rk_obj->pages[i]);
-> >                   if (ret)
-> >                      return ret;
-> >                   uaddr += PAGE_SIZE;
-> >               }
-> >
-> > we iterate over rk_obj->pages indices from 2 through 9.
-> > Does it indicates the actual code have a bug when *offset != 0*.
->
-> Please look at _all_ of the original code.
->
-> Just like in your patch 2, you removed the tests that protect against
-> this overflow:
->
-> -       unsigned int i, count = obj->size >> PAGE_SHIFT;
->         unsigned long user_count = vma_pages(vma);
-> -       unsigned long uaddr = vma->vm_start;
->         unsigned long offset = vma->vm_pgoff;
-> -       unsigned long end = user_count + offset;
-> -       int ret;
-> -
-> -       if (user_count == 0)
-> -               return -ENXIO;
-> -       if (end > count)
-> -               return -ENXIO;
->
-> 'count' will be 8.  'end' will be 10.  The existing code would have
-> therefore returned -ENXIO.
->
-> This is what I'm pointing out in my reviewed of your patches - they
-> remove necessary tests and, by doing so, introduce these array
-> overflows.
+Since we've had:
 
-I change the code accordingly. Does it looks good ?
+  commit cb538267ea1e ("jump_label/lockdep: Assert we hold the hotplug lock for _cpuslocked() operations")
 
-@@ -221,26 +221,18 @@ static int
-rockchip_drm_gem_object_mmap_iommu(struct drm_gem_object *obj,
-                                              struct vm_area_struct *vma)
+we've been getting some lockdep warnings during init, such as on HiKey960:
+
+[    0.820495] WARNING: CPU: 4 PID: 0 at kernel/cpu.c:316 lockdep_assert_cpus_held+0x3c/0x48
+[    0.820498] Modules linked in:
+[    0.820509] CPU: 4 PID: 0 Comm: swapper/4 Tainted: G S                4.20.0-rc5-00051-g4cae42a #34
+[    0.820511] Hardware name: HiKey960 (DT)
+[    0.820516] pstate: 600001c5 (nZCv dAIF -PAN -UAO)
+[    0.820520] pc : lockdep_assert_cpus_held+0x3c/0x48
+[    0.820523] lr : lockdep_assert_cpus_held+0x38/0x48
+[    0.820526] sp : ffff00000a9cbe50
+[    0.820528] x29: ffff00000a9cbe50 x28: 0000000000000000
+[    0.820533] x27: 00008000b69e5000 x26: ffff8000bff4cfe0
+[    0.820537] x25: ffff000008ba69e0 x24: 0000000000000001
+[    0.820541] x23: ffff000008fce000 x22: ffff000008ba70c8
+[    0.820545] x21: 0000000000000001 x20: 0000000000000003
+[    0.820548] x19: ffff00000a35d628 x18: ffffffffffffffff
+[    0.820552] x17: 0000000000000000 x16: 0000000000000000
+[    0.820556] x15: ffff00000958f848 x14: 455f3052464d4d34
+[    0.820559] x13: 00000000769dde98 x12: ffff8000bf3f65a8
+[    0.820564] x11: 0000000000000000 x10: ffff00000958f848
+[    0.820567] x9 : ffff000009592000 x8 : ffff00000958f848
+[    0.820571] x7 : ffff00000818ffa0 x6 : 0000000000000000
+[    0.820574] x5 : 0000000000000000 x4 : 0000000000000001
+[    0.820578] x3 : 0000000000000000 x2 : 0000000000000001
+[    0.820582] x1 : 00000000ffffffff x0 : 0000000000000000
+[    0.820587] Call trace:
+[    0.820591]  lockdep_assert_cpus_held+0x3c/0x48
+[    0.820598]  static_key_enable_cpuslocked+0x28/0xd0
+[    0.820606]  arch_timer_check_ool_workaround+0xe8/0x228
+[    0.820610]  arch_timer_starting_cpu+0xe4/0x2d8
+[    0.820615]  cpuhp_invoke_callback+0xe8/0xd08
+[    0.820619]  notify_cpu_starting+0x80/0xb8
+[    0.820625]  secondary_start_kernel+0x118/0x1d0
+
+We've also had a similar warning in sched_init_smp() for every
+asymmetric system that would enable the sched_asym_cpucapacity static
+key, although that was singled out in:
+
+  commit 40fa3780bac2 ("sched/core: Take the hotplug lock in sched_init_smp()")
+
+Those warnings are actually harmless, since we cannot have hotplug
+operations at the time they appear. Instead of starting to sprinkle
+useless hotplug lock operations in the init codepaths, mute the
+warnings until they start warning about real problems.
+
+Suggested-by: Peter Zijlstra <peterz@infradead.org>
+Signed-off-by: Valentin Schneider <valentin.schneider@arm.com>
+---
+FYI Thomas Gleixner suggested using SYSTEM_SCHEDULING instead of
+SYSTEM_RUNNING, but that seems to still be too early - sched_init_smp()
+(and kernel_init() actually) hasn't completed yet, so we'd still get
+those warnings.
+---
+ kernel/cpu.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/kernel/cpu.c b/kernel/cpu.c
+index 91d5c38..34e40ef 100644
+--- a/kernel/cpu.c
++++ b/kernel/cpu.c
+@@ -313,6 +313,15 @@ void cpus_write_unlock(void)
+ 
+ void lockdep_assert_cpus_held(void)
  {
-        struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
--       unsigned int i, count = obj->size >> PAGE_SHIFT;
-+       unsigned int count = obj->size >> PAGE_SHIFT;
-        unsigned long user_count = vma_pages(vma);
--       unsigned long uaddr = vma->vm_start;
-        unsigned long offset = vma->vm_pgoff;
-        unsigned long end = user_count + offset;
--       int ret;
++	/*
++	 * We can't have hotplug operations before userspace starts running,
++	 * and some init codepaths will knowingly not take the hotplug lock.
++	 * This is all valid, so mute lockdep until it makes sense to report
++	 * unheld locks.
++	 */
++	if (system_state < SYSTEM_RUNNING)
++		return;
++
+ 	percpu_rwsem_assert_held(&cpu_hotplug_lock);
+ }
+ 
+--
+2.7.4
 
-        if (user_count == 0)
-                return -ENXIO;
-        if (end > count)
-                return -ENXIO;
-
--       for (i = offset; i < end; i++) {
--               ret = vm_insert_page(vma, uaddr, rk_obj->pages[i]);
--               if (ret)
--                       return ret;
--               uaddr += PAGE_SIZE;
--       }
--
--       return 0;
-+       return vm_insert_range(vma, vma->vm_start, rk_obj->pages + offset,
-+                               user_count);
 
 _______________________________________________
 linux-arm-kernel mailing list
