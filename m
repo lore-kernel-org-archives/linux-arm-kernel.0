@@ -2,69 +2,78 @@ Return-Path: <SRS0=AHqO=O5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6F9CEC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 19:41:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 308ADC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 19:49:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 454B6218FD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 19:41:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 039D5218D3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 19:49:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Rxx20dPc";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="BwCnDIi5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 454B6218FD
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DYKmbyJH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 039D5218D3
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Date:Subject:Message-ID:In-Reply-To:
-	From:References:To:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=I01XWr+0ssph298g4H4EiiE7grBJow5GxCZNL2FsW/Y=; b=Rxx20dPcIoMvs8
-	iSZlBvVpPi//nDBb8fnhM/NIl+jro1PI74I1TwbCZ54ZryQMHSiCJxpkAMwCNE+2X0jCcAeLcPuXj
-	m/RUB2SO40SLHN65K2kJSY0PhJSUu42BGryExeK1YS/FRp18bajg0ZiobFIU9EkVDhYtZhUuSBld6
-	mYLwL3jo7mbS2gFyWhdDJwYuBPtdC8EKeQnemNtiv/3Posv/5zKb7LFR4V7BS0c6n+6fdatHuwzOn
-	AkvY2gfCRr5VhAmMk08lVVb07M4YcUSBFJ0Ux9WVDbW3oGHY/ijAzIjvIyA3S2ztxd0Nv8SGZ3+2N
-	+VGgvAjqjwu08JkUtfdw==;
+	List-Owner; bh=T/GYHpyKZPhsYg/SZ0B+w1SYEaluQLgZ11t/AcyXjAI=; b=DYKmbyJHOnQ3Su
+	1Z0y41ncaF1nKNmCXt6YcYFZ9eIWzw7hQqeeFQsKQZBSccv5Vv3QN12/PDbd4l8aAXb9Z/Jv+IYh+
+	JHBb8mBcj+5bvQxBhMgqt6o9l8llwwtSbtaIUAhNDbKii7hd+jJIy49X5g6wFoDwOQODSH8gzMVBR
+	4+2afAoAOigS1HO7XlLM0uSViBLTFJS+NjUEi9+IydGrwlKSO2rO/+/fFaZGeZcA6HsQ0V0dfaVW5
+	qoUKSaCCmAsjrNiKaOOy2p4sdY7jaXtMUz18/ufGjuLctfyrptTnaMsQK3Z3uXTWodmQg/V1w1HYr
+	DORPpkeSf27dU7jqp5wQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ga4Bm-00066T-7z; Thu, 20 Dec 2018 19:40:58 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1ga4K0-0008AA-7V; Thu, 20 Dec 2018 19:49:28 +0000
+Received: from mail-ot1-f68.google.com ([209.85.210.68])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ga4Bj-00065e-K5
- for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 19:40:56 +0000
-Received: from localhost (unknown [104.132.0.74])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id EEEBD218FD;
- Thu, 20 Dec 2018 19:40:41 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1545334842;
- bh=pi24CHAmq7xCxJVYDvfBIo2R604H9Ryr/IlzefsreTs=;
- h=To:References:Cc:From:In-Reply-To:Subject:Date:From;
- b=BwCnDIi5tJKKp+NPMCw0RZ5DrZHd8Fl0EdB0yzv+kVTFE5xvI4v+se6IV1y61Dqrd
- SkJFe5J61ksz3X0Rgu6zlnb2dsDACzJqCKUj0GifshlB+OGZdB3kCBLSLjAMhvFyfy
- nMOvh/JbtRgsdldcAVFJYmySqaLzb3MEMXjZ+2Eg=
+ id 1ga4Jw-00088r-9K
+ for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 19:49:25 +0000
+Received: by mail-ot1-f68.google.com with SMTP id 81so3056796otj.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 20 Dec 2018 11:49:13 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=Mpin4rmY1KHiXB2yLRM1gONu7AeF2ezjMMA9danRL7s=;
+ b=KZBJbeRMMhAu1i/14gZSXXfLU28+mW/SscQbEvtWBbRzMN9lzIkxQaBHhqZYZs152v
+ cu1694BvZUkqxTJx7dQ86v4Ci44Nr5uXjtrfciNX+uGKlAhy62YrU9i7OoDmPZC/YeQK
+ 2n0PZ8RNwkmFHkXqUMIhC/2ta2mL0Aesk+hhYx6nzNATbaMt9EnvoYhNmJfznozoS9ym
+ P1gS6cUi1ZIP7X9CSZLzRydj5CmWXXKMG4HMv00MbUgHjVXUqga7znrYIyw2qLuqFqSo
+ r1FyQ/IPfAJL6JI77Eoth+jaqS6Yo6Hql4+pku5K8L0vajnjCPFccA0DQsmcs5ZgDp9W
+ NjGw==
+X-Gm-Message-State: AA+aEWbLP4Y1SgpOBDdhHXU2290l9MTLsMorUgaq6WBUS7bi67P9LMLS
+ 3b1SowAR9W7oCb2spRD3Ww==
+X-Google-Smtp-Source: AFSGD/UmB/VXwQMTBz+ZpWV6GMPqXR5Mpfw5Zk5BFr+klOY+NIMe33FWpYrh9JdRvBJgB2go4ge5zQ==
+X-Received: by 2002:a9d:128b:: with SMTP id g11mr18776880otg.130.1545335352988; 
+ Thu, 20 Dec 2018 11:49:12 -0800 (PST)
+Received: from localhost ([2607:fb90:20d2:a5e2:49af:e73e:5a36:3b50])
+ by smtp.gmail.com with ESMTPSA id j5sm22008741otc.54.2018.12.20.11.49.11
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Thu, 20 Dec 2018 11:49:12 -0800 (PST)
+Date: Thu, 20 Dec 2018 13:49:11 -0600
+From: Rob Herring <robh@kernel.org>
+To: cezary.gapinski@gmail.com
+Subject: Re: [PATCH 5/5] spi: stm32: add description about STM32F4 bindings
+Message-ID: <20181220194911.GA17409@bogus>
+References: <1544363636-12161-1-git-send-email-cezary.gapinski@gmail.com>
+ <1544363636-12161-6-git-send-email-cezary.gapinski@gmail.com>
 MIME-Version: 1.0
-User-Agent: alot/0.8
-To: Aisheng Dong <aisheng.dong@nxp.com>, Fabio Estevam <festevam@gmail.com>
-References: <1545232888-9302-1-git-send-email-aisheng.dong@nxp.com>
- <1545232888-9302-5-git-send-email-aisheng.dong@nxp.com>
- <CAOMZO5DzMpMp-Tf74iM3SuHoFpji8z-dxM-UsC13GeDx2bZYgA@mail.gmail.com>
- <VI1PR04MB4222ABD43B82BD3C0B73404780BF0@VI1PR04MB4222.eurprd04.prod.outlook.com>
-From: Stephen Boyd <sboyd@kernel.org>
-In-Reply-To: <VI1PR04MB4222ABD43B82BD3C0B73404780BF0@VI1PR04MB4222.eurprd04.prod.outlook.com>
-Message-ID: <154533484105.79149.16225192496445475758@swboyd.mtv.corp.google.com>
-Subject: RE: [PATCH 4/5] clk: imx8qxp: make the name of clock ID generic
-Date: Thu, 20 Dec 2018 11:40:41 -0800
+Content-Disposition: inline
+In-Reply-To: <1544363636-12161-6-git-send-email-cezary.gapinski@gmail.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_114055_696492_8DC39690 
-X-CRM114-Status: GOOD (  19.18  )
+X-CRM114-CacheID: sfid-20181220_114924_327827_9860A45C 
+X-CRM114-Status: GOOD (  11.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,73 +85,31 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mturquette@baylibre.com" <mturquette@baylibre.com>,
- dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Amelie Delaunay <amelie.delaunay@st.com>,
+ Cezary Gapinski <cezary.gapinski@gmail.com>,
+ Alexandre Torgue <alexandre.torgue@st.com>, linux-kernel@vger.kernel.org,
+ linux-spi@vger.kernel.org, Mark Brown <broonie@kernel.org>,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>,
+ linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Aisheng Dong (2018-12-19 22:26:50)
-> > -----Original Message-----
-> > From: Fabio Estevam [mailto:festevam@gmail.com]
-> > Hi Aisheng,
-> > 
-> > On Wed, Dec 19, 2018 at 1:29 PM Aisheng Dong <aisheng.dong@nxp.com>
-> > wrote:
-> > >
-> > > SCU clock can be used in a similar way by IMX8QXP and IMX8QM SoCs.
-> > > Let's make the name of clock ID generic to allow other SoCs to reuse
-> > > the common part.
-> > >
-> > > This patch only changes the clock id name and file name, so no
-> > > functional change.
-> > >
-> > > Cc: Shawn Guo <shawnguo@kernel.org>
-> > > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > > Cc: Stephen Boyd <sboyd@kernel.org>
-> > > Cc: Michael Turquette <mturquette@baylibre.com>
-> > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > > ---
-> > >  drivers/clk/imx/clk-imx8qxp-lpcg.c        | 146 +++++++--------
-> > >  drivers/clk/imx/clk-imx8qxp.c             | 152 ++++++++--------
-> > >  include/dt-bindings/clock/imx8-clock.h    | 289
-> > ++++++++++++++++++++++++++++++
-> > >  include/dt-bindings/clock/imx8qxp-clock.h | 289
-> > > ------------------------------
-> > >  4 files changed, 438 insertions(+), 438 deletions(-)
-> > 
-> > This seems like unneeded churn. Just keep the existing naming and other SoCs
-> > can reuse it without problem.
+On Sun,  9 Dec 2018 14:53:56 +0100, cezary.gapinski@gmail.com wrote:
+> From: Cezary Gapinski <cezary.gapinski@gmail.com>
 > 
-> There's a reason.
-> We still need add some clock IDs which exist on MX8QM only (probably more on future SoCs)
-> Having them prefixed with 'IMX8QXP' may look strange.
+> Add description that STM32F4 can be used in compatible property.
+> Master Inter-Data Idleness optional property cannot be used in STM32F4.
 > 
-> Besides that, as those clock IDs will also be used in devicetree, make the name generic for
-> different SoCs seems still better and less confusing.
+> Signed-off-by: Cezary Gapinski <cezary.gapinski@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/spi/spi-stm32.txt | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
 > 
 
-This looks like an integration problem. Is anyone using the defines that
-are merged through clk tree now? A grep of linux-next says no, but how
-can I be sure?
-
-So can you leave around the header file with the deprecated define names
-and introduce another one that's a copy of the header file but with the
-non-SoC specific names?  Then you can wait for a release cycle and
-delete the old header file that nobody should be using in DT anymore.
-Unless you plan to make sure that nobody uses the deprecated defines
-somehow?
-
-And please Cc DT mailing list and maintainers one all bindings patches.
-This includes include/dt-bindings/.
-
+Reviewed-by: Rob Herring <robh@kernel.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
