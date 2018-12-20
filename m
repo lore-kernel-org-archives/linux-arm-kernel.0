@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0BAFFC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 16:33:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 65298C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 16:37:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B7DB021773
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 16:33:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2F3B121773
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 16:37:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eBF6zhKp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B7DB021773
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dHJ8tkQ+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2F3B121773
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,52 +24,49 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hQGNU7NsfX+mYy+hKSFewKNAd77BRlPaKJTKtTTN2cM=; b=eBF6zhKpC4t4RT
-	KoBHAVscmvS+eTgG7OXpKbc7FFfMyk5y7SbWyz37KDjgwJ03WjbJVWf2KwHhzL7jO9OhBSZMTFzl6
-	+OOot9SVcZpXECKCTVxqvsvm4fV2Daoflk91uTw6bpW73XfIvBMydzn24u1uRdCFKnya/HZIXpMVA
-	qDisohij9RBI63HR8SmU/HGFBujb9AL0kfg2vgcdCr9oJ3ameZqpH0hyWUblJMecRQw7bU9/Lu5fr
-	RCc+mp0dVT0fq3vmHe/ARbq04qJr6WkcZ1ufoHK6Y2qIgL4AoI1pzaQRBF6WJuo/D062cRhFLRDEy
-	3NJh7iXcS0GtUczH8qVA==;
+	List-Owner; bh=L/RfzxYf972PErRDhTQiiqGmUCJP95yuNtUwe1gZzIs=; b=dHJ8tkQ+cf2xX7
+	0Bap5E0yt6h5M6+KauKpUDJChJsJE2BeC/5zPn+bvhu53UwSTrpbo40IfCmqTkCnaLwDbQMKepP54
+	A1K4vXQHE1HTJbgPUMoXhLTn6c+Zy00q8n0tbOFKrVdyj6yDb6POovuNd2t33V4u8UNT31Ovwppgn
+	kaGhdUIis1qHTJ2aUqgY8TXAdUefVW6z397kYMot3rM9Tuvv0h4BJ9iJBe4L1ICHbrcTwN8sl0HZP
+	oI2JMlf/dJ+fNj0JmBFhX/xJVpWLvNDnLtI5I0vYoudUgX/epBO0wtvKf6oegCm4jsh93UWP9Eaw3
+	qCw+urhcIZ7/mOn+JsAA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ga1GG-0006hR-Qt; Thu, 20 Dec 2018 16:33:24 +0000
-Received: from mail-qk1-f193.google.com ([209.85.222.193])
+	id 1ga1Jo-0000Jo-4h; Thu, 20 Dec 2018 16:37:04 +0000
+Received: from mail-qk1-f195.google.com ([209.85.222.195])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ga1GD-0006eh-64; Thu, 20 Dec 2018 16:33:22 +0000
-Received: by mail-qk1-f193.google.com with SMTP id n12so1334696qkh.11;
- Thu, 20 Dec 2018 08:33:10 -0800 (PST)
+ id 1ga1Jl-0000Ig-MG
+ for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 16:37:02 +0000
+Received: by mail-qk1-f195.google.com with SMTP id o125so1356566qkf.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 20 Dec 2018 08:36:51 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=V6Ic7Z+ngRTDyQ6H5HIiPmOMadMWGa69OQrX5EZVtow=;
- b=ejr54KcbOxx++vcrSDeHWqJg/FgouYhAHzC1O6sJiaTS7zNIo/tgYc3aQ9EiZzngBf
- 4+mwEc2g4hWnmR9QrqUfLWTHq0XRs6eYp3vNkI2EtNtAGgTx2q679Fy0yp9DRCBxzelB
- 47oUjR4on+LBE1LwpuOBJDc4IFEglpTymjtHxNyacU5pCWXEhvppen2b1JLAEhNMA6BM
- A6uPpwZv2r/zKijp1uJGGRShOYGT495T3JxHVcHOdiqXM9Ft5WIJDzK5PLHE46O0+q11
- MezjYodt1TpxMtcyarvbkvJfv6IXP5/lELbqVrPm7lKDKCnQCDcbOyBjwHGJDrpLpS7q
- 81vg==
-X-Gm-Message-State: AA+aEWbA6M6PgP17U+2DZeBNVFRchtgvy/L6oj6saTU9UtZ8HyWPm82l
- KaRTUY5mtuLaakj/0OJLcpWeHaO06O2thvOW0bM=
-X-Google-Smtp-Source: AFSGD/XUJrTtOMLVyN5Y+bkHUNpb1AKSctnSCnglyp+v8O6pqZf31x9HVgbj7BotlF1ZVq0lE8bHQR/X4h1qRcnlqAc=
-X-Received: by 2002:ae9:d8c2:: with SMTP id
- u185mr24053922qkf.107.1545323589901; 
- Thu, 20 Dec 2018 08:33:09 -0800 (PST)
+ bh=hhWZ40mjnDjSNil82Gh7Oaa45EcoXgQnyH4Tvgg+uzI=;
+ b=KX4xASvFJb1SYqvNE+2fK2GGIhh3U/NfZR2fUkKDOdbzAvpEfBmYhYSKfzN80e4By9
+ Xv57C64ZH5nPyEhOVcoaP3WCW6yhvTWFZ3GK9dTUxYjnqQRLtDoEtkcDo7uQVTzljqTK
+ +hlsbh7Glpl2Nm4npQB6bVsg0ms0OWZClnEHfJQ6TXsDYSYg/2NA8mQ9TotEQgf3rUdG
+ H5QujF4uoVVPfANiH5fxi7H4FtxqL7plAHxiuhXY1uayk69DJwsCluOxk2dwk4Przvmw
+ uyZZlzdw09LiX4umJ5trPSywfoQHCLlONDxCJ4AM6gYejRW8uL5yJ9TmD3W6clryqzey
+ lrsA==
+X-Gm-Message-State: AA+aEWaWwlz5Km4GsqgQGC1OrHX6GThnxb7djyVnwpJ/osBAvQqPTWiL
+ e78tL76VeaPvH4cuYJxEneq+Fe21t4tMZsB1spU=
+X-Google-Smtp-Source: AFSGD/VU5Gjyelqh1kUFpYNWv3fG6G/JX+Wq39OG/9/r4dJdwQqJ+kvpT0XL0qK5bpU0bq4cJ8FJL81xbE/RAh9Y34U=
+X-Received: by 2002:ae9:e102:: with SMTP id g2mr23823298qkm.343.1545323810748; 
+ Thu, 20 Dec 2018 08:36:50 -0800 (PST)
 MIME-Version: 1.0
-References: <20181216084854.GJ13243@dragon>
- <CAK8P3a34R+Gv+H8_jjGP452i2kSqq+u0PsE-4pDnRRtY14SG0w@mail.gmail.com>
- <a73f86ff-15ce-9512-bbf0-be852cf39a35@kontron.de>
- <CAK8P3a1PMoR-WWcb_G8sTVW9HKUKvKfUZmcinkOEy9mJ5c=Lxw@mail.gmail.com>
- <6dde2248-da0d-7bd3-801b-b42b2974c038@kontron.de>
-In-Reply-To: <6dde2248-da0d-7bd3-801b-b42b2974c038@kontron.de>
+References: <cover.1544705534.git.horms+renesas@verge.net.au>
+In-Reply-To: <cover.1544705534.git.horms+renesas@verge.net.au>
 From: Arnd Bergmann <arnd@arndb.de>
-Date: Thu, 20 Dec 2018 17:32:52 +0100
-Message-ID: <CAK8P3a0WCOcVjSegBKRPw3kkokE8S4JEXManqBkq4CjfcBRSMg@mail.gmail.com>
-Subject: Re: [GIT PULL] FSL QSPI device tree cleanup for 4.21
-To: frieder.schrempf@kontron.de
+Date: Thu, 20 Dec 2018 17:36:33 +0100
+Message-ID: <CAK8P3a3b=H88epScZ14Rk-Q9kni_OmueOtohUo7L7N_+P8uYpg@mail.gmail.com>
+Subject: Re: [GIT PULL] Second Round of Renesas ARM Based SoC Fixes for v4.20
+To: Simon Horman <horms+renesas@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_083321_222577_75595BA7 
-X-CRM114-Status: GOOD (  19.93  )
+X-CRM114-CacheID: sfid-20181220_083701_721367_3C57D3FE 
+X-CRM114-Status: GOOD (  10.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,75 +78,27 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-spi <linux-spi@vger.kernel.org>, arm-soc <arm@kernel.org>,
- linux-mtd <linux-mtd@lists.infradead.org>, linux-imx@nxp.com,
- Sascha Hauer <kernel@pengutronix.de>, Fabio Estevam <fabio.estevam@nxp.com>,
- Shawn Guo <shawnguo@kernel.org>,
+Cc: Kevin Hilman <khilman@kernel.org>, Magnus Damm <magnus.damm@gmail.com>,
+ Linux-Renesas <linux-renesas-soc@vger.kernel.org>, arm-soc <arm@kernel.org>,
+ Olof Johansson <olof@lixom.net>,
  Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Dec 20, 2018 at 5:23 PM Schrempf Frieder
-<frieder.schrempf@kontron.de> wrote:
+On Fri, Dec 14, 2018 at 12:57 PM Simon Horman
+<horms+renesas@verge.net.au> wrote:
 >
-> On 20.12.18 17:11, Arnd Bergmann wrote:
-> > On Thu, Dec 20, 2018 at 5:03 PM Schrempf Frieder
-> > <frieder.schrempf@kontron.de> wrote:
-> >>
-> >> Hi Arnd,
-> >>
-> >> On 20.12.18 16:50, Arnd Bergmann wrote:
-> >>> On Sun, Dec 16, 2018 at 9:50 AM Shawn Guo <shawnguo@kernel.org> wrote:
-> >>>>
-> >>>> Hi,
-> >>>>
-> >>>> As the series cleans up both i.MX/Freescale arm32 and arm64 device
-> >>>> trees, the pull request is based on a merge of tag imx-dt-4.21 and
-> >>>> imx-dt64-4.21 that have already been pulled into arm-soc next/dt branch.
-> >>>> This comes a bit late, and we appreciate it if you can pull it for 4.21,
-> >>>> as it paves the way for new QSPI driver under SPI framework to land in
-> >>>> the next release cycle.  Thanks.
-> >>>
-> >>> Pulled into next/dt. For my understanding, what is going to happen
-> >>> with the fsl-quadspi mtd driver? Will it remain as part of the kernel
-> >>> to support old DTB files, or will that transitions mean those stop
-> >>> working with new kernels and have to be updated the same way?
-> >>
-> >> Thanks for pulling these late changes. The old SPI NOR driver
-> >> (fsl-quadspi.c) will be replaced by the new SPI driver. Old dtb files
-> >> will work with the new driver if they already have the reg properties
-> >> set up correctly (which should be the case, but who knows what setups
-> >> exist out-of-tree).
-> >
-> > Ok, good.
-> >
-> >> There will be a performance penalty though if you do not set
-> >> spi-[tx/rx]-bus-width to 4.
-> >
-> > I guess that's acceptable, but what is the reason for requiring
-> > this? Would it be possible to have the qspi driver add those
-> > properties and print a warning whenever the dtb doesn't
-> > already contain them?
+> Hi Olof, Hi Kevin, Hi Arnd,
 >
-> As the new driver is a SPI driver, the common rules in
-> Documentation/devicetree/bindings/spi/spi-bus.txt apply and
-> spi-[tx/rx]-bus-width are defined to default to 1 if not specified.
-> So we can't set those properties in the driver if they are missing in
-> the dtb as we would deviate from the standard, although it would make
-> more sense for a *Quad*-SPI driver to default to 4.
+> Please consider these second round of Renesas ARM based SoC fixes for v4.20.
+>
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-fixes-for-v4.20,
+> which you have already accepted.
 
-Right, I guess that makes sense.
-
-Now, you could change the binding for the fsl-quadspi driver to
-require the bus-width properties, which would then just make
-the old dtb files invalid, and you give us an excuse to override
-the properties by adding the =4 ones, once that is documented
-in the driver specific binding.
-
-Since it's only a performance difference, I suppose we can live
-with the limitation and stay a little closer to the normal binding.
+Pulled into fixes, thanks!
 
      Arnd
 
