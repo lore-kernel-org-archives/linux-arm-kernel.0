@@ -2,90 +2,146 @@ Return-Path: <SRS0=AHqO=O5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FROM,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 39FE9C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 17:58:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 88BD6C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 18:06:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0AD17218D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 17:58:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5B074218E0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 18:06:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TVRp1eR0";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="dUiEucCX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0AD17218D9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="baTlZd/8";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.com header.i=@fb.com header.b="OkvkbBPa";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.onmicrosoft.com header.i=@fb.onmicrosoft.com header.b="eMKeqwVo"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5B074218E0
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=fb.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=jl4g+RWCPLIH6G30k/uvOZ7gWZDvNjTxPUO+B0bNyS0=; b=TVRp1eR04YSYWzGTvbOWLIRCq
-	ockK+dQrJJgyGR09btNyvTbpXaBtlh9ppnlpXlyvGZxRrJ7WkkFkDzSRqMoAWDfrVPXSfcW3gyh3A
-	JDocUnRzXrTSmsZFaXIRg7zr9zHUGpbXhBzK+zmEusFQRjHcY3+uN3H6mXxKkluY8Ms48DkX+p/0b
-	y/lVKmn803VGyF24DCKkguMQOR8dMDxg6O7mZoYqMhdEBvLAhWqWFRO0R6U6hNvZFmB6/7jqF1stO
-	iWQaNlOZwaJeOPsosmF4eDW236G0qotd8FcRGhd/C73EP7CjnYHKLmwBfAI16Fk2sd5E5IZItnYb7
-	ZvOKCmJ3A==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=L4EA0Z7y4+v5IKYf8ghKkz1cqIYtQ8Z3XlYqayg6S/k=; b=baTlZd/88RWHds
+	9TVqIPO+Mui3N7XQdVfKpQvcuJ2ly+8bPg7eUqxKPtZs3dh8GJD+Csky6GkFDumTb/4er39tB5MIr
+	dYZgxuJG87K0W3CgUk66crZa7FwG+BCv5BabNVca7EFrGEsbGGfaCsaTqAD1mPVzSoN4DP0OH7iE4
+	oX/cHAJWhkXklkXNraf0fbmA+E88Tr7DI34MS2lX152kCX8HKjocvB6C0Zzusdmnht0MHZ1THTtqe
+	n3DLHpsttreyg0f5FWTtJKF6BEpXRmFMQUxFYp4fE2aizuzkVBPcr8Qaz7/rbB43xIuTbKZvOo2r8
+	GxO1lfwLxoc9qpxn7OGA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ga2aF-0005sP-FX; Thu, 20 Dec 2018 17:58:07 +0000
-Received: from mail-ed1-x542.google.com ([2a00:1450:4864:20::542])
+	id 1ga2iI-0000u2-D5; Thu, 20 Dec 2018 18:06:26 +0000
+Received: from mx0b-00082601.pphosted.com ([67.231.153.30]
+ helo=mx0a-00082601.pphosted.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ga2aC-0005gt-9o
- for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 17:58:05 +0000
-Received: by mail-ed1-x542.google.com with SMTP id h50so2496631ede.5
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 20 Dec 2018 09:57:53 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=fTXnL4w7SphguGIdxnyMHivvmZhE6EALEGuSn5Oz+Zo=;
- b=dUiEucCX35iC+62dRJ2DmDvRxYVB/oeg69HHeXPOcN11NsP4KKm2V8I2pmUz1DWt5t
- AeBgAkF0hEFXNZ+I4w4mPRLaM0os9J6eCNzvhkwL/2zIVVhQxNR00upGFDHWTp49q6bk
- 9JieHwOZwR7CoOE4234tufN7iNFf6ofcj8w09NW0qcl/JVrdzNZBEkEtL6eMG//aey0g
- tAlaU+1OKkqV5r23qI9i27mwCd//ENMBAWOSY/kb7h0K69LhG9au6L3hsIexDu2QLb/2
- QIBmNHPeCst3HqbOb6hqECvbz0OZyVL7HX+mtOo7w3HFZpVnn92QPEyOvbFFJhBdheks
- d+6g==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=fTXnL4w7SphguGIdxnyMHivvmZhE6EALEGuSn5Oz+Zo=;
- b=tTqrzXQLahe/jSN2BiFCYDQfT8JAtofeh03Hd6G6/Ie4MltHWAwpM0lNr6E5L6wKUE
- OXg2ZakPInIAkpeWF4QEeH8ZsR2JiYDNHtbgXr4HqkqHPhBT83Jea0Gbvytlpba+vRTd
- PfzeBNuGc4LbEhUkEGiQnfP8IlRjlybQsM96gHf25TAifKC3J9YcgJxG6lHhhJON8MB/
- EynQkUU4NwZGYosa8tpT021I9ERj3abIgBdN4NwHMievgZQT+mUgXeeIXInccrnLQwyg
- vkQaVUrIBz0+xZtM388nKIMgexw9qb4JLG54/xBaNzzUEw7ysXGwXiQulSecB8189Qj1
- M9pA==
-X-Gm-Message-State: AA+aEWaH2KgXzS5+WAuD7qVVlMD+2kzH4YL4jniWzbx+qAmPovqUHY4B
- HR3B4D/E0kXYVnUbhqM9oqLftnht
-X-Google-Smtp-Source: AFSGD/VT6nzno0bxmV8Xv+voM79d+6FDwlEfCpKASrMzSFAgF3BgfgPoSd20jitgWwl25WmglRqTmg==
-X-Received: by 2002:a17:906:7d0:: with SMTP id
- m16-v6mr20472522ejc.32.1545328672428; 
- Thu, 20 Dec 2018 09:57:52 -0800 (PST)
-Received: from localhost (pD9E51040.dip0.t-ipconnect.de. [217.229.16.64])
- by smtp.gmail.com with ESMTPSA id t18-v6sm3278237ejz.9.2018.12.20.09.57.51
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 20 Dec 2018 09:57:51 -0800 (PST)
-Date: Thu, 20 Dec 2018 18:57:50 +0100
-From: Thierry Reding <thierry.reding@gmail.com>
-To: Hao Zhang <hao5781286@gmail.com>
-Subject: Re: [PATCH v3 6/6] ARM: PWM: add allwinner sun8i R40/T3/V40 PWM
- support.
-Message-ID: <20181220175750.GG9408@ulmo>
-References: <20181125162319.GA5422@arx-s1>
+ id 1ga2iE-0000sz-AL
+ for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 18:06:23 +0000
+Received: from pps.filterd (m0089730.ppops.net [127.0.0.1])
+ by m0089730.ppops.net (8.16.0.27/8.16.0.27) with SMTP id wBKHsMmS002204;
+ Thu, 20 Dec 2018 10:06:01 -0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fb.com;
+ h=from : to : cc : subject
+ : date : message-id : references : in-reply-to : content-type : content-id
+ : content-transfer-encoding : mime-version; s=facebook;
+ bh=dVSRtrZVNsfLNnCVNL6bgUEgLQwhZIkAPE5lLG5a9ZY=;
+ b=OkvkbBPaqgJd4VpYuQEX8TVJcZyut3hdcr76z+yL9MNUrstf9dGnGATBavlVaQinCAJq
+ MCKkc21APwZu1ssdlLWb1sHg4s7OltMQEtbgvshX1OfaWsyQYB8xAUOfZbVzngI5aNnJ
+ /OKp2AgZ0Qvq+4h9tYQbH9LDyAmHEcTsw0U= 
+Received: from maileast.thefacebook.com ([199.201.65.23])
+ by m0089730.ppops.net with ESMTP id 2pgevq09nc-3
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-SHA384 bits=256 verify=NOT);
+ Thu, 20 Dec 2018 10:05:59 -0800
+Received: from frc-mbx03.TheFacebook.com (2620:10d:c0a1:f82::27) by
+ frc-hub01.TheFacebook.com (2620:10d:c021:18::171) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id
+ 15.1.1531.3; Thu, 20 Dec 2018 10:05:43 -0800
+Received: from frc-hub05.TheFacebook.com (2620:10d:c021:18::175) by
+ frc-mbx03.TheFacebook.com (2620:10d:c0a1:f82::27) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id
+ 15.1.1531.3; Thu, 20 Dec 2018 10:05:43 -0800
+Received: from NAM04-BN3-obe.outbound.protection.outlook.com (192.168.183.28)
+ by o365-in.thefacebook.com (192.168.177.75) with Microsoft SMTP
+ Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.1.1531.3
+ via Frontend Transport; Thu, 20 Dec 2018 10:05:43 -0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fb.onmicrosoft.com;
+ s=selector1-fb-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=dVSRtrZVNsfLNnCVNL6bgUEgLQwhZIkAPE5lLG5a9ZY=;
+ b=eMKeqwVoEbPM5ocUV2UFH20CJ153h96aYy3iPQTktCRyuf4XNzzTBdkR6dyooyA4/SJQ+uB3vZDuj9Od7MnNFP0NuWPVKppENuszWpfuIOohqzeqRB5Tfc6DbxxJsYFWjo5IEFhSHu8LBmUWatWWJ6xBQWY7TQeRgTeiPQMl+70=
+Received: from CY4PR15MB1269.namprd15.prod.outlook.com (10.172.180.139) by
+ CY4PR15MB1173.namprd15.prod.outlook.com (10.172.177.7) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1425.22; Thu, 20 Dec 2018 18:05:42 +0000
+Received: from CY4PR15MB1269.namprd15.prod.outlook.com
+ ([fe80::1bd:fa86:857:9b04]) by CY4PR15MB1269.namprd15.prod.outlook.com
+ ([fe80::1bd:fa86:857:9b04%10]) with mapi id 15.20.1446.018; Thu, 20 Dec 2018
+ 18:05:41 +0000
+From: Vijay Khemka <vijaykhemka@fb.com>
+To: Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
+ Joel Stanley <joel@jms.id.au>, Andrew Jeffery <andrew@aj.id.au>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "linux-aspeed@lists.ozlabs.org"
+ <linux-aspeed@lists.ozlabs.org>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>
+Subject: Re: [PATCH v2 4/4] ARM: dts: aspeed: Add lpc ctrl for Facebook
+Thread-Topic: [PATCH v2 4/4] ARM: dts: aspeed: Add lpc ctrl for Facebook
+Thread-Index: AQHUlkO6p1obtPptykC2AH1z2EHxEqWHapcA
+Date: Thu, 20 Dec 2018 18:05:41 +0000
+Message-ID: <F23E6426-F6FE-4F10-A88A-D5862D5407B4@fb.com>
+References: <20181217200405.2904551-1-vijaykhemka@fb.com>
+ <20181217200405.2904551-4-vijaykhemka@fb.com>
+In-Reply-To: <20181217200405.2904551-4-vijaykhemka@fb.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-originating-ip: [2620:10d:c090:200::7:c50e]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; CY4PR15MB1173;
+ 20:5ENWW2OF6DQYDGKuQdYS5G6kC36ANYrHYjaGI97ZR7tqOryB+1A9YOIf2O/XOQcsdyIFHFjktPATlmv1Nq8wnIsx5RW6JCdd8ElFA6ItGsRo8uUv4rLF93GqOeT3VUkM+zoErQb93niuw0MYC7mzaLALciOblcbgDJoXvZu/42U=
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: 863b8bdb-a1f1-4541-d479-08d666a5c167
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(2017052603328)(7153060)(7193020);
+ SRVR:CY4PR15MB1173; 
+x-ms-traffictypediagnostic: CY4PR15MB1173:
+x-microsoft-antispam-prvs: <CY4PR15MB11732DEE07257EB376CF29EADDBF0@CY4PR15MB1173.namprd15.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(3230021)(999002)(11241501185)(5005026)(6040522)(2401047)(8121501046)(3002001)(10201501046)(93006095)(93001095)(3231475)(944501520)(52105112)(149066)(150057)(6041310)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(20161123560045)(20161123562045)(20161123564045)(201708071742011)(7699051)(76991095);
+ SRVR:CY4PR15MB1173; BCL:0; PCL:0; RULEID:; SRVR:CY4PR15MB1173; 
+x-forefront-prvs: 0892FA9A88
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10019020)(366004)(376002)(396003)(136003)(346002)(39860400002)(47680400002)(189003)(199004)(43544003)(81166006)(81156014)(8676002)(2201001)(97736004)(102836004)(6506007)(186003)(305945005)(33656002)(76176011)(476003)(7736002)(86362001)(14454004)(105586002)(256004)(68736007)(6116002)(106356001)(486006)(2501003)(8936002)(71200400001)(71190400001)(99286004)(83716004)(478600001)(36756003)(11346002)(6246003)(316002)(6486002)(110136005)(53936002)(6512007)(2616005)(446003)(82746002)(25786009)(5660300001)(4326008)(2906002)(6436002)(46003)(229853002);
+ DIR:OUT; SFP:1102; SCL:1; SRVR:CY4PR15MB1173;
+ H:CY4PR15MB1269.namprd15.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: fb.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: yHgkjH9+I78MxDvnI645o3aKDhnp3dhNF0ixuBpp/Z9phO3YXLes7DKpihjTKfRAA0NjMkx7ErNiCRMgElaGFHRe07TZbqU9pKfKn3SsO0LPrZOstwt+y8SXZVjFN+Vt6iVAUKOgvegqpI1b/vQ4vCJLu/zq9+Riitcts1Kd7zwzI0oKut0TFBT2g3yHjzK44/UASNFi+z13/2naxZ4YcWP1wco22asgQt2lbvyJc4FHZNIbY3VVz9LkerBXSHVePeShx2nrXavgxjV3ZegsZj5szaocuhi+30PUQDkdU53+zoIcgdkT9chMTkwpIwHJ
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+Content-ID: <1E63902F63E2064EB2DB2D7E516CF5C1@namprd15.prod.outlook.com>
 MIME-Version: 1.0
-In-Reply-To: <20181125162319.GA5422@arx-s1>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 863b8bdb-a1f1-4541-d479-08d666a5c167
+X-MS-Exchange-CrossTenant-originalarrivaltime: 20 Dec 2018 18:05:41.8817 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 8ae927fe-1255-47a7-a2af-5f3a069daaa2
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: CY4PR15MB1173
+X-OriginatorOrg: fb.com
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2018-12-20_09:, , signatures=0
+X-Proofpoint-Spam-Reason: safe
+X-FB-Internal: Safe
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_095804_348356_B633C9EF 
-X-CRM114-Status: GOOD (  29.13  )
+X-CRM114-CacheID: sfid-20181220_100622_477875_3FA09E78 
+X-CRM114-Status: GOOD (  17.65  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,396 +153,37 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
- linux-gpio@vger.kernel.org, maxime.ripard@bootlin.com, mturquette@baylibre.com,
- linux-sunxi@googlegroups.com, linux-kernel@vger.kernel.org,
- linux-pwm@vger.kernel.org, sboyd@kernel.org, wens@csie.org, robh+dt@kernel.org,
- linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============8247135743682086360=="
+Cc: "openbmc @ lists . ozlabs . org" <openbmc@lists.ozlabs.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
---===============8247135743682086360==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="oXNgvKVxGWJ0RPMJ"
-Content-Disposition: inline
-
-
---oXNgvKVxGWJ0RPMJ
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Mon, Nov 26, 2018 at 12:23:19AM +0800, Hao Zhang wrote:
-> The sun8i R40/T3/V40 PWM has 8 PWM channals and divides to 4 PWM pairs,
-> each PWM pair built-in 1 clock module, 2 timer logic module and 1
-> programmable dead-time generator, it also support waveform capture.
-> It has 2 clock sources OSC24M and APB1, it is different with the
-> sun4i-pwm driver, Therefore add a new driver for it.
->=20
-> Signed-off-by: Hao Zhang <hao5781286@gmail.com>
-> ---
->  drivers/pwm/Kconfig     |  12 +-
->  drivers/pwm/Makefile    |   1 +
->  drivers/pwm/pwm-sun8i.c | 418 ++++++++++++++++++++++++++++++++++++++++++=
-++++++
->  3 files changed, 430 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/pwm/pwm-sun8i.c
->=20
-> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-> index 504d252..6105ac8 100644
-> --- a/drivers/pwm/Kconfig
-> +++ b/drivers/pwm/Kconfig
-> @@ -426,7 +426,7 @@ config PWM_STMPE
->  	  expanders.
-> =20
->  config PWM_SUN4I
-> -	tristate "Allwinner PWM support"
-> +	tristate "Allwinner SUN4I PWM support"
->  	depends on ARCH_SUNXI || COMPILE_TEST
->  	depends on HAS_IOMEM && COMMON_CLK
->  	help
-> @@ -435,6 +435,16 @@ config PWM_SUN4I
->  	  To compile this driver as a module, choose M here: the module
->  	  will be called pwm-sun4i.
-> =20
-> +config PWM_SUN8I
-> +	tristate "Allwinner SUN8I (R40/V40/T3) PWM support"
-> +	depends on ARCH_SUNXI || COMPILE_TEST
-> +	depends on HAS_IOMEM && COMMON_CLK
-> +	help
-> +	  Generic PWM framework driver for Allwinner R40/V40/T3 SoCs.
-> +
-> +	  To compile this driver as a module, choose M here: the module
-> +	  will be called pwm-sun8i.
-> +
->  config PWM_TEGRA
->  	tristate "NVIDIA Tegra PWM support"
->  	depends on ARCH_TEGRA
-> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-> index 9c676a0..32c8d2d 100644
-> --- a/drivers/pwm/Makefile
-> +++ b/drivers/pwm/Makefile
-> @@ -43,6 +43,7 @@ obj-$(CONFIG_PWM_STM32)		+=3D pwm-stm32.o
->  obj-$(CONFIG_PWM_STM32_LP)	+=3D pwm-stm32-lp.o
->  obj-$(CONFIG_PWM_STMPE)		+=3D pwm-stmpe.o
->  obj-$(CONFIG_PWM_SUN4I)		+=3D pwm-sun4i.o
-> +obj-$(CONFIG_PWM_SUN8I)		+=3D pwm-sun8i.o
->  obj-$(CONFIG_PWM_TEGRA)		+=3D pwm-tegra.o
->  obj-$(CONFIG_PWM_TIECAP)	+=3D pwm-tiecap.o
->  obj-$(CONFIG_PWM_TIEHRPWM)	+=3D pwm-tiehrpwm.o
-> diff --git a/drivers/pwm/pwm-sun8i.c b/drivers/pwm/pwm-sun8i.c
-> new file mode 100644
-> index 0000000..d8597e4
-> --- /dev/null
-> +++ b/drivers/pwm/pwm-sun8i.c
-> @@ -0,0 +1,418 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +// Copyright (C) 2018 Hao Zhang <hao5781286@gmail.com>
-> +
-> +#include <linux/bitops.h>
-> +#include <linux/clk.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/delay.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/pwm.h>
-> +#include <linux/slab.h>
-> +#include <linux/spinlock.h>
-> +#include <linux/time.h>
-> +#include <linux/regmap.h>
-> +
-> +#define PWM_IRQ_ENABLE_REG	0x0000
-> +#define PCIE(ch)		BIT(ch)
-> +
-> +#define PWM_IRQ_STATUS_REG	0x0004
-> +#define PIS(ch)			BIT(ch)
-> +
-> +#define CAPTURE_IRQ_ENABLE_REG	0x0010
-> +#define CRIE(ch)		BIT((ch) * 2)
-> +#define CFIE(ch)		BIT((ch) * 2 + 1)
-> +
-> +#define CAPTURE_IRQ_STATUS_REG	0x0014
-> +#define CRIS(ch)		BIT((ch) * 2)
-> +#define CFIS(ch)		BIT((ch) * 2 + 1)
-> +
-> +#define CLK_CFG_REG(ch)		(0x0020 + ((ch) >> 1) * 4)
-> +#define CLK_SRC_SEL		GENMASK(8, 7)
-> +#define CLK_SRC_BYPASS_SEC	BIT(6)
-> +#define CLK_SRC_BYPASS_FIR	BIT(5)
-> +#define CLK_GATING		BIT(4)
-> +#define CLK_DIV_M		GENMASK(3, 0)
-> +
-> +#define PWM_DZ_CTR_REG(ch)	(0x0030 + ((ch) >> 1) * 4)
-> +#define PWM_DZ_INTV		GENMASK(15, 8)
-> +#define PWM_DZ_EN		BIT(0)
-> +
-> +#define PWM_ENABLE_REG		0x0040
-> +#define PWM_EN(ch)		BIT(ch)
-> +
-> +#define CAPTURE_ENABLE_REG	0x0044
-> +#define CAP_EN(ch)		BIT(ch)
-> +
-> +#define PWM_CTR_REG(ch)		(0x0060 + (ch) * 0x20)
-> +#define PWM_PERIOD_RDY		BIT(11)
-> +#define PWM_PUL_START		BIT(10)
-> +#define PWM_MODE		BIT(9)
-> +#define PWM_ACT_STA		BIT(8)
-> +#define PWM_PRESCAL_K		GENMASK(7, 0)
-> +
-> +#define PWM_PERIOD_REG(ch)	(0x0064 + (ch) * 0x20)
-> +#define PWM_ENTIRE_CYCLE	GENMASK(31, 16)
-> +#define PWM_ACT_CYCLE		GENMASK(15, 0)
-> +
-> +#define PWM_CNT_REG(ch)		(0x0068 + (ch) * 0x20)
-> +#define PWM_CNT_VAL		GENMASK(15, 0)
-> +
-> +#define CAPTURE_CTR_REG(ch)	(0x006c + (ch) * 0x20)
-> +#define CAPTURE_CRLF		BIT(2)
-> +#define CAPTURE_CFLF		BIT(1)
-> +#define CAPINV			BIT(0)
-> +
-> +#define CAPTURE_RISE_REG(ch)	(0x0070 + (ch) * 0x20)
-> +#define CAPTURE_CRLR		GENMASK(15, 0)
-> +
-> +#define CAPTURE_FALL_REG(ch)	(0x0074 + (ch) * 0x20)
-> +#define CAPTURE_CFLR		GENMASK(15, 0)
-> +
-> +struct sun8i_pwm_chip {
-> +	struct pwm_chip chip;
-> +	struct clk *clk;
-> +	void __iomem *base;
-> +	const struct sun8i_pwm_data *data;
-> +	struct regmap *regmap;
-> +};
-> +
-> +static struct sun8i_pwm_chip *to_sun8i_pwm_chip(struct pwm_chip *chip)
-> +{
-> +	return container_of(chip, struct sun8i_pwm_chip, chip);
-> +}
-> +
-> +static u32 sun8i_pwm_read(struct sun8i_pwm_chip *sun8i_pwm,
-> +			  unsigned long offset)
-> +{
-> +	u32 val;
-> +
-> +	regmap_read(sun8i_pwm->regmap, offset, &val);
-> +	return val;
-> +}
-> +
-> +static void sun8i_pwm_set_bit(struct sun8i_pwm_chip *sun8i_pwm,
-> +			      unsigned long reg, u32 bit)
-> +{
-> +	regmap_update_bits(sun8i_pwm->regmap, reg, bit, bit);
-> +}
-> +
-> +static void sun8i_pwm_clear_bit(struct sun8i_pwm_chip *sun8i_pwm,
-> +				unsigned long reg, u32 bit)
-> +{
-> +	regmap_update_bits(sun8i_pwm->regmap, reg, bit, 0);
-> +}
-> +
-> +static void sun8i_pwm_set_value(struct sun8i_pwm_chip *sun8i_pwm,
-> +				unsigned long reg, u32 mask, u32 val)
-> +{
-> +	regmap_update_bits(sun8i_pwm->regmap, reg, mask, val);
-> +}
-> +
-> +static void sun8i_pwm_set_polarity(struct sun8i_pwm_chip *chip, u32 ch,
-> +				   enum pwm_polarity polarity)
-> +{
-> +	if (polarity =3D=3D PWM_POLARITY_NORMAL)
-> +		sun8i_pwm_set_bit(chip, PWM_CTR_REG(ch), PWM_ACT_STA);
-> +	else
-> +		sun8i_pwm_clear_bit(chip, PWM_CTR_REG(ch), PWM_ACT_STA);
-> +}
-> +
-> +static int sun8i_pwm_config(struct sun8i_pwm_chip *sun8i_pwm, u8 ch,
-> +			    struct pwm_state *state)
-> +{
-> +	u64 clk_rate, clk_div, val;
-> +	u16 prescaler =3D 0;
-> +	u16 div_id =3D 0;
-> +	struct clk *clk;
-> +	bool is_clk;
-> +	int ret;
-> +
-> +	clk_rate =3D clk_get_rate(sun8i_pwm->clk);
-> +
-> +	/* check period and select clock source */
-> +	val =3D state->period * clk_rate;
-> +	do_div(val, NSEC_PER_SEC);
-> +	is_clk =3D devm_clk_name_match(sun8i_pwm->clk, "mux-0");
-> +	if (val <=3D 1 && is_clk) {
-> +		clk =3D devm_clk_get(sun8i_pwm->chip.dev, "mux-1");
-> +		if (IS_ERR(clk)) {
-> +			dev_err(sun8i_pwm->chip.dev,
-> +				"Period expects a larger value\n");
-> +			return -EINVAL;
-> +		}
-
-You should never try to get resources at this point. You should have
-requested them already at ->probe() time. Otherwise, how are you going
-to handle failures here?
-
-> +
-> +		clk_rate =3D clk_get_rate(clk);
-> +		val =3D state->period * clk_rate;
-> +		do_div(val, NSEC_PER_SEC);
-> +		if (val <=3D 1) {
-> +			dev_err(sun8i_pwm->chip.dev,
-> +				"Period expects a larger value\n");
-> +			return -EINVAL;
-> +		}
-> +
-> +		/* change clock source to "mux-1" */
-> +		clk_disable_unprepare(sun8i_pwm->clk);
-> +		devm_clk_put(sun8i_pwm->chip.dev, sun8i_pwm->clk);
-> +		sun8i_pwm->clk =3D clk;
-> +
-> +		ret =3D clk_prepare_enable(sun8i_pwm->clk);
-> +		if (ret) {
-> +			dev_err(sun8i_pwm->chip.dev,
-> +				"Failed to enable PWM clock\n");
-> +			return ret;
-> +		}
-> +
-> +	} else {
-> +		dev_err(sun8i_pwm->chip.dev,
-> +			"Period expects a larger value\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	is_clk =3D devm_clk_name_match(sun8i_pwm->clk, "mux-0");
-> +	if (is_clk)
-> +		sun8i_pwm_set_value(sun8i_pwm, CLK_CFG_REG(ch),
-> +				    CLK_SRC_SEL, 0 << 7);
-> +	else
-> +		sun8i_pwm_set_value(sun8i_pwm, CLK_CFG_REG(ch),
-> +				    CLK_SRC_SEL, 1 << 7);
-> +
-> +	dev_info(sun8i_pwm->chip.dev, "clock source freq:%lldHz\n", clk_rate);
-> +
-> +	/* calculate and set prescaler, div table, PWM entire cycle */
-> +	clk_div =3D val;
-> +	while (clk_div > 65535) {
-> +		prescaler++;
-> +		clk_div =3D val;
-> +		do_div(clk_div, 1U << div_id);
-> +		do_div(clk_div, prescaler + 1);
-> +
-> +		if (prescaler =3D=3D 255) {
-> +			prescaler =3D 0;
-> +			div_id++;
-> +			if (div_id =3D=3D 9) {
-> +				dev_err(sun8i_pwm->chip.dev,
-> +					"unsupport period value\n");
-> +				return -EINVAL;
-> +			}
-> +		}
-> +	}
-> +
-> +	sun8i_pwm_set_value(sun8i_pwm, PWM_PERIOD_REG(ch),
-> +			    PWM_ENTIRE_CYCLE, clk_div << 16);
-> +	sun8i_pwm_set_value(sun8i_pwm, PWM_CTR_REG(ch),
-> +			    PWM_PRESCAL_K, prescaler << 0);
-> +	sun8i_pwm_set_value(sun8i_pwm, CLK_CFG_REG(ch),
-> +			    CLK_DIV_M, div_id << 0);
-> +
-> +	/* set duty cycle */
-> +	val =3D state->period;
-> +	do_div(val, clk_div);
-> +	clk_div =3D state->duty_cycle;
-> +	do_div(clk_div, val);
-> +	if (clk_div > 65535)
-> +		clk_div =3D 65535;
-> +
-> +	sun8i_pwm_set_value(sun8i_pwm, PWM_PERIOD_REG(ch),
-> +			    PWM_ACT_CYCLE, clk_div << 0);
-> +
-> +	return 0;
-> +}
-> +
-> +static int sun8i_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
-> +			   struct pwm_state *state)
-> +{
-> +	int ret;
-> +	struct sun8i_pwm_chip *sun8i_pwm =3D to_sun8i_pwm_chip(chip);
-> +	struct pwm_state cstate;
-> +
-> +	pwm_get_state(pwm, &cstate);
-> +	if (!cstate.enabled) {
-> +		ret =3D clk_prepare_enable(sun8i_pwm->clk);
-> +		if (ret) {
-> +			dev_err(chip->dev, "Failed to enable PWM clock\n");
-> +			return ret;
-> +		}
-> +	}
-> +
-> +	if ((cstate.period !=3D state->period) ||
-> +	    (cstate.duty_cycle !=3D state->duty_cycle)) {
-> +		ret =3D sun8i_pwm_config(sun8i_pwm, pwm->hwpwm, state);
-> +		if (ret) {
-> +			dev_err(chip->dev, "Failed to config PWM\n");
-> +			return ret;
-> +		}
-> +	}
-
-So this isn't really how atomic is supposed to work. The whole point of
-the single callback is to allow the driver to apply the changes in an
-atomic way, which means that either everything is applied or nothing is
-applied.
-
-That's not what you do here. In the above you can end up with an enabled
-clock but the settings not being applied. Similarly sun8i_pwm_config()
-can abort in a number of places, which would leave you with a half-
-configured PWM channel.
-
-Instead, what you should be doing is precompute everything and check
-that the configuration can be applied before touching any registers or
-enabling clocks. Once you've validate the new state, you need to write
-everything and there should be no more risk of failure.
-
-Thierry
-
---oXNgvKVxGWJ0RPMJ
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQIzBAABCAAdFiEEiOrDCAFJzPfAjcif3SOs138+s6EFAlwb2B4ACgkQ3SOs138+
-s6GmgRAAwvTyhaFa0jWmUftz+0FS5JTXADm9VusyhbSlmHV7UNkqkQuLnaT1WoGi
-gGW5ZMLA+wSPWrXqGsw1HuzLc57c1/eDQdxLmlqBz0Lwribn75+0kisEvV3CRCEL
-P9UiTgMualhTe0DGKZmcHJvV56sEhx7b2WQ81sOn5nZvCP/iFTURp5WSyk+phAyb
-ss9i5bjwuxC34wLC0wCVNvr2XlpdD7CTy0R/nap1Za2nf6Cm0TnzGGPIYki1/gM2
-fUtYT/zCvfGp+JG5+R2755XdomXzj0vmXD7Omv75eKzMb+HivolmLPJEfUiP8c+x
-SElT/F/jIkwvdBzyeQ/sA8ybh4N0DVapnUxBjrUBLOMlrNDlh+ApjUOOpwylQBXQ
-6JKmjoHoBg31lK9QEPxoIoNP0FdZBr6+lAaZeQNx95PeICxD21IvPtuLEp4ksbX7
-fJsOxbkBzbIMpKuxLM3vkl89/O9IhPbVoyvMASCPMmdwAIH+LSy3SvIFWbGQ0nXS
-gwjTzN4r1AWmdXIN+faT6khnNY64WoPd896AyJSQ5mQsl42IMKRi42kpfeN3/f8y
-x4d07WSTCRB4v+OehJEVP2WJNsbI3EvtClbngn66xSac7kGSbg4cpbW0NzkrFj+T
-dOG2p9wUMibPBXzS+V7JzTsDgR9JG2fzxG8PhEesaG/Bt32Hg0Y=
-=S1Wz
------END PGP SIGNATURE-----
-
---oXNgvKVxGWJ0RPMJ--
-
-
---===============8247135743682086360==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============8247135743682086360==--
-
+Sm9lbCwgQ2FuIHlvdSBwbGVhc2UgdGFrZSBjYXJlIG9mIHRoZXNlIHBhdGNoZXMgbWVyZ2UuDQoN
+Cu+7v09uIDEyLzE3LzE4LCAxMjowNCBQTSwgIlZpamF5IEtoZW1rYSIgPHZpamF5a2hlbWthQGZi
+LmNvbT4gd3JvdGU6DQoNCiAgICBBZGRlZCBscGMgY3RybCBkZXZpY2UgdG8gZW5hYmxlIExQQyBj
+bG9jayBpbiBGYWNlYm9vaw0KICAgIFRpb2dhcGFzcyBkZXZpY2UgdHJlZS4NCiAgICANCiAgICBT
+aWduZWQtb2ZmLWJ5OiBWaWpheSBLaGVta2EgPHZpamF5a2hlbWthQGZiLmNvbT4NCiAgICAtLS0N
+CiAgICAgLi4uL2Jvb3QvZHRzL2FzcGVlZC1ibWMtZmFjZWJvb2stdGlvZ2FwYXNzLmR0cyAgfCAx
+NyArKysrKysrKysrKysrKysrKw0KICAgICAxIGZpbGUgY2hhbmdlZCwgMTcgaW5zZXJ0aW9ucygr
+KQ0KICAgIA0KICAgIGRpZmYgLS1naXQgYS9hcmNoL2FybS9ib290L2R0cy9hc3BlZWQtYm1jLWZh
+Y2Vib29rLXRpb2dhcGFzcy5kdHMgYi9hcmNoL2FybS9ib290L2R0cy9hc3BlZWQtYm1jLWZhY2Vi
+b29rLXRpb2dhcGFzcy5kdHMNCiAgICBpbmRleCA3M2U1OGE4MjE2MTMuLmVmNzg3NWI1NDU2MiAx
+MDA2NDQNCiAgICAtLS0gYS9hcmNoL2FybS9ib290L2R0cy9hc3BlZWQtYm1jLWZhY2Vib29rLXRp
+b2dhcGFzcy5kdHMNCiAgICArKysgYi9hcmNoL2FybS9ib290L2R0cy9hc3BlZWQtYm1jLWZhY2Vi
+b29rLXRpb2dhcGFzcy5kdHMNCiAgICBAQCAtMjIsNiArMjIsMTcgQEANCiAgICAgCQlyZWcgPSA8
+MHg4MDAwMDAwMCAweDIwMDAwMDAwPjsNCiAgICAgCX07DQogICAgIA0KICAgICsJcmVzZXJ2ZWQt
+bWVtb3J5IHsNCiAgICArCQkjYWRkcmVzcy1jZWxscyA9IDwxPjsNCiAgICArCQkjc2l6ZS1jZWxs
+cyA9IDwxPjsNCiAgICArCQlyYW5nZXM7DQogICAgKw0KICAgICsJCWZsYXNoX21lbW9yeTogcmVn
+aW9uQDk4MDAwMDAwIHsNCiAgICArCQkJbm8tbWFwOw0KICAgICsJCQlyZWcgPSA8MHg5ODAwMDAw
+MCAweDAwMDAxMDAwPjsgLyogNEsgKi8NCiAgICArCQl9Ow0KICAgICsJfTsNCiAgICArDQogICAg
+IAlpaW8taHdtb24gew0KICAgICAJCWNvbXBhdGlibGUgPSAiaWlvLWh3bW9uIjsNCiAgICAgCQlp
+by1jaGFubmVscyA9IDwmYWRjIDA+LCA8JmFkYyAxPiwgPCZhZGMgMj4sIDwmYWRjIDM+LA0KICAg
+IEBAIC01NCw2ICs2NSwxMiBAQA0KICAgICAJfTsNCiAgICAgfTsNCiAgICAgDQogICAgKyZscGNf
+Y3RybCB7DQogICAgKwlzdGF0dXMgPSAib2theSI7DQogICAgKwltZW1vcnktcmVnaW9uID0gPCZm
+bGFzaF9tZW1vcnk+Ow0KICAgICsJZmxhc2ggPSA8JnNwaTE+Ow0KICAgICt9Ow0KICAgICsNCiAg
+ICAgJnVhcnQxIHsNCiAgICAgCS8vIEhvc3QgQ29uc29sZQ0KICAgICAJc3RhdHVzID0gIm9rYXki
+Ow0KICAgIC0tIA0KICAgIDIuMTcuMQ0KICAgIA0KICAgIA0KDQpfX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlz
+dApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJh
+ZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
