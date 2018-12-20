@@ -2,85 +2,76 @@ Return-Path: <SRS0=AHqO=O5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=unavailable
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 67DC8C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 10:00:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DF596C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 10:11:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 35AD121741
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 10:00:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A72A12176F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 10:11:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A2dBqBHC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 35AD121741
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lEowdBaO";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="UzPq6eY4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A72A12176F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=avNTgqN3FljlZY31fakDloEh0g+alLPJ+TPhp8AqOy4=; b=A2dBqBHCgpxYmo+M0OlXA2FPe
-	GyMvq/2nZZF5szZkOvmn/XhbrJMTZD8qMDmCS65joxwcPZFUihtYSzrlcoTKIkRGgtmb8uUGoGXvU
-	rOBdT0xblB9WOE7HEP4CM3RzVAH1Tf6EFfh+iqQyWV/lgpCwsYKYQljqZDpXH6v/lCT/EtN8IwtJD
-	ErTm5Abss3nqTs9GCNt0gNka/YOSTuiOfvmx4ZZv6VGkzs+ndP1DxnylXybTBPRvPXhkGycK0iQ+e
-	v/uZXflh08HfR+JUIR54bI9cLvafBzevXZSP6AwtnzMQW1SkqERJZpoJXv84MLKX9fuMgS5/+2Rcn
-	8O4ZggRYg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=mXfEfxIlHWnO43cpiI9IzvfrpfiXd6TP+pwOcKF8Pwc=; b=lEowdBaOUrvDI0
+	1ktEn995Orr92Qgjc0j9/4XFBM5fBr5Sz0w06ksfS5l6fn6oLrIsD8/Rc/8ia7BcN6g/bQhBkKaMF
+	1GNoToNv+C0ANa4YbsFRPspKAYZkR9kbzu9PkKc588oo30Jc/VtV16Ze/E/p6Xuzyj5Hz0UWTSHpJ
+	XMAhStRV2lAt874JPhShoJZ8r0eZ65y0W+HB5HVbBkQubMVAbhuYEqZEWB6xq3wmSSxnzeZYz/VqC
+	MmWKjNbAoarmXn/s/KAl5FwIdRvOZOucov1DzK6n3Bkr9JFA21KZYboRepLNXOqIphwGoMlEWd2ep
+	cZ8TKfzF8dx/y4riYiXA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZv8M-0001iD-TB; Thu, 20 Dec 2018 10:00:50 +0000
-Received: from mail-ed1-f65.google.com ([209.85.208.65])
+	id 1gZvIW-0004r1-Kc; Thu, 20 Dec 2018 10:11:20 +0000
+Received: from pandora.armlinux.org.uk
+ ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZv8F-0001gn-Bt
- for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 10:00:48 +0000
-Received: by mail-ed1-f65.google.com with SMTP id h50so1201160ede.5
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 20 Dec 2018 02:00:32 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=ylwzKhANp4Cl8xusWKqb85xW+2cdSkQ3nxCl1I5yYWs=;
- b=dAb1/UdJoclBpXbIQtcwIfpcz/zcQXlUhCqFn0Mn4OsaoxczVckPS6Sd9h3F0l1XHn
- CEeShj7AK/+r27JtttUk4CI9ujA1T2CZzESpgC+WgHNJui1av4ya1lL0FlCHyShTlIN3
- 9zaubouOgnddY2EfgSKNZ/DY9/MD9JDWpK3qtoKxbbgRnotT4LBPen0xqxpZNt5CxEDF
- uDG68/nKlAXz4braJ5Hb7umyU1BDay+1KIOqxF9KT4VuDh/EtU1byBGV3bsFgDtpTk6y
- 1JFFgLyaBcT79TBsF5wvGtqiMhoMzwyskFfAI1ugxI4utiD+w4u5045B9JlLxLzPznHQ
- NLow==
-X-Gm-Message-State: AA+aEWbLOMVKyek6RsgRI61T+mZODGL2YwUTGoNbErCbuAt7MKmlwGAJ
- flhih7tiUlswnE+ri72ILg2ioA==
-X-Google-Smtp-Source: AFSGD/U+z0NW0ZSR9XZ3d8SpPEG73Cd5o78YWj37ciMqJWCZXrwore7exMuiLuL3XBB9kBNGDHua7g==
-X-Received: by 2002:a50:d643:: with SMTP id c3mr22291753edj.178.1545300031177; 
- Thu, 20 Dec 2018 02:00:31 -0800 (PST)
-Received: from shalem.localdomain (546A5441.cm-12-3b.dynamic.ziggo.nl.
- [84.106.84.65])
- by smtp.gmail.com with ESMTPSA id s3sm6001255edm.31.2018.12.20.02.00.30
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 20 Dec 2018 02:00:30 -0800 (PST)
-Subject: Re: [PATCH 01/10] i2c: add suspended flag and accessors for i2c
- adapters
-To: Wolfram Sang <wsa@the-dreams.de>
-References: <20181219164827.20985-1-wsa+renesas@sang-engineering.com>
- <20181219164827.20985-2-wsa+renesas@sang-engineering.com>
- <20181219172250.ytronxeq2yc4vp4r@wunner.de>
- <83b17734-2437-5a04-8843-e18ccf7ad398@redhat.com>
- <20181219223341.GA998@kunai>
-From: Hans de Goede <hdegoede@redhat.com>
-Message-ID: <e8bfcadc-7c1a-6659-7173-4ce484ceeca3@redhat.com>
-Date: Thu, 20 Dec 2018 11:00:29 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
+ id 1gZvIT-0004q0-6n
+ for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 10:11:19 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=9dQsjKGXtMjcXA64HsuJ+g9/XzQV5QwkKkvEYEm5fsw=; b=UzPq6eY4B0e7JBbG340rBmXRd
+ StM2VXDdMoJbhirekQ//1JLmmBOq6n7nf+rUx+b1xEUFkmk0EDjyk996FI4QQdrOONZa9IRKD25de
+ l/Xwcq1WHHYGG9VqTrHXCzkYmumAabq4hR3caB0Bc//AKQ65akyUdkMOkQPQKyas8Rckc=;
+Received: from n2100.armlinux.org.uk
+ ([2001:4d48:ad52:3201:214:fdff:fe10:4f86]:59715)
+ by pandora.armlinux.org.uk with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
+ (envelope-from <linux@armlinux.org.uk>)
+ id 1gZvI1-0000BV-AD; Thu, 20 Dec 2018 10:10:49 +0000
+Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
+ (envelope-from <linux@n2100.armlinux.org.uk>)
+ id 1gZvHy-0000m3-DQ; Thu, 20 Dec 2018 10:10:46 +0000
+Date: Thu, 20 Dec 2018 10:10:44 +0000
+From: Russell King - ARM Linux <linux@armlinux.org.uk>
+To: linux-arm-kernel@lists.infradead.org, linux-arm-msm@vger.kernel.org,
+ linux-omap@vger.kernel.org, linux-oxnas@groups.io,
+ linux-samsung-soc@vger.kernel.org, linux-soc@vger.kernel.org
+Subject: Re: [PATCH 0/9] Clean up ARM SMP/CPU hotplug implementations
+Message-ID: <20181220101044.GN9507@n2100.armlinux.org.uk>
+References: <20181213175952.GC26090@n2100.armlinux.org.uk>
 MIME-Version: 1.0
-In-Reply-To: <20181219223341.GA998@kunai>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <20181213175952.GC26090@n2100.armlinux.org.uk>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_020043_407453_93D5E96C 
-X-CRM114-Status: GOOD (  23.29  )
+X-CRM114-CacheID: sfid-20181220_021117_658158_C5ACCB0E 
+X-CRM114-Status: GOOD (  29.26  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,85 +83,136 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-pm@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-renesas-soc@vger.kernel.org,
- Wolfram Sang <wsa+renesas@sang-engineering.com>,
- Lukas Wunner <lukas@wunner.de>, linux-i2c@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Barry Song <baohua@kernel.org>,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Neil Armstrong <narmstrong@baylibre.com>, Tony Lindgren <tony@atomide.com>,
+ Viresh Kumar <vireshk@kernel.org>, Linus Walleij <linus.walleij@linaro.org>,
+ Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
+ Liviu Dudau <liviu.dudau@arm.com>, Patrice Chotard <patrice.chotard@st.com>,
+ Krzysztof Kozlowski <krzk@kernel.org>, David Brown <david.brown@linaro.org>,
+ Kukjin Kim <kgene@kernel.org>, Sudeep Holla <sudeep.holla@arm.com>,
+ Andy Gross <andy.gross@linaro.org>,
+ Shiraz Hashim <shiraz.linux.kernel@gmail.com>,
+ Andreas =?iso-8859-1?Q?F=E4rber?= <afaerber@suse.de>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+Since almost no one has responded, my intention is to queue up
+patches 1-3,5-8 for the Christmas-time merge window through my
+tree.  They will be in linux-next tonight.
 
-On 19-12-18 23:33, Wolfram Sang wrote:
-> Hi Lukas, Hans,
+On Thu, Dec 13, 2018 at 05:59:52PM +0000, Russell King - ARM Linux wrote:
+> There is a lot of apparent copied code in arch/arm for handling SMP/
+> CPU hotplug, much of which is inappropriate or plain buggy.  This
+> seems to be a topic that occasionally comes up.
 > 
-> On Wed, Dec 19, 2018 at 07:36:54PM +0100, Hans de Goede wrote:
->> Hi,
->>
->> On 19-12-18 18:22, Lukas Wunner wrote:
->>> On Wed, Dec 19, 2018 at 05:48:17PM +0100, Wolfram Sang wrote:
->>>> +static inline void i2c_mark_adapter_suspended(struct i2c_adapter *adap)
->>>> +{
->>>> +	i2c_lock_bus(adap, I2C_LOCK_ROOT_ADAPTER);
->>>> +	set_bit(I2C_ALF_IS_SUSPENDED, &adap->locked_flags);
->>>> +	i2c_unlock_bus(adap, I2C_LOCK_ROOT_ADAPTER);
->>>> +}
->>>
->>> This looks like a duplication of the is_suspended flag in struct dev_pm_info.
->>> Any reason why you can't use that?  If so, it would be good to document the
->>> reason in the commit message.
->>
->> Oh, that is a very good point and that one only gets set on system suspend
->> and not on resume suspend, working around the problems with the i2c-designware
+> The "pen_release" thing was created for ARM Ltd development platforms
+> where there was no way to individually control secondary CPUs leaving
+> the boot loader - they all jumped to whatever physical code address
+> was supplied at the same time.  This made it necessary for _these_
+> platforms to have a "holding pen" for the CPUs while the kernel
+> initialised.
 > 
-> Just to make it clear: you mean runtime suspend, not resume suspend, or?
-
-Yes I mean runtime-suspend, sorry.
-
->> driver.
->>
->> I think this might be as simple as adding:
->>
->> 	if (WARN_ON(adap->dev.parent->power.is_suspended))
->> 		return -ESHUTDOWN;
+> The "boot_lock" thing was also created for ARM Ltd development
+> platforms which had restricted bus bandwidth, and which used the
+> loops_per_jiffy delay mechanism, which was calibrated for each
+> secondary CPU.  With the restricted bus bandwidth, activity from the
+> boot CPU would affect the delay calibration adversely.
 > 
-> I have seen this flag but decided against it. One reason is because it
-> is marked as "PM core only".
-
-Right and we definitely should not be touching it, but reading it should
-be fine.
-
-> The other reason is that it doesn't know
-> about the adapter lock. It might get set while a transfer is on going.
-> Or even right after the suggested if-block above. The code from this
-> series gets the mutex first which ensures that on going transfers are
-> completed and no new ones are started in parallel.
+> Lastly, the Versatile CPU hotplug implementation is an entirely
+> ficticious one - these platforms do _not_ support CPU hotplug as
+> there is no way to actually disable any of the secondary CPUs, or
+> reset them.  Such an implementation is not acceptable when supporting
+> features such as suspend or kexec.  As the Versatile platforms are
+> ARM development platforms which do not have suspend support, this is
+> acceptable there, but not for production hardware.
 > 
-> Unless I am totally overlooking something...
+> None of these three facilities/implementations should be used on
+> modern production hardware, yet we have a number of copies of this
+> code.
+> 
+> This series addresses that by removing the inappropriate copies of
+> some Realview/Versatile Express specific workarounds, and makes it
+> (hopefully) more clear that introducing this code is really not
+> acceptable.
+> 
+> To discourage copying the Versatile code, further comments are added
+> and the functions renamed for CPU hotplug to be "immitation" to make
+> it clear that it's not a real implementation.
+> 
+> We tried reducing the duplication in the past with ideas around
+> consolidating the pen_release/boot_lock/immitation hotplug stuff,
+> but I nacked that because it's not an acceptable implementation for
+> production hardware.  However, we did decide to consolidate the
+> "pen_release" definition.  In hind sight, that was a mistake,
+> because that gave more credence to that way of doing things, and
+> also gave rise to buggy implementations which only read from that
+> variable - meaning it served no useful purpose.
+> 
+> There are some rather complex cases that remain, and those need the
+> SoC folk to fix.
+> 
+> I have left the Actions Semi patch in place since following patches
+> depend on it, but there is a five-patch series from Linus Walleij
+> that address this platform which should replace this patch - with
+> the patch concerned marked as "RFT" - request for testing.
+> 
+>  arch/arm/include/asm/smp.h                         |   1 -
+>  arch/arm/kernel/smp.c                              |   6 --
+>  arch/arm/mach-actions/platsmp.c                    |  15 ---
+>  arch/arm/mach-exynos/headsmp.S                     |   2 +-
+>  arch/arm/mach-exynos/platsmp.c                     |  31 +++---
+>  arch/arm/mach-omap2/omap-smp.c                     |  20 ----
+>  arch/arm/mach-oxnas/Makefile                       |   1 -
+>  arch/arm/mach-oxnas/hotplug.c                      | 109 --------------------
+>  arch/arm/mach-oxnas/platsmp.c                      |   4 -
+>  arch/arm/mach-prima2/common.h                      |   2 +
+>  arch/arm/mach-prima2/headsmp.S                     |   2 +-
+>  arch/arm/mach-prima2/hotplug.c                     |   3 +-
+>  arch/arm/mach-prima2/platsmp.c                     |  17 ++--
+>  arch/arm/mach-qcom/platsmp.c                       |  26 -----
+>  arch/arm/mach-realview/Makefile                    |   1 -
+>  arch/arm/mach-realview/hotplug.c                   | 111 ---------------------
+>  arch/arm/mach-realview/hotplug.h                   |   1 -
+>  arch/arm/mach-realview/platsmp-dt.c                |   8 +-
+>  arch/arm/mach-spear/generic.h                      |   2 +
+>  arch/arm/mach-spear/headsmp.S                      |   2 +-
+>  arch/arm/mach-spear/hotplug.c                      |   4 +-
+>  arch/arm/mach-spear/platsmp.c                      |  27 +++--
+>  arch/arm/mach-sti/Makefile                         |   2 +-
+>  arch/arm/mach-sti/headsmp.S                        |  43 --------
+>  arch/arm/mach-sti/platsmp.c                        |  62 +-----------
+>  arch/arm/mach-vexpress/Makefile                    |   1 -
+>  arch/arm/mach-vexpress/core.h                      |   2 -
+>  arch/arm/mach-vexpress/platsmp.c                   |   7 ++
+>  arch/arm/plat-versatile/Makefile                   |   1 +
+>  arch/arm/plat-versatile/headsmp.S                  |   2 +-
+>  .../{mach-vexpress => plat-versatile}/hotplug.c    |  47 ++++-----
+>  arch/arm/plat-versatile/include/plat/platsmp.h     |   2 +
+>  arch/arm/plat-versatile/platsmp.c                  |  47 ++++++---
+>  33 files changed, 132 insertions(+), 479 deletions(-)
+>  delete mode 100644 arch/arm/mach-oxnas/hotplug.c
+>  delete mode 100644 arch/arm/mach-realview/hotplug.c
+>  delete mode 100644 arch/arm/mach-realview/hotplug.h
+>  delete mode 100644 arch/arm/mach-sti/headsmp.S
+>  rename arch/arm/{mach-vexpress => plat-versatile}/hotplug.c (56%)
+> 
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+> According to speedtest.net: 11.9Mbps down 500kbps up
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel@lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-No you are right, there is a race here, but I don't think we are likely to
-hit that race. Normally there won't be any ongoing i2c-transfers during
-a system suspend and more over, the goal of adding this check is to help
-find problems, so even if the check sometimes does not trigger because
-of the race that is not really a big deal.
-
-I think we need to get really unlucky to have both a suspend ordering
-problem in the first case (already a somewhat rare thing) combined with
-hitting this race in such a way *each time* that we don't trigger the
-WARN_ON.
-
-To me this seems a case of perfect being the enemy of good. When we
-first started discussing this you wanted to not have to modify the
-adapter/bus drivers for the check, using adap->dev.parent->power.is_suspended
-gives us that and it will also work for complex cases like
-the i2c-designware case, so I believe the benefits outway the downsides.
-
-Regards,
-
-Hans
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
 
 _______________________________________________
 linux-arm-kernel mailing list
