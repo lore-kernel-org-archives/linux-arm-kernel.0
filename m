@@ -2,91 +2,163 @@ Return-Path: <SRS0=AHqO=O5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=BAD_ENC_HEADER,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 32C1EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 17:17:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A4916C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 17:33:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DDE1721773
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 17:17:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 725A92186A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 17:33:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LoJVCHLm";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="OumhfZUk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DDE1721773
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="np58GOV2";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="pdfh7Wpq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 725A92186A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=v036sFognL3l8EGYd15Wx50K8wZLZsgXKRunusMjd6M=; b=LoJVCHLmgOhWAx
-	n7naG25qMCmVM32f+3N3LskAIwkIDVJivnRrkABGNwSMFApffqqchKS5At7wIHFtocQ5ARmG3F4uh
-	7/D19E+Vblbre911JsxIb4IDemHQlVDINcLbsqOR0E+TWnjgD/Cgxd+GT4mZq2kuEpkI6tEHMBxFE
-	2PrY9e40VUG9jmD8hRJ2IIAhb4dWwevvDNGqn/urvXyIF9Rnm0AJQjpK8DOxxg9sGU1axxykrCDs5
-	eo6anaX/zMJeDNfsVOAIoyaWRO4odhxFk5bpQ9W6hGUiVCgPN2GuMHJHEcEgwS+t3QZ1FzmqqOpam
-	YDc6AEnruOLWBYo6qFOg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=N0n51drWfaIfHlu3HmulbiSL889dS6nM2YQorNoopE0=; b=np58GOV2iyBCjf
+	pcH40ltPof04WJNbvtgLbTc1QwGgY7dMJXmjrEmTnjfYG07KrSqurUL87xTFjKVsH3M//nUGy1olE
+	QMnH4OHYB+SfT97Sb1QEH3oevlgUyUOODN71UAQI2EA+g1aRiBYqiLevSxcP5+ScCTOtcoZnZQxZ8
+	D6b4q3/dEwoU3x3+QGtxQ86farqHmUoawa+JTiFo2jam/60jwBCM8NdAbvheod/EbaVFnK9wY2zHj
+	8sbxSF1tBHoaKrAnPXagh4apf2JaDbP9e2flZpORkmPX2a/dB03AqTNoeNkog8JabUmJGKJzImP7N
+	j2tL4DHPivBAVjuU8j8g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ga1wT-0007N7-I6; Thu, 20 Dec 2018 17:17:01 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1ga2C1-0004Yk-Jl; Thu, 20 Dec 2018 17:33:05 +0000
+Received: from mail-eopbgr810058.outbound.protection.outlook.com
+ ([40.107.81.58] helo=NAM01-BY2-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ga1wQ-0007Lz-2P
- for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 17:17:00 +0000
-Received: by mail-wr1-x441.google.com with SMTP id r10so2551251wrs.10
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 20 Dec 2018 09:16:47 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=hSPuEWRRK7wMhu9OfMbHsNDR/FeXcaBZmoLhSCUdMRs=;
- b=OumhfZUkI/U0KQevVpk3cMXgzj5YsX8TR7OYR4S4/L8vudzJ4rsoT0Kz6uG1MhPmy7
- 2kLJWgPV4opvutrosIuL9SLIy/zR9txHWAR8peb7+v8VyYjD0QfQojKY8eVv7DzETQy7
- vAVPgLwyJwKtEggfm0B51PoclvvQmGRJPxBiE=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=hSPuEWRRK7wMhu9OfMbHsNDR/FeXcaBZmoLhSCUdMRs=;
- b=IK2ri5qaebIiTsmINfa5N9oud7tSzvXImI13ypwPXnVABV7Kh7SklFXVz93e+KWUk8
- t1xXKdC8X3vrncJqUYTehteKIrxK9WFnh9mCP1IYMMcltXEZIrIS+q2Y/awf6babyH9m
- e6hlhUcdGeXobRmzOIQ4CJtP+nj3f3N0cEF3k5/z1LF0H/+8umToRXHaihIgyRi1O7vF
- +CVY098AEOTSQmwK4wVZXIRZbO0jrXw40v8lpvFV2EA5HiPx0dKretLgGu8XENfXITho
- c3NdefzZ8i6+eRdBGFa+Oc4tbuUeHT1b+Abfv6ug7ayapHBsGBsc6fySkFyHez9ZhljH
- 8yRw==
-X-Gm-Message-State: AA+aEWYY8actchajxzKwV6i7nBvxRfhYEy3xgLz+rmHJDlXzdvprYt3k
- 3UvleVyqMEeacMUAtW8mOP0bfQ==
-X-Google-Smtp-Source: AFSGD/X9HwzfwzJfpEHl4DkaDE8vakqF5lkNgW85yvdIQUa6NYwiXkTs5buTByly2RAyMT8t8WSkbA==
-X-Received: by 2002:adf:e78f:: with SMTP id n15mr24059134wrm.115.1545326205755; 
- Thu, 20 Dec 2018 09:16:45 -0800 (PST)
-Received: from [192.168.0.40] (55.183.88.92.rev.sfr.net. [92.88.183.55])
- by smtp.googlemail.com with ESMTPSA id v132sm8379247wme.20.2018.12.20.09.16.43
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 20 Dec 2018 09:16:44 -0800 (PST)
-Subject: Re: [PATCH v10 16/27] drivers: firmware: psci: Prepare to use OS
- initiated suspend mode
-To: Ulf Hansson <ulf.hansson@linaro.org>
-References: <20181129174700.16585-1-ulf.hansson@linaro.org>
- <20181129174700.16585-17-ulf.hansson@linaro.org>
- <20e1c04b-870f-3213-835d-28724ef4f530@linaro.org>
- <CAPDyKFqwB0X6DwamGqYgYKsGRcZRzStT=o_AL2wGExuOkQ2rgw@mail.gmail.com>
-From: Daniel Lezcano <daniel.lezcano@linaro.org>
-Message-ID: <fe405425-9d94-9f14-b599-63a709e004cf@linaro.org>
-Date: Thu, 20 Dec 2018 18:16:43 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1ga2Bx-0004Wg-Nl
+ for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 17:33:03 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=tI44kxVzn+8Ps6+mIF/W4nH2fSanjTf2cettQGmsw6Q=;
+ b=pdfh7WpqDCV1e/V5pS4KKzjO/VDhrATCgqy02e1Y0kQYo29s8Zt4pi9lKMt6glybn3gG3qAJ4C98llTzSi26GTJCvdmktAknL7QEKuNyuaz5FSnt/zSeN+rew/Nnbw3CNTRT1wpeVk72cT/NpTbDQHHgHGIILAYN6CHpnUZnqcg=
+Received: from SN6PR02CA0029.namprd02.prod.outlook.com (2603:10b6:805:a2::42)
+ by CY1PR0201MB0731.namprd02.prod.outlook.com
+ (2a01:111:e400:4c28::18) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1425.22; Thu, 20 Dec
+ 2018 17:32:48 +0000
+Received: from BL2NAM02FT044.eop-nam02.prod.protection.outlook.com
+ (2a01:111:f400:7e46::200) by SN6PR02CA0029.outlook.office365.com
+ (2603:10b6:805:a2::42) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.20.1446.19 via Frontend
+ Transport; Thu, 20 Dec 2018 17:32:48 +0000
+Authentication-Results: spf=pass (sender IP is 149.199.60.83)
+ smtp.mailfrom=xilinx.com; gmail.com; dkim=none (message not signed)
+ header.d=none;gmail.com; dmarc=bestguesspass action=none
+ header.from=xilinx.com;
+Received-SPF: Pass (protection.outlook.com: domain of xilinx.com designates
+ 149.199.60.83 as permitted sender) receiver=protection.outlook.com;
+ client-ip=149.199.60.83; helo=xsj-pvapsmtpgw01;
+Received: from xsj-pvapsmtpgw01 (149.199.60.83) by
+ BL2NAM02FT044.mail.protection.outlook.com (10.152.77.35) with Microsoft SMTP
+ Server (version=TLS1_0, cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.20.1446.11
+ via Frontend Transport; Thu, 20 Dec 2018 17:32:47 +0000
+Received: from unknown-38-66.xilinx.com ([149.199.38.66] helo=xsj-pvapsmtp01)
+ by xsj-pvapsmtpgw01 with esmtp (Exim 4.63)
+ (envelope-from <wendy.liang@xilinx.com>)
+ id 1ga2Bi-0006cn-On; Thu, 20 Dec 2018 09:32:46 -0800
+Received: from [127.0.0.1] (helo=localhost)
+ by xsj-pvapsmtp01 with smtp (Exim 4.63)
+ (envelope-from <wendy.liang@xilinx.com>)
+ id 1ga2Bd-0002Wx-Kf; Thu, 20 Dec 2018 09:32:41 -0800
+Received: from [172.19.2.167] (helo=xsjjliang50.xilinx.com)
+ by xsj-pvapsmtp01 with esmtp (Exim 4.63)
+ (envelope-from <wendy.liang@xilinx.com>)
+ id 1ga2BU-0002Sm-B6; Thu, 20 Dec 2018 09:32:32 -0800
+From: Wendy Liang <wendy.liang@xilinx.com>
+To: <jassisinghbrar@gmail.com>, <michal.simek@xilinx.com>,
+ <robh+dt@kernel.org>, <mark.rutland@arm.com>
+Subject: [PATH v7 1/2] mailbox: ZynqMP IPI mailbox controller
+Date: Thu, 20 Dec 2018 09:32:28 -0800
+Message-ID: <1545327149-22331-2-git-send-email-wendy.liang@xilinx.com>
+X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1545327149-22331-1-git-send-email-wendy.liang@xilinx.com>
+References: <1545327149-22331-1-git-send-email-wendy.liang@xilinx.com>
+X-TM-AS-Product-Ver: IMSS-7.1.0.1224-8.2.0.1013-23620.005
+X-TM-AS-User-Approved-Sender: Yes;Yes
+X-EOPAttributedMessage: 0
+X-MS-Office365-Filtering-HT: Tenant
+X-Forefront-Antispam-Report: CIP:149.199.60.83; IPV:NLI; CTRY:US; EFV:NLI;
+ SFV:NSPM;
+ SFS:(10009020)(346002)(376002)(136003)(396003)(39860400002)(2980300002)(199004)(189003)(39060400002)(81156014)(486006)(5660300001)(107886003)(44832011)(36756003)(15650500001)(48376002)(47776003)(476003)(106002)(126002)(36386004)(50466002)(14444005)(316002)(305945005)(54906003)(478600001)(16586007)(4744004)(356004)(6666004)(110136005)(4326008)(7696005)(76176011)(2906002)(9786002)(446003)(11346002)(2616005)(336012)(426003)(51416003)(8936002)(186003)(8676002)(63266004)(77096007)(50226002)(81166006)(106466001)(26005)(107986001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:CY1PR0201MB0731; H:xsj-pvapsmtpgw01; FPR:;
+ SPF:Pass; LANG:en; PTR:unknown-60-83.xilinx.com; A:1; MX:1; 
+X-Microsoft-Exchange-Diagnostics: 1; BL2NAM02FT044;
+ 1:Gu9/ae1ekxlb+yKUEd+M9QIRCu6M7kIqF8wmG13vHFBaDxEQFC05Gek/2u8DQt1ZnBcX88mGJiKPSsuyar3I+Aaz3FvIUl0sUoMRIT7uscRq1rJIuMsaQaLbe2Lwhlrm
 MIME-Version: 1.0
-In-Reply-To: <CAPDyKFqwB0X6DwamGqYgYKsGRcZRzStT=o_AL2wGExuOkQ2rgw@mail.gmail.com>
-Content-Language: en-US
+X-MS-PublicTrafficType: Email
+X-MS-Office365-Filtering-Correlation-Id: d21045b8-f4f3-4efd-0de6-08d666a128ea
+X-Microsoft-Antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4608076)(2017052603328)(7153060);
+ SRVR:CY1PR0201MB0731; 
+X-Microsoft-Exchange-Diagnostics: 1; CY1PR0201MB0731;
+ 3:RXkfzKwFMR8r0lJN7U1GZOALbme2ACnEInhKGMBAddvBw+uKFKehQ1LusRKIc7RNzSmld1LIXcjyKZF/v5LAKk1I8/LWAtryZ7TCXHwM161FYQhpHGna0tlC76fMWJUC/8StKB9Aa/k/qGE7YRHfSiMdEP02+NvTFe7FyBZwZoo3lquFqyEMbBsgOgi0Tq+jULUCmgTsmERSD45SQmt6Y0Vq4L2Q19VaWrwV+4HoJWihjypP7p0QjvqWyEpZ/TgymVbtzqxhyW6kyWZrmBNwKIe716MSju7Z6SO/rd5oJQ6FtJeV81sRVvbvxgbkJ1S4OLWJeIDBwFtFr0Tk9oXrH2yqRp/xy3+hHqu3BvZUHq4=;
+ 25:crpzZzfJbEsNPRMBNQi0nj+rhuX0VNXXnHEi6TCJ0oofbersJIrmEg9vZTfN6dfdbfTy0izthDx7Ppm6nbSVi3HNwKXk3VGDMLSXZwAX54sVbpyUV9W0eLOzALctSWQ+GYfYnYw9vZtfINU9eYlyaXlpeBtHqLbbYadbVIOWbU+qbeoasVRaw+TnGBpeIuCrvkfMcBZd9b1nUNK94T4g1Zkjp6q2vUpRa1GH7jgCvGhWFfZQHFWpSZCDD6YnNYdMMU5MMEQqwvtnbR6FyhH0fme+t549S6kNiE/uaJTV8PbuU+nCwBO6wAMDfYDsikFMPAiHsgX//7vKVWiVIeeXSV3ftGAeXzP3xJQSb5HqUww=
+X-MS-TrafficTypeDiagnostic: CY1PR0201MB0731:
+X-Microsoft-Exchange-Diagnostics: 1; CY1PR0201MB0731;
+ 31:GbNo5YCLi/H03DeaOOaxRXoSHPQSBjVve2eelGGEKoUifvzDzZfugnY5IhwqsscdIRL7s0ttwPilHvBczBhaFgZSsf5FZC39d0Lueu4x4C2YonFm0mjvXq+aZPPv15nTASFf7hJc0We6VLdQjV7J8ekxwb9TQAKHko0AD8zZZbDxzuynO8mKhOhOuWRRvaISXzuoXCaz/OkSKBp9FmWr9EqTrKtmrAfWH0fXDGF9cJ0=;
+ 20:fTKBTdZ5cW+DonSvCjwcaUNyqcnWd3ofIzVdUmT2354f76sVZAqJjmjGsAqwlyKh0HFTGhTbX88Yb6M8omtHbBCz8B6J/W9b7NjdyKvKu8KxF6YG+7pYg/Ji1FUQs4KlMAG3xYDmzcsKTQS/TmWfS0Nkq1lcBr3G+YWkbnQfyClZX7Z88/UG9rLfbvBxT6J3Z3zfMWlhsEPk14o6lGPby/ni2wXzlp/PNlu9EicxL+tAZdknKa4/TkaqPisfPsQ7axinY/olv/T8/NPaAmQmfUMGJQURtkhDC6HB6UkyTqNv874oAiYfCvGwKlc3YmVs0Wtq8UX4JgOfJ6/duEhlmrlA1somhExtmfu6z9Ij5tQWnrAu3znxQvxU2ccLPqnouvOCvyNIn+OfXCaRz76NWQvxn4nvWq9r8qxmBhGsK/vwpIkih2cYUlsHBW//JXXdhyDUMfZOPD/vw6sk3VfO+PEKBah3lQVp22859kKs1qzMuYcRBoIzUMoKUPerFLmT
+X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
+X-Microsoft-Antispam-PRVS: <CY1PR0201MB0731A6A60DE3C0C8813AC09BB0BF0@CY1PR0201MB0731.namprd02.prod.outlook.com>
+X-MS-Exchange-SenderADCheck: 1
+X-Exchange-Antispam-Report-CFA-Test: BCL:0; PCL:0;
+ RULEID:(8211001083)(3230021)(999002)(5005026)(6040522)(2401047)(8121501046)(3231475)(944501493)(52105112)(93006095)(93004095)(3002001)(10201501046)(6055026)(149066)(150057)(6041310)(20161123558120)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123560045)(20161123564045)(201708071742011)(7699051)(76991095);
+ SRVR:CY1PR0201MB0731; BCL:0; PCL:0; RULEID:; SRVR:CY1PR0201MB0731; 
+X-Microsoft-Exchange-Diagnostics: 1; CY1PR0201MB0731;
+ 4:9gMQyAyCMQohX/LmcpJGYWBPXawYz+fnm/vr2HSO3FsbwHEc4tmXfztFiGc56QrOu4h2OUt2EZ0vLC++jxymlj455hUBWgAn9ECZNx7WqVOdAaPfeSTtTyoxy9k3GY3sBNSQ7TPkVZ+STb61bJLlrAK+Tlsek/8RCmXpL7Lx5lMQXQCTEOObmV/vJFHfojjvI6Z+g6bRVlioURdgJO39ump7kICuEp6GcTzRrpoQqxTI6KgRPJWD2GJY9bhlGM6AHZvkZDhAAvxgJ1knODu9UQ==
+X-Forefront-PRVS: 0892FA9A88
+X-Microsoft-Exchange-Diagnostics: =?us-ascii?Q?1; CY1PR0201MB0731;
+ 23:K21RwDv5lfAUavBud6fmY0SY54soPbtTjMI8AfQ?=
+ =?us-ascii?Q?6rxBkf4fG+op2NT4XYFXBqPurglV7Xs2FVUF7feeDiWmqjVcT5TwFy6dpXyw?=
+ =?us-ascii?Q?d/6LC2LNtWdrdHBvwIdmX3nV3KFJUT8O8txVTrleb8Bk+4CFP5fr+vuntZUU?=
+ =?us-ascii?Q?lr4oYGS1s2dBVhUUR/HytVMq6LeRNIAyu5tZNP6HMGbC+44h9iHawf7ihUE6?=
+ =?us-ascii?Q?5N0j590L1GNUi7ytm712fzr96hYD+b4OsFRYvoCywkBKplTFiDechuS5MZVc?=
+ =?us-ascii?Q?oBwyw09IVv2n3wc+6XFICzXdu8LffbsCiHTZ9xqbC6BU8Rc2mQYIIgxXv8zw?=
+ =?us-ascii?Q?DruSPp+X6ub+DCxkoj10rfTF8ev5cwLXUyIRJ8Bp6aIKVJ0TNzl8S2EuJrsr?=
+ =?us-ascii?Q?yFgyO79FBXywSFcQhgo3mFzD05BDRadE6Xk2GS6a8b987WOFKUzkHcd2IcdT?=
+ =?us-ascii?Q?TWYWOJ0YQenUC9mf2vSs/WBvMUbFRyctXgCQKwzU8UVd4HsiYcAMRf1a12HW?=
+ =?us-ascii?Q?iAuarr1vXUtgyThExbo9ZTKvoJ9Sdkmn+mWD/34p3RtZ46CFWIDoK16/3Arn?=
+ =?us-ascii?Q?H9iE8OS02mYWTwkTOR72gIPmzarW+HNe4voc2qVOIkTx6QvEqDr6Pvf0/4oz?=
+ =?us-ascii?Q?lDtn/DHV4fdgvb3/OmZepslrYCIThTPPBT7mCqSn/rXEEHLHRLUHuRDT1HGX?=
+ =?us-ascii?Q?9Nb3T2KihjwfYDxe2jk8eWSS1R0ULeVt0q2h/aJ1FMwI2liS74PmI4wjNPhs?=
+ =?us-ascii?Q?FOGmYSAbbv2XusR+lokCb1m0xOJZPQqtiG2hnt0YXT1uiDmIyXO25Qs7YYVm?=
+ =?us-ascii?Q?Tln+LN2LEpgv2wuF6Kc8sGlZlLH4pCoAAO4/1cnt+ysZebujUy/luVML7hAl?=
+ =?us-ascii?Q?VVdEmoThXnAw/9C7MuMxWmxy/Pmt9mLGmfUDZkD7EZS/UDPsaEY8Pz4qNlnn?=
+ =?us-ascii?Q?Re3x1ZKzV481FclQgYEnAJLvSkv2mcmIJAbyE0ZTxcoc3bBRGVNIt11vLwBG?=
+ =?us-ascii?Q?dMT15vMA251XK3BujGNMfFH4P+xlJhNVGXbe/Yd2I0qPH8UbVOXwue3XOjgm?=
+ =?us-ascii?Q?DcSLQWp8qeTnCIa5BDcJKiDRnA4v9T4MRmY7lqmbP+J+X3Xx3NFVsrnYLvks?=
+ =?us-ascii?Q?5LyIIaSG9lIP8AtZMxNqFMFGXHWaOtxoQyJpGBI9F6qPga8DZBWrzuMxO2O1?=
+ =?us-ascii?Q?UQl94rwfPgQQcLu8xw/JB0eYl3NHf1ro0Wlw7?=
+X-Microsoft-Antispam-Message-Info: 5fr4shhSfJKYqyETPu3ZBomqHPCEJRPny1W47w9EZUJp8AzxyHb+YUo+fmQGy0mU4HOOOhQTuU0kbeV7PGYEaRPGnGdKcmyxqz05qIoVw5lWUjcibas6udZf8CVZu+JILejPYrcsK4oRs0Jo0gbkR8nLuYTOoIHUB9V9b56EbPW1F911QFzK8H4bVKghvgt490fIX+cnZVnfFt1BlZ2xQWpaqKgcEpY7BOWgWdz6MtLYCfS9ULkvQ4RB+koeewHgyFNsVrXw5TRZVHp0jGP3wNgwHz1OO25lLkOe2Ji0Uv45ed3u3H64Uix7CAf3+PIQ
+X-Microsoft-Exchange-Diagnostics: 1; CY1PR0201MB0731;
+ 6:5YTGX1Zg0OxxN4b1W6sLRvM6E+dlZPRPiX2Gg0RMY96UhhiT6mXz7pKw1HMBc6NOAVblfDhp5EiqB9p6svIkE8YbA5KHDxk/QqFmbYHYJxdG5yK/ph7N71CUgoLK/zXTOVVzgAPAocUvuPsZ9hoEBZdLKDjYd1gzpahZcBUs0BKNiKXKWc+EdqU3aJ2kkGifBALurdAn2MX9XP7v+z8XiX27LGwQthBBFHugg+AacelgiLXSRctLVbSwsFPYv7aBZlSHbB8NyVhsbflxQTJ+r1lGGpX+FFQ0NGVNSgOwOkrRZ5jxC+WHzdcjOW4Gjtzi0Jjvf7rGMo+fZ1Hauy3LdljHTSDGrfvbI4ABHJ1hiIkhhdJK4VgtwDYe63jvCqgDWZBfa6QuNbKsyyMBujYZWv8/Mysv4LSnIuKXXTeJjxyOae2nct9/mR8MEqnSjBAIAb4S+rKnmhz3VRwAI94L8A==;
+ 5:1iSO29iGxS3+eBGwappFxyZInF0bMQTJ5Px1uLqDscGj4Emlls9ARhu+nVQsaHCbuozGZ+0ZZeVj7/tN5800pXRiAdYQ7HRAgYOae7lOqXG04wj3EqXkZDHfnfSxG2Yp/AJl0aVKWm+tdLzLzwuVY8flpc9Bt0pozul8Cw52fJc=;
+ 7:J9VWt5AZnxfzPiD+p+s5RSwnGaeol7htzL5jYPhrOhfw5C/nB50SmhgDOUHQzRQYN5OzkM2pjBDi3ZsznEWkzjkwgI0sF0t4n221++SItwZSiycYdn6nMCDVVMjDjCJ9EsohDvJQgFTNWm5TJn91tw==
+SpamDiagnosticOutput: 1:99
+SpamDiagnosticMetadata: NSPM
+X-OriginatorOrg: xilinx.com
+X-MS-Exchange-CrossTenant-OriginalArrivalTime: 20 Dec 2018 17:32:47.4824 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: d21045b8-f4f3-4efd-0de6-08d666a128ea
+X-MS-Exchange-CrossTenant-Id: 657af505-d5df-48d0-8300-c31994686c5c
+X-MS-Exchange-CrossTenant-OriginalAttributedTenantConnectingIp: TenantId=657af505-d5df-48d0-8300-c31994686c5c; Ip=[149.199.60.83];
+ Helo=[xsj-pvapsmtpgw01]
+X-MS-Exchange-CrossTenant-FromEntityHeader: HybridOnPrem
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: CY1PR0201MB0731
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_091658_116968_0EBD86B3 
-X-CRM114-Status: GOOD (  29.24  )
+X-CRM114-CacheID: sfid-20181220_093301_816004_A1AC3A39 
+X-CRM114-Status: GOOD (  15.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,102 +170,829 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>,
- Vincent Guittot <vincent.guittot@linaro.org>,
- Geert Uytterhoeven <geert+renesas@glider.be>,
- Linux PM <linux-pm@vger.kernel.org>, Stephen Boyd <sboyd@kernel.org>,
- Viresh Kumar <viresh.kumar@linaro.org>,
- linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- Kevin Hilman <khilman@kernel.org>, "Rafael J . Wysocki" <rjw@rjwysocki.net>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Lina Iyer <ilina@codeaurora.org>, Tony Lindgren <tony@atomide.com>,
- Sudeep Holla <sudeep.holla@arm.com>,
- "Raju P . L . S . S . S . N" <rplsssn@codeaurora.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: devicetree@vger.kernel.org, Wendy Liang <wendy.liang@xilinx.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMjAvMTIvMjAxOCAxNjo0MSwgVWxmIEhhbnNzb24gd3JvdGU6Cj4gT24gVGh1LCAyMCBEZWMg
-MjAxOCBhdCAxNTowOSwgRGFuaWVsIExlemNhbm8gPGRhbmllbC5sZXpjYW5vQGxpbmFyby5vcmc+
-IHdyb3RlOgo+Pgo+PiBPbiAyOS8xMS8yMDE4IDE4OjQ2LCBVbGYgSGFuc3NvbiB3cm90ZToKPj4+
-IFRvIGVuYWJsZSB0aGUgT1MgaW5pdGlhdGVkIG1vZGUsIHRoZSBDUFUgdG9wb2xvZ3kgbmVlZHMg
-dG8gYmUgZGVzY3JpYmVkCj4+PiB1c2luZyB0aGUgaGllcmFyY2hpY2FsIG1vZGVsIGluIERULiBX
-aGVuIHVzZWQsIHRoZSBpZGxlIHN0YXRlIGJpdHMgZm9yIHRoZQo+Pj4gQ1BVIGFyZSBjcmVhdGVk
-IGJ5IE9SaW5nIHRoZSBiaXRzIGZvciBQTSBkb21haW4ncyBpZGxlIHN0YXRlLgo+Pj4KPj4+IExl
-dCdzIHByZXBhcmUgdGhlIFBTQ0kgZHJpdmVyIHRvIGRlYWwgd2l0aCB0aGlzLCB2aWEgaW50cm9k
-dWNpbmcgYSBwZXIgQ1BVCj4+PiB2YXJpYWJsZSBjYWxsZWQgZG9tYWluX3N0YXRlIGFuZCBieSBh
-ZGRpbmcgaW50ZXJuYWwgaGVscGVycyB0byByZWFkL3dyaXRlCj4+PiB0aGUgdmFsdWUgb2YgdGhl
-IHZhcmlhYmxlLgo+Pgo+PiBXaGF0IGFyZSB0aGUgZG9tYWluIHN0YXRlcyA/IFdoYXQgdmFsdWVz
-IGNhbiB0aGV5IGhhdmUgPwo+IAo+IFRoZSBleGlzdGluZyBwc2NpX3Bvd2VyX3N0YXRlLCBhbHNv
-IGRlZmluZWQgYXMgYSBwZXIgY3B1IHZhcmlhYmxlLAo+IGNvbnRhaW5zIGZpeGVkIHZhbHVlcyBy
-ZWZsZWN0aW5nIHRoZSBjb3JyZXNwb25kaW5nCj4gYXJtLHBzY2ktc3VzcGVuZC1wYXJhbSBmb3Ig
-dGhlIGlkbGUgc3RhdGUgaW4gcXVlc3Rpb24uCj4gCj4gVGhpcyBpc24ndCBzdWZmaWNpZW50LCB3
-aGVuIHVzaW5nIHRoZSBoaWVyYXJjaGljYWwgQ1BVIHRvcG9sb2d5IGluIERUCj4gYW5kIHdoZW4g
-T1NJIG1vZGUgaXMgc3VwcG9ydGVkLCBiZWNhdXNlIG9mIHRoZSB3YXkgd2Ugdm90ZSB3aXRoIHRo
-ZQo+IFBTQ0kgQ1BVIHN1c3BlbmQgcGFyYW1ldGVyLiBQYXJ0cyBvZiB0aGlzIHBhcmFtZXRlciBz
-aGFsbCBpbmZvcm0gYWJvdXQKPiB3aGF0IHN0YXRlIHRvIGFsbG93IGZvciB0aGUgY2x1c3Rlciwg
-d2hpbGUgb3RoZXIgcGFydHMgdGVsbHMgdGhlIHN0YXRlCj4gZm9yIHRoZSBDUFUuCj4gCj4gVGhl
-IG5ldyAiZG9tYWluIHN0YXRlcyIgcGVyIENQVSB2YXJpYWJsZSwgZ2V0cyBkeW5hbWljYWxseSBj
-aGFuZ2VkCj4gd2hlbiBhY3RpdmVseSB1c2VkIGJ5IGZvbGxvd2luZyBwYXRjaGVzIHRoYXQgaW1w
-bGVtZW50cyB0aGUgUFNDSSBQTQo+IGRvbWFpbiBzdXBwb3J0LiBEZXBlbmRpbmcgb24gd2hhdCBz
-dGF0ZSB0aGUgUE0gZG9tYWluIHBpY2tzLCB0aGUgZ2VucGQKPiAtPnBvd2VyX29mZigpIGNhbGxi
-YWNrIHNldHMgYSBuZXcgImRvbWFpbiBzdGF0ZXMiIHZhbHVlLCByZWZsZWN0aW5nCj4gdGhlIHN0
-YXRlIGZvciB0aGUgY2x1c3Rlci4KPiAKPiBEb2VzIGl0IG1ha2VzIHNlbnNlPyBJZiB5b3UgbGlr
-ZSwgSSBjYW4gdHJ5IHRvIHVwZGF0ZSB0aGUgY2hhbmdlbG9nIHRvCj4gY2xhcmlmeSB0aGlzPwoK
-WWVzLCBpdCBtYWtlcyBzZW5zZS4gTWF5IGJlIGdpdmUgYSBwb2ludGVyIG9yIGFuIGluZm9ybWF0
-aW9uIGFib3V0IHRoZQpwYXJhbWV0ZXIgZW5jb2RpbmcgaW4gYWRkaXRpb24gdG8gdGhlIGRlc2Ny
-aXB0aW9uIGFib3ZlIGNhbiBoZWxwLgoKCj4+PiBDYzogTGluYSBJeWVyIDxpbGluYUBjb2RlYXVy
-b3JhLm9yZz4KPj4+IENvLWRldmVsb3BlZC1ieTogTGluYSBJeWVyIDxsaW5hLml5ZXJAbGluYXJv
-Lm9yZz4KPj4+IFNpZ25lZC1vZmYtYnk6IFVsZiBIYW5zc29uIDx1bGYuaGFuc3NvbkBsaW5hcm8u
-b3JnPgo+Pj4gLS0tCj4+Pgo+Pj4gQ2hhbmdlcyBpbiB2MTA6Cj4+PiAgICAgICAtIFVzZSBfX3Ro
-aXNfY3B1X3JlYWR8d3JpdGUoKSByYXRoZXIgdGhhbiB0aGlzX2NwdV9yZWFkfHdyaXRlKCkuCj4+
-Pgo+Pj4gLS0tCj4+PiAgZHJpdmVycy9maXJtd2FyZS9wc2NpL3BzY2kuYyB8IDI2ICsrKysrKysr
-KysrKysrKysrKysrKystLS0tCj4+PiAgMSBmaWxlIGNoYW5nZWQsIDIyIGluc2VydGlvbnMoKyks
-IDQgZGVsZXRpb25zKC0pCj4+Pgo+Pj4gZGlmZiAtLWdpdCBhL2RyaXZlcnMvZmlybXdhcmUvcHNj
-aS9wc2NpLmMgYi9kcml2ZXJzL2Zpcm13YXJlL3BzY2kvcHNjaS5jCj4+PiBpbmRleCA0ZjBjYmM5
-NWU0MWIuLjhkYmNkZWNjMmFlNCAxMDA2NDQKPj4+IC0tLSBhL2RyaXZlcnMvZmlybXdhcmUvcHNj
-aS9wc2NpLmMKPj4+ICsrKyBiL2RyaXZlcnMvZmlybXdhcmUvcHNjaS9wc2NpLmMKPj4+IEBAIC04
-Nyw4ICs4NywxOSBAQCBzdGF0aWMgdTMyIHBzY2lfZnVuY3Rpb25faWRbUFNDSV9GTl9NQVhdOwo+
-Pj4gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgKFBTQ0lfMV8wX0VYVF9QT1dFUl9TVEFU
-RV9JRF9NQVNLIHwgXAo+Pj4gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgUFNDSV8xXzBf
-RVhUX1BPV0VSX1NUQVRFX1RZUEVfTUFTSykKPj4+Cj4+PiArc3RhdGljIERFRklORV9QRVJfQ1BV
-KHUzMiwgZG9tYWluX3N0YXRlKTsKPj4+ICBzdGF0aWMgdTMyIHBzY2lfY3B1X3N1c3BlbmRfZmVh
-dHVyZTsKPj4+Cj4+PiArc3RhdGljIGlubGluZSB1MzIgcHNjaV9nZXRfZG9tYWluX3N0YXRlKHZv
-aWQpCj4+PiArewo+Pj4gKyAgICAgcmV0dXJuIF9fdGhpc19jcHVfcmVhZChkb21haW5fc3RhdGUp
-Owo+Pj4gK30KPj4+ICsKPj4+ICtzdGF0aWMgaW5saW5lIHZvaWQgcHNjaV9zZXRfZG9tYWluX3N0
-YXRlKHUzMiBzdGF0ZSkKPj4+ICt7Cj4+PiArICAgICBfX3RoaXNfY3B1X3dyaXRlKGRvbWFpbl9z
-dGF0ZSwgc3RhdGUpOwo+Pj4gK30KPj4+ICsKPj4+ICBzdGF0aWMgaW5saW5lIGJvb2wgcHNjaV9o
-YXNfZXh0X3Bvd2VyX3N0YXRlKHZvaWQpCj4+PiAgewo+Pj4gICAgICAgcmV0dXJuIHBzY2lfY3B1
-X3N1c3BlbmRfZmVhdHVyZSAmCj4+PiBAQCAtMTg3LDYgKzE5OCw4IEBAIHN0YXRpYyBpbnQgcHNj
-aV9jcHVfb24odW5zaWduZWQgbG9uZyBjcHVpZCwgdW5zaWduZWQgbG9uZyBlbnRyeV9wb2ludCkK
-Pj4+Cj4+PiAgICAgICBmbiA9IHBzY2lfZnVuY3Rpb25faWRbUFNDSV9GTl9DUFVfT05dOwo+Pj4g
-ICAgICAgZXJyID0gaW52b2tlX3BzY2lfZm4oZm4sIGNwdWlkLCBlbnRyeV9wb2ludCwgMCk7Cj4+
-PiArICAgICAvKiBDbGVhciB0aGUgZG9tYWluIHN0YXRlIHRvIHN0YXJ0IGZyZXNoLiAqLwo+Pj4g
-KyAgICAgcHNjaV9zZXRfZG9tYWluX3N0YXRlKDApOwo+Pj4gICAgICAgcmV0dXJuIHBzY2lfdG9f
-bGludXhfZXJybm8oZXJyKTsKPj4KPj4gSSB0aGluayB0aGlzIGNoYW5nZSBpcyBhbWJpZ3VvdXM6
-Cj4+Cj4+ICAtIGlmIGl0IGlzIGEgY2hhbmdlIG9mIHRoZSBzdGF0ZSBiZWNhdXNlIG9mIHRoZSBj
-cHVfb24sIHRoZW4gSSB3YXMKPj4gZXhwZWN0aW5nIGEgc2ltaWxhciBjaGFuZ2UgaW4gY3B1X29m
-ZiBhbmQgdGhlIGNoYW5nZSBvbmx5IGlmCj4+IGludm9rZV9wc2NpX2ZuKCkgc3VjY2VlZHMuCj4g
-Cj4gWW91IGFyZSByaWdodC4gVGhpcyByYXRoZXIgYmVsb25ncyB0byBwYXRjaCAyNCwgYXMgaXRz
-IGludGVudCBpcyB0bwo+IGRlYWwgd2l0aCBDUFUgaG90cGx1Zy4KPiAKPj4KPj4gIC0gaWYgaXQg
-aXMgYSBjaGFuZ2UgdG8gdGFrZSBvcHBvcnR1bml0eSBvZiB0aGUgY29kZSBwYXRoIHRvIGluaXRp
-YWxpemUKPj4gdGhlIGRvbWFpbiBzdGF0ZSwgSSBzdWdnZXN0IHRvIHJlbW92ZSBpdCBmcm9tIHRo
-ZXJlIGFuZCBtYWtlIGl0IHZlcnkKPj4gZXhwbGljaXQgd2l0aCBzdGF0aWMgREVGSU5FX1BFUl9D
-UFUodTMyLCBkb21haW5fc3RhdGUpID0geyAwIH07Cj4gCj4gV2Ugc2hvdWxkbid0IG5lZWQgdG8g
-ZXhwbGljaXRseSBzZXQgc3RhdGljIHZhcmlhYmxlcyB0byB6ZXJvLCBhcyB0aGF0Cj4gc2hvdWxk
-IGJlIG1hbmFnZWQgYnkgdGhlIGNvbXBpbGVyLgoKWWVhaCwgdGhhdCB3YXMgdGhlIHB1cnBvc2Ug
-b2YgdGhlICp2ZXJ5IGV4cGxpY2l0KiB3b3JkcywgdGhhdCBpcyB0ZWxsCnRoZSByZWFkZXIsIHRo
-ZSBpbml0aWFsaXphdGlvbiByZWxpZXMgb24gdGhlIHN0YXRpYyB2YXJpYWJsZXMgYmVpbmcgc2V0
-CnRvIHplcm8uCgo+IExldCBtZSBzaW1wbHkgcmVtb3ZlIHRoZSBjYWxsIHRvICBwc2NpX3NldF9k
-b21haW5fc3RhdGUoMCkgYW5kIGluc3RlYWQKPiBjb25zaWRlciBpdCBmb3IgcGF0Y2ggMjQuCgpZ
-ZXMsIHN1cmUuCgoKCi0tIAogPGh0dHA6Ly93d3cubGluYXJvLm9yZy8+IExpbmFyby5vcmcg4pSC
-IE9wZW4gc291cmNlIHNvZnR3YXJlIGZvciBBUk0gU29DcwoKRm9sbG93IExpbmFybzogIDxodHRw
-Oi8vd3d3LmZhY2Vib29rLmNvbS9wYWdlcy9MaW5hcm8+IEZhY2Vib29rIHwKPGh0dHA6Ly90d2l0
-dGVyLmNvbS8jIS9saW5hcm9vcmc+IFR3aXR0ZXIgfAo8aHR0cDovL3d3dy5saW5hcm8ub3JnL2xp
-bmFyby1ibG9nLz4gQmxvZwoKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxA
-bGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xp
-c3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+This patch is to introduce ZynqMP IPI mailbox controller driver
+to use the ZynqMP IPI block as mailboxes.
+
+Signed-off-by: Wendy Liang <wendy.liang@xilinx.com>
+---
+ drivers/mailbox/Kconfig              |  11 +
+ drivers/mailbox/Makefile             |   2 +
+ drivers/mailbox/zynqmp-ipi-mailbox.c | 764 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 777 insertions(+)
+ create mode 100644 drivers/mailbox/zynqmp-ipi-mailbox.c
+
+diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
+index 3eeb12e9..d86e7a4 100644
+--- a/drivers/mailbox/Kconfig
++++ b/drivers/mailbox/Kconfig
+@@ -205,4 +205,15 @@ config MTK_CMDQ_MBOX
+ 	  mailbox driver. The CMDQ is used to help read/write registers with
+ 	  critical time limitation, such as updating display configuration
+ 	  during the vblank.
++
++config ZYNQMP_IPI_MBOX
++	bool "Xilinx ZynqMP IPI Mailbox"
++	depends on ARCH_ZYNQMP && OF
++	help
++	  Say yes here to add support for Xilinx IPI mailbox driver.
++	  This mailbox driver is used to send notification or short message
++	  between processors with Xilinx ZynqMP IPI. It will place the
++	  message to the IPI buffer and will access the IPI control
++	  registers to kick the other processor or enquire status.
++
+ endif
+diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
+index c818b5d..8be3bcb 100644
+--- a/drivers/mailbox/Makefile
++++ b/drivers/mailbox/Makefile
+@@ -44,3 +44,5 @@ obj-$(CONFIG_TEGRA_HSP_MBOX)	+= tegra-hsp.o
+ obj-$(CONFIG_STM32_IPCC) 	+= stm32-ipcc.o
+ 
+ obj-$(CONFIG_MTK_CMDQ_MBOX)	+= mtk-cmdq-mailbox.o
++
++obj-$(CONFIG_ZYNQMP_IPI_MBOX)	+= zynqmp-ipi-mailbox.o
+diff --git a/drivers/mailbox/zynqmp-ipi-mailbox.c b/drivers/mailbox/zynqmp-ipi-mailbox.c
+new file mode 100644
+index 0000000..bbddfd5
+--- /dev/null
++++ b/drivers/mailbox/zynqmp-ipi-mailbox.c
+@@ -0,0 +1,764 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Xilinx Inter Processor Interrupt(IPI) Mailbox Driver
++ *
++ * Copyright (C) 2018 Xilinx, Inc.
++ */
++
++#include <linux/arm-smccc.h>
++#include <linux/delay.h>
++#include <linux/device.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/mailbox_controller.h>
++#include <linux/mailbox/zynqmp-ipi-message.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_device.h>
++#include <linux/of_irq.h>
++#include <linux/platform_device.h>
++
++/* IPI agent ID any */
++#define IPI_ID_ANY 0xFFUL
++
++/* indicate if ZynqMP IPI mailbox driver uses SMC calls or HVC calls */
++#define USE_SMC 0
++#define USE_HVC 1
++
++/* Default IPI SMC function IDs */
++#define SMC_IPI_MAILBOX_OPEN		0x82001000U
++#define SMC_IPI_MAILBOX_RELEASE		0x82001001U
++#define SMC_IPI_MAILBOX_STATUS_ENQUIRY	0x82001002U
++#define SMC_IPI_MAILBOX_NOTIFY		0x82001003U
++#define SMC_IPI_MAILBOX_ACK		0x82001004U
++#define SMC_IPI_MAILBOX_ENABLE_IRQ	0x82001005U
++#define SMC_IPI_MAILBOX_DISABLE_IRQ	0x82001006U
++
++/* IPI SMC Macros */
++#define IPI_SMC_OPEN_IRQ_MASK		0x00000001UL /* IRQ enable bit in IPI
++						      * open SMC call
++						      */
++#define IPI_SMC_NOTIFY_BLOCK_MASK	0x00000001UL /* Flag to indicate if
++						      * IPI notification needs
++						      * to be blocking.
++						      */
++#define IPI_SMC_ENQUIRY_DIRQ_MASK	0x00000001UL /* Flag to indicate if
++						      * notification interrupt
++						      * to be disabled.
++						      */
++#define IPI_SMC_ACK_EIRQ_MASK		0x00000001UL /* Flag to indicate if
++						      * notification interrupt
++						      * to be enabled.
++						      */
++
++/* IPI mailbox status */
++#define IPI_MB_STATUS_IDLE		0
++#define IPI_MB_STATUS_SEND_PENDING	1
++#define IPI_MB_STATUS_RECV_PENDING	2
++
++#define IPI_MB_CHNL_TX	0 /* IPI mailbox TX channel */
++#define IPI_MB_CHNL_RX	1 /* IPI mailbox RX channel */
++
++/**
++ * struct zynqmp_ipi_mchan - Description of a Xilinx ZynqMP IPI mailbox channel
++ * @is_opened: indicate if the IPI channel is opened
++ * @req_buf: local to remote request buffer start address
++ * @resp_buf: local to remote response buffer start address
++ * @req_buf_size: request buffer size
++ * @resp_buf_size: response buffer size
++ * @rx_buf: receive buffer to pass received message to client
++ * @chan_type: channel type
++ */
++struct zynqmp_ipi_mchan {
++	int is_opened;
++	void __iomem *req_buf;
++	void __iomem *resp_buf;
++	void *rx_buf;
++	size_t req_buf_size;
++	size_t resp_buf_size;
++	unsigned int chan_type;
++};
++
++/**
++ * struct zynqmp_ipi_mbox - Description of a ZynqMP IPI mailbox
++ *                          platform data.
++ * @pdata:		  pointer to the IPI private data
++ * @dev:                  device pointer corresponding to the Xilinx ZynqMP
++ *                        IPI mailbox
++ * @remote_id:            remote IPI agent ID
++ * @mbox:                 mailbox Controller
++ * @mchans:               array for channels, tx channel and rx channel.
++ * @irq:                  IPI agent interrupt ID
++ */
++struct zynqmp_ipi_mbox {
++	struct zynqmp_ipi_pdata *pdata;
++	struct device dev;
++	u32 remote_id;
++	struct mbox_controller mbox;
++	struct zynqmp_ipi_mchan mchans[2];
++};
++
++/**
++ * struct zynqmp_ipi_pdata - Description of z ZynqMP IPI agent platform data.
++ *
++ * @dev:                  device pointer corresponding to the Xilinx ZynqMP
++ *                        IPI agent
++ * @irq:                  IPI agent interrupt ID
++ * @method:               IPI SMC or HVC is going to be used
++ * @local_id:             local IPI agent ID
++ * @num_mboxes:           number of mailboxes of this IPI agent
++ * @ipi_mboxes:           IPI mailboxes of this IPI agent
++ */
++struct zynqmp_ipi_pdata {
++	struct device *dev;
++	int irq;
++	unsigned int method;
++	u32 local_id;
++	int num_mboxes;
++	struct zynqmp_ipi_mbox *ipi_mboxes;
++};
++
++static struct device_driver zynqmp_ipi_mbox_driver = {
++	.owner = THIS_MODULE,
++	.name = "zynqmp-ipi-mbox",
++};
++
++static void zynqmp_ipi_fw_call(struct zynqmp_ipi_mbox *ipi_mbox,
++			       unsigned long a0, unsigned long a3,
++			       unsigned long a4, unsigned long a5,
++			       unsigned long a6, unsigned long a7,
++			       struct arm_smccc_res *res)
++{
++	struct zynqmp_ipi_pdata *pdata = ipi_mbox->pdata;
++	unsigned long a1, a2;
++
++	a1 = pdata->local_id;
++	a2 = ipi_mbox->remote_id;
++	if (pdata->method == USE_SMC)
++		arm_smccc_smc(a0, a1, a2, a3, a4, a5, a6, a7, res);
++	else
++		arm_smccc_hvc(a0, a1, a2, a3, a4, a5, a6, a7, res);
++}
++
++/**
++ * zynqmp_ipi_interrupt - Interrupt handler for IPI notification
++ *
++ * @irq:  Interrupt number
++ * @data: ZynqMP IPI mailbox platform data.
++ *
++ * Return: -EINVAL if there is no instance
++ * IRQ_NONE if the interrupt is not ours.
++ * IRQ_HANDLED if the rx interrupt was successfully handled.
++ */
++static irqreturn_t zynqmp_ipi_interrupt(int irq, void *data)
++{
++	struct zynqmp_ipi_pdata *pdata = data;
++	struct mbox_chan *chan;
++	struct zynqmp_ipi_mbox *ipi_mbox;
++	struct zynqmp_ipi_mchan *mchan;
++	struct zynqmp_ipi_message *msg;
++	u64 arg0, arg3;
++	struct arm_smccc_res res;
++	int ret, i;
++
++	(void)irq;
++	arg0 = SMC_IPI_MAILBOX_STATUS_ENQUIRY;
++	arg3 = IPI_SMC_ENQUIRY_DIRQ_MASK;
++	for (i = 0; i < pdata->num_mboxes; i++) {
++		ipi_mbox = &pdata->ipi_mboxes[i];
++		mchan = &ipi_mbox->mchans[IPI_MB_CHNL_RX];
++		chan = &ipi_mbox->mbox.chans[IPI_MB_CHNL_RX];
++		zynqmp_ipi_fw_call(ipi_mbox, arg0, arg3, 0, 0, 0, 0, &res);
++		ret = (int)(res.a0 & 0xFFFFFFFF);
++		if (ret > 0 && ret & IPI_MB_STATUS_RECV_PENDING) {
++			if (mchan->is_opened) {
++				msg = mchan->rx_buf;
++				msg->len = mchan->req_buf_size;
++				memcpy_fromio(msg->data, mchan->req_buf,
++					      msg->len);
++				mbox_chan_received_data(chan, (void *)msg);
++				return IRQ_HANDLED;
++			}
++		}
++	}
++	return IRQ_NONE;
++}
++
++/**
++ * zynqmp_ipi_peek_data - Peek to see if there are any rx messages.
++ *
++ * @chan: Channel Pointer
++ *
++ * Return: 'true' if there is pending rx data, 'false' if there is none.
++ */
++static bool zynqmp_ipi_peek_data(struct mbox_chan *chan)
++{
++	struct device *dev = chan->mbox->dev;
++	struct zynqmp_ipi_mbox *ipi_mbox = dev_get_drvdata(dev);
++	struct zynqmp_ipi_mchan *mchan = chan->con_priv;
++	int ret;
++	u64 arg0;
++	struct arm_smccc_res res;
++
++	if (WARN_ON(!ipi_mbox)) {
++		dev_err(dev, "no platform drv data??\n");
++		return false;
++	}
++
++	arg0 = SMC_IPI_MAILBOX_STATUS_ENQUIRY;
++	zynqmp_ipi_fw_call(ipi_mbox, arg0, 0, 0, 0, 0, 0, &res);
++	ret = (int)(res.a0 & 0xFFFFFFFF);
++
++	if (mchan->chan_type == IPI_MB_CHNL_TX) {
++		/* TX channel, check if the message has been acked
++		 * by the remote, if yes, response is available.
++		 */
++		if (ret < 0 || ret & IPI_MB_STATUS_SEND_PENDING)
++			return false;
++		else
++			return true;
++	} else if (ret > 0 && ret & IPI_MB_STATUS_RECV_PENDING) {
++		/* RX channel, check if there is message arrived. */
++		return true;
++	}
++	return false;
++}
++
++/**
++ * zynqmp_ipi_last_tx_done - See if the last tx message is sent
++ *
++ * @chan: Channel pointer
++ *
++ * Return: 'true' is no pending tx data, 'false' if there are any.
++ */
++static bool zynqmp_ipi_last_tx_done(struct mbox_chan *chan)
++{
++	struct device *dev = chan->mbox->dev;
++	struct zynqmp_ipi_mbox *ipi_mbox = dev_get_drvdata(dev);
++	struct zynqmp_ipi_mchan *mchan = chan->con_priv;
++	int ret;
++	u64 arg0;
++	struct arm_smccc_res res;
++	struct zynqmp_ipi_message *msg;
++
++	if (WARN_ON(!ipi_mbox)) {
++		dev_err(dev, "no platform drv data??\n");
++		return false;
++	}
++
++	if (mchan->chan_type == IPI_MB_CHNL_TX) {
++		/* We only need to check if the message been taken
++		 * by the remote in the TX channel
++		 */
++		arg0 = SMC_IPI_MAILBOX_STATUS_ENQUIRY;
++		zynqmp_ipi_fw_call(ipi_mbox, arg0, 0, 0, 0, 0, 0, &res);
++		/* Check the SMC call status, a0 of the result */
++		ret = (int)(res.a0 & 0xFFFFFFFF);
++		if (ret < 0 || ret & IPI_MB_STATUS_SEND_PENDING)
++			return false;
++
++		msg = mchan->rx_buf;
++		msg->len = mchan->resp_buf_size;
++		memcpy_fromio(msg->data, mchan->resp_buf, msg->len);
++		mbox_chan_received_data(chan, (void *)msg);
++		return true;
++	}
++	/* Always true for the response message in RX channel */
++	return true;
++}
++
++/**
++ * zynqmp_ipi_send_data - Send data
++ *
++ * @chan: Channel Pointer
++ * @data: Message Pointer
++ *
++ * Return: 0 if all goes good, else appropriate error messages.
++ */
++static int zynqmp_ipi_send_data(struct mbox_chan *chan, void *data)
++{
++	struct device *dev = chan->mbox->dev;
++	struct zynqmp_ipi_mbox *ipi_mbox = dev_get_drvdata(dev);
++	struct zynqmp_ipi_mchan *mchan = chan->con_priv;
++	struct zynqmp_ipi_message *msg = data;
++	u64 arg0;
++	struct arm_smccc_res res;
++	u32 timeout;
++	int ret;
++
++	if (WARN_ON(!ipi_mbox)) {
++		dev_err(dev, "no platform drv data??\n");
++		return -EINVAL;
++	}
++
++	if (mchan->chan_type == IPI_MB_CHNL_TX) {
++		/* Send request message */
++		if (msg && msg->len > mchan->req_buf_size) {
++			dev_err(dev, "channel %d message length %u > max %lu\n",
++				mchan->chan_type, (unsigned int)msg->len,
++				mchan->req_buf_size);
++			return -EINVAL;
++		}
++		/* Enquire if the mailbox is free to send message */
++		arg0 = SMC_IPI_MAILBOX_STATUS_ENQUIRY;
++		timeout = 10;
++		if (msg && msg->len) {
++			timeout = 10;
++			do {
++				zynqmp_ipi_fw_call(ipi_mbox, arg0,
++						   0, 0, 0, 0, 0, &res);
++				ret = res.a0 & 0xFFFFFFFF;
++				if (ret >= 0 &&
++				    !(ret & IPI_MB_STATUS_SEND_PENDING))
++					break;
++				usleep_range(1, 2);
++				timeout--;
++			} while (timeout);
++			if (!timeout) {
++				dev_warn(dev, "chan %d sending msg timeout.\n",
++					 ipi_mbox->remote_id);
++				return -ETIME;
++			}
++			memcpy_toio(mchan->req_buf, msg->data, msg->len);
++		}
++		/* Kick IPI mailbox to send message */
++		arg0 = SMC_IPI_MAILBOX_NOTIFY;
++		zynqmp_ipi_fw_call(ipi_mbox, arg0, 0, 0, 0, 0, 0, &res);
++	} else {
++		/* Send response message */
++		if (msg && msg->len > mchan->resp_buf_size) {
++			dev_err(dev, "channel %d message length %u > max %lu\n",
++				mchan->chan_type, (unsigned int)msg->len,
++				mchan->resp_buf_size);
++			return -EINVAL;
++		}
++		if (msg && msg->len)
++			memcpy_toio(mchan->resp_buf, msg->data, msg->len);
++		arg0 = SMC_IPI_MAILBOX_NOTIFY;
++		arg0 = SMC_IPI_MAILBOX_ACK;
++		zynqmp_ipi_fw_call(ipi_mbox, arg0, IPI_SMC_ACK_EIRQ_MASK,
++				   0, 0, 0, 0, &res);
++	}
++	return 0;
++}
++
++/**
++ * zynqmp_ipi_startup - Startup the IPI channel
++ *
++ * @chan: Channel pointer
++ *
++ * Return: 0 if all goes good, else return corresponding error message
++ */
++static int zynqmp_ipi_startup(struct mbox_chan *chan)
++{
++	struct device *dev = chan->mbox->dev;
++	struct zynqmp_ipi_mbox *ipi_mbox = dev_get_drvdata(dev);
++	struct zynqmp_ipi_mchan *mchan = chan->con_priv;
++	u64 arg0;
++	struct arm_smccc_res res;
++	int ret = 0;
++	unsigned int nchan_type;
++
++	if (mchan->is_opened)
++		return 0;
++
++	/* If no channel has been opened, open the IPI mailbox */
++	nchan_type = (mchan->chan_type + 1) % 2;
++	if (!ipi_mbox->mchans[nchan_type].is_opened) {
++		arg0 = SMC_IPI_MAILBOX_OPEN;
++		zynqmp_ipi_fw_call(ipi_mbox, arg0, 0, 0, 0, 0, 0, &res);
++		/* Check the SMC call status, a0 of the result */
++		ret = (int)(res.a0 & 0xFFFFFFFF);
++		if (ret < 0) {
++			dev_err(dev, "SMC to open the IPI channel failed.\n");
++			return ret;
++		}
++		ret = 0;
++	}
++
++	/* If it is RX channel, enable the IPI notification interrupt */
++	if (mchan->chan_type == IPI_MB_CHNL_RX) {
++		arg0 = SMC_IPI_MAILBOX_ENABLE_IRQ;
++		zynqmp_ipi_fw_call(ipi_mbox, arg0, 0, 0, 0, 0, 0, &res);
++	}
++	mchan->is_opened = 1;
++
++	return ret;
++}
++
++/**
++ * zynqmp_ipi_shutdown - Shutdown the IPI channel
++ *
++ * @chan: Channel pointer
++ */
++static void zynqmp_ipi_shutdown(struct mbox_chan *chan)
++{
++	struct device *dev = chan->mbox->dev;
++	struct zynqmp_ipi_mbox *ipi_mbox = dev_get_drvdata(dev);
++	struct zynqmp_ipi_mchan *mchan = chan->con_priv;
++	u64 arg0;
++	struct arm_smccc_res res;
++	unsigned int chan_type;
++
++	if (!mchan->is_opened)
++		return;
++
++	/* If it is RX channel, disable notification interrupt */
++	chan_type = mchan->chan_type;
++	if (chan_type == IPI_MB_CHNL_RX) {
++		arg0 = SMC_IPI_MAILBOX_DISABLE_IRQ;
++		zynqmp_ipi_fw_call(ipi_mbox, arg0, 0, 0, 0, 0, 0, &res);
++	}
++	/* Release IPI mailbox if no other channel is opened */
++	chan_type = (chan_type + 1) % 2;
++	if (!ipi_mbox->mchans[chan_type].is_opened) {
++		arg0 = SMC_IPI_MAILBOX_RELEASE;
++		zynqmp_ipi_fw_call(ipi_mbox, arg0, 0, 0, 0, 0, 0, &res);
++	}
++
++	mchan->is_opened = 0;
++}
++
++/* ZynqMP IPI mailbox operations */
++static const struct mbox_chan_ops zynqmp_ipi_chan_ops = {
++	.startup = zynqmp_ipi_startup,
++	.shutdown = zynqmp_ipi_shutdown,
++	.peek_data = zynqmp_ipi_peek_data,
++	.last_tx_done = zynqmp_ipi_last_tx_done,
++	.send_data = zynqmp_ipi_send_data,
++};
++
++/**
++ * zynqmp_ipi_of_xlate - Translate of phandle to IPI mailbox channel
++ *
++ * @mbox: mailbox controller pointer
++ * @p:    phandle pointer
++ *
++ * Return: Mailbox channel, else return error pointer.
++ */
++static struct mbox_chan *zynqmp_ipi_of_xlate(struct mbox_controller *mbox,
++					     const struct of_phandle_args *p)
++{
++	struct mbox_chan *chan;
++	struct device *dev = mbox->dev;
++	unsigned int chan_type;
++
++	/* Only supports TX and RX channels */
++	chan_type = p->args[0];
++	if (chan_type != IPI_MB_CHNL_TX && chan_type != IPI_MB_CHNL_RX) {
++		dev_err(dev, "req chnl failure: invalid chnl type %u.\n",
++			chan_type);
++		return ERR_PTR(-EINVAL);
++	}
++	chan = &mbox->chans[chan_type];
++	return chan;
++}
++
++static const struct of_device_id zynqmp_ipi_of_match[] = {
++	{ .compatible = "xlnx,zynqmp-ipi-mailbox" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, zynqmp_ipi_of_match);
++
++/**
++ * zynqmp_ipi_mbox_get_buf_res - Get buffer resource from the IPI dev node
++ *
++ * @node: IPI mbox device child node
++ * @name: name of the IPI buffer
++ * @res: pointer to where the resource information will be stored.
++ *
++ * Return: 0 for success, negative value for failure
++ */
++static int zynqmp_ipi_mbox_get_buf_res(struct device_node *node,
++				       const char *name,
++				       struct resource *res)
++{
++	int ret, index;
++
++	index = of_property_match_string(node, "reg-names", name);
++	if (index >= 0) {
++		ret = of_address_to_resource(node, index, res);
++		if (ret < 0)
++			return -EINVAL;
++		return 0;
++	}
++	return -ENODEV;
++}
++
++/**
++ * zynqmp_ipi_mbox_dev_release() - release the existence of a ipi mbox dev
++ *
++ * @dev: the ipi mailbox device
++ *
++ * This is to avoid the no device release() function kernel warning.
++ *
++ */
++static void zynqmp_ipi_mbox_dev_release(struct device *dev)
++{
++	(void)dev;
++}
++
++/**
++ * zynqmp_ipi_mbox_probe - probe IPI mailbox resource from device node
++ *
++ * @ipi_mbox: pointer to IPI mailbox private data structure
++ * @node: IPI mailbox device node
++ *
++ * Return: 0 for success, negative value for failure
++ */
++static int zynqmp_ipi_mbox_probe(struct zynqmp_ipi_mbox *ipi_mbox,
++				 struct device_node *node)
++{
++	struct zynqmp_ipi_mchan *mchan;
++	struct mbox_chan *chans;
++	struct mbox_controller *mbox;
++	struct resource res;
++	struct device *dev, *mdev;
++	const char *name;
++	int ret;
++
++	dev = ipi_mbox->pdata->dev;
++	/* Initialize dev for IPI mailbox */
++	ipi_mbox->dev.parent = dev;
++	ipi_mbox->dev.release = NULL;
++	ipi_mbox->dev.of_node = node;
++	dev_set_name(&ipi_mbox->dev, "%s", of_node_full_name(node));
++	dev_set_drvdata(&ipi_mbox->dev, ipi_mbox);
++	ipi_mbox->dev.release = zynqmp_ipi_mbox_dev_release;
++	ipi_mbox->dev.driver = &zynqmp_ipi_mbox_driver;
++	ret = device_register(&ipi_mbox->dev);
++	if (ret) {
++		dev_err(dev, "Failed to register ipi mbox dev.\n");
++		return ret;
++	}
++	mdev = &ipi_mbox->dev;
++
++	mchan = &ipi_mbox->mchans[IPI_MB_CHNL_TX];
++	name = "local_request_region";
++	ret = zynqmp_ipi_mbox_get_buf_res(node, name, &res);
++	if (!ret) {
++		mchan->req_buf_size = resource_size(&res);
++		mchan->req_buf = devm_ioremap(mdev, res.start,
++					      mchan->req_buf_size);
++		if (IS_ERR(mchan->req_buf)) {
++			dev_err(mdev, "Unable to map IPI buffer I/O memory\n");
++			ret = PTR_ERR(mchan->req_buf);
++			return ret;
++		}
++	} else if (ret != -ENODEV) {
++		dev_err(mdev, "Unmatched resource %s, %d.\n", name, ret);
++		return ret;
++	}
++
++	name = "remote_response_region";
++	ret = zynqmp_ipi_mbox_get_buf_res(node, name, &res);
++	if (!ret) {
++		mchan->resp_buf_size = resource_size(&res);
++		mchan->resp_buf = devm_ioremap(mdev, res.start,
++					       mchan->resp_buf_size);
++		if (IS_ERR(mchan->resp_buf)) {
++			dev_err(mdev, "Unable to map IPI buffer I/O memory\n");
++			ret = PTR_ERR(mchan->resp_buf);
++			return ret;
++		}
++	} else if (ret != -ENODEV) {
++		dev_err(mdev, "Unmatched resource %s.\n", name);
++		return ret;
++	}
++	mchan->rx_buf = devm_kzalloc(mdev,
++				     mchan->resp_buf_size +
++				     sizeof(struct zynqmp_ipi_message),
++				     GFP_KERNEL);
++	if (!mchan->rx_buf)
++		return -ENOMEM;
++
++	mchan = &ipi_mbox->mchans[IPI_MB_CHNL_RX];
++	name = "remote_request_region";
++	ret = zynqmp_ipi_mbox_get_buf_res(node, name, &res);
++	if (!ret) {
++		mchan->req_buf_size = resource_size(&res);
++		mchan->req_buf = devm_ioremap(mdev, res.start,
++					      mchan->req_buf_size);
++		if (IS_ERR(mchan->req_buf)) {
++			dev_err(mdev, "Unable to map IPI buffer I/O memory\n");
++			ret = PTR_ERR(mchan->req_buf);
++			return ret;
++		}
++	} else if (ret != -ENODEV) {
++		dev_err(mdev, "Unmatched resource %s.\n", name);
++		return ret;
++	}
++
++	name = "local_response_region";
++	ret = zynqmp_ipi_mbox_get_buf_res(node, name, &res);
++	if (!ret) {
++		mchan->resp_buf_size = resource_size(&res);
++		mchan->resp_buf = devm_ioremap(mdev, res.start,
++					       mchan->resp_buf_size);
++		if (IS_ERR(mchan->resp_buf)) {
++			dev_err(mdev, "Unable to map IPI buffer I/O memory\n");
++			ret = PTR_ERR(mchan->resp_buf);
++			return ret;
++		}
++	} else if (ret != -ENODEV) {
++		dev_err(mdev, "Unmatched resource %s.\n", name);
++		return ret;
++	}
++	mchan->rx_buf = devm_kzalloc(mdev,
++				     mchan->resp_buf_size +
++				     sizeof(struct zynqmp_ipi_message),
++				     GFP_KERNEL);
++	if (!mchan->rx_buf)
++		return -ENOMEM;
++
++	/* Get the IPI remote agent ID */
++	ret = of_property_read_u32(node, "xlnx,ipi-id", &ipi_mbox->remote_id);
++	if (ret < 0) {
++		dev_err(dev, "No IPI remote ID is specified.\n");
++		return ret;
++	}
++
++	mbox = &ipi_mbox->mbox;
++	mbox->dev = mdev;
++	mbox->ops = &zynqmp_ipi_chan_ops;
++	mbox->num_chans = 2;
++	mbox->txdone_irq = false;
++	mbox->txdone_poll = true;
++	mbox->txpoll_period = 5;
++	mbox->of_xlate = zynqmp_ipi_of_xlate;
++	chans = devm_kzalloc(mdev, 2 * sizeof(*chans), GFP_KERNEL);
++	if (!chans)
++		return -ENOMEM;
++	mbox->chans = chans;
++	chans[IPI_MB_CHNL_TX].con_priv = &ipi_mbox->mchans[IPI_MB_CHNL_TX];
++	chans[IPI_MB_CHNL_RX].con_priv = &ipi_mbox->mchans[IPI_MB_CHNL_RX];
++	ipi_mbox->mchans[IPI_MB_CHNL_TX].chan_type = IPI_MB_CHNL_TX;
++	ipi_mbox->mchans[IPI_MB_CHNL_RX].chan_type = IPI_MB_CHNL_RX;
++	ret = mbox_controller_register(mbox);
++	if (ret)
++		dev_err(mdev,
++			"Failed to register mbox_controller(%d)\n", ret);
++	else
++		dev_info(mdev, "Probed ZynqMP IPI Mailbox driver.\n");
++	return ret;
++}
++
++/**
++ * zynqmp_ipi_free_mboxes - Free IPI mailboxes devices
++ *
++ * @pdata: IPI private data
++ */
++static void zynqmp_ipi_free_mboxes(struct zynqmp_ipi_pdata *pdata)
++{
++	struct zynqmp_ipi_mbox *ipi_mbox;
++	int i;
++
++	i = pdata->num_mboxes;
++	for (; i >= 0; i--) {
++		ipi_mbox = &pdata->ipi_mboxes[i];
++		if (ipi_mbox->dev.parent) {
++			mbox_controller_unregister(&ipi_mbox->mbox);
++			device_unregister(&ipi_mbox->dev);
++		}
++	}
++}
++
++static int zynqmp_ipi_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct device_node *nc, *np = pdev->dev.of_node;
++	struct zynqmp_ipi_pdata *pdata;
++	struct zynqmp_ipi_mbox *mbox;
++	int i, ret = -EINVAL;
++
++	i = 0;
++	for_each_available_child_of_node(np, nc)
++		i++;
++	pdata = devm_kzalloc(dev, sizeof(*pdata) + (i * sizeof(*mbox)),
++			     GFP_KERNEL);
++	if (!pdata)
++		return -ENOMEM;
++	pdata->dev = dev;
++
++	/* Get the IPI local agents ID */
++	ret = of_property_read_u32(np, "xlnx,ipi-id", &pdata->local_id);
++	if (ret < 0) {
++		dev_err(dev, "No IPI local ID is specified.\n");
++		return ret;
++	}
++
++	pdata->num_mboxes = i;
++	pdata->ipi_mboxes = (struct zynqmp_ipi_mbox *)
++			    ((char *)pdata + sizeof(*pdata));
++
++	mbox = pdata->ipi_mboxes;
++	for_each_available_child_of_node(np, nc) {
++		mbox->pdata = pdata;
++		ret = zynqmp_ipi_mbox_probe(mbox, nc);
++		if (ret) {
++			dev_err(dev, "failed to probe subdev.\n");
++			ret = -EINVAL;
++			goto free_mbox_dev;
++		}
++		mbox++;
++	}
++
++	/* IPI IRQ */
++	ret = platform_get_irq(pdev, 0);
++	if (ret < 0) {
++		dev_err(dev, "unable to find IPI IRQ.\n");
++		goto free_mbox_dev;
++	}
++	pdata->irq = ret;
++	ret = devm_request_irq(dev, pdata->irq, zynqmp_ipi_interrupt,
++			       IRQF_SHARED, dev_name(dev), pdata);
++	if (ret) {
++		dev_err(dev, "IRQ %d is not requested successfully.\n",
++			pdata->irq);
++		goto free_mbox_dev;
++	}
++
++	platform_set_drvdata(pdev, pdata);
++	return ret;
++
++free_mbox_dev:
++	zynqmp_ipi_free_mboxes(pdata);
++	return ret;
++}
++
++static int zynqmp_ipi_remove(struct platform_device *pdev)
++{
++	struct zynqmp_ipi_pdata *pdata;
++
++	pdata = platform_get_drvdata(pdev);
++	zynqmp_ipi_free_mboxes(pdata);
++
++	return 0;
++}
++
++static struct platform_driver zynqmp_ipi_driver = {
++	.probe = zynqmp_ipi_probe,
++	.remove = zynqmp_ipi_remove,
++	.driver = {
++		   .name = "zynqmp-ipi",
++		   .of_match_table = of_match_ptr(zynqmp_ipi_of_match),
++	},
++};
++
++static int __init zynqmp_ipi_init(void)
++{
++	return platform_driver_register(&zynqmp_ipi_driver);
++}
++subsys_initcall(zynqmp_ipi_init);
++
++static void __exit zynqmp_ipi_exit(void)
++{
++	platform_driver_unregister(&zynqmp_ipi_driver);
++}
++module_exit(zynqmp_ipi_exit);
++
++MODULE_LICENSE("GPL v2");
++MODULE_DESCRIPTION("Xilinx ZynqMP IPI Mailbox driver");
++MODULE_AUTHOR("Xilinx Inc.");
+-- 
+2.7.4
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
