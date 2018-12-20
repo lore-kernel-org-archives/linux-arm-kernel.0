@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
 	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9B220C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 08:56:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1DE0AC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 08:57:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 647EC21741
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 08:56:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DF4F72176F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 08:57:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E8nj7i1r";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="T5DCQJsS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 647EC21741
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m8EavOgg";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="AMVV/XOQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DF4F72176F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,32 +25,32 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=L0orKDhS8engvPvad0Lw3wfESVFkOS51cHqio29R/AU=; b=E8nj7i1rkdJ7Y2
-	4b7T9w+cbzT6Fih5r1hGG5rKUAMh7chaddUEzPJKaTHwUCEYexSjWrAUKCjOM/84tnuBaBid3cMum
-	XV0g6iagsD2iZZg1PQ5ec50yjVVumwGUeeSNTf8BcgLRW9OnRNsidNCUDwJZrjBqMZ+/JJtQwLbSp
-	3pUuLdcXfJs1AmY+Rsx0PkD73kbs8Wykcn5PhjXZps8d+q7oOfqEZUOgqXPGeSbPzxfa3SMM13wZh
-	LpMAe0wCXyIp5ak1CCHO5Z6F0xMTLl8ITq3dSVLM0DDgBH7nO4JS6SHZPx03+GLssEkW7ThmXx5nQ
-	uEVw7dDhLmICNkBvMsPQ==;
+	List-Owner; bh=+DRhM0A4yrwaedm0DrW613eu7nL0UjS6Pswl+0xHlcg=; b=m8EavOggWbxiY9
+	Vh7Xd8Gacd9LMKWfCypHPAD0rvleoF9hNYb/g/S51MKftByZMRWuL9cZatBDSDzcXOPXBNmA/zlOF
+	7Ij2OJjK5vv31+Q7UQYoaqIbFp/QpxxlmfHmWWGIh0wLndazckj3uYmcayfBvwL2pdGd/eNvLLYhd
+	kyWT9VIW55rYXcnpwMuE2z2r2u42tr2P+4s0/CaWEF+a8ujnUhWT90DtTjLG6yYSGB9LrOdkdBTct
+	ucNorGv8x3f7KBJ5HBUUFnJ+MpppH2ROYsvEM3bZN0KWLoyGsIIicNcMtIoCJlXBF7QbELZ6aVVf5
+	REvZLNsiSekybC4hTNhw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZu8P-0004bC-5C; Thu, 20 Dec 2018 08:56:49 +0000
+	id 1gZu8d-0004rg-KW; Thu, 20 Dec 2018 08:57:03 +0000
 Received: from mail-eopbgr140040.outbound.protection.outlook.com
  ([40.107.14.40] helo=EUR01-VE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZu81-00049C-6Y
- for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 08:56:30 +0000
+ id 1gZu86-00049C-Py
+ for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 08:56:32 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=6DjiJUU3JsLHTOMWgTAfFMxUCK01lBDe2voLmWTW15g=;
- b=T5DCQJsSBEEnpKsgxjoIZKR/98e76S2kaZM8RfRp4emiSZVBHguWIuX7bFsstpjFaBm20sszSympZ6fl/9azXvFN3rluHZ3DfglvzjMmVFm1HMlWB7Vq0wea+9wZXZLHMLHZp8osujWCwzg1HRGlbk+3WPB4u4uaYkjBRAynJD4=
+ bh=NiPt1ICpOUSWSrLVgxfupB7bNmf3ucLjQUDr+sqLGbU=;
+ b=AMVV/XOQdBT2iKziXtpg+hOzolKDW62VMrzEbjuh873L8w9kxHyop99L8nXqWugHRkCjDlpsx45Z+lLuToIQ+NE/nZ0zNVGF2MPSvYxyS1Uu0a+8gvW/EEAOn50qmZtKbBwb5JyEeoM7P/9gNsUBWQE9kfC3MQSJynmyh8snmto=
 Received: from AM6PR0402MB3911.eurprd04.prod.outlook.com (52.133.30.10) by
  AM6PR0402MB3653.eurprd04.prod.outlook.com (52.133.28.144) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1446.17; Thu, 20 Dec 2018 08:56:16 +0000
+ 15.20.1446.17; Thu, 20 Dec 2018 08:56:25 +0000
 Received: from AM6PR0402MB3911.eurprd04.prod.outlook.com
  ([fe80::987c:cb59:96c9:6b71]) by AM6PR0402MB3911.eurprd04.prod.outlook.com
  ([fe80::987c:cb59:96c9:6b71%2]) with mapi id 15.20.1425.025; Thu, 20 Dec 2018
- 08:56:16 +0000
+ 08:56:25 +0000
 From: Anson Huang <anson.huang@nxp.com>
 To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
  <mark.rutland@arm.com>, "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
@@ -70,11 +70,13 @@ To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
  "linux-arm-kernel@lists.infradead.org"
  <linux-arm-kernel@lists.infradead.org>, "linux-rtc@vger.kernel.org"
  <linux-rtc@vger.kernel.org>
-Subject: [PATCH V5 2/4] rtc: add i.MX system controller RTC support
-Thread-Topic: [PATCH V5 2/4] rtc: add i.MX system controller RTC support
-Thread-Index: AQHUmEHdVixj4el6fUSTLnxifG4HUQ==
-Date: Thu, 20 Dec 2018 08:56:16 +0000
-Message-ID: <1545295872-20169-3-git-send-email-Anson.Huang@nxp.com>
+Subject: [PATCH V5 3/4] defconfig: arm64: add i.MX system controller RTC
+ support
+Thread-Topic: [PATCH V5 3/4] defconfig: arm64: add i.MX system controller RTC
+ support
+Thread-Index: AQHUmEHjxu+dVHKVvUqH/OBKM8Rc8Q==
+Date: Thu, 20 Dec 2018 08:56:25 +0000
+Message-ID: <1545295872-20169-4-git-send-email-Anson.Huang@nxp.com>
 References: <1545295872-20169-1-git-send-email-Anson.Huang@nxp.com>
 In-Reply-To: <1545295872-20169-1-git-send-email-Anson.Huang@nxp.com>
 Accept-Language: en-US
@@ -89,24 +91,24 @@ x-ms-exchange-messagesentrepresentingtype: 1
 x-originating-ip: [119.31.174.66]
 x-ms-publictraffictype: Email
 x-microsoft-exchange-diagnostics: 1; AM6PR0402MB3653;
- 6:XBpKXG4VT24jF9P1ULrbrrt1XFi1DgWhlDCfPwIDWRCp+WkU7bQA+Hrg+IoUk8TZ9vMhVY5xCofC/IepPjgEkg8Sw9Q3TkLgzq/MhU/Fi1WNYG9t6JuHIuMDr8cqo+BjCCoP5Ww49HC4dk4502ijuh3Rpv8ab8JYOsOwb+fDudgAj1vDRyE+E1CnLenk54BFqlz1RBXcnsZQDaqIHhZYY+bYSlXsHgxHxi0lTlUW+QmijiZu2F3Jxg5vQKI32fYVAgXakrne4kNdwB5qLt++d8UqSbLK/iWM7+BL1l8z02gcXzB0uOLR0ZUxjqa6GtdCVSo7WQ8z3EbYIsrplHVsKjVBx6rxwO4/tMwmPFY1UMVmhgfZ3uFZKShJcz/FdNXzoEClQi9b/PzytDeovOvjoFYKW1WulJRzqwyCVhY2b6kIPCoXfEVSHnwDxzeS/8N4MFXq42XIz/Qcfuyo9CgIIQ==;
- 5:gmCxj3zb57mMrY4/5E8hMCYzj/EM0toLoPZE+D9UNk9bwnld7NfEcldZiWX9lteDRSjmB+NWuBJVZCsZVT0KjQbaTch0Js8T8Hbdejhb2qb1m6f+aE8mKt1aqBnbKDooUyV2G5LjrBXEAcLdLsIaHttK2Ll9kkuQiVc7BTGwbYc=;
- 7:GjfGGUdPSq5I2LASqytcEPdx5+PmsOuqgTxsGVFK4TkmF0TX+BMTrCHcTFxzbIH0nHJcGVHu+sn8wSBiRhDMgpzN7eCxVY7BGFbzCPwF2IfXF0wDsVELkSn8XxYXJasAZjB0IJG/+Fl9xNB9idGbew==
-x-ms-office365-filtering-correlation-id: b03dbc36-1815-4819-eabe-08d666590028
+ 6:Oc5P4iGhWg4/1wAtxwQ/nKg16+Azc3geN/WqPXEmm7fuw+tc/UwO54A1RNNqY5+1laKi/0+zsVxGWgiueU7tw3N419ZxflZJW9tOAXoc7gcqM2jKHMf9nY1nvE9xcy6qoj2Nlx6Ipe+l4kAKnt/OqtEu8LXTX1J6n4Bu7OtgRkOC5HPXm2UsClbRAxtapbYn4sHyhdTroEPd5y7rrjK6Fdw6lkaeTmtQDIPS4d/xbOL/qB7JU7sidltF8ud13huUg0Uv381vn2huKlge9qpQ4zTm4AxB91H3j7n8ZAmB8xyadEHLDgNTvHK8tEG8V34xvYwml9YvO1kTfUc7q3GbOljsecRoZBrXnRSpaIgn9xGCwg1MsWHqd/rPlG9qNozFyBij9cZAc6pLJ39q9xck46s124qe8hahuKJy55EX+gzmH/gO4rrGGJmc+tKIPbiObwlwTFdZilauu13FEcnv3A==;
+ 5:B98os/KGCEljKqkd6hxDIY5V8C7R6z7rfhM5ratwsc6Dxn0wk+r1ZsOIom8pqXQOLdw7ypTU/sBEys8jmHR2vbdSrjSqaxOy1QoUYL2F5t7NYbPyx01RSJFmk9Jgkj4KL1o+bOXwZKC1+5VkCQ9dgalT4ZwzqeBdARXMwdm4n38=;
+ 7:DvYaLp1BjO7z7Rx1hNg8VSI3eaOy3q0ewNU4tGbpzNE2nPyCAQTxvqFT9dKp2N7wQPfe/mHykgIOnydTD6OCsiKquPERZUB4ST74nbAxfH0/hwQyHhCNZRnu5n5LnJIy1iXKj4kbKMmX5+Mu5gFBRQ==
+x-ms-office365-filtering-correlation-id: 9ec5e1a3-8799-48ac-78ab-08d666590542
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(5600074)(711020)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
  SRVR:AM6PR0402MB3653; 
 x-ms-traffictypediagnostic: AM6PR0402MB3653:
 x-ld-processed: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635,ExtAddr
-x-microsoft-antispam-prvs: <AM6PR0402MB36539ADE30D47427B9567C2AF5BF0@AM6PR0402MB3653.eurprd04.prod.outlook.com>
+x-microsoft-antispam-prvs: <AM6PR0402MB36531322908CB4B43863111DF5BF0@AM6PR0402MB3653.eurprd04.prod.outlook.com>
 x-ms-exchange-senderadcheck: 1
 x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
  RULEID:(8211001083)(3230021)(999002)(5005026)(6040522)(2401047)(8121501046)(3231475)(944501520)(52105112)(10201501046)(3002001)(93006095)(93001095)(6055026)(149066)(150057)(6041310)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123564045)(20161123560045)(20161123562045)(20161123558120)(201708071742011)(7699051)(76991095);
  SRVR:AM6PR0402MB3653; BCL:0; PCL:0; RULEID:; SRVR:AM6PR0402MB3653; 
 x-forefront-prvs: 0892FA9A88
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(346002)(376002)(366004)(136003)(39860400002)(396003)(199004)(189003)(54534003)(76176011)(102836004)(11346002)(446003)(2616005)(6506007)(14454004)(386003)(478600001)(52116002)(53936002)(2201001)(6512007)(575784001)(86362001)(25786009)(71200400001)(71190400001)(50226002)(110136005)(4326008)(6436002)(68736007)(6486002)(5660300001)(106356001)(105586002)(305945005)(316002)(66066001)(2501003)(97736004)(7416002)(99286004)(81166006)(81156014)(8936002)(8676002)(7736002)(3846002)(6116002)(2906002)(256004)(6346003)(26005)(476003)(36756003)(486006)(186003)(921003)(1121003);
+ SFS:(10009020)(346002)(376002)(366004)(136003)(39860400002)(396003)(199004)(189003)(76176011)(102836004)(11346002)(446003)(2616005)(6506007)(14454004)(386003)(478600001)(52116002)(53936002)(2201001)(6512007)(86362001)(25786009)(71200400001)(71190400001)(50226002)(110136005)(4326008)(6436002)(68736007)(6486002)(5660300001)(106356001)(105586002)(305945005)(316002)(66066001)(2501003)(97736004)(7416002)(99286004)(81166006)(81156014)(8936002)(8676002)(7736002)(3846002)(6116002)(2906002)(256004)(6346003)(26005)(476003)(36756003)(486006)(186003)(921003)(1121003);
  DIR:OUT; SFP:1101; SCL:1; SRVR:AM6PR0402MB3653;
  H:AM6PR0402MB3911.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; A:1; MX:1; 
@@ -114,19 +116,19 @@ received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 authentication-results: spf=none (sender IP is )
  smtp.mailfrom=anson.huang@nxp.com; 
-x-microsoft-antispam-message-info: h+bT9s0jM4hMS2iaz0f4/eTVx674uRi70sqOmaXpdTIie/hVaWKayxI0HxDOzfjw/AhXXxqIVclucF8h8+RIdkEd0Ks7IRLykzBgyyOWU/eQIQ87Qv+gtsU/CVD+6eShG3IFRYj5SLJYPHqm6ineKRs/GHKu7euZQTd8q9+kukso5JMjs+OzoYeEeRLIMcOjMyp8rAZsXVtummHgM2lme48FDJ3TDvF4vbwC65KZcXfxbPCEvI6AjWLH+P8lN9gRXVB0nSzR3TcfBYRRvyRU1u4aa7lDQmvukg7nnHfyCjYSdlIx6Ff/HyFRFZan4kS8
+x-microsoft-antispam-message-info: Xr5WVSO51yneJWFIbaxUZw4MxWduQz4wT406WuEI9AZOx1QrRYky6V7J2HO8nX7oVI+90rBARWB7V+SjUWJcrei2Oyc+ltYbGmm8VEFINiaw33I5DQTfAWskMzynbDDK9gbg2QYSXeRh3IwtTKfGig2IaR3QyJWgYxvqMsH5bq+V6sr9KP/bAYQvSi8+xgU+Z9HnXZl+m+Uca5WvYv1BwjsFFUc8gfcyVinspkrqPMw99VM68iH6/1KXIjFA5lUx38FwuLq/BdjU10rcCYb4hwNwd45kHZx2UdU5i67iUS6CynmWslZIiapo1q/JnbNv
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: b03dbc36-1815-4819-eabe-08d666590028
-X-MS-Exchange-CrossTenant-originalarrivaltime: 20 Dec 2018 08:56:16.2409 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 9ec5e1a3-8799-48ac-78ab-08d666590542
+X-MS-Exchange-CrossTenant-originalarrivaltime: 20 Dec 2018 08:56:25.0972 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR0402MB3653
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_005625_790975_93BDCB1C 
-X-CRM114-Status: GOOD (  22.20  )
+X-CRM114-CacheID: sfid-20181220_005631_187022_071896F8 
+X-CRM114-Status: GOOD (  11.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -144,158 +146,27 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-i.MX8QXP is an ARMv8 SoC which has a Cortex-M4 system controller
-inside, the system controller is in charge of controlling power,
-clock and secure rtc etc..
-
-This patch adds i.MX system controller RTC driver support,
-Linux kernel has to communicate with system controller via MU
-(message unit) IPC to set/get RTC time and other alarm functions,
-since the RTC set time needs to be done in secure EL3 mode (required
-by system controller firmware) and alarm functions needs to be done
-with general MU IRQ handle, these depend on other components which
-are NOT ready, so this patch ONLY enables the RTC time read.
+This patch enables CONFIG_RTC_DRV_IMX_SC as module by default.
 
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
-ChangeLog since V4:
-    - Add dependency on IMX_SCU to avoid compile error when IMX_SCU is NOT enabled;
-    - Use dev_err instead of pr_err;
-    - Remove unneccssary different errors check in imx_scu_get_handle which is already done in API.
+No change since V4.
 ---
- drivers/rtc/Kconfig      |  7 ++++
- drivers/rtc/Makefile     |  1 +
- drivers/rtc/rtc-imx-sc.c | 91 ++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 99 insertions(+)
- create mode 100644 drivers/rtc/rtc-imx-sc.c
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index a819ef0..225b0b8 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -1677,6 +1677,13 @@ config RTC_DRV_SNVS
- 	   This driver can also be built as a module, if so, the module
- 	   will be called "rtc-snvs".
- 
-+config RTC_DRV_IMX_SC
-+	depends on IMX_SCU
-+	tristate "NXP i.MX System Controller RTC support"
-+	help
-+	   If you say yes here you get support for the NXP i.MX System
-+	   Controller RTC module.
-+
- config RTC_DRV_SIRFSOC
- 	tristate "SiRFSOC RTC"
- 	depends on ARCH_SIRF
-diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
-index 290c173..f97c05e 100644
---- a/drivers/rtc/Makefile
-+++ b/drivers/rtc/Makefile
-@@ -75,6 +75,7 @@ obj-$(CONFIG_RTC_DRV_GOLDFISH)	+= rtc-goldfish.o
- obj-$(CONFIG_RTC_DRV_HID_SENSOR_TIME) += rtc-hid-sensor-time.o
- obj-$(CONFIG_RTC_DRV_HYM8563)	+= rtc-hym8563.o
- obj-$(CONFIG_RTC_DRV_IMXDI)	+= rtc-imxdi.o
-+obj-$(CONFIG_RTC_DRV_IMX_SC)	+= rtc-imx-sc.o
- obj-$(CONFIG_RTC_DRV_ISL12022)	+= rtc-isl12022.o
- obj-$(CONFIG_RTC_DRV_ISL12026)	+= rtc-isl12026.o
- obj-$(CONFIG_RTC_DRV_ISL1208)	+= rtc-isl1208.o
-diff --git a/drivers/rtc/rtc-imx-sc.c b/drivers/rtc/rtc-imx-sc.c
-new file mode 100644
-index 0000000..7ff0854
---- /dev/null
-+++ b/drivers/rtc/rtc-imx-sc.c
-@@ -0,0 +1,91 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Copyright 2018 NXP.
-+ */
-+
-+#include <linux/firmware/imx/sci.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/rtc.h>
-+
-+#define IMX_SC_TIMER_FUNC_GET_RTC_SEC1970	9
-+#define IMX_SC_TIMER_FUNC_SET_RTC_TIME		6
-+
-+static struct imx_sc_ipc *rtc_ipc_handle;
-+static struct rtc_device *imx_sc_rtc;
-+
-+struct imx_sc_msg_timer_get_rtc_time {
-+	struct imx_sc_rpc_msg hdr;
-+	u32 time;
-+} __packed;
-+
-+static int imx_sc_rtc_read_time(struct device *dev, struct rtc_time *tm)
-+{
-+	struct imx_sc_msg_timer_get_rtc_time msg;
-+	struct imx_sc_rpc_msg *hdr = &msg.hdr;
-+	int ret;
-+
-+	hdr->ver = IMX_SC_RPC_VERSION;
-+	hdr->svc = IMX_SC_RPC_SVC_TIMER;
-+	hdr->func = IMX_SC_TIMER_FUNC_GET_RTC_SEC1970;
-+	hdr->size = 1;
-+
-+	ret = imx_scu_call_rpc(rtc_ipc_handle, &msg, true);
-+	if (ret) {
-+		dev_err(dev, "read rtc time failed, ret %d\n", ret);
-+		return ret;
-+	}
-+
-+	rtc_time_to_tm(msg.time, tm);
-+
-+	return 0;
-+}
-+
-+static const struct rtc_class_ops imx_sc_rtc_ops = {
-+	.read_time = imx_sc_rtc_read_time,
-+};
-+
-+static int imx_sc_rtc_probe(struct platform_device *pdev)
-+{
-+	int ret;
-+
-+	ret = imx_scu_get_handle(&rtc_ipc_handle);
-+	if (ret)
-+		return ret;
-+
-+	imx_sc_rtc = devm_rtc_allocate_device(&pdev->dev);
-+	if (IS_ERR(imx_sc_rtc))
-+		return PTR_ERR(imx_sc_rtc);
-+
-+	imx_sc_rtc->ops = &imx_sc_rtc_ops;
-+	imx_sc_rtc->range_min = 0;
-+	imx_sc_rtc->range_max = U32_MAX;
-+
-+	ret = rtc_register_device(imx_sc_rtc);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to register rtc: %d\n", ret);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id imx_sc_dt_ids[] = {
-+	{ .compatible = "fsl,imx8qxp-sc-rtc", },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, imx_sc_dt_ids);
-+
-+static struct platform_driver imx_sc_rtc_driver = {
-+	.driver = {
-+		.name	= "imx-sc-rtc",
-+		.of_match_table = imx_sc_dt_ids,
-+	},
-+	.probe		= imx_sc_rtc_probe,
-+};
-+module_platform_driver(imx_sc_rtc_driver);
-+
-+MODULE_AUTHOR("Anson Huang <Anson.Huang@nxp.com>");
-+MODULE_DESCRIPTION("NXP i.MX System Controller RTC Driver");
-+MODULE_LICENSE("GPL");
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index d3aa3f7..abd80c5 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -572,6 +572,7 @@ CONFIG_RTC_DRV_PL031=y
+ CONFIG_RTC_DRV_SUN6I=y
+ CONFIG_RTC_DRV_ARMADA38X=y
+ CONFIG_RTC_DRV_TEGRA=y
++CONFIG_RTC_DRV_IMX_SC=m
+ CONFIG_RTC_DRV_XGENE=y
+ CONFIG_DMADEVICES=y
+ CONFIG_DMA_BCM2835=m
 -- 
 2.7.4
 
