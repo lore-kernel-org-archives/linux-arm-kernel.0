@@ -2,21 +2,21 @@ Return-Path: <SRS0=AHqO=O5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=unavailable
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 37EDDC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 15:00:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9A10BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 15:05:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 030E421720
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 15:00:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6BF9420989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 15:05:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="O5kTeVw5";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="pdnUMcCF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 030E421720
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VVJ85RDY";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="BKoi93q0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6BF9420989
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,59 +25,56 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kQgsmY6vuldLqzs4JJHuTcWKY994tsyRYgb+aVgHcRU=; b=O5kTeVw5BSZwWc
-	ludXo34rvHPJ0m0UZwFZW/+FCt4QvwFwAmZnB2MDJKDL/a76Kgb5J6k294r5Jyq6FRdj3quKIdkq6
-	59BUE5eopOjW/MpyN6fT2+MJtpW6xpMt+hm3bkqZR0N4MIFp2UF5xxyJrPiR/iz9BnaaUzTWXDewb
-	W7NlgOx5B25JF0vq+pzCqbr9V6nb8Mqxla+0v9A9iac3GzVOcNZh3PuBbSQSqbFRg3hz7M7MlZo45
-	NTm7I0pa1KFHuWiDQEZPS/bTc9WbKgGqMFPqbcgKb75Uk2tKgDVPTOC5h2Ji8L0tIpxBEAhujt48i
-	bJD4fGQuYEJl7N4y16AQ==;
+	List-Owner; bh=OBnanbYAOFKtObCKZ+XBFS91RzCKQ/GAxpts6QFFU0Q=; b=VVJ85RDY6UaXNb
+	9JVJ92nOIkUyCOD2AfMot8QJ3ByJVDhmUmhiZaWSGUfmqXEUdOsw6uNsO6RW4rv4v3umsce+TFcLw
+	pXaVOHimTuR9OQ5VRC07qQqywy6jLRm6rno8RFnnjiZtGbdhk56X7qt4nj6Gr10jQJktJVrOGtF8O
+	2ylw13FLZKEi47VngojysuiR8IJQVQEGeIIoqn3S9ZEcEwylAZzVqtgwTEtG/PXNfecy8+LGc1p71
+	oQdidOHJFWTdz0OPvB2ZlC8N3rwjKzr7ew/L5oIv1A0Kpq7pA2v8F1t2LsNy/SzXNdXUis3+VYmJJ
+	gUZGIPW3zWnHjCy5Dyug==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZzoM-0002PM-5t; Thu, 20 Dec 2018 15:00:30 +0000
+	id 1gZzt5-0004Jf-D2; Thu, 20 Dec 2018 15:05:23 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZzoI-0002OM-5b
- for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 15:00:28 +0000
-Received: from mail-qt1-f173.google.com (mail-qt1-f173.google.com
- [209.85.160.173])
+ id 1gZzt3-0004IP-9N
+ for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 15:05:22 +0000
+Received: from mail-qt1-f182.google.com (mail-qt1-f182.google.com
+ [209.85.160.182])
  (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 8C8C7218D9
+ by mail.kernel.org (Postfix) with ESMTPSA id CE08C218AE
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 20 Dec 2018 15:00:15 +0000 (UTC)
+ Thu, 20 Dec 2018 15:05:10 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1545318015;
- bh=PgdcFzzFJRfg9e6GuRKfjwKRt1qszJo4vAoki4ZdPow=;
+ s=default; t=1545318311;
+ bh=pU1qiUpdARY0RhrguUJV+QXDWs9jVr6LBPKymW/y3LY=;
  h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=pdnUMcCFDBFzHEAMdpyHRqX9GgShwKo+QWg59/9Oe4NJ82DCoTOfLtLzZYMANPtwQ
- L0sUq2vX5mD6Af6yxTOnQuLhXBpFkmQnsid16WJWPW1iqe/fF8awRHmT6MQ7y6YWYx
- uTqdoLMVoIEznpEq3UtzC3+ivOhjCz4zQIY5fcgI=
-Received: by mail-qt1-f173.google.com with SMTP id k12so2084939qtf.7
+ b=BKoi93q0Ey+xkCzuqqOQTHp+4u/DfalRPbHW2Qz9e849jTnhxKau5RC161IZ+DP88
+ OwmgI5xxXVKG+JHalCnryZ+OBJKvudzsAjz4bBe5Hu9Bqx2lSnGAKCudk22sZyld0z
+ fTfLjh+MAWHqFUgAbjZ48wyxMbcb0EnLSg46B9Iw=
+Received: by mail-qt1-f182.google.com with SMTP id l12so2098050qtf.8
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 20 Dec 2018 07:00:15 -0800 (PST)
-X-Gm-Message-State: AA+aEWaQfq8/rASCGV7VgWY0sQJhTfyr3PL9NThW+PHX+7l+2uWwJIbK
- R6QKboOEje6a8PFl0N7r/9iSG8/BgQNDWyUdcA==
-X-Google-Smtp-Source: AFSGD/UI6ZKZCM3DWOK3vRuT6L0eQh3X21IsbTvynvSnAaNVyobUIJbREiqUsj9quGSzKi6VGzTplbsMOKm35Uj5ark=
-X-Received: by 2002:a0c:f212:: with SMTP id h18mr26745039qvk.106.1545318014699; 
- Thu, 20 Dec 2018 07:00:14 -0800 (PST)
+ Thu, 20 Dec 2018 07:05:10 -0800 (PST)
+X-Gm-Message-State: AA+aEWa621ieXab6wgHFSsZFZvPln3N8dcNRBS9QZ7qTOmenV07aSJsj
+ ad+uaCMb3b+MxUNdv7O/wJgP88N+srlOBvmkdA==
+X-Google-Smtp-Source: AFSGD/UnuIu7E3MzUS/BouOvxJ8zdia4VxZRbCWxRFN6Pdr0hyHOUB1E4X4aLpHc9e8tsdnhFPql4uFymmKZAHFEpn0=
+X-Received: by 2002:a0c:c389:: with SMTP id o9mr26473216qvi.90.1545318310028; 
+ Thu, 20 Dec 2018 07:05:10 -0800 (PST)
 MIME-Version: 1.0
 References: <20181218040702.29231-1-andrew.smirnov@gmail.com>
  <20181218040702.29231-4-andrew.smirnov@gmail.com>
  <20181218151533.GA2922@bogus>
  <VI1PR04MB5533533242C036C5CF6352BAEEBD0@VI1PR04MB5533.eurprd04.prod.outlook.com>
- <CAL_JsqJb24ZpM7qQfy_F7RUVEGyceBAXOndbZcTMh3a__k38UQ@mail.gmail.com>
- <CAHQ1cqEMxxo9JGN5be4XQWAtPz7nC2JyLCr3qasnD5QK7_hOYQ@mail.gmail.com>
- <1545268969.22930.77.camel@impinj.com>
-In-Reply-To: <1545268969.22930.77.camel@impinj.com>
+In-Reply-To: <VI1PR04MB5533533242C036C5CF6352BAEEBD0@VI1PR04MB5533.eurprd04.prod.outlook.com>
 From: Rob Herring <robh@kernel.org>
-Date: Thu, 20 Dec 2018 09:00:01 -0600
-X-Gmail-Original-Message-ID: <CAL_JsqJBxZw225qqWfCFa8UqADtGOUCjFogo6Pb2bd8bKwz3nA@mail.gmail.com>
-Message-ID: <CAL_JsqJBxZw225qqWfCFa8UqADtGOUCjFogo6Pb2bd8bKwz3nA@mail.gmail.com>
+Date: Thu, 20 Dec 2018 09:04:58 -0600
+X-Gmail-Original-Message-ID: <CAL_JsqLcMb+RG8CJxzCRx0D8TdfZBFOtcx768ejHeNHtSSp5Wg@mail.gmail.com>
+Message-ID: <CAL_JsqLcMb+RG8CJxzCRx0D8TdfZBFOtcx768ejHeNHtSSp5Wg@mail.gmail.com>
 Subject: Re: [PATCH v3 3/3] PCI: imx6: Add support for i.MX8MQ
-To: Trent Piepho <tpiepho@impinj.com>
+To: Leonard Crestez <leonard.crestez@nxp.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_070026_247747_6F51C395 
-X-CRM114-Status: GOOD (  21.31  )
+X-CRM114-CacheID: sfid-20181220_070521_356705_7A111133 
+X-CRM114-Status: GOOD (  16.82  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,70 +93,55 @@ Cc: Dong Aisheng <aisheng.dong@nxp.com>, devicetree@vger.kernel.org,
  <linux-arm-kernel@lists.infradead.org>,
  Andrey Smirnov <andrew.smirnov@gmail.com>, linux-pci@vger.kernel.org,
  "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Bjorn Helgaas <bhelgaas@google.com>, NXP Linux Team <linux-imx@nxp.com>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- Leonard Crestez <leonard.crestez@nxp.com>, Chris Healy <cphealy@gmail.com>,
+ Fabio Estevam <fabio.estevam@nxp.com>, NXP Linux Team <linux-imx@nxp.com>,
+ Bjorn Helgaas <bhelgaas@google.com>, Chris Healy <cphealy@gmail.com>,
  Lucas Stach <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 19, 2018 at 7:22 PM Trent Piepho <tpiepho@impinj.com> wrote:
+On Tue, Dec 18, 2018 at 12:09 PM Leonard Crestez
+<leonard.crestez@nxp.com> wrote:
 >
-> On Wed, 2018-12-19 at 16:47 -0800, Andrey Smirnov wrote:
+> On 12/18/2018 5:15 PM, Rob Herring wrote:
+> > On Mon, Dec 17, 2018 at 08:07:02PM -0800, Andrey Smirnov wrote:
+> >> Add code needed to support i.MX8MQ variant.
+> >>
+> >> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> >> Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+>
+> >> --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> >> +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> >>
+> >> +Additional required properties for imx8mq-pcie:
+> >> +- fsl,controller-id: Logical ID of a given PCIE controller. PCIE1 is 0, PCIE2 is 1;
+> >> +
 > >
-> > > > This series initially added explicit offsets but I suggested a single
-> > > > "controller-id" because:
-> > > >   * There are multiple bit and byte offsets
-> > > >   * Other imx8 SOCs also have 2x pcie with other bit/byte offsets
-> > > >
-> > > > Hiding this behind a compatible string and single "controller-id" seem
-> > > > preferable to elaborating register maps in dt bindings. It also makes
-> > > > upgrades simpler: if features are added which use other bits there is no
-> > > > need to describe them in DT and deal with compatibility headaches.
-> > >
-> > > You already have an id for the controllers: the address. Use that if
-> > > you don't want to put the register offsets in DT.
-> > >
+> > Remove this.
 > >
-> > Lucas, are you on board with this?
+> > If GPR register offset is what you need, then put that into DT.
+> > Typically, we'd have a property with iomuxc phandle and offset.
 >
-> Does address here mean the address from the controller's reg property?
-
-Yes.
-
-> How do you map that address to the controller's index?  A giant table
-> of every soc so the soc type plus controller register address pair than
-> can be looked up in the driver?
-
-You only need the 2-Nth instance addresses. A non-matching address can
-be instance 0.
-
-> I.e., on iMX8MQ the controller at 0x33800000 is controller 0 and so on
-> for every possible SoC address combination?
+> This series initially added explicit offsets but I suggested a single
+> "controller-id" because:
+>   * There are multiple bit and byte offsets
+>   * Other imx8 SOCs also have 2x pcie with other bit/byte offsets
 >
-> Not really a fan of that.
+> Hiding this behind a compatible string and single "controller-id" seem
+> preferable to elaborating register maps in dt bindings. It also makes
+> upgrades simpler: if features are added which use other bits there is no
+> need to describe them in DT and deal with compatibility headaches.
 
-Well, this was not my first suggestion.
+You don't have to describe all bit and byte offsets. Once you know 1,
+you can derive all the others. In fact, it doesn't have to be a
+register field at all, just provide whatever identifier you need:
 
-> The situation here is that some registers for these controllers are
-> interleaved, right?  I.e., there's one register somewhere where bit 0
-> means enable controller 0 and bit 1 means enable controller 1 and so
-> on.
+<$syscon 0>
 
-So? The only difference here is an additional mapping step.
+and
 
-> Isn't cell-index already the standard device tree property for this
-> kind of setup?
->
-> I know cell-index was historically also (ab)used in an attempt to
-> provide a fixed kernel device enumeration order, something now handled
-> better by chosen node aliases.
-
-Don't use cell-index. Consider it a deprecated relic from OF that is
-not used on FDT (though there probably are some cases it did get
-used).
+<&syscon 1>
 
 Rob
 
