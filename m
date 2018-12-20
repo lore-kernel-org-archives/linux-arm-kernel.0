@@ -3,19 +3,21 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 57F22C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 22:42:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 704A3C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 23:20:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1C7592186A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 22:42:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3BBC2218FE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 23:20:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G/P7I+8j"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1C7592186A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lYJTyTdS";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="jq9FmGN4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3BBC2218FE
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -23,53 +25,56 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ehUMu4rqRRkJ60hvDw9sxz3Vqcp+CY/V3M8+ocXnlrg=; b=G/P7I+8jQ3iNOj
-	bdfMalFut2K/smcCL5NcXxDxAdPHff1FUF7OlhD1GsLKyq3YaRpy2U2iCi78ivhQBgr8eSRxFoVqH
-	+t1nLiMZjoDW5SwXWVXqtVaK6FD27/KoZ0Xi9TtPHiLDYUqJzJN2abahk1JOpFXWYtaa68V2njGD9
-	GaSwSxIAKvA60QAVj+jaYPMQVWFTSK+uO7KqETtf40f/OvfSxGAx5HlBQp6vG5GCXHZzwgyDmaPBd
-	6AGMRvtn4yd1op95lTcXcjBccmXFV9QS0jvUL4mlvlFZ0LVGiSeCtaA7bJZq4n5SwcoNE5pcRRHqA
-	jAm6kuQ2ET8f0m26RKBg==;
+	List-Owner; bh=cfW2b6FInPngAPIRoYbDjCU/AE8wrgjDknRIO4ui7fE=; b=lYJTyTdSkVRH+g
+	Q4X63UF49ZSyjQONMmzHGYrX9T1bS4YUDxvipzxDYkJlAgMVLW8kStCp1HKrP6xkuBfJ5puNEtIKR
+	AVugiPGym0UdB+S6YyURzwY9nYutyxbBq8GJivRoUwQJxQciX9O67fE9ybHh02mQd/SJMqIcpKgKA
+	isHBdvq/lvcJlTki9XBjf2to1z/DREgZHz/bU30xx+pzGpryY0+bSbxbU9O8bwWoP1L2gV8AmZU08
+	0U8wUKBZSP1dtz5Vdsp3Mv6a7A/ZybhQC4veHFPCfIEYhnO9mhb1XsOkAHEHRduHhu5La+18X8Plv
+	JRIvW7Kif0Q8/ChnEiAg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ga71F-0005wz-Dw; Thu, 20 Dec 2018 22:42:17 +0000
-Received: from mail-qk1-f194.google.com ([209.85.222.194])
+	id 1ga7cP-0002xC-R9; Thu, 20 Dec 2018 23:20:41 +0000
+Received: from mail-it1-x144.google.com ([2607:f8b0:4864:20::144])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ga713-0005oX-Su; Thu, 20 Dec 2018 22:42:07 +0000
-Received: by mail-qk1-f194.google.com with SMTP id a1so2018787qkc.5;
- Thu, 20 Dec 2018 14:41:55 -0800 (PST)
+ id 1ga7cM-0002vW-2u
+ for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 23:20:39 +0000
+Received: by mail-it1-x144.google.com with SMTP id g85so4500387ita.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 20 Dec 2018 15:20:25 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=aJCstcpioKX1kDPN9Do4ajl4wQrLRjEEgz6HAK8MoUY=;
+ b=jq9FmGN4dEMDtMTdoSlw+U4KYxRXJEWTp0D/E5gKQxakIGOQlDSyOpAf28F3X6D93Q
+ zBWTouplLsJzDsBHyzbPw5I5cneJ2jm5gNKicFCRLDOnZkK23qJn4Olt6gCsRkaBV4ys
+ ff+XaSkC4mwtm7wQHD6ms6kOp4MHJ4ZTcCjH8=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=M5yVewNMCEuWqwKt7RGtu94TxkIpyukx9AL0sXO399A=;
- b=Pa6NMVtbRwRbpLSEPuChk/T7W7WQrPe/VNDbvXQDKOnPBU8HJym4AmQHuk30MV/sTx
- /HqCFqR1ahgb116OdntnjxDmtpTjam1/PuZ6sMIecY2DYrqZHhQXQb6MxHIurMIN6hi2
- sXfefAVjs0Pi4N6mJufcKyL9EklVUuWdpz0Vh1kfX0jiCHGfZm95ZHQcDlzuU/7+btdY
- zfcbrKUCFZgkohF4pF9WJpjM76tC86WeroxS065ggHFO7Xxr7JeKkjJFpJwHOlqso2Jd
- Uwa28eXuWTLkbnmsKRrwTqjNPwp9gevnI89jERTh/ydedhrD99wnSkqe9bOJGLmL25nH
- x6oQ==
-X-Gm-Message-State: AJcUukeX39sIJzNbblB6Y/XQ7UFkOfBJoiQEc95Ou9v2x7u463gkt8m1
- huQHHVcbj/Mcr44xGCnwixGiYX+rqF9dtgs+cC8=
-X-Google-Smtp-Source: ALg8bN6h1BVzDgByjESrDJWvHbPvIV2Il0t2io3cVK7A8qgutsNvHmdIhXiDmLmPuDjiDH3lwOq2ybsmQdSZ8Nd19z8=
-X-Received: by 2002:ae9:d8c2:: with SMTP id u185mr59680qkf.107.1545345714346; 
- Thu, 20 Dec 2018 14:41:54 -0800 (PST)
+ bh=aJCstcpioKX1kDPN9Do4ajl4wQrLRjEEgz6HAK8MoUY=;
+ b=lGPA0p/q2VYXBf5GabTfXUjwHBb+/qs6wTkwXjVjZmRKHfvsmx67LcAGbfAeDHuYDB
+ DI6VcngYA3Is0P7HMAvR9ISmbsoV7SUdQEn2TO8W010j0cn9Lhc9iS8ApZqlOsS2btGA
+ DDlEstXwv+v9/hZRs0QAaQHHtAbdDq8AGwiSakmlHWsShQkAe7CZDTPWih7ODA6mtCU1
+ r0SmE/1Gza9IckIlNUwdTtxm5OrAgRr1rnTTmQ0rYGVQ4MSFtHGa3jeLNwSF4NNi98rx
+ cXJs5ASc4z83acd4XOaQhrWg7l1Zafp8C+RWecfTW863zRzLJumVfDPQ2DI8AVPY0dvx
+ 8QKA==
+X-Gm-Message-State: AJcUukeShhiOTHhDWwr5DG19M9xv8VeaaZIZp8RzM47DtQieJjj/i14+
+ 5KfhSsclzeTRoMVylBAojJdJg+y9rbfoyu4d00s1ug==
+X-Google-Smtp-Source: AFSGD/WPKU3M+3Jvw6zAtXzZltMyw24jz/yuzayxY6/Dl1M0Ds3Tovkz1K5Cs+O0YvNmtCqawmFHb/ey5XpGON0VQjM=
+X-Received: by 2002:a24:bd0e:: with SMTP id x14mr502314ite.123.1545348024331; 
+ Thu, 20 Dec 2018 15:20:24 -0800 (PST)
 MIME-Version: 1.0
-References: <20181216084854.GJ13243@dragon>
- <CAK8P3a34R+Gv+H8_jjGP452i2kSqq+u0PsE-4pDnRRtY14SG0w@mail.gmail.com>
- <a73f86ff-15ce-9512-bbf0-be852cf39a35@kontron.de>
- <CAK8P3a1PMoR-WWcb_G8sTVW9HKUKvKfUZmcinkOEy9mJ5c=Lxw@mail.gmail.com>
- <6dde2248-da0d-7bd3-801b-b42b2974c038@kontron.de>
- <CAK8P3a0WCOcVjSegBKRPw3kkokE8S4JEXManqBkq4CjfcBRSMg@mail.gmail.com>
- <CAMuHMdW1NsqEHWBBn77wTAYnXi068iT2Lo8rxUUSvbo5UHDTkA@mail.gmail.com>
-In-Reply-To: <CAMuHMdW1NsqEHWBBn77wTAYnXi068iT2Lo8rxUUSvbo5UHDTkA@mail.gmail.com>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Thu, 20 Dec 2018 23:41:37 +0100
-Message-ID: <CAK8P3a0QxoNyq=5LzQObFnq2i7mVRJDj73j7ur+cQ9rmoKZpMQ@mail.gmail.com>
-Subject: Re: [GIT PULL] FSL QSPI device tree cleanup for 4.21
-To: Geert Uytterhoeven <geert@linux-m68k.org>
+References: <20181024013132.115907-1-dbasehore@chromium.org>
+ <154534054131.79149.12015186156265337224@swboyd.mtv.corp.google.com>
+In-Reply-To: <154534054131.79149.12015186156265337224@swboyd.mtv.corp.google.com>
+From: "dbasehore ." <dbasehore@chromium.org>
+Date: Thu, 20 Dec 2018 15:20:13 -0800
+Message-ID: <CAGAzgsq=p-2N6ybFXNTnz5SDkcdktA+Gk6e3gxrjpJB+L8389A@mail.gmail.com>
+Subject: Re: [PATCH 0/6] Coordinated Clks
+To: sboyd@kernel.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_144205_927532_A33B4D7A 
-X-CRM114-Status: GOOD (  17.88  )
+X-CRM114-CacheID: sfid-20181220_152038_129980_1BD6DA5B 
+X-CRM114-Status: GOOD (  15.19  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,47 +86,34 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: frieder.schrempf@kontron.de, linux-spi <linux-spi@vger.kernel.org>,
- arm-soc <arm@kernel.org>, linux-mtd <linux-mtd@lists.infradead.org>,
- linux-imx@nxp.com, Sascha Hauer <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>, Shawn Guo <shawnguo@kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: aisheng.dong@nxp.com, =?UTF-8?Q?Heiko_St=C3=BCbner?= <heiko@sntech.de>,
+ linux-doc@vger.kernel.org, Michael Turquette <mturquette@baylibre.com>,
+ Jonathan Corbet <corbet@lwn.net>, linux-kernel <linux-kernel@vger.kernel.org>,
+ linux-rockchip@lists.infradead.org, mchehab+samsung@kernel.org,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Dec 20, 2018 at 7:23 PM Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> On Thu, Dec 20, 2018 at 5:33 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thu, Dec 20, 2018 at 5:23 PM Schrempf Frieder
-> > > As the new driver is a SPI driver, the common rules in
-> > > Documentation/devicetree/bindings/spi/spi-bus.txt apply and
-> > > spi-[tx/rx]-bus-width are defined to default to 1 if not specified.
-> > > So we can't set those properties in the driver if they are missing in
-> > > the dtb as we would deviate from the standard, although it would make
-> > > more sense for a *Quad*-SPI driver to default to 4.
-> >
-> > Right, I guess that makes sense.
-> >
-> > Now, you could change the binding for the fsl-quadspi driver to
-> > require the bus-width properties, which would then just make
-> > the old dtb files invalid, and you give us an excuse to override
-> > the properties by adding the =4 ones, once that is documented
-> > in the driver specific binding.
-> >
-> > Since it's only a performance difference, I suppose we can live
-> > with the limitation and stay a little closer to the normal binding.
+On Thu, Dec 20, 2018 at 1:15 PM Stephen Boyd <sboyd@kernel.org> wrote:
 >
-> Please note that a quad-capable SPI FLASH may be physically wired
-> to a quad-capable SPI controller using only 2 wires, so defaulting to
-> 4 may cause issues.  Defaulting to 2 may work, if the device is
-> dual-capable.
+> Quoting Derek Basehore (2018-10-23 18:31:26)
+> > Here's the first set of patches that I'm working on for the Common
+> > Clk Framework. Part of this patch series adds a new clk op,
+> > pre_rate_req. This is designed to replace the clk notifier approach
+> > that many clk drivers use right now to setup alt parents or temporary
+> > dividers. This should allow for the removal of the
+> > CLK_RECALC_NEW_RATES flag and the implementation of a better locking
+> > scheme for the prepare lock.
+>
+> Are you going to resend this series? I can do a review but I wonder how
+> much it will change anyway.
+>
 
-Right, this would only work because the old driver used 4 wires
-in the absence of the DT property, and the driver would warn
-when it's not there for new dtb files.
-
-      Arnd
+I'm going to resend next year. I got distracted trying to get other
+code to work. This code has bugs in it, so a new patch set is
+required.
 
 _______________________________________________
 linux-arm-kernel mailing list
