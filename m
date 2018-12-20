@@ -2,20 +2,20 @@ Return-Path: <SRS0=AHqO=O5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 308ADC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 19:49:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AC673C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 19:52:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 039D5218D3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 19:49:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 61017218D3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 19:52:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DYKmbyJH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 039D5218D3
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="M4tj8LyP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 61017218D3
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,56 +24,53 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=T/GYHpyKZPhsYg/SZ0B+w1SYEaluQLgZ11t/AcyXjAI=; b=DYKmbyJHOnQ3Su
-	1Z0y41ncaF1nKNmCXt6YcYFZ9eIWzw7hQqeeFQsKQZBSccv5Vv3QN12/PDbd4l8aAXb9Z/Jv+IYh+
-	JHBb8mBcj+5bvQxBhMgqt6o9l8llwwtSbtaIUAhNDbKii7hd+jJIy49X5g6wFoDwOQODSH8gzMVBR
-	4+2afAoAOigS1HO7XlLM0uSViBLTFJS+NjUEi9+IydGrwlKSO2rO/+/fFaZGeZcA6HsQ0V0dfaVW5
-	qoUKSaCCmAsjrNiKaOOy2p4sdY7jaXtMUz18/ufGjuLctfyrptTnaMsQK3Z3uXTWodmQg/V1w1HYr
-	DORPpkeSf27dU7jqp5wQ==;
+	List-Owner; bh=W57ZgGvTIA5QXLV+iOECpnKKaD9+F44JsdfVMyXtZ3U=; b=M4tj8LyPE+lD8h
+	j2hu3DDXrrRQgG6wPJUC2nda8Aaz+JSBc4kfbMmFiokNZ1xZp9ABZr5ZKUsJha2C1SxzTP+zo7CSO
+	0Osrz5xII4MUAGOjq+tI5bNpYZvl5biYz9eTUnH2Z+RQgbHsbut7Zoj+RDczhtLRk5zurAEp/DTtF
+	60PUy6tOyKX4gOAhLBURuJjzk/9iEfpXsYjTHfYpOtypMulj8pEmoKFQiJcmOLnvhY/yiiao/diTq
+	LSY7e+wn+fG6xT/kcJxg1VkZzMWaBb8l9abB93T08q3DiH5xL+JDlx8M1gHBX4uHHzrCo4NhQ34yM
+	iiIAZ/XIC8leim01JFGg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ga4K0-0008AA-7V; Thu, 20 Dec 2018 19:49:28 +0000
-Received: from mail-ot1-f68.google.com ([209.85.210.68])
+	id 1ga4NA-0001MM-4W; Thu, 20 Dec 2018 19:52:44 +0000
+Received: from mail-oi1-f193.google.com ([209.85.167.193])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ga4Jw-00088r-9K
- for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 19:49:25 +0000
-Received: by mail-ot1-f68.google.com with SMTP id 81so3056796otj.2
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 20 Dec 2018 11:49:13 -0800 (PST)
+ id 1ga4N7-0001LB-7T; Thu, 20 Dec 2018 19:52:42 +0000
+Received: by mail-oi1-f193.google.com with SMTP id y23so2900339oia.4;
+ Thu, 20 Dec 2018 11:52:30 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=Mpin4rmY1KHiXB2yLRM1gONu7AeF2ezjMMA9danRL7s=;
- b=KZBJbeRMMhAu1i/14gZSXXfLU28+mW/SscQbEvtWBbRzMN9lzIkxQaBHhqZYZs152v
- cu1694BvZUkqxTJx7dQ86v4Ci44Nr5uXjtrfciNX+uGKlAhy62YrU9i7OoDmPZC/YeQK
- 2n0PZ8RNwkmFHkXqUMIhC/2ta2mL0Aesk+hhYx6nzNATbaMt9EnvoYhNmJfznozoS9ym
- P1gS6cUi1ZIP7X9CSZLzRydj5CmWXXKMG4HMv00MbUgHjVXUqga7znrYIyw2qLuqFqSo
- r1FyQ/IPfAJL6JI77Eoth+jaqS6Yo6Hql4+pku5K8L0vajnjCPFccA0DQsmcs5ZgDp9W
- NjGw==
-X-Gm-Message-State: AA+aEWbLP4Y1SgpOBDdhHXU2290l9MTLsMorUgaq6WBUS7bi67P9LMLS
- 3b1SowAR9W7oCb2spRD3Ww==
-X-Google-Smtp-Source: AFSGD/UmB/VXwQMTBz+ZpWV6GMPqXR5Mpfw5Zk5BFr+klOY+NIMe33FWpYrh9JdRvBJgB2go4ge5zQ==
-X-Received: by 2002:a9d:128b:: with SMTP id g11mr18776880otg.130.1545335352988; 
- Thu, 20 Dec 2018 11:49:12 -0800 (PST)
+ bh=24BoR+RxY5BGrbZKEBLkjKqR1VsXUja9f0axGQKK+Nc=;
+ b=DTQ375FZV8Ul/4nxlQBhiLESCSU2T2F/WsOxCS4NKxuFH15ufphJJFT7N0XXFW3ZE7
+ LsGcfizxaqlHBAxMfQjfzxHAEhvHWZpfWvx3IxNBdtH5BSH50hZcIMgAgYrOqg6u6bCS
+ c9B/azGY/SClbSXZGAaMcny6qJuvNfApURjATxuq5bwd5sPiGOEAsDqFH2lS18nk5Imz
+ Z6TDtzYP9q4L0ayMMDOI7B46QZ5k6LkCOfx9yDtNqkkxhXghluHYg41kF9/74BxRQ9Bw
+ 8fex8EK/vEUesmGOwXubBm/faPgoJOA9lVCpRi+xsQCqTb9OYlfxieAunZzpfq7aju34
+ 2l2Q==
+X-Gm-Message-State: AJcUukd+oPdSk6va+kUtvs9+t0PIAGXl3GMq2ocKOaSqmaAGiiayDL0D
+ 32T/Pfztb7udOlG3GaArQA==
+X-Google-Smtp-Source: AFSGD/UCP0m+Wl3wBjVSkcHbNMxV2MlnqZtYM+FJISKW2QIPvuPW5PdJj1sX9T+Zo7pOQDpsao97QA==
+X-Received: by 2002:a54:4088:: with SMTP id i8mr65490oii.324.1545335549842;
+ Thu, 20 Dec 2018 11:52:29 -0800 (PST)
 Received: from localhost ([2607:fb90:20d2:a5e2:49af:e73e:5a36:3b50])
- by smtp.gmail.com with ESMTPSA id j5sm22008741otc.54.2018.12.20.11.49.11
+ by smtp.gmail.com with ESMTPSA id c78sm16305114oig.30.2018.12.20.11.52.29
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 20 Dec 2018 11:49:12 -0800 (PST)
-Date: Thu, 20 Dec 2018 13:49:11 -0600
+ Thu, 20 Dec 2018 11:52:29 -0800 (PST)
+Date: Thu, 20 Dec 2018 13:52:28 -0600
 From: Rob Herring <robh@kernel.org>
-To: cezary.gapinski@gmail.com
-Subject: Re: [PATCH 5/5] spi: stm32: add description about STM32F4 bindings
-Message-ID: <20181220194911.GA17409@bogus>
-References: <1544363636-12161-1-git-send-email-cezary.gapinski@gmail.com>
- <1544363636-12161-6-git-send-email-cezary.gapinski@gmail.com>
+To: Maxime Jourdan <mjourdan@baylibre.com>
+Subject: Re: [PATCH 1/2] dt-bindings: meson: add specific simplefb bindings
+Message-ID: <20181220195228.GA17561@bogus>
+References: <20181210090640.4495-1-mjourdan@baylibre.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1544363636-12161-6-git-send-email-cezary.gapinski@gmail.com>
+In-Reply-To: <20181210090640.4495-1-mjourdan@baylibre.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_114924_327827_9860A45C 
-X-CRM114-Status: GOOD (  11.83  )
+X-CRM114-CacheID: sfid-20181220_115241_274127_F1D9574A 
+X-CRM114-Status: GOOD (  17.69  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,31 +82,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Amelie Delaunay <amelie.delaunay@st.com>,
- Cezary Gapinski <cezary.gapinski@gmail.com>,
- Alexandre Torgue <alexandre.torgue@st.com>, linux-kernel@vger.kernel.org,
- linux-spi@vger.kernel.org, Mark Brown <broonie@kernel.org>,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>,
- linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org
+Cc: devicetree@vger.kernel.org, Neil Armstrong <narmstrong@baylibre.com>,
+ Kevin Hilman <khilman@baylibre.com>, linux-kernel@vger.kernel.org,
+ linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sun,  9 Dec 2018 14:53:56 +0100, cezary.gapinski@gmail.com wrote:
-> From: Cezary Gapinski <cezary.gapinski@gmail.com>
+On Mon, Dec 10, 2018 at 10:06:39AM +0100, Maxime Jourdan wrote:
+> Similar to simple-framebuffer-sunxi, we support different display pipelines
+> that the firmware is free to choose from.
 > 
-> Add description that STM32F4 can be used in compatible property.
-> Master Inter-Data Idleness optional property cannot be used in STM32F4.
+> This documents the "amlogic,simple-framebuffer" compatible and the
+> "amlogic,pipeline" extension.
 > 
-> Signed-off-by: Cezary Gapinski <cezary.gapinski@gmail.com>
+> Signed-off-by: Maxime Jourdan <mjourdan@baylibre.com>
 > ---
->  Documentation/devicetree/bindings/spi/spi-stm32.txt | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
+>  .../display/simple-framebuffer-meson.txt      | 33 +++++++++++++++++++
+>  1 file changed, 33 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/simple-framebuffer-meson.txt
 > 
+> diff --git a/Documentation/devicetree/bindings/display/simple-framebuffer-meson.txt b/Documentation/devicetree/bindings/display/simple-framebuffer-meson.txt
+> new file mode 100644
+> index 000000000000..122a5c005cd9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/simple-framebuffer-meson.txt
+> @@ -0,0 +1,33 @@
+> +Meson specific Simple Framebuffer bindings
+> +
+> +This binding documents meson specific extensions to the simple-framebuffer
+> +bindings. The meson simplefb u-boot code relies on the devicetree containing
+> +pre-populated simplefb nodes.
+> +
+> +These extensions are intended so that u-boot can select the right node based
+> +on which pipeline is being used. As such they are solely intended for
+> +firmware / bootloader use, and the OS should ignore them.
+> +
+> +Required properties:
+> +- compatible: "amlogic,simple-framebuffer"
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+And a fallback?
+
+> +- amlogic,pipeline, one of:
+> +  "vpu-cvbs"
+> +  "vpu-hdmi"
+> +
+> +Example:
+> +
+> +chosen {
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +	ranges;
+> +
+> +	framebuffer@0 {
+
+Without 'reg', you shouldn't have a unit-address.
+
+> +		compatible = "amlogic,simple-framebuffer",
+> +			     "simple-framebuffer";
+> +		amlogic,pipeline = "vpu-hdmi";
+> +		clocks = <&clkc CLKID_HDMI_PCLK>,
+> +			 <&clkc CLKID_CLK81>,
+> +			 <&clkc CLKID_GCLK_VENCI_INT0>;
+> +		power-domains = <&pwrc_vpu>;
+> +	};
+> +};
+> -- 
+> 2.19.2
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
