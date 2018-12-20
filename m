@@ -2,70 +2,129 @@ Return-Path: <SRS0=AHqO=O5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6F278C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 11:14:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C7627C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 11:38:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3EBA421773
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 11:14:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 926F620815
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 11:38:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eqSrO7S9";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="ZZ7qrSEp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3EBA421773
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bjzyCxV/";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="BjFE794U"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 926F620815
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
+	Date:Message-ID:From:To:Subject:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zOPsnEGmC8v3ffmD5bvTftJFCtbbq7KrrFnN0jCEX+c=; b=eqSrO7S95AUr+B
-	UqjZ1b6XBYGHrNeonjvDPqdRdmqrofzIus8a6slfFjcAHX96vwupC0zcavWjAMuL0O6AhhoqW/GI7
-	/j0D9sAHxGNdrg1nL6Wt4glytC39QJyrvojhdwOVNd1X5OtedPzupSJYtAHT68Ap+KKh4rQl39CEU
-	BcJmONVVoaT7zvUzmN7/DalhmNUaEVV1+aGChPno1/h8Fx72cqly8NYMgCVEOk7LWW5GsnZCKHUiH
-	vnAvduOvad1iQHeirQNES71AhCzBxspCGowafxnUDky/4B9c90N0UHA4ApK8rTb8u7R4kU+Lbb+xR
-	8nZCb6nBvk9h5X5+0dsA==;
+	List-Owner; bh=K5VCt2WQocJV2bG2tBKpOu6DQiUKVJt0ao+h17QFYiI=; b=bjzyCxV/NqRYAn
+	sHEYrzWnWKRaLookGxmjcYRqGSbBLvEuFPl4inbeFEIQSv/oQ3a8bagY6aZOv2MgbarPDjV3cLe8W
+	E++kOj0OsmY0BSxsDNcShMwjCCxuQEhY22APbLpzmFr/nhdAno7mVKpEVlR3CZdPYQ/092xcFDXdI
+	7mobOCwwfUGiVMiLg2XOeyGlcZGT4/rWAcv/oEp773GQf57igpGomglOAT0sVEAgTVgVZkWUCI/Bf
+	txlKPJfjpFPcRNlSxwyweaFcgmuj8wZoasH1+WICEIkLBHzu7rCMi+fILbsQq+zvPVJCXKzYaXaCN
+	vzBx/flxLE9SeDhGdaAQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZwHx-0003We-PM; Thu, 20 Dec 2018 11:14:49 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gZwei-0002zY-3c; Thu, 20 Dec 2018 11:38:20 +0000
+Received: from mailout1.w1.samsung.com ([210.118.77.11])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZwHv-0003TA-5h
- for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 11:14:48 +0000
-Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 4FC3321773;
- Thu, 20 Dec 2018 11:14:36 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1545304476;
- bh=ZX3E9KLkZSZsJIlGRBHs6DgIyYx6jyueqRFmLMqTX+I=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=ZZ7qrSEpD/CaMKf6SSCS75j1gH4L1gdw1lpCyPhjgfVrQfu46kJzU4MwZ0qNdZ3H+
- TmXikLU4l+sgfSa6ULD09hryUW7VHhu23HgTfuzQKb6gGW1CBhXqXjXTmWkImEdZFG
- LzJi0IrDRDVcqoXYvolOQOeX2KzpZwGnqdsYW9PI=
-Date: Thu, 20 Dec 2018 12:14:34 +0100
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-To: Andrzej Hajda <a.hajda@samsung.com>
-Subject: Re: [PATCH v4 3/3] driver core: add probe_err_ptr helper
-Message-ID: <20181220111434.GC10978@kroah.com>
-References: <20181220102247.4911-1-a.hajda@samsung.com>
- <CGME20181220102300eucas1p210735c7753688a52a73ccf026884dd11@eucas1p2.samsung.com>
- <20181220102247.4911-4-a.hajda@samsung.com>
+ id 1gZwee-0002yc-0c
+ for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 11:38:18 +0000
+Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
+ by mailout1.w1.samsung.com (KnoxPortal) with ESMTP id
+ 20181220113803euoutp014e6a27bbef5656d29a8faaa6118620d5~yB4N19ykA2772527725euoutp01H
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 20 Dec 2018 11:38:03 +0000 (GMT)
+DKIM-Filter: OpenDKIM Filter v2.11.0 mailout1.w1.samsung.com
+ 20181220113803euoutp014e6a27bbef5656d29a8faaa6118620d5~yB4N19ykA2772527725euoutp01H
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
+ s=mail20170921; t=1545305883;
+ bh=/wtVSIU1u8jkniyVCmf9tdEnnLzL0IulpduUFjvvCK8=;
+ h=Subject:To:Cc:From:Date:In-Reply-To:References:From;
+ b=BjFE794UuI9MuzvIm3YGXcLukyrJeiTlxRtR44ChQ4SseyMjOR2gtyR7r4kxlgbxt
+ Yv+XfZJWJduWQj1Kb2DRpmz6oYnL4Ip2MnZSI2VcwRMpkBEDEofauBqTYfdDhQktMc
+ 1ZWw3GnLDQlVnQsmgoygWrGn3P9ZH5J4aZ5QCXiA=
+Received: from eusmges2new.samsung.com (unknown [203.254.199.244]) by
+ eucas1p1.samsung.com (KnoxPortal) with ESMTP id
+ 20181220113802eucas1p1e9ecf87e8492337bad2269605244fe90~yB4MuBWvu1592515925eucas1p1H;
+ Thu, 20 Dec 2018 11:38:02 +0000 (GMT)
+Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
+ eusmges2new.samsung.com (EUCPMTA) with SMTP id AA.FC.04294.91F7B1C5; Thu, 20
+ Dec 2018 11:38:01 +0000 (GMT)
+Received: from eusmtrp1.samsung.com (unknown [182.198.249.138]) by
+ eucas1p1.samsung.com (KnoxPortal) with ESMTPA id
+ 20181220113801eucas1p1c8485c363200952f23a2a35e06d85842~yB4LvSiD91724317243eucas1p1B;
+ Thu, 20 Dec 2018 11:38:01 +0000 (GMT)
+Received: from eusmgms1.samsung.com (unknown [182.198.249.179]) by
+ eusmtrp1.samsung.com (KnoxPortal) with ESMTP id
+ 20181220113800eusmtrp12021081b24e59575dfd7e3e20d8bc4ef~yB4LgJ2Mg2144921449eusmtrp1t;
+ Thu, 20 Dec 2018 11:38:00 +0000 (GMT)
+X-AuditID: cbfec7f4-84fff700000010c6-08-5c1b7f1962e0
+Received: from eusmtip1.samsung.com ( [203.254.199.221]) by
+ eusmgms1.samsung.com (EUCPMTA) with SMTP id 69.24.04284.81F7B1C5; Thu, 20
+ Dec 2018 11:38:00 +0000 (GMT)
+Received: from [106.120.43.17] (unknown [106.120.43.17]) by
+ eusmtip1.samsung.com (KnoxPortal) with ESMTPA id
+ 20181220113800eusmtip17949c581ea817caa20a3aa79d9b22a6d~yB4LBQtK11857618576eusmtip1E;
+ Thu, 20 Dec 2018 11:38:00 +0000 (GMT)
+Subject: Re: [PATCH v4 1/3] driver core: add probe_err log helper
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+From: Andrzej Hajda <a.hajda@samsung.com>
+Message-ID: <b9f7cb75-62a0-20f6-0e5b-1553852d81b2@samsung.com>
+Date: Thu, 20 Dec 2018 12:37:58 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181220102247.4911-4-a.hajda@samsung.com>
-User-Agent: Mutt/1.11.1 (2018-12-01)
+In-Reply-To: <20181220111403.GB10978@kroah.com>
+Content-Language: en-US
+X-Brightmail-Tracker: H4sIAAAAAAAAA02SbUhTYRTHfbzbvdfR5G4qO2pkDgwsfE3lgmFKfbjUl1KIUqGmXpzlpmxq
+ mR+0hFKTWoamQzNZaWhhvm26smCr1NR8W1qWWTgsxSGhlVJGXq+S337n/M//Of8DD4lJ+4Re
+ ZJo6i9WoFelyXCQwvlp9E+CZ750YPGMMpud0VkS3VDYL6fIvdpwuNDTjdF1FA6JbZ8aF9Ji5
+ Gqct5d2IfvRiiqBrlsuxaBEzNj6CMV36KYJpbSzGmec1Dwmm7V4+s/jsLc5cb29EzFLrrmNk
+ vOhACpuelsNqgqLOiJQTZR9RZpXkgsWmwwrQd3EJciGBCgNb0ygqQSJSSj1A0D0ySvDFMgKb
+ 6ZuAL5YQ1Pe+dt6ytDV2YLzQgMBqc2z6HQjs0xMEN+VGxcDk0Dzi2J3aDzcG9RvvYtQvZzDa
+ F4WcgFP+sNb2HudYTEVB4WwJxrGA8oOrs7c32IM6CUXTTZszEuirsgs4dqGCwFDEezHKB0yO
+ aoxnGUzaa525ZUBNEjC0fAfxuQ/DmmmI4NkN5nvaN3kn9N8qFfCcD5erbBhvLkLQa2jAeSES
+ rD0j66nJ9Q3+0GwO4tsx8HiknODaQLnCO4eEz+AKZUYuP9cWQ9EVKT/tC9ODHRjPMrg//APX
+ Ibl+22X6bdfot12j/7/3LhI0IhmbrVWlstpQNXs+UKtQabPVqYHJGapWtP7B+v/2LHci858k
+ C6JIJN8hroz3SpQKFTnaXJUFAYnJ3cUzZ70TpeIURe5FVpNxWpOdzmotyJsUyGXiPKfPCVIq
+ VZHFnmPZTFazpTqTLl4FqEIXd/BnkpOyiw4/kmAj7l3yWZmLMAfbw/eZg4cNSaoC08zKxCFd
+ WBSTP75QUDyQ5quLFX/NyzaFkHllVV79u1ei/ToksaFxAdfWfq9GRpV5mm+a9mQetfZ3Frao
+ jaeSn/a5eLyUHa89IXEKS68rTVbW931ayu1+MjBu8Fv4ECEXaJWKkL2YRqv4Byl7wX9cAwAA
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFrrFIsWRmVeSWpSXmKPExsVy+t/xu7oS9dIxBotX61i8nHCY0WLjjPWs
+ FlMfPmGzaF68ns1i4bTljBabHl9jtbi8aw6bxaGpexkt1h65y24x98tUZgcuj8vXLjJ77Jx1
+ l91j06pONo/9c9ewe2xeUu/xft9VNo++LasYPT5vkgvgiNKzKcovLUlVyMgvLrFVija0MNIz
+ tLTQMzKx1DM0No+1MjJV0rezSUnNySxLLdK3S9DLuD7pDmPBTMGKQ1cmMDcwfuTtYuTkkBAw
+ kdi8aisziC0ksJRR4s0hXYi4uMTu+W+ZIWxhiT/Xuti6GLmAal4zSjw69g0sISzgKHHr/CtG
+ EFtEwFii/+wsdhCbWeA3k8SUDVkQDfcYJR6sfMMEkmAT0JT4u/kmG4jNK2An0fysC2wQi4Cq
+ RPuz6WC2qECExNmX6xghagQlTs58wgJicwroSyzugOhlFlCX+DPvEjOELS+x/e0cKFtc4taT
+ +UwTGIVmIWmfhaRlFpKWWUhaFjCyrGIUSS0tzk3PLTbUK07MLS7NS9dLzs/dxAiM123Hfm7e
+ wXhpY/AhRgEORiUe3hlRUjFCrIllxZW5hxglOJiVRHgfZ0nHCPGmJFZWpRblxxeV5qQWH2I0
+ BXpuIrOUaHI+MJXklcQbmhqaW1gamhubG5tZKInznjeojBISSE8sSc1OTS1ILYLpY+LglGpg
+ ZIrgv64m4f3inalX2J1Lm64fCcrZtHae/Ry55BlRe61VTTR/xj5393/CsPahJtvkM+LK3Kc2
+ M7i2LBPbPXHle7OMtp3nJi6XYp17W8Ykx+Js3ZWvndsLVENlzJ48u2Y/g1vfa4aCjf70Fes7
+ cwymHGIXL7550uW7qujhRnm/faFSK03r1+i9UmIpzkg01GIuKk4EABycEB7tAgAA
+X-CMS-MailID: 20181220113801eucas1p1c8485c363200952f23a2a35e06d85842
+X-Msg-Generator: CA
+X-RootMTR: 20181220102259eucas1p2f748c68e01cd4e09a266da879722e218
+X-EPHeader: CA
+CMS-TYPE: 201P
+X-CMS-RootMailID: 20181220102259eucas1p2f748c68e01cd4e09a266da879722e218
+References: <20181220102247.4911-1-a.hajda@samsung.com>
+ <CGME20181220102259eucas1p2f748c68e01cd4e09a266da879722e218@eucas1p2.samsung.com>
+ <20181220102247.4911-2-a.hajda@samsung.com>
+ <20181220111403.GB10978@kroah.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_031447_231220_C4542C4F 
-X-CRM114-Status: UNSURE (   8.72  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181220_033816_192697_A2D69584 
+X-CRM114-Status: GOOD (  19.80  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,19 +148,67 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Dec 20, 2018 at 11:22:47AM +0100, Andrzej Hajda wrote:
-> probe_err is useful in multiple contexts where error is encoded in pointer.
-> Adding helper performing conversion to error value should simplify code
-> further.
+On 20.12.2018 12:14, Greg Kroah-Hartman wrote:
+> On Thu, Dec 20, 2018 at 11:22:45AM +0100, Andrzej Hajda wrote:
+>> During probe every time driver gets resource it should usually check for error
+>> printk some message if it is not -EPROBE_DEFER and return the error. This
+>> pattern is simple but requires adding few lines after any resource acquisition
+>> code, as a result it is often omited or implemented only partially.
+>> probe_err helps to replace such code sequences with simple call, so code:
+>> 	if (err != -EPROBE_DEFER)
+>> 		dev_err(dev, ...);
+>> 	return err;
+>> becomes:
+>> 	return probe_err(dev, err, ...);
+> Can you show a driver being converted to use this to show if it really
+> will save a bunch of lines and make things simpler?  Usually you are
+> requesting lots of resources so you need to do more than just return,
+> you need to clean stuff up first.
 
-Same question as on patch 1/3, please some someone using this.
 
-Also, it's too late for 4.21, so no rush on this.  My trees are now
-closed.
+I have posted sample conversion patch (generated by cocci) in previous
+version of this patchset [1].
 
-thanks,
+I did not re-posted it again as it is quite big patch and it will not be
+applied without prior splitting it per subsystem.
 
-greg k-h
+Regarding stuff cleaning: devm_* usually makes it unnecessary, but also
+even with necessary cleaning you can profit from probe_err, you just
+calls it without leaving probe - you have still handled correctly probe
+deferring.
+
+Here is sample usage (taken from beginning of the mentioned patch):
+
+---
+diff --git a/drivers/ata/libahci_platform.c b/drivers/ata/libahci_platform.c
+index 4b900fc659f7..52e891fe1586 100644
+--- a/drivers/ata/libahci_platform.c
++++ b/drivers/ata/libahci_platform.c
+@@ -581,11 +581,8 @@ int ahci_platform_init_host(struct platform_device *pdev,
+ 	int i, irq, n_ports, rc;
+ 
+ 	irq = platform_get_irq(pdev, 0);
+-	if (irq <= 0) {
+-		if (irq != -EPROBE_DEFER)
+-			dev_err(dev, "no irq\n");
+-		return irq;
+-	}
++	if (irq <= 0)
++		return probe_err(dev, irq, "no irq\n");
+
+---
+
+And there is plenty of such places, with new version of cocci script I can locate about 2700 such cases, and it is still far from completeness.
+
+[1]:
+https://lore.kernel.org/lkml/20181016072244.1216-4-a.hajda@samsung.com/T/#u
+
+
+Regards
+
+Andrzej
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
