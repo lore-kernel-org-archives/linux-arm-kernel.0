@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7C2DFC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 15:59:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3C313C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 15:59:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4A433218C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 15:59:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0D84920645
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 15:59:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XEWwXZkW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4A433218C3
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Vvud4/DK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0D84920645
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,63 +24,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=0uP8Bt1Prz1b2UsFuzXwemeAtykMgWkHFy6HAMoN4/w=; b=XEWwXZkWrHiEdL
-	mw0jjDzvUW9rwCPg9t9kFROKeDccMFC65sA3X8KsH3MFHsYfmS6ENjKRGlYR8WFd5UpOjC+sDwgnN
-	n9Oe9+WTvsNM7KUJuH4t8ZEi11xKXtiRVQkRPB+C2bmbhLi6TyYOKHDw/Hp8f/9/v5JJ1vaaCxtM3
-	TWlPx/HZgqshhmuyJgcsn5BSlvTzut4kS9KkJv4XnySsxgNg/XYdN5cPUldmOZMOwXMh0ddqyPMk4
-	HLHBox3ILxNRGB352XSTVXn+5tUL2O6jtam01aFJA4oB5r5Gj2zk49gCDDx4K/iMz3J9MFc1+3UJ5
-	V0rg0ygvtmkk83VE86hA==;
+	List-Owner; bh=qdAhRAofnckzCTrCdJPHxcOXNCm2bpDsEaSoEhwMb6c=; b=Vvud4/DK2bQuQg
+	mBxarj9+iE6DOUVfLqlj0/QWnh9dR9iOrjC5xp+VYZvq/yAXwGnv05IU0p3UhXMrueg51RFa07+hl
+	Lle8PdtT26ejqGk4nWNOXtVTd7iE9ku5jRHd4/XwHIgbCsvqmlbBWX5WSO804qNx+eP2YjN2zdR93
+	F6M30ZqvG6STgTG95rrgOon9Dz3YDFTEVpUfPr+X1mo1ycBQ5poDDNtmucxEa6dJgnP5bJuv0r3Mq
+	CZeSn7t+LtbeFfrlczsUhN14oFpkDOpOGR4y3YD6AZcEvmwW8Q4ZQz0Hs4zVNVTUUqb/sH4S0MB6A
+	M38uxEbZNEEvAId0SvHw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ga0jZ-0000qY-9f; Thu, 20 Dec 2018 15:59:37 +0000
-Received: from mail-ed1-f66.google.com ([209.85.208.66])
+	id 1ga0jo-00014T-3v; Thu, 20 Dec 2018 15:59:52 +0000
+Received: from mail-qt1-f195.google.com ([209.85.160.195])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ga0jW-0000q5-8u
- for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 15:59:35 +0000
-Received: by mail-ed1-f66.google.com with SMTP id g19so2163124edy.8
+ id 1ga0jc-0000qC-4J
+ for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 15:59:42 +0000
+Received: by mail-qt1-f195.google.com with SMTP id k12so2318459qtf.7
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 20 Dec 2018 07:59:23 -0800 (PST)
+ Thu, 20 Dec 2018 07:59:29 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=Ayq0w2cwuOSy07jq4d4aibOw4krZLC8XeIRVzrZd/Qs=;
- b=c091AVM/WsLZk/52DQISilStTjZBYfGdPucA9JwnzzCcIJF0bZvVUdLUX2TH7x2kAM
- wPkkakBWRW0Wf7QTXkag1gobTWPGoeB15YWIP65CZIjrHXlxC6kqaxc8VOKUUfuU12db
- zc/LbZQ8+blPD4XttEHVYlp+CcLrhQxPiTLbgjb0Ro23zOnMK2VY2WH6dEXZioG8aPKd
- Z0QyMmemLJpZlmsBbITQ25MiqIT6u3Sw9Gne5XebMGvsbQNco0SqBkWjU+/Ng/8Dt2HF
- pi46BtviGLgk2tnpfSzT+nhPVl5YIB4biMdmR1uwd8Yjll3A91V6gYUcWeW10q+CxeY9
- dS5g==
-X-Gm-Message-State: AA+aEWbJhUgvCd6nQgk3x0biM6OzSuElsCFPr44KTgEBjoLAGXusaaHB
- FTaOalWAdaJ40euM6BAvlHcnQLNJlkU=
-X-Google-Smtp-Source: AFSGD/XKLGgSJ5x0Oki4YMWlKGUiPtbIjtt4c1DglKQqJ02bJZe9A2gEh39bqJ8fYil7snSBiJiJtA==
-X-Received: by 2002:a50:903c:: with SMTP id b57mr24733714eda.161.1545321561442; 
- Thu, 20 Dec 2018 07:59:21 -0800 (PST)
-Received: from mail-wm1-f47.google.com (mail-wm1-f47.google.com.
- [209.85.128.47])
- by smtp.gmail.com with ESMTPSA id d5sm6256681edb.48.2018.12.20.07.59.20
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 20 Dec 2018 07:59:20 -0800 (PST)
-Received: by mail-wm1-f47.google.com with SMTP id c126so2757669wmh.0
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 20 Dec 2018 07:59:20 -0800 (PST)
-X-Received: by 2002:a1c:e58c:: with SMTP id
- c134mr11725108wmh.124.1545321560542; 
- Thu, 20 Dec 2018 07:59:20 -0800 (PST)
+ bh=aIg/5zAK8tjNV2wkM6gTk/QZO3NS47XZ7LXwbETevks=;
+ b=AYGnBJjVSyhGHkPWC5sP9k7hlLaCMLKqMPQJl/5g+kVdE10bIeTuT4QheDK4B0pH0N
+ QvAanrbM/gA1xtSIDFVeYTyLI6dm4Vn2gZK/d5o7RQHO6oMxAk+WEl7+QiuYy2ZyeD/K
+ KoF5GqLjPZlGjwnH5AB2H6Q7/tY8OBeG3WBj7k/OVA40acdKpCA6FEViyuSjAanNGcX9
+ aCdLji+/CbdJ5W+AWeelNIk97qnA/w4z4mV69KBCmsUba7+1qGGTyWwJouRjWshj3G/J
+ T7tTcQHIe4umW2ug6/iD3JLmtJY8upntXDca3fQjCNctHj9sN9sPPAmGx+m+nbiXJz89
+ EDfQ==
+X-Gm-Message-State: AA+aEWaBb34QmHOpsyhZoujxGmP3UocssEaQl2FSUXoyaQ36sBvjKWLa
+ rHnNUjuIgf4z0Svah34MuW1murWeH3LyAqwI45E=
+X-Google-Smtp-Source: AFSGD/XMe3S+3SydPpPPDFz75aZuNLj2qaoGZJLim4UzuKZyEM4mGjIABRkQb64/1F1KCHl+ZyUgjeLPel8i/QiXvC8=
+X-Received: by 2002:a0c:dc0f:: with SMTP id s15mr26083946qvk.40.1545321568977; 
+ Thu, 20 Dec 2018 07:59:28 -0800 (PST)
 MIME-Version: 1.0
-References: <20181219095546.GA2302@wens.csie.org>
- <CAK8P3a2j7Hu7yK1wPELFr0Ke5MDFBgVnn7WjoQW+Xsv12d3weg@mail.gmail.com>
-In-Reply-To: <CAK8P3a2j7Hu7yK1wPELFr0Ke5MDFBgVnn7WjoQW+Xsv12d3weg@mail.gmail.com>
-From: Chen-Yu Tsai <wens@csie.org>
-Date: Thu, 20 Dec 2018 23:59:08 +0800
-X-Gmail-Original-Message-ID: <CAGb2v67jfh+e6vbnjVsYDUwpSD4SEdCq+ujUsovpBNQNwTPOZA@mail.gmail.com>
-Message-ID: <CAGb2v67jfh+e6vbnjVsYDUwpSD4SEdCq+ujUsovpBNQNwTPOZA@mail.gmail.com>
-Subject: Re: [GIT PULL] Allwinner DT changes for 4.21 - Round 2
-To: Arnd Bergmann <arnd@arndb.de>
+References: <20181219095847.GA6281@wens.csie.org>
+In-Reply-To: <20181219095847.GA6281@wens.csie.org>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Thu, 20 Dec 2018 16:59:12 +0100
+Message-ID: <CAK8P3a296Ar8mKPzjoZeWBr5dH-QApuAo55qq9131hHwqDti4Q@mail.gmail.com>
+Subject: Re: [GIT PULL] Allwinner arm64 DT changes for 4.21 - round 2
+To: Chen-Yu Tsai <wens@csie.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_075934_312575_776F9B5D 
-X-CRM114-Status: GOOD (  13.05  )
+X-CRM114-CacheID: sfid-20181220_075940_456333_6BC25239 
+X-CRM114-Status: UNSURE (   9.57  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,25 +86,18 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Dec 20, 2018 at 11:57 PM Arnd Bergmann <arnd@arndb.de> wrote:
+On Wed, Dec 19, 2018 at 10:58 AM Chen-Yu Tsai <wens@csie.org> wrote:
 >
-> On Wed, Dec 19, 2018 at 10:55 AM Chen-Yu Tsai <wens@csie.org> wrote:
-> >
-> > Hi Arnd, Olof,
-> >
-> > This is a late pull request for 4.21. There are two patches, as shown
-> > in the tag's body. The first is a fix for content sent in the first
-> > pull request for 4.21. The second is a patch from a series that had
-> > been posted over a month ago, and the driver bits were merged today.
-> > We'd like to have both patches included for 4.21.
+> Hi Arnd, Olof,
 >
-> Pulled into next/dt, thanks!
+> This is a late pull request for 4.21. There's only one patch, as shown
+> in the tag's body. Like the arm32 DT PR, the patch from a series that
+> had been posted over a month ago, and the driver bits were merged today.
+> We'd like to have it included for 4.21.
 
-This pull request also contains "ARM: dts: suniv: Fix improper bindings
-include patch" from Maxime. Hope it doesn't cause any confusion or
-conflicts.
+Pulled into next/dt, thanks!
 
-ChenYu
+       Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
