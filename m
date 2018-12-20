@@ -2,95 +2,84 @@ Return-Path: <SRS0=AHqO=O5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9ADE2C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 12:56:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D1A53C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 13:03:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5DEA72084A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 12:56:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9DFB921741
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 13:03:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="J43cvQYy";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="OqNkOUfz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5DEA72084A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="g78IDksN";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="KOeaA4RF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9DFB921741
+Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=OpS2CspzOJGJT4k0n1VkMyEQuG6KY2SbYH7bgV26ZKw=; b=J43cvQYyoMOGHm
-	tRFCeCM4yPk5U2U77N3I7OiT0llgEIXXLZsi13c8UfAwHVmkIc4ldf5zb4oUjpBKEDsjqgoFknbSm
-	8K6V9z5p9w43BLgY1AZFdTZGfqaUevwFRZBozAU4CFElFahAGsqUV939uNeN8bTixLVaravA0sy4q
-	Ht5dG43bWHE2IFUkf0QcAUK7P+AI4dOLhla3r/bzsfUM7qQU/dtPVwZCHQHFX3Ll2fdtqNpfZ2Rzu
-	bNLXOCXZGtRM6olsZf1I6e47T9TxuVqqy+lBpx2ccSU+A6nTOTcZI7R44ObIasctaTIWMC36aiYNZ
-	Z+YEroF/X4J84E6vEJQA==;
+	List-Owner; bh=DuF4LstEdtEUzzntDURyTUiawAM6DSzJ6mYGxUhU5u8=; b=g78IDksNVixmGz
+	ZQSeW64e+Fr2+p/pkFxWD1k2w2/ge590GwPZMF+7Aoh9trnatuyMCaZWx3l+pMLStRyNg+aqDrcAA
+	NflDJxtg+zde2rhQ6jPAjrddJi3QkczYRdb6U92t87wcbuaLv2uUgjTRWjTDkuR08q9XYeIwQh0rl
+	JgAT+MW1D2/K+5TnRvyXFqM0A3lo0ymtFO9kQ+YnslcOxgMpDeMy/LJkZxywOevQ7q8BpnNxiE8mB
+	d2TNE8Igx4cTz6SJHNxZEdEehUJ2VTlj0o32db4giC9W5j7lBcqRwd9Nti8N9wHyt4v/LUi2oxkqP
+	sjcJFJBKXKhUDG6lJ0dw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZxsS-0005IY-J2; Thu, 20 Dec 2018 12:56:36 +0000
-Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+	id 1gZxyv-0007eU-1n; Thu, 20 Dec 2018 13:03:17 +0000
+Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZxqv-0002gS-3v
- for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 12:55:09 +0000
-Received: by mail-wm1-x341.google.com with SMTP id p6so2062253wmc.1
+ id 1gZxyo-0007Z8-3z
+ for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 13:03:15 +0000
+Received: by mail-pl1-x643.google.com with SMTP id y1so855639plp.9
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 20 Dec 2018 04:55:00 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=amarulasolutions.com; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=jEijnCjicnGILwhFrMB461TXW1hBMByoFGuErMag6m8=;
- b=OqNkOUfzqgjoQyhejdqh03U9bW5LPxP6cJgHr8DrmmDR6co5LEA1lPNy06CWMa5diC
- 8HFpmRY/RdxzXB41ICCzKewZhWTyPZrlnYwzNq3wj0342ilCj8mNWFcfeCt97FRX7ZaB
- rLKfqk5A+199/9SAS+ba0Eomgryl7+N+vUa7w=
+ Thu, 20 Dec 2018 05:02:57 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=z33AmGyYeTegWwnOqVnqPvq8oZtBrBxpXFU1R2PJCDQ=;
+ b=KOeaA4RFW7Vqmg1WmtF7cLRxXmCj5vMgg/OW/MzbZg9l2h0MXNBFsh3zJFRGYNu9DL
+ JQNodnslaUNkEMUDlplfn5SNiK72WbiPVGpnNv6NRBHvX6XoGTgY/jZj+W4fZ/MeW/7D
+ oTOnVG92FVpJiZ3YMS0mI2x4XmEEitQ36aIsSIqOOzMnvzxdAwV+Nl7IaJ0UgmIOiLOz
+ 6fPS168dfauNGrXAZW3rlx9zDa++2V2sFumbzrBbc9I2rQvcBCtHZGrqGSW0wn4Fflvx
+ fE+uj/0LHKELDJESqQj4LRamOVJ974sekG30+ZoSbG/78as7kjwnRa+y4ifax8qYDwxR
+ UCfQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=jEijnCjicnGILwhFrMB461TXW1hBMByoFGuErMag6m8=;
- b=kEaMlafw5/DL7k7ynPs8FjDcbAb3vDBP0RXrLnWnH+fD7COSM7MAk1jGCBqThprVKC
- v9NXJYFlA9X33XvWI9JhhTSKCCQN3vHT2nXFKY7oWFaqNvCtcSBK1eDD9Qd7C/14dpsl
- rGC3qJYoT/PwkoPX8AU8++Ee6/fzTS4Z934NqWLZVWamSNHrgQ4PgibV5XSf7/XNoTTN
- R7BgM03uEVYsfBH4X+1yUkYftV3J/ZsnJ/zASEjXMaY/yZnRrYLP0rR3mkQm5QYEetfe
- knMxv4Dhf3yrKVz2Qtm8idJyvwMKXHgJHWvdvkhMq6R51Kef5Vcmtc3DVlC5+fwOIJ66
- S+cw==
-X-Gm-Message-State: AA+aEWb3weoRhAR+2MbM8NqzCLJgU1fJqI2xALC1WbqyEb+tByxGl8yP
- 5cCQPKcnxLqzI0tPd9cV6ya9clQ3ts4=
-X-Google-Smtp-Source: AFSGD/UN81KQhKo/d71SW3eqyGyxaLk4UeGQ4qmnRgXdU/jlhJ76DFWvMXnCrFCWNWD5YY4JE/ppJQ==
-X-Received: by 2002:a1c:f605:: with SMTP id w5mr11781988wmc.116.1545310499216; 
- Thu, 20 Dec 2018 04:54:59 -0800 (PST)
-Received: from localhost.localdomain (ip-163-240.sn-213-198.clouditalia.com.
- [213.198.163.240])
- by smtp.gmail.com with ESMTPSA id o4sm8732756wrq.66.2018.12.20.04.54.57
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 20 Dec 2018 04:54:58 -0800 (PST)
-From: Jagan Teki <jagan@amarulasolutions.com>
-To: Yong Deng <yong.deng@magewell.com>,
- Mauro Carvalho Chehab <mchehab@kernel.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- Chen-Yu Tsai <wens@csie.org>, linux-media@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-sunxi <linux-sunxi@googlegroups.com>,
- linux-amarula@amarulasolutions.com,
- Michael Trimarchi <michael@amarulasolutions.com>
-Subject: [DO NOT MERGE] [PATCH v5 6/6] arm64: dts: allwinner: bananapi-m64:
- Add HDF5640 camera module
-Date: Thu, 20 Dec 2018 18:24:38 +0530
-Message-Id: <20181220125438.11700-7-jagan@amarulasolutions.com>
-X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
-In-Reply-To: <20181220125438.11700-1-jagan@amarulasolutions.com>
-References: <20181220125438.11700-1-jagan@amarulasolutions.com>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=z33AmGyYeTegWwnOqVnqPvq8oZtBrBxpXFU1R2PJCDQ=;
+ b=nc38Ooc8EphhtYVfGCJATw8Dc4erGVGtKggtgDNw0Q234qDLV0ZnenFWedlhy1l8d4
+ RraGlj0IK3sjASOmMfa9a43jTsL/hvBCMD4ZPB8vPCSB2eHUpKtumUt8xLgSN/uIUbhc
+ BYmffblFq+PkJ4MKi0YrrAhbW38isV4xPC5uSicbDNOP85Rj3/eG3vaJUALCNI9r910a
+ toyxXxxIx/ZpjmnMWO4wDC5nhtb8HTa44gNR8LCYgkQz9+Lo9ot3wUKVdUysOP5FdIi7
+ Ltg8ijqMKbaBflcqiPVDNKPaz82DT77dkKS3IVbblqIR7MDs5W8cYO0wsiRzuwtzGoOB
+ V6WQ==
+X-Gm-Message-State: AA+aEWahbHawvluTvaaNyfgmNeDirpWx1vwOP9vNfnL9bmPH0IqhA+mI
+ g2Vc9cgCIGHJjYn+IvMIiqGDVRS0XjXAY/H9BqYMWw==
+X-Google-Smtp-Source: AFSGD/WOa83WUlOnQ0njasNEnkyLgn6475HlT3sAOPSTUT2Ym4C/TKTW1I6IgMjTWWIfkk7SKMal+m4GX2ZLl0cvNIQ=
+X-Received: by 2002:a17:902:a58a:: with SMTP id
+ az10mr24543086plb.10.1545310976746; 
+ Thu, 20 Dec 2018 05:02:56 -0800 (PST)
 MIME-Version: 1.0
+References: <706da77adfceb0c324e824d03b52d58a752577ea.1545139710.git.andreyknvl@google.com>
+ <20181218125453.4c5e6c056d31ccaa3a73d4a5@linux-foundation.org>
+In-Reply-To: <20181218125453.4c5e6c056d31ccaa3a73d4a5@linux-foundation.org>
+From: Andrey Konovalov <andreyknvl@google.com>
+Date: Thu, 20 Dec 2018 14:02:45 +0100
+Message-ID: <CAAeHK+yggnKfkycdUdTHG4MvWBMq_XK70m0rQuH873DZU+RnGQ@mail.gmail.com>
+Subject: Re: [PATCH mm] kasan,
+ arm64: use ARCH_SLAB_MINALIGN instead of manual aligning
+To: Andrew Morton <akpm@linux-foundation.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_045501_328641_3C59F998 
-X-CRM114-Status: GOOD (  13.97  )
+X-CRM114-CacheID: sfid-20181220_050310_189053_D1BAD38D 
+X-CRM114-Status: GOOD (  17.99  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -102,129 +91,102 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jagan Teki <jagan@amarulasolutions.com>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Kate Stewart <kstewart@linuxfoundation.org>,
+ "open list:DOCUMENTATION" <linux-doc@vger.kernel.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ Paul Lawrence <paullawrence@google.com>,
+ Linux Memory Management List <linux-mm@kvack.org>,
+ Alexander Potapenko <glider@google.com>,
+ Chintan Pandya <cpandya@codeaurora.org>, Christoph Lameter <cl@linux.com>,
+ Vincenzo Frascino <vincenzo.frascino@arm.com>, Ingo Molnar <mingo@kernel.org>,
+ Jacob Bramley <Jacob.Bramley@arm.com>,
+ Ruben Ayrapetyan <Ruben.Ayrapetyan@arm.com>, Mark Brand <markbrand@google.com>,
+ kasan-dev <kasan-dev@googlegroups.com>, linux-sparse@vger.kernel.org,
+ Geert Uytterhoeven <geert@linux-m68k.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Andrey Ryabinin <aryabinin@virtuozzo.com>, Dave Martin <dave.martin@arm.com>,
+ Evgeniy Stepanov <eugenis@google.com>, Vishwath Mohan <vishwath@google.com>,
+ Arnd Bergmann <arnd@arndb.de>,
+ Linux Kbuild mailing list <linux-kbuild@vger.kernel.org>,
+ Marc Zyngier <marc.zyngier@arm.com>,
+ Ramana Radhakrishnan <Ramana.Radhakrishnan@arm.com>,
+ Mike Rapoport <rppt@linux.vnet.ibm.com>, Dmitry Vyukov <dvyukov@google.com>,
+ Kostya Serebryany <kcc@google.com>, Jann Horn <jannh@google.com>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Nick Desaulniers <ndesaulniers@google.com>,
+ LKML <linux-kernel@vger.kernel.org>,
+ "Eric W . Biederman" <ebiederm@xmission.com>, Lee Smith <Lee.Smith@arm.com>,
+ "Kirill A . Shutemov" <kirill.shutemov@linux.intel.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Bananapi M64 comes with an optional sensor based on the ov5640,
-add support for it with below pin information.
+On Tue, Dec 18, 2018 at 9:55 PM Andrew Morton <akpm@linux-foundation.org> wrote:
+>
+> On Tue, 18 Dec 2018 14:30:33 +0100 Andrey Konovalov <andreyknvl@google.com> wrote:
+>
+> > Instead of changing cache->align to be aligned to KASAN_SHADOW_SCALE_SIZE
+> > in kasan_cache_create() we can reuse the ARCH_SLAB_MINALIGN macro.
+> >
+> > ...
+> >
+> > --- a/arch/arm64/include/asm/kasan.h
+> > +++ b/arch/arm64/include/asm/kasan.h
+> > @@ -36,6 +36,10 @@
+> >  #define KASAN_SHADOW_OFFSET     (KASAN_SHADOW_END - (1ULL << \
+> >                                       (64 - KASAN_SHADOW_SCALE_SHIFT)))
+> >
+> > +#ifdef CONFIG_KASAN_SW_TAGS
+> > +#define ARCH_SLAB_MINALIGN   (1ULL << KASAN_SHADOW_SCALE_SHIFT)
+> > +#endif
+> > +
+> >  void kasan_init(void);
+> >  void kasan_copy_shadow(pgd_t *pgdir);
+> >  asmlinkage void kasan_early_init(void);
+>
+> This looks unreliable.  include/linux/slab.h has
+>
+> /*
+>  * Setting ARCH_SLAB_MINALIGN in arch headers allows a different alignment.
+>  * Intended for arches that get misalignment faults even for 64 bit integer
+>  * aligned buffers.
+>  */
+> #ifndef ARCH_SLAB_MINALIGN
+> #define ARCH_SLAB_MINALIGN __alignof__(unsigned long long)
+> #endif
+>
+> so if a .c file includes arch/arm64/include/asm/kasan.h after
+> include/linux/slab.h, it can get a macro-redefined warning.  If the .c
+> file includes those headers in the other order, ARCH_SLAB_MINALIGN will
+> get a different value compared to other .c files.
+>
+> Or something like that.
+>
+> Different architectures define ARCH_SLAB_MINALIGN in different place:
+>
+> ./arch/microblaze/include/asm/page.h:#define ARCH_SLAB_MINALIGN L1_CACHE_BYTES
+> ./arch/arm/include/asm/cache.h:#define ARCH_SLAB_MINALIGN 8
+> ./arch/sh/include/asm/page.h:#define ARCH_SLAB_MINALIGN 8
+> ./arch/c6x/include/asm/cache.h:#define ARCH_SLAB_MINALIGN       L1_CACHE_BYTES
+> ./arch/sparc/include/asm/cache.h:#define ARCH_SLAB_MINALIGN     __alignof__(unsigned long long)
+> ./arch/xtensa/include/asm/processor.h:#define ARCH_SLAB_MINALIGN STACK_ALIGN
+>
+> which is rather bad of us.
+>
+> But still.  I think your definition should occur in an arch header file
+> which is reliably included from slab.h.  And kasan code should get its
+> definition of ARCH_SLAB_MINALIGN by including slab.h.
+>
 
-- PE13, PE12 via i2c-gpio bitbanging
-- CLK_CSI_MCLK as external clock
-- PE1 as external clock pin muxing
-- DLDO3 as AVDD supply
-- ALDO1 as DOVDD supply
-- ELDO3 as DVDD supply
-- PE16 gpio for reset pin
-- PE17 gpio for powerdown pin
+KASAN code doesn't use this macro directly, so I don't think it needs
+to get it's definition.
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
- .../dts/allwinner/sun50i-a64-bananapi-m64.dts | 65 +++++++++++++++++++
- 1 file changed, 65 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-index 83e30e0afe5b..c185ceec8c81 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-@@ -60,6 +60,41 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-+	i2c-csi {
-+		compatible = "i2c-gpio";
-+		sda-gpios = <&pio 4 13 GPIO_ACTIVE_HIGH>; /* CSI0-SDA: PE13 */
-+		scl-gpios = <&pio 4 12 GPIO_ACTIVE_HIGH>; /* CSI0-SCK: PE12 */
-+		i2c-gpio,delay-us = <5>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ov5640: camera@3c {
-+			compatible = "ovti,ov5640";
-+			reg = <0x3c>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&csi_mclk_pin>;
-+			clocks = <&ccu CLK_CSI_MCLK>;
-+			clock-names = "xclk";
-+
-+			AVDD-supply = <&reg_dldo3>;
-+			DOVDD-supply = <&reg_aldo1>;
-+			DVDD-supply = <&reg_eldo3>;
-+			reset-gpios = <&pio 4 16 GPIO_ACTIVE_LOW>; /* CSI0-RST: PE16 */
-+			powerdown-gpios = <&pio 4 17 GPIO_ACTIVE_HIGH>; /* CSI0-PWDN: PE17 */
-+
-+			port {
-+				ov5640_ep: endpoint {
-+					remote-endpoint = <&csi_ep>;
-+					bus-width = <8>;
-+					hsync-active = <1>; /* Active high */
-+					vsync-active = <0>; /* Active low */
-+					data-active = <1>;  /* Active high */
-+					pclk-sample = <1>;  /* Rising */
-+				};
-+			};
-+		};
-+	};
-+
- 	hdmi-connector {
- 		compatible = "hdmi-connector";
- 		type = "a";
-@@ -106,6 +141,24 @@
- 	status = "okay";
- };
- 
-+&csi {
-+	status = "okay";
-+
-+	port {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		csi_ep: endpoint {
-+			remote-endpoint = <&ov5640_ep>;
-+			bus-width = <8>;
-+			hsync-active = <1>; /* Active high */
-+			vsync-active = <0>; /* Active low */
-+			data-active = <1>;  /* Active high */
-+			pclk-sample = <1>;  /* Rising */
-+		};
-+	};
-+};
-+
- &dai {
- 	status = "okay";
- };
-@@ -296,6 +349,12 @@
- 	regulator-name = "vcc-wifi";
- };
- 
-+&reg_dldo3 {
-+	regulator-min-microvolt = <2800000>;
-+	regulator-max-microvolt = <2800000>;
-+	regulator-name = "avdd-csi";
-+};
-+
- &reg_dldo4 {
- 	regulator-min-microvolt = <1800000>;
- 	regulator-max-microvolt = <3300000>;
-@@ -313,6 +372,12 @@
- 	regulator-name = "cpvdd";
- };
- 
-+&reg_eldo3 {
-+	regulator-min-microvolt = <1500000>;
-+	regulator-max-microvolt = <1500000>;
-+	regulator-name = "dvdd-csi";
-+};
-+
- &reg_fldo1 {
- 	regulator-min-microvolt = <1200000>;
- 	regulator-max-microvolt = <1200000>;
--- 
-2.18.0.321.gffc6fa0e3
-
+What do you think about adding #include <linux/kasan.h> into
+linux/slab.h? Perhaps with a comment that this is needed to get
+definition of ARCH_SLAB_MINALIGN?
 
 _______________________________________________
 linux-arm-kernel mailing list
