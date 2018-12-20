@@ -2,90 +2,116 @@ Return-Path: <SRS0=AHqO=O5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 21B33C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 01:08:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7A00AC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 01:23:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D69DC2084A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 01:08:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4166320866
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 01:23:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PB6B7p73";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="knPpRNPv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D69DC2084A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ec67SdGj";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=impinj.com header.i=@impinj.com header.b="HFipYgHB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4166320866
+Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=impinj.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ghZJo6ZiZ/y0HJzz7JWgGmJPkoa0xc2CP+Pm+q39pKY=; b=PB6B7p73rFOW0B
-	7M02EMhW5eBCN3u7G3+wHuEgz31YJUe0cw3OnQycOAKZpKOdmgUYiav39rqvcDEqtNTx9JS89Dczl
-	RaXyq+f863fCpRNRgGaRppNdoBB2sKzGOHjUMHApdkH4pmnbfd1OLbOahNgXDfMbg2EZEtJ0JET88
-	GEWIgvXUelrH2A9XOQ4W7AmVRbTxXCOxswVBmdY/6Kt073D7N/pIFaDwSmv8LWnaT9LVaQhrZXj/A
-	W/I1VGh5XRYHCtLCrgfkJB5lmQublOJygv7SQ3eNmqC3+cXTz2Yh/vNRt8QGwjHlpqtF1EpIaWArN
-	sNWcllLVRQlzPE/pPowQ==;
+	List-Owner; bh=+oJ5AARWtDWw+g4XdN9yz/f49ETltI0Cg2KYOUBLURY=; b=ec67SdGj95/xu6
+	mKunXtBZafsuM3aI/Eafj9aCNAtu1th6A8lQQ2n8+BxrZEz0QNxo0eviVIINRCslq/B11kI3ewtqX
+	Rle55qKQV8iAvSmJWl+UPiS37knf5ac3cyKNlQAfhuRDKVKIrT9kyx53kmsm5IaXJNByWHDB+iKJG
+	23SH0tQLJ457m86kG2LmqwmiBkM12ZL2JuBqSzTdbh6I8LMBJCpabeF2BatEpVqJSywo7vzOiYw82
+	Do54tSUJ1MBRGxwKAVE+9bnrt/MLbSyiZW/YZZthhFsSut/Dr+RzisnsgeCeoE9GcWLha9RFkuLH6
+	f3SHyaHpFAH8zCn6zfPg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZmp1-0005w7-7v; Thu, 20 Dec 2018 01:08:19 +0000
-Received: from mail-pf1-x443.google.com ([2607:f8b0:4864:20::443])
+	id 1gZn3O-0003E3-8v; Thu, 20 Dec 2018 01:23:10 +0000
+Received: from mail-eopbgr690137.outbound.protection.outlook.com
+ ([40.107.69.137] helo=NAM04-CO1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZmoJ-0005HX-Rx
- for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 01:07:45 +0000
-Received: by mail-pf1-x443.google.com with SMTP id y126so38221pfb.4
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 19 Dec 2018 17:07:25 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=9eDj9Bbt2oCf40baWi7GsmAunPoJ7bQGVVCa01DH/lM=;
- b=knPpRNPve/QpAk838saOm0fzqBMDJZUpf9ZwdhpSbcqX1+2m6ewzdTVo7P0Pkh5R8s
- prneLkG9ohhukGXVYDYumezv99MF4Jb+dO9aJ0ucF+LpsSesZXYf929WmdGi+AgwVI7G
- wkDZKarPWboOwmQlSgrYKl8fI4gt1BrzybodmiWB5wDEwlPHjopVYu4hepIqz9MvMR5s
- dSyRN8Z9geJuD6v7nB00lmcbTf2C+O6lsJAM5sXjASoVzey/PlQ4xRSywUW/naG+ymKq
- CsnlFmOdqhpgxOuBEY/b3vURJYVidVXI3xPaioHeCzqrKVDsPZDn9YQCoBEBAlWu4cZT
- iuBA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=9eDj9Bbt2oCf40baWi7GsmAunPoJ7bQGVVCa01DH/lM=;
- b=oVgmvBUyl2kr+8Rn2lznX932kRfVxEAdQTaQyzjuceVrjWdto9fw8yoBsFDMo5SwNY
- r4M5kvnOEl2b34IbyCFgw5HkQsF+4ImZEv924NFh/thvYUwKVLIDGGFvC2nnSQ/frew7
- PikR37lAtYU2TiDFhu5gIfSylBt/32rG3Q9Lxyl7+AYCYxNJ70wsiCrFfdGeT75x8gIq
- LhQYrrLMePY1ZBMH+vO/WuMmPWXjp5nyKsZoQ2BzndORmBpPq6+55i6b5lH75uAB4hBX
- j8NhmczoffTygRyc151JHGCcvERrVNkYm6ecZOS73PVyi88WnkQkyQCsXVKw7bf7q1m0
- pRWQ==
-X-Gm-Message-State: AA+aEWb/Vywe4YbjLdiCXNACcitG4JuoPCBcAHkLWxddSka19oHQ5qHQ
- nZlQfdbXfhZ0vCmpqLZse+s=
-X-Google-Smtp-Source: AFSGD/Xk4iEb/3kumYvsWax7BIovJuhImdrqNN/gjgnOhxLr/GDDsrxdgU540Fs4qQL43q0ijfx80A==
-X-Received: by 2002:a62:8d4f:: with SMTP id z76mr23262096pfd.2.1545268044860; 
- Wed, 19 Dec 2018 17:07:24 -0800 (PST)
-Received: from squirtle.lan (c-24-22-235-96.hsd1.wa.comcast.net.
- [24.22.235.96])
- by smtp.gmail.com with ESMTPSA id 83sm29008612pgf.57.2018.12.19.17.07.22
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 19 Dec 2018 17:07:24 -0800 (PST)
-From: Andrey Smirnov <andrew.smirnov@gmail.com>
-To: p.zabel@pengutronix.de
-Subject: [PATCH v4 3/3] reset: imx7: Add support for i.MX8MQ IP block variant
-Date: Wed, 19 Dec 2018 17:07:00 -0800
-Message-Id: <20181220010700.8598-4-andrew.smirnov@gmail.com>
-X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20181220010700.8598-1-andrew.smirnov@gmail.com>
-References: <20181220010700.8598-1-andrew.smirnov@gmail.com>
+ id 1gZn3K-0003CF-0b
+ for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 01:23:07 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=impinj.com;
+ s=selector1;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=oHJSiqcMQxG/aqO+mzGu/H2GdnflQqdrCw9YYUtmhFw=;
+ b=HFipYgHBluDrDRp0aDk2trS0bQSz6lhgcqz9kqyiMj5bwfTPkm1Oq/NSsVpFVzlai/AovvA+56Maah5te+YUGriQnXS9DAJrk789AiW6s19ooarDO3LxNCp0MhLCED6c6CAITb1iQhawGlCg0Ax1w+uvL/9IgvNwbtCsFRgE3r8=
+Received: from MWHPR0601MB3708.namprd06.prod.outlook.com (10.167.236.38) by
+ MWHPR0601MB3721.namprd06.prod.outlook.com (10.167.236.138) with Microsoft
+ SMTP Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1446.19; Thu, 20 Dec 2018 01:22:52 +0000
+Received: from MWHPR0601MB3708.namprd06.prod.outlook.com
+ ([fe80::24d2:3a2c:20ed:7cfd]) by MWHPR0601MB3708.namprd06.prod.outlook.com
+ ([fe80::24d2:3a2c:20ed:7cfd%6]) with mapi id 15.20.1446.020; Thu, 20 Dec 2018
+ 01:22:51 +0000
+From: Trent Piepho <tpiepho@impinj.com>
+To: "l.stach@pengutronix.de" <l.stach@pengutronix.de>,
+ "andrew.smirnov@gmail.com" <andrew.smirnov@gmail.com>
+Subject: Re: [PATCH v3 3/3] PCI: imx6: Add support for i.MX8MQ
+Thread-Topic: [PATCH v3 3/3] PCI: imx6: Add support for i.MX8MQ
+Thread-Index: AQHUloc4EyB/jPStRUyDq4OW+MrDYaWE/zeAgAHO4ICAAAnkgA==
+Date: Thu, 20 Dec 2018 01:22:51 +0000
+Message-ID: <1545268969.22930.77.camel@impinj.com>
+References: <20181218040702.29231-1-andrew.smirnov@gmail.com>
+ <20181218040702.29231-4-andrew.smirnov@gmail.com>
+ <20181218151533.GA2922@bogus>
+ <VI1PR04MB5533533242C036C5CF6352BAEEBD0@VI1PR04MB5533.eurprd04.prod.outlook.com>
+ <CAL_JsqJb24ZpM7qQfy_F7RUVEGyceBAXOndbZcTMh3a__k38UQ@mail.gmail.com>
+ <CAHQ1cqEMxxo9JGN5be4XQWAtPz7nC2JyLCr3qasnD5QK7_hOYQ@mail.gmail.com>
+In-Reply-To: <CAHQ1cqEMxxo9JGN5be4XQWAtPz7nC2JyLCr3qasnD5QK7_hOYQ@mail.gmail.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=tpiepho@impinj.com; 
+x-originating-ip: [216.207.205.253]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; MWHPR0601MB3721;
+ 6:IYShTawWmHrB0u6/5093DDHFrYHjNeuvJV1KQ6hSrZShUSfBw2AfnjXcy+7INdkW+LvSn/U7a548lZZt/lz+fsgpn+1hpEF7J3OvW12wzUfdX9nTb4H2A3b0dffCB6YjBgk23/7Z827U+CZlmOODuXkzA6gLpBhjI2uNsBL9wJeWpOlTdJIvdzhBIoSs4f33jn2NeBPuW1POA3wfM6zzO8F5ejTKgrWqbaXiPIW+FFxRqe7t6IY5h64/x7EoBf2f7Sjv12Mo7n+ul8WBp/QWeNdUvHqvtkGZdM8vvikWBtGiHB9x0WsUF3eTM8wV6C23ayv/xIgWpvGEM7xhiAliYEDf/6UxWdPlkomdpkhl4dYmSideFAD94WRoVWnuEj6nLd4nXAPkkaiBXf9A2SbeLC0IgzrN+MwwAemWhL5JZa5zg+U4jsl9h4IDhclSwgVceabxyzEfnsDLJ8xL0zDnHA==;
+ 5:te1VzsV52awN4VjZPU+NV84ebSmzOfCJ69ECoBCJXnoqUtbwvtb8CmJzgDaRfOXqw1wclIwMhTUXCNqNu5kPE1p7OlL34FswrNveGtx9YgypUqSf6ftJXTLi5Hh/5ing3rc2PWHXzxf9BV3o2zGIpo0uuoB4fHxYYknJywRo1RQ=;
+ 7:4LPfKnnFIXiazYHdkZKb7bMaj7P36T0MChIc3xcaY1QBdDJTLe2ufQApENyNGD/DlHLJkGwaIB0VHHY1Z0FQhd8mWRnAddHLR0BdepZ0UUSUPCJD4aBsWmeF+rtXtty6/bWXQxPYlA7jvkeLUbq4rw==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: cde7f651-5ee1-42f2-8b04-08d66619a8ef
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(2017052603328)(7153060)(7193020);
+ SRVR:MWHPR0601MB3721; 
+x-ms-traffictypediagnostic: MWHPR0601MB3721:
+x-microsoft-antispam-prvs: <MWHPR0601MB3721B9BB6E55ED10696428E2D3BF0@MWHPR0601MB3721.namprd06.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(3230021)(999002)(5005026)(6040522)(2401047)(8121501046)(3002001)(10201501046)(93006095)(93001095)(3231475)(944501520)(52105112)(149066)(150057)(6041310)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123560045)(20161123564045)(20161123558120)(20161123562045)(201708071742011)(7699051)(76991095);
+ SRVR:MWHPR0601MB3721; BCL:0; PCL:0; RULEID:; SRVR:MWHPR0601MB3721; 
+x-forefront-prvs: 0892FA9A88
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10019020)(346002)(136003)(39840400004)(376002)(366004)(396003)(189003)(199004)(26005)(53936002)(6116002)(25786009)(3846002)(68736007)(5660300001)(102836004)(81166006)(86362001)(186003)(478600001)(2906002)(229853002)(8676002)(6506007)(6512007)(7736002)(305945005)(71200400001)(71190400001)(486006)(6486002)(99286004)(39060400002)(14454004)(106356001)(4001150100001)(76176011)(7416002)(4326008)(2501003)(256004)(93886005)(14444005)(36756003)(103116003)(97736004)(476003)(2616005)(11346002)(6436002)(110136005)(54906003)(105586002)(8936002)(81156014)(66066001)(6246003)(316002)(446003);
+ DIR:OUT; SFP:1102; SCL:1; SRVR:MWHPR0601MB3721;
+ H:MWHPR0601MB3708.namprd06.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: impinj.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: e8r0V9OZWI4h9NMo1OWJauPX+WIfQecOnIegA9bTCsuLLIdm3w1KSDUvBQMA4o9wRjspaB4i18j9K6jlS708+FsZwG+G9KDpZyWQTvdoqeGoQJaeTCV5+RO3g4y76Nw8Yxz7Hzx1aia2t1giYRRwFWmG5gb0Iik7yIhMXhjQ1BXjjEs+fTEM621ey6SvlI474E5KBgsISyTBKu0S9aaIh4WapCQjmgNb0bPwVddwGcX22bdGlZIgUVGK/DYthHgzYyii/Sb794/jfqOIXS4k+fGxCxrKPfggfyCojiXWu9Kldu5HzfavmRCzGNqgU+iS
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+Content-ID: <F57C2BFF224B7843B60ABC715CD776CA@namprd06.prod.outlook.com>
 MIME-Version: 1.0
+X-OriginatorOrg: impinj.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: cde7f651-5ee1-42f2-8b04-08d66619a8ef
+X-MS-Exchange-CrossTenant-originalarrivaltime: 20 Dec 2018 01:22:51.2949 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 6de70f0f-7357-4529-a415-d8cbb7e93e5e
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR0601MB3721
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181219_170736_359069_B8D2CC39 
-X-CRM114-Status: GOOD (  18.22  )
+X-CRM114-CacheID: sfid-20181219_172306_058267_55959491 
+X-CRM114-Status: GOOD (  18.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,188 +123,64 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Rob Herring <robh@kernel.org>,
- Richard Zhu <hongxing.zhu@nxp.com>, linux-arm-kernel@lists.infradead.org,
- devicetree@vger.kernel.org, Andrey Smirnov <andrew.smirnov@gmail.com>,
- linux-kernel@vger.kernel.org, linux-imx@nxp.com,
- Fabio Estevam <fabio.estevam@nxp.com>,
- Leonard Crestez <leonard.crestez@nxp.com>, cphealy@gmail.com,
- l.stach@pengutronix.de
+Cc: "aisheng.dong@nxp.com" <aisheng.dong@nxp.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "lorenzo.pieralisi@arm.com" <lorenzo.pieralisi@arm.com>,
+ "hongxing.zhu@nxp.com" <hongxing.zhu@nxp.com>,
+ "robh@kernel.org" <robh@kernel.org>,
+ "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "bhelgaas@google.com" <bhelgaas@google.com>,
+ "linux-imx@nxp.com" <linux-imx@nxp.com>,
+ "fabio.estevam@nxp.com" <fabio.estevam@nxp.com>,
+ "leonard.crestez@nxp.com" <leonard.crestez@nxp.com>,
+ "cphealy@gmail.com" <cphealy@gmail.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add bits and pieces needed to support IP block variant found on
-i.MX8MQ SoCs.
+On Wed, 2018-12-19 at 16:47 -0800, Andrey Smirnov wrote:
+> 
+> > > This series initially added explicit offsets but I suggested a single
+> > > "controller-id" because:
+> > >   * There are multiple bit and byte offsets
+> > >   * Other imx8 SOCs also have 2x pcie with other bit/byte offsets
+> > > 
+> > > Hiding this behind a compatible string and single "controller-id" seem
+> > > preferable to elaborating register maps in dt bindings. It also makes
+> > > upgrades simpler: if features are added which use other bits there is no
+> > > need to describe them in DT and deal with compatibility headaches.
+> > 
+> > You already have an id for the controllers: the address. Use that if
+> > you don't want to put the register offsets in DT.
+> > 
+> 
+> Lucas, are you on board with this?
 
-Cc: p.zabel@pengutronix.de
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: cphealy@gmail.com
-Cc: l.stach@pengutronix.de
-Cc: Leonard Crestez <leonard.crestez@nxp.com>
-Cc: "A.s. Dong" <aisheng.dong@nxp.com>
-Cc: Richard Zhu <hongxing.zhu@nxp.com>
-Cc: Rob Herring <robh@kernel.org>
-Cc: devicetree@vger.kernel.org
-Cc: linux-imx@nxp.com
-Cc: linux-arm-kernel@lists.infradead.org
-Cc: linux-kernel@vger.kernel.org
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
----
- drivers/reset/Kconfig      |   4 +-
- drivers/reset/reset-imx7.c | 106 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 108 insertions(+), 2 deletions(-)
+Does address here mean the address from the controller's reg property?
+ 
+How do you map that address to the controller's index?  A giant table
+of every soc so the soc type plus controller register address pair than
+can be looked up in the driver?
 
-diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-index c21da9fe51ec..add84b523be1 100644
---- a/drivers/reset/Kconfig
-+++ b/drivers/reset/Kconfig
-@@ -48,9 +48,9 @@ config RESET_HSDK
- 	  This enables the reset controller driver for HSDK board.
- 
- config RESET_IMX7
--	bool "i.MX7 Reset Driver" if COMPILE_TEST
-+	bool "i.MX7/8 Reset Driver" if COMPILE_TEST
- 	depends on HAS_IOMEM
--	default SOC_IMX7D
-+	default SOC_IMX7D || (ARM64 && ARCH_MXC)
- 	select MFD_SYSCON
- 	help
- 	  This enables the reset controller driver for i.MX7 SoCs.
-diff --git a/drivers/reset/reset-imx7.c b/drivers/reset/reset-imx7.c
-index 3a36d5863891..bb826935db6d 100644
---- a/drivers/reset/reset-imx7.c
-+++ b/drivers/reset/reset-imx7.c
-@@ -22,6 +22,7 @@
- #include <linux/reset-controller.h>
- #include <linux/regmap.h>
- #include <dt-bindings/reset/imx7-reset.h>
-+#include <dt-bindings/reset/imx8mq-reset.h>
- 
- struct imx7_src_signal {
- 	unsigned int offset, bit;
-@@ -113,6 +114,110 @@ static const struct imx7_src_variant variant_imx7 = {
- 	.prepare = imx7_src_prepare,
- };
- 
-+enum imx8mq_src_registers {
-+	SRC_A53RCR0		= 0x0004,
-+	SRC_HDMI_RCR		= 0x0030,
-+	SRC_DISP_RCR		= 0x0034,
-+	SRC_GPU_RCR		= 0x0040,
-+	SRC_VPU_RCR		= 0x0044,
-+	SRC_PCIE2_RCR		= 0x0048,
-+	SRC_MIPIPHY1_RCR	= 0x004c,
-+	SRC_MIPIPHY2_RCR	= 0x0050,
-+	SRC_DDRC2_RCR		= 0x1004,
-+};
-+
-+static const struct imx7_src_signal imx8mq_src_signals[IMX8MQ_RESET_NUM] = {
-+	[IMX8MQ_RESET_A53_CORE_POR_RESET0]	= { SRC_A53RCR0, BIT(0) },
-+	[IMX8MQ_RESET_A53_CORE_POR_RESET1]	= { SRC_A53RCR0, BIT(1) },
-+	[IMX8MQ_RESET_A53_CORE_POR_RESET2]	= { SRC_A53RCR0, BIT(2) },
-+	[IMX8MQ_RESET_A53_CORE_POR_RESET3]	= { SRC_A53RCR0, BIT(3) },
-+	[IMX8MQ_RESET_A53_CORE_RESET0]		= { SRC_A53RCR0, BIT(4) },
-+	[IMX8MQ_RESET_A53_CORE_RESET1]		= { SRC_A53RCR0, BIT(5) },
-+	[IMX8MQ_RESET_A53_CORE_RESET2]		= { SRC_A53RCR0, BIT(6) },
-+	[IMX8MQ_RESET_A53_CORE_RESET3]		= { SRC_A53RCR0, BIT(7) },
-+	[IMX8MQ_RESET_A53_DBG_RESET0]		= { SRC_A53RCR0, BIT(8) },
-+	[IMX8MQ_RESET_A53_DBG_RESET1]		= { SRC_A53RCR0, BIT(9) },
-+	[IMX8MQ_RESET_A53_DBG_RESET2]		= { SRC_A53RCR0, BIT(10) },
-+	[IMX8MQ_RESET_A53_DBG_RESET3]		= { SRC_A53RCR0, BIT(11) },
-+	[IMX8MQ_RESET_A53_ETM_RESET0]		= { SRC_A53RCR0, BIT(12) },
-+	[IMX8MQ_RESET_A53_ETM_RESET1]		= { SRC_A53RCR0, BIT(13) },
-+	[IMX8MQ_RESET_A53_ETM_RESET2]		= { SRC_A53RCR0, BIT(14) },
-+	[IMX8MQ_RESET_A53_ETM_RESET3]		= { SRC_A53RCR0, BIT(15) },
-+	[IMX8MQ_RESET_A53_SOC_DBG_RESET]	= { SRC_A53RCR0, BIT(20) },
-+	[IMX8MQ_RESET_A53_L2RESET]		= { SRC_A53RCR0, BIT(21) },
-+	[IMX8MQ_RESET_SW_NON_SCLR_M4C_RST]	= { SRC_M4RCR, BIT(0) },
-+	[IMX8MQ_RESET_OTG1_PHY_RESET]		= { SRC_USBOPHY1_RCR, BIT(0) },
-+	[IMX8MQ_RESET_OTG2_PHY_RESET]		= { SRC_USBOPHY2_RCR, BIT(0) },
-+	[IMX8MQ_RESET_MIPI_DSI_RESET_BYTE_N]	= { SRC_MIPIPHY_RCR, BIT(1) },
-+	[IMX8MQ_RESET_MIPI_DSI_RESET_N]		= { SRC_MIPIPHY_RCR, BIT(2) },
-+	[IMX8MQ_RESET_MIPI_DIS_DPI_RESET_N]	= { SRC_MIPIPHY_RCR, BIT(3) },
-+	[IMX8MQ_RESET_MIPI_DIS_ESC_RESET_N]	= { SRC_MIPIPHY_RCR, BIT(4) },
-+	[IMX8MQ_RESET_MIPI_DIS_PCLK_RESET_N]	= { SRC_MIPIPHY_RCR, BIT(5) },
-+	[IMX8MQ_RESET_PCIEPHY]			= { SRC_PCIEPHY_RCR,
-+						    BIT(2) | BIT(1) },
-+	[IMX8MQ_RESET_PCIEPHY_PERST]		= { SRC_PCIEPHY_RCR, BIT(3) },
-+	[IMX8MQ_RESET_PCIE_CTRL_APPS_EN]	= { SRC_PCIEPHY_RCR, BIT(6) },
-+	[IMX8MQ_RESET_PCIE_CTRL_APPS_TURNOFF]	= { SRC_PCIEPHY_RCR, BIT(11) },
-+	[IMX8MQ_RESET_HDMI_PHY_APB_RESET]	= { SRC_HDMI_RCR, BIT(0) },
-+	[IMX8MQ_RESET_DISP_RESET]		= { SRC_DISP_RCR, BIT(0) },
-+	[IMX8MQ_RESET_GPU_RESET]		= { SRC_GPU_RCR, BIT(0) },
-+	[IMX8MQ_RESET_VPU_RESET]		= { SRC_VPU_RCR, BIT(0) },
-+	[IMX8MQ_RESET_PCIEPHY2]			= { SRC_PCIE2_RCR,
-+						    BIT(2) | BIT(1) },
-+	[IMX8MQ_RESET_PCIEPHY2_PERST]		= { SRC_PCIE2_RCR, BIT(3) },
-+	[IMX8MQ_RESET_PCIE2_CTRL_APPS_EN]	= { SRC_PCIE2_RCR, BIT(6) },
-+	[IMX8MQ_RESET_PCIE2_CTRL_APPS_TURNOFF]	= { SRC_PCIE2_RCR, BIT(11) },
-+	[IMX8MQ_RESET_MIPI_CSI1_CORE_RESET]	= { SRC_MIPIPHY1_RCR, BIT(0) },
-+	[IMX8MQ_RESET_MIPI_CSI1_PHY_REF_RESET]	= { SRC_MIPIPHY1_RCR, BIT(1) },
-+	[IMX8MQ_RESET_MIPI_CSI1_ESC_RESET]	= { SRC_MIPIPHY1_RCR, BIT(2) },
-+	[IMX8MQ_RESET_MIPI_CSI2_CORE_RESET]	= { SRC_MIPIPHY2_RCR, BIT(0) },
-+	[IMX8MQ_RESET_MIPI_CSI2_PHY_REF_RESET]	= { SRC_MIPIPHY2_RCR, BIT(1) },
-+	[IMX8MQ_RESET_MIPI_CSI2_ESC_RESET]	= { SRC_MIPIPHY2_RCR, BIT(2) },
-+	[IMX8MQ_RESET_DDRC1_PRST]		= { SRC_DDRC_RCR, BIT(0) },
-+	[IMX8MQ_RESET_DDRC1_CORE_RESET]		= { SRC_DDRC_RCR, BIT(1) },
-+	[IMX8MQ_RESET_DDRC1_PHY_RESET]		= { SRC_DDRC_RCR, BIT(2) },
-+	[IMX8MQ_RESET_DDRC2_PHY_RESET]		= { SRC_DDRC2_RCR, BIT(0) },
-+	[IMX8MQ_RESET_DDRC2_CORE_RESET]		= { SRC_DDRC2_RCR, BIT(1) },
-+	[IMX8MQ_RESET_DDRC2_PRST]		= { SRC_DDRC2_RCR, BIT(2) },
-+};
-+
-+static unsigned int
-+imx8mq_src_prepare(struct imx7_src *imx7src, unsigned long id, bool assert)
-+{
-+	const unsigned int bit = imx7src->variant->signals[id].bit;
-+	unsigned int value = assert ? bit : 0;
-+
-+	switch (id) {
-+	case IMX8MQ_RESET_PCIEPHY:
-+	case IMX8MQ_RESET_PCIEPHY2: /* fallthrough */
-+		/*
-+		 * wait for more than 10us to release phy g_rst and
-+		 * btnrst
-+		 */
-+		if (!assert)
-+			udelay(10);
-+		break;
-+
-+	case IMX8MQ_RESET_PCIE_CTRL_APPS_EN:
-+	case IMX8MQ_RESET_PCIE2_CTRL_APPS_EN:	/* fallthrough */
-+	case IMX8MQ_RESET_MIPI_DIS_PCLK_RESET_N:	/* fallthrough */
-+	case IMX8MQ_RESET_MIPI_DIS_ESC_RESET_N:	/* fallthrough */
-+	case IMX8MQ_RESET_MIPI_DIS_DPI_RESET_N:	/* fallthrough */
-+	case IMX8MQ_RESET_MIPI_DSI_RESET_N:	/* fallthrough */
-+	case IMX8MQ_RESET_MIPI_DSI_RESET_BYTE_N:	/* fallthrough */
-+		value = assert ? 0 : bit;
-+		break;
-+	}
-+
-+	return value;
-+}
-+
-+static const struct imx7_src_variant variant_imx8mq = {
-+	.signals = imx8mq_src_signals,
-+	.signals_num = ARRAY_SIZE(imx8mq_src_signals),
-+	.prepare = imx8mq_src_prepare,
-+};
-+
- static struct imx7_src *to_imx7_src(struct reset_controller_dev *rcdev)
- {
- 	return container_of(rcdev, struct imx7_src, rcdev);
-@@ -175,6 +280,7 @@ static int imx7_reset_probe(struct platform_device *pdev)
- 
- static const struct of_device_id imx7_reset_dt_ids[] = {
- 	{ .compatible = "fsl,imx7d-src", .data = &variant_imx7 },
-+	{ .compatible = "fsl,imx8mq-src", .data = &variant_imx8mq },
- 	{ /* sentinel */ },
- };
- 
--- 
-2.19.1
+I.e., on iMX8MQ the controller at 0x33800000 is controller 0 and so on
+for every possible SoC address combination?
+
+Not really a fan of that.
+
+The situation here is that some registers for these controllers are
+interleaved, right?  I.e., there's one register somewhere where bit 0
+means enable controller 0 and bit 1 means enable controller 1 and so
+on.
+
+Isn't cell-index already the standard device tree property for this
+kind of setup?
+
+I know cell-index was historically also (ab)used in an attempt to
+provide a fixed kernel device enumeration order, something now handled
+better by chosen node aliases.
 
 
 _______________________________________________
