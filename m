@@ -2,76 +2,73 @@ Return-Path: <SRS0=AHqO=O5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AB083C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 11:05:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BA162C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 11:06:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7783C2177E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 11:05:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 851EA21741
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 11:06:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WaYUwo+z";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="SChZgPWJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7783C2177E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l9RmI3/C"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 851EA21741
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=dve8cSNiZRdxfT+GUDVBy0GcJXJuhf4t1T9KW82bSu4=; b=WaYUwo+zZ5dlqo
-	ROBqpJM4qlN0ZmiEBXlaaMBn2wIBrqPaa2NVB35MEY7Q5cpA5rLj/6kQXmbQawQ6klJC4bmd5arzx
-	LITN3zGmXkprPhFzsVdSFAZzeHr0lvoSICwMaZLrHvj0jGQTdu/9EVuCwYXlJwpET9PP+GQuAoxlM
-	ePhN9hmLW4YrjfrYgRLi4ZKO9q/2zcnLerZWfx0sYT3wGfGBNDZlVv3VYG3lWJVp0c8ldvJhKtb8m
-	QDfDXewDtopi8PE3emzdaQFKxeI/qXw5ZMlIu2ur8Yj7uLNoIObES3EzqFiyk0T+m9Zue8KBviMUQ
-	Cnl0hqqIl0JEaPwn4Qyw==;
+	List-Owner; bh=HaEBnkXR5XmfAGMsVKCuTC40LsdWMOowCAYPE9gAV0g=; b=l9RmI3/CoVMhPI
+	gjtIk5lzwX54yNgDDRSIYcYo+HcwWgEOb6pXlGIUvI/FFd/RAXodK9HUfq6ikkxwgtxUaWo7G+Y2+
+	5VvKtheqBW5IudUP92aoifAiA8GM0csLf2e57PsHfYxp/tJ1EXw/z2+zaatB6PoBhJFlszuqy4Noc
+	LC0HC4c0KtbuFfIP+2Fcd6TzQ9Ihv0etzk09TE6zMKog7HuHGDM/JwkT2TfJaPrYhb1QHvv/NrUa7
+	iBgnqk4r/PFNpse59ihkUEFnifrwoES6J1zrhkT2fv+pw7hUbDpJM46nLch6Obt9Vl3fWG5eFkHqj
+	fE8MeKUM21XQeCzEJ6Nw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZw9C-0000Kn-1m; Thu, 20 Dec 2018 11:05:46 +0000
-Received: from pandora.armlinux.org.uk
- ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
+	id 1gZw9S-0000Ze-5A; Thu, 20 Dec 2018 11:06:02 +0000
+Received: from mail-ot1-f67.google.com ([209.85.210.67])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZw95-0000JC-44
- for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 11:05:44 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=pNocAJiT+m1Lf6MbJTUddXOe/mvu3NcIIB6KXBjFINM=; b=SChZgPWJIrJX+URBWdz6qfGYp
- lgA2nLn8mE7Er3TpTc5xG5P4r3d33u3NtYocwo628AL+umUtquitoe0atWsJA7NsVKYKQg56qltKY
- s7dX1TigkBaMHKXF6ijpaNFc2Om9FW4HypVP1v1AD4GLo57clbQQwvgarpOqnJbGqFnF8=;
-Received: from n2100.armlinux.org.uk
- ([2001:4d48:ad52:3201:214:fdff:fe10:4f86]:60339)
- by pandora.armlinux.org.uk with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
- (envelope-from <linux@armlinux.org.uk>)
- id 1gZw8k-0000Pg-2G; Thu, 20 Dec 2018 11:05:18 +0000
-Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
- (envelope-from <linux@n2100.armlinux.org.uk>)
- id 1gZw8Z-0001Jn-Sk; Thu, 20 Dec 2018 11:05:08 +0000
-Date: Thu, 20 Dec 2018 11:05:03 +0000
-From: Russell King - ARM Linux <linux@armlinux.org.uk>
-To: Krzysztof Kozlowski <krzk@kernel.org>
-Subject: Re: [PATCH 0/9] Clean up ARM SMP/CPU hotplug implementations
-Message-ID: <20181220110503.GO9507@n2100.armlinux.org.uk>
-References: <20181213175952.GC26090@n2100.armlinux.org.uk>
- <20181220101044.GN9507@n2100.armlinux.org.uk>
- <CAJKOXPdkebh8P4u=uqAxuoh_xxsdSfKeyy3ccDEiScstb_J_pg@mail.gmail.com>
+ id 1gZw9H-0000KL-UE
+ for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 11:05:55 +0000
+Received: by mail-ot1-f67.google.com with SMTP id w25so1249231otm.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 20 Dec 2018 03:05:41 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=nq8d07HAa0tURcA9JYcwKrgnNSA4HwhiWl3XqEL59Zc=;
+ b=NIZBrN9hK163ZIPK1GHclR/it7xjHy/1vrqe/umViRvZbyYYVR7yibC4GG+7c1jAJd
+ iRvUE8i+3QGLgHNZ4hxGJon2sZ2j9PbpofFaiQqyEV9wOgy5ndia++7a0qpN4G6IteiI
+ +BZUaMu1AHDpFxg9Thdkypi+KE2ffOcLqZFvZvw/QUi3uCDtrXFp+BABcqPDzI353Mvk
+ Sy4z6ikeUVlNkRu7gpxGR+0x5drp8fmUIdMDIUZnqjyGFXghJ8Aqz1+m8IHk74MRpnZS
+ +sS2GYhSiSS8zLn8r4n7vRBG3Py05FZUDBYfNzxnD63UEWzxBP+eyRts2S3x5ipPRJSJ
+ XH3Q==
+X-Gm-Message-State: AA+aEWbai6qfLe2EGfJBlb42Er/5fG2X4Oasjz9K1xIgw7uxXETLw95w
+ rS7KVhRy7z+trVM63Sew6uzcWXXRqc9MClRqR3s=
+X-Google-Smtp-Source: AFSGD/XBUlS0ADGlXz9kg54sao9pZE5paZ6+97pw61rIIxgIojgvRKmkFuaLFikqMe3TYsAr0EAM7pXCfDSDq2jexu8=
+X-Received: by 2002:a9d:4c84:: with SMTP id m4mr16332731otf.124.1545303940805; 
+ Thu, 20 Dec 2018 03:05:40 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CAJKOXPdkebh8P4u=uqAxuoh_xxsdSfKeyy3ccDEiScstb_J_pg@mail.gmail.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+References: <CGME20181220102300eucas1p210735c7753688a52a73ccf026884dd11@eucas1p2.samsung.com>
+ <20181220102247.4911-1-a.hajda@samsung.com>
+ <20181220102247.4911-4-a.hajda@samsung.com>
+In-Reply-To: <20181220102247.4911-4-a.hajda@samsung.com>
+From: "Rafael J. Wysocki" <rafael@kernel.org>
+Date: Thu, 20 Dec 2018 12:05:29 +0100
+Message-ID: <CAJZ5v0gzwu9Zf+1MjVqomqMuvZpHtpKizETgW0==7HBqDq2w-w@mail.gmail.com>
+Subject: Re: [PATCH v4 3/3] driver core: add probe_err_ptr helper
+To: Andrzej Hajda <a.hajda@samsung.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_030539_160465_2B3F2ABD 
-X-CRM114-Status: GOOD (  17.63  )
+X-CRM114-CacheID: sfid-20181220_030552_832891_4C0FA9A1 
+X-CRM114-Status: GOOD (  14.77  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,67 +80,49 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Barry Song <baohua@kernel.org>,
- "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
- Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
- Neil Armstrong <narmstrong@baylibre.com>, Tony Lindgren <tony@atomide.com>,
- linux-arm-msm@vger.kernel.org, Linus Walleij <linus.walleij@linaro.org>,
- Sudeep Holla <sudeep.holla@arm.com>, Liviu Dudau <liviu.dudau@arm.com>,
- Patrice Chotard <patrice.chotard@st.com>,
- Andreas =?iso-8859-1?Q?F=E4rber?= <afaerber@suse.de>,
- David Brown <david.brown@linaro.org>, linux-omap@vger.kernel.org,
- Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>, Kukjin Kim <kgene@kernel.org>,
- Viresh Kumar <vireshk@kernel.org>, Andy Gross <andy.gross@linaro.org>,
- linux-oxnas@groups.io, linux-soc@vger.kernel.org,
- Shiraz Hashim <shiraz.linux.kernel@gmail.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: "Rafael J. Wysocki" <rafael@kernel.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, javierm@redhat.com,
+ Andy Shevchenko <andy.shevchenko@gmail.com>, Mark Brown <broonie@kernel.org>,
+ Russell King - ARM Linux <linux@armlinux.org.uk>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Marek Szyprowski <m.szyprowski@samsung.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Dec 20, 2018 at 11:23:57AM +0100, Krzysztof Kozlowski wrote:
-> On Thu, 20 Dec 2018 at 11:11, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> >
-> > Since almost no one has responded, my intention is to queue up
-> > patches 1-3,5-8 for the Christmas-time merge window through my
-> > tree.  They will be in linux-next tonight.
-> 
-> AFAIU, the patch 9 (or entire patchset) was not build tested, did not
-> compile and therefore was not in linux-next. Sending something, which
-> was not building, to linux-next just few days before Christmas merge
-> window makes the schedule really tight. Especially that during
-> Christmas some people might be offline.
+On Thu, Dec 20, 2018 at 11:23 AM Andrzej Hajda <a.hajda@samsung.com> wrote:
+>
+> probe_err is useful in multiple contexts where error is encoded in pointer.
+> Adding helper performing conversion to error value should simplify code
+> further.
+>
+> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 
-If you're only testing linux-next, then you have a hole in your test
-regime.
+Reviewed-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 
-> I think it should sit in linux-next for few weeks... it should sit
-> there already so the auto-testers would try it. At least if it were in
-> linux-next, the booting and few simple tests were already done, e.g.
-> by my boards, without any additional effort.
-
-As I've said, I'm omitting patches 4 and 9.  Patch 9 is the troublesome
-patch and can't be merged anyway since patch 4 is going via the STi
-maintainer along with other changes.  The remainder of the patch set
-are all specific to individual platforms, some of which have been
-acked, but most platform maintainers have not responded in _any_ way.
-
-You are aware that the autobuilders do build patches sent to the
-mailing list, and then we have kernelci which builds my tree, builds
-linux-next etc.  There's multiple stages of build test that such
-stuff goes through.
-
-Lastly, linux-next is not a general test tree, it is for integration
-testing of code destined for the _NEXT_ merge window.  The clue is
-in the name.  It is not for code destined for the following merge
-window - only code for _this_ merge window should be in linux-next.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+> ---
+>  include/linux/device.h | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/include/linux/device.h b/include/linux/device.h
+> index 2d3a1cc6f5da..50632414c363 100644
+> --- a/include/linux/device.h
+> +++ b/include/linux/device.h
+> @@ -1594,6 +1594,8 @@ do {                                                                      \
+>  extern __printf(3, 4)
+>  int probe_err(const struct device *dev, int err, const char *fmt, ...);
+>
+> +#define probe_err_ptr(dev, ptr, args...) probe_err(dev, PTR_ERR(ptr), args)
+> +
+>  /* Create alias, so I can be autoloaded. */
+>  #define MODULE_ALIAS_CHARDEV(major,minor) \
+>         MODULE_ALIAS("char-major-" __stringify(major) "-" __stringify(minor))
+> --
+> 2.17.1
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
