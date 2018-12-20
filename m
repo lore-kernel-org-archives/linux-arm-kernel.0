@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 93BF4C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 15:51:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 250E8C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 15:57:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 65155217D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 15:51:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E4D7F20645
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 15:57:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="n5TO6nOK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 65155217D8
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IpJokt8d"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E4D7F20645
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,47 +24,49 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=OhX6nbLJ8zvSgXi6tvuAGoAQTWtpjPdCZYwvajpMF38=; b=n5TO6nOKv6tfHf
-	btmbFqOsj7Cq7/ABhzV+qL5tjxKXYDbvVeLhc7L9gXQDWzskrA3zLgB1ZevKBaKBchh1+5lbakLKQ
-	EMm3tblvKsDmnTWC3gYmIMWTgMF4N0crU8S8iOkNFpWdrY0oPAjMPMxA8GM3P9xTYbYXn+X4xG8lT
-	PpwwbhC3ANdVv9WEwRekIZAsz0bNr7oQF9UEvZj3npZ8ql/pjmwCiA4n3dH1nsT8i7zCU0LZx/0fz
-	Xi0iuW+wGRiuUsBQXGQbVjRp+N51Ohm/gpu2XGoWX5joLBfuTaj3KJjzzxvIkuoU7fkXpcBRxtcEk
-	ZixW3mKBR1yr9vqk+HMQ==;
+	List-Owner; bh=s0Sf8bEM2O9+EWPnsfsDHkxCXQLK7bpTXNCYoCNRQO8=; b=IpJokt8dg1DvjQ
+	5JEXzAoJ/PESOmLbVm+nildECzWQXIYhpFdEKVhUkdDBlHPvmz+6LTbhDIFDRrYi3bM/aVtnmOynO
+	tg+a/D1rOnp6PfI6zG4IWuzjmULhy512AktKg5luVWvSkPpkT0773rmiJ+O6u6PQGCuDX08jCNDXb
+	abRNjgKyApqlHtsV04BwKdBAEY5X6XNuGVSVEWFYhflyGU1iUcpAZwIC+1Nb2wjm8lo8+1jZz5Gxi
+	2O3xx1V/HSAmF9Db3kIrlVG3USesm0mEMBgDD6Rxt69PZi55ZTRQSZGoD8HnoMW0la1xjgpw6Mz1A
+	nQ42DRyJEVoJ1Opv4POg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ga0bX-0006al-Lc; Thu, 20 Dec 2018 15:51:19 +0000
-Received: from mail-qt1-f193.google.com ([209.85.160.193])
+	id 1ga0hV-0000YZ-29; Thu, 20 Dec 2018 15:57:29 +0000
+Received: from mail-qk1-f195.google.com ([209.85.222.195])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ga0bU-0006Zv-MW; Thu, 20 Dec 2018 15:51:17 +0000
-Received: by mail-qt1-f193.google.com with SMTP id l11so2318998qtp.0;
- Thu, 20 Dec 2018 07:51:06 -0800 (PST)
+ id 1ga0hS-0000Y6-8R
+ for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 15:57:27 +0000
+Received: by mail-qk1-f195.google.com with SMTP id a1so1273882qkc.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 20 Dec 2018 07:57:15 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=WQWGtgT0fgcNBIfwioUMaqKGTaG8bbKxTwCufj0gFV0=;
- b=HHUg0YdAE7vRLghIIAqozbo0EaF/hpz5KFKPcNU8h8s2ut3m6fHD86YcQj2v4RDNtC
- OWmyy6nVvqrNflnRPmxjgeVijaAH01KGr0uFujOy7Ooj377ExRRVFYIHUntT1Trlj3GV
- 8nsR+TFuA0ZbY2wXukPRHW1Zd34oCtq4khYK4Y7soj090FEFiU+53d3UkNii2KRZsGzQ
- +uNqO6ELp3R4C+9T8T6KAQlt688sxN9ucsqT6JOk50aly6DGfYuNUUblXsszIOD0yjYQ
- szyvPSBwt5Gul/4qrlZM1HJHvOFv3576qv87IdtjiF1dRGWe9wuwFdD6BT6OvmGyhOQs
- 3U0g==
-X-Gm-Message-State: AA+aEWaY0i+9znwCr6zZVuwJRaJhUmpNypSCgc8JHnQ/rt02ywpMnYYA
- 9hVxSUGdnKvgsreJCJ9NBRSSX/DnQqBDlrbU/gE=
-X-Google-Smtp-Source: AFSGD/XenCVSVL/Aed2RpsLxbi44vSAgavBh5yBinMcFcNIM7bqyPXQGlQdnK/4PZdrZf2UZ8noWf145NcA+PlIRD0k=
-X-Received: by 2002:ac8:1d12:: with SMTP id d18mr26273107qtl.343.1545321065719; 
- Thu, 20 Dec 2018 07:51:05 -0800 (PST)
+ bh=3+uO6G8aNCnK/AZsnQVOZoyUwaZLmsIgVwVIrS2fz0c=;
+ b=uWa6LhBa/0RRu8LjY0ck7BVhK1HW+T5mWKyHxf5I1/M8YGg98gDld+bIWFAKgtzZS7
+ x953gKn72/s5gWu2QeBo000IS6VJy5J4pHR5kg5kwtlDe5PWRsuPyGH575esqrlf2z8w
+ sXOb7BbcfL+3O+FphdMqnEXFUR74htpL9QaHUWgJ33xe+ESQVs8kccQk4B/QdKqZo8qf
+ FzfoiIt/FBXCGY4f1aQkQpHMY5EfiVNaZ29aehyPS+UTtpaqqaUkrTcOjKqj8UIK1LWx
+ kt9b35wT0gTT/46YHqX8UNLAW4dfdj3NHNtT/fgoqweUwavwQu3yQz2ZiE4wnVE57sUW
+ s9Ww==
+X-Gm-Message-State: AA+aEWbxMqyKKYHHMuF6x4ZspqAAO83bC37Yj0MSOxVMCZ/tuP5Dt73c
+ 5j0bEu46ukv5jQEYEvIrC8qP6vitFOOLFKZXTxM=
+X-Google-Smtp-Source: AFSGD/XYtYRImeBz4LLPoeaUMcOSRpu6eA7WLfQgpEJXZ5iBHlMvKk1wpBqsHLsgEDJGXtJVmwYXSRPmvQ1eRps0jBc=
+X-Received: by 2002:ae9:e102:: with SMTP id g2mr23657709qkm.343.1545321434858; 
+ Thu, 20 Dec 2018 07:57:14 -0800 (PST)
 MIME-Version: 1.0
-References: <20181216084854.GJ13243@dragon>
-In-Reply-To: <20181216084854.GJ13243@dragon>
+References: <20181219095546.GA2302@wens.csie.org>
+In-Reply-To: <20181219095546.GA2302@wens.csie.org>
 From: Arnd Bergmann <arnd@arndb.de>
-Date: Thu, 20 Dec 2018 16:50:49 +0100
-Message-ID: <CAK8P3a34R+Gv+H8_jjGP452i2kSqq+u0PsE-4pDnRRtY14SG0w@mail.gmail.com>
-Subject: Re: [GIT PULL] FSL QSPI device tree cleanup for 4.21
-To: Shawn Guo <shawnguo@kernel.org>
+Date: Thu, 20 Dec 2018 16:56:57 +0100
+Message-ID: <CAK8P3a2j7Hu7yK1wPELFr0Ke5MDFBgVnn7WjoQW+Xsv12d3weg@mail.gmail.com>
+Subject: Re: [GIT PULL] Allwinner DT changes for 4.21 - Round 2
+To: Chen-Yu Tsai <wens@csie.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_075116_727118_BBC0FA26 
-X-CRM114-Status: GOOD (  10.19  )
+X-CRM114-CacheID: sfid-20181220_075726_296883_98BB83AB 
+X-CRM114-Status: GOOD (  10.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,35 +78,26 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: frieder.schrempf@kontron.de, linux-spi <linux-spi@vger.kernel.org>,
- arm-soc <arm@kernel.org>, linux-mtd <linux-mtd@lists.infradead.org>,
- linux-imx@nxp.com, Sascha Hauer <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
+Cc: Maxime Ripard <maxime.ripard@bootlin.com>, arm-soc <arm@kernel.org>,
  Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sun, Dec 16, 2018 at 9:50 AM Shawn Guo <shawnguo@kernel.org> wrote:
+On Wed, Dec 19, 2018 at 10:55 AM Chen-Yu Tsai <wens@csie.org> wrote:
 >
-> Hi,
+> Hi Arnd, Olof,
 >
-> As the series cleans up both i.MX/Freescale arm32 and arm64 device
-> trees, the pull request is based on a merge of tag imx-dt-4.21 and
-> imx-dt64-4.21 that have already been pulled into arm-soc next/dt branch.
-> This comes a bit late, and we appreciate it if you can pull it for 4.21,
-> as it paves the way for new QSPI driver under SPI framework to land in
-> the next release cycle.  Thanks.
+> This is a late pull request for 4.21. There are two patches, as shown
+> in the tag's body. The first is a fix for content sent in the first
+> pull request for 4.21. The second is a patch from a series that had
+> been posted over a month ago, and the driver bits were merged today.
+> We'd like to have both patches included for 4.21.
 
-Pulled into next/dt. For my understanding, what is going to happen
-with the fsl-quadspi mtd driver? Will it remain as part of the kernel
-to support old DTB files, or will that transitions mean those stop
-working with new kernels and have to be updated the same way?
+Pulled into next/dt, thanks!
 
-Thanks,
-
-      Arnd
+        Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
