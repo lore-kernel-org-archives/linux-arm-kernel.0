@@ -2,66 +2,71 @@ Return-Path: <SRS0=AHqO=O5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-14.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9B9A8C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 15:37:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B377BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 15:37:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5EC9E20869
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 15:37:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7BF6F218C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 15:37:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gxTm0nQB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5EC9E20869
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=katsuster.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="p5CqV8n/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7BF6F218C3
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=/LB8MerMfF7OJO7zJ5OCp2epIhLJFanNYJDnI3yCMUo=; b=gxTm0nQB+Ug+ce
-	wjz0ccDF+lBJJTblVtzaQaDbHwVrR8KaEtQUWUWy3/0kN3fgZDdo0JPIyeHP7YylEk0DX3vmzQ6Qj
-	OdyTlkZITtQbBuAvtiHEOxYPs7vohnYPxdsZ5BSETwYp0rhf8IFVD5TXiuNQ/EeCe4P5zgv/xJn6o
-	k34aq7FMN4p4YdRiPJnL0BNeZyCu4i66EUrjLsHG9UYjfaX6JBumw+AxXzovufxiSlzPEuSgEttUm
-	eV8NOiuYpY6+8CmqG1p2v5LjLH3JsB6M2TgAoE4O8r8dHjK6p17qCtuIAkmfdbOLboHxjfJQ0oamB
-	asjKV4tDoZW9F8oGn50Q==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=n/Ojn1BkO7PEaCR89wD9INC2AMsoXq/55354dDqWhI4=; b=p5CqV8n/2oAsfs
+	fdVWLnFOx1FxbI4sGvmjkxxYBV/lCRWjkeA65W/PjIJEiIegcPIohzd03JIyQavyb8k+iZN5U5qaw
+	u2H965d2lJohv3LR3IWxjQ+XmxpfxKPA9Ck4mzGjBus1gDq4qDiSEEv6vb+cec15JO7VR1s7LV9sP
+	2xn9qT9FGTSyP/ApOCt9rf8BzLEys5wEI3zBh7CRatSkMn7F71sbJFHo8zCV5SXVpSFvKbq0IkWM3
+	Pom8Oo9VL0BPwS3Lh0+w3yUaeiHMk3QY8geTonWzhGGeIV0EKdG49hocvrklqyuVPp44UyKL4eNq4
+	3H87ySooqNQ92swmiEtw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ga0O0-0008Rf-TU; Thu, 20 Dec 2018 15:37:20 +0000
-Received: from www1102.sakura.ne.jp ([219.94.129.142])
+	id 1ga0OP-0000LB-Fa; Thu, 20 Dec 2018 15:37:45 +0000
+Received: from mail-qt1-f193.google.com ([209.85.160.193])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ga0Nj-0008DA-Qb
- for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 15:37:07 +0000
-Received: from fsav404.sakura.ne.jp (fsav404.sakura.ne.jp [133.242.250.103])
- by www1102.sakura.ne.jp (8.15.2/8.15.2) with ESMTP id wBKFafvE040741;
- Fri, 21 Dec 2018 00:36:41 +0900 (JST)
- (envelope-from katsuhiro@katsuster.net)
-Received: from www1102.sakura.ne.jp (219.94.129.142)
- by fsav404.sakura.ne.jp (F-Secure/fsigk_smtp/530/fsav404.sakura.ne.jp);
- Fri, 21 Dec 2018 00:36:41 +0900 (JST)
-X-Virus-Status: clean(F-Secure/fsigk_smtp/530/fsav404.sakura.ne.jp)
-Received: from localhost.localdomain (183.38.232.153.ap.dti.ne.jp
- [153.232.38.183]) (authenticated bits=0)
- by www1102.sakura.ne.jp (8.15.2/8.15.2) with ESMTPSA id wBKFabSE040730
- (version=TLSv1.2 cipher=DHE-RSA-AES256-SHA bits=256 verify=NO);
- Fri, 21 Dec 2018 00:36:41 +0900 (JST)
- (envelope-from katsuhiro@katsuster.net)
-From: Katsuhiro Suzuki <katsuhiro@katsuster.net>
-To: Mark Brown <broonie@kernel.org>, alsa-devel@alsa-project.org
-Subject: [PATCH 1/2] ASoC: rockchip: support ACODEC for rk3328
-Date: Fri, 21 Dec 2018 00:36:35 +0900
-Message-Id: <20181220153636.5213-1-katsuhiro@katsuster.net>
-X-Mailer: git-send-email 2.19.2
+ id 1ga0ON-0000D7-13
+ for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 15:37:44 +0000
+Received: by mail-qt1-f193.google.com with SMTP id y20so2208995qtm.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 20 Dec 2018 07:37:32 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=Kr8LcUPJd0Ipjgj+yK+B08cNBjQa3nqcdZJKjmfyMyA=;
+ b=H6BIDh7C1i1ctfvO1+sQM3GACxirssIAcR4VmE1RpJg3MSPigPYEF/5HTswp+eFQyx
+ pq1bGkjUR5isea5MITQWA2Beruwa82LTss9AQK1uyA3QNAo5z36fHRE15WotJJvpryfb
+ 9z9dpZdGCPTdmGc8n54sS184IHxgwgaHvSD7XAYSlTyxKHis0SgZq6kdjHQgR3YDBbls
+ ohi9Bv1PoDHa6aTdPjkc5g5lEZwfyClE4Idmwmjoit0F9BsxDPlj6vc7d4TRV6C4njUZ
+ mK7DvtmfbAVhOLSlGaqdC90lEa/Z3UW2QNnkhH+nxzKsBrZsxTqP86sFrDONGjjMuhxQ
+ K07w==
+X-Gm-Message-State: AA+aEWY6xlSmL4gtVzMlQ7DR21TC3CFuIjKAyNBwAengLefqLhm7LGuH
+ XQaFbirCHafNuYqnWH1LPaBgiZ/WDZgvDkEnkak=
+X-Google-Smtp-Source: AFSGD/WMVFCenM3I0BI4Q6D0EzerdB2pf1qJSaSejagBclkqpmteBxdS+q3au8dNGV9xaxrb4q9gqSIHLBNfhljOwKo=
+X-Received: by 2002:aed:35c5:: with SMTP id d5mr26378239qte.212.1545320250452; 
+ Thu, 20 Dec 2018 07:37:30 -0800 (PST)
 MIME-Version: 1.0
+References: <pull-1544723769-214686@atomide.com>
+In-Reply-To: <pull-1544723769-214686@atomide.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Thu, 20 Dec 2018 16:37:12 +0100
+Message-ID: <CAK8P3a1fnreKPkbyEMBgC_ACGCnhJ56bQOad38VfaQcKNnWEeg@mail.gmail.com>
+Subject: Re: [GIT PULL] ti-sysc dts changes for omaps for v4.21
+To: Tony Lindgren <tony@atomide.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_073704_333471_9DD8C5F2 
-X-CRM114-Status: GOOD (  18.39  )
+X-CRM114-CacheID: sfid-20181220_073743_075112_6559C3A0 
+X-CRM114-Status: GOOD (  19.69  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,847 +78,59 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Katsuhiro Suzuki <katsuhiro@katsuster.net>, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: linux-omap <linux-omap@vger.kernel.org>, arm-soc <arm@kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch adds support for audio CODEC core of rk3328.
+On Thu, Dec 13, 2018 at 9:25 PM Tony Lindgren <tony@atomide.com> wrote:
+>   ARM: dts: Cosmetic fix for omap5 USB node names (2018-12-13 09:08:43 -0800)
+>
+> ----------------------------------------------------------------
+> Add interconnect target module dts data for omaps for v4.21
+>
+> This big set of changes adds SoC specific l4 interconnect target module
+> device tree data for am335x, am437x, omap5 and dra7 SoCs. We also move
+> existing devices to the right location in the l4 interconnect hierarcy.
+> This is similar to what we've already done for omap4 l4 interconnects
+> earlier, and follows what is documented in the ti-sysc driver dts binding
+> in Documentation/devicetree/bindings/bus/ti-sysc.txt.
+>
+> These changes will essentially replace the struct ti_sysc and clock
+> entries in the arch/arm/mach-omap2/omap_hwmod_*_data.c files. Then a few
+> merge windows later, we can start dropping the built-in platform data
+> from the omap_hwmod_*_data.c files in favor of the device tree data only.
+> For now, we verify the device tree data module data against the built-in
+> data and warn about changes to prevent regressions.
+>
+> With the device tree data, we are also probing devices with the ti-sysc
+> interconnect target module instead of omap_device. This fixes up the
+> handling for multiple device instances in a single interconnect target
+> module that has caused trouble earlier. A custom wrapper driver has been
+> needed earlier for such cases.
+>
+> And as the device tree data is organized by the l4 interconnect instances,
+> we will be able to use genpd later on. This is because each interconnect
+> instance is also often also a single power domain.
+>
+> This series of changes has been brewing for several months now. I did not
+> want to send a pull request earlier as people were still seeing device
+> specific issues until recently though. However, it turned out that all the
+> issues were quite trivial to fix. I had missed adding device tree ranges
+> for the l3 data port used on some devices, and I had missed converting the
+> device addresses for a few devices. And some devices like needed fixes for
+> deferred probe handling such as the EHCI PHY for built-in case on omap5.
+>
+> Anyways, in case of trouble, we can easily just revert changes for a
+> single device if needed.
 
-Rockchip does not publish detail specification of this core
-but driver source code is opened on their GitHub repository.
-  https://github.com/rockchip-linux/kernel
+Thanks a lot for the detailed description and background, that really helps!
 
-So I ported this code to linux-next and added some trivial fixes.
+Pulled into next/dt now,
 
-Signed-off-by: Katsuhiro Suzuki <katsuhiro@katsuster.net>
----
- .../bindings/sound/rockchip,rk3328-codec.txt  |  23 +
- sound/soc/codecs/Kconfig                      |   5 +
- sound/soc/codecs/Makefile                     |   2 +
- sound/soc/codecs/rk3328_codec.c               | 517 ++++++++++++++++++
- sound/soc/codecs/rk3328_codec.h               | 210 +++++++
- 5 files changed, 757 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/rockchip,rk3328-codec.txt
- create mode 100644 sound/soc/codecs/rk3328_codec.c
- create mode 100644 sound/soc/codecs/rk3328_codec.h
-
-diff --git a/Documentation/devicetree/bindings/sound/rockchip,rk3328-codec.txt b/Documentation/devicetree/bindings/sound/rockchip,rk3328-codec.txt
-new file mode 100644
-index 000000000000..2469588c7ccb
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/rockchip,rk3328-codec.txt
-@@ -0,0 +1,23 @@
-+* Rockchip Rk3328 internal codec
-+
-+Required properties:
-+
-+- compatible: "rockchip,rk3328-codec"
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+- rockchip,grf: the phandle of the syscon node for GRF register.
-+- clocks: a list of phandle + clock-specifer pairs, one for each entry in clock-names.
-+- clock-names: should be "pclk".
-+- spk-depop-time-ms: speak depop time msec.
-+
-+Example for rk3328 internal codec:
-+
-+codec: codec@ff410000 {
-+	compatible = "rockchip,rk3328-codec";
-+	reg = <0x0 0xff410000 0x0 0x1000>;
-+	rockchip,grf = <&grf>;
-+	clocks = <&cru PCLK_ACODEC>;
-+	clock-names = "pclk";
-+	spk-depop-time-ms = 100;
-+	status = "disabled";
-+};
-diff --git a/sound/soc/codecs/Kconfig b/sound/soc/codecs/Kconfig
-index 62bdb7e333b8..19a5168e0b89 100644
---- a/sound/soc/codecs/Kconfig
-+++ b/sound/soc/codecs/Kconfig
-@@ -129,6 +129,7 @@ config SND_SOC_ALL_CODECS
- 	select SND_SOC_PCM5102A
- 	select SND_SOC_PCM512x_I2C if I2C
- 	select SND_SOC_PCM512x_SPI if SPI_MASTER
-+	select SND_SOC_RK3328
- 	select SND_SOC_RT274 if I2C
- 	select SND_SOC_RT286 if I2C
- 	select SND_SOC_RT298 if I2C
-@@ -799,6 +800,10 @@ config SND_SOC_PCM512x_SPI
- 	select SND_SOC_PCM512x
- 	select REGMAP_SPI
- 
-+config SND_SOC_RK3328
-+	tristate "Rockchip RK3328 audio CODEC"
-+	select REGMAP_MMIO
-+
- config SND_SOC_RL6231
- 	tristate
- 	default y if SND_SOC_RT5514=y
-diff --git a/sound/soc/codecs/Makefile b/sound/soc/codecs/Makefile
-index 66f55d185620..0d924efbc8ec 100644
---- a/sound/soc/codecs/Makefile
-+++ b/sound/soc/codecs/Makefile
-@@ -132,6 +132,7 @@ snd-soc-pcm5102a-objs := pcm5102a.o
- snd-soc-pcm512x-objs := pcm512x.o
- snd-soc-pcm512x-i2c-objs := pcm512x-i2c.o
- snd-soc-pcm512x-spi-objs := pcm512x-spi.o
-+snd-soc-rk3328-objs := rk3328_codec.o
- snd-soc-rl6231-objs := rl6231.o
- snd-soc-rl6347a-objs := rl6347a.o
- snd-soc-rt1305-objs := rt1305.o
-@@ -398,6 +399,7 @@ obj-$(CONFIG_SND_SOC_PCM5102A)	+= snd-soc-pcm5102a.o
- obj-$(CONFIG_SND_SOC_PCM512x)	+= snd-soc-pcm512x.o
- obj-$(CONFIG_SND_SOC_PCM512x_I2C)	+= snd-soc-pcm512x-i2c.o
- obj-$(CONFIG_SND_SOC_PCM512x_SPI)	+= snd-soc-pcm512x-spi.o
-+obj-$(CONFIG_SND_SOC_RK3328)	+= snd-soc-rk3328.o
- obj-$(CONFIG_SND_SOC_RL6231)	+= snd-soc-rl6231.o
- obj-$(CONFIG_SND_SOC_RL6347A)	+= snd-soc-rl6347a.o
- obj-$(CONFIG_SND_SOC_RT1305)	+= snd-soc-rt1305.o
-diff --git a/sound/soc/codecs/rk3328_codec.c b/sound/soc/codecs/rk3328_codec.c
-new file mode 100644
-index 000000000000..71f3fc2d970c
---- /dev/null
-+++ b/sound/soc/codecs/rk3328_codec.c
-@@ -0,0 +1,517 @@
-+// SPDX-License-Identifier: GPL-2.0
-+//
-+// rk3328 ALSA SoC Audio driver
-+//
-+// Copyright (c) 2017, Fuzhou Rockchip Electronics Co., Ltd All rights reserved.
-+
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/device.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
-+#include <sound/dmaengine_pcm.h>
-+#include <sound/pcm_params.h>
-+#include "rk3328_codec.h"
-+
-+/*
-+ * volume setting
-+ * 0: -39dB
-+ * 26: 0dB
-+ * 31: 6dB
-+ * Step: 1.5dB
-+ */
-+#define OUT_VOLUME	(0x18)
-+#define RK3328_GRF_SOC_CON2	(0x0408)
-+#define RK3328_GRF_SOC_CON10	(0x0428)
-+#define INITIAL_FREQ	(11289600)
-+
-+struct rk3328_codec_priv {
-+	struct regmap *regmap;
-+	struct regmap *grf;
-+	struct clk *mclk;
-+	struct clk *pclk;
-+	unsigned int sclk;
-+	int spk_depop_time; /* msec */
-+};
-+
-+static const struct reg_default rk3328_codec_reg_defaults[] = {
-+	{ CODEC_RESET, 0x03 },
-+	{ DAC_INIT_CTRL1, 0x00 },
-+	{ DAC_INIT_CTRL2, 0x50 },
-+	{ DAC_INIT_CTRL3, 0x0e },
-+	{ DAC_PRECHARGE_CTRL, 0x01 },
-+	{ DAC_PWR_CTRL, 0x00 },
-+	{ DAC_CLK_CTRL, 0x00 },
-+	{ HPMIX_CTRL, 0x00 },
-+	{ HPOUT_CTRL, 0x00 },
-+	{ HPOUTL_GAIN_CTRL, 0x00 },
-+	{ HPOUTR_GAIN_CTRL, 0x00 },
-+	{ HPOUT_POP_CTRL, 0x11 },
-+};
-+
-+static int rk3328_codec_reset(struct rk3328_codec_priv *rk3328)
-+{
-+	regmap_write(rk3328->regmap, CODEC_RESET, 0x00);
-+	mdelay(10);
-+	regmap_write(rk3328->regmap, CODEC_RESET, 0x03);
-+
-+	return 0;
-+}
-+
-+static int rk3328_set_dai_fmt(struct snd_soc_dai *dai, unsigned int fmt)
-+{
-+	struct rk3328_codec_priv *rk3328 =
-+		snd_soc_component_get_drvdata(dai->component);
-+	unsigned int val;
-+
-+	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
-+	case SND_SOC_DAIFMT_CBS_CFS:
-+		val = PIN_DIRECTION_IN | DAC_I2S_MODE_SLAVE;
-+		break;
-+	case SND_SOC_DAIFMT_CBM_CFM:
-+		val = PIN_DIRECTION_OUT | DAC_I2S_MODE_MASTER;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	regmap_update_bits(rk3328->regmap, DAC_INIT_CTRL1,
-+			   PIN_DIRECTION_MASK | DAC_I2S_MODE_MASK, val);
-+
-+	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
-+	case SND_SOC_DAIFMT_DSP_A:
-+	case SND_SOC_DAIFMT_DSP_B:
-+		val = DAC_MODE_PCM;
-+		break;
-+	case SND_SOC_DAIFMT_I2S:
-+		val = DAC_MODE_I2S;
-+		break;
-+	case SND_SOC_DAIFMT_RIGHT_J:
-+		val = DAC_MODE_RJM;
-+		break;
-+	case SND_SOC_DAIFMT_LEFT_J:
-+		val = DAC_MODE_LJM;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	regmap_update_bits(rk3328->regmap, DAC_INIT_CTRL2,
-+			   DAC_MODE_MASK, val);
-+
-+	return 0;
-+}
-+
-+static void rk3328_analog_output(struct rk3328_codec_priv *rk3328, int mute)
-+{
-+	unsigned int val = BIT(17);
-+
-+	if (mute)
-+		val |= BIT(1);
-+
-+	regmap_write(rk3328->grf, RK3328_GRF_SOC_CON10, val);
-+}
-+
-+static int rk3328_digital_mute(struct snd_soc_dai *dai, int mute)
-+{
-+	struct rk3328_codec_priv *rk3328 =
-+		snd_soc_component_get_drvdata(dai->component);
-+	unsigned int val;
-+
-+	if (mute)
-+		val = HPOUTL_MUTE | HPOUTR_MUTE;
-+	else
-+		val = HPOUTL_UNMUTE | HPOUTR_UNMUTE;
-+
-+	regmap_update_bits(rk3328->regmap, HPOUT_CTRL,
-+			   HPOUTL_MUTE_MASK | HPOUTR_MUTE_MASK, val);
-+
-+	return 0;
-+}
-+
-+static int rk3328_codec_power_on(struct rk3328_codec_priv *rk3328, int wait_ms)
-+{
-+	regmap_update_bits(rk3328->regmap, DAC_PRECHARGE_CTRL,
-+			   DAC_CHARGE_XCHARGE_MASK, DAC_CHARGE_PRECHARGE);
-+	mdelay(10);
-+	regmap_update_bits(rk3328->regmap, DAC_PRECHARGE_CTRL,
-+			   DAC_CHARGE_CURRENT_ALL_MASK,
-+			   DAC_CHARGE_CURRENT_ALL_ON);
-+	mdelay(wait_ms);
-+
-+	return 0;
-+}
-+
-+static int rk3328_codec_power_off(struct rk3328_codec_priv *rk3328, int wait_ms)
-+{
-+	regmap_update_bits(rk3328->regmap, DAC_PRECHARGE_CTRL,
-+			   DAC_CHARGE_XCHARGE_MASK, DAC_CHARGE_DISCHARGE);
-+	mdelay(10);
-+	regmap_update_bits(rk3328->regmap, DAC_PRECHARGE_CTRL,
-+			   DAC_CHARGE_CURRENT_ALL_MASK,
-+			   DAC_CHARGE_CURRENT_ALL_ON);
-+	mdelay(wait_ms);
-+
-+	return 0;
-+}
-+
-+static const struct rk3328_reg_msk_val playback_open_list[] = {
-+	{ DAC_PWR_CTRL, DAC_PWR_MASK, DAC_PWR_ON },
-+	{ DAC_PWR_CTRL, DACL_PATH_REFV_MASK | DACR_PATH_REFV_MASK,
-+	  DACL_PATH_REFV_ON | DACR_PATH_REFV_ON },
-+	{ DAC_PWR_CTRL, HPOUTL_ZERO_CROSSING_MASK | HPOUTR_ZERO_CROSSING_MASK,
-+	  HPOUTL_ZERO_CROSSING_ON | HPOUTR_ZERO_CROSSING_ON },
-+	{ HPOUT_POP_CTRL, HPOUTR_POP_MASK | HPOUTL_POP_MASK,
-+	  HPOUTR_POP_WORK | HPOUTL_POP_WORK },
-+	{ HPMIX_CTRL, HPMIXL_MASK | HPMIXR_MASK, HPMIXL_EN | HPMIXR_EN },
-+	{ HPMIX_CTRL, HPMIXL_INIT_MASK | HPMIXR_INIT_MASK,
-+	  HPMIXL_INIT_EN | HPMIXR_INIT_EN },
-+	{ HPOUT_CTRL, HPOUTL_MASK | HPOUTR_MASK, HPOUTL_EN | HPOUTR_EN },
-+	{ HPOUT_CTRL, HPOUTL_INIT_MASK | HPOUTR_INIT_MASK,
-+	  HPOUTL_INIT_EN | HPOUTR_INIT_EN },
-+	{ DAC_CLK_CTRL, DACL_REFV_MASK | DACR_REFV_MASK,
-+	  DACL_REFV_ON | DACR_REFV_ON },
-+	{ DAC_CLK_CTRL, DACL_CLK_MASK | DACR_CLK_MASK,
-+	  DACL_CLK_ON | DACR_CLK_ON },
-+	{ DAC_CLK_CTRL, DACL_MASK | DACR_MASK, DACL_ON | DACR_ON },
-+	{ DAC_CLK_CTRL, DACL_INIT_MASK | DACR_INIT_MASK,
-+	  DACL_INIT_ON | DACR_INIT_ON },
-+	{ DAC_SELECT, DACL_SELECT_MASK | DACR_SELECT_MASK,
-+	  DACL_SELECT | DACR_SELECT },
-+	{ HPMIX_CTRL, HPMIXL_INIT2_MASK | HPMIXR_INIT2_MASK,
-+	  HPMIXL_INIT2_EN | HPMIXR_INIT2_EN },
-+	{ HPOUT_CTRL, HPOUTL_MUTE_MASK | HPOUTR_MUTE_MASK,
-+	  HPOUTL_UNMUTE | HPOUTR_UNMUTE },
-+};
-+
-+static int rk3328_codec_open_playback(struct rk3328_codec_priv *rk3328)
-+{
-+	int i;
-+
-+	regmap_update_bits(rk3328->regmap, DAC_PRECHARGE_CTRL,
-+			   DAC_CHARGE_CURRENT_ALL_MASK,
-+			   DAC_CHARGE_CURRENT_I);
-+
-+	for (i = 0; i < ARRAY_SIZE(playback_open_list); i++) {
-+		regmap_update_bits(rk3328->regmap,
-+				   playback_open_list[i].reg,
-+				   playback_open_list[i].msk,
-+				   playback_open_list[i].val);
-+		mdelay(1);
-+	}
-+
-+	msleep(rk3328->spk_depop_time);
-+	rk3328_analog_output(rk3328, 1);
-+
-+	regmap_update_bits(rk3328->regmap, HPOUTL_GAIN_CTRL,
-+			   HPOUTL_GAIN_MASK, OUT_VOLUME);
-+	regmap_update_bits(rk3328->regmap, HPOUTR_GAIN_CTRL,
-+			   HPOUTR_GAIN_MASK, OUT_VOLUME);
-+
-+	return 0;
-+}
-+
-+static const struct rk3328_reg_msk_val playback_close_list[] = {
-+	{ HPMIX_CTRL, HPMIXL_INIT2_MASK | HPMIXR_INIT2_MASK,
-+	  HPMIXL_INIT2_DIS | HPMIXR_INIT2_DIS },
-+	{ DAC_SELECT, DACL_SELECT_MASK | DACR_SELECT_MASK,
-+	  DACL_UNSELECT | DACR_UNSELECT },
-+	{ HPOUT_CTRL, HPOUTL_MUTE_MASK | HPOUTR_MUTE_MASK,
-+	  HPOUTL_MUTE | HPOUTR_MUTE },
-+	{ HPOUT_CTRL, HPOUTL_INIT_MASK | HPOUTR_INIT_MASK,
-+	  HPOUTL_INIT_DIS | HPOUTR_INIT_DIS },
-+	{ HPOUT_CTRL, HPOUTL_MASK | HPOUTR_MASK, HPOUTL_DIS | HPOUTR_DIS },
-+	{ HPMIX_CTRL, HPMIXL_MASK | HPMIXR_MASK, HPMIXL_DIS | HPMIXR_DIS },
-+	{ DAC_CLK_CTRL, DACL_MASK | DACR_MASK, DACL_OFF | DACR_OFF },
-+	{ DAC_CLK_CTRL, DACL_CLK_MASK | DACR_CLK_MASK,
-+	  DACL_CLK_OFF | DACR_CLK_OFF },
-+	{ DAC_CLK_CTRL, DACL_REFV_MASK | DACR_REFV_MASK,
-+	  DACL_REFV_OFF | DACR_REFV_OFF },
-+	{ HPOUT_POP_CTRL, HPOUTR_POP_MASK | HPOUTL_POP_MASK,
-+	  HPOUTR_POP_XCHARGE | HPOUTL_POP_XCHARGE },
-+	{ DAC_PWR_CTRL, DACL_PATH_REFV_MASK | DACR_PATH_REFV_MASK,
-+	  DACL_PATH_REFV_OFF | DACR_PATH_REFV_OFF },
-+	{ DAC_PWR_CTRL, DAC_PWR_MASK, DAC_PWR_OFF },
-+	{ HPMIX_CTRL, HPMIXL_INIT_MASK | HPMIXR_INIT_MASK,
-+	  HPMIXL_INIT_DIS | HPMIXR_INIT_DIS },
-+	{ DAC_CLK_CTRL, DACL_INIT_MASK | DACR_INIT_MASK,
-+	  DACL_INIT_OFF | DACR_INIT_OFF },
-+};
-+
-+static int rk3328_codec_close_playback(struct rk3328_codec_priv *rk3328)
-+{
-+	size_t i;
-+
-+	rk3328_analog_output(rk3328, 0);
-+
-+	regmap_update_bits(rk3328->regmap, HPOUTL_GAIN_CTRL,
-+			   HPOUTL_GAIN_MASK, 0);
-+	regmap_update_bits(rk3328->regmap, HPOUTR_GAIN_CTRL,
-+			   HPOUTR_GAIN_MASK, 0);
-+
-+	for (i = 0; i < ARRAY_SIZE(playback_close_list); i++) {
-+		regmap_update_bits(rk3328->regmap,
-+				   playback_close_list[i].reg,
-+				   playback_close_list[i].msk,
-+				   playback_close_list[i].val);
-+		mdelay(1);
-+	}
-+
-+	regmap_update_bits(rk3328->regmap, DAC_PRECHARGE_CTRL,
-+			   DAC_CHARGE_CURRENT_ALL_MASK,
-+			   DAC_CHARGE_CURRENT_I);
-+
-+	return 0;
-+}
-+
-+static int rk3328_hw_params(struct snd_pcm_substream *substream,
-+			    struct snd_pcm_hw_params *params,
-+			    struct snd_soc_dai *dai)
-+{
-+	struct rk3328_codec_priv *rk3328 =
-+		snd_soc_component_get_drvdata(dai->component);
-+	unsigned int val = 0;
-+
-+	switch (params_format(params)) {
-+	case SNDRV_PCM_FORMAT_S16_LE:
-+		val = DAC_VDL_16BITS;
-+		break;
-+	case SNDRV_PCM_FORMAT_S20_3LE:
-+		val = DAC_VDL_20BITS;
-+		break;
-+	case SNDRV_PCM_FORMAT_S24_LE:
-+		val = DAC_VDL_24BITS;
-+		break;
-+	case SNDRV_PCM_FORMAT_S32_LE:
-+		val = DAC_VDL_32BITS;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+	regmap_update_bits(rk3328->regmap, DAC_INIT_CTRL2, DAC_VDL_MASK, val);
-+
-+	val = DAC_WL_32BITS | DAC_RST_DIS;
-+	regmap_update_bits(rk3328->regmap, DAC_INIT_CTRL3,
-+			   DAC_WL_MASK | DAC_RST_MASK, val);
-+
-+	return 0;
-+}
-+
-+static int rk3328_pcm_startup(struct snd_pcm_substream *substream,
-+			      struct snd_soc_dai *dai)
-+{
-+	struct rk3328_codec_priv *rk3328 =
-+		snd_soc_component_get_drvdata(dai->component);
-+
-+	return rk3328_codec_open_playback(rk3328);
-+}
-+
-+static void rk3328_pcm_shutdown(struct snd_pcm_substream *substream,
-+				struct snd_soc_dai *dai)
-+{
-+	struct rk3328_codec_priv *rk3328 =
-+		snd_soc_component_get_drvdata(dai->component);
-+
-+	rk3328_codec_close_playback(rk3328);
-+}
-+
-+static const struct snd_soc_dai_ops rk3328_dai_ops = {
-+	.hw_params = rk3328_hw_params,
-+	.set_fmt = rk3328_set_dai_fmt,
-+	.digital_mute = rk3328_digital_mute,
-+	.startup = rk3328_pcm_startup,
-+	.shutdown = rk3328_pcm_shutdown,
-+};
-+
-+static struct snd_soc_dai_driver rk3328_dai[] = {
-+	{
-+		.name = "rk3328-hifi",
-+		.id = RK3328_HIFI,
-+		.playback = {
-+			.stream_name = "HIFI Playback",
-+			.channels_min = 1,
-+			.channels_max = 2,
-+			.rates = SNDRV_PCM_RATE_8000_96000,
-+			.formats = (SNDRV_PCM_FMTBIT_S16_LE |
-+				    SNDRV_PCM_FMTBIT_S20_3LE |
-+				    SNDRV_PCM_FMTBIT_S24_LE |
-+				    SNDRV_PCM_FMTBIT_S32_LE),
-+		},
-+		.capture = {
-+			.stream_name = "HIFI Capture",
-+			.channels_min = 2,
-+			.channels_max = 8,
-+			.rates = SNDRV_PCM_RATE_8000_96000,
-+			.formats = (SNDRV_PCM_FMTBIT_S16_LE |
-+				    SNDRV_PCM_FMTBIT_S20_3LE |
-+				    SNDRV_PCM_FMTBIT_S24_LE |
-+				    SNDRV_PCM_FMTBIT_S32_LE),
-+		},
-+		.ops = &rk3328_dai_ops,
-+	},
-+};
-+
-+static int rk3328_codec_probe(struct snd_soc_component *component)
-+{
-+	struct rk3328_codec_priv *rk3328 =
-+		snd_soc_component_get_drvdata(component);
-+
-+	rk3328_codec_reset(rk3328);
-+	rk3328_codec_power_on(rk3328, 0);
-+
-+	return 0;
-+}
-+
-+static void rk3328_codec_remove(struct snd_soc_component *component)
-+{
-+	struct rk3328_codec_priv *rk3328 =
-+		snd_soc_component_get_drvdata(component);
-+
-+	rk3328_codec_close_playback(rk3328);
-+	rk3328_codec_power_off(rk3328, 0);
-+}
-+
-+static const struct snd_soc_component_driver soc_codec_rk3328 = {
-+	.probe = rk3328_codec_probe,
-+	.remove = rk3328_codec_remove,
-+};
-+
-+static bool rk3328_codec_write_read_reg(struct device *dev, unsigned int reg)
-+{
-+	switch (reg) {
-+	case CODEC_RESET:
-+	case DAC_INIT_CTRL1:
-+	case DAC_INIT_CTRL2:
-+	case DAC_INIT_CTRL3:
-+	case DAC_PRECHARGE_CTRL:
-+	case DAC_PWR_CTRL:
-+	case DAC_CLK_CTRL:
-+	case HPMIX_CTRL:
-+	case DAC_SELECT:
-+	case HPOUT_CTRL:
-+	case HPOUTL_GAIN_CTRL:
-+	case HPOUTR_GAIN_CTRL:
-+	case HPOUT_POP_CTRL:
-+		return true;
-+	default:
-+		return false;
-+	}
-+}
-+
-+static bool rk3328_codec_volatile_reg(struct device *dev, unsigned int reg)
-+{
-+	switch (reg) {
-+	case CODEC_RESET:
-+		return true;
-+	default:
-+		return false;
-+	}
-+}
-+
-+static const struct regmap_config rk3328_codec_regmap_config = {
-+	.reg_bits = 32,
-+	.reg_stride = 4,
-+	.val_bits = 32,
-+	.max_register = HPOUT_POP_CTRL,
-+	.writeable_reg = rk3328_codec_write_read_reg,
-+	.readable_reg = rk3328_codec_write_read_reg,
-+	.volatile_reg = rk3328_codec_volatile_reg,
-+	.reg_defaults = rk3328_codec_reg_defaults,
-+	.num_reg_defaults = ARRAY_SIZE(rk3328_codec_reg_defaults),
-+	.cache_type = REGCACHE_FLAT,
-+};
-+
-+static int rk3328_platform_probe(struct platform_device *pdev)
-+{
-+	struct device_node *rk3328_np = pdev->dev.of_node;
-+	struct rk3328_codec_priv *rk3328;
-+	struct resource *res;
-+	struct regmap *grf;
-+	void __iomem *base;
-+	int ret = 0;
-+
-+	rk3328 = devm_kzalloc(&pdev->dev, sizeof(*rk3328), GFP_KERNEL);
-+	if (!rk3328)
-+		return -ENOMEM;
-+
-+	grf = syscon_regmap_lookup_by_phandle(rk3328_np,
-+					      "rockchip,grf");
-+	if (IS_ERR(grf)) {
-+		dev_err(&pdev->dev, "missing 'rockchip,grf'\n");
-+		return PTR_ERR(grf);
-+	}
-+	rk3328->grf = grf;
-+	/* enable i2s_acodec_en */
-+	regmap_write(grf, RK3328_GRF_SOC_CON2,
-+		     (BIT(14) << 16 | BIT(14)));
-+
-+	ret = of_property_read_u32(rk3328_np, "spk-depop-time-ms",
-+				   &rk3328->spk_depop_time);
-+	if (ret < 0) {
-+		dev_info(&pdev->dev, "spk_depop_time use default value.\n");
-+		rk3328->spk_depop_time = 200;
-+	}
-+
-+	rk3328_analog_output(rk3328, 0);
-+
-+	rk3328->mclk = devm_clk_get(&pdev->dev, "mclk");
-+	if (IS_ERR(rk3328->mclk))
-+		return PTR_ERR(rk3328->mclk);
-+
-+	ret = clk_prepare_enable(rk3328->mclk);
-+	if (ret)
-+		return ret;
-+	clk_set_rate(rk3328->mclk, INITIAL_FREQ);
-+
-+	rk3328->pclk = devm_clk_get(&pdev->dev, "pclk");
-+	if (IS_ERR(rk3328->pclk)) {
-+		dev_err(&pdev->dev, "can't get acodec pclk\n");
-+		return PTR_ERR(rk3328->pclk);
-+	}
-+
-+	ret = clk_prepare_enable(rk3328->pclk);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to enable acodec pclk\n");
-+		return ret;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	rk3328->regmap = devm_regmap_init_mmio(&pdev->dev, base,
-+					       &rk3328_codec_regmap_config);
-+	if (IS_ERR(rk3328->regmap))
-+		return PTR_ERR(rk3328->regmap);
-+
-+	platform_set_drvdata(pdev, rk3328);
-+
-+	return devm_snd_soc_register_component(&pdev->dev, &soc_codec_rk3328,
-+					       rk3328_dai,
-+					       ARRAY_SIZE(rk3328_dai));
-+}
-+
-+static const struct of_device_id rk3328_codec_of_match[] = {
-+		{ .compatible = "rockchip,rk3328-codec", },
-+		{},
-+};
-+MODULE_DEVICE_TABLE(of, rk3328_codec_of_match);
-+
-+static struct platform_driver rk3328_codec_driver = {
-+	.driver = {
-+		   .name = "rk3328-codec",
-+		   .owner = THIS_MODULE,
-+		   .of_match_table = of_match_ptr(rk3328_codec_of_match),
-+	},
-+	.probe = rk3328_platform_probe,
-+};
-+module_platform_driver(rk3328_codec_driver);
-+
-+MODULE_AUTHOR("Sugar Zhang <sugar.zhang@rock-chips.com>");
-+MODULE_DESCRIPTION("ASoC rk3328 codec driver");
-+MODULE_LICENSE("GPL v2");
-diff --git a/sound/soc/codecs/rk3328_codec.h b/sound/soc/codecs/rk3328_codec.h
-new file mode 100644
-index 000000000000..655103586241
---- /dev/null
-+++ b/sound/soc/codecs/rk3328_codec.h
-@@ -0,0 +1,210 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * rk3328 ALSA SoC Audio driver
-+ *
-+ * Copyright (c) 2017, Fuzhou Rockchip Electronics Co., Ltd All rights reserved.
-+ */
-+
-+#ifndef _RK3328_CODEC_H
-+#define _RK3328_CODEC_H
-+
-+#include <linux/bitfield.h>
-+
-+/* codec register */
-+#define CODEC_RESET			(0x00 << 2)
-+#define DAC_INIT_CTRL1			(0x03 << 2)
-+#define DAC_INIT_CTRL2			(0x04 << 2)
-+#define DAC_INIT_CTRL3			(0x05 << 2)
-+#define DAC_PRECHARGE_CTRL		(0x22 << 2)
-+#define DAC_PWR_CTRL			(0x23 << 2)
-+#define DAC_CLK_CTRL			(0x24 << 2)
-+#define HPMIX_CTRL			(0x25 << 2)
-+#define DAC_SELECT			(0x26 << 2)
-+#define HPOUT_CTRL			(0x27 << 2)
-+#define HPOUTL_GAIN_CTRL		(0x28 << 2)
-+#define HPOUTR_GAIN_CTRL		(0x29 << 2)
-+#define HPOUT_POP_CTRL			(0x2a << 2)
-+
-+/* REG00: CODEC_RESET */
-+#define PWR_RST_BYPASS_DIS		(0x0 << 6)
-+#define PWR_RST_BYPASS_EN		(0x1 << 6)
-+#define DIG_CORE_RST			(0x0 << 1)
-+#define DIG_CORE_WORK			(0x1 << 1)
-+#define SYS_RST				(0x0 << 0)
-+#define SYS_WORK			(0x1 << 0)
-+
-+/* REG03: DAC_INIT_CTRL1 */
-+#define PIN_DIRECTION_MASK		BIT(5)
-+#define PIN_DIRECTION_IN		(0x0 << 5)
-+#define PIN_DIRECTION_OUT		(0x1 << 5)
-+#define DAC_I2S_MODE_MASK		BIT(4)
-+#define DAC_I2S_MODE_SLAVE		(0x0 << 4)
-+#define DAC_I2S_MODE_MASTER		(0x1 << 4)
-+
-+/* REG04: DAC_INIT_CTRL2 */
-+#define DAC_I2S_LRP_MASK		BIT(7)
-+#define DAC_I2S_LRP_NORMAL		(0x0 << 7)
-+#define DAC_I2S_LRP_REVERSAL		(0x1 << 7)
-+#define DAC_VDL_MASK			GENMASK(6, 5)
-+#define DAC_VDL_16BITS			(0x0 << 5)
-+#define DAC_VDL_20BITS			(0x1 << 5)
-+#define DAC_VDL_24BITS			(0x2 << 5)
-+#define DAC_VDL_32BITS			(0x3 << 5)
-+#define DAC_MODE_MASK			GENMASK(4, 3)
-+#define DAC_MODE_RJM			(0x0 << 3)
-+#define DAC_MODE_LJM			(0x1 << 3)
-+#define DAC_MODE_I2S			(0x2 << 3)
-+#define DAC_MODE_PCM			(0x3 << 3)
-+#define DAC_LR_SWAP_MASK		BIT(2)
-+#define DAC_LR_SWAP_DIS			(0x0 << 2)
-+#define DAC_LR_SWAP_EN			(0x1 << 2)
-+
-+/* REG05: DAC_INIT_CTRL3 */
-+#define DAC_WL_MASK			GENMASK(3, 2)
-+#define DAC_WL_16BITS			(0x0 << 2)
-+#define DAC_WL_20BITS			(0x1 << 2)
-+#define DAC_WL_24BITS			(0x2 << 2)
-+#define DAC_WL_32BITS			(0x3 << 2)
-+#define DAC_RST_MASK			BIT(1)
-+#define DAC_RST_EN			(0x0 << 1)
-+#define DAC_RST_DIS			(0x1 << 1)
-+#define DAC_BCP_MASK			BIT(0)
-+#define DAC_BCP_NORMAL			(0x0 << 0)
-+#define DAC_BCP_REVERSAL		(0x1 << 0)
-+
-+/* REG22: DAC_PRECHARGE_CTRL */
-+#define DAC_CHARGE_XCHARGE_MASK		BIT(7)
-+#define DAC_CHARGE_DISCHARGE		(0x0 << 7)
-+#define DAC_CHARGE_PRECHARGE		(0x1 << 7)
-+#define DAC_CHARGE_CURRENT_64I_MASK	BIT(6)
-+#define DAC_CHARGE_CURRENT_64I		(0x1 << 6)
-+#define DAC_CHARGE_CURRENT_32I_MASK	BIT(5)
-+#define DAC_CHARGE_CURRENT_32I		(0x1 << 5)
-+#define DAC_CHARGE_CURRENT_16I_MASK	BIT(4)
-+#define DAC_CHARGE_CURRENT_16I		(0x1 << 4)
-+#define DAC_CHARGE_CURRENT_08I_MASK	BIT(3)
-+#define DAC_CHARGE_CURRENT_08I		(0x1 << 3)
-+#define DAC_CHARGE_CURRENT_04I_MASK	BIT(2)
-+#define DAC_CHARGE_CURRENT_04I		(0x1 << 2)
-+#define DAC_CHARGE_CURRENT_02I_MASK	BIT(1)
-+#define DAC_CHARGE_CURRENT_02I		(0x1 << 1)
-+#define DAC_CHARGE_CURRENT_I_MASK	BIT(0)
-+#define DAC_CHARGE_CURRENT_I		(0x1 << 0)
-+#define DAC_CHARGE_CURRENT_ALL_MASK	GENMASK(6, 0)
-+#define DAC_CHARGE_CURRENT_ALL_OFF	0x00
-+#define DAC_CHARGE_CURRENT_ALL_ON	0x7f
-+
-+/* REG23: DAC_PWR_CTRL */
-+#define DAC_PWR_MASK			BIT(6)
-+#define DAC_PWR_OFF			(0x0 << 6)
-+#define DAC_PWR_ON			(0x1 << 6)
-+#define DACL_PATH_REFV_MASK		BIT(5)
-+#define DACL_PATH_REFV_OFF		(0x0 << 5)
-+#define DACL_PATH_REFV_ON		(0x1 << 5)
-+#define HPOUTL_ZERO_CROSSING_MASK	BIT(4)
-+#define HPOUTL_ZERO_CROSSING_OFF	(0x0 << 4)
-+#define HPOUTL_ZERO_CROSSING_ON		(0x1 << 4)
-+#define DACR_PATH_REFV_MASK		BIT(1)
-+#define DACR_PATH_REFV_OFF		(0x0 << 1)
-+#define DACR_PATH_REFV_ON		(0x1 << 1)
-+#define HPOUTR_ZERO_CROSSING_MASK	BIT(0)
-+#define HPOUTR_ZERO_CROSSING_OFF	(0x0 << 0)
-+#define HPOUTR_ZERO_CROSSING_ON		(0x1 << 0)
-+
-+/* REG24: DAC_CLK_CTRL */
-+#define DACL_REFV_MASK			BIT(7)
-+#define DACL_REFV_OFF			(0x0 << 7)
-+#define DACL_REFV_ON			(0x1 << 7)
-+#define DACL_CLK_MASK			BIT(6)
-+#define DACL_CLK_OFF			(0x0 << 6)
-+#define DACL_CLK_ON			(0x1 << 6)
-+#define DACL_MASK			BIT(5)
-+#define DACL_OFF			(0x0 << 5)
-+#define DACL_ON				(0x1 << 5)
-+#define DACL_INIT_MASK			BIT(4)
-+#define DACL_INIT_OFF			(0x0 << 4)
-+#define DACL_INIT_ON			(0x1 << 4)
-+#define DACR_REFV_MASK			BIT(3)
-+#define DACR_REFV_OFF			(0x0 << 3)
-+#define DACR_REFV_ON			(0x1 << 3)
-+#define DACR_CLK_MASK			BIT(2)
-+#define DACR_CLK_OFF			(0x0 << 2)
-+#define DACR_CLK_ON			(0x1 << 2)
-+#define DACR_MASK			BIT(1)
-+#define DACR_OFF			(0x0 << 1)
-+#define DACR_ON				(0x1 << 1)
-+#define DACR_INIT_MASK			BIT(0)
-+#define DACR_INIT_OFF			(0x0 << 0)
-+#define DACR_INIT_ON			(0x1 << 0)
-+
-+/* REG25: HPMIX_CTRL*/
-+#define HPMIXL_MASK			BIT(6)
-+#define HPMIXL_DIS			(0x0 << 6)
-+#define HPMIXL_EN			(0x1 << 6)
-+#define HPMIXL_INIT_MASK		BIT(5)
-+#define HPMIXL_INIT_DIS			(0x0 << 5)
-+#define HPMIXL_INIT_EN			(0x1 << 5)
-+#define HPMIXL_INIT2_MASK		BIT(4)
-+#define HPMIXL_INIT2_DIS		(0x0 << 4)
-+#define HPMIXL_INIT2_EN			(0x1 << 4)
-+#define HPMIXR_MASK			BIT(2)
-+#define HPMIXR_DIS			(0x0 << 2)
-+#define HPMIXR_EN			(0x1 << 2)
-+#define HPMIXR_INIT_MASK		BIT(1)
-+#define HPMIXR_INIT_DIS			(0x0 << 1)
-+#define HPMIXR_INIT_EN			(0x1 << 1)
-+#define HPMIXR_INIT2_MASK		BIT(0)
-+#define HPMIXR_INIT2_DIS		(0x0 << 0)
-+#define HPMIXR_INIT2_EN			(0x1 << 0)
-+
-+/* REG26: DAC_SELECT */
-+#define DACL_SELECT_MASK		BIT(4)
-+#define DACL_UNSELECT			(0x0 << 4)
-+#define DACL_SELECT			(0x1 << 4)
-+#define DACR_SELECT_MASK		BIT(0)
-+#define DACR_UNSELECT			(0x0 << 0)
-+#define DACR_SELECT			(0x1 << 0)
-+
-+/* REG27: HPOUT_CTRL */
-+#define HPOUTL_MASK			BIT(7)
-+#define HPOUTL_DIS			(0x0 << 7)
-+#define HPOUTL_EN			(0x1 << 7)
-+#define HPOUTL_INIT_MASK		BIT(6)
-+#define HPOUTL_INIT_DIS			(0x0 << 6)
-+#define HPOUTL_INIT_EN			(0x1 << 6)
-+#define HPOUTL_MUTE_MASK		BIT(5)
-+#define HPOUTL_MUTE			(0x0 << 5)
-+#define HPOUTL_UNMUTE			(0x1 << 5)
-+#define HPOUTR_MASK			BIT(4)
-+#define HPOUTR_DIS			(0x0 << 4)
-+#define HPOUTR_EN			(0x1 << 4)
-+#define HPOUTR_INIT_MASK		BIT(3)
-+#define HPOUTR_INIT_DIS			(0x0 << 3)
-+#define HPOUTR_INIT_EN			(0x1 << 3)
-+#define HPOUTR_MUTE_MASK		BIT(2)
-+#define HPOUTR_MUTE			(0x0 << 2)
-+#define HPOUTR_UNMUTE			(0x1 << 2)
-+
-+/* REG28: HPOUTL_GAIN_CTRL */
-+#define HPOUTL_GAIN_MASK		GENMASK(4, 0)
-+
-+/* REG29: HPOUTR_GAIN_CTRL */
-+#define HPOUTR_GAIN_MASK		GENMASK(4, 0)
-+
-+/* REG2a: HPOUT_POP_CTRL */
-+#define HPOUTR_POP_MASK			GENMASK(5, 4)
-+#define HPOUTR_POP_XCHARGE		(0x1 << 4)
-+#define HPOUTR_POP_WORK			(0x2 << 4)
-+#define HPOUTL_POP_MASK			GENMASK(1, 0)
-+#define HPOUTL_POP_XCHARGE		(0x1 << 0)
-+#define HPOUTL_POP_WORK			(0x2 << 0)
-+
-+#define RK3328_HIFI			0
-+
-+struct rk3328_reg_msk_val {
-+	unsigned int reg;
-+	unsigned int msk;
-+	unsigned int val;
-+};
-+
-+#endif
--- 
-2.19.2
-
+      Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
