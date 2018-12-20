@@ -2,21 +2,21 @@ Return-Path: <SRS0=AHqO=O5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 45A7CC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 11:12:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E3D5CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 11:14:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F2E5621773
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 11:12:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B348121773
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 11:14:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="R57ACs9F";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="aSFgg8nZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F2E5621773
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fyfXvhYW";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="NB1MIHDt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B348121773
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,47 +25,46 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HxSFH03SWR8Vjt36ZIVDZCmlr/koqaW3x09iq2pOj4E=; b=R57ACs9F/1Sivw
-	+SISD+CpDdW4s7J4n2DwBtmBS0xA2BtaJOSILPIQyXkLfmHErh9/z58tekWSaykwOlbqJBse80hSa
-	ylRCTxlOG3+lsxXT3aqiBGMLoEofKIcxiPF751uiRljcEPDPjRPCLq2XfTWU2SjInYc4qZdj8597n
-	zkZP+yxMmiff2Vom8lnfKfgIkEOTjfCPab4tG5pGkpqyMPJT5uj0ZvD1sZfyAzrOONlyEmb7Jts/U
-	4jidKqEsESLNJleLiqQXBr0o4LnzqiNmclxRE5vQX8x+LKQjTVoNcO86L124NuwiEMQKN2vVz5IfR
-	ihCvZdyiIRRjiGy8nMbw==;
+	List-Owner; bh=G6DJTaL5mtUkagtw96tB9UHSQN6tTGjNewa7UVlnJog=; b=fyfXvhYWOTNWD0
+	xe1M8CZ40TbS9qTx1tdAbrDyiiqsbUHkB2VfWnm/JtrB8uIjO03yIVfPpWnhnuQC1TnfIgnPP6GG3
+	cBfrV0b/d5lcIX6dU1PpwI9U2FIKgvurEiTOjltGUnyjlJtK2ELqXPeDoGKa85Bo/J5gbnyl8nFo/
+	UtmaWRk/CRcnVJwPP5KmzsNaoHzpjNNzN1fjQ1zokjOCPBR07NN+YJw5f16ORsKpMtJS25uYzRkEm
+	jkoGoSuMezKnp5/x7hKZ6wz3LgSjPYrWwYP+A2OyNkIDx54eOMYp/B3ezmqadWyESXBEURbZCvyDB
+	ElnlS/MzJx6Z0R+NhMFg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gZwFo-0002t7-9Y; Thu, 20 Dec 2018 11:12:36 +0000
+	id 1gZwHT-0003BV-3M; Thu, 20 Dec 2018 11:14:19 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gZwFl-0002rk-1A
- for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 11:12:34 +0000
+ id 1gZwHP-0003AR-Vo
+ for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 11:14:17 +0000
 Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 21A3721773;
- Thu, 20 Dec 2018 11:12:21 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 31EE22177E;
+ Thu, 20 Dec 2018 11:14:05 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1545304342;
- bh=Z1RtiamxNdkQLjthF/Os4scAVy5XWYySiawRDzjW1Ag=;
+ s=default; t=1545304445;
+ bh=qkcBJQcK9EzKTNvCn2J3Q56O1CSgbtK7TIpoj0Cd1MQ=;
  h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=aSFgg8nZC64+zf+1Et3LXMrQXmWdc+vZJdo3jPHSfFye+nFTldbB4N/d1uido7SYY
- gS5bS/VbxqnPneqxWOLDwtFByJjGEkBbT4heQv+6Qlyoz6llP9f4DBvteT1sDuCJkw
- h44s6SxDL9+RTR2tqQNcgzwoCEN4DlMwAcqrgo8c=
-Date: Thu, 20 Dec 2018 12:12:20 +0100
+ b=NB1MIHDtKAO6S3NbbT/7Muqq1uORKJnYiv0l928izLYYVbo4Z7jlbMQFJRsrK7oG/
+ JGZ12MMEB5E1MM0HKOr6GU6sN2Z2J3j8LSVx9afVTFLLrSvHhK8hmZ7FN8cvM6P6+S
+ JD6dkxejLlXwKRQbupoarJZxBbGNPPWYwIVv6JZw=
+Date: Thu, 20 Dec 2018 12:14:03 +0100
 From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 To: Andrzej Hajda <a.hajda@samsung.com>
-Subject: Re: [PATCH v4 2/3] driver core: add deferring probe reason to
- devices_deferred property
-Message-ID: <20181220111220.GA10978@kroah.com>
+Subject: Re: [PATCH v4 1/3] driver core: add probe_err log helper
+Message-ID: <20181220111403.GB10978@kroah.com>
 References: <20181220102247.4911-1-a.hajda@samsung.com>
- <CGME20181220102259eucas1p1884a0b68ce342239c2a43a74cc50725a@eucas1p1.samsung.com>
- <20181220102247.4911-3-a.hajda@samsung.com>
+ <CGME20181220102259eucas1p2f748c68e01cd4e09a266da879722e218@eucas1p2.samsung.com>
+ <20181220102247.4911-2-a.hajda@samsung.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181220102247.4911-3-a.hajda@samsung.com>
+In-Reply-To: <20181220102247.4911-2-a.hajda@samsung.com>
 User-Agent: Mutt/1.11.1 (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_031233_107224_0C03478C 
-X-CRM114-Status: GOOD (  24.81  )
+X-CRM114-CacheID: sfid-20181220_031416_042881_7ACC0689 
+X-CRM114-Status: GOOD (  11.72  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,134 +88,22 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Dec 20, 2018 at 11:22:46AM +0100, Andrzej Hajda wrote:
-> /sys/kernel/debug/devices_deferred property contains list of deferred devices.
-> This list does not contain reason why the driver deferred probe, the patch
-> improves it.
-> The natural place to set the reason is probe_err function introduced recently,
-> ie. if probe_err will be called with -EPROBE_DEFER instead of printk the message
-> will be attached to deferred device and printed when user read devices_deferred
-> property.
-> 
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> Reviewed-by: Mark Brown <broonie@kernel.org>
-> Reviewed-by: Javier Martinez Canillas <javierm@redhat.com>
-> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
-> ---
-> v4:
->   - removed NULL check before kfree,
->   - coding style tweaking.
-> v3:
->   - adjusted deferred_devs_show, to accept newline ended messages,
->   - changed conditonal check to positive,
->   - added R-b by Andy.
-> v2:
->   - changed __deferred_probe_set_msg args - like in __dev_printk, fits better,
->   - use kasprintf instead of bunch of code,
->   - keep consistent format of devices_deferred lines,
->   - added R-Bs (again I hope changes above are not against it).
-> ---
-> ---
->  drivers/base/base.h |  3 +++
->  drivers/base/core.c |  9 +++++----
->  drivers/base/dd.c   | 21 ++++++++++++++++++++-
->  3 files changed, 28 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/base/base.h b/drivers/base/base.h
-> index 7a419a7a6235..effbd5e7f9f1 100644
-> --- a/drivers/base/base.h
-> +++ b/drivers/base/base.h
-> @@ -75,6 +75,7 @@ struct device_private {
->  	struct klist_node knode_driver;
->  	struct klist_node knode_bus;
->  	struct list_head deferred_probe;
-> +	char *deferred_probe_msg;
->  	struct device *device;
->  };
->  #define to_device_private_parent(obj)	\
-> @@ -113,6 +114,8 @@ extern void device_release_driver_internal(struct device *dev,
->  extern void driver_detach(struct device_driver *drv);
->  extern int driver_probe_device(struct device_driver *drv, struct device *dev);
->  extern void driver_deferred_probe_del(struct device *dev);
-> +extern void __deferred_probe_set_msg(const struct device *dev,
-> +				     struct va_format *vaf);
->  static inline int driver_match_device(struct device_driver *drv,
->  				      struct device *dev)
->  {
-> diff --git a/drivers/base/core.c b/drivers/base/core.c
-> index 7f644f3c41d3..d3eb5aeeaa28 100644
-> --- a/drivers/base/core.c
-> +++ b/drivers/base/core.c
-> @@ -3108,6 +3108,7 @@ define_dev_printk_level(_dev_info, KERN_INFO);
->   *
->   * This helper implements common pattern present in probe functions for error
->   * checking: print message if the error is not -EPROBE_DEFER and propagate it.
-> + * In case of -EPROBE_DEFER it sets defer probe reason.
->   * It replaces code sequence:
->   * 	if (err != -EPROBE_DEFER)
->   * 		dev_err(dev, ...);
-> @@ -3123,14 +3124,14 @@ int probe_err(const struct device *dev, int err, const char *fmt, ...)
->  	struct va_format vaf;
->  	va_list args;
->  
-> -	if (err == -EPROBE_DEFER)
-> -		return err;
-> -
->  	va_start(args, fmt);
->  	vaf.fmt = fmt;
->  	vaf.va = &args;
->  
-> -	dev_err(dev, "error %d: %pV", err, &vaf);
-> +	if (err == -EPROBE_DEFER)
-> +		__deferred_probe_set_msg(dev, &vaf);
-> +	else
-> +		dev_err(dev, "error %d: %pV", err, &vaf);
->  
->  	va_end(args);
->  
-> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> index 88713f182086..857aa4d1d45d 100644
-> --- a/drivers/base/dd.c
-> +++ b/drivers/base/dd.c
-> @@ -27,6 +27,7 @@
->  #include <linux/async.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/pinctrl/devinfo.h>
-> +#include <linux/slab.h>
->  
->  #include "base.h"
->  #include "power/power.h"
-> @@ -132,6 +133,8 @@ void driver_deferred_probe_del(struct device *dev)
->  	if (!list_empty(&dev->p->deferred_probe)) {
->  		dev_dbg(dev, "Removed from deferred list\n");
->  		list_del_init(&dev->p->deferred_probe);
-> +		kfree(dev->p->deferred_probe_msg);
-> +		dev->p->deferred_probe_msg = NULL;
->  	}
->  	mutex_unlock(&deferred_probe_mutex);
->  }
-> @@ -202,6 +205,21 @@ void device_unblock_probing(void)
->  	driver_deferred_probe_trigger();
->  }
->  
-> +/*
-> + * __deferred_probe_set_msg() - Set defer probe reason message for device
-> + */
-> +void __deferred_probe_set_msg(const struct device *dev, struct va_format *vaf)
-> +{
-> +	const char *drv = dev_driver_string(dev);
-> +
-> +	mutex_lock(&deferred_probe_mutex);
-> +
-> +	kfree(dev->p->deferred_probe_msg);
-> +	dev->p->deferred_probe_msg = kasprintf(GFP_KERNEL, "%s: %pV", drv, vaf);
+On Thu, Dec 20, 2018 at 11:22:45AM +0100, Andrzej Hajda wrote:
+> During probe every time driver gets resource it should usually check for error
+> printk some message if it is not -EPROBE_DEFER and return the error. This
+> pattern is simple but requires adding few lines after any resource acquisition
+> code, as a result it is often omited or implemented only partially.
+> probe_err helps to replace such code sequences with simple call, so code:
+> 	if (err != -EPROBE_DEFER)
+> 		dev_err(dev, ...);
+> 	return err;
+> becomes:
+> 	return probe_err(dev, err, ...);
 
-Why do you also need the dev driver string here?  Don't you get it
-automatically when you print out the list in deferred_devs_show()?
-
-How about we just wait on this patch, it seems very unneeded.  Or at
-least I can't see who would need this, what can a user do with this
-information?
+Can you show a driver being converted to use this to show if it really
+will save a bunch of lines and make things simpler?  Usually you are
+requesting lots of resources so you need to do more than just return,
+you need to clean stuff up first.
 
 thanks,
 
