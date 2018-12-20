@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
 	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3B2F6C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 15:42:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1096DC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 15:50:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DEB8E218D3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 15:42:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D4128217D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 15:50:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aMgKR3kq";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="QF1KVOGw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DEB8E218D3
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RktclLzC";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="c93U3Jyx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D4128217D8
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,58 +25,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KkREu07Cb2I/JRfi0SYZ5XVzZECMSwHCT/ZmesXHe2A=; b=aMgKR3kqr/MOGH
-	TBaw0eAV0YMh5IGHlHDk7DFTbWWFQ2YFBhYH7UBOt7yTit7m+6ezIyONEbdD1czLvbQhuAQYc8Bax
-	Zc0lOwjklwW2pdkuATEk4RAH27l14GhpUsF0bG028V5qvAL3gxGI4IjWCJnL8W/PpxUlXtVEnwykO
-	jPLHWJuR7TlwlzHhyzKCXhlIDOMTHOhRbKWOYOgT6qwqsVoJ08UywZDacHFCZLoemtnD9uTsM+PUq
-	LYRpuud/aATXMW0uA3l1KCQFPaeGb51g+30uaqsZy/IZZs4L3GUtusD9xOZAOS0LlcTDhhBi0X+0T
-	POXY/UD+1cu41luDOQgA==;
+	List-Owner; bh=ItRWkDHfVqnm01JAARQKdOcqeStt/8TyHyBB1ZGl2fs=; b=RktclLzCn486e/
+	X1FwB261QEbfMAz7Ux04Znmy65ljkXDvcPQRdEfqeV6ervHhyQer4plAslRLwusNZbUXMcnhsc3bp
+	gcGrhWLmlnTAmsA3rjALlnoL3HjLK6G2FlaSBFslBkiRWxXtuscOtS0X8SQmr2omzf9miXIhhhnzK
+	+6/iyzh0MW8buPDfcYQF2qSrzen4t6oJ6u/l6NFl1+2euM3KRmRd1laMKiiVR9tsz7AGhtKR6dcOr
+	RamK3viYTnDRRU7gCRlBoyfd2ZdPJu2SBp/AHVubrhhe5bIGH6PlQ5GAMLJA08jlE4v+4R89+G9Zq
+	IsoW0AC4cCrtXj46ZQPw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ga0Ss-0002VU-KL; Thu, 20 Dec 2018 15:42:22 +0000
-Received: from mail-vk1-xa41.google.com ([2607:f8b0:4864:20::a41])
+	id 1ga0aQ-00064r-L8; Thu, 20 Dec 2018 15:50:10 +0000
+Received: from mail-vs1-xe44.google.com ([2607:f8b0:4864:20::e44])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ga0Sp-0002UM-As
- for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 15:42:20 +0000
-Received: by mail-vk1-xa41.google.com with SMTP id o130so467391vke.10
+ id 1ga0aH-0004vE-58
+ for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 15:50:07 +0000
+Received: by mail-vs1-xe44.google.com with SMTP id y27so1375392vsi.1
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 20 Dec 2018 07:42:08 -0800 (PST)
+ Thu, 20 Dec 2018 07:49:47 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=DQRrUWaCRcky+rMmXJm4LzdTZV0tSdXB2y0mUMPH6Co=;
- b=QF1KVOGwZZrPj7VsRMmRp8gZL4LjIpdRComBLoRvIYK1lTmZkCKJPQhBKVD9IOq9sK
- H2cAcpmgy5ukZ1tpZRhF4NKP89dpP5dSoGHLObkJLxpvHNBCjdkQoAvngCqfsZhHDd3K
- Rb96nSoiToTMPEfBvYY3qfqm0DPpnSI8xRE7E=
+ :cc; bh=Qn72qtavczvyDQK9+bypOLwn0vE7TYTvQ62AhlWVQvc=;
+ b=c93U3JyxU7xHglhNXDNeXprXo6AnSMsYOYtv0bAJBQYaG/VFNHKiSoh3sjn5+4EIok
+ BsWcGL3OAaiRmdepRf3pLtbpU/MyRxY+e9CW10GFIT3euZGvyafmJ2CwrGITnes/vCii
+ hHBBU11S/aM8xzbF6ZSfauHf0vFO6wijkdxpE=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=DQRrUWaCRcky+rMmXJm4LzdTZV0tSdXB2y0mUMPH6Co=;
- b=WALMu4DnMXV2KfRcCvajxjXA2oqAri5vs2KlOnl6rfxyWKBzLhFOEuwnEaJ/0GLdOv
- dMlylv3Oi1aw5gQ80eHVueMYD8lAEoJR0vevyTvO4Ooo83rUuENo67SSh2mBTyiCR0tM
- OAV/zwGgXO1ikH/bwOFWO4cE/IkEUMqVsg6zj8IKWRCOl/l2HzleNxMJW6EXaT7Q6pfy
- 4IVR9t9stZLFf2Ybw+UQcfBRb+N64fpTXMMtnY8kcBHugJiGs5w8BC00N/lm6u0C2giW
- LdUsf/J99FCjQ59zL1o5kPsocRiQYgrUgMsDMVZjfIhUwXx+L/D99iP8wcX5F07bW1JC
- Ym5w==
-X-Gm-Message-State: AA+aEWYFJnipeLiBYJ8dYxJcMZQ5N5fJlmFSEfwhZ3HIQoKvkxC0K9Ym
- m/TkoV7QUfWL5lyPupOMHlOcfRdgtPxobBLEi7kWDw==
-X-Google-Smtp-Source: AFSGD/VG+v6LFSlb6/GsgO01KqCnG7CCaHllP8FIKk0+ekvO079m5l2VJzCrq1ZsScdFqzo347H0RHG7CvtUUNaQESs=
-X-Received: by 2002:a1f:9042:: with SMTP id s63mr11399093vkd.17.1545320527573; 
- Thu, 20 Dec 2018 07:42:07 -0800 (PST)
+ bh=Qn72qtavczvyDQK9+bypOLwn0vE7TYTvQ62AhlWVQvc=;
+ b=rqd5NGin16d8zyyZLbA0treQCVTrrcDZhTPWYFvXSC1QJwpUXjdRbR4xx2HOn443b+
+ YwSP9ezghQP36oLjN9+YSs4CfEfP15qv5xjBNxEOv/xm2gSXDh8PCmwg10pH1rxZdAsQ
+ BweiXTmP9q4nPkBeDyurEZGETVZMCbHyd3XkCwMmyQ/9AfSOGEnQi47ZY2Z6RfuWvZ8F
+ 0YBIavZDurU4M5vYcYwHOubRZCFZCzP6Cm3MxPxxOiQ+rwpq9JQGKbDJzlXj1n0rf8aO
+ KhXLz1IBdYPyvioq+WmvnAfSzJvnxRKIhM2ztrP6Ql/6xR/UgAPkkieUJ1cYG4qqwivW
+ YpMg==
+X-Gm-Message-State: AA+aEWabNsBNo2WH+58057F6aVg8z+lilHA1Aokg/HaZMRY621+XjBlv
+ uestva4oc+fm6ORqHZO8aMnLMdmn9xJ6zho0AvzrcA==
+X-Google-Smtp-Source: AFSGD/X0T/PUFBNw2axl+qwYI9yKy7q7VEdIgg/mW+jwrGKXNHWex9SJwM4cT5gy19+WAPLksaxH3/8dcTlPwFuGwik=
+X-Received: by 2002:a67:7685:: with SMTP id r127mr12276554vsc.35.1545320986457; 
+ Thu, 20 Dec 2018 07:49:46 -0800 (PST)
 MIME-Version: 1.0
 References: <20181129174700.16585-1-ulf.hansson@linaro.org>
- <20181129174700.16585-17-ulf.hansson@linaro.org>
- <20e1c04b-870f-3213-835d-28724ef4f530@linaro.org>
-In-Reply-To: <20e1c04b-870f-3213-835d-28724ef4f530@linaro.org>
+ <20181129174700.16585-18-ulf.hansson@linaro.org>
+ <d82f3fe0-7f60-c89a-6503-435cc6dcc5cf@linaro.org>
+In-Reply-To: <d82f3fe0-7f60-c89a-6503-435cc6dcc5cf@linaro.org>
 From: Ulf Hansson <ulf.hansson@linaro.org>
-Date: Thu, 20 Dec 2018 16:41:31 +0100
-Message-ID: <CAPDyKFqwB0X6DwamGqYgYKsGRcZRzStT=o_AL2wGExuOkQ2rgw@mail.gmail.com>
-Subject: Re: [PATCH v10 16/27] drivers: firmware: psci: Prepare to use OS
- initiated suspend mode
+Date: Thu, 20 Dec 2018 16:49:09 +0100
+Message-ID: <CAPDyKFpfp+d9K-i-ytCqwSq2ToQvqApatH0YyRXbW55wLyU=wA@mail.gmail.com>
+Subject: Re: [PATCH v10 17/27] drivers: firmware: psci: Prepare to support PM
+ domains
 To: Daniel Lezcano <daniel.lezcano@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_074219_382228_5ADF620C 
-X-CRM114-Status: GOOD (  26.70  )
+X-CRM114-CacheID: sfid-20181220_075001_196062_DFEE526F 
+X-CRM114-Status: GOOD (  29.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,106 +106,125 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 20 Dec 2018 at 15:09, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+On Thu, 20 Dec 2018 at 15:19, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
 >
 > On 29/11/2018 18:46, Ulf Hansson wrote:
-> > To enable the OS initiated mode, the CPU topology needs to be described
-> > using the hierarchical model in DT. When used, the idle state bits for the
-> > CPU are created by ORing the bits for PM domain's idle state.
+> > Following changes are about to implement support for PM domains to PSCI.
+> > Those changes are mainly going to be implemented in a new separate file,
+> > hence a couple of the internal PSCI functions needs to be shared to be
+> > accessible. So, let's do that via adding new PSCI header file.
 > >
-> > Let's prepare the PSCI driver to deal with this, via introducing a per CPU
-> > variable called domain_state and by adding internal helpers to read/write
-> > the value of the variable.
->
-> What are the domain states ? What values can they have ?
-
-The existing psci_power_state, also defined as a per cpu variable,
-contains fixed values reflecting the corresponding
-arm,psci-suspend-param for the idle state in question.
-
-This isn't sufficient, when using the hierarchical CPU topology in DT
-and when OSI mode is supported, because of the way we vote with the
-PSCI CPU suspend parameter. Parts of this parameter shall inform about
-what state to allow for the cluster, while other parts tells the state
-for the CPU.
-
-The new "domain states" per CPU variable, gets dynamically changed
-when actively used by following patches that implements the PSCI PM
-domain support. Depending on what state the PM domain picks, the genpd
-->power_off() callback sets a new "domain states" value, reflecting
-the state for the cluster.
-
-Does it makes sense? If you like, I can try to update the changelog to
-clarify this?
-
->
-> > Cc: Lina Iyer <ilina@codeaurora.org>
-> > Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
+> > Moreover, the changes deploying support for PM domains, needs to be able to
+> > switch the PSCI FW into the OS initiated mode. For that reason, let's add a
+> > new function that deals with this and share it via the new PSCI header
+> > file.
+> >
 > > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 > > ---
 > >
 > > Changes in v10:
-> >       - Use __this_cpu_read|write() rather than this_cpu_read|write().
+> >       - New patch. Re-places the earlier patch: "drivers: firmware: psci:
+> >         Share a few internal PSCI functions".
 > >
 > > ---
-> >  drivers/firmware/psci/psci.c | 26 ++++++++++++++++++++++----
-> >  1 file changed, 22 insertions(+), 4 deletions(-)
+> >  drivers/firmware/psci/psci.c | 28 +++++++++++++++++++++-------
+> >  drivers/firmware/psci/psci.h | 14 ++++++++++++++
+> >  2 files changed, 35 insertions(+), 7 deletions(-)
+> >  create mode 100644 drivers/firmware/psci/psci.h
 > >
 > > diff --git a/drivers/firmware/psci/psci.c b/drivers/firmware/psci/psci.c
-> > index 4f0cbc95e41b..8dbcdecc2ae4 100644
+> > index 8dbcdecc2ae4..623591b541a4 100644
 > > --- a/drivers/firmware/psci/psci.c
 > > +++ b/drivers/firmware/psci/psci.c
-> > @@ -87,8 +87,19 @@ static u32 psci_function_id[PSCI_FN_MAX];
-> >                               (PSCI_1_0_EXT_POWER_STATE_ID_MASK | \
-> >                               PSCI_1_0_EXT_POWER_STATE_TYPE_MASK)
+> > @@ -34,6 +34,8 @@
+> >  #include <asm/smp_plat.h>
+> >  #include <asm/suspend.h>
 > >
-> > +static DEFINE_PER_CPU(u32, domain_state);
+> > +#include "psci.h"
+> > +
+> >  /*
+> >   * While a 64-bit OS can make calls with SMC32 calling conventions, for some
+> >   * calls it is necessary to use SMC64 to pass or return 64-bit values.
+> > @@ -90,23 +92,35 @@ static u32 psci_function_id[PSCI_FN_MAX];
+> >  static DEFINE_PER_CPU(u32, domain_state);
 > >  static u32 psci_cpu_suspend_feature;
 > >
-> > +static inline u32 psci_get_domain_state(void)
+> > -static inline u32 psci_get_domain_state(void)
+> > +u32 psci_get_domain_state(void)
+> >  {
+> >       return __this_cpu_read(domain_state);
+> >  }
+> >
+> > -static inline void psci_set_domain_state(u32 state)
+> > +void psci_set_domain_state(u32 state)
+> >  {
+> >       __this_cpu_write(domain_state, state);
+> >  }
+> >
+> > +bool psci_set_osi_mode(void)
 > > +{
-> > +     return __this_cpu_read(domain_state);
-> > +}
+> > +     int ret;
 > > +
-> > +static inline void psci_set_domain_state(u32 state)
-> > +{
-> > +     __this_cpu_write(domain_state, state);
+> > +     ret = invoke_psci_fn(PSCI_1_0_FN_SET_SUSPEND_MODE,
+> > +                     PSCI_1_0_SUSPEND_MODE_OSI, 0, 0);
+> > +     if (ret)
+> > +             pr_warn("failed to enable OSI mode: %d\n", ret);
+> > +
+> > +     return !ret;
 > > +}
+>
+> Please keep the convention with the error code (0 => success)
+>
+> In the next patch it can be called:
+>
+> if (psci_has_osi_support())
+>         osi_mode_enabled = psci_set_osi_mode() ? false : true;
+>
+
+Sure!
+
 > > +
 > >  static inline bool psci_has_ext_power_state(void)
 > >  {
 > >       return psci_cpu_suspend_feature &
-> > @@ -187,6 +198,8 @@ static int psci_cpu_on(unsigned long cpuid, unsigned long entry_point)
+> >                               PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK;
+> >  }
 > >
-> >       fn = psci_function_id[PSCI_FN_CPU_ON];
-> >       err = invoke_psci_fn(fn, cpuid, entry_point, 0);
-> > +     /* Clear the domain state to start fresh. */
-> > +     psci_set_domain_state(0);
-> >       return psci_to_linux_errno(err);
+> > -static inline bool psci_has_osi_support(void)
+> > +bool psci_has_osi_support(void)
+> >  {
+> >       return psci_cpu_suspend_feature & PSCI_1_0_OS_INITIATED;
+> >  }
+> > @@ -285,10 +299,7 @@ static int __init psci_features(u32 psci_func_id)
+> >                             psci_func_id, 0, 0);
+> >  }
+> >
+> > -#ifdef CONFIG_CPU_IDLE
+> > -static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
+> > -
+> > -static int psci_dt_parse_state_node(struct device_node *np, u32 *state)
+> > +int psci_dt_parse_state_node(struct device_node *np, u32 *state)
+> >  {
+> >       int err = of_property_read_u32(np, "arm,psci-suspend-param", state);
+> >
+> > @@ -305,6 +316,9 @@ static int psci_dt_parse_state_node(struct device_node *np, u32 *state)
+> >       return 0;
+> >  }
+> >
+> > +#ifdef CONFIG_CPU_IDLE
 >
-> I think this change is ambiguous:
->
->  - if it is a change of the state because of the cpu_on, then I was
-> expecting a similar change in cpu_off and the change only if
-> invoke_psci_fn() succeeds.
+> It would be nicer if you can remove the CONFIG_CPU_IDLE by replacing it
+> with a specific one (eg. CONFIG_PSCI_IDLE) and make it depend on
+> CONFIG_CPU_IDLE, so the config options stay contained in their
+> respective subsystems directory.
 
-You are right. This rather belongs to patch 24, as its intent is to
-deal with CPU hotplug.
+I am all for simplifying the Kconfig options in here, as indeed it's
+rather messy. However, I would rather avoid folding in additional
+cleanup changes to this series, is already extensive enough.
 
->
->  - if it is a change to take opportunity of the code path to initialize
-> the domain state, I suggest to remove it from there and make it very
-> explicit with static DEFINE_PER_CPU(u32, domain_state) = { 0 };
-
-We shouldn't need to explicitly set static variables to zero, as that
-should be managed by the compiler.
-
-Let me simply remove the call to  psci_set_domain_state(0) and instead
-consider it for patch 24.
+Would you be okay if we deal with that on top?
 
 [...]
-
-Thanks for reviewing!
 
 Kind regards
 Uffe
