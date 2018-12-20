@@ -2,91 +2,90 @@ Return-Path: <SRS0=AHqO=O5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=unavailable
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FROM,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 258E9C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 17:54:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 39FE9C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 17:58:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ED63F218D3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 17:54:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0AD17218D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 20 Dec 2018 17:58:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tVWlaszc";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="FnbPkDPL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ED63F218D3
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TVRp1eR0";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="dUiEucCX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0AD17218D9
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kqLD529OfdE/mlVapj1C75WNS96hc1xeCSvU3dwL78E=; b=tVWlaszcpSp2Jd
-	baOlkX4tMmxVdQVVZP9GJBqg+ydPsL3Yyxg6ZFFDDx4g1ZDYP+/iEETYADw9Le2aex1CvQPyIM+xw
-	DCbpMzNPetPfj9OUHzhGfJAW+oODyxEgz5barKbiHTYg5AfhwhK/dKsbC6KYpisiF38uv8w5zfkDU
-	JE57da6Qh+lMBOmGWtvDFRasL4AWzbdGki9XLRQj01pOUeSD1XaVY+A+7JkDWYt9yaledXsHqVh3l
-	Y3YorYKBa+eJTJ1VQCZmueetUKdVH/nwbt8k+5B8nt2KGSTsuuM3W4C/dkIC1I5EklrKesaOPeRou
-	A4jpAe28OxQI4LUhtYVA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=jl4g+RWCPLIH6G30k/uvOZ7gWZDvNjTxPUO+B0bNyS0=; b=TVRp1eR04YSYWzGTvbOWLIRCq
+	ockK+dQrJJgyGR09btNyvTbpXaBtlh9ppnlpXlyvGZxRrJ7WkkFkDzSRqMoAWDfrVPXSfcW3gyh3A
+	JDocUnRzXrTSmsZFaXIRg7zr9zHUGpbXhBzK+zmEusFQRjHcY3+uN3H6mXxKkluY8Ms48DkX+p/0b
+	y/lVKmn803VGyF24DCKkguMQOR8dMDxg6O7mZoYqMhdEBvLAhWqWFRO0R6U6hNvZFmB6/7jqF1stO
+	iWQaNlOZwaJeOPsosmF4eDW236G0qotd8FcRGhd/C73EP7CjnYHKLmwBfAI16Fk2sd5E5IZItnYb7
+	ZvOKCmJ3A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ga2WY-00046K-4H; Thu, 20 Dec 2018 17:54:18 +0000
-Received: from mail-io1-xd42.google.com ([2607:f8b0:4864:20::d42])
+	id 1ga2aF-0005sP-FX; Thu, 20 Dec 2018 17:58:07 +0000
+Received: from mail-ed1-x542.google.com ([2a00:1450:4864:20::542])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ga2WV-00044Y-Aj
- for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 17:54:16 +0000
-Received: by mail-io1-xd42.google.com with SMTP id t24so1530684ioi.0
+ id 1ga2aC-0005gt-9o
+ for linux-arm-kernel@lists.infradead.org; Thu, 20 Dec 2018 17:58:05 +0000
+Received: by mail-ed1-x542.google.com with SMTP id h50so2496631ede.5
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 20 Dec 2018 09:54:04 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=+w81jMbb1o2ygo2dFZKor/RnHjUNYim0qXEYOaVTDLc=;
- b=FnbPkDPLEuqKdeWe1yEFJJZBekH1QO+pKfgDgKGFEwq8gAd4uvTADH9/BuvWR9V1f+
- 6kAR2citfpmJctvSKlLZwenOiV9M9Oc7tg7QvUtAWiN48ciAl0JQfXwb/vp/zU+C7IMf
- x4IV6Ym0i0JaTtiu8z4PulYcpLT/n0qulLFLU=
+ Thu, 20 Dec 2018 09:57:53 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=fTXnL4w7SphguGIdxnyMHivvmZhE6EALEGuSn5Oz+Zo=;
+ b=dUiEucCX35iC+62dRJ2DmDvRxYVB/oeg69HHeXPOcN11NsP4KKm2V8I2pmUz1DWt5t
+ AeBgAkF0hEFXNZ+I4w4mPRLaM0os9J6eCNzvhkwL/2zIVVhQxNR00upGFDHWTp49q6bk
+ 9JieHwOZwR7CoOE4234tufN7iNFf6ofcj8w09NW0qcl/JVrdzNZBEkEtL6eMG//aey0g
+ tAlaU+1OKkqV5r23qI9i27mwCd//ENMBAWOSY/kb7h0K69LhG9au6L3hsIexDu2QLb/2
+ QIBmNHPeCst3HqbOb6hqECvbz0OZyVL7HX+mtOo7w3HFZpVnn92QPEyOvbFFJhBdheks
+ d+6g==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=+w81jMbb1o2ygo2dFZKor/RnHjUNYim0qXEYOaVTDLc=;
- b=oxLaw5sRnZbAKQwNTw9FksOl4wcweBRIQ4tbaEZntNoIizRKVaBvdSpZIecaNGOIsL
- iSzycEoPNl7bcv90wnNvcGEJHKXIGJR6rHvQI9BumenuOnZLnNyL9hae18la9IrDAU5l
- 8fKUb1l+3AKIkzULqi7XBsAmOkmBw1UdorXdNB441lELVPPsa5jV1smz7n+iC6uV3WRb
- DKYzkjZPTCPOKIoyBRg8DsOXDhl4Qq0mHoj1dIBiKHV0RpV/QXjoBZ6cnKHZqe6QV6Yg
- NhDSi6G0s+2L29W9an6Eco+nW+AbaisCKPtacWkkmqbRxP/IwwSA1pnF+qcLdjJpW+Pu
- 7CeA==
-X-Gm-Message-State: AA+aEWbypawqbPZM/+fYfw60ri1lm9SaV31RifUPtpVWSPe0oatmju12
- cFt34dMGIa6//OMujYw6+FuNlDCYIETiaxUb3cOD5g==
-X-Google-Smtp-Source: AFSGD/Vp+zhHyHp1nKMdtFw4tma8WbKDd6zssG67ODBx/MRA4s6TcuYWmfeK3vKs6cMQBA1XTO1HTT1ZnDOBJTq64So=
-X-Received: by 2002:a5e:cb0b:: with SMTP id p11mr22959730iom.60.1545328444007; 
- Thu, 20 Dec 2018 09:54:04 -0800 (PST)
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=fTXnL4w7SphguGIdxnyMHivvmZhE6EALEGuSn5Oz+Zo=;
+ b=tTqrzXQLahe/jSN2BiFCYDQfT8JAtofeh03Hd6G6/Ie4MltHWAwpM0lNr6E5L6wKUE
+ OXg2ZakPInIAkpeWF4QEeH8ZsR2JiYDNHtbgXr4HqkqHPhBT83Jea0Gbvytlpba+vRTd
+ PfzeBNuGc4LbEhUkEGiQnfP8IlRjlybQsM96gHf25TAifKC3J9YcgJxG6lHhhJON8MB/
+ EynQkUU4NwZGYosa8tpT021I9ERj3abIgBdN4NwHMievgZQT+mUgXeeIXInccrnLQwyg
+ vkQaVUrIBz0+xZtM388nKIMgexw9qb4JLG54/xBaNzzUEw7ysXGwXiQulSecB8189Qj1
+ M9pA==
+X-Gm-Message-State: AA+aEWaH2KgXzS5+WAuD7qVVlMD+2kzH4YL4jniWzbx+qAmPovqUHY4B
+ HR3B4D/E0kXYVnUbhqM9oqLftnht
+X-Google-Smtp-Source: AFSGD/VT6nzno0bxmV8Xv+voM79d+6FDwlEfCpKASrMzSFAgF3BgfgPoSd20jitgWwl25WmglRqTmg==
+X-Received: by 2002:a17:906:7d0:: with SMTP id
+ m16-v6mr20472522ejc.32.1545328672428; 
+ Thu, 20 Dec 2018 09:57:52 -0800 (PST)
+Received: from localhost (pD9E51040.dip0.t-ipconnect.de. [217.229.16.64])
+ by smtp.gmail.com with ESMTPSA id t18-v6sm3278237ejz.9.2018.12.20.09.57.51
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Thu, 20 Dec 2018 09:57:51 -0800 (PST)
+Date: Thu, 20 Dec 2018 18:57:50 +0100
+From: Thierry Reding <thierry.reding@gmail.com>
+To: Hao Zhang <hao5781286@gmail.com>
+Subject: Re: [PATCH v3 6/6] ARM: PWM: add allwinner sun8i R40/T3/V40 PWM
+ support.
+Message-ID: <20181220175750.GG9408@ulmo>
+References: <20181125162319.GA5422@arx-s1>
 MIME-Version: 1.0
-References: <1544633245-6036-1-git-send-email-julien.thierry@arm.com>
- <1544633245-6036-12-git-send-email-julien.thierry@arm.com>
- <CAKv+Gu8E9g=J78a-2HAdcijaHyVFL1KA3civwfoVHQ=mp7yJJA@mail.gmail.com>
- <19500d6b-62a3-21cb-9ac0-a4e5d4714a63@arm.com>
- <CAKv+Gu8+1JNzM4AUujiEfkYujpgakLXcUwTDG4eHwvQ7pKAzFA@mail.gmail.com>
- <31e41461-763f-aa7d-91ea-b493ede81eed@arm.com>
- <CAKv+Gu9PaeGbfB-9r0Gv1oYn+jORJDk9ozajEwKbse3KjkSmbQ@mail.gmail.com>
- <bc27fb6d-1adf-d7e9-ded2-2cbed81b6e03@arm.com>
- <e0ecdb24-ef52-2c31-565d-66f7a2770f4a@arm.com>
- <7d42f570-541a-59a3-79fc-f00dc0b51689@arm.com>
- <CAKv+Gu8CNmL8v=ePXSvQ0vEAzD2O2YAKutQW-b+E6JmyYBPTnA@mail.gmail.com>
- <9c64a977-fdee-b2b2-d726-1e9744d229a7@arm.com>
- <0e6edb8d-dd41-fd3d-0598-7f02ce4ee9ef@arm.com>
-In-Reply-To: <0e6edb8d-dd41-fd3d-0598-7f02ce4ee9ef@arm.com>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Thu, 20 Dec 2018 18:53:51 +0100
-Message-ID: <CAKv+Gu-joM6GivoTqF1t8UKUwtfXkVZ5gTKL6JzMh3uCUJeWog@mail.gmail.com>
-Subject: Re: [PATCH v7 11/25] arm64: irqflags: Use ICC_PMR_EL1 for interrupt
- masking
-To: Julien Thierry <julien.thierry@arm.com>
+In-Reply-To: <20181125162319.GA5422@arx-s1>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_095415_366267_4F532AB2 
-X-CRM114-Status: GOOD (  20.53  )
+X-CRM114-CacheID: sfid-20181220_095804_348356_B633C9EF 
+X-CRM114-Status: GOOD (  29.13  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,89 +97,396 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Daniel Thompson <daniel.thompson@linaro.org>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Christoffer Dall <christoffer.dall@arm.com>, James Morse <james.morse@arm.com>,
- oleg@redhat.com, joel@joelfernandes.org,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ linux-gpio@vger.kernel.org, maxime.ripard@bootlin.com, mturquette@baylibre.com,
+ linux-sunxi@googlegroups.com, linux-kernel@vger.kernel.org,
+ linux-pwm@vger.kernel.org, sboyd@kernel.org, wens@csie.org, robh+dt@kernel.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: multipart/mixed; boundary="===============8247135743682086360=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 19 Dec 2018 at 18:01, Julien Thierry <julien.thierry@arm.com> wrote:
->
-> Hi Ard,
->
-> On 14/12/2018 16:40, Julien Thierry wrote:
-> >
-> >
-> > On 14/12/2018 15:49, Ard Biesheuvel wrote:
-> >> On Fri, 14 Dec 2018 at 16:23, Julien Thierry <julien.thierry@arm.com> wrote:
-> >>>
-> >>> Hi,
-> >>>
-> >>> On 13/12/2018 15:03, Julien Thierry wrote:
-> >>>>
-> >>>> Argh, not as simple as I had expected.
-> >>>>
-> >>>> Turns out include/linux/efi.h does not include asm/efi.h (including it
-> >>>> at the beginning of the file breaks the build because asm/efi.h misses
-> >>>> the efi type definitions.
-> >>>>
-> >>>> So a thing like:
-> >>>>
-> >>>> #ifndef efi_get_irqflags
-> >>>> #define efi_get_irqflags(flags) local_save_flags(flags)
-> >>>> #endif
-> >>>>
-> >>>> in include/linux/efi.h cannot be overridden.
-> >>>>
-> >>>> Either I would need to introduce the definitions arm, arm64 and x86 (I
-> >>>> don't think there are other arch supporting EFI right now) or I'll need
-> >>>> to come up with another solution.
-> >>>>
-> >>>
-> >>
-> >> It might be a bit nasty, but can we put the #ifndef above in
-> >> runtime-wrappers.c directly? The only reference in linux/efi.h is a
-> >> macro, so that shouldn't matter afaict.
-> >>
-> >
-> > Sadly, in arch/x86/platform/uv/bios_uv.c, uv_bios_call() has a reference
-> > to the macro efi_call_virt_pointer() which wouldn't be able to see the
-> > definition in runtime-wrappers.c
-> >
-> > Otherwise, we could've moved efi_call_virt_pointer() and
-> > __efi_call_virt_pointer in runtime-wrappers.c and things would not have
-> > been as nasty.
-> >
-> > But no, I don't think we can do that without breaking some x86 build :( .
-> >
->
-> Since the above does not work, would the solution with the
-> HAVE_GENERIC_EFI_FLAGS below be acceptable to you? Or would you rather I
-> defined helpers in <asm/efi.h> for all arm/arm64/x86?
->
-> Or neither and I shall find another way?
->
 
-Would it be possible to introduce a function
+--===============8247135743682086360==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="oXNgvKVxGWJ0RPMJ"
+Content-Disposition: inline
 
-efi_call_virt_save_flags()
 
-[as a counterpart to efi_call_virt_check_flags()], and put the
-implementation in runtime-wrappers.c (which already includes
-asm/efi.h)?
+--oXNgvKVxGWJ0RPMJ
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-That should allow you to put arch-specific hooks in asm/efi.h, and use
-them in the implementation of efi_call_virt_save_flags(). AFAICT, that
-removes the need for Kconfig glue.
+On Mon, Nov 26, 2018 at 12:23:19AM +0800, Hao Zhang wrote:
+> The sun8i R40/T3/V40 PWM has 8 PWM channals and divides to 4 PWM pairs,
+> each PWM pair built-in 1 clock module, 2 timer logic module and 1
+> programmable dead-time generator, it also support waveform capture.
+> It has 2 clock sources OSC24M and APB1, it is different with the
+> sun4i-pwm driver, Therefore add a new driver for it.
+>=20
+> Signed-off-by: Hao Zhang <hao5781286@gmail.com>
+> ---
+>  drivers/pwm/Kconfig     |  12 +-
+>  drivers/pwm/Makefile    |   1 +
+>  drivers/pwm/pwm-sun8i.c | 418 ++++++++++++++++++++++++++++++++++++++++++=
+++++++
+>  3 files changed, 430 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/pwm/pwm-sun8i.c
+>=20
+> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+> index 504d252..6105ac8 100644
+> --- a/drivers/pwm/Kconfig
+> +++ b/drivers/pwm/Kconfig
+> @@ -426,7 +426,7 @@ config PWM_STMPE
+>  	  expanders.
+> =20
+>  config PWM_SUN4I
+> -	tristate "Allwinner PWM support"
+> +	tristate "Allwinner SUN4I PWM support"
+>  	depends on ARCH_SUNXI || COMPILE_TEST
+>  	depends on HAS_IOMEM && COMMON_CLK
+>  	help
+> @@ -435,6 +435,16 @@ config PWM_SUN4I
+>  	  To compile this driver as a module, choose M here: the module
+>  	  will be called pwm-sun4i.
+> =20
+> +config PWM_SUN8I
+> +	tristate "Allwinner SUN8I (R40/V40/T3) PWM support"
+> +	depends on ARCH_SUNXI || COMPILE_TEST
+> +	depends on HAS_IOMEM && COMMON_CLK
+> +	help
+> +	  Generic PWM framework driver for Allwinner R40/V40/T3 SoCs.
+> +
+> +	  To compile this driver as a module, choose M here: the module
+> +	  will be called pwm-sun8i.
+> +
+>  config PWM_TEGRA
+>  	tristate "NVIDIA Tegra PWM support"
+>  	depends on ARCH_TEGRA
+> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+> index 9c676a0..32c8d2d 100644
+> --- a/drivers/pwm/Makefile
+> +++ b/drivers/pwm/Makefile
+> @@ -43,6 +43,7 @@ obj-$(CONFIG_PWM_STM32)		+=3D pwm-stm32.o
+>  obj-$(CONFIG_PWM_STM32_LP)	+=3D pwm-stm32-lp.o
+>  obj-$(CONFIG_PWM_STMPE)		+=3D pwm-stmpe.o
+>  obj-$(CONFIG_PWM_SUN4I)		+=3D pwm-sun4i.o
+> +obj-$(CONFIG_PWM_SUN8I)		+=3D pwm-sun8i.o
+>  obj-$(CONFIG_PWM_TEGRA)		+=3D pwm-tegra.o
+>  obj-$(CONFIG_PWM_TIECAP)	+=3D pwm-tiecap.o
+>  obj-$(CONFIG_PWM_TIEHRPWM)	+=3D pwm-tiehrpwm.o
+> diff --git a/drivers/pwm/pwm-sun8i.c b/drivers/pwm/pwm-sun8i.c
+> new file mode 100644
+> index 0000000..d8597e4
+> --- /dev/null
+> +++ b/drivers/pwm/pwm-sun8i.c
+> @@ -0,0 +1,418 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +// Copyright (C) 2018 Hao Zhang <hao5781286@gmail.com>
+> +
+> +#include <linux/bitops.h>
+> +#include <linux/clk.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/delay.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pwm.h>
+> +#include <linux/slab.h>
+> +#include <linux/spinlock.h>
+> +#include <linux/time.h>
+> +#include <linux/regmap.h>
+> +
+> +#define PWM_IRQ_ENABLE_REG	0x0000
+> +#define PCIE(ch)		BIT(ch)
+> +
+> +#define PWM_IRQ_STATUS_REG	0x0004
+> +#define PIS(ch)			BIT(ch)
+> +
+> +#define CAPTURE_IRQ_ENABLE_REG	0x0010
+> +#define CRIE(ch)		BIT((ch) * 2)
+> +#define CFIE(ch)		BIT((ch) * 2 + 1)
+> +
+> +#define CAPTURE_IRQ_STATUS_REG	0x0014
+> +#define CRIS(ch)		BIT((ch) * 2)
+> +#define CFIS(ch)		BIT((ch) * 2 + 1)
+> +
+> +#define CLK_CFG_REG(ch)		(0x0020 + ((ch) >> 1) * 4)
+> +#define CLK_SRC_SEL		GENMASK(8, 7)
+> +#define CLK_SRC_BYPASS_SEC	BIT(6)
+> +#define CLK_SRC_BYPASS_FIR	BIT(5)
+> +#define CLK_GATING		BIT(4)
+> +#define CLK_DIV_M		GENMASK(3, 0)
+> +
+> +#define PWM_DZ_CTR_REG(ch)	(0x0030 + ((ch) >> 1) * 4)
+> +#define PWM_DZ_INTV		GENMASK(15, 8)
+> +#define PWM_DZ_EN		BIT(0)
+> +
+> +#define PWM_ENABLE_REG		0x0040
+> +#define PWM_EN(ch)		BIT(ch)
+> +
+> +#define CAPTURE_ENABLE_REG	0x0044
+> +#define CAP_EN(ch)		BIT(ch)
+> +
+> +#define PWM_CTR_REG(ch)		(0x0060 + (ch) * 0x20)
+> +#define PWM_PERIOD_RDY		BIT(11)
+> +#define PWM_PUL_START		BIT(10)
+> +#define PWM_MODE		BIT(9)
+> +#define PWM_ACT_STA		BIT(8)
+> +#define PWM_PRESCAL_K		GENMASK(7, 0)
+> +
+> +#define PWM_PERIOD_REG(ch)	(0x0064 + (ch) * 0x20)
+> +#define PWM_ENTIRE_CYCLE	GENMASK(31, 16)
+> +#define PWM_ACT_CYCLE		GENMASK(15, 0)
+> +
+> +#define PWM_CNT_REG(ch)		(0x0068 + (ch) * 0x20)
+> +#define PWM_CNT_VAL		GENMASK(15, 0)
+> +
+> +#define CAPTURE_CTR_REG(ch)	(0x006c + (ch) * 0x20)
+> +#define CAPTURE_CRLF		BIT(2)
+> +#define CAPTURE_CFLF		BIT(1)
+> +#define CAPINV			BIT(0)
+> +
+> +#define CAPTURE_RISE_REG(ch)	(0x0070 + (ch) * 0x20)
+> +#define CAPTURE_CRLR		GENMASK(15, 0)
+> +
+> +#define CAPTURE_FALL_REG(ch)	(0x0074 + (ch) * 0x20)
+> +#define CAPTURE_CFLR		GENMASK(15, 0)
+> +
+> +struct sun8i_pwm_chip {
+> +	struct pwm_chip chip;
+> +	struct clk *clk;
+> +	void __iomem *base;
+> +	const struct sun8i_pwm_data *data;
+> +	struct regmap *regmap;
+> +};
+> +
+> +static struct sun8i_pwm_chip *to_sun8i_pwm_chip(struct pwm_chip *chip)
+> +{
+> +	return container_of(chip, struct sun8i_pwm_chip, chip);
+> +}
+> +
+> +static u32 sun8i_pwm_read(struct sun8i_pwm_chip *sun8i_pwm,
+> +			  unsigned long offset)
+> +{
+> +	u32 val;
+> +
+> +	regmap_read(sun8i_pwm->regmap, offset, &val);
+> +	return val;
+> +}
+> +
+> +static void sun8i_pwm_set_bit(struct sun8i_pwm_chip *sun8i_pwm,
+> +			      unsigned long reg, u32 bit)
+> +{
+> +	regmap_update_bits(sun8i_pwm->regmap, reg, bit, bit);
+> +}
+> +
+> +static void sun8i_pwm_clear_bit(struct sun8i_pwm_chip *sun8i_pwm,
+> +				unsigned long reg, u32 bit)
+> +{
+> +	regmap_update_bits(sun8i_pwm->regmap, reg, bit, 0);
+> +}
+> +
+> +static void sun8i_pwm_set_value(struct sun8i_pwm_chip *sun8i_pwm,
+> +				unsigned long reg, u32 mask, u32 val)
+> +{
+> +	regmap_update_bits(sun8i_pwm->regmap, reg, mask, val);
+> +}
+> +
+> +static void sun8i_pwm_set_polarity(struct sun8i_pwm_chip *chip, u32 ch,
+> +				   enum pwm_polarity polarity)
+> +{
+> +	if (polarity =3D=3D PWM_POLARITY_NORMAL)
+> +		sun8i_pwm_set_bit(chip, PWM_CTR_REG(ch), PWM_ACT_STA);
+> +	else
+> +		sun8i_pwm_clear_bit(chip, PWM_CTR_REG(ch), PWM_ACT_STA);
+> +}
+> +
+> +static int sun8i_pwm_config(struct sun8i_pwm_chip *sun8i_pwm, u8 ch,
+> +			    struct pwm_state *state)
+> +{
+> +	u64 clk_rate, clk_div, val;
+> +	u16 prescaler =3D 0;
+> +	u16 div_id =3D 0;
+> +	struct clk *clk;
+> +	bool is_clk;
+> +	int ret;
+> +
+> +	clk_rate =3D clk_get_rate(sun8i_pwm->clk);
+> +
+> +	/* check period and select clock source */
+> +	val =3D state->period * clk_rate;
+> +	do_div(val, NSEC_PER_SEC);
+> +	is_clk =3D devm_clk_name_match(sun8i_pwm->clk, "mux-0");
+> +	if (val <=3D 1 && is_clk) {
+> +		clk =3D devm_clk_get(sun8i_pwm->chip.dev, "mux-1");
+> +		if (IS_ERR(clk)) {
+> +			dev_err(sun8i_pwm->chip.dev,
+> +				"Period expects a larger value\n");
+> +			return -EINVAL;
+> +		}
+
+You should never try to get resources at this point. You should have
+requested them already at ->probe() time. Otherwise, how are you going
+to handle failures here?
+
+> +
+> +		clk_rate =3D clk_get_rate(clk);
+> +		val =3D state->period * clk_rate;
+> +		do_div(val, NSEC_PER_SEC);
+> +		if (val <=3D 1) {
+> +			dev_err(sun8i_pwm->chip.dev,
+> +				"Period expects a larger value\n");
+> +			return -EINVAL;
+> +		}
+> +
+> +		/* change clock source to "mux-1" */
+> +		clk_disable_unprepare(sun8i_pwm->clk);
+> +		devm_clk_put(sun8i_pwm->chip.dev, sun8i_pwm->clk);
+> +		sun8i_pwm->clk =3D clk;
+> +
+> +		ret =3D clk_prepare_enable(sun8i_pwm->clk);
+> +		if (ret) {
+> +			dev_err(sun8i_pwm->chip.dev,
+> +				"Failed to enable PWM clock\n");
+> +			return ret;
+> +		}
+> +
+> +	} else {
+> +		dev_err(sun8i_pwm->chip.dev,
+> +			"Period expects a larger value\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	is_clk =3D devm_clk_name_match(sun8i_pwm->clk, "mux-0");
+> +	if (is_clk)
+> +		sun8i_pwm_set_value(sun8i_pwm, CLK_CFG_REG(ch),
+> +				    CLK_SRC_SEL, 0 << 7);
+> +	else
+> +		sun8i_pwm_set_value(sun8i_pwm, CLK_CFG_REG(ch),
+> +				    CLK_SRC_SEL, 1 << 7);
+> +
+> +	dev_info(sun8i_pwm->chip.dev, "clock source freq:%lldHz\n", clk_rate);
+> +
+> +	/* calculate and set prescaler, div table, PWM entire cycle */
+> +	clk_div =3D val;
+> +	while (clk_div > 65535) {
+> +		prescaler++;
+> +		clk_div =3D val;
+> +		do_div(clk_div, 1U << div_id);
+> +		do_div(clk_div, prescaler + 1);
+> +
+> +		if (prescaler =3D=3D 255) {
+> +			prescaler =3D 0;
+> +			div_id++;
+> +			if (div_id =3D=3D 9) {
+> +				dev_err(sun8i_pwm->chip.dev,
+> +					"unsupport period value\n");
+> +				return -EINVAL;
+> +			}
+> +		}
+> +	}
+> +
+> +	sun8i_pwm_set_value(sun8i_pwm, PWM_PERIOD_REG(ch),
+> +			    PWM_ENTIRE_CYCLE, clk_div << 16);
+> +	sun8i_pwm_set_value(sun8i_pwm, PWM_CTR_REG(ch),
+> +			    PWM_PRESCAL_K, prescaler << 0);
+> +	sun8i_pwm_set_value(sun8i_pwm, CLK_CFG_REG(ch),
+> +			    CLK_DIV_M, div_id << 0);
+> +
+> +	/* set duty cycle */
+> +	val =3D state->period;
+> +	do_div(val, clk_div);
+> +	clk_div =3D state->duty_cycle;
+> +	do_div(clk_div, val);
+> +	if (clk_div > 65535)
+> +		clk_div =3D 65535;
+> +
+> +	sun8i_pwm_set_value(sun8i_pwm, PWM_PERIOD_REG(ch),
+> +			    PWM_ACT_CYCLE, clk_div << 0);
+> +
+> +	return 0;
+> +}
+> +
+> +static int sun8i_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+> +			   struct pwm_state *state)
+> +{
+> +	int ret;
+> +	struct sun8i_pwm_chip *sun8i_pwm =3D to_sun8i_pwm_chip(chip);
+> +	struct pwm_state cstate;
+> +
+> +	pwm_get_state(pwm, &cstate);
+> +	if (!cstate.enabled) {
+> +		ret =3D clk_prepare_enable(sun8i_pwm->clk);
+> +		if (ret) {
+> +			dev_err(chip->dev, "Failed to enable PWM clock\n");
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	if ((cstate.period !=3D state->period) ||
+> +	    (cstate.duty_cycle !=3D state->duty_cycle)) {
+> +		ret =3D sun8i_pwm_config(sun8i_pwm, pwm->hwpwm, state);
+> +		if (ret) {
+> +			dev_err(chip->dev, "Failed to config PWM\n");
+> +			return ret;
+> +		}
+> +	}
+
+So this isn't really how atomic is supposed to work. The whole point of
+the single callback is to allow the driver to apply the changes in an
+atomic way, which means that either everything is applied or nothing is
+applied.
+
+That's not what you do here. In the above you can end up with an enabled
+clock but the settings not being applied. Similarly sun8i_pwm_config()
+can abort in a number of places, which would leave you with a half-
+configured PWM channel.
+
+Instead, what you should be doing is precompute everything and check
+that the configuration can be applied before touching any registers or
+enabling clocks. Once you've validate the new state, you need to write
+everything and there should be no more risk of failure.
+
+Thierry
+
+--oXNgvKVxGWJ0RPMJ
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAABCAAdFiEEiOrDCAFJzPfAjcif3SOs138+s6EFAlwb2B4ACgkQ3SOs138+
+s6GmgRAAwvTyhaFa0jWmUftz+0FS5JTXADm9VusyhbSlmHV7UNkqkQuLnaT1WoGi
+gGW5ZMLA+wSPWrXqGsw1HuzLc57c1/eDQdxLmlqBz0Lwribn75+0kisEvV3CRCEL
+P9UiTgMualhTe0DGKZmcHJvV56sEhx7b2WQ81sOn5nZvCP/iFTURp5WSyk+phAyb
+ss9i5bjwuxC34wLC0wCVNvr2XlpdD7CTy0R/nap1Za2nf6Cm0TnzGGPIYki1/gM2
+fUtYT/zCvfGp+JG5+R2755XdomXzj0vmXD7Omv75eKzMb+HivolmLPJEfUiP8c+x
+SElT/F/jIkwvdBzyeQ/sA8ybh4N0DVapnUxBjrUBLOMlrNDlh+ApjUOOpwylQBXQ
+6JKmjoHoBg31lK9QEPxoIoNP0FdZBr6+lAaZeQNx95PeICxD21IvPtuLEp4ksbX7
+fJsOxbkBzbIMpKuxLM3vkl89/O9IhPbVoyvMASCPMmdwAIH+LSy3SvIFWbGQ0nXS
+gwjTzN4r1AWmdXIN+faT6khnNY64WoPd896AyJSQ5mQsl42IMKRi42kpfeN3/f8y
+x4d07WSTCRB4v+OehJEVP2WJNsbI3EvtClbngn66xSac7kGSbg4cpbW0NzkrFj+T
+dOG2p9wUMibPBXzS+V7JzTsDgR9JG2fzxG8PhEesaG/Bt32Hg0Y=
+=S1Wz
+-----END PGP SIGNATURE-----
+
+--oXNgvKVxGWJ0RPMJ--
+
+
+--===============8247135743682086360==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============8247135743682086360==--
+
