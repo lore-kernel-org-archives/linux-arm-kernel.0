@@ -2,82 +2,57 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-12.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7621CC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:12:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 45BA9C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:12:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 42A752075B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:12:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0AF5721906
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:12:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sdoGcilk";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="YimIdrgG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 42A752075B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="H1jwdhZ3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0AF5721906
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=5uPtQkiM2shIptFZHEx3Ph2LFdDGtxPO1zsPzI0hpZU=; b=sdoGcilkIl2f8K
-	xDS0yXdo2OEcSud6h4mRI1iHm1+6unKLUBeWI4DDRyfDtIdBSSh7WJ49nwc2iD3DzVVttYz8t9kne
-	60h5BUQkNuGbDTV6HQt0jj9Px1DxqiAntbeHbrIY5Ucx8AXRv2yle7aqkNBaZLCO3YT7z40UR7HXX
-	M7yhnLQe7rUQ6zfiGYybQaFEPVcsN0vish0W3pmI8Mkb1r30JrwEQ/X5MJYRbax9uRD7nyRczfpAP
-	IlsCViR0igvAgKdKP1628e9RM+6G6ShlKuYEkZSbwfmdPq3SaWYwwSZS7qe+YUj+Fpoz5s+Qe0wFa
-	aUfRzAIlBHN2QJMrMRxw==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=O2dLLkYAraXDDe0shHL6Wdak01pEEpqUB1gek3m4/d0=; b=H1j
+	wdhZ3WDJYntK2+b3t5j2qOg3XiDykIv/S+XzjKgSn+Fd7W7thietkgC9WpoCFrVNY+anDtSHHtCYZ
+	Uf0Y26wLyS0luDntzEXLQ09hr/PMvx2Sz1JcUWoaA2HngOxhe64b2xA1z265veMLXgt2SWH8v+J2g
+	bqkgO4V9QO51pB+gc5OaDkoYn0c2C7z3UdJf3ZN40sNAQ+8otC/RuYQDZAUfIIU2vbycHA7gWAIMP
+	nCqeKqTS+Tjv3EKmZmd8u4UQ0o92PS9amSoQ8Q9TkBFi7OpLjfvtK+DVMKwm2597ZqDKMkBI+4UNJ
+	mFpfrG4V4G4kjVOoyNGPphVolTZJ0BQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaPHP-0005fx-01; Fri, 21 Dec 2018 18:12:11 +0000
-Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaPHL-0005ef-SE
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 18:12:09 +0000
-Received: by mail-pg1-x544.google.com with SMTP id y4so2828212pgc.12
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 21 Dec 2018 10:11:55 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=s+s0cCpjIWVQiboFpL5zFPaKNhtl7rE4uoN8aqs1kLI=;
- b=YimIdrgGY5kOVlG+kPdeha0dYALLoL0bjb1JmPeUURrqxIDlMdxfvYSpiGsZ0iGmol
- gCWlw+WkTsc8JvRW7g19ZIDhPwGQ7eDw87yKddTzTA7BhtzCQ8LRK9HdvT4SEPN9QP40
- A20cT9XO+yZMY0u9a52rdr1fVMJZDDZhPA3p5QIVWJn0JOAj1ljqSb2duLO4h8VDzQi2
- ZlDqExCtiF15mDyzzu7lxMprzH2n9y1Ipl4Hanx+LdH/3uQ9I1Bc05z5TNcxiw+ApspW
- 2AZVxK0qNh3VgMfyPoohoap0Ri2yyK2ut+hUq0QH8zoAMHVHmeMC7fcQ63ZGXMpkfAaP
- gFoA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=s+s0cCpjIWVQiboFpL5zFPaKNhtl7rE4uoN8aqs1kLI=;
- b=nIL+4fWj4+iFnPJq8uPys+m2jDxy5/J3LkzI3MSSoBfN2+lvjrMQV8S/kMFYGY16B8
- lrd9x1CSf6aHxHbgt9nsaGFebUbErZQXkor0jke+ccmpzpIDwUIJB3M5/WTKMMNbRinL
- iVrX7Blro8naoHnUEymfNpSQN5frD5fs50Kn7ARBlTVYg6qvt+fI9a+nQLUxA9qxAWJg
- q+bS+EnfBYf3//m/CfrtWpGAv+BgAqT6S1/R/hP1IaRDIoPGssJmvZuzSWGAy6OZ4pyP
- VomPJLFcnaZ0MiNICVgatOGhXyC15qmnCHigESVCu55EnpNqO+Rl03vxHmWDNoOUvZ5z
- CPMQ==
-X-Gm-Message-State: AJcUukd3ukJn1wd3f6L3EeUnURuCssvnxTDOxGYYbLCaHxXj0vzsOyDR
- CMsybg2SaTVJPdzG7vx3db9gBKPMRHZrkWTZXl3Pqw==
-X-Google-Smtp-Source: ALg8bN7lftdti7rNkwuau6n+UL53WBYOLTn2sRichzFPafU22RR8xqToudo0eJodzgc4hxheyd66mmmDj0JlmSCWJVY=
-X-Received: by 2002:a63:42c1:: with SMTP id p184mr3374238pga.202.1545415914314; 
- Fri, 21 Dec 2018 10:11:54 -0800 (PST)
-MIME-Version: 1.0
-References: <20181215212304.19390-1-natechancellor@gmail.com>
-In-Reply-To: <20181215212304.19390-1-natechancellor@gmail.com>
-From: Nick Desaulniers <ndesaulniers@google.com>
-Date: Fri, 21 Dec 2018 10:11:43 -0800
-Message-ID: <CAKwvOdkfehycubxKDLs9vZvKWE4QR+EyerxNSaV72aDwySx8eQ@mail.gmail.com>
-Subject: Re: [PATCH] ARM: Ensure that NEON code always compiles with Clang
-To: Nathan Chancellor <natechancellor@gmail.com>
+	id 1gaPHi-0005yM-1j; Fri, 21 Dec 2018 18:12:30 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gaPHU-0005hr-4v
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 18:12:19 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 89A3E1596;
+ Fri, 21 Dec 2018 10:12:12 -0800 (PST)
+Received: from usa.arm.com (e107155-lin.cambridge.arm.com [10.1.196.42])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 541EB3F575;
+ Fri, 21 Dec 2018 10:12:11 -0800 (PST)
+From: Sudeep Holla <sudeep.holla@arm.com>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [PATCH] ARM: dts: imx: replace gpio-key,
+ wakeup with wakeup-source property
+Date: Fri, 21 Dec 2018 18:12:03 +0000
+Message-Id: <20181221181203.6764-1-sudeep.holla@arm.com>
+X-Mailer: git-send-email 2.17.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_101207_917267_C41E37FA 
-X-CRM114-Status: GOOD (  26.60  )
+X-CRM114-CacheID: sfid-20181221_101216_625381_F7E4130E 
+X-CRM114-Status: GOOD (  11.80  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,138 +64,74 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>, Tri Vo <trong@android.com>,
- Jonathan Corbet <corbet@lwn.net>, linux-doc@vger.kernel.org,
- Russell King <linux@armlinux.org.uk>, LKML <linux-kernel@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>, devicetree@vger.kernel.org,
+ Shawn Guo <shawnguo@kernel.org>, NXP Linux Team <linux-imx@nxp.com>,
+ Sudeep Holla <sudeep.holla@arm.com>
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, Dec 15, 2018 at 1:23 PM Nathan Chancellor
-<natechancellor@gmail.com> wrote:
->
-> While building arm32 allyesconfig, I ran into the following errors:
->
->   arch/arm/lib/xor-neon.c:17:2: error: You should compile this file with
->   '-mfloat-abi=softfp -mfpu=neon'
->
->   In file included from lib/raid6/neon1.c:27:
->   /home/nathan/cbl/prebuilt/lib/clang/8.0.0/include/arm_neon.h:28:2:
->   error: "NEON support not enabled"
->
-> Building V=1 showed NEON_FLAGS getting passed along to Clang but
-> __ARM_NEON__ was not getting defined. Ultimately, it boils down to Clang
-> only defining __ARM_NEON__ when targeting armv7, rather than armv6k,
-> which is the '-march' value for allyesconfig.
->
-> From lib/Basic/Targets/ARM.cpp in the Clang source:
->
->   // This only gets set when Neon instructions are actually available, unlike
->   // the VFP define, hence the soft float and arch check. This is subtly
->   // different from gcc, we follow the intent which was that it should be set
->   // when Neon instructions are actually available.
->   if ((FPU & NeonFPU) && !SoftFloat && ArchVersion >= 7) {
->     Builder.defineMacro("__ARM_NEON", "1");
->     Builder.defineMacro("__ARM_NEON__");
->     // current AArch32 NEON implementations do not support double-precision
->     // floating-point even when it is present in VFP.
->     Builder.defineMacro("__ARM_NEON_FP",
->                         "0x" + Twine::utohexstr(HW_FP & ~HW_FP_DP));
->   }
->
-> Ard Biesheuvel recommended explicitly adding '-march=armv7-a' at the
-> beginning of the NEON_FLAGS definitions so that __ARM_NEON__ always gets
-> definined by Clang. This doesn't functionally change anything because
-> that code will only run where NEON is supported, which is implicitly
-> armv7.
->
-> Link: https://github.com/ClangBuiltLinux/linux/issues/287
-> Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
+Most of the legacy "gpio-key,wakeup" and "enable-sdio-wakeup" boolean
+properties are already replaced with "wakeup-source". However few
+occurrences of old property has popped up again, probably from the
+remnants in downstream trees. Almost all of those were remove couple
+of years back.
 
-Nathan,
-Thanks for sending the patch, and thanks to Ard for the suggestion.
-Reviewed-by: Nick Desaulniers <ndesaulniers@google.com>
+Replace the legacy properties with the unified "wakeup-source" property
+introduced in the commit 700a38b27eef ("Input: gpio_keys - switch to using
+generic device properties") and commit 0dbcdc0622ea ("mmc: core: enable
+support for the standard "wakeup-source" property")
 
-> ---
->  Documentation/arm/kernel_mode_neon.txt | 4 ++--
->  arch/arm/lib/Makefile                  | 2 +-
->  arch/arm/lib/xor-neon.c                | 2 +-
->  lib/raid6/Makefile                     | 2 +-
->  4 files changed, 5 insertions(+), 5 deletions(-)
->
-> diff --git a/Documentation/arm/kernel_mode_neon.txt b/Documentation/arm/kernel_mode_neon.txt
-> index 525452726d31..b9e060c5b61e 100644
-> --- a/Documentation/arm/kernel_mode_neon.txt
-> +++ b/Documentation/arm/kernel_mode_neon.txt
-> @@ -6,7 +6,7 @@ TL;DR summary
->  * Use only NEON instructions, or VFP instructions that don't rely on support
->    code
->  * Isolate your NEON code in a separate compilation unit, and compile it with
-> -  '-mfpu=neon -mfloat-abi=softfp'
-> +  '-march=armv7-a -mfpu=neon -mfloat-abi=softfp'
->  * Put kernel_neon_begin() and kernel_neon_end() calls around the calls into your
->    NEON code
->  * Don't sleep in your NEON code, and be aware that it will be executed with
-> @@ -87,7 +87,7 @@ instructions appearing in unexpected places if no special care is taken.
->  Therefore, the recommended and only supported way of using NEON/VFP in the
->  kernel is by adhering to the following rules:
->  * isolate the NEON code in a separate compilation unit and compile it with
-> -  '-mfpu=neon -mfloat-abi=softfp';
-> +  '-march=armv7-a -mfpu=neon -mfloat-abi=softfp';
->  * issue the calls to kernel_neon_begin(), kernel_neon_end() as well as the calls
->    into the unit containing the NEON code from a compilation unit which is *not*
->    built with the GCC flag '-mfpu=neon' set.
-> diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
-> index ad25fd1872c7..0bff0176db2c 100644
-> --- a/arch/arm/lib/Makefile
-> +++ b/arch/arm/lib/Makefile
-> @@ -39,7 +39,7 @@ $(obj)/csumpartialcopy.o:     $(obj)/csumpartialcopygeneric.S
->  $(obj)/csumpartialcopyuser.o:  $(obj)/csumpartialcopygeneric.S
->
->  ifeq ($(CONFIG_KERNEL_MODE_NEON),y)
-> -  NEON_FLAGS                   := -mfloat-abi=softfp -mfpu=neon
-> +  NEON_FLAGS                   := -march=armv7-a -mfloat-abi=softfp -mfpu=neon
->    CFLAGS_xor-neon.o            += $(NEON_FLAGS)
->    obj-$(CONFIG_XOR_BLOCKS)     += xor-neon.o
->  endif
-> diff --git a/arch/arm/lib/xor-neon.c b/arch/arm/lib/xor-neon.c
-> index a6741a895189..4600b62d845f 100644
-> --- a/arch/arm/lib/xor-neon.c
-> +++ b/arch/arm/lib/xor-neon.c
-> @@ -14,7 +14,7 @@
->  MODULE_LICENSE("GPL");
->
->  #ifndef __ARM_NEON__
-> -#error You should compile this file with '-mfloat-abi=softfp -mfpu=neon'
-> +#error You should compile this file with '-march=armv7-a -mfloat-abi=softfp -mfpu=neon'
->  #endif
->
->  /*
-> diff --git a/lib/raid6/Makefile b/lib/raid6/Makefile
-> index 2f8b61dfd9b0..bfec7c87c61e 100644
-> --- a/lib/raid6/Makefile
-> +++ b/lib/raid6/Makefile
-> @@ -25,7 +25,7 @@ endif
->  ifeq ($(CONFIG_KERNEL_MODE_NEON),y)
->  NEON_FLAGS := -ffreestanding
->  ifeq ($(ARCH),arm)
-> -NEON_FLAGS += -mfloat-abi=softfp -mfpu=neon
-> +NEON_FLAGS += -march=armv7-a -mfloat-abi=softfp -mfpu=neon
->  endif
->  CFLAGS_recov_neon_inner.o += $(NEON_FLAGS)
->  ifeq ($(ARCH),arm64)
-> --
-> 2.20.1
->
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: NXP Linux Team <linux-imx@nxp.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ arch/arm/boot/dts/imx6q-pistachio.dts | 2 +-
+ arch/arm/boot/dts/imx6sll-evk.dts     | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
+Hi Fabio,
 
--- 
-Thanks,
-~Nick Desaulniers
+Olof requested to slipt the patch and send it via platform maintainers.
+I totally forgot to follow up on this. You had acked this previously but
+please pick this up and submit via your tree to ARM SoC. Sorry for the
+confusion.
+
+Regards,
+Sudeep
+
+diff --git a/arch/arm/boot/dts/imx6q-pistachio.dts b/arch/arm/boot/dts/imx6q-pistachio.dts
+index a31e83cd07a3..8f4b60dd819c 100644
+--- a/arch/arm/boot/dts/imx6q-pistachio.dts
++++ b/arch/arm/boot/dts/imx6q-pistachio.dts
+@@ -102,7 +102,7 @@
+ 		power {
+ 			label = "Power Button";
+ 			gpios = <&gpio2 12 GPIO_ACTIVE_LOW>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 			linux,code = <KEY_POWER>;
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/imx6sll-evk.dts b/arch/arm/boot/dts/imx6sll-evk.dts
+index c8e115564ba2..30b5d63ed319 100644
+--- a/arch/arm/boot/dts/imx6sll-evk.dts
++++ b/arch/arm/boot/dts/imx6sll-evk.dts
+@@ -296,7 +296,7 @@
+ 	pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
+ 	cd-gpios = <&gpio3 22 GPIO_ACTIVE_LOW>;
+ 	keep-power-in-suspend;
+-	enable-sdio-wakeup;
++	wakeup-source;
+ 	vmmc-supply = <&reg_sd3_vmmc>;
+ 	status = "okay";
+ };
+--
+2.17.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
