@@ -2,58 +2,71 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-12.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 63A95C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:13:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 23B99C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:15:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 34EFA21906
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:13:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E8B1921906
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:15:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AFZOe2I5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 34EFA21906
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="S3sWcDhy";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="TM2KODKV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E8B1921906
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=BUVqD/FrMqOWJ24VhQZP7w2ii3QzIQLvMDBPJ1UZB1g=; b=AFZOe2I5MWI5e7
-	h+r894kxtRXhNngzglopUgLaORA47MN/ix5VZvNHjJHpB2jUf5QOrbF895r9mM66IB5ygPHDFimD1
-	r5lCwEdHSzPye0tcv+cIKbdjl3xdRjjbzoUEKr7qM37WiyFsbTTBReo6yg/6gDYH5Lj2235B5vnO+
-	iqAX6FKnusud5HuQ5/sOOU2fMbdtdofHcjLGXBnwXOzXt9QrBo44mSlr6wS4WyV/FRj/8+eO/DTWO
-	ZV8OOm2H6jXnu88VD1s33+kufAKAKXYhGV7al/Tr/RLz5dfUVxNEmOw2Dajpvgi+qI7z5BEYlKFqj
-	8zNvFTQJdMhRw+1C0bXw==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Date:Message-Id:
+	In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	References:List-Owner; bh=+paj6Tux8IfOG/4PbzpxmRtdcgHt26c32P6btFJmKDc=; b=S3s
+	WcDhyheJ4yVMNo7wM0smh+lelonidaASCPtfmlYNQgZViEtq7aJqPn6QBG3g5mgrHe9GK9ni1b+qK
+	pA8ywEW5WFFMSBBspAQakpKtK9bdh75pWoZC8YWCez0pD+ReGZaOTFFveKkKcOIBTmwyelFThoZFQ
+	Qx527NZjpkQC73bZdDSMzwGQjz2DocaGz+U/MtwCIAg1BhL3u3dT6T0+p77URvJJKD/8Xznd6KxEv
+	c3gHvPB0YTys7FszwS2BNN288KzabS7clngHw9ide/rP2kn/En9N86iHi5sz2DEWh1nNxph4NxaB1
+	250bVAIWKKXt/62i3mK9/QbDYfOLt1w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaPIT-0006ed-76; Fri, 21 Dec 2018 18:13:17 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaPHj-0005xm-Dp
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 18:12:41 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 280CA1596;
- Fri, 21 Dec 2018 10:12:28 -0800 (PST)
-Received: from usa.arm.com (e107155-lin.cambridge.arm.com [10.1.196.42])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id DDD653F575;
- Fri, 21 Dec 2018 10:12:26 -0800 (PST)
-From: Sudeep Holla <sudeep.holla@arm.com>
-To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH -next] ARM: dts: am437x: replace linux,
- wakeup with wakeup-source property
-Date: Fri, 21 Dec 2018 18:12:20 +0000
-Message-Id: <20181221181220.6877-1-sudeep.holla@arm.com>
-X-Mailer: git-send-email 2.17.1
-MIME-Version: 1.0
+	id 1gaPKS-00004r-6V; Fri, 21 Dec 2018 18:15:20 +0000
+Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gaPKP-0007TM-7U
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 18:15:18 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=sirena.org.uk; s=20170815-heliosphere; h=Date:Message-Id:In-Reply-To:
+ Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:
+ List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:
+ List-Archive; bh=nGj0bkijnCx3gJMubzNqFQYa/+Sd/+6on7euzubTFrc=; b=TM2KODKVb7ie
+ ype7Gjq52Z+SS6K4mS4AHdMMbhCLLcAPzcs2TLmYrArAl3UVmllre1H4nxvCiOdrPPXk3C0HNhrj/
+ /KimsXzs18dub3aT2PGx/kjBM9ZlUrc+uBFpigh73MiG9W03GVIN8MrCKqz/5fnZZcHNb8WP6iQpR
+ nStKQ=;
+Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
+ ([82.37.168.47] helo=debutante.sirena.org.uk)
+ by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
+ (envelope-from <broonie@sirena.org.uk>)
+ id 1gaPK7-0003q7-A4; Fri, 21 Dec 2018 18:14:59 +0000
+Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
+ id EB54D1121B93; Fri, 21 Dec 2018 18:14:58 +0000 (GMT)
+From: Mark Brown <broonie@kernel.org>
+To: Katsuhiro Suzuki <katsuhiro@katsuster.net>
+Subject: Applied "ASoC: rockchip: add workaround for silence of rk3288 ACODEC"
+ to the asoc tree
+In-Reply-To: <20181220153636.5213-2-katsuhiro@katsuster.net>
+X-Patchwork-Hint: ignore
+Message-Id: <20181221181458.EB54D1121B93@debutante.sirena.org.uk>
+Date: Fri, 21 Dec 2018 18:14:58 +0000 (GMT)
+X-Bad-Reply: In-Reply-To but no 'Re:' in Subject.
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_101232_217571_F33F998C 
-X-CRM114-Status: GOOD (  12.91  )
+X-CRM114-CacheID: sfid-20181221_101517_414948_FDE2719E 
+X-CRM114-Status: GOOD (  15.33  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -65,35 +78,81 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Tony Lindgren <tony@atomide.com>, devicetree@vger.kernel.org,
- linux-omap@vger.kernel.org,
- =?UTF-8?q?Beno=C3=AEt=20Cousson?= <bcousson@baylibre.com>,
- Sudeep Holla <sudeep.holla@arm.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: alsa-devel@alsa-project.org, Mark Brown <broonie@kernel.org>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-TW9zdCBvZiB0aGUgbGVnYWN5ICJsaW51eCx3YWtldXAiIGJvb2xlYW4gcHJvcGVydHkgaXMgYWxy
-ZWFkeSByZXBsYWNlZAp3aXRoICJ3YWtldXAtc291cmNlIi4gSG93ZXZlciBmZXcgb2NjdXJyZW5j
-ZXMgb2Ygb2xkIHByb3BlcnR5IGhhcyBwb3BwZWQKdXAgYWdhaW4sIHByb2JhYmx5IGZyb20gdGhl
-IHJlbW5hbnRzIGluIGRvd25zdHJlYW0gdHJlZXMuCgpSZXBsYWNlIHRoZSBsZWdhY3kgcHJvcGVy
-dGllcyB3aXRoIHRoZSB1bmlmaWVkICJ3YWtldXAtc291cmNlIiBwcm9wZXJ0eQppbnRyb2R1Y2Vk
-IGluIHRoZSBjb21taXQgYWVkYTUwMDNkMGI5ICgiSW5wdXQ6IG1hdHJpeF9rZXlwYWQgLSBjaGFu
-Z2UKbmFtZSBvZiB3YWtldXAgcHJvcGVydHkgdG8gIndha2V1cC1zb3VyY2UiIikKCkNjOiAiQmVu
-b8OudCBDb3Vzc29uIiA8YmNvdXNzb25AYmF5bGlicmUuY29tPgpDYzogVG9ueSBMaW5kZ3JlbiA8
-dG9ueUBhdG9taWRlLmNvbT4KQ2M6IGxpbnV4LW9tYXBAdmdlci5rZXJuZWwub3JnClNpZ25lZC1v
-ZmYtYnk6IFN1ZGVlcCBIb2xsYSA8c3VkZWVwLmhvbGxhQGFybS5jb20+Ci0tLQogYXJjaC9hcm0v
-Ym9vdC9kdHMvYW00Mzd4LWdwLWV2bS5kdHMgfCAyICstCiAxIGZpbGUgY2hhbmdlZCwgMSBpbnNl
-cnRpb24oKyksIDEgZGVsZXRpb24oLSkKCmRpZmYgLS1naXQgYS9hcmNoL2FybS9ib290L2R0cy9h
-bTQzN3gtZ3AtZXZtLmR0cyBiL2FyY2gvYXJtL2Jvb3QvZHRzL2FtNDM3eC1ncC1ldm0uZHRzCmlu
-ZGV4IGY0YTIwY2FkZTgwOC4uNGM2ZWUzN2VhNTczIDEwMDY0NAotLS0gYS9hcmNoL2FybS9ib290
-L2R0cy9hbTQzN3gtZ3AtZXZtLmR0cworKysgYi9hcmNoL2FybS9ib290L2R0cy9hbTQzN3gtZ3At
-ZXZtLmR0cwpAQCAtNzEsNyArNzEsNyBAQAogCQlwaW5jdHJsLTAgPSA8Jm1hdHJpeF9rZXlwYWRf
-ZGVmYXVsdD47CiAJCXBpbmN0cmwtMSA9IDwmbWF0cml4X2tleXBhZF9zbGVlcD47CgotCQlsaW51
-eCx3YWtldXA7CisJCXdha2V1cC1zb3VyY2U7CgogCQlyb3ctZ3Bpb3MgPSA8JmdwaW8wIDMgR1BJ
-T19BQ1RJVkVfSElHSCAvKiBCYW5rMCwgcGluMyAqLwogCQkJCSZncGlvNCAzIEdQSU9fQUNUSVZF
-X0hJR0ggLyogQmFuazQsIHBpbjMgKi8KLS0KMi4xNy4xCgoKX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QK
-bGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRl
-YWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+The patch
+
+   ASoC: rockchip: add workaround for silence of rk3288 ACODEC
+
+has been applied to the asoc tree at
+
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+From 25af20ae05b95b63cfe655ca248b9dcbf904104c Mon Sep 17 00:00:00 2001
+From: Katsuhiro Suzuki <katsuhiro@katsuster.net>
+Date: Fri, 21 Dec 2018 00:36:36 +0900
+Subject: [PATCH] ASoC: rockchip: add workaround for silence of rk3288 ACODEC
+
+This patch adds reset and precharge in shutdown of PCM device.
+
+ACODEC goes to silence if we change Fs to 44.1kHz from 48kHz. This
+workaround seems to work but I don't know this workaround is correct
+sequence or not for ACODEC.
+
+Signed-off-by: Katsuhiro Suzuki <katsuhiro@katsuster.net>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/codecs/rk3328_codec.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/sound/soc/codecs/rk3328_codec.c b/sound/soc/codecs/rk3328_codec.c
+index 71f3fc2d970c..f3442a2283ea 100644
+--- a/sound/soc/codecs/rk3328_codec.c
++++ b/sound/soc/codecs/rk3328_codec.c
+@@ -261,9 +261,12 @@ static int rk3328_codec_close_playback(struct rk3328_codec_priv *rk3328)
+ 		mdelay(1);
+ 	}
+ 
++	/* Workaround for silence when changed Fs 48 -> 44.1kHz */
++	rk3328_codec_reset(rk3328);
++
+ 	regmap_update_bits(rk3328->regmap, DAC_PRECHARGE_CTRL,
+ 			   DAC_CHARGE_CURRENT_ALL_MASK,
+-			   DAC_CHARGE_CURRENT_I);
++			   DAC_CHARGE_CURRENT_ALL_ON);
+ 
+ 	return 0;
+ }
+-- 
+2.20.1
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
