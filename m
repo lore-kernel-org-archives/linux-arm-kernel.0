@@ -2,63 +2,89 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FROM,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B1669C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 14:57:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1F00BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 15:21:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 76B8E218E0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 14:57:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E4D712192B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 15:21:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ESYHKbz+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 76B8E218E0
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="H8LgRuqp";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="SD91lDlO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E4D712192B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Lwlc4DkZh4xHR6evSgkH7pAruECVdKF0+XjuQHCQpu0=; b=ESYHKbz++5YaFO
-	AQveAllM7nMuIOfqnocEtrCxFbmmlmSaEw3t2fyuPT7p4F1KOxBcC6Dw7GFIuX9sFYswn3kZViBhq
-	uu67dM0ClmnrUT7nYJF69ZFxJOWyditRNxlMphwuItFi/d+DvmEkX31RtPgLjMf+r8rOfFgyEnUZI
-	5SsYgbaYm+f/cns4whBtQE9pcqAkKRAcR2OVMRX4kDEZp6UEXBoym56PuV/3QTe8x3qn5l1T7K1Zf
-	KVasP7ARW4o13RP6/6RjpTCAkEXv1RN7LSZuHw4J8aQup612OdqyR30P6UfAPl5F+M/ARs3HHOH0p
-	+u2MRKgclukG2Pg8Yzqg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=Dr+mPLZpiGxNIxpai6npsBO72onde/beCwoJv5kCwC8=; b=H8LgRuqpqwRdYx
+	iT7x/vnqvHP/cuqdDW8nZNqj9OkW8HaEiGSRKb3w8Gk1h3uyrBcOnr8xo4tmnIc3qv66p/sPItC3+
+	1rCYNXUkgKWtt+gQIHlgMaYZqpNa5QBYfYE2rGcCBj4R45uLsrQJgALsx2Jz8cUhIf80WzliD3qRK
+	uGggPDU6Jkx8ewOWxcrWJmF1UKL9FcjXXJoQoNY/qRP+dI7+zWT3wrW+2IP+RQkpLPGxcl+fSFDaY
+	wNRul+FEcH3LJckg42xMz0DC0zlBI9rxLDzje+7nxyLAC+f/SttRjWkuw7+udHrEI/1F9+sar7ad4
+	OGHdiVIAWMR9a4pTCXmg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaMF7-0007DL-Vh; Fri, 21 Dec 2018 14:57:37 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaMEw-000757-J1
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 14:57:28 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4FD6C1596;
- Fri, 21 Dec 2018 06:57:18 -0800 (PST)
-Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E9DBD3F59C;
- Fri, 21 Dec 2018 06:57:16 -0800 (PST)
-Subject: Re: [PATCH v2 2/2] arm64: uaccess: Implement unsafe accessors
-To: Julien Thierry <julien.thierry@arm.com>
-References: <1543845318-24543-1-git-send-email-julien.thierry@arm.com>
- <1543845318-24543-3-git-send-email-julien.thierry@arm.com>
-From: James Morse <james.morse@arm.com>
-Message-ID: <f933b06a-0f4a-3bdb-86ef-644ac0a16163@arm.com>
-Date: Fri, 21 Dec 2018 14:57:15 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
+	id 1gaMcD-0007FL-6o; Fri, 21 Dec 2018 15:21:29 +0000
+Received: from mail-lj1-x241.google.com ([2a00:1450:4864:20::241])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gaMc9-0007CX-6O
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 15:21:26 +0000
+Received: by mail-lj1-x241.google.com with SMTP id x85-v6so5072179ljb.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 21 Dec 2018 07:21:14 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=ffmZcVfSfeQA3nmlJnD8pY5wfE+gHGqpjgHkWfO9544=;
+ b=SD91lDlOM/WdjbURKKFSIHqQ0g0Gza3k7dVUJuwxrVD9duJAgtW3/Br9SYYSinDk0o
+ skLAClHMdQVoxMtT4oYo1BwQiUs7+29V9GeZg1Xxf2JAXVGHCEgfpQagwJL3wSeDFobU
+ k4lHJocQY3Zy9n9n1RQ4sPQDxPEAZ0LCfnlBO+frO9XOTJqddKA0KN/WNWUH9/8T6NWl
+ U/bp/XG86ixxNN1aCGvZVwfBNnVUnUaiIAh6JOPhY1q6RyqepS52LPtUv7nusrfMQ0vE
+ DBl3U+8b2WXVtwSz1jOOsGDII7pHRxvzQCqqSy4sdrqyeHxAKzOz/kwx3tSLdRpxddXM
+ brUA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=ffmZcVfSfeQA3nmlJnD8pY5wfE+gHGqpjgHkWfO9544=;
+ b=su8pG6dYSyyVvd3P57tHyXGy+1h5e7SOoHwLJfL+mrw2nAV5rH/mLVX8kE6aqzC/hq
+ b9Qn67AZUbO29BrUcpTGxwT+HOcrKxw7l1nN216qo46dYgyVgLc0ILHl+y3XX+Nt87hk
+ RVnxrxi1ri3A7PmJnfzVbAmKGTrQrm9yRzYHAMLEGunkauxKDMn82CmX6NyYPBFIg/MJ
+ k5wF+auBdR3KrVX29prG3Qf+LZuVrLxtfKMkr32riTuSQCC97KOfoS6F+Y3r1mf175vm
+ ekpmP+aUqnqB0PNVZfXmh3KxvNMq2N5Vlka60QhfnttlfMDA5hN5HJ6mLqaEKiCyzYOc
+ pkpQ==
+X-Gm-Message-State: AJcUukfph/FhpadJwJlOWabPAHcT8NTV7EuJNYjRwDwXIdR9n2t5RHeX
+ GG2J1CwCLA3iHUXPcJbdNXY=
+X-Google-Smtp-Source: ALg8bN6aGwsBuFCCEliK6zyyS9ARcHvGGy/zL+6jGizSb7I2yBBOhhkBUQo0Pxs7Kzj0EMUKRsOZAQ==
+X-Received: by 2002:a2e:97d7:: with SMTP id
+ m23-v6mr2099630ljj.18.1545405672729; 
+ Fri, 21 Dec 2018 07:21:12 -0800 (PST)
+Received: from localhost.localdomain (c90-142-43-138.bredband.comhem.se.
+ [90.142.43.138])
+ by smtp.gmail.com with ESMTPSA id q30sm5005601lfi.94.2018.12.21.07.21.11
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 21 Dec 2018 07:21:11 -0800 (PST)
+From: codekipper@gmail.com
+To: maxime.ripard@free-electrons.com, wens@csie.org,
+ linux-sunxi@googlegroups.com
+Subject: [PATCH v3 0/9] ASoC: sun4i-i2s: Updates to the driver
+Date: Fri, 21 Dec 2018 16:21:01 +0100
+Message-Id: <20181221152110.17982-1-codekipper@gmail.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-In-Reply-To: <1543845318-24543-3-git-send-email-julien.thierry@arm.com>
-Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_065726_671976_DEA2AFB9 
-X-CRM114-Status: GOOD (  17.86  )
+X-CRM114-CacheID: sfid-20181221_072125_230354_F89193D8 
+X-CRM114-Status: GOOD (  17.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,79 +96,83 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: peterz@infradead.org, catalin.marinas@arm.com, will.deacon@arm.com,
- linux-kernel@vger.kernel.org, mingo@redhat.com, hpa@zytor.com,
- linux-arm-kernel@lists.infradead.org
+Cc: alsa-devel@alsa-project.org, Marcus Cooper <codekipper@gmail.com>,
+ lgirdwood@gmail.com, linux-kernel@vger.kernel.org, be17068@iperbole.bo.it,
+ broonie@kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Julien,
+From: Marcus Cooper <codekipper@gmail.com>
 
-On 03/12/2018 13:55, Julien Thierry wrote:
-> Current implementation of get/put_user_unsafe default to get/put_user
-> which toggle PAN before each access, despite having been told by the caller
-> that multiple accesses to user memory were about to happen.
-> 
-> Provide implementations for user_access_begin/end to turn PAN off/on and
-> implement unsafe accessors that assume PAN was already turned off.
+Hi All,
 
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index 842fb95..4e6477b 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -108,6 +108,8 @@
->  #define SYS_DC_CSW			sys_insn(1, 0, 7, 10, 2)
->  #define SYS_DC_CISW			sys_insn(1, 0, 7, 14, 2)
->  
-> +#define SYS_PSTATE_PAN			sys_reg(3, 0, 4, 2, 3)
+here is a patch series to add some improvements to the sun4i-i2s driver
+found whilst getting slave clocking and hdmi audio working on the newer
+SoCs. Since the last push there has been some activity getting surround
+sound working and this is included.
 
-Nit: Could we keep this list in encoding order please.
-(it makes conflicts easier to resolve in the future)
+The functionality included with the new patch set has been extended to
+cover more sample resolutions, multi-lane data output for HDMI audio
+and some bug fixes that have been discovered along the way.
 
->  #define SYS_OSDTRRX_EL1			sys_reg(2, 0, 0, 0, 2)
->  #define SYS_MDCCINT_EL1			sys_reg(2, 0, 0, 2, 0)
->  #define SYS_MDSCR_EL1			sys_reg(2, 0, 0, 2, 2)
-> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-> index 07c3408..cabfcae 100644
-> --- a/arch/arm64/include/asm/uaccess.h
-> +++ b/arch/arm64/include/asm/uaccess.h
-> @@ -233,6 +233,23 @@ static inline void uaccess_enable_not_uao(void)
->  	__uaccess_enable(ARM64_ALT_PAN_NOT_UAO);
->  }
->  
-> +#define unsafe_user_region_active	uaccess_region_active
-> +static inline bool uaccess_region_active(void)
-> +{
-> +	if (system_uses_ttbr0_pan()) {
-> +		u64 ttbr;
-> +
-> +		ttbr = read_sysreg(ttbr1_el1);
-> +		return ttbr & TTBR_ASID_MASK;
-> +	} else if (cpus_have_const_cap(ARM64_ALT_PAN_NOT_UAO)) {
-> +		return (read_sysreg(sctlr_el1) & SCTLR_EL1_SPAN) ?
-> +				false :
-> +				!read_sysreg_s(SYS_PSTATE_PAN);
-> +	}
-> +
-> +	return false;
-> +}
+I can see more usage of the tdm property since I last attempted to push
+these patches and the examples currently in mainline sort of the opposite
+to what I'm trying to achieve. When we first started looking at the i2s
+driver, the codecs that we were using allowed for the frame width to be
+determined based on the sampling resolution but in most use cases it
+seems that a fixed width is required(my highest priority should be to get
+HDMI audio support in). We're using the tdm property to override the old
+way to calculate the frame width. What I've seen in what has already been
+mainlined is that the i2s driver has a frame width that is fixed to 32
+bits and this can be overridden using the tdm property.
 
-(Reading the SCTLR bit is a bit of a heavy-hammer, as suggested elsewhere on the
-thread, can we use alternatives_applied here?)
+Anyway, I've moved the more controversial patches to the top of the stack
+as I'm expecting feedback.
 
-It may be worth splitting this into three patches, so the 'unsafe' bits can be
-merged without the debug option.
+Have a great Xmas and New Year,
 
+BR,
+CK
 
-Either way, for the unsafe parts:
-Reviewed-by: James Morse <james.morse@arm.com>
+---
 
+v3 changes compared to v2 are:
+ - added back slave mode changes
+ - added back the use of tdm properties
+ - changes to regmap and caching
+ - removed loopback functionality
+ - fixes to the channel offset mask
 
-Thanks!
+v2 changes compared to v1 are:
+ - removed slave mode changes which didn't set mclk and bclk div.
+ - removed use of tdm and now use a dedicated property.
+ - fix commit message to better explain reason for sign extending
+ - add divider calculations for newer SoCs.
+ - add support for multi-lane i2s data output.
+ - add support for 20, 24 and 32 bit samples.
+ - add loopback property so blocks can be tested without a codec.
 
-James
+---
+
+Marcus Cooper (9):
+  ASoC: sun4i-i2s: Adjust regmap settings
+  ASoC: sun4i-i2s: Add regmap field to sign extend sample
+  ASoc: sun4i-i2s: Add 20, 24 and 32 bit support
+  ASoC: sun4i-i2s: Fix offset mask
+  ASoC: sun4i-i2s: Correct divider calculations
+  ASoC: sun4i-i2s: Add multi-lane functionality
+  ASoC: sun4i-i2s: Do not divide clocks when slave
+  ASoC: sun4i-i2s: Add set_tdm_slot functionality
+  ASoC: sun4i-i2s: Add multichannel functionality
+
+ sound/soc/sunxi/sun4i-i2s.c | 399 ++++++++++++++++++++++++------------
+ 1 file changed, 267 insertions(+), 132 deletions(-)
+
+-- 
+2.20.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
