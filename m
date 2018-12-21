@@ -3,61 +3,90 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 214D3C43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 17:57:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 05BDDC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 17:59:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E752C218E0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 17:57:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C7B84218E0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 17:59:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DtNGTcsa"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E752C218E0
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=goodmis.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="O72qQoxO";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="jfbY+aso";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="o/iZX2iW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C7B84218E0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Subject:To:From
-	:Date:Message-Id:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	List-Owner; bh=FinxA8O15GE0bM+ZlzS1K4hC873skpIGMzXtyliUZng=; b=DtNGTcsaVx7WDL
-	eeSpVHd5d76XyCVZdDOt1qiy1RnjjSwwUrAA5DfBDkngeqajk/9KEoS0zAlhArkMb9GQENVUn6ok6
-	fU4wjY2YH5jl30GW/m6jhWBGYpqqec7HnDq0SBOaQt50MtybOy0PG4PXoA0FrgJlRFz6lhV8RhHIA
-	FNL51p2sHe5q3pdlfWdBAqereGZL65m+mKc0TFI4ClwVhD488gnuTIvVO9tfGk1QX0/gScObK3fAA
-	GgZhGp2JX+Dr5fYlUdTxs7FUYP21asZAP7h3sWHgvtSiv3jB1Os1E8Un9nT5TgHSqUyFnb3Qo+4Gu
-	rantktqRmvE7HeR/mhnA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=cKhrQBNrLE9tlOFyIDZQ4W+JC7DBE6VSwoTzd8vwUW8=; b=O72qQoxOeqYc8w4MvA42prGyr
+	DRKoVdR+/ijHzNXIKMtBPj67gPKBNDK9dpjYL4c8cGQB9hNAot23Nsryd5kqExDpo0pC12yYZsKeP
+	t2Lwf33EEKldShf+OiH5rv9jVDQnB7bQG0/5JnQtl9BIBD4q+2tYgAvI4GeMavrqBI9b+arqUz/0X
+	9xSOaycnED9J7+Orw/G/UaOLpJ14kZOyE1TED1cGNPdREiZPsmXzbduT/V8lLKEx9CGSJJGd4/MaM
+	nzAzdBkITlQztq/3/DQ5t0LaWvIEKK1qkxBw8OJhL6/q4pvYrqdqbQhoSPXSeoLNwP57TO0b7E7I1
+	kT67x6eeg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaP2t-0000MD-Kb; Fri, 21 Dec 2018 17:57:11 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gaP4x-0000m3-Vi; Fri, 21 Dec 2018 17:59:19 +0000
+Received: from smtp.codeaurora.org ([198.145.29.96])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaP2q-0000KC-E0
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 17:57:09 +0000
-Received: from gandalf.local.home (cpe-66-24-56-78.stny.res.rr.com
- [66.24.56.78])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ id 1gaP4u-0000l0-EO
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 17:59:18 +0000
+Received: by smtp.codeaurora.org (Postfix, from userid 1000)
+ id 3167E60767; Fri, 21 Dec 2018 17:59:04 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1545415145;
+ bh=ToaKA+6kwMe5bmJIcLqmQ8j2a69VMR6t5WiM4eu5240=;
+ h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
+ b=jfbY+asoa/TUnvisqGz8uojFkSdYCe4tn0sELFNH8WmrPK4RP/36Oad+6ujBS7YF/
+ Mog1ouxrDN67IJ5IgFqmNPiHrzAExrPSzZL+fjwrpBrlm991pSVM++xiDJANsfb1iT
+ s73SNvHKKmaK8lAz1ahCxzwqUlwkgGKqacFkxC2w=
+Received: from [192.168.225.247] (unknown [49.32.116.12])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id B0BFC21934;
- Fri, 21 Dec 2018 17:56:57 +0000 (UTC)
-Received: from rostedt by gandalf.local.home with local (Exim 4.91)
- (envelope-from <rostedt@goodmis.org>)
- id 1gaP2e-0002Ki-Jw; Fri, 21 Dec 2018 12:56:56 -0500
-Message-Id: <20181221175656.503716620@goodmis.org>
-User-Agent: quilt/0.65
-Date: Fri, 21 Dec 2018 12:56:26 -0500
-From: Steven Rostedt <rostedt@goodmis.org>
-To: linux-kernel@vger.kernel.org
-Subject: [for-next][PATCH 08/24] arm64: Use ftrace_graph_get_ret_stack()
- instead of curr_ret_stack
-References: <20181221175618.968519903@goodmis.org>
+ (Authenticated sender: tdas@smtp.codeaurora.org)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id 74724606CF;
+ Fri, 21 Dec 2018 17:58:52 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1545415143;
+ bh=ToaKA+6kwMe5bmJIcLqmQ8j2a69VMR6t5WiM4eu5240=;
+ h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
+ b=o/iZX2iWacHywN+CVwHpV3qK4M02LmP9sUwTINPTn+7g7wZ4v1k6QSxEDj0o39C56
+ 76IkKiXK8V/Oe371klqyc91BTYPGTURQzeIOMxskE6yGEhuQKovh4WGF5h2N45l/PH
+ ywD4bEIOBFtO0fi/4cjob7yQHHHmgGJzCzTZ2riM=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 74724606CF
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ dmarc=none (p=none dis=none) header.from=codeaurora.org
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ spf=none smtp.mailfrom=tdas@codeaurora.org
+Subject: Re: [PATCH 01/13] clk: qcom: gcc: limit GPLL0_AO_OUT operating
+ frequency
+To: Jorge Ramirez <jorge.ramirez-ortiz@linaro.org>, robh+dt@kernel.org,
+ mark.rutland@arm.com, andy.gross@linaro.org, david.brown@linaro.org,
+ sboyd@kernel.org, will.deacon@arm.com, mturquette@baylibre.com,
+ jassisinghbrar@gmail.com
+References: <1545039990-19984-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <1545039990-19984-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <e97d9050-effc-56d7-0f9b-768df90dd73a@codeaurora.org>
+ <6814777f-1e5f-bd99-db63-a0050dcdd930@linaro.org>
+From: Taniya Das <tdas@codeaurora.org>
+Message-ID: <874ce15d-67f5-8e55-8b62-73071fe6ae06@codeaurora.org>
+Date: Fri, 21 Dec 2018 23:28:49 +0530
+User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.3
 MIME-Version: 1.0
+In-Reply-To: <6814777f-1e5f-bd99-db63-a0050dcdd930@linaro.org>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_095708_503339_C9F53D90 
-X-CRM114-Status: GOOD (  15.57  )
+X-CRM114-CacheID: sfid-20181221_095916_521541_212784DC 
+X-CRM114-Status: GOOD (  23.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,152 +98,69 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- Masami Hiramatsu <mhiramat@kernel.org>, Namhyung Kim <namhyung@kernel.org>,
- Andrew Morton <akpm@linux-foundation.org>, Ingo Molnar <mingo@kernel.org>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: devicetree@vger.kernel.org, heiko@sntech.de, arnd@arndb.de, olof@lixom.net,
+ linux-clk@vger.kernel.org, linux-kernel@vger.kernel.org,
+ amit.kucheria@linaro.org, bjorn.andersson@linaro.org,
+ enric.balletbo@collabora.com, vkoul@kernel.org, sibis@codeaurora.org,
+ niklas.cassel@linaro.org, horms+renesas@verge.net.au, georgi.djakov@linaro.org,
+ linux-arm-kernel@lists.infradead.org, jagan@amarulasolutions.com
+Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="utf-8"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: "Steven Rostedt (VMware)" <rostedt@goodmis.org>
-
-The structure of the ret_stack array on the task struct is going to
-change, and accessing it directly via the curr_ret_stack index will no
-longer give the ret_stack entry that holds the return address. To access
-that, architectures must now use ftrace_graph_get_ret_stack() to get the
-associated ret_stack that matches the saved return address.
-
-Cc: linux-arm-kernel@lists.infradead.org
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
----
- arch/arm64/kernel/perf_callchain.c |  2 +-
- arch/arm64/kernel/process.c        |  2 +-
- arch/arm64/kernel/return_address.c |  2 +-
- arch/arm64/kernel/stacktrace.c     | 12 +++++++-----
- arch/arm64/kernel/time.c           |  2 +-
- arch/arm64/kernel/traps.c          |  2 +-
- 6 files changed, 12 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm64/kernel/perf_callchain.c b/arch/arm64/kernel/perf_callchain.c
-index bcafd7dcfe8b..1b792b46604e 100644
---- a/arch/arm64/kernel/perf_callchain.c
-+++ b/arch/arm64/kernel/perf_callchain.c
-@@ -164,7 +164,7 @@ void perf_callchain_kernel(struct perf_callchain_entry_ctx *entry,
- 	frame.fp = regs->regs[29];
- 	frame.pc = regs->pc;
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
--	frame.graph = current->curr_ret_stack;
-+	frame.graph = 0;
- #endif
- 
- 	walk_stackframe(current, &frame, callchain_trace, entry);
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index d9a4c2d6dd8b..37a66394b07d 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -459,7 +459,7 @@ unsigned long get_wchan(struct task_struct *p)
- 	frame.fp = thread_saved_fp(p);
- 	frame.pc = thread_saved_pc(p);
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
--	frame.graph = p->curr_ret_stack;
-+	frame.graph = 0;
- #endif
- 	do {
- 		if (unwind_frame(p, &frame))
-diff --git a/arch/arm64/kernel/return_address.c b/arch/arm64/kernel/return_address.c
-index 933adbc0f654..53c40196b607 100644
---- a/arch/arm64/kernel/return_address.c
-+++ b/arch/arm64/kernel/return_address.c
-@@ -44,7 +44,7 @@ void *return_address(unsigned int level)
- 	frame.fp = (unsigned long)__builtin_frame_address(0);
- 	frame.pc = (unsigned long)return_address; /* dummy */
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
--	frame.graph = current->curr_ret_stack;
-+	frame.graph = 0;
- #endif
- 
- 	walk_stackframe(current, &frame, save_return_addr, &data);
-diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-index 7723dadf25be..1a29f2695ff2 100644
---- a/arch/arm64/kernel/stacktrace.c
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -59,15 +59,17 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
- 	if (tsk->ret_stack &&
- 			(frame->pc == (unsigned long)return_to_handler)) {
--		if (WARN_ON_ONCE(frame->graph == -1))
--			return -EINVAL;
-+		struct ftrace_ret_stack *ret_stack;
- 		/*
- 		 * This is a case where function graph tracer has
- 		 * modified a return address (LR) in a stack frame
- 		 * to hook a function return.
- 		 * So replace it to an original value.
- 		 */
--		frame->pc = tsk->ret_stack[frame->graph--].ret;
-+		ret_stack = ftrace_graph_get_ret_stack(tsk, frame->graph++);
-+		if (WARN_ON_ONCE(!ret_stack))
-+			return -EINVAL;
-+		frame->pc = ret_stack->ret;
- 	}
- #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
- 
-@@ -134,7 +136,7 @@ void save_stack_trace_regs(struct pt_regs *regs, struct stack_trace *trace)
- 	frame.fp = regs->regs[29];
- 	frame.pc = regs->pc;
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
--	frame.graph = current->curr_ret_stack;
-+	frame.graph = 0;
- #endif
- 
- 	walk_stackframe(current, &frame, save_trace, &data);
-@@ -165,7 +167,7 @@ static noinline void __save_stack_trace(struct task_struct *tsk,
- 		frame.pc = (unsigned long)__save_stack_trace;
- 	}
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
--	frame.graph = tsk->curr_ret_stack;
-+	frame.graph = 0;
- #endif
- 
- 	walk_stackframe(tsk, &frame, save_trace, &data);
-diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
-index f258636273c9..a777ae90044d 100644
---- a/arch/arm64/kernel/time.c
-+++ b/arch/arm64/kernel/time.c
-@@ -52,7 +52,7 @@ unsigned long profile_pc(struct pt_regs *regs)
- 	frame.fp = regs->regs[29];
- 	frame.pc = regs->pc;
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
--	frame.graph = current->curr_ret_stack;
-+	frame.graph = 0;
- #endif
- 	do {
- 		int ret = unwind_frame(NULL, &frame);
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 5f4d9acb32f5..49ebf3771391 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -122,7 +122,7 @@ void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- 		frame.pc = thread_saved_pc(tsk);
- 	}
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
--	frame.graph = tsk->curr_ret_stack;
-+	frame.graph = 0;
- #endif
- 
- 	skip = !!regs;
--- 
-2.19.2
-
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGVsbG8sCgpPbiAxMi8yMS8yMDE4IDY6MDYgUE0sIEpvcmdlIFJhbWlyZXogd3JvdGU6Cj4gT24g
+MTIvMjEvMTggMTI6MTksIFRhbml5YSBEYXMgd3JvdGU6Cj4+Cj4+Cj4+IE9uIDEyLzE3LzIwMTgg
+MzoxNiBQTSwgSm9yZ2UgUmFtaXJlei1PcnRpeiB3cm90ZToKPj4+IExpbWl0IHRoZSBHUExMMF9B
+T19PVVRfTUFJTiBvcGVyYXRpbmcgZnJlcXVlbmN5IGFzIHBlciBpdHMgaGFyZHdhcmUKPj4+IHNw
+ZWNpZmljYXRpb25zLgo+Pj4KPj4+IENvLWRldmVsb3BlZC1ieTogTmlrbGFzIENhc3NlbCA8bmlr
+bGFzLmNhc3NlbEBsaW5hcm8ub3JnPgo+Pj4gU2lnbmVkLW9mZi1ieTogTmlrbGFzIENhc3NlbCA8
+bmlrbGFzLmNhc3NlbEBsaW5hcm8ub3JnPgo+Pj4gU2lnbmVkLW9mZi1ieTogSm9yZ2UgUmFtaXJl
+ei1PcnRpeiA8am9yZ2UucmFtaXJlei1vcnRpekBsaW5hcm8ub3JnPgo+Pj4gLS0tCj4+PiDCoCBk
+cml2ZXJzL2Nsay9xY29tL2djYy1xY3M0MDQuYyB8IDYgKysrKysrCj4+PiDCoCAxIGZpbGUgY2hh
+bmdlZCwgNiBpbnNlcnRpb25zKCspCj4+Pgo+Pj4gZGlmZiAtLWdpdCBhL2RyaXZlcnMvY2xrL3Fj
+b20vZ2NjLXFjczQwNC5jIAo+Pj4gYi9kcml2ZXJzL2Nsay9xY29tL2djYy1xY3M0MDQuYwo+Pj4g
+aW5kZXggNjRkYTAzMi4uODMzNDM2YSAxMDA2NDQKPj4+IC0tLSBhL2RyaXZlcnMvY2xrL3Fjb20v
+Z2NjLXFjczQwNC5jCj4+PiArKysgYi9kcml2ZXJzL2Nsay9xY29tL2djYy1xY3M0MDQuYwo+Pj4g
+QEAgLTMwNCwxMCArMzA0LDE2IEBAIHN0YXRpYyBzdHJ1Y3QgY2xrX2FscGhhX3BsbCBncGxsMF9v
+dXRfbWFpbiA9IHsKPj4+IMKgwqDCoMKgwqAgfSwKPj4+IMKgIH07Cj4+PiDCoCArc3RhdGljIGNv
+bnN0IHN0cnVjdCBwbGxfdmNvIGdwbGwwX2FvX291dF92Y29bXSA9IHsKPj4+ICvCoMKgwqAgeyA4
+MDAwMDAwMDAsIDgwMDAwMDAwMCwgMCB9LAo+Pj4gK307Cj4+PiArCj4+PiDCoCBzdGF0aWMgc3Ry
+dWN0IGNsa19hbHBoYV9wbGwgZ3BsbDBfYW9fb3V0X21haW4gPSB7Cj4+PiDCoMKgwqDCoMKgIC5v
+ZmZzZXQgPSAweDIxMDAwLAo+Pj4gwqDCoMKgwqDCoCAucmVncyA9IGNsa19hbHBoYV9wbGxfcmVn
+c1tDTEtfQUxQSEFfUExMX1RZUEVfREVGQVVMVF0sCj4+PiDCoMKgwqDCoMKgIC5mbGFncyA9IFNV
+UFBPUlRTX0ZTTV9NT0RFLAo+Pj4gK8KgwqDCoCAudmNvX3RhYmxlID0gZ3BsbDBfYW9fb3V0X3Zj
+bywKPj4+ICvCoMKgwqAgLm51bV92Y28gPSBBUlJBWV9TSVpFKGdwbGwwX2FvX291dF92Y28pLAo+
+Pgo+PiBDb3VsZCB5b3UgcGxlYXNlIGhlbHAgYXMgdG8gd2h5IHRoaXMgaXMgcmVxdWlyZWQ/IFRo
+aXMgaXMgYSBmaXhlZCBQTEwgCj4+IGFuZCB3ZSBkbyBub3QgcmVxdWlyZSBhIFZDTyB0YWJsZSBm
+b3IgaXQuCj4gCj4gSGkgVGFuaXlhLAo+IAo+IHRoaXMgcGF0Y2ggLSB0aGUgYWRkaXRpb25hbCBp
+bmZvcm1hdGlvbiB0aGF0IGl0IHByb3ZpZGVzIGFib3V0IHRoZSAKPiBoYXJkd2FyZSAtIGhlbHBz
+IHRvIHNlbGVjdCB0aGUgcmlnaHQgcGFyZW50IGNsb2NrIGZvciBhIGdpdmVuIGZyZXF1ZW5jeS4K
+PiAKPiBPbiB0aGUgcWNzNDA0IHRoaXMgY2xvY2sgaXMgb25lIG9mIHRoZSB0d28gcGFyZW50IGNs
+b2NrcyBvZiB0aGUgYXBjcyAKPiBjbG9jayBjb250cm9sbGVyICh0aGUgb3RoZXIgb25lIGJlaW5n
+IHRoZSBoaWdoIGZyZXF1ZW5jeSBwbGwpCj4gV2hlbiBjcHVmcmVxIHNldHMgYSB0YXJnZXQgZnJl
+cXVlbmN5LCB0aGVyZSBpcyBhbiBpdGVyYXRpb24gdGhyb3VnaCB0aGUgCj4gbGlzdCBvZiBwYXJl
+bnRzIHRvIHNlbGVjdCB0aGUgb25lIHRoYXQgZGVsaXZlcnMgdGhlIGJlc3QgbWF0Y2guCj4gCj4g
+V2hlbiBhdHRlbXB0aW5nIHRvIHNldCB0aGUgY2xvY2sgZm9yIGFuIGFscGhhX3BsbCwgdGhlIG9w
+ZXJhdGlvbiBkb2VzIGEgCj4gc2FuaXR5IGNoZWNrIHRvIHZhbGlkYXRlIHRoYXQgdGhlIHJlcXVl
+c3RlZCBmcmVxdWVuY3kgaXMgaW4gZmFjdCAKPiByZWFjaGFibGUgdXNpbmcgdGhlIHZjbyByYW5n
+ZTogdHJ5aW5nIHRvIHNldCBhIHZhbHVlIHRoYXQgaXMgbm90IGluIAo+IHJhbmdlIHdpbGwgZmFp
+bC4KPiAKPiBUaGlzIHBhdGNoIG1ha2VzIHN1cmUgdGhhdCBpdHMgcmFuZ2UgaXMgZXhwbGljaXRs
+eSBkZWZpbmVkLgo+IAo+IEl0IGFsc28gaGVscHMgbWFraW5nIHN1cmUgdGhlcmUgYXJlIG5vIHJv
+dW5kaW5nIGlzc3VlcyB3aGVuIHNldHRpbmcgaXRzIAo+IHZhbHVlOiB3aXRob3V0IGl0IHRoZSBj
+bG9jayB3YXMgYmVpbmcgcmVhZCBhdCA3OTlNSHoKPiAKPiAKCklmIHRoZSBQTEwgaXMgYmVpbmcg
+cmVhZCBhcyA3OTlNSHogaXQgd291bGQgYmVjYXVzZSBub3QgYWxsIHRoZSA0MCBiaXRzIApvZiB0
+aGUgQUxQSEFfVkFMIGJlaW5nIHByb2dyYW1tZWQgYnkgdGhlIGJvb3Rsb2FkZXJzKHdoaWNoIGFy
+ZSB0aGUgCm9yaWdpbmFsIG93bmVycyBvZiB0aGlzIFBMTCkuIFNvIHdlIHNob3VsZCBnbyB3aXRo
+IHRoZSB3YXkgdGhleSBhcmUgCmJlaW5nIHNldCBieSBib290bG9hZGVycyBhbmQgcmVhZCBieSBI
+TE9TIGRyaXZlci4KCkFuZCBhIFZDTyByYW5nZSB5b3UgaGF2ZSBjb25zaWRlcmVkIGlzIHdyb25n
+IGZyb20gYSBQTEwgcGVyc3BlY3RpdmUuIEFzIAp0aGVzZSBhcmUgZml4ZWQgUExMcyBhbmQgVkNP
+IHJhbmdlIHJlYWxseSBkb2VzIG5vdCBtYXR0ZXIgaGVyZSwgc28gCnBsZWFzZSBkcm9wIHRoaXMg
+Y2hhbmdlLgoKPj4KPj4+IMKgwqDCoMKgwqAgLmNsa3IgPSB7Cj4+PiDCoMKgwqDCoMKgwqDCoMKg
+wqAgLmVuYWJsZV9yZWcgPSAweDQ1MDAwLAo+Pj4gwqDCoMKgwqDCoMKgwqDCoMKgIC5lbmFibGVf
+bWFzayA9IEJJVCgwKSwKPj4+Cj4+Cj4gCgotLSAKUVVBTENPTU0gSU5ESUEsIG9uIGJlaGFsZiBv
+ZiBRdWFsY29tbSBJbm5vdmF0aW9uIENlbnRlciwgSW5jLiBpcyBhIG1lbWJlcgpvZiBDb2RlIEF1
+cm9yYSBGb3J1bSwgaG9zdGVkIGJ5IFRoZSBMaW51eCBGb3VuZGF0aW9uLgoKLS0KCl9fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwg
+bWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8v
+bGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
