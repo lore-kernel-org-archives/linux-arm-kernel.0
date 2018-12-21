@@ -2,94 +2,88 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FROM,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C8687C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 07:15:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1302FC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 07:27:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 97E4C21906
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 07:15:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CF7F221903
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 07:27:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F+y8t0Eo";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="TM13oeX8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 97E4C21906
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kFa4FAno";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="TPCt8xVC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CF7F221903
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RYqdNfvhRg/wcIeIxYtl0asMMx7M5+bj6o4gxwUL4sE=; b=F+y8t0Eocqq7kJ
-	x0Fylha3ksVx7yAizRzN0qVe8EoVuaRTg99wBRHxKMTczyhayZmgkrxKFIoEaBD3Lx4jFMJ2JuOAq
-	zzysIvPe/G9/9Ldz13hebgytf/IRkdXr8IOb+p+o9/NfUznZJk1i6GK6vRvAP1IS91DCbvOe5LwOw
-	Ry+ARFEk+qVbZPrUUiPPDE8OeMCUm2FN2ZcZw/sorcDdsQDMwcdQqo54rVU7HKwVFtyK9juQIEcmU
-	QTJkkOwZzHgYO9AT0imcwJ+qYxX5m4Jvx5ABmw1gioSj/MhHG7/hknMfH39UqMa+j9sR51cxkqT6u
-	g90643M/VK/iC+q/N/ag==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=P8Aewg/1CdavvDncT/IJ200ahi199Rfmuk14juv8f98=; b=kFa4FAnoTn2KBv
+	SgnHzfoiKVZLvG5gHCdOllB77+X7BYYiD4Ce6YjJGjpD3o0JUvisihWr38lQGbazaD7FazxbQbIdm
+	NKh/OztcB87RIuDw2/DbGVvAFsN3fpjbyHo55a3RY5hVqfa6lPu0w5cdAUaWxoKuiZhp+2QnMyndU
+	gtN0L7gohRzQy5YnJuUvkLkoR7hpDBT7cLrXk3p1PFBOH3hWQ2TZXEmD/t5nvptbOuvjHYDQvdv8T
+	dJKrjVNkRXbhNadsqjJWO06PtokdCuSSaP6JKlIA3+NQE5QQbS8KWzS8tefE7x8+piGzXDj3qOs63
+	1WRnljtkN5Mlbld6K98g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaF1n-0006T2-IC; Fri, 21 Dec 2018 07:15:23 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1gaFDt-0001gD-Nt; Fri, 21 Dec 2018 07:27:53 +0000
+Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaF1k-0006Bc-Cq
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 07:15:21 +0000
-Received: by mail-wr1-x441.google.com with SMTP id v13so4105749wrw.5
+ id 1gaFDq-0001e2-Hw
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 07:27:51 +0000
+Received: by mail-pl1-x644.google.com with SMTP id y1so2097418plp.9
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 20 Dec 2018 23:15:09 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=6Y999tZFT4KVowGELbP8C8GTRfZSF77FOo8O93TvjWE=;
- b=TM13oeX8/ojpm0DGwVB+zJTWSYmX0uEuJpuKlsjuJREnP4QSE4knUu4USgNhfA7fuO
- JH6mN7ibY1CqyIkFeAle0XMQNOC+eKClAi5+3mqI8CqRQU6foK6Gsg5uGJVywklPnzhU
- ZKW8k4a4Uvr9XWJuxMs3PrEmBGL7N1s4DslNw=
+ Thu, 20 Dec 2018 23:27:39 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=kOc0ZMWuA+wm6aVDJRuGECq2GcrB/9tzKOsAAmB0XOw=;
+ b=TPCt8xVCVDNxQebkP1nin8NzBDcA1ymLh+qmgaDZK2/R84wnC0MGL83O2AbRWUOMIl
+ aBz+6aVlXOFXp87rfma2dUDM7+FQhc/0kNuzxmMs0aojYjVMlulbqZH972LaSDHUaR3t
+ QWdxj4ms/Hqvayzoyuy4YlyJ4OLZP5BixfI6GlXQtL+7RegjwPqIVOJPYTouv1H0T5b+
+ 5jiJBS+SI1eP2mSf4dbyd3Bv7MpN3YIP51YYOP5PuxYWALLGPM8fNEg0CdVWAw/SrKGw
+ LUSgAkc78RNyeNHrAExKXm8zzBtGaxLPB8ZQ/NmI+saNZAif8Rm5Zxfqbys0PDMuhohf
+ c4Pg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
  :content-transfer-encoding;
- bh=6Y999tZFT4KVowGELbP8C8GTRfZSF77FOo8O93TvjWE=;
- b=Dkfjkvj5x/Lsh8r3a/UD6mP155GsZB6KM02/wg+08Vln8Chapmb7cwff7HFM/wGPOT
- 19fgyi+CQUH9S3ufmuK95kqP+EXFWE+jHroFpPZKNm0C94zRkYzlsEa62YAYWlMPkgOj
- 5JNThm3LDId1nwJxMCwE04TZmcdNp5rJkec8Qy1PX+sAWM61rD99bS819Wju9t/DS31q
- 3okt1wfNvyxGGxnKqYXr/Ly6tZwH0wheuHuLmzEFJAQTfaBUNOvua29E5kLhjSYgRcOM
- vtohVVFNdTwphJgauOq2oI+puS3dgmzG05J0s42iAcARoYUPebScYDMpgXlWzJDEATQU
- As7Q==
-X-Gm-Message-State: AJcUukfZI1JurK+2xpZIIbLfdjVo2wSh4803WN27KFblE45ti9Q+G6OX
- 3Wq4IUhezOC8Mc+0i6FDD4bLSA==
-X-Google-Smtp-Source: ALg8bN7TBdc1qH89yzLvwkAJgAemjrA3k7EQ/vErm4YNlhVkQxgp0RyXuKg6BXnY2IygHHMp7JkxuQ==
-X-Received: by 2002:a5d:5182:: with SMTP id k2mr1238879wrv.121.1545376508086; 
- Thu, 20 Dec 2018 23:15:08 -0800 (PST)
-Received: from [192.168.0.40] (sju31-1-78-210-255-2.fbx.proxad.net.
- [78.210.255.2])
- by smtp.googlemail.com with ESMTPSA id a1sm13838089wrw.76.2018.12.20.23.15.06
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 20 Dec 2018 23:15:07 -0800 (PST)
-Subject: Re: [PATCH v10 17/27] drivers: firmware: psci: Prepare to support PM
- domains
-To: Ulf Hansson <ulf.hansson@linaro.org>
-References: <20181129174700.16585-1-ulf.hansson@linaro.org>
- <20181129174700.16585-18-ulf.hansson@linaro.org>
- <d82f3fe0-7f60-c89a-6503-435cc6dcc5cf@linaro.org>
- <CAPDyKFpfp+d9K-i-ytCqwSq2ToQvqApatH0YyRXbW55wLyU=wA@mail.gmail.com>
- <c5587b35-734c-5c1d-a433-ce78c8583ef1@linaro.org>
- <CAPDyKFqdeSm56hVB+9dwJekNhZU10DE+-WaWa4m=wdUmjAdAdw@mail.gmail.com>
-From: Daniel Lezcano <daniel.lezcano@linaro.org>
-Message-ID: <66f0871e-fd1d-2f9a-13ce-1164c04e65ca@linaro.org>
-Date: Fri, 21 Dec 2018 08:15:05 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ bh=kOc0ZMWuA+wm6aVDJRuGECq2GcrB/9tzKOsAAmB0XOw=;
+ b=XmaKRcDEFYr9bpba3IftYNST6mbh7B883wXVwc0ZL7uae6t53BvhW/sVcUkX5CYuVS
+ b2MXq43erPayW2ZiRXzYFwBHEYNU0AW/m+fnqzWysuTCXsGjE+fyFcx7lmnsIV85gFwH
+ 9XoKBzIyW2qW2WIwg4Kk2PcSvoNwF4qlX8iSN6nb3JPDi1DQ9WYNrU0lxjo2dfjo82eI
+ 2BUxFCh+MLzmai5wVJv8pLZvneFNr0O9o4uTwoMQ8phUptwEhnRQjPzfntp5MXwC9qDC
+ sDYArjXHqRg2TeGFpKAb2+I9usU0B4aqEeE7yHqZQMaGtUnHhR6VDOlNS/QcGudaBhrv
+ vbkA==
+X-Gm-Message-State: AJcUukcolZxcKzmT0Dt1/CGTUXHcfpDSy09OAPUq21zXLxXh2LOveZ0D
+ OvShpkhG+qdhPU3j2C5cBs8=
+X-Google-Smtp-Source: ALg8bN7yfpjuiwJOykG2+SWyVOxDLnQslYnPFMp5CGu0sCI/4m5T4u96cgAQER5ge0VU9qEafNlb7w==
+X-Received: by 2002:a17:902:28e9:: with SMTP id
+ f96mr1405913plb.169.1545377259137; 
+ Thu, 20 Dec 2018 23:27:39 -0800 (PST)
+Received: from squirtle.lan (c-24-22-235-96.hsd1.wa.comcast.net.
+ [24.22.235.96])
+ by smtp.gmail.com with ESMTPSA id t90sm44971921pfj.23.2018.12.20.23.27.36
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Thu, 20 Dec 2018 23:27:38 -0800 (PST)
+From: Andrey Smirnov <andrew.smirnov@gmail.com>
+To: linux-pci@vger.kernel.org
+Subject: [PATCH 00/21] i.MX6, DesignWare PCI improvements
+Date: Thu, 20 Dec 2018 23:26:55 -0800
+Message-Id: <20181221072716.29017-1-andrew.smirnov@gmail.com>
+X-Mailer: git-send-email 2.19.1
 MIME-Version: 1.0
-In-Reply-To: <CAPDyKFqdeSm56hVB+9dwJekNhZU10DE+-WaWa4m=wdUmjAdAdw@mail.gmail.com>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_231520_439525_8C33C699 
-X-CRM114-Status: GOOD (  19.93  )
+X-CRM114-CacheID: sfid-20181220_232750_600352_E37B5983 
+X-CRM114-Status: UNSURE (   8.03  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,56 +95,67 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>,
- Vincent Guittot <vincent.guittot@linaro.org>,
- Geert Uytterhoeven <geert+renesas@glider.be>,
- Linux PM <linux-pm@vger.kernel.org>, Stephen Boyd <sboyd@kernel.org>,
- Viresh Kumar <viresh.kumar@linaro.org>,
- linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- Kevin Hilman <khilman@kernel.org>, "Rafael J . Wysocki" <rjw@rjwysocki.net>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Lina Iyer <ilina@codeaurora.org>, Tony Lindgren <tony@atomide.com>,
- Sudeep Holla <sudeep.holla@arm.com>,
- "Raju P . L . S . S . S . N" <rplsssn@codeaurora.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: "A.s. Dong" <aisheng.dong@nxp.com>,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Richard Zhu <hongxing.zhu@nxp.com>, linux-arm-kernel@lists.infradead.org,
+ Andrey Smirnov <andrew.smirnov@gmail.com>, linux-kernel@vger.kernel.org,
+ Fabio Estevam <fabio.estevam@nxp.com>, linux-imx@nxp.com,
+ Bjorn Helgaas <bhelgaas@google.com>, Leonard Crestez <leonard.crestez@nxp.com>,
+ Chris Healy <cphealy@gmail.com>, Lucas Stach <l.stach@pengutronix.de>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMjAvMTIvMjAxOCAyMjozNywgVWxmIEhhbnNzb24gd3JvdGU6Cj4gT24gVGh1LCAyMCBEZWMg
-MjAxOCBhdCAxOTowNiwgRGFuaWVsIExlemNhbm8gPGRhbmllbC5sZXpjYW5vQGxpbmFyby5vcmc+
-IHdyb3RlOgo+Pgo+PiBPbiAyMC8xMi8yMDE4IDE2OjQ5LCBVbGYgSGFuc3NvbiB3cm90ZToKPj4K
-Pj4gWyAuLi4gXQo+Pgo+Pj4+PiArI2lmZGVmIENPTkZJR19DUFVfSURMRQo+Pj4+Cj4+Pj4gSXQg
-d291bGQgYmUgbmljZXIgaWYgeW91IGNhbiByZW1vdmUgdGhlIENPTkZJR19DUFVfSURMRSBieSBy
-ZXBsYWNpbmcgaXQKPj4+PiB3aXRoIGEgc3BlY2lmaWMgb25lIChlZy4gQ09ORklHX1BTQ0lfSURM
-RSkgYW5kIG1ha2UgaXQgZGVwZW5kIG9uCj4+Pj4gQ09ORklHX0NQVV9JRExFLCBzbyB0aGUgY29u
-ZmlnIG9wdGlvbnMgc3RheSBjb250YWluZWQgaW4gdGhlaXIKPj4+PiByZXNwZWN0aXZlIHN1YnN5
-c3RlbXMgZGlyZWN0b3J5Lgo+Pj4KPj4+IEkgYW0gYWxsIGZvciBzaW1wbGlmeWluZyB0aGUgS2Nv
-bmZpZyBvcHRpb25zIGluIGhlcmUsIGFzIGluZGVlZCBpdCdzCj4+PiByYXRoZXIgbWVzc3kuIEhv
-d2V2ZXIsIEkgd291bGQgcmF0aGVyIGF2b2lkIGZvbGRpbmcgaW4gYWRkaXRpb25hbAo+Pj4gY2xl
-YW51cCBjaGFuZ2VzIHRvIHRoaXMgc2VyaWVzLCBpcyBhbHJlYWR5IGV4dGVuc2l2ZSBlbm91Z2gu
-Cj4+Pgo+Pj4gV291bGQgeW91IGJlIG9rYXkgaWYgd2UgZGVhbCB3aXRoIHRoYXQgb24gdG9wPwo+
-Pgo+PiBJTU8sIHRoZXJlIGFyZSBwYXRjaGVzIGluIHRoaXMgc2VyaWVzIHdoaWNoIGNhbiBiZSBn
-cm91cGVkIGludG8gYQo+PiBjbGVhbnVwICsgc2V0IHRoZSBzY2VuZSBwYXRjaHNldCBhbmQgbWVy
-Z2VkIGltbWVkaWF0ZWx5LiBBbiBvcHRpb24KPj4gc2ltaWxhciB0byBBUk1fU0NNSV9QT1dFUl9E
-T01BSU4gY2FuIGJlIHBhcnQgb2YgaXQuCj4gCj4gSSBjZXJ0YWlubHkgYWdyZWUgdG8gdGhhdC4g
-VGhlIHRyaWNreSBpcywgdG8ga25vdyB3aGF0IHBpZWNlcyBwZW9wbGUKPiBhcmUgaGFwcHkgd2l0
-aCB0byBnbyBpbi4gOi0pCj4gCj4gRWFybGllciwgaW4gdjkgSSB0cmllZCB5b3VyIHN1Z2dlc3Rl
-ZCBhcHByb2FjaCAoa2luZCBvZiksIGJ1dCB0aGVuCj4gTG9yZW56byBzdGF0ZWQgdGhhdCBpdCdz
-IGtpbmQgb2YgYWxsIG9yIG5vdGhpbmcuIE1heWJlIHdlIGNhbiBicmluZyB1cAo+IHRoYXQgZGlz
-Y3Vzc2lvbiBhZ2FpbiB3aXRoIGhpbSBhbmQgc2VlIHdoYXQgd2UgY2FuIGZpZ3VyZSBvdXQuCj4g
-Cj4+Cj4+IEhvd2V2ZXIsIGlmIHlvdSBzd2VhciB5b3Ugd2lsbCBkbyB0aGUgY2hhbmdlIGFmdGVy
-IGFuZCBzaWduIHdpdGggeW91cgo+PiBibG9vZCwgSSdtIGZpbmUgd2l0aCB0aGF0IDA6KQo+Pgo+
-IAo+IFdoYXRldmVyIGl0IHRha2VzIQo+IAo+IEFueXdheSwgYXMgc3RhdGVkLCB0aGUgcmVhc29u
-IHdoeSBJIHdhbnQgdG8gdGFja2xlIHRoYXQgb24gdG9wLCBpcwo+IHRoYXQgSSBkb24ndCB3YW50
-IHRvIG1ha2UgdGhlIHNlcmllcyBtb3JlIGV4dGVuc2l2ZSB0aGFuIGl0IGFscmVhZHkKPiBpcy4K
-PiAKPiBBZ3JlZT8KClllcwoKLS0gCiA8aHR0cDovL3d3dy5saW5hcm8ub3JnLz4gTGluYXJvLm9y
-ZyDilIIgT3BlbiBzb3VyY2Ugc29mdHdhcmUgZm9yIEFSTSBTb0NzCgpGb2xsb3cgTGluYXJvOiAg
-PGh0dHA6Ly93d3cuZmFjZWJvb2suY29tL3BhZ2VzL0xpbmFybz4gRmFjZWJvb2sgfAo8aHR0cDov
-L3R3aXR0ZXIuY29tLyMhL2xpbmFyb29yZz4gVHdpdHRlciB8CjxodHRwOi8vd3d3LmxpbmFyby5v
-cmcvbGluYXJvLWJsb2cvPiBCbG9nCgoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtl
-cm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxt
-YW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+Everyone:
+
+This is the series containing various small improvements that I made
+while reading the code and researching commit history of pci-imx6.c
+and pcie-designware*.c files. All changes are optional, so commits
+that don't seem like an improvement can be easily dropped. Hopefully
+each patch is self-explanatory.
+
+I tested this series on i.MX6Q, i.MX7D and i.MX8MQ.
+
+Feedback is welcome!
+
+Thanks,
+Andrey Smirnov
+
+Andrey Smirnov (21):
+  PCI: imx6: Simplify imx7d_pcie_wait_for_phy_pll_lock()
+  PCI: imx6: Remove redundant debug tracing
+  PCI: imx6: Return -ETIMEOUT from imx6_pcie_wait_for_speed_change()
+  PCI: imx6: Remove duplicate macro definitions
+  PCI: imx6: Remove PCIE_PL_PFLR_* constants
+  PCI: imx6: Remove PCIE_PHY_RX_ASIC_OUT* constants
+  PCI: designware: Make use of IS_ALIGNED()
+  PCI: designware: Share code for dw_pcie_rd/wr_other_conf()
+  PCI: imx6: Drop imx6_pcie_link_up()
+  PCI: designware: imx6: Share PHY debug register definitions
+  PCI: designware: Make use of BIT() in constant definitions
+  PCI: imx6: Make use of BIT() in constant definitions
+  PCI: imx6: Simplify bit operations in PHY functions
+  PCI: imx6: Simplify pcie_phy_poll_ack()
+  PCI: imx6: Restrict PHY register data to 16-bit
+  PCI: imx6: Pass data to dw_pcie_writel_dbi() directly
+  PCI: imx6: Use common mask in imx6_pcie_reset_phy()
+  PCI: imx6: Simplify bit operations in imx6_setup_phy_mpll()
+  PCI: imx6: Remove magic numbers from imx6_pcie_establish_link()
+  PCI: designware: Make use of GENMASK/FIELD_PREP
+  PCI: designware: Remove superfluous shifting in definitions
+
+ drivers/pci/controller/dwc/pci-imx6.c         | 151 +++++++-----------
+ .../pci/controller/dwc/pcie-designware-host.c |  61 +++----
+ drivers/pci/controller/dwc/pcie-designware.c  |  18 +--
+ drivers/pci/controller/dwc/pcie-designware.h  |  60 +++----
+ 4 files changed, 116 insertions(+), 174 deletions(-)
+
+-- 
+2.19.1
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
