@@ -2,116 +2,79 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 14112C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 04:34:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8BD0EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 04:44:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D58E121907
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 04:34:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 59FE221903
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 04:44:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="anF95j29";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="YNmvigR7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D58E121907
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m0B5GWlj";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="lVkpBMj6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 59FE221903
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=Y9aGzDewsKXMdH/ge+cQEKI96Rn5NTk5EbHWOMeiNBc=; b=anF95j29VegGG8
-	p3zyup9o6IB2/GSyb5G+DxcnX21NBS3aGgo0rHDZV32aMxofB4c/blPZoHBFjYQkpuLvU2eYuLGy/
-	7qkj1nK7HoobUYDdtv//EPSQx22qUV0vrfOwoivq4jzWqZlckf4ZZmve1g8nlajMnVTT9I0hyjIw0
-	hn2yxr9ewugpvbSlS2NGoScrvVtQ6U0iguyt5+YvmYOiH1Gp4LbkJBRJhLKZ5NoqyUulTrJ2+YSYY
-	2XhLUOd2XnWwk/3/+ZdOKQzbL+1ydpUfP9QIx43mwKkF78Jz4o2i00X4/8BH7G6qW5v1efaoQESZP
-	/nFJoSC1IWG03vIUFmvg==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=1ozGyeTaY/92CdLqGNXh+KwM12WzgIB+kNqm+0LuMsQ=; b=m0B5GWljoyfZHK
+	A6C7nmHRg8FgrKwkdNfrqGGun7TTRldQ8elpU38w2P1zwtxMu283K4W+6qO9OrN5VxWpxNcqnWE+0
+	mgoy9Zl0cXRpEF+fuVojJ4wYAlSgy85JGR6zUCl/H0Nj4ZjUZTrhswbSw04iDz9PFNKxPf3iEQXEo
+	a11YWsCIAjD1PC/GLorc53CB1WGofplKzIuRtaMDLRs5GkSkUYfGQ3shVYRiOBvaJpDU3jY8LZyrR
+	e0Roj8FICNeZ1JloPJEm0i8Imm3N6j8fsbQFu9bO6+ltvV1063holNlr4lMaVyG5yv/SL9i0bUdGg
+	/FCuEvmuWsvoGC6lBvVA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaCVZ-0003YE-J7; Fri, 21 Dec 2018 04:33:57 +0000
-Received: from mail-am5eur03on0612.outbound.protection.outlook.com
- ([2a01:111:f400:fe08::612]
- helo=EUR03-AM5-obe.outbound.protection.outlook.com)
+	id 1gaCfM-0007N5-F1; Fri, 21 Dec 2018 04:44:04 +0000
+Received: from mail-qk1-x742.google.com ([2607:f8b0:4864:20::742])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaCVV-0003VK-GF
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 04:33:55 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=4pvrTvDPlZ1AbzH6dOf6medo/eBpnpw/VonWXMEIc/w=;
- b=YNmvigR7BNtBMft6VBH0tG1d7ZJna3e33hVtzcbpMUPFRF/0r65O6vta+DwCDaU1Q/4rE0eL5cgJtDQEHxJiduBn03tl9COOprmaTzPGychkrNTvERD3znylgdPmg8LQNJf4JETDVxiVQn3K0C7Yw40RK4FaV9h/0vsyLV1COoQ=
-Received: from AM6PR0402MB3573.eurprd04.prod.outlook.com (52.133.20.10) by
- AM6PR0402MB3557.eurprd04.prod.outlook.com (52.133.19.158) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1446.21; Fri, 21 Dec 2018 04:33:38 +0000
-Received: from AM6PR0402MB3573.eurprd04.prod.outlook.com
- ([fe80::7862:1b29:2780:1864]) by AM6PR0402MB3573.eurprd04.prod.outlook.com
- ([fe80::7862:1b29:2780:1864%2]) with mapi id 15.20.1446.022; Fri, 21 Dec 2018
- 04:33:38 +0000
-From: Richard Zhu <hongxing.zhu@nxp.com>
-To: "bhelgaas@google.com" <bhelgaas@google.com>, "lorenzo.pieralisi@arm.com"
- <lorenzo.pieralisi@arm.com>, "l.stach@pengutronix.de"
- <l.stach@pengutronix.de>, "andrew.smirnov@gmail.com"
- <andrew.smirnov@gmail.com>, "TheSven73@googlemail.com"
- <TheSven73@googlemail.com>
-Subject: [v6] PCI: imx: make msi work without CONFIG_PCIEPORTBUS=y
-Thread-Topic: [v6] PCI: imx: make msi work without CONFIG_PCIEPORTBUS=y
-Thread-Index: AQHUmOZXutAsHiyvt06v7QdQeB+h1A==
-Date: Fri, 21 Dec 2018 04:33:38 +0000
-Message-ID: <1545365708-13086-1-git-send-email-hongxing.zhu@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-mailer: git-send-email 2.7.4
-x-clientproxiedby: HK0PR03CA0021.apcprd03.prod.outlook.com
- (2603:1096:203:2e::33) To AM6PR0402MB3573.eurprd04.prod.outlook.com
- (2603:10a6:209:8::10)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=hongxing.zhu@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [119.31.174.66]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; AM6PR0402MB3557;
- 6:6HUUWU7Ylyq83ygiwKaD0U/NMoCPnKQKCOFXIi0LxGENFizQLoAOEMXOzMDGcYjbeOYsaNFm8EdBa9OICDCcTAVsUTX9UiO1dpE+OtMrOzOlrkK1bE6aZqEGCioEFuXlsHJ/hLQonPvp/jE4haxuSZIy6a4PqFYkOhVzKharcTqGVJgL++U+NuTL2098AP2Jh0sGJMRNN5kUB4La3nZTsZjVRKbQ4+emVSPOUVUvLL2lBIrPP7/bZKQj+yGrpOup2eorMptrZYj0rp0XX46f0lTEOmwxMNBnxzG5pys6sscLpfxTyfzMvKJVAafgvjt5FSrBSU9dKgnf/NbbIrKAB/MwrDZk0CKIxjiVpajoPu9Igw716jkHuCU2YCJoqH9HZsU9pmnq4C4nJl3d4kqFnVcKAbq/fs0Nyaxep89Tg428gz15bglr5UDSXdzKJPrCQik7qMKuEd/4rV9PPq/8gQ==;
- 5:yLlTR1V4xMBzQ/O66o/hoyp8FIEClY73DposvoFZ8YozUJ8qaPwfNfyGAJKQzZ8dSvrDqlHsEirqB0IpVUTBSKXp/sbcX7vXj1pE0/MhSi2RXWtnvas1BwY9BKnSIvxRpDrf1EYajdklfuEgnBz8jr5ibC75qUq1AxQBE82oXlU=;
- 7:P9fO/HdDamyAZl8WVd4bTFYOPWKayvITFK7ylCO9SLqWX0Wub4McvTNxSxi8akH1s80c8XkAvHejG9w+ZxkIxewEOIRkOHpSYLkEasyakg1quISN5XO5VkXTP1wO0i9+uGLXua8jBaA6V7X4oZekGg==
-x-ms-office365-filtering-correlation-id: 755169f7-ba2b-4033-8a54-08d666fd7a45
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:AM6PR0402MB3557; 
-x-ms-traffictypediagnostic: AM6PR0402MB3557:
-x-microsoft-antispam-prvs: <AM6PR0402MB3557FC345822A6B23A5B97D68CB80@AM6PR0402MB3557.eurprd04.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(3230021)(999002)(5005026)(6040522)(2401047)(8121501046)(3231475)(944501520)(52105112)(10201501046)(3002001)(93006095)(93001095)(6055026)(149066)(150057)(6041310)(20161123562045)(20161123564045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(20161123560045)(201708071742011)(7699051)(76991095);
- SRVR:AM6PR0402MB3557; BCL:0; PCL:0; RULEID:; SRVR:AM6PR0402MB3557; 
-x-forefront-prvs: 0893636978
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(136003)(366004)(396003)(376002)(346002)(39860400002)(189003)(199004)(3846002)(8676002)(6116002)(486006)(50226002)(7736002)(8936002)(81156014)(68736007)(81166006)(305945005)(99286004)(54906003)(110136005)(105586002)(106356001)(2501003)(316002)(5660300001)(6486002)(6436002)(97736004)(66066001)(6506007)(386003)(36756003)(478600001)(71200400001)(71190400001)(102836004)(39060400002)(4326008)(25786009)(2906002)(6512007)(26005)(14444005)(256004)(186003)(14454004)(53936002)(86362001)(575784001)(2616005)(476003)(2201001)(52116002);
- DIR:OUT; SFP:1101; SCL:1; SRVR:AM6PR0402MB3557;
- H:AM6PR0402MB3573.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: oEEC6hoPDOztjoNWPp7IOgoVp340qKNqj5a9aBzosgEKCEgllAI4VHAlY+uZEkWVLiDkg5F2tQqX/O8iJUmeos1KvqbLwbz9F+ufzHg1jZ5uu9x+wFexiKjJp61VCk0Z4DKIVCvRKaZXXy7r3b6M3Mr/HF6NziaJhK7pgIZnMu+MN2C57SDKRXtSMT/XiU2ZEW5qvQ92tPulHA9EvtChWf+w4JgzVb5DQzE0dmjDvVOrhUqU792q7gUfWmmU/onzP4sCZglHtfM8Tl5TxkzjoCmLVuzEmvmdcqZiCjC54crd1I78f1OkaXvpOYHL3ELo
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1gaCfJ-0007LX-1x
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 04:44:02 +0000
+Received: by mail-qk1-x742.google.com with SMTP id y16so2384228qki.7
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 20 Dec 2018 20:43:49 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=dJtoVP/WBM+yokpO/MfpqAes+qj0HoWyz9Dh/VqCCqg=;
+ b=lVkpBMj6TP1absix+Ja1Gh494aEv++FxtRtXgR1BqtWFdKVAYmHKd/0LwmdX3MG3mu
+ Js+8pLCFsjRlspJ6qnK6bY0ET0PiiSRdKh89v1oTyhCdF45onwqoANDPGQZOD2BwPZHe
+ ZybunO3P2UkrigkZnWsbPmTCbtskhh4ZNwxNE=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=dJtoVP/WBM+yokpO/MfpqAes+qj0HoWyz9Dh/VqCCqg=;
+ b=PEfjO5+2lubFnbuXVMBxXuKmocHOQWTyawVJcGPJiohnI3ospbjllxMZEeOghOPBYm
+ 8yElqQyeeOG1uQ9zZSBy06kepVatHinfCxiPCqVWsVpw3XIqKcSwZ9KF5flOa3DcJmYi
+ QplulSS5AhR1BpgQq6sj/r16jmK4QXckvsXxEQbRMF6dV42q6AX2TgkDAK5NQuXJzgaZ
+ jx5y9JHUkWZr6aQPLFoyGLoCMxmgb92NLiE3tZZY7rOB4fJGfAzHVOZHbGBp7ETLGG6C
+ 6UaRNQdjUpV9EOcEjmHQh+bmCQItSWfLY5+Wz4SU2y/ZTEDxYDM3jKTxNqB7MfEjIkF7
+ aTMg==
+X-Gm-Message-State: AJcUukdmSraoqC48RUY3wBGEgfDnhkuI516dPEBBcpS5dozXvsRNlRuv
+ dn18HuZpiAc3GwSzWPH02yDBs1EcU9F4jdBiDgPCpA==
+X-Google-Smtp-Source: ALg8bN5OyqeTBsiZJakuN+YDKNjc3jx9FFFM+k7iUwl4HzWlg7tZkjwrnEzkpDErEvDmd3QPS4hzrOe7JWL0CIcwuhg=
+X-Received: by 2002:a37:7885:: with SMTP id t127mr899092qkc.323.1545367428691; 
+ Thu, 20 Dec 2018 20:43:48 -0800 (PST)
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 755169f7-ba2b-4033-8a54-08d666fd7a45
-X-MS-Exchange-CrossTenant-originalarrivaltime: 21 Dec 2018 04:33:38.6921 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR0402MB3557
+References: <1544258371-4600-1-git-send-email-yong.wu@mediatek.com>
+ <1544258371-4600-11-git-send-email-yong.wu@mediatek.com>
+In-Reply-To: <1544258371-4600-11-git-send-email-yong.wu@mediatek.com>
+From: Nicolas Boichat <drinkcat@chromium.org>
+Date: Fri, 21 Dec 2018 12:43:37 +0800
+Message-ID: <CANMq1KBMWM8BhMDJo1paVbToibsZGYVOCWBOua81w7fnTCO-bw@mail.gmail.com>
+Subject: Re: [PATCH v4 10/18] iommu/mediatek: Add mt8183 IOMMU support
+To: Yong Wu <yong.wu@mediatek.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_203353_545392_194FFDF4 
-X-CRM114-Status: GOOD (  15.83  )
+X-CRM114-CacheID: sfid-20181220_204401_368670_E9695F2D 
+X-CRM114-Status: GOOD (  28.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -123,100 +86,232 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
- Richard Zhu <hongxing.zhu@nxp.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: youlin.pei@mediatek.com, devicetree@vger.kernel.org, arnd@arndb.de,
+ srv_heupstream@mediatek.com, Joerg Roedel <joro@8bytes.org>,
+ Will Deacon <will.deacon@arm.com>, lkml <linux-kernel@vger.kernel.org>,
+ Tomasz Figa <tfiga@google.com>, iommu@lists.linux-foundation.org,
+ Rob Herring <robh+dt@kernel.org>, linux-mediatek@lists.infradead.org,
+ Arvind Yadav <arvind.yadav.cs@gmail.com>,
+ Matthias Brugger <matthias.bgg@gmail.com>, yingjoe.chen@mediatek.com,
+ Robin Murphy <robin.murphy@arm.com>,
+ linux-arm Mailing List <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The MSI Enable bit in the MSI Capability (PCIe r4.0, sec 7.7.1.2)
-controls whether a Function can request service using MSI.
+On Sat, Dec 8, 2018 at 4:42 PM Yong Wu <yong.wu@mediatek.com> wrote:
+>
+> The M4U IP blocks in mt8183 is MediaTek's generation2 M4U which use
+> the ARM Short-descriptor like mt8173, and most of the HW registers
+> are the same.
+>
+> Here list main differences between mt8183 and mt8173/mt2712:
+> 1) mt8183 has only one M4U HW like mt8173 while mt2712 has two.
+> 2) mt8183 don't have the "bclk" clock, it use the EMI clock instead.
+> 3) mt8183 can support the dram over 4GB, but it doesn't call this "4GB
+> mode".
+> 4) mt8183 pgtable base register(0x0) extend bit[1:0] which represent
+> the bit[33:32] in the physical address of the pgtable base, But the
+> standard ttbr0[1] means the S bit which is enabled defaultly, Hence,
+> we add a mask.
+> 5) mt8183 HW has a GALS modules, SMI should enable "has_gals" support.
+> 6) the larb-id in smi-common is remapped. M4U should enable
+> larbid_remapped support.
+>
+> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> ---
+>  drivers/iommu/mtk_iommu.c | 31 ++++++++++++++++++++++---------
+>  drivers/iommu/mtk_iommu.h |  1 +
+>  drivers/memory/mtk-smi.c  | 19 +++++++++++++++++++
+>  3 files changed, 42 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+> index 8ab3b69..d91a554 100644
+> --- a/drivers/iommu/mtk_iommu.c
+> +++ b/drivers/iommu/mtk_iommu.c
+> @@ -36,6 +36,7 @@
+>  #include "mtk_iommu.h"
+>
+>  #define REG_MMU_PT_BASE_ADDR                   0x000
+> +#define MMU_PT_ADDR_MASK                       GENMASK(31, 7)
+>
+>  #define REG_MMU_INVALIDATE                     0x020
+>  #define F_ALL_INVLD                            0x2
+> @@ -54,7 +55,7 @@
+>  #define REG_MMU_CTRL_REG                       0x110
+>  #define F_MMU_PREFETCH_RT_REPLACE_MOD          BIT(4)
+>  #define F_MMU_TF_PROTECT_SEL_SHIFT(data) \
+> -       ((data)->plat_data->m4u_plat == M4U_MT2712 ? 4 : 5)
+> +       ((data)->plat_data->m4u_plat == M4U_MT8173 ? 5 : 4)
 
-i.MX6 Root Ports implement the MSI Capability and may use MSI to
-request service for events like PME, hotplug, AER, etc.  In
-addition, on i.MX6, the MSI Enable bit controls delivery of MSI
-interrupts from components below the Root Port.
+Should the shift value be a member of plat_data instead?
 
-Prior to commit f3fdfc4ac3a2 ("PCI: Remove host driver Kconfig selection
-of CONFIG_PCIEPORTBUS"), enabling CONFIG_PCI_IMX6 automatically also
-enabled CONFIG_PCIEPORTBUS, and when portdrv claimed the Root Ports,
-it set the MSI Enable bit so it could use PME, hotplug, AER, etc.
-As a side effect, that also enabled delivery of MSI interrupts from
-downstream components.
+>  /* It's named by F_MMU_TF_PROT_SEL in mt2712. */
+>  #define F_MMU_TF_PROTECT_SEL(prot, data) \
+>         (((prot) & 0x3) << F_MMU_TF_PROTECT_SEL_SHIFT(data))
+> @@ -347,7 +348,7 @@ static int mtk_iommu_attach_device(struct iommu_domain *domain,
+>         /* Update the pgtable base address register of the M4U HW */
+>         if (!data->m4u_dom) {
+>                 data->m4u_dom = dom;
+> -               writel(dom->cfg.arm_v7s_cfg.ttbr[0],
+> +               writel(dom->cfg.arm_v7s_cfg.ttbr[0] & MMU_PT_ADDR_MASK,
+>                        data->base + REG_MMU_PT_BASE_ADDR);
+>         }
+>
+> @@ -510,6 +511,7 @@ static int mtk_iommu_of_xlate(struct device *dev, struct of_phandle_args *args)
+>
+>  static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+>  {
+> +       enum mtk_iommu_plat m4u_plat = data->plat_data->m4u_plat;
+>         u32 regval;
+>         int ret;
+>
+> @@ -520,7 +522,7 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+>         }
+>
+>         regval = F_MMU_TF_PROTECT_SEL(2, data);
+> -       if (data->plat_data->m4u_plat == M4U_MT8173)
+> +       if (m4u_plat == M4U_MT8173)
+>                 regval |= F_MMU_PREFETCH_RT_REPLACE_MOD;
+>         writel_relaxed(regval, data->base + REG_MMU_CTRL_REG);
+>
+> @@ -541,14 +543,14 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+>                 F_INT_PRETETCH_TRANSATION_FIFO_FAULT;
+>         writel_relaxed(regval, data->base + REG_MMU_INT_MAIN_CONTROL);
+>
+> -       if (data->plat_data->m4u_plat == M4U_MT8173)
+> +       if (m4u_plat == M4U_MT8173)
+>                 regval = (data->protect_base >> 1) | (data->enable_4GB << 31);
+>         else
+>                 regval = lower_32_bits(data->protect_base) |
+>                          upper_32_bits(data->protect_base);
+>         writel_relaxed(regval, data->base + REG_MMU_IVRP_PADDR);
+>
+> -       if (data->enable_4GB && data->plat_data->m4u_plat != M4U_MT8173) {
+> +       if (data->enable_4GB && m4u_plat == M4U_MT2712) {
+>                 /*
+>                  * If 4GB mode is enabled, the validate PA range is from
+>                  * 0x1_0000_0000 to 0x1_ffff_ffff. here record bit[32:30].
+> @@ -558,8 +560,11 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+>         }
+>         writel_relaxed(0, data->base + REG_MMU_DCM_DIS);
+>
+> -       /* It's MISC control register whose default value is ok except mt8173.*/
+> -       if (data->plat_data->m4u_plat == M4U_MT8173)
+> +       /*
+> +        * It's MISC control register whose default value is ok
+> +        * except mt8173 and mt8183.
+> +        */
+> +       if (m4u_plat == M4U_MT8173 || m4u_plat == M4U_MT8183)
 
-After f3fdfc4ac3a2, the imx6q-pcie driver can operate without
-portdrv, but that means imx6q-pcie must set the MSI Enable bit
-itself if downstream components use MSI.
+Again, should this be a field in plat_data?
 
-Fixes: f3fdfc4ac3a2 ("PCI: Remove host driver Kconfig selection of CONFIG_PCIEPORTBUS")
-
-Signed-off-by: Richard Zhu <hongxing.zhu@nxp.com>
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
-Tested-by: Sven Van Asbroeck <TheSven73@googlemail.com>
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
-Changes v1 -> v2:
-* Assert the MSI_EN unconditionally when MSI is supported.
-Changes v2 -> v3:
-* Remove the IS_ENABLED(CONFIG_PCI_MSI) since the driver depends on
-PCI_MSI_IRQ_DOMAIN
-* Extended with a check for pci_msi_enabled() to see if the user
-explicitly want legacy IRQs
-Changes v3 -> v4:
-* Refer to Bjorn's comments, refine the subject and commit log and change
-the PCI_MSI_CAP to PCIE_RC_IMX6_MSI_CAP.
-Changes v4 -> v5:
-* Correct one spell mistake from PCIE_RC_MSI_IMX6_CAP to
-PCIE_RC_IMX6_MSI_CAP.
-Changes v5 -> v6:
-* Update with Bjorn's commit.
-* One "commit" added in "Prior to f3fdfc4ac3a2" refer to the complain of
-checkpatch.pl.
----
- drivers/pci/controller/dwc/pci-imx6.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
-index e563ca9..73542dd 100644
---- a/drivers/pci/controller/dwc/pci-imx6.c
-+++ b/drivers/pci/controller/dwc/pci-imx6.c
-@@ -82,6 +82,7 @@ struct imx6_pcie {
- #define PHY_PLL_LOCK_WAIT_USLEEP_MAX	200
- 
- /* PCIe Root Complex registers (memory-mapped) */
-+#define PCIE_RC_IMX6_MSI_CAP			0x50
- #define PCIE_RC_LCR				0x7c
- #define PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1	0x1
- #define PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN2	0x2
-@@ -999,6 +1000,7 @@ static int imx6_pcie_probe(struct platform_device *pdev)
- 	struct resource *dbi_base;
- 	struct device_node *node = dev->of_node;
- 	int ret;
-+	u16 val;
- 
- 	imx6_pcie = devm_kzalloc(dev, sizeof(*imx6_pcie), GFP_KERNEL);
- 	if (!imx6_pcie)
-@@ -1149,6 +1151,14 @@ static int imx6_pcie_probe(struct platform_device *pdev)
- 	if (ret < 0)
- 		return ret;
- 
-+	if (pci_msi_enabled()) {
-+		val = dw_pcie_readw_dbi(pci, PCIE_RC_IMX6_MSI_CAP +
-+				PCI_MSI_FLAGS);
-+		val |= PCI_MSI_FLAGS_ENABLE;
-+		dw_pcie_writew_dbi(pci, PCIE_RC_IMX6_MSI_CAP +
-+				PCI_MSI_FLAGS, val);
-+	}
-+
- 	return 0;
- }
- 
--- 
-2.7.4
-
+>                 writel_relaxed(0, data->base + REG_MMU_STANDARD_AXI_MODE);
+>
+>         if (devm_request_irq(data->dev, data->irq, mtk_iommu_isr, 0,
+> @@ -713,6 +718,7 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
+>  {
+>         struct mtk_iommu_data *data = dev_get_drvdata(dev);
+>         struct mtk_iommu_suspend_reg *reg = &data->reg;
+> +       struct mtk_iommu_domain *m4u_dom = data->m4u_dom;
+>         void __iomem *base = data->base;
+>         int ret;
+>
+> @@ -728,8 +734,8 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
+>         writel_relaxed(reg->int_control0, base + REG_MMU_INT_CONTROL0);
+>         writel_relaxed(reg->int_main_control, base + REG_MMU_INT_MAIN_CONTROL);
+>         writel_relaxed(reg->ivrp_paddr, base + REG_MMU_IVRP_PADDR);
+> -       if (data->m4u_dom)
+> -               writel(data->m4u_dom->cfg.arm_v7s_cfg.ttbr[0],
+> +       if (m4u_dom)
+> +               writel(m4u_dom->cfg.arm_v7s_cfg.ttbr[0] & MMU_PT_ADDR_MASK,
+>                        base + REG_MMU_PT_BASE_ADDR);
+>         return 0;
+>  }
+> @@ -750,9 +756,16 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
+>         .has_bclk     = true,
+>  };
+>
+> +static const struct mtk_iommu_plat_data mt8183_data = {
+> +       .m4u_plat            = M4U_MT8183,
+> +       .larbid_remap_enable = true,
+> +       .larbid_remapped     = {0, 4, 5, 6, 7, 2, 3, 1},
+> +};
+> +
+>  static const struct of_device_id mtk_iommu_of_ids[] = {
+>         { .compatible = "mediatek,mt2712-m4u", .data = &mt2712_data},
+>         { .compatible = "mediatek,mt8173-m4u", .data = &mt8173_data},
+> +       { .compatible = "mediatek,mt8183-m4u", .data = &mt8183_data},
+>         {}
+>  };
+>
+> diff --git a/drivers/iommu/mtk_iommu.h b/drivers/iommu/mtk_iommu.h
+> index 3877050..6385dec 100644
+> --- a/drivers/iommu/mtk_iommu.h
+> +++ b/drivers/iommu/mtk_iommu.h
+> @@ -39,6 +39,7 @@ enum mtk_iommu_plat {
+>         M4U_MT2701,
+>         M4U_MT2712,
+>         M4U_MT8173,
+> +       M4U_MT8183,
+>  };
+>
+>  struct mtk_iommu_plat_data {
+> diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
+> index 3720c77..bced778 100644
+> --- a/drivers/memory/mtk-smi.c
+> +++ b/drivers/memory/mtk-smi.c
+> @@ -285,6 +285,12 @@ static void mtk_smi_larb_config_port_gen1(struct device *dev)
+>         .larb_special_mask = BIT(8) | BIT(9),          /* bdpsys */
+>  };
+>
+> +static const struct mtk_smi_larb_gen mtk_smi_larb_mt8183 = {
+> +       .has_gals          = true,
+> +       .config_port       = mtk_smi_larb_config_port_gen2_general,
+> +       .larb_special_mask = BIT(2) | BIT(3) | BIT(7), /* IPU0 | IPU1 | CCU */
+> +};
+> +
+>  static const struct of_device_id mtk_smi_larb_of_ids[] = {
+>         {
+>                 .compatible = "mediatek,mt8173-smi-larb",
+> @@ -298,6 +304,10 @@ static void mtk_smi_larb_config_port_gen1(struct device *dev)
+>                 .compatible = "mediatek,mt2712-smi-larb",
+>                 .data = &mtk_smi_larb_mt2712
+>         },
+> +       {
+> +               .compatible = "mediatek,mt8183-smi-larb",
+> +               .data = &mtk_smi_larb_mt8183
+> +       },
+>         {}
+>  };
+>
+> @@ -391,6 +401,11 @@ static int mtk_smi_larb_remove(struct platform_device *pdev)
+>         .gen = MTK_SMI_GEN2,
+>  };
+>
+> +static const struct mtk_smi_common_plat mtk_smi_common_mt8183 = {
+> +       .gen      = MTK_SMI_GEN2,
+> +       .has_gals = true,
+> +};
+> +
+>  static const struct of_device_id mtk_smi_common_of_ids[] = {
+>         {
+>                 .compatible = "mediatek,mt8173-smi-common",
+> @@ -404,6 +419,10 @@ static int mtk_smi_larb_remove(struct platform_device *pdev)
+>                 .compatible = "mediatek,mt2712-smi-common",
+>                 .data = &mtk_smi_common_gen2,
+>         },
+> +       {
+> +               .compatible = "mediatek,mt8183-smi-common",
+> +               .data = &mtk_smi_common_mt8183,
+> +       },
+>         {}
+>  };
+>
+> --
+> 1.9.1
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
