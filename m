@@ -2,71 +2,64 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-12.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	MAILING_LIST_MULTI,SPF_PASS autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C77F1C43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:15:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C0DFDC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:18:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8C9A421906
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:15:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8C55E2190A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:18:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KuF2oQ3U";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="i35Ssz1j"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8C9A421906
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ivTIdRan"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8C55E2190A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Date:Message-Id:
-	In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	References:List-Owner; bh=X7PYovc1clvlhGjO+Z6uWzyUyE01Xre6MGLHYxKjJRc=; b=KuF
-	2oQ3UFnxeDUHFRm+NMznOvymEwLSXmTimLpaodOj7Xc+mOXgnF+KZ868/s4t/72D6jGmFjZ6r95Rf
-	RpfhwdIY9nE4dg8KORstMRgwSlA+kOZe3BbRV0FGaHEVMpE8EXoZKAMyrId7lus/6urFyLa2eMzR7
-	uOwi52tOCg6evnw55oxYA7/cc767qBFKu+/2tWDEHrnABpEKzcAkeiAcJfHeZzsoty/fTFL2BxcWz
-	dICFJWgP74sb5cPW+DJkMsns7XXThdki4D4nbNxsIIbI6wWA4JQZdL52MJ7ViWXrsDUdKg6OwQyvu
-	hFrxxlt5rV5U4GZCPxFrQSyEJbD29UA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:References:To:Subject:From:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=XwQ/+FJytU6rBdWB+tZsas/J7lD07fG3okCbsD06wZM=; b=ivTIdRanzSRlN2
+	goBlVYhfieEaxJB4UYTFrhq0BW5ZJCp1glP+mZUOWZyiHrLvzTIBW40GDiOMH/KUoOmgFJGFpC155
+	54K1yAvKh70X+KNDHHLpw3ynqSjCfnI4PgnHnKLr/Xrj3pm7R7ZrhNl6tsvnS5rZxHH+Qe/JYr23F
+	o2b6iRAbZwqOe4iBuaofflWrVnwjTh5U2ljbqaqpKnS8cyiAaxyunivz0UKqvqkcuPY7AvtMXuxgW
+	uY91VEvXJSuvIVGYK96Dy5Uy9mCQMbjsz6u7/lwMxusI7ocSNBPZfHbDXMrA+nlbyH0QjEiJYk59u
+	b0AOs/YkKD1hmOPE+FDQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaPL4-0000f0-VV; Fri, 21 Dec 2018 18:15:59 +0000
-Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaPKm-0000FK-5u
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 18:15:44 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=sirena.org.uk; s=20170815-heliosphere; h=Date:Message-Id:In-Reply-To:
- Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:
- List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:
- List-Archive; bh=yzXDoApcww88R3efFug8UjxBpb/bi5WJhpi/w6Hi5pM=; b=i35Ssz1jhHLt
- szdLlhHvYLRFoyaZD8E1MIsBm6UMkOhwC8Dbv61i1d32nsC7OOEkxtKl8Ev7EvO1puxkkgarhoASo
- PHguYz3HaGRC/5VTJSk64k426Qd+gzy9F5+ltHzQsl+tgZ77Ct0y1nT7qJk8XR1zD2QR/H76RgibV
- q77nw=;
-Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
- ([82.37.168.47] helo=debutante.sirena.org.uk)
- by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
- (envelope-from <broonie@sirena.org.uk>)
- id 1gaPKX-0003rc-Ab; Fri, 21 Dec 2018 18:15:25 +0000
-Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id F217B1121B93; Fri, 21 Dec 2018 18:15:24 +0000 (GMT)
-From: Mark Brown <broonie@kernel.org>
-To: Maruthi Srinivas Bayyavarapu <maruthi.srinivas.bayyavarapu@xilinx.com>
-Subject: Applied "ASoC: xlnx: add pcm formatter platform driver" to the asoc
- tree
-In-Reply-To: <1545382649-181411-3-git-send-email-maruthi.srinivas.bayyavarapu@xilinx.com>
-X-Patchwork-Hint: ignore
-Message-Id: <20181221181524.F217B1121B93@debutante.sirena.org.uk>
-Date: Fri, 21 Dec 2018 18:15:24 +0000 (GMT)
-X-Bad-Reply: In-Reply-To but no 'Re:' in Subject.
+	id 1gaPN1-00013T-JT; Fri, 21 Dec 2018 18:17:59 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gaPMy-00012K-EX
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 18:17:58 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7B23EEBD;
+ Fri, 21 Dec 2018 10:17:43 -0800 (PST)
+Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 87D223F575;
+ Fri, 21 Dec 2018 10:17:41 -0800 (PST)
+From: James Morse <james.morse@arm.com>
+Subject: Re: [RFC RESEND PATCH] kvm: arm64: export memory error recovery
+ capability to user space
+To: Peter Maydell <peter.maydell@linaro.org>
+References: <0184EA26B2509940AA629AE1405DD7F201FFC21E@dggema523-mbx.china.huawei.com>
+ <c01e3ed0-f66c-f7df-295a-70b44bad49ff@arm.com>
+ <CAFEAcA8No4tti6o9oErdfGKyHqRTfXebO4fuEOhBApFAxw=LOg@mail.gmail.com>
+Message-ID: <1d73ec5a-b58d-1e00-b681-53cd80cba999@arm.com>
+Date: Fri, 21 Dec 2018 18:17:40 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
+MIME-Version: 1.0
+In-Reply-To: <CAFEAcA8No4tti6o9oErdfGKyHqRTfXebO4fuEOhBApFAxw=LOg@mail.gmail.com>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_101541_085310_A91CE43A 
-X-CRM114-Status: GOOD (  21.10  )
+X-CRM114-CacheID: sfid-20181221_101756_494384_7BCD72D5 
+X-CRM114-Status: GOOD (  36.33  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,636 +71,161 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- alsa-devel@alsa-project.org, linux-kernel@vger.kernel.org,
- Takashi Iwai <tiwai@suse.com>, Rob Herring <robh+dt@kernel.org>,
- Liam Girdwood <lgirdwood@gmail.com>, Mark Brown <broonie@kernel.org>,
- linux-arm-kernel@lists.infradead.org, Jaroslav Kysela <perex@perex.cz>,
- Michal Simek <michal.simek@xilinx.com>, Vishal Sagar <vsagar@xilinx.com>
-MIME-Version: 1.0
+Cc: "open list:DOCUMENTATION" <linux-doc@vger.kernel.org>,
+ kvm-devel <kvm@vger.kernel.org>, Jonathan Corbet <corbet@lwn.net>,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ =?UTF-8?B?UmFkaW0gS3LEjW3DocWZ?= <rkrcmar@redhat.com>,
+ Will Deacon <will.deacon@arm.com>, Christoffer Dall <christoffer.dall@arm.com>,
+ gengdongjiu <gengdongjiu@huawei.com>,
+ arm-mail-list <linux-arm-kernel@lists.infradead.org>,
+ lkml - Kernel Mailing List <linux-kernel@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The patch
+Hi Peter,
 
-   ASoC: xlnx: add pcm formatter platform driver
+On 19/12/2018 19:02, Peter Maydell wrote:
+> On Mon, 17 Dec 2018 at 15:56, James Morse <james.morse@arm.com> wrote:
+>> I don't think this really matters. Its only the NMIlike notifications that the
+>> guest doesn't have to register or poll. The ones we support today extend the
+>> architectures existing behaviour: you would have taken an external-abort on a
+>> real system, whether you know about the additional metadata doesn't matter to Qemu.
+> 
+> Consider the case where we booted the guest using a DTB and no ACPI
+> table at all -- we certainly can't just call QEMU code that tries to
+> add entries to a nonexistent table.
 
-has been applied to the asoc tree at
+Sure, because you know which of the two sets of firmware-table you're providing.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+I'm taking the behaviour of physical machines as the template for what we should
+do here. I can boot a DT-only kernel on Seattle. Firmware has no idea I did
+this, it will still take DRAM uncorrected-error IRQs in firmware, and generate
+CPER records in the POLLed areas. But the kernel will never look, because it
+booted with DT.
+What happens if the kernel goes on to access the corrupt location? It either
+gets corrupt values back, or an external abort, depending on the design of the
+memory-controller.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+X-gene uses an IRQ for its firmware-first notification. Booted with DT that
+interrupt can be asserted, but as the OS has didn't know to register it, its
+never taken. We eventually get the same corrupt-values/external-abort behaviour.
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+KVM/Linux is acting as the memory controller using stage2. When an error is
+detected by the host it unmaps the page from stage2, and refuses to map it again
+until its fixed up in Qemu's memory map (which can happen automatically). If the
+kernel can't fix it itself, the AO signal is like the DRAM-IRQ above, and the AR
+like the external abort.
+We don't have a parallel to the 'gets corrupt values back' behaviour as Linux
+will always unmap hwpoison pages from user-space/guests.
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+If the host-kernel wasn't build with CONFIG_MEMORY_FAILURE, its like the memory
+controller doesn't support any of the above. I think knowing this is the closest
+to what you want.
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
 
-Thanks,
-Mark
+> My main point is that there
+> needs to be logic in Dongjiu's QEMU patches that checks more than
+> just "does this KVM feature exist". I'm not sufficiently familiar
+> with all this RAS stuff to be certain what those checks should
+> be and what the right choices are; I just know we need to check
+> *something*...
 
-From 796175a94a7f128c696b793a90f9088005df774b Mon Sep 17 00:00:00 2001
-From: Maruthi Srinivas Bayyavarapu <maruthi.srinivas.bayyavarapu@xilinx.com>
-Date: Fri, 21 Dec 2018 14:27:28 +0530
-Subject: [PATCH] ASoC: xlnx: add pcm formatter platform driver
+I think this is the crux of where we don't see this the same way.
+The v8.2 RAS stuff is new, RAS support on arm64 is not. Kernel support arrived
+at roughly the same time, but not CPU support. There are v8.0 systems that
+support RAS. There are DT systems that can do the same with edac drivers.
+The physical v8.0 systems that do this, are doing it without any extra CPU support.
 
-The audio formatter PL IP supports DMA of two streams -
-mm2s and s2mm for playback and capture respectively. Apart from
-DMA, IP also does conversions like PCM to AES and viceversa.
-This patch adds DMA component driver for the IP.
+I think x86's behaviour here includes some history, which we don't have.
+From the order of the HEST entries, it looks like the machine-check stuff came
+first, then firmware-first using a 'GHES' entry in that table.
+I think Qemu on x86 only supports the emulated machine check stuff, so it needs
+to check KVM has the widget to do this.
+If Qemu on x86 supported firmware-first, I don't think there would be anything
+to check. (details below)
 
-Signed-off-by: Maruthi Srinivas Bayyavarapu <maruthi.srinivas.bayyavarapu@xilinx.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/xilinx/xlnx_formatter_pcm.c | 565 ++++++++++++++++++++++++++
- 1 file changed, 565 insertions(+)
- create mode 100644 sound/soc/xilinx/xlnx_formatter_pcm.c
 
-diff --git a/sound/soc/xilinx/xlnx_formatter_pcm.c b/sound/soc/xilinx/xlnx_formatter_pcm.c
-new file mode 100644
-index 000000000000..f7235f7664d7
---- /dev/null
-+++ b/sound/soc/xilinx/xlnx_formatter_pcm.c
-@@ -0,0 +1,565 @@
-+// SPDX-License-Identifier: GPL-2.0
-+//
-+// Xilinx ASoC audio formatter support
-+//
-+// Copyright (C) 2018 Xilinx, Inc.
-+//
-+// Author: Maruthi Srinivas Bayyavarapu <maruthis@xilinx.com>
-+
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/sizes.h>
-+
-+#include <sound/soc.h>
-+#include <sound/pcm_params.h>
-+
-+#define DRV_NAME "xlnx_formatter_pcm"
-+
-+#define XLNX_S2MM_OFFSET	0
-+#define XLNX_MM2S_OFFSET	0x100
-+
-+#define XLNX_AUD_CORE_CONFIG	0x4
-+#define XLNX_AUD_CTRL		0x10
-+#define XLNX_AUD_STS		0x14
-+
-+#define AUD_CTRL_RESET_MASK	BIT(1)
-+#define AUD_CFG_MM2S_MASK	BIT(15)
-+#define AUD_CFG_S2MM_MASK	BIT(31)
-+
-+#define XLNX_AUD_FS_MULTIPLIER	0x18
-+#define XLNX_AUD_PERIOD_CONFIG	0x1C
-+#define XLNX_AUD_BUFF_ADDR_LSB	0x20
-+#define XLNX_AUD_BUFF_ADDR_MSB	0x24
-+#define XLNX_AUD_XFER_COUNT	0x28
-+#define XLNX_AUD_CH_STS_START	0x2C
-+#define XLNX_BYTES_PER_CH	0x44
-+
-+#define AUD_STS_IOC_IRQ_MASK	BIT(31)
-+#define AUD_STS_CH_STS_MASK	BIT(29)
-+#define AUD_CTRL_IOC_IRQ_MASK	BIT(13)
-+#define AUD_CTRL_TOUT_IRQ_MASK	BIT(14)
-+#define AUD_CTRL_DMA_EN_MASK	BIT(0)
-+
-+#define CFG_MM2S_CH_MASK	GENMASK(11, 8)
-+#define CFG_MM2S_CH_SHIFT	8
-+#define CFG_MM2S_XFER_MASK	GENMASK(14, 13)
-+#define CFG_MM2S_XFER_SHIFT	13
-+#define CFG_MM2S_PKG_MASK	BIT(12)
-+
-+#define CFG_S2MM_CH_MASK	GENMASK(27, 24)
-+#define CFG_S2MM_CH_SHIFT	24
-+#define CFG_S2MM_XFER_MASK	GENMASK(30, 29)
-+#define CFG_S2MM_XFER_SHIFT	29
-+#define CFG_S2MM_PKG_MASK	BIT(28)
-+
-+#define AUD_CTRL_DATA_WIDTH_SHIFT	16
-+#define AUD_CTRL_ACTIVE_CH_SHIFT	19
-+#define PERIOD_CFG_PERIODS_SHIFT	16
-+
-+#define PERIODS_MIN		2
-+#define PERIODS_MAX		6
-+#define PERIOD_BYTES_MIN	192
-+#define PERIOD_BYTES_MAX	(50 * 1024)
-+
-+enum bit_depth {
-+	BIT_DEPTH_8,
-+	BIT_DEPTH_16,
-+	BIT_DEPTH_20,
-+	BIT_DEPTH_24,
-+	BIT_DEPTH_32,
-+};
-+
-+struct xlnx_pcm_drv_data {
-+	void __iomem *mmio;
-+	bool s2mm_presence;
-+	bool mm2s_presence;
-+	unsigned int s2mm_irq;
-+	unsigned int mm2s_irq;
-+	struct snd_pcm_substream *play_stream;
-+	struct snd_pcm_substream *capture_stream;
-+	struct clk *axi_clk;
-+};
-+
-+/*
-+ * struct xlnx_pcm_stream_param - stream configuration
-+ * @mmio: base address offset
-+ * @interleaved: audio channels arrangement in buffer
-+ * @xfer_mode: data formatting mode during transfer
-+ * @ch_limit: Maximum channels supported
-+ * @buffer_size: stream ring buffer size
-+ */
-+struct xlnx_pcm_stream_param {
-+	void __iomem *mmio;
-+	bool interleaved;
-+	u32 xfer_mode;
-+	u32 ch_limit;
-+	u64 buffer_size;
-+};
-+
-+static const struct snd_pcm_hardware xlnx_pcm_hardware = {
-+	.info = SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_BLOCK_TRANSFER |
-+		SNDRV_PCM_INFO_BATCH | SNDRV_PCM_INFO_PAUSE |
-+		SNDRV_PCM_INFO_RESUME,
-+	.formats = SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_S16_LE |
-+		   SNDRV_PCM_FMTBIT_S24_LE,
-+	.channels_min = 2,
-+	.channels_max = 2,
-+	.rates = SNDRV_PCM_RATE_8000_192000,
-+	.rate_min = 8000,
-+	.rate_max = 192000,
-+	.buffer_bytes_max = PERIODS_MAX * PERIOD_BYTES_MAX,
-+	.period_bytes_min = PERIOD_BYTES_MIN,
-+	.period_bytes_max = PERIOD_BYTES_MAX,
-+	.periods_min = PERIODS_MIN,
-+	.periods_max = PERIODS_MAX,
-+};
-+
-+static int xlnx_formatter_pcm_reset(void __iomem *mmio_base)
-+{
-+	u32 val, retries = 0;
-+
-+	val = readl(mmio_base + XLNX_AUD_CTRL);
-+	val |= AUD_CTRL_RESET_MASK;
-+	writel(val, mmio_base + XLNX_AUD_CTRL);
-+
-+	val = readl(mmio_base + XLNX_AUD_CTRL);
-+	/* Poll for maximum timeout of approximately 100ms (1 * 100)*/
-+	while ((val & AUD_CTRL_RESET_MASK) && (retries < 100)) {
-+		mdelay(1);
-+		retries++;
-+		val = readl(mmio_base + XLNX_AUD_CTRL);
-+	}
-+	if (val & AUD_CTRL_RESET_MASK)
-+		return -ENODEV;
-+
-+	return 0;
-+}
-+
-+static void xlnx_formatter_disable_irqs(void __iomem *mmio_base, int stream)
-+{
-+	u32 val;
-+
-+	val = readl(mmio_base + XLNX_AUD_CTRL);
-+	val &= ~AUD_CTRL_IOC_IRQ_MASK;
-+	if (stream == SNDRV_PCM_STREAM_CAPTURE)
-+		val &= ~AUD_CTRL_TOUT_IRQ_MASK;
-+
-+	writel(val, mmio_base + XLNX_AUD_CTRL);
-+}
-+
-+static irqreturn_t xlnx_mm2s_irq_handler(int irq, void *arg)
-+{
-+	u32 val;
-+	void __iomem *reg;
-+	struct device *dev = arg;
-+	struct xlnx_pcm_drv_data *adata = dev_get_drvdata(dev);
-+
-+	reg = adata->mmio + XLNX_MM2S_OFFSET + XLNX_AUD_STS;
-+	val = readl(reg);
-+	if (val & AUD_STS_IOC_IRQ_MASK) {
-+		writel(val & AUD_STS_IOC_IRQ_MASK, reg);
-+		if (adata->play_stream)
-+			snd_pcm_period_elapsed(adata->play_stream);
-+		return IRQ_HANDLED;
-+	}
-+
-+	return IRQ_NONE;
-+}
-+
-+static irqreturn_t xlnx_s2mm_irq_handler(int irq, void *arg)
-+{
-+	u32 val;
-+	void __iomem *reg;
-+	struct device *dev = arg;
-+	struct xlnx_pcm_drv_data *adata = dev_get_drvdata(dev);
-+
-+	reg = adata->mmio + XLNX_S2MM_OFFSET + XLNX_AUD_STS;
-+	val = readl(reg);
-+	if (val & AUD_STS_IOC_IRQ_MASK) {
-+		writel(val & AUD_STS_IOC_IRQ_MASK, reg);
-+		if (adata->capture_stream)
-+			snd_pcm_period_elapsed(adata->capture_stream);
-+		return IRQ_HANDLED;
-+	}
-+
-+	return IRQ_NONE;
-+}
-+
-+static int xlnx_formatter_pcm_open(struct snd_pcm_substream *substream)
-+{
-+	int err;
-+	u32 val, data_format_mode;
-+	u32 ch_count_mask, ch_count_shift, data_xfer_mode, data_xfer_shift;
-+	struct xlnx_pcm_stream_param *stream_data;
-+	struct snd_pcm_runtime *runtime = substream->runtime;
-+	struct snd_soc_pcm_runtime *prtd = substream->private_data;
-+	struct snd_soc_component *component = snd_soc_rtdcom_lookup(prtd,
-+								    DRV_NAME);
-+	struct xlnx_pcm_drv_data *adata = dev_get_drvdata(component->dev);
-+
-+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK &&
-+	    !adata->mm2s_presence)
-+		return -ENODEV;
-+	else if (substream->stream == SNDRV_PCM_STREAM_CAPTURE &&
-+		 !adata->s2mm_presence)
-+		return -ENODEV;
-+
-+	stream_data = kzalloc(sizeof(*stream_data), GFP_KERNEL);
-+	if (!stream_data)
-+		return -ENOMEM;
-+
-+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-+		ch_count_mask = CFG_MM2S_CH_MASK;
-+		ch_count_shift = CFG_MM2S_CH_SHIFT;
-+		data_xfer_mode = CFG_MM2S_XFER_MASK;
-+		data_xfer_shift = CFG_MM2S_XFER_SHIFT;
-+		data_format_mode = CFG_MM2S_PKG_MASK;
-+		stream_data->mmio = adata->mmio + XLNX_MM2S_OFFSET;
-+		adata->play_stream = substream;
-+
-+	} else {
-+		ch_count_mask = CFG_S2MM_CH_MASK;
-+		ch_count_shift = CFG_S2MM_CH_SHIFT;
-+		data_xfer_mode = CFG_S2MM_XFER_MASK;
-+		data_xfer_shift = CFG_S2MM_XFER_SHIFT;
-+		data_format_mode = CFG_S2MM_PKG_MASK;
-+		stream_data->mmio = adata->mmio + XLNX_S2MM_OFFSET;
-+		adata->capture_stream = substream;
-+	}
-+
-+	val = readl(adata->mmio + XLNX_AUD_CORE_CONFIG);
-+
-+	if (!(val & data_format_mode))
-+		stream_data->interleaved = true;
-+
-+	stream_data->xfer_mode = (val & data_xfer_mode) >> data_xfer_shift;
-+	stream_data->ch_limit = (val & ch_count_mask) >> ch_count_shift;
-+	dev_info(component->dev,
-+		 "stream %d : format = %d mode = %d ch_limit = %d\n",
-+		 substream->stream, stream_data->interleaved,
-+		 stream_data->xfer_mode, stream_data->ch_limit);
-+
-+	snd_soc_set_runtime_hwparams(substream, &xlnx_pcm_hardware);
-+	runtime->private_data = stream_data;
-+
-+	/* Resize the period size divisible by 64 */
-+	err = snd_pcm_hw_constraint_step(runtime, 0,
-+					 SNDRV_PCM_HW_PARAM_PERIOD_BYTES, 64);
-+	if (err) {
-+		dev_err(component->dev,
-+			"unable to set constraint on period bytes\n");
-+		return err;
-+	}
-+
-+	/* enable DMA IOC irq */
-+	val = readl(stream_data->mmio + XLNX_AUD_CTRL);
-+	val |= AUD_CTRL_IOC_IRQ_MASK;
-+	writel(val, stream_data->mmio + XLNX_AUD_CTRL);
-+
-+	return 0;
-+}
-+
-+static int xlnx_formatter_pcm_close(struct snd_pcm_substream *substream)
-+{
-+	int ret;
-+	struct xlnx_pcm_stream_param *stream_data =
-+			substream->runtime->private_data;
-+	struct snd_soc_pcm_runtime *prtd = substream->private_data;
-+	struct snd_soc_component *component = snd_soc_rtdcom_lookup(prtd,
-+								    DRV_NAME);
-+
-+	ret = xlnx_formatter_pcm_reset(stream_data->mmio);
-+	if (ret) {
-+		dev_err(component->dev, "audio formatter reset failed\n");
-+		goto err_reset;
-+	}
-+	xlnx_formatter_disable_irqs(stream_data->mmio, substream->stream);
-+
-+err_reset:
-+	kfree(stream_data);
-+	return 0;
-+}
-+
-+static snd_pcm_uframes_t
-+xlnx_formatter_pcm_pointer(struct snd_pcm_substream *substream)
-+{
-+	u32 pos;
-+	struct snd_pcm_runtime *runtime = substream->runtime;
-+	struct xlnx_pcm_stream_param *stream_data = runtime->private_data;
-+
-+	pos = readl(stream_data->mmio + XLNX_AUD_XFER_COUNT);
-+
-+	if (pos >= stream_data->buffer_size)
-+		pos = 0;
-+
-+	return bytes_to_frames(runtime, pos);
-+}
-+
-+static int xlnx_formatter_pcm_hw_params(struct snd_pcm_substream *substream,
-+					struct snd_pcm_hw_params *params)
-+{
-+	u32 low, high, active_ch, val, bytes_per_ch, bits_per_sample;
-+	int status;
-+	u64 size;
-+	struct snd_pcm_runtime *runtime = substream->runtime;
-+	struct xlnx_pcm_stream_param *stream_data = runtime->private_data;
-+
-+	active_ch = params_channels(params);
-+	if (active_ch > stream_data->ch_limit)
-+		return -EINVAL;
-+
-+	size = params_buffer_bytes(params);
-+	status = snd_pcm_lib_malloc_pages(substream, size);
-+	if (status < 0)
-+		return status;
-+
-+	stream_data->buffer_size = size;
-+
-+	low = lower_32_bits(substream->dma_buffer.addr);
-+	high = upper_32_bits(substream->dma_buffer.addr);
-+	writel(low, stream_data->mmio + XLNX_AUD_BUFF_ADDR_LSB);
-+	writel(high, stream_data->mmio + XLNX_AUD_BUFF_ADDR_MSB);
-+
-+	val = readl(stream_data->mmio + XLNX_AUD_CTRL);
-+	bits_per_sample = params_width(params);
-+	switch (bits_per_sample) {
-+	case 8:
-+		val |= (BIT_DEPTH_8 << AUD_CTRL_DATA_WIDTH_SHIFT);
-+		break;
-+	case 16:
-+		val |= (BIT_DEPTH_16 << AUD_CTRL_DATA_WIDTH_SHIFT);
-+		break;
-+	case 20:
-+		val |= (BIT_DEPTH_20 << AUD_CTRL_DATA_WIDTH_SHIFT);
-+		break;
-+	case 24:
-+		val |= (BIT_DEPTH_24 << AUD_CTRL_DATA_WIDTH_SHIFT);
-+		break;
-+	case 32:
-+		val |= (BIT_DEPTH_32 << AUD_CTRL_DATA_WIDTH_SHIFT);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	val |= active_ch << AUD_CTRL_ACTIVE_CH_SHIFT;
-+	writel(val, stream_data->mmio + XLNX_AUD_CTRL);
-+
-+	val = (params_periods(params) << PERIOD_CFG_PERIODS_SHIFT)
-+		| params_period_bytes(params);
-+	writel(val, stream_data->mmio + XLNX_AUD_PERIOD_CONFIG);
-+	bytes_per_ch = DIV_ROUND_UP(params_period_bytes(params), active_ch);
-+	writel(bytes_per_ch, stream_data->mmio + XLNX_BYTES_PER_CH);
-+
-+	return 0;
-+}
-+
-+static int xlnx_formatter_pcm_hw_free(struct snd_pcm_substream *substream)
-+{
-+	return snd_pcm_lib_free_pages(substream);
-+}
-+
-+static int xlnx_formatter_pcm_trigger(struct snd_pcm_substream *substream,
-+				      int cmd)
-+{
-+	u32 val;
-+	struct xlnx_pcm_stream_param *stream_data =
-+			substream->runtime->private_data;
-+
-+	switch (cmd) {
-+	case SNDRV_PCM_TRIGGER_START:
-+	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-+	case SNDRV_PCM_TRIGGER_RESUME:
-+		val = readl(stream_data->mmio + XLNX_AUD_CTRL);
-+		val |= AUD_CTRL_DMA_EN_MASK;
-+		writel(val, stream_data->mmio + XLNX_AUD_CTRL);
-+		break;
-+	case SNDRV_PCM_TRIGGER_STOP:
-+	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-+	case SNDRV_PCM_TRIGGER_SUSPEND:
-+		val = readl(stream_data->mmio + XLNX_AUD_CTRL);
-+		val &= ~AUD_CTRL_DMA_EN_MASK;
-+		writel(val, stream_data->mmio + XLNX_AUD_CTRL);
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
-+static int xlnx_formatter_pcm_new(struct snd_soc_pcm_runtime *rtd)
-+{
-+	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd,
-+								    DRV_NAME);
-+	return snd_pcm_lib_preallocate_pages_for_all(rtd->pcm,
-+			SNDRV_DMA_TYPE_DEV, component->dev,
-+			xlnx_pcm_hardware.buffer_bytes_max,
-+			xlnx_pcm_hardware.buffer_bytes_max);
-+}
-+
-+static const struct snd_pcm_ops xlnx_formatter_pcm_ops = {
-+	.open = xlnx_formatter_pcm_open,
-+	.close = xlnx_formatter_pcm_close,
-+	.ioctl = snd_pcm_lib_ioctl,
-+	.hw_params = xlnx_formatter_pcm_hw_params,
-+	.hw_free = xlnx_formatter_pcm_hw_free,
-+	.trigger = xlnx_formatter_pcm_trigger,
-+	.pointer = xlnx_formatter_pcm_pointer,
-+};
-+
-+static const struct snd_soc_component_driver xlnx_asoc_component = {
-+	.name = DRV_NAME,
-+	.ops = &xlnx_formatter_pcm_ops,
-+	.pcm_new = xlnx_formatter_pcm_new,
-+};
-+
-+static int xlnx_formatter_pcm_probe(struct platform_device *pdev)
-+{
-+	int ret;
-+	u32 val;
-+	struct xlnx_pcm_drv_data *aud_drv_data;
-+	struct resource *res;
-+	struct device *dev = &pdev->dev;
-+
-+	aud_drv_data = devm_kzalloc(dev, sizeof(*aud_drv_data), GFP_KERNEL);
-+	if (!aud_drv_data)
-+		return -ENOMEM;
-+
-+	aud_drv_data->axi_clk = devm_clk_get(dev, "s_axi_lite_aclk");
-+	if (IS_ERR(aud_drv_data->axi_clk)) {
-+		ret = PTR_ERR(aud_drv_data->axi_clk);
-+		dev_err(dev, "failed to get s_axi_lite_aclk(%d)\n", ret);
-+		return ret;
-+	}
-+	ret = clk_prepare_enable(aud_drv_data->axi_clk);
-+	if (ret) {
-+		dev_err(dev,
-+			"failed to enable s_axi_lite_aclk(%d)\n", ret);
-+		return ret;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(dev, "audio formatter node:addr to resource failed\n");
-+		ret = -ENXIO;
-+		goto clk_err;
-+	}
-+	aud_drv_data->mmio = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(aud_drv_data->mmio)) {
-+		dev_err(dev, "audio formatter ioremap failed\n");
-+		ret = PTR_ERR(aud_drv_data->mmio);
-+		goto clk_err;
-+	}
-+
-+	val = readl(aud_drv_data->mmio + XLNX_AUD_CORE_CONFIG);
-+	if (val & AUD_CFG_MM2S_MASK) {
-+		aud_drv_data->mm2s_presence = true;
-+		ret = xlnx_formatter_pcm_reset(aud_drv_data->mmio +
-+					       XLNX_MM2S_OFFSET);
-+		if (ret) {
-+			dev_err(dev, "audio formatter reset failed\n");
-+			goto clk_err;
-+		}
-+		xlnx_formatter_disable_irqs(aud_drv_data->mmio +
-+					    XLNX_MM2S_OFFSET,
-+					    SNDRV_PCM_STREAM_PLAYBACK);
-+
-+		aud_drv_data->mm2s_irq = platform_get_irq_byname(pdev,
-+								 "irq_mm2s");
-+		if (aud_drv_data->mm2s_irq < 0) {
-+			dev_err(dev, "xlnx audio mm2s irq resource failed\n");
-+			ret = aud_drv_data->mm2s_irq;
-+			goto clk_err;
-+		}
-+		ret = devm_request_irq(dev, aud_drv_data->mm2s_irq,
-+				       xlnx_mm2s_irq_handler, 0,
-+				       "xlnx_formatter_pcm_mm2s_irq", dev);
-+		if (ret) {
-+			dev_err(dev, "xlnx audio mm2s irq request failed\n");
-+			goto clk_err;
-+		}
-+	}
-+	if (val & AUD_CFG_S2MM_MASK) {
-+		aud_drv_data->s2mm_presence = true;
-+		ret = xlnx_formatter_pcm_reset(aud_drv_data->mmio +
-+					       XLNX_S2MM_OFFSET);
-+		if (ret) {
-+			dev_err(dev, "audio formatter reset failed\n");
-+			goto clk_err;
-+		}
-+		xlnx_formatter_disable_irqs(aud_drv_data->mmio +
-+					    XLNX_S2MM_OFFSET,
-+					    SNDRV_PCM_STREAM_CAPTURE);
-+
-+		aud_drv_data->s2mm_irq = platform_get_irq_byname(pdev,
-+								 "irq_s2mm");
-+		if (aud_drv_data->s2mm_irq < 0) {
-+			dev_err(dev, "xlnx audio s2mm irq resource failed\n");
-+			ret = aud_drv_data->s2mm_irq;
-+			goto clk_err;
-+		}
-+		ret = devm_request_irq(dev, aud_drv_data->s2mm_irq,
-+				       xlnx_s2mm_irq_handler, 0,
-+				       "xlnx_formatter_pcm_s2mm_irq",
-+				       dev);
-+		if (ret) {
-+			dev_err(dev, "xlnx audio s2mm irq request failed\n");
-+			goto clk_err;
-+		}
-+	}
-+
-+	dev_set_drvdata(dev, aud_drv_data);
-+
-+	ret = devm_snd_soc_register_component(dev, &xlnx_asoc_component,
-+					      NULL, 0);
-+	if (ret) {
-+		dev_err(dev, "pcm platform device register failed\n");
-+		goto clk_err;
-+	}
-+
-+	return 0;
-+
-+clk_err:
-+	clk_disable_unprepare(aud_drv_data->axi_clk);
-+	return ret;
-+}
-+
-+static int xlnx_formatter_pcm_remove(struct platform_device *pdev)
-+{
-+	int ret = 0;
-+	struct xlnx_pcm_drv_data *adata = dev_get_drvdata(&pdev->dev);
-+
-+	if (adata->s2mm_presence)
-+		ret = xlnx_formatter_pcm_reset(adata->mmio + XLNX_S2MM_OFFSET);
-+
-+	/* Try MM2S reset, even if S2MM  reset fails */
-+	if (adata->mm2s_presence)
-+		ret = xlnx_formatter_pcm_reset(adata->mmio + XLNX_MM2S_OFFSET);
-+
-+	if (ret)
-+		dev_err(&pdev->dev, "audio formatter reset failed\n");
-+
-+	clk_disable_unprepare(adata->axi_clk);
-+	return ret;
-+}
-+
-+static const struct of_device_id xlnx_formatter_pcm_of_match[] = {
-+	{ .compatible = "xlnx,audio-formatter-1.0"},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, xlnx_formatter_pcm_of_match);
-+
-+static struct platform_driver xlnx_formatter_pcm_driver = {
-+	.probe	= xlnx_formatter_pcm_probe,
-+	.remove	= xlnx_formatter_pcm_remove,
-+	.driver	= {
-+		.name	= DRV_NAME,
-+		.of_match_table	= xlnx_formatter_pcm_of_match,
-+	},
-+};
-+
-+module_platform_driver(xlnx_formatter_pcm_driver);
-+MODULE_AUTHOR("Maruthi Srinivas Bayyavarapu <maruthis@xilinx.com>");
-+MODULE_LICENSE("GPL v2");
--- 
-2.20.1
+>>> Let us see the X86's QEMU logic:
+>>> 1. Before the vCPU created, it will set a default env->mcg_cap value with
+>>
+>>> MCE_CAP_DEF flag, MCG_SER_P means it expected the guest CPU model supports
+>>> RAS error recovery.[1] 2. when the vCPU initialize, it will check whether host
+>>> kernel support this feature[2]. Only when host kernel and default env->mcg_cap
+>>> value all expected this feature, then it will setup vCPU support RAS error
+>>> recovery[3].
+>>
+>> This looks like KVM exposing a CPU capability to Qemu, which then configures the
+>> behaviour KVM gives to the guest. This doesn't tell you anything about what the
+>> guest supports.
+> 
+> It tells you what the *guest CPU* supports, which for x86 is a combination
+> of (a) what did the user/machine model ask for and (b) what can KVM
+> actually implement. I don't much care whether the guest OS supports
+> anything or not, that's its business... but it does seem odd to me
+> that the equivalent Arm code is not similarly saying "what were we
+> asked for, and what can we do?".
 
+The flow is something like:
+For AO, generate CPER records, and notify the OS via NOTIFY_POLL (which isn't
+really a notification) or some flavour of IRQ.
+To do this, Qemu needs to be able to write to its reserved area of guest memory,
+and possibly trigger an interrupt.
+
+For AR, generate CPER records and notify the OS via external abort. (the
+presence of the CPER records makes this NOTIFY_SEA or NOTIFY_SEI).
+To do this, Qemu again needs to be able to write to guest memory, set guest
+registers (KVM_SET_ONE_REG()). If it wants to inject an
+SError-Interrupt/Asynchronous-external-abort while the guest has it masked, it
+needs KVM_SET_VCPU_EVENTS().
+
+Nothing here depends on the CPU or kernel configuration. This is all ACPI stuff,
+so its the same on x86. (The only difference is external-abort becomes NMI,
+which is probably done through SET_VCPU_EVENTS())
+
+What were we asked for? Qemu wants to know if it can write to guest memory,
+guest registers (for synchronous external abort) and trigger interrupts. It has
+always been able to do these things.
+
+
+> I think one question here which it would be good to answer is:
+> if we are modelling a guest and we haven't specifically provided
+> it an ACPI table to tell it about memory errors, what do we do
+> when we get a sigbus from the host? We have basically two choices:
+>  (1) send the guest an SError (aka asynchronous external abort)
+>      anyway (with no further info about what the memory error is)
+
+For an AR signal an external abort is valid. Its up to the implementation
+whether these are synchronous or asynchronous. Qemu can only take a signal for
+something that was synchronous, so you can choose between the two.
+Synchronous external abort is marginally better as an unaware OS knows its
+affects this thread, and may be able to kill it.
+SError with an imp-def ESR is indistinguishable from 'part of the soc fell out',
+and should always result in a panic().
+
+
+>  (2) just stop QEMU (as we would for a memory error in QEMU's
+>      own memory)
+
+This is also valid. A machine may take external-abort to EL3 and then
+reboot/crash/burn.
+
+
+Just in case this is the deeper issue: I keep picking on memory-errors, what
+about CPU errors?
+Linux can't handle these at all, unless they are also memory errors. If we take
+an imprecise abort from a guest KVM can't tell Qemu using signals. We don't have
+any mechanism to tell user-space about imprecise exceptions. In this case KVM
+throws an imp-def SError back at the affected vcpu, these are allowed to be
+imprecise, as this is the closest thing we have.
+
+This does mean that any AO/AR signal Qemu gets is a memory error.
+
+
+Happy New Year,
+
+James
 
 _______________________________________________
 linux-arm-kernel mailing list
