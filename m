@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
 	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5AB64C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 02:36:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 946CCC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 02:37:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 26EE621906
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 02:36:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 627DE218FE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 02:37:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="s8C1sRfy";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Nl3DC+W1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 26EE621906
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eVFgnLLU";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="NM1c+Qfg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 627DE218FE
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,64 +25,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KMJQ9caKuoAA2cFfWQXorXQDMnBy5B5jIv90qeSrgZM=; b=s8C1sRfykj/Epf
-	/Zgo0Y8WnnS3dZXU9O7H8YFRMCwc37U+4A8h5cJgg27gpMylxV965tEHPR5HvdDzrNesp/Aeyx3Km
-	Sv1Xvzw/RxoToUlZR23RK/OHnFZE0btFGH2cfgqlvrtVDHIud8uDdjk1h5MBF/jd+lPdk5bCzVJsN
-	91Ljfs8J9+bTNkfKP534m1Tob8cO2NnB7DZmS+StUsBsovXRVDsZB7xATn6OpJkzkGRtgBsZC3wBQ
-	2ohvpAbrNrx1RqoAX0C/qulNj8ArG5OfbgI8JDIRODWRtUhi0SJgrL1u1rWo1GnVGzSBxkufF/T73
-	9d4ZoMgkX4jtDnmSCVRw==;
+	List-Owner; bh=sb1rEklpAdZh6aV503K41u1/Dm++iTdAMni5F1kEGsc=; b=eVFgnLLUMjalCd
+	GYFp+LSYUbwhQStwIqU6+99u9N8Rj1lG7kME7XZBhkhsXTyDUAe48eJPhls+cTmQsZrzTKEmpabJn
+	wzbMXNDDSg7oJWLWKoacpE/deL4OuDWE5k1rVFmjyPLASoaRqYRe+989lwkjAU8ObYXrbgOi4JQgG
+	CT43ahJfS0pHmUyl+H0lE6kkgVDb+ukpVk34fdrojwi5q/4V8vSF6vEn1+f4zWGO0SVGXBEMzbEhD
+	h6NzVkoEE6kIp5HIM1Ma7WS53ujsst58ze4DnsAnLz5PmLeWxZSsxoyljnLN/tb6wEPHP4G/WGVsS
+	BSMGoALlfsbwpb8ttcPA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaAfm-0002ua-UX; Fri, 21 Dec 2018 02:36:22 +0000
-Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
+	id 1gaAgv-0003Jj-6V; Fri, 21 Dec 2018 02:37:33 +0000
+Received: from mail-pf1-x443.google.com ([2607:f8b0:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaAfj-0002sd-Kq
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 02:36:21 +0000
-Received: by mail-pf1-x444.google.com with SMTP id c123so1849079pfb.0
+ id 1gaAgr-0003Hr-Dz
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 02:37:30 +0000
+Received: by mail-pf1-x443.google.com with SMTP id z9so1844511pfi.2
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 20 Dec 2018 18:36:08 -0800 (PST)
+ Thu, 20 Dec 2018 18:37:19 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=D0MlURTt1nCvg8EFKNr+8mCnhzAm1tiCZAzywT9Mfr8=;
- b=Nl3DC+W1F5t+2H5wFgXxpJcesI0pR80bQa2En9Sf3PGcPmSOSpVViGSFg8lZmJ4+y7
- 81Y2M6eOlq4DEdCyWIFmRx4qRbXfH5EY5cnkSZWOyzfEyA6XCybo7bIaID8AhIgqtIyL
- wp+sh1kRm5NQnlnmXj6QkYmUn/2A0TxdWWUcg=
+ bh=1FKU2VnaVUrF8mvg01F+2EVZF5Lm4oPl3ZBbFPmuK/8=;
+ b=NM1c+Qfgs2DBiCnB+WYwV6wHbMgf1+IWcn+gFarudTc0Dj2xDoVCFI4lvmcuHadkD7
+ OL7jv4Umes3O9GdjTv1d1mooZfPvUFBCaf+o5eNvkeMSRCZbElcYUfZ3bbuO4u3P/kte
+ AKwtP6OXQA1LQYURTcEtxfG5NGtqkdwpBp374=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=D0MlURTt1nCvg8EFKNr+8mCnhzAm1tiCZAzywT9Mfr8=;
- b=g1OoTKh0dLXBcjR72Bxig/XHyy2C6nMhztjBwRyvjJOx5ZlUiaiPuYGGUUuIcCrrTu
- QqjcPmUkzAWNHx3m30MkQcsnmamoiDUME3MTEuk03rfBmEXn0HR/utgUdhHlwSvolXQ4
- hnuIYU6pP6bUY9VyMAhlGis5pazFFxxDPLet99KKKxIq5u1IrLpFn8M9qhlDxsR8Quq4
- jYC2QPbvIO6RDish99vTRgxdqEp0kRoAnnerxYiLMub9kacsDtyiS9Hat8b/XqpZofOv
- f8AzGOGRn7C4a2M+JNrUJJWgjL6ERlczXlqpsHElZ7XsRfXnwNlt/lPDLuujKQk1F1CF
- RGeQ==
-X-Gm-Message-State: AA+aEWaJM4qvBkRC6XUkKBNyGJqrUMaRB+neKGlAzZ9P228dwDh6Bcou
- 0A3QYeumpxhmkjBAcIae891+
-X-Google-Smtp-Source: AFSGD/VdDzzOjEgiDcSVmGChhmKrJxSTOeceVHFlIibvWIzIdF1z0QZEFTFg10NZ5HZ2Cn2IZyWbaw==
-X-Received: by 2002:a62:db41:: with SMTP id f62mr677668pfg.123.1545359767807; 
- Thu, 20 Dec 2018 18:36:07 -0800 (PST)
+ bh=1FKU2VnaVUrF8mvg01F+2EVZF5Lm4oPl3ZBbFPmuK/8=;
+ b=QbWpmtHl2B+EHH2b9wxTQZmhzjp84oFH9VnxcQO+u61tu3O7tmu/NsUoZfGF4CZYht
+ 1satulLUQXd4fqgCvVJP03ROdJc9JvUOPKGUOIEhSiqeb7TmSfz0hwiEpNHPF0KY/FTU
+ N1iVxxRcoj1knnTG9i0fn7bZn9B7ZqRqTpPSbBXAs2dTD/GbF9N5WRgTbZiTvB6Nlaqq
+ FZmwmK1orxUinvbH9kBU5m0n4nBQrfnESrkT0YmKLQwE0ykRgDC1Y10hOql1vmgdZEVI
+ RAb1P8ZKiuY8rNa41+gJOfFCfRgV3Lo0S2fOxWUBO796EFLZrm/fTkTTMoTd0uPltNsX
+ WOxQ==
+X-Gm-Message-State: AA+aEWavynpd7dOxa13kf8AbLgyRvJag1e+YGwuJMNepTvGANUo0+4Mn
+ 3Ai4rEIdqPQTvAKlqBGtTOzK
+X-Google-Smtp-Source: AFSGD/WlLo0zGagcnWNYzQMDNTBeirR3zEMHwrIqI6NLk7AccGxdgC2IBeSk5L4M3qWiuyLW8bQW1w==
+X-Received: by 2002:a62:75d1:: with SMTP id q200mr678265pfc.254.1545359838693; 
+ Thu, 20 Dec 2018 18:37:18 -0800 (PST)
 Received: from Mani-XPS-13-9360 ([2409:4072:810:d868:55e9:25e8:dbda:255b])
- by smtp.gmail.com with ESMTPSA id h82sm41836555pfa.105.2018.12.20.18.36.00
+ by smtp.gmail.com with ESMTPSA id a195sm14667864pfa.7.2018.12.20.18.37.10
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 20 Dec 2018 18:36:07 -0800 (PST)
-Date: Fri, 21 Dec 2018 08:05:57 +0530
+ Thu, 20 Dec 2018 18:37:18 -0800 (PST)
+Date: Fri, 21 Dec 2018 08:07:08 +0530
 From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-To: andy.gross@linaro.org
-Subject: Re: [PATCH v3 7/7] arm64: dts: qcom: apq8016-sbc: Standardize LED
- labels
-Message-ID: <20181221023554.GB3233@Mani-XPS-13-9360>
+To: michal.simek@xilinx.com
+Subject: Re: [PATCH v3 6/7] arm64: dts: xilinx: ultra96: Standardize LED
+ labels and triggers
+Message-ID: <20181221023708.GC3233@Mani-XPS-13-9360>
 References: <20181029094245.7886-1-manivannan.sadhasivam@linaro.org>
- <20181029094245.7886-8-manivannan.sadhasivam@linaro.org>
+ <20181029094245.7886-7-manivannan.sadhasivam@linaro.org>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181029094245.7886-8-manivannan.sadhasivam@linaro.org>
+In-Reply-To: <20181029094245.7886-7-manivannan.sadhasivam@linaro.org>
 User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_183619_702844_7D2FD59C 
-X-CRM114-Status: GOOD (  15.55  )
+X-CRM114-CacheID: sfid-20181220_183729_496431_24EA19E6 
+X-CRM114-Status: GOOD (  15.50  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,7 +105,7 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Oct 29, 2018 at 03:12:45PM +0530, Manivannan Sadhasivam wrote:
+On Mon, Oct 29, 2018 at 03:12:44PM +0530, Manivannan Sadhasivam wrote:
 > For all 96Boards, the following standard is used for onboard LEDs.
 > 
 > green:user1  default-trigger: heartbeat
@@ -115,9 +115,10 @@ On Mon, Oct 29, 2018 at 03:12:45PM +0530, Manivannan Sadhasivam wrote:
 > yellow:wlan  default-trigger: phy0tx
 > blue:bt      default-trigger: hci0-power
 > 
-> So lets adopt the same for APQ8016 SBC (Dragonboard410c), which is
-> one of the 96Boards CE platform.
->
+> So lets adopt the same for Ultra96, which is one of the 96Boards
+> CE and AI platform. Since the WLAN and BT LEDs are hardwired onboard,
+> consolidate only User LEDs.
+> 
 
 Hello,
 
@@ -127,65 +128,52 @@ Regards,
 Mani
 
 > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> Acked-by: Amit Kucheria <amit.kucheria@linaro.org>
 > ---
->  arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
+>  arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts | 15 ++++++++-------
+>  1 file changed, 8 insertions(+), 7 deletions(-)
 > 
-> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> index 46feedf7c989..35f95154316b 100644
-> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> @@ -300,28 +300,28 @@
->  			compatible = "gpio-leds";
+> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+> index eb5e8bddb610..c08a8753215b 100644
+> --- a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+> @@ -57,29 +57,30 @@
+>  	leds {
+>  		compatible = "gpio-leds";
+>  		ds2 {
+> -			label = "ds2";
+> +			label = "green:user1";
+>  			gpios = <&gpio 20 GPIO_ACTIVE_HIGH>;
+>  			linux,default-trigger = "heartbeat";
+>  		};
 >  
->  			led@1 {
-> -				label = "apq8016-sbc:green:user1";
-> +				label = "green:user1";
->  				gpios = <&msmgpio 21 GPIO_ACTIVE_HIGH>;
->  				linux,default-trigger = "heartbeat";
->  				default-state = "off";
->  			};
+>  		ds3 {
+> -			label = "ds3";
+> +			label = "green:user2";
+>  			gpios = <&gpio 19 GPIO_ACTIVE_HIGH>;
+> -			linux,default-trigger = "phy0tx"; /* WLAN tx */
+> +			linux,default-trigger = "mmc0";
+>  			default-state = "off";
+>  		};
 >  
->  			led@2 {
-> -				label = "apq8016-sbc:green:user2";
-> +				label = "green:user2";
->  				gpios = <&msmgpio 120 GPIO_ACTIVE_HIGH>;
->  				linux,default-trigger = "mmc0";
->  				default-state = "off";
->  			};
+>  		ds4 {
+> -			label = "ds4";
+> +			label = "green:user3";
+>  			gpios = <&gpio 18 GPIO_ACTIVE_HIGH>;
+> -			linux,default-trigger = "phy0rx"; /* WLAN rx */
+> +			linux,default-trigger = "mmc1";
+>  			default-state = "off";
+>  		};
 >  
->  			led@3 {
-> -				label = "apq8016-sbc:green:user3";
-> +				label = "green:user3";
->  				gpios = <&pm8916_gpios 1 GPIO_ACTIVE_HIGH>;
->  				linux,default-trigger = "mmc1";
->  				default-state = "off";
->  			};
+>  		ds5 {
+> -			label = "ds5";
+> +			label = "green:user4";
+>  			gpios = <&gpio 17 GPIO_ACTIVE_HIGH>;
+> -			linux,default-trigger = "bluetooth-power";
+> +			linux,default-trigger = "none";
+> +			panic-indicator;
+>  		};
 >  
->  			led@4 {
-> -				label = "apq8016-sbc:green:user4";
-> +				label = "green:user4";
->  				gpios = <&pm8916_gpios 2 GPIO_ACTIVE_HIGH>;
->  				linux,default-trigger = "none";
->  				panic-indicator;
-> @@ -329,14 +329,14 @@
->  			};
->  
->  			led@5 {
-> -				label = "apq8016-sbc:yellow:wlan";
-> +				label = "yellow:wlan";
->  				gpios = <&pm8916_mpps 2 GPIO_ACTIVE_HIGH>;
->  				linux,default-trigger = "phy0tx";
->  				default-state = "off";
->  			};
->  
->  			led@6 {
-> -				label = "apq8016-sbc:blue:bt";
-> +				label = "blue:bt";
->  				gpios = <&pm8916_mpps 3 GPIO_ACTIVE_HIGH>;
->  				linux,default-trigger = "bluetooth-power";
->  				default-state = "off";
+>  		vbus_det { /* U5 USB5744 VBUS detection via MIO25 */
 > -- 
 > 2.17.1
 > 
