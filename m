@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E8DA7C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 07:29:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 21715C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 07:29:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B938621903
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 07:29:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D3AE221903
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 07:29:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aZsX6117";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="rrBrVyti"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B938621903
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DroVr5qg";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Z4zvbexJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D3AE221903
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,65 +26,65 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=efXuaLgrj+t2Z9LT+ngDFG+fsea98JbHS0zkKenE1Yo=; b=aZsX6117rNd60u
-	b4eKmy+ej2wbdNu1tYor8sWJytMkxAwV4jPkc+3zuoG+uTGCDlPWm1/ngUyRYyBVUVTOTk2rWZeIB
-	H6OrVg3pD3439k5OlvMN5oCpvawcxqWjXuy5xaAyAgIEXhmVhlhh18U8SI9UUQHqC6TE0icdyVsTg
-	MWVD+EgXRWQHXFqi+Bi3KIrL/LEM2xf3xgwgpcWkq5DQlzPAMr3lLM5vYJwx0lgvcUy9hZiP5IMMr
-	YOHnx8okVmxDIfgvyBgn8eclQ4WTZ+cDPepPg0Ck7ESqh06uXknCbEx/f9Di7rjzlKpdsaT3TVCo8
-	bHi3sS+F2hMOyQWAHsBQ==;
+	List-Owner; bh=l7CdwRrgMX//CxKqBOU2z3XvUEyCGOdHI88KysFqUTM=; b=DroVr5qghZpl+e
+	sedNYVxVx3V1e2qAD4ovq6Hqz3yjbgQSHwjzhzvtArOOLCldF1K2RZo2jkGU5q4PBS/OhBXOkyAX9
+	O2m0ahIwHWAkRTdyinthTWTzOWFqtueJiffDlO2Fy+Rilqsfd6vRixeSZW+tJ/I+GfMCof6/9OSIJ
+	GwF7sdYGi50RdN+6X1KFoAoU/kKjTuW93/ZUB2khXxbS+0iil+oC16Tec6ds6bVWXP6BMOIlMrA4z
+	f5kBlf9vPEgYwGEW+P8I/l0aAqlk6yfDAq7JwCzLyOqkeLmuqzPqKP3ufqJBaQz+QSEJaLkpxy/iN
+	PwYcW17F+awVa+JGpwSw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaFEw-0002mq-Hf; Fri, 21 Dec 2018 07:28:58 +0000
-Received: from mail-pf1-x442.google.com ([2607:f8b0:4864:20::442])
+	id 1gaFFE-00033V-1R; Fri, 21 Dec 2018 07:29:16 +0000
+Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaFDx-0001et-J1
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 07:28:02 +0000
-Received: by mail-pf1-x442.google.com with SMTP id y126so2186931pfb.4
+ id 1gaFE2-0001fT-6r
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 07:28:06 +0000
+Received: by mail-pg1-x544.google.com with SMTP id n2so2116564pgm.3
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 20 Dec 2018 23:27:47 -0800 (PST)
+ Thu, 20 Dec 2018 23:27:51 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=fltZQbZSIQgUXi/Z+xP/+nOzCe8SxwJBjLTLp8RDlGA=;
- b=rrBrVytiDnat/KCHZDBMlr2Q4rK7dzYqetel/FN3IPPM07pVdKgmLf2nl+yaPN4i6h
- reGL4tQFU2bZ2oANOA6ueS9c2dh55HWlgZu+eJYLmRT+yoJI/NuEDPdgVEbbYr3z7b58
- nxs3DDTX2GiLuvPhpBByWtA/l2/F+7TZ2BxmRRt/Qpv5mkJFlQ0iSkk3imIeRrJdRmzA
- 1bvBZEkw46EzOinWphj81lvnvNm3BzQxrRSAV3xEDW7IalBojTLDVV9IdQJTEhExudwK
- h6SmNPoY9y06VaT8Ed83PqIHZI7LcknkWGdqsoy6aaZIqqg9wFMsiXq45cElV9ur7Vz1
- z4XQ==
+ bh=d+ZYsrQDzgljKv7Hwi24dI5tor2oRWLv2kgiIeP0lnI=;
+ b=Z4zvbexJFGJpGh32+7HGRQJGf6LTreqO/NmuvyBGVazPAY0h38tNQYijQDnyfi3QPw
+ Zkvn54K8ava4sziwAA6w/Q9AIBKSE6lM0Bvt2NPsHGg9fRaMQZiJToJMqMBbbbfUgPwc
+ 99RndgkRnhG1ZyrXbhPws6Hag+v8/OXuDqa9EOPRpggP1oCMMTyzWzxkfd3agbv9dy+5
+ TqMgrK6Ur0Xw3/mt6+GI7+RAa025bD/gDyK6eM7DBbx6BKGs5/XYjxEQVIabiwDDG5sT
+ SyPVnhijHovEidUWEGCZH5O644uq161RRE5MNd2vCNtxe6JZ+wY+L1TtCLruPMqh001H
+ ntlQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=fltZQbZSIQgUXi/Z+xP/+nOzCe8SxwJBjLTLp8RDlGA=;
- b=Q7GEMcPBBocImfhcoXEtHWtQnCyHnJm6IDTeqJsRdeYX5UIJrMTyPaZbW2ILW3rpd3
- y5KKap0GM9pzFCrx7tL5uS291yL6HCTKjtc/DXOhNaV9arAuc3wOGc1d39fWchtCn2fN
- Wa2voWD5sdneNfCjz1V4hRMpo0BMWRoN9YU2ZqjhfPy2xoBIdO0CGoq9pSslydsB8PJq
- 0VIcxnzYNsswGjD7cPOUgCq+EYuiWlNv1U+BvJIkA/SkPifF0VRtzTfvyaatwdix3dEl
- pTXOMnNLj6vTfuokKyUj0XK0EImde0J2tu+4kFmPv3B8JETUqTK6Z0Q6vBogb3vx4+RH
- qojQ==
-X-Gm-Message-State: AJcUukdOMGiVVjr6jkdJVIn2CiRyFO/ygOfD8fJYLyygwsTZMX9vwgRW
- M0si35vAoVi7aTaqxDY+oM4=
-X-Google-Smtp-Source: ALg8bN7so8dNzKUeH8NV9oDrLTu7hCW6lX/cL+aAyLv7GoPIg1L2wuobljjFpsXFADTv8zZvuVc/Sw==
-X-Received: by 2002:a63:ae01:: with SMTP id q1mr1321976pgf.402.1545377266708; 
- Thu, 20 Dec 2018 23:27:46 -0800 (PST)
+ bh=d+ZYsrQDzgljKv7Hwi24dI5tor2oRWLv2kgiIeP0lnI=;
+ b=p/5IoOPyU/BJfqeDrrBhLUTclMLZmEd7Atjv7lZO4btQ0zwi4RnEO4WRI3oa6/ms/0
+ HIo8/8l+fG0Y5fh1MF//UMLcyKBM7eA+RpYssLyleXXzrUinhUTk8nGq/0DYO18B9nYT
+ fOW9TPArropi8cQqQ92f3I8r0xpV+MBcpk1PE+NaOvZ5eEmCjs4j1SoPVryMtPg7fbUq
+ Lg6roZmCHPTovsShlLvhQwGRAK9UrxLJOGt4OZnMt0oH6pwdZmycjE5diicACt6UQWWK
+ 2i/ZpASBTB2C/9U0VnBxHi4/fltfqYRrEFjz+muhaRqxrtYavGXab5jt2sXstaQzCXug
+ EpSQ==
+X-Gm-Message-State: AJcUukf9RkdminUqGIXW63I74SOaeacp8GHeBEwIKLDuXYMxSdveOhrG
+ 8DL2Je3XZOwY1j9SJbClNkA=
+X-Google-Smtp-Source: AFSGD/WzK6aotUaeFQYslS1ZuCcb0xGrM4bYW4RJdzTkpTf9ea02REhEidYhtufShyRIHnc/I9ASqQ==
+X-Received: by 2002:a62:4c:: with SMTP id 73mr1424657pfa.24.1545377271247;
+ Thu, 20 Dec 2018 23:27:51 -0800 (PST)
 Received: from squirtle.lan (c-24-22-235-96.hsd1.wa.comcast.net.
  [24.22.235.96])
- by smtp.gmail.com with ESMTPSA id t90sm44971921pfj.23.2018.12.20.23.27.44
+ by smtp.gmail.com with ESMTPSA id t90sm44971921pfj.23.2018.12.20.23.27.49
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 20 Dec 2018 23:27:45 -0800 (PST)
+ Thu, 20 Dec 2018 23:27:50 -0800 (PST)
 From: Andrey Smirnov <andrew.smirnov@gmail.com>
 To: linux-pci@vger.kernel.org
-Subject: [PATCH 04/21] PCI: imx6: Remove duplicate macro definitions
-Date: Thu, 20 Dec 2018 23:26:59 -0800
-Message-Id: <20181221072716.29017-5-andrew.smirnov@gmail.com>
+Subject: [PATCH 06/21] PCI: imx6: Remove PCIE_PHY_RX_ASIC_OUT* constants
+Date: Thu, 20 Dec 2018 23:27:01 -0800
+Message-Id: <20181221072716.29017-7-andrew.smirnov@gmail.com>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20181221072716.29017-1-andrew.smirnov@gmail.com>
 References: <20181221072716.29017-1-andrew.smirnov@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_232758_029954_F0B86F06 
-X-CRM114-Status: GOOD (  10.60  )
+X-CRM114-CacheID: sfid-20181220_232802_837379_2DF27429 
+X-CRM114-Status: GOOD (  10.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,9 +108,8 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Both PCIE_LINK_WIDTH_SPEED_CONTROL and PORT_LOGIC_SPEED_CHANGE are
-already defined in pcie-desingware.h, so drop duplicate definintion in
-pci-imx6.c. No functional change intended.
+Code using these constants was removed in commit a77c5422d758 ("PCI:
+imx6: Remove broken Gen2 workaround"). No functional change intended.
 
 Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
@@ -130,19 +129,19 @@ Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
  1 file changed, 3 deletions(-)
 
 diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
-index e990030564d8..2265f4b40e39 100644
+index 60803f1f16f8..937d630f8c9d 100644
 --- a/drivers/pci/controller/dwc/pci-imx6.c
 +++ b/drivers/pci/controller/dwc/pci-imx6.c
-@@ -100,9 +100,6 @@ struct imx6_pcie {
- #define PCIE_PHY_STAT (PL_OFFSET + 0x110)
- #define PCIE_PHY_STAT_ACK_LOC 16
+@@ -108,9 +108,6 @@ struct imx6_pcie {
+ #define  PCIE_PHY_MPLL_MULTIPLIER_MASK		0x7f
+ #define  PCIE_PHY_MPLL_MULTIPLIER_OVRD		(0x1 << 9)
  
--#define PCIE_LINK_WIDTH_SPEED_CONTROL	0x80C
--#define PORT_LOGIC_SPEED_CHANGE		(0x1 << 17)
+-#define PCIE_PHY_RX_ASIC_OUT 0x100D
+-#define PCIE_PHY_RX_ASIC_OUT_VALID	(1 << 0)
 -
- /* PHY registers (not memory-mapped) */
- #define PCIE_PHY_ATEOVRD			0x10
- #define  PCIE_PHY_ATEOVRD_EN			(0x1 << 2)
+ #define PHY_RX_OVRD_IN_LO 0x1005
+ #define PHY_RX_OVRD_IN_LO_RX_DATA_EN (1 << 5)
+ #define PHY_RX_OVRD_IN_LO_RX_PLL_EN (1 << 3)
 -- 
 2.19.1
 
