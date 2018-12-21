@@ -2,91 +2,110 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 05BDDC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 17:59:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F0565C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:00:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C7B84218E0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 17:59:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BE5F821920
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:00:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="O72qQoxO";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="jfbY+aso";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="o/iZX2iW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C7B84218E0
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OTzZcp1+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BE5F821920
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=cKhrQBNrLE9tlOFyIDZQ4W+JC7DBE6VSwoTzd8vwUW8=; b=O72qQoxOeqYc8w4MvA42prGyr
-	DRKoVdR+/ijHzNXIKMtBPj67gPKBNDK9dpjYL4c8cGQB9hNAot23Nsryd5kqExDpo0pC12yYZsKeP
-	t2Lwf33EEKldShf+OiH5rv9jVDQnB7bQG0/5JnQtl9BIBD4q+2tYgAvI4GeMavrqBI9b+arqUz/0X
-	9xSOaycnED9J7+Orw/G/UaOLpJ14kZOyE1TED1cGNPdREiZPsmXzbduT/V8lLKEx9CGSJJGd4/MaM
-	nzAzdBkITlQztq/3/DQ5t0LaWvIEKK1qkxBw8OJhL6/q4pvYrqdqbQhoSPXSeoLNwP57TO0b7E7I1
-	kT67x6eeg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:Reply-To:List-Subscribe:List-Help:
+	List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:In-Reply-To:
+	MIME-Version:References:Subject:To:From:Date:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=HnRwFdhJdAXCExNwO3d41RkF4R4eSMLs7huBYj/90QQ=; b=OTzZcp1+IG4u4H
+	BlP1azEtdKOOdchOj11dmM3e3hplUPY1U3IFj1G+cvZ8gAwUbp6jdVFdjPZoN3lIzs/cUuswnLr0H
+	/mc3B1uvQ9WmT3l5HQAyqvEGw7AuCQcPW3DRfvSVhE38cPyz5v/F3MrnMlaWX8+4wDp40dUlPQ56a
+	7hHaYAtio5ayatDZtCXKa8Gx6TUg3A5/scoVjUm+fp/WLn+HDVK2SwrjcKkUryo3WZCXCtCRlVu6a
+	EGkiBleCO1eQzP8lpk7ig96DU4s8LIVBsTXY1G9+/MLAgMxQlL+KRFWwW83cBzi/pfcu5ehvjTrJh
+	8ZLZGlUgkSW2eTm04dgg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaP4x-0000m3-Vi; Fri, 21 Dec 2018 17:59:19 +0000
-Received: from smtp.codeaurora.org ([198.145.29.96])
+	id 1gaP5w-0002H6-Ig; Fri, 21 Dec 2018 18:00:20 +0000
+Received: from mx0b-001b2d01.pphosted.com ([148.163.158.5]
+ helo=mx0a-001b2d01.pphosted.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaP4u-0000l0-EO
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 17:59:18 +0000
-Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id 3167E60767; Fri, 21 Dec 2018 17:59:04 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1545415145;
- bh=ToaKA+6kwMe5bmJIcLqmQ8j2a69VMR6t5WiM4eu5240=;
- h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
- b=jfbY+asoa/TUnvisqGz8uojFkSdYCe4tn0sELFNH8WmrPK4RP/36Oad+6ujBS7YF/
- Mog1ouxrDN67IJ5IgFqmNPiHrzAExrPSzZL+fjwrpBrlm991pSVM++xiDJANsfb1iT
- s73SNvHKKmaK8lAz1ahCxzwqUlwkgGKqacFkxC2w=
-Received: from [192.168.225.247] (unknown [49.32.116.12])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- (Authenticated sender: tdas@smtp.codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id 74724606CF;
- Fri, 21 Dec 2018 17:58:52 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1545415143;
- bh=ToaKA+6kwMe5bmJIcLqmQ8j2a69VMR6t5WiM4eu5240=;
- h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
- b=o/iZX2iWacHywN+CVwHpV3qK4M02LmP9sUwTINPTn+7g7wZ4v1k6QSxEDj0o39C56
- 76IkKiXK8V/Oe371klqyc91BTYPGTURQzeIOMxskE6yGEhuQKovh4WGF5h2N45l/PH
- ywD4bEIOBFtO0fi/4cjob7yQHHHmgGJzCzTZ2riM=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 74724606CF
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- dmarc=none (p=none dis=none) header.from=codeaurora.org
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- spf=none smtp.mailfrom=tdas@codeaurora.org
-Subject: Re: [PATCH 01/13] clk: qcom: gcc: limit GPLL0_AO_OUT operating
- frequency
-To: Jorge Ramirez <jorge.ramirez-ortiz@linaro.org>, robh+dt@kernel.org,
- mark.rutland@arm.com, andy.gross@linaro.org, david.brown@linaro.org,
- sboyd@kernel.org, will.deacon@arm.com, mturquette@baylibre.com,
- jassisinghbrar@gmail.com
-References: <1545039990-19984-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
- <1545039990-19984-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
- <e97d9050-effc-56d7-0f9b-768df90dd73a@codeaurora.org>
- <6814777f-1e5f-bd99-db63-a0050dcdd930@linaro.org>
-From: Taniya Das <tdas@codeaurora.org>
-Message-ID: <874ce15d-67f5-8e55-8b62-73071fe6ae06@codeaurora.org>
-Date: Fri, 21 Dec 2018 23:28:49 +0530
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.3
+ id 1gaP5t-0001z2-KH
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 18:00:19 +0000
+Received: from pps.filterd (m0098414.ppops.net [127.0.0.1])
+ by mx0b-001b2d01.pphosted.com (8.16.0.22/8.16.0.22) with SMTP id
+ wBLHwaQh066704
+ for <linux-arm-kernel@lists.infradead.org>; Fri, 21 Dec 2018 13:00:06 -0500
+Received: from e13.ny.us.ibm.com (e13.ny.us.ibm.com [129.33.205.203])
+ by mx0b-001b2d01.pphosted.com with ESMTP id 2ph22qgnb2-1
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
+ for <linux-arm-kernel@lists.infradead.org>; Fri, 21 Dec 2018 13:00:06 -0500
+Received: from localhost
+ by e13.ny.us.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
+ Violators will be prosecuted
+ for <linux-arm-kernel@lists.infradead.org> from <paulmck@linux.vnet.ibm.com>; 
+ Fri, 21 Dec 2018 18:00:05 -0000
+Received: from b01cxnp22033.gho.pok.ibm.com (9.57.198.23)
+ by e13.ny.us.ibm.com (146.89.104.200) with IBM ESMTP SMTP Gateway: Authorized
+ Use Only! Violators will be prosecuted; 
+ (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
+ Fri, 21 Dec 2018 18:00:01 -0000
+Received: from b01ledav003.gho.pok.ibm.com (b01ledav003.gho.pok.ibm.com
+ [9.57.199.108])
+ by b01cxnp22033.gho.pok.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
+ wBLI00IO20709428
+ (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Fri, 21 Dec 2018 18:00:00 GMT
+Received: from b01ledav003.gho.pok.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id 8375FB2066;
+ Fri, 21 Dec 2018 18:00:00 +0000 (GMT)
+Received: from b01ledav003.gho.pok.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id 60BDEB205F;
+ Fri, 21 Dec 2018 18:00:00 +0000 (GMT)
+Received: from paulmck-ThinkPad-W541 (unknown [9.85.153.1])
+ by b01ledav003.gho.pok.ibm.com (Postfix) with ESMTP;
+ Fri, 21 Dec 2018 18:00:00 +0000 (GMT)
+Received: by paulmck-ThinkPad-W541 (Postfix, from userid 1000)
+ id 3C71216C36A7; Fri, 21 Dec 2018 10:00:07 -0800 (PST)
+Date: Fri, 21 Dec 2018 10:00:07 -0800
+From: "Paul E. McKenney" <paulmck@linux.ibm.com>
+To: Andi Kleen <ak@linux.intel.com>
+Subject: Re: [PATCH 0/7] ARM: hacks for link-time optimization
+References: <20180220215954.4092811-1-arnd@arndb.de>
+ <20181217225020.GA16520@hirez.programming.kicks-ass.net>
+ <20181218000800.GB25620@tassilo.jf.intel.com>
+ <20181218091824.GI2218@hirez.programming.kicks-ass.net>
+ <20181221172044.GE25620@tassilo.jf.intel.com>
 MIME-Version: 1.0
-In-Reply-To: <6814777f-1e5f-bd99-db63-a0050dcdd930@linaro.org>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <20181221172044.GE25620@tassilo.jf.intel.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+X-TM-AS-GCONF: 00
+x-cbid: 18122118-0064-0000-0000-0000038A71D9
+X-IBM-SpamModules-Scores: 
+X-IBM-SpamModules-Versions: BY=3.00010262; HX=3.00000242; KW=3.00000007;
+ PH=3.00000004; SC=3.00000272; SDB=6.01135049; UDB=6.00590197; IPR=6.00915221; 
+ MB=3.00024789; MTD=3.00000008; XFM=3.00000015; UTC=2018-12-21 18:00:04
+X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
+x-cbparentid: 18122118-0065-0000-0000-00003BC300C5
+Message-Id: <20181221180007.GQ4170@linux.ibm.com>
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2018-12-21_09:, , signatures=0
+X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
+ priorityscore=1501
+ malwarescore=0 suspectscore=0 phishscore=0 bulkscore=0 spamscore=0
+ clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
+ mlxlogscore=999 adultscore=0 classifier=spam adjust=0 reason=mlx
+ scancount=1 engine=8.0.1-1810050000 definitions=main-1812210137
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_095916_521541_212784DC 
-X-CRM114-Status: GOOD (  23.23  )
+X-CRM114-CacheID: sfid-20181221_100017_787920_42B8C3B0 
+X-CRM114-Status: GOOD (  35.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,69 +117,104 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, heiko@sntech.de, arnd@arndb.de, olof@lixom.net,
- linux-clk@vger.kernel.org, linux-kernel@vger.kernel.org,
- amit.kucheria@linaro.org, bjorn.andersson@linaro.org,
- enric.balletbo@collabora.com, vkoul@kernel.org, sibis@codeaurora.org,
- niklas.cassel@linaro.org, horms+renesas@verge.net.au, georgi.djakov@linaro.org,
- linux-arm-kernel@lists.infradead.org, jagan@amarulasolutions.com
-Content-Transfer-Encoding: base64
-Content-Type: text/plain; charset="utf-8"; Format="flowed"
+Reply-To: paulmck@linux.ibm.com
+Cc: Arnd Bergmann <arnd@arndb.de>, Nicolas Pitre <nico@linaro.org>,
+ Peter Zijlstra <peterz@infradead.org>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, hubicka@ucw.cz,
+ Thomas Gleixner <tglx@linutronix.de>, Ingo Molnar <mingo@kernel.org>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGVsbG8sCgpPbiAxMi8yMS8yMDE4IDY6MDYgUE0sIEpvcmdlIFJhbWlyZXogd3JvdGU6Cj4gT24g
-MTIvMjEvMTggMTI6MTksIFRhbml5YSBEYXMgd3JvdGU6Cj4+Cj4+Cj4+IE9uIDEyLzE3LzIwMTgg
-MzoxNiBQTSwgSm9yZ2UgUmFtaXJlei1PcnRpeiB3cm90ZToKPj4+IExpbWl0IHRoZSBHUExMMF9B
-T19PVVRfTUFJTiBvcGVyYXRpbmcgZnJlcXVlbmN5IGFzIHBlciBpdHMgaGFyZHdhcmUKPj4+IHNw
-ZWNpZmljYXRpb25zLgo+Pj4KPj4+IENvLWRldmVsb3BlZC1ieTogTmlrbGFzIENhc3NlbCA8bmlr
-bGFzLmNhc3NlbEBsaW5hcm8ub3JnPgo+Pj4gU2lnbmVkLW9mZi1ieTogTmlrbGFzIENhc3NlbCA8
-bmlrbGFzLmNhc3NlbEBsaW5hcm8ub3JnPgo+Pj4gU2lnbmVkLW9mZi1ieTogSm9yZ2UgUmFtaXJl
-ei1PcnRpeiA8am9yZ2UucmFtaXJlei1vcnRpekBsaW5hcm8ub3JnPgo+Pj4gLS0tCj4+PiDCoCBk
-cml2ZXJzL2Nsay9xY29tL2djYy1xY3M0MDQuYyB8IDYgKysrKysrCj4+PiDCoCAxIGZpbGUgY2hh
-bmdlZCwgNiBpbnNlcnRpb25zKCspCj4+Pgo+Pj4gZGlmZiAtLWdpdCBhL2RyaXZlcnMvY2xrL3Fj
-b20vZ2NjLXFjczQwNC5jIAo+Pj4gYi9kcml2ZXJzL2Nsay9xY29tL2djYy1xY3M0MDQuYwo+Pj4g
-aW5kZXggNjRkYTAzMi4uODMzNDM2YSAxMDA2NDQKPj4+IC0tLSBhL2RyaXZlcnMvY2xrL3Fjb20v
-Z2NjLXFjczQwNC5jCj4+PiArKysgYi9kcml2ZXJzL2Nsay9xY29tL2djYy1xY3M0MDQuYwo+Pj4g
-QEAgLTMwNCwxMCArMzA0LDE2IEBAIHN0YXRpYyBzdHJ1Y3QgY2xrX2FscGhhX3BsbCBncGxsMF9v
-dXRfbWFpbiA9IHsKPj4+IMKgwqDCoMKgwqAgfSwKPj4+IMKgIH07Cj4+PiDCoCArc3RhdGljIGNv
-bnN0IHN0cnVjdCBwbGxfdmNvIGdwbGwwX2FvX291dF92Y29bXSA9IHsKPj4+ICvCoMKgwqAgeyA4
-MDAwMDAwMDAsIDgwMDAwMDAwMCwgMCB9LAo+Pj4gK307Cj4+PiArCj4+PiDCoCBzdGF0aWMgc3Ry
-dWN0IGNsa19hbHBoYV9wbGwgZ3BsbDBfYW9fb3V0X21haW4gPSB7Cj4+PiDCoMKgwqDCoMKgIC5v
-ZmZzZXQgPSAweDIxMDAwLAo+Pj4gwqDCoMKgwqDCoCAucmVncyA9IGNsa19hbHBoYV9wbGxfcmVn
-c1tDTEtfQUxQSEFfUExMX1RZUEVfREVGQVVMVF0sCj4+PiDCoMKgwqDCoMKgIC5mbGFncyA9IFNV
-UFBPUlRTX0ZTTV9NT0RFLAo+Pj4gK8KgwqDCoCAudmNvX3RhYmxlID0gZ3BsbDBfYW9fb3V0X3Zj
-bywKPj4+ICvCoMKgwqAgLm51bV92Y28gPSBBUlJBWV9TSVpFKGdwbGwwX2FvX291dF92Y28pLAo+
-Pgo+PiBDb3VsZCB5b3UgcGxlYXNlIGhlbHAgYXMgdG8gd2h5IHRoaXMgaXMgcmVxdWlyZWQ/IFRo
-aXMgaXMgYSBmaXhlZCBQTEwgCj4+IGFuZCB3ZSBkbyBub3QgcmVxdWlyZSBhIFZDTyB0YWJsZSBm
-b3IgaXQuCj4gCj4gSGkgVGFuaXlhLAo+IAo+IHRoaXMgcGF0Y2ggLSB0aGUgYWRkaXRpb25hbCBp
-bmZvcm1hdGlvbiB0aGF0IGl0IHByb3ZpZGVzIGFib3V0IHRoZSAKPiBoYXJkd2FyZSAtIGhlbHBz
-IHRvIHNlbGVjdCB0aGUgcmlnaHQgcGFyZW50IGNsb2NrIGZvciBhIGdpdmVuIGZyZXF1ZW5jeS4K
-PiAKPiBPbiB0aGUgcWNzNDA0IHRoaXMgY2xvY2sgaXMgb25lIG9mIHRoZSB0d28gcGFyZW50IGNs
-b2NrcyBvZiB0aGUgYXBjcyAKPiBjbG9jayBjb250cm9sbGVyICh0aGUgb3RoZXIgb25lIGJlaW5n
-IHRoZSBoaWdoIGZyZXF1ZW5jeSBwbGwpCj4gV2hlbiBjcHVmcmVxIHNldHMgYSB0YXJnZXQgZnJl
-cXVlbmN5LCB0aGVyZSBpcyBhbiBpdGVyYXRpb24gdGhyb3VnaCB0aGUgCj4gbGlzdCBvZiBwYXJl
-bnRzIHRvIHNlbGVjdCB0aGUgb25lIHRoYXQgZGVsaXZlcnMgdGhlIGJlc3QgbWF0Y2guCj4gCj4g
-V2hlbiBhdHRlbXB0aW5nIHRvIHNldCB0aGUgY2xvY2sgZm9yIGFuIGFscGhhX3BsbCwgdGhlIG9w
-ZXJhdGlvbiBkb2VzIGEgCj4gc2FuaXR5IGNoZWNrIHRvIHZhbGlkYXRlIHRoYXQgdGhlIHJlcXVl
-c3RlZCBmcmVxdWVuY3kgaXMgaW4gZmFjdCAKPiByZWFjaGFibGUgdXNpbmcgdGhlIHZjbyByYW5n
-ZTogdHJ5aW5nIHRvIHNldCBhIHZhbHVlIHRoYXQgaXMgbm90IGluIAo+IHJhbmdlIHdpbGwgZmFp
-bC4KPiAKPiBUaGlzIHBhdGNoIG1ha2VzIHN1cmUgdGhhdCBpdHMgcmFuZ2UgaXMgZXhwbGljaXRs
-eSBkZWZpbmVkLgo+IAo+IEl0IGFsc28gaGVscHMgbWFraW5nIHN1cmUgdGhlcmUgYXJlIG5vIHJv
-dW5kaW5nIGlzc3VlcyB3aGVuIHNldHRpbmcgaXRzIAo+IHZhbHVlOiB3aXRob3V0IGl0IHRoZSBj
-bG9jayB3YXMgYmVpbmcgcmVhZCBhdCA3OTlNSHoKPiAKPiAKCklmIHRoZSBQTEwgaXMgYmVpbmcg
-cmVhZCBhcyA3OTlNSHogaXQgd291bGQgYmVjYXVzZSBub3QgYWxsIHRoZSA0MCBiaXRzIApvZiB0
-aGUgQUxQSEFfVkFMIGJlaW5nIHByb2dyYW1tZWQgYnkgdGhlIGJvb3Rsb2FkZXJzKHdoaWNoIGFy
-ZSB0aGUgCm9yaWdpbmFsIG93bmVycyBvZiB0aGlzIFBMTCkuIFNvIHdlIHNob3VsZCBnbyB3aXRo
-IHRoZSB3YXkgdGhleSBhcmUgCmJlaW5nIHNldCBieSBib290bG9hZGVycyBhbmQgcmVhZCBieSBI
-TE9TIGRyaXZlci4KCkFuZCBhIFZDTyByYW5nZSB5b3UgaGF2ZSBjb25zaWRlcmVkIGlzIHdyb25n
-IGZyb20gYSBQTEwgcGVyc3BlY3RpdmUuIEFzIAp0aGVzZSBhcmUgZml4ZWQgUExMcyBhbmQgVkNP
-IHJhbmdlIHJlYWxseSBkb2VzIG5vdCBtYXR0ZXIgaGVyZSwgc28gCnBsZWFzZSBkcm9wIHRoaXMg
-Y2hhbmdlLgoKPj4KPj4+IMKgwqDCoMKgwqAgLmNsa3IgPSB7Cj4+PiDCoMKgwqDCoMKgwqDCoMKg
-wqAgLmVuYWJsZV9yZWcgPSAweDQ1MDAwLAo+Pj4gwqDCoMKgwqDCoMKgwqDCoMKgIC5lbmFibGVf
-bWFzayA9IEJJVCgwKSwKPj4+Cj4+Cj4gCgotLSAKUVVBTENPTU0gSU5ESUEsIG9uIGJlaGFsZiBv
-ZiBRdWFsY29tbSBJbm5vdmF0aW9uIENlbnRlciwgSW5jLiBpcyBhIG1lbWJlcgpvZiBDb2RlIEF1
-cm9yYSBGb3J1bSwgaG9zdGVkIGJ5IFRoZSBMaW51eCBGb3VuZGF0aW9uLgoKLS0KCl9fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwg
-bWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8v
-bGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+On Fri, Dec 21, 2018 at 09:20:44AM -0800, Andi Kleen wrote:
+> > In particular turning an address-dependency into a control-dependency,
+> > which is something allowed by the C language, since it doesn't recognise
+> > these concepts as such.
+> > 
+> > The 'optimization' is allowed currently, but LTO will make it much more
+> > likely since it will have a much wider view of things. Esp. when combined
+> > with PGO.
+> > 
+> > Specifically; if you have something like:
+> > 
+> > int idx;
+> > struct object objs[2];
+> > 
+> > the statement:
+> > 
+> >   val = objs[idx & 1].ponies;
+> > 
+> > which you 'need' to be translated like:
+> > 
+> >   struct object *obj = objs;
+> >   obj += (idx & 1);
+> >   val = obj->ponies;
+> > 
+> > Such that the load of obj->ponies depends on the load of idx. However
+> > our dear compiler is allowed to make it:
+> > 
+> >   if (idx & 1)
+> >     obj = &objs[1];
+> >   else
+> >     obj = &objs[0];
+> > 
+> >   val = obj->ponies;
+> 
+> I don't see why a compiler would do such an optimization. Clearly
+> the second variant is worse than the first, bigger and needs
+> branch prediction resources.
+> 
+> In fact compilers usually try hard to go into the other direction
+> and apply if conversion.
+> 
+> Has anyone seen real world examples of such changes being done, or is this
+> all language lawyering theory?
+
+I have not seen it myself, but I have heard others claim to.  For example,
+if "idx & 1" had to be computed for some other reason, especially if there
+was a pre-exiting "if" statement with this as its condition.  Or if you
+have hardware that has a conditional-move instruction.  And so on.
+
+Do you have a way to guarantee that it never happens?
+
+							Thanx, Paul
+
+> -Andi
+> 
+> > 
+> > Because C doesn't recognise this as being different. However this is
+> > utterly broken, because in this translation we can speculate the load
+> > of obj->ponies such that it no longer depends on the load of idx, which
+> > breaks RCU.
+> > 
+> > Note that further 'optimization' is possible and the compiler could even
+> > make it:
+> > 
+> >   if (idx & 1)
+> >     val = objs[1].ponies;
+> >   else
+> >     val = objs[0].ponies;
+> > 
+> > Now, granted, this is a fairly artificial example, but it does
+> > illustrate the exact problem.
+> > 
+> > The more the compiler can see of the complete program, the more likely
+> > it can make inferrences like this, esp. when coupled with PGO.
+> > 
+> > Now, we're (usually) very careful to wrap things in READ_ONCE() and
+> > rcu_dereference() and the like, which makes it harder on the compiler
+> > (because 'volatile' is special), but nothing really stops it from doing
+> > this.
+> > 
+> > Paul has been trying to beat clue into the language people, but given
+> > he's been at it for 10 years now, and there's no resolution, I figure we
+> > ought to get compiler implementations to give us a knob.
+> 
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
