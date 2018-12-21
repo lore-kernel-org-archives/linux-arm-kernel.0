@@ -2,75 +2,112 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2E39AC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 15:28:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D0C8EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 15:31:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E8DD721903
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 15:28:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9F9C821903
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 15:31:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bXWmVCaX";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="aoPUViPm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E8DD721903
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Stra/Wrg";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="OjN314kz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9F9C821903
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=MZbMlhGq5JaQuNtifsoBa6VlfUoy0NCRbwNENCfyEgo=; b=bXWmVCaXXdy7K2
-	bgNPwl/G6eRS/TWEcAyCW4b7a5UcfrP/CR5WdK1tSoPQ3+yvxKS8wX9LPwMqA4SjQ/7i7zo/r/+5B
-	tP9VBc/TApLXKBRTaGlNEHweLA+6/1ls2xASWBg499OY6T28b/g8IFGkE/LH4jB/KjXMRi4gHD2nr
-	Cs8OsNl50rR+hv118Ad5ll4jz1v2Y1KvZ54faOQ4Tg1XgJXiy9bIDUg1U5JSthBdMliiiZ7Wx8w/j
-	3jBAT2WmW/fuz4j92yk5VxQpNZBUyo2s9gDnkVfhZweywsXGTR1XyRx3ANwwvIT3xP0RH3Tcptl4O
-	/wCDcslNYfCDtdXyuG9A==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=uf0Rus02ze13nK0e6lUAGNNJG9q3CU3csuCK1f7VcKY=; b=Stra/WrgO2IVJK
+	L0U60m7WjIRbxXuzVSUnGd8OkcbN+6WvQA//zgaF1WZPX57HNqBNx//VRDtnXZzrRkoLaOWg8XeUI
+	tFsbCQcJ7/0n8gpq8+eMxxRDxV4pDzhM194TRPxKmBnMqDgv1M8os57jd5ZZjc+aQf/whVFfIWpLz
+	4p3q2ck23/+0sGd9/ewZIzFOMBssHXNnFVd/8l0zXGV8gVmJ9E41//XO6o+pXxKG0wTyk3IyDHlBG
+	qWtUmDZNL4SSLOgpnBqKE2VPz2jqjUtjoWaXSaoUM/rmmD9kQQPwhjVgaNV12i8ZAE7xs98HUe6lG
+	LkZnSpWy+TZ4nUlTAgtQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaMip-0003P5-7E; Fri, 21 Dec 2018 15:28:19 +0000
-Received: from pandora.armlinux.org.uk
- ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
+	id 1gaMlp-0005qE-BE; Fri, 21 Dec 2018 15:31:25 +0000
+Received: from mail-eopbgr40049.outbound.protection.outlook.com ([40.107.4.49]
+ helo=EUR03-DB5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaMik-0003MA-Ul
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 15:28:18 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=L/8AIlneBYRPC+3W3DXZUFl+oPqXxZfFR3kgfHMJ5dg=; b=aoPUViPm+py834+TLywfaXj3M
- NqmoQoZjH7c/h7vkiXtVI4b+qjY8szLHMc+sDnwc/pVGLI7j6kvOUWIMpY4M2GzBEPOy1juzAy13h
- KBAOHB4YwR/ljs+Gw7TW3xunm5NdoMwxGv3DvouUYP5kyBiYm3p4NARQh+NHK5gABCIm8=;
-Received: from n2100.armlinux.org.uk
- ([2001:4d48:ad52:3201:214:fdff:fe10:4f86]:51305)
- by pandora.armlinux.org.uk with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
- (envelope-from <linux@armlinux.org.uk>)
- id 1gaMgS-0007Sd-Nk; Fri, 21 Dec 2018 15:25:52 +0000
-Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
- (envelope-from <linux@n2100.armlinux.org.uk>)
- id 1gaMgN-0000is-OT; Fri, 21 Dec 2018 15:25:47 +0000
-Date: Fri, 21 Dec 2018 15:25:45 +0000
-From: Russell King - ARM Linux <linux@armlinux.org.uk>
-To: Julia Lawall <julia.lawall@lip6.fr>
-Subject: Re: [arm:csi-v6 3/5] drivers/media/i2c/imx219.c:2218:2-8: preceding
- lock on line 2206 (fwd)
-Message-ID: <20181221152545.GV26090@n2100.armlinux.org.uk>
-References: <alpine.DEB.2.20.1812201622480.14665@hadrien>
+ id 1gaMlm-0005da-Ac
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 15:31:23 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=DQE+rSTsEOYYnmOCwQTZLf5Q/t9buhZ76I5qKgn+U2g=;
+ b=OjN314kz7Nq+V6jp/pxXcgRvuOkqgVXp4LFW9djFz0reIwBNPVeH32fpyl4VxgptIOqE/jJCnF6BCvVHiFkB6uUzoW3BVZDFdtlzDUPKoHdPM9dE+PpuYqbb1E1CKbpoV24lOdm8Lat8A9T0dXWoX/O7BHOLQhIbXcxyowkQ9vw=
+Received: from VI1PR0402MB2800.eurprd04.prod.outlook.com (10.172.255.18) by
+ VI1PR0402MB3488.eurprd04.prod.outlook.com (52.134.4.16) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1425.22; Fri, 21 Dec 2018 15:31:07 +0000
+Received: from VI1PR0402MB2800.eurprd04.prod.outlook.com
+ ([fe80::95a2:5df5:8d7b:22e9]) by VI1PR0402MB2800.eurprd04.prod.outlook.com
+ ([fe80::95a2:5df5:8d7b:22e9%6]) with mapi id 15.20.1446.022; Fri, 21 Dec 2018
+ 15:31:07 +0000
+From: Ioana Ciornei <ioana.ciornei@nxp.com>
+To: Leo Li <leoyang.li@nxp.com>, "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "devicetree@vger.kernel.org"
+ <devicetree@vger.kernel.org>
+Subject: [PATCH 0/3] soc: fsl: add DPAA2 log console support
+Thread-Topic: [PATCH 0/3] soc: fsl: add DPAA2 log console support
+Thread-Index: AQHUmUIx/NHo/hQT3EWASVsQKa2/4w==
+Date: Fri, 21 Dec 2018 15:31:07 +0000
+Message-ID: <1545406240-3061-1-git-send-email-ioana.ciornei@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1PR0801CA0082.eurprd08.prod.outlook.com
+ (2603:10a6:800:7d::26) To VI1PR0402MB2800.eurprd04.prod.outlook.com
+ (2603:10a6:800:ad::18)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=ioana.ciornei@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [86.34.165.90]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; VI1PR0402MB3488;
+ 6:exXNo1jUb6h0Ahmt/gMQFM+kuaf/fyLnzZHrKyuDEF72PjNwGJ0BZfewRnLbpOG7VCf6XAeAuL9wzUkD9eUmA21q/ALOmIlZhwjpq9QmE8eL1PwNu6AzmF7es42TuK8ATokP2PZFJ9THv8sgCS03pq1qs92aaU1jmQHQRrvUh+uU8/P+VqeAVupIJMG7WK+m6CHFLEFJPgsMRTiWTldfuxvCBLfBzKugS6NXwijpX/b9PX0ss8maDGrHa4WNvJzXSrMt6zcUnWFSH1WHKY8s5NrouCc1eJpAizXY13OfDW9krGHye/hq/Nhnrljn1nxx9Fy3obMdgkmSgI1bdRl2mBkLBAMSSlBmGczTdPkdzmqcEZ66LP9HMyi/Y6uWeNrMVogbNCX6zgxkX6R7X8yPDi7lWw1P2/W95qmBKB96as7ZOweLiGxsHfxpBypgJCZV3IAy6taFZ+C9q4cV7/vfGQ==;
+ 5:snKljzK4uf5x8U/8wuRqHOzF2oJEF37W+HA7lN80VQ4o2E6ODzSlau1COJ1SN/vR60N3/MfKhIcspmo9XanizZ2iDM3RJUL8bcqn8bR8PPgwlVgFtyFwuNHa5aupZdqTrAt9d5vJBYhfNNZtT2P4Ex3kHTXPypvOoa8fWoZeV48=;
+ 7:P/rq0/y3B1ugzstXJrnFWKD3CWcbyz8rq7Sj+jVVG+nKq7nfhlkUlI1XSDzcNWCZFENBD295ON3RTYVZps8c7/0/J7zOSfyXtxCi540SM6CKzIgYcy5Ly5OrgYFYuhnvHC89hhzxeMAlSvYFpk+qJQ==
+x-ms-office365-filtering-correlation-id: 4f0dd865-dae6-4c5b-67c0-08d6675953a8
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR0402MB3488; 
+x-ms-traffictypediagnostic: VI1PR0402MB3488:
+x-microsoft-antispam-prvs: <VI1PR0402MB34882E8CD2E3B864C04BA0F2E0B80@VI1PR0402MB3488.eurprd04.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(3230021)(999002)(5005026)(6040522)(2401047)(8121501046)(3231475)(944501520)(52105112)(93006095)(93001095)(10201501046)(3002001)(6055026)(149066)(150057)(6041310)(20161123558120)(20161123562045)(20161123564045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123560045)(201708071742011)(7699051)(76991095);
+ SRVR:VI1PR0402MB3488; BCL:0; PCL:0; RULEID:; SRVR:VI1PR0402MB3488; 
+x-forefront-prvs: 0893636978
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(376002)(39860400002)(366004)(346002)(136003)(396003)(199004)(189003)(6512007)(53936002)(2906002)(71200400001)(71190400001)(86362001)(2201001)(26005)(97736004)(256004)(102836004)(6486002)(110136005)(186003)(386003)(68736007)(99286004)(316002)(52116002)(305945005)(36756003)(6116002)(25786009)(66066001)(8936002)(105586002)(6436002)(106356001)(2616005)(476003)(54906003)(81166006)(81156014)(14454004)(44832011)(3846002)(6506007)(8676002)(478600001)(5660300001)(486006)(2501003)(4326008)(7736002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR0402MB3488;
+ H:VI1PR0402MB2800.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: 62/vy68TMDgGUtePKBggwXcrXI1in37BL8i+2Cj9glc7YucQKd2mdFZfbUIQsfjgUi7KpvK50vfGPL4gRj2bfuDnBi+e3ods9peciqXc396PO6JzGjAml3+TdCgfUw5Nebz+rA9DG9sQrJCMQmH1vjGNaO2pE+VTzj+Wvr7QyRmu0rS61kIlPkhScc3Ab2VWCL3UmbVnqtwp86evy1Js57Tl7sgwIjn0aKlIuAEV4RSXR8ZY4ySLUz3QKT2zLTX2UWGabVuQOHbr8Ql/4z4CD5fgpsBMc+PeOwjpPq6etVW4MzJNQxL3PSjC50iaoRJP
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <alpine.DEB.2.20.1812201622480.14665@hadrien>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 4f0dd865-dae6-4c5b-67c0-08d6675953a8
+X-MS-Exchange-CrossTenant-originalarrivaltime: 21 Dec 2018 15:31:07.5612 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR0402MB3488
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_072815_420005_CAE935E5 
-X-CRM114-Status: GOOD (  16.99  )
+X-CRM114-CacheID: sfid-20181221_073122_372329_B0B4E8FE 
+X-CRM114-Status: GOOD (  12.27  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,141 +119,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kbuild-all@01.org, linux-arm-kernel@lists.infradead.org
+Cc: Ioana Ciocoi Radulescu <ruxandra.radulescu@nxp.com>,
+ Roy Pledge <roy.pledge@nxp.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>,
+ Ioana Ciornei <ioana.ciornei@nxp.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Thanks, fixed.
+This patch set adds support for exporting DPAA2 firmware console
+logs to userspace.
 
-On Thu, Dec 20, 2018 at 04:23:23PM +0100, Julia Lawall wrote:
-> Hello,
-> 
-> It looks like an unlock may be needed at line 2218.
-> 
-> julia
-> 
-> ---------- Forwarded message ----------
-> Date: Thu, 20 Dec 2018 23:15:54 +0800
-> From: kbuild test robot <lkp@intel.com>
-> To: kbuild@01.org
-> Cc: Julia Lawall <julia.lawall@lip6.fr>
-> Subject: [arm:csi-v6 3/5] drivers/media/i2c/imx219.c:2218:2-8: preceding lock on
->      line 2206
-> 
-> CC: kbuild-all@01.org
-> CC: linux-arm-kernel@lists.infradead.org
-> TO: Russell King <rmk+kernel@armlinux.org.uk>
-> 
-> tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git csi-v6
-> head:   787eec29b136e015f9f10ba0475c800a43dc9f65
-> commit: 2aaa1f8a02040955a755baa0e39d5f1c3c33c8e7 [3/5] media: i2c: imx219 camera driver
-> :::::: branch date: 7 days ago
-> :::::: commit date: 7 days ago
-> 
-> >> drivers/media/i2c/imx219.c:2218:2-8: preceding lock on line 2206
-> 
-> git remote add arm git://git.armlinux.org.uk/~rmk/linux-arm.git
-> git remote update arm
-> git checkout 2aaa1f8a02040955a755baa0e39d5f1c3c33c8e7
-> vim +2218 drivers/media/i2c/imx219.c
-> 
-> 2aaa1f8a Russell King 2017-01-21  2162
-> 2aaa1f8a Russell King 2017-01-21  2163  /*
-> 2aaa1f8a Russell King 2017-01-21  2164   * Hardware limitations:
-> 2aaa1f8a Russell King 2017-01-21  2165   * The sink crop rectangle must always fit within the sink pad format size.
-> 2aaa1f8a Russell King 2017-01-21  2166   * The sink compose rectangle must always fit within the sink crop rectangle.
-> 2aaa1f8a Russell King 2017-01-21  2167   * The source pad format size must always match the compose rectangle size.
-> 2aaa1f8a Russell King 2017-01-21  2168   *
-> 2aaa1f8a Russell King 2017-01-21  2169   * Even if V4L2_SEL_FLAG_KEEP_CONFIG is set, we _must_ propagate a change
-> 2aaa1f8a Russell King 2017-01-21  2170   * in the compose rectangle size to the source pad format, because the
-> 2aaa1f8a Russell King 2017-01-21  2171   * difference is a pure software fallacy.
-> 2aaa1f8a Russell King 2017-01-21  2172   */
-> 2aaa1f8a Russell King 2017-01-21  2173  static int imx219_set_selection(struct v4l2_subdev *sd,
-> 2aaa1f8a Russell King 2017-01-21  2174  				struct v4l2_subdev_pad_config *cfg,
-> 2aaa1f8a Russell King 2017-01-21  2175  				struct v4l2_subdev_selection *sel)
-> 2aaa1f8a Russell King 2017-01-21  2176  {
-> 2aaa1f8a Russell King 2017-01-21  2177  	struct imx219_private *priv = imx219_get_priv(sd);
-> 2aaa1f8a Russell King 2017-01-21  2178  	struct imx219_sub *sub = imx219_get_sub(sd);
-> 2aaa1f8a Russell King 2017-01-21  2179  	struct v4l2_mbus_framefmt *pad_fmt, *src_fmt;
-> 2aaa1f8a Russell King 2017-01-21  2180  	struct v4l2_rect *pad_crop, *pad_compose;
-> 2aaa1f8a Russell King 2017-01-21  2181  	struct v4l2_rect *rects[4], sink_fmt_rect, src_fmt_rect;
-> 2aaa1f8a Russell King 2017-01-21  2182  	int ret, idx;
-> 2aaa1f8a Russell King 2017-01-21  2183
-> 2aaa1f8a Russell King 2017-01-21  2184  	if (!sub->pad_ops->adj_selection)
-> 2aaa1f8a Russell King 2017-01-21  2185  		return -ENOTTY;
-> 2aaa1f8a Russell King 2017-01-21  2186
-> 2aaa1f8a Russell King 2017-01-21  2187  	switch (sel->target) {
-> 2aaa1f8a Russell King 2017-01-21  2188  	case V4L2_SEL_TGT_CROP:
-> 2aaa1f8a Russell King 2017-01-21  2189  		idx = 1;
-> 2aaa1f8a Russell King 2017-01-21  2190  		break;
-> 2aaa1f8a Russell King 2017-01-21  2191  	case V4L2_SEL_TGT_COMPOSE:
-> 2aaa1f8a Russell King 2017-01-21  2192  		idx = 2;
-> 2aaa1f8a Russell King 2017-01-21  2193  		break;
-> 2aaa1f8a Russell King 2017-01-21  2194  	default:
-> 2aaa1f8a Russell King 2017-01-21  2195  		return -EINVAL;
-> 2aaa1f8a Russell King 2017-01-21  2196  	}
-> 2aaa1f8a Russell King 2017-01-21  2197
-> 2aaa1f8a Russell King 2017-01-21  2198  	pad_fmt = imx219_get_pad_fmt(sd, cfg, sel->which, sel->pad);
-> 2aaa1f8a Russell King 2017-01-21  2199  	pad_crop = imx219_get_pad_crop(sd, cfg, sel->which, sel->pad);
-> 2aaa1f8a Russell King 2017-01-21  2200  	pad_compose = imx219_get_pad_compose(sd, cfg, sel->which, sel->pad);
-> 2aaa1f8a Russell King 2017-01-21  2201  	if (!pad_fmt || !pad_compose || !pad_crop)
-> 2aaa1f8a Russell King 2017-01-21  2202  		return -EINVAL;
-> 2aaa1f8a Russell King 2017-01-21  2203
-> 2aaa1f8a Russell King 2017-01-21  2204  	src_fmt = imx219_get_pad_fmt(sd, cfg, sel->which, PAD_SRC);
-> 2aaa1f8a Russell King 2017-01-21  2205
-> 2aaa1f8a Russell King 2017-01-21 @2206  	mutex_lock(&priv->mutex);
-> 2aaa1f8a Russell King 2017-01-21  2207  	imx219_framefmt_to_rect(&sink_fmt_rect, pad_fmt);
-> 2aaa1f8a Russell King 2017-01-21  2208  	imx219_framefmt_to_rect(&src_fmt_rect, src_fmt);
-> 2aaa1f8a Russell King 2017-01-21  2209
-> 2aaa1f8a Russell King 2017-01-21  2210  	rects[0] = &sink_fmt_rect;
-> 2aaa1f8a Russell King 2017-01-21  2211  	rects[1] = pad_crop;
-> 2aaa1f8a Russell King 2017-01-21  2212  	rects[2] = pad_compose;
-> 2aaa1f8a Russell King 2017-01-21  2213  	rects[3] = &src_fmt_rect;
-> 2aaa1f8a Russell King 2017-01-21  2214
-> 2aaa1f8a Russell King 2017-01-21  2215  	ret = sub->pad_ops->adj_selection(priv, sel->target, sel->flags,
-> 2aaa1f8a Russell King 2017-01-21  2216  					  &sel->r, rects + idx);
-> 2aaa1f8a Russell King 2017-01-21  2217  	if (ret)
-> 2aaa1f8a Russell King 2017-01-21 @2218  		return ret;
-> 2aaa1f8a Russell King 2017-01-21  2219
-> 2aaa1f8a Russell King 2017-01-21  2220  	if (sel->which == V4L2_SUBDEV_FORMAT_ACTIVE) {
-> 2aaa1f8a Russell King 2017-01-21  2221  		ret = sub->pad_ops->set_selection(priv, sub, sel->pad,
-> 2aaa1f8a Russell King 2017-01-21  2222  						  sel->target,
-> 2aaa1f8a Russell King 2017-01-21  2223  						  &sel->r, rects[idx - 1]);
-> 2aaa1f8a Russell King 2017-01-21  2224
-> 2aaa1f8a Russell King 2017-01-21  2225  		/* Setting the crop also propagates to the compose */
-> 2aaa1f8a Russell King 2017-01-21  2226  		if (sel->target == V4L2_SEL_TGT_CROP && ret == 0)
-> 2aaa1f8a Russell King 2017-01-21  2227  			ret = sub->pad_ops->set_selection(priv, sub, sel->pad,
-> 2aaa1f8a Russell King 2017-01-21  2228  							  V4L2_SEL_TGT_COMPOSE,
-> 2aaa1f8a Russell King 2017-01-21  2229  							  &sel->r, &sel->r);
-> 2aaa1f8a Russell King 2017-01-21  2230  	}
-> 2aaa1f8a Russell King 2017-01-21  2231
-> 2aaa1f8a Russell King 2017-01-21  2232  	if (ret == 0) {
-> 2aaa1f8a Russell King 2017-01-21  2233  		*rects[idx] = sel->r;
-> 2aaa1f8a Russell King 2017-01-21  2234
-> 2aaa1f8a Russell King 2017-01-21  2235  		if (!(sel->flags & V4L2_SEL_FLAG_KEEP_CONFIG)) {
-> 2aaa1f8a Russell King 2017-01-21  2236  			while (++idx < ARRAY_SIZE(rects))
-> 2aaa1f8a Russell King 2017-01-21  2237  				*rects[idx] = sel->r;
-> 2aaa1f8a Russell King 2017-01-21  2238
-> 2aaa1f8a Russell King 2017-01-21  2239  			src_fmt->width = src_fmt_rect.width;
-> 2aaa1f8a Russell King 2017-01-21  2240  			src_fmt->height = src_fmt_rect.height;
-> 2aaa1f8a Russell King 2017-01-21  2241  		}
-> 2aaa1f8a Russell King 2017-01-21  2242  	}
-> 2aaa1f8a Russell King 2017-01-21  2243  	mutex_unlock(&priv->mutex);
-> 2aaa1f8a Russell King 2017-01-21  2244
-> 2aaa1f8a Russell King 2017-01-21  2245  	return ret;
-> 2aaa1f8a Russell King 2017-01-21  2246  }
-> 2aaa1f8a Russell King 2017-01-21  2247
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+The first two patches add the needed device tree node and its documentation
+while the third one adds the actual platform driver.
+
+Ioana Ciornei (3):
+  arm64: dts: add dpaa2-console node for DPAA2 platforms
+  Documentation: DT: Add entry for DPAA2 console
+  soc: fsl: add DPAA2 console support
+
+ .../devicetree/bindings/misc/dpaa2-console.txt     |  11 +
+ MAINTAINERS                                        |   1 +
+ arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi     |   5 +
+ arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi     |   5 +
+ drivers/soc/fsl/Kconfig                            |  10 +
+ drivers/soc/fsl/Makefile                           |   1 +
+ drivers/soc/fsl/dpaa2-console.c                    | 306 +++++++++++++++++++++
+ 7 files changed, 339 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/misc/dpaa2-console.txt
+ create mode 100644 drivers/soc/fsl/dpaa2-console.c
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+1.9.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
