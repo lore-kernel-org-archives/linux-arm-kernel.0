@@ -2,64 +2,79 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,SPF_PASS autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C0DFDC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:18:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1C0D8C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:19:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8C55E2190A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:18:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AE76820449
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:19:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ivTIdRan"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8C55E2190A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sSRhbilw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AE76820449
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:References:To:Subject:From:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XwQ/+FJytU6rBdWB+tZsas/J7lD07fG3okCbsD06wZM=; b=ivTIdRanzSRlN2
-	goBlVYhfieEaxJB4UYTFrhq0BW5ZJCp1glP+mZUOWZyiHrLvzTIBW40GDiOMH/KUoOmgFJGFpC155
-	54K1yAvKh70X+KNDHHLpw3ynqSjCfnI4PgnHnKLr/Xrj3pm7R7ZrhNl6tsvnS5rZxHH+Qe/JYr23F
-	o2b6iRAbZwqOe4iBuaofflWrVnwjTh5U2ljbqaqpKnS8cyiAaxyunivz0UKqvqkcuPY7AvtMXuxgW
-	uY91VEvXJSuvIVGYK96Dy5Uy9mCQMbjsz6u7/lwMxusI7ocSNBPZfHbDXMrA+nlbyH0QjEiJYk59u
-	b0AOs/YkKD1hmOPE+FDQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=PH/b5UHwLUyKoieV8wWOHlOsUXFLy4aw+lKIig8wN8E=; b=sSRhbilwvPoiF3
+	K78O3Zat7iUMS52kHcj2xqu9gdeiYhsyL+3QSPR92z4zM4GVoLeR6z42vo+ByqAgSDyYHRAofe7Qy
+	6lNaEHeYQSCijz6Vsp44RHqoKX7PKGhhDZHeBfH07tzZpSnHGM6cfLlg1Vdb0S+i7tHW+J++Qjr0R
+	L7qqlk7GaJtttNKnYNnCALNhvVi3VTig2u7cqQERm25ZbmHRXWR46G/GOiz59/Boz7XoKQ3NLbcGb
+	cQgRb8fNtuEC92ihH8wrg/R9/vDpY9hhuVYNxToIz0d4uMqpJfiJlDxAT8cY+Xbru3yf5wOTAKK5U
+	kE9Tc8d8LnJs17QKyFZg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaPN1-00013T-JT; Fri, 21 Dec 2018 18:17:59 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaPMy-00012K-EX
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 18:17:58 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7B23EEBD;
- Fri, 21 Dec 2018 10:17:43 -0800 (PST)
-Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 87D223F575;
- Fri, 21 Dec 2018 10:17:41 -0800 (PST)
-From: James Morse <james.morse@arm.com>
-Subject: Re: [RFC RESEND PATCH] kvm: arm64: export memory error recovery
- capability to user space
-To: Peter Maydell <peter.maydell@linaro.org>
-References: <0184EA26B2509940AA629AE1405DD7F201FFC21E@dggema523-mbx.china.huawei.com>
- <c01e3ed0-f66c-f7df-295a-70b44bad49ff@arm.com>
- <CAFEAcA8No4tti6o9oErdfGKyHqRTfXebO4fuEOhBApFAxw=LOg@mail.gmail.com>
-Message-ID: <1d73ec5a-b58d-1e00-b681-53cd80cba999@arm.com>
-Date: Fri, 21 Dec 2018 18:17:40 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
+	id 1gaPOD-0001Ur-24; Fri, 21 Dec 2018 18:19:13 +0000
+Received: from mail-oi1-f193.google.com ([209.85.167.193])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gaPO8-0001SK-Uu; Fri, 21 Dec 2018 18:19:10 +0000
+Received: by mail-oi1-f193.google.com with SMTP id w13so5489758oiw.9;
+ Fri, 21 Dec 2018 10:18:58 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=YMUcRmedR1+TWGOjoz0Wlfhqc+rkPb0GF3TzBUuCLYA=;
+ b=NuDl+l7CigubVPv6T+YggWNi0V+YKrqeWSmSBxS0Sur467QO3yWgIMFZ3nxSZ8Y3BP
+ HI3nyWoYYU14/miMxzCX+t9AsG2k/uqQTeRFzHhKwCtmk7AgF/u5vWvuhOWQwaRAJaDj
+ s8BvWmJbBWhPJpHlZKo2U00KtWrB8xxVDwHyev4Rl6WZXez+aHLsS7qP8DNvNZGObN+t
+ 3uRwIjyvHXqrT5bPoKetsMVvn3hdOCB3RN5eGTfh8SgOOR8ua8o0T7V9g2CzmcnaA/YO
+ vAtcwiCbs1g4IreY/x8TZ0FeSCFT57QVIOb69o1zRo8bh3cul4sut9N4OiYOplXwXNjP
+ iHwQ==
+X-Gm-Message-State: AA+aEWYXbGR3XrnZkxIj7Epp/IVudDCGJlzXtfR9tuy2jOJVMMWALPG4
+ 6ddXJDMVWVsnXCLkLeUIzhnvJkM=
+X-Google-Smtp-Source: AFSGD/XUXMmQl06uZgiT0gemqrUbdmLYDxBCg8xj5pPNaYPvlxeYPHFVVh1FjXAvR1cFBY/kZRHHWA==
+X-Received: by 2002:aca:5d84:: with SMTP id r126mr2157519oib.227.1545416337485; 
+ Fri, 21 Dec 2018 10:18:57 -0800 (PST)
+Received: from localhost (ip-70-12-27-227.kscymo.spcsdns.net. [70.12.27.227])
+ by smtp.gmail.com with ESMTPSA id
+ f18sm12822700otl.18.2018.12.21.10.18.55
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 21 Dec 2018 10:18:56 -0800 (PST)
+Date: Fri, 21 Dec 2018 12:18:53 -0600
+From: Rob Herring <robh@kernel.org>
+To: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Subject: Re: [PATCH 1/5] dt-bindings: gpu: mali-utgard: add Amlogic Meson8
+ and Meson8b compatible
+Message-ID: <20181221181853.GA29842@bogus>
+References: <20181208171247.22238-1-martin.blumenstingl@googlemail.com>
+ <20181208171247.22238-2-martin.blumenstingl@googlemail.com>
 MIME-Version: 1.0
-In-Reply-To: <CAFEAcA8No4tti6o9oErdfGKyHqRTfXebO4fuEOhBApFAxw=LOg@mail.gmail.com>
-Content-Language: en-GB
+Content-Disposition: inline
+In-Reply-To: <20181208171247.22238-2-martin.blumenstingl@googlemail.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_101756_494384_7BCD72D5 
-X-CRM114-Status: GOOD (  36.33  )
+X-CRM114-CacheID: sfid-20181221_101908_989934_93AC5762 
+X-CRM114-Status: UNSURE (   9.97  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,161 +86,31 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "open list:DOCUMENTATION" <linux-doc@vger.kernel.org>,
- kvm-devel <kvm@vger.kernel.org>, Jonathan Corbet <corbet@lwn.net>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- =?UTF-8?B?UmFkaW0gS3LEjW3DocWZ?= <rkrcmar@redhat.com>,
- Will Deacon <will.deacon@arm.com>, Christoffer Dall <christoffer.dall@arm.com>,
- gengdongjiu <gengdongjiu@huawei.com>,
- arm-mail-list <linux-arm-kernel@lists.infradead.org>,
- lkml - Kernel Mailing List <linux-kernel@vger.kernel.org>
+Cc: devicetree@vger.kernel.org, narmstrong@baylibre.com, sboyd@kernel.org,
+ khilman@baylibre.com, mturquette@baylibre.com, linux-kernel@vger.kernel.org,
+ dri-devel@lists.freedesktop.org,
+ Martin Blumenstingl <martin.blumenstingl@googlemail.com>, robh+dt@kernel.org,
+ linux-amlogic@lists.infradead.org, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, jbrunet@baylibre.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Peter,
-
-On 19/12/2018 19:02, Peter Maydell wrote:
-> On Mon, 17 Dec 2018 at 15:56, James Morse <james.morse@arm.com> wrote:
->> I don't think this really matters. Its only the NMIlike notifications that the
->> guest doesn't have to register or poll. The ones we support today extend the
->> architectures existing behaviour: you would have taken an external-abort on a
->> real system, whether you know about the additional metadata doesn't matter to Qemu.
+On Sat,  8 Dec 2018 18:12:43 +0100, Martin Blumenstingl wrote:
+> Add a compatible string for the Mali-450 GPU on Amlogic Meson8 and
+> Meson8b SoCs. Meson8 uses an "MP6" variant with six pixel processors
+> while Meson8b (as cost-reduced SoC) uses an "MP2" variant with two pixel
+> processors. Both have a reset line to bring the GPU into a well-defined
+> state.
 > 
-> Consider the case where we booted the guest using a DTB and no ACPI
-> table at all -- we certainly can't just call QEMU code that tries to
-> add entries to a nonexistent table.
-
-Sure, because you know which of the two sets of firmware-table you're providing.
-
-I'm taking the behaviour of physical machines as the template for what we should
-do here. I can boot a DT-only kernel on Seattle. Firmware has no idea I did
-this, it will still take DRAM uncorrected-error IRQs in firmware, and generate
-CPER records in the POLLed areas. But the kernel will never look, because it
-booted with DT.
-What happens if the kernel goes on to access the corrupt location? It either
-gets corrupt values back, or an external abort, depending on the design of the
-memory-controller.
-
-X-gene uses an IRQ for its firmware-first notification. Booted with DT that
-interrupt can be asserted, but as the OS has didn't know to register it, its
-never taken. We eventually get the same corrupt-values/external-abort behaviour.
-
-KVM/Linux is acting as the memory controller using stage2. When an error is
-detected by the host it unmaps the page from stage2, and refuses to map it again
-until its fixed up in Qemu's memory map (which can happen automatically). If the
-kernel can't fix it itself, the AO signal is like the DRAM-IRQ above, and the AR
-like the external abort.
-We don't have a parallel to the 'gets corrupt values back' behaviour as Linux
-will always unmap hwpoison pages from user-space/guests.
-
-If the host-kernel wasn't build with CONFIG_MEMORY_FAILURE, its like the memory
-controller doesn't support any of the above. I think knowing this is the closest
-to what you want.
-
-
-> My main point is that there
-> needs to be logic in Dongjiu's QEMU patches that checks more than
-> just "does this KVM feature exist". I'm not sufficiently familiar
-> with all this RAS stuff to be certain what those checks should
-> be and what the right choices are; I just know we need to check
-> *something*...
-
-I think this is the crux of where we don't see this the same way.
-The v8.2 RAS stuff is new, RAS support on arm64 is not. Kernel support arrived
-at roughly the same time, but not CPU support. There are v8.0 systems that
-support RAS. There are DT systems that can do the same with edac drivers.
-The physical v8.0 systems that do this, are doing it without any extra CPU support.
-
-I think x86's behaviour here includes some history, which we don't have.
-From the order of the HEST entries, it looks like the machine-check stuff came
-first, then firmware-first using a 'GHES' entry in that table.
-I think Qemu on x86 only supports the emulated machine check stuff, so it needs
-to check KVM has the widget to do this.
-If Qemu on x86 supported firmware-first, I don't think there would be anything
-to check. (details below)
-
-
->>> Let us see the X86's QEMU logic:
->>> 1. Before the vCPU created, it will set a default env->mcg_cap value with
->>
->>> MCE_CAP_DEF flag, MCG_SER_P means it expected the guest CPU model supports
->>> RAS error recovery.[1] 2. when the vCPU initialize, it will check whether host
->>> kernel support this feature[2]. Only when host kernel and default env->mcg_cap
->>> value all expected this feature, then it will setup vCPU support RAS error
->>> recovery[3].
->>
->> This looks like KVM exposing a CPU capability to Qemu, which then configures the
->> behaviour KVM gives to the guest. This doesn't tell you anything about what the
->> guest supports.
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>  Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> It tells you what the *guest CPU* supports, which for x86 is a combination
-> of (a) what did the user/machine model ask for and (b) what can KVM
-> actually implement. I don't much care whether the guest OS supports
-> anything or not, that's its business... but it does seem odd to me
-> that the equivalent Arm code is not similarly saying "what were we
-> asked for, and what can we do?".
 
-The flow is something like:
-For AO, generate CPER records, and notify the OS via NOTIFY_POLL (which isn't
-really a notification) or some flavour of IRQ.
-To do this, Qemu needs to be able to write to its reserved area of guest memory,
-and possibly trigger an interrupt.
-
-For AR, generate CPER records and notify the OS via external abort. (the
-presence of the CPER records makes this NOTIFY_SEA or NOTIFY_SEI).
-To do this, Qemu again needs to be able to write to guest memory, set guest
-registers (KVM_SET_ONE_REG()). If it wants to inject an
-SError-Interrupt/Asynchronous-external-abort while the guest has it masked, it
-needs KVM_SET_VCPU_EVENTS().
-
-Nothing here depends on the CPU or kernel configuration. This is all ACPI stuff,
-so its the same on x86. (The only difference is external-abort becomes NMI,
-which is probably done through SET_VCPU_EVENTS())
-
-What were we asked for? Qemu wants to know if it can write to guest memory,
-guest registers (for synchronous external abort) and trigger interrupts. It has
-always been able to do these things.
-
-
-> I think one question here which it would be good to answer is:
-> if we are modelling a guest and we haven't specifically provided
-> it an ACPI table to tell it about memory errors, what do we do
-> when we get a sigbus from the host? We have basically two choices:
->  (1) send the guest an SError (aka asynchronous external abort)
->      anyway (with no further info about what the memory error is)
-
-For an AR signal an external abort is valid. Its up to the implementation
-whether these are synchronous or asynchronous. Qemu can only take a signal for
-something that was synchronous, so you can choose between the two.
-Synchronous external abort is marginally better as an unaware OS knows its
-affects this thread, and may be able to kill it.
-SError with an imp-def ESR is indistinguishable from 'part of the soc fell out',
-and should always result in a panic().
-
-
->  (2) just stop QEMU (as we would for a memory error in QEMU's
->      own memory)
-
-This is also valid. A machine may take external-abort to EL3 and then
-reboot/crash/burn.
-
-
-Just in case this is the deeper issue: I keep picking on memory-errors, what
-about CPU errors?
-Linux can't handle these at all, unless they are also memory errors. If we take
-an imprecise abort from a guest KVM can't tell Qemu using signals. We don't have
-any mechanism to tell user-space about imprecise exceptions. In this case KVM
-throws an imp-def SError back at the affected vcpu, these are allowed to be
-imprecise, as this is the closest thing we have.
-
-This does mean that any AO/AR signal Qemu gets is a memory error.
-
-
-Happy New Year,
-
-James
+Reviewed-by: Rob Herring <robh@kernel.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
