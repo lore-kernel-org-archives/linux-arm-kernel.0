@@ -2,110 +2,82 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-12.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F0565C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:00:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7621CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:12:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BE5F821920
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:00:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 42A752075B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:12:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OTzZcp1+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BE5F821920
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sdoGcilk";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="YimIdrgG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 42A752075B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:Reply-To:List-Subscribe:List-Help:
-	List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:In-Reply-To:
-	MIME-Version:References:Subject:To:From:Date:Content-ID:Content-Description:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HnRwFdhJdAXCExNwO3d41RkF4R4eSMLs7huBYj/90QQ=; b=OTzZcp1+IG4u4H
-	BlP1azEtdKOOdchOj11dmM3e3hplUPY1U3IFj1G+cvZ8gAwUbp6jdVFdjPZoN3lIzs/cUuswnLr0H
-	/mc3B1uvQ9WmT3l5HQAyqvEGw7AuCQcPW3DRfvSVhE38cPyz5v/F3MrnMlaWX8+4wDp40dUlPQ56a
-	7hHaYAtio5ayatDZtCXKa8Gx6TUg3A5/scoVjUm+fp/WLn+HDVK2SwrjcKkUryo3WZCXCtCRlVu6a
-	EGkiBleCO1eQzP8lpk7ig96DU4s8LIVBsTXY1G9+/MLAgMxQlL+KRFWwW83cBzi/pfcu5ehvjTrJh
-	8ZLZGlUgkSW2eTm04dgg==;
+	List-Owner; bh=5uPtQkiM2shIptFZHEx3Ph2LFdDGtxPO1zsPzI0hpZU=; b=sdoGcilkIl2f8K
+	xDS0yXdo2OEcSud6h4mRI1iHm1+6unKLUBeWI4DDRyfDtIdBSSh7WJ49nwc2iD3DzVVttYz8t9kne
+	60h5BUQkNuGbDTV6HQt0jj9Px1DxqiAntbeHbrIY5Ucx8AXRv2yle7aqkNBaZLCO3YT7z40UR7HXX
+	M7yhnLQe7rUQ6zfiGYybQaFEPVcsN0vish0W3pmI8Mkb1r30JrwEQ/X5MJYRbax9uRD7nyRczfpAP
+	IlsCViR0igvAgKdKP1628e9RM+6G6ShlKuYEkZSbwfmdPq3SaWYwwSZS7qe+YUj+Fpoz5s+Qe0wFa
+	aUfRzAIlBHN2QJMrMRxw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaP5w-0002H6-Ig; Fri, 21 Dec 2018 18:00:20 +0000
-Received: from mx0b-001b2d01.pphosted.com ([148.163.158.5]
- helo=mx0a-001b2d01.pphosted.com)
+	id 1gaPHP-0005fx-01; Fri, 21 Dec 2018 18:12:11 +0000
+Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaP5t-0001z2-KH
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 18:00:19 +0000
-Received: from pps.filterd (m0098414.ppops.net [127.0.0.1])
- by mx0b-001b2d01.pphosted.com (8.16.0.22/8.16.0.22) with SMTP id
- wBLHwaQh066704
- for <linux-arm-kernel@lists.infradead.org>; Fri, 21 Dec 2018 13:00:06 -0500
-Received: from e13.ny.us.ibm.com (e13.ny.us.ibm.com [129.33.205.203])
- by mx0b-001b2d01.pphosted.com with ESMTP id 2ph22qgnb2-1
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
- for <linux-arm-kernel@lists.infradead.org>; Fri, 21 Dec 2018 13:00:06 -0500
-Received: from localhost
- by e13.ny.us.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
- Violators will be prosecuted
- for <linux-arm-kernel@lists.infradead.org> from <paulmck@linux.vnet.ibm.com>; 
- Fri, 21 Dec 2018 18:00:05 -0000
-Received: from b01cxnp22033.gho.pok.ibm.com (9.57.198.23)
- by e13.ny.us.ibm.com (146.89.104.200) with IBM ESMTP SMTP Gateway: Authorized
- Use Only! Violators will be prosecuted; 
- (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
- Fri, 21 Dec 2018 18:00:01 -0000
-Received: from b01ledav003.gho.pok.ibm.com (b01ledav003.gho.pok.ibm.com
- [9.57.199.108])
- by b01cxnp22033.gho.pok.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
- wBLI00IO20709428
- (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
- Fri, 21 Dec 2018 18:00:00 GMT
-Received: from b01ledav003.gho.pok.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 8375FB2066;
- Fri, 21 Dec 2018 18:00:00 +0000 (GMT)
-Received: from b01ledav003.gho.pok.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 60BDEB205F;
- Fri, 21 Dec 2018 18:00:00 +0000 (GMT)
-Received: from paulmck-ThinkPad-W541 (unknown [9.85.153.1])
- by b01ledav003.gho.pok.ibm.com (Postfix) with ESMTP;
- Fri, 21 Dec 2018 18:00:00 +0000 (GMT)
-Received: by paulmck-ThinkPad-W541 (Postfix, from userid 1000)
- id 3C71216C36A7; Fri, 21 Dec 2018 10:00:07 -0800 (PST)
-Date: Fri, 21 Dec 2018 10:00:07 -0800
-From: "Paul E. McKenney" <paulmck@linux.ibm.com>
-To: Andi Kleen <ak@linux.intel.com>
-Subject: Re: [PATCH 0/7] ARM: hacks for link-time optimization
-References: <20180220215954.4092811-1-arnd@arndb.de>
- <20181217225020.GA16520@hirez.programming.kicks-ass.net>
- <20181218000800.GB25620@tassilo.jf.intel.com>
- <20181218091824.GI2218@hirez.programming.kicks-ass.net>
- <20181221172044.GE25620@tassilo.jf.intel.com>
+ id 1gaPHL-0005ef-SE
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 18:12:09 +0000
+Received: by mail-pg1-x544.google.com with SMTP id y4so2828212pgc.12
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 21 Dec 2018 10:11:55 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=s+s0cCpjIWVQiboFpL5zFPaKNhtl7rE4uoN8aqs1kLI=;
+ b=YimIdrgGY5kOVlG+kPdeha0dYALLoL0bjb1JmPeUURrqxIDlMdxfvYSpiGsZ0iGmol
+ gCWlw+WkTsc8JvRW7g19ZIDhPwGQ7eDw87yKddTzTA7BhtzCQ8LRK9HdvT4SEPN9QP40
+ A20cT9XO+yZMY0u9a52rdr1fVMJZDDZhPA3p5QIVWJn0JOAj1ljqSb2duLO4h8VDzQi2
+ ZlDqExCtiF15mDyzzu7lxMprzH2n9y1Ipl4Hanx+LdH/3uQ9I1Bc05z5TNcxiw+ApspW
+ 2AZVxK0qNh3VgMfyPoohoap0Ri2yyK2ut+hUq0QH8zoAMHVHmeMC7fcQ63ZGXMpkfAaP
+ gFoA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=s+s0cCpjIWVQiboFpL5zFPaKNhtl7rE4uoN8aqs1kLI=;
+ b=nIL+4fWj4+iFnPJq8uPys+m2jDxy5/J3LkzI3MSSoBfN2+lvjrMQV8S/kMFYGY16B8
+ lrd9x1CSf6aHxHbgt9nsaGFebUbErZQXkor0jke+ccmpzpIDwUIJB3M5/WTKMMNbRinL
+ iVrX7Blro8naoHnUEymfNpSQN5frD5fs50Kn7ARBlTVYg6qvt+fI9a+nQLUxA9qxAWJg
+ q+bS+EnfBYf3//m/CfrtWpGAv+BgAqT6S1/R/hP1IaRDIoPGssJmvZuzSWGAy6OZ4pyP
+ VomPJLFcnaZ0MiNICVgatOGhXyC15qmnCHigESVCu55EnpNqO+Rl03vxHmWDNoOUvZ5z
+ CPMQ==
+X-Gm-Message-State: AJcUukd3ukJn1wd3f6L3EeUnURuCssvnxTDOxGYYbLCaHxXj0vzsOyDR
+ CMsybg2SaTVJPdzG7vx3db9gBKPMRHZrkWTZXl3Pqw==
+X-Google-Smtp-Source: ALg8bN7lftdti7rNkwuau6n+UL53WBYOLTn2sRichzFPafU22RR8xqToudo0eJodzgc4hxheyd66mmmDj0JlmSCWJVY=
+X-Received: by 2002:a63:42c1:: with SMTP id p184mr3374238pga.202.1545415914314; 
+ Fri, 21 Dec 2018 10:11:54 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181221172044.GE25620@tassilo.jf.intel.com>
-User-Agent: Mutt/1.5.21 (2010-09-15)
-X-TM-AS-GCONF: 00
-x-cbid: 18122118-0064-0000-0000-0000038A71D9
-X-IBM-SpamModules-Scores: 
-X-IBM-SpamModules-Versions: BY=3.00010262; HX=3.00000242; KW=3.00000007;
- PH=3.00000004; SC=3.00000272; SDB=6.01135049; UDB=6.00590197; IPR=6.00915221; 
- MB=3.00024789; MTD=3.00000008; XFM=3.00000015; UTC=2018-12-21 18:00:04
-X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
-x-cbparentid: 18122118-0065-0000-0000-00003BC300C5
-Message-Id: <20181221180007.GQ4170@linux.ibm.com>
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2018-12-21_09:, , signatures=0
-X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
- priorityscore=1501
- malwarescore=0 suspectscore=0 phishscore=0 bulkscore=0 spamscore=0
- clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
- mlxlogscore=999 adultscore=0 classifier=spam adjust=0 reason=mlx
- scancount=1 engine=8.0.1-1810050000 definitions=main-1812210137
+References: <20181215212304.19390-1-natechancellor@gmail.com>
+In-Reply-To: <20181215212304.19390-1-natechancellor@gmail.com>
+From: Nick Desaulniers <ndesaulniers@google.com>
+Date: Fri, 21 Dec 2018 10:11:43 -0800
+Message-ID: <CAKwvOdkfehycubxKDLs9vZvKWE4QR+EyerxNSaV72aDwySx8eQ@mail.gmail.com>
+Subject: Re: [PATCH] ARM: Ensure that NEON code always compiles with Clang
+To: Nathan Chancellor <natechancellor@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_100017_787920_42B8C3B0 
-X-CRM114-Status: GOOD (  35.48  )
+X-CRM114-CacheID: sfid-20181221_101207_917267_C41E37FA 
+X-CRM114-Status: GOOD (  26.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -117,102 +89,138 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Reply-To: paulmck@linux.ibm.com
-Cc: Arnd Bergmann <arnd@arndb.de>, Nicolas Pitre <nico@linaro.org>,
- Peter Zijlstra <peterz@infradead.org>, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, hubicka@ucw.cz,
- Thomas Gleixner <tglx@linutronix.de>, Ingo Molnar <mingo@kernel.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>, Tri Vo <trong@android.com>,
+ Jonathan Corbet <corbet@lwn.net>, linux-doc@vger.kernel.org,
+ Russell King <linux@armlinux.org.uk>, LKML <linux-kernel@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 21, 2018 at 09:20:44AM -0800, Andi Kleen wrote:
-> > In particular turning an address-dependency into a control-dependency,
-> > which is something allowed by the C language, since it doesn't recognise
-> > these concepts as such.
-> > 
-> > The 'optimization' is allowed currently, but LTO will make it much more
-> > likely since it will have a much wider view of things. Esp. when combined
-> > with PGO.
-> > 
-> > Specifically; if you have something like:
-> > 
-> > int idx;
-> > struct object objs[2];
-> > 
-> > the statement:
-> > 
-> >   val = objs[idx & 1].ponies;
-> > 
-> > which you 'need' to be translated like:
-> > 
-> >   struct object *obj = objs;
-> >   obj += (idx & 1);
-> >   val = obj->ponies;
-> > 
-> > Such that the load of obj->ponies depends on the load of idx. However
-> > our dear compiler is allowed to make it:
-> > 
-> >   if (idx & 1)
-> >     obj = &objs[1];
-> >   else
-> >     obj = &objs[0];
-> > 
-> >   val = obj->ponies;
-> 
-> I don't see why a compiler would do such an optimization. Clearly
-> the second variant is worse than the first, bigger and needs
-> branch prediction resources.
-> 
-> In fact compilers usually try hard to go into the other direction
-> and apply if conversion.
-> 
-> Has anyone seen real world examples of such changes being done, or is this
-> all language lawyering theory?
+On Sat, Dec 15, 2018 at 1:23 PM Nathan Chancellor
+<natechancellor@gmail.com> wrote:
+>
+> While building arm32 allyesconfig, I ran into the following errors:
+>
+>   arch/arm/lib/xor-neon.c:17:2: error: You should compile this file with
+>   '-mfloat-abi=softfp -mfpu=neon'
+>
+>   In file included from lib/raid6/neon1.c:27:
+>   /home/nathan/cbl/prebuilt/lib/clang/8.0.0/include/arm_neon.h:28:2:
+>   error: "NEON support not enabled"
+>
+> Building V=1 showed NEON_FLAGS getting passed along to Clang but
+> __ARM_NEON__ was not getting defined. Ultimately, it boils down to Clang
+> only defining __ARM_NEON__ when targeting armv7, rather than armv6k,
+> which is the '-march' value for allyesconfig.
+>
+> From lib/Basic/Targets/ARM.cpp in the Clang source:
+>
+>   // This only gets set when Neon instructions are actually available, unlike
+>   // the VFP define, hence the soft float and arch check. This is subtly
+>   // different from gcc, we follow the intent which was that it should be set
+>   // when Neon instructions are actually available.
+>   if ((FPU & NeonFPU) && !SoftFloat && ArchVersion >= 7) {
+>     Builder.defineMacro("__ARM_NEON", "1");
+>     Builder.defineMacro("__ARM_NEON__");
+>     // current AArch32 NEON implementations do not support double-precision
+>     // floating-point even when it is present in VFP.
+>     Builder.defineMacro("__ARM_NEON_FP",
+>                         "0x" + Twine::utohexstr(HW_FP & ~HW_FP_DP));
+>   }
+>
+> Ard Biesheuvel recommended explicitly adding '-march=armv7-a' at the
+> beginning of the NEON_FLAGS definitions so that __ARM_NEON__ always gets
+> definined by Clang. This doesn't functionally change anything because
+> that code will only run where NEON is supported, which is implicitly
+> armv7.
+>
+> Link: https://github.com/ClangBuiltLinux/linux/issues/287
+> Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
 
-I have not seen it myself, but I have heard others claim to.  For example,
-if "idx & 1" had to be computed for some other reason, especially if there
-was a pre-exiting "if" statement with this as its condition.  Or if you
-have hardware that has a conditional-move instruction.  And so on.
+Nathan,
+Thanks for sending the patch, and thanks to Ard for the suggestion.
+Reviewed-by: Nick Desaulniers <ndesaulniers@google.com>
 
-Do you have a way to guarantee that it never happens?
+> ---
+>  Documentation/arm/kernel_mode_neon.txt | 4 ++--
+>  arch/arm/lib/Makefile                  | 2 +-
+>  arch/arm/lib/xor-neon.c                | 2 +-
+>  lib/raid6/Makefile                     | 2 +-
+>  4 files changed, 5 insertions(+), 5 deletions(-)
+>
+> diff --git a/Documentation/arm/kernel_mode_neon.txt b/Documentation/arm/kernel_mode_neon.txt
+> index 525452726d31..b9e060c5b61e 100644
+> --- a/Documentation/arm/kernel_mode_neon.txt
+> +++ b/Documentation/arm/kernel_mode_neon.txt
+> @@ -6,7 +6,7 @@ TL;DR summary
+>  * Use only NEON instructions, or VFP instructions that don't rely on support
+>    code
+>  * Isolate your NEON code in a separate compilation unit, and compile it with
+> -  '-mfpu=neon -mfloat-abi=softfp'
+> +  '-march=armv7-a -mfpu=neon -mfloat-abi=softfp'
+>  * Put kernel_neon_begin() and kernel_neon_end() calls around the calls into your
+>    NEON code
+>  * Don't sleep in your NEON code, and be aware that it will be executed with
+> @@ -87,7 +87,7 @@ instructions appearing in unexpected places if no special care is taken.
+>  Therefore, the recommended and only supported way of using NEON/VFP in the
+>  kernel is by adhering to the following rules:
+>  * isolate the NEON code in a separate compilation unit and compile it with
+> -  '-mfpu=neon -mfloat-abi=softfp';
+> +  '-march=armv7-a -mfpu=neon -mfloat-abi=softfp';
+>  * issue the calls to kernel_neon_begin(), kernel_neon_end() as well as the calls
+>    into the unit containing the NEON code from a compilation unit which is *not*
+>    built with the GCC flag '-mfpu=neon' set.
+> diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
+> index ad25fd1872c7..0bff0176db2c 100644
+> --- a/arch/arm/lib/Makefile
+> +++ b/arch/arm/lib/Makefile
+> @@ -39,7 +39,7 @@ $(obj)/csumpartialcopy.o:     $(obj)/csumpartialcopygeneric.S
+>  $(obj)/csumpartialcopyuser.o:  $(obj)/csumpartialcopygeneric.S
+>
+>  ifeq ($(CONFIG_KERNEL_MODE_NEON),y)
+> -  NEON_FLAGS                   := -mfloat-abi=softfp -mfpu=neon
+> +  NEON_FLAGS                   := -march=armv7-a -mfloat-abi=softfp -mfpu=neon
+>    CFLAGS_xor-neon.o            += $(NEON_FLAGS)
+>    obj-$(CONFIG_XOR_BLOCKS)     += xor-neon.o
+>  endif
+> diff --git a/arch/arm/lib/xor-neon.c b/arch/arm/lib/xor-neon.c
+> index a6741a895189..4600b62d845f 100644
+> --- a/arch/arm/lib/xor-neon.c
+> +++ b/arch/arm/lib/xor-neon.c
+> @@ -14,7 +14,7 @@
+>  MODULE_LICENSE("GPL");
+>
+>  #ifndef __ARM_NEON__
+> -#error You should compile this file with '-mfloat-abi=softfp -mfpu=neon'
+> +#error You should compile this file with '-march=armv7-a -mfloat-abi=softfp -mfpu=neon'
+>  #endif
+>
+>  /*
+> diff --git a/lib/raid6/Makefile b/lib/raid6/Makefile
+> index 2f8b61dfd9b0..bfec7c87c61e 100644
+> --- a/lib/raid6/Makefile
+> +++ b/lib/raid6/Makefile
+> @@ -25,7 +25,7 @@ endif
+>  ifeq ($(CONFIG_KERNEL_MODE_NEON),y)
+>  NEON_FLAGS := -ffreestanding
+>  ifeq ($(ARCH),arm)
+> -NEON_FLAGS += -mfloat-abi=softfp -mfpu=neon
+> +NEON_FLAGS += -march=armv7-a -mfloat-abi=softfp -mfpu=neon
+>  endif
+>  CFLAGS_recov_neon_inner.o += $(NEON_FLAGS)
+>  ifeq ($(ARCH),arm64)
+> --
+> 2.20.1
+>
 
-							Thanx, Paul
 
-> -Andi
-> 
-> > 
-> > Because C doesn't recognise this as being different. However this is
-> > utterly broken, because in this translation we can speculate the load
-> > of obj->ponies such that it no longer depends on the load of idx, which
-> > breaks RCU.
-> > 
-> > Note that further 'optimization' is possible and the compiler could even
-> > make it:
-> > 
-> >   if (idx & 1)
-> >     val = objs[1].ponies;
-> >   else
-> >     val = objs[0].ponies;
-> > 
-> > Now, granted, this is a fairly artificial example, but it does
-> > illustrate the exact problem.
-> > 
-> > The more the compiler can see of the complete program, the more likely
-> > it can make inferrences like this, esp. when coupled with PGO.
-> > 
-> > Now, we're (usually) very careful to wrap things in READ_ONCE() and
-> > rcu_dereference() and the like, which makes it harder on the compiler
-> > (because 'volatile' is special), but nothing really stops it from doing
-> > this.
-> > 
-> > Paul has been trying to beat clue into the language people, but given
-> > he's been at it for 10 years now, and there's no resolution, I figure we
-> > ought to get compiler implementations to give us a knob.
-> 
-
+-- 
+Thanks,
+~Nick Desaulniers
 
 _______________________________________________
 linux-arm-kernel mailing list
