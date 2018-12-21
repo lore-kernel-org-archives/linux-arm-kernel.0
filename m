@@ -2,84 +2,57 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E60C5C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 16:49:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 13A22C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 16:52:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B331521916
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 16:49:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D92BF21916
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 16:52:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YvuhHqF9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B331521916
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HN5cLRW5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D92BF21916
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=TVJ2WDfUgf9how2XyTG/G4Afmm3M0Gx1MVdYWvYLTf0=; b=YvuhHqF96/oirL
-	0nph3xT61bMmZMynAa303ks3zcXSyQWTHCkwlgZkpfI55er7UybdY1yhZq0t0BiLllVOEzbr6Z7yN
-	UefjjtNvqHB7OBX/EbaYjy/Vfl6gEkYCRGNqfnZsq0/xKDvYaUMdtwboOnb4HyPXWUEfVB1m/EGt5
-	3yP2uu9fmw+Mvs00mzKcVKUWloD5Rv2sPhzGnTy23SYJn1xdZBLRgrwaDx5iKpPtsXBbcB+4fjUyZ
-	iQPG3LkKB8fYdteRcQr/7sTfX95Xh3DS4OPY1ZlidiMnlN4au/t34e2TWimwm3rImpvkH+8GJyAp7
-	TAVfY3fLEpDM/24AUggA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=pSoH0eNdIc4wPxqS9/PcH0jMfRxrxEcABfEEKmNhSpU=; b=HN5cLRW5AbCHxp
+	PswMsWW5a7Ij9ZgTC62Rsfh8OEgDV/mPmjc3oIJdh4PU5xovtQbBl9ZWUnISHMxAQ4ujc8Qeq6XAa
+	xmi8RkN5D33IIusTNa3Kko+Pv8h+1YKoEf0znFkwJDWhwOInrxwP3t+MCp00QptKkhzfjuVwh06Ry
+	LTHUl/gdnXmWI1QGreJASuP3TVbyNO+Trl7sgu6udL+g6YAxKfCWxXmZVlVZcwK67JSodiubV2WIq
+	3z6UYZPzlvuws+mGeGA0Pu0vkc+RFoLRWQHUgrKCiqN3J1K8l6tf0x/ytcaBOTGoJpw+fCRKdgBd1
+	zX769JCVWaL/FO3NuLNw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaNz3-0007ty-NF; Fri, 21 Dec 2018 16:49:09 +0000
-Received: from mail-ed1-f65.google.com ([209.85.208.65])
+	id 1gaO1m-0000zc-1c; Fri, 21 Dec 2018 16:51:58 +0000
+Received: from gloria.sntech.de ([185.11.138.130])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaNz0-0007t2-6j
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 16:49:07 +0000
-Received: by mail-ed1-f65.google.com with SMTP id d39so5154443edb.12
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 21 Dec 2018 08:48:53 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=ZqqCdnbZYBpsITc5EMAHVafk34rmCvV3c1syI8YgPPY=;
- b=WmLQ0vNfTI4939OV1whiRk4gd4oRulTS1SNs+Lg1XsEedt+YoSZ826t6IxpTIXaoTm
- 90d8UVpov9mXCo6oPGf4eesta+CpBPysGxQqgS4lnWe5zJICSP4/EKMYxTkfeH8M1Gl4
- kgULrcEBxIkaWU/zpMLpVNb60DJ462J8aQ/irqLfhiqzF1ih5Viniqbnwl8LOzZ7SqZF
- bU6A0ckUo8Be8MtYNtFcWDMSdbjnXUBwGYS6ryMiWyM7N8NQxCLs+uzejrWxB3nN3Qj0
- e1bOZ8SM5XZu3OdZDXqBPYK/nczgVJlced/N1YkDMLGU5+QSMnjzuevd3jLvcE3O7L4C
- i8hg==
-X-Gm-Message-State: AA+aEWYe0pe7BetZrneMIoARkg7lDi4e3965ks9TVTDxJ5eS0VwoIe3y
- 7VxwX2KlHspfo04hWV38QXKisSZgXw4=
-X-Google-Smtp-Source: AFSGD/Vtl+jZvs+VtqQC0VQ3JHktxrSNXPkVXNGHkJP1sZreLrMbBwGJuHquzTqH9ubUlJlVdn3kRA==
-X-Received: by 2002:a50:9291:: with SMTP id k17mr2932132eda.243.1545410931840; 
- Fri, 21 Dec 2018 08:48:51 -0800 (PST)
-Received: from mail-wm1-f44.google.com (mail-wm1-f44.google.com.
- [209.85.128.44])
- by smtp.gmail.com with ESMTPSA id m14sm7093475edc.27.2018.12.21.08.48.51
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 21 Dec 2018 08:48:51 -0800 (PST)
-Received: by mail-wm1-f44.google.com with SMTP id f188so6331456wmf.5
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 21 Dec 2018 08:48:51 -0800 (PST)
-X-Received: by 2002:a1c:e58c:: with SMTP id c134mr3475663wmh.124.1545410931063; 
- Fri, 21 Dec 2018 08:48:51 -0800 (PST)
+ id 1gaO1i-0000yk-F0; Fri, 21 Dec 2018 16:51:56 +0000
+Received: from p5b127cbb.dip0.t-ipconnect.de ([91.18.124.187]
+ helo=phil.fritz.box)
+ by gloria.sntech.de with esmtpsa (TLS1.2:ECDHE_RSA_AES_128_GCM_SHA256:128)
+ (Exim 4.89) (envelope-from <heiko@sntech.de>)
+ id 1gaO1U-0001RY-1l; Fri, 21 Dec 2018 17:51:40 +0100
+From: Heiko Stuebner <heiko@sntech.de>
+To: linux-rockchip@lists.infradead.org
+Subject: [PATCH] ARM: dts: rockchip: add focaltech touchscreen to
+ rk3188-bqedison2qc
+Date: Fri, 21 Dec 2018 17:51:29 +0100
+Message-Id: <20181221165129.28628-1-heiko@sntech.de>
+X-Mailer: git-send-email 2.19.2
 MIME-Version: 1.0
-References: <20181221152110.17982-1-codekipper@gmail.com>
- <20181221152110.17982-4-codekipper@gmail.com>
-In-Reply-To: <20181221152110.17982-4-codekipper@gmail.com>
-From: Chen-Yu Tsai <wens@csie.org>
-Date: Sat, 22 Dec 2018 00:48:39 +0800
-X-Gmail-Original-Message-ID: <CAGb2v67LyDW6kmDrahzLYsY7q9mSJimrZ=jMO3PrPQ=mcxy0qw@mail.gmail.com>
-Message-ID: <CAGb2v67LyDW6kmDrahzLYsY7q9mSJimrZ=jMO3PrPQ=mcxy0qw@mail.gmail.com>
-Subject: Re: [PATCH v3 3/9] ASoc: sun4i-i2s: Add 20, 24 and 32 bit support
-To: Code Kipper <codekipper@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_084906_247512_872A0DED 
-X-CRM114-Status: GOOD (  19.17  )
+X-CRM114-CacheID: sfid-20181221_085154_648797_EAB9A08A 
+X-CRM114-Status: UNSURE (   9.41  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,134 +64,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Linux-ALSA <alsa-devel@alsa-project.org>,
- linux-kernel <linux-kernel@vger.kernel.org>,
- Liam Girdwood <lgirdwood@gmail.com>,
- "Andrea Venturi \(pers\)" <be17068@iperbole.bo.it>,
- linux-sunxi <linux-sunxi@googlegroups.com>, Mark Brown <broonie@kernel.org>,
- Maxime Ripard <maxime.ripard@free-electrons.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: linux-arm-kernel@lists.infradead.org,
+ Heiko Stuebner <heiko.stuebner@bq.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 21, 2018 at 11:21 PM <codekipper@gmail.com> wrote:
->
-> From: Marcus Cooper <codekipper@gmail.com>
->
-> Extend the functionality of the driver to include support of 20 and
-> 24 bits per sample for the earlier SoCs.
->
-> Newer SoCs can also handle 32bit samples.
->
-> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
-> ---
->  sound/soc/sunxi/sun4i-i2s.c | 41 ++++++++++++++++++++++++++++++++++---
->  1 file changed, 38 insertions(+), 3 deletions(-)
->
-> diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
-> index 80bf29e0cc86..adb988ae9ac5 100644
-> --- a/sound/soc/sunxi/sun4i-i2s.c
-> +++ b/sound/soc/sunxi/sun4i-i2s.c
-> @@ -399,6 +399,11 @@ static int sun4i_i2s_hw_params(struct snd_pcm_substream *substream,
->         case 16:
->                 width = DMA_SLAVE_BUSWIDTH_2_BYTES;
->                 break;
-> +       case 20:
-> +       case 24:
-> +       case 32:
-> +               width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-> +               break;
->         default:
->                 dev_err(dai->dev, "Unsupported physical sample width: %d\n",
->                         params_physical_width(params));
-> @@ -411,7 +416,18 @@ static int sun4i_i2s_hw_params(struct snd_pcm_substream *substream,
->                 sr = 0;
->                 wss = 0;
->                 break;
-> -
-> +       case 20:
-> +               sr = 1;
-> +               wss = 1;
-> +               break;
-> +       case 24:
-> +               sr = 2;
-> +               wss = 2;
-> +               break;
-> +       case 32:
-> +               sr = 4;
-> +               wss = 4;
-> +               break;
->         default:
->                 dev_err(dai->dev, "Unsupported sample width: %d\n",
->                         params_width(params));
-> @@ -687,6 +703,13 @@ static int sun4i_i2s_dai_probe(struct snd_soc_dai *dai)
->         return 0;
->  }
->
-> +#define SUN4I_FORMATS  (SNDRV_PCM_FMTBIT_S16_LE | \
-> +                        SNDRV_PCM_FMTBIT_S20_3LE | \
-> +                        SNDRV_PCM_FMTBIT_S24_LE)
+From: Heiko Stuebner <heiko.stuebner@bq.com>
 
-IIRC SNDRV_PCM_FMTBIT_S24_LE and SNDRV_PCM_FMTBIT_S32_LE with .sig_bits = 24
-are different things, in regards to how the sample is aligned in a 4 byte
-space. Have you checked that things actually work as expected? This was
-something that did not work using SNDRV_PCM_FMTBIT_S24_LE on sun4i-codec.
+The Edison tablet uses a Focaltech touchscreen, with one speciality
+that the touchscreen resolution doesn't match the display resolution
+(1024x768 vs. 1280x600) which userspace will have to compensate for.
 
-> +
-> +#define SUN8I_FORMATS  (SUN4I_FORMATS | \
-> +                        SNDRV_PCM_FMTBIT_S32_LE)
-> +
->  static struct snd_soc_dai_driver sun4i_i2s_dai = {
->         .probe = sun4i_i2s_dai_probe,
->         .capture = {
-> @@ -694,14 +717,14 @@ static struct snd_soc_dai_driver sun4i_i2s_dai = {
->                 .channels_min = 2,
->                 .channels_max = 2,
->                 .rates = SNDRV_PCM_RATE_8000_192000,
-> -               .formats = SNDRV_PCM_FMTBIT_S16_LE,
-> +               .formats = SUN4I_FORMATS,
->         },
->         .playback = {
->                 .stream_name = "Playback",
->                 .channels_min = 2,
->                 .channels_max = 2,
->                 .rates = SNDRV_PCM_RATE_8000_192000,
-> -               .formats = SNDRV_PCM_FMTBIT_S16_LE,
-> +               .formats = SUN4I_FORMATS,
->         },
->         .ops = &sun4i_i2s_dai_ops,
->         .symmetric_rates = 1,
-> @@ -1106,6 +1129,18 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
->         i2s->capture_dma_data.addr = res->start + SUN4I_I2S_FIFO_RX_REG;
->         i2s->capture_dma_data.maxburst = 8;
->
-> +       soc_dai = devm_kmemdup(&pdev->dev, &sun4i_i2s_dai,
-> +                              sizeof(*soc_dai), GFP_KERNEL);
-> +       if (!soc_dai) {
-> +               ret = -ENOMEM;
-> +               goto err_pm_disable;
-> +       }
-> +
-> +       if (i2s->variant->has_fmt_set_lrck_period) {
+Signed-off-by: Heiko Stuebner <heiko.stuebner@bq.com>
+---
+ arch/arm/boot/dts/rk3188-bqedison2qc.dts | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-This condition deserves a comment, particularly as to why you use it
-in place of having a separate quirk field to represent 32 bit support.
+diff --git a/arch/arm/boot/dts/rk3188-bqedison2qc.dts b/arch/arm/boot/dts/rk3188-bqedison2qc.dts
+index a7477a09fbe8..3685568f999f 100644
+--- a/arch/arm/boot/dts/rk3188-bqedison2qc.dts
++++ b/arch/arm/boot/dts/rk3188-bqedison2qc.dts
+@@ -408,6 +408,21 @@
+ &i2c2 {
+ 	clock-frequency = <400000>;
+ 	status = "okay";
++
++	ft5606: touchscreen@3e {
++		compatible = "edt,edt-ft5506";
++		reg = <0x3e>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <RK_PB7 IRQ_TYPE_EDGE_FALLING>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&tp_int &tp_rst>;
++		reset-gpios = <&gpio0 RK_PB6 GPIO_ACTIVE_LOW>;
++		touchscreen-inverted-y;
++		/* hw ts resolution does not match display */
++		touchscreen-size-y = <1024>;
++		touchscreen-size-x = <768>;
++		touchscreen-swapped-x-y;
++	};
+ };
+ 
+ &i2c3 {
+-- 
+2.19.2
 
-Regards
-ChenYu
-
-> +               soc_dai->playback.formats = SUN8I_FORMATS;
-> +               soc_dai->capture.formats = SUN8I_FORMATS;
-> +       }
-> +
->         pm_runtime_enable(&pdev->dev);
->         if (!pm_runtime_enabled(&pdev->dev)) {
->                 ret = sun4i_i2s_runtime_resume(&pdev->dev);
-> --
-> 2.20.1
->
 
 _______________________________________________
 linux-arm-kernel mailing list
