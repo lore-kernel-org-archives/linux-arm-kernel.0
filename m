@@ -2,118 +2,87 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 00E2FC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 08:33:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 20AE2C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 08:39:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B0C49218FD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 08:33:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E38B0218FD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 08:39:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IFxEzZRV";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="Nm4cLdgN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B0C49218FD
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oUuWAZC9";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Wh5PjhHR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E38B0218FD
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-reply-to:Message-id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=+ldrYCcitPeq4ezvp0wJXdyoml/MXvTu5gb7UWB+z+s=; b=IFxEzZRV+BzzKclqvFHp8GwHyY
-	58SvE+BQTANqudoHHVZcGmKLd6aoOQ73t3OAV2H1ObSeh4KJPYhOk5dTgHBe/HJD0+En9QfRNl3nd
-	+ehW7T22DdKBByc3R+9ZcMtK+IDdQpGASDp8EcHMjJslKTQSLd/jI99BZYMsfU/yWQvPwSfTfr+mg
-	EnGK1NJIcLWcWLm9pUpBlmSAA/a2RPqvOBGLaVwVqEVvcODS3KmsNTwPWo27T/zkPa3rHlV+TOAKR
-	9D7RO5xCtEprpbhz/fGw3NNR+sgPDPZAdHA7dhm0cU4BuqhkEP5NTQprvh8RC7AHk6L6buzD+rXgq
-	BapB+CmQ==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=YvnuyaLT2dIhjp8HQB9lLqfXKVDCGd2xYdt2ET4S9U0=; b=oUuWAZC98K7qBa
+	SCJo6aJJloqP3FkEmkonpczlzUpt7iF+lip7jvAjUyQlsksv4xr6lO487V3Wi9zY5zTWGHPDCrJ7m
+	HyY+ucRkQPNgOVAfqVdwr6AraAIcyTyr4ycdXOkOJmhJNssBZAhdTGY2xih+HQtbjpO/lD2I9gWQU
+	0KNYk/z+iY6NjwlkTRdPofErkfOs5VJ2qeTO3pCtNHg0Eb8UoxTSrnpwPiC2UyEwXEVCrGP1V2k9g
+	4iXJcMmd324FCZl/NXSaKPDvqY7LeNe0mcUzAszabOhr6Z27lsIM1FcEMRvMHAYwVDQdYmQbsCZSA
+	CkeLnx8X5qRn0Cd/ba5Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaGEz-0003Wp-FH; Fri, 21 Dec 2018 08:33:05 +0000
-Received: from mailout1.w1.samsung.com ([210.118.77.11])
+	id 1gaGLR-0005VM-96; Fri, 21 Dec 2018 08:39:45 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaGEv-0003KL-KS
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 08:33:03 +0000
-Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
- by mailout1.w1.samsung.com (KnoxPortal) with ESMTP id
- 20181221083247euoutp01e4e488e040b14f600c175dd758ba18f0~yS-wA5Q6s1764617646euoutp01Q;
- Fri, 21 Dec 2018 08:32:47 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout1.w1.samsung.com
- 20181221083247euoutp01e4e488e040b14f600c175dd758ba18f0~yS-wA5Q6s1764617646euoutp01Q
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1545381167;
- bh=tLC3+04L43oul86HuxKWApsTwBv8jVtRRdaFe6Bs3Wk=;
- h=From:To:Cc:Subject:Date:In-reply-to:References:From;
- b=Nm4cLdgNnBjrqBL/uzwMMVOb0EUaU5sqR04g9VYvIH1v4dTMU+txR7idiHJVeN/9F
- /46ZOaqXzpN1yRefQiPco2LmzodDvivqf7ecB8V7gB+OcC1pX2S4nkBKkiSsj8Ii5A
- yQFensTeSqFw40uIVyYDe5hcdqjpkkE59NDcy5do=
-Received: from eusmges2new.samsung.com (unknown [203.254.199.244]) by
- eucas1p2.samsung.com (KnoxPortal) with ESMTP id
- 20181221083247eucas1p271308b4950ef226b4bc65f955060eb00~yS-vc-4hu0581305813eucas1p2A;
- Fri, 21 Dec 2018 08:32:47 +0000 (GMT)
-Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
- eusmges2new.samsung.com (EUCPMTA) with SMTP id FD.1A.04294.E25AC1C5; Fri, 21
- Dec 2018 08:32:46 +0000 (GMT)
-Received: from eusmgms2.samsung.com (unknown [182.198.249.180]) by
- eucas1p2.samsung.com (KnoxPortal) with ESMTP id
- 20181221083246eucas1p22cade911a455344d351db6060d39ddce~yS-u0XXPk3030030300eucas1p2a;
- Fri, 21 Dec 2018 08:32:46 +0000 (GMT)
-X-AuditID: cbfec7f4-835ff700000010c6-f0-5c1ca52ebd78
-Received: from eusync1.samsung.com ( [203.254.199.211]) by
- eusmgms2.samsung.com (EUCPMTA) with SMTP id 33.F0.04128.E25AC1C5; Fri, 21
- Dec 2018 08:32:46 +0000 (GMT)
-Received: from AMDC3748.DIGITAL.local ([106.120.43.17]) by
- eusync1.samsung.com (Oracle Communications Messaging Server 7.0.5.31.0 64bit
- (built May  5 2014)) with ESMTPA id <0PK2007EFVQLXY60@eusync1.samsung.com>;
- Fri, 21 Dec 2018 08:32:46 +0000 (GMT)
-From: Andrzej Hajda <a.hajda@samsung.com>
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Subject: [PATCH] PCI: pcie-rockchip: use probe_err helpers instead of open
- coding
-Date: Fri, 21 Dec 2018 09:32:38 +0100
-Message-id: <20181221083238.10020-1-a.hajda@samsung.com>
-X-Mailer: git-send-email 2.17.1
-In-reply-to: <20181220111434.GC10978@kroah.com>
-X-Brightmail-Tracker: H4sIAAAAAAAAAzWSbUhTcRTG/Xvv7u5mk9sU/KdSMRJRcmpGXLAsYemV+iAEfSgjp96c6aZs
- ztQ+aCqhFrU11DZTKl+Z5myb04x8meIySRraTEnIJqSzKF+IynQ5b377PTzPcw4HDo7wl9FA
- PEuWT8tl4hwBxkUtY78nI4QtwSlRan0sOdc1ySKXVSOAfP7QwCJrFhYxsrzJgJHuzyss8klt
- GyCNTgeLnOp/hJHWmleA/Lq5xCafjc6zyYaNGoT8uGhgnfGlOhs7ATXlsCPUC908mzLqqzBq
- sKGTTZmaS6jvA+8xaks3iFL3zHpA9ToaEWrdeDDZ5xL3ZAadk1VAyyPjUrmS7tpRLM8dXThR
- 28MuBU/DqgEHh8Rx2Ka1s6sBF+cT7QD+mhlgMWIdwLo1DdhLmX5uezNGK4ALdbdQRrgBHH+p
- ZXtSGBEGt0yzmIf9iRh4/61udy5CaFHo3KhHPYYfcQHOVOi9PYwSIdA1O71b4BEkVH8xspl1
- h2BH9xDiYQ4RCV2W0d1tkFjBoKZxdaeM7wgRHNEVM3k/6LKZ/3eD4ZTmDspwCSzTTiNMtxLA
- 101tGGPEwhGbneVhhPCFDyx1CDOTBytv8xmk4NpaDHNkGYBb9k1EBQ48Bl56EEArFdJMWnFM
- Rt8QKsRShVKWKUzPlRrBzgNMbNs2+kD/3zQrIHAg2Md71xuUwmeJCxRFUiuAOCLw51WeCk7h
- 8zLERcW0PPeqXJlDK6wgCEcFAbybXp8u84lMcT6dTdN5tHzP9cY5gaVA1Ld/7nzCCZ/SnjcR
- V5qiLp7+YUNUR+OD6guNPaHEcJIhTLcklLQnfhAlX6/K1rb6uwuU4RUrf+y25vzh2kWTb268
- xNwhOjvUYoFD6Q6OKo1f/k0dMlYiTz8yvWrRCKzr5rjQxLsD+nNxXRl4qlrVkuy8phQnOV0J
- 4+rDSgGqkIijwxG5QvwPWKANUvwCAAA=
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFjrBLMWRmVeSWpSXmKPExsVy+t/xy7p6S2ViDL79k7a4te4cq8XLCYcZ
- LTbOWM9qMfXhEzaL5sXr2Sz+P3rNarFw2nJGi02Pr7FaXN41h83i0NS9jBZvfr9gt1h75C67
- xdwvU5kt7jxZz+rA57Fm3hpGj8vXLjJ77Jx1l91j06pONo/9c9ewe2xeUu/xft9VNo+/s/az
- ePRtWcXosf3aPGaPz5vkArijuGxSUnMyy1KL9O0SuDI2TDvCVvDfsOL0tK3sDYyLNLsYOTkk
- BEwkNn/7x9TFyMUhJLCEUWLOytWMEE4jk0T/40eMIFVsApoSfzffZAOxRQSMJfrPzmIHKWIW
- mMsicez4DLCEsECwxPWWVUwgNouAqsSrm1fA4rwCFhITn29ih1gnL7F6wwFmEJtTQF/i1bYj
- LCC2kICexNXmZ4wTGHkWMDKsYhRJLS3OTc8tNtIrTswtLs1L10vOz93ECAzfbcd+btnB2PUu
- +BCjAAejEg+vxi7pGCHWxLLiytxDjBIczEoivB22MjFCvCmJlVWpRfnxRaU5qcWHGKU5WJTE
- ec8bVEYJCaQnlqRmp6YWpBbBZJk4OKUaGCcontKYEdkzdc6js4Y9N0qDEv5GKa5JWGX6wo1n
- sXtY4fprpgL6pybO7FCzNo/8/yy+MX718pcG3y4Fzrx6YWqz/NpIRs7wLdcm7GcICLitpRbM
- c6BfqTXRbPrq2rtrvpZHc/iwObz02r0gc3rbvgfbJ7OsCP5v8mOR+oZn91oWpb2e+GKa4W0l
- luKMREMt5qLiRAD44L/AWwIAAA==
-X-CMS-MailID: 20181221083246eucas1p22cade911a455344d351db6060d39ddce
-X-Msg-Generator: CA
-CMS-TYPE: 201P
-X-CMS-RootMailID: 20181221083246eucas1p22cade911a455344d351db6060d39ddce
-References: <20181220111434.GC10978@kroah.com>
- <CGME20181221083246eucas1p22cade911a455344d351db6060d39ddce@eucas1p2.samsung.com>
+ id 1gaGLN-0005UK-JR
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 08:39:43 +0000
+Received: by mail-wr1-x443.google.com with SMTP id t27so4319817wra.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 21 Dec 2018 00:39:30 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:content-transfer-encoding:in-reply-to
+ :user-agent; bh=D/iWBheHUBC5EEZU6E5yzFudwU+7y61AN7x2cxOztmY=;
+ b=Wh5PjhHR9IEvx2PF0Vpc9sx0Y/p1Vk0xWz8xSar65KumEa+xAoEhSmlBuvtcxYPLnc
+ 5uTWbIDyLacj9oyBz8979tJ55KIxqAy0inf8pJUIku47li9vgWfExa5n2XSUcLuZG9wz
+ 71Q4ggc8HjgIsaaBl/uTTTuMjazaBgvxHFlR8=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:content-transfer-encoding
+ :in-reply-to:user-agent;
+ bh=D/iWBheHUBC5EEZU6E5yzFudwU+7y61AN7x2cxOztmY=;
+ b=OK3n3SnpUl8xwAM56YgwWexlDOxlnlBMgILzHm1lzIW1wAD8RRZgwXHcOQGwDBi47W
+ mkqBLuW6XWgtfoggMtCzveCsQrzQslcR6A0PC1rT2SWSn9tU7tRYO81CLIqdql/i/FDD
+ /1CLIW10eH7YwFUmJhdnB2zF9W9ioBre0s99v3qOPcflixiRjqYmfvFWQQoY17IALy4A
+ 0UUwJ7K5/T8L/srK0PFuloMpA6/n3Nf9I8l57Fy1i+8jswvoxbVhzrCaE/rfawjMxN8b
+ U9Zzdv+gsSBklbWggd5MdhpCJTXenQ3FCk6luBCrmrxwsAfBB2VUE5fEaXYjui9QjTj6
+ YzCQ==
+X-Gm-Message-State: AJcUukcjSPP8r8+ddy9BvvCNOAk0IWI+qmj7nB81rPXDo00ybZIpwG53
+ +Aj5p1cuzQVUTh94gCjADtYfzg==
+X-Google-Smtp-Source: ALg8bN6AGXmEO9/tU3hw9d1aKGRiTA8PvoOGgj3qEHkg7G1zzKziozVOUdzF+6WBFgpdZf1Q2K8omQ==
+X-Received: by 2002:adf:e34b:: with SMTP id n11mr1457464wrj.91.1545381569436; 
+ Fri, 21 Dec 2018 00:39:29 -0800 (PST)
+Received: from dell ([95.149.164.119])
+ by smtp.gmail.com with ESMTPSA id k128sm13109833wmd.37.2018.12.21.00.39.28
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 21 Dec 2018 00:39:28 -0800 (PST)
+Date: Fri, 21 Dec 2018 08:39:27 +0000
+From: Lee Jones <lee.jones@linaro.org>
+To: Priit Laes <plaes@plaes.org>
+Subject: Re: [PATCH v2 1/8] mfd: axp20x: name voltage ramping define properly
+Message-ID: <20181221083927.GQ4497@dell>
+References: <cover.923997dd7d7396bb4d71f8967698b58ca956b929.1544512919.git-series.plaes@plaes.org>
+ <01367c4f4f1e174fefbef9aac645f6792bda07e5.1544512919.git-series.plaes@plaes.org>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <01367c4f4f1e174fefbef9aac645f6792bda07e5.1544512919.git-series.plaes@plaes.org>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_003301_810148_26678ECC 
-X-CRM114-Status: GOOD (  15.63  )
+X-CRM114-CacheID: sfid-20181221_003941_635961_F95979C2 
+X-CRM114-Status: GOOD (  15.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -125,200 +94,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- Heiko Stuebner <heiko@sntech.de>,
- Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
- Shawn Lin <shawn.lin@rock-chips.com>, "Rafael J.
- Wysocki" <rafael@kernel.org>, linux-kernel@vger.kernel.org,
- Javier Martinez Canillas <javierm@redhat.com>,
- Andrzej Hajda <a.hajda@samsung.com>, andy.shevchenko@gmail.com,
- Mark Brown <broonie@kernel.org>,
- Russell King - ARM Linux <linux@armlinux.org.uk>,
- linux-arm-kernel@lists.infradead.org,
- Marek Szyprowski <m.szyprowski@samsung.com>
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Maxime Ripard <maxime.ripard@bootlin.com>, Mark Brown <broonie@kernel.org>,
+ linux-sunxi <linux-sunxi@googlegroups.com>,
+ Liam Girdwood <lgirdwood@gmail.com>, linux-kernel@vger.kernel.org,
+ Olliver Schinagl <oliver@schinagl.nl>, Chen-Yu Tsai <wens@csie.org>,
+ Rob Herring <robh+dt@kernel.org>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-probe_err helpers makes probe error handling easier and less error prone.
-
-Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
----
-Hi all,
-
-This is sample conversion of one of drivers to proposed probe_err* helpers.
-It was created to convince Greg that these helpers are useful.
-With this helper we gain:
-- corect error handling (deferral does not spam dmesg, other errors are logged),
-- uniform error logging,
-- simplified code,
-- possibilty to check why some devices are deferred,
-- shorter code.
-Here are links to patchsets adding helpers v1[1], v4[2], in v1 I have added
-big patch doing conversion to probe_err to show scale of the 'issue'.
-If the helpers will be accepted I plan to send patches converting other drivers
-as well.
-
-[1]: https://lkml.org/lkml/2018/10/16/601
-[2]: https://lkml.org/lkml/2018/12/20/438
-
-Regards
-Andrzej
----
-
- drivers/pci/controller/pcie-rockchip.c | 100 ++++++++++---------------
- 1 file changed, 39 insertions(+), 61 deletions(-)
-
-diff --git a/drivers/pci/controller/pcie-rockchip.c b/drivers/pci/controller/pcie-rockchip.c
-index c53d1322a3d6..0d4f012c02ba 100644
---- a/drivers/pci/controller/pcie-rockchip.c
-+++ b/drivers/pci/controller/pcie-rockchip.c
-@@ -69,86 +69,67 @@ int rockchip_pcie_parse_dt(struct rockchip_pcie *rockchip)
- 		rockchip->link_gen = 2;
- 
- 	rockchip->core_rst = devm_reset_control_get_exclusive(dev, "core");
--	if (IS_ERR(rockchip->core_rst)) {
--		if (PTR_ERR(rockchip->core_rst) != -EPROBE_DEFER)
--			dev_err(dev, "missing core reset property in node\n");
--		return PTR_ERR(rockchip->core_rst);
--	}
-+	if (IS_ERR(rockchip->core_rst))
-+		return probe_err_ptr(dev, rockchip->core_rst,
-+				     "missing core reset property in node\n");
- 
- 	rockchip->mgmt_rst = devm_reset_control_get_exclusive(dev, "mgmt");
--	if (IS_ERR(rockchip->mgmt_rst)) {
--		if (PTR_ERR(rockchip->mgmt_rst) != -EPROBE_DEFER)
--			dev_err(dev, "missing mgmt reset property in node\n");
--		return PTR_ERR(rockchip->mgmt_rst);
--	}
-+	if (IS_ERR(rockchip->mgmt_rst))
-+		return probe_err_ptr(dev, rockchip->mgmt_rst,
-+				     "missing mgmt reset property in node\n");
- 
- 	rockchip->mgmt_sticky_rst = devm_reset_control_get_exclusive(dev,
- 								     "mgmt-sticky");
--	if (IS_ERR(rockchip->mgmt_sticky_rst)) {
--		if (PTR_ERR(rockchip->mgmt_sticky_rst) != -EPROBE_DEFER)
--			dev_err(dev, "missing mgmt-sticky reset property in node\n");
--		return PTR_ERR(rockchip->mgmt_sticky_rst);
--	}
-+	if (IS_ERR(rockchip->mgmt_sticky_rst))
-+		return probe_err_ptr(dev, rockchip->mgmt_sticky_rst,
-+				     "missing mgmt-sticky reset property in node\n");
- 
- 	rockchip->pipe_rst = devm_reset_control_get_exclusive(dev, "pipe");
--	if (IS_ERR(rockchip->pipe_rst)) {
--		if (PTR_ERR(rockchip->pipe_rst) != -EPROBE_DEFER)
--			dev_err(dev, "missing pipe reset property in node\n");
--		return PTR_ERR(rockchip->pipe_rst);
--	}
-+	if (IS_ERR(rockchip->pipe_rst))
-+		return probe_err_ptr(dev, rockchip->pipe_rst,
-+				     "missing pipe reset property in node\n");
- 
- 	rockchip->pm_rst = devm_reset_control_get_exclusive(dev, "pm");
--	if (IS_ERR(rockchip->pm_rst)) {
--		if (PTR_ERR(rockchip->pm_rst) != -EPROBE_DEFER)
--			dev_err(dev, "missing pm reset property in node\n");
--		return PTR_ERR(rockchip->pm_rst);
--	}
-+	if (IS_ERR(rockchip->pm_rst))
-+		return probe_err_ptr(dev, rockchip->pm_rst,
-+				     "missing pm reset property in node\n");
- 
- 	rockchip->pclk_rst = devm_reset_control_get_exclusive(dev, "pclk");
--	if (IS_ERR(rockchip->pclk_rst)) {
--		if (PTR_ERR(rockchip->pclk_rst) != -EPROBE_DEFER)
--			dev_err(dev, "missing pclk reset property in node\n");
--		return PTR_ERR(rockchip->pclk_rst);
--	}
-+	if (IS_ERR(rockchip->pclk_rst))
-+		return probe_err_ptr(dev, rockchip->pclk_rst,
-+				     "missing pclk reset property in node\n");
- 
- 	rockchip->aclk_rst = devm_reset_control_get_exclusive(dev, "aclk");
--	if (IS_ERR(rockchip->aclk_rst)) {
--		if (PTR_ERR(rockchip->aclk_rst) != -EPROBE_DEFER)
--			dev_err(dev, "missing aclk reset property in node\n");
--		return PTR_ERR(rockchip->aclk_rst);
--	}
-+	if (IS_ERR(rockchip->aclk_rst))
-+		return probe_err_ptr(dev, rockchip->aclk_rst,
-+				     "missing aclk reset property in node\n");
- 
- 	if (rockchip->is_rc) {
- 		rockchip->ep_gpio = devm_gpiod_get(dev, "ep", GPIOD_OUT_HIGH);
--		if (IS_ERR(rockchip->ep_gpio)) {
--			dev_err(dev, "missing ep-gpios property in node\n");
--			return PTR_ERR(rockchip->ep_gpio);
--		}
-+		if (IS_ERR(rockchip->ep_gpio))
-+			return probe_err_ptr(dev, rockchip->ep_gpio,
-+					     "missing ep-gpios property in node\n");
- 	}
- 
- 	rockchip->aclk_pcie = devm_clk_get(dev, "aclk");
--	if (IS_ERR(rockchip->aclk_pcie)) {
--		dev_err(dev, "aclk clock not found\n");
--		return PTR_ERR(rockchip->aclk_pcie);
--	}
-+	if (IS_ERR(rockchip->aclk_pcie))
-+		return probe_err_ptr(dev, rockchip->aclk_pcie,
-+				     "aclk clock not found\n");
- 
- 	rockchip->aclk_perf_pcie = devm_clk_get(dev, "aclk-perf");
--	if (IS_ERR(rockchip->aclk_perf_pcie)) {
--		dev_err(dev, "aclk_perf clock not found\n");
--		return PTR_ERR(rockchip->aclk_perf_pcie);
--	}
-+	if (IS_ERR(rockchip->aclk_perf_pcie))
-+		return probe_err_ptr(dev, rockchip->aclk_perf_pcie,
-+				     "aclk_perf clock not found\n");
- 
- 	rockchip->hclk_pcie = devm_clk_get(dev, "hclk");
--	if (IS_ERR(rockchip->hclk_pcie)) {
--		dev_err(dev, "hclk clock not found\n");
--		return PTR_ERR(rockchip->hclk_pcie);
--	}
-+	if (IS_ERR(rockchip->hclk_pcie))
-+		return probe_err_ptr(dev, rockchip->hclk_pcie,
-+				     "hclk clock not found\n");
- 
- 	rockchip->clk_pcie_pm = devm_clk_get(dev, "pm");
--	if (IS_ERR(rockchip->clk_pcie_pm)) {
--		dev_err(dev, "pm clock not found\n");
--		return PTR_ERR(rockchip->clk_pcie_pm);
--	}
-+	if (IS_ERR(rockchip->clk_pcie_pm))
-+		return probe_err_ptr(dev, rockchip->clk_pcie_pm,
-+				     "pm clock not found\n");
- 
- 	return 0;
- }
-@@ -323,12 +304,9 @@ int rockchip_pcie_get_phys(struct rockchip_pcie *rockchip)
- 		phy = devm_of_phy_get(dev, dev->of_node, name);
- 		kfree(name);
- 
--		if (IS_ERR(phy)) {
--			if (PTR_ERR(phy) != -EPROBE_DEFER)
--				dev_err(dev, "missing phy for lane %d: %ld\n",
--					i, PTR_ERR(phy));
--			return PTR_ERR(phy);
--		}
-+		if (IS_ERR(phy))
-+			return probe_err_ptr(dev, phy,
-+					     "missing phy for lane %d\n", i);
- 
- 		rockchip->phys[i] = phy;
- 	}
--- 
-2.17.1
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gVHVlLCAxMSBEZWMgMjAxOCwgUHJpaXQgTGFlcyB3cm90ZToKCj4gRnJvbTogT2xsaXZlciBT
+Y2hpbmFnbCA8b2xpdmVyQHNjaGluYWdsLm5sPgo+IAo+IFRoZSBjdXJyZW50IGF4cDIweCBuYW1l
+cyB0aGUgcmFtcGluZyByZWdpc3RlciAnc2NhbCcgd2hpY2ggcHJvYmFibHkKPiBtZWFucyBzY2Fs
+aW5nLiBTaW5jZSB0aGUgcmVnaXN0ZXIgcmVhbGx5IGhhcyBub3RoaW5nIHRvIGRvIHdpdGgKPiBz
+Y2FsaW5nLCBidXQgcmVhbGx5IGlzIHRoZSB2b2x0YWdlIHJhbXAgd2UgcmVuYW1lIGl0IGFwcHJv
+cHJpYXRlbHkuCj4gCj4gU2lnbmVkLW9mZi1ieTogT2xsaXZlciBTY2hpbmFnbCA8b2xpdmVyQHNj
+aGluYWdsLm5sPgo+IFNpZ25lZC1vZmYtYnk6IFByaWl0IExhZXMgPHBsYWVzQHBsYWVzLm9yZz4K
+PiBBY2tlZC1mb3ItTUZELWJ5OiBMZWUgSm9uZXMgPGxlZS5qb25lc0BsaW5hcm8ub3JnPgo+IC0t
+LQo+ICBpbmNsdWRlL2xpbnV4L21mZC9heHAyMHguaCB8IDQgKystLQo+ICAxIGZpbGUgY2hhbmdl
+ZCwgMiBpbnNlcnRpb25zKCspLCAyIGRlbGV0aW9ucygtKQoKSSd2ZSBsb3N0IHRyYWNrIG9mIHdo
+YXQncyBoYXBwZW5pbmcgd2l0aCB0aGlzIHNldCBub3cuCgpNYXJrLAoKRGlkIHlvdSB0YWtlIHRo
+aXMgcGF0Y2ggaW4gdGhlIGVuZD8KCj4gZGlmZiAtLWdpdCBhL2luY2x1ZGUvbGludXgvbWZkL2F4
+cDIweC5oIGIvaW5jbHVkZS9saW51eC9tZmQvYXhwMjB4LmgKPiBpbmRleCAyMzAyYjYyLi5hMzUz
+Y2QyIDEwMDY0NAo+IC0tLSBhL2luY2x1ZGUvbGludXgvbWZkL2F4cDIweC5oCj4gKysrIGIvaW5j
+bHVkZS9saW51eC9tZmQvYXhwMjB4LmgKPiBAQCAtMzUsNyArMzUsNyBAQCBlbnVtIGF4cDIweF92
+YXJpYW50cyB7Cj4gICNkZWZpbmUgQVhQMTUyX0FMRE9fT1BfTU9ERQkJMHgxMwo+ICAjZGVmaW5l
+IEFYUDE1Ml9MRE8wX0NUUkwJCTB4MTUKPiAgI2RlZmluZSBBWFAxNTJfRENEQzJfVl9PVVQJCTB4
+MjMKPiAtI2RlZmluZSBBWFAxNTJfRENEQzJfVl9TQ0FMCQkweDI1Cj4gKyNkZWZpbmUgQVhQMTUy
+X0RDREMyX1ZfUkFNUAkJMHgyNQo+ICAjZGVmaW5lIEFYUDE1Ml9EQ0RDMV9WX09VVAkJMHgyNgo+
+ICAjZGVmaW5lIEFYUDE1Ml9EQ0RDM19WX09VVAkJMHgyNwo+ICAjZGVmaW5lIEFYUDE1Ml9BTERP
+MTJfVl9PVVQJCTB4MjgKPiBAQCAtNTMsNyArNTMsNyBAQCBlbnVtIGF4cDIweF92YXJpYW50cyB7
+Cj4gICNkZWZpbmUgQVhQMjBYX1VTQl9PVEdfU1RBVFVTCQkweDAyCj4gICNkZWZpbmUgQVhQMjBY
+X1BXUl9PVVRfQ1RSTAkJMHgxMgo+ICAjZGVmaW5lIEFYUDIwWF9EQ0RDMl9WX09VVAkJMHgyMwo+
+IC0jZGVmaW5lIEFYUDIwWF9EQ0RDMl9MRE8zX1ZfU0NBTAkweDI1Cj4gKyNkZWZpbmUgQVhQMjBY
+X0RDREMyX0xETzNfVl9SQU1QCTB4MjUKPiAgI2RlZmluZSBBWFAyMFhfRENEQzNfVl9PVVQJCTB4
+MjcKPiAgI2RlZmluZSBBWFAyMFhfTERPMjRfVl9PVVQJCTB4MjgKPiAgI2RlZmluZSBBWFAyMFhf
+TERPM19WX09VVAkJMHgyOQoKLS0gCkxlZSBKb25lcyBb5p2O55C85pavXQpMaW5hcm8gU2Vydmlj
+ZXMgVGVjaG5pY2FsIExlYWQKTGluYXJvLm9yZyDilIIgT3BlbiBzb3VyY2Ugc29mdHdhcmUgZm9y
+IEFSTSBTb0NzCkZvbGxvdyBMaW5hcm86IEZhY2Vib29rIHwgVHdpdHRlciB8IEJsb2cKCl9fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJu
+ZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRw
+Oi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
