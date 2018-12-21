@@ -3,72 +3,63 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DD66AC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 19:01:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 37640C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 19:19:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A7F7C2190A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 19:01:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0411321720
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 19:19:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ppqNOupZ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="a+mBcdCU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A7F7C2190A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oSxyGDLX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0411321720
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Date:Message-ID:References:In-Reply-To:
-	From:To:Subject:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pPRdgdVi8Cp0nJ2jqwwl11oKx0zyUds4ZfdD6NDlsvY=; b=ppqNOupZD03OYm
-	PHJXbW6Oe8LAg94eJcwdrspIWq/zVjp2bU/QcHpsRODa1TQTf1SUxYMK1tCEihQfDkVipW/Ah/V3q
-	2t/gTlNcluQdAtGHkEnkxCR0EJMAgpe4fDrFVRbgz0WelEfnLCEhiAVxlfUw3tb4EIEiZl9LbJsgN
-	tLtOuq5qqF/VhsNPjFyr3RFgq2e63nIT298hM0aLGMZx4qONDnCaihV3NaTWZHaVtGLq7adkb0Vp6
-	kr0+dpHGF93uN8daiMF5zhjEDSaLZVaZYWgUCRH+1e8BsCIeEisAmzSST7bN7Ql6XVjK1Y9dxRfJz
-	2J9XcasOUBTrmmIGuuKg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=2PL5Raw9eAXANnkbKR8YR3FQuI/5d20vEhRYcZJAImA=; b=oSxyGDLXyzSZ/n
+	nuGxV+daIIhu29tHNf2F5kTcdbD/kWpEAFTnB9sdF83UNB4BBBCll+8seiqH8dvDlVuTorWm/UW4Q
+	K5e4UkdMciPpQ4RdIwo+gOU21jL1ImYtE1TtJcHH3KKTN51V7DsBgGY5UdoOWQI078Mai7CU1hxXo
+	pgG5iVDuitPMrfM+URcgkAPt6mU53XWcwufR9DeNuFJn/FpvGV3eZFKXMMxuvv8TUhFLK9Sk7iWgF
+	rWUexJ5oRyBzNoYtOXQ7W0Em+UFExC+yBIWW4eGZIB9r5p9f9w4C4H2o/5e08ZUFbW3cvF1bAHqiq
+	MdugZWRZffrj6XW/ZU1w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaQ2n-0003qh-Do; Fri, 21 Dec 2018 19:01:09 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaQ2k-0003pz-5c
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 19:01:07 +0000
-Received: from localhost (unknown [104.132.0.74])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 850B32190A;
- Fri, 21 Dec 2018 19:00:55 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1545418855;
- bh=tKCy/obsv6cYooVTpl2l9vGZthElPottVY1/IlJ5K/g=;
- h=Subject:Cc:To:From:In-Reply-To:References:Date:From;
- b=a+mBcdCUQcVDpSgzwJmjvTpF8HuVX+W8gv7FKLePBo3HkWAHngvyfIM9+kRkz2lPk
- UVlad/N1p7E6CtM4nebr4kewmMjn9LE744MIzmh4Jk6OgUHQ8bxz3dn15MbvUQOi4x
- DPvrl04jDBvy/rqilWyEGgDmCgkKFkrQqMhK/UUM=
+	id 1gaQKl-0000Cn-Ta; Fri, 21 Dec 2018 19:19:43 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gaQKj-0000Bn-4v
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 19:19:42 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 13B2280D;
+ Fri, 21 Dec 2018 11:19:26 -0800 (PST)
+Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 4EBD13F575;
+ Fri, 21 Dec 2018 11:19:25 -0800 (PST)
+Subject: Re: [PATCH] firmware: arm_sdei: fix wrong of_node_put() in init
+ function
+To: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
+References: <20181126121536.28739-1-nsaenzjulienne@suse.de>
+ <08d6b9e6-7aa0-9342-193b-1ce6e0417f77@arm.com>
+ <7a75afd030cbd17c986a3ad486aab35ad3418b28.camel@suse.de>
+From: James Morse <james.morse@arm.com>
+Message-ID: <cf4e5313-c467-8343-ac90-bb4b937b63ff@arm.com>
+Date: Fri, 21 Dec 2018 19:19:23 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-Subject: RE: [PATCH 4/5] clk: imx8qxp: make the name of clock ID generic
-To: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>, Aisheng Dong <aisheng.dong@nxp.com>,
- Fabio Estevam <festevam@gmail.com>
-From: Stephen Boyd <sboyd@kernel.org>
-In-Reply-To: <AM0PR04MB4211F8786714DD6CCBB55F0A80B80@AM0PR04MB4211.eurprd04.prod.outlook.com>
-User-Agent: alot/0.8
-References: <1545232888-9302-1-git-send-email-aisheng.dong@nxp.com>
- <1545232888-9302-5-git-send-email-aisheng.dong@nxp.com>
- <CAOMZO5DzMpMp-Tf74iM3SuHoFpji8z-dxM-UsC13GeDx2bZYgA@mail.gmail.com>
- <VI1PR04MB4222ABD43B82BD3C0B73404780BF0@VI1PR04MB4222.eurprd04.prod.outlook.com>
- <154533484105.79149.16225192496445475758@swboyd.mtv.corp.google.com>
- <AM0PR04MB4211F8786714DD6CCBB55F0A80B80@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <154541885475.13075.16994932864140896829@swboyd.mtv.corp.google.com>
-Date: Fri, 21 Dec 2018 11:00:54 -0800
+In-Reply-To: <7a75afd030cbd17c986a3ad486aab35ad3418b28.camel@suse.de>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_110106_247479_35FCEF5E 
-X-CRM114-Status: GOOD (  27.60  )
+X-CRM114-CacheID: sfid-20181221_111941_197405_E640F176 
+X-CRM114-Status: GOOD (  15.33  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,98 +71,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mturquette@baylibre.com" <mturquette@baylibre.com>,
- dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Aisheng Dong (2018-12-20 17:44:28)
-> > -----Original Message-----
-> > From: Stephen Boyd [mailto:sboyd@kernel.org]
-> > Quoting Aisheng Dong (2018-12-19 22:26:50)
-> > > > -----Original Message-----
-> > > > From: Fabio Estevam [mailto:festevam@gmail.com] Hi Aisheng,
-> > > >
-> > > > On Wed, Dec 19, 2018 at 1:29 PM Aisheng Dong
-> > <aisheng.dong@nxp.com>
-> > > > wrote:
-> > > > >
-> > > > > SCU clock can be used in a similar way by IMX8QXP and IMX8QM SoCs.
-> > > > > Let's make the name of clock ID generic to allow other SoCs to
-> > > > > reuse the common part.
-> > > > >
-> > > > > This patch only changes the clock id name and file name, so no
-> > > > > functional change.
-> > > > >
-> > > > > Cc: Shawn Guo <shawnguo@kernel.org>
-> > > > > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > > > > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > > > > Cc: Stephen Boyd <sboyd@kernel.org>
-> > > > > Cc: Michael Turquette <mturquette@baylibre.com>
-> > > > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > > > > ---
-> > > > >  drivers/clk/imx/clk-imx8qxp-lpcg.c        | 146 +++++++--------
-> > > > >  drivers/clk/imx/clk-imx8qxp.c             | 152 ++++++++--------
-> > > > >  include/dt-bindings/clock/imx8-clock.h    | 289
-> > > > ++++++++++++++++++++++++++++++
-> > > > >  include/dt-bindings/clock/imx8qxp-clock.h | 289
-> > > > > ------------------------------
-> > > > >  4 files changed, 438 insertions(+), 438 deletions(-)
-> > > >
-> > > > This seems like unneeded churn. Just keep the existing naming and
-> > > > other SoCs can reuse it without problem.
-> > >
-> > > There's a reason.
-> > > We still need add some clock IDs which exist on MX8QM only (probably
-> > > more on future SoCs) Having them prefixed with 'IMX8QXP' may look
-> > strange.
-> > >
-> > > Besides that, as those clock IDs will also be used in devicetree, make
-> > > the name generic for different SoCs seems still better and less confusing.
-> > >
-> > 
-> > This looks like an integration problem. Is anyone using the defines that are
-> > merged through clk tree now? A grep of linux-next says no, but how can I be
-> > sure?
-> 
-> I'm sure no one is using it now.
-> The only user DTS (imx8qxp mek) is waiting for merge after 4.21-rc1 is out.
-> So it's a chance to update it. 
-> 
-> > 
-> > So can you leave around the header file with the deprecated define names and
-> > introduce another one that's a copy of the header file but with the non-SoC
-> > specific names?  Then you can wait for a release cycle and delete the old
-> > header file that nobody should be using in DT anymore.
-> > Unless you plan to make sure that nobody uses the deprecated defines
-> > somehow?
-> > 
-> 
-> Yes, the plan is to make sure nobody uses that.
-> Otherwise, it may be hard to send DTS patches using new CLK ID name through
-> different tree later.
-> 
+Hi Nicolas,
 
-I've already tagged and prepared to send out clk tree for the next merge
-window. It's getting difficult to change this before -rc1 too because
-I'm traveling for the holidays in the US. I'm fine with changing the
-world if it doesn't break anything, but I'm not interested in making the
-pull request wait another few days for this particular topic, so I'd
-rather send this as part of a follow-on fixes PR during the merge window
-next week.
+On 03/12/2018 12:25, Nicolas Saenz Julienne wrote:
+> On Fri, 2018-11-30 at 18:31 +0000, James Morse wrote:
+>> On 26/11/2018 12:15, Nicolas Saenz Julienne wrote:
+>>> After finding a "firmware" dt node arm_sdei tries to match it's
+>>> compatible string with it. To do so it's calling
+>>> of_find_matching_node()
+>>> which already takes care of decreasing the refcount on the
+>>> "firmware"
+>>> node. We are then incorrectly decreasing the refcount on that node
+>>> again.
+>>>
+>>> This patch removes the unwarranted call to of_node_put().
+>>>
+>>> Fixes: ad6eb31ef903 ("firmware: arm_sdei: Add driver for Software
+>>> Delegated Exceptions")
+>>> Signed-off-by: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
+>>
+>> Thanks!, I agree this is unwarranted.
+>> Is there a tool that picks these up? I remember sparse giving me a
+>> headache, but
+>> I don't remember this one... I probably cargo-culted it from
+>> somewhere else.
+> 
+> We stumbled upon this one on a test system. TBH I don't really know
+> much about these tools so I can't tell. That said, I sent 4 more fixes
+> on this bug (one more in drivers/firmware) so there definitively was
+> some cargo-culting happening.
 
-Can you resend with just the things that need to be changed for the next
-release (v4.21 or v5.0)? And Cc the relevant people/lists and try to
-collect acks and reviewed-by tags before next Wednesday? I can send a
-fixes PR on Friday next week then.
+Well this is embarrassing. I was trying to test this before re-posting it, to
+discover dt-probing hasn't worked properly since it was merged, so I evidently
+didn't test it properly after the merge-window. (at the same time the OF core
+code took over creating platform devices from the firmware node, meaning my
+attempt here fails, and the driver never gets registered).
 
+I'll post the additional patch, and drop the fixes tag as this has never worked.
+
+
+Thanks!
+
+James
 
 _______________________________________________
 linux-arm-kernel mailing list
