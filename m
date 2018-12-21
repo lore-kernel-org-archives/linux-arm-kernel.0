@@ -2,20 +2,21 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9CC89C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:40:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EAE2AC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:46:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 65E5F21920
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:40:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A6B3321927
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 18:46:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eq8oEsJa";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=axentia.se header.i=@axentia.se header.b="fyzS6SiS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 65E5F21920
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t3elLSsF";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=axentia.se header.i=@axentia.se header.b="CuqBwUv6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A6B3321927
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=axentia.se
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,50 +25,46 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
 	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kFWt/K40xyWHvpw07fhLi6K5grpF4GhDc6K6GNYwqRI=; b=eq8oEsJaZDLOtD
-	1dA6ocZ60aQXGvLYM2O3N1Ffs1Po0iWYu9qOOc25/045V/et0KxNsMwV5OUaRb0KmmVKRBmqKJ2rw
-	BoZ9b4TuvJ1gZuVVi0ba09p0ByDOCKSS3kR6b1cAknMTD82gcp4qhNyJ3CA11SD6mboOtOmWP54Bp
-	RQ6Db7Ef3VRxHryCAls8CiO3xh98H/KohACCqtselluKcZXE5kNV+7JtXEdKZsQdW4H3TWNSHNE7z
-	L1D6djLdr+fqXo3plnCi/bHOfaQQgjzm0c7t8wzx+nbCObok/K5b8X4o/3WuPe8rObfSyEo/H06aP
-	siJPwa4UbzUkhvB+am+g==;
+	List-Owner; bh=D5Qqmiuh0kP2gnY8WVlglwbZXayOBHlGPUyBvQmWh/Q=; b=t3elLSsFfBxJql
+	ojKRkqBDs4JckOgFldGcODbqJfV+QsDQJgfG6cfUmen5W41b5kxEqRmiohTHEdf1brtR1TBEVY9xB
+	oRxbLREzbufPxYXVCeeBAoqBZ4gvdsrOdQW/COyRltSmjzqhVFkWare86mLERuBFDV66kVoR2xm76
+	rp7sZwJ+zdoT2subTWFaopAsK9+dkjKNPijerHE/oIPZAr8E2u3fOZsLcW0T+XKZ6pumqxVpQiGNF
+	SLG0ElQITVpGZZxDfmaUquAoSItu8NUKPQfvdFFfQZ4UkHeuIRxDqmahSelNhSfqxAXOlgje6jXRK
+	BvXS6/zpjtcoycuj7ckg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaPin-0001nH-Ce; Fri, 21 Dec 2018 18:40:29 +0000
-Received: from mail-eopbgr20113.outbound.protection.outlook.com
- ([40.107.2.113] helo=EUR02-VE1-obe.outbound.protection.outlook.com)
+	id 1gaPoe-0003Qr-1G; Fri, 21 Dec 2018 18:46:32 +0000
+Received: from mail-am5eur02on0700.outbound.protection.outlook.com
+ ([2a01:111:f400:fe07::700]
+ helo=EUR02-AM5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaPik-0001mH-2w
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 18:40:27 +0000
+ id 1gaPoa-0003QI-Sm
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 18:46:30 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=axentia.se;
  s=selector1;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=2hgJ9eKcvp3mtD3qtsywV2vcd5imvkiW6tLFwOQ5DIU=;
- b=fyzS6SiScvab2I6QjUqk1fRYyMs+dYA+1SXqf2/fyxen2YzooQrrwLKBdMn6rgIny7RiUqjoGWZT3cfmlVzIQ29AJ2t5DjhHOu4h790kb8mW4nopqkSp2x43uHGAdsMK/gwir4ArNVdGGZjZo1cnBGkm04SkmJiPo4rP0wT0VUI=
+ bh=RBL69DahXTu8tAUg2Vmo5SZ+cXUEqJN+MGIRSnidJDA=;
+ b=CuqBwUv6ViRPmLLESuqZQrXig0oA86PakXX187Qxxc0D3xGqIo7Jn1olzyw1ht0how6Iow83oJk4gyxpUFYPpXN/0jBWNzWxwJsGc9oOER+IKuYp3ih4vrcbKYX22K+r1+3oDc9pQQ3ZNNIF/+71AaS99zkJ+NPKi2HGtO3aJOo=
 Received: from VI1PR02MB5119.eurprd02.prod.outlook.com (20.178.13.204) by
- VI1PR02MB1440.eurprd02.prod.outlook.com (10.165.232.146) with Microsoft SMTP
+ VI1PR02MB3103.eurprd02.prod.outlook.com (10.170.236.16) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1446.19; Fri, 21 Dec 2018 18:40:08 +0000
+ 15.20.1446.23; Fri, 21 Dec 2018 18:46:12 +0000
 Received: from VI1PR02MB5119.eurprd02.prod.outlook.com
  ([fe80::11d9:9fe:f412:46a8]) by VI1PR02MB5119.eurprd02.prod.outlook.com
  ([fe80::11d9:9fe:f412:46a8%5]) with mapi id 15.20.1446.020; Fri, 21 Dec 2018
- 18:40:08 +0000
+ 18:46:12 +0000
 From: Peter Rosin <peda@axentia.se>
-To: Wolfram Sang <wsa@the-dreams.de>, Hans de Goede <hdegoede@redhat.com>
-Subject: Re: [PATCH 01/10] i2c: add suspended flag and accessors for i2c
- adapters
-Thread-Topic: [PATCH 01/10] i2c: add suspended flag and accessors for i2c
- adapters
-Thread-Index: AQHUl7rfZ33se6fYoU6lrQpH7Zprj6WGT3kAgAAUsQCAAEIogIAAv+SAgAHjUwCAAEAuAA==
-Date: Fri, 21 Dec 2018 18:40:08 +0000
-Message-ID: <c1518533-ccc0-1a82-31b4-959682fb9b9e@axentia.se>
-References: <20181219164827.20985-1-wsa+renesas@sang-engineering.com>
- <20181219164827.20985-2-wsa+renesas@sang-engineering.com>
- <20181219172250.ytronxeq2yc4vp4r@wunner.de>
- <83b17734-2437-5a04-8843-e18ccf7ad398@redhat.com>
- <20181219223341.GA998@kunai>
- <e8bfcadc-7c1a-6659-7173-4ce484ceeca3@redhat.com>
- <20181221145022.umsugdwadw5a5ag6@ninjato>
-In-Reply-To: <20181221145022.umsugdwadw5a5ag6@ninjato>
+To: Sudeep Holla <sudeep.holla@arm.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Subject: Re: [PATCH] ARM: dts: at91: replace gpio-key,wakeup with
+ wakeup-source property
+Thread-Topic: [PATCH] ARM: dts: at91: replace gpio-key,wakeup with
+ wakeup-source property
+Thread-Index: AQHUmVivQqIWiJjdrEKDiARCuPmK/6WJiC6A
+Date: Fri, 21 Dec 2018 18:46:12 +0000
+Message-ID: <c22dacbe-ddc9-04c7-cda8-100dcbe0e70b@axentia.se>
+References: <20181221181149.6708-1-sudeep.holla@arm.com>
+In-Reply-To: <20181221181149.6708-1-sudeep.holla@arm.com>
 Accept-Language: en-US, sv-SE
 Content-Language: en-US
 X-MS-Has-Attach: 
@@ -75,49 +72,49 @@ X-MS-TNEF-Correlator:
 user-agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
  Thunderbird/60.3.3
 x-originating-ip: [85.226.244.23]
-x-clientproxiedby: HE1PR0402CA0001.eurprd04.prod.outlook.com
- (2603:10a6:3:d0::11) To VI1PR02MB5119.eurprd02.prod.outlook.com
+x-clientproxiedby: HE1PR07CA0038.eurprd07.prod.outlook.com
+ (2603:10a6:7:66::24) To VI1PR02MB5119.eurprd02.prod.outlook.com
  (2603:10a6:803:b7::12)
 authentication-results: spf=none (sender IP is )
  smtp.mailfrom=peda@axentia.se; 
 x-ms-exchange-messagesentrepresentingtype: 1
 x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; VI1PR02MB1440;
- 6:Xf8aLQNsbDW6rmSQrqZ160y9FjQt1dZ2VqpPsNMSn9CObmkFFqJODDi1Mb7jZ+eHD850Z+27JKTZHI4PWknPuFZJz66A9vunUWXJen6umThWMyrDQM/pV2LJjEQmgGTqDIw6XPq8qclDkT9OuELTab5nyWncWYN5zMT3hScRCH7cj9L6pS2KdKd9YFubgaaFagpbrtUpkNMtynzbpFkEv08dsbYQVeT/Tbowj6DDpMkl1lK9+YzyaA9EOU2eWG5TJvAfZtfJo8xfHLUupVXm1amHFpQWo8ZX/4z8P9343DbH5Wjwebpne0+lKtWjL4CVzONP3+cbg3FGIqvvJRtfWfpDORIrpsmguvzuSafkd3wJseIWuw3RxpM3eA22VWypEWeIL9GBUHQP42+MvOtcCBxY+1GQozq8+c2mcmruuegdvYZnegZYJoCbYTMZx/59x25zpdycuIhEXm39ASETEA==;
- 5:sptudN96DoBQRAYeCpO1G1jk5SF8y9pHMfjmZ7tKJIMzShtsewzzduTdwfM/tM9IoEjrSuxljSVbo1XWjVk803o07KINpOHjIjmMiy/ZXYSYD6LnFF4QBX387V4ZwaTFngrJxSXdRyQ4KCEkNzZ4LCGWzOu4sZ3AmQ1kgbD5GwE=;
- 7:9TCpJSvL1tuYTMtIJt2Ba6yeG9X0iw81kUGBm5jRD5SezxJxHCe/6myvhjQfCMa4J80zxw1LQl9MUHvMNI07xeKj37VKDC6SogFAB4SVHkouJQwGwekd9FyKydj60+H7X9TvKsxPfpnqMnXymKZHfA==
-x-ms-office365-filtering-correlation-id: b0f3ed5f-9f52-4037-eb0b-08d66773bb24
+x-microsoft-exchange-diagnostics: 1; VI1PR02MB3103;
+ 6:0pR+/VTN9rKYJRalBGD3ABpixu2FuCmCHmXAfOvkT8L7R0P+o0MaIeLweG2RKMEC/akw3rdY1MtUarjw0xjcVay+zT7E9AMaQnR65/pCW3pU6bxRK33IO21Dbke3PUaS43gRLN4Duz+vvWa6884smFIDDPRBdkLcb62oZ1o+zXoCiN84zweRV9b7adEuX/iiWZc+yMTrHdjWU+NKUtjYuYsdCf2kn/cDbSVfUmigqtCPXMUJ6iTmNaHipct57w++qqUpc/CdQplOJWAwwSkY0cBT42umbQYRCy9J42BUk6J08fa8PpYOiQAY1MAdDkZKfO1VhNXedHBCmw92B8p9yQM/haBQWox0b5proWxTJ0caPmrGdOFD4Xbn0g3LLfmny0B9BDzNrqnwmdyYtLau6nzeKJGXegZg9sdnBX9HEIF5Eoaxm2DHxxUBbBpNpi5B7HlkofJWYkSpNGx8dQv/Ag==;
+ 5:OT9uXKTAqAxyN5/U6kiCTmqWIv4w99LW9Ned5ciOfJkkNRYbdmgW4Z8ezz3PgjhSQP4lKUoQF1/HSAxVu2+ffnpnlW50H6Hd+RT74W1slhAZmMXY3y796YYJuunN6omHt/7RF0P0lrvkneFu/LHRai+dPzA2Ol9UTu2nHiKbMBU=;
+ 7:E2MImlzquYYdtcYQlNH6PDMNZUOb46PIUIpGArnaYFKFED3zRVofwqUwlrn++yf8kOrAOjlyJ7Vz5lha52DFzxbCXtVGKz7JQQQPmnlf/YUwsx9JPVGp/45HeW0Egcpv8XGAwWc2qvPpILAULUCe2Q==
+x-ms-office365-filtering-correlation-id: fd1ce1d6-397c-4c03-2398-08d667749421
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(7021145)(8989299)(4534185)(7022145)(4603075)(4627221)(201702281549075)(8990200)(7048125)(7024125)(7027125)(7023125)(5600074)(711020)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR02MB1440; 
-x-ms-traffictypediagnostic: VI1PR02MB1440:
-x-microsoft-antispam-prvs: <VI1PR02MB1440096A6B45079B66FCF32FBCB80@VI1PR02MB1440.eurprd02.prod.outlook.com>
+ SRVR:VI1PR02MB3103; 
+x-ms-traffictypediagnostic: VI1PR02MB3103:
+x-microsoft-antispam-prvs: <VI1PR02MB31030BA680B42C13E860A9D4BCB80@VI1PR02MB3103.eurprd02.prod.outlook.com>
 x-ms-exchange-senderadcheck: 1
 x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(3230021)(999002)(5005026)(6040522)(2401047)(8121501046)(10201501046)(3002001)(93006095)(93001095)(3231475)(944501520)(52105112)(149066)(150057)(6041310)(20161123560045)(20161123562045)(2016111802025)(20161123558120)(20161123564045)(6043046)(201708071742011)(7699051)(76991095);
- SRVR:VI1PR02MB1440; BCL:0; PCL:0; RULEID:; SRVR:VI1PR02MB1440; 
+ RULEID:(3230021)(999002)(5005026)(6040522)(2401047)(8121501046)(3231475)(944501520)(52105112)(93006095)(93001095)(10201501046)(3002001)(149066)(150057)(6041310)(20161123562045)(20161123564045)(20161123558120)(20161123560045)(2016111802025)(6043046)(201708071742011)(7699051)(76991095);
+ SRVR:VI1PR02MB3103; BCL:0; PCL:0; RULEID:; SRVR:VI1PR02MB3103; 
 x-forefront-prvs: 0893636978
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10019020)(396003)(136003)(366004)(39830400003)(376002)(346002)(199004)(189003)(6246003)(105586002)(65826007)(14454004)(65806001)(65956001)(2906002)(8676002)(81166006)(7736002)(66066001)(6512007)(36756003)(4001150100001)(97736004)(52116002)(71190400001)(256004)(14444005)(3846002)(31696002)(71200400001)(53936002)(6436002)(5660300001)(25786009)(81156014)(446003)(11346002)(508600001)(2616005)(476003)(64126003)(58126008)(186003)(6486002)(486006)(86362001)(8936002)(110136005)(54906003)(229853002)(305945005)(26005)(68736007)(93886005)(4326008)(74482002)(53546011)(6116002)(106356001)(316002)(99286004)(6506007)(76176011)(31686004)(386003)(102836004);
- DIR:OUT; SFP:1102; SCL:1; SRVR:VI1PR02MB1440;
+ SFS:(10019020)(136003)(376002)(346002)(366004)(39830400003)(396003)(189003)(199004)(4001150100001)(7736002)(97736004)(446003)(26005)(4326008)(14454004)(11346002)(8936002)(6486002)(74482002)(3846002)(102836004)(6512007)(25786009)(53546011)(81156014)(508600001)(71190400001)(71200400001)(68736007)(2616005)(8676002)(256004)(186003)(81166006)(476003)(305945005)(53936002)(386003)(6506007)(2906002)(486006)(6246003)(6116002)(229853002)(106356001)(52116002)(316002)(110136005)(5660300001)(54906003)(58126008)(99286004)(76176011)(65826007)(31686004)(31696002)(36756003)(65806001)(65956001)(64126003)(66066001)(86362001)(6436002)(105586002)(2501003)(142933001);
+ DIR:OUT; SFP:1102; SCL:1; SRVR:VI1PR02MB3103;
  H:VI1PR02MB5119.eurprd02.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
+ PTR:InfoNoRecords; MX:1; A:1; 
 received-spf: None (protection.outlook.com: axentia.se does not designate
  permitted sender hosts)
-x-microsoft-antispam-message-info: 5JVRT7NAqfDAss/22WKCdRT+KX5saY/r+kecVXsGYtABSxOmu+cQ2dQ35L2SF9cQmFPQZEoUQNhdMVm5pwopR6iMBP9HAt1u51LBxpbDIVcHh3+VvpDkzC46mnwZiAYhi5RvJ0AYKiC6zf3bNxFx8j3nGWt4MDxmDegG1qqvOezGRvHU/c568VfmrdaPRpJK4XA9D9BCQEqK++iHapKpASWLtfxT3cw7rjEMxTKhL/Zg+pUIGoDD4MMJkZtZS9OH2sLBoBkGG4Ozq0PI9QtgSVHtRhJc1cT8snOg9xmnk0/ar3ZKCXsy+qr4iMm+RCpW
+x-microsoft-antispam-message-info: VvP0IedzX6tdrOFWRsQQRoORqGxAP1N03hUIz9FVi5ESw/OU5MAWmvxMtcpv7GO/cV6AuyVliRRsLshSlLid6UWH+s0qI750TXV/+/uLKTmScgq62p0aCeTD08Y4gRImeMZbE0uqCy/g10VwbjPim8gLSTFRcDapVDEfm7aB6RWhDepI6q5mEGDxLvfvq42E8dK1+3cO8aeCkR3Nypb7x/y+q0AWv49NHgwgnJ2RHrrXEn/Ck0JRJDIbFGyuJietj/Pql2oqXPHipQrFCjlNrstL6cV964npleD+sIWkBB1VtfpY6fRC10UrTvwr+xet
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
-Content-ID: <02D913DAABD69147955C10E49A5487A1@eurprd02.prod.outlook.com>
+Content-ID: <64532381741D0B44AF9CB5D446BC903E@eurprd02.prod.outlook.com>
 MIME-Version: 1.0
 X-OriginatorOrg: axentia.se
-X-MS-Exchange-CrossTenant-Network-Message-Id: b0f3ed5f-9f52-4037-eb0b-08d66773bb24
-X-MS-Exchange-CrossTenant-originalarrivaltime: 21 Dec 2018 18:40:08.0984 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: fd1ce1d6-397c-4c03-2398-08d667749421
+X-MS-Exchange-CrossTenant-originalarrivaltime: 21 Dec 2018 18:46:12.3074 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 4ee68585-03e1-4785-942a-df9c1871a234
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR02MB1440
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR02MB3103
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_104026_138101_350B7374 
-X-CRM114-Status: GOOD (  12.77  )
+X-CRM114-CacheID: sfid-20181221_104628_928843_F02D8BD5 
+X-CRM114-Status: GOOD (  12.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -129,42 +126,35 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "linux-pm@vger.kernel.org" <linux-pm@vger.kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "linux-renesas-soc@vger.kernel.org" <linux-renesas-soc@vger.kernel.org>,
- Wolfram Sang <wsa+renesas@sang-engineering.com>,
- Lukas Wunner <lukas@wunner.de>,
- "linux-i2c@vger.kernel.org" <linux-i2c@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Alexandre Belloni <alexandre.belloni@bootlin.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 2018-12-21 15:50, Wolfram Sang wrote:
+On 2018-12-21 19:11, Sudeep Holla wrote:
+> Most of the legacy "gpio-key,wakeup" property are already replaced
+> with "wakeup-source". However few occurrences of old property has
+> popped up again, probably from the remnants in downstream trees.
+> Almost all of those were remove couple of years back.
 > 
->>>> I think this might be as simple as adding:
->>>>
->>>> 	if (WARN_ON(adap->dev.parent->power.is_suspended))
->>>> 		return -ESHUTDOWN;
+> Replace the legacy properties with the unified "wakeup-source"
+> property introduced in the commit 700a38b27eef ("Input: gpio_keys -
+> switch to using generic device properties")
 > 
-> Peter, I think this should work for muxes, too, or? The i2c_transfer()
-> call to the mux will not be rejected, but it will be later when we reach
-> the root adapter. And then the error code will be pushed down the tree
-> until we arrive at the mux again. So, the rejection will not happen at
-> the earliest time, but it will happen. Is my understanding correct?
+> Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> Cc: Peter Rosin <peda@axentia.se>
+> Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 
-Yes, I agree with that analysis. All mux actions eventually end up with
-an __i2c_transfer() call on the relevant root adapter. Hmm, but not *all*
-calls. How about SMBus adapters? Should there not be a similar WARN_ON
-in __i2c_smbus_xfer?
+Why is this not v3?
+Why did you drop all the tags you already got?
 
-But maybe that's not applicable for some reason? Just asking...
+Acked-by: Peter Rosin <peda@axentia.se>
 
 Cheers,
 Peter
-
-
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
