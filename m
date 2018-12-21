@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C4323C43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 15:22:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C9832C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 15:23:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 941B62192B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 15:22:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9AD3721927
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 15:23:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LpkGlz+L";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Ut8/sDmI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 941B62192B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G1yx7d6z";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="n8Js1Zha"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9AD3721927
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,66 +26,67 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LDkwfah0aMdQ+pjF97smTdJrQLjqZZe0q/rvyImp1Uw=; b=LpkGlz+LEEVjCO
-	15Q26quvCDK0hhgEQsP6eROI+sd4xLqwwUadpONKEfvfkxWCrElXe1OywUye8RGgzez+1fUVqBAYg
-	IR3jR6VgXkCFDjpSsQb9rXoeRg4+vYaS06+JkucGtm5j8zFshNfh3pQJxdwLhHi9OBAZkVNadNsWz
-	TrDm5eOBFmpKsycaeFRAQOBxmkgFXnkaDkTejRjKqNaeKS6ll0+8jvvAJ+PJgOTlM+Dp5ZOVGsXmM
-	6yngRtHfiN6ThBNZuWaP6FCNyUYSbXsR/w9wszNGDDL1fqS5YJPHr9J5B0AZu8YIWRO1ZYB+Fj/gQ
-	9t/cHNCfjzuQGvl7mL9Q==;
+	List-Owner; bh=HWgF//EOzzB2pRCYDrbbQFlxvEeZi9sTbJd4gys1hLQ=; b=G1yx7d6zIbs2m8
+	FVnrbzOLNBI6lVurBZpXx1HwfvBcCN0JqRj3ETFlAMkhiOhQPYstDVstUQqNkJ+FP+c4Kz6diYRO/
+	x5tpwYNaXJyvqbALIgdrSW9fOW37PmIcK+yNyS6XwnsqI2vm2RUjmxcdQPfuIs905bkmCN1yucuJI
+	93CpYnR7zRh3jWLNo5VWtFDrVfgEsP4GDrR5oO+QRO7ykYVOsAsrvc2XbO60u2YHhJYTGT1tEUbeH
+	KdbCCYBINrlbW2efpt1GFSFd8YEZihlHzR6QKwZ7DcdbkrE4Ogv5Bs25u+HkRe85q/RkH0wz50ESA
+	rvCWFCLgdlVof8gQzXLA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaMdO-0008W1-0a; Fri, 21 Dec 2018 15:22:42 +0000
-Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
+	id 1gaMdc-0000KG-4B; Fri, 21 Dec 2018 15:22:56 +0000
+Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaMcC-0007Ca-Cy
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 15:21:29 +0000
-Received: by mail-lf1-x143.google.com with SMTP id f23so4147720lfc.13
+ id 1gaMcD-0007Cz-Dd
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 15:21:31 +0000
+Received: by mail-lj1-x242.google.com with SMTP id k15-v6so5053501ljc.8
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 21 Dec 2018 07:21:17 -0800 (PST)
+ Fri, 21 Dec 2018 07:21:21 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=i6JjiPCmTaf5vd0jGiuaXaqrB7/Dt9QwI5wneEqTlYM=;
- b=Ut8/sDmI1j0vvoKRrWJL7UzivFbr1XbcS7YKMQ4aYVmr+Pa8rv6F5mz8NUVYff3PeK
- ve2X4eSsZ0DgPHcr78Jm35e5bhdQ5aZj1mNPMC1p+2iDvNj+WBjTjiutv9RL/oqkg8q7
- PQOrRTZ4q4a2goVBcObxEXwR4zDyCUD0FyOye0TaYwTn+uJFg+3F3cDZeRqZPDTnGsJz
- 6cHwcG6oX9SbwwyWpabEuMk4YWp6TX8WCjmMt5gW+vfiDmlX/mngFwHrbEzdVHpwh3Ik
- wH0newTL117fZE2cwy3s2c2FIHsDa7AkUCX8F8NwVON6wXTwQvprponSQTqOQbsfLSy9
- 52Qw==
+ bh=YO4CeGln0tXYn1nCL2HnWXHfIVIdma6kfCZR3YsTlCA=;
+ b=n8Js1ZhaCTlVzS2/ZLWrpbC5r7or7fEoj8Yp0xbzQZq9XSB3mlZNmBnGKJ+9+QhLIs
+ PGqdVl+1UHg1nTRyNtcxR6qvUuhuBgln/agKDjUHfS6cMS/ChRTbTajk1QYYwKEEMcwA
+ 3eXiwLknJtBAzkfribgp7ZNo7FWPp25HaROqJ7WCCnUZbj/a0GYFwcEArsnnH09absrQ
+ D4Sq3VkeZn3hJvBF+hAM7zwUEKiaVQJ6I0RHfl2BV8A8xGNDEvXX7GwxCy7a/J2eoV7D
+ NPSbdF+FKZTeE6LVrcndFfKd1faWl/jjfoAwEo2USK35fheoSTWJvy70x5bLhFKN6q6O
+ dXYw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=i6JjiPCmTaf5vd0jGiuaXaqrB7/Dt9QwI5wneEqTlYM=;
- b=dzuUdrn3i2BrhL6pjYzBXYmA2wb3XtXeyD56fVI9wA6rYpl54IFrUXc5IMkbVSg+BL
- /IOqPmx0oHwbVxSlVysRs6poCHAdGY+qQhB1RNUy7ZpsLnA7nL8UiKQtKiQxqEs9h+Gj
- 7QU7VBn5pKRVwsncL5+6aMyckR+Z9AXh3or0spaMJamXARu3ubDanh7wYStIhTngCBDD
- BqcyCDmGYQNgSTEl/gEZgBWiIV6FmxZOvrIXZz4B2Z+/1o/NWkdoPypFUDJc+6/gHhxN
- BT6+clzHX97/GfvEGLhwAdGWnDPHElIvhpDw1ua/WOaFC+5Ncfewaei1fpGdcFrbcxRD
- agGQ==
-X-Gm-Message-State: AA+aEWZT+e9DMRDbJHs6/lXmDG1UXhT3ME/x9NoJL3EM3BzWnjGcLiVz
- YnvAzafQGzZju38Ev03sb1g=
-X-Google-Smtp-Source: AFSGD/UjWM9VvfBv0ChRjPCyCwOoYn6QOxMuTLf1obp3YgtDLnXrEP1ss8UbMCseDn654FRbiUOkAA==
-X-Received: by 2002:a19:d5:: with SMTP id 204mr1587680lfa.116.1545405676440;
- Fri, 21 Dec 2018 07:21:16 -0800 (PST)
+ bh=YO4CeGln0tXYn1nCL2HnWXHfIVIdma6kfCZR3YsTlCA=;
+ b=hEQYshwl+IUxU1tPRJHKIP/nFX5mqHaZu06vCGFnvo36/eKj+F0FsbVUXE/M4CPUYo
+ rClwzbbVaES8e361MDdbOsRBhCOv+LTNDyU/vS77ag+ST64Qr8BD6NPSnqWSXth4etG/
+ bj0kJBta88xZ8G8ifEM/0Vs0AYLfBS5U+ZBpjOfrgLvHsINvulwzTe0WinzdNmLG24gI
+ jguEZvnodhba/AZeJhOFyHPMZZZn8ESC62TtA3+p1xSy8s661QY6UFKaQtPOa9nNm7WF
+ DjpCd76dLhl7YF39uxobMtqVQxa/K8OAOtI+Wa5Q+WEw7l8z76dTSihf+m+QA0FJ9aDc
+ E1Jg==
+X-Gm-Message-State: AJcUukc4nTBLTJvaX29NHwDFS3JCQIql3CXAw2hTZaXB59WfK++kienj
+ TUk/7uIua6IXvGf3I7o2L/g=
+X-Google-Smtp-Source: ALg8bN4z/X7VrVOMuBNvI8ciYDEa/SZnf7tfwDqEUSLO8ASNF6ROkO19nRVwQkBUp6NU82630E7WPg==
+X-Received: by 2002:a2e:b00a:: with SMTP id
+ y10-v6mr1801460ljk.109.1545405680201; 
+ Fri, 21 Dec 2018 07:21:20 -0800 (PST)
 Received: from localhost.localdomain (c90-142-43-138.bredband.comhem.se.
  [90.142.43.138])
- by smtp.gmail.com with ESMTPSA id q30sm5005601lfi.94.2018.12.21.07.21.15
+ by smtp.gmail.com with ESMTPSA id q30sm5005601lfi.94.2018.12.21.07.21.18
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 21 Dec 2018 07:21:15 -0800 (PST)
+ Fri, 21 Dec 2018 07:21:19 -0800 (PST)
 From: codekipper@gmail.com
 To: maxime.ripard@free-electrons.com, wens@csie.org,
  linux-sunxi@googlegroups.com
-Subject: [PATCH v3 3/9] ASoc: sun4i-i2s: Add 20, 24 and 32 bit support
-Date: Fri, 21 Dec 2018 16:21:04 +0100
-Message-Id: <20181221152110.17982-4-codekipper@gmail.com>
+Subject: [PATCH v3 6/9] ASoC: sun4i-i2s: Add multi-lane functionality
+Date: Fri, 21 Dec 2018 16:21:07 +0100
+Message-Id: <20181221152110.17982-7-codekipper@gmail.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20181221152110.17982-1-codekipper@gmail.com>
 References: <20181221152110.17982-1-codekipper@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_072128_434980_A320706D 
-X-CRM114-Status: GOOD (  15.11  )
+X-CRM114-CacheID: sfid-20181221_072129_692545_C2200C9A 
+X-CRM114-Status: GOOD (  16.77  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,102 +108,111 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Marcus Cooper <codekipper@gmail.com>
 
-Extend the functionality of the driver to include support of 20 and
-24 bits per sample for the earlier SoCs.
+The i2s block supports multi-lane i2s output however this functionality
+is only possible in earlier SoCs where the pins are exposed and for
+the i2s block used for HDMI audio on the later SoCs.
 
-Newer SoCs can also handle 32bit samples.
+To enable this functionality, an optional property has been added to
+the bindings.
 
 Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
- sound/soc/sunxi/sun4i-i2s.c | 41 ++++++++++++++++++++++++++++++++++---
- 1 file changed, 38 insertions(+), 3 deletions(-)
+ sound/soc/sunxi/sun4i-i2s.c | 37 ++++++++++++++++++++++++++++++++-----
+ 1 file changed, 32 insertions(+), 5 deletions(-)
 
 diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
-index 80bf29e0cc86..adb988ae9ac5 100644
+index b31f84787218..e85789d84c0c 100644
 --- a/sound/soc/sunxi/sun4i-i2s.c
 +++ b/sound/soc/sunxi/sun4i-i2s.c
-@@ -399,6 +399,11 @@ static int sun4i_i2s_hw_params(struct snd_pcm_substream *substream,
- 	case 16:
- 		width = DMA_SLAVE_BUSWIDTH_2_BYTES;
- 		break;
-+	case 20:
-+	case 24:
-+	case 32:
-+		width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+		break;
- 	default:
- 		dev_err(dai->dev, "Unsupported physical sample width: %d\n",
- 			params_physical_width(params));
-@@ -411,7 +416,18 @@ static int sun4i_i2s_hw_params(struct snd_pcm_substream *substream,
- 		sr = 0;
- 		wss = 0;
- 		break;
--
-+	case 20:
-+		sr = 1;
-+		wss = 1;
-+		break;
-+	case 24:
-+		sr = 2;
-+		wss = 2;
-+		break;
-+	case 32:
-+		sr = 4;
-+		wss = 4;
-+		break;
- 	default:
- 		dev_err(dai->dev, "Unsupported sample width: %d\n",
- 			params_width(params));
-@@ -687,6 +703,13 @@ static int sun4i_i2s_dai_probe(struct snd_soc_dai *dai)
- 	return 0;
- }
+@@ -27,7 +27,7 @@
  
-+#define SUN4I_FORMATS	(SNDRV_PCM_FMTBIT_S16_LE | \
-+			 SNDRV_PCM_FMTBIT_S20_3LE | \
-+			 SNDRV_PCM_FMTBIT_S24_LE)
-+
-+#define SUN8I_FORMATS	(SUN4I_FORMATS | \
-+			 SNDRV_PCM_FMTBIT_S32_LE)
-+
- static struct snd_soc_dai_driver sun4i_i2s_dai = {
- 	.probe = sun4i_i2s_dai_probe,
- 	.capture = {
-@@ -694,14 +717,14 @@ static struct snd_soc_dai_driver sun4i_i2s_dai = {
- 		.channels_min = 2,
- 		.channels_max = 2,
- 		.rates = SNDRV_PCM_RATE_8000_192000,
--		.formats = SNDRV_PCM_FMTBIT_S16_LE,
-+		.formats = SUN4I_FORMATS,
- 	},
- 	.playback = {
- 		.stream_name = "Playback",
- 		.channels_min = 2,
- 		.channels_max = 2,
- 		.rates = SNDRV_PCM_RATE_8000_192000,
--		.formats = SNDRV_PCM_FMTBIT_S16_LE,
-+		.formats = SUN4I_FORMATS,
- 	},
- 	.ops = &sun4i_i2s_dai_ops,
- 	.symmetric_rates = 1,
-@@ -1106,6 +1129,18 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
- 	i2s->capture_dma_data.addr = res->start + SUN4I_I2S_FIFO_RX_REG;
- 	i2s->capture_dma_data.maxburst = 8;
+ #define SUN4I_I2S_CTRL_REG		0x00
+ #define SUN4I_I2S_CTRL_SDO_EN_MASK		GENMASK(11, 8)
+-#define SUN4I_I2S_CTRL_SDO_EN(sdo)			BIT(8 + (sdo))
++#define SUN4I_I2S_CTRL_SDO_EN(lines)		(((1 << lines) - 1) << 8)
+ #define SUN4I_I2S_CTRL_MODE_MASK		BIT(5)
+ #define SUN4I_I2S_CTRL_MODE_SLAVE			(1 << 5)
+ #define SUN4I_I2S_CTRL_MODE_MASTER			(0 << 5)
+@@ -394,14 +394,23 @@ static int sun4i_i2s_hw_params(struct snd_pcm_substream *substream,
+ 	struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
+ 	int sr, wss, channels;
+ 	u32 width;
++	int lines;
  
-+	soc_dai = devm_kmemdup(&pdev->dev, &sun4i_i2s_dai,
-+			       sizeof(*soc_dai), GFP_KERNEL);
-+	if (!soc_dai) {
-+		ret = -ENOMEM;
-+		goto err_pm_disable;
+ 	channels = params_channels(params);
+-	if (channels != 2) {
++	if ((channels > dai->driver->playback.channels_max) ||
++		(channels < dai->driver->playback.channels_min)) {
+ 		dev_err(dai->dev, "Unsupported number of channels: %d\n",
+ 			channels);
+ 		return -EINVAL;
+ 	}
+ 
++	lines = (channels + 1) / 2;
++
++	/* Enable the required output lines */
++	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
++			   SUN4I_I2S_CTRL_SDO_EN_MASK,
++			   SUN4I_I2S_CTRL_SDO_EN(lines));
++
+ 	if (i2s->variant->has_chcfg) {
+ 		regmap_update_bits(i2s->regmap, SUN8I_I2S_CHAN_CFG_REG,
+ 				   SUN8I_I2S_CHAN_CFG_TX_SLOT_NUM_MASK,
+@@ -412,8 +421,19 @@ static int sun4i_i2s_hw_params(struct snd_pcm_substream *substream,
+ 	}
+ 
+ 	/* Map the channels for playback and capture */
+-	regmap_field_write(i2s->field_txchanmap, 0x76543210);
+ 	regmap_field_write(i2s->field_rxchanmap, 0x00003210);
++	regmap_field_write(i2s->field_txchanmap, 0x10);
++	if (i2s->variant->has_chsel_tx_chen) {
++		if (channels > 2)
++			regmap_write(i2s->regmap,
++				     SUN8I_I2S_TX_CHAN_MAP_REG+4, 0x32);
++		if (channels > 4)
++			regmap_write(i2s->regmap,
++				     SUN8I_I2S_TX_CHAN_MAP_REG+8, 0x54);
++		if (channels > 6)
++			regmap_write(i2s->regmap,
++				     SUN8I_I2S_TX_CHAN_MAP_REG+12, 0x76);
 +	}
-+
-+	if (i2s->variant->has_fmt_set_lrck_period) {
-+		soc_dai->playback.formats = SUN8I_FORMATS;
-+		soc_dai->capture.formats = SUN8I_FORMATS;
+ 
+ 	/* Configure the channels */
+ 	regmap_field_write(i2s->field_txchansel,
+@@ -1094,9 +1114,10 @@ static int sun4i_i2s_init_regmap_fields(struct device *dev,
+ static int sun4i_i2s_probe(struct platform_device *pdev)
+ {
+ 	struct sun4i_i2s *i2s;
++	struct snd_soc_dai_driver *soc_dai;
+ 	struct resource *res;
+ 	void __iomem *regs;
+-	int irq, ret;
++	int irq, ret, val;
+ 
+ 	i2s = devm_kzalloc(&pdev->dev, sizeof(*i2s), GFP_KERNEL);
+ 	if (!i2s)
+@@ -1175,6 +1196,12 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
+ 		soc_dai->capture.formats = SUN8I_FORMATS;
+ 	}
+ 
++	if (!of_property_read_u32(pdev->dev.of_node,
++				  "allwinner,playback-channels", &val)) {
++		if (val >= 2 && val <= 8)
++			soc_dai->playback.channels_max = val;
 +	}
 +
  	pm_runtime_enable(&pdev->dev);
  	if (!pm_runtime_enabled(&pdev->dev)) {
  		ret = sun4i_i2s_runtime_resume(&pdev->dev);
+@@ -1184,7 +1211,7 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
+ 
+ 	ret = devm_snd_soc_register_component(&pdev->dev,
+ 					      &sun4i_i2s_component,
+-					      &sun4i_i2s_dai, 1);
++					      soc_dai, 1);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Could not register DAI\n");
+ 		goto err_suspend;
 -- 
 2.20.1
 
