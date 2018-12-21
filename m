@@ -2,69 +2,60 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1DE5EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 17:21:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4967AC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 17:33:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E4F9120866
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 17:21:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1324121917
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 17:33:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JpRmpL2I"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E4F9120866
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.intel.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nVk9H3zk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1324121917
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ociIcJFcBRUYFDfyc16BilOjmYul4Z+3U+iL4w+7c4g=; b=JpRmpL2IlIhYrT
-	Mdif14M7j8mNtKccMS0fFzTlgyh8ZCGq8xmu30udqJEo3tRoYOPTiOVDat71osK9LA1RzCvFSNcYv
-	nIIEChSeMnR1mzzITrrwu3pPo/rcR6KBAC5t0e7c7mlsP0D4BUTCbfszjjHDYc0ohtnpCWkBLJO+h
-	pUig7mEtENKNdPwnyepll8ltWlxnYQQ9PfDJ/vOg+8cY98ektHOO1oNpfSLINvlFpbhKjQLJdxGsN
-	Dyv53zpFRb6C0haalFCjHdkSOR6UJHpbWnFGNsieoIhANm24wquB1XhKfkYAp1hTaCLR0QIntVDI5
-	ghdzTc0Bl3+SnIIvjmvw==;
+	List-Owner; bh=00D+coc7qTiqya72GUDTiURk4IDRxCr+yW3W0cvv1T0=; b=nVk9H3zkPmggWL
+	jclSIEMe/2ED6VyX9CX3EeCy5lrHIXWSyFpW9In5RhAJ77rMS5hO0tLQ+88J1jrFsKLyl1J4oLak2
+	QKdCroXq4CDg1Uz9b4yHmYUi1DmStQGTQNmnIxCr+6o0Dan1MSBe8NHCwU7UEwRqf33rQExbCf3Sf
+	cMO2YHEV6R7c5YkZCQ+BrKTsor+Gjt0KDm7YkhIla59F4KUWuVR0OWIsweX7XrAashZ/ADES2CtWK
+	Gaq8jCLVFmq5vcl5NZ5lEmbmLiXWMufEQTfQhT3CEw1h1su14GmHMGyxUWKUpv5c9B7QG6MTiAhv1
+	0OAnxkID34H3nOgR0uSw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaOTs-0003FL-15; Fri, 21 Dec 2018 17:21:00 +0000
-Received: from mga14.intel.com ([192.55.52.115])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaOTo-0003EI-6C
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 17:20:57 +0000
-X-Amp-Result: UNKNOWN
-X-Amp-Original-Verdict: FILE UNKNOWN
-X-Amp-File-Uploaded: False
-Received: from fmsmga005.fm.intel.com ([10.253.24.32])
- by fmsmga103.fm.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
- 21 Dec 2018 09:20:45 -0800
-X-ExtLoop1: 1
-X-IronPort-AV: E=Sophos;i="5.56,382,1539673200"; d="scan'208";a="305773566"
-Received: from tassilo.jf.intel.com (HELO tassilo.localdomain) ([10.7.201.137])
- by fmsmga005.fm.intel.com with ESMTP; 21 Dec 2018 09:20:44 -0800
-Received: by tassilo.localdomain (Postfix, from userid 1000)
- id 69927301036; Fri, 21 Dec 2018 09:20:44 -0800 (PST)
-Date: Fri, 21 Dec 2018 09:20:44 -0800
-From: Andi Kleen <ak@linux.intel.com>
-To: Peter Zijlstra <peterz@infradead.org>
-Subject: Re: [PATCH 0/7] ARM: hacks for link-time optimization
-Message-ID: <20181221172044.GE25620@tassilo.jf.intel.com>
-References: <20180220215954.4092811-1-arnd@arndb.de>
- <20181217225020.GA16520@hirez.programming.kicks-ass.net>
- <20181218000800.GB25620@tassilo.jf.intel.com>
- <20181218091824.GI2218@hirez.programming.kicks-ass.net>
+	id 1gaOg1-0007MI-2R; Fri, 21 Dec 2018 17:33:33 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gaOfx-0007Ip-Hi
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 17:33:31 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 3AA9320734; Fri, 21 Dec 2018 18:33:16 +0100 (CET)
+Received: from localhost (242.171.71.37.rev.sfr.net [37.71.171.242])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 082372079F;
+ Fri, 21 Dec 2018 18:33:06 +0100 (CET)
+From: Gregory CLEMENT <gregory.clement@bootlin.com>
+To: Linus Walleij <linus.walleij@linaro.org>, linux-gpio@vger.kernel.org,
+ linux-kernel@vger.kernel.org
+Subject: [PATCH 2/3] pinctrl: armada-37xx: add missing pin: PCIe1 Wakeup
+Date: Fri, 21 Dec 2018 18:32:58 +0100
+Message-Id: <20181221173259.8372-3-gregory.clement@bootlin.com>
+X-Mailer: git-send-email 2.19.2
+In-Reply-To: <20181221173259.8372-1-gregory.clement@bootlin.com>
+References: <20181221173259.8372-1-gregory.clement@bootlin.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181218091824.GI2218@hirez.programming.kicks-ass.net>
-User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_092056_246855_310FFD01 
-X-CRM114-Status: GOOD (  19.27  )
+X-CRM114-CacheID: sfid-20181221_093329_720343_46233E7D 
+X-CRM114-Status: UNSURE (   9.67  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,89 +67,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnd Bergmann <arnd@arndb.de>, Nicolas Pitre <nico@linaro.org>,
- Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
- hubicka@ucw.cz, Thomas Gleixner <tglx@linutronix.de>,
- Paul McKenney <paulmck@linux.vnet.ibm.com>, Ingo Molnar <mingo@kernel.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Andrew Lunn <andrew@lunn.ch>, Jason Cooper <jason@lakedaemon.net>,
+ Antoine Tenart <antoine.tenart@bootlin.com>,
+ Gregory CLEMENT <gregory.clement@bootlin.com>,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ Nadav Haklai <nadavh@marvell.com>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ =?UTF-8?q?Miqu=C3=A8l=20Raynal?= <miquel.raynal@bootlin.com>,
+ Marcin Wojtas <mw@semihalf.com>, linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-> In particular turning an address-dependency into a control-dependency,
-> which is something allowed by the C language, since it doesn't recognise
-> these concepts as such.
-> 
-> The 'optimization' is allowed currently, but LTO will make it much more
-> likely since it will have a much wider view of things. Esp. when combined
-> with PGO.
-> 
-> Specifically; if you have something like:
-> 
-> int idx;
-> struct object objs[2];
-> 
-> the statement:
-> 
->   val = objs[idx & 1].ponies;
-> 
-> which you 'need' to be translated like:
-> 
->   struct object *obj = objs;
->   obj += (idx & 1);
->   val = obj->ponies;
-> 
-> Such that the load of obj->ponies depends on the load of idx. However
-> our dear compiler is allowed to make it:
-> 
->   if (idx & 1)
->     obj = &objs[1];
->   else
->     obj = &objs[0];
-> 
->   val = obj->ponies;
+Declare the PCIe1 Wakeup which was initially missing.
 
-I don't see why a compiler would do such an optimization. Clearly
-the second variant is worse than the first, bigger and needs
-branch prediction resources.
+Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+---
+ drivers/pinctrl/mvebu/pinctrl-armada-37xx.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-In fact compilers usually try hard to go into the other direction
-and apply if conversion.
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+index 267dfc530985..4b9f2cf94431 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+@@ -198,6 +198,7 @@ static struct armada_37xx_pin_group armada_37xx_sb_groups[] = {
+ 	PIN_GRP_GPIO("smi", 18, 2, BIT(4), "smi"),
+ 	PIN_GRP_GPIO("pcie1", 3, 1, BIT(5), "pcie"),
+ 	PIN_GRP_GPIO("pcie1_clkreq", 4, 1, BIT(9), "pcie"),
++	PIN_GRP_GPIO("pcie1_wakeup", 5, 1, BIT(10), "pcie"),
+ 	PIN_GRP_GPIO("ptp", 20, 3, BIT(11) | BIT(12) | BIT(13), "ptp"),
+ 	PIN_GRP("ptp_clk", 21, 1, BIT(6), "ptp", "mii"),
+ 	PIN_GRP("ptp_trig", 22, 1, BIT(7), "ptp", "mii"),
+-- 
+2.19.2
 
-Has anyone seen real world examples of such changes being done, or is this
-all language lawyering theory?
-
--Andi
-
-> 
-> Because C doesn't recognise this as being different. However this is
-> utterly broken, because in this translation we can speculate the load
-> of obj->ponies such that it no longer depends on the load of idx, which
-> breaks RCU.
-> 
-> Note that further 'optimization' is possible and the compiler could even
-> make it:
-> 
->   if (idx & 1)
->     val = objs[1].ponies;
->   else
->     val = objs[0].ponies;
-> 
-> Now, granted, this is a fairly artificial example, but it does
-> illustrate the exact problem.
-> 
-> The more the compiler can see of the complete program, the more likely
-> it can make inferrences like this, esp. when coupled with PGO.
-> 
-> Now, we're (usually) very careful to wrap things in READ_ONCE() and
-> rcu_dereference() and the like, which makes it harder on the compiler
-> (because 'volatile' is special), but nothing really stops it from doing
-> this.
-> 
-> Paul has been trying to beat clue into the language people, but given
-> he's been at it for 10 years now, and there's no resolution, I figure we
-> ought to get compiler implementations to give us a knob.
 
 _______________________________________________
 linux-arm-kernel mailing list
