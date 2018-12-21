@@ -2,88 +2,67 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 94237C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 07:41:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7C403C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 08:03:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 61E8F218E2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 07:41:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4BEF521906
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 08:03:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U0czVqUI";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="F4vCTfCj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 61E8F218E2
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JEZQQc7c"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4BEF521906
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XwIxbiXF6wNREl9t0pMdoQ9TNrpX1t+qkaL3aQZObLo=; b=U0czVqUIF+EMu0
-	2jvr1hJtsWxJebFEe723m8Bhnzo4A9/daGhQE0D00fCjVW30xUXJQh62bregDdhHlvxZRN/u+gsCB
-	ItG9yHOksV1GjZyp8MhuDWBuB5u9zRXnO3Y3qKkv9hx2X6t91KM+6o/QriDYTvJziINa0beDYX2O9
-	DfNWKdQ/lQhlGMMqCV7J8EwzvL+98A//ASSuRVnfW3gjUSPere8O1zJCVusYvu9Cy0qkfQ5A6EmLO
-	3FMa7YOR01A9qxavHLBIHCSpEDMgA14nsSrtjC1FUtopZbM+/leMNBeISiKTG+V2nVHmTwauzMquT
-	VYrhhA3cWx/kHDG9rCQw==;
+	List-Owner; bh=duu2fy9XiLDB7cK75yEzjolgPETA7eN7f5y0jb6ASsc=; b=JEZQQc7ctZ5BsG
+	sAdT2tHaoO8xaIBplbpOgjOpa0Lw8BLFBsuQOz6TnENqt3okf6R0MceA3jPyqPaHsd7mx307SJC6k
+	V+gkBj38POWN3efzNzZUEi5p4wlPO2qcN1BBEgowx1HMWxFnxU8FWxhlHEQZxpoeCo0LWzetEWQfR
+	DKas25MB6dubkZAuX7RCOxZ2SUnOdfTAShITdW4In1QO6N4SST2U2QCrYeQcoD8lT8HM7wPpiFbyM
+	cHINEUHwPoSvo5RF2V/kO82XgYeTrSgX8chgZrePIO+E7OR/lORNK3DRBfAkBr8r8XDo2tEurNDWV
+	rtisRofrVV0NxzkpcnWQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaFQu-0003cO-Au; Fri, 21 Dec 2018 07:41:20 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaFQr-0003be-Sd
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 07:41:19 +0000
-Received: by mail-wm1-x342.google.com with SMTP id d15so4334522wmb.3
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 20 Dec 2018 23:41:06 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:content-transfer-encoding:in-reply-to
- :user-agent; bh=wXL5f8n1srKsQxmGBFauSfHPgXgwfmcCSAYDei6qN7Y=;
- b=F4vCTfCjg7hklY95hmB97lF/cUrfPxUEXMD1Q+NyFAVsV6epkaCJUZTNeH0gszy2hH
- oiY6zuhvyK3ZINVDN1BlQWEtUB6L/XIqlaLjUKTAP3uur+zPog6a35efTsvs4t+6YN28
- v0uviWHi0/FZRB95o/kXLhZF4XEJ2zycnSvhI=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:content-transfer-encoding
- :in-reply-to:user-agent;
- bh=wXL5f8n1srKsQxmGBFauSfHPgXgwfmcCSAYDei6qN7Y=;
- b=AqWPBN0GOrFG1Uia3vd9mipc0SGvvAYoLNXUrc0LfvGaPpB1XXHOMK5A15/pV4qasI
- mmKoBJbgyDJrgLxJ7pN3JxekSBP7/0RsQbzjqEuWBrfRcG+fwSz3apxaHQ1qhofsvoeW
- 4NeoBFY7B1VTSB6IQ535OeiESPNDT26aQg9PojWkkhtCDMX7bKA0x1bEKKvmN2rl0wvF
- 91q6r382iAxY8vYMcZlz45PK6tkBUYCXF/rR3prrnHOL3jHrcpp/Yd199CiKQCkfAbQ3
- zE3ZUrtYkcXacEQX6tA31ikNfvnoNMV7N2VK5we+1CFwv5HIxd84m5THmu0K+YmpEo9d
- Mklw==
-X-Gm-Message-State: AA+aEWZVpDIucPqzb40gmm0qRUzIPdxyRyQkwcZGJJhu/noyPNAX7NAr
- seCkMu4vktPzf5duCW8RgXZ6Rg==
-X-Google-Smtp-Source: AFSGD/XXCqbgRoB2koMOkag3IfFE3of9TGe/NT9c3krl8eC+OMC0v1dOIPq0DoGOtq2elEaDn+NCZQ==
-X-Received: by 2002:a1c:d74a:: with SMTP id o71mr1655755wmg.73.1545378064972; 
- Thu, 20 Dec 2018 23:41:04 -0800 (PST)
-Received: from dell ([95.149.164.119])
- by smtp.gmail.com with ESMTPSA id f15sm8785543wrt.10.2018.12.20.23.41.04
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 20 Dec 2018 23:41:04 -0800 (PST)
-Date: Fri, 21 Dec 2018 07:41:02 +0000
-From: Lee Jones <lee.jones@linaro.org>
-To: Frank Lee <tiny.windzz@gmail.com>
-Subject: Re: [PATCH] mfd: convert to DEFINE_SHOW_ATTRIBUTE
-Message-ID: <20181221074102.GP4497@dell>
-References: <20181202021710.9307-1-tiny.windzz@gmail.com>
- <CACRpkdahwmjED=BY715E+cpRhveqk32vCRpevyHF8SdcqC0kvg@mail.gmail.com>
- <CAEExFWssZtWV3XnJpjwm8BXAE4duhrrvjaPWQhfRP3W4y-O1Rg@mail.gmail.com>
+	id 1gaFmD-0001fH-LI; Fri, 21 Dec 2018 08:03:21 +0000
+Received: from [1.203.163.78] (helo=mailgw01.mediatek.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gaFm9-0001cr-Fh; Fri, 21 Dec 2018 08:03:19 +0000
+X-UUID: 825da9160cde4d3f86d22be463450247-20181221
+X-UUID: 825da9160cde4d3f86d22be463450247-20181221
+Received: from mtkcas32.mediatek.inc [(172.27.4.250)] by mailgw01.mediatek.com
+ (envelope-from <yong.wu@mediatek.com>)
+ (mailgw01.mediatek.com ESMTP with TLS)
+ with ESMTP id 967893425; Fri, 21 Dec 2018 16:02:49 +0800
+Received: from MTKCAS36.mediatek.inc (172.27.4.186) by MTKMBS31DR.mediatek.inc
+ (172.27.6.102) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
+ Fri, 21 Dec 2018 16:02:47 +0800
+Received: from [10.17.3.153] (10.17.3.153) by MTKCAS36.mediatek.inc
+ (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Fri, 21 Dec 2018 16:02:46 +0800
+Message-ID: <1545379367.29587.53.camel@mhfsdcap03>
+Subject: Re: [PATCH v4 13/18] memory: mtk-smi: Add bus_sel for mt8183
+From: Yong Wu <yong.wu@mediatek.com>
+To: Nicolas Boichat <drinkcat@chromium.org>
+Date: Fri, 21 Dec 2018 16:02:47 +0800
+In-Reply-To: <CANMq1KA4GLZHcDH31=W==8BTBZOVbRX9HBTJrpPFNQ3rWaM4xg@mail.gmail.com>
+References: <1544258371-4600-1-git-send-email-yong.wu@mediatek.com>
+ <1544258371-4600-14-git-send-email-yong.wu@mediatek.com>
+ <CANMq1KA4GLZHcDH31=W==8BTBZOVbRX9HBTJrpPFNQ3rWaM4xg@mail.gmail.com>
+X-Mailer: Evolution 3.2.3-0ubuntu6 
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CAEExFWssZtWV3XnJpjwm8BXAE4duhrrvjaPWQhfRP3W4y-O1Rg@mail.gmail.com>
-User-Agent: Mutt/1.9.4 (2018-02-28)
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_234117_930707_8E3AD10E 
-X-CRM114-Status: GOOD (  11.24  )
+X-CRM114-CacheID: sfid-20181221_000317_965520_10C2CF80 
+X-CRM114-Status: GOOD (  26.61  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,25 +74,144 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Linus Walleij <linus.walleij@linaro.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: youlin.pei@mediatek.com, devicetree@vger.kernel.org, arnd@arndb.de,
+ srv_heupstream@mediatek.com, Joerg Roedel <joro@8bytes.org>,
+ Will Deacon <will.deacon@arm.com>, lkml <linux-kernel@vger.kernel.org>,
+ Tomasz Figa <tfiga@google.com>, iommu@lists.linux-foundation.org,
+ Rob Herring <robh+dt@kernel.org>, linux-mediatek@lists.infradead.org,
+ Arvind Yadav <arvind.yadav.cs@gmail.com>,
+ Matthias Brugger <matthias.bgg@gmail.com>, yingjoe.chen@mediatek.com,
+ Robin Murphy <robin.murphy@arm.com>,
+ linux-arm Mailing List <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gRnJpLCAyMSBEZWMgMjAxOCwgRnJhbmsgTGVlIHdyb3RlOgoKPiBwaW5nLi4uLi4uCgpJJ3Zl
-IHRvbGQgeW91IGFib3V0IHRoaXMgYmVmb3JlOgoKIgpQbGVhc2UgZG9uJ3QgZG8gdGhhdC4KCklm
-IHlvdSB0aGluayB5b3VyIHBhdGNoIGhhcyBiZWVuIG1pc3NlZCwgdGhlbiBwbGVhc2Ugc2VuZCBp
-dCBhZ2FpbiBhcwphIFtSRVNFTkRdLiAgSW4gdGhpcyBjYXNlIHlvdSB3aWxsIG5lZWQgdG8gZml4
-IHRoZSAkU1VCSkVDVCBsaW5lIHRvby4KVG8gc2VlIHdoYXQgaXQgc2hvdWxkIGxvb2sgbGlrZSBk
-byB0aGUgZm9sbG93aW5nOgogCiAgYGdpdCBsb2cgLS1vbmVsaW5lIC0tIGRyaXZlcnMvbWZkYAog
-Ck9uY2UgZml4ZWQsIHMvW1BBVENIXS9bUkVTRU5ELyBhbmQgcmVzdWJtaXQgaXQuCiIKCkluIHRo
-aXMgY2FzZSB0aGUgJFNVQkpFQ1QgbGluZSBpcyBmaW5lLCBidXQgdGhlIHJlc3QgaXMgcmVsZXZh
-bnQuCgotLSAKTGVlIEpvbmVzIFvmnY7nkLzmlq9dCkxpbmFybyBTZXJ2aWNlcyBUZWNobmljYWwg
-TGVhZApMaW5hcm8ub3JnIOKUgiBPcGVuIHNvdXJjZSBzb2Z0d2FyZSBmb3IgQVJNIFNvQ3MKRm9s
-bG93IExpbmFybzogRmFjZWJvb2sgfCBUd2l0dGVyIHwgQmxvZwoKX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxp
-c3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZy
-YWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+On Fri, 2018-12-21 at 12:47 +0800, Nicolas Boichat wrote:
+> On Sat, Dec 8, 2018 at 4:43 PM Yong Wu <yong.wu@mediatek.com> wrote:
+> >
+> > There are 2 mmu cells in a M4U HW. we could adjust some larbs entering
+> > mmu0 or mmu1 to balance the bandwidth via the smi-common register
+> > SMI_BUS_SEL(0x220)(Each larb occupy 2 bits).
+> >
+> > In mt8183, For better performance, we switch larb1/2/5/7 to enter
+> > mmu1 while the others still keep enter mmu0.
+> >
+> > In mt8173 and mt2712, we don't get the performance issue,
+> > Keep its default value(0x0), that means all the larbs enter mmu0.
+> >
+> > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> > ---
+> >  drivers/memory/mtk-smi.c | 22 ++++++++++++++++++++--
+> >  1 file changed, 20 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
+> > index ee6165e..88eb61a 100644
+> > --- a/drivers/memory/mtk-smi.c
+> > +++ b/drivers/memory/mtk-smi.c
+> > @@ -49,6 +49,12 @@
+> >  #define SMI_LARB_NONSEC_CON(id)        (0x380 + ((id) * 4))
+> >  #define F_MMU_EN               BIT(0)
+> >
+> > +/* SMI COMMON */
+> > +#define SMI_BUS_SEL                    0x220
+> > +#define SMI_BUS_LARB_SHIFT(larbid)     ((larbid) << 1)
+> > +/* All are MMU0 defaultly. Only specialize mmu1 here. */
+> > +#define F_MMU1_LARB(larbid)            (0x1 << SMI_BUS_LARB_SHIFT(larbid))
+> > +
+> >  enum mtk_smi_gen {
+> >         MTK_SMI_GEN1,
+> >         MTK_SMI_GEN2
+> > @@ -57,6 +63,7 @@ enum mtk_smi_gen {
+> >  struct mtk_smi_common_plat {
+> >         enum mtk_smi_gen gen;
+> >         bool             has_gals;
+> > +       u32              bus_sel; /* Balance some larbs to enter mmu0 or mmu1 */
+> >  };
+> >
+> >  struct mtk_smi_larb_gen {
+> > @@ -72,8 +79,8 @@ struct mtk_smi {
+> >         struct clk                      *clk_apb, *clk_smi;
+> >         struct clk                      *clk_gals0, *clk_gals1;
+> >         struct clk                      *clk_async; /*only needed by mt2701*/
+> > -       void __iomem                    *smi_ao_base;
+> > -
+> > +       void __iomem                    *smi_ao_base; /* only for gen1 */
+> > +       void __iomem                    *base;        /* only for gen2 */
+> >         const struct mtk_smi_common_plat *plat;
+> >  };
+> >
+> > @@ -409,6 +416,8 @@ static int __maybe_unused mtk_smi_larb_suspend(struct device *dev)
+> >  static const struct mtk_smi_common_plat mtk_smi_common_mt8183 = {
+> >         .gen      = MTK_SMI_GEN2,
+> >         .has_gals = true,
+> > +       .bus_sel  = F_MMU1_LARB(1) | F_MMU1_LARB(2) | F_MMU1_LARB(5) |
+> > +                   F_MMU1_LARB(7),
+> 
+> Maybe it's ok for now, but I wonder if this is something that should
+> be specified in device tree? Maybe different applications will want
+> different larb split between MMU0 and MMU1?
+
+Good question. Many Thanks. This value is recommended from the HW DE. In
+some SoCs, It may be different in different scenarios. and in some SoCs
+like mt8183, the bus_sel always use a fixed value.
+
+I guess it should not be in device tree if it may be changed in
+different applications.
+
+BTW, Is there some existed IOCTL command or the similar interface that
+can tell the kernel driver(SMI here) which scenario it is currently,
+like it is playing video or the camera is running. 
+
+Currently the SMI driver is so simple, it doesn't know which application
+it is. All use the HW default value. of course, the default also is ok,
+only the bandwidth may be not so good.
+
+For the bus_sel of mt8183, I think it is ok right now. Sure, it can be
+improved if we can change it dynamically.
+
+> 
+> >  };
+> >
+> >  static const struct of_device_id mtk_smi_common_of_ids[] = {
+> > @@ -481,6 +490,11 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
+> >                 ret = clk_prepare_enable(common->clk_async);
+> >                 if (ret)
+> >                         return ret;
+> > +       } else {
+> > +               res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +               common->base = devm_ioremap_resource(dev, res);
+> > +               if (IS_ERR(common->base))
+> > +                       return PTR_ERR(common->base);
+> >         }
+> >         pm_runtime_enable(dev);
+> >         platform_set_drvdata(pdev, common);
+> > @@ -496,6 +510,7 @@ static int mtk_smi_common_remove(struct platform_device *pdev)
+> >  static int __maybe_unused mtk_smi_common_resume(struct device *dev)
+> >  {
+> >         struct mtk_smi *common = dev_get_drvdata(dev);
+> > +       u32 bus_sel = common->plat->bus_sel;
+> >         int ret;
+> >
+> >         ret = mtk_smi_clk_enable(common);
+> > @@ -503,6 +518,9 @@ static int __maybe_unused mtk_smi_common_resume(struct device *dev)
+> >                 dev_err(common->dev, "Failed to enable clock(%d).\n", ret);
+> >                 return ret;
+> >         }
+> > +
+> > +       if (common->plat->gen == MTK_SMI_GEN2 && bus_sel)
+> > +               writel(bus_sel, common->base + SMI_BUS_SEL);
+> >         return 0;
+> >  }
+> >
+> > --
+> > 1.9.1
+> >
+
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
