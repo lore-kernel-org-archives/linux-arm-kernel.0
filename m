@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6464CC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 17:48:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B0DD7C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 17:49:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 35FAA21903
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 17:48:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7B85B21903
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 17:49:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EVhHs1dQ";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="bJuUMcrQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 35FAA21903
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mzsTs9gm";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="BT1hheMV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7B85B21903
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,58 +26,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=eLJf72H9tgZ3l80RGBCKTC8ZL4hknoKEbp8NVwTAABM=; b=EVhHs1dQcMJhKw
-	ePF56k7L0al70/0LwDUshWt9qvw9riZ17svamXyrbcYL9PjZsqWCrJ731+E/l+FMd/1gvyjiss2YR
-	w2R4EoY3m4APQwGzJTzoKpV9BOmUU+M2AzBf/JWQanlxS1roIx9qrPkFv6AYQ7CUxk3Lq4NY3qeU4
-	fQr4xbstIjdDNJ+ipNwj43tEkG+UVPh49kllw9ozO7hHWgldGY9eVN0y7EM3ovGTFnPv6hV3vI+dc
-	jUWCOPPRUE67Y3SX+nIJxtlAOYRh+POnd+pdM2bleYEGVclyinKredtZCR46AbNH1eJhn9FIA+EfW
-	UWmSaQKpe4l4xQajtjcQ==;
+	List-Owner; bh=MqjB69OrWoLB7q9X7yTjKlk597/y01fxA1lqIwkRYp4=; b=mzsTs9gmI6hsdY
+	/awJ4HphXxRUsNEPHjzih+p8WbPUx9BG3rx6rNRnpUNXiLTf/fSPxFuiZtHDzCS/wZ51Egq02mFnp
+	V1EW4twMngxoTkCZXHZFAhcARUh5TVGfqM6zRQDf45hLYTl9oAOmGC9nS9tjlylaVbOlFOxT+BvUT
+	thKh2RksSIdJ8lZqXi3Q6lIP9X60xUC9rqyWJqXjtcBg/hHk27ZaL8PEC1H7WgQpwXSI++xTiCEk5
+	YekEPmnPj4Yz6qz1WSzi3iWwtxid3ZYRzRLBstWRYSL+wtdbvWs4ZvN4HQSzEO9m4FWFHq+dl4jV1
+	ZgSU09arLni/j8QiXaWQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaOtw-0004ts-VN; Fri, 21 Dec 2018 17:47:56 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+	id 1gaOvO-0005GD-DX; Fri, 21 Dec 2018 17:49:26 +0000
+Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaOtt-0004sx-OS; Fri, 21 Dec 2018 17:47:55 +0000
-Received: by mail-wm1-x342.google.com with SMTP id g67so6509082wmd.2;
- Fri, 21 Dec 2018 09:47:43 -0800 (PST)
+ id 1gaOvL-0005EC-9E; Fri, 21 Dec 2018 17:49:24 +0000
+Received: by mail-wr1-x442.google.com with SMTP id t27so6120926wra.6;
+ Fri, 21 Dec 2018 09:49:12 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
  :user-agent:mime-version:in-reply-to:content-language
  :content-transfer-encoding;
- bh=8bB0rJmEzScf63gcQCpVOR2nQyBnbfHYF7eW9RZU64Y=;
- b=bJuUMcrQZgRtos2TJUBIby91fQktvoeTWJANz5p+saua2BPnn34Al6a0Egc0yETnos
- kX6vJQRV1eVPjfftxaBCILRfRt8Kys6coDJOguB3S++IPyvkNrEBMIw0J0CUSZi2UtTh
- uC341RVwdkvVZhv/skGnm0q5Mj1nLOLDV047c3JvVPfXmTKPOhDEX0M/3NtjZcbNqR/d
- VeCs1jm9K5MrVBVW/MPWvZkP27yKyQEaHxRw/kk4n0NWMR1czBBUbN4cHm4tmDmrajmK
- 2RaqSa9AlZNfAd23XSEgBWvry+nRwTSV5EWF2L+/YaSFvmFxadfivIZIAX3LNCMBvTf2
- NC1A==
+ bh=PVVGFdrrV9RDkEwvMjB1nO9TajaHGiR7jqHL3I6q0u8=;
+ b=BT1hheMVLf/hMdvG1fjkreGtTBtgppXLuda/LiAXrcY+YHj5eCynk/6XmEVPMrR2xM
+ l9KSeTLVTfM0waP345dm60hFWx7xhugGGTyjFTz96Ws49kYUbVG8y0nXV608RndbOclN
+ lHbMHKvtu8rvkmOFBFtvg1ICl8zuYbEUumBxoq1W4skxpi4hU5oy3URPipGCdX0D0RUN
+ 23M/z+0Pyl5lbdywmXlIFlSxjCFEA08UwRozPaOAbHqn6c/3Wbys4Rq7huUTuBepJQFo
+ /uVYETcWFuavivnjq4vRe6OEnCzkklnEh77V96oWzz3p/YhpAQTowUPGvAoesOzWAhQ0
+ 3Tqg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
  :message-id:date:user-agent:mime-version:in-reply-to
  :content-language:content-transfer-encoding;
- bh=8bB0rJmEzScf63gcQCpVOR2nQyBnbfHYF7eW9RZU64Y=;
- b=Gdeb/uFESNQHqsWEfWkaMeomB7iRMgF29dLC7x5O3krrXSvfXciFBob9xkESI51cCx
- qPLDPPJK/Y66lx+I5ZUxyRWFr4NapdgMmjFWSQBV08iMmYonjrR0PXu/1+UOvogkV0gw
- qKj0teGPOjFGikdYYKSK8IIUGKc0YUTYrVVM4d/f4htMlsu5JYGf6L3cm7p+DU1IiGlf
- mjQOt6//OvSr3S6D25mniCJjm73IWfL0xUXb88UuCZR/yubTyIreh8gu4AZzauO7wfYU
- i7ySWLxvw/LpQI7WIXvplYaHPZMG2rgWAuqgQ6fkavyJuT2ILafQVUVtzipIObyHTcyc
- ecww==
-X-Gm-Message-State: AJcUukeWypcjwYvUe8V97xQgkint1ERN3mhGTSj4sYkHsJIf7h601W32
- 33ZtfUJzulKW8usmZGWU83U=
-X-Google-Smtp-Source: ALg8bN53X5AmI2BQwUt7l3wBiwoEYMc/7w14j5Gcc2fZHpbx6cGnMQOmANEt9q9XK/Jdhf0mCWqiQQ==
-X-Received: by 2002:a1c:b189:: with SMTP id a131mr3837885wmf.38.1545414461708; 
- Fri, 21 Dec 2018 09:47:41 -0800 (PST)
+ bh=PVVGFdrrV9RDkEwvMjB1nO9TajaHGiR7jqHL3I6q0u8=;
+ b=fFw2EbKWnDsOEQtoCvK4VK68Y9W3HNB2XOBMhRpJLAWIbbqOwRyqI8vGqRZ/nLPvbN
+ zjLwKwYpyNTmLIQVF9p+t4fDtjPhwI3kSsUqDJk0Q1mZbC8hHlYe6orDfHiTCKs1mBjr
+ oIak388FsC6CjjXxm2iK4eAYD+Iqo+K5gISwrURKUDVUuTHwB2tax2le2TpjvwP0mx82
+ rjQhmFoLGlkEeDMYNj6fv6nOzI3/hPHaxDgjV/pqtMMDfKz0hXV2QsWwd4HaPxfepUfE
+ Ytg2/Pkuv/Ld/pucsiehtM22fUa7/EGv9gnymQRCCRSQ+Ha5UzUKsrTOaunemudwYdY3
+ /wGw==
+X-Gm-Message-State: AJcUukdalTH2vM1Wb5AxjF6GJuYtBMXThlKHub46VkeXEafi/7u+0n0F
+ 3oZVb/4bfXPGhCxw3oCenWc=
+X-Google-Smtp-Source: ALg8bN7anwgeYsT7c2EbnhEDCaRParwJn4Xbr9goOG2tXLveXL0T0BQiW8gikbcewokvc2/vPRy7OQ==
+X-Received: by 2002:adf:f091:: with SMTP id n17mr3565453wro.292.1545414551606; 
+ Fri, 21 Dec 2018 09:49:11 -0800 (PST)
 Received: from ziggy.stardust ([93.176.153.35])
- by smtp.gmail.com with ESMTPSA id 67sm3713183wra.37.2018.12.21.09.47.40
+ by smtp.gmail.com with ESMTPSA id c12sm8850589wrs.82.2018.12.21.09.49.10
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 21 Dec 2018 09:47:41 -0800 (PST)
-Subject: Re: [PATCH v4 03/18] memory: mtk-smi: Use a general config_port
- interface
+ Fri, 21 Dec 2018 09:49:10 -0800 (PST)
+Subject: Re: [PATCH v4 04/18] memory: mtk-smi: Use a struct for the platform
+ data for smi-common
 To: Yong Wu <yong.wu@mediatek.com>, Joerg Roedel <joro@8bytes.org>,
  Robin Murphy <robin.murphy@arm.com>, Rob Herring <robh+dt@kernel.org>
 References: <1544258371-4600-1-git-send-email-yong.wu@mediatek.com>
- <1544258371-4600-4-git-send-email-yong.wu@mediatek.com>
+ <1544258371-4600-5-git-send-email-yong.wu@mediatek.com>
 From: Matthias Brugger <matthias.bgg@gmail.com>
 Openpgp: preference=signencrypt
 Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
@@ -173,16 +173,16 @@ Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
  pac005PuhxCWkKTJz3gCmznnoat4GCnL5gy/m0Qk45l4PFqwWXVLo9AQg2Kp3mlIFZ6fsEKI
  AN5hxlbNvNb9V2Zo5bFZjPWPFTxOteM0omUAS+QopwU0yPLLGJVf2iCmItHcUXI+r2JwH1CJ
  jrHWeQEI2ucSKsNa8FllDmG/fQ==
-Message-ID: <aa91ceb7-673b-7022-d718-f9f61d4b2f23@gmail.com>
-Date: Fri, 21 Dec 2018 18:47:39 +0100
+Message-ID: <7a216644-bc10-c31d-209a-abbcf20a14b6@gmail.com>
+Date: Fri, 21 Dec 2018 18:49:09 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.3.3
 MIME-Version: 1.0
-In-Reply-To: <1544258371-4600-4-git-send-email-yong.wu@mediatek.com>
+In-Reply-To: <1544258371-4600-5-git-send-email-yong.wu@mediatek.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_094754_102635_C2D7908C 
-X-CRM114-Status: GOOD (  25.83  )
+X-CRM114-CacheID: sfid-20181221_094923_327079_AFC7C477 
+X-CRM114-Status: GOOD (  22.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -209,74 +209,118 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 
 On 08/12/2018 09:39, Yong Wu wrote:
-> The config_port of mt2712 and mt8183 are the same. Use a general
-> config_port interface instead.
+> Use a struct as the platform special data instead of the enumeration.
 > 
-> In addition, in mt2712, larb8 and larb9 are the bdpsys larbs which
-> are not the normal larb, their register space are different from the
-> normal one. thus, we can not call the general config_port. In mt8183,
-> IPU0/1 and CCU connect with smi-common directly, they also are not
-> the normal larb. Hence, we add a "larb_special_mask" for these special
-> larbs.
+> Also there is a minor change that moving the position of
+> "enum mtk_smi_gen" definition, this is because we expect define
+> "struct mtk_smi_common_plat" before it is referred.
 > 
-> This is also a preparing patch for adding mt8183 SMI support.
+> This is a preparing patch for mt8183.
 > 
 > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> ---
->  drivers/memory/mtk-smi.c | 12 +++++-------
->  1 file changed, 5 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
-> index 8f2d152..3b9ad0e 100644
-> --- a/drivers/memory/mtk-smi.c
-> +++ b/drivers/memory/mtk-smi.c
-> @@ -53,6 +53,7 @@ struct mtk_smi_larb_gen {
->  	bool need_larbid;
->  	int port_in_larb[MTK_LARB_NR_MAX + 1];
->  	void (*config_port)(struct device *);
-> +	unsigned int larb_special_mask; /* The special larbs mask. */
-
-I'm not really happy with the name larb_special_mask but I can't think of
-anything else. The comment is not needed as it just rewords the name of the
-variable.
-
-Other then that (or even without changing anything):
 
 Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
 
+> ---
+>  drivers/memory/mtk-smi.c | 35 ++++++++++++++++++++++++-----------
+>  1 file changed, 24 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
+> index 3b9ad0e..a5ddd42 100644
+> --- a/drivers/memory/mtk-smi.c
+> +++ b/drivers/memory/mtk-smi.c
+> @@ -49,6 +49,15 @@
+>  #define SMI_LARB_NONSEC_CON(id)	(0x380 + ((id) * 4))
+>  #define F_MMU_EN		BIT(0)
+>  
+> +enum mtk_smi_gen {
+> +	MTK_SMI_GEN1,
+> +	MTK_SMI_GEN2
+> +};
+> +
+> +struct mtk_smi_common_plat {
+> +	enum mtk_smi_gen gen;
+> +};
+> +
+>  struct mtk_smi_larb_gen {
+>  	bool need_larbid;
+>  	int port_in_larb[MTK_LARB_NR_MAX + 1];
+> @@ -61,6 +70,8 @@ struct mtk_smi {
+>  	struct clk			*clk_apb, *clk_smi;
+>  	struct clk			*clk_async; /*only needed by mt2701*/
+>  	void __iomem			*smi_ao_base;
+> +
+> +	const struct mtk_smi_common_plat *plat;
 >  };
 >  
->  struct mtk_smi {
-> @@ -176,17 +177,13 @@ void mtk_smi_larb_put(struct device *larbdev)
->  	return -ENODEV;
->  }
+>  struct mtk_smi_larb { /* larb: local arbiter */
+> @@ -72,11 +83,6 @@ struct mtk_smi_larb { /* larb: local arbiter */
+>  	u32				*mmu;
+>  };
 >  
-> -static void mtk_smi_larb_config_port_mt2712(struct device *dev)
-> +static void mtk_smi_larb_config_port_gen2_general(struct device *dev)
+> -enum mtk_smi_gen {
+> -	MTK_SMI_GEN1,
+> -	MTK_SMI_GEN2
+> -};
+> -
+>  static int mtk_smi_enable(const struct mtk_smi *smi)
 >  {
->  	struct mtk_smi_larb *larb = dev_get_drvdata(dev);
->  	u32 reg;
->  	int i;
->  
-> -	/*
-> -	 * larb 8/9 is the bdpsys larb, the iommu_en is enabled defaultly.
-> -	 * Don't need to set it again.
-> -	 */
-> -	if (larb->larbid == 8 || larb->larbid == 9)
-> +	if (BIT(larb->larbid) & larb->larb_gen->larb_special_mask)
->  		return;
->  
->  	for_each_set_bit(i, (unsigned long *)larb->mmu, 32) {
-> @@ -261,7 +258,8 @@ static void mtk_smi_larb_config_port_gen1(struct device *dev)
->  
->  static const struct mtk_smi_larb_gen mtk_smi_larb_mt2712 = {
->  	.need_larbid = true,
-> -	.config_port = mtk_smi_larb_config_port_mt2712,
-> +	.config_port       = mtk_smi_larb_config_port_gen2_general,
-> +	.larb_special_mask = BIT(8) | BIT(9),          /* bdpsys */
+>  	int ret;
+> @@ -351,18 +357,26 @@ static int mtk_smi_larb_remove(struct platform_device *pdev)
+>  	}
 >  };
 >  
->  static const struct of_device_id mtk_smi_larb_of_ids[] = {
+> +static const struct mtk_smi_common_plat mtk_smi_common_gen1 = {
+> +	.gen = MTK_SMI_GEN1,
+> +};
+> +
+> +static const struct mtk_smi_common_plat mtk_smi_common_gen2 = {
+> +	.gen = MTK_SMI_GEN2,
+> +};
+> +
+>  static const struct of_device_id mtk_smi_common_of_ids[] = {
+>  	{
+>  		.compatible = "mediatek,mt8173-smi-common",
+> -		.data = (void *)MTK_SMI_GEN2
+> +		.data = &mtk_smi_common_gen2,
+>  	},
+>  	{
+>  		.compatible = "mediatek,mt2701-smi-common",
+> -		.data = (void *)MTK_SMI_GEN1
+> +		.data = &mtk_smi_common_gen1,
+>  	},
+>  	{
+>  		.compatible = "mediatek,mt2712-smi-common",
+> -		.data = (void *)MTK_SMI_GEN2
+> +		.data = &mtk_smi_common_gen2,
+>  	},
+>  	{}
+>  };
+> @@ -372,13 +386,13 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
+>  	struct device *dev = &pdev->dev;
+>  	struct mtk_smi *common;
+>  	struct resource *res;
+> -	enum mtk_smi_gen smi_gen;
+>  	int ret;
+>  
+>  	common = devm_kzalloc(dev, sizeof(*common), GFP_KERNEL);
+>  	if (!common)
+>  		return -ENOMEM;
+>  	common->dev = dev;
+> +	common->plat = of_device_get_match_data(dev);
+>  
+>  	common->clk_apb = devm_clk_get(dev, "apb");
+>  	if (IS_ERR(common->clk_apb))
+> @@ -394,8 +408,7 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
+>  	 * clock into emi clock domain, but for mtk smi gen2, there's no smi ao
+>  	 * base.
+>  	 */
+> -	smi_gen = (enum mtk_smi_gen)of_device_get_match_data(dev);
+> -	if (smi_gen == MTK_SMI_GEN1) {
+> +	if (common->plat->gen == MTK_SMI_GEN1) {
+>  		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  		common->smi_ao_base = devm_ioremap_resource(dev, res);
+>  		if (IS_ERR(common->smi_ao_base))
 > 
 
 _______________________________________________
