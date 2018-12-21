@@ -6,18 +6,18 @@ X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 50F99C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 06:51:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C8687C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 07:15:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 19C8921906
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 06:51:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 97E4C21906
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 07:15:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F5pdeXgM";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="TKyVaadz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 19C8921906
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F+y8t0Eo";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="TM13oeX8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 97E4C21906
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,156 +25,71 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=FTOeNz/bkydvw53piQgybf2KTQPT213PhXljiFwidvU=; b=F5pdeXgMS22zT4
-	1Xj/Rpr02lG9pryeOdzu8uuDEyNb2eYlW5ys8UY4lrOmW/keQg8/bn+xOTd8ZvlYlCKnXTqxSVE2k
-	yuyLUhsZ2vYM0KfHLhbWDEktx3ma8CRKx0e9KQUlbqOqS4VIs/Wwhoo80oSkxwNxohHrg8d9bJdjo
-	qz3p/E/Y96zo9OK4DI1mPy4eQIJbXsaogeK2sla/piobgvGj3b86v9usNLRpbFsADXHxOvz0Ro+z1
-	iI3TZIKiE5893bdmy3RX9ISA6fuwzuAu3I6EGvy/i2J/KcnF6AYMHIh4wTWo105k91mKhnQ1J/ypQ
-	Q005f6PVeaoN7P/01OUw==;
+	List-Owner; bh=RYqdNfvhRg/wcIeIxYtl0asMMx7M5+bj6o4gxwUL4sE=; b=F+y8t0Eocqq7kJ
+	x0Fylha3ksVx7yAizRzN0qVe8EoVuaRTg99wBRHxKMTczyhayZmgkrxKFIoEaBD3Lx4jFMJ2JuOAq
+	zzysIvPe/G9/9Ldz13hebgytf/IRkdXr8IOb+p+o9/NfUznZJk1i6GK6vRvAP1IS91DCbvOe5LwOw
+	Ry+ARFEk+qVbZPrUUiPPDE8OeMCUm2FN2ZcZw/sorcDdsQDMwcdQqo54rVU7HKwVFtyK9juQIEcmU
+	QTJkkOwZzHgYO9AT0imcwJ+qYxX5m4Jvx5ABmw1gioSj/MhHG7/hknMfH39UqMa+j9sR51cxkqT6u
+	g90643M/VK/iC+q/N/ag==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaEeT-0003vk-Mw; Fri, 21 Dec 2018 06:51:17 +0000
-Received: from mail-sn1nam04on0605.outbound.protection.outlook.com
- ([2a01:111:f400:fe4c::605]
- helo=NAM04-SN1-obe.outbound.protection.outlook.com)
+	id 1gaF1n-0006T2-IC; Fri, 21 Dec 2018 07:15:23 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaEeQ-0003ue-6A; Fri, 21 Dec 2018 06:51:15 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=eF/V1AOrdnGmi4Bw/w+Xl//h7VqNR61dsyccBj58atY=;
- b=TKyVaadzPKNs4oM2ad370HHoUoctm5ycC4iSvkt94riuecQOWobDpUcZtNTDTC6B4Eoz4EVBFjlaqCFIK+9fL9zz1TBgrQm70IzbD4btoLybevm45biijSi3oCb3aVVNGNGEUVRtifZTHNvsGAZoQaZPY88xFbl6gGRUxBkGTfQ=
-Received: from SN6PR02CA0027.namprd02.prod.outlook.com (2603:10b6:805:a2::40)
- by DM6PR02MB5226.namprd02.prod.outlook.com (2603:10b6:5:48::11) with
- Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1425.22; Fri, 21 Dec
- 2018 06:51:00 +0000
-Received: from BL2NAM02FT009.eop-nam02.prod.protection.outlook.com
- (2a01:111:f400:7e46::205) by SN6PR02CA0027.outlook.office365.com
- (2603:10b6:805:a2::40) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.20.1446.19 via Frontend
- Transport; Fri, 21 Dec 2018 06:50:59 +0000
-Authentication-Results: spf=pass (sender IP is 149.199.60.83)
- smtp.mailfrom=xilinx.com; linaro.org; dkim=none (message not signed)
- header.d=none;linaro.org; dmarc=bestguesspass action=none
- header.from=xilinx.com;
-Received-SPF: Pass (protection.outlook.com: domain of xilinx.com designates
- 149.199.60.83 as permitted sender) receiver=protection.outlook.com;
- client-ip=149.199.60.83; helo=xsj-pvapsmtpgw01;
-Received: from xsj-pvapsmtpgw01 (149.199.60.83) by
- BL2NAM02FT009.mail.protection.outlook.com (10.152.77.68) with Microsoft SMTP
- Server (version=TLS1_0, cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.20.1446.11
- via Frontend Transport; Fri, 21 Dec 2018 06:50:54 +0000
-Received: from unknown-38-66.xilinx.com ([149.199.38.66] helo=xsj-pvapsmtp01)
- by xsj-pvapsmtpgw01 with esmtp (Exim 4.63)
- (envelope-from <michal.simek@xilinx.com>)
- id 1gaEe5-0002vt-7Z; Thu, 20 Dec 2018 22:50:53 -0800
-Received: from [127.0.0.1] (helo=localhost)
- by xsj-pvapsmtp01 with smtp (Exim 4.63)
- (envelope-from <michal.simek@xilinx.com>)
- id 1gaEdz-0006ub-T4; Thu, 20 Dec 2018 22:50:47 -0800
-Received: from xsj-pvapsmtp01 (xsj-smtp.xilinx.com [149.199.38.66])
- by xsj-smtp-dlp1.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id wBL6obpt001382; 
- Thu, 20 Dec 2018 22:50:37 -0800
-Received: from [172.30.17.111] by xsj-pvapsmtp01 with esmtp (Exim 4.63)
- (envelope-from <michals@xilinx.com>)
- id 1gaEdo-0006tZ-Ol; Thu, 20 Dec 2018 22:50:36 -0800
-Subject: Re: [PATCH v3 6/7] arm64: dts: xilinx: ultra96: Standardize LED
- labels and triggers
-To: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
- <michal.simek@xilinx.com>, Rob Herring <robh+dt@kernel.org>
-References: <20181029094245.7886-1-manivannan.sadhasivam@linaro.org>
- <20181029094245.7886-7-manivannan.sadhasivam@linaro.org>
- <20181221023708.GC3233@Mani-XPS-13-9360>
-From: Michal Simek <michal.simek@xilinx.com>
-Message-ID: <9f4f05cb-f326-a4e3-e306-cfbf64b629b4@xilinx.com>
-Date: Fri, 21 Dec 2018 07:50:29 +0100
+ id 1gaF1k-0006Bc-Cq
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 07:15:21 +0000
+Received: by mail-wr1-x441.google.com with SMTP id v13so4105749wrw.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 20 Dec 2018 23:15:09 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=subject:to:cc:references:from:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=6Y999tZFT4KVowGELbP8C8GTRfZSF77FOo8O93TvjWE=;
+ b=TM13oeX8/ojpm0DGwVB+zJTWSYmX0uEuJpuKlsjuJREnP4QSE4knUu4USgNhfA7fuO
+ JH6mN7ibY1CqyIkFeAle0XMQNOC+eKClAi5+3mqI8CqRQU6foK6Gsg5uGJVywklPnzhU
+ ZKW8k4a4Uvr9XWJuxMs3PrEmBGL7N1s4DslNw=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=6Y999tZFT4KVowGELbP8C8GTRfZSF77FOo8O93TvjWE=;
+ b=Dkfjkvj5x/Lsh8r3a/UD6mP155GsZB6KM02/wg+08Vln8Chapmb7cwff7HFM/wGPOT
+ 19fgyi+CQUH9S3ufmuK95kqP+EXFWE+jHroFpPZKNm0C94zRkYzlsEa62YAYWlMPkgOj
+ 5JNThm3LDId1nwJxMCwE04TZmcdNp5rJkec8Qy1PX+sAWM61rD99bS819Wju9t/DS31q
+ 3okt1wfNvyxGGxnKqYXr/Ly6tZwH0wheuHuLmzEFJAQTfaBUNOvua29E5kLhjSYgRcOM
+ vtohVVFNdTwphJgauOq2oI+puS3dgmzG05J0s42iAcARoYUPebScYDMpgXlWzJDEATQU
+ As7Q==
+X-Gm-Message-State: AJcUukfZI1JurK+2xpZIIbLfdjVo2wSh4803WN27KFblE45ti9Q+G6OX
+ 3Wq4IUhezOC8Mc+0i6FDD4bLSA==
+X-Google-Smtp-Source: ALg8bN7TBdc1qH89yzLvwkAJgAemjrA3k7EQ/vErm4YNlhVkQxgp0RyXuKg6BXnY2IygHHMp7JkxuQ==
+X-Received: by 2002:a5d:5182:: with SMTP id k2mr1238879wrv.121.1545376508086; 
+ Thu, 20 Dec 2018 23:15:08 -0800 (PST)
+Received: from [192.168.0.40] (sju31-1-78-210-255-2.fbx.proxad.net.
+ [78.210.255.2])
+ by smtp.googlemail.com with ESMTPSA id a1sm13838089wrw.76.2018.12.20.23.15.06
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 20 Dec 2018 23:15:07 -0800 (PST)
+Subject: Re: [PATCH v10 17/27] drivers: firmware: psci: Prepare to support PM
+ domains
+To: Ulf Hansson <ulf.hansson@linaro.org>
+References: <20181129174700.16585-1-ulf.hansson@linaro.org>
+ <20181129174700.16585-18-ulf.hansson@linaro.org>
+ <d82f3fe0-7f60-c89a-6503-435cc6dcc5cf@linaro.org>
+ <CAPDyKFpfp+d9K-i-ytCqwSq2ToQvqApatH0YyRXbW55wLyU=wA@mail.gmail.com>
+ <c5587b35-734c-5c1d-a433-ce78c8583ef1@linaro.org>
+ <CAPDyKFqdeSm56hVB+9dwJekNhZU10DE+-WaWa4m=wdUmjAdAdw@mail.gmail.com>
+From: Daniel Lezcano <daniel.lezcano@linaro.org>
+Message-ID: <66f0871e-fd1d-2f9a-13ce-1164c04e65ca@linaro.org>
+Date: Fri, 21 Dec 2018 08:15:05 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20181221023708.GC3233@Mani-XPS-13-9360>
+In-Reply-To: <CAPDyKFqdeSm56hVB+9dwJekNhZU10DE+-WaWa4m=wdUmjAdAdw@mail.gmail.com>
 Content-Language: en-US
-X-RCIS-Action: ALLOW
-X-TM-AS-Product-Ver: IMSS-7.1.0.1224-8.2.0.1013-23620.005
-X-TM-AS-User-Approved-Sender: Yes;Yes
-X-EOPAttributedMessage: 0
-X-MS-Office365-Filtering-HT: Tenant
-X-Forefront-Antispam-Report: CIP:149.199.60.83; IPV:NLI; CTRY:US; EFV:NLI;
- SFV:NSPM;
- SFS:(10009020)(396003)(136003)(376002)(346002)(39860400002)(2980300002)(199004)(189003)(64126003)(9786002)(6666004)(356004)(2906002)(76176011)(36386004)(6246003)(31686004)(8676002)(110136005)(54906003)(58126008)(230700001)(81166006)(316002)(81156014)(14444005)(186003)(26005)(50466002)(44832011)(36756003)(77096007)(446003)(65956001)(63266004)(106002)(11346002)(7416002)(426003)(486006)(8936002)(2616005)(126002)(476003)(65826007)(305945005)(478600001)(5660300001)(229853002)(23676004)(106466001)(65806001)(47776003)(31696002)(336012)(575784001)(4326008)(2486003)(107986001)(2101003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DM6PR02MB5226; H:xsj-pvapsmtpgw01; FPR:;
- SPF:Pass; LANG:en; PTR:unknown-60-83.xilinx.com; A:1; MX:1; 
-X-Microsoft-Exchange-Diagnostics: 1; BL2NAM02FT009;
- 1:MKqMotHaStxZEXVilAwgKXrjorS4nGa4Z3kfV9UpKSAsHdGUubLECDh0odN52vh7wooMUZrMjJ69U6c6gSRqoXHWdf9xoYojW8HN8M5UTORoQEQIt1hKCiKC4RcpPCgw
-X-MS-PublicTrafficType: Email
-X-MS-Office365-Filtering-Correlation-Id: 8e1dc704-9937-4000-925a-08d66710aa42
-X-Microsoft-Antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4608076)(2017052603328)(7153060);
- SRVR:DM6PR02MB5226; 
-X-Microsoft-Exchange-Diagnostics: 1; DM6PR02MB5226;
- 3:JcuAm2+kewdvPxm4Zh3wfI94NQoo7U5ZOpPsM69yNJiGmF79NegTxyjDT3uGY7Bn/bt1J9mApiVbYhk6fZp2AOjtrsV4mFmcSlJQ9RJuC5WIhCc3KPq7GfY+ngZ4vGlzYdrqgHj50EY9pe5QddPF9u7rMrvk8elITb5ElMiSRdLcOb7YUgDV21q5oZmOTas5bpfi1YEW/JH+omDAxi44uXWwl0wDmol+YKgs1LwfiB5+ucG2QxnECICKK41jNYQrOPc1QQk1E6HtPYdATdyb+IQuvVSyjwcnHYOKgDG9TUAAdClat38yCaXuXCI3hV0u1DfxFgTm2e2WbSGN9+2UxkwoAMPwHbdMDKfHYRLnysk=;
- 25:u56GF3F+3fkXoHGgKon8H/0CNyCL/20eeSVNkfYHG+a4ahJblMhg8b2aKdp5u0IoeOqprWuzquY6XfOKmpGLazbGVeZQ21uNXq6vaMELvpRDseLnnU3iLWw9C8ofdXBPu+vDgenCPEXoo07wO6iBaYmEtFTfFxBrZaspUVewxjaedJ81ujY3G3bQawBwAcqj7WLEpuZQ7cehXnVllEzQCWwEq1KOEHcekiNjbFMs1RnxtbmwwCwYn093ehow98QPJ5rUpsUZcPok/OS1DJG9vZQbsFsx81cJkPBIdcgytThuCpQ9goxciKi0+0jWyG/O/W+sSTjjle2TcrKO5bPsMA==
-X-MS-TrafficTypeDiagnostic: DM6PR02MB5226:
-X-Microsoft-Exchange-Diagnostics: 1; DM6PR02MB5226;
- 31:UF94JNUpaBxt78zKIK8StMcUZ1HF8cqZuDcmB0CQJdh8IODmyYJfr1wcLwjMm4XfR8apDCMvygT5VAvAQNllfTqj+UArDrjVj365VtcSgqE9epiDDDcYVxSb7XLtV6d89wa24EPAJL+OgdnOQVoXnmhbUjoR86X0oeQbErkBAnFwPIAHlWGNwpL1nfjFITYVa8XCk2+tQeo2pv10/0L3NvjIBxtLV0gLTBNsg0KvoL8=;
- 20:rtbTD6whqlP+jbUJR0FnHs+RgYLHo14C3iVdbFzh177xTZomWBD3H3LcI/EWMAqX4CkOEpNWLWR8wjeh70ur9i8LaJ2pfmPjnLNKxu/NMuwhOsj17lPlft6CikxdToaHPRAMHirLVG9XwYQYsArzkgLJfxOmKY/qxQkQGlh0vmcKgHO726BzGBcIOE2/bo0Nk9BastN7VKemTBoUjw+brwLEtYaJklvTPJM630jOpHUm1BXUE5C4P3Ou4kDrb64TCAA5+vxd3BNT0n+rtkIpwgnyNR1ZEOTinqI7N618XQ2EGVcdIlMFmu3KUgdxKV6LbDAZKvzVuPIRG9TBpYz4nqGZEcp2fdcGlvTGpyOX+GBNA+Nic3kmt3KyXNTKO0dPZhEUC2u/cRgO1RWYerqT1+NcKFYGyvdbhxweXnw8ocjs6jjDEQeToJHHyy5rOQh3NbdoY++W4wvKP8WKBjwUXdXLN9BF5+GnXeOn7z9JybVEEuZiv44OgF/wMA1kF076
-X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
-X-Microsoft-Antispam-PRVS: <DM6PR02MB5226FB53CB0804460F49D733C6B80@DM6PR02MB5226.namprd02.prod.outlook.com>
-X-MS-Exchange-SenderADCheck: 1
-X-Exchange-Antispam-Report-CFA-Test: BCL:0; PCL:0;
- RULEID:(8211001083)(3230021)(999002)(5005026)(6040522)(2401047)(8121501046)(10201501046)(3231475)(944501520)(52105112)(3002001)(93006095)(93004095)(6055026)(149066)(150057)(6041310)(20161123564045)(20161123560045)(20161123558120)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123562045)(201708071742011)(7699051)(76991095);
- SRVR:DM6PR02MB5226; BCL:0; PCL:0; RULEID:; SRVR:DM6PR02MB5226; 
-X-Microsoft-Exchange-Diagnostics: 1; DM6PR02MB5226;
- 4:DGN48ogADd/JtRkwLaSj81iiVZxaqH4e7atQpiszWGoZpjG79mHogDFoF8yaAHMTI3XW45KGYg0CcUxOg7O4BjvSmpti5RaYys7WmZf9aVVVjT2+b05qWe0uHIf2epDHAHSVV4S/whl6S8QrKdDKQxYL71CdAC2RlrKUcTiHHZp1nvqsxo7VvArbhaxpFgECATZ4j4zPpINPATdV8kcWMlWJJ1f4oMvxsJrItsLP0GB7U3znSohJHOP+EDXX8s97sRjfrPtEbOpBEXwCJ14luw==
-X-Forefront-PRVS: 0893636978
-X-Microsoft-Exchange-Diagnostics: =?utf-8?B?MTtETTZQUjAyTUI1MjI2OzIzOjlXN1JhMmcrclpsYzFWUFg5bHE3K1VSMHVi?=
- =?utf-8?B?THAxbXd2NWs2dmZaWERlVEo5Ky9GT3dPYnJWRldIbmpYWUZ0a2prekFiazZD?=
- =?utf-8?B?ZzcySlpZVm5odGVweVNQM0pzZzI5TWRSWEhYWG5iek5XUStqbGp4TXVGWEFQ?=
- =?utf-8?B?YWRjbTNXM21ON280MWduejJmV1dKTEtHeEgxa1AxT2lPdU8zS2dEMFZ1KzZU?=
- =?utf-8?B?MzVaTDBZS3pDSGY0VkdUd1drMk5FWmVacG1EVHZ5dVlPaEl4N1p2SmVwb2hv?=
- =?utf-8?B?UUV5ckUyejMwbzFBVjl5ZisvUHRnVnJySnN4K2hQRWxBdWVrQmJGcUI4SDV3?=
- =?utf-8?B?RHF5N3Rzc21FSmwrVHhQYmxacktXOTlSdzloSnNOVHhWaWkyQ3VMN2RxeDlQ?=
- =?utf-8?B?cGs5YUgzS0dFSmRBYVlMTUllWmIxdEFwZHlJRjFFVG9yMzVxckVYN0xUZDlP?=
- =?utf-8?B?akxEUXdjSEVYSXpsZGdPVkFmdTBhS2MwTlVjeXhQbWFFakpsZ2RLcUpLc1o3?=
- =?utf-8?B?bEhXZG5xTWJ0QmswdUE4N0NuZ0x1UjAzOUhGWmJTR0dUMUFmVVBPVGFOamxQ?=
- =?utf-8?B?Z0g4allRZWJoQmFJeTNtaGxhaDJtMzNlR25tRStzdEN0angzMHFiaVZLWGV0?=
- =?utf-8?B?VDlGSW9STGFJNnVxaG1jd1FxVkRQSEgvVkpsSE1kSzdFazNKV2lCbUh3YlpC?=
- =?utf-8?B?NUV2WFpEb1VIZ0ExUTZVVUNvYUU3RVlxV0ZVTkZ2Z1BvQTNsY0pHS1dGSUov?=
- =?utf-8?B?N1M1WnFXc1NMT1NvdWRYbSs4RmJkMnJVYzI0SnJXWjVXNmlLZVAvTDJaT3dP?=
- =?utf-8?B?cVlBNUZTSnFiN2E1cGZGbzFtS1JRb3o2dHQ4WlZEVkVpd3E0Sk1oZFVRSGRw?=
- =?utf-8?B?NFVKbXFGVmFLclVna25TQng4ZFFqbEFnWFROMFhhVnN5S2orSnFSSUZ0dVd5?=
- =?utf-8?B?Qlg5VFpHQmlQUDFqR3YxRlFRbUFaYnhielVaa3daVGdsL3FqWTdFeVBCNWFw?=
- =?utf-8?B?R1Vaa2Z5RU1qVm5KWlBzMGFXY21LTDRYU2QzSWpNa0U5eTRXb1RjbXVFMGFi?=
- =?utf-8?B?RkMrSFZKaHp1dXpRdU13SkJsd1RONEU1TE8rY2l0L1RJUTRnQmxrc0VTem5O?=
- =?utf-8?B?b0ZJdEZSdkRsWFY2WERKcUpoWjd2TnE5dy9mU1VtTmZrczNmeFBVckZTUVJH?=
- =?utf-8?B?M2lmQjZlK0hLMDBucTB3K2wzWW14eHZqRHlGdWY3TmlrNjZ2SlcxeVhjQUpC?=
- =?utf-8?B?R0ticy85dzUrYmcwbEM2M2VmaVBpYUIrVStPaXQvb0lXRFN2eXJDRDQxODlI?=
- =?utf-8?B?OVFuNnpDa1g5ajZHdUFhMThzRG9qTlJndE1aVS9BUGxCMmVyL241WkM0Y2Yw?=
- =?utf-8?B?UjZMTXhsODNmbis0SDQ3T0dhQkt3RnptMm8zZGt3dis2MS94QWk1UndZdzls?=
- =?utf-8?B?QzZRVVFXS3VSenVvcE5SeGV2OUJ0TlluWkZSNmNLNkczbDdaNGl4T2NFbENG?=
- =?utf-8?B?UlMwc2hnTXNmUmE0aWgwNUphVlBwTVNGRDZENm5sTDlWMStVSXRYaWJmWXV1?=
- =?utf-8?B?RHVtMHNSMDlwYVhGK2tZYXRvOXNNQURJNHdsbS9GdjNmSGVLMnovUlc1ZlBC?=
- =?utf-8?B?MG0vRWs0amZZWS9WdWwwMFBnZzZTdDlPYXM3Vnh0RzZlVFNOZzE0d0UzRUVF?=
- =?utf-8?B?TFEvTWJ1NjFPWUx1Vmd5N1NtUUlSVmcwbXZqc05kMWliT21qQlU0Z1ZDMFFE?=
- =?utf-8?Q?LeZ2Xw9B7/7WZ+9zvivCCrFwCU9iLYtsoG5rA=3D?=
-X-Microsoft-Antispam-Message-Info: rxSYo2/x6OcwfQNPRlrmAR19pptV1wezBjHuTVBRkGQUFPseW8hhq+ngDis1mm2vBBpUxwkEpY4kfKurfUW7N+kygdnSXwMDy/vODfjQAQPcGnSWhp2ef3QA5MMrzTTM5oDgjfTCrYqAZo1CsAn4264WzIQwgaG17bTSnwFfcZ9G6jJI1YdG7ZnY4PHkfeDiogXx3Jpdiwhn3HamhYFFxYKVzY/qbvuLCqrxa10aCK6DxhdwKENbuaPEfCSHIle8rzXMpfPHBVHFKF6wEumP83SKso2EjC8GITmDhb0vIAZatv9LYnsICcOrlnwPHhEm
-X-Microsoft-Exchange-Diagnostics: 1; DM6PR02MB5226;
- 6:vbaEjGb3XLbDLNnDHchz+xBwbRXWn2OTRdBwR9ufs4SK3kWYsPoPb7/lyW6vRHJscF5/ogpD903Mjlg/LaVwWHfplPaP8gGALO1GvxNwApxMr/VKlPpF51Jom/LctnUrnt2BsjoF1RV/PSuEqRmSK4DICSCEUtQ8Ro9CkacJX1ZuoUTvMvqQry1XOj4b7a2x8RizFL971tlbBLkCUBasY49bvA8R6e4dHnFVvCZ+VkqtV+T2AX+h8Dy5yhvI/jmLnVDlxKi82BuGQNHIwtxXzgung3H/biug7JYFy/3p9F2mD3BIa5Exm8/oFX/IqcYeurQZsKYbknIalGs7lkHMHnTkLUN2kx/H8oZyGujbO0n2gWJuH3R0IG5w0wmrQX91bTQU9/jmXV0ZE84aK/aFgSigz7yCLWViykT8LA7sd0Zt0qKZXNmqkZVIchfdidSus7q/IA6ANSs5vJLhHEaCZA==;
- 5:sOUUt6X4sC/V5x1rVugUuC/QpxSOqHrxvWwMVUvQJNMjFAN4vDzbY26hbpjoXuMh5uVRQzaJc9Uiy9IeZtG01m0blSSqKcqeoH312k7VS/3Oz8ol6CXeieUkaTGd7hSE2hM4ynVkawluCCtgEKzVeBlt7LZK/SHqiqiBQMpe/cw=;
- 7:Buk96ktpCw1cc7L7ulNhq4thSnD0lP/iVPTj70PMvrxofHWpJv0MUG0HVI7TM7e8RXqedluBsRUopkddJdMyjKgFwAn+wtLQhufZbYbsE/gDETgRbUa0G6XLPLjKtQrepFpINor8VU2zYiQpedoHNw==
-SpamDiagnosticOutput: 1:99
-SpamDiagnosticMetadata: NSPM
-X-OriginatorOrg: xilinx.com
-X-MS-Exchange-CrossTenant-OriginalArrivalTime: 21 Dec 2018 06:50:54.1567 (UTC)
-X-MS-Exchange-CrossTenant-Network-Message-Id: 8e1dc704-9937-4000-925a-08d66710aa42
-X-MS-Exchange-CrossTenant-Id: 657af505-d5df-48d0-8300-c31994686c5c
-X-MS-Exchange-CrossTenant-OriginalAttributedTenantConnectingIp: TenantId=657af505-d5df-48d0-8300-c31994686c5c; Ip=[149.199.60.83];
- Helo=[xsj-pvapsmtpgw01]
-X-MS-Exchange-CrossTenant-FromEntityHeader: HybridOnPrem
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DM6PR02MB5226
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_225114_243013_97E2B8E1 
-X-CRM114-Status: GOOD (  10.52  )
+X-CRM114-CacheID: sfid-20181220_231520_439525_8C33C699 
+X-CRM114-Status: GOOD (  19.93  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -186,45 +101,56 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, daniel.thompson@linaro.org,
- linux-arm-msm@vger.kernel.org, linus.walleij@linaro.org,
- linux-kernel@vger.kernel.org, amit.kucheria@linaro.org,
- linux-rockchip@lists.infradead.org, koen.kooi@linaro.org,
- linux-leds@vger.kernel.org, nicolas.dechesne@linaro.org,
- linux-soc@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>,
+ Vincent Guittot <vincent.guittot@linaro.org>,
+ Geert Uytterhoeven <geert+renesas@glider.be>,
+ Linux PM <linux-pm@vger.kernel.org>, Stephen Boyd <sboyd@kernel.org>,
+ Viresh Kumar <viresh.kumar@linaro.org>,
+ linux-arm-msm <linux-arm-msm@vger.kernel.org>,
+ Kevin Hilman <khilman@kernel.org>, "Rafael J . Wysocki" <rjw@rjwysocki.net>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Lina Iyer <ilina@codeaurora.org>, Tony Lindgren <tony@atomide.com>,
+ Sudeep Holla <sudeep.holla@arm.com>,
+ "Raju P . L . S . S . S . N" <rplsssn@codeaurora.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 21. 12. 18 3:37, Manivannan Sadhasivam wrote:
-> On Mon, Oct 29, 2018 at 03:12:44PM +0530, Manivannan Sadhasivam wrote:
->> For all 96Boards, the following standard is used for onboard LEDs.
->>
->> green:user1  default-trigger: heartbeat
->> green:user2  default-trigger: mmc0/disk-activity(onboard-storage)
->> green:user3  default-trigger: mmc1 (SD-card)
->> green:user4  default-trigger: none, panic-indicator
->> yellow:wlan  default-trigger: phy0tx
->> blue:bt      default-trigger: hci0-power
->>
->> So lets adopt the same for Ultra96, which is one of the 96Boards
->> CE and AI platform. Since the WLAN and BT LEDs are hardwired onboard,
->> consolidate only User LEDs.
->>
-> 
-> Hello,
-> 
-> Any update on this patch?
-
-I am still waiting for reaction from Rob.
-We are keep trying to keep backward compatibility and this patch is
-breaking it that's why I want to know DT guys reaction on this change.
-
-Thanks,
-Michal
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gMjAvMTIvMjAxOCAyMjozNywgVWxmIEhhbnNzb24gd3JvdGU6Cj4gT24gVGh1LCAyMCBEZWMg
+MjAxOCBhdCAxOTowNiwgRGFuaWVsIExlemNhbm8gPGRhbmllbC5sZXpjYW5vQGxpbmFyby5vcmc+
+IHdyb3RlOgo+Pgo+PiBPbiAyMC8xMi8yMDE4IDE2OjQ5LCBVbGYgSGFuc3NvbiB3cm90ZToKPj4K
+Pj4gWyAuLi4gXQo+Pgo+Pj4+PiArI2lmZGVmIENPTkZJR19DUFVfSURMRQo+Pj4+Cj4+Pj4gSXQg
+d291bGQgYmUgbmljZXIgaWYgeW91IGNhbiByZW1vdmUgdGhlIENPTkZJR19DUFVfSURMRSBieSBy
+ZXBsYWNpbmcgaXQKPj4+PiB3aXRoIGEgc3BlY2lmaWMgb25lIChlZy4gQ09ORklHX1BTQ0lfSURM
+RSkgYW5kIG1ha2UgaXQgZGVwZW5kIG9uCj4+Pj4gQ09ORklHX0NQVV9JRExFLCBzbyB0aGUgY29u
+ZmlnIG9wdGlvbnMgc3RheSBjb250YWluZWQgaW4gdGhlaXIKPj4+PiByZXNwZWN0aXZlIHN1YnN5
+c3RlbXMgZGlyZWN0b3J5Lgo+Pj4KPj4+IEkgYW0gYWxsIGZvciBzaW1wbGlmeWluZyB0aGUgS2Nv
+bmZpZyBvcHRpb25zIGluIGhlcmUsIGFzIGluZGVlZCBpdCdzCj4+PiByYXRoZXIgbWVzc3kuIEhv
+d2V2ZXIsIEkgd291bGQgcmF0aGVyIGF2b2lkIGZvbGRpbmcgaW4gYWRkaXRpb25hbAo+Pj4gY2xl
+YW51cCBjaGFuZ2VzIHRvIHRoaXMgc2VyaWVzLCBpcyBhbHJlYWR5IGV4dGVuc2l2ZSBlbm91Z2gu
+Cj4+Pgo+Pj4gV291bGQgeW91IGJlIG9rYXkgaWYgd2UgZGVhbCB3aXRoIHRoYXQgb24gdG9wPwo+
+Pgo+PiBJTU8sIHRoZXJlIGFyZSBwYXRjaGVzIGluIHRoaXMgc2VyaWVzIHdoaWNoIGNhbiBiZSBn
+cm91cGVkIGludG8gYQo+PiBjbGVhbnVwICsgc2V0IHRoZSBzY2VuZSBwYXRjaHNldCBhbmQgbWVy
+Z2VkIGltbWVkaWF0ZWx5LiBBbiBvcHRpb24KPj4gc2ltaWxhciB0byBBUk1fU0NNSV9QT1dFUl9E
+T01BSU4gY2FuIGJlIHBhcnQgb2YgaXQuCj4gCj4gSSBjZXJ0YWlubHkgYWdyZWUgdG8gdGhhdC4g
+VGhlIHRyaWNreSBpcywgdG8ga25vdyB3aGF0IHBpZWNlcyBwZW9wbGUKPiBhcmUgaGFwcHkgd2l0
+aCB0byBnbyBpbi4gOi0pCj4gCj4gRWFybGllciwgaW4gdjkgSSB0cmllZCB5b3VyIHN1Z2dlc3Rl
+ZCBhcHByb2FjaCAoa2luZCBvZiksIGJ1dCB0aGVuCj4gTG9yZW56byBzdGF0ZWQgdGhhdCBpdCdz
+IGtpbmQgb2YgYWxsIG9yIG5vdGhpbmcuIE1heWJlIHdlIGNhbiBicmluZyB1cAo+IHRoYXQgZGlz
+Y3Vzc2lvbiBhZ2FpbiB3aXRoIGhpbSBhbmQgc2VlIHdoYXQgd2UgY2FuIGZpZ3VyZSBvdXQuCj4g
+Cj4+Cj4+IEhvd2V2ZXIsIGlmIHlvdSBzd2VhciB5b3Ugd2lsbCBkbyB0aGUgY2hhbmdlIGFmdGVy
+IGFuZCBzaWduIHdpdGggeW91cgo+PiBibG9vZCwgSSdtIGZpbmUgd2l0aCB0aGF0IDA6KQo+Pgo+
+IAo+IFdoYXRldmVyIGl0IHRha2VzIQo+IAo+IEFueXdheSwgYXMgc3RhdGVkLCB0aGUgcmVhc29u
+IHdoeSBJIHdhbnQgdG8gdGFja2xlIHRoYXQgb24gdG9wLCBpcwo+IHRoYXQgSSBkb24ndCB3YW50
+IHRvIG1ha2UgdGhlIHNlcmllcyBtb3JlIGV4dGVuc2l2ZSB0aGFuIGl0IGFscmVhZHkKPiBpcy4K
+PiAKPiBBZ3JlZT8KClllcwoKLS0gCiA8aHR0cDovL3d3dy5saW5hcm8ub3JnLz4gTGluYXJvLm9y
+ZyDilIIgT3BlbiBzb3VyY2Ugc29mdHdhcmUgZm9yIEFSTSBTb0NzCgpGb2xsb3cgTGluYXJvOiAg
+PGh0dHA6Ly93d3cuZmFjZWJvb2suY29tL3BhZ2VzL0xpbmFybz4gRmFjZWJvb2sgfAo8aHR0cDov
+L3R3aXR0ZXIuY29tLyMhL2xpbmFyb29yZz4gVHdpdHRlciB8CjxodHRwOi8vd3d3LmxpbmFyby5v
+cmcvbGluYXJvLWJsb2cvPiBCbG9nCgoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtl
+cm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxt
+YW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
