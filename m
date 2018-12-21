@@ -2,71 +2,65 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3CE49C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 13:14:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DBA95C43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 13:47:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0ADFE2190A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 13:14:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ADE2620866
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 13:47:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gqWLNzHs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0ADFE2190A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TYdteU/J"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ADE2620866
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pschenker.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=oXJyxHh/3tJMrDXqS07PcgZmLdaHy6OhD00BPXm5yfs=; b=gqWLNzHsZrJpWR
-	o1VEsOsdx+LxVrRIsgfs5yQJ14AIoN6dTfnFiuCpUDbJdVPZBjd2YTcJLimdEVf6BjtBd7tCFnVv8
-	FBezw7s63E060AdtmI2qBk03fZzg2XP+hoscy6cd2s+H/ZR061nSWViyVRF8zlqJ3Fpw6z8eLlx4h
-	4chb4dhJQKMOYnbRsxJE+HvP47kijq7Bz6mM+9nT5sf+HNbriE+pI4YzIIHAqtZTQq8WXMehPSDtQ
-	N6wGM2qaRbKjEeJiVyVqlgPID2PU+c+B1I93PVGpZHt9OP1BDA7IYS/IH4CGRXA6jW5uxXprccN5W
-	OiaLyBdgkNX94+ZcmM2g==;
+	List-Owner; bh=Zj6QEyEZKE7F+i5XRPDWV5nxHdCH50yAJEo0/bG/suI=; b=TYdteU/JDh6wDA
+	9YRkBLnbRTQO6iDoB4DiWD3nVHu7rvgCc9smazODhI8OSSpxlGrbjmNnzSvjyZ276XqgJRWVLIdtG
+	DjFyjHfHkp0B6Xfb/6kZtbVZWM2ab4FzMditd9gK2Haqzf7NFeKgEn1xl4AtgDorRTnSs1bwU/mwE
+	0T/Dn/FL6mzIPvA852KcFHP+keHh8nJh6bgKi7hEe9oCbEl0L9NHsdbcSQFZiH7vXdd2a9GnVOzxe
+	ucq5KG1mmKJeSccEv0hKbnvp4tUX5XxE9V4WfZXChWpqmNHLMuRpKzFb+AMvedYxeW1cW7YlFk6Yw
+	k/JM6KXLBhV65JmxZqBw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaKd7-0008NC-LO; Fri, 21 Dec 2018 13:14:17 +0000
-Received: from [1.203.163.81] (helo=mailgw02.mediatek.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaKd2-0008ME-1i; Fri, 21 Dec 2018 13:14:14 +0000
-X-UUID: 1e3c602add0a4690a97d4c6255b9464f-20181221
-X-UUID: 1e3c602add0a4690a97d4c6255b9464f-20181221
-Received: from mtkcas32.mediatek.inc [(172.27.4.250)] by mailgw02.mediatek.com
- (envelope-from <jianjun.wang@mediatek.com>)
- (mailgw01.mediatek.com ESMTP with TLS)
- with ESMTP id 1063640725; Fri, 21 Dec 2018 21:13:34 +0800
-Received: from MTKCAS36.mediatek.inc (172.27.4.186) by MTKMBS31N2.mediatek.inc
- (172.27.4.87) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Fri, 21 Dec 2018 21:13:32 +0800
-Received: from [10.17.3.153] (10.17.3.153) by MTKCAS36.mediatek.inc
- (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Fri, 21 Dec 2018 21:13:31 +0800
-Message-ID: <1545398011.25199.43.camel@mhfsdcap03>
-Subject: Re: [PATCH 2/2] PCI: mediatek: Add controller support for MT7629
-From: Jianjun Wang <jianjun.wang@mediatek.com>
-To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Date: Fri, 21 Dec 2018 21:13:31 +0800
-In-Reply-To: <20181218153232.GA6715@e107981-ln.cambridge.arm.com>
-References: <1544058553-10936-1-git-send-email-jianjun.wang@mediatek.com>
- <1544058553-10936-3-git-send-email-jianjun.wang@mediatek.com>
- <20181213145517.GB4701@google.com> <1545034779.8528.8.camel@mhfsdcap03>
- <20181217143247.GK20725@google.com>
- <20181217154645.GA24864@e107981-ln.cambridge.arm.com>
- <1545124764.25199.3.camel@mhfsdcap03>
- <20181218153232.GA6715@e107981-ln.cambridge.arm.com>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+	id 1gaL97-00048a-Di; Fri, 21 Dec 2018 13:47:21 +0000
+Received: from mxout017.mail.hostpoint.ch ([2a00:d70:0:e::317])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gaL8w-0003yD-F1
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 13:47:12 +0000
+Received: from [10.0.2.46] (helo=asmtp013.mail.hostpoint.ch)
+ by mxout017.mail.hostpoint.ch with esmtp (Exim 4.91 (FreeBSD))
+ (envelope-from <dev@pschenker.ch>)
+ id 1gaL8g-0005bs-KB; Fri, 21 Dec 2018 14:46:54 +0100
+Received: from [46.140.72.82] (helo=philippe-pc.toradex.int)
+ by asmtp013.mail.hostpoint.ch with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES256-GCM-SHA384:256) (Exim 4.91 (FreeBSD))
+ (envelope-from <dev@pschenker.ch>)
+ id 1gaL8g-000BCi-E0; Fri, 21 Dec 2018 14:46:54 +0100
+X-Authenticated-Sender-Id: dev@pschenker.ch
+From: Philippe Schenker <dev@pschenker.ch>
+To: jic23@kernel.org,
+	marcel.ziswiler@toradex.com,
+	stefan@agner.ch
+Subject: [PATCH v5 7/8] ARM: dts: Add stmpe-adc DT node to Toradex iMX6 modules
+Date: Fri, 21 Dec 2018 14:46:36 +0100
+Message-Id: <20181221134638.20600-8-dev@pschenker.ch>
+X-Mailer: git-send-email 2.19.2
+In-Reply-To: <20181221134638.20600-1-dev@pschenker.ch>
+References: <20181221134638.20600-1-dev@pschenker.ch>
 MIME-Version: 1.0
-X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_051412_815489_FD2FD4F5 
-X-CRM114-Status: GOOD (  23.69  )
+X-CRM114-CacheID: sfid-20181221_054710_501452_0E3E645E 
+X-CRM114-Status: GOOD (  10.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,325 +72,141 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, ryder.lee@mediatek.com,
- linux-pci@vger.kernel.org, youlin.pei@mediatek.com,
- linux-kernel@vger.kernel.org, robh+dt@kernel.org,
- Bjorn Helgaas <helgaas@kernel.org>, honghui.zhang@mediatek.com,
- matthias.bgg@gmail.com, linux-mediatek@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, robh@kernel.org,
+ alexandre.torgue@st.com, devicetree@vger.kernel.org, lee.jones@linaro.org,
+ Sascha Hauer <s.hauer@pengutronix.de>, dmitry.torokhov@gmail.com,
+ linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
+ Philippe Schenker <philippe.schenker@toradex.com>, thierry.reding@gmail.com,
+ linux-arm-kernel@lists.infradead.org,
+ Pengutronix Kernel Team <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>, digetx@gmail.com, shawnguo@kernel.org,
+ coquelin.stm32@gmail.com, NXP Linux Team <linux-imx@nxp.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, 2018-12-18 at 15:32 +0000, Lorenzo Pieralisi wrote:
-> On Tue, Dec 18, 2018 at 05:19:24PM +0800, Jianjun Wang wrote:
-> > On Mon, 2018-12-17 at 15:46 +0000, Lorenzo Pieralisi wrote:
-> > > On Mon, Dec 17, 2018 at 08:32:47AM -0600, Bjorn Helgaas wrote:
-> > > > On Mon, Dec 17, 2018 at 04:19:39PM +0800, Jianjun Wang wrote:
-> > > > > On Thu, 2018-12-13 at 08:55 -0600, Bjorn Helgaas wrote:
-> > > > > > On Thu, Dec 06, 2018 at 09:09:13AM +0800, Jianjun Wang wrote:
-> > > > > > > The read value of BAR0 is 0xffff_ffff, it's size will be calculated as 4GB
-> > > > > > > in arm64 but bogus alignment values at arm32, the pcie device and devices
-> > > > > > > behind this bridge will not be enabled. Fix it's BAR0 resource size to
-> > > > > > > guarantee the pcie devices will be enabled correctly.
-> > > > > > 
-> > > > > > So this is a hardware erratum?  Per spec, a memory BAR has bit 0 hardwired
-> > > > > > to 0, and an IO BAR has bit 1 hardwired to 0.
-> > > > > 
-> > > > > Yes, it only works properly on 64bit platform.
-> > > > 
-> > > > I don't understand.  BARs are supposed to work the same regardless of
-> > > > whether it's a 32- or 64-bit platform.  If this is a workaround for a
-> > > > hardware defect, please just say that explicitly.
-> > > 
-> > > I do not understand this either. First thing to do is to describe the
-> > > problem properly so that we can actually find a solution to it.
-> > > 
-> > > Lorenzo
-> > 
-> > This BAR0 is a 64-bit memory BAR, the HW default values for this BAR is
-> > 0xffff_ffff_0000_0000 and it could not be changed except by config write
-> > operation.
-> > 
-> > The calculated BAR size will be 0 in 32-bit platform since the
-> > phys_addr_t is a 32bit value in 32-bit platform.
-> > 
-> > Actually MediaTek's HW does not using this BAR0, just omit it when
-> > assign resource is totally fine.
-> > 
-> > When assign the resource for each device, software will check the
-> > resource alignment first, and the resource of length zero will be
-> > regarded as a bogus alignment resource, it will be ignored and won't
-> > claim a resource parent for it.
-> > 
-> > When drivers try to enable the PCIe devices, the software will enable
-> > it's resources, but it will return an error number when found a
-> > unclaimed resource, in that case, the flow of enable devices will be
-> > interrupted and PCIe devices won't work properly.
-> 
-> As a starting point, please provide kernel logs for both 64-bit and
-> 32-bit platforms (without this patch applied) and also a:
-> 
-> cat /proc/iomem
-> 
-> and
-> 
-> lspci
-> 
-> output for both configurations.
-> 
-> Thanks,
-> Lorenzo
+From: Philippe Schenker <philippe.schenker@toradex.com>
 
-I compared with the mt2712 platform, which is an arm64 platform, and the
-EP deivce is an Intel e1000e NIC. Compiled these drivers to modules
-(without this patch applied both), and insert them separately after
-system startup.
+Add the stmpe-adc DT node as found on Toradex iMX6 modules
 
-After insert these modules, there will be an Ethernet device on both
-platform, and the 64-bit platform works properly, but the 32-bit
-platform doesn't.
+Signed-off-by: Philippe Schenker <philippe.schenker@toradex.com>
 
-1.The following logs is from the 64-bit platform (mt2712):
+---
 
-1.1. insmod pcie-mediatek.ko:
-mtk-pcie 11700000.pcie: host bridge /pcie@11700000 ranges:
-mtk-pcie 11700000.pcie:   MEM 0x20000000..0x2fffffff -> 0x20000000
-mtk-pcie 11700000.pcie: PCI host bridge to bus 0000:00
-pci_bus 0000:00: root bus resource [bus 00-ff]
-pci_bus 0000:00: root bus resource [mem 0x20000000-0x2fffffff]
-pci 0000:00:00.0: bridge configuration invalid ([bus 00-00]),
-reconfiguring
-pci 0000:01:00.0: 2.000 Gb/s available PCIe bandwidth, limited by 2.5
-GT/s x1 link at 0000:00:00.0 (capable of 7.876 Gb/s with 8 GT/s x1
-link)
-pci 0000:00:00.0: BAR 0: no space for [mem size 0x100000000 64bit pref]
-pci 0000:00:00.0: BAR 0: failed to assign [mem size 0x100000000 64bit
-pref]
-pci 0000:00:00.0: BAR 8: assigned [mem 0x20000000-0x200fffff]
-pci 0000:01:00.0: BAR 1: assigned [mem 0x20000000-0x2007ffff]
-pci 0000:01:00.0: BAR 6: assigned [mem 0x20080000-0x200bffff pref]
-pci 0000:01:00.0: BAR 0: assigned [mem 0x200c0000-0x200dffff]
-pci 0000:01:00.0: BAR 3: assigned [mem 0x200e0000-0x200e3fff]
-pci 0000:01:00.0: BAR 2: no space for [io  size 0x0020]
-pci 0000:01:00.0: BAR 2: failed to assign [io  size 0x0020]
-pci 0000:00:00.0: PCI bridge to [bus 01]
-pci 0000:00:00.0:   bridge window [mem 0x20000000-0x200fffff]
+Changes in v5: None
+Changes in v4:
+ - Moved T30 devicetree settings to separate commit
 
-1.2. insmod e1000e.ko:
-e1000e: Intel(R) PRO/1000 Network Driver - 3.2.6-k
-e1000e: Copyright(c) 1999 - 2015 Intel Corporation.
-pci 0000:00:00.0: enabling device (0000 -> 0002)
-e1000e 0000:01:00.0: enabling device (0000 -> 0002)
-e1000e 0000:01:00.0: Interrupt Throttling Rate (ints/sec) set to dynamic
-conservative mode
-e1000e 0000:01:00.0 0000:01:00.0 (uninitialized): registered PHC clock
-e1000e 0000:01:00.0 eth0: (PCI Express:2.5GT/s:Width x1)
-2c:53:4a:03:89:e9
-e1000e 0000:01:00.0 eth0: Intel(R) PRO/1000 Network Connection
-e1000e 0000:01:00.0 eth0: MAC: 3, PHY: 8, PBA No: FFFFFF-0FF
+Changes in v3:
+ - None
 
-1.3. lspci -xxx
-00:00.0 Class 0604: Device 14c3:2712
-00: c3 14 12 27 06 00 10 00 00 01 04 06 00 00 01 00
-10: 0c 00 00 00 00 00 00 00 00 01 01 40 00 00 20 04
-20: 00 20 00 20 00 00 00 00 00 00 00 00 00 00 00 00
-30: 00 00 00 00 50 00 00 00 00 00 00 00 00 01 00 00
-40: 00 00 00 00 60 61 12 02 00 00 00 00 00 00 00 00
-50: 05 78 80 00 00 00 00 00 00 00 00 00 00 00 00 00
-60: 00 00 00 00 00 00 00 00 11 78 00 00 00 00 00 00
-70: 00 00 00 00 00 00 00 00 01 80 c3 01 08 00 00 00
-80: 10 00 42 01 41 83 00 00 10 28 20 00 12 8c 60 01
-90: 08 00 11 10 00 00 04 00 00 00 00 00 00 00 00 00
-a0: 00 00 00 00 00 08 00 00 00 00 00 00 00 00 00 00
-b0: 02 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00
-c0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-d0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-e0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-f0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+Changes in v2:
+ - Put common ADC settings in mfd
 
-01:00.0 Class 0200: Device 8086:10d3
-00: 86 80 d3 10 06 04 18 00 00 00 00 02 10 00 00 00
-10: 00 00 0c 20 00 00 00 20 01 00 00 00 00 00 0e 20
-20: 00 00 00 00 00 00 00 00 00 00 00 00 1a 1d 00 00
-30: 00 00 00 00 c8 00 00 00 00 00 00 00 f3 01 00 00
-40: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-50: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-60: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-70: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-90: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-a0: 11 00 04 80 03 00 00 00 03 20 00 00 00 00 00 00
-b0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-c0: 00 00 00 00 00 00 00 00 01 d0 22 c8 00 20 00 14
-d0: 05 e0 80 00 00 00 00 00 00 00 00 00 00 00 00 00
-e0: 10 a0 01 00 c1 8c 00 00 10 28 10 00 11 1c 03 01
-f0: 00 00 11 10 00 00 00 00 00 00 00 00 00 00 00 00
+ arch/arm/boot/dts/imx6qdl-apalis.dtsi  | 22 ++++++++++++++--------
+ arch/arm/boot/dts/imx6qdl-colibri.dtsi | 23 +++++++++++++++--------
+ 2 files changed, 29 insertions(+), 16 deletions(-)
 
-1.4 lspci -v
-00:00.0 Class 0604: Device 14c3:2712 (prog-if 01)
-	Flags: bus master, fast devsel, latency 0
-	Memory at <unassigned> (64-bit, prefetchable)
-	Bus: primary=00, secondary=01, subordinate=01, sec-latency=64
-	I/O behind bridge: 00000000-00000fff [size=4K]
-	Memory behind bridge: 20000000-200fffff [size=1M]
-	Prefetchable memory behind bridge: 00000000-000fffff [size=1M]
-	Capabilities: [50] MSI: Enable- Count=1/1 Maskable- 64bit+
-	Capabilities: [78] Power Management version 3
-	Capabilities: [80] Express Root Port (Slot+), MSI 00
-	Capabilities: [100] Virtual Channel
-	Capabilities: [400] L1 PM Substates
-	Capabilities: [600] Latency Tolerance Reporting
-
-01:00.0 Class 0200: Device 8086:10d3
-	Subsystem: Device 1d1a:0000
-	Flags: bus master, fast devsel, latency 0, IRQ 243
-	Memory at 200c0000 (32-bit, non-prefetchable) [size=128K]
-	Memory at 20000000 (32-bit, non-prefetchable) [size=512K]
-	I/O ports at <unassigned> [disabled]
-	Memory at 200e0000 (32-bit, non-prefetchable) [size=16K]
-	[virtual] Expansion ROM at 20080000 [disabled] [size=256K]
-	Capabilities: [c8] Power Management version 2
-	Capabilities: [d0] MSI: Enable- Count=1/1 Maskable- 64bit+
-	Capabilities: [e0] Express Endpoint, MSI 00
-	Capabilities: [a0] MSI-X: Enable+ Count=5 Masked-
-	Capabilities: [100] Advanced Error Reporting
-	Capabilities: [140] Device Serial Number 2c-53-4a-ff-ff-03-89-e9
-	Kernel driver in use: e1000e
-
-1.5. cat /proc/iomem
-20000000-2fffffff : pcie@11700000
-  20000000-200fffff : PCI Bus 0000:01
-    20000000-2007ffff : 0000:01:00.0
-      20000000-2007ffff : e1000e
-    20080000-200bffff : 0000:01:00.0
-    200c0000-200dffff : 0000:01:00.0
-      200c0000-200dffff : e1000e
-    200e0000-200e3fff : 0000:01:00.0
-      200e0000-200e3fff : e1000e
-
-2. The following logs is from the 32-bit platform (mt7629):
-
-2.1. insmod pcie-mediatek.ko
-mtk-pcie 1a140000.pcie: host bridge /pcie@1a140000 ranges:
-mtk-pcie 1a140000.pcie:   MEM 0x20000000..0x2fffffff -> 0x20000000
-mtk-pcie 1a140000.pcie: PCI host bridge to bus 0000:00
-pci_bus 0000:00: root bus resource [bus 00-ff]
-pci_bus 0000:00: root bus resource [mem 0x20000000-0x2fffffff]
-PCI: bus0: Fast back to back transfers disabled
-pci 0000:00:01.0: bridge configuration invalid ([bus 00-00]),
-reconfiguring
-pci 0000:01:00.0: 2.000 Gb/s available PCIe bandwidth, limited by 2.5
-GT/s x1 link at 0000:00:01.0 (capable of 7.876 Gb/s with 8 GT/s x1
-link)
-PCI: bus1: Fast back to back transfers disabled
-pci 0000:00:01.0: BAR 0: [mem 0x00000000-0xffffffff 64bit pref] has
-bogus alignment
-pci 0000:00:01.0: BAR 8: assigned [mem 0x20000000-0x200fffff]
-pci 0000:01:00.0: BAR 1: assigned [mem 0x20000000-0x2007ffff]
-pci 0000:01:00.0: BAR 6: assigned [mem 0x20080000-0x200bffff pref]
-pci 0000:01:00.0: BAR 0: assigned [mem 0x200c0000-0x200dffff]
-pci 0000:01:00.0: BAR 3: assigned [mem 0x200e0000-0x200e3fff]
-pci 0000:01:00.0: BAR 2: no space for [io  size 0x0020]
-pci 0000:01:00.0: BAR 2: failed to assign [io  size 0x0020]
-pci 0000:00:01.0: PCI bridge to [bus 01]
-pci 0000:00:01.0:   bridge window [mem 0x20000000-0x200fffff]
-
-2.2. insmod e1000e.ko
-e1000e: Intel(R) PRO/1000 Network Driver - 3.2.6-k
-e1000e: Copyright(c) 1999 - 2015 Intel Corporation.
-pci 0000:00:01.0: can't enable device: BAR 0 [mem 0x00000000-0xffffffff
-64bit pref] not claimed
-pci 0000:00:01.0: Error enabling bridge (-22), continuing
-e1000e 0000:01:00.0: enabling device (0140 -> 0142)
-e1000e 0000:01:00.0: Interrupt Throttling Rate (ints/sec) set to dynamic
-conservative mode
-e1000e 0000:01:00.0 eth0: (PCI Express:2.5GT/s:Width x1)
-2c:53:4a:03:89:e9
-e1000e 0000:01:00.0 eth0: Intel(R) PRO/1000 Network Connection
-e1000e 0000:01:00.0 eth0: MAC: 3, PHY: 8, PBA No: FFFFFF-0FF
-
-2.3. lspci -xxx
-00:01.0 Class 0604: Device 14c3:7629
-00: c3 14 29 76 40 01 10 00 00 01 04 06 10 00 01 00
-10: 0c 00 00 00 00 00 00 00 00 01 01 40 00 00 20 04
-20: 00 20 00 20 00 00 00 00 00 00 00 00 00 00 00 00
-30: 00 00 00 00 50 00 00 00 00 00 00 00 00 01 01 00
-40: 00 00 00 00 60 61 12 02 00 00 00 00 00 00 00 00
-50: 05 78 80 00 00 00 00 00 00 00 00 00 00 00 00 00
-60: 00 00 00 00 00 00 00 00 11 78 00 00 00 00 00 00
-70: 00 00 00 00 00 00 00 00 01 80 c3 01 08 00 00 00
-80: 10 00 42 01 41 83 00 00 10 28 20 00 22 8c 60 01
-90: 08 00 11 10 00 00 04 00 00 00 00 00 00 00 00 00
-a0: 00 00 00 00 00 08 00 00 00 00 00 00 00 00 00 00
-b0: 02 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00
-c0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-d0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-e0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-f0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-
-01:00.0 Class 0200: Device 8086:10d3
-00: 86 80 d3 10 40 01 10 00 00 00 00 02 10 00 00 00
-10: 00 00 0c 20 00 00 00 20 01 00 00 00 00 00 0e 20
-20: 00 00 00 00 00 00 00 00 00 00 00 00 1a 1d 00 00
-30: 00 00 00 00 c8 00 00 00 00 00 00 00 00 01 00 00
-40: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-50: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-60: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-70: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-90: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-a0: 11 00 04 00 03 00 00 00 03 20 00 00 00 00 00 00
-b0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-c0: 00 00 00 00 00 00 00 00 01 d0 22 c8 00 20 00 14
-d0: 05 e0 80 00 00 00 00 00 00 00 00 00 00 00 00 00
-e0: 10 a0 01 00 c1 8c 00 00 10 28 10 00 11 1c 03 01
-f0: 00 00 11 10 00 00 00 00 00 00 00 00 00 00 00 00
-
-2.4. lspci -v
-00:01.0 Class 0604: Device 14c3:7629 (prog-if 01)
-	Flags: bus master, fast devsel, latency 0
-	Memory at <unassigned> (64-bit, prefetchable) [disabled] [size=4G]
-	Bus: primary=00, secondary=01, subordinate=01, sec-latency=64
-	I/O behind bridge: 00000000-00000fff [size=4K]
-	Memory behind bridge: 20000000-200fffff [size=1M]
-	Prefetchable memory behind bridge: 00000000-000fffff [size=1M]
-	Capabilities: [50] MSI: Enable- Count=1/1 Maskable- 64bit+
-	Capabilities: [78] Power Management version 3
-	Capabilities: [80] Express Root Port (Slot+), MSI 00
-	Capabilities: [100] Virtual Channel
-	Capabilities: [400] L1 PM Substates
-	Capabilities: [600] Latency Tolerance Reporting
-
-01:00.0 Class 0200: Device 8086:10d3
-	Subsystem: Device 1d1a:0000
-	Flags: bus master, fast devsel, latency 0, IRQ 110
-	Memory at 200c0000 (32-bit, non-prefetchable) [size=128K]
-	Memory at 20000000 (32-bit, non-prefetchable) [size=512K]
-	I/O ports at <unassigned> [disabled]
-	Memory at 200e0000 (32-bit, non-prefetchable) [size=16K]
-	[virtual] Expansion ROM at 20080000 [disabled] [size=256K]
-	Capabilities: [c8] Power Management version 2
-	Capabilities: [d0] MSI: Enable- Count=1/1 Maskable- 64bit+
-	Capabilities: [e0] Express Endpoint, MSI 00
-	Capabilities: [a0] MSI-X: Enable+ Count=5 Masked-
-	Capabilities: [100] Advanced Error Reporting
-	Capabilities: [140] Device Serial Number 2c-53-4a-ff-ff-03-89-e9
-	Kernel driver in use: e1000e
-
-2.5. cat /proc/iomem
-20000000-2fffffff : pcie@1a140000
-  20000000-200fffff : PCI Bus 0000:01
-    20000000-2007ffff : 0000:01:00.0
-      20000000-2007ffff : e1000e
-    20080000-200bffff : 0000:01:00.0
-    200c0000-200dffff : 0000:01:00.0
-      200c0000-200dffff : e1000e
-    200e0000-200e3fff : 0000:01:00.0
-      200e0000-200e3fff : e1000e
-
-Thanks.
+diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+index 3dc99dd8dde1..8db476d8978d 100644
+--- a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+@@ -331,11 +331,18 @@
+ 		id = <0>;
+ 		blocks = <0x5>;
+ 		irq-trigger = <0x1>;
++		/* 3.25 MHz ADC clock speed */
++		st,adc-freq = <1>;
++		/* 12-bit ADC */
++		st,mod-12b = <1>;
++		/* internal ADC reference */
++		st,ref-sel = <0>;
++		/* ADC converstion time: 80 clocks */
++		st,sample-time = <4>;
++		/* forbid to use ADC channels 3-0 (touch) */
+ 
+ 		stmpe_touchscreen {
+ 			compatible = "st,stmpe-ts";
+-			/* 3.25 MHz ADC clock speed */
+-			st,adc-freq = <1>;
+ 			/* 8 sample average control */
+ 			st,ave-ctrl = <3>;
+ 			/* 7 length fractional part in z */
+@@ -345,17 +352,16 @@
+ 			 * current limit value
+ 			 */
+ 			st,i-drive = <1>;
+-			/* 12-bit ADC */
+-			st,mod-12b = <1>;
+-			/* internal ADC reference */
+-			st,ref-sel = <0>;
+-			/* ADC converstion time: 80 clocks */
+-			st,sample-time = <4>;
+ 			/* 1 ms panel driver settling time */
+ 			st,settling = <3>;
+ 			/* 5 ms touch detect interrupt delay */
+ 			st,touch-det-delay = <5>;
+ 		};
++
++		stmpe_adc {
++			compatible = "st,stmpe-adc";
++			st,norequest-mask = <0x0F>;
++		};
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-colibri.dtsi b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
+index 87e15e7cb32b..2e303d79c7f8 100644
+--- a/arch/arm/boot/dts/imx6qdl-colibri.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
+@@ -262,11 +262,18 @@
+ 		id = <0>;
+ 		blocks = <0x5>;
+ 		irq-trigger = <0x1>;
++		/* 3.25 MHz ADC clock speed */
++		st,adc-freq = <1>;
++		/* 12-bit ADC */
++		st,mod-12b = <1>;
++		/* internal ADC reference */
++		st,ref-sel = <0>;
++		/* ADC converstion time: 80 clocks */
++		st,sample-time = <4>;
++		/* forbid to use ADC channels 3-0 (touch) */
+ 
+ 		stmpe_touchscreen {
+ 			compatible = "st,stmpe-ts";
+-			/* 3.25 MHz ADC clock speed */
+-			st,adc-freq = <1>;
+ 			/* 8 sample average control */
+ 			st,ave-ctrl = <3>;
+ 			/* 7 length fractional part in z */
+@@ -276,17 +283,17 @@
+ 			 * current limit value
+ 			 */
+ 			st,i-drive = <1>;
+-			/* 12-bit ADC */
+-			st,mod-12b = <1>;
+-			/* internal ADC reference */
+-			st,ref-sel = <0>;
+-			/* ADC converstion time: 80 clocks */
+-			st,sample-time = <4>;
+ 			/* 1 ms panel driver settling time */
+ 			st,settling = <3>;
+ 			/* 5 ms touch detect interrupt delay */
+ 			st,touch-det-delay = <5>;
+ 		};
++
++		stmpe_adc {
++			compatible = "st,stmpe-adc";
++			/* 3.25 MHz ADC clock speed */
++			st,norequest-mask = <0x0F>;
++		};
+ 	};
+ };
+ 
+-- 
+2.19.2
 
 
 _______________________________________________
