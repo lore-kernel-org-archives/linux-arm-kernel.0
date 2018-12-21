@@ -2,149 +2,62 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FROM,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1EDF6C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 17:52:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 214D3C43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 17:57:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E48CF21903
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 17:52:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E752C218E0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 17:57:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KxcWrWG6";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="R+mzUzaO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E48CF21903
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DtNGTcsa"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E752C218E0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=goodmis.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1KpOu58qR67DEYZXZWV9wLiMApEzq3vf2OKNAStU/ZI=; b=KxcWrWG6JBgeE9
-	KSH7zmGFQ5ytPYzi39hmleIErl5AsShvVxYF/UvpdJbqWZd5625xV2a2xSaxgIGCEQu5hFSzRtA//
-	0fzaGX7XirGWMkLn70ECU+nNqxlCFPddWmi2BBKQ1zyty4+RTuHdHTRi4maNGakJYnB8YldaWJrrs
-	sl997eKssahL1+zfQ/EL9KVA9QzYBSL4Go932plYc/JeNh+wRAU3j41UpSMFDonnnIFZ6BWMOeezf
-	HpcS8Dp7Kpiu4jCfBjFzJQs9pr/YtNKNEcumqJy4QJrhzcODL8hoEnujDgmSqOHkUnxm7tOTH/B71
-	g8/6Wa3ZOJT84NpczAqA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Subject:To:From
+	:Date:Message-Id:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	List-Owner; bh=FinxA8O15GE0bM+ZlzS1K4hC873skpIGMzXtyliUZng=; b=DtNGTcsaVx7WDL
+	eeSpVHd5d76XyCVZdDOt1qiy1RnjjSwwUrAA5DfBDkngeqajk/9KEoS0zAlhArkMb9GQENVUn6ok6
+	fU4wjY2YH5jl30GW/m6jhWBGYpqqec7HnDq0SBOaQt50MtybOy0PG4PXoA0FrgJlRFz6lhV8RhHIA
+	FNL51p2sHe5q3pdlfWdBAqereGZL65m+mKc0TFI4ClwVhD488gnuTIvVO9tfGk1QX0/gScObK3fAA
+	GgZhGp2JX+Dr5fYlUdTxs7FUYP21asZAP7h3sWHgvtSiv3jB1Os1E8Un9nT5TgHSqUyFnb3Qo+4Gu
+	rantktqRmvE7HeR/mhnA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaOyh-0006rw-VS; Fri, 21 Dec 2018 17:52:51 +0000
-Received: from mail-yw1-xc44.google.com ([2607:f8b0:4864:20::c44])
+	id 1gaP2t-0000MD-Kb; Fri, 21 Dec 2018 17:57:11 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaOyf-0006rA-4C; Fri, 21 Dec 2018 17:52:50 +0000
-Received: by mail-yw1-xc44.google.com with SMTP id x2so2416930ywc.9;
- Fri, 21 Dec 2018 09:52:38 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=UH1iNYpu++D0W8CIX3Ql52gGxRatf+PS/hQS4hJlfHM=;
- b=R+mzUzaO2YPMl3eVbsPBw/+Upf6pYLHXY6CMZuUewBSpUXl4LqFrvoILpehLL10G4C
- vYkcf7WWlNmFK07ZX7reA/1CKqI4SIppyxCUebV/Yk/pJdz/gBXF9TtrTTOkpOEgkN1M
- Y3yipAavUGrBTE1fCano4JXql9BEhkLxECCReWXjZr4z7nuVSgKYlr+oO3xn9L+TnK0B
- rQueZiyaedx/xKjS9L74XhpNJf4ZnLuB6EHMwjes0eCLii/bpDWmmM54+yVlu66V0qv1
- OeIrD3pMHdNx5b69TjlbEs8Z1zn4MndQILQSZ7+tdWku06de6bMt6UV5ZsJG57bDi+Y5
- Loew==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=UH1iNYpu++D0W8CIX3Ql52gGxRatf+PS/hQS4hJlfHM=;
- b=WOATo+7yWhD34GsiBXentXPvB6tGrL5jB13oJIpTKhRKlKVyZNhfykOB55qRAqyVqs
- oaS8pY5L1hadBDF3ePhCJHso+QJPRjt5+9WII63x9t7wADzcHXaH4MX3ePHTtQd/CGA8
- ORrlQ73ThWO3tM50BDiF2I0qsFsCEhi1TNoXqrSoMgHzGd7uHFRHmqQyJnT+6ql1GOpU
- ERuRCxcsc8xM+yW2n2zEhLrDtt4X8HGoXZSe8qrf57ZKRQxMdnlcBXol2levewT4W9Qu
- lTRFuZZQVoGhxT5/dJsQgYeKb3ZxuDW5IwXdm3m4rVjFND5U7G/avziFDgGXgKHU0Mt9
- 5GEA==
-X-Gm-Message-State: AA+aEWbqoC48smBJeUPv/2rRnMmCbZty6Dg9STqdQNr2rOQCbjREeanX
- 0D2jAd6yX5XFXmrmPYwD4y4=
-X-Google-Smtp-Source: AFSGD/UAFbz0kZyKMdtJspSSUt3JiT80hWKkgKohP424v0eeIt4MgZ7MPeNxA2rwMA9Ida43DFFTOQ==
-X-Received: by 2002:a81:5fd5:: with SMTP id t204mr3423526ywb.312.1545414757583; 
- Fri, 21 Dec 2018 09:52:37 -0800 (PST)
-Received: from [10.67.49.9] ([192.19.223.250])
- by smtp.googlemail.com with ESMTPSA id g138sm7843633ywb.64.2018.12.21.09.52.33
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 21 Dec 2018 09:52:36 -0800 (PST)
-Subject: Re: [PATCH] i2c: bcm2835: Clear current message and count after a
- transaction
-To: Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- bcm-kernel-feedback-list@broadcom.com, linux-i2c@vger.kernel.org,
- linux-rpi-kernel@lists.infradead.org, linux-arm-kernel@lists.infradead.org,
- linux-kernel@vger.kernel.org
-References: <20181221121135.4847-1-paul.kocialkowski@bootlin.com>
-From: Florian Fainelli <f.fainelli@gmail.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=f.fainelli@gmail.com; prefer-encrypt=mutual; keydata=
- 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
- M5kY0ACeNhCZJvZ5g4C2Lc9fcTHu8jxmEkI=
-Message-ID: <4892f080-dff5-8d08-c78f-3c8b85f5a454@gmail.com>
-Date: Fri, 21 Dec 2018 09:52:27 -0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gaP2q-0000KC-E0
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 17:57:09 +0000
+Received: from gandalf.local.home (cpe-66-24-56-78.stny.res.rr.com
+ [66.24.56.78])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id B0BFC21934;
+ Fri, 21 Dec 2018 17:56:57 +0000 (UTC)
+Received: from rostedt by gandalf.local.home with local (Exim 4.91)
+ (envelope-from <rostedt@goodmis.org>)
+ id 1gaP2e-0002Ki-Jw; Fri, 21 Dec 2018 12:56:56 -0500
+Message-Id: <20181221175656.503716620@goodmis.org>
+User-Agent: quilt/0.65
+Date: Fri, 21 Dec 2018 12:56:26 -0500
+From: Steven Rostedt <rostedt@goodmis.org>
+To: linux-kernel@vger.kernel.org
+Subject: [for-next][PATCH 08/24] arm64: Use ftrace_graph_get_ret_stack()
+ instead of curr_ret_stack
+References: <20181221175618.968519903@goodmis.org>
 MIME-Version: 1.0
-In-Reply-To: <20181221121135.4847-1-paul.kocialkowski@bootlin.com>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_095249_194106_A08DD11C 
-X-CRM114-Status: GOOD (  23.72  )
+X-CRM114-CacheID: sfid-20181221_095708_503339_C9F53D90 
+X-CRM114-Status: GOOD (  15.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -156,58 +69,150 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Stefan Wahren <stefan.wahren@i2se.com>, Ray Jui <rjui@broadcom.com>,
- Scott Branden <sbranden@broadcom.com>, Eric Anholt <eric@anholt.net>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ Masami Hiramatsu <mhiramat@kernel.org>, Namhyung Kim <namhyung@kernel.org>,
+ Andrew Morton <akpm@linux-foundation.org>, Ingo Molnar <mingo@kernel.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 12/21/18 4:11 AM, Paul Kocialkowski wrote:
-> The driver's interrupt handler checks whether a message is currently
-> being handled with the curr_msg pointer. When it is NULL, the interrupt
-> is considered to be unexpected. Similarly, the i2c_start_transfer
-> routine checks for the remaining number of messages to handle in
-> num_msgs.
-> 
-> However, these values are never cleared and always keep the message and
-> number relevant to the latest transfer (which might be done already and
-> the underlying message memory might have been freed).
-> 
-> When an unexpected interrupt hits with the DONE bit set, the isr will
-> then try to access the flags field of the curr_msg structure, leading
-> to a fatal page fault.
-> 
-> Fix the issue by systematically clearing curr_msg and num_msgs in the
-> driver-wide device structure when a transfer is considered complete.
+From: "Steven Rostedt (VMware)" <rostedt@goodmis.org>
 
-Should not this get a Fixes tag?
+The structure of the ret_stack array on the task struct is going to
+change, and accessing it directly via the curr_ret_stack index will no
+longer give the ret_stack entry that holds the return address. To access
+that, architectures must now use ftrace_graph_get_ret_stack() to get the
+associated ret_stack that matches the saved return address.
 
-> 
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> ---
->  drivers/i2c/busses/i2c-bcm2835.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
-> index 44deae78913e..5486252f5f2f 100644
-> --- a/drivers/i2c/busses/i2c-bcm2835.c
-> +++ b/drivers/i2c/busses/i2c-bcm2835.c
-> @@ -298,6 +298,9 @@ static int bcm2835_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
->  		return -ETIMEDOUT;
->  	}
->  
-> +	i2c_dev->curr_msg = NULL;
-> +	i2c_dev->num_msgs = 0;
-> +
->  	if (!i2c_dev->msg_err)
->  		return num;
->  
-> 
+Cc: linux-arm-kernel@lists.infradead.org
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+---
+ arch/arm64/kernel/perf_callchain.c |  2 +-
+ arch/arm64/kernel/process.c        |  2 +-
+ arch/arm64/kernel/return_address.c |  2 +-
+ arch/arm64/kernel/stacktrace.c     | 12 +++++++-----
+ arch/arm64/kernel/time.c           |  2 +-
+ arch/arm64/kernel/traps.c          |  2 +-
+ 6 files changed, 12 insertions(+), 10 deletions(-)
 
-
+diff --git a/arch/arm64/kernel/perf_callchain.c b/arch/arm64/kernel/perf_callchain.c
+index bcafd7dcfe8b..1b792b46604e 100644
+--- a/arch/arm64/kernel/perf_callchain.c
++++ b/arch/arm64/kernel/perf_callchain.c
+@@ -164,7 +164,7 @@ void perf_callchain_kernel(struct perf_callchain_entry_ctx *entry,
+ 	frame.fp = regs->regs[29];
+ 	frame.pc = regs->pc;
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-	frame.graph = current->curr_ret_stack;
++	frame.graph = 0;
+ #endif
+ 
+ 	walk_stackframe(current, &frame, callchain_trace, entry);
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index d9a4c2d6dd8b..37a66394b07d 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -459,7 +459,7 @@ unsigned long get_wchan(struct task_struct *p)
+ 	frame.fp = thread_saved_fp(p);
+ 	frame.pc = thread_saved_pc(p);
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-	frame.graph = p->curr_ret_stack;
++	frame.graph = 0;
+ #endif
+ 	do {
+ 		if (unwind_frame(p, &frame))
+diff --git a/arch/arm64/kernel/return_address.c b/arch/arm64/kernel/return_address.c
+index 933adbc0f654..53c40196b607 100644
+--- a/arch/arm64/kernel/return_address.c
++++ b/arch/arm64/kernel/return_address.c
+@@ -44,7 +44,7 @@ void *return_address(unsigned int level)
+ 	frame.fp = (unsigned long)__builtin_frame_address(0);
+ 	frame.pc = (unsigned long)return_address; /* dummy */
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-	frame.graph = current->curr_ret_stack;
++	frame.graph = 0;
+ #endif
+ 
+ 	walk_stackframe(current, &frame, save_return_addr, &data);
+diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+index 7723dadf25be..1a29f2695ff2 100644
+--- a/arch/arm64/kernel/stacktrace.c
++++ b/arch/arm64/kernel/stacktrace.c
+@@ -59,15 +59,17 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ 	if (tsk->ret_stack &&
+ 			(frame->pc == (unsigned long)return_to_handler)) {
+-		if (WARN_ON_ONCE(frame->graph == -1))
+-			return -EINVAL;
++		struct ftrace_ret_stack *ret_stack;
+ 		/*
+ 		 * This is a case where function graph tracer has
+ 		 * modified a return address (LR) in a stack frame
+ 		 * to hook a function return.
+ 		 * So replace it to an original value.
+ 		 */
+-		frame->pc = tsk->ret_stack[frame->graph--].ret;
++		ret_stack = ftrace_graph_get_ret_stack(tsk, frame->graph++);
++		if (WARN_ON_ONCE(!ret_stack))
++			return -EINVAL;
++		frame->pc = ret_stack->ret;
+ 	}
+ #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
+ 
+@@ -134,7 +136,7 @@ void save_stack_trace_regs(struct pt_regs *regs, struct stack_trace *trace)
+ 	frame.fp = regs->regs[29];
+ 	frame.pc = regs->pc;
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-	frame.graph = current->curr_ret_stack;
++	frame.graph = 0;
+ #endif
+ 
+ 	walk_stackframe(current, &frame, save_trace, &data);
+@@ -165,7 +167,7 @@ static noinline void __save_stack_trace(struct task_struct *tsk,
+ 		frame.pc = (unsigned long)__save_stack_trace;
+ 	}
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-	frame.graph = tsk->curr_ret_stack;
++	frame.graph = 0;
+ #endif
+ 
+ 	walk_stackframe(tsk, &frame, save_trace, &data);
+diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+index f258636273c9..a777ae90044d 100644
+--- a/arch/arm64/kernel/time.c
++++ b/arch/arm64/kernel/time.c
+@@ -52,7 +52,7 @@ unsigned long profile_pc(struct pt_regs *regs)
+ 	frame.fp = regs->regs[29];
+ 	frame.pc = regs->pc;
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-	frame.graph = current->curr_ret_stack;
++	frame.graph = 0;
+ #endif
+ 	do {
+ 		int ret = unwind_frame(NULL, &frame);
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 5f4d9acb32f5..49ebf3771391 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -122,7 +122,7 @@ void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+ 		frame.pc = thread_saved_pc(tsk);
+ 	}
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-	frame.graph = tsk->curr_ret_stack;
++	frame.graph = 0;
+ #endif
+ 
+ 	skip = !!regs;
 -- 
-Florian
+2.19.2
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
