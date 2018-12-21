@@ -2,23 +2,23 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.9 required=3.0 tests=DKIM_ADSP_ALL,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FROM,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9C67BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 08:43:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E0D78C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 08:47:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6BD9521906
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 08:43:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 91FD2218F0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 08:47:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dux7q39n";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=plaes.org header.i=@plaes.org header.b="SneUCw3f"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6BD9521906
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=plaes.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G0MazblM";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="mgwXJ1As"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 91FD2218F0
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,47 +26,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=h2bo8Egx1MFeqGMPPGjq4mEWiGuPgn6GcMmuWWCpad4=; b=dux7q39nK+yZK3
-	5NAwNyP+OodlnEfXX8P5E4qmSPXPxa2AcbADncNmYKhLV4+bdhVnzfYYTl8L2RVY74rEaFuwmgqI6
-	+B0kYvvRmkrkle9vuJ22DiD4O+xhV9zONFsfxn6z5nUb4F3IVzsjbK2lqKmDOxeYZOsQMdzsISd6J
-	op6Y3ZuN8XaldWV2DPRNAnlqBnUCody43U+9WsIjzDquSfrRTx+VapO5Y3Gv2Xe+y3MGDmszbdf5e
-	SOJwraMDPF6i8O+oe7jYaV7NsN5kz20PRzgnsrIgU3H8aw6nuocyecHF8Aoxrn8KPBOi2rno8mW7L
-	s9L+eaXVoaLEb23sisXg==;
+	List-Owner; bh=wv4QqE6JFBU9BmI0WRDiKTNSDfiQK1sCtH7hyhakj8c=; b=G0MazblMphD5MZ
+	mHHmOxTN7BCPFFWtaOZiIzWrEkW+s7qWu9Cqy8Dh8eLK+gmeLOrRdancSZprgGup/5q0WaazmoTMB
+	9UDXuHjKjQOpaoyJM7f2q4N54lRfGm4qwmRwiIYy+qCxnpToJFBqi6CsDdsJuwGS+VBzLbO6PjPJn
+	em4/YOyGvWgwejurysG4b0vbZBH4ojtiQmh1embbiogTjTV6KlOvm2K0p0yi3tiRPPF4y8cL2aOeH
+	oDV4ArLh5DMd3HqBfc5l9jWMZ0OWkF+QXzKEIlUdf+0nLiMbt/F26K2FqqpyEJi8dk/VvTQXoB9wD
+	Mwm7XOnrAmMUOeyoGkZA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaGP8-0007f1-H9; Fri, 21 Dec 2018 08:43:34 +0000
-Received: from plaes.org ([188.166.43.21])
+	id 1gaGSS-000117-7Y; Fri, 21 Dec 2018 08:47:00 +0000
+Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaGP5-0007eT-9p
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 08:43:33 +0000
-Received: from plaes.org (localhost [127.0.0.1])
- by plaes.org (Postfix) with ESMTPSA id 92006408E1;
- Fri, 21 Dec 2018 08:42:47 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=plaes.org; s=mail;
- t=1545381767; bh=KWZrrP4uMqfRM50npT9IhegpzIgzKYjVpYc0tfDfs2M=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=SneUCw3fpzvNz1MJvoH/kCWpbgbO2x51C+F494u7tpuH4s050o8fxbfXtVx79wRic
- m96OwGq/Twibk1KgnvcSEoro2ZXph5cA11fXzgQWiCYXZNihr0OmzgRSbKXCFzJsJ9
- ISvolHIIRDX0IcovSougid+7RaqbHWzTbqvQGfURWfm7w7i07m7GJlS58DrOm6GKI/
- hNvl5See9HscInF+VYY777qWzLhpZFhP1BJc83YCV1m336TWKQ6zmY/avvBDTNFLq3
- PAAiy9BPW0M4j0/1gObyyVGg9cwTDF1LQEeXfgEzr3cK8i48duaaPMwCLcoVJ33BK0
- s8Iq0n4u0QMYg==
-Date: Fri, 21 Dec 2018 08:42:46 +0000
-From: Priit Laes <plaes@plaes.org>
-To: Lee Jones <lee.jones@linaro.org>
-Subject: Re: [linux-sunxi] Re: [PATCH v2 1/8] mfd: axp20x: name voltage
- ramping define properly
-Message-ID: <20181221084246.myrtv6n4jrv6lajl@plaes.org>
-References: <cover.923997dd7d7396bb4d71f8967698b58ca956b929.1544512919.git-series.plaes@plaes.org>
- <01367c4f4f1e174fefbef9aac645f6792bda07e5.1544512919.git-series.plaes@plaes.org>
- <20181221083927.GQ4497@dell>
+ id 1gaGSN-0000zQ-Bi; Fri, 21 Dec 2018 08:46:56 +0000
+Received: by mail-pg1-x544.google.com with SMTP id d72so2199960pga.9;
+ Fri, 21 Dec 2018 00:46:44 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=BGxEk3/D6g1MqHex7GlE9IhaxrZrX946np858x37zqI=;
+ b=mgwXJ1AsKsltgkW36r5r2eRHHndvtEmFSm3eqkfelo+HKUaIA/40YRb4bi8IyyiD15
+ kP81US9EWW3GvWtWNmQQftDRsOwMPwwznDoWcgH/afWMzyA5CrQs0zZi+fmD2IiaeNHR
+ jLCPBavNISuCZbZkAdkGOvdPMv5b9kpiadDhsfxbm3jwD8tKs+62QTvrQ/xXZw/rigjc
+ Q9CmbaYWqCqIL+V108BU5h6l8BNCO4Vwu7darDdLr/0TO4/ETZUzsYYwAlWnhF3LPv8j
+ YiMElMaS18/pZIw6Q+ujaj1cVYt/M2YEJokv0vmF5u8n455NWl2ANtERtWchsc3AnntK
+ X52g==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=BGxEk3/D6g1MqHex7GlE9IhaxrZrX946np858x37zqI=;
+ b=rC+W0aMMoxo1z+K75TaGbTx3vk8QJG+AKMc+xh1nRdf0euOoxzX/8Y4ia/nXwVraws
+ qCTfIVTVxRHwCPLRfGKWVWAb42+1WPpUhzFoewVJVvKpD5ZfpRKknpihAvXy1uUuDByZ
+ 0L6tKdZnbJgbvVt6LxTj477vhG0N+aoiqZnA3UpT0pWTOASCP78PrF1cGwgUQ+NGr+CU
+ Ba3FcZgYXUy21gagwpolY7POBo+sIlEPL+uiDRb36EenF5RYE3+lzrB5aDxONVHWB9x9
+ 3k8YwaHYuQMV061WZcRSE6iu7MT01+haXPowuz6NbDaED5yxFliKVC3R1acv6D1x+lW0
+ nJaw==
+X-Gm-Message-State: AJcUukdsgmuKMY7w1ZJlfVyQ7DXI0G2GZuf1WynhtM/oNk/4+LcQPhH3
+ omZkj2pVskadvx90eym8kE8=
+X-Google-Smtp-Source: ALg8bN6QI0/l/vBK9caNVFvyWfATU4idnxpc45Vay4Fy1qGehGYZnyXrdFXA3JTJogAm7iFQEHMS3w==
+X-Received: by 2002:a63:151f:: with SMTP id v31mr1537852pgl.34.1545382003702; 
+ Fri, 21 Dec 2018 00:46:43 -0800 (PST)
+Received: from dtor-ws ([2620:15c:202:201:3adc:b08c:7acc:b325])
+ by smtp.gmail.com with ESMTPSA id x186sm35197522pfb.59.2018.12.21.00.46.42
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 21 Dec 2018 00:46:42 -0800 (PST)
+Date: Fri, 21 Dec 2018 00:46:40 -0800
+From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+To: YueHaibing <yuehaibing@huawei.com>
+Subject: Re: [PATCH v2 -next] input: keyboard: remove duplicated include from
+ mtk-pmic-keys.c
+Message-ID: <20181221084640.GI211587@dtor-ws>
+References: <20181211093200.18140-1-yuehaibing@huawei.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181221083927.GQ4497@dell>
-User-Agent: NeoMutt/20170113 (1.7.2)
+In-Reply-To: <20181211093200.18140-1-yuehaibing@huawei.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_004331_547959_6C90CC4E 
-X-CRM114-Status: GOOD (  20.27  )
+X-CRM114-CacheID: sfid-20181221_004655_409127_13860385 
+X-CRM114-Status: GOOD (  13.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,55 +95,67 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Maxime Ripard <maxime.ripard@bootlin.com>, Mark Brown <broonie@kernel.org>,
- linux-sunxi <linux-sunxi@googlegroups.com>,
- Liam Girdwood <lgirdwood@gmail.com>, linux-kernel@vger.kernel.org,
- Olliver Schinagl <oliver@schinagl.nl>, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: lee.jones@linaro.org, linux-kernel@vger.kernel.org,
+ linux-mediatek@lists.infradead.org, linux-input@vger.kernel.org,
+ matthias.bgg@gmail.com, chen.zhong@mediatek.com,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gRnJpLCBEZWMgMjEsIDIwMTggYXQgMDg6Mzk6MjdBTSArMDAwMCwgTGVlIEpvbmVzIHdyb3Rl
-Ogo+IE9uIFR1ZSwgMTEgRGVjIDIwMTgsIFByaWl0IExhZXMgd3JvdGU6Cj4gCj4gPiBGcm9tOiBP
-bGxpdmVyIFNjaGluYWdsIDxvbGl2ZXJAc2NoaW5hZ2wubmw+Cj4gPiAKPiA+IFRoZSBjdXJyZW50
-IGF4cDIweCBuYW1lcyB0aGUgcmFtcGluZyByZWdpc3RlciAnc2NhbCcgd2hpY2ggcHJvYmFibHkK
-PiA+IG1lYW5zIHNjYWxpbmcuIFNpbmNlIHRoZSByZWdpc3RlciByZWFsbHkgaGFzIG5vdGhpbmcg
-dG8gZG8gd2l0aAo+ID4gc2NhbGluZywgYnV0IHJlYWxseSBpcyB0aGUgdm9sdGFnZSByYW1wIHdl
-IHJlbmFtZSBpdCBhcHByb3ByaWF0ZWx5Lgo+ID4gCj4gPiBTaWduZWQtb2ZmLWJ5OiBPbGxpdmVy
-IFNjaGluYWdsIDxvbGl2ZXJAc2NoaW5hZ2wubmw+Cj4gPiBTaWduZWQtb2ZmLWJ5OiBQcmlpdCBM
-YWVzIDxwbGFlc0BwbGFlcy5vcmc+Cj4gPiBBY2tlZC1mb3ItTUZELWJ5OiBMZWUgSm9uZXMgPGxl
-ZS5qb25lc0BsaW5hcm8ub3JnPgo+ID4gLS0tCj4gPiAgaW5jbHVkZS9saW51eC9tZmQvYXhwMjB4
-LmggfCA0ICsrLS0KPiA+ICAxIGZpbGUgY2hhbmdlZCwgMiBpbnNlcnRpb25zKCspLCAyIGRlbGV0
-aW9ucygtKQo+IAo+IEkndmUgbG9zdCB0cmFjayBvZiB3aGF0J3MgaGFwcGVuaW5nIHdpdGggdGhp
-cyBzZXQgbm93Lgo+IAo+IE1hcmssCj4gCj4gRGlkIHlvdSB0YWtlIHRoaXMgcGF0Y2ggaW4gdGhl
-IGVuZD8KClllcywgdGhpcyBpcyBpbiBsaW51eC1uZXh0Lgo+IAo+ID4gZGlmZiAtLWdpdCBhL2lu
-Y2x1ZGUvbGludXgvbWZkL2F4cDIweC5oIGIvaW5jbHVkZS9saW51eC9tZmQvYXhwMjB4LmgKPiA+
-IGluZGV4IDIzMDJiNjIuLmEzNTNjZDIgMTAwNjQ0Cj4gPiAtLS0gYS9pbmNsdWRlL2xpbnV4L21m
-ZC9heHAyMHguaAo+ID4gKysrIGIvaW5jbHVkZS9saW51eC9tZmQvYXhwMjB4LmgKPiA+IEBAIC0z
-NSw3ICszNSw3IEBAIGVudW0gYXhwMjB4X3ZhcmlhbnRzIHsKPiA+ICAjZGVmaW5lIEFYUDE1Ml9B
-TERPX09QX01PREUJCTB4MTMKPiA+ICAjZGVmaW5lIEFYUDE1Ml9MRE8wX0NUUkwJCTB4MTUKPiA+
-ICAjZGVmaW5lIEFYUDE1Ml9EQ0RDMl9WX09VVAkJMHgyMwo+ID4gLSNkZWZpbmUgQVhQMTUyX0RD
-REMyX1ZfU0NBTAkJMHgyNQo+ID4gKyNkZWZpbmUgQVhQMTUyX0RDREMyX1ZfUkFNUAkJMHgyNQo+
-ID4gICNkZWZpbmUgQVhQMTUyX0RDREMxX1ZfT1VUCQkweDI2Cj4gPiAgI2RlZmluZSBBWFAxNTJf
-RENEQzNfVl9PVVQJCTB4MjcKPiA+ICAjZGVmaW5lIEFYUDE1Ml9BTERPMTJfVl9PVVQJCTB4MjgK
-PiA+IEBAIC01Myw3ICs1Myw3IEBAIGVudW0gYXhwMjB4X3ZhcmlhbnRzIHsKPiA+ICAjZGVmaW5l
-IEFYUDIwWF9VU0JfT1RHX1NUQVRVUwkJMHgwMgo+ID4gICNkZWZpbmUgQVhQMjBYX1BXUl9PVVRf
-Q1RSTAkJMHgxMgo+ID4gICNkZWZpbmUgQVhQMjBYX0RDREMyX1ZfT1VUCQkweDIzCj4gPiAtI2Rl
-ZmluZSBBWFAyMFhfRENEQzJfTERPM19WX1NDQUwJMHgyNQo+ID4gKyNkZWZpbmUgQVhQMjBYX0RD
-REMyX0xETzNfVl9SQU1QCTB4MjUKPiA+ICAjZGVmaW5lIEFYUDIwWF9EQ0RDM19WX09VVAkJMHgy
-Nwo+ID4gICNkZWZpbmUgQVhQMjBYX0xETzI0X1ZfT1VUCQkweDI4Cj4gPiAgI2RlZmluZSBBWFAy
-MFhfTERPM19WX09VVAkJMHgyOQo+IAo+IC0tIAo+IExlZSBKb25lcyBb5p2O55C85pavXQo+IExp
-bmFybyBTZXJ2aWNlcyBUZWNobmljYWwgTGVhZAo+IExpbmFyby5vcmcg4pSCIE9wZW4gc291cmNl
-IHNvZnR3YXJlIGZvciBBUk0gU29Dcwo+IEZvbGxvdyBMaW5hcm86IEZhY2Vib29rIHwgVHdpdHRl
-ciB8IEJsb2cKPiAKPiAtLSAKPiBZb3UgcmVjZWl2ZWQgdGhpcyBtZXNzYWdlIGJlY2F1c2UgeW91
-IGFyZSBzdWJzY3JpYmVkIHRvIHRoZSBHb29nbGUgR3JvdXBzICJsaW51eC1zdW54aSIgZ3JvdXAu
-Cj4gVG8gdW5zdWJzY3JpYmUgZnJvbSB0aGlzIGdyb3VwIGFuZCBzdG9wIHJlY2VpdmluZyBlbWFp
-bHMgZnJvbSBpdCwgc2VuZCBhbiBlbWFpbCB0byBsaW51eC1zdW54aSt1bnN1YnNjcmliZUBnb29n
-bGVncm91cHMuY29tLgo+IEZvciBtb3JlIG9wdGlvbnMsIHZpc2l0IGh0dHBzOi8vZ3JvdXBzLmdv
-b2dsZS5jb20vZC9vcHRvdXQuCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVs
-QGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9s
-aXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+On Tue, Dec 11, 2018 at 05:32:00PM +0800, YueHaibing wrote:
+> alphabetise the header files and remove duplicated include
+> file linux/kernel.h
+> 
+> Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+
+Applied, thank you.
+
+> ---
+> v2: alphabetise the header files
+> ---
+>  drivers/input/keyboard/mtk-pmic-keys.c | 13 ++++++-------
+>  1 file changed, 6 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/input/keyboard/mtk-pmic-keys.c b/drivers/input/keyboard/mtk-pmic-keys.c
+> index 02c67a1..8e6ebab 100644
+> --- a/drivers/input/keyboard/mtk-pmic-keys.c
+> +++ b/drivers/input/keyboard/mtk-pmic-keys.c
+> @@ -14,18 +14,17 @@
+>   *
+>   */
+>  
+> -#include <linux/module.h>
+> -#include <linux/kernel.h>
+>  #include <linux/input.h>
+>  #include <linux/interrupt.h>
+> -#include <linux/platform_device.h>
+>  #include <linux/kernel.h>
+> -#include <linux/of.h>
+> -#include <linux/of_device.h>
+> -#include <linux/regmap.h>
+>  #include <linux/mfd/mt6323/registers.h>
+> -#include <linux/mfd/mt6397/registers.h>
+>  #include <linux/mfd/mt6397/core.h>
+> +#include <linux/mfd/mt6397/registers.h>
+> +#include <linux/module.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+>  
+>  #define MTK_PMIC_PWRKEY_RST_EN_MASK	0x1
+>  #define MTK_PMIC_PWRKEY_RST_EN_SHIFT	6
+> -- 
+> 2.7.4
+> 
+> 
+
+-- 
+Dmitry
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
