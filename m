@@ -2,74 +2,84 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-14.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	FREEMAIL_FROM,INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C1DEBC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 16:45:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E60C5C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 16:49:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8F02E21916
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 16:45:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B331521916
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 16:49:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N+ZZs5bN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8F02E21916
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=gmx.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YvuhHqF9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B331521916
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=auKoS2UVpFqt7sGZcVkYQkjWxUDvEL+Ycv7m0csAS3A=; b=N+ZZs5bNKy24uD
-	ZuQiHxoab0RsQMkQ/BonjbG89JRoVRKcMyxPPPy1bcVZ3UwEU1DWJqLnahkymGtGKrSMmiK3zTJtC
-	EQJ7BWe4a3buWi2OKyIWngAsW3p8RXIdtBUbHxwCzp3jSvc7SabtZKpLNeDX0tD/nmCsOHqGsoAdo
-	p7TkRpV6QLc3BsR81OfrFbC+faICVGxS17F2EuLs61W3SXiit2wIso7x7zfpF4pYfU0KzBcwV2kWD
-	9lMWk5CHSh7XRVKhnFISQIxY/NKrg7qOt0isuitVtrkSwLZvkhy0QKs6zPfm50wPNwXOB1tvoa0nP
-	EEDIbC2eTWuJhfVUAYdQ==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=TVJ2WDfUgf9how2XyTG/G4Afmm3M0Gx1MVdYWvYLTf0=; b=YvuhHqF96/oirL
+	0nph3xT61bMmZMynAa303ks3zcXSyQWTHCkwlgZkpfI55er7UybdY1yhZq0t0BiLllVOEzbr6Z7yN
+	UefjjtNvqHB7OBX/EbaYjy/Vfl6gEkYCRGNqfnZsq0/xKDvYaUMdtwboOnb4HyPXWUEfVB1m/EGt5
+	3yP2uu9fmw+Mvs00mzKcVKUWloD5Rv2sPhzGnTy23SYJn1xdZBLRgrwaDx5iKpPtsXBbcB+4fjUyZ
+	iQPG3LkKB8fYdteRcQr/7sTfX95Xh3DS4OPY1ZlidiMnlN4au/t34e2TWimwm3rImpvkH+8GJyAp7
+	TAVfY3fLEpDM/24AUggA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaNvf-0007TI-7i; Fri, 21 Dec 2018 16:45:39 +0000
-Received: from mout.gmx.net ([212.227.15.15])
+	id 1gaNz3-0007ty-NF; Fri, 21 Dec 2018 16:49:09 +0000
+Received: from mail-ed1-f65.google.com ([209.85.208.65])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaNvb-0007Rh-UP
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 16:45:37 +0000
-Received: from macchiato.fritz.box ([84.118.159.3]) by mail.gmx.com (mrgmx003
- [212.227.17.184]) with ESMTPSA (Nemesis) id 0MQQzk-1gxaBL1FoS-00TmfP; Fri, 21
- Dec 2018 17:45:15 +0100
-From: Heinrich Schuchardt <xypron.glpk@gmx.de>
-To: Jason Cooper <jason@lakedaemon.net>,
-	Andrew Lunn <andrew@lunn.ch>
-Subject: [PATCH v2 1/1] arm64: dts: marvell: armada-ap806: reserve PSCI area
-Date: Fri, 21 Dec 2018 17:45:03 +0100
-Message-Id: <20181221164503.5128-1-xypron.glpk@gmx.de>
-X-Mailer: git-send-email 2.19.2
+ id 1gaNz0-0007t2-6j
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 16:49:07 +0000
+Received: by mail-ed1-f65.google.com with SMTP id d39so5154443edb.12
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 21 Dec 2018 08:48:53 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=ZqqCdnbZYBpsITc5EMAHVafk34rmCvV3c1syI8YgPPY=;
+ b=WmLQ0vNfTI4939OV1whiRk4gd4oRulTS1SNs+Lg1XsEedt+YoSZ826t6IxpTIXaoTm
+ 90d8UVpov9mXCo6oPGf4eesta+CpBPysGxQqgS4lnWe5zJICSP4/EKMYxTkfeH8M1Gl4
+ kgULrcEBxIkaWU/zpMLpVNb60DJ462J8aQ/irqLfhiqzF1ih5Viniqbnwl8LOzZ7SqZF
+ bU6A0ckUo8Be8MtYNtFcWDMSdbjnXUBwGYS6ryMiWyM7N8NQxCLs+uzejrWxB3nN3Qj0
+ e1bOZ8SM5XZu3OdZDXqBPYK/nczgVJlced/N1YkDMLGU5+QSMnjzuevd3jLvcE3O7L4C
+ i8hg==
+X-Gm-Message-State: AA+aEWYe0pe7BetZrneMIoARkg7lDi4e3965ks9TVTDxJ5eS0VwoIe3y
+ 7VxwX2KlHspfo04hWV38QXKisSZgXw4=
+X-Google-Smtp-Source: AFSGD/Vtl+jZvs+VtqQC0VQ3JHktxrSNXPkVXNGHkJP1sZreLrMbBwGJuHquzTqH9ubUlJlVdn3kRA==
+X-Received: by 2002:a50:9291:: with SMTP id k17mr2932132eda.243.1545410931840; 
+ Fri, 21 Dec 2018 08:48:51 -0800 (PST)
+Received: from mail-wm1-f44.google.com (mail-wm1-f44.google.com.
+ [209.85.128.44])
+ by smtp.gmail.com with ESMTPSA id m14sm7093475edc.27.2018.12.21.08.48.51
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 21 Dec 2018 08:48:51 -0800 (PST)
+Received: by mail-wm1-f44.google.com with SMTP id f188so6331456wmf.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 21 Dec 2018 08:48:51 -0800 (PST)
+X-Received: by 2002:a1c:e58c:: with SMTP id c134mr3475663wmh.124.1545410931063; 
+ Fri, 21 Dec 2018 08:48:51 -0800 (PST)
 MIME-Version: 1.0
-X-Provags-ID: V03:K1:NTsIIujFJRNYukWdFSnzEwLKoB+tAHo8mjNhGy1vmiPMhNrt9yB
- 0RV2/cbI8AFWbZeEw/cR3Tx5fgzAtQK/oDQNowpRvsGqJ+90JoEpmTcruX7R8Vhtpy6n6oj
- U3sGGP8Ll9FsIcAVT1NSa0ZdMGsX7M/SS5wNKcXwJYRYn5QwhRCR6bgwpjwQxJAjel9soWQ
- GiFCH9CRO8Gjejs7vAMJw==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:PVgJ3hldQEA=:+XLn2eHOpxnvM1urPXFi16
- Rp3g3T1TN/jEjhE43tMT0huQ7SSuXzJX51aEiNOE9ssqu6FFD9Mi/oKQAFNhtuFybCb1cstVD
- 6D6i2gcWmp/n9flRpl5ZEUqJwg7CHRNVUXtAsM1chOGy3IUATcvTzTIl2YOSOyCroPewvnOHZ
- uanUTICmSSeGExkJ4wYtL1VOwoRCWGIaSRxO6EhDTOMOj878nawlgZVzj7vqSgX2qvghywByX
- +w6JkJxpXstkWQGDR8SUAl+9pZPNnxR9Dupch3lSyRp7txbrTa0EGuWEsB95tWdyXf7kp0VAy
- Rxof1wl8mjaW+gR1PonHHmTHWVig19/ePUfIBDKBLVnJCOafeVMBmofMdSQOK/PLm528y5ZUP
- pHuKYnuAuVDV8VGxtkq9AVNoV3wESFxDf0mSpxMH9F7OpqihyxZZoUH0FMHlThyk424Ri4WVL
- 4o0FbK+xKsn1IXmCSoh2e9ZkxH5R8baTF9ANbGlFoJ+GGZWi1SYNs8I+baXuxkI6f3gjEg4bN
- JvafrbF6EnAArUEWGiRUFFPVIvq+MTWkalmRyOiRPqAAhZZEWvXetPLr3poj2s63usjW4yMt0
- ssAuT7YjHaP3E2kT0HvaUMd+J1s3e2XtUhwHCzF9ZFBHu54n7xV/jJPT8P7Cyg/ZMV3DSQa7p
- hrfdKm/88dEzQ4Ijj8UwlDQcj11fH1hf2A/fQS3hEyA/XViiyjKj+0oJnx56iiTI1U9SUiB+/
- PPSz4MSoek8uZ7unzg++ehoRuKmfFbyqBaEcAt4Sl8kZX+OLnwDctBBt/So3nvSumgamQg9Ge
- 6CU89qDxA0X7k+b7W3zxAUXp7Mq8N4i2/Xo8snXdTVjzjVqFo7vxGjnor5Amsyqt0zyD4kssh
- bIiwUnPdKwdW0jz7PIDuZohnn2H/DHOx8rEFrq6M09i+NJPirWN1W9AnwiQpSi
+References: <20181221152110.17982-1-codekipper@gmail.com>
+ <20181221152110.17982-4-codekipper@gmail.com>
+In-Reply-To: <20181221152110.17982-4-codekipper@gmail.com>
+From: Chen-Yu Tsai <wens@csie.org>
+Date: Sat, 22 Dec 2018 00:48:39 +0800
+X-Gmail-Original-Message-ID: <CAGb2v67LyDW6kmDrahzLYsY7q9mSJimrZ=jMO3PrPQ=mcxy0qw@mail.gmail.com>
+Message-ID: <CAGb2v67LyDW6kmDrahzLYsY7q9mSJimrZ=jMO3PrPQ=mcxy0qw@mail.gmail.com>
+Subject: Re: [PATCH v3 3/9] ASoc: sun4i-i2s: Add 20, 24 and 32 bit support
+To: Code Kipper <codekipper@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_084536_280095_9E30FCDA 
-X-CRM114-Status: GOOD (  10.96  )
+X-CRM114-CacheID: sfid-20181221_084906_247512_872A0DED 
+X-CRM114-Status: GOOD (  19.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,57 +91,134 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Heinrich Schuchardt <xypron.glpk@gmx.de>,
- Gregory Clement <gregory.clement@bootlin.com>, linux-kernel@vger.kernel.org,
- Rob Herring <robh+dt@kernel.org>, linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Linux-ALSA <alsa-devel@alsa-project.org>,
+ linux-kernel <linux-kernel@vger.kernel.org>,
+ Liam Girdwood <lgirdwood@gmail.com>,
+ "Andrea Venturi \(pers\)" <be17068@iperbole.bo.it>,
+ linux-sunxi <linux-sunxi@googlegroups.com>, Mark Brown <broonie@kernel.org>,
+ Maxime Ripard <maxime.ripard@free-electrons.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The memory area [0x4000000-0x4200000[ is occupied by the PSCI firmware. Any
-attempt to access it from Linux leads to an immediate crash.
+On Fri, Dec 21, 2018 at 11:21 PM <codekipper@gmail.com> wrote:
+>
+> From: Marcus Cooper <codekipper@gmail.com>
+>
+> Extend the functionality of the driver to include support of 20 and
+> 24 bits per sample for the earlier SoCs.
+>
+> Newer SoCs can also handle 32bit samples.
+>
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> ---
+>  sound/soc/sunxi/sun4i-i2s.c | 41 ++++++++++++++++++++++++++++++++++---
+>  1 file changed, 38 insertions(+), 3 deletions(-)
+>
+> diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
+> index 80bf29e0cc86..adb988ae9ac5 100644
+> --- a/sound/soc/sunxi/sun4i-i2s.c
+> +++ b/sound/soc/sunxi/sun4i-i2s.c
+> @@ -399,6 +399,11 @@ static int sun4i_i2s_hw_params(struct snd_pcm_substream *substream,
+>         case 16:
+>                 width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+>                 break;
+> +       case 20:
+> +       case 24:
+> +       case 32:
+> +               width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+> +               break;
+>         default:
+>                 dev_err(dai->dev, "Unsupported physical sample width: %d\n",
+>                         params_physical_width(params));
+> @@ -411,7 +416,18 @@ static int sun4i_i2s_hw_params(struct snd_pcm_substream *substream,
+>                 sr = 0;
+>                 wss = 0;
+>                 break;
+> -
+> +       case 20:
+> +               sr = 1;
+> +               wss = 1;
+> +               break;
+> +       case 24:
+> +               sr = 2;
+> +               wss = 2;
+> +               break;
+> +       case 32:
+> +               sr = 4;
+> +               wss = 4;
+> +               break;
+>         default:
+>                 dev_err(dai->dev, "Unsupported sample width: %d\n",
+>                         params_width(params));
+> @@ -687,6 +703,13 @@ static int sun4i_i2s_dai_probe(struct snd_soc_dai *dai)
+>         return 0;
+>  }
+>
+> +#define SUN4I_FORMATS  (SNDRV_PCM_FMTBIT_S16_LE | \
+> +                        SNDRV_PCM_FMTBIT_S20_3LE | \
+> +                        SNDRV_PCM_FMTBIT_S24_LE)
 
-So let's make the same memory reservation as the vendor kernel.
+IIRC SNDRV_PCM_FMTBIT_S24_LE and SNDRV_PCM_FMTBIT_S32_LE with .sig_bits = 24
+are different things, in regards to how the sample is aligned in a 4 byte
+space. Have you checked that things actually work as expected? This was
+something that did not work using SNDRV_PCM_FMTBIT_S24_LE on sun4i-codec.
 
-Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
----
-v2
-	Move the change from armada-8040-mcbin.dts to armada-ap806.dtsi.
-	I only have a MACCHIATObin for testing but
-	https://github.com/MarvellEmbeddedProcessors/linux-marvell
-	has the reservation in that file.
----
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+> +
+> +#define SUN8I_FORMATS  (SUN4I_FORMATS | \
+> +                        SNDRV_PCM_FMTBIT_S32_LE)
+> +
+>  static struct snd_soc_dai_driver sun4i_i2s_dai = {
+>         .probe = sun4i_i2s_dai_probe,
+>         .capture = {
+> @@ -694,14 +717,14 @@ static struct snd_soc_dai_driver sun4i_i2s_dai = {
+>                 .channels_min = 2,
+>                 .channels_max = 2,
+>                 .rates = SNDRV_PCM_RATE_8000_192000,
+> -               .formats = SNDRV_PCM_FMTBIT_S16_LE,
+> +               .formats = SUN4I_FORMATS,
+>         },
+>         .playback = {
+>                 .stream_name = "Playback",
+>                 .channels_min = 2,
+>                 .channels_max = 2,
+>                 .rates = SNDRV_PCM_RATE_8000_192000,
+> -               .formats = SNDRV_PCM_FMTBIT_S16_LE,
+> +               .formats = SUN4I_FORMATS,
+>         },
+>         .ops = &sun4i_i2s_dai_ops,
+>         .symmetric_rates = 1,
+> @@ -1106,6 +1129,18 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
+>         i2s->capture_dma_data.addr = res->start + SUN4I_I2S_FIFO_RX_REG;
+>         i2s->capture_dma_data.maxburst = 8;
+>
+> +       soc_dai = devm_kmemdup(&pdev->dev, &sun4i_i2s_dai,
+> +                              sizeof(*soc_dai), GFP_KERNEL);
+> +       if (!soc_dai) {
+> +               ret = -ENOMEM;
+> +               goto err_pm_disable;
+> +       }
+> +
+> +       if (i2s->variant->has_fmt_set_lrck_period) {
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-index 7d94c1fa592a..f8dafef83db0 100644
---- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-@@ -28,6 +28,17 @@
- 		method = "smc";
- 	};
- 
-+	reserved-memory {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		psci-area@4000000 {
-+			reg = <0x0 0x4000000 0x0 0x200000>;
-+			no-map;
-+		};
-+	};
-+
- 	ap806 {
- 		#address-cells = <2>;
- 		#size-cells = <2>;
--- 
-2.19.2
+This condition deserves a comment, particularly as to why you use it
+in place of having a separate quirk field to represent 32 bit support.
 
+Regards
+ChenYu
+
+> +               soc_dai->playback.formats = SUN8I_FORMATS;
+> +               soc_dai->capture.formats = SUN8I_FORMATS;
+> +       }
+> +
+>         pm_runtime_enable(&pdev->dev);
+>         if (!pm_runtime_enabled(&pdev->dev)) {
+>                 ret = sun4i_i2s_runtime_resume(&pdev->dev);
+> --
+> 2.20.1
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
