@@ -2,59 +2,185 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FROM,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ADCC8C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 17:34:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AC082C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 17:45:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7CA6221917
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 17:34:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7739F21903
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 17:45:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hSe7HVLX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7CA6221917
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Owx1Udrn";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="JfGOBZzQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7739F21903
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DGf/Oo9YTUdcsVKWq95FPRx1NKmw8/Xd6C2+J2M2EiU=; b=hSe7HVLXa76Yol
-	SmitbIujVMmghPx4i1kD/6x4ygDrBaBwFsyBEURZfYfRPpu8XAFawZ0moGE1QUnMiKIEpBGVTftMs
-	yIP65q2a7V1soSE0WijfCMjjVts8+5zsR2/FdG1405qtsGzwjdU2qN/urpPdMSTaF5FbFjoeRdclD
-	eWIWZpzzh+aClez8Wobn0hQxodnohqMoyWaRtYNg9u12Jv16jqdFQZyR0tt8b6L+zUs3PViBLBgZ+
-	Ko7fYnV4AnKFcUVD9ki1y8KQ4p165i0DmH1qhDRE7J7bquN64dllb6TQSEl6H6o6zEyT+JjfopSu3
-	Km+xW2/GtZd7Y68Jm3jw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=aBQ5KX6RcSPs+y6yGI7v2gx2DFXsFirfPQug3cPK91o=; b=Owx1UdrnHi4kas
+	nqVeCpHivg9FCnL65TvKCqhivVOEb4iYjTJu6Xnz0ZLEg5JOVHDZVb8WU42xtI9aei9OTzptk/C9U
+	bgyr15X6AYb/+nGQWIg4lTrqLvdO4A0U2owENnKsjPFx3DYNKGCXw2Z9xrvPr6hWJRENuH5CzGJfI
+	M56W2+PALDB5Z/L3iYJTV6ugtpRvyG0lfHOfvE4/MuuqMf8xm3RL2dO8S2KqpjSH/j8NVkFDTG0ZM
+	glWiRO8is6uVc7AqJ5R1p236BPHkL7cJt1ICdna+CtHstNWsctYZtuFHdh/61NQk54crig8QRfWGz
+	RV2wYTgAxbMynB23iHwg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaOgk-0008H3-LI; Fri, 21 Dec 2018 17:34:18 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaOfx-0007In-Hf
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 17:33:32 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id E5BE520717; Fri, 21 Dec 2018 18:33:15 +0100 (CET)
-Received: from localhost (242.171.71.37.rev.sfr.net [37.71.171.242])
- by mail.bootlin.com (Postfix) with ESMTPSA id AD89020734;
- Fri, 21 Dec 2018 18:33:05 +0100 (CET)
-From: Gregory CLEMENT <gregory.clement@bootlin.com>
-To: Linus Walleij <linus.walleij@linaro.org>, linux-gpio@vger.kernel.org,
- linux-kernel@vger.kernel.org
-Subject: [PATCH 1/3] pinctrl: armada-37xx: Correct mpp definitions
-Date: Fri, 21 Dec 2018 18:32:57 +0100
-Message-Id: <20181221173259.8372-2-gregory.clement@bootlin.com>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181221173259.8372-1-gregory.clement@bootlin.com>
-References: <20181221173259.8372-1-gregory.clement@bootlin.com>
+	id 1gaOrJ-0004VB-1S; Fri, 21 Dec 2018 17:45:13 +0000
+Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gaOrG-0003F3-1z; Fri, 21 Dec 2018 17:45:11 +0000
+Received: by mail-wm1-x344.google.com with SMTP id c126so6495917wmh.0;
+ Fri, 21 Dec 2018 09:44:59 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=yQkmZzZyXGoJXiFchhrQyJkpQERkH20QIS6NwSQuAKE=;
+ b=JfGOBZzQ0xR3v/7e2LHBANjASAi3Zb3rBEnpMdDQuaYKrUax44Z4oGXmr9sdL9SjCn
+ dI3+7vzTxOb1CirBqMVFqtPDQWOr+zmag6j0cGV4siTb+BorNqtHrJrsGXgLd02nL7Dh
+ GSGwgfdycx/GvwJ3CzsI+FFQfAQ34gKoXTbaoEpXLzTyFSbgopdauG6Fr1VVIYlRzLG8
+ RTjX5p6w77ThpzeSNrwtMRAw7EPO4pC1FfVmqebwp06qMvog8srV0UwGJSmXPweGCh1i
+ i9/lkA2QoXr33ZEANnaWJzC3P/hcadD5ieNoENiNCpg37KwUZUdMDrmyTK+Eq6JswQ5M
+ qf7w==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
+ :message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=yQkmZzZyXGoJXiFchhrQyJkpQERkH20QIS6NwSQuAKE=;
+ b=TfZtxFqbFYItoC6PC1TVJuBbDiol1zYD+dt/3bRq09WzEIzsssyEjAnTG98aoo8rs4
+ gAiI9XLfuLmIzcZGsvQzk0z+o1TcsEWvjORmjW4UcV/8qnPrVXdxVn5nin0BWO8SIEU5
+ h7xox/NI6zKVPKYBguzQe97UuLpRV/6aE+xpJalklGqM1T37wnOKEIwWJT+/Da6pXE00
+ 97SQMTBNX1j9FxQmRgkGrvrDYYDdPOp0cOOxwYJ51SSdGT1wzcq9OaXShRTUT8VO7ftG
+ ko2vnNmw6EE6JeZYtP9vRmygMy5pn34dg3NUHBsh8eYaMB6EskfjUWjTv2lQkjdNQ4U1
+ ur+A==
+X-Gm-Message-State: AA+aEWbn5MrK8flIGjuzmY2R94oJvTbaYrNZU9CtiodP5+QKyz0/P+r4
+ yQtbXttG0f/wQ9hklzqS6e4=
+X-Google-Smtp-Source: ALg8bN5XH5wpT2OmAspg1wposIdIDVur4eXTCz7M/w5cRTaFu6H74juUFSvFoNaHlBolDr3EzMhu6A==
+X-Received: by 2002:a1c:30b:: with SMTP id 11mr3674570wmd.110.1545414297742;
+ Fri, 21 Dec 2018 09:44:57 -0800 (PST)
+Received: from ziggy.stardust ([93.176.153.35])
+ by smtp.gmail.com with ESMTPSA id w18sm9398387wru.54.2018.12.21.09.44.55
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 21 Dec 2018 09:44:56 -0800 (PST)
+Subject: Re: [PATCH v4 02/18] iommu/mediatek: Use a struct as the platform data
+To: Yong Wu <yong.wu@mediatek.com>, Joerg Roedel <joro@8bytes.org>,
+ Robin Murphy <robin.murphy@arm.com>, Rob Herring <robh+dt@kernel.org>
+References: <1544258371-4600-1-git-send-email-yong.wu@mediatek.com>
+ <1544258371-4600-3-git-send-email-yong.wu@mediatek.com>
+From: Matthias Brugger <matthias.bgg@gmail.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
+ 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
+ jrHWeQEI2ucSKsNa8FllDmG/fQ==
+Message-ID: <be32c912-359e-73c9-ca24-d0cbface47d3@gmail.com>
+Date: Fri, 21 Dec 2018 18:44:55 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.3
 MIME-Version: 1.0
+In-Reply-To: <1544258371-4600-3-git-send-email-yong.wu@mediatek.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_093329_987892_D714C078 
-X-CRM114-Status: GOOD (  11.49  )
+X-CRM114-CacheID: sfid-20181221_094510_107932_379C154A 
+X-CRM114-Status: GOOD (  22.13  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -66,81 +192,137 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>, Jason Cooper <jason@lakedaemon.net>,
- Antoine Tenart <antoine.tenart@bootlin.com>,
- Gregory CLEMENT <gregory.clement@bootlin.com>,
- Maxime Chevallier <maxime.chevallier@bootlin.com>,
- Nadav Haklai <nadavh@marvell.com>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- =?UTF-8?q?Miqu=C3=A8l=20Raynal?= <miquel.raynal@bootlin.com>,
- Marcin Wojtas <mw@semihalf.com>,
- =?UTF-8?q?Marek=20Beh=C3=BAn?= <marek.behun@nic.cz>,
- linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: youlin.pei@mediatek.com, devicetree@vger.kernel.org,
+ Nicolas Boichat <drinkcat@chromium.org>, arnd@arndb.de,
+ srv_heupstream@mediatek.com, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, Tomasz Figa <tfiga@google.com>,
+ iommu@lists.linux-foundation.org, linux-mediatek@lists.infradead.org,
+ Arvind Yadav <arvind.yadav.cs@gmail.com>, yingjoe.chen@mediatek.com,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-RnJvbTogTWFyZWsgQmVow7puIDxtYXJlay5iZWh1bkBuaWMuY3o+CgpUaGlzIGlzIGEgY2xlYW51
-cCBhbmQgZml4IG9mIHRoZSBwYXRjaCBieSBLZW4gTWEgPG1ha2VAbWFydmVsbC5jb20+LgoKRml4
-IHRoZSBtcHAgZGVmaW5pdGlvbnMgYWNjb3JkaW5nIHRvIG5ld2VzdCByZXZpc2lvbiBvZiB0aGUK
-c3BlY2lmaWNhdGlvbjoKICAtIG5vcnRoYnJpZGdlOgogICAgZml4IHBtaWMxIGdwaW8gbnVtYmVy
-IHRvIDcKICAgIGZpeCBwbWljMCBncGlvIG51bWJlciB0byA2CiAgLSBzb3V0aGJyaWRnZQogICAg
-c3BsaXQgcGNpZTEgZ3JvdXAgYml0IG1hc2sgdG8gQklUKDUpIGFuZCAgQklUKDkpCiAgICBmaXgg
-cHRwIGdyb3VwIGJpdCBtYXNrIHRvIEJJVCgxMSkgfCBCSVQoMTIpIHwgQklUKDEzKQogICAgYWRk
-IHNtaSBncm91cCB3aXRoIGJpdCBtYXNrIEJJVCg0KQoKW2dyZWdvcnk6IHNwbGl0IHRoZSBwY2ll
-IGdyb3VwIGluIDIsIGFzIGF0IGhhcmR3YXJlIGxldmVsIHRoZXkgY2FuIGJlCmNvbmZpZ3VyZWQg
-c2VwYXJhdGVseV0KU2lnbmVkLW9mZi1ieTogTWFyZWsgQmVow7puIDxtYXJlay5iZWh1bkBuaWMu
-Y3o+ClNpZ25lZC1vZmYtYnk6IEdyZWdvcnkgQ0xFTUVOVCA8Z3JlZ29yeS5jbGVtZW50QGJvb3Rs
-aW4uY29tPgotLS0KIC4uLi9waW5jdHJsL21hcnZlbGwsYXJtYWRhLTM3eHgtcGluY3RybC50eHQg
-ICAgfCAxOCArKysrKysrKysrKysrLS0tLS0KIGRyaXZlcnMvcGluY3RybC9tdmVidS9waW5jdHJs
-LWFybWFkYS0zN3h4LmMgICAgfCAxMCArKysrKystLS0tCiAyIGZpbGVzIGNoYW5nZWQsIDE5IGlu
-c2VydGlvbnMoKyksIDkgZGVsZXRpb25zKC0pCgpkaWZmIC0tZ2l0IGEvRG9jdW1lbnRhdGlvbi9k
-ZXZpY2V0cmVlL2JpbmRpbmdzL3BpbmN0cmwvbWFydmVsbCxhcm1hZGEtMzd4eC1waW5jdHJsLnR4
-dCBiL0RvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy9waW5jdHJsL21hcnZlbGwsYXJt
-YWRhLTM3eHgtcGluY3RybC50eHQKaW5kZXggYzdjMDg4ZDJkZDUwLi5mNjlmODI3NDFjYWUgMTAw
-NjQ0Ci0tLSBhL0RvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy9waW5jdHJsL21hcnZl
-bGwsYXJtYWRhLTM3eHgtcGluY3RybC50eHQKKysrIGIvRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVl
-L2JpbmRpbmdzL3BpbmN0cmwvbWFydmVsbCxhcm1hZGEtMzd4eC1waW5jdHJsLnR4dApAQCAtNTgs
-MTEgKzU4LDExIEBAIGdyb3VwIHB3bTMKICAtIGZ1bmN0aW9ucyBwd20sIGdwaW8KIAogZ3JvdXAg
-cG1pYzEKLSAtIHBpbiAxNworIC0gcGluIDcKICAtIGZ1bmN0aW9ucyBwbWljLCBncGlvCiAKIGdy
-b3VwIHBtaWMwCi0gLSBwaW4gMTYKKyAtIHBpbiA2CiAgLSBmdW5jdGlvbnMgcG1pYywgZ3Bpbwog
-CiBncm91cCBpMmMyCkBAIC0xMTIsMTcgKzExMiwyNSBAQCBncm91cCB1c2IyX2RydnZidXMxCiAg
-LSBmdW5jdGlvbnMgZHJ2YnVzLCBncGlvCiAKIGdyb3VwIHNkaW9fc2IKLSAtIHBpbnMgNjAtNjQK
-KyAtIHBpbnMgNjAtNjUKICAtIGZ1bmN0aW9ucyBzZGlvLCBncGlvCiAKIGdyb3VwIHJnbWlpCi0g
-LSBwaW5zIDQyLTU1CisgLSBwaW5zIDQyLTUzCiAgLSBmdW5jdGlvbnMgbWlpLCBncGlvCiAKIGdy
-b3VwIHBjaWUxCi0gLSBwaW5zIDM5LTQwCisgLSBwaW5zIDM5CisgLSBmdW5jdGlvbnMgcGNpZSwg
-Z3BpbworCitncm91cCBwY2llMV9jbGtyZXEKKyAtIHBpbnMgNDAKICAtIGZ1bmN0aW9ucyBwY2ll
-LCBncGlvCiAKK2dyb3VwIHNtaQorIC0gcGlucyA1NC01NQorIC0gZnVuY3Rpb25zIHNtaSwgZ3Bp
-bworCiBncm91cCBwdHAKICAtIHBpbnMgNTYtNTgKICAtIGZ1bmN0aW9ucyBwdHAsIGdwaW8KZGlm
-ZiAtLWdpdCBhL2RyaXZlcnMvcGluY3RybC9tdmVidS9waW5jdHJsLWFybWFkYS0zN3h4LmMgYi9k
-cml2ZXJzL3BpbmN0cmwvbXZlYnUvcGluY3RybC1hcm1hZGEtMzd4eC5jCmluZGV4IGFhNDhiM2Yy
-M2M3Zi4uMjY3ZGZjNTMwOTg1IDEwMDY0NAotLS0gYS9kcml2ZXJzL3BpbmN0cmwvbXZlYnUvcGlu
-Y3RybC1hcm1hZGEtMzd4eC5jCisrKyBiL2RyaXZlcnMvcGluY3RybC9tdmVidS9waW5jdHJsLWFy
-bWFkYS0zN3h4LmMKQEAgLTE3MCw4ICsxNzAsOCBAQCBzdGF0aWMgc3RydWN0IGFybWFkYV8zN3h4
-X3Bpbl9ncm91cCBhcm1hZGFfMzd4eF9uYl9ncm91cHNbXSA9IHsKIAlQSU5fR1JQX0dQSU8oInB3
-bTEiLCAxMiwgMSwgQklUKDQpLCAicHdtIiksCiAJUElOX0dSUF9HUElPKCJwd20yIiwgMTMsIDEs
-IEJJVCg1KSwgInB3bSIpLAogCVBJTl9HUlBfR1BJTygicHdtMyIsIDE0LCAxLCBCSVQoNiksICJw
-d20iKSwKLQlQSU5fR1JQX0dQSU8oInBtaWMxIiwgMTcsIDEsIEJJVCg3KSwgInBtaWMiKSwKLQlQ
-SU5fR1JQX0dQSU8oInBtaWMwIiwgMTYsIDEsIEJJVCg4KSwgInBtaWMiKSwKKwlQSU5fR1JQX0dQ
-SU8oInBtaWMxIiwgNywgMSwgQklUKDcpLCAicG1pYyIpLAorCVBJTl9HUlBfR1BJTygicG1pYzAi
-LCA2LCAxLCBCSVQoOCksICJwbWljIiksCiAJUElOX0dSUF9HUElPKCJpMmMyIiwgMiwgMiwgQklU
-KDkpLCAiaTJjIiksCiAJUElOX0dSUF9HUElPKCJpMmMxIiwgMCwgMiwgQklUKDEwKSwgImkyYyIp
-LAogCVBJTl9HUlBfR1BJTygic3BpX2NzMSIsIDE3LCAxLCBCSVQoMTIpLCAic3BpIiksCkBAIC0x
-OTUsOCArMTk1LDEwIEBAIHN0YXRpYyBzdHJ1Y3QgYXJtYWRhXzM3eHhfcGluX2dyb3VwIGFybWFk
-YV8zN3h4X3NiX2dyb3Vwc1tdID0gewogCVBJTl9HUlBfR1BJTygidXNiMl9kcnZ2YnVzMSIsIDEs
-IDEsIEJJVCgxKSwgImRydmJ1cyIpLAogCVBJTl9HUlBfR1BJTygic2Rpb19zYiIsIDI0LCA2LCBC
-SVQoMiksICJzZGlvIiksCiAJUElOX0dSUF9HUElPKCJyZ21paSIsIDYsIDEyLCBCSVQoMyksICJt
-aWkiKSwKLQlQSU5fR1JQX0dQSU8oInBjaWUxIiwgMywgMiwgQklUKDQpLCAicGNpZSIpLAotCVBJ
-Tl9HUlBfR1BJTygicHRwIiwgMjAsIDMsIEJJVCg1KSwgInB0cCIpLAorCVBJTl9HUlBfR1BJTygi
-c21pIiwgMTgsIDIsIEJJVCg0KSwgInNtaSIpLAorCVBJTl9HUlBfR1BJTygicGNpZTEiLCAzLCAx
-LCBCSVQoNSksICJwY2llIiksCisJUElOX0dSUF9HUElPKCJwY2llMV9jbGtyZXEiLCA0LCAxLCBC
-SVQoOSksICJwY2llIiksCisJUElOX0dSUF9HUElPKCJwdHAiLCAyMCwgMywgQklUKDExKSB8IEJJ
-VCgxMikgfCBCSVQoMTMpLCAicHRwIiksCiAJUElOX0dSUCgicHRwX2NsayIsIDIxLCAxLCBCSVQo
-NiksICJwdHAiLCAibWlpIiksCiAJUElOX0dSUCgicHRwX3RyaWciLCAyMiwgMSwgQklUKDcpLCAi
-cHRwIiwgIm1paSIpLAogCVBJTl9HUlBfR1BJT18zKCJtaWlfY29sIiwgMjMsIDEsIEJJVCg4KSB8
-IEJJVCgxNCksIDAsIEJJVCg4KSwgQklUKDE0KSwKLS0gCjIuMTkuMgoKCl9fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGlu
-ZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMu
-aW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+
+
+On 08/12/2018 09:39, Yong Wu wrote:
+> Use a struct as the platform special data instead of the enumeration.
+> This is a prepare patch for adding mt8183 iommu support.
+> 
+> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> ---
+
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+
+>  drivers/iommu/mtk_iommu.c | 24 ++++++++++++++++--------
+>  drivers/iommu/mtk_iommu.h |  6 +++++-
+>  2 files changed, 21 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+> index 44bd5b9..9a2225b 100644
+> --- a/drivers/iommu/mtk_iommu.c
+> +++ b/drivers/iommu/mtk_iommu.c
+> @@ -54,7 +54,7 @@
+>  #define REG_MMU_CTRL_REG			0x110
+>  #define F_MMU_PREFETCH_RT_REPLACE_MOD		BIT(4)
+>  #define F_MMU_TF_PROTECT_SEL_SHIFT(data) \
+> -	((data)->m4u_plat == M4U_MT2712 ? 4 : 5)
+> +	((data)->plat_data->m4u_plat == M4U_MT2712 ? 4 : 5)
+>  /* It's named by F_MMU_TF_PROT_SEL in mt2712. */
+>  #define F_MMU_TF_PROTECT_SEL(prot, data) \
+>  	(((prot) & 0x3) << F_MMU_TF_PROTECT_SEL_SHIFT(data))
+> @@ -517,7 +517,7 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+>  	}
+>  
+>  	regval = F_MMU_TF_PROTECT_SEL(2, data);
+> -	if (data->m4u_plat == M4U_MT8173)
+> +	if (data->plat_data->m4u_plat == M4U_MT8173)
+>  		regval |= F_MMU_PREFETCH_RT_REPLACE_MOD;
+>  	writel_relaxed(regval, data->base + REG_MMU_CTRL_REG);
+>  
+> @@ -538,14 +538,14 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+>  		F_INT_PRETETCH_TRANSATION_FIFO_FAULT;
+>  	writel_relaxed(regval, data->base + REG_MMU_INT_MAIN_CONTROL);
+>  
+> -	if (data->m4u_plat == M4U_MT8173)
+> +	if (data->plat_data->m4u_plat == M4U_MT8173)
+>  		regval = (data->protect_base >> 1) | (data->enable_4GB << 31);
+>  	else
+>  		regval = lower_32_bits(data->protect_base) |
+>  			 upper_32_bits(data->protect_base);
+>  	writel_relaxed(regval, data->base + REG_MMU_IVRP_PADDR);
+>  
+> -	if (data->enable_4GB && data->m4u_plat != M4U_MT8173) {
+> +	if (data->enable_4GB && data->plat_data->m4u_plat != M4U_MT8173) {
+>  		/*
+>  		 * If 4GB mode is enabled, the validate PA range is from
+>  		 * 0x1_0000_0000 to 0x1_ffff_ffff. here record bit[32:30].
+> @@ -556,7 +556,7 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+>  	writel_relaxed(0, data->base + REG_MMU_DCM_DIS);
+>  
+>  	/* It's MISC control register whose default value is ok except mt8173.*/
+> -	if (data->m4u_plat == M4U_MT8173)
+> +	if (data->plat_data->m4u_plat == M4U_MT8173)
+>  		writel_relaxed(0, data->base + REG_MMU_STANDARD_AXI_MODE);
+>  
+>  	if (devm_request_irq(data->dev, data->irq, mtk_iommu_isr, 0,
+> @@ -589,7 +589,7 @@ static int mtk_iommu_probe(struct platform_device *pdev)
+>  	if (!data)
+>  		return -ENOMEM;
+>  	data->dev = dev;
+> -	data->m4u_plat = (enum mtk_iommu_plat)of_device_get_match_data(dev);
+> +	data->plat_data = of_device_get_match_data(dev);
+>  
+>  	/* Protect memory. HW will access here while translation fault.*/
+>  	protect = devm_kzalloc(dev, MTK_PROTECT_PA_ALIGN * 2, GFP_KERNEL);
+> @@ -733,9 +733,17 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
+>  	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(mtk_iommu_suspend, mtk_iommu_resume)
+>  };
+>  
+> +static const struct mtk_iommu_plat_data mt2712_data = {
+> +	.m4u_plat     = M4U_MT2712,
+> +};
+> +
+> +static const struct mtk_iommu_plat_data mt8173_data = {
+> +	.m4u_plat     = M4U_MT8173,
+> +};
+> +
+>  static const struct of_device_id mtk_iommu_of_ids[] = {
+> -	{ .compatible = "mediatek,mt2712-m4u", .data = (void *)M4U_MT2712},
+> -	{ .compatible = "mediatek,mt8173-m4u", .data = (void *)M4U_MT8173},
+> +	{ .compatible = "mediatek,mt2712-m4u", .data = &mt2712_data},
+> +	{ .compatible = "mediatek,mt8173-m4u", .data = &mt8173_data},
+>  	{}
+>  };
+>  
+> diff --git a/drivers/iommu/mtk_iommu.h b/drivers/iommu/mtk_iommu.h
+> index 778498b..333a0ef 100644
+> --- a/drivers/iommu/mtk_iommu.h
+> +++ b/drivers/iommu/mtk_iommu.h
+> @@ -41,6 +41,10 @@ enum mtk_iommu_plat {
+>  	M4U_MT8173,
+>  };
+>  
+> +struct mtk_iommu_plat_data {
+> +	enum mtk_iommu_plat m4u_plat;
+> +};
+> +
+>  struct mtk_iommu_domain;
+>  
+>  struct mtk_iommu_data {
+> @@ -57,7 +61,7 @@ struct mtk_iommu_data {
+>  	bool				tlb_flush_active;
+>  
+>  	struct iommu_device		iommu;
+> -	enum mtk_iommu_plat		m4u_plat;
+> +	const struct mtk_iommu_plat_data *plat_data;
+>  
+>  	struct list_head		list;
+>  };
+> 
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
