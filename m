@@ -2,65 +2,63 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0D3A0C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 13:49:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 74FA9C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 13:49:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CF9F921917
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 13:49:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 46ABE21917
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 13:49:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tLAW00sb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CF9F921917
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eoMdmsDd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 46ABE21917
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pschenker.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hcHhz1edU1AsgI6WobkfFkRN+Jenh8JcrIzIXDPlslU=; b=tLAW00sbmkQ8Rb
-	7EPVdSo8xZmJjdS2twiZnFNLTZHQvi5OX9D1hmoYOLfzU6DxS+E64kOs1JQzoF7e7ZTEGkExwRYMa
-	mxy71oRJV5X2oNht2JJge364Uk31rT5cJViYq0e0hP83pksQvTBUq/FzsNPyPhug8NGJzb+c89Lld
-	MxQFAFQTXxFMrBDTurc9BYxju/T3mK07EMewdCo8Atc6TP9NOfqozAO7kTT8m8uuvMBwtGnLozEOW
-	M3L1VN3gfi+B11uZqEEPSaHnrr/Nux8Ai7I1MZiXWB1ihWYpBF/FdEUXrVP9BWJ4Eg7rKhl2+esOz
-	UUgXmlCXX+OtuOxrLadg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=93Me2EZ75QbwgFldsE9aAijSOfv09zmByztIFpS9dfU=; b=eoMdmsDd0PYIQz
+	v8ZC8E81vhPCdcPhmfZa73alxAy+tjXwEWx3ZKUZT06Y2kj693QXBklcV/K324+SzYIFe4rmxY2sO
+	Bz6cQ2O+yJ6iR4qnLeaXMhR6JhR/Y5mUwSEzJeQySJG2QIWgPzBBJWXooh1IMqQmTjDcgisbE90rl
+	OdfFgtWaL65/ltspY4ZA2nSCkvICMv6OixAx+zlvtQQxV08sYLAsPpJAb4W1kIEF0FdLGCjleKVEU
+	LWbNsvHWLQzTBNpN3eOUw2cY/KDNVyjbAyGvrNVGTOsMctpVv0imu9ppqDLI25ObMrY6dbY9jXVtU
+	mYlG2Fup+u7Wk/kKHMGA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaLB5-00064Q-VI; Fri, 21 Dec 2018 13:49:23 +0000
+	id 1gaLBE-0006Cx-I0; Fri, 21 Dec 2018 13:49:32 +0000
 Received: from mxout014.mail.hostpoint.ch ([2a00:d70:0:e::314])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaL9F-00044w-Ep
+ id 1gaL9F-0004AA-Eq
  for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 13:47:34 +0000
 Received: from [10.0.2.46] (helo=asmtp013.mail.hostpoint.ch)
  by mxout014.mail.hostpoint.ch with esmtp (Exim 4.91 (FreeBSD))
  (envelope-from <dev@pschenker.ch>)
- id 1gaL8e-000ECe-T1; Fri, 21 Dec 2018 14:46:52 +0100
+ id 1gaL8a-000EBk-KN; Fri, 21 Dec 2018 14:46:48 +0100
 Received: from [46.140.72.82] (helo=philippe-pc.toradex.int)
  by asmtp013.mail.hostpoint.ch with esmtpsa
  (TLSv1.2:ECDHE-RSA-AES256-GCM-SHA384:256) (Exim 4.91 (FreeBSD))
  (envelope-from <dev@pschenker.ch>)
- id 1gaL8e-000BCi-Le; Fri, 21 Dec 2018 14:46:52 +0100
+ id 1gaL8a-000BCi-DD; Fri, 21 Dec 2018 14:46:48 +0100
 X-Authenticated-Sender-Id: dev@pschenker.ch
 From: Philippe Schenker <dev@pschenker.ch>
 To: jic23@kernel.org,
 	marcel.ziswiler@toradex.com,
 	stefan@agner.ch
-Subject: [PATCH v5 5/8] iio: adc: add STMPE ADC driver using IIO framework
-Date: Fri, 21 Dec 2018 14:46:34 +0100
-Message-Id: <20181221134638.20600-6-dev@pschenker.ch>
+Subject: [PATCH v5 0/8] Adding support for STMPE811 ADC
+Date: Fri, 21 Dec 2018 14:46:29 +0100
+Message-Id: <20181221134638.20600-1-dev@pschenker.ch>
 X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181221134638.20600-1-dev@pschenker.ch>
-References: <20181221134638.20600-1-dev@pschenker.ch>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_054730_353364_02A980A0 
-X-CRM114-Status: GOOD (  23.93  )
+X-CRM114-CacheID: sfid-20181221_054730_338414_48CC760D 
+X-CRM114-Status: GOOD (  22.07  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,238 +70,174 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dmitry.torokhov@gmail.com, Peter Meerwald-Stadler <pmeerw@pmeerw.net>,
- linux-iio@vger.kernel.org, thierry.reding@gmail.com,
- Max Krummenacher <max.krummenacher@toradex.com>, digetx@gmail.com,
- Freeman Liu <freeman.liu@spreadtrum.com>,
+Cc: Mark Rutland <mark.rutland@arm.com>, dmitry.torokhov@gmail.com,
+ Max Krummenacher <max.krummenacher@toradex.com>, linux-iio@vger.kernel.org,
+ thierry.reding@gmail.com, Peter Meerwald-Stadler <pmeerw@pmeerw.net>,
+ digetx@gmail.com, Freeman Liu <freeman.liu@spreadtrum.com>,
  linux-stm32@st-md-mailman.stormreply.com, robh@kernel.org,
  Marcus Folkesson <marcus.folkesson@gmail.com>,
  Lars-Peter Clausen <lars@metafoo.de>, lee.jones@linaro.org,
- Geert Uytterhoeven <geert@linux-m68k.org>, coquelin.stm32@gmail.com,
- alexandre.torgue@st.com, Arnd Bergmann <arnd@arndb.de>,
+ Jonathan Hunter <jonathanh@nvidia.com>,
+ Geert Uytterhoeven <geert@linux-m68k.org>, NXP Linux Team <linux-imx@nxp.com>,
+ linux-input@vger.kernel.org, coquelin.stm32@gmail.com,
+ devicetree@vger.kernel.org, alexandre.torgue@st.com,
+ Arnd Bergmann <arnd@arndb.de>, Sascha Hauer <s.hauer@pengutronix.de>,
  William Breathitt Gray <vilhelm.gray@gmail.com>,
  Siddartha Mohanadoss <smohanad@codeaurora.org>,
  Philippe Schenker <philippe.schenker@toradex.com>,
- Mark Brown <broonie@kernel.org>, linux-arm-kernel@lists.infradead.org,
+ Mark Brown <broonie@kernel.org>,
+ Jonathan Cameron <Jonathan.Cameron@huawei.com>, linux-tegra@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>,
  Randy Dunlap <rdunlap@infradead.org>,
  Arnaud Pouliquen <arnaud.pouliquen@st.com>, linux-kernel@vger.kernel.org,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>, Hartmut Knaack <knaack.h@gmx.de>,
+ Rob Herring <robh+dt@kernel.org>,
+ Pengutronix Kernel Team <kernel@pengutronix.de>,
+ Hartmut Knaack <knaack.h@gmx.de>, Fabio Estevam <fabio.estevam@nxp.com>,
  Eugen Hristev <eugen.hristev@microchip.com>, shawnguo@kernel.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-RnJvbTogU3RlZmFuIEFnbmVyIDxzdGVmYW5AYWduZXIuY2g+CgpUaGlzIGFkZHMgYW4gQURDIGRy
-aXZlciBmb3IgdGhlIFNUTVBFIGRldmljZSB1c2luZyB0aGUgaW5kdXN0cmlhbAppbnB1dC9vdXRw
-dXQgaW50ZXJmYWNlLiBUaGUgZHJpdmVyIHN1cHBvcnRzIHJhdyByZWFkaW5nIG9mIHZhbHVlcy4K
-VGhlIGRyaXZlciBkZXBlbmRzIG9uIHRoZSBNRkQgU1RNUEUgZHJpdmVyLiBJZiB0aGUgdG91Y2hz
-Y3JlZW4KYmxvY2sgaXMgZW5hYmxlZCB0b28sIG9ubHkgZm91ciBvZiB0aGUgOCBBREMgY2hhbm5l
-bHMgYXJlIGF2YWlsYWJsZS4KClNpZ25lZC1vZmYtYnk6IFN0ZWZhbiBBZ25lciA8c3RlZmFuQGFn
-bmVyLmNoPgpTaWduZWQtb2ZmLWJ5OiBNYXggS3J1bW1lbmFjaGVyIDxtYXgua3J1bW1lbmFjaGVy
-QHRvcmFkZXguY29tPgpTaWduZWQtb2ZmLWJ5OiBQaGlsaXBwZSBTY2hlbmtlciA8cGhpbGlwcGUu
-c2NoZW5rZXJAdG9yYWRleC5jb20+ClJldmlld2VkLWJ5OiBKb25hdGhhbiBDYW1lcm9uIDxKb25h
-dGhhbi5DYW1lcm9uQGh1YXdlaS5jb20+CgotLS0KCkNoYW5nZXMgaW4gdjU6CiAtIFJlbW92ZWQg
-ZGV2bV9hZGRfYWN0aW9uX29yX3Jlc2V0CiAtIENoYW5nZWQgaWlvX2RldmljZV9yZWdpc3RlciB0
-byBkZXZtX2lpb19kZXZpY2VfcmVnaXN0ZXIKIC0gQWRkZWQgSm9uYXRoYW4gQ2FtZXJvbidzIFJl
-dmlld2VkLWJ5CiAtIEFkZGVkIGNvcnJlY3QgYXV0aG9yIG9mIGNvbW1pdCwgYXMgdGhpcyBjaGFu
-Z2VkIGJ5IGFjY2lkZW50CgpDaGFuZ2VzIGluIHY0OgogLSBNb3ZlZCBNRkQgY2hhbmdlcyB0byBh
-IHByZWN1cnNvciBwYXRjaAogLSBNb3ZlZCBzdG1wZS10cyBjaGFuZ2VzIHRvIGEgcHJlY3Vyc29y
-IHBhdGNoCiAtIENyZWF0ZWQgc3RtcGVfcmVhZF90ZW1wIGFuZCBzdG1wZV9yZWFkX3ZvbHRhZ2Ug
-ZnVuY3Rpb25zIHRvIG1ha2UKICAgcmVhZF9yYXcgbW9yZSByZWFkYWJsZQogLSBBZGRlZCBsb2Nh
-bCBsb2NrIGluc3RlYWQgb2YgdXNpbmcgaW5kaW9fZGV2J3MgbWxvY2sKIC0gVXNlIGJlMTZfdG9f
-Y3B1KCkgbWFjcm8gaW5zdGVhZCBvZiBiaXRzaGlmdGluZwogLSBBZGRlZCBzdG1wZV9lbmFibGUg
-YWdhaW4gdG8gc3RtcGVfYWRjX2luaXRfaHcKIC0gVXNlIGRldm1fYWRkX2FjdGlvbl9vcl9yZXNl
-dCB0byBnZXQgcmlkIG9mIHRoZSByZW1vdmUgZnVuY3Rpb24KICAgKEkgdGVzdGVkIGlmIHRoYXQg
-YWN0dWFsbHkgd29ya3MpCgpDaGFuZ2VzIGluIHYzOgogLSBSZW1vdmVkIENPTVBJTEVfVEVTVCBm
-cm9tIGRlcGVuZGluZ3MgaW4gS2NvbmZpZwogLSBSZW1vdmVkIHN0bXBlX2FkY19nZXRfcGxhdGZv
-cm1faW5mbygpIGZ1bmN0aW9uIGFuZCBpbnRlZ3JhdGVkIHRoZQogICBmZXcgY29kZSBsaW5lcyBp
-biB0aGUgb3RoZXIgZnVuY3Rpb24KCkNoYW5nZXMgaW4gdjI6CiAtIENvZGUgZm9ybWF0dGluZwog
-LSBSZW1vdmVkIHVudXNlZCBpbmNsdWRlcwogLSBEZWZpbmVkIHRoZSBtYWNybyBTVE1QRV9TVEFS
-VF9PTkVfVEVNUF9DT05WIHdpdGggb3RoZXIgbWFjcm9zLgogLSBBZGRlZCBuZXcgbWFjcm8gdGhh
-dCBkZWZpbmVzIHRoZSBjaGFubmVsIG9mIHRoZSB0ZW1wZXJhdHVyZSBzZW5zb3IuCiAgIFRvb2sg
-bmV3IG5hbWUgZm9yIFNUTVBFX01BWF9BREMtPlNUTVBFX0FEQ19MQVNUX05SIGFuZCB1c2VkIGl0
-CiAgIHRocm91Z2hvdXQgdGhlIGNvZGUgZm9yIGJldHRlciByZWFkYWJpbGl0eS4KIC0gQWRkZWQg
-bXV0ZXhfdW5sb2NrIHdoZXJlIG1pc3NpbmcuCgogZHJpdmVycy9paW8vYWRjL0tjb25maWcgICAg
-IHwgICA3ICsKIGRyaXZlcnMvaWlvL2FkYy9NYWtlZmlsZSAgICB8ICAgMSArCiBkcml2ZXJzL2lp
-by9hZGMvc3RtcGUtYWRjLmMgfCAzNjMgKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysr
-KysrCiAzIGZpbGVzIGNoYW5nZWQsIDM3MSBpbnNlcnRpb25zKCspCiBjcmVhdGUgbW9kZSAxMDA2
-NDQgZHJpdmVycy9paW8vYWRjL3N0bXBlLWFkYy5jCgpkaWZmIC0tZ2l0IGEvZHJpdmVycy9paW8v
-YWRjL0tjb25maWcgYi9kcml2ZXJzL2lpby9hZGMvS2NvbmZpZwppbmRleCBhNTJmZWE4NzQ5YTku
-LjIyNGYyMDY3NDk0ZCAxMDA2NDQKLS0tIGEvZHJpdmVycy9paW8vYWRjL0tjb25maWcKKysrIGIv
-ZHJpdmVycy9paW8vYWRjL0tjb25maWcKQEAgLTczNCw2ICs3MzQsMTMgQEAgY29uZmlnIFNUTTMy
-X0RGU0RNX0FEQwogCSAgVGhpcyBkcml2ZXIgY2FuIGFsc28gYmUgYnVpbHQgYXMgYSBtb2R1bGUu
-ICBJZiBzbywgdGhlIG1vZHVsZQogCSAgd2lsbCBiZSBjYWxsZWQgc3RtMzItZGZzZG0tYWRjLgog
-Citjb25maWcgU1RNUEVfQURDCisJdHJpc3RhdGUgIlNUTWljcm9lbGVjdHJvbmljcyBTVE1QRSBB
-REMgZHJpdmVyIgorCWRlcGVuZHMgb24gT0YgJiYgTUZEX1NUTVBFCisJaGVscAorCSAgU2F5IHll
-cyBoZXJlIHRvIGJ1aWxkIHN1cHBvcnQgZm9yIFNUIE1pY3JvZWxlY3Ryb25pY3MgU1RNUEUKKwkg
-IGJ1aWx0LWluIEFEQyBibG9jayAoc3RtcGU4MTEpLgorCiBjb25maWcgU1RYMTA0CiAJdHJpc3Rh
-dGUgIkFwZXggRW1iZWRkZWQgU3lzdGVtcyBTVFgxMDQgZHJpdmVyIgogCWRlcGVuZHMgb24gUEMx
-MDQgJiYgWDg2CmRpZmYgLS1naXQgYS9kcml2ZXJzL2lpby9hZGMvTWFrZWZpbGUgYi9kcml2ZXJz
-L2lpby9hZGMvTWFrZWZpbGUKaW5kZXggYTZlNmEwYjY1OWUyLi5jYmE4ODljMzBiZjkgMTAwNjQ0
-Ci0tLSBhL2RyaXZlcnMvaWlvL2FkYy9NYWtlZmlsZQorKysgYi9kcml2ZXJzL2lpby9hZGMvTWFr
-ZWZpbGUKQEAgLTY5LDYgKzY5LDcgQEAgb2JqLSQoQ09ORklHX1NUTTMyX0FEQ19DT1JFKSArPSBz
-dG0zMi1hZGMtY29yZS5vCiBvYmotJChDT05GSUdfU1RNMzJfQURDKSArPSBzdG0zMi1hZGMubwog
-b2JqLSQoQ09ORklHX1NUTTMyX0RGU0RNX0NPUkUpICs9IHN0bTMyLWRmc2RtLWNvcmUubwogb2Jq
-LSQoQ09ORklHX1NUTTMyX0RGU0RNX0FEQykgKz0gc3RtMzItZGZzZG0tYWRjLm8KK29iai0kKENP
-TkZJR19TVE1QRV9BREMpICs9IHN0bXBlLWFkYy5vCiBvYmotJChDT05GSUdfVElfQURDMDgxQykg
-Kz0gdGktYWRjMDgxYy5vCiBvYmotJChDT05GSUdfVElfQURDMDgzMikgKz0gdGktYWRjMDgzMi5v
-CiBvYmotJChDT05GSUdfVElfQURDMDg0UzAyMSkgKz0gdGktYWRjMDg0czAyMS5vCmRpZmYgLS1n
-aXQgYS9kcml2ZXJzL2lpby9hZGMvc3RtcGUtYWRjLmMgYi9kcml2ZXJzL2lpby9hZGMvc3RtcGUt
-YWRjLmMKbmV3IGZpbGUgbW9kZSAxMDA2NDQKaW5kZXggMDAwMDAwMDAwMDAwLi4zN2Y0Yjc0YTVk
-MzIKLS0tIC9kZXYvbnVsbAorKysgYi9kcml2ZXJzL2lpby9hZGMvc3RtcGUtYWRjLmMKQEAgLTAs
-MCArMSwzNjMgQEAKKy8vIFNQRFgtTGljZW5zZS1JZGVudGlmaWVyOiBHUEwtMi4wCisvKgorICog
-IFNUTWljcm9lbGVjdHJvbmljcyBTVE1QRTgxMSBJSU8gQURDIERyaXZlcgorICoKKyAqICA0IGNo
-YW5uZWwsIDEwLzEyLWJpdCBBREMKKyAqCisgKiAgQ29weXJpZ2h0IChDKSAyMDEzLTIwMTggVG9y
-YWRleCBBRyA8c3RlZmFuLmFnbmVyQHRvcmFkZXguY29tPgorICovCisKKyNpbmNsdWRlIDxsaW51
-eC9jb21wbGV0aW9uLmg+CisjaW5jbHVkZSA8bGludXgvZXJyLmg+CisjaW5jbHVkZSA8bGludXgv
-aWlvL2lpby5oPgorI2luY2x1ZGUgPGxpbnV4L2ludGVycnVwdC5oPgorI2luY2x1ZGUgPGxpbnV4
-L2tlcm5lbC5oPgorI2luY2x1ZGUgPGxpbnV4L21mZC9zdG1wZS5oPgorI2luY2x1ZGUgPGxpbnV4
-L21vZHVsZS5oPgorI2luY2x1ZGUgPGxpbnV4L29mX3BsYXRmb3JtLmg+CisjaW5jbHVkZSA8bGlu
-dXgvcGxhdGZvcm1fZGV2aWNlLmg+CisjaW5jbHVkZSA8bGludXgvZGV2aWNlLmg+CisKKyNkZWZp
-bmUgU1RNUEVfUkVHX0lOVF9TVEEJCTB4MEIKKyNkZWZpbmUgU1RNUEVfUkVHX0FEQ19JTlRfRU4J
-CTB4MEUKKyNkZWZpbmUgU1RNUEVfUkVHX0FEQ19JTlRfU1RBCQkweDBGCisKKyNkZWZpbmUgU1RN
-UEVfUkVHX0FEQ19DVFJMMQkJMHgyMAorI2RlZmluZSBTVE1QRV9SRUdfQURDX0NUUkwyCQkweDIx
-CisjZGVmaW5lIFNUTVBFX1JFR19BRENfQ0FQVAkJMHgyMgorI2RlZmluZSBTVE1QRV9SRUdfQURD
-X0RBVEFfQ0goY2hhbm5lbCkJKDB4MzAgKyAyICogKGNoYW5uZWwpKQorCisjZGVmaW5lIFNUTVBF
-X1JFR19URU1QX0NUUkwJCTB4NjAKKyNkZWZpbmUgU1RNUEVfVEVNUF9DVFJMX0VOQUJMRQkJQklU
-KDApCisjZGVmaW5lIFNUTVBFX1RFTVBfQ1RSTF9BQ1EJCUJJVCgxKQorI2RlZmluZSBTVE1QRV9U
-RU1QX0NUUkxfVEhSRVNfRU4JQklUKDMpCisjZGVmaW5lIFNUTVBFX1NUQVJUX09ORV9URU1QX0NP
-TlYJKFNUTVBFX1RFTVBfQ1RSTF9FTkFCTEUgfCBcCisJCQkJCVNUTVBFX1RFTVBfQ1RSTF9BQ1Eg
-fCBcCisJCQkJCVNUTVBFX1RFTVBfQ1RSTF9USFJFU19FTikKKyNkZWZpbmUgU1RNUEVfUkVHX1RF
-TVBfREFUQQkJMHg2MQorI2RlZmluZSBTVE1QRV9SRUdfVEVNUF9USAkJMHg2MworI2RlZmluZSBT
-VE1QRV9BRENfTEFTVF9OUgkJNworI2RlZmluZSBTVE1QRV9URU1QX0NIQU5ORUwJCShTVE1QRV9B
-RENfTEFTVF9OUiArIDEpCisKKyNkZWZpbmUgU1RNUEVfQURDX0NIKGNoYW5uZWwpCQkoKDEgPDwg
-KGNoYW5uZWwpKSAmIDB4ZmYpCisKKyNkZWZpbmUgU1RNUEVfQURDX1RJTUVPVVQJCW1zZWNzX3Rv
-X2ppZmZpZXMoMTAwMCkKKworc3RydWN0IHN0bXBlX2FkYyB7CisJc3RydWN0IHN0bXBlICpzdG1w
-ZTsKKwlzdHJ1Y3QgY2xrICpjbGs7CisJc3RydWN0IGRldmljZSAqZGV2OworCXN0cnVjdCBtdXRl
-eCBsb2NrOworCisJLyogV2UgYXJlIGFsbG9jYXRpbmcgcGx1cyBvbmUgZm9yIHRoZSB0ZW1wZXJh
-dHVyZSBjaGFubmVsICovCisJc3RydWN0IGlpb19jaGFuX3NwZWMgc3RtcGVfYWRjX2lpb19jaGFu
-bmVsc1tTVE1QRV9BRENfTEFTVF9OUiArIDJdOworCisJc3RydWN0IGNvbXBsZXRpb24gY29tcGxl
-dGlvbjsKKworCXU4IGNoYW5uZWw7CisJdTMyIHZhbHVlOworfTsKKworc3RhdGljIGludCBzdG1w
-ZV9yZWFkX3ZvbHRhZ2Uoc3RydWN0IHN0bXBlX2FkYyAqaW5mbywKKwkJc3RydWN0IGlpb19jaGFu
-X3NwZWMgY29uc3QgKmNoYW4sIGludCAqdmFsKQoreworCWxvbmcgcmV0OworCisJbXV0ZXhfbG9j
-aygmaW5mby0+bG9jayk7CisKKwlpbmZvLT5jaGFubmVsID0gKHU4KWNoYW4tPmNoYW5uZWw7CisK
-KwlpZiAoaW5mby0+Y2hhbm5lbCA+IFNUTVBFX0FEQ19MQVNUX05SKSB7CisJCW11dGV4X3VubG9j
-aygmaW5mby0+bG9jayk7CisJCXJldHVybiAtRUlOVkFMOworCX0KKworCXN0bXBlX3JlZ193cml0
-ZShpbmZvLT5zdG1wZSwgU1RNUEVfUkVHX0FEQ19JTlRfRU4sCisJCQlTVE1QRV9BRENfQ0goaW5m
-by0+Y2hhbm5lbCkpOworCisJc3RtcGVfcmVnX3dyaXRlKGluZm8tPnN0bXBlLCBTVE1QRV9SRUdf
-QURDX0NBUFQsCisJCQlTVE1QRV9BRENfQ0goaW5mby0+Y2hhbm5lbCkpOworCisJKnZhbCA9IGlu
-Zm8tPnZhbHVlOworCisJcmV0ID0gd2FpdF9mb3JfY29tcGxldGlvbl9pbnRlcnJ1cHRpYmxlX3Rp
-bWVvdXQKKwkJKCZpbmZvLT5jb21wbGV0aW9uLCBTVE1QRV9BRENfVElNRU9VVCk7CisKKwlpZiAo
-cmV0IDw9IDApIHsKKwkJbXV0ZXhfdW5sb2NrKCZpbmZvLT5sb2NrKTsKKwkJaWYgKHJldCA9PSAw
-KQorCQkJcmV0dXJuIC1FVElNRURPVVQ7CisJCWVsc2UKKwkJCXJldHVybiByZXQ7CisJfQorCisJ
-KnZhbCA9IGluZm8tPnZhbHVlOworCisJbXV0ZXhfdW5sb2NrKCZpbmZvLT5sb2NrKTsKKworCXJl
-dHVybiAwOworfQorCitzdGF0aWMgaW50IHN0bXBlX3JlYWRfdGVtcChzdHJ1Y3Qgc3RtcGVfYWRj
-ICppbmZvLAorCQlzdHJ1Y3QgaWlvX2NoYW5fc3BlYyBjb25zdCAqY2hhbiwgaW50ICp2YWwpCit7
-CisJbG9uZyByZXQ7CisKKwltdXRleF9sb2NrKCZpbmZvLT5sb2NrKTsKKworCWluZm8tPmNoYW5u
-ZWwgPSAodTgpY2hhbi0+Y2hhbm5lbDsKKworCWlmIChpbmZvLT5jaGFubmVsICE9IFNUTVBFX1RF
-TVBfQ0hBTk5FTCkgeworCQltdXRleF91bmxvY2soJmluZm8tPmxvY2spOworCQlyZXR1cm4gLUVJ
-TlZBTDsKKwl9CisKKwlzdG1wZV9yZWdfd3JpdGUoaW5mby0+c3RtcGUsIFNUTVBFX1JFR19URU1Q
-X0NUUkwsCisJCQlTVE1QRV9TVEFSVF9PTkVfVEVNUF9DT05WKTsKKworCXJldCA9IHdhaXRfZm9y
-X2NvbXBsZXRpb25faW50ZXJydXB0aWJsZV90aW1lb3V0CisJCSgmaW5mby0+Y29tcGxldGlvbiwg
-U1RNUEVfQURDX1RJTUVPVVQpOworCisJaWYgKHJldCA8PSAwKSB7CisJCW11dGV4X3VubG9jaygm
-aW5mby0+bG9jayk7CisJCWlmIChyZXQgPT0gMCkKKwkJCXJldHVybiAtRVRJTUVET1VUOworCQll
-bHNlCisJCQlyZXR1cm4gcmV0OworCX0KKworCS8qCisJICogYWJzb2x1dGUgdGVtcCA9ICtWMy4z
-ICogdmFsdWUgLzcuNTEgW0tdCisJICogc2NhbGUgdG8gW21pbGxpIMKwQ10KKwkgKi8KKwkqdmFs
-ID0gKCg0NDk5NjBsICogaW5mby0+dmFsdWUpIC8gMTAyNGwpIC0gMjczMTUwOworCisJbXV0ZXhf
-dW5sb2NrKCZpbmZvLT5sb2NrKTsKKworCXJldHVybiAwOworfQorCitzdGF0aWMgaW50IHN0bXBl
-X3JlYWRfcmF3KHN0cnVjdCBpaW9fZGV2ICppbmRpb19kZXYsCisJCQkgIHN0cnVjdCBpaW9fY2hh
-bl9zcGVjIGNvbnN0ICpjaGFuLAorCQkJICBpbnQgKnZhbCwKKwkJCSAgaW50ICp2YWwyLAorCQkJ
-ICBsb25nIG1hc2spCit7CisJc3RydWN0IHN0bXBlX2FkYyAqaW5mbyA9IGlpb19wcml2KGluZGlv
-X2Rldik7CisJbG9uZyByZXQ7CisKKwlzd2l0Y2ggKG1hc2spIHsKKwljYXNlIElJT19DSEFOX0lO
-Rk9fUkFXOgorCWNhc2UgSUlPX0NIQU5fSU5GT19QUk9DRVNTRUQ6CisKKwkJc3dpdGNoIChjaGFu
-LT50eXBlKSB7CisJCWNhc2UgSUlPX1ZPTFRBR0U6CisJCQlyZXQgPSBzdG1wZV9yZWFkX3ZvbHRh
-Z2UoaW5mbywgY2hhbiwgdmFsKTsKKwkJCWJyZWFrOworCisJCWNhc2UgSUlPX1RFTVA6CisJCQly
-ZXQgPSBzdG1wZV9yZWFkX3RlbXAoaW5mbywgY2hhbiwgdmFsKTsKKwkJCWJyZWFrOworCQlkZWZh
-dWx0OgorCQkJcmV0dXJuIC1FSU5WQUw7CisJCX0KKworCQlpZiAocmV0IDwgMCkKKwkJCXJldHVy
-biByZXQ7CisKKwkJcmV0dXJuIElJT19WQUxfSU5UOworCisJY2FzZSBJSU9fQ0hBTl9JTkZPX1ND
-QUxFOgorCQkqdmFsID0gMzMwMDsKKwkJKnZhbDIgPSBpbmZvLT5zdG1wZS0+bW9kXzEyYiA/IDEy
-IDogMTA7CisJCXJldHVybiBJSU9fVkFMX0ZSQUNUSU9OQUxfTE9HMjsKKworCWRlZmF1bHQ6CisJ
-CWJyZWFrOworCX0KKworCXJldHVybiAtRUlOVkFMOworfQorCitzdGF0aWMgaXJxcmV0dXJuX3Qg
-c3RtcGVfYWRjX2lzcihpbnQgaXJxLCB2b2lkICpkZXZfaWQpCit7CisJc3RydWN0IHN0bXBlX2Fk
-YyAqaW5mbyA9IChzdHJ1Y3Qgc3RtcGVfYWRjICopZGV2X2lkOworCXUxNiBkYXRhOworCisJaWYg
-KGluZm8tPmNoYW5uZWwgPiBTVE1QRV9URU1QX0NIQU5ORUwpCisJCXJldHVybiBJUlFfTk9ORTsK
-KworCWlmIChpbmZvLT5jaGFubmVsIDw9IFNUTVBFX0FEQ19MQVNUX05SKSB7CisJCWludCBpbnRf
-c3RhOworCisJCWludF9zdGEgPSBzdG1wZV9yZWdfcmVhZChpbmZvLT5zdG1wZSwgU1RNUEVfUkVH
-X0FEQ19JTlRfU1RBKTsKKworCQkvKiBJcyB0aGUgaW50ZXJydXB0IHJlbGV2YW50ICovCisJCWlm
-ICghKGludF9zdGEgJiBTVE1QRV9BRENfQ0goaW5mby0+Y2hhbm5lbCkpKQorCQkJcmV0dXJuIElS
-UV9OT05FOworCisJCS8qIFJlYWQgdmFsdWUgKi8KKwkJc3RtcGVfYmxvY2tfcmVhZChpbmZvLT5z
-dG1wZSwKKwkJCVNUTVBFX1JFR19BRENfREFUQV9DSChpbmZvLT5jaGFubmVsKSwgMiwgKHU4ICop
-ICZkYXRhKTsKKworCQlzdG1wZV9yZWdfd3JpdGUoaW5mby0+c3RtcGUsIFNUTVBFX1JFR19BRENf
-SU5UX1NUQSwgaW50X3N0YSk7CisJfSBlbHNlIGlmIChpbmZvLT5jaGFubmVsID09IFNUTVBFX1RF
-TVBfQ0hBTk5FTCkgeworCQkvKiBSZWFkIHZhbHVlICovCisJCXN0bXBlX2Jsb2NrX3JlYWQoaW5m
-by0+c3RtcGUsIFNUTVBFX1JFR19URU1QX0RBVEEsIDIsCisJCQkJKHU4ICopICZkYXRhKTsKKwl9
-CisKKwlpbmZvLT52YWx1ZSA9ICh1MzIpIGJlMTZfdG9fY3B1KGRhdGEpOworCWNvbXBsZXRlKCZp
-bmZvLT5jb21wbGV0aW9uKTsKKworCXJldHVybiBJUlFfSEFORExFRDsKK30KKworc3RhdGljIGNv
-bnN0IHN0cnVjdCBpaW9faW5mbyBzdG1wZV9hZGNfaWlvX2luZm8gPSB7CisJLnJlYWRfcmF3ID0g
-JnN0bXBlX3JlYWRfcmF3LAorfTsKKworc3RhdGljIHZvaWQgc3RtcGVfYWRjX3ZvbHRhZ2VfY2hh
-bihzdHJ1Y3QgaWlvX2NoYW5fc3BlYyAqaWNzLCBpbnQgY2hhbikKK3sKKwlpY3MtPnR5cGUgPSBJ
-SU9fVk9MVEFHRTsKKwlpY3MtPmluZm9fbWFza19zZXBhcmF0ZSA9IEJJVChJSU9fQ0hBTl9JTkZP
-X1JBVyk7CisJaWNzLT5pbmZvX21hc2tfc2hhcmVkX2J5X3R5cGUgPSBCSVQoSUlPX0NIQU5fSU5G
-T19TQ0FMRSk7CisJaWNzLT5pbmRleGVkID0gMTsKKwlpY3MtPmNoYW5uZWwgPSBjaGFuOworfQor
-CitzdGF0aWMgdm9pZCBzdG1wZV9hZGNfdGVtcF9jaGFuKHN0cnVjdCBpaW9fY2hhbl9zcGVjICpp
-Y3MsIGludCBjaGFuKQoreworCWljcy0+dHlwZSA9IElJT19URU1QOworCWljcy0+aW5mb19tYXNr
-X3NlcGFyYXRlID0gQklUKElJT19DSEFOX0lORk9fUFJPQ0VTU0VEKTsKKwlpY3MtPmluZGV4ZWQg
-PSAxOworCWljcy0+Y2hhbm5lbCA9IGNoYW47Cit9CisKK3N0YXRpYyBpbnQgc3RtcGVfYWRjX2lu
-aXRfaHcoc3RydWN0IHN0bXBlX2FkYyAqYWRjKQoreworCWludCByZXQ7CisJc3RydWN0IHN0bXBl
-ICpzdG1wZSA9IGFkYy0+c3RtcGU7CisKKwlyZXQgPSBzdG1wZV9lbmFibGUoc3RtcGUsIFNUTVBF
-X0JMT0NLX0FEQyk7CisJaWYgKHJldCkgeworCQlkZXZfZXJyKHN0bXBlLT5kZXYsICJDb3VsZCBu
-b3QgZW5hYmxlIGNsb2NrIGZvciBBRENcbiIpOworCQlyZXR1cm4gcmV0OworCX0KKworCXJldCA9
-IHN0bXBlODExX2FkY19jb21tb25faW5pdChzdG1wZSk7CisJaWYgKHJldCkgeworCQlzdG1wZV9k
-aXNhYmxlKHN0bXBlLCBTVE1QRV9CTE9DS19BREMpOworCQlyZXR1cm4gcmV0OworCX0KKworCS8q
-IHVzZSB0ZW1wIGlycSBmb3IgZWFjaCBjb252ZXJzaW9uIGNvbXBsZXRpb24gKi8KKwlzdG1wZV9y
-ZWdfd3JpdGUoc3RtcGUsIFNUTVBFX1JFR19URU1QX1RILCAwKTsKKwlzdG1wZV9yZWdfd3JpdGUo
-c3RtcGUsIFNUTVBFX1JFR19URU1QX1RIICsgMSwgMCk7CisKKwlyZXR1cm4gMDsKK30KKworc3Rh
-dGljIGludCBzdG1wZV9hZGNfcHJvYmUoc3RydWN0IHBsYXRmb3JtX2RldmljZSAqcGRldikKK3sK
-KwlzdHJ1Y3QgaWlvX2RldiAqaW5kaW9fZGV2OworCXN0cnVjdCBzdG1wZV9hZGMgKmluZm87CisJ
-c3RydWN0IGRldmljZV9ub2RlICpucDsKKwl1MzIgbm9yZXF1ZXN0X21hc2sgPSAwOworCWludCBp
-cnFfdGVtcCwgaXJxX2FkYzsKKwlpbnQgbnVtX2NoYW4gPSAwOworCWludCBpID0gMDsKKwlpbnQg
-cmV0OworCisJaXJxX2FkYyA9IHBsYXRmb3JtX2dldF9pcnFfYnluYW1lKHBkZXYsICJTVE1QRV9B
-REMiKTsKKwlpZiAoaXJxX2FkYyA8IDApCisJCXJldHVybiBpcnFfYWRjOworCisJaW5kaW9fZGV2
-ID0gZGV2bV9paW9fZGV2aWNlX2FsbG9jKCZwZGV2LT5kZXYsIHNpemVvZihzdHJ1Y3Qgc3RtcGVf
-YWRjKSk7CisJaWYgKCFpbmRpb19kZXYpIHsKKwkJZGV2X2VycigmcGRldi0+ZGV2LCAiZmFpbGVk
-IGFsbG9jYXRpbmcgaWlvIGRldmljZVxuIik7CisJCXJldHVybiAtRU5PTUVNOworCX0KKworCWlu
-Zm8gPSBpaW9fcHJpdihpbmRpb19kZXYpOworCW11dGV4X2luaXQoJmluZm8tPmxvY2spOworCisJ
-aW5pdF9jb21wbGV0aW9uKCZpbmZvLT5jb21wbGV0aW9uKTsKKwlyZXQgPSBkZXZtX3JlcXVlc3Rf
-dGhyZWFkZWRfaXJxKCZwZGV2LT5kZXYsIGlycV9hZGMsIE5VTEwsCisJCQkJCXN0bXBlX2FkY19p
-c3IsIElSUUZfT05FU0hPVCwKKwkJCQkJInN0bXBlLWFkYyIsIGluZm8pOworCWlmIChyZXQgPCAw
-KSB7CisJCWRldl9lcnIoJnBkZXYtPmRldiwgImZhaWxlZCByZXF1ZXN0aW5nIGlycSwgaXJxID0g
-JWRcbiIsCisJCQkJaXJxX2FkYyk7CisJCXJldHVybiByZXQ7CisJfQorCisJaXJxX3RlbXAgPSBw
-bGF0Zm9ybV9nZXRfaXJxX2J5bmFtZShwZGV2LCAiU1RNUEVfVEVNUF9TRU5TIik7CisJaWYgKGly
-cV90ZW1wID49IDApIHsKKwkJcmV0ID0gZGV2bV9yZXF1ZXN0X3RocmVhZGVkX2lycSgmcGRldi0+
-ZGV2LCBpcnFfdGVtcCwgTlVMTCwKKwkJCQkJCXN0bXBlX2FkY19pc3IsIElSUUZfT05FU0hPVCwK
-KwkJCQkJCSJzdG1wZS1hZGMiLCBpbmZvKTsKKwkJaWYgKHJldCA8IDApCisJCQlkZXZfd2Fybigm
-cGRldi0+ZGV2LCAiZmFpbGVkIHJlcXVlc3RpbmcgaXJxIGZvciIKKwkJCQkgIiB0ZW1wIHNlbnNv
-ciwgaXJxID0gJWRcbiIsIGlycV90ZW1wKTsKKwl9CisKKwlwbGF0Zm9ybV9zZXRfZHJ2ZGF0YShw
-ZGV2LCBpbmRpb19kZXYpOworCisJaW5kaW9fZGV2LT5uYW1lCQk9IGRldl9uYW1lKCZwZGV2LT5k
-ZXYpOworCWluZGlvX2Rldi0+ZGV2LnBhcmVudAk9ICZwZGV2LT5kZXY7CisJaW5kaW9fZGV2LT5p
-bmZvCQk9ICZzdG1wZV9hZGNfaWlvX2luZm87CisJaW5kaW9fZGV2LT5tb2Rlcwk9IElORElPX0RJ
-UkVDVF9NT0RFOworCisJaW5mby0+c3RtcGUgPSBkZXZfZ2V0X2RydmRhdGEocGRldi0+ZGV2LnBh
-cmVudCk7CisKKwlucCA9IHBkZXYtPmRldi5vZl9ub2RlOworCisJaWYgKCFucCkKKwkJZGV2X2Vy
-cigmcGRldi0+ZGV2LCAibm8gZGV2aWNlIHRyZWUgbm9kZSBmb3VuZFxuIik7CisKKwlvZl9wcm9w
-ZXJ0eV9yZWFkX3UzMihucCwgInN0LG5vcmVxdWVzdC1tYXNrIiwgJm5vcmVxdWVzdF9tYXNrKTsK
-KworCWZvcl9lYWNoX2NsZWFyX2JpdChpLCAodW5zaWduZWQgbG9uZyAqKSAmbm9yZXF1ZXN0X21h
-c2ssCisJCQkgICAoU1RNUEVfQURDX0xBU1RfTlIgKyAxKSkgeworCQlzdG1wZV9hZGNfdm9sdGFn
-ZV9jaGFuKCZpbmZvLT5zdG1wZV9hZGNfaWlvX2NoYW5uZWxzW251bV9jaGFuXSwgaSk7CisJCW51
-bV9jaGFuKys7CisJfQorCXN0bXBlX2FkY190ZW1wX2NoYW4oJmluZm8tPnN0bXBlX2FkY19paW9f
-Y2hhbm5lbHNbbnVtX2NoYW5dLCBpKTsKKwludW1fY2hhbisrOworCWluZGlvX2Rldi0+Y2hhbm5l
-bHMgPSBpbmZvLT5zdG1wZV9hZGNfaWlvX2NoYW5uZWxzOworCWluZGlvX2Rldi0+bnVtX2NoYW5u
-ZWxzID0gbnVtX2NoYW47CisKKwlyZXQgPSBzdG1wZV9hZGNfaW5pdF9odyhpbmZvKTsKKwlpZiAo
-cmV0KQorCQlyZXR1cm4gcmV0OworCisJcmV0dXJuIGRldm1faWlvX2RldmljZV9yZWdpc3Rlcigm
-cGRldi0+ZGV2LCBpbmRpb19kZXYpOworfQorCitzdGF0aWMgaW50IF9fbWF5YmVfdW51c2VkIHN0
-bXBlX2FkY19yZXN1bWUoc3RydWN0IGRldmljZSAqZGV2KQoreworCXN0cnVjdCBpaW9fZGV2ICpp
-bmRpb19kZXYgPSBkZXZfZ2V0X2RydmRhdGEoZGV2KTsKKwlzdHJ1Y3Qgc3RtcGVfYWRjICppbmZv
-ID0gaWlvX3ByaXYoaW5kaW9fZGV2KTsKKworCXN0bXBlX2FkY19pbml0X2h3KGluZm8pOworCisJ
-cmV0dXJuIDA7Cit9CisKK3N0YXRpYyBTSU1QTEVfREVWX1BNX09QUyhzdG1wZV9hZGNfcG1fb3Bz
-LCBOVUxMLCBzdG1wZV9hZGNfcmVzdW1lKTsKKworc3RhdGljIHN0cnVjdCBwbGF0Zm9ybV9kcml2
-ZXIgc3RtcGVfYWRjX2RyaXZlciA9IHsKKwkucHJvYmUJCT0gc3RtcGVfYWRjX3Byb2JlLAorCS5k
-cml2ZXIJCT0geworCQkubmFtZQk9ICJzdG1wZS1hZGMiLAorCQkucG0JPSAmc3RtcGVfYWRjX3Bt
-X29wcywKKwl9LAorfTsKKworbW9kdWxlX3BsYXRmb3JtX2RyaXZlcihzdG1wZV9hZGNfZHJpdmVy
-KTsKKworTU9EVUxFX0FVVEhPUigiU3RlZmFuIEFnbmVyIDxzdGVmYW4uYWduZXJAdG9yYWRleC5j
-b20+Iik7CitNT0RVTEVfREVTQ1JJUFRJT04oIlNUTVBFWFhYIEFEQyBkcml2ZXIiKTsKK01PRFVM
-RV9MSUNFTlNFKCJHUEwgdjIiKTsKK01PRFVMRV9BTElBUygicGxhdGZvcm06c3RtcGUtYWRjIik7
-Ci0tIAoyLjE5LjIKCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3Rz
-LmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5m
-by9saW51eC1hcm0ta2VybmVsCg==
+From: Philippe Schenker <philippe.schenker@toradex.com>
+
+Hello everyone,
+
+This patchset is adding an ADC driver for STMPE811. The STMPE811 is a
+Multi-Frontend-Device that supports a touchscreen, ADC, GPIO and a
+temperature sensor.
+
+For Touchscreen and GPIO there are already existing drivers in
+mainline. This patchset will add support, to read out the ADC and
+temperature sensor.
+This patchset is also reformatting device tree bindings, so they are
+easier to read (PATCH 1/1).
+To be able to add this ADC driver it is necessary to move some defines
+from the touchscreen driver to the mfd device (PATCH 2/8) so they are
+also accessible by mfd and adc driver.
+Because the touchscreen driver is also using the internal ADC it makes
+sense to put the common adc settings of stmpe-ts.c and stmpe_adc.c to
+the MFD. In the MFD there is then also an initialisation for the common
+settings of ADC done. The existing initialisation in touchscreen driver
+is kept for backwards-compatibility. All of this MFD related changes
+are in PATCH 3/8.
+In PATCH 4/8 then these settings are removed from stmpe-ts and grabbed
+from MFD.
+PATCH 5/8 is actually adding the ADC driver that also supports the
+built-in temperature sensor.
+PATCH 6/8 is then adding the needed devicetree bindings.
+PATCH 7/8 and 8/8 is lastly adding the stmpe_adc DT-nodes as found on
+Toradex boards.
+
+Changes in v5:
+ - Made a one column list
+ - Added lee's Acked-for-MFD
+ - Changed author of commit to use correct email.
+ - Changed author of commit to use correct email
+ - Added Lee Jone's Ack
+ - Changed author of commit. Previous patch versions author was wrong
+   by mistake.
+ - Changed author of commit to use correct email.
+ - Removed devm_add_action_or_reset
+ - Changed iio_device_register to devm_iio_device_register
+ - Added Jonathan Cameron's Reviewed-by
+ - Added correct author of commit, as this changed by accident
+ - Made a one column list
+ - Cleared note about precedence
+ - Changed example to a full STMPE811 device with MFD, touchscreen, and the new
+   stmpe_adc driver.
+ - Added Jonathan Cameron's Reviewed-by
+
+Changes in v4:
+ - New separate precursor patch for holding reformatting
+ - Added Lee Jone's Ack
+ - Added Dmitry Torokhov's Ack
+ - New patch: split mfd changes into this precursor patch
+ - Export the added stmpe811_adc_commmon_init function
+ - Disabling adc when mfd is removed
+ - New patch: Split changes in stmpe-ts.c to a separate commit
+ - Remove common adc settings from init and call the
+   stmpe811_adc_common_init function
+ - Moved MFD changes to a precursor patch
+ - Moved stmpe-ts changes to a precursor patch
+ - Created stmpe_read_temp and stmpe_read_voltage functions to make
+   read_raw more readable
+ - Added local lock instead of using indio_dev's mlock
+ - Use be16_to_cpu() macro instead of bitshifting
+ - Added stmpe_enable again to stmpe_adc_init_hw
+ - Use devm_add_action_or_reset to get rid of the remove function
+   (I tested if that actually works)
+ - Put reformatting in a separate precursor patch.
+ - Moved T30 devicetree settings to separate commit
+ - New separate commit to hold T30 devicetree changes
+
+Changes in v3:
+ - Undo ADC-settings related code-deletions in stmpe-ts.c that the code
+   is backwards-compatible to older devicetrees.
+ - Removed COMPILE_TEST from dependings in Kconfig
+ - Removed stmpe_adc_get_platform_info() function and integrated the
+   few code lines in the other function
+ - Reformatted documentation for touchscreen to use tabs and have a better
+   overview of the settings.
+ - Added note which adc-settings will take precedence.
+ - changed typo in sample-time setting from 144 clocks to 124 clocks, as stated
+   in the datasheet.
+ - None
+
+Changes in v2:
+ - This is a new added commit. Separate commit for moving the defines
+   out of drivers/input/touchscreen/stmpe-ts.c to overlying mfd-device
+   drivers/mfd/stmpe.c
+ - Pre-fix defines with STMPE_
+ - Move code to setup ADC to MFD device, as it is used by both drivers
+   adc and touchscreen
+ - Code formatting
+ - Removed unused includes
+ - Defined the macro STMPE_START_ONE_TEMP_CONV with other macros.
+ - Added new macro that defines the channel of the temperature sensor.
+   Took new name for STMPE_MAX_ADC->STMPE_ADC_LAST_NR and used it
+   throughout the code for better readability.
+ - Added mutex_unlock where missing.
+ - Moved the bindings for ADC to the overlying mfd.
+ - Reformatted for better readability
+ - Put common ADC settings in mfd
+
+Philippe Schenker (5):
+  dt-bindings: stmpe: reformatting parameter list and use tabs only
+  mfd: stmpe: Move ADC related defines to header of mfd
+  Input: stmpe-ts: preparations for STMPE ADC driver
+  ARM: dts: Add stmpe-adc DT node to Toradex iMX6 modules
+  ARM: dts: Add stmpe-adc DT node to Toradex T30 modules
+
+Stefan Agner (3):
+  mfd: stmpe: preparations for STMPE ADC driver
+  iio: adc: add STMPE ADC driver using IIO framework
+  iio: adc: add STMPE ADC devicetree bindings
+
+ .../devicetree/bindings/iio/adc/stmpe-adc.txt |  21 +
+ .../bindings/input/touchscreen/stmpe.txt      | 116 ++++--
+ .../devicetree/bindings/mfd/stmpe.txt         |  28 +-
+ arch/arm/boot/dts/imx6qdl-apalis.dtsi         |  22 +-
+ arch/arm/boot/dts/imx6qdl-colibri.dtsi        |  23 +-
+ arch/arm/boot/dts/tegra30-apalis.dtsi         |  22 +-
+ arch/arm/boot/dts/tegra30-colibri.dtsi        |  22 +-
+ drivers/iio/adc/Kconfig                       |   7 +
+ drivers/iio/adc/Makefile                      |   1 +
+ drivers/iio/adc/stmpe-adc.c                   | 363 ++++++++++++++++++
+ drivers/input/touchscreen/stmpe-ts.c          |  66 +---
+ drivers/mfd/Kconfig                           |   3 +-
+ drivers/mfd/stmpe.c                           |  68 ++++
+ include/linux/mfd/stmpe.h                     |  21 +
+ 14 files changed, 667 insertions(+), 116 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/stmpe-adc.txt
+ create mode 100644 drivers/iio/adc/stmpe-adc.c
+
+-- 
+2.19.2
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
