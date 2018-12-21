@@ -3,19 +3,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 07EFEC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 09:24:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F3C95C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 09:25:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C9DCF21908
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 09:24:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C38AE21909
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 09:25:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ANuRA33r"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C9DCF21908
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BVgs3E9/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C38AE21909
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,39 +24,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1frsymWxjdy+8JotVx48RihxT02CsFOgeQppjFytuo4=; b=ANuRA33rktchYV
-	G6/An2ivrQ28ToS04W7JovGRirhdrNZ7QnRLnjLzWLpz6kljAqWCFKEymhOwNxgFd4EtbN313/A3O
-	CLwV+un/Z2voUW+WEYt/fesBAmvme5+1px01fv9O3FQlEM/nmngD6aPLcJPkJ3UT/s9I03a3pdkxE
-	VCIGt1S/W+d9j7QO8hFlt8VQvdmZaZwKTXrCnK7NLgXTKC6y80+FYq0AXJVFJowafG2I4T0qmN1wq
-	/PPwo0/JyP3FWqVb3uOUBWEo65cGITgiYpFMDNjDsUpSArV/aT5ZLtPZnbS9W7wdBter6rbZ8SsIo
-	DcodWE2Pfj+7IsahhLYQ==;
+	List-Owner; bh=Nk+NxvKIXOCLjJq46kMkM/oNI+8Xpb40t0gaKEJKZbY=; b=BVgs3E9/80OiQ9
+	KbAM0acNtDXoaYHmJ6rFlXFU0KERWDCFyZN+dmw1C/dkRdDcrsMWZhAge6+DeDXdzKyqvwTWly/tI
+	wBwmKE35XZ7i2OjXAtwi9tbVoVlPmXprL7Rg784KP52CF0m5OgoN8r5uQsiCUnsRJgx/5fohpUR1R
+	pwEmIPWcM0C0KaWVKfmh7SzUKdM5mNLIrRjqQArE4a12T14ds3AlLKtZ+06pubObvq9TpCZ/2vU+j
+	cPAwXxA/eJuOWBJaGSFTmUHklXd9t6cB1CI0vi3eWq7QDuV+HBPm4VrUCeL+OxKycm+CWeaoYMIsl
+	DFxsSLT/SDyuxtXLyslQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaH2y-0008Ac-Mb; Fri, 21 Dec 2018 09:24:44 +0000
+	id 1gaH3I-00005m-Mo; Fri, 21 Dec 2018 09:25:04 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaH2u-0007uP-8M
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 09:24:42 +0000
+ id 1gaH3D-0008Fb-GD
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 09:25:02 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id B5B3C20763; Fri, 21 Dec 2018 10:24:26 +0100 (CET)
+ id F11F120763; Fri, 21 Dec 2018 10:24:47 +0100 (CET)
 Received: from localhost (lfbn-1-17122-186.w86-248.abo.wanadoo.fr
  [86.248.186.186])
- by mail.bootlin.com (Postfix) with ESMTPSA id 8B36C20747;
- Fri, 21 Dec 2018 10:24:26 +0100 (CET)
-Date: Fri, 21 Dec 2018 10:24:26 +0100
+ by mail.bootlin.com (Postfix) with ESMTPSA id C0C5620747;
+ Fri, 21 Dec 2018 10:24:47 +0100 (CET)
+Date: Fri, 21 Dec 2018 10:24:47 +0100
 From: Alexandre Belloni <alexandre.belloni@bootlin.com>
 To: Anson Huang <anson.huang@nxp.com>
-Subject: Re: [PATCH V5 1/4] dt-bindings: fsl: scu: add rtc binding
-Message-ID: <20181221092426.GL2188@piout.net>
+Subject: Re: [PATCH V5 2/4] rtc: add i.MX system controller RTC support
+Message-ID: <20181221092447.GM2188@piout.net>
 References: <1545295872-20169-1-git-send-email-Anson.Huang@nxp.com>
- <1545295872-20169-2-git-send-email-Anson.Huang@nxp.com>
+ <1545295872-20169-3-git-send-email-Anson.Huang@nxp.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1545295872-20169-2-git-send-email-Anson.Huang@nxp.com>
+In-Reply-To: <1545295872-20169-3-git-send-email-Anson.Huang@nxp.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_012440_510707_DD0BC13C 
-X-CRM114-Status: GOOD (  11.47  )
+X-CRM114-CacheID: sfid-20181221_012459_669333_BFB9DB44 
+X-CRM114-Status: GOOD (  15.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,21 +93,31 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 20/12/2018 08:56:07+0000, Anson Huang wrote:
-> NXP i.MX8QXP is an ARMv8 SoC with a Cortex-M4 core inside as
-> system controller, the system controller is in charge of system
-> power, clock and secure RTC etc. management, Linux kernel
-> has to communicate with system controller via MU (message unit)
-> IPC to do RTC operation, this patch adds binding doc for i.MX
-> system controller RTC driver.
+On 20/12/2018 08:56:16+0000, Anson Huang wrote:
+> i.MX8QXP is an ARMv8 SoC which has a Cortex-M4 system controller
+> inside, the system controller is in charge of controlling power,
+> clock and secure rtc etc..
+> 
+> This patch adds i.MX system controller RTC driver support,
+> Linux kernel has to communicate with system controller via MU
+> (message unit) IPC to set/get RTC time and other alarm functions,
+> since the RTC set time needs to be done in secure EL3 mode (required
+> by system controller firmware) and alarm functions needs to be done
+> with general MU IRQ handle, these depend on other components which
+> are NOT ready, so this patch ONLY enables the RTC time read.
 > 
 > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
 > ---
-> No change since V4.
+> ChangeLog since V4:
+>     - Add dependency on IMX_SCU to avoid compile error when IMX_SCU is NOT enabled;
+>     - Use dev_err instead of pr_err;
+>     - Remove unneccssary different errors check in imx_scu_get_handle which is already done in API.
 > ---
->  Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+>  drivers/rtc/Kconfig      |  7 ++++
+>  drivers/rtc/Makefile     |  1 +
+>  drivers/rtc/rtc-imx-sc.c | 91 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 99 insertions(+)
+>  create mode 100644 drivers/rtc/rtc-imx-sc.c
 > 
 Applied, thanks.
 
