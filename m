@@ -2,73 +2,148 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.9 required=3.0 tests=DKIM_ADSP_ALL,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DFCFAC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 09:29:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B609EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 09:31:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A2707218F0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 09:29:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7D22C218F0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 09:31:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Bqe7K1u2";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=plaes.org header.i=@plaes.org header.b="oVGtEs/m"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A2707218F0
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=plaes.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EV6dD9pD";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="k27rEf2d"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7D22C218F0
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=97w4ElgtaF+4iKqQbPoIhHOg3KCcrH+f8V0moqOgB0o=; b=Bqe7K1u2ju52Pi
-	XkfE9M/sMl3xGLiLti3HBrFYhJB5wFL+On6StX6gqy07rvpryNac6QkjJcL+ZRyyA/dN+xFz308zC
-	gdBYv1OF1bO1boFmsx+Q/0vZ3rQtD59VwLqKaGHqUlyecYo5l01YkiHvLxmy2GlAwt20OUMHgkCeh
-	3cNds+bpcuaiBgnOQ6WNeiXmWAoP7Q4aWEHRtlvCi5DMKgGZRJzK90rrmAK2EwwN87wIW1AqlDEf4
-	bM5e3SQciO6W6Fogq8vOLM1sdtGarVl6ksGHcdw+cTI4z7W58wmedV7TV/qf+pvm3XOX9v14HSs8+
-	qgUwbYxY73nXJTULw1Mw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=dk5+QGziTJWFawzjAOwyUs521m4oWxF2KONz7kOO4c4=; b=EV6dD9pD6iHiIh
+	zgotxxTbkAPHuoO/nk2+MEIu/PDGovoEdK4YwZUC9228z+pulp/eE20/jP6HNezKTQOQRp+uK5kha
+	J8WUgdy/iZ18HsYgmtOqZFJzxD9FdO0y2h0SAUqCMuqNUHhe62vxp0KS/LPAPZmKt1XH5TglfoV2m
+	1buB+pnWhEzf34kkPWi8hXGpNybswocBGJnWILrZ+UW7iHV+OZXr+umLUIEmDVwJ9IEV6lYjz1QeZ
+	hJK50UvWN/a9wRW4ZH+sD/7yPwfCMOz+BLSaETd1S7yoJxXSROwXu9sKuBn+EKGC1Y6OOVMx253qf
+	pA1wM10aFkJG8TiJqEZg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaH7o-0001vC-SL; Fri, 21 Dec 2018 09:29:44 +0000
-Received: from plaes.org ([188.166.43.21])
+	id 1gaH9l-0003qj-NC; Fri, 21 Dec 2018 09:31:45 +0000
+Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaH7k-0001uT-T8
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 09:29:42 +0000
-Received: from plaes.org (localhost [127.0.0.1])
- by plaes.org (Postfix) with ESMTPSA id 4FB6D402C1;
- Fri, 21 Dec 2018 09:28:59 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=plaes.org; s=mail;
- t=1545384539; bh=/S6BxI+GAK5WS0/EhA92uvgr6Ez3wigOIyqi8T73vGk=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=oVGtEs/m2CLPOHpTekkyGPumMYiDSiQtTkwPBM+r82cOV7b8AkVbgkKKpZM9AzQB5
- 9Y0DQt5Bc4awqotarB2BkL6HrZKNQKmW8U5o+Xvcy7MzxEIlxC9m16huRToHwIjYSi
- vVsAWyTO1MUhPODserRHrJoWHCY6kS+/lEEyaqta/i9TjI0yKa0+/pnZgIecy3kcOM
- 2OCMTKlHa4Bv2VMq19w1tyOJNFxaQ8cOQQuurgK4rXw4XaebmCdASVOPuBVBm5V0Ja
- dhQ7yOyz9vTl7LLeskUX1sfop04pNjVPVmhOCzrqlnPpm7vx3ku7j/54UNP7iAE3wS
- YeD0FRQiJfPzw==
-Date: Fri, 21 Dec 2018 09:28:58 +0000
-From: Priit Laes <plaes@plaes.org>
-To: Lee Jones <lee.jones@linaro.org>
-Subject: Re: [linux-sunxi] Re: [PATCH v2 1/8] mfd: axp20x: name voltage
- ramping define properly
-Message-ID: <20181221092858.6koh5dkrlc7xhvbh@plaes.org>
-References: <cover.923997dd7d7396bb4d71f8967698b58ca956b929.1544512919.git-series.plaes@plaes.org>
- <01367c4f4f1e174fefbef9aac645f6792bda07e5.1544512919.git-series.plaes@plaes.org>
- <20181221083927.GQ4497@dell>
- <20181221084246.myrtv6n4jrv6lajl@plaes.org>
- <20181221092658.GB13248@dell>
+ id 1gaH9i-0003pO-3W
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 09:31:43 +0000
+Received: by mail-wm1-x343.google.com with SMTP id b11so4637279wmj.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 21 Dec 2018 01:31:31 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=sender:subject:to:cc:references:from:openpgp:autocrypt:message-id
+ :date:user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=NqJ1ZygM7d32i2cesM1IybGBm3lDm82mQWpm0w8o7Dw=;
+ b=k27rEf2dEMdOw8CifYQdHb6l0R/Ct5jDpDLUktt87xsdWlSUULeZ6u1oTxTj1BCckG
+ eswffTZBgDauF8o5o/x08jdVp7zmqR5iELP+onraOtYNyq/q+ARAhQRlJjIPIbbqaIBV
+ vVt0/eRb3JKpdw3Udd72BoBMD+aujZ1yYHBraa2e34m8D0EuftVSFUYDDRV65mGGx8Zn
+ VDNmna9w8H1nqNZ/joLNIVe64HMltHZ5p8Hdn3gl79/rvNq49Tkh44LSClsf0rBjxtRc
+ 5p4pZnXPpgDkBAfnPMdfl5SnhQLFxRDkDhks52UHlon0cZa0uPlclXpcMFbxYtFqihI9
+ ZNnw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:sender:subject:to:cc:references:from:openpgp
+ :autocrypt:message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=NqJ1ZygM7d32i2cesM1IybGBm3lDm82mQWpm0w8o7Dw=;
+ b=ELfJowITUpAhtn9dCT7YLr7oG4HQGVQg7UWFOOy0DOBpcikBxW6CxzXztQmcujO/oc
+ d6jIKTUS7Z0vtJpylHvhXOx+mtLTHmnscFtgq40wowd3hYDa5wi8qh046cslbyicSQVW
+ 1bWii7rngujYxgwo1idfAiJHDF2s180rMWoRBvnk+wjGIzpeH22/D1XzDoTB0BakSTmx
+ RKCS0SteeI095XA0Vd5NIQBGJKpvSixBsrhI0Hjzmm50cSntEyG8mX2vmB4R3MZQqV/4
+ YsFEGMuViF57xzsJn1+herEWgPdVCV3fcGOwzG0Zq025DiGkCe6f6UQv9iXKzNlpSgaP
+ IK4A==
+X-Gm-Message-State: AA+aEWbMtvcYH3a+AqZWvVy5a8xwBRe0ElXMCPUUjBfFXQXlrYKtitkP
+ uouDHupPrCbsx6MRMcWZ/svgxrAE
+X-Google-Smtp-Source: ALg8bN6NfrY196JuieUaeE6s+5jl/wtM29CTI3sruqQ1pYmXCc0PTNoEy9oJIgWl/0cgwZfjFuqjZg==
+X-Received: by 2002:a1c:8acf:: with SMTP id m198mr2138988wmd.143.1545384690047; 
+ Fri, 21 Dec 2018 01:31:30 -0800 (PST)
+Received: from [192.168.10.150] ([93.56.166.5])
+ by smtp.googlemail.com with ESMTPSA id j8sm8329569wrt.40.2018.12.21.01.31.28
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 21 Dec 2018 01:31:29 -0800 (PST)
+Subject: Re: [Resend PATCH V5 0/10] x86/KVM/Hyper-v: Add HV ept tlb range
+ flush hypercall support in KVM
+To: lantianyu1986@gmail.com
+References: <20181206132113.2691-1-Tianyu.Lan@microsoft.com>
+From: Paolo Bonzini <pbonzini@redhat.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=pbonzini@redhat.com; keydata=
+ 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
+ uUHgL9dKIfvpm+rNXRn9wAwGjk0X/A==
+Message-ID: <36f1e16f-2390-fa61-e5e0-07320abea9ba@redhat.com>
+Date: Fri, 21 Dec 2018 10:31:28 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181221092658.GB13248@dell>
-User-Agent: NeoMutt/20170113 (1.7.2)
+In-Reply-To: <20181206132113.2691-1-Tianyu.Lan@microsoft.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_012941_223904_1FC9F5D2 
-X-CRM114-Status: GOOD (  24.12  )
+X-CRM114-CacheID: sfid-20181221_013142_145425_0C7EB06E 
+X-CRM114-Status: GOOD (  17.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,65 +155,113 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Maxime Ripard <maxime.ripard@bootlin.com>, Mark Brown <broonie@kernel.org>,
- linux-sunxi <linux-sunxi@googlegroups.com>,
- Liam Girdwood <lgirdwood@gmail.com>, linux-kernel@vger.kernel.org,
- Olliver Schinagl <oliver@schinagl.nl>, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: linux-mips@linux-mips.org, kvm@vger.kernel.org, rkrcmar@redhat.com,
+ benh@kernel.crashing.org, will.deacon@arm.com, christoffer.dall@arm.com,
+ paulus@ozlabs.org, hpa@zytor.com, kys@microsoft.com,
+ kvmarm@lists.cs.columbia.edu, sthemmin@microsoft.com, mpe@ellerman.id.au,
+ x86@kernel.org, linux@armlinux.org.uk, michael.h.kelley@microsoft.com,
+ mingo@redhat.com, catalin.marinas@arm.com, jhogan@kernel.org,
+ Lan Tianyu <Tianyu.Lan@microsoft.com>, marc.zyngier@arm.com,
+ haiyangz@microsoft.com, kvm-ppc@vger.kernel.org, bp@alien8.de,
+ tglx@linutronix.de, linux-arm-kernel@lists.infradead.org,
+ linux-kernel@vger.kernel.org, ralf@linux-mips.org, paul.burton@mips.com,
+ devel@linuxdriverproject.org, vkuznets@redhat.com,
+ linuxppc-dev@lists.ozlabs.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gRnJpLCBEZWMgMjEsIDIwMTggYXQgMDk6MjY6NThBTSArMDAwMCwgTGVlIEpvbmVzIHdyb3Rl
-Ogo+IE9uIEZyaSwgMjEgRGVjIDIwMTgsIFByaWl0IExhZXMgd3JvdGU6Cj4gCj4gPiBPbiBGcmks
-IERlYyAyMSwgMjAxOCBhdCAwODozOToyN0FNICswMDAwLCBMZWUgSm9uZXMgd3JvdGU6Cj4gPiA+
-IE9uIFR1ZSwgMTEgRGVjIDIwMTgsIFByaWl0IExhZXMgd3JvdGU6Cj4gPiA+IAo+ID4gPiA+IEZy
-b206IE9sbGl2ZXIgU2NoaW5hZ2wgPG9saXZlckBzY2hpbmFnbC5ubD4KPiA+ID4gPiAKPiA+ID4g
-PiBUaGUgY3VycmVudCBheHAyMHggbmFtZXMgdGhlIHJhbXBpbmcgcmVnaXN0ZXIgJ3NjYWwnIHdo
-aWNoIHByb2JhYmx5Cj4gPiA+ID4gbWVhbnMgc2NhbGluZy4gU2luY2UgdGhlIHJlZ2lzdGVyIHJl
-YWxseSBoYXMgbm90aGluZyB0byBkbyB3aXRoCj4gPiA+ID4gc2NhbGluZywgYnV0IHJlYWxseSBp
-cyB0aGUgdm9sdGFnZSByYW1wIHdlIHJlbmFtZSBpdCBhcHByb3ByaWF0ZWx5Lgo+ID4gPiA+IAo+
-ID4gPiA+IFNpZ25lZC1vZmYtYnk6IE9sbGl2ZXIgU2NoaW5hZ2wgPG9saXZlckBzY2hpbmFnbC5u
-bD4KPiA+ID4gPiBTaWduZWQtb2ZmLWJ5OiBQcmlpdCBMYWVzIDxwbGFlc0BwbGFlcy5vcmc+Cj4g
-PiA+ID4gQWNrZWQtZm9yLU1GRC1ieTogTGVlIEpvbmVzIDxsZWUuam9uZXNAbGluYXJvLm9yZz4K
-PiA+ID4gPiAtLS0KPiA+ID4gPiAgaW5jbHVkZS9saW51eC9tZmQvYXhwMjB4LmggfCA0ICsrLS0K
-PiA+ID4gPiAgMSBmaWxlIGNoYW5nZWQsIDIgaW5zZXJ0aW9ucygrKSwgMiBkZWxldGlvbnMoLSkK
-PiA+ID4gCj4gPiA+IEkndmUgbG9zdCB0cmFjayBvZiB3aGF0J3MgaGFwcGVuaW5nIHdpdGggdGhp
-cyBzZXQgbm93Lgo+ID4gPiAKPiA+ID4gTWFyaywKPiA+ID4gCj4gPiA+IERpZCB5b3UgdGFrZSB0
-aGlzIHBhdGNoIGluIHRoZSBlbmQ/Cj4gPiAKPiA+IFllcywgdGhpcyBpcyBpbiBsaW51eC1uZXh0
-Lgo+IAo+IEkgaGF2ZSBubyBpZGVhIHdoeSBNYXJrJ3MgdHJhY2tlciBpc24ndCBtYWlsaW5nIG1l
-ICh0aGlzIGlzIG5vdCB0aGUKPiBmaXJzdCB0aW1lIHRoaXMgaGFzIGhhcHBlbmVkKS4KPiAKPiBD
-b3VsZCB5b3UgcGxlYXNlIHJlYmFzZSB0aGlzIHNldCBhbmQgcmVzdWJtaXQgYWxsIG9mIHRoZSBw
-YXRjaGVzIHdoaWNoCj4gaGF2ZSBub3QgeWV0IGJlZW4gYXBwbGllZD8KCldob2xlIHNlcmllIGhh
-cyBiZWVuIGFwcGxpZWQuCgo+IFRoYW5rIHlvdS4KPiAKPiA+ID4gPiBkaWZmIC0tZ2l0IGEvaW5j
-bHVkZS9saW51eC9tZmQvYXhwMjB4LmggYi9pbmNsdWRlL2xpbnV4L21mZC9heHAyMHguaAo+ID4g
-PiA+IGluZGV4IDIzMDJiNjIuLmEzNTNjZDIgMTAwNjQ0Cj4gPiA+ID4gLS0tIGEvaW5jbHVkZS9s
-aW51eC9tZmQvYXhwMjB4LmgKPiA+ID4gPiArKysgYi9pbmNsdWRlL2xpbnV4L21mZC9heHAyMHgu
-aAo+ID4gPiA+IEBAIC0zNSw3ICszNSw3IEBAIGVudW0gYXhwMjB4X3ZhcmlhbnRzIHsKPiA+ID4g
-PiAgI2RlZmluZSBBWFAxNTJfQUxET19PUF9NT0RFCQkweDEzCj4gPiA+ID4gICNkZWZpbmUgQVhQ
-MTUyX0xETzBfQ1RSTAkJMHgxNQo+ID4gPiA+ICAjZGVmaW5lIEFYUDE1Ml9EQ0RDMl9WX09VVAkJ
-MHgyMwo+ID4gPiA+IC0jZGVmaW5lIEFYUDE1Ml9EQ0RDMl9WX1NDQUwJCTB4MjUKPiA+ID4gPiAr
-I2RlZmluZSBBWFAxNTJfRENEQzJfVl9SQU1QCQkweDI1Cj4gPiA+ID4gICNkZWZpbmUgQVhQMTUy
-X0RDREMxX1ZfT1VUCQkweDI2Cj4gPiA+ID4gICNkZWZpbmUgQVhQMTUyX0RDREMzX1ZfT1VUCQkw
-eDI3Cj4gPiA+ID4gICNkZWZpbmUgQVhQMTUyX0FMRE8xMl9WX09VVAkJMHgyOAo+ID4gPiA+IEBA
-IC01Myw3ICs1Myw3IEBAIGVudW0gYXhwMjB4X3ZhcmlhbnRzIHsKPiA+ID4gPiAgI2RlZmluZSBB
-WFAyMFhfVVNCX09UR19TVEFUVVMJCTB4MDIKPiA+ID4gPiAgI2RlZmluZSBBWFAyMFhfUFdSX09V
-VF9DVFJMCQkweDEyCj4gPiA+ID4gICNkZWZpbmUgQVhQMjBYX0RDREMyX1ZfT1VUCQkweDIzCj4g
-PiA+ID4gLSNkZWZpbmUgQVhQMjBYX0RDREMyX0xETzNfVl9TQ0FMCTB4MjUKPiA+ID4gPiArI2Rl
-ZmluZSBBWFAyMFhfRENEQzJfTERPM19WX1JBTVAJMHgyNQo+ID4gPiA+ICAjZGVmaW5lIEFYUDIw
-WF9EQ0RDM19WX09VVAkJMHgyNwo+ID4gPiA+ICAjZGVmaW5lIEFYUDIwWF9MRE8yNF9WX09VVAkJ
-MHgyOAo+ID4gPiA+ICAjZGVmaW5lIEFYUDIwWF9MRE8zX1ZfT1VUCQkweDI5Cj4gPiA+IAo+IAo+
-IC0tIAo+IExlZSBKb25lcyBb5p2O55C85pavXQo+IExpbmFybyBTZXJ2aWNlcyBUZWNobmljYWwg
-TGVhZAo+IExpbmFyby5vcmcg4pSCIE9wZW4gc291cmNlIHNvZnR3YXJlIGZvciBBUk0gU29Dcwo+
-IEZvbGxvdyBMaW5hcm86IEZhY2Vib29rIHwgVHdpdHRlciB8IEJsb2cKPiAKPiAtLSAKPiBZb3Ug
-cmVjZWl2ZWQgdGhpcyBtZXNzYWdlIGJlY2F1c2UgeW91IGFyZSBzdWJzY3JpYmVkIHRvIHRoZSBH
-b29nbGUgR3JvdXBzICJsaW51eC1zdW54aSIgZ3JvdXAuCj4gVG8gdW5zdWJzY3JpYmUgZnJvbSB0
-aGlzIGdyb3VwIGFuZCBzdG9wIHJlY2VpdmluZyBlbWFpbHMgZnJvbSBpdCwgc2VuZCBhbiBlbWFp
-bCB0byBsaW51eC1zdW54aSt1bnN1YnNjcmliZUBnb29nbGVncm91cHMuY29tLgo+IEZvciBtb3Jl
-IG9wdGlvbnMsIHZpc2l0IGh0dHBzOi8vZ3JvdXBzLmdvb2dsZS5jb20vZC9vcHRvdXQuCgpfX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2Vy
-bmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0
-cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVs
-Cg==
+On 06/12/18 14:21, lantianyu1986@gmail.com wrote:
+> From: Lan Tianyu <Tianyu.Lan@microsoft.com>
+> 
+> For nested memory virtualization, Hyper-v doesn't set write-protect
+> L1 hypervisor EPT page directory and page table node to track changes 
+> while it relies on guest to tell it changes via HvFlushGuestAddressLlist
+> hypercall. HvFlushGuestAddressLlist hypercall provides a way to flush
+> EPT page table with ranges which are specified by L1 hypervisor.
+> 
+> If L1 hypervisor uses INVEPT or HvFlushGuestAddressSpace hypercall to
+> flush EPT tlb, Hyper-V will invalidate associated EPT shadow page table
+> and sync L1's EPT table when next EPT page fault is triggered.
+> HvFlushGuestAddressLlist hypercall helps to avoid such redundant EPT
+> page fault and synchronization of shadow page table.
+> 
+> This patchset is based on the Patch "KVM/VMX: Check ept_pointer before
+> flushing ept tlb"(https://marc.info/?l=kvm&m=154408169705686&w=2).
+> 
+> Change since v4:
+>        1) Split flush address and flush list patches. This patchset only contains
+>        flush address patches. Will post flush list patches later.
+>        2) Expose function hyperv_fill_flush_guest_mapping_list()
+>        out of hyperv file
+>        3) Adjust parameter of hyperv_flush_guest_mapping_range()
+>        4) Reorder patchset and move Hyper-V and VMX changes ahead.
+> 
+> Change since v3:
+>         1) Remove code of updating "tlbs_dirty" in kvm_flush_remote_tlbs_with_range()
+>         2) Remove directly tlb flush in the kvm_handle_hva_range()
+>         3) Move tlb flush in kvm_set_pte_rmapp() to kvm_mmu_notifier_change_pte()
+>         4) Combine Vitaly's "don't pass EPT configuration info to
+> vmx_hv_remote_flush_tlb()" fix
+> 
+> Change since v2:
+>        1) Fix comment in the kvm_flush_remote_tlbs_with_range()
+>        2) Move HV_MAX_FLUSH_PAGES and HV_MAX_FLUSH_REP_COUNT to
+>         hyperv-tlfs.h.
+>        3) Calculate HV_MAX_FLUSH_REP_COUNT in the macro definition
+>        4) Use HV_MAX_FLUSH_REP_COUNT to define length of gpa_list in
+>         struct hv_guest_mapping_flush_list.
+> 
+> Change since v1:
+>        1) Convert "end_gfn" of struct kvm_tlb_range to "pages" in order
+>           to avoid confusion as to whether "end_gfn" is inclusive or exlusive.
+>        2) Add hyperv tlb range struct and replace kvm tlb range struct
+>           with new struct in order to avoid using kvm struct in the hyperv
+>           code directly.
+> 
+> 
+> 
+> Lan Tianyu (10):
+>   KVM: Add tlb_remote_flush_with_range callback in kvm_x86_ops
+>   x86/hyper-v: Add HvFlushGuestAddressList hypercall support
+>   x86/Hyper-v: Add trace in the
+>     hyperv_nested_flush_guest_mapping_range()
+>   KVM/VMX: Add hv tlb range flush support
+>   KVM/MMU: Add tlb flush with range helper function
+>   KVM: Replace old tlb flush function with new one to flush a specified
+>     range.
+>   KVM: Make kvm_set_spte_hva() return int
+>   KVM/MMU: Move tlb flush in kvm_set_pte_rmapp() to
+>     kvm_mmu_notifier_change_pte()
+>   KVM/MMU: Flush tlb directly in the kvm_set_pte_rmapp()
+>   KVM/MMU: Flush tlb directly in the kvm_zap_gfn_range()
+> 
+>  arch/arm/include/asm/kvm_host.h     |  2 +-
+>  arch/arm64/include/asm/kvm_host.h   |  2 +-
+>  arch/mips/include/asm/kvm_host.h    |  2 +-
+>  arch/mips/kvm/mmu.c                 |  3 +-
+>  arch/powerpc/include/asm/kvm_host.h |  2 +-
+>  arch/powerpc/kvm/book3s.c           |  3 +-
+>  arch/powerpc/kvm/e500_mmu_host.c    |  3 +-
+>  arch/x86/hyperv/nested.c            | 80 +++++++++++++++++++++++++++++++
+>  arch/x86/include/asm/hyperv-tlfs.h  | 32 +++++++++++++
+>  arch/x86/include/asm/kvm_host.h     |  9 +++-
+>  arch/x86/include/asm/mshyperv.h     | 15 ++++++
+>  arch/x86/include/asm/trace/hyperv.h | 14 ++++++
+>  arch/x86/kvm/mmu.c                  | 96 +++++++++++++++++++++++++++++--------
+>  arch/x86/kvm/paging_tmpl.h          |  3 +-
+>  arch/x86/kvm/vmx.c                  | 63 +++++++++++++++++-------
+>  virt/kvm/arm/mmu.c                  |  6 ++-
+>  virt/kvm/kvm_main.c                 |  5 +-
+>  17 files changed, 292 insertions(+), 48 deletions(-)
+> 
+
+Queued, thanks.
+
+Paolo
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
