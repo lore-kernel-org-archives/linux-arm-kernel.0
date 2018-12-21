@@ -2,67 +2,59 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9FA76C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 11:53:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 77A64C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 12:12:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5FC9721908
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 11:53:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4437221906
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 12:12:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q+0EbVq/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5FC9721908
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A0kKoi3P"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4437221906
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Cc:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=75Z1MN9yLoPGGjD+5gMbM/nOC7uiBXqwBqpVB/3Hpro=; b=Q+0EbVq/hVK6wMJZQv7gJVsE90
-	p9E1FSGGjOPzwBi+zXWTyEVHS1elh+ao3sPAv9dk8qHsTEPiISoEzBKCD8y2DA4ffBs6OnTJm2OS4
-	iu36IweGwR8/aZwdzza7XXFz3inodw6rh13TYbq0rN3PSzfaPX5wiJUZIDjTmvgUKX0bKq7wdTDJV
-	zzWPQnewHYiA7W+UtZ2GwRYEC6YLi/o1QSlf7F4Vl8WI8HChyhN60wnaLC/TYny8Dvj/n1mP2B6SN
-	chj/wehol8KvrG7c9AcvI4V+dMKY+e6Ak4P3yTlWcQrVzjs+q0ZDkZ4AF1XSQf83uhsoKuT0ux53T
-	fVPxAI6Q==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=KmdsNO3lIDdTgrKyyYFBzFCQNiSB4umK69WP6710ZpE=; b=A0kKoi3PShYXMl
+	PGp1qe4lZex9Oei0kDruLWy/INp4JDrcFpF2MNwgkgsP8RLN1hA39nOOJMIb43H7LW0HbFAM6Mx2s
+	1A6/0Xy1sWYBOgmwBjot0ZVJobuCA+stFTE3AIcWGtaCRuaiGMWOl+0qI8gi+zmkqnNT5exua7rz1
+	MHx3CyQhs8UudE0bXEk5r0YfiZxLhkE3EB0hWZMaWziBByMg4wcTVoyTBJMs2IA+Z2yMLHKkDGHOy
+	R5cL8APhkUqWKnnJIvFiqYXYb/hdzs8kgmEAxJ9OoS/s3OhOMIcbfcZOSnP7yWzAE0Xxju5u0bS9X
+	2P+g68U7xHIdSlwERDyQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaJNG-0000bZ-EI; Fri, 21 Dec 2018 11:53:50 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gaJfH-0001WX-Ml; Fri, 21 Dec 2018 12:12:27 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaJNC-0000b1-Sm
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 11:53:48 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 813811596;
- Fri, 21 Dec 2018 03:53:32 -0800 (PST)
-Received: from [10.1.196.78] (ostrya.cambridge.arm.com [10.1.196.78])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 680813F5C0;
- Fri, 21 Dec 2018 03:53:31 -0800 (PST)
-Subject: Re: question about broadcast invalidation and atc invalidation
-To: Zhongmiao <zhongmiao@hisilicon.com>, Will Deacon <Will.Deacon@arm.com>,
- "Leizhen (ThunderTown)" <thunder.leizhen@huawei.com>,
- "Chengchuanning (Hisi-Turing)" <chengchuanning@hisilicon.com>,
- "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>,
- "iommu@lists.linux-foundation.org" <iommu@lists.linux-foundation.org>
-References: <e33aad8d-ab12-e1c7-0b8b-85fe09260270@hisilicon.com>
-From: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-Message-ID: <fb76a20b-0ff4-d64e-4f9c-c160254b07ce@arm.com>
-Date: Fri, 21 Dec 2018 11:53:07 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.0
+ id 1gaJfE-0001V5-M6; Fri, 21 Dec 2018 12:12:26 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 103EB207AE; Fri, 21 Dec 2018 13:12:07 +0100 (CET)
+Received: from localhost.localdomain
+ (aaubervilliers-681-1-38-38.w90-88.abo.wanadoo.fr [90.88.157.38])
+ by mail.bootlin.com (Postfix) with ESMTPSA id B13DB2078E;
+ Fri, 21 Dec 2018 13:12:06 +0100 (CET)
+From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+To: bcm-kernel-feedback-list@broadcom.com, linux-i2c@vger.kernel.org,
+ linux-rpi-kernel@lists.infradead.org, linux-arm-kernel@lists.infradead.org,
+ linux-kernel@vger.kernel.org
+Subject: [PATCH] i2c: bcm2835: Clear current message and count after a
+ transaction
+Date: Fri, 21 Dec 2018 13:11:35 +0100
+Message-Id: <20181221121135.4847-1-paul.kocialkowski@bootlin.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-In-Reply-To: <e33aad8d-ab12-e1c7-0b8b-85fe09260270@hisilicon.com>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_035346_935051_4FFE1962 
-X-CRM114-Status: GOOD (  13.08  )
+X-CRM114-CacheID: sfid-20181221_041224_855529_EC0E5970 
+X-CRM114-Status: GOOD (  13.67  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,40 +66,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
+Cc: Stefan Wahren <stefan.wahren@i2se.com>,
+ Florian Fainelli <f.fainelli@gmail.com>, Scott Branden <sbranden@broadcom.com>,
+ Ray Jui <rjui@broadcom.com>, Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
+ Eric Anholt <eric@anholt.net>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+The driver's interrupt handler checks whether a message is currently
+being handled with the curr_msg pointer. When it is NULL, the interrupt
+is considered to be unexpected. Similarly, the i2c_start_transfer
+routine checks for the remaining number of messages to handle in
+num_msgs.
 
-On 21/12/2018 09:31, Zhongmiao wrote:
-> Hi Jean:
-> 	Now Soft need to make sure build atc inv cmd to smmu after Execute 
-> "TLBI" (dvm sync). I don't think it's very reasonable. Why  Smmu The 
-> smmu automatically sends the inv atc command when smmu receive 
-> broadcast invalidation ?
+However, these values are never cleared and always keep the message and
+number relevant to the latest transfer (which might be done already and
+the underlying message memory might have been freed).
 
-I'd also like to see this done by hardware, but it's not
-straightforward. I see two difficulties with turning broadcast TLBI into
-ATC invalidation:
+When an unexpected interrupt hits with the DONE bit set, the isr will
+then try to access the flags field of the curr_msg structure, leading
+to a fatal page fault.
 
-* TLBI uses VMID and ASID to target the TLB entries to invalidate, but
-ATS uses RID and PASID. The SMMU would need to do a reverse lookup to
-convert VMID:ASID into RID:PASID, and there may be multiple RID:PASID
-pairs associated to one VMID:ASID.
+Fix the issue by systematically clearing curr_msg and num_msgs in the
+driver-wide device structure when a transfer is considered complete.
 
-* ATS flow control. Each endpoint has a limited number of in-flight ATC
-invalidate requests. If the CPU is sending TLBI too fast, the SMMU would
-have to buffer them or back-pressure the interconnect, while waiting for
-in-flight ATC invalidate to complete.
+Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+---
+ drivers/i2c/busses/i2c-bcm2835.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-So for the moment the architecture doesn't support this. We use MMU
-notifiers to convert VMID:ASID into RID:PASID and wait for ATC
-invalidation to complete.
+diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
+index 44deae78913e..5486252f5f2f 100644
+--- a/drivers/i2c/busses/i2c-bcm2835.c
++++ b/drivers/i2c/busses/i2c-bcm2835.c
+@@ -298,6 +298,9 @@ static int bcm2835_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
+ 		return -ETIMEDOUT;
+ 	}
+ 
++	i2c_dev->curr_msg = NULL;
++	i2c_dev->num_msgs = 0;
++
+ 	if (!i2c_dev->msg_err)
+ 		return num;
+ 
+-- 
+2.20.1
 
-Thanks,
-Jean
 
 _______________________________________________
 linux-arm-kernel mailing list
