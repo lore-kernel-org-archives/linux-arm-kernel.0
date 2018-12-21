@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BDCCBC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 07:29:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A55EBC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 07:29:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7E76821903
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 07:29:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 51FD721903
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 07:29:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nJSY1CgN";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ShvpZPrv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7E76821903
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QGgcWJuX";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="D+v8BjIw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 51FD721903
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,65 +26,65 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=VcqoTDE5gALEDwe4pQgKXjU7n2F+mCr92gSOlWOnWqU=; b=nJSY1CgNexINlf
-	iDVT3UQv3LZ2XcPvfnTFtPiEfp52O5hy25KJDJ5bWPpLtCYuRGjOAcaeSOATdAOhfNOJ1Fy6TX/78
-	+DJ1H8c5N/ERg4hb/3aWmx0q2H+X4p144NPeNAQO0SNgqT0souBWWnwYDVfj3FA8WzzU+FJn6CjP4
-	e073/sIhkVaCpuNbkOwB6eBEWFl7Z3OIRClm7bQ3Bv1bP+MWfV4oAa0MHWDZZYj4nKPNSiwCFTzbs
-	QuNChj4C0V6QzD9pUhSek8qgIf9DcCF0BgtJAghfbY5O+s8dfNEw7wf2aAMb6sw5BQEse9Yz5AyIE
-	A1d1Mosd8oyHpeUBlFqA==;
+	List-Owner; bh=d7Ol6tZ2odoTI0biw30JYoaPmPAjPyQtsBQ61tPAF7Y=; b=QGgcWJuXEv/LkT
+	NOIGHyNQrfasXtBtrEWtk4S+3cRyb7pLxnlDwsH/Pp3h/ztcu6KEethqDtiAmZ1os77Dp0VBpoTIu
+	sUSddym2nCZZ5Tphe74+CmGrkklSIuu/cMTTzbGSAFC5gV0gSnsjq3MEI2uSIQWbrLDIZQH3cSgkk
+	CKFaR0GROZ5HIXPFvDVsVmCKZ+yLpBmxxkBhDzWrJTRWCz3gRfblrLUC6on8QaBt4F84PKB1qEkkL
+	mBgPasi8v6rEcfhylQqxC5Ka4wPIIL5je0FMMaVlqwEUxRzSs5NTFApK+4Sk7x9/n5mon3NqD4/PU
+	AuIiKoxAoIBCrd1n+qrA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaFFS-0003Hh-4v; Fri, 21 Dec 2018 07:29:30 +0000
-Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
+	id 1gaFFd-0003UO-Cw; Fri, 21 Dec 2018 07:29:41 +0000
+Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaFE2-0001g7-6w
+ id 1gaFDz-0001fD-Rq
  for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 07:28:06 +0000
-Received: by mail-pg1-x544.google.com with SMTP id z11so2122192pgu.0
+Received: by mail-pf1-x444.google.com with SMTP id i12so2177882pfo.7
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 20 Dec 2018 23:27:53 -0800 (PST)
+ Thu, 20 Dec 2018 23:27:49 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=dUwToKhhL89vx1LjgzipUu4yk4Mqqx0vIAofTHjHZac=;
- b=ShvpZPrvcZfDw0J1ASzD0s3YT+jY0oS1MadiUlCWWjzz5X5zDssoIvCHAloq9QV5xC
- NjF1rpzikWkybtHcGu4YjiZKY4KAoohtfSZsMzW1qJB+ZSiDdNcHxyug7LkwUWD5OpTk
- qmksrnvAHxMg9bf3m5lOM4e7opmqBfi2JuMtRoBinthmsui86Y5DvN1TzH8lKSWPBgWh
- xCjIGY45Q6rwEo5Bm/5Vo8c6WxKZO2lCzUp0tchyY/Odxeyts6XvWLZjmlZhEtuekZCE
- UlTYTDThf99GmmFa6/nTdxRaY+Jr7AJymU93pMSI6FDUAjJHf3J/K4+4q5TDxLV9RDrS
- PerA==
+ bh=J1XPUyhdugQdjD1RjA8TcbqShFQ6vNfPgtVDRPKD26M=;
+ b=D+v8BjIwaeBkHWCUn0SIc9Vauqh6k/EcRAx/6NL+x5IkPsPR441bJb8zpvorrru7tf
+ WQpOaXEz0F1I4yQjIp9cCpkZZstdoQUvPF3cliFgyAXSrybbqb/8LC1ZPsZ/pgufsNk1
+ AqoNPMrKD5/PZcnFX859gEz7gy30NgnwpnnDc2apCYY1C/yyrzFwKlpvRbN19PuE17mw
+ +WDInCgOVD3V4o4MLInCLYjY7gnhvqx71hXA3y/rOjwfCq96gemXDtl252k3YS+E2Rbb
+ 76bKO8WtEZwQ1BWm8+h7aJDHIQopoRuLzD2zYjXfyDwD9usA8s80o2WQvuznD7ZxgcER
+ j7Bw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=dUwToKhhL89vx1LjgzipUu4yk4Mqqx0vIAofTHjHZac=;
- b=tKrhsQS7L64Dk44jLEtWDFm0rQUDiyvhMxgdtIh2swDk0V8Us3OnPvdIaktcNnQEW3
- UDlgU8NhxK5GuhPbD65b/SyiYXd62h8RrRgOyMKNg0fAbLuRokMzoUPZkc1efTGTY2IO
- CdH6ZRglvm7d/8DbmSuhOVTlaE1BfuhA8QrMeKDUeuOptS1tC83g+QP41cQkl1MOpq1D
- pnk+dLy4+ZBI5FAOjk80nfQoSNmlv/FdQVJub1cyztCTedDqPEjs7Gbw3BCOdZwzXWTL
- W5J4KDyxXFo6pn4oeI+ZZbPPmKUPLtp1JUo/hvbu8WKhfBEm4hv9uhUhsjPOIFp4mtFa
- O+pg==
-X-Gm-Message-State: AA+aEWZCi2svezFOyGUpHysqIJhHg0/1f/d0fXRNo10LCPnXWWRTX+YH
- kzCgWKqniFr1g0e8I+Ork5k=
-X-Google-Smtp-Source: AFSGD/VUQQi8yisb9aoewB9+qE7nuQLuYz8kYTpt3NojM7V2vPNF3ZlRLRnTQ6Sz6/Yix3QYYdtGqw==
-X-Received: by 2002:a62:a99:: with SMTP id 25mr1380678pfk.121.1545377272845;
- Thu, 20 Dec 2018 23:27:52 -0800 (PST)
+ bh=J1XPUyhdugQdjD1RjA8TcbqShFQ6vNfPgtVDRPKD26M=;
+ b=hCthartdhE1sKTNscIEGKmvcw/50oCs6NDEPyFJbFnW86+6gLiSPNvVTK+xVaLLxOu
+ 1LoJnl8i4wYUbFi4YlNa0SVRcybIADVild2VCiI9y2j2aIbs7zP/ZJzEof2A56VNLFVu
+ dyq+JcNDg92cJ4OJ7b3NjqxxboOJLCZvXPcqVq1K/nUkQPDZtLfP/425JP6BBc3kGEOI
+ alizq9oiHPphEY/v1RIAusi61PSV2fK2NeVKrV97Han+2ivDr6T4ZE+gyAmJ00QmHK6a
+ B4MD2JhGvT9M5ukDhO9/kwqFffnbUl+1ppID0FG7KUqi65H/Z+Gdxu1wm/Qof+62vQ2p
+ djfQ==
+X-Gm-Message-State: AJcUukf1g9vu+WdZIWxnk1sPb0biJgK4Zq42gHv+2QcBFBlEgr2UwEFW
+ tPBM4AM7edJFdB/Qt9Ev0gQ=
+X-Google-Smtp-Source: ALg8bN7DefFb9r+kRTFCRUxMnRCb2jxCddzSWYYkcXZREmCl0oq4M1VuRrjtSzH7qve+8RIUv4nlxw==
+X-Received: by 2002:a63:70c:: with SMTP id 12mr1315807pgh.352.1545377268946;
+ Thu, 20 Dec 2018 23:27:48 -0800 (PST)
 Received: from squirtle.lan (c-24-22-235-96.hsd1.wa.comcast.net.
  [24.22.235.96])
- by smtp.gmail.com with ESMTPSA id t90sm44971921pfj.23.2018.12.20.23.27.51
+ by smtp.gmail.com with ESMTPSA id t90sm44971921pfj.23.2018.12.20.23.27.46
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 20 Dec 2018 23:27:52 -0800 (PST)
+ Thu, 20 Dec 2018 23:27:48 -0800 (PST)
 From: Andrey Smirnov <andrew.smirnov@gmail.com>
 To: linux-pci@vger.kernel.org
-Subject: [PATCH 07/21] PCI: designware: Make use of IS_ALIGNED()
-Date: Thu, 20 Dec 2018 23:27:02 -0800
-Message-Id: <20181221072716.29017-8-andrew.smirnov@gmail.com>
+Subject: [PATCH 05/21] PCI: imx6: Remove PCIE_PL_PFLR_* constants
+Date: Thu, 20 Dec 2018 23:27:00 -0800
+Message-Id: <20181221072716.29017-6-andrew.smirnov@gmail.com>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20181221072716.29017-1-andrew.smirnov@gmail.com>
 References: <20181221072716.29017-1-andrew.smirnov@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181220_232802_815052_F63AC461 
-X-CRM114-Status: GOOD (  12.80  )
+X-CRM114-CacheID: sfid-20181220_232800_560952_EE26AF73 
+X-CRM114-Status: GOOD (  10.21  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,9 +108,9 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Make the intent a bit more clear as well as get rid of explicit
-arithmetic by using IS_ALIGNED() to determine if "addr" is aligned to
-"size". No functional change intended.
+Code using these constants was removed in commit a71280722eeb ("PCI:
+imx6: Remove LTSSM disable workaround"). No functional change
+intended.
 
 Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
@@ -126,31 +126,23 @@ Cc: linux-kernel@vger.kernel.org
 Cc: linux-pci@vger.kernel.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/pci/controller/dwc/pcie-designware.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/pci/controller/dwc/pci-imx6.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/drivers/pci/controller/dwc/pcie-designware.c b/drivers/pci/controller/dwc/pcie-designware.c
-index 93ef8c31fb39..67236379c61a 100644
---- a/drivers/pci/controller/dwc/pcie-designware.c
-+++ b/drivers/pci/controller/dwc/pcie-designware.c
-@@ -22,7 +22,7 @@
+diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+index 2265f4b40e39..60803f1f16f8 100644
+--- a/drivers/pci/controller/dwc/pci-imx6.c
++++ b/drivers/pci/controller/dwc/pci-imx6.c
+@@ -82,9 +82,6 @@ struct imx6_pcie {
  
- int dw_pcie_read(void __iomem *addr, int size, u32 *val)
- {
--	if ((uintptr_t)addr & (size - 1)) {
-+	if (!IS_ALIGNED((uintptr_t)addr, size)) {
- 		*val = 0;
- 		return PCIBIOS_BAD_REGISTER_NUMBER;
- 	}
-@@ -43,7 +43,7 @@ int dw_pcie_read(void __iomem *addr, int size, u32 *val)
- 
- int dw_pcie_write(void __iomem *addr, int size, u32 val)
- {
--	if ((uintptr_t)addr & (size - 1))
-+	if (!IS_ALIGNED((uintptr_t)addr, size))
- 		return PCIBIOS_BAD_REGISTER_NUMBER;
- 
- 	if (size == 4)
+ /* PCIe Port Logic registers (memory-mapped) */
+ #define PL_OFFSET 0x700
+-#define PCIE_PL_PFLR (PL_OFFSET + 0x08)
+-#define PCIE_PL_PFLR_LINK_STATE_MASK		(0x3f << 16)
+-#define PCIE_PL_PFLR_FORCE_LINK			(1 << 15)
+ #define PCIE_PHY_DEBUG_R0 (PL_OFFSET + 0x28)
+ #define PCIE_PHY_DEBUG_R1 (PL_OFFSET + 0x2c)
+ #define PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING	(1 << 29)
 -- 
 2.19.1
 
