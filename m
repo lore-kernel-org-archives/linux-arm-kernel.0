@@ -2,85 +2,123 @@ Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FROM,FROM_EXCESS_BASE64,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 64DDBC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 11:08:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5E7D3C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 11:18:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 29F2721908
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 11:08:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0EAC5218FD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 11:18:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i4v3l3yJ";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="dPKl4n9Y"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 29F2721908
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PMjECeqz";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="mMEhpCUN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0EAC5218FD
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=L56IDOMhlJORLtiEa3obw8bGpJo1qq7h+pRFPOJr/Og=; b=i4v3l3yJaa0i9L
-	JX5yl8vyuEsfrPZktFsEmX3LXz81ILlRAielyFqMAVBKXKDE3MA0wi2HnAHnn0xRJBYaQfIkJa1P6
-	aw/H6gqytu2FSSKW1Ebq/NISSW2/A93pLZ7XuGgOkXPR1MIfzGmt3YhFrIJXy/WXxJUcOff2Ef8v/
-	ZBWAEJqeMuLCU9NS9zyMS50ZtjLwIubLC655Kx9P+AAhL+bQIsDXjHLUZ3pL040j+PBrFDyRISB1D
-	eidxgOFRZmVm4FzXbF26+ysVxdfGsxqlGaESZxU3aDesLL0+Ue9UPQsdqRGsATnYUF/1gMggdlfxa
-	PXk997M7swP88h5Ny2jQ==;
+	List-Owner; bh=Qf5k/Y2OAnCnsCT8uRrwZ9J/LkeFfuvn3GBFGc6wkac=; b=PMjECeqzXamvtc
+	Y3fO/6q4pNodkDCwUWvRN6jc+eDyuJDos4wvT0iJCRlYQ9y+8WUQNUBexWfFtTgL6QUkdhfp0PftQ
+	MwaP/gri6niQ7oYygSgulpItF5YAoUw1hlbUiZ54qBa5PhjU4ZNkmi0jgmgFRQpHaHMwaS+t+kbUl
+	oUrUV5PiVnOsd7NKxWUYgJeHDFMcEYfMCIE17fu0+X9bNfOfBruGhuJJA/QJUomTj6IMhitD6ShA/
+	PiyFAIyQ9uYJPD4BqXooN3Br9A+Nf21/Oq9Kd52zhp1RcYySfbO8mSK1dDGntSa2YhBtKSZ5EyE6O
+	7t4m6zijIZeH7rwI6gxA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaIfG-00060y-H4; Fri, 21 Dec 2018 11:08:22 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+	id 1gaIop-0003nc-0x; Fri, 21 Dec 2018 11:18:15 +0000
+Received: from esa3.microchip.iphmx.com ([68.232.153.233])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaIfD-000606-Lq
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 11:08:21 +0000
-Received: by mail-wm1-x342.google.com with SMTP id n190so4934543wmd.0
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 21 Dec 2018 03:08:08 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc:content-transfer-encoding;
- bh=1jp1Ws1IdkETdpE/4LoStqL7EzwAyXIkAS6IH/WY904=;
- b=dPKl4n9Ym1z/DKrnolMo6TH4L5qUcxWk14B4fGQOT0qbyAZ/0EP4g8ygZdJvxIsZ2X
- 39Fom4RPTACmi6hUqvt32F8W1dOO/pWHZCZRMaNBN8ReKgmYwD6Rsryav9cGRkHF8eu7
- 3BLdpKtTgiLDu/xMrYYnvJeLZvNN7l7XLK2H4AVqle7GFhPtQtxR+aHZrpMmInGNVcY8
- tlo7Co5Y0fYpuVQ8C0jbMtjKsQfRKLYyssvR32S2lquuSAbVGF1GfEC8KqH2ejn0Qt9u
- Fl4dWTX74oUGNVqsda24aevM7UwbXWbB1kpi5DVv2A1n7qTbmUlsiUj6Llex3FE4rFp2
- SeAg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc:content-transfer-encoding;
- bh=1jp1Ws1IdkETdpE/4LoStqL7EzwAyXIkAS6IH/WY904=;
- b=hXPg5U+9cU/HFfMq8nnrQRBk0M9Rcnxuj5l25vR3dmfj/2MqbInva8LDFQdTJNOUu1
- 5MfKR/lrscAvtONKsyBkWJO3uk1Ax9sS8wiHbQyWLqVCS2fLBw2YZP/6QUreb6wfx2tV
- s9GVxvI7jd1LS7C644HAbeKd5Ar44KfjTuE8DgCGBR7wq860xpQvYj3Vr5RV3PY3Jw2s
- e6rt5LB/XO+3LpyumDMltr/uWyu2q+ltN6+loFyQG9uTK2f4YAid1N6b/3C1HJEbB0tr
- Nv3v4HuaHHQguJZVZjPnG2Ji5sR2FqDM9o3TjIgn/gnZ60ALI6Qx9rhZgpcvKrZ9oiss
- 5jLw==
-X-Gm-Message-State: AA+aEWaz6J4lY4g/jnvrjR716T1fEHTMDrrpFTjC0Y9OL1HbZH/3Klms
- lckAOZJni4TX4o/8KDlAl6jjWIArPlf5RaTHmgs=
-X-Google-Smtp-Source: ALg8bN50JfP05o9cFE3J91DIAmFWjbKKszSug5hSTZJTaexe8QXkBkeNsnkoZL5JdgDopHvId7z1mpmo7uxDmujYyho=
-X-Received: by 2002:a1c:c2d4:: with SMTP id s203mr2409108wmf.3.1545390487407; 
- Fri, 21 Dec 2018 03:08:07 -0800 (PST)
+ id 1gaIog-0003gZ-Cd
+ for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 11:18:08 +0000
+X-IronPort-AV: E=Sophos;i="5.56,381,1539673200"; d="scan'208";a="24670754"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa3.microchip.iphmx.com with ESMTP/TLS/AES128-SHA;
+ 21 Dec 2018 04:17:53 -0700
+Received: from NAM04-BN3-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.37) with Microsoft SMTP Server (TLS) id
+ 14.3.352.0; Fri, 21 Dec 2018 04:18:10 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=g4mHf4dk0HFn93tmLI3qQjKNl7LUo4XHeDUOOUy6kaQ=;
+ b=mMEhpCUNrfxS5ut4BZYGW9pM3+yDQ6NUwh3V4appaF4/VV0mqR6Utfb36ktbKmWKijP1QsyWpj6ALtFhmfIyKTIUboHAGvnrYdbzMW3eiVb8Ke3Q9yGv7UJhuJl9NFYF2/0s/+07gZv24WfHrMC3RYKZUa+gy9rhcEv9fYeS7LA=
+Received: from MWHPR11MB1662.namprd11.prod.outlook.com (10.172.55.15) by
+ MWHPR11MB1406.namprd11.prod.outlook.com (10.169.234.16) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1446.17; Fri, 21 Dec 2018 11:17:50 +0000
+Received: from MWHPR11MB1662.namprd11.prod.outlook.com
+ ([fe80::d4e0:49b4:1b0a:8ae6]) by MWHPR11MB1662.namprd11.prod.outlook.com
+ ([fe80::d4e0:49b4:1b0a:8ae6%6]) with mapi id 15.20.1446.022; Fri, 21 Dec 2018
+ 11:17:50 +0000
+From: <Nicolas.Ferre@microchip.com>
+To: <axel.lin@ingics.com>, <broonie@kernel.org>
+Subject: Re: [PATCH] regulator: mcp16502: Use #ifdef CONFIG_PM_SLEEP around
+ mcp16502_suspend/resume_noirq
+Thread-Topic: [PATCH] regulator: mcp16502: Use #ifdef CONFIG_PM_SLEEP around
+ mcp16502_suspend/resume_noirq
+Thread-Index: AQHUmR7P+RCUftXxtk+md7qXXbwhgQ==
+Date: Fri, 21 Dec 2018 11:17:50 +0000
+Message-ID: <3751abc0-1377-2a66-3fa9-7ceee93b7aab@microchip.com>
+References: <20181220131413.21922-1-axel.lin@ingics.com>
+In-Reply-To: <20181220131413.21922-1-axel.lin@ingics.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: CWLP265CA0124.GBRP265.PROD.OUTLOOK.COM
+ (2603:10a6:401:53::16) To MWHPR11MB1662.namprd11.prod.outlook.com
+ (2603:10b6:301:e::15)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Nicolas.Ferre@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [195.6.168.232]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; MWHPR11MB1406;
+ 6:lOJJyAd+pLtl8gc1EDGGUpzGP5LdHcjxE5WkYbKs+6mpwojNratm3qXtDzoEhcK8VvmPUmslByvm+nlhwm6Doz8a1GcTYy53rmzPKW3gqPaYbAxfCOiI6W57uC9YCPehEAnHwYjQtSSHVrlYnYCd4UpI2JER7RO2+hbLlASKpGK/Hp/5JJ5IH7mGTfFMrVbqXfibMBxDgA1PdZHMWbnwwJjGXy7R8u86OYmWOG0nVNhdGXocOEsyoJdSSWLjSZg96HrPEkUnuxnt0IexkqSuk2RdvB2+33g//yS7zbllNjV0cd5pX29+bAVWvD/ZZIfVwPNCtljxjybLyOx8G6TbKoAhzolXX3NmXrzr68TP9S24FI7P+XN+4VwYqUGKifoHJCFbDI/IH3lUuikafQEBnc5xdLmz7Ms1iJ3EuZKDed5BK+zCNdNc0k27MF0vOwlkscgE2zW/eIcPd+Lv17Z92w==;
+ 5:6n5LvdY8MrXcQ8qv5CikVhhO/GO5fn90DK3ERlsomzWrqnIqu1Rmz5IaoVDXm+DueqIGLeeEY9AuCIlemSFu39r19/64Jx5RcnIR/5UgbbQOiSN2B+3PZrKGTISp50hk11ylHKCyzaAZ5PK9nrCMpZYNMUNE7hVj97wwEOq42i8=;
+ 7:OhcO4nBCs4Wg8XhVLb11DqU1tkGYZbquPIXNrrRDEZtMpDJJdX8Cta4W0Q24MSQqzYpbXFvLnzgRwmmZzsROx9nlg6HR5C1uxmF+VUTd6gkzrGlxeBinkWrS8cXEcY63L7RQzG88Z3T596YhUIGKlA==
+x-ms-office365-filtering-correlation-id: 09ff3ace-44c8-4268-74ef-08d66735f169
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(2017052603328)(7153060)(7193020);
+ SRVR:MWHPR11MB1406; 
+x-ms-traffictypediagnostic: MWHPR11MB1406:
+x-microsoft-antispam-prvs: <MWHPR11MB14066CFD3BC3DBAB7D21BF38E0B80@MWHPR11MB1406.namprd11.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(3230021)(999002)(5005026)(6040522)(2401047)(8121501046)(3002001)(10201501046)(3231475)(944501520)(52105112)(93006095)(93001095)(149066)(150057)(6041310)(20161123564045)(20161123562045)(20161123558120)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123560045)(201708071742011)(7699051)(76991095);
+ SRVR:MWHPR11MB1406; BCL:0; PCL:0; RULEID:; SRVR:MWHPR11MB1406; 
+x-forefront-prvs: 0893636978
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(396003)(346002)(136003)(366004)(39860400002)(376002)(189003)(199004)(31696002)(305945005)(14454004)(86362001)(25786009)(106356001)(72206003)(6436002)(6246003)(8936002)(81156014)(8676002)(81166006)(478600001)(36756003)(71200400001)(71190400001)(6486002)(97736004)(2906002)(105586002)(6512007)(107886003)(186003)(3846002)(6116002)(53546011)(6506007)(386003)(229853002)(102836004)(76176011)(54906003)(5660300001)(4326008)(446003)(26005)(2616005)(53936002)(11346002)(476003)(486006)(316002)(66066001)(256004)(14444005)(52116002)(99286004)(31686004)(39060400002)(7736002)(68736007)(110136005);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:MWHPR11MB1406;
+ H:MWHPR11MB1662.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: VCJaI2zlQDv4CBLrbvXlsRZ6Uig+t7WxgRb0IC0pRkKunUd6KYhe/HIqy9Z8LEeYh2/6pcJtYJ86eadqbcjzkbKjI1RCYZHbMEAsLPXLwQB45rvtr11cwJpB7btNiCKamXn37Qac+BbsT5Qbbc+jdz/j6JLjqI24hYCY182r3qUD7q9G30fvuEt5sSFF+B5fUvQwBs4W7h1Z8Nrz5zZwMzjYHsoCkOP7KoSxUlsUPVq4JfJu76n1Nv53dhmQHhidOMkRTRj4bU/wRFDWKvU3c87qhEZZvtC92JJ1C3DOflcCjggtyQOUFao/WsOP2p7B
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+Content-ID: <28CAA01342A08E48998ED200641EEF62@namprd11.prod.outlook.com>
 MIME-Version: 1.0
-References: <20181218155744.19409-1-zajec5@gmail.com>
- <CACRpkdYoZtZci3BJ=-2AGr4vz7-OVJ9UwppYviMAiotBn2EU6Q@mail.gmail.com>
-In-Reply-To: <CACRpkdYoZtZci3BJ=-2AGr4vz7-OVJ9UwppYviMAiotBn2EU6Q@mail.gmail.com>
-From: =?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?= <zajec5@gmail.com>
-Date: Fri, 21 Dec 2018 12:07:56 +0100
-Message-ID: <CACna6rx2P3ncP6ekksxGVZGBJ6YQtsOFkv6eK0BTxvMDRHZHxg@mail.gmail.com>
-Subject: Re: [PATCH fixes 4.20] dt-bindings: pinctrl: bcm4708-pinmux: rework
- binding to use syscon
-To: Linus Walleij <linus.walleij@linaro.org>
+X-MS-Exchange-CrossTenant-Network-Message-Id: 09ff3ace-44c8-4268-74ef-08d66735f169
+X-MS-Exchange-CrossTenant-originalarrivaltime: 21 Dec 2018 11:17:50.6036 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR11MB1406
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_030819_736143_0BEEBC6F 
-X-CRM114-Status: GOOD (  22.13  )
+X-CRM114-CacheID: sfid-20181221_031806_534507_55159732 
+X-CRM114-Status: GOOD (  20.03  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,56 +130,78 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>, Florian Fainelli <f.fainelli@gmail.com>,
- Scott Branden <sbranden@broadcom.com>, Ray Jui <rjui@broadcom.com>,
- "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
- Rob Herring <robh+dt@kernel.org>,
- bcm-kernel-feedback-list <bcm-kernel-feedback-list@broadcom.com>,
- =?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?= <rafal@milecki.pl>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Andrei.Stefanescu@microchip.com, lgirdwood@gmail.com,
+ linux-kernel@vger.kernel.org, Ludovic.Desroches@microchip.com,
+ Claudiu.Beznea@microchip.com, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gRnJpLCAyMSBEZWMgMjAxOCBhdCAxMTo0NSwgTGludXMgV2FsbGVpaiA8bGludXMud2FsbGVp
-akBsaW5hcm8ub3JnPiB3cm90ZToKPiBPbiBUdWUsIERlYyAxOCwgMjAxOCBhdCA0OjU4IFBNIFJh
-ZmHFgiBNacWCZWNraSA8emFqZWM1QGdtYWlsLmNvbT4gd3JvdGU6Cj4KPiA+IEZyb206IFJhZmHF
-giBNacWCZWNraSA8cmFmYWxAbWlsZWNraS5wbD4KPiA+Cj4gPiBBcyBwb2ludGVkIGJ5IFJvYiwg
-Q1JVIGlzIGEga2luZCBvZiBibG9jayB0aGF0IGNhbid0IGJlIGd1YXJhbnRlZWQgdG8KPiA+IGhh
-dmUgZXZlcnl0aGluZyBleHBvc2VkIGFzIHN1Ym5vZGVzLiBJdCdzIGEgc2V0IG9mIHZhcmlvdXMg
-cmVnaXN0ZXJzCj4gPiB0aGF0IGFyZW4ndCB0aWVkIHRvIGFueSBzaW5nbGUgZGV2aWNlLiBJdCBj
-b3VsZCBiZSBkZXNjcmliZWQgbXVjaCBtb3JlCj4gPiBhY2N1cmF0ZWx5IGFzIE1GRCAoTXVsdGkt
-RnVuY3Rpb24gRGV2aWNlKS4KPiA+Cj4gPiBTb21lIGhhcmR3YXJlIGJsb2NrcyBtYXkgaW5kZWVk
-IHdhbnQgdG8gYWNjZXNzIGEgcmVnaXN0ZXIgb3IgdHdvIG9mIHRoZQo+ID4gQ1JVIHdoaWNoIHJl
-cXVpcmVzIGRlc2NyaWJpbmcgaXQgYXMgdGhlICJzeXNjb24iLgo+ID4KPiA+IFdoaWxlIGF0IGl0
-IHJlcGxhY2UgZXhtcGxlIG5vZGUgbmFtZSB3aXRoIHRoZSBzdGFuZGFyZCAicGluY3RybCIgKGFs
-c28KPiA+IHBvaW50ZWQgb3V0IGJ5IFJvYikuCj4gPgo+ID4gU2lnbmVkLW9mZi1ieTogUmFmYcWC
-IE1pxYJlY2tpIDxyYWZhbEBtaWxlY2tpLnBsPgo+ID4gLS0tCj4gPiBIaSBMaW51cywKPiA+Cj4g
-PiBBZnRlciBiZWluZyBwaW5nZWQgYWJvdXQgdGhlIHBpbmN0cmwgZHJpdmVyIEkgcmVhbGl6ZWQg
-SSBuZXZlciBhZGRyZXNzZWQKPiA+IFJvYidzIGNvbW1lbnRzIGZyb20gdGhlIGUtbWFpbCB0aHJl
-YWQ6Cj4gPgo+ID4gW1BBVENIXSBkdC1iaW5kaW5nczogcGluY3RybDogYmNtNDcwOC1waW5tdXg6
-IGltcHJvdmUgZXhhbXBsZSBiaW5kaW5nCj4gPiBodHRwczovL3d3dy5zcGluaWNzLm5ldC9saXN0
-cy9hcm0ta2VybmVsL21zZzY4MjgzOC5odG1sCj4gPiBodHRwczovL3BhdGNod29yay5vemxhYnMu
-b3JnL3BhdGNoLzk4NDAyNC8KPiA+Cj4gPiBSb2IgaGFzIHBvaW50ZWQgY29ycmVjdGx5IChhcyBh
-bHdheXMpIHRoYXQgZGVzY3JpYmluZyBDUlUgdXNpbmcKPiA+ICJzaW1wbGUtYnVzIiBoYXMgaXRz
-IGltcGxpY2F0aW9ucyBhbmQgbWF5IGh1bnQgdXMgYmFjayBpZiB3ZSBldmVyCj4gPiByZWFsaXpl
-IHdlIHdpbGwgd2FudCB0byByZWZlcmVuY2UgaXQgYXMgInN5c2NvbiIuIFRoYXQgaXMgcHJldHR5
-IGxpa2VseQo+ID4gYWN0dWFsbHkuCj4gPgo+ID4gVG8gZml4IHRoYXQgd2hpbGUgc3RpbGwgcG9z
-c2libGUgKGJlZm9yZSBoYXZpbmcgdGhhdCBEb2N1bWVudGF0aW9uIGluCj4gPiBhbnkgc3RhYmxl
-IHJlbGVhc2UpIEknZCBsaWtlIHlvdSB0byBjb25zaWRlciB0YWtpbmcgdGhpcyBwYXRjaCBmb3Ig
-dGhlCj4gPiA0LjIwIHJlbGVhc2UgaWYgeW91IGZpbmQgaXQgcG9zc2libGUuCj4gPgo+ID4gSSdt
-IHdlbGwgYXdhcmUgaXQncyBkYW1uIGxhdGUuIEknbSBhd2FyZSBJJ3ZlIHNjcmV3ZWQgdXAuIEkn
-bSBzb3JyeS4KPiA+Cj4gPiBJJ20gYWZyYWlkIEkgY2Fubm90IGZpeCBpdCBhbnlob3cuIEp1c3Qg
-dGFrZSBhIGxvb2sgYXQgdGhhdCBwYXRjaCBhbmQKPiA+IGZlZWwgZnJlZSB0byBzYXkgSSdtIGNy
-YXp5IGNvbWluZyB3aXRoIGl0IHNvIGxhdGUuCj4KPiBJIGp1c3QgYXBwbGllZCBpdC4gSXQncyBu
-b3QgbGlrZSBpdCdzIGV0Y2hlZCBpbiBzdG9uZSB0aG91Z2ggc29tZQo+IHBlb3BsZSBtYXkgaGF2
-ZSB0aGF0IG1lbnRhbCBtb2RlbC4KPgo+IElmIHRoZSBEVCBtYWludGFpbmVycyBoYXZlIGZ1cnRo
-ZXIgY29uY2VybnMgd2UgY2FuIHBhdGNoIGl0Cj4gYWdhaW4uCj4KPiBSb3VnaCBjb25zZW5zdXMg
-YW5kIHJ1bm5pbmcgY29kZS4KClRoYW5rIHlvdSwgSSBhcHByZWNpYXRlIGl0IQoKLS0gClJhZmHF
-ggoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgt
-YXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQu
-b3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJt
-LWtlcm5lbAo=
+On 20/12/2018 at 14:14, Axel Lin wrote:
+> mcp16502_suspend/resume_noirq is only used by SET_NOIRQ_SYSTEM_SLEEP_PM_OPS
+> when CONFIG_PM_SLEEP is defined.
+> So use #ifdef CONFIG_PM_SLEEP instead CONFIG_SUSPEND guard.
+> 
+> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+
+I'm not against this patch and don't know the habits about this... one 
+remark below...
+
+
+> ---
+> This patch replaces below patch I sent today.
+> regulator: mcp16502: Fix build error when !CONFIG_SUSPEND && CONFIG_PM_SLEEP
+> Changed the subject line because after commit 308144ce8e51 ("regulator: mcp16502: code cleanup")
+> it's not related to build error now.
+> 
+>   drivers/regulator/mcp16502.c | 7 ++-----
+>   1 file changed, 2 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/regulator/mcp16502.c b/drivers/regulator/mcp16502.c
+> index 809a664733a4..cb11fb206899 100644
+> --- a/drivers/regulator/mcp16502.c
+> +++ b/drivers/regulator/mcp16502.c
+> @@ -497,7 +497,7 @@ static int mcp16502_probe(struct i2c_client *client,
+>   	return 0;
+>   }
+>   
+> -#ifdef CONFIG_SUSPEND
+> +#ifdef CONFIG_PM_SLEEP
+
+Why not use CONFIG_PM just like ...
+
+>   static int mcp16502_suspend_noirq(struct device *dev)
+>   {
+>   	struct i2c_client *client = to_i2c_client(dev);
+> @@ -517,10 +517,7 @@ static int mcp16502_resume_noirq(struct device *dev)
+>   
+>   	return 0;
+>   }
+> -#else /* !CONFIG_SUSPEND */
+> -#define mcp16502_suspend_noirq NULL
+> -#define mcp16502_resume_noirq NULL
+> -#endif /* !CONFIG_SUSPEND */
+> +#endif
+>   
+>   #ifdef CONFIG_PM
+
+... here.... or unify both directives to "CONFIG_PM_SLEEP" ?
+
+
+Otherwise, no problem in adding my:
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+
+(as Andrei is not with Microchip anymore).
+
+
+>   static const struct dev_pm_ops mcp16502_pm_ops = {
+> 
+
+
+-- 
+Nicolas Ferre
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
