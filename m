@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A8BCFC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 22 Dec 2018 20:27:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D907DC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 22 Dec 2018 20:27:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5AAFC21934
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 22 Dec 2018 20:27:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 917D921934
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 22 Dec 2018 20:27:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lCcCFbNi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5AAFC21934
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NooiLaDv"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 917D921934
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sang-engineering.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,35 +25,34 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DrmFAocQrTEKmAqmzSgzJrkR3q3gXJbXzR8+sJ2qxPw=; b=lCcCFbNi+fSG7O
-	IB5UOJfSvwAk63+Kpw0ugYDRBnZZ8VVrHwTzEw9kj6yB8eIXsrJ+bL5U6RdI7V2b+jdC2CnP2S9z1
-	8oz81L8LDAHn4mfmR97Tl4VzfrmDx4MP61+sWmW/q1oq+U/Z1tWn47b5EHmPKWj5edYlvmHLBcjOf
-	X7hN927n+ScW/SAdaqarCtxpeNXgkykJaKZ/+DsDE23ZIWqdAYegu3O3nYBtBFsWtlvOYBStCYKtm
-	CDyBGu4OfNyg1FtvBh4SThME2mfj+2vn5xPiJIv6mGPOyvWNDrvWu+Ef+5Fo4ROQU5Rc8uYhjfytd
-	IU7scHxAJa0td2QUCGLw==;
+	List-Owner; bh=G4+lSNTGd8EELZmS9FqlM/u+4Fx53UKtMmqhOH5q+oM=; b=NooiLaDvM/P1fc
+	x16PEvduuOY2G6x8ECAQHgRY0evqwoY7ykHlccNlqRrm06tQzEwGCYSb5jwbsQ/krtV50hT3p9YXw
+	mw7YcF4IbEj5FJRWKsSJtjDBgb8G6WLNEN3bRB21ZBsc+4+q+bwefLvB4YJizkyDkHuGNVtayQ2NF
+	GVa3wv92wJwZOt56xqsk5HLHVPIjNZPgh8/qMMkHQwsfE0hpB0TOTZskunR54WyoeI8237g5Q2YT/
+	ptOKBI+tEw1aayiGMUee/4VzyBYVjgjxxULo9bE8KCqkNGQF6R8PSl+/qbDFRegYEbLYO8AyXJOFy
+	T5ylO8BepCNX9JpjktCA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ganrf-0000AN-JA; Sat, 22 Dec 2018 20:27:15 +0000
+	id 1ganrs-0000Oq-VP; Sat, 22 Dec 2018 20:27:28 +0000
 Received: from sauhun.de ([88.99.104.3] helo=pokefinder.org)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ganrD-000884-8p
- for linux-arm-kernel@lists.infradead.org; Sat, 22 Dec 2018 20:26:48 +0000
+ id 1ganrD-00088A-8q
+ for linux-arm-kernel@lists.infradead.org; Sat, 22 Dec 2018 20:26:49 +0000
 Received: from localhost (p54B67A8B.dip0.t-ipconnect.de [84.182.122.139])
- by pokefinder.org (Postfix) with ESMTPSA id E27E42E3560;
- Sat, 22 Dec 2018 21:26:31 +0100 (CET)
+ by pokefinder.org (Postfix) with ESMTPSA id 81B1C2E35D0;
+ Sat, 22 Dec 2018 21:26:34 +0100 (CET)
 From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 To: linux-i2c@vger.kernel.org
-Subject: [PATCH v2 1/9] PM / core: add helper to return suspend status of a
- device
-Date: Sat, 22 Dec 2018 21:26:15 +0100
-Message-Id: <20181222202623.4521-2-wsa+renesas@sang-engineering.com>
+Subject: [PATCH v2 3/9] i2c: synquacer: remove unused is_suspended flag
+Date: Sat, 22 Dec 2018 21:26:17 +0100
+Message-Id: <20181222202623.4521-4-wsa+renesas@sang-engineering.com>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20181222202623.4521-1-wsa+renesas@sang-engineering.com>
 References: <20181222202623.4521-1-wsa+renesas@sang-engineering.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181222_122647_464673_9BBAE2B8 
-X-CRM114-Status: UNSURE (   8.83  )
+X-CRM114-CacheID: sfid-20181222_122647_468308_464275BC 
+X-CRM114-Status: UNSURE (   8.66  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -66,7 +65,8 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>, linux-pm@vger.kernel.org,
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Wolfram Sang <wsa+renesas@sang-engineering.com>, linux-pm@vger.kernel.org,
  linux-kernel@vger.kernel.org, linux-renesas-soc@vger.kernel.org,
  Hans de Goede <hdegoede@redhat.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
@@ -74,30 +74,37 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-I2C core would like this to reject transfers on an already suspended
-adapter.
+This flag was defined and checked but never set a value. Remove it.
 
 Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- include/linux/device.h | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/i2c/busses/i2c-synquacer.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/include/linux/device.h b/include/linux/device.h
-index 1b25c7a43f4c..e63d3e06989f 100644
---- a/include/linux/device.h
-+++ b/include/linux/device.h
-@@ -1138,6 +1138,11 @@ static inline int device_is_registered(struct device *dev)
- 	return dev->kobj.state_in_sysfs;
- }
+diff --git a/drivers/i2c/busses/i2c-synquacer.c b/drivers/i2c/busses/i2c-synquacer.c
+index 2184b7c3580e..d18b0941b71a 100644
+--- a/drivers/i2c/busses/i2c-synquacer.c
++++ b/drivers/i2c/busses/i2c-synquacer.c
+@@ -144,8 +144,6 @@ struct synquacer_i2c {
+ 	u32			timeout_ms;
+ 	enum i2c_state		state;
+ 	struct i2c_adapter	adapter;
+-
+-	bool			is_suspended;
+ };
  
-+static inline bool device_is_suspended(struct device *dev)
-+{
-+	return dev->power.is_suspended;
-+}
-+
- static inline void device_enable_async_suspend(struct device *dev)
- {
- 	if (!dev->power.is_prepared)
+ static inline int is_lastmsg(struct synquacer_i2c *i2c)
+@@ -316,9 +314,6 @@ static int synquacer_i2c_doxfer(struct synquacer_i2c *i2c,
+ 	unsigned long timeout;
+ 	int ret;
+ 
+-	if (i2c->is_suspended)
+-		return -EBUSY;
+-
+ 	synquacer_i2c_hw_init(i2c);
+ 	bsr = readb(i2c->base + SYNQUACER_I2C_REG_BSR);
+ 	if (bsr & SYNQUACER_I2C_BSR_BB) {
 -- 
 2.19.1
 
