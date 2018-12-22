@@ -2,73 +2,55 @@ Return-Path: <SRS0=zEjV=O7=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,T_DKIMWL_WL_HIGH,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.9 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	SPF_PASS,T_DKIMWL_WL_HIGH,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E002FC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 22 Dec 2018 18:50:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 200C2C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 22 Dec 2018 20:26:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ABFE521934
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 22 Dec 2018 18:50:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DD6F22195D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 22 Dec 2018 20:26:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CmrNQGCy";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="IjnT/BUS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ABFE521934
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Qdo/N2r5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DD6F22195D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sang-engineering.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KFKx/rhOUIEQvcah9dCZvTHm+iz1rE03VFl+1VLezeE=; b=CmrNQGCyqOMI1G
-	fLZaAuhH+5ikDLnnoNqnh8vvojeaDCPHbgwYCl0xYqhSRNPrO2DNY76AOBQcIcK+xVGAPtgNT2Jxg
-	wVDUhaMrO+0Wf43dDSSPpw9VtL6HdCQ6M0eg7WeOxWqz7iHrMamBevCNMwJArkg6n1SK1yAk/VkIg
-	FK1cZOMQ0wEcfd7ABLJ1h4I1xUNc5DXctupoy/WwXtVjbNBKz7jyv+03m7GpFTG5bDAcWpoyutR5U
-	j4PbS6oZxukUTJOpdZY1e1tmwnantnxuPEeUlWSPNG3vqpvgsFyJqHmdAjiJoS9q2DQXkE3nTb17A
-	8uvmSDwtqg4uwGccamlQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=N6AxbmpcK2NAl7C/SvRMik+Qf5Fbj/F+yoQyn8wnTdg=; b=Qdo/N2r5tpx6t+
+	nwjkNdBBueHl0P/OO/7iMqMrJqCoIMCG5hJ/Uf/jL15kbqpCaCQlqfYYE2O4ykV0y+dGjcHcxL0Zz
+	YTLWYCU+SrpT9RUcMnzDd3HMhU5kegRK5P25ECHp6MiqcysuxfozkiB9uD9bX4U74e6Yf3J+DZyzD
+	sJE+0lSjJpXb/K8prXG7B3HVeDQxYWjnhGdYCJiK2vyA62Q8i+fba0trDcQK6qP3WHCVBCdP4p4x+
+	vOVQpgnEV7jmfLnAa/tagwGiPYueGFQDqk9Bmi6OdsXTZfHYDJ1LFX+iuhTahSPNAK72ZjOBN0pzv
+	tInYhhEutcKs8UNETHKQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gamLw-0005jh-I1; Sat, 22 Dec 2018 18:50:24 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gamLt-0005ii-W1; Sat, 22 Dec 2018 18:50:23 +0000
-Received: from mail-wr1-f52.google.com (mail-wr1-f52.google.com
- [209.85.221.52])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 55D8D21934;
- Sat, 22 Dec 2018 18:50:10 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1545504610;
- bh=EXOANm6tkF2VD+tusHpxMKU/XXyEeaq1YvVk9+PsR00=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=IjnT/BUShlBgikHhMQLg+sH3RlMO7frzPfTSNuVzGbVipnr7dpDk/V10vH0qch2PQ
- MOiDwz3V2GQRoVnvrsAiKuxC4hT4V+2wKxKtWg+qe+zWNE+FeizauxJAeD5jaxQurk
- yZz70wuj6FQKifDcloWEGLkGXzWmLz1lgO9n+Qhw=
-Received: by mail-wr1-f52.google.com with SMTP id z5so8288654wrt.11;
- Sat, 22 Dec 2018 10:50:10 -0800 (PST)
-X-Gm-Message-State: AJcUukcVjXZVpMcLIP4DY985yhcRm6r4bAtU9pelP2kkP/4x03MNWf80
- Kai7EeKjnJ6Z3Whf1muHaNTcEBzM+UvPCXSDEQQ=
-X-Google-Smtp-Source: ALg8bN5lX4dZDF6anLCJlQsv8WTedtCVif7l7EUPUCJupBT0ZhY6oI2B03/yp2mobzDw6+eDiDQOys68duHtxfjBaZ0=
-X-Received: by 2002:a5d:66c1:: with SMTP id k1mr6691953wrw.132.1545504608825; 
- Sat, 22 Dec 2018 10:50:08 -0800 (PST)
+	id 1ganrF-0008B6-Cq; Sat, 22 Dec 2018 20:26:49 +0000
+Received: from sauhun.de ([88.99.104.3] helo=pokefinder.org)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ganrA-000880-Te
+ for linux-arm-kernel@lists.infradead.org; Sat, 22 Dec 2018 20:26:47 +0000
+Received: from localhost (p54B67A8B.dip0.t-ipconnect.de [84.182.122.139])
+ by pokefinder.org (Postfix) with ESMTPSA id 208C22E3542;
+ Sat, 22 Dec 2018 21:26:30 +0100 (CET)
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+To: linux-i2c@vger.kernel.org
+Subject: [PATCH v2 0/9] i2c: move handling of suspended adapters to the core
+Date: Sat, 22 Dec 2018 21:26:14 +0100
+Message-Id: <20181222202623.4521-1-wsa+renesas@sang-engineering.com>
+X-Mailer: git-send-email 2.19.1
 MIME-Version: 1.0
-References: <1545100282-15756-1-git-send-email-chuanjia.liu@mediatek.com>
-In-Reply-To: <1545100282-15756-1-git-send-email-chuanjia.liu@mediatek.com>
-From: Sean Wang <sean.wang@kernel.org>
-Date: Sat, 22 Dec 2018 10:50:01 -0800
-X-Gmail-Original-Message-ID: <CAGp9Lzoo6bw-3Hr56rgbL6EhrRvXX2y5pajaOo13c5MV9FsO7Q@mail.gmail.com>
-Message-ID: <CAGp9Lzoo6bw-3Hr56rgbL6EhrRvXX2y5pajaOo13c5MV9FsO7Q@mail.gmail.com>
-Subject: Re: [PATCH v2] pinctrl:mediatek:add judgment conditions
-To: chuanjia.liu@mediatek.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181222_105022_050665_06AC4E07 
-X-CRM114-Status: GOOD (  18.69  )
+X-CRM114-CacheID: sfid-20181222_122645_102054_48102EF0 
+X-CRM114-Status: GOOD (  10.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,70 +62,65 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: youlin.pei@mediatek.com, zhiyong.tao@mediatek.com,
- Linus Walleij <linus.walleij@linaro.org>, linux-kernel@vger.kernel.org,
- linux-gpio@vger.kernel.org, linux-mediatek@lists.infradead.org,
- hailong.fan@mediatek.com, Matthias Brugger <matthias.bgg@gmail.com>,
- eddie.huang@mediatek.com, linux-arm-kernel@lists.infradead.org
+Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>, linux-pm@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-renesas-soc@vger.kernel.org,
+ Hans de Goede <hdegoede@redhat.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 17, 2018 at 6:32 PM <chuanjia.liu@mediatek.com> wrote:
->
+Here is the new version without specific I2C helpers but using the
+'is_suspended' flag from the PM core. I didn't like messing with the
+flag directly, so I did a helper in patch 1. So far, I like the
+approach. The diffstat looks nice, and i2c-rcar.c and i2c-sh_mobile.c
+rejected rightfully too later transfers without further modifications.
+Tested on a Renesas Lager board (R-Car H2).
 
-I thought the subject still is much general, it should be further
-improved with something like "add EINT support to virtual GPIOs" and
-should say more about what virtual GPIOs means by MTKers in the patch
-description because "virtual" is a usual term used throughout the
-kernel and that would easily cause others to fail to interpret
-correctly.
+I dropped a few Tested-by tags because I think this approach is too
+different from V1 to keep them. I hope you guys can have a look again.
+Thanks for all the testing, so far!
 
-> From: Chuanjia Liu <Chuanjia.Liu@mediatek.com>
->
-> This patch avoid return err when virtual gpio set SMT.
->
-> Signed-off-by: Chuanjia Liu <Chuanjia.Liu@mediatek.com>
-> ---
-> change note:
-> v2 : 1. delete virtual gpio number
->      2. add judgment conditions
-> ---
->  drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
-> index 4a9e0d4c2bbc..a576e417744a 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
-> @@ -290,7 +290,11 @@ static int mtk_xt_set_gpio_as_eint(void *data, unsigned long eint_n)
->                 return err;
->
->         err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_SMT, MTK_ENABLE);
-> -       if (err)
-> +
-> +       /* SMT doesn't support virtual GPIO, add err != -ENOTSUPP is used for
-> +        * avoid return err when virtual gpio set SMT.
-> +        */
+A branch can be found here:
 
-I'd prefer to the comments as the below
+git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git renesas/i2c/reject-when-suspended
 
-/*
-SMT is supposed to be supported by every real GPIO and doesn't support
-virtual GPIOs, so the extra condition err != -ENOTSUPP is just for
-adding EINT support to these virtual GPIOs. It should add an extra
-flag in the pin descriptor when more pins with distinctive
-characteristic come out.
-*/
+If this series is acceptable, I'd suggest to take it via my i2c tree
+after rc1. And then I'll provide an immutable branch for the PM tree to
+pick. Let me know if this works for you.
 
-> +       if (err && err != -ENOTSUPP)
->                 return err;
->
->         return 0;
-> --
-> 2.19.1
->
+And thanks to Renesas for funding this work!
+
+Thanks and kind regards,
+
+   Wolfram
+
+Wolfram Sang (9):
+  PM / core: add helper to return suspend status of a device
+  i2c: reject new transfers when adapters are suspended
+  i2c: synquacer: remove unused is_suspended flag
+  i2c: brcmstb: don't open code to reject transfers when suspended
+  i2c: zx2967: don't open code to reject transfers when suspended
+  i2c: sprd: don't use pdev as variable name for struct device *
+  i2c: sprd: don't open code to reject transfers when suspended
+  i2c: exynos5: don't open code to reject transfers when suspended
+  i2c: s3c2410: don't open code to reject transfers when suspended
+
+ Documentation/i2c/fault-codes      |  4 ++++
+ drivers/i2c/busses/i2c-brcmstb.c   | 22 +-------------------
+ drivers/i2c/busses/i2c-exynos5.c   | 10 ----------
+ drivers/i2c/busses/i2c-s3c2410.c   |  7 -------
+ drivers/i2c/busses/i2c-sprd.c      | 32 ++++++++++--------------------
+ drivers/i2c/busses/i2c-synquacer.c |  5 -----
+ drivers/i2c/busses/i2c-zx2967.c    |  8 --------
+ drivers/i2c/i2c-core-base.c        |  3 +++
+ drivers/i2c/i2c-core-smbus.c       |  4 ++++
+ include/linux/device.h             |  5 +++++
+ 10 files changed, 27 insertions(+), 73 deletions(-)
+
+-- 
+2.19.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
