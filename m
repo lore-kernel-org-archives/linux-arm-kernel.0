@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	SPF_PASS,T_DKIMWL_WL_HIGH,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6B234C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 22 Dec 2018 20:28:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A91A2C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 22 Dec 2018 20:28:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2E22621934
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 22 Dec 2018 20:28:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7330C21934
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 22 Dec 2018 20:28:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="g6OzOdXp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2E22621934
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JUEsPjOr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7330C21934
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sang-engineering.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,36 +25,35 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DMXN/QZq3mX1TH/iHL1GKDcJpEVH6b52mB+IR7dhzIM=; b=g6OzOdXpdJs2Nl
-	OeqMJO7l0hC1CPUUtASbdIcruB/rhTj9GyZw7+WfD6nb4fXTUAaJTUStCBHz8g6BWpa8iYf6K1WTd
-	weQzY/8PucQPA2vxq80T3ZCQwJjt7YwSJRq2AavEoJpZOE8i256TxgJTDZy9eCYGDD48pQvyHYzLz
-	KLP2VBr8cuLfhh8KcGfxGtkhSkK/MqHJPeUxEKk1BYSKQUDt09RSGDcWeCTDkHxSTI6wwqLSxEm0f
-	ejY05zUzCiDwfTNi9XJVU+1Fvf3QY0YDkHc04rnGPU3PHDtutM/EKE0FThgdlDWDBARdkO3VxehLJ
-	yPN/r0BvKZwGoWY/oPzA==;
+	List-Owner; bh=c432Qr41uZI8YV1B2zD8QnC/mvAmDlaCj7AJDcaxwxY=; b=JUEsPjOrwkzF4A
+	2+i8cDvzGquL/p1QVHXbXt5zTe5qg4rJOJs/2BnJ1AFbsiw4XEr+Z9tr7sE796SzwuahGv5kKvWBz
+	FsdvfzUaavsXC437QLP6A/kHLQc5YtiE+xCkWhFbS7FzW3HjaBmeEqAadW2exLinK+eE7UDXGahmX
+	SP+OWpK8XLQCK0xM7eQ617SEGaCNdnPrhrl+W8FewmaWYytJ2dGNbTjiMBtpq166WOZPSd28iHcBW
+	Dv5ERW6mrQ7HUj7y0y9gNair5hU9yAS0TYSm85Dz62i3gi7j9ynNegy+eCF68GekZ8xnWEUSP9s1k
+	LVzK+PclY0ejrRIYKQuA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gansk-0001Ma-Vs; Sat, 22 Dec 2018 20:28:23 +0000
+	id 1gansx-0001Zb-O7; Sat, 22 Dec 2018 20:28:35 +0000
 Received: from sauhun.de ([88.99.104.3] helo=pokefinder.org)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ganrN-0008Aa-Oy
+ id 1ganrN-0008BL-Ov
  for linux-arm-kernel@lists.infradead.org; Sat, 22 Dec 2018 20:27:02 +0000
 Received: from localhost (p54B67A8B.dip0.t-ipconnect.de [84.182.122.139])
- by pokefinder.org (Postfix) with ESMTPSA id 8B3232E35D2;
- Sat, 22 Dec 2018 21:26:36 +0100 (CET)
+ by pokefinder.org (Postfix) with ESMTPSA id AEB4A2E3606;
+ Sat, 22 Dec 2018 21:26:40 +0100 (CET)
 From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 To: linux-i2c@vger.kernel.org
-Subject: [PATCH v2 5/9] i2c: zx2967: don't open code to reject transfers when
+Subject: [PATCH v2 9/9] i2c: s3c2410: don't open code to reject transfers when
  suspended
-Date: Sat, 22 Dec 2018 21:26:19 +0100
-Message-Id: <20181222202623.4521-6-wsa+renesas@sang-engineering.com>
+Date: Sat, 22 Dec 2018 21:26:23 +0100
+Message-Id: <20181222202623.4521-10-wsa+renesas@sang-engineering.com>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20181222202623.4521-1-wsa+renesas@sang-engineering.com>
 References: <20181222202623.4521-1-wsa+renesas@sang-engineering.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181222_122658_124819_CBADE102 
-X-CRM114-Status: UNSURE (   9.43  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181222_122658_222331_41C6F613 
+X-CRM114-Status: GOOD (  10.19  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -66,10 +65,11 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>, linux-pm@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-renesas-soc@vger.kernel.org,
- Hans de Goede <hdegoede@redhat.com>, Jun Nie <jun.nie@linaro.org>,
- Shawn Guo <shawnguo@kernel.org>, linux-arm-kernel@lists.infradead.org
+Cc: linux-samsung-soc@vger.kernel.org,
+ Wolfram Sang <wsa+renesas@sang-engineering.com>, linux-pm@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Krzysztof Kozlowski <krzk@kernel.org>,
+ linux-renesas-soc@vger.kernel.org, Hans de Goede <hdegoede@redhat.com>,
+ Kukjin Kim <kgene@kernel.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
@@ -79,51 +79,48 @@ This is handled by the I2C core meanwhile.
 
 Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- drivers/i2c/busses/i2c-zx2967.c | 8 --------
- 1 file changed, 8 deletions(-)
+ drivers/i2c/busses/i2c-s3c2410.c | 7 -------
+ 1 file changed, 7 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-zx2967.c b/drivers/i2c/busses/i2c-zx2967.c
-index b8f9e020d80e..cb1f45647a8b 100644
---- a/drivers/i2c/busses/i2c-zx2967.c
-+++ b/drivers/i2c/busses/i2c-zx2967.c
-@@ -66,7 +66,6 @@ struct zx2967_i2c {
- 	int			msg_rd;
- 	u8			*cur_trans;
- 	u8			access_cnt;
--	bool			is_suspended;
- 	int			error;
- };
+diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
+index 2f2e28d60ef5..eeccd19b5f42 100644
+--- a/drivers/i2c/busses/i2c-s3c2410.c
++++ b/drivers/i2c/busses/i2c-s3c2410.c
+@@ -104,7 +104,6 @@ enum s3c24xx_i2c_state {
+ struct s3c24xx_i2c {
+ 	wait_queue_head_t	wait;
+ 	kernel_ulong_t		quirks;
+-	unsigned int		suspended:1;
  
-@@ -313,9 +312,6 @@ static int zx2967_i2c_xfer(struct i2c_adapter *adap,
+ 	struct i2c_msg		*msg;
+ 	unsigned int		msg_num;
+@@ -703,9 +702,6 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
+ 	unsigned long timeout;
  	int ret;
- 	int i;
  
--	if (i2c->is_suspended)
--		return -EBUSY;
+-	if (i2c->suspended)
+-		return -EIO;
 -
- 	zx2967_set_addr(i2c, msgs->addr);
- 
- 	for (i = 0; i < num; i++) {
-@@ -470,9 +466,7 @@ static int __maybe_unused zx2967_i2c_suspend(struct device *dev)
+ 	ret = s3c24xx_i2c_set_master(i2c);
+ 	if (ret != 0) {
+ 		dev_err(i2c->dev, "cannot get bus (error %d)\n", ret);
+@@ -1246,8 +1242,6 @@ static int s3c24xx_i2c_suspend_noirq(struct device *dev)
  {
- 	struct zx2967_i2c *i2c = dev_get_drvdata(dev);
+ 	struct s3c24xx_i2c *i2c = dev_get_drvdata(dev);
  
--	i2c->is_suspended = true;
- 	clk_disable_unprepare(i2c->clk);
+-	i2c->suspended = 1;
 -
+ 	if (!IS_ERR(i2c->sysreg))
+ 		regmap_read(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, &i2c->sys_i2c_cfg);
+ 
+@@ -1267,7 +1261,6 @@ static int s3c24xx_i2c_resume_noirq(struct device *dev)
+ 		return ret;
+ 	s3c24xx_i2c_init(i2c);
+ 	clk_disable(i2c->clk);
+-	i2c->suspended = 0;
+ 
  	return 0;
  }
- 
-@@ -480,9 +474,7 @@ static int __maybe_unused zx2967_i2c_resume(struct device *dev)
- {
- 	struct zx2967_i2c *i2c = dev_get_drvdata(dev);
- 
--	i2c->is_suspended = false;
- 	clk_prepare_enable(i2c->clk);
--
- 	return 0;
- }
- 
 -- 
 2.19.1
 
