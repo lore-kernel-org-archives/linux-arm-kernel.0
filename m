@@ -1,91 +1,82 @@
-Return-Path: <SRS0=7qzz=O6=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
+Return-Path: <SRS0=zEjV=O7=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
-	autolearn_force=no version=3.4.0
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 92CFBC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 23:13:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5A32DC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 22 Dec 2018 00:32:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 624522190A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 21 Dec 2018 23:13:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 277042190A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 22 Dec 2018 00:32:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ILkHiOBe";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="tcHZIDOA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 624522190A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FtngkYHM";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="jMLHjyyW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 277042190A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
-	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=b4w3uuaZHvHZ9i7KrtxePfhjXytICkhEO2B5fWFfCCk=; b=ILkHiOBeI5qL8F
-	zGjO5m2j5gw/1pb0vyo+JeJOGVXRAvVvLqx2/3ZYfteuCsESo86ojjVskIIOhxLjBHXdsvJ9PtH6a
-	qDwPJG7uCwsgW6VjWv0kdnoQP03PExf8+M2FTMX7H1tQ7e9AMYFnYgt+rjwJ6WK83vgb/pXm5Lebh
-	C62Mrzah4hIVABOljA8jvtVNLZ64qiawcnIO8XVXlRb0cdbihPFDfsfN7VpIzCFOQoHyxyaTmSr2u
-	Gzoc7KTZ+77qFE0nygTMLjKQaoxS8qUG4+aEPIEO/0d47dhtRCycdiFOydPEgJA68YGpwg0bx7rN6
-	V+6JRHY7Cx1F1Wp0L3Ow==;
+	List-Owner; bh=d/d4mfzL2UlgST+e685TWpqUKkWMHgthIsVQianTZfI=; b=FtngkYHMWXyueY
+	XrLmhDBOx/OfioCQs/C6T0eU0uoFvwNn3YinX1UO8XD7LLO7smLYnjFemQElaen78f1wah+ZPQeIO
+	AddNLXdOm6K+7qqejiazJfSOfbG+cXUMrBrXVZ5blIb4eG61/kzFIIHv1eD3sHJN/GBMdnAvm8YVU
+	jb7M2E+qbzxONrnnnWKtgG9kj/GBnOsaTxIevdsz7bPUcKN59198BdyKrFc4Efho6W0R2eE3OVtsQ
+	zdQ+i7IDl7MmXWyReh4/zkMhxim/Kl89idmY1Fg5RzkTOqoiLVUZLpbd8JAbDZ0baVUO6RQddxQsp
+	xXzvUHfDCzVYHR/iHE2Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gaTzI-0003lm-On; Fri, 21 Dec 2018 23:13:48 +0000
-Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
+	id 1gaVCx-0003v3-GK; Sat, 22 Dec 2018 00:31:59 +0000
+Received: from mail-qk1-x741.google.com ([2607:f8b0:4864:20::741])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gaTzC-0003ke-UG
- for linux-arm-kernel@lists.infradead.org; Fri, 21 Dec 2018 23:13:45 +0000
-Received: by mail-pl1-x642.google.com with SMTP id a14so3108319plm.12
+ id 1gaVCt-0003tw-W4
+ for linux-arm-kernel@lists.infradead.org; Sat, 22 Dec 2018 00:31:57 +0000
+Received: by mail-qk1-x741.google.com with SMTP id r71so4167374qkr.10
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 21 Dec 2018 15:13:31 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:in-reply-to:references:date:message-id
- :mime-version:content-transfer-encoding;
- bh=abNvcfy0ctwrO6xXPJ7uMEdhM3z3GEhCvmRhA5UceKM=;
- b=tcHZIDOAf8qwEnDqgyFQBCg2PO+jkbmB4Snxs25toGXyH/Sl/kyhbjY9Y0LYxo6L/A
- YNbAamxPkJXABrQ88ylxJf3kkLc7ft4A1k4TC+CAqGuILo3j4RQYTIu0DKwkZtcw70ye
- ZZidxKoy80WEg57BgkP9+kPTiVizhKokElImOSdq4s896SU3CSSXsYoymcZE51GObqin
- sjQjBQdk16XRBVjixHc6aMlWQa3hiRaV0J2nP6FP5be0Pg7NDK70DwCNEHgNi59QAfTt
- Dv0sGTGVQZ5EH+nXyOzP557rRER+BDabVJV84AGduDh8j7e/JQKemwE/4C1Xcv+O+Zul
- zHBQ==
+ Fri, 21 Dec 2018 16:31:45 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=Fw6KSKC9utOhtabpKAhBkW73wfRGpPx1HvCrekdUbxM=;
+ b=jMLHjyyW48Zolw/C1d2bD6lkbYg8pSaAsFJhCpYx8KYWQHml6iblx6A+WOlcQRpeaH
+ zgWNNoylVNs2BNkPSz4WRnzqCamM5/aaGNQ8Pv8Wv9zCV5J7wvI7t1X02S5q+/TTkBPE
+ KUrDY2J5UFOxAC35MCHBEARYQisiZtnC3P9XA=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:in-reply-to:references:date
- :message-id:mime-version:content-transfer-encoding;
- bh=abNvcfy0ctwrO6xXPJ7uMEdhM3z3GEhCvmRhA5UceKM=;
- b=ato0qcxFzabh74R/g4iJqWIqCRONcJxjTnf78mcfqEtqk66hsH+roJa/tAcVUc6GKi
- +KwItrloLmntuUblnJlkeRLD0jQEu767MCFzUYIAInHI2wugR2pCIYkavIQVtqSrH7f0
- aRqREi2gm6tu9BEqGa4IAJ+Zy8rNIwPqQcP1Edrr1RKZEGB9nn29Aqp6fIXBySPweca2
- ItD7bdJo52o+ueYNQr3rT6DgKxGFgu1mV+sjeKbuXxuqw6jKH2nHpYx2iZL0LlTery8l
- pIkBuMsu5e4RlRtbKVqwx0wZNUG4Sahdt3WMi7XkMIdgCrnWQjWk/IAa4f7U4NV0EOeG
- tlWg==
-X-Gm-Message-State: AJcUukcKttDKWwatGBSbkt6tQW1VQJn6gw6U1HY0sq+L0o/8l9xXycN+
- O65F65ONp9PTZ17v92QJv+AqEg==
-X-Google-Smtp-Source: ALg8bN496KpvbHJMgz+XL8XdPMKdcOPCPMKCswFD4JaPDzF+m6Hjcd+GX0wSq9e7l221G9l9sqB5YQ==
-X-Received: by 2002:a17:902:7044:: with SMTP id
- h4mr4378935plt.35.1545434011051; 
- Fri, 21 Dec 2018 15:13:31 -0800 (PST)
-Received: from localhost ([2601:602:9200:a1a5:4dea:8076:74d1:94e1])
- by smtp.googlemail.com with ESMTPSA id 84sm51968092pfa.115.2018.12.21.15.13.30
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 21 Dec 2018 15:13:30 -0800 (PST)
-From: Kevin Hilman <khilman@baylibre.com>
-To: Chris Moore <moore@free.fr>, linux-amlogic@lists.infradead.org
-Subject: Re: [PATCH v2 1/2] dt-bindings: arm: amlogic: add amediatech x96-max
- bindings
-In-Reply-To: <dc14926f-4433-fa7b-311f-cb275a7e7aee@free.fr>
-References: <20181219233519.35287-1-khilman@baylibre.com>
- <dc14926f-4433-fa7b-311f-cb275a7e7aee@free.fr>
-Date: Fri, 21 Dec 2018 15:13:29 -0800
-Message-ID: <7hr2eaqxra.fsf@baylibre.com>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=Fw6KSKC9utOhtabpKAhBkW73wfRGpPx1HvCrekdUbxM=;
+ b=ILM7dTEqDDxMIch6oH7w6Q6OHTpQxWp90eLtKYeBkiZlNc8bRAcPfOGc+TZu9AMLor
+ cUb4hEedYmcPuiDRwxncPQk/TkwFdh4TDQPCRZ6AIg74Odk5yHFy3WFJwQ2x0/mowJtQ
+ 7ks7ZjU6bheGA9rLDPfu/pnyiuIZjzIgAxQZyTnMdBtmPrJJhHt1n6Dbxt3uV31+qowH
+ 8TuiC/1Ezv7UxQPAJ8I68olP0mKTzRTvYcgXE3+KFNwVmzTABcpQmch6+Eg+iiC5rqDO
+ NYQSnNwyjWYWW9/Qwn3rqvy6dYxQUmv8If35AeUkl/+nTa47jgQtRw2jbPjnO4mPlb3t
+ z7ww==
+X-Gm-Message-State: AJcUuke6O+uyJy6FoRulKbHoHi+OAgDequwiet0IjK/18w8CfH5jBiLY
+ ViBAb5wytEzx0+NA4AXAV2XeFROvH8De58G1t+Mudw==
+X-Google-Smtp-Source: ALg8bN5lM6Dsz8j/gCUoawconycXriunMBfghDSBY4CUHC5ymImkL8oTraieVmXLjrrN99xR2WrQyXeE3wlmgMfoxTM=
+X-Received: by 2002:a37:5107:: with SMTP id f7mr4481973qkb.124.1545438703724; 
+ Fri, 21 Dec 2018 16:31:43 -0800 (PST)
 MIME-Version: 1.0
+References: <1544258371-4600-1-git-send-email-yong.wu@mediatek.com>
+ <1544258371-4600-11-git-send-email-yong.wu@mediatek.com>
+ <CANMq1KBMWM8BhMDJo1paVbToibsZGYVOCWBOua81w7fnTCO-bw@mail.gmail.com>
+ <1545379358.29587.51.camel@mhfsdcap03>
+In-Reply-To: <1545379358.29587.51.camel@mhfsdcap03>
+From: Nicolas Boichat <drinkcat@chromium.org>
+Date: Sat, 22 Dec 2018 08:31:32 +0800
+Message-ID: <CANMq1KDz5kja9BLuuDZer1eGPqOhhcAg3oPt85jE=XOuqaExcg@mail.gmail.com>
+Subject: Re: [PATCH v4 10/18] iommu/mediatek: Add mt8183 IOMMU support
+To: Yong Wu <yong.wu@mediatek.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181221_151343_270735_3E613744 
-X-CRM114-Status: GOOD (  11.58  )
+X-CRM114-CacheID: sfid-20181221_163156_031842_F9BA75CF 
+X-CRM114-Status: GOOD (  37.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,33 +88,267 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: youlin.pei@mediatek.com, devicetree@vger.kernel.org,
+ Arnd Bergmann <arnd@arndb.de>, srv_heupstream@mediatek.com,
+ Joerg Roedel <joro@8bytes.org>, Will Deacon <will.deacon@arm.com>,
+ lkml <linux-kernel@vger.kernel.org>, Tomasz Figa <tfiga@google.com>,
+ iommu@lists.linux-foundation.org, Rob Herring <robh+dt@kernel.org>,
+ linux-mediatek@lists.infradead.org, Arvind Yadav <arvind.yadav.cs@gmail.com>,
+ Matthias Brugger <matthias.bgg@gmail.com>, yingjoe.chen@mediatek.com,
+ Robin Murphy <robin.murphy@arm.com>,
+ linux-arm Mailing List <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Q2hyaXMgTW9vcmUgPG1vb3JlQGZyZWUuZnI+IHdyaXRlczoKCj4gSGksCj4KPiBTb3JyeSBmb3Ig
-dGhlIHJlcGVhdCA6IEkgcmVwbGllZCBwcmV2aW91c2x5IHRvIHYxIGFzIEkgaGFkbid0IG5vdGlj
-ZWQgCj4gdGhhdCB0aGVyZSB3YXMgYWxyZWFkeSBhIHYyLgo+Cj4gTGUgMjAvMTIvMjAxOCDDoCAw
-MDozNSwgS2V2aW4gSGlsbWFuIGEgw6ljcml0wqA6Cj4+IEFkZCBuZXcgdmVuZG9yIGZvciBhbWVk
-aWF0ZWNoLCBhbmQgaW5pdGlhbCBib2FyZDogeDk2LW1heAo+Pgo+PiBTaWduZWQtb2ZmLWJ5OiBL
-ZXZpbiBIaWxtYW4gPGtoaWxtYW5AYmF5bGlicmUuY29tPgo+PiAtLS0KPj4gICBEb2N1bWVudGF0
-aW9uL2RldmljZXRyZWUvYmluZGluZ3MvYXJtL2FtbG9naWMudHh0ICAgICB8IDEgKwo+PiAgIERv
-Y3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy92ZW5kb3ItcHJlZml4ZXMudHh0IHwgMSAr
-Cj4+ICAgMiBmaWxlcyBjaGFuZ2VkLCAyIGluc2VydGlvbnMoKykKPj4KPj4gZGlmZiAtLWdpdCBh
-L0RvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy9hcm0vYW1sb2dpYy50eHQgYi9Eb2N1
-bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvYXJtL2FtbG9naWMudHh0Cj4+IGluZGV4IDhk
-YmMyNTkwODFlNC4uYzUwYjA4NGI2YzU5IDEwMDY0NAo+PiAtLS0gYS9Eb2N1bWVudGF0aW9uL2Rl
-dmljZXRyZWUvYmluZGluZ3MvYXJtL2FtbG9naWMudHh0Cj4+ICsrKyBiL0RvY3VtZW50YXRpb24v
-ZGV2aWNldHJlZS9iaW5kaW5ncy9hcm0vYW1sb2dpYy50eHQKPj4gQEAgLTk5LDYgKzk5LDcgQEAg
-Qm9hcmQgY29tcGF0aWJsZSB2YWx1ZXMgKGFscGhhYmV0aWNhbGx5LCBncm91cGVkIGJ5IFNvQyk6
-Cj4+ICAgICAtICJhbWxvZ2ljLHAyODEiIChNZXNvbiBneGwgczkwNXcpCj4+ICAgICAtICJvcmFu
-dGgsdHgzLW1pbmkiIChNZXNvbiBneGwgczkwNXcpCj4+ICAgCj4+ICsgIC0gImFtZWRpYXRlY2gs
-eDk2LW1heCIgKE1lc29uIGd4bSBzOTEyKQo+Cj4gU2hvdWxkbid0IHRoYXQgYmUgTWVzb24gZzEy
-YSBzOTA1eDIgPwoKVWdoLCB5ZXMuICBMYXp5IGNvcHkvcGFzdGUgYnVnLiAgV2lsbCBmaXggdGhh
-dCBpbiBhIHYzIG5leHQgeWVhci4gOikKClRoYW5rcyBmb3IgdGhlIHJldmlldywKCktldmluCgpf
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0t
-a2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcK
-aHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2Vy
-bmVsCg==
+On Fri, Dec 21, 2018 at 4:02 PM Yong Wu <yong.wu@mediatek.com> wrote:
+>
+> On Fri, 2018-12-21 at 12:43 +0800, Nicolas Boichat wrote:
+> > On Sat, Dec 8, 2018 at 4:42 PM Yong Wu <yong.wu@mediatek.com> wrote:
+> > >
+> > > The M4U IP blocks in mt8183 is MediaTek's generation2 M4U which use
+> > > the ARM Short-descriptor like mt8173, and most of the HW registers
+> > > are the same.
+> > >
+> > > Here list main differences between mt8183 and mt8173/mt2712:
+> > > 1) mt8183 has only one M4U HW like mt8173 while mt2712 has two.
+> > > 2) mt8183 don't have the "bclk" clock, it use the EMI clock instead.
+> > > 3) mt8183 can support the dram over 4GB, but it doesn't call this "4GB
+> > > mode".
+> > > 4) mt8183 pgtable base register(0x0) extend bit[1:0] which represent
+> > > the bit[33:32] in the physical address of the pgtable base, But the
+> > > standard ttbr0[1] means the S bit which is enabled defaultly, Hence,
+> > > we add a mask.
+> > > 5) mt8183 HW has a GALS modules, SMI should enable "has_gals" support.
+> > > 6) the larb-id in smi-common is remapped. M4U should enable
+> > > larbid_remapped support.
+> > >
+> > > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> > > ---
+> > >  drivers/iommu/mtk_iommu.c | 31 ++++++++++++++++++++++---------
+> > >  drivers/iommu/mtk_iommu.h |  1 +
+> > >  drivers/memory/mtk-smi.c  | 19 +++++++++++++++++++
+> > >  3 files changed, 42 insertions(+), 9 deletions(-)
+> > >
+> > > diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+> > > index 8ab3b69..d91a554 100644
+> > > --- a/drivers/iommu/mtk_iommu.c
+> > > +++ b/drivers/iommu/mtk_iommu.c
+> > > @@ -36,6 +36,7 @@
+> > >  #include "mtk_iommu.h"
+> > >
+> > >  #define REG_MMU_PT_BASE_ADDR                   0x000
+> > > +#define MMU_PT_ADDR_MASK                       GENMASK(31, 7)
+> > >
+> > >  #define REG_MMU_INVALIDATE                     0x020
+> > >  #define F_ALL_INVLD                            0x2
+> > > @@ -54,7 +55,7 @@
+> > >  #define REG_MMU_CTRL_REG                       0x110
+> > >  #define F_MMU_PREFETCH_RT_REPLACE_MOD          BIT(4)
+> > >  #define F_MMU_TF_PROTECT_SEL_SHIFT(data) \
+> > > -       ((data)->plat_data->m4u_plat == M4U_MT2712 ? 4 : 5)
+> > > +       ((data)->plat_data->m4u_plat == M4U_MT8173 ? 5 : 4)
+> >
+> > Should the shift value be a member of plat_data instead?
+>
+> It's also ok.
+> This TF_PROTECT_SEL MACRO looks a bit complex. I can use a new patch to
+> refactor it.
+
+SGTM.
+
+> >
+> > >  /* It's named by F_MMU_TF_PROT_SEL in mt2712. */
+> > >  #define F_MMU_TF_PROTECT_SEL(prot, data) \
+> > >         (((prot) & 0x3) << F_MMU_TF_PROTECT_SEL_SHIFT(data))
+> > > @@ -347,7 +348,7 @@ static int mtk_iommu_attach_device(struct iommu_domain *domain,
+> > >         /* Update the pgtable base address register of the M4U HW */
+> > >         if (!data->m4u_dom) {
+> > >                 data->m4u_dom = dom;
+> > > -               writel(dom->cfg.arm_v7s_cfg.ttbr[0],
+> > > +               writel(dom->cfg.arm_v7s_cfg.ttbr[0] & MMU_PT_ADDR_MASK,
+> > >                        data->base + REG_MMU_PT_BASE_ADDR);
+> > >         }
+> > >
+> > > @@ -510,6 +511,7 @@ static int mtk_iommu_of_xlate(struct device *dev, struct of_phandle_args *args)
+> > >
+> > >  static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+> > >  {
+> > > +       enum mtk_iommu_plat m4u_plat = data->plat_data->m4u_plat;
+> > >         u32 regval;
+> > >         int ret;
+> > >
+> > > @@ -520,7 +522,7 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+> > >         }
+> > >
+> > >         regval = F_MMU_TF_PROTECT_SEL(2, data);
+> > > -       if (data->plat_data->m4u_plat == M4U_MT8173)
+> > > +       if (m4u_plat == M4U_MT8173)
+> > >                 regval |= F_MMU_PREFETCH_RT_REPLACE_MOD;
+> > >         writel_relaxed(regval, data->base + REG_MMU_CTRL_REG);
+> > >
+> > > @@ -541,14 +543,14 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+> > >                 F_INT_PRETETCH_TRANSATION_FIFO_FAULT;
+> > >         writel_relaxed(regval, data->base + REG_MMU_INT_MAIN_CONTROL);
+> > >
+> > > -       if (data->plat_data->m4u_plat == M4U_MT8173)
+> > > +       if (m4u_plat == M4U_MT8173)
+> > >                 regval = (data->protect_base >> 1) | (data->enable_4GB << 31);
+> > >         else
+> > >                 regval = lower_32_bits(data->protect_base) |
+> > >                          upper_32_bits(data->protect_base);
+> > >         writel_relaxed(regval, data->base + REG_MMU_IVRP_PADDR);
+> > >
+> > > -       if (data->enable_4GB && data->plat_data->m4u_plat != M4U_MT8173) {
+> > > +       if (data->enable_4GB && m4u_plat == M4U_MT2712) {
+> > >                 /*
+> > >                  * If 4GB mode is enabled, the validate PA range is from
+> > >                  * 0x1_0000_0000 to 0x1_ffff_ffff. here record bit[32:30].
+> > > @@ -558,8 +560,11 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+> > >         }
+> > >         writel_relaxed(0, data->base + REG_MMU_DCM_DIS);
+> > >
+> > > -       /* It's MISC control register whose default value is ok except mt8173.*/
+> > > -       if (data->plat_data->m4u_plat == M4U_MT8173)
+> > > +       /*
+> > > +        * It's MISC control register whose default value is ok
+> > > +        * except mt8173 and mt8183.
+> > > +        */
+> > > +       if (m4u_plat == M4U_MT8173 || m4u_plat == M4U_MT8183)
+> >
+> > Again, should this be a field in plat_data?
+>
+> In mt8173 and mt8183, 0x48 is REG_MMU_STANDARD_AXI_MODE while it's
+> MMU_MISC_CTRL which contain this STANDARD_AXI_MODE bit and some other
+> bits in the other SoCs.
+>
+> The register name and meaning are not the same. I guess I can not use a
+> value like reg_0x48 in plat_data. I'd like to keep the current way. is
+> it ok?
+
+What I mean is to add a "reset_axi" (or something) field in plat_data, and do:
+if (plat_data->reset_axi)
+instead of
+ if (m4u_plat == M4U_MT8173 || m4u_plat == M4U_MT8183)
+
+My main concern is that the test will grow bigger and bigger as we add
+support for more SoCs (similarly to your F_MMU_TF_PROTECT_SEL_SHIFT
+test above, where you are lucky because only one of the SoC requires a
+shift of 5 bits, and the 2 others require 4).
+
+Thanks,
+
+> >
+> > >                 writel_relaxed(0, data->base + REG_MMU_STANDARD_AXI_MODE);
+> > >
+> > >         if (devm_request_irq(data->dev, data->irq, mtk_iommu_isr, 0,
+> > > @@ -713,6 +718,7 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
+> > >  {
+> > >         struct mtk_iommu_data *data = dev_get_drvdata(dev);
+> > >         struct mtk_iommu_suspend_reg *reg = &data->reg;
+> > > +       struct mtk_iommu_domain *m4u_dom = data->m4u_dom;
+> > >         void __iomem *base = data->base;
+> > >         int ret;
+> > >
+> > > @@ -728,8 +734,8 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
+> > >         writel_relaxed(reg->int_control0, base + REG_MMU_INT_CONTROL0);
+> > >         writel_relaxed(reg->int_main_control, base + REG_MMU_INT_MAIN_CONTROL);
+> > >         writel_relaxed(reg->ivrp_paddr, base + REG_MMU_IVRP_PADDR);
+> > > -       if (data->m4u_dom)
+> > > -               writel(data->m4u_dom->cfg.arm_v7s_cfg.ttbr[0],
+> > > +       if (m4u_dom)
+> > > +               writel(m4u_dom->cfg.arm_v7s_cfg.ttbr[0] & MMU_PT_ADDR_MASK,
+> > >                        base + REG_MMU_PT_BASE_ADDR);
+> > >         return 0;
+> > >  }
+> > > @@ -750,9 +756,16 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
+> > >         .has_bclk     = true,
+> > >  };
+> > >
+> > > +static const struct mtk_iommu_plat_data mt8183_data = {
+> > > +       .m4u_plat            = M4U_MT8183,
+> > > +       .larbid_remap_enable = true,
+> > > +       .larbid_remapped     = {0, 4, 5, 6, 7, 2, 3, 1},
+> > > +};
+> > > +
+> > >  static const struct of_device_id mtk_iommu_of_ids[] = {
+> > >         { .compatible = "mediatek,mt2712-m4u", .data = &mt2712_data},
+> > >         { .compatible = "mediatek,mt8173-m4u", .data = &mt8173_data},
+> > > +       { .compatible = "mediatek,mt8183-m4u", .data = &mt8183_data},
+> > >         {}
+> > >  };
+> > >
+> > > diff --git a/drivers/iommu/mtk_iommu.h b/drivers/iommu/mtk_iommu.h
+> > > index 3877050..6385dec 100644
+> > > --- a/drivers/iommu/mtk_iommu.h
+> > > +++ b/drivers/iommu/mtk_iommu.h
+> > > @@ -39,6 +39,7 @@ enum mtk_iommu_plat {
+> > >         M4U_MT2701,
+> > >         M4U_MT2712,
+> > >         M4U_MT8173,
+> > > +       M4U_MT8183,
+> > >  };
+> > >
+> > >  struct mtk_iommu_plat_data {
+> > > diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
+> > > index 3720c77..bced778 100644
+> > > --- a/drivers/memory/mtk-smi.c
+> > > +++ b/drivers/memory/mtk-smi.c
+> > > @@ -285,6 +285,12 @@ static void mtk_smi_larb_config_port_gen1(struct device *dev)
+> > >         .larb_special_mask = BIT(8) | BIT(9),          /* bdpsys */
+> > >  };
+> > >
+> > > +static const struct mtk_smi_larb_gen mtk_smi_larb_mt8183 = {
+> > > +       .has_gals          = true,
+> > > +       .config_port       = mtk_smi_larb_config_port_gen2_general,
+> > > +       .larb_special_mask = BIT(2) | BIT(3) | BIT(7), /* IPU0 | IPU1 | CCU */
+> > > +};
+> > > +
+> > >  static const struct of_device_id mtk_smi_larb_of_ids[] = {
+> > >         {
+> > >                 .compatible = "mediatek,mt8173-smi-larb",
+> > > @@ -298,6 +304,10 @@ static void mtk_smi_larb_config_port_gen1(struct device *dev)
+> > >                 .compatible = "mediatek,mt2712-smi-larb",
+> > >                 .data = &mtk_smi_larb_mt2712
+> > >         },
+> > > +       {
+> > > +               .compatible = "mediatek,mt8183-smi-larb",
+> > > +               .data = &mtk_smi_larb_mt8183
+> > > +       },
+> > >         {}
+> > >  };
+> > >
+> > > @@ -391,6 +401,11 @@ static int mtk_smi_larb_remove(struct platform_device *pdev)
+> > >         .gen = MTK_SMI_GEN2,
+> > >  };
+> > >
+> > > +static const struct mtk_smi_common_plat mtk_smi_common_mt8183 = {
+> > > +       .gen      = MTK_SMI_GEN2,
+> > > +       .has_gals = true,
+> > > +};
+> > > +
+> > >  static const struct of_device_id mtk_smi_common_of_ids[] = {
+> > >         {
+> > >                 .compatible = "mediatek,mt8173-smi-common",
+> > > @@ -404,6 +419,10 @@ static int mtk_smi_larb_remove(struct platform_device *pdev)
+> > >                 .compatible = "mediatek,mt2712-smi-common",
+> > >                 .data = &mtk_smi_common_gen2,
+> > >         },
+> > > +       {
+> > > +               .compatible = "mediatek,mt8183-smi-common",
+> > > +               .data = &mtk_smi_common_mt8183,
+> > > +       },
+> > >         {}
+> > >  };
+> > >
+> > > --
+> > > 1.9.1
+> > >
+>
+>
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
