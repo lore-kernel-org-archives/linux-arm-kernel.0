@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	SPF_PASS,T_DKIMWL_WL_HIGH,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A91A2C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 22 Dec 2018 20:28:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C9A8AC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 22 Dec 2018 20:28:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7330C21934
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 22 Dec 2018 20:28:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 94A3121934
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 22 Dec 2018 20:28:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JUEsPjOr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7330C21934
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nT89v94H"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 94A3121934
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sang-engineering.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,35 +25,35 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=c432Qr41uZI8YV1B2zD8QnC/mvAmDlaCj7AJDcaxwxY=; b=JUEsPjOrwkzF4A
-	2+i8cDvzGquL/p1QVHXbXt5zTe5qg4rJOJs/2BnJ1AFbsiw4XEr+Z9tr7sE796SzwuahGv5kKvWBz
-	FsdvfzUaavsXC437QLP6A/kHLQc5YtiE+xCkWhFbS7FzW3HjaBmeEqAadW2exLinK+eE7UDXGahmX
-	SP+OWpK8XLQCK0xM7eQ617SEGaCNdnPrhrl+W8FewmaWYytJ2dGNbTjiMBtpq166WOZPSd28iHcBW
-	Dv5ERW6mrQ7HUj7y0y9gNair5hU9yAS0TYSm85Dz62i3gi7j9ynNegy+eCF68GekZ8xnWEUSP9s1k
-	LVzK+PclY0ejrRIYKQuA==;
+	List-Owner; bh=2xi19NPyIiQ41qWjvvabrGPARB6YRNngeRjF1zsE7YM=; b=nT89v94HN9+slW
+	Ov7xjMJUpGaYLsyRIkbWis7PvGdQfSjz6x9ylkzvKqJCJImFhvAAxMRCFhJ5owjeIXXdGIi7Dfu1/
+	trZbgUcoFdeuypQRhtl50+JyzF5e4SYlIJI2OpLVaExMdDOZWRO4MnRE+pWIw1X41snZjdxyvsUBC
+	ElVFRbmxbnl6a4TA7vDkpAsUy4HeNwQq3zUHGA1gPP0VzWEuMkxd58HCeg+9ABHlEHx36gb9OA7dJ
+	y2Km7EACrg5JMxse5gV+7HB7pFmeutgmjzWfu/nm/E2b4spo0hOEML1ANfu75eysp3pU8Vxk8rsqm
+	59jzyN2lp7XyuDOqlFTQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gansx-0001Zb-O7; Sat, 22 Dec 2018 20:28:35 +0000
+	id 1gantA-0001oo-QW; Sat, 22 Dec 2018 20:28:48 +0000
 Received: from sauhun.de ([88.99.104.3] helo=pokefinder.org)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ganrN-0008BL-Ov
+ id 1ganrN-0008B4-Ox
  for linux-arm-kernel@lists.infradead.org; Sat, 22 Dec 2018 20:27:02 +0000
 Received: from localhost (p54B67A8B.dip0.t-ipconnect.de [84.182.122.139])
- by pokefinder.org (Postfix) with ESMTPSA id AEB4A2E3606;
- Sat, 22 Dec 2018 21:26:40 +0100 (CET)
+ by pokefinder.org (Postfix) with ESMTPSA id 8D1732E35FD;
+ Sat, 22 Dec 2018 21:26:39 +0100 (CET)
 From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 To: linux-i2c@vger.kernel.org
-Subject: [PATCH v2 9/9] i2c: s3c2410: don't open code to reject transfers when
+Subject: [PATCH v2 8/9] i2c: exynos5: don't open code to reject transfers when
  suspended
-Date: Sat, 22 Dec 2018 21:26:23 +0100
-Message-Id: <20181222202623.4521-10-wsa+renesas@sang-engineering.com>
+Date: Sat, 22 Dec 2018 21:26:22 +0100
+Message-Id: <20181222202623.4521-9-wsa+renesas@sang-engineering.com>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20181222202623.4521-1-wsa+renesas@sang-engineering.com>
 References: <20181222202623.4521-1-wsa+renesas@sang-engineering.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181222_122658_222331_41C6F613 
-X-CRM114-Status: GOOD (  10.19  )
+X-CRM114-CacheID: sfid-20181222_122658_143076_F9DCF103 
+X-CRM114-Status: GOOD (  11.54  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,43 +79,47 @@ This is handled by the I2C core meanwhile.
 
 Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- drivers/i2c/busses/i2c-s3c2410.c | 7 -------
- 1 file changed, 7 deletions(-)
+ drivers/i2c/busses/i2c-exynos5.c | 10 ----------
+ 1 file changed, 10 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-index 2f2e28d60ef5..eeccd19b5f42 100644
---- a/drivers/i2c/busses/i2c-s3c2410.c
-+++ b/drivers/i2c/busses/i2c-s3c2410.c
-@@ -104,7 +104,6 @@ enum s3c24xx_i2c_state {
- struct s3c24xx_i2c {
- 	wait_queue_head_t	wait;
- 	kernel_ulong_t		quirks;
+diff --git a/drivers/i2c/busses/i2c-exynos5.c b/drivers/i2c/busses/i2c-exynos5.c
+index c1ce2299a76e..81b9c3cf4e75 100644
+--- a/drivers/i2c/busses/i2c-exynos5.c
++++ b/drivers/i2c/busses/i2c-exynos5.c
+@@ -183,7 +183,6 @@ enum i2c_type_exynos {
+ 
+ struct exynos5_i2c {
+ 	struct i2c_adapter	adap;
 -	unsigned int		suspended:1;
  
  	struct i2c_msg		*msg;
- 	unsigned int		msg_num;
-@@ -703,9 +702,6 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
- 	unsigned long timeout;
- 	int ret;
+ 	struct completion	msg_complete;
+@@ -715,11 +714,6 @@ static int exynos5_i2c_xfer(struct i2c_adapter *adap,
+ 	struct exynos5_i2c *i2c = adap->algo_data;
+ 	int i, ret;
  
--	if (i2c->suspended)
+-	if (i2c->suspended) {
+-		dev_err(i2c->dev, "HS-I2C is not initialized.\n");
 -		return -EIO;
+-	}
 -
- 	ret = s3c24xx_i2c_set_master(i2c);
- 	if (ret != 0) {
- 		dev_err(i2c->dev, "cannot get bus (error %d)\n", ret);
-@@ -1246,8 +1242,6 @@ static int s3c24xx_i2c_suspend_noirq(struct device *dev)
+ 	ret = clk_enable(i2c->clk);
+ 	if (ret)
+ 		return ret;
+@@ -847,10 +841,7 @@ static int exynos5_i2c_suspend_noirq(struct device *dev)
  {
- 	struct s3c24xx_i2c *i2c = dev_get_drvdata(dev);
+ 	struct exynos5_i2c *i2c = dev_get_drvdata(dev);
  
 -	i2c->suspended = 1;
 -
- 	if (!IS_ERR(i2c->sysreg))
- 		regmap_read(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, &i2c->sys_i2c_cfg);
+ 	clk_unprepare(i2c->clk);
+-
+ 	return 0;
+ }
  
-@@ -1267,7 +1261,6 @@ static int s3c24xx_i2c_resume_noirq(struct device *dev)
- 		return ret;
- 	s3c24xx_i2c_init(i2c);
+@@ -871,7 +862,6 @@ static int exynos5_i2c_resume_noirq(struct device *dev)
+ 
+ 	exynos5_i2c_init(i2c);
  	clk_disable(i2c->clk);
 -	i2c->suspended = 0;
  
