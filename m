@@ -2,57 +2,72 @@ Return-Path: <SRS0=5OaU=PA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C1FA4C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 23 Dec 2018 20:00:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0EF92C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 23 Dec 2018 21:00:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8A4A5217D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 23 Dec 2018 20:00:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C959B2184D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 23 Dec 2018 21:00:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jmpysJAc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8A4A5217D7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ucw.cz
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZZ4op3YV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C959B2184D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=+vvoDPRItZ9MCIvssaWm9JT3X/tHKZyg2NEKcS/rGbA=; b=jmpysJAcbDTaOzCQ091d5uG9u
-	Z/dJT1i7Pe0bvAo4O+jk6HNNiC12o1X2sSJEoeQN9FxLFVUCNv1CbKjAq7vo8KWHjVd54V+NWwdiB
-	tHLmcAB0VdHijFXwDYkqB4NbtDdmTf8Enw1J/O9+0EHyt8ZbGqpE9dZuDmrqwfApQl9HvpaFbnnQ4
-	hOtx2/6U3jkdUVdJbL9qb8HQGxFZZU6NEXDc9dYD9g0ITRNIaqgcfJD0yngy+J0aTRP7bzMFmZyYM
-	CMotem5PXF+aGJS6RpDpmNJqOusi2NRCeoO5tCbA8hfj9sKRIxIn1uSzzIZ0Yro3CmJrrhV8Iyze6
-	83cjWj/Xg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=0Cfst0aavwq2BzhOoJiKH5s4NpJ/Us+GjXPJ4zrLsg0=; b=ZZ4
+	op3YV27iZX0UKzSqXuUq2LaE+MP3aEAQmT8Rdvb/NFFHbn+wqbOszDRj6XW3ajga4pCSwUf3L4gvo
+	ZheL4Sb+6+oiR1HdK8EBuDjmzKY1qn/zgS8gwvVv6TSbD2Bz8Lw0hQ/tW2MwUuIDngXtzfUoFvHrp
+	wADpWDQf/OcQj2dRuqMLquQTkjTnYDP94Ml87y52NZhbu9+9n3h0+0X7oerCqM/RLjCwl9atrORaV
+	DAWfKL1pif2kz0UoT1x6vjaOmbSa3NqSXmUo+2dM64jUixp5JllINpIuIDUX2KNTo2pRF3og+BnsP
+	8TFZ0aIA+N69i6dOIQTBKCcJIb86Jjw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gb9uo-0004xr-LY; Sun, 23 Dec 2018 19:59:58 +0000
-Received: from atrey.karlin.mff.cuni.cz ([195.113.26.193])
+	id 1gbArM-0005Ta-7p; Sun, 23 Dec 2018 21:00:28 +0000
+Received: from mout.kundenserver.de ([212.227.126.131])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gb9ul-0004xB-0q
- for linux-arm-kernel@lists.infradead.org; Sun, 23 Dec 2018 19:59:57 +0000
-Received: by atrey.karlin.mff.cuni.cz (Postfix, from userid 512)
- id ED91880897; Sun, 23 Dec 2018 20:59:33 +0100 (CET)
-Date: Sun, 23 Dec 2018 20:59:37 +0100
-From: Pavel Machek <pavel@ucw.cz>
-To: Tony Lindgren <tony@atomide.com>
-Subject: Re: WIP Droid 4 voice calls, GNSS & PM with a TS 27.010 serdev driver
-Message-ID: <20181223195937.GE15237@amd>
-References: <20181217004450.GW6707@atomide.com> <20181223103315.GA1936@amd>
- <20181223111059.GB1936@amd> <20181223155147.GI6707@atomide.com>
-MIME-Version: 1.0
-In-Reply-To: <20181223155147.GI6707@atomide.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+ id 1gbArH-0004QG-NL
+ for linux-arm-kernel@lists.infradead.org; Sun, 23 Dec 2018 21:00:25 +0000
+Received: from localhost.localdomain ([37.4.249.153]) by
+ mrelayeu.kundenserver.de (mreue012 [212.227.15.167]) with ESMTPSA (Nemesis)
+ id 1MSZDt-1gz0AW3YfB-00SsKG; Sun, 23 Dec 2018 21:59:57 +0100
+From: Stefan Wahren <stefan.wahren@i2se.com>
+To: Al Cooper <alcooperx@gmail.com>, Adrian Hunter <adrian.hunter@intel.com>,
+ Ulf Hansson <ulf.hansson@linaro.org>
+Subject: [PATCH 1/2] mmc: sdhci-iproc: handle mmc_of_parse() errors during
+ probe
+Date: Sun, 23 Dec 2018 21:59:17 +0100
+Message-Id: <1545598758-4502-1-git-send-email-stefan.wahren@i2se.com>
+X-Mailer: git-send-email 2.7.4
+X-Provags-ID: V03:K1:FsBhp74NqgbMckX6QGEkM7zbuM0fjnbtNqB9c5GjfSu+JG+zOVC
+ nt6p6+TF28Gk+lb0VFAh2hNrWHdwlR1sqk5ygcbOiXLgQ93PecRf9Zl130rJ7qR4Km04fzv
+ AR0JypQ0XgjJ+nia824FdeQ9oO4xRynoGH5q7Raco0HsIMewr0syOybYSJgsqI5UUptIo+5
+ FhdCMrpIfxuFpRh23naog==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:7uvqm/6Tn2w=:qedwftyLF+r+WaFGRyzPKR
+ vItrffDfG7f534X5qt1icf/24c6TYj93h3+1AKvP593z2hpmJxIemKNrdRT7/zXPP+Ipke8UQ
+ I08zvqpRa5wcGU3iO0jQaPt/WU58GkdmjkiuWzotVkbcj4+NuMi4iMPfiAMd1VdT5ouv2omWI
+ /7S/9AqsTnPbNYo+5i1oNsSFDmrxWvlKZC9K+Ab8vTe8J9L+wUiRCWFHsOr0C9lC1J3MRHbgZ
+ OPX3nnGBLnuKcWjrMJyIjqsNOJ2w89xWpOFvNfsPTrVhHX/xApgyQQcbDBXvwgMh709QJowTD
+ 88M4HvgmrK3Ah0BS164aJZtufA38R7Fpay/nQ6hojx7BKV6OM712L+vkkzNuK4MrfQKtQeiv5
+ sf7mvN2YqPw13dJxC70+a8u2MvwhX7Udha2YtQJT7ZhcqlIYkVb4HoDJ565iYqAe/jp9npFjh
+ 3wPekqu1cY3V/0rhdWVETv/Atcchi598SE0RS4cL8/C7Z189r2wCrohPWDDedc8/AmF+J9y4N
+ 2lAHyAmq7u7IUBkxmYHzFu+KvE6jVNgVFm6mB21lO2gHqTIz6toyP36igFPxPp0FZrigwqCWb
+ Ot1jt/Ep+g9ykC8xjM36X5RKjfDrAOpgwSb+FWRqaablXguW1xgCC2weNx8PjENo21hCxHNgG
+ 2jSstrMAZFww3b39FzyTblcT3LcsuU6JOjyIMPCApzh0y7wgI+VVT+y3jyezQpszpAxbbdYnS
+ WH896vn09u7vjjjfG9zlqROWkG+q3ZLGfxrm4gRjo5HnJF78W1Fq11QIq0U=
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181223_115955_218234_30D11678 
-X-CRM114-Status: GOOD (  15.25  )
+X-CRM114-CacheID: sfid-20181223_130024_058181_62761026 
+X-CRM114-Status: GOOD (  14.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -64,119 +79,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>, Marcel Partap <mpartap@gmx.net>,
- Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>, omerlle@gmail.com,
- Merlijn Wajer <merlijn@wizzup.org>, linux-kernel@vger.kernel.org,
- Johan Hovold <johan@kernel.org>, Peter Ujfalusi <peter.ujfalusi@ti.com>,
- NeKit <nekit1000@gmail.com>, linux-arm-kernel@lists.infradead.org,
- Michael Scott <hashcode0f@gmail.com>, Sebastian Reichel <sre@kernel.org>,
- linux-omap@vger.kernel.org, Jarkko Nikula <jarkko.nikula@bitmer.com>
-Content-Type: multipart/mixed; boundary="===============0786780197805892010=="
+Cc: Stefan Wahren <stefan.wahren@i2se.com>,
+ Florian Fainelli <f.fainelli@gmail.com>, Scott Branden <sbranden@broadcom.com>,
+ Ray Jui <rjui@broadcom.com>, linux-mmc@vger.kernel.org, stable@vger.kernel.org,
+ Eric Anholt <eric@anholt.net>, bcm-kernel-feedback-list@broadcom.com,
+ Gregory Fong <gregory.0xf0@gmail.com>,
+ Brian Norris <computersforpeace@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+We need to handle mmc_of_parse() errors during probe.
 
---===============0786780197805892010==
-Content-Type: multipart/signed; micalg=pgp-sha1;
-	protocol="application/pgp-signature"; boundary="RpqchZ26BWispMcB"
-Content-Disposition: inline
+This finally fixes the wifi regression on Raspberry Pi 3 series.
+In error case the wifi chip was permanently in reset because of
+the power sequence depending on the deferred probe of the GPIO expander.
 
+Fixes: b580c52d58d9 ("mmc: sdhci-iproc: add IPROC SDHCI driver")
+Cc: stable@vger.kernel.org
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ drivers/mmc/host/sdhci-iproc.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
---RpqchZ26BWispMcB
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+diff --git a/drivers/mmc/host/sdhci-iproc.c b/drivers/mmc/host/sdhci-iproc.c
+index 0db9905..9d12c06 100644
+--- a/drivers/mmc/host/sdhci-iproc.c
++++ b/drivers/mmc/host/sdhci-iproc.c
+@@ -296,7 +296,10 @@ static int sdhci_iproc_probe(struct platform_device *pdev)
+ 
+ 	iproc_host->data = iproc_data;
+ 
+-	mmc_of_parse(host->mmc);
++	ret = mmc_of_parse(host->mmc);
++	if (ret)
++		goto err;
++
+ 	sdhci_get_property(pdev);
+ 
+ 	host->mmc->caps |= iproc_host->data->mmc_caps;
+-- 
+2.7.4
 
-On Sun 2018-12-23 07:51:47, Tony Lindgren wrote:
-> * Pavel Machek <pavel@ucw.cz> [181223 11:11]:
-> > I added some printks to motmdm_probe, and they don't appear to be
-> > called. I wonder if I'm missing something else in the config? I do
-> > have serial
-> >=20
-> > root@devuan:/my/ko# ls -al /dev/ttyS0
-> > crw-rw---- 1 root dialout 4, 64 Dec 23 11:52 /dev/ttyS0
-> >=20
-> > but not gsm multiplex:
-> >=20
-> > root@devuan:/my/ko# ls -al /dev/gsm*
-> > ls: cannot access '/dev/gsm*': No such file or directory
->=20
-> Hmm with serdev you should not get /dev/ttyS0, so maybe you're missing:
->=20
-> CONFIG_SERIAL_DEV_BUS=3Dy
-> CONFIG_SERIAL_DEV_CTRL_TTYPORT=3Dy
-
-I had those enabled.
-
-I also have
-
-CONFIG_SERIAL_OMAP=3Dy
-CONFIG_SERIAL_OMAP_CONSOLE=3Dy
-
-> Probably the Kconfig dependency should be for SERIAL_DEV_CTRL_TTYPORT
-> instead of SERIAL_DEV_BUS in these patches if that helps.
->=20
-> Or else you're missing the serdev related dts changes?
-
-Thanks for the hints, but dts looks ok, too.
-
-We still have
-uart1: serial@0 {
-   compatible =3D "ti,omap4-uart";
-
-in omap4-l4.dtsi, right? ...
-
-I see that CONFIG_SERIAL_OMAP=3Dy and 8250_omap handles same
-hardware. Let me try disabling CONFIG_SERIAL_OMAP=3Dy.
-
-Best regards,
-								Pavel
-
-Oh and you may want to apply this:
-
-diff --git a/drivers/mfd/motorola-mdm.c b/drivers/mfd/motorola-mdm.c
-index 2b7c324..2cdc9e8 100644
---- a/drivers/mfd/motorola-mdm.c
-+++ b/drivers/mfd/motorola-mdm.c
-@@ -1141,5 +1152,5 @@ module_serdev_device_driver(motmdm_driver);
-=20
- MODULE_ALIAS("platform:motorola-mdm");
- MODULE_DESCRIPTION("Motorola Modem TS 27.010 serdev driver");
--MODULE_AUTHOR("Tony Lindgren <tony@atomide.com");
-+MODULE_AUTHOR("Tony Lindgren <tony@atomide.com>");
- MODULE_LICENSE("GPL v2");
-
-
---=20
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blo=
-g.html
-
---RpqchZ26BWispMcB
-Content-Type: application/pgp-signature; name="signature.asc"
-Content-Description: Digital signature
-
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iEYEARECAAYFAlwf6SkACgkQMOfwapXb+vLc+QCfdzhtFpsJJdQyVDvOhFUBkjXB
-UN0An3P/at06sNp/7TZ5GaTB+bYfIYyK
-=ZCa/
------END PGP SIGNATURE-----
-
---RpqchZ26BWispMcB--
-
-
---===============0786780197805892010==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============0786780197805892010==--
-
