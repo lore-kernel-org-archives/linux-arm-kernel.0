@@ -2,82 +2,113 @@ Return-Path: <SRS0=tR0U=PB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F2AA9C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 08:55:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9BA4AC04ABA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 09:03:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BB4DB21721
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 08:55:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6AB262171F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 09:03:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jq1Vli1F"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BB4DB21721
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BthWUsF2";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="uP1AZmVp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6AB262171F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=gI96avGWQC6ufgyOjwRjDBPvBXD8Yl1VrobZvDTP7nU=; b=jq1Vli1FqlcGYfzFYxL89lScZ
-	KMHaFsTgG+xRYDblAAoKTlxc3inlCntg5lqy07LpGgSy5dopGl1iC/qTjer9Td9nbkrfDkw3M1FXx
-	7g7MqXtSsKIMeNX7YwY+rrLWvs0C8LQhpcf7mrSDKdxCyCcKskkM6EzifDTX0bJvNdm3kFj+XR5y1
-	TCoXmaDZZWWSOsjKmSBeNz2oRbEnpdqtg4IA2JP0hS2g+NzjmjyxwwaHDybLkwaiWLjotgzm67LOh
-	l1cKegMbIh+teqX9rWVaravprJAxEg+/xZEr9DfPGUwSr6sLYeY577YQS9kQgvYmk90k24r1kcBlH
-	HYpAC3Jfg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=VSMXsstoPLHwJY8670BxmcNPBydUeOhZ3EcT5LodFBs=; b=BthWUsF2zujxsX
+	E6ZLBEt2G0Op7S+5Sa7Fh9Cjh4FfO3cVuDFKZNTOr9z8NyQZhxiLjgwS2R1dQpV4zp+F/+7OnjoKb
+	eoiaoy1g+w0fXSpUl8Xtt70rmTHU27mK2D6kmH2Z4l8mJPYpHPO5OhNGhW3SmX4LyN9yqypAxLT2A
+	YFi+4o4ZrcCfhepSNlgsP95yRxUUUOfLyg8XYvbQnDaDrC2fyzzI1NbpmcJhc/AZdIg48oR3QCK4E
+	QABV5gXg48qvPtgdXMMyuzMXGnn3D/nAQIM7NkeYSWm4Mz4B/BQRRxKgrrjwCy1DB1xuwx1B3bEzt
+	DzBDSbPcPOZc6qeuCVxQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gbM1i-0002Al-Ti; Mon, 24 Dec 2018 08:55:54 +0000
-Received: from mail-ed1-f65.google.com ([209.85.208.65])
+	id 1gbM8z-0004B3-2R; Mon, 24 Dec 2018 09:03:25 +0000
+Received: from mail-eopbgr40067.outbound.protection.outlook.com ([40.107.4.67]
+ helo=EUR03-DB5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gbM1d-000291-MI
- for linux-arm-kernel@lists.infradead.org; Mon, 24 Dec 2018 08:55:52 +0000
-Received: by mail-ed1-f65.google.com with SMTP id y20so9615716edw.9
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 24 Dec 2018 00:55:39 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=uvgDl0zaRclmAWSUoyGF73jp9Q0y9utqlwKPLMiDedM=;
- b=OMml9SeK5eFYXVMPFufYLlKa5F/hQnsQNK88wzq51j9U2RgACJPA/fRy3eIUzvWzAJ
- 5IWbb9tNkYww62zvcQn1r26EUgUJM0GKO6bCLJk+w84Xpiz35v1k7JHQruSVSk2nEBb1
- 9I7pC1ZY6CCyqBG9kV+YKV0cLFcFhMnFGjCPJ3GPC56CtKwLeXtZFn6Br4NrGCgAu3PH
- iFEfolEdHrWDdaSVO6cok01w//3xlnuLi4uFDTGZA2Ueck9IgXw7KV3yGaJEmGvthdl5
- WW41o7QolPltvnfgG6vXJc/RUPfNcJTfj0Yemt0Lsn4SOObIH491hzwjQtruYrunMjMN
- ljFg==
-X-Gm-Message-State: AA+aEWarBJa99VvjfDeCq5zwBzo8EI1MYFVJ5F1jVbcWAPpWCQpXQgrS
- xuzVwYbIjjG/iP5v6Yil5EvA4g==
-X-Google-Smtp-Source: AFSGD/VdcA83vWXu0jMmWjRNqba1ITVqBs2MmDfWz/ohdeUlnho4PEFvTfAvWkoqONjY+XO9fYZuDA==
-X-Received: by 2002:a50:8e16:: with SMTP id 22mr10057084edw.269.1545641737689; 
- Mon, 24 Dec 2018 00:55:37 -0800 (PST)
-Received: from shalem.localdomain (546A5441.cm-12-3b.dynamic.ziggo.nl.
- [84.106.84.65])
- by smtp.gmail.com with ESMTPSA id s19-v6sm4713219ejz.2.2018.12.24.00.55.35
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 24 Dec 2018 00:55:36 -0800 (PST)
-Subject: Re: [PATCH v2 0/9] i2c: move handling of suspended adapters to the
- core
-To: Wolfram Sang <wsa+renesas@sang-engineering.com>, linux-i2c@vger.kernel.org
-References: <20181222202623.4521-1-wsa+renesas@sang-engineering.com>
-From: Hans de Goede <hdegoede@redhat.com>
-Message-ID: <7fd31445-6cf8-5094-3cd8-d6ca5c059541@redhat.com>
-Date: Mon, 24 Dec 2018 09:55:35 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
-MIME-Version: 1.0
-In-Reply-To: <20181222202623.4521-1-wsa+renesas@sang-engineering.com>
+ id 1gbM8v-00044v-VX
+ for linux-arm-kernel@lists.infradead.org; Mon, 24 Dec 2018 09:03:23 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=KvJJHunIA0dOFPojYvDatA2mJ0cOSRrRWN7jHv1NAhY=;
+ b=uP1AZmVp2e0jFY3nAjDachZBHlyh9sgh1igs9ocwY1eKctWpsr6fAJ6w8WcWttVh8S7uK33o06oCBXS11/ikNWHS9lcpEBSXrCUkv7uCJC5OJAG/tGUCwjWdhNX1czMwB8+e7XkuffzBMj2VQRt+npE0OnElDnsPveeY4azFMyE=
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
+ AM0PR04MB5235.eurprd04.prod.outlook.com (20.177.42.28) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1446.24; Mon, 24 Dec 2018 09:03:08 +0000
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::9125:e806:7303:d8e6]) by AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::9125:e806:7303:d8e6%7]) with mapi id 15.20.1446.026; Mon, 24 Dec 2018
+ 09:03:08 +0000
+From: Aisheng Dong <aisheng.dong@nxp.com>
+To: "Gustavo A. R. Silva" <gustavo@embeddedor.com>, Shawn Guo
+ <shawnguo@kernel.org>, Sascha Hauer <s.hauer@pengutronix.de>, Pengutronix
+ Kernel Team <kernel@pengutronix.de>, Fabio Estevam <fabio.estevam@nxp.com>,
+ dl-linux-imx <linux-imx@nxp.com>, Michael Turquette
+ <mturquette@baylibre.com>, Stephen Boyd <sboyd@kernel.org>
+Subject: RE: [PATCH] clk: imx: imx7ulp: use struct_size() in kzalloc()
+Thread-Topic: [PATCH] clk: imx: imx7ulp: use struct_size() in kzalloc()
+Thread-Index: AQHUm1OPkBqOOJvyT0mKdwNiqNhtGaWNlY6g
+Date: Mon, 24 Dec 2018 09:03:08 +0000
+Message-ID: <AM0PR04MB42110CE89585A5CA0703944280BB0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <20181224064025.GA9588@embeddedor.com>
+In-Reply-To: <20181224064025.GA9588@embeddedor.com>
+Accept-Language: zh-CN, en-US
 Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=aisheng.dong@nxp.com; 
+x-originating-ip: [119.31.174.66]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; AM0PR04MB5235;
+ 6:oXho+KqmEqjYCanWjUCwMupc3Pwbpk3KM8dDZZzLFiqr5NAy8DEFISLse4xyBefmXxLnidIhjHzFwmloZDD+JTVWy9hbvTG5/1m38DCY6yvfsYIA8zR/9VSB9nKMzjbnJIi+pjemTECZ3BjDZDvMNpC14Y1wjmREhIFOHdmFyy8nFZ3sYSoTqA8CNWME2v4G4u4vQENQBoJheFPL3Wf37EGUaxhB8yqZ8bYJybE6RfJoRUVkqaxw15Pb7mHhOQKuKW6ZTU8tqkkWrfvEfuPbItf+gRcTWBVzz4aqocIqdjrya82Gw4ss28TWTj5fu5LKmd0fiNi0eRekUp/cHrmAT/Nd18GRaWQrnvI7Ksqk6EJHVW7WL5aPNuq4ogI+rf+tv+ven1SBQVjj/iSOGjhWL7YuclCwgSZfagNnWHRLvoPkf/dIyB2WHapEAZQh7UedPGw2rCjDJE9rY4X4opkQZg==;
+ 5:t7V5eQd2MA0dlOxOXzohPJjovLC7GSm9kejYCnrqF7M6N1eSSBuJC5RojGbHiL1cpSTtwN0RMGfupR/PhL0ZkOcejkY/tYu3/LKipZbIVCRiSsXGmeE7xTwrJwylgGYm118PxLCEO1PX8nbmD7zEcGOo3IQOOVc8ssi7KAosOSk=;
+ 7:dhL9M/cEQdibAsIxsoi121mlFbiCh3BesKvKcZRifKBj0GCPIPZi0DDasA9faPcGEk3CrE57QM/j8TqyORlzO3LXBo9+NZ4RB5rHlNC1NKkMVAeJub6BFMKVjn+4LMJD2Uom4nUL/Uf81S4AX4hG1g==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: 05b81dd9-b081-4343-14d2-08d6697e9f9f
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:AM0PR04MB5235; 
+x-ms-traffictypediagnostic: AM0PR04MB5235:
+x-microsoft-antispam-prvs: <AM0PR04MB52357BFD0541A249250B2CCA80BB0@AM0PR04MB5235.eurprd04.prod.outlook.com>
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(3230021)(908002)(999002)(5005026)(6040522)(2401047)(8121501046)(3231475)(944501520)(52105112)(93006095)(93001095)(10201501046)(3002001)(6055026)(6041310)(20161123560045)(20161123562045)(20161123564045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(201708071742011)(7699051)(76991095);
+ SRVR:AM0PR04MB5235; BCL:0; PCL:0; RULEID:; SRVR:AM0PR04MB5235; 
+x-forefront-prvs: 0896BFCE6C
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(366004)(396003)(136003)(376002)(346002)(39860400002)(13464003)(199004)(189003)(81166006)(81156014)(99286004)(2906002)(76176011)(5660300001)(33656002)(8936002)(186003)(6116002)(229853002)(486006)(3846002)(476003)(4326008)(44832011)(478600001)(26005)(446003)(7696005)(11346002)(71190400001)(6506007)(6436002)(6246003)(66066001)(71200400001)(106356001)(14454004)(7736002)(105586002)(316002)(102836004)(110136005)(54906003)(25786009)(256004)(97736004)(68736007)(74316002)(9686003)(55016002)(53936002)(8676002)(86362001)(305945005);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB5235;
+ H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: BM76e7ivDBLAK48d7J7eKbZ7888bGYNtC3JTexy378jmINcNQYSkpIW5x4hgH7neCdyR98FlA2lkmpAbDyUZPKLdO4DUzEuvyfLBWIMQVS/+AWJdfX7XNufR/A4khuq94Oe/nho2AVPjAKEjBR1EJXOtrosbLLZMcz6YPttsqTkJpGq7AxGSmzMqLUvU0w+uR1JP7/D3OyB648es9l1ZojOUBeh1p27uk3MXEUx2pr97EplhbfGxlFDW9XTNuMdqPVgd97e7lJYxPMJ8iYIisGXhDZl0UweZHeNUASWcWGt2Ro3sETkoSi5uYodYu6kk
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+MIME-Version: 1.0
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 05b81dd9-b081-4343-14d2-08d6697e9f9f
+X-MS-Exchange-CrossTenant-originalarrivaltime: 24 Dec 2018 09:03:08.3521 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB5235
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181224_005549_724859_ACE1B491 
-X-CRM114-Status: GOOD (  23.60  )
+X-CRM114-CacheID: sfid-20181224_010322_028821_5688FCCB 
+X-CRM114-Status: GOOD (  12.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,76 +120,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-renesas-soc@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-pm@vger.kernel.org
+Cc: "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+> -----Original Message-----
+> From: Gustavo A. R. Silva [mailto:gustavo@embeddedor.com]
+> Sent: Monday, December 24, 2018 2:40 PM
+> 
+> One of the more common cases of allocation size calculations is finding the
+> size of a structure that has a zero-sized array at the end, along with memory
+> for some number of elements for that array. For example:
+> 
+> struct foo {
+>     int stuff;
+>     void *entry[];
+> };
+> 
+> instance = kzalloc(sizeof(struct foo) + sizeof(void *) * count, GFP_KERNEL);
+> 
+> Instead of leaving these open-coded and prone to type mistakes, we can now
+> use the new struct_size() helper:
+> 
+> instance = kzalloc(struct_size(instance, entry, count), GFP_KERNEL);
+> 
+> This issue was detected with the help of Coccinelle.
+> 
+> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
 
-On 22-12-18 21:26, Wolfram Sang wrote:
-> Here is the new version without specific I2C helpers but using the
-> 'is_suspended' flag from the PM core. I didn't like messing with the
-> flag directly, so I did a helper in patch 1. So far, I like the
-> approach. The diffstat looks nice, and i2c-rcar.c and i2c-sh_mobile.c
-> rejected rightfully too later transfers without further modifications.
-> Tested on a Renesas Lager board (R-Car H2).
-> 
-> I dropped a few Tested-by tags because I think this approach is too
-> different from V1 to keep them. I hope you guys can have a look again.
-> Thanks for all the testing, so far!
-> 
-> A branch can be found here:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git renesas/i2c/reject-when-suspended
-> 
-> If this series is acceptable, I'd suggest to take it via my i2c tree
-> after rc1. And then I'll provide an immutable branch for the PM tree to
-> pick. Let me know if this works for you.
-> 
-> And thanks to Renesas for funding this work!
+Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-Series looks good to me:
-
-Reviewed-by: Hans de Goede <hdegoede@redhat.com>
-
-Regards,
-
-Hans
-
-
-
-
-> 
-> Thanks and kind regards,
-> 
->     Wolfram
-> 
-> Wolfram Sang (9):
->    PM / core: add helper to return suspend status of a device
->    i2c: reject new transfers when adapters are suspended
->    i2c: synquacer: remove unused is_suspended flag
->    i2c: brcmstb: don't open code to reject transfers when suspended
->    i2c: zx2967: don't open code to reject transfers when suspended
->    i2c: sprd: don't use pdev as variable name for struct device *
->    i2c: sprd: don't open code to reject transfers when suspended
->    i2c: exynos5: don't open code to reject transfers when suspended
->    i2c: s3c2410: don't open code to reject transfers when suspended
-> 
->   Documentation/i2c/fault-codes      |  4 ++++
->   drivers/i2c/busses/i2c-brcmstb.c   | 22 +-------------------
->   drivers/i2c/busses/i2c-exynos5.c   | 10 ----------
->   drivers/i2c/busses/i2c-s3c2410.c   |  7 -------
->   drivers/i2c/busses/i2c-sprd.c      | 32 ++++++++++--------------------
->   drivers/i2c/busses/i2c-synquacer.c |  5 -----
->   drivers/i2c/busses/i2c-zx2967.c    |  8 --------
->   drivers/i2c/i2c-core-base.c        |  3 +++
->   drivers/i2c/i2c-core-smbus.c       |  4 ++++
->   include/linux/device.h             |  5 +++++
->   10 files changed, 27 insertions(+), 73 deletions(-)
-> 
+Regards
+Dong Aisheng
 
 _______________________________________________
 linux-arm-kernel mailing list
