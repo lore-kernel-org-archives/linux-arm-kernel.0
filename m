@@ -2,88 +2,79 @@ Return-Path: <SRS0=tR0U=PB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C7CE0C43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 13:20:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8EC29C64E75
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 15:19:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 97C3C21850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 13:20:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5D1672184A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 15:19:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iAUxuDUM";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="bZlLJOIm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 97C3C21850
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tVepsyIU";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="V7qedW9R"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5D1672184A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
-	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=fmsOwmA8gPcIVLblLtrpN/pfiZaxhEqHQQK+cmMNA1I=; b=iAUxuDUMEvPvpQ
-	3sZKh7EkrAOT0QFFVCnsrd4GoyIp740VQZE+D3JW/6k8CkYHQN5dQG9q1fSEafbkQJEkPIjnQK5V1
-	WJXAWHD7dkMjbyxnoCpnAKrLc7KsAzpYMxZBJACMXeZb7poOfOZbjGrbsmOu+HxGiYOfCn1um6GTf
-	snJeF69O7cXkCJawEzFQ29yM9it3SKBKZT+JhuxfnsOnRxyyd5h9b+SnwhrO/5mCxOZ/afoL7Cv+m
-	Gt8AyyPJRKlw7tQD1BsohDanGyKA8p1N6morkxA96+/eNC4XqOE0SLcbPlqGOhlQaGpjhxTYoj6kp
-	fLpWx+T8rS7pAFmP4pwQ==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=P1rK1UgNfNeh6kIL0ETYI7XQO4BzTjTgbzxX0+LQcfw=; b=tVepsyIUc71XNa
+	7eJmdZ3G2zFWRHRAbQmEr17hkJf3uC62pqy2ipOLgmeybBuVzifgu3oqEnrRkgqJVLy8DRY45TFMI
+	EojfS/fzZLoPOzb2jsNvoUzHUNupavM3M6v4t7u8+zPRyDWCOX5DVVSItU3BAQ4bSRka714OamzUq
+	XlQvKKxqZZ2vnUVf2OsHRDvwVb837ZWZGbtERP1WCdIZBUoohSCmA7y9ICtVR6SvYTAG1cAZ8uvrf
+	W9tQ4X6mIURvPGhHmRPkgGy+4VDMZ94fCiyyK585RZqEF5QgiunwPORkMekgaqZWBc13pPSJsQBS+
+	VIX2TdZbxTpV82/eKv/Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gbQ9O-0004BD-Tq; Mon, 24 Dec 2018 13:20:06 +0000
-Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
+	id 1gbS13-0000Di-H7; Mon, 24 Dec 2018 15:19:37 +0000
+Received: from conssluserg-04.nifty.com ([210.131.2.83])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gbQ9J-0003fE-Ex; Mon, 24 Dec 2018 13:20:03 +0000
-Received: by mail-pg1-x543.google.com with SMTP id z10so5589843pgp.7;
- Mon, 24 Dec 2018 05:19:50 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=date:from:to:cc:subject:message-id:mime-version:content-disposition
- :user-agent; bh=ta45jCjTTw9h608mLSaRumjRsUxHErr+7YYhcRdk80Q=;
- b=bZlLJOImO/1bupplpSBgyvMTMpxNs0KKCyh9eTwdH+0uwPXfvhWmQ2pAF8DBwsk9Rh
- bUzZMgNq5nuyQY4GhD3gBu+bVpcBE11KxlyMH4e4GZcPAfuh33MQNhj1AdFZ3jCDGO80
- pw0nh5Zx//0/hc8/8FFns4JVjWJHJEPmTg/eT1k0ZUpBl00xFnUcKdIg5f+PdxVKKQa5
- FCwYRtJKVzzaeQlNqWS4BSXGJQUhPC21z/MJEvaiy2M9oJNQzcrFQKX4+e8lpIRSzbhj
- CXPgWhP0XbFWNCAtL9bP3cJwnXoT0RpNFDimxMCjz/XJnM+Mzti5wvF9ze4fxY1gPbV3
- yV9A==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:mime-version
- :content-disposition:user-agent;
- bh=ta45jCjTTw9h608mLSaRumjRsUxHErr+7YYhcRdk80Q=;
- b=s5TZlSSDBY7+kPANCYg4WGsJIKrnlh85jfy0mgoDjoQNGr/psZX7MuvSsFqMDzXO9j
- HPwnjblV1WX8QpBSvubiprR6+wmABKoTk7Avdnzu+jQX11WMgTUXNd/iAcGszG5FLQXo
- YAV2Bvgejw51neckdqc78p9ZSvLKl/B6jSbbDwoTHvo10Mvt3B5bA45ZHeVDWtWwj7TW
- HHbjDZwsNkXW0NkGjDDQw4KnHmzUIReJ01jMSzP17kZXRsEj0phVmSx2RXr1aJJsaBZG
- y6CJXn+W2Yi0Nb5cz3GGQ26HO5OdC3kvVkoTYivrM1hS3HmF/Q7lN1EzdYjgFEhBwqjZ
- gelQ==
-X-Gm-Message-State: AJcUukekF4dgVosd/rWtE85e2DOvLSI3vBLaOpi6x0SbRuM/K31Z9E+L
- 0f63PXwrTyGSJs24BtvGioIIs6XD
-X-Google-Smtp-Source: ALg8bN5WlOmqbcy4mwSttJzqAgLDaKxP0MsWaY4oRqlS6nY5gpEXpC5t31E85FE+ygzeYcDzQuE9IQ==
-X-Received: by 2002:a63:db48:: with SMTP id x8mr11898908pgi.365.1545657589149; 
- Mon, 24 Dec 2018 05:19:49 -0800 (PST)
-Received: from jordon-HP-15-Notebook-PC ([106.51.18.181])
- by smtp.gmail.com with ESMTPSA id s9sm42516339pgl.88.2018.12.24.05.19.47
- (version=TLS1 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Mon, 24 Dec 2018 05:19:48 -0800 (PST)
-Date: Mon, 24 Dec 2018 18:53:40 +0530
-From: Souptick Joarder <jrdr.linux@gmail.com>
-To: akpm@linux-foundation.org, willy@infradead.org, mhocko@suse.com,
- hjc@rock-chips.com, heiko@sntech.de, airlied@linux.ie,
- linux@armlinux.org.uk, robin.murphy@arm.com
-Subject: [PATCH v5 4/9] drm/rockchip/rockchip_drm_gem.c: Convert to use
- vm_insert_range
-Message-ID: <20181224132340.GA22112@jordon-HP-15-Notebook-PC>
+ id 1gbS0z-0000Cx-N5
+ for linux-arm-kernel@lists.infradead.org; Mon, 24 Dec 2018 15:19:35 +0000
+Received: from mail-ua1-f50.google.com (mail-ua1-f50.google.com
+ [209.85.222.50]) (authenticated)
+ by conssluserg-04.nifty.com with ESMTP id wBOFIq8h016647
+ for <linux-arm-kernel@lists.infradead.org>; Tue, 25 Dec 2018 00:18:52 +0900
+DKIM-Filter: OpenDKIM Filter v2.10.3 conssluserg-04.nifty.com wBOFIq8h016647
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
+ s=dec2015msa; t=1545664733;
+ bh=UXjlcCjNBYREdXZVkdbV9tZVMZM+rHkD94gGjCVeWRU=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=V7qedW9REXOQ1L9cZ6RcS12Hrf8Ba9Q5WVW2jfUwcZ38eIvMBBOjmYNgNFYiLJMea
+ YIkVTYhm9PRpNB9JOBw4HIf0yEX3gstqDcPgPbRDsnrhFYaqGIM+qfYY6C0uIGrfBJ
+ B9ykGphR7tqYrKK/zZjF50cx1kNTxVxqYfk2b4q2OC9+4TY5plGp6HQA7VmqZcrWcN
+ MrEPlArP1org01GH8+UCPVt/UPS5lto2lxpeqhi/RWm3Sp8JcUsAmw+PZ/vA/nYLmW
+ Yijk7TMqd7f2WAbOJ55gft86LfoOzvlDHIG0oKFkH97WmokfNkxQh9xFu2gfLTkIP3
+ TQZxtCoMPPtyg==
+X-Nifty-SrcIP: [209.85.222.50]
+Received: by mail-ua1-f50.google.com with SMTP id n7so3912740uao.7
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 24 Dec 2018 07:18:52 -0800 (PST)
+X-Gm-Message-State: AJcUukfmSyZK4ykFdhwLiODRi2bJAnlVRW+nviRnEYzPcBSIiweyZPWM
+ 01CdvXNpWGLuQo/iddPKPOMdMAYijOswFfO9BCk=
+X-Google-Smtp-Source: ALg8bN45VGA3r/fkHUvZIsAF2hDkVlHRcnJf9QXZM8gm2WW9D0I2gwTzu8R+fcjlGcmnhwxPzSU1VIXVFfB/fCHKisY=
+X-Received: by 2002:a9f:3f41:: with SMTP id i1mr4798362uaj.42.1545664731483;
+ Mon, 24 Dec 2018 07:18:51 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <1545472235-12782-1-git-send-email-yamada.masahiro@socionext.com>
+In-Reply-To: <1545472235-12782-1-git-send-email-yamada.masahiro@socionext.com>
+From: Masahiro Yamada <yamada.masahiro@socionext.com>
+Date: Tue, 25 Dec 2018 00:18:15 +0900
+X-Gmail-Original-Message-ID: <CAK7LNATVQY+w3o0j6sKp7ZiLMJX2SorddmsHbskqmMwimzPh7A@mail.gmail.com>
+Message-ID: <CAK7LNATVQY+w3o0j6sKp7ZiLMJX2SorddmsHbskqmMwimzPh7A@mail.gmail.com>
+Subject: Re: [PATCH 1/3] treewide: remove explicit rules for *offsets.s
+To: Linux Kbuild mailing list <linux-kbuild@vger.kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181224_052001_516095_38D8BB18 
-X-CRM114-Status: GOOD (  14.47  )
+X-CRM114-CacheID: sfid-20181224_071933_970916_A4A062FA 
+X-CRM114-Status: GOOD (  15.39  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,61 +86,142 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-mm@kvack.org, dri-devel@lists.freedesktop.org,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-rockchip@lists.infradead.org
+Cc: Fenghua Yu <fenghua.yu@intel.com>,
+ Alexandre Belloni <alexandre.belloni@bootlin.com>,
+ Tony Luck <tony.luck@intel.com>, linux-ia64@vger.kernel.org,
+ Daniel Borkmann <daniel@iogearbox.net>, Tony Lindgren <tony@atomide.com>,
+ Networking <netdev@vger.kernel.org>, Alexei Starovoitov <ast@kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Ludovic Desroches <ludovic.desroches@microchip.com>,
+ Russell King <linux@armlinux.org.uk>, Linux-OMAP <linux-omap@vger.kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Convert to use vm_insert_range() to map range of kernel
-memory to user vma.
+On Sun, Dec 23, 2018 at 7:32 PM Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+>
+> These explicit rules are unneeded because scripts/Makefile.build
+> provides a pattern rule to create %.s from %.c
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
 
-Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
-Tested-by: Heiko Stuebner <heiko@sntech.de>
-Acked-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 14 +++-----------
- 1 file changed, 3 insertions(+), 11 deletions(-)
+Series, applied to linux-kbuild.
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-index a8db758..28458ae 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-@@ -221,26 +221,18 @@ static int rockchip_drm_gem_object_mmap_iommu(struct drm_gem_object *obj,
- 					      struct vm_area_struct *vma)
- {
- 	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
--	unsigned int i, count = obj->size >> PAGE_SHIFT;
-+	unsigned int count = obj->size >> PAGE_SHIFT;
- 	unsigned long user_count = vma_pages(vma);
--	unsigned long uaddr = vma->vm_start;
- 	unsigned long offset = vma->vm_pgoff;
- 	unsigned long end = user_count + offset;
--	int ret;
- 
- 	if (user_count == 0)
- 		return -ENXIO;
- 	if (end > count)
- 		return -ENXIO;
- 
--	for (i = offset; i < end; i++) {
--		ret = vm_insert_page(vma, uaddr, rk_obj->pages[i]);
--		if (ret)
--			return ret;
--		uaddr += PAGE_SIZE;
--	}
--
--	return 0;
-+	return vm_insert_range(vma, vma->vm_start, rk_obj->pages + offset,
-+				user_count);
- }
- 
- static int rockchip_drm_gem_object_mmap_dma(struct drm_gem_object *obj,
+
+>  Kbuild                              | 9 +--------
+>  arch/arm/mach-at91/Makefile         | 3 ---
+>  arch/arm/mach-omap2/Makefile        | 3 ---
+>  arch/ia64/kernel/Makefile           | 5 -----
+>  drivers/memory/Makefile.asm-offsets | 3 ---
+>  samples/bpf/Makefile                | 3 ---
+>  6 files changed, 1 insertion(+), 25 deletions(-)
+>
+> diff --git a/Kbuild b/Kbuild
+> index 0053042..b24210c 100644
+> --- a/Kbuild
+> +++ b/Kbuild
+> @@ -16,10 +16,6 @@ bounds-file := include/generated/bounds.h
+>  always  := $(bounds-file)
+>  targets := kernel/bounds.s
+>
+> -# We use internal kbuild rules to avoid the "is up to date" message from make
+> -kernel/bounds.s: kernel/bounds.c FORCE
+> -       $(call if_changed_dep,cc_s_c)
+> -
+>  $(obj)/$(bounds-file): kernel/bounds.s FORCE
+>         $(call filechk,offsets,__LINUX_BOUNDS_H__)
+>
+> @@ -50,10 +46,7 @@ offsets-file := include/generated/asm-offsets.h
+>  always  += $(offsets-file)
+>  targets += arch/$(SRCARCH)/kernel/asm-offsets.s
+>
+> -# We use internal kbuild rules to avoid the "is up to date" message from make
+> -arch/$(SRCARCH)/kernel/asm-offsets.s: arch/$(SRCARCH)/kernel/asm-offsets.c \
+> -                                      $(obj)/$(timeconst-file) $(obj)/$(bounds-file) FORCE
+> -       $(call if_changed_dep,cc_s_c)
+> +arch/$(SRCARCH)/kernel/asm-offsets.s: $(obj)/$(timeconst-file) $(obj)/$(bounds-file)
+>
+>  $(obj)/$(offsets-file): arch/$(SRCARCH)/kernel/asm-offsets.s FORCE
+>         $(call filechk,offsets,__ASM_OFFSETS_H__)
+> diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+> index 7415f18..f87066b 100644
+> --- a/arch/arm/mach-at91/Makefile
+> +++ b/arch/arm/mach-at91/Makefile
+> @@ -19,9 +19,6 @@ ifeq ($(CONFIG_PM_DEBUG),y)
+>  CFLAGS_pm.o += -DDEBUG
+>  endif
+>
+> -arch/arm/mach-at91/pm_data-offsets.s: arch/arm/mach-at91/pm_data-offsets.c
+> -       $(call if_changed_dep,cc_s_c)
+> -
+>  include/generated/at91_pm_data-offsets.h: arch/arm/mach-at91/pm_data-offsets.s FORCE
+>         $(call filechk,offsets,__PM_DATA_OFFSETS_H__)
+>
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> index 01377c2..55c482c 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -236,9 +236,6 @@ obj-y                                       += omap_phy_internal.o
+>
+>  obj-$(CONFIG_MACH_OMAP2_TUSB6010)      += usb-tusb6010.o
+>
+> -arch/arm/mach-omap2/pm-asm-offsets.s: arch/arm/mach-omap2/pm-asm-offsets.c
+> -       $(call if_changed_dep,cc_s_c)
+> -
+>  include/generated/ti-pm-asm-offsets.h: arch/arm/mach-omap2/pm-asm-offsets.s FORCE
+>         $(call filechk,offsets,__TI_PM_ASM_OFFSETS_H__)
+>
+> diff --git a/arch/ia64/kernel/Makefile b/arch/ia64/kernel/Makefile
+> index d0c0ccd..7372d99 100644
+> --- a/arch/ia64/kernel/Makefile
+> +++ b/arch/ia64/kernel/Makefile
+> @@ -50,10 +50,5 @@ CFLAGS_traps.o  += -mfixed-range=f2-f5,f16-f31
+>  # The gate DSO image is built using a special linker script.
+>  include $(src)/Makefile.gate
+>
+> -# We use internal kbuild rules to avoid the "is up to date" message from make
+> -arch/$(SRCARCH)/kernel/nr-irqs.s: arch/$(SRCARCH)/kernel/nr-irqs.c
+> -       $(Q)mkdir -p $(dir $@)
+> -       $(call if_changed_dep,cc_s_c)
+> -
+>  include/generated/nr-irqs.h: arch/$(SRCARCH)/kernel/nr-irqs.s FORCE
+>         $(call filechk,offsets,__ASM_NR_IRQS_H__)
+> diff --git a/drivers/memory/Makefile.asm-offsets b/drivers/memory/Makefile.asm-offsets
+> index 843ff60..f968dfa 100644
+> --- a/drivers/memory/Makefile.asm-offsets
+> +++ b/drivers/memory/Makefile.asm-offsets
+> @@ -1,5 +1,2 @@
+> -drivers/memory/emif-asm-offsets.s: drivers/memory/emif-asm-offsets.c
+> -       $(call if_changed_dep,cc_s_c)
+> -
+>  include/generated/ti-emif-asm-offsets.h: drivers/memory/emif-asm-offsets.s FORCE
+>         $(call filechk,offsets,__TI_EMIF_ASM_OFFSETS_H__)
+> diff --git a/samples/bpf/Makefile b/samples/bpf/Makefile
+> index be0a961..100a49d 100644
+> --- a/samples/bpf/Makefile
+> +++ b/samples/bpf/Makefile
+> @@ -227,9 +227,6 @@ $(LIBBPF): FORCE
+>  # Fix up variables inherited from Kbuild that tools/ build system won't like
+>         $(MAKE) -C $(dir $@) RM='rm -rf' LDFLAGS= srctree=$(BPF_SAMPLES_PATH)/../../ O=
+>
+> -$(obj)/syscall_nrs.s:  $(src)/syscall_nrs.c
+> -       $(call if_changed_dep,cc_s_c)
+> -
+>  $(obj)/syscall_nrs.h:  $(obj)/syscall_nrs.s FORCE
+>         $(call filechk,offsets,__SYSCALL_NRS_H__)
+>
+> --
+> 2.7.4
+>
+
+
 -- 
-1.9.1
-
+Best Regards
+Masahiro Yamada
 
 _______________________________________________
 linux-arm-kernel mailing list
