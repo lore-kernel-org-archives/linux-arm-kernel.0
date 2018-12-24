@@ -2,79 +2,74 @@ Return-Path: <SRS0=tR0U=PB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+X-Spam-Status: No, score=-3.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8EC29C64E75
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 15:19:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5D269C64E79
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 15:24:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5D1672184A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 15:19:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1D0D42184A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 15:24:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tVepsyIU";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="V7qedW9R"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5D1672184A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KylmLD2l";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="TATbDOi3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1D0D42184A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=P1rK1UgNfNeh6kIL0ETYI7XQO4BzTjTgbzxX0+LQcfw=; b=tVepsyIUc71XNa
-	7eJmdZ3G2zFWRHRAbQmEr17hkJf3uC62pqy2ipOLgmeybBuVzifgu3oqEnrRkgqJVLy8DRY45TFMI
-	EojfS/fzZLoPOzb2jsNvoUzHUNupavM3M6v4t7u8+zPRyDWCOX5DVVSItU3BAQ4bSRka714OamzUq
-	XlQvKKxqZZ2vnUVf2OsHRDvwVb837ZWZGbtERP1WCdIZBUoohSCmA7y9ICtVR6SvYTAG1cAZ8uvrf
-	W9tQ4X6mIURvPGhHmRPkgGy+4VDMZ94fCiyyK585RZqEF5QgiunwPORkMekgaqZWBc13pPSJsQBS+
-	VIX2TdZbxTpV82/eKv/Q==;
+	List-Owner; bh=5CjLaUBkt3gVpf3vppfAAHshFSYTbXulbUTNWIIgXMQ=; b=KylmLD2lu06/vQ
+	7z+LZAA5l9nzPXd5M8YUyvVmdHXnO1NwFuwZV4QZdhxKy07cPpQ+CenPw4752bf8ir+Cj2xbaK1Ep
+	IgUwi/bt+VI/7ej6lDLsA41N7TtC/F0qURBkXxnxvbi7smdvciContRZt85xvS/ziMLv7b82ChyPi
+	Zi0Jxc/+iyHskmHu/1e+G+qcoy+x6ddH65+AwJDQtlN06rcinFtaoyeP3O15auzQxoAnYtvI0lOwL
+	Quq6P1Cd/4KXUJfnHZbh9t2jMdsYRP1NzrgDSU/83pg920oCy5U8nvovc41mFC8ufXZh0o9cqDLEZ
+	JqCA0gIQ1E46oIR29KRg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gbS13-0000Di-H7; Mon, 24 Dec 2018 15:19:37 +0000
-Received: from conssluserg-04.nifty.com ([210.131.2.83])
+	id 1gbS5t-000220-BR; Mon, 24 Dec 2018 15:24:37 +0000
+Received: from pandora.armlinux.org.uk
+ ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gbS0z-0000Cx-N5
- for linux-arm-kernel@lists.infradead.org; Mon, 24 Dec 2018 15:19:35 +0000
-Received: from mail-ua1-f50.google.com (mail-ua1-f50.google.com
- [209.85.222.50]) (authenticated)
- by conssluserg-04.nifty.com with ESMTP id wBOFIq8h016647
- for <linux-arm-kernel@lists.infradead.org>; Tue, 25 Dec 2018 00:18:52 +0900
-DKIM-Filter: OpenDKIM Filter v2.10.3 conssluserg-04.nifty.com wBOFIq8h016647
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
- s=dec2015msa; t=1545664733;
- bh=UXjlcCjNBYREdXZVkdbV9tZVMZM+rHkD94gGjCVeWRU=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=V7qedW9REXOQ1L9cZ6RcS12Hrf8Ba9Q5WVW2jfUwcZ38eIvMBBOjmYNgNFYiLJMea
- YIkVTYhm9PRpNB9JOBw4HIf0yEX3gstqDcPgPbRDsnrhFYaqGIM+qfYY6C0uIGrfBJ
- B9ykGphR7tqYrKK/zZjF50cx1kNTxVxqYfk2b4q2OC9+4TY5plGp6HQA7VmqZcrWcN
- MrEPlArP1org01GH8+UCPVt/UPS5lto2lxpeqhi/RWm3Sp8JcUsAmw+PZ/vA/nYLmW
- Yijk7TMqd7f2WAbOJ55gft86LfoOzvlDHIG0oKFkH97WmokfNkxQh9xFu2gfLTkIP3
- TQZxtCoMPPtyg==
-X-Nifty-SrcIP: [209.85.222.50]
-Received: by mail-ua1-f50.google.com with SMTP id n7so3912740uao.7
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 24 Dec 2018 07:18:52 -0800 (PST)
-X-Gm-Message-State: AJcUukfmSyZK4ykFdhwLiODRi2bJAnlVRW+nviRnEYzPcBSIiweyZPWM
- 01CdvXNpWGLuQo/iddPKPOMdMAYijOswFfO9BCk=
-X-Google-Smtp-Source: ALg8bN45VGA3r/fkHUvZIsAF2hDkVlHRcnJf9QXZM8gm2WW9D0I2gwTzu8R+fcjlGcmnhwxPzSU1VIXVFfB/fCHKisY=
-X-Received: by 2002:a9f:3f41:: with SMTP id i1mr4798362uaj.42.1545664731483;
- Mon, 24 Dec 2018 07:18:51 -0800 (PST)
+ id 1gbS5p-0001ss-H0; Mon, 24 Dec 2018 15:24:35 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=MnCBPLk/TWveJ/PPLBS7RWz+axnrCYxLUyWpWEjxPy4=; b=TATbDOi3szvOxUTavPt0X/r70
+ vsZj5TZTSx89zhAQEl7pS0fasAu9W4Uive0aLhYKym8rlMr0h3b5qwCBM6UIqLJdkpMS98GpUMDFU
+ bc0TulCo/Wa0vECNHHWmPTUklO2uv6AO21/tGIxV+oMKw13XOlxLGMTtHjIrkIyQj253g=;
+Received: from n2100.armlinux.org.uk
+ ([2001:4d48:ad52:3201:214:fdff:fe10:4f86]:44267)
+ by pandora.armlinux.org.uk with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
+ (envelope-from <linux@armlinux.org.uk>)
+ id 1gbS2Y-0007zj-3i; Mon, 24 Dec 2018 15:21:10 +0000
+Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
+ (envelope-from <linux@n2100.armlinux.org.uk>)
+ id 1gbS2Q-00077T-Hm; Mon, 24 Dec 2018 15:21:02 +0000
+Date: Mon, 24 Dec 2018 15:20:59 +0000
+From: Russell King - ARM Linux <linux@armlinux.org.uk>
+To: Souptick Joarder <jrdr.linux@gmail.com>
+Subject: Re: [PATCH v5 0/9] Use vm_insert_range
+Message-ID: <20181224152059.GA26090@n2100.armlinux.org.uk>
+References: <20181224131841.GA22017@jordon-HP-15-Notebook-PC>
 MIME-Version: 1.0
-References: <1545472235-12782-1-git-send-email-yamada.masahiro@socionext.com>
-In-Reply-To: <1545472235-12782-1-git-send-email-yamada.masahiro@socionext.com>
-From: Masahiro Yamada <yamada.masahiro@socionext.com>
-Date: Tue, 25 Dec 2018 00:18:15 +0900
-X-Gmail-Original-Message-ID: <CAK7LNATVQY+w3o0j6sKp7ZiLMJX2SorddmsHbskqmMwimzPh7A@mail.gmail.com>
-Message-ID: <CAK7LNATVQY+w3o0j6sKp7ZiLMJX2SorddmsHbskqmMwimzPh7A@mail.gmail.com>
-Subject: Re: [PATCH 1/3] treewide: remove explicit rules for *offsets.s
-To: Linux Kbuild mailing list <linux-kbuild@vger.kernel.org>
+Content-Disposition: inline
+In-Reply-To: <20181224131841.GA22017@jordon-HP-15-Notebook-PC>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181224_071933_970916_A4A062FA 
-X-CRM114-Status: GOOD (  15.39  )
+X-CRM114-CacheID: sfid-20181224_072433_563341_F3E15171 
+X-CRM114-Status: GOOD (  14.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,142 +81,137 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Fenghua Yu <fenghua.yu@intel.com>,
- Alexandre Belloni <alexandre.belloni@bootlin.com>,
- Tony Luck <tony.luck@intel.com>, linux-ia64@vger.kernel.org,
- Daniel Borkmann <daniel@iogearbox.net>, Tony Lindgren <tony@atomide.com>,
- Networking <netdev@vger.kernel.org>, Alexei Starovoitov <ast@kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Ludovic Desroches <ludovic.desroches@microchip.com>,
- Russell King <linux@armlinux.org.uk>, Linux-OMAP <linux-omap@vger.kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: mhocko@suse.com, heiko@sntech.de, peterz@infradead.org,
+ dri-devel@lists.freedesktop.org, linux-kernel@vger.kernel.org,
+ linux-mm@kvack.org, linux1394-devel@lists.sourceforge.net,
+ m.szyprowski@samsung.com, sfr@canb.auug.org.au,
+ oleksandr_andrushchenko@epam.com, joro@8bytes.org,
+ iommu@lists.linux-foundation.org, willy@infradead.org, airlied@linux.ie,
+ linux-arm-kernel@lists.infradead.org, linux-rockchip@lists.infradead.org,
+ treding@nvidia.com, linux-media@vger.kernel.org, keescook@chromium.org,
+ pawel@osciak.com, riel@surriel.com, rppt@linux.vnet.ibm.com,
+ boris.ostrovsky@oracle.com, mchehab@kernel.org, iamjoonsoo.kim@lge.com,
+ vbabka@suse.cz, jgross@suse.com, hjc@rock-chips.com, xen-devel@lists.xen.org,
+ kyungmin.park@samsung.com, stefanr@s5r6.in-berlin.de,
+ akpm@linux-foundation.org, robin.murphy@arm.com,
+ kirill.shutemov@linux.intel.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sun, Dec 23, 2018 at 7:32 PM Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
->
-> These explicit rules are unneeded because scripts/Makefile.build
-> provides a pattern rule to create %.s from %.c
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
+Having discussed with Matthew offlist, I think we've come to the
+following conclusion - there's a number of drivers that buggily
+ignore vm_pgoff.
 
-Series, applied to linux-kbuild.
+So, what I proposed is:
 
+static int __vm_insert_range(struct vm_struct *vma, struct page *pages,
+			     size_t num, unsigned long offset)
+{
+	unsigned long count = vma_pages(vma);
+	unsigned long uaddr = vma->vm_start;
+	int ret;
 
->  Kbuild                              | 9 +--------
->  arch/arm/mach-at91/Makefile         | 3 ---
->  arch/arm/mach-omap2/Makefile        | 3 ---
->  arch/ia64/kernel/Makefile           | 5 -----
->  drivers/memory/Makefile.asm-offsets | 3 ---
->  samples/bpf/Makefile                | 3 ---
->  6 files changed, 1 insertion(+), 25 deletions(-)
->
-> diff --git a/Kbuild b/Kbuild
-> index 0053042..b24210c 100644
-> --- a/Kbuild
-> +++ b/Kbuild
-> @@ -16,10 +16,6 @@ bounds-file := include/generated/bounds.h
->  always  := $(bounds-file)
->  targets := kernel/bounds.s
->
-> -# We use internal kbuild rules to avoid the "is up to date" message from make
-> -kernel/bounds.s: kernel/bounds.c FORCE
-> -       $(call if_changed_dep,cc_s_c)
-> -
->  $(obj)/$(bounds-file): kernel/bounds.s FORCE
->         $(call filechk,offsets,__LINUX_BOUNDS_H__)
->
-> @@ -50,10 +46,7 @@ offsets-file := include/generated/asm-offsets.h
->  always  += $(offsets-file)
->  targets += arch/$(SRCARCH)/kernel/asm-offsets.s
->
-> -# We use internal kbuild rules to avoid the "is up to date" message from make
-> -arch/$(SRCARCH)/kernel/asm-offsets.s: arch/$(SRCARCH)/kernel/asm-offsets.c \
-> -                                      $(obj)/$(timeconst-file) $(obj)/$(bounds-file) FORCE
-> -       $(call if_changed_dep,cc_s_c)
-> +arch/$(SRCARCH)/kernel/asm-offsets.s: $(obj)/$(timeconst-file) $(obj)/$(bounds-file)
->
->  $(obj)/$(offsets-file): arch/$(SRCARCH)/kernel/asm-offsets.s FORCE
->         $(call filechk,offsets,__ASM_OFFSETS_H__)
-> diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-> index 7415f18..f87066b 100644
-> --- a/arch/arm/mach-at91/Makefile
-> +++ b/arch/arm/mach-at91/Makefile
-> @@ -19,9 +19,6 @@ ifeq ($(CONFIG_PM_DEBUG),y)
->  CFLAGS_pm.o += -DDEBUG
->  endif
->
-> -arch/arm/mach-at91/pm_data-offsets.s: arch/arm/mach-at91/pm_data-offsets.c
-> -       $(call if_changed_dep,cc_s_c)
-> -
->  include/generated/at91_pm_data-offsets.h: arch/arm/mach-at91/pm_data-offsets.s FORCE
->         $(call filechk,offsets,__PM_DATA_OFFSETS_H__)
->
-> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-> index 01377c2..55c482c 100644
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -236,9 +236,6 @@ obj-y                                       += omap_phy_internal.o
->
->  obj-$(CONFIG_MACH_OMAP2_TUSB6010)      += usb-tusb6010.o
->
-> -arch/arm/mach-omap2/pm-asm-offsets.s: arch/arm/mach-omap2/pm-asm-offsets.c
-> -       $(call if_changed_dep,cc_s_c)
-> -
->  include/generated/ti-pm-asm-offsets.h: arch/arm/mach-omap2/pm-asm-offsets.s FORCE
->         $(call filechk,offsets,__TI_PM_ASM_OFFSETS_H__)
->
-> diff --git a/arch/ia64/kernel/Makefile b/arch/ia64/kernel/Makefile
-> index d0c0ccd..7372d99 100644
-> --- a/arch/ia64/kernel/Makefile
-> +++ b/arch/ia64/kernel/Makefile
-> @@ -50,10 +50,5 @@ CFLAGS_traps.o  += -mfixed-range=f2-f5,f16-f31
->  # The gate DSO image is built using a special linker script.
->  include $(src)/Makefile.gate
->
-> -# We use internal kbuild rules to avoid the "is up to date" message from make
-> -arch/$(SRCARCH)/kernel/nr-irqs.s: arch/$(SRCARCH)/kernel/nr-irqs.c
-> -       $(Q)mkdir -p $(dir $@)
-> -       $(call if_changed_dep,cc_s_c)
-> -
->  include/generated/nr-irqs.h: arch/$(SRCARCH)/kernel/nr-irqs.s FORCE
->         $(call filechk,offsets,__ASM_NR_IRQS_H__)
-> diff --git a/drivers/memory/Makefile.asm-offsets b/drivers/memory/Makefile.asm-offsets
-> index 843ff60..f968dfa 100644
-> --- a/drivers/memory/Makefile.asm-offsets
-> +++ b/drivers/memory/Makefile.asm-offsets
-> @@ -1,5 +1,2 @@
-> -drivers/memory/emif-asm-offsets.s: drivers/memory/emif-asm-offsets.c
-> -       $(call if_changed_dep,cc_s_c)
-> -
->  include/generated/ti-emif-asm-offsets.h: drivers/memory/emif-asm-offsets.s FORCE
->         $(call filechk,offsets,__TI_EMIF_ASM_OFFSETS_H__)
-> diff --git a/samples/bpf/Makefile b/samples/bpf/Makefile
-> index be0a961..100a49d 100644
-> --- a/samples/bpf/Makefile
-> +++ b/samples/bpf/Makefile
-> @@ -227,9 +227,6 @@ $(LIBBPF): FORCE
->  # Fix up variables inherited from Kbuild that tools/ build system won't like
->         $(MAKE) -C $(dir $@) RM='rm -rf' LDFLAGS= srctree=$(BPF_SAMPLES_PATH)/../../ O=
->
-> -$(obj)/syscall_nrs.s:  $(src)/syscall_nrs.c
-> -       $(call if_changed_dep,cc_s_c)
-> -
->  $(obj)/syscall_nrs.h:  $(obj)/syscall_nrs.s FORCE
->         $(call filechk,offsets,__SYSCALL_NRS_H__)
->
-> --
-> 2.7.4
->
+	/* Fail if the user requested offset is beyond the end of the object */
+	if (offset > num)
+		return -ENXIO;
 
+	/* Fail if the user requested size exceeds available object size */
+	if (count > num - offset)
+		return -ENXIO;
+
+	/* Never exceed the number of pages that the user requested */
+	for (i = 0; i < count; i++) {
+		ret = vm_insert_page(vma, uaddr, pages[offset + i]);
+		if (ret < 0)
+			return ret;
+		uaddr += PAGE_SIZE;
+	}
+
+	return 0;
+}
+
+/*
+ * Maps an object consisting of `num' `pages', catering for the user's
+ * requested vm_pgoff
+ */
+int vm_insert_range(struct vm_struct *vma, struct page *pages, size_t num)
+{
+	return __vm_insert_range(vma, pages, num, vma->vm_pgoff);
+}
+
+/*
+ * Maps a set of pages, always starting at page[0]
+ */
+int vm_insert_range_buggy(struct vm_struct *vma, struct page *pages, size_t num)
+{
+	return __vm_insert_range(vma, pages, num, 0);
+}
+
+With this, drivers such as iommu/dma-iommu.c can be converted thusly:
+
+ int iommu_dma_mmap(struct page **pages, size_t size, struct vm_area_struct *vma+)
+ {
+-	unsigned long uaddr = vma->vm_start;
+-	unsigned int i, count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+-	int ret = -ENXIO;
+-
+-	for (i = vma->vm_pgoff; i < count && uaddr < vma->vm_end; i++) {
+-		ret = vm_insert_page(vma, uaddr, pages[i]);
+-		if (ret)
+-			break;
+-		uaddr += PAGE_SIZE;
+-	}
+-	return ret;
++	return vm_insert_range(vma, pages, PAGE_ALIGN(size) >> PAGE_SHIFT);
+}
+
+and drivers such as firewire/core-iso.c:
+
+ int fw_iso_buffer_map_vma(struct fw_iso_buffer *buffer,
+ 			  struct vm_area_struct *vma)
+ {
+-	unsigned long uaddr;
+-	int i, err;
+-
+-	uaddr = vma->vm_start;
+-	for (i = 0; i < buffer->page_count; i++) {
+-		err = vm_insert_page(vma, uaddr, buffer->pages[i]);
+-		if (err)
+-			return err;
+-
+-		uaddr += PAGE_SIZE;
+-	}
+-
+-	return 0;
++	return vm_insert_range_buggy(vma, buffer->pages, buffer->page_count);
+}
+
+and this gives us something to grep for to find these buggy drivers.
+
+Now, this may not look exactly equivalent, but if you look at
+fw_device_op_mmap(), buffer->page_count is basically vma_pages(vma)
+at this point, which means this should be equivalent.
+
+We _could_ then at a later date "fix" these drivers to behave according
+to the normal vm_pgoff offsetting simply by removing the _buggy suffix
+on the function name... and if that causes regressions, it gives us an
+easy way to revert (as long as vm_insert_range_buggy() remains
+available.)
+
+In the case of firewire/core-iso.c, it currently ignores the mmap offset
+entirely, so making the above suggested change would be tantamount to
+causing it to return -ENXIO for any non-zero mmap offset.
+
+IMHO, this approach is way simpler, and easier to get it correct at
+each call site, rather than the current approach which seems to be
+error-prone.
 
 -- 
-Best Regards
-Masahiro Yamada
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
 
 _______________________________________________
 linux-arm-kernel mailing list
