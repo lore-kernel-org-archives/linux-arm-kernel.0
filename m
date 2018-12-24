@@ -2,88 +2,93 @@ Return-Path: <SRS0=tR0U=PB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B39E0C64E79
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 22:01:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 28803C64E75
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 22:01:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7D087218B0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 22:01:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E3BED21850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 22:01:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ENlpc7Lh";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="uZ0Xpyz1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7D087218B0
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ne9KbAwx";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="PZOZAmER"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E3BED21850
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=MlvVrYUsNch0lDG9V7yVn0ttueShzeCJMNDxEpKtPDA=; b=ENl
-	pc7LhbatiTqclnlTD4hkZJmf9I5/Jsv/vrNfxY1jfls2Gc9IARKV8MFS57pVfP6g2y/c/0ut02MCj
-	W8XudyofS/RTd3kldnLWHDBWeheCofAD27//bSYiGSxB5SZ+ctpOn0vNIAPwygBlgiFfwVqCISWHE
-	Ef0D9yyHejfkkuwpHJzRpRNSwUHpUPI+yQKB1vmYTadxT01/EIusM71v3YBqZgj28la2VGN2hxVuW
-	uXvSFvJH2mLujV1CsZe/ym1Xk6Z7Yt5bPAiLnLVj7Z9S74H8ExKuDAioD0pOirlSAfw7ryU81PSh9
-	hV8lBEs05+SzvS6MrxoJUbYVjdFQ5tg==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=KNdfAG8bJskVuPSqkdhfgj4dOHEkcDtSJLpk+XJUJJk=; b=Ne9KbAwx4j51CxSGYJcNcauMt3
+	FJYrcfec6DJzS7LXslEmyo1fbUYXR/gMYqlPVSf8NS8+gezmnlhNyPoSs8pYhlfnxnccICY1jpp99
+	OPqsopk870wfvPTrjDh1Y1HIRN5Cg/KeJ3ZAfNmzWIgrUVXzF+VUdqkoM0g7+VCO/yqJ3TnJ+bSpy
+	3NL99HdIrmYoD8w2cwZMvYShYMmCdW878JFf0sZR9ff4G2haiTivMttSlNk/6N6HiAp59wKC1sqjB
+	JavDECDJZvH/SYYLVX79PmUTEdD+wFafGaka0GR25gwZBvHmNyTOmfgVEljEXD0qmsHRFg6xkdWf0
+	e9YKyPXQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gbYHd-0004Jl-95; Mon, 24 Dec 2018 22:01:09 +0000
-Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+	id 1gbYHx-0004dU-4u; Mon, 24 Dec 2018 22:01:29 +0000
+Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gbYHa-0004HF-8g
- for linux-arm-kernel@lists.infradead.org; Mon, 24 Dec 2018 22:01:07 +0000
-Received: by mail-wm1-x344.google.com with SMTP id g67so12631670wmd.2
+ id 1gbYHa-0004HI-Vq
+ for linux-arm-kernel@lists.infradead.org; Mon, 24 Dec 2018 22:01:08 +0000
+Received: by mail-wr1-x444.google.com with SMTP id v13so12540883wrw.5
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 24 Dec 2018 14:00:53 -0800 (PST)
+ Mon, 24 Dec 2018 14:00:55 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id;
- bh=wETRVoQwq1FJW2ofgoSV5BYdsGt8DeR49CADrQfmLZQ=;
- b=uZ0Xpyz1noBUtZPxGKJ88kUMB4+4hExjDMX9qwFOotCt/KgmhEvrhd06QkosTAcFXO
- 8vi+xlJIrZt5jIyzBvZ3+Q6Btapx2lrEwSl4g2FDulaYcKUUL8xEXNI/JVB/Tnzp9Lom
- HNJrqFbyNjp0QEnDTZxxMHKXL0feL6qwUMyTs18RWriJUjNKDxxOE0YUPxRyYjzQMcKJ
- VVnMP54amhQvIAEsJbOmvf7EphWqpLIzioEk5IIlMnVkAnSAvSN+fJfL0ubQDmyg2uzH
- AdWY8rxb19LM2dM7nUIbiDyTUzD3nVgOdIPhJpLM5i2p+cMJbwaXbbUDpvu422LFKWpL
- w7zw==
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=UVK3picnxEN2rlJmIqzlDdlyx6P0B1CQOZKOVIBWBms=;
+ b=PZOZAmER3sPxNMpPc/WXdL58IrIRLODqkUw3bojdeQ3GkKKKPv/h7ZsT4fo+4z/hS1
+ PHOHfr9KEYDp31+vpVyKdTqZMC6p11vhcTZ8dx8BGDPlocuDSExLak3tvlbd/uMkgJ6y
+ eGN4wk74qAh2ref8/V0EiEIUsPTKoSI7+THMjI2gnxO5fSDKjTPeyoEzxFAFJtwkDTTc
+ gSdVf9ECJDf5gsqOJpNMCI3RN/gAESsQe0jkz+ZcMgVkyBoWmLRTgIVvYT69Jv12p+xq
+ oMSN1UE46oeqdAuO24TcBqZgiCWa8iQNBnJARoRt+blAJdK++QsQjTDGiH72mLgytrqH
+ //+g==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=wETRVoQwq1FJW2ofgoSV5BYdsGt8DeR49CADrQfmLZQ=;
- b=crw5MKTdNYL/cLJ9GXDARoKzHpJDOiGVDtWiPvyhWECMCTh+T+4jwdv7yWkdA7XDow
- 0wmmxiPboAYFnK2Xq84aR0Z++0CifyIW2vPGMk55sDi/d5oZwnK/axRQzw0My5L4Inn2
- K2D8El02gJhW7mt8aM/QPXV+YcaG/FclOzr9qSDZvr8qx+5R66ldcKdONnw5pQNJvKrn
- LgxT1S0z6AIGVPfrIGdhX2pIitnFR9aZUXnU2gA6QBxxm0z4EidGgK7n9UQUAnZWN/K4
- rLzbyIK4iEfskdFV1avfyAmVkPhZ7RRxfXs37cUWDpHO2M99Fedy4ZY6d+rWGR5QpI8u
- wJMw==
-X-Gm-Message-State: AA+aEWamAXCxrMGhC8EftcX0PpOSVM4rVVUji7HeWEagnfiSUqZC6ngb
- w4Kzlz2D9rIIt/YzVXrfMW4=
-X-Google-Smtp-Source: ALg8bN6QPiUZSycrwzktCXQiDQnfq6CwkVEziEhl8FcqE9l6gWGjcjn21/n52shhQZmbM0RuFZfxGg==
-X-Received: by 2002:a1c:f613:: with SMTP id w19mr13371149wmc.0.1545688852372; 
- Mon, 24 Dec 2018 14:00:52 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references;
+ bh=UVK3picnxEN2rlJmIqzlDdlyx6P0B1CQOZKOVIBWBms=;
+ b=nzyRehhq04Jxm7YkcsCM2QAYyjP3MMFLMqv6uWZNKqy/lI/RQjDeUbHsLfkhaF/PCV
+ AsUd2XWZ3U428THaRUD5bi/AJsUZf9m6TD/8H7xNzWtZCl713MYD9uAGQ091HsNGhOS9
+ jxu4dO0nB+/Z+HRez0Qiyze/+oIkwj5pBLN5CFITnEZ+zLmzigzJwvAJ3hM3WFSWSWuM
+ OinaRnHEIizOgFMn0SSIhWM0Qu6f2gCVLTmxoUmjv78s/iPZ968s3I4GnZ6o8QJO/mqL
+ LmAK9tklB5CEhlHDOLqWsp8YtylpEDYh/BkX8R+e14xVpQnXKQJi136l+Hl+6V9F7U77
+ h9aw==
+X-Gm-Message-State: AJcUukczFKo8rbJC+bQV2plIJkjPXkr+UJh1piUYcZvfJqnBnmxjk0bn
+ 2YffPPSP/o1x+e43ac235HE=
+X-Google-Smtp-Source: ALg8bN467yOrdPebH2WOjaiAY3PdvXhrHguy4lWN8PvunBAYBSuw1x0bianSlOoMdTk17vkTGh5xBw==
+X-Received: by 2002:adf:c505:: with SMTP id q5mr12824650wrf.84.1545688854136; 
+ Mon, 24 Dec 2018 14:00:54 -0800 (PST)
 Received: from gapa-Lenovo-IdeaPad-Y580.home (daw20.neoplus.adsl.tpnet.pl.
  [83.23.22.20])
- by smtp.gmail.com with ESMTPSA id d4sm23970153wrp.89.2018.12.24.14.00.50
+ by smtp.gmail.com with ESMTPSA id d4sm23970153wrp.89.2018.12.24.14.00.52
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Mon, 24 Dec 2018 14:00:51 -0800 (PST)
+ Mon, 24 Dec 2018 14:00:53 -0800 (PST)
 From: cezary.gapinski@gmail.com
 To: Mark Brown <broonie@kernel.org>, linux-spi@vger.kernel.org,
  linux-stm32@st-md-mailman.stormreply.com,
  linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
  Rob Herring <robh+dt@kernel.org>, devicetree@vger.kernel.org,
  Amelie Delaunay <amelie.delaunay@st.com>
-Subject: [PATCH v2 00/14] Add support for STM32F4 SPI
-Date: Mon, 24 Dec 2018 23:00:26 +0100
-Message-Id: <1545688840-23992-1-git-send-email-cezary.gapinski@gmail.com>
+Subject: [PATCH v2 01/14] spi: stm32: switch to SPDX identifier
+Date: Mon, 24 Dec 2018 23:00:27 +0100
+Message-Id: <1545688840-23992-2-git-send-email-cezary.gapinski@gmail.com>
 X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1545688840-23992-1-git-send-email-cezary.gapinski@gmail.com>
+References: <1545688840-23992-1-git-send-email-cezary.gapinski@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181224_140106_311027_15CDAACC 
-X-CRM114-Status: GOOD (  13.46  )
+X-CRM114-CacheID: sfid-20181224_140107_029014_7C088E3A 
+X-CRM114-Status: GOOD (  13.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,52 +112,49 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Cezary Gapinski <cezary.gapinski@gmail.com>
 
-This series of patches adds support for first generation of SPI
-interface for STM32F4 family.
+Adopt the SPDX license identifier headers to ease license compliance
+management.
 
-This version of driver is mostly different to STM32H7 one. Based on
-linux kernel I2C drivers for STM32 where drivers were splited into
-STM32F4 and STM32F7 family the same approach seems to be sufficient for
-SPI STM32 drivers. Therefore STM32H7 driver was moved to spi-stm32h7.c
-file and register and functions were renamed to be more specific to
-STM32H7.
+Signed-off-by: Cezary Gapinski <cezary.gapinski@gmail.com>
+---
+ drivers/spi/spi-stm32.c | 27 +++++++--------------------
+ 1 file changed, 7 insertions(+), 20 deletions(-)
 
-For current version master mode with full-duplex and 8/16 bit data
-frame format are supported. There is no TX and RX FIFOs like
-in STM32H7. DMA capabilility is supported for messages longer than
-arbitrary number of bytes (that is set already to 16 bytes) when TX
-and RX channels are set at the same time.
-
-v2:
-Based on Amelie Delaunay recommendation only one common file
-spi-stm32.c is used. Before adding support for STM32F4 driver, first six
-patches adds some improvements to actual driver.
-Next patches rearrange driver to be more useful for new STM32F4 SPI
-and adding support for this family.
-This version also supports simplex-tx and 3wire-tx modes.
-
-Cezary Gapinski (14):
-  spi: stm32: switch to SPDX identifier
-  spi: stm32: use NULL pointer instead of plain integer
-  spi: stm32: fix DMA configuration with only one channel
-  spi: fix typo in SPI_STM32 help text
-  spi: stm32: use explicit CPOL and CPHA mode bits
-  spi: stm32: remove SPI LOOP mode
-  spi: stm32: rename STM32 SPI registers to STM32H7
-  spi: stm32: rename interrupt function
-  spi: stm32: split transfer one setup function
-  spi: stm32: add start dma transfer function
-  spi: stm32: introduce compatible data cfg
-  spi: stm32: add support for STM32F4
-  ARM: dts: stm32: add SPI support on STM32F429 SoC
-  spi: stm32: add description about STM32F4 bindings
-
- .../devicetree/bindings/spi/spi-stm32.txt          |    9 +-
- arch/arm/boot/dts/stm32f429.dtsi                   |   60 +
- drivers/spi/Kconfig                                |    2 +-
- drivers/spi/spi-stm32.c                            | 1403 +++++++++++++++-----
- 4 files changed, 1139 insertions(+), 335 deletions(-)
-
+diff --git a/drivers/spi/spi-stm32.c b/drivers/spi/spi-stm32.c
+index ad1e55d..5f30578 100644
+--- a/drivers/spi/spi-stm32.c
++++ b/drivers/spi/spi-stm32.c
+@@ -1,23 +1,10 @@
+-/*
+- * STMicroelectronics STM32 SPI Controller driver (master mode only)
+- *
+- * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
+- * Author(s): Amelie Delaunay <amelie.delaunay@st.com> for STMicroelectronics.
+- *
+- * License terms: GPL V2.0.
+- *
+- * spi_stm32 driver is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU General Public License version 2 as published by
+- * the Free Software Foundation.
+- *
+- * spi_stm32 driver is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+- * details.
+- *
+- * You should have received a copy of the GNU General Public License along with
+- * spi_stm32 driver. If not, see <http://www.gnu.org/licenses/>.
+- */
++// SPDX-License-Identifier: GPL-2.0
++//
++// STMicroelectronics STM32 SPI Controller driver (master mode only)
++//
++// Copyright (C) 2017, STMicroelectronics - All Rights Reserved
++// Author(s): Amelie Delaunay <amelie.delaunay@st.com> for STMicroelectronics.
++
+ #include <linux/debugfs.h>
+ #include <linux/clk.h>
+ #include <linux/delay.h>
 -- 
 2.7.4
 
