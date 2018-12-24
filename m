@@ -2,72 +2,84 @@ Return-Path: <SRS0=tR0U=PB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,FREEMAIL_REPLYTO_END_DIGIT,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8BD8FC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 04:34:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E59D4C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 05:51:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 59B5D21773
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 04:34:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AFE0721738
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 05:51:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jBsHJ4vd";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="mjMcAr/3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 59B5D21773
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mail.asiacob.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q6cO9iJW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AFE0721738
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=embeddedor.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Reply-To:List-Subscribe:List-Help:
-	List-Post:List-Archive:List-Unsubscribe:List-Id:MIME-Version:Subject:
-	Message-ID:To:From:Date:Cc:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=1dYHOMSOvK2pneCL+6LUCpvI8LBEMYbUjUMm/96sQCg=; b=jBs
-	HJ4vdKd4wlFFUe7kID0/N0ph3MLuE82o8aE+hGaRgKCV4jccsNpV3QGI9iproAs7PVBT5YMFQXdOe
-	tc3MtDDiVOxOHa39Vp7SJQFtQ4Q/tNjKlOmmwkQLTGP2pyhptp9vtjF2+Ny7BucotOiiI1SOWCDB2
-	s3M8hkMn1Y0CU2CS49QQejoC5rSFexL8qQa9isBRu9wwOmp2bvEEUS4jpJ7ng0B6CLESKShrl+zHW
-	B6lxKjH33VeB90VRZgkJ9RYxgzHQ33Nux7U0mnWxW/3QSLFGXycWsOw1OIbR5BY2jrxECQdEGLTSL
-	wt5WrQaZfLN7ZAIXvmbCNPtgwUhpZmQ==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=tLwQzjtSHcdp5q15M7L18pnb5uo7IErjPTR7ioqXZQY=; b=Q6cO9iJWzjze5b
+	epC2sl2KgnWcGdv6cDDXd+PFYWQ4Dfi7ZSsIE30Qx2klbu4wu/+Fe5mrWi2BrIEIYIzxaLJD3e87p
+	5Jez3wJuopUzlatvJ9PH92hiqUIgbI5YbD/lhInioREMkFpSXquUwyNadb+vTUomu7MyArTkkil9W
+	FM1z3iBpj6Ej9J+6/csiIGPDLnJb9uAxH7anMidJ5GSmcQ6uDnDHaM5RLFVIhRlD4gG1VpGxyQzOQ
+	lTS7QcQtYcvQjAp2HsXYN1G6elkl7/mIjUnnw4gWIIMijNPd1AvtBAOeUUGgpP52tc7jVo8VriilP
+	DE7otzClXgFqKRwX+muA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gbHwV-0004KX-Ao; Mon, 24 Dec 2018 04:34:15 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1gbJ9I-0003yC-P7; Mon, 24 Dec 2018 05:51:32 +0000
+Received: from gateway34.websitewelcome.com ([192.185.150.114])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gbHwS-0004KK-SX
- for linux-arm-kernel@bombadil.infradead.org; Mon, 24 Dec 2018 04:34:12 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:Content-Type:
- MIME-Version:Subject:Message-ID:To:Reply-To:From:Date:Sender:Cc:Content-ID:
- Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
- :Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:
- List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=PACHUPhPa0bGIUqlay2A0RhyP/kGU6Txw3OlnUaK7c4=; b=mjMcAr/3CJ4eu+XGroN74qLlpk
- idLhsjpGSFzO214e8FMJo/NMY5875BRyV07FsfCsseEE8EQ2Ru54XIiiw2IRPIzHND7xNwXAaN8w2
- Z7KXOjLryNqY18GU7azn/nWmQAzV2bERkVqUH5YOzXqCaXrNvtd4ITIeDsBYQ1rHxaK5HJGGgnPEN
- ci1vNFRVhPlckBNA30MusIdS0U3HwaHiJ7vNTe2PbCCBLQnG2j/S0smOWEYTtbAUqFtAxZlmSODOl
- gsEMmwmG8jnRBSAggOknXPci1it25G1an3gCaRktKjTKn3zEaFQ2HVrq9S5FIFucmEw/m12SxeJxw
- 8sxhV/jw==;
-Received: from [195.22.13.238] (helo=mx.chimarrao.pt)
- by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gbHwP-00076Y-Lr
- for linux-arm-kernel@lists.infradead.org; Mon, 24 Dec 2018 04:34:10 +0000
-Received: from 192.168.1.3 (217.217.179.17.dyn.user.ono.com [217.217.179.17])
- (authenticated bits=0)
- by mx.chimarrao.pt (8.13.8/8.13.8) with ESMTP id wBO4XS3d021656
- for <linux-arm-kernel@lists.infradead.org>; Mon, 24 Dec 2018 04:33:30 GMT
-Date: Mon, 24 Dec 2018 05:33:27 +0100 (CET)
-From: Peter Wong <Peterwong@mail.asiacob.com>
-To: linux-arm-kernel@lists.infradead.org
-Message-ID: <22497222.180990.1545626008308.JavaMail.cash@195.22.13.238>
-Subject: Investment opportunity
+ id 1gbJ9E-0003v7-OZ
+ for linux-arm-kernel@lists.infradead.org; Mon, 24 Dec 2018 05:51:30 +0000
+Received: from cm12.websitewelcome.com (cm12.websitewelcome.com [100.42.49.8])
+ by gateway34.websitewelcome.com (Postfix) with ESMTP id C1152A83CA
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sun, 23 Dec 2018 23:51:05 -0600 (CST)
+Received: from gator4166.hostgator.com ([108.167.133.22]) by cmsmtp with SMTP
+ id bJ8rg8byZiQerbJ8rgDFyE; Sun, 23 Dec 2018 23:51:05 -0600
+X-Authority-Reason: nr=8
+Received: from [189.250.106.44] (port=49820 helo=embeddedor)
+ by gator4166.hostgator.com with esmtpa (Exim 4.91)
+ (envelope-from <gustavo@embeddedor.com>)
+ id 1gbJ8q-00478n-9u; Sun, 23 Dec 2018 23:51:04 -0600
+Date: Sun, 23 Dec 2018 23:50:58 -0600
+From: "Gustavo A. R. Silva" <gustavo@embeddedor.com>
+To: Jolly Shah <jolly.shah@xilinx.com>,
+ Michael Turquette <mturquette@baylibre.com>,
+ Stephen Boyd <sboyd@kernel.org>, Michal Simek <michal.simek@xilinx.com>
+Subject: [PATCH] clk: zynqmp: Fix memory allocation in zynqmp_clk_setup
+Message-ID: <20181224055058.GA23947@embeddedor.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+User-Agent: Mutt/1.9.4 (2018-02-28)
+X-AntiAbuse: This header was added to track abuse,
+ please include it with any abuse report
+X-AntiAbuse: Primary Hostname - gator4166.hostgator.com
+X-AntiAbuse: Original Domain - lists.infradead.org
+X-AntiAbuse: Originator/Caller UID/GID - [47 12] / [47 12]
+X-AntiAbuse: Sender Address Domain - embeddedor.com
+X-BWhitelist: no
+X-Source-IP: 189.250.106.44
+X-Source-L: No
+X-Exim-ID: 1gbJ8q-00478n-9u
+X-Source: 
+X-Source-Args: 
+X-Source-Dir: 
+X-Source-Sender: (embeddedor) [189.250.106.44]:49820
+X-Source-Auth: gustavo@embeddedor.com
+X-Email-Count: 11
+X-Source-Cap: Z3V6aWRpbmU7Z3V6aWRpbmU7Z2F0b3I0MTY2Lmhvc3RnYXRvci5jb20=
+X-Local-Domain: yes
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181223_233409_996768_0941F168 
-X-CRM114-Status: UNSURE (  -0.89  )
+X-CRM114-CacheID: sfid-20181223_215128_843460_003B2957 
+X-CRM114-Status: UNSURE (   8.37  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -80,21 +92,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Reply-To: Peter Wong <pw178484@gmail.com>
+Cc: "Gustavo A. R. Silva" <gustavo@embeddedor.com>, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Greetings, 
-I am contacting you for a proffer to invest in any profitable business in your country. 
-We offer a quick loan at low interest rate, if you are interested E-mail: mdpeterwonghk@naver.com Sincerely: Peter Wong
+Fix memory allocation and use struct_size() in kzalloc().
 
+Fixes: 3fde0e16d016 ("drivers: clk: Add ZynqMP clock driver")
+Cc: stable@vger.kernel.org
+Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
+---
+ drivers/clk/zynqmp/clkc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-
-
-----------------------------------------------------
-This email was sent by the shareware version of Postman Professional.
+diff --git a/drivers/clk/zynqmp/clkc.c b/drivers/clk/zynqmp/clkc.c
+index f65cc0ff76ab..b0908ec62f73 100644
+--- a/drivers/clk/zynqmp/clkc.c
++++ b/drivers/clk/zynqmp/clkc.c
+@@ -669,8 +669,8 @@ static int zynqmp_clk_setup(struct device_node *np)
+ 	if (ret)
+ 		return ret;
+ 
+-	zynqmp_data = kzalloc(sizeof(*zynqmp_data) + sizeof(*zynqmp_data) *
+-						clock_max_idx, GFP_KERNEL);
++	zynqmp_data = kzalloc(struct_size(zynqmp_data, hws, clock_max_idx),
++			      GFP_KERNEL);
+ 	if (!zynqmp_data)
+ 		return -ENOMEM;
+ 
+-- 
+2.17.0
 
 
 _______________________________________________
