@@ -2,83 +2,88 @@ Return-Path: <SRS0=tR0U=PB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EF033C64E75
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 21:33:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B39E0C64E79
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 22:01:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BD85F2184A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 21:33:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7D087218B0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 22:01:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kCdLaBB1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BD85F2184A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ENlpc7Lh";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="uZ0Xpyz1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7D087218B0
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Content-Type:
-	In-Reply-To:MIME-Version:Date:Message-ID:From:References:To:Subject:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=2ZRRnr/oF4ouGatyRekI3m69RS5IQVqeV3kLjp80uls=; b=kCdLaBB15zsLoUATrR+fPpnQx
-	+tiADMwbjCFifZmDYn5nQ5/4KDf+kgXGcm8PX+mdVBVZ0dmJwaIU/JlHZYqiqsqNOqEH1fs1je4Oe
-	8P8JbJ4TlEKLMnuVp6SCGX3UDGaWuzk0T94lhFjfLdHj1oxa7iBoySXmVYcxrsTLM+5O6ZC9FBzC8
-	77CVhLanvc2ambN07jA57U6FbfybFlRGM2pi1LLex2MxpnV7zFzFhBtWNePnAxUhteoKFy0mTWWuR
-	60yQKxQQuhe22jA3CfE6q77pj/ijtQAqcuwqO0dMAxFSo4P7SgFjaXuxqTb57JLwaLTS/boRlX0Ap
-	Aqaz6heoA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=MlvVrYUsNch0lDG9V7yVn0ttueShzeCJMNDxEpKtPDA=; b=ENl
+	pc7LhbatiTqclnlTD4hkZJmf9I5/Jsv/vrNfxY1jfls2Gc9IARKV8MFS57pVfP6g2y/c/0ut02MCj
+	W8XudyofS/RTd3kldnLWHDBWeheCofAD27//bSYiGSxB5SZ+ctpOn0vNIAPwygBlgiFfwVqCISWHE
+	Ef0D9yyHejfkkuwpHJzRpRNSwUHpUPI+yQKB1vmYTadxT01/EIusM71v3YBqZgj28la2VGN2hxVuW
+	uXvSFvJH2mLujV1CsZe/ym1Xk6Z7Yt5bPAiLnLVj7Z9S74H8ExKuDAioD0pOirlSAfw7ryU81PSh9
+	hV8lBEs05+SzvS6MrxoJUbYVjdFQ5tg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gbXqc-0003kL-4O; Mon, 24 Dec 2018 21:33:14 +0000
-Received: from mail-wr1-f66.google.com ([209.85.221.66])
+	id 1gbYHd-0004Jl-95; Mon, 24 Dec 2018 22:01:09 +0000
+Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gbXqY-0003iu-Eh
- for linux-arm-kernel@lists.infradead.org; Mon, 24 Dec 2018 21:33:12 +0000
-Received: by mail-wr1-f66.google.com with SMTP id s12so12485984wrt.4
+ id 1gbYHa-0004HF-8g
+ for linux-arm-kernel@lists.infradead.org; Mon, 24 Dec 2018 22:01:07 +0000
+Received: by mail-wm1-x344.google.com with SMTP id g67so12631670wmd.2
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 24 Dec 2018 13:32:59 -0800 (PST)
+ Mon, 24 Dec 2018 14:00:53 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id;
+ bh=wETRVoQwq1FJW2ofgoSV5BYdsGt8DeR49CADrQfmLZQ=;
+ b=uZ0Xpyz1noBUtZPxGKJ88kUMB4+4hExjDMX9qwFOotCt/KgmhEvrhd06QkosTAcFXO
+ 8vi+xlJIrZt5jIyzBvZ3+Q6Btapx2lrEwSl4g2FDulaYcKUUL8xEXNI/JVB/Tnzp9Lom
+ HNJrqFbyNjp0QEnDTZxxMHKXL0feL6qwUMyTs18RWriJUjNKDxxOE0YUPxRyYjzQMcKJ
+ VVnMP54amhQvIAEsJbOmvf7EphWqpLIzioEk5IIlMnVkAnSAvSN+fJfL0ubQDmyg2uzH
+ AdWY8rxb19LM2dM7nUIbiDyTUzD3nVgOdIPhJpLM5i2p+cMJbwaXbbUDpvu422LFKWpL
+ w7zw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language;
- bh=wEGryfaejhg6mjVm2qvFTPe18tWQUbjlHrwN1JnARk4=;
- b=k5e860/0+Yzeb0Xa1y0ox+XICj6rWi0pMMYjrAMKfkaIyz2O9Lk9gWAA/ae+Xktn97
- VGp2y9gIyTXOQuUsQBYu8QhUpsRt9jwjUHDyhXszr41MU8OiZ1IwDMJJpRRQH89Np1P6
- IAemYMFEtXKyIoMuylm46ENe2ztESlpnGk/LSIw3FevJKQjOpc5ZpRZoQ2zSeB6NoF6N
- zpwupESZ7Hx8RIz6MADEx21Y3N54i93gVdFxZDQUywXbatj25cElJ006dhufoOHXiB9v
- H8GL7Y0tKiPQqID7yOI65Qf0f6ok0cEy52zWOkBvJUvYbTVSd5aNBVV5PR3jFS6IvGuV
- x9cQ==
-X-Gm-Message-State: AJcUukeYnAznk3sd22/u+7CojE6gzyPpmJeF5o5bKWTQkqgga3kTGV1m
- FxvOc1o5CfHa1ttgU4WpGwK4iw==
-X-Google-Smtp-Source: ALg8bN5872VPPSdN/haOgF28eDWn/R1eFPkCj0/A7LR6ojPm6L5if03uBGN3X7vlYQM+q2T/x9WM7g==
-X-Received: by 2002:adf:f691:: with SMTP id v17mr12543563wrp.114.1545687177522; 
- Mon, 24 Dec 2018 13:32:57 -0800 (PST)
-Received: from shalem.localdomain (546A5441.cm-12-3b.dynamic.ziggo.nl.
- [84.106.84.65])
- by smtp.gmail.com with ESMTPSA id 143sm22825914wml.14.2018.12.24.13.32.56
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 24 Dec 2018 13:32:56 -0800 (PST)
-Subject: Re: [PATCH v2 2/9] i2c: reject new transfers when adapters are
- suspended
-To: Wolfram Sang <wsa+renesas@sang-engineering.com>, linux-i2c@vger.kernel.org
-References: <20181222202623.4521-1-wsa+renesas@sang-engineering.com>
- <20181222202623.4521-3-wsa+renesas@sang-engineering.com>
-From: Hans de Goede <hdegoede@redhat.com>
-Message-ID: <5e560c2e-4da9-05ef-9bfa-3391fdd8ad23@redhat.com>
-Date: Mon, 24 Dec 2018 22:32:55 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
-MIME-Version: 1.0
-In-Reply-To: <20181222202623.4521-3-wsa+renesas@sang-engineering.com>
-Content-Type: multipart/mixed; boundary="------------34983B75F30C509E4209A341"
-Content-Language: en-US
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=wETRVoQwq1FJW2ofgoSV5BYdsGt8DeR49CADrQfmLZQ=;
+ b=crw5MKTdNYL/cLJ9GXDARoKzHpJDOiGVDtWiPvyhWECMCTh+T+4jwdv7yWkdA7XDow
+ 0wmmxiPboAYFnK2Xq84aR0Z++0CifyIW2vPGMk55sDi/d5oZwnK/axRQzw0My5L4Inn2
+ K2D8El02gJhW7mt8aM/QPXV+YcaG/FclOzr9qSDZvr8qx+5R66ldcKdONnw5pQNJvKrn
+ LgxT1S0z6AIGVPfrIGdhX2pIitnFR9aZUXnU2gA6QBxxm0z4EidGgK7n9UQUAnZWN/K4
+ rLzbyIK4iEfskdFV1avfyAmVkPhZ7RRxfXs37cUWDpHO2M99Fedy4ZY6d+rWGR5QpI8u
+ wJMw==
+X-Gm-Message-State: AA+aEWamAXCxrMGhC8EftcX0PpOSVM4rVVUji7HeWEagnfiSUqZC6ngb
+ w4Kzlz2D9rIIt/YzVXrfMW4=
+X-Google-Smtp-Source: ALg8bN6QPiUZSycrwzktCXQiDQnfq6CwkVEziEhl8FcqE9l6gWGjcjn21/n52shhQZmbM0RuFZfxGg==
+X-Received: by 2002:a1c:f613:: with SMTP id w19mr13371149wmc.0.1545688852372; 
+ Mon, 24 Dec 2018 14:00:52 -0800 (PST)
+Received: from gapa-Lenovo-IdeaPad-Y580.home (daw20.neoplus.adsl.tpnet.pl.
+ [83.23.22.20])
+ by smtp.gmail.com with ESMTPSA id d4sm23970153wrp.89.2018.12.24.14.00.50
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Mon, 24 Dec 2018 14:00:51 -0800 (PST)
+From: cezary.gapinski@gmail.com
+To: Mark Brown <broonie@kernel.org>, linux-spi@vger.kernel.org,
+ linux-stm32@st-md-mailman.stormreply.com,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
+ Rob Herring <robh+dt@kernel.org>, devicetree@vger.kernel.org,
+ Amelie Delaunay <amelie.delaunay@st.com>
+Subject: [PATCH v2 00/14] Add support for STM32F4 SPI
+Date: Mon, 24 Dec 2018 23:00:26 +0100
+Message-Id: <1545688840-23992-1-git-send-email-cezary.gapinski@gmail.com>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181224_133310_498240_276AE1EA 
-X-CRM114-Status: GOOD (  32.06  )
+X-CRM114-CacheID: sfid-20181224_140106_311027_15CDAACC 
+X-CRM114-Status: GOOD (  13.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,199 +95,69 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-renesas-soc@vger.kernel.org, Wolfram Sang <wsa@the-dreams.de>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-pm@vger.kernel.org
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Cezary Gapinski <cezary.gapinski@gmail.com>,
+ Alexandre Torgue <alexandre.torgue@st.com>,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This is a multi-part message in MIME format.
---------------34983B75F30C509E4209A341
-Content-Type: text/plain; charset=utf-8; format=flowed
-Content-Transfer-Encoding: 7bit
+From: Cezary Gapinski <cezary.gapinski@gmail.com>
 
-Hi,
+This series of patches adds support for first generation of SPI
+interface for STM32F4 family.
 
-Thank you for this new version.
+This version of driver is mostly different to STM32H7 one. Based on
+linux kernel I2C drivers for STM32 where drivers were splited into
+STM32F4 and STM32F7 family the same approach seems to be sufficient for
+SPI STM32 drivers. Therefore STM32H7 driver was moved to spi-stm32h7.c
+file and register and functions were renamed to be more specific to
+STM32H7.
 
-On 22-12-18 21:26, Wolfram Sang wrote:
-> Using the 'is_suspended' flag from the PM core, we now reject new
-> transfers if the parent of the adapter is already marked suspended.
+For current version master mode with full-duplex and 8/16 bit data
+frame format are supported. There is no TX and RX FIFOs like
+in STM32H7. DMA capabilility is supported for messages longer than
+arbitrary number of bytes (that is set already to 16 bytes) when TX
+and RX channels are set at the same time.
 
-I've been running some tests and I'm afraid that those have
-exposed multiple issues:
+v2:
+Based on Amelie Delaunay recommendation only one common file
+spi-stm32.c is used. Before adding support for STM32F4 driver, first six
+patches adds some improvements to actual driver.
+Next patches rearrange driver to be more useful for new STM32F4 SPI
+and adding support for this family.
+This version also supports simplex-tx and 3wire-tx modes.
 
-1) It seems that adap->dev.parent can be NULL in some cases, specifically
-this patch causes the i915 driver to crash during probe on an Apollo Lake
-laptop with an eDP panel. I've attached a fixup patch which fixes this.
+Cezary Gapinski (14):
+  spi: stm32: switch to SPDX identifier
+  spi: stm32: use NULL pointer instead of plain integer
+  spi: stm32: fix DMA configuration with only one channel
+  spi: fix typo in SPI_STM32 help text
+  spi: stm32: use explicit CPOL and CPHA mode bits
+  spi: stm32: remove SPI LOOP mode
+  spi: stm32: rename STM32 SPI registers to STM32H7
+  spi: stm32: rename interrupt function
+  spi: stm32: split transfer one setup function
+  spi: stm32: add start dma transfer function
+  spi: stm32: introduce compatible data cfg
+  spi: stm32: add support for STM32F4
+  ARM: dts: stm32: add SPI support on STM32F429 SoC
+  spi: stm32: add description about STM32F4 bindings
 
-2) There are multiple suspend stages: prepare suspend, suspend_late,
-suspend_no_irq and several devices which need access to i2c-transfers
-suspend from the suspend_late or even the suspend_no_irq handler.
+ .../devicetree/bindings/spi/spi-stm32.txt          |    9 +-
+ arch/arm/boot/dts/stm32f429.dtsi                   |   60 +
+ drivers/spi/Kconfig                                |    2 +-
+ drivers/spi/spi-stm32.c                            | 1403 +++++++++++++++-----
+ 4 files changed, 1139 insertions(+), 335 deletions(-)
 
-The way this works is that first all devices are moved to the prepared
-state, then a second run is done moving all devices over to suspended,
-then a third run moving all devices over to suspend_late, etc.
-
-To make this work, e.g. the i2c-designware driver has a nop suspend
-callback and does the actual suspend from its suspend_late or
-suspend_no_irq callback. But the is_suspended flag we are testing for
-now gets set during the suspend phase. So when we are then asked to
-do an i2c-transfer during the suspend_late phase we get a false-positive
-triggering of the:
-
-	if (WARN(device_is_suspended(adap->dev.parent),
-		 "Accessing already suspended I2C/SMBus adapter"))
-		return -ESHUTDOWN;
-
-WARN and a return of -ESHUTDOWN, because the adapter is in the
-suspended state, but it has not actually been suspended / moved
-to the D3 low-power state as that happens later when we reach
-e.g. the suspend_no_irq phase of the suspend.
-
-This is not only a problem with the somewhat complex PMIC
-situation on some Cherry Trail devices, but it also breaks the
-i915 driver since as a PCI device the i915 device also only
-really gets turned off from the suspend_no_irq phase of the suspend.
-
-Sorry, this is something which I should have realized before, but
-well I didn't.
-
-TL;DR: really only the adapter driver knows when the device is
-put in such a state that it can no longer do transfers, as it
-actually turns of clks / moves it D3 / etc. Which may happen at
-any of the 3 suspend phases so any "core" based solution is going
-to get this wrong.
-
-I share your desire to have the check for this shared in core code,
-but I'm afraid that just is not going to work.
-
-Regards,
-
-Hans
-
-
-
-
-
-
-
-
-
-
-> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> ---
->   Documentation/i2c/fault-codes | 4 ++++
->   drivers/i2c/i2c-core-base.c   | 3 +++
->   drivers/i2c/i2c-core-smbus.c  | 4 ++++
->   3 files changed, 11 insertions(+)
-> 
-> diff --git a/Documentation/i2c/fault-codes b/Documentation/i2c/fault-codes
-> index 47c25abb7d52..0cee0fc545b4 100644
-> --- a/Documentation/i2c/fault-codes
-> +++ b/Documentation/i2c/fault-codes
-> @@ -112,6 +112,10 @@ EPROTO
->   	case is when the length of an SMBus block data response
->   	(from the SMBus slave) is outside the range 1-32 bytes.
->   
-> +ESHUTDOWN
-> +	Returned when a transfer was requested using an adapter
-> +	which is already suspended.
-> +
->   ETIMEDOUT
->   	This is returned by drivers when an operation took too much
->   	time, and was aborted before it completed.
-> diff --git a/drivers/i2c/i2c-core-base.c b/drivers/i2c/i2c-core-base.c
-> index 28460f6a60cc..3ce238b782f3 100644
-> --- a/drivers/i2c/i2c-core-base.c
-> +++ b/drivers/i2c/i2c-core-base.c
-> @@ -1865,6 +1865,9 @@ int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
->   
->   	if (WARN_ON(!msgs || num < 1))
->   		return -EINVAL;
-> +	if (WARN(device_is_suspended(adap->dev.parent),
-> +		 "Accessing already suspended I2C/SMBus adapter"))
-> +		return -ESHUTDOWN;
->   
->   	if (adap->quirks && i2c_check_for_quirks(adap, msgs, num))
->   		return -EOPNOTSUPP;
-> diff --git a/drivers/i2c/i2c-core-smbus.c b/drivers/i2c/i2c-core-smbus.c
-> index 9cd66cabb84f..e0f7f22feabd 100644
-> --- a/drivers/i2c/i2c-core-smbus.c
-> +++ b/drivers/i2c/i2c-core-smbus.c
-> @@ -547,6 +547,10 @@ s32 __i2c_smbus_xfer(struct i2c_adapter *adapter, u16 addr,
->   	int try;
->   	s32 res;
->   
-> +	if (WARN(device_is_suspended(adapter->dev.parent),
-> +		 "Accessing already suspended I2C/SMBus adapter"))
-> +		return -ESHUTDOWN;
-> +
->   	/* If enabled, the following two tracepoints are conditional on
->   	 * read_write and protocol.
->   	 */
-> 
-
---------------34983B75F30C509E4209A341
-Content-Type: text/x-patch;
- name="0001-FIXUP-i2c-reject-new-transfers-when-adapters-are-sus.patch"
-Content-Transfer-Encoding: 7bit
-Content-Disposition: attachment;
- filename*0="0001-FIXUP-i2c-reject-new-transfers-when-adapters-are-sus.pa";
- filename*1="tch"
-
-From 0ff431b48f7f2d08bbf299265c67589a598ec5d4 Mon Sep 17 00:00:00 2001
-From: Hans de Goede <hdegoede@redhat.com>
-Date: Mon, 24 Dec 2018 22:00:31 +0100
-Subject: [PATCH] FIXUP: i2c: reject new transfers when adapters are suspended
-
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/i2c/i2c-core-base.c  | 2 +-
- drivers/i2c/i2c-core-smbus.c | 3 ++-
- 2 files changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/i2c/i2c-core-base.c b/drivers/i2c/i2c-core-base.c
-index 3ce238b782f3..e2fae7ec6c95 100644
---- a/drivers/i2c/i2c-core-base.c
-+++ b/drivers/i2c/i2c-core-base.c
-@@ -1865,7 +1865,7 @@ int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
- 
- 	if (WARN_ON(!msgs || num < 1))
- 		return -EINVAL;
--	if (WARN(device_is_suspended(adap->dev.parent),
-+	if (WARN(adap->dev.parent && device_is_suspended(adap->dev.parent),
- 		 "Accessing already suspended I2C/SMBus adapter"))
- 		return -ESHUTDOWN;
- 
-diff --git a/drivers/i2c/i2c-core-smbus.c b/drivers/i2c/i2c-core-smbus.c
-index e0f7f22feabd..1376620ae204 100644
---- a/drivers/i2c/i2c-core-smbus.c
-+++ b/drivers/i2c/i2c-core-smbus.c
-@@ -547,7 +547,8 @@ s32 __i2c_smbus_xfer(struct i2c_adapter *adapter, u16 addr,
- 	int try;
- 	s32 res;
- 
--	if (WARN(device_is_suspended(adapter->dev.parent),
-+	if (WARN(adapter->dev.parent &&
-+			device_is_suspended(adapter->dev.parent),
- 		 "Accessing already suspended I2C/SMBus adapter"))
- 		return -ESHUTDOWN;
- 
 -- 
-2.20.1
+2.7.4
 
-
---------------34983B75F30C509E4209A341
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---------------34983B75F30C509E4209A341--
-
