@@ -5,20 +5,20 @@ X-Spam-Level:
 X-Spam-Status: No, score=-6.2 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 23A70C64E75
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 22:03:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 675E5C64E75
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 22:03:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D86552070D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 22:03:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3268D2070D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 24 Dec 2018 22:03:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DQcjniMe";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="CZ23oMi6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D86552070D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pGKZ7Wfi";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="hnaflPdY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3268D2070D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -28,67 +28,67 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=Dd7xZyAq7yJC2Zp3oXfX40i84hAL0DoMMAfVcQ8ZYV4=; b=DQcjniMeGsKa9jO6lQ8Imd7klD
-	zjs8EQc/gml9QVYmqBPG7jT6EwamjFGnDGJDpf02zNiC0YdESVKi3wNfNZe9WAPsmlAyYgENHFAeE
-	9DwHV11KzIloA79uuOQC8Y1sAqVdtOWfaVUMUzBL07jaNPhEa+n3WFbv06LKpN6PIGjtL9ZecHFbh
-	R8Ff4wNTTpmjsP/K3xdN64AqOvzYrrsu2yuylx6DaubblqIu73P+Rn62midfvAuQNmmxbX7l1aeRH
-	V5G4le/xwvs6k2hcXPrSWNDRzZEJ3LPfA8u61ALz1lMkNDWk4UjZXZ6iALN7S8ujYSmQ94OBjG9EB
-	HdUVMFng==;
+	bh=0qX8i7/Z5PFBJN8N2lKomj4Ihn7hevC7sJwEwsIEIkQ=; b=pGKZ7Wfi1ssraQ7u486CBppYxl
+	KCmxXZzp9ue6HVvYAY0Sh1jPCD8wY7F42jAdYRBBDGejrxaRFclryzekx0NkId9X0ZjrBHX/Q2us3
+	cFO8XaoiGBWDQOXiLNeFvFnXUBqfvmhGcK1IcNs5DZwEc60V/wtaUUIHtsC5Uq4jfoHwBMxb73n6s
+	h1Q7oAhaYxvppNq6UiNnuwJ1Vm9so1yrV5A206z1B9uuFoMAzR3FHbvU8BD2s7ggmBDlCGq7QT8oT
+	TFEdMEaSPkELsPkfxgapSI16r3n8R2/LTeXEiVvXsgI84fL4K4rLs3C//gz/EewmnAkpZ5AWN4t9T
+	Z4VelsUQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gbYJf-0006Gs-Rp; Mon, 24 Dec 2018 22:03:16 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1gbYJw-0006Tx-14; Mon, 24 Dec 2018 22:03:32 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gbYHi-0004I2-8u
- for linux-arm-kernel@lists.infradead.org; Mon, 24 Dec 2018 22:01:22 +0000
-Received: by mail-wr1-x443.google.com with SMTP id c14so12557846wrr.0
+ id 1gbYHe-0004IA-Mr
+ for linux-arm-kernel@lists.infradead.org; Mon, 24 Dec 2018 22:01:23 +0000
+Received: by mail-wr1-x441.google.com with SMTP id z5so12524437wrt.11
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 24 Dec 2018 14:01:03 -0800 (PST)
+ Mon, 24 Dec 2018 14:01:05 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=GGnsImLEJas/NCseLAI8aIfWslIulfuhj1PcOtADAf8=;
- b=CZ23oMi6wENbcxj7WbCjP5YgM+0Dd+MD748+cmAHihjwVZJh84iUpzLtoU3aGf2l/W
- ZSY1mfxTel8ODCp/HT19RfKKwryTggajfhV9XAJWuL1pMFyAJrZhFkmdii83N9U8sZtk
- /86wVqxuT2fmIWn/r/y37fN53hGVMhpLRzNXllxmfjXX38+K6W1dTWmnCcTvLhFJPCW7
- oNfP8kL9zvptaBc5Xx6m3qVs/nZhKVzepQX47du4hq+H0JeVXDCkgMmeWavus44L3bk3
- BkBOP5Y3/1zg7FTN84UwbpE3TrdanW+UOAygHR0NsJeBZKfiBCA23xy8sFof9BXK47+X
- cZ1g==
+ bh=/D4cj5JtqL1kGi4KC16LtBA9BYAncZktbIIS8aC3q8U=;
+ b=hnaflPdYraRlwCw7xr6BuyvezmSZ22bIH9nQEBxWDKPb5tXr1hga6InOpKXZO+TGBL
+ y6shfOeImzpMHVSBRjx2IKzPpETeCcz48k+DDjg0i18Oj6zgYklU7guw1AoAIGiCbNs7
+ 61fRAes2TgtyoDsLcwazjN2NuzWBaH4j8LNWObtv0aNVqRk25TWcR19HJ8H8//XmVnb7
+ PqTzUz+HOgLXbyfkNunld6TLtml7ZlFm/MrKLYiE3/gqP1Fh0Pa1geruQMvn7p7J9REa
+ 3dvTTZG/YTJdgoSJmJvgV2jPGpsqGB2CrmdTUNX0e6yQ+lhqiaMIF3v+zVa9uOpC0vzM
+ dD9A==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=GGnsImLEJas/NCseLAI8aIfWslIulfuhj1PcOtADAf8=;
- b=mGP8W9I99jI3uvLRc4q0b1MajgmWSRgX6QgieKWALWnYLX8fti48Z3uo5CfZ2nxvHn
- R1z7Y+89YpQBOdTvtTrJ6ODiHrpLHCROMU1NWwgOOIEhmz2JhHjENDflbOn52d7wPYQD
- g+aDzZN+HGiZvSIlwKPf9HKPOg4YH3aKsGTjFKHSC9NZ3ZHCRogdxLHue0QgG41042SE
- kxAGaaOw3VxifaeimUyaAyTQ8BbxgSqHQxaXU+vpf/Zv1FCK4uGZx6nBgEpxMHRJbV4B
- YmUs00yRSuo8jXxFMrxmdSb622IPKv0OyAgQW9Sh0IZM3fiL4bSw29dCZUgrpUjFqwKN
- NgDA==
-X-Gm-Message-State: AJcUukcwBsFKWqbDfA0lSAigtFKmd5oBwXVnSeytT8roXBJfJ/4iO0Bs
- uBGjWKMj18JQyulwsx/StUU=
-X-Google-Smtp-Source: ALg8bN40hFS++7/EeyfQeA3w3xfLqb4EK61aM566f0n123LvqurVUABzjFeqmBv8CMt9u8EZnA2x3g==
-X-Received: by 2002:a5d:40c1:: with SMTP id b1mr13673585wrq.133.1545688862368; 
- Mon, 24 Dec 2018 14:01:02 -0800 (PST)
+ bh=/D4cj5JtqL1kGi4KC16LtBA9BYAncZktbIIS8aC3q8U=;
+ b=NAftBxxUbnDeJ2UWcJEKh5578W5/OXkbW3Zh4zycnZcadd8cyo4PvN8nbLTe9H21CM
+ o3fs709ddoUlkawQ2ThK9JXS79PoZFpWIKrBkFycSo2r+WnJMww37WoEJo7c6sRvRlVA
+ 5uxbkJjJaI0/BQgcNcrr62bXt1kMI4P4LZRUW/l9v2VLMB5+FL06m3vw9NI29ErAM9Ok
+ kLl/aq5laXxm4cuYfbh5W8ws3jHxnwEKxOu4kwNHvCK5JqjYvmZAcSleosGY0iTjBipH
+ Fvesk5KgxlbbFiD4EhJaa1EgAle9pfrS7/OUEUGPt6IXGUDoi9JLMxk3yyTXSVKsRyfI
+ fWWw==
+X-Gm-Message-State: AJcUukct9K/brt23h3qOsO0CuPXQromstGrBrx+QGkv9HFN9474G8OPk
+ dZIVo34/YnnM+Qy7LoQ9xlI=
+X-Google-Smtp-Source: ALg8bN4y+jm/5upySmtKZWUivW/uuGN/hpUKQ2ZDZtDNyFjIbrXcGNymDSRtuMl7CQ9YNLEN1jR8Ag==
+X-Received: by 2002:a5d:66c1:: with SMTP id k1mr12768938wrw.132.1545688864145; 
+ Mon, 24 Dec 2018 14:01:04 -0800 (PST)
 Received: from gapa-Lenovo-IdeaPad-Y580.home (daw20.neoplus.adsl.tpnet.pl.
  [83.23.22.20])
- by smtp.gmail.com with ESMTPSA id d4sm23970153wrp.89.2018.12.24.14.01.00
+ by smtp.gmail.com with ESMTPSA id d4sm23970153wrp.89.2018.12.24.14.01.02
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Mon, 24 Dec 2018 14:01:01 -0800 (PST)
+ Mon, 24 Dec 2018 14:01:03 -0800 (PST)
 From: cezary.gapinski@gmail.com
 To: Mark Brown <broonie@kernel.org>, linux-spi@vger.kernel.org,
  linux-stm32@st-md-mailman.stormreply.com,
  linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
  Rob Herring <robh+dt@kernel.org>, devicetree@vger.kernel.org,
  Amelie Delaunay <amelie.delaunay@st.com>
-Subject: [PATCH v2 06/14] spi: stm32: remove SPI LOOP mode
-Date: Mon, 24 Dec 2018 23:00:32 +0100
-Message-Id: <1545688840-23992-7-git-send-email-cezary.gapinski@gmail.com>
+Subject: [PATCH v2 07/14] spi: stm32: rename STM32 SPI registers to STM32H7
+Date: Mon, 24 Dec 2018 23:00:33 +0100
+Message-Id: <1545688840-23992-8-git-send-email-cezary.gapinski@gmail.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1545688840-23992-1-git-send-email-cezary.gapinski@gmail.com>
 References: <1545688840-23992-1-git-send-email-cezary.gapinski@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181224_140114_950285_BE1E9F21 
-X-CRM114-Status: GOOD (  13.78  )
+X-CRM114-CacheID: sfid-20181224_140111_283035_F63EEE61 
+X-CRM114-Status: GOOD (  17.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -112,27 +112,736 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Cezary Gapinski <cezary.gapinski@gmail.com>
 
-This driver does not support SPI LOOP mode by configuration
-in registers.
+Rename STM32 SPI registers to be related to STM32H7 SPI driver
+and not STM32 generally.
 
 Signed-off-by: Cezary Gapinski <cezary.gapinski@gmail.com>
 ---
- drivers/spi/spi-stm32.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/spi/spi-stm32.c | 381 +++++++++++++++++++++++++-----------------------
+ 1 file changed, 199 insertions(+), 182 deletions(-)
 
 diff --git a/drivers/spi/spi-stm32.c b/drivers/spi/spi-stm32.c
-index f7056b7..b639be7 100644
+index b639be7..2ece69a 100644
 --- a/drivers/spi/spi-stm32.c
 +++ b/drivers/spi/spi-stm32.c
-@@ -1143,7 +1143,7 @@ static int stm32_spi_probe(struct platform_device *pdev)
- 	master->auto_runtime_pm = true;
- 	master->bus_num = pdev->id;
+@@ -20,86 +20,86 @@
+ 
+ #define DRIVER_NAME "spi_stm32"
+ 
+-/* STM32 SPI registers */
+-#define STM32_SPI_CR1		0x00
+-#define STM32_SPI_CR2		0x04
+-#define STM32_SPI_CFG1		0x08
+-#define STM32_SPI_CFG2		0x0C
+-#define STM32_SPI_IER		0x10
+-#define STM32_SPI_SR		0x14
+-#define STM32_SPI_IFCR		0x18
+-#define STM32_SPI_TXDR		0x20
+-#define STM32_SPI_RXDR		0x30
+-#define STM32_SPI_I2SCFGR	0x50
+-
+-/* STM32_SPI_CR1 bit fields */
+-#define SPI_CR1_SPE		BIT(0)
+-#define SPI_CR1_MASRX		BIT(8)
+-#define SPI_CR1_CSTART		BIT(9)
+-#define SPI_CR1_CSUSP		BIT(10)
+-#define SPI_CR1_HDDIR		BIT(11)
+-#define SPI_CR1_SSI		BIT(12)
+-
+-/* STM32_SPI_CR2 bit fields */
+-#define SPI_CR2_TSIZE_SHIFT	0
+-#define SPI_CR2_TSIZE		GENMASK(15, 0)
+-
+-/* STM32_SPI_CFG1 bit fields */
+-#define SPI_CFG1_DSIZE_SHIFT	0
+-#define SPI_CFG1_DSIZE		GENMASK(4, 0)
+-#define SPI_CFG1_FTHLV_SHIFT	5
+-#define SPI_CFG1_FTHLV		GENMASK(8, 5)
+-#define SPI_CFG1_RXDMAEN	BIT(14)
+-#define SPI_CFG1_TXDMAEN	BIT(15)
+-#define SPI_CFG1_MBR_SHIFT	28
+-#define SPI_CFG1_MBR		GENMASK(30, 28)
+-#define SPI_CFG1_MBR_MIN	0
+-#define SPI_CFG1_MBR_MAX	(GENMASK(30, 28) >> 28)
+-
+-/* STM32_SPI_CFG2 bit fields */
+-#define SPI_CFG2_MIDI_SHIFT	4
+-#define SPI_CFG2_MIDI		GENMASK(7, 4)
+-#define SPI_CFG2_COMM_SHIFT	17
+-#define SPI_CFG2_COMM		GENMASK(18, 17)
+-#define SPI_CFG2_SP_SHIFT	19
+-#define SPI_CFG2_SP		GENMASK(21, 19)
+-#define SPI_CFG2_MASTER		BIT(22)
+-#define SPI_CFG2_LSBFRST	BIT(23)
+-#define SPI_CFG2_CPHA		BIT(24)
+-#define SPI_CFG2_CPOL		BIT(25)
+-#define SPI_CFG2_SSM		BIT(26)
+-#define SPI_CFG2_AFCNTR		BIT(31)
+-
+-/* STM32_SPI_IER bit fields */
+-#define SPI_IER_RXPIE		BIT(0)
+-#define SPI_IER_TXPIE		BIT(1)
+-#define SPI_IER_DXPIE		BIT(2)
+-#define SPI_IER_EOTIE		BIT(3)
+-#define SPI_IER_TXTFIE		BIT(4)
+-#define SPI_IER_OVRIE		BIT(6)
+-#define SPI_IER_MODFIE		BIT(9)
+-#define SPI_IER_ALL		GENMASK(10, 0)
+-
+-/* STM32_SPI_SR bit fields */
+-#define SPI_SR_RXP		BIT(0)
+-#define SPI_SR_TXP		BIT(1)
+-#define SPI_SR_EOT		BIT(3)
+-#define SPI_SR_OVR		BIT(6)
+-#define SPI_SR_MODF		BIT(9)
+-#define SPI_SR_SUSP		BIT(11)
+-#define SPI_SR_RXPLVL_SHIFT	13
+-#define SPI_SR_RXPLVL		GENMASK(14, 13)
+-#define SPI_SR_RXWNE		BIT(15)
+-
+-/* STM32_SPI_IFCR bit fields */
+-#define SPI_IFCR_ALL		GENMASK(11, 3)
+-
+-/* STM32_SPI_I2SCFGR bit fields */
+-#define SPI_I2SCFGR_I2SMOD	BIT(0)
+-
+-/* SPI Master Baud Rate min/max divisor */
+-#define SPI_MBR_DIV_MIN		(2 << SPI_CFG1_MBR_MIN)
+-#define SPI_MBR_DIV_MAX		(2 << SPI_CFG1_MBR_MAX)
++/* STM32H7 SPI registers */
++#define STM32H7_SPI_CR1			0x00
++#define STM32H7_SPI_CR2			0x04
++#define STM32H7_SPI_CFG1		0x08
++#define STM32H7_SPI_CFG2		0x0C
++#define STM32H7_SPI_IER			0x10
++#define STM32H7_SPI_SR			0x14
++#define STM32H7_SPI_IFCR		0x18
++#define STM32H7_SPI_TXDR		0x20
++#define STM32H7_SPI_RXDR		0x30
++#define STM32H7_SPI_I2SCFGR		0x50
++
++/* STM32H7_SPI_CR1 bit fields */
++#define STM32H7_SPI_CR1_SPE		BIT(0)
++#define STM32H7_SPI_CR1_MASRX		BIT(8)
++#define STM32H7_SPI_CR1_CSTART		BIT(9)
++#define STM32H7_SPI_CR1_CSUSP		BIT(10)
++#define STM32H7_SPI_CR1_HDDIR		BIT(11)
++#define STM32H7_SPI_CR1_SSI		BIT(12)
++
++/* STM32H7_SPI_CR2 bit fields */
++#define STM32H7_SPI_CR2_TSIZE_SHIFT	0
++#define STM32H7_SPI_CR2_TSIZE		GENMASK(15, 0)
++
++/* STM32H7_SPI_CFG1 bit fields */
++#define STM32H7_SPI_CFG1_DSIZE_SHIFT	0
++#define STM32H7_SPI_CFG1_DSIZE		GENMASK(4, 0)
++#define STM32H7_SPI_CFG1_FTHLV_SHIFT	5
++#define STM32H7_SPI_CFG1_FTHLV		GENMASK(8, 5)
++#define STM32H7_SPI_CFG1_RXDMAEN	BIT(14)
++#define STM32H7_SPI_CFG1_TXDMAEN	BIT(15)
++#define STM32H7_SPI_CFG1_MBR_SHIFT	28
++#define STM32H7_SPI_CFG1_MBR		GENMASK(30, 28)
++#define STM32H7_SPI_CFG1_MBR_MIN	0
++#define STM32H7_SPI_CFG1_MBR_MAX	(GENMASK(30, 28) >> 28)
++
++/* STM32H7_SPI_CFG2 bit fields */
++#define STM32H7_SPI_CFG2_MIDI_SHIFT	4
++#define STM32H7_SPI_CFG2_MIDI		GENMASK(7, 4)
++#define STM32H7_SPI_CFG2_COMM_SHIFT	17
++#define STM32H7_SPI_CFG2_COMM		GENMASK(18, 17)
++#define STM32H7_SPI_CFG2_SP_SHIFT	19
++#define STM32H7_SPI_CFG2_SP		GENMASK(21, 19)
++#define STM32H7_SPI_CFG2_MASTER		BIT(22)
++#define STM32H7_SPI_CFG2_LSBFRST	BIT(23)
++#define STM32H7_SPI_CFG2_CPHA		BIT(24)
++#define STM32H7_SPI_CFG2_CPOL		BIT(25)
++#define STM32H7_SPI_CFG2_SSM		BIT(26)
++#define STM32H7_SPI_CFG2_AFCNTR		BIT(31)
++
++/* STM32H7_SPI_IER bit fields */
++#define STM32H7_SPI_IER_RXPIE		BIT(0)
++#define STM32H7_SPI_IER_TXPIE		BIT(1)
++#define STM32H7_SPI_IER_DXPIE		BIT(2)
++#define STM32H7_SPI_IER_EOTIE		BIT(3)
++#define STM32H7_SPI_IER_TXTFIE		BIT(4)
++#define STM32H7_SPI_IER_OVRIE		BIT(6)
++#define STM32H7_SPI_IER_MODFIE		BIT(9)
++#define STM32H7_SPI_IER_ALL		GENMASK(10, 0)
++
++/* STM32H7_SPI_SR bit fields */
++#define STM32H7_SPI_SR_RXP		BIT(0)
++#define STM32H7_SPI_SR_TXP		BIT(1)
++#define STM32H7_SPI_SR_EOT		BIT(3)
++#define STM32H7_SPI_SR_OVR		BIT(6)
++#define STM32H7_SPI_SR_MODF		BIT(9)
++#define STM32H7_SPI_SR_SUSP		BIT(11)
++#define STM32H7_SPI_SR_RXPLVL_SHIFT	13
++#define STM32H7_SPI_SR_RXPLVL		GENMASK(14, 13)
++#define STM32H7_SPI_SR_RXWNE		BIT(15)
++
++/* STM32H7_SPI_IFCR bit fields */
++#define STM32H7_SPI_IFCR_ALL		GENMASK(11, 3)
++
++/* STM32H7_SPI_I2SCFGR bit fields */
++#define STM32H7_SPI_I2SCFGR_I2SMOD	BIT(0)
++
++/* STM32H7 SPI Master Baud Rate min/max divisor */
++#define STM32H7_SPI_MBR_DIV_MIN		(2 << STM32H7_SPI_CFG1_MBR_MIN)
++#define STM32H7_SPI_MBR_DIV_MAX		(2 << STM32H7_SPI_CFG1_MBR_MAX)
+ 
+ /* SPI Communication mode */
+ #define SPI_FULL_DUPLEX		0
+@@ -188,12 +188,12 @@ static int stm32_spi_get_fifo_size(struct stm32_spi *spi)
+ 
+ 	spin_lock_irqsave(&spi->lock, flags);
+ 
+-	stm32_spi_set_bits(spi, STM32_SPI_CR1, SPI_CR1_SPE);
++	stm32_spi_set_bits(spi, STM32H7_SPI_CR1, STM32H7_SPI_CR1_SPE);
+ 
+-	while (readl_relaxed(spi->base + STM32_SPI_SR) & SPI_SR_TXP)
+-		writeb_relaxed(++count, spi->base + STM32_SPI_TXDR);
++	while (readl_relaxed(spi->base + STM32H7_SPI_SR) & STM32H7_SPI_SR_TXP)
++		writeb_relaxed(++count, spi->base + STM32H7_SPI_TXDR);
+ 
+-	stm32_spi_clr_bits(spi, STM32_SPI_CR1, SPI_CR1_SPE);
++	stm32_spi_clr_bits(spi, STM32H7_SPI_CR1, STM32H7_SPI_CR1_SPE);
+ 
+ 	spin_unlock_irqrestore(&spi->lock, flags);
+ 
+@@ -217,10 +217,11 @@ static int stm32_spi_get_bpw_mask(struct stm32_spi *spi)
+ 	 * The most significant bit at DSIZE bit field is reserved when the
+ 	 * maximum data size of periperal instances is limited to 16-bit
+ 	 */
+-	stm32_spi_set_bits(spi, STM32_SPI_CFG1, SPI_CFG1_DSIZE);
++	stm32_spi_set_bits(spi, STM32H7_SPI_CFG1, STM32H7_SPI_CFG1_DSIZE);
+ 
+-	cfg1 = readl_relaxed(spi->base + STM32_SPI_CFG1);
+-	max_bpw = (cfg1 & SPI_CFG1_DSIZE) >> SPI_CFG1_DSIZE_SHIFT;
++	cfg1 = readl_relaxed(spi->base + STM32H7_SPI_CFG1);
++	max_bpw = (cfg1 & STM32H7_SPI_CFG1_DSIZE) >>
++		  STM32H7_SPI_CFG1_DSIZE_SHIFT;
+ 	max_bpw += 1;
+ 
+ 	spin_unlock_irqrestore(&spi->lock, flags);
+@@ -250,8 +251,8 @@ static int stm32_spi_prepare_mbr(struct stm32_spi *spi, u32 speed_hz)
+ 	 * no need to check it there.
+ 	 * However, we need to ensure the following calculations.
+ 	 */
+-	if (div < SPI_MBR_DIV_MIN ||
+-	    div > SPI_MBR_DIV_MAX)
++	if (div < STM32H7_SPI_MBR_DIV_MIN ||
++	    div > STM32H7_SPI_MBR_DIV_MAX)
+ 		return -EINVAL;
+ 
+ 	/* Determine the first power of 2 greater than or equal to div */
+@@ -302,23 +303,24 @@ static u32 stm32_spi_prepare_fthlv(struct stm32_spi *spi)
+ static void stm32_spi_write_txfifo(struct stm32_spi *spi)
+ {
+ 	while ((spi->tx_len > 0) &&
+-	       (readl_relaxed(spi->base + STM32_SPI_SR) & SPI_SR_TXP)) {
++		       (readl_relaxed(spi->base + STM32H7_SPI_SR) &
++			STM32H7_SPI_SR_TXP)) {
+ 		u32 offs = spi->cur_xferlen - spi->tx_len;
+ 
+ 		if (spi->tx_len >= sizeof(u32)) {
+ 			const u32 *tx_buf32 = (const u32 *)(spi->tx_buf + offs);
+ 
+-			writel_relaxed(*tx_buf32, spi->base + STM32_SPI_TXDR);
++			writel_relaxed(*tx_buf32, spi->base + STM32H7_SPI_TXDR);
+ 			spi->tx_len -= sizeof(u32);
+ 		} else if (spi->tx_len >= sizeof(u16)) {
+ 			const u16 *tx_buf16 = (const u16 *)(spi->tx_buf + offs);
+ 
+-			writew_relaxed(*tx_buf16, spi->base + STM32_SPI_TXDR);
++			writew_relaxed(*tx_buf16, spi->base + STM32H7_SPI_TXDR);
+ 			spi->tx_len -= sizeof(u16);
+ 		} else {
+ 			const u8 *tx_buf8 = (const u8 *)(spi->tx_buf + offs);
+ 
+-			writeb_relaxed(*tx_buf8, spi->base + STM32_SPI_TXDR);
++			writeb_relaxed(*tx_buf8, spi->base + STM32H7_SPI_TXDR);
+ 			spi->tx_len -= sizeof(u8);
+ 		}
+ 	}
+@@ -335,35 +337,37 @@ static void stm32_spi_write_txfifo(struct stm32_spi *spi)
+  */
+ static void stm32_spi_read_rxfifo(struct stm32_spi *spi, bool flush)
+ {
+-	u32 sr = readl_relaxed(spi->base + STM32_SPI_SR);
+-	u32 rxplvl = (sr & SPI_SR_RXPLVL) >> SPI_SR_RXPLVL_SHIFT;
++	u32 sr = readl_relaxed(spi->base + STM32H7_SPI_SR);
++	u32 rxplvl = (sr & STM32H7_SPI_SR_RXPLVL) >>
++		     STM32H7_SPI_SR_RXPLVL_SHIFT;
+ 
+ 	while ((spi->rx_len > 0) &&
+-	       ((sr & SPI_SR_RXP) ||
+-		(flush && ((sr & SPI_SR_RXWNE) || (rxplvl > 0))))) {
++	       ((sr & STM32H7_SPI_SR_RXP) ||
++		(flush && ((sr & STM32H7_SPI_SR_RXWNE) || (rxplvl > 0))))) {
+ 		u32 offs = spi->cur_xferlen - spi->rx_len;
+ 
+ 		if ((spi->rx_len >= sizeof(u32)) ||
+-		    (flush && (sr & SPI_SR_RXWNE))) {
++		    (flush && (sr & STM32H7_SPI_SR_RXWNE))) {
+ 			u32 *rx_buf32 = (u32 *)(spi->rx_buf + offs);
+ 
+-			*rx_buf32 = readl_relaxed(spi->base + STM32_SPI_RXDR);
++			*rx_buf32 = readl_relaxed(spi->base + STM32H7_SPI_RXDR);
+ 			spi->rx_len -= sizeof(u32);
+ 		} else if ((spi->rx_len >= sizeof(u16)) ||
+ 			   (flush && (rxplvl >= 2 || spi->cur_bpw > 8))) {
+ 			u16 *rx_buf16 = (u16 *)(spi->rx_buf + offs);
+ 
+-			*rx_buf16 = readw_relaxed(spi->base + STM32_SPI_RXDR);
++			*rx_buf16 = readw_relaxed(spi->base + STM32H7_SPI_RXDR);
+ 			spi->rx_len -= sizeof(u16);
+ 		} else {
+ 			u8 *rx_buf8 = (u8 *)(spi->rx_buf + offs);
+ 
+-			*rx_buf8 = readb_relaxed(spi->base + STM32_SPI_RXDR);
++			*rx_buf8 = readb_relaxed(spi->base + STM32H7_SPI_RXDR);
+ 			spi->rx_len -= sizeof(u8);
+ 		}
+ 
+-		sr = readl_relaxed(spi->base + STM32_SPI_SR);
+-		rxplvl = (sr & SPI_SR_RXPLVL) >> SPI_SR_RXPLVL_SHIFT;
++		sr = readl_relaxed(spi->base + STM32H7_SPI_SR);
++		rxplvl = (sr & STM32H7_SPI_SR_RXPLVL) >>
++			 STM32H7_SPI_SR_RXPLVL_SHIFT;
+ 	}
+ 
+ 	dev_dbg(spi->dev, "%s%s: %d bytes left\n", __func__,
+@@ -381,7 +385,7 @@ static void stm32_spi_enable(struct stm32_spi *spi)
+ {
+ 	dev_dbg(spi->dev, "enable controller\n");
+ 
+-	stm32_spi_set_bits(spi, STM32_SPI_CR1, SPI_CR1_SPE);
++	stm32_spi_set_bits(spi, STM32H7_SPI_CR1, STM32H7_SPI_CR1_SPE);
+ }
+ 
+ /**
+@@ -401,23 +405,23 @@ static void stm32_spi_disable(struct stm32_spi *spi)
+ 
+ 	spin_lock_irqsave(&spi->lock, flags);
+ 
+-	cr1 = readl_relaxed(spi->base + STM32_SPI_CR1);
++	cr1 = readl_relaxed(spi->base + STM32H7_SPI_CR1);
+ 
+-	if (!(cr1 & SPI_CR1_SPE)) {
++	if (!(cr1 & STM32H7_SPI_CR1_SPE)) {
+ 		spin_unlock_irqrestore(&spi->lock, flags);
+ 		return;
+ 	}
+ 
+ 	/* Wait on EOT or suspend the flow */
+-	if (readl_relaxed_poll_timeout_atomic(spi->base + STM32_SPI_SR,
+-					      sr, !(sr & SPI_SR_EOT),
++	if (readl_relaxed_poll_timeout_atomic(spi->base + STM32H7_SPI_SR,
++					      sr, !(sr & STM32H7_SPI_SR_EOT),
+ 					      10, 100000) < 0) {
+-		if (cr1 & SPI_CR1_CSTART) {
+-			writel_relaxed(cr1 | SPI_CR1_CSUSP,
+-				       spi->base + STM32_SPI_CR1);
++		if (cr1 & STM32H7_SPI_CR1_CSTART) {
++			writel_relaxed(cr1 | STM32H7_SPI_CR1_CSUSP,
++				       spi->base + STM32H7_SPI_CR1);
+ 			if (readl_relaxed_poll_timeout_atomic(
+-						spi->base + STM32_SPI_SR,
+-						sr, !(sr & SPI_SR_SUSP),
++						spi->base + STM32H7_SPI_SR,
++						sr, !(sr & STM32H7_SPI_SR_SUSP),
+ 						10, 100000) < 0)
+ 				dev_warn(spi->dev,
+ 					 "Suspend request timeout\n");
+@@ -432,14 +436,14 @@ static void stm32_spi_disable(struct stm32_spi *spi)
+ 	if (spi->cur_usedma && spi->dma_rx)
+ 		dmaengine_terminate_all(spi->dma_rx);
+ 
+-	stm32_spi_clr_bits(spi, STM32_SPI_CR1, SPI_CR1_SPE);
++	stm32_spi_clr_bits(spi, STM32H7_SPI_CR1, STM32H7_SPI_CR1_SPE);
+ 
+-	stm32_spi_clr_bits(spi, STM32_SPI_CFG1, SPI_CFG1_TXDMAEN |
+-						SPI_CFG1_RXDMAEN);
++	stm32_spi_clr_bits(spi, STM32H7_SPI_CFG1, STM32H7_SPI_CFG1_TXDMAEN |
++						STM32H7_SPI_CFG1_RXDMAEN);
+ 
+ 	/* Disable interrupts and clear status flags */
+-	writel_relaxed(0, spi->base + STM32_SPI_IER);
+-	writel_relaxed(SPI_IFCR_ALL, spi->base + STM32_SPI_IFCR);
++	writel_relaxed(0, spi->base + STM32H7_SPI_IER);
++	writel_relaxed(STM32H7_SPI_IFCR_ALL, spi->base + STM32H7_SPI_IFCR);
+ 
+ 	spin_unlock_irqrestore(&spi->lock, flags);
+ }
+@@ -476,19 +480,19 @@ static irqreturn_t stm32_spi_irq(int irq, void *dev_id)
+ 
+ 	spin_lock_irqsave(&spi->lock, flags);
+ 
+-	sr = readl_relaxed(spi->base + STM32_SPI_SR);
+-	ier = readl_relaxed(spi->base + STM32_SPI_IER);
++	sr = readl_relaxed(spi->base + STM32H7_SPI_SR);
++	ier = readl_relaxed(spi->base + STM32H7_SPI_IER);
+ 
+ 	mask = ier;
+ 	/* EOTIE is triggered on EOT, SUSP and TXC events. */
+-	mask |= SPI_SR_SUSP;
++	mask |= STM32H7_SPI_SR_SUSP;
+ 	/*
+ 	 * When TXTF is set, DXPIE and TXPIE are cleared. So in case of
+ 	 * Full-Duplex, need to poll RXP event to know if there are remaining
+ 	 * data, before disabling SPI.
+ 	 */
+ 	if (spi->rx_buf && !spi->cur_usedma)
+-		mask |= SPI_SR_RXP;
++		mask |= STM32H7_SPI_SR_RXP;
+ 
+ 	if (!(sr & mask)) {
+ 		dev_dbg(spi->dev, "spurious IT (sr=0x%08x, ier=0x%08x)\n",
+@@ -497,7 +501,7 @@ static irqreturn_t stm32_spi_irq(int irq, void *dev_id)
+ 		return IRQ_NONE;
+ 	}
+ 
+-	if (sr & SPI_SR_SUSP) {
++	if (sr & STM32H7_SPI_SR_SUSP) {
+ 		dev_warn(spi->dev, "Communication suspended\n");
+ 		if (!spi->cur_usedma && (spi->rx_buf && (spi->rx_len > 0)))
+ 			stm32_spi_read_rxfifo(spi, false);
+@@ -509,12 +513,12 @@ static irqreturn_t stm32_spi_irq(int irq, void *dev_id)
+ 			end = true;
+ 	}
+ 
+-	if (sr & SPI_SR_MODF) {
++	if (sr & STM32H7_SPI_SR_MODF) {
+ 		dev_warn(spi->dev, "Mode fault: transfer aborted\n");
+ 		end = true;
+ 	}
+ 
+-	if (sr & SPI_SR_OVR) {
++	if (sr & STM32H7_SPI_SR_OVR) {
+ 		dev_warn(spi->dev, "Overrun: received value discarded\n");
+ 		if (!spi->cur_usedma && (spi->rx_buf && (spi->rx_len > 0)))
+ 			stm32_spi_read_rxfifo(spi, false);
+@@ -526,21 +530,21 @@ static irqreturn_t stm32_spi_irq(int irq, void *dev_id)
+ 			end = true;
+ 	}
+ 
+-	if (sr & SPI_SR_EOT) {
++	if (sr & STM32H7_SPI_SR_EOT) {
+ 		if (!spi->cur_usedma && (spi->rx_buf && (spi->rx_len > 0)))
+ 			stm32_spi_read_rxfifo(spi, true);
+ 		end = true;
+ 	}
+ 
+-	if (sr & SPI_SR_TXP)
++	if (sr & STM32H7_SPI_SR_TXP)
+ 		if (!spi->cur_usedma && (spi->tx_buf && (spi->tx_len > 0)))
+ 			stm32_spi_write_txfifo(spi);
+ 
+-	if (sr & SPI_SR_RXP)
++	if (sr & STM32H7_SPI_SR_RXP)
+ 		if (!spi->cur_usedma && (spi->rx_buf && (spi->rx_len > 0)))
+ 			stm32_spi_read_rxfifo(spi, false);
+ 
+-	writel_relaxed(mask, spi->base + STM32_SPI_IFCR);
++	writel_relaxed(mask, spi->base + STM32H7_SPI_IFCR);
+ 
+ 	spin_unlock_irqrestore(&spi->lock, flags);
+ 
+@@ -593,19 +597,19 @@ static int stm32_spi_prepare_msg(struct spi_master *master,
+ 		dev_dbg(spi->dev, "%dns inter-data idleness\n", spi->cur_midi);
+ 
+ 	if (spi_dev->mode & SPI_CPOL)
+-		cfg2_setb |= SPI_CFG2_CPOL;
++		cfg2_setb |= STM32H7_SPI_CFG2_CPOL;
+ 	else
+-		cfg2_clrb |= SPI_CFG2_CPOL;
++		cfg2_clrb |= STM32H7_SPI_CFG2_CPOL;
+ 
+ 	if (spi_dev->mode & SPI_CPHA)
+-		cfg2_setb |= SPI_CFG2_CPHA;
++		cfg2_setb |= STM32H7_SPI_CFG2_CPHA;
+ 	else
+-		cfg2_clrb |= SPI_CFG2_CPHA;
++		cfg2_clrb |= STM32H7_SPI_CFG2_CPHA;
+ 
+ 	if (spi_dev->mode & SPI_LSB_FIRST)
+-		cfg2_setb |= SPI_CFG2_LSBFRST;
++		cfg2_setb |= STM32H7_SPI_CFG2_LSBFRST;
+ 	else
+-		cfg2_clrb |= SPI_CFG2_LSBFRST;
++		cfg2_clrb |= STM32H7_SPI_CFG2_LSBFRST;
+ 
+ 	dev_dbg(spi->dev, "cpol=%d cpha=%d lsb_first=%d cs_high=%d\n",
+ 		spi_dev->mode & SPI_CPOL,
+@@ -617,9 +621,9 @@ static int stm32_spi_prepare_msg(struct spi_master *master,
+ 
+ 	if (cfg2_clrb || cfg2_setb)
+ 		writel_relaxed(
+-			(readl_relaxed(spi->base + STM32_SPI_CFG2) &
++			(readl_relaxed(spi->base + STM32H7_SPI_CFG2) &
+ 				~cfg2_clrb) | cfg2_setb,
+-			       spi->base + STM32_SPI_CFG2);
++			       spi->base + STM32H7_SPI_CFG2);
+ 
+ 	spin_unlock_irqrestore(&spi->lock, flags);
+ 
+@@ -640,11 +644,11 @@ static void stm32_spi_dma_cb(void *data)
+ 
+ 	spin_lock_irqsave(&spi->lock, flags);
+ 
+-	sr = readl_relaxed(spi->base + STM32_SPI_SR);
++	sr = readl_relaxed(spi->base + STM32H7_SPI_SR);
+ 
+ 	spin_unlock_irqrestore(&spi->lock, flags);
+ 
+-	if (!(sr & SPI_SR_EOT))
++	if (!(sr & STM32H7_SPI_SR_EOT))
+ 		dev_warn(spi->dev, "DMA error (sr=0x%08x)\n", sr);
+ 
+ 	/* Now wait for EOT, or SUSP or OVR in case of error */
+@@ -677,14 +681,14 @@ static void stm32_spi_dma_config(struct stm32_spi *spi,
+ 	memset(dma_conf, 0, sizeof(struct dma_slave_config));
+ 	dma_conf->direction = dir;
+ 	if (dma_conf->direction == DMA_DEV_TO_MEM) { /* RX */
+-		dma_conf->src_addr = spi->phys_addr + STM32_SPI_RXDR;
++		dma_conf->src_addr = spi->phys_addr + STM32H7_SPI_RXDR;
+ 		dma_conf->src_addr_width = buswidth;
+ 		dma_conf->src_maxburst = maxburst;
+ 
+ 		dev_dbg(spi->dev, "Rx DMA config buswidth=%d, maxburst=%d\n",
+ 			buswidth, maxburst);
+ 	} else if (dma_conf->direction == DMA_MEM_TO_DEV) { /* TX */
+-		dma_conf->dst_addr = spi->phys_addr + STM32_SPI_TXDR;
++		dma_conf->dst_addr = spi->phys_addr + STM32H7_SPI_TXDR;
+ 		dma_conf->dst_addr_width = buswidth;
+ 		dma_conf->dst_maxburst = maxburst;
+ 
+@@ -707,14 +711,15 @@ static int stm32_spi_transfer_one_irq(struct stm32_spi *spi)
+ 
+ 	/* Enable the interrupts relative to the current communication mode */
+ 	if (spi->tx_buf && spi->rx_buf)	/* Full Duplex */
+-		ier |= SPI_IER_DXPIE;
++		ier |= STM32H7_SPI_IER_DXPIE;
+ 	else if (spi->tx_buf)		/* Half-Duplex TX dir or Simplex TX */
+-		ier |= SPI_IER_TXPIE;
++		ier |= STM32H7_SPI_IER_TXPIE;
+ 	else if (spi->rx_buf)		/* Half-Duplex RX dir or Simplex RX */
+-		ier |= SPI_IER_RXPIE;
++		ier |= STM32H7_SPI_IER_RXPIE;
+ 
+ 	/* Enable the interrupts relative to the end of transfer */
+-	ier |= SPI_IER_EOTIE | SPI_IER_TXTFIE |	SPI_IER_OVRIE |	SPI_IER_MODFIE;
++	ier |= STM32H7_SPI_IER_EOTIE | STM32H7_SPI_IER_TXTFIE |
++	       STM32H7_SPI_IER_OVRIE | STM32H7_SPI_IER_MODFIE;
+ 
+ 	spin_lock_irqsave(&spi->lock, flags);
+ 
+@@ -724,9 +729,9 @@ static int stm32_spi_transfer_one_irq(struct stm32_spi *spi)
+ 	if (spi->tx_buf)
+ 		stm32_spi_write_txfifo(spi);
+ 
+-	stm32_spi_set_bits(spi, STM32_SPI_CR1, SPI_CR1_CSTART);
++	stm32_spi_set_bits(spi, STM32H7_SPI_CR1, STM32H7_SPI_CR1_CSTART);
+ 
+-	writel_relaxed(ier, spi->base + STM32_SPI_IER);
++	writel_relaxed(ier, spi->base + STM32H7_SPI_IER);
+ 
+ 	spin_unlock_irqrestore(&spi->lock, flags);
+ 
+@@ -755,7 +760,8 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
+ 		dmaengine_slave_config(spi->dma_rx, &rx_dma_conf);
+ 
+ 		/* Enable Rx DMA request */
+-		stm32_spi_set_bits(spi, STM32_SPI_CFG1, SPI_CFG1_RXDMAEN);
++		stm32_spi_set_bits(spi, STM32H7_SPI_CFG1,
++				   STM32H7_SPI_CFG1_RXDMAEN);
+ 
+ 		rx_dma_desc = dmaengine_prep_slave_sg(
+ 					spi->dma_rx, xfer->rx_sg.sgl,
+@@ -809,16 +815,18 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
+ 		dma_async_issue_pending(spi->dma_tx);
+ 
+ 		/* Enable Tx DMA request */
+-		stm32_spi_set_bits(spi, STM32_SPI_CFG1, SPI_CFG1_TXDMAEN);
++		stm32_spi_set_bits(spi, STM32H7_SPI_CFG1,
++				   STM32H7_SPI_CFG1_TXDMAEN);
+ 	}
+ 
+ 	/* Enable the interrupts relative to the end of transfer */
+-	ier |= SPI_IER_EOTIE | SPI_IER_TXTFIE |	SPI_IER_OVRIE |	SPI_IER_MODFIE;
+-	writel_relaxed(ier, spi->base + STM32_SPI_IER);
++	ier |= STM32H7_SPI_IER_EOTIE | STM32H7_SPI_IER_TXTFIE |
++	       STM32H7_SPI_IER_OVRIE | STM32H7_SPI_IER_MODFIE;
++	writel_relaxed(ier, spi->base + STM32H7_SPI_IER);
+ 
+ 	stm32_spi_enable(spi);
+ 
+-	stm32_spi_set_bits(spi, STM32_SPI_CR1, SPI_CR1_CSTART);
++	stm32_spi_set_bits(spi, STM32H7_SPI_CR1, STM32H7_SPI_CR1_CSTART);
+ 
+ 	spin_unlock_irqrestore(&spi->lock, flags);
+ 
+@@ -829,7 +837,7 @@ static int stm32_spi_transfer_one_dma(struct stm32_spi *spi,
+ 		dmaengine_terminate_all(spi->dma_rx);
+ 
+ dma_desc_error:
+-	stm32_spi_clr_bits(spi, STM32_SPI_CFG1, SPI_CFG1_RXDMAEN);
++	stm32_spi_clr_bits(spi, STM32H7_SPI_CFG1, STM32H7_SPI_CFG1_RXDMAEN);
+ 
+ 	spin_unlock_irqrestore(&spi->lock, flags);
+ 
+@@ -861,14 +869,16 @@ static int stm32_spi_transfer_one_setup(struct stm32_spi *spi,
+ 		spi->cur_bpw = transfer->bits_per_word;
+ 		bpw = spi->cur_bpw - 1;
+ 
+-		cfg1_clrb |= SPI_CFG1_DSIZE;
+-		cfg1_setb |= (bpw << SPI_CFG1_DSIZE_SHIFT) & SPI_CFG1_DSIZE;
++		cfg1_clrb |= STM32H7_SPI_CFG1_DSIZE;
++		cfg1_setb |= (bpw << STM32H7_SPI_CFG1_DSIZE_SHIFT) &
++			     STM32H7_SPI_CFG1_DSIZE;
+ 
+ 		spi->cur_fthlv = stm32_spi_prepare_fthlv(spi);
+ 		fthlv = spi->cur_fthlv - 1;
+ 
+-		cfg1_clrb |= SPI_CFG1_FTHLV;
+-		cfg1_setb |= (fthlv << SPI_CFG1_FTHLV_SHIFT) & SPI_CFG1_FTHLV;
++		cfg1_clrb |= STM32H7_SPI_CFG1_FTHLV;
++		cfg1_setb |= (fthlv << STM32H7_SPI_CFG1_FTHLV_SHIFT) &
++			     STM32H7_SPI_CFG1_FTHLV;
+ 	}
+ 
+ 	if (spi->cur_speed != transfer->speed_hz) {
+@@ -883,14 +893,15 @@ static int stm32_spi_transfer_one_setup(struct stm32_spi *spi,
+ 
+ 		transfer->speed_hz = spi->cur_speed;
+ 
+-		cfg1_clrb |= SPI_CFG1_MBR;
+-		cfg1_setb |= ((u32)mbr << SPI_CFG1_MBR_SHIFT) & SPI_CFG1_MBR;
++		cfg1_clrb |= STM32H7_SPI_CFG1_MBR;
++		cfg1_setb |= ((u32)mbr << STM32H7_SPI_CFG1_MBR_SHIFT) &
++			     STM32H7_SPI_CFG1_MBR;
+ 	}
+ 
+ 	if (cfg1_clrb || cfg1_setb)
+-		writel_relaxed((readl_relaxed(spi->base + STM32_SPI_CFG1) &
++		writel_relaxed((readl_relaxed(spi->base + STM32H7_SPI_CFG1) &
+ 				~cfg1_clrb) | cfg1_setb,
+-			       spi->base + STM32_SPI_CFG1);
++			       spi->base + STM32H7_SPI_CFG1);
+ 
+ 	mode = SPI_FULL_DUPLEX;
+ 	if (spi_dev->mode & SPI_3WIRE) { /* MISO/MOSI signals shared */
+@@ -902,9 +913,11 @@ static int stm32_spi_transfer_one_setup(struct stm32_spi *spi,
+ 		 */
+ 		mode = SPI_HALF_DUPLEX;
+ 		if (!transfer->tx_buf)
+-			stm32_spi_clr_bits(spi, STM32_SPI_CR1, SPI_CR1_HDDIR);
++			stm32_spi_clr_bits(spi, STM32H7_SPI_CR1,
++					   STM32H7_SPI_CR1_HDDIR);
+ 		else if (!transfer->rx_buf)
+-			stm32_spi_set_bits(spi, STM32_SPI_CR1, SPI_CR1_HDDIR);
++			stm32_spi_set_bits(spi, STM32H7_SPI_CR1,
++					   STM32H7_SPI_CR1_HDDIR);
+ 	} else {
+ 		if (!transfer->tx_buf)
+ 			mode = SPI_SIMPLEX_RX;
+@@ -914,26 +927,29 @@ static int stm32_spi_transfer_one_setup(struct stm32_spi *spi,
+ 	if (spi->cur_comm != mode) {
+ 		spi->cur_comm = mode;
+ 
+-		cfg2_clrb |= SPI_CFG2_COMM;
+-		cfg2_setb |= (mode << SPI_CFG2_COMM_SHIFT) & SPI_CFG2_COMM;
++		cfg2_clrb |= STM32H7_SPI_CFG2_COMM;
++		cfg2_setb |= (mode << STM32H7_SPI_CFG2_COMM_SHIFT) &
++			     STM32H7_SPI_CFG2_COMM;
+ 	}
+ 
+-	cfg2_clrb |= SPI_CFG2_MIDI;
++	cfg2_clrb |= STM32H7_SPI_CFG2_MIDI;
+ 	if ((transfer->len > 1) && (spi->cur_midi > 0)) {
+ 		u32 sck_period_ns = DIV_ROUND_UP(SPI_1HZ_NS, spi->cur_speed);
+ 		u32 midi = min((u32)DIV_ROUND_UP(spi->cur_midi, sck_period_ns),
+-			       (u32)SPI_CFG2_MIDI >> SPI_CFG2_MIDI_SHIFT);
++			       (u32)STM32H7_SPI_CFG2_MIDI >>
++			       STM32H7_SPI_CFG2_MIDI_SHIFT);
+ 
+ 		dev_dbg(spi->dev, "period=%dns, midi=%d(=%dns)\n",
+ 			sck_period_ns, midi, midi * sck_period_ns);
+ 
+-		cfg2_setb |= (midi << SPI_CFG2_MIDI_SHIFT) & SPI_CFG2_MIDI;
++		cfg2_setb |= (midi << STM32H7_SPI_CFG2_MIDI_SHIFT) &
++			     STM32H7_SPI_CFG2_MIDI;
+ 	}
+ 
+ 	if (cfg2_clrb || cfg2_setb)
+-		writel_relaxed((readl_relaxed(spi->base + STM32_SPI_CFG2) &
++		writel_relaxed((readl_relaxed(spi->base + STM32H7_SPI_CFG2) &
+ 				~cfg2_clrb) | cfg2_setb,
+-			       spi->base + STM32_SPI_CFG2);
++			       spi->base + STM32H7_SPI_CFG2);
+ 
+ 	if (spi->cur_bpw <= 8)
+ 		nb_words = transfer->len;
+@@ -941,10 +957,10 @@ static int stm32_spi_transfer_one_setup(struct stm32_spi *spi,
+ 		nb_words = DIV_ROUND_UP(transfer->len * 8, 16);
+ 	else
+ 		nb_words = DIV_ROUND_UP(transfer->len * 8, 32);
+-	nb_words <<= SPI_CR2_TSIZE_SHIFT;
++	nb_words <<= STM32H7_SPI_CR2_TSIZE_SHIFT;
+ 
+-	if (nb_words <= SPI_CR2_TSIZE) {
+-		writel_relaxed(nb_words, spi->base + STM32_SPI_CR2);
++	if (nb_words <= STM32H7_SPI_CR2_TSIZE) {
++		writel_relaxed(nb_words, spi->base + STM32H7_SPI_CR2);
+ 	} else {
+ 		ret = -EMSGSIZE;
+ 		goto out;
+@@ -1030,16 +1046,17 @@ static int stm32_spi_config(struct stm32_spi *spi)
+ 	spin_lock_irqsave(&spi->lock, flags);
+ 
+ 	/* Ensure I2SMOD bit is kept cleared */
+-	stm32_spi_clr_bits(spi, STM32_SPI_I2SCFGR, SPI_I2SCFGR_I2SMOD);
++	stm32_spi_clr_bits(spi, STM32H7_SPI_I2SCFGR,
++			   STM32H7_SPI_I2SCFGR_I2SMOD);
+ 
+ 	/*
+ 	 * - SS input value high
+ 	 * - transmitter half duplex direction
+ 	 * - automatic communication suspend when RX-Fifo is full
+ 	 */
+-	stm32_spi_set_bits(spi, STM32_SPI_CR1, SPI_CR1_SSI |
+-					       SPI_CR1_HDDIR |
+-					       SPI_CR1_MASRX);
++	stm32_spi_set_bits(spi, STM32H7_SPI_CR1, STM32H7_SPI_CR1_SSI |
++						 STM32H7_SPI_CR1_HDDIR |
++						 STM32H7_SPI_CR1_MASRX);
+ 
+ 	/*
+ 	 * - Set the master mode (default Motorola mode)
+@@ -1047,9 +1064,9 @@ static int stm32_spi_config(struct stm32_spi *spi)
+ 	 *   SS input value is determined by the SSI bit
+ 	 * - keep control of all associated GPIOs
+ 	 */
+-	stm32_spi_set_bits(spi, STM32_SPI_CFG2, SPI_CFG2_MASTER |
+-						SPI_CFG2_SSM |
+-						SPI_CFG2_AFCNTR);
++	stm32_spi_set_bits(spi, STM32H7_SPI_CFG2, STM32H7_SPI_CFG2_MASTER |
++						  STM32H7_SPI_CFG2_SSM |
++						  STM32H7_SPI_CFG2_AFCNTR);
+ 
+ 	spin_unlock_irqrestore(&spi->lock, flags);
+ 
+@@ -1145,8 +1162,8 @@ static int stm32_spi_probe(struct platform_device *pdev)
  	master->mode_bits = SPI_CPHA | SPI_CPOL | SPI_CS_HIGH | SPI_LSB_FIRST |
--			    SPI_3WIRE | SPI_LOOP;
-+			    SPI_3WIRE;
+ 			    SPI_3WIRE;
  	master->bits_per_word_mask = stm32_spi_get_bpw_mask(spi);
- 	master->max_speed_hz = spi->clk_rate / SPI_MBR_DIV_MIN;
- 	master->min_speed_hz = spi->clk_rate / SPI_MBR_DIV_MAX;
+-	master->max_speed_hz = spi->clk_rate / SPI_MBR_DIV_MIN;
+-	master->min_speed_hz = spi->clk_rate / SPI_MBR_DIV_MAX;
++	master->max_speed_hz = spi->clk_rate / STM32H7_SPI_MBR_DIV_MIN;
++	master->min_speed_hz = spi->clk_rate / STM32H7_SPI_MBR_DIV_MAX;
+ 	master->setup = stm32_spi_setup;
+ 	master->prepare_message = stm32_spi_prepare_msg;
+ 	master->transfer_one = stm32_spi_transfer_one;
 -- 
 2.7.4
 
