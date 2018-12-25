@@ -2,49 +2,105 @@ Return-Path: <SRS0=E6tZ=PC=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2AA36C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 25 Dec 2018 13:59:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E614EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 25 Dec 2018 19:57:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DFD142177E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 25 Dec 2018 13:59:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A6E782087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 25 Dec 2018 19:57:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="s8XzePIY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DFD142177E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="C3P/Hvz2";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=umn.edu header.i=@umn.edu header.b="csF9Jj/7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A6E782087F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=umn.edu
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RHrTSyoCwsyA8PxBZx4JLI2ZEpyHoC3gr2cTsYzD7Yg=; b=s8XzePIYD5X7D8
-	BG06OVl3Zz77EwTcEiq4EpoRJRxOw00KCLsKvI/0od4bfLM4Trk+T5zOaQJ9fYRsJeqiQVtvsczMp
-	gchsK8qsNx3Sg4CNIA/ruZ0MsDU2oglaYMwkPQUtnlnx9sDZNrkwBfFJZzpegZcbSQvkQn7mZ2m6U
-	EUAqibnUNsvyn6FrHV12ID4ajIC3C5r91XNgA9m+nsaKeTq/TFUtW9rmhhs2cvORDHzSPI9eTHK0u
-	06AMyRq1xdQ82qLhlDThASV5yNjvYzv0rrUW1WuSrvV9sy/Qm23KsHSNT6dkm60qsW8DyLDCmxT42
-	Zwr5axlmDvSUm/D3mAtw==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=tHcL/i0497OQDokggRBhbjNywcTCXD2OkiENPUD+an8=; b=C3P
+	/Hvz2D1Jgsuz3RYL3UJyP0zkkygxJpZ14PG2J8Ssq0Erzzm7BaRHkkyau2U/YADRDH31th0SL64wV
+	nPa2d7hNIBasbgyfqOM22BqDiJey+azF/CkffumTv2lF+GgnrlRqTDzSWrwX0VveuGdNcgxdH6XpR
+	rtRrn3A60OwHnTvbe6U5oqxXAePermtxrpx7byimC5oWZhvQTx/4QN8XCS3IZ8Q28FjwjV4pfjBXs
+	hwYHcozHnD8yeiJB0smLSf2LXkiFG2quUFKFwH0et9QgdtCbxQl6A8zx4zEXfalH3HXIbrdBYj+M6
+	DqOC6+nCzuubazeMWSOT0/Zyc8QuvtA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gbnFL-00084g-O9; Tue, 25 Dec 2018 13:59:47 +0000
-Received: from willy by bombadil.infradead.org with local (Exim 4.90_1 #2 (Red
- Hat Linux)) id 1gbnFE-00084P-D9; Tue, 25 Dec 2018 13:59:40 +0000
-Date: Tue, 25 Dec 2018 05:59:40 -0800
-From: Matthew Wilcox <willy@infradead.org>
-To: Kehong Zhang <zhangkehong@hisilicon.com>
-Subject: Re: [RFC] mm: add pad in sturct page
-Message-ID: <20181225135940.GA20878@bombadil.infradead.org>
-References: <1545703503-20939-1-git-send-email-zhangkehong@hisilicon.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1545703503-20939-1-git-send-email-zhangkehong@hisilicon.com>
-User-Agent: Mutt/1.9.2 (2017-12-15)
+	id 1gbspf-000780-HZ; Tue, 25 Dec 2018 19:57:39 +0000
+Received: from mta-p5.oit.umn.edu ([134.84.196.205])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gbspM-000779-E5
+ for linux-arm-kernel@lists.infradead.org; Tue, 25 Dec 2018 19:57:22 +0000
+Received: from localhost (unknown [127.0.0.1])
+ by mta-p5.oit.umn.edu (Postfix) with ESMTP id 374D2B34
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 25 Dec 2018 19:57:09 +0000 (UTC)
+X-Virus-Scanned: amavisd-new at umn.edu
+Received: from mta-p5.oit.umn.edu ([127.0.0.1])
+ by localhost (mta-p5.oit.umn.edu [127.0.0.1]) (amavisd-new, port 10024)
+ with ESMTP id ks6kmNxLNqvl for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 25 Dec 2018 13:57:09 -0600 (CST)
+Received: from mail-it1-f198.google.com (mail-it1-f198.google.com
+ [209.85.166.198])
+ (using TLSv1.2 with cipher AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mta-p5.oit.umn.edu (Postfix) with ESMTPS id 1158DAA8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 25 Dec 2018 13:57:08 -0600 (CST)
+Received: by mail-it1-f198.google.com with SMTP id x3so16831027itb.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 25 Dec 2018 11:57:08 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=umn.edu; s=google;
+ h=from:to:cc:subject:date:message-id;
+ bh=4j9+iKNJ8s8Atk43E6W22afZdFKgiCQCrarKCTLLx2U=;
+ b=csF9Jj/7OOUwV4hj5i7DaPXTnR2vtYi1mwCZIslMfU7d0KheTkWjLgEhopTmfF1M1K
+ y9dmwZqHn/xRuZ6ku4F7Ww0xTPgKl3bn1vRm91zmYSR1L1Rx7byYprwJfRGS1LsvQtp0
+ Y6O+c2I77j/FgQxcg8j/kgG4eI2cqurZQNj1kcfMhcQgqYsBQObiCKhzvmvHhpbqu9x9
+ jIGiriUBsCGHYWpt6/7GyspFQbLnDN+FVuJziPlGO6C0toNf2Yu9DjnkyZnOMnLyByGa
+ U5cTBN1Kh1jM0NHcuw2XCQ3hpZrJcGM6lGT7aEps4GK6bWoNXuQmXcuNYRxxRU+5EBbl
+ rcVw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=4j9+iKNJ8s8Atk43E6W22afZdFKgiCQCrarKCTLLx2U=;
+ b=mWuyq4E2k9ug3guM6UNwRTTGtOHW9OUTXY4KQ68rAqpTJzJ/3U6tmHAjGS6n0VqK0J
+ gveZoT8cQ5h6Chkip0nZKdiOGgJJpre+Avu0jGZyqxs++0dEPv/9smD25ywvVDzBu35i
+ Eq+FpbT6WyORC4NIxBZt5Imt9wz2kRmJK5GIRyZimAbC3Q8Fky7rde7ETliC0jlSVmBF
+ w+Guqv2NYDi2pwD27A+wnx+4NkfV6mtID4ycaaNY2Ume9HEMKwDAJKi4yvFkktg5SU6g
+ GO0g/YzzOoMnppmAh/t069qsU1WEdBrOBjM32dHFADTakddTD3eX4y4YQnVZFpsRJnS0
+ FaRQ==
+X-Gm-Message-State: AJcUukcrHGkNMNgTRJEQMlsk53H33RjLZrJR6am7bjs+FcTYtUz09wIV
+ WFi0lZLQcVsEqzDZQOP8fX5ZgwZIvMjS8TzJqADnEzaaEYVA595c8Sk1ZX/m8iJLA20jNPdl/Wp
+ rA54KTClbMn+tujWIzFnuCpo+MuVljEowdE3U34s=
+X-Received: by 2002:a5e:8b05:: with SMTP id g5mr9776635iok.144.1545767827793; 
+ Tue, 25 Dec 2018 11:57:07 -0800 (PST)
+X-Google-Smtp-Source: ALg8bN7vluLCp7C7vcRQxK+NcD0t1sWSsJOm8Qq1TE6IIG4dScS+etAMbNphm/TDaM+we8iSFRKXTA==
+X-Received: by 2002:a5e:8b05:: with SMTP id g5mr9776625iok.144.1545767827556; 
+ Tue, 25 Dec 2018 11:57:07 -0800 (PST)
+Received: from localhost.localdomain
+ (host-173-230-104-22.mnmigsc.mn.minneapolis.us.clients.pavlovmedia.net.
+ [173.230.104.22])
+ by smtp.gmail.com with ESMTPSA id d128sm16530360iof.37.2018.12.25.11.57.06
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Tue, 25 Dec 2018 11:57:06 -0800 (PST)
+From: Kangjie Lu <kjlu@umn.edu>
+To: kjlu@umn.edu
+Subject: [PATCH] hwtracing: stm: avoid a double-fetch case when fetching
+ policy id
+Date: Tue, 25 Dec 2018 13:56:37 -0600
+Message-Id: <20181225195637.69304-1-kjlu@umn.edu>
+X-Mailer: git-send-email 2.17.2 (Apple Git-113)
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20181225_115720_563691_5915483D 
+X-CRM114-Status: GOOD (  13.80  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -56,61 +112,44 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Michal Hocko <mhocko@suse.com>, Rik van Riel <riel@surriel.com>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Vlastimil Babka <vbabka@suse.cz>, Will Deacon <will.deacon@arm.com>,
- Masahiro Yamada <yamada.masahiro@socionext.com>,
- "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>,
- Andrey Konovalov <andreyknvl@google.com>,
- Andrey Ryabinin <aryabinin@virtuozzo.com>,
- Andrew Morton <akpm@linux-foundation.org>,
- linux-arm-kernel@lists.infradead.org, Souptick Joarder <jrdr.linux@gmail.com>
+Cc: Alexandre Torgue <alexandre.torgue@st.com>,
+ Alexander Shishkin <alexander.shishkin@linux.intel.com>,
+ linux-kernel@vger.kernel.org, Maxime Coquelin <mcoquelin.stm32@gmail.com>,
+ pakki001@umn.edu, linux-stm32@st-md-mailman.stormreply.com,
+ linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 25, 2018 at 10:05:03AM +0800, Kehong Zhang wrote:
->         When I analysis the performance of using nginx for static websites.
-> 	I found a high cpu workload in the code below:
-> 
-> 	mm/filemap.c
-> 	@@ 1425,3 @@ struct page *find_get_entry(struct address_space 
-> 						*mapping, pgoff_t offset)
-> 	head = compound_head(page);
-> 	if (!page_cache_get_speculative(head))
-> 		goto repeat;
->         
-> 	The code will read page->compound_head and atomic add page->_refcount,
-> 	which two variables are in the same cache-line. As multiple core 
-> 	read/write two variables in the same cache-line	will cause serious
-> 	slowdown,
+"size" is fetched from user space and security checked. The fix avoids
+fetching it again. Since "size" is no longer used after the second
+fetch in the current code, so let's just skip copying "size" in the
+second fetch.
 
-page->compound is written at allocation.  It's not modified during use,
-so your analysis is wrong here.  What you're seeing is the first attempt
-to access this struct page, so it's a cache-miss.  If you take away the
-access to page->compound, you'll instead see all of the penalty incurred
-on the next attempt to access the struct page.
+Signed-off-by: Kangjie Lu <kjlu@umn.edu>
+---
+ drivers/hwtracing/stm/core.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
->       I test the performance of using nginx for static websites
-> 	in two cases, add patch below and original.
-> 
-> 	core num\Scenes        add pad        no pad      
-> 	8core                  317654         344414
+diff --git a/drivers/hwtracing/stm/core.c b/drivers/hwtracing/stm/core.c
+index 93ce3aa740a9..55df1d374c57 100644
+--- a/drivers/hwtracing/stm/core.c
++++ b/drivers/hwtracing/stm/core.c
+@@ -752,7 +752,8 @@ static int stm_char_policy_set_ioctl(struct stm_file *stmf, void __user *arg)
+ 	if (!id)
+ 		return -ENOMEM;
+ 
+-	if (copy_from_user(id, arg, size)) {
++	if (copy_from_user(id + sizeof(size),
++				arg + sizeof(size), size - sizeof(size))) {
+ 		ret = -EFAULT;
+ 		goto err_free;
+ 	}
+-- 
+2.17.2 (Apple Git-113)
 
-These numbers aren't particularly useful.  How stable are they from run
-to run?  That is, if you do five runs, what range do they fall in?  Also,
-is higher better or is lower better?  I can't tell if this is requests
-per second or latency or something else being measured.
-
-> 	As we know, struct page is the most used struct and should be as
-> 	small as possible. And I don't have a better way to solve it, if
-> 	anybody have any idea to solve it?
-
-Obviously we're not going to grow struct page from 64 bytes to 256 bytes.
-I have briefly investigated an idea to eliminate the reference counting
-for page cache accesses that don't need to sleep, but it's a long way
-down my todo list.
 
 _______________________________________________
 linux-arm-kernel mailing list
