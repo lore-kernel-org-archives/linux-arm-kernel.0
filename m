@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
 	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8317AC64E75
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 25 Dec 2018 03:57:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E9FC1C07520
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 25 Dec 2018 04:16:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5185720882
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 25 Dec 2018 03:57:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B3EE6218B0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 25 Dec 2018 04:16:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o7HcGgjI";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="HLPkITwj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5185720882
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Nn9abpWo";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="KEfh6oir"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B3EE6218B0
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,56 +25,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4gzD5KvBBZ5NaEJSFF9vhsmORqbV+4nR5NEGnBH2o6Q=; b=o7HcGgjIeyNN76
-	8vsR2PWBT4fIE82qJ17jg3E5ryrAzT8RpP8gLNIAL5Gq1kTZFIq90EaMgxBu2GcyBoUZRXiJ2ikzM
-	4khe6MnpdzQyxwY9ljxQuJLyyQIfYqlc6djRBfyX4CN9uUpnaZmVryatohBAfZkOtszFsj2YsJZ8C
-	6ukSTJAmKAUToM/iKGUSF/dpWxRL/Usg4OuQUPEY/5yVos5dWFoY+C9Olx3d3ZrgLpncpJWQRkiz9
-	v+yK0/lp2WVJAvmvYyDtLSyXQg8oTOr2WbjKMudcI0h4ZYByJAgRM0Ke5AOz4FpUiPjIG9wTmXUit
-	yWU3SP9rHjFTVgzWIO7w==;
+	List-Owner; bh=SSD7boGWurvmBg8bTwja5IMZitzuuuD230C6gKzKw/U=; b=Nn9abpWo64DiQ7
+	Lx/cGLXSFs9f/sXQY4jvzr3ufD5jNbmKfY5V5p50ScYhI21NUZVIRNExhJe84847c5EWfLkiaTic5
+	+YkfUXHpXTp9Kp/EnA84xZVVHZ6TN8wOzjXe1IuUb1c7uHK7PcGsgpUlMJgnp5cEZVfatx5Qoqod5
+	333OeVBhwA5MWGqfaOUbsH3mIDEv/7VcbM9jKoiczUW3NEpxCEPxZyCjIOnAkZs2tqzbOrzICSb7f
+	+czH01kY4XQVyCP5f+Ua8ONORMbGBRv3ljFxhTldyNs7jgelznTRYdKPaRelGfo4bRYsCT9ozK9H+
+	C6SyqbchVPdKygtGa/BQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gbdqU-0008Va-8x; Tue, 25 Dec 2018 03:57:30 +0000
-Received: from mail-qt1-x841.google.com ([2607:f8b0:4864:20::841])
+	id 1gbe8a-000634-6C; Tue, 25 Dec 2018 04:16:12 +0000
+Received: from mail-qk1-x741.google.com ([2607:f8b0:4864:20::741])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gbdqO-0008UF-EJ
- for linux-arm-kernel@lists.infradead.org; Tue, 25 Dec 2018 03:57:28 +0000
-Received: by mail-qt1-x841.google.com with SMTP id p17so14334194qtl.5
+ id 1gbe8T-00061r-Gq
+ for linux-arm-kernel@lists.infradead.org; Tue, 25 Dec 2018 04:16:09 +0000
+Received: by mail-qk1-x741.google.com with SMTP id r71so7755172qkr.10
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 24 Dec 2018 19:57:12 -0800 (PST)
+ Mon, 24 Dec 2018 20:15:54 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=s5geiLs7kDycDhYNSL4q6vv2w/JxPB7NmvJkyHK8CYI=;
- b=HLPkITwjGl65iN8oUZFeOk3xzKurwM1QYWPHXLL+nDaL/SJ5hYTsGF3zJvv+ie6iOp
- hFylEVic3usbaWQ1r+5l53cioUWAXF6ql/rWeXdjX7PQ59MZ/vuEf8Yvnqab6gDdjOyO
- MJIa7MGBdrhfrPo4mAOxTijLmzElfVtK++NiU=
+ :cc; bh=4fLaJ9WArwsfvNaLAZ8iEKft++hOrau5AV7vS/wxgZw=;
+ b=KEfh6oirEOs7YwLIvfEoKJ/f9+ivNg3AZXMEeU2TqFQ8v0JH+X3GVJ3W4sLKttZnsR
+ oZLgO3MLwpJi/+CwDQKnbTmMG7H1nNZqZ2VWPvG/3Cr1fLSOS/hPoQO1rGUS54s2ldhF
+ kxlRMFULW4cZw4oNaCWnbu0O0cQIVldWdjImQ=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=s5geiLs7kDycDhYNSL4q6vv2w/JxPB7NmvJkyHK8CYI=;
- b=KZrodiLPgjWbnF8qNMn7B5tgaEOqTqV5HMhVMegbP8JM4xZQl1QwRU7EgLGhvjhsf+
- iL+loECvOzEN+63xud/E863OqlWzMhJJvJ8Qvk2ZfEsXL474+1mBeylOuJgVf5tUrRcU
- aRZ6QslChCGjp/wjo0TQ67mM+uMzWoTl1VpSXG2SJ9d1XeZoa7kc9jV2/Cjy29+LJk6A
- icvc5191FJj2wrrE7O3ty47kvTTRrEE0pnoCUS7NLC5itFG4QyeQpnwvzxD87YgVTUnH
- gVYys4F05p5QXFNqIKzz9GSBO93HP5HC9PVoPt404iGZMg7L415uXnoV3/5VUEcdtZnm
- r9Ng==
-X-Gm-Message-State: AJcUukdQd4SqrgCPzwOuA7u9NdGpenyBRWGB2DJOmBjX75qMA93NoVr4
- FI7km9TiRCzW5ofzeZSHZvektenVXhHV9zvM4eVtJQ==
-X-Google-Smtp-Source: ALg8bN6xgg47waxonnNSsErsFKqVr/MYeuvZGLAnjipVbD1FgXDfc5ueGpw0WOyMZbfxMhx//31nZiKbw9UC4+Mbwos=
-X-Received: by 2002:a0c:d0d7:: with SMTP id b23mr14050872qvh.67.1545710231259; 
- Mon, 24 Dec 2018 19:57:11 -0800 (PST)
+ bh=4fLaJ9WArwsfvNaLAZ8iEKft++hOrau5AV7vS/wxgZw=;
+ b=fH4qreXUsZWk824a/J3ophmKKpvQblzi8GtMp963MbA90CFkwhxR3VMMitwqjYnJDO
+ Bcq5eoyEJvujzVqe+wP3wHX7ccUClbvEHP8IzaNHMlRuCT299VMJTOy1iDPGlWeoahVq
+ skmFPUI/Pldn5tXUXqcFSV054RjA1THvFNCa8EoyOxpJTVhvlyn+XkqyvVYIFZo/8Jze
+ I1JV8J1rw0aLPJ9rzYU7mTOGr3qD5hgZRBfygJ7V1cLPwyHbtGi0PYgnrogxuPfPH6tO
+ 5pA1J9bNxQYmwoCGmHa32u3J97hukA/vpikb79QMh7SaLQkjMxOeVeWGiVj8dAaZOZET
+ se8Q==
+X-Gm-Message-State: AJcUukfiYZODmld1+sJdaIjVdMKtuHUQdA9ZVs8VPtZxiOC/5lHwSoS6
+ kQeR7gUo1iIW0y3z2jWN8V92vyDDdvvPFyw6eOtWbQ==
+X-Google-Smtp-Source: ALg8bN5QE7B8DqfMGmo68JsdDxoWuPqrpXJeDayRTJjMK0XXZGW+9ZHVpZ9L4OWdnouJENVHWbG7S5BLpDuYy4p9SQg=
+X-Received: by 2002:a37:7885:: with SMTP id
+ t127mr14062107qkc.323.1545711353630; 
+ Mon, 24 Dec 2018 20:15:53 -0800 (PST)
 MIME-Version: 1.0
 References: <1545638931-24938-1-git-send-email-yongqiang.niu@mediatek.com>
- <1545638931-24938-4-git-send-email-yongqiang.niu@mediatek.com>
-In-Reply-To: <1545638931-24938-4-git-send-email-yongqiang.niu@mediatek.com>
+ <1545638931-24938-11-git-send-email-yongqiang.niu@mediatek.com>
+In-Reply-To: <1545638931-24938-11-git-send-email-yongqiang.niu@mediatek.com>
 From: Nicolas Boichat <drinkcat@chromium.org>
-Date: Tue, 25 Dec 2018 11:57:00 +0800
-Message-ID: <CANMq1KBTN61hmWy2K+rrx3NL0eR7AXhFQBkCpcHu5nhUw_6xjw@mail.gmail.com>
-Subject: Re: [PATCH 03/18] drm/mediatek: redefine mtk_ddp_sout_sel
+Date: Tue, 25 Dec 2018 12:15:42 +0800
+Message-ID: <CANMq1KC_JwVfvFd46_gP_wK_QNO0LTZOcwRAbotF6MghYivJYw@mail.gmail.com>
+Subject: Re: [PATCH 10/18] drm/mediatek: add gmc_bits for ovl private data
 To: Yongqiang Niu <yongqiang.niu@mediatek.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181224_195724_478515_D745BB30 
-X-CRM114-Status: GOOD (  19.13  )
+X-CRM114-CacheID: sfid-20181224_201605_585047_64E4EEC3 
+X-CRM114-Status: GOOD (  19.36  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,93 +98,89 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 24, 2018 at 6:52 PM Yongqiang Niu
+On Mon, Dec 24, 2018 at 6:53 PM Yongqiang Niu
 <yongqiang.niu@mediatek.com> wrote:
 >
-> This patch redefine mtk_ddp_sout_sel
-
-Can you describe a bit more why you are making this change?
-
+> This patch add gmc_bits for ovl private data
+>
 > Signed-off-by: Yongqiang Niu <yongqiang.niu@mediatek.com>
 > ---
->  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 32 ++++++++++++++++++++------------
->  1 file changed, 20 insertions(+), 12 deletions(-)
+>  drivers/gpu/drm/mediatek/mtk_disp_ovl.c | 23 +++++++++++++++++++++--
+>  1 file changed, 21 insertions(+), 2 deletions(-)
 >
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> index adb37e4..592f852 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> @@ -405,21 +405,27 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
->         return value;
->  }
+> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+> index 28d1911..afb313c 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+> @@ -39,7 +39,9 @@
+>  #define DISP_REG_OVL_ADDR_MT8173               0x0f40
+>  #define DISP_REG_OVL_ADDR(ovl, n)              ((ovl)->data->addr + 0x20 * (n))
 >
-> -static void mtk_ddp_sout_sel(void __iomem *config_regs,
-> -                            enum mtk_ddp_comp_id cur,
-> -                            enum mtk_ddp_comp_id next)
-> +static unsigned int mtk_ddp_sout_sel(void __iomem *config_regs,
-
-You don't use config_regs anymore, drop it.
-
-> +                                    enum mtk_ddp_comp_id cur,
-> +                                    enum mtk_ddp_comp_id next,
-> +                                    unsigned int *addr)
+> -#define        OVL_RDMA_MEM_GMC        0x40402020
+> +#define GMC_THRESHOLD_BITS     16
+> +#define GMC_THRESHOLD_HIGH     ((1 << GMC_THRESHOLD_BITS) / 4)
+> +#define GMC_THRESHOLD_LOW      ((1 << GMC_THRESHOLD_BITS) / 8)
+>
+>  #define OVL_CON_BYTE_SWAP      BIT(24)
+>  #define OVL_CON_MTX_YUV_TO_RGB (6 << 16)
+> @@ -57,6 +59,7 @@
+>
+>  struct mtk_disp_ovl_data {
+>         unsigned int addr;
+> +       unsigned int gmc_bits;
+>         bool fmt_rgb565_is_0;
+>  };
+>
+> @@ -140,9 +143,23 @@ static unsigned int mtk_ovl_layer_nr(struct mtk_ddp_comp *comp)
+>  static void mtk_ovl_layer_on(struct mtk_ddp_comp *comp, unsigned int idx)
 >  {
-> +       unsigned int value;
-> +
->         if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0) {
-> -               writel_relaxed(BLS_TO_DSI_RDMA1_TO_DPI1,
-> -                              config_regs + DISP_REG_CONFIG_OUT_SEL);
-> +               *addr = DISP_REG_CONFIG_OUT_SEL;
-> +               value = BLS_TO_DSI_RDMA1_TO_DPI1;
-
-You can directly return BLS_TO_DSI_RDMA1_TO_DPI1.
-
->         } else if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DPI0) {
-> -               writel_relaxed(BLS_TO_DPI_RDMA1_TO_DSI,
-> -                              config_regs + DISP_REG_CONFIG_OUT_SEL);
-> -               writel_relaxed(DSI_SEL_IN_RDMA,
-> -                              config_regs + DISP_REG_CONFIG_DSI_SEL);
-> -               writel_relaxed(DPI_SEL_IN_BLS,
-> -                              config_regs + DISP_REG_CONFIG_DPI_SEL);
-> +               *addr = DISP_REG_CONFIG_OUT_SEL;
-> +               value = BLS_TO_DPI_RDMA1_TO_DSI;
-
-I (kind of) understand the change above, as you still end up writing
-BLS_TO_DSI_RDMA1_TO_DPI1 in DISP_REG_CONFIG_OUT_SEL.
-
-This changes the behaviour, as now you only write
-BLS_TO_DPI_RDMA1_TO_DSI to DISP_REG_CONFIG_OUT_SEL, but the previous
-revision of the code would also write to DISP_REG_CONFIG_DSI_SEL and
-DISP_REG_CONFIG_DPI_SEL. Why?
-
-> +       } else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DSI0) {
-> +               *addr = DISP_REG_CONFIG_DSI_SEL;
-> +               value = DSI_SEL_IN_RDMA;
-> +       } else {
-> +               value = 0;
->         }
-> +
-> +       return value;
->  }
+>         unsigned int reg;
+> +       unsigned int gmc_thrshd_l;
+> +       unsigned int gmc_thrshd_h;
+> +       unsigned int gmc_value;
+> +       struct mtk_disp_ovl *ovl = comp_to_ovl(comp);
 >
->  void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
-> @@ -434,7 +440,9 @@ void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
->                 writel_relaxed(reg, config_regs + addr);
->         }
+>         writel(0x1, comp->regs + DISP_REG_OVL_RDMA_CTRL(idx));
+> -       writel(OVL_RDMA_MEM_GMC, comp->regs + DISP_REG_OVL_RDMA_GMC(idx));
+> +
+> +       gmc_thrshd_l = GMC_THRESHOLD_LOW >>
+> +                     (GMC_THRESHOLD_BITS - ovl->data->gmc_bits);
+> +       gmc_thrshd_h = GMC_THRESHOLD_HIGH >>
+> +                     (GMC_THRESHOLD_BITS - ovl->data->gmc_bits);
+> +       if (ovl->data->gmc_bits == 10)
+> +               gmc_value = gmc_thrshd_h | gmc_thrshd_h << 16;
+
+I don't really get what this does, but is it intentional that you
+don't use gmc_thrshd_l here?
+
+Also, if you only ever use 8 or 10 bits gmc, maybe it's easier to
+hard-code the 2 values?
+if (ovl->data->gmc_bits == 10)
+  gmc_value = OVL_RDMA_MEM_GMC_10BIT;
+else
+  gmc_value = OVL_RDMA_MEM_GMC_8BIT; //0x40402020
+
+> +       else
+> +               gmc_value = gmc_thrshd_l | gmc_thrshd_l << 8 |
+> +                           gmc_thrshd_h << 16 | gmc_thrshd_h << 24;
+> +       writel(gmc_value, comp->regs + DISP_REG_OVL_RDMA_GMC(idx));
 >
-> -       mtk_ddp_sout_sel(config_regs, cur, next);
-> +       value = mtk_ddp_sout_sel(cur, next, &addr);
-> +       if (value)
-> +               writel_relaxed(value, config_regs + addr);
-
-Why this change? I don't see mtk_ddp_sout_sel being used later in the
-series, so I'm not sure why we don't directly write the value into the
-register.
-
-
-
->         value = mtk_ddp_sel_in(cur, next, &addr);
->         if (value) {
+>         reg = readl(comp->regs + DISP_REG_OVL_SRC_CON);
+>         reg = reg | BIT(idx);
+> @@ -324,11 +341,13 @@ static int mtk_disp_ovl_remove(struct platform_device *pdev)
+>
+>  static const struct mtk_disp_ovl_data mt2701_ovl_driver_data = {
+>         .addr = DISP_REG_OVL_ADDR_MT2701,
+> +       .gmc_bits = 8,
+>         .fmt_rgb565_is_0 = false,
+>  };
+>
+>  static const struct mtk_disp_ovl_data mt8173_ovl_driver_data = {
+>         .addr = DISP_REG_OVL_ADDR_MT8173,
+> +       .gmc_bits = 8,
+>         .fmt_rgb565_is_0 = true,
+>  };
+>
 > --
 > 1.8.1.1.dirty
 > _______________________________________________
