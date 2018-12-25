@@ -4,19 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E9FC1C07520
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 25 Dec 2018 04:16:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7682AC07520
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 25 Dec 2018 04:20:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B3EE6218B0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 25 Dec 2018 04:16:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 42AD6218B0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 25 Dec 2018 04:20:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Nn9abpWo";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="KEfh6oir"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B3EE6218B0
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tMvzFgwi";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="Bp+/YmZH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 42AD6218B0
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,57 +26,56 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SSD7boGWurvmBg8bTwja5IMZitzuuuD230C6gKzKw/U=; b=Nn9abpWo64DiQ7
-	Lx/cGLXSFs9f/sXQY4jvzr3ufD5jNbmKfY5V5p50ScYhI21NUZVIRNExhJe84847c5EWfLkiaTic5
-	+YkfUXHpXTp9Kp/EnA84xZVVHZ6TN8wOzjXe1IuUb1c7uHK7PcGsgpUlMJgnp5cEZVfatx5Qoqod5
-	333OeVBhwA5MWGqfaOUbsH3mIDEv/7VcbM9jKoiczUW3NEpxCEPxZyCjIOnAkZs2tqzbOrzICSb7f
-	+czH01kY4XQVyCP5f+Ua8ONORMbGBRv3ljFxhTldyNs7jgelznTRYdKPaRelGfo4bRYsCT9ozK9H+
-	C6SyqbchVPdKygtGa/BQ==;
+	List-Owner; bh=TowJg4TxLKUw/oFr6p3VGfIQOsow7nWNRImYrGGk6Is=; b=tMvzFgwiKhTMaD
+	dVWEUffAnC5yvXof/TOJk5mLFL0Jn2fUKHkK5BgVCbUZ/L3IIQX/MRtN9x/WLYRwXKZD0+ym1NqKP
+	9P2nPXkPQ21HoL8ULmTmWagC1+A4T8FuOCYL0BnWD5FNm0Vcyz3rOD+Se02enJ5vVKEfx0bAP7XJi
+	W6vjgFfvBB3C+cRchNy+PS46pot4wmVP523jA8ya+RUs4MYpOUUantMD5AjXuP4gMPFYN0RYSvnbF
+	gc0cGiO7kJ1OuJT/0uQffQo60/qJA1a2sk3r58gjxs8rGDklgo7XeugwD53aQfoWPYBjccyHajqVE
+	d3L76wKoTfHVZ2a0+kwQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gbe8a-000634-6C; Tue, 25 Dec 2018 04:16:12 +0000
-Received: from mail-qk1-x741.google.com ([2607:f8b0:4864:20::741])
+	id 1gbeCL-0006bp-1b; Tue, 25 Dec 2018 04:20:05 +0000
+Received: from mail-qt1-x842.google.com ([2607:f8b0:4864:20::842])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gbe8T-00061r-Gq
- for linux-arm-kernel@lists.infradead.org; Tue, 25 Dec 2018 04:16:09 +0000
-Received: by mail-qk1-x741.google.com with SMTP id r71so7755172qkr.10
+ id 1gbeCC-0006Tz-I2
+ for linux-arm-kernel@lists.infradead.org; Tue, 25 Dec 2018 04:20:00 +0000
+Received: by mail-qt1-x842.google.com with SMTP id n32so14322230qte.11
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 24 Dec 2018 20:15:54 -0800 (PST)
+ Mon, 24 Dec 2018 20:19:46 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=4fLaJ9WArwsfvNaLAZ8iEKft++hOrau5AV7vS/wxgZw=;
- b=KEfh6oirEOs7YwLIvfEoKJ/f9+ivNg3AZXMEeU2TqFQ8v0JH+X3GVJ3W4sLKttZnsR
- oZLgO3MLwpJi/+CwDQKnbTmMG7H1nNZqZ2VWPvG/3Cr1fLSOS/hPoQO1rGUS54s2ldhF
- kxlRMFULW4cZw4oNaCWnbu0O0cQIVldWdjImQ=
+ :cc; bh=hRltAEGdhdJSlbSLKF4x4jRfCNGMuHVTLWedpYRw1p8=;
+ b=Bp+/YmZH2iQSQxajUYpcSgggriNdHEphMLv4FmM8sl+tDILAa49yg6uxlTVHTTqb2V
+ q12YvoNFl/3/LjlCswoN8h6JJ1vJZt3mUffCtcn1vhMwOiRFuhxL6q97N2FuiVwQvis4
+ R2xecFTAcGfwO1JiCfmO+CivlGDarR2DH9uIQ=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=4fLaJ9WArwsfvNaLAZ8iEKft++hOrau5AV7vS/wxgZw=;
- b=fH4qreXUsZWk824a/J3ophmKKpvQblzi8GtMp963MbA90CFkwhxR3VMMitwqjYnJDO
- Bcq5eoyEJvujzVqe+wP3wHX7ccUClbvEHP8IzaNHMlRuCT299VMJTOy1iDPGlWeoahVq
- skmFPUI/Pldn5tXUXqcFSV054RjA1THvFNCa8EoyOxpJTVhvlyn+XkqyvVYIFZo/8Jze
- I1JV8J1rw0aLPJ9rzYU7mTOGr3qD5hgZRBfygJ7V1cLPwyHbtGi0PYgnrogxuPfPH6tO
- 5pA1J9bNxQYmwoCGmHa32u3J97hukA/vpikb79QMh7SaLQkjMxOeVeWGiVj8dAaZOZET
- se8Q==
-X-Gm-Message-State: AJcUukfiYZODmld1+sJdaIjVdMKtuHUQdA9ZVs8VPtZxiOC/5lHwSoS6
- kQeR7gUo1iIW0y3z2jWN8V92vyDDdvvPFyw6eOtWbQ==
-X-Google-Smtp-Source: ALg8bN5QE7B8DqfMGmo68JsdDxoWuPqrpXJeDayRTJjMK0XXZGW+9ZHVpZ9L4OWdnouJENVHWbG7S5BLpDuYy4p9SQg=
-X-Received: by 2002:a37:7885:: with SMTP id
- t127mr14062107qkc.323.1545711353630; 
- Mon, 24 Dec 2018 20:15:53 -0800 (PST)
+ bh=hRltAEGdhdJSlbSLKF4x4jRfCNGMuHVTLWedpYRw1p8=;
+ b=WhaTAm3DYp+Syb421b9ZUuuKoswCbYbx1uuVP3vdLcMWoYBLTLjgm3hMEdv0xceXVr
+ J1zm4Gc1o0fwCTZ9fXqOfDq38gD/bxYLeTFR0uaJx66DWOsdMqA1afNztOX5O6JQ6NkQ
+ nEh2NBSxwE5NQsVYwjI5CynNpeCKTCX5vyG7yKLp4AxMGFEId0105+M+AFc5C6YHdcuG
+ VRaQZclyLh1EoDgjN57FX6ni90MSCSFW1zIaewrbrn37beCS4EA5jyY02JREIM+L3Pji
+ Ztfpq93h7K5RT3Wu3las9g8R2uQRzS71gtTN4Uh4IW0RV5KDvs+tA6qZchTrjUk96qzS
+ kHjA==
+X-Gm-Message-State: AA+aEWakW6dfbGtjN/162NReaPGvXrUYxTpzEXjqqalj05M7Luvg+JLK
+ ZTZzlzoUy2s9i6L5pFzNb9lYJdL1E1NAAcPooF2Kfw==
+X-Google-Smtp-Source: AFSGD/WiWuKdqXnBY1d4PChmVEr/pLLqCS21n1XNZB6O7T15NrPJ7Tn+xv5ZUZLSR01Y4IPTEmTUVvoVRsFdMrqpUfs=
+X-Received: by 2002:aed:3442:: with SMTP id w60mr14405639qtd.339.1545711585226; 
+ Mon, 24 Dec 2018 20:19:45 -0800 (PST)
 MIME-Version: 1.0
 References: <1545638931-24938-1-git-send-email-yongqiang.niu@mediatek.com>
- <1545638931-24938-11-git-send-email-yongqiang.niu@mediatek.com>
-In-Reply-To: <1545638931-24938-11-git-send-email-yongqiang.niu@mediatek.com>
+ <1545638931-24938-17-git-send-email-yongqiang.niu@mediatek.com>
+In-Reply-To: <1545638931-24938-17-git-send-email-yongqiang.niu@mediatek.com>
 From: Nicolas Boichat <drinkcat@chromium.org>
-Date: Tue, 25 Dec 2018 12:15:42 +0800
-Message-ID: <CANMq1KC_JwVfvFd46_gP_wK_QNO0LTZOcwRAbotF6MghYivJYw@mail.gmail.com>
-Subject: Re: [PATCH 10/18] drm/mediatek: add gmc_bits for ovl private data
+Date: Tue, 25 Dec 2018 12:19:34 +0800
+Message-ID: <CANMq1KAerBM7Z+hNkfQj1R=Fou_Vcnsu5AStBuZeaH4vC6i2ag@mail.gmail.com>
+Subject: Re: [PATCH 16/18] drm/mediatek: add function mtk_ddp_comp_get_type
 To: Yongqiang Niu <yongqiang.niu@mediatek.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181224_201605_585047_64E4EEC3 
-X-CRM114-Status: GOOD (  19.36  )
+X-CRM114-CacheID: sfid-20181224_201956_593758_244D97A2 
+X-CRM114-Status: GOOD (  16.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,86 +101,52 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 On Mon, Dec 24, 2018 at 6:53 PM Yongqiang Niu
 <yongqiang.niu@mediatek.com> wrote:
 >
-> This patch add gmc_bits for ovl private data
+> This patch add function mtk_ddp_comp_get_type
 >
 > Signed-off-by: Yongqiang Niu <yongqiang.niu@mediatek.com>
 > ---
->  drivers/gpu/drm/mediatek/mtk_disp_ovl.c | 23 +++++++++++++++++++++--
->  1 file changed, 21 insertions(+), 2 deletions(-)
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 10 ++++++++++
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |  1 +
+>  2 files changed, 11 insertions(+)
 >
-> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> index 28d1911..afb313c 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> @@ -39,7 +39,9 @@
->  #define DISP_REG_OVL_ADDR_MT8173               0x0f40
->  #define DISP_REG_OVL_ADDR(ovl, n)              ((ovl)->data->addr + 0x20 * (n))
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> index 1c0f9cc..71b565c 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> @@ -350,6 +350,16 @@ int mtk_ddp_comp_get_id(struct device_node *node,
+>         return -EINVAL;
+>  }
 >
-> -#define        OVL_RDMA_MEM_GMC        0x40402020
-> +#define GMC_THRESHOLD_BITS     16
-> +#define GMC_THRESHOLD_HIGH     ((1 << GMC_THRESHOLD_BITS) / 4)
-> +#define GMC_THRESHOLD_LOW      ((1 << GMC_THRESHOLD_BITS) / 8)
->
->  #define OVL_CON_BYTE_SWAP      BIT(24)
->  #define OVL_CON_MTX_YUV_TO_RGB (6 << 16)
-> @@ -57,6 +59,7 @@
->
->  struct mtk_disp_ovl_data {
->         unsigned int addr;
-> +       unsigned int gmc_bits;
->         bool fmt_rgb565_is_0;
->  };
->
-> @@ -140,9 +143,23 @@ static unsigned int mtk_ovl_layer_nr(struct mtk_ddp_comp *comp)
->  static void mtk_ovl_layer_on(struct mtk_ddp_comp *comp, unsigned int idx)
->  {
->         unsigned int reg;
-> +       unsigned int gmc_thrshd_l;
-> +       unsigned int gmc_thrshd_h;
-> +       unsigned int gmc_value;
-> +       struct mtk_disp_ovl *ovl = comp_to_ovl(comp);
->
->         writel(0x1, comp->regs + DISP_REG_OVL_RDMA_CTRL(idx));
-> -       writel(OVL_RDMA_MEM_GMC, comp->regs + DISP_REG_OVL_RDMA_GMC(idx));
+> +enum mtk_ddp_comp_type mtk_ddp_comp_get_type(enum mtk_ddp_comp_id comp_id)
+> +{
+> +       enum mtk_ddp_comp_type comp_type = MTK_DDP_COMP_TYPE_MAX;
 > +
-> +       gmc_thrshd_l = GMC_THRESHOLD_LOW >>
-> +                     (GMC_THRESHOLD_BITS - ovl->data->gmc_bits);
-> +       gmc_thrshd_h = GMC_THRESHOLD_HIGH >>
-> +                     (GMC_THRESHOLD_BITS - ovl->data->gmc_bits);
-> +       if (ovl->data->gmc_bits == 10)
-> +               gmc_value = gmc_thrshd_h | gmc_thrshd_h << 16;
+> +       if (comp_id < DDP_COMPONENT_ID_MAX)
+> +               comp_type = mtk_ddp_matches[comp_id].type;
 
-I don't really get what this does, but is it intentional that you
-don't use gmc_thrshd_l here?
+return mtk_ddp_matches[comp_id].type
 
-Also, if you only ever use 8 or 10 bits gmc, maybe it's easier to
-hard-code the 2 values?
-if (ovl->data->gmc_bits == 10)
-  gmc_value = OVL_RDMA_MEM_GMC_10BIT;
-else
-  gmc_value = OVL_RDMA_MEM_GMC_8BIT; //0x40402020
+> +
+> +       return comp_type;
 
-> +       else
-> +               gmc_value = gmc_thrshd_l | gmc_thrshd_l << 8 |
-> +                           gmc_thrshd_h << 16 | gmc_thrshd_h << 24;
-> +       writel(gmc_value, comp->regs + DISP_REG_OVL_RDMA_GMC(idx));
+return MTK_DDP_COMP_TYPE_MAX
+
+> +}
+> +
+>  int mtk_ddp_comp_init(struct device *dev, struct device_node *node,
+>                       struct mtk_ddp_comp *comp, enum mtk_ddp_comp_id comp_id,
+>                       const struct mtk_ddp_comp_funcs *funcs)
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> index b908172..599e293 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> @@ -198,5 +198,6 @@ void mtk_ddp_write_mask(unsigned int value,
+>                         struct mtk_ddp_comp *comp,
+>                         unsigned int offset,
+>                         unsigned int mask);
+> +enum mtk_ddp_comp_type mtk_ddp_comp_get_type(enum mtk_ddp_comp_id comp_id);
 >
->         reg = readl(comp->regs + DISP_REG_OVL_SRC_CON);
->         reg = reg | BIT(idx);
-> @@ -324,11 +341,13 @@ static int mtk_disp_ovl_remove(struct platform_device *pdev)
->
->  static const struct mtk_disp_ovl_data mt2701_ovl_driver_data = {
->         .addr = DISP_REG_OVL_ADDR_MT2701,
-> +       .gmc_bits = 8,
->         .fmt_rgb565_is_0 = false,
->  };
->
->  static const struct mtk_disp_ovl_data mt8173_ovl_driver_data = {
->         .addr = DISP_REG_OVL_ADDR_MT8173,
-> +       .gmc_bits = 8,
->         .fmt_rgb565_is_0 = true,
->  };
->
+>  #endif /* MTK_DRM_DDP_COMP_H */
 > --
 > 1.8.1.1.dirty
 > _______________________________________________
