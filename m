@@ -4,75 +4,66 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9FEC4C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 08:03:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8BBF1C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 08:09:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 68A6421741
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 08:03:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5A9A621741
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 08:09:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XwNKEUUl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 68A6421741
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=intel.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CcmtRFsW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5A9A621741
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wcQ2c1MAnPuMAHAgtXaizcPBFkKOnsquRraL47aFyKI=; b=XwNKEUUl9hS7oE
-	L/JiTTiXkDtVOWH4lelP6ECXUJA0TqQWo/NiwFa0seTB2AXM/GIWspx1K9L+lcv7vc0u06Mc3pUx4
-	T9Ls4UA1ru6CJSLJzRH8FSEOjF29lcKiE5MUb3o/fcqBEZlRzcd28njq3FLL7JmxabEqDw74LytTm
-	6ZUd6aNAZxBvAAU/HX2NhxCjxHQm/cytaeoJDxaWalVGv20noUECIw1ynxILBsE4kPcZZTqAGDUUm
-	5gLcXuy8TjG/npZgk7fT+kPspKK2XCAlaDQpCUuw9Gj0Ll62FZsaiG34KIuINZzsKY2M6i8vpoNB9
-	iyzt57uPJyuiADf39bhQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=nr8/vMadvqiwJD9sSPUv3SswfuC/iabVdfFO6PmniW8=; b=CcmtRFsWC8T8Bs
+	1MzPav9WqSZK1A3MOl57dgjpxWi7rk9yNiQ0IV+XXOOgbYkQaIUVi31NZedVKfcQDxgQV4bXdiymN
+	rchubn3CMhfUKcpUQ7LgoQvxWg7iY2jfHw2UaoE9QO84H2WhNCdSg4DYyODpBkxU9p+nYpGQfWtYL
+	SNmJyk1WCd87NGsFDKCShcF63aOurB1HMzPzoQlAE1Ap9nus/4aquXZzVD+J4xG0JKHSHKrwMFN/8
+	FAHFKMbKNVSiAIVgGeKwzEBEaxReKON5O0qfHwX3B0O9GC4vKM5WSiDp+05a31Tb3EMgOoUpzLO8j
+	zdGwjdRSOE3Cm3GKBV+Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gcQdW-0001as-Og; Thu, 27 Dec 2018 08:03:22 +0000
-Received: from mga03.intel.com ([134.134.136.65])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gcQdP-0001PG-OG
- for linux-arm-kernel@lists.infradead.org; Thu, 27 Dec 2018 08:03:20 +0000
-X-Amp-Result: SKIPPED(no attachment in message)
-X-Amp-File-Uploaded: False
-Received: from fmsmga007.fm.intel.com ([10.253.24.52])
- by orsmga103.jf.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
- 27 Dec 2018 00:03:00 -0800
-X-ExtLoop1: 1
-X-IronPort-AV: E=Sophos;i="5.56,404,1539673200"; d="scan'208";a="110241330"
-Received: from ahunter-desktop.fi.intel.com (HELO [10.237.72.56])
- ([10.237.72.56])
- by fmsmga007.fm.intel.com with ESMTP; 27 Dec 2018 00:02:55 -0800
-Subject: Re: [PATCH 2/3] mmc: sdhci-esdhc-imx: add SD clock limitation for
- imx6ull
-To: BOUGH CHEN <haibo.chen@nxp.com>,
- "ulf.hansson@linaro.org" <ulf.hansson@linaro.org>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>,
- "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>
-References: <1545292612-14471-1-git-send-email-haibo.chen@nxp.com>
- <1545292612-14471-2-git-send-email-haibo.chen@nxp.com>
-From: Adrian Hunter <adrian.hunter@intel.com>
-Organization: Intel Finland Oy, Registered Address: PL 281, 00181 Helsinki,
- Business Identity Code: 0357606 - 4, Domiciled in Helsinki
-Message-ID: <cff15a85-3f72-a8ea-2e5f-731963175fde@intel.com>
-Date: Thu, 27 Dec 2018 10:01:24 +0200
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1gcQjN-0003Hr-Ay; Thu, 27 Dec 2018 08:09:25 +0000
+Received: from [1.203.163.81] (helo=mailgw02.mediatek.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gcQjF-0003GH-VB; Thu, 27 Dec 2018 08:09:22 +0000
+X-UUID: 20354ebc75064bbd9129fb237b52616d-20181227
+X-UUID: 20354ebc75064bbd9129fb237b52616d-20181227
+Received: from mtkcas32.mediatek.inc [(172.27.4.250)] by mailgw02.mediatek.com
+ (envelope-from <ck.hu@mediatek.com>)
+ (mailgw01.mediatek.com ESMTP with TLS)
+ with ESMTP id 1059708300; Thu, 27 Dec 2018 16:08:57 +0800
+Received: from mtkcas09.mediatek.inc (172.21.101.178) by
+ MTKMBS31DR.mediatek.inc (172.27.6.102) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Thu, 27 Dec 2018 16:08:56 +0800
+Received: from [172.21.77.4] (172.21.77.4) by mtkcas09.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Thu, 27 Dec 2018 16:08:56 +0800
+Message-ID: <1545898136.19450.5.camel@mtksdaap41>
+Subject: Re: [PATCH 15/18] drm/mediatek: add RDMA1 fifo size into RDMA
+ private data
+From: CK Hu <ck.hu@mediatek.com>
+To: Yongqiang Niu <yongqiang.niu@mediatek.com>
+Date: Thu, 27 Dec 2018 16:08:56 +0800
+In-Reply-To: <1545638931-24938-16-git-send-email-yongqiang.niu@mediatek.com>
+References: <1545638931-24938-1-git-send-email-yongqiang.niu@mediatek.com>
+ <1545638931-24938-16-git-send-email-yongqiang.niu@mediatek.com>
+X-Mailer: Evolution 3.10.4-0ubuntu2 
 MIME-Version: 1.0
-In-Reply-To: <1545292612-14471-2-git-send-email-haibo.chen@nxp.com>
-Content-Language: en-US
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181227_000315_899129_AB70F57A 
-X-CRM114-Status: GOOD (  21.67  )
+X-CRM114-CacheID: sfid-20181227_000918_561476_6430D01A 
+X-CRM114-Status: GOOD (  17.70  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,85 +75,102 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "linux-mmc@vger.kernel.org" <linux-mmc@vger.kernel.org>,
- dl-linux-imx <linux-imx@nxp.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ David Airlie <airlied@linux.ie>, linux-kernel@vger.kernel.org,
+ dri-devel@lists.freedesktop.org, Rob Herring <robh+dt@kernel.org>,
+ linux-mediatek@lists.infradead.org, Philipp Zabel <p.zabel@pengutronix.de>,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 20/12/18 9:49 AM, BOUGH CHEN wrote:
-> i.MX6ULL has errata ERR010450, point out that due to SOC I/O
-> timing limitation, for eMMC HS200 and SD/SDIO 3.0 SDR104, the
-> clock rate can't exceed 150MHz. And for eMMC DDR52 and SD/SDIO
-> DDR50 mode, the clock rate can't exceed 45MHz.
+Hi, Yongqiang:
+
+On Mon, 2018-12-24 at 16:08 +0800, Yongqiang Niu wrote:
+> This patch add RDMA1 fifo size into RDMA private data
 > 
-> This patch add this limit for imx6ull.
-> 
-> Signed-off-by: Haibo Chen <haibo.chen@nxp.com>
-
-Apart from the kbuild test robot complaints (do they need to be fixed?):
-
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
-
+> Signed-off-by: Yongqiang Niu <yongqiang.niu@mediatek.com>
 > ---
->  drivers/mmc/host/sdhci-esdhc-imx.c | 19 ++++++++++++++++++-
->  1 file changed, 18 insertions(+), 1 deletion(-)
+>  drivers/gpu/drm/mediatek/mtk_disp_rdma.c | 16 +++++++++++++++-
+>  1 file changed, 15 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index d0d3193..75a2484 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -138,7 +138,11 @@
->  #define ESDHC_FLAG_HS200		BIT(8)
->  /* The IP supports HS400 mode */
->  #define ESDHC_FLAG_HS400		BIT(9)
-> -
-> +/* The IP has errata ERR010450
-> + * uSDHC: Due to the I/O timing limit, for SDR mode, SD card clock can't
-> + * exceed 150MHz, for DDR mode, SD card clock can't exceed 45MHz.
-> + */
-> +#define ESDHC_FLAG_ERR010450           BIT(10)
->  /* A clock frequency higher than this rate requires strobe dll control */
->  #define ESDHC_STROBE_DLL_CLK_FREQ	100000000
+> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> index b0a5cff..3f9b4d4 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> @@ -53,12 +53,14 @@
+>  #define RDMA_FIFO_PSEUDO_SIZE(bytes)			(((bytes) / 16) << 16)
+>  #define RDMA_OUTPUT_VALID_FIFO_THRESHOLD(bytes)		((bytes) / 16)
+>  #define RDMA_FIFO_SIZE(rdma)			((rdma)->data->fifo_size)
+> +#define RDMA_FIFO_SIZE1(rdma)			((rdma)->data->fifo_size1)
+>  #define DISP_RDMA_MEM_START_ADDR		0x0f00
 >  
-> @@ -177,6 +181,12 @@ struct esdhc_soc_data {
->  			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200,
+>  #define RDMA_MEM_GMC				0x40402020
+>  
+>  struct mtk_disp_rdma_data {
+>  	unsigned int fifo_size;
+> +	unsigned int fifo_size1;
 >  };
 >  
-> +static struct esdhc_soc_data usdhc_imx6ull_data = {
-> +	.flags = ESDHC_FLAG_USDHC | ESDHC_FLAG_STD_TUNING
-> +			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200
-> +			| ESDHC_FLAG_ERR010450,
-> +};
-> +
->  static struct esdhc_soc_data usdhc_imx7d_data = {
->  	.flags = ESDHC_FLAG_USDHC | ESDHC_FLAG_STD_TUNING
->  			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200
-> @@ -227,6 +237,7 @@ struct pltfm_imx_data {
->  	{ .compatible = "fsl,imx6sx-usdhc", .data = &usdhc_imx6sx_data, },
->  	{ .compatible = "fsl,imx6sl-usdhc", .data = &usdhc_imx6sl_data, },
->  	{ .compatible = "fsl,imx6q-usdhc", .data = &usdhc_imx6q_data, },
-> +	{ .compatible = "fsl,imx6ull-usdhc", .data = &usdhc_imx6ull_data, },
->  	{ .compatible = "fsl,imx7d-usdhc", .data = &usdhc_imx7d_data, },
->  	{ /* sentinel */ }
->  };
-> @@ -733,6 +744,12 @@ static inline void esdhc_pltfm_set_clock(struct sdhci_host *host,
->  		| ESDHC_CLOCK_MASK);
->  	sdhci_writel(host, temp, ESDHC_SYSTEM_CONTROL);
+>  /**
+> @@ -137,11 +139,17 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
+>  {
+>  	unsigned int threshold;
+>  	unsigned int reg;
+> +	unsigned int rdma_fifo_size;
+>  	struct mtk_disp_rdma *rdma = comp_to_rdma(comp);
 >  
-> +	if (imx_data->socdata->flags & ESDHC_FLAG_ERR010450) {
-> +		if (imx_data->is_ddr)
-> +			clock = clock > 45000000 ? 45000000 : clock;
-> +		else
-> +			clock = clock > 150000000 ? 150000000 : clock;
+>  	rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_0, 0xfff, width);
+>  	rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_1, 0xfffff, height);
+>  
+> +	if (comp->id == DDP_COMPONENT_RDMA1)
+> +		rdma_fifo_size = RDMA_FIFO_SIZE1(rdma);
+> +	else
+> +		rdma_fifo_size = RDMA_FIFO_SIZE(rdma);
 > +
->  	while (host_clock / (16 * pre_div * ddr_pre_div) > clock &&
->  			pre_div < 256)
->  		pre_div *= 2;
-> 
+
+It looks like that mt81830-rdma0 and mt8183-rdma1 are different in
+hardware, so I think fifo_size should be decided by something from
+device tree rather than from its name. Maybe add a property 'FIFO_SIZE'
+in rdma device node or create an additional compatible string for
+mt8183-rdma1.
+
+Regards,
+CK
+
+>  	/*
+>  	 * Enable FIFO underflow since DSI and DPI can't be blocked.
+>  	 * Keep the FIFO pseudo size reset default of 8 KiB. Set the
+> @@ -149,8 +157,12 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
+>  	 * account for blanking, and with a pixel depth of 4 bytes:
+>  	 */
+>  	threshold = width * height * vrefresh * 4 * 7 / 1000000;
+> +
+> +	if (threshold > rdma_fifo_size)
+> +		threshold = rdma_fifo_size;
+> +
+>  	reg = RDMA_FIFO_UNDERFLOW_EN |
+> -	      RDMA_FIFO_PSEUDO_SIZE(RDMA_FIFO_SIZE(rdma)) |
+> +	      RDMA_FIFO_PSEUDO_SIZE(rdma_fifo_size) |
+>  	      RDMA_OUTPUT_VALID_FIFO_THRESHOLD(threshold);
+>  	writel(reg, comp->regs + DISP_REG_RDMA_FIFO_CON);
+>  }
+> @@ -330,10 +342,12 @@ static int mtk_disp_rdma_remove(struct platform_device *pdev)
+>  
+>  static const struct mtk_disp_rdma_data mt2701_rdma_driver_data = {
+>  	.fifo_size = SZ_4K,
+> +	.fifo_size1 = SZ_4K,
+>  };
+>  
+>  static const struct mtk_disp_rdma_data mt8173_rdma_driver_data = {
+>  	.fifo_size = SZ_8K,
+> +	.fifo_size1 = SZ_8K,
+>  };
+>  
+>  static const struct of_device_id mtk_disp_rdma_driver_dt_match[] = {
+
 
 
 _______________________________________________
