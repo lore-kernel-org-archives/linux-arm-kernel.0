@@ -2,69 +2,92 @@ Return-Path: <SRS0=oMaZ=PE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ABDEDC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 13:12:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 16D13C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 13:47:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7BB2721479
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 13:12:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D7F2220882
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 13:47:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E7JDurPw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7BB2721479
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RENJ1r3v";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="pLpLlsu7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D7F2220882
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=oracle.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Nm+smdV0lJ5I4MIO7WThS74Xl0HznTpmXwow1TkMM0w=; b=E7JDurPwwRYLOg
-	vMNzzmrp9qxEXAc/MYslZWTNqP7n5jwTrU65hfkM4TjMOHZctqKYYcKHdpb6b5ZoQXmxQxlKKQu4g
-	IzDI63CjKg7Cqx4rVm8kET0GKHK7l1DnfwGpLEs81idyBa24jRjgYI4AEPfcGUpxcXCNblkq+dDaA
-	MPhbYYxoiFiIjg/U0cp7UjlinmaULP/WoRYyfecxKPs9AvRk0WC145fOJ6YyLsK3Z0BG3aSRtSbyO
-	AyZ93LSiir+lEg04Dvo9//pBYAxHBJdrHW03MBJeWtvkN5fRuJ6BX1PQQqKjXbm4gQhQMpUq53MBg
-	4vvpvf1Epy9E9IdXMdDA==;
+	List-Owner; bh=KbKfAQm6TBKpb7s4lrhVIpGAdl5Jt/goYvvPNxTc8s4=; b=RENJ1r3vebwp27
+	zJfH02JGlbOqsuWJxTM9XL3XJFCDPRHaju4Dd9l/H2xKSZGYlCVV3DZJBgonv3Z28YE7tAzNMDRTa
+	YdgLSkAq+RAHVtSRIN2c81CBeyI1GHaFEsxuR7WbAtoytM6BM9eWW2f7hCmCE4lAq9+C1gp70tarH
+	/GadQ9omQxzCWndxUdCX3Z6CryiA4pe8lw1jW7+00iwU+hdrcgqTtvPvDK/kGR4MoW5uDJRmkSTiB
+	+3HBE7ajNqXsgROEapveiL70VeYjH4AJUbiph53UnNAOpxvZmMB2wcCLVze4Y5fB1vA439xqgoSLe
+	mU9RQCJePzWmGQJc6nsg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gcVSc-000724-N7; Thu, 27 Dec 2018 13:12:26 +0000
-Received: from [210.61.82.183] (helo=mailgw01.mediatek.com)
+	id 1gcW0F-0002yc-Bo; Thu, 27 Dec 2018 13:47:11 +0000
+Received: from aserp2130.oracle.com ([141.146.126.79])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gcVRv-0006L6-9F; Thu, 27 Dec 2018 13:11:47 +0000
-X-UUID: f87d5f996ab74b30bd4b748fee1e788f-20181227
-X-UUID: f87d5f996ab74b30bd4b748fee1e788f-20181227
-Received: from mtkcas08.mediatek.inc [(172.21.101.126)] by
- mailgw01.mediatek.com (envelope-from <shun-chih.yu@mediatek.com>)
- (mhqrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1655417562; Thu, 27 Dec 2018 21:11:11 +0800
-Received: from mtkcas07.mediatek.inc (172.21.101.84) by
- mtkmbs02n1.mediatek.inc (172.21.101.77) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Thu, 27 Dec 2018 21:11:10 +0800
-Received: from mtkswgap22.mediatek.inc (172.21.77.33) by mtkcas07.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
- Frontend Transport; Thu, 27 Dec 2018 21:11:10 +0800
-From: <shun-chih.yu@mediatek.com>
-To: Sean Wang <sean.wang@mediatek.com>, Vinod Koul <vkoul@kernel.org>, Rob
- Herring <robh+dt@kernel.org>, Matthias Brugger <matthias.bgg@gmail.com>, Dan
- Williams <dan.j.williams@intel.com>
-Subject: [PATCH 1/2] dt-bindings: dmaengine: Add MediaTek Command-Queue DMA
- controller bindings
-Date: Thu, 27 Dec 2018 21:10:57 +0800
-Message-ID: <1545916258-18218-2-git-send-email-shun-chih.yu@mediatek.com>
-X-Mailer: git-send-email 1.7.9.5
-In-Reply-To: <1545916258-18218-1-git-send-email-shun-chih.yu@mediatek.com>
-References: <1545916258-18218-1-git-send-email-shun-chih.yu@mediatek.com>
+ id 1gcW0B-0002y1-0D
+ for linux-arm-kernel@lists.infradead.org; Thu, 27 Dec 2018 13:47:08 +0000
+Received: from pps.filterd (aserp2130.oracle.com [127.0.0.1])
+ by aserp2130.oracle.com (8.16.0.22/8.16.0.22) with SMTP id wBRDd30u050865;
+ Thu, 27 Dec 2018 13:41:10 GMT
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com;
+ h=date : from : to : cc
+ : subject : message-id : references : mime-version : content-type :
+ in-reply-to; s=corp-2018-07-02;
+ bh=wWhlKvi6DYO/+w7JYjA/SNhf/XJAF2jtuIRmY0IuZj4=;
+ b=pLpLlsu7wAnzIkELBQItlkruOcNnB9iJ3uXpebHwioUiJxQ1DDDMwth+uHf2+MF+A5We
+ nj9KTNHdA7E7/qdaioAPmfta88TiY/cWfqhbU+DqbdpuJBW6S0K8hs2NQpBW22TGLNjP
+ w+zkwr/gNluxEunFCkDABo/dN0Y4BZy8IYv+8ba3xrIebAAjT1Lnpfa5/d1MoXelqmNG
+ xJuOEkpVEa+6ca8MhwaWsPcEHzCb6CFq7Zmsote4JmrENcGPgE0N6dMwO9XLwGU4vAM3
+ vAXCHmSqLps+zZ/QWYuOuWOI9e9epAlBxvpHKm+v2eU2o3vS2FuiRBOF5k1+a6dE4ANo Lw== 
+Received: from aserv0022.oracle.com (aserv0022.oracle.com [141.146.126.234])
+ by aserp2130.oracle.com with ESMTP id 2phasdwfjk-1
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+ Thu, 27 Dec 2018 13:41:10 +0000
+Received: from aserv0121.oracle.com (aserv0121.oracle.com [141.146.126.235])
+ by aserv0022.oracle.com (8.14.4/8.14.4) with ESMTP id wBRDfAD1032512
+ (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+ Thu, 27 Dec 2018 13:41:10 GMT
+Received: from abhmp0018.oracle.com (abhmp0018.oracle.com [141.146.116.24])
+ by aserv0121.oracle.com (8.14.4/8.13.8) with ESMTP id wBRDf940020543;
+ Thu, 27 Dec 2018 13:41:09 GMT
+Received: from kadam (/197.157.34.167) by default (Oracle Beehive Gateway v4.0)
+ with ESMTP ; Thu, 27 Dec 2018 05:41:08 -0800
+Date: Thu, 27 Dec 2018 16:40:55 +0300
+From: Dan Carpenter <dan.carpenter@oracle.com>
+To: Tom Psyborg <pozega.tomislav@gmail.com>
+Subject: Re: [PATCH 00/20] drop useless LIST_HEAD
+Message-ID: <20181227134055.GA2272@kadam>
+References: <1545555435-24576-1-git-send-email-Julia.Lawall@lip6.fr>
+ <CAKR_QVJefW1vxYb7-qiU8=0YdbFghYo15SK2eGjOC-dntRfyYA@mail.gmail.com>
+ <alpine.DEB.2.21.1812232304130.2940@hadrien>
+ <CAKR_QVLeZBL43W4x1mzcfcakSZyyh9L81vgUMxfnSccKawEfdg@mail.gmail.com>
 MIME-Version: 1.0
-X-MTK: N
+Content-Disposition: inline
+In-Reply-To: <CAKR_QVLeZBL43W4x1mzcfcakSZyyh9L81vgUMxfnSccKawEfdg@mail.gmail.com>
+User-Agent: Mutt/1.9.4 (2018-02-28)
+X-Proofpoint-Virus-Version: vendor=nai engine=5900 definitions=9118
+ signatures=668680
+X-Proofpoint-Spam-Details: rule=notspam policy=default score=0 suspectscore=0
+ malwarescore=0
+ phishscore=0 bulkscore=0 spamscore=0 mlxscore=0 mlxlogscore=656
+ adultscore=0 classifier=spam adjust=0 reason=mlx scancount=1
+ engine=8.0.1-1810050000 definitions=main-1812270124
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181227_051143_894318_392B800A 
-X-CRM114-Status: GOOD (  10.51  )
+X-CRM114-CacheID: sfid-20181227_054707_136001_8D7241A3 
+X-CRM114-Status: GOOD (  18.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,67 +99,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
- srv_wsdupstream@mediatek.com, linux-mediatek@lists.infradead.org,
- Shun-Chih Yu <shun-chih.yu@mediatek.com>, dmaengine@vger.kernel.org,
+Cc: linux-wireless@vger.kernel.org, linux-nfs@vger.kernel.org,
+ Stefano Stabellini <sstabellini@kernel.org>, linux-scsi@vger.kernel.org,
+ linux-rdma@vger.kernel.org, netdev@vger.kernel.org,
+ kernel-janitors@vger.kernel.org, linux-kernel@vger.kernel.org,
+ linux-xfs@vger.kernel.org, Julia Lawall <julia.lawall@lip6.fr>,
+ linux-btrfs@vger.kernel.org, dmaengine@vger.kernel.org,
+ xen-devel@lists.xenproject.org, Dan Williams <dan.j.williams@intel.com>,
+ Andy Shevchenko <andriy.shevchenko@linux.intel.com>,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Shun-Chih Yu <shun-chih.yu@mediatek.com>
+On Tue, Dec 25, 2018 at 11:12:20PM +0100, Tom Psyborg wrote:
+> there was discussion about this just some days ago. CC 4-5 lists is
+> more than enough
+> 
 
-Document the devicetree bindings for MediaTek Command-Queue DMA controller
-which could be found on MT6765 SoC or other similar Mediatek SoCs.
+I don't know who you were discussing this with...
 
-Change-Id: I9736c8cac9be160358feeab935fabaffc5730519
-Signed-off-by: Shun-Chih Yu <shun-chih.yu@mediatek.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/dma/mtk-cqdma.txt          |   31 ++++++++++++++++++++
- 1 file changed, 31 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/mtk-cqdma.txt
+You should CC the 0th patch to all the mailinglists.  That much is a
+clear rule.
 
-diff --git a/Documentation/devicetree/bindings/dma/mtk-cqdma.txt b/Documentation/devicetree/bindings/dma/mtk-cqdma.txt
-new file mode 100644
-index 0000000..fb12927
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/mtk-cqdma.txt
-@@ -0,0 +1,31 @@
-+MediaTek Command-Queue DMA Controller
-+==================================
-+
-+Required properties:
-+
-+- compatible:	Must be "mediatek,mt6765-cqdma" for MT6765.
-+- reg:		Should contain the base address and length for each channel.
-+- interrupts:	Should contain references to the interrupts for each channel.
-+- clocks:	Should be the clock specifiers corresponding to the entry in
-+		clock-names property.
-+- clock-names:	Should contain "cqdma" entries.
-+- dma-channels: The number of DMA channels supported by the controller.
-+- dma-requests: The number of DMA request supported by the controller.
-+- #dma-cells: 	The length of the DMA specifier, must be <1>. This one cell
-+		in dmas property of a client device represents the channel
-+		number.
-+Example:
-+
-+        cqdma: dma-controller@10212000 {
-+		compatible = "mediatek,mt6765-cqdma";
-+		reg = <0 0x10212000 0 0x1000>;
-+		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>,
-+			<GIC_SPI 114 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&infracfg CLK_IFR_CQ_DMA>;
-+		clock-names = "cqdma";
-+		dma-channels = <2>;
-+		dma-requests = <32>;
-+		#dma-cells = <1>;
-+	};
-+
-+DMA clients must use the format described in dma/dma.txt file.
--- 
-1.7.9.5
+For the rest, Julia's position is the more conservative one.  I was in
+a conversation in RL and they were like, "CC everyone for all the
+patches".  It depends on the context, of course.  If the patches are
+dependent on each other then you *have* to CC everyone for everything.
+
+If we really have other clear rules, then it should be encoded into
+get_maintainer.pl so that it's automatic.
+
+My other question is why do the linux-arm-kernel@lists.infradead.org
+people feel like they need to be CC'd about every driver???  I always
+remove them from the CC list unless it's an arch/arm issue.
+
+regards,
+dan carpenter
+
+PS:  Please, no more top posting.
 
 
 _______________________________________________
