@@ -2,60 +2,62 @@ Return-Path: <SRS0=oMaZ=PE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 23DD7C43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 15:14:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D9204C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 15:14:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E67A3208E4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 15:14:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 944D4208E4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 15:14:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CfKd4a8Q"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E67A3208E4
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="j0VOfK9C"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 944D4208E4
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=s+BgHC5KjQY6p02dUj7S9+1B78esRH45VGW+U9zntHk=; b=CfKd4a8QgoVCPS
-	P842FV0AQQXhVEPDuNMi4D7OXt757fAUyI2AKZnF08mvEvBaj3UXWILBqNAnAKgbSRHfRsGzdOEWP
-	2ZI6II38fL/3GY/3POanJdJMzi04MCSDTD3QXrNkhlddB/AHEpci3f9GObFaYblOuz5UCDJWcRKcw
-	OAzc1LvLvHB71lqJmdB3SLmuvUmoFq/aH4jmxunoEZIM8yeGqHaMStQb+aqrY99BTGJCGsIuEOgEB
-	kSTOCB5+6UbW8mGYgQGiFUwT4Ne8HIejmwnllePtdx/q1APT1Xvtp6QQpQSqDl1sLO87kPk/D4B4S
-	TZox7LHqCK/b636jt+Sw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=MRmdriRyfffjQZ82y5pBr2JJSxXXUUSSOUWt8fA2VdQ=; b=j0VOfK9CpEYkTl
+	m1WSVzo2VRQbKJwiazvljDamF1ucjB3VVOho4lAxQDlUBoNwqV4gXcu7T4Yx6XIaEhiqW/VhZA3g+
+	guOikMbPFTSV7//8aKEJrAYfQHLEdpHI6u4hd7V66TvpngEW/FPC/N//xh0AOGblQ1t3oRCRBpfMG
+	yngog3ecroUzMG/gXH9ubSvjcV9I5ySaIUtMUiUygX/FXLU39XuaZ+Nb9OGzBmAc4ZEPcC71AX/Cf
+	9axGoM8iHQZDyb8JYsNumarhDovC4oZK9EXNLm9rGGiSiqLn0vogt0lTcfwpk8mKYuzOhfoHhYVLi
+	ttWMmRD+8RrjLsIu0/gQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gcXMQ-0006Im-HN; Thu, 27 Dec 2018 15:14:10 +0000
+	id 1gcXMf-0006YQ-2C; Thu, 27 Dec 2018 15:14:25 +0000
 Received: from esa4.microchip.iphmx.com ([68.232.154.123])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gcXLz-0005t5-3K
- for linux-arm-kernel@lists.infradead.org; Thu, 27 Dec 2018 15:13:47 +0000
-X-IronPort-AV: E=Sophos;i="5.56,405,1539673200"; d="scan'208";a="24405601"
+ id 1gcXLy-0005tA-Mw
+ for linux-arm-kernel@lists.infradead.org; Thu, 27 Dec 2018 15:13:50 +0000
+X-IronPort-AV: E=Sophos;i="5.56,405,1539673200"; d="scan'208";a="24405608"
 Received: from smtpout.microchip.com (HELO email.microchip.com)
  ([198.175.253.82])
  by esa4.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 27 Dec 2018 08:13:23 -0700
+ 27 Dec 2018 08:13:30 -0700
 Received: from M43218.corp.atmel.com (10.10.76.4) by
  chn-sv-exch03.mchp-main.com (10.10.76.49) with Microsoft SMTP Server id
- 14.3.352.0; Thu, 27 Dec 2018 08:13:47 -0700
+ 14.3.352.0; Thu, 27 Dec 2018 08:13:54 -0700
 From: Ludovic Desroches <ludovic.desroches@microchip.com>
 To: <linux-i2c@vger.kernel.org>, <linux-arm-kernel@lists.infradead.org>
-Subject: [PATCH v4 0/3] i2c: at91: slave mode support
-Date: Thu, 27 Dec 2018 16:13:08 +0100
-Message-ID: <20181227151311.20107-1-ludovic.desroches@microchip.com>
+Subject: [PATCH v4 3/3] i2c: at91: added slave mode support
+Date: Thu, 27 Dec 2018 16:13:11 +0100
+Message-ID: <20181227151311.20107-4-ludovic.desroches@microchip.com>
 X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20181227151311.20107-1-ludovic.desroches@microchip.com>
+References: <20181227151311.20107-1-ludovic.desroches@microchip.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181227_071343_479513_525A34AD 
-X-CRM114-Status: GOOD (  14.00  )
+X-CRM114-CacheID: sfid-20181227_071343_042768_48E1E6EA 
+X-CRM114-Status: GOOD (  20.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,123 +72,315 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
 Cc: alexandre.belloni@bootlin.com, wsa@the-dreams.de, me@jue.yt,
  linux-kernel@vger.kernel.org,
  Ludovic Desroches <ludovic.desroches@microchip.com>,
- andriy.shevchenko@linux.intel.com
+ andriy.shevchenko@linux.intel.com, Juergen Fitschen <jfi@ssv-embedded.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-[Ludovic Desroches: see Changes section]
+From: Juergen Fitschen <jfi@ssv-embedded.de>
 
-Based on the discussion we had on the i2c-linux list [1], I wrote a patch for
-AT91 hardware and tried to fulfill the Linux I2C slave interface description
-[2] as good as possible. This enables aforementioned hardware to act as an I2C
-slave that can be accessed by a remote I2C master.
+Slave mode driver is based on the concept of i2c-designware driver.
 
-I have tested this patchset successfully on an ATSAMA5D27.
-
-                                 ^  3.3V   ^  3.3V
-    +-----------------------+    |         |         +-----------------------+
-    | Slave: ATSAMA5D27     |   +-+       +-+        | Master: ATSAMA5D35    |
-    | with i2c-slave-eeprom |   | | 100k  | | 100k   | with i2cset           |
-    +-------------------+-+-+   +-+       +-+        +-+-+-------------------+
-                        | |      |         |           | |
-                        | +------+---------|---(SDA)---+ |
-                        +------------------+---(SCL)-----+
-
-    Schematic: Connection of slave and master with 100kOhm pullup resistors.
-
-On the master the following BASH script has been used to stress the slave.
-
-        root@emblinux:~# cat ./stress.sh
-        #!/bin/bash
-        I=0
-        while true
-        do
-                if i2cset -y -r 1 0x64 0 $I w | grep mismatch
-                then
-                        echo "$(date): Error in transmission ${I}"
-                fi
-                ((I++))
-                if [ $I -eq 65536 ]
-                then
-                        I=0
-                        echo "$(date): Sent 65536 transmissions"
-                fi
-        done
-
-After running the script for some time I had the following output. To me this
-looks promising :)
-
-        root@emblinux:~# ./stress.sh
-        Thu Nov  9 13:58:45 CTE 2017: Sent 65536 transmissions
-        Thu Nov  9 14:35:20 CTE 2017: Sent 65536 transmissions
-        Thu Nov  9 15:12:11 CTE 2017: Sent 65536 transmissions
-        Thu Nov  9 15:49:04 CTE 2017: Sent 65536 transmissions
-        Thu Nov  9 16:26:00 CTE 2017: Sent 65536 transmissions
-        Thu Nov  9 17:03:07 UTC 2017: Sent 65536 transmissions
-        Thu Nov  9 17:40:15 UTC 2017: Sent 65536 transmissions
-
-        If you have some hardware with an at91-i2c interface included at hand, I really
-        would appreciate if you can run the test script on your hardware and test this
-        driver.
-        Thu Nov  9 17:40:15 UTC 2017: Sent 65536 transmissions
-
-        If you have some hardware with an at91-i2c interface included at hand, I really
-        would appreciate if you can run the test script on your hardware and test this
-        driver.
-
-Best regards
-  Juergen
-
-
-[Ludovic Desroches]
-Changes in v4:
- - rebased on next-20181224
- - update Kconfig part to state that this feature is experimental.
- - tested quickly on a single board, SAMA5D2 Xplained, i2c-gpio as master, OK.
-Changes in v3:
- - rebase (cherry-pick was enough)
- - fix checkpatch errors
- - tests:
-   - hangs with a SAMA5D4 (master and slave on different busses) after about
-   100 transfers. It's the first time I do this test.
-   - some mismatches with a SAMA5D4 as slave and a SAMA5D2 as master
-   I don't know if it's a regression. I don't remember having seen this
-   behavior previously.
-   I think it's worth taking those patches even if there are some possible
-   bugs. It'll allow to get more people using it and so to consolidate the
-   slave mode support.
-
-Changes in v2:
- - Implemented all suggestions made by Ludovic. (Thank you!)
- - Reworked the IRQ handler completely. Have a look in patch 3 fort further
-   details.
-
-[1] https://marc.info/?t=150824004800001&r=1&w=1
-[2] https://www.kernel.org/doc/Documentation/i2c/slave-interface
-
-
-
-Juergen Fitschen (3):
-  i2c: at91: segregate master mode specific code from probe and init
-    func
-  i2c: at91: split driver into core and master file
-  i2c: at91: added slave mode support
-
- MAINTAINERS                                   |   3 +-
- drivers/i2c/busses/Kconfig                    |  13 +
- drivers/i2c/busses/Makefile                   |   4 +
- drivers/i2c/busses/i2c-at91-core.c            | 380 +++++++++++++++
- .../busses/{i2c-at91.c => i2c-at91-master.c}  | 453 +-----------------
- drivers/i2c/busses/i2c-at91-slave.c           | 147 ++++++
- drivers/i2c/busses/i2c-at91.h                 | 179 +++++++
- 7 files changed, 732 insertions(+), 447 deletions(-)
- create mode 100644 drivers/i2c/busses/i2c-at91-core.c
- rename drivers/i2c/busses/{i2c-at91.c => i2c-at91-master.c} (67%)
+Signed-off-by: Juergen Fitschen <me@jue.yt>
+[ludovic.desroches@microchip.com: rework Kconfig]
+Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+---
+ drivers/i2c/busses/Kconfig          |  13 +++
+ drivers/i2c/busses/Makefile         |   3 +
+ drivers/i2c/busses/i2c-at91-core.c  |  13 ++-
+ drivers/i2c/busses/i2c-at91-slave.c | 147 ++++++++++++++++++++++++++++
+ drivers/i2c/busses/i2c-at91.h       |  30 +++++-
+ 5 files changed, 202 insertions(+), 4 deletions(-)
  create mode 100644 drivers/i2c/busses/i2c-at91-slave.c
- create mode 100644 drivers/i2c/busses/i2c-at91.h
 
+diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+index f2c681971201..6b1f6dcdf533 100644
+--- a/drivers/i2c/busses/Kconfig
++++ b/drivers/i2c/busses/Kconfig
+@@ -387,6 +387,19 @@ config I2C_AT91
+ 	  the latency to fill the transmission register is too long. If you
+ 	  are facing this situation, use the i2c-gpio driver.
+ 
++config I2C_AT91_SLAVE_EXPERIMENTAL
++	tristate "Microchip AT91 I2C experimental slave mode"
++	depends on I2C_AT91
++	select I2C_SLAVE
++	help
++	  If you say yes to this option, support for the slave mode will be
++	  added. Caution: do not use it for production. This feature has not
++	  been tested in a heavy way, help wanted.
++	  There are known bugs:
++	    - It can hang, on a SAMA5D4, after several transfers.
++	    - There are some mismtaches with a SAMA5D4 as slave and a SAMA5D2 as
++	    master.
++
+ config I2C_AU1550
+ 	tristate "Au1550/Au1200/Au1300 SMBus interface"
+ 	depends on MIPS_ALCHEMY
+diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
+index ea75a777940e..59b22fbef90a 100644
+--- a/drivers/i2c/busses/Makefile
++++ b/drivers/i2c/busses/Makefile
+@@ -36,6 +36,9 @@ obj-$(CONFIG_I2C_ALTERA)	+= i2c-altera.o
+ obj-$(CONFIG_I2C_ASPEED)	+= i2c-aspeed.o
+ obj-$(CONFIG_I2C_AT91)		+= i2c-at91.o
+ i2c-at91-objs			:= i2c-at91-core.o i2c-at91-master.o
++ifeq ($(CONFIG_I2C_AT91_SLAVE_EXPERIMENTAL),y)
++	i2c-at91-objs		+= i2c-at91-slave.o
++endif
+ obj-$(CONFIG_I2C_AU1550)	+= i2c-au1550.o
+ obj-$(CONFIG_I2C_AXXIA)		+= i2c-axxia.o
+ obj-$(CONFIG_I2C_BCM2835)	+= i2c-bcm2835.o
+diff --git a/drivers/i2c/busses/i2c-at91-core.c b/drivers/i2c/busses/i2c-at91-core.c
+index 5d9c6c81e6ab..c74283fa567f 100644
+--- a/drivers/i2c/busses/i2c-at91-core.c
++++ b/drivers/i2c/busses/i2c-at91-core.c
+@@ -60,8 +60,10 @@ void at91_init_twi_bus(struct at91_twi_dev *dev)
+ {
+ 	at91_disable_twi_interrupts(dev);
+ 	at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_SWRST);
+-
+-	at91_init_twi_bus_master(dev);
++	if (dev->slave_detected)
++		at91_init_twi_bus_slave(dev);
++	else
++		at91_init_twi_bus_master(dev);
+ }
+ 
+ static struct at91_twi_pdata at91rm9200_config = {
+@@ -243,7 +245,12 @@ static int at91_twi_probe(struct platform_device *pdev)
+ 	dev->adapter.timeout = AT91_I2C_TIMEOUT;
+ 	dev->adapter.dev.of_node = pdev->dev.of_node;
+ 
+-	rc = at91_twi_probe_master(pdev, phy_addr, dev);
++	dev->slave_detected = i2c_detect_slave_mode(&pdev->dev);
++
++	if (dev->slave_detected)
++		rc = at91_twi_probe_slave(pdev, phy_addr, dev);
++	else
++		rc = at91_twi_probe_master(pdev, phy_addr, dev);
+ 	if (rc)
+ 		return rc;
+ 
+diff --git a/drivers/i2c/busses/i2c-at91-slave.c b/drivers/i2c/busses/i2c-at91-slave.c
+new file mode 100644
+index 000000000000..4b4808e0c8f7
+--- /dev/null
++++ b/drivers/i2c/busses/i2c-at91-slave.c
+@@ -0,0 +1,147 @@
++/*
++ *  i2c slave support for Atmel's AT91 Two-Wire Interface (TWI)
++ *
++ *  Copyright (C) 2017 Juergen Fitschen <me@jue.yt>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2 of the License, or
++ *  (at your option) any later version.
++ */
++
++#include <linux/err.h>
++#include <linux/i2c.h>
++#include <linux/interrupt.h>
++#include <linux/pm_runtime.h>
++
++#include "i2c-at91.h"
++
++static irqreturn_t atmel_twi_interrupt_slave(int irq, void *dev_id)
++{
++	struct at91_twi_dev *dev = dev_id;
++	const unsigned status = at91_twi_read(dev, AT91_TWI_SR);
++	const unsigned irqstatus = status & at91_twi_read(dev, AT91_TWI_IMR);
++	u8 value;
++
++	if (!irqstatus)
++		return IRQ_NONE;
++
++	/* slave address has been detected on I2C bus */
++	if (irqstatus & AT91_TWI_SVACC) {
++		if (status & AT91_TWI_SVREAD) {
++			i2c_slave_event(dev->slave,
++					I2C_SLAVE_READ_REQUESTED, &value);
++			writeb_relaxed(value, dev->base + AT91_TWI_THR);
++			at91_twi_write(dev, AT91_TWI_IER,
++				       AT91_TWI_TXRDY | AT91_TWI_EOSACC);
++		} else {
++			i2c_slave_event(dev->slave,
++					I2C_SLAVE_WRITE_REQUESTED, &value);
++			at91_twi_write(dev, AT91_TWI_IER,
++				       AT91_TWI_RXRDY | AT91_TWI_EOSACC);
++		}
++		at91_twi_write(dev, AT91_TWI_IDR, AT91_TWI_SVACC);
++	}
++
++	/* byte transmitted to remote master */
++	if (irqstatus & AT91_TWI_TXRDY) {
++		i2c_slave_event(dev->slave, I2C_SLAVE_READ_PROCESSED, &value);
++		writeb_relaxed(value, dev->base + AT91_TWI_THR);
++	}
++
++	/* byte received from remote master */
++	if (irqstatus & AT91_TWI_RXRDY) {
++		value = readb_relaxed(dev->base + AT91_TWI_RHR);
++		i2c_slave_event(dev->slave, I2C_SLAVE_WRITE_RECEIVED, &value);
++	}
++
++	/* master sent stop */
++	if (irqstatus & AT91_TWI_EOSACC) {
++		at91_twi_write(dev, AT91_TWI_IDR,
++			       AT91_TWI_TXRDY | AT91_TWI_RXRDY | AT91_TWI_EOSACC);
++		at91_twi_write(dev, AT91_TWI_IER, AT91_TWI_SVACC);
++		i2c_slave_event(dev->slave, I2C_SLAVE_STOP, &value);
++	}
++
++	return IRQ_HANDLED;
++}
++
++static int at91_reg_slave(struct i2c_client *slave)
++{
++	struct at91_twi_dev *dev = i2c_get_adapdata(slave->adapter);
++
++	if (dev->slave)
++		return -EBUSY;
++
++	if (slave->flags & I2C_CLIENT_TEN)
++		return -EAFNOSUPPORT;
++
++	/* Make sure twi_clk doesn't get turned off! */
++	pm_runtime_get_sync(dev->dev);
++
++	dev->slave = slave;
++	dev->smr = AT91_TWI_SMR_SADR(slave->addr);
++
++	at91_init_twi_bus(dev);
++	at91_twi_write(dev, AT91_TWI_IER, AT91_TWI_SVACC);
++
++	dev_info(dev->dev, "entered slave mode (ADR=%d)\n", slave->addr);
++
++	return 0;
++}
++
++static int at91_unreg_slave(struct i2c_client *slave)
++{
++	struct at91_twi_dev *dev = i2c_get_adapdata(slave->adapter);
++
++	WARN_ON(!dev->slave);
++
++	dev_info(dev->dev, "leaving slave mode\n");
++
++	dev->slave = NULL;
++	dev->smr = 0;
++
++	at91_init_twi_bus(dev);
++
++	pm_runtime_put(dev->dev);
++
++	return 0;
++}
++
++static u32 at91_twi_func(struct i2c_adapter *adapter)
++{
++	return I2C_FUNC_SLAVE | I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL
++		| I2C_FUNC_SMBUS_READ_BLOCK_DATA;
++}
++
++static const struct i2c_algorithm at91_twi_algorithm_slave = {
++	.reg_slave	= at91_reg_slave,
++	.unreg_slave	= at91_unreg_slave,
++	.functionality	= at91_twi_func,
++};
++
++int at91_twi_probe_slave(struct platform_device *pdev,
++			 u32 phy_addr, struct at91_twi_dev *dev)
++{
++	int rc;
++
++	rc = devm_request_irq(&pdev->dev, dev->irq, atmel_twi_interrupt_slave,
++			      0, dev_name(dev->dev), dev);
++	if (rc) {
++		dev_err(dev->dev, "Cannot get irq %d: %d\n", dev->irq, rc);
++		return rc;
++	}
++
++	dev->adapter.algo = &at91_twi_algorithm_slave;
++
++	return 0;
++}
++
++void at91_init_twi_bus_slave(struct at91_twi_dev *dev)
++{
++	at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_MSDIS);
++	if (dev->slave_detected && dev->smr) {
++		at91_twi_write(dev, AT91_TWI_SMR, dev->smr);
++		at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_SVEN);
++	}
++}
+diff --git a/drivers/i2c/busses/i2c-at91.h b/drivers/i2c/busses/i2c-at91.h
+index 555b1674ddbe..14cc71433366 100644
+--- a/drivers/i2c/busses/i2c-at91.h
++++ b/drivers/i2c/busses/i2c-at91.h
+@@ -53,6 +53,10 @@
+ #define	AT91_TWI_IADRSZ_1	0x0100	/* Internal Device Address Size */
+ #define	AT91_TWI_MREAD		BIT(12)	/* Master Read Direction */
+ 
++#define	AT91_TWI_SMR		0x0008	/* Slave Mode Register */
++#define	AT91_TWI_SMR_SADR_MAX	0x007f
++#define	AT91_TWI_SMR_SADR(x)	(((x) & AT91_TWI_SMR_SADR_MAX) << 16)
++
+ #define	AT91_TWI_IADR		0x000c	/* Internal Address Register */
+ 
+ #define	AT91_TWI_CWGR		0x0010	/* Clock Waveform Generator Reg */
+@@ -63,13 +67,17 @@
+ #define	AT91_TWI_TXCOMP		BIT(0)	/* Transmission Complete */
+ #define	AT91_TWI_RXRDY		BIT(1)	/* Receive Holding Register Ready */
+ #define	AT91_TWI_TXRDY		BIT(2)	/* Transmit Holding Register Ready */
++#define	AT91_TWI_SVREAD		BIT(3)	/* Slave Read */
++#define	AT91_TWI_SVACC		BIT(4)	/* Slave Access */
+ #define	AT91_TWI_OVRE		BIT(6)	/* Overrun Error */
+ #define	AT91_TWI_UNRE		BIT(7)	/* Underrun Error */
+ #define	AT91_TWI_NACK		BIT(8)	/* Not Acknowledged */
++#define	AT91_TWI_EOSACC		BIT(11)	/* End Of Slave Access */
+ #define	AT91_TWI_LOCK		BIT(23) /* TWI Lock due to Frame Errors */
+ 
+ #define	AT91_TWI_INT_MASK \
+-	(AT91_TWI_TXCOMP | AT91_TWI_RXRDY | AT91_TWI_TXRDY | AT91_TWI_NACK)
++	(AT91_TWI_TXCOMP | AT91_TWI_RXRDY | AT91_TWI_TXRDY | AT91_TWI_NACK \
++	| AT91_TWI_SVACC | AT91_TWI_EOSACC)
+ 
+ #define	AT91_TWI_IER		0x0024	/* Interrupt Enable Register */
+ #define	AT91_TWI_IDR		0x0028	/* Interrupt Disable Register */
+@@ -137,6 +145,11 @@ struct at91_twi_dev {
+ 	bool recv_len_abort;
+ 	u32 fifo_size;
+ 	struct at91_twi_dma dma;
++	bool slave_detected;
++#if IS_ENABLED(CONFIG_I2C_AT91_SLAVE_EXPERIMENTAL)
++	unsigned smr;
++	struct i2c_client *slave;
++#endif
+ };
+ 
+ unsigned at91_twi_read(struct at91_twi_dev *dev, unsigned reg);
+@@ -149,3 +162,18 @@ void at91_init_twi_bus(struct at91_twi_dev *dev);
+ void at91_init_twi_bus_master(struct at91_twi_dev *dev);
+ int at91_twi_probe_master(struct platform_device *pdev, u32 phy_addr,
+ 			  struct at91_twi_dev *dev);
++
++#if IS_ENABLED(CONFIG_I2C_AT91_SLAVE_EXPERIMENTAL)
++void at91_init_twi_bus_slave(struct at91_twi_dev *dev);
++int at91_twi_probe_slave(struct platform_device *pdev, u32 phy_addr,
++			 struct at91_twi_dev *dev);
++
++#else
++static inline void at91_init_twi_bus_slave(struct at91_twi_dev *dev) {}
++static inline int at91_twi_probe_slave(struct platform_device *pdev,
++				       u32 phy_addr, struct at91_twi_dev *dev)
++{
++	return -EINVAL;
++}
++
++#endif
 -- 
 2.20.1
 
