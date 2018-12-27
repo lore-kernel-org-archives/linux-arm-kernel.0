@@ -3,19 +3,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-6.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 520C0C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 21:10:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DD835C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 21:43:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1B7182148D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 21:10:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AADA32148D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 21:43:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nAzX+Ffo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1B7182148D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Sf5L71Qe"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AADA32148D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,57 +24,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ZkM1QyTitvArNJLj+Puq+EWr9H8F2otBur6UbmIXl0c=; b=nAzX+FfooOSO3G
-	KCLOIbqsFvvTPbgyGrU6GFuL4ruUsZ6npOCYbca6AVTZKKZKfzkMxqAN3jM23WGu7+M8R0+/a4p3W
-	d5MzdXcMWUMhoh/oVWruvVx+M2SPSMO/znRmzpbMe5ES5t8Qp25a1yGuyS84OgT0rrCw1QbRk5jKP
-	0lU4ipHk/in/X3WdLxsviI13ubmFM2QXiWxq6eLTFY6miJor1FX3efZlRxn3GeJt2bvOe7Q/0pthm
-	VnB7fUvI6mJi/Fj6u6Wznfbf3W5WTcBQ5LRDK4fgg9BXNuODuCtOG4sHz+gIeU6dlKCqYpI2oxXWM
-	lT5vILbujzfkRdwY2BXg==;
+	List-Owner; bh=IdqYUqlMTnSLOCbfKTo5aFlzJ5ozPrRcD9Qc3Xdli9s=; b=Sf5L71Qe96WIsX
+	V2CyeqQSiiTSKzzzjwoDkLGHSHK6bp53yehCOcxdc0+Lz+18vI+CBZ9bbvkhtUgTYU6Y70Y8w/h2Q
+	1w1bRCZLepegp9Ym8KDrksyIKdEoyeR1ywoEFSs99ZxQXzux+ansIqWTkeAsF6RlxXVn7ji/u8NKl
+	SWIWg89uLjgpg5DC6onMb2rouIBO3bg6RpS+vmGYqMykEcS7PrUw1jYn50j46c2FeVsOFVmT1Yktm
+	mdP//lIAJocLMVnfb8ORP0KFQawkP8/ck9AxZsTWlg270kWS3/+nxmhbn7XijIfcRRp+i7p6zSYgx
+	gn3wGuRAAv8ZQnUDmpFQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gccuy-0006LR-6i; Thu, 27 Dec 2018 21:10:12 +0000
-Received: from mail-io1-f68.google.com ([209.85.166.68])
+	id 1gcdQu-0007Py-3z; Thu, 27 Dec 2018 21:43:12 +0000
+Received: from mail-it1-f195.google.com ([209.85.166.195])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gccuu-00052C-1Z
- for linux-arm-kernel@lists.infradead.org; Thu, 27 Dec 2018 21:10:09 +0000
-Received: by mail-io1-f68.google.com with SMTP id p7so4573356iog.12
+ id 1gcdQd-0007P3-65
+ for linux-arm-kernel@lists.infradead.org; Thu, 27 Dec 2018 21:42:57 +0000
+Received: by mail-it1-f195.google.com with SMTP id p197so25213672itp.0
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 27 Dec 2018 13:09:54 -0800 (PST)
+ Thu, 27 Dec 2018 13:42:43 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=i3w/R5gR+TdjmOUjmdVKVXjH3rS0dZDOdRUKMIU0C5I=;
- b=t6+BiYMktE8PtusyWBJu2PL8FkP+RNZOr1hHZoTtTdEcRFj/Ou4mUgHaLBpHwo46bv
- 5vxzcRu78hdaX3uugMOQzWQEM03TQKmzFvt9nHaICr1nwZ4oWPORbOsVBU51xiZiRFRg
- hAyKmnUsgfYQgrjNZuGXmCb3oI5/lA79d+0nols/qDHnI2yKfb2EcF0z7QyrXJd8oI6m
- IXQ+gVZ4972pe/n3CMOn2SUKecx1h5bVAnc/zc7Yum8OzjEJj3fpFu7hEmDVer9gOBNy
- SMALL0hIvSNbbWoOXQSKXZIjBmLMmIFHi3vA4UMCAmDUeu7a1p8O7mw7GC6wtZqkQvyT
- +QpQ==
-X-Gm-Message-State: AJcUukc7XAAPuAI3bFD6AzbyW1cYL/FaniJyqVoSpCSL8GZWzEvKT2LL
- xjomO/349U+8pmCBBZbp+g==
-X-Google-Smtp-Source: ALg8bN6uxLNlL1SLxOd7h8Pw3C2ra6M6k6X40yXAXjKSMhjwoxv27WAOCn7jg8WfGYzvOkcZyslZcQ==
-X-Received: by 2002:a6b:7844:: with SMTP id h4mr2137221iop.216.1545944993830; 
- Thu, 27 Dec 2018 13:09:53 -0800 (PST)
+ bh=YDRlM9iTAR6SXAB2Mi5oMWRbavZlWKteJrKfbkVf7wo=;
+ b=WeEzPUIwaT1pbpBpDKsUiD/4xTI2a+M8Gti3C9wVl50YbjNJNzWt4SyGelgsIHzk4S
+ p4Q1RcJQ59oyhLl8AsvzjqkMUlKqYnI3uCYHhuQj/mhSu++j6gc5xcEZTcSCzUprsYQd
+ U3ioErHIxPpxCV2YBoQKAJKmi2AJ7fCasq7EUCheykfCxB3kQ7GAkrmYlp7ETDDc266G
+ wz6+mH2JSnlKJ4N4M6BmdfnA1TspoOS9K0+ddcDqHCQvnZrBbT69HrNOXA2gAxCus1Yk
+ P3TEqsXrPJdGGVaASViT6nkBtwL3eJbXS40lsy5nRXT8n3PZBnYw8ZvFCJICUHeFuRQd
+ ZqjA==
+X-Gm-Message-State: AA+aEWY4xhbh90LvWWFOfJJ/BR7i7SsB8SHl9FLAvomKJ7cDcWSfk2qp
+ H+A8OZeet+Wz8Dzkoim41A==
+X-Google-Smtp-Source: AFSGD/X/qzipHgYiQWM4fEA9sA4fF3E030kIh8jdbhjOKJl8OEtanbb6dvJvaB0fEbXK2SH/6N8bbw==
+X-Received: by 2002:a24:1e06:: with SMTP id 6mr16523420itt.46.1545946962511;
+ Thu, 27 Dec 2018 13:42:42 -0800 (PST)
 Received: from localhost ([24.51.61.172])
- by smtp.gmail.com with ESMTPSA id m186sm12985893ita.2.2018.12.27.13.09.52
+ by smtp.gmail.com with ESMTPSA id b25sm14659130itd.37.2018.12.27.13.42.41
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 27 Dec 2018 13:09:53 -0800 (PST)
-Date: Thu, 27 Dec 2018 15:09:52 -0600
+ Thu, 27 Dec 2018 13:42:41 -0800 (PST)
+Date: Thu, 27 Dec 2018 15:42:41 -0600
 From: Rob Herring <robh@kernel.org>
-To: cezary.gapinski@gmail.com
-Subject: Re: [PATCH v2 14/14] spi: stm32: add description about STM32F4
- bindings
-Message-ID: <20181227210952.GA26671@bogus>
-References: <1545688840-23992-1-git-send-email-cezary.gapinski@gmail.com>
- <1545688840-23992-15-git-send-email-cezary.gapinski@gmail.com>
+To: thor.thayer@linux.intel.com
+Subject: Re: [PATCHv2 2/6] Documentation: dt: socfpga: Add S10 System Manager
+ binding
+Message-ID: <20181227214241.GA25008@bogus>
+References: <1545351802-4354-1-git-send-email-thor.thayer@linux.intel.com>
+ <1545351802-4354-3-git-send-email-thor.thayer@linux.intel.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1545688840-23992-15-git-send-email-cezary.gapinski@gmail.com>
+In-Reply-To: <1545351802-4354-3-git-send-email-thor.thayer@linux.intel.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181227_131008_104152_2C35C9A8 
-X-CRM114-Status: GOOD (  13.19  )
+X-CRM114-CacheID: sfid-20181227_134255_225968_C956674F 
+X-CRM114-Status: GOOD (  11.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,35 +86,33 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Amelie Delaunay <amelie.delaunay@st.com>,
- Cezary Gapinski <cezary.gapinski@gmail.com>,
- Alexandre Torgue <alexandre.torgue@st.com>, linux-kernel@vger.kernel.org,
- linux-spi@vger.kernel.org, Mark Brown <broonie@kernel.org>,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>,
- linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, joabreu@synopsys.com,
+ Thor Thayer <thor.thayer@linux.intel.com>, alexandre.torgue@st.com,
+ arnd@arndb.de, devicetree@vger.kernel.org, catalin.marinas@arm.com,
+ olof@lixom.net, will.deacon@arm.com, linux@armlinux.org.uk,
+ bjorn.andersson@linaro.org, dinguyen@kernel.org, robh+dt@kernel.org,
+ linux-arm-kernel@lists.infradead.org, mcoquelin.stm32@gmail.com,
+ netdev@vger.kernel.org, mchehab+samsung@kernel.org, peppe.cavallaro@st.com,
+ lee.jones@linaro.org, davem@davemloft.net, linux-kernel@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 24 Dec 2018 23:00:40 +0100, cezary.gapinski@gmail.com wrote:
-> From: Cezary Gapinski <cezary.gapinski@gmail.com>
+On Thu, 20 Dec 2018 18:23:18 -0600, thor.thayer@linux.intel.com wrote:
+> From: Thor Thayer <thor.thayer@linux.intel.com>
 > 
-> Add description that STM32F4 can be used in compatible property.
-> Master Inter-Data Idleness optional property cannot be used in STM32F4.
+> Add the device tree bindings for the Stratix10 System Manager.
 > 
-> Signed-off-by: Cezary Gapinski <cezary.gapinski@gmail.com>
+> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
 > ---
->  Documentation/devicetree/bindings/spi/spi-stm32.txt | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
+> v2  New compatible string and usage for Stratix10
+> ---
+>  .../devicetree/bindings/arm/altera/socfpga-system.txt        | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 > 
 
-Please add Acked-by/Reviewed-by tags when posting new versions. However,
-there's no need to repost patches *only* to add the tags. The upstream
-maintainer will do that for acks received on the version they apply.
-
-If a tag was not added on purpose, please state why and what changed.
+Reviewed-by: Rob Herring <robh@kernel.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
