@@ -2,93 +2,77 @@ Return-Path: <SRS0=oMaZ=PE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	FROM_EXCESS_BASE64,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4F060C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 11:58:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 07522C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 12:23:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1ADB62148D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 11:58:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C60382148E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 12:23:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Kyl28fCK";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="p/Iq3RXe"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1ADB62148D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WaXaC2rA";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="ePY/RoYX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C60382148E
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=IfEpGH+vn1DFt/NtGhaoi1w6QpC/J9RH7oHHRRVH2JE=; b=Kyl28fCKjUMrBH
-	qnn7VpwuIl1iy4jH/C+35w0yEKJOs39uyqq5kMyRkgdEi795tjXNGITmBnvoT9xzdozHCJvT9zzrm
-	bsBA2ChVKnHIdeEdt2OtpHxhwOzBEeD5ePGw6m56V+KN2BrqzahOG3gniHBkgF7loy5OUS3tgtW1b
-	lTxssixhDGdhTyMN9sqL5RwpjQ2+7hHaf5JWCjPSO51dIsP/w4kuxwU0JFRNUQOU92ebQzmR5cxmR
-	O5mIFmeDD3s1TQChPAJofXSSNvmUF1l9ofewF4QxeATYliwzGiSk7/2Yri6DgWSHNCpiWR8NeBjzb
-	i7MQZcm6O2AYJmgTLAWw==;
+	List-Owner; bh=koScMDAiWyqAAC+rGqjTDG9snpv6Fo3g9IuxX4Yis7Y=; b=WaXaC2rAoEO7jy
+	CnWnQ16wKnyHh5Fvtk5kfXe8Nd0RhSoyJI/oUx910UTgK5HYcSBymadk9vbWK6uXIlrNzVRtymiXM
+	IojShVa7MZELBdbgZRgzaYAQWqJt62uWrr5lNCiafb37+trrU31C1/9HmbdD3JUl0J/dcoJMCE5Dn
+	8bihgjVzFbOVVUbBia+4rJUWlr7+ZqCBp7Cji3NSAieAJkw5MJnLyqPotXPFOsw11+R4cHYWdzklx
+	qNMap3TxUUnNng5pPVxQO+tjTrKbPWXE6VShrUGoiDDDWJPmMe2pgQMT7adX96SlfIxwN9G6qD0nJ
+	AlfC0g8W4hR9+oNKSvhw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gcUIW-0006oV-6Z; Thu, 27 Dec 2018 11:57:56 +0000
-Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
+	id 1gcUhU-0007Of-BB; Thu, 27 Dec 2018 12:23:44 +0000
+Received: from pandora.armlinux.org.uk
+ ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gcUIS-0006nL-9B
- for linux-arm-kernel@lists.infradead.org; Thu, 27 Dec 2018 11:57:53 +0000
-Received: by mail-lf1-x143.google.com with SMTP id n18so12543016lfh.6
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 27 Dec 2018 03:57:40 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=0u+t53wp3ovowzonqM8HJAMfjd+IqOrSRFovgYZHdmM=;
- b=p/Iq3RXeki+vvId89NEwssocj8L1S1kuWidCLyH0WkwN7fqzXot9XNJzpsFpfqRWi7
- Uo7aiPgHaIjgpLcRI9/i6bry20oDUW7/03e95gYVZZpYI1dUJRODzwi4X+Muhqi7+FXn
- A6xASCZ/Lbx7iq0Big0C7uwCwRtnEtv/qXO9yi8deDscu+Jov9HTgYsfdHG/d+Y4fSN5
- 5gpaIjizaHbSH9w+Gme8C5pm9QErV4yjdNcsZyPFOrzvd3lXkFFOkZzXUTmrjyNjZoiV
- +Rdo7l271QG+a/fDMpVcp5i9h+1sVrqErO3kMCe4M28Mi+gdqpAYVZgcw/UBtvsGDPhD
- tjfw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=0u+t53wp3ovowzonqM8HJAMfjd+IqOrSRFovgYZHdmM=;
- b=A6tprvIsDjvtxiHxufTp10pfS0FYl57/64Xij2bFZqK59M4T0XWHUmoOMbher2AP/i
- BLr5HMDzlxJBGU2q/UhcEDeFsZSKnx0KrjcTZKMAtZTRQq/XzQX1y4G4JzfzU+ZTh5vA
- 9AFw9azGZJupVgrphvIl1knLUEYIbKqQCtnwzgTE6umm4WHfWcDAlEZ6PuFlmIptIXjV
- T22PCoZ66N0GW5vv0Cct0w2th7XLNjepqkCU6HxYot6ZgILUpLrkha9hffAKDCxF+Dg/
- w0op7wiVVSPI0zhDzo51gCjOHx87ahIKjnRp5oSLkJBxCyDTg46fOlW48OYbVDI+uNwp
- FIiA==
-X-Gm-Message-State: AA+aEWYmvn8l/3ZGNG/Wu2+m7LcESsU544yXCWhKxJjeEdKmiGTUI2aa
- aaR0oZxwyWr3Hrf9yK2J5QA=
-X-Google-Smtp-Source: AFSGD/XRKParsNAMKywnx/zABcWlwVKK4mUA7fT8fxwv1yeHGc39XBCGdas93ZOPhD7cX4EcP/rtKg==
-X-Received: by 2002:a19:a9d2:: with SMTP id
- s201mr11302168lfe.154.1545911858376; 
- Thu, 27 Dec 2018 03:57:38 -0800 (PST)
-Received: from acerlaptop.localnet ([2a02:a315:5445:5300:9009:87a3:91bb:333a])
- by smtp.gmail.com with ESMTPSA id
- o5-v6sm7916444ljh.75.2018.12.27.03.57.36
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 27 Dec 2018 03:57:37 -0800 (PST)
-From: =?utf-8?B?UGF3ZcWC?= Chmiel <pawel.mikolaj.chmiel@gmail.com>
-To: Krzysztof Kozlowski <krzk@kernel.org>
-Subject: Re: [PATCH 2/3] dt-bindings: gpu: samsung-rotator: Document s5pv210
- support
-Date: Thu, 27 Dec 2018 12:57:35 +0100
-Message-ID: <4331572.iOIAVLAcOa@acerlaptop>
-In-Reply-To: <CAJKOXPfHHNUzQZu62btspC+6SwgoGPdAzusfSixXM7U9u3QP7A@mail.gmail.com>
-References: <20181219155704.15264-1-pawel.mikolaj.chmiel@gmail.com>
- <20181219155704.15264-3-pawel.mikolaj.chmiel@gmail.com>
- <CAJKOXPfHHNUzQZu62btspC+6SwgoGPdAzusfSixXM7U9u3QP7A@mail.gmail.com>
+ id 1gcUhQ-0007NS-5G
+ for linux-arm-kernel@lists.infradead.org; Thu, 27 Dec 2018 12:23:41 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=HHqgO3g5eKkRPwsjUKEmcI0sspvwSEMM8uaX2s6O3rw=; b=ePY/RoYXWZLWq3Glc0Vxv4Ye5
+ Ir06qg4PuLm6ffDQRXlPPLFYGtq2gf+yfEu2oqyvIG3cRKpWBkYMeErVUTGzWPql4mml0LKKb0R3R
+ iNaqiE+ItFgEcYbuDpNPT2nilitVkCQ3q0KQF7a6xyDUjr9qztxD9OYU+H5fE9UYYUw/w=;
+Received: from n2100.armlinux.org.uk
+ ([2001:4d48:ad52:3201:214:fdff:fe10:4f86]:36879)
+ by pandora.armlinux.org.uk with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
+ (envelope-from <linux@armlinux.org.uk>)
+ id 1gcUgm-0000z1-Jp; Thu, 27 Dec 2018 12:23:00 +0000
+Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
+ (envelope-from <linux@n2100.armlinux.org.uk>)
+ id 1gcUgj-0001g4-D5; Thu, 27 Dec 2018 12:22:57 +0000
+Date: Thu, 27 Dec 2018 12:22:55 +0000
+From: Russell King - ARM Linux <linux@armlinux.org.uk>
+To: Adrian Hunter <adrian.hunter@intel.com>
+Subject: Re: [PATCH 2/3] mmc: sdhci-esdhc-imx: add SD clock limitation for
+ imx6ull
+Message-ID: <20181227122254.GB26090@n2100.armlinux.org.uk>
+References: <1545292612-14471-1-git-send-email-haibo.chen@nxp.com>
+ <1545292612-14471-2-git-send-email-haibo.chen@nxp.com>
+ <cff15a85-3f72-a8ea-2e5f-731963175fde@intel.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <cff15a85-3f72-a8ea-2e5f-731963175fde@intel.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181227_035752_325397_9DEDF53C 
-X-CRM114-Status: GOOD (  17.21  )
+X-CRM114-CacheID: sfid-20181227_042340_197700_20DEB947 
+X-CRM114-Status: GOOD (  16.05  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,43 +84,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
- "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
- jy0922.shim@samsung.com, airlied@linux.ie,
- Seung Woo Kim <sw0312.kim@samsung.com>, linux-kernel@vger.kernel.org,
- dri-devel@lists.freedesktop.org, Inki Dae <inki.dae@samsung.com>,
- robh+dt@kernel.org, kyungmin.park@samsung.com, kgene@kernel.org,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "ulf.hansson@linaro.org" <ulf.hansson@linaro.org>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
+ "linux-mmc@vger.kernel.org" <linux-mmc@vger.kernel.org>,
+ BOUGH CHEN <haibo.chen@nxp.com>, "robh+dt@kernel.org" <robh+dt@kernel.org>,
+ dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-RG5pYSDFm3JvZGEsIDE5IGdydWRuaWEgMjAxOCAxNzoyMjo1MSBDRVQgS3J6eXN6dG9mIEtvemxv
-d3NraSBwaXN6ZToKPiBPbiBXZWQsIDE5IERlYyAyMDE4IGF0IDE3OjA0LCBQYXdlxYIgQ2htaWVs
-Cj4gPHBhd2VsLm1pa29sYWouY2htaWVsQGdtYWlsLmNvbT4gd3JvdGU6Cj4gPgo+ID4gVGhpcyBj
-b21taXQgZG9jdW1lbnRzIG5ldyBjb21wYXRpYmxlIGZvciBzNXB2MjEwIHNvYywKPiA+IHdoaWNo
-IHdpbGwgYmUgYWxzbyBzdXBwb3J0ZWQgYnkgdGhpcyBkcml2ZXIuCj4gPgo+ID4gU2lnbmVkLW9m
-Zi1ieTogUGF3ZcWCIENobWllbCA8cGF3ZWwubWlrb2xhai5jaG1pZWxAZ21haWwuY29tPgo+ID4g
-LS0tCj4gPiAgRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL2dwdS9zYW1zdW5nLXJv
-dGF0b3IudHh0IHwgMSArCj4gPiAgMSBmaWxlIGNoYW5nZWQsIDEgaW5zZXJ0aW9uKCspCj4gPgo+
-ID4gZGlmZiAtLWdpdCBhL0RvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy9ncHUvc2Ft
-c3VuZy1yb3RhdG9yLnR4dCBiL0RvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy9ncHUv
-c2Ftc3VuZy1yb3RhdG9yLnR4dAo+ID4gaW5kZXggODJjZDFlZDBiZTkzLi43ODY1OGRlYzY5NDEg
-MTAwNjQ0Cj4gPiAtLS0gYS9Eb2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvZ3B1L3Nh
-bXN1bmctcm90YXRvci50eHQKPiA+ICsrKyBiL0RvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5k
-aW5ncy9ncHUvc2Ftc3VuZy1yb3RhdG9yLnR4dAo+ID4gQEAgLTUsNiArNSw3IEBAIFJlcXVpcmVk
-IHByb3BlcnRpZXM6Cj4gPiAgICAgICAgIChhKSAic2Ftc3VuZyxleHlub3M0MjEwLXJvdGF0b3Ii
-IGZvciBSb3RhdG9yIElQIGluIEV4eW5vczQyMTAKPiA+ICAgICAgICAgKGIpICJzYW1zdW5nLGV4
-eW5vczQyMTItcm90YXRvciIgZm9yIFJvdGF0b3IgSVAgaW4gRXh5bm9zNDIxMi80NDEyCj4gPiAg
-ICAgICAgIChjKSAic2Ftc3VuZyxleHlub3M1MjUwLXJvdGF0b3IiIGZvciBSb3RhdG9yIElQIGlu
-IEV4eW5vczUyNTAKPiA+ICsgICAgICAgKGQpICJzYW1zdW5nLHM1cHYyMTAtcm90YXRvciIgZm9y
-IFJvdGF0b3IgSVAgaW4gUzVQVjIxMAo+IAo+IEhvdyBhYm91dCBwdXR0aW5nIGl0IGF0IGJlZ2lu
-bmluZyBhcyB0aGUgb2xkZXN0IGNoaXBzZXQ/IFRoaXMgd291bGQKPiByZXF1aXJlIHJlb3JkZXJp
-bmcgdGhlIGxpc3Qgc28gbWF5YmUgbGV0J3MgcmVtb3ZlIHRoZSBhL2IvYyBsaXN0Cj4gZW51bWVy
-YXRpb25zPyBUaGV5IGFyZSBraW5kIG9mIHVzZWxlc3MuCk9rLCBpJ2xsIHNlbmQgdjIgb2YgcGF0
-Y2hzZXQgd2l0aCB0aGlzIGNoYW5nZS4KPiAKPiBCZXN0IHJlZ2FyZHMsCj4gS3J6eXN6dG9mCgoK
-CgoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgt
-YXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQu
-b3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJt
-LWtlcm5lbAo=
+On Thu, Dec 27, 2018 at 10:01:24AM +0200, Adrian Hunter wrote:
+> On 20/12/18 9:49 AM, BOUGH CHEN wrote:
+> > i.MX6ULL has errata ERR010450, point out that due to SOC I/O
+> > timing limitation, for eMMC HS200 and SD/SDIO 3.0 SDR104, the
+> > clock rate can't exceed 150MHz. And for eMMC DDR52 and SD/SDIO
+> > DDR50 mode, the clock rate can't exceed 45MHz.
+> > 
+> > This patch add this limit for imx6ull.
+> > 
+> > Signed-off-by: Haibo Chen <haibo.chen@nxp.com>
+> 
+> Apart from the kbuild test robot complaints (do they need to be fixed?):
+> 
+> Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+
+Nacked-by: Russell King <rmk+kernel@armlinux.org.uk>
+
+The kbuild test robot complaints do need to be fixed first.  They're
+confusing because GCC produces quite a lot of garbage in its error
+messages now.  If you look at the patch, there's a hunk that has:
+
++       if (imx_data->socdata->flags & ESDHC_FLAG_ERR010450) {
++               if (imx_data->is_ddr)
++                       clock = clock > 45000000 ? 45000000 : clock;
++               else
++                       clock = clock > 150000000 ? 150000000 : clock;
++
+
+which is missing a closing brace.  This patch could not have been
+build tested before it was mailed to the list, and the test robot
+is highlighting that fact.
+
+It may also be a good idea to encourage a different approach to the
+above anyway:
+
+	if (imx_data->socdata->flags & ESDHC_FLAG_ERR010450) {
+		unsigned long max_clock;
+
+		max_clock = imx_data->is_ddr ? 45000000 : 150000000;
+
+		clock = max(clock, max_clock);
+	}
+
+rather than open-coding the max() stuff in the driver.
+
+Thanks.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
