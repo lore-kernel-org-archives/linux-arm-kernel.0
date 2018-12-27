@@ -2,86 +2,114 @@ Return-Path: <SRS0=oMaZ=PE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B3275C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 17:05:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A9CD4C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 17:15:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 75E5720861
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 17:05:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 756BC208E4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 17:15:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PgunmR84";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="egOkD9gE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 75E5720861
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bvqsOxtZ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="eJaYp7Dn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 756BC208E4
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=nTcRbHblX+mJ6jYADfafbcXBxBeub7Qkze1LyWp0HC4=; b=PgunmR840IYvlX
-	445RQDKnPxlCXjblsqj1goa3/HQ1UdjxL5bVkj/mAU7fSMEp98zb9pRQNDilhD0vP2lPhR6z+t0kJ
-	FKXEeIdAKYT8tcWIzEhPKlgnvr0AlZ7ILHq6+tfIsiQG4E82v57VB8wjYyQ4dhNvPfJ/1wV/dMTMe
-	nfK08n1dYiEgiwy54P7z11tnC+BDyD3Zi5IwVGBy7xmFZyX7fHZW0qMLdArmS7Eb42cBqaTIEpoO2
-	IFyafcIXmtksyzOoHCaxxcRDgvokQa6qsAZo37Eng1uu8Oq0X4NHygllaU2kN65ZBJA25ZAJYSeKv
-	3jXlK3v7o4pl9u1N4gMw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=dYhvZ982UINCHr+i/jULGS77lB0S/37ziPFiSgTM9tw=; b=bvqsOxtZrkvydq
+	cOja1j8pPorZZ48MsvBQ+qdRYIddNRctp6vPXDyAkjiMAyJwsR88YNNPJmDn4RFgoO8AuxzCcT3x1
+	3klpwRvjv1x5zIErX578rcgT8n/UcbHVzKzRnP19Ar3PkFVL5AdPxr0nxZs4lESPA8z7ZBMzjyNBB
+	dXuUzU9cCBYCsv1ukzUvqvJZHTCxARm2w7wsqdnIN19OAnIAKQU6qYh1nAnEMvL+bVkBsLYg/R+ks
+	M9iyYgB4pAx2l2gahOh63HWs4E9awuo6RgYXiDRJsy/uWf22Udnmo+bBrofAli8ueINe8/HYRHZdU
+	sFy9NpDzIequx9KteB0A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gcZ6U-0000f7-8F; Thu, 27 Dec 2018 17:05:50 +0000
-Received: from mail-io1-xd44.google.com ([2607:f8b0:4864:20::d44])
+	id 1gcZFU-00041i-P0; Thu, 27 Dec 2018 17:15:08 +0000
+Received: from mail-eopbgr00051.outbound.protection.outlook.com ([40.107.0.51]
+ helo=EUR02-AM5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gcZ6Q-0000eX-Uo
- for linux-arm-kernel@lists.infradead.org; Thu, 27 Dec 2018 17:05:48 +0000
-Received: by mail-io1-xd44.google.com with SMTP id k7so14969066iob.6
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 27 Dec 2018 09:05:36 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=PxN3IceSAHTN/afci5ZupMRI+FLUTdEFATdBPqBbyCc=;
- b=egOkD9gEN5p+sArcJFiDGEk33G2YpATtE0uvWpTcKvIqUl4bYw0zgJ6WOn+HnMO8b3
- dx0DgsFObwqkR6b+v9MfHF0uupzTcJKetq/YqEMabu4AAXASB8TyN/qtogKEVT5X1mx9
- pqfbAlY4UKe45Rk6MN7A15KVZBQXrYl0aKo1SbfJsHumEOxudItX5+A3R1xPBn4Uvf7x
- aMCMV5+7s6XMw8ECxn9KVNl3dImbA3jxrfCY48SVKgH4MsJhl9h4WI/ehT8B3iezVs2N
- BMP/MCSWzf76gRKbCzvWRD6AumZmEW6WTORggX3PAB6HNQjcREhSgezNVuU4eMHtiPvD
- 80OQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=PxN3IceSAHTN/afci5ZupMRI+FLUTdEFATdBPqBbyCc=;
- b=RyR70SGyWhiXimjuuJ+tN/FY3k+hqR0aUwSatD+rFwNz8mCerDm6+3d/9NlzBAG1Jv
- 4AcUdaYYKuYVw0rRarhtaiI6F41gcp7NmxhqaWH1P7YGDk1UX07ZqMKcrTkKzqUxCTN7
- smRfU3sjO4hdFo4ZBNfK3al17ADrKH2tDHekfIXziOeAN6T65bYAug6Hk/0+zoIpu/0+
- 8xFDA+5t5EkGikH3H60ITDL0Mg1ZMHzCTQLsZ7L2mfwHGT0OZ4mcjXJtBw+10WFpDxPX
- 1zVawv8wwftWVwEuUbt3q4pIJxar7/Y1LoiAJxMyUjJDp/YtK4CMnwPwYeMcK/NCSyuM
- 8Mcw==
-X-Gm-Message-State: AJcUukdQWl2nhDvdYFDxlhP4CzDHS9E9V1PH7CPAFrOq8dLJ9Vz4yaUx
- Bhd8GHDI4dKYw37pnoequ0gEyKg/TinFB1tONC0=
-X-Google-Smtp-Source: ALg8bN530QwDZk6ZM7S2W3Vk0PxLTxOmlW+nnHY50MXRYVqZelhgZv5zsBUnt9znjyI+SoaBkLEbwIUYwLvnzPzhCyE=
-X-Received: by 2002:a5d:9a03:: with SMTP id s3mr17124347iol.69.1545930335808; 
- Thu, 27 Dec 2018 09:05:35 -0800 (PST)
+ id 1gcZFQ-0003Gl-7q
+ for linux-arm-kernel@lists.infradead.org; Thu, 27 Dec 2018 17:15:06 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=+cTy30umQRbngbCO0UFlX+2TS1jCNAFUoXKXdYwMEUg=;
+ b=eJaYp7DnukWeLtLcuN6oO6/YvT1slPBjNY0LOIy9yojGqVYyxhs392YQdJXKFqlIu1BH3dLvIL1L0juhFG/CcVgqFLN95Cxa6UVg/WevQcYujJda4SO7Ndi7p3qVREMdwoFk/Bu9tQhiK9ucFUI1XxZaISdj+2dC29Mz5FJK7NI=
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
+ AM0PR04MB5427.eurprd04.prod.outlook.com (20.178.116.84) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1471.20; Thu, 27 Dec 2018 17:14:48 +0000
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::9125:e806:7303:d8e6]) by AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::9125:e806:7303:d8e6%7]) with mapi id 15.20.1446.027; Thu, 27 Dec 2018
+ 17:14:48 +0000
+From: Aisheng Dong <aisheng.dong@nxp.com>
+To: "linux-pm@vger.kernel.org" <linux-pm@vger.kernel.org>
+Subject: [RFC PATCH 1/1] PM / Domains: Add multi PM domains support for
+ attach_dev
+Thread-Topic: [RFC PATCH 1/1] PM / Domains: Add multi PM domains support for
+ attach_dev
+Thread-Index: AQHUngerKaedheUOE0OdzOpUuVXDPw==
+Date: Thu, 27 Dec 2018 17:14:48 +0000
+Message-ID: <1545930550-9906-1-git-send-email-aisheng.dong@nxp.com>
+Accept-Language: zh-CN, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: git-send-email 2.7.4
+x-clientproxiedby: HK0PR01CA0017.apcprd01.prod.exchangelabs.com
+ (2603:1096:203:92::29) To AM0PR04MB4211.eurprd04.prod.outlook.com
+ (2603:10a6:208:66::21)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=aisheng.dong@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [119.31.174.66]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; AM0PR04MB5427;
+ 6:+fskWIJCrt5qETjnmfbePtE3GceutJsWTQOwHLvqExwPdOJnvE2S/4ucOkvv/hjbGcM7VrTCFI1I0HRMeecPlFjJnaghjx5HxTngjBCHyYGAV7B3DhOF8OV75TFJvm3PlD2hy6s+3XWEtRPAcN9wZWUSUTd4x6NXjKwt2JwYeuIXtMRumev/Vp6oaBjGRxfFShU7XAaPmddOmoDmRed1sYF4YKrophNzFM00YUmWpKt3oUUYQck5KXIVC+zvp1dhOqHlR+mxRXNAFlaOckoOOxhpMUG8S0JCkQSk+cm4cs3mGly4Oww83iy11X+ifKa5p0GKKoAXtrWANg4gHyzWNfHFcxQ1EA620JG4xbCQqTL97Ay8HI2W/JKOX8CFfJjhBvxoBkU15FLOY7RKWq2hKLKnSMps56dUhh+A36dBE1vYsqHRaq4ZVxU1pJR6pgjse+iXv9oXWGUtLQzrzRZgLQ==;
+ 5:McyEVeiMVs4vMHil1P0iCoXyigCCE306ZrWRFN+GyGe7MqNP/KAMPTL3xgJVd+/Wdh4MKpzqt79msDRJ5LqxiiOdNhmoodpHqG070ro9mERV3/83eujHq2Nayzqv+nbBvv4Ba7t66tjktnr+cAhmxRjgJY1X2GKORYB/ki5W8j4=;
+ 7:z1PC1DJ8NZ4fGm/8RBmAkHJ37p5kKKWjLdXraay2TOKi0yLWsjMGQEwVfYIFtXOPMj0TGTh7zqqk4ztIjss+N50uVbhiyuWSZz1Yt48zQD0sdilJE8WngIOIIzXF+GDHc2FbLFmicrrvkAA40PyQrg==
+x-ms-office365-filtering-correlation-id: c2c9c871-2dd3-43b5-34fe-08d66c1ece28
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:AM0PR04MB5427; 
+x-ms-traffictypediagnostic: AM0PR04MB5427:
+x-microsoft-antispam-prvs: <AM0PR04MB5427CF57C09B9AF8B4A2EB1E80B60@AM0PR04MB5427.eurprd04.prod.outlook.com>
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(3230021)(908002)(999002)(5005026)(6040522)(2401047)(8121501046)(10201501046)(3002001)(93006095)(93001095)(3231475)(944501520)(52105112)(6055026)(6041310)(20161123562045)(20161123560045)(20161123558120)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123564045)(201708071742011)(7699051)(76991095);
+ SRVR:AM0PR04MB5427; BCL:0; PCL:0; RULEID:; SRVR:AM0PR04MB5427; 
+x-forefront-prvs: 0899B47777
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(39860400002)(366004)(396003)(346002)(136003)(376002)(52314003)(199004)(189003)(8936002)(97736004)(5660300001)(53936002)(4326008)(5024004)(3846002)(50226002)(86362001)(6916009)(316002)(966005)(256004)(14454004)(2616005)(14444005)(71190400001)(71200400001)(476003)(478600001)(7736002)(36756003)(305945005)(6116002)(39060400002)(6486002)(217873002)(68736007)(486006)(2501003)(186003)(2906002)(99286004)(25786009)(6306002)(54906003)(102836004)(6512007)(44832011)(6436002)(5640700003)(7416002)(8676002)(106356001)(105586002)(2351001)(6506007)(386003)(81156014)(81166006)(66066001)(26005)(52116002)(21314003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB5427;
+ H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: gzUPVIHohWAlRn6dwanv20LkYOQI9GTBvLOGTWgSBFRqz9lq1k+bJZC6Tbzm05A4JIu9QgUdWDBibX3+HLgEP2ssZtw5jK31/nXSBs+jqE3VOK2eD2QME1KYyW3NRGyXu2vaJ4EbzbrM1n88dujHz04PWNGGNWJDxH0CakW25P03i/rQdfUfiQ2UNRSyFT4m5UStSKforYiceLhPkZKV1ix4YyT/zuLT+iCsh3PghnOlJRe6Dekxkvvpt3s4OuvJ7W363WmwWlir8Ezdno3vr8IXS8SiECFhbru2M1f5x96AWIRAS89M0wp+wL1P5LjA
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-References: <20181213230411.5009-1-tony@atomide.com>
- <CAHCN7xJmde1RJOMMqexR0uNiVEYjztTV4qXvkcjqb+w7R1vmpA@mail.gmail.com>
- <20181223163040.GO6707@atomide.com>
- <CAHCN7xJKyjXb6br-f+_q_dQxkqWHFxFfA+X_yYG4eh8w7RW8SQ@mail.gmail.com>
- <20181227165812.GS6707@atomide.com>
-In-Reply-To: <20181227165812.GS6707@atomide.com>
-From: Adam Ford <aford173@gmail.com>
-Date: Thu, 27 Dec 2018 11:05:23 -0600
-Message-ID: <CAHCN7xKyvXPMSaRQ_qP4u_bX7uh=52OUCtfO2XW974=rNnRcXw@mail.gmail.com>
-Subject: Re: [PATCH 1/3] ARM: dts: Add wlcore wakeirq for omap3-evm
-To: Tony Lindgren <tony@atomide.com>
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: c2c9c871-2dd3-43b5-34fe-08d66c1ece28
+X-MS-Exchange-CrossTenant-originalarrivaltime: 27 Dec 2018 17:14:48.7367 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB5427
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181227_090547_022756_50E0863A 
-X-CRM114-Status: GOOD (  20.35  )
+X-CRM114-CacheID: sfid-20181227_091504_294450_2989207E 
+X-CRM114-Status: GOOD (  22.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,66 +121,214 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree <devicetree@vger.kernel.org>, linux-omap@vger.kernel.org,
- =?UTF-8?Q?Beno=C3=AEt_Cousson?= <bcousson@baylibre.com>,
- arm-soc <linux-arm-kernel@lists.infradead.org>
+Cc: Aisheng Dong <aisheng.dong@nxp.com>,
+ "ulf.hansson@linaro.org" <ulf.hansson@linaro.org>,
+ "dongas86@gmail.com" <dongas86@gmail.com>,
+ "khilman@kernel.org" <khilman@kernel.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ "rjw@rjwysocki.net" <rjw@rjwysocki.net>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Dec 27, 2018 at 10:58 AM Tony Lindgren <tony@atomide.com> wrote:
->
-> * Adam Ford <aford173@gmail.com> [181227 14:33]:
-> > On Sun, Dec 23, 2018 at 10:30 AM Tony Lindgren <tony@atomide.com> wrote:
-> > >
-> > > * Adam Ford <aford173@gmail.com> [181222 20:54]:
-> > > > I noticed for your patch, I noticed you listed both the IRQ, gpio 149
-> > > > as well as uart1_rts.  Looking at the device tree, I see that
-> > > > uart1_rts is configured as gpio 149.
-> > >
-> > > The uart1_rts is just the pad name used in the TRM, so it should
-> > > probably say uart1_rts.gpio_149 meaning pad uart1_rts is muxed to
-> > > gpio_149.
-> > >
-> > > Would that clear the issue for you?
-> >
-> > That part I understand.  I poorly phrased my question.  What was
-> > mostly confusing to me is why both irq and wakeup interrupts are
-> > needed since it seems like
-> >
-> > <&gpio5 21 IRQ_TYPE_EDGE_RISING>,
-> >
-> > and
-> > <&omap3_pmx_core 0x14e>;
-> > point to the same pin.  Or did I mis-interpret the datasheet again?  :-)
->
-> Ah OK. Yes the same pin can trigger interrupts at two different
-> controllers. During runtime a proper GPIO is triggered, and then
-> in deeper idle states only the padconf interrupt is triggered as
-> the GPIO can be powered off. So the padconf interrupt is there
-> to provide wake-up events if configured. This allows the device
-> to enter off-mode during idle with things like ping and ssh
-> working with some extra latency :)
->
-> The padconf interrupt can also be something other than a GPIO pin,
-> such as UART RX pin, and the padconf device is separate from the
-> GPIO device. So they're treated as two separate interrupt
-> controllers. They can be both active the same time although that
-> is undesired for the extra overhead.
->
-> Eventually we should be able to make the GPIO interrupts work
-> in a transparent way with the padconf interrupts.
+Currently attach_dev() in power domain infrastructure still does
+not support multi domains case as the struct device *dev passed
+down from genpd_dev_pm_attach_by_id() is a virtual PD device, it
+does not help for parsing the real device information from device
+tree, e.g. Device/Power IDs, Clocks and it's unware of which real
+power domain the device should attach.
 
-Thanks for the clarifcation.  Is this additional IRQ and wakeup stuff
-something I should add to the Torpedo and SOM-LV boards?  I think
-right now, I'm just triggering on the GPIO rising edge.
+Extend the framework a bit to store the multi PM domains information
+in per-device struct generic_pm_domain_data, then power domain driver
+could retrieve it for necessary operations during attach_dev().
 
-adam
->
-> Regards,
->
-> Tony
+Two new APIs genpd_is_mpd_device() and dev_gpd_mpd_data() are also
+introduced to ease the driver operation.
+
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Kevin Hilman <khilman@kernel.org>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
+This patch is a follow-up work of the earlier discussion with Ulf Hansson
+about the multi PM domains support for the attach_dev() function [1].
+After a bit more thinking, this is a less intrusive implementation with
+the mininum impact on the exist function definitions and calling follows.
+One known little drawback is that we have to use the device driver private
+data (device.drvdata) to pass down the multi domains information in a
+earlier time. However, as multi PD devices are created by domain framework,
+this seems to be safe to use it in domain core code as device driver
+is not likely going to use it.
+Anyway, if any better ideas, please let me know.
+
+With the two new APIs, the using can be simply as:
+static int xxx_attach_dev(struct generic_pm_domain *domain,
+			  struct device *dev)
+{
+	...
+	if (genpd_is_mpd_device(dev)) {
+		mpd_data = dev_gpd_mpd_data(dev);
+		np = mpd_data->parent->of_node;
+		idx = mpd_data->index;
+		//dts parsing
+		...
+	}
+	...
+}
+
+[1] https://patchwork.kernel.org/patch/10658669/
+---
+ drivers/base/power/domain.c | 31 +++++++++++++++++++++++++++++++
+ include/linux/pm_domain.h   | 23 +++++++++++++++++++++++
+ 2 files changed, 54 insertions(+)
+
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 7f38a92..1aa0918 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -1343,6 +1343,9 @@ static struct generic_pm_domain_data *genpd_alloc_dev_data(struct device *dev,
+ 	gpd_data->td.effective_constraint_ns = PM_QOS_RESUME_LATENCY_NO_CONSTRAINT_NS;
+ 	gpd_data->nb.notifier_call = genpd_dev_pm_qos_notifier;
+ 
++	if (genpd_is_mpd_device(dev))
++		gpd_data->mpd_data = dev_get_drvdata(dev);
++
+ 	spin_lock_irq(&dev->power.lock);
+ 
+ 	if (dev->power.subsys_data->domain_data) {
+@@ -2179,6 +2182,7 @@ EXPORT_SYMBOL_GPL(of_genpd_remove_last);
+ 
+ static void genpd_release_dev(struct device *dev)
+ {
++	kfree(dev->driver_data);
+ 	kfree(dev);
+ }
+ 
+@@ -2320,6 +2324,20 @@ int genpd_dev_pm_attach(struct device *dev)
+ EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
+ 
+ /**
++ * genpd_is_mpd_device - Check if a device is associated with multi PM domains
++ * @dev: Device to check.
++ */
++
++bool genpd_is_mpd_device(struct device *dev)
++{
++	if (!dev || (dev && !dev->bus))
++		return false;
++
++	return dev->bus == &genpd_bus_type;
++};
++EXPORT_SYMBOL_GPL(genpd_is_mpd_device);
++
++/**
+  * genpd_dev_pm_attach_by_id - Associate a device with one of its PM domains.
+  * @dev: The device used to lookup the PM domain.
+  * @index: The index of the PM domain.
+@@ -2338,6 +2356,7 @@ EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
+ struct device *genpd_dev_pm_attach_by_id(struct device *dev,
+ 					 unsigned int index)
+ {
++	struct pm_domain_mpd_data *mpd_data;
+ 	struct device *genpd_dev;
+ 	int num_domains;
+ 	int ret;
+@@ -2366,6 +2385,18 @@ struct device *genpd_dev_pm_attach_by_id(struct device *dev,
+ 		return ERR_PTR(ret);
+ 	}
+ 
++	/* Allocate multi power domains data */
++	mpd_data = kzalloc(sizeof(*mpd_data), GFP_KERNEL);
++	if (!mpd_data) {
++		device_unregister(genpd_dev);
++		return ERR_PTR(-ENOMEM);
++	}
++
++	mpd_data->parent = dev;
++	mpd_data->index = index;
++
++	dev_set_drvdata(genpd_dev, mpd_data);
++
+ 	/* Try to attach the device to the PM domain at the specified index. */
+ 	ret = __genpd_dev_pm_attach(genpd_dev, dev->of_node, index, false);
+ 	if (ret < 1) {
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index 3b5d728..106d4e7 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -144,6 +144,11 @@ struct gpd_timing_data {
+ 	bool cached_suspend_ok;
+ };
+ 
++struct pm_domain_mpd_data {
++	struct device *parent;
++	unsigned int index;
++};
++
+ struct pm_domain_data {
+ 	struct list_head list_node;
+ 	struct device *dev;
+@@ -151,6 +156,7 @@ struct pm_domain_data {
+ 
+ struct generic_pm_domain_data {
+ 	struct pm_domain_data base;
++	struct pm_domain_mpd_data *mpd_data;
+ 	struct gpd_timing_data td;
+ 	struct notifier_block nb;
+ 	unsigned int performance_state;
+@@ -262,10 +268,17 @@ unsigned int of_genpd_opp_to_performance_state(struct device *dev,
+ 				struct device_node *np);
+ 
+ int genpd_dev_pm_attach(struct device *dev);
++bool genpd_is_mpd_device(struct device *dev);
+ struct device *genpd_dev_pm_attach_by_id(struct device *dev,
+ 					 unsigned int index);
+ struct device *genpd_dev_pm_attach_by_name(struct device *dev,
+ 					   char *name);
++
++static inline struct pm_domain_mpd_data *dev_gpd_mpd_data(struct device *dev)
++{
++	return dev_gpd_data(dev)->mpd_data;
++}
++
+ #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
+ static inline int of_genpd_add_provider_simple(struct device_node *np,
+ 					struct generic_pm_domain *genpd)
+@@ -311,6 +324,11 @@ static inline int genpd_dev_pm_attach(struct device *dev)
+ 	return 0;
+ }
+ 
++static bool genpd_is_mpd_device(struct device *dev)
++{
++	return false;
++}
++
+ static inline struct device *genpd_dev_pm_attach_by_id(struct device *dev,
+ 						       unsigned int index)
+ {
+@@ -323,6 +341,11 @@ static inline struct device *genpd_dev_pm_attach_by_name(struct device *dev,
+ 	return NULL;
+ }
+ 
++static inline struct pm_domain_mpd_data *dev_gpd_mpd_data(struct device *dev)
++{
++	return ERR_PTR(-ENOSYS);
++}
++
+ static inline
+ struct generic_pm_domain *of_genpd_remove_last(struct device_node *np)
+ {
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
