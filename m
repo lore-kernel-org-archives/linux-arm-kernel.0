@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ED5A7C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 06:15:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D2EB1C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 06:15:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9DE2A214C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 06:15:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A316E214C6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 06:15:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PgFU0NA+";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="Lz7xzfib"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9DE2A214C6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZHmgdiQJ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="S5zyFKbv"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A316E214C6
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,54 +26,54 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KHnrA8vjPL/M9xDdGDao1fZzXhpAdcmQsQOVkby6b00=; b=PgFU0NA+i57yj9
-	FcjtuZs/m++pJDdoPgUz+9PZtq+chvV8CkHyj9j+2TbZSJc+L5d8Spi5Ie0M6/c/FM4EE1/3yz4d2
-	+nNyowqlqXo8GgY6YiX56xFAHE6gx/21bNnkBGeFsE/lyEd3HJtO3gKvo6G7ws3kT5L6XLm0EaccB
-	RDfe5u80YBEbU7LGdGciYBsP1ccw0f+yCWMSpL8LPv85E41lj1HX6lbxNpRj6XsUCMQ7skpvEygJd
-	Bt4hokWRShMfj6LFHSCo+8K3asChvjFUPhsXeho9Fn6hgzNDzy4GqSBwOSJlMegCvSWZ9wRCv6xY2
-	xKnzQXMVFM+UWXAqjDaA==;
+	List-Owner; bh=b/JyOdh8Dc7Z6rj9q5qkTWuy/IxSTzZDTnMURxuaMyc=; b=ZHmgdiQJtcJhm2
+	EfKdIG686q+mFX7gqhxMh+alRZwgiaVut9/1z7RMrUtdHYGHOdN5ARtvBL6Ow6V22t+P0RDr2VrUs
+	dcDZXkd0xo2FLxo8UuQ7Vth0RxAJQfB7y7lF1gj28vLBjw0PpFcdiiUslIOTTydObZgow18GsTTbS
+	jWdL/0n42bdvdBHVeKscn0X//852GjwkbYHhke8Bp3tIpBxfV1a3hAlWVF4frCrPYGnvxgLgPhjiw
+	hRX8bIaFh7QgY57uBF7s6GfmtUVVk1EtBwF64gqasuFmNVfN9/liDNXn0A7cSCJrUyTolhS017U8d
+	mY0ICiXK2dKr5WAs+yDA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gcOxF-0007oQ-CS; Thu, 27 Dec 2018 06:15:37 +0000
-Received: from lelv0142.ext.ti.com ([198.47.23.249])
+	id 1gcOxT-00087c-8D; Thu, 27 Dec 2018 06:15:51 +0000
+Received: from fllv0015.ext.ti.com ([198.47.19.141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gcOvw-0005AE-9z
- for linux-arm-kernel@lists.infradead.org; Thu, 27 Dec 2018 06:14:32 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBR6Do56033468;
- Thu, 27 Dec 2018 00:13:50 -0600
+ id 1gcOvz-0005KT-QG
+ for linux-arm-kernel@lists.infradead.org; Thu, 27 Dec 2018 06:14:33 +0000
+Received: from fllv0035.itg.ti.com ([10.64.41.0])
+ by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBR6E2Ud077503;
+ Thu, 27 Dec 2018 00:14:02 -0600
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1545891230;
- bh=+9HYKdz28DvpD1a0BlSqRzAAN2Tfpb9Ur5Y+Oeyr5Fo=;
+ s=ti-com-17Q1; t=1545891242;
+ bh=KotTqQfhijDOPactJyxRFTQKuKTL+hLoGVA66ru3C0w=;
  h=From:To:CC:Subject:Date:In-Reply-To:References;
- b=Lz7xzfibWsJMcLZ6bUaDFXTrIC0a+HWx8JcynB8lKYxi7KiE5HevwmjAirpOuZjXG
- eCakzoKdtIVkESUXyjwd/AtcVwj66dYApeRp2htJxCyo7sA2ip1wZNppYCI4bQPlSg
- GeBfn4VSDYNmeLmuMiC5wMwEfsjWpp+c3EKrFXq0=
+ b=S5zyFKbvAdiWjuxDAOr4DgG2JkQdmzp8CPL3wLYwNxJcGkCvUoHxs3fBi1u6j4LJ2
+ wnBjNXxKp4hJqpN0+1K25CDgg2fub0OOLxbvdHiayHM05nV3QlsrQY/2KBmSnY3QFz
+ haI23X0S9jmbhrD0l9etkSWsaRYQG10ll6U4ErHM=
 Received: from DFLE107.ent.ti.com (dfle107.ent.ti.com [10.64.6.28])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBR6Do6H125545
+ by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBR6E2SH060161
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Thu, 27 Dec 2018 00:13:50 -0600
-Received: from DFLE109.ent.ti.com (10.64.6.30) by DFLE107.ent.ti.com
+ Thu, 27 Dec 2018 00:14:02 -0600
+Received: from DFLE100.ent.ti.com (10.64.6.21) by DFLE107.ent.ti.com
  (10.64.6.28) with Microsoft SMTP Server (version=TLS1_2,
  cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 27
- Dec 2018 00:13:50 -0600
-Received: from dflp32.itg.ti.com (10.64.6.15) by DFLE109.ent.ti.com
- (10.64.6.30) with Microsoft SMTP Server (version=TLS1_0,
+ Dec 2018 00:14:01 -0600
+Received: from dflp32.itg.ti.com (10.64.6.15) by DFLE100.ent.ti.com
+ (10.64.6.21) with Microsoft SMTP Server (version=TLS1_0,
  cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Thu, 27 Dec 2018 00:13:50 -0600
+ Thu, 27 Dec 2018 00:14:01 -0600
 Received: from uda0131933.india.ti.com (ileax41-snat.itg.ti.com
  [10.172.224.153])
- by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBR6DRrC026064;
- Thu, 27 Dec 2018 00:13:46 -0600
+ by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBR6DRrF026064;
+ Thu, 27 Dec 2018 00:13:58 -0600
 From: Lokesh Vutla <lokeshvutla@ti.com>
 To: <marc.zyngier@arm.com>, Nishanth Menon <nm@ti.com>, Santosh Shilimkar
  <ssantosh@kernel.org>,
  Rob Herring <robh+dt@kernel.org>, <tglx@linutronix.de>,
  <jason@lakedaemon.net>
-Subject: [PATCH v4 06/13] dt-bindings: irqchip: Introduce TISCI Interrupt
- router bindings
-Date: Thu, 27 Dec 2018 11:43:06 +0530
-Message-ID: <20181227061313.5451-6-lokeshvutla@ti.com>
+Subject: [RFC PATCH v4 09/13] genirq/msi: Add support for .msi_unprepare
+ callback
+Date: Thu, 27 Dec 2018 11:43:09 +0530
+Message-ID: <20181227061313.5451-9-lokeshvutla@ti.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181227061313.5451-1-lokeshvutla@ti.com>
 References: <20181227060829.5080-1-lokeshvutla@ti.com>
@@ -81,8 +81,8 @@ References: <20181227060829.5080-1-lokeshvutla@ti.com>
 MIME-Version: 1.0
 X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181226_221418_571344_8CA62379 
-X-CRM114-Status: GOOD (  19.34  )
+X-CRM114-CacheID: sfid-20181226_221422_095262_744920ED 
+X-CRM114-Status: GOOD (  14.56  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -104,118 +104,57 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add the DT binding documentation for Interrupt router driver.
+Add an optional callback .msi_unprepare to struct msi_domain_ops.
+This is used to clear any effect that is done by .msi_prepare callback.
 
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 ---
- .../interrupt-controller/ti,sci-intr.txt      | 85 +++++++++++++++++++
- MAINTAINERS                                   |  1 +
- 2 files changed, 86 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+ include/linux/msi.h |  3 +++
+ kernel/irq/msi.c    | 10 ++++++++++
+ 2 files changed, 13 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
-new file mode 100644
-index 000000000000..4b0ca797fda1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
-@@ -0,0 +1,85 @@
-+Texas Instruments K3 Interrupt Router
-+=====================================
-+
-+The Interrupt Router (INTR) module provides a mechanism to mux M
-+interrupt inputs to N interrupt outputs, where all M inputs are selectable
-+to be driven per N output. There is one register per output (MUXCNTL_N) that
-+controls the selection.
-+
-+
-+                                 Interrupt Router
-+                             +----------------------+
-+                             |  Inputs     Outputs  |
-+        +-------+            | +------+             |
-+        | GPIO  |----------->| | irq0 |             |       Host IRQ
-+        +-------+            | +------+             |      controller
-+                             |    .        +-----+  |      +-------+
-+        +-------+            |    .        |  0  |  |----->|  IRQ  |
-+        | INTA  |----------->|    .        +-----+  |      +-------+
-+        +-------+            |    .          .      |
-+                             | +------+      .      |
-+                             | | irqM |    +-----+  |
-+                             | +------+    |  N  |  |
-+                             |             +-----+  |
-+                             +----------------------+
-+
-+Configuration of these MUXCNTL_N registers is done by a system controller
-+(like the Device Memory and Security Controller on K3 AM654 SoC). System
-+controller will keep track of the used and unused registers within the Router.
-+Driver should request the system controller to get the range of GIC IRQs
-+assigned to the requesting hosts. It is the drivers responsibility to keep
-+track of Host IRQs.
-+
-+Communication between the host processor running an OS and the system
-+controller happens through a protocol called TI System Control Interface
-+(TISCI protocol). For more details refer:
-+Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-+
-+TISCI Interrupt Router Node:
-+----------------------------
-+- compatible:		Must be "ti,sci-intr".
-+- interrupt-controller:	Identifies the node as an interrupt controller
-+- #interrupt-cells:	Specifies the number of cells needed to encode an
-+			interrupt source. The value should be 4.
-+			First cell should contain the TISCI device ID of source
-+			Second cell should contain the interrupt source offset
-+			within the device
-+			Third cell specifies the trigger type as defined
-+			in interrupts.txt in this directory.
-+			Fourth cell should be 1 if the irq is coming from
-+			interrupt aggregator else 0.
-+- ti,sci:		Phandle to TI-SCI compatible System controller node.
-+- ti,sci-dst-id:	TISCI device ID of the destination IRQ controller.
-+- ti,sci-rm-range-girq:	Array of TISCI subtype ids representing the host irqs
-+			assigned to this interrupt router. Each subtype id
-+			corresponds to a range of host irqs.
-+
-+For more details on TISCI IRQ resource management refer:
-+http://downloads.ti.com/tisci/esd/latest/2_tisci_msgs/rm/rm_irq.html
-+
-+Example:
-+--------
-+The following example demonstrates both interrupt router node and the consumer
-+node(main gpio) on the AM654 SoC:
-+
-+main_intr: interrupt-controller0 {
-+	compatible = "ti,sci-intr";
-+	interrupt-controller;
-+	interrupt-parent = <&gic500>;
-+	#interrupt-cells = <4>;
-+	ti,sci = <&dmsc>;
-+	ti,sci-dst-id = <56>;
-+	ti,sci-rm-range-girq = <0x1>;
-+};
-+
-+main_gpio0: gpio@600000 {
-+	...
-+	interrupt-parent = <&main_intr>;
-+	interrupts = <57 256 IRQ_TYPE_EDGE_RISING 0>,
-+			<57 257 IRQ_TYPE_EDGE_RISING 0>,
-+			<57 258 IRQ_TYPE_EDGE_RISING 0>,
-+			<57 259 IRQ_TYPE_EDGE_RISING 0>,
-+			<57 260 IRQ_TYPE_EDGE_RISING 0>,
-+			<57 261 IRQ_TYPE_EDGE_RISING 0>;
-+	...
-+};
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 82dc44b09a7e..8c7513b02d50 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -15023,6 +15023,7 @@ F:	Documentation/devicetree/bindings/reset/ti,sci-reset.txt
- F:	Documentation/devicetree/bindings/clock/ti,sci-clk.txt
- F:	drivers/clk/keystone/sci-clk.c
- F:	drivers/reset/reset-ti-sci.c
-+F:	Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index 474490826f8c..f35dd19f6c69 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -239,6 +239,8 @@ struct msi_domain_ops {
+ 	int		(*msi_prepare)(struct irq_domain *domain,
+ 				       struct device *dev, int nvec,
+ 				       msi_alloc_info_t *arg);
++	void		(*msi_unprepare)(struct irq_domain *domain, int nvec,
++					 void *data);
+ 	void		(*msi_finish)(msi_alloc_info_t *arg, int retval);
+ 	void		(*set_desc)(msi_alloc_info_t *arg,
+ 				    struct msi_desc *desc);
+@@ -319,6 +321,7 @@ void platform_msi_domain_free_irqs(struct device *dev);
+ /* When an MSI domain is used as an intermediate domain */
+ int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
+ 			    int nvec, msi_alloc_info_t *args);
++void msi_domain_unprepare_irqs(struct irq_domain *domain, int nvec, void *data);
+ int msi_domain_populate_irqs(struct irq_domain *domain, struct device *dev,
+ 			     int virq, int nvec, msi_alloc_info_t *args);
+ struct irq_domain *
+diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
+index eb7459324113..1a1738690519 100644
+--- a/kernel/irq/msi.c
++++ b/kernel/irq/msi.c
+@@ -312,6 +312,16 @@ int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
+ 	return ret;
+ }
  
- Texas Instruments ASoC drivers
- M:	Peter Ujfalusi <peter.ujfalusi@ti.com>
++void msi_domain_unprepare_irqs(struct irq_domain *domain, int nvec,
++			       void *data)
++{
++	struct msi_domain_info *info = domain->host_data;
++	struct msi_domain_ops *ops = info->ops;
++
++	if (ops->msi_unprepare)
++		ops->msi_unprepare(domain, nvec, data);
++}
++
+ int msi_domain_populate_irqs(struct irq_domain *domain, struct device *dev,
+ 			     int virq, int nvec, msi_alloc_info_t *arg)
+ {
 -- 
 2.19.2
 
