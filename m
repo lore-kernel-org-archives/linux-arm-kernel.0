@@ -2,103 +2,79 @@ Return-Path: <SRS0=oMaZ=PE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-6.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 87A30C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 19:55:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 520C0C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 21:10:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 511A0214C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 19:55:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1B7182148D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 21:10:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NV9urXFW";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=umn.edu header.i=@umn.edu header.b="YqRhkZj1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 511A0214C6
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=umn.edu
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nAzX+Ffo"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1B7182148D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=rOfFoWr9RpL7o0B6MjpyQb/2Uthm0Oyy//x5AhXxbIE=; b=NV9
-	urXFWjKMsYrglMc1b6/B7kxmqimuOcg8k6CUClPr/oUxgCqt3xNy5QBBmHMrdY7LNSrDsPQC36bAW
-	xAauciwZ+tmeIc/yZMbpeL9zGPbhMu1lsEfvzitb+TKakqVybr4meJ8CEqJ9ScsQ04r9U8YqVe83s
-	NuMSIf7VLXoDdOU8ikHsGnJJqLmJn5zokYdKSBb1eR9jUQ43RjzS1kzxb12UTz5xbzPPYSBJGMGuO
-	YxgeqjUnOrCa9UrqORXZ3gb9sC5OUOcwHnHgkUk65ghbPJIiW05saP/skKiwWMc02Np3qVrh+01XM
-	5P2GVgKfY1Iv/4PMt4EFyq9IXg4tp+w==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ZkM1QyTitvArNJLj+Puq+EWr9H8F2otBur6UbmIXl0c=; b=nAzX+FfooOSO3G
+	KCLOIbqsFvvTPbgyGrU6GFuL4ruUsZ6npOCYbca6AVTZKKZKfzkMxqAN3jM23WGu7+M8R0+/a4p3W
+	d5MzdXcMWUMhoh/oVWruvVx+M2SPSMO/znRmzpbMe5ES5t8Qp25a1yGuyS84OgT0rrCw1QbRk5jKP
+	0lU4ipHk/in/X3WdLxsviI13ubmFM2QXiWxq6eLTFY6miJor1FX3efZlRxn3GeJt2bvOe7Q/0pthm
+	VnB7fUvI6mJi/Fj6u6Wznfbf3W5WTcBQ5LRDK4fgg9BXNuODuCtOG4sHz+gIeU6dlKCqYpI2oxXWM
+	lT5vILbujzfkRdwY2BXg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gcbkV-00055F-NA; Thu, 27 Dec 2018 19:55:19 +0000
-Received: from mta-p7.oit.umn.edu ([134.84.196.207])
+	id 1gccuy-0006LR-6i; Thu, 27 Dec 2018 21:10:12 +0000
+Received: from mail-io1-f68.google.com ([209.85.166.68])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gcbkS-0003PU-L0
- for linux-arm-kernel@lists.infradead.org; Thu, 27 Dec 2018 19:55:18 +0000
-Received: from localhost (unknown [127.0.0.1])
- by mta-p7.oit.umn.edu (Postfix) with ESMTP id 75A11CCD
+ id 1gccuu-00052C-1Z
+ for linux-arm-kernel@lists.infradead.org; Thu, 27 Dec 2018 21:10:09 +0000
+Received: by mail-io1-f68.google.com with SMTP id p7so4573356iog.12
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 27 Dec 2018 19:55:03 +0000 (UTC)
-X-Virus-Scanned: amavisd-new at umn.edu
-Received: from mta-p7.oit.umn.edu ([127.0.0.1])
- by localhost (mta-p7.oit.umn.edu [127.0.0.1]) (amavisd-new, port 10024)
- with ESMTP id H3QTkvJUUPDR for <linux-arm-kernel@lists.infradead.org>;
- Thu, 27 Dec 2018 13:55:03 -0600 (CST)
-Received: from mail-io1-f72.google.com (mail-io1-f72.google.com
- [209.85.166.72])
- (using TLSv1.2 with cipher AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mta-p7.oit.umn.edu (Postfix) with ESMTPS id 4EEFC254
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 27 Dec 2018 13:55:03 -0600 (CST)
-Received: by mail-io1-f72.google.com with SMTP id t4so3199146iog.1
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 27 Dec 2018 11:55:03 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=umn.edu; s=google;
- h=from:to:cc:subject:date:message-id;
- bh=Hu1jqh/oLjWGatdKi5LxSCSeLVZPpR4Y3Ivsb+hWC3U=;
- b=YqRhkZj1F8AP93nQIT6mtvISNfqK8COn7pwOcfi7KqxZbdqIqVRgZmgx1MEmfjvWmA
- WoUVirnxQSUk42Fd0s/4noJolIKBIhGCOfEJTWkAnyLNwxA4Cz1ViNCmYgisrlPPewfk
- zAgfS9s+8wODjb2EiBgK9P1t2MeT/GHMtEJHlGHhoT99exP+BJQl51iw+MCYXBZa8POY
- pJwYfqZIITkiY3EQ3I6mIplgpKObYm8Zqo49KzW7oSPDoG28n4cBt7dbj4ulSw03cucG
- dP2NWOZnfk09yYcP6pAa2IboKllSZlIrxxcZKHUUgzFZJlrmxC/bdt4hgEUpHPxh+oNV
- /JKQ==
+ Thu, 27 Dec 2018 13:09:54 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=Hu1jqh/oLjWGatdKi5LxSCSeLVZPpR4Y3Ivsb+hWC3U=;
- b=tUjFp3T/otzmzFVVu0WFQIZz2kDPTHcwM7dvtnPOhcXMSQOJ0iWlJn6Wkwo4rYMvGX
- WrYvU1ECN108ifPFiRmu0/ctWPNQKmVTExCxgZpvqaDKfOu2K2Igq87XwALFzAmBCJ07
- ee95Ufvu0nOhT0LQC2eBCetgqpL0pAqyuIVPFUmU6qBIz4es1TCl91pjYNQKWe45hTN3
- 8DeDGujUPt5hpqTDW9wZl084rW4WPWG292PA8aj9bTwXV5wSx+3N8mHnKS6AcY9Api/o
- NIvgBkj5lC7UKellZxRzJ4XyJjqnSz2zcWeyD/GMYjTzQuBl6BD1LTfVVwb0lMrcHo2/
- xSAw==
-X-Gm-Message-State: AJcUukfmA7F3MAdoxIIdaDStmE2LlXalfN/Fw9SHfEMNwe5CIvlJi59r
- 6rhyMxnyFcMh92BpZ5yB6DwN2oKMUJ+/N2JU2VCcvxW2YjVuzlZrikwMWzrpQE1RQykUNVj2D1C
- 4/g+WdB01nlQGL5mN5SIEZLewacScSmxLJgrRm/k=
-X-Received: by 2002:a5d:934a:: with SMTP id i10mr16607193ioo.162.1545940502655; 
- Thu, 27 Dec 2018 11:55:02 -0800 (PST)
-X-Google-Smtp-Source: ALg8bN4/Fs7FcOOR/IB5wY4/JpfTvK7IM0aan8n8kWN1UC5NgHKhfiIwHkmxVp6ucjZWR79qMZTU5A==
-X-Received: by 2002:a5d:934a:: with SMTP id i10mr16607177ioo.162.1545940502407; 
- Thu, 27 Dec 2018 11:55:02 -0800 (PST)
-Received: from cs-u-syssec1.cs.umn.edu (cs-u-syssec1.cs.umn.edu.
- [134.84.121.78])
- by smtp.gmail.com with ESMTPSA id 137sm15667190itm.21.2018.12.27.11.55.01
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 27 Dec 2018 11:55:01 -0800 (PST)
-From: Aditya Pakki <pakki001@umn.edu>
-To: pakki001@umn.edu
-Subject: [PATCH] iio: adc: xilinx: check return value of xadc_write_adc_reg
-Date: Thu, 27 Dec 2018 13:54:52 -0600
-Message-Id: <20181227195454.26344-1-pakki001@umn.edu>
-X-Mailer: git-send-email 2.17.1
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=i3w/R5gR+TdjmOUjmdVKVXjH3rS0dZDOdRUKMIU0C5I=;
+ b=t6+BiYMktE8PtusyWBJu2PL8FkP+RNZOr1hHZoTtTdEcRFj/Ou4mUgHaLBpHwo46bv
+ 5vxzcRu78hdaX3uugMOQzWQEM03TQKmzFvt9nHaICr1nwZ4oWPORbOsVBU51xiZiRFRg
+ hAyKmnUsgfYQgrjNZuGXmCb3oI5/lA79d+0nols/qDHnI2yKfb2EcF0z7QyrXJd8oI6m
+ IXQ+gVZ4972pe/n3CMOn2SUKecx1h5bVAnc/zc7Yum8OzjEJj3fpFu7hEmDVer9gOBNy
+ SMALL0hIvSNbbWoOXQSKXZIjBmLMmIFHi3vA4UMCAmDUeu7a1p8O7mw7GC6wtZqkQvyT
+ +QpQ==
+X-Gm-Message-State: AJcUukc7XAAPuAI3bFD6AzbyW1cYL/FaniJyqVoSpCSL8GZWzEvKT2LL
+ xjomO/349U+8pmCBBZbp+g==
+X-Google-Smtp-Source: ALg8bN6uxLNlL1SLxOd7h8Pw3C2ra6M6k6X40yXAXjKSMhjwoxv27WAOCn7jg8WfGYzvOkcZyslZcQ==
+X-Received: by 2002:a6b:7844:: with SMTP id h4mr2137221iop.216.1545944993830; 
+ Thu, 27 Dec 2018 13:09:53 -0800 (PST)
+Received: from localhost ([24.51.61.172])
+ by smtp.gmail.com with ESMTPSA id m186sm12985893ita.2.2018.12.27.13.09.52
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Thu, 27 Dec 2018 13:09:53 -0800 (PST)
+Date: Thu, 27 Dec 2018 15:09:52 -0600
+From: Rob Herring <robh@kernel.org>
+To: cezary.gapinski@gmail.com
+Subject: Re: [PATCH v2 14/14] spi: stm32: add description about STM32F4
+ bindings
+Message-ID: <20181227210952.GA26671@bogus>
+References: <1545688840-23992-1-git-send-email-cezary.gapinski@gmail.com>
+ <1545688840-23992-15-git-send-email-cezary.gapinski@gmail.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <1545688840-23992-15-git-send-email-cezary.gapinski@gmail.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181227_115516_778198_EA4062F2 
-X-CRM114-Status: GOOD (  14.48  )
+X-CRM114-CacheID: sfid-20181227_131008_104152_2C35C9A8 
+X-CRM114-Status: GOOD (  13.19  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -110,46 +86,35 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Lars-Peter Clausen <lars@metafoo.de>, linux-iio@vger.kernel.org,
- kjlu@umn.edu, Michal Simek <michal.simek@xilinx.com>,
- linux-kernel@vger.kernel.org, Manish Narani <manish.narani@xilinx.com>,
- linux-arm-kernel@lists.infradead.org,
- Peter Meerwald-Stadler <pmeerw@pmeerw.net>, Hartmut Knaack <knaack.h@gmx.de>,
- Jonathan Cameron <jic23@kernel.org>
-MIME-Version: 1.0
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Amelie Delaunay <amelie.delaunay@st.com>,
+ Cezary Gapinski <cezary.gapinski@gmail.com>,
+ Alexandre Torgue <alexandre.torgue@st.com>, linux-kernel@vger.kernel.org,
+ linux-spi@vger.kernel.org, Mark Brown <broonie@kernel.org>,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>,
+ linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-In function xadc_probe, xadc_write_adc_reg can return an error value
-when write fails. The fix checks for the return value consistent with
-other invocations of the latter function.
+On Mon, 24 Dec 2018 23:00:40 +0100, cezary.gapinski@gmail.com wrote:
+> From: Cezary Gapinski <cezary.gapinski@gmail.com>
+> 
+> Add description that STM32F4 can be used in compatible property.
+> Master Inter-Data Idleness optional property cannot be used in STM32F4.
+> 
+> Signed-off-by: Cezary Gapinski <cezary.gapinski@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/spi/spi-stm32.txt | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
+> 
 
-Signed-off-by: Aditya Pakki <pakki001@umn.edu>
----
- drivers/iio/adc/xilinx-xadc-core.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+Please add Acked-by/Reviewed-by tags when posting new versions. However,
+there's no need to repost patches *only* to add the tags. The upstream
+maintainer will do that for acks received on the version they apply.
 
-diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
-index 3f6be5ac049a..b13c61539d46 100644
---- a/drivers/iio/adc/xilinx-xadc-core.c
-+++ b/drivers/iio/adc/xilinx-xadc-core.c
-@@ -1273,8 +1273,10 @@ static int xadc_probe(struct platform_device *pdev)
- 			xadc->threshold[i] = 0xffff;
- 		else
- 			xadc->threshold[i] = 0;
--		xadc_write_adc_reg(xadc, XADC_REG_THRESHOLD(i),
-+		ret = xadc_write_adc_reg(xadc, XADC_REG_THRESHOLD(i),
- 			xadc->threshold[i]);
-+		if (ret)
-+			goto err_free_irq;
- 	}
- 
- 	/* Go to non-buffered mode */
--- 
-2.17.1
-
+If a tag was not added on purpose, please state why and what changed.
 
 _______________________________________________
 linux-arm-kernel mailing list
