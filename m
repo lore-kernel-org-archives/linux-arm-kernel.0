@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 934ADC43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 06:14:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 48496C43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 06:14:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5E702214C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 06:14:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C7750218EA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 06:14:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ANJJ6FUM";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="teKjecCW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5E702214C6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ORbg7ixe";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="dFk1MThM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C7750218EA
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,62 +26,62 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=meMCDqCgAYmjbrQcQY4/RFB8N+jRAgJr+dc2pVhE7JA=; b=ANJJ6FUMNg8hBC
-	Yv3/mXpl5NnQpykvNMv/VaheAUBlGwidZpPUUDOB7rcYWCE4QhLgY+rI/WwoaI/vuqPDE6hdueozA
-	fsXDS3CSYhkEPnEdwyHP8L6IzA9Dl+xNZh6Ob8Cjth5M08hLG0EhCnI/FrW0sYlotFeM2jCBdun3J
-	SLQxkbTPu73Tr5WBZlDVHiHWXE4He/nev9Y3sRBUKXPndXhUSojXJJOsv6nKyzY/xOUSbtEbY2GFN
-	7v/2n2Y6DcdK0/OpQWEwbWUpXPoRy6Y1AwrKeB0VLbVe8XZSYqWwXyJvXq3eqVL57W0s/cUAjoZpv
-	eqtx6yFo+zPOc0JwYQTA==;
+	List-Owner; bh=B9VEUosPq00+A4CUS19O5VC7kWAw+HzRUpzxbP2nXiE=; b=ORbg7ixeijPALn
+	AVxoP75EKNohL3r0wB4l3gbSNLCltTmU7ZV8AM2bwbG4HDXsTGZjNSJ+EBEy3I5kWiuCYPrB86Bhl
+	6CStAPRDHHz+wuWbvkHi1AgHt0s5LOntbt9qJeY77FUpn8056/8G6kf0EQZCZv6cpTGHjQ2RHXGDh
+	OktOUIu+i/4FsbhZIXwHV3RLvA/XIyvXyk+pb0KWdnJ8nAaX7cx0muNHhtRPR38mdkEmQqLdIrHCm
+	5tuRAxp/ajsW/yYndGtdLgeM6UaBkC92vNwp+HNnoN1rg95RcYSQrPkkwYSlxVTShcjO50YNhD1rK
+	p5bY1BwgNHjmVT4tsB5Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gcOvk-00059Z-O6; Thu, 27 Dec 2018 06:14:04 +0000
+	id 1gcOvq-0005Ep-CH; Thu, 27 Dec 2018 06:14:10 +0000
 Received: from lelv0143.ext.ti.com ([198.47.23.248])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gcOvf-000589-3u
+ id 1gcOvf-00057y-3w
  for linux-arm-kernel@lists.infradead.org; Thu, 27 Dec 2018 06:14:02 +0000
-Received: from lelv0266.itg.ti.com ([10.180.67.225])
- by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBR6Dh4q027065;
- Thu, 27 Dec 2018 00:13:43 -0600
+Received: from fllv0034.itg.ti.com ([10.64.40.246])
+ by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id wBR6DVw4027029;
+ Thu, 27 Dec 2018 00:13:31 -0600
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1545891223;
- bh=JtLuv5r/WkYlBZXMpTRzqAq+gi7BysBSUIUw78LzkRE=;
+ s=ti-com-17Q1; t=1545891211;
+ bh=zvA+z+h4dS66Be5CZ0S0GZlhHVEU+ft0s2Eh2RHnZao=;
  h=From:To:CC:Subject:Date:In-Reply-To:References;
- b=teKjecCWzvbz5gL0m4TJxofjqMObFyCZ4MJfeXJT4spUtEm5A9g7nruuxUUxNHv3s
- la/Zu3z43k0zFZvU23wgyBmHdpRrcWcTjWamdKSzH55/ajMQY1bfFKZAgU9OW5VlXD
- rYcuJRBM/o7Nx4LfVcctUwJU0eoRVxdAYEpyogAk=
-Received: from DLEE107.ent.ti.com (dlee107.ent.ti.com [157.170.170.37])
- by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBR6DhFR108472
+ b=dFk1MThMS0GJjT5TjzL3S0tFZTB21qwFzspsRacJHLh9FInm31dVHoKg9jApYMidI
+ mVyfbjJdNt5OHO/5MQm3vqTygMUYAzQfa5jxd/UUckqL6Ysp0SgJW2IFMoxmRKlSxf
+ 7m78ICMCY5qJIZs/TbYsidgPh9Mm2UxyY2ed4skQ=
+Received: from DLEE103.ent.ti.com (dlee103.ent.ti.com [157.170.170.33])
+ by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wBR6DV9Z052636
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Thu, 27 Dec 2018 00:13:43 -0600
-Received: from DLEE114.ent.ti.com (157.170.170.25) by DLEE107.ent.ti.com
- (157.170.170.37) with Microsoft SMTP Server (version=TLS1_2,
+ Thu, 27 Dec 2018 00:13:31 -0600
+Received: from DLEE109.ent.ti.com (157.170.170.41) by DLEE103.ent.ti.com
+ (157.170.170.33) with Microsoft SMTP Server (version=TLS1_2,
  cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 27
- Dec 2018 00:13:42 -0600
-Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE114.ent.ti.com
- (157.170.170.25) with Microsoft SMTP Server (version=TLS1_0,
+ Dec 2018 00:13:31 -0600
+Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE109.ent.ti.com
+ (157.170.170.41) with Microsoft SMTP Server (version=TLS1_0,
  cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Thu, 27 Dec 2018 00:13:42 -0600
+ Thu, 27 Dec 2018 00:13:31 -0600
 Received: from uda0131933.india.ti.com (ileax41-snat.itg.ti.com
  [10.172.224.153])
- by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBR6DRrA026064;
- Thu, 27 Dec 2018 00:13:39 -0600
+ by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wBR6DRr7026064;
+ Thu, 27 Dec 2018 00:13:28 -0600
 From: Lokesh Vutla <lokeshvutla@ti.com>
 To: <marc.zyngier@arm.com>, Nishanth Menon <nm@ti.com>, Santosh Shilimkar
  <ssantosh@kernel.org>,
  Rob Herring <robh+dt@kernel.org>, <tglx@linutronix.de>,
  <jason@lakedaemon.net>
-Subject: [PATCH v4 04/13] firmware: ti_sci: Add RM mapping table for am654
-Date: Thu, 27 Dec 2018 11:43:04 +0530
-Message-ID: <20181227061313.5451-4-lokeshvutla@ti.com>
+Subject: [PATCH v4 01/13] firmware: ti_sci: Add support to get TISCI handle
+ using of_phandle
+Date: Thu, 27 Dec 2018 11:43:01 +0530
+Message-ID: <20181227061313.5451-1-lokeshvutla@ti.com>
 X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181227061313.5451-1-lokeshvutla@ti.com>
+In-Reply-To: <20181227060829.5080-1-lokeshvutla@ti.com>
 References: <20181227060829.5080-1-lokeshvutla@ti.com>
- <20181227061313.5451-1-lokeshvutla@ti.com>
 MIME-Version: 1.0
 X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181226_221359_247445_7A0F3096 
-X-CRM114-Status: GOOD (  16.58  )
+X-CRM114-CacheID: sfid-20181226_221359_243370_A5705A33 
+X-CRM114-Status: GOOD (  19.50  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,73 +103,156 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Peter Ujfalusi <peter.ujfalusi@ti.com>
+From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-Add the resource mapping table for AM654 SoC as defined
-in http://downloads.ti.com/tisci/esd/latest/5_soc_doc/am6x/resasg_types.html
-Introduce a new compatible for AM654 "ti,am654-sci" for using
-this resource map table.
+TISCI has been updated to have support for Resource management(likes
+interrupts etc..). And there can be multiple device instances of a
+resource type in a SoC. So every driver corresponding to a resource type
+should get a TISCI handle so that it can make TISCI calls. And each
+DT node corresponding to a device should exist under its corresponding
+bus node as per the SoC architecture.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+But existing apis in TISCI library assumes that all TISCI users are
+child nodes of TISCI. Which is not true in the above case. So introduce
+(devm_)ti_sci_get_by_phandle() apis that can be used by TISCI users
+to get TISCI handle using of phandle property.
+
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 ---
- .../bindings/arm/keystone/ti,sci.txt          |  3 ++-
- drivers/firmware/ti_sci.c                     | 23 +++++++++++++++++++
- 2 files changed, 25 insertions(+), 1 deletion(-)
+ drivers/firmware/ti_sci.c              | 83 ++++++++++++++++++++++++++
+ include/linux/soc/ti/ti_sci_protocol.h | 17 ++++++
+ 2 files changed, 100 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-index b56a02c10ae6..6f0cd31c1520 100644
---- a/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-+++ b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-@@ -24,7 +24,8 @@ relationship between the TI-SCI parent node to the child node.
- 
- Required properties:
- -------------------
--- compatible: should be "ti,k2g-sci"
-+- compatible:	should be "ti,k2g-sci" for TI 66AK2G SoC
-+		should be "ti,am654-sci" for for TI AM654 SoC
- - mbox-names:
- 	"rx" - Mailbox corresponding to receive path
- 	"tx" - Mailbox corresponding to transmit path
 diff --git a/drivers/firmware/ti_sci.c b/drivers/firmware/ti_sci.c
-index 987bfb29475c..c2f0815edab6 100644
+index 69ed1464175c..f0cafa8a2ee9 100644
 --- a/drivers/firmware/ti_sci.c
 +++ b/drivers/firmware/ti_sci.c
-@@ -2500,10 +2500,33 @@ static const struct ti_sci_desc ti_sci_pmmc_k2g_desc = {
- 	/* Limited by MBOX_TX_QUEUE_LEN. K2G can handle upto 128 messages! */
- 	.max_msgs = 20,
- 	.max_msg_size = 64,
-+	.rm_type_map = NULL,
-+};
-+
-+static struct ti_sci_rm_type_map ti_sci_am654_rm_type_map[] = {
-+	{.dev_id = 56, .type = 0x00b}, /* GIC_IRQ */
-+	{.dev_id = 179, .type = 0x000}, /* MAIN_NAV_UDMASS_IA0 */
-+	{.dev_id = 187, .type = 0x009}, /* MAIN_NAV_RA */
-+	{.dev_id = 188, .type = 0x006}, /* MAIN_NAV_UDMAP */
-+	{.dev_id = 194, .type = 0x007}, /* MCU_NAV_UDMAP */
-+	{.dev_id = 195, .type = 0x00a}, /* MCU_NAV_RA */
-+	{.dev_id = 0, .type = 0x000}, /* end of table */
-+};
-+
-+/* Description for AM654 */
-+static const struct ti_sci_desc ti_sci_pmmc_am654_desc = {
-+	.default_host_id = 12,
-+	/* Conservative duration */
-+	.max_rx_timeout_ms = 10000,
-+	/* Limited by MBOX_TX_QUEUE_LEN. K2G can handle upto 128 messages! */
-+	.max_msgs = 20,
-+	.max_msg_size = 60,
-+	.rm_type_map = ti_sci_am654_rm_type_map,
- };
+@@ -1781,6 +1781,89 @@ const struct ti_sci_handle *devm_ti_sci_get_handle(struct device *dev)
+ }
+ EXPORT_SYMBOL_GPL(devm_ti_sci_get_handle);
  
- static const struct of_device_id ti_sci_of_match[] = {
- 	{.compatible = "ti,k2g-sci", .data = &ti_sci_pmmc_k2g_desc},
-+	{.compatible = "ti,am654-sci", .data = &ti_sci_pmmc_am654_desc},
- 	{ /* Sentinel */ },
- };
- MODULE_DEVICE_TABLE(of, ti_sci_of_match);
++/**
++ * ti_sci_get_by_phandle() - Get the TI SCI handle using DT phandle
++ * @np:		device node
++ * @propname:	property name containing phandle on TISCI node
++ *
++ * NOTE: The function does not track individual clients of the framework
++ * and is expected to be maintained by caller of TI SCI protocol library.
++ * ti_sci_put_handle must be balanced with successful ti_sci_get_by_phandle
++ * Return: pointer to handle if successful, else:
++ * -EPROBE_DEFER if the instance is not ready
++ * -ENODEV if the required node handler is missing
++ * -EINVAL if invalid conditions are encountered.
++ */
++const struct ti_sci_handle *ti_sci_get_by_phandle(struct device_node *np,
++						  const char *property)
++{
++	struct ti_sci_handle *handle = NULL;
++	struct device_node *ti_sci_np;
++	struct ti_sci_info *info;
++	struct list_head *p;
++
++	if (!np) {
++		pr_err("I need a device pointer\n");
++		return ERR_PTR(-EINVAL);
++	}
++
++	ti_sci_np = of_parse_phandle(np, property, 0);
++	if (!ti_sci_np)
++		return ERR_PTR(-ENODEV);
++
++	mutex_lock(&ti_sci_list_mutex);
++	list_for_each(p, &ti_sci_list) {
++		info = list_entry(p, struct ti_sci_info, node);
++		if (ti_sci_np == info->dev->of_node) {
++			handle = &info->handle;
++			info->users++;
++			break;
++		}
++	}
++	mutex_unlock(&ti_sci_list_mutex);
++	of_node_put(ti_sci_np);
++
++	if (!handle)
++		return ERR_PTR(-EPROBE_DEFER);
++
++	return handle;
++}
++EXPORT_SYMBOL_GPL(ti_sci_get_by_phandle);
++
++/**
++ * devm_ti_sci_get_by_phandle() - Managed get handle using phandle
++ * @dev:	Device pointer requesting TISCI handle
++ * @propname:	property name containing phandle on TISCI node
++ *
++ * NOTE: This releases the handle once the device resources are
++ * no longer needed. MUST NOT BE released with ti_sci_put_handle.
++ * The function does not track individual clients of the framework
++ * and is expected to be maintained by caller of TI SCI protocol library.
++ *
++ * Return: 0 if all went fine, else corresponding error.
++ */
++const struct ti_sci_handle *devm_ti_sci_get_by_phandle(struct device *dev,
++						       const char *property)
++{
++	const struct ti_sci_handle *handle;
++	const struct ti_sci_handle **ptr;
++
++	ptr = devres_alloc(devm_ti_sci_release, sizeof(*ptr), GFP_KERNEL);
++	if (!ptr)
++		return ERR_PTR(-ENOMEM);
++	handle = ti_sci_get_by_phandle(dev_of_node(dev), property);
++
++	if (!IS_ERR(handle)) {
++		*ptr = handle;
++		devres_add(dev, ptr);
++	} else {
++		devres_free(ptr);
++	}
++
++	return handle;
++}
++EXPORT_SYMBOL_GPL(devm_ti_sci_get_by_phandle);
++
+ static int tisci_reboot_handler(struct notifier_block *nb, unsigned long mode,
+ 				void *cmd)
+ {
+diff --git a/include/linux/soc/ti/ti_sci_protocol.h b/include/linux/soc/ti/ti_sci_protocol.h
+index 18435e5c6364..515587e9d373 100644
+--- a/include/linux/soc/ti/ti_sci_protocol.h
++++ b/include/linux/soc/ti/ti_sci_protocol.h
+@@ -217,6 +217,10 @@ struct ti_sci_handle {
+ const struct ti_sci_handle *ti_sci_get_handle(struct device *dev);
+ int ti_sci_put_handle(const struct ti_sci_handle *handle);
+ const struct ti_sci_handle *devm_ti_sci_get_handle(struct device *dev);
++const struct ti_sci_handle *ti_sci_get_by_phandle(struct device_node *np,
++						  const char *property);
++const struct ti_sci_handle *devm_ti_sci_get_by_phandle(struct device *dev,
++						       const char *property);
+ 
+ #else	/* CONFIG_TI_SCI_PROTOCOL */
+ 
+@@ -236,6 +240,19 @@ const struct ti_sci_handle *devm_ti_sci_get_handle(struct device *dev)
+ 	return ERR_PTR(-EINVAL);
+ }
+ 
++static inline
++const struct ti_sci_handle *ti_sci_get_by_phandle(struct device_node *np,
++						  const char *property)
++{
++	return ERR_PTR(-EINVAL);
++}
++
++static inline
++const struct ti_sci_handle *devm_ti_sci_get_by_phandle(struct device *dev,
++						       const char *property)
++{
++	return ERR_PTR(-EINVAL);
++}
+ #endif	/* CONFIG_TI_SCI_PROTOCOL */
+ 
+ #endif	/* __TISCI_PROTOCOL_H */
 -- 
 2.19.2
 
