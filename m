@@ -2,78 +2,85 @@ Return-Path: <SRS0=oMaZ=PE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 33CD2C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 21:55:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 84596C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 21:57:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ED9D9214C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 21:55:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 53D21214C6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 21:57:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WZFG1HCg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ED9D9214C6
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SrDvOAD6";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="hc6SMTqW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 53D21214C6
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tQi2BgPqa9V56CBMvG6lCIWEwLWTveqD4frxFZmadyE=; b=WZFG1HCgJe9KVm
-	kwqghAl3zFG3gAR879oJXhbkLqFrPtP6Oqpoxib4NXyT2hdE8t2MlkwILo9H2ojJ1GAF4ftnh5xQC
-	VSHEPPsh9AEz+IwabG/8VIh5sJ928T2rEVLbDlWfM97O2716m8luUK50AnKuc9cSHcU+7loVEXMPs
-	Jt2Asyt44GoZZlQP2vxfKDA/FU6kGOIGbVwI7XvYakPcr/O+LM4ILAqPbyTvMpy6TuF+4fl0eS4B3
-	erxMKyoSQUGSc6jJtksXtjoiz5RgisotEflcTacJieakxGxeCFdjkOpTaaZqRecsmRje6kSaTXMrT
-	jNo3OaUm6VKLZIwLI0Ag==;
+	List-Owner; bh=weYCTe+BQu0UHnurw5LTaWFYcpEqq1DNmXBIU3+zbAw=; b=SrDvOAD6NhRIcq
+	pT01WpcxiDpfCBaCSjDAwJazLnWn2XCHSbo1yZ6V98fLm0wFHKFLbCuxpPaeqHuMKqZdp4T0KXvOE
+	tVkb5hY9XyN6yGchFLTwpjc3KaDHyvN1atcbzKPDCxYmYXHTNhaFVEEH3HJnOZk0vVi6MsxTr4JbC
+	p/kGEACjqVOplLW+xvs9NxmCE7W2bllD57QtMzp37WwNvdUnTIVPp7jUXb7HGmWL/Cn0OMRgzwGys
+	m71ROEyp03VEP9H7r7d42NA6qobkIAz1MT/Np+/aZddPbNbPKfnpr1/r86uWXEn1LOgnleRqJPpJZ
+	d8QO5fEwvkU3pr30VJcg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gcdcP-0003ZL-Gf; Thu, 27 Dec 2018 21:55:05 +0000
-Received: from mail-io1-f68.google.com ([209.85.166.68])
+	id 1gcdeC-0004gh-ON; Thu, 27 Dec 2018 21:56:56 +0000
+Received: from mail-ot1-x344.google.com ([2607:f8b0:4864:20::344])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gcdcL-00038x-7y
- for linux-arm-kernel@lists.infradead.org; Thu, 27 Dec 2018 21:55:03 +0000
-Received: by mail-io1-f68.google.com with SMTP id t24so15528503ioi.0
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 27 Dec 2018 13:54:51 -0800 (PST)
+ id 1gcde6-0004fF-RX; Thu, 27 Dec 2018 21:56:53 +0000
+Received: by mail-ot1-x344.google.com with SMTP id i20so17345056otl.0;
+ Thu, 27 Dec 2018 13:56:40 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=googlemail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=qpvNNDNFbl2XbhdSLEQ4I8hppK6pfisIA9kuAu0WWwU=;
+ b=hc6SMTqW8avzQ7rmPZQdiGq7T0o5dRNfIz+a/uG4biAb2WML9ZWIruyB9goiv15u8q
+ 3BQhnP8Hvts53wqfGupIuPPuzxsBQAXllRYp4zlQxxkGLd3ztouHSNA4qkYZwu5P3l23
+ C+Xmk2ufdPGsh0oy4wFv+H1HnOPxQIkSneY9NW8x57i9NAjIBl9gJ8KuOU2EIKGqVqWo
+ qN+a1WxyCqQ5ANlfdo9ynbm/O22mL28XIO3/UO/RdlTA4OGMeL2ca3bTsi00g6xY23n+
+ X1kWiAQv0GtKKzgsHvz+gCbjCWWAi0zcc8VuVwIKY5JNQk4Bo5icXfXbKUlBTPmaxITe
+ +6tg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=qVKjW1jPignFC6PDbZudzDYlcK9KOJ0D+lc5t1OhGkk=;
- b=rqOTdivyO4MEXon623zWOHvePmHhUtfdLUzMJ61nzpqsFv9D/a5R7wG52JIbHU9uVg
- b9sz8W8ZWRPQ83B/C27xjEe0umrsnMbP8Nx1calq7fsbMzZI34Wa8nuS1aqQCTCUiFHR
- mutFNAxPGqispe4JBtDANAAkiuukyFwyQyZsJAo8PLJLZ0Mf2qspbzWBbVGSHgA8nRgh
- OWWCLuqpmkcGoB5aTPk5IPrNGQaLWK655ZhJU0P0czB/bz7cQ0o0kEx2LCmDYUy0y9Nr
- 4fXVB40QoXyGJCCW9lFGA2Vj69IstT6fScomtBQdu4tpBjn4lgNG27Z6BcQ7lEdCDAtJ
- Y8zg==
-X-Gm-Message-State: AJcUukdItmVFPwZhBD4Gst4jyE45c31U1OpSIZxohTxoqeg45IVz0UP3
- FgO1ZXhV4vvwNxX+Kx7wJw==
-X-Google-Smtp-Source: ALg8bN49OFGnMLTGDjsDK+EoPFZBSNCvPAEs+X6v6LWm5j66PJz3T9YclANLW4lO9+T2Gv19Mxbs/w==
-X-Received: by 2002:a6b:c386:: with SMTP id
- t128mr17449483iof.304.1545947690494; 
- Thu, 27 Dec 2018 13:54:50 -0800 (PST)
-Received: from localhost ([24.51.61.172])
- by smtp.gmail.com with ESMTPSA id s4sm6546133iom.83.2018.12.27.13.54.49
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 27 Dec 2018 13:54:49 -0800 (PST)
-Date: Thu, 27 Dec 2018 15:54:47 -0600
-From: Rob Herring <robh@kernel.org>
-To: Aisheng Dong <aisheng.dong@nxp.com>
-Subject: Re: [PATCH V2 1/1] clk: imx8qxp: make the name of clock ID generic
-Message-ID: <20181227215447.GA12514@bogus>
-References: <1545581665-15446-1-git-send-email-aisheng.dong@nxp.com>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=qpvNNDNFbl2XbhdSLEQ4I8hppK6pfisIA9kuAu0WWwU=;
+ b=syJWVNuO9Emr5I01lySyZw8KYRiVjPyktsu3wxnRHlw/edkdkiw2pLGJreD70dswW9
+ oPQJrbhAG8Tai/TdMGr95qlWalqcRi6vPWf4+VVYpiVEC3d+CKxJg0xyN49xiVs8ygae
+ f6VicKTtL5ptALq/TXFkMz1Ad9dRIH8s282R/NC4Y4Q6+4tHaDIr8wGHmqPrjd9h0d96
+ fUztkdBJrjWIYYNul2eETYja5SuRvoGPrH/58iR9rqdpzppNfqZgy/RJqtchDEu4rt67
+ t1+YYF+bqTAaeb8mpexiNsAV007DicOoLm1imu3luR3WkParkI1dNDpdBssJpVuLSRgb
+ gfzQ==
+X-Gm-Message-State: AJcUukdvXkz6xxeBUaJH6DqsOpF/7iX7ZmBpHzdr8R8h78SRzc0vGrw7
+ SgLrxEBGgz9ZujFU8A8iQIwYRCaQHfnDE+svPR8=
+X-Google-Smtp-Source: ALg8bN4JIlq1HeVMU+lVRPIXqHKVDV+Dv+k1Q24nGnE9gM6S4jB8m07E2kNz5c71dIobNSQqIrpuDcnUflGeon0qzzk=
+X-Received: by 2002:a9d:715d:: with SMTP id y29mr17710714otj.148.1545947799737; 
+ Thu, 27 Dec 2018 13:56:39 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1545581665-15446-1-git-send-email-aisheng.dong@nxp.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+References: <20181202220847.24364-1-martin.blumenstingl@googlemail.com>
+ <20181202220847.24364-3-martin.blumenstingl@googlemail.com>
+ <85aa8e12-0bca-6432-e1a8-0faceff1dd5e@codethink.co.uk>
+ <CAFBinCBDUxTc+ofCYm-zEeiFdU90U6DQOkX4B659q=MvRK64fg@mail.gmail.com>
+ <CAFBinCAY7+-zA5-hY6oXmFz2i8aj9wFJsb-HBbKt_Swn9BtMMg@mail.gmail.com>
+In-Reply-To: <CAFBinCAY7+-zA5-hY6oXmFz2i8aj9wFJsb-HBbKt_Swn9BtMMg@mail.gmail.com>
+From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Date: Thu, 27 Dec 2018 22:56:29 +0100
+Message-ID: <CAFBinCBh8hy8xmtz6j5mKPKwy3yW5bxTQG8TEFDNN-ocHfqTEw@mail.gmail.com>
+Subject: Re: [PATCH v5 2/2] rtc: support for the Amlogic Meson RTC
+To: ben.dooks@codethink.co.uk
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181227_135501_366375_54A12F89 
-X-CRM114-Status: GOOD (  18.17  )
+X-CRM114-CacheID: sfid-20181227_135650_951564_5B508164 
+X-CRM114-Status: GOOD (  15.93  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,58 +92,50 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Aisheng Dong <aisheng.dong@nxp.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "sboyd@kernel.org" <sboyd@kernel.org>,
- "mturquette@baylibre.com" <mturquette@baylibre.com>,
- dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: linux-rtc@vger.kernel.org, a.zummo@towertech.it,
+ alexandre.belloni@bootlin.com, ccaione@baylibre.com,
+ linux-kernel@vger.kernel.org, linux-amlogic@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sun, 23 Dec 2018 16:20:02 +0000, Aisheng Dong wrote:
-> SCU clock can be used in a similar way by IMX8QXP and IMX8QM SoCs.
-> Let's make the name of clock ID generic to allow other SoCs to reuse
-> the common part.
-> 
-> This patch only changes the clock id name and file name, so no
-> functional change.
-> 
-> Cc: Stephen Boyd <sboyd@kernel.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Cc: devicetree@vger.kernel.org
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> ---
-> According to Stephen's suggestion[1], resend the needed changes
-> for 4.21 separately, then we can pick it up and send it as part
-> of a follow-on fixes PR during the merge window next week.
-> As there's still no users in kernel and the plan is also to avoid
-> any using of it, so please help review at an early time.
-> v1->v2:
->  * resend Patch [4/5] which needs to change for v4.21.
->  * update headfile name accordingly
-> [1] https://patchwork.kernel.org/patch/10737463/
-> ---
->  drivers/clk/imx/clk-imx8qxp-lpcg.c        | 148 +++++++--------
->  drivers/clk/imx/clk-imx8qxp.c             | 154 ++++++++--------
->  include/dt-bindings/clock/imx8-clock.h    | 289 ++++++++++++++++++++++++++++++
->  include/dt-bindings/clock/imx8qxp-clock.h | 289 ------------------------------
->  4 files changed, 440 insertions(+), 440 deletions(-)
->  create mode 100644 include/dt-bindings/clock/imx8-clock.h
->  delete mode 100644 include/dt-bindings/clock/imx8qxp-clock.h
-> 
+Hi Ben,
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+On Tue, Dec 18, 2018 at 12:48 AM Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+>
+> Hi Ben,
+>
+> On Wed, Dec 5, 2018 at 11:15 PM Martin Blumenstingl
+> <martin.blumenstingl@googlemail.com> wrote:
+> [...]
+> > > > Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> > > > [resurrected Ben's patches after 2 years]
+> > > > Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> > >
+> > > Just checking if the change of author is deliberate?
+> > > not sure how to do >1 author on patches like this.
+> > I changed the author on purpose after seeing how much I changed
+> > (compared to your v4). this is also why I added you to the CC list
+> > however, I left in your copyright (just like you kept Carlo's
+> > copyright note) and MODULE_AUTHOR
+> please let me know:
+> 1. whether you want to be the author of the patch or if you're fine
+> with my name in there
+> 2. if you are fine with both of us being listed as Signed-off-by or if
+> you want me to switch to Co-authored-by
+> 3. about any other concerns you have
+>
+> I would like to update this patch next weekend so it can be reviewed
+> (and merged once all is fine) for v4.22
+I've been busy last weekend so I didn't manage to update this series
+please let me know how you want me to proceed with this
+
+
+Regards
+Martin
 
 _______________________________________________
 linux-arm-kernel mailing list
