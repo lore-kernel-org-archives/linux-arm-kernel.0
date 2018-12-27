@@ -2,84 +2,64 @@ Return-Path: <SRS0=oMaZ=PE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,URIBL_RHS_DOB autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E4A55C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 14:56:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 53F17C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 15:10:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B51C320874
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 14:56:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 24C262087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 15:10:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Dry7Kt0C";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="DYHQrOmV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B51C320874
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oTJvvtuy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 24C262087F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2p3zhm64RcxvEOLeiz8/dx7kibHRGcfh+HETTYrEm3I=; b=Dry7Kt0C0pBQcU
-	QJt9NiEMzxwaA6aIwNyNwg8ifinvsLTeOMTGcSBCFSsX4mQJ0Dsi90U5NXbEleFq2djyD3hUu1Yy+
-	LeYvxFYFbXuGu/bH1xwNmVGDiOvm1PTmx6QmfO558Yz4oNrFUhbVpetijN+7JQlyivn+Akaf+lxk3
-	tyYfR04UjKxcENmlq2sIpkzKs1g2DRKhRmk7z58UrOQx7+gTYxtL9viMPGj0DTnWUnUrXXyv9f/YM
-	7OouMce1MIs+IUfrgCfefnmP0cBLGkOBdPskjdp9oTZadLgJjPuCL/JOti5H2+kZCKqidjdbz+4Je
-	tDJYX1X9zgAUfoFVAMyQ==;
+	List-Owner; bh=hq7xENh3ZxcDU9arZlGtRlTRjj5V+4T91yJTH6MHTPg=; b=oTJvvtuy6oTkkZ
+	a3j93Nz1m+/q4NYLpbOamReRjfLSSfnvVjw8U0URGQ9n03D6mbsvJv00q/IwP4JGUPXCpxMmbjP3R
+	aGeGVg8arwfkKY8igO7MtBw6+p5IMDOsKVvrrE40Ot0TkKx1IL+Ca3vfdk5Q2K/QAr493jczFXUJa
+	wu6e2sPLvZy/TJikNgb8AOCCdMMogKm2E8mFpwkjLYHNj1Goug7XOUpRjyEcYR0s7uswzee3A6OkZ
+	unYCNKIFA9E2sL1DMOXc2OEIIskkKeUcRTGA5ACl2EuSyLHLDP0cSdaE5d1+w+c4ygx75v4r3RPTm
+	+9ceDiyazAD2J4fLtlmA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gcX5R-0008Lj-Jv; Thu, 27 Dec 2018 14:56:37 +0000
-Received: from mail-qk1-x744.google.com ([2607:f8b0:4864:20::744])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gcX5N-0008Ks-SM
- for linux-arm-kernel@lists.infradead.org; Thu, 27 Dec 2018 14:56:35 +0000
-Received: by mail-qk1-x744.google.com with SMTP id q1so10914306qkf.13
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 27 Dec 2018 06:56:23 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=B1+FmvZXnUqqvWdNdU8jnu2ftZC3qkcxSQR84GGlPnk=;
- b=DYHQrOmVjRhU/96m9z85JNZPU7I3aev5+tJYC7upN5GBC+tIGiH+QMkNq6zO4viIeV
- W17JT2SXBN803hnhGW30ut60E1zH6LQ0IcywUwLDbT07g6l7/XlzEjvQZEeSAXGwDFtq
- jqF162MWlt3LAkhSWXTSaaLsxIjndhfCZwGtd1J26/1t0W/+BIkkG3Yj5WvkS4uiV1He
- OqvETd87PCibwQ0g/Rf1NTXy+sTpezd+UxUOVh3vzMAiXL/ogzwtOELPhzN6YAGLliGY
- jqTAEXAbtBjN1LMBhHFlEWQtSSrJQO0JqI0eLBNnmoFyO6oj1Q1ouYzFeIhqjRIxloJl
- zwHw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=B1+FmvZXnUqqvWdNdU8jnu2ftZC3qkcxSQR84GGlPnk=;
- b=MvJ4SDmUEi7IxZN1rx9YIwQmQkLK5DfntjG4ZgqRXtw/7VyBr83xvhKmPI0LhzNtRa
- 908VSS1A5t42p6lwEyj+9D0RoB5yFM57iW8RFHHmhzejZ8j/P9qfS47QRDZAD6aayaQW
- PpLfpF6B3zO4roeplMg/IEwYQEkkDwDOPVqIrfCYqLBzjW6tGteAtfZ94VRO1YdBSRCF
- R0czBpYbQKMdA0Oy2w33stZ/zB1cWEFV1TJkx+wXK/9V5M3n8e0dulSYdeZMGgi6E9yy
- wmHyqcuGgVUquJ9GHijTZhV/I6idxt7sGQOplzS9MrxUSvhSJ8BmDBlaTmetMdkPWHP+
- BUyA==
-X-Gm-Message-State: AJcUukeewDWrb4JozIllpJ0MjDb40cgnfTDIb2M90foVMwJGNC34a3Ol
- msWP0POLyowaYdIgpTvnZDigKjqfNrKmpj/ACa8=
-X-Google-Smtp-Source: ALg8bN6VfblYnkztEanWXOEq431OCKsItGipVM8N2LQkZUPWn4fY+UxEjwes/D4yliDdPE0zxffxCBJrczk0l6gJdEg=
-X-Received: by 2002:ae9:dec5:: with SMTP id
- s188mr21550788qkf.127.1545922582209; 
- Thu, 27 Dec 2018 06:56:22 -0800 (PST)
-MIME-Version: 1.0
-References: <cover.1528819790.git.dolinux.peng@gmail.com>
- <b55024472e101a33b3d6b098aa2ce23c5b5dd6f7.1528819790.git.dolinux.peng@gmail.com>
-In-Reply-To: <b55024472e101a33b3d6b098aa2ce23c5b5dd6f7.1528819790.git.dolinux.peng@gmail.com>
-From: Donglin Peng <dolinux.peng@gmail.com>
-Date: Thu, 27 Dec 2018 22:56:10 +0800
-Message-ID: <CAErzpmv94LHULidn4n-ChgeJkXqc=Z1Zf-DaanBJE1iFpRe_xg@mail.gmail.com>
-Subject: Re: [PATCH 1/2] ARM: dump: Convert to use DEFINE_SHOW_ATTRIBUTE macro
-To: catalin.marinas@arm.com, will.deacon@arm.com
+	id 1gcXJ9-0005au-1Z; Thu, 27 Dec 2018 15:10:47 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gcXJ4-0005Zs-1s; Thu, 27 Dec 2018 15:10:44 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 9649B209ED; Thu, 27 Dec 2018 16:10:28 +0100 (CET)
+Received: from aptenodytes (aaubervilliers-681-1-80-230.w90-88.abo.wanadoo.fr
+ [90.88.22.230])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 4B6122072F;
+ Thu, 27 Dec 2018 16:10:18 +0100 (CET)
+Message-ID: <3c5dd6c834406ffc1e674af7839eea09fea748ee.camel@bootlin.com>
+Subject: Re: [PATCH] i2c: bcm2835: Clear current message and count after a
+ transaction
+From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+To: Stefan Wahren <stefan.wahren@i2se.com>
+Date: Thu, 27 Dec 2018 16:10:18 +0100
+In-Reply-To: <1232214204.268730.1545919526431@email.ionos.de>
+References: <20181221121135.4847-1-paul.kocialkowski@bootlin.com>
+ <1941132339.131316.1545481176339@email.ionos.de>
+ <baa17fb765bf8b40fe6e91b4884b83af6fcf7641.camel@bootlin.com>
+ <1232214204.268730.1545919526431@email.ionos.de>
+Organization: Bootlin
+User-Agent: Evolution 3.30.3 
+Mime-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181227_065633_922934_9420C1A1 
-X-CRM114-Status: GOOD (  16.05  )
+X-CRM114-CacheID: sfid-20181227_071042_373895_497783BF 
+X-CRM114-Status: GOOD (  33.98  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,51 +71,132 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Florian Fainelli <f.fainelli@gmail.com>,
+ Scott Branden <sbranden@broadcom.com>, Ray Jui <rjui@broadcom.com>,
+ linux-kernel@vger.kernel.org, Eric Anholt <eric@anholt.net>,
+ bcm-kernel-feedback-list@broadcom.com, linux-rpi-kernel@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org, linux-i2c@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jun 13, 2018 at 9:15 AM Peng Donglin <dolinux.peng@gmail.com> wrote:
->
-> Use DEFINE_SHOW_ATTRIBUTE macro to simplify the code.
->
-> Signed-off-by: Peng Donglin <dolinux.peng@gmail.com>
-> ---
->  arch/arm/mm/ptdump_debugfs.c | 13 +------------
->  1 file changed, 1 insertion(+), 12 deletions(-)
->
-> diff --git a/arch/arm/mm/ptdump_debugfs.c b/arch/arm/mm/ptdump_debugfs.c
-> index be8d87b..79002fe 100644
-> --- a/arch/arm/mm/ptdump_debugfs.c
-> +++ b/arch/arm/mm/ptdump_debugfs.c
-> @@ -11,18 +11,7 @@ static int ptdump_show(struct seq_file *m, void *v)
->         ptdump_walk_pgd(m, info);
->         return 0;
->  }
-> -
-> -static int ptdump_open(struct inode *inode, struct file *file)
-> -{
-> -       return single_open(file, ptdump_show, inode->i_private);
-> -}
-> -
-> -static const struct file_operations ptdump_fops = {
-> -       .open           = ptdump_open,
-> -       .read           = seq_read,
-> -       .llseek         = seq_lseek,
-> -       .release        = single_release,
-> -};
-> +DEFINE_SHOW_ATTRIBUTE(ptdump);
->
->  int ptdump_debugfs_register(struct ptdump_info *info, const char *name)
->  {
-> --
-> 2.7.4
->
+Hi Stefan,
 
-any suggestion?
+On Thu, 2018-12-27 at 15:05 +0100, Stefan Wahren wrote:
+> Hi Paul,
+> 
+> > Paul Kocialkowski <paul.kocialkowski@bootlin.com> hat am 24. Dezember 2018 um 10:10 geschrieben:
+> > 
+> > 
+> > Hi,
+> > 
+> > On Sat, 2018-12-22 at 13:19 +0100, Stefan Wahren wrote:
+> > > Hi Paul,
+> > > 
+> > > > Paul Kocialkowski <paul.kocialkowski@bootlin.com> hat am 21. Dezember 2018 um 13:11 geschrieben:
+> > > > 
+> > > > 
+> > > > The driver's interrupt handler checks whether a message is currently
+> > > > being handled with the curr_msg pointer. When it is NULL, the interrupt
+> > > > is considered to be unexpected. Similarly, the i2c_start_transfer
+> > > > routine checks for the remaining number of messages to handle in
+> > > > num_msgs.
+> > > > 
+> > > > However, these values are never cleared and always keep the message and
+> > > > number relevant to the latest transfer (which might be done already and
+> > > > the underlying message memory might have been freed).
+> > > > 
+> > > > When an unexpected interrupt hits with the DONE bit set, the isr will
+> > > > then try to access the flags field of the curr_msg structure, leading
+> > > > to a fatal page fault.
+> > > > 
+> > > > Fix the issue by systematically clearing curr_msg and num_msgs in the
+> > > > driver-wide device structure when a transfer is considered complete.
+> > > > 
+> > > > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> > > > ---
+> > > >  drivers/i2c/busses/i2c-bcm2835.c | 3 +++
+> > > >  1 file changed, 3 insertions(+)
+> > > > 
+> > > > diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
+> > > > index 44deae78913e..5486252f5f2f 100644
+> > > > --- a/drivers/i2c/busses/i2c-bcm2835.c
+> > > > +++ b/drivers/i2c/busses/i2c-bcm2835.c
+> > > > @@ -298,6 +298,9 @@ static int bcm2835_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
+> > > >  		return -ETIMEDOUT;
+> > > >  	}
+> > > >  
+> > > > +	i2c_dev->curr_msg = NULL;
+> > > > +	i2c_dev->num_msgs = 0;
+> > > 
+> > > AFAIU this would reduce the chance of a use-after-free dramatically but not completely.
+> > 
+> > Do you have a specific case of use-after-free related to these
+> > variables in mind that this cleanup would not fix (except for the
+> > timeout case)?
+> 
+> okay i was wrong about the use-after-free. But i'm not sure about this scenario on the I2C bus shared with the VC4:
+> 
+> 1. ARM core starts I2C transfer (bcm2835_i2c_start_transfer)
+> 2. VC4 triggers a BCM2835_I2C_S_DONE interrupt
+> 3. ARM core catches this interrupt before the VC4
+
+Well, I thought the VC4 has precedence over the ARM core, so if the
+interrupts hits in hardware, it should be seen by the VC4 first and
+forwarded to the ARM core if needed (I might be wrong though). So in
+that case, perhaps the ARM core wouldn't see the interrupt and just
+timeout?
+
+Either way, I'm don't think that having both the VC4 and the ARM core
+poke on the same bus is a scenario we can realisticly aim to support.
+Although it should definitely not make our driver crash if that
+happens.
+
+The HDMI DDC bus is an I2C bus shared between the ARM core and VC4, but
+the VC4 firmware should detect from the device-tree that Linux will
+attempt to drive the bus and let the ARM core deal with it without
+interference.
+
+Thanks for your feedback!
+
+Cheers,
+
+Paul
+
+> > The msg_buf element (in association with msg_buf_remaining keeping its
+> > previous value) could also lead to similar problems, so I'm thinking of
+> > making a bcm2835_i2c_finish_transfer function to group all the cleanups
+> > and call that right after wait_for_completion_timeout.
+> > 
+> > > Btw: Why did you leave of the i2c transfer timeout case?
+> > 
+> > I should definitely have included it, actually.
+> > 
+> > Cheers,
+> > 
+> > Paul
+> > 
+> > > Thanks
+> > > Stefan
+> > > 
+> > > > +
+> > > >  	if (!i2c_dev->msg_err)
+> > > >  		return num;
+> > > >  
+> > > > -- 
+> > > > 2.20.1
+> > > > 
+> > -- 
+> > Paul Kocialkowski, Bootlin (formerly Free Electrons)
+> > Embedded Linux and kernel engineering
+> > https://bootlin.com
+> > 
+-- 
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+
 
 _______________________________________________
 linux-arm-kernel mailing list
