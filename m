@@ -2,67 +2,77 @@ Return-Path: <SRS0=oMaZ=PE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 82973C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 07:36:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9FEC4C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 08:03:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4D64B20856
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 07:36:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 68A6421741
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 08:03:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EzLIohvn"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4D64B20856
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XwNKEUUl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 68A6421741
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=intel.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=e1Qr6SQDEgNwER7uhkqmUhKZJGD5mQO3ygCzmL/u3Is=; b=EzLIohvn0Xbwuo
-	JU5zBF4bcxe26xVgRKtWYVUBqtUVgOOzXxxZ5Ft59UC1VdmV4aPLnWPOvqYjqvgzok0VMOPlUHlIi
-	l2rxki/113cvF5hL6ewXtJuSaFgixXMtIUVsOHFb1wW7+0YMM0K6P5l+IHeuniL9oaVg5ARRC4aVv
-	qwpiaS3HU1DrM9+Bag8y2ocHPLOesLfUHioeHN4RZsyIHaLLfC1Cpuf1cggE2F2lOSM3/YjwDayUg
-	lCbsrAUcMyn0MISTsWp/+W3Qkqehq31odf6dKjyfnVAs+NZvolRtTPdATrhYHD0KN+S2fZOToF/I8
-	OSkNITCYeEUONWaF+VmA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=wcQ2c1MAnPuMAHAgtXaizcPBFkKOnsquRraL47aFyKI=; b=XwNKEUUl9hS7oE
+	L/JiTTiXkDtVOWH4lelP6ECXUJA0TqQWo/NiwFa0seTB2AXM/GIWspx1K9L+lcv7vc0u06Mc3pUx4
+	T9Ls4UA1ru6CJSLJzRH8FSEOjF29lcKiE5MUb3o/fcqBEZlRzcd28njq3FLL7JmxabEqDw74LytTm
+	6ZUd6aNAZxBvAAU/HX2NhxCjxHQm/cytaeoJDxaWalVGv20noUECIw1ynxILBsE4kPcZZTqAGDUUm
+	5gLcXuy8TjG/npZgk7fT+kPspKK2XCAlaDQpCUuw9Gj0Ll62FZsaiG34KIuINZzsKY2M6i8vpoNB9
+	iyzt57uPJyuiADf39bhQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gcQDu-0001sY-GW; Thu, 27 Dec 2018 07:36:54 +0000
-Received: from [1.203.163.81] (helo=mailgw02.mediatek.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gcQCs-00083R-HV; Thu, 27 Dec 2018 07:35:55 +0000
-X-UUID: b650fc18a28d48beb3a896ae640f8ca3-20181227
-X-UUID: b650fc18a28d48beb3a896ae640f8ca3-20181227
-Received: from mtkcas34.mediatek.inc [(172.27.4.250)] by mailgw02.mediatek.com
- (envelope-from <min.guo@mediatek.com>)
- (mailgw01.mediatek.com ESMTP with TLS)
- with ESMTP id 1110584122; Thu, 27 Dec 2018 15:34:48 +0800
-Received: from mtkcas09.mediatek.inc (172.21.101.178) by
- MTKMBS31N1.mediatek.inc (172.27.4.69) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Thu, 27 Dec 2018 15:34:47 +0800
-Received: from localhost.localdomain (10.17.3.153) by mtkcas09.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Thu, 27 Dec 2018 15:34:46 +0800
-From: <min.guo@mediatek.com>
-To: Bin Liu <b-liu@ti.com>, Rob Herring <robh+dt@kernel.org>
-Subject: [PATCH 2/4] arm: dts: mt2701: Add usb2 device nodes
-Date: Thu, 27 Dec 2018 15:34:24 +0800
-Message-ID: <1545896066-897-3-git-send-email-min.guo@mediatek.com>
-X-Mailer: git-send-email 1.7.9.5
-In-Reply-To: <1545896066-897-1-git-send-email-min.guo@mediatek.com>
-References: <1545896066-897-1-git-send-email-min.guo@mediatek.com>
+	id 1gcQdW-0001as-Og; Thu, 27 Dec 2018 08:03:22 +0000
+Received: from mga03.intel.com ([134.134.136.65])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gcQdP-0001PG-OG
+ for linux-arm-kernel@lists.infradead.org; Thu, 27 Dec 2018 08:03:20 +0000
+X-Amp-Result: SKIPPED(no attachment in message)
+X-Amp-File-Uploaded: False
+Received: from fmsmga007.fm.intel.com ([10.253.24.52])
+ by orsmga103.jf.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
+ 27 Dec 2018 00:03:00 -0800
+X-ExtLoop1: 1
+X-IronPort-AV: E=Sophos;i="5.56,404,1539673200"; d="scan'208";a="110241330"
+Received: from ahunter-desktop.fi.intel.com (HELO [10.237.72.56])
+ ([10.237.72.56])
+ by fmsmga007.fm.intel.com with ESMTP; 27 Dec 2018 00:02:55 -0800
+Subject: Re: [PATCH 2/3] mmc: sdhci-esdhc-imx: add SD clock limitation for
+ imx6ull
+To: BOUGH CHEN <haibo.chen@nxp.com>,
+ "ulf.hansson@linaro.org" <ulf.hansson@linaro.org>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>,
+ "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>
+References: <1545292612-14471-1-git-send-email-haibo.chen@nxp.com>
+ <1545292612-14471-2-git-send-email-haibo.chen@nxp.com>
+From: Adrian Hunter <adrian.hunter@intel.com>
+Organization: Intel Finland Oy, Registered Address: PL 281, 00181 Helsinki,
+ Business Identity Code: 0357606 - 4, Domiciled in Helsinki
+Message-ID: <cff15a85-3f72-a8ea-2e5f-731963175fde@intel.com>
+Date: Thu, 27 Dec 2018 10:01:24 +0200
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-X-MTK: N
+In-Reply-To: <1545292612-14471-2-git-send-email-haibo.chen@nxp.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181226_233551_072554_AE57F24E 
-X-CRM114-Status: UNSURE (   9.46  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181227_000315_899129_AB70F57A 
+X-CRM114-Status: GOOD (  21.67  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,117 +84,85 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-usb@vger.kernel.org,
- linux-kernel@vger.kernel.org, Matthias Brugger <matthias.bgg@gmail.com>,
- Alan Stern <stern@rowland.harvard.edu>, Min Guo <min.guo@mediatek.com>,
- chunfeng.yun@mediatek.com, linux-mediatek@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "linux-mmc@vger.kernel.org" <linux-mmc@vger.kernel.org>,
+ dl-linux-imx <linux-imx@nxp.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Min Guo <min.guo@mediatek.com>
+On 20/12/18 9:49 AM, BOUGH CHEN wrote:
+> i.MX6ULL has errata ERR010450, point out that due to SOC I/O
+> timing limitation, for eMMC HS200 and SD/SDIO 3.0 SDR104, the
+> clock rate can't exceed 150MHz. And for eMMC DDR52 and SD/SDIO
+> DDR50 mode, the clock rate can't exceed 45MHz.
+> 
+> This patch add this limit for imx6ull.
+> 
+> Signed-off-by: Haibo Chen <haibo.chen@nxp.com>
 
-Add musb nodes and usb2 phy nodes for MT2701
+Apart from the kbuild test robot complaints (do they need to be fixed?):
 
-Signed-off-by: Min Guo <min.guo@mediatek.com>
----
- arch/arm/boot/dts/mt2701-evb.dts | 21 +++++++++++++++++++++
- arch/arm/boot/dts/mt2701.dtsi    | 34 ++++++++++++++++++++++++++++++++++
- 2 files changed, 55 insertions(+)
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 
-diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
-index be0edb3..2635911 100644
---- a/arch/arm/boot/dts/mt2701-evb.dts
-+++ b/arch/arm/boot/dts/mt2701-evb.dts
-@@ -6,6 +6,7 @@
-  */
- 
- /dts-v1/;
-+#include <dt-bindings/gpio/gpio.h>
- #include "mt2701.dtsi"
- 
- / {
-@@ -60,6 +61,20 @@
- 		>;
- 		default-brightness-level = <9>;
- 	};
-+
-+	extcon_usb: extcon_iddig {
-+		compatible = "linux,extcon-usb-gpio";
-+		id-gpio = <&pio 44 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	usb_vbus: regulator@0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&pio 45 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
- };
- 
- &auxadc {
-@@ -229,3 +244,9 @@
- &uart0 {
- 	status = "okay";
- };
-+
-+&usb2 {
-+	vbus-supply = <&usb_vbus>;
-+	extcon = <&extcon_usb>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index 180377e..495ece9 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -670,6 +670,40 @@
- 		};
- 	};
- 
-+	usb2: usb@11200000 {
-+		compatible = "mediatek,mt2701-musb",
-+				"mediatek,mtk-musb";
-+		reg = <0 0x11200000 0 0x1000>;
-+		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_LOW>;
-+		interrupt-names = "mc";
-+		phys = <&u2port2 PHY_TYPE_USB2>;
-+		phy-names = "usb2-phy";
-+		dr_mode = "otg";
-+		clocks = <&pericfg CLK_PERI_USB0>,
-+			 <&pericfg CLK_PERI_USB0_MCU>,
-+			 <&pericfg CLK_PERI_USB_SLV>;
-+		clock-names = "main","mcu","univpll";
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_IFR_MSC>;
-+		status = "disabled";
-+	};
-+
-+	u2phy0: usb-phy@11210000 {
-+		compatible = "mediatek,generic-tphy-v1";
-+		reg = <0 0x11210000 0 0x0800>;
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+		status = "okay";
-+
-+		u2port2: usb-phy@1a1c4800 {
-+			reg = <0 0x11210800 0 0x0100>;
-+			clocks = <&topckgen CLK_TOP_USB_PHY48M>;
-+			clock-names = "ref";
-+			#phy-cells = <1>;
-+			status = "okay";
-+		};
-+	};
-+
- 	ethsys: syscon@1b000000 {
- 		compatible = "mediatek,mt2701-ethsys", "syscon";
- 		reg = <0 0x1b000000 0 0x1000>;
--- 
-1.9.1
+> ---
+>  drivers/mmc/host/sdhci-esdhc-imx.c | 19 ++++++++++++++++++-
+>  1 file changed, 18 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> index d0d3193..75a2484 100644
+> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> @@ -138,7 +138,11 @@
+>  #define ESDHC_FLAG_HS200		BIT(8)
+>  /* The IP supports HS400 mode */
+>  #define ESDHC_FLAG_HS400		BIT(9)
+> -
+> +/* The IP has errata ERR010450
+> + * uSDHC: Due to the I/O timing limit, for SDR mode, SD card clock can't
+> + * exceed 150MHz, for DDR mode, SD card clock can't exceed 45MHz.
+> + */
+> +#define ESDHC_FLAG_ERR010450           BIT(10)
+>  /* A clock frequency higher than this rate requires strobe dll control */
+>  #define ESDHC_STROBE_DLL_CLK_FREQ	100000000
+>  
+> @@ -177,6 +181,12 @@ struct esdhc_soc_data {
+>  			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200,
+>  };
+>  
+> +static struct esdhc_soc_data usdhc_imx6ull_data = {
+> +	.flags = ESDHC_FLAG_USDHC | ESDHC_FLAG_STD_TUNING
+> +			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200
+> +			| ESDHC_FLAG_ERR010450,
+> +};
+> +
+>  static struct esdhc_soc_data usdhc_imx7d_data = {
+>  	.flags = ESDHC_FLAG_USDHC | ESDHC_FLAG_STD_TUNING
+>  			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200
+> @@ -227,6 +237,7 @@ struct pltfm_imx_data {
+>  	{ .compatible = "fsl,imx6sx-usdhc", .data = &usdhc_imx6sx_data, },
+>  	{ .compatible = "fsl,imx6sl-usdhc", .data = &usdhc_imx6sl_data, },
+>  	{ .compatible = "fsl,imx6q-usdhc", .data = &usdhc_imx6q_data, },
+> +	{ .compatible = "fsl,imx6ull-usdhc", .data = &usdhc_imx6ull_data, },
+>  	{ .compatible = "fsl,imx7d-usdhc", .data = &usdhc_imx7d_data, },
+>  	{ /* sentinel */ }
+>  };
+> @@ -733,6 +744,12 @@ static inline void esdhc_pltfm_set_clock(struct sdhci_host *host,
+>  		| ESDHC_CLOCK_MASK);
+>  	sdhci_writel(host, temp, ESDHC_SYSTEM_CONTROL);
+>  
+> +	if (imx_data->socdata->flags & ESDHC_FLAG_ERR010450) {
+> +		if (imx_data->is_ddr)
+> +			clock = clock > 45000000 ? 45000000 : clock;
+> +		else
+> +			clock = clock > 150000000 ? 150000000 : clock;
+> +
+>  	while (host_clock / (16 * pre_div * ddr_pre_div) > clock &&
+>  			pre_div < 256)
+>  		pre_div *= 2;
+> 
 
 
 _______________________________________________
