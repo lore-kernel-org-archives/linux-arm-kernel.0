@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3EDA9C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 00:44:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 50C23C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 00:44:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0DAAB214D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 00:44:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1D9D9214D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 27 Dec 2018 00:44:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lyxB4Wor"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0DAAB214D8
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Kil9E4wD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1D9D9214D8
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=zte.com.cn
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,44 +25,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
 	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=h4uqM+6sgPqGhhpTf1mNu0P2Jn/QYYvNU1w2X90kvOk=; b=lyx
-	B4WorH1JOS9JC1xYl1GubUNBtNVnElNDCteKgx1BFvaOqDO5YiaYhNz+GThmvU/0e8/VE/8etqhVL
-	EWoReZfY/QdQxgK6eXlOb1cgY51cwhNgBrwkrykvy9jInSmVe+KJdmsbtCPmIBxzReQIGb9uhfV3U
-	gJ3qCY4P8GCC28PNnE4Qg5Uz7EQf0dO2ys81cZQvyZL9JfHHIo4K3yc3KeIJB7KBCk2Chr1iIs6CI
-	FX1uffCaSx+TX47m3QGzLLybGQwjPyO7SBKVisbF1CpZEypg3VHSoLhSc2FJJPM3dgSqr/e0uaBFZ
-	YLKdMiBle76vmxCsxw6XBL6v+4SSdRQ==;
+	References:List-Owner; bh=PFEG8bdeNepD3vSWV+HlrtDImafnFlPLREszP4c9YhA=; b=Kil
+	9E4wDBIlWeHkT2d7IuROeenJDQ5nCqHmraHcKs06cl3s7SYTrO/mjoXUALMP4EecCdCaatJ4ARn6v
+	PJjL+qSzeNii2nFfYTyJDx+Cli9ivtxCAxgmGpbDU0seWEkuC82ulOmWcGnCstoe+sAJubwgj54BY
+	HwZaVD8FrJNq2aRxH8DzM36UYFacGfeqzjtrqqstYiBT5dKMekwgIISPgJ4T2/HD5wkJXxsnM6iCX
+	yUaMVPeOkIDR72fX9+IlqWuLnblRCMyB01uxdm5nRAIF7jez3bz4UIr3guW40wuToI2bT9xiVNu89
+	FnBiajOOkIY4NNyKcWRWSUHUeY6P4PA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gcJmU-00089Q-7n; Thu, 27 Dec 2018 00:44:10 +0000
+	id 1gcJn0-0008PF-Eo; Thu, 27 Dec 2018 00:44:42 +0000
 Received: from out1.zte.com.cn ([202.103.147.172] helo=mxct.zte.com.cn)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gcJmN-00087e-Sk
- for linux-arm-kernel@lists.infradead.org; Thu, 27 Dec 2018 00:44:07 +0000
+ id 1gcJmv-0008Lv-Fu
+ for linux-arm-kernel@lists.infradead.org; Thu, 27 Dec 2018 00:44:39 +0000
 Received: from mse01.zte.com.cn (unknown [10.30.3.20])
- by Forcepoint Email with ESMTPS id 2C70ED9DD21C710D2AB4;
- Thu, 27 Dec 2018 08:43:42 +0800 (CST)
+ by Forcepoint Email with ESMTPS id 2F6B128E61222EFC2C8F;
+ Thu, 27 Dec 2018 08:44:26 +0800 (CST)
 Received: from notes_smtp.zte.com.cn ([10.30.1.239])
- by mse01.zte.com.cn with ESMTP id wBR0ha63080408;
- Thu, 27 Dec 2018 08:43:36 +0800 (GMT-8)
+ by mse01.zte.com.cn with ESMTP id wBR0iFFT081323;
+ Thu, 27 Dec 2018 08:44:15 +0800 (GMT-8)
  (envelope-from peng.hao2@zte.com.cn)
 Received: from localhost.localdomain.localdomain ([10.74.120.59])
  by szsmtp06.zte.com.cn (Lotus Domino Release 8.5.3FP6)
- with ESMTP id 2018122708440271-18985685 ;
- Thu, 27 Dec 2018 08:44:02 +0800 
+ with ESMTP id 2018122708444218-18985965 ;
+ Thu, 27 Dec 2018 08:44:42 +0800 
 From: Peng Hao <peng.hao2@zte.com.cn>
 To: christoffer.dall@arm.com, marc.zyngier@arm.com
-Subject: [PATCH]  kvm:arm/arm64: vgic: remove unnecessary semicolon
-Date: Thu, 27 Dec 2018 09:04:27 +0800
-Message-Id: <1545872667-82509-1-git-send-email-peng.hao2@zte.com.cn>
+Subject: [PATCH]  kvm: arm/arm64 : vgic: remove unneeded semicolon
+Date: Thu, 27 Dec 2018 09:05:08 +0800
+Message-Id: <1545872708-82583-1-git-send-email-peng.hao2@zte.com.cn>
 X-Mailer: git-send-email 1.8.3.1
 X-MIMETrack: Itemize by SMTP Server on SZSMTP06/server/zte_ltd(Release
- 8.5.3FP6|November 21, 2013) at 2018-12-27 08:44:02,
+ 8.5.3FP6|November 21, 2013) at 2018-12-27 08:44:42,
  Serialize by Router on notes_smtp/zte_ltd(Release 9.0.1FP7|August  17, 2016) at
- 2018-12-27 08:43:24, Serialize complete at 2018-12-27 08:43:24
-X-MAIL: mse01.zte.com.cn wBR0ha63080408
+ 2018-12-27 08:44:04, Serialize complete at 2018-12-27 08:44:04
+X-MAIL: mse01.zte.com.cn wBR0iFFT081323
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181226_164404_087023_D22172EF 
-X-CRM114-Status: GOOD (  11.08  )
+X-CRM114-CacheID: sfid-20181226_164437_689797_03F0D92D 
+X-CRM114-Status: GOOD (  11.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,26 +82,26 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Remove unnecessary semicolon in vgic_put_irq.
+Remove unneeded semicolon in kvm_vgic_hyp_init.
 
 Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
 ---
- virt/kvm/arm/vgic/vgic.c | 2 +-
+ virt/kvm/arm/vgic/vgic-init.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 7cfdfbc..f9ff5c7 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -142,7 +142,7 @@ void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq)
- 	if (!kref_put(&irq->refcount, vgic_irq_release)) {
- 		spin_unlock_irqrestore(&dist->lpi_list_lock, flags);
- 		return;
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index c0c0b88..3496155 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -510,7 +510,7 @@ int kvm_vgic_hyp_init(void)
+ 		break;
+ 	default:
+ 		ret = -ENODEV;
 -	};
 +	}
  
- 	list_del(&irq->lpi_list);
- 	dist->lpi_list_count--;
+ 	if (ret)
+ 		return ret;
 -- 
 1.8.3.1
 
