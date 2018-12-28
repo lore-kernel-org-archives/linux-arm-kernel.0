@@ -2,57 +2,90 @@ Return-Path: <SRS0=Tyfh=PF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B2AE2C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 20:46:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CF082C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 21:39:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7C96A20866
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 20:46:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9D40F20861
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 21:39:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KVbUAyFy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7C96A20866
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ucw.cz
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Zvcjahup";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="WMLKpvwM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9D40F20861
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=BJLo1DjIy1YriHiqp05aME8uuswpqXWW/7W5mnY6Lf0=; b=KVbUAyFyV991aPtzE/kVU0rqf
-	ao45NnJtyt3siTZ+AWWYIB4/Y2468qIko98748JbWbv7OAtrd16clnqfZ5CfKSpM4be2IvsJiTgSK
-	KyUM0jdjZJKGzX32ifUrvyAI3szsW42omngFLnijCLHGhCVhJfvwEH1MTaD2TNlCUGrzj2VLyS7lS
-	FSHm3mHX+iCqBC21d8Q3t2ydWtF9JDTCTwR8XoxHHT6s2GUyYePDJ33fOUQITF50gRqQstcgrRbLq
-	4iQhDG70hs5+yjR/rPwf9TU9puZPoXz4Oqddq/kapyXhisoLbc3fJq4bUDYXjv99Wu7IF/QmBXUDy
-	dcJKDpPiw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:Date:In-Reply-To:From:Subject:
+	References:Message-ID:To:MIME-Version:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=7rLCfYDiJIUdm8Cw1ZkqVzNTNvmHzrU6QD9CyymKaRQ=; b=Zvcjahupys+ZT/
+	3zxhJvpMgQt1cuh+/ySXjO5BrpRXXQFvpNkfPSbL9L+kRfaNVdztg68GHQ/mL50dM/8g74g9MJSbD
+	ME/++zLhTxrtd6aPnkvAr1dnmOW9vIuJNHL7yxzuFSoOrdwgG2Hml9zcazLlBBF8vYKlplMbqpktJ
+	wSjN5/AWNS3D3qwJbVDS1uHd1bDEXzKlMT8wbtT4tvz0r3FegRd32v0iThEtXtTrl9Jkhddicn34r
+	h5b1hgjPQI0P1pclAYaPFA1R7fLRzshbghCa13HgqOODnU+GIN1UBIjBBSc7+1Y96laSCYj9m2r7L
+	SR0kUL6eYkG9VLgvRJBA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gcz1i-0007Dt-0W; Fri, 28 Dec 2018 20:46:38 +0000
-Received: from atrey.karlin.mff.cuni.cz ([195.113.26.193])
+	id 1gczq9-0006Hj-8A; Fri, 28 Dec 2018 21:38:45 +0000
+Received: from mail-pg1-x541.google.com ([2607:f8b0:4864:20::541])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gcz1d-0007D7-1I
- for linux-arm-kernel@lists.infradead.org; Fri, 28 Dec 2018 20:46:35 +0000
-Received: by atrey.karlin.mff.cuni.cz (Postfix, from userid 512)
- id 42CFB80648; Fri, 28 Dec 2018 21:46:10 +0100 (CET)
-Date: Fri, 28 Dec 2018 21:46:14 +0100
-From: Pavel Machek <pavel@ucw.cz>
-To: Tony Lindgren <tony@atomide.com>
-Subject: Re: WIP Droid 4 voice calls, GNSS & PM with a TS 27.010 serdev driver
-Message-ID: <20181228204614.GA9431@amd>
-References: <20181217004450.GW6707@atomide.com> <20181227101647.GA32260@amd>
- <20181228193105.GW6707@atomide.com>
+ id 1gczq4-0006Gv-Ev
+ for linux-arm-kernel@lists.infradead.org; Fri, 28 Dec 2018 21:38:42 +0000
+Received: by mail-pg1-x541.google.com with SMTP id y4so10488338pgc.12
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 28 Dec 2018 13:38:29 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=mime-version:content-transfer-encoding:to:message-id:references
+ :subject:cc:from:user-agent:in-reply-to:date;
+ bh=NLDRg8d3P3g0015PxnCaL0q7vIF2U2AakIDHRtQEgcM=;
+ b=WMLKpvwMb+vkyQWUm24xoSbGH6GsvRBrNeY4IZ8EJnN2uD4d6jYbV0pfLa57wmO5m5
+ hG7vbl8fPOBZbg5fRrysph0bLPC4Gp5js9hpXb/A4KaLiIF/hi/3Z1/mE+fIq3XUoGWz
+ RMKaVKDFdRWhVbWYtndw8uO0AJ4SmdVw7/2c4=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:content-transfer-encoding:to
+ :message-id:references:subject:cc:from:user-agent:in-reply-to:date;
+ bh=NLDRg8d3P3g0015PxnCaL0q7vIF2U2AakIDHRtQEgcM=;
+ b=OFH6o1hcDwOJUBcELLg9A21XbBszIoxMP7oirLaiaGORdEy5aN24Sh4JMLa9POxLfH
+ AQmfP5ajE88XfQ4QQpaNAF0l0CXzk8DrVt9HwPb7W3xrcREl7GF4tNyE0syL/ZCVO+aF
+ rpyBaCvaYhGiIDSxSCnrMo3S+/jurGHUIUVKXXz9JlaokJoeOpgWhTC9P0xnB0vJlFx4
+ lhEM5JbsA3LD0gy6xZa8outFIJoDfntC2zXFRGajAVc8PQNU5oov3MUWAuitC+vMuzE8
+ Z9p7cnvNmxczzw/oiLTspBE7A1b9jReKmRufczgvzxOBT4FgrcJ8M6CtcnwXu5JE+dFM
+ LjPQ==
+X-Gm-Message-State: AA+aEWZXFvEV9HDU2VwRIlhvTuLndC5JHK0Vr/3qUmnC+X2DaRuqC6A5
+ YskMYPj9hgHsvYAodNj5speB2A==
+X-Google-Smtp-Source: AFSGD/XqPjsUb/JfrS+qCKtXNHaLkd+ERTq3bD6qUBzo0Fh7aqQvuKQ+qt2qm3y/fftdftZw605qJw==
+X-Received: by 2002:a62:1d4c:: with SMTP id d73mr29863361pfd.90.1546033109141; 
+ Fri, 28 Dec 2018 13:38:29 -0800 (PST)
+Received: from localhost ([2620:15c:202:1:fa53:7765:582b:82b9])
+ by smtp.gmail.com with ESMTPSA id s9sm57225203pgl.88.2018.12.28.13.38.28
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 28 Dec 2018 13:38:28 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20181228193105.GW6707@atomide.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+To: Raju P L S S S N <rplsssn@codeaurora.org>, andy.gross@linaro.org,
+ david.brown@linaro.org, linux-arm-msm@vger.kernel.org,
+ linux-soc@vger.kernel.org
+Message-ID: <154603310752.179992.9262815873457262616@swboyd.mtv.corp.google.com>
+References: <20181221115946.10095-1-rplsssn@codeaurora.org>
+ <20181221115946.10095-4-rplsssn@codeaurora.org>
+ <154546438942.179992.14851496143150245966@swboyd.mtv.corp.google.com>
+ <504cae51-0f35-beb8-496b-a335863a9071@codeaurora.org>
+Subject: Re: [PATCH RFC 3/5] dt-bindings: Add PDC timer bindings for Qualcomm
+ SoCs
+From: Stephen Boyd <swboyd@chromium.org>
+User-Agent: alot/0.8
+In-Reply-To: <504cae51-0f35-beb8-496b-a335863a9071@codeaurora.org>
+Date: Fri, 28 Dec 2018 13:38:27 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181228_124633_385777_A0688884 
-X-CRM114-Status: GOOD (  22.48  )
+X-CRM114-CacheID: sfid-20181228_133840_941469_7625CFA8 
+X-CRM114-Status: GOOD (  24.84  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -64,135 +97,119 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>, Marcel Partap <mpartap@gmx.net>,
- Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>, omerlle@gmail.com,
- Merlijn Wajer <merlijn@wizzup.org>, linux-kernel@vger.kernel.org,
- Johan Hovold <johan@kernel.org>, Peter Ujfalusi <peter.ujfalusi@ti.com>,
- NeKit <nekit1000@gmail.com>, linux-arm-kernel@lists.infradead.org,
- Michael Scott <hashcode0f@gmail.com>, Sebastian Reichel <sre@kernel.org>,
- linux-omap@vger.kernel.org, Jarkko Nikula <jarkko.nikula@bitmer.com>
-Content-Type: multipart/mixed; boundary="===============0945645865316040384=="
+Cc: devicetree@vger.kernel.org, rnayak@codeaurora.org, linux-pm@vger.kernel.org,
+ dianders@chromium.org, evgreen@chromium.org, linux-kernel@vger.kernel.org,
+ mka@chromium.org, ilina@codeaurora.org, bjorn.andersson@linaro.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Quoting Raju P L S S S N (2018-12-26 01:44:43)
+> 
+> 
+> On 12/22/2018 1:09 PM, Stephen Boyd wrote:
+> >> +If an RSC needs to program next wake-up in the PDC timer, it must specify the
+> >> +binding as child node with the following properties:
+> >> +
+> >> +Properties:
+> >> +- compatible:
+> >> +    Usage: required
+> >> +       Value type: <string>
+> >> +       Definition: must be "qcom,pdc-timer".
+> >> +
+> >> +- reg:
+> >> +    Usage: required
+> >> +       Value type: <prop-encoded-array>
+> >> +       Definition: Specifies the offset of the control register.
+> >> +
+> >>   Example 1:
+> >>   
+> >>   For a TCS whose RSC base address is is 0x179C0000 and is at a DRV id of 2, the
+> >> @@ -103,6 +123,9 @@ TCS-OFFSET: 0xD00
+> >>                        <0x179d0000 0x10000>,
+> >>                        <0x179e0000 0x10000>;
+> >>                  reg-names = "drv-0", "drv-1", "drv-2";
+> >> +               #address-cells = <1>;
+> >> +               #size-cells = <1>;
+> >> +               ranges;
+> >>                  interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
+> >>                               <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
+> >>                               <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
+> >> @@ -112,6 +135,12 @@ TCS-OFFSET: 0xD00
+> >>                                    <SLEEP_TCS   3>,
+> >>                                    <WAKE_TCS    3>,
+> >>                                    <CONTROL_TCS 1>;
+> >> +
+> >> +               pdc_timer@38 {
+> >> +                       compatible = "qcom,pdc-timer";
+> >> +                       reg = <0x38 0x1>,
+> >> +                             <0x40 0x1>;
+> > I don't understand this whole binding. Why can't the pdc timer be
+> > programmed within the rpmh driver? This looks like a node is being added
+> > as a child just to make a platform driver and device match up in the
+> > linux kernel. And that in turn causes a regmap to need to be created?
+> > Sorry, it just looks really bad.
+> 
+> 
+> There are two RSC devices in SoC one for application processor subsystem 
+> & other display subsystem. Both RSC contain registers for PDC timers 
+> (one for each subsystem).
 
---===============0945645865316040384==
-Content-Type: multipart/signed; micalg=pgp-sha1;
-	protocol="application/pgp-signature"; boundary="uAKRQypu60I7Lcqm"
-Content-Disposition: inline
+When is the timer programmed on the display subsystem's RSC? It's hard
+to give advice without all the information.
 
+> But only for application processor the PDC 
+> timer needs to be programmed when application processor enters 
+> sleep/suspend. As the driver is common between both RSC devices, this 
+> approach is taken. Do you have any other suggestions to distinguish 
+> between the two? Perhaps, by additional compatible string?
+> 
 
---uAKRQypu60I7Lcqm
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Maybe compatible? I sort of doubt it though. Do all RSCs have a PDC
+timer?
 
-Hi!
+I would think that it would make sense for the application processor's
+RSC timer to be programmed from the broadcast timer mechanism in the
+kernel so that timers during idle work and suspend turns off the timer
+appropriately with a shutdown hook. I guess the PDC can't tell you the
+time though? It looks like a shadow (and limited) version of the ARM
+architected MMIO timer that we already program for the broadcast timer
+mechanism. Is that because even the MMIO timer can't wakeup the system
+in deep idle?  Assuming that's true, it means the ARM MMIO timer can't
+always be used as the system wide broadcast mechanism because we need to
+augment it with the PDC timer to get the actual wakeup.
 
-> Yeah so I found that Ruby pdu_tools module allows decoding PDUs
-> properly while I did not have much luck with other tools.
->=20
-> So I wrote a hasty script to read SMS, copy it to a Maildir and
-> then ack it:
->=20
-> https://github.com/tmlind/droid4-sms-tools
+Maybe we should be adding hooks into the broadcast timer mechanism to
+program this wakeup event hardware in addition to the ARM MMIO timer. Or
+we should stop using the ARM MMIO timer on these systems and read the
+system register based physical time in the RSC timer driver and register
+this 64-bit PDC register as the broadcast timer. So the time reading
+would be through sysreg and the wakeup programming would be done by
+writing the PDC timer. The assumption would be that we have access to
+the physical time registers (which sounds like the assumption we have to
+make).
 
-Aha, that was quick :-). Interesting, let me take a look.
+Do we get an interrupt somewhere from the RSC hardware when the timer
+fires? Or does that just cause a system wakeup event without any pending
+irq and then another irq (like the ARM architected timer) just happens
+to be pending around the same time? If we get an interrupt somehow then
+I would prefer to drop the ARM MMIO timer and do this hybrid broadcast
+timer approach.
 
-> > Proper solution involves special support for ofonod...
->=20
-> Yeah at least we're dealing with standard PDU format now for
-> incoming SMS.
->=20
-> Also looks like there is no status on the modem for these incoming
-> messages as checked with mmcli. I guess the idea with raw PDU
-> access is that the message is delivered directly to the client
-> and then acked instead of being queued in the modem?
-
-I'm not sure what "directly" and "client" is here, but yes, it seems
-that motmdm9 just delivers messages, and if you don't ack them,
-network will just keep retransmitting the message.
-
-> > Fortunately ttyUSB4 still works, so I can still use my old code... and
-> > I started logging motmdm1 and 9 to a file as a backup... that should
-> > be better than my existing solution. (But I don't get power benefits
-> > etc.)
->=20
-> So what are you using to ack the received SMS over ttyUSB4?
-
-I have ofone with direct AT access --
-https://github.com/pavelmachek/unicsy_demo/blob/master/ofone/at.py .
-
-And then better solution using ofone + ofonod.
-
-https://github.com/maemo-leste/bugtracker/issues/150
-
-Now, ttyUSB4 provides quite a rich interface, and you can actually
-select what if you want messages in text and PDU format, and if you
-want modem to auto-acknowledge messages for you.
-
-(But I don't think all options work).
-
-It may be even possible to select if you want the messages to be
-queued or delivered directly.
-
-> My logs show that Android uses two different commands for ack.
-> Either AT+GCNMA=3D1 or AT+CNMA=3D0,0 gets used depending on something
-> that I have no idea of.. Maybe the network connected?
-
-Not sure what goes on there.
-
-> Sending SMS via /dev/motmdm3 needs move investigation, but at
-> least ModemManager mmcli can be used to create and send SMS.
->=20
-> Hmm or what are you using to send SMS over ttyUSB4?
-> I think you already replied with some of that info earlier
-> but I can't find it..
-
-Same as above -- in text mode sending messages is very easy (can be
-done by hand in minicom, or at.py can do it), and ofonod can already
-do PDU encoding etc.
-
-> Oh one more thing, I noticed that on /dev/motmdm1, typing
-> AT+SCRN=3D0 supresses notifications except for WAKEUP, and then
-> 1 is used to enable them again. That allows the UART to idle
-> instead of getting network status messages every few seconds :)
-
-What kind of battery life do you get with all the optimalizations?
-IIRC I was getting 7h with ttyUSB4 in use...
-
-Best regards,
-									Pavel
---=20
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blo=
-g.html
-
---uAKRQypu60I7Lcqm
-Content-Type: application/pgp-signature; name="signature.asc"
-Content-Description: Digital signature
-
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iEYEARECAAYFAlwmi5YACgkQMOfwapXb+vI2+wCgtsn0dqWzuSNmTJ3PVOBlu5aW
-X7wAn1KV/kVHN+45c6CD9RStnD34mPyj
-=5X3+
------END PGP SIGNATURE-----
-
---uAKRQypu60I7Lcqm--
-
-
---===============0945645865316040384==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+How the RSC is used in general by other devices, like display, is not
+clear to me. We don't have a "wakeup event" framework in the kernel that
+device drivers like the display driver can grab a reference to and
+program some system wide wakeup for. That sounds like something new that
+could be handled entirely in the display driver with direct register
+writes, or it could be some qcom specific API/framework that eventually
+calls down into the same RSC driver that knows what offsets to write
+into in the display RSC's register space, or it could be an entirely
+generic framework like clk or regulator frameworks that could be used by
+anything. BTW, are we using the display RSC yet?
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============0945645865316040384==--
-
