@@ -2,74 +2,67 @@ Return-Path: <SRS0=Tyfh=PF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DD96DC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 06:39:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 98858C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 07:38:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9F7CF208E4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 06:39:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6763C2146F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 07:38:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K2JNOIH9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9F7CF208E4
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ogCWEhR8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6763C2146F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=kylinos.cn
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=JAzS1B0j5zsrzjaJkCp/NoHaBDgK3sEdRAEAksbyVCU=; b=K2JNOIH9zj4/c6zOGQDljcke+
-	K37zXd+KkJaaMkTJXEfSnur/r9pvGglN/6Jnn9HSjXtRC3gyHBgyQnpUp1Gd9tR53Mxykq03cnomC
-	EMJDKan6UaXY7/0he3FcQQalDZL0UYxPN9d7Qa8bb7wh9kEkEbLj4DRcpLoEMS+w9sZQkZW9G7ROF
-	O0a7ns/NTpTmS5E9y6xC9hYZfUFhi2Brm7K//YKTwDAdj3I0BIuoadzLtVq2Ogghghw2wGg4ZjBtP
-	vkNulyP/xd/UmpoV/zYPXh6j0NuFhMrXZ8uUCEp467CY9Ie3QBq1lR5KIWBbkz+VgN/8KrtNiFvGo
-	g5lzlnOSg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=pUkQiNq3m1QoeEhqE3a0G/+JyXKcPVbbHUfPrr8N0Ao=; b=ogCWEhR8OI+1ke
+	qGRBSsS9Skt4Pv/5tYX07gNEb1jjN1IcPEDtbP/KlqY1zGVDZbq3agKLvZwC+4GDBSn+xP8qhQMLf
+	Tcd2huvogj+FPGSLvc2B1qtiiGXse/TbtXGLe9mJQrTVedAD1SaNJunShDUH1cWT+7lCHaHkOqLUa
+	17aVFO0PN/wlS4YIdXiWrLUfENvA2tBs6shHK2BJ7fN6m0MbvfLOwZ11fr3ETQy1WCtJSv/vXOLah
+	fDAOOc6giml+eGQBI3676DVtO7vqb3kXe3gHKBHkLAeuxCGX5lltXlTiW7QU0P4TWDL8Pu/nwbNxu
+	v+c0DaxnH8dEp8eyQ96Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gcloC-0004Wk-RN; Fri, 28 Dec 2018 06:39:48 +0000
-Received: from mx.socionext.com ([202.248.49.38])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gclne-0003tG-P3
- for linux-arm-kernel@lists.infradead.org; Fri, 28 Dec 2018 06:39:21 +0000
-Received: from unknown (HELO kinkan-ex.css.socionext.com) ([172.31.9.52])
- by mx.socionext.com with ESMTP; 28 Dec 2018 15:38:59 +0900
-Received: from mail.mfilter.local (m-filter-2 [10.213.24.62])
- by kinkan-ex.css.socionext.com (Postfix) with ESMTP id 0D8C21800F6;
- Fri, 28 Dec 2018 15:39:00 +0900 (JST)
-Received: from 172.31.9.53 (172.31.9.53) by m-FILTER with ESMTP;
- Fri, 28 Dec 2018 15:38:59 +0900
-Received: from yuzu.css.socionext.com (yuzu [172.31.8.45])
- by iyokan.css.socionext.com (Postfix) with ESMTP id B1C6C40221;
- Fri, 28 Dec 2018 15:38:59 +0900 (JST)
-Received: from [127.0.0.1] (unknown [10.213.119.83])
- by yuzu.css.socionext.com (Postfix) with ESMTP id 95260121BF2;
- Fri, 28 Dec 2018 15:38:59 +0900 (JST)
-Subject: Re: [PATCH 07/14] clock: milbeaut: Add Milbeaut M10V clock control
-To: Stephen Boyd <sboyd@kernel.org>, devicetree@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-clk@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-serial@vger.kernel.org
-References: <1542589274-13878-1-git-send-email-sugaya.taichi@socionext.com>
- <1542589274-13878-8-git-send-email-sugaya.taichi@socionext.com>
- <154356669840.88331.4455990896653868594@swboyd.mtv.corp.google.com>
- <9fba4689-b20f-c18a-ea11-d961de497ea3@socionext.com>
- <154595756614.179992.794211301759568891@swboyd.mtv.corp.google.com>
-From: "Sugaya, Taichi" <sugaya.taichi@socionext.com>
-Message-ID: <0c8db56a-6738-e003-5088-0c13588f695a@socionext.com>
-Date: Fri, 28 Dec 2018 15:38:58 +0900
-User-Agent: Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101
- Thunderbird/60.3.3
+	id 1gcmj3-000651-88; Fri, 28 Dec 2018 07:38:33 +0000
+Received: from smtpbgau1.qq.com ([54.206.16.166])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gcmiy-00063t-QQ
+ for linux-arm-kernel@lists.infradead.org; Fri, 28 Dec 2018 07:38:31 +0000
+X-QQ-mid: bizesmtp12t1545982665t7nrb338
+Received: from hhtrace-pc.localdomain (unknown [210.22.22.130])
+ by esmtp6.qq.com (ESMTP) with 
+ id ; Fri, 28 Dec 2018 15:37:41 +0800 (CST)
+X-QQ-SSF: 01400000002000F0FF32000A0000000
+X-QQ-FEAT: x4sLw9LeY+a6c8l1PkBEh+C+0gbA+aUyeOjp2pc07qx5Jc2fR4K8t1KIDTYcX
+ OD16VIiR4INYT9M+E/7IQC/d9RxDhBs4u2GpPWDE7elbhPhEUvqb95UITN10myegaUl08AZ
+ 9BISQktB/WdDNLmoz70nVbl59QN/Ed5HGbrs/1mVIOENsUlVdaQjIcc64YjtGssdbNfDS3Q
+ XJzv03K6ZHqJnedNv07JXo3lXW8R/gcE1MeRnBFxFsvTd0Ex8WZY3VMYuCI/WCxiddvZpxn
+ 6zoS1lrjJC5vnRiArO/udcupqALhZbSU+fByHD5fUX24j+
+X-QQ-GoodBg: 2
+From: huhai <huhai@kylinos.cn>
+To: will.deacon@arm.com,
+	catalin.marinas@arm.com
+Subject: [PATCH] arm64/lib: add accelerated do_csum for arm64
+Date: Fri, 28 Dec 2018 15:37:39 +0800
+Message-Id: <20181228073739.13169-1-huhai@kylinos.cn>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-In-Reply-To: <154595756614.179992.794211301759568891@swboyd.mtv.corp.google.com>
-Content-Language: en-US
+X-QQ-SENDSIZE: 520
+Feedback-ID: bizesmtp:kylinos.cn:qybgforeign:qybgforeign4
+X-QQ-Bgrelay: 1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181227_223915_697533_F06F1BC4 
-X-CRM114-Status: GOOD (  26.86  )
+X-CRM114-CacheID: sfid-20181227_233829_218006_24F4A19D 
+X-CRM114-Status: GOOD (  16.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,83 +74,203 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Masami Hiramatsu <masami.hiramatsu@linaro.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Michael Turquette <mturquette@baylibre.com>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- Russell King <linux@armlinux.org.uk>, Jassi Brar <jaswinder.singh@linaro.org>,
- Rob Herring <robh+dt@kernel.org>, Jiri Slaby <jslaby@suse.com>,
- Thomas Gleixner <tglx@linutronix.de>
+Cc: liuyun01@kylinos.cn, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, huhai <huhai@kylinos.cn>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi
+do_csum() in lib/checksum.c is too slow in ARM64,
+and we can use assembly and algorithm to accelerate it.
 
-On 2018/12/28 9:39, Stephen Boyd wrote:
-> Quoting Sugaya, Taichi (2018-12-25 17:35:27)
->> Hi
->>
->> On 2018/11/30 17:31, Stephen Boyd wrote:
->>>> +       init.num_parents = parents;
->>>> +       init.parent_names = parent_names;
->>>> +
->>>> +       mcm->cname = clk_name;
->>>> +       mcm->parent = 0;
->>>> +       mcm->hw.init = &init;
->>>> +
->>>> +       clk = clk_register(NULL, &mcm->hw);
->>>> +       if (IS_ERR(clk))
->>>> +               goto err_clk;
->>>> +
->>>> +       of_clk_add_provider(node, of_clk_src_simple_get, clk);
->>>> +       return;
->>>> +
->>>> +err_clk:
->>>> +       kfree(mcm);
->>>> +err_mcm:
->>>> +       kfree(parent_names);
->>>> +}
->>>> +CLK_OF_DECLARE(m10v_clk_mux, "socionext,milbeaut-m10v-clk-mux",
->>>> +                       m10v_clk_mux_setup);
->>>
->>> Any chance you can use a platform driver?
->>>
->>
->> Excuse me to re-ask you.
->> Why do you recommend to use a platform driver? Is that current fad?
-> 
-> Not exactly a fad. We've been doing it for some time now. From an older
-> email on the list:
-> 
-> Reasons (in no particular order):
-> 
->    1. We get a dev pointer to use with clk_hw_register()
-> 
->    2. We can handle probe defer if some resource is not available
-> 
->    3. Using device model gets us a hook into power management frameworks
->       like runtime PM and system PM for things like suspend and hibernate
-> 
->    4. It encourages a single DT node clk controller style binding
->       instead of a single node per clk style binding
-> 
->    5. We can use non-DT specific functions like devm_ioremap_resource() to map
->       registers and acquire other resources, leading to more portable and
->       generic code
-> 
->    6. We may be able to make the device driver a module, which will
->       make distros happy if we don't have to compile in all
->       these clk drivers to the resulting vmlinux
-> 
+Signed-off-by: huhai <huhai@kylinos.cn>
+---
+ arch/arm64/include/asm/checksum.h |   3 +
+ arch/arm64/lib/Makefile           |   2 +-
+ arch/arm64/lib/checksum.c         | 144 ++++++++++++++++++++++++++++++
+ 3 files changed, 148 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/lib/checksum.c
 
-Great thanks for answering. I strongly understand.
-#It takes a bit of time to send v2.
+diff --git a/arch/arm64/include/asm/checksum.h b/arch/arm64/include/asm/checksum.h
+index 0b6f5a7d4027..0d7b80fb300e 100644
+--- a/arch/arm64/include/asm/checksum.h
++++ b/arch/arm64/include/asm/checksum.h
+@@ -26,6 +26,9 @@ static inline __sum16 csum_fold(__wsum csum)
+ }
+ #define csum_fold csum_fold
+ 
++#define do_csum do_csum
++unsigned int do_csum(const unsigned char *buff, unsigned int len);
++
+ static inline __sum16 ip_fast_csum(const void *iph, unsigned int ihl)
+ {
+ 	__uint128_t tmp;
+diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
+index 69ff9887f724..4134730a121b 100644
+--- a/arch/arm64/lib/Makefile
++++ b/arch/arm64/lib/Makefile
+@@ -1,5 +1,5 @@
+ # SPDX-License-Identifier: GPL-2.0
+-lib-y		:= clear_user.o delay.o copy_from_user.o		\
++lib-y		:= checksum.o clear_user.o delay.o copy_from_user.o	\
+ 		   copy_to_user.o copy_in_user.o copy_page.o		\
+ 		   clear_page.o memchr.o memcpy.o memmove.o memset.o	\
+ 		   memcmp.o strcmp.o strncmp.o strlen.o strnlen.o	\
+diff --git a/arch/arm64/lib/checksum.c b/arch/arm64/lib/checksum.c
+new file mode 100644
+index 000000000000..6931ef13ef87
+--- /dev/null
++++ b/arch/arm64/lib/checksum.c
+@@ -0,0 +1,144 @@
++/*
++ * arch/arm64/lib/checksum.c
++ *
++ * This file contains network checksum routines that are better done
++ * in an architecture-specific manner due to speed.
++ *
++ * Acknowledgements:
++ * This file is based on arch/x86/lib/csum-partial_64.c and
++ * arch/alpha/lib/checksum.c, which was written by Thomas Gleixner
++ * and Rick Gorton respectively.
++ */
++
++#include <linux/compiler.h>
++#include <linux/module.h>
++#include <asm/checksum.h>
++
++static inline unsigned short from64to16(unsigned long x)
++{
++	/* Using extract instructions is a bit more efficient
++	 * than the original shift/bitmask version.
++	 */
++
++	union {
++		unsigned long   ul;
++		unsigned int    ui[2];
++		unsigned short  us[4];
++	} in_v, tmp_v, out_v;
++
++	in_v.ul = x;
++	tmp_v.ul = (unsigned long) in_v.ui[0] + (unsigned long) in_v.ui[1];
++
++	/* Since the bits of tmp_v.sh[3] are going to always be zero,
++	 * we don't have to bother to add that in.
++	 */
++	out_v.ul = (unsigned long) tmp_v.us[0] + (unsigned long) tmp_v.us[1]
++			+ (unsigned long) tmp_v.us[2];
++
++	/* Similarly, out_v.us[2] is always zero for the final add.  */
++	return out_v.us[0] + out_v.us[1];
++}
++
++/*
++ * Do a 64-bit checksum on an arbitrary memory area.
++ * Returns a 16bit checksum.
++ */
++unsigned int do_csum(const unsigned char *buff, unsigned len)
++{
++	unsigned odd, count;
++	unsigned long result = 0;
++
++	if (unlikely(len == 0))
++		return result;
++	odd = 1 & (unsigned long) buff;
++	if (odd) {
++		result = *buff << 8;
++		len--;
++		buff++;
++	}
++	count = len >> 1;		/* nr of 16-bit words.. */
++	if (count) {
++		if (2 & (unsigned long) buff) {
++			result += *(unsigned short *)buff;
++			count--;
++			len -= 2;
++			buff += 2;
++		}
++		count >>= 1;		/* nr of 32-bit words.. */
++		if (count) {
++			unsigned long zero;
++			unsigned long tmp1;
++			unsigned count64;
++
++			if (4 & (unsigned long) buff) {
++				result += *(unsigned int *) buff;
++				count--;
++				len -= 4;
++				buff += 4;
++			}
++			count >>= 1;	/* nr of 64-bit words.. */
++
++			/* main loop using 64byte blocks */
++			zero = 0;
++			count64 = count >> 3;
++			while (count64) {
++				__asm__ __volatile__(
++					"ldr %x3, [%x1, #0]\n"
++					"adds %x0, %x0, %x3\n"
++					"ldr %x3, [%x1, #8]\n"
++					"adcs %x0, %x0, %x3\n"
++					"ldr %x3, [%x1, #16]\n"
++					"adcs %x0, %x0, %x3\n"
++					"ldr %x3, [%x1, #24]\n"
++					"adcs %x0, %x0, %x3\n"
++					"ldr %x3, [%x1, #32]\n"
++					"adcs %x0, %x0, %x3\n"
++					"ldr %x3, [%x1, #40]\n"
++					"adcs %x0, %x0, %x3\n"
++					"ldr %x3, [%x1, #48]\n"
++					"adcs %x0, %x0, %x3\n"
++					"ldr %x3, [%x1, #56]\n"
++					"adcs %x0, %x0, %x3\n"
++					"adcs %x0, %x0, %x2\n"
++					: "=r" (result)
++					: "r" (buff), "r" (zero), "r" (tmp1), "0" (result)
++					: "cc", "memory");
++
++				buff += 64;
++				count64--;
++			}
++
++			/* last up to 7 8byte blocks */
++			count %= 8;
++
++			while (count) {
++				__asm__ __volatile__(
++					"adds %x0, %x0, %x1\n"
++					"adcs %x0, %x0, %x2\n"
++					: "=r" (result)
++					: "r" (*(unsigned long *)buff), "r" (zero), "0" (result)
++					: "cc", "memory");
++				--count;
++				buff += 8;
++			}
++			result = (result & 0xffffffff) + (result >> 32);
++
++			if (len & 4) {
++				result += *(unsigned int *) buff;
++				buff += 4;
++			}
++		}
++		if (len & 2) {
++			result += *(unsigned short *) buff;
++			buff += 2;
++		}
++	}
++	if (len & 1)
++		result += *buff;
++
++	result = from64to16(result);
++	if (odd)
++		result = ((result >> 8) & 0xff) | ((result & 0xff) << 8);
++
++	return result;
++}
+-- 
+2.20.1
 
-Best Regards,
-Sugaya Taichi
+
 
 
 _______________________________________________
