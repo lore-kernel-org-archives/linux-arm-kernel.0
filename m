@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2B40BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 08:12:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DBD3AC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 08:12:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ED7AE2146F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 08:12:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8C6512146F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 08:12:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EY7JY1To"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ED7AE2146F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DCimdKyq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8C6512146F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,49 +25,47 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=l0QyBKPlVkQ+gAGxsOrLYUWfihhjJYyHh+WHjGy3Gww=; b=EY7JY1To8JleJv
-	PzcUAfscJk2/5jCYyfCP4yrWEpJJ5/Ze1oaT4WG/ssgDLWs/7mIW1/aQ1ujVR+qLYsz7+X5Wt3TsQ
-	fb3pZeXLso0OG9DFQ1yYOotWI90p3kwV4FbxYNZ8btO5VCjKka0Cf5SywVzDpB7EVgsUWJWuZ5ZQc
-	ADQUNe1f5PQ685PsCcRwcoaU22pvGJOtnLgnsom5/v/9Ya88S3wxZCIwnhi6MIl+KQVOiB2JI/Zi0
-	ZGbQHeJ3sePCK5IcDYw57xQqkIyaulOSfIollfNhszTy2XNPF/6fMxh+2yKxzfjsX9w8YPbiWwgQk
-	mYBibDL09kuYzZSVJanQ==;
+	List-Owner; bh=U+TrX1+CLuKUg9ko5dKUBTAGMAB368tpcEBWngD7ibE=; b=DCimdKyqVBPHpM
+	i53inMQe89i9LB+L5UqImvLv/jC2mN5KC6ust5AhjbjOPPCkaG+kC9dYcynmQHgusI9S1ieHuV+VC
+	fF0DQYynZm5ulQwog3abH64XOkr9/4nDESI2La4HENzekGVsPrJbgmh94sbgIcqKrQEdEiw2FFu9E
+	POwMF+IwIjj+YEczu3XscvdWVhlUCp8wsHkngIilgn1SpMgLq7rwpmcLx1M6vD5S3s6LKeCkVKgR6
+	IErkT/fVHziRjsUdzS5rmZZXC7+Liz/gGlpuEbGySxdqGDuCgSElQgIfcLCM8ee98TstNsUfTFk9X
+	aQLQO0pTIQ3PcCA0YLCQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gcnFb-0001QX-Ou; Fri, 28 Dec 2018 08:12:11 +0000
+	id 1gcnFm-0001Za-P4; Fri, 28 Dec 2018 08:12:22 +0000
 Received: from [210.61.82.184] (helo=mailgw02.mediatek.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gcnDx-0008Nn-8W; Fri, 28 Dec 2018 08:10:35 +0000
-X-UUID: 265ebbebdac24e5f9f8d9839822c936c-20181228
-X-UUID: 265ebbebdac24e5f9f8d9839822c936c-20181228
-Received: from mtkcas06.mediatek.inc [(172.21.101.30)] by mailgw02.mediatek.com
- (envelope-from <erin.lo@mediatek.com>)
+ id 1gcnDx-0008Nb-8V; Fri, 28 Dec 2018 08:10:35 +0000
+X-UUID: c261aa3ff6044103a4da42b802cb5175-20181228
+X-UUID: c261aa3ff6044103a4da42b802cb5175-20181228
+Received: from mtkcas08.mediatek.inc [(172.21.101.126)] by
+ mailgw02.mediatek.com (envelope-from <erin.lo@mediatek.com>)
  (mhqrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 2069359684; Fri, 28 Dec 2018 16:09:59 +0800
+ with ESMTP id 387816687; Fri, 28 Dec 2018 16:10:00 +0800
 Received: from mtkcas09.mediatek.inc (172.21.101.178) by
- mtkmbs02n1.mediatek.inc (172.21.101.77) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Fri, 28 Dec 2018 16:09:57 +0800
+ mtkmbs08n1.mediatek.inc (172.21.101.55) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Fri, 28 Dec 2018 16:09:59 +0800
 Received: from mtkslt303.mediatek.inc (10.21.14.116) by mtkcas09.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
- Frontend Transport; Fri, 28 Dec 2018 16:09:58 +0800
+ Frontend Transport; Fri, 28 Dec 2018 16:09:59 +0800
 From: Erin Lo <erin.lo@mediatek.com>
 To: Matthias Brugger <matthias.bgg@gmail.com>, Rob Herring
  <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>, Thomas Gleixner
  <tglx@linutronix.de>, Jason Cooper <jason@lakedaemon.net>, Marc Zyngier
  <marc.zyngier@arm.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
  Stephen Boyd <sboyd@codeaurora.org>
-Subject: [PATCH v5 3/6] dt-bindings: mtk-sysirq: Add compatible for Mediatek
- MT8183
-Date: Fri, 28 Dec 2018 16:09:38 +0800
-Message-ID: <1545984581-25843-4-git-send-email-erin.lo@mediatek.com>
+Subject: [PATCH v5 4/6] dt-bindings: serial: Add compatible for Mediatek MT8183
+Date: Fri, 28 Dec 2018 16:09:39 +0800
+Message-ID: <1545984581-25843-5-git-send-email-erin.lo@mediatek.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1545984581-25843-1-git-send-email-erin.lo@mediatek.com>
 References: <1545984581-25843-1-git-send-email-erin.lo@mediatek.com>
 MIME-Version: 1.0
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181228_001030_423700_EDFBD192 
-X-CRM114-Status: UNSURE (   9.97  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181228_001030_670122_F43A6BB6 
+X-CRM114-Status: GOOD (  10.03  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,27 +87,27 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This adds dt-binding documentation of SYSIRQ for Mediatek MT8183 SoC
+This adds dt-binding documentation of uart for Mediatek MT8183 SoC
 Platform.
 
 Signed-off-by: Erin Lo <erin.lo@mediatek.com>
 Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/interrupt-controller/mediatek,sysirq.txt         | 1 +
+ Documentation/devicetree/bindings/serial/mtk-uart.txt | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt b/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
-index 33a98eb..91aa9ab 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
-@@ -5,6 +5,7 @@ interrupt.
+diff --git a/Documentation/devicetree/bindings/serial/mtk-uart.txt b/Documentation/devicetree/bindings/serial/mtk-uart.txt
+index 742cb47..bcfb131 100644
+--- a/Documentation/devicetree/bindings/serial/mtk-uart.txt
++++ b/Documentation/devicetree/bindings/serial/mtk-uart.txt
+@@ -16,6 +16,7 @@ Required properties:
+   * "mediatek,mt8127-uart" for MT8127 compatible UARTS
+   * "mediatek,mt8135-uart" for MT8135 compatible UARTS
+   * "mediatek,mt8173-uart" for MT8173 compatible UARTS
++  * "mediatek,mt8183-uart", "mediatek,mt6577-uart" for MT8183 compatible UARTS
+   * "mediatek,mt6577-uart" for MT6577 and all of the above
  
- Required properties:
- - compatible: should be
-+	"mediatek,mt8183-sysirq", "mediatek,mt6577-sysirq": for MT8183
- 	"mediatek,mt8173-sysirq", "mediatek,mt6577-sysirq": for MT8173
- 	"mediatek,mt8135-sysirq", "mediatek,mt6577-sysirq": for MT8135
- 	"mediatek,mt8127-sysirq", "mediatek,mt6577-sysirq": for MT8127
+ - reg: The base address of the UART register bank.
 -- 
 1.9.1
 
