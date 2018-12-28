@@ -2,22 +2,22 @@ Return-Path: <SRS0=Tyfh=PF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CE657C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 06:34:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4FAC5C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 06:34:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 95399208E4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 06:34:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1D759208E4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 06:34:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eOtnmGic"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 95399208E4
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bDn3n4xg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1D759208E4
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,40 +25,46 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Pb+GhZoQPr4DsigwPmrP6D/twUJHVS0rWRufS9BtCAQ=; b=eOtnmGicaP6tiP
-	xVB/ftTiyoXEuMO/j0f8psBApKoCzfJ4OWK1lJwe8HXdmYvv6JIm6A5Jomu8jTcS4vzm1Pvj6dk8F
-	Wap313jofrDulsJtX5iqgwjft/oILzUhyzs4cvL0vGc58V4eJo/AGVOV8nO/soW7cMJpMD+IvCkFX
-	PvfD94fyNZFl+HYXpzw8CRDPKFLe5xilexcgqLhBWwm+995vXL2bEZEHywcPGbWpGFJj+HAM6z2s3
-	8RQV5Y9z4GIfibDKpQbAAvsOIXlLWqb+uCUeyRbLzWqaLfR7kCAY4QDCegnv+rFdH5rBsIeUeH6kU
-	VLrD1mPGpK/q3YQr8KDg==;
+	List-Owner; bh=JZSgqunNjTZ+qMoh5cxJ9dmSwQQgwq74EgVg8RVQD6Y=; b=bDn3n4xgr+3OE+
+	mh5xDfpdrNbSJNS4DP7Lgrh+45ocUPTB6PPOUsG34toUCUDhc9pKcm+3hRCCwyp8iAnhzXQfk7tMh
+	cdcB5TcOcyqrDh8vFk9hEJyd8lFxTQieQY5qgJOyUlWebt9dXnVYK0ciVKM6NhgAZD6f/CsVNvSwQ
+	d+lAh6qAvbMMxRyKc8G49r1OqzIIlwZOXgEwPTZsQESM+iE6fbKeJrLueRtyjfs1+9NBnVRkOimR5
+	z7ySiVuacuwTTEfkZFJ8A53imii0cdVYF6lGbwNAcJkSKh01zWyDQ232xTrxM+12HtCLr8QnqX50s
+	/qGrNH8W0lQrPp6j45kw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gclib-0001Pu-8O; Fri, 28 Dec 2018 06:34:01 +0000
-Received: from szxga05-in.huawei.com ([45.249.212.191] helo=huawei.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gcliB-0000wy-S0
- for linux-arm-kernel@lists.infradead.org; Fri, 28 Dec 2018 06:33:44 +0000
-Received: from DGGEMS411-HUB.china.huawei.com (unknown [172.30.72.60])
- by Forcepoint Email with ESMTP id C90AE2EF4676B;
- Fri, 28 Dec 2018 14:33:13 +0800 (CST)
-Received: from SIA1000080854.huawei.com (10.180.101.187) by
- DGGEMS411-HUB.china.huawei.com (10.3.19.211) with Microsoft SMTP Server id
- 14.3.408.0; Fri, 28 Dec 2018 14:33:07 +0800
-From: h00249924 <hutenghui@huawei.com>
-To: <linux-arm-kernel@lists.infradead.org>, <devicetree@vger.kernel.org>,
- <linux-kernel@vger.kernel.org>, <alsa-devel@alsa-project.org>
-Subject: [PATCH 2/2] sound: Add hisi i2s audio driver
-Date: Fri, 28 Dec 2018 14:30:46 +0800
-Message-ID: <1545978646-124051-2-git-send-email-hutenghui@huawei.com>
-X-Mailer: git-send-email 1.9.1
-In-Reply-To: <1545978646-124051-1-git-send-email-hutenghui@huawei.com>
-References: <1545978646-124051-1-git-send-email-hutenghui@huawei.com>
+	id 1gclj9-0001n9-Jm; Fri, 28 Dec 2018 06:34:35 +0000
+Received: from [210.61.82.183] (helo=mailgw01.mediatek.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gcliO-00012S-4O; Fri, 28 Dec 2018 06:33:55 +0000
+X-UUID: 852db2bb50d24431b69678067403023a-20181228
+X-UUID: 852db2bb50d24431b69678067403023a-20181228
+Received: from mtkmrs01.mediatek.inc [(172.21.131.159)] by
+ mailgw01.mediatek.com (envelope-from <yunfei.dong@mediatek.com>)
+ (mhqrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 1360667792; Fri, 28 Dec 2018 14:33:32 +0800
+Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
+ mtkmbs08n2.mediatek.inc (172.21.101.56) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Fri, 28 Dec 2018 14:33:30 +0800
+Received: from localhost.localdomain (10.17.3.153) by MTKCAS06.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Fri, 28 Dec 2018 14:33:30 +0800
+From: Yunfei Dong <yunfei.dong@mediatek.com>
+To: Tiffany Lin <tiffany.lin@mediatek.com>, Andrew-CT Chen
+ <andrew-ct.chen@mediatek.com>, Rob Herring <robh+dt@kernel.org>
+Subject: [PATCH 2/3] arm64: dts: Using standard CCF interface to set vcodec clk
+Date: Fri, 28 Dec 2018 14:33:04 +0800
+Message-ID: <1545978785-31375-2-git-send-email-yunfei.dong@mediatek.com>
+X-Mailer: git-send-email 1.7.9.5
+In-Reply-To: <1545978785-31375-1-git-send-email-yunfei.dong@mediatek.com>
+References: <1545978785-31375-1-git-send-email-yunfei.dong@mediatek.com>
 MIME-Version: 1.0
-X-Originating-IP: [10.180.101.187]
-X-CFilter-Loop: Reflected
+X-TM-SNTS-SMTP: 875461805C2CE4A218E7B839B12F64CA8F807A8C3956755F8E4BD91474B016F42000:8
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181227_223336_627624_B476CCDB 
-X-CRM114-Status: GOOD (  17.47  )
+X-CRM114-CacheID: sfid-20181227_223348_657211_FC36D1C6 
+X-CRM114-Status: UNSURE (   7.38  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,602 +76,59 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Youlin Wang <wwx575822@notesmail.huawei.com>,
- Jun Chen <cwx232124@notesmail.huawei.com>, Liam Girdwood <lgirdwood@gmail.com>,
- suzhuangluan@hisilicon.com, Takashi Iwai <tiwai@suse.com>,
- hantanglei@huawei.com, kongfei@hisilicon.com,
- Kaihua Zhong <zwx206529@notesmail.huawei.com>, ninggaoyu@hisilicon.com,
- Mark Brown <broonie@kernel.org>, John Stultz <john.stultz@linaro.org>,
- liyuequan@hisilicon.com, Guangke Ji <j00209069@notesmail.huawei.com>,
- huangli295@hisilicon.com, wangyoulin1@hisilicon.com,
- Jaroslav Kysela <perex@perex.cz>, cash.qianli@hisilicon.com
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Yunfei Dong <yunfei.dong@mediatek.com>, linux-kernel@vger.kernel.org,
+ linux-mediatek@lists.infradead.org, Qianqian Yan <qianqian.yan@mediatek.com>,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ Mauro Carvalho Chehab <mchehab@kernel.org>,
+ linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Youlin Wang <wwx575822@notesmail.huawei.com>
+Using standard CCF interface to set vdec/venc parent clk
+and clk rate.
 
-Add i2s driver for hisi3660.
-
-Origenal patch from 13dcb3aeefe431010689de314d7543db86ebf93c by Guangke Ji.
-
-Reviewed-by: Feng Chen <puck.chen@hisilicon.com>
-Signed-off-by: Kaihua Zhong <zwx206529@notesmail.huawei.com>
-Signed-off-by: Jun Chen <cwx232124@notesmail.huawei.com>
-Signed-off-by: Guangke Ji <j00209069@notesmail.huawei.com>
-Signed-off-by: John Stultz <john.stultz@linaro.org>
-Signed-off-by: Youlin Wang <wwx575822@notesmail.huawei.com>
-Signed-off-by: Tanglei Han <hantanglei@huawei.com>
-Cc: Liam Girdwood <lgirdwood@gmail.com>
-Cc: Mark Brown <broonie@kernel.org>
-Cc: Jaroslav Kysela <perex@perex.cz>
-Cc: Takashi Iwai <tiwai@suse.com>
+Signed-off-by: Yunfei Dong <yunfei.dong@mediatek.com>
+Signed-off-by: Qianqian Yan <qianqian.yan@mediatek.com>
 ---
- sound/soc/hisilicon/Kconfig      |   8 +-
- sound/soc/hisilicon/Makefile     |   1 +
- sound/soc/hisilicon/hi3660-i2s.c | 423 +++++++++++++++++++++++++++++++++++++++
- sound/soc/hisilicon/hi3660-i2s.h |  95 +++++++++
- 4 files changed, 526 insertions(+), 1 deletion(-)
- create mode 100644 sound/soc/hisilicon/hi3660-i2s.c
- create mode 100644 sound/soc/hisilicon/hi3660-i2s.h
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/sound/soc/hisilicon/Kconfig b/sound/soc/hisilicon/Kconfig
-index 4356d5a..b023ef9 100644
---- a/sound/soc/hisilicon/Kconfig
-+++ b/sound/soc/hisilicon/Kconfig
-@@ -1,5 +1,11 @@
- config SND_I2S_HI6210_I2S
--	tristate "Hisilicon I2S controller"
-+	tristate "Hisilicon Hi6210 I2S controller"
-+	select SND_SOC_GENERIC_DMAENGINE_PCM
-+	help
-+	  Hisilicon I2S
-+
-+config SND_I2S_HI3660_I2S
-+	tristate "Hisilicon 960 I2S controller"
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
- 	help
- 	  Hisilicon I2S
-diff --git a/sound/soc/hisilicon/Makefile b/sound/soc/hisilicon/Makefile
-index e8095e2..6800516 100644
---- a/sound/soc/hisilicon/Makefile
-+++ b/sound/soc/hisilicon/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_SND_I2S_HI6210_I2S) += hi6210-i2s.o
-+obj-$(CONFIG_SND_I2S_HI3660_I2S) += hi3660-i2s.o
-diff --git a/sound/soc/hisilicon/hi3660-i2s.c b/sound/soc/hisilicon/hi3660-i2s.c
-new file mode 100644
-index 0000000..d709043
---- /dev/null
-+++ b/sound/soc/hisilicon/hi3660-i2s.c
-@@ -0,0 +1,423 @@
-+/*
-+ * linux/sound/soc/hisilicon/hisi_i2s.c - I2S IP driver
-+ *
-+ * Copyright (c) 2001-2021, Huawei Tech. Co., Ltd.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/device.h>
-+#include <linux/delay.h>
-+#include <linux/clk.h>
-+#include <linux/jiffies.h>
-+#include <linux/io.h>
-+#include <linux/gpio.h>
-+#include <sound/core.h>
-+#include <sound/pcm.h>
-+#include <sound/pcm_params.h>
-+#include <sound/dmaengine_pcm.h>
-+#include <sound/initval.h>
-+#include <sound/soc.h>
-+#include <linux/interrupt.h>
-+#include <linux/reset.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/reset-controller.h>
-+#include <linux/clk.h>
-+#include <linux/regulator/consumer.h>
-+
-+#include "hi3660-i2s.h"
-+
-+struct hisi_i2s {
-+	struct device *dev;
-+	struct reset_control *rc;
-+	int clocks;
-+	struct regulator *regu_asp;
-+	struct pinctrl *pctrl;
-+	struct pinctrl_state *pin_default;
-+	struct pinctrl_state *pin_idle;
-+	struct clk *asp_subsys_clk;
-+	struct snd_soc_dai_driver dai;
-+	void __iomem *base;
-+	void __iomem *base_syscon;
-+	phys_addr_t base_phys;
-+	struct snd_dmaengine_dai_dma_data dma_data[2];
-+	spinlock_t lock;
-+	int rate;
-+	int format;
-+	int bits;
-+	int channels;
-+	u32 master;
-+	u32 status;
-+};
-+
-+static void hisi_bits(struct hisi_i2s *i2s, u32 ofs, u32 reset, u32 set)
-+{
-+	u32 val = readl(i2s->base + ofs) & ~reset;
-+
-+	writel(val | set, i2s->base + ofs);
-+}
-+
-+static void hisi_syscon_bits(struct hisi_i2s *i2s, u32 ofs, u32 reset, u32 set)
-+{
-+	u32 val = readl(i2s->base_syscon + ofs) & ~reset;
-+
-+	writel(val | set, i2s->base_syscon + ofs);
-+}
-+
-+static int _hisi_i2s_set_fmt(struct hisi_i2s *i2s,
-+			       struct snd_pcm_substream *substream)
-+{
-+	switch (i2s->format & SND_SOC_DAIFMT_MASTER_MASK) {
-+	case SND_SOC_DAIFMT_CBM_CFM:
-+		i2s->master = false;
-+		hisi_syscon_bits(i2s, HI_ASP_CFG_R_CLK_SEL_REG, 0, HI_ASP_CFG_R_CLK_SEL_EN);
-+		break;
-+	case SND_SOC_DAIFMT_CBS_CFS:
-+		i2s->master = true;
-+		hisi_syscon_bits(i2s, HI_ASP_CFG_R_CLK_SEL_REG, HI_ASP_CFG_R_CLK_SEL_EN,0);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+int hisi_i2s_startup(struct snd_pcm_substream *substream,
-+		     struct snd_soc_dai *cpu_dai)
-+{
-+	struct hisi_i2s *i2s = dev_get_drvdata(cpu_dai->dev);
-+
-+	/* deassert reset on sio_bt*/
-+	hisi_syscon_bits(i2s, HI_ASP_CFG_R_RST_CTRLDIS_REG, 0, BIT(2)|BIT(6)|BIT(8)|BIT(16));
-+
-+	/* enable clk before frequency division */
-+	hisi_syscon_bits(i2s, HI_ASP_CFG_R_GATE_EN_REG, 0, BIT(5)|BIT(6));
-+
-+	/* enable frequency division */
-+	hisi_syscon_bits(i2s, HI_ASP_CFG_R_GATE_CLKDIV_EN_REG, 0, BIT(2)|BIT(5));
-+
-+	/* select clk */
-+	hisi_syscon_bits(i2s, HI_ASP_CFG_R_CLK_SEL_REG, HI_ASP_MASK, HI_ASP_CFG_R_CLK_SEL);
-+
-+	/* select clk_div */
-+	hisi_syscon_bits(i2s, HI_ASP_CFG_R_CLK1_DIV_REG, HI_ASP_MASK, HI_ASP_CFG_R_CLK1_DIV_SEL);
-+	hisi_syscon_bits(i2s, HI_ASP_CFG_R_CLK4_DIV_REG, HI_ASP_MASK, HI_ASP_CFG_R_CLK4_DIV_SEL);
-+	hisi_syscon_bits(i2s, HI_ASP_CFG_R_CLK6_DIV_REG, HI_ASP_MASK, HI_ASP_CFG_R_CLK6_DIV_SEL);
-+
-+	/* sio config */
-+	hisi_bits(i2s, HI_ASP_SIO_MODE_REG, HI_ASP_MASK, 0x0);
-+	hisi_bits(i2s, HI_ASP_SIO_DATA_WIDTH_SET_REG, HI_ASP_MASK, 0x9);
-+	hisi_bits(i2s, HI_ASP_SIO_I2S_POS_MERGE_EN_REG, HI_ASP_MASK, 0x1);
-+	hisi_bits(i2s, HI_ASP_SIO_I2S_START_POS_REG, HI_ASP_MASK, 0x0);
-+
-+	return 0;
-+}
-+void hisi_i2s_shutdown(struct snd_pcm_substream *substream,
-+		       struct snd_soc_dai *cpu_dai)
-+{
-+	struct hisi_i2s *i2s = dev_get_drvdata(cpu_dai->dev);
-+
-+	if (!IS_ERR_OR_NULL(i2s->asp_subsys_clk)) {
-+		clk_disable_unprepare(i2s->asp_subsys_clk);
-+	}
-+
-+}
-+
-+static void hisi_i2s_txctrl(struct snd_soc_dai *cpu_dai, int on)
-+{
-+	struct hisi_i2s *i2s = dev_get_drvdata(cpu_dai->dev);
-+
-+	spin_lock(&i2s->lock);
-+
-+	if (on) {
-+		/* enable SIO TX */
-+		hisi_bits(i2s, HI_ASP_SIO_CT_SET_REG, 0,
-+			HI_ASP_SIO_TX_ENABLE | HI_ASP_SIO_TX_DATA_MERGE | HI_ASP_SIO_TX_FIFO_THRESHOLD |
-+			HI_ASP_SIO_RX_ENABLE |HI_ASP_SIO_RX_DATA_MERGE | HI_ASP_SIO_RX_FIFO_THRESHOLD);
-+	} else
-+		/* disable SIO TX */
-+		hisi_bits(i2s, HI_ASP_SIO_CT_CLR_REG, 0, HI_ASP_SIO_TX_ENABLE |HI_ASP_SIO_RX_ENABLE);
-+	spin_unlock(&i2s->lock);
-+}
-+
-+static void hisi_i2s_rxctrl(struct snd_soc_dai *cpu_dai, int on)
-+{
-+	struct hisi_i2s *i2s = dev_get_drvdata(cpu_dai->dev);
-+
-+	spin_lock(&i2s->lock);
-+	if (on)
-+		/* enable SIO RX */
-+		hisi_bits(i2s, HI_ASP_SIO_CT_SET_REG, 0,
-+			HI_ASP_SIO_TX_ENABLE | HI_ASP_SIO_TX_DATA_MERGE | HI_ASP_SIO_TX_FIFO_THRESHOLD |
-+			HI_ASP_SIO_RX_ENABLE |HI_ASP_SIO_RX_DATA_MERGE | HI_ASP_SIO_RX_FIFO_THRESHOLD);
-+	else
-+		/* disable SIO RX */
-+		hisi_bits(i2s, HI_ASP_SIO_CT_CLR_REG,0, HI_ASP_SIO_TX_ENABLE |HI_ASP_SIO_RX_ENABLE);
-+	spin_unlock(&i2s->lock);
-+}
-+
-+static int hisi_i2s_set_sysclk(struct snd_soc_dai *cpu_dai,
-+			     int clk_id, unsigned int freq, int dir)
-+{
-+	return 0;
-+}
-+
-+static int hisi_i2s_set_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
-+{
-+	struct hisi_i2s *i2s = dev_get_drvdata(cpu_dai->dev);
-+
-+	i2s->format = fmt;
-+	i2s->master = (i2s->format & SND_SOC_DAIFMT_MASTER_MASK) ==
-+		      SND_SOC_DAIFMT_CBS_CFS;
-+
-+	return 0;
-+}
-+
-+static int hisi_i2s_hw_params(struct snd_pcm_substream *substream,
-+			    struct snd_pcm_hw_params *params,
-+			    struct snd_soc_dai *cpu_dai)
-+{
-+	struct hisi_i2s *i2s = dev_get_drvdata(cpu_dai->dev);
-+        struct snd_dmaengine_dai_dma_data *dma_data;
-+
-+        dma_data = snd_soc_dai_get_dma_data(cpu_dai, substream);
-+
-+	_hisi_i2s_set_fmt(i2s, substream);
-+
-+	dma_data->maxburst = 4;
-+
-+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-+		dma_data->addr = i2s->base_phys + HI_ASP_SIO_I2S_DUAL_TX_CHN_REG;
-+	else
-+		dma_data->addr = i2s->base_phys + HI_ASP_SIO_I2S_DUAL_RX_CHN_REG;
-+
-+	switch (params_format(params)) {
-+	case SNDRV_PCM_FORMAT_U16_LE:
-+	case SNDRV_PCM_FORMAT_S16_LE:
-+		i2s->bits = 16;
-+		dma_data->addr_width = 4;
-+		break;
-+
-+	case SNDRV_PCM_FORMAT_U24_LE:
-+	case SNDRV_PCM_FORMAT_S24_LE:
-+		i2s->bits = 32;
-+		dma_data->addr_width = 4;
-+		break;
-+	default:
-+		dev_err(cpu_dai->dev, "Bad format\n");
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static int hisi_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
-+			  struct snd_soc_dai *cpu_dai)
-+{
-+	switch (cmd) {
-+	case SNDRV_PCM_TRIGGER_START:
-+	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-+		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-+			hisi_i2s_rxctrl(cpu_dai, 1);
-+		else
-+			hisi_i2s_txctrl(cpu_dai, 1);
-+		break;
-+	case SNDRV_PCM_TRIGGER_STOP:
-+	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-+		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-+			hisi_i2s_rxctrl(cpu_dai, 0);
-+		else
-+			hisi_i2s_txctrl(cpu_dai, 0);
-+		break;
-+	default:
-+		dev_err(cpu_dai->dev, "uknown cmd\n");
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static int hisi_i2s_dai_probe(struct snd_soc_dai *dai)
-+{
-+	struct hisi_i2s *i2s = snd_soc_dai_get_drvdata(dai);
-+
-+        snd_soc_dai_init_dma_data(dai,
-+                                  &i2s->dma_data[SNDRV_PCM_STREAM_PLAYBACK],
-+                                  &i2s->dma_data[SNDRV_PCM_STREAM_CAPTURE]);
-+
-+        return 0;
-+}
-+
-+
-+static struct snd_soc_dai_ops hisi_i2s_dai_ops = {
-+	.trigger	= hisi_i2s_trigger,
-+	.hw_params	= hisi_i2s_hw_params,
-+	.set_fmt	= hisi_i2s_set_fmt,
-+	.set_sysclk	= hisi_i2s_set_sysclk,
-+	.startup	= hisi_i2s_startup,
-+	.shutdown	= hisi_i2s_shutdown,
-+};
-+
-+struct snd_soc_dai_driver hisi_i2s_dai_init = {
-+	.name = "hisi_i2s",
-+	.probe		= hisi_i2s_dai_probe,
-+	.playback = {
-+		.channels_min = 2,
-+		.channels_max = 2,
-+		.formats = SNDRV_PCM_FMTBIT_S16_LE |
-+			   SNDRV_PCM_FMTBIT_U16_LE,
-+		.rates = SNDRV_PCM_RATE_48000,
-+	},
-+	.capture = {
-+		.channels_min = 2,
-+		.channels_max = 2,
-+		.formats = SNDRV_PCM_FMTBIT_S16_LE |
-+			   SNDRV_PCM_FMTBIT_U16_LE,
-+		.rates = SNDRV_PCM_RATE_48000,
-+	},
-+	.ops = &hisi_i2s_dai_ops,
-+};
-+
-+static const struct snd_soc_component_driver hisi_i2s_i2s_comp = {
-+	.name = "hisi_i2s-i2s",
-+};
-+
-+#include <sound/dmaengine_pcm.h>
-+
-+static const struct snd_pcm_hardware snd_hisi_hardware = {
-+        .info                   = SNDRV_PCM_INFO_MMAP |
-+                                  SNDRV_PCM_INFO_MMAP_VALID |
-+                                  SNDRV_PCM_INFO_PAUSE |
-+                                  SNDRV_PCM_INFO_RESUME |
-+                                  SNDRV_PCM_INFO_INTERLEAVED |
-+                                  SNDRV_PCM_INFO_HALF_DUPLEX,
-+        .period_bytes_min       = 4096,
-+        .period_bytes_max       = 4096,
-+        .periods_min            = 4,
-+        .periods_max            = UINT_MAX,
-+        .buffer_bytes_max       = SIZE_MAX,
-+};
-+
-+static const struct snd_dmaengine_pcm_config hisi_dmaengine_pcm_config = {
-+        .pcm_hardware = &snd_hisi_hardware,
-+	.prepare_slave_config = snd_dmaengine_pcm_prepare_slave_config,
-+        .prealloc_buffer_size = 64 * 1024,
-+};
-+
-+static int hisi_i2s_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct hisi_i2s *i2s;
-+	struct resource *res;
-+	int ret;
-+
-+	i2s = devm_kzalloc(dev,sizeof(*i2s), GFP_KERNEL);
-+	if (!i2s)
-+		return -ENOMEM;
-+
-+	i2s->dev = dev;
-+	spin_lock_init(&i2s->lock);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		ret = -ENODEV;
-+		return ret;
-+	}
-+	i2s->base_phys = (phys_addr_t)res->start;
-+
-+	i2s->dai = hisi_i2s_dai_init;
-+	dev_set_drvdata(&pdev->dev, i2s);
-+
-+	i2s->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(i2s->base)) {
-+		dev_err(&pdev->dev, "ioremap failed\n");
-+		ret = PTR_ERR(i2s->base);
-+		return ret;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	if (!res) {
-+		ret = -ENODEV;
-+		return ret;
-+	}
-+	i2s->base_syscon = devm_ioremap(dev, res->start, resource_size(res));
-+	if (IS_ERR(i2s->base_syscon)) {
-+		dev_err(&pdev->dev, "ioremap failed\n");
-+		ret = PTR_ERR(i2s->base_syscon);
-+		return ret;
-+	}
-+
-+	/* i2s iomux config */
-+	i2s->pctrl = devm_pinctrl_get(dev);
-+	if (IS_ERR(i2s->pctrl)) {
-+		dev_err(dev, "could not get pinctrl\n");
-+		ret = -EIO;
-+		return ret;
-+	}
-+
-+	i2s->pin_default = pinctrl_lookup_state(i2s->pctrl, PINCTRL_STATE_DEFAULT);
-+	if (IS_ERR(i2s->pin_default)) {
-+		dev_err(dev, "could not get default state (%li)\n" , PTR_ERR(i2s->pin_default));
-+		ret = -EIO;
-+		return ret;
-+	}
-+
-+	if (pinctrl_select_state(i2s->pctrl, i2s->pin_default)) {
-+		dev_err(dev, "could not set pins to default state\n");
-+		ret = -EIO;
-+		return ret;
-+	}
-+
-+	ret = devm_snd_dmaengine_pcm_register(&pdev->dev,
-+					      &hisi_dmaengine_pcm_config,
-+					      0);
-+	if (ret)
-+		return ret;
-+
-+	ret = snd_soc_register_component(&pdev->dev, &hisi_i2s_i2s_comp,
-+					 &i2s->dai, 1);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Failed to register dai\n");
-+		return ret;;
-+	}
-+	dev_info(&pdev->dev, "Registered as %s\n", i2s->dai.name);
-+
-+	return 0;
-+}
-+
-+static int hisi_i2s_remove(struct platform_device *pdev)
-+{
-+	struct hisi_i2s *i2s = dev_get_drvdata(&pdev->dev);
-+
-+	snd_soc_unregister_component(&pdev->dev);
-+	dev_set_drvdata(&pdev->dev, NULL);
-+
-+	pinctrl_put(i2s->pctrl);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id hisi_i2s_dt_ids[] = {
-+	{ .compatible = "hisilicon,hisi-i2s" },
-+	{ /* sentinel */ }
-+};
-+
-+MODULE_DEVICE_TABLE(of, hisi_i2s_dt_ids);
-+
-+static struct platform_driver hisi_i2s_driver = {
-+	.probe = hisi_i2s_probe,
-+	.remove = hisi_i2s_remove,
-+	.driver = {
-+		.name = "hisi_i2s",
-+		.owner = THIS_MODULE,
-+		.of_match_table = hisi_i2s_dt_ids,
-+	},
-+};
-+
-+module_platform_driver(hisi_i2s_driver);
-+
-+MODULE_DESCRIPTION("Hisilicon I2S driver");
-+MODULE_AUTHOR("Andy Green <andy.green@linaro.org>");
-+MODULE_LICENSE("GPL");
-diff --git a/sound/soc/hisilicon/hi3660-i2s.h b/sound/soc/hisilicon/hi3660-i2s.h
-new file mode 100644
-index 0000000..e010067
---- /dev/null
-+++ b/sound/soc/hisilicon/hi3660-i2s.h
-@@ -0,0 +1,95 @@
-+/*
-+ * linux/sound/soc/hisilicon/hi3660-i2s.h
-+ *
-+ * Copyright (c) 2001-2021, Huawei Tech. Co., Ltd.
-+ */
-+
-+#ifndef _HISI_I2S_H
-+#define _HISI_I2S_H
-+
-+  enum hisi_bits {
-+	HII2S_BITS_16,
-+	HII2S_BITS_18,
-+	HII2S_BITS_20,
-+	HII2S_BITS_24,
-+};
-+
-+enum hisi_i2s_rates {
-+	HII2S_FS_RATE_8KHZ = 0,
-+	HII2S_FS_RATE_16KHZ = 1,
-+	HII2S_FS_RATE_32KHZ = 2,
-+	HII2S_FS_RATE_48KHZ = 4,
-+	HII2S_FS_RATE_96KHZ = 5,
-+	HII2S_FS_RATE_192KHZ = 6,
-+};
-+
-+#define HI_ASP_CFG_R_RST_CTRLEN_REG		0x0
-+#define HI_ASP_CFG_R_RST_CTRLDIS_REG		0x4
-+#define HI_ASP_CFG_R_GATE_EN_REG			0xC
-+#define HI_ASP_CFG_R_GATE_DIS_REG			0x10
-+#define HI_ASP_CFG_R_GATE_CLKEN_REG 		0x14
-+#define HI_ASP_CFG_R_GATE_CLKSTAT_REG 		0x18
-+#define HI_ASP_CFG_R_GATE_CLKDIV_EN_REG	0x1C
-+#define HI_ASP_CFG_R_CLK1_DIV_REG			0x20
-+#define HI_ASP_CFG_R_CLK2_DIV_REG			0x24
-+#define HI_ASP_CFG_R_CLK3_DIV_REG			0x28
-+#define HI_ASP_CFG_R_CLK4_DIV_REG 			0x2C
-+#define HI_ASP_CFG_R_CLK5_DIV_REG			0x30
-+#define HI_ASP_CFG_R_CLK6_DIV_REG			0x34
-+#define HI_ASP_CFG_R_CLK_SEL_REG 			0x38
-+#define HI_ASP_CFG_R_SEC_REG 				0x100
-+
-+
-+#define HI_ASP_SIO_VERSION_REG			(0x3C)
-+#define HI_ASP_SIO_MODE_REG			(0x40)
-+#define HI_ASP_SIO_INTSTATUS_REG		(0x44)
-+#define HI_ASP_SIO_INTCLR_REG			(0x48)
-+#define HI_ASP_SIO_I2S_LEFT_XD_REG		(0x4C)
-+#define HI_ASP_SIO_I2S_RIGHT_XD_REG	(0x50)
-+#define HI_ASP_SIO_I2S_LEFT_RD_REG		(0x54)
-+#define HI_ASP_SIO_I2S_RIGHT_RD_REG 	(0x58)
-+#define HI_ASP_SIO_CT_SET_REG			(0x5C)
-+#define HI_ASP_SIO_CT_CLR_REG			(0x60)
-+#define HI_ASP_SIO_RX_STA_REG			(0x68)
-+#define HI_ASP_SIO_TX_STA_REG			(0x6C)
-+#define HI_ASP_SIO_DATA_WIDTH_SET_REG	(0x78)
-+#define HI_ASP_SIO_I2S_START_POS_REG	(0x7C)
-+#define HI_ASP_SIO_I2S_POS_FLAG_REG	(0x80)
-+#define HI_ASP_SIO_SIGNED_EXT_REG		(0x84)
-+#define HI_ASP_SIO_I2S_POS_MERGE_EN_REG	(0x88)
-+#define HI_ASP_SIO_INTMASK_REG				(0x8C)
-+#define HI_ASP_SIO_I2S_DUAL_RX_CHN_REG	(0xA0)
-+#define HI_ASP_SIO_I2S_DUAL_TX_CHN_REG		(0xC0)
-+
-+
-+#define HI_ASP_CFG_R_CLK_SEL_EN				BIT(2)
-+#define HI_ASP_CFG_R_CLK_SEL				0x140010
-+#define HI_ASP_CFG_R_CLK1_DIV_SEL			0xbcdc9a
-+#define HI_ASP_CFG_R_CLK4_DIV_SEL			0x00ff000f
-+#define HI_ASP_CFG_R_CLK6_DIV_SEL			0x00ff003f
-+#define HI_ASP_CFG_SIO_MODE				0
-+#define HI_ASP_SIO_MODE_SEL_EN				BIT(0)
-+#define HI_ASP_MASK							0xffffffff
-+
-+#define HI_ASP_SIO_RX_ENABLE				BIT(13)
-+#define HI_ASP_SIO_TX_ENABLE				BIT(12)
-+#define HI_ASP_SIO_RX_FIFO_DISABLE			BIT(11)
-+#define HI_ASP_SIO_TX_FIFO_DISABLE			BIT(10)
-+#define HI_ASP_SIO_RX_DATA_MERGE			BIT(9)
-+#define HI_ASP_SIO_TX_DATA_MERGE			BIT(8)
-+#define HI_ASP_SIO_RX_FIFO_THRESHOLD       	(0x5 << 4)
-+#define HI_ASP_SIO_TX_FIFO_THRESHOLD		(0xB << 0)
-+#define HI_ASP_SIO_RX_FIFO_THRESHOLD_CLR	(0xF << 4)
-+#define HI_ASP_SIO_TX_FIFO_THRESHOLD_CLR	(0xF << 0)
-+#define HI_ASP_SIO_BURST                   			(0x4)
-+
-+
-+enum hisi_i2s_formats {
-+	HII2S_FORMAT_I2S,
-+	HII2S_FORMAT_PCM_STD,
-+	HII2S_FORMAT_PCM_USER,
-+	HII2S_FORMAT_LEFT_JUST,
-+	HII2S_FORMAT_RIGHT_JUST,
-+};
-+
-+#endif/* _HISI_I2S_H */
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index abd2f15a544b..bbc282aae412 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -1295,6 +1295,15 @@
+ 				      "vencpll",
+ 				      "venc_lt_sel",
+ 				      "vdec_bus_clk_src";
++			assigned-clocks = <&topckgen CLK_TOP_VENC_LT_SEL>,
++					  <&topckgen CLK_TOP_CCI400_SEL>,
++					  <&topckgen CLK_TOP_VDEC_SEL>,
++					  <&apmixedsys CLK_APMIXED_VCODECPLL>,
++					  <&apmixedsys CLK_APMIXED_VENCPLL>;
++			assigned-clock-parents = <&topckgen CLK_TOP_VCODECPLL_370P5>,
++						 <&topckgen CLK_TOP_UNIVPLL_D2>,
++						 <&topckgen CLK_TOP_VCODECPLL>;
++			assigned-clock-rates = <0>, <0>, <0>, <1482000000>, <800000000>;
+ 		};
+ 
+ 		larb1: larb@16010000 {
+@@ -1360,6 +1369,10 @@
+ 				      "venc_sel",
+ 				      "venc_lt_sel_src",
+ 				      "venc_lt_sel";
++			assigned-clocks = <&topckgen CLK_TOP_VENC_SEL>,
++					  <&topckgen CLK_TOP_VENC_LT_SEL>;
++			assigned-clock-parents = <&topckgen CLK_TOP_VENCPLL_D2>,
++						 <&topckgen CLK_TOP_UNIVPLL1_D2>;
+ 		};
+ 
+ 		vencltsys: clock-controller@19000000 {
 -- 
-1.9.1
+2.19.1
 
 
 _______________________________________________
