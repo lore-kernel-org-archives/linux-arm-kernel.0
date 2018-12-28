@@ -3,70 +3,67 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9A108C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 00:39:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0B7F1C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 00:52:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6BB0D2148E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 00:39:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C902921741
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 00:52:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jIq1lNNr";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="BrT+HptP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6BB0D2148E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KLeOLRgk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C902921741
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=anholt.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Date:In-Reply-To:From:Subject:
-	References:Message-ID:To:MIME-Version:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ghJ7IujwobuL0j4gS17CdjE7zdrNVsOpbQn5TmdH3+g=; b=jIq1lNNrYx4Eg0
-	TPIWzY9NVDGwXqVQk6X2cpnlrpthZ/QpFOLad+cg1fCH1W/Wv9/mTE05P2/bfOWgETUlSW84Mdj17
-	27DsEhe937olSDf+6Qt6XJpihod+mHToB4y4jkHaPbXv9X5hqvEkHqYC/7VA1zeXEnkLPxVdrM1j/
-	8XcxVA6vuXZyAFzCgKlYNkmY1cj8MmvWSWEw6qKY1PLVn7pyjj8MeC96g3IKm/uX/5DHWsxeqgkWT
-	40RgyNAT2V7kZDvVkW0DL0bPE/tnHKfoztPjwA2ZmCQjST+a3VLcIJ2pkgUk+pCgKElI+wCW4Sswn
-	IYqN0aRuZ+f/JGDD8mJA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	MIME-Version:Message-ID:Date:References:In-Reply-To:Subject:To:From:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=pLycoVtNzCcnkG+D7uIMouEF40EO1Za8FsFv6baLZ5M=; b=KLeOLRgk5Yyx7xM2EG4CWoUHo
+	iS0GeZ0Xeri02Mn3T+DjHW6XdNZG0kmARaxd9p89/L1nGK+kQ1qIRk3UZmLC0xa2I0vRWeUqY6SWc
+	R5z4RJpVs9Xv6XylRrb6+Xstnmm2+Um4Jpp8eac3FB89vi2TZwZpqi1bwzFv6MKRnpyPohTobi72A
+	A58ALXEU+HWb2hsTRIxR4Y37NHf09l061Ncw47TMtanmPpgphUKL0jtgjYI0bmnqmGDim3VtI9Wk6
+	MF9tfWPyAVw3yAD3Yg7tIHOiXbtorL/C0dAfbNDBzp8i3SAmWrG/Fn/h3Rx/vvyLk5rW9tNSmG9Tg
+	H4HopCbZw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gcgBh-00070y-6F; Fri, 28 Dec 2018 00:39:41 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gcgBe-000706-2b
- for linux-arm-kernel@lists.infradead.org; Fri, 28 Dec 2018 00:39:39 +0000
-Received: from localhost (unknown [104.132.0.74])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id E33682148E;
- Fri, 28 Dec 2018 00:39:26 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1545957567;
- bh=1ddqU3RtRwJWXxclcxRkIZinYqh+4vVVHA0QuoYWCAg=;
- h=To:References:Subject:Cc:From:In-Reply-To:Date:From;
- b=BrT+HptPTHXixErxKdZK0ULHXTRmcI5npZLplUBH05ts30fXdkPbeEcv/FjdiTbBC
- +ZFmMxkL1t0yBrCGKr9qL2Urcb58QJVtfb07U1oB/sKPThRCwrxuMl7aXxUqj+L1IF
- Vj/CtYNqbUZKwtOI2AU5xa0GrCHrcWlVIHprW77I=
+	id 1gcgNs-0002q2-MM; Fri, 28 Dec 2018 00:52:16 +0000
+Received: from anholt.net ([50.246.234.109])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gcgNo-0002pQ-V1; Fri, 28 Dec 2018 00:52:14 +0000
+Received: from localhost (localhost [127.0.0.1])
+ by anholt.net (Postfix) with ESMTP id 93F8E10A2767;
+ Thu, 27 Dec 2018 16:51:57 -0800 (PST)
+X-Virus-Scanned: Debian amavisd-new at anholt.net
+Received: from anholt.net ([127.0.0.1])
+ by localhost (kingsolver.anholt.net [127.0.0.1]) (amavisd-new, port 10024)
+ with LMTP id JHQeTyy0c9y5; Thu, 27 Dec 2018 16:51:56 -0800 (PST)
+Received: from eliezer.anholt.net (localhost [127.0.0.1])
+ by anholt.net (Postfix) with ESMTP id 3CB9F10A0EA3;
+ Thu, 27 Dec 2018 16:51:56 -0800 (PST)
+Received: by eliezer.anholt.net (Postfix, from userid 1000)
+ id C99AF2FE36F3; Thu, 27 Dec 2018 16:51:55 -0800 (PST)
+From: Eric Anholt <eric@anholt.net>
+To: Stefan Wahren <stefan.wahren@i2se.com>, Rob Herring <robh+dt@kernel.org>,
+ Mark Rutland <mark.rutland@arm.com>, Florian Fainelli <f.fainelli@gmail.com>,
+ Ray Jui <rjui@broadcom.com>, Scott Branden <sbranden@broadcom.com>
+Subject: Re: [PATCH V4 2/3] ARM: dts: add Raspberry Pi 3 A+
+In-Reply-To: <1545780008-22271-3-git-send-email-stefan.wahren@i2se.com>
+References: <1545780008-22271-1-git-send-email-stefan.wahren@i2se.com>
+ <1545780008-22271-3-git-send-email-stefan.wahren@i2se.com>
+User-Agent: Notmuch/0.22.2+1~gb0bcfaa (http://notmuchmail.org) Emacs/25.2.2
+ (x86_64-pc-linux-gnu)
+Date: Thu, 27 Dec 2018 16:51:54 -0800
+Message-ID: <87wonulbh1.fsf@anholt.net>
 MIME-Version: 1.0
-To: "Sugaya, Taichi" <sugaya.taichi@socionext.com>, devicetree@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-clk@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-serial@vger.kernel.org
-Message-ID: <154595756614.179992.794211301759568891@swboyd.mtv.corp.google.com>
-References: <1542589274-13878-1-git-send-email-sugaya.taichi@socionext.com>
- <1542589274-13878-8-git-send-email-sugaya.taichi@socionext.com>
- <154356669840.88331.4455990896653868594@swboyd.mtv.corp.google.com>
- <9fba4689-b20f-c18a-ea11-d961de497ea3@socionext.com>
-Subject: Re: [PATCH 07/14] clock: milbeaut: Add Milbeaut M10V clock control
-From: Stephen Boyd <sboyd@kernel.org>
-User-Agent: alot/0.8
-In-Reply-To: <9fba4689-b20f-c18a-ea11-d961de497ea3@socionext.com>
-Date: Thu, 27 Dec 2018 16:39:26 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181227_163938_134828_CBA4C7AA 
-X-CRM114-Status: GOOD (  15.04  )
+X-CRM114-CacheID: sfid-20181227_165213_041869_D7B42C52 
+X-CRM114-Status: GOOD (  10.41  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,76 +75,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Masami Hiramatsu <masami.hiramatsu@linaro.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Michael Turquette <mturquette@baylibre.com>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- Russell King <linux@armlinux.org.uk>, Jassi Brar <jaswinder.singh@linaro.org>,
- Rob Herring <robh+dt@kernel.org>, Jiri Slaby <jslaby@suse.com>,
- Thomas Gleixner <tglx@linutronix.de>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Stefan Wahren <stefan.wahren@i2se.com>, devicetree@vger.kernel.org,
+ Phil Elwell <phil@raspberrypi.org>, bcm-kernel-feedback-list@broadcom.com,
+ linux-rpi-kernel@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Content-Type: multipart/mixed; boundary="===============5664278743474050857=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Sugaya, Taichi (2018-12-25 17:35:27)
-> Hi
-> 
-> On 2018/11/30 17:31, Stephen Boyd wrote:
-> >> +       init.num_parents = parents;
-> >> +       init.parent_names = parent_names;
-> >> +
-> >> +       mcm->cname = clk_name;
-> >> +       mcm->parent = 0;
-> >> +       mcm->hw.init = &init;
-> >> +
-> >> +       clk = clk_register(NULL, &mcm->hw);
-> >> +       if (IS_ERR(clk))
-> >> +               goto err_clk;
-> >> +
-> >> +       of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> >> +       return;
-> >> +
-> >> +err_clk:
-> >> +       kfree(mcm);
-> >> +err_mcm:
-> >> +       kfree(parent_names);
-> >> +}
-> >> +CLK_OF_DECLARE(m10v_clk_mux, "socionext,milbeaut-m10v-clk-mux",
-> >> +                       m10v_clk_mux_setup);
-> > 
-> > Any chance you can use a platform driver?
-> > 
-> 
-> Excuse me to re-ask you.
-> Why do you recommend to use a platform driver? Is that current fad?
+--===============5664278743474050857==
+Content-Type: multipart/signed; boundary="=-=-=";
+	micalg=pgp-sha512; protocol="application/pgp-signature"
 
-Not exactly a fad. We've been doing it for some time now. From an older
-email on the list:
+--=-=-=
+Content-Type: text/plain
 
-Reasons (in no particular order):
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-  1. We get a dev pointer to use with clk_hw_register()
+> The Raspberry Pi 3 A+ is similar to the Pi 3 B+ but has only 512 MB RAM,
+> 1 USB 2.0 port and no Ethernet.
+>
+> Compared to the Raspberry Pi 3 B it isn't possible to control BT_ON and
+> WL_ON separately.
 
-  2. We can handle probe defer if some resource is not available
+Acked-by: Eric Anholt <eric@anholt.net>
 
-  3. Using device model gets us a hook into power management frameworks
-     like runtime PM and system PM for things like suspend and hibernate
+--=-=-=
+Content-Type: application/pgp-signature; name="signature.asc"
 
-  4. It encourages a single DT node clk controller style binding
-     instead of a single node per clk style binding
+-----BEGIN PGP SIGNATURE-----
 
-  5. We can use non-DT specific functions like devm_ioremap_resource() to map
-     registers and acquire other resources, leading to more portable and
-     generic code
+iQIzBAEBCgAdFiEE/JuuFDWp9/ZkuCBXtdYpNtH8nugFAlwlc6oACgkQtdYpNtH8
+nujEpw/+OSvYCHuNDF4JtRArp9tmrKbu0q/srr/KksmBLsVDr9VUhY6TBgv2CkFP
+2l7ONPb9fnP746Y6MUxvw+9s+lyS8gYLcymxYSBcYiaaQQp2w/g6CBBwcMLUyzX3
+JvWoslX9DxHAbi7ISwWi3GJERnIzZ/rchU9vCYRuyk9FyhwUymVG+I+ExhFDOxBU
+MRm11nRVr2cGBRbB4WSylQF14agNYZHuF1BUtHIizosZF05SNqdqYAAtgWofhb+7
+dWOPkSM7Nis3PQ6g8r9pkZtB9UNEokKX08PdF4jfEGtOH528SIOIDcUVK8Bi45jW
+CQBOMHHdNsp6oCaTuf01I17hkjdHYCx10BluvOkYy4cWuqL9+Q35wbYLcefTr583
+Ni7QrJtOJPVJyPpqCrSvLo4qV1X43bp3mfLYUwZPDvftW2AoQLaITSDRG5ewaHDY
+/tjhP7jj15W3mtzRf2wI/iHU46aLltiLICLUgfM+At1DG1iCWsT0O6zkoPnMO8Cf
+NgS8ChS221vTVu4Xa0nuk9WoIAeGClp7fwqiU3r8zo6o9Rkm5eBTY7gwqk1jgv3z
+PzaPpIRmciOjlwlTTvEucJ7QAMxnHKIjNrEex6CARwXAgdx6DQM6rErGWthDgg2n
+7Q+CnNZp4By+IB+o7vWF+PPOszsyrZXne1e27Gnvwuf8b6zbYk0=
+=6Pd0
+-----END PGP SIGNATURE-----
+--=-=-=--
 
-  6. We may be able to make the device driver a module, which will
-     make distros happy if we don't have to compile in all
-     these clk drivers to the resulting vmlinux
 
+--===============5664278743474050857==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============5664278743474050857==--
+
