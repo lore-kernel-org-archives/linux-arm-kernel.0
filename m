@@ -2,22 +2,21 @@ Return-Path: <SRS0=Tyfh=PF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1F5F8C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 22:04:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F057CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 22:05:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DB45E217F9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 22:04:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B6EB3217F9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 22:05:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jvxp/oJC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DB45E217F9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BOZBASnM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B6EB3217F9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=dudau.co.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,54 +24,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Vz1EJskJXWt3Cpv4VKqiOOZecVWCKv0BvZVLcgM4y6c=; b=jvxp/oJC5eRRSq
-	nBzRHNZrKjvOP8KcY3aa043rwU20x9rXZZjfpwZ941g/1/qTiOOJxGGwD/l69BmHzwFCXP7NZleW5
-	JLUvkHXF14KBgz1kjSqHK01rxyBk4h8BzfqdTziR2aaZ1Oxjsb5dV+v5Ee+L8upD3xrgiAsqCqGZ7
-	R9RlMdxpGHOw+tM2TsX44tDpQdiiVNKsIwfcECFF0XXmejrFSCUlbV5NWjdVM0Qb1oSXZ474ja7/Q
-	GtKluxNkbiOjtUrfgrd/pNhwYXBO7nHyOMWdv+IaFTHDPT4hr8TyIXSd+gkfP00A859WSH3bVVheJ
-	ouosCD3kJ/S3eaKQ1Ljw==;
+	List-Owner; bh=TGA6lcq9zjq+LI78ta0jJ9lTfJS6elj3P2HuQIlv5Ss=; b=BOZBASnMuNLZG1
+	qFnLT/pWW3LV2gvn6GFtAh3vVt/eWKIADM/cVdaVJWhUQQCIFsZxFvfIit5ZJHlu+9YQaQAAWEVbY
+	2w1f/XPzKg4pTTlOo5q4KsGzxRxCdxnHNTVRbf51FlGmNpxWxERAEnwfNpieQc4KqCggUfkdjZbnR
+	WEyzpZn2Vem0pejjRkp7zlbXIaM8+XJqi0E00uikhCEsdPaueIEUJBv8tLupVuJi0tzNcpcTS7ZeR
+	XS+4tG1p2JuAuKM5tpmMmPCo5lTLlCrsTvzNGymfl/UO4ucuN7guE7kJuTmZTwVgxOiDADz588Mv5
+	0S2AX9shd4eneV6r3T8Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gd0F2-000635-AP; Fri, 28 Dec 2018 22:04:28 +0000
-Received: from mail-it1-f196.google.com ([209.85.166.196])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gd0Eu-00061i-8s; Fri, 28 Dec 2018 22:04:22 +0000
-Received: by mail-it1-f196.google.com with SMTP id g85so30018779ita.3;
- Fri, 28 Dec 2018 14:04:07 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=notmpdDYWSi2JCcn64Q/8o1c94650SqabPpHm6d37c8=;
- b=fUsb+ZXh23t11b5gqPe0JNHsmlcBGthTSvyqE16Bow0NHU2fLMM7d+7wflSDLu6wt+
- d0wVksUPf8E4edECX66SuMfgznpLIXIP+TkZ6wAwBiq/EJMPTRPgVej88e3HjS7jw+sE
- Oz5gSRo0q8EMfPFqpOgkDv0ckkdPm2M84eQknK6V1dv4P9b33ZSejYnrG/LdtYWbRctX
- Z11wX/3ScD7K1XIqS/BFyAeeSX9BMI1gUjLy2pOHEIAOFJh+qNkNxj2z0VuStGuukLGD
- +pmpGxI3gDNglBOuzL7mL+Qd26eXRp8zpzdpELIrFFmkROnDtx+faPbWXwztIV00GksD
- mFaQ==
-X-Gm-Message-State: AA+aEWZnDm5fEeLp2J74e4eW3qaaImak9zXhOlutUl4Gm4/hy2UlvEXa
- zjt3oB6Cga5rB/zw6g5qQg==
-X-Google-Smtp-Source: AFSGD/V3XBAlTTF7/zPGtpLedkoM2pu2PX66XShQPXNsmTTIz+801eskBVfox6c+vZfvl0+8sdQlFQ==
-X-Received: by 2002:a24:ed4f:: with SMTP id r76mr17599014ith.17.1546034646772; 
- Fri, 28 Dec 2018 14:04:06 -0800 (PST)
-Received: from localhost ([24.51.61.172])
- by smtp.gmail.com with ESMTPSA id b188sm16853950itc.9.2018.12.28.14.04.05
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 28 Dec 2018 14:04:06 -0800 (PST)
-Date: Fri, 28 Dec 2018 16:04:05 -0600
-From: Rob Herring <robh@kernel.org>
-To: Erin Lo <erin.lo@mediatek.com>
-Subject: Re: [PATCH v5 5/6] dt-bindings: pinctrl: mt8183: add binding document
-Message-ID: <20181228220405.GA8739@bogus>
-References: <1545984581-25843-1-git-send-email-erin.lo@mediatek.com>
- <1545984581-25843-6-git-send-email-erin.lo@mediatek.com>
+	id 1gd0GH-0007j3-HS; Fri, 28 Dec 2018 22:05:45 +0000
+Received: from dliviu.plus.com ([80.229.23.120] helo=smtp.dudau.co.uk)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gd0GD-0007iQ-Kf
+ for linux-arm-kernel@lists.infradead.org; Fri, 28 Dec 2018 22:05:43 +0000
+Received: from mail.dudau.co.uk (bart.dudau.co.uk [192.168.14.2])
+ by smtp.dudau.co.uk (Postfix) with SMTP id 5A09641080C1;
+ Fri, 28 Dec 2018 22:05:29 +0000 (GMT)
+Received: by mail.dudau.co.uk (sSMTP sendmail emulation);
+ Fri, 28 Dec 2018 22:05:29 +0000
+Date: Fri, 28 Dec 2018 22:05:29 +0000
+From: Liviu Dudau <liviu@dudau.co.uk>
+To: Christoph Hellwig <hch@lst.de>
+Subject: Re: [PATCH dma-mapping tree] arm64: default to the direct mapping in
+ get_arch_dma_ops
+Message-ID: <20181228220529.GB20342@bart.dudau.co.uk>
+References: <20181214150240.26427-1-hch@lst.de> <20181219165502.GA25904@lst.de>
+ <20181228173057.GA20342@bart.dudau.co.uk>
+ <20181228175900.GB16929@lst.de>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1545984581-25843-6-git-send-email-erin.lo@mediatek.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <20181228175900.GB16929@lst.de>
+User-Agent: Mutt/1.11.1 (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181228_140420_318030_94E6E8BC 
-X-CRM114-Status: GOOD (  24.33  )
+X-CRM114-CacheID: sfid-20181228_140541_822141_E07F683B 
+X-CRM114-Status: GOOD (  14.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,167 +69,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Jason Cooper <jason@lakedaemon.net>,
- srv_heupstream <srv_heupstream@mediatek.com>,
- Marc Zyngier <marc.zyngier@arm.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>, mars.cheng@mediatek.com,
- Stephen Boyd <sboyd@codeaurora.org>, linux-kernel@vger.kernel.org,
- linux-mediatek@lists.infradead.org, linux-serial@vger.kernel.org,
- Zhiyong Tao <zhiyong.tao@mediatek.com>,
- Matthias Brugger <matthias.bgg@gmail.com>, yingjoe.chen@mediatek.com,
- Thomas Gleixner <tglx@linutronix.de>, eddie.huang@mediatek.com,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: catalin.marinas@arm.com, iommu@lists.linux-foundation.org,
+ robin.murphy@arm.com, linux-arm-kernel@lists.infradead.org,
+ will.deacon@arm.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 28, 2018 at 04:09:40PM +0800, Erin Lo wrote:
-> From: Zhiyong Tao <zhiyong.tao@mediatek.com>
+On Fri, Dec 28, 2018 at 06:59:00PM +0100, Christoph Hellwig wrote:
+> On Fri, Dec 28, 2018 at 05:30:57PM +0000, Liviu Dudau wrote:
+> > On Wed, Dec 19, 2018 at 05:55:02PM +0100, Christoph Hellwig wrote:
+> > > As all maintainers seem to be off to their holidays already I've
+> > > applied this now given that I don't want to leave arm64 in broken
+> > > state in linux-next any longer.
+> > 
+> > Hi Christoph,
+> > 
+> > Talking about linux-next being broken, I found out that with
+> > next-20181224 the nvme driver with an HMB NVMe SSD (Toshiba RC-100)
+> > also fails on a RK3399 board (NanoPC T4). It works with v4.20 just fine.
+> > 
+> > The reason for linking it to your patchset is that I get this on
+> > next-20181224 (the DMA addresses looks the same for the allocated buffers):
 > 
-> The commit adds mt8183 compatible node in binding document.
-> 
-> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
-> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
-> ---
->  .../devicetree/bindings/pinctrl/pinctrl-mt8183.txt | 110 +++++++++++++++++++++
->  1 file changed, 110 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt
-> new file mode 100644
-> index 0000000..7b5285e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt
-> @@ -0,0 +1,110 @@
-> +* Mediatek MT8183 Pin Controller
-> +
-> +The Mediatek's Pin controller is used to control SoC pins.
-> +
-> +Required properties:
-> +- compatible: value should be one of the following.
-> +	"mediatek,mt8183-pinctrl", compatible with mt8183 pinctrl.
-> +- gpio-controller : Marks the device node as a gpio controller.
-> +- #gpio-cells: number of cells in GPIO specifier. Since the generic GPIO
-> +  binding is used, the amount of cells must be specified as 2. See the below
-> +  mentioned gpio binding representation for description of particular cells.
-> +- gpio-ranges : gpio valid number range.
-> +
-> +	Eg: <&pio 6 0>
-> +	<[phandle of the gpio controller node]
-> +	[line number within the gpio controller]
-> +	[flags]>
-> +
-> +	Values for gpio specifier:
-> +	- Line number: is a value between 0 to 202.
-> +	- Flags:  bit field of flags, as defined in <dt-bindings/gpio/gpio.h>.
-> +            Only the following flags are supported:
-> +            0 - GPIO_ACTIVE_HIGH
-> +            1 - GPIO_ACTIVE_LOW
-> +
-> +Optional properties:
-> +- reg: physicall address base for gpio base registers.
+> Your patch looks correct.  Can you send the dma_alloc_coherent
+> to dma_alloc_attrs switch to linux-nvme list with a proper commit log
+> and signoff?
 
-s/physicall/physical/
+Sure, but that still doesn't make nvme work. Do you have any suggestions?
 
-reg should never be optional. 
+Best regards,
+Liviu
 
-Need to say how many reg entries.
 
-> +- reg-names: gpio base registers name.
-
-Need to say what are the names. However, I don't find the names in the 
-example all that useful, so I'd just drop it.
-
-> +- interrupt-controller: Marks the device node as an interrupt controller
-> +- #interrupt-cells: Should be two.
-> +- interrupts : The interrupt outputs from the controller.
-> +
-> +Please refer to pinctrl-bindings.txt in this directory for details of the
-> +common pinctrl bindings used by client devices.
-> +
-> +Subnode format
-> +A pinctrl node should contain at least one subnodes representing the
-> +pinctrl groups available on the machine. Each subnode will list the
-> +pins it needs, and how they should be configured, with regard to muxer
-> +configuration, pullups, drive strength, input enable/disable and input schmitt.
-> +
-> +    node {
-> +	pinmux = <PIN_NUMBER_PINMUX>;
-> +	GENERIC_PINCONFIG;
-> +    };
-> +
-> +Required properties:
-> +- pinmux: integer array, represents gpio pin number and mux setting.
-> +    Supported pin number and mux varies for different SoCs, and are defined
-> +    as macros in boot/dts/<soc>-pinfunc.h directly.
-> +
-> +Optional properties:
-> +- GENERIC_PINCONFIG: is the generic pinconfig options to use, bias-disable,
-> +    bias-pull-down, bias-pull-up, input-enable, input-disable, output-low, output-high,
-> +    input-schmitt-enable, input-schmitt-disable and drive-strength are valid.
-> +
-> +    Some special pins have extra pull up strength, there are R0 and R1 pull-up
-> +    resistors available, but for user, it's only need to set R1R0 as 00, 01, 10 or 11.
-> +    So when config mediatek,pull-up-adv or mediatek,pull-down-adv,
-> +    it support arguments for those special pins.
-> +
-> +    When config drive-strength, it can support some arguments, such as
-> +    MTK_DRIVE_4mA, MTK_DRIVE_6mA, etc. See dt-bindings/pinctrl/mt65xx.h.
-> +
-> +Examples:
-> +
-> +#include "mt8183-pinfunc.h"
-> +
-> +...
-> +{
-> +	pio: pinctrl@10005000 {
-> +		compatible = "mediatek,mt8183-pinctrl";
-> +		reg = <0 0x10005000 0 0x1000>,
-> +		      <0 0x11F20000 0 0x1000>,
-> +		      <0 0x11E80000 0 0x1000>,
-> +		      <0 0x11E70000 0 0x1000>,
-> +		      <0 0x11E90000 0 0x1000>,
-> +		      <0 0x11D30000 0 0x1000>,
-> +		      <0 0x11D20000 0 0x1000>,
-> +		      <0 0x11C50000 0 0x1000>,
-> +		      <0 0x11F30000 0 0x1000>;
-> +		reg-names = "iocfg0", "iocfg1", "iocfg2",
-> +			    "iocfg3", "iocfg4", "iocfg5",
-> +			    "iocfg6", "iocfg7", "iocfg8";
-> +		gpio-controller;
-> +		#gpio-cells = <2>;
-> +		gpio-ranges = <&pio 0 0 192>;
-> +		interrupt-controller;
-> +		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
-> +		interrupt-parent = <&gic>;
-> +		#interrupt-cells = <2>;
-> +
-> +		i2c0_pins_a: i2c0@0 {
-
-unit-address without reg property is not valid.
-
-> +			pins1 {
-> +				pinmux = <PINMUX_GPIO48__FUNC_SCL5>,
-> +					 <PINMUX_GPIO49__FUNC_SDA5>;
-> +				mediatek,pull-up-adv = <11>;
-> +			};
-> +		};
-> +
-> +		i2c1_pins_a: i2c1@0 {
-> +			pins {
-> +				pinmux = <PINMUX_GPIO50__FUNC_SCL3>,
-> +					 <PINMUX_GPIO51__FUNC_SDA3>;
-> +				mediatek,pull-down-adv = <10>;
-> +			};
-> +		};
-> +		...
-> +	};
-> +};
-> -- 
-> 1.9.1
-> 
+-- 
+           ________________________________________________________
+  ________|                                                        |_______
+  \       |  With enough courage, you can do without a reputation  |      /
+   \      |                                  -- Rhett Butler       |     /
+   /      |________________________________________________________|     \
+  /__________)                                                  (_________\
 
 _______________________________________________
 linux-arm-kernel mailing list
