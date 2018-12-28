@@ -4,62 +4,62 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A7D34C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 10:08:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 54D0AC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 10:28:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7536C20879
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 10:08:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 24BA420874
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 10:28:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZHUlEqaj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7536C20879
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rAaXIsEZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 24BA420874
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=uqHhWRo71tOPQyZ6IRzXMcjPnoAiqf6oBxJgoKe0m34=; b=ZHU
-	lEqaj/9jkJNHpYE4gzwPeI7PCSKREGorqFN+9LXtGN6g72CN5mdsojzcQEmjw6OvCtuHDRf4NFVdM
-	SMjf+FClmYmGI8xajuI+0cmFGYgbuRMXeVpxz/z6Ic8BhJ4YG7R+HTLLUmApYO5HUNP0RIq7RDTB2
-	rv6hD0cB9TcqvElUFpfqtVdKqGOulr1iue3BTvQXdx/UPSWyFx9IIMWeA6TthuNl1/C+8ndiO3klt
-	gxuvl2qZKq4o7d+8Pfgh1YufEndghKKKC4uq7SrUHE3q5GexfvvNTnff9kOagqJuvHjJGc3rC0fhI
-	SELE2MVmQ5LQz2HSHkLmctOuUvlAukw==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=jxGvgys7/IRbuCGi1pzFp7hdGR1hjGMzydbjgsh7BsM=; b=rAaXIsEZP4tZOR
+	uE4Ahj+suS4yczM/4ySCt6owrJjbK5WhzAqZ8EvWk69ui+zfLQAAT6EWqabNClUBHRNvrJxn3PuQc
+	QDRg92FWnPENAqIdNrX1oc3BqJ8jbG4Nq1Jznr+Xj8QU/ESOiiFbUjpxYRWK06UjPQJpuAqoxxxWH
+	xLffi63/SIE2vYkgEeA3ybMSAFARQCFPh4o1JRY1DDRMaR7TmHrVeo/KPVK1FT3adBfkS/QqpWI9Q
+	RXvbHPj9NRLbSSUUQ6tmU8cmEhMQtJ/Is1lbeEGkgYrKIOuAELARdyF7gNa8z9gAK7RrL9jWft+LE
+	YIMLeY1C3VWFPAgIRBQA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gcp3x-0004iG-Cz; Fri, 28 Dec 2018 10:08:17 +0000
-Received: from inva020.nxp.com ([92.121.34.13])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gcp3t-0004hO-MH
- for linux-arm-kernel@lists.infradead.org; Fri, 28 Dec 2018 10:08:15 +0000
-Received: from inva020.nxp.com (localhost [127.0.0.1])
- by inva020.eu-rdc02.nxp.com (Postfix) with ESMTP id 8FBAF1A004D;
- Fri, 28 Dec 2018 11:07:59 +0100 (CET)
-Received: from invc005.ap-rdc01.nxp.com (invc005.ap-rdc01.nxp.com
- [165.114.16.14])
- by inva020.eu-rdc02.nxp.com (Postfix) with ESMTP id DAEC11A0196;
- Fri, 28 Dec 2018 11:07:54 +0100 (CET)
-Received: from titan.ap.freescale.net (TITAN.ap.freescale.net [10.192.208.233])
- by invc005.ap-rdc01.nxp.com (Postfix) with ESMTP id C0D2F402E0;
- Fri, 28 Dec 2018 18:07:48 +0800 (SGT)
-From: Yinbo Zhu <yinbo.zhu@nxp.com>
-To: linux-mmc@vger.kernel.org, Adrian Hunter <adrian.hunter@intel.com>,
- ulf.hansson@linaro.org, Shawn Guo <shawnguo@kernel.org>,
- Sascha Hauer <kernel@pengutronix.de>
-Subject: [PATCH v1] ARM: dts: ls1021aqds: Enable the esdhc
-Date: Fri, 28 Dec 2018 18:02:51 +0800
-Message-Id: <20181228100251.25697-1-yinbo.zhu@nxp.com>
-X-Mailer: git-send-email 2.14.1
-X-Virus-Scanned: ClamAV using ClamSMTP
+	id 1gcpNa-0002bI-9d; Fri, 28 Dec 2018 10:28:34 +0000
+Received: from [1.203.163.78] (helo=mailgw01.mediatek.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gcpNV-0002aJ-Tp; Fri, 28 Dec 2018 10:28:32 +0000
+X-UUID: c2e64387311a4d66bb304d5030e54b95-20181228
+X-UUID: c2e64387311a4d66bb304d5030e54b95-20181228
+Received: from mtkcas35.mediatek.inc [(172.27.4.250)] by mailgw01.mediatek.com
+ (envelope-from <chunfeng.yun@mediatek.com>)
+ (mailgw01.mediatek.com ESMTP with TLS)
+ with ESMTP id 1042852339; Fri, 28 Dec 2018 18:27:57 +0800
+Received: from mtkcas09.mediatek.inc (172.21.101.178) by
+ MTKMBS31DR.mediatek.inc (172.27.6.102) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Fri, 28 Dec 2018 18:27:55 +0800
+Received: from localhost.localdomain (10.17.3.153) by mtkcas09.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Fri, 28 Dec 2018 18:27:54 +0800
+From: Chunfeng Yun <chunfeng.yun@mediatek.com>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Subject: [PATCH] usb: devio: update max count of DPs per interval for ISOC
+Date: Fri, 28 Dec 2018 18:27:44 +0800
+Message-ID: <1545992864-9530-1-git-send-email-chunfeng.yun@mediatek.com>
+X-Mailer: git-send-email 1.7.9.5
+MIME-Version: 1.0
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181228_020813_865211_98B7745A 
-X-CRM114-Status: UNSURE (   8.32  )
+X-CRM114-CacheID: sfid-20181228_022831_064102_E6A1083A 
+X-CRM114-Status: UNSURE (   9.36  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -72,38 +72,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>, yinbo.zhu@nxp.com, yangbo.lu@nxp.com,
- linux-arm-kernel@lists.infradead.org, leoyang.li@nxp.com
-MIME-Version: 1.0
+Cc: devicetree@vger.kernel.org, Felipe Balbi <felipe.balbi@linux.intel.com>,
+ linux-usb@vger.kernel.org, linux-kernel@vger.kernel.org,
+ Chunfeng Yun <chunfeng.yun@mediatek.com>, linux-mediatek@lists.infradead.org,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch is to set the esdhc's status to "okay" in kernel.
+The host shall be able to accept and send up to 96 DPs for
+devices operating at Gen 2 speed.
 
-Signed-off-by: Yinbo Zhu <yinbo.zhu@nxp.com>
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- arch/arm/boot/dts/ls1021a-qds.dts |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ drivers/usb/core/devio.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ls1021a-qds.dts b/arch/arm/boot/dts/ls1021a-qds.dts
-index bfd3746..98e562c 100644
---- a/arch/arm/boot/dts/ls1021a-qds.dts
-+++ b/arch/arm/boot/dts/ls1021a-qds.dts
-@@ -334,6 +334,10 @@
- 	};
- };
- 
-+&esdhc {
-+	status = "okay";
-+};
-+
- &sai2 {
- 	status = "okay";
- };
+diff --git a/drivers/usb/core/devio.c b/drivers/usb/core/devio.c
+index a75bc0b8a50f..82c16210e34c 100644
+--- a/drivers/usb/core/devio.c
++++ b/drivers/usb/core/devio.c
+@@ -1564,12 +1564,10 @@ static int proc_do_submiturb(struct usb_dev_state *ps, struct usbdevfs_urb *uurb
+ 		}
+ 		for (totlen = u = 0; u < number_of_packets; u++) {
+ 			/*
+-			 * arbitrary limit need for USB 3.0
+-			 * bMaxBurst (0~15 allowed, 1~16 packets)
+-			 * bmAttributes (bit 1:0, mult 0~2, 1~3 packets)
+-			 * sizemax: 1024 * 16 * 3 = 49152
++			 * arbitrary limit need for USB 3.1 Gen2
++			 * sizemax: 96 DPs at SSP, 96 * 1024 = 98304
+ 			 */
+-			if (isopkt[u].length > 49152) {
++			if (isopkt[u].length > 98304) {
+ 				ret = -EINVAL;
+ 				goto error;
+ 			}
 -- 
-1.7.1
+2.19.1
 
 
 _______________________________________________
