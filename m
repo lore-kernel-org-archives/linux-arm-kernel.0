@@ -2,86 +2,89 @@ Return-Path: <SRS0=Tyfh=PF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 86001C43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 16:06:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4843BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 16:18:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 562B520874
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 16:06:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1870620856
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 16:18:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oL047B4m";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="fztLfO0D"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 562B520874
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cJ7kEjKu";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="WcSrwqY6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1870620856
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=7nl0Kkw2GIHOvo0Jnt8xZMLOmj8ZhkYVy8CTtTirFYU=; b=oL047B4m/+bNAf
-	pdEcN91HiQcZhzCE2OTrJ5nFgUIkECoMBXrTSPhkDINmPYQchgjiS414/O0iXyTrS3OFdVIlR4qdR
-	TiVRHvgICxOiZZ0a8dWexMTar8HaVkr1b5dlfi1XRWQdsXtH81efkZwdMXLa0bCMmIsCWIvMOBHTI
-	tbQaRCT5v1XvaVTVt9I+yMy6Ji54JWCuN9xJ733nA0TJBx5eQqn5P58kAOjgKiWqxbu2mFfJgmQap
-	Jfn65dl+hc8iXvth96tByJmEYKzJTh7v4vE6Dts5ViCvgL89BfvohA+jqxRPneOdx0CbRXKgJmE8x
-	E0wP6iL30wNm4Y0PydBw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=O2KEGkssXM50X9xUYkgdoJdXOF7/lvyaPy7tLJxeeDw=; b=cJ7kEjKuW04l+j
+	smmOo19X+MfD9bODGXBF1u1D4kyaWRiqstYMcep31e/YcrXcaVjSCe9wqW5SL/1ZbjqUSVwoOc2y7
+	sY0CykGSwh3Cau5HIz/T5W8p/6lwi04+SCL7s2srQZQMD00sZiPmpBHmdZZRj2/ytFi0nO0WnAxCg
+	TJQii7uRVsTQ/tDFgbDuYJKEgzkpU0RPcq0ctlNU7Bqwf1+Nq5vD3aypMVQYcOdtteBqltaNXkrDA
+	ZHSdyYdEyopOwpSpvDYUacu/sWjz52E4CVhGPcvxBP+GDb0Vt9XFR8kMK0e/dekQx08ZlqMtSFUU5
+	rUPNNXICUjCZKgao4njA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gcueJ-0000uC-JA; Fri, 28 Dec 2018 16:06:11 +0000
-Received: from mail-ot1-x344.google.com ([2607:f8b0:4864:20::344])
+	id 1gcuqT-0004GZ-UU; Fri, 28 Dec 2018 16:18:45 +0000
+Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gcueA-0000hl-Ej
- for linux-arm-kernel@lists.infradead.org; Fri, 28 Dec 2018 16:06:06 +0000
-Received: by mail-ot1-x344.google.com with SMTP id 32so18936114ota.12
+ id 1gcuqQ-0004EO-Bb
+ for linux-arm-kernel@lists.infradead.org; Fri, 28 Dec 2018 16:18:43 +0000
+Received: by mail-lj1-x242.google.com with SMTP id t18-v6so19071311ljd.4
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 28 Dec 2018 08:05:51 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=ezGYfVxiwhlDU503aVqkNVICSduystT0QEAYy84RgY4=;
- b=fztLfO0DXWBYQ35Nz5OkG1AxRjZhZABkT878ZN8nmYN5+7yD/I3qbE1Pvukiqb4Ouo
- ATCsUH5/2VLHV5RwcVW7gX+OFDDORrWMtsfA/IFKVWTMOAZCnSRvHRLzOMXVC6ysavux
- lrdou3MbozxK716J+y6cye7q8fjM3mkpjsrRA=
+ Fri, 28 Dec 2018 08:18:31 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=C+leDKkBVfjRpoUE44MkXKt8HF9pvwnytOv/e4MMaU8=;
+ b=WcSrwqY64z5Sb6TFyFSlJCQlUBLnDE+X8oeeAfM4tmamS4Lh9uQe1jQoWlW7U7R1AK
+ vgVcNUyDu4KZ6FkIXLCu7FmfNrRQMD3Zk2NyH/GQT7iDpjxZDGZ2Z2UOAY7fpwx/ka7V
+ yaaXr3UsKTFnrUemBUuhHdsA8opySn/Lq7xmYgZJdqYi33I8U4Gp8+PjQJxGc1vToR8B
+ /GosPsVzPOC6Sy3fFptbGyYFymAfg0dfMyNbfWZT1U8R4KXjhyik54V0lLX3wbdAQ9ih
+ gmlVaKH2khrWFyQImyAc8BSUmiwTonbuAVHhvOE6T7EYK1kUDNami48K1i7KER2ZZHdL
+ VoRA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=ezGYfVxiwhlDU503aVqkNVICSduystT0QEAYy84RgY4=;
- b=Pbgvq5i4pIZrZifRxl7/B3NHEUTAJ6JPJ5MxR3EwcEdywCjUo7KRDTy3S6LXof/MXc
- +Mtrs0TS2PgiBXk7R5kCJdlbUDsv7/RReWhOKgwGRK82fZQV/9+caX3DR4qG5ySQ2YDJ
- m7+sfCUEekOx89f5ezMlZDFdYRUUoR/6S2Xi+oRBZuLrMrm+P6eR6ogftoKCUjBUO9DT
- +x7AnOfKwCrmUn1qnB2WB9ldZCvXKVt4M4W7RqlPjmLzy2inz1C5U5qlKjwxfUBit9cv
- Lq2iW8KrJbIGXrvlL+QtcNVlI0yLEiwaGxaIeij9AVYXAqUEsLnOLncMQobebC5YsY5j
- xgZQ==
-X-Gm-Message-State: AJcUukdNrFGnzyzJGXo/Gue9TuUW4eiUrvnMbf0jUcxHiYvZylSf4yIh
- 4Qo0w2o4dPgIP3/wz/DYKCenpw==
-X-Google-Smtp-Source: ALg8bN7r1HuYdAqB7iSYNL/3a4xAII9XX5thrOd0eQZVkZNOPfV+ymfot699NE25EOSTCek7SiO2SA==
-X-Received: by 2002:a9d:8e4:: with SMTP id 91mr18438655otf.169.1546013150937; 
- Fri, 28 Dec 2018 08:05:50 -0800 (PST)
-Received: from localhost (107-207-74-175.lightspeed.austtx.sbcglobal.net.
- [107.207.74.175])
- by smtp.gmail.com with ESMTPSA id a1sm18537313oto.71.2018.12.28.08.05.49
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=C+leDKkBVfjRpoUE44MkXKt8HF9pvwnytOv/e4MMaU8=;
+ b=mRwZUgnXdAKrYwN71Ej6MoaWmwSKqKN1YUX/QND/mCxBspgJzZ9khJjNAL6M4bjrW/
+ CpmLer/t1y0K/z1Y2PopQJ/p3tkWlatDUOd0lSPG4K3hQDBAkAiwopkK8WB0urNVNWyE
+ Em5K3ZBvG7uq7Vq0aWDlv38uRkubC7LwNF0PE2F5FLjAuLBFbwpT9vm1aY6PmiOKn6bB
+ /9s1YDaud4nAj+dTWOsJdfEXnv/cQEHFnW6YeBIK5Tfc5aQJbzveVQPsA2vihanGgpHY
+ tbyb9xb5QtrTUad0a3Kfv6JJD3l7b368F0ychhS1X6Tjrj10BkyqetOHSeRjS0vhachH
+ BOLw==
+X-Gm-Message-State: AJcUukcMhR/Q2BFvdwi/X+ZF+9Ff/p96Xb8LPFZfYzctUHrqkbnYgPQa
+ r898gtsbtsr5Xg7JqBSkkjU=
+X-Google-Smtp-Source: ALg8bN7r4F+mBjki6kxhWO46pf+rJxzeohYOsNUr+Rcmz2Pga8Ms1bki4O3aO7GlE5ME1gPr2/XfXw==
+X-Received: by 2002:a2e:92ca:: with SMTP id
+ k10-v6mr16099242ljh.63.1546013910132; 
+ Fri, 28 Dec 2018 08:18:30 -0800 (PST)
+Received: from localhost.localdomain
+ ([2a02:a315:5445:5300:7146:fd07:48ff:9665])
+ by smtp.googlemail.com with ESMTPSA id r4sm8136502lfe.60.2018.12.28.08.18.27
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 28 Dec 2018 08:05:50 -0800 (PST)
-Date: Fri, 28 Dec 2018 10:05:46 -0600
-From: Andy Gross <andy.gross@linaro.org>
-To: Marc Gonzalez <marc.w.gonzalez@free.fr>
-Subject: Re: [PATCH v1] phy: qcom-ufs: Use iopoll.h readl_poll_timeout macro
-Message-ID: <20181228160546.GC25288@hector.attlocal.net>
-References: <88cd3a2e-2acc-02ff-9f27-284d3b679d10@free.fr>
+ Fri, 28 Dec 2018 08:18:29 -0800 (PST)
+From: =?UTF-8?q?Pawe=C5=82=20Chmiel?= <pawel.mikolaj.chmiel@gmail.com>
+To: krzk@kernel.org
+Subject: [PATCH 0/6] ARM: dts: s5pv210: aries: Enable more drivers present on
+ Samsung Aries based devices
+Date: Fri, 28 Dec 2018 17:18:13 +0100
+Message-Id: <20181228161819.18931-1-pawel.mikolaj.chmiel@gmail.com>
+X-Mailer: git-send-email 2.17.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <88cd3a2e-2acc-02ff-9f27-284d3b679d10@free.fr>
-User-Agent: Mutt/1.5.23.1 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181228_080602_963240_0BC010C7 
-X-CRM114-Status: GOOD (  10.93  )
+X-CRM114-CacheID: sfid-20181228_081842_404842_EA6DB000 
+X-CRM114-Status: GOOD (  10.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,29 +96,38 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnd Bergmann <arnd@arndb.de>, MSM <linux-arm-msm@vger.kernel.org>,
- Will Deacon <will.deacon@arm.com>, LKML <linux-kernel@vger.kernel.org>,
- Kishon Vijay Abraham <kishon@ti.com>, David Brown <david.brown@linaro.org>,
- Matt Wagantall <mattw@codeaurora.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Vivek Gautam <vivek.gautam@codeaurora.org>,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- Mitchel Humpherys <mitchelh@codeaurora.org>,
- Yaniv Gardi <ygardi@codeaurora.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ linux-samsung-soc@vger.kernel.org, xc-racer2@live.ca, linux@armlinux.org.uk,
+ robh+dt@kernel.org, linux-kernel@vger.kernel.org, kgene@kernel.org,
+ linux-arm-kernel@lists.infradead.org, pawel.mikolaj.chmiel@gmail.com
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 21, 2018 at 11:13:18AM +0100, Marc Gonzalez wrote:
-> The private copy of readl_poll_timeout is no longer needed.
-> Use the implementation in iopoll.h instead.
-> 
-> Signed-off-by: Marc Gonzalez <marc.w.gonzalez@free.fr>
-
-Reviewed-by: Andy Gross <andy.gross@linaro.org>
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+VGhpcyBwYXRjaHNldCBlbmFibGVzIG1vcmUgZHJpdmVycyBmb3IgZGV2aWNlcyBwcmVzZW50IG9u
+CiBTYW1zdW5nIEFyaWVzIGJhc2VkIGRldmljZXMuCgpGaXJzdCBwYXRjaCBzd2l0Y2hlcyBmaW1k
+IHRvIGNvcnJlY3QgdmFyaWFudCwgd2hpY2ggd2Fzbid0CiBwcmVzZW50IGF0IG1vbWVudCBvZiBh
+ZGRpbmcgYXJpZXMgZHRzLgoKTmV4dCB0d28gcGF0Y2hlcyByZW1vdmVzIGhhcmRjb2RlZCBib290
+YXJncyBmcm9tIGR0cyBmaWxlcwogZm9yIGdhbGF4eXMgYW5kIGZhc2NpbmF0ZTRnLCBiZWNhdXNl
+IG5vdyB3ZSBoYXZlIHdvcmtpbmcgYm9vdGxvYWRlcgogd2hpY2ggY2FuIHBhc3MgdGhvc2UgdmFs
+dWVzLgoKT25lIG9mIHRoZSBwYXRjaGVzIGFsc28gcmVzZXJ2ZXMgbWVtb3J5IGZvciBTYW1zdW5n
+IFM1UCBNRkMKIHZpZGVvIGNvZGVjLCBzbyBpdCdzIHBvc3NpYmxlIHRvIHVzZSBpdC4KCkxhc3Qg
+dHdvIHBhdGNoZXMgYWRkcyBhbmQgZW5hYmxlcyBtb3JlIGRyaXZlcnMuCgpKb25hdGhhbiBCYWtr
+ZXIgKDEpOgogIEFSTTogZHRzOiBzNXB2MjEwOiBhcmllczogU3VwcG9ydCBmb3IgbW9yZSBkZXZp
+Y2VzIHByZXNlbnQgb24gQXJpZXMKClBhd2XFgiBDaG1pZWwgKDUpOgogIEFSTTogZHRzOiBzNXB2
+MjEwOiBVc2UgY29ycmVjdCBmaW1kIHZhcmlhbnQKICBBUk06IGR0czogczVwdjIxMDogZ2FsYXh5
+czogUmVtb3ZlIGhhcmRjb2RlZCBib290YXJncwogIEFSTTogZHRzOiBzNXB2MjEwOiBmYXNjaW5h
+dGU0ZzogUmVtb3ZlIGhhcmRjb2RlZCBib290YXJncwogIEFSTTogZHRzOiBzNXB2MjEwOiBhcmll
+czogQWRkIHJlc2VydmVkIG1lbW9yeSBmb3IgbWZjCiAgQVJNOiBkZWZjb25maWc6IHM1cHYyMTA6
+IEVuYWJsZSBtb3JlIGRyaXZlcnMgcHJlc2VudCBvbiBTYW1zdW5nIEFyaWVzCgogYXJjaC9hcm0v
+Ym9vdC9kdHMvczVwdjIxMC1hcmllcy5kdHNpICAgICAgfCA5MCArKysrKysrKysrKysrKysrKysr
+KysrKwogYXJjaC9hcm0vYm9vdC9kdHMvczVwdjIxMC1mYXNjaW5hdGU0Zy5kdHMgfCAgNyAtLQog
+YXJjaC9hcm0vYm9vdC9kdHMvczVwdjIxMC1nYWxheHlzLmR0cyAgICAgfCAgNyAtLQogYXJjaC9h
+cm0vYm9vdC9kdHMvczVwdjIxMC5kdHNpICAgICAgICAgICAgfCAgMiArLQogYXJjaC9hcm0vY29u
+Zmlncy9zNXB2MjEwX2RlZmNvbmZpZyAgICAgICAgfCA0MSArKysrKysrKy0tLQogNSBmaWxlcyBj
+aGFuZ2VkLCAxMjEgaW5zZXJ0aW9ucygrKSwgMjYgZGVsZXRpb25zKC0pCgotLSAKMi4xNy4xCgoK
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJt
+LWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3Jn
+Cmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtl
+cm5lbAo=
