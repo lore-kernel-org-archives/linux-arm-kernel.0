@@ -2,89 +2,90 @@ Return-Path: <SRS0=Tyfh=PF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4843BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 16:18:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 345AEC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 16:19:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1870620856
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 16:18:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0182C20857
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 16:19:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cJ7kEjKu";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="WcSrwqY6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1870620856
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pKtB6vMo";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="AgFJH9Gq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0182C20857
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=O2KEGkssXM50X9xUYkgdoJdXOF7/lvyaPy7tLJxeeDw=; b=cJ7kEjKuW04l+j
-	smmOo19X+MfD9bODGXBF1u1D4kyaWRiqstYMcep31e/YcrXcaVjSCe9wqW5SL/1ZbjqUSVwoOc2y7
-	sY0CykGSwh3Cau5HIz/T5W8p/6lwi04+SCL7s2srQZQMD00sZiPmpBHmdZZRj2/ytFi0nO0WnAxCg
-	TJQii7uRVsTQ/tDFgbDuYJKEgzkpU0RPcq0ctlNU7Bqwf1+Nq5vD3aypMVQYcOdtteBqltaNXkrDA
-	ZHSdyYdEyopOwpSpvDYUacu/sWjz52E4CVhGPcvxBP+GDb0Vt9XFR8kMK0e/dekQx08ZlqMtSFUU5
-	rUPNNXICUjCZKgao4njA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=zQbjKVFXCUCeS35FGEie4VKsXArkfraiz7XMb9bjKjE=; b=pKtB6vMoQr8G3H
+	ywR6N0w6qJN5b2ypxrG6HUt6aYh5DhlRTUz6VXT/1Bm8dMfTEm0rkJuwQJRnqawvJnGIAA6o7/bHU
+	9ZmS4iwPd5pU73JPNsBy85VHY3WVf20HbjlK4Cpr9Sb+HlIquHlOQEroik3waKHRJydUL6NAfie6z
+	0y57hxzgHBp7R1EClyfs9p+zKmcC+CEydjAGoESS4OUmquaK5jIg3CeMYdS92LFygn37iAC9ewwGH
+	KXJuoIlgniIPQs+pTzqA4UIwbyk923BZdLwGqWSxl7evuuLq8RWatCM14Q0hVW0qqsZ1F7CIhuSrB
+	TprxLl8j4nQrEdnaA/Jg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gcuqT-0004GZ-UU; Fri, 28 Dec 2018 16:18:45 +0000
-Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
+	id 1gcuqk-0004WK-On; Fri, 28 Dec 2018 16:19:02 +0000
+Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gcuqQ-0004EO-Bb
- for linux-arm-kernel@lists.infradead.org; Fri, 28 Dec 2018 16:18:43 +0000
-Received: by mail-lj1-x242.google.com with SMTP id t18-v6so19071311ljd.4
+ id 1gcuqS-0004EU-2w
+ for linux-arm-kernel@lists.infradead.org; Fri, 28 Dec 2018 16:18:45 +0000
+Received: by mail-lf1-x142.google.com with SMTP id i26so14868716lfc.0
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 28 Dec 2018 08:18:31 -0800 (PST)
+ Fri, 28 Dec 2018 08:18:33 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=C+leDKkBVfjRpoUE44MkXKt8HF9pvwnytOv/e4MMaU8=;
- b=WcSrwqY64z5Sb6TFyFSlJCQlUBLnDE+X8oeeAfM4tmamS4Lh9uQe1jQoWlW7U7R1AK
- vgVcNUyDu4KZ6FkIXLCu7FmfNrRQMD3Zk2NyH/GQT7iDpjxZDGZ2Z2UOAY7fpwx/ka7V
- yaaXr3UsKTFnrUemBUuhHdsA8opySn/Lq7xmYgZJdqYi33I8U4Gp8+PjQJxGc1vToR8B
- /GosPsVzPOC6Sy3fFptbGyYFymAfg0dfMyNbfWZT1U8R4KXjhyik54V0lLX3wbdAQ9ih
- gmlVaKH2khrWFyQImyAc8BSUmiwTonbuAVHhvOE6T7EYK1kUDNami48K1i7KER2ZZHdL
- VoRA==
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=otuHlPExgvwh1mlMZzgUgoZRtdmzR3U/LJ6rxovEI4k=;
+ b=AgFJH9GqPOnlCudwvqJ2wWGD5eaKd7XDH+yUqrlr2uPTSI5ttY9oCeU8/p+waF5VFF
+ 48pLfKJ5pfMIbTDWFR4YiS0+/Fz4wRADQ4mtNExI6fHQVbcTIvqEKft6W4wHcOeQxhLs
+ JeSqO18I/EDm+zHSxYv9pqzTTe/oOSBBbC55NEi9T6cUI/t9jiTBpoZ9jh4zuOCvl8b0
+ 6vb/S0Xl6n9o3a9jjKZJ9JjbOkQurzuINPPfY4GQ7vX1O+lESmH6covdE/hd181lTwPS
+ sTA04vNENZe7dsV9PtygE5IJ2f+49jIufCeEjEH+jloYb6EVKoAdVX9JkJnoc2MWl01A
+ muzQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=C+leDKkBVfjRpoUE44MkXKt8HF9pvwnytOv/e4MMaU8=;
- b=mRwZUgnXdAKrYwN71Ej6MoaWmwSKqKN1YUX/QND/mCxBspgJzZ9khJjNAL6M4bjrW/
- CpmLer/t1y0K/z1Y2PopQJ/p3tkWlatDUOd0lSPG4K3hQDBAkAiwopkK8WB0urNVNWyE
- Em5K3ZBvG7uq7Vq0aWDlv38uRkubC7LwNF0PE2F5FLjAuLBFbwpT9vm1aY6PmiOKn6bB
- /9s1YDaud4nAj+dTWOsJdfEXnv/cQEHFnW6YeBIK5Tfc5aQJbzveVQPsA2vihanGgpHY
- tbyb9xb5QtrTUad0a3Kfv6JJD3l7b368F0ychhS1X6Tjrj10BkyqetOHSeRjS0vhachH
- BOLw==
-X-Gm-Message-State: AJcUukcMhR/Q2BFvdwi/X+ZF+9Ff/p96Xb8LPFZfYzctUHrqkbnYgPQa
- r898gtsbtsr5Xg7JqBSkkjU=
-X-Google-Smtp-Source: ALg8bN7r4F+mBjki6kxhWO46pf+rJxzeohYOsNUr+Rcmz2Pga8Ms1bki4O3aO7GlE5ME1gPr2/XfXw==
-X-Received: by 2002:a2e:92ca:: with SMTP id
- k10-v6mr16099242ljh.63.1546013910132; 
- Fri, 28 Dec 2018 08:18:30 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=otuHlPExgvwh1mlMZzgUgoZRtdmzR3U/LJ6rxovEI4k=;
+ b=ozSKe3IbAPX2k/k5VrnMJXJ5Wc/howEPnhRba/97HT+FrjjnK0iCxKVoUOWx9Nd8gg
+ uSqzaLWg//FRoJRYBLqEG3k+NmxFvTcP7Yd8gX/oKQ0vnrHpAGwoF93crij/gsp34OqH
+ qLupxhTDT3wWKqUNQYuH8HbtAk1qaIugTgNGvIqm3SjV2zvhJPSOzVftq6EaSBQ0PZU+
+ pKJgWsEAxdjfg5PGW3QCiRws9sRtwOYYep5OUzK+zXEpbuDhr1d8MYX2dw3rq7vkDuac
+ os6d0mu8QPvS1JSUchSYNNwwprzVGLoYeAz2F7C6lqK9+K1qWwWXTrdGhbjUyLk8y3S4
+ wC5g==
+X-Gm-Message-State: AA+aEWZEc6h6aN1v80HduDjAFkaVTRQIa7pselqeZb2TB+j6Dm61F3Tz
+ DSRXO8TVbG/SMS/PTkL/WmY=
+X-Google-Smtp-Source: AFSGD/VAaDu5yC4knlwspbo7uIKQpQuFB3SeF5DYHpLGiiBQp7pVbb02sHPiA3WtFhV2XKVUM+/4cQ==
+X-Received: by 2002:a19:d145:: with SMTP id i66mr15013769lfg.97.1546013912224; 
+ Fri, 28 Dec 2018 08:18:32 -0800 (PST)
 Received: from localhost.localdomain
  ([2a02:a315:5445:5300:7146:fd07:48ff:9665])
- by smtp.googlemail.com with ESMTPSA id r4sm8136502lfe.60.2018.12.28.08.18.27
+ by smtp.googlemail.com with ESMTPSA id r4sm8136502lfe.60.2018.12.28.08.18.30
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 28 Dec 2018 08:18:29 -0800 (PST)
+ Fri, 28 Dec 2018 08:18:31 -0800 (PST)
 From: =?UTF-8?q?Pawe=C5=82=20Chmiel?= <pawel.mikolaj.chmiel@gmail.com>
 To: krzk@kernel.org
-Subject: [PATCH 0/6] ARM: dts: s5pv210: aries: Enable more drivers present on
- Samsung Aries based devices
-Date: Fri, 28 Dec 2018 17:18:13 +0100
-Message-Id: <20181228161819.18931-1-pawel.mikolaj.chmiel@gmail.com>
+Subject: [PATCH 1/6] ARM: dts: s5pv210: Use correct fimd variant
+Date: Fri, 28 Dec 2018 17:18:14 +0100
+Message-Id: <20181228161819.18931-2-pawel.mikolaj.chmiel@gmail.com>
 X-Mailer: git-send-email 2.17.1
+In-Reply-To: <20181228161819.18931-1-pawel.mikolaj.chmiel@gmail.com>
+References: <20181228161819.18931-1-pawel.mikolaj.chmiel@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181228_081842_404842_EA6DB000 
-X-CRM114-Status: GOOD (  10.04  )
+X-CRM114-CacheID: sfid-20181228_081844_131049_ABE4E47D 
+X-CRM114-Status: GOOD (  13.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,29 +106,19 @@ Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-VGhpcyBwYXRjaHNldCBlbmFibGVzIG1vcmUgZHJpdmVycyBmb3IgZGV2aWNlcyBwcmVzZW50IG9u
-CiBTYW1zdW5nIEFyaWVzIGJhc2VkIGRldmljZXMuCgpGaXJzdCBwYXRjaCBzd2l0Y2hlcyBmaW1k
-IHRvIGNvcnJlY3QgdmFyaWFudCwgd2hpY2ggd2Fzbid0CiBwcmVzZW50IGF0IG1vbWVudCBvZiBh
-ZGRpbmcgYXJpZXMgZHRzLgoKTmV4dCB0d28gcGF0Y2hlcyByZW1vdmVzIGhhcmRjb2RlZCBib290
-YXJncyBmcm9tIGR0cyBmaWxlcwogZm9yIGdhbGF4eXMgYW5kIGZhc2NpbmF0ZTRnLCBiZWNhdXNl
-IG5vdyB3ZSBoYXZlIHdvcmtpbmcgYm9vdGxvYWRlcgogd2hpY2ggY2FuIHBhc3MgdGhvc2UgdmFs
-dWVzLgoKT25lIG9mIHRoZSBwYXRjaGVzIGFsc28gcmVzZXJ2ZXMgbWVtb3J5IGZvciBTYW1zdW5n
-IFM1UCBNRkMKIHZpZGVvIGNvZGVjLCBzbyBpdCdzIHBvc3NpYmxlIHRvIHVzZSBpdC4KCkxhc3Qg
-dHdvIHBhdGNoZXMgYWRkcyBhbmQgZW5hYmxlcyBtb3JlIGRyaXZlcnMuCgpKb25hdGhhbiBCYWtr
-ZXIgKDEpOgogIEFSTTogZHRzOiBzNXB2MjEwOiBhcmllczogU3VwcG9ydCBmb3IgbW9yZSBkZXZp
-Y2VzIHByZXNlbnQgb24gQXJpZXMKClBhd2XFgiBDaG1pZWwgKDUpOgogIEFSTTogZHRzOiBzNXB2
-MjEwOiBVc2UgY29ycmVjdCBmaW1kIHZhcmlhbnQKICBBUk06IGR0czogczVwdjIxMDogZ2FsYXh5
-czogUmVtb3ZlIGhhcmRjb2RlZCBib290YXJncwogIEFSTTogZHRzOiBzNXB2MjEwOiBmYXNjaW5h
-dGU0ZzogUmVtb3ZlIGhhcmRjb2RlZCBib290YXJncwogIEFSTTogZHRzOiBzNXB2MjEwOiBhcmll
-czogQWRkIHJlc2VydmVkIG1lbW9yeSBmb3IgbWZjCiAgQVJNOiBkZWZjb25maWc6IHM1cHYyMTA6
-IEVuYWJsZSBtb3JlIGRyaXZlcnMgcHJlc2VudCBvbiBTYW1zdW5nIEFyaWVzCgogYXJjaC9hcm0v
-Ym9vdC9kdHMvczVwdjIxMC1hcmllcy5kdHNpICAgICAgfCA5MCArKysrKysrKysrKysrKysrKysr
-KysrKwogYXJjaC9hcm0vYm9vdC9kdHMvczVwdjIxMC1mYXNjaW5hdGU0Zy5kdHMgfCAgNyAtLQog
-YXJjaC9hcm0vYm9vdC9kdHMvczVwdjIxMC1nYWxheHlzLmR0cyAgICAgfCAgNyAtLQogYXJjaC9h
-cm0vYm9vdC9kdHMvczVwdjIxMC5kdHNpICAgICAgICAgICAgfCAgMiArLQogYXJjaC9hcm0vY29u
-Zmlncy9zNXB2MjEwX2RlZmNvbmZpZyAgICAgICAgfCA0MSArKysrKysrKy0tLQogNSBmaWxlcyBj
-aGFuZ2VkLCAxMjEgaW5zZXJ0aW9ucygrKSwgMjYgZGVsZXRpb25zKC0pCgotLSAKMi4xNy4xCgoK
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJt
-LWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3Jn
-Cmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtl
-cm5lbAo=
+U2luY2Ugd2UgaGF2ZSBzZXBhcmF0ZSBjb21wYXRpYmxlIGZvciBvdXIgU09DLApsZXQncyB1c2Ug
+aXQgcmF0aGVyIHVzaW5nIG9uZSBmcm9tIGV4eW5vczQyMTAuCgpTaWduZWQtb2ZmLWJ5OiBQYXdl
+xYIgQ2htaWVsIDxwYXdlbC5taWtvbGFqLmNobWllbEBnbWFpbC5jb20+Ci0tLQogYXJjaC9hcm0v
+Ym9vdC9kdHMvczVwdjIxMC5kdHNpIHwgMiArLQogMSBmaWxlIGNoYW5nZWQsIDEgaW5zZXJ0aW9u
+KCspLCAxIGRlbGV0aW9uKC0pCgpkaWZmIC0tZ2l0IGEvYXJjaC9hcm0vYm9vdC9kdHMvczVwdjIx
+MC5kdHNpIGIvYXJjaC9hcm0vYm9vdC9kdHMvczVwdjIxMC5kdHNpCmluZGV4IDc1ZjQ1NGEyMTBk
+Ni4uM2Q2ZTVhZDFlYTM1IDEwMDY0NAotLS0gYS9hcmNoL2FybS9ib290L2R0cy9zNXB2MjEwLmR0
+c2kKKysrIGIvYXJjaC9hcm0vYm9vdC9kdHMvczVwdjIxMC5kdHNpCkBAIC01MTEsNyArNTExLDcg
+QEAKIAkJfTsKIAogCQlmaW1kOiBmaW1kQGY4MDAwMDAwIHsKLQkJCWNvbXBhdGlibGUgPSAic2Ft
+c3VuZyxleHlub3M0MjEwLWZpbWQiOworCQkJY29tcGF0aWJsZSA9ICJzYW1zdW5nLHM1cHYyMTAt
+ZmltZCI7CiAJCQlpbnRlcnJ1cHQtcGFyZW50ID0gPCZ2aWMyPjsKIAkJCXJlZyA9IDwweGY4MDAw
+MDAwIDB4MjAwMDA+OwogCQkJaW50ZXJydXB0LW5hbWVzID0gImZpZm8iLCAidnN5bmMiLCAibGNk
+X3N5cyI7Ci0tIAoyLjE3LjEKCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVs
+QGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9s
+aXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
