@@ -2,80 +2,63 @@ Return-Path: <SRS0=Tyfh=PF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2F744C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 13:25:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 97354C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 13:26:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E9E6A20873
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 13:25:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 630DE20873
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 28 Dec 2018 13:26:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XPlyzAzZ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="RqSQREwZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E9E6A20873
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GHXYa5Vf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 630DE20873
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=C1ErLb7FuqTH7E6x8GeUqgGG33eYp/zkmM8A2bxkZP8=; b=XPlyzAzZNtK59s
-	d/xOtXrDAU/SH/0ajUdvQRuUm38vj4HIAkZoNDplD/vYLuiUWwMGTipLgNrLBlPzBYB2w92NqKqWL
-	e/c5dXJnsi4d1GTHLIJ8+Snxh10lDCTTytgzSqrwRaYRt7sz773aUCZVDC035flUoxgIzZVzjTA1D
-	21dD+Ac+OKWzNVxRComu/kLGd3kMBWcXgfC+0Gj+lCpZPfbuKyGzeZXPYHqgpASWsxMPtMc9vB9iJ
-	Q7w6O1oHRLMweZHC56/zU46WoGwusRlSIpwHjJ2guhBwtlso3E7rwHWWZbaEyIq/Dcdt/++BgDcdf
-	LjDH3iZmCperLPjQhcyQ==;
+	List-Owner; bh=frjo7fHxopvlikTanRg6OqsZY1s0A+QALVccsCUQPy0=; b=GHXYa5VfgZtE4r
+	WjSe+lUBSGII0oGTotpj6RWWayqrwnM2mdPqWI8wJH2+igdYh0UBxTRwovKT556WdUE52ohhlaeNa
+	M/74aTTmC85mpRb9YXDvUV4PEWaqxuXf5SxunQ4mYUcmLKZ/gR+O4qsjuOLUt4UKWNt/D3toS1cc5
+	L3pt5SzXpKzPpumG5Ju5yNfctCohamV3hzRxhFAViQYSonsJoFS4u6ODEVBpX8WHIfHjme0wOF88+
+	NrjqQBsxQomexcO8lqox2MyN6lZu8HcqDjWmC59wRxzo3WlrgpyfoNKyhKshV14zq8ih15+HR5TWv
+	CAMAeIDeiorEFBvr3kmA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gcs8e-0007NA-CM; Fri, 28 Dec 2018 13:25:20 +0000
-Received: from mail-ua1-x941.google.com ([2607:f8b0:4864:20::941])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gcs8Z-0006Hq-LT
- for linux-arm-kernel@lists.infradead.org; Fri, 28 Dec 2018 13:25:18 +0000
-Received: by mail-ua1-x941.google.com with SMTP id c12so6836526uas.6
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 28 Dec 2018 05:25:04 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=nCnu5917HpXSd+U0Z3wsxutcf9qvj7SgM/Lu3tE6Vnk=;
- b=RqSQREwZpWMEikTvhb/34NfqIC7gslieouLJHnqVI4gAGRpnlrseaDP22xEPbMx2UU
- +7RT+3IY93SFCqZpdLSJ1G/8Ww+6SaYtkqf5jyoX15fmyFliQ0r0Ac1rnicu4xX3CIGa
- I6ob6+fQvylhYub599d0EHH7NcHu316bK4ftU=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=nCnu5917HpXSd+U0Z3wsxutcf9qvj7SgM/Lu3tE6Vnk=;
- b=OCfteZ1vG9HFdrVTUbgF7Dbw7ZU8Payjb3oroyq7OK+RJz20f1rJdeZN+uO68jb/Nr
- 8qdGnzFSxa9Aomgk3sg5bZuEHxQkqVzJxf0h+0nenRNHK2nchx46uILQ1cQCQCqM7jZB
- uYaGhP4ElIHLYNoG0/EfJA7HkrZVh1Fmv/DglUAPlqmcXRCln30vDL62IP00PzWCVCXM
- W1YGl6R65QWi0EW6ZwYmsKOV7SMP+8Ev+VXUAQzw6rbfWVm+UQFOlRxagC22foeF5UBR
- fKHy+js2MgI5V7kBjg/V8n5AvVl+WcQ0JCdZpGpjnKMTg+q+ZT06r/uwWoouPS9NcwiW
- doMw==
-X-Gm-Message-State: AJcUukcnh9PZI2U2aLW/ZkN0Z1GS7Y8TzG8SYWncZhqLG5NxF4ZZqq3b
- n/pEgoQlvnAQTYAKPksumHWjiFjfbZTk12/JJfE/mw==
-X-Google-Smtp-Source: ALg8bN5fjQCqoOXtHG7FkGER6NiGirfzskAZ3AXgvVKtRExXTa5LfbnzGtMj1377MyGgqzgcWDxCeJT96vk5RSZHRCU=
-X-Received: by 2002:a9f:2244:: with SMTP id 62mr9625448uad.119.1546003503648; 
- Fri, 28 Dec 2018 05:25:03 -0800 (PST)
+	id 1gcs9j-0007e4-I1; Fri, 28 Dec 2018 13:26:27 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gcs9Z-0007ck-Oa
+ for linux-arm-kernel@lists.infradead.org; Fri, 28 Dec 2018 13:26:25 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 61C35A78;
+ Fri, 28 Dec 2018 05:26:04 -0800 (PST)
+Received: from e107155-lin (e107155-lin.cambridge.arm.com [10.1.196.42])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 4F4143F675;
+ Fri, 28 Dec 2018 05:26:03 -0800 (PST)
+Date: Fri, 28 Dec 2018 13:25:57 +0000
+From: Sudeep Holla <sudeep.holla@arm.com>
+To: Peter Rosin <peda@axentia.se>
+Subject: Re: [PATCH] ARM: dts: at91: replace gpio-key,wakeup with
+ wakeup-source property
+Message-ID: <20181228132557.GA12018@e107155-lin>
+References: <20181221181149.6708-1-sudeep.holla@arm.com>
+ <c22dacbe-ddc9-04c7-cda8-100dcbe0e70b@axentia.se>
 MIME-Version: 1.0
-References: <1545148524-658-1-git-send-email-aisheng.dong@nxp.com>
- <AM0PR04MB4211FB9C3BA2CBBDB58F03FC80B70@AM0PR04MB4211.eurprd04.prod.outlook.com>
-In-Reply-To: <AM0PR04MB4211FB9C3BA2CBBDB58F03FC80B70@AM0PR04MB4211.eurprd04.prod.outlook.com>
-From: Ulf Hansson <ulf.hansson@linaro.org>
-Date: Fri, 28 Dec 2018 14:24:27 +0100
-Message-ID: <CAPDyKFokg+Rg9cBDF2WM6udx-T3GiNRTkXsn=u=JO9LP=0F55A@mail.gmail.com>
-Subject: Re: [PATCH 0/3] firmware: imx: scu-pd: add fallback compatible string
- support
-To: Aisheng Dong <aisheng.dong@nxp.com>
+Content-Disposition: inline
+In-Reply-To: <c22dacbe-ddc9-04c7-cda8-100dcbe0e70b@axentia.se>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181228_052515_717670_0699B74C 
-X-CRM114-Status: GOOD (  14.66  )
+X-CRM114-CacheID: sfid-20181228_052617_798702_48CF624F 
+X-CRM114-Status: GOOD (  14.13  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,62 +71,44 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "dongas86@gmail.com" <dongas86@gmail.com>,
- "khilman@kernel.org" <khilman@kernel.org>,
- "linux-pm@vger.kernel.org" <linux-pm@vger.kernel.org>,
- "rjw@rjwysocki.net" <rjw@rjwysocki.net>, Rob Herring <robh+dt@kernel.org>,
- dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ Alexandre Belloni <alexandre.belloni@bootlin.com>,
  "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 28 Dec 2018 at 03:38, Aisheng Dong <aisheng.dong@nxp.com> wrote:
->
-> Sorry, missed DT guys.
->
-> Hi Rob & Ulf,
->
-> Would you help review this patch series?
-
-This is DT changes, so I didn't look until now.
-
->
-> Regards
-> Dong Aisheng
->
-> > -----Original Message-----
-> > From: Aisheng Dong
-> > Sent: Wednesday, December 19, 2018 12:01 AM
+On Fri, Dec 21, 2018 at 06:46:12PM +0000, Peter Rosin wrote:
+> On 2018-12-21 19:11, Sudeep Holla wrote:
+> > Most of the legacy "gpio-key,wakeup" property are already replaced
+> > with "wakeup-source". However few occurrences of old property has
+> > popped up again, probably from the remnants in downstream trees.
+> > Almost all of those were remove couple of years back.
 > >
-> > SCU power domain can be used in the same way by IMX8QXP and IMX8QM
-> > SoCs.
-> > Let's add a "fsl,scu-pd" fallback compatible string to allow other SoCs to reuse
-> > the common part.
+> > Replace the legacy properties with the unified "wakeup-source"
+> > property introduced in the commit 700a38b27eef ("Input: gpio_keys -
+> > switch to using generic device properties")
 > >
-> > Dong Aisheng (3):
-> >   dt-bindings: fsl: scu: add fallback compatible string for power domain
-> >   dt-bindings: fsl: scu: add imx8qm scu power domain support
-> >   firmware: imx: scu-pd: add fallback compatible string support
-> >
-> >  Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt | 8 ++++++--
-> >  drivers/firmware/imx/scu-pd.c                               | 1 +
-> >  2 files changed, 7 insertions(+), 2 deletions(-)
-> >
-> > --
-> > 2.7.4
+> > Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> > Cc: Peter Rosin <peda@axentia.se>
+> > Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
+> > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>
+> Why is this not v3?
+> Why did you drop all the tags you already got?
 >
 
-For series, feel free to add:
+Sorry for that, I intentionally dropped Acks from maintainer who would
+merge and add their sign-offs, but I dropped yours accidentally.
 
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Acked-by: Peter Rosin <peda@axentia.se>
+>
 
-Kind regards
-Uffe
+Thanks.
+
+--
+Regards,
+Sudeep
 
 _______________________________________________
 linux-arm-kernel mailing list
