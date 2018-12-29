@@ -2,67 +2,67 @@ Return-Path: <SRS0=jr7z=PG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B7ED6C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 29 Dec 2018 02:49:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 965A1C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 29 Dec 2018 04:45:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8525D218FD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 29 Dec 2018 02:49:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 66AAE218A1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 29 Dec 2018 04:45:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JINBH0Gm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8525D218FD
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HwkDVkGN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 66AAE218A1
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=zte.com.cn
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=yY5GzFuep8imFyne1vaBmyG/Z+eaQnIYJ0igUKl0cYo=; b=JINBH0Gmbg7J4O
-	OgocHqD12rmyWH31K6PhPY9sFXXlwkSI5t4Oxzr3NCHfirvTJPcIXso1xGx2Fp7EgR1CuX14/L2qC
-	VMdu/4kKL6L4VrQFIxmAxdDoKVUp68tSg+ZrPfkxUWj1KycGB8xo4vTLeWN58Gmo1XdYgoZ+GKDft
-	YGh1f52BQkKoXVWpwg1Avc98cZ1BzxWMH490KxvcLTvAKcB5n9FncpdJxr6n3Vf8OdWVKzOdNnIqB
-	kwHqm2ccajTukDm1+NxEW+YqR1NTQQvuNrXjcqDpRAmGvStyU+axY12Mtw6MYy9VwbbrR3cNNQimk
-	JRsPCNrIRihIadkvnk4w==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=gZ9nSLx4yc3RSp7g5EaZ3dwm77fm33KjQyv4K89kzBo=; b=Hwk
+	DVkGNGWpb3Ka6VDy1mQrIj9GqiID0dgItg3bIEB5XCk3HKFanScPOJd0r0bAq6BqVPTkFV3TQezp7
+	+dLBF3I3/qaKDeYnajbyrnOE90n1AUrUxzNKV60BvgEp/DCMQHmFqlq06jVfmdK4GVukDlxEdUw7L
+	SZNYl3Abzz8sg4E3FZem+M06Hwg8GTuuTeW5zZo9NHL9FbBWZ3NFJ7CElbCyYI2TWsil6u1Mq9w77
+	+BCo4/skHHXF7MM1ghiOO09zueU7vNni02BhhZr8kqEIs/seE0qsRjp5JDikOZbnpWncUcluDRBLS
+	B8uxYKyE5YwqJm1rpf4v2qYXm7kv9kw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gd4ge-0002zp-BA; Sat, 29 Dec 2018 02:49:16 +0000
-Received: from [1.203.163.81] (helo=mailgw02.mediatek.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gd4gY-0002yi-3K; Sat, 29 Dec 2018 02:49:12 +0000
-X-UUID: 82db1c0ec9f14e29a3abd3678ac361f7-20181229
-X-UUID: 82db1c0ec9f14e29a3abd3678ac361f7-20181229
-Received: from mtkcas34.mediatek.inc [(172.27.4.250)] by mailgw02.mediatek.com
- (envelope-from <chunfeng.yun@mediatek.com>)
- (mailgw01.mediatek.com ESMTP with TLS)
- with ESMTP id 1276222270; Sat, 29 Dec 2018 10:48:42 +0800
-Received: from MTKCAS32.mediatek.inc (172.27.4.184) by MTKMBS33N1.mediatek.inc
- (172.27.4.75) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Sat, 29 Dec 2018 10:48:40 +0800
-Received: from [10.17.3.153] (10.17.3.153) by MTKCAS32.mediatek.inc
- (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Sat, 29 Dec 2018 10:48:40 +0800
-Message-ID: <1546051720.32173.139.camel@mhfsdcap03>
-Subject: Re: [PATCH] usb: devio: update max count of DPs per interval for ISOC
-From: Chunfeng Yun <chunfeng.yun@mediatek.com>
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Sat, 29 Dec 2018 10:48:40 +0800
-In-Reply-To: <20181228105148.GA22073@kroah.com>
-References: <1545992864-9530-1-git-send-email-chunfeng.yun@mediatek.com>
- <20181228105148.GA22073@kroah.com>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
-MIME-Version: 1.0
-X-MTK: N
+	id 1gd6Us-00087k-Fm; Sat, 29 Dec 2018 04:45:14 +0000
+Received: from mxhk.zte.com.cn ([63.217.80.70])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gd6Un-0006mt-RN
+ for linux-arm-kernel@lists.infradead.org; Sat, 29 Dec 2018 04:45:12 +0000
+Received: from mse01.zte.com.cn (unknown [10.30.3.20])
+ by Forcepoint Email with ESMTPS id 4B826DBFEDF8EAE682DE;
+ Sat, 29 Dec 2018 12:44:46 +0800 (CST)
+Received: from notes_smtp.zte.com.cn ([10.30.1.239])
+ by mse01.zte.com.cn with ESMTP id wBT4ieTc075448;
+ Sat, 29 Dec 2018 12:44:40 +0800 (GMT-8)
+ (envelope-from peng.hao2@zte.com.cn)
+Received: from localhost.localdomain.localdomain ([10.74.120.59])
+ by szsmtp06.zte.com.cn (Lotus Domino Release 8.5.3FP6)
+ with ESMTP id 2018122912452431-19455156 ;
+ Sat, 29 Dec 2018 12:45:24 +0800 
+From: Peng Hao <peng.hao2@zte.com.cn>
+To: linux@armlinux.org.uk
+Subject: [PATCH 1/2] arm/common/dmabounce : NULL check before dma_pool_destroy
+Date: Sat, 29 Dec 2018 13:05:26 +0800
+Message-Id: <1546059926-97458-1-git-send-email-peng.hao2@zte.com.cn>
+X-Mailer: git-send-email 1.8.3.1
+X-MIMETrack: Itemize by SMTP Server on SZSMTP06/server/zte_ltd(Release
+ 8.5.3FP6|November 21, 2013) at 2018-12-29 12:45:24,
+ Serialize by Router on notes_smtp/zte_ltd(Release 9.0.1FP7|August  17, 2016) at
+ 2018-12-29 12:44:20, Serialize complete at 2018-12-29 12:44:20
+X-MAIL: mse01.zte.com.cn wBT4ieTc075448
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181228_184910_367020_302C74A3 
-X-CRM114-Status: GOOD (  18.92  )
+X-CRM114-CacheID: sfid-20181228_204510_054863_E8A10218 
+X-CRM114-Status: GOOD (  10.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,66 +74,41 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Felipe Balbi <felipe.balbi@linux.intel.com>,
- linux-usb@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
+Cc: Peng Hao <peng.hao2@zte.com.cn>, linux-kernel@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
-On Fri, 2018-12-28 at 11:51 +0100, Greg Kroah-Hartman wrote:
-> On Fri, Dec 28, 2018 at 06:27:44PM +0800, Chunfeng Yun wrote:
-> > The host shall be able to accept and send up to 96 DPs for
-> > devices operating at Gen 2 speed.
-> 
-> Why?  What is this keeping from working properly today?
+NULL check before dma_pool_destroy is unnecessary because
+there is a NULL check in dma_pool_destroy.
 
-The failure happened when I tried to send up to 96DPs per an interval
-for SSP ISOC transations by libusb, this is used to verify SSP ISOC
-function of USB3 GEN2 controller. Maybe for normal scenarios they
-needn't transfer greater than 48 DPs in an ISOC interval.
-(refer usb3.1r1.0 section 8.12.6 Isochronous Transactions)
-> 
-> I need a much better changelog text here in order to be able to accept
-> this patch.
-I'll make the change in next version
-> 
-> > 
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> > ---
-> >  drivers/usb/core/devio.c | 8 +++-----
-> >  1 file changed, 3 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/drivers/usb/core/devio.c b/drivers/usb/core/devio.c
-> > index a75bc0b8a50f..82c16210e34c 100644
-> > --- a/drivers/usb/core/devio.c
-> > +++ b/drivers/usb/core/devio.c
-> > @@ -1564,12 +1564,10 @@ static int proc_do_submiturb(struct usb_dev_state *ps, struct usbdevfs_urb *uurb
-> >  		}
-> >  		for (totlen = u = 0; u < number_of_packets; u++) {
-> >  			/*
-> > -			 * arbitrary limit need for USB 3.0
-> > -			 * bMaxBurst (0~15 allowed, 1~16 packets)
-> > -			 * bmAttributes (bit 1:0, mult 0~2, 1~3 packets)
-> > -			 * sizemax: 1024 * 16 * 3 = 49152
-> > +			 * arbitrary limit need for USB 3.1 Gen2
-> > +			 * sizemax: 96 DPs at SSP, 96 * 1024 = 98304
-> >  			 */
-> > -			if (isopkt[u].length > 49152) {
-> > +			if (isopkt[u].length > 98304) {
-> 
-> Are we going to have to keep bumping this up as speeds get faster and
-> faster?
-Or remove the check of data length? I'm not sure which way is better
+Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
+---
+ arch/arm/common/dmabounce.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-> 
-> thanks,
-> 
-> greg k-h
-
+diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
+index 9a92de6..dcdd80c 100644
+--- a/arch/arm/common/dmabounce.c
++++ b/arch/arm/common/dmabounce.c
+@@ -569,10 +569,8 @@ void dmabounce_unregister_dev(struct device *dev)
+ 		BUG();
+ 	}
+ 
+-	if (device_info->small.pool)
+-		dma_pool_destroy(device_info->small.pool);
+-	if (device_info->large.pool)
+-		dma_pool_destroy(device_info->large.pool);
++	dma_pool_destroy(device_info->small.pool);
++	dma_pool_destroy(device_info->large.pool);
+ 
+ #ifdef STATS
+ 	if (device_info->attr_res == 0)
+-- 
+1.8.3.1
 
 
 _______________________________________________
