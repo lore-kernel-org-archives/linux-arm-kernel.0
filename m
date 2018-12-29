@@ -2,86 +2,82 @@ Return-Path: <SRS0=jr7z=PG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3D404C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 29 Dec 2018 13:36:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4E6C2C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 29 Dec 2018 14:30:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0B9EA20828
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 29 Dec 2018 13:36:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 18D152087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 29 Dec 2018 14:30:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ctkV54e6";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="VnJOrBNm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0B9EA20828
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PZtye4i4";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="hY7FlQeD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 18D152087F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=R/3UpNr41L9ZMTRqpRKO+KqLgMkgsyN8r9w5NM/+L8s=; b=ctkV54e6NjyyOVwDXQXWazmEmK
-	2GyZLZ1P+QYQ8od36UvHJi9CM5rMgcS7CdGViQyzb4Wuk/2hjWypi+CwWP5JX5hn4vnsDJaoaqtOP
-	QKrMDLePp5SH1i+HVHHmwx/ILMWD6uS1mmMN6HEXL8W1nWxdGNN92N5RElx/6KeHwcOtXvsqylsBf
-	Bh7twNz1ZZTJrW90uTkNk+hV472V8asBrhOELxjtor76fVBHPN1ChLjfvlQDK1ooPi6ZeFkldapPR
-	QA+HCfEHQK5oqEOVtwAxiESWMswbbhtn7EPz0M1kTjAy1yMO/7Oy0rmp32pCxG9WKRBklOu40JdR7
-	q94OT0YQ==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=zslJlPxoR5bVF2DFmvTqIeokoxE6KYt3//MAvE6ZSoQ=; b=PZtye4i4z6EkJY
+	Q54F3PWKhz+ClX8PliAuXVt8KHHpqDzwqxoq8SkWaZJArvb8VZ86uXP7BsXUKUyU/Ojk0PShooTc2
+	4Fy/+E1BW8MESk3vWCJufXUU4uKK50LObmrbYqU6HbQYws5ZgFTpa2yZ7frGQDVP5q4o4apqnt7tk
+	oIfGyJTk6FTckLmOfPyTokCYu9mXb6fJDFDk4mP/yFSYOyUlxz/1JU1Ax1UHk6RC15egMRSLW23wM
+	lNhERBvhhrY33fEk7ydcBF8uwFBb4MEHAPxvNlsgMRsYXuUz6cise6iH3YD34OONOOk0MPKEqkw60
+	ACZaenSSwENpsOcEr7pQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gdEmX-0000EQ-08; Sat, 29 Dec 2018 13:36:01 +0000
-Received: from mail-ed1-x543.google.com ([2a00:1450:4864:20::543])
+	id 1gdFcZ-0000gq-JE; Sat, 29 Dec 2018 14:29:47 +0000
+Received: from mail-ot1-x342.google.com ([2607:f8b0:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gdEkR-0005PI-1l; Sat, 29 Dec 2018 13:33:55 +0000
-Received: by mail-ed1-x543.google.com with SMTP id p6so19513851eds.0;
- Sat, 29 Dec 2018 05:33:40 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=+VCBySQXhTipKQxLBqodKfMWCHahqpPnV/2FwaZKvSU=;
- b=VnJOrBNmue5O1PtnKiJd63+LT/iFauDAvwKw8er3zs8zahN67/i0CX17jsC0w1dRmq
- lT2D6DPEEs/OL6Fem9t5ic1LruQyXG7ABxEXAe41gstAzeFrtRwSmLH+akGaaMC0LJCe
- V+ZQIc0D2VsPoTLpBl3gdryCpdS7B0iFrsE3jB36ZsGxpf1+x2l4Oavz6TjfGQwRTbPu
- lrQ7NA63eVK5DmNnqDg/VsnMlsC30oeSLDn5qgdMYmej/wGq8Qo7M7OztCA3YpNl8QSi
- WQ1llXJrsmZOL/siYNlLDYcigWyESKkOPSCSy7qrV1wQFM8XKvfCzyOZB/4oxPiHHh/v
- qBKg==
+ id 1gdFcU-0000fo-Oq; Sat, 29 Dec 2018 14:29:44 +0000
+Received: by mail-ot1-x342.google.com with SMTP id a11so20654470otr.10;
+ Sat, 29 Dec 2018 06:29:32 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=googlemail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=Ie9auksBhJoXtAc+Y/yaeP1FssPIISyrcQYmTk85oIk=;
+ b=hY7FlQeDRMO29Gx81zoHkNgWaZVaxcONGfYmzyk8vWgVjEKb7XLOL2IF2qr9p/i0RU
+ mEXeAAvGQNizoPwPSe8tDjqHQqSyyCJs6QV6q4Rqjw0evUXeJKHIlBPI0aeG2TnOGDIi
+ a40O/wGwPILrM0MJkDwLf+09PbQOUCL0nFVJ6MarkqxbM4efEv1X6A1G3HuJ3KevPt41
+ SQRiw08OqY8zI+6cs31yAMvbu+45QyP9R3tL1DQuztPGnOEJ5YXEbAV3dTrd5UZfW5hQ
+ IeVlhYIAm4QpmFCxq1cp8Xyv1NwSnlPTitZliqn+2v5kfcJORfPz2M8+r9R9d0Wzhran
+ dLrQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=+VCBySQXhTipKQxLBqodKfMWCHahqpPnV/2FwaZKvSU=;
- b=e7XANICjTCng99QBjpLT/BSCz+3OhRr7ruj0Gir2wLdh2yXAPgGyocj5hy9yCdizY4
- XokrMJnJ4sP7jDZ2moful3HSJvhMagCaIMpGuAFve+bcDMQMyuLwETvlfsNcuvhSjfkG
- utD37Wb5d+6sD4NUlGmEvlHYpdeLbQuJYnWe2C/3j5XLQMd20VfaKel49vWRNBXqDd5k
- K7/KZkkKUkdd6hv5z9Oldjh/CfAJs8CU+brGKNVpLDyn5fiWS96mRupGO58//B3B7fJL
- HGZ1aBYzweI8JsLdKibq25fZt48VZHh2g5WWdRGORBrGaGkouoy7FrtotZO1TuqQFCgr
- 1JLQ==
-X-Gm-Message-State: AA+aEWbIpQOmD1mwbU0/X8iCNL1d31r1VlNCVmqPFDcWIF0EY7RzEmOs
- +8PN+YzQ88NWvQ+XXliWljM=
-X-Google-Smtp-Source: AFSGD/V6HJRw3Vzsiaq98oDpDoYv9GVOGWVNVzOI44C9EZh1rRPMFha91360Py5UrN8MQSqeTZo82g==
-X-Received: by 2002:a05:6402:1286:: with SMTP id
- w6mr26493428edv.53.1546090419242; 
- Sat, 29 Dec 2018 05:33:39 -0800 (PST)
-Received: from debian.home (ip51ccf9cd.speed.planet.nl. [81.204.249.205])
- by smtp.gmail.com with ESMTPSA id d7-v6sm8023063ejx.68.2018.12.29.05.33.38
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sat, 29 Dec 2018 05:33:38 -0800 (PST)
-From: Johan Jonker <jbx6244@gmail.com>
-To: heiko@sntech.de
-Subject: [PATCH v2 5/7] ARM: dts: rockchip: add rk3066 vop display nodes
-Date: Sat, 29 Dec 2018 14:33:16 +0100
-Message-Id: <20181229133318.18128-6-jbx6244@gmail.com>
-X-Mailer: git-send-email 2.11.0
-In-Reply-To: <20181229133318.18128-1-jbx6244@gmail.com>
-References: <20181229133318.18128-1-jbx6244@gmail.com>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=Ie9auksBhJoXtAc+Y/yaeP1FssPIISyrcQYmTk85oIk=;
+ b=UWvFNjLWXjX8BfYp1glyFXr04AURyznAyvLmcaVkf3xE5RRB7cjjOqGz1uuaFIiFAM
+ rEmPFo3MccAI4KYVPJuIKWMePwhhx2WC2Vj5w63rHeeeak2BNv9bSj91/xmshFgKfycy
+ qWPoCVPNFqTmJN4D2+h9x0AM09Qwv8+G3sbRlNzfRJZTl7ygBnyS3j+IXQGruCBn72pR
+ +BKVfmb5Hi9AWZjPiu+GaQDaaG8v4I+1YO0YV7mKcRGHa5kYe0KRjhzvO+DlY46gwgkm
+ cEaivjmBEiVraQGRTXDChd9BSHsmOVmI82gpGKxasahBbRDBaGvItXR/XXeFZU3KH0iu
+ 9ebQ==
+X-Gm-Message-State: AJcUukeSA1rlfwCxfuYGUtCP0lBgG+CsK6HzdllqQGmezkiHbIMzBwvF
+ g16cAikRQMDwRMznahOuh9HpXKHFXftw12ACSqv1AgY9
+X-Google-Smtp-Source: ALg8bN57O9bRVZadMEpInEcEjClNttCqBLs78cW0zP1oBYfkAk6RuIXr19m4W2JEVL0BRFUj0PuZdiQIvxZerLIO8SE=
+X-Received: by 2002:a9d:7749:: with SMTP id t9mr22401989otl.342.1546093771264; 
+ Sat, 29 Dec 2018 06:29:31 -0800 (PST)
+MIME-Version: 1.0
+References: <20181229125711.5205-1-martin.blumenstingl@googlemail.com>
+In-Reply-To: <20181229125711.5205-1-martin.blumenstingl@googlemail.com>
+From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Date: Sat, 29 Dec 2018 15:29:20 +0100
+Message-ID: <CAFBinCCpsy40NuB124TqDUWy9zogeMrLsCGCanbbvpfd-yVDdQ@mail.gmail.com>
+Subject: Re: [PATCH 0/3] ARM: dts: meson: fix SD card cd-gpio (pre v4.21-rc)
+To: linux-amlogic@lists.infradead.org, khilman@baylibre.com, 
+ linus.walleij@linaro.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181229_053351_400394_8D532D89 
-X-CRM114-Status: GOOD (  13.89  )
+X-CRM114-CacheID: sfid-20181229_062942_818767_206C7A39 
+X-CRM114-Status: GOOD (  11.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,95 +89,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
- linux-rockchip@lists.infradead.org, airlied@linux.ie, mturquette@baylibre.com,
- hjc@rock-chips.com, dri-devel@lists.freedesktop.org,
- linux-kernel@vger.kernel.org, sboyd@kernel.org, robh+dt@kernel.org,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: linus.luessing@c0d3.blue, bgolaszewski@baylibre.com, balbes-150@yandex.ru,
+ linux-mmc@vger.kernel.org, linux-gpio@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux@roeck-us.net
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Mark Yao <mark.yao@rock-chips.com>
+On Sat, Dec 29, 2018 at 1:57 PM Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+>
+> Today I noticed that my Odroid-C1 doesn't see it's SD card anymore.
+> My board is not the only one, Odroid-C1 on KernelCI suffers from the
+> same problem:
+> v4.20-6428-g00c569b567c7 still sees the SD card (mmc0): [0]
+> v4.20-8955-g903b77c63167 doesn't see the SD card (mmc0) anymore: [1]
+>
+> My Endless Mini (EC-100) is also affected by this issue.
+>
+> a git bisect run points to this commit:
+> 89a5e15bcba87df5120d4656e0ff33d4f7cd6152 ("gpio/mmc/of: Respect polarity
+> in the device tree")
+>
+> and indeed, reverting it makes my Odroid-C1 and EC-100 see the SD card
+> again.
+I started a separate discussion for that topic on the linux-mmc and
+linux-gpio mailing list for this topic: [0]
 
-This patch adds the core display subsystem and vop nodes to rk3066.
+comments regarding this series are still welcome!
 
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-Signed-off-by: Johan Jonker <jbx6244@gmail.com>
----
- arch/arm/boot/dts/rk3066a.dtsi | 47 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 47 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-index b6b3a77da..653127a37 100644
---- a/arch/arm/boot/dts/rk3066a.dtsi
-+++ b/arch/arm/boot/dts/rk3066a.dtsi
-@@ -44,6 +44,11 @@
- 		};
- 	};
- 
-+	display-subsystem {
-+		compatible = "rockchip,display-subsystem";
-+		ports = <&vop0_out>, <&vop1_out>;
-+	};
-+
- 	sram: sram@10080000 {
- 		compatible = "mmio-sram";
- 		reg = <0x10080000 0x10000>;
-@@ -57,6 +62,48 @@
- 		};
- 	};
- 
-+	vop0: vop@1010c000 {
-+		compatible = "rockchip,rk3066-vop";
-+		reg = <0x1010c000 0x19c>;
-+		interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru ACLK_LCDC0>,
-+			 <&cru DCLK_LCDC0>,
-+			 <&cru HCLK_LCDC0>;
-+		clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
-+		power-domains = <&power RK3066_PD_VIO>;
-+		resets = <&cru SRST_LCDC0_AXI>,
-+			 <&cru SRST_LCDC0_AHB>,
-+			 <&cru SRST_LCDC0_DCLK>;
-+		reset-names = "axi", "ahb", "dclk";
-+		status = "disabled";
-+
-+		vop0_out: port {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+	};
-+
-+	vop1: vop@1010e000 {
-+		compatible = "rockchip,rk3066-vop";
-+		reg = <0x1010e000 0x19c>;
-+		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru ACLK_LCDC1>,
-+			 <&cru DCLK_LCDC1>,
-+			 <&cru HCLK_LCDC1>;
-+		clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
-+		power-domains = <&power RK3066_PD_VIO>;
-+		resets = <&cru SRST_LCDC1_AXI>,
-+			 <&cru SRST_LCDC1_AHB>,
-+			 <&cru SRST_LCDC1_DCLK>;
-+		reset-names = "axi", "ahb", "dclk";
-+		status = "disabled";
-+
-+		vop1_out: port {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+	};
-+
- 	i2s0: i2s@10118000 {
- 		compatible = "rockchip,rk3066-i2s";
- 		reg = <0x10118000 0x2000>;
--- 
-2.11.0
+Regards
+Martin
 
+
+[0] https://marc.info/?l=linux-mmc&m=154609359306732&w=3
 
 _______________________________________________
 linux-arm-kernel mailing list
