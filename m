@@ -2,75 +2,69 @@ Return-Path: <SRS0=jr7z=PG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 931F6C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 29 Dec 2018 12:27:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4E3A3C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 29 Dec 2018 12:49:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5FD8721019
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 29 Dec 2018 12:27:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 164342081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 29 Dec 2018 12:49:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SeQKkMKg";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=agner.ch header.i=@agner.ch header.b="km1r5C94"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5FD8721019
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=agner.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="shb9Nc7G";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="tjvzESE6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 164342081B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Message-ID:References:In-Reply-To:
-	Subject:To:From:Date:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zWFYGqb59lyIvwD1JvYCbXZc6N8oA18NlxjGTKmIHdw=; b=SeQKkMKggdwHk9
-	eK2uQkoMCuPjNt/kKLI82zVor5CgpubZqo+Z2F/fSpTNZ4Vjr6CC/GgfxM/hon74e+GnFICuIsV5U
-	eZVESTQqE38YxOpKZ8g6wyYHPaS4Lk4Mjy/JLPE5hAizqgAVZZyQM3+P2WA2caIKcnEPkJBqJUeJg
-	yEc0hyCf+Mp4Nf8bZRaOe757OjSkQnsMV7+5n8TqWkPBq1f2aF0o3CdAvqy1dFQiS309nb18ZMiV+
-	gOPKMGdh5K+N93brCv54h1cKmL7k6izkD2jTnOIVMEqCX2c6US2+dwHmSnoF8IAZWLGGoApy1YE8A
-	RugbMnJ0C8shhZJK+cWw==;
+	List-Owner; bh=smIlJ1DZHO6qcbJQxjvd97pH+hhaT2v8Lewcz7tLTtc=; b=shb9Nc7GDhHOuZ
+	BbT3Sds3Ymnsk0KcAMOnoMr4JWqhH0w605mHY/8QlN6Y3WRB3YDYnghzlTGyC0FP5xIan8wnzSG8N
+	POQXz0LVKilymdREq/puvNWDc9637ak9iJOkcud+hSPwmiVFOpnLY+tnC5UgabeaKO8vK2PETL923
+	r9DQ+cebDkypVCsIq78sLvuZi7b+7uLAnPqZC6WUn2kuT2V0/mrhj7ECfIxj6aqyAY3ub41rOnbDd
+	QjhwByh2NiNt4t1JgbBTxeL/MBT3GfwEbSs3h2CYtSgRxJKYjICXfEqth3n2jwIEGaTmkDmBf9jhr
+	pchTTELPRm4vj0mr8X9g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gdDiV-0002M7-Lm; Sat, 29 Dec 2018 12:27:47 +0000
-Received: from mail.kmu-office.ch ([2a02:418:6a02::a2])
+	id 1gdE3e-00087E-36; Sat, 29 Dec 2018 12:49:38 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gdDiR-0002Kl-MW
- for linux-arm-kernel@lists.infradead.org; Sat, 29 Dec 2018 12:27:46 +0000
-Received: from webmail.kmu-office.ch (unknown [IPv6:2a02:418:6a02::a3])
- by mail.kmu-office.ch (Postfix) with ESMTPSA id 841055C0BC2;
- Sat, 29 Dec 2018 13:27:28 +0100 (CET)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=agner.ch; s=dkim;
- t=1546086448;
- h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
- to:to:cc:cc:mime-version:mime-version:content-type:content-type:
- content-transfer-encoding:content-transfer-encoding:
- in-reply-to:in-reply-to:references:references;
- bh=u0aluuXCGZ2q4LiUEKZ5W0RobqEiHEoilw5d3ke3Q6c=;
- b=km1r5C94v5HEgNIxkAx4O//6AW/JcDcG9uzYBYQnDtCCcEUQGAI9QNXBGQruH21GE0ENV8
- bK7aEjdQ903QOYZwVU6Mtebj1pVsbl35S08zcjoI5SbznOx/pijIYOnsJBwe16xN8J9CLT
- FTjvf4kCyd27VKHtBMicLfgNVHn0B80=
+ id 1gdE3b-00085c-0i; Sat, 29 Dec 2018 12:49:36 +0000
+Received: from localhost (83-68-17-109.ip.xs4all.nl [83.68.17.109])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 879D42081B;
+ Sat, 29 Dec 2018 12:49:23 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1546087764;
+ bh=K5tHIdGxD5w9c0Sx/kxQmPHSmItASLtP1uBdx5nzfRo=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=tjvzESE6CL4QcJGlKulO0+63qOHs9wGcaff+WFcOpeMkSruNjBj6TPBtkM2U5/M3M
+ WB49wDfnQnoSKEqpbyHyYgnahPAGieK+omVP3SjA4jM4TRLIZgGhuza0v9tt8tRXwC
+ vUY3GpktIKxQnSGIx4mtUS4cl85otqKYuFhm0Hh4=
+Date: Sat, 29 Dec 2018 13:49:21 +0100
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+To: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Subject: Re: [PATCH] usb: devio: update max count of DPs per interval for ISOC
+Message-ID: <20181229124921.GA5959@kroah.com>
+References: <1545992864-9530-1-git-send-email-chunfeng.yun@mediatek.com>
+ <20181228105148.GA22073@kroah.com>
+ <1546051720.32173.139.camel@mhfsdcap03>
 MIME-Version: 1.0
-Date: Sat, 29 Dec 2018 13:27:28 +0100
-From: Stefan Agner <stefan@agner.ch>
-To: Nathan Chancellor <natechancellor@gmail.com>
-Subject: Re: [PATCH 2/2] ARM: Wrap '--pic-veneer' with ld-option
-In-Reply-To: <20181205194519.GA9197@flashbox>
-References: <20181205014213.943-1-natechancellor@gmail.com>
- <20181205014213.943-2-natechancellor@gmail.com>
- <CAKv+Gu-N9j5X4WoFDbQrzeOCfBaNm6ujXe_fAruusE_kWdj8iQ@mail.gmail.com>
- <20181205080645.GA11936@flashbox>
- <CAKv+Gu9Nq51Fj_14MYS6MEm0VPHOJB1CBFkCHmyC8Wt0=NWpRg@mail.gmail.com>
- <20181205183606.GA7274@flashbox>
- <CAKv+Gu-2JAiAJqWu9VaaEJ3uFr_B--J7s=iHAN9ze90HD=pXEQ@mail.gmail.com>
- <20181205194519.GA9197@flashbox>
-Message-ID: <9f43145527aa4220ecde4c3b263241e6@agner.ch>
-X-Sender: stefan@agner.ch
-User-Agent: Roundcube Webmail/1.3.7
+Content-Disposition: inline
+In-Reply-To: <1546051720.32173.139.camel@mhfsdcap03>
+User-Agent: Mutt/1.11.1 (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181229_042744_035570_CC47C921 
-X-CRM114-Status: GOOD (  29.80  )
+X-CRM114-CacheID: sfid-20181229_044935_083110_A763678C 
+X-CRM114-Status: GOOD (  22.21  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,290 +76,71 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>, Arnd Bergmann <arnd@arndb.de>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Nick Desaulniers <ndesaulniers@google.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Russell King <linux@armlinux.org.uk>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: devicetree@vger.kernel.org, Felipe Balbi <felipe.balbi@linux.intel.com>,
+ linux-usb@vger.kernel.org, linux-kernel@vger.kernel.org,
+ linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 05.12.2018 20:45, Nathan Chancellor wrote:
-> On Wed, Dec 05, 2018 at 07:39:55PM +0100, Ard Biesheuvel wrote:
->> On Wed, 5 Dec 2018 at 19:36, Nathan Chancellor <natechancellor@gmail.com> wrote:
->> >
->> > On Wed, Dec 05, 2018 at 09:09:56AM +0100, Ard Biesheuvel wrote:
->> > > (+ Arnd)
->> > >
->> > > On Wed, 5 Dec 2018 at 09:06, Nathan Chancellor <natechancellor@gmail.com> wrote:
->> > > >
->> > > > On Wed, Dec 05, 2018 at 08:37:05AM +0100, Ard Biesheuvel wrote:
->> > > > > On Wed, 5 Dec 2018 at 02:42, Nathan Chancellor <natechancellor@gmail.com> wrote:
->> > > > > >
->> > > > > > This flag is not supported by lld:
->> > > > > >
->> > > > > >     ld.lld: error: unknown argument: --pic-veneer
->> > > > > >
->> > > > > > Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
->> > > > >
->> > > > > Hi Nate,
->> > > > >
->> > > > > Does this mean ld.lld is guaranteed to produce position independent
->> > > > > veneers if you build kernels that are bigger than the typical range of
->> > > > > a relative branch?
->> > > > >
->> > > >
->> > > > Hi Ard,
->> > > >
->> > > > Honestly, I'm not quite sure. I saw your commit that introduced this
->> > > > flag and I wasn't quite sure what to make of it for lld. What
->> > > > configuration would I use to verify and what would I check for?
->> > > >
->> > >
->> > > Try building allyesconfig, and check the resulting binary for veneers
->> > > (which have 'veneer' in the symbol name, at least when ld.bfd emits
->> > > them). These veneers should not take the [virtual] address of the
->> > > branch target directly, but take a PC relative offset (as in the
->> > > example in the commit log of that patch you are referring to)
->> > >
->> >
->> > Alright, compiling with allyesconfig is a little rough at the moment
->> > (bug reports I will file in due time) but I was able to do it. Here's
->> > the disassembly specifically for the functions you had in your commit,
->> > my assembly knowledge is pretty much non-existent unfortunately so I am
->> > not sure what to make of it (it doesn't look like there is a virtual
->> > address for pc in that mix?). I am happy to provide any more information
->> > that is needed.
->> >
->> > c03030cc <__enable_mmu>:
->> > c03030cc:       e3c00002        bic     r0, r0, #2
->> > c03030d0:       e3c00b02        bic     r0, r0, #2048   ; 0x800
->> > c03030d4:       e3c00a01        bic     r0, r0, #4096   ; 0x1000
->> > c03030d8:       e3a05051        mov     r5, #81 ; 0x51
->> > c03030dc:       ee035f10        mcr     15, 0, r5, cr3, cr0, {0}
->> > c03030e0:       ee024f10        mcr     15, 0, r4, cr2, cr0, {0}
->> > c03030e4:       eafff3c5        b       c0300000 <__turn_mmu_on>
->> > c03030e8:       e320f000        nop     {0}
->> > c03030ec:       e320f000        nop     {0}
->> > c03030f0:       e320f000        nop     {0}
->> > c03030f4:       e320f000        nop     {0}
->> > c03030f8:       e320f000        nop     {0}
->> > c03030fc:       e320f000        nop     {0}
->> >
->> > c0300000 <__turn_mmu_on>:
->> > c0300000:       e1a00000        nop                     ; (mov r0, r0)
->> > c0300004:       ee070f95        mcr     15, 0, r0, cr7, cr5, {4}
->> > c0300008:       ee010f10        mcr     15, 0, r0, cr1, cr0, {0}
->> > c030000c:       ee103f10        mrc     15, 0, r3, cr0, cr0, {0}
->> > c0300010:       ee070f95        mcr     15, 0, r0, cr7, cr5, {4}
->> > c0300014:       e1a03003        mov     r3, r3
->> > c0300018:       e1a0300d        mov     r3, sp
->> > c030001c:       e1a0f003        mov     pc, r3
->> >
->>
->> Thanks Nate.
->>
->> So these functions no longer appear to reside far away from each
->> other, so there no veneer has been emitted.
->>
->> What we're looking for are veneers, i.e., snippets inserted by the
->> linker that serve as a trampoline so a branch target that is far away
->> can be reached.
->>
->> If no symbols exist with 'veneer' in their name *, it might make sense
->> to rebuild the kernel as Thumb2, which has a branching range of only 8
->> MB (as opposed to 16 MB for ARM mode)
->>
->> * I have no idea whether lld names its veneers like this, or even at all
+On Sat, Dec 29, 2018 at 10:48:40AM +0800, Chunfeng Yun wrote:
+> Hi,
+> On Fri, 2018-12-28 at 11:51 +0100, Greg Kroah-Hartman wrote:
+> > On Fri, Dec 28, 2018 at 06:27:44PM +0800, Chunfeng Yun wrote:
+> > > The host shall be able to accept and send up to 96 DPs for
+> > > devices operating at Gen 2 speed.
+> > 
+> > Why?  What is this keeping from working properly today?
 > 
-> Thanks Ard, I understand now, I appreciate that.
-> 
-> I compiled with CONFIG_THUMB2_KERNEL (config attached) and I am still
-> not seeing any veneers or thunks as Peter said they would be called for
-> lld in the LLVM bug report linked earlier in the thread. Peter did note
-> that the branch ranges were 32MB and 16MB for ARM and Thumb2
-> respectively, which could be playing into this.
-> 
-> c03028d0 <__enable_mmu>:
-> c03028d0:       f020 0002       bic.w   r0, r0, #2
-> c03028d4:       f420 6000       bic.w   r0, r0, #2048   ; 0x800
-> c03028d8:       f420 5080       bic.w   r0, r0, #4096   ; 0x1000
-> c03028dc:       f04f 0551       mov.w   r5, #81 ; 0x51
-> c03028e0:       ee03 5f10       mcr     15, 0, r5, cr3, cr0, {0}
-> c03028e4:       ee02 4f10       mcr     15, 0, r4, cr2, cr0, {0}
-> c03028e8:       f7fd bb8a       b.w     c0300000 <__turn_mmu_on>
-> c03028ec:       f3af 8000       nop.w
-> c03028f0:       f3af 8000       nop.w
-> c03028f4:       f3af 8000       nop.w
-> c03028f8:       f3af 8000       nop.w
-> c03028fc:       f3af 8000       nop.w
-> 
-> c0300000 <__turn_mmu_on>:
-> c0300000:       4600            mov     r0, r0
-> c0300002:       f3bf 8f6f       isb     sy
-> c0300006:       ee01 0f10       mcr     15, 0, r0, cr1, cr0, {0}
-> c030000a:       ee10 3f10       mrc     15, 0, r3, cr0, cr0, {0}
-> c030000e:       f3bf 8f6f       isb     sy
-> c0300012:       461b            mov     r3, r3
-> c0300014:       466b            mov     r3, sp
-> c0300016:       469f            mov     pc, r3
-> 
-> Thanks for all the insight you've given!
-> Nathan
+> The failure happened when I tried to send up to 96DPs per an interval
+> for SSP ISOC transations by libusb, this is used to verify SSP ISOC
+> function of USB3 GEN2 controller. Maybe for normal scenarios they
+> needn't transfer greater than 48 DPs in an ISOC interval.
+> (refer usb3.1r1.0 section 8.12.6 Isochronous Transactions)
 
-I was able to reproduce the issue by using allyesconfig, removing
---pic-veneer and reverting eb765c1ceb27 ("ARM: 8317/1: move the
-.idmap.text section closer to .head.text"). I guess due to that fix the
-issue currently does not appear in practice (or at least not in that
-particular case we are looking at).
+Ok, please add this information in the changelog text please.
 
-Using ld.bfd:
-$ arm-buildroot-linux-gnueabihf-objdump -d vmlinux | grep -C 4
-turn_mmu_on
-c020815c:       e12fff1e        bx      lr
-c0208160:       cc3c2857        .word   0xcc3c2857
-c0208164:       fd883000        .word   0xfd883000
+> > 
+> > I need a much better changelog text here in order to be able to accept
+> > this patch.
+> I'll make the change in next version
+> > 
+> > > 
+> > > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> > > ---
+> > >  drivers/usb/core/devio.c | 8 +++-----
+> > >  1 file changed, 3 insertions(+), 5 deletions(-)
+> > > 
+> > > diff --git a/drivers/usb/core/devio.c b/drivers/usb/core/devio.c
+> > > index a75bc0b8a50f..82c16210e34c 100644
+> > > --- a/drivers/usb/core/devio.c
+> > > +++ b/drivers/usb/core/devio.c
+> > > @@ -1564,12 +1564,10 @@ static int proc_do_submiturb(struct usb_dev_state *ps, struct usbdevfs_urb *uurb
+> > >  		}
+> > >  		for (totlen = u = 0; u < number_of_packets; u++) {
+> > >  			/*
+> > > -			 * arbitrary limit need for USB 3.0
+> > > -			 * bMaxBurst (0~15 allowed, 1~16 packets)
+> > > -			 * bmAttributes (bit 1:0, mult 0~2, 1~3 packets)
+> > > -			 * sizemax: 1024 * 16 * 3 = 49152
+> > > +			 * arbitrary limit need for USB 3.1 Gen2
+> > > +			 * sizemax: 96 DPs at SSP, 96 * 1024 = 98304
+> > >  			 */
+> > > -			if (isopkt[u].length > 49152) {
+> > > +			if (isopkt[u].length > 98304) {
+> > 
+> > Are we going to have to keep bumping this up as speeds get faster and
+> > faster?
+> Or remove the check of data length? I'm not sure which way is better
 
-c0208168 <__turn_mmu_on_loc>:
-c0208168:       c0208168        .word   0xc0208168
-c020816c:       c7b11230        .word   0xc7b11230
-c0208170:       c7b11250        .word   0xc7b11250
+No, we added that check for a good reason, please see the git log for
+the details :)
 
---
-c0303304:       e3c00a01        bic     r0, r0, #4096   ; 0x1000
-c0303308:       e3a05051        mov     r5, #81 ; 0x51
-c030330c:       ee035f10        mcr     15, 0, r5, cr3, cr0, {0}
-c0303310:       ee024f10        mcr     15, 0, r4, cr2, cr0, {0}
-c0303314:       ea0fd9c7        b       c06f9a38
-<____turn_mmu_on_veneer>
-c0303318:       e320f000        nop     {0}
-c030331c:       e320f000        nop     {0}
+thanks,
 
-c0303320 <__do_fixup_smp_on_up>:
---
-c06f9a30 <__bus_register_notifier_veneer>:
-c06f9a30:       e51ff004        ldr     pc, [pc, #-4]   ; c06f9a34
-<__bus_register_notifier_veneer+0x4>
-c06f9a34:       c29752c0        .word   0xc29752c0
-
-c06f9a38 <____turn_mmu_on_veneer>:
-c06f9a38:       e51ff004        ldr     pc, [pc, #-4]   ; c06f9a3c
-<____turn_mmu_on_veneer+0x4>
-c06f9a3c:       c7b11230        .word   0xc7b11230
-
-c06f9a40 <__rb_replace_node_veneer>:
-c06f9a40:       e51ff004        ldr     pc, [pc, #-4]   ; c06f9a44
-<__rb_replace_node_veneer+0x4>
- --
-
-c7b1122c <__kprobes_text_end>:
-c7b1122c:       00000000        .word   0x00000000
-
-c7b11230 <__turn_mmu_on>:
-c7b11230:       e1a00000        nop                     ; (mov r0, r0)
-c7b11234:       ee070f95        mcr     15, 0, r0, cr7, cr5, {4}
-c7b11238:       ee010f10        mcr     15, 0, r0, cr1, cr0, {0}
-c7b1123c:       ee103f10        mrc     15, 0, r3, cr0, cr0, {0}
-
-
-And with ld.lld:
-
-$ arm-buildroot-linux-gnueabihf-objdump -d vmlinux | grep -C 4
-turn_mmu_on
-c0208158:       e12fff1e        bx      lr
-c020815c:       cb2cb747        .word   0xcb2cb747
-c0208160:       fd883000        .word   0xfd883000
-
-c0208164 <__turn_mmu_on_loc>:
-c0208164:       c0208164        .word   0xc0208164
-c0208168:       c6c3ca38        .word   0xc6c3ca38
-c020816c:       c6c3ca58        .word   0xc6c3ca58
-
---
-c0301fb4:       e3c00a01        bic     r0, r0, #4096   ; 0x1000
-c0301fb8:       e3a05051        mov     r5, #81 ; 0x51
-c0301fbc:       ee035f10        mcr     15, 0, r5, cr3, cr0, {0}
-c0301fc0:       ee024f10        mcr     15, 0, r4, cr2, cr0, {0}
-c0301fc4:       ea3f3e38        b       c12d18ac
-<__ARMv7ABSLongThunk___turn_mmu_on>
-c0301fc8:       e320f000        nop     {0}
-c0301fcc:       e320f000        nop     {0}
-c0301fd0:       e320f000        nop     {0}
-c0301fd4:       e320f000        nop     {0}
---
-c12d18a0:       e3a00001        mov     r0, #1
-c12d18a4:       e28dd004        add     sp, sp, #4
-c12d18a8:       e8bd8ff0        pop     {r4, r5, r6, r7, r8, r9, sl, fp,
-pc}
-
-c12d18ac <__ARMv7ABSLongThunk___turn_mmu_on>:
-c12d18ac:       e30cca38        movw    ip, #51768      ; 0xca38
-c12d18b0:       e34cc6c3        movt    ip, #50883      ; 0xc6c3
-c12d18b4:       e12fff1c        bx      ip
-
---
-c6c3ca2c:       e309c90c        movw    ip, #39180      ; 0x990c
-c6c3ca30:       e34cc032        movt    ip, #49202      ; 0xc032
-c6c3ca34:       e12fff1c        bx      ip
-
-c6c3ca38 <__turn_mmu_on>:
-c6c3ca38:       e1a00000        nop                     ; (mov r0, r0)
-c6c3ca3c:       f57ff06f        isb     sy
-c6c3ca40:       ee010f10        mcr     15, 0, r0, cr1, cr0, {0}
-c6c3ca44:       ee103f10        mrc     15, 0, r3, cr0, cr0, {0}
-
-With --pic-veneer and ld.bfd:
-
- $ arm-buildroot-linux-gnueabihf-objdump -d vmlinux | grep -C 4
-turn_mmu_on
-c0208158:       e12fff1e        bx      lr
-c020815c:       cb1cb747        .word   0xcb1cb747
-c0208160:       fd883000        .word   0xfd883000
-
-c0208164 <__turn_mmu_on_loc>:
-c0208164:       c0208164        .word   0xc0208164
-c0208168:       c6c514e0        .word   0xc6c514e0
-c020816c:       c6c51500        .word   0xc6c51500
-
---
-c0301fb4:       e3c00a01        bic     r0, r0, #4096   ; 0x1000
-c0301fb8:       e3a05051        mov     r5, #81 ; 0x51
-c0301fbc:       ee035f10        mcr     15, 0, r5, cr3, cr0, {0}
-c0301fc0:       ee024f10        mcr     15, 0, r4, cr2, cr0, {0}
-c0301fc4:       ea0fd5a4        b       c06f765c
-<____turn_mmu_on_veneer>
-c0301fc8:       e320f000        nop     {0}
-c0301fcc:       e320f000        nop     {0}
-c0301fd0:       e320f000        nop     {0}
-c0301fd4:       e320f000        nop     {0}
---
-c06f7650:       e59fc000        ldr     ip, [pc]        ; c06f7658
-<____xa_set_mark_veneer+0x8>
-c06f7654:       e08ff00c        add     pc, pc, ip
-c06f7658:       0654cebc        .word   0x0654cebc
-
-c06f765c <____turn_mmu_on_veneer>:
-c06f765c:       e59fc000        ldr     ip, [pc]        ; c06f7664
-<____turn_mmu_on_veneer+0x8>
-c06f7660:       e08ff00c        add     pc, pc, ip
-c06f7664:       06559e78        .word   0x06559e78
-
---
-c6c514d4:       e1a00006        mov     r0, r6
-c6c514d8:       e8bd4070        pop     {r4, r5, r6, lr}
-c6c514dc:       e12fff13        bx      r3
-
-c6c514e0 <__turn_mmu_on>:
-c6c514e0:       e1a00000        nop                     ; (mov r0, r0)
-c6c514e4:       f57ff06f        isb     sy
-c6c514e8:       ee010f10        mcr     15, 0, r0, cr1, cr0, {0}
-c6c514ec:       ee103f10        mrc     15, 0, r3, cr0, cr0, {0}
-
---
-Stefan
+greg k-h
 
 _______________________________________________
 linux-arm-kernel mailing list
