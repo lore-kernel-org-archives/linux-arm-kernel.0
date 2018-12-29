@@ -8,17 +8,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 336B5C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 29 Dec 2018 12:58:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 235D7C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 29 Dec 2018 12:58:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 038BF20836
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 29 Dec 2018 12:58:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CFB6B20836
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 29 Dec 2018 12:58:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VBl9mGsI";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="YWvhDm0A"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 038BF20836
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WdbehSSe";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="uwIjXHkD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CFB6B20836
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,67 +27,68 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=5S43vt/HOLhylFSFUcEGs72wbI5/opsVBvHpPeYzPmA=; b=VBl9mGsILFOBab
-	vfVjcMS1gOaYpoEh9oZjY5ay/2Qi+qloXBC2twVzuojFnK2nhFgOa70KXv/ycqaJwM9Jz2YNoa9il
-	cJi5Fq/QQan0+oGPik0lCgu2p+UYrbnMsBLzfkxO/yM/Siqj6Gc4wPlk7FspAHE0tLvUvHm8iQIk5
-	PqF+UOcmOWXjeRwwFy/xHWo+L9qxHw7e2nWLUVsblK9JEH2cmqjNmJsMcNSeGTl0RBHbPcCIISRPI
-	S+iCUqulmpAucof7kG1PqG6GqNQN8Xs0Rpm1ZrSVbqaB7yOLKYRqrWK5aq8JdXsNfe5ssr4vtOyb/
-	hkot8Hepi3aNfTGYXedw==;
+	List-Owner; bh=OV+mOvTGoUy6fZ8dPankBjokaxMxoJYRU0lYWMwP6fQ=; b=WdbehSSeqlBpXH
+	AGR7NVtipPRyRlKOrYc08kA8L4JiGjF95G5JXMhxU5C+nbe/Y+t803N4UDK3CXht238/0oEYNSevs
+	uZkmHlwp9QF31Am/ER0Ol7ghYAC0GWOYQEh4k71FCXIuXIEbBrkerkb5lYNCVv1CMSqpoGGuZTxXM
+	T2PbJ84ojJAUGyZBeeUaIUHi5vZcaRtnzfZrM9NBsyfWmQd3a3qLqZ7nZ1zXeNfQmcTh0ShxYsw9t
+	O624rzg0PeooZF4czKUl7teyijvME3t/AL7IxsMv0bNjCghMJN195c6gZ2SAuW7q32FleAOJFpjDA
+	FdEo+Y1Kj3sbR8XB8ehg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gdECE-0003dV-Jr; Sat, 29 Dec 2018 12:58:30 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1gdECP-0003m1-37; Sat, 29 Dec 2018 12:58:41 +0000
+Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gdEBX-0002wl-Nw; Sat, 29 Dec 2018 12:57:49 +0000
-Received: by mail-wr1-x441.google.com with SMTP id x10so23030967wrs.8;
- Sat, 29 Dec 2018 04:57:37 -0800 (PST)
+ id 1gdEBY-0002wn-U6; Sat, 29 Dec 2018 12:57:51 +0000
+Received: by mail-wm1-x342.google.com with SMTP id t200so9547115wmt.0;
+ Sat, 29 Dec 2018 04:57:38 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=googlemail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=VlAqZUJKjhpDiruDFrlNjds26NWgcPdIHOc9gfNOZDw=;
- b=YWvhDm0AIwD9W5CR4hxwB9wQM2KP/7L0i9j7aD1eEFABQNrP8Svf0auI8t44vA4Aj7
- u76e+fiMzYUvNuMG0Fb0p5GOm354hoN4/zjkDLwxQSkn+3zJXi3jgCFmPRhuG6fiDAtW
- IfEAQANGeMa5jWqjUTH7DhnF0Illwl6a0um15uy7ZmnuFZNFv0EepJPqfZroo5P23dYs
- UfUBbuqEfNSLLGAzqTdb2FOMOHOHGPtG/v1jiAyJ6t1+Bh/p1aq6q9EvcJkGSWJQqXyM
- bEkUfKYbiKB19Syc1Ppueb1YgnG6A0k36hgg4cN3fWbeKl4IGkv/jCiCell9LQqEHFzc
- aEPQ==
+ bh=0GgHqqxZVFXgmfbHJtxlutcHlK9nbAzoBbUIQBCbANI=;
+ b=uwIjXHkDkkPZPetAQRlQ8Dx0nMlgoymY6ulxb1HBCaPhu8NTZtSOApAgBwpRh19a/1
+ bJbenQV6tpB8P8pR6L9vBsubpz0wWKquymP9F3fi7i7ljO4b3qjd/Gj/PjCPao5HNaH8
+ DYKyhBrVS7m5m9egGQZWVop04jtTnopuEsKIJpJLRgtvUoK7FmHfu1Thk7FodE1b/6f8
+ 1AOVC6YL/0GSrugej4VjDM4F7gTdQseqG1gRXPEs1cUOWQyjGDokJJy/fPDrMVLaaGFS
+ jSegRpMHu3+5vF7o2irUWR4wxk25ZbhoH5O86aobJsYfQdVsqLPB72wudis5HEm3RXWg
+ cHUw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=VlAqZUJKjhpDiruDFrlNjds26NWgcPdIHOc9gfNOZDw=;
- b=V7TBBI6C4JPkXCElG9RnUYdsFjF4kdBA5XJCMe/2F77ER1uDuwCZvvdczejf1Npc0x
- nZln8tBsTl21rhAmf0ZWUcaqQzPl1TM9RNPw8KB6tgZX+3LvDGCXnwWc0ucrIyOM++1I
- 4Qr0MQV1Z9oqBtKyHA8AJJI7aFcEMSQoZeZfkQjNZp0ifM/idSMPG/b0i/NqRUDCOJOP
- +R611ifkNScO90CAyGS5SHy+wSVtV4UEIEN/TNZW1sDwcT9Lt3bZj/JSWs2qiKCa+QWs
- Oes6ezlAsRKnb5D52joam0t8zfTLfmtxXp6RPolHlbNoa9JiQj7CR1kmR77bDQi2NgJV
- ytGg==
-X-Gm-Message-State: AJcUukcWuZUHtdcuRUQ13SNLR7mrKTQpEcqKsa8tgxa+k5tHh4BdBdFj
- nblWM61ow4cxsAWkraR83QDYyqen
-X-Google-Smtp-Source: ALg8bN7xzdiR3LRxK+u6K8d/bbdwUQJ88L0TyNFqvdygQEPhOt8U5L8VvlqqHSd8UJjMYifFUIQMSA==
-X-Received: by 2002:adf:a743:: with SMTP id e3mr27143292wrd.56.1546088255653; 
- Sat, 29 Dec 2018 04:57:35 -0800 (PST)
+ bh=0GgHqqxZVFXgmfbHJtxlutcHlK9nbAzoBbUIQBCbANI=;
+ b=UyGAu9hmD/2w8b+FLHr9VdbKJrweQnaXsW0ZelU/ebpNhcZqLz9FbZhqvn6oJ1flHV
+ s3t+HDO2YtEp43AR/45Bw2p9R2hHQcrjmTb+qLJ2LUnnc1l+PL3R4pcAwh2b8I45uIgk
+ FIz1LA5nzAypBpgRH1IUzLn+3VPteG8IHmr/up9utYBc2Vku6etEV/JE3syWkdhIOkMI
+ gMS+MBKY9OEn+ID4CxgKvWiVvl5XIVthSckoDTV2GfdX+K7m5Kr/ZsZH9E5PkXu7bVQR
+ AS1XZthfsLXJcjChmL953OPqCtPEesoBFZwV6TlAeNFkOlwt5Hy5aJwsJhz0m7HW50vl
+ mTCg==
+X-Gm-Message-State: AJcUukc35Wu0Tfq0LQe4JD6eC6aJNo/7eszwQkaT3DtnMikWM/HIK1KU
+ whLy4gGlFbU0lWLFIfMM3HYdjmoe
+X-Google-Smtp-Source: AFSGD/Xq2dNuPD5B9Jyeeixk2jL9dKx4017uH/Ni5DQpYTDxU0ptgJE384Bv+wvOFtev/8VZrZfeOg==
+X-Received: by 2002:a1c:5fd7:: with SMTP id
+ t206mr28045169wmb.145.1546088256856; 
+ Sat, 29 Dec 2018 04:57:36 -0800 (PST)
 Received: from blackbox.darklights.net
  (p200300DCD7294600914F24DE1716D3FC.dip0.t-ipconnect.de.
  [2003:dc:d729:4600:914f:24de:1716:d3fc])
- by smtp.googlemail.com with ESMTPSA id h17sm31987059wrt.59.2018.12.29.04.57.34
+ by smtp.googlemail.com with ESMTPSA id h17sm31987059wrt.59.2018.12.29.04.57.35
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sat, 29 Dec 2018 04:57:34 -0800 (PST)
+ Sat, 29 Dec 2018 04:57:36 -0800 (PST)
 From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 To: linux-amlogic@lists.infradead.org, khilman@baylibre.com,
  linus.walleij@linaro.org
-Subject: [PATCH 2/3] ARM: dts: meson8b: ec100: mark the SD card detection GPIO
- active-low
-Date: Sat, 29 Dec 2018 13:57:10 +0100
-Message-Id: <20181229125711.5205-3-martin.blumenstingl@googlemail.com>
+Subject: [PATCH 3/3] ARM: dts: meson8m2: mxiii-plus: mark the SD card
+ detection GPIO active-low
+Date: Sat, 29 Dec 2018 13:57:11 +0100
+Message-Id: <20181229125711.5205-4-martin.blumenstingl@googlemail.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20181229125711.5205-1-martin.blumenstingl@googlemail.com>
 References: <20181229125711.5205-1-martin.blumenstingl@googlemail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181229_045747_777055_1585DC03 
-X-CRM114-Status: GOOD (  14.27  )
+X-CRM114-CacheID: sfid-20181229_045749_163482_90765B70 
+X-CRM114-Status: GOOD (  14.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -111,26 +112,26 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 After commit 89a5e15bcba87d ("gpio/mmc/of: Respect polarity in the device
 tree") SD cards are not detected anymore.
 
-The CD GPIO is "active low" on the EC-100. The MMC dt-bindings specify:
-"[...] using the "cd-inverted" property means, that the CD line is active
-high, i.e. it is high, when a card is inserted".
+The CD GPIO is "active low" on the MXIII-Plus. The MMC dt-bindings
+specify: "[...] using the "cd-inverted" property means, that the CD line
+is active high, i.e. it is high, when a card is inserted".
 
 Fix the description of the SD card by marking it as GPIO_ACTIVE_LOW and
 drop the "cd-inverted" property. This makes the definition consistent
 with the existing dt-bindings and fixes the check whether an SD card is
 inserted.
 
-Fixes: bbedc1f1d90e33 ("ARM: dts: meson8b: Add support for the Endless Mini (EC-100)")
+Fixes: 35ee52bea66c74 ("ARM: dts: meson8m2: add support for the Tronsmart MXIII Plus")
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 ---
- arch/arm/boot/dts/meson8b-ec100.dts | 3 +--
+ arch/arm/boot/dts/meson8m2-mxiii-plus.dts | 3 +--
  1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/meson8b-ec100.dts b/arch/arm/boot/dts/meson8b-ec100.dts
-index 0872f6e3abf5..d50fc2f60fa3 100644
---- a/arch/arm/boot/dts/meson8b-ec100.dts
-+++ b/arch/arm/boot/dts/meson8b-ec100.dts
-@@ -205,8 +205,7 @@
+diff --git a/arch/arm/boot/dts/meson8m2-mxiii-plus.dts b/arch/arm/boot/dts/meson8m2-mxiii-plus.dts
+index f5853610b20b..6ac02beb5fa7 100644
+--- a/arch/arm/boot/dts/meson8m2-mxiii-plus.dts
++++ b/arch/arm/boot/dts/meson8m2-mxiii-plus.dts
+@@ -206,8 +206,7 @@
  		cap-sd-highspeed;
  		disable-wp;
  
