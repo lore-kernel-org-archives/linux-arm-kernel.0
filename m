@@ -2,82 +2,89 @@ Return-Path: <SRS0=jr7z=PG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
-	autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4E6C2C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 29 Dec 2018 14:30:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 61013C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 29 Dec 2018 14:36:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 18D152087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 29 Dec 2018 14:30:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1BE4A2087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 29 Dec 2018 14:36:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PZtye4i4";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="hY7FlQeD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 18D152087F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Eo0A76Sa";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="gNpo5E4S"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1BE4A2087F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zslJlPxoR5bVF2DFmvTqIeokoxE6KYt3//MAvE6ZSoQ=; b=PZtye4i4z6EkJY
-	Q54F3PWKhz+ClX8PliAuXVt8KHHpqDzwqxoq8SkWaZJArvb8VZ86uXP7BsXUKUyU/Ojk0PShooTc2
-	4Fy/+E1BW8MESk3vWCJufXUU4uKK50LObmrbYqU6HbQYws5ZgFTpa2yZ7frGQDVP5q4o4apqnt7tk
-	oIfGyJTk6FTckLmOfPyTokCYu9mXb6fJDFDk4mP/yFSYOyUlxz/1JU1Ax1UHk6RC15egMRSLW23wM
-	lNhERBvhhrY33fEk7ydcBF8uwFBb4MEHAPxvNlsgMRsYXuUz6cise6iH3YD34OONOOk0MPKEqkw60
-	ACZaenSSwENpsOcEr7pQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=cTIEoboYqHR6BURU98TbmpHA+lecw9W3MWS/YztEpFs=; b=Eo0A76Sa1hUUuM
+	nvkLdoOd8hpwonoWJFXZhZ7zMmCtDxoEtrbS+OM9r30Txi1rTH7ud/oGNnkAsXU5GNwfYfSRt7C3o
+	zVTH/AIF5Ko5/Lei9p6rWwRBabHRHFThKi91BaEZiiD27ztQmmpRMz6issygNxGg1eGIVyoC5bQXF
+	F/QAdfOVdwrfFufvrSjzkABvjGEk3mbTt33UEPWNrvCj+s3jFTU49w4OgpX7h/t982xy+7SKUeiV6
+	+4jb4Ae5maZGAc4bdXyu9ZOk0vmXKu8Bc5qIzIVbZ+494rf5oOgZPaz1gMreI08pFuYemvZIuyCYC
+	K+ZVLCRpfCUrfpF1Hnjg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gdFcZ-0000gq-JE; Sat, 29 Dec 2018 14:29:47 +0000
-Received: from mail-ot1-x342.google.com ([2607:f8b0:4864:20::342])
+	id 1gdFjA-0003Zg-5M; Sat, 29 Dec 2018 14:36:36 +0000
+Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gdFcU-0000fo-Oq; Sat, 29 Dec 2018 14:29:44 +0000
-Received: by mail-ot1-x342.google.com with SMTP id a11so20654470otr.10;
- Sat, 29 Dec 2018 06:29:32 -0800 (PST)
+ id 1gdFj5-0003XT-9b; Sat, 29 Dec 2018 14:36:32 +0000
+Received: by mail-wm1-x343.google.com with SMTP id b11so20808396wmj.1;
+ Sat, 29 Dec 2018 06:36:20 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=googlemail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=Ie9auksBhJoXtAc+Y/yaeP1FssPIISyrcQYmTk85oIk=;
- b=hY7FlQeDRMO29Gx81zoHkNgWaZVaxcONGfYmzyk8vWgVjEKb7XLOL2IF2qr9p/i0RU
- mEXeAAvGQNizoPwPSe8tDjqHQqSyyCJs6QV6q4Rqjw0evUXeJKHIlBPI0aeG2TnOGDIi
- a40O/wGwPILrM0MJkDwLf+09PbQOUCL0nFVJ6MarkqxbM4efEv1X6A1G3HuJ3KevPt41
- SQRiw08OqY8zI+6cs31yAMvbu+45QyP9R3tL1DQuztPGnOEJ5YXEbAV3dTrd5UZfW5hQ
- IeVlhYIAm4QpmFCxq1cp8Xyv1NwSnlPTitZliqn+2v5kfcJORfPz2M8+r9R9d0Wzhran
- dLrQ==
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=2DlGmc2NFsu0CtSBpdnlMMk72YXVAb3M+9shp7ULxmo=;
+ b=gNpo5E4SIbWv7IzCAPD89UINW8H4koN7LPgnmqWE1QfSWsSsXk92637g+rhVnxzDc8
+ mlqHsqzGtCZ2KKwoU+KBULkCdJPVo+2msHsXJgK2c4unGwptRCLBVvARtJrQrnun0HFG
+ +oVv+18IFoGAUliL8/iCFL+DwCgeOb/zFD+GsPajtTJ+8XkPYpQZsZ1CP822nMqVn4N0
+ 5GzjPq21JnYN1WxgS5/wVME2PQoy2AR3z5OhZtSWi5g0LYjGbwZGxq3/kqFbXA8T3ZrW
+ oNwUyC/BiRhRaLC+cvVpxFUQZZ9RsZaq9Ppd06gbyjgHPs4t8j/M/4AhVSOHne8pqZZM
+ fe2Q==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=Ie9auksBhJoXtAc+Y/yaeP1FssPIISyrcQYmTk85oIk=;
- b=UWvFNjLWXjX8BfYp1glyFXr04AURyznAyvLmcaVkf3xE5RRB7cjjOqGz1uuaFIiFAM
- rEmPFo3MccAI4KYVPJuIKWMePwhhx2WC2Vj5w63rHeeeak2BNv9bSj91/xmshFgKfycy
- qWPoCVPNFqTmJN4D2+h9x0AM09Qwv8+G3sbRlNzfRJZTl7ygBnyS3j+IXQGruCBn72pR
- +BKVfmb5Hi9AWZjPiu+GaQDaaG8v4I+1YO0YV7mKcRGHa5kYe0KRjhzvO+DlY46gwgkm
- cEaivjmBEiVraQGRTXDChd9BSHsmOVmI82gpGKxasahBbRDBaGvItXR/XXeFZU3KH0iu
- 9ebQ==
-X-Gm-Message-State: AJcUukeSA1rlfwCxfuYGUtCP0lBgG+CsK6HzdllqQGmezkiHbIMzBwvF
- g16cAikRQMDwRMznahOuh9HpXKHFXftw12ACSqv1AgY9
-X-Google-Smtp-Source: ALg8bN57O9bRVZadMEpInEcEjClNttCqBLs78cW0zP1oBYfkAk6RuIXr19m4W2JEVL0BRFUj0PuZdiQIvxZerLIO8SE=
-X-Received: by 2002:a9d:7749:: with SMTP id t9mr22401989otl.342.1546093771264; 
- Sat, 29 Dec 2018 06:29:31 -0800 (PST)
-MIME-Version: 1.0
-References: <20181229125711.5205-1-martin.blumenstingl@googlemail.com>
-In-Reply-To: <20181229125711.5205-1-martin.blumenstingl@googlemail.com>
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=2DlGmc2NFsu0CtSBpdnlMMk72YXVAb3M+9shp7ULxmo=;
+ b=B1x+fyhwaSAiGAP6GT4IwRq/eSjaFK+fAOBlkvkymYe6RxvFSiWxkDh7bejD1ua3Ft
+ Rudi26zi/lk5lh3VZBzjgLgWEd6xqXHzChIxFJbDfVR1KrCDJStL+LI8jl8gAxzzE6oG
+ NHGpEvHclrQ/KZ4du9tbO+ZJ9VZsSunKUKEzJ8aiHDj7yNsNCwUKSdOijMutKo6VwFAM
+ b1ywcT8J3OetuvnoTO9C9hv1gn31NjtofFZ+IImfoCTyEtp1SmciBB+10843gKWVvdIe
+ RCCPiV0vHOUrEi1XTy/wYPo2eAp9TjE0Gkklr/yGCGRX8sPOIlCUgPjNcPN8fA37nVcx
+ 5ZFg==
+X-Gm-Message-State: AJcUukeWFjiNELZgKTR3gaxCExbnj/KJ8+JgOMyJWGeOtSwufWKFY6Bi
+ 34O78LGa8RncQ+fU+NtHghN+Q4+V
+X-Google-Smtp-Source: ALg8bN67CHcSSdbwZXJZt51FLfJfhkR53cW/+Hvpng1q/u7lqmQjat8t+qXeY7QRZVyrKKz9KwYmJg==
+X-Received: by 2002:a7b:c5d1:: with SMTP id n17mr2807530wmk.152.1546094178435; 
+ Sat, 29 Dec 2018 06:36:18 -0800 (PST)
+Received: from blackbox.darklights.net
+ (p200300DCD7294600914F24DE1716D3FC.dip0.t-ipconnect.de.
+ [2003:dc:d729:4600:914f:24de:1716:d3fc])
+ by smtp.googlemail.com with ESMTPSA id
+ k135sm53626412wmd.42.2018.12.29.06.36.17
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Sat, 29 Dec 2018 06:36:17 -0800 (PST)
 From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Date: Sat, 29 Dec 2018 15:29:20 +0100
-Message-ID: <CAFBinCCpsy40NuB124TqDUWy9zogeMrLsCGCanbbvpfd-yVDdQ@mail.gmail.com>
-Subject: Re: [PATCH 0/3] ARM: dts: meson: fix SD card cd-gpio (pre v4.21-rc)
-To: linux-amlogic@lists.infradead.org, khilman@baylibre.com, 
- linus.walleij@linaro.org
+To: linux-amlogic@lists.infradead.org, khilman@baylibre.com,
+ ingrassia@epigenesys.com
+Subject: [PATCH v3 0/2] Meson8b RGMII Ethernet pin fixes
+Date: Sat, 29 Dec 2018 15:35:54 +0100
+Message-Id: <20181229143556.27339-1-martin.blumenstingl@googlemail.com>
+X-Mailer: git-send-email 2.20.1
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181229_062942_818767_206C7A39 
-X-CRM114-Status: GOOD (  11.23  )
+X-CRM114-CacheID: sfid-20181229_063631_363846_4A2A7623 
+X-CRM114-Status: GOOD (  14.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,42 +96,55 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linus.luessing@c0d3.blue, bgolaszewski@baylibre.com, balbes-150@yandex.ru,
- linux-mmc@vger.kernel.org, linux-gpio@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux@roeck-us.net
+Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ linux-arm-kernel@lists.infradead.org, jianxin.pan@amlogic.com,
+ linus.luessing@c0d3.blue
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, Dec 29, 2018 at 1:57 PM Martin Blumenstingl
-<martin.blumenstingl@googlemail.com> wrote:
->
-> Today I noticed that my Odroid-C1 doesn't see it's SD card anymore.
-> My board is not the only one, Odroid-C1 on KernelCI suffers from the
-> same problem:
-> v4.20-6428-g00c569b567c7 still sees the SD card (mmc0): [0]
-> v4.20-8955-g903b77c63167 doesn't see the SD card (mmc0) anymore: [1]
->
-> My Endless Mini (EC-100) is also affected by this issue.
->
-> a git bisect run points to this commit:
-> 89a5e15bcba87df5120d4656e0ff33d4f7cd6152 ("gpio/mmc/of: Respect polarity
-> in the device tree")
->
-> and indeed, reverting it makes my Odroid-C1 and EC-100 see the SD card
-> again.
-I started a separate discussion for that topic on the linux-mmc and
-linux-gpio mailing list for this topic: [0]
+Hi Emiliano, Hi Linus,
 
-comments regarding this series are still welcome!
+could you please test the patch from this series on your Odroid-C1?
+I tested it on mine and Ethernet seems to be improve Ethernet transmit
+speeds greatly (at the cost of a small drop in receive performance).
 
 
-Regards
-Martin
+Changes since v2 at [1]:
+- Thanks to Jianxin for providing the documentation for the two missing
+  bits in pin mux register 7
+- added a patch to add the missing eth_rxd2 and eth_rxd3 pin groups to
+  the pinctrl-meson8b driver
+- update the meson8.dtsi patch to include the eth_rxd2 and eth_rxd3 pin
+  groups on top of the previous change which only removed eth_txd0_1
+  and eth_txd1_1 (including the patch description)
+- update subject of the cover-letter and the meson8b.dtsi patch
 
 
-[0] https://marc.info/?l=linux-mmc&m=154609359306732&w=3
+Changes since v1 at [0]:
+- rebased so it applies on top of "ARM: dts: meson: meson8b: add the CPU
+  OPP tables" which will be part of v4.20-rc1 once the arm-soc tree is
+  merged into mainline
+- updated patch description with more details
+
+
+[0] http://lists.infradead.org/pipermail/linux-amlogic/2018-May/007274.html
+[1] https://patchwork.kernel.org/cover/10744709/
+
+
+Martin Blumenstingl (2):
+  pinctrl: meson: meson8b: add the eth_rxd2 and eth_rxd3 pins
+  ARM: dts: meson8b: fix the Ethernet data line signals in
+    eth_rgmii_pins
+
+ arch/arm/boot/dts/meson8b.dtsi          | 6 +++---
+ drivers/pinctrl/meson/pinctrl-meson8b.c | 6 +++++-
+ 2 files changed, 8 insertions(+), 4 deletions(-)
+
+-- 
+2.20.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
