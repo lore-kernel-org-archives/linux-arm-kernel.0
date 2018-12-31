@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 03A70C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 09:30:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BC33AC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 09:30:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C29602133F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 09:30:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8B6D72133F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 09:30:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gbavrZaw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C29602133F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="L5GHzwMQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8B6D72133F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,77 +26,78 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	References:In-Reply-To:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=rcZfpAyqxp5q/xug+X3Fb933o/u4lO1AGVOuM26/+f4=; b=gbavrZawSQlfq6Z6B3FSRWFGUU
-	So+RQbu6NoZ+lUJ2g4Sj2FUcPCCMvAGUQkRwSWjxkQbauuvgLFfj5vhgmdVS13WChdAuL8v0RfyQ2
-	G3EC6oas1sXyBXm82KpSlJ0ao08xVeJvAkWYqxayqF6ob3vpwDnbffotcXpgz36X/JGlK72f53WOf
-	Hb1HmMYItvuIbZH37DFtw8p3DS8C1qFXCk3Xix49vDEODIpCSuX5XFoPGC04CJZI+hmJBKyRRebHq
-	hMekr1cyhKt39BHp7hyLJPDSmjlxoYt86Iws2uIPFpMTnmtiTzifU2O8AMRjNdnbot5+4IJGvE4fT
-	cgNCsdwg==;
+	bh=RU/chiyEvSGuoA95pJMl51CJbQ35P14y+wghytadS9Y=; b=L5GHzwMQLUgl9JvYre/RbN8v1S
+	XUUfflcqYdeMBjwQSdv1VKIhr/+Dzn5Z/DovgAC7KtUANx0GS1ZCmFO6uXaxdeT1OOASEr7wwbcXX
+	MkBxeCxz4Nag2Lty/q9dXR5I8t3hBGUyodBjP03OkbZnFG09YmGCbl9/2i4d0ijYpwisxDA9tiphp
+	r46+Ab4p6pkpnjstDkgviZ6ZSli8maVKaFQcDwByqgGrwmk8o38xcCALI2BbLE1Bz5Cu0xsiNensV
+	OvGNGR/wNhQrpceaczvs7zc1JyJvaRFnox8A/JEcqWvshkEtLHoJpv497fbgSp4UaB/yjKAkw4JRR
+	7oFopkNg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gdtu5-0001sL-La; Mon, 31 Dec 2018 09:30:33 +0000
-Received: from mx0a-001b2d01.pphosted.com ([148.163.156.1])
+	id 1gdtuH-00024W-Vr; Mon, 31 Dec 2018 09:30:45 +0000
+Received: from mx0b-001b2d01.pphosted.com ([148.163.158.5]
+ helo=mx0a-001b2d01.pphosted.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gdttS-00005m-2w
- for linux-arm-kernel@lists.infradead.org; Mon, 31 Dec 2018 09:29:58 +0000
-Received: from pps.filterd (m0098410.ppops.net [127.0.0.1])
- by mx0a-001b2d01.pphosted.com (8.16.0.22/8.16.0.22) with SMTP id
- wBV9SiW1017056
- for <linux-arm-kernel@lists.infradead.org>; Mon, 31 Dec 2018 04:29:53 -0500
-Received: from e06smtp03.uk.ibm.com (e06smtp03.uk.ibm.com [195.75.94.99])
- by mx0a-001b2d01.pphosted.com with ESMTP id 2pqftghdh6-1
+ id 1gdttV-00009q-E3
+ for linux-arm-kernel@lists.infradead.org; Mon, 31 Dec 2018 09:29:59 +0000
+Received: from pps.filterd (m0098416.ppops.net [127.0.0.1])
+ by mx0b-001b2d01.pphosted.com (8.16.0.22/8.16.0.22) with SMTP id
+ wBV9SkSi068857
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 31 Dec 2018 04:29:56 -0500
+Received: from e06smtp05.uk.ibm.com (e06smtp05.uk.ibm.com [195.75.94.101])
+ by mx0b-001b2d01.pphosted.com with ESMTP id 2pqbe91vcd-1
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
- for <linux-arm-kernel@lists.infradead.org>; Mon, 31 Dec 2018 04:29:53 -0500
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 31 Dec 2018 04:29:56 -0500
 Received: from localhost
- by e06smtp03.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
+ by e06smtp05.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
  Violators will be prosecuted
  for <linux-arm-kernel@lists.infradead.org> from <rppt@linux.ibm.com>;
- Mon, 31 Dec 2018 09:29:50 -0000
-Received: from b06cxnps4075.portsmouth.uk.ibm.com (9.149.109.197)
- by e06smtp03.uk.ibm.com (192.168.101.133) with IBM ESMTP SMTP Gateway:
+ Mon, 31 Dec 2018 09:29:54 -0000
+Received: from b06cxnps4074.portsmouth.uk.ibm.com (9.149.109.196)
+ by e06smtp05.uk.ibm.com (192.168.101.135) with IBM ESMTP SMTP Gateway:
  Authorized Use Only! Violators will be prosecuted; 
  (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
- Mon, 31 Dec 2018 09:29:43 -0000
-Received: from d06av24.portsmouth.uk.ibm.com (mk.ibm.com [9.149.105.60])
- by b06cxnps4075.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
- wBV9TgJY9240952
+ Mon, 31 Dec 2018 09:29:48 -0000
+Received: from d06av25.portsmouth.uk.ibm.com (d06av25.portsmouth.uk.ibm.com
+ [9.149.105.61])
+ by b06cxnps4074.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
+ wBV9TlgC5636522
  (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
- Mon, 31 Dec 2018 09:29:42 GMT
-Received: from d06av24.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 1C19E42045;
- Mon, 31 Dec 2018 09:29:42 +0000 (GMT)
-Received: from d06av24.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 7DB7B42041;
- Mon, 31 Dec 2018 09:29:38 +0000 (GMT)
+ Mon, 31 Dec 2018 09:29:47 GMT
+Received: from d06av25.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id ED91411C050;
+ Mon, 31 Dec 2018 09:29:46 +0000 (GMT)
+Received: from d06av25.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id 276E811C04A;
+ Mon, 31 Dec 2018 09:29:43 +0000 (GMT)
 Received: from rapoport-lnx (unknown [9.148.207.181])
- by d06av24.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
- Mon, 31 Dec 2018 09:29:38 +0000 (GMT)
+ by d06av25.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
+ Mon, 31 Dec 2018 09:29:43 +0000 (GMT)
 Received: by rapoport-lnx (sSMTP sendmail emulation);
- Mon, 31 Dec 2018 11:29:36 +0200
+ Mon, 31 Dec 2018 11:29:42 +0200
 From: Mike Rapoport <rppt@linux.ibm.com>
 To: Andrew Morton <akpm@linux-foundation.org>
-Subject: [PATCH v4 2/6] microblaze: prefer memblock API returning virtual
- address
-Date: Mon, 31 Dec 2018 11:29:22 +0200
+Subject: [PATCH v4 3/6] sh: prefer memblock APIs returning virtual address
+Date: Mon, 31 Dec 2018 11:29:23 +0200
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1546248566-14910-1-git-send-email-rppt@linux.ibm.com>
 References: <1546248566-14910-1-git-send-email-rppt@linux.ibm.com>
 X-TM-AS-GCONF: 00
-x-cbid: 18123109-0012-0000-0000-000002DFB3DA
+x-cbid: 18123109-0020-0000-0000-000002FE3658
 X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
-x-cbparentid: 18123109-0013-0000-0000-000021166B31
-Message-Id: <1546248566-14910-3-git-send-email-rppt@linux.ibm.com>
+x-cbparentid: 18123109-0021-0000-0000-0000214E6FCA
+Message-Id: <1546248566-14910-4-git-send-email-rppt@linux.ibm.com>
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2018-12-31_06:, , signatures=0
 X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
  priorityscore=1501
  malwarescore=0 suspectscore=0 phishscore=0 bulkscore=0 spamscore=0
  clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
- mlxlogscore=577 adultscore=0 classifier=spam adjust=0 reason=mlx
+ mlxlogscore=908 adultscore=0 classifier=spam adjust=0 reason=mlx
  scancount=1 engine=8.0.1-1810050000 definitions=main-1812310088
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181231_012954_957875_8F8AE028 
-X-CRM114-Status: GOOD (  21.19  )
+X-CRM114-CacheID: sfid-20181231_012957_709400_11B0CA05 
+X-CRM114-Status: GOOD (  21.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -134,28 +135,66 @@ Rather than use the memblock_alloc_base that returns a physical address and
 then convert this address to the virtual one, use appropriate memblock
 function that returns a virtual address.
 
-Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
-Tested-by: Michal Simek <michal.simek@xilinx.com>
----
- arch/microblaze/mm/init.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+There is a small functional change in the allocation of then NODE_DATA().
+Instead of panicing if the local allocation failed, the non-local
+allocation attempt will be made.
 
-diff --git a/arch/microblaze/mm/init.c b/arch/microblaze/mm/init.c
-index b17fd8a..44f4b89 100644
---- a/arch/microblaze/mm/init.c
-+++ b/arch/microblaze/mm/init.c
-@@ -363,8 +363,9 @@ void __init *early_get_page(void)
- 	 * Mem start + kernel_tlb -> here is limit
- 	 * because of mem mapping from head.S
- 	 */
--	return __va(memblock_alloc_base(PAGE_SIZE, PAGE_SIZE,
--				memory_start + kernel_tlb));
-+	return memblock_alloc_try_nid_raw(PAGE_SIZE, PAGE_SIZE,
-+				MEMBLOCK_LOW_LIMIT, memory_start + kernel_tlb,
-+				NUMA_NO_NODE);
- }
+Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
+---
+ arch/sh/mm/init.c | 18 +++++-------------
+ arch/sh/mm/numa.c |  5 ++---
+ 2 files changed, 7 insertions(+), 16 deletions(-)
+
+diff --git a/arch/sh/mm/init.c b/arch/sh/mm/init.c
+index a8e5c0e..a0fa4de 100644
+--- a/arch/sh/mm/init.c
++++ b/arch/sh/mm/init.c
+@@ -192,24 +192,16 @@ void __init page_table_range_init(unsigned long start, unsigned long end,
+ void __init allocate_pgdat(unsigned int nid)
+ {
+ 	unsigned long start_pfn, end_pfn;
+-#ifdef CONFIG_NEED_MULTIPLE_NODES
+-	unsigned long phys;
+-#endif
  
- #endif /* CONFIG_MMU */
+ 	get_pfn_range_for_nid(nid, &start_pfn, &end_pfn);
+ 
+ #ifdef CONFIG_NEED_MULTIPLE_NODES
+-	phys = __memblock_alloc_base(sizeof(struct pglist_data),
+-				SMP_CACHE_BYTES, end_pfn << PAGE_SHIFT);
+-	/* Retry with all of system memory */
+-	if (!phys)
+-		phys = __memblock_alloc_base(sizeof(struct pglist_data),
+-					SMP_CACHE_BYTES, memblock_end_of_DRAM());
+-	if (!phys)
++	NODE_DATA(nid) = memblock_alloc_try_nid_nopanic(
++				sizeof(struct pglist_data),
++				SMP_CACHE_BYTES, MEMBLOCK_LOW_LIMIT,
++				MEMBLOCK_ALLOC_ACCESSIBLE, nid);
++	if (!NODE_DATA(nid))
+ 		panic("Can't allocate pgdat for node %d\n", nid);
+-
+-	NODE_DATA(nid) = __va(phys);
+-	memset(NODE_DATA(nid), 0, sizeof(struct pglist_data));
+ #endif
+ 
+ 	NODE_DATA(nid)->node_start_pfn = start_pfn;
+diff --git a/arch/sh/mm/numa.c b/arch/sh/mm/numa.c
+index 830e8b3..c4bde61 100644
+--- a/arch/sh/mm/numa.c
++++ b/arch/sh/mm/numa.c
+@@ -41,9 +41,8 @@ void __init setup_bootmem_node(int nid, unsigned long start, unsigned long end)
+ 	__add_active_range(nid, start_pfn, end_pfn);
+ 
+ 	/* Node-local pgdat */
+-	NODE_DATA(nid) = __va(memblock_alloc_base(sizeof(struct pglist_data),
+-					     SMP_CACHE_BYTES, end));
+-	memset(NODE_DATA(nid), 0, sizeof(struct pglist_data));
++	NODE_DATA(nid) = memblock_alloc_node(sizeof(struct pglist_data),
++					     SMP_CACHE_BYTES, nid);
+ 
+ 	NODE_DATA(nid)->node_start_pfn = start_pfn;
+ 	NODE_DATA(nid)->node_spanned_pages = end_pfn - start_pfn;
 -- 
 2.7.4
 
