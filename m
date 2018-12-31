@@ -4,88 +4,87 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-15.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6D908C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 21:47:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C7DD9C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 21:47:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3942B20B1F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 21:47:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7F5AF20B1F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 21:47:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B8Gz5UAM";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="z4AvOhMl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3942B20B1F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tII+QofF";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="Ak33XhEj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7F5AF20B1F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=m2ThXMpML3ErNdMzVN6a2Go5zR/vumzDgIF7VfFlY/g=; b=B8Gz5UAMRj7Af/
-	bQIRG3rUoh93MtUvZHt61tjHflmzPLeroO6eph1AGbssKUbRKzm4JY27aQWluqtQdYBh0G0cT6/T4
-	MmEoJ921z1D7dUTuAPutKPkHW/4ztv9NnkjB+Vy45knt0CTKi1AYKLOd2kTmBok9qrsg/yvZ8hJ6P
-	z+NOsZUbMl2JIF7dMDwGyWAw1wnh7DWUUeSxZfF/U+IekUSCkHSQD/PvMONAU1qsPP721t0/m2n8p
-	NfQiamwYJWGADy5eXCWKFRjpZBY8O6rgp3VNPv0W+e5uyQuT8SQpvMaHiljLUpA8wr6zRYph5vxVa
-	pYVJqpf460/gVbPQ3uEA==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=GZsfvGQ8hTczN7/kKruzSsCWWKC6UqwCWC9SWY14c2Y=; b=tII+QofFp7xBE3bKj9PydlHji3
+	2UwxTxEuxOxX8/H4XTkplcdU1Nc7l7bpHYqvCj8/BNyecq1hETgo7/cZt1zDOUMswAOILXa3Cql50
+	R4JbVM3+Y9jtwqLQ04kYC76TRh6JA2PiKW1KqTASDO7vamjPXgctpA8eQrLLbIUwmBvkld8yJHeyD
+	Ls47dm7JtU1cX4ShchVTt3TuYXCSr/hdC4MTijVNzC/UiClt+MCYcXrVM0kWjxrOAmUeMPZxJbwVd
+	zt7NV93AsK5o2XIm1yK8s4bRIGu3jpVBeObbIuX+9swJllkGgNjGX0ct8fR5GvGtIGSYtL92PngUD
+	tnY6+vQg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ge5P3-0003ur-FU; Mon, 31 Dec 2018 21:47:17 +0000
-Received: from mail-pf1-x442.google.com ([2607:f8b0:4864:20::442])
+	id 1ge5PD-00043m-8o; Mon, 31 Dec 2018 21:47:27 +0000
+Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ge5Og-0003dM-8I
- for linux-arm-kernel@lists.infradead.org; Mon, 31 Dec 2018 21:46:56 +0000
-Received: by mail-pf1-x442.google.com with SMTP id y126so13580705pfb.4
+ id 1ge5Oi-0003dy-L6
+ for linux-arm-kernel@lists.infradead.org; Mon, 31 Dec 2018 21:47:03 +0000
+Received: by mail-pf1-x441.google.com with SMTP id c123so13585333pfb.0
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 31 Dec 2018 13:46:54 -0800 (PST)
+ Mon, 31 Dec 2018 13:46:56 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=G9A+7yoanUGtCCAhWFTCiIEkDdBciZZherERnp1z9co=;
- b=z4AvOhMl/lqssutws8bytcqS2WXci7yYaVsYXelJroxPYjeMBukt497IxdAwRkUeyX
- LQylLrLjIw8zuT3fBaKQrWe9YNH/18dGkuJ16rfrDqISiomO6GvAw98bcVWcSrr+LOSp
- vPdxxfDtKHZfEui+3OeS8WjW2oYUa42m2A9rADv5g/Ju0Rw9jVhR9h3IK2Qga5JOA0Tm
- fCo09NDI6eDJEyao7RI5GgRtDz4cRbk0C0MvBmnyxNA6e8kTOEPn2X9FcIZnrSlOQVSB
- xVuI/ZMjLFAdrn8HomEmhC0gcCWDDTw5DkaATifLwuO5zmS9KdNHQ3jSMAsn5MemNDpJ
- MYtg==
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=Jj6XdwEJtAnO2Gkmj0ob+Z9ZSB/vn/KMcLaoPuXWHYI=;
+ b=Ak33XhEj1Hqy8WzbJthYCsKjzAqEbguVSUOyw9X23qw29FgiqPFiHM3aFa4XrSJoc1
+ 4CJe9IQ224Fg8I9SF+nf8GQtovUAOHb+wjXq61LkkHnWl4bKwmqVYmcP599HzZ++tpED
+ koGBd9fs1Cp/lTC6HeG/IbpbIaakqXzGdh467mABKlKaV1KNAO12zIPsXGRjqKAtI4r7
+ E58dpPsiRxWZlP/EsrdNF+zEvI47Ekm2eiIQe1ogqJaq/O9wuo7liRILlWNpoxomuw/x
+ 6UZxDl7YAcb88SjJDH6DmpHoM/yhQ7aaZH0E7jwpXZ5IwhVlG4UhvBzg2tfZYk/L8DNH
+ FAxg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=G9A+7yoanUGtCCAhWFTCiIEkDdBciZZherERnp1z9co=;
- b=CQ+4I5coQnRADwismnGe9nqBGFGYxa+K05PSSLAxqmJ2VgbRz4lYxUCXU2xm7W7Bif
- HZ9RqZ4IanV6QBPPIjoGlY4qXO2nrrq/weWQVZleZMs4FHhpJiyhcdeq73VI0Z/tSiPh
- EX29vg1LTAuDeFVWDemNP9ZKaYIOAXinewXMs3ckGdf4gnsAT9Lp7i1b6gAIdvEyO8mm
- xeyiAw8BdKNqYU9Ukg+97yQthSt4xnUmk20+Rk09BUBp4Qq2m+YCGBuqnd1Py3Pf5+bl
- NGfPoyFczv3RfT4wB0qX9GogdjHtgXM5da2A4aXT/SDL7b5Zt9QrlENc+u3TulKEb+fK
- Fwtw==
-X-Gm-Message-State: AJcUukdrpSk78UrtJa1KWj44RUV5qAWrdcnZK3OBQ/4MIotMWC66v8f6
- 30BtIH8tjvs342ebXBiTLZc5bw==
-X-Google-Smtp-Source: ALg8bN5Fyf0DsZKsxis8f87OVJL70VPcI284h2u8fOIYswv/VAVeegkvUDMLG6fyCJi9yygkFXZLxg==
-X-Received: by 2002:a63:4c04:: with SMTP id z4mr8860922pga.312.1546292813537; 
- Mon, 31 Dec 2018 13:46:53 -0800 (PST)
+ :references;
+ bh=Jj6XdwEJtAnO2Gkmj0ob+Z9ZSB/vn/KMcLaoPuXWHYI=;
+ b=kycn7ArDq83FJqFwaHOpmQOeUhmeFlhrskpEHuCGyiw+VIt9LTr0cOZsg8BQDW/YBw
+ hhW5BovG4E9kYtPU9MbMYnvs9WPemFJm4xlNiE7xGZ7GTQKPWbjBgGa0vWuhhYVDKq1p
+ jra8KpzQ1BZhCho7C99v+jlenJjanRHONjP+/a6P1rtt3tMvr8AbgwKSGK1oj4eRA5d7
+ Sy1PALXB7/dhGxpbrdPTpKrldssvZOlOGV26Oph75+jTz/y0JN1algqEc/HaY10KSRQk
+ pzoxuz+Oo8ff6kMWPEw85+vw4avbL27GFdM0u8P5mbFqHQjoJyCkLcHUMMWys1ojnWwE
+ tXkg==
+X-Gm-Message-State: AJcUukdu+gDUs0Id/k03w4O4ugWw5l6GpJsrOIQrJMYMcFoXACWT71Qd
+ uJqw+jQecOFZylVY1+eYHT49jA==
+X-Google-Smtp-Source: ALg8bN482ur0l5AoOPy4pFqe2jLhQhsiiaykxxNyUYP6y0BicHm1mnumhLgQlWkYXqISOOXGEZk1ig==
+X-Received: by 2002:a63:c748:: with SMTP id v8mr8882640pgg.108.1546292815688; 
+ Mon, 31 Dec 2018 13:46:55 -0800 (PST)
 Received: from localhost.localdomain
  (99-152-116-91.lightspeed.sntcca.sbcglobal.net. [99.152.116.91])
- by smtp.gmail.com with ESMTPSA id u126sm96477085pgb.2.2018.12.31.13.46.51
+ by smtp.gmail.com with ESMTPSA id u126sm96477085pgb.2.2018.12.31.13.46.53
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 31 Dec 2018 13:46:51 -0800 (PST)
+ Mon, 31 Dec 2018 13:46:53 -0800 (PST)
 From: Olof Johansson <olof@lixom.net>
 To: torvalds@linux-foundation.org
-Subject: [GIT PULL 1/4] ARM: SoC platform updates
-Date: Mon, 31 Dec 2018 13:46:37 -0800
-Message-Id: <20181231214640.17015-2-olof@lixom.net>
+Subject: [GIT PULL 2/4] ARM: SoC driver updates
+Date: Mon, 31 Dec 2018 13:46:38 -0800
+Message-Id: <20181231214640.17015-3-olof@lixom.net>
 X-Mailer: git-send-email 2.11.0
 In-Reply-To: <20181231214640.17015-1-olof@lixom.net>
 References: <20181231214640.17015-1-olof@lixom.net>
-MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181231_134654_295877_EA779077 
-X-CRM114-Status: GOOD (  24.23  )
+X-CRM114-CacheID: sfid-20181231_134657_001244_5816EA1A 
+X-CRM114-Status: GOOD (  22.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,238 +98,294 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Olof Johansson <olof@lixom.net>, arm@kernel.org,
  linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-U29DIHVwZGF0ZXMsIG1vc3RseSByZWZhY3RvcmluZ3MgYW5kIGNsZWFudXBzIG9mIG9sZCBsZWdh
-Y3kgcGxhdGZvcm1zLApidXQgYWxzbyBhIGZldyBtb3JlIHRoaW5nczoKCk5ldyBTb0Mgc3VwcG9y
-dCB0aGlzIHJlbGVhc2U6Ci0gTlhQL0ZyZWVzY2FsZSBpLk1YN1VMUCAoMXggQ29ydGV4LUE3LCBD
-b3J0ZXgtTTQsIGdyYXBoaWNzLCBldGMpCi0gQWxsd2lubmVyIEYxQzEwMCwgb2xkZXIgcGxhdGZv
-cm0gd2l0aCBhbiBBUk05MjYtRUpTIChBUk12NSkgY29yZQoKQ2xlYW51cHMgb2YgdmFyaW91cyBw
-bGF0Zm9ybXM6Ci0gT01BUDEgYW1zLWRlbHRhIGRvZXMgc29tZSBHUElPIGNsZWFudXBzCi0gRGF2
-aW5jaSByZW1vdmVzIG9mIGF0MjQgcGxhdGZvcm0gZGF0YQotIFNhbXN1bmcgY2xlYW5zIHVwIG9s
-ZCB3YWtldXAsIFBNIGRlYnVnIGFuZCBzZWNvbmRhcnkgY29yZSBib290IGNvZGUKLSBSZW5lc2Fz
-IG1vdmVzIGFyb3VuZCBjb25maWcgb3B0aW9ucyBhbmQgUE0gY29kZSB0byBkcml2ZXJzL3NvYyBm
-b3IKc2hhcmluZyB3aXRoIDY0LWJpdCBhbmQgbW9yZSBjb25zaXN0ZW5jeQotIGkuTVgsIEJyb2Fk
-Y29tIGFuZCBTb0NGUEdBIGFsbCBoYXZlIHR3ZWFrcyB0byBsb3dsZXZlbCBkZWJ1ZyBjb25zb2xl
-IHNldHVwcwotIFNvQ0ZQR0EgYWRkcyBleHBsaWNpdCBzZWxlY3Rpb24gb2YgQVJNIGVycmF0YSBh
-bmQgcmVtb3ZlcyBzb21lIHVudXNlZCBjb2RlCgpUaGlzIHRhZyBhbHNvIGNvbnRhaW5zIGEgZmV3
-IHBhdGNoZXMgdGhhdCBJIGhhZCBxdWV1ZWQgdXAgYXMgZml4ZXMgZm9yCjQuMjAgYnV0IGRpZG4n
-dCBzZW5kIGluIGJlZm9yZSB0aGUgcmVsZWFzZS4KCgpDb25mbGljdHM6CgphcmNoL2FybS9tYWNo
-LW9tYXAxL2JvYXJkLWFtcy1kZWx0YS5jOgpDaGFuZ2UvcmVtb3ZlLiBSZW1vdmUgdGhlIGNvZGUg
-dGhhdCdzIGluIGNvbmZsaWN0ICh0aGUgbGVkcy9ncGlvIGluaXQKZnVuY3Rpb25zKQoKYXJjaC9h
-cm0vbWFjaC1zb2NmcGdhL0tjb25maWc6CkFkZC9jaGFuZ2UuIEtlZXAgbmV3IHNldCBvZiBlcnJh
-dGEgYW5kIFBDSV9ET01BSU5TX0dFTkVSSUMsIGRyb3AKUENJX0RPTUFJTlMuCgotLS0tLS0tLS0t
-LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCgpU
-aGUgZm9sbG93aW5nIGNoYW5nZXMgc2luY2UgY29tbWl0IGYxMmU4NDBjODE5YmFiNDI2MjE2ODU1
-NThhMDFkM2Y0NmFiOWEyMjY6CgogIE1lcmdlIGJyYW5jaCAnZm9yLWxpbnVzJyBvZiBnaXQ6Ly9n
-aXQua2VybmVsLm9yZy9wdWIvc2NtL2xpbnV4L2tlcm5lbC9naXQvbWF0dHN0ODgvYWxwaGEKCmFy
-ZSBhdmFpbGFibGUgaW4gdGhlIGdpdCByZXBvc2l0b3J5IGF0OgoKICBnaXQ6Ly9naXQua2VybmVs
-Lm9yZy9wdWIvc2NtL2xpbnV4L2tlcm5lbC9naXQvYXJtL2FybS1zb2MuZ2l0IHRhZ3MvYXJtc29j
-LXNvYwoKZm9yIHlvdSB0byBmZXRjaCBjaGFuZ2VzIHVwIHRvIGNhYzFmYzhmYjU2MWFjNzY2NDY4
-Mzk0ZDQ5YzNkZDExYTJiOGNiNDQ6CgogIE1lcmdlIGJyYW5jaCAnZml4ZXMnIGludG8gbmV4dC9z
-b2MKCi0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
-LS0tLS0tLS0tLS0KCkEucy4gRG9uZyAoMSk6CiAgICAgIEFSTTogaW14OiBhZGQgaW5pdGlhbCBz
-dXBwb3J0IGZvciBpbXg3dWxwCgpBYXJvIEtvc2tpbmVuICg0KToKICAgICAgQVJNOiBPTUFQMS8y
-OiBmaXggU29DIG5hbWUgcHJpbnRpbmcKICAgICAgQVJNOiBPTUFQMTogZGV2aWNlczogY29uZmln
-dXJlIG9tYXAxX3NwaTEwMGsgb25seSBvbiBPTUFQN3h4CiAgICAgIEFSTTogT01BUDE6IGFkZCBN
-TUMgY29uZmlndXJhdGlvbiBmb3IgUGFsbSBUdW5nc3RlbiBFCiAgICAgIEFSTTogT01BUDE6IGZp
-eCBVU0IgY29uZmlndXJhdGlvbiBmb3IgZGV2aWNlLW9ubHkgc2V0dXBzCgpBcm5kIEJlcmdtYW5u
-ICg4KToKICAgICAgQVJNOiBpbXg6IGZpeCBkZXBlbmRlbmNpZXMgb24gaW14N3VscAogICAgICBB
-Uk06IG1tcDogZml4IHRpbWVyX2luaXQgY2FsbHMKICAgICAgQVJNOiBtbXA6IGZpeCBweGExNjhf
-ZGV2aWNlX3VzYl9waHkgdXNlIG9uIGFzcGVuaXRlCiAgICAgIEFSTTogcHhhOiBhdm9pZCBzZWN0
-aW9uIG1pc21hdGNoIHdhcm5pbmcKICAgICAgQVJNOiBrczg2OTU6IGZpeCBzZWN0aW9uIG1pc21h
-dGNoIHdhcm5pbmcKICAgICAgQVJNOiB0ZWdyYTogYXZvaWQgc2VjdGlvbiBtaXNtYXRjaCB3YXJu
-aW5nCiAgICAgIEFSTTogb21hcDI6IGF2b2lkIHNlY3Rpb24gbWlzbWF0Y2ggd2FybmluZwogICAg
-ICBNZXJnZSB0YWcgJ3JlbmVzYXMtZml4ZXMyLWZvci12NC4yMCcgb2YgZ2l0Oi8vZ2l0Lmtlcm5l
-bC5vcmcvLi4uL2hvcm1zL3JlbmVzYXMgaW50byBmaXhlcwoKQmFydGxvbWllaiBab2xuaWVya2ll
-d2ljeiAoMik6CiAgICAgIEFSTTogZXh5bm9zOiBSZW1vdmUgbm8gbG9uZ2VyIG5lZWRlZCBzM2Nf
-cG1fY2hlY2tfKigpIGNhbGxzCiAgICAgIEFSTTogc2Ftc3VuZzogTGltaXQgU0FNU1VOR19QTV9E
-RUJVRyBjb25maWcgb3B0aW9uIHRvIG5vbi1FeHlub3MgcGxhdGZvcm1zCgpCYXJ0b3N6IEdvbGFz
-emV3c2tpICg3KToKICAgICAgQVJNOiBkYXZpbmNpOiBkbTM2NS1ldm06IHVzZSBjZWxsIG52bWVt
-IGxvb2t1cCBmb3IgbWFjIGFkZHJlc3MKICAgICAgQVJNOiBkYXZpbmNpOiBkbTY0NHgtZXZtOiB1
-c2UgY2VsbCBudm1lbSBsb29rdXAgZm9yIG1hYyBhZGRyZXNzCiAgICAgIEFSTTogZGF2aW5jaTog
-ZG02NDZ4LWV2bTogdXNlIGNlbGwgbnZtZW0gbG9va3VwIGZvciBtYWMgYWRkcmVzcwogICAgICBB
-Uk06IGRhdmluY2k6IGRhODMwLWV2bTogdXNlIGNlbGwgbnZtZW0gbG9va3VwIGZvciBtYWMgYWRk
-cmVzcwogICAgICBBUk06IGRhdmluY2k6IG1pdHlvbWFwbDEzODogdXNlIGNlbGwgbnZtZW0gbG9v
-a3VwIGZvciBtYWMgYWRkcmVzcwogICAgICBBUk06IGRhdmluY2k6IGRtODUwLWV2bTogdXNlIGNl
-bGwgbnZtZW0gbG9va3VwIGZvciBtYWMgYWRkcmVzcwogICAgICBBUk06IGRhdmluY2k6IGRhODUw
-LWV2bTogcmVtb3ZlIHVubmVjZXNzYXJ5IGluY2x1ZGUKCkNhcmxvIENhaW9uZSAoMSk6CiAgICAg
-IE1BSU5UQUlORVJTOiBSZW1vdmUgbXlzZWxmIGZyb20gdGhlIGxpc3QKCkNsw6ltZW50IFDDqXJv
-biAoMik6CiAgICAgIEFSTTogZGVidWc6IGVuYWJsZSBVQVJUMSBmb3Igc29jZnBnYSBDeWNsb25l
-NQogICAgICBBUk06IHNvY2ZwZ2E6IENsZWFuIHVudXNlZCBmdW5jdGlvbnMKCkNvcmVudGluIExh
-YmJlICgxKToKICAgICAgTUFJTlRBSU5FUlM6IGFkZCBkcml2ZXJzL3NvYy9hbWxvZ2ljLyB0byBh
-bWxvZ2ljIGxpc3QKCkRpbmggTmd1eWVuICgxKToKICAgICAgQVJNOiBzb2NmcGdhOiBUdXJuIG9u
-IEFSTSBlcnJhdGEgZm9yIEwyIGNhY2hlCgpGZWxpeCBCcmFjayAoMSk6CiAgICAgIEFSTTogZHRz
-OiBhbTMzNXgtcGR1MDAxOiBGaXggcG9sYXJpdHkgb2YgY2FyZCBkZXRlY3Rpb24gaW5wdXQKCkZs
-b3JpYW4gRmFpbmVsbGkgKDIpOgogICAgICBBUk06IEJDTTYzWFg6IEVuYWJsZSByZXNldCBjb250
-cm9sbGVyIHN1cHBvcnQKICAgICAgTWVyZ2UgdGFnICd0YWdzL2JjbTI4MzUtc29jLW5leHQtMjAx
-OC0xMS0yNycgaW50byBzb2MvbmV4dAoKR2VlcnQgVXl0dGVyaG9ldmVuICg5KToKICAgICAgQVJN
-OiBzaG1vYmlsZTogUmVzdHJpY3QgU0NVIHN1cHBvcnQgdG8gU29DcyB0aGF0IGhhdmUgaXQKICAg
-ICAgQVJNOiBzaG1vYmlsZTogUmVzdHJpY3QgVFdEIHN1cHBvcnQgdG8gU29DcyB0aGF0IGhhdmUg
-aXQKICAgICAgQVJNOiBzaG1vYmlsZTogc2g3M2EwOiBSZW1vdmUgb2Jzb2xldGUgaW5jbHVzaW9u
-IG9mIDxhc20vc21wX3R3ZC5oPgogICAgICBBUk06IHNobW9iaWxlOiBIaWRlIEFSQ0hfUlpOMSB0
-byBpbXByb3ZlIGNvbnNpc3RlbmN5CiAgICAgIGFybTY0OiByZW5lc2FzOiBNb3ZlIFNvQyBLY29u
-ZmlnIHN5bWJvbHMgdG8gZHJpdmVycy9zb2MvcmVuZXNhcy8KICAgICAgQVJNOiBzaG1vYmlsZTog
-TW92ZSBTb0MgS2NvbmZpZyBzeW1ib2xzIHRvIGRyaXZlcnMvc29jL3JlbmVzYXMvCiAgICAgIEFS
-TTogT01BUDIrOiB0aW1lcjogUmVtb3ZlIG9ic29sZXRlIGluY2x1c2lvbiBvZiA8YXNtL3NtcF90
-d2QuaD4KICAgICAgQVJNOiBzaG1vYmlsZTogUi1Nb2JpbGU6IENsZWFuIHVwIHN0cnVjdCBybW9i
-aWxlX3BtX2RvbWFpbgogICAgICBBUk06IHNobW9iaWxlOiBSLU1vYmlsZTogTW92ZSBwbS1ybW9i
-aWxlIHRvIGRyaXZlcnMvc29jL3JlbmVzYXMvCgpHZXJhbGQgQmFlemEgKDEpOgogICAgICBBUk06
-IHN0bTMyOiBkZWJ1ZzogYWRkIGxvdy1sZXZlbCBkZWJ1ZyBzdXBwb3J0CgpKYW51c3ogS3J6eXN6
-dG9maWsgKDYpOgogICAgICBBUk06IE9NQVAxOiBhbXMtZGVsdGE6IG1ha2UgYm9hcmQgaGVhZGVy
-IGZpbGUgbG9jYWwgdG8gbWFjaC1vbWFwMQogICAgICBBUk06IE9NQVAxOiBhbXMtZGVsdGE6IFBy
-b3ZpZGUgR1BJTyBsb29rdXAgdGFibGUgZm9yIExFRCBkZXZpY2UKICAgICAgQVJNOiBPTUFQMTog
-YW1zLWRlbHRhOiBEcm9wIGJvYXJkIHNwZWNpZmljIGdsb2JhbCBHUElPIG51bWJlcnMKICAgICAg
-QVJNOiBPTUFQMTogYW1zLWRlbHRhOiBEcm9wIHVudXNlZCBzeW1ib2xzIGZyb20gdGhlIGJvYXJk
-IGhlYWRlcgogICAgICBBUk06IE9NQVAxOiBhbXMtZGVsdGE6IE1vdmUgQU1TX0RFTFRBX0xBVENI
-Ml9OR1BJTyB0byB0aGUgYm9hcmQgZmlsZQogICAgICBBUk06IE9NQVAxOiBhbXMtZGVsdGE6IEZp
-eCBhdWRpbyBwZXJtYW5lbnRseSBtdXRlZAoKSnVzdGluIENoZW4gKDEpOgogICAgICBBUk06IGJy
-Y21zdGI6IEFkZCBlbnRyeSBmb3IgNzI1NQoKS3J6eXN6dG9mIEtvemxvd3NraSAoMik6CiAgICAg
-IEFSTTogczVwdjIxMDogUmVtb3ZlIGxlZ2FjeSBzZXR0aW5nIG9mIGV4dGVybmFsIHdha2V1cCBp
-bnRlcnJ1cHRzCiAgICAgIEFSTTogZXh5bm9zOiBSZW1vdmUgbGVnYWN5IHNldHRpbmcgb2YgZXh0
-ZXJuYWwgd2FrZXVwIGludGVycnVwdHMKCkxhdXJlbnQgUGluY2hhcnQgKDEpOgogICAgICBhcm02
-NDogZHRzOiByZW5lc2FzOiBkcmFhazogRml4IENWQlMgaW5wdXQKCkx1Ym9taXIgUmludGVsICg0
-KToKICAgICAgQVJNOiBtbXAyOiBpbml0aWFsaXplIGNsb2NrcyBiZWZvcmUgdGhlIHRpbWVyCiAg
-ICAgIEFSTTogbW1wL21tcDI6IGR0OiBlbmFibGUgdGhlIGNsb2NrCiAgICAgIEFSTTogbW1wOiBh
-ZGQgYSBweGEtdXNiLXBoeSBkZXZpY2UKICAgICAgQVJNOiBtbXA6IGFkZCBhbiBpbnN0YW5jZSBv
-ZiBweGEtdXNiLXBoeSB0byB0dGNfZGtiIGFuZCBhc3Blbml0ZQoKTWFydGluIEJsdW1lbnN0aW5n
-bCAoMSk6CiAgICAgIEFSTTogbWVzb246IHNlbGVjdCBIQVZFX0FSTV9UV0QgYW5kIEFSTV9HTE9C
-QUxfVElNRVIKCk1lc2loIEtpbGluYyAoNCk6CiAgICAgIEFSTTogQ2hlY2sgQVJDSF9NVUxUSV9W
-NyB0byBkaWZmZXJlbnRpYXRlIEFSTXY1L3Y3IEFsbHdpbm5lciBTb0NzCiAgICAgIGR0LWJpbmRp
-bmdzOiBhcm06IEFkZCBuZXcgQWxsd2lubmVyIEFSTXY1IEYxQzEwMHMgU29DCiAgICAgIEFSTTog
-c3VueGk6IGFkZCBBbGx3aW5uZXIgQVJNdjUgU29DcwogICAgICBkdC1iaW5kaW5nczogd2F0Y2hk
-b2c6IEFkZCBBbGx3aW5uZXIgQVJNdjUgRjFDMTAwcyB3ZHQKCk5hdGhhbiBDaGFuY2VsbG9yICgy
-KToKICAgICAgQVJNOiBPTUFQMis6IGh3bW9kOiBGaXggc29tZSBzZWN0aW9uIGFubm90YXRpb25z
-CiAgICAgIEFSTTogT01BUDIrOiBwcm00NHh4OiBGaXggc2VjdGlvbiBhbm5vdGF0aW9uIG9uIG9t
-YXA0NHh4X3BybV9lbmFibGVfaW9fd2FrZXVwCgpPbG9mIEpvaGFuc3NvbiAoMTMpOgogICAgICBN
-ZXJnZSB0YWcgJ3NvY2ZwZ2FfdXBkYXRlc19mb3JfdjUuMCcgb2YgZ2l0Oi8vZ2l0Lmtlcm5lbC5v
-cmcvLi4uL2Rpbmd1eWVuL2xpbnV4IGludG8gbmV4dC9zb2MKICAgICAgTWVyZ2UgdGFnICdvbWFw
-LWZvci12NC4yMS9zb2Mtc2lnbmVkJyBvZiBnaXQ6Ly9naXQua2VybmVsLm9yZy8uLi4vdG1saW5k
-L2xpbnV4LW9tYXAgaW50byBuZXh0L3NvYwogICAgICBNZXJnZSB0YWcgJ2FybS1zb2MvZm9yLTQu
-MjEvc29jJyBvZiBodHRwczovL2dpdGh1Yi5jb20vQnJvYWRjb20vc3RibGludXggaW50byBuZXh0
-L3NvYwogICAgICBNZXJnZSB0YWcgJ3JlbmVzYXMtc29jLWZvci12NC4yMScgb2YgaHR0cHM6Ly9n
-aXQua2VybmVsLm9yZy8uLi4vaG9ybXMvcmVuZXNhcyBpbnRvIG5leHQvc29jCiAgICAgIE1lcmdl
-IHRhZyAnZGF2aW5jaS1mb3ItdjQuMjEvc29jJyBvZiBnaXQ6Ly9naXQua2VybmVsLm9yZy8uLi4v
-bnNla2hhci9saW51eC1kYXZpbmNpIGludG8gbmV4dC9zb2MKICAgICAgTWVyZ2UgdGFnICdzdW54
-aS1jb3JlLWZvci00LjIxJyBvZiBodHRwczovL2dpdC5rZXJuZWwub3JnLy4uLi9zdW54aS9saW51
-eCBpbnRvIG5leHQvc29jCiAgICAgIE1lcmdlIHRhZyAnc2Ftc3VuZy1zb2MtNC4yMScgb2YgaHR0
-cHM6Ly9naXQua2VybmVsLm9yZy8uLi4va3J6ay9saW51eCBpbnRvIG5leHQvc29jCiAgICAgIE1l
-cmdlIHRhZyAnaW14LXNvYy00LjIxJyBvZiBnaXQ6Ly9naXQua2VybmVsLm9yZy8uLi4vc2hhd25n
-dW8vbGludXggaW50byBuZXh0L3NvYwogICAgICBNZXJnZSB0YWcgJ29tYXAtZm9yLXY0LjIxL29t
-YXAxLXNpZ25lZCcgb2YgZ2l0Oi8vZ2l0Lmtlcm5lbC5vcmcvLi4uL3RtbGluZC9saW51eC1vbWFw
-IGludG8gbmV4dC9zb2MKICAgICAgTWVyZ2UgdGFnICdhbWxvZ2ljLXNvYycgb2YgaHR0cHM6Ly9n
-aXQua2VybmVsLm9yZy8uLi4va2hpbG1hbi9saW51eC1hbWxvZ2ljIGludG8gbmV4dC9zb2MKICAg
-ICAgTWVyZ2UgdGFnICdvbWFwLWZvci12NC4yMC9maXhlcy1yYzYnIG9mIGdpdDovL2dpdC5rZXJu
-ZWwub3JnLy4uLi90bWxpbmQvbGludXgtb21hcCBpbnRvIGZpeGVzCiAgICAgIE1lcmdlIHRhZyAn
-djQuMjAtcm9ja2NoaXAtZHRzNjRmaXhlcy0yJyBvZiBnaXQ6Ly9naXQua2VybmVsLm9yZy8uLi4v
-bW1pbmQvbGludXgtcm9ja2NoaXAgaW50byBmaXhlcwogICAgICBNZXJnZSBicmFuY2ggJ2ZpeGVz
-JyBpbnRvIG5leHQvc29jCgpPc2thcmkgTGVtbWVsYSAoMSk6CiAgICAgIGFybTY0OiBkdHM6IHJv
-Y2tjaGlwOiBmaXggcmszMzk5LXJvY2twcm82NCByZWd1bGF0b3IgZ3Bpb3MKClBhbmthaiBEdWJl
-eSAoMSk6CiAgICAgIEFSTTogZXh5bm9zOiBSZW1vdmUgc2Vjb25kYXJ5IHN0YXJ0dXAgaW5pdGlh
-bGl6YXRpb24gZnJvbSBzbXBfcHJlcGFyZV9jcHVzCgpSb2dlciBRdWFkcm9zICgxKToKICAgICAg
-QVJNOiBkdHM6IG9tYXA1OiBGaXggZHVhbC1yb2xlIG1vZGUgb24gU3VwZXItU3BlZWQgcG9ydAoK
-UnVzc2VsbCBLaW5nIC0gQVJNIExpbnV4ICgxKToKICAgICAgQVJNOiBkdHM6IEZpeCBPTUFQNDQz
-MCBTRFAgRXRoZXJuZXQgc3RhcnR1cAoKU3RlZmFuIFdhaHJlbiAoMSk6CiAgICAgIEFSTTogbWFj
-aC1iY206IFN3aXRjaCBiY20yODM1IGFuZCBwbGF0c21wIHRvIFNQRFggaWRlbnRpZmllcgoKVGFr
-ZXNoaSBLaWhhcmEgKDEpOgogICAgICBhcm02NDogcmVuZXNhczogRW5hYmxlIEdQSU9MSUIgdG8g
-YWxsb3cgR1BJTyBkcml2ZXIgc2VsZWN0aW9uCgpUb255IExpbmRncmVuICgyKToKICAgICAgTWVy
-Z2UgYnJhbmNoICdhdWRpby1maXgnIGludG8gb21hcC1mb3ItdjQuMjAvZml4ZXMKICAgICAgTWVy
-Z2UgYnJhbmNoICdvbWFwMS11c2ItZml4JyBpbnRvIG9tYXAtZm9yLXY0LjIxL29tYXAxCgpVd2Ug
-S2xlaW5lLUvDtm5pZyAoMSk6CiAgICAgIEFSTTogZGVidWctaW14OiBvbmx5IGRlZmluZSBERUJV
-R19JTVhfVUFSVF9QT1JUIGlmIG5lZWRlZAoKWWFuZ3RhbyBMaSAoMik6CiAgICAgIEFSTTogT01B
-UDE6IGNsb2NrOiBDaGFuZ2UgdG8gdXNlIERFRklORV9TSE9XX0FUVFJJQlVURSBtYWNybwogICAg
-ICBBUk06IE9NQVA6IFBNOiBDaGFuZ2UgdG8gdXNlIERFRklORV9TSE9XX0FUVFJJQlVURSBtYWNy
-bwoKCiBEb2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvYXJtL3N1bnhpLnR4dCB8ICAg
-MSArCiAuLi4vZGV2aWNldHJlZS9iaW5kaW5ncy93YXRjaGRvZy9zdW54aS13ZHQudHh0ICB8ICAg
-MSArCiBNQUlOVEFJTkVSUyAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB8ICAg
-MiArLQogYXJjaC9hcm0vS2NvbmZpZy5kZWJ1ZyAgICAgICAgICAgICAgICAgICAgICAgICAgfCAg
-NzggKysrKy0tCiBhcmNoL2FybS9ib290L2R0cy9hbTMzNXgtcGR1MDAxLmR0cyAgICAgICAgICAg
-ICB8ICAgMiArLQogYXJjaC9hcm0vYm9vdC9kdHMvb21hcDQtc2RwLmR0cyAgICAgICAgICAgICAg
-ICAgfCAgIDEgKwogYXJjaC9hcm0vYm9vdC9kdHMvb21hcDUtYm9hcmQtY29tbW9uLmR0c2kgICAg
-ICAgfCAgIDEgKwogYXJjaC9hcm0vaW5jbHVkZS9kZWJ1Zy9icmNtc3RiLlMgICAgICAgICAgICAg
-ICAgfCAgMjQgKy0KIGFyY2gvYXJtL2luY2x1ZGUvZGVidWcvc3RtMzIuUyAgICAgICAgICAgICAg
-ICAgIHwgIDQxICsrKysKIGFyY2gvYXJtL21hY2gtYmNtL0tjb25maWcgICAgICAgICAgICAgICAg
-ICAgICAgIHwgICAxICsKIGFyY2gvYXJtL21hY2gtYmNtL2JvYXJkX2JjbTI4MzUuYyAgICAgICAg
-ICAgICAgIHwgIDExICstCiBhcmNoL2FybS9tYWNoLWJjbS9wbGF0c21wLmMgICAgICAgICAgICAg
-ICAgICAgICB8ICAxMCArLQogYXJjaC9hcm0vbWFjaC1iY20vcGxhdHNtcC5oICAgICAgICAgICAg
-ICAgICAgICAgfCAgIDYgKy0KIGFyY2gvYXJtL21hY2gtZGF2aW5jaS9ib2FyZC1kYTgzMC1ldm0u
-YyAgICAgICAgIHwgIDI2ICsrCiBhcmNoL2FybS9tYWNoLWRhdmluY2kvYm9hcmQtZGE4NTAtZXZt
-LmMgICAgICAgICB8ICAzMCArKy0KIGFyY2gvYXJtL21hY2gtZGF2aW5jaS9ib2FyZC1kbTM2NS1l
-dm0uYyAgICAgICAgIHwgIDI1ICsrCiBhcmNoL2FybS9tYWNoLWRhdmluY2kvYm9hcmQtZG02NDR4
-LWV2bS5jICAgICAgICB8ICAyNCArKwogYXJjaC9hcm0vbWFjaC1kYXZpbmNpL2JvYXJkLWRtNjQ2
-eC1ldm0uYyAgICAgICAgfCAgMjQgKysKIGFyY2gvYXJtL21hY2gtZGF2aW5jaS9ib2FyZC1taXR5
-b21hcGwxMzguYyAgICAgIHwgIDI5ICsrKwogYXJjaC9hcm0vbWFjaC1leHlub3MvY29tbW9uLmgg
-ICAgICAgICAgICAgICAgICAgfCAgIDIgLQogYXJjaC9hcm0vbWFjaC1leHlub3MvcGxhdHNtcC5j
-ICAgICAgICAgICAgICAgICAgfCAgMjYgLS0KIGFyY2gvYXJtL21hY2gtZXh5bm9zL3N1c3BlbmQu
-YyAgICAgICAgICAgICAgICAgIHwgIDM3ICsrLQogYXJjaC9hcm0vbWFjaC1pbXgvS2NvbmZpZyAg
-ICAgICAgICAgICAgICAgICAgICAgfCAgIDkgKwogYXJjaC9hcm0vbWFjaC1pbXgvTWFrZWZpbGUg
-ICAgICAgICAgICAgICAgICAgICAgfCAgIDEgKwogYXJjaC9hcm0vbWFjaC1pbXgvY29tbW9uLmgg
-ICAgICAgICAgICAgICAgICAgICAgfCAgIDEgKwogYXJjaC9hcm0vbWFjaC1pbXgvY3B1LmMgICAg
-ICAgICAgICAgICAgICAgICAgICAgfCAgIDMgKwogYXJjaC9hcm0vbWFjaC1pbXgvbWFjaC1pbXg3
-dWxwLmMgICAgICAgICAgICAgICAgfCAgMzEgKysrCiBhcmNoL2FybS9tYWNoLWlteC9teGMuaCAg
-ICAgICAgICAgICAgICAgICAgICAgICB8ICAgMSArCiBhcmNoL2FybS9tYWNoLWlteC9wbS1pbXg3
-dWxwLmMgICAgICAgICAgICAgICAgICB8ICAyOSArKysKIGFyY2gvYXJtL21hY2gta3M4Njk1L2Jv
-YXJkLWFjczVrLmMgICAgICAgICAgICAgIHwgICAyICstCiBhcmNoL2FybS9tYWNoLW1lc29uL0tj
-b25maWcgICAgICAgICAgICAgICAgICAgICB8ICAgMiArCiBhcmNoL2FybS9tYWNoLW1tcC9hc3Bl
-bml0ZS5jICAgICAgICAgICAgICAgICAgICB8ICAgNyArCiBhcmNoL2FybS9tYWNoLW1tcC9jb21t
-b24uaCAgICAgICAgICAgICAgICAgICAgICB8ICAgMiArLQogYXJjaC9hcm0vbWFjaC1tbXAvZGV2
-aWNlcy5jICAgICAgICAgICAgICAgICAgICAgfCAgMjEgKysKIGFyY2gvYXJtL21hY2gtbW1wL21t
-cDItZHQuYyAgICAgICAgICAgICAgICAgICAgIHwgICAyICstCiBhcmNoL2FybS9tYWNoLW1tcC9t
-bXAyLmMgICAgICAgICAgICAgICAgICAgICAgICB8ICAgMiArLQogYXJjaC9hcm0vbWFjaC1tbXAv
-cHhhMTY4LmMgICAgICAgICAgICAgICAgICAgICAgfCAgIDIgKy0KIGFyY2gvYXJtL21hY2gtbW1w
-L3B4YTkxMC5jICAgICAgICAgICAgICAgICAgICAgIHwgICAyICstCiBhcmNoL2FybS9tYWNoLW1t
-cC9weGE5MTAuaCAgICAgICAgICAgICAgICAgICAgICB8ICAgMSArCiBhcmNoL2FybS9tYWNoLW1t
-cC90aW1lLmMgICAgICAgICAgICAgICAgICAgICAgICB8ICAzMiArKy0KIGFyY2gvYXJtL21hY2gt
-bW1wL3R0Y19ka2IuYyAgICAgICAgICAgICAgICAgICAgIHwgICA2ICsKIGFyY2gvYXJtL21hY2gt
-b21hcDEvTWFrZWZpbGUgICAgICAgICAgICAgICAgICAgIHwgICAyICstCiBhcmNoL2FybS9tYWNo
-LW9tYXAxL2Ftcy1kZWx0YS1maXEtaGFuZGxlci5TICAgICB8ICAgMiArLQogYXJjaC9hcm0vbWFj
-aC1vbWFwMS9hbXMtZGVsdGEtZmlxLmMgICAgICAgICAgICAgfCAgIDMgKy0KIGFyY2gvYXJtL21h
-Y2gtb21hcDEvYm9hcmQtYW1zLWRlbHRhLmMgICAgICAgICAgIHwgMTEyICsrKy0tLS0tLQogLi4u
-L3tpbmNsdWRlL21hY2ggPT4gfS9ib2FyZC1hbXMtZGVsdGEuaCAgICAgICAgfCAgMjQgKy0KIGFy
-Y2gvYXJtL21hY2gtb21hcDEvYm9hcmQtcGFsbXRlLmMgICAgICAgICAgICAgIHwgIDI5ICsrKwog
-YXJjaC9hcm0vbWFjaC1vbWFwMS9jbG9jay5jICAgICAgICAgICAgICAgICAgICAgfCAgMTQgKy0K
-IGFyY2gvYXJtL21hY2gtb21hcDEvZGV2aWNlcy5jICAgICAgICAgICAgICAgICAgIHwgICAzICsK
-IGFyY2gvYXJtL21hY2gtb21hcDEvaWQuYyAgICAgICAgICAgICAgICAgICAgICAgIHwgICA2ICst
-CiBhcmNoL2FybS9tYWNoLW9tYXAxL2luY2x1ZGUvbWFjaC91c2IuaCAgICAgICAgICB8ICAgMiAr
-LQogYXJjaC9hcm0vbWFjaC1vbWFwMS9wbS5jICAgICAgICAgICAgICAgICAgICAgICAgfCAgMTMg
-Ky0KIGFyY2gvYXJtL21hY2gtb21hcDIvaWQuYyAgICAgICAgICAgICAgICAgICAgICAgIHwgICA0
-ICstCiBhcmNoL2FybS9tYWNoLW9tYXAyL29tYXBfaHdtb2QuYyAgICAgICAgICAgICAgICB8ICAg
-NiArLQogYXJjaC9hcm0vbWFjaC1vbWFwMi9wbTMzeHgtY29yZS5jICAgICAgICAgICAgICAgfCAg
-IDIgKy0KIGFyY2gvYXJtL21hY2gtb21hcDIvdGltZXIuYyAgICAgICAgICAgICAgICAgICAgIHwg
-ICAxIC0KIGFyY2gvYXJtL21hY2gtcHhhL2NtLXgzMDAuYyAgICAgICAgICAgICAgICAgICAgIHwg
-ICAyICstCiBhcmNoL2FybS9tYWNoLXB4YS9saXR0bGV0b24uYyAgICAgICAgICAgICAgICAgICB8
-ICAgMiArLQogYXJjaC9hcm0vbWFjaC1weGEvemV1cy5jICAgICAgICAgICAgICAgICAgICAgICAg
-fCAgIDIgKy0KIGFyY2gvYXJtL21hY2gtczVwdjIxMC9jb21tb24uaCAgICAgICAgICAgICAgICAg
-IHwgICAxIC0KIGFyY2gvYXJtL21hY2gtczVwdjIxMC9wbS5jICAgICAgICAgICAgICAgICAgICAg
-IHwgIDE2ICstCiBhcmNoL2FybS9tYWNoLXNobW9iaWxlL0tjb25maWcgICAgICAgICAgICAgICAg
-ICB8IDEyOSAtLS0tLS0tLS0tCiBhcmNoL2FybS9tYWNoLXNobW9iaWxlL01ha2VmaWxlICAgICAg
-ICAgICAgICAgICB8ICAgMSAtCiBhcmNoL2FybS9tYWNoLXNobW9iaWxlL3BtLXJtb2JpbGUuaCAg
-ICAgICAgICAgICB8ICAyMiAtLQogYXJjaC9hcm0vbWFjaC1zaG1vYmlsZS9zbXAtc2g3M2EwLmMg
-ICAgICAgICAgICAgfCAgIDEgLQogYXJjaC9hcm0vbWFjaC1zb2NmcGdhL0tjb25maWcgICAgICAg
-ICAgICAgICAgICAgfCAgIDcgKwogYXJjaC9hcm0vbWFjaC1zb2NmcGdhL2NvcmUuaCAgICAgICAg
-ICAgICAgICAgICAgfCAgIDIgLQogYXJjaC9hcm0vbWFjaC1zb2NmcGdhL3NvY2ZwZ2EuYyAgICAg
-ICAgICAgICAgICAgfCAgIDIgKy0KIGFyY2gvYXJtL21hY2gtc3VueGkvS2NvbmZpZyAgICAgICAg
-ICAgICAgICAgICAgIHwgIDE5ICstCiBhcmNoL2FybS9tYWNoLXN1bnhpL3N1bnhpLmMgICAgICAg
-ICAgICAgICAgICAgICB8ICAgOSArCiBhcmNoL2FybS9tYWNoLXRlZ3JhL2lycS5jICAgICAgICAg
-ICAgICAgICAgICAgICB8ICAgNCArLQogYXJjaC9hcm0vcGxhdC1zYW1zdW5nL0tjb25maWcgICAg
-ICAgICAgICAgICAgICAgfCAgIDEgKwogYXJjaC9hcm02NC9LY29uZmlnLnBsYXRmb3JtcyAgICAg
-ICAgICAgICAgICAgICAgfCAgNjAgKy0tLS0KIGFyY2gvYXJtNjQvYm9vdC9kdHMvcmVuZXNhcy9y
-OGE3Nzk5NS1kcmFhay5kdHMgIHwgICAyICstCiAuLi4vYm9vdC9kdHMvcm9ja2NoaXAvcmszMzk5
-LXJvY2twcm82NC5kdHMgICAgICB8ICAyMCArLQogZHJpdmVycy9zb2MvcmVuZXNhcy9LY29uZmln
-ICAgICAgICAgICAgICAgICAgICAgfCAyNDEgKysrKysrKysrKysrKysrKystLQogZHJpdmVycy9z
-b2MvcmVuZXNhcy9NYWtlZmlsZSAgICAgICAgICAgICAgICAgICAgfCAgIDEgKwogLi4uL3NvYy9y
-ZW5lc2FzL3Jtb2JpbGUtc3lzYy5jICAgICAgICAgICAgICAgICAgfCAgMzcgKystCiA3OCBmaWxl
-cyBjaGFuZ2VkLCA4MjIgaW5zZXJ0aW9ucygrKSwgNTQwIGRlbGV0aW9ucygtKQogY3JlYXRlIG1v
-ZGUgMTAwNjQ0IGFyY2gvYXJtL2luY2x1ZGUvZGVidWcvc3RtMzIuUwogY3JlYXRlIG1vZGUgMTAw
-NjQ0IGFyY2gvYXJtL21hY2gtaW14L21hY2gtaW14N3VscC5jCiBjcmVhdGUgbW9kZSAxMDA2NDQg
-YXJjaC9hcm0vbWFjaC1pbXgvcG0taW14N3VscC5jCiByZW5hbWUgYXJjaC9hcm0vbWFjaC1vbWFw
-MS97aW5jbHVkZS9tYWNoID0+IH0vYm9hcmQtYW1zLWRlbHRhLmggKDY2JSkKIGRlbGV0ZSBtb2Rl
-IDEwMDY0NCBhcmNoL2FybS9tYWNoLXNobW9iaWxlL3BtLXJtb2JpbGUuaAogcmVuYW1lIGFyY2gv
-YXJtL21hY2gtc2htb2JpbGUvcG0tcm1vYmlsZS5jID0+IGRyaXZlcnMvc29jL3JlbmVzYXMvcm1v
-YmlsZS1zeXNjLmMgKDkzJSkKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxA
-bGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xp
-c3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+Misc driver updates for platforms, many of them power related.
+
+- Rockchip adds power domain support for rk3066 and rk3188
+- Amlogic adds a power measurement driver
+- Allwinner adds SRAM support for three platforms (F1C100, H5, A64 C1)
+- Wakeup and ti-sysc (platform bus) fixes for OMAP/DRA7
+- Broadcom fixes suspend/resume with Thumb2 kernels, and improves
+  stability of a handful of firmware/platform interfaces
+- PXA completes their conversion to dmaengine framework
+- Renesas does a bunch of PM cleanups across many platforms
+- Tegra adds support for suspend/resume on T186/T194, which includes
+  some driver cleanups and addition of wake events
+- Tegra also adds a driver for memory controller (EMC) on Tegra2
+- i.MX tweaks power domain bindings, and adds support for i.MX8MQ in GPC
+- Atmel adds identifiers and LPDDR2 support for a new SoC, SAM9X60
+
++ misc cleanups across several platforms
+
+----------------------------------------------------------------
+
+The following changes since commit b0e8b6ef5408a5b97c4fa8c835599e67ff4a0e3d:
+
+  Merge tag 'armsoc-soc' into HEAD
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-drivers
+
+for you to fetch changes up to a6f119a06960ef1dc30570401e43b71f9ebdd2c2:
+
+  Merge tag 'omap-for-v4.21/driver-part2-signed' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into next/drivers
+
+----------------------------------------------------------------
+
+A.s. Dong (1):
+      firmware: imx: add SCU power domain driver
+
+Alok Chauhan (1):
+      soc: qcom: Add irq clear handling during SE init
+
+Arnd Bergmann (1):
+      soc: qcom/llcc: add MODULE_LICENSE tag
+
+Arun Kumar Neelakantam (1):
+      soc: qcom: qmi_interface: Limit txn ids to U16_MAX
+
+Bjorn Andersson (1):
+      soc: qcom: smd-rpm: Add QCS404 compatible
+
+Bo Yan (1):
+      soc/tegra: fuse: Remove duplicated function declaration
+
+Corentin Labbe (1):
+      soc: amlogic: meson-clk-measure: Add missing REGMAP_MMIO dependency
+
+Dmitry Osipenko (2):
+      memory: tegra: Introduce Tegra20 EMC driver
+      soc/tegra: pmc: Drop locking from tegra_powergate_is_powered()
+
+Florian Fainelli (2):
+      soc: bcm: brcmstb: Fix re-entry point with a THUMB2_KERNEL
+      Merge tag 'tags/bcm2835-drivers-next-2018-11-27' into drivers/next
+
+Geert Uytterhoeven (9):
+      soc: renesas: r8a77965-sysc: Remove non-existent A3IR power domain
+      soc: renesas: r8a77970-sysc: Remove non-existent CR7 power domain
+      soc: renesas: r8a77970-sysc: Correct names of A2DP/A2CN power domains
+      soc: renesas: r8a77980-sysc: Correct names of A2DP[01] power domains
+      soc: renesas: r8a77980-sysc: Correct A3VIP[012] power domain hierarchy
+      soc: renesas: r8a77990-sysc: Fix initialization order of 3DG-{A,B}
+      soc: renesas: rcar-sysc: Remove rcar_sysc_power_{down,up}() helpers
+      soc: renesas: rcar-sysc: Merge PM Domain registration and linking
+      soc: renesas: rcar-sysc: Fix power domain control after system resume
+
+Heiko Stuebner (6):
+      dt-bindings: add power-domain header for RK3188 SoCs
+      dt-bindings: add power-domain header for RK3066 SoCs
+      dt-bindings: add compatibles for rk3066/rk3188 power controllers
+      Merge branch 'v4.21-shared/pdids' into v4.21-armsoc/drivers
+      soc: rockchip: power-domain: add rk3188 powerdomains
+      soc: rockchip: power-domain: add rk3066 powerdomains
+
+Houlong Wei (1):
+      soc: mediatek: Add Mediatek CMDQ helper
+
+James Hughes (1):
+      firmware: raspberrypi: Fix firmware calls with large buffers
+
+Jon Hunter (1):
+      soc/tegra: pmc: Don't power-up XUSB power-domains
+
+Jordan Crouse (1):
+      soc: qcom: llcc-slice: Add error checks for API functions
+
+Keerthy (1):
+      soc: ti: wkup_m3: Add PRCM int16 as the wake up source
+
+Leonard Crestez (1):
+      soc: imx: gpc: Increase GPC_CLK_MAX to 7
+
+Lucas Stach (3):
+      soc: imx: gpcv2: prefix i.MX7 specific defines
+      soc: imx: gpcv2: move register access table to domain data
+      soc: imx: gpcv2: add support for i.MX8MQ SoC
+
+Maxime Jourdan (1):
+      drivers: soc: Allow building the amlogic drivers without ARCH_MESON
+
+Mesih Kilinc (1):
+      dt-bindings: sram: Add Allwinner suniv F1C100s
+
+Neil Armstrong (2):
+      dt-bindings: amlogic: Add Internal Clock Measurer bindings
+      soc: amlogic: Add Meson Clock Measure driver
+
+Nicolas Ferre (1):
+      ARM: at91: add support in soc driver for LPDDR2 SiP
+
+Niklas Cassel (1):
+      soc: qcom: Drop help text for QCOM_QMI_HELPERS
+
+Olof Johansson (16):
+      Merge tag 'v4.21-rockchip-drivers-1' of git://git.kernel.org/.../mmind/linux-rockchip into next/drivers
+      Merge tag 'amlogic-drivers' of https://git.kernel.org/.../khilman/linux-amlogic into next/drivers
+      Merge tag 'omap-for-v4.21/driver-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/drivers
+      Merge tag 'arm-soc/for-4.21/drivers' of https://github.com/Broadcom/stblinux into next/drivers
+      Merge tag 'qcom-drivers-for-4.21' of git://git.kernel.org/.../agross/linux into next/drivers
+      Merge tag 'pxa-for-4.21' of https://github.com/rjarzmik/linux into next/drivers
+      Merge tag 'renesas-drivers-for-v4.21' of https://git.kernel.org/.../horms/renesas into next/drivers
+      Merge tag 'tegra-for-4.21-soc' of git://git.kernel.org/.../tegra/linux into next/drivers
+      Merge tag 'tegra-for-4.21-firmware' of git://git.kernel.org/.../tegra/linux into next/drivers
+      Merge tag 'sunxi-drivers-for-4.21' of https://git.kernel.org/.../sunxi/linux into next/drivers
+      Merge tag 'v4.20-next-soc' of https://git.kernel.org/.../matthias.bgg/linux into next/drivers
+      Merge tag 'imx-drivers-4.21' of git://git.kernel.org/.../shawnguo/linux into next/drivers
+      Merge tag 'amlogic-drivers-2' of https://git.kernel.org/.../khilman/linux-amlogic into next/drivers
+      Merge tag 'at91-4.21-soc' of git://git.kernel.org/.../at91/linux into next/drivers
+      Merge tag 'tegra-for-4.21-memory' of git://git.kernel.org/.../tegra/linux into next/drivers
+      Merge tag 'omap-for-v4.21/driver-part2-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/drivers
+
+Paul Kocialkowski (4):
+      soc: sunxi: sram: Enable EMAC clock access for H3 variant
+      soc: sunxi: sram: Add support for the H5 SoC system control
+      dt-bindings: sram: sunxi: Add bindings for the H5 with SRAM C1
+      dt-bindings: sram: sunxi: Add compatible for the A64 SRAM C1
+
+Rob Herring (1):
+      memory: omap-gpmc: Use of_node_name_eq for node name comparisons
+
+Robert Jarzmik (1):
+      dmaengine: pxa: make the filter function internal
+
+Sandeep Sheriker Mallikarjun (1):
+      ARM: at91: add support in soc driver for new SAM9X60
+
+Sandipan Patra (1):
+      soc/tegra: pmc: Add sysfs entries for reset info
+
+Stefan Wahren (3):
+      firmware: raspberrypi: Define timeout for transactions
+      soc: bcm: Switch raspberrypi-power to SPDX identifier
+      firmware: raspberrypi: Switch to SPDX identifier
+
+Stephen Boyd (3):
+      soc: qcom: cmd-db: Remove memcpy()ing from cmd_db_get_header()
+      soc: qcom: cmd-db: Stop memcpy()ing in cmd_db_read_aux_data()
+      drm: msm: Check cmd_db_read_aux_data() for failure
+
+Thierry Reding (4):
+      soc/tegra: pmc: Add Tegra194 support
+      soc/tegra: pmc: Add wake event support
+      soc/tegra: pmc: Add initial Tegra186 wake events
+      soc/tegra: pmc: Add initial Tegra194 wake events
+
+Timo Alho (5):
+      firmware: tegra: Add helper to check for supported MRQs
+      firmware: tegra: Switch to global mrq_is_supported()
+      firmware: tegra: Print version tag at full
+      soc/tegra: bpmp: Update ABI header
+      firmware: tegra: Use in-band messages for firmware version query
+
+Tony Lindgren (7):
+      bus: ti-sysc: Fix getting optional clocks in clock_roles
+      bus: ti-sysc: Add mcasp optional clocks flag
+      bus: ti-sysc: Detect devices for debug on omap5
+      Merge branch 'omap-for-v4.21/ti-sysc' into omap-for-v4.21/driver
+      ARM: OMAP2+: Check also the first dts child for hwmod flags
+      bus: ti-sysc: Check for no-reset and no-idle flags at the child level
+      Merge branch 'omap-for-v4.21/ti-sysc' into omap-for-v4.21/driver
+
+Wolfram Sang (1):
+      bus: brcmstb_gisb: simplify getting .driver_data
+
+Yangtao Li (4):
+      soc/tegra: Don't leak device tree node reference
+      soc/tegra: pmc: Change to use DEFINE_SHOW_ATTRIBUTE macro
+      soc: sunxi: Change to use DEFINE_SHOW_ATTRIBUTE macro
+      soc: bcm: brcmstb: Don't leak device tree node reference
+
+YueHaibing (1):
+      soc: qcom: llcc-slice: Remove duplicated include from llcc-slice.c
+
+
+ .../devicetree/bindings/bus/ti-sysc.txt         |    1 +
+ .../devicetree/bindings/power/fsl,imx-gpcv2.txt |    7 +-
+ .../bindings/soc/amlogic/clk-measure.txt        |   18 +
+ .../bindings/soc/qcom/qcom,smd-rpm.txt          |    1 +
+ .../bindings/soc/rockchip/power_domain.txt      |    4 +
+ .../devicetree/bindings/sram/sunxi-sram.txt     |    9 +
+ arch/arm/mach-omap2/omap_hwmod.c                |   23 +-
+ drivers/bus/brcmstb_gisb.c                      |   12 +-
+ drivers/bus/ti-sysc.c                           |   55 +-
+ drivers/dma/pxa_dma.c                           |    5 +-
+ drivers/firmware/imx/Kconfig                    |    6 +
+ drivers/firmware/imx/Makefile                   |    3 +-
+ drivers/firmware/imx/scu-pd.c                   |  339 +++++
+ drivers/firmware/raspberrypi.c                  |   48 +-
+ drivers/firmware/tegra/bpmp-debugfs.c           |   29 +-
+ drivers/firmware/tegra/bpmp.c                   |   77 +-
+ drivers/gpu/drm/msm/adreno/a6xx_gmu.c           |   59 +-
+ drivers/memory/omap-gpmc.c                      |    8 +-
+ drivers/memory/tegra/Kconfig                    |   10 +
+ drivers/memory/tegra/Makefile                   |    1 +
+ drivers/memory/tegra/tegra20-emc.c              |  591 +++++++++
+ drivers/soc/Makefile                            |    2 +-
+ drivers/soc/amlogic/Kconfig                     |    9 +
+ drivers/soc/amlogic/Makefile                    |    1 +
+ drivers/soc/amlogic/meson-clk-measure.c         |  350 ++++++
+ drivers/soc/atmel/soc.c                         |   10 +
+ drivers/soc/atmel/soc.h                         |    7 +
+ drivers/soc/bcm/brcmstb/common.c                |    6 +-
+ drivers/soc/bcm/brcmstb/pm/pm-arm.c             |    2 +-
+ drivers/soc/bcm/raspberrypi-power.c             |    5 +-
+ drivers/soc/imx/Kconfig                         |    6 +-
+ drivers/soc/imx/Makefile                        |    2 +-
+ drivers/soc/imx/gpc.c                           |    2 +-
+ drivers/soc/imx/gpcv2.c                         |  296 ++++-
+ drivers/soc/mediatek/Kconfig                    |   12 +
+ drivers/soc/mediatek/Makefile                   |    1 +
+ drivers/soc/mediatek/mtk-cmdq-helper.c          |  300 +++++
+ drivers/soc/qcom/Kconfig                        |    5 -
+ drivers/soc/qcom/cmd-db.c                       |   93 +-
+ drivers/soc/qcom/llcc-slice.c                   |   17 +-
+ drivers/soc/qcom/qcom-geni-se.c                 |   25 +-
+ drivers/soc/qcom/qmi_interface.c                |    2 +-
+ drivers/soc/qcom/smd-rpm.c                      |    1 +
+ drivers/soc/renesas/r8a77965-sysc.c             |    1 -
+ drivers/soc/renesas/r8a77970-sysc.c             |    5 +-
+ drivers/soc/renesas/r8a77980-sysc.c             |   10 +-
+ drivers/soc/renesas/r8a77990-sysc.c             |   23 +-
+ drivers/soc/renesas/rcar-sysc.c                 |   65 +-
+ drivers/soc/rockchip/pm_domains.c               |   48 +
+ drivers/soc/sunxi/sunxi_sram.c                  |   22 +-
+ drivers/soc/tegra/common.c                      |    6 +-
+ drivers/soc/tegra/pmc.c                         |  472 ++++++-
+ drivers/soc/ti/wkup_m3_ipc.c                    |    1 +
+ include/dt-bindings/power/imx8mq-power.h        |   21 +
+ include/dt-bindings/power/r8a77970-sysc.h       |    7 +-
+ include/dt-bindings/power/r8a77980-sysc.h       |    6 +-
+ include/dt-bindings/power/raspberrypi-power.h   |    5 +-
+ include/dt-bindings/power/rk3066-power.h        |   22 +
+ include/dt-bindings/power/rk3188-power.h        |   24 +
+ include/linux/dma/pxa-dma.h                     |   11 -
+ include/linux/soc/mediatek/mtk-cmdq.h           |  133 ++
+ include/linux/soc/qcom/qmi.h                    |    2 +-
+ include/soc/bcm2835/raspberrypi-firmware.h      |    5 +-
+ include/soc/qcom/cmd-db.h                       |   12 +-
+ include/soc/tegra/bpmp-abi.h                    | 1188 ++++++++++++++----
+ include/soc/tegra/bpmp.h                        |    7 +
+ include/soc/tegra/fuse.h                        |    1 -
+ include/soc/tegra/pmc.h                         |   21 +
+ 68 files changed, 3910 insertions(+), 668 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/soc/amlogic/clk-measure.txt
+ create mode 100644 drivers/firmware/imx/scu-pd.c
+ create mode 100644 drivers/memory/tegra/tegra20-emc.c
+ create mode 100644 drivers/soc/amlogic/meson-clk-measure.c
+ create mode 100644 drivers/soc/mediatek/mtk-cmdq-helper.c
+ create mode 100644 include/dt-bindings/power/imx8mq-power.h
+ create mode 100644 include/dt-bindings/power/rk3066-power.h
+ create mode 100644 include/dt-bindings/power/rk3188-power.h
+ create mode 100644 include/linux/soc/mediatek/mtk-cmdq.h
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
