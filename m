@@ -2,68 +2,94 @@ Return-Path: <SRS0=D6bT=PI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B4D61C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 08:25:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A8638C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 08:42:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8590E20B1F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 08:25:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 715C8213A2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 08:42:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IKyu9i3A";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="ZfjwtGQa"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8590E20B1F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZGFv26ds";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="B0mgJ4q8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 715C8213A2
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=ZC9SUC1KZH/RbrmhwGMVFehvPq4afu6B07Ys2nX2Q5o=; b=IKy
-	u9i3AzrZGiH9OWcFQaZS5n9eGQge91kFnPzP92WfD4j4IACxRbt3Ys2t9Tys60MlK4ttJTSqbCGGg
-	t31Bohacf8EmSdPNTNm/QmpyF6q56StObMG4mlJZDWxE8FnX8UC8ybV9K6kY9Pi7HclsN9wBcDCiq
-	H25NKBrmHNyrXy7xS1cuGrdkXM5W+nrNN0FSvVbjgEEsypWm3CIsfOZWHsiaOjmh3Z7cGMnreoK30
-	rwKgtC9gMvUndOKFZ3AR7BLgSam+vSKqdJcDzldhqtO4RrTjZGDh8RsXoH2H0IhbGB8hbz8gZQE3k
-	zA2las5VOuI8udA/MZUUbXq35YBbjbQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=r5Lp2Alh5oNYnq1Sc43VdU+uzEwVotAjBB24VhJsw/Q=; b=ZGFv26dsIB+VstzifD/23uGFC
+	E2fjp11ThEiapQ7dNOt7xSkBOYUzZSBiAtuPyTYItyRJdJS9E2ar2vtNJsDGdNpWOwN0k/i27Jkhv
+	G4ap97+XndLSUq/jWovZCXLXFuI3vTvg4Q86UMh3/4ewbSkWThWCZCfZqhrtVLOq3u3EBs83PrzqZ
+	dfiKvC6ycT9w5VKt4R0L4y3HC5F5+tKbLhu0BdyaLZIzAlZcD3MSOrjw1+TeXVLX/uQEuKNitzbq7
+	zOaxHcaEaBxB4pUxJZvzeEgqJ8CdBi8QgB+nhesga654FY35IsSNFjuK78Ug6Jk1pRmLbXuaKrb3D
+	Oz7Yx8k3Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gdssd-0004y5-DM; Mon, 31 Dec 2018 08:24:59 +0000
-Received: from conuserg-11.nifty.com ([210.131.2.78])
+	id 1gdt9l-0002e3-D3; Mon, 31 Dec 2018 08:42:41 +0000
+Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gdssO-0004pk-3J
- for linux-arm-kernel@lists.infradead.org; Mon, 31 Dec 2018 08:24:46 +0000
-Received: from grover.tkatk1.zaq.ne.jp (zaqdadce369.zaq.ne.jp
- [218.220.227.105]) (authenticated)
- by conuserg-11.nifty.com with ESMTP id wBV8OIjp008355;
- Mon, 31 Dec 2018 17:24:19 +0900
-DKIM-Filter: OpenDKIM Filter v2.10.3 conuserg-11.nifty.com wBV8OIjp008355
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
- s=dec2015msa; t=1546244660;
- bh=G8pxkQmNDNH3vwq5DKqGPQ+ShnVl7BpdwBqJnR3pKbo=;
- h=From:To:Cc:Subject:Date:From;
- b=ZfjwtGQabuf0cb/sdFUOwqK57/lxOuu6+GbZXmf3IPAlLiPS6K0zcW2EMtFY4Lz1J
- RAGJHcHOV7QNVuhhvodMXrU8onxoZGi7uFMIuc9IYPvTe6BG1gSao331eGn2Ks9Mw/
- msE30BqsL25KsQkEtuEbS5KVOdRpEG+plIDegOCdt3Lw4HxIF0dTlGC7XVLBZLhPUx
- oN1LZFbTj+16yOFdpiRDladqZJuH0ZHRiT59CqMF1ODRioBXtW7/JFhzY4LTjUSCtx
- /ZNy4QskWbXpF10YTNm2WkIsv5kg0bykl+PVKHMGEchB69cEorLdO5wpSGwcYj0DZ3
- 1XB1Pyk+XOdSg==
-X-Nifty-SrcIP: [218.220.227.105]
-From: Masahiro Yamada <yamada.masahiro@socionext.com>
-To: linux-kbuild@vger.kernel.org
-Subject: [PATCH 1/4] kbuild: remove redundant target cleaning on failure
-Date: Mon, 31 Dec 2018 17:24:08 +0900
-Message-Id: <1546244651-10447-1-git-send-email-yamada.masahiro@socionext.com>
-X-Mailer: git-send-email 2.7.4
+ id 1gdt9h-0002dX-UV
+ for linux-arm-kernel@lists.infradead.org; Mon, 31 Dec 2018 08:42:39 +0000
+Received: by mail-wm1-x344.google.com with SMTP id a62so23079031wmh.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 31 Dec 2018 00:42:37 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=subject:to:cc:references:from:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=El90UuvXSTwvHkTCycgQ+Zo1FPArY4bUiDSukrnlXpo=;
+ b=B0mgJ4q8VvsUUC6I+FZaFu3eQ6CD5FFUjZpzdzCpOem5TjESV0+8tPdYbh849/DRkt
+ X4sZo9vftrf83GdHq8pEGjl9JH8SU8JWhofQQtS2LGx97/7fG1VnAsttLZnHV7F87UpA
+ d/lC4UMEBTm38vD8QyWYTYVmcEKRVFtUheNf0=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=El90UuvXSTwvHkTCycgQ+Zo1FPArY4bUiDSukrnlXpo=;
+ b=MoFKNwDtQmFKugbjH+PUBQSzHLnQQ42Uv/imckTrH0i8xtbCTfx0yZRYQC4lQPBNHJ
+ 9vXGmsAoNJ5oyFXPtIyeTGqS2r1exndGoPNU1s3aZUfp6A0l7l7repJa4KftssvbprU8
+ MiOJw8pmy++wLqsrgE3lJ8/mQ+rP6+1EBswrSPDZeWYewHW5Umt3qo+YKHw27vu1Av82
+ +Ko49RfzN1S5m+Z0r6WXVs13qzwmfifvt+a5EwhSKf7ETSvni7xY1V5MYVUxoUEivT7f
+ nj2XYHagtlvN3sbzFNWnDQg4iw7rM2+6Uqk0gz4noLnZ+alPRCLiDo2timdGubLJiYR2
+ B5lQ==
+X-Gm-Message-State: AA+aEWZ3ND1tBpg+EProJbZPkVLIvYtJIDvpiTgSQbsEwlbhwOKeRZrc
+ p+h1cNSv7eRq3/6eEzDiOc8YWw==
+X-Google-Smtp-Source: AFSGD/WEKyUwv2tuz8D2f7vDYkbd3Buv/bJHy53tqnckCpIFz1B/AtUQ3hNtKf1utkb9M7je68532g==
+X-Received: by 2002:a1c:6607:: with SMTP id a7mr29394245wmc.129.1546245755633; 
+ Mon, 31 Dec 2018 00:42:35 -0800 (PST)
+Received: from [192.168.1.2] (92.red-83-34-185.dynamicip.rima-tde.net.
+ [83.34.185.92])
+ by smtp.gmail.com with ESMTPSA id g198sm53816074wmd.23.2018.12.31.00.42.33
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 31 Dec 2018 00:42:34 -0800 (PST)
+Subject: Re: [PATCH 05/13] clk: qcom: apcs-msm8916: get parent clock names
+ from DT
+To: Stephen Boyd <sboyd@kernel.org>, Niklas Cassel <niklas.cassel@linaro.org>
+References: <1545039990-19984-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <1545039990-19984-6-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <154508986359.19322.1555129141976726505@swboyd.mtv.corp.google.com>
+ <20181218143503.GA32562@centauri.ideon.se>
+ <72bc192f-b60a-1209-7818-78a2fed07831@linaro.org>
+ <154603613437.179992.1170701312259011363@swboyd.mtv.corp.google.com>
+From: Jorge Ramirez <jorge.ramirez-ortiz@linaro.org>
+Message-ID: <45a9e033-16e8-e0f9-36cf-3b892af1bd8f@linaro.org>
+Date: Mon, 31 Dec 2018 09:42:33 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
+MIME-Version: 1.0
+In-Reply-To: <154603613437.179992.1170701312259011363@swboyd.mtv.corp.google.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181231_002444_468288_6DD0E00B 
-X-CRM114-Status: GOOD (  11.79  )
+X-CRM114-CacheID: sfid-20181231_004238_003856_FED44D9D 
+X-CRM114-Status: GOOD (  17.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,219 +101,107 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Michal Marek <michal.lkml@markovi.net>,
- Yoshinori Sato <ysato@users.sourceforge.jp>, linux-sh@vger.kernel.org,
- x86@kernel.org, linux-kernel@vger.kernel.org, Rich Felker <dalias@libc.org>,
- David Howells <dhowells@redhat.com>,
- Masahiro Yamada <yamada.masahiro@socionext.com>, keyrings@vger.kernel.org,
- Borislav Petkov <bp@alien8.de>, "H. Peter Anvin" <hpa@zytor.com>,
- Russell King <linux@armlinux.org.uk>, Thomas Gleixner <tglx@linutronix.de>,
- David Woodhouse <dwmw2@infradead.org>, Ingo Molnar <mingo@redhat.com>,
- linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
+Cc: mark.rutland@arm.com, heiko@sntech.de, mturquette@baylibre.com,
+ will.deacon@arm.com, bjorn.andersson@linaro.org, david.brown@linaro.org,
+ linux-clk@vger.kernel.org, jassisinghbrar@gmail.com, sibis@codeaurora.org,
+ andy.gross@linaro.org, jagan@amarulasolutions.com, devicetree@vger.kernel.org,
+ arnd@arndb.de, olof@lixom.net, robh+dt@kernel.org, horms+renesas@verge.net.au,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
+ amit.kucheria@linaro.org, vkoul@kernel.org, enric.balletbo@collabora.com,
+ georgi.djakov@linaro.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Since commit 9c2af1c7377a ("kbuild: add .DELETE_ON_ERROR special
-target"), the target file is automatically deleted on failure.
+On 12/28/18 23:28, Stephen Boyd wrote:
+> Quoting Jorge Ramirez (2018-12-26 01:20:07)
+>> On 12/18/18 15:35, Niklas Cassel wrote:
+>>> On Mon, Dec 17, 2018 at 03:37:43PM -0800, Stephen Boyd wrote:
+>>>> Quoting Jorge Ramirez-Ortiz (2018-12-17 01:46:22)
+>>>>> Allow accessing the parent clock names required for the driver
+>>>>> operation by using the device tree node.
+>>>>>
+>>>>> This permits extending the driver to other platforms without having to
+>>>>> modify its source code.
+>>>>>
+>>>>> For backwards compatibility leave previous values as default.
+>>>>
+>>>> Why do we need to maintain backwards compatibility? Isn't is required
+>>>> that the nodes have clocks properties?
+>>>>
+>>>
+>>> Hello Stephen,
+>>>
+>>>
+>>> This is the existing DT nodes for msm8916:
+>>>
+>>>                  a53pll: clock@b016000 {
+>>>                           compatible = "qcom,msm8916-a53pll";
+>>>                           reg = <0xb016000 0x40>;
+>>>                           #clock-cells = <0>;
+>>>                   };
+>>>
+>>>                   apcs: mailbox@b011000 {
+>>>                           compatible = "qcom,msm8916-apcs-kpss-global", "syscon";
+>>>                           reg = <0xb011000 0x1000>;
+>>>                           #mbox-cells = <1>;
+>>>                           clocks = <&a53pll>;
+>>>                           #clock-cells = <0>;
+>>>                   };
+>>>
+>>>
+>>> This is the (suggested) DT nodes for qcs404:
+>>>
+>>>                   apcs_hfpll: clock-controller@0b016000 {
+>>>                           compatible = "qcom,hfpll";
+>>>                           reg = <0x0b016000 0x30>;
+>>>                           #clock-cells = <0>;
+>>>                           clock-output-names = "apcs_hfpll";
+>>>                           clocks = <&xo_board>;
+>>>                           clock-names = "xo";
+>>>                   };
+>>>
+>>>                   apcs_glb: mailbox@b011000 {
+>>>                           compatible = "qcom,qcs404-apcs-apps-global", "syscon";
+>>>                           reg = <0x0b011000 0x1000>;
+>>>                           #mbox-cells = <1>;
+>>>                           clocks = <&gcc GCC_GPLL0_AO_OUT_MAIN>, <&apcs_hfpll>;
+>>>                           clock-names = "aux", "pll";
+>>>                           #clock-cells = <0>;
+>>>                   };
+>>>
+>>> qcs404 specifies two clocks, with an accompanied clock-name for each clock.
+>>>
+>>> msm8916 specifies a single clock, without an accompanied clock-name.
+>>>
+>>> It is possible to append clock-names = "pll" for the existing clock,
+>>> as well as to define the aux clock in the apcs node in the msm8916 DT:
+>>> clocks = <&gcc GPLL0_VOTE>;
+>>> clock-names = "aux";
+>>>
+>>> However, since the DT is treated as an ABI, the existing DT for msm8916 must
+>>> still work, so I don't think that it is possible to ignore having backwards
+>>> compability in the apcs clock driver.
+>>
+>>
+>> so where are we with this?
+>>
+>> do we remove backwards compatibility (see below] for v2 or is the DT
+>> really an ABI and therefore the patch under review is good as is?
+>>
+> 
+> Breaking compatibility is up to the platform maintainers. If anything, I
+> would make the DTS and driver changes in parallel and then remove the
+> driver's backwards compatibility logic later on.
+> 
+> 
 
-The boilerplate code
+I am not completely sure of what you mean. are you saying that the 
+original patch is good and we should just provide another patch (not 
+part of the current patch series) to remove the compatibility?
 
-  ... || { rm -f $@; false; }
-
-is unneeded.
-
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
- arch/arm/boot/Makefile            |  2 +-
- arch/arm/boot/compressed/Makefile |  2 +-
- arch/arm/tools/Makefile           |  3 +--
- arch/sh/tools/Makefile            |  2 +-
- arch/x86/boot/compressed/Makefile |  2 +-
- arch/x86/lib/Makefile             |  2 +-
- certs/Makefile                    |  2 +-
- lib/raid6/Makefile                |  5 ++---
- scripts/Makefile.lib              | 21 +++++++--------------
- 9 files changed, 16 insertions(+), 25 deletions(-)
-
-diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-index a3af4dc..0b3cd7a 100644
---- a/arch/arm/boot/Makefile
-+++ b/arch/arm/boot/Makefile
-@@ -32,7 +32,7 @@ targets := Image zImage xipImage bootpImage uImage
- ifeq ($(CONFIG_XIP_KERNEL),y)
- 
- cmd_deflate_xip_data = $(CONFIG_SHELL) -c \
--	'$(srctree)/$(src)/deflate_xip_data.sh $< $@ || { rm -f $@; false; }'
-+	'$(srctree)/$(src)/deflate_xip_data.sh $< $@'
- 
- ifeq ($(CONFIG_XIP_DEFLATED_DATA),y)
- quiet_cmd_mkxip = XIPZ    $@
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 01bf258..6114ae6 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -170,7 +170,7 @@ check_for_bad_syms = \
- bad_syms=$$($(CROSS_COMPILE)nm $@ | sed -n 's/^.\{8\} [bc] \(.*\)/\1/p') && \
- [ -z "$$bad_syms" ] || \
-   ( echo "following symbols must have non local/private scope:" >&2; \
--    echo "$$bad_syms" >&2; rm -f $@; false )
-+    echo "$$bad_syms" >&2; false )
- 
- check_for_multiple_zreladdr = \
- if [ $(words $(ZRELADDR)) -gt 1 -a "$(CONFIG_AUTO_ZRELADDR)" = "" ]; then \
-diff --git a/arch/arm/tools/Makefile b/arch/arm/tools/Makefile
-index ddb89a7..27d8beb 100644
---- a/arch/arm/tools/Makefile
-+++ b/arch/arm/tools/Makefile
-@@ -35,8 +35,7 @@ _dummy := $(shell [ -d '$(kapi)' ] || mkdir -p '$(kapi)') \
- 
- quiet_cmd_gen_mach = GEN     $@
-       cmd_gen_mach = mkdir -p $(dir $@) && \
--		     $(AWK) -f $(filter-out $(PHONY),$^) > $@ || \
--		     { rm -f $@; /bin/false; }
-+		     $(AWK) -f $(filter-out $(PHONY),$^) > $@
- 
- $(kapi)/mach-types.h: $(src)/gen-mach-types $(src)/mach-types FORCE
- 	$(call if_changed,gen_mach)
-diff --git a/arch/sh/tools/Makefile b/arch/sh/tools/Makefile
-index 2082af1..e5ba31c 100644
---- a/arch/sh/tools/Makefile
-+++ b/arch/sh/tools/Makefile
-@@ -13,4 +13,4 @@
- include/generated/machtypes.h: $(src)/gen-mach-types $(src)/mach-types
- 	@echo '  Generating $@'
- 	$(Q)mkdir -p $(dir $@)
--	$(Q)LC_ALL=C $(AWK) -f $^ > $@ || { rm -f $@; /bin/false; }
-+	$(Q)LC_ALL=C $(AWK) -f $^ > $@
-diff --git a/arch/x86/boot/compressed/Makefile b/arch/x86/boot/compressed/Makefile
-index 466f66c..f0515ac8 100644
---- a/arch/x86/boot/compressed/Makefile
-+++ b/arch/x86/boot/compressed/Makefile
-@@ -151,7 +151,7 @@ suffix-$(CONFIG_KERNEL_LZO) 	:= lzo
- suffix-$(CONFIG_KERNEL_LZ4) 	:= lz4
- 
- quiet_cmd_mkpiggy = MKPIGGY $@
--      cmd_mkpiggy = $(obj)/mkpiggy $< > $@ || ( rm -f $@ ; false )
-+      cmd_mkpiggy = $(obj)/mkpiggy $< > $@
- 
- targets += piggy.S
- $(obj)/piggy.S: $(obj)/vmlinux.bin.$(suffix-y) $(obj)/mkpiggy FORCE
-diff --git a/arch/x86/lib/Makefile b/arch/x86/lib/Makefile
-index 25a972c..89d0f37 100644
---- a/arch/x86/lib/Makefile
-+++ b/arch/x86/lib/Makefile
-@@ -9,7 +9,7 @@ KCOV_INSTRUMENT_delay.o	:= n
- inat_tables_script = $(srctree)/arch/x86/tools/gen-insn-attr-x86.awk
- inat_tables_maps = $(srctree)/arch/x86/lib/x86-opcode-map.txt
- quiet_cmd_inat_tables = GEN     $@
--      cmd_inat_tables = $(AWK) -f $(inat_tables_script) $(inat_tables_maps) > $@ || rm -f $@
-+      cmd_inat_tables = $(AWK) -f $(inat_tables_script) $(inat_tables_maps) > $@
- 
- $(obj)/inat-tables.c: $(inat_tables_script) $(inat_tables_maps)
- 	$(call cmd,inat_tables)
-diff --git a/certs/Makefile b/certs/Makefile
-index 5d0999b..f4c25b6 100644
---- a/certs/Makefile
-+++ b/certs/Makefile
-@@ -22,7 +22,7 @@ $(obj)/system_certificates.o: $(obj)/x509_certificate_list
- AFLAGS_system_certificates.o := -I$(srctree)
- 
- quiet_cmd_extract_certs  = EXTRACT_CERTS   $(patsubst "%",%,$(2))
--      cmd_extract_certs  = scripts/extract-cert $(2) $@ || ( rm $@; exit 1)
-+      cmd_extract_certs  = scripts/extract-cert $(2) $@
- 
- targets += x509_certificate_list
- $(obj)/x509_certificate_list: scripts/extract-cert $(SYSTEM_TRUSTED_KEYS_SRCPREFIX)$(SYSTEM_TRUSTED_KEYS_FILENAME) FORCE
-diff --git a/lib/raid6/Makefile b/lib/raid6/Makefile
-index 7ed43ea..4e90d44 100644
---- a/lib/raid6/Makefile
-+++ b/lib/raid6/Makefile
-@@ -13,8 +13,7 @@ raid6_pq-$(CONFIG_S390) += s390vx8.o recov_s390xc.o
- hostprogs-y	+= mktables
- 
- quiet_cmd_unroll = UNROLL  $@
--      cmd_unroll = $(AWK) -f$(srctree)/$(src)/unroll.awk -vN=$(UNROLL) \
--                   < $< > $@ || ( rm -f $@ && exit 1 )
-+      cmd_unroll = $(AWK) -f$(srctree)/$(src)/unroll.awk -vN=$(UNROLL) < $< > $@
- 
- ifeq ($(CONFIG_ALTIVEC),y)
- altivec_flags := -maltivec $(call cc-option,-mabi=altivec)
-@@ -160,7 +159,7 @@ $(obj)/s390vx8.c:   $(src)/s390vx.uc $(src)/unroll.awk FORCE
- 	$(call if_changed,unroll)
- 
- quiet_cmd_mktable = TABLE   $@
--      cmd_mktable = $(obj)/mktables > $@ || ( rm -f $@ && exit 1 )
-+      cmd_mktable = $(obj)/mktables > $@
- 
- targets += tables.c
- $(obj)/tables.c: $(obj)/mktables FORCE
-diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
-index d10c61e..390957f 100644
---- a/scripts/Makefile.lib
-+++ b/scripts/Makefile.lib
-@@ -242,8 +242,7 @@ cmd_objcopy = $(OBJCOPY) $(OBJCOPYFLAGS) $(OBJCOPYFLAGS_$(@F)) $< $@
- # ---------------------------------------------------------------------------
- 
- quiet_cmd_gzip = GZIP    $@
--cmd_gzip = (cat $(filter-out FORCE,$^) | gzip -n -f -9 > $@) || \
--	(rm -f $@ ; false)
-+      cmd_gzip = cat $(filter-out FORCE,$^) | gzip -n -f -9 > $@
- 
- # DTC
- # ---------------------------------------------------------------------------
-@@ -336,26 +335,22 @@ printf "%08x\n" $$dec_size |						\
- 
- quiet_cmd_bzip2 = BZIP2   $@
- cmd_bzip2 = (cat $(filter-out FORCE,$^) | \
--	bzip2 -9 && $(call size_append, $(filter-out FORCE,$^))) > $@ || \
--	(rm -f $@ ; false)
-+	bzip2 -9 && $(call size_append, $(filter-out FORCE,$^))) > $@
- 
- # Lzma
- # ---------------------------------------------------------------------------
- 
- quiet_cmd_lzma = LZMA    $@
- cmd_lzma = (cat $(filter-out FORCE,$^) | \
--	lzma -9 && $(call size_append, $(filter-out FORCE,$^))) > $@ || \
--	(rm -f $@ ; false)
-+	lzma -9 && $(call size_append, $(filter-out FORCE,$^))) > $@
- 
- quiet_cmd_lzo = LZO     $@
- cmd_lzo = (cat $(filter-out FORCE,$^) | \
--	lzop -9 && $(call size_append, $(filter-out FORCE,$^))) > $@ || \
--	(rm -f $@ ; false)
-+	lzop -9 && $(call size_append, $(filter-out FORCE,$^))) > $@
- 
- quiet_cmd_lz4 = LZ4     $@
- cmd_lz4 = (cat $(filter-out FORCE,$^) | \
--	lz4c -l -c1 stdin stdout && $(call size_append, $(filter-out FORCE,$^))) > $@ || \
--	(rm -f $@ ; false)
-+	lz4c -l -c1 stdin stdout && $(call size_append, $(filter-out FORCE,$^))) > $@
- 
- # U-Boot mkimage
- # ---------------------------------------------------------------------------
-@@ -399,13 +394,11 @@ quiet_cmd_uimage = UIMAGE  $@
- quiet_cmd_xzkern = XZKERN  $@
- cmd_xzkern = (cat $(filter-out FORCE,$^) | \
- 	sh $(srctree)/scripts/xz_wrap.sh && \
--	$(call size_append, $(filter-out FORCE,$^))) > $@ || \
--	(rm -f $@ ; false)
-+	$(call size_append, $(filter-out FORCE,$^))) > $@
- 
- quiet_cmd_xzmisc = XZMISC  $@
- cmd_xzmisc = (cat $(filter-out FORCE,$^) | \
--	xz --check=crc32 --lzma2=dict=1MiB) > $@ || \
--	(rm -f $@ ; false)
-+	xz --check=crc32 --lzma2=dict=1MiB) > $@
- 
- # ASM offsets
- # ---------------------------------------------------------------------------
--- 
-2.7.4
+TIA
 
 
 _______________________________________________
