@@ -6,65 +6,72 @@ X-Spam-Status: No, score=-4.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 29FC6C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 15:29:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 40855C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 17:50:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EF2D721720
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 15:29:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 128BF2080D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 17:50:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nnGx6uwQ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="mt0r7B0i"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EF2D721720
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dFj6ayKY";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="XZe4LPum"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 128BF2080D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/gbLniLJrE8NWc6l8/AtuboxEHbL//Uz12vriT2P+Wg=; b=nnGx6uwQDBOGLQ
-	Elv2sxq8jtFHg1xAPY9UOlBTUR7H7x6KOhbJEjz+R55Fmm+gEsX4HjKgN+f9bYD5DKe4pq8qOYzmJ
-	2LZIV1ax8GdGh7DLX2SBferLiWKMA+x21CYP4nfWhDZffCSzrTaGlv1aipLot3sjaAe2GhgwJM0xy
-	kLDZh4g9SE+BratZXFIPnhlNM0FBcsPR5Jd1e+T1D5f2uvxpky1J6R5dXKnh0xn8V1JN7NM8/Hdml
-	tXzOAfkjNELsSA7JEDi9VfyN7QBtxEs49F/Wmg/sEdsPaiRE4LAlXZco4VbCrZ39E1DCoAZjGngu3
-	3ldG4K4bP5nz498Z7CeA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=xkRlVEA+CJDW5Q/KRFvAcG72gJqZucwd6nhKS8yYKiI=; b=dFj6ayKYS+tD0VD3bA5wl2i9v
+	ZmGu8/zPls9J23fjmbK2RIootoBBisDEEODcgg4ddG17eP9BcAckLPVT3mSwcLcwVcIEz2HWJZhZS
+	AasUuVA8lp8NEEj385G//D3hAxfZIxz1CO5hfG6OGPMH7zI0rFseq/rW4u87V/kXmvY0xjeHgwNvx
+	s9AxfQLXAwrdbqn27s6MD7sQMiTxLD4x1ATCk3dYQE78mC9eZkZbYywgBfd+4s2EmqAHzEgNmmapv
+	ybbOtx5n2p7p6WQ3XgEnybrWUsbxjUCcn1VWJ4TncFPxredSpTQNS1OFmtKN7ZEe2sq/9V7jbx/Nb
+	qFD3mzeIQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gdzVU-00066f-2O; Mon, 31 Dec 2018 15:29:32 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1ge1iI-0000PP-Ei; Mon, 31 Dec 2018 17:50:54 +0000
+Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gdzVR-00065w-4E
- for linux-arm-kernel@lists.infradead.org; Mon, 31 Dec 2018 15:29:30 +0000
-Received: from localhost (unknown [69.71.4.100])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 450502133F;
- Mon, 31 Dec 2018 15:29:24 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1546270166;
- bh=ep05JDV0jUZt3JPGp9M2KlJH4vaZEgl8Hdop8Y4VudM=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=mt0r7B0iq02qpZwkWngDX5Luz/oENZKBhgEcBqkTHCTQcRyFPofeZML5H1E9YBOqQ
- tdH+hVzbPtNVeaIHfgLU9Iy3EtQ5aCx4FerbGPIi16vBMMlfHLuxi9M5ZBGDpk/YWr
- K8GJ97dJjnBde51sDxnTnWd20bkbwedHDdoB/dmk=
-Date: Mon, 31 Dec 2018 09:29:18 -0600
-From: Bjorn Helgaas <helgaas@kernel.org>
-To: Krzysztof =?utf-8?Q?Ha=C5=82asa?= <khalasa@piap.pl>
-Subject: Re: [PATCH] arm: cns3xxx: fix writing to wrong PCI registers after
- alignment
-Message-ID: <20181231152918.GE159477@google.com>
-References: <20181218111743.25566-1-koen.vandeputte@ncentric.com>
- <20181230010625.GC159477@google.com> <m336qegfzv.fsf@t19.piap.pl>
+ id 1ge1iE-0000Oo-P6; Mon, 31 Dec 2018 17:50:52 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=sirena.org.uk; s=20170815-heliosphere; h=In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=EuxVX4LJYId/8LX28UqFKZnuP20NSGU0ia1Xsei30RY=; b=XZe4LPumYFC3s7XJzACepq9y5
+ 8X+dgydcSTraMgudKh7IJK2UKaNVMDeCinlfgfuHV/ObdbwbaJV2L3KlUaYfHfAGzoIqSoDYwKcIU
+ 84qPyRXgXxD/7MkEOxkaHclr6lEWDYRIjCaLKPgbHUCO8C1AmEnXZlyar1EPp2OTK8JFU=;
+Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
+ ([82.37.168.47] helo=finisterre.ee.mobilebroadband)
+ by heliosphere.sirena.org.uk with esmtpsa
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
+ (envelope-from <broonie@sirena.org.uk>)
+ id 1ge1hz-0002Ny-Nz; Mon, 31 Dec 2018 17:50:35 +0000
+Received: by finisterre.ee.mobilebroadband (Postfix, from userid 1000)
+ id 009E6440080; Mon, 31 Dec 2018 17:50:34 +0000 (GMT)
+Date: Mon, 31 Dec 2018 17:50:34 +0000
+From: Mark Brown <broonie@kernel.org>
+To: Andreas =?iso-8859-1?Q?F=E4rber?= <afaerber@suse.de>
+Subject: Re: [PATCH v3 lora-next 5/5] net: lora: sx125x sx1301: allow radio
+ to register as a clk provider
+Message-ID: <20181231175034.GI1846@sirena.org.uk>
+References: <1539361567-3602-1-git-send-email-ben.whitten@lairdtech.com>
+ <1539361567-3602-6-git-send-email-ben.whitten@lairdtech.com>
+ <a89c7974-672f-e5d0-8022-d2c2f9ffeac0@suse.de>
+ <d22f1f18-0c93-a537-a439-07363174a03b@suse.de>
+ <491d1a46-c112-1106-9f25-14149f0dcbd0@suse.de>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <m336qegfzv.fsf@t19.piap.pl>
+In-Reply-To: <491d1a46-c112-1106-9f25-14149f0dcbd0@suse.de>
+X-Cookie: knowledge, n.:
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181231_072929_187698_3EC583C2 
-X-CRM114-Status: GOOD (  18.37  )
+X-CRM114-CacheID: sfid-20181231_095050_961646_EA969F4A 
+X-CRM114-Status: GOOD (  12.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,53 +83,83 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>, Arnd Bergmann <arnd@arndb.de>,
- linux-pci@vger.kernel.org, Tim Harvey <tharvey@gateworks.com>,
- Russell King <linux@armlinux.org.uk>, stable@vger.kernel.org,
- Robin Leblon <robin.leblon@ncentric.com>,
- Koen Vandeputte <koen.vandeputte@ncentric.com>,
- Olof Johansson <olof@lixom.net>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Ben Whitten <ben.whitten@gmail.com>,
+ devicetree <devicetree@vger.kernel.org>, linux-clk <linux-clk@vger.kernel.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, netdev@vger.kernel.org,
+ Michael Turquette <mturquette@baylibre.com>,
+ Stephen Boyd <sboyd@codeaurora.org>,
+ "linux-lpwan@lists.infradead.org" <linux-lpwan@lists.infradead.org>,
+ linux-kernel@vger.kernel.org, starnight@g.ncu.edu.tw,
+ "linux-spi@vger.kernel.org" <linux-spi@vger.kernel.org>,
+ "David S. Miller" <davem@davemloft.net>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: multipart/mixed; boundary="===============1171462287818488632=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gTW9uLCBEZWMgMzEsIDIwMTggYXQgMTE6MTQ6MjhBTSArMDEwMCwgS3J6eXN6dG9mIEhhxYJh
-c2Egd3JvdGU6Cj4gQmpvcm4gSGVsZ2FhcyA8aGVsZ2Fhc0BrZXJuZWwub3JnPiB3cml0ZXM6Cj4g
-Cj4gPiA4MDJiN2MwNmFkYzcgcmVwbGFjZWQgY25zM3h4eF9wY2lfd3JpdGVfY29uZmlnKCksIHdo
-aWNoIGFsd2F5cyB1c2VkCj4gPiBfX3Jhd193cml0ZWwoKSBzbyBpdCBvbmx5IGRpZCAzMi1iaXQg
-YWNjZXNzZXMsIHdpdGgKPiA+IHBjaV9nZW5lcmljX2NvbmZpZ193cml0ZSgpLCB3aGljaCB1c2Vz
-IHdyaXRlYi93cml0ZXcvd3JpdGVsKCkKPiA+IGRlcGVuZGluZyBvbiB0aGUgc2l6ZS4KPiA+Cj4g
-PiA4MDJiN2MwNmFkYzcgYWxzbyBjb252ZXJ0ZWQgY25zM3h4eF9wY2lfcmVhZF9jb25maWcoKSBm
-cm9tIGFsd2F5cwo+ID4gdXNpbmcgX19yYXdfcmVhZGwoKSAoYSAzMi1iaXQgYWNjZXNzKSB0byB1
-c2luZwo+ID4gcGNpX2dlbmVyaWNfY29uZmlnX3JlYWQzMigpLCB3aGljaCBhbHNvIGFsd2F5cyBk
-b2VzIGEgMzItYml0IGFjY2Vzcy4KPiA+Cj4gPiBUaGlzIG1ha2VzIG1lIHRoaW5rIHRoZSBjbngz
-eHh4IGhhcmR3YXJlIGlzIG9ubHkgY2FwYWJsZSBvZiAzMi1iaXQKPiA+IGFjY2Vzc2VzLCBhbmQg
-dGhpcyBwYXRjaCBzaG91bGQgY2hhbmdlIHRoZSBkcml2ZXIgdG8gdXNlCj4gPiBwY2lfZ2VuZXJp
-Y19jb25maWdfd3JpdGUzMigpIGluc3RlYWQgb2YgcGNpX2dlbmVyaWNfY29uZmlnX3dyaXRlKCkg
-aW4KPiA+IGFkZGl0aW9uIHRvIHRoZSBtYXBwaW5nIGZpeCBhYm92ZS4KPiAKPiBIYXNuJ3QgaXQg
-YWxyZWFkeSBiZWVuIHZlcmlmaWVkIHRoYXQgdGhlIENOUzN4eHggY2FuIGRvIDgtYml0IGFjY2Vz
-c2VzCj4gKGFuZCBwcm9iYWJseSAxNi1iaXQgb25lcyBhcyB3ZWxsKSwgYW5kIHRoYXQgdGhlIGRv
-Y3MgZG9uJ3QgbWVudGlvbiBhbnkKPiBzdWNoIGxpbWl0YXRpb24/CgpRdWl0ZSBwb3NzaWJseS4g
-IEknbSBub3QgZmFtaWxpYXIgd2l0aCB0aGUgaGFyZHdhcmUgb3IgZG9jcyBzbyBjYW4ndApjb21t
-ZW50IHBlcnNvbmFsbHkuCgo4MDJiN2MwNmFkYzcgcmVpbXBsZW1lbnRlZCBjbnMzeHh4X3BjaV9y
-ZWFkX2NvbmZpZygpIHVzaW5nCnBjaV9nZW5lcmljX2NvbmZpZ19yZWFkMzIoKSwgd2hpY2ggcHJl
-c2VydmVkIHRoZSBwcm9wZXJ0eSBvZiBvbmx5CmRvaW5nIDMyLWJpdCByZWFkcy4gIEl0IHJlcGxh
-Y2VkIGNuczN4eHhfcGNpX3dyaXRlX2NvbmZpZygpIHdpdGgKcGNpX2dlbmVyaWNfY29uZmlnX3dy
-aXRlKCksIHNvIGl0IGNoYW5nZWQgd3JpdGVzIGZyb20gYWx3YXlzIGJlaW5nIDMyCmJpdHMgdG8g
-YmVpbmcgdGhlIGFjdHVhbCBzaXplLiAgSSB0aGluayB0aGlzIHdhcyBhbiBlcnJvciBpbiB0aGUK
-b3JpZ2luYWwgY29tbWl0LCBzaW5jZSB0aGUgY2hhbmdlbG9nIGRvZXNuJ3QgbWVudGlvbiB0aGlz
-IGNoYW5nZTsgaW4KZmFjdCwgdGhlIGNoYW5nZWxvZyBzYXlzIGl0IGNoYW5nZXMgX19yYXdfd3Jp
-dGVsIHRvIHdyaXRlbC4KClRoZSBjaGFuZ2UgZnJvbSAzMi1iaXQgdG8gYWN0dWFsIHNpemUgYWNj
-ZXNzZXMgd291bGQgbG9naWNhbGx5IGJlIGEKc2VwYXJhdGUgY29tbWl0IGZyb20gY2hhbmdpbmcg
-dG8gdXNlIHRoZSBnZW5lcmljIGFjY2Vzc29ycy4KCkFzc3VtaW5nIHRoZSBoYXJkd2FyZSBkb2Vz
-IHN1cHBvcnQgc21hbGxlciBhY2Nlc3NlcywgSSdkIHByb3Bvc2UgdHdvCnBhdGNoZXM6CgogIDEp
-IFRoZSBjdXJyZW50IG9uZSB0aGF0IGNvcnJlY3RzIHRoZSBhZGRyZXNzIGFsaWdubWVudCBlcnJv
-ciwgYW5kCiAgMikgQSBuZXcgb25lIHRoYXQgY29udmVydHMgY25zM3h4eF9wY2lfcmVhZF9jb25m
-aWcoKSB0byB1c2UKICAgICBwY2lfZ2VuZXJpY19jb25maWdfcmVhZCgpIGluc3RlYWQgb2YgcGNp
-X2dlbmVyaWNfY29uZmlnX3JlYWQzMigpLgoKSWRlYWxseSB0aGUgY2hhbmdlbG9nIGZvciB0aGUg
-c2Vjb25kIHBhdGNoIHdvdWxkIHJlZmVyIHRvIHRoZQp2ZXJpZmljYXRpb24gdGhhdCB0aGUgaGFy
-ZHdhcmUgaXMgY2FwYWJsZSBvZiA4LSBhbmQgMTYtYml0IGFjY2Vzc2VzLgoKQmpvcm4KCl9fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJu
-ZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRw
-Oi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+
+--===============1171462287818488632==
+Content-Type: multipart/signed; micalg=pgp-sha512;
+	protocol="application/pgp-signature"; boundary="nEsDIrWrg+hrB7l1"
+Content-Disposition: inline
+
+
+--nEsDIrWrg+hrB7l1
+Content-Type: text/plain; charset=iso-8859-1
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Sun, Dec 30, 2018 at 11:55:46AM +0100, Andreas F=E4rber wrote:
+> + linux-spi, LAKML
+
+> Given that observed symptoms were CPU stalls, workqueue hangs and RCU
+> problems, requiring a power-cycle to recover, I wonder whether we are
+> running into some atomic/locking issue with clk_enable()? Is it valid at
+> all to use SPI/regmap for clk_enable()? If it is, is there a known issue
+> specific to spi-sun6i (A64) in 4.20.0?
+> I already tried setting .disable_locking =3D true in both regmap_configs.
+> Any suggestions how to further debug?
+
+You can't use SPI for clk_enable(), clk_enable() needs to be doable in
+atomic context since we need to wait for the bus operations to complete
+(you can start SPI transfers in atomic context but you still need to
+wait for them to complete).  Any clocks that are only accessible via a
+slow bus like I2C or SPI need to do the enable/disable in the
+prepare/unprepare operations which aren't done in atomic context.
+
+regmap can be used in atomic contexts, though you need to configure it
+to use spinlocks instead of mutexes and ensure that no register cache
+allocations happen during I/O (eg, by providing defaults for all
+registers or by not using a cache).
+
+--nEsDIrWrg+hrB7l1
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAABCgAdFiEEreZoqmdXGLWf4p/qJNaLcl1Uh9AFAlwqVuoACgkQJNaLcl1U
+h9B/iwf7BlSQzbOQ0KksQFHM3Zo+w60UAruaEM3FZHfuKjMa19b2GVVEYt6jfcrh
+tpvudfBIi3vlkx4Z0adtfhOb5oGv8Y3owUOBMWWpS4Bn/ZHOBvZOdh2EWHw85Jvb
+6YijmsoqAj1fNooCPEXFD6SCEAGfyRjVz3hANVIZmiBQYKrU2KT32/hNQ/WC6XK2
+AG6ZlNDFZJHyuP6dQ9hOhH3fUyYZSYEB7xopOje8ZTCrdO5htJNA17P4C+zojRR8
+5KO2RrumYLTaEdeXCIq+qvFaErgsYAg30mJwGVZLb14KPy0z4w8SFriJDNKG/0K3
+fcTWnePlEZ7GfuI2t+b9vyV0xJgKxQ==
+=OefZ
+-----END PGP SIGNATURE-----
+
+--nEsDIrWrg+hrB7l1--
+
+
+--===============1171462287818488632==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============1171462287818488632==--
+
