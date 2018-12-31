@@ -1,106 +1,72 @@
-Return-Path: <SRS0=kGow=PH=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
+Return-Path: <SRS0=D6bT=PI=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D0269C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 30 Dec 2018 23:39:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 293C9C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 08:24:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 99C2720828
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 30 Dec 2018 23:39:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E6B8B20B1F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 08:24:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sVRXIgAe"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 99C2720828
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=suse.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mGUJ8BYw";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="LhO2fkib"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E6B8B20B1F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=TE8JVsQBFk+ko0LIDaaqNSproJs2EM7Ulm37D8ZNbD0=; b=sVRXIgAeqe363W
-	2LKeHSKqaZ5WbUkkUen5736Iv+ZMV1x0l8fxPgNGkRTLkkln6ybxPHwcWa1L9KP8Dq8dz9TjWcP1y
-	SZrwz03hrQbkCEbOUqM5K9jZTIZsCZgZcXI0BDS0+CVqvA0n8Xp4zpsrbhG+zyyItB0MocZIdo50Q
-	El4UpzoMLVWiodzkOc+f3aOhSseKX91TkeHIbeO3S9iHXF4QIZ9wv2xCiCxyP7TZU0gqoeTVii/lB
-	3gO3Pr2ZFQmZqGUay82UKH/pxnTSTpRuqiSklGGtY6BlKH0UwuA99jDjQTY8gLOlTr9RAekBUfADc
-	MXF9n5Y+SXNF7k/D7cjA==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=0oWMqN+XmDyqg39FYAVQMFQWnHgqPMlsdqtfcVe327k=; b=mGUJ8BYwMF/d48QqHIa7oe/LZj
+	IJl8zMhfm8KbBuEPjXhlp7Z/jpJdsQKbd5obWNqZG/JQQrlsDfKwQBS+XPQYY0PRfWGIrOmU/7ahZ
+	AY840MPCJLARGJSFgLImyLbrEif/u7oxLS//6ioM7ccCastIkFdP6yAb6pbxB+ntIKDoum5IbJKL0
+	2gF0iM4DIXvgicgDndmEmUMVl0ifL5eMI9wLOe/w2DqvnsfcYe8CA8jWujeOLsHwwV+fP/jxHXtkE
+	4C/UXSYUsA0hG7TOMTFaUkAEy+JgFQumU5OUtRcWPt9+vi76ZDt2pHd6yACga/5KZnMQtFZE0ZXp/
+	RQ3uFUSg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gdkfI-0002NL-V6; Sun, 30 Dec 2018 23:38:40 +0000
-Received: from mx2.suse.de ([195.135.220.15] helo=mx1.suse.de)
+	id 1gdssU-0004rG-Kw; Mon, 31 Dec 2018 08:24:50 +0000
+Received: from conuserg-11.nifty.com ([210.131.2.78])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gdkfE-0002Mo-FP; Sun, 30 Dec 2018 23:38:38 +0000
-X-Virus-Scanned: by amavisd-new at test-mx.suse.de
-Received: from relay2.suse.de (unknown [195.135.220.254])
- by mx1.suse.de (Postfix) with ESMTP id 058EDAC8A;
- Sun, 30 Dec 2018 23:38:33 +0000 (UTC)
-Subject: Re: [PATCH RFC lora-next 4/4] net: lora: sx1301: introduce a lora
- frame for packet metadata
-To: Ben Whitten <ben.whitten@gmail.com>
-References: <20181219155616.9547-1-ben.whitten@lairdtech.com>
- <20181219155616.9547-5-ben.whitten@lairdtech.com>
-From: =?UTF-8?Q?Andreas_F=c3=a4rber?= <afaerber@suse.de>
-Openpgp: preference=signencrypt
-Autocrypt: addr=afaerber@suse.de; prefer-encrypt=mutual; keydata=
- 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
-Organization: SUSE Linux GmbH
-Message-ID: <58753abe-885b-96c7-0d04-ed9ae97f3942@suse.de>
-Date: Mon, 31 Dec 2018 00:38:31 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.0
-MIME-Version: 1.0
-In-Reply-To: <20181219155616.9547-5-ben.whitten@lairdtech.com>
-Content-Language: en-US
+ id 1gdssO-0004pj-3L
+ for linux-arm-kernel@lists.infradead.org; Mon, 31 Dec 2018 08:24:46 +0000
+Received: from grover.tkatk1.zaq.ne.jp (zaqdadce369.zaq.ne.jp
+ [218.220.227.105]) (authenticated)
+ by conuserg-11.nifty.com with ESMTP id wBV8OIjr008355;
+ Mon, 31 Dec 2018 17:24:21 +0900
+DKIM-Filter: OpenDKIM Filter v2.10.3 conuserg-11.nifty.com wBV8OIjr008355
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
+ s=dec2015msa; t=1546244661;
+ bh=sZ34wNp5QOxinAjl4K6AZ3e+ex4n5qiP88Og+S/xRdE=;
+ h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+ b=LhO2fkibHG0FbyiWN0CR3zSH0HNvA4ivSsZKhRXuN0jTrXl0UNuqdGptrudomZ0gV
+ omLT7uZdDUiCCzvn/LxYGrzvGVa2RG3DPbLVlghoErSwGfslnhH6+/qNN0zJ0p/7fi
+ CdQVmbnDNdtH7opfaaPhrfu17MaJXf8mUtMFXqrsn3KcywGJfonBCSl6/b23eUbHQI
+ QhuX4OwuJLgdTGMgHTQ1rUST4Ugv8L0CVgBU8pY6F/jNdZtquDWbQwrLoRS9JA8Azo
+ PKipYbzzIAR9oEO1iNKOkKtDyfD7fY2eHym8Cu1Y9liMV5vyhE2qwfFc2h8lFi9Re7
+ Um0wuwju6wS6A==
+X-Nifty-SrcIP: [218.220.227.105]
+From: Masahiro Yamada <yamada.masahiro@socionext.com>
+To: linux-kbuild@vger.kernel.org
+Subject: [PATCH 3/4] kbuild: remove unnecessary in-subshell execution
+Date: Mon, 31 Dec 2018 17:24:10 +0900
+Message-Id: <1546244651-10447-3-git-send-email-yamada.masahiro@socionext.com>
+X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1546244651-10447-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1546244651-10447-1-git-send-email-yamada.masahiro@socionext.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181230_153836_817790_E94EE82B 
-X-CRM114-Status: GOOD (  25.45  )
+X-CRM114-CacheID: sfid-20181231_002444_467742_F08D299C 
+X-CRM114-Status: GOOD (  11.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -112,103 +78,159 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Alan Cox <gnomes@lxorguk.ukuu.org.uk>, jiri@resnulli.us,
- Ben Whitten <ben.whitten@lairdtech.com>, netdev@vger.kernel.org,
- linux-lpwan@lists.infradead.org, linux-kernel@vger.kernel.org,
- starnight@g.ncu.edu.tw, "David S. Miller" <davem@davemloft.net>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Masahiro Yamada <yamada.masahiro@socionext.com>,
+ Michal Marek <michal.lkml@markovi.net>, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, Russell King <linux@armlinux.org.uk>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgQmVuLAoKQW0gMTkuMTIuMTggdW0gMTY6NTYgc2NocmllYiBCZW4gV2hpdHRlbjoKPiBJbmZv
-cm1hdGlvbiBzdWNoIGFzIHNwcmVhZGluZyBmYWN0b3IsIGNvZGluZyByYXRlIGFuZCBwb3dlciBh
-cmUgb24gYSBwZXIKPiB0cmFuc21pc3Npb24gYmFzaXMgc28gaXQgbWFrZXMgc2VuY2UgdG8gaW5j
-bHVkZSB0aGlzIGluIGEgaGVhZGVyIG11Y2gKCiJzZW5zZSIgKGV2ZW4gaW4gQnJpdGlzaCBFbmds
-aXNoISA6KSkKCj4gbGlrZSBDQU4gZnJhbWVzIGRvLgoKQW55IHBvaW50ZXIgZm9yIHRoYXQ/IE15
-IHVuZGVyc3RhbmRpbmcgb2YgQ0FOIHdhcyB0aGF0IGl0IGFjdHVhbGx5IHVzZXMKdGhlIENBTiBv
-ciBDQU4gRkQgZnJhbWUgZm9yIHRyYW5zbWlzc2lvbiBvbiB0aGUgd2lyZS4KCldoZXJlYXMgaGVy
-ZSB5b3UgdXNlIGl0IGZvciBtZXRhZGF0YSB0aGF0IGRvZXMgbm90IGdvIG92ZXIgdGhlIGFpci4K
-Cj4KPiBTaWduZWQtb2ZmLWJ5OiBCZW4gV2hpdHRlbiA8YmVuLndoaXR0ZW5AbGFpcmR0ZWNoLmNv
-bT4KPiAtLS0KPiAgZHJpdmVycy9uZXQvbG9yYS9kZXYuYyAgICB8ICAyIC0KPiAgZHJpdmVycy9u
-ZXQvbG9yYS9zeDEzMDEuYyB8IDc5ICsrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKy0t
-LS0tLQo+ICBpbmNsdWRlL3VhcGkvbGludXgvbG9yYS5oIHwgNDYgKysrKysrKysrKysrKysrKysr
-KysrKysKPiAgMyBmaWxlcyBjaGFuZ2VkLCAxMTQgaW5zZXJ0aW9ucygrKSwgMTMgZGVsZXRpb25z
-KC0pCgpJZiB3ZSBzaG91bGQgc2VyaW91c2x5IGNvbnNpZGVyIHRoaXMgbmV3IGFwcHJvYWNoLCBw
-bGVhc2UgYWx3YXlzIGNsZWFubHkKc3BsaXQgaXQgb2ZmIGZyb20gc3gxMzAxIGRyaXZlciBjaGFu
-Z2VzLiBUaGUgbW9zdCBpbXBvcnRhbnQgY2hhbmdlcyBhcmUKYXQgdGhlIHZlcnkgYm90dG9tIGhl
-cmUgb3RoZXJ3aXNlLgoKU29tZSBvZiB0aGUgZW51bXMgbWF5IGJlIHVzZWZ1bCBlaXRoZXIgd2F5
-LgoKW3NuaXBdCj4gZGlmZiAtLWdpdCBhL2luY2x1ZGUvdWFwaS9saW51eC9sb3JhLmggYi9pbmNs
-dWRlL3VhcGkvbGludXgvbG9yYS5oCj4gaW5kZXggNGZmMDBiOWMzYzIwLi5kNjc1MDI1ZDJhNmUg
-MTAwNjQ0Cj4gLS0tIGEvaW5jbHVkZS91YXBpL2xpbnV4L2xvcmEuaAo+ICsrKyBiL2luY2x1ZGUv
-dWFwaS9saW51eC9sb3JhLmgKPiBAQCAtMjEsNCArMjEsNTAgQEAgc3RydWN0IHNvY2thZGRyX2xv
-cmEgewo+ICAJfSBsb3JhX2FkZHI7Cj4gIH07Cj4gIAo+ICsjZGVmaW5lIExPUkFfTUFYX0RMRU4J
-MjU2CgpOb3RlOiBBY2NvcmRpbmcgdG8gSGVsbXV0LCAiU1gxMjc2IGNhbiBkbyBNVFUgc2l6ZXMg
-dXAgdG8gMjA0OCBieXRlcyIuCkJ1dCBJIGhhdmUgZmFpbGVkIHRvIGZpbmQgbWVudGlvbiBvZiBM
-b1JhLW1vZGUgaW50ZXJydXB0cyBvdGhlciB0aGFuClR4RG9uZSBvciBhbnkgc3VjaCBob3ctdG8g
-aW4gdGhlIFNYMTI3NiBtYW51YWwgb3Igb24gR29vZ2xlOyBvbmx5IHRoZQpGU0svT09LIG1vZGVt
-IGhhcyBhIEZJRk8tbGVzcyBDb250aW51b3VzIG1vZGUgZG9jdW1lbnRlZC4KCj4gKwo+ICtlbnVt
-IGxvcmFfYncgewo+ICsJTE9SQV9CV18xMjVLSFosCj4gKwlMT1JBX0JXXzI1MEtIWiwKPiArCUxP
-UkFfQldfNTAwS0haLAoKTGFja2luZyBsb3dlciBiYW5kd2lkdGhzLiBTWDEyN3ggY2FuIGdvIGFz
-IGxvdyBhcyA3Ljgga0h6LgoKV291bGQgaXQgd29yayB0byBoYXZlIGl0IGFzIGFuIGludGVnZXIg
-aW4gSHogZm9yIGZsZXhpYmlsaXR5PwoKPiArfTsKPiArCj4gK2VudW0gbG9yYV9jciB7Cj4gKwlM
-T1JBX0NSXzRfNSwKPiArCUxPUkFfQ1JfNF82LAo+ICsJTE9SQV9DUl80XzcsCj4gKwlMT1JBX0NS
-XzRfOCwKPiArfTsKCklmIHdlIGhhdmUgdGhpcyBhcyBBQkksIHdlIHNob3VsZCBwcm9iYWJseSBn
-byBzYWZlIGFuZCBpbml0aWFsaXplIHRoZQpmaXJzdCBvbmUgdG8gMC4KCj4gKwo+ICtlbnVtIGxv
-cmFfc2Ygewo+ICsJTE9SQV9TRl82LAo+ICsJTE9SQV9TRl83LAo+ICsJTE9SQV9TRl84LAo+ICsJ
-TE9SQV9TRl85LAo+ICsJTE9SQV9TRl8xMCwKPiArCUxPUkFfU0ZfMTEsCj4gKwlMT1JBX1NGXzEy
-LAo+ICt9OwoKV291bGRuJ3QgYW4gaW50ZWdlciBiZSBzdWZmaWNpZW50IGZvciB0aGUgU3ByZWFk
-aW5nIEZhY3Rvcj8KV2UnbGwgbmVlZCB0byBzYWZlZ3VhcmQgY29kZSBhZ2FpbnN0IHVuZXhwZWN0
-ZWQgdmFsdWVzIGFueXdheS4KCkFuIGFkZGVkIGJvbnVzIGZvciB0aGUgZW51bS9kZWZpbmVzIHdv
-dWxkIGJlIGlmIHdlIGNvdWxkIGhhdmUKTE9SQV9TRl82ID0gNjQKdXAgdG8KTE9SQV9TRl8xMiA9
-IDQwOTYKKGNoaXBzIHBlciBzeW1ib2wpCgo+ICsKPiArLyoqCj4gKyAqIHN0cnVjdCBsb3JhX2Zy
-YW1lIC0gTG9SYSBmcmFtZSBzdHJ1Y3R1cmUKPiArICogQGZyZXE6IEZyZXF1ZW5jeSBvZiBMb1Jh
-IHRyYW5zbWlzc2lvbiBpbiBIego+ICsgKiBAcG93ZXI6IFBvd2VyIG9mIHRyYW5zbWlzc2lvbiBp
-biBkQm0KPiArICogQGJ3OiAgYmFuZHdpZHRoLCAxMjUsIDI1MCBvciA1MDAgS0h6Cj4gKyAqIEBj
-cjogIGNvZGluZyByYXRlLCA0LzUgdG8gNC84Cj4gKyAqIEBzZjogIHNwcmVhZGluZyBmYWN0b3Ig
-ZnJvbSBTRjYgdG8gMTIKPiArICogQGRhdGE6ICAgTG9SYSBmcmFtZSBwYXlsb2FkICh1cCB0byBM
-T1JBX01BWF9ETEVOIGJ5dGUpCj4gKyAqLwo+ICtzdHJ1Y3QgbG9yYV9mcmFtZSB7Cj4gKwlfX3Uz
-MgkJZnJlcTsgLyogdHJhbnNtaXNzaW9uIGZyZXF1ZW5jeSBpbiBIeiAqLwo+ICsJX191OAkJcG93
-ZXI7IC8qIHRyYW5zbWlzc2lvbiBwb3dlciBpbiBkQm0gKi8KPiArCWVudW0gbG9yYV9idwlidzsg
-LyogYmFuZHdpZHRoICovCj4gKwllbnVtIGxvcmFfY3IJY3I7IC8qIGNvZGluZyByYXRlICovCj4g
-KwllbnVtIGxvcmFfc2YJc2Y7IC8qIHNwcmVhZGluZyBmYWN0b3IgKi8KPiArCV9fdTgJCWxlbjsK
-PiArCV9fdTgJCWRhdGFbTE9SQV9NQVhfRExFTl0gX19hdHRyaWJ1dGVfXygoYWxpZ25lZCg4KSkp
-Owo+ICt9OwoKSSdtIG5vdCBjb21mb3J0YWJsZSB3aXRoIG1ha2luZyB0aGlzIGFyYml0cmFyeSBm
-b3JtYXQgYSB1c2Vyc3BhY2UgQUJJLgoKRm9yIGV4YW1wbGUsIGhhcmRjb2RpbmcgdGhlIGZyZXF1
-ZW5jeSBhcyBfX3UzMiB3aWxsIGxpbWl0IHVzIHRvIDQgR0h6LAp3aGljaCBpcyBzdWZmaWNpZW50
-IGZvciAyLjQgR0h6LCBidXQgV2lmaSBpcyBhbHJlYWR5IGF0IDUgYW5kIDYwIEdIei4KSGF2aW5n
-IHRoZSBkYXRhIGF0IHRoZSBlbmQgbWVhbnMgd2UgY2FuJ3QgZWFzaWx5IGFkZCBoZWFkZXIgZmll
-bGRzLCBzdWNoCmFzIFN5bmMgV29yZCAodGhhdCB5b3UncmUgbWlzc2luZyBhYm92ZSkgb3IgYSBm
-cmVxdWVuY3kgZXh0ZW5zaW9uIHdvcmQuCgpSZXVzZSB3aXRoIEZTSy9PT0sgb3Igb3RoZXIgTFBX
-QU4gdGVjaG5vbG9naWVzIGNvdWxkIGJlIGEgYm9udXMgZ29hbC4KCkluIG15IHByZXNlbnRhdGlv
-biBJIGhhZCBzdWdnZXN0ZWQgdG8gdXNlIHRoZSBzb2NrZXQgYWRkcmVzcyBmb3Igc3RvcmluZwpt
-b3N0IG9mIHRoYXQgbWV0YWRhdGEuIFRoZSBjb3VudGVyLXByb3Bvc2FsIHdhcyB0byB1c2UgbmV0
-bGluayBmb3IgYW55Cmdsb2JhbCBzZXR0aW5nIGNoYW5nZXMgYW5kIGhhdmUgdGhlIHNvY2tldCBq
-dXN0IHNlbmQgdGhlIGFjdHVhbCBkYXRhLgoKUmVtaW5kZXI6IFdlIGNhbiBzZXQgU1gxMjd4IHJl
-Z2lzdGVycyBiZWZvcmUgZWFjaCBUWCwgYnV0IFJYIHJlbWFpbmVkCnVuc29sdmVkLiBGb3IgU1gx
-MzB4IHdlIGNhbiBzZXQgc29tZSBtZXRhZGF0YSBwZXIgVFggKG11bHRpLWNoYW5uZWwpLApidXQg
-cmFkaW8vY2hhbm5lbCBuZWVkIHRvIGhhdmUgYmVlbiBjb25maWd1cmVkIGFwcHJvcHJpYXRlbHku
-IFdpZmkgY2FyZHMKbWF5IHN1cHBvcnQgTUlNTyBidXQgc3RpbGwgc2hvdyB1cCBhcyBvbmUgd2xh
-bjAgbmV0ZGV2LCBzbyBpdCBzZWVtZWQKcXVlc3Rpb25hYmxlIHRvIGRpdmVyZ2UgZm9yIFNYMTMw
-eCBieSBoYXZpbmcgfjEwIG5ldGRldnMgYW5kIGltcHJhY3RpY2FsCnNpbmNlIHdlIGhhdmUgYSBs
-b3Qgb2YgcmFkaW8gaW5pdGlhbGl6YXRpb25zIGluIC5uZG9fb3Blbi4KCkNvbXBhcmUgc2xpZGVz
-IDE2IGZmLiB2cy4gc2xpZGUgMjc6Cmh0dHBzOi8vZXZlbnRzLmxpbnV4Zm91bmRhdGlvbi5vcmcv
-d3AtY29udGVudC91cGxvYWRzLzIwMTcvMTIvRUxDRTIwMThfTG9SYV9maW5hbF9BbmRyZWFzLUZh
-cmJlci5wZGYKClVsdGltYXRlbHkgdGhlIHNrYiBpcyB3aGVyZSB3ZSBuZWVkIGFueSBwZXItdHJh
-bnNhY3Rpb24gbWV0YWRhdGEsIGFuZApvdXRzaWRlIHVhcGkvIEknbSBtdWNoIGxlc3MgY29uY2Vy
-bmVkIGFib3V0IEFCSSBjaGFuZ2VzLiBTbyBmcm9tIG15CnBlcnNwZWN0aXZlIHN1Y2ggZmllbGRz
-IHdvdWxkIGdvIGludG8gbGludXgvbG9yYS9za2IuaCBzdHJ1Y3QgbG9yYV9wcml2CmFmdGVyIHRo
-ZSBpZmluZGV4LCBpZiB3ZSBnbyB3aXRoIFBGX0xPUkEuIEFzIG1lbnRpb25lZCBiZWZvcmUsIGlm
-IHdlCmhhdmUgdG8gZ28gd2l0aCBQRl9QQUNLRVQgdGhlbiBJJ20gY2x1ZWxlc3Mgd2hlcmUgdG8g
-c3RvcmUgc3VjaCBkYXRhLi4uCgo+ICsKPiArI2RlZmluZSBMT1JBX01UVSAoc2l6ZW9mKHN0cnVj
-dCBsb3JhX2ZyYW1lKSkKCkV2ZW4gaWYgSGVsbXV0J3MgY29tbWVudCB3YXMgbWlzdGFrZW4sIGl0
-IGRvZXNuJ3Qgc3RyaWtlIG1lIGFzIGEgZ29vZAppZGVhIHRvIGhhcmRjb2RlIHRoaXMgaGVyZSAt
-IHlvdSBjb3VsZCBqdXN0IHVzZSBkYXRhWzBdIGFuZCBsZWF2ZSBhY3R1YWwKTVRVIHRvIHRoZSBk
-cml2ZXIvdXNlci4KCj4gKwo+ICAjZW5kaWYgLyogX1VBUElfTElOVVhfTE9SQV9IICovCgpDaGVl
-cnMsCkFuZHJlYXMKCi0tIApTVVNFIExpbnV4IEdtYkgsIE1heGZlbGRzdHIuIDUsIDkwNDA5IE7D
-vHJuYmVyZywgR2VybWFueQpHRjogRmVsaXggSW1lbmTDtnJmZmVyLCBKYW5lIFNtaXRoYXJkLCBH
-cmFoYW0gTm9ydG9uCkhSQiAyMTI4NCAoQUcgTsO8cm5iZXJnKQoKX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxp
-c3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZy
-YWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+The commands surrounded by ( ) are executed in a subshell, but in
+most cases, we do not need to spawn an extra subshell.
+
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
+
+ arch/arm/boot/compressed/Makefile |  4 ++--
+ scripts/Makefile.build            |  4 ++--
+ scripts/Makefile.lib              | 28 ++++++++++++++--------------
+ scripts/mkcompile_h               |  4 ++--
+ 4 files changed, 20 insertions(+), 20 deletions(-)
+
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 6114ae6..6fe29c4 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -169,8 +169,8 @@ $(obj)/bswapsdi2.S: $(srctree)/arch/$(SRCARCH)/lib/bswapsdi2.S
+ check_for_bad_syms = \
+ bad_syms=$$($(CROSS_COMPILE)nm $@ | sed -n 's/^.\{8\} [bc] \(.*\)/\1/p') && \
+ [ -z "$$bad_syms" ] || \
+-  ( echo "following symbols must have non local/private scope:" >&2; \
+-    echo "$$bad_syms" >&2; false )
++  { echo "following symbols must have non local/private scope:" >&2; \
++    echo "$$bad_syms" >&2; false; }
+ 
+ check_for_multiple_zreladdr = \
+ if [ $(words $(ZRELADDR)) -gt 1 -a "$(CONFIG_AUTO_ZRELADDR)" = "" ]; then \
+diff --git a/scripts/Makefile.build b/scripts/Makefile.build
+index fd03d60..0a44863 100644
+--- a/scripts/Makefile.build
++++ b/scripts/Makefile.build
+@@ -312,11 +312,11 @@ $(real-obj-m:.o=.s): modkern_aflags := $(KBUILD_AFLAGS_MODULE) $(AFLAGS_MODULE)
+ #
+ # These mirror gensymtypes_c and co above, keep them in synch.
+ cmd_gensymtypes_S =                                                         \
+-    (echo "\#include <linux/kernel.h>" ;                                    \
++    {echo "\#include <linux/kernel.h>" ;                                    \
+      echo "\#include <asm/asm-prototypes.h>" ;                              \
+     $(CPP) $(a_flags) $< |                                                  \
+      grep "\<___EXPORT_SYMBOL\>" |                                          \
+-     sed 's/.*___EXPORT_SYMBOL[[:space:]]*\([a-zA-Z0-9_]*\)[[:space:]]*,.*/EXPORT_SYMBOL(\1);/' ) | \
++     sed 's/.*___EXPORT_SYMBOL[[:space:]]*\([a-zA-Z0-9_]*\)[[:space:]]*,.*/EXPORT_SYMBOL(\1);/'; } | \
+     $(CPP) -D__GENKSYMS__ $(c_flags) -xc - |                                \
+     $(GENKSYMS) $(if $(1), -T $(2))                                         \
+      $(patsubst y,-R,$(CONFIG_MODULE_REL_CRCS))                             \
+diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+index 12b88d0..b44ae6c 100644
+--- a/scripts/Makefile.lib
++++ b/scripts/Makefile.lib
+@@ -270,7 +270,7 @@ DTC_FLAGS += $(DTC_FLAGS_$(basetarget))
+ # Generate an assembly file to wrap the output of the device tree compiler
+ quiet_cmd_dt_S_dtb= DTB     $@
+ cmd_dt_S_dtb=						\
+-(							\
++{							\
+ 	echo '\#include <asm-generic/vmlinux.lds.h>'; 	\
+ 	echo '.section .dtb.init.rodata,"a"';		\
+ 	echo '.balign STRUCT_ALIGNMENT';		\
+@@ -280,7 +280,7 @@ cmd_dt_S_dtb=						\
+ 	echo '__dtb_$(subst -,_,$(*F))_end:';		\
+ 	echo '.global __dtb_$(subst -,_,$(*F))_end';	\
+ 	echo '.balign STRUCT_ALIGNMENT'; 		\
+-) > $@
++} > $@
+ 
+ $(obj)/%.dtb.S: $(obj)/%.dtb FORCE
+ 	$(call if_changed,dt_S_dtb)
+@@ -334,23 +334,23 @@ printf "%08x\n" $$dec_size |						\
+ )
+ 
+ quiet_cmd_bzip2 = BZIP2   $@
+-cmd_bzip2 = (cat $(filter-out FORCE,$^) | \
+-	bzip2 -9 && $(call size_append, $(filter-out FORCE,$^))) > $@
++      cmd_bzip2 = cat $(filter-out FORCE,$^) | \
++	bzip2 -9 && $(call size_append, $(filter-out FORCE,$^)) > $@
+ 
+ # Lzma
+ # ---------------------------------------------------------------------------
+ 
+ quiet_cmd_lzma = LZMA    $@
+-cmd_lzma = (cat $(filter-out FORCE,$^) | \
+-	lzma -9 && $(call size_append, $(filter-out FORCE,$^))) > $@
++      cmd_lzma = cat $(filter-out FORCE,$^) | \
++	lzma -9 && $(call size_append, $(filter-out FORCE,$^)) > $@
+ 
+ quiet_cmd_lzo = LZO     $@
+-cmd_lzo = (cat $(filter-out FORCE,$^) | \
+-	lzop -9 && $(call size_append, $(filter-out FORCE,$^))) > $@
++      cmd_lzo = cat $(filter-out FORCE,$^) | \
++	lzop -9 && $(call size_append, $(filter-out FORCE,$^)) > $@
+ 
+ quiet_cmd_lz4 = LZ4     $@
+-cmd_lz4 = (cat $(filter-out FORCE,$^) | \
+-	lz4c -l -c1 stdin stdout && $(call size_append, $(filter-out FORCE,$^))) > $@
++      cmd_lz4 = cat $(filter-out FORCE,$^) | \
++	lz4c -l -c1 stdin stdout && $(call size_append, $(filter-out FORCE,$^)) > $@
+ 
+ # U-Boot mkimage
+ # ---------------------------------------------------------------------------
+@@ -392,13 +392,13 @@ quiet_cmd_uimage = UIMAGE  $@
+ # big dictionary would increase the memory usage too much in the multi-call
+ # decompression mode. A BCJ filter isn't used either.
+ quiet_cmd_xzkern = XZKERN  $@
+-cmd_xzkern = (cat $(filter-out FORCE,$^) | \
++      cmd_xzkern = cat $(filter-out FORCE,$^) | \
+ 	sh $(srctree)/scripts/xz_wrap.sh && \
+-	$(call size_append, $(filter-out FORCE,$^))) > $@
++	$(call size_append, $(filter-out FORCE,$^)) > $@
+ 
+ quiet_cmd_xzmisc = XZMISC  $@
+-cmd_xzmisc = (cat $(filter-out FORCE,$^) | \
+-	xz --check=crc32 --lzma2=dict=1MiB) > $@
++      cmd_xzmisc = cat $(filter-out FORCE,$^) | \
++	xz --check=crc32 --lzma2=dict=1MiB > $@
+ 
+ # ASM offsets
+ # ---------------------------------------------------------------------------
+diff --git a/scripts/mkcompile_h b/scripts/mkcompile_h
+index 87f1fc9..2339f86 100755
+--- a/scripts/mkcompile_h
++++ b/scripts/mkcompile_h
+@@ -62,7 +62,7 @@ UTS_TRUNCATE="cut -b -$UTS_LEN"
+ 
+ # Generate a temporary compile.h
+ 
+-( echo /\* This file is auto generated, version $VERSION \*/
++{ echo /\* This file is auto generated, version $VERSION \*/
+   if [ -n "$CONFIG_FLAGS" ] ; then echo "/* $CONFIG_FLAGS */"; fi
+ 
+   echo \#define UTS_MACHINE \"$ARCH\"
+@@ -73,7 +73,7 @@ UTS_TRUNCATE="cut -b -$UTS_LEN"
+   echo \#define LINUX_COMPILE_HOST \"`echo $LINUX_COMPILE_HOST | $UTS_TRUNCATE`\"
+ 
+   echo \#define LINUX_COMPILER \"`$CC -v 2>&1 | grep ' version ' | sed 's/[[:space:]]*$//'`\"
+-) > .tmpcompile
++} > .tmpcompile
+ 
+ # Only replace the real compile.h if the new one is different,
+ # in order to preserve the timestamp and avoid unnecessary
+-- 
+2.7.4
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
