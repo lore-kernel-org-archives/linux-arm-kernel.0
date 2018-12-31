@@ -2,22 +2,22 @@ Return-Path: <SRS0=D6bT=PI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-8.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7D3A2C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 21:37:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AFBA9C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 21:37:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4D288205C9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 21:37:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6F215205C9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 21:37:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JpBCZLyC";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="DVTWvLT3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4D288205C9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fa4+jXMz";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="CoRVFkuM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6F215205C9
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,67 +26,67 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=o99zlfAxonRxMFVEIEq0JqruUmf+PZPDLOsUv7oBiyI=; b=JpBCZLyCgnIML8
-	YocdbuUKVSaKEc3ODaSU4gmvfbqHN8kxUi2KVJv/Pg8UjafAaJgPTH4zGGPIsa/9bpV2dKSFF+nAL
-	5qOckSfC8kyibfwvre4S89JO9N/H2sPRuBfzavoJM41LVmgB0s3bSQ9jQRNoSuRT3cNAjS8CmlGjp
-	/cjafyIePp9/YTLGpJlLs3C9FMmPSyIRR0JV0Mqmi/EUDdyc+aLUUWxAqYlpC0GDpy7OoSEpCtWRH
-	vIOGqRTnWq3PxXeUc/OKW434Xv4AO0tO1u45C1gbYBxNoHzwsULDL8mRnsF4uB46THIdpl3ntiR05
-	boEzpqfMgejM8YbBvrGw==;
+	List-Owner; bh=QCmzsd1VKUjNP+9WHiS2x1kFZ2kgHATntRjzQy7HMrA=; b=fa4+jXMzAFZNLG
+	NKxotSIbGJQFnclVOTA2K1B+bAExVbhNcAKEqdB7vpiZcaG3WwgtP5mJO/ASEH0TRo+xaO0tQ72Xh
+	/Z0HKSIbyJwBH/cod6p+8f7dCmvbLni4fNA8fOtM7yqSf2WLK43Wqj2VhqCsOIwl6j9LGDqRQa7eL
+	UKHPc5RXAJfHebKCCopB/vG2tlS3+ZQytk/KaHY4laoRgNyrnVIxSR+dp4gePLcumah1N9CiCXkL8
+	bnkETTmvPATddxijfY3/SBwv03WVJShdxhVMpd7uOXED4NmMql3WTLX+fi/EwqgcfkoKImlNJoc0T
+	1GywSpWJ/RcC/3zq095A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ge5FI-00005q-CO; Mon, 31 Dec 2018 21:37:12 +0000
-Received: from mail-lf1-x141.google.com ([2a00:1450:4864:20::141])
+	id 1ge5FX-0000Ih-UA; Mon, 31 Dec 2018 21:37:27 +0000
+Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ge5D7-0005pv-Iu
- for linux-arm-kernel@lists.infradead.org; Mon, 31 Dec 2018 21:35:06 +0000
-Received: by mail-lf1-x141.google.com with SMTP id p86so18835195lfg.5
+ id 1ge5D9-0005s7-Fa
+ for linux-arm-kernel@lists.infradead.org; Mon, 31 Dec 2018 21:35:07 +0000
+Received: by mail-lj1-x242.google.com with SMTP id v15-v6so24294037ljh.13
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 31 Dec 2018 13:34:57 -0800 (PST)
+ Mon, 31 Dec 2018 13:34:59 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=6wuk01MYx/T22n1RmoV6mfsD4mjku4gy0h2Bo9Voas0=;
- b=DVTWvLT37ypW4gOCh6b4mVN/BkBu01d8Of67AUs6nF/MtEWBi/ZdxgbavSuiGdfe7D
- LJcw6fuqHmb16pDjdPDuJr4L2368GH27nXLlBGlm/6Fe8vpa26ceWBjx1ucBhP7gqJeJ
- 4T7eLy/B0Zk1qPxp7e1eLjcuTjpSnGUA5o4EhdMfimXRsKM+ino20O0dPSqJxr1j7zmT
- 0Vgi39ushQqzgqXHbWE1udaMhcPkqb8B4739dxpABLYSxQJpgIkFgUrX4lEjCDxhaQQn
- Kbeh3el435uNeXf9rMLfk6HSCIVBZYEbnCFbCGuEHkHqZYtXlmzJBxpL2+QGpd92yHXh
- SGkQ==
+ bh=RitWBMSWBPvI6qEt0eDigOTixt2IEvWYEed38jkqDQk=;
+ b=CoRVFkuMrh7r4TC8SdgTireVJvCyjWDQnxdLiGaQnkDPB0zHY5xbqKVfSnJXhcB7dD
+ Hh8zE0FEUxDIVy3/YOB75qSfbRUO3URS8RFs+azfXvXfnMi69AFqnMWn3S21c7yNQDIf
+ BdphqNXVcnlgFTqBK1YFdn02glAxCpZxg+Rc4axPLluTVJoVDNXvXcDLZWXBeuXh2NcV
+ S+D3oE/rAWvplYaY4bdr1SgBbATws4+iMU65GS1Ra19LMpcmQniwGfHzwW1EtmHbU3Hf
+ MJSTIsi0sgfDAK1vmNQEBmt6Hq9iyGzFxWZzyrANoiONaeL5ijvIn3hapRK2zCuuttju
+ Urgg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=6wuk01MYx/T22n1RmoV6mfsD4mjku4gy0h2Bo9Voas0=;
- b=CQ3cfxfIQ//XjY8hP8mVFbgYtg/whsXQpgkMx7+b4OTZxEKCQh1/P5fBrVDdJ8v+vc
- rf9v4VBi/h0ID4TdjU2bSTa9spj+6sayZH1qDokoDeCSr8SiYxF5d2JNR/llVuCPMShk
- G+9J+cy6hhPM65ctTRLIo+nO6COvBtTc+Vme/slTaqD35wljZ0thGVtldCONErv3Av3M
- zFgzZLH7BUpUo2i2X+5bhf8IF3quy48c/rGdOXJ7fGDZGAEKo+sl+2Jz+pA3aH94WtoL
- QmR1tiLDsXNMkQOrL7oAU3ykLardQSfAQ3Ze2vItA3tBAwz9vpHCegKDm9MHBpFZH/a6
- 43/w==
-X-Gm-Message-State: AA+aEWbv0kiuD97XH+Jnri5fePThxPZUFSeMomcOdjlkDo9y73mPANgU
- gi77wVjWsXqHhBZUQEaX6/3uTA==
-X-Google-Smtp-Source: AFSGD/UM14oFPYEKwXDHhVLvqF6b0XwXj9MM+5NAxkGY00KskwvcJgxIQFdf0NaGsZ6qfhAM+iM2mg==
-X-Received: by 2002:a19:789:: with SMTP id 131mr20383130lfh.11.1546292095582; 
- Mon, 31 Dec 2018 13:34:55 -0800 (PST)
+ bh=RitWBMSWBPvI6qEt0eDigOTixt2IEvWYEed38jkqDQk=;
+ b=czHXT/V/MFZJcccj6F/+SQJQWbVVwSOYqxMlMQKIkDy7mmuGE0aqQmG1JhxBNmNoFM
+ Od01mzSOwYLxpD5fddYiapnEYzZbUnyxvKDoqePnzyFFKx4ur6FahgD+DbZSiiV8oW2t
+ WSVryl8vAeYgGhYQzO63yJ4H4kMzyBn/7VnW7rXVLo/XOuM0agUxytaQW6Ph073d4O+M
+ /++DdfIK2c20OnLOnzBAj6ZNBnjSSXe1ZUTquP5qBxZzcP8z7BhfAWBW8NihsBTJZtqb
+ +66hzu47SaQ8EyKxmChW9vx/L3dTye8L3tyR5MoXk688bG4lphGfVoCPPZau1rAVqUb3
+ PbQQ==
+X-Gm-Message-State: AJcUukc/26aPqAKRLoOnj0xKLUCIDwlQdyMUGzrpVUYGWppaSctAEWEp
+ gWUzHTiVsZAqZ8+ZjitJ9oeCVg==
+X-Google-Smtp-Source: ALg8bN5/wXpXHBmjpa6uaVJbNlvOaXi13sZXsS1I4jwvWAmfVak2Kj5qidNIb+OdDhaNktPzKTgSvw==
+X-Received: by 2002:a2e:3803:: with SMTP id
+ f3-v6mr21893622lja.169.1546292097503; 
+ Mon, 31 Dec 2018 13:34:57 -0800 (PST)
 Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id e19-v6sm10416018ljf.67.2018.12.31.13.34.53
+ by smtp.gmail.com with ESMTPSA id j18-v6sm10295353ljc.52.2018.12.31.13.34.56
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 31 Dec 2018 13:34:54 -0800 (PST)
-Date: Mon, 31 Dec 2018 13:13:42 -0800
+ Mon, 31 Dec 2018 13:34:56 -0800 (PST)
+Date: Mon, 31 Dec 2018 13:16:52 -0800
 From: Olof Johansson <olof@lixom.net>
-To: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-Subject: Re: [PATCH v7 00/11] Add initial RDA8810PL SoC and Orange Pi boards
- support
-Message-ID: <20181231211342.ulg4jytermffqi34@localhost>
-References: <20181218150238.23010-1-manivannan.sadhasivam@linaro.org>
+To: Stefan Wahren <stefan.wahren@i2se.com>
+Subject: Re: [PATCH] arm64: defconfig: Re-enable bcm2835-thermal driver
+Message-ID: <20181231211652.bcosbp5awullhucw@localhost>
+References: <1546016003-7572-1-git-send-email-stefan.wahren@i2se.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181218150238.23010-1-manivannan.sadhasivam@linaro.org>
+In-Reply-To: <1546016003-7572-1-git-send-email-stefan.wahren@i2se.com>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181231_133458_429466_1D3A55F5 
-X-CRM114-Status: GOOD (  16.25  )
+X-CRM114-CacheID: sfid-20181231_133500_219803_84E3B1BE 
+X-CRM114-Status: GOOD (  13.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,49 +98,25 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, arm@kernel.org, arnd@arndb.de,
- gregkh@linuxfoundation.org, linus.walleij@linaro.org,
- linux-kernel@vger.kernel.org, amit.kucheria@linaro.org,
- linux-unisoc@lists.infradead.org, robh+dt@kernel.org,
- linux-serial@vger.kernel.org, jslaby@suse.com, afaerber@suse.de,
- linux-arm-kernel@lists.infradead.org, zhao_steven@263.net
+Cc: Florian Fainelli <f.fainelli@gmail.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ Eric Anholt <eric@anholt.net>, bcm-kernel-feedback-list@broadcom.com,
+ linux-rpi-kernel@lists.infradead.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 18, 2018 at 08:32:27PM +0530, Manivannan Sadhasivam wrote:
-> Hello Maintainers,
+On Fri, Dec 28, 2018 at 05:53:23PM +0100, Stefan Wahren wrote:
+> The bcm2835-thermal driver was added with commit ac178e4280e6
+> ("ARM64: bcm2835: add thermal driver to default config"). Unfortunately
+> this was accidentally dropped by commit eb1e6716cc9c
+> ("arm64: defconfig: sync with savedefconfig"). So enable the driver again.
 > 
-> This patch series adds initial RDA8810PL SoC and Orange Pi boards (2G IoT and
-> i96) support. RDA8810PL is an ARM Cortex A5 based SoC with Vivante's GC860
-> GPU. The SoC has been added as a new ARM sub architecture with myself as the
-> maintainer.
-> 
-> More information about the boards can be found in below links:
-> 
-> 1. Orange Pi 2G-IoT - http://www.orangepi.org/OrangePi2GIOT/
-> 2. Orange Pi i96 - https://www.96boards.org/product/orangepi-i96/
-> 
-> All patches are reviewed by the corresponding subsystem maintainers. The
-> clocksource and irqchip patches are reviewed and merged while the serial
-> driver got review from Greg but I'm not sure who will apply it.
-> 
-> So as per my discussion with Arnd, sending the individual patches instead
-> of a Pull request so that the rest of the patches can go through the
-> ARM SoC tree.
-> 
-> Please consider applying it.
+> Fixes: eb1e6716cc9c ("arm64: defconfig: sync with savedefconfig")
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 
-Hi,
-
-I've applied this series to our next/late branch. It's a branch we'll try to
-get merged by the end of the merge window, but it's not a guarantee that we'll
-be able to get it done. If not, the material will be moved to the next release
-instead.
-
-
-Thanks!
+Applied to next/late. Thanks.
 
 
 -Olof
