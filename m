@@ -2,69 +2,72 @@ Return-Path: <SRS0=D6bT=PI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-14.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 61514C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 19:12:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 033DAC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 19:42:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2E5112081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 19:12:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C561C21019
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 19:42:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="a8IIxvke"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2E5112081B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=perches.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bR2ByGvh";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="hTDJJHtQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C561C21019
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Date:Message-Id:
+	In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mJ+MF4UShCZUTNAOhlt3LfR9NIbyMUnvOKWGJeaWv+s=; b=a8IIxvke1dkNYa
-	ls465DKWyre0OWEkhILhlQcAF3u9aYNTqSC3GDJvw9nMSHzPzusmWZ4YXWduO12ZsmB8PJ2s9qysg
-	CbdIjdhQr89EQQsqjt1xlUFnYK+mo57DGXzxpX7m/FAnUXz+WxJm78DLYiufpuETckrDHDRyZ9T6X
-	fOLlubisJqRYVol8rH3dw9ooqXIQ3A6ST/a+zqKdQDCIjg7neqLH5TZKxZ6S6HnIrB/0vFV+TA7fl
-	+v1zoyKVY8otS6AoMW5ZphUQiGwUcbpNTRS5DUAQixJaysM7ydbwll1AbkATWbXCPTEUya9va+/OR
-	QXTwFFhrPR/rjnlIrvbA==;
+	References:List-Owner; bh=JRQCOHVARZlx469uwQv8yoQYfH9h/3vK7sFUdSTt8gc=; b=bR2
+	ByGvh6QWWFnLRDkyluTk7ZMd9U4JPAUiBpnv+x1O/39pP6gn9UyNd6xfvwTn/nPdMF5k1gsDCup85
+	9ZnMOYZTWG2GCzntqaAatB7CHSbYqDOgmRL/D7tr5WBpL/C0hZurP5/4waMEBF+/o1+feOvpnPwwB
+	Swf+acbex20Nx5vC1SUcAr3TJYLDLrq65R5LjdvJfYwfo8HAyHZKI/c26TlJ5xHd+8mee3cIOjf9I
+	kjB9mUhQnvWK/XiF37+/TiAZO9VxMAkNFzwNS1Sn3vZHvf0UYMGBGz95CbXcVLcx+J+haj/9MAfaX
+	51xEid9qYrzyvcQt1Brrbx86Z+a7B+g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ge2zJ-0002hx-FU; Mon, 31 Dec 2018 19:12:33 +0000
-Received: from smtprelay0141.hostedemail.com ([216.40.44.141]
- helo=smtprelay.hostedemail.com)
+	id 1ge3SM-0005Od-Id; Mon, 31 Dec 2018 19:42:34 +0000
+Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ge2zG-0002hA-5r; Mon, 31 Dec 2018 19:12:31 +0000
-Received: from filter.hostedemail.com (clb03-v110.bra.tucows.net
- [216.40.38.60])
- by smtprelay01.hostedemail.com (Postfix) with ESMTP id 9790B100E86C1;
- Mon, 31 Dec 2018 19:12:21 +0000 (UTC)
-X-Session-Marker: 6A6F6540706572636865732E636F6D
-X-HE-Tag: spade09_4e8ff7f567408
-X-Filterd-Recvd-Size: 1943
-Received: from XPS-9350.home (unknown [47.151.153.53])
- (Authenticated sender: joe@perches.com)
- by omf01.hostedemail.com (Postfix) with ESMTPA;
- Mon, 31 Dec 2018 19:12:19 +0000 (UTC)
-Message-ID: <2a7f53c58896e2a9c3115a8630040b98497e5877.camel@perches.com>
-Subject: Re: [PATCH 6/6] MAINTAINERS: Add linux-actions mailing list for
- Actions Semi
-From: Joe Perches <joe@perches.com>
-To: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>, 
- sboyd@kernel.org, mturquette@baylibre.com, afaerber@suse.de,
- robh+dt@kernel.org
-Date: Mon, 31 Dec 2018 11:12:18 -0800
-In-Reply-To: <20181231185517.18517-7-manivannan.sadhasivam@linaro.org>
-References: <20181231185517.18517-1-manivannan.sadhasivam@linaro.org>
- <20181231185517.18517-7-manivannan.sadhasivam@linaro.org>
-User-Agent: Evolution 3.30.1-1build1 
-Mime-Version: 1.0
+ id 1ge3SJ-0005OI-E7
+ for linux-arm-kernel@lists.infradead.org; Mon, 31 Dec 2018 19:42:33 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=sirena.org.uk; s=20170815-heliosphere; h=Date:Message-Id:In-Reply-To:
+ Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:
+ List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:
+ List-Archive; bh=jDzeMw5IOGld66i1Y8C7KaJHMopxr5sAcaV7BGS/ZpU=; b=hTDJJHtQs8w3
+ EeifoPjoOtA/+fJs5PM7OTOS7WCif8kX//Y80diaFhaTVEuRYY65/mgsQou/PJ6cIN53QNLMoDrl4
+ +35CBjmNoBIiN0VH2u2L9L7h3mNXBucH9PGf/hZH6EqO1QicsRR6FNuKiYR+BFWs//RBh4CGrgQ88
+ KYDHI=;
+Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
+ ([82.37.168.47] helo=finisterre.ee.mobilebroadband)
+ by heliosphere.sirena.org.uk with esmtpsa
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
+ (envelope-from <broonie@sirena.org.uk>)
+ id 1ge3S9-0002mW-M4; Mon, 31 Dec 2018 19:42:21 +0000
+Received: by finisterre.ee.mobilebroadband (Postfix, from userid 1000)
+ id EB6EF440082; Mon, 31 Dec 2018 19:42:20 +0000 (GMT)
+From: Mark Brown <broonie@kernel.org>
+To: Gustavo A. R. Silva <gustavo@embeddedor.com>
+Subject: Applied "ASoC: xlnx: fix error handling in xlnx_formatter_pcm_probe"
+ to the asoc tree
+In-Reply-To: <20181226211106.GA16692@embeddedor>
+X-Patchwork-Hint: ignore
+Message-Id: <20181231194220.EB6EF440082@finisterre.ee.mobilebroadband>
+Date: Mon, 31 Dec 2018 19:42:20 +0000 (GMT)
+X-Bad-Reply: In-Reply-To but no 'Re:' in Subject.
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181231_111230_279481_A5A5AE9E 
-X-CRM114-Status: UNSURE (   6.11  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181231_114231_642328_8941F368 
+X-CRM114-Status: GOOD (  15.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,44 +79,84 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-actions@lists.infradead.org,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-kernel@vger.kernel.org
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: alsa-devel@alsa-project.org, Liam Girdwood <lgirdwood@gmail.com>,
+ linux-kernel@vger.kernel.org, "Gustavo A. R. Silva" <gustavo@embeddedor.com>,
+ Takashi Iwai <tiwai@suse.com>,
+ Maruthi Srinivas Bayyavarapu <maruthi.srinivas.bayyavarapu@xilinx.com>,
+ Michal Simek <michal.simek@xilinx.com>, Mark Brown <broonie@kernel.org>,
+ Jaroslav Kysela <perex@perex.cz>, linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, 2019-01-01 at 00:25 +0530, Manivannan Sadhasivam wrote:
-> Add the linux-actions mailing list for Actions Semi SoC architecture.
+The patch
 
-Unrelated to adding this L: entry
+   ASoC: xlnx: fix error handling in xlnx_formatter_pcm_probe
 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-[]
-> @@ -1240,6 +1240,7 @@ ARM/ACTIONS SEMI ARCHITECTURE
->  M:	Andreas F=E4rber <afaerber@suse.de>
->  R:	Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
->  L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
-> +L:	linux-actions@lists.infradead.org (moderated for non-subscribers)
->  S:	Maintained
->  N:	owl
+has been applied to the asoc tree at
 
-The N: entry matches too many non-owl entries like:
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-Documentation/parport-lowlevel.txt
-drivers/misc/ibmasm/lowlevel.c
-drivers/misc/ibmasm/lowlevel.h
-fs/udf/lowle
-vel.c
-net/ipv6/ip6_flowlabel.c
-sound/soc/samsung/lowland.c
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-Maybe there should be two entries
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-N:	/owl
-N:	-owl
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
 
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+From fbaa95f4397eef4448bf9dbc36b7d4e961b169a6 Mon Sep 17 00:00:00 2001
+From: "Gustavo A. R. Silva" <gustavo@embeddedor.com>
+Date: Wed, 26 Dec 2018 15:11:06 -0600
+Subject: [PATCH] ASoC: xlnx: fix error handling in xlnx_formatter_pcm_probe
+
+Currently, if platform_get_irq_byname() fails, the returned error
+turns into a huge value, once it is being store into a variable
+of type unsigned int, hence never actually reporting any error
+and causing unexpected behavior when using the values stored
+in aud_drv_data->s2mm_irq and aud_drv_data->mm2s_irq.
+
+Fix this by changing the type of variables s2mm_irq and mm2s_irq in
+structure xlnx_pcm_drv_data from unsigned int to int.
+
+Addresses-Coverity-ID: 1476096 ("Unsigned compared against 0")
+Fixes: 796175a94a7f ("ASoC: xlnx: add pcm formatter platform driver")
+Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/xilinx/xlnx_formatter_pcm.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/sound/soc/xilinx/xlnx_formatter_pcm.c b/sound/soc/xilinx/xlnx_formatter_pcm.c
+index f7235f7664d7..d2194da928e7 100644
+--- a/sound/soc/xilinx/xlnx_formatter_pcm.c
++++ b/sound/soc/xilinx/xlnx_formatter_pcm.c
+@@ -76,8 +76,8 @@ struct xlnx_pcm_drv_data {
+ 	void __iomem *mmio;
+ 	bool s2mm_presence;
+ 	bool mm2s_presence;
+-	unsigned int s2mm_irq;
+-	unsigned int mm2s_irq;
++	int s2mm_irq;
++	int mm2s_irq;
+ 	struct snd_pcm_substream *play_stream;
+ 	struct snd_pcm_substream *capture_stream;
+ 	struct clk *axi_clk;
+-- 
+2.20.1
 
 
 _______________________________________________
