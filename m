@@ -2,76 +2,90 @@ Return-Path: <SRS0=D6bT=PI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 40855C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 17:50:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2CA9FC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 18:12:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 128BF2080D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 17:50:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E6C1520B1F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 18:12:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dFj6ayKY";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="XZe4LPum"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 128BF2080D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PSUX49eO";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="V8DBKwCl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E6C1520B1F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=xkRlVEA+CJDW5Q/KRFvAcG72gJqZucwd6nhKS8yYKiI=; b=dFj6ayKYS+tD0VD3bA5wl2i9v
-	ZmGu8/zPls9J23fjmbK2RIootoBBisDEEODcgg4ddG17eP9BcAckLPVT3mSwcLcwVcIEz2HWJZhZS
-	AasUuVA8lp8NEEj385G//D3hAxfZIxz1CO5hfG6OGPMH7zI0rFseq/rW4u87V/kXmvY0xjeHgwNvx
-	s9AxfQLXAwrdbqn27s6MD7sQMiTxLD4x1ATCk3dYQE78mC9eZkZbYywgBfd+4s2EmqAHzEgNmmapv
-	ybbOtx5n2p7p6WQ3XgEnybrWUsbxjUCcn1VWJ4TncFPxredSpTQNS1OFmtKN7ZEe2sq/9V7jbx/Nb
-	qFD3mzeIQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=whOjBu/yqahGBiG5iDAmeOlu96i+uAbJhGEdiWpQmLc=; b=PSUX49eOs2Ce3e
+	Ie7O+p0ycgsV50oKCwXYihQk5V4cM4Zaljf7IQL2IMlse6k2ay+OAGU1C+T0zqeYJDuZ1EeaUNgky
+	DdbDEcatyJt1vqikuvm/xfPw4btRKhHxT8cI/sd/F1Aml+/odV0WcLGEP3TNx19N88+ZmD+m3zQIv
+	y7iLgIyoQTYXaK82U9hMxW9B2KNvDEgO6/eOqWiJB4KqADGkfTi7UPwV1Zy3LbieaLKPB0yQ6UmFE
+	WRo2qSqGZH+OphprorFPT/FKvsGUsftBkfqz3hll3/I4QTiTBFw50Bl4O7F3k9AFiGTVy169Wy8TL
+	KeWd6Ln+XSnP5/NQekDw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ge1iI-0000PP-Ei; Mon, 31 Dec 2018 17:50:54 +0000
-Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
+	id 1ge23E-0006vL-0R; Mon, 31 Dec 2018 18:12:32 +0000
+Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ge1iE-0000Oo-P6; Mon, 31 Dec 2018 17:50:52 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=sirena.org.uk; s=20170815-heliosphere; h=In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=EuxVX4LJYId/8LX28UqFKZnuP20NSGU0ia1Xsei30RY=; b=XZe4LPumYFC3s7XJzACepq9y5
- 8X+dgydcSTraMgudKh7IJK2UKaNVMDeCinlfgfuHV/ObdbwbaJV2L3KlUaYfHfAGzoIqSoDYwKcIU
- 84qPyRXgXxD/7MkEOxkaHclr6lEWDYRIjCaLKPgbHUCO8C1AmEnXZlyar1EPp2OTK8JFU=;
-Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
- ([82.37.168.47] helo=finisterre.ee.mobilebroadband)
- by heliosphere.sirena.org.uk with esmtpsa
- (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
- (envelope-from <broonie@sirena.org.uk>)
- id 1ge1hz-0002Ny-Nz; Mon, 31 Dec 2018 17:50:35 +0000
-Received: by finisterre.ee.mobilebroadband (Postfix, from userid 1000)
- id 009E6440080; Mon, 31 Dec 2018 17:50:34 +0000 (GMT)
-Date: Mon, 31 Dec 2018 17:50:34 +0000
-From: Mark Brown <broonie@kernel.org>
-To: Andreas =?iso-8859-1?Q?F=E4rber?= <afaerber@suse.de>
-Subject: Re: [PATCH v3 lora-next 5/5] net: lora: sx125x sx1301: allow radio
- to register as a clk provider
-Message-ID: <20181231175034.GI1846@sirena.org.uk>
-References: <1539361567-3602-1-git-send-email-ben.whitten@lairdtech.com>
- <1539361567-3602-6-git-send-email-ben.whitten@lairdtech.com>
- <a89c7974-672f-e5d0-8022-d2c2f9ffeac0@suse.de>
- <d22f1f18-0c93-a537-a439-07363174a03b@suse.de>
- <491d1a46-c112-1106-9f25-14149f0dcbd0@suse.de>
+ id 1ge23A-0006uf-AZ
+ for linux-arm-kernel@lists.infradead.org; Mon, 31 Dec 2018 18:12:30 +0000
+Received: by mail-wm1-x341.google.com with SMTP id m1so23890521wml.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 31 Dec 2018 10:12:26 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=AAOnbAxkac0UC41NM/y5SZGaEvMV/qtWid+iG06fEiE=;
+ b=V8DBKwClcmmVtlJtWihVDKHGuwOYfXuUtXwtEiRLJo4wr+TOqrrRwZ4gEwdrMg2Ybq
+ 1HkfDWnSSuS1+p76KzZkj1Knum1hpzQGneiZgKFgK6q3L1XqgNTos71fOL8KwuaOo/d7
+ +3eA2kh7t67CPQNPDZ7vG+xS91oeFLv4+wyXASNeWyxmhEN5JZV21rFhurxDARm0HE5l
+ LJe/hQklMch00z255TSgGVu0PqOZAHvydmk0o6y8APGPjoBRGy+u7TdZnRYL6fH++hNR
+ AgcqZ0TeEyDWBZpmjnxQJv0tBnMaPkB2SVW6crILFEEPJpEFuAbZrqxqFqS5WH20JlqT
+ 5uxw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=AAOnbAxkac0UC41NM/y5SZGaEvMV/qtWid+iG06fEiE=;
+ b=Hu21QaZBVWmvESKzMsFwh2mPDZd9ZP7SE1hBVGteEDViXRaGZSdU2pLMfk0XQWifMw
+ 4eRc0F4owcf5HvvGmUKo4JFY8f4vlUMgOOLjg2DUldUNFCuQB7dnRxWA5bCtZczxdVq+
+ culUkAWjlDHTthQ6CNAZiHGjIPAzLmd7EahI8kNeFfkJwiuCcMviupTazwM4FhLpLNaI
+ oe5XeKzPd6TVHS3GGrnGvT7OtZpOVkxezp1LCe3gvrKKWCv85IunZYX3eMnhpzVAks+C
+ X5LimUk7i3yRltyGH13yezSETRgA2eD9LLZZ/dIMc4M/umoAB6rlgVXY6xEptgQqqqqA
+ lRQg==
+X-Gm-Message-State: AJcUukdtoVn6ND/7M8HJtPx59yRdRV9nglpNXsR0G6KyrNUmK845OzCa
+ lU1yb8pk8wj8VVphpUlW5c8=
+X-Google-Smtp-Source: AFSGD/V96Ltg1sJB72FtjDfLwpK33HJZhp0Nwx6OIVwcf2HNJiuq2TM9KfYhSR9Jq9PYXn+oQKRZXA==
+X-Received: by 2002:a1c:af08:: with SMTP id y8mr29566776wme.94.1546279944581; 
+ Mon, 31 Dec 2018 10:12:24 -0800 (PST)
+Received: from localhost.localdomain ([2a01:4f8:10b:24a5::2])
+ by smtp.gmail.com with ESMTPSA id t5sm38254713wmd.15.2018.12.31.10.12.23
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 31 Dec 2018 10:12:23 -0800 (PST)
+From: Nathan Chancellor <natechancellor@gmail.com>
+To: Russell King <linux@armlinux.org.uk>
+Subject: [PATCH v2] ARM: Remove '-p' from LDFLAGS
+Date: Mon, 31 Dec 2018 11:12:10 -0700
+Message-Id: <20181231181209.28695-1-natechancellor@gmail.com>
+X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20181205014213.943-1-natechancellor@gmail.com>
+References: <20181205014213.943-1-natechancellor@gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <491d1a46-c112-1106-9f25-14149f0dcbd0@suse.de>
-X-Cookie: knowledge, n.:
-User-Agent: Mutt/1.10.1 (2018-07-13)
+X-Patchwork-Bot: notify
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181231_095050_961646_EA969F4A 
-X-CRM114-Status: GOOD (  12.85  )
+X-CRM114-CacheID: sfid-20181231_101228_388661_57689F19 
+X-CRM114-Status: GOOD (  13.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,83 +97,90 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ben Whitten <ben.whitten@gmail.com>,
- devicetree <devicetree@vger.kernel.org>, linux-clk <linux-clk@vger.kernel.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>, netdev@vger.kernel.org,
- Michael Turquette <mturquette@baylibre.com>,
- Stephen Boyd <sboyd@codeaurora.org>,
- "linux-lpwan@lists.infradead.org" <linux-lpwan@lists.infradead.org>,
- linux-kernel@vger.kernel.org, starnight@g.ncu.edu.tw,
- "linux-spi@vger.kernel.org" <linux-spi@vger.kernel.org>,
- "David S. Miller" <davem@davemloft.net>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: multipart/mixed; boundary="===============1171462287818488632=="
+Cc: Nicolas Pitre <nico@linaro.org>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Nick Desaulniers <ndesaulniers@google.com>, linux-kernel@vger.kernel.org,
+ Stefan Agner <stefan@agner.ch>, Nathan Chancellor <natechancellor@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+This option is not supported by lld:
 
---===============1171462287818488632==
-Content-Type: multipart/signed; micalg=pgp-sha512;
-	protocol="application/pgp-signature"; boundary="nEsDIrWrg+hrB7l1"
-Content-Disposition: inline
+    ld.lld: error: unknown argument: -p
 
+This has been a no-op in binutils since 2004 (see commit dea514f51da1 in
+that tree). Given that the lowest officially supported of binutils for
+the kernel is 2.20, which was released in 2009, nobody needs this flag
+around so just remove it. Commit 1a381d4a0a9a ("arm64: remove no-op -p
+linker flag") did the same for arm64.
 
---nEsDIrWrg+hrB7l1
-Content-Type: text/plain; charset=iso-8859-1
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Reviewed-by: Nick Desaulniers <ndesaulniers@google.com>
+Reviewed-by: Stefan Agner <stefan@agner.ch>
+---
 
-On Sun, Dec 30, 2018 at 11:55:46AM +0100, Andreas F=E4rber wrote:
-> + linux-spi, LAKML
+v1 -> v2:
 
-> Given that observed symptoms were CPU stalls, workqueue hangs and RCU
-> problems, requiring a power-cycle to recover, I wonder whether we are
-> running into some atomic/locking issue with clk_enable()? Is it valid at
-> all to use SPI/regmap for clk_enable()? If it is, is there a known issue
-> specific to spi-sun6i (A64) in 4.20.0?
-> I already tried setting .disable_locking =3D true in both regmap_configs.
-> Any suggestions how to further debug?
+* Collect tags
 
-You can't use SPI for clk_enable(), clk_enable() needs to be doable in
-atomic context since we need to wait for the bus operations to complete
-(you can start SPI transfers in atomic context but you still need to
-wait for them to complete).  Any clocks that are only accessible via a
-slow bus like I2C or SPI need to do the enable/disable in the
-prepare/unprepare operations which aren't done in atomic context.
+* Remove an additional occurence of '-p' in the bootp Makefile, thank
+  you to Stefan for pointing it out
 
-regmap can be used in atomic contexts, though you need to configure it
-to use spinlocks instead of mutexes and ensure that no register cache
-allocations happen during I/O (eg, by providing defaults for all
-registers or by not using a cache).
+* Drop patch 2/2, it will be fixed properly in lld: https://reviews.llvm.org/D55505
 
---nEsDIrWrg+hrB7l1
-Content-Type: application/pgp-signature; name="signature.asc"
+ arch/arm/Makefile                 | 2 +-
+ arch/arm/boot/bootp/Makefile      | 2 +-
+ arch/arm/boot/compressed/Makefile | 2 --
+ 3 files changed, 2 insertions(+), 4 deletions(-)
 
------BEGIN PGP SIGNATURE-----
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 0436002d5091..1d48c8ed5f89 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -10,7 +10,7 @@
+ #
+ # Copyright (C) 1995-2001 by Russell King
+ 
+-LDFLAGS_vmlinux	:=-p --no-undefined -X --pic-veneer
++LDFLAGS_vmlinux	:= --no-undefined -X --pic-veneer
+ ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
+ LDFLAGS_vmlinux	+= --be8
+ KBUILD_LDFLAGS_MODULE	+= --be8
+diff --git a/arch/arm/boot/bootp/Makefile b/arch/arm/boot/bootp/Makefile
+index 83e1a076a5d6..981a8d03f064 100644
+--- a/arch/arm/boot/bootp/Makefile
++++ b/arch/arm/boot/bootp/Makefile
+@@ -8,7 +8,7 @@
+ 
+ GCOV_PROFILE	:= n
+ 
+-LDFLAGS_bootp	:=-p --no-undefined -X \
++LDFLAGS_bootp	:= --no-undefined -X \
+ 		 --defsym initrd_phys=$(INITRD_PHYS) \
+ 		 --defsym params_phys=$(PARAMS_PHYS) -T
+ AFLAGS_initrd.o :=-DINITRD=\"$(INITRD)\"
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 01bf2585a0fa..ecfa4ca320a7 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -132,8 +132,6 @@ endif
+ ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
+ LDFLAGS_vmlinux += --be8
+ endif
+-# ?
+-LDFLAGS_vmlinux += -p
+ # Report unresolved symbol references
+ LDFLAGS_vmlinux += --no-undefined
+ # Delete all temporary local symbols
+-- 
+2.20.1
 
-iQEzBAABCgAdFiEEreZoqmdXGLWf4p/qJNaLcl1Uh9AFAlwqVuoACgkQJNaLcl1U
-h9B/iwf7BlSQzbOQ0KksQFHM3Zo+w60UAruaEM3FZHfuKjMa19b2GVVEYt6jfcrh
-tpvudfBIi3vlkx4Z0adtfhOb5oGv8Y3owUOBMWWpS4Bn/ZHOBvZOdh2EWHw85Jvb
-6YijmsoqAj1fNooCPEXFD6SCEAGfyRjVz3hANVIZmiBQYKrU2KT32/hNQ/WC6XK2
-AG6ZlNDFZJHyuP6dQ9hOhH3fUyYZSYEB7xopOje8ZTCrdO5htJNA17P4C+zojRR8
-5KO2RrumYLTaEdeXCIq+qvFaErgsYAg30mJwGVZLb14KPy0z4w8SFriJDNKG/0K3
-fcTWnePlEZ7GfuI2t+b9vyV0xJgKxQ==
-=OefZ
------END PGP SIGNATURE-----
-
---nEsDIrWrg+hrB7l1--
-
-
---===============1171462287818488632==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============1171462287818488632==--
-
