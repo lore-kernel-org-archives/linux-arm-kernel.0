@@ -2,94 +2,99 @@ Return-Path: <SRS0=D6bT=PI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A8638C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 08:42:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 98883C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 09:29:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 715C8213A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 08:42:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6427E2133F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 09:29:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZGFv26ds";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="B0mgJ4q8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 715C8213A2
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YVHnn3Ak"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6427E2133F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=r5Lp2Alh5oNYnq1Sc43VdU+uzEwVotAjBB24VhJsw/Q=; b=ZGFv26dsIB+VstzifD/23uGFC
-	E2fjp11ThEiapQ7dNOt7xSkBOYUzZSBiAtuPyTYItyRJdJS9E2ar2vtNJsDGdNpWOwN0k/i27Jkhv
-	G4ap97+XndLSUq/jWovZCXLXFuI3vTvg4Q86UMh3/4ewbSkWThWCZCfZqhrtVLOq3u3EBs83PrzqZ
-	dfiKvC6ycT9w5VKt4R0L4y3HC5F5+tKbLhu0BdyaLZIzAlZcD3MSOrjw1+TeXVLX/uQEuKNitzbq7
-	zOaxHcaEaBxB4pUxJZvzeEgqJ8CdBi8QgB+nhesga654FY35IsSNFjuK78Ug6Jk1pRmLbXuaKrb3D
-	Oz7Yx8k3Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=6aG3lBiz5z1y/LvDm8aAHMWDrsqdKMy+JOPX1uJD+lQ=; b=YVH
+	nn3Ak3S8mZl6jYhZvkj12aKrcmVSGwHr//cu1QACp4l4phd8ztZzIFX5wUgkaf70vOoVyv0PTouzZ
+	t5G51d3i20qCJgHr3EyAp3Fd5IZEKtYBHoh7G0u6LjOsFKOTx45bqRGIkiXG5wCpBwZbf88QQuQAl
+	qBIS6TAzfAMjZ2YfHDgLYj0lQwF+ZnhQNhlifAJo1OoJOuyViK2Gkh6Flt4dLRPTOlkZJ89ippnxf
+	umFKOV3vkk5W+dSNdmmCe+Hew7HebhyOt4dydjMQySHlMGrIMT6LWSGPaAWvKFdEeRmOYaVHZbxH3
+	LHUOB4s5b5+S0nYqgEp0s4iPWJ9hp7w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gdt9l-0002e3-D3; Mon, 31 Dec 2018 08:42:41 +0000
-Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+	id 1gdttL-0008RZ-VG; Mon, 31 Dec 2018 09:29:47 +0000
+Received: from mx0b-001b2d01.pphosted.com ([148.163.158.5]
+ helo=mx0a-001b2d01.pphosted.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gdt9h-0002dX-UV
- for linux-arm-kernel@lists.infradead.org; Mon, 31 Dec 2018 08:42:39 +0000
-Received: by mail-wm1-x344.google.com with SMTP id a62so23079031wmh.4
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 31 Dec 2018 00:42:37 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=El90UuvXSTwvHkTCycgQ+Zo1FPArY4bUiDSukrnlXpo=;
- b=B0mgJ4q8VvsUUC6I+FZaFu3eQ6CD5FFUjZpzdzCpOem5TjESV0+8tPdYbh849/DRkt
- X4sZo9vftrf83GdHq8pEGjl9JH8SU8JWhofQQtS2LGx97/7fG1VnAsttLZnHV7F87UpA
- d/lC4UMEBTm38vD8QyWYTYVmcEKRVFtUheNf0=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=El90UuvXSTwvHkTCycgQ+Zo1FPArY4bUiDSukrnlXpo=;
- b=MoFKNwDtQmFKugbjH+PUBQSzHLnQQ42Uv/imckTrH0i8xtbCTfx0yZRYQC4lQPBNHJ
- 9vXGmsAoNJ5oyFXPtIyeTGqS2r1exndGoPNU1s3aZUfp6A0l7l7repJa4KftssvbprU8
- MiOJw8pmy++wLqsrgE3lJ8/mQ+rP6+1EBswrSPDZeWYewHW5Umt3qo+YKHw27vu1Av82
- +Ko49RfzN1S5m+Z0r6WXVs13qzwmfifvt+a5EwhSKf7ETSvni7xY1V5MYVUxoUEivT7f
- nj2XYHagtlvN3sbzFNWnDQg4iw7rM2+6Uqk0gz4noLnZ+alPRCLiDo2timdGubLJiYR2
- B5lQ==
-X-Gm-Message-State: AA+aEWZ3ND1tBpg+EProJbZPkVLIvYtJIDvpiTgSQbsEwlbhwOKeRZrc
- p+h1cNSv7eRq3/6eEzDiOc8YWw==
-X-Google-Smtp-Source: AFSGD/WEKyUwv2tuz8D2f7vDYkbd3Buv/bJHy53tqnckCpIFz1B/AtUQ3hNtKf1utkb9M7je68532g==
-X-Received: by 2002:a1c:6607:: with SMTP id a7mr29394245wmc.129.1546245755633; 
- Mon, 31 Dec 2018 00:42:35 -0800 (PST)
-Received: from [192.168.1.2] (92.red-83-34-185.dynamicip.rima-tde.net.
- [83.34.185.92])
- by smtp.gmail.com with ESMTPSA id g198sm53816074wmd.23.2018.12.31.00.42.33
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 31 Dec 2018 00:42:34 -0800 (PST)
-Subject: Re: [PATCH 05/13] clk: qcom: apcs-msm8916: get parent clock names
- from DT
-To: Stephen Boyd <sboyd@kernel.org>, Niklas Cassel <niklas.cassel@linaro.org>
-References: <1545039990-19984-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
- <1545039990-19984-6-git-send-email-jorge.ramirez-ortiz@linaro.org>
- <154508986359.19322.1555129141976726505@swboyd.mtv.corp.google.com>
- <20181218143503.GA32562@centauri.ideon.se>
- <72bc192f-b60a-1209-7818-78a2fed07831@linaro.org>
- <154603613437.179992.1170701312259011363@swboyd.mtv.corp.google.com>
-From: Jorge Ramirez <jorge.ramirez-ortiz@linaro.org>
-Message-ID: <45a9e033-16e8-e0f9-36cf-3b892af1bd8f@linaro.org>
-Date: Mon, 31 Dec 2018 09:42:33 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <154603613437.179992.1170701312259011363@swboyd.mtv.corp.google.com>
-Content-Language: en-US
+ id 1gdttH-0008RC-QP
+ for linux-arm-kernel@lists.infradead.org; Mon, 31 Dec 2018 09:29:45 +0000
+Received: from pps.filterd (m0098416.ppops.net [127.0.0.1])
+ by mx0b-001b2d01.pphosted.com (8.16.0.22/8.16.0.22) with SMTP id
+ wBV9SimH068788
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 31 Dec 2018 04:29:42 -0500
+Received: from e06smtp07.uk.ibm.com (e06smtp07.uk.ibm.com [195.75.94.103])
+ by mx0b-001b2d01.pphosted.com with ESMTP id 2pqbe91v67-1
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 31 Dec 2018 04:29:41 -0500
+Received: from localhost
+ by e06smtp07.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
+ Violators will be prosecuted
+ for <linux-arm-kernel@lists.infradead.org> from <rppt@linux.ibm.com>;
+ Mon, 31 Dec 2018 09:29:40 -0000
+Received: from b06cxnps3075.portsmouth.uk.ibm.com (9.149.109.195)
+ by e06smtp07.uk.ibm.com (192.168.101.137) with IBM ESMTP SMTP Gateway:
+ Authorized Use Only! Violators will be prosecuted; 
+ (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
+ Mon, 31 Dec 2018 09:29:33 -0000
+Received: from d06av22.portsmouth.uk.ibm.com (d06av22.portsmouth.uk.ibm.com
+ [9.149.105.58])
+ by b06cxnps3075.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
+ wBV9TWYT26017906
+ (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Mon, 31 Dec 2018 09:29:32 GMT
+Received: from d06av22.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id 154B84C040;
+ Mon, 31 Dec 2018 09:29:32 +0000 (GMT)
+Received: from d06av22.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id 83CC14C04A;
+ Mon, 31 Dec 2018 09:29:28 +0000 (GMT)
+Received: from rapoport-lnx (unknown [9.148.207.181])
+ by d06av22.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
+ Mon, 31 Dec 2018 09:29:28 +0000 (GMT)
+Received: by rapoport-lnx (sSMTP sendmail emulation);
+ Mon, 31 Dec 2018 11:29:27 +0200
+From: Mike Rapoport <rppt@linux.ibm.com>
+To: Andrew Morton <akpm@linux-foundation.org>
+Subject: [PATCH v4 0/6] memblock: simplify several early memory allocation
+Date: Mon, 31 Dec 2018 11:29:20 +0200
+X-Mailer: git-send-email 2.7.4
+X-TM-AS-GCONF: 00
+x-cbid: 18123109-0028-0000-0000-00000331258E
+X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
+x-cbparentid: 18123109-0029-0000-0000-000023EE69C7
+Message-Id: <1546248566-14910-1-git-send-email-rppt@linux.ibm.com>
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2018-12-31_06:, , signatures=0
+X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
+ priorityscore=1501
+ malwarescore=0 suspectscore=2 phishscore=0 bulkscore=0 spamscore=0
+ clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
+ mlxlogscore=999 adultscore=0 classifier=spam adjust=0 reason=mlx
+ scancount=1 engine=8.0.1-1810050000 definitions=main-1812310088
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181231_004238_003856_FED44D9D 
-X-CRM114-Status: GOOD (  17.44  )
+X-CRM114-CacheID: sfid-20181231_012943_982779_1045FB72 
+X-CRM114-Status: GOOD (  23.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,107 +106,108 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, heiko@sntech.de, mturquette@baylibre.com,
- will.deacon@arm.com, bjorn.andersson@linaro.org, david.brown@linaro.org,
- linux-clk@vger.kernel.org, jassisinghbrar@gmail.com, sibis@codeaurora.org,
- andy.gross@linaro.org, jagan@amarulasolutions.com, devicetree@vger.kernel.org,
- arnd@arndb.de, olof@lixom.net, robh+dt@kernel.org, horms+renesas@verge.net.au,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
- amit.kucheria@linaro.org, vkoul@kernel.org, enric.balletbo@collabora.com,
- georgi.djakov@linaro.org
+Cc: Michal Hocko <mhocko@suse.com>, linux-sh@vger.kernel.org,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>, linux-mm@kvack.org,
+ Rich Felker <dalias@libc.org>, Paul Mackerras <paulus@samba.org>,
+ sparclinux@vger.kernel.org, Vincent Chen <deanbo422@gmail.com>,
+ Jonas Bonn <jonas@southpole.se>, linux-s390@vger.kernel.org,
+ linux-c6x-dev@linux-c6x.org, Yoshinori Sato <ysato@users.sourceforge.jp>,
+ Michael Ellerman <mpe@ellerman.id.au>, Russell King <linux@armlinux.org.uk>,
+ Mike Rapoport <rppt@linux.ibm.com>, Mark Salter <msalter@redhat.com>,
+ Arnd Bergmann <arnd@arndb.de>,
+ Stefan Kristiansson <stefan.kristiansson@saunalahti.fi>,
+ openrisc@lists.librecores.org, Greentime Hu <green.hu@gmail.com>,
+ Stafford Horne <shorne@gmail.com>, Guan Xuetao <gxt@pku.edu.cn>,
+ linux-arm-kernel@lists.infradead.org, Michal Simek <monstr@monstr.eu>,
+ linux-kernel@vger.kernel.org, Martin Schwidefsky <schwidefsky@de.ibm.com>,
+ linuxppc-dev@lists.ozlabs.org, "David S. Miller" <davem@davemloft.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 12/28/18 23:28, Stephen Boyd wrote:
-> Quoting Jorge Ramirez (2018-12-26 01:20:07)
->> On 12/18/18 15:35, Niklas Cassel wrote:
->>> On Mon, Dec 17, 2018 at 03:37:43PM -0800, Stephen Boyd wrote:
->>>> Quoting Jorge Ramirez-Ortiz (2018-12-17 01:46:22)
->>>>> Allow accessing the parent clock names required for the driver
->>>>> operation by using the device tree node.
->>>>>
->>>>> This permits extending the driver to other platforms without having to
->>>>> modify its source code.
->>>>>
->>>>> For backwards compatibility leave previous values as default.
->>>>
->>>> Why do we need to maintain backwards compatibility? Isn't is required
->>>> that the nodes have clocks properties?
->>>>
->>>
->>> Hello Stephen,
->>>
->>>
->>> This is the existing DT nodes for msm8916:
->>>
->>>                  a53pll: clock@b016000 {
->>>                           compatible = "qcom,msm8916-a53pll";
->>>                           reg = <0xb016000 0x40>;
->>>                           #clock-cells = <0>;
->>>                   };
->>>
->>>                   apcs: mailbox@b011000 {
->>>                           compatible = "qcom,msm8916-apcs-kpss-global", "syscon";
->>>                           reg = <0xb011000 0x1000>;
->>>                           #mbox-cells = <1>;
->>>                           clocks = <&a53pll>;
->>>                           #clock-cells = <0>;
->>>                   };
->>>
->>>
->>> This is the (suggested) DT nodes for qcs404:
->>>
->>>                   apcs_hfpll: clock-controller@0b016000 {
->>>                           compatible = "qcom,hfpll";
->>>                           reg = <0x0b016000 0x30>;
->>>                           #clock-cells = <0>;
->>>                           clock-output-names = "apcs_hfpll";
->>>                           clocks = <&xo_board>;
->>>                           clock-names = "xo";
->>>                   };
->>>
->>>                   apcs_glb: mailbox@b011000 {
->>>                           compatible = "qcom,qcs404-apcs-apps-global", "syscon";
->>>                           reg = <0x0b011000 0x1000>;
->>>                           #mbox-cells = <1>;
->>>                           clocks = <&gcc GCC_GPLL0_AO_OUT_MAIN>, <&apcs_hfpll>;
->>>                           clock-names = "aux", "pll";
->>>                           #clock-cells = <0>;
->>>                   };
->>>
->>> qcs404 specifies two clocks, with an accompanied clock-name for each clock.
->>>
->>> msm8916 specifies a single clock, without an accompanied clock-name.
->>>
->>> It is possible to append clock-names = "pll" for the existing clock,
->>> as well as to define the aux clock in the apcs node in the msm8916 DT:
->>> clocks = <&gcc GPLL0_VOTE>;
->>> clock-names = "aux";
->>>
->>> However, since the DT is treated as an ABI, the existing DT for msm8916 must
->>> still work, so I don't think that it is possible to ignore having backwards
->>> compability in the apcs clock driver.
->>
->>
->> so where are we with this?
->>
->> do we remove backwards compatibility (see below] for v2 or is the DT
->> really an ABI and therefore the patch under review is good as is?
->>
-> 
-> Breaking compatibility is up to the platform maintainers. If anything, I
-> would make the DTS and driver changes in parallel and then remove the
-> driver's backwards compatibility logic later on.
-> 
-> 
+Hi,
 
-I am not completely sure of what you mean. are you saying that the 
-original patch is good and we should just provide another patch (not 
-part of the current patch series) to remove the compatibility?
+These patches simplify some of the early memory allocations by replacing
+usage of older memblock APIs with newer and shinier ones.
 
-TIA
+Quite a few places in the arch/ code allocated memory using a memblock API
+that returns a physical address of the allocated area, then converted this
+physical address to a virtual one and then used memset(0) to clear the
+allocated range.
+
+More recent memblock APIs do all the three steps in one call and their
+usage simplifies the code.
+
+It's important to note that regardless of API used, the core allocation is
+nearly identical for any set of memblock allocators: first it tries to find
+a free memory with all the constraints specified by the caller and then
+falls back to the allocation with some or all constraints disabled.
+
+The first three patches perform the conversion of call sites that have
+exact requirements for the node and the possible memory range.
+
+The fourth patch is a bit one-off as it simplifies openrisc's
+implementation of pte_alloc_one_kernel(), and not only the memblock usage.
+
+The fifth patch takes care of simpler cases when the allocation can be
+satisfied with a simple call to memblock_alloc().
+
+The sixth patch removes one-liner wrappers for memblock_alloc on arm and
+unicore32, as suggested by Christoph.
+
+v4:
+* rebased on the current upstream
+* added conversion of s390 node data allocation
+
+v3:
+* added Tested-by from Michal Simek for microblaze changes
+* updated powerpc changes as per Michael Ellerman comments:
+  - use allocations that clear memory in alloc_paca_data() and alloc_stack()
+  - ensure the replacement is equivalent to old API
+
+v2:
+* added Ack from Stafford Horne for openrisc changes
+* entirely drop early_alloc wrappers on arm and unicore32, as per Christoph
+Hellwig
+
+Mike Rapoport (6):
+  powerpc: prefer memblock APIs returning virtual address
+  microblaze: prefer memblock API returning virtual address
+  sh: prefer memblock APIs returning virtual address
+  openrisc: simplify pte_alloc_one_kernel()
+  arch: simplify several early memory allocations
+  arm, s390, unicore32: remove oneliner wrappers for memblock_alloc()
+
+ arch/arm/mm/mmu.c                      | 13 +++----------
+ arch/c6x/mm/dma-coherent.c             |  9 ++-------
+ arch/microblaze/mm/init.c              |  5 +++--
+ arch/nds32/mm/init.c                   | 12 ++++--------
+ arch/openrisc/mm/ioremap.c             | 11 ++++-------
+ arch/powerpc/kernel/paca.c             | 16 ++++++----------
+ arch/powerpc/kernel/setup-common.c     |  4 ++--
+ arch/powerpc/kernel/setup_64.c         | 24 ++++++++++--------------
+ arch/powerpc/mm/hash_utils_64.c        |  6 +++---
+ arch/powerpc/mm/pgtable-book3e.c       |  8 ++------
+ arch/powerpc/mm/pgtable-book3s64.c     |  5 +----
+ arch/powerpc/mm/pgtable-radix.c        | 25 +++++++------------------
+ arch/powerpc/mm/ppc_mmu_32.c           |  3 +--
+ arch/powerpc/platforms/pasemi/iommu.c  |  5 +++--
+ arch/powerpc/platforms/powernv/opal.c  |  3 +--
+ arch/powerpc/platforms/pseries/setup.c | 18 ++++++++++++++----
+ arch/powerpc/sysdev/dart_iommu.c       |  7 +++++--
+ arch/s390/numa/numa.c                  | 14 +-------------
+ arch/sh/mm/init.c                      | 18 +++++-------------
+ arch/sh/mm/numa.c                      |  5 ++---
+ arch/sparc/kernel/prom_64.c            |  7 ++-----
+ arch/sparc/mm/init_64.c                |  9 +++------
+ arch/unicore32/mm/mmu.c                | 14 ++++----------
+ 23 files changed, 88 insertions(+), 153 deletions(-)
+
+-- 
+2.7.4
 
 
 _______________________________________________
