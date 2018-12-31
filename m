@@ -2,23 +2,22 @@ Return-Path: <SRS0=D6bT=PI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DC422C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 11:03:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A0DE7C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 11:37:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A7C8B21738
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 11:03:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 68D9321783
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 31 Dec 2018 11:37:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="esG+HM95";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="DBYTZsgy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A7C8B21738
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CGhP5Rqz";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="XQC9Z2zQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 68D9321783
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,58 +25,55 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=bU6M/AuPpZchxKBjn61stmh8bJ2Apdqq8iHB8U7FAtA=; b=esG+HM95e3yGcG
-	PjqehcoVPk1vFJLNpI0DbO9CAKMoZMw/pZa85p2lWdSL+nZcn3tu3iuy4xuIReapOM957TCnWfiOr
-	0uz4C9onjk6ogWSUamZ90h0Jbda9nWY/DrLEodqe+4T5QWit3A7HWnglKAf91CfuLb5e5Klz/kvVm
-	8xtMcCDCdhZLNE5YaF0UY2zm3fF1eAiZMq0kTpIRnLw4YHzZzZ9XLA77UDAcQK5yRWky4E5y7Ta2z
-	DYS52j4ZzwjX0pFkSiAFcirmnIjV6OMlQPvmTVGzKsL/yuXIgGJ7fump1CTYsSAEhAXh+DNVbtHfo
-	mYoRcjQxTr/Bt38j59yA==;
+	List-Owner; bh=9M3Cjq4p2lk6Ar7GU4cLOU3dlxoabeXHNY/jFNbc/i8=; b=CGhP5RqzMAn4Sj
+	ap8MMY9Lq3XnSpzLOV0wmCeQxUpFtu0x32J8tpnkhKv98jIYceT+d+OUhXPmkTEthTaXkbKJ41556
+	eFmDhBB78m3sg/GsjDd4cxCyrRnZJRv2SD01Nh3SVEk3oRvOZFTJy/SMgPCfve148yidI6JSRbtxG
+	2qnk0sw6oWa4kK5p/XPt7LPr2SNFSNgoSJ/TsRxEeAKJC9+uFc0nRZKDOYyVe90iDCpyy+3MNbnh4
+	zgzwGQU6mabMgrZuZYXbiLDP5bav/mdnucM0KgiIjW1K2gITqjlSy8CBFhySHiNRvmoHNh9YoTWGo
+	AuKab545gP6sWA/q8MMQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gdvLt-0006WG-7h; Mon, 31 Dec 2018 11:03:21 +0000
-Received: from mail-oi1-x243.google.com ([2607:f8b0:4864:20::243])
+	id 1gdvtB-00017B-NG; Mon, 31 Dec 2018 11:37:45 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gdvLp-0006V8-50; Mon, 31 Dec 2018 11:03:18 +0000
-Received: by mail-oi1-x243.google.com with SMTP id w13so21680412oiw.9;
- Mon, 31 Dec 2018 03:03:16 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=googlemail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=rak2wfNDO84QeXnOlJ08jzJBrSTyZVxgQfN5/5p4nQQ=;
- b=DBYTZsgyUGnYosNP3eP1AxZBWHuMX39H4BHsQzu41M45khRFWk3Ld5PVMJZW61wkLR
- cva+QYrhKsytrZBY26VZ5kO1JQgqkp4JhYaXXlJ8GX0MCLTyDDVcivhsfbUNgCYyld7O
- 7hZFAEudv9g8h/mu967Ftqcge/+h2STvkBTFa3vs48fSK+u2lngLpzp9efc0LNBeU3Iq
- DHrdHfMYbtDYVNhgs45pNr6ywbCPUOtWp5GywR9Gv2gSZYCZiL2mR09tpfqiVyG9zUyn
- NJnXskaY7WCSWAO8kTz2i9Aa4cczJ01M2gVMXNEFKhR4+Bv2UZToE2LRvRQrOCSiAu4Z
- a/fg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=rak2wfNDO84QeXnOlJ08jzJBrSTyZVxgQfN5/5p4nQQ=;
- b=jg8kVxoqekCI9ikqqoBi9IgtDzFB2FWnIU0pWs01/R1wbQvKK8wmRtWzOG8Y/MzidE
- lHE88KvyYpIVwk9s+mrBF5aPHgMVADKbJimmoDst1aYme1c7xmDDS8LDoZRs8gNNuSLm
- dOUa+3712QzyMkb5V6l70orbN2F8uTn93t814rP1U7A2uM04urmUiqWYIbqJAyb8Bs1h
- n2qpvV//6aeKVebdxn1soYbO5GUwYVn0V7rEuGXhKUIX30C+8EOBQy1A/TnH8QjB103S
- Cu0zO/6FHTXIxyL5/4CfMX+7/YlEjdYZx0HWuGffWmMkMRKsP/nYISHO9wrpt9dqkvPv
- FN2w==
-X-Gm-Message-State: AA+aEWbAvX1dH9upoq1O1kcjL6ujv9R2OKk0qcgnkjfzQTpUkgjH38Y/
- UJ0RT61wn1Q6sRVRnIyE8+BzkpLYPFZwacOkl8w=
-X-Google-Smtp-Source: AFSGD/XyV5mcXpVEZ4BSwXqtjj+g7tALllnBjrQyXHyAVViJu7W0szTl1hBuPmaYgDTYEZeVV03bLbAvFonufZtARDs=
-X-Received: by 2002:aca:3586:: with SMTP id c128mr25505245oia.47.1546254195995; 
- Mon, 31 Dec 2018 03:03:15 -0800 (PST)
+ id 1gdvt8-00016n-Pt
+ for linux-arm-kernel@lists.infradead.org; Mon, 31 Dec 2018 11:37:44 +0000
+Received: from mail-lj1-f180.google.com (mail-lj1-f180.google.com
+ [209.85.208.180])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 8C55921871
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 31 Dec 2018 11:37:41 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1546256261;
+ bh=b7yKPqndEmKWUgmsRkmbbqWx5vMBaYn8Bsc4wUnPXVo=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=XQC9Z2zQgmZ0omf/lIam185INV2bPQZ7qrjpelkV2UcjVQwh6NQWdFxNJ1z1AwR3G
+ mCIxnTYzPvNpH7JX5XXt44AbVFkzr6gmMlOHpjIiHljovvSERY0pSaJquN5iK3FAMX
+ hzLAJnFmHY8zMlBD8oCN05k2bKCcJVxoUI96WMaI=
+Received: by mail-lj1-f180.google.com with SMTP id s5-v6so23429975ljd.12
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 31 Dec 2018 03:37:41 -0800 (PST)
+X-Gm-Message-State: AJcUukdInW5UEZAo1vrPb8JzK9BSfoeFejtLAjOxpeBK9R2amQAn6FYY
+ MBb3NVAB9Gd0Ph56GIJwam5n5zk1e3nhtbLZeio=
+X-Google-Smtp-Source: ALg8bN5+XVupxHZv0BKqm8A3CnCshN6LRhIwrndlRk4MwMDraAc//ZP3AttZr0BGPI5Yc8ANrGa4zQPK6buk3gaq/Js=
+X-Received: by 2002:a2e:81d3:: with SMTP id
+ s19-v6mr10434615ljg.138.1546256259610; 
+ Mon, 31 Dec 2018 03:37:39 -0800 (PST)
 MIME-Version: 1.0
-References: <20181229125711.5205-1-martin.blumenstingl@googlemail.com>
- <CACRpkdZ4bex+wm4vGWhDLSAsXnaVeHWEp6Rf4g8NQZmXnFfneQ@mail.gmail.com>
-In-Reply-To: <CACRpkdZ4bex+wm4vGWhDLSAsXnaVeHWEp6Rf4g8NQZmXnFfneQ@mail.gmail.com>
-From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Date: Mon, 31 Dec 2018 12:03:05 +0100
-Message-ID: <CAFBinCBG-==df7swBsWvg9banuxH5JFyHRAwv2poZUMa3h3MVw@mail.gmail.com>
-Subject: Re: [PATCH 0/3] ARM: dts: meson: fix SD card cd-gpio (pre v4.21-rc)
-To: Linus Walleij <linus.walleij@linaro.org>
+References: <20181228161819.18931-1-pawel.mikolaj.chmiel@gmail.com>
+ <20181228161819.18931-2-pawel.mikolaj.chmiel@gmail.com>
+In-Reply-To: <20181228161819.18931-2-pawel.mikolaj.chmiel@gmail.com>
+From: Krzysztof Kozlowski <krzk@kernel.org>
+Date: Mon, 31 Dec 2018 12:37:28 +0100
+X-Gmail-Original-Message-ID: <CAJKOXPf+Ut1ghXJnEqrUiz=r_ts-Bz3cum1LvUMOjEqWp8q+Vw@mail.gmail.com>
+Message-ID: <CAJKOXPf+Ut1ghXJnEqrUiz=r_ts-Bz3cum1LvUMOjEqWp8q+Vw@mail.gmail.com>
+Subject: Re: [PATCH 1/6] ARM: dts: s5pv210: Use correct fimd variant
+To: =?UTF-8?Q?Pawe=C5=82_Chmiel?= <pawel.mikolaj.chmiel@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181231_030317_196263_D83F15C0 
-X-CRM114-Status: GOOD (  16.76  )
+X-CRM114-CacheID: sfid-20181231_033742_861347_14CCF0A4 
+X-CRM114-Status: GOOD (  15.91  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,52 +85,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linus.luessing@c0d3.blue, Bartosz Golaszewski <bgolaszewski@baylibre.com>,
- balbes-150@yandex.ru, Kevin Hilman <khilman@baylibre.com>,
- linux-mmc <linux-mmc@vger.kernel.org>,
- "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
- Guenter Roeck <linux@roeck-us.net>,
- "open list:ARM/Amlogic Meson..." <linux-amlogic@lists.infradead.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
+ xc-racer2@live.ca, linux@armlinux.org.uk, robh+dt@kernel.org,
+ linux-kernel@vger.kernel.org, kgene@kernel.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Linus,
-
-On Sun, Dec 30, 2018 at 8:57 PM Linus Walleij <linus.walleij@linaro.org> wrote:
->
-> On Sat, Dec 29, 2018 at 1:57 PM Martin Blumenstingl
-> <martin.blumenstingl@googlemail.com> wrote:
->
-> > However, while reviewing the .dts files for the 32-bit Amlogic Meson
-> > boards I found that the cd-gpios are specified incorrectly in the .dts.
-> > Documentation/devicetree/bindings/mmc/mmc.txt states: "[...] using the
-> > "cd-inverted" property means, that the CD line is active high, i.e. it
-> > is high, when a card is inserted".
-> > This is not the case on all currently supported 32-bit Meson boards, so
-> > this switches the cd-gpios
-> > - from GPIO_ACTIVE_HIGH with the "cd-inverted" property being set
-> > - to GPIO_ACTIVE_LOW with the "cd-inverted" property being absent
-> >
-> > This fix also works even if the following two commits are reverted:
-> > - 89a5e15bcba87d ("gpio/mmc/of: Respect polarity in the device tree")
-> > - 81c85ec15a1946 ("gpio: OF: Parse MMC-specific CD and WP properties")
->
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-thank you for reviewing my series!
-
-> Thanks for looking into this, I think fixing the device trees is
-> orthogonal to fixing the issue I created, let's fix both!
-I fully agree. if I still have time I'll look into a patch for the MMC
-core later today, otherwise I'll try to do it tomorrow
-
-
-Regards
-Martin
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gRnJpLCAyOCBEZWMgMjAxOCBhdCAxNzoxOCwgUGF3ZcWCIENobWllbAo8cGF3ZWwubWlrb2xh
+ai5jaG1pZWxAZ21haWwuY29tPiB3cm90ZToKPgo+IFNpbmNlIHdlIGhhdmUgc2VwYXJhdGUgY29t
+cGF0aWJsZSBmb3Igb3VyIFNPQywKPiBsZXQncyB1c2UgaXQgcmF0aGVyIHVzaW5nIG9uZSBmcm9t
+IGV4eW5vczQyMTAuCgpQbGVhc2UgZml4CnlvdXIgZWRpdG9yCnRvIHdyYXAgbGluZXMKbWF0Y2hp
+bmcgTGludXgKc3R5bGUgYmVjYXVzZQppdCBpcyBkaWZmaWN1bHQKdG8gcmVhZC4KCllvdSBoYXZl
+IHVudXN1YWwgY29uZmlndXJhdGlvbiBiZWNhdXNlIG1vc3Qgb2YgdGhlIGVkaXRvcnMgd3JhcCBn
+aXQKY29tbWl0IGFzIGV4cGVjdGVkLgpodHRwczovL2VsaXhpci5ib290bGluLmNvbS9saW51eC9s
+YXRlc3Qvc291cmNlL0RvY3VtZW50YXRpb24vcHJvY2Vzcy9zdWJtaXR0aW5nLXBhdGNoZXMucnN0
+I0w2MzMKCkJlc3QgcmVnYXJkcywKS3J6eXN6dG9mCgo+Cj4gU2lnbmVkLW9mZi1ieTogUGF3ZcWC
+IENobWllbCA8cGF3ZWwubWlrb2xhai5jaG1pZWxAZ21haWwuY29tPgo+IC0tLQo+ICBhcmNoL2Fy
+bS9ib290L2R0cy9zNXB2MjEwLmR0c2kgfCAyICstCj4gIDEgZmlsZSBjaGFuZ2VkLCAxIGluc2Vy
+dGlvbigrKSwgMSBkZWxldGlvbigtKQo+Cj4gZGlmZiAtLWdpdCBhL2FyY2gvYXJtL2Jvb3QvZHRz
+L3M1cHYyMTAuZHRzaSBiL2FyY2gvYXJtL2Jvb3QvZHRzL3M1cHYyMTAuZHRzaQo+IGluZGV4IDc1
+ZjQ1NGEyMTBkNi4uM2Q2ZTVhZDFlYTM1IDEwMDY0NAo+IC0tLSBhL2FyY2gvYXJtL2Jvb3QvZHRz
+L3M1cHYyMTAuZHRzaQo+ICsrKyBiL2FyY2gvYXJtL2Jvb3QvZHRzL3M1cHYyMTAuZHRzaQo+IEBA
+IC01MTEsNyArNTExLDcgQEAKPiAgICAgICAgICAgICAgICAgfTsKPgo+ICAgICAgICAgICAgICAg
+ICBmaW1kOiBmaW1kQGY4MDAwMDAwIHsKPiAtICAgICAgICAgICAgICAgICAgICAgICBjb21wYXRp
+YmxlID0gInNhbXN1bmcsZXh5bm9zNDIxMC1maW1kIjsKPiArICAgICAgICAgICAgICAgICAgICAg
+ICBjb21wYXRpYmxlID0gInNhbXN1bmcsczVwdjIxMC1maW1kIjsKPiAgICAgICAgICAgICAgICAg
+ICAgICAgICBpbnRlcnJ1cHQtcGFyZW50ID0gPCZ2aWMyPjsKPiAgICAgICAgICAgICAgICAgICAg
+ICAgICByZWcgPSA8MHhmODAwMDAwMCAweDIwMDAwPjsKPiAgICAgICAgICAgICAgICAgICAgICAg
+ICBpbnRlcnJ1cHQtbmFtZXMgPSAiZmlmbyIsICJ2c3luYyIsICJsY2Rfc3lzIjsKPiAtLQo+IDIu
+MTcuMQo+CgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwps
+aW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJh
+ZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51
+eC1hcm0ta2VybmVsCg==
