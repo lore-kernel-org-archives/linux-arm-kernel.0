@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5227AC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  1 Jan 2019 04:02:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 10EA4C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  1 Jan 2019 04:03:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 155D62075D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  1 Jan 2019 04:02:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C77432075D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  1 Jan 2019 04:03:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kclySMOe"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 155D62075D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ayEP53NI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C77432075D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,45 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=e/wR22R8w9c5Xfb4Ov7ouGRfiSxIkQ0rrIcvl8Ck75I=; b=kclySMOeHN7LEV
-	02styGO9JcQi2hK16xxuTiL/M4iU6y20zhhzUM53Jk4KwSn5JNb9QJwtvBh8PTwgcjWGJYSUBWdEk
-	kr4K4ANRn7lT4eydzni78oqUoZEyYId1+rUXbj+lVrPRL2m6gsR+fIqdc5g3NXUIhPWoKCIoxaaPN
-	zPxyFgZISQWFx+v6WHx74aK6U1efWzYRkV/s002vEkU4n9ciaM4j2atvdYlYgmF7cJ5WneA7mCZBR
-	3AX6y8nq7fxymmSEh1WTVJU4ydb7Ckcc/Vr9VgryOiJ6oyaUNMGUqsloZ2X7ZWtUVVD6R1GoLlayM
-	lKk77p5wwgCdf5hFanYw==;
+	List-Owner; bh=SNqlMfHkyRjSlmK4CthRD89vwzsMVmTxlOLSiTZdmoo=; b=ayEP53NIOVc/Zs
+	eSiqDZwa5jgR9SZB+USqrLYFfTeguMiCPgeGfs/XbEJDcaNH1ORnLnmY8EQlveVx0fMAyqz7qbs+Y
+	DFtUtuYChFD+F1pSwKVt57mL8ht5oJysSM+mH+Rx8hwCtXHtZR8/tLhbgEkeaoaGp2E+23PaAVK1B
+	tDYjH7fueGsBLDL3ww0tZfSenUqfh7Ij5o4iTIMT1nF2iMcSb4RKAkDyeaErf2TbwJPFyL8z3rgSd
+	qE7M09NoLtt2+8av5H6A0frqQDoAiGmFX5k5eexnR982CGucTzRWWUP/Ek+d+93SZ7IkRzMXoq84g
+	n9U1woG/8djdF4QtnALw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1geBGP-0002b5-LO; Tue, 01 Jan 2019 04:02:45 +0000
-Received: from [210.61.82.184] (helo=mailgw02.mediatek.com)
+	id 1geBGe-0002oR-U2; Tue, 01 Jan 2019 04:03:00 +0000
+Received: from [210.61.82.183] (helo=mailgw01.mediatek.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1geBDw-00074X-Il; Tue, 01 Jan 2019 04:01:01 +0000
-X-UUID: 09cdba4314004d378ca3c99d6ab3a3ea-20190101
-X-UUID: 09cdba4314004d378ca3c99d6ab3a3ea-20190101
-Received: from mtkcas06.mediatek.inc [(172.21.101.30)] by mailgw02.mediatek.com
- (envelope-from <yong.wu@mediatek.com>)
+ id 1geBE7-0000dH-PR; Tue, 01 Jan 2019 04:01:01 +0000
+X-UUID: 64c31351db5d4ba19bb44812930132a6-20190101
+X-UUID: 64c31351db5d4ba19bb44812930132a6-20190101
+Received: from mtkexhb02.mediatek.inc [(172.21.101.103)] by
+ mailgw01.mediatek.com (envelope-from <yong.wu@mediatek.com>)
  (mhqrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 886063835; Tue, 01 Jan 2019 11:59:53 +0800
+ with ESMTP id 1660273875; Tue, 01 Jan 2019 12:00:04 +0800
 Received: from mtkcas07.mediatek.inc (172.21.101.84) by
- mtkmbs01n1.mediatek.inc (172.21.101.68) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 1 Jan 2019 11:59:52 +0800
+ mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Tue, 1 Jan 2019 12:00:03 +0800
 Received: from localhost.localdomain (10.17.3.153) by mtkcas07.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Tue, 1 Jan 2019 11:59:51 +0800
+ Transport; Tue, 1 Jan 2019 12:00:03 +0800
 From: Yong Wu <yong.wu@mediatek.com>
 To: Joerg Roedel <joro@8bytes.org>, Matthias Brugger <matthias.bgg@gmail.com>, 
  Robin Murphy <robin.murphy@arm.com>, Rob Herring <robh+dt@kernel.org>
-Subject: [PATCH v5 18/20] iommu/mediatek: Fix VLD_PA_RANGE register backup
- when suspend
-Date: Tue, 1 Jan 2019 11:55:50 +0800
-Message-ID: <1546314952-15990-19-git-send-email-yong.wu@mediatek.com>
+Subject: [PATCH v5 19/20] iommu/mediatek: Add shutdown callback
+Date: Tue, 1 Jan 2019 11:55:51 +0800
+Message-ID: <1546314952-15990-20-git-send-email-yong.wu@mediatek.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1546314952-15990-1-git-send-email-yong.wu@mediatek.com>
 References: <1546314952-15990-1-git-send-email-yong.wu@mediatek.com>
 MIME-Version: 1.0
+X-TM-SNTS-SMTP: BA3E90807588920A516E43686156FF7C58D87C46E4B96381C65D99E98F62FC1B2000:8
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181231_200013_263077_36B8C497 
-X-CRM114-Status: GOOD (  11.93  )
+X-CRM114-CacheID: sfid-20181231_200024_583516_3C949FE6 
+X-CRM114-Status: GOOD (  10.66  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,49 +87,65 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The register VLD_PA_RNG(0x118) was forgot to backup while adding 4GB
-mode support for mt2712. this patch add it.
+In the reboot burning test, if some Multimedia HW has something wrong,
+It may keep send the invalid request to IOMMU. In order to avoid
+affect the reboot flow, we add the shutdown callback to disable
+M4U HW when shutdown.
 
-Fixes: 30e2fccf9512 ("iommu/mediatek: Enlarge the validate PA range
-for 4GB mode")
 Signed-off-by: Yong Wu <yong.wu@mediatek.com>
 ---
- drivers/iommu/mtk_iommu.c | 2 ++
- drivers/iommu/mtk_iommu.h | 1 +
- 2 files changed, 3 insertions(+)
+ drivers/iommu/mtk_iommu.c    | 6 ++++++
+ drivers/iommu/mtk_iommu_v1.c | 6 ++++++
+ 2 files changed, 12 insertions(+)
 
 diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-index 7fcef19..ddf1969 100644
+index ddf1969..dcb02e3 100644
 --- a/drivers/iommu/mtk_iommu.c
 +++ b/drivers/iommu/mtk_iommu.c
-@@ -716,6 +716,7 @@ static int __maybe_unused mtk_iommu_suspend(struct device *dev)
- 	reg->int_control0 = readl_relaxed(base + REG_MMU_INT_CONTROL0);
- 	reg->int_main_control = readl_relaxed(base + REG_MMU_INT_MAIN_CONTROL);
- 	reg->ivrp_paddr = readl_relaxed(base + REG_MMU_IVRP_PADDR);
-+	reg->vld_pa_range = readl_relaxed(base + REG_MMU_VLD_PA_RNG);
- 	clk_disable_unprepare(data->bclk);
+@@ -703,6 +703,11 @@ static int mtk_iommu_remove(struct platform_device *pdev)
  	return 0;
  }
-@@ -740,6 +741,7 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
- 	writel_relaxed(reg->int_control0, base + REG_MMU_INT_CONTROL0);
- 	writel_relaxed(reg->int_main_control, base + REG_MMU_INT_MAIN_CONTROL);
- 	writel_relaxed(reg->ivrp_paddr, base + REG_MMU_IVRP_PADDR);
-+	writel_relaxed(reg->vld_pa_range, base + REG_MMU_VLD_PA_RNG);
- 	if (m4u_dom)
- 		writel(m4u_dom->cfg.arm_v7s_cfg.ttbr[0] & MMU_PT_ADDR_MASK,
- 		       base + REG_MMU_PT_BASE_ADDR);
-diff --git a/drivers/iommu/mtk_iommu.h b/drivers/iommu/mtk_iommu.h
-index 0a7c463..c500bfd 100644
---- a/drivers/iommu/mtk_iommu.h
-+++ b/drivers/iommu/mtk_iommu.h
-@@ -33,6 +33,7 @@ struct mtk_iommu_suspend_reg {
- 	u32				int_control0;
- 	u32				int_main_control;
- 	u32				ivrp_paddr;
-+	u32				vld_pa_range;
- };
  
- enum mtk_iommu_plat {
++static void mtk_iommu_shutdown(struct platform_device *pdev)
++{
++	mtk_iommu_remove(pdev);
++}
++
+ static int __maybe_unused mtk_iommu_suspend(struct device *dev)
+ {
+ 	struct mtk_iommu_data *data = dev_get_drvdata(dev);
+@@ -784,6 +789,7 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
+ static struct platform_driver mtk_iommu_driver = {
+ 	.probe	= mtk_iommu_probe,
+ 	.remove	= mtk_iommu_remove,
++	.shutdown = mtk_iommu_shutdown,
+ 	.driver	= {
+ 		.name = "mtk-iommu",
+ 		.of_match_table = of_match_ptr(mtk_iommu_of_ids),
+diff --git a/drivers/iommu/mtk_iommu_v1.c b/drivers/iommu/mtk_iommu_v1.c
+index 6ede428..517dfbd 100644
+--- a/drivers/iommu/mtk_iommu_v1.c
++++ b/drivers/iommu/mtk_iommu_v1.c
+@@ -662,6 +662,11 @@ static int mtk_iommu_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static void mtk_iommu_shutdown(struct platform_device *pdev)
++{
++	mtk_iommu_remove(pdev);
++}
++
+ static int __maybe_unused mtk_iommu_suspend(struct device *dev)
+ {
+ 	struct mtk_iommu_data *data = dev_get_drvdata(dev);
+@@ -699,6 +704,7 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
+ static struct platform_driver mtk_iommu_driver = {
+ 	.probe	= mtk_iommu_probe,
+ 	.remove	= mtk_iommu_remove,
++	.shutdown = mtk_iommu_shutdown,
+ 	.driver	= {
+ 		.name = "mtk-iommu-v1",
+ 		.of_match_table = mtk_iommu_of_ids,
 -- 
 1.9.1
 
