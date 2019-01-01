@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D5FC9C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  1 Jan 2019 04:53:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F0156C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  1 Jan 2019 04:54:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A50BE2075D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  1 Jan 2019 04:53:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BC8672075D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  1 Jan 2019 04:54:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PcPTH75P"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A50BE2075D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HOKQIPTH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BC8672075D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,46 +25,46 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=UNQQQoTFmJDbtif56ISkzIq2xm4pFuerzqc7ZzifCA8=; b=PcPTH75PhezXl5
-	E3Mluoa+OgWduzePrYzlLoFxC97gOTraFVVpWfUrYH+vZAcZ4KrfvAUOxCvHNrUhwqFfFC6InDRs+
-	XU5E92tWP5d+7J4kJS2D2st//nIgQOQWtwMDGqncGpgPCTy9yoJeWHG1uiSq87NgfZ6pLH5IRWoaU
-	bAcHNZsRNHmbz0AlxvePI07cRnN3R6pK/tJmnPalpgw38TFvuDJsmZ5b4YpkA9j1tcFdRWuSoOA6l
-	xqiAJQ9XZjui68mlGxfkIGLpGEodUluu7hfZiZ8hKY/W1B9lMSs0Uka3tnaaEMrCeYCVqQtcLbs1h
-	l+UiTFnkptDxZ/0K4dpw==;
+	List-Owner; bh=IANgENZ/Y9Zox3G91c1FhNI1ytobXHcrkg84dIpjJCI=; b=HOKQIPTHmqNUl7
+	Xpdfw6JG4qiCHnymstMYps8hX6vVih7yuTIIGheHiIm89yrY3hPs0LH4K6C6w+oO4KHZT56o5aBwB
+	H9mq1SRBvzTCg7RvLSdK8+Nl3i/KYY66YgZFUcBN/XORneyMYx1Z1te0k71BB2KZC0TEs28mUok1L
+	5dt1QuCs4f///BCOJFp27+W16vHtXbFUSJxmevvlBDNJZh7B+w9CK67d0KsQhtHbvvAG5Ntn4FBmV
+	rm78R6WBy4hwXeZwM/HdDLBkZIoSrfILH0pcEil/bZCIT6fofmr3S5o+0PyfUZsx/z6sLzFhL4bth
+	QjhYu8zekT1/7VAxjzgw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1geC3h-0003N0-Kr; Tue, 01 Jan 2019 04:53:41 +0000
-Received: from [210.61.82.183] (helo=mailgw01.mediatek.com)
+	id 1geC44-0003gN-51; Tue, 01 Jan 2019 04:54:04 +0000
+Received: from [210.61.82.184] (helo=mailgw02.mediatek.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1geC2g-0002cO-PS; Tue, 01 Jan 2019 04:52:51 +0000
-X-UUID: ebc142b41523454d961ebf39024a2bc3-20190101
-X-UUID: ebc142b41523454d961ebf39024a2bc3-20190101
-Received: from mtkcas07.mediatek.inc [(172.21.101.84)] by mailgw01.mediatek.com
- (envelope-from <yong.wu@mediatek.com>)
+ id 1geC2Y-0002S2-25; Tue, 01 Jan 2019 04:52:42 +0000
+X-UUID: 628c0d94224647a2aad435cf35f6990d-20190101
+X-UUID: 628c0d94224647a2aad435cf35f6990d-20190101
+Received: from mtkcas09.mediatek.inc [(172.21.101.178)] by
+ mailgw02.mediatek.com (envelope-from <yong.wu@mediatek.com>)
  (mhqrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 619470398; Tue, 01 Jan 2019 12:52:34 +0800
+ with ESMTP id 39374120; Tue, 01 Jan 2019 12:52:26 +0800
 Received: from mtkcas08.mediatek.inc (172.21.101.126) by
- mtkmbs01n2.mediatek.inc (172.21.101.79) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 1 Jan 2019 12:52:32 +0800
+ mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Tue, 1 Jan 2019 12:52:24 +0800
 Received: from localhost.localdomain (10.17.3.153) by mtkcas08.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Tue, 1 Jan 2019 12:52:31 +0800
+ Transport; Tue, 1 Jan 2019 12:52:23 +0800
 From: Yong Wu <yong.wu@mediatek.com>
 To: Joerg Roedel <joro@8bytes.org>, Greg Kroah-Hartman
  <gregkh@linuxfoundation.org>, Matthias Brugger <matthias.bgg@gmail.com>, Rob
  Herring <robh+dt@kernel.org>
-Subject: [PATCH 07/13] media: mtk-mdp: Get rid of mtk_smi_larb_get/put
-Date: Tue, 1 Jan 2019 12:51:10 +0800
-Message-ID: <1546318276-18993-8-git-send-email-yong.wu@mediatek.com>
+Subject: [PATCH 06/13] media: mtk-jpeg: Get rid of mtk_smi_larb_get/put
+Date: Tue, 1 Jan 2019 12:51:09 +0800
+Message-ID: <1546318276-18993-7-git-send-email-yong.wu@mediatek.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1546318276-18993-1-git-send-email-yong.wu@mediatek.com>
 References: <1546318276-18993-1-git-send-email-yong.wu@mediatek.com>
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: 26D1EF13B4E2B0323B4C3185C9D28A6D32679BA8252AB2638711BD12D98733932000:8
+X-TM-SNTS-SMTP: 3AF47A93A0CB5DC13A8ADBFAC3BE13D8A9F8013C35280552A495621E89F6FE852000:8
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181231_205239_441678_8445AFF0 
-X-CRM114-Status: GOOD (  13.05  )
+X-CRM114-CacheID: sfid-20181231_205230_639827_FF89C854 
+X-CRM114-Status: GOOD (  11.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,137 +77,103 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: youlin.pei@mediatek.com, devicetree@vger.kernel.org,
- Nicolas Boichat <drinkcat@chromium.org>,
- Minghsiu Tsai <minghsiu.tsai@mediatek.com>, arnd@arndb.de,
+ Nicolas Boichat <drinkcat@chromium.org>, arnd@arndb.de,
  srv_heupstream@mediatek.com, Will Deacon <will.deacon@arm.com>,
  linux-kernel@vger.kernel.org, Tomasz Figa <tfiga@google.com>,
  iommu@lists.linux-foundation.org, linux-mediatek@lists.infradead.org,
- yong.wu@mediatek.com, yingjoe.chen@mediatek.com,
- Robin Murphy <robin.murphy@arm.com>, linux-arm-kernel@lists.infradead.org
+ yong.wu@mediatek.com, Rick Chang <rick.chang@mediatek.com>,
+ yingjoe.chen@mediatek.com, Robin Murphy <robin.murphy@arm.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-MediaTek IOMMU has already added the device_link between the consumer
-and smi-larb device. If the mdp device call the pm_runtime_get_sync,
+MediaTek IOMMU has already added device_link between the consumer
+and smi-larb device. If the jpg device call the pm_runtime_get_sync,
 the smi-larb's pm_runtime_get_sync also be called automatically.
 
-CC: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+CC: Rick Chang <rick.chang@mediatek.com>
 Signed-off-by: Yong Wu <yong.wu@mediatek.com>
 ---
- drivers/media/platform/mtk-mdp/mtk_mdp_comp.c | 38 ---------------------------
- drivers/media/platform/mtk-mdp/mtk_mdp_comp.h |  2 --
- drivers/media/platform/mtk-mdp/mtk_mdp_core.c |  1 -
- 3 files changed, 41 deletions(-)
+ drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c | 22 ----------------------
+ drivers/media/platform/mtk-jpeg/mtk_jpeg_core.h |  2 --
+ 2 files changed, 24 deletions(-)
 
-diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_comp.c b/drivers/media/platform/mtk-mdp/mtk_mdp_comp.c
-index 03aba03..4f7cbc4 100644
---- a/drivers/media/platform/mtk-mdp/mtk_mdp_comp.c
-+++ b/drivers/media/platform/mtk-mdp/mtk_mdp_comp.c
-@@ -17,7 +17,6 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
+diff --git a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
+index 2a5d500..23da32c 100644
+--- a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
++++ b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
+@@ -29,7 +29,6 @@
+ #include <media/v4l2-ioctl.h>
+ #include <media/videobuf2-core.h>
+ #include <media/videobuf2-dma-contig.h>
 -#include <soc/mediatek/smi.h>
  
- #include "mtk_mdp_comp.h"
+ #include "mtk_jpeg_hw.h"
+ #include "mtk_jpeg_core.h"
+@@ -901,11 +900,6 @@ static int mtk_jpeg_queue_init(void *priv, struct vb2_queue *src_vq,
  
-@@ -66,14 +65,6 @@ void mtk_mdp_comp_clock_on(struct device *dev, struct mtk_mdp_comp *comp)
+ static void mtk_jpeg_clk_on(struct mtk_jpeg_dev *jpeg)
  {
- 	int i, err;
- 
--	if (comp->larb_dev) {
--		err = mtk_smi_larb_get(comp->larb_dev);
--		if (err)
--			dev_err(dev,
--				"failed to get larb, err %d. type:%d id:%d\n",
--				err, comp->type, comp->id);
--	}
+-	int ret;
 -
- 	for (i = 0; i < ARRAY_SIZE(comp->clk); i++) {
- 		if (IS_ERR(comp->clk[i]))
- 			continue;
-@@ -94,16 +85,11 @@ void mtk_mdp_comp_clock_off(struct device *dev, struct mtk_mdp_comp *comp)
- 			continue;
- 		clk_disable_unprepare(comp->clk[i]);
- 	}
--
--	if (comp->larb_dev)
--		mtk_smi_larb_put(comp->larb_dev);
+-	ret = mtk_smi_larb_get(jpeg->larb);
+-	if (ret)
+-		dev_err(jpeg->dev, "mtk_smi_larb_get larbvdec fail %d\n", ret);
+ 	clk_prepare_enable(jpeg->clk_jdec_smi);
+ 	clk_prepare_enable(jpeg->clk_jdec);
+ }
+@@ -914,7 +908,6 @@ static void mtk_jpeg_clk_off(struct mtk_jpeg_dev *jpeg)
+ {
+ 	clk_disable_unprepare(jpeg->clk_jdec);
+ 	clk_disable_unprepare(jpeg->clk_jdec_smi);
+-	mtk_smi_larb_put(jpeg->larb);
  }
  
- int mtk_mdp_comp_init(struct device *dev, struct device_node *node,
- 		      struct mtk_mdp_comp *comp, enum mtk_mdp_comp_id comp_id)
+ static irqreturn_t mtk_jpeg_dec_irq(int irq, void *priv)
+@@ -1059,21 +1052,6 @@ static int mtk_jpeg_release(struct file *file)
+ 
+ static int mtk_jpeg_clk_init(struct mtk_jpeg_dev *jpeg)
  {
--	struct device_node *larb_node;
--	struct platform_device *larb_pdev;
- 	int i;
- 
- 	if (comp_id < 0 || comp_id >= MTK_MDP_COMP_ID_MAX) {
-@@ -124,30 +110,6 @@ int mtk_mdp_comp_init(struct device *dev, struct device_node *node,
- 			break;
- 	}
- 
--	/* Only DMA capable components need the LARB property */
--	comp->larb_dev = NULL;
--	if (comp->type != MTK_MDP_RDMA &&
--	    comp->type != MTK_MDP_WDMA &&
--	    comp->type != MTK_MDP_WROT)
--		return 0;
+-	struct device_node *node;
+-	struct platform_device *pdev;
 -
--	larb_node = of_parse_phandle(node, "mediatek,larb", 0);
--	if (!larb_node) {
--		dev_err(dev,
--			"Missing mediadek,larb phandle in %pOF node\n", node);
+-	node = of_parse_phandle(jpeg->dev->of_node, "mediatek,larb", 0);
+-	if (!node)
+-		return -EINVAL;
+-	pdev = of_find_device_by_node(node);
+-	if (WARN_ON(!pdev)) {
+-		of_node_put(node);
 -		return -EINVAL;
 -	}
+-	of_node_put(node);
 -
--	larb_pdev = of_find_device_by_node(larb_node);
--	if (!larb_pdev) {
--		dev_warn(dev, "Waiting for larb device %pOF\n", larb_node);
--		of_node_put(larb_node);
--		return -EPROBE_DEFER;
--	}
--	of_node_put(larb_node);
+-	jpeg->larb = &pdev->dev;
 -
--	comp->larb_dev = &larb_pdev->dev;
--
- 	return 0;
- }
- 
-diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_comp.h b/drivers/media/platform/mtk-mdp/mtk_mdp_comp.h
-index 63b3983..602d577 100644
---- a/drivers/media/platform/mtk-mdp/mtk_mdp_comp.h
-+++ b/drivers/media/platform/mtk-mdp/mtk_mdp_comp.h
-@@ -47,7 +47,6 @@ enum mtk_mdp_comp_id {
-  * @dev_node:	component device node
-  * @clk:	clocks required for component
-  * @regs:	Mapped address of component registers.
-- * @larb_dev:	SMI device required for component
-  * @type:	component type
-  * @id:		component ID
+ 	jpeg->clk_jdec = devm_clk_get(jpeg->dev, "jpgdec");
+ 	if (IS_ERR(jpeg->clk_jdec))
+ 		return PTR_ERR(jpeg->clk_jdec);
+diff --git a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.h b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.h
+index 1a6cdfd..e35fb79 100644
+--- a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.h
++++ b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.h
+@@ -55,7 +55,6 @@ enum mtk_jpeg_ctx_state {
+  * @dec_reg_base:	JPEG registers mapping
+  * @clk_jdec:		JPEG hw working clock
+  * @clk_jdec_smi:	JPEG SMI bus clock
+- * @larb:		SMI device
   */
-@@ -55,7 +54,6 @@ struct mtk_mdp_comp {
- 	struct device_node	*dev_node;
- 	struct clk		*clk[2];
- 	void __iomem		*regs;
--	struct device		*larb_dev;
- 	enum mtk_mdp_comp_type	type;
- 	enum mtk_mdp_comp_id	id;
+ struct mtk_jpeg_dev {
+ 	struct mutex		lock;
+@@ -69,7 +68,6 @@ struct mtk_jpeg_dev {
+ 	void __iomem		*dec_reg_base;
+ 	struct clk		*clk_jdec;
+ 	struct clk		*clk_jdec_smi;
+-	struct device		*larb;
  };
-diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
-index bbb24fb..adb098d 100644
---- a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
-+++ b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
-@@ -25,7 +25,6 @@
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
- #include <linux/workqueue.h>
--#include <soc/mediatek/smi.h>
  
- #include "mtk_mdp_core.h"
- #include "mtk_mdp_m2m.h"
+ /**
 -- 
 1.9.1
 
