@@ -4,19 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0244CC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  1 Jan 2019 05:02:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 23B7EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  1 Jan 2019 05:12:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BC6422080D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  1 Jan 2019 05:02:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D8BF12080D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  1 Jan 2019 05:12:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eQ1OSdcd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BC6422080D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oMda8+vD";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="t4TC3Jvh"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D8BF12080D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,45 +26,62 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=r0j567/QUX3q4mOVHtKv5vJ+WKfkyTYEC/WgOvStFJ8=; b=eQ1OSdcdq+6Snd
-	JrQMHw5ikHPtAWypj+bxU28U8WZR8UROgRtqM1bdwsRXvE1jJhib9VIPISMMek2zB9LT5DwdrBhzN
-	qUhK+LVlBs2FvPYLsjl3TxRLEbZhhkQPkWWRtrUFEor/C1HxaTnj/QuSYpXp7SuuFkFSUuq2qTBI9
-	7qZWy4Ig5ZqbLGYE6h3XrRDXANPVGjPK96Gm0X3BjQ4GqhswFo7LI8hzonAB1CCk4avjE5vVJB4Gd
-	pn6op6q4w9tcCUV/dxoG31EnaSwmkbmbm7iFJq4Vvm2tD/xJ1sblQVe45Lca+qtOvScF0Y4kScrzN
-	MoqORwVLzPSR1WoXxt2Q==;
+	List-Owner; bh=jl7c4E4vFCbW7bW+9odfhhkUWDlWivmmtfnlEkO817I=; b=oMda8+vDD9UMD/
+	+10bBt0SkUUzLKbjWIXFt1vG6x5RqAEGG3HSHsv1YJVqPu/EpA0rnAAa4z6KO0hf+LyfP9eye7TUj
+	kLUdGq3VLMEHyJjyfB16H1OIHtGaVgqk75rMI/2KosfOjy+n1qTPcvFZ/CXQTOsP/K3hQIfp9vz6K
+	go7+KRkOkwZJBnwx+fA6LK1psSvHo18KRJvPm3pyHFmxM8bQvWf8/1fkOM0b00ebEbMISlKbUebb9
+	WAt7/qGQCg9izEHPUCRh1/SXQwhrdSc3CtoIvXkv9O6o46VAJhTpC+RwOhxIY3+8hME6fF2WLxi/0
+	+AfJ4nuJFAD3pt9sydbg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1geCCD-0007yU-N8; Tue, 01 Jan 2019 05:02:29 +0000
-Received: from [210.61.82.183] (helo=mailgw01.mediatek.com)
+	id 1geCLN-00036d-3I; Tue, 01 Jan 2019 05:11:57 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1geC28-00025s-SO; Tue, 01 Jan 2019 04:52:10 +0000
-X-UUID: f37bd95a5c0342f0a47459b720a2ea70-20190101
-X-UUID: f37bd95a5c0342f0a47459b720a2ea70-20190101
-Received: from mtkcas08.mediatek.inc [(172.21.101.126)] by
+ id 1geCLL-000353-2j; Tue, 01 Jan 2019 05:11:55 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=Content-Type:MIME-Version:References:
+ In-Reply-To:Message-ID:Date:Subject:CC:To:From:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=puE2a/CzPBjvW3mWjmxCphl+JEivMkom0BKMgVhRLtY=; b=t4TC3Jvh0ayIbkx6gSSfXmDLU
+ c2koMW0iVkKYnrMESE5fOgvHR4klREO66BiiJ69Dq5AJl+68i8tD2NZMYOYGBeKnZx7MarT64tHbN
+ ApVSsR2fgtzYW2cGAc2W0i0dHGT8TXOWak+aALfiqJby5CgLwc2/83j+pepwPvLzsHM/VRoMUXZxT
+ SkXK0yRfPYor39WHG8VPaduITXKzfGu/HBNBMjjUh9fBFQUVyP77WpIMkOCBKB0gAnGmoTzxiSqf0
+ 26wijk97b5q0jUTTUCvNxg9Fz++bif7l/r12EIK/WFofm/iRzCw5wIA11qQrDjuLnjSwVQq2jZsZP
+ TNaGe69Ww==;
+Received: from [210.61.82.183] (helo=mailgw01.mediatek.com)
+ by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1geC3P-0006XV-CC; Tue, 01 Jan 2019 04:53:25 +0000
+X-UUID: 3e2f305bb08d4058ab5e046c67bcea37-20190101
+X-UUID: 3e2f305bb08d4058ab5e046c67bcea37-20190101
+Received: from mtkexhb01.mediatek.inc [(172.21.101.102)] by
  mailgw01.mediatek.com (envelope-from <yong.wu@mediatek.com>)
  (mhqrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1143020851; Tue, 01 Jan 2019 12:51:58 +0800
+ with ESMTP id 1984185709; Tue, 01 Jan 2019 12:53:13 +0800
 Received: from mtkcas08.mediatek.inc (172.21.101.126) by
- mtkmbs03n1.mediatek.inc (172.21.101.181) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 1 Jan 2019 12:51:57 +0800
+ mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Tue, 1 Jan 2019 12:53:11 +0800
 Received: from localhost.localdomain (10.17.3.153) by mtkcas08.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Tue, 1 Jan 2019 12:51:56 +0800
+ Transport; Tue, 1 Jan 2019 12:53:10 +0800
 From: Yong Wu <yong.wu@mediatek.com>
 To: Joerg Roedel <joro@8bytes.org>, Greg Kroah-Hartman
  <gregkh@linuxfoundation.org>, Matthias Brugger <matthias.bgg@gmail.com>, Rob
  Herring <robh+dt@kernel.org>
-Subject: [PATCH 03/13] iommu/mediatek: Add probe_defer for smi-larb
-Date: Tue, 1 Jan 2019 12:51:06 +0800
-Message-ID: <1546318276-18993-4-git-send-email-yong.wu@mediatek.com>
+Subject: [PATCH 12/13] arm: dts: mediatek: Get rid of mediatek,
+ larb for MM nodes
+Date: Tue, 1 Jan 2019 12:51:15 +0800
+Message-ID: <1546318276-18993-13-git-send-email-yong.wu@mediatek.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1546318276-18993-1-git-send-email-yong.wu@mediatek.com>
 References: <1546318276-18993-1-git-send-email-yong.wu@mediatek.com>
 MIME-Version: 1.0
+X-TM-SNTS-SMTP: 4300F4DC98DC9A84B545C8CE2F374691E7516EE5F2F246E92314933F406918BD2000:8
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181231_205205_588060_5DA23CCB 
-X-CRM114-Status: GOOD (  14.71  )
+X-CRM114-CacheID: sfid-20190101_045323_684339_D079BCCE 
+X-CRM114-Status: GOOD (  11.72  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,50 +105,40 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The iommu consumer should use device_link to connect with the
-smi-larb(supplier). then the smi-larb should run before the iommu
-consumer. Here we delay the iommu driver until the smi driver is
-ready, then all the iommu consumer always is after the smi driver.
+After adding device_link between the IOMMU consumer and smi,
+the mediatek,larb is unnecessary now.
 
-When there is no this patch, if some consumer drivers run before
-smi-larb, the supplier link_status is DL_DEV_NO_DRIVER(0) in the
-device_link_add, then device_links_driver_bound will use WARN_ON
-to complain that the link_status of supplier is not right.
-
-This is a preparing patch for adding device_link.
-
+CC: Matthias Brugger <matthias.bgg@gmail.com>
 Signed-off-by: Yong Wu <yong.wu@mediatek.com>
 ---
- drivers/iommu/mtk_iommu.c    | 2 +-
- drivers/iommu/mtk_iommu_v1.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/mt2701.dtsi | 1 -
+ arch/arm/boot/dts/mt7623.dtsi | 1 -
+ 2 files changed, 2 deletions(-)
 
-diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-index 36526c9..202e41b 100644
---- a/drivers/iommu/mtk_iommu.c
-+++ b/drivers/iommu/mtk_iommu.c
-@@ -645,7 +645,7 @@ static int mtk_iommu_probe(struct platform_device *pdev)
- 			id = i;
- 
- 		plarbdev = of_find_device_by_node(larbnode);
--		if (!plarbdev)
-+		if (!plarbdev || !plarbdev->dev.driver)
- 			return -EPROBE_DEFER;
- 		data->smi_imu.larb_imu[id].dev = &plarbdev->dev;
- 
-diff --git a/drivers/iommu/mtk_iommu_v1.c b/drivers/iommu/mtk_iommu_v1.c
-index f8b8275..9386aee 100644
---- a/drivers/iommu/mtk_iommu_v1.c
-+++ b/drivers/iommu/mtk_iommu_v1.c
-@@ -601,7 +601,7 @@ static int mtk_iommu_probe(struct platform_device *pdev)
- 			plarbdev = of_platform_device_create(
- 						larb_spec.np, NULL,
- 						platform_bus_type.dev_root);
--			if (!plarbdev) {
-+			if (!plarbdev || !plarbdev->dev.driver) {
- 				of_node_put(larb_spec.np);
- 				return -EPROBE_DEFER;
- 			}
+diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+index 180377e..938fa31 100644
+--- a/arch/arm/boot/dts/mt2701.dtsi
++++ b/arch/arm/boot/dts/mt2701.dtsi
+@@ -563,7 +563,6 @@
+ 		clock-names = "jpgdec-smi",
+ 			      "jpgdec";
+ 		power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
+-		mediatek,larb = <&larb2>;
+ 		iommus = <&iommu MT2701_M4U_PORT_JPGDEC_WDMA>,
+ 			 <&iommu MT2701_M4U_PORT_JPGDEC_BSDMA>;
+ 	};
+diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
+index d01bdee..c831398 100644
+--- a/arch/arm/boot/dts/mt7623.dtsi
++++ b/arch/arm/boot/dts/mt7623.dtsi
+@@ -774,7 +774,6 @@
+ 		clock-names = "jpgdec-smi",
+ 			      "jpgdec";
+ 		power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
+-		mediatek,larb = <&larb2>;
+ 		iommus = <&iommu MT2701_M4U_PORT_JPGDEC_WDMA>,
+ 			 <&iommu MT2701_M4U_PORT_JPGDEC_BSDMA>;
+ 	};
 -- 
 1.9.1
 
