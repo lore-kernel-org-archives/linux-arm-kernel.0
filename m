@@ -2,109 +2,79 @@ Return-Path: <SRS0=RmN+=PK=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,
-	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 494B8C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 17:37:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C7B85C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 18:00:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 16DBF218EA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 17:37:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9B5CC218D3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 18:00:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="O05Lrkgp";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="J3EioQAm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 16DBF218EA
-Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ia9khsfI";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="HYMwdb6R"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9B5CC218D3
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ZZCjZ+Q3kXJVvlM3I0NTy1cdPwujy5lXbIteBT5O2KQ=; b=O05Lrkgpz7Yy22
-	0FDSFKT64UJ+iZliiI6CSuQxsEg2BtN1a4ph/j4233b2B6cb2jMLHeLySNfe/iltiYhmtmJRHDUmq
-	Z4WwfpH8nwFwpTnYupzTk+LFjV/nYzJgz+VbF7qS7xQrwlk9k99nt0JQ1PYDLCeSPd5Z8RRUcY4XG
-	XZK/5bfASlSBAYeiuocw9ArdwjQWAtGk75Sq15LGvfXeG2ohiGG4NwRMOa3xrsZFSi20qLwDNO/or
-	LfiaoIQ2bfB01aaQ4Xb711z7+2YeL/0mv/VEuTWznC/p9VpY8vs3L6GSvKyPNj7rkhUP97jnx0mNJ
-	hHcoow8xkPiCg/a8x78g==;
+	List-Owner; bh=X/Q8NyIrPFrwJt0eoN9l5AkgYQ2rDE2PAoMxsb2QfL4=; b=Ia9khsfIHlbC/7
+	tSjE/efzTx1dtvAy6TySRDtbdR8pjfpaye01KLVuiCYdVdmd/Ew2wq1+uTPW1IrqAQarpd7XJHXGH
+	QvKkvMioEEcO4p9Cx9Y5qLFK+5PbB53A03DWmLnUHP7CTtJXe6NnpIbTK/q0NFr6Y9Jta9Ym8006h
+	/kx2UpY11JUDA/wTyoCSs/8evlBRUqENNNrvw/Osb2d4BwHy7mHOOZw1FJVDiYcUKnkyMir8TLfRN
+	KAqt+7f0FT0aP7I97r1ct0Nl+nDMYQaVqtz9A2NL3feCDXN+5OIlPDpzq+/Cmx2FSki5UpYpHss/f
+	2IFwPSNINcSCh4UJptDg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gekS5-0006EZ-JA; Wed, 02 Jan 2019 17:37:09 +0000
-Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+	id 1gekoj-0005Ti-Sx; Wed, 02 Jan 2019 18:00:33 +0000
+Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gekRI-0005Pc-Ot
- for linux-arm-kernel@lists.infradead.org; Wed, 02 Jan 2019 17:36:23 +0000
-Received: by mail-wm1-x344.google.com with SMTP id b11so27271537wmj.1
+ id 1gekog-0005Sz-Bo
+ for linux-arm-kernel@lists.infradead.org; Wed, 02 Jan 2019 18:00:31 +0000
+Received: by mail-wr1-x444.google.com with SMTP id 96so31349161wrb.2
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 02 Jan 2019 09:36:20 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=JbDh3nO/eQ5r3H90w51/iWL5ZM5B6uICF84/YZhcCg4=;
- b=J3EioQAmzqQ510tIYUdGn3niW30hZBCQDaqUxXA6W8Tx56EgefOMxfeiYePggvLtzV
- duXz2IeiYTCZpxPro8vAGHyjWQH/Y1/d/Ak/b3m9WVFcOtcdpIuYK79GinCB8sSiZtG3
- ldCh6avAFDLKYMtq9F3XaB02vQPo22UkXsFhXhyIBx7oOFhnHXxUUD8YJ7FKz6fLxj4g
- UdEA7DwTWevqPwpxJS3DNw0FJygWBLCgnIL+wZ0Gdd6dAoG2Qh+1ORT2/g8fuq65aSCh
- hwax2bMe285RhifAqx23AgtZ3ATuL6cdl/MSN8F0BuYYlWJ2a2yf/dyePmmOzCrkGSnZ
- /Clg==
+ Wed, 02 Jan 2019 10:00:29 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=crmJ+Hige/rGqRrSYyXt9V+tTDSuqc5vu0JbeeQ95MI=;
+ b=HYMwdb6REUv9VQ3hvyMZy0tsSLP6CdaJOuBwX++M85lGTQ2t3GkXHAIV5qLwDNo/jM
+ 2Tp6AmrO9AzF2yEhbTEHinlUMem78yJcQ1XmgtMLaDX3emfPsJkIIAkgEWBT5k5V1VMO
+ SUdErX1uC3HkxLcFbsbWr3OXrBooMoz4dVjwI=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=JbDh3nO/eQ5r3H90w51/iWL5ZM5B6uICF84/YZhcCg4=;
- b=IqTeQ0YP06dj04KiGhIrmreeiRVyqtYIffkz4JpQCB6OIHeKvbTDtIGeFJfPxGIfZ4
- SOjE9ASHucBM7SfkflHyVRDsrg96uxBj2EnZdp5Z6tkPld/UAuSpbXjnax9yzCoSnGYa
- hUbPkDe3IDHejlp+AsHr8SDNR7C9usfaKFBjBzBJsRHTNK3yeNYzgQusF8GSHfsgvdsQ
- POhRm0xROxCTIoRygLUBHQeEwXVgLyi1jkRFaQQ2uVf05LIZ43Ja3rUIAb5GDX71ih6v
- NgiXqyvVPNOp1/Q/En8xkSYlcNvbVWgu9RAPTIuJW++sdNbaICJ6MYj2plKUliflzKDR
- he2A==
-X-Gm-Message-State: AA+aEWbgkrl+zhSM/454ZlaoU8eQaXgfGB+6FELmYIAGF2EMfBqHyL/W
- qPBl8cyDoTyfoLgTSzwOJ8y2mg==
-X-Google-Smtp-Source: ALg8bN4dqeXqnEdkw7vZRXClez1sw3njLXNHpEGFyX9nPGsXXD3dzvB0Oz/M0AbKGq7DF3oZ68k8Uw==
-X-Received: by 2002:a1c:e715:: with SMTP id e21mr36108254wmh.101.1546450578353; 
- Wed, 02 Jan 2019 09:36:18 -0800 (PST)
-Received: from andreyknvl0.muc.corp.google.com
- ([2a00:79e0:15:13:8ce:d7fa:9f4c:492])
- by smtp.gmail.com with ESMTPSA id t4sm45987076wrm.6.2019.01.02.09.36.16
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 02 Jan 2019 09:36:17 -0800 (PST)
-From: Andrey Konovalov <andreyknvl@google.com>
-To: Andrey Ryabinin <aryabinin@virtuozzo.com>,
- Alexander Potapenko <glider@google.com>,
- Dmitry Vyukov <dvyukov@google.com>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, Christoph Lameter <cl@linux.com>,
- Andrew Morton <akpm@linux-foundation.org>,
- Mark Rutland <mark.rutland@arm.com>,
- Nick Desaulniers <ndesaulniers@google.com>,
- Marc Zyngier <marc.zyngier@arm.com>, Dave Martin <dave.martin@arm.com>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- "Eric W . Biederman" <ebiederm@xmission.com>,
- Ingo Molnar <mingo@kernel.org>, Paul Lawrence <paullawrence@google.com>,
- Geert Uytterhoeven <geert@linux-m68k.org>, Arnd Bergmann <arnd@arndb.de>,
- "Kirill A . Shutemov" <kirill.shutemov@linux.intel.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Kate Stewart <kstewart@linuxfoundation.org>,
- Mike Rapoport <rppt@linux.vnet.ibm.com>,
- Vincenzo Frascino <vincenzo.frascino@arm.com>, kasan-dev@googlegroups.com,
- linux-doc@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-sparse@vger.kernel.org,
- linux-mm@kvack.org, linux-kbuild@vger.kernel.org
-Subject: [PATCH v2 3/3] kasan: fix krealloc handling for tag-based mode
-Date: Wed,  2 Jan 2019 18:36:08 +0100
-Message-Id: <bc983dc45be2af41701ac3a88f154b5dd1459a26.1546450432.git.andreyknvl@google.com>
-X-Mailer: git-send-email 2.20.1.415.g653613c723-goog
-In-Reply-To: <cover.1546450432.git.andreyknvl@google.com>
-References: <cover.1546450432.git.andreyknvl@google.com>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=crmJ+Hige/rGqRrSYyXt9V+tTDSuqc5vu0JbeeQ95MI=;
+ b=jSIGhHdiMs6aULppU12fa6iMuMP9PFwOFLjH5fpjz9zAysUbY1Zpz1vScSbJeoP2wz
+ lyJb0y+psRJPFimvnKVvVwoU6FCTCRv/FsNPiHTA8pvvJyveJZeNgH9SoNGuZNxKGaXp
+ bpouhyvu83coI/wk5sMXg3KdECDiOwyLJa3qBjrOo3ETNcTtW/sN2saV5NvfA6tocb8R
+ O+eDwPYgJ+ZvKw5YJadk479yjPIRI4oF2RADx8uO8HZhB+rNACmyc/Yrw9xi1aIJWiOi
+ KhD8odCOQxR6aIecEklF9z2lZr0punEKLeA1H6Dg1EoTWHjzGZBmq33Caxu1ruWC8QEy
+ qbww==
+X-Gm-Message-State: AJcUukeeC9ZEBPXfOzEKdT1m+7Xh+wa6CRTJyIhi6xEL2+n4P6nyyIe2
+ HaBjCYdYYX9LBqmox1RZR4mcE+y8/do1visKtuIeCg==
+X-Google-Smtp-Source: ALg8bN7EppCifOtzPEcN8dpB/+i2dd9Gmj/20uw6E369/AIGGqNL9aUG0sPXilgQhF8JkwUf/7SV/AHrb7C4NJKsgJU=
+X-Received: by 2002:a5d:6988:: with SMTP id g8mr37231230wru.33.1546452027972; 
+ Wed, 02 Jan 2019 10:00:27 -0800 (PST)
 MIME-Version: 1.0
+References: <1545978983-124360-1-git-send-email-hutenghui@huawei.com>
+ <1545978983-124360-2-git-send-email-hutenghui@huawei.com>
+In-Reply-To: <1545978983-124360-2-git-send-email-hutenghui@huawei.com>
+From: John Stultz <john.stultz@linaro.org>
+Date: Wed, 2 Jan 2019 10:00:15 -0800
+Message-ID: <CALAqxLW_eGX25sZKVCpGwoq94QdYj9K2nJg6buh=FAZZt_Cuhg@mail.gmail.com>
+Subject: Re: [PATCH 2/3] dmaengine: Extend the k3dma driver binding
+To: h00249924 <hutenghui@huawei.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190102_093620_813708_3548968B 
-X-CRM114-Status: GOOD (  20.22  )
+X-CRM114-CacheID: sfid-20190102_100030_408175_3C5CAB56 
+X-CRM114-Status: GOOD (  16.34  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -116,265 +86,79 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Vishwath Mohan <vishwath@google.com>,
- Chintan Pandya <cpandya@codeaurora.org>, Jacob Bramley <Jacob.Bramley@arm.com>,
- Jann Horn <jannh@google.com>, Ruben Ayrapetyan <Ruben.Ayrapetyan@arm.com>,
- Andrey Konovalov <andreyknvl@google.com>, Lee Smith <Lee.Smith@arm.com>,
- Kostya Serebryany <kcc@google.com>, Mark Brand <markbrand@google.com>,
- Ramana Radhakrishnan <Ramana.Radhakrishnan@arm.com>,
- Evgeniy Stepanov <eugenis@google.com>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
+ <devicetree@vger.kernel.org>, wwx575822@notesmail.huawei.com,
+ hanxiaolong3@hisilicon.com, Zhuangluan Su <suzhuangluan@hisilicon.com>,
+ Hantanglei <hantanglei@huawei.com>, lkml <linux-kernel@vger.kernel.org>,
+ Kongfei <kongfei@hisilicon.com>, ninggaoyu <ninggaoyu@hisilicon.com>,
+ Vinod Koul <vkoul@kernel.org>, Rob Herring <robh+dt@kernel.org>,
+ Liyuequan <liyuequan@hisilicon.com>, dmaengine@vger.kernel.org,
+ "huangli \(I\)" <huangli295@hisilicon.com>,
+ wangyoulin <wangyoulin1@hisilicon.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ "Qianli \(A\)" <cash.qianli@hisilicon.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Right now tag-based KASAN can retag the memory that is reallocated via
-krealloc and return a differently tagged pointer even if the same slab
-object gets used and no reallocated technically happens.
+On Thu, Dec 27, 2018 at 10:39 PM h00249924 <hutenghui@huawei.com> wrote:
+>
+> From: Youlin Wang <wwx575822@notesmail.huawei.com>
+>
+> Extend the k3dma driver binding to support hisi-asp hardware variants.
+>
+> Signed-off-by: Youlin Wang <wwx575822@notesmail.huawei.com>
+> Signed-off-by: Tanglei Han <hantanglei@huawei.com>
+> Cc: Vinod Koul <vkoul@kernel.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> ---
+>  Documentation/devicetree/bindings/dma/k3dma.txt | 33 ++++++++++++++++++++++++-
+>  1 file changed, 32 insertions(+), 1 deletion(-)
+>
+> diff --git a/Documentation/devicetree/bindings/dma/k3dma.txt b/Documentation/devicetree/bindings/dma/k3dma.txt
+> index 4945aea..cd21b82 100644
+> --- a/Documentation/devicetree/bindings/dma/k3dma.txt
+> +++ b/Documentation/devicetree/bindings/dma/k3dma.txt
+> @@ -3,7 +3,9 @@
+>  See dma.txt first
+>
+>  Required properties:
+> -- compatible: Should be "hisilicon,k3-dma-1.0"
+> +- compatible: Must be one of
+> +-              "hisilicon,k3-dma-1.0"
+> +-              "hisilicon,hisi-pcm-asp-dma-1.0"
+>  - reg: Should contain DMA registers location and length.
+>  - interrupts: Should contain one interrupt shared by all channel
+>  - #dma-cells: see dma.txt, should be 1, para number
+> @@ -43,3 +45,32 @@ For example, i2c0 read channel request line is 18, while write channel use 19
+>                         dma-names = "rx", "tx";
+>                 };
+>
+> +
+> +
+> +
+> +Controller:
+> +               asp_dmac: asp_dmac@E804B000 {
+> +                       compatible = "hisilicon,hisi-pcm-asp-dma-1.0";
+> +                       reg = <0x0 0xe804b000 0x0 0x1000>;
+> +                       #dma-cells = <1>;
+> +                       dma-channels = <16>;
+> +                       dma-requests = <32>;
+> +                       dma-min-chan = <0>;
+> +                       dma-used-chans = <0xFFFE>;
+> +                       dma-share;
 
-There are a few issues with this approach. One is that krealloc callers
-can't rely on comparing the return value with the passed argument to
-check whether reallocation happened. Another is that if a caller knows
-that no reallocation happened, that it can access object memory through
-the old pointer, which leads to false positives. Look at nf_ct_ext_add()
-to see an example.
+Thanks for sending this out!
 
-Fix this by keeping the same tag if the memory don't actually gets
-reallocated during krealloc.
+So min-chan, used-chans and dma-share aren't in the existing binding
+document. So they probably should be removed from this example, or the
+binding document needs to be updated first.
 
-Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
----
- include/linux/kasan.h | 14 +++++---------
- include/linux/slab.h  |  4 ++--
- mm/kasan/common.c     | 20 ++++++++++++--------
- mm/slab.c             |  8 ++++----
- mm/slab_common.c      |  2 +-
- mm/slub.c             | 10 +++++-----
- 6 files changed, 29 insertions(+), 29 deletions(-)
-
-diff --git a/include/linux/kasan.h b/include/linux/kasan.h
-index b40ea104dd36..7576fff90923 100644
---- a/include/linux/kasan.h
-+++ b/include/linux/kasan.h
-@@ -57,9 +57,8 @@ void * __must_check kasan_kmalloc_large(const void *ptr, size_t size,
- void kasan_kfree_large(void *ptr, unsigned long ip);
- void kasan_poison_kfree(void *ptr, unsigned long ip);
- void * __must_check kasan_kmalloc(struct kmem_cache *s, const void *object,
--					size_t size, gfp_t flags);
--void * __must_check kasan_krealloc(const void *object, size_t new_size,
--					gfp_t flags);
-+				size_t size, gfp_t flags, bool krealloc);
-+void kasan_krealloc(const void *object, size_t new_size, gfp_t flags);
- 
- void * __must_check kasan_slab_alloc(struct kmem_cache *s, void *object,
- 					gfp_t flags);
-@@ -118,15 +117,12 @@ static inline void *kasan_kmalloc_large(void *ptr, size_t size, gfp_t flags)
- static inline void kasan_kfree_large(void *ptr, unsigned long ip) {}
- static inline void kasan_poison_kfree(void *ptr, unsigned long ip) {}
- static inline void *kasan_kmalloc(struct kmem_cache *s, const void *object,
--				size_t size, gfp_t flags)
--{
--	return (void *)object;
--}
--static inline void *kasan_krealloc(const void *object, size_t new_size,
--				 gfp_t flags)
-+				size_t size, gfp_t flags, bool krealloc)
- {
- 	return (void *)object;
- }
-+static inline void kasan_krealloc(const void *object, size_t new_size,
-+				 gfp_t flags) {}
- 
- static inline void *kasan_slab_alloc(struct kmem_cache *s, void *object,
- 				   gfp_t flags)
-diff --git a/include/linux/slab.h b/include/linux/slab.h
-index d87f913ab4e8..1cd168758c05 100644
---- a/include/linux/slab.h
-+++ b/include/linux/slab.h
-@@ -445,7 +445,7 @@ static __always_inline void *kmem_cache_alloc_trace(struct kmem_cache *s,
- {
- 	void *ret = kmem_cache_alloc(s, flags);
- 
--	ret = kasan_kmalloc(s, ret, size, flags);
-+	ret = kasan_kmalloc(s, ret, size, flags, false);
- 	return ret;
- }
- 
-@@ -456,7 +456,7 @@ kmem_cache_alloc_node_trace(struct kmem_cache *s,
- {
- 	void *ret = kmem_cache_alloc_node(s, gfpflags, node);
- 
--	ret = kasan_kmalloc(s, ret, size, gfpflags);
-+	ret = kasan_kmalloc(s, ret, size, gfpflags, false);
- 	return ret;
- }
- #endif /* CONFIG_TRACING */
-diff --git a/mm/kasan/common.c b/mm/kasan/common.c
-index 44390392d4c9..b6633ab86160 100644
---- a/mm/kasan/common.c
-+++ b/mm/kasan/common.c
-@@ -392,7 +392,7 @@ void * __must_check kasan_init_slab_obj(struct kmem_cache *cache,
- void * __must_check kasan_slab_alloc(struct kmem_cache *cache, void *object,
- 					gfp_t flags)
- {
--	return kasan_kmalloc(cache, object, cache->object_size, flags);
-+	return kasan_kmalloc(cache, object, cache->object_size, flags, false);
- }
- 
- static inline bool shadow_invalid(u8 tag, s8 shadow_byte)
-@@ -451,7 +451,7 @@ bool kasan_slab_free(struct kmem_cache *cache, void *object, unsigned long ip)
- }
- 
- void * __must_check kasan_kmalloc(struct kmem_cache *cache, const void *object,
--					size_t size, gfp_t flags)
-+				size_t size, gfp_t flags, bool krealloc)
- {
- 	unsigned long redzone_start;
- 	unsigned long redzone_end;
-@@ -468,8 +468,12 @@ void * __must_check kasan_kmalloc(struct kmem_cache *cache, const void *object,
- 	redzone_end = round_up((unsigned long)object + cache->object_size,
- 				KASAN_SHADOW_SCALE_SIZE);
- 
--	if (IS_ENABLED(CONFIG_KASAN_SW_TAGS))
--		tag = assign_tag(cache, object, false);
-+	if (IS_ENABLED(CONFIG_KASAN_SW_TAGS)) {
-+		if (krealloc)
-+			tag = get_tag(object);
-+		else
-+			tag = assign_tag(cache, object, false);
-+	}
- 
- 	/* Tag is ignored in set_tag without CONFIG_KASAN_SW_TAGS */
- 	kasan_unpoison_shadow(set_tag(object, tag), size);
-@@ -508,19 +512,19 @@ void * __must_check kasan_kmalloc_large(const void *ptr, size_t size,
- 	return (void *)ptr;
- }
- 
--void * __must_check kasan_krealloc(const void *object, size_t size, gfp_t flags)
-+void kasan_krealloc(const void *object, size_t size, gfp_t flags)
- {
- 	struct page *page;
- 
- 	if (unlikely(object == ZERO_SIZE_PTR))
--		return (void *)object;
-+		return;
- 
- 	page = virt_to_head_page(object);
- 
- 	if (unlikely(!PageSlab(page)))
--		return kasan_kmalloc_large(object, size, flags);
-+		kasan_kmalloc_large(object, size, flags);
- 	else
--		return kasan_kmalloc(page->slab_cache, object, size, flags);
-+		kasan_kmalloc(page->slab_cache, object, size, flags, true);
- }
- 
- void kasan_poison_kfree(void *ptr, unsigned long ip)
-diff --git a/mm/slab.c b/mm/slab.c
-index 73fe23e649c9..09b54386cf67 100644
---- a/mm/slab.c
-+++ b/mm/slab.c
-@@ -3604,7 +3604,7 @@ kmem_cache_alloc_trace(struct kmem_cache *cachep, gfp_t flags, size_t size)
- 
- 	ret = slab_alloc(cachep, flags, _RET_IP_);
- 
--	ret = kasan_kmalloc(cachep, ret, size, flags);
-+	ret = kasan_kmalloc(cachep, ret, size, flags, false);
- 	trace_kmalloc(_RET_IP_, ret,
- 		      size, cachep->size, flags);
- 	return ret;
-@@ -3647,7 +3647,7 @@ void *kmem_cache_alloc_node_trace(struct kmem_cache *cachep,
- 
- 	ret = slab_alloc_node(cachep, flags, nodeid, _RET_IP_);
- 
--	ret = kasan_kmalloc(cachep, ret, size, flags);
-+	ret = kasan_kmalloc(cachep, ret, size, flags, false);
- 	trace_kmalloc_node(_RET_IP_, ret,
- 			   size, cachep->size,
- 			   flags, nodeid);
-@@ -3668,7 +3668,7 @@ __do_kmalloc_node(size_t size, gfp_t flags, int node, unsigned long caller)
- 	if (unlikely(ZERO_OR_NULL_PTR(cachep)))
- 		return cachep;
- 	ret = kmem_cache_alloc_node_trace(cachep, flags, node, size);
--	ret = kasan_kmalloc(cachep, ret, size, flags);
-+	ret = kasan_kmalloc(cachep, ret, size, flags, false);
- 
- 	return ret;
- }
-@@ -3706,7 +3706,7 @@ static __always_inline void *__do_kmalloc(size_t size, gfp_t flags,
- 		return cachep;
- 	ret = slab_alloc(cachep, flags, caller);
- 
--	ret = kasan_kmalloc(cachep, ret, size, flags);
-+	ret = kasan_kmalloc(cachep, ret, size, flags, false);
- 	trace_kmalloc(caller, ret,
- 		      size, cachep->size, flags);
- 
-diff --git a/mm/slab_common.c b/mm/slab_common.c
-index 81732d05e74a..b55c58178f83 100644
---- a/mm/slab_common.c
-+++ b/mm/slab_common.c
-@@ -1507,7 +1507,7 @@ static __always_inline void *__do_krealloc(const void *p, size_t new_size,
- 		ks = ksize(p);
- 
- 	if (ks >= new_size) {
--		p = kasan_krealloc((void *)p, new_size, flags);
-+		kasan_krealloc((void *)p, new_size, flags);
- 		return (void *)p;
- 	}
- 
-diff --git a/mm/slub.c b/mm/slub.c
-index 1e3d0ec4e200..20aa0547acbf 100644
---- a/mm/slub.c
-+++ b/mm/slub.c
-@@ -2763,7 +2763,7 @@ void *kmem_cache_alloc_trace(struct kmem_cache *s, gfp_t gfpflags, size_t size)
- {
- 	void *ret = slab_alloc(s, gfpflags, _RET_IP_);
- 	trace_kmalloc(_RET_IP_, ret, size, s->size, gfpflags);
--	ret = kasan_kmalloc(s, ret, size, gfpflags);
-+	ret = kasan_kmalloc(s, ret, size, gfpflags, false);
- 	return ret;
- }
- EXPORT_SYMBOL(kmem_cache_alloc_trace);
-@@ -2791,7 +2791,7 @@ void *kmem_cache_alloc_node_trace(struct kmem_cache *s,
- 	trace_kmalloc_node(_RET_IP_, ret,
- 			   size, s->size, gfpflags, node);
- 
--	ret = kasan_kmalloc(s, ret, size, gfpflags);
-+	ret = kasan_kmalloc(s, ret, size, gfpflags, false);
- 	return ret;
- }
- EXPORT_SYMBOL(kmem_cache_alloc_node_trace);
-@@ -3364,7 +3364,7 @@ static void early_kmem_cache_node_alloc(int node)
- 	init_tracking(kmem_cache_node, n);
- #endif
- 	n = kasan_kmalloc(kmem_cache_node, n, sizeof(struct kmem_cache_node),
--		      GFP_KERNEL);
-+		      GFP_KERNEL, false);
- 	page->freelist = get_freepointer(kmem_cache_node, n);
- 	page->inuse = 1;
- 	page->frozen = 0;
-@@ -3779,7 +3779,7 @@ void *__kmalloc(size_t size, gfp_t flags)
- 
- 	trace_kmalloc(_RET_IP_, ret, size, s->size, flags);
- 
--	ret = kasan_kmalloc(s, ret, size, flags);
-+	ret = kasan_kmalloc(s, ret, size, flags, false);
- 
- 	return ret;
- }
-@@ -3823,7 +3823,7 @@ void *__kmalloc_node(size_t size, gfp_t flags, int node)
- 
- 	trace_kmalloc_node(_RET_IP_, ret, size, s->size, flags, node);
- 
--	ret = kasan_kmalloc(s, ret, size, flags);
-+	ret = kasan_kmalloc(s, ret, size, flags, false);
- 
- 	return ret;
- }
--- 
-2.20.1.415.g653613c723-goog
-
+thanks
+-john
 
 _______________________________________________
 linux-arm-kernel mailing list
