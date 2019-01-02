@@ -2,77 +2,77 @@ Return-Path: <SRS0=RmN+=PK=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.4 required=3.0 tests=DKIMWL_WL_HIGH,
+X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,
 	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 10ED9C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 17:36:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 53E46C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 17:36:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DD07A218EA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 17:36:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 226EE218EA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 17:36:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="H+B/KugB";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="eInQQm6s"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DD07A218EA
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kBHxLpmF";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="lAlrMqV+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 226EE218EA
 Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=dlHuOfX/9MmBwnHO5heu1sB+zn8nKoZjhSosT7GhLm8=; b=H+B/KugBg7Oq6N
-	6Q3Tb82dmyyqHavvapeAqJhi1NEnCo97zjCbq6P+51Ah7ffhaiTsNdTE42xtDDk9sptrtqeuiGMnT
-	629JUi99F8ozSsyikA8NyVYQ2WXpCyZDS/RCIp0beE+yOLa8ShDyQaTnbk7eKlb5aU+lGww5KNCme
-	h3K7lNojCfGCHVGGSnx4ijmbewwlcxdN0x7rbpwuqQbfOiYhj/j6Puzq9nRDutwiPKnEPac+1iXAS
-	VNmD/FFptF/XmK7b3W+JN/JnKFgTjfu+69w9PDpXpISSxpPnkVk7oGxhGyFxmoPu+o+MYENWuZDuL
-	IUs/zgXcncRcqm2fmlkQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=0IYlAZYs1ScmKRQJ0X+GZ0WEYvbCM7HuT5U+u5IDuuo=; b=kBHxLpmFcYVbpl
+	dQPdFcOjoB565Uwilel6pYAoHwFOoNF/J6Iiz/c2KO4fAB3bFaH8xhOSQqza2bDB7CyY3PEQKQuwY
+	IH3L1sdPfM0IoieZOucKx/eMYX5+YNI1CptwcqKvkk1AAqxEBBK1WiAh85FSLt52NYf/QswDarMQY
+	DMKn1zbS3i6F1GJG1htY0GlsIFwDNmmyYUEHfX1jxghaJ/tFC2kjKKMSY4DjOaBCL+9/PL+tuRvcB
+	cUn8UVXpllKp78a0VKrkra9RnY/jJnuhBTLAw2puB+4htSCg9hLI+L5MfkOwJbpkpLdmhJgiKRTAe
+	2LPwvJ5X9o7oTaAp2xCg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gekRM-0005SH-0Q; Wed, 02 Jan 2019 17:36:24 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1gekRV-0005cU-Ot; Wed, 02 Jan 2019 17:36:33 +0000
+Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gekRH-0005PP-Ok
+ id 1gekRH-0005PT-U7
  for linux-arm-kernel@lists.infradead.org; Wed, 02 Jan 2019 17:36:21 +0000
-Received: by mail-wr1-x443.google.com with SMTP id c14so31296178wrr.0
+Received: by mail-wm1-x342.google.com with SMTP id d15so27257960wmb.3
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 02 Jan 2019 09:36:14 -0800 (PST)
+ Wed, 02 Jan 2019 09:36:16 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=WqvxLRjs/8snQEsiyX94OkFXxMlQW9YzCnB6B4t2n8E=;
- b=eInQQm6sEDrSW8Ri+2HTk9tz3KWL9anV9aQzBFXwpIjQ4AslOvmf6JrAnCjVPVskuq
- ggP7jCm5cJAgtjJ/fZmLjKcm/Xveqors2DstMRikDY34EH2+KXOkbSK4m0kIaz6QLcbI
- otUByN5572pZdK9BeiJ9bovq8A4K9xoY6l8mD3nYm3QjXsnb16R2Wg/qaxZGqvXtEoc6
- UNb5Ta0RlReeCtasTgUG2dYzC6YmZAs1X6pvyDHur7RbcME8G/AXmy+Yrdw9M7dJ+YMs
- kqL+2tdPZkveGaEuzfj676vUysAAq7naoRF0853qdrcjSVmYRPA26o6RQaPkZzaIT0/V
- dC8w==
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=ZsJFoVJf3IIY1mc4G8PoWo9I+7LoITd3hZ2Vo5zkWAc=;
+ b=lAlrMqV+AGSkWFg5yrz2JZbPk6RoKIqYdaAHGwn+o5V/PT3wER7ZaMKwkE5hdb8SuZ
+ LPObNhnGQkXOjiShOE7KLEe+L83ocrpqNvR5qQwkMP5Jd9WvyCHU1XtGvb8QckxB9cCo
+ gFwgxa8I2Z6nAI/XlNVC2sTC4UcKZCyjZClhL4LmKKz7nwSQmrvkj3eDWI5v8Qyf3dVU
+ KN+qP7/l7ObKbX4pR3rxTA8VymtrWoOGIyD2lKYFGn5sBzxkrkvUhOi4CFKYCGGGVkVv
+ 6IVZkI9DYKZ4d6sI3dIg+OQntY2oMujijkTJspbpA7hPOjSgmSOqiAXGwZvhxQwTzZsC
+ vurA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=WqvxLRjs/8snQEsiyX94OkFXxMlQW9YzCnB6B4t2n8E=;
- b=t8untBXh7w5dGx6IbuPgW8YY00dCfttlqLrHCmhpYjoE/11VXAPV17eqMmkIOLMog0
- AyCee/UligTThOFVGnKntUEIwgXJmudl3LuhVOFlTtHnlD0AFGwKAneN8v3x018Zjrpp
- vb33Rs9O0ge8hGerMa5EA+XgJKVthONrmpWLsvFtVvKSzfWxN6bP75cCvvrqKb2khsIm
- 24mYJc44sTjMJ1hsDTDIM2ixElW9+651BIjyjbGAnbO/HD+iV292LBQn8aKEAVPchkIp
- k5pD1BVQ5HA53lM9dc12LvB9/u54xjuCswWH4wUxX3o7s5cDx4l+YQs64QVxWPJn/QR7
- 3QvA==
-X-Gm-Message-State: AJcUukf6dGuVpsF8u42i1UneN9Thku5G/170w2JrUkYFg9SY+0fgvLMh
- vthrZgEyiNlRsx6YhK7r6VVjIA==
-X-Google-Smtp-Source: ALg8bN66RPF5pJV4sTABV8H6vo3c/v+grDb2wiefBxmR4QoVbGBAeb/TQmsmt/DjfRVG2/5x2PUzCA==
-X-Received: by 2002:a5d:5182:: with SMTP id k2mr38617647wrv.121.1546450573026; 
- Wed, 02 Jan 2019 09:36:13 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=ZsJFoVJf3IIY1mc4G8PoWo9I+7LoITd3hZ2Vo5zkWAc=;
+ b=YMRaK5Mzu7LEa0HoUkvHl/74x384h7Cx74jVGOFgVqh2WQHQ0030GWNZkSFF8NyeFS
+ SEgV1jMv+ghPcGpf1/NEe8B6ychfOG5zcBWX6Sbp6NCm6S+HRf0fPb+qzZHvNWWkZa0O
+ NQ3y5Lhz+uBVzHrvgdoQ35cmGL2TbnLHt3xSRm6LjK1HCgqlKUGCRbP+P3M/BJF100Xi
+ jPUIVqWW0iV5Sb9yXsxm3G/X504jW7LZBSoems1C49GoFZJMdOjBQ5RH3NmYKexAAdes
+ DU+0q40aLfSaD2kPkQIfsUhIZ3AMZ6QQ96pMU/7jfDnkLjDgX3c9BkckwQ0WLxKJQlkb
+ 0q+g==
+X-Gm-Message-State: AA+aEWbCIg0cnIPHgQUb5hbv7iibmw8Sg0wdecKos0sY602xFqEL/0lX
+ GQigvGz64j4JyJ93rkgJRNwQxA==
+X-Google-Smtp-Source: AFSGD/VaDhJ7tSu1Glf9joOK/KwNwzfxgXuAYl8ckeRSP/aFiyqPuu4bYT2MGG+9MfJfx5N6OAZhBA==
+X-Received: by 2002:a1c:7511:: with SMTP id o17mr35511822wmc.42.1546450574842; 
+ Wed, 02 Jan 2019 09:36:14 -0800 (PST)
 Received: from andreyknvl0.muc.corp.google.com
  ([2a00:79e0:15:13:8ce:d7fa:9f4c:492])
- by smtp.gmail.com with ESMTPSA id t4sm45987076wrm.6.2019.01.02.09.36.10
+ by smtp.gmail.com with ESMTPSA id t4sm45987076wrm.6.2019.01.02.09.36.13
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 02 Jan 2019 09:36:11 -0800 (PST)
+ Wed, 02 Jan 2019 09:36:13 -0800 (PST)
 From: Andrey Konovalov <andreyknvl@google.com>
 To: Andrey Ryabinin <aryabinin@virtuozzo.com>,
  Alexander Potapenko <glider@google.com>,
@@ -95,14 +95,17 @@ To: Andrey Ryabinin <aryabinin@virtuozzo.com>,
  linux-doc@vger.kernel.org, linux-kernel@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org, linux-sparse@vger.kernel.org,
  linux-mm@kvack.org, linux-kbuild@vger.kernel.org
-Subject: [PATCH v2 0/3] kasan: tag-based mode fixes
-Date: Wed,  2 Jan 2019 18:36:05 +0100
-Message-Id: <cover.1546450432.git.andreyknvl@google.com>
+Subject: [PATCH v2 1/3] kasan,
+ arm64: use ARCH_SLAB_MINALIGN instead of manual aligning
+Date: Wed,  2 Jan 2019 18:36:06 +0100
+Message-Id: <b16c90197bb2c06c780e6e981c40345e03fda465.1546450432.git.andreyknvl@google.com>
 X-Mailer: git-send-email 2.20.1.415.g653613c723-goog
+In-Reply-To: <cover.1546450432.git.andreyknvl@google.com>
+References: <cover.1546450432.git.andreyknvl@google.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190102_093619_867207_14C3386D 
-X-CRM114-Status: GOOD (  11.66  )
+X-CRM114-CacheID: sfid-20190102_093619_980459_B7DEA227 
+X-CRM114-Status: GOOD (  14.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -126,29 +129,57 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Andrew,
+Instead of changing cache->align to be aligned to KASAN_SHADOW_SCALE_SIZE
+in kasan_cache_create() we can reuse the ARCH_SLAB_MINALIGN macro.
 
-This patchset includes an updated "kasan, arm64: use ARCH_SLAB_MINALIGN
-instead of manual aligning" patch and fixes for two more issues that
-were uncovered while testing with a variety of different config options
-enabled.
+Suggested-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
+Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+---
+ arch/arm64/include/asm/kasan.h | 4 ++++
+ include/linux/slab.h           | 1 +
+ mm/kasan/common.c              | 2 --
+ 3 files changed, 5 insertions(+), 2 deletions(-)
 
-Thanks!
-
-Andrey Konovalov (3):
-  kasan, arm64: use ARCH_SLAB_MINALIGN instead of manual aligning
-  kasan: make tag based mode work with CONFIG_HARDENED_USERCOPY
-  kasan: fix krealloc handling for tag-based mode
-
- arch/arm64/include/asm/kasan.h |  4 ++++
- include/linux/kasan.h          | 14 +++++---------
- include/linux/slab.h           |  5 +++--
- mm/kasan/common.c              | 22 ++++++++++++----------
- mm/slab.c                      |  8 ++++----
- mm/slab_common.c               |  2 +-
- mm/slub.c                      | 12 +++++++-----
- 7 files changed, 36 insertions(+), 31 deletions(-)
-
+diff --git a/arch/arm64/include/asm/kasan.h b/arch/arm64/include/asm/kasan.h
+index b52aacd2c526..ba26150d578d 100644
+--- a/arch/arm64/include/asm/kasan.h
++++ b/arch/arm64/include/asm/kasan.h
+@@ -36,6 +36,10 @@
+ #define KASAN_SHADOW_OFFSET     (KASAN_SHADOW_END - (1ULL << \
+ 					(64 - KASAN_SHADOW_SCALE_SHIFT)))
+ 
++#ifdef CONFIG_KASAN_SW_TAGS
++#define ARCH_SLAB_MINALIGN	(1ULL << KASAN_SHADOW_SCALE_SHIFT)
++#endif
++
+ void kasan_init(void);
+ void kasan_copy_shadow(pgd_t *pgdir);
+ asmlinkage void kasan_early_init(void);
+diff --git a/include/linux/slab.h b/include/linux/slab.h
+index 11b45f7ae405..d87f913ab4e8 100644
+--- a/include/linux/slab.h
++++ b/include/linux/slab.h
+@@ -16,6 +16,7 @@
+ #include <linux/overflow.h>
+ #include <linux/types.h>
+ #include <linux/workqueue.h>
++#include <linux/kasan.h>
+ 
+ 
+ /*
+diff --git a/mm/kasan/common.c b/mm/kasan/common.c
+index 03d5d1374ca7..44390392d4c9 100644
+--- a/mm/kasan/common.c
++++ b/mm/kasan/common.c
+@@ -298,8 +298,6 @@ void kasan_cache_create(struct kmem_cache *cache, unsigned int *size,
+ 		return;
+ 	}
+ 
+-	cache->align = round_up(cache->align, KASAN_SHADOW_SCALE_SIZE);
+-
+ 	*flags |= SLAB_KASAN;
+ }
+ 
 -- 
 2.20.1.415.g653613c723-goog
 
