@@ -2,75 +2,89 @@ Return-Path: <SRS0=RmN+=PK=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-16.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4504FC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 12:26:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 546BFC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 12:27:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0EDD9206A3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 12:26:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 22BD9218CD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 12:27:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qv//FseZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0EDD9206A3
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=public-files.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UiHkZKG1";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="KUFtcbKg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 22BD9218CD
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=dU+U4r9S4sUKIXILK2xGVBKLzOErC6gYuWadinzqAeo=; b=qv//FseZJqro54J+2MSaP0Gsnt
-	sMk+szg3vS9aEFTmLB8RG/wiyYOmJ95Y5lvLJozK9HOGO0ASwZzdJy5m/EJhTVH9JVRAs7rDUs0mV
-	m8Anu1+DaxSmbqhui74LRsDtwTWjedeUUoBXg9hqr+OwyXKXeDwxeDyo9x/2cAMp+zXmCuCZaHYNw
-	qfvp1TOYbNtUdyQZ8y4mvptTh7hQyqCSQrl2eem6KxJzduWaq3FeAo6jKZs+DbVBksTAE3eQP5Iff
-	Wq4k65y1Qd537M6makRpTAyvHMMloodHtgLG3CJCpFZFkK6nV52gxn+KyHgtq9pYsl4PM2v7sOeir
-	GW5NpYJw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=ZXFJH53/1oDEboIuPV88TUZVcYWcHbvUyl70icUohhI=; b=UiHkZKG10EQ3IUi8S9S5IYl5t
+	SZu2sYrYrMIfJOMEo5okHDJ2KExrLMB18ArRI37/Q/L3Z7Ncv4kcSbJFzDc+IeChqaxN3l8p3UZ7g
+	3eFCQNd68ggW5PEdWXbJv1Lm8I1+0zBgF8ofOGapcawk/Gs67E/uPyJX4x2QQBdcHsTH6A2QcZRCl
+	nul5NbVIyFoDIECUKTaSB5sdDMc4VtRk94II1R6pxEKm5GjQHgNR/EA4JruL6PHvbdQt4W6eusODP
+	9T6goajHS253NyK/dps/9Y1FVfbaBfXl6CV34bYRH15nh2ZYaXQxFIFO0nig4Jh/rA1DVMKu1rNoU
+	cg9ynGuWQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gefb8-0002mY-1I; Wed, 02 Jan 2019 12:26:10 +0000
-Received: from mout.gmx.net ([212.227.15.15])
+	id 1gefcL-00038y-Lk; Wed, 02 Jan 2019 12:27:25 +0000
+Received: from lelv0143.ext.ti.com ([198.47.23.248])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gefb1-0002cF-QT; Wed, 02 Jan 2019 12:26:07 +0000
-Received: from localhost.localdomain ([91.14.68.120]) by mail.gmx.com
- (mrgmx001 [212.227.17.190]) with ESMTPSA (Nemesis) id
- 0Lh6sJ-1h92Cl2awh-00oaja; Wed, 02 Jan 2019 13:25:52 +0100
-From: Frank Wunderlich <frank-w@public-files.de>
-To: linux-arm-kernel@lists.infradead.org,
-	linux-mediatek@lists.infradead.org
-Subject: [PATCH] drm/mediatek: Add MTK Framebuffer-Device (mt7623)
-Date: Wed,  2 Jan 2019 13:25:40 +0100
-Message-Id: <20190102122540.7002-2-frank-w@public-files.de>
-X-Mailer: git-send-email 2.17.1
-In-Reply-To: <20190102122540.7002-1-frank-w@public-files.de>
-References: <20190102122540.7002-1-frank-w@public-files.de>
-X-Provags-ID: V03:K1:HMPFNeiM6bCzXZfUJbgwLqs+F5Pr4SnT1Q8wqMrORGekjEAWnCK
- cHSIEf2JNxFymUPmwMQgRGnutsch7KEfLtazOdi+1sdTWxCjr2XIOf+gLsRWAcppU0AyrAb
- 0OCNrLftw1Cl7O7UUQsJKqkWb67V6An8z95ybsQdsG7Z9Pk8wOWsscB3iie1wa/XNgbFz+/
- FGaTobaV1KK5vA9vmk+1g==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:vA1tl7qwe2g=:iAAR3XGKjpKvs4vupWX3bC
- hD3H6dQLEy6GIH5RfSDS8YNgZmWGKqvXY9XOiBz4NvuC/BP/+1vttuf97Eu3rcrVDdnSawGTV
- QKHPcQlomJl2sSEphdJqMz8Hy78yMUzaThrdyDDwr7h4RW9wVHSdGxg7Ml2/4RAoHyZQG5wjo
- hNDavJphdh1KeI+eRoF3DqUQnrpOFgwgUUXWlp/ijpqb2N5KSs97CGEso37iRpppVWRnLjswa
- xLjgeAmkmXxX7mQ2R+WQSf6OkfjpE8zhi+oi7LZJsqpHmozlwsnG13tQ2bpcIbNR2z9ofr5/W
- f4m9XoSZ+WoZXGyYK07geecYPxEEqd9+guubcLPA2n7RRTeGH9fG2GT9aNot4UwK/rjwG6zkd
- eF1hVaf8nmTby3NZqKgNGxZgzxsgPA9e6S4eulWRVV6vfpdggCZC/jH8T0ux48lrtD90dcyA1
- Sw7+QKEHpgVK4xJkl11Yi1mMIB63MMJnt5x0ixgfQM4tbDuE5zcGA0ZMyDa1z07EtYPLr4utb
- /CsUtSVy++6T4LnYRMCgMFE5GqVK0l3EEkciWXcTtJgBEmmig7PMVByq7mLtBTti02Wwwttb+
- b3DZjdZ+rvBBQXiAcQv6mzeVGOLofqkz8ha0FwG6H41yltVZ88CV5rDNYzvmQOeqOmYIps5jN
- YKouirxMvrK6HodLYyekvDz26o0rs6FiTCDfqnsFrTkgZw2/29w6IYUQ4r/GsnFrV6LSBNGWA
- nJ6Hj65X35PuHeOv7PV56JyOe4BeETU1JUTk43GygJls0hpBnuhfXYGQ6Mwwpi69ZJmcmsSjl
- C3RRTkXhb8CjHiDinHWGO8usre8VtxX4sEck/wBY1jp9G+ELDNv7e7HhQPFOv3vt9ulR/LdCr
- HCKuaeUeaRPbBaaT1I8J4OgISgTP9rwn6kBPCJ5H+liwoPQrZByaT276p1QlZn
+ id 1gefcH-00038W-KH
+ for linux-arm-kernel@lists.infradead.org; Wed, 02 Jan 2019 12:27:23 +0000
+Received: from fllv0035.itg.ti.com ([10.64.41.0])
+ by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x02CR3H2023476;
+ Wed, 2 Jan 2019 06:27:03 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1546432023;
+ bh=lOs1pYtZZ4BDSEjaj8NL32uFIdC+voVOPDxUtK3XZqQ=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=KUFtcbKgX64YuIFQN/gkVghOgmt2bIcYbClq5J+EMbkunB6vvvuI8XJ3/8qk8uXwN
+ hXCumOAtKLYIJGY1sE2jrArF4MWBx7k5mrc/wUpUDQ6ijRnjHWMAOMfzcTZwayaIbC
+ ZKcSWfNwmgLyVrCVi6ovaOW5+jn9fXvc/bfjsK1I=
+Received: from DLEE104.ent.ti.com (dlee104.ent.ti.com [157.170.170.34])
+ by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x02CR29h028417
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Wed, 2 Jan 2019 06:27:03 -0600
+Received: from DLEE106.ent.ti.com (157.170.170.36) by DLEE104.ent.ti.com
+ (157.170.170.34) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Wed, 2
+ Jan 2019 06:27:02 -0600
+Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE106.ent.ti.com
+ (157.170.170.36) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Wed, 2 Jan 2019 06:27:02 -0600
+Received: from [172.24.190.117] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x02CQwwT017314;
+ Wed, 2 Jan 2019 06:26:59 -0600
+Subject: Re: [RFC PATCH v4 12/13] irqchip: ti-sci-inta: Add support for
+ Interrupt Aggregator driver
+To: Peter Ujfalusi <peter.ujfalusi@ti.com>, <marc.zyngier@arm.com>, Nishanth
+ Menon <nm@ti.com>, Santosh Shilimkar <ssantosh@kernel.org>, Rob Herring
+ <robh+dt@kernel.org>, <tglx@linutronix.de>, <jason@lakedaemon.net>
+References: <20181227060829.5080-1-lokeshvutla@ti.com>
+ <20181227061313.5451-1-lokeshvutla@ti.com>
+ <20181227061313.5451-12-lokeshvutla@ti.com>
+ <9efbb01b-2ef9-13e7-f871-8db2c92844ee@ti.com>
+From: Lokesh Vutla <lokeshvutla@ti.com>
+Message-ID: <50da7038-9b1c-6910-2cf1-78fa98ddc3bd@ti.com>
+Date: Wed, 2 Jan 2019 17:56:47 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
+MIME-Version: 1.0
+In-Reply-To: <9efbb01b-2ef9-13e7-f871-8db2c92844ee@ti.com>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190102_042604_894871_B5B6D42B 
-X-CRM114-Status: GOOD (  19.61  )
+X-CRM114-CacheID: sfid-20190102_042721_938809_0F429F77 
+X-CRM114-Status: GOOD (  24.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,382 +96,129 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: CK Hu <ck.hu@mediatek.com>, Alexander Ryabchenko <d3adme4t@gmail.com>,
- Frank Wunderlich <frank-w@public-files.de>
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Tero Kristo <t-kristo@ti.com>,
+ Device Tree Mailing List <devicetree@vger.kernel.org>,
+ Sekhar Nori <nsekhar@ti.com>, linux-kernel@vger.kernel.org,
+ Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
+Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="utf-8"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: CK Hu <ck.hu@mediatek.com>
-
-This patch adds Framebuffer-Driver for Mediatek
-
-currently tested on mt7623, maybe works on other platforms
-MTK-FBDev written by CK Hu and ported from 4.4
-
-based on patchset drm/hdmi for 7623 v5 (except last part included in 4.20)
-  https://patchwork.kernel.org/project/linux-mediatek/list/?series=25989
-
-depends on
-  dts-patch (resend of 5/5, parts 1-4 already in 4.20):
-    "arm: dts: mt7623: add display subsystem related device nodes"
-    https://patchwork.kernel.org/patch/10588951/
-  2 bugfix-patches from bibby hsieh
-    fix-boot-up-for-720-and-480-but-1080
-    using-different-round-rate-for-mt7623
-  1 Patch from Ryder Lee
-    http://forum.banana-pi.org/t/kernel-4-19-rc1-for-testers/6618/52
-
-full working tree here for reference:
-https://github.com/frank-w/BPI-R2-4.14/commits/4.20-hdmiv5
-
-Signed-off-by: CK Hu <ck.hu@mediatek.com>
-Signed-off-by: Alexander Ryabchenko <d3adme4t@gmail.com>
-Signed-off-by: Frank Wunderlich <frank-w@public-files.de>
-Tested-by: Frank Wunderlich <frank-w@public-files.de>
----
- drivers/gpu/drm/mediatek/Makefile        |   1 +
- drivers/gpu/drm/mediatek/mtk_drm_drv.c   |   6 +
- drivers/gpu/drm/mediatek/mtk_drm_drv.h   |   4 +
- drivers/gpu/drm/mediatek/mtk_drm_fb.c    |  13 ++
- drivers/gpu/drm/mediatek/mtk_drm_fb.h    |   3 +
- drivers/gpu/drm/mediatek/mtk_drm_fbdev.c | 178 +++++++++++++++++++++++
- drivers/gpu/drm/mediatek/mtk_drm_fbdev.h |  25 ++++
- 7 files changed, 230 insertions(+)
- create mode 100644 drivers/gpu/drm/mediatek/mtk_drm_fbdev.c
- create mode 100644 drivers/gpu/drm/mediatek/mtk_drm_fbdev.h
-
-diff --git a/drivers/gpu/drm/mediatek/Makefile b/drivers/gpu/drm/mediatek/Makefile
-index 82ae49c64221..d71e57dea77a 100644
---- a/drivers/gpu/drm/mediatek/Makefile
-+++ b/drivers/gpu/drm/mediatek/Makefile
-@@ -14,6 +14,7 @@ mediatek-drm-y := mtk_disp_color.o \
- 		  mtk_mipi_tx.o \
- 		  mtk_dpi.o
- 
-+mediatek-drm-$(CONFIG_DRM_FBDEV_EMULATION) += mtk_drm_fbdev.o
- obj-$(CONFIG_DRM_MEDIATEK) += mediatek-drm.o
- 
- mediatek-drm-hdmi-objs := mtk_cec.o \
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-index 7800822b4db1..51f1ec3412d3 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-@@ -32,6 +32,7 @@
- #include "mtk_drm_ddp_comp.h"
- #include "mtk_drm_drv.h"
- #include "mtk_drm_fb.h"
-+#include "mtk_drm_fbdev.h"
- #include "mtk_drm_gem.h"
- 
- #define DRIVER_NAME "mediatek"
-@@ -299,6 +300,10 @@ static int mtk_drm_kms_init(struct drm_device *drm)
- 	drm_kms_helper_poll_init(drm);
- 	drm_mode_config_reset(drm);
- 
-+	ret = mtk_fbdev_init(drm);
-+	if (ret)
-+		goto err_component_unbind;
-+
- 	return 0;
- 
- err_component_unbind:
-@@ -311,6 +316,7 @@ static int mtk_drm_kms_init(struct drm_device *drm)
- 
- static void mtk_drm_kms_deinit(struct drm_device *drm)
- {
-+	mtk_fbdev_fini(drm);
- 	drm_kms_helper_poll_fini(drm);
- 
- 	component_unbind_all(drm->dev, drm);
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-index 256a3ff2e66e..56129a21fb2b 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-@@ -14,6 +14,7 @@
- #ifndef MTK_DRM_DRV_H
- #define MTK_DRM_DRV_H
- 
-+#include <drm/drm_fb_helper.h>
- #include <linux/io.h>
- #include "mtk_drm_ddp_comp.h"
- 
-@@ -43,6 +44,7 @@ struct mtk_drm_private {
- 	struct drm_device *drm;
- 	struct device *dma_dev;
- 
-+	struct drm_crtc *crtc[MAX_CRTC];
- 	unsigned int num_pipes;
- 
- 	struct device_node *mutex_node;
-@@ -59,6 +61,8 @@ struct mtk_drm_private {
- 	} commit;
- 
- 	struct drm_atomic_state *suspend_state;
-+	struct drm_fb_helper fb_helper;
-+	struct drm_gem_object *fbdev_bo;
- };
- 
- extern struct platform_driver mtk_ddp_driver;
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fb.c b/drivers/gpu/drm/mediatek/mtk_drm_fb.c
-index be5f6f1daf55..7533aa4733d2 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_fb.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_fb.c
-@@ -56,6 +56,19 @@ static struct drm_framebuffer *mtk_drm_framebuffer_init(struct drm_device *dev,
- 	return fb;
- }
- 
-+struct drm_framebuffer *mtk_drm_framebuffer_create(struct drm_device *dev,
-+					const struct drm_mode_fb_cmd2 *mode,
-+					struct drm_gem_object *obj)
-+{
-+	struct drm_framebuffer *mtk_fb;
-+
-+	mtk_fb = mtk_drm_framebuffer_init(dev, mode, obj);
-+	if (IS_ERR(mtk_fb))
-+		return ERR_CAST(mtk_fb);
-+
-+	return mtk_fb;
-+}
-+
- /*
-  * Wait for any exclusive fence in fb's gem object's reservation object.
-  *
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fb.h b/drivers/gpu/drm/mediatek/mtk_drm_fb.h
-index 7f976b196a15..e49e015380d0 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_fb.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_fb.h
-@@ -18,5 +18,8 @@ int mtk_fb_wait(struct drm_framebuffer *fb);
- struct drm_framebuffer *mtk_drm_mode_fb_create(struct drm_device *dev,
- 					       struct drm_file *file,
- 					       const struct drm_mode_fb_cmd2 *cmd);
-+struct drm_framebuffer *mtk_drm_framebuffer_create(struct drm_device *dev,
-+		const struct drm_mode_fb_cmd2 *mode,
-+		struct drm_gem_object *obj);
- 
- #endif /* MTK_DRM_FB_H */
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fbdev.c b/drivers/gpu/drm/mediatek/mtk_drm_fbdev.c
-new file mode 100644
-index 000000000000..9670f50d1247
---- /dev/null
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_fbdev.c
-@@ -0,0 +1,178 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (c) 2018 MediaTek Inc.
-+ * Author: CK Hu <ck.hu@mediatek.com>
-+ */
-+
-+#include <drm/drmP.h>
-+#include <drm/drm_crtc_helper.h>
-+#include <drm/drm_fb_helper.h>
-+#include <drm/drm_gem.h>
-+
-+#include "mtk_drm_drv.h"
-+#include "mtk_drm_fb.h"
-+#include "mtk_drm_gem.h"
-+#include "mtk_drm_fbdev.h"
-+
-+#define to_drm_private(x) \
-+		container_of(x, struct mtk_drm_private, fb_helper)
-+
-+static int mtk_drm_fbdev_mmap(struct fb_info *info, struct vm_area_struct *vma)
-+{
-+	struct drm_fb_helper *helper = info->par;
-+	struct mtk_drm_private *private = to_drm_private(helper);
-+
-+	return mtk_drm_gem_mmap_buf(private->fbdev_bo, vma);
-+}
-+
-+static struct fb_ops mtk_fbdev_ops = {
-+	.owner = THIS_MODULE,
-+	DRM_FB_HELPER_DEFAULT_OPS,
-+	.fb_fillrect = drm_fb_helper_cfb_fillrect,
-+	.fb_copyarea = drm_fb_helper_cfb_copyarea,
-+	.fb_imageblit = drm_fb_helper_cfb_imageblit,
-+	.fb_check_var = drm_fb_helper_check_var,
-+	.fb_set_par = drm_fb_helper_set_par,
-+	.fb_blank = drm_fb_helper_blank,
-+	.fb_pan_display = drm_fb_helper_pan_display,
-+	.fb_setcmap = drm_fb_helper_setcmap,
-+	.fb_mmap = mtk_drm_fbdev_mmap,
-+};
-+
-+static int mtk_fbdev_probe(struct drm_fb_helper *helper,
-+			   struct drm_fb_helper_surface_size *sizes)
-+{
-+	struct drm_device *dev = helper->dev;
-+	struct mtk_drm_private *private = to_drm_private(helper);
-+	struct drm_mode_fb_cmd2 mode = { 0 };
-+	struct mtk_drm_gem_obj *mtk_gem;
-+	struct fb_info *info;
-+	struct drm_framebuffer *fb;
-+	unsigned int bytes_per_pixel;
-+	unsigned long offset;
-+	size_t size;
-+	int err = 0;
-+
-+	bytes_per_pixel = DIV_ROUND_UP(sizes->surface_bpp, 8);
-+
-+	mode.width = sizes->surface_width;
-+	mode.height = sizes->surface_height;
-+	mode.pitches[0] = sizes->surface_width * bytes_per_pixel;
-+	mode.pixel_format = drm_mode_legacy_fb_format(sizes->surface_bpp,
-+						      sizes->surface_depth);
-+
-+	size = mode.pitches[0] * mode.height;
-+
-+	mtk_gem = mtk_drm_gem_create(dev, size, true);
-+	if (IS_ERR(mtk_gem))
-+		return PTR_ERR(mtk_gem);
-+
-+	private->fbdev_bo = &mtk_gem->base;
-+
-+	info = drm_fb_helper_alloc_fbi(helper);
-+	if (IS_ERR(info)) {
-+		DRM_DEV_ERROR(dev->dev,
-+			"failed to allocate framebuffer info, %d\n",
-+			err);
-+		err = PTR_ERR(info);
-+		goto out;
-+	}
-+
-+	fb = mtk_drm_framebuffer_create(dev, &mode, private->fbdev_bo);
-+	if (IS_ERR(fb)) {
-+		DRM_DEV_ERROR(dev->dev,
-+			"failed to allocate DRM framebuffer, %d\n",
-+			err);
-+		err = PTR_ERR(fb);
-+		goto out;
-+	}
-+	helper->fb = fb;
-+
-+	info->par = helper;
-+	info->flags = FBINFO_FLAG_DEFAULT;
-+	info->fbops = &mtk_fbdev_ops;
-+
-+	drm_fb_helper_fill_fix(info, fb->pitches[0], fb->format->depth);
-+	drm_fb_helper_fill_var(info, helper, sizes->fb_width, sizes->fb_height);
-+
-+	offset = info->var.xoffset * bytes_per_pixel;
-+	offset += info->var.yoffset * fb->pitches[0];
-+
-+	dev->mode_config.fb_base = 0;
-+	info->screen_base = mtk_gem->kvaddr + offset;
-+	info->screen_size = size;
-+	info->fix.smem_len = size;
-+
-+	DRM_DEBUG_KMS("FB [%ux%u]-%u offset=%lu size=%zd\n",
-+		      fb->width, fb->height, fb->format->depth, offset, size);
-+
-+	info->skip_vt_switch = true;
-+
-+	return 0;
-+
-+out:
-+
-+
-+	mtk_drm_gem_free_object(&mtk_gem->base);
-+	return err;
-+}
-+
-+static const struct drm_fb_helper_funcs mtk_drm_fb_helper_funcs = {
-+	.fb_probe = mtk_fbdev_probe,
-+};
-+
-+int mtk_fbdev_init(struct drm_device *dev)
-+{
-+	struct mtk_drm_private *priv = dev->dev_private;
-+	struct drm_fb_helper *helper = &priv->fb_helper;
-+	int ret;
-+
-+	if (!dev->mode_config.num_crtc || !dev->mode_config.num_connector)
-+		return -EINVAL;
-+
-+	drm_fb_helper_prepare(dev, helper, &mtk_drm_fb_helper_funcs);
-+
-+	ret = drm_fb_helper_init(dev, helper, dev->mode_config.num_connector);
-+	if (ret < 0) {
-+		DRM_DEV_ERROR(dev->dev,
-+			"failed to initialize DRM FB helper, %d\n",
-+			ret);
-+//		goto fini;
-+		return ret;
-+	}
-+
-+	ret = drm_fb_helper_single_add_all_connectors(helper);
-+	if (ret < 0) {
-+		DRM_DEV_ERROR(dev->dev, "failed to add connectors, %d\n", ret);
-+		goto fini;
-+	}
-+
-+	ret = drm_fb_helper_initial_config(helper, 32);
-+	if (ret < 0) {
-+		DRM_DEV_ERROR(dev->dev,
-+			"failed to set initial configuration, %d\n",
-+			ret);
-+		goto fini;
-+	}
-+
-+	return 0;
-+
-+fini:
-+	drm_fb_helper_fini(helper);
-+	return ret;
-+}
-+
-+void mtk_fbdev_fini(struct drm_device *dev)
-+{
-+	struct mtk_drm_private *priv = dev->dev_private;
-+	struct drm_fb_helper *helper = &priv->fb_helper;
-+
-+	drm_fb_helper_unregister_fbi(helper);
-+
-+	if (helper->fb) {
-+		drm_framebuffer_unregister_private(helper->fb);
-+		drm_framebuffer_remove(helper->fb);
-+	}
-+
-+	drm_fb_helper_fini(helper);
-+}
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fbdev.h b/drivers/gpu/drm/mediatek/mtk_drm_fbdev.h
-new file mode 100644
-index 000000000000..45717b642dc5
---- /dev/null
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_fbdev.h
-@@ -0,0 +1,25 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Copyright (c) 2018 MediaTek Inc.
-+ * Author: CK Hu <ck.hu@mediatek.com>
-+ */
-+
-+#ifndef MTK_DRM_FBDEV_H
-+#define MTK_DRM_FBDEV_H
-+
-+#ifdef CONFIG_DRM_FBDEV_EMULATION
-+int mtk_fbdev_init(struct drm_device *dev);
-+void mtk_fbdev_fini(struct drm_device *dev);
-+#else
-+int mtk_fbdev_init(struct drm_device *dev)
-+{
-+	return 0;
-+}
-+
-+void mtk_fbdev_fini(struct drm_device *dev)
-+{
-+
-+}
-+#endif /* CONFIG_DRM_FBDEV_EMULATION */
-+
-+#endif /* MTK_DRM_FBDEV_H */
--- 
-2.17.1
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgUGV0ZXIsCgpPbiAwMi8wMS8xOSA1OjE5IFBNLCBQZXRlciBVamZhbHVzaSB3cm90ZToKPiAK
+PiAKPiAKPiBPbiAyNy8xMi8yMDE4IDguMTMsIExva2VzaCBWdXRsYSB3cm90ZToKPj4gVGV4YXMg
+SW5zdHJ1bWVudHMnIEszIGdlbmVyYXRpb24gU29DcyBoYXMgYW4gSVAgSW50ZXJydXB0IEFnZ3Jl
+Z2F0b3IKPj4gd2hpY2ggaXMgYW4gaW50ZXJydXB0IGNvbnRyb2xsZXIgdGhhdCBkb2VzIHRoZSBm
+b2xsb3dpbmc6Cj4+IC0gQ29udmVydHMgZXZlbnRzIHRvIGludGVycnVwdHMgdGhhdCBjYW4gYmUg
+dW5kZXJzdG9vZCBieQo+PiAgICBhbiBpbnRlcnJ1cHQgcm91dGVyLgo+PiAtIEFsbG93cyBmb3Ig
+bXVsdGlwbGV4aW5nIG9mIGV2ZW50cyB0byBpbnRlcnJ1cHRzLgo+Pgo+PiBDb25maWd1cmF0aW9u
+IG9mIHRoZSBpbnRlcnJ1cHQgYWdncmVnYXRvciByZWdpc3RlcnMgY2FuIG9ubHkgYmUgZG9uZSBi
+eQo+PiBhIHN5c3RlbSBjby1wcm9jZXNzb3IgYW5kIHRoZSBkcml2ZXIgbmVlZHMgdG8gc2VuZCBh
+IG1lc3NhZ2UgdG8gdGhpcwo+PiBjbyBwcm9jZXNzb3Igb3ZlciBUSVNDSSBwcm90b2NvbC4KPj4K
+Pj4gQWRkIHN1cHBvcnQgZm9yIEludGVycnVwdCBBZ2dyZWdhdG9yIGRyaXZlciBvdmVyIFRJU0NJ
+IHByb3RvY29sLgo+Pgo+PiBTaWduZWQtb2ZmLWJ5OiBMb2tlc2ggVnV0bGEgPGxva2VzaHZ1dGxh
+QHRpLmNvbT4KPj4gU2lnbmVkLW9mZi1ieTogUGV0ZXIgVWpmYWx1c2kgPHBldGVyLnVqZmFsdXNp
+QHRpLmNvbT4KPj4gLS0tCj4+ICAgTUFJTlRBSU5FUlMgICAgICAgICAgICAgICAgICAgICAgIHwg
+ICAxICsKPj4gICBkcml2ZXJzL2lycWNoaXAvS2NvbmZpZyAgICAgICAgICAgfCAgMTIgKwo+PiAg
+IGRyaXZlcnMvaXJxY2hpcC9NYWtlZmlsZSAgICAgICAgICB8ICAgMSArCj4+ICAgZHJpdmVycy9p
+cnFjaGlwL2lycS10aS1zY2ktaW50YS5jIHwgNTYxICsrKysrKysrKysrKysrKysrKysrKysrKysr
+KysrKwo+PiAgIDQgZmlsZXMgY2hhbmdlZCwgNTc1IGluc2VydGlvbnMoKykKPj4gICBjcmVhdGUg
+bW9kZSAxMDA2NDQgZHJpdmVycy9pcnFjaGlwL2lycS10aS1zY2ktaW50YS5jCj4+Cj4+IGRpZmYg
+LS1naXQgYS9NQUlOVEFJTkVSUyBiL01BSU5UQUlORVJTCj4+IGluZGV4IGFlYmNlNjE1MTUxZS4u
+N2QxMjc4OGM4NDRhIDEwMDY0NAo+PiAtLS0gYS9NQUlOVEFJTkVSUwo+PiArKysgYi9NQUlOVEFJ
+TkVSUwo+PiBAQCAtMTUwMjYsNiArMTUwMjYsNyBAQCBGOglkcml2ZXJzL3Jlc2V0L3Jlc2V0LXRp
+LXNjaS5jCj4+ICAgRjoJRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL2ludGVycnVw
+dC1jb250cm9sbGVyL3RpLHNjaS1pbnRyLnR4dAo+PiAgIEY6CURvY3VtZW50YXRpb24vZGV2aWNl
+dHJlZS9iaW5kaW5ncy9pbnRlcnJ1cHQtY29udHJvbGxlci90aSxzY2ktaW50YS50eHQKPj4gICBG
+Oglkcml2ZXJzL2lycWNoaXAvaXJxLXRpLXNjaS1pbnRyLmMKPj4gK0Y6CWRyaXZlcnMvaXJxY2hp
+cC9pcnEtdGktc2NpLWludGEuYwo+PiAgIAo+PiAgIFRleGFzIEluc3RydW1lbnRzIEFTb0MgZHJp
+dmVycwo+PiAgIE06CVBldGVyIFVqZmFsdXNpIDxwZXRlci51amZhbHVzaUB0aS5jb20+Cj4+IGRp
+ZmYgLS1naXQgYS9kcml2ZXJzL2lycWNoaXAvS2NvbmZpZyBiL2RyaXZlcnMvaXJxY2hpcC9LY29u
+ZmlnCj4+IGluZGV4IGE4ZDliZWQwMjU0Yi4uZDE2ZmQzOTQwOGFkIDEwMDY0NAo+PiAtLS0gYS9k
+cml2ZXJzL2lycWNoaXAvS2NvbmZpZwo+PiArKysgYi9kcml2ZXJzL2lycWNoaXAvS2NvbmZpZwo+
+PiBAQCAtNDE3LDYgKzQxNywxOCBAQCBjb25maWcgVElfU0NJX0lOVFJfSVJRQ0hJUAo+PiAgIAkg
+IElmIHlvdSB3aXNoIHRvIHVzZSBpbnRlcnJ1cHQgcm91dGVyIGlycSByZXNvdXJjZXMgbWFuYWdl
+ZCBieSB0aGUKPj4gICAJICBUSSBTeXN0ZW0gQ29udHJvbGxlciwgc2F5IFkgaGVyZS4gT3RoZXJ3
+aXNlLCBzYXkgTi4KPj4gICAKPj4gK2NvbmZpZyBUSV9TQ0lfSU5UQV9JUlFDSElQCj4+ICsJYm9v
+bAo+PiArCWRlcGVuZHMgb24gVElfU0NJX1BST1RPQ09MICYmIEFSQ0hfSzMKPj4gKwlzZWxlY3Qg
+SVJRX0RPTUFJTgo+PiArCXNlbGVjdCBJUlFfRE9NQUlOX0hJRVJBUkNIWQo+PiArCXNlbGVjdCBL
+M19JTlRBX01TSV9ET01BSU4KPj4gKwloZWxwCj4+ICsJICBUaGlzIGVuYWJsZXMgdGhlIGlycWNo
+aXAgZHJpdmVyIHN1cHBvcnQgZm9yIEszIEludGVycnVwdCBhZ2dyZWdhdG9yCj4+ICsJICBvdmVy
+IFRJIFN5c3RlbSBDb250cm9sIEludGVyZmFjZSBhdmFpbGFibGUgb24gc29tZSBuZXcgVEkncyBT
+b0NzLgo+PiArCSAgSWYgeW91IHdpc2ggdG8gdXNlIGludGVycnVwdCBhZ2dyZWdhdG9yIGlycSBy
+ZXNvdXJjZXMgbWFuYWdlZCBieSB0aGUKPj4gKwkgIFRJIFN5c3RlbSBDb250cm9sbGVyLCBzYXkg
+WSBoZXJlLiBPdGhlcndpc2UsIHNheSBOLgo+PiArCj4+ICAgZW5kbWVudQo+PiAgIAo+PiAgIGNv
+bmZpZyBTSUZJVkVfUExJQwo+PiBkaWZmIC0tZ2l0IGEvZHJpdmVycy9pcnFjaGlwL01ha2VmaWxl
+IGIvZHJpdmVycy9pcnFjaGlwL01ha2VmaWxlCj4+IGluZGV4IGI0ZmYzNzZhMDhlZi4uYTY3OTQ5
+MGE3MDU5IDEwMDY0NAo+PiAtLS0gYS9kcml2ZXJzL2lycWNoaXAvTWFrZWZpbGUKPj4gKysrIGIv
+ZHJpdmVycy9pcnFjaGlwL01ha2VmaWxlCj4+IEBAIC05NSwzICs5NSw0IEBAIG9iai0kKENPTkZJ
+R19TSUZJVkVfUExJQykJCSs9IGlycS1zaWZpdmUtcGxpYy5vCj4+ICAgb2JqLSQoQ09ORklHX0lN
+WF9JUlFTVEVFUikJCSs9IGlycS1pbXgtaXJxc3RlZXIubwo+PiAgIG9iai0kKENPTkZJR19NQURF
+UkFfSVJRKQkJKz0gaXJxLW1hZGVyYS5vCj4+ICAgb2JqLSQoQ09ORklHX1RJX1NDSV9JTlRSX0lS
+UUNISVApCSs9IGlycS10aS1zY2ktaW50ci5vCj4+ICtvYmotJChDT05GSUdfVElfU0NJX0lOVEFf
+SVJRQ0hJUCkJKz0gaXJxLXRpLXNjaS1pbnRhLm8KPj4gZGlmZiAtLWdpdCBhL2RyaXZlcnMvaXJx
+Y2hpcC9pcnEtdGktc2NpLWludGEuYyBiL2RyaXZlcnMvaXJxY2hpcC9pcnEtdGktc2NpLWludGEu
+Ywo+PiBuZXcgZmlsZSBtb2RlIDEwMDY0NAo+PiBpbmRleCAwMDAwMDAwMDAwMDAuLjc4YmZjODNh
+MDc5YQo+PiAtLS0gL2Rldi9udWxsCj4+ICsrKyBiL2RyaXZlcnMvaXJxY2hpcC9pcnEtdGktc2Np
+LWludGEuYwo+PiBAQCAtMCwwICsxLDU2MSBAQAo+PiArLy8gU1BEWC1MaWNlbnNlLUlkZW50aWZp
+ZXI6IEdQTC0yLjAKPj4gKy8qCj4+ICsgKiBUZXhhcyBJbnN0cnVtZW50cycgSzMgSW50ZXJydXB0
+IEFnZ3JlZ2F0b3IgaXJxY2hpcCBkcml2ZXIKPj4gKyAqCj4+ICsgKiBDb3B5cmlnaHQgKEMpIDIw
+MTggVGV4YXMgSW5zdHJ1bWVudHMgSW5jb3Jwb3JhdGVkIC0gaHR0cDovL3d3dy50aS5jb20vCj4+
+ICsgKglMb2tlc2ggVnV0bGEgPGxva2VzaHZ1dGxhQHRpLmNvbT4KPj4gKyAqLwo+PiArCj4+ICsj
+aW5jbHVkZSA8bGludXgvZXJyLmg+Cj4+ICsjaW5jbHVkZSA8bGludXgvaW8uaD4KPj4gKyNpbmNs
+dWRlIDxsaW51eC9tc2kuaD4KPj4gKyNpbmNsdWRlIDxsaW51eC9pcnFjaGlwLmg+Cj4+ICsjaW5j
+bHVkZSA8bGludXgvb2ZfcGxhdGZvcm0uaD4KPj4gKyNpbmNsdWRlIDxsaW51eC9vZl9hZGRyZXNz
+Lmg+Cj4+ICsjaW5jbHVkZSA8bGludXgvb2ZfaXJxLmg+Cj4+ICsjaW5jbHVkZSA8bGludXgvbW9k
+dWxlLmg+Cj4+ICsjaW5jbHVkZSA8bGludXgvbW9kdWxlcGFyYW0uaD4KPj4gKyNpbmNsdWRlIDxs
+aW51eC9pcnFkb21haW4uaD4KPiAKPiBUbyBmaXggdGhpczoKPiAKPiBkcml2ZXJzL2lycWNoaXAv
+aXJxLXRpLXNjaS1pbnRhLmM6IEluIGZ1bmN0aW9uIOKAmGludGFfbXNpX2lycV9oYW5kbGVy4oCZ
+Ogo+IGRyaXZlcnMvaXJxY2hpcC9pcnEtdGktc2NpLWludGEuYzozMDg6ODogZXJyb3I6IOKAmElS
+UUZfVFJJR0dFUl9ISUdI4oCZIHVuZGVjbGFyZWQgKGZpcnN0IHVzZSBpbiB0aGlzIGZ1bmN0aW9u
+KTsgZGlkIHlvdSBtZWFuIOKAmElSUURfVFJJR0dFUl9NQVNL4oCZPwo+ICAgICAgICAgIElSUUZf
+VFJJR0dFUl9ISUdIKQo+ICAgICAgICAgIF5+fn5+fn5+fn5+fn5+fn5+Cj4gICAgICAgICAgSVJR
+RF9UUklHR0VSX01BU0sKPiBkcml2ZXJzL2lycWNoaXAvaXJxLXRpLXNjaS1pbnRhLmM6MzA4Ojg6
+IG5vdGU6IGVhY2ggdW5kZWNsYXJlZCBpZGVudGlmaWVyIGlzIHJlcG9ydGVkIG9ubHkgb25jZSBm
+b3IgZWFjaCBmdW5jdGlvbiBpdCBhcHBlYXJzIGluCj4gZHJpdmVycy9pcnFjaGlwL2lycS10aS1z
+Y2ktaW50YS5jOiBJbiBmdW5jdGlvbiDigJh0aV9zY2lfaW50YV9hbGxvY19wYXJlbnRfaXJx4oCZ
+Ogo+IGRyaXZlcnMvaXJxY2hpcC9pcnEtdGktc2NpLWludGEuYzozNjA6Mjc6IGVycm9yOiDigJhJ
+UlFGX1RSSUdHRVJfSElHSOKAmSB1bmRlY2xhcmVkIChmaXJzdCB1c2UgaW4gdGhpcyBmdW5jdGlv
+bik7IGRpZCB5b3UgbWVhbiDigJhJUlFEX1RSSUdHRVJfTUFTS+KAmT8KPiAgICBwYXJlbnRfZndz
+cGVjLnBhcmFtWzJdID0gSVJRRl9UUklHR0VSX0hJR0g7Cj4gICAgICAgICAgICAgICAgICAgICAg
+ICAgICAgIF5+fn5+fn5+fn5+fn5+fn5+Cj4gICAgICAgICAgICAgICAgICAgICAgICAgICAgIElS
+UURfVFJJR0dFUl9NQVNLCj4gbWFrZVszXTogKioqIFtzY3JpcHRzL01ha2VmaWxlLmJ1aWxkOjI3
+NjogZHJpdmVycy9pcnFjaGlwL2lycS10aS1zY2ktaW50YS5vXSBFcnJvciAxCj4gCj4gQWRkIHRo
+aXM6Cj4gI2luY2x1ZGUgPGxpbnV4L2ludGVycnVwdC5oPgoKSSBkaWQgbm90IHNlZSBhbnkgc3Vj
+aCBidWlsZCBlcnJvciBkdXJpbmcgbXkgdGVzdGluZyBhcyBzaG93biBiZWxvdy4gQnV0IGFncmVl
+IAphYm91dCB0aGUgcmVwb3J0LiBXaWxsIGZpeCBpdCBpbiBuZXh0IHZlcnNpb24KCuKenCAgbGlu
+dXggZ2l0OihuZXgtbWFzdGVyKSB2OG1ha2UgZGVmY29uZmlnCiAgIEhPU1RDQyAgc2NyaXB0cy9i
+YXNpYy9maXhkZXAKICAgSE9TVENDICBzY3JpcHRzL2tjb25maWcvY29uZi5vCiAgIEhPU1RDQyAg
+c2NyaXB0cy9rY29uZmlnL2NvbmZkYXRhLm8KICAgSE9TVENDICBzY3JpcHRzL2tjb25maWcvZXhw
+ci5vCiAgIEhPU1RDQyAgc2NyaXB0cy9rY29uZmlnL3N5bWJvbC5vCiAgIEhPU1RDQyAgc2NyaXB0
+cy9rY29uZmlnL3ByZXByb2Nlc3MubwogICBMRVggICAgIHNjcmlwdHMva2NvbmZpZy96Y29uZi5s
+ZXguYwogICBZQUNDICAgIHNjcmlwdHMva2NvbmZpZy96Y29uZi50YWIuaAogICBIT1NUQ0MgIHNj
+cmlwdHMva2NvbmZpZy96Y29uZi5sZXgubwogICBZQUNDICAgIHNjcmlwdHMva2NvbmZpZy96Y29u
+Zi50YWIuYwogICBIT1NUQ0MgIHNjcmlwdHMva2NvbmZpZy96Y29uZi50YWIubwp2OCAgSE9TVExE
+ICBzY3JpcHRzL2tjb25maWcvY29uZgoqKiogRGVmYXVsdCBjb25maWd1cmF0aW9uIGlzIGJhc2Vk
+IG9uICdkZWZjb25maWcnCm1ha2UgIwojIGNvbmZpZ3VyYXRpb24gd3JpdHRlbiB0byAuY29uZmln
+CiMKSSUgCiAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg4p6cICBsaW51eCBnaXQ6KG5l
+eC1tYXN0ZXIpIHY4bWFrZSBJbWFnZSBkdGJzIC1qNCAtcwphcmNoL2FybTY0L2Jvb3QvZHRzL3Jv
+Y2tjaGlwL3JrMzM5OS1ncnUtYm9iLmR0czoyNS45LTI5LjU6IFdhcm5pbmcgKGdyYXBoX3BvcnQp
+OiAKL2VkcC1wYW5lbC9wb3J0czogZ3JhcGggcG9ydCBub2RlIG5hbWUgc2hvdWxkIGJlICdwb3J0
+JwphcmNoL2FybTY0L2Jvb3QvZHRzL3JvY2tjaGlwL3JrMzM5OS1ncnUta2V2aW4uZHRzOjQ2Ljkt
+NTAuNTogV2FybmluZyAKKGdyYXBoX3BvcnQpOiAvZWRwLXBhbmVsL3BvcnRzOiBncmFwaCBwb3J0
+IG5vZGUgbmFtZSBzaG91bGQgYmUgJ3BvcnQnCmFyY2gvYXJtNjQvYm9vdC9kdHMvcm9ja2NoaXAv
+cmszMzk5LXNhcHBoaXJlLWV4Y2F2YXRvci5kdHM6OTQuOS05OC41OiBXYXJuaW5nIAooZ3JhcGhf
+cG9ydCk6IC9lZHAtcGFuZWwvcG9ydHM6IGdyYXBoIHBvcnQgbm9kZSBuYW1lIHNob3VsZCBiZSAn
+cG9ydCcKPHN0ZGluPjoxMzM5OjI6IHdhcm5pbmc6ICN3YXJuaW5nIHN5c2NhbGwgb3Blbl90cmVl
+IG5vdCBpbXBsZW1lbnRlZCBbLVdjcHBdCjxzdGRpbj46MTM0MjoyOiB3YXJuaW5nOiAjd2Fybmlu
+ZyBzeXNjYWxsIG1vdmVfbW91bnQgbm90IGltcGxlbWVudGVkIFstV2NwcF0KPHN0ZGluPjoxMzQ1
+OjI6IHdhcm5pbmc6ICN3YXJuaW5nIHN5c2NhbGwgZnNvcGVuIG5vdCBpbXBsZW1lbnRlZCBbLVdj
+cHBdCjxzdGRpbj46MTM0ODoyOiB3YXJuaW5nOiAjd2FybmluZyBzeXNjYWxsIGZzY29uZmlnIG5v
+dCBpbXBsZW1lbnRlZCBbLVdjcHBdCjxzdGRpbj46MTM1MToyOiB3YXJuaW5nOiAjd2FybmluZyBz
+eXNjYWxsIGZzbW91bnQgbm90IGltcGxlbWVudGVkIFstV2NwcF0KPHN0ZGluPjoxMzU0OjI6IHdh
+cm5pbmc6ICN3YXJuaW5nIHN5c2NhbGwgZnNwaWNrIG5vdCBpbXBsZW1lbnRlZCBbLVdjcHBdCuKe
+nCAgbGludXggZ2l0OihuZXgtbWFzdGVyKQoKVGhhbmtzIGFuZCByZWdhcmRzLApMb2tlc2gKCl9f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1r
+ZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpo
+dHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJu
+ZWwK
