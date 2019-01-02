@@ -2,120 +2,89 @@ Return-Path: <SRS0=RmN+=PK=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FAKE_REPLY_C,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EBF37C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 21:42:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E1BCC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 22:14:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B6B1521479
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 21:42:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 643B5214C6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 22:14:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YOTbyYFs";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="G3HbRDgl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B6B1521479
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jh5TfDyi";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="dDFqY4As"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 643B5214C6
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=aBBZyMvv+HFCwUZn8f3Gfl0VrPeuEYCOyNxqmmAwU3U=; b=YOTbyYFsaogg/Y
-	1VxWGU8URco/tkYzWKpnCYQWED30o4GfVMMOK6iYXCUcMwyuHrpBzVMZ6EfuD41hHO0Sk/IjqGEpt
-	gN92Qv5WqtxZlapLp4ExrkstnSfyZ2DwCo7yNBU/OCQHwW35FUGJDC3oUXp2ZX35zPstMpYtyGpvS
-	0xXqO3ThBKJNj+cOSkKFCau1XXjO0kP10XaGZMak68sf2L87j5PRKNaUMI1cZFPpBD2MJ/epcSTsd
-	8CarYyf+04HNt0cmzvJm6DjK4JdZ+7Pa3Vy6bpmIdpFEsfirgyznvnd9Lt9ZtjRzJmGE7OcoYvG0E
-	Sjcn06x3HTtv3QYegZbg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Message-ID:
+	Subject:To:From:Date:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:
+	List-Owner; bh=A87SIWseoGep36G3v+M2TOEl6KG1aZAyQ80A2EWnjg4=; b=jh5TfDyiNkoVE4
+	EFETQIk8BWyYKTQz7WhywGBVhPkRmzW5rrHQgsIWPKtErG6kn06R7gX/zcBoSpwGeEPDUzzEyqkFB
+	gDNw17BzDb1+JskJ4k7EgsWxNfUtcP4JWt4Hh1/cR/QbV0NbdzXKb5bZ1LqpwuyMcgMnOnauFXifW
+	ByzJj4MHZxR2HHImpdC28oTu+i/DjMOmqTQyC+lltbrkA0gqD4HMpw3LaPkZUlfAiLzl/tmskPS8n
+	fAWfsqmgicc1HBq3c23du8456mZN9OdOnAQtA21oaJZU062trHNf+wAV8eG/ATGnypcvZwkW701nh
+	nUsAo1FDyNTeMWV72ErA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1geoHf-00023r-Vm; Wed, 02 Jan 2019 21:42:39 +0000
-Received: from esa5.microchip.iphmx.com ([216.71.150.166])
+	id 1geomo-0002uu-PN; Wed, 02 Jan 2019 22:14:50 +0000
+Received: from mail-ed1-x541.google.com ([2a00:1450:4864:20::541])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1geoHb-00023P-GJ
- for linux-arm-kernel@lists.infradead.org; Wed, 02 Jan 2019 21:42:38 +0000
-X-IronPort-AV: E=Sophos;i="5.56,432,1539673200"; d="scan'208";a="22905596"
-Received: from smtpout.microchip.com (HELO email.microchip.com)
- ([198.175.253.82])
- by esa5.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 02 Jan 2019 14:42:31 -0700
-Received: from NAM01-BN3-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.107) with Microsoft SMTP Server (TLS)
- id 14.3.352.0; Wed, 2 Jan 2019 14:43:02 -0700
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=microchiptechnology.onmicrosoft.com;
- s=selector1-microchiptechnology-onmicrosoft-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=ddyMyuNrv1uCwbRodVaCQaO6sm10DbFVC+ASQ4g5ASk=;
- b=G3HbRDglhLE9f+goSVWbDYmVP3CVBxPpnXdyL9fcUppGCYMPK1RxtmCrLc+/OkAFGYq6Pyn+/pV9VRL27uD4u/WAOIdZFG2WOVAislrIed44cArGXtO66LXxljOah95Fz2RkaB4tQfrdZDKkLPc9SI1awBWShYWP9rIaGmdnysY=
-Received: from BN6PR1101MB2130.namprd11.prod.outlook.com (10.174.112.135) by
- BN6PR1101MB2068.namprd11.prod.outlook.com (10.174.112.10) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1495.6; Wed, 2 Jan 2019 21:42:25 +0000
-Received: from BN6PR1101MB2130.namprd11.prod.outlook.com
- ([fe80::7505:e994:c781:910]) by BN6PR1101MB2130.namprd11.prod.outlook.com
- ([fe80::7505:e994:c781:910%2]) with mapi id 15.20.1495.005; Wed, 2 Jan 2019
- 21:42:25 +0000
-From: <Woojung.Huh@microchip.com>
-To: <stefan.wahren@i2se.com>
-Subject: RE: lan78xx: WARNING: irq 79 handler enabled interrupts
-Thread-Topic: lan78xx: WARNING: irq 79 handler enabled interrupts
-Thread-Index: AQHUnwoprNs5FgB5F0GdFnVzz/mpVaWVd08AgAElhECABFfkgIABlH8A
-Date: Wed, 2 Jan 2019 21:42:25 +0000
-Message-ID: <BN6PR1101MB21304C3686D65E78E59110FDE78C0@BN6PR1101MB2130.namprd11.prod.outlook.com>
-References: <1082628525.187562.1546041777025@email.ionos.de>
- <86efa0brfx.wl-marc.zyngier@arm.com>
- <BN6PR1101MB21305BBBB3F617C9C49141E4E7B10@BN6PR1101MB2130.namprd11.prod.outlook.com>
- <958035754.310420.1546378307673@email.ionos.de>
-In-Reply-To: <958035754.310420.1546378307673@email.ionos.de>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Woojung.Huh@microchip.com; 
-x-originating-ip: [47.19.18.123]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; BN6PR1101MB2068;
- 6:yXw1pEP/NTg6jthP6ztLJYE8ht5IkLsMVCmOAoRxvoXOLOnLSE1i3Yaahj2PcHys88uqq0AWEXaUoG52xBbhWPnvRFRC9vw2PjLGEpp2BiV78D4PAS6XvQB0U3rm+60wwYJ1Knbmm6T9U1kebaM78zDEnsXE0gl70JTMK/P0/BxhvdVhS+UKdtM145mZQ2Tpp+Tea3RzVJKaMw1vfQjxcav6mOgtpFEUW2iif7WkRzdhrLKzz3Is81UYzwTqHeVVJ+5A3QvuAS3bbcGA6nil+td9AsyPrPsLNeAJueXul3UkeDvixxVwrzqvOg7IhNgHu5ZJwfvlCjHY19rIFLzB81grsTPA2lIeuYKfXf0ZEsS4VmFYb3OF3govBefN6F+laJBQW5QlsXZoaEW1sH+jl5c3rsOEHu+l2NUMS4rvSaVVhhtJ8NMdnTyx9DtTNizQY1fxAOqF/nsZDT6w3PDYXg==;
- 5:mbVAkyprD3Ec6ZOFyGsHI7RYS1eHVkMNvLweJpDZYtR+zwVzYkSaH0NemXfpdLGEoHC5salq4C1E3N77s2nPxPauOn/vLD/IIE+px6t04IlWXDZjpxfM895oa1z3NKa2i7hIxUPtAavT5M1yi/w+Gu3iuYAbfv814hTxsCh3ySl02Kcc6zF2VkX2ZXEO39oaMHZ/ccppGC6on5bT3ks9bw==;
- 7:SOTrSKLTsUxsoKEXsACxixEYGJa59ttWAGo8Rp2C+33QOX9oTu80UPqFEAA/z5AM7eqOOqy1gMY1vprTyUYNVNy9bC3Iq+VNQQI9N2WV97GySWqfmM0uBRDXBtyS8hD9GJCMvXR35PoaS+w12hkKRg==
-x-ms-exchange-antispam-srfa-diagnostics: SOS;
-x-ms-office365-filtering-correlation-id: 3acc185d-8860-4ee2-4c1f-08d670fb2fbc
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(2017052603328)(7153060)(7193020);
- SRVR:BN6PR1101MB2068; 
-x-ms-traffictypediagnostic: BN6PR1101MB2068:
-x-microsoft-antispam-prvs: <BN6PR1101MB20681B81A8F6EF663767BACAE78C0@BN6PR1101MB2068.namprd11.prod.outlook.com>
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(3230021)(908002)(999002)(5005026)(6040522)(8220060)(2401047)(8121501046)(823302103)(3002001)(3231475)(944501520)(52105112)(10201501046)(93006095)(93001095)(6041310)(20161123558120)(20161123560045)(20161123562045)(20161123564045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(201708071742011)(7699051)(76991095);
- SRVR:BN6PR1101MB2068; BCL:0; PCL:0; RULEID:; SRVR:BN6PR1101MB2068; 
-x-forefront-prvs: 0905A6B2C7
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(366004)(376002)(346002)(39860400002)(396003)(136003)(13464003)(189003)(199004)(16799955002)(99286004)(106356001)(316002)(26005)(53546011)(6506007)(102836004)(476003)(186003)(93886005)(11346002)(486006)(446003)(256004)(33656002)(76176011)(105586002)(81156014)(8676002)(8936002)(81166006)(54906003)(7736002)(305945005)(14444005)(7696005)(74316002)(53936002)(68736007)(25786009)(6916009)(66066001)(5660300001)(229853002)(3846002)(6116002)(6436002)(97736004)(71190400001)(71200400001)(4326008)(86362001)(2906002)(478600001)(6246003)(966005)(55016002)(14454004)(72206003)(6306002)(9686003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR1101MB2068;
- H:BN6PR1101MB2130.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: microchip.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: OXkzij8hWBEe1z01O4/q5xE7tAE3kNh/tbMJQboqB9Ub7pSLLTVM/YQDQsnIZ7e9eMZ9mNk9xuCP5f6Sn+eOaPNLwm3TvprRMONQXOP0ixf/St+3wo9/YHC7IJXcuzhWzqHB2rBFbPZ/23fCX+j/eSHzUHZcqL9pAl0dxMhkhN8LKP2WSv2W44LiUdFZp/THSF4UWwCrLxzL0s5ADvfuP2r6iUM31RG0EBeSc8thX2LGvZKaJ/pjcWsHUDvvvbvjLtQkbNTHO1055qaAW0QgOlyWqmi1387oSRd2iLbpAcT6/wP2ONbAlO3+a7Nm7vHf
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1geoml-0002uQ-Oy
+ for linux-arm-kernel@lists.infradead.org; Wed, 02 Jan 2019 22:14:49 +0000
+Received: by mail-ed1-x541.google.com with SMTP id h15so27438092edb.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 02 Jan 2019 14:14:44 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=date:from:to:cc:subject:message-id:mime-version:content-disposition
+ :in-reply-to:user-agent;
+ bh=9RY6fdJuJxTIuPFCRUs33W8BiOrFpwhleLKM2RAt214=;
+ b=dDFqY4AsbggW3GGQOPFa5DTMTKsLNA1iemACBKW/z9F0vOOibkKIZiewwmkgegtxsg
+ tFbtzxzBCNhTZaf+yBhJyoRabQGSbNoWwcaHx4rk0K3Jc0Bm3sPgCJQsJ0aOcrs2tGN4
+ L/kVmGECcT8sgh1gt3zCk5j9zYYev+7P6zbUUE8mOA3pFdBfZKb1WUqNz+5Micn9GtjB
+ a5FOV1KWvn7tJ+KdWW26DLGJFUlX2qFkjC+hjDzl66nnc2XGX3JOCe/Q7h9IJYxehqAv
+ /d7om8Asei2cRU9k34yfP4jMZnaBkAX8tovfHpRousDXIyn/twyFsOngbg/G2iD32cyU
+ VwXg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=9RY6fdJuJxTIuPFCRUs33W8BiOrFpwhleLKM2RAt214=;
+ b=QICf14c52YcZIq/FCzCUejdcSqk1f3FXVZx/1i7xC3tcIuLvsnjBKvlrjvzBM+LI8H
+ Rkd/o+ENHnK4lVWgHMBnpe0qwD7UmHFp1jm1nH9eksAQZWSBzJpwujM76aqALLJdk3Js
+ 2Y3fNMiJ8RP1pstdhjEOdDKcuyZnoOBGOuNp5IgvRkxJJxFwPR8+Hyj8bOe3q0rUg2nb
+ WBPql5xuvMqJxPexTAl8Wl2EuYJkDWKLc3Dx9cr81n5CwjkCO5TPQVku2b4uo2pkuvPk
+ fWJeCdh6JvuWbsHMCe8QN8Zciz/1B58jjpKHaIKoN+lLtXI+pjnchfc3Onc1PIXVV85T
+ qtWQ==
+X-Gm-Message-State: AA+aEWYGRykXW7CujgRomysBAN8PViOmp8RN5qgh5nJYgOlT5Ncj9p6Y
+ /ZrrWYRyMfZgU1y8/lm9Awd+1mY5EMU=
+X-Google-Smtp-Source: AFSGD/X3tiXO3EJR+mX8emK1LckeIvAgyuZQVF4vjqwls95zfjdqL475c8Ta1GOpMD+Mcerkxk54BA==
+X-Received: by 2002:a50:b559:: with SMTP id z25mr39874020edd.239.1546467282961; 
+ Wed, 02 Jan 2019 14:14:42 -0800 (PST)
+Received: from localhost (ip1f11350a.dynamic.kabel-deutschland.de.
+ [31.17.53.10])
+ by smtp.gmail.com with ESMTPSA id q13-v6sm12521079eja.8.2019.01.02.14.14.41
+ (version=TLS1_2 cipher=AES128-SHA bits=128/128);
+ Wed, 02 Jan 2019 14:14:41 -0800 (PST)
+Date: Wed, 2 Jan 2019 23:14:41 +0100
+From: Oliver Graute <oliver.graute@gmail.com>
+To: linux-arm-kernel@lists.infradead.org
+Subject: Re: Re: [PATCH 1/3] ARM: dts: Add support for Variscite DART-6UL board
+Message-ID: <20190102221441.GA22974@ripley>
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: 3acc185d-8860-4ee2-4c1f-08d670fb2fbc
-X-MS-Exchange-CrossTenant-originalarrivaltime: 02 Jan 2019 21:42:25.8537 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR1101MB2068
-X-OriginatorOrg: microchip.com
+Content-Disposition: inline
+In-Reply-To: <CAOMZO5CF5uYDm_XM8m-+9ARQPsxVqNqUJuuHwEF-CRu2DNDOdQ@mail.gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190102_134235_713123_0B99EEA1 
-X-CRM114-Status: GOOD (  18.25  )
+X-CRM114-CacheID: sfid-20190102_141447_838701_E5803AE9 
+X-CRM114-Status: GOOD (  13.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -127,74 +96,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: marc.zyngier@arm.com, eric@anholt.net, netdev@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, UNGLinuxDriver@microchip.com
+Cc: s.hauer@pengutronix.de, Oliver Graute <oliver.graute@gmail.com>,
+ linux-imx@nxp.com, kernel@pengutronix.de, fabio.estevam@nxp.com,
+ shawnguo@kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Stefan,
+>> +&lcdif {
+>> +       pinctrl-names = "default";
+>> +       pinctrl-0 = <&pinctrl_lcdif_dat
+>> +                    &pinctrl_lcdif_ctrl>;
+>> +       display = <&display0>;
+>> +       status = "okay";
+>> +
+>> +       display0: display {
+>> +               bits-per-pixel = <16>;
+>> +               bus-width = <24>;
+>> +
+>> +               display-timings {
+>> +                       native-mode = <&timing0>;
+>> +                       timing0: timing0 {
+>> +                               clock-frequency =<35000000>;
+>> +                               hactive = <800>;
+>> +                               vactive = <480>;
+>> +                               hfront-porch = <40>;
+>> +                               hback-porch = <40>;
+>> +                               hsync-len = <48>;
+>> +                               vback-porch = <29>;
+>> +                               vfront-porch = <13>;
+>> +                               vsync-len = <3>;
+>> +                               hsync-active = <0>;
+>> +                               vsync-active = <0>;
+>> +                               de-active = <1>;
+>> +                               pixelclk-active = <0>;
 
-Thanks for information and creating a ticket.
+> Don't add timing parameters in the device tree. Add the panel support
+> in the simple panel driver and use the drm mxsfb bindings.
 
-Did quick check on a PC machine with 4.20 rc. However, not seeing same warning.
-Look need time to repro and get details on same build & target you are using.
+can you point me to an example? I don't have any clue how to do this.
+which panel driver code do you mean?
 
-Regards,
-Woojung
+>> +                               MX6UL_PAD_GPIO1_IO03__OSC32K_32K_OUT
+>> 0x03029
 
-> -----Original Message-----
-> From: Stefan Wahren <stefan.wahren@i2se.com>
-> Sent: Tuesday, January 1, 2019 4:32 PM
-> To: Woojung Huh - C21699 <Woojung.Huh@microchip.com>
-> Cc: eric@anholt.net; UNGLinuxDriver <UNGLinuxDriver@microchip.com>; marc.zyngier@arm.com;
-> netdev@vger.kernel.org; linux-arm-kernel@lists.infradead.org
-> Subject: RE: lan78xx: WARNING: irq 79 handler enabled interrupts
-> 
-> Hi Woojung,
-> 
-> > Woojung.Huh@microchip.com hat am 30. Dezember 2018 um 04:25 geschrieben:
-> >
-> >
-> > HI Marc & Stephen,
-> >
-> > Most of engineers are out until New Year's Day.
-> 
-> thanks. I didn't expect a reply that fast.
-> 
-> >
-> > LAN78xx driver uses irq_domain for phy interrupt, but smsc95xx uses polling.
-> > Need to check flow again, you can try that comment out "lan78xx_setup_irq_domain" to
-> > make dev->domain_data.phyirq = 0 which forces PHY polling.
-> 
-> I tested your suggestion with multi_v7_defconfig (32 bit) and arm64/defconfig.
-> The warning disappeared and Ethernet is still working.
-> 
-> Only the old issue that we can't receive until a first packet has been send out reappear. But this should
-> be manageable.
-> 
-> >
-> > Can you share if this is filed on RPI forum?
-> 
-> I didn't submit this to the raspberrypi.org forum / github. They mostly care about the next LTS release
-> 4.19 and not really about arm64.
-> 
-> But an Arch Linux user (aarch64 using Mainline kernel) already discovered this issue:
-> https://archlinuxarm.org/forum/viewtopic.php?f=65&t=13302
-> 
-> > Also, it would be appreciated if you can create a ticket on Microchip site at
-> > https://www.microchip.com/technical-support/hot-topics
-> 
-> Done
-> 
-> Best regards
-> Stefan
-> 
-> >
-> > Best Regards,
-> > Woojung
-> >
+>Is this for Wifi? If so you could add a pwrseq entry that could take
+>care of it.
+
+yes this PAD is for wifi. Do you have an pwrseq example?
+
+Best Regards,
+
+Oliver
+
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
