@@ -2,87 +2,86 @@ Return-Path: <SRS0=RmN+=PK=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EB4C4C43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 18:18:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1048BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 18:28:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BE522218DE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 18:18:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DCF2C218E2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 18:28:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pzr4C0qL";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="PFt7daVN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BE522218DE
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RVtNQFok";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="JzdtyI56"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DCF2C218E2
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Date:Message-ID:References:From:
-	In-Reply-To:To:Subject:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=jbJT77yQpYmF96FqAmGz9rpoFDfFCKbYcxXmPFLruKs=; b=pzr4C0qL4hp3N5
-	dvY0rcMmd6jy5laLUY9MKZJpRXV/r6XtFLaK979cLre5MhWlHVW34ZlroiAqSgWWDQr0JCcbZgK39
-	j/wBoPvDTleXoWfL/7AYRcsFkpXgCnxXMdw5c2VxxYAgAyWXazq8/8UzBtbTEQYr066A0wX4HmO8B
-	VLJb5w//0uPLBAOVm5eVndE7iTPllmTKB46gxWb7eAMmPkD5bbf+LcWugdfvjPOGJukDE9yyXiA8M
-	vOfDWut2heHokkpEyvvUClN9RkvyZVjcCK4wuFrv/snAyaFbv/ewxPxBEjHU9PHLQDMA2TfauvTUP
-	GCGbhA/ItvSLtKFgll5Q==;
+	List-Owner; bh=rkWFT73qZDHlz5MZyUkKUYOl7tkUeTG8SYDShb4mWPs=; b=RVtNQFoklJGcG2
+	6Ob36v4+r7xiVvrAHWOA3p9eC9eA7j/E+cN+k3Xrd2+XdbQlaAf3VgNiII2Jzipdy+4rn8CMuDqSM
+	VMmvM6xWBa4bg/PDRP0JnmULwOT0CERtJzjfYZSrU+iHjsw7L5/kOz6EOW8NxDoaLQMpMZVHv7kuv
+	loaximMQ/AKwHxbFpum9cHMqBLxEM1KEUoSo3oyUDri2pngbG6hH6jhsI1VoruTRj985Lba6IcNM4
+	V/6/8ATmtvs5c2q2TUKWPieRHsjs5Swol9ijVs6QgkmuvxpT+7c6SGHZ4hd2jBYMRSXG53n5r6fad
+	jvlSEYvHzFrhrFjFju0Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gel5g-0002Oq-Su; Wed, 02 Jan 2019 18:18:04 +0000
-Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
+	id 1gelFi-0005rK-TZ; Wed, 02 Jan 2019 18:28:26 +0000
+Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gel5d-0002OC-V0
- for linux-arm-kernel@lists.infradead.org; Wed, 02 Jan 2019 18:18:03 +0000
-Received: by mail-pg1-x543.google.com with SMTP id g189so14898362pgc.5
+ id 1gelFg-0005qg-44
+ for linux-arm-kernel@lists.infradead.org; Wed, 02 Jan 2019 18:28:25 +0000
+Received: by mail-wr1-x444.google.com with SMTP id r10so31367762wrs.10
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 02 Jan 2019 10:18:01 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
- h=mime-version:content-transfer-encoding:subject:cc:to:in-reply-to
- :from:user-agent:references:message-id:date;
- bh=4BX045HuqzZQyLnghk5iaBiLMxe1Qq6U3uS4PB9/uLg=;
- b=PFt7daVNho4cL+SGAaJnt6xRclJEymy7RG1WUL+d3dyiTbMU0otgop2rC4MQffKGrA
- XG7N3vNiUXJ62b6+G+UUR6BxKSnXYO7A+l3Wv942x7lDb2iWUOD8TrzG9BxMHObIH4Ya
- k0qgzHq0RFyCveyIdYrgQigxU18J5xcJ6A7TM=
+ Wed, 02 Jan 2019 10:28:22 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc:content-transfer-encoding;
+ bh=gMhKoB56fl1CENDGxaDFPrqlt7cUUK874k7xw397NdU=;
+ b=JzdtyI56NkMTgEJWWUI7nVrrdM4ObN36HtPjzfrSSjcdqdR9Gtl9t/46owiSX02KfJ
+ wude1FNPPx52lUIBO6Mj1WbUQ7dn1GEkoUAWSBE0ruGW/AYS1ZdrVE4WEG+cjM3s9gDR
+ POqYiDhxqJkxRfi/ZQiGRyw+4M3gWrbKCVED24XGoMjWdIchuBU3I7Qy08q7YX29sIRl
+ C45vCtxvK5eXALv38zLCau929LZIPSi7uRWZXAZqMmFxcagAMxgyR+2mO7MegAWSvLAk
+ kG2L+cFubVPh+1r7Unm9pPfxY26p6AQdjpHnpqt7xJNVRwcb8LLKTAinlvtgIm1zyhP+
+ cv8g==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:content-transfer-encoding:subject
- :cc:to:in-reply-to:from:user-agent:references:message-id:date;
- bh=4BX045HuqzZQyLnghk5iaBiLMxe1Qq6U3uS4PB9/uLg=;
- b=Z2BlJHAlbd4Iwtsty1vG+hGTua4qPoXGl32ZZPEw04ihlgFjY/B6arcZuOgLsMOO2t
- q/COrmbRFTbyTTfl/d6JPwUjr5rp427dvvt2U9sakzouDUriVd2ycL1vD2QGOqpAAOgT
- CvW5jhLY0MeUB7rzInTUGHMDn0ZDSzYpKB9xvzK6xB2owRf6quD6UL4VL8Dt+D42jVya
- K/PXwwa7W7EaQR6955otv3kt0boo2O4XiCh2geTQOGVv1SiPWDXP+P4kXRzVfLzJTk/6
- KePfYAA3CEpHgLn3WAYaAD7OdeMxFQtbJ3+2FA6KuUX9UlkTlLmsQS93ja3lyWPWiVzQ
- ezQA==
-X-Gm-Message-State: AA+aEWZJ8JJJvXUAM+TwzUNFMk6IJtTgwcaTKbh5ZAXMV5MbO4xSa0PR
- G3kda76Xij1qRILru/HtSZ8IXQ==
-X-Google-Smtp-Source: AFSGD/UPHpLjW+AXVFjEjAm75gjeEgjowwb3HS9AAeGheP1dpquQ//uCgTP9undsY4Tnx9xebWkFng==
-X-Received: by 2002:a62:6799:: with SMTP id t25mr45307411pfj.139.1546453080499; 
- Wed, 02 Jan 2019 10:18:00 -0800 (PST)
-Received: from localhost ([2620:15c:202:1:fa53:7765:582b:82b9])
- by smtp.gmail.com with ESMTPSA id n73sm86997017pfj.148.2019.01.02.10.17.59
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 02 Jan 2019 10:17:59 -0800 (PST)
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc:content-transfer-encoding;
+ bh=gMhKoB56fl1CENDGxaDFPrqlt7cUUK874k7xw397NdU=;
+ b=eB3oztdJC0Q1pfemk5buBvtNUAY9Xbs+V/qg9x4SDNL7d2ZELqIGDTY69NcDQ9V7Pc
+ 2thTH6cUqTVZLrUel7dfbyxXv5X41Kgp2T9XV9LQEjfTAHMo1r/1Ejr2EiYW5Loz7UDX
+ VSceVUN2yJoiRE8ZXE3/7gbuOwhQQjBXaKdlRmrK1sr5+6ICx5yPvVcaNSX9iYIMlWcS
+ drfbb79g5/05zdwU+ZPRNtf3Rpkx7nTXsJhHoQppyOCK8G0t+5lwK+YHcFoV5W5mTfn4
+ y+YPtRWANcKYrhLas9Mm88mTKg++tW+9qgSecpOkdZTFjQOdlVZ5eHSqozlF/yIQux19
+ IxtA==
+X-Gm-Message-State: AJcUukf668P//xeAxS5oWs+4B/SXPgAFAOJeIE1k5Lydzl44HMA1iWB1
+ hJjHdfYoP7trSekPjzicCIQJEMlZhTqK7/5WKtg=
+X-Google-Smtp-Source: ALg8bN5DG7KGiHBMbCIxnPHPogckdubzNMt/jjijDA8hZ2AZq8k3DkpH3670RP94iJyqTvr7cTVkl8RWceaALOX7seg=
+X-Received: by 2002:a5d:4b01:: with SMTP id v1mr37134675wrq.5.1546453701202;
+ Wed, 02 Jan 2019 10:28:21 -0800 (PST)
 MIME-Version: 1.0
-Subject: Re: [PATCH v2] driver core: platform: Add an error message to
- platform_get_irq*()
-To: Andy Shevchenko <andy.shevchenko@gmail.com>
-In-Reply-To: <CAHp75Ve9YSPy14hwKOsjChZ6JhRYokLqm-RNs6xgu-RG-5QctA@mail.gmail.com>
-From: Stephen Boyd <swboyd@chromium.org>
-User-Agent: alot/0.8
-References: <CABGGisxcHWwhUcQML7XmriK_DLFGjmud3cKt8yp+K4G2CAL=9Q@mail.gmail.com>
- <20181228215620.120672-1-swboyd@chromium.org>
- <CAHp75Ve9YSPy14hwKOsjChZ6JhRYokLqm-RNs6xgu-RG-5QctA@mail.gmail.com>
-Message-ID: <154645307874.15366.9874268705850757907@swboyd.mtv.corp.google.com>
-Date: Wed, 02 Jan 2019 10:17:58 -0800
+References: <20181221072716.29017-1-andrew.smirnov@gmail.com>
+ <20181221072716.29017-12-andrew.smirnov@gmail.com>
+ <86e8172d-d1dc-59d6-0b64-b11ce014b6a4@synopsys.com>
+In-Reply-To: <86e8172d-d1dc-59d6-0b64-b11ce014b6a4@synopsys.com>
+From: Andrey Smirnov <andrew.smirnov@gmail.com>
+Date: Wed, 2 Jan 2019 10:28:09 -0800
+Message-ID: <CAHQ1cqH3uFj51ORhp1eHPp6jVNoM0D1nv5qHvQESnmPX3-ESoQ@mail.gmail.com>
+Subject: Re: [PATCH 11/21] PCI: designware: Make use of BIT() in constant
+ definitions
+To: Gustavo Pimentel <gustavo.pimentel@synopsys.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190102_101802_021515_24E440E7 
-X-CRM114-Status: GOOD (  16.06  )
+X-CRM114-CacheID: sfid-20190102_102824_222228_BE51F02C 
+X-CRM114-Status: GOOD (  12.67  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,64 +93,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>,
- Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- "Rafael J. Wysocki" <rafael@kernel.org>,
- Javier Martinez Canillas <javierm@redhat.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Andrzej Hajda <a.hajda@samsung.com>, Mark Brown <broonie@kernel.org>,
- Russell King - ARM Linux <linux@armlinux.org.uk>,
- linux-arm Mailing List <linux-arm-kernel@lists.infradead.org>,
- Marek Szyprowski <m.szyprowski@samsung.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: "A.s. Dong" <aisheng.dong@nxp.com>,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Richard Zhu <hongxing.zhu@nxp.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Fabio Estevam <fabio.estevam@nxp.com>, "linux-imx@nxp.com" <linux-imx@nxp.com>,
+ Bjorn Helgaas <bhelgaas@google.com>, Leonard Crestez <leonard.crestez@nxp.com>,
+ Chris Healy <cphealy@gmail.com>, Lucas Stach <l.stach@pengutronix.de>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Andy Shevchenko (2018-12-30 02:42:39)
-> On Fri, Dec 28, 2018 at 11:56 PM Stephen Boyd <swboyd@chromium.org> wrote:
-> >
-> > A grep of the kernel shows that many drivers print an error message if
-> > they fail to get the irq they're looking for. Furthermore, those drivers
-> > all decide to print the device name, or not, and the irq they were
-> > requesting, or not, etc. Let's consolidate all these error messages into
-> > the API itself, allowing us to get rid of the error messages in each
-> > driver.
-> 
-> > +static int __platform_get_irq(struct platform_device *dev, unsigned int num, bool warn)
-> >  {
-> 
-> > +error:
-> > +       if (warn)
-> > +               dev_err(&dev->dev, "IRQ index %u not found\n", num);
-> > +
-> > +       return ret;
-> > +}
-> > +
-> > +/**
-> > + * platform_get_irq - get an IRQ for a device
-> > + * @dev: platform device
-> > + * @num: IRQ number index
-> > + */
-> > +int platform_get_irq(struct platform_device *dev, unsigned int num)
-> > +{
-> > +       return __platform_get_irq(dev, num, true);
-> 
-> Hmm... Why not just  do
-> int  ret = __plaform_get_irq();
-> if (ret)
->  dev_err();
-> return ret;
-> 
-> instead of big refactoring of platform_get_irq()?
-
-Sure. Thanks for the suggestion. But we need to check for ret < 0 I
-suppose so that we don't print an error message for all the irq numbers.
-I'll send the updated patch as a v3.
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gV2VkLCBEZWMgMjYsIDIwMTggYXQgNzoxOSBBTSBHdXN0YXZvIFBpbWVudGVsCjxndXN0YXZv
+LnBpbWVudGVsQHN5bm9wc3lzLmNvbT4gd3JvdGU6Cj4KPiBIaSwKPgo+IE9uIDIxLzEyLzIwMTgg
+MDc6MjcsIEFuZHJleSBTbWlybm92IHdyb3RlOgo+ID4gQXZvaWQgdXNpbmcgZXhwbGljaXQgbGVm
+dCBzaGlmdHMgYW5kIGNvbnZlcnQgdmFyaW91cyBkZWZpbml0aW9ucyB0bwo+ID4gdXNlIEJJVCgp
+IGluc3RlYWQuIE5vIGZ1bmN0aW9uYWwgY2hhbmdlIGludGVuZGVkLgo+ID4KPiA+IENjOiBMb3Jl
+bnpvIFBpZXJhbGlzaSA8bG9yZW56by5waWVyYWxpc2lAYXJtLmNvbT4KPiA+IENjOiBCam9ybiBI
+ZWxnYWFzIDxiaGVsZ2Fhc0Bnb29nbGUuY29tPgo+ID4gQ2M6IEZhYmlvIEVzdGV2YW0gPGZhYmlv
+LmVzdGV2YW1AbnhwLmNvbT4KPiA+IENjOiBDaHJpcyBIZWFseSA8Y3BoZWFseUBnbWFpbC5jb20+
+Cj4gPiBDYzogTHVjYXMgU3RhY2ggPGwuc3RhY2hAcGVuZ3V0cm9uaXguZGU+Cj4gPiBDYzogTGVv
+bmFyZCBDcmVzdGV6IDxsZW9uYXJkLmNyZXN0ZXpAbnhwLmNvbT4KPiA+IENjOiAiQS5zLiBEb25n
+IiA8YWlzaGVuZy5kb25nQG54cC5jb20+Cj4gPiBDYzogUmljaGFyZCBaaHUgPGhvbmd4aW5nLnpo
+dUBueHAuY29tPgo+ID4gQ2M6IGxpbnV4LWlteEBueHAuY29tCj4gPiBDYzogbGludXgtYXJtLWtl
+cm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCj4gPiBDYzogbGludXgta2VybmVsQHZnZXIua2VybmVs
+Lm9yZwo+ID4gQ2M6IGxpbnV4LXBjaUB2Z2VyLmtlcm5lbC5vcmcKPiA+IFNpZ25lZC1vZmYtYnk6
+IEFuZHJleSBTbWlybm92IDxhbmRyZXcuc21pcm5vdkBnbWFpbC5jb20+Cj4gPiAtLS0KPiA+ICBk
+cml2ZXJzL3BjaS9jb250cm9sbGVyL2R3Yy9wY2llLWRlc2lnbndhcmUuYyB8ICAyICstCj4gPiAg
+ZHJpdmVycy9wY2kvY29udHJvbGxlci9kd2MvcGNpZS1kZXNpZ253YXJlLmggfCAxOCArKysrKysr
+KystLS0tLS0tLS0KPiA+ICAyIGZpbGVzIGNoYW5nZWQsIDEwIGluc2VydGlvbnMoKyksIDEwIGRl
+bGV0aW9ucygtKQo+ID4KPiA+IGRpZmYgLS1naXQgYS9kcml2ZXJzL3BjaS9jb250cm9sbGVyL2R3
+Yy9wY2llLWRlc2lnbndhcmUuYyBiL2RyaXZlcnMvcGNpL2NvbnRyb2xsZXIvZHdjL3BjaWUtZGVz
+aWdud2FyZS5jCj4gPiBpbmRleCBkMTIzYWMyOTBiOWUuLjA4NmU4N2E0MDMxNiAxMDA2NDQKPiA+
+IC0tLSBhL2RyaXZlcnMvcGNpL2NvbnRyb2xsZXIvZHdjL3BjaWUtZGVzaWdud2FyZS5jCj4gPiAr
+KysgYi9kcml2ZXJzL3BjaS9jb250cm9sbGVyL2R3Yy9wY2llLWRlc2lnbndhcmUuYwo+ID4gQEAg
+LTMwMCw3ICszMDAsNyBAQCB2b2lkIGR3X3BjaWVfZGlzYWJsZV9hdHUoc3RydWN0IGR3X3BjaWUg
+KnBjaSwgaW50IGluZGV4LAo+ID4gICAgICAgfQo+ID4KPiA+ICAgICAgIGR3X3BjaWVfd3JpdGVs
+X2RiaShwY2ksIFBDSUVfQVRVX1ZJRVdQT1JULCByZWdpb24gfCBpbmRleCk7Cj4gPiAtICAgICBk
+d19wY2llX3dyaXRlbF9kYmkocGNpLCBQQ0lFX0FUVV9DUjIsIH5QQ0lFX0FUVV9FTkFCTEUpOwo+
+ID4gKyAgICAgZHdfcGNpZV93cml0ZWxfZGJpKHBjaSwgUENJRV9BVFVfQ1IyLCAodTMyKX5QQ0lF
+X0FUVV9FTkFCTEUpOwo+Cj4gVGhpcyBpcyB1bnJlbGF0ZWQgd2l0aCB0aGUgcGF0Y2ggZGVzY3Jp
+cHRpb24gcHVycG9zZS4KPgoKVGhpcyBpcyBhIGRpcmVjdCByZXN1bHQgb2YgY29udmVydGluZyBQ
+Q0lFX0FUVV9FTkFCTEUgdG8gQklUKDMxKS4KQklUKDMxKSBleHBhbmRzIHRvICgxVUwgPDwgMzEp
+IHNvLCB3aXRob3V0IHRoYXQgY2FzdCBJIGdldAoKZHJpdmVycy9wY2kvY29udHJvbGxlci9kd2Mv
+cGNpZS1kZXNpZ253YXJlLmM6IEluIGZ1bmN0aW9uCuKAmGR3X3BjaWVfZGlzYWJsZV9hdHXigJk6
+CmRyaXZlcnMvcGNpL2NvbnRyb2xsZXIvZHdjL3BjaWUtZGVzaWdud2FyZS5jOjMwMzo0MDogd2Fy
+bmluZzogbGFyZ2UKaW50ZWdlciBpbXBsaWNpdGx5IHRydW5jYXRlZCB0byB1bnNpZ25lZCB0eXBl
+IFstV292ZXJmbG93XQogIGR3X3BjaWVfd3JpdGVsX2RiaShwY2ksIFBDSUVfQVRVX0NSMiwgflBD
+SUVfQVRVX0VOQUJMRSk7CgpvbiBBQXJjaDY0LiBJIGFtIGd1ZXNzaW5nIHRoYXQgb3JpZ2luYWwg
+ZGVmaW5pdGlvbiBvZiAoMSA8PCAzMSkgYXZvaWRzCnRoaXMgcHJvYmxlbSBieSBiZWluZyBhbiAi
+aW50IiBpbnN0ZWFkIG9mICJ1bnNpZ25lZCBsb25nIi4KClRoYW5rcywKQW5kcmV5IFNtaXJub3YK
+Cl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFy
+bS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9y
+ZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1r
+ZXJuZWwK
