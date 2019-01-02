@@ -2,141 +2,70 @@ Return-Path: <SRS0=RmN+=PK=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-8.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 25079C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 15:08:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 04034C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 15:09:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EA28220656
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 15:08:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C366620656
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  2 Jan 2019 15:09:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HbwA7ksh";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="ImPeXIMC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EA28220656
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=partner.samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GMOohQPk";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=agner.ch header.i=@agner.ch header.b="NKDXpZgG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C366620656
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=agner.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
-	Date:Message-ID:From:To:Subject:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Message-ID:References:In-Reply-To:
+	Subject:To:From:Date:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DZ0UxNkZj2VS9VLmwCmjqmPd+Jff9708LPhUawpd028=; b=HbwA7ksh/JzBAe
-	HUSOwHrJZZ6JWA1DcXJRnyqel1bi97n6ph4NOlPBLLEa8z6vtp6a3okbWI9tVrEY6FY33TLmdDy58
-	t3VVbF7CvmikanhbzkJyxqjslbJX3JAaxaEsR7E0dQlQuj0pN7x/8mJZHM2NstAvny7MJlHgZEwy9
-	Wcj9c1ku6f2Y0/ryXejh7gevGy1BWtSjwukraxzbrigc1i7waJXe6kZnA8wAp33HXeR+6doaU73cX
-	CrFOBHcWlMNqOClSixlaRQESfNN3+17RfhsqUQoF6Hdvdo8kaOA4lQVl5904AxTN5Ba0AZqQAbdyn
-	e6BgIm5ArCdWJ5OCtjYQ==;
+	List-Owner; bh=RjQmsNHz6mdVAPcBBHHeuXh+LtT51keSLJlwUmQVWtM=; b=GMOohQPkli2kRE
+	8l/zfByvvhcUXA+WJu+ai6la0t5VbpgW1+PCnuRC7y9Bv8QuOsN93v1+tIGgUPf2Y7Jt55OgnwZ+H
+	2GgXfwn+TxfLd+8ScjJaBnC36Id+7CTPY0vuOps+vErPo2DYTJ1g7OFIaKCUlvoFYYsxT039ORUxt
+	wu8OTU04w/aNpPY6y+REWShwUfWfqETmD76mONfNs3WGoI0i8gDhOiCcCqzzRMChVH69OvSomhftl
+	nBUQcUxmll7rK/BSaFSrh0xNv9C7PJitNBK2LQuNMimUOS07Zxv6N9Ts8nydjsvp+E000+zWTPW00
+	HxC+Hjktn0RMOSHy99nw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gei8d-0003vI-TT; Wed, 02 Jan 2019 15:08:55 +0000
-Received: from mailout2.w1.samsung.com ([210.118.77.12])
+	id 1gei91-0004Fp-8d; Wed, 02 Jan 2019 15:09:19 +0000
+Received: from mail.kmu-office.ch ([2a02:418:6a02::a2])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gei8a-0003tw-3m
- for linux-arm-kernel@lists.infradead.org; Wed, 02 Jan 2019 15:08:54 +0000
-Received: from eucas1p1.samsung.com (unknown [182.198.249.206])
- by mailout2.w1.samsung.com (KnoxPortal) with ESMTP id
- 20190102150845euoutp020c95a4b2941c125c06184263a5e604ff~2EI5nep0E2754927549euoutp02a
- for <linux-arm-kernel@lists.infradead.org>;
- Wed,  2 Jan 2019 15:08:45 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout2.w1.samsung.com
- 20190102150845euoutp020c95a4b2941c125c06184263a5e604ff~2EI5nep0E2754927549euoutp02a
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1546441725;
- bh=Dauv+FCCkr7n/ZSEz6jvJVwA7TRT6PBibnYObEabNWs=;
- h=Subject:To:Cc:From:Date:In-Reply-To:References:From;
- b=ImPeXIMC71EE9O05dpFKpj0uQWhFBgwfhA1siFVA4A8cQKflw7hQmlS53ghQajFIG
- u8MKwHVcenFUBdDx1SQLIWFAbAsZGcv0pJiHIqeamkqS4xTmECJ3LhiG9dxcU4h9k3
- W0yyLInu/8T3uwgEq3adkj682I+bKEVpgQlgZ628=
-Received: from eusmges2new.samsung.com (unknown [203.254.199.244]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTP id
- 20190102150844eucas1p1a38cad87181f71021188f438eb16e4bf~2EI3_eHLs2902929029eucas1p1m;
- Wed,  2 Jan 2019 15:08:44 +0000 (GMT)
-Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
- eusmges2new.samsung.com (EUCPMTA) with SMTP id EC.EB.04294.BF3DC2C5; Wed,  2
- Jan 2019 15:08:43 +0000 (GMT)
-Received: from eusmtrp1.samsung.com (unknown [182.198.249.138]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTPA id
- 20190102150843eucas1p178b4aa4faf0243a2c28236d54b402c2c~2EI3AX_kg2902329023eucas1p1n;
- Wed,  2 Jan 2019 15:08:43 +0000 (GMT)
-Received: from eusmgms2.samsung.com (unknown [182.198.249.180]) by
- eusmtrp1.samsung.com (KnoxPortal) with ESMTP id
- 20190102150842eusmtrp1ee3aa15b03dd0597f07f305d39becc8c~2EI2wssyf1315313153eusmtrp1o;
- Wed,  2 Jan 2019 15:08:42 +0000 (GMT)
-X-AuditID: cbfec7f4-835ff700000010c6-66-5c2cd3fb658b
-Received: from eusmtip2.samsung.com ( [203.254.199.222]) by
- eusmgms2.samsung.com (EUCPMTA) with SMTP id 45.6A.04128.AF3DC2C5; Wed,  2
- Jan 2019 15:08:42 +0000 (GMT)
-Received: from [106.120.51.20] (unknown [106.120.51.20]) by
- eusmtip2.samsung.com (KnoxPortal) with ESMTPA id
- 20190102150841eusmtip2e53560e132d75204eeba41493dd8ddb4~2EI13KSHp2438424384eusmtip2D;
- Wed,  2 Jan 2019 15:08:41 +0000 (GMT)
-Subject: Re: [PATCH v3 4/5] drivers: power: suspend: call devfreq
- suspend/resume
-To: "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "linux-samsung-soc@vger.kernel.org"
- <linux-samsung-soc@vger.kernel.org>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>, "linux-pm@vger.kernel.org"
- <linux-pm@vger.kernel.org>, "devicetree@vger.kernel.org"
- <devicetree@vger.kernel.org>, "rjw@rjwysocki.net" <rjw@rjwysocki.net>
-From: Lukasz Luba <l.luba@partner.samsung.com>
-Message-ID: <eda2b1f2-ed6f-b75f-f582-761c2a48c0cd@partner.samsung.com>
-Date: Wed, 2 Jan 2019 16:08:40 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gei8v-0004BZ-Ld
+ for linux-arm-kernel@lists.infradead.org; Wed, 02 Jan 2019 15:09:16 +0000
+Received: from webmail.kmu-office.ch (unknown [IPv6:2a02:418:6a02::a3])
+ by mail.kmu-office.ch (Postfix) with ESMTPSA id ABC385C0249;
+ Wed,  2 Jan 2019 16:09:04 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=agner.ch; s=dkim;
+ t=1546441744;
+ h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+ to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+ content-transfer-encoding:content-transfer-encoding:
+ in-reply-to:in-reply-to:references:references;
+ bh=yyQmrlVqjJYGuohv6QITgAdpSPw6RbmaPhZKcGEJjR0=;
+ b=NKDXpZgGGHPbTlJ6ALc6nwnci2LvUkYVEoQ+ywMeylHCJC99U+G+XZuARBPYMaNY8Gtvla
+ 7kMmY/dlDjRxXB/+LxZYCcqih1RfYnBSCoC7ye5j+Cu9CJ3ofQeaJvLajviIPXWI/hvZFb
+ bN5QCwklQaHhZAqjDZR4bHagVEzvjQ0=
 MIME-Version: 1.0
-In-Reply-To: <20181221003305epcms1p756d76191d5f233c6e3238400d233b3c6@epcms1p7>
-Content-Language: en-US
-X-Brightmail-Tracker: H4sIAAAAAAAAA01Se0xTVxz29D6BlRyLs7/Aoqbuj2EcjG1ZzuKyaEbmTSTL4qLZg8xVuQEz
- iq4X2GTLRHl1lZesMOzqgyCPXLoU266QCjI7RmUVkJnJHNORQMQpXcxKAIWwcbmQ8d93vkd+
- 35ccntI52Hj+cE6uaM4xZhvYaNrX93jw+fmb29NfcE0mk6vfJ5JL9S6GdFyaYcjI9CRDzvcO
- MqSo0cWS66dMpGr8IUWGhto5MnByiiN2W7eGuMdvMeSm38GSSEUvIvVDVzTku947HGkaGdaQ
- 0ROtLLnz809L+dAvDCnp7uVIadsjhkzduEvv1Au+yz5GcJ5zIuHbwmFaqK76BwmNXX9pBLf8
- FSv0nHVyguficWGxjxO8v5bRQqVXRkJr2ywnRNyb3ta+H/1ahph9OF80J7/+UXTWqOcsdTSs
- /WzmdJguRHKMFUXxgF8G70Q1a0XRvA63IuiamuMUQYenEcz6E1QhgqCq5BpaTbSX+RjV1ILg
- dvtB1RRGcMZ1kVaEOLwXguUuRhE24EUN2GYuLD8oXMzCYOgyZUU8z+Ik6JQ/UQJa/CYE624t
- h2n8LFiuhCgFP43fBcufbazqWQ/9ZyZoJRqF34K7A68qNIX18PvEeY2KN0NH2EEppwD/wUNF
- f4RRW6dCpS+wsiAOHgS9nIqfgdDX5bSKJRiwyKyKv4Cy/s4Vzw74MTjMKHcpnAguf7JK74Lr
- /h+W6wCOhd/C69UKsVDj+4ZSaS1YSnWq+znwlt/QqHgjtDjruGpksK/ZZV8zxr5mjP3/uxcQ
- LSO9mCeZMkXpxRzx0yTJaJLycjKTDh0xudHSnw0tBqc7kX/hYABhHhme0lqubk/XMcZ86Zgp
- gICnDBu0G6UlSpthPFYgmo8cMOdli1IAJfC0Qa/9fN3YBzqcacwVPxbFo6J5VdXwUfGFqHBk
- T27avZ7ml2rmndV4/+OGeG+LITUi/73vkJwytqV5a5b/vnUiQ4gKcTsigd3veFizfp2j0dIU
- fBLc/W9tvocS3st0PLk25qFcRfpZ+UH6GG9bKLYf//AVd0xtzMMvm2zD9XuLTpVZIwMNW8ZH
- bXOPit7QxRU0ZHO30zpiewy0lGVM2UaZJeN/mJd/068DAAA=
-X-Brightmail-Tracker: H4sIAAAAAAAAA03Sa0hTYRgHcN6dq+niNC97G3ZhCJXU0Wnqu7Lhh4hDHyy6SvdRRzfanJ0z
- o9WHVlLmssyS0JlT6IIsy5o2o1LRTDHTZZpGkVEZIToxNSMxaXMFfvu/z/P8XnjgoTGZi1DQ
- +kwzL2RqDUpyAd4x2zawZrpn9b5Yr3MVanq0Cj0sriZQ3cMpAvVPfidQeUsXgXJuVpPo1UUj
- Kvg6jCGP5wGFOs+OUMheVC9Brq99BOp5coNEE5daACr2NEjQvZaPFLrd3y1BH85Ukujjyxc+
- 3/GGQOfqWyh0/u4YgUZeD+Apcs791E1wVY4qwJVau3HuSsE44G4+G5JwLmceyTWWVVFcza3T
- 3GwrxdW+zcW5y7VOwFXe/UVxE66lW6V72GTBlG3ml+tMonmDcq8KxbEqNWLj1qpZVXzS/nVx
- CcoYTfIR3qA/zgsxmkOs7kNNGZbllZ6YKvTiVuAMtoEgGjJr4YNcN2EDC2gZcxvAL6V2KtCI
- gFcb6v7lUDjTZyMDQ8MAvpsaxPyNUGYbbMuvntNhjBWDP8crMP8DY2wkfFJZQAVIrwR6263A
- BmiaZFj42HnMr6XMJth2vQ/3Z5yJghcaOuZ+DWfSYOfQfRCYWQTbSwZxPw1iUuFAp9pfxphE
- 6Kj5jAWyHL4fLJcE8jJY572BXQEy+zxtn0fs84h9HqkAuBOE8dmiMcMoxrGi1ihmZ2awh01G
- F/Ddi7v1d+1jYBvd3gwYGihDpLGNq/fJCO1x0WJsBpDGlGHSCNFXkh7RWk7ygumgkG3gxWaQ
- 4NutEFOEHzb5ri/TfFCVoEpCalVSfFJ8IlLKpZ5Yyx4Zk6E180d5PosX/jsJHaSwgpDEXZbU
- XsVuKiV3mG+a3lg6qXGQ8gN2W63QmIeCC9jo5+uGBpktsrS3UeklRTnBTxPkCw+MhurvWEYG
- 5Nd0eeoVHo08sjzIoI4YWy+986c33dG1I2RzyadIPZdWvVXR/D2qTCZ07zLkb/sWs7NtY8+p
- 3+nRmiU/VkZXjC+eyVHiok6risYEUfsX6Nm8GUUDAAA=
-X-CMS-MailID: 20190102150843eucas1p178b4aa4faf0243a2c28236d54b402c2c
-X-Msg-Generator: CA
-X-RootMTR: 20181205110623eucas1p120f9d8b38822bf856a5b7d427d00e49f
-X-EPHeader: CA
-CMS-TYPE: 201P
-X-CMS-RootMailID: 20181205110623eucas1p120f9d8b38822bf856a5b7d427d00e49f
-References: <ce1d415d-2a00-ef0e-6b58-23d16cffee4a@partner.samsung.com>
- <1544007956-28889-1-git-send-email-l.luba@partner.samsung.com>
- <1544007956-28889-5-git-send-email-l.luba@partner.samsung.com>
- <CGME20181205110623eucas1p120f9d8b38822bf856a5b7d427d00e49f@epcms1p7>
- <20181221003305epcms1p756d76191d5f233c6e3238400d233b3c6@epcms1p7>
+Date: Wed, 02 Jan 2019 16:09:04 +0100
+From: Stefan Agner <stefan@agner.ch>
+To: linux@armlinux.org.uk
+Subject: Re: [PATCH 2/3] ARM: uaccess: use unified assembler language syntax
+In-Reply-To: <201812310309.fFJTFUuf%fengguang.wu@intel.com>
+References: <8190fb3605e863295bdb6311b1966b69d4fa9e73.1546185298.git.stefan@agner.ch>
+ <201812310309.fFJTFUuf%fengguang.wu@intel.com>
+Message-ID: <8f6aeb56adcb7a937c834ee24b654805@agner.ch>
+X-Sender: stefan@agner.ch
+User-Agent: Roundcube Webmail/1.3.7
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190102_070852_290799_730E7699 
-X-CRM114-Status: GOOD (  14.25  )
+X-CRM114-CacheID: sfid-20190102_070914_188926_06063522 
+X-CRM114-Status: GOOD (  18.62  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -148,84 +77,92 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "len.brown@intel.com" <len.brown@intel.com>,
- "tony.luck@intel.com" <tony.luck@intel.com>,
- "keescook@chromium.org" <keescook@chromium.org>,
- Chanwoo Choi <cw00.choi@samsung.com>,
- Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
- "gregkh@linuxfoundation.org" <gregkh@linuxfoundation.org>,
- "anton@enomsg.org" <anton@enomsg.org>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>,
- "tjakobi@math.uni-bielefeld.de" <tjakobi@math.uni-bielefeld.de>,
- Kyungmin Park <kyungmin.park@samsung.com>, myungjoo.ham@samsung.com,
- "kgene@kernel.org" <kgene@kernel.org>, "pavel@ucw.cz" <pavel@ucw.cz>,
- "ccross@android.com" <ccross@android.com>, "krzk@kernel.org" <krzk@kernel.org>,
- Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: nicolas.pitre@linaro.org, mark.rutland@arm.com,
+ kbuild test robot <lkp@intel.com>, arnd@arndb.de, ard.biesheuvel@linaro.org,
+ peterz@infradead.org, will.deacon@arm.com, julien.thierry@arm.com,
+ ndesaulniers@google.com, linux-kernel@vger.kernel.org, mingo@redhat.com,
+ kbuild-all@01.org, natechancellor@gmail.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Rafael,
+On 30.12.2018 20:12, kbuild test robot wrote:
+> Hi Stefan,
+> 
+> I love your patch! Yet something to improve:
+> 
+> [auto build test ERROR on arm/for-next]
+> [also build test ERROR on v4.20 next-20181224]
+> [if your patch is applied to the wrong git tree, please drop us a note
+> to help improve the system]
+> 
+> url:   
+> https://github.com/0day-ci/linux/commits/Stefan-Agner/ARM-fix-argument-count-to-match-macro-definition/20181231-001137
+> base:   git://git.armlinux.org.uk/~rmk/linux-arm.git for-next
+> config: arm-ebsa110_defconfig (attached as .config)
+> compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+> reproduce:
+>         wget
+> https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross
+> -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         GCC_VERSION=7.2.0 make.cross ARCH=arm 
+> 
+> All errors (new ones prefixed by >>):
+> 
+>    /tmp/ccfKN3IW.s: Assembler messages:
+>    /tmp/ccfKN3IW.s:26: Error: bad instruction `sbcscc r1,r1,r3'
+>>> /tmp/ccfKN3IW.s:94: Error: bad instruction `sbcscc r8,r8,r0'
+>    /tmp/ccfKN3IW.s:104: Error: bad instruction `sbcscc r0,r0,r2'
+>    /tmp/ccfKN3IW.s:155: Error: bad instruction `sbcscc lr,lr,r2'
+>    /tmp/ccfKN3IW.s:630: Error: bad instruction `sbcscc r1,r1,r2'
 
-Gentle ping...
-Please take this patch, it got ACK.
-The other patches have been taken through MyungJoo's
-tree, but this one is actually enabling the feature.
+Hm, it seems that gcc always assumes inline assembly is in non-unified
+syntax when compiling using -marm:
 
-Regards,
-Lukasz
+        .syntax divided
+@ 244 "arch/arm/kernel/signal.c" 1
+        adds ip, r1, #760; sbcscc ip, ip, r3; movcc r3, #0
+@ 0 "" 2
+
+It seems that gcc would have an option to force unified syntax when
+generating code for ARM state (-marm) using -masm-syntax-unified.
+However, unfortunately, this seems currently broken. I created a bug in
+the gcc bug tracker:
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=88648
+
+The only solution I found is using ".syntax unified" in inline assembly,
+not pretty but seems to do the job... Will send a v2.
+
+--
+Stefan
 
 
-On 12/21/18 1:33 AM, MyungJoo Ham wrote:
->> On 2018-12-05 12:05, Lukasz Luba wrote:
->>> Devfreq framework supports suspend of its devices.
->>> Call the the devfreq interface and allow devfreq devices preserve/restore
->>> their states during suspend/resume.
->>>
->>> Suggested-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
->>> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
->>> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
+
+> --
+>    /tmp/cc9oa73P.s: Assembler messages:
+>    /tmp/cc9oa73P.s:2036: Error: bad instruction `sbcscc r1,r1,r3'
+>    /tmp/cc9oa73P.s:3325: Error: bad instruction `sbcscc r3,r3,r0'
+>    /tmp/cc9oa73P.s:3724: Error: bad instruction `sbcscc r2,r2,r3'
+>    /tmp/cc9oa73P.s:4242: Error: bad instruction `sbcscc r1,r1,r3'
+>>> /tmp/cc9oa73P.s:4304: Error: bad instruction `sbcscc r10,r10,r2'
+>    /tmp/cc9oa73P.s:4831: Error: bad instruction `sbcscc r1,r1,r3'
+>    /tmp/cc9oa73P.s:4973: Error: bad instruction `sbcscc r1,r1,r3'
+>    /tmp/cc9oa73P.s:5059: Error: bad instruction `sbcscc r0,r0,r2'
+>    /tmp/cc9oa73P.s:5076: Error: bad instruction `sbcscc r0,r0,r2'
+>    /tmp/cc9oa73P.s:5120: Error: bad instruction `sbcscc r1,r1,r3'
+> --
+>    /tmp/ccnaC92i.s: Assembler messages:
+>>> /tmp/ccnaC92i.s:133: Error: bad instruction `sbcscc r7,r7,r1'
+>    /tmp/ccnaC92i.s:225: Error: bad instruction `sbcscc r1,r1,r3'
+>    /tmp/ccnaC92i.s:631: Error: bad instruction `sbcscc ip,ip,r3'
 > 
-> This looks all good to me.
-> 
-> Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> 
->>> ---
->>>   drivers/base/power/main.c | 3 +++
->>>   1 file changed, 3 insertions(+)
->>>
->>> diff --git a/drivers/base/power/main.c b/drivers/base/power/main.c
->>> index a690fd4..0992e67 100644
->>> --- a/drivers/base/power/main.c
->>> +++ b/drivers/base/power/main.c
->>> @@ -32,6 +32,7 @@
->>>   #include <trace/events/power.h>
->>>   #include <linux/cpufreq.h>
->>>   #include <linux/cpuidle.h>
->>> +#include <linux/devfreq.h>
->>>   #include <linux/timer.h>
->>>   
->>>   #include "../base.h"
->>> @@ -1078,6 +1079,7 @@ void dpm_resume(pm_message_t state)
->>>   	dpm_show_time(starttime, state, 0, NULL);
->>>   
->>>   	cpufreq_resume();
->>> +	devfreq_resume();
->>>   	trace_suspend_resume(TPS("dpm_resume"), state.event, false);
->>>   }
->>>   
->>> @@ -1852,6 +1854,7 @@ int dpm_suspend(pm_message_t state)
->>>   	trace_suspend_resume(TPS("dpm_suspend"), state.event, true);
->>>   	might_sleep();
->>>   
->>> +	devfreq_suspend();
->>>   	cpufreq_suspend();
->>>   
->>>   	mutex_lock(&dpm_list_mtx);
-> 
-> 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 
 _______________________________________________
 linux-arm-kernel mailing list
