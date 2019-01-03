@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ABD56C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 03:05:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CF1BAC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 03:38:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6CC28204EC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 03:05:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9613320883
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 03:38:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FvOBoZE9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6CC28204EC
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tXPl6F73"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9613320883
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,38 +25,48 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
 	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=iEaCnPDuglp5RQFCqMXMrMOxvEX4XaOo1ybmceF7TsY=; b=FvOBoZE9Bx/fp/
-	JQGxnJdHN28XO+UCZYdYj1Ovdwki4KePM7/i7gQQLeMkJylPC5fv/lOcPDffd3Y4U0A5/FY/6Ai8I
-	A+53kOCrYVQHwiHhcODhT4qSXezSHcItgCwj5p4rXth5/usLZdjFXgWg9DLL/aE91qacZ33bJq10+
-	z9pMC+cDgIDgGYEEMe8MMhbkE5NykGKRH+pm/qPmwfhRny+h5T7C2x4o4cBiKVYL4ulh/Hgcyvl1z
-	1DNdBT5mxE4TnOBH4fGMQe6zIlWmkH0WTPvc67XtVUK7a1uBJTeIBoWrsDUC33GmsgVq/Qk34p1mA
-	4U8wAaTtsSIFP+ZP6EqQ==;
+	List-Owner; bh=3d2vwWZ014KIgFug+B+CInqZBlemte57A0eFmB1olGM=; b=tXPl6F73tSAhiO
+	Pz6ku8INKKS2Ygu7k0am/9anAG1zsauEkOl22P1//EsaE6IiCsOuNdPnH+F63f8xTRmiCWoNh5+x3
+	foZE14JvGM6NIeM6FY5FQkYytRwNvotnGrQIzIT7A7fVDE6QFDPiqNpg5TQZJgjsHNvXXJHngiMMv
+	a7Aquw/7E7fUfByjJFw592FLQ+1FycDvaWhZBxtNpv8y4/ku80J3qe4fmhqDnYadv8FBoUeHXhXjq
+	ABJLKU/MMgDq9g8FL5PKsrmYWw+B3odNYtAFXtG/tRmP/cbRgiP4UX+ZXv8JqOk8bKQTOrce4lw8N
+	U1e7JQLbnvs8nIqRKEPQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1getKR-00077i-At; Thu, 03 Jan 2019 03:05:51 +0000
-Received: from szxga06-in.huawei.com ([45.249.212.32] helo=huawei.com)
+	id 1getpj-00012l-SN; Thu, 03 Jan 2019 03:38:11 +0000
+Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1getKM-00076U-RP; Thu, 03 Jan 2019 03:05:48 +0000
-Received: from DGGEMS407-HUB.china.huawei.com (unknown [172.30.72.60])
- by Forcepoint Email with ESMTP id 10DC520D0CC70;
- Thu,  3 Jan 2019 11:05:38 +0800 (CST)
-Received: from localhost.localdomain.localdomain (10.175.113.25) by
- DGGEMS407-HUB.china.huawei.com (10.3.19.207) with Microsoft SMTP Server id
- 14.3.408.0; Thu, 3 Jan 2019 11:05:31 +0800
-From: YueHaibing <yuehaibing@huawei.com>
-To: Yue Wang <yue.wang@Amlogic.com>, Lorenzo Pieralisi
- <lorenzo.pieralisi@arm.com>, Bjorn Helgaas <bhelgaas@google.com>, "Kevin
- Hilman" <khilman@baylibre.com>
-Subject: [PATCH -next] PCI: amlogic: Use PTR_ERR_OR_ZERO
-Date: Thu, 3 Jan 2019 03:12:18 +0000
-Message-ID: <1546485138-142830-1-git-send-email-yuehaibing@huawei.com>
-X-Mailer: git-send-email 1.8.3.1
+ id 1getpg-00012K-62; Thu, 03 Jan 2019 03:38:09 +0000
+X-UUID: 93150fb1eb2d41caabc7b9b16fee4d8a-20190102
+X-UUID: 93150fb1eb2d41caabc7b9b16fee4d8a-20190102
+Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw02.mediatek.com
+ (envelope-from <chuanjia.liu@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 529028950; Wed, 02 Jan 2019 19:38:00 -0800
+Received: from mtkmbs08n2.mediatek.inc (172.21.101.56) by
+ MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Wed, 2 Jan 2019 19:37:58 -0800
+Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
+ mtkmbs08n2.mediatek.inc (172.21.101.56) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Thu, 3 Jan 2019 11:37:56 +0800
+Received: from localhost.localdomain (10.17.3.153) by MTKCAS06.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Thu, 3 Jan 2019 11:37:56 +0800
+From: <chuanjia.liu@mediatek.com>
+To: <sean.wang@kernel.org>, <linus.walleij@linaro.org>,
+ <matthias.bgg@gmail.com>, <linux-mediatek@lists.infradead.org>,
+ <linux-gpio@vger.kernel.org>, <linux-arm-kernel@lists.infradead.org>,
+ <linux-kernel@vger.kernel.org>
+Subject: [PATCH v5] pinctrl: mediatek: add EINT support to virtual GPIOs
+Date: Thu, 3 Jan 2019 11:37:15 +0800
+Message-ID: <1546486635-16829-1-git-send-email-chuanjia.liu@mediatek.com>
+X-Mailer: git-send-email 1.7.9.5
 MIME-Version: 1.0
-X-Originating-IP: [10.175.113.25]
-X-CFilter-Loop: Reflected
+X-TM-SNTS-SMTP: BCF6E7E982204055E7BCDB50B5020F824FCB9BA70D68E92B9F7A9DE898E55FFE2000:8
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190102_190547_060723_FF3E9202 
-X-CRM114-Status: UNSURE (   7.80  )
+X-CRM114-CacheID: sfid-20190102_193808_237373_1D69B659 
+X-CRM114-Status: UNSURE (   9.59  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -69,53 +79,49 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-pci@vger.kernel.org, kernel-janitors@vger.kernel.org,
- YueHaibing <yuehaibing@huawei.com>, linux-arm-kernel@lists.infradead.org,
- linux-amlogic@lists.infradead.org
+Cc: youlin.pei@mediatek.com, zhiyong.tao@mediatek.com, eddie.huang@mediatek.com,
+ hailong.fan@mediatek.com, "chuanjia.liu" <Chuanjia.Liu@mediatek.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Use PTR_ERR_OR_ZERO rather than if(IS_ERR(...)) + PTR_ERR
+From: "chuanjia.liu" <Chuanjia.Liu@mediatek.com>
 
-Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+Virtual gpio only used inside SOC and not being exported to outside SOC.
+Some modules use virtual gpio as eint and doesn't need SMT.
+So this patch add EINT support to virtual GPIOs.
+
+Signed-off-by: chuanjia.liu <Chuanjia.Liu@mediatek.com>
 ---
- drivers/pci/controller/dwc/pci-meson.c | 10 ++--------
- 1 file changed, 2 insertions(+), 8 deletions(-)
+change note:
+v5: This patch is the same as v4,re-upload due to
+      mail permissions issues	 
+---
+ drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pci/controller/dwc/pci-meson.c b/drivers/pci/controller/dwc/pci-meson.c
-index 241ebe0..51cf20c 100644
---- a/drivers/pci/controller/dwc/pci-meson.c
-+++ b/drivers/pci/controller/dwc/pci-meson.c
-@@ -181,10 +181,7 @@ static int meson_pcie_get_mems(struct platform_device *pdev,
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
+index 4a9e0d4c2bbc..b1c368455d30 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
+@@ -290,7 +290,13 @@ static int mtk_xt_set_gpio_as_eint(void *data, unsigned long eint_n)
+ 		return err;
  
- 	/* Meson SoC has two PCI controllers use same phy register*/
- 	mp->mem_res.phy_base = meson_pcie_get_mem_shared(pdev, mp, "phy");
--	if (IS_ERR(mp->mem_res.phy_base))
--		return PTR_ERR(mp->mem_res.phy_base);
--
--	return 0;
-+	return PTR_ERR_OR_ZERO(mp->mem_res.phy_base);
- }
+ 	err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_SMT, MTK_ENABLE);
+-	if (err)
++	/* SMT is supposed to be supported by every real GPIO and doesn't
++	 * support virtual GPIOs, so the extra condition err != -ENOTSUPP
++	 * is just for adding EINT support to these virtual GPIOs. It should
++	 * add an extra flag in the pin descriptor when more pins with
++	 * distinctive characteristic come out.
++	 */
++	if (err && err != -ENOTSUPP)
+ 		return err;
  
- static void meson_pcie_power_on(struct meson_pcie *mp)
-@@ -258,10 +255,7 @@ static int meson_pcie_probe_clocks(struct meson_pcie *mp)
- 		return PTR_ERR(res->general_clk);
- 
- 	res->clk = meson_pcie_probe_clock(dev, "pcie", 0);
--	if (IS_ERR(res->clk))
--		return PTR_ERR(res->clk);
--
--	return 0;
-+	return PTR_ERR_OR_ZERO(res->clk);
- }
- 
- static inline void meson_elb_writel(struct meson_pcie *mp, u32 val, u32 reg)
-
-
-
-
+ 	return 0;
+-- 
+2.19.1
 
 
 _______________________________________________
