@@ -3,77 +3,61 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-3.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6A674C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 10:08:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2F10CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 10:10:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 383E32073D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 10:08:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F1BC32073D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 10:10:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EqKCIEOQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 383E32073D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jO5DCyoB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F1BC32073D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=FLVV+2/uiEb65HRMv1qAYBYRFJ3UqB5GjA7pwjBgwOc=; b=EqKCIEOQQWNpnq
-	AN3ENyR920nc4BXi04Xoaq0wZkNZaFFM8QDtgYisV7lKvxMaQIJBi8quUHOeFY5FMnXj6oWsdwmXZ
-	/mbrr7f8xb4y0hAVLLI+v8rSA4jgvs5H/lYeBmP2N3f4uR7Z+jNf9eb805yZ0D591vMzhyVrW1T9A
-	XM2dLOI0UaK1sxe3bs50gqtHuZhJLd3ocV3fvm/mtCT0GAQQ4yNt+jGbZPaGar9ghXj+qVgUu9isb
-	jBxRVcwNN1kFXO6bcMmc5KWu3vkMCa/cd4pCkhkaL9VSbnQCkj3+9tF1LZ5PmVGOuarPPV8oUE9Su
-	YW2FyGfG9LpD7MFUeZ7g==;
+	List-Owner; bh=tPe9QHTSS+cXr7jeAAl4guARk+Nlkd1IiqmBHMhCO3A=; b=jO5DCyoBicTdTR
+	1s+NCRfD+4AmJ8CKCnuaU+JeECuFtDEbPbwVEI/aXx9NRZ++8ENqhfAtH/1eC8Jv51PALAdXzM1Ye
+	ffBapdwfmqSn3f+N8+aw4d1G7myc+IfAGIdx8JeAwa0j/p98svE0oIfDHONv53mgcgthbpnyzTmhL
+	raD7BHW2vJnkwJHzH9DM6lQ85Y9BWNe5FJKDDjO1fpfBgfD6efxWD2TyHHUGCAHLAkshso2xbCb9+
+	7+0X4VjJDvGWOuJ5KKUjmvZmVeTLzUPsIb6Do34JAW8bWPDClYPdrnxFgi5TXgxnogebiYTkNiQ+Q
+	f9+Cp830zcrh2MusuKig==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gezva-0001zB-0B; Thu, 03 Jan 2019 10:08:38 +0000
-Received: from mail-oi1-f193.google.com ([209.85.167.193])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gezvW-0001yg-QH
- for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 10:08:36 +0000
-Received: by mail-oi1-f193.google.com with SMTP id c206so27331681oib.0
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 03 Jan 2019 02:08:34 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=p4BMsPmNVulD2wJr7uIl6oF25NRo2H9JNsEVVTR9rSw=;
- b=diMN+phPMxb8DZtqkOEn/jEFufuJjGwG6D4nD3QNI6WFjxqMed88Ujn3szFN/cHbFF
- 1rMDnWnontV5YOsMDWmIuZHHzIt/2keItjxjM5yYhYq8MbAx7+Qe1NWrP3KJeX6nUKme
- f85zjKKNKtbfc/pll4gF5eikqn0U845mDR/qBpFNM3F8FYhH28ihBOB+3kiuhheOrT2q
- RLSvWYQPrGC9cEyN9dRF9CUlO7S1Wz/KSG1SOxHLv2c4+/krhnZuL3gY1LHA0b2gqfz9
- bhKTLh74GaHscOiEtXLcZaoUlGvR6coKRh5cbOUYtrXxqyuTU9YpYxIufWBsdUcvuzSQ
- ec9A==
-X-Gm-Message-State: AA+aEWYPwCGEwcPs/lq2W6HzfEDa1fU9JM9wtayZJhIsox0q2RSlSACw
- c89p77nYpvBZlXxfsiGJ8Zr/PKnzYiPkj5VVEx0=
-X-Google-Smtp-Source: ALg8bN7YahUbk4q0shL2kXkYHr+/V8GVJveWujGxaRriHrdh0dSE4bsshFomaZyBgQ5XJTb59+cHu9w0foHxT5LHLxM=
-X-Received: by 2002:aca:3d42:: with SMTP id k63mr32426394oia.95.1546510113851; 
- Thu, 03 Jan 2019 02:08:33 -0800 (PST)
-MIME-Version: 1.0
-References: <ce1d415d-2a00-ef0e-6b58-23d16cffee4a@partner.samsung.com>
- <1544007956-28889-1-git-send-email-l.luba@partner.samsung.com>
- <1544007956-28889-5-git-send-email-l.luba@partner.samsung.com>
- <CGME20181205110623eucas1p120f9d8b38822bf856a5b7d427d00e49f@epcms1p7>
- <20181221003305epcms1p756d76191d5f233c6e3238400d233b3c6@epcms1p7>
- <eda2b1f2-ed6f-b75f-f582-761c2a48c0cd@partner.samsung.com>
-In-Reply-To: <eda2b1f2-ed6f-b75f-f582-761c2a48c0cd@partner.samsung.com>
-From: "Rafael J. Wysocki" <rafael@kernel.org>
-Date: Thu, 3 Jan 2019 11:08:22 +0100
-Message-ID: <CAJZ5v0jAkCP62Vj_G_Eq3wG=ZfdO_NtM1vdAO-HQNovnLSMTMQ@mail.gmail.com>
-Subject: Re: [PATCH v3 4/5] drivers: power: suspend: call devfreq
- suspend/resume
-To: Lukasz Luba <l.luba@partner.samsung.com>
+	id 1gezxk-0003l6-VC; Thu, 03 Jan 2019 10:10:52 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gezxh-0003k9-Hn
+ for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 10:10:51 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 5732E207AD; Thu,  3 Jan 2019 11:10:46 +0100 (CET)
+Received: from aptenodytes (aaubervilliers-681-1-29-148.w90-88.abo.wanadoo.fr
+ [90.88.149.148])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 0BF5E2074D;
+ Thu,  3 Jan 2019 11:10:36 +0100 (CET)
+Message-ID: <fc3c7771e4cc25227d97be02efe11173c1350482.camel@bootlin.com>
+Subject: Re: [PATCH v4 00/22] drm/sun4i: Support for linear and tiled YUV
+ formats with the frontend
+From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+To: dri-devel@lists.freedesktop.org, linux-arm-kernel@lists.infradead.org, 
+ linux-kernel@vger.kernel.org
+Date: Thu, 03 Jan 2019 11:10:36 +0100
+In-Reply-To: <20181205083703.21488-1-paul.kocialkowski@bootlin.com>
+References: <20181205083703.21488-1-paul.kocialkowski@bootlin.com>
+Organization: Bootlin
+User-Agent: Evolution 3.30.3 
+Mime-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190103_020834_853267_3E554311 
-X-CRM114-Status: UNSURE (   9.61  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190103_021049_858004_B41E5403 
+X-CRM114-Status: GOOD (  21.26  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,43 +69,121 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "len.brown@intel.com" <len.brown@intel.com>, "pavel@ucw.cz" <pavel@ucw.cz>,
- Marek Szyprowski <m.szyprowski@samsung.com>,
- "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
- "anton@enomsg.org" <anton@enomsg.org>, "krzk@kernel.org" <krzk@kernel.org>,
- Chanwoo Choi <cw00.choi@samsung.com>, Myungjoo Ham <myungjoo.ham@samsung.com>,
- Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "keescook@chromium.org" <keescook@chromium.org>,
- "linux-pm@vger.kernel.org" <linux-pm@vger.kernel.org>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- "tony.luck@intel.com" <tony.luck@intel.com>,
- "gregkh@linuxfoundation.org" <gregkh@linuxfoundation.org>,
- "rjw@rjwysocki.net" <rjw@rjwysocki.net>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "tjakobi@math.uni-bielefeld.de" <tjakobi@math.uni-bielefeld.de>,
- Kyungmin Park <kyungmin.park@samsung.com>,
- "kgene@kernel.org" <kgene@kernel.org>,
- "ccross@android.com" <ccross@android.com>
+Cc: Daniel Vetter <daniel@ffwll.ch>, Maxime Ripard <maxime.ripard@bootlin.com>,
+ Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
+ linux-sunxi@googlegroups.com, David Airlie <airlied@linux.ie>,
+ Chen-Yu Tsai <wens@csie.org>, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Sean Paul <sean@poorly.run>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 2, 2019 at 4:08 PM Lukasz Luba <l.luba@partner.samsung.com> wrote:
->
-> Hi Rafael,
->
-> Gentle ping...
-> Please take this patch, it got ACK.
-> The other patches have been taken through MyungJoo's
-> tree, but this one is actually enabling the feature.
+On Wed, 2018-12-05 at 09:36 +0100, Paul Kocialkowski wrote:
+> This series implements support for YUV formats using the display engine
+> frontend in the sun4i DRM driver, with various fixes along the way.
+> Scaling is supported for every format handled by the frontend.
+> 
+> The tiling mode used by the VPU on Allwinner platforms is also supported
+> by this series and a dedicated fourcc modifier is introduced, along with
+> a specific ioctl for allocating tiled buffers.
+> 
+> New common fourcc helpers are also introduced in this series, especially
+> related to YUV formats.
 
-Applied now and sorry for missing it.
+This series should be about ready for merge for the sun4i parts, but
+I'd like to get some feedback regarding the new helpers introduced to
+drm_fourcc (patches 1/ and 2/) as well as the introduction of the
+Allwinner tiling definitions (patch 11/).
 
-Thanks!
+Does anyone have any objection or suggestion regarding these patches or
+can we go ahead and merge them along with the remaining driver patches
+in this series?
+
+Cheers,
+
+Paul
+
+> This was tested on the A33 and A20 platforms and all supported features
+> work properly on both. Framebuffer offsets and source positions are not
+> supported at this point.
+> 
+> Changes since v3:
+> * Made the BT.601 CSC coefficients common;
+> * Moved the tiling mode comment next to the associated macro;
+> * Added collected Acked-by tags.
+> 
+> Changes since v2:
+> * Removed DRM format helpers taking the format fourcc;
+> * Passed the DRM format info structure when needed instead of iterating
+>   through the list;
+> * Removed the sun4i-specific ioctl for allocating tiled buffers, which
+>   will be rebranded as a generic one in an upcoming patch;
+> * Improved comment for X1 tiled offset and simplified its calculation;
+> * Corrected author email and added SoB where needed;
+> * Rebased on latest drm-misc next.
+> 
+> Changes since v1:
+> * Extended source selected cleanup to both YUV and video channels;
+> * Split and reworded comment about backend scaling;
+> * Sorted newly-introduced lists alphabetically;
+> * Simplified functions to check if a format is supported;
+> * Reworked frontend selection logic as discussed;
+> * Made YUV helpers common, with fourcc and drm_info fashions;
+> * Changed the CREATE_TILED ioctl flags to match the CREATE_DUMB ioctl;
+> * Reworked YUV dimensions calculations to use drm_format_info;
+> * Dropped MB32 part in modifier to match V4L2 definition name;
+> * Improved the description of the tiling modifier;
+> * Avoided splitting CSC coefficients to avoid introducing a new module;
+> * Fixed building the driver as modules;
+> * Various code simplifications and cleanups;
+> * Split commits into logical changes.
+> 
+> Maxime Ripard (5):
+>   drm/sun4i: Move access control before setting the register as
+>     documented
+>   drm/sun4i: frontend: Add a quirk structure
+>   drm/sun4i: Set the coef_rdy bit right after the coef have been set
+>   drm/sun4i: Make COEF_RDY conditional
+>   drm/sun4i: frontend: Move the FIR filter phases to our quirks
+> 
+> Paul Kocialkowski (17):
+>   drm/fourcc: Add format info helpers for checking YUV planes
+>     disposition
+>   drm/fourcc: Add format info helpers for checking YUV sub-sampling
+>   drm/sun4i: backend: Use explicit fourcc helpers for packed YUV422
+>     check
+>   drm/sun4i: frontend: Pass DRM format info to input format helpers
+>   drm/sun4i: frontend: Determine input format based on colorspace
+>   drm/sun4i: Move the BT.601 CSC coefficients to the frontend
+>   drm/sun4i: frontend: Configure and enable YUV to RGB CSC when needed
+>   drm/sun4i: frontend: Add support for packed YUV422 input formats
+>   drm/sun4i: frontend: Add support for semi-planar YUV input formats
+>   drm/sun4i: frontend: Add support for planar YUV input formats
+>   drm/fourcc: Add definitions for Allwinner vendor and VPU tiled format
+>   drm/sun4i: frontend: Add support for tiled YUV input mode
+>     configuration
+>   drm/sun4i: Add buffer stride and offset configuration for tiling mode
+>   drm/sun4i: frontend: Add and use helper for checking tiling support
+>   drm/sun4i: layer: Add tiled modifier support and helper
+>   drm/sun4i: drv: Allow framebuffer modifiers in mode config
+>   drm/sun4i: frontend: Add A20-specific device-tree compatible and
+>     quirks
+> 
+>  drivers/gpu/drm/sun4i/sun4i_backend.c  |  25 +-
+>  drivers/gpu/drm/sun4i/sun4i_drv.c      |   1 +
+>  drivers/gpu/drm/sun4i/sun4i_frontend.c | 346 ++++++++++++++++++++++---
+>  drivers/gpu/drm/sun4i/sun4i_frontend.h |  52 ++++
+>  drivers/gpu/drm/sun4i/sun4i_layer.c    |  28 +-
+>  include/drm/drm_fourcc.h               | 117 +++++++++
+>  include/uapi/drm/drm_fourcc.h          |  16 ++
+>  7 files changed, 530 insertions(+), 55 deletions(-)
+> 
+-- 
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+
 
 _______________________________________________
 linux-arm-kernel mailing list
