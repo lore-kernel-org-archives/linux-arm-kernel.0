@@ -4,110 +4,172 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 37D03C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 10:52:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ABA3CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 11:00:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EBDEF2073D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 10:52:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 69E3D20883
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 11:00:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dTBC3LK/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EBDEF2073D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KbjK6b9u";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="h6wo2Qp2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 69E3D20883
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Cc:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=+YJA/puCvSwbn7ApajqZ/ahDA6VCGA8nND+4S2ms/Ac=; b=dTBC3LK/6ack0DeKVaNjjZjnam
-	p/TEOG68yfii6bL3kM0kKyckJf50zzha+cg6/dO2B6zI4g1cUJ5/Yh44grk7wSUdiMdng+AjiEfnO
-	iX5VcpbX4FAC/Wmrl8oE8Ek4DMb8r0T+dhA0xTpW4NttGlWFm+dOkI4rT8M7kAz3NIwHTtCwXxSw/
-	a6BLOC2mevRJdBNUMsNsnkSnppaqidlhBlS0HIFgVsAVXYxYjxPx15ByrY4tLeJ+hsUqShuGuh6lT
-	ttB6fd/yGL/1ZrCx/jBj1yrW0BsRWaQd74CQLzoavQAkneMdQLxMys5vzHHps2bZ78Wbtb9Fx9x7Y
-	qYUnUuiA==;
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=rMRNyRk67M0pcIqT5lL5H84w2CnyZWHpfMtVbAL4vNc=; b=KbjK6b9uYmqkKR
+	fQ66d7+xR3DtDm18HKtsG5NfWryHHpkrYQJojmnzsE12GeK/1t0kLJw1DBrleecS3fwiOsxuIoMsE
+	6zfGo7ez1oGafLjSL3R98b+qxnLWmY7Z2gjBGqLT705XLX+VxdVGr2odliWnSmEUf5czii/NWFQE+
+	kUC2gS3vXoF5E96jH+mZ93pANI375GtRQcEF0VxxF7FlWU5UDhZGzyV+0ESIFZP20YwR6OuLP/IBP
+	mFDnlHg/z8VYkxqgF4chFec0kHsOdjyVuJXsb//b68Ruk3b3EHcZ5EnOt68my7SUAeKFn1HweER2x
+	OfzN4VaD16s2YMXfCbKw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gf0ba-00037G-6c; Thu, 03 Jan 2019 10:52:02 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gf0bX-00036P-49
- for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 10:52:00 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 100FF80D;
- Thu,  3 Jan 2019 02:51:57 -0800 (PST)
-Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- BFD253F5D4; Thu,  3 Jan 2019 02:51:54 -0800 (PST)
-Subject: Re: [PATCH v3 3/3] arm64: Early boot time stamps
-To: Pavel Tatashin <pasha.tatashin@soleen.com>, catalin.marinas@arm.com,
- will.deacon@arm.com, akpm@linux-foundation.org, rppt@linux.vnet.ibm.com,
- mhocko@suse.com, ard.biesheuvel@linaro.org, andrew.murray@arm.com,
- james.morse@arm.com, sboyd@kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-kernel@vger.kernel.org
-References: <20181226164509.22916-1-pasha.tatashin@soleen.com>
- <20181226164509.22916-4-pasha.tatashin@soleen.com>
-From: Marc Zyngier <marc.zyngier@arm.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
- 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
-Organization: ARM Ltd
-Message-ID: <9fe670d4-d799-c05f-297e-437eda1d2072@arm.com>
-Date: Thu, 3 Jan 2019 10:51:53 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
+	id 1gf0js-0006a2-8W; Thu, 03 Jan 2019 11:00:36 +0000
+Received: from mail-cys01nam02on0629.outbound.protection.outlook.com
+ ([2a01:111:f400:fe45::629]
+ helo=NAM02-CY1-obe.outbound.protection.outlook.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gf0jp-0006ZL-7g
+ for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 11:00:34 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=S0mvc2I2OSm2E0oYl0OsJnC9ggXMERIsTeVlDTJDRXQ=;
+ b=h6wo2Qp2MGXw5y3C0ttLprsYZ5bPM29T/PQdxNGBm8KRPoqzKWx/jwX/KhNDWUKS+kOq1WEQt/ZLcf9tD2c+ifhoiaBtH2mo2l1eRNG2E4+GT2enXPMNWpCUfMbxregk7P0IzE/kB751/kTKh/68bK2I9tOo5w+SFGAjUDpcFS0=
+Received: from DM6PR02CA0023.namprd02.prod.outlook.com (2603:10b6:5:1c::36) by
+ BY2PR0201MB1895.namprd02.prod.outlook.com (2a01:111:e400:58b6::21)
+ with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1495.7; Thu, 3 Jan
+ 2019 11:00:24 +0000
+Received: from CY1NAM02FT004.eop-nam02.prod.protection.outlook.com
+ (2a01:111:f400:7e45::209) by DM6PR02CA0023.outlook.office365.com
+ (2603:10b6:5:1c::36) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.20.1495.6 via Frontend
+ Transport; Thu, 3 Jan 2019 11:00:24 +0000
+Authentication-Results: spf=pass (sender IP is 149.199.60.83)
+ smtp.mailfrom=xilinx.com; vger.kernel.org; dkim=none (message not signed)
+ header.d=none;vger.kernel.org; dmarc=bestguesspass action=none
+ header.from=xilinx.com;
+Received-SPF: Pass (protection.outlook.com: domain of xilinx.com designates
+ 149.199.60.83 as permitted sender) receiver=protection.outlook.com;
+ client-ip=149.199.60.83; helo=xsj-pvapsmtpgw01;
+Received: from xsj-pvapsmtpgw01 (149.199.60.83) by
+ CY1NAM02FT004.mail.protection.outlook.com (10.152.74.112) with Microsoft SMTP
+ Server (version=TLS1_0, cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.20.1471.13
+ via Frontend Transport; Thu, 3 Jan 2019 11:00:23 +0000
+Received: from unknown-38-66.xilinx.com ([149.199.38.66] helo=xsj-pvapsmtp01)
+ by xsj-pvapsmtpgw01 with esmtp (Exim 4.63)
+ (envelope-from <michal.simek@xilinx.com>)
+ id 1gf0jf-0006c0-3n; Thu, 03 Jan 2019 03:00:23 -0800
+Received: from [127.0.0.1] (helo=localhost)
+ by xsj-pvapsmtp01 with smtp (Exim 4.63)
+ (envelope-from <michal.simek@xilinx.com>)
+ id 1gf0jZ-00073p-Ua; Thu, 03 Jan 2019 03:00:17 -0800
+Received: from [172.30.17.111] by xsj-pvapsmtp01 with esmtp (Exim 4.63)
+ (envelope-from <michals@xilinx.com>)
+ id 1gf0jT-0006p5-Rm; Thu, 03 Jan 2019 03:00:12 -0800
+Subject: Re: [PATCH] clk: zynqmp: Fix memory allocation in zynqmp_clk_setup
+To: "Gustavo A. R. Silva" <gustavo@embeddedor.com>, Jolly Shah
+ <jolly.shah@xilinx.com>, Michael Turquette <mturquette@baylibre.com>, Stephen
+ Boyd <sboyd@kernel.org>, Michal Simek <michal.simek@xilinx.com>
+References: <20181224055058.GA23947@embeddedor.com>
+From: Michal Simek <michal.simek@xilinx.com>
+Message-ID: <8d281c7b-4d07-02a3-fd89-61eeeaa78612@xilinx.com>
+Date: Thu, 3 Jan 2019 12:00:09 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20181226164509.22916-4-pasha.tatashin@soleen.com>
+In-Reply-To: <20181224055058.GA23947@embeddedor.com>
 Content-Language: en-US
+X-TM-AS-Product-Ver: IMSS-7.1.0.1224-8.2.0.1013-23620.005
+X-TM-AS-User-Approved-Sender: Yes;Yes
+X-EOPAttributedMessage: 0
+X-MS-Office365-Filtering-HT: Tenant
+X-Forefront-Antispam-Report: CIP:149.199.60.83; IPV:NLI; CTRY:US; EFV:NLI;
+ SFV:NSPM;
+ SFS:(10009020)(136003)(39860400002)(396003)(376002)(346002)(2980300002)(189003)(199004)(44832011)(31696002)(110136005)(575784001)(6666004)(31686004)(63266004)(50466002)(305945005)(2906002)(486006)(36756003)(54906003)(230700001)(229853002)(316002)(58126008)(356004)(106466001)(106002)(64126003)(11346002)(65806001)(65956001)(478600001)(2616005)(336012)(4326008)(426003)(81166006)(8936002)(6246003)(81156014)(8676002)(26005)(77096007)(186003)(5660300001)(2486003)(9786002)(23676004)(446003)(76176011)(65826007)(476003)(126002)(36386004)(47776003)(107986001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BY2PR0201MB1895; H:xsj-pvapsmtpgw01; FPR:;
+ SPF:Pass; LANG:en; PTR:unknown-60-83.xilinx.com; MX:1; A:1; 
+X-Microsoft-Exchange-Diagnostics: 1; CY1NAM02FT004;
+ 1:SYM1iK/p8EgWM+DbV+Wrf+rVwsCdSAwiwW9iHL7vVGBM35VR3YM83ymriRwHBH2uaeysBzpzvhfYusRmbzMC5DDzHD1Sy9MA4zw8kUIGeGDH3B3Mv7L9tqGZcVbUVS7+
+X-MS-PublicTrafficType: Email
+X-MS-Office365-Filtering-Correlation-Id: f591903e-5755-4edc-1309-08d6716aa93e
+X-Microsoft-Antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4608076)(4709027)(2017052603328)(7153060);
+ SRVR:BY2PR0201MB1895; 
+X-Microsoft-Exchange-Diagnostics: 1; BY2PR0201MB1895;
+ 3:gu+BE7SK9TPAf8rR1AM46A73sgLaWeO0qguwAAJYDnJ/glOr+itiGH4FEBVVR/opfMb1QHIoQceSuaHmHo9valK9i6NUHLYk6cv80QIUNxnD3wr6jKG4JSV4zNca6EDhPQVqAOiz0VQTDq147zMaocyN3fM9MrCM+LcWO3td+AoXdamyF0RhwcJI29g2XaUSYNqFoqcRcfnzvPI2eRflx1RFS5tctW+/z8UInV3MPSMUmo48VJGolnXS45ehNmqZtCVsvFZRl6J/j5db1dqZr+fgBzsjuERO66JwqjfqRmFgHMpave42obOu2GUJ1f6OpOq2nPSgh7YRd8LZN2X9arBZN3oEIet34up7YP1qJ4rAJS7fCC/GIB1DQ9LhXrfX;
+ 25:P9r9wlBQWTkY1TG+X79QiSHePfhLlwpIb/83AuhZT2676oiQ6bvL1IfeGEr6PbOTkK7XnV6s0D87JGj1sAuGf67UujGHA3Xzt+Bt8L1HOaF2mxfINaPNdCLyjqep3nWsje59SPjx2B95QYVomkQ3NqprhYQgPtcBYQB/j5i6D4uKj9d4TeztjdV9eyzgDiClhbTPWx+qTYTI8JiHlRtPbyXNOzCJIlmpgcF95Ep9wdA94ARnISdSCaN3h+WRr0VzLszkmFVkf7FwuqL0YOKpPvHCC5MOHfxMnC5XczugyIJam9DLtbHZDqvOdT6DbPfINqnzkhC579h5Ai91zpgb9g==
+X-MS-TrafficTypeDiagnostic: BY2PR0201MB1895:
+X-Microsoft-Exchange-Diagnostics: 1; BY2PR0201MB1895;
+ 31:MopCWO2csQwr2uxDLB3Q2+/zWSEZKA8d/LfJk5Wrg1OhO/NZQIHEPOmFVL6b7c33kjsCGAFshyyLPbV0Bwgx9VEDPFDyABOUairpPvqbpHeUppJoDCpGirq2GgiDIOpMq45a7sQbvm+3FSPJYSwAweaE+dmhlWRD2Ai4jYYknJ0nmuY0Ql8V2S1IgA9j7r0WJ0AdskAPaxWJEIEggTz8OUt25cGtoW/ae5VFvsyoEdE=;
+ 20:pGA4KOQwOu2Pwb8IpW4Q2qWNsgjUrnVaZEG80ON7uct0gcQCfcsFCp/oUfBe+Dsi9hq86O9TYaIncJq6L6XfcBQYmXJJ7ZoeiKPRJK+AWVDJVs/u+z7UozVK8MOAXURR/MeOw+A9cdvOAGk7YfornfJOQj7V9KYqWp8Mnkssi+YmvWvvXoYfvHTCwlEL1LecekMGioWOH0bbwjW/NpadkawVgNWr1EmV5xWtxf34nZT9YZb7Y+hHF32qNoIdjLN+/W3gKrNSNLXfipV7DT1qs8ktz1CZrXaPGaklN87tgTnQEp2aRgm7JlMTwjpHqvCNQvi3zxbjcH8B3K5F+5kkUGVYFldhDQMPgJsV2/75QHXX+kJytTu4+8wuOnB3IT9sL6fEPghnv7+MjZzAdcPB7BfPhiD5vE+drOJFtptf3mB4VE+gnuITpqRB3au2wWJkoD24JXdhqlC7LkdELOn/l49V8K3b2VrZd3jO7aMSl1vOyMwBi+gHjKYCplsQ3oR3
+X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
+X-Microsoft-Antispam-PRVS: <BY2PR0201MB1895EB5BA0CAB6C3C4C61E27C68D0@BY2PR0201MB1895.namprd02.prod.outlook.com>
+X-Exchange-Antispam-Report-CFA-Test: BCL:0; PCL:0;
+ RULEID:(8211001083)(3230021)(908002)(999002)(5005026)(6040522)(8220060)(2401047)(8121501046)(10201501046)(3002001)(3231475)(944501520)(52105112)(93006095)(93004095)(6055026)(6041310)(20161123560045)(20161123562045)(20161123564045)(20161123558120)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(201708071742011)(7699051)(76991095);
+ SRVR:BY2PR0201MB1895; BCL:0; PCL:0; RULEID:; SRVR:BY2PR0201MB1895; 
+X-Microsoft-Exchange-Diagnostics: 1; BY2PR0201MB1895;
+ 4:NK+TK+Nl3XAGV3zJb/kLbILk9jaDpLmCbqUzn2Te0H/u+II+P+fNTtrjPC9oSbJ+AC1Ehwf142S/IaKWpt1Yj5mPMAUZbSqLr2mqBSYmQ6v0+35GC6qQ9JhavDgbp1YtwTFxSCObHPqVt4mrIEY3okk4h/eDcMS5fdrmCkyLMzqz5+UnokkMQRXAQlm7vzxT20sR3t8r3C1AwfUkN020vQZAG9DViaWM4aBQ2cnNrb689fOsOxgZ9Vb7m/S+EAi1k7k6nXou1pMgOg2k9VZEvVtmf7OsQuN1YSDZv/CSKKJqeNTQ5aIVl6ubsBnomn46
+X-Forefront-PRVS: 0906E83A25
+X-Microsoft-Exchange-Diagnostics: =?utf-8?B?MTtCWTJQUjAyMDFNQjE4OTU7MjM6aW9RZGxGckV3ZFBnSFhDVjkvcjlma0E5?=
+ =?utf-8?B?OG9wMVdVQVRPcXFaQzNnbWlDeVF5SzdUZkc0dWR2ZUdON0l3V3ExNFoxYi9K?=
+ =?utf-8?B?YkY3aEVEcWNPOHpqQXNXd1ZpVzlJMU9HM2ZPVU02S25CVGVPWHdvLzlFTUV2?=
+ =?utf-8?B?MEp1M0N1UUV0WmszSlpLY0hWWHl5aVpZTDNodUxUMUw4bkRkYnpZV044TlZi?=
+ =?utf-8?B?cFozcm5QQXpka0gvY3VKTVcwVXNrYnVSeGthYlZNS2hzMzdiWjBpM1krVTVh?=
+ =?utf-8?B?clFJT3BqMHlnOWdHTGhsRUwyOG9IbzY1bi85TjZGWjFvNHpSSzdnRVpleUZ4?=
+ =?utf-8?B?bjVpV1JDQkRaQ3FNVlV1YlVIY0NpdkNuOHZPVjJuVFdSUit5azByUVpDdWF4?=
+ =?utf-8?B?RXpJWXBCQis4QnJ4L2xRakVUT21COXJHeUFobjQ5bHhSQ09QTG50Q2NZY3VO?=
+ =?utf-8?B?eGF0VktOakl6UVBzL0RaRndJQzMzaDFoWW5FK290NlNRQTlzZmlrUjhOM3hM?=
+ =?utf-8?B?cWgzMGJrdjUrc25vZGVUbFBRNDFhbFVKUFBYaUdGa0xoV2xkdnJnL2FZeFFH?=
+ =?utf-8?B?Q3JsdEVtNzVwSWNJMjQ2TS9abE90akl5WTJuZGxIcE1PeTc1ZFg4ckRGNmIx?=
+ =?utf-8?B?VTgyMW55ZmlaVmJqbGxoOENnb2tXb2F2R2wrVVJDd1d0TVZZYWNKMVJraXBS?=
+ =?utf-8?B?Z0kwckF6bmlZeFhjOVowUkF2WllJd3lvTGpqbnVFN1V4ZTlvRmN6YllKUEg2?=
+ =?utf-8?B?QXVXWmxaNld1R0o0NzRMS2x6RE9qMkEzVG0wUGRnRWRLekZFV1p0T1pmbjNO?=
+ =?utf-8?B?T3M5dGo1WDduTnNwUGpwa2RSNW16VzlVTzJiem1hYU1ZNXBOb05DN1FYMEk0?=
+ =?utf-8?B?UXNOYnEzRkt5aEFBVE5zWWhtZTFHZDhXY1d1WVhMOXZHZVlVa1JZV0twbCtU?=
+ =?utf-8?B?U0poUjd1dVJBcVcza2xxWlpNRlowenVYdG8vMG9mL3djVThlSWljSXFEbjJK?=
+ =?utf-8?B?RUR1aHFSRTNzaXRLUWovSktjdjFNV3YyY0hJL3hGelEzMUxpR201OVFCanBQ?=
+ =?utf-8?B?VEIwNzFFM0hFeGMrOXpDeFV5M1RGZnZnTjBiY2dNckNPV1hxT2RxRG5ZQURU?=
+ =?utf-8?B?cTh3TmZ2UVpEUEIrZFc5SWFNYmJ0U3JWYUZvYjdDVlBCSVVHODRTSDZRUUdG?=
+ =?utf-8?B?dHVmbWZ3WTIvblowdlNrbW9WV0JDT3R3T3F1RWpVMkR6UVJ5eWY2U0hUNXVo?=
+ =?utf-8?B?OGZ3YitKbjdvbDliZzlqMXhuZEg1QW53dkFGTUNCNE1Yay8zMFJXRFpPbUtj?=
+ =?utf-8?B?bldsMHhwQiszYlVNcTRscmxqamQ2c3pBR0ZIczdLeUdCZEVoWE1QSWNxUlAr?=
+ =?utf-8?B?cVdKWHRzZVFreTZ0OVkvNDdNa29sVitzTWRwZVpRNTRmc1FHSWtPR1p6U0s2?=
+ =?utf-8?B?VURrcnVxeThYS3hReE1PbkVXSzBMQVR0REhQUjJscmN5V05TdWI2bEVxRmZu?=
+ =?utf-8?B?MlgxMXhSdGVlSXY3dFBDU1FzaDJDRXpwN3R2QVJGZFRCaW1ub1BIbGVpNmNH?=
+ =?utf-8?B?aTBORlBlS3BSVG1lWmZRVGFJMnhXK1pha2R4VEw0VGNHeStDbk9aWVU4bm5X?=
+ =?utf-8?B?S2tZZzFPNDRxZUtEQ09raDVTYzZIVTVYVWd1QjY1WkcyMjkrVnU4Y3FmbEtZ?=
+ =?utf-8?Q?wp9lveXbANW1ovf0wRztKpiQLbz8JOetfqrbn6P0i?=
+X-MS-Exchange-SenderADCheck: 1
+X-Microsoft-Antispam-Message-Info: MpwDVo3IvKCFZell0y5RCMG+A7DLuCgTvFSIYVdnh8lya+nFPYg9Nq44v7z6dDU5Xe8Q6ZiJ0USK3fGTzLz6VNIOYaAx5AkhKlJtedp6V1yBOiqOMks3Q97pDY8q8ZfptrIb5jwFSzhfVVLqoeWrV+Bv/l5bCn2RQ/jLgdhP6ZD/KaYnrXgeQrBBmYdRle4hUiOcpJdCUtJ7ujSruNncm8MV7PNvOk4Qsgh8Lchw2S7x0yOZSbaFiAMvw1P7IUbNTPdR3+ItbXh9fol9WmgJPHYdJ+v8B46DUeeRkal20aPg950y+Dyi8nTz8A9AW5Sk
+X-Microsoft-Exchange-Diagnostics: 1; BY2PR0201MB1895;
+ 6:GyFjw+uKDhNmOEtQFhuS/f8ysvRuiN1orSlgHnE1Qp2llywGXRecPS6ToJ4kAEfMpIHRn4Rn6EamnSkqtgMd92ab9N4P4YO7sPaz22cIE/HNrQqpT+Pc+At+l0xzydlQaSwT7nOJMkwwBq0MnxxcQiSRqaQ8S0H4CUEGScDk52fGHVxN5py9aAIdMT96l+c76pUoeD49+8e+hIlEbUPe79W3oCFMzKmOsF2BB7XljubJJJe5nSg2JulcW2t5e68Do4iM6WcKnEUjk+uAk8H4JDEkKGTXJjzOpITe2i7rON+oWlwSWwfpBikTdm93RmeWGz3TT0cA/gsXD2VXeaHq6GwjUC4XIirWCI1wn08BjgQeZoDcUEocOGZrmusQcx6KU81AE/1oCc/zuyIySKwv+Akg1+GvvKtQgqk2lu1DWS4H7vy2sPHq1aoH5EAFi0OBj9a5KGxwOlaCBdbnu21yJQ==;
+ 5:QmE8GL0dEDnW/26dTePpBVYjNpml9x5Sy0m5P9XptePIviD24HmE2ftNhWaRN/zDrR5+qwX3n5vrsqualYCDoML+O3qk1Rd1aj6ODkb9FLTQUItDtoOI8MQZuQTlgPdq7ijzsaZuiauH/deHleXZA9LRXxuDmuZ3lSRxmZ8L3wZarq0WzJMDiLFP0lUQYKWqi9hPNkgbFIXmTo63zfmoyQ==;
+ 7:ByUb9caqATc6dK6ftDiCA3ZWjiqu1+UoMLwfHpcx35+OQnpeWF7GCkTvJgajlbczSr7FhZN7qYscYiw7hbDjpuCGBo48iRxZkcPvkNDkhqtYvm7OZrPV9SVdcn08PrmDM7Pxmy3pDlGxfjabtDR22Q==
+SpamDiagnosticOutput: 1:99
+SpamDiagnosticMetadata: NSPM
+X-OriginatorOrg: xilinx.com
+X-MS-Exchange-CrossTenant-OriginalArrivalTime: 03 Jan 2019 11:00:23.5177 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: f591903e-5755-4edc-1309-08d6716aa93e
+X-MS-Exchange-CrossTenant-Id: 657af505-d5df-48d0-8300-c31994686c5c
+X-MS-Exchange-CrossTenant-OriginalAttributedTenantConnectingIp: TenantId=657af505-d5df-48d0-8300-c31994686c5c; Ip=[149.199.60.83];
+ Helo=[xsj-pvapsmtpgw01]
+X-MS-Exchange-CrossTenant-FromEntityHeader: HybridOnPrem
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BY2PR0201MB1895
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190103_025159_173313_E74BD781 
-X-CRM114-Status: GOOD (  18.95  )
+X-CRM114-CacheID: sfid-20190103_030033_311515_25366BA2 
+X-CRM114-Status: GOOD (  15.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -119,84 +181,48 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
+Cc: linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-kernel@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Pavel,
-
-On 26/12/2018 16:45, Pavel Tatashin wrote:
-> Allow printk time stamps/sched_clock() to be available from the early
-> boot.
+On 24. 12. 18 6:50, Gustavo A. R. Silva wrote:
+> Fix memory allocation and use struct_size() in kzalloc().
 > 
-> Signed-off-by: Pavel Tatashin <pasha.tatashin@soleen.com>
+> Fixes: 3fde0e16d016 ("drivers: clk: Add ZynqMP clock driver")
+> Cc: stable@vger.kernel.org
+> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
 > ---
->  arch/arm64/kernel/setup.c | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
+>  drivers/clk/zynqmp/clkc.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index 4b0e1231625c..28126facc4ed 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -40,6 +40,7 @@
->  #include <linux/efi.h>
->  #include <linux/psci.h>
->  #include <linux/sched/task.h>
-> +#include <linux/sched_clock.h>
->  #include <linux/mm.h>
+> diff --git a/drivers/clk/zynqmp/clkc.c b/drivers/clk/zynqmp/clkc.c
+> index f65cc0ff76ab..b0908ec62f73 100644
+> --- a/drivers/clk/zynqmp/clkc.c
+> +++ b/drivers/clk/zynqmp/clkc.c
+> @@ -669,8 +669,8 @@ static int zynqmp_clk_setup(struct device_node *np)
+>  	if (ret)
+>  		return ret;
 >  
->  #include <asm/acpi.h>
-> @@ -279,8 +280,32 @@ arch_initcall(reserve_memblock_reserved_regions);
+> -	zynqmp_data = kzalloc(sizeof(*zynqmp_data) + sizeof(*zynqmp_data) *
+> -						clock_max_idx, GFP_KERNEL);
+> +	zynqmp_data = kzalloc(struct_size(zynqmp_data, hws, clock_max_idx),
+> +			      GFP_KERNEL);
+>  	if (!zynqmp_data)
+>  		return -ENOMEM;
 >  
->  u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
->  
-> +/*
-> + * Get time stamps available early in boot, useful to identify boot time issues
-> + * from the early boot.
-> + */
-> +static __init void sched_clock_early_init(void)
-> +{
-> +	u64 (*read_time)(void) = arch_counter_get_cntvct;
-> +	u64 freq = arch_timer_get_cntfrq();
-> +
-> +	/*
-> +	 * The arm64 boot protocol mandates that CNTFRQ_EL0 reflects
-> +	 * the timer frequency. To avoid breakage on misconfigured
-> +	 * systems, do not register the early sched_clock if the
-> +	 * programmed value if zero. Other random values will just
-> +	 * result in random output.
-> +	 */
-> +	if (!freq)
-> +		return;
-> +
-> +	sched_clock_register(read_time, ARCH_TIMER_NBITS, freq);
-> +}
-> +
->  void __init setup_arch(char **cmdline_p)
->  {
-> +	sched_clock_early_init();
-> +
->  	init_mm.start_code = (unsigned long) _text;
->  	init_mm.end_code   = (unsigned long) _etext;
->  	init_mm.end_data   = (unsigned long) _edata;
 > 
 
-I still think this approach is flawed. You provide the kernel with a
-potentially broken sched_clock that may jump back and forth until the
-workaround kicks in. Nobody expects this.
-
-Instead, I'd suggest you allow for a something other than local_clock()
-to be used for the time stamping until a properly working sched_clock
-gets registered.
-
-This way, you'll only impact the timestamps when running on a broken system.
+Looks good. Description could be maybe more verbose that you are fixing
+issue that it should be sizeof(struct clk_hw) instead of sizeof(struct
+clk_hw_onecell_data)
+Otherwise
+Acked-by: Michal Simek <michal.simek@xilinx.com>
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Michal
 
 _______________________________________________
 linux-arm-kernel mailing list
