@@ -2,80 +2,68 @@ Return-Path: <SRS0=5A9c=PL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 68183C43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 21:33:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7FE7AC43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 21:48:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2E6762184B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 21:33:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4BB6F2184B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 21:48:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="j5D5CRLw";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="jaXlM75I"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2E6762184B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YhCgiMo5";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=agner.ch header.i=@agner.ch header.b="TYA9x5Pb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4BB6F2184B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=agner.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ZzUynWe3DpLIrCQGVd+nXApGc06w0ijj6wuQWNEduLY=; b=j5D5CRLwZhy/MR
-	ukIfIpxSpeitaZCcXEzmtsrd1rEGVTEPhPTTZyLox1HqNvfTXKC3shoGxvvZ5YbDMkUO+2xe7b1AG
-	P1pEowW3uk0xjkWoZaw5RRX9j8NjMiSjscXoDeKNyjA1RsLQLHLykL8u6DD0gIBKRIhXrODDg/VpY
-	G2M/GysVf3rtvepE8xRT2pE9w2HAWrsn86n/jsZQq+0P0F2vrHmqNdSWT7ujkKARwJoIxIbFgRuEs
-	gEaZsCsNYnVHdm6QuIec2wxxb5fsWWasHEdQWIko5pjCAqg2iHfkmPL/2HDXJ78NHXPyMO7nuJ6S8
-	N9azzDxw5bATdtPhaiBQ==;
+	List-Owner; bh=wgDt1Ufwvy49IMachKo/5bgD1sOrX+BxPzDumVAgwIU=; b=YhCgiMo5843R/F
+	9HrgO5ckXeZWEKA4N3dxR5DKasxsXGhU28s/EYrSe2pNejcVLqfAqOyDf9XIHKaW+p3C1I9Ji/EIK
+	NoRq4vKqUmhSPihJwJ0uzJwZleZvAo7UxFDrnsrAjzrkhauxfvpbTpALMRvCU4ZfILglZJelHpxCR
+	BnuUIBphh461ZZbn37fqdACSfN1OiDu/KFp2UGJ7w8uf0ayRx6SgZ2HG+9tympFHkOezHTIGFQr9P
+	fpbbsRQuExyToywpEtYvbFZpRMYuDsr/9HnZqbTVabsF5e+TLpOVs0XiQypYHSkISFYC53zVlncRI
+	JMWA1ysNo+dGoERi5wXA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfAc7-0004iB-QE; Thu, 03 Jan 2019 21:33:15 +0000
-Received: from mail-ua1-x944.google.com ([2607:f8b0:4864:20::944])
+	id 1gfAqZ-000161-UA; Thu, 03 Jan 2019 21:48:11 +0000
+Received: from mail.kmu-office.ch ([2a02:418:6a02::a2])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfAc4-0004hf-EW
- for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 21:33:14 +0000
-Received: by mail-ua1-x944.google.com with SMTP id c24so11418358uak.1
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 03 Jan 2019 13:33:11 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=hRdhXbAsuNg1Aq90NHt2icvWZc4/LaxBRWRFkVibi80=;
- b=jaXlM75IMQPRGV2NwZfFifOVgF9ct7F3py/oDVehhJx61PzEon4Fcb2QghfpsirQpM
- xGh1Tym4VdtxMyhPYXjdI/DYc4hSRdFtKpjC6EKYFYQ+8R4Qe+KmUW6J5xcSL48BQf05
- PzLFKpDnN97VWxgSOO+HUdDMDPiEyq26Rj2+I=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=hRdhXbAsuNg1Aq90NHt2icvWZc4/LaxBRWRFkVibi80=;
- b=egN1KTTSMx7oanPX67+reqjzPBAqdPjcp+LPwwxvxApw95iRKbJcFE7ploMCB0OCvA
- OB5I66AQMixLWL89EuXbWfA+zntHoUOPCWlpa6OpCj+FI5QmgM41nEWcVqttdNtdGEqL
- 9rdRNeSsCwZUqrZmeSF+STHSG65lLVfnl1TbbSidmKPD04bwNoQvodtC9f6qTTX+Y1nq
- OJ1bREx7f1IqkShGjwebqHTkTZG5O0KncYrwy05BwVGcXFHe1fTVc6akrvc8NLmGN48a
- CXVsi5cA9MZV6krZwNcsLRJxGWq0+nEOUW2q/Eyp0eHtoa++N38xYfOh7YrZiGm+mOgj
- Q4Hg==
-X-Gm-Message-State: AJcUukdW5DN55MYyjxyrD1llEoqDG6uTxK50phwWwEKWccjBmhrfFzLj
- cio2xcnidki7wEuVqzVukndXk67OTvG+6KPkM9l+cg==
-X-Google-Smtp-Source: ALg8bN5NkbkO9tYoEuTdpj293GY/U5b40mMrfrC3ezDIED1PONNxYJYygwxA9EDQbVMC4qlpE11fAKkCoid7G6Qffvg=
-X-Received: by 2002:ab0:3484:: with SMTP id c4mr18290931uar.39.1546551190827; 
- Thu, 03 Jan 2019 13:33:10 -0800 (PST)
+ id 1gfAqW-00014Y-Fk
+ for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 21:48:10 +0000
+Received: from zyt.lan (unknown [IPv6:2a02:169:3465::564])
+ by mail.kmu-office.ch (Postfix) with ESMTPSA id CA7F05C0DDF;
+ Thu,  3 Jan 2019 22:48:04 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=agner.ch; s=dkim;
+ t=1546552084;
+ h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+ to:to:cc:cc:mime-version:mime-version:content-type:
+ content-transfer-encoding:content-transfer-encoding:
+ in-reply-to:in-reply-to:references:references;
+ bh=51xr4xYeiDI4RYE/PzJ1r3c7j9DrlQRWm/NtP3kFLMo=;
+ b=TYA9x5Pbx82LwyMAxfQFwLLbyerlqWRVh6xzfBxrmlh0atGvPW3XcVQsq/y2JumNzAfNWt
+ CrI/k3g0KviFz4yPmJ3bpS5PPO4RCqSgg0m7bnXUT6HvQx1fSYo3Ic+rj6rd+oeRLah9yI
+ 75rzeDJ1Tv2q5z8ZZMuV7DxF6z7B57s=
+From: Stefan Agner <stefan@agner.ch>
+To: linux@armlinux.org.uk
+Subject: [PATCH v2 3/3] ARM: spinlock: use unified assembler language syntax
+Date: Thu,  3 Jan 2019 22:48:15 +0100
+Message-Id: <ad0fbab91f337ec99e3a2a3d60886a785da34366.1546551693.git.stefan@agner.ch>
+X-Mailer: git-send-email 2.20.1
+In-Reply-To: <cover.1546551693.git.stefan@agner.ch>
+References: <cover.1546551693.git.stefan@agner.ch>
 MIME-Version: 1.0
-References: <6ccac7db-3ab7-e396-90be-8681a8ee336b@web.de>
- <CALAqxLXz_s6B=NzSp17Lj6xMTYybEsMh4jDR8COXnWQCnFTrsw@mail.gmail.com>
-In-Reply-To: <CALAqxLXz_s6B=NzSp17Lj6xMTYybEsMh4jDR8COXnWQCnFTrsw@mail.gmail.com>
-From: Ulf Hansson <ulf.hansson@linaro.org>
-Date: Thu, 3 Jan 2019 22:32:35 +0100
-Message-ID: <CAPDyKFrY58-x3SsUwhfrLvf=hayhdjQZJWqUpmegArmnEsWATg@mail.gmail.com>
-Subject: Re: [PATCH] arm64: dts: hikey: Give wifi some time after power-on
-To: John Stultz <john.stultz@linaro.org>, Jan Kiszka <jan.kiszka@web.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190103_133312_535411_B1F408B8 
-X-CRM114-Status: GOOD (  20.71  )
+X-CRM114-CacheID: sfid-20190103_134808_845127_38C67F06 
+X-CRM114-Status: GOOD (  11.98  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,81 +75,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Anders Roxell <anders.roxell@linaro.org>, Ryan Grachek <ryan@edited.us>,
- Tony Lindgren <tony@atomide.com>, Ricardo Salveti <rsalveti@rsalveti.net>,
- linux-wireless@vger.kernel.org,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Wei Xu <xuwei5@hisilicon.com>, KISHON VIJAY ABRAHAM <kishon@ti.com>, "Reizer,
- Eyal" <eyalr@ti.com>, Kalle Valo <kvalo@codeaurora.org>,
- Valentin Schneider <valentin.schneider@arm.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>, "Mishol,
- Guy" <guym@ti.com>
+Cc: nicolas.pitre@linaro.org, mark.rutland@arm.com, arnd@arndb.de,
+ ard.biesheuvel@linaro.org, peterz@infradead.org, will.deacon@arm.com,
+ julien.thierry@arm.com, ndesaulniers@google.com, linux-kernel@vger.kernel.org,
+ Stefan Agner <stefan@agner.ch>, mingo@redhat.com, natechancellor@gmail.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 2 Jan 2019 at 23:21, John Stultz <john.stultz@linaro.org> wrote:
->
-> Adding a few folks to cc from the thread here:
-> https://patchwork.kernel.org/patch/10734021/
->
-> As this sounds like a very similar issue.
-> thanks
-> -john
+Convert the conditional infix to a postfix to make sure this inline
+assembly is unified syntax. Since gcc assumes non-unified syntax
+when emitting ARM instructions, make sure to define the syntax as
+unified.
 
-John, thanks for looping me in.
+This allows to use LLVM's integrated assembler.
 
->
-> On Sun, Dec 30, 2018 at 3:38 AM Jan Kiszka <jan.kiszka@web.de> wrote:
-> >
-> > From: Jan Kiszka <jan.kiszka@siemens.com>
-> >
-> > Somewhere along recent changes to power control of the wl1835, power-on
-> > became very unreliable on the hikey, failing like this:
-> >
-> > wl1271_sdio: probe of mmc2:0001:1 failed with error -16
-> > wl1271_sdio: probe of mmc2:0001:2 failed with error -16
-> >
-> > After playing with some dt parameters and comparing to other users of
-> > this chip, it turned out we need some power-on delay to make things
-> > stable again. In contrast to those other users which define 200 ms, the
-> > hikey is already very happy with 1 ms.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+Changes since v1:
+- Explicitly use unified syntax for inline assembly
 
-According to the discussions we had so far, this doesn't sound like
-the correct solution.
 
-I am intending to post patch soon, however, I am not sure exactly what
-solution to pick yet. I will keep you on cc - and of course I
-appreciate if you could help to test.
+ arch/arm/include/asm/spinlock.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Kind regards
-Uffe
+diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
+index 099c78fcf62d..8f009e788ad4 100644
+--- a/arch/arm/include/asm/spinlock.h
++++ b/arch/arm/include/asm/spinlock.h
+@@ -210,11 +210,12 @@ static inline void arch_read_lock(arch_rwlock_t *rw)
+ 
+ 	prefetchw(&rw->lock);
+ 	__asm__ __volatile__(
++"	.syntax unified\n"
+ "1:	ldrex	%0, [%2]\n"
+ "	adds	%0, %0, #1\n"
+ "	strexpl	%1, %0, [%2]\n"
+ 	WFE("mi")
+-"	rsbpls	%0, %1, #0\n"
++"	rsbspl	%0, %1, #0\n"
+ "	bmi	1b"
+ 	: "=&r" (tmp), "=&r" (tmp2)
+ 	: "r" (&rw->lock)
+-- 
+2.20.1
 
-> >
-> > Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
-> > ---
-> >
-> > Tested with 4.19 and linus/master.
-> >
-> >   arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 1 +
-> >   1 file changed, 1 insertion(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> > b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> > index f4964bee6a1a..1e771bf201b9 100644
-> > --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> > +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> > @@ -118,6 +118,7 @@
-> >                 reset-gpios = <&gpio0 5 GPIO_ACTIVE_LOW>;
-> >                 clocks = <&pmic>;
-> >                 clock-names = "ext_clock";
-> > +               post-power-on-delay-ms = <1>;
-> >                 power-off-delay-us = <10>;
-> >         };
-> >
-> > --
-> > 2.16.4
 
 _______________________________________________
 linux-arm-kernel mailing list
