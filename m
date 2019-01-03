@@ -2,77 +2,79 @@ Return-Path: <SRS0=5A9c=PL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2A616C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 17:39:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7CB71C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 17:41:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EDD5E217F5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 17:39:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4F0B4208E3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 17:41:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lOnrIFRn"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EDD5E217F5
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="a/AUC5PY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4F0B4208E3
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+OnPmuXfepcah/7IJ+v1GvLIcAcZUXi8nc1+GN6g2mI=; b=lOnrIFRnH12O2h
-	zacO2a+5+y2Sfkt/lQQXXGxRzn7d1v+5JSRLGf+zd/WN6VxXWnRR5Cr9WX2ug8duM+GdOeQtl3Ogh
-	vm8l40uDXOslQlzx+/9e+qSs2WYREHLTMlqaf7SNwX1qIj8cwiX1g1jha5HX8dhoZUul4gKyDz6l9
-	5SibMfx/xGJEPZbdvRA/3wJnDNAG0kNWtqqfZRrvxvcZ6KX1Q+r35jrWXDjLbb0Md71oeLeL+nDkE
-	xVbl9M1MAO9lAB3DdV1TsDIfOb73QbU9u0o8nHrl8Vhui/nt+n4CbIzqeAwo742+Op+/HpFNzWRJL
-	kg4m2cdf73pOm0G8MezQ==;
+	List-Owner; bh=YZpkd3m+cVPMwoxh2gXActg/m3jTtAfVKxYuz6ALpWk=; b=a/AUC5PYrUXbUD
+	01N7ZZFwogs2cfFItvLrDAy/cjS2LPTd8Xnx7kL4ltn1O298d85QBWuBZvDkn6OPvCwMrttTLnCGx
+	6HldHQBXBBchxj2Jjeh6/O3YzBjJayS5qzoL6T9e/jY0XjCuL5Ph6Z6q3SNvQ/2LA9AgFaqQpBBpo
+	44ZgVDYS4LHu0gcLvvWy2khJ+Y6ZW7P+6T89lFqu1SJB3XuCClqcgpBv1DgyQbslEf1R7tYYIAA1j
+	j3qRY/0ZL6bcmESA2roG2LhJ4/3P85I2bC2desz6Ks6EtcwVEAeyj1drBl4Cqbz9/0E3NUHGq3RWj
+	vGUjnFD1v9/cK7GUnEmA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gf6xa-0008Di-Vm; Thu, 03 Jan 2019 17:39:10 +0000
-Received: from mail-oi1-f195.google.com ([209.85.167.195])
+	id 1gf6zq-0001MS-8f; Thu, 03 Jan 2019 17:41:30 +0000
+Received: from mail-it1-f195.google.com ([209.85.166.195])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gf6xX-0008C5-LL
- for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 17:39:09 +0000
-Received: by mail-oi1-f195.google.com with SMTP id x202so28276630oif.13
+ id 1gf6zl-0001M5-Rr
+ for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 17:41:27 +0000
+Received: by mail-it1-f195.google.com with SMTP id z7so46334885iti.0
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 03 Jan 2019 09:39:07 -0800 (PST)
+ Thu, 03 Jan 2019 09:41:24 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=6DZzW66VVPYYwKb351IgdGl4LhNRguOE3nUFacZsWeU=;
- b=V0ZpsQlLhE86ZL/dzoZcUBF34kZxvtBmrlkdwxiVFW01GkQRDJguelrS/p+SY7pJ64
- K4b1U90SoajDLCxY9UpJq49CB9QdC7R2OiYb6D6JY7UNKh0SejKktcy7HHvYFV2+5ghM
- 7Gm4yxBcZtq9Dv2FFfvLkuLYvDrYOSy5Zd7Fnr8wjobndYo0Mtc4H0j3nmUs0Qw00GM0
- Z83TRJRRFw4YBuLgCb+VGJFOFzbI89ARABN4SIX5wv9beUuyaYpAxfpLkxrb4vXX2rZ4
- +BcYA2nZzc9GMdC6g4Y66ucU4w6L9mCantbWuFAENjSsS7S1Sa6pDDJuPHf+Jbdlos0j
- +gCg==
-X-Gm-Message-State: AA+aEWaBm5haDFIFMa/g9sX/bx8/y17pFaeiyAVDP5jc+dMg2WrbcdiH
- kCsejUZKg0VHLIC66qlZIuAJDnctGEupyUoyDd0=
-X-Google-Smtp-Source: AFSGD/UD4eLUSYW8g1hpqewFWE2ZnhqNgvnUEyJetkcbPYNbBLNt6H2GhhBH0q6UiJABrf+9L6Et7H9vdjIZNiUTTgU=
-X-Received: by 2002:aca:195:: with SMTP id 143mr30684057oib.322.1546537146567; 
- Thu, 03 Jan 2019 09:39:06 -0800 (PST)
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=XgtY3ON4bBMzyuiNr7dfPpNVT+C5KIh9dO8CbrGw7tk=;
+ b=haQqlgkqjjGr9OQ+vSqzp1w0yiHqB4NSdzqZ5GbvHqSsPBt64KGo4igOzSbNmO5vC6
+ epF325ed09HsYNz3jSS2gKouWkKoEouRagLFJyO71EtyJlGZjLutv3WETXdvNKBrIZ5q
+ xk7zqNlyXVC0H4rCAOfZt1FNKCcw53uM9beTi0MSUZYxxYWLFdH2/M6n4HT6r3s+JOJB
+ 59bGdwxdjIOxsSIUTMK9KIP23eE4rA2nxQy5Exkz1k1fqKdYexCXbUYJ9M+zzarhcs1K
+ wTY0mXsqYh2fzr6RAUq3KxS1Q95dgrQwyfdjhPNqTcaI04q8jz/aJlwBkGxTP813UnKV
+ t+QQ==
+X-Gm-Message-State: AA+aEWZrrSS/GHmy/ssA/KqrZADb9s5wTN9t2cKPL0LzF0crXmjwLVKn
+ Da8cy87KZC/G+M+oEnw7jQ==
+X-Google-Smtp-Source: AFSGD/V9b5yqNsHDxHuE9KElWPtdLZDxaY7MyTLeweez3j5H2PftNm0IWXF0oxxaHSQNzRuuliNPtg==
+X-Received: by 2002:a24:16cc:: with SMTP id a195mr31184772ita.38.1546537284031; 
+ Thu, 03 Jan 2019 09:41:24 -0800 (PST)
+Received: from localhost ([24.51.61.172])
+ by smtp.gmail.com with ESMTPSA id h13sm6088944ioq.72.2019.01.03.09.41.23
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Thu, 03 Jan 2019 09:41:23 -0800 (PST)
+Date: Thu, 3 Jan 2019 11:41:17 -0600
+From: Rob Herring <robh@kernel.org>
+To: Florian Fainelli <f.fainelli@gmail.com>
+Subject: Re: [PATCH 1/2] dt-bindings: reset: Add document for Broadcom STB
+ reset controller
+Message-ID: <20190103174117.GA6613@bogus>
+References: <20181221013409.14324-1-f.fainelli@gmail.com>
+ <20181221013409.14324-2-f.fainelli@gmail.com>
 MIME-Version: 1.0
-References: <CABGGisxcHWwhUcQML7XmriK_DLFGjmud3cKt8yp+K4G2CAL=9Q@mail.gmail.com>
- <20190102185106.56913-1-swboyd@chromium.org>
- <CAJZ5v0iL_Fq0RUbLjMj9WBitDw2amNV_ybirkiPbuYb0zroGAg@mail.gmail.com>
- <154653191998.15366.14229484132412159772@swboyd.mtv.corp.google.com>
- <CAJZ5v0hwhuerPoizdYjqNkdymxubOweZ3JhPiXRUcrNtByz_=Q@mail.gmail.com>
- <154653631992.15366.980047163353936345@swboyd.mtv.corp.google.com>
-In-Reply-To: <154653631992.15366.980047163353936345@swboyd.mtv.corp.google.com>
-From: "Rafael J. Wysocki" <rafael@kernel.org>
-Date: Thu, 3 Jan 2019 18:38:55 +0100
-Message-ID: <CAJZ5v0jj13UgkM+7ad8-17W_4cdOJw61FMyvshBAcybzaiea5A@mail.gmail.com>
-Subject: Re: [PATCH v3] driver core: platform: Add an error message to
- platform_get_irq*()
-To: Stephen Boyd <swboyd@chromium.org>
+Content-Disposition: inline
+In-Reply-To: <20181221013409.14324-2-f.fainelli@gmail.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190103_093907_701866_6E359127 
-X-CRM114-Status: GOOD (  13.25  )
+X-CRM114-CacheID: sfid-20190103_094125_962353_081151DE 
+X-CRM114-Status: GOOD (  17.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,41 +86,61 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>,
- Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- "Rafael J. Wysocki" <rafael@kernel.org>, javierm@redhat.com,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Andrzej Hajda <a.hajda@samsung.com>,
- Andy Shevchenko <andy.shevchenko@gmail.com>, Mark Brown <broonie@kernel.org>,
- Russell King - ARM Linux <linux@armlinux.org.uk>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
+ <devicetree@vger.kernel.org>, p.zabel@pengutronix.de,
+ linux-kernel@vger.kernel.org,
+ "maintainer:BROADCOM BCM7XXX ARM ARCHITECTURE"
+ <bcm-kernel-feedback-list@broadcom.com>, Gregory Fong <gregory.0xf0@gmail.com>,
+ Brian Norris <computersforpeace@gmail.com>,
+ "moderated list:BROADCOM BCM7XXX ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 3, 2019 at 6:25 PM Stephen Boyd <swboyd@chromium.org> wrote:
->
-> Quoting Rafael J. Wysocki (2019-01-03 09:22:56)
-> > On Thu, Jan 3, 2019 at 5:12 PM Stephen Boyd <swboyd@chromium.org> wrote:
-> > >
-> > > I don't see much benefit to seeing -ENXIO or -EINVAL printed here, so I
-> > > left out the error code.
-> >
-> > OK, so the value of the message is to tell the user that some driver
-> > asked for an invalid IRQ, right?
->
-> Yes.
+On Thu, Dec 20, 2018 at 05:34:08PM -0800, Florian Fainelli wrote:
+> Add a binding document for the Broadcom STB reset controller, also known
+> as SW_INIT-style reset controller.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  .../devicetree/bindings/reset/brcm,reset.txt  | 27 +++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/reset/brcm,reset.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/reset/brcm,reset.txt b/Documentation/devicetree/bindings/reset/brcm,reset.txt
+> new file mode 100644
+> index 000000000000..6e5341b4f891
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/reset/brcm,reset.txt
+> @@ -0,0 +1,27 @@
+> +Broadcom STB SW_INIT-style reset controller
+> +===========================================
+> +
+> +Broadcom STB SoCs have a SW_INIT-style reset controller with separate
+> +SET/CLEAR/STATUS registers and possibly multiple banks, each of 32 bit
+> +reset lines.
+> +
+> +Please also refer to reset.txt in this directory for common reset
+> +controller binding usage.
+> +
+> +Required properties:
+> +- compatible: should be brcm,brcmstb-reset
+> +- reg: register base and length
+> +- #reset-cells: must be set to 1
+> +
+> +Example:
+> +
+> +	reset: reset-controller@8404318 {
+> +		compatible = "brcm,brcmstb-reset";
+> +		reg = <0x8404318 0x30>;
 
-OK
+Based on this address, should this be a sub-node of something else? Or 
+not even a sub-node and just make the parent be a reset provider?
 
-This can help to reduce code duplication a bit, so
-
-Reviewed-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-
-for the v3.
+Rob
 
 _______________________________________________
 linux-arm-kernel mailing list
