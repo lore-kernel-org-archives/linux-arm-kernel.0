@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1A92DC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 13:30:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 33A52C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 13:31:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B6BDC217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 13:30:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F2DB02073D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 13:31:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PDtPcw0H";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="gvFbuHrs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B6BDC217D9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kS7GvPn7";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="IhlAK6HX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F2DB02073D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,50 +26,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Y/Kz7dn7QChtKMLQ+X4ZSyALfsQf6L9x6C/LXu5rl9c=; b=PDtPcw0HOrcFFV
-	MhC62rCr8BYLwa2qkgPDc6MUKYrVTHENtwZNlkxrLyx96T8eIVGfMHnHDrk6I8ivZ1EE2ZueEpydg
-	RTvRj7Vx+EU7t/faj4IjB+ifX6aVrBpve4DcCpRkC0cOigU747YWejfiEn/Z5Il/0iyNsu6KvrHN0
-	u7l0YLgrIdDc0KN4g0OAsJ90LfvJraKlA8WJRexEBEYMbOonNbYbsYC/Q2qxT/VW2C3ZG772S4tRH
-	nmct3t7atWIif2lAQgbSrqs4wYjFP1OQrMPXEvOqilZxfz+TXJTBKU8RhG0sHKGvDap1nSxJ1/vxY
-	t9bMds02VriVwItJpqxA==;
+	List-Owner; bh=ZJtoh10wC+FUhyLM/cwLD4Bf+S2umWRfchT/cG5X2ac=; b=kS7GvPn724hCKx
+	sw0cXDPM6wuJ+YIGmhN1qYNuMIYEdw/O7Xt/v779L8VRl3mjyH4LDTScu6LsmGRtbt96Jv1C0b4y8
+	NXR2hcZXLaXjFWKCWwIry/sa1e7a65aRP/3/6vCBfkuwTrMS4/bdWen7h0ml897k9DE9Umq/cProv
+	kx/ezWJ0lD0Z/7T1gpn2RBgigk5bsoLwPzciuzKyYBibjbBCX7AJ0BouhVQeJxdkOgjHOf9/oVtn4
+	aivcCAYK17vbPzkakH25jHnTuucgkg/QZtQ+N86sRuMttwgHyalcwVIVL1qtrXYnhgGVJLFqROErY
+	nWTGUiek5tplld1RQxRQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gf351-0000Jd-Sa; Thu, 03 Jan 2019 13:30:35 +0000
-Received: from esa5.microchip.iphmx.com ([216.71.150.166])
+	id 1gf35G-0000a7-Av; Thu, 03 Jan 2019 13:30:50 +0000
+Received: from esa1.microchip.iphmx.com ([68.232.147.91])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gf34L-0006tA-GX
+ id 1gf34M-0006sZ-0Q
  for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 13:29:55 +0000
-X-IronPort-AV: E=Sophos;i="5.56,435,1539673200"; d="scan'208";a="22933260"
+X-IronPort-AV: E=Sophos;i="5.56,435,1539673200"; d="scan'208";a="25939504"
 Received: from smtpout.microchip.com (HELO email.microchip.com)
  ([198.175.253.82])
- by esa5.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 03 Jan 2019 06:29:51 -0700
+ by esa1.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 03 Jan 2019 06:29:53 -0700
 Received: from NAM03-CO1-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.106) with Microsoft SMTP Server (TLS)
- id 14.3.352.0; Thu, 3 Jan 2019 06:30:23 -0700
+ email.microchip.com (10.10.76.105) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Thu, 3 Jan 2019 06:30:25 -0700
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=microchiptechnology.onmicrosoft.com;
  s=selector1-microchiptechnology-onmicrosoft-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=wpSJewagfrs8VaVUElz5kkpmqguC8UIFUEOTNeJaI7c=;
- b=gvFbuHrszY34KSZL0ocv73yTtuZQHxhUVYk1WqqFJQkI8QA7yppHqVb2tn/NtQ1IvA1aKBQk5lnRTJYaKBN+LNnN6HgFdetBIOZE84WhuYExemP/2LGSVqSKOkRlKiBJEgcLu5SEfl4+Lk+GCaWdFq/RUFPsa0BuG4UETDknrIQ=
+ bh=fgevUhPYg5Bh3SNVnyZSPjukuIyPbHAlU740fVrcAwU=;
+ b=IhlAK6HXOzlISZZu6W8Mz4DzK6Pdj5gg2gVoQncAOaaCtvMvEyo7a7lNYpIKPLdYDoodn0EmGCEeVO/avFxs/xLyUzccFtXTFChPjFIKsNCvWEGt9qdvNuQ0y5fHUmGihZ8r3MaDnPVleFv5KMKsIGpDFsk2rnFHD9UePEpmUjg=
 Received: from MWHPR11MB1920.namprd11.prod.outlook.com (10.175.54.19) by
  MWHPR11MB1984.namprd11.prod.outlook.com (10.175.54.147) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1495.6; Thu, 3 Jan 2019 13:29:48 +0000
+ 15.20.1495.6; Thu, 3 Jan 2019 13:29:51 +0000
 Received: from MWHPR11MB1920.namprd11.prod.outlook.com
  ([fe80::e553:ff9d:8c0b:9627]) by MWHPR11MB1920.namprd11.prod.outlook.com
  ([fe80::e553:ff9d:8c0b:9627%6]) with mapi id 15.20.1495.005; Thu, 3 Jan 2019
- 13:29:48 +0000
+ 13:29:50 +0000
 From: <Claudiu.Beznea@microchip.com>
 To: <thierry.reding@gmail.com>, <corbet@lwn.net>,
  <Nicolas.Ferre@microchip.com>, <alexandre.belloni@bootlin.com>,
  <Ludovic.Desroches@microchip.com>
-Subject: [PATCH v8 2/6] pwm: add PWM modes
-Thread-Topic: [PATCH v8 2/6] pwm: add PWM modes
-Thread-Index: AQHUo2hlGTRebPui4EWivBrexXjs4w==
-Date: Thu, 3 Jan 2019 13:29:47 +0000
-Message-ID: <1546522081-23659-3-git-send-email-claudiu.beznea@microchip.com>
+Subject: [PATCH v8 3/6] pwm: atmel: add pwm capabilities
+Thread-Topic: [PATCH v8 3/6] pwm: atmel: add pwm capabilities
+Thread-Index: AQHUo2hnvyIqHD2cNkWnKHVETasQ7A==
+Date: Thu, 3 Jan 2019 13:29:50 +0000
+Message-ID: <1546522081-23659-4-git-send-email-claudiu.beznea@microchip.com>
 References: <1546522081-23659-1-git-send-email-claudiu.beznea@microchip.com>
 In-Reply-To: <1546522081-23659-1-git-send-email-claudiu.beznea@microchip.com>
 Accept-Language: en-US
@@ -85,40 +85,40 @@ x-ms-exchange-messagesentrepresentingtype: 1
 x-originating-ip: [94.177.32.154]
 x-ms-publictraffictype: Email
 x-microsoft-exchange-diagnostics: 1; MWHPR11MB1984;
- 6:awZjB8DGDkAfydnChEZ68RUVxYrBkW6C1IW8637vx0wEdf4leF4r2geuoUyDgwSRYpV3bpsCtw6IF+cFSpvbnRmgAEFQk9rG97nuybLiz8VxkZ/2eqsnoBp1ySBR4qQWGcZnccIYoQirA1hVp3/7xAOV0W4BXLTP2P3QiQhjJOKOpbMTonPbd163TOG2u8eNjlXikOwFAjOsLrYNtuXecgdlapBB6tZ3XsVBLZmOlUG228JjuRKzF4qglraNiIPupNSqnnyXvN/jac351czMf/7TjGdIV4MNFKtZ+4b30/WIH4DMc05b96o+DVZP3GmXJihNexU8WNOpqXRjBtQOSwpMv5+J2qnxQ/YLZVhAl9r+nTYQVWFVm3Q6lRL+NR/MtgsYX3Rw1RMyWA51yR9BXBMNOBsNYMcUZB0xPAuviF3hes6m3m2lOyr8KMJ0EwCUCV9wQi/UIooM7vVaZrx8qA==;
- 5:LMHQfPC/L8k3E/Y7J/px5RBMxy/iSX8xe7MJzvMjgIsUmY9OncuOfwvAztNwh0QDilsm5M+6hrG6zm1u/1yaLh95hxeT79qDF43bn6EvgonICDTnoMUWTab79hRRv02NA1VhOiVR0jvO5+oM6e2UxBTFH7r8FGFUj3CsZxUDBXR3EKjMv+VGBiYHIj4IWLN+2MyqH/OSW1UzLX7+JjQ+xw==;
- 7:icZTRBEypjAx5844Y5QdyhkGXLl0uV0YWZku3U+5VTA7E6/ZEkbP/xoWl8gj9uponfrrvW8VjaXWkCNZr/Bvvr3f3vwaCncZMvrCc5LBaWjZQ3nZi3ZVI4VV8l93siy2yw4qJRfVmswLkcqD6BawSA==
-x-ms-office365-filtering-correlation-id: 50974f9a-eff2-4c73-9161-08d6717f87fe
+ 6:z4Gb7PVTLaxtGaDvZQA3NP2ECmX3dxlHJVJUfZMpzCsub+YrR/3b3JSF60Wo4ZqV5OaTlExEBMwsT6lOc2Y9429ibmLyl5wgBYQGRdfeqm3Hvkx86Gyv3SfKzsyjXn0mSWY1V2wLotT684KZSedA85+m9j0c1aHjZdUVUv0bTGDCPwVTUzjgRBT5/ety1Vtv39IvsENJZiZemUpaem5vLzAm2adcMMl82YcAMfjkRyIbgizC2UIJtFs9im7G6YV8EsdpyfLozmwItmxYYJYwTYcdHsHH9IsoKC0uR+JjB+1xZARN3obtfdblpaXyZJOFCJIOMVqjvarDgLTQPc24CRoYuDIiby3hIewxuLreL8suKEyffzWjLTPoHmdESJi0rTSNdBNKL5ADBdGYmAvtvaHGjQQ/1eCMED4IN8Ae5fIhZJdbvAbgGQhbY53n82x2Htg7k2yexRIiZ2Myyszb1Q==;
+ 5:E0k1PNfo8xpgfALDMKJVU95k0NwzL6n91oafDNQV5KKH/p7c+RvyvHxKlcdz3hPgMUjx7Ug+a97iyISRnsvNDx0sRhEdXpxOD3DV999b2AMHTpqZybJmF/X9HNoCitGaBo96E5SFM7nKFAGK4Fem0yMh9jxU6Y7vAtd8KVkPphhUQfEociu+rHuikuetNgYKur4RTPLkkClb5hfkXi3vBg==;
+ 7:HpMe1i+beL6C1eMLcpCj1wUfTo8g5LxN1fEZ3m6iI4nzI8UpdH4gokOAckd7LYdcQsjun2XFGdggrvniJmK59+9HZrYfH/zHhf6W6Wl7+uGrOlQWdcUi1q4zouA2aDe3aTRgHLF0n9E07vjec2OPCQ==
+x-ms-office365-filtering-correlation-id: 2138b6f4-d8cb-40eb-6841-08d6717f89b2
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(5600109)(711020)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
  SRVR:MWHPR11MB1984; 
 x-ms-traffictypediagnostic: MWHPR11MB1984:
-x-microsoft-antispam-prvs: <MWHPR11MB1984D6B5F999826497064561878D0@MWHPR11MB1984.namprd11.prod.outlook.com>
+x-microsoft-antispam-prvs: <MWHPR11MB198437E2BD61605FB94D4409878D0@MWHPR11MB1984.namprd11.prod.outlook.com>
 x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
  RULEID:(3230021)(908002)(999002)(5005026)(6040522)(8220060)(2401047)(8121501046)(93006095)(93001095)(3231475)(944501520)(52105112)(3002001)(10201501046)(6041310)(20161123564045)(20161123560045)(20161123562045)(20161123558120)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(201708071742011)(7699051)(76991095);
  SRVR:MWHPR11MB1984; BCL:0; PCL:0; RULEID:; SRVR:MWHPR11MB1984; 
 x-forefront-prvs: 0906E83A25
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(136003)(376002)(346002)(396003)(366004)(199004)(189003)(11346002)(71190400001)(6486002)(2501003)(72206003)(14454004)(2616005)(476003)(97736004)(446003)(5660300001)(478600001)(316002)(6636002)(575784001)(86362001)(99286004)(54906003)(52116002)(110136005)(71200400001)(6436002)(6512007)(186003)(53936002)(305945005)(7736002)(3846002)(39060400002)(6506007)(386003)(6116002)(105586002)(106356001)(107886003)(68736007)(76176011)(36756003)(4326008)(26005)(81156014)(81166006)(102836004)(8936002)(66066001)(2906002)(486006)(8676002)(256004)(25786009)(14444005);
+ SFS:(10009020)(39860400002)(136003)(376002)(346002)(396003)(366004)(199004)(189003)(11346002)(71190400001)(6486002)(2501003)(72206003)(14454004)(2616005)(476003)(97736004)(446003)(5660300001)(478600001)(316002)(6636002)(86362001)(99286004)(54906003)(52116002)(110136005)(71200400001)(6436002)(6512007)(186003)(53936002)(305945005)(7736002)(3846002)(39060400002)(6506007)(386003)(6116002)(105586002)(106356001)(107886003)(68736007)(76176011)(36756003)(4326008)(26005)(81156014)(81166006)(102836004)(8936002)(66066001)(2906002)(486006)(8676002)(256004)(25786009)(14444005);
  DIR:OUT; SFP:1101; SCL:1; SRVR:MWHPR11MB1984;
  H:MWHPR11MB1920.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; A:1; MX:1; 
 received-spf: None (protection.outlook.com: microchip.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: IWO9mD4F8vqxVIkIEfWLXTz47Aat9JlEpV0O/zpsbfdBKUN70lSD8e0q0glMa5wu0jyN+DP+jgsnm5MAy60YyRBQMfk8ET92R45Pi9ZqmcRgiHvyEAENG2l2oMsu7clhG8k9cKkvksN1ZL3NAYSBNEuvezzwQJ45eBOvbEk0t3WM/Slc7aUzvSkPP9svy39Du9G4qiafZc4mp3ab0XlNkc90LW40jAmsztyIVXavqC0EVQKCwx0XXcSgJTYdybLa7+eBLqKcNGK7uiRcnqFFmBQ+KOQQ4kcAQR5qTQ17t6O9HzVpeNfXmjeWlm3H7ysM
+x-microsoft-antispam-message-info: +qQ+vj+OcG0+UgnyrcR+Lm9uZOS2qjqArr2a5s8cwjLjzBwT/ZPwl2fU2RoKifwI5XFzkLgtwO+80vxm5ocZ7gYtNmqTopJjDRq3i6NDNbOoZBxfleQ74lzIZYg3Abt3/Bmku3GOmvl2jFp57CSXzMCJhx04RoOkup0ZjwF9TOdFlWvlr43468jHnORtc7TZLQrYIYS+s6eR9u1jEex0uphLhX46bTdXF2dFDv4CipiCXwEda457SGi3zoa4BbWWGBZI/VoEw0iv2OUmLVY3aDLji5VR6aOjWa2TUpf+49b2kovzzvLvRovD4ck7oK77
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: 50974f9a-eff2-4c73-9161-08d6717f87fe
-X-MS-Exchange-CrossTenant-originalarrivaltime: 03 Jan 2019 13:29:47.8518 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 2138b6f4-d8cb-40eb-6841-08d6717f89b2
+X-MS-Exchange-CrossTenant-originalarrivaltime: 03 Jan 2019 13:29:50.7182 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR11MB1984
 X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190103_052953_656499_56420228 
-X-CRM114-Status: GOOD (  10.72  )
+X-CRM114-CacheID: sfid-20190103_052954_195505_17B76DCA 
+X-CRM114-Status: GOOD (  13.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -140,45 +140,207 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Claudiu Beznea <claudiu.beznea@microchip.com>
 
-Add PWM normal and complementary modes.
+Add pwm capabilities for Atmel/Microchip PWM controllers.
 
 Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
 ---
- Documentation/pwm.txt | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ drivers/pwm/pwm-atmel.c | 86 ++++++++++++++++++++++++++++++++-----------------
+ 1 file changed, 57 insertions(+), 29 deletions(-)
 
-diff --git a/Documentation/pwm.txt b/Documentation/pwm.txt
-index 8fbf0aa3ba2d..669fd4c9cc8e 100644
---- a/Documentation/pwm.txt
-+++ b/Documentation/pwm.txt
-@@ -110,6 +110,28 @@ channel that was exported. The following properties will then be available:
- 	- 0 - disabled
- 	- 1 - enabled
+diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+index 530d7dc5f1b5..b72cacd5dca3 100644
+--- a/drivers/pwm/pwm-atmel.c
++++ b/drivers/pwm/pwm-atmel.c
+@@ -65,18 +65,23 @@ struct atmel_pwm_registers {
+ 	u8 duty_upd;
+ };
  
-+  mode
-+    Get/set PWM channel working mode.
++struct atmel_pwm_data {
++	struct atmel_pwm_registers regs;
++	struct pwm_caps caps;
++};
 +
-+    In the following description PWMx_y refers to output y of PWM with ID x.
+ struct atmel_pwm_chip {
+ 	struct pwm_chip chip;
+ 	struct clk *clk;
+ 	void __iomem *base;
+-	const struct atmel_pwm_registers *regs;
++	const struct atmel_pwm_data *data;
+ 
+ 	unsigned int updated_pwms;
+ 	/* ISR is cleared when read, ensure only one thread does that */
+ 	struct mutex isr_lock;
+ };
+ 
+-static inline struct atmel_pwm_chip *to_atmel_pwm_chip(struct pwm_chip *chip)
++static inline struct atmel_pwm_chip *to_atmel_pwm_chip(const struct pwm_chip *chip)
+ {
+ 	return container_of(chip, struct atmel_pwm_chip, chip);
+ }
+@@ -150,15 +155,15 @@ static void atmel_pwm_update_cdty(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+ 	u32 val;
+ 
+-	if (atmel_pwm->regs->duty_upd ==
+-	    atmel_pwm->regs->period_upd) {
++	if (atmel_pwm->data->regs.duty_upd ==
++	    atmel_pwm->data->regs.period_upd) {
+ 		val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
+ 		val &= ~PWM_CMR_UPD_CDTY;
+ 		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
+ 	}
+ 
+ 	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm,
+-			    atmel_pwm->regs->duty_upd, cdty);
++			    atmel_pwm->data->regs.duty_upd, cdty);
+ }
+ 
+ static void atmel_pwm_set_cprd_cdty(struct pwm_chip *chip,
+@@ -168,9 +173,9 @@ static void atmel_pwm_set_cprd_cdty(struct pwm_chip *chip,
+ 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+ 
+ 	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm,
+-			    atmel_pwm->regs->duty, cdty);
++			    atmel_pwm->data->regs.duty, cdty);
+ 	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm,
+-			    atmel_pwm->regs->period, cprd);
++			    atmel_pwm->data->regs.period, cprd);
+ }
+ 
+ static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm,
+@@ -225,7 +230,7 @@ static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ 		    cstate.polarity == state->polarity &&
+ 		    cstate.period == state->period) {
+ 			cprd = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm,
+-						  atmel_pwm->regs->period);
++						  atmel_pwm->data->regs.period);
+ 			atmel_pwm_calculate_cdty(state, cprd, &cdty);
+ 			atmel_pwm_update_cdty(chip, pwm, cdty);
+ 			return 0;
+@@ -272,32 +277,55 @@ static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	return 0;
+ }
+ 
++static int atmel_pwm_get_caps(const struct pwm_chip *chip,
++			      const struct pwm_device *pwm,
++			      struct pwm_caps *caps)
++{
++	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
 +
-+    Normal mode - for PWM channels with one output; this should be the
-+        default working mode for every PWM channel; output waveforms looks
-+        like this:
-+              __      __      __      __
-+    PWMx   __|  |____|  |____|  |____|  |__
-+             ^       ^       ^       ^
++	*caps = atmel_pwm->data->caps;
 +
-+    Complementary mode - for PWM channels with two outputs; output waveforms
-+        looks line this:
-+              __      __      __      __
-+    PWMx_0 __|  |____|  |____|  |____|  |__
-+           __    ____    ____    ____    __
-+    PWMx_1   |__|    |__|    |__|    |__|
-+             ^       ^       ^       ^
++	return 0;
++}
 +
-+    Where '^' specifies the beginning of a period.
-+
- Implementing a PWM driver
- -------------------------
+ static const struct pwm_ops atmel_pwm_ops = {
+ 	.apply = atmel_pwm_apply,
++	.get_caps = atmel_pwm_get_caps,
+ 	.owner = THIS_MODULE,
+ };
+ 
+-static const struct atmel_pwm_registers atmel_pwm_regs_v1 = {
+-	.period		= PWMV1_CPRD,
+-	.period_upd	= PWMV1_CUPD,
+-	.duty		= PWMV1_CDTY,
+-	.duty_upd	= PWMV1_CUPD,
++static const struct atmel_pwm_data atmel_pwm_data_v1 = {
++	.regs = {
++		.period		= PWMV1_CPRD,
++		.period_upd	= PWMV1_CUPD,
++		.duty		= PWMV1_CDTY,
++		.duty_upd	= PWMV1_CUPD,
++	},
++	.caps = {
++		.modes_msk = PWM_MODE_BIT(NORMAL),
++	},
+ };
+ 
+-static const struct atmel_pwm_registers atmel_pwm_regs_v2 = {
+-	.period		= PWMV2_CPRD,
+-	.period_upd	= PWMV2_CPRDUPD,
+-	.duty		= PWMV2_CDTY,
+-	.duty_upd	= PWMV2_CDTYUPD,
++static const struct atmel_pwm_data atmel_pwm_data_v2 = {
++	.regs = {
++		.period		= PWMV2_CPRD,
++		.period_upd	= PWMV2_CPRDUPD,
++		.duty		= PWMV2_CDTY,
++		.duty_upd	= PWMV2_CDTYUPD,
++	},
++	.caps = {
++		.modes_msk = PWM_MODE_BIT(NORMAL) |
++			     PWM_MODE_BIT(COMPLEMENTARY),
++	},
+ };
+ 
+ static const struct platform_device_id atmel_pwm_devtypes[] = {
+ 	{
+ 		.name = "at91sam9rl-pwm",
+-		.driver_data = (kernel_ulong_t)&atmel_pwm_regs_v1,
++		.driver_data = (kernel_ulong_t)&atmel_pwm_data_v1,
+ 	}, {
+ 		.name = "sama5d3-pwm",
+-		.driver_data = (kernel_ulong_t)&atmel_pwm_regs_v2,
++		.driver_data = (kernel_ulong_t)&atmel_pwm_data_v2,
+ 	}, {
+ 		/* sentinel */
+ 	},
+@@ -307,20 +335,20 @@ MODULE_DEVICE_TABLE(platform, atmel_pwm_devtypes);
+ static const struct of_device_id atmel_pwm_dt_ids[] = {
+ 	{
+ 		.compatible = "atmel,at91sam9rl-pwm",
+-		.data = &atmel_pwm_regs_v1,
++		.data = &atmel_pwm_data_v1,
+ 	}, {
+ 		.compatible = "atmel,sama5d3-pwm",
+-		.data = &atmel_pwm_regs_v2,
++		.data = &atmel_pwm_data_v2,
+ 	}, {
+ 		.compatible = "atmel,sama5d2-pwm",
+-		.data = &atmel_pwm_regs_v2,
++		.data = &atmel_pwm_data_v2,
+ 	}, {
+ 		/* sentinel */
+ 	},
+ };
+ MODULE_DEVICE_TABLE(of, atmel_pwm_dt_ids);
+ 
+-static inline const struct atmel_pwm_registers *
++static inline const struct atmel_pwm_data *
+ atmel_pwm_get_driver_data(struct platform_device *pdev)
+ {
+ 	const struct platform_device_id *id;
+@@ -330,18 +358,18 @@ atmel_pwm_get_driver_data(struct platform_device *pdev)
+ 
+ 	id = platform_get_device_id(pdev);
+ 
+-	return (struct atmel_pwm_registers *)id->driver_data;
++	return (struct atmel_pwm_data *)id->driver_data;
+ }
+ 
+ static int atmel_pwm_probe(struct platform_device *pdev)
+ {
+-	const struct atmel_pwm_registers *regs;
++	const struct atmel_pwm_data *data;
+ 	struct atmel_pwm_chip *atmel_pwm;
+ 	struct resource *res;
+ 	int ret;
+ 
+-	regs = atmel_pwm_get_driver_data(pdev);
+-	if (!regs)
++	data = atmel_pwm_get_driver_data(pdev);
++	if (!data)
+ 		return -ENODEV;
+ 
+ 	atmel_pwm = devm_kzalloc(&pdev->dev, sizeof(*atmel_pwm), GFP_KERNEL);
+@@ -373,7 +401,7 @@ static int atmel_pwm_probe(struct platform_device *pdev)
+ 
+ 	atmel_pwm->chip.base = -1;
+ 	atmel_pwm->chip.npwm = 4;
+-	atmel_pwm->regs = regs;
++	atmel_pwm->data = data;
+ 	atmel_pwm->updated_pwms = 0;
+ 	mutex_init(&atmel_pwm->isr_lock);
  
 -- 
 2.7.4
