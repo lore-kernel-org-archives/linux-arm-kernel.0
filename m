@@ -2,62 +2,78 @@ Return-Path: <SRS0=5A9c=PL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2F10CC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 10:10:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C007CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 10:17:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F1BC32073D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 10:10:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8D96620815
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 10:17:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jO5DCyoB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F1BC32073D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OXS4yhh0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8D96620815
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tPe9QHTSS+cXr7jeAAl4guARk+Nlkd1IiqmBHMhCO3A=; b=jO5DCyoBicTdTR
-	1s+NCRfD+4AmJ8CKCnuaU+JeECuFtDEbPbwVEI/aXx9NRZ++8ENqhfAtH/1eC8Jv51PALAdXzM1Ye
-	ffBapdwfmqSn3f+N8+aw4d1G7myc+IfAGIdx8JeAwa0j/p98svE0oIfDHONv53mgcgthbpnyzTmhL
-	raD7BHW2vJnkwJHzH9DM6lQ85Y9BWNe5FJKDDjO1fpfBgfD6efxWD2TyHHUGCAHLAkshso2xbCb9+
-	7+0X4VjJDvGWOuJ5KKUjmvZmVeTLzUPsIb6Do34JAW8bWPDClYPdrnxFgi5TXgxnogebiYTkNiQ+Q
-	f9+Cp830zcrh2MusuKig==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=QgbkL3QaIRlJRmvDg2P019NOWj9CHJdK5wHOte3Uv9Q=; b=OXS4yhh0Iakagl
+	yleMhgLlgcpTyFMoPX7TEX8/cERWOtHibZFgb/9IsQEHQmkdy2HIYtIh3Iy/2hjZD4ZhPItrwFNW/
+	sQvVRW2q9biAgAPQS/r2uW9rCXMsuHKwofOOIA8z55E/U0FdeASgaxVelcjogfM3A5rOGEPJoY3bL
+	EOzR7Mg5sli96dyQdfy6Yx+CppIeon8j4mQg6JBZYRmRcYp9vERz9TYNUcdIDeFpn7FZJlvmYV4PE
+	vS75WURZ7/D3imzuzpVx0r7KeN/ixi7FbO0NZ+FUCYI/yQG34iB8LQPdeHrsuwaejJ9iUB1gHs3Uq
+	hDGqumnd4JncEzd0LFFA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gezxk-0003l6-VC; Thu, 03 Jan 2019 10:10:52 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gezxh-0003k9-Hn
- for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 10:10:51 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 5732E207AD; Thu,  3 Jan 2019 11:10:46 +0100 (CET)
-Received: from aptenodytes (aaubervilliers-681-1-29-148.w90-88.abo.wanadoo.fr
- [90.88.149.148])
- by mail.bootlin.com (Postfix) with ESMTPSA id 0BF5E2074D;
- Thu,  3 Jan 2019 11:10:36 +0100 (CET)
-Message-ID: <fc3c7771e4cc25227d97be02efe11173c1350482.camel@bootlin.com>
-Subject: Re: [PATCH v4 00/22] drm/sun4i: Support for linear and tiled YUV
- formats with the frontend
-From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-To: dri-devel@lists.freedesktop.org, linux-arm-kernel@lists.infradead.org, 
- linux-kernel@vger.kernel.org
-Date: Thu, 03 Jan 2019 11:10:36 +0100
-In-Reply-To: <20181205083703.21488-1-paul.kocialkowski@bootlin.com>
-References: <20181205083703.21488-1-paul.kocialkowski@bootlin.com>
-Organization: Bootlin
-User-Agent: Evolution 3.30.3 
-Mime-Version: 1.0
+	id 1gf045-00062A-UG; Thu, 03 Jan 2019 10:17:25 +0000
+Received: from mx07-00178001.pphosted.com ([62.209.51.94])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gf042-00060r-Dm
+ for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 10:17:24 +0000
+Received: from pps.filterd (m0046037.ppops.net [127.0.0.1])
+ by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x03AGY4w004133; Thu, 3 Jan 2019 11:17:13 +0100
+Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
+ by mx07-00178001.pphosted.com with ESMTP id 2pnyjxj7ph-1
+ (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
+ Thu, 03 Jan 2019 11:17:13 +0100
+Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id B098638;
+ Thu,  3 Jan 2019 10:17:12 +0000 (GMT)
+Received: from Webmail-eu.st.com (sfhdag5node2.st.com [10.75.127.14])
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 4B71E2A8B;
+ Thu,  3 Jan 2019 10:17:12 +0000 (GMT)
+Received: from localhost (10.75.127.46) by SFHDAG5NODE2.st.com (10.75.127.14)
+ with Microsoft SMTP Server (TLS) id 15.0.1347.2;
+ Thu, 3 Jan 2019 11:17:11 +0100
+From: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+To: Dan Williams <dan.j.williams@intel.com>, Vinod Koul <vkoul@kernel.org>,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>, Alexandre Torgue
+ <alexandre.torgue@st.com>, <dmaengine@vger.kernel.org>,
+ <linux-stm32@st-md-mailman.stormreply.com>,
+ <linux-arm-kernel@lists.infradead.org>, <linux-kernel@vger.kernel.org>
+Subject: [RESEND PATCH v1 0/3] Add PM Runtime support
+Date: Thu, 3 Jan 2019 11:17:07 +0100
+Message-ID: <1546510630-16555-1-git-send-email-pierre-yves.mordret@st.com>
+X-Mailer: git-send-email 2.7.4
+MIME-Version: 1.0
+X-Originating-IP: [10.75.127.46]
+X-ClientProxiedBy: SFHDAG1NODE3.st.com (10.75.127.3) To SFHDAG5NODE2.st.com
+ (10.75.127.14)
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2019-01-03_04:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190103_021049_858004_B41E5403 
-X-CRM114-Status: GOOD (  21.26  )
+X-CRM114-CacheID: sfid-20190103_021722_808138_2CCD4CA3 
+X-CRM114-Status: UNSURE (   6.62  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,120 +85,33 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Daniel Vetter <daniel@ffwll.ch>, Maxime Ripard <maxime.ripard@bootlin.com>,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- linux-sunxi@googlegroups.com, David Airlie <airlied@linux.ie>,
- Chen-Yu Tsai <wens@csie.org>, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Sean Paul <sean@poorly.run>
+Cc: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 2018-12-05 at 09:36 +0100, Paul Kocialkowski wrote:
-> This series implements support for YUV formats using the display engine
-> frontend in the sun4i DRM driver, with various fixes along the way.
-> Scaling is supported for every format handled by the frontend.
-> 
-> The tiling mode used by the VPU on Allwinner platforms is also supported
-> by this series and a dedicated fourcc modifier is introduced, along with
-> a specific ioctl for allocating tiled buffers.
-> 
-> New common fourcc helpers are also introduced in this series, especially
-> related to YUV formats.
+Use pm_runtime engine for clock management purpose for both DMA, DMAMUX and
+MDMA
 
-This series should be about ready for merge for the sun4i parts, but
-I'd like to get some feedback regarding the new helpers introduced to
-drm_fourcc (patches 1/ and 2/) as well as the introduction of the
-Allwinner tiling definitions (patch 11/).
+---
+  Version history:
+    v1:
+       * Initial
+---
 
-Does anyone have any objection or suggestion regarding these patches or
-can we go ahead and merge them along with the remaining driver patches
-in this series?
+Pierre-Yves MORDRET (3):
+  dmaengine: stm32-dma: Add PM Runtime support
+  dmaengine: stm32-dmamux: Add PM Runtime support
+  dmaengine: stm32-mdma: Add PM Runtime support
 
-Cheers,
+ drivers/dma/stm32-dma.c    | 58 ++++++++++++++++++++++++++++++++++++++++------
+ drivers/dma/stm32-dmamux.c | 58 +++++++++++++++++++++++++++++++++++++---------
+ drivers/dma/stm32-mdma.c   | 52 ++++++++++++++++++++++++++++++++++++-----
+ 3 files changed, 144 insertions(+), 24 deletions(-)
 
-Paul
-
-> This was tested on the A33 and A20 platforms and all supported features
-> work properly on both. Framebuffer offsets and source positions are not
-> supported at this point.
-> 
-> Changes since v3:
-> * Made the BT.601 CSC coefficients common;
-> * Moved the tiling mode comment next to the associated macro;
-> * Added collected Acked-by tags.
-> 
-> Changes since v2:
-> * Removed DRM format helpers taking the format fourcc;
-> * Passed the DRM format info structure when needed instead of iterating
->   through the list;
-> * Removed the sun4i-specific ioctl for allocating tiled buffers, which
->   will be rebranded as a generic one in an upcoming patch;
-> * Improved comment for X1 tiled offset and simplified its calculation;
-> * Corrected author email and added SoB where needed;
-> * Rebased on latest drm-misc next.
-> 
-> Changes since v1:
-> * Extended source selected cleanup to both YUV and video channels;
-> * Split and reworded comment about backend scaling;
-> * Sorted newly-introduced lists alphabetically;
-> * Simplified functions to check if a format is supported;
-> * Reworked frontend selection logic as discussed;
-> * Made YUV helpers common, with fourcc and drm_info fashions;
-> * Changed the CREATE_TILED ioctl flags to match the CREATE_DUMB ioctl;
-> * Reworked YUV dimensions calculations to use drm_format_info;
-> * Dropped MB32 part in modifier to match V4L2 definition name;
-> * Improved the description of the tiling modifier;
-> * Avoided splitting CSC coefficients to avoid introducing a new module;
-> * Fixed building the driver as modules;
-> * Various code simplifications and cleanups;
-> * Split commits into logical changes.
-> 
-> Maxime Ripard (5):
->   drm/sun4i: Move access control before setting the register as
->     documented
->   drm/sun4i: frontend: Add a quirk structure
->   drm/sun4i: Set the coef_rdy bit right after the coef have been set
->   drm/sun4i: Make COEF_RDY conditional
->   drm/sun4i: frontend: Move the FIR filter phases to our quirks
-> 
-> Paul Kocialkowski (17):
->   drm/fourcc: Add format info helpers for checking YUV planes
->     disposition
->   drm/fourcc: Add format info helpers for checking YUV sub-sampling
->   drm/sun4i: backend: Use explicit fourcc helpers for packed YUV422
->     check
->   drm/sun4i: frontend: Pass DRM format info to input format helpers
->   drm/sun4i: frontend: Determine input format based on colorspace
->   drm/sun4i: Move the BT.601 CSC coefficients to the frontend
->   drm/sun4i: frontend: Configure and enable YUV to RGB CSC when needed
->   drm/sun4i: frontend: Add support for packed YUV422 input formats
->   drm/sun4i: frontend: Add support for semi-planar YUV input formats
->   drm/sun4i: frontend: Add support for planar YUV input formats
->   drm/fourcc: Add definitions for Allwinner vendor and VPU tiled format
->   drm/sun4i: frontend: Add support for tiled YUV input mode
->     configuration
->   drm/sun4i: Add buffer stride and offset configuration for tiling mode
->   drm/sun4i: frontend: Add and use helper for checking tiling support
->   drm/sun4i: layer: Add tiled modifier support and helper
->   drm/sun4i: drv: Allow framebuffer modifiers in mode config
->   drm/sun4i: frontend: Add A20-specific device-tree compatible and
->     quirks
-> 
->  drivers/gpu/drm/sun4i/sun4i_backend.c  |  25 +-
->  drivers/gpu/drm/sun4i/sun4i_drv.c      |   1 +
->  drivers/gpu/drm/sun4i/sun4i_frontend.c | 346 ++++++++++++++++++++++---
->  drivers/gpu/drm/sun4i/sun4i_frontend.h |  52 ++++
->  drivers/gpu/drm/sun4i/sun4i_layer.c    |  28 +-
->  include/drm/drm_fourcc.h               | 117 +++++++++
->  include/uapi/drm/drm_fourcc.h          |  16 ++
->  7 files changed, 530 insertions(+), 55 deletions(-)
-> 
 -- 
-Paul Kocialkowski, Bootlin (formerly Free Electrons)
-Embedded Linux and kernel engineering
-https://bootlin.com
+2.7.4
 
 
 _______________________________________________
