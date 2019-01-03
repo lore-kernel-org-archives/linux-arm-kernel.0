@@ -2,92 +2,62 @@ Return-Path: <SRS0=5A9c=PL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B7D9DC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 15:12:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B0A24C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 15:39:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 88A1C2070D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 15:12:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7719D208E3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 15:39:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lbH2Nqz1";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="mzkfy880"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 88A1C2070D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="h+OxBGya"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7719D208E3
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=FgC8dq2Qwc1Iyxx/Vh2XY28t7An/TTaarpIzHyFLgSU=; b=lbH2Nqz1FdVxjm
-	pr83R5Ad3JxO1by8nhpjrDn7J9F2pvStQXdAuCQYfIc+daUq77edrlUsNimh1KMWvJPabOx+IPNHP
-	RT1o0d14S3H8dWseyfbqeDzKcnc3EF7T00LKmcz9r52ulV2wvzMgSaMigYawk+sEv7ED+tXX2pA46
-	7JowpKMpt9JIqKQ9mhZqVzlUJETEZI4sBFjKMJ4VSGGMlz1aHiYlmjVmIyBcCp+AuBHlzULjWZwjg
-	rK8YaE7XAisc81USi7SfFX4MQXnA76Oc5qgUK33MK+03jfqH1sN6Vk0ooWtFfJQAKwPDPb0HBMKME
-	S24FP3Tes/uoaQsCD8EA==;
+	List-Owner; bh=SjRC9DMTNqqWHD8GNON7HDXSuxf7uk5WxhA2nmEVifY=; b=h+OxBGyajEnjQ6
+	g1yFYc3fkt+yB9476Q6vRkoJRXe4jAT1qKUi1M1+tQGV+E9l4ctKTqsHbhZfIcEm+EsYWZ6KZXhPz
+	mmMGqM9iF7pGnRk4aL/hFPa9VmlDOCep6LD7MxLUkHIWjOdGzhHTPL9eAhbGk9inbcJ4y3zNBa4Yy
+	Ice6oxwAWDtw/M0ZOwdSOJFQSEGIAt9aWIRTCd5JnP3PoOnzC4Sy6U8nF/wX11X8nJDOLSXx9mQFM
+	1zIPbyBwfv5JLzm1KnQZKiDtlGDvdhxJrlvvYeNQBIYbOG3+Q4Iz7y1MXWYlGF+/ogbaKGIduZAXH
+	0M0TCqIVNCbcSN/sAspQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gf4fe-0005Nf-SO; Thu, 03 Jan 2019 15:12:30 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gf4ea-0004Eu-Df
- for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 15:11:29 +0000
-Received: by mail-wr1-x441.google.com with SMTP id u4so33847552wrp.3
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 03 Jan 2019 07:11:24 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=bztX5GLS2nM4tEUX9wPl/F9/kiH0XADSVNwoqijTUcw=;
- b=mzkfy880idbgY3ZUEea+GPENXKJ/TXULVloJe+8AyryH52ArrckmLgkUWCSEIcR2Cr
- AS4JOUFnnTSUddkvGMNZNA5dNaOUI4AfOHt2OM0nXe/aCKsuHVtRCbdDDmv+VzjoPGI/
- TSnFVMbie9Y8fdFwvnbkYW/1eQc3CTLbzRMKK6MQzqe2mjfKDbvFM3nAatN/LTFXkxvT
- yS/kmRO+Pgnq3MdlxIjpUG0KZlm0DlL4C5ZvPsvpL1KlwqtdwiJLA/68PSgEEdjOatnI
- 7lobECsUugLr/mp21OiOeou1GORuHiQT1ziTnMqR2AqcYYunspLauznMRUdeW/G/GjOg
- cbhQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=bztX5GLS2nM4tEUX9wPl/F9/kiH0XADSVNwoqijTUcw=;
- b=CmyxZM5dhqrldBQau6G8AgEogfI8Q+Wjc/wp8y0LSJQxc69e7Us6lWZaOMvuxaifJ/
- ftkr2XSvZOV+X0sQh+THRZBUvZpswN7Hs8dAJkxDEoSaQNUljpTppQCy+HLCMVB+EpCc
- vVvzruaRZrO9PF0PmBxS4jTq4kBkfc+KWIUVKo3ulKDfSdtQHQuhvQNOpe1pi2jNmUb/
- QAVs8NwhuUdfs3hHQE0E622BHtVTEum5ibg/5zoN+wcDG1pJLJFzH6fO+1L9U1QQEwH4
- zq01JbIHfJ7md7hgcg9M57GxnqoW+uhajsTLof0Vx1FLBR3R/B69ZX/3MirxaLSQMIAd
- KE1Q==
-X-Gm-Message-State: AJcUukfSykgDrxdfpsxrB1R7KL9Ouu9VricHZFug9kiV/3fGzh8q1XOw
- IAOBw66yNdqBHQcXs9oDzwEE7A==
-X-Google-Smtp-Source: ALg8bN4MS1F0pPVMMusxIxLPyNFMi2QrKOzGGvKYF1CAUk3gvLf/sDvc4gX4d4nfIr3mCR/jjHLvzg==
-X-Received: by 2002:adf:f649:: with SMTP id x9mr40385684wrp.247.1546528282696; 
- Thu, 03 Jan 2019 07:11:22 -0800 (PST)
-Received: from debian-brgl.baylibre.local
- (astlambert-681-1-88-79.w90-86.abo.wanadoo.fr. [90.86.3.79])
- by smtp.gmail.com with ESMTPSA id n5sm45620707wrr.94.2019.01.03.07.11.20
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 03 Jan 2019 07:11:21 -0800 (PST)
-From: Bartosz Golaszewski <brgl@bgdev.pl>
-To: Sekhar Nori <nsekhar@ti.com>,
-	Kevin Hilman <khilman@kernel.org>
-Subject: [PATCH 5/5] ARM: davinci: omapl138-hawk: fix label names in GPIO
- lookup entries
-Date: Thu,  3 Jan 2019 16:11:04 +0100
-Message-Id: <20190103151104.11839-6-brgl@bgdev.pl>
-X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20190103151104.11839-1-brgl@bgdev.pl>
-References: <20190103151104.11839-1-brgl@bgdev.pl>
+	id 1gf55T-0005H3-ID; Thu, 03 Jan 2019 15:39:11 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gf55Q-0005GY-ES
+ for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 15:39:09 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7A78BA78;
+ Thu,  3 Jan 2019 07:39:06 -0800 (PST)
+Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 88FB03F575;
+ Thu,  3 Jan 2019 07:39:05 -0800 (PST)
+Date: Thu, 3 Jan 2019 15:39:03 +0000
+From: Mark Rutland <mark.rutland@arm.com>
+To: Shaokun Zhang <zhangshaokun@hisilicon.com>
+Subject: Re: [PATCH] arm64: smp: Fix compilation error
+Message-ID: <20190103153902.GD45937@lakrids.cambridge.arm.com>
+References: <1546047797-48275-1-git-send-email-zhangshaokun@hisilicon.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <1546047797-48275-1-git-send-email-zhangshaokun@hisilicon.com>
+User-Agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190103_071124_989181_BD706FAF 
-X-CRM114-Status: GOOD (  12.04  )
+X-CRM114-CacheID: sfid-20190103_073908_485970_6F8A83E1 
+X-CRM114-Status: GOOD (  16.36  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,47 +69,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Linus Walleij <linus.walleij@linaro.org>, linux-kernel@vger.kernel.org,
- stable@vger.kernel.org, "Andrew F . Davis" <afd@ti.com>,
- Bartosz Golaszewski <bgolaszewski@baylibre.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Sat, Dec 29, 2018 at 09:43:17AM +0800, Shaokun Zhang wrote:
+> For arm64: updates for 4.21, there is a compilation error:
+> arch/arm64/kernel/head.S: Assembler messages:
+> arch/arm64/kernel/head.S:824: Error: missing ')'
+> arch/arm64/kernel/head.S:824: Error: missing ')'
+> arch/arm64/kernel/head.S:824: Error: missing ')'
+> arch/arm64/kernel/head.S:824: Error: unexpected characters following instruction at operand 2 -- `mov x2,#(2)|(2U<<(8))'
+> scripts/Makefile.build:391: recipe for target 'arch/arm64/kernel/head.o' failed
+> make[1]: *** [arch/arm64/kernel/head.o] Error 1
+> GCC version is gcc (Ubuntu/Linaro 5.4.0-6ubuntu1~16.04.10) 5.4.0 20160609
+> 
+> Let's fix it using the UL() macro.
+> 
+> Fixes: 66f16a24512f ("arm64: smp: Rework early feature mismatched detection")
+> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+> ---
+>  arch/arm64/include/asm/smp.h | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
+> index 1895561839a9..99c9ed170072 100644
+> --- a/arch/arm64/include/asm/smp.h
+> +++ b/arch/arm64/include/asm/smp.h
+> @@ -25,12 +25,12 @@
+>  /* The cpu invoked ops->cpu_die, synchronise it with cpu_kill */
+>  #define CPU_KILL_ME			(1)
+>  /* The cpu couldn't die gracefully and is looping in the kernel */
+> -#define CPU_STUCK_IN_KERNEL		(2)
+> +#define CPU_STUCK_IN_KERNEL		UL(2)
 
-Since commit 587f7a694f01 ("gpio: davinci: Use dev name for label and
-automatic base selection") the gpiochip label no longer has an ID
-suffix. Update the GPIO lookup entries.
+I don't think we need this here.
 
-Fixes: 587f7a694f01 ("gpio: davinci: Use dev name for label and automatic base selection")
-Cc: stable@vger.kernel.org
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/mach-davinci/board-omapl138-hawk.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+If we want this for consistenty, it should be applied to all of the
+CPU_* definitions, and should probably rethink CPU_MMU_OFF.
 
-diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
-index 8e8d51f4a276..94c4f126ef86 100644
---- a/arch/arm/mach-davinci/board-omapl138-hawk.c
-+++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
-@@ -134,9 +134,9 @@ static const short hawk_mmcsd0_pins[] = {
- static struct gpiod_lookup_table mmc_gpios_table = {
- 	.dev_id = "da830-mmc.0",
- 	.table = {
--		GPIO_LOOKUP("davinci_gpio.0", DA850_HAWK_MMCSD_CD_PIN, "cd",
-+		GPIO_LOOKUP("davinci_gpio", DA850_HAWK_MMCSD_CD_PIN, "cd",
- 			    GPIO_ACTIVE_LOW),
--		GPIO_LOOKUP("davinci_gpio.0", DA850_HAWK_MMCSD_WP_PIN, "wp",
-+		GPIO_LOOKUP("davinci_gpio", DA850_HAWK_MMCSD_WP_PIN, "wp",
- 			    GPIO_ACTIVE_LOW),
- 	},
- };
--- 
-2.19.1
+>  /* Fatal system error detected by secondary CPU, crash the system */
+>  #define CPU_PANIC_KERNEL		(3)
+>  
+>  #define CPU_STUCK_REASON_52_BIT_VA	(1U << CPU_STUCK_REASON_SHIFT)
+> -#define CPU_STUCK_REASON_NO_GRAN	(2U << CPU_STUCK_REASON_SHIFT)
+> +#define CPU_STUCK_REASON_NO_GRAN	(UL(2) << CPU_STUCK_REASON_SHIFT)
 
+We'll need this for CPU_STUCK_REASON_52_BIT_VA, too.
+
+Thanks,
+Mark.
 
 _______________________________________________
 linux-arm-kernel mailing list
