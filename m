@@ -2,58 +2,70 @@ Return-Path: <SRS0=5A9c=PL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0A937C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 19:14:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 14BD9C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 19:18:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CBB3020815
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 19:14:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8B9FC2184B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 19:18:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MU2m5MHh"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CBB3020815
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=the-dreams.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ewL6ibDz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8B9FC2184B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=mellanox.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=a0dZnLN4Cj3LnCFwoTPZXkkoMsm22XS+MbllySHDeJ8=; b=MU2m5MHhQ5wP92eWHYPNIEaux
-	hBvsoBKJ+LyJuISLf+5RrNMq8lBcq+GBUwfQSTwulAlEldDheIDQvVACV/GvYugkA3Mxe7mVO+izI
-	/HQAroqQlAvTmUsAlgUSBPAcTRs03hxhpBuCfDQMgbt6bZ9PHGk5o8dYJAiM6Y9IawT1DYF7IxZGa
-	xrlAVF23G9UXytCJ7o4p/9mrIv+HdG0PDR1ryAPii1toxXTGtRSixgcNJVAtc3d7XT6xiVpiU7eqZ
-	0i6g+gveuB2Caj6JfYOUeZ1suyN31Z06Z1VjDBCWjkceHBfiwDCoQtgnSnFkKKxVC/4P6FXVvTNo9
-	9lEt2uO5w==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=X1yZ+ShnQGNwU2e7ecU0l2k74Dhym238wS6MzIRPTDU=; b=ewL6ibDzgnWjoo00dAQK9pdMbG
+	FFqqtu7Ea6aI0k38F36kxFo33LTzFYC9PXHKSbJVEjgYMblOomRPTxk5cVWlCkSizksDXlEqBc6aT
+	VbfPb2K8/GDZrj5vtJ7AM6FZKxjc8cefZpY1QWg9z/WXKprLQJ5oZcdN3B5VBCmSZqM/cdwQcexJv
+	hdDr7LGswk0v0J7EkOM5KQajTu/EUkEWoTqJlaaQ8W3bQjTFBFtbQRgdmNTZQYrtvi9PFEyMi6KIZ
+	Yn0p24w0ZQ9LaZRPmGCgm9JDaFo2NxqAJDE6EdS0z/lo7UMD6hAgSYJMr1g7Tyqj8Gwq4bry0MUAy
+	sVtCEzOg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gf8RT-0000Ad-Gf; Thu, 03 Jan 2019 19:14:07 +0000
-Received: from sauhun.de ([88.99.104.3] helo=pokefinder.org)
+	id 1gf8VD-0001tH-60; Thu, 03 Jan 2019 19:17:59 +0000
+Received: from mail-il-dmz.mellanox.com ([193.47.165.129] helo=mellanox.co.il)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gf8RK-0008SI-Qf; Thu, 03 Jan 2019 19:14:03 +0000
-Received: from localhost (p54B3379A.dip0.t-ipconnect.de [84.179.55.154])
- by pokefinder.org (Postfix) with ESMTPSA id D43822E3614;
- Thu,  3 Jan 2019 20:13:57 +0100 (CET)
-Date: Thu, 3 Jan 2019 20:13:57 +0100
-From: Wolfram Sang <wsa@the-dreams.de>
-To: Parthiban Nallathambi <pn@denx.de>
-Subject: Re: [PATCH v3 3/4] i2c: Add Actions Semiconductor Owl family S700
- I2C support
-Message-ID: <20190103191357.iegsd3w2qwdyt7qv@ninjato>
-References: <20181211080448.24007-1-pn@denx.de>
- <20181211080448.24007-4-pn@denx.de>
-MIME-Version: 1.0
-In-Reply-To: <20181211080448.24007-4-pn@denx.de>
-User-Agent: NeoMutt/20170113 (1.7.2)
+ id 1gf8V8-0001s7-AK
+ for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 19:17:56 +0000
+Received: from Internal Mail-Server by MTLPINE1 (envelope-from
+ lsun@mellanox.com)
+ with ESMTPS (AES256-SHA encrypted); 3 Jan 2019 21:17:48 +0200
+Received: from bu-lab53.mtbu.labs.mlnx (bu-lab53.mtbu.labs.mlnx [10.15.8.107])
+ by labmailer.mlnx (8.13.8/8.13.8) with ESMTP id x03JHlNG027028;
+ Thu, 3 Jan 2019 21:17:48 +0200
+Received: from bu-lab53.mtbu.labs.mlnx (localhost [127.0.0.1])
+ by bu-lab53.mtbu.labs.mlnx (8.14.7/8.14.7) with ESMTP id x03JHlA4156094;
+ Thu, 3 Jan 2019 14:17:47 -0500
+Received: (from lsun@localhost)
+ by bu-lab53.mtbu.labs.mlnx (8.14.7/8.14.7/Submit) id x03JHlgO156093;
+ Thu, 3 Jan 2019 14:17:47 -0500
+From: Liming Sun <lsun@mellanox.com>
+To: Olof Johansson <olof@lixom.net>, Arnd Bergmann <arnd@arndb.de>,
+ David Woods <dwoods@mellanox.com>, Robin Murphy <robin.murphy@arm.com>,
+ arm-soc <arm@kernel.org>
+Subject: [PATCH v7 2/9] arm64: Add Mellanox BlueField SoC config option
+Date: Thu,  3 Jan 2019 14:17:15 -0500
+Message-Id: <1546543042-156044-2-git-send-email-lsun@mellanox.com>
+X-Mailer: git-send-email 1.8.3.1
+In-Reply-To: <1546543042-156044-1-git-send-email-lsun@mellanox.com>
+References: <1546543042-156044-1-git-send-email-lsun@mellanox.com>
+In-Reply-To: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
+References: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190103_111359_494125_36B11C45 
-X-CRM114-Status: UNSURE (   6.32  )
+X-CRM114-CacheID: sfid-20190103_111754_751344_74945EBB 
+X-CRM114-Status: UNSURE (   7.84  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -66,71 +78,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, linux@cubietech.com,
- linux-actions@lists.infradead.org, linux-kernel@vger.kernel.org,
- thomas.liau@actions-semi.com, robh+dt@kernel.org, linux-i2c@vger.kernel.org,
- manivannan.sadhasivam@linaro.org, afaerber@suse.de,
+Cc: devicetree@vger.kernel.org, Liming Sun <lsun@mellanox.com>,
  linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============5655031775422976579=="
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+This commit introduces config option for Mellanox BlueField SoC,
+which can be used to build the SoC specific drivers, and enables
+it by default in configs/defconfig.
 
---===============5655031775422976579==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="fpxnagkc257sawko"
-Content-Disposition: inline
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+Reviewed-by: David Woods <dwoods@mellanox.com>
+Signed-off-by: Liming Sun <lsun@mellanox.com>
+---
+ arch/arm64/Kconfig.platforms | 6 ++++++
+ arch/arm64/configs/defconfig | 1 +
+ 2 files changed, 7 insertions(+)
 
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 51bc479..a9b10a0 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -119,6 +119,12 @@ config ARCH_MESON
+ 	help
+ 	  This enables support for the Amlogic S905 SoCs.
+ 
++config ARCH_MLNX_BLUEFIELD
++	bool "Mellanox BlueField SoC Family"
++	select SOC_MLNX
++	help
++	  This enables support for the Mellanox BlueField SoC.
++
+ config ARCH_MVEBU
+ 	bool "Marvell EBU SoC Family"
+ 	select ARMADA_AP806_SYSCON
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index c9a57d1..85dbef0 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -44,6 +44,7 @@ CONFIG_ARCH_LG1K=y
+ CONFIG_ARCH_HISI=y
+ CONFIG_ARCH_MEDIATEK=y
+ CONFIG_ARCH_MESON=y
++CONFIG_ARCH_MLNX_BLUEFIELD=y
+ CONFIG_ARCH_MVEBU=y
+ CONFIG_ARCH_QCOM=y
+ CONFIG_ARCH_ROCKCHIP=y
+-- 
+1.8.3.1
 
---fpxnagkc257sawko
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Tue, Dec 11, 2018 at 09:04:47AM +0100, Parthiban Nallathambi wrote:
-> Add S700 to the list of devices supported by Owl I2C driver.
->=20
-> Add Actions Semiconductor Owl family S700 I2C driver.
->=20
-> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
-> Reviewed-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-
-Applied to for-next, thanks!
-
-
---fpxnagkc257sawko
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQIzBAABCAAdFiEEOZGx6rniZ1Gk92RdFA3kzBSgKbYFAlwuXvUACgkQFA3kzBSg
-KbbIXhAAn7Gr/BtL4P+5gCIKhJ+7uZDVeTxTHH6v/I9Zcrlr25sY2PgnqXEwzsGl
-Kz+3zElXy4q6qMZ8sXjc778+VsmwE5TJXEmnYiVobCprx0Paf+pgxMX/1gKOYmSr
-gBJqGiW66FeJSBYkvaoI89moQxyJhl3vmJSDVi8mrlE8/AXhfqyJ2m49IdflIn/8
-7WHwMD9jNIuC41tJBtqigS5l0UjYtyB9j4/EXXltcBYyom9t7famyomNOE0eeGRn
-qhcN9uBNhHOl4yBbjxqsONyMt+ZjOEa9TyPHXLUsob0POwRwe0FiJMiMy3RmIrqc
-n5BbAJIjqATGmpwKtVDjEEvAJ1qbUoMUNu6cEbcmyV5ySkJ3OwKPf8zUiGDTkFU/
-/hVvAtc0WutEzoz1kwKpsm7OufuE6C96cDNkPvDyzgI5VjlSsFuhmBxtmUvLLIg4
-0E9h5j1cpI7luxt3SFGtIM4kfJyWXDZnIRGxllJKkgmQzM+9+ZkTLjpXQ5sFMuJu
-VEZQfG2Z5AcKUDzaHcXLA0lhedrDTYQIB9IowFRN8AHjxpt4TElehgkroohOh2ad
-sH8jaN9oH/uYuA1z4SjtPVafd2giR8ChZ3PMrqVfuCRtgav7c2morRLr9J7Ru3PS
-lFibpUL6pUNiw1M9C+3DD+68y9MkiGTGf7PUk+WLIH1n8CdGLgU=
-=bUoW
------END PGP SIGNATURE-----
-
---fpxnagkc257sawko--
-
-
---===============5655031775422976579==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============5655031775422976579==--
-
