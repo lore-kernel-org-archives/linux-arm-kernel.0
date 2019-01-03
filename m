@@ -2,61 +2,80 @@ Return-Path: <SRS0=5A9c=PL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B4109C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 12:32:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5453EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 12:37:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 71B3021479
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 12:32:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1944021479
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 12:37:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="b9jBQfG7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 71B3021479
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="n8BsHxuk";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="d0n8LxGZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1944021479
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=/JiyJkPz3SsrQbhAsP4Zl1AyZG7526R0K0sn4adLTZQ=; b=b9jBQfG74b6JaN
-	bvPlpp/6+/IHYAaZxQheRjoZnBqPVXiaqRLDIiP2wAw8YKDsSldkA1n4C4Q0j5l3kFkLmBfOVdTT7
-	NZhx1TJjqoFjhimTKNBRmO9c+dqe3FeS+P25j+uQz/w1sZpOfh4gA0ha04vN2S0dohCVGABmLSmFP
-	9OZiNjYGmgO5MEDvAG87o68iFMQuLWbW6sNtWs3XxTMCOFOG9ho7ZYauZbnh25f7p/4Lv4ftQWqfp
-	dFgAC2G86Wm9Zog2DQe57Xld0Vl+aInN7LUHzlItgDPHwZ63/jcRdwVS7WHRMlfKAp7T9YXYIftgb
-	QHCVvNXNvMB4cZ6TRGOw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=/yJYeHko66Mbzgsbabq+0giD8xku7/WpxU35sDxLOUo=; b=n8BsHxukrWFZTgp5gkj7NVRrH
+	5MBz2BDpPMyvwNdQaYbRX8kPmyJTQenA48LxB7TggAZCTbS3EiXA3+N4labrzz1b1usqK0pDw7Gxx
+	G1p13O7xfGgsRaJauL3+Vekylc5hgxUmtDSS2m0WbeVo+OmHxxyK5LdhfulfODD6syQ1O+4gtG0vb
+	kwnQxV6d9no0c7KguLVyV+0av5etD29SauRysKiYHj1rIxJU0tCA3nGNYfFJwmU0deT92F60grOcE
+	+tJepZ4CSbKXmzwVIOWhB5eAORnpS5StSdeZj3oZiAfJOltAHgG48Da/7c+V0BJRvB4jnrRIZXgqX
+	6TeBPfiPQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gf2Al-0004Wy-To; Thu, 03 Jan 2019 12:32:27 +0000
-Received: from szxga05-in.huawei.com ([45.249.212.191] helo=huawei.com)
+	id 1gf2Fm-0006Fq-51; Thu, 03 Jan 2019 12:37:38 +0000
+Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gf2Ai-0004WU-1Q
- for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 12:32:25 +0000
-Received: from DGGEMS404-HUB.china.huawei.com (unknown [172.30.72.58])
- by Forcepoint Email with ESMTP id 2D71477FEB4AC
- for <linux-arm-kernel@lists.infradead.org>;
- Thu,  3 Jan 2019 20:32:14 +0800 (CST)
-Received: from ubuntu.huawei.com (10.93.195.238) by
- DGGEMS404-HUB.china.huawei.com (10.3.19.204) with Microsoft SMTP Server id
- 14.3.408.0; Thu, 3 Jan 2019 20:32:06 +0800
-From: Lingyan Huang <huanglingyan2@huawei.com>
-To: <linux-arm-kernel@lists.infradead.org>
-Subject: [PATCH v2] arm64: lib: accelerate do_csum with NEON instruction
-Date: Thu, 3 Jan 2019 20:32:49 +0800
-Message-ID: <1546518769-114424-1-git-send-email-huanglingyan2@huawei.com>
-X-Mailer: git-send-email 2.7.4
+ id 1gf2Fj-0006F4-CO; Thu, 03 Jan 2019 12:37:36 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=sirena.org.uk; s=20170815-heliosphere; h=In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=f79EABYDV+dsASJEvEqhPNamqf/vT4jNMtDLjiGrScg=; b=d0n8LxGZy3PpIfjIs+EE8Mpd3
+ FYrWxgW0/9IidXX/M2+o8B6PLYGj95PczplxgeEMJWH2j8CimIHhzPq5+a5rbTxwVQ3jfDbFcPI18
+ yebyIbbIQbcpjVzWhpkh7Y+7D+0xjq4FYICoYfUz7vHQAhG7jrnFInoFQQBPEMxOPX7G0=;
+Received: from [2001:470:1f1d:6b5:7e7a:91ff:fede:4a45]
+ (helo=finisterre.ee.mobilebroadband)
+ by heliosphere.sirena.org.uk with esmtpsa
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
+ (envelope-from <broonie@sirena.org.uk>)
+ id 1gf2FV-0005TW-AK; Thu, 03 Jan 2019 12:37:21 +0000
+Received: by finisterre.ee.mobilebroadband (Postfix, from userid 1000)
+ id B277A440080; Thu,  3 Jan 2019 12:37:20 +0000 (GMT)
+Date: Thu, 3 Jan 2019 12:37:20 +0000
+From: Mark Brown <broonie@kernel.org>
+To: Andreas =?iso-8859-1?Q?F=E4rber?= <afaerber@suse.de>
+Subject: Re: [PATCH v3 lora-next 5/5] net: lora: sx125x sx1301: allow radio
+ to register as a clk provider
+Message-ID: <20190103123720.GR1846@sirena.org.uk>
+References: <1539361567-3602-1-git-send-email-ben.whitten@lairdtech.com>
+ <1539361567-3602-6-git-send-email-ben.whitten@lairdtech.com>
+ <a89c7974-672f-e5d0-8022-d2c2f9ffeac0@suse.de>
+ <d22f1f18-0c93-a537-a439-07363174a03b@suse.de>
+ <491d1a46-c112-1106-9f25-14149f0dcbd0@suse.de>
+ <20181231175034.GI1846@sirena.org.uk>
+ <ae7dd20c-777e-e043-127c-819fa0ae4792@suse.de>
+ <1904336c-3349-b22b-18ac-e82e4afebc51@suse.de>
 MIME-Version: 1.0
-X-Originating-IP: [10.93.195.238]
-X-CFilter-Loop: Reflected
+In-Reply-To: <1904336c-3349-b22b-18ac-e82e4afebc51@suse.de>
+X-Cookie: knowledge, n.:
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190103_043224_260998_F5AE4170 
-X-CRM114-Status: GOOD (  17.41  )
+X-CRM114-CacheID: sfid-20190103_043735_571661_3AA171A1 
+X-CRM114-Status: UNSURE (   9.54  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,246 +87,78 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Lingyan Huang <huanglingyan2@huawei.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Ben Whitten <ben.whitten@gmail.com>,
+ devicetree <devicetree@vger.kernel.org>,
+ "David S. Miller" <davem@davemloft.net>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, netdev@vger.kernel.org,
+ Michael Turquette <mturquette@baylibre.com>,
+ Stephen Boyd <sboyd@codeaurora.org>,
+ "linux-lpwan@lists.infradead.org" <linux-lpwan@lists.infradead.org>,
+ "linux-spi@vger.kernel.org" <linux-spi@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ Russell King <linux@armlinux.org.uk>, starnight@g.ncu.edu.tw,
+ linux-clk <linux-clk@vger.kernel.org>, linux-kernel@vger.kernel.org
+Content-Type: multipart/mixed; boundary="===============6046854612886661279=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Function do_csum() in lib/checksum.c is used to compute checksum,
-which is turned out to be slowly and costs a lot of resources.
-Let's use neon instructions to accelerate the checksum computation
-for arm64.
 
-------
-V1 ==> V2:
-    Change NEON assembly code to NEON intrinsic code which is built
-    on top of arm_neon.h to avoid dropping into assembly.
-------
-
-Here is the comparison results of function ip_compute_csum() between
-general do_csum() and neon instruction do_csum().
-
-        len(1000cycle)      general(ns)        do_csum_neon(ns)
-          64B:                58060                 59460
-         128B:                82930                 83930
-         256B:               132480                 73570
-         512B:               230100                 86230
-        1024B:               426600                 98200
+--===============6046854612886661279==
+Content-Type: multipart/signed; micalg=pgp-sha512;
+	protocol="application/pgp-signature"; boundary="l2C7pJE7HE4aLL3l"
+Content-Disposition: inline
 
 
----
- arch/arm64/lib/Makefile        |   4 ++
- arch/arm64/lib/checksum.c      | 140 +++++++++++++++++++++++++++++++++++++++++
- include/asm-generic/checksum.h |   1 +
- lib/checksum.c                 |   8 ++-
- 4 files changed, 152 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/lib/checksum.c
+--l2C7pJE7HE4aLL3l
+Content-Type: text/plain; charset=iso-8859-1
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-index 5540a16..ec2fcd3 100644
---- a/arch/arm64/lib/Makefile
-+++ b/arch/arm64/lib/Makefile
-@@ -9,6 +9,10 @@ ifeq ($(CONFIG_KERNEL_MODE_NEON), y)
- obj-$(CONFIG_XOR_BLOCKS)	+= xor-neon.o
- CFLAGS_REMOVE_xor-neon.o	+= -mgeneral-regs-only
- CFLAGS_xor-neon.o		+= -ffreestanding
-+
-+obj-y    += checksum.o
-+CFLAGS_REMOVE_checksum.o	+= -mgeneral-regs-only
-+CFLAGS_checksum.o		+= -ffreestanding
- endif
- 
- # Tell the compiler to treat all general purpose registers (with the
-diff --git a/arch/arm64/lib/checksum.c b/arch/arm64/lib/checksum.c
-new file mode 100644
-index 0000000..48f4ead
---- /dev/null
-+++ b/arch/arm64/lib/checksum.c
-@@ -0,0 +1,140 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * arch/arm64/lib/checksum.c
-+ *
-+ * Authors: Lingyan Huang <huanglingyan2@huawei.com>
-+ * Copyright (C) 2018 Hisilicon, Inc. All Rights Reserved.
-+ *
-+ * Generic C or neon implementation of do_csum operations.
-+ * Choose faster neon instructions when NEON is supported.
-+ *
-+ */
-+
-+#include <asm/neon.h>
-+#include <asm/simd.h>
-+#include <asm/checksum.h>
-+#include <asm/byteorder.h>
-+#include <asm/neon-intrinsics.h>
-+
-+#define CSUM_NEON_THRESHOLD 128
-+#ifdef CONFIG_KERNEL_MODE_NEON
-+static inline u32 from64to16(u64 x)
-+{
-+	/* add up 32-bit and 32-bit for 32+c bit */
-+	x = (x & 0xffffffff) + (x >> 32);
-+	/* add up carry.. */
-+	x = (x & 0xffffffff) + (x >> 32);
-+	/* add up 16-bit and 16-bit for 16+c bit */
-+	x = ((u32)x & 0xffff) + ((u32)x >> 16);
-+	/* add up carry.. */
-+	x = ((u32)x & 0xffff) + ((u32)x >> 16);
-+	return x;
-+}
-+
-+unsigned int do_csum_neon(const unsigned char *buff, unsigned int len)
-+{
-+	unsigned int odd, count;
-+	uint64_t result = 0;
-+	unsigned int count64;
-+	uint32x4_t vzero = (uint32x4_t){0, 0, 0, 0};
-+
-+	register uint32x4_t v0, v1, v2, v3;
-+
-+	if (unlikely(len <= 0))
-+		return result;
-+
-+	odd = 1 & (unsigned long) buff;
-+	if (unlikely(odd)) {
-+		result = *buff;
-+		len--;
-+		buff++;
-+	}
-+
-+	count = len >> 1;
-+	if (count) {
-+		if (2 & (unsigned long) buff) {
-+			result += *(unsigned short *)buff;
-+			count--;
-+			len -= 2;
-+			buff += 2;
-+		}
-+		count >>= 1;            /* nr of 32-bit words.. */
-+		if (count) {
-+			if (4 & (unsigned long) buff) {
-+				result += *(unsigned int *) buff;
-+				count--;
-+				len -= 4;
-+				buff += 4;
-+			}
-+			count >>= 1;    /* nr of 64-bit words.. */
-+
-+			v0 = vzero;
-+			v1 = vzero;
-+			v2 = vzero;
-+			v3 = vzero;
-+
-+			count64 = count >> 3;  /* compute 64 Byte circle */
-+			while (count64) {
-+				v0 = vpadalq_u16(v0,
-+					vld1q_u16((uint16_t *)buff + 0));
-+				v1 = vpadalq_u16(v1,
-+					vld1q_u16((uint16_t *)buff + 8));
-+				v2 = vpadalq_u16(v2,
-+					vld1q_u16((uint16_t *)buff + 16));
-+				v3 = vpadalq_u16(v3,
-+					vld1q_u16((uint16_t *)buff + 24));
-+				buff += 64;
-+				count64--;
-+			}
-+			v0 = vaddq_u32(v0, v1);
-+			v2 = vaddq_u32(v2, v3);
-+			v0 = vaddq_u32(v0, v2);
-+
-+			count %= 8;
-+			while (count >= 2) { /* compute 16 byte circle */
-+				v0 = vpadalq_u16(v0,
-+					vld1q_u16((uint16_t *)buff + 0));
-+				buff += 16;
-+				count -= 2;
-+			}
-+
-+			result += vgetq_lane_u32(v0, 0);
-+			result += vgetq_lane_u32(v0, 1);
-+			result += vgetq_lane_u32(v0, 2);
-+			result += vgetq_lane_u32(v0, 3);
-+			if (count & 1) {
-+				result += *(unsigned long long *) buff;
-+				buff += 8;
-+			}
-+			if (len & 4) {
-+				result += *(unsigned int *) buff;
-+				buff += 4;
-+			}
-+		}
-+		if (len & 2) {
-+			result += *(unsigned short *) buff;
-+			buff += 2;
-+		}
-+	}
-+	if (len & 1)
-+		result += *buff;
-+	result = from64to16(result);
-+	if (odd)
-+		result = ((result >> 8) & 0xff) | ((result & 0xff) << 8);
-+	return result;
-+}
-+#endif
-+
-+
-+unsigned int do_csum(const unsigned char *buff, unsigned int len)
-+{
-+	if ((len >= CSUM_NEON_THRESHOLD) && may_use_simd()) {
-+		unsigned int res;
-+
-+		kernel_neon_begin();
-+		res = do_csum_neon(buff, len);
-+		kernel_neon_end();
-+		return res;
-+	} else
-+		return do_csum_generic(buff, len);
-+}
-diff --git a/include/asm-generic/checksum.h b/include/asm-generic/checksum.h
-index 34785c0..041063c 100644
---- a/include/asm-generic/checksum.h
-+++ b/include/asm-generic/checksum.h
-@@ -33,6 +33,7 @@ extern __wsum csum_partial_copy(const void *src, void *dst, int len, __wsum sum)
-  */
- extern __wsum csum_partial_copy_from_user(const void __user *src, void *dst,
- 					int len, __wsum sum, int *csum_err);
-+extern unsigned int do_csum_generic(const unsigned char *buff, int len);
- 
- #ifndef csum_partial_copy_nocheck
- #define csum_partial_copy_nocheck(src, dst, len, sum)	\
-diff --git a/lib/checksum.c b/lib/checksum.c
-index d3ec93f..83392db 100644
---- a/lib/checksum.c
-+++ b/lib/checksum.c
-@@ -47,7 +47,7 @@ static inline unsigned short from32to16(unsigned int x)
- 	return x;
- }
- 
--static unsigned int do_csum(const unsigned char *buff, int len)
-+unsigned int do_csum_generic(const unsigned char *buff, int len)
- {
- 	int odd;
- 	unsigned int result = 0;
-@@ -100,6 +100,12 @@ static unsigned int do_csum(const unsigned char *buff, int len)
- out:
- 	return result;
- }
-+
-+static unsigned int do_csum(const unsigned char *buff, int len)
-+{
-+	return do_csum_generic(buff, len);
-+}
-+
- #endif
- 
- #ifndef ip_fast_csum
--- 
-2.7.4
+On Wed, Jan 02, 2019 at 01:44:40AM +0100, Andreas F=E4rber wrote:
 
+> So, the third invocation of sun6i_transfer_one() calling clk_get_rate()
+> hangs at the prepare_lock instead of reference-counting, because it runs
+> from a separate kthread, unlike the two previous calls?
+
+If there's any contestation for the bus we push all the I/O through a
+separate thread to maintain ordering and improve performance.
+
+> I did not find any *regmap_init_spi() based example in drivers/clk/, and
+> all other "spi" mentions in drivers/clk/ appeared to be clock names.
+> The closest was devm_regmap_init_i2c() based clk-cdce706.c, which uses
+> the prepare/unprepare ops, as suggested by Mark, and does
+> regmap_update_bits() from there.
+
+You'll find a bunch of the MFDs have SPI options as well.
+
+--l2C7pJE7HE4aLL3l
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAABCgAdFiEEreZoqmdXGLWf4p/qJNaLcl1Uh9AFAlwuAf8ACgkQJNaLcl1U
+h9B0fgf+L5M5NYjkOb8YWAmiLMYKo32qz8zumAKB3jHRMDLhmVZ11snwrNem9O1u
+a9uD3TkuRJqmhjiGU41W0F+7+72K6RVlQHqQXBTCbvBp2NtnwPUlwRsJyDMjfuoE
+m+Tc1NWzViVdxoSBK1GwGc49gZcZtqLT0gfInSOCSyhDQpD815qpSaBH72jh3oNa
+txSLnhegZan3tHsatH0Vi0Ly8JweQ+RMG3GV9vWe4DgPAA8kM1/p2Pg7pCVUPb6O
+jwFZEtXHVKW4ZRQ093OPH+1ReH31GoxKnXkw0S8cq4vnLqbnxcTpRrs8X8DypCbF
+ofLLAAWzlMrfyfXw0tF5wjGAI0x/fg==
+=fEFJ
+-----END PGP SIGNATURE-----
+
+--l2C7pJE7HE4aLL3l--
+
+
+--===============6046854612886661279==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============6046854612886661279==--
+
