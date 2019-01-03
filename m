@@ -7,57 +7,62 @@ X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E4656C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 00:51:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 110E9C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 01:11:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B4D7020815
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 00:51:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D4A6C2073F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 01:11:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rUGEKMBD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B4D7020815
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EqM2PHvv";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="pJkB5K+z"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D4A6C2073F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=SPJgMzWiPH21f8u/27fFO3Vg1B9hiF63mG6E8wUAD0I=; b=rUGEKMBD9AGlXPqmgi8u29vRfb
-	cR2c6qoGdte1dMAAzBMpa52ql9SYX55aAJLKgp3HPHWEjlLoct/KsxYtSDQEI0nkhIFM6SE0LLGcf
-	hvIb5KRwj8l13S5fmiTUC557YRNy6ruewyzTzLZJA668ZveJhtihJxUf7b2qV8+XkwwLx7meMshe7
-	TEGTh1qCiG3akbOqJPYtrVAGTWwJf6o9BQuS3NI3WooS0GHJGngmqdSSRSmYUq9zSzRKpKWgQknjL
-	LGruxXg50t0RJoCArA7TbRjAlQ3sDy0Z2Dr59JGc+NnIBWqJDugHyGs7vtlPnQC+c9X0o3CoeqwD0
-	xN1/4avg==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=SXMN2+KPW+OvJJ271s4nI9rTn7iGGmynwoEakY+PBDM=; b=EqM
+	2PHvveXX8bxTpVBbvPsVEO3dLcqNdrR+rbOJxuyUU6ucm688IllKEn4AiELLOZiGNCnYwjNeum4/W
+	6PMZLAtwvY3zc4NnleQnkjKzYsdx5k8EjWnYzgtPG/iLCmbV4vk517dKWolImvUCj9vJEYCHtMM4f
+	BaqdliFR2zqclet4U8NPGtpkzw+XgpWfS7Xx5RMxjig+Ddg+sjelGAROv3t8dHzFoPwARlZnQ0q6I
+	clPVvzl8bpUqwUIYSEurC1HlK5Qbb0RAO7t3uhDHtKyqMoggT1cXLEjaUsa6Cyj3fF3MMl8fQPHPi
+	0FzJnbaHsNrdKI3THjD8yBBBdLSGexg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gerEA-0003er-0a; Thu, 03 Jan 2019 00:51:14 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gerCe-0000vc-U5
- for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 00:49:47 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7FEC21682;
- Wed,  2 Jan 2019 16:49:40 -0800 (PST)
-Received: from beelzebub.austin.arm.com (beelzebub.austin.arm.com
- [10.118.12.119])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 9FC3D3F5AF;
- Wed,  2 Jan 2019 16:49:39 -0800 (PST)
-From: Jeremy Linton <jeremy.linton@arm.com>
-To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v2 7/7] arm64: enable generic CPU vulnerabilites support
-Date: Wed,  2 Jan 2019 18:49:21 -0600
-Message-Id: <20190103004921.1928921-8-jeremy.linton@arm.com>
-X-Mailer: git-send-email 2.17.2
-In-Reply-To: <20190103004921.1928921-1-jeremy.linton@arm.com>
-References: <20190103004921.1928921-1-jeremy.linton@arm.com>
+	id 1gerXg-0001Ru-4o; Thu, 03 Jan 2019 01:11:24 +0000
+Received: from conuserg-10.nifty.com ([210.131.2.77])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gerXc-0001QP-TB; Thu, 03 Jan 2019 01:11:22 +0000
+Received: from grover.tkatk1.zaq.ne.jp (zaqdadce369.zaq.ne.jp
+ [218.220.227.105]) (authenticated)
+ by conuserg-10.nifty.com with ESMTP id x031Apkd032182;
+ Thu, 3 Jan 2019 10:10:51 +0900
+DKIM-Filter: OpenDKIM Filter v2.10.3 conuserg-10.nifty.com x031Apkd032182
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
+ s=dec2015msa; t=1546477852;
+ bh=BK1njVfh2IoLFxPPiAZlVo7NqwABDFBCBCKtQ1k2F3Y=;
+ h=From:To:Cc:Subject:Date:From;
+ b=pJkB5K+zo/ksMybXTBLcPARRk9hsX9TSLsWkch+j40sU71xhtGe0+MwRAQqrzSpft
+ FReO0qPaDGXGc/WYpsCPV8zNKETfGH6GnjWbZ2Hd+5Eq5TSxbUtTnxDTq0OqPDdxaZ
+ JFARudqWwLTLo+Cgye6DYwkVc6tkv2a8I72yCouu4ejBvdIO+WcGCCXHc2myW/0/W9
+ e1kj7r/SVQH/ps/bR/ec0ZHjNGUUqgyARtUY69AVQIBS88ux1NM1MyeVlWoTzKIRBm
+ pOC1YFLyuqf7g+ZVpIXhB7vNqKAV82TEAPx/qV1Yxn5JPLSagtvt2+YVcbPa8uC2Lo
+ eaXY4kAh427zA==
+X-Nifty-SrcIP: [218.220.227.105]
+From: Masahiro Yamada <yamada.masahiro@socionext.com>
+To: linux-kbuild@vger.kernel.org
+Subject: [PATCH 1/5] riscv: remove redundant kernel-space generic-y
+Date: Thu,  3 Jan 2019 10:10:36 +0900
+Message-Id: <1546477840-14278-1-git-send-email-yamada.masahiro@socionext.com>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190102_164941_164050_00568DA4 
-X-CRM114-Status: UNSURE (   9.72  )
+X-CRM114-CacheID: sfid-20190102_171121_163447_646A2213 
+X-CRM114-Status: UNSURE (   4.46  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -70,42 +75,129 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, mlangsdo@redhat.com, suzuki.poulose@arm.com,
- marc.zyngier@arm.com, catalin.marinas@arm.com, julien.thierry@arm.com,
- will.deacon@arm.com, linux-kernel@vger.kernel.org,
- Jeremy Linton <jeremy.linton@arm.com>, steven.price@arm.com, ykaukab@suse.de,
- dave.martin@arm.com, shankerd@codeaurora.org
+Cc: linux-arch@vger.kernel.org, Masahiro Yamada <yamada.masahiro@socionext.com>,
+ linux-riscv@lists.infradead.org, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Mian Yousaf Kaukab <ykaukab@suse.de>
+This commit removes redundant generic-y defines in
+arch/riscv/include/asm/Kbuild.
 
-Enable CPU vulnerabilty show functions for spectre_v1, spectre_v2,
-meltdown and store-bypass.
+[1] It is redundant to define the same generic-y in both
+    arch/$(ARCH)/include/asm/Kbuild and
+    arch/$(ARCH)/include/uapi/asm/Kbuild.
 
-Signed-off-by: Mian Yousaf Kaukab <ykaukab@suse.de>
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+    Remove the following generic-y:
+
+      errno.h
+      fcntl.h
+      ioctl.h
+      ioctls.h
+      ipcbuf.h
+      mman.h
+      msgbuf.h
+      param.h
+      poll.h
+      posix_types.h
+      resource.h
+      sembuf.h
+      setup.h
+      shmbuf.h
+      signal.h
+      socket.h
+      sockios.h
+      stat.h
+      statfs.h
+      swab.h
+      termbits.h
+      termios.h
+      types.h
+
+[2] It is redundant to define generic-y when arch-specific
+    implementation exists in arch/$(ARCH)/include/asm/*.h
+
+    Remove the following generic-y:
+
+      cacheflush.h
+      module.h
+
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
- arch/arm64/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index a4168d366127..be9872ee1d61 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -88,6 +88,7 @@ config ARM64
- 	select GENERIC_CLOCKEVENTS
- 	select GENERIC_CLOCKEVENTS_BROADCAST
- 	select GENERIC_CPU_AUTOPROBE
-+	select GENERIC_CPU_VULNERABILITIES
- 	select GENERIC_EARLY_IOREMAP
- 	select GENERIC_IDLE_POLL_SETUP
- 	select GENERIC_IRQ_MULTI_HANDLER
+Changes in v2:
+  - rebase on Linus' tree
+
+ arch/riscv/include/asm/Kbuild | 25 -------------------------
+ 1 file changed, 25 deletions(-)
+
+diff --git a/arch/riscv/include/asm/Kbuild b/arch/riscv/include/asm/Kbuild
+index 6a646d9..cccd12c 100644
+--- a/arch/riscv/include/asm/Kbuild
++++ b/arch/riscv/include/asm/Kbuild
+@@ -1,5 +1,4 @@
+ generic-y += bugs.h
+-generic-y += cacheflush.h
+ generic-y += checksum.h
+ generic-y += compat.h
+ generic-y += cputime.h
+@@ -9,16 +8,11 @@ generic-y += dma.h
+ generic-y += dma-contiguous.h
+ generic-y += dma-mapping.h
+ generic-y += emergency-restart.h
+-generic-y += errno.h
+ generic-y += exec.h
+ generic-y += fb.h
+-generic-y += fcntl.h
+ generic-y += hardirq.h
+ generic-y += hash.h
+ generic-y += hw_irq.h
+-generic-y += ioctl.h
+-generic-y += ioctls.h
+-generic-y += ipcbuf.h
+ generic-y += irq_regs.h
+ generic-y += irq_work.h
+ generic-y += kdebug.h
+@@ -27,34 +21,15 @@ generic-y += kvm_para.h
+ generic-y += local.h
+ generic-y += local64.h
+ generic-y += mm-arch-hooks.h
+-generic-y += mman.h
+-generic-y += module.h
+-generic-y += msgbuf.h
+ generic-y += mutex.h
+-generic-y += param.h
+ generic-y += percpu.h
+-generic-y += poll.h
+-generic-y += posix_types.h
+ generic-y += preempt.h
+-generic-y += resource.h
+ generic-y += scatterlist.h
+ generic-y += sections.h
+-generic-y += sembuf.h
+ generic-y += serial.h
+-generic-y += setup.h
+-generic-y += shmbuf.h
+ generic-y += shmparam.h
+-generic-y += signal.h
+-generic-y += socket.h
+-generic-y += sockios.h
+-generic-y += stat.h
+-generic-y += statfs.h
+-generic-y += swab.h
+-generic-y += termbits.h
+-generic-y += termios.h
+ generic-y += topology.h
+ generic-y += trace_clock.h
+-generic-y += types.h
+ generic-y += unaligned.h
+ generic-y += user.h
+ generic-y += vga.h
 -- 
-2.17.2
+2.7.4
 
 
 _______________________________________________
