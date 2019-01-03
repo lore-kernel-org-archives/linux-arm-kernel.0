@@ -2,78 +2,58 @@ Return-Path: <SRS0=5A9c=PL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-5.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 67183C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 00:37:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E496AC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 00:49:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 32EF220685
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 00:37:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AFB0120815
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 00:49:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EGgMuR3F";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="trUrQ4d0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 32EF220685
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fuPYOuBD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AFB0120815
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=TAAWqsPFC8iJ1CdL8ZWgrud3y9L8euq12fZLMwIpR14=; b=EGgMuR3FY84q8L
-	bx4hnwt7Fa5NEVjSS8djw4J07kHnSMnVaM5mINolMtZYXznscDXEy6Nb9pZfyt58VIMSkTnaGsknJ
-	wfzEgvStd8LdLR2FfvXhRH4H75H4slXQxWMSugrfw6ftecw55PNUoZA4eKjwpSvd9RlnFhssWkD1P
-	fN/6KsmFC+mR+3vj7wV1DWOlXeCEUDIWVVpnAvdML/zk6Dq8j9DyKyq/Gbk8dpuBgpGCodkP8g89m
-	cQdEcp6dof3NWi7KQVb5bE4UYwXvitl2yQmvS5vOMoWY4LHQ/HJP5j8PG19KKXU69+5IsiTpMaD1W
-	mJnzkQc/jOq+XmQQS8pQ==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=UIlpsVsfMOx3rlJeLXnovYnPiGKpqZr8BcGWQZFVryk=; b=fuP
+	YOuBDqq8cAkgKvaXeCLOr8RaMIlR6Cp+7tdJW0sdyBMOCWP2NPG5TN/UXmpSuzyNpJCsyqwuRlzgu
+	10DqWLvBmXn43ue/8ZFDGu4Zb61zCMRRH8nK878H79C5tjlr9oxhvEsFyTiXXRsWHNj6Wbq+rYtzm
+	a42sJzK1IEDZZVO8yo48Mhhy/ePz7wRBjMuPTnvdt37E78qr5W1gTGVxGC0WxnznhOyFNe0qt/rJS
+	6yxAc1T5rF9paZv5lhfrNbUMbAZsAxknjd2sq2zxQEJjhnIEyxRutUlH3BZz1vXXVir7OPtBo5xUD
+	v/NfpuWExb8kGQ/bf2sk58mN2VO3P1Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ger0T-0005G6-Gm; Thu, 03 Jan 2019 00:37:05 +0000
-Received: from conssluserg-01.nifty.com ([210.131.2.80])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ger0P-0005Ff-3Z
- for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 00:37:03 +0000
-Received: from mail-vk1-f173.google.com (mail-vk1-f173.google.com
- [209.85.221.173]) (authenticated)
- by conssluserg-01.nifty.com with ESMTP id x030aPai026363
- for <linux-arm-kernel@lists.infradead.org>; Thu, 3 Jan 2019 09:36:26 +0900
-DKIM-Filter: OpenDKIM Filter v2.10.3 conssluserg-01.nifty.com x030aPai026363
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
- s=dec2015msa; t=1546475786;
- bh=mJlYWSiWeqCZq2fJPK7I50b08OCqBiH7PgNOiO8M/9g=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=trUrQ4d0GJhO3Ji00o7ysJnLg6IbdIjv2lH9K+fNm6Eb/JfGraqu85JH4j6bzHl2m
- 03VekhKiMkvrMdhyPGYNohhgmp1GL1btms/aqNntGR8lgQDMl1mXwi38cgt5csr2ZL
- bR+LmhnkzW2aBblu2vFFN47lk1y8k7IkjAnKqWXbbQ02Ii1q7+NA0tL/g1PKSieA0x
- eW8n9yEj7GxC4V5AjKzyOYDnSbuC4YA8EMEsodcLQ9oYAmdVhXhsL1IXMc+a7lfPbQ
- ZTPu6riAnPWyy/IoqC04dxkNapSh5wlaMrZi3M6aTY5B6klUt8TQCiP4N4jOTmi2Mh
- 2SB5SHKN4Mjnw==
-X-Nifty-SrcIP: [209.85.221.173]
-Received: by mail-vk1-f173.google.com with SMTP id y14so6952249vkd.1
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 02 Jan 2019 16:36:26 -0800 (PST)
-X-Gm-Message-State: AJcUukdSvsjgpuYV8k8bmvwUBWhRTKCTYpJMIjevkK/iQnpOc4PUrlK9
- AWYKTSGEGtfTywDi2FenVp8V5+zjJgEWBg5SaJE=
-X-Google-Smtp-Source: ALg8bN5FKddHcrGWono5UpsMPLqZ5N1NpHGJZCSJ3hQLIGkLGFV1mgyHFxVQz3xse4vncUMh7jRcVM6IwDWcKpScUP8=
-X-Received: by 2002:a1f:27d7:: with SMTP id n206mr17035556vkn.0.1546475785253; 
- Wed, 02 Jan 2019 16:36:25 -0800 (PST)
-MIME-Version: 1.0
-References: <CA+icZUU=1S0Xg3+zWNU-60eknfWyL2kjEPm2BNNTK8Eu-tkTEg@mail.gmail.com>
-In-Reply-To: <CA+icZUU=1S0Xg3+zWNU-60eknfWyL2kjEPm2BNNTK8Eu-tkTEg@mail.gmail.com>
-From: Masahiro Yamada <yamada.masahiro@socionext.com>
-Date: Thu, 3 Jan 2019 09:35:49 +0900
-X-Gmail-Original-Message-ID: <CAK7LNASWScb7Qt0kmV8RyBdix2GPA24gv=eRNYVWu5dGGePbfQ@mail.gmail.com>
-Message-ID: <CAK7LNASWScb7Qt0kmV8RyBdix2GPA24gv=eRNYVWu5dGGePbfQ@mail.gmail.com>
-Subject: Re: jump_label: move 'asm goto' support test to Kconfig
-To: Sedat Dilek <sedat.dilek@gmail.com>
+	id 1gerCU-0000hJ-13; Thu, 03 Jan 2019 00:49:30 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gerCQ-0000gg-ER
+ for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 00:49:28 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1A54B80D;
+ Wed,  2 Jan 2019 16:49:24 -0800 (PST)
+Received: from beelzebub.austin.arm.com (beelzebub.austin.arm.com
+ [10.118.12.119])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 425AC3F5AF;
+ Wed,  2 Jan 2019 16:49:23 -0800 (PST)
+From: Jeremy Linton <jeremy.linton@arm.com>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [PATCH v2 0/7] add system vulnerability sysfs entries
+Date: Wed,  2 Jan 2019 18:49:14 -0600
+Message-Id: <20190103004921.1928921-1-jeremy.linton@arm.com>
+X-Mailer: git-send-email 2.17.2
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190102_163701_367251_DF7E421C 
-X-CRM114-Status: GOOD (  14.55  )
+X-CRM114-CacheID: sfid-20190102_164926_492816_4D5E7F18 
+X-CRM114-Status: UNSURE (   6.63  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,69 +65,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch <linux-arch@vger.kernel.org>, linux-xtensa@linux-xtensa.org,
- X86 ML <x86@kernel.org>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Peter Zijlstra <peterz@infradead.org>, linux-s390 <linux-s390@vger.kernel.org>,
- Linux Kbuild mailing list <linux-kbuild@vger.kernel.org>,
- Will Deacon <will.deacon@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Linus Torvalds <torvalds@linux-foundation.org>,
- Max Filippov <jcmvbkbc@gmail.com>, Ingo Molnar <mingo@redhat.com>,
- Josh Poimboeuf <jpoimboe@redhat.com>, sparclinux <sparclinux@vger.kernel.org>,
- Thomas Gleixner <tglx@linutronix.de>,
- linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
- "David S . Miller" <davem@davemloft.net>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: mark.rutland@arm.com, mlangsdo@redhat.com, suzuki.poulose@arm.com,
+ marc.zyngier@arm.com, catalin.marinas@arm.com, julien.thierry@arm.com,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ Jeremy Linton <jeremy.linton@arm.com>, steven.price@arm.com, ykaukab@suse.de,
+ dave.martin@arm.com, shankerd@codeaurora.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 2, 2019 at 9:14 PM Sedat Dilek <sedat.dilek@gmail.com> wrote:
->
-> Hi,
->
-> I was not aware that CONFIG_JUMP_LABEL Kconfig setting depends on the
-> support of asm-goto.
->
-> Currently, I am doing experiments with clang-7 and a snapshot of
-> clang-8 on Linux/x86.
-> These compilers have no asm-goto support.
->
-> What is your recommendation for Linux >= v4.20?
-> I am asking as it is possible to set CONFIG_JUMP_LABEL=y when
-> compiling with clang - which has no effect.
-> This is confusing.
->
-> Thanks, this patch makes things clearer and protects users from
-> setting "wrong" in the sense of non-functional settings.
->
-> I have tested this against recent Linus tree where kbuild/kconfig Git
-> pulls were latest commits.
->
-> Tested-by: Sedat Dilek <sedat.dilek@gmail.com> [ x86 with LLVM/Clang
-> v7 and v8 (snapshot) ]
+This series was originally by Mian Yousaf Kaukab.
 
+Arm64 machines should be displaying a human readable
+vulnerability status to speculative execution attacks in
+/sys/devices/system/cpu/vulnerabilities 
 
-Which part was tested?
+This series enables that behavior by providing the expected
+functions. Those functions expose the cpu errata and feature
+states, as well as whether firmware is responding appropriately
+to display the overall machine status. This means that in a
+heterogeneous machine we will only claim the machine is mitigated
+or safe if we are confident all booted cores are safe or
+mitigated. Otherwise, we will display unknown or unsafe
+depending on how much of the machine configuration can
+be assured.
 
-x86 kernel cannot be compiled with Clang
-since it lacks the asm-goto support.
+v1->v2:
+	Add "Unknown" state to ABI/testing docs.
+	Minor tweaks.
+	
+Jeremy Linton (3):
+  sysfs/cpu: Add "Unknown" vulnerability state
+  arm64: add sysfs vulnerability show for meltdown
+  arm64: add sysfs vulnerability show for spectre v2
 
+Mian Yousaf Kaukab (4):
+  arm64: kpti: move check for non-vulnerable CPUs to a function
+  arm64: add sysfs vulnerability show for spectre v1
+  arm64: add sysfs vulnerability show for speculative store bypass
+  arm64: enable generic CPU vulnerabilites support
 
-$ make CC=clang
-Compiler lacks asm-goto support.
-arch/x86/Makefile:293: recipe for target 'checkbin' failed
-make: *** [checkbin] Error 1
-
-
-
-
-
+ .../ABI/testing/sysfs-devices-system-cpu      |   1 +
+ arch/arm64/Kconfig                            |   1 +
+ arch/arm64/kernel/cpu_errata.c                | 107 +++++++++++++++++-
+ arch/arm64/kernel/cpufeature.c                |  42 +++++--
+ 4 files changed, 138 insertions(+), 13 deletions(-)
 
 -- 
-Best Regards
-Masahiro Yamada
+2.17.2
+
 
 _______________________________________________
 linux-arm-kernel mailing list
