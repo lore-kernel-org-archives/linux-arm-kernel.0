@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,
 	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 96D25C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 18:46:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C0F56C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 18:46:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 46CA5217F5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 18:46:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8F190217F5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 18:46:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q/d7E/7C";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="JzRV4OzU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 46CA5217F5
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="joLGkz28";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="hTmg+DGu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8F190217F5
 Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,53 +26,53 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=aSUscJ3jrCuidi+qlPI+u+SfWo39XTIfEcwA3Jl6NDA=; b=q/d7E/7C+noSqK
-	tRHq1HmnbCm9mKuNIUQYwoQCMlD9gnh40z55nqB5hdE5YAMpQM36UekO0Z8GP2MTnxvgHvXWXf9Ri
-	uJzJkJ1FNTKhKuS7svgQZV9GVFvxUCsPvGol31SQoZg354D1Lvg6PHEtKvxPqLA16WSPZ3JcAoYHF
-	KEEr9uf0yppsxVva9Dk8hHmc+PXwBHXVJ+ua+FtN95Y6nevEaHRMyPsl1d3ysQ/39FgSTUYiL1o9k
-	wfvHj8ZbgJvcDwT9naLepNq/C+TqwGJzHmCYvuYNPq71uurD/mxhVIpcELVzvdiSqmxA6NqYuBDwE
-	zaPSUpbPXlU0NWmUNOSQ==;
+	List-Owner; bh=hIbUyF+JlsGVLSeNNhi3+Gn9oV2Hw1WUMS9TkjHEhLc=; b=joLGkz28VeIgen
+	6ptCC28V+2hZ2k17JQh66iewtQlFPXGOVfgjadbm9ch5+lpfBWvtNr3lLnwsmeWLs+3pDmtAPbADR
+	LeN/4ODEv3YUnqZ+g0PMc12U0LWmplYX7nz5RQV7AzlkPrHAWKDWjMpAjK9YUV6koTz20GAPIwkon
+	oh4oAKkLsBbzwfnThskRlrVF/BVpGdyQeuAHOa8IfCwwZJYl12ff0DU9Lt021ydKaVMhPbCUN+Nam
+	SARAUGbFLZNhQo0aTDfXfXLGvGCxYlkoWfyhRuow+N9G2drE13lGpNESWGhYr4MCztwem5P+DQBIs
+	oScOx32Vs1PZOHE9K/jg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gf80E-0007b4-PP; Thu, 03 Jan 2019 18:45:58 +0000
+	id 1gf80X-0007vH-Qe; Thu, 03 Jan 2019 18:46:17 +0000
 Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gf7zm-00074y-D2
- for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 18:45:32 +0000
-Received: by mail-wr1-x442.google.com with SMTP id v13so34488984wrw.5
+ id 1gf7zo-00076A-0Y
+ for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 18:45:37 +0000
+Received: by mail-wr1-x442.google.com with SMTP id r10so34464793wrs.10
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 03 Jan 2019 10:45:28 -0800 (PST)
+ Thu, 03 Jan 2019 10:45:31 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=LcZuxDuPGnY34gBBOzPjzW9RC6MdmGqedzN7uzgRX8A=;
- b=JzRV4OzU47GC2npsOEq89Allc1qgPv+Y5jsoLkXuyflZ9xTmZcqNEWdvopVB2mLN9u
- 8dO+4sD19DkkXcPnobH6i4C8sPCDcTKX0Zb5bMIzj7AAWZze9z4tJvCau1rxfVHhRRRb
- jSjusOJhz6SUeB4bWg1pRK3Ec1iK+PCIbicMVihCOHNB3eu8wG57R5YW7mn3YHEbjXfG
- GoNIzVch9Hl/MBebbU2cyVjj/+ZtkiaLrajzmanxTB4cyMH9xs/7d39MOEsVTcaLg585
- xYTZJkUhlbbMrBQ3Hrw6gURwz+PJUt3SD5vFdNZwyzVNZuM8xmb9QtROaHCZOT2IPHuL
- VF0w==
+ bh=loqk+YaJssCyhGzAFNinnRGb50LrNU13L8MGywEfc18=;
+ b=hTmg+DGuRIQF2vlqz/Vhl1D+/+mvgPMsjqLDHi0P1rk+WOre7zmTu5qqGxv3MuZCCE
+ UmLGhAKFZbzdsd4JMY8pdmgI4HYcHr4YnHntxG+Gt//m4C9Qndntnz8PKfjmfZeLTDpd
+ K0fspUq1NKHV5A284NV0qPwtJ8DdvroBOj8kdD2qczrMK2lmGiPk5KVZxusGtbJdfqwR
+ UUZxn2Qs6thHtP1o2ZG8BwsnsoATqNMckkznlYwnbdZQ8C3QDsxrTRM76uXF0vMqJHwb
+ NV6DgqPzaJ4SZY9nrBP+8lLvzwTIs4vFYaq5Eyd/Nw+pUV8pY0KTWdZ5qFjegRMm8Ha4
+ w6xQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=LcZuxDuPGnY34gBBOzPjzW9RC6MdmGqedzN7uzgRX8A=;
- b=gMadkfOHF7e8MSLaZZFU61TtHcekrGYDSnFlYbGujkcBfCJgliDMvmf75L7AJ4of06
- 36ETpt+uZQyWKEGEoa4tMPzDgy18UZ6f5d8iDP91lKaeFZOSzOpKWXt4cuXAkE6nYMgf
- q5uILOgPv4UQ3ZaoUdwQR0lSy2mRc2fbHlp2u/tiy2Xjxr0KYnY/yqi0vq/PL90IuWII
- FU29nCcYkXP8JG8ZJ4D6NhXeEUlkKEKga96zTrGB05sSi4rk2M4ThmNeEfkO0HPly2E3
- 1KwXcOjG+XM0TgxIQowo4XW/CymbYLUSot2ozIbUcAcutiBjGpX8VqALj2ukwc/qfoWL
- xHsg==
-X-Gm-Message-State: AJcUukd2522Duh4GmGAwFmi72sHThIfuBDM8y46vn3P50yiFo7Lw3saI
- BJYFfL+mn8ORNc8GjoW29wyQBg==
-X-Google-Smtp-Source: ALg8bN5f1SEsd4ITLAOkW46zsAXPnkQ0Kw16Q2Kzdp8Q2K31EY+gUdUwN0+RWy+mZNfdm32Jcr+xpQ==
-X-Received: by 2002:adf:fa05:: with SMTP id m5mr29524927wrr.155.1546541126907; 
- Thu, 03 Jan 2019 10:45:26 -0800 (PST)
+ bh=loqk+YaJssCyhGzAFNinnRGb50LrNU13L8MGywEfc18=;
+ b=h7G50NRynDMPVPZFqhmDheaw8he1e+Zu25tZNcMmcD7fYtMciYc+jfWm6uvjn6vhD2
+ OL89P1BV4SjBNZqyUxHUjZVWW5kuTx6HUN5lUPw3WrHIlHnE/HBvG3jJ4kcrxNL5ydup
+ O9gXzrozgGWIpspaQNtHX22Auwmbms+AqjHyIIcoPgyalRR3d2vtpB/jgFjKxyYYSBag
+ QJlmN6+DELZpcp9DL5zjt0riGFUDdhUNVaJ9RTBvRiKG1yEr90Q9QkZEXwsyW73kFtCp
+ FdxJPzNN8It5WFCBsc9MsWmPBNw7X+UWXW63wN8qZ81ZEXDywWuG/hfrXoEjNj7QIAUS
+ kspw==
+X-Gm-Message-State: AJcUukeVGPcFhzCSuvq2nifoZ1z4DEtNhHsc48UDGZoX1wTmCDqKGFEl
+ jdHBHgxHsxZxES4et5106QqmvA==
+X-Google-Smtp-Source: ALg8bN4jM3MVHQyzwSzizLWeommEZcTAUOfqxGGPUDgiXkfn7dghhnI866UT0Yj3Z9dcwdbzSDIU7w==
+X-Received: by 2002:adf:e34b:: with SMTP id n11mr39771740wrj.91.1546541130566; 
+ Thu, 03 Jan 2019 10:45:30 -0800 (PST)
 Received: from andreyknvl0.muc.corp.google.com
  ([2a00:79e0:15:13:8ce:d7fa:9f4c:492])
- by smtp.gmail.com with ESMTPSA id t12sm52236944wrr.65.2019.01.03.10.45.25
+ by smtp.gmail.com with ESMTPSA id t12sm52236944wrr.65.2019.01.03.10.45.28
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 03 Jan 2019 10:45:25 -0800 (PST)
+ Thu, 03 Jan 2019 10:45:29 -0800 (PST)
 From: Andrey Konovalov <andreyknvl@google.com>
 To: Andrey Ryabinin <aryabinin@virtuozzo.com>,
  Alexander Potapenko <glider@google.com>,
@@ -95,17 +95,16 @@ To: Andrey Ryabinin <aryabinin@virtuozzo.com>,
  linux-doc@vger.kernel.org, linux-kernel@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org, linux-sparse@vger.kernel.org,
  linux-mm@kvack.org, linux-kbuild@vger.kernel.org
-Subject: [PATCH v3 1/3] kasan,
- arm64: use ARCH_SLAB_MINALIGN instead of manual aligning
-Date: Thu,  3 Jan 2019 19:45:19 +0100
-Message-Id: <52ddd881916bcc153a9924c154daacde78522227.1546540962.git.andreyknvl@google.com>
+Subject: [PATCH v3 3/3] kasan: fix krealloc handling for tag-based mode
+Date: Thu,  3 Jan 2019 19:45:21 +0100
+Message-Id: <bb2a71d17ed072bcc528cbee46fcbd71a6da3be4.1546540962.git.andreyknvl@google.com>
 X-Mailer: git-send-email 2.20.1.415.g653613c723-goog
 In-Reply-To: <cover.1546540962.git.andreyknvl@google.com>
 References: <cover.1546540962.git.andreyknvl@google.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190103_104530_444772_75E9E973 
-X-CRM114-Status: GOOD (  12.48  )
+X-CRM114-CacheID: sfid-20190103_104532_467785_9F692B8C 
+X-CRM114-Status: GOOD (  22.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -129,46 +128,141 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Instead of changing cache->align to be aligned to KASAN_SHADOW_SCALE_SIZE
-in kasan_cache_create() we can reuse the ARCH_SLAB_MINALIGN macro.
+Right now tag-based KASAN can retag the memory that is reallocated via
+krealloc and return a differently tagged pointer even if the same slab
+object gets used and no reallocated technically happens.
 
-Suggested-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
+There are a few issues with this approach. One is that krealloc callers
+can't rely on comparing the return value with the passed argument to
+check whether reallocation happened. Another is that if a caller knows
+that no reallocation happened, that it can access object memory through
+the old pointer, which leads to false positives. Look at nf_ct_ext_add()
+to see an example.
+
+Fix this by keeping the same tag if the memory don't actually gets
+reallocated during krealloc.
+
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- arch/arm64/include/asm/cache.h | 6 ++++++
- mm/kasan/common.c              | 2 --
- 2 files changed, 6 insertions(+), 2 deletions(-)
+ mm/kasan/common.c | 63 ++++++++++++++++++++++++++++++++---------------
+ 1 file changed, 43 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
-index 13dd42c3ad4e..eb43e09c1980 100644
---- a/arch/arm64/include/asm/cache.h
-+++ b/arch/arm64/include/asm/cache.h
-@@ -58,6 +58,12 @@
-  */
- #define ARCH_DMA_MINALIGN	(128)
- 
-+#ifdef CONFIG_KASAN_SW_TAGS
-+#define ARCH_SLAB_MINALIGN	(1ULL << KASAN_SHADOW_SCALE_SHIFT)
-+#else
-+#define ARCH_SLAB_MINALIGN	__alignof__(unsigned long long)
-+#endif
-+
- #ifndef __ASSEMBLY__
- 
- #include <linux/bitops.h>
 diff --git a/mm/kasan/common.c b/mm/kasan/common.c
-index 03d5d1374ca7..44390392d4c9 100644
+index 44390392d4c9..73c9cbfdedf4 100644
 --- a/mm/kasan/common.c
 +++ b/mm/kasan/common.c
-@@ -298,8 +298,6 @@ void kasan_cache_create(struct kmem_cache *cache, unsigned int *size,
- 		return;
- 	}
- 
--	cache->align = round_up(cache->align, KASAN_SHADOW_SCALE_SIZE);
--
- 	*flags |= SLAB_KASAN;
+@@ -347,28 +347,43 @@ void kasan_poison_object_data(struct kmem_cache *cache, void *object)
  }
  
+ /*
+- * Since it's desirable to only call object contructors once during slab
+- * allocation, we preassign tags to all such objects. Also preassign tags for
+- * SLAB_TYPESAFE_BY_RCU slabs to avoid use-after-free reports.
+- * For SLAB allocator we can't preassign tags randomly since the freelist is
+- * stored as an array of indexes instead of a linked list. Assign tags based
+- * on objects indexes, so that objects that are next to each other get
+- * different tags.
+- * After a tag is assigned, the object always gets allocated with the same tag.
+- * The reason is that we can't change tags for objects with constructors on
+- * reallocation (even for non-SLAB_TYPESAFE_BY_RCU), because the constructor
+- * code can save the pointer to the object somewhere (e.g. in the object
+- * itself). Then if we retag it, the old saved pointer will become invalid.
++ * This function assigns a tag to an object considering the following:
++ * 1. A cache might have a constructor, which might save a pointer to a slab
++ *    object somewhere (e.g. in the object itself). We preassign a tag for
++ *    each object in caches with constructors during slab creation and reuse
++ *    the same tag each time a particular object is allocated.
++ * 2. A cache might be SLAB_TYPESAFE_BY_RCU, which means objects can be
++ *    accessed after being freed. We preassign tags for objects in these
++ *    caches as well.
++ * 3. For SLAB allocator we can't preassign tags randomly since the freelist
++ *    is stored as an array of indexes instead of a linked list. Assign tags
++ *    based on objects indexes, so that objects that are next to each other
++ *    get different tags.
+  */
+-static u8 assign_tag(struct kmem_cache *cache, const void *object, bool new)
++static u8 assign_tag(struct kmem_cache *cache, const void *object,
++			bool init, bool krealloc)
+ {
++	/* Reuse the same tag for krealloc'ed objects. */
++	if (krealloc)
++		return get_tag(object);
++
++	/*
++	 * If the cache neither has a constructor nor has SLAB_TYPESAFE_BY_RCU
++	 * set, assign a tag when the object is being allocated (init == false).
++	 */
+ 	if (!cache->ctor && !(cache->flags & SLAB_TYPESAFE_BY_RCU))
+-		return new ? KASAN_TAG_KERNEL : random_tag();
++		return init ? KASAN_TAG_KERNEL : random_tag();
+ 
++	/* For caches that either have a constructor or SLAB_TYPESAFE_BY_RCU: */
+ #ifdef CONFIG_SLAB
++	/* For SLAB assign tags based on the object index in the freelist. */
+ 	return (u8)obj_to_index(cache, virt_to_page(object), (void *)object);
+ #else
+-	return new ? random_tag() : get_tag(object);
++	/*
++	 * For SLUB assign a random tag during slab creation, otherwise reuse
++	 * the already assigned tag.
++	 */
++	return init ? random_tag() : get_tag(object);
+ #endif
+ }
+ 
+@@ -384,7 +399,8 @@ void * __must_check kasan_init_slab_obj(struct kmem_cache *cache,
+ 	__memset(alloc_info, 0, sizeof(*alloc_info));
+ 
+ 	if (IS_ENABLED(CONFIG_KASAN_SW_TAGS))
+-		object = set_tag(object, assign_tag(cache, object, true));
++		object = set_tag(object,
++				assign_tag(cache, object, true, false));
+ 
+ 	return (void *)object;
+ }
+@@ -450,8 +466,8 @@ bool kasan_slab_free(struct kmem_cache *cache, void *object, unsigned long ip)
+ 	return __kasan_slab_free(cache, object, ip, true);
+ }
+ 
+-void * __must_check kasan_kmalloc(struct kmem_cache *cache, const void *object,
+-					size_t size, gfp_t flags)
++static void *__kasan_kmalloc(struct kmem_cache *cache, const void *object,
++				size_t size, gfp_t flags, bool krealloc)
+ {
+ 	unsigned long redzone_start;
+ 	unsigned long redzone_end;
+@@ -469,7 +485,7 @@ void * __must_check kasan_kmalloc(struct kmem_cache *cache, const void *object,
+ 				KASAN_SHADOW_SCALE_SIZE);
+ 
+ 	if (IS_ENABLED(CONFIG_KASAN_SW_TAGS))
+-		tag = assign_tag(cache, object, false);
++		tag = assign_tag(cache, object, false, krealloc);
+ 
+ 	/* Tag is ignored in set_tag without CONFIG_KASAN_SW_TAGS */
+ 	kasan_unpoison_shadow(set_tag(object, tag), size);
+@@ -481,6 +497,12 @@ void * __must_check kasan_kmalloc(struct kmem_cache *cache, const void *object,
+ 
+ 	return set_tag(object, tag);
+ }
++
++void * __must_check kasan_kmalloc(struct kmem_cache *cache, const void *object,
++				size_t size, gfp_t flags)
++{
++	return __kasan_kmalloc(cache, object, size, flags, false);
++}
+ EXPORT_SYMBOL(kasan_kmalloc);
+ 
+ void * __must_check kasan_kmalloc_large(const void *ptr, size_t size,
+@@ -520,7 +542,8 @@ void * __must_check kasan_krealloc(const void *object, size_t size, gfp_t flags)
+ 	if (unlikely(!PageSlab(page)))
+ 		return kasan_kmalloc_large(object, size, flags);
+ 	else
+-		return kasan_kmalloc(page->slab_cache, object, size, flags);
++		return __kasan_kmalloc(page->slab_cache, object, size,
++						flags, true);
+ }
+ 
+ void kasan_poison_kfree(void *ptr, unsigned long ip)
 -- 
 2.20.1.415.g653613c723-goog
 
