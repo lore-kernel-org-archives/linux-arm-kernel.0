@@ -4,78 +4,77 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CC0BFC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 10:18:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 47043C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 10:18:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 94F6420815
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 10:18:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0F6FB20815
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 10:18:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="alsfcn2X"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 94F6420815
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TwpqdnCf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0F6FB20815
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pOuToGoX7zFRWotWBsY2xf2HzUe8yzh4jrsuwKB1s4E=; b=alsfcn2XgLEz92
-	fy6PEdiYl0p+jOvtvLupnwq4w+7A6jkkyJqSyyBw+p4/dHjHlxHuwGuZV1sQXpSisPW8d77fwN8EX
-	JvoG4rwUVt6QzGa2WbEPgIcFhSNmrlYNSYmkURa3cHOxt8ewigiFExpcybe5LPGSSz4/+PbAIC7OF
-	iwZz23BwoWmY0/BnUSRWqhFo7zr4QlS+G52niR1j+00kvEqOL1aygThsdnaik+bvM1saltceE1gT1
-	w7Nw84BW3vWWjNHLLVFWF/dKSoZ7yJcP14CGXI+/ATAXpJnOw2625NjOaxS0+ZcjWGEicLZazDcM/
-	YCjxhgQLwUDl70kupKSA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=VDDvGF8IXSyiNTTlLKWnbj66WIpqEKT4bEtGpIb4+0o=; b=TwpqdnCf1vhlFY
+	qCqsdfiLbiduTnAzW6IJr9aQjDln12uumGkooo0x2i8JHag8pQbr0Mizaambl8EYYsmpx/xd4062U
+	0q54tMl6n1wRVmpu/qw/4YZUN8mkeCJc4gM5oPeLHQoSskBWYSi00ZTc4gIYp7sv07i18dnZtu572
+	NoVIHX2enBeuzS9d264CQle7TeJlobyfbkis8uXFBmp8TVVUVbTX07M85rSZp4MQ+fbDN1j9J7zOc
+	YQlgGsSgXb5m86N8HPyf7R46gJqVriZfntzJSbo4dDGRd1WsZ8WmMOh7JSMemUsI6NyXHXBw9FLVp
+	fQ1K1tqQ1gENrLcYerjA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gf04k-0006mT-5Y; Thu, 03 Jan 2019 10:18:06 +0000
-Received: from mx08-00178001.pphosted.com ([91.207.212.93]
- helo=mx07-00178001.pphosted.com)
+	id 1gf04z-00071b-Oz; Thu, 03 Jan 2019 10:18:21 +0000
+Received: from mx07-00178001.pphosted.com ([62.209.51.94])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gf043-000610-Vo
- for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 10:17:25 +0000
-Received: from pps.filterd (m0046660.ppops.net [127.0.0.1])
- by mx08-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x03AC9K7023336; Thu, 3 Jan 2019 11:17:16 +0100
+ id 1gf04I-0006FR-3I
+ for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 10:17:42 +0000
+Received: from pps.filterd (m0046668.ppops.net [127.0.0.1])
+ by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x03AG1vW024886; Thu, 3 Jan 2019 11:17:32 +0100
 Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx08-00178001.pphosted.com with ESMTP id 2pnxxbtska-1
+ by mx07-00178001.pphosted.com with ESMTP id 2pny93a8s9-1
  (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Thu, 03 Jan 2019 11:17:16 +0100
+ Thu, 03 Jan 2019 11:17:32 +0100
 Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 5437D3A;
- Thu,  3 Jan 2019 10:17:15 +0000 (GMT)
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 9C9C438;
+ Thu,  3 Jan 2019 10:17:31 +0000 (GMT)
 Received: from Webmail-eu.st.com (sfhdag5node2.st.com [10.75.127.14])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 348C22A85;
- Thu,  3 Jan 2019 10:17:15 +0000 (GMT)
-Received: from localhost (10.75.127.44) by SFHDAG5NODE2.st.com (10.75.127.14)
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 7C3142C6C;
+ Thu,  3 Jan 2019 10:17:31 +0000 (GMT)
+Received: from localhost (10.75.127.47) by SFHDAG5NODE2.st.com (10.75.127.14)
  with Microsoft SMTP Server (TLS) id 15.0.1347.2;
- Thu, 3 Jan 2019 11:17:14 +0100
+ Thu, 3 Jan 2019 11:17:30 +0100
 From: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 To: Dan Williams <dan.j.williams@intel.com>, Vinod Koul <vkoul@kernel.org>,
  Maxime Coquelin <mcoquelin.stm32@gmail.com>, Alexandre Torgue
  <alexandre.torgue@st.com>, <dmaengine@vger.kernel.org>,
  <linux-stm32@st-md-mailman.stormreply.com>,
  <linux-arm-kernel@lists.infradead.org>, <linux-kernel@vger.kernel.org>
-Subject: [RESEND PATCH v1 3/3] dmaengine: stm32-mdma: Add PM Runtime support
-Date: Thu, 3 Jan 2019 11:17:10 +0100
-Message-ID: <1546510630-16555-4-git-send-email-pierre-yves.mordret@st.com>
+Subject: [RESEND PATCH v1] dmaengine: stm32-dma: check FIFO error interrupt
+ enable
+Date: Thu, 3 Jan 2019 11:17:29 +0100
+Message-ID: <1546510649-16744-1-git-send-email-pierre-yves.mordret@st.com>
 X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1546510630-16555-1-git-send-email-pierre-yves.mordret@st.com>
-References: <1546510630-16555-1-git-send-email-pierre-yves.mordret@st.com>
 MIME-Version: 1.0
-X-Originating-IP: [10.75.127.44]
-X-ClientProxiedBy: SFHDAG2NODE2.st.com (10.75.127.5) To SFHDAG5NODE2.st.com
+X-Originating-IP: [10.75.127.47]
+X-ClientProxiedBy: SFHDAG1NODE1.st.com (10.75.127.1) To SFHDAG5NODE2.st.com
  (10.75.127.14)
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2019-01-03_04:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190103_021724_468823_F2221DE7 
-X-CRM114-Status: GOOD (  14.85  )
+X-CRM114-CacheID: sfid-20190103_021739_221784_189DEF5B 
+X-CRM114-Status: UNSURE (   9.70  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,7 +92,9 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Use pm_runtime engine for clock management purpose
+For avoiding false FIFO detection, check FIFO Error interrupt is
+enabled prior raising any errors.
+This will prevent having spurious FIFO error where it shouldn't.
 
 Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
@@ -102,116 +103,45 @@ Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
        * Initial
 ---
 ---
- drivers/dma/stm32-mdma.c | 52 ++++++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 46 insertions(+), 6 deletions(-)
+ drivers/dma/stm32-dma.c | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/dma/stm32-mdma.c b/drivers/dma/stm32-mdma.c
-index 390e4ca..ac0301b 100644
---- a/drivers/dma/stm32-mdma.c
-+++ b/drivers/dma/stm32-mdma.c
-@@ -37,6 +37,7 @@
- #include <linux/of_device.h>
- #include <linux/of_dma.h>
- #include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
- #include <linux/reset.h>
- #include <linux/slab.h>
+diff --git a/drivers/dma/stm32-dma.c b/drivers/dma/stm32-dma.c
+index 4903a40..48f7c0f 100644
+--- a/drivers/dma/stm32-dma.c
++++ b/drivers/dma/stm32-dma.c
+@@ -641,12 +641,13 @@ static irqreturn_t stm32_dma_chan_irq(int irq, void *devid)
+ {
+ 	struct stm32_dma_chan *chan = devid;
+ 	struct stm32_dma_device *dmadev = stm32_dma_get_dev(chan);
+-	u32 status, scr;
++	u32 status, scr, sfcr;
  
-@@ -1456,15 +1457,13 @@ static int stm32_mdma_alloc_chan_resources(struct dma_chan *c)
- 		return -ENOMEM;
+ 	spin_lock(&chan->vchan.lock);
+ 
+ 	status = stm32_dma_irq_status(chan);
+ 	scr = stm32_dma_read(dmadev, STM32_DMA_SCR(chan->id));
++	sfcr = stm32_dma_read(dmadev, STM32_DMA_SFCR(chan->id));
+ 
+ 	if (status & STM32_DMA_TCI) {
+ 		stm32_dma_irq_clear(chan, STM32_DMA_TCI);
+@@ -661,10 +662,12 @@ static irqreturn_t stm32_dma_chan_irq(int irq, void *devid)
+ 	if (status & STM32_DMA_FEI) {
+ 		stm32_dma_irq_clear(chan, STM32_DMA_FEI);
+ 		status &= ~STM32_DMA_FEI;
+-		if (!(scr & STM32_DMA_SCR_EN))
+-			dev_err(chan2dev(chan), "FIFO Error\n");
+-		else
+-			dev_dbg(chan2dev(chan), "FIFO over/underrun\n");
++		if (sfcr & STM32_DMA_SFCR_FEIE) {
++			if (!(scr & STM32_DMA_SCR_EN))
++				dev_err(chan2dev(chan), "FIFO Error\n");
++			else
++				dev_dbg(chan2dev(chan), "FIFO over/underrun\n");
++		}
  	}
- 
--	ret = clk_prepare_enable(dmadev->clk);
--	if (ret < 0) {
--		dev_err(chan2dev(chan), "clk_prepare_enable failed: %d\n", ret);
-+	ret = pm_runtime_get_sync(dmadev->ddev.dev);
-+	if (ret < 0)
- 		return ret;
--	}
- 
- 	ret = stm32_mdma_disable_chan(chan);
- 	if (ret < 0)
--		clk_disable_unprepare(dmadev->clk);
-+		pm_runtime_put(dmadev->ddev.dev);
- 
- 	return ret;
- }
-@@ -1484,7 +1483,7 @@ static void stm32_mdma_free_chan_resources(struct dma_chan *c)
- 		spin_unlock_irqrestore(&chan->vchan.lock, flags);
- 	}
- 
--	clk_disable_unprepare(dmadev->clk);
-+	pm_runtime_put(dmadev->ddev.dev);
- 	vchan_free_chan_resources(to_virt_chan(c));
- 	dmam_pool_destroy(chan->desc_pool);
- 	chan->desc_pool = NULL;
-@@ -1597,6 +1596,12 @@ static int stm32_mdma_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	ret = clk_prepare_enable(dmadev->clk);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "clk_prep_enable error: %d\n", ret);
-+		return ret;
-+	}
-+
- 	dmadev->rst = devm_reset_control_get(&pdev->dev, NULL);
- 	if (!IS_ERR(dmadev->rst)) {
- 		reset_control_assert(dmadev->rst);
-@@ -1668,6 +1673,10 @@ static int stm32_mdma_probe(struct platform_device *pdev)
- 	}
- 
- 	platform_set_drvdata(pdev, dmadev);
-+	pm_runtime_set_active(&pdev->dev);
-+	pm_runtime_enable(&pdev->dev);
-+	pm_runtime_get_noresume(&pdev->dev);
-+	pm_runtime_put(&pdev->dev);
- 
- 	dev_info(&pdev->dev, "STM32 MDMA driver registered\n");
- 
-@@ -1677,11 +1686,42 @@ static int stm32_mdma_probe(struct platform_device *pdev)
- 	return ret;
- }
- 
-+#ifdef CONFIG_PM
-+static int stm32_mdma_runtime_suspend(struct device *dev)
-+{
-+	struct stm32_mdma_device *dmadev = dev_get_drvdata(dev);
-+
-+	clk_disable_unprepare(dmadev->clk);
-+
-+	return 0;
-+}
-+
-+static int stm32_mdma_runtime_resume(struct device *dev)
-+{
-+	struct stm32_mdma_device *dmadev = dev_get_drvdata(dev);
-+	int ret;
-+
-+	ret = clk_prepare_enable(dmadev->clk);
-+	if (ret) {
-+		dev_err(dev, "failed to prepare_enable clock\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+#endif
-+
-+static const struct dev_pm_ops stm32_mdma_pm_ops = {
-+	SET_RUNTIME_PM_OPS(stm32_mdma_runtime_suspend,
-+			   stm32_mdma_runtime_resume, NULL)
-+};
-+
- static struct platform_driver stm32_mdma_driver = {
- 	.probe = stm32_mdma_probe,
- 	.driver = {
- 		.name = "stm32-mdma",
- 		.of_match_table = stm32_mdma_of_match,
-+		.pm = &stm32_mdma_pm_ops,
- 	},
- };
- 
+ 	if (status) {
+ 		stm32_dma_irq_clear(chan, status);
 -- 
 2.7.4
 
