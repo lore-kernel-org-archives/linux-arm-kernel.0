@@ -2,93 +2,61 @@ Return-Path: <SRS0=5A9c=PL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,FROM_LOCAL_NOVOWEL,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A88ABC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 12:23:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B4109C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 12:32:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 744B2206B6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 12:23:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 71B3021479
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 12:32:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="vDmtXsqE";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="HGabXCDW";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="naRRG8wJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 744B2206B6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="b9jBQfG7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 71B3021479
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=i9iz1b3U+ElSDDJgez51JvvNAwOUinY/Wjx5JuttX6g=; b=vDmtXsqEyqUvsRZLh5oKIm/0Q
-	jIYtfQdBaHE+jqEB6qK28etgS3IED+e4cNgofvdNjJ8yJQkZ4rMcF7LJQUAgH+raIfPkZLa0JIYr5
-	1wmTp/NALGIe44C++uACcxtKy5MINM9TsMsPM9jRq3q0eRIYGK7z7P+BO6N9AV/FIq+GbCl3/Mumw
-	QjfXYDKudKh5Uu0idSEgc3zJzLsaIjcFc+riIPjbDcuOKhOCmM2VvKiFDa8aGda3zRinpnfAc7yzx
-	xPp65NTMjW2Q9/NZq2KwHJs8MMN4OzYM/HxCrdHZa5GW+TNBYh6O6/nyex9TXQ7QSKjRRxfMzxGsV
-	okbkiVAIg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=/JiyJkPz3SsrQbhAsP4Zl1AyZG7526R0K0sn4adLTZQ=; b=b9jBQfG74b6JaN
+	bvPlpp/6+/IHYAaZxQheRjoZnBqPVXiaqRLDIiP2wAw8YKDsSldkA1n4C4Q0j5l3kFkLmBfOVdTT7
+	NZhx1TJjqoFjhimTKNBRmO9c+dqe3FeS+P25j+uQz/w1sZpOfh4gA0ha04vN2S0dohCVGABmLSmFP
+	9OZiNjYGmgO5MEDvAG87o68iFMQuLWbW6sNtWs3XxTMCOFOG9ho7ZYauZbnh25f7p/4Lv4ftQWqfp
+	dFgAC2G86Wm9Zog2DQe57Xld0Vl+aInN7LUHzlItgDPHwZ63/jcRdwVS7WHRMlfKAp7T9YXYIftgb
+	QHCVvNXNvMB4cZ6TRGOw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gf21o-0001VB-1f; Thu, 03 Jan 2019 12:23:12 +0000
-Received: from smtp.codeaurora.org ([198.145.29.96])
+	id 1gf2Al-0004Wy-To; Thu, 03 Jan 2019 12:32:27 +0000
+Received: from szxga05-in.huawei.com ([45.249.212.191] helo=huawei.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gf21k-0001Ul-Q8
- for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 12:23:10 +0000
-Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id C6615607F4; Thu,  3 Jan 2019 12:23:06 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1546518186;
- bh=2nvMDgbJ5HiVhx5IP5Vy/JFtFgrGVBS/dPaHd4VB2xc=;
- h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
- b=HGabXCDWEX19/J3zHd0ftaOTSxqVWrs9ic8OQ3Dd/6X4hmZ1OsHZOiI7GRpZQoIG4
- IXIOJhB0bKNnA4jYNE5SmlmKsfR9UQYOwHtHA6qKMdM6HFSR/FH4ZQ99nREP/Q8Ncr
- 6k3X3OnEsr1wqaluQwJwv1Ot2rojWHwDQ4/rmzmY=
-Received: from [10.242.6.12]
- (blr-c-bdr-fw-01_globalnat_allzones-outside.qualcomm.com [103.229.19.19])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- (Authenticated sender: rplsssn@smtp.codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id 092776034F;
- Thu,  3 Jan 2019 12:23:00 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1546518185;
- bh=2nvMDgbJ5HiVhx5IP5Vy/JFtFgrGVBS/dPaHd4VB2xc=;
- h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
- b=naRRG8wJ6MgtdtW2kZ8GWBMlRssZh2y7Zc1osF2M8QMNBLr6KwdPlx6oL18SG/P1l
- x8h06IyuAQZ8Bp/TyRHdkyCbSxbXQ3/g0MWC0i2vFYU7hrd+w+fDvdjYpZWhdIdEXQ
- 1TD1mQuX1pl+V8tdaUpt+eBTg93UkxEvX0bVeaaI=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 092776034F
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- dmarc=none (p=none dis=none) header.from=codeaurora.org
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- spf=none smtp.mailfrom=rplsssn@codeaurora.org
-Subject: Re: [PATCH RFC 3/5] dt-bindings: Add PDC timer bindings for Qualcomm
- SoCs
-To: Stephen Boyd <swboyd@chromium.org>, andy.gross@linaro.org,
- david.brown@linaro.org, linux-arm-msm@vger.kernel.org,
- linux-soc@vger.kernel.org
-References: <20181221115946.10095-1-rplsssn@codeaurora.org>
- <20181221115946.10095-4-rplsssn@codeaurora.org>
- <154546438942.179992.14851496143150245966@swboyd.mtv.corp.google.com>
- <504cae51-0f35-beb8-496b-a335863a9071@codeaurora.org>
- <154603310752.179992.9262815873457262616@swboyd.mtv.corp.google.com>
-From: Raju P L S S S N <rplsssn@codeaurora.org>
-Message-ID: <b97937a0-68ff-ded7-d63b-680981818114@codeaurora.org>
-Date: Thu, 3 Jan 2019 17:52:58 +0530
-User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.3
+ id 1gf2Ai-0004WU-1Q
+ for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 12:32:25 +0000
+Received: from DGGEMS404-HUB.china.huawei.com (unknown [172.30.72.58])
+ by Forcepoint Email with ESMTP id 2D71477FEB4AC
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu,  3 Jan 2019 20:32:14 +0800 (CST)
+Received: from ubuntu.huawei.com (10.93.195.238) by
+ DGGEMS404-HUB.china.huawei.com (10.3.19.204) with Microsoft SMTP Server id
+ 14.3.408.0; Thu, 3 Jan 2019 20:32:06 +0800
+From: Lingyan Huang <huanglingyan2@huawei.com>
+To: <linux-arm-kernel@lists.infradead.org>
+Subject: [PATCH v2] arm64: lib: accelerate do_csum with NEON instruction
+Date: Thu, 3 Jan 2019 20:32:49 +0800
+Message-ID: <1546518769-114424-1-git-send-email-huanglingyan2@huawei.com>
+X-Mailer: git-send-email 2.7.4
 MIME-Version: 1.0
-In-Reply-To: <154603310752.179992.9262815873457262616@swboyd.mtv.corp.google.com>
-Content-Language: en-US
+X-Originating-IP: [10.93.195.238]
+X-CFilter-Loop: Reflected
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190103_042308_886715_2815873F 
-X-CRM114-Status: GOOD (  28.97  )
+X-CRM114-CacheID: sfid-20190103_043224_260998_F5AE4170 
+X-CRM114-Status: GOOD (  17.41  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,142 +68,244 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, rnayak@codeaurora.org, linux-pm@vger.kernel.org,
- dianders@chromium.org, evgreen@chromium.org, linux-kernel@vger.kernel.org,
- mka@chromium.org, ilina@codeaurora.org, bjorn.andersson@linaro.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Lingyan Huang <huanglingyan2@huawei.com>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Function do_csum() in lib/checksum.c is used to compute checksum,
+which is turned out to be slowly and costs a lot of resources.
+Let's use neon instructions to accelerate the checksum computation
+for arm64.
+
+------
+V1 ==> V2:
+    Change NEON assembly code to NEON intrinsic code which is built
+    on top of arm_neon.h to avoid dropping into assembly.
+------
+
+Here is the comparison results of function ip_compute_csum() between
+general do_csum() and neon instruction do_csum().
+
+        len(1000cycle)      general(ns)        do_csum_neon(ns)
+          64B:                58060                 59460
+         128B:                82930                 83930
+         256B:               132480                 73570
+         512B:               230100                 86230
+        1024B:               426600                 98200
 
 
-On 12/29/2018 3:08 AM, Stephen Boyd wrote:
-> Quoting Raju P L S S S N (2018-12-26 01:44:43)
->>
->>
->> On 12/22/2018 1:09 PM, Stephen Boyd wrote:
->>>> +If an RSC needs to program next wake-up in the PDC timer, it must specify the
->>>> +binding as child node with the following properties:
->>>> +
->>>> +Properties:
->>>> +- compatible:
->>>> +    Usage: required
->>>> +       Value type: <string>
->>>> +       Definition: must be "qcom,pdc-timer".
->>>> +
->>>> +- reg:
->>>> +    Usage: required
->>>> +       Value type: <prop-encoded-array>
->>>> +       Definition: Specifies the offset of the control register.
->>>> +
->>>>    Example 1:
->>>>    
->>>>    For a TCS whose RSC base address is is 0x179C0000 and is at a DRV id of 2, the
->>>> @@ -103,6 +123,9 @@ TCS-OFFSET: 0xD00
->>>>                         <0x179d0000 0x10000>,
->>>>                         <0x179e0000 0x10000>;
->>>>                   reg-names = "drv-0", "drv-1", "drv-2";
->>>> +               #address-cells = <1>;
->>>> +               #size-cells = <1>;
->>>> +               ranges;
->>>>                   interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
->>>>                                <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
->>>>                                <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
->>>> @@ -112,6 +135,12 @@ TCS-OFFSET: 0xD00
->>>>                                     <SLEEP_TCS   3>,
->>>>                                     <WAKE_TCS    3>,
->>>>                                     <CONTROL_TCS 1>;
->>>> +
->>>> +               pdc_timer@38 {
->>>> +                       compatible = "qcom,pdc-timer";
->>>> +                       reg = <0x38 0x1>,
->>>> +                             <0x40 0x1>;
->>> I don't understand this whole binding. Why can't the pdc timer be
->>> programmed within the rpmh driver? This looks like a node is being added
->>> as a child just to make a platform driver and device match up in the
->>> linux kernel. And that in turn causes a regmap to need to be created?
->>> Sorry, it just looks really bad.
->>
->>
->> There are two RSC devices in SoC one for application processor subsystem
->> & other display subsystem. Both RSC contain registers for PDC timers
->> (one for each subsystem).
-> 
-> When is the timer programmed on the display subsystem's RSC? It's hard
-> to give advice without all the information.
+---
+ arch/arm64/lib/Makefile        |   4 ++
+ arch/arm64/lib/checksum.c      | 140 +++++++++++++++++++++++++++++++++++++++++
+ include/asm-generic/checksum.h |   1 +
+ lib/checksum.c                 |   8 ++-
+ 4 files changed, 152 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/lib/checksum.c
 
-For display subsystem RSC, hardware sleep solver takes care of timer 
-programming for wakeup when the subsystem goes to Power collapse.
+diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
+index 5540a16..ec2fcd3 100644
+--- a/arch/arm64/lib/Makefile
++++ b/arch/arm64/lib/Makefile
+@@ -9,6 +9,10 @@ ifeq ($(CONFIG_KERNEL_MODE_NEON), y)
+ obj-$(CONFIG_XOR_BLOCKS)	+= xor-neon.o
+ CFLAGS_REMOVE_xor-neon.o	+= -mgeneral-regs-only
+ CFLAGS_xor-neon.o		+= -ffreestanding
++
++obj-y    += checksum.o
++CFLAGS_REMOVE_checksum.o	+= -mgeneral-regs-only
++CFLAGS_checksum.o		+= -ffreestanding
+ endif
+ 
+ # Tell the compiler to treat all general purpose registers (with the
+diff --git a/arch/arm64/lib/checksum.c b/arch/arm64/lib/checksum.c
+new file mode 100644
+index 0000000..48f4ead
+--- /dev/null
++++ b/arch/arm64/lib/checksum.c
+@@ -0,0 +1,140 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * arch/arm64/lib/checksum.c
++ *
++ * Authors: Lingyan Huang <huanglingyan2@huawei.com>
++ * Copyright (C) 2018 Hisilicon, Inc. All Rights Reserved.
++ *
++ * Generic C or neon implementation of do_csum operations.
++ * Choose faster neon instructions when NEON is supported.
++ *
++ */
++
++#include <asm/neon.h>
++#include <asm/simd.h>
++#include <asm/checksum.h>
++#include <asm/byteorder.h>
++#include <asm/neon-intrinsics.h>
++
++#define CSUM_NEON_THRESHOLD 128
++#ifdef CONFIG_KERNEL_MODE_NEON
++static inline u32 from64to16(u64 x)
++{
++	/* add up 32-bit and 32-bit for 32+c bit */
++	x = (x & 0xffffffff) + (x >> 32);
++	/* add up carry.. */
++	x = (x & 0xffffffff) + (x >> 32);
++	/* add up 16-bit and 16-bit for 16+c bit */
++	x = ((u32)x & 0xffff) + ((u32)x >> 16);
++	/* add up carry.. */
++	x = ((u32)x & 0xffff) + ((u32)x >> 16);
++	return x;
++}
++
++unsigned int do_csum_neon(const unsigned char *buff, unsigned int len)
++{
++	unsigned int odd, count;
++	uint64_t result = 0;
++	unsigned int count64;
++	uint32x4_t vzero = (uint32x4_t){0, 0, 0, 0};
++
++	register uint32x4_t v0, v1, v2, v3;
++
++	if (unlikely(len <= 0))
++		return result;
++
++	odd = 1 & (unsigned long) buff;
++	if (unlikely(odd)) {
++		result = *buff;
++		len--;
++		buff++;
++	}
++
++	count = len >> 1;
++	if (count) {
++		if (2 & (unsigned long) buff) {
++			result += *(unsigned short *)buff;
++			count--;
++			len -= 2;
++			buff += 2;
++		}
++		count >>= 1;            /* nr of 32-bit words.. */
++		if (count) {
++			if (4 & (unsigned long) buff) {
++				result += *(unsigned int *) buff;
++				count--;
++				len -= 4;
++				buff += 4;
++			}
++			count >>= 1;    /* nr of 64-bit words.. */
++
++			v0 = vzero;
++			v1 = vzero;
++			v2 = vzero;
++			v3 = vzero;
++
++			count64 = count >> 3;  /* compute 64 Byte circle */
++			while (count64) {
++				v0 = vpadalq_u16(v0,
++					vld1q_u16((uint16_t *)buff + 0));
++				v1 = vpadalq_u16(v1,
++					vld1q_u16((uint16_t *)buff + 8));
++				v2 = vpadalq_u16(v2,
++					vld1q_u16((uint16_t *)buff + 16));
++				v3 = vpadalq_u16(v3,
++					vld1q_u16((uint16_t *)buff + 24));
++				buff += 64;
++				count64--;
++			}
++			v0 = vaddq_u32(v0, v1);
++			v2 = vaddq_u32(v2, v3);
++			v0 = vaddq_u32(v0, v2);
++
++			count %= 8;
++			while (count >= 2) { /* compute 16 byte circle */
++				v0 = vpadalq_u16(v0,
++					vld1q_u16((uint16_t *)buff + 0));
++				buff += 16;
++				count -= 2;
++			}
++
++			result += vgetq_lane_u32(v0, 0);
++			result += vgetq_lane_u32(v0, 1);
++			result += vgetq_lane_u32(v0, 2);
++			result += vgetq_lane_u32(v0, 3);
++			if (count & 1) {
++				result += *(unsigned long long *) buff;
++				buff += 8;
++			}
++			if (len & 4) {
++				result += *(unsigned int *) buff;
++				buff += 4;
++			}
++		}
++		if (len & 2) {
++			result += *(unsigned short *) buff;
++			buff += 2;
++		}
++	}
++	if (len & 1)
++		result += *buff;
++	result = from64to16(result);
++	if (odd)
++		result = ((result >> 8) & 0xff) | ((result & 0xff) << 8);
++	return result;
++}
++#endif
++
++
++unsigned int do_csum(const unsigned char *buff, unsigned int len)
++{
++	if ((len >= CSUM_NEON_THRESHOLD) && may_use_simd()) {
++		unsigned int res;
++
++		kernel_neon_begin();
++		res = do_csum_neon(buff, len);
++		kernel_neon_end();
++		return res;
++	} else
++		return do_csum_generic(buff, len);
++}
+diff --git a/include/asm-generic/checksum.h b/include/asm-generic/checksum.h
+index 34785c0..041063c 100644
+--- a/include/asm-generic/checksum.h
++++ b/include/asm-generic/checksum.h
+@@ -33,6 +33,7 @@ extern __wsum csum_partial_copy(const void *src, void *dst, int len, __wsum sum)
+  */
+ extern __wsum csum_partial_copy_from_user(const void __user *src, void *dst,
+ 					int len, __wsum sum, int *csum_err);
++extern unsigned int do_csum_generic(const unsigned char *buff, int len);
+ 
+ #ifndef csum_partial_copy_nocheck
+ #define csum_partial_copy_nocheck(src, dst, len, sum)	\
+diff --git a/lib/checksum.c b/lib/checksum.c
+index d3ec93f..83392db 100644
+--- a/lib/checksum.c
++++ b/lib/checksum.c
+@@ -47,7 +47,7 @@ static inline unsigned short from32to16(unsigned int x)
+ 	return x;
+ }
+ 
+-static unsigned int do_csum(const unsigned char *buff, int len)
++unsigned int do_csum_generic(const unsigned char *buff, int len)
+ {
+ 	int odd;
+ 	unsigned int result = 0;
+@@ -100,6 +100,12 @@ static unsigned int do_csum(const unsigned char *buff, int len)
+ out:
+ 	return result;
+ }
++
++static unsigned int do_csum(const unsigned char *buff, int len)
++{
++	return do_csum_generic(buff, len);
++}
++
+ #endif
+ 
+ #ifndef ip_fast_csum
+-- 
+2.7.4
 
-> 
->> But only for application processor the PDC
->> timer needs to be programmed when application processor enters
->> sleep/suspend. As the driver is common between both RSC devices, this
->> approach is taken. Do you have any other suggestions to distinguish
->> between the two? Perhaps, by additional compatible string?
->>
-> 
-> Maybe compatible? I sort of doubt it though. Do all RSCs have a PDC
-> timer?
-
-Yes. all RSCs have their own PDC timer.
-
-> 
-> I would think that it would make sense for the application processor's
-> RSC timer to be programmed from the broadcast timer mechanism in the
-> kernel so that timers during idle work and suspend turns off the timer
-> appropriately with a shutdown hook. I guess the PDC can't tell you the
-> time though? It looks like a shadow (and limited) version of the ARM
-> architected MMIO timer that we already program for the broadcast timer
-> mechanism. Is that because even the MMIO timer can't wakeup the system
-> in deep idle?  Assuming that's true, it means the ARM MMIO timer can't
-> always be used as the system wide broadcast mechanism because we need to
-> augment it with the PDC timer to get the actual wakeup.
-> 
-
-Yes. this is correct.
-
-> Maybe we should be adding hooks into the broadcast timer mechanism to
-> program this wakeup event hardware in addition to the ARM MMIO timer. Or
-> we should stop using the ARM MMIO timer on these systems and read the
-> system register based physical time in the RSC timer driver and register
-> this 64-bit PDC register as the broadcast timer. So the time reading
-> would be through sysreg and the wakeup programming would be done by
-> writing the PDC timer. The assumption would be that we have access to
-> the physical time registers (which sounds like the assumption we have to
-> make).
-
-There are no physical timer registers available in RSC for this purpose.
-
-> 
-> Do we get an interrupt somewhere from the RSC hardware when the timer
-> fires? Or does that just cause a system wakeup event without any pending
-> irq and then another irq (like the ARM architected timer) just happens
-> to be pending around the same time? If we get an interrupt somehow then
-> I would prefer to drop the ARM MMIO timer and do this hybrid broadcast
-> timer approach.
-
-There is no interrupt for PDC timeout. It just causes system wakeup 
-without a pending irq. ARM MMIO is necessary for irq.
-
-> 
-> How the RSC is used in general by other devices, like display, is not
-> clear to me. We don't have a "wakeup event" framework in the kernel that
-> device drivers like the display driver can grab a reference to and
-> program some system wide wakeup for. That sounds like something new that
-> could be handled entirely in the display driver with direct register
-> writes, or it could be some qcom specific API/framework that eventually
-> calls down into the same RSC driver that knows what offsets to write
-> into in the display RSC's register space, or it could be an entirely
-> generic framework like clk or regulator frameworks that could be used by
-> anything. BTW, are we using the display RSC yet?
-> 
-
-Only display subsystem RSC is programmed along with CPU RSC in Linux. 
-display RSC instance is not present in upstream but it is present in 
-downstream and used for resource communication purpose only.
 
 _______________________________________________
 linux-arm-kernel mailing list
