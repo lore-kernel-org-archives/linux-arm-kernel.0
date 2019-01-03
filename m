@@ -2,109 +2,91 @@ Return-Path: <SRS0=5A9c=PL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,
-	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C0F56C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 18:46:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E91B7C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 18:46:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8F190217F5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 18:46:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B7540217F5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 18:46:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="joLGkz28";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="hTmg+DGu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8F190217F5
-Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="O8FwoPye";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="OywNSw1k";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="DcKWQg92"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B7540217F5
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hIbUyF+JlsGVLSeNNhi3+Gn9oV2Hw1WUMS9TkjHEhLc=; b=joLGkz28VeIgen
-	6ptCC28V+2hZ2k17JQh66iewtQlFPXGOVfgjadbm9ch5+lpfBWvtNr3lLnwsmeWLs+3pDmtAPbADR
-	LeN/4ODEv3YUnqZ+g0PMc12U0LWmplYX7nz5RQV7AzlkPrHAWKDWjMpAjK9YUV6koTz20GAPIwkon
-	oh4oAKkLsBbzwfnThskRlrVF/BVpGdyQeuAHOa8IfCwwZJYl12ff0DU9Lt021ydKaVMhPbCUN+Nam
-	SARAUGbFLZNhQo0aTDfXfXLGvGCxYlkoWfyhRuow+N9G2drE13lGpNESWGhYr4MCztwem5P+DQBIs
-	oScOx32Vs1PZOHE9K/jg==;
+	List-Owner; bh=YqV+E3FvlUrXvrXIgLwHNi8vfB+Bz/RD2Gdy5tsjqd4=; b=O8FwoPyeLoQArV
+	mUyw/AAoF3LXr5XoVtyqhalpTI0f4Wc4JiFU3NvofBajJ75qv0m/GMou8XPHIUDKbmyjJA50L9cAA
+	zWmw4CzjPmqY0VBDT7lJA0EKXtwoJtaHQ5ez1ixg4LJMjyBPu6hdXV3QAtTmY845fW43ueAyiUYMO
+	5mXqmrvTZoa3bYUeCUpW84Z684pp8JQji3OjRNMQIYVXpBfpmEmss6hwKU7FKZVIV2FCgKkuJDTlX
+	kdfBxOfB2C1ZV37s4WfXziprJPaUanA937myeucYx7uTaDO13Cc7n1VGA9gZkx0H2jOA+kcS2RaBS
+	ZKSek1Jrd+ZNoDHCPWow==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gf80X-0007vH-Qe; Thu, 03 Jan 2019 18:46:17 +0000
-Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
+	id 1gf80n-0008G7-Ir; Thu, 03 Jan 2019 18:46:33 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gf7zo-00076A-0Y
- for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 18:45:37 +0000
-Received: by mail-wr1-x442.google.com with SMTP id r10so34464793wrs.10
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 03 Jan 2019 10:45:31 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=loqk+YaJssCyhGzAFNinnRGb50LrNU13L8MGywEfc18=;
- b=hTmg+DGuRIQF2vlqz/Vhl1D+/+mvgPMsjqLDHi0P1rk+WOre7zmTu5qqGxv3MuZCCE
- UmLGhAKFZbzdsd4JMY8pdmgI4HYcHr4YnHntxG+Gt//m4C9Qndntnz8PKfjmfZeLTDpd
- K0fspUq1NKHV5A284NV0qPwtJ8DdvroBOj8kdD2qczrMK2lmGiPk5KVZxusGtbJdfqwR
- UUZxn2Qs6thHtP1o2ZG8BwsnsoATqNMckkznlYwnbdZQ8C3QDsxrTRM76uXF0vMqJHwb
- NV6DgqPzaJ4SZY9nrBP+8lLvzwTIs4vFYaq5Eyd/Nw+pUV8pY0KTWdZ5qFjegRMm8Ha4
- w6xQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=loqk+YaJssCyhGzAFNinnRGb50LrNU13L8MGywEfc18=;
- b=h7G50NRynDMPVPZFqhmDheaw8he1e+Zu25tZNcMmcD7fYtMciYc+jfWm6uvjn6vhD2
- OL89P1BV4SjBNZqyUxHUjZVWW5kuTx6HUN5lUPw3WrHIlHnE/HBvG3jJ4kcrxNL5ydup
- O9gXzrozgGWIpspaQNtHX22Auwmbms+AqjHyIIcoPgyalRR3d2vtpB/jgFjKxyYYSBag
- QJlmN6+DELZpcp9DL5zjt0riGFUDdhUNVaJ9RTBvRiKG1yEr90Q9QkZEXwsyW73kFtCp
- FdxJPzNN8It5WFCBsc9MsWmPBNw7X+UWXW63wN8qZ81ZEXDywWuG/hfrXoEjNj7QIAUS
- kspw==
-X-Gm-Message-State: AJcUukeVGPcFhzCSuvq2nifoZ1z4DEtNhHsc48UDGZoX1wTmCDqKGFEl
- jdHBHgxHsxZxES4et5106QqmvA==
-X-Google-Smtp-Source: ALg8bN4jM3MVHQyzwSzizLWeommEZcTAUOfqxGGPUDgiXkfn7dghhnI866UT0Yj3Z9dcwdbzSDIU7w==
-X-Received: by 2002:adf:e34b:: with SMTP id n11mr39771740wrj.91.1546541130566; 
- Thu, 03 Jan 2019 10:45:30 -0800 (PST)
-Received: from andreyknvl0.muc.corp.google.com
- ([2a00:79e0:15:13:8ce:d7fa:9f4c:492])
- by smtp.gmail.com with ESMTPSA id t12sm52236944wrr.65.2019.01.03.10.45.28
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 03 Jan 2019 10:45:29 -0800 (PST)
-From: Andrey Konovalov <andreyknvl@google.com>
-To: Andrey Ryabinin <aryabinin@virtuozzo.com>,
- Alexander Potapenko <glider@google.com>,
- Dmitry Vyukov <dvyukov@google.com>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, Christoph Lameter <cl@linux.com>,
- Andrew Morton <akpm@linux-foundation.org>,
- Mark Rutland <mark.rutland@arm.com>,
- Nick Desaulniers <ndesaulniers@google.com>,
- Marc Zyngier <marc.zyngier@arm.com>, Dave Martin <dave.martin@arm.com>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- "Eric W . Biederman" <ebiederm@xmission.com>,
- Ingo Molnar <mingo@kernel.org>, Paul Lawrence <paullawrence@google.com>,
- Geert Uytterhoeven <geert@linux-m68k.org>, Arnd Bergmann <arnd@arndb.de>,
- "Kirill A . Shutemov" <kirill.shutemov@linux.intel.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Kate Stewart <kstewart@linuxfoundation.org>,
- Mike Rapoport <rppt@linux.vnet.ibm.com>,
- Vincenzo Frascino <vincenzo.frascino@arm.com>, kasan-dev@googlegroups.com,
- linux-doc@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-sparse@vger.kernel.org,
- linux-mm@kvack.org, linux-kbuild@vger.kernel.org
-Subject: [PATCH v3 3/3] kasan: fix krealloc handling for tag-based mode
-Date: Thu,  3 Jan 2019 19:45:21 +0100
-Message-Id: <bb2a71d17ed072bcc528cbee46fcbd71a6da3be4.1546540962.git.andreyknvl@google.com>
-X-Mailer: git-send-email 2.20.1.415.g653613c723-goog
-In-Reply-To: <cover.1546540962.git.andreyknvl@google.com>
-References: <cover.1546540962.git.andreyknvl@google.com>
+ id 1gf80V-0007sx-3r; Thu, 03 Jan 2019 18:46:15 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=Content-Type:Cc:To:Subject:Message-ID:
+ Date:From:In-Reply-To:References:MIME-Version:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=HpLaT31lx0Chd9R3UN2zzE7rCUt3h5YDJRDI4MSKi90=; b=OywNSw1knzaJkcqMEZnPT3Lys
+ sKWoSEKIo8s+jyvB3XCrUCAvUIIzfDJX4lak8SF3e2SdRewbyP+76e648XIhmTQPC83y3GluNVzyb
+ KRs4e2X9TBrnLEqTmD50BnuYL9jLU/Z8Gp51+0zrsi3M3YOPt/GHK40eNdZEfPUCLc0SM7Gn7/q/F
+ RgTtWCLrYBE69iWkLV50E0qyARGKr38qsKwaiyOzpZsgXiYTU9e1UN4syKLATK/+dKNTLwTpPD5+g
+ BjflEqxg9KRugBRCDBNqoaTDIcAKjXZ3VpMctCe7pghe4ku4eA7xldZckrkgUe/cYQZFZjmQ0IFEO
+ iIajgJO1A==;
+Received: from mail.kernel.org ([198.145.29.99])
+ by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gf80Q-00019b-CS; Thu, 03 Jan 2019 18:46:12 +0000
+Received: from mail-qk1-f170.google.com (mail-qk1-f170.google.com
+ [209.85.222.170])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 744FC21871;
+ Thu,  3 Jan 2019 18:46:07 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1546541167;
+ bh=feEzb5DmN/tcbVN7HizVbAa2zKmf011KYyDHrWocAPY=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=DcKWQg92TvgrrnqKTYo9AlDequCxuKMlLuLItgL7ixQ/FLd62HxyfdTVOnW13nQwZ
+ dgyL8VI0WdZSFLQcKoU8guNMxWaTzbavFI/RCTMbaI9WeQIJ7U4z5Y+nTDrQ4yyZXE
+ 5aQwtdpBdvAEqqOVRTtvrUPD2u2NFrMleyFbYcKs=
+Received: by mail-qk1-f170.google.com with SMTP id a1so20220097qkc.5;
+ Thu, 03 Jan 2019 10:46:07 -0800 (PST)
+X-Gm-Message-State: AJcUukc34i5WpgbSbkDdmWGvo7oEHHp9g3VzmP+rPduOWb9a3KF03OG7
+ Z5gzU5Jvdd9bN8Rk7lxdzQ1KZ9BThIYBYKpdqQ==
+X-Google-Smtp-Source: ALg8bN55c9+ff84kzOyNUJ4aDSEn/x7T5GqMB7sVKtPRLc//csJ/sfkg77+ctfOHiIjv0vOjYNUIy5dwIWvxbvA4uvA=
+X-Received: by 2002:ae9:ef14:: with SMTP id d20mr45626127qkg.147.1546541166685; 
+ Thu, 03 Jan 2019 10:46:06 -0800 (PST)
 MIME-Version: 1.0
+References: <1546438198-1677-1-git-send-email-henryc.chen@mediatek.com>
+ <1546438198-1677-3-git-send-email-henryc.chen@mediatek.com>
+In-Reply-To: <1546438198-1677-3-git-send-email-henryc.chen@mediatek.com>
+From: Rob Herring <robh+dt@kernel.org>
+Date: Thu, 3 Jan 2019 12:45:54 -0600
+X-Gmail-Original-Message-ID: <CAL_JsqJXFAEdSaexA3p62u8f3RsVA1vfNsOLu4aetB-iLb9qFg@mail.gmail.com>
+Message-ID: <CAL_JsqJXFAEdSaexA3p62u8f3RsVA1vfNsOLu4aetB-iLb9qFg@mail.gmail.com>
+Subject: Re: [RFC RESEND PATCH 2/7] dt-bindings: soc: Add opp table on scpsys
+ bindings
+To: Henry Chen <henryc.chen@mediatek.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190103_104532_467785_9F692B8C 
-X-CRM114-Status: GOOD (  22.01  )
+X-CRM114-CacheID: sfid-20190103_134610_537369_3159ADE6 
+X-CRM114-Status: GOOD (  19.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -116,156 +98,66 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Vishwath Mohan <vishwath@google.com>,
- Chintan Pandya <cpandya@codeaurora.org>, Jacob Bramley <Jacob.Bramley@arm.com>,
- Jann Horn <jannh@google.com>, Ruben Ayrapetyan <Ruben.Ayrapetyan@arm.com>,
- Andrey Konovalov <andreyknvl@google.com>, Lee Smith <Lee.Smith@arm.com>,
- Kostya Serebryany <kcc@google.com>, Mark Brand <markbrand@google.com>,
- Ramana Radhakrishnan <Ramana.Radhakrishnan@arm.com>,
- Evgeniy Stepanov <eugenis@google.com>
+Cc: Mark Rutland <mark.rutland@arm.com>, James Liao <jamesjj.liao@mediatek.com>,
+ Ulf Hansson <ulf.hansson@linaro.org>, Kees Cook <keescook@chromium.org>,
+ Weiyi Lu <weiyi.lu@mediatek.com>,
+ "open list:THERMAL" <linux-pm@vger.kernel.org>,
+ Stephen Boyd <sboyd@kernel.org>, Viresh Kumar <vireshk@kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Fan Chen <fan.chen@mediatek.com>, devicetree@vger.kernel.org,
+ linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Right now tag-based KASAN can retag the memory that is reallocated via
-krealloc and return a differently tagged pointer even if the same slab
-object gets used and no reallocated technically happens.
+On Wed, Jan 2, 2019 at 8:10 AM Henry Chen <henryc.chen@mediatek.com> wrote:
+>
+> Add opp table on scpsys dt-bindings for Mediatek SoC.
+>
+> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+> ---
+>  Documentation/devicetree/bindings/opp/mtk-opp.txt  | 24 +++++++++++++
+>  .../devicetree/bindings/soc/mediatek/scpsys.txt    | 42 ++++++++++++++++++++++
+>  2 files changed, 66 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/opp/mtk-opp.txt
+>
+> diff --git a/Documentation/devicetree/bindings/opp/mtk-opp.txt b/Documentation/devicetree/bindings/opp/mtk-opp.txt
+> new file mode 100644
+> index 0000000..036be1c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/opp/mtk-opp.txt
+> @@ -0,0 +1,24 @@
+> +Mediatek OPP bindings to descibe OPP nodes with level values
+> +
+> +OPP tables for devices on Mediatek platforms require an additional
+> +platform specific level value to be specified.
+> +This value is passed on to the mediatek Power Management Unit by the
+> +CPU, which then takes the necessary actions to set a voltage rail
+> +to an appropriate voltage based on the value passed.
+> +
+> +The bindings are based on top of the operating-points-v2 bindings
+> +described in Documentation/devicetree/bindings/opp/opp.txt
+> +Additional properties are described below.
+> +
+> +* OPP Table Node
+> +
+> +Required properties:
+> +- compatible: Allow OPPs to express their compatibility. It should be:
+> +  "operating-points-v2-mtk-level"
+> +
+> +* OPP Node
+> +
+> +Required properties:
+> +- mtk,level: On Mediatek platforms an OPP node can describe a positive value
+> +representing a level that's communicated with a our power management hardware
+> +which then translates it into a certain voltage on a voltage rail.
 
-There are a few issues with this approach. One is that krealloc callers
-can't rely on comparing the return value with the passed argument to
-check whether reallocation happened. Another is that if a caller knows
-that no reallocation happened, that it can access object memory through
-the old pointer, which leads to false positives. Look at nf_ct_ext_add()
-to see an example.
+Work with the Qcom folks and create a common level property.
 
-Fix this by keeping the same tag if the memory don't actually gets
-reallocated during krealloc.
-
-Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
----
- mm/kasan/common.c | 63 ++++++++++++++++++++++++++++++++---------------
- 1 file changed, 43 insertions(+), 20 deletions(-)
-
-diff --git a/mm/kasan/common.c b/mm/kasan/common.c
-index 44390392d4c9..73c9cbfdedf4 100644
---- a/mm/kasan/common.c
-+++ b/mm/kasan/common.c
-@@ -347,28 +347,43 @@ void kasan_poison_object_data(struct kmem_cache *cache, void *object)
- }
- 
- /*
-- * Since it's desirable to only call object contructors once during slab
-- * allocation, we preassign tags to all such objects. Also preassign tags for
-- * SLAB_TYPESAFE_BY_RCU slabs to avoid use-after-free reports.
-- * For SLAB allocator we can't preassign tags randomly since the freelist is
-- * stored as an array of indexes instead of a linked list. Assign tags based
-- * on objects indexes, so that objects that are next to each other get
-- * different tags.
-- * After a tag is assigned, the object always gets allocated with the same tag.
-- * The reason is that we can't change tags for objects with constructors on
-- * reallocation (even for non-SLAB_TYPESAFE_BY_RCU), because the constructor
-- * code can save the pointer to the object somewhere (e.g. in the object
-- * itself). Then if we retag it, the old saved pointer will become invalid.
-+ * This function assigns a tag to an object considering the following:
-+ * 1. A cache might have a constructor, which might save a pointer to a slab
-+ *    object somewhere (e.g. in the object itself). We preassign a tag for
-+ *    each object in caches with constructors during slab creation and reuse
-+ *    the same tag each time a particular object is allocated.
-+ * 2. A cache might be SLAB_TYPESAFE_BY_RCU, which means objects can be
-+ *    accessed after being freed. We preassign tags for objects in these
-+ *    caches as well.
-+ * 3. For SLAB allocator we can't preassign tags randomly since the freelist
-+ *    is stored as an array of indexes instead of a linked list. Assign tags
-+ *    based on objects indexes, so that objects that are next to each other
-+ *    get different tags.
-  */
--static u8 assign_tag(struct kmem_cache *cache, const void *object, bool new)
-+static u8 assign_tag(struct kmem_cache *cache, const void *object,
-+			bool init, bool krealloc)
- {
-+	/* Reuse the same tag for krealloc'ed objects. */
-+	if (krealloc)
-+		return get_tag(object);
-+
-+	/*
-+	 * If the cache neither has a constructor nor has SLAB_TYPESAFE_BY_RCU
-+	 * set, assign a tag when the object is being allocated (init == false).
-+	 */
- 	if (!cache->ctor && !(cache->flags & SLAB_TYPESAFE_BY_RCU))
--		return new ? KASAN_TAG_KERNEL : random_tag();
-+		return init ? KASAN_TAG_KERNEL : random_tag();
- 
-+	/* For caches that either have a constructor or SLAB_TYPESAFE_BY_RCU: */
- #ifdef CONFIG_SLAB
-+	/* For SLAB assign tags based on the object index in the freelist. */
- 	return (u8)obj_to_index(cache, virt_to_page(object), (void *)object);
- #else
--	return new ? random_tag() : get_tag(object);
-+	/*
-+	 * For SLUB assign a random tag during slab creation, otherwise reuse
-+	 * the already assigned tag.
-+	 */
-+	return init ? random_tag() : get_tag(object);
- #endif
- }
- 
-@@ -384,7 +399,8 @@ void * __must_check kasan_init_slab_obj(struct kmem_cache *cache,
- 	__memset(alloc_info, 0, sizeof(*alloc_info));
- 
- 	if (IS_ENABLED(CONFIG_KASAN_SW_TAGS))
--		object = set_tag(object, assign_tag(cache, object, true));
-+		object = set_tag(object,
-+				assign_tag(cache, object, true, false));
- 
- 	return (void *)object;
- }
-@@ -450,8 +466,8 @@ bool kasan_slab_free(struct kmem_cache *cache, void *object, unsigned long ip)
- 	return __kasan_slab_free(cache, object, ip, true);
- }
- 
--void * __must_check kasan_kmalloc(struct kmem_cache *cache, const void *object,
--					size_t size, gfp_t flags)
-+static void *__kasan_kmalloc(struct kmem_cache *cache, const void *object,
-+				size_t size, gfp_t flags, bool krealloc)
- {
- 	unsigned long redzone_start;
- 	unsigned long redzone_end;
-@@ -469,7 +485,7 @@ void * __must_check kasan_kmalloc(struct kmem_cache *cache, const void *object,
- 				KASAN_SHADOW_SCALE_SIZE);
- 
- 	if (IS_ENABLED(CONFIG_KASAN_SW_TAGS))
--		tag = assign_tag(cache, object, false);
-+		tag = assign_tag(cache, object, false, krealloc);
- 
- 	/* Tag is ignored in set_tag without CONFIG_KASAN_SW_TAGS */
- 	kasan_unpoison_shadow(set_tag(object, tag), size);
-@@ -481,6 +497,12 @@ void * __must_check kasan_kmalloc(struct kmem_cache *cache, const void *object,
- 
- 	return set_tag(object, tag);
- }
-+
-+void * __must_check kasan_kmalloc(struct kmem_cache *cache, const void *object,
-+				size_t size, gfp_t flags)
-+{
-+	return __kasan_kmalloc(cache, object, size, flags, false);
-+}
- EXPORT_SYMBOL(kasan_kmalloc);
- 
- void * __must_check kasan_kmalloc_large(const void *ptr, size_t size,
-@@ -520,7 +542,8 @@ void * __must_check kasan_krealloc(const void *object, size_t size, gfp_t flags)
- 	if (unlikely(!PageSlab(page)))
- 		return kasan_kmalloc_large(object, size, flags);
- 	else
--		return kasan_kmalloc(page->slab_cache, object, size, flags);
-+		return __kasan_kmalloc(page->slab_cache, object, size,
-+						flags, true);
- }
- 
- void kasan_poison_kfree(void *ptr, unsigned long ip)
--- 
-2.20.1.415.g653613c723-goog
-
+Rob
 
 _______________________________________________
 linux-arm-kernel mailing list
