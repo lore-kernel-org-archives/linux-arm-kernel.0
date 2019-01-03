@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B4275C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 19:19:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 14CFFC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 19:20:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7608E21871
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 19:19:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C6B9C20815
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 19:20:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rXm/YBs2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7608E21871
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="D8aGbyEv"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C6B9C20815
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=mellanox.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,46 +26,46 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=/XWaRvqhxnnMWTAW8FTv0yTV23Jxos9ClkjetaDxPAw=; b=rXm/YBs2giVsMw/pCVlz2bgvvO
-	H2+XXT3oQD7caHnsyobh2dIf8m9Zx6/Q5gURlADx34IlbGaFXjyBVaCj26YnCjfp/ty29spa0K8l8
-	w7y46huC72Q9HtYYN3uqCk1kGkGVFD00tnxS21pSOx4duNmeVRHgGiGbqwTt3Jt+s0QMlsuPOQ43f
-	rR/mVYHj7fTcecJvJENeEMAMyx6ieocqQIeAv+NUMjzu6jbKvW7SvkrQIPQ/4X5LghafIUuZ6X1j9
-	cBW1J6NbaLulnsDMSDUQX7uZrP/5woszwmDpp++VjeWhlzOMPMvbP5L9RNH5cj0jWZWHOQ0CQGREr
-	E4UxNBuw==;
+	bh=T0yhxjdpeliNZmw65IrWTtWqwqhqUYiCqnyJF63RySo=; b=D8aGbyEvvHrWk6MvQnfweXHXQB
+	lCmux2op9yzSMT9e0qejSX/72cLsQqFY+nm7cJiuQJJ4UVVFogxNZynl4M+jqcMnd1xKb8AmFbKgm
+	YZZjydO0rwmu2QvK9ql2EhFA7SZHk+P5Tz/dVratLPfP+T4orX+J6QLf9PUQFX7ORVlxc67gGDrO3
+	/HGah8FbSrwib8sl2t5szFPlgUrWOveUfkUtGAubpRPoNa7g6kYjrFGngGg7Wq0TSeUFjtij1eASM
+	WhQzevcgB8Mxyf7TamscBzwGGgh6TZ9cziEqo5qKPwuq8FBdI5XV+9vw7KN+IMa7EcXKO0HK3knVd
+	iXL7YJ8g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gf8Ww-0003an-CI; Thu, 03 Jan 2019 19:19:46 +0000
+	id 1gf8XD-0003oB-NJ; Thu, 03 Jan 2019 19:20:03 +0000
 Received: from mail-il-dmz.mellanox.com ([193.47.165.129] helo=mellanox.co.il)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gf8VS-0002Au-LB
- for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 19:18:58 +0000
+ id 1gf8VX-0002Gr-Ln
+ for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 19:19:02 +0000
 Received: from Internal Mail-Server by MTLPINE1 (envelope-from
  lsun@mellanox.com)
- with ESMTPS (AES256-SHA encrypted); 3 Jan 2019 21:18:08 +0200
+ with ESMTPS (AES256-SHA encrypted); 3 Jan 2019 21:18:16 +0200
 Received: from bu-lab53.mtbu.labs.mlnx (bu-lab53.mtbu.labs.mlnx [10.15.8.107])
- by labmailer.mlnx (8.13.8/8.13.8) with ESMTP id x03JI7sr027611;
- Thu, 3 Jan 2019 21:18:08 +0200
+ by labmailer.mlnx (8.13.8/8.13.8) with ESMTP id x03JIFl9027675;
+ Thu, 3 Jan 2019 21:18:16 +0200
 Received: from bu-lab53.mtbu.labs.mlnx (localhost [127.0.0.1])
- by bu-lab53.mtbu.labs.mlnx (8.14.7/8.14.7) with ESMTP id x03JI6Ye156103;
- Thu, 3 Jan 2019 14:18:06 -0500
+ by bu-lab53.mtbu.labs.mlnx (8.14.7/8.14.7) with ESMTP id x03JIFQd156115;
+ Thu, 3 Jan 2019 14:18:15 -0500
 Received: (from lsun@localhost)
- by bu-lab53.mtbu.labs.mlnx (8.14.7/8.14.7/Submit) id x03JI6Su156102;
- Thu, 3 Jan 2019 14:18:06 -0500
+ by bu-lab53.mtbu.labs.mlnx (8.14.7/8.14.7/Submit) id x03JIEQ6156114;
+ Thu, 3 Jan 2019 14:18:14 -0500
 From: Liming Sun <lsun@mellanox.com>
 To: Olof Johansson <olof@lixom.net>, Arnd Bergmann <arnd@arndb.de>,
  David Woods <dwoods@mellanox.com>, Robin Murphy <robin.murphy@arm.com>,
  arm-soc <arm@kernel.org>
-Subject: [PATCH v7 6/9] soc: mellanox: host: Add networking support over Rshim
-Date: Thu,  3 Jan 2019 14:17:19 -0500
-Message-Id: <1546543042-156044-6-git-send-email-lsun@mellanox.com>
+Subject: [PATCH v7 8/9] soc: mellanox: host: Add the Rshim PCIe backend driver
+Date: Thu,  3 Jan 2019 14:17:21 -0500
+Message-Id: <1546543042-156044-8-git-send-email-lsun@mellanox.com>
 X-Mailer: git-send-email 1.8.3.1
 In-Reply-To: <1546543042-156044-1-git-send-email-lsun@mellanox.com>
 References: <1546543042-156044-1-git-send-email-lsun@mellanox.com>
 In-Reply-To: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
 References: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190103_111818_509946_849E7FE7 
-X-CRM114-Status: GOOD (  22.45  )
+X-CRM114-CacheID: sfid-20190103_111822_819098_08FDEABB 
+X-CRM114-Status: GOOD (  24.03  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,866 +85,509 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This commit adds networking support over the Rshim interface of
-the BlueField SoC. It communicates with the target (ARM) side via
-the Rshim TmFifo.
+This commit adds the PCIe backend driver to access the Rshim
+interface on the BlueField SoC, such as on the Smart NIC.
 
 Reviewed-by: David Woods <dwoods@mellanox.com>
 Signed-off-by: Liming Sun <lsun@mellanox.com>
 ---
- drivers/soc/mellanox/host/Makefile    |   2 +-
- drivers/soc/mellanox/host/rshim_net.c | 834 ++++++++++++++++++++++++++++++++++
- 2 files changed, 835 insertions(+), 1 deletion(-)
- create mode 100644 drivers/soc/mellanox/host/rshim_net.c
+ drivers/soc/mellanox/host/Makefile     |   2 +-
+ drivers/soc/mellanox/host/rshim_pcie.c | 478 +++++++++++++++++++++++++++++++++
+ 2 files changed, 479 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/soc/mellanox/host/rshim_pcie.c
 
 diff --git a/drivers/soc/mellanox/host/Makefile b/drivers/soc/mellanox/host/Makefile
-index e47842f..1a282b9 100644
+index c6703cd..fa4b21c 100644
 --- a/drivers/soc/mellanox/host/Makefile
 +++ b/drivers/soc/mellanox/host/Makefile
 @@ -1,2 +1,2 @@
--obj-m := rshim.o
-+obj-m := rshim.o rshim_net.o
+-obj-m := rshim.o rshim_net.o rshim_usb.o
++obj-m := rshim.o rshim_net.o rshim_usb.o rshim_pcie.o
  
-diff --git a/drivers/soc/mellanox/host/rshim_net.c b/drivers/soc/mellanox/host/rshim_net.c
+diff --git a/drivers/soc/mellanox/host/rshim_pcie.c b/drivers/soc/mellanox/host/rshim_pcie.c
 new file mode 100644
-index 0000000..6d10497
+index 0000000..3fa7bd9
 --- /dev/null
-+++ b/drivers/soc/mellanox/host/rshim_net.c
-@@ -0,0 +1,834 @@
++++ b/drivers/soc/mellanox/host/rshim_pcie.c
+@@ -0,0 +1,478 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
-+ * rshim_net.c - Mellanox RShim network host driver
++ * rshim_pcie.c - Mellanox RShim PCIe host driver
 + *
-+ * Copyright (c) 2017, Mellanox Technologies. All rights reserved.
++ * Copyright 2017 Mellanox Technologies. All Rights Reserved.
 + *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version
-+ * 2 of the License, or (at your option) any later version.
++ *   This program is free software; you can redistribute it and/or
++ *   modify it under the terms of the GNU General Public License
++ *   as published by the Free Software Foundation, version 2.
++ *
++ *   This program is distributed in the hope that it will be useful, but
++ *   WITHOUT ANY WARRANTY; without even the implied warranty of
++ *   MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, GOOD TITLE or
++ *   NON INFRINGEMENT.  See the GNU General Public License for
++ *   more details.
 + */
 +
-+#include <linux/delay.h>
-+#include <linux/device.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/math64.h>
-+#include <linux/module.h>
-+#include <linux/moduleparam.h>
-+#include <linux/platform_device.h>
-+#include <linux/resource.h>
-+#include <linux/slab.h>
-+#include <linux/mutex.h>
-+#include <linux/types.h>
-+#include <linux/virtio.h>
-+#include <linux/virtio_config.h>
-+#include <linux/virtio_ids.h>
-+#include <linux/virtio_ring.h>
-+#include <linux/virtio_net.h>
-+#include <linux/cache.h>
-+#include <linux/interrupt.h>
++#include <linux/pci.h>
 +#include <linux/version.h>
-+#include <asm/byteorder.h>
++#include <linux/sched.h>
++#include <linux/sched/signal.h>
 +
 +#include "rshim.h"
 +
-+/* Vring size. */
-+#define RSH_NET_VRING_SIZE			1024
++/* Disable RSim access. */
++static int rshim_disable;
++module_param(rshim_disable, int, 0444);
++MODULE_PARM_DESC(rshim_disable, "Disable rshim (obsoleted)");
++
++/** Our Vendor/Device IDs. */
++#define TILERA_VENDOR_ID					0x15b3
++#define BLUEFIELD_DEVICE_ID					0xc2d2
++
++/** The offset in BAR2 of the RShim region. */
++#define PCI_RSHIM_WINDOW_OFFSET					0x0
++
++/** The size the RShim region. */
++#define PCI_RSHIM_WINDOW_SIZE					0x100000
++
++/* Maximum number of devices this driver can handle */
++#define MAX_DEV_COUNT						16
++
++struct rshim_pcie {
++	/* RShim backend structure. */
++	struct rshim_backend	bd;
++
++	struct pci_dev *pci_dev;
++
++	/* RShim BAR size. */
++	uint64_t bar0_size;
++
++	/* Address of the RShim registers. */
++	u8 __iomem *rshim_regs;
++
++	/* Keep track of number of 8-byte word writes */
++	u8 write_count;
++};
++
++static struct rshim_pcie *instances[MAX_DEV_COUNT];
++
++#ifndef CONFIG_64BIT
++/* Wait until the RSH_BYTE_ACC_CTL pending bit is cleared */
++static int rshim_byte_acc_pending_wait(struct rshim_pcie *dev, int chan)
++{
++	u32 read_value;
++
++	do {
++		read_value = readl(dev->rshim_regs +
++			(RSH_BYTE_ACC_CTL | (chan << 16)));
++
++		if (signal_pending(current))
++			return -EINTR;
++
++	} while (read_value & RSH_BYTE_ACC_PENDING);
++
++	return 0;
++}
 +
 +/*
-+ * Keepalive time in seconds. If configured, the link is considered down
-+ * if no Rx activity within the configured time.
++ * RShim read/write methods for 32-bit systems
++ * Mechanism to do an 8-byte access to the Rshim using
++ * two 4-byte accesses through the Rshim Byte Access Widget.
 + */
-+static int rshim_net_keepalive;
-+module_param(rshim_net_keepalive, int, 0644);
-+MODULE_PARM_DESC(rshim_net_keepalive,
-+		 "Keepalive time in seconds.");
-+
-+/* Use a timer for house-keeping. */
-+static int rshim_net_timer_interval = HZ / 10;
-+
-+/* Flag to drain the current pending packet. */
-+static bool rshim_net_draining_mode;
-+
-+/* Spin lock. */
-+static DEFINE_SPINLOCK(rshim_net_spin_lock);
-+
-+/* Virtio ring size. */
-+static int rshim_net_vring_size = RSH_NET_VRING_SIZE;
-+module_param(rshim_net_vring_size, int, 0444);
-+MODULE_PARM_DESC(rshim_net_vring_size, "Size of the vring.");
-+
-+/* Supported virtio-net features. */
-+#define RSH_NET_FEATURES		((1 << VIRTIO_NET_F_MTU) | \
-+					 (1 << VIRTIO_NET_F_MAC) | \
-+					 (1 << VIRTIO_NET_F_STATUS))
-+
-+/* Default MAC. */
-+static u8 rshim_net_default_mac[6] = {0x00, 0x1A, 0xCA, 0xFF, 0xFF, 0x02};
-+module_param_array(rshim_net_default_mac, byte, NULL, 0);
-+MODULE_PARM_DESC(rshim_net_default_mac, "default MAC address");
-+
-+#define VIRTIO_GET_FEATURES_RETURN_TYPE		u64
-+#define VIRTIO_FINALIZE_FEATURES_RETURN_TYPE	int
-+#define VIRTIO_NOTIFY_RETURN_TYPE	bool
-+#define VIRTIO_NOTIFY_RETURN		{ return true; }
-+
-+/* MTU setting of the virtio-net interface. */
-+#define RSH_NET_MTU			1500
-+
-+struct rshim_net;
-+static void rshim_net_virtio_rxtx(struct virtqueue *vq, bool is_rx);
-+static void rshim_net_update_activity(struct rshim_net *net, bool activity);
-+
-+/* Structure to maintain the ring state. */
-+struct rshim_net_vring {
-+	void *va;			/* virtual address */
-+	struct virtqueue *vq;		/* virtqueue pointer */
-+	struct vring_desc *desc;	/* current desc */
-+	struct vring_desc *desc_head;	/* current desc head */
-+	int cur_len;			/* processed len in current desc */
-+	int rem_len;			/* remaining length to be processed */
-+	int size;			/* vring size */
-+	int align;			/* vring alignment */
-+	int id;				/* vring id */
-+	u32 pkt_len;			/* packet total length */
-+	u16 next_avail;			/* next avail desc id */
-+	union rshim_tmfifo_msg_hdr hdr;	/* header of the current packet */
-+	struct rshim_net *net;		/* pointer back to the rshim_net */
-+};
-+
-+/* Event types. */
-+enum {
-+	RSH_NET_RX_EVENT,		/* Rx event */
-+	RSH_NET_TX_EVENT		/* Tx event */
-+};
-+
-+/* Ring types (Rx & Tx). */
-+enum {
-+	RSH_NET_VRING_RX,		/* Rx ring */
-+	RSH_NET_VRING_TX,		/* Tx ring */
-+	RSH_NET_VRING_NUM
-+};
-+
-+/* RShim net device structure */
-+struct rshim_net {
-+	struct virtio_device vdev;	/* virtual device */
-+	struct mutex lock;
-+	struct rshim_backend *bd;		/* backend */
-+	u8 status;
-+	u16 virtio_registered : 1;
-+	u64 features;
-+	int tx_fifo_size;		/* number of entries of the Tx FIFO */
-+	int rx_fifo_size;		/* number of entries of the Rx FIFO */
-+	unsigned long pend_events;	/* pending bits for deferred process */
-+	struct work_struct work;	/* work struct for deferred process */
-+	struct timer_list timer;	/* keepalive timer */
-+	unsigned long rx_jiffies;	/* last Rx jiffies */
-+	struct rshim_net_vring vrings[RSH_NET_VRING_NUM];
-+	struct virtio_net_config config;	/* virtio config space */
-+};
-+
-+/* Allocate vrings for the net device. */
-+static int rshim_net_alloc_vrings(struct rshim_net *net)
++static int rshim_byte_acc_read(struct rshim_pcie *dev, int chan, int addr,
++				u64 *result)
 +{
-+	void *va;
-+	int i, size;
-+	struct rshim_net_vring *vring;
-+	struct virtio_device *vdev = &net->vdev;
++	int retval;
++	u32 read_value;
++	u64 read_result;
 +
-+	for (i = 0; i < ARRAY_SIZE(net->vrings); i++) {
-+		vring = &net->vrings[i];
-+		vring->net = net;
-+		vring->size = rshim_net_vring_size;
-+		vring->align = SMP_CACHE_BYTES;
-+		vring->id = i;
++	/* Wait for RSH_BYTE_ACC_CTL pending bit to be cleared */
++	retval = rshim_byte_acc_pending_wait(dev, chan);
++	if (retval)
++		return retval;
 +
-+		size = PAGE_ALIGN(vring_size(vring->size, vring->align));
-+		va = kzalloc(size, GFP_KERNEL);
-+		if (!va) {
-+			dev_err(vdev->dev.parent, "vring allocation failed\n");
-+			return -EINVAL;
-+		}
++	/* Write control bits to RSH_BYTE_ACC_CTL */
++	writel(RSH_BYTE_ACC_SIZE, dev->rshim_regs +
++		(RSH_BYTE_ACC_CTL | (chan << 16)));
 +
-+		vring->va = va;
-+	}
++	/* Write target address to RSH_BYTE_ACC_ADDR */
++	writel(addr, dev->rshim_regs + (RSH_BYTE_ACC_ADDR | (chan << 16)));
++
++	/* Write trigger bits to perform read */
++	writel(RSH_BYTE_ACC_READ_TRIGGER, dev->rshim_regs +
++		(RSH_BYTE_ACC_CTL | (chan << 16)));
++
++	/* Wait for RSH_BYTE_ACC_CTL pending bit to be cleared */
++	retval = rshim_byte_acc_pending_wait(dev, chan);
++	if (retval)
++		return retval;
++
++	/* Read RSH_BYTE_ACC_RDAT to read lower 32-bits of data */
++	read_value = readl(dev->rshim_regs +
++		(RSH_BYTE_ACC_RDAT | (chan << 16)));
++
++	read_result = (u64)read_value << 32;
++
++	/* Wait for RSH_BYTE_ACC_CTL pending bit to be cleared */
++	retval = rshim_byte_acc_pending_wait(dev, chan);
++	if (retval)
++		return retval;
++
++	/* Read RSH_BYTE_ACC_RDAT to read upper 32-bits of data */
++	read_value = readl(dev->rshim_regs +
++		(RSH_BYTE_ACC_RDAT | (chan << 16)));
++
++	read_result |= (u64)read_value;
++	*result = be64_to_cpu(read_result);
 +
 +	return 0;
 +}
 +
-+/* Free vrings of the net device. */
-+static void rshim_net_free_vrings(struct rshim_net *net)
++static int rshim_byte_acc_write(struct rshim_pcie *dev, int chan, int addr,
++				u64 value)
 +{
-+	int i, size;
-+	struct rshim_net_vring *vring;
++	int retval;
 +
-+	for (i = 0; i < ARRAY_SIZE(net->vrings); i++) {
-+		vring = &net->vrings[i];
-+		size = PAGE_ALIGN(vring_size(vring->size, vring->align));
-+		if (vring->va) {
-+			kfree(vring->va);
-+			vring->va = NULL;
-+			if (vring->vq) {
-+				vring_del_virtqueue(vring->vq);
-+				vring->vq = NULL;
-+			}
-+		}
-+	}
-+}
++	/* Wait for RSH_BYTE_ACC_CTL pending bit to be cleared */
++	retval = rshim_byte_acc_pending_wait(dev, chan);
++	if (retval)
++		return retval;
 +
-+/* Work handler for Rx, Tx or activity monitoring. */
-+static void rshim_net_work_handler(struct work_struct *work)
-+{
-+	struct virtqueue *vq;
-+	struct rshim_net *net = container_of(work, struct rshim_net, work);
++	/* Write control bits to RSH_BYTE_ACC_CTL */
++	writel(RSH_BYTE_ACC_SIZE, dev->rshim_regs +
++		(RSH_BYTE_ACC_CTL | (chan << 16)));
 +
-+	/* Tx. */
-+	if (test_and_clear_bit(RSH_NET_TX_EVENT, &net->pend_events) &&
-+		       net->virtio_registered) {
-+		vq = net->vrings[RSH_NET_VRING_TX].vq;
-+		if (vq)
-+			rshim_net_virtio_rxtx(vq, false);
-+	}
++	/* Write target address to RSH_BYTE_ACC_ADDR */
++	writel(addr, dev->rshim_regs + (RSH_BYTE_ACC_ADDR | (chan << 16)));
 +
-+	/* Rx. */
-+	if (test_and_clear_bit(RSH_NET_RX_EVENT, &net->pend_events) &&
-+		       net->virtio_registered) {
-+		vq = net->vrings[RSH_NET_VRING_RX].vq;
-+		if (vq)
-+			rshim_net_virtio_rxtx(vq, true);
-+	}
++	/* Write control bits to RSH_BYTE_ACC_CTL */
++	writel(RSH_BYTE_ACC_SIZE, dev->rshim_regs +
++		(RSH_BYTE_ACC_CTL | (chan << 16)));
 +
-+	/* Keepalive check. */
-+	if (rshim_net_keepalive &&
-+	    time_after(jiffies, net->rx_jiffies +
-+		       (unsigned long)rshim_net_keepalive * HZ)) {
-+		mutex_lock(&net->lock);
-+		rshim_net_update_activity(net, false);
-+		mutex_unlock(&net->lock);
-+	}
-+}
++	/* Write lower 32 bits of data to TRIO_CR_GW_DATA */
++	writel((u32)(value >> 32), dev->rshim_regs +
++		(RSH_BYTE_ACC_WDAT | (chan << 16)));
 +
-+/* Nothing to do for now. */
-+static void rshim_net_virtio_dev_release(struct device *dev)
-+{
-+}
++	/* Wait for RSH_BYTE_ACC_CTL pending bit to be cleared */
++	retval = rshim_byte_acc_pending_wait(dev, chan);
++	if (retval)
++		return retval;
 +
-+/* Get the next packet descriptor from the vring. */
-+static inline struct vring_desc *
-+rshim_net_virtio_get_next_desc(struct virtqueue *vq)
-+{
-+	unsigned int idx, head;
-+	struct vring *vr = (struct vring *)virtqueue_get_vring(vq);
-+	struct rshim_net_vring *vring = (struct rshim_net_vring *)vq->priv;
++	/* Write upper 32 bits of data to TRIO_CR_GW_DATA */
++	writel((u32)(value), dev->rshim_regs +
++		(RSH_BYTE_ACC_WDAT | (chan << 16)));
 +
-+	if (vring->next_avail == vr->avail->idx)
-+		return NULL;
-+
-+	idx = vring->next_avail % vring->size;
-+	head = vr->avail->ring[idx];
-+	BUG_ON(head >= vring->size);
-+	vring->next_avail++;
-+	return &vr->desc[head];
-+}
-+
-+/* Get the total length of a descriptor chain. */
-+static inline u32 rshim_net_virtio_get_pkt_len(struct virtio_device *vdev,
-+			struct vring_desc *desc, struct vring *vr)
-+{
-+	u32 len = 0, idx;
-+
-+	while (desc) {
-+		len += virtio32_to_cpu(vdev, desc->len);
-+		if (!(virtio16_to_cpu(vdev, desc->flags) & VRING_DESC_F_NEXT))
-+			break;
-+		idx = virtio16_to_cpu(vdev, desc->next);
-+		desc = &vr->desc[idx];
-+	}
-+
-+	return len;
-+}
-+
-+/* House-keeping timer. */
-+static void rshim_net_timer(struct timer_list *arg)
-+{
-+	struct rshim_net *net = container_of(arg, struct rshim_net, timer);
-+
-+	/*
-+	 * Wake up Rx handler in case Rx event is missing or any leftover
-+	 * bytes are stuck in the backend.
-+	 */
-+	test_and_set_bit(RSH_NET_RX_EVENT, &net->pend_events);
-+
-+	/*
-+	 * Wake up Tx handler in case virtio has queued too many packets
-+	 * and are waiting for buffer return.
-+	 */
-+	test_and_set_bit(RSH_NET_TX_EVENT, &net->pend_events);
-+
-+	schedule_work(&net->work);
-+
-+	mod_timer(&net->timer, jiffies + rshim_net_timer_interval);
-+}
-+
-+static void rshim_net_release_cur_desc(struct virtio_device *vdev,
-+				       struct rshim_net_vring *vring)
-+{
-+	int idx;
-+	unsigned long flags;
-+	struct vring *vr = (struct vring *)virtqueue_get_vring(vring->vq);
-+
-+	idx = vr->used->idx % vring->size;
-+	vr->used->ring[idx].id = vring->desc_head - vr->desc;
-+	vr->used->ring[idx].len =
-+		cpu_to_virtio32(vdev, vring->pkt_len);
-+
-+	/*
-+	 * Virtio could poll and check the 'idx' to decide
-+	 * whether the desc is done or not. Add a memory
-+	 * barrier here to make sure the update above completes
-+	 * before updating the idx.
-+	 */
-+	mb();
-+	vr->used->idx++;
-+
-+	vring->desc = NULL;
-+
-+	/* Notify upper layer. */
-+	spin_lock_irqsave(&rshim_net_spin_lock, flags);
-+	vring_interrupt(0, vring->vq);
-+	spin_unlock_irqrestore(&rshim_net_spin_lock, flags);
-+}
-+
-+/* Update the link activity. */
-+static void rshim_net_update_activity(struct rshim_net *net, bool activity)
-+{
-+	if (activity) {
-+		/* Bring up the link. */
-+		if (!(net->config.status & VIRTIO_NET_S_LINK_UP)) {
-+			net->config.status |= VIRTIO_NET_S_LINK_UP;
-+			virtio_config_changed(&net->vdev);
-+		}
-+	} else {
-+		/* Bring down the link. */
-+		if (net->config.status & VIRTIO_NET_S_LINK_UP) {
-+			int i;
-+
-+			net->config.status &= ~VIRTIO_NET_S_LINK_UP;
-+			virtio_config_changed(&net->vdev);
-+
-+			/* Reset the ring state. */
-+			for (i = 0; i < RSH_NET_VRING_NUM; i++) {
-+				net->vrings[i].pkt_len =
-+						sizeof(struct virtio_net_hdr);
-+				net->vrings[i].cur_len = 0;
-+				net->vrings[i].rem_len = 0;
-+			}
-+		}
-+	}
-+}
-+
-+/* Rx & Tx processing of a virtual queue. */
-+static void rshim_net_virtio_rxtx(struct virtqueue *vq, bool is_rx)
-+{
-+	struct rshim_net_vring *vring = (struct rshim_net_vring *)vq->priv;
-+	struct rshim_net *net = vring->net;
-+	struct vring *vr = (struct vring *)virtqueue_get_vring(vq);
-+	struct virtio_device *vdev = &net->vdev;
-+	void *addr;
-+	int len, idx, seg_len;
-+	struct vring_desc *desc;
-+
-+	mutex_lock(&net->lock);
-+
-+	/* Get the current pending descriptor. */
-+	desc = vring->desc;
-+
-+	/* Don't continue if booting. */
-+	if (net->bd->is_boot_open) {
-+		/* Drop the pending buffer. */
-+		if (desc != NULL)
-+			rshim_net_release_cur_desc(vdev, vring);
-+		mutex_unlock(&net->lock);
-+		return;
-+	}
-+
-+	while (1) {
-+		if (!desc) {
-+			/* Don't process new packet in draining mode. */
-+			if (RSHIM_READ_ONCE(rshim_net_draining_mode))
-+				break;
-+
-+			/* Get the head desc of next packet. */
-+			vring->desc_head = rshim_net_virtio_get_next_desc(vq);
-+			if (!vring->desc_head) {
-+				vring->desc = NULL;
-+				mutex_unlock(&net->lock);
-+				return;
-+			}
-+			desc = vring->desc_head;
-+
-+			/* Packet length is unknown yet. */
-+			vring->pkt_len = 0;
-+			vring->rem_len = sizeof(vring->hdr);
-+		}
-+
-+		/* Beginning of a packet. */
-+		if (vring->pkt_len == 0) {
-+			if (is_rx) {
-+				struct virtio_net_hdr *net_hdr;
-+
-+				/* Read the packet header. */
-+				len = rshim_fifo_read(net->bd,
-+					(void *)&vring->hdr +
-+					sizeof(vring->hdr) - vring->rem_len,
-+					vring->rem_len, TMFIFO_NET_CHAN, true,
-+					false);
-+				if (len > 0) {
-+					vring->rem_len -= len;
-+					if (vring->rem_len != 0)
-+						continue;
-+				} else
-+					break;
-+
-+				/* Update activity. */
-+				net->rx_jiffies = jiffies;
-+				rshim_net_update_activity(net, true);
-+
-+				/* Skip the length 0 packet (keepalive). */
-+				if (vring->hdr.len == 0) {
-+					vring->rem_len = sizeof(vring->hdr);
-+					continue;
-+				}
-+
-+				/* Update total length. */
-+				vring->pkt_len = ntohs(vring->hdr.len) +
-+					sizeof(struct virtio_net_hdr);
-+
-+				/* Initialize the packet header. */
-+				net_hdr = (struct virtio_net_hdr *)
-+					phys_to_virt(virtio64_to_cpu(
-+					vdev, desc->addr));
-+				memset(net_hdr, 0, sizeof(*net_hdr));
-+			} else {
-+				/* Write packet header. */
-+				if (vring->rem_len == sizeof(vring->hdr)) {
-+					len = rshim_net_virtio_get_pkt_len(
-+							vdev, desc, vr);
-+					vring->hdr.data = 0;
-+					vring->hdr.type = VIRTIO_ID_NET;
-+					vring->hdr.len = htons(len -
-+						sizeof(struct virtio_net_hdr));
-+				}
-+
-+				len = rshim_fifo_write(net->bd,
-+					(void *)&vring->hdr +
-+					sizeof(vring->hdr) - vring->rem_len,
-+					vring->rem_len, TMFIFO_NET_CHAN,
-+					true, false);
-+				if (len > 0) {
-+					vring->rem_len -= len;
-+					if (vring->rem_len != 0)
-+						continue;
-+				} else
-+					break;
-+
-+				/* Update total length. */
-+				vring->pkt_len = rshim_net_virtio_get_pkt_len(
-+							vdev, desc, vr);
-+			}
-+
-+			vring->cur_len = sizeof(struct virtio_net_hdr);
-+			vring->rem_len = vring->pkt_len;
-+		}
-+
-+		/* Check available space in this desc. */
-+		len = virtio32_to_cpu(vdev, desc->len);
-+		if (len > vring->rem_len)
-+			len = vring->rem_len;
-+
-+		/* Check whether this desc is full or completed. */
-+		if (vring->cur_len == len) {
-+			vring->cur_len = 0;
-+			vring->rem_len -= len;
-+
-+			/* Get the next desc on the chain. */
-+			if (vring->rem_len > 0 &&
-+			    (virtio16_to_cpu(vdev, desc->flags) &
-+						VRING_DESC_F_NEXT)) {
-+				idx = virtio16_to_cpu(vdev, desc->next);
-+				desc = &vr->desc[idx];
-+				continue;
-+			}
-+
-+			/* Done with this chain. */
-+			rshim_net_release_cur_desc(vdev, vring);
-+
-+			/* Clear desc and go back to the loop. */
-+			desc = NULL;
-+
-+			continue;
-+		}
-+
-+		addr = phys_to_virt(virtio64_to_cpu(vdev, desc->addr));
-+
-+		if (is_rx) {
-+			seg_len = rshim_fifo_read(net->bd,
-+					addr + vring->cur_len,
-+					len - vring->cur_len,
-+					TMFIFO_NET_CHAN, true, false);
-+		} else {
-+			seg_len = rshim_fifo_write(net->bd,
-+					addr + vring->cur_len,
-+					len - vring->cur_len,
-+					TMFIFO_NET_CHAN, true, false);
-+		}
-+		if (seg_len > 0)
-+			vring->cur_len += seg_len;
-+		else {
-+			/* Schedule the worker to speed up Tx. */
-+			if (!is_rx) {
-+				if (!test_and_set_bit(RSH_NET_TX_EVENT,
-+				    &net->pend_events))
-+					schedule_work(&net->work);
-+			}
-+			break;
-+		}
-+	}
-+
-+	/* Save the current desc. */
-+	vring->desc = desc;
-+
-+	mutex_unlock(&net->lock);
-+}
-+
-+/* The notify function is called when new buffers are posted. */
-+static VIRTIO_NOTIFY_RETURN_TYPE rshim_net_virtio_notify(struct virtqueue *vq)
-+{
-+	struct rshim_net_vring *vring = (struct rshim_net_vring *)vq->priv;
-+	struct rshim_net *net = vring->net;
-+
-+	/*
-+	 * Virtio-net maintains vrings in pairs. Odd number ring for Rx
-+	 * and even number ring for Tx.
-+	 */
-+	if (!(vring->id & 1)) {
-+		/* Set the RX bit. */
-+		if (!test_and_set_bit(RSH_NET_RX_EVENT, &net->pend_events))
-+			schedule_work(&net->work);
-+	} else {
-+		/* Set the TX bit. */
-+		if (!test_and_set_bit(RSH_NET_TX_EVENT, &net->pend_events))
-+			schedule_work(&net->work);
-+	}
-+
-+	VIRTIO_NOTIFY_RETURN;
-+}
-+
-+/* Get the array of feature bits for this device. */
-+static VIRTIO_GET_FEATURES_RETURN_TYPE rshim_net_virtio_get_features(
-+	struct virtio_device *vdev)
-+{
-+	struct rshim_net *net = container_of(vdev, struct rshim_net, vdev);
-+
-+	return net->features;
-+}
-+
-+/* Confirm device features to use. */
-+static VIRTIO_FINALIZE_FEATURES_RETURN_TYPE rshim_net_virtio_finalize_features(
-+	struct virtio_device *vdev)
-+{
-+	struct rshim_net *net = container_of(vdev, struct rshim_net, vdev);
-+
-+	net->features = vdev->features;
 +	return 0;
 +}
++#endif /* CONFIG_64BIT */
 +
-+/* Free virtqueues found by find_vqs(). */
-+static void rshim_net_virtio_del_vqs(struct virtio_device *vdev)
++/* RShim read/write routines */
++static int rshim_pcie_read(struct rshim_backend *bd, int chan, int addr,
++				u64 *result)
 +{
-+	int i;
-+	struct rshim_net_vring *vring;
-+	struct virtqueue *vq;
-+	struct rshim_net *net = container_of(vdev, struct rshim_net, vdev);
++	struct rshim_pcie *dev = container_of(bd, struct rshim_pcie, bd);
++	int retval = 0;
 +
-+	for (i = 0; i < ARRAY_SIZE(net->vrings); i++) {
-+		vring = &net->vrings[i];
++	if (!bd->has_rshim)
++		return -ENODEV;
 +
-+		/* Release the pending packet. */
-+		if (vring->desc != NULL)
-+			rshim_net_release_cur_desc(vdev, vring);
++	dev->write_count = 0;
 +
-+		vq = vring->vq;
-+		if (vq) {
-+			vring->vq = NULL;
-+			vring_del_virtqueue(vq);
-+		}
-+	}
++#ifndef CONFIG_64BIT
++	retval = rshim_byte_acc_read(dev, chan, addr, result);
++#else
++	*result = readq(dev->rshim_regs + (addr | (chan << 16)));
++#endif
++	return retval;
 +}
 +
-+/* Create and initialize the virtual queues. */
-+static int rshim_net_virtio_find_vqs(struct virtio_device *vdev,
-+				     unsigned int nvqs,
-+				     struct virtqueue *vqs[],
-+				     vq_callback_t *callbacks[],
-+				     const char * const names[],
-+				     const bool *ctx,
-+				     struct irq_affinity *desc)
++static int rshim_pcie_write(struct rshim_backend *bd, int chan, int addr,
++				u64 value)
 +{
-+	int i, ret = -EINVAL, size;
-+	struct rshim_net_vring *vring;
-+	struct virtqueue *vq;
-+	struct rshim_net *net = container_of(vdev, struct rshim_net, vdev);
++	struct rshim_pcie *dev = container_of(bd, struct rshim_pcie, bd);
++	u64 result;
++	int retval = 0;
 +
-+	if (nvqs > ARRAY_SIZE(net->vrings))
-+		return -EINVAL;
++	if (!bd->has_rshim)
++		return -ENODEV;
 +
-+	for (i = 0; i < nvqs; ++i) {
-+		if (!names[i])
-+			goto error;
-+		vring = &net->vrings[i];
-+
-+		/* zero vring */
-+		size = vring_size(vring->size, vring->align);
-+		memset(vring->va, 0, size);
-+
-+		vq = vring_new_virtqueue(
-+					 i,
-+					 vring->size, vring->align, vdev,
-+					 false, false, vring->va,
-+					 rshim_net_virtio_notify,
-+					 callbacks[i], names[i]);
-+		if (!vq) {
-+			dev_err(&vdev->dev, "vring_new_virtqueue failed\n");
-+			ret = -ENOMEM;
-+			goto error;
-+		}
-+
-+		vq->priv = vring;
-+		/*
-+		 * Add barrier to make sure vq is ready before assigning to
-+		 * vring.
-+		 */
++	/*
++	 * We cannot stream large numbers of PCIe writes to the RShim's BAR.
++	 * Instead, we must write no more than 15 8-byte words before
++	 * doing a read from another register within the BAR,
++	 * which forces previous writes to drain.
++	 */
++	if (dev->write_count == 15) {
++		/* Add memory barrier to synchronize the order. */
 +		mb();
-+		vring->vq = vq;
-+		vqs[i] = vq;
++		rshim_pcie_read(bd, chan, RSH_SCRATCHPAD, &result);
++	}
++	dev->write_count++;
++#ifndef CONFIG_64BIT
++	retval = rshim_byte_acc_write(dev, chan, addr, value);
++#else
++	writeq(value, dev->rshim_regs + (addr | (chan << 16)));
++#endif
++
++	return retval;
++}
++
++static void rshim_pcie_delete(struct kref *kref)
++{
++	struct rshim_backend *bd;
++	struct rshim_pcie *dev;
++
++	bd = container_of(kref, struct rshim_backend, kref);
++	dev = container_of(bd, struct rshim_pcie, bd);
++
++	rshim_deregister(bd);
++	if (dev->pci_dev)
++		dev_set_drvdata(&dev->pci_dev->dev, NULL);
++	kfree(dev);
++}
++
++/* Probe routine */
++static int rshim_pcie_probe(struct pci_dev *pci_dev,
++			    const struct pci_device_id *id)
++{
++	struct rshim_pcie *dev;
++	struct rshim_backend *bd;
++	char *pcie_dev_name;
++	int index, retval, err = 0, allocfail = 0;
++	const int max_name_len = 20;
++
++	for (index = 0; index < MAX_DEV_COUNT; index++)
++		if (instances[index] == NULL)
++			break;
++	if (index == MAX_DEV_COUNT) {
++		pr_err("Driver cannot handle any more devices.\n");
++		return -ENODEV;
 +	}
 +
-+	return 0;
-+
-+error:
-+	rshim_net_virtio_del_vqs(vdev);
-+	return ret;
-+}
-+
-+/* Read the status byte. */
-+static u8 rshim_net_virtio_get_status(struct virtio_device *vdev)
-+{
-+	struct rshim_net *net = container_of(vdev, struct rshim_net, vdev);
-+
-+	return net->status;
-+}
-+
-+/* Write the status byte. */
-+static void rshim_net_virtio_set_status(struct virtio_device *vdev, u8 status)
-+{
-+	struct rshim_net *net = container_of(vdev, struct rshim_net, vdev);
-+
-+	net->status = status;
-+}
-+
-+/* Reset the device. Not much here for now. */
-+static void rshim_net_virtio_reset(struct virtio_device *vdev)
-+{
-+	struct rshim_net *net = container_of(vdev, struct rshim_net, vdev);
-+
-+	net->status = 0;
-+}
-+
-+/* Read the value of a configuration field. */
-+static void rshim_net_virtio_get(struct virtio_device *vdev,
-+				 unsigned int offset,
-+				 void *buf,
-+				 unsigned int len)
-+{
-+	struct rshim_net *net = container_of(vdev, struct rshim_net, vdev);
-+
-+	if (offset + len > sizeof(net->config) || offset + len < len) {
-+		dev_err(vdev->dev.parent, "virtio_get access out of bounds\n");
-+		return;
++	pcie_dev_name = kzalloc(max_name_len, GFP_KERNEL);
++	if (pcie_dev_name == NULL) {
++		err = -ENOMEM;
++		goto error;
++	}
++	retval = snprintf(pcie_dev_name, max_name_len,
++				"rshim_pcie%d", index);
++	if (WARN_ON_ONCE(retval >= max_name_len)) {
++		err = -EINVAL;
++		goto error;
 +	}
 +
-+	memcpy(buf, (u8 *)&net->config + offset, len);
-+}
++	pr_debug("Probing %s\n", pcie_dev_name);
 +
-+/* Write the value of a configuration field. */
-+static void rshim_net_virtio_set(struct virtio_device *vdev,
-+				 unsigned int offset,
-+				 const void *buf,
-+				 unsigned int len)
-+{
-+	struct rshim_net *net = container_of(vdev, struct rshim_net, vdev);
++	rshim_lock();
 +
-+	if (offset + len > sizeof(net->config) || offset + len < len) {
-+		dev_err(vdev->dev.parent, "virtio_get access out of bounds\n");
-+		return;
++	/* Find the backend. */
++	bd = rshim_find(pcie_dev_name);
++	if (bd) {
++		kref_get(&bd->kref);
++		dev = container_of(bd, struct rshim_pcie, bd);
++	} else {
++		/* Get some memory for this device's driver state. */
++		dev = kzalloc(sizeof(*dev), GFP_KERNEL);
++		if (dev == NULL) {
++			err = -ENOMEM;
++			rshim_unlock();
++			goto error;
++		}
++
++		instances[index] = dev;
++		bd = &dev->bd;
++		bd->has_rshim = 1;
++		bd->has_tm = 1;
++		bd->dev_name = pcie_dev_name;
++		bd->read_rshim = rshim_pcie_read;
++		bd->write_rshim = rshim_pcie_write;
++		bd->destroy = rshim_pcie_delete;
++		bd->owner = THIS_MODULE;
++		dev->write_count = 0;
++		mutex_init(&bd->mutex);
 +	}
 +
-+	memcpy((u8 *)&net->config + offset, buf, len);
-+}
-+
-+/* Virtio config operations. */
-+static struct virtio_config_ops rshim_net_virtio_config_ops = {
-+	.get_features = rshim_net_virtio_get_features,
-+	.finalize_features = rshim_net_virtio_finalize_features,
-+	.find_vqs = rshim_net_virtio_find_vqs,
-+	.del_vqs = rshim_net_virtio_del_vqs,
-+	.reset = rshim_net_virtio_reset,
-+	.set_status = rshim_net_virtio_set_status,
-+	.get_status = rshim_net_virtio_get_status,
-+	.get = rshim_net_virtio_get,
-+	.set = rshim_net_virtio_set,
-+};
-+
-+/* Remove. */
-+static int rshim_net_delete_dev(struct rshim_net *net)
-+{
-+	if (net) {
-+		/* Stop the timer. */
-+		del_timer_sync(&net->timer);
-+
-+		/* Cancel the pending work. */
-+		cancel_work_sync(&net->work);
-+
-+		/* Unregister virtio. */
-+		if (net->virtio_registered)
-+			unregister_virtio_device(&net->vdev);
-+
-+		/* Free vring. */
-+		rshim_net_free_vrings(net);
-+
-+		kfree(net);
++	retval = rshim_fifo_alloc(bd);
++	if (retval) {
++		rshim_unlock();
++		dev_err(&pci_dev->dev, "Failed to allocate fifo\n");
++		err = -ENOMEM;
++		goto enable_failed;
 +	}
 +
-+	return 0;
-+}
++	allocfail |= rshim_fifo_alloc(bd);
 +
-+/* Rx ready. */
-+void rshim_net_rx_notify(struct rshim_backend *bd)
-+{
-+	struct rshim_net *net = (struct rshim_net *)bd->net;
-+
-+	if (net) {
-+		test_and_set_bit(RSH_NET_RX_EVENT, &net->pend_events);
-+		schedule_work(&net->work);
++	if (!bd->read_buf) {
++		bd->read_buf = kzalloc(READ_BUF_SIZE,
++					   GFP_KERNEL);
 +	}
-+}
++	allocfail |= bd->read_buf == 0;
 +
-+/* Remove. */
-+int rshim_net_delete(struct rshim_backend *bd)
-+{
-+	int ret = 0;
++	if (!bd->write_buf) {
++		bd->write_buf = kzalloc(WRITE_BUF_SIZE,
++					    GFP_KERNEL);
++	}
++	allocfail |= bd->write_buf == 0;
 +
-+	if (bd->net) {
-+		ret = rshim_net_delete_dev((struct rshim_net *)bd->net);
-+		bd->net = NULL;
++	if (allocfail) {
++		rshim_unlock();
++		pr_err("can't allocate buffers\n");
++		goto enable_failed;
 +	}
 +
-+	return ret;
-+}
++	rshim_unlock();
 +
-+/* Init. */
-+int rshim_net_create(struct rshim_backend *bd)
-+{
-+	struct rshim_net *net;
-+	struct virtio_device *vdev;
-+	int ret = -ENOMEM;
-+
-+	if (bd->net)
-+		return -EEXIST;
-+
-+	net = kzalloc(sizeof(struct rshim_net), GFP_KERNEL);
-+	if (!net)
-+		return ret;
-+
-+	INIT_WORK(&net->work, rshim_net_work_handler);
-+
-+	timer_setup(&net->timer, rshim_net_timer, 0);
-+	net->timer.function = rshim_net_timer;
-+
-+	net->features = RSH_NET_FEATURES;
-+	net->config.mtu = RSH_NET_MTU;
-+	memcpy(net->config.mac, rshim_net_default_mac,
-+	       sizeof(rshim_net_default_mac));
-+	/* Set MAC address to be unique even number. */
-+	net->config.mac[5] += bd->dev_index * 2;
-+
-+	mutex_init(&net->lock);
-+
-+	vdev = &net->vdev;
-+	vdev->id.device = VIRTIO_ID_NET;
-+	vdev->config = &rshim_net_virtio_config_ops;
-+	vdev->dev.parent = bd->dev;
-+	vdev->dev.release = rshim_net_virtio_dev_release;
-+	if (rshim_net_alloc_vrings(net))
-+		goto err;
-+
-+	/* Register the virtio device. */
-+	ret = register_virtio_device(vdev);
-+	if (ret) {
-+		dev_err(bd->dev, "register_virtio_device() failed\n");
-+		goto err;
++	/* Enable the device. */
++	err = pci_enable_device(pci_dev);
++	if (err != 0) {
++		pr_err("Device enable failed with error %d\n", err);
++		goto enable_failed;
 +	}
-+	net->virtio_registered = 1;
 +
-+	mod_timer(&net->timer, jiffies + rshim_net_timer_interval);
++	/* Initialize object */
++	dev->pci_dev = pci_dev;
++	dev_set_drvdata(&pci_dev->dev, dev);
 +
-+	net->bd = bd;
-+	/* Add a barrier to keep the order of the two pointer assignments. */
-+	mb();
-+	bd->net = net;
++	dev->bar0_size = pci_resource_len(pci_dev, 0);
 +
-+	/* Bring up the interface. */
-+	mutex_lock(&net->lock);
-+	rshim_net_update_activity(net, true);
-+	mutex_unlock(&net->lock);
++	/* Fail if the BAR is unassigned. */
++	if (!dev->bar0_size) {
++		pr_err("BAR unassigned, run 'lspci -v'.\n");
++		err = -ENOMEM;
++		goto rshim_map_failed;
++	}
 +
-+	return 0;
++	/* Map in the RShim registers. */
++	dev->rshim_regs = ioremap(pci_resource_start(pci_dev, 0) +
++				  PCI_RSHIM_WINDOW_OFFSET,
++				  PCI_RSHIM_WINDOW_SIZE);
++	if (dev->rshim_regs == NULL) {
++		dev_err(&pci_dev->dev, "Failed to map RShim registers\n");
++		err = -ENOMEM;
++		goto rshim_map_failed;
++	}
 +
-+err:
-+	rshim_net_delete_dev(net);
-+	return ret;
-+}
++	/* Enable PCI bus mastering. */
++	pci_set_master(pci_dev);
 +
-+struct rshim_service rshim_svc = {
-+	.type = RSH_SVC_NET,
-+	.create = rshim_net_create,
-+	.delete = rshim_net_delete,
-+	.rx_notify = rshim_net_rx_notify
-+};
-+
-+static int __init rshim_net_init(void)
-+{
-+	return rshim_register_service(&rshim_svc);
-+}
-+
-+static void __exit rshim_net_exit(void)
-+{
 +	/*
-+	 * Wait 200ms, which should be good enough to drain the current
-+	 * pending packet.
++	 * Register rshim here since it needs to detect whether other backend
++	 * has already registered or not, which involves reading/writing rshim
++	 * registers and has assumption that the under layer is working.
 +	 */
-+	rshim_net_draining_mode = true;
-+	msleep(200);
++	rshim_lock();
++	if (!bd->registered) {
++		retval = rshim_register(bd);
++		if (retval) {
++			rshim_unlock();
++			goto rshim_map_failed;
++		} else
++			pcie_dev_name = NULL;
++	}
++	rshim_unlock();
 +
-+	return rshim_deregister_service(&rshim_svc);
++	/* Notify that the device is attached */
++	mutex_lock(&bd->mutex);
++	retval = rshim_notify(bd, RSH_EVENT_ATTACH, 0);
++	mutex_unlock(&bd->mutex);
++	if (retval)
++		goto rshim_map_failed;
++
++	return 0;
++
++ rshim_map_failed:
++	pci_disable_device(pci_dev);
++ enable_failed:
++	rshim_lock();
++	kref_put(&bd->kref, rshim_pcie_delete);
++	rshim_unlock();
++ error:
++	kfree(pcie_dev_name);
++	return err;
 +}
 +
-+module_init(rshim_net_init);
-+module_exit(rshim_net_exit);
++/* Called via pci_unregister_driver() when the module is removed. */
++static void rshim_pcie_remove(struct pci_dev *pci_dev)
++{
++	struct rshim_pcie *dev = dev_get_drvdata(&pci_dev->dev);
++	int flush_wq;
++
++	if (!dev)
++		return;
++
++	/*
++	 * Reset TRIO_PCIE_INTFC_RX_BAR0_ADDR_MASK and TRIO_MAP_RSH_BASE.
++	 * Otherwise, upon host reboot, the two registers will retain previous
++	 * values that don't match the new BAR0 address that is assigned to
++	 * the PCIe ports, causing host MMIO access to RShim to fail.
++	 */
++	rshim_pcie_write(&dev->bd, (RSH_SWINT >> 16) & 0xF,
++		RSH_SWINT & 0xFFFF, RSH_INT_VEC0_RTC__SWINT3_MASK);
++
++	/* Clear the flags before unmapping rshim registers to avoid race. */
++	dev->bd.has_rshim = 0;
++	dev->bd.has_tm = 0;
++	/* Add memory barrier to synchronize the order. */
++	mb();
++
++	if (dev->rshim_regs)
++		iounmap(dev->rshim_regs);
++
++	rshim_notify(&dev->bd, RSH_EVENT_DETACH, 0);
++	mutex_lock(&dev->bd.mutex);
++	flush_wq = !cancel_delayed_work(&dev->bd.work);
++	if (flush_wq)
++		flush_workqueue(rshim_wq);
++	dev->bd.has_cons_work = 0;
++	kfree(dev->bd.read_buf);
++	kfree(dev->bd.write_buf);
++	rshim_fifo_free(&dev->bd);
++	mutex_unlock(&dev->bd.mutex);
++
++	rshim_lock();
++	kref_put(&dev->bd.kref, rshim_pcie_delete);
++	rshim_unlock();
++
++	pci_disable_device(pci_dev);
++	dev_set_drvdata(&pci_dev->dev, NULL);
++}
++
++static struct pci_device_id rshim_pcie_table[] = {
++	{ PCI_DEVICE(TILERA_VENDOR_ID, BLUEFIELD_DEVICE_ID), },
++	{ 0, }
++};
++MODULE_DEVICE_TABLE(pci, rshim_pcie_table);
++
++static struct pci_driver rshim_pcie_driver = {
++	.name = "rshim_pcie",
++	.probe = rshim_pcie_probe,
++	.remove = rshim_pcie_remove,
++	.id_table = rshim_pcie_table,
++};
++
++static int __init rshim_pcie_init(void)
++{
++	int result;
++
++	/* Register the driver */
++	result = pci_register_driver(&rshim_pcie_driver);
++	if (result)
++		pr_err("pci_register failed, error number %d\n", result);
++
++	return result;
++}
++
++static void __exit rshim_pcie_exit(void)
++{
++	/* Unregister the driver. */
++	pci_unregister_driver(&rshim_pcie_driver);
++}
++
++module_init(rshim_pcie_init);
++module_exit(rshim_pcie_exit);
 +
 +MODULE_LICENSE("GPL");
 +MODULE_AUTHOR("Mellanox Technologies");
-+MODULE_VERSION("0.7");
++MODULE_VERSION("0.6");
 -- 
 1.8.3.1
 
