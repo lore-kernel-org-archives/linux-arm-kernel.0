@@ -2,63 +2,75 @@ Return-Path: <SRS0=5A9c=PL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2F3D0C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 17:07:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7DA7AC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 17:23:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F136C20815
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 17:07:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4C3F02176F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 17:23:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PBsc76/o"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F136C20815
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Eih6wI1n"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4C3F02176F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hRFKU58XFPnb6PDlFzbE0xi5PAppTPddAIuJJFD2mhY=; b=PBsc76/oYZaJax
-	ibidDkJphD+soDN8/8s42sTUBDbCfNApcF0vjleWs9VmnzTiJeXtjM1P5XNziTNwCuEvkhbVnStrU
-	zHJzGMa6sv1Xr6tqybR2sGjVHiT91bfYUgqcCmcXqPVzJucHff3PmcQk72bDazUGiPwbwRuBmnRIl
-	OP9tFSjbsoa64R6IxPEezye8xjneEe4fHkSaOQoUBwWZgBke7xKEcfqIWq9JAiPQmv5+p9+7w0VqG
-	1aJk+W0XoV73Tzp307SzPZWeGcri8PzGq1bwFsmQ0VZKqbXZSlzK+VbWNyrgvZqWFNPPauzJaPA4L
-	BfgqxeFEHmw201oO6NBQ==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=6TGQNdaoWazqStxAlTiVnTi4/Zj1qqIYpSPFMWMwuPs=; b=Eih6wI1nfXydAz
+	cm0VVsPUHwR+fpzInmzdwUydsDSgIhTdBWXDnKYMAKN8qT17ZHPj30pbzp4Pf+mgRkioFs4JiBEkl
+	b9U8g2fzdTTLUuBo3ZDo/7qlOKCnTNeQ3mEFzMOX2hVOuUTmqyZWSjcPiZxdXclae3ct553gfF7Na
+	yDRovXHh74N2sHeCPslKP+OVEsZfw86zLw/EfxhGVQ2L5X7l4oUv/0GHQNW6ZacvvMsdC67KEQkYp
+	AUZhYSVZlyT52wxWvSw4ul60tQVmcmzxRyVDnw4mv4jHs9ClaY5/G5DniCtzTJMQS9HfAeyYrex+B
+	AyGBVCOfBgMNG86B2Sfg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gf6Sv-00066G-Ch; Thu, 03 Jan 2019 17:07:29 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gf6Ss-00065r-4t
- for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 17:07:27 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 75E8515AD;
- Thu,  3 Jan 2019 09:07:25 -0800 (PST)
-Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 3159F3F5D4;
- Thu,  3 Jan 2019 09:07:24 -0800 (PST)
-Subject: Re: [PATCH 2/3] arm64: kprobes: Remove unneeded RODATA check
-To: Masami Hiramatsu <mhiramat@kernel.org>
-References: <154502881646.30629.9938335052821665530.stgit@devbox>
- <154502887509.30629.17754148993239954461.stgit@devbox>
-From: James Morse <james.morse@arm.com>
-Message-ID: <3bebf737-fe6b-33c8-e535-5d155591b303@arm.com>
-Date: Thu, 3 Jan 2019 17:07:22 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
+	id 1gf6i9-0002YI-6j; Thu, 03 Jan 2019 17:23:13 +0000
+Received: from mail-ot1-f66.google.com ([209.85.210.66])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gf6i5-0002XZ-6V
+ for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 17:23:11 +0000
+Received: by mail-ot1-f66.google.com with SMTP id w25so29904259otm.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 03 Jan 2019 09:23:08 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=d+Algh/Ysyc2qh0ZVeiaQBZGmFP+zB1c7uxH2nEn/v4=;
+ b=W4XXc+SLlwZBbNe+s7VBONeXvSHz4/ODjXSgx1GRz6DJaXX6chSuVqEaP2MxZKq7Zs
+ WcYsqwceNSrhc8yzoVlJ0liXrfA1V7T5ku0Pzo7av3xuR4LbTQ4MzlPrCRm3+5VXNPi2
+ CHt2ais/1UDqUNVCStZPQ1bTDEjXkBdd9wF6QLkmNv8SUZS7OLlwNV0UP6xpA9MG9dlq
+ 6Zp0MYkNwDysr3CfFowEb/3VHxUH2wIjZhlX+iXeJAVfcIf6zIASpiAALmzfOeUZtdzj
+ GcjxrWpk89ECIy/WSUMVKrihErLE2g3fC02e+3ZJxeild96K0r/Rqk33Q0aIhsdF9o/D
+ 18tw==
+X-Gm-Message-State: AJcUukcOCteqkL5ZAcvzXIRf7pLEnG0tCOeqbMcjHfp06Tg+weyguuAR
+ dtgZKaf1L9BWnOBeyIE4WrE9dPZ8NnJnlYRDa+w=
+X-Google-Smtp-Source: ALg8bN4BW3f84jWlcOVu8qCZefasXC5VB9c2tgXpmhzdTqTmpOrIg2Js0+29sLhBYpBeetofjeWwRahjN+3vGjAIbtQ=
+X-Received: by 2002:a9d:60b:: with SMTP id 11mr32154029otn.200.1546536188072; 
+ Thu, 03 Jan 2019 09:23:08 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <154502887509.30629.17754148993239954461.stgit@devbox>
-Content-Language: en-GB
+References: <CABGGisxcHWwhUcQML7XmriK_DLFGjmud3cKt8yp+K4G2CAL=9Q@mail.gmail.com>
+ <20190102185106.56913-1-swboyd@chromium.org>
+ <CAJZ5v0iL_Fq0RUbLjMj9WBitDw2amNV_ybirkiPbuYb0zroGAg@mail.gmail.com>
+ <154653191998.15366.14229484132412159772@swboyd.mtv.corp.google.com>
+In-Reply-To: <154653191998.15366.14229484132412159772@swboyd.mtv.corp.google.com>
+From: "Rafael J. Wysocki" <rafael@kernel.org>
+Date: Thu, 3 Jan 2019 18:22:56 +0100
+Message-ID: <CAJZ5v0hwhuerPoizdYjqNkdymxubOweZ3JhPiXRUcrNtByz_=Q@mail.gmail.com>
+Subject: Re: [PATCH v3] driver core: platform: Add an error message to
+ platform_get_irq*()
+To: Stephen Boyd <swboyd@chromium.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190103_090726_193655_B9EC186D 
-X-CRM114-Status: GOOD (  14.97  )
+X-CRM114-CacheID: sfid-20190103_092309_244999_184A3723 
+X-CRM114-Status: GOOD (  15.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,60 +82,51 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Pratyush Anand <panand@redhat.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- linux-kernel <linux-kernel@vger.kernel.org>,
- "David A . Long" <dave.long@linaro.org>, linux-arm-kernel@lists.infradead.org
+Cc: Rob Herring <robh@kernel.org>,
+ Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ "Rafael J. Wysocki" <rafael@kernel.org>, javierm@redhat.com,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Andrzej Hajda <a.hajda@samsung.com>,
+ Andy Shevchenko <andy.shevchenko@gmail.com>, Mark Brown <broonie@kernel.org>,
+ Russell King - ARM Linux <linux@armlinux.org.uk>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Marek Szyprowski <m.szyprowski@samsung.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi!
+On Thu, Jan 3, 2019 at 5:12 PM Stephen Boyd <swboyd@chromium.org> wrote:
+>
+> Quoting Rafael J. Wysocki (2019-01-03 01:40:26)
+> > On Wed, Jan 2, 2019 at 7:51 PM Stephen Boyd <swboyd@chromium.org> wrote:
+> > > @@ -130,6 +125,22 @@ int platform_get_irq(struct platform_device *dev, unsigned int num)
+> > >         return r ? r->start : -ENXIO;
+> > >  #endif
+> > >  }
+> > > +
+> > > +/**
+> > > + * platform_get_irq - get an IRQ for a device
+> > > + * @dev: platform device
+> > > + * @num: IRQ number index
+> > > + */
+> > > +int platform_get_irq(struct platform_device *dev, unsigned int num)
+> > > +{
+> > > +       int ret;
+> > > +
+> > > +       ret = __platform_get_irq(dev, num);
+> > > +       if (ret < 0 && ret != -EPROBE_DEFER)
+> > > +               dev_err(&dev->dev, "IRQ index %u not found\n", num);
+> >
+> > Why don't you log the error code too?
+> >
+>
+> I don't see much benefit to seeing -ENXIO or -EINVAL printed here, so I
+> left out the error code.
 
-On 17/12/2018 06:41, Masami Hiramatsu wrote:
-> Remove unneeded RODATA check from arch_prepare_kprobe().
-> 
-> Since check_kprobe_address_safe() already ensured that
-> the probe address is in kernel text, we don't need to
-> check whether the address in RODATA or not. That must
-> be always false.
-
-So it does!
-
-Reviewed-by: James Morse <james.morse@arm.com>
-
-
-Thanks
-
-James
-
-> diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
-> index b2d4b7428ebc..1dae500d0a81 100644
-> --- a/arch/arm64/kernel/probes/kprobes.c
-> +++ b/arch/arm64/kernel/probes/kprobes.c
-> @@ -91,8 +91,6 @@ static void __kprobes arch_simulate_insn(struct kprobe *p, struct pt_regs *regs)
->  int __kprobes arch_prepare_kprobe(struct kprobe *p)
->  {
->  	unsigned long probe_addr = (unsigned long)p->addr;
-> -	extern char __start_rodata[];
-> -	extern char __end_rodata[];
->  
->  	if (probe_addr & 0x3)
->  		return -EINVAL;
-> @@ -106,10 +104,6 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
->  	if (search_exception_tables(probe_addr))
->  		return -EINVAL;
->  
-> -	if (probe_addr >= (unsigned long) __start_rodata &&
-> -	    probe_addr <= (unsigned long) __end_rodata)
-> -		return -EINVAL;
-> -
->  	/* decode instruction */
->  	switch (arm_kprobe_decode_insn(p->addr, &p->ainsn)) {
->  	case INSN_REJECTED:	/* insn not supported */
-> 
-
+OK, so the value of the message is to tell the user that some driver
+asked for an invalid IRQ, right?
 
 _______________________________________________
 linux-arm-kernel mailing list
