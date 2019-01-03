@@ -2,152 +2,133 @@ Return-Path: <SRS0=5A9c=PL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 92B34C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 19:31:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BB756C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 19:35:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5882A217F5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 19:31:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 86DE920675
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 19:35:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mfZoCyKu";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="BJ+rSr8V"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5882A217F5
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i7dvLbWc";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="BV5H3UB0";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=Mellanox.com header.i=@Mellanox.com header.b="fHiifil9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 86DE920675
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=mellanox.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ZJNkA6XPpOEn9xSeNnFYn6bSfbI7jKBtp8BTICKNkRU=; b=mfZoCyKu1aS9aN
-	zdnaB+I5md4lCeGhOo8+4DIonYy6te0Hu8cmi4zeMlLinrr3sfemYFLmBLI6KhOAa4WTJE+CFOkfm
-	wFbhCOvDV4wyo6sdf5cM3pqnO7DWJOsxs6LEB+o7GVoN00R/ppjnFZN9erF7l6AKqntUyFNamXkO0
-	vqQxfvIGk6FOwC1GH/WzvjujAt1AlwvZ0oN2fWUdUofmEr8/svRKYmkx3zMff7oZH6AgQRmmh+AQ9
-	uCI5nzjzYDDJIRnd8g3HyfiwyqcMsMi/u8yy06A19d89xRMnzfvlEfSCjF/oEP3W+nEQK/E9ne8/s
-	DaE4BUtI3y5BUfMm2byQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=agHy7u4j3C/juWtbOahDtCvSdK6OVfjKjeZLUxjJvFA=; b=i7dvLbWcN5+ziV
+	6z6np+ziHhPBavQbN5xX8RgC407O6O36QBtfEBXx13Hhwvpgpf/pL95cjUDedbmcxqQkZGllVShRj
+	ihl80mWeuM6MUMgxcVz0hoUghGNyA/Qv0XSROZ3P8IcIVs9nj5SWZ8TCcYQHuVKqdujNQy3j2IXPr
+	vgq9/4B7uMZNMouFjUmZJUfPhclzkdY9g05WxIluWoVxPZqOxJ9BFAM4B5jp2Cq24T9/iIM+7xbE5
+	FoKWvFkHiyUxwHsGgEnufy8VpQBdvJYlOI37jhh8Sq7sOXD3AsvcGXj+Ueo0N43MWzrUbSSmUnml5
+	2boy7OUgdEt+5lJPqT+A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gf8iS-00023N-W3; Thu, 03 Jan 2019 19:31:40 +0000
-Received: from mail-yw1-xc42.google.com ([2607:f8b0:4864:20::c42])
+	id 1gf8lt-0003m9-QQ; Thu, 03 Jan 2019 19:35:13 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gf8iN-00022y-4V
- for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 19:31:38 +0000
-Received: by mail-yw1-xc42.google.com with SMTP id d190so13653985ywd.12
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 03 Jan 2019 11:31:34 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=xs22Cea2PrNQpDApl86Vw5dGBkwFpWseyAw0tz8dggg=;
- b=BJ+rSr8VnouiO/lupGHD/u08dRMbSvHtOdUAX0hXhSzQ4k6A3ED4gIsyoKnwIpYew5
- Hd29wrMWnf0icjC6/gOjhREgRL4vu1SYerFb3ZNP/SzBkiK+BqMrZIoOPMas9SEYYQ93
- iAnjMLNn7GgtHpku9uvldHQyWUId+PVktR3O5y1fsomAPeHnVdQ3K2ozwvOkGIeeVveI
- F9D/BI/qYoukPYwb467PTF/u6Tca49qWYkq0XJ+lZLCktaCbODydwwNh6QGwJuAdahMo
- Fus/xoW6AVozFDe6+QD262J5SpZ8pmjKo+QL/8USZTVNIutbeBwo7QjdRIK13ri9hrFX
- n1eg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=xs22Cea2PrNQpDApl86Vw5dGBkwFpWseyAw0tz8dggg=;
- b=fcJNlFkOquyR0adKpYqjuxUi7K7H9cnLlQQr96iJaKw6G5b7QmDcmO+kPoyA0J25zm
- ARh3CpBI57YGjwZE8KlOxw44ItSP7fKyA8x07ypRIi9dYG+NVt0L3AJDRwJrCM5qrsWS
- ceMziZV/EREbGMwJheYRg4BGle7iUXu0cvVKGoB0OQd91F9KhenOJcWbddvPc1WDsf+l
- TFH3D5lK/V5RexztfExWhUEK1tcktVHTO/9f65/KkHwzBinHI4rXOHwTSgHrECXYfh4R
- Rbyu2L9zIyfL0jh/NFhbj17aOKeA9Dcc6eURTHsnAmgUYxFxX22cK+sS89B7fm6OTBY7
- V5rw==
-X-Gm-Message-State: AA+aEWZAM85qFiC2js9bkirtqNljEFY2jlr69hrS4yl8fhh8YrIsUMhx
- gDIHNG9G219Y0HPGUZ2gnPojIwu3
-X-Google-Smtp-Source: AFSGD/Wi1Rd8phbfJo7uDpUjB7omXc309SWTgq5WqpHXHDPhOfX4IDAk2LXHigWmUV1afpMVfT/Siw==
-X-Received: by 2002:a81:7d8a:: with SMTP id
- y132mr51229301ywc.501.1546543893312; 
- Thu, 03 Jan 2019 11:31:33 -0800 (PST)
-Received: from [10.67.49.9] ([192.19.223.250])
- by smtp.googlemail.com with ESMTPSA id p71sm22140390ywg.98.2019.01.03.11.31.31
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 03 Jan 2019 11:31:32 -0800 (PST)
-Subject: Re: [PATCH 1/2] dt-bindings: reset: Add document for Broadcom STB
- reset controller
-To: Rob Herring <robh@kernel.org>, Florian Fainelli <f.fainelli@gmail.com>
-References: <20181221013409.14324-1-f.fainelli@gmail.com>
- <20181221013409.14324-2-f.fainelli@gmail.com> <20190103174117.GA6613@bogus>
- <2a54c2cf-5595-ade5-fb29-40e8b6d3133e@gmail.com>
- <20190103191915.GB6613@bogus>
-From: Florian Fainelli <f.fainelli@gmail.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=f.fainelli@gmail.com; prefer-encrypt=mutual; keydata=
- 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
- M5kY0ACeNhCZJvZ5g4C2Lc9fcTHu8jxmEkI=
-Message-ID: <bcfe4df0-8928-90e2-6460-1391320af9be@gmail.com>
-Date: Thu, 3 Jan 2019 11:31:22 -0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <20190103191915.GB6613@bogus>
+ id 1gf8lr-0002NT-Nw
+ for linux-arm-kernel@bombadil.infradead.org; Thu, 03 Jan 2019 19:35:11 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=MIME-Version:Content-Transfer-Encoding:
+ Content-Type:In-Reply-To:References:Message-ID:Date:Subject:CC:To:From:Sender
+ :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=jaZcTt/fzcNjlPHLZXenxLbLylkL5pHWkwNhnjpGmC8=; b=BV5H3UB0Tb3pS1Kd4z+8ffC9g0
+ tTvdqCLB4L0K0tlYDhtaTqdjAEiwH+ZJSYg/mhX0IXEWfY6PNjaKfNveKCI60spu7vSRR9zRYvpfM
+ SoBQtPQVB8ML2PWG3cswrLB7JT0SCbv8z2iDO3/ByHfZ38ZmH7otrQmgW9xvc9Q4t58+xuMqWOMmK
+ E9SeujDqUP6o1tqI7yN4FMoZ8oRe18Ri1r/yaRud1Yu0vWBB2Qx12XQcR26ZJVETnxUBuS2q6q6qk
+ yyWqKce5YxF8MlbUIQQ8m/7lHnynduXUadsXKvQSelhSJ0Fc+m8jwZxWWV9Caglj2ysaBTO6ks47b
+ RgTdBibQ==;
+Received: from mail-am5eur03on0603.outbound.protection.outlook.com
+ ([2a01:111:f400:fe08::603]
+ helo=EUR03-AM5-obe.outbound.protection.outlook.com)
+ by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gf8Xg-0007i3-8E
+ for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 19:20:36 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=Mellanox.com;
+ s=selector1;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=jaZcTt/fzcNjlPHLZXenxLbLylkL5pHWkwNhnjpGmC8=;
+ b=fHiifil9lkbveD04gdaglwVHSK76KFcQUz7mdJ6WlQ4rTjxrAzUR9m6z9DcDTTkGfp+qSVMKzB5P/vc17jCvaQiKRrLnvo3xGck9IvCgfDv04+ZNnb9kexWL94cRmEQtjC3BfBWfkTqZ6R2H6y2J4LrFsqooCyag5GONLn+7h1Q=
+Received: from DB6PR05MB3223.eurprd05.prod.outlook.com (10.175.232.149) by
+ DB6PR05MB3335.eurprd05.prod.outlook.com (10.170.221.142) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1495.6; Thu, 3 Jan 2019 19:20:27 +0000
+Received: from DB6PR05MB3223.eurprd05.prod.outlook.com
+ ([fe80::434:e856:a94a:3847]) by DB6PR05MB3223.eurprd05.prod.outlook.com
+ ([fe80::434:e856:a94a:3847%5]) with mapi id 15.20.1495.005; Thu, 3 Jan 2019
+ 19:20:26 +0000
+From: Liming Sun <lsun@mellanox.com>
+To: Matthias Brugger <matthias.bgg@gmail.com>, "y@bu-lab53.mtbu.labs.mlnx"
+ <y@bu-lab53.mtbu.labs.mlnx>, Olof Johansson <olof@lixom.net>, Arnd Bergmann
+ <arnd@arndb.de>, David Woods <dwoods@mellanox.com>, Robin Murphy
+ <robin.murphy@arm.com>, arm-soc <arm@kernel.org>
+Subject: RE: [PATCH v6 1/9] soc: Add TmFifo driver for Mellanox BlueField Soc
+Thread-Topic: [PATCH v6 1/9] soc: Add TmFifo driver for Mellanox BlueField Soc
+Thread-Index: AQHUcgL19IXAwWJbf0GhGYLkfBKW0KV7+vIAgCJTYKA=
+Date: Thu, 3 Jan 2019 19:20:26 +0000
+Message-ID: <DB6PR05MB3223FDA372C153FEF4E34D90A18D0@DB6PR05MB3223.eurprd05.prod.outlook.com>
+References: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
+ <1541089431-175572-1-git-send-email-lsun@mellanox.com>
+ <23fff14b-0e44-651c-1dfd-8f8e07c7eaee@gmail.com>
+In-Reply-To: <23fff14b-0e44-651c-1dfd-8f8e07c7eaee@gmail.com>
+Accept-Language: en-US
 Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=lsun@mellanox.com; 
+x-originating-ip: [216.156.69.42]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; DB6PR05MB3335;
+ 6:ASuCLLzUDqkfYc9CTlgVtc4WfpngTKAc7+0uU2fS0y0QPxUsZSgm3g9q0X5HbtmvoQTSpv9lOZy62bZNruqOm+XvEloIL8fELjtMwkvMh28eM2a9bMleElVv/JtAYHCG1Tcvx9wy2NNKmctnR7SamJRues3228E7nPk7/WbTHKiYDlr7jySZ2JLiB/0RKwiGFWFQHFmtqzHoVhnu+3mAB5YwaKfSksIVWl0bk2RGEOMaYhl9rwogbLkMcX3cl7I2B5nqVBNXSy5X6jaQFjfWMkP0xnRJUTy368n6p7z+EtqIyqKUXXKcrhGrFFmkk2C26XFgs4QNGj/xYDNW/MsRpQAIFEfXy1xCIemYDn3oT/ymhAYINXq4aoOPLzNavdRyro/2KINrFTSFcdOryiIjtDB4grxsfRm/79PNwsIb13yXBcDUiZLDDk15dNKNuM3B6oSP/ADu47wg4sixbP7crw==;
+ 5:MvLD5k0bl2yX33mzp3umtvYzM74mEysrISGxVVSk1+8Limbbs/V6mmGJKrhTRUQM0H50qpOHiRMsoejoas0wYiFX1QMwqijdVJ5T9OTsH39JaIX+fwBYLw96a6RH1uaqonm/e5eMlziHyCRIFqvBK2Nsr+Kzi/tmTtCZptNE00CTgETfNlyGVoQik8RmmbU9ESBa14b8+sTPqq+TjW+50g==;
+ 7:ZREzaOp9SpVbhIhK6IcQuBaAd2BNHkuPNdcQ+5+o1Y7WY9SxYapbxscLdWzsH9ovLhy5NLPWTQ+Q6igsR3/TvYanCmo0KDgI2D8Mvx2W9VkhVZKLtTu0NdQvzJ/kFy7v3OJVmeYx0fJwFluASNHs2A==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: 321bb6ae-1429-45ed-5475-08d671b08462
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:DB6PR05MB3335; 
+x-ms-traffictypediagnostic: DB6PR05MB3335:
+x-microsoft-antispam-prvs: <DB6PR05MB3335046EC2F3C8D50BA10771A18D0@DB6PR05MB3335.eurprd05.prod.outlook.com>
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(3230021)(908002)(999002)(5005026)(6040522)(8220060)(2401047)(8121501046)(93006095)(93001095)(3231475)(944501520)(52105112)(3002001)(10201501046)(6055026)(6041310)(20161123558120)(20161123560045)(20161123564045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123562045)(201708071742011)(7699051)(76991095);
+ SRVR:DB6PR05MB3335; BCL:0; PCL:0; RULEID:; SRVR:DB6PR05MB3335; 
+x-forefront-prvs: 0906E83A25
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(6029001)(366004)(396003)(39860400002)(136003)(376002)(346002)(13464003)(199004)(189003)(110136005)(54906003)(316002)(4326008)(256004)(14444005)(86362001)(68736007)(106356001)(105586002)(33656002)(8936002)(2906002)(6246003)(66066001)(39060400002)(2501003)(229853002)(71190400001)(99286004)(71200400001)(6436002)(5660300001)(8676002)(476003)(446003)(11346002)(53936002)(74316002)(55016002)(478600001)(9686003)(25786009)(81166006)(81156014)(97736004)(3846002)(102836004)(76176011)(6506007)(53546011)(6116002)(486006)(7736002)(305945005)(7696005)(186003)(26005)(14454004)(781001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DB6PR05MB3335;
+ H:DB6PR05MB3223.eurprd05.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: mellanox.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: 0avxtDIDQJsbTAiz/7Sk7mEDHjVZl5W5hfXFytzYcrKp8wo1BFpjFkIa+PzAHiPd1VSlTpRMngLkDRx29L7b3Azdco2njRAD8cE2Fa+1PKN11X8pOEiZ6YzkxK24A2ZMZfuZhBt7zqPvx8KVXEsNGRcJ4F2kSg1ImiQmNIw3/E+xIhcY3iDPyxFZgFPULbat0ZrKoB2zTiWQe4o0KlxeApk7OjMi2w4Kpkg7B+IVOWzwnz1xK7w5Fgcvhgd6LRDbVGpB+G4Ajjrg8gyEzDYQpraGBP07Wdy7dLtO1CGzDPlt9+xStQaPeYn6QwhoVRRa
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+MIME-Version: 1.0
+X-OriginatorOrg: Mellanox.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 321bb6ae-1429-45ed-5475-08d671b08462
+X-MS-Exchange-CrossTenant-originalarrivaltime: 03 Jan 2019 19:20:26.7122 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: a652971c-7d2e-4d9b-a6a4-d149256f461b
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB6PR05MB3335
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190103_113137_189685_9C241A31 
-X-CRM114-Status: GOOD (  21.80  )
+X-CRM114-CacheID: sfid-20190103_192032_422758_F2FD2E81 
+X-CRM114-Status: GOOD (  30.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -159,110 +140,123 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>, p.zabel@pengutronix.de,
- linux-kernel@vger.kernel.org,
- "maintainer:BROADCOM BCM7XXX ARM ARCHITECTURE"
- <bcm-kernel-feedback-list@broadcom.com>, Gregory Fong <gregory.0xf0@gmail.com>,
- Brian Norris <computersforpeace@gmail.com>,
- "moderated list:BROADCOM BCM7XXX ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "mbrugger@suse.com >> Matthias Brugger" <mbrugger@suse.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 1/3/19 11:19 AM, Rob Herring wrote:
-> On Thu, Jan 03, 2019 at 10:53:25AM -0800, Florian Fainelli wrote:
->> On 1/3/19 9:41 AM, Rob Herring wrote:
->>> On Thu, Dec 20, 2018 at 05:34:08PM -0800, Florian Fainelli wrote:
->>>> Add a binding document for the Broadcom STB reset controller, also known
->>>> as SW_INIT-style reset controller.
->>>>
->>>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
->>>> ---
->>>>  .../devicetree/bindings/reset/brcm,reset.txt  | 27 +++++++++++++++++++
->>>>  1 file changed, 27 insertions(+)
->>>>  create mode 100644 Documentation/devicetree/bindings/reset/brcm,reset.txt
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/reset/brcm,reset.txt b/Documentation/devicetree/bindings/reset/brcm,reset.txt
->>>> new file mode 100644
->>>> index 000000000000..6e5341b4f891
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/reset/brcm,reset.txt
->>>> @@ -0,0 +1,27 @@
->>>> +Broadcom STB SW_INIT-style reset controller
->>>> +===========================================
->>>> +
->>>> +Broadcom STB SoCs have a SW_INIT-style reset controller with separate
->>>> +SET/CLEAR/STATUS registers and possibly multiple banks, each of 32 bit
->>>> +reset lines.
->>>> +
->>>> +Please also refer to reset.txt in this directory for common reset
->>>> +controller binding usage.
->>>> +
->>>> +Required properties:
->>>> +- compatible: should be brcm,brcmstb-reset
->>>> +- reg: register base and length
->>>> +- #reset-cells: must be set to 1
->>>> +
->>>> +Example:
->>>> +
->>>> +	reset: reset-controller@8404318 {
->>>> +		compatible = "brcm,brcmstb-reset";
->>>> +		reg = <0x8404318 0x30>;
->>>
->>> Based on this address, should this be a sub-node of something else? Or 
->>> not even a sub-node and just make the parent be a reset provider?
->>
->> The reset controller is part of a larger "sundry" node which has a
->> collection of functionality, from pinmux/pinctrl, reset controller,
->> spare bits, chicken bits, anything the designers forgot to put somewhere
->> else and decided to put there.
->>
->> If there is one thing consistent though is that given a set of 32-bit
->> register groups, they have a self contained functionality such that you
->> can break up the larger "sundry" space into smaller sub-blocks which
->> have one an only one functionality. Do you think this warrants a
->> different representation in Device Tree?
+Thanks Matthias for the comments and sorry for the holiday delay.
+The recommended changes have been posted in patch v7 1/9.
+
+Thanks,
+Liming
+
+> -----Original Message-----
+> From: Matthias Brugger <matthias.bgg@gmail.com>
+> Sent: Wednesday, December 12, 2018 6:08 PM
+> To: Liming Sun <lsun@mellanox.com>; y@bu-lab53.mtbu.labs.mlnx; Olof Johansson <olof@lixom.net>; Arnd Bergmann <arnd@arndb.de>;
+> David Woods <dwoods@mellanox.com>; Robin Murphy <robin.murphy@arm.com>; arm-soc <arm@kernel.org>
+> Cc: devicetree@vger.kernel.org; linux-arm-kernel@lists.infradead.org; mbrugger@suse.com >> Matthias Brugger <mbrugger@suse.com>
+> Subject: Re: [PATCH v6 1/9] soc: Add TmFifo driver for Mellanox BlueField Soc
 > 
-> With pinctrl in the mix, you're going to need sub-nodes anyways. So just 
-> define what this is a sub-node of.
-
-pinctrl is not necessarily something I want the kernel to control, since
-we have a high level scripting language without our bootloader that
-makes sure pinctrl is properly configured from early boot on all the way
-to the kernel, and preserved across suspend/resume states.
-pinctrl-single does work, and was occasionally used. Everything else is
-typically muxes that the kernel does not need to touch/see/be aware of.
-
 > 
-> Also, I'd prefer to have complete example for the "sundry" node and 
-> child nodes than partial examples spread across the tree.
-
-I am afraid I can't provide that example because the sundry node is
-really changing from chip to chip, and there is a gazillion of things in
-there that the kernel typically does not even touch, like
-pinmuxing/pinctrl, various mux selections etc. I could provide the
-following example if that is what you are requesting?:
-
-
-sun-top-ctrl: simple-bus@8404000 {
-	compatible = "brcm,brcmstb-sun-top-ctrl", "simple-bus";
-	reg = <0x8404000 0x708>;
-
-	reset: reset-controller@318 {
-		compatible = "brcm,brcmstb-reset";
-		reg = <0x318 0x30>;
-		#reset-cells = <1>;
-	};
-};
-
-Would that be what you expect to see?
--- 
-Florian
-
+> 
+> On 01/11/2018 17:23, Liming Sun wrote:> This commit adds the TmFifo driver for
+> Mellanox BlueField Soc.
+> > TmFifo is a shared FIFO which enables external host machine to
+> > exchange data with the SoC via USB or PCIe. The driver is based on
+> > virtio framework and has console and network access enabled.
+> >
+> > Reviewed-by: David Woods <dwoods@mellanox.com>
+> > Signed-off-by: Liming Sun <lsun@mellanox.com>
+> > ---
+> >  drivers/soc/Kconfig                |    1 +
+> >  drivers/soc/Makefile               |    1 +
+> >  drivers/soc/mellanox/Kconfig       |   18 +
+> >  drivers/soc/mellanox/Makefile      |    5 +
+> >  drivers/soc/mellanox/tmfifo.c      | 1236 ++++++++++++++++++++++++++++++++++++
+> >  drivers/soc/mellanox/tmfifo_regs.h |   76 +++
+> >  6 files changed, 1337 insertions(+)
+> >  create mode 100644 drivers/soc/mellanox/Kconfig
+> >  create mode 100644 drivers/soc/mellanox/Makefile
+> >  create mode 100644 drivers/soc/mellanox/tmfifo.c
+> >  create mode 100644 drivers/soc/mellanox/tmfifo_regs.h
+> >
+> 
+> [...]
+> 
+> > +
+> > +/* Interrupt handler. */
+> > +static irqreturn_t tmfifo_irq_handler(int irq, void *dev_id)
+> > +{
+> > +	int i = (uintptr_t)dev_id % sizeof(void *);
+> > +	struct tmfifo *fifo = dev_id - i;
+> > +
+> > +	if (i < TM_IRQ_CNT && !test_and_set_bit(i, &fifo->pend_events))
+> > +		schedule_work(&fifo->work);
+> > +
+> > +	return IRQ_HANDLED;
+> > +}
+> > +
+> [...]
+> > +
+> > +/* Probe the TMFIFO. */
+> > +static int tmfifo_probe(struct platform_device *pdev)
+> > +{
+> > +	u64 ctl;
+> > +	struct tmfifo *fifo;
+> > +	struct resource *rx_res, *tx_res;
+> > +	struct virtio_net_config net_config;
+> > +	int i, ret;
+> > +
+> > +	/* Get the resource of the Rx & Tx FIFO. */
+> > +	rx_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	tx_res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> > +	if (!rx_res || !tx_res) {
+> > +		ret = -EINVAL;
+> > +		goto err;
+> > +	}
+> > +
+> > +	if (request_mem_region(rx_res->start,
+> > +			       resource_size(rx_res), "bf-tmfifo") == NULL) {
+> > +		ret = -EBUSY;
+> > +		goto early_err;
+> > +	}
+> > +
+> > +	if (request_mem_region(tx_res->start,
+> > +			       resource_size(tx_res), "bf-tmfifo") == NULL) {
+> > +		release_mem_region(rx_res->start, resource_size(rx_res));
+> > +		ret = -EBUSY;
+> > +		goto early_err;
+> > +	}
+> > +
+> > +	ret = -ENOMEM;
+> > +	fifo = kzalloc(sizeof(struct tmfifo), GFP_KERNEL);
+> > +	if (!fifo)
+> > +		goto err;
+> > +
+> > +	fifo->pdev = pdev;
+> > +	platform_set_drvdata(pdev, fifo);
+> > +
+> > +	spin_lock_init(&fifo->spin_lock);
+> > +	INIT_WORK(&fifo->work, tmfifo_work_handler);
+> > +
+> > +	timer_setup(&fifo->timer, tmfifo_timer, 0);
+> > +	fifo->timer.function = tmfifo_timer;
+> > +
+> > +	for (i = 0; i < TM_IRQ_CNT; i++) {
+> > +		fifo->irq[i] = platform_get_irq(pdev, i);
+> > +		ret = request_irq(fifo->irq[i], tmfifo_irq_handler, 0,
+> > +				  "tmfifo", (u8 *)fifo + i);
+> 
+> I think it would be better if you create a struct that passes a pointer to fifo
+> and the ID instead of "hiding" the ID inside the address.
+> 
+> Regards,
+> Matthias
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
