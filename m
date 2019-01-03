@@ -2,56 +2,66 @@ Return-Path: <SRS0=5A9c=PL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-3.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9968AC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 20:29:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1616BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 20:32:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 64CE821479
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 20:29:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D83C52184B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 20:32:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JMS661jS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 64CE821479
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ucw.cz
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oYn6eZTK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D83C52184B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=upB/l9kLt7+fcjlFp/37RlotP40BhOeKs+1KE3Vyr+8=; b=JMS661jSQgFbMTQ2OCp9bGHEh
-	wg0BrGHPnS2L1SNBWIz6kXCikIi4hjIiiv4ysGGDtfhH4B1RIMvoLu5nCvJoGA04Nm9AL0DBThQFP
-	VOmrYFgwTrLMdl0tURrn+dYFoyVEhKz7NNsMezTkYgRCQn9ULPrDK+og/rVRJOZEyoof7aBAB8yyQ
-	Viy0d1ngD5LRDbjxZi/jNpgXVN0I8tHHJL6uts+s0Y6k4+eaQX8xWLb41u1z4d+9nbJDr+CQWdpJU
-	0TL+K8ZOWTdPZVEwfMjhasAgPNrefZLVU71IfdVNSqIpUIKArQgKzONtmgZZSKU1bRIcztQtbncbc
-	d9sOPBeeg==;
+	 bh=phCQBi28uZUaQvUDxBr73IbJ4Z4kM4PfECsPhz/qsjE=; b=oYn6eZTKY+LRDn7cc8NQxrlh9
+	gyDmzbrv+j8nnD3bjT5Pq/u0/CfXn2T8dq2spa80WgzAN6LmIgpSkQKGpKgPfONw+p4hbjiRa5qu5
+	zh0OSUtKjEEyEp16HggXnTAp4Tmye8Z69f8Ve+L/dHGB6WKBWu7qLIPgoYaLVayzbiAyLvev7464N
+	grpKtm5AkDACokxD28sa6qwd+VksapCfqS58fVbZwEUwTKD5MiPXPY9S5UIn7BYHpM/dnaWxoMRl4
+	t2np2UCNMDOj8Wu0653lcSBQHnsu1XDvDHcFE0d9sGuv7ng7LwEMimUaVJmE+rJ3DXid88Cn2yun1
+	GRy7SvyAQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gf9c9-0006Zw-78; Thu, 03 Jan 2019 20:29:13 +0000
-Received: from atrey.karlin.mff.cuni.cz ([195.113.26.193])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gf9c4-0006Z2-N9
- for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 20:29:10 +0000
-Received: by atrey.karlin.mff.cuni.cz (Postfix, from userid 512)
- id 3586780806; Thu,  3 Jan 2019 21:28:57 +0100 (CET)
-Date: Thu, 3 Jan 2019 21:29:01 +0100
-From: Pavel Machek <pavel@ucw.cz>
-To: Kristina Martsenko <kristina.martsenko@arm.com>
-Subject: Re: [PATCH v6 07/13] arm64: add basic pointer authentication support
-Message-ID: <20190103202901.GA21564@amd>
-References: <20181207183931.4285-1-kristina.martsenko@arm.com>
- <20181207183931.4285-8-kristina.martsenko@arm.com>
+	id 1gf9ff-0008Sf-UL; Thu, 03 Jan 2019 20:32:51 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gf9fc-0008SG-P7
+ for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 20:32:50 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 063DBEBD;
+ Thu,  3 Jan 2019 12:32:48 -0800 (PST)
+Received: from [192.168.100.243] (usa-sjc-mx-foss1.foss.arm.com
+ [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 9AE393F575;
+ Thu,  3 Jan 2019 12:32:46 -0800 (PST)
+Subject: Re: [PATCH v2 1/7] sysfs/cpu: Add "Unknown" vulnerability state
+To: Stefan Wahren <stefan.wahren@i2se.com>, Dave Martin <Dave.Martin@arm.com>
+References: <20190103004921.1928921-1-jeremy.linton@arm.com>
+ <20190103004921.1928921-2-jeremy.linton@arm.com>
+ <20190103163740.GC3529@e103592.cambridge.arm.com>
+ <db5968e6-609b-1a1f-464d-436327dd1738@arm.com>
+ <1951199845.271163.1546543806398@email.ionos.de>
+From: Jeremy Linton <jeremy.linton@arm.com>
+Message-ID: <5818faa8-e820-7aee-5aaa-42ced65d6f9d@arm.com>
+Date: Thu, 3 Jan 2019 14:32:44 -0600
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.7.0
 MIME-Version: 1.0
-In-Reply-To: <20181207183931.4285-8-kristina.martsenko@arm.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+In-Reply-To: <1951199845.271163.1546543806398@email.ionos.de>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190103_122908_905717_D69B3B35 
-X-CRM114-Status: GOOD (  12.59  )
+X-CRM114-CacheID: sfid-20190103_123248_816239_FD9B4E3F 
+X-CRM114-Status: GOOD (  19.69  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -63,92 +73,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Jones <drjones@redhat.com>,
- linux-kernel@vger.kernel.org, Jacob Bramley <jacob.bramley@arm.com>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Adam Wallis <awallis@codeaurora.org>,
- Suzuki K Poulose <suzuki.poulose@arm.com>,
- Richard Henderson <richard.henderson@linaro.org>,
- Christoffer Dall <christoffer.dall@arm.com>, Will Deacon <will.deacon@arm.com>,
- kvmarm@lists.cs.columbia.edu, Cyrill Gorcunov <gorcunov@gmail.com>,
- Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>,
- Amit Kachhap <amit.kachhap@arm.com>, Dave P Martin <dave.martin@arm.com>,
- linux-arm-kernel@lists.infradead.org, Kees Cook <keescook@chromium.org>
-Content-Type: multipart/mixed; boundary="===============1035632320244268222=="
+Cc: mark.rutland@arm.com, julien.thierry@arm.com, mlangsdo@redhat.com,
+ "Rafael J . Wysocki" <rafael.j.wysocki@intel.com>, suzuki.poulose@arm.com,
+ marc.zyngier@arm.com, catalin.marinas@arm.com,
+ Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>, will.deacon@arm.com,
+ linux-kernel@vger.kernel.org, steven.price@arm.com,
+ Dave Hansen <dave.hansen@intel.com>, Peter Zijlstra <peterz@infradead.org>,
+ Borislav Petkov <bp@alien8.de>, David Woodhouse <dwmw@amazon.co.uk>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>, ykaukab@suse.de,
+ Thomas Gleixner <tglx@linutronix.de>, shankerd@codeaurora.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi,
 
---===============1035632320244268222==
-Content-Type: multipart/signed; micalg=pgp-sha1;
-	protocol="application/pgp-signature"; boundary="gKMricLos+KVdGMg"
-Content-Disposition: inline
+On 01/03/2019 01:30 PM, Stefan Wahren wrote:
+> Hi Jeremy,
+> 
+>> Jeremy Linton <jeremy.linton@arm.com> hat am 3. Januar 2019 um 17:46 geschrieben:
+>>
+>>
+>> Hi,
+>>
+>> On 01/03/2019 10:37 AM, Dave Martin wrote:
+>>> On Wed, Jan 02, 2019 at 06:49:15PM -0600, Jeremy Linton wrote:
+>>>> There is a lot of variation in the Arm ecosystem. Because of this,
+>>>> there exist possible cases where the kernel cannot authoritatively
+>>>> determine if a machine is vulnerable.
+>>>>
+>>>> Rather than guess the vulnerability status in cases where
+>>>> the mitigation is disabled or the firmware isn't responding
+>>>> correctly, we need to display an "Unknown" state.
+>>>>
+> 
+> i applied your patch series on linux-next-20190103. On my Raspberry Pi 3B+ (defconfig) i'm getting this from sysfs:
+> 
+> l1tf:Not affected
+> meltdown:Not affected
+> spec_store_bypass:Unknown
+> spectre_v1:Mitigation: __user pointer sanitization
+> spectre_v2:Unknown
+> 
+> AFAIK it has 4 Cortex-A53 cores (no PSCI firmware), so shouldn't be affected.
 
+So, for spec_store_bypass, as you noted your getting hit by the lack of 
+psci/smccc to report the ssb state, and this patch is just reflecting that.
 
---gKMricLos+KVdGMg
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Fri 2018-12-07 18:39:25, Kristina Martsenko wrote:
-> From: Mark Rutland <mark.rutland@arm.com>
->=20
-> This patch adds basic support for pointer authentication, allowing
-> userspace to make use of APIAKey, APIBKey, APDAKey, APDBKey, and
-> APGAKey. The kernel maintains key values for each process (shared by all
-> threads within), which are initialised to random values at exec()
-time.
-
-=2E..
-
-> +/*
-> + * We give each process its own keys, which are shared by all threads. T=
-he keys
-> + * are inherited upon fork(), and reinitialised upon exec*().
-> + */
-> +struct ptrauth_keys {
-> +	struct ptrauth_key apia;
-> +	struct ptrauth_key apib;
-> +	struct ptrauth_key apda;
-> +	struct ptrauth_key apdb;
-> +	struct ptrauth_key apga;
-> +};
-
-intstruction_a, data_a, generic_a? Should be easier to understand than
-"apdb" ...
-
-									Pavel
---=20
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blo=
-g.html
-
---gKMricLos+KVdGMg
-Content-Type: application/pgp-signature; name="signature.asc"
-Content-Description: Digital signature
-
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iEYEARECAAYFAlwucI0ACgkQMOfwapXb+vKOAwCgkLvdESb50TdMC9uVVTRAt2oy
-JY0An30sVTzX4gQ5fTxKf5nu3+EScPPb
-=MRNf
------END PGP SIGNATURE-----
-
---gKMricLos+KVdGMg--
+In the case of spectrev2 it may be correct to blame this patch set 
+because its displaying "unknown" since your core isn't in the black 
+list, and your core isn't new enough to have the csv2 bit indicating its 
+not vulnerable. In this case if we do away with the unknown state, we 
+should probably depend entirely on the black list and simply display 
+"Not affected" if the core isn't listed. (meaning we may report cores 
+not affected when they are missing from the blacklist).
 
 
---===============1035632320244268222==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+> How can this be fixed?
+
+For ssb, the correct answer is probably fix the firmware, but given the 
+situation, its likely this kind of machine is going to force an 
+additional MIDR list to report the state correctly. Maybe Will or 
+someone can chime in here?
+
+For spectrev2, wait for another version of this patch.
+
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============1035632320244268222==--
-
