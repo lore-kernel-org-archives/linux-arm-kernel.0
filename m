@@ -2,79 +2,92 @@ Return-Path: <SRS0=E6Hv=PM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9458BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 13:48:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7AD2EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 13:52:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5ACCA2070C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 13:48:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 384DF2070C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 13:52:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qSRLu/0h"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5ACCA2070C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lpW7zGX8";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ajxlO0fi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 384DF2070C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=ox/5OsN7UOH3IKMRCgL0dRHh2VhYBcVTk55bVbpjWys=; b=qSRLu/0hXeJzKy
-	R1wimuY6K5M9uCusBoDdOuoa9tHfWa3+SccTUovl7CuNZHfOtciQylUaCnsyy/3g3K+/kq6KU34L6
-	zOPz1Ly8thbhHm1K+CjSiQpgStizb0ZC3Z4rP3Mh3BANQhbl7XWTCMZlidoNi49dq37iRnsI5pvth
-	6+yqcaLBJ/Zg7McEurIz0kBKgLktfACjvZN4bW7k5JiVQdrL7opUtOrUqbIuHGi5SrtvirXbo+D1d
-	MlGwsJ49fHF9KETT8DjgpxCUHQ+zcHAesTwezg/ERXUxyEQhrsQt57Hc5nZj0Z8uoKJBt+R35NhxR
-	pAZRf0ChxZn2m161alrQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ZlZzOQYm4Xo+9MMPZpq8CCGrmK9yi7n66O8v7s+7VDQ=; b=lpW7zGX81FbazY
+	r+6SvQkTbR/9DyUGNIBvt2r0Zn/a1RsGfqfQ2SlX0zhuq377gs60hhh4ysplgnbtmESrdyqCqI4TR
+	pPRISVGXF+aI541LrxRPjhtbHly8B9Gw1iAf0rftEPBV2w09KQjkFoGw3MePG47z313hOs1M2NH+1
+	yXLNQmkRTZSNPzEGj7sEj8pRwrBOPEuC5enEW/zsB0EckdKkoPy5H/cyAEun5hjHz6rREfIJ3u4jw
+	VW7mQtncpIUovzM7g85p86LO5hEiCm57e5uX9t9/Y/DvsjBSQL0EA4ZJcyKofRlI/PCn/xVpI6kku
+	5O7qEPRUvMXD7aD/DKow==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfPpz-0005RN-Q0; Fri, 04 Jan 2019 13:48:35 +0000
-Received: from mx08-00178001.pphosted.com ([91.207.212.93]
- helo=mx07-00178001.pphosted.com)
+	id 1gfPtu-00078A-6s; Fri, 04 Jan 2019 13:52:38 +0000
+Received: from mail-ed1-x531.google.com ([2a00:1450:4864:20::531])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfPpQ-0004ow-Dv
- for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 13:48:09 +0000
-Received: from pps.filterd (m0046660.ppops.net [127.0.0.1])
- by mx08-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x04DfHAP026819; Fri, 4 Jan 2019 14:47:57 +0100
-Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx08-00178001.pphosted.com with ESMTP id 2pnxxc0v9k-1
- (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Fri, 04 Jan 2019 14:47:57 +0100
-Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 308D638;
- Fri,  4 Jan 2019 13:47:57 +0000 (GMT)
-Received: from Webmail-eu.st.com (Safex1hubcas21.st.com [10.75.90.44])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 131495310;
- Fri,  4 Jan 2019 13:47:57 +0000 (GMT)
-Received: from SAFEX1HUBCAS23.st.com (10.75.90.47) by SAFEX1HUBCAS21.st.com
- (10.75.90.44) with Microsoft SMTP Server (TLS) id 14.3.361.1; Fri, 4 Jan 2019
- 14:47:56 +0100
-Received: from localhost (10.129.4.161) by webmail-ga.st.com (10.75.90.48)
- with Microsoft SMTP Server (TLS) id 14.3.361.1; Fri, 4 Jan 2019 14:47:56
- +0100
-From: Fabien Dessenne <fabien.dessenne@st.com>
-To: Jassi Brar <jassisinghbrar@gmail.com>, Maxime Coquelin
- <mcoquelin.stm32@gmail.com>, Alexandre Torgue <alexandre.torgue@st.com>,
- <linux-kernel@vger.kernel.org>, <linux-stm32@st-md-mailman.stormreply.com>,
- <linux-arm-kernel@lists.infradead.org>
-Subject: [PATCH 1/2] mailbox: stm32-ipcc: do not enable wakeup source by
- default
-Date: Fri, 4 Jan 2019 14:47:47 +0100
-Message-ID: <1546609668-6488-1-git-send-email-fabien.dessenne@st.com>
-X-Mailer: git-send-email 2.7.4
+ id 1gfPtr-00077L-FH
+ for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 13:52:37 +0000
+Received: by mail-ed1-x531.google.com with SMTP id o10so31794697edt.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 04 Jan 2019 05:52:34 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=2ep5TUwXKNyInpMcpvSVipIR0a+OfcdvALZkZTc4mwE=;
+ b=ajxlO0finsb4JKhrTS/16ipmxAJaJbq7H5tRymJ1CD2iNw7JwiIhDwb+CHlnU6rhBi
+ +bhcXpXPbogeCZGNt1I8gQibpoLWQWi6WaZZX610gKaEseOd5VYHifZ0EATND2DbrxdH
+ gEMkcwHXI6gcwx5V7hjK75Uh8YjIigQHviTNN5je7t4ptl5pm8dTQULjbyqKI6JaiMZs
+ 9UvheNP+vaUpIWKSTzo9HHhIle5KlfmO5a5YD9dj0utw8R3BLh3oLUxbDoASgOevVufm
+ S9oibCTj/48zgQ1D3V9y7GQNQtCSSQQvSYo9IF/KbZjUVjmvvZW+amU+ccPQrybzz2n1
+ j37g==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=2ep5TUwXKNyInpMcpvSVipIR0a+OfcdvALZkZTc4mwE=;
+ b=j7vJOganrKmt8D+ssPcBYWE3aQuSeUh2yIdE28Zot2jEGne+c3aarllFcHPLNos0IX
+ rJWF7azeWLnK7o6BVSGKXUCusVucafA5fS6zn+2zwesuRPB1PZsxoYE/mfj4H0xR+nXI
+ q7eLEh5LuVx4hNBwIV0X9phszbfHrzjZErrF/zPm7aZWqxcTPBUGWoi96cb1ZxQPkLfl
+ yjrkQX9mJ9jhWl9Mc8aeJ2mqyOPTwrELwzWzZcY5+DjfjuQLhj8iQ8wNrX/x0a3rFoZa
+ O24c+l7GdmtIiZgGKhburgoca1gJT0TEuqwxLM5LR35bijhb90YCCvjKCpsNOvvo6DlX
+ IjKA==
+X-Gm-Message-State: AA+aEWZtsg+JGQvtPIwbncSt1qp0EWEifXrqa5c79k0oLTzM4FniYiDF
+ TN0TYY5OWQCnBFUgD/fMQ7s=
+X-Google-Smtp-Source: AFSGD/XzSA9+PFFHJ8Dkd+CEscRo+nzCnweJf4SjfcAAAk1c9oDdLmQRqNhuNjd+pEEpTMBeIsKd3A==
+X-Received: by 2002:a17:906:b1b:: with SMTP id
+ u27-v6mr38763863ejg.67.1546609952757; 
+ Fri, 04 Jan 2019 05:52:32 -0800 (PST)
+Received: from localhost (ip1f11350a.dynamic.kabel-deutschland.de.
+ [31.17.53.10])
+ by smtp.gmail.com with ESMTPSA id c30sm25186266edc.70.2019.01.04.05.52.31
+ (version=TLS1_2 cipher=AES128-SHA bits=128/128);
+ Fri, 04 Jan 2019 05:52:31 -0800 (PST)
+Date: Fri, 4 Jan 2019 14:52:31 +0100
+From: Oliver Graute <oliver.graute@gmail.com>
+To: Neil Armstrong <narmstrong@baylibre.com>
+Subject: Re: [PATCHv2] ARM: dts: Add support for Variscite DART-6UL board
+Message-ID: <20190104135231.GB31930@ripley>
+References: <1546608371-31472-1-git-send-email-oliver2000@gmx.net>
+ <413a63ce-618e-4edc-ab1a-cd3071543a84@baylibre.com>
 MIME-Version: 1.0
-X-Originating-IP: [10.129.4.161]
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2019-01-04_05:, , signatures=0
+Content-Disposition: inline
+In-Reply-To: <413a63ce-618e-4edc-ab1a-cd3071543a84@baylibre.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190104_054801_283363_9E853934 
-X-CRM114-Status: GOOD (  11.67  )
+X-CRM114-CacheID: sfid-20190104_055235_535201_8E4D6377 
+X-CRM114-Status: GOOD (  16.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,39 +99,51 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnaud Pouliquen <arnaud.pouliquen@st.com>,
- Benjamin Gaignard <benjamin.gaignard@st.com>,
- Ludovic Barre <ludovic.barre@st.com>
+Cc: s.hauer@pengutronix.de, linux-imx@nxp.com, kernel@pengutronix.de,
+ fabio.estevam@nxp.com, shawnguo@kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-By default do not enable the wakeup source.
-This lets the userspace application decide whether the wakeup source
-shall be enabled or not.
+On 04/01/19, Neil Armstrong wrote:
+> Hi Olivier,
+> 
+> On 04/01/2019 14:26, Oliver Graute wrote:
+> > From: Oliver Graute <oliver.graute@gmail.com>
+> > 
+> > This patch adds support for the Variscite DART-6UL SoM
+> > 
+> > Signed-off-by: Oliver Graute <oliver.graute@gmail.com>
+> > ---
+> > changes since PATCHv1:
+> > 
+> >  - reworked this patch according to Fabios comments
+> > 
+> >  Questions:
+> > 
+> >  - its unclear for me howto handle the LCD timings
+> >  - unclear howto split things into base board and SoM the best way
+> >  - do someone have the same Variscite base board with other SoM here?
+> 
+> Seems you missed my reply in your V1.
 
-Signed-off-by: Fabien Dessenne <fabien.dessenne@st.com>
----
- drivers/mailbox/stm32-ipcc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+sry i'll take a look
 
-diff --git a/drivers/mailbox/stm32-ipcc.c b/drivers/mailbox/stm32-ipcc.c
-index a338bd4..7ca8a14 100644
---- a/drivers/mailbox/stm32-ipcc.c
-+++ b/drivers/mailbox/stm32-ipcc.c
-@@ -270,7 +270,7 @@ static int stm32_ipcc_probe(struct platform_device *pdev)
- 			goto err_clk;
- 		}
- 
--		device_init_wakeup(dev, true);
-+		device_set_wakeup_capable(dev, true);
- 		ret = dev_pm_set_dedicated_wake_irq(dev, ipcc->wkp);
- 		if (ret) {
- 			dev_err(dev, "Failed to set wake up irq\n");
--- 
-2.7.4
+> Please have a look how I added support for the iMX6QDL variant,
+> separation betweem SoM and Board should be similar, the kits are very
+> close.
 
+thx for this hint, I take a look to imx6qdl-var-dart.dtsi
+
+> PS: And please add a cover letter to your patchset next time !
+
+ok
+
+Best regards,
+
+Oliver
 
 _______________________________________________
 linux-arm-kernel mailing list
