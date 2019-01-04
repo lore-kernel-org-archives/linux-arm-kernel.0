@@ -8,17 +8,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 53FA8C43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 17:51:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AD29CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 17:52:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 107FD21872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 17:51:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6ED9621872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 17:52:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OU/55XQL";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="o0FDJgev"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 107FD21872
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="laCpPBz+";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="cl1DLcwR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6ED9621872
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,66 +27,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=yQwxqhcXCocFPPwphep1vt0FJqVXQ/wKjpTpXonvQHA=; b=OU/55XQLDgZYC1
-	6iVxLEL9rdkmehxWQ4yQRr7RrCOw9SuKvkU4fc0KKbUG/sJtc9zQFGHLXHNotMo7ivLk5uABsjhsz
-	z1JQdxNTonKHiVwIBU1WqmxGNYZq/eENPU8mHh2+ZnfDPJ/tu3t8dY5P7qdBBvQRdQm6WkguMScBR
-	+k+NcRacB71C9X6/58sZGcb1PdXeOTBvUd2ZwEa8AWz92+/P20CPa5yl5Eop94Gtyplt4y/EsmK4V
-	RCQIWhfK7kHOkXgLnFioRMKXc8nWKwhJX5vcqMHbPR3qf6s6CfLZfV9NM+946iFlhYAYSt4OxP7xU
-	UVZU+FS8c3VqauKx5z1A==;
+	List-Owner; bh=vb261sJecCBTIWcXpDT4yjJ9DYwsxGgnTraiG1zlh6U=; b=laCpPBz+OphdG7
+	HLnEmaXE/AJJ1kVnFJ+2l+xboksjhNOxqSBHynkpXaZHO38QwoTYD+FREy8sUzjMVqWjteQSlCGcJ
+	puEQ+ZML7coZtbJovMRKc6bGikHu26x22r7WvofkDhfzMBYa2mk9SjReqZq0VX+sFrOT/ocmQdcTg
+	+Rt8XYmgELKRwtittvPn4ESt8jonXVAujaLfUJn4DGZsBugnAzx/tgEb6GplAzmyUNWbL5BpW8RoY
+	lO3uMC249BNMQ9vpf3LdD2BU/effTItYdhp5jjFLJG5l8ZoQmuHUvBUH0cYFT148fk0LGszYfa3mH
+	CmLyt/qglSGxPEY/eBIg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfTdH-0007IG-3G; Fri, 04 Jan 2019 17:51:43 +0000
-Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
+	id 1gfTdU-0007WF-9i; Fri, 04 Jan 2019 17:51:56 +0000
+Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfTbY-0004Ib-5z
- for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 17:50:13 +0000
-Received: by mail-pl1-x641.google.com with SMTP id g9so17734282plo.3
+ id 1gfTba-0004L0-2d
+ for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 17:50:16 +0000
+Received: by mail-pl1-x642.google.com with SMTP id 101so17733742pld.6
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 04 Jan 2019 09:49:56 -0800 (PST)
+ Fri, 04 Jan 2019 09:49:57 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=x2fXdz4Ik0AFAzOQLJZdPMvlCQxR5gTcFSjR6Jns4ok=;
- b=o0FDJgev9btFmYYkveMGrkg/Hkmls0C8+1uS/nygLw4Uk7vy/dy9p8BKoV/YhfH3wp
- 4vGK5MGwAkx10+ic3evz42ug6d/Sf5yOaTxPqhZP6wjJlVFYtP0ZvgwjLyd76mPsftVQ
- QerpaZdGIkOxN2mZxUgu4kvKEWGSVzRYWONCfW0jLa+y/mwm7G9rnvxe/X9e9xH/R9KM
- +csBimpxYMZfnbZTCSBBaXL2SJ6bER9uaFzg+3aO1jPf7xrzezyC3KP0t2ba2c8mrzHj
- LDoPufDPALnR77DADEmjBJJrrvChh2HBsXvzeZdSdx0YmmMFBczmk/udUxfQ7PZtoy4W
- USFQ==
+ bh=shK5Doptk0Qhk1JfbtIOZ/odHZxsAlF8OFxlwBmTSmo=;
+ b=cl1DLcwRE/0QWpXSbhSh5i0/TvsBDRwsOkAAPfQn0820+d/QVQbClX49IoSnREMRBL
+ zxnfMG4pWoNcC8D0cP6VPi2bj6s10QjS2/WG1XgllsKJPtdSAMIrQm20reIhnEw6z9HX
+ +BLrO1ogIB0/6RxoBfW+KluWbWMcl+Q5Jqq66h0OXhirOVEKyLYFZKyQ/NCM0GCeWaLA
+ IE6sgPXDOv9RtA56sojeXdqs/ewJ58mXxoaP7WeXq4VU54Zxk5GwgtBibUyYZTZcTqAa
+ iSVVH/4dWXNs7hVbX17zPNm0jN+VsFQRG+iwmunKx71ox3qmkzuzdUUf8/iIlym9kc9r
+ 3j+g==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=x2fXdz4Ik0AFAzOQLJZdPMvlCQxR5gTcFSjR6Jns4ok=;
- b=Si3hplWh/sf/UkEt5t/6TV/DjjjHBL9ElSNeXUK+A3GVnOeZTUtqsTQyob335PoXTl
- MvIuk18QzzzqluAI+pWnB87HTmQ941Yj86tCMbBMU2gMVuwpCp2/ZyVwjw/+96RKS+5O
- OqY42utfZxD3w9Op9XWPVvskBG3CGYQbrIEp6xpy+ffXN2XZXr+lRpAbM6OSYbjhzEX3
- ar6DRIDy797Hb0zCrPyur53nIW4D9seiV32NpUrkkU3/6SbYswN0dRqmnT56jsVjkrTJ
- CaKEbhdDeaKLE1zA2tCeJ4Y78oDyNQtYsepZ51UlZBGCzkmkeGlgKEnYrkt0rBD+/aYH
- nXkQ==
-X-Gm-Message-State: AJcUukc0jmHLqepcWbbiDeWwiFddbIFMo51JH9gcrftkv5tteqefsrbB
- 78tHIGChN6bg4oW6Vq3yI1I=
-X-Google-Smtp-Source: ALg8bN5ad63oBiClCtZSZLIALm9EAJPHW2K5pki0ZrSO3gi4fH5hTpIUwFEptho0YVi2j6ZqVHykMA==
-X-Received: by 2002:a17:902:1105:: with SMTP id
- d5mr49894927pla.47.1546624195161; 
- Fri, 04 Jan 2019 09:49:55 -0800 (PST)
+ bh=shK5Doptk0Qhk1JfbtIOZ/odHZxsAlF8OFxlwBmTSmo=;
+ b=dovLph8ygF5Xppo7ZtCIIDSSEyDFGyEB+UyK6HrYJ3ZZgBY76YeaZkf255ffyDcg4U
+ F/+5FhxOpSmOSarL9v16IP8e9spWLFHjFGbBfK+yYyHARvM7DdWozybW1S9AidIuj0o1
+ HtETwqFZatNO9HfIvPSgh2VEmu8OyiVYwNgPjO6lbJi6rFS4IJDau9PvVA/PWXgeFc3S
+ NntN87OYZ9rlPTfborfT5QwByiTJ1f8kF3TAFHo4AotqgwR8i2b4Lz6iRSiI8UUonlmt
+ E6QhitgqggKCGiwu2tLI5SnA5B5zdzoxKTB4Ou0GrXxNY5cA7Z+BlB3cmeMKraNJi+BT
+ 5AzQ==
+X-Gm-Message-State: AJcUukcuM3qygy4E8kN/tlnMTaud6TmDOoLRd6k4rXA6MTlYg1yYJu0W
+ hW6EvEYxQwC3N2mX9IVzD4c=
+X-Google-Smtp-Source: ALg8bN7xL2Wj0D3OvOejOoR/ru4ykY6LA92CJfEgjRNXWosVQ6tj6c/GwLJV5CaMLFa9MqTdBrCMeA==
+X-Received: by 2002:a17:902:5982:: with SMTP id
+ p2mr51337128pli.39.1546624197107; 
+ Fri, 04 Jan 2019 09:49:57 -0800 (PST)
 Received: from squirtle.lan (c-24-22-235-96.hsd1.wa.comcast.net.
  [24.22.235.96])
- by smtp.gmail.com with ESMTPSA id i193sm100699632pgc.22.2019.01.04.09.49.53
+ by smtp.gmail.com with ESMTPSA id i193sm100699632pgc.22.2019.01.04.09.49.55
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 04 Jan 2019 09:49:54 -0800 (PST)
+ Fri, 04 Jan 2019 09:49:56 -0800 (PST)
 From: Andrey Smirnov <andrew.smirnov@gmail.com>
 To: linux-pci@vger.kernel.org
-Subject: [PATCH v2 08/20] PCI: dwc: Share code for dw_pcie_rd/wr_other_conf()
-Date: Fri,  4 Jan 2019 09:49:13 -0800
-Message-Id: <20190104174925.17153-9-andrew.smirnov@gmail.com>
+Subject: [PATCH v2 09/20] PCI: dwc: imx6: Share PHY debug register definitions
+Date: Fri,  4 Jan 2019 09:49:14 -0800
+Message-Id: <20190104174925.17153-10-andrew.smirnov@gmail.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190104174925.17153-1-andrew.smirnov@gmail.com>
 References: <20190104174925.17153-1-andrew.smirnov@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190104_094957_410163_FB49A4EF 
-X-CRM114-Status: GOOD (  13.93  )
+X-CRM114-CacheID: sfid-20190104_094958_641686_C63F26FA 
+X-CRM114-Status: GOOD (  12.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,8 +101,7 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
 Cc: "A.s. Dong" <aisheng.dong@nxp.com>,
  Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
  Richard Zhu <hongxing.zhu@nxp.com>, linux-arm-kernel@lists.infradead.org,
- Andrey Smirnov <andrew.smirnov@gmail.com>,
- Gustavo Pimentel <gustavo.pimentel@synopsys.com>, linux-kernel@vger.kernel.org,
+ Andrey Smirnov <andrew.smirnov@gmail.com>, linux-kernel@vger.kernel.org,
  Fabio Estevam <fabio.estevam@nxp.com>, linux-imx@nxp.com,
  Bjorn Helgaas <bhelgaas@google.com>, Leonard Crestez <leonard.crestez@nxp.com>,
  Chris Healy <cphealy@gmail.com>, Lucas Stach <l.stach@pengutronix.de>
@@ -111,10 +110,10 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Default implementation of pcie_rd_other_conf() and
-dw_pcie_wd_other_conf() share more than 80% of their code. Move shared
-code into a dedicated subroutine and convert pcie_rd_other_conf() and
-dw_pcie_wd_other_conf() to use it. No functional change intended.
+Both pcie-designware.c and pci-imx6.c contain custom definitions for
+PHY debug registers R0/R1 and on top of that there's already a
+definition for R0 in pcie-designware.h. Move all of the definitions to
+pcie-designware.h. No functional change intended.
 
 Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
@@ -128,110 +127,81 @@ Cc: linux-imx@nxp.com
 Cc: linux-arm-kernel@lists.infradead.org
 Cc: linux-kernel@vger.kernel.org
 Cc: linux-pci@vger.kernel.org
-Acked-by: Gustavo Pimentel <gustavo.pimentel@synopsys.com>
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- .../pci/controller/dwc/pcie-designware-host.c | 61 +++++++------------
- 1 file changed, 23 insertions(+), 38 deletions(-)
+ drivers/pci/controller/dwc/pci-imx6.c        |  6 ++----
+ drivers/pci/controller/dwc/pcie-designware.c | 12 +++---------
+ drivers/pci/controller/dwc/pcie-designware.h |  3 +++
+ 3 files changed, 8 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/pci/controller/dwc/pcie-designware-host.c b/drivers/pci/controller/dwc/pcie-designware-host.c
-index 721d60a5d9e4..8f957cd6901b 100644
---- a/drivers/pci/controller/dwc/pcie-designware-host.c
-+++ b/drivers/pci/controller/dwc/pcie-designware-host.c
-@@ -512,8 +512,9 @@ int dw_pcie_host_init(struct pcie_port *pp)
+diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+index 282b09076fea..5e7fab089bde 100644
+--- a/drivers/pci/controller/dwc/pci-imx6.c
++++ b/drivers/pci/controller/dwc/pci-imx6.c
+@@ -99,8 +99,6 @@ struct imx6_pcie {
+ 
+ /* PCIe Port Logic registers (memory-mapped) */
+ #define PL_OFFSET 0x700
+-#define PCIE_PHY_DEBUG_R0 (PL_OFFSET + 0x28)
+-#define PCIE_PHY_DEBUG_R1 (PL_OFFSET + 0x2c)
+ 
+ #define PCIE_PHY_CTRL (PL_OFFSET + 0x114)
+ #define PCIE_PHY_CTRL_DATA_LOC 0
+@@ -784,8 +782,8 @@ static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
+ 
+ err_reset_phy:
+ 	dev_dbg(dev, "PHY DEBUG_R0=0x%08x DEBUG_R1=0x%08x\n",
+-		dw_pcie_readl_dbi(pci, PCIE_PHY_DEBUG_R0),
+-		dw_pcie_readl_dbi(pci, PCIE_PHY_DEBUG_R1));
++		dw_pcie_readl_dbi(pci, PCIE_PORT_DEBUG0),
++		dw_pcie_readl_dbi(pci, PCIE_PORT_DEBUG1));
+ 	imx6_pcie_reset_phy(imx6_pcie);
  	return ret;
  }
+diff --git a/drivers/pci/controller/dwc/pcie-designware.c b/drivers/pci/controller/dwc/pcie-designware.c
+index 67236379c61a..d123ac290b9e 100644
+--- a/drivers/pci/controller/dwc/pcie-designware.c
++++ b/drivers/pci/controller/dwc/pcie-designware.c
+@@ -14,12 +14,6 @@
  
--static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
--				 u32 devfn, int where, int size, u32 *val)
-+static int dw_pcie_access_other_conf(struct pcie_port *pp, struct pci_bus *bus,
-+				     u32 devfn, int where, int size, u32 *val,
-+				     bool write)
- {
- 	int ret, type;
- 	u32 busdev, cfg_size;
-@@ -521,9 +522,6 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
- 	void __iomem *va_cfg_base;
- 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+ #include "pcie-designware.h"
  
--	if (pp->ops->rd_other_conf)
--		return pp->ops->rd_other_conf(pp, bus, devfn, where, size, val);
+-/* PCIe Port Logic registers */
+-#define PLR_OFFSET			0x700
+-#define PCIE_PHY_DEBUG_R1		(PLR_OFFSET + 0x2c)
+-#define PCIE_PHY_DEBUG_R1_LINK_UP	(0x1 << 4)
+-#define PCIE_PHY_DEBUG_R1_LINK_IN_TRAINING	(0x1 << 29)
 -
- 	busdev = PCIE_ATU_BUS(bus->number) | PCIE_ATU_DEV(PCI_SLOT(devfn)) |
- 		 PCIE_ATU_FUNC(PCI_FUNC(devfn));
+ int dw_pcie_read(void __iomem *addr, int size, u32 *val)
+ {
+ 	if (!IS_ALIGNED((uintptr_t)addr, size)) {
+@@ -334,9 +328,9 @@ int dw_pcie_link_up(struct dw_pcie *pci)
+ 	if (pci->ops->link_up)
+ 		return pci->ops->link_up(pci);
  
-@@ -542,7 +540,11 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
- 	dw_pcie_prog_outbound_atu(pci, PCIE_ATU_REGION_INDEX1,
- 				  type, cpu_addr,
- 				  busdev, cfg_size);
--	ret = dw_pcie_read(va_cfg_base + where, size, val);
-+	if (write)
-+		ret = dw_pcie_write(va_cfg_base + where, size, *val);
-+	else
-+		ret = dw_pcie_read(va_cfg_base + where, size, val);
-+
- 	if (pci->num_viewport <= 2)
- 		dw_pcie_prog_outbound_atu(pci, PCIE_ATU_REGION_INDEX1,
- 					  PCIE_ATU_TYPE_IO, pp->io_base,
-@@ -551,43 +553,26 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
- 	return ret;
+-	val = readl(pci->dbi_base + PCIE_PHY_DEBUG_R1);
+-	return ((val & PCIE_PHY_DEBUG_R1_LINK_UP) &&
+-		(!(val & PCIE_PHY_DEBUG_R1_LINK_IN_TRAINING)));
++	val = readl(pci->dbi_base + PCIE_PORT_DEBUG1);
++	return ((val & PCIE_PORT_DEBUG1_LINK_UP) &&
++		(!(val & PCIE_PORT_DEBUG1_LINK_IN_TRAINING)));
  }
  
-+static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
-+				 u32 devfn, int where, int size, u32 *val)
-+{
-+	if (pp->ops->rd_other_conf)
-+		return pp->ops->rd_other_conf(pp, bus, devfn, where,
-+					      size, val);
-+
-+	return dw_pcie_access_other_conf(pp, bus, devfn, where, size, val,
-+					 false);
-+}
-+
- static int dw_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
- 				 u32 devfn, int where, int size, u32 val)
- {
--	int ret, type;
--	u32 busdev, cfg_size;
--	u64 cpu_addr;
--	void __iomem *va_cfg_base;
--	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
--
- 	if (pp->ops->wr_other_conf)
--		return pp->ops->wr_other_conf(pp, bus, devfn, where, size, val);
--
--	busdev = PCIE_ATU_BUS(bus->number) | PCIE_ATU_DEV(PCI_SLOT(devfn)) |
--		 PCIE_ATU_FUNC(PCI_FUNC(devfn));
-+		return pp->ops->wr_other_conf(pp, bus, devfn, where,
-+					      size, val);
+ void dw_pcie_setup(struct dw_pcie *pci)
+diff --git a/drivers/pci/controller/dwc/pcie-designware.h b/drivers/pci/controller/dwc/pcie-designware.h
+index 9943d8c68335..58735fd01668 100644
+--- a/drivers/pci/controller/dwc/pcie-designware.h
++++ b/drivers/pci/controller/dwc/pcie-designware.h
+@@ -39,6 +39,9 @@
+ #define PCIE_PORT_DEBUG0		0x728
+ #define PORT_LOGIC_LTSSM_STATE_MASK	0x1f
+ #define PORT_LOGIC_LTSSM_STATE_L0	0x11
++#define PCIE_PORT_DEBUG1		0x72C
++#define PCIE_PORT_DEBUG1_LINK_UP		(0x1 << 4)
++#define PCIE_PORT_DEBUG1_LINK_IN_TRAINING	(0x1 << 29)
  
--	if (bus->parent->number == pp->root_bus_nr) {
--		type = PCIE_ATU_TYPE_CFG0;
--		cpu_addr = pp->cfg0_base;
--		cfg_size = pp->cfg0_size;
--		va_cfg_base = pp->va_cfg0_base;
--	} else {
--		type = PCIE_ATU_TYPE_CFG1;
--		cpu_addr = pp->cfg1_base;
--		cfg_size = pp->cfg1_size;
--		va_cfg_base = pp->va_cfg1_base;
--	}
--
--	dw_pcie_prog_outbound_atu(pci, PCIE_ATU_REGION_INDEX1,
--				  type, cpu_addr,
--				  busdev, cfg_size);
--	ret = dw_pcie_write(va_cfg_base + where, size, val);
--	if (pci->num_viewport <= 2)
--		dw_pcie_prog_outbound_atu(pci, PCIE_ATU_REGION_INDEX1,
--					  PCIE_ATU_TYPE_IO, pp->io_base,
--					  pp->io_bus_addr, pp->io_size);
--
--	return ret;
-+	return dw_pcie_access_other_conf(pp, bus, devfn, where, size, &val,
-+					 true);
- }
- 
- static int dw_pcie_valid_device(struct pcie_port *pp, struct pci_bus *bus,
+ #define PCIE_LINK_WIDTH_SPEED_CONTROL	0x80C
+ #define PORT_LOGIC_SPEED_CHANGE		(0x1 << 17)
 -- 
 2.20.1
 
