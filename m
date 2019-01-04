@@ -2,112 +2,60 @@ Return-Path: <SRS0=E6Hv=PM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3B841C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 18:03:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9FCA5C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 18:06:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ED389218D3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 18:03:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 65D05218D3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 18:06:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Nby7sSFz";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="NHA8UPSF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ED389218D3
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uaGykmv3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 65D05218D3
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=goodmis.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DZmeKloeZeAwWCi5GOBNajjgys3muiPhuMtR5JnTJYU=; b=Nby7sSFziirmxr
-	7CzIPYo58oaerjHS2Sq7inFHJw7fqIkUozs6N9NjijTeSQc35sU1aG8znuNkmDNoOh+931BHajI6R
-	bPvp6nGF131i8eDLyoYGC2FhuDA1ASHKxk8yme5dWT8z50vndoFMx29+7W+48jrqY/Qoyds88FyHK
-	pNPKiXq7X/A9MfkbS1w4jhWUQKt8t7yKNyvUp8IpfU7JV04B2m/+PFLkCDFXePnKlkbNeL565FAga
-	NOFYth6wfWCHwpOsjY9QtNMHpWFcgT4yTYs5zJ78jxbtM0JeNkp+qUXBGENhyqq9dghPFSbfvHX0X
-	Uyq8W58DFZhlDC9aAHqA==;
+	List-Owner; bh=O9Ln5qDEhDgVQ67e0OooLg6xcyExmyqmhQZY6nu+oOY=; b=uaGykmv3IYSbUL
+	/U7CtwiQqGJDHdIr8ZMwUEtOmZwR05hGlIws7zQe/mw9f5FmTNYHqS28YnBco1CSMlLRrXIliO6BQ
+	5AM4UKprLCPf4ZvsPyDjDIkb4xAI8xTYkh9mEtfP8HdSzaJSnY0yKS9fT/+iOjnEpLv8/9Ztz7Bsm
+	H0OEWdVoCjym0Um++83KiG0fJopN7nkVszzJDK1zPFdoTg3D+rwQblCAnsyXBTaxS4x+9cuUzAvaG
+	Q7b9Ng70cuW+cLy7vtvFEZYnuLng8LKFPrJK03MxFv4vC6gKqUyXP/WQiwQn1bz9NKedMN1hsd3+W
+	lZ/7kO2itXmiYaVsiZbw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfToS-0000j4-LQ; Fri, 04 Jan 2019 18:03:16 +0000
-Received: from mail-ve1eur02on0624.outbound.protection.outlook.com
- ([2a01:111:f400:fe06::624]
- helo=EUR02-VE1-obe.outbound.protection.outlook.com)
+	id 1gfTs0-0002nf-GV; Fri, 04 Jan 2019 18:06:56 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfTcK-0006Fq-BO
- for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 17:51:24 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=/ycRanE1PLC28Kv5AjRGhHR3Ni2r+ij468A0lieghZk=;
- b=NHA8UPSF2+ZoOxhqQVzh0zhtVPBEywzudQqivaNOwd02JlpUBsDPWk5vjE7NYK8ocThuwjpp0liJy2WFRJG7haASUltdtaJwBej7wzdHdXJE7Z6FzQVc5CkJrK8iDAxsqvLqp5voINJjwYfK9FGbY52rjHrqZHOLYruEEGu/m1k=
-Received: from VI1PR0402MB2800.eurprd04.prod.outlook.com (10.172.255.18) by
- VI1PR0402MB3389.eurprd04.prod.outlook.com (52.134.1.149) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1471.20; Fri, 4 Jan 2019 17:50:37 +0000
-Received: from VI1PR0402MB2800.eurprd04.prod.outlook.com
- ([fe80::95a2:5df5:8d7b:22e9]) by VI1PR0402MB2800.eurprd04.prod.outlook.com
- ([fe80::95a2:5df5:8d7b:22e9%7]) with mapi id 15.20.1495.005; Fri, 4 Jan 2019
- 17:50:37 +0000
-From: Ioana Ciornei <ioana.ciornei@nxp.com>
-To: Rob Herring <robh@kernel.org>
-Subject: RE: [PATCH 2/3] Documentation: DT: Add entry for DPAA2 console
-Thread-Topic: [PATCH 2/3] Documentation: DT: Add entry for DPAA2 console
-Thread-Index: AQHUmUIzLDDB55qxuECeWDzF4+LHLKWeFHgAgAFZMBA=
-Date: Fri, 4 Jan 2019 17:50:37 +0000
-Message-ID: <VI1PR0402MB280090CC66E990AD6E82F52FE08E0@VI1PR0402MB2800.eurprd04.prod.outlook.com>
-References: <1545406240-3061-1-git-send-email-ioana.ciornei@nxp.com>
- <1545406240-3061-3-git-send-email-ioana.ciornei@nxp.com>
- <20190103203250.GA18731@bogus>
-In-Reply-To: <20190103203250.GA18731@bogus>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-originating-ip: [86.34.165.90]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; VI1PR0402MB3389;
- 6:ygxncry4yY4OR9JzpbzbqjgZxtjgZ/s5fTwgKAYYKsavNT7RriJN2qdxRHCAZ4rGgxPFtfxWCd4P7Qy7MlsSugbLth6jwsDBRSU+EKlFwvFJrb2uNykmKVkp8LTMu+emVW1fF/m+bCi+phlU7GzDVUZ7xNj57SDmdaJuzLifiG8T1Vm/1sGfNl9hAQh2KT8yDjZCZn3670uHJXZffxbG26Sl4kR2BbEw40sStPLSr3X3kzSC2KrfnSooWsh6bJKesgy2GDA//xyINaiXfLrNYObLvONSpI7XdHNGvy/r+XIg4F4OsC96CLfoec9x8tWRM1eiew3LXL8IQcWERIC0pdhE0HOItkXOHOEqrF9n5YgiAZe/hiRt0Cp7jBrHgiwm8VTV4eBJ1ygatCgrADeffq7ka2M0yXZRcEeTw+tHEoRE4vbYfTGPcZ+RmcM1IOW1UjMVqUxTkLuJFWTqI3KvVA==;
- 5:ooVnbf8T2EdYVejegfI+Paz097TrrQUWVVOSshcZOePRgWq4FFZj8sJDFjWeJUARk8548EBNkRPM6ZoVnzja39v19nst1uWix4nIVcC0N1xUHLebtnGPUAMxK+gyBHauxdNMfmED8Kaj3LU8hCx1YnrRG+t6P2WXIMayKuvW108=;
- 7:bJqM7BNbk+HStP1jjIdwM/kZkc973Bd8xw0r+ZalhM+NpsS+n/D/DUYENAMY2TQ//AbmMffF1i2epBmde9+ljvf6XkZOKIbfy9Q6hRnStpoKiHxrULnJSLYjyrEHPhAvOGMpR/y32Ggscs9KNjNWvA==
-x-ms-exchange-antispam-srfa-diagnostics: SOS;
-x-ms-office365-filtering-correlation-id: d579e93b-544b-4446-664c-08d6726d2262
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR0402MB3389; 
-x-ms-traffictypediagnostic: VI1PR0402MB3389:
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=ioana.ciornei@nxp.com; 
-x-microsoft-antispam-prvs: <VI1PR0402MB3389AB9060FABCD0AAD7E3F5E08E0@VI1PR0402MB3389.eurprd04.prod.outlook.com>
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(3230021)(908002)(999002)(5005026)(6040522)(8220060)(2401047)(8121501046)(10201501046)(3002001)(93006095)(93001095)(3231475)(944501520)(52105112)(6055026)(6041310)(20161123564045)(20161123560045)(20161123562045)(20161123558120)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(201708071742011)(7699051)(76991095);
- SRVR:VI1PR0402MB3389; BCL:0; PCL:0; RULEID:; SRVR:VI1PR0402MB3389; 
-x-forefront-prvs: 0907F58A24
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(136003)(346002)(376002)(39860400002)(396003)(366004)(199004)(189003)(106356001)(316002)(478600001)(54906003)(71190400001)(71200400001)(14454004)(6116002)(66066001)(105586002)(7736002)(305945005)(3846002)(68736007)(256004)(486006)(25786009)(5660300001)(9686003)(6916009)(44832011)(74316002)(97736004)(7696005)(2906002)(76176011)(6436002)(4326008)(86362001)(33656002)(99286004)(446003)(476003)(6246003)(229853002)(102836004)(26005)(6506007)(186003)(53936002)(11346002)(81166006)(81156014)(8676002)(55016002)(8936002);
- DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR0402MB3389;
- H:VI1PR0402MB2800.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: WpDelCzYVOvF1nOEtm+Pp2RjCHhzxzltFXXhcSk0MeXSmlWkpskDhqII76iCoxRvrBA4tq+17Rtwf6W+Dk+xLPgfAbJjmb+huQH7tWffWhVUEwvndYzBJXWjxxSqGIc/cN0GYXSTK/HSU7z4TWgie1r3q6lscKA6vr+YMDllGgmvBs/CD7MR9n9q7cn4d0lkQ7XpNivZ+r1CbzvTeU+HQJEZ4bOsnuF/gK96jnxoxSgp7comn5MvmYPXX0uW2Q5v6VtuvN0p8ToHrm9ChtjH+gbG8HX6OFtM6+Mth348OUQAH66cpQ0ztPX4cTt087Jd
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1gfTrw-0002kB-RG
+ for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 18:06:54 +0000
+Received: from gandalf.local.home (cpe-66-24-56-78.stny.res.rr.com
+ [66.24.56.78])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 4D612218D3;
+ Fri,  4 Jan 2019 18:06:50 +0000 (UTC)
+Date: Fri, 4 Jan 2019 13:06:48 -0500
+From: Steven Rostedt <rostedt@goodmis.org>
+To: Mark Rutland <mark.rutland@arm.com>
+Subject: Re: [PATCH v6] arm64: implement ftrace with regs
+Message-ID: <20190104130648.02657f3f@gandalf.local.home>
+In-Reply-To: <20190104175017.GA7157@lakrids.cambridge.arm.com>
+References: <20190104141053.360F768D93@newverein.lst.de>
+ <20190104175017.GA7157@lakrids.cambridge.arm.com>
+X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: d579e93b-544b-4446-664c-08d6726d2262
-X-MS-Exchange-CrossTenant-originalarrivaltime: 04 Jan 2019 17:50:37.2028 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR0402MB3389
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190104_095045_795522_EF59F3E7 
-X-CRM114-Status: GOOD (  20.36  )
+X-CRM114-CacheID: sfid-20190104_100652_900334_96DB267E 
+X-CRM114-Status: GOOD (  13.21  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -119,66 +67,48 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Ioana Ciocoi Radulescu <ruxandra.radulescu@nxp.com>,
- Roy Pledge <roy.pledge@nxp.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Leo Li <leoyang.li@nxp.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Arnd Bergmann <arnd@arndb.de>, Julien Thierry <julien.thierry@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, AKASHI Takahiro <takahiro.akashi@linaro.org>,
+ Ingo Molnar <mingo@redhat.com>, Torsten Duwe <duwe@lst.de>,
+ Josh Poimboeuf <jpoimboe@redhat.com>,
+ Amit Daniel Kachhap <amit.kachhap@arm.com>, live-patching@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-> Subject: Re: [PATCH 2/3] Documentation: DT: Add entry for DPAA2 console
+On Fri, 4 Jan 2019 17:50:18 +0000
+Mark Rutland <mark.rutland@arm.com> wrote:
+
+> At Linux Plumbers, I had a conversation with Steve Rostedt, and we came
+> to the conclusion that (withut heavyweight synchronization) patching two
+> NOPs at runtime isn't safe, since a CPU might have executed the first
+> NOP as a NOP before another CPU patches both instructions. So a CPU
+> might execute:
 > 
-> On Fri, Dec 21, 2018 at 03:31:11PM +0000, Ioana Ciornei wrote:
-> > This patch adds a devicetree binding documentation for FSL's DPAA2
-> > console.
-> >
-> > Signed-off-by: Ioana Ciornei <ioana.ciornei@nxp.com>
-> > ---
-> >  Documentation/devicetree/bindings/misc/dpaa2-console.txt | 11
-> +++++++++++
-> >  MAINTAINERS                                              |  1 +
-> >  2 files changed, 12 insertions(+)
-> >  create mode 100644
-> > Documentation/devicetree/bindings/misc/dpaa2-console.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/misc/dpaa2-console.txt
-> > b/Documentation/devicetree/bindings/misc/dpaa2-console.txt
-> > new file mode 100644
-> > index 0000000..f4e16b1
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/misc/dpaa2-console.txt
-> > @@ -0,0 +1,11 @@
-> > +DPAA2 console support
-> > +
-> > +Required properties:
-> > +
-> > +    - compatible
-> > +        Value type: <string>
-> > +        Definition: Must be "dpaa2-console".
-> > +    - reg
-> > +        Value type: <prop-encoded-array>
-> > +        Definition: A standard property.  Specifies the region where the MCFBA
-> > +                    (MC firmware base address) register can be found.
+> 	NOP
+> 	BL	ftrace_regs_caller
 > 
-> What's the relationship between MCFBA and the console?
-
-The console is basically a log buffer of the MC firmware, and is found at a known offset compared to the firmware image's runtime base address.
-
-> The binding should describe the h/w block or firmware interface not the feature you want to
-> implement. Are there other functions provided by the MC firmware?
-
-The MC firmware manages all hardware resources related to networking or any other accelerators.
-Any interaction with the firmware is made through commands put in memory mapped regions.
-The fsl-mc bus driver is the one that already manages this interaction with the MC.
-
-Ioana
-
+> ... rather than the expected:
 > 
-> Rob
+> 	MOV	X9, X30
+> 	BL	ftrace_regs_caller
+> 
+> ... and therefore X9 contains some UNKNOWN value, rather than the
+> original LR value.
+> 
+> I wonder if we could solve that by patching the kernel at build-time, to
+> add the MOV X9, X30 in place of the first NOP. If we were to do that, we
+> could also update the addresses to pooint at the second NOP, simplifying
+> the changes to the runtime code.
+
+You can also patch it at boot up when there's only one CPU running, and
+interrupts are disabled.
+
+-- Steve
 
 _______________________________________________
 linux-arm-kernel mailing list
