@@ -2,111 +2,85 @@ Return-Path: <SRS0=E6Hv=PM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 25549C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 16:50:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A484EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 16:52:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E815F218D3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 16:50:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 74EA0218D3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 16:52:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IzjfCkOv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E815F218D3
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sSKkccci";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="jsjy8Uah"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 74EA0218D3
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=JWzW2YHX6s9LmtRRC4usrKBD34Q//Q2YRGPIBaOIkvI=; b=IzjfCkOvNl5Ify
-	EeAEfqGzH4GV8Tiwnr23bUBcxVnhomCZo48gL9zWyMQ+pFYs1GIQX8b4uFp/bYCJF3TBy6anq11Sm
-	+WKfpijfUsMCZsAUZnpzjBF3EyXjfYv93bE9zeY+eS371tJR2IOlR/7z9RIr787TO8aH4RkwPFTYe
-	NI0f5+o78tbE5etA0dg8XbqwqQFyXENLDpnlwD3mq6OmKtiNh5SBqZirkztyrypVHDndI6Eaa3Y2V
-	qzij4+XFiwQjBK1Zd1qTC8B31CLPH2J8OwCSVJE87ED8xHnTS999kx4LkzMz9DZKq0o33xdojkUpW
-	f0XybIczt/2e1ZpU5pNg==;
+	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Cc:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=8Wd7k8ZminpY4uU6Yp65YFkaeyJeIhfQJ+0NPh8Slps=; b=sSKkccciNki4zrt7NGOtsed67L
+	3UfSPN7MkfHa096vSOFHVsIptRsVan0nSQXajQ9jFL5rjqllNIs2QAlxDCcbp1l41vgupEdsZgR4V
+	yiENz/IALPe2sbmc0Hu0oREvVyLErNymhrr9dpyCbMXynislMtfsasYhtUGt9GZJs/le8HfijJNYq
+	Iwvyg6G8l4nGwZdET3cDFOvZ51TWW6iF9FgqFpZtrwkOKYD+3lBZxd5+yPwuvKx98oTIuT6GYrSCq
+	8QsOc74cY54vewPwApJBFQCJ/U8Il5QQbhd3zwrkLMuDQzs6QETpSFZ6EEvMR7zDLoeONxNCedqTc
+	GUMfVNxA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfSfY-0004HC-C2; Fri, 04 Jan 2019 16:50:00 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfSfU-0004GJ-NE
- for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 16:49:58 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3AE91EBD;
- Fri,  4 Jan 2019 08:49:52 -0800 (PST)
-Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 46B023F5D4; Fri,  4 Jan 2019 08:49:50 -0800 (PST)
-Subject: Re: [PATCH v3 3/3] arm64: Early boot time stamps
-To: Pavel Tatashin <pasha.tatashin@soleen.com>
-References: <20181226164509.22916-1-pasha.tatashin@soleen.com>
- <20181226164509.22916-4-pasha.tatashin@soleen.com>
- <9fe670d4-d799-c05f-297e-437eda1d2072@arm.com>
- <CA+CK2bA_006YGu3dtJM24pN1ZGgcJZnF2oEeWKkq3QBrcCbB6Q@mail.gmail.com>
- <86bm4wbff9.wl-marc.zyngier@arm.com>
- <CA+CK2bCZHCp7d3SyiE2UpZr=K-NMPcGPVS0d-iU_7_tfcVmaGw@mail.gmail.com>
-From: Marc Zyngier <marc.zyngier@arm.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
- 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
-Organization: ARM Ltd
-Message-ID: <54caed52-2859-df94-1e3b-223397d42602@arm.com>
-Date: Fri, 4 Jan 2019 16:49:48 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
+	id 1gfShq-0006XU-6i; Fri, 04 Jan 2019 16:52:22 +0000
+Received: from mail-ot1-x344.google.com ([2607:f8b0:4864:20::344])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gfShm-0006X2-U5
+ for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 16:52:20 +0000
+Received: by mail-ot1-x344.google.com with SMTP id 40so32571427oth.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 04 Jan 2019 08:52:18 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to;
+ bh=0kNeVu5O1/Er3qPxqBYKcrWwjq25w/8rgELWbLGY+7Q=;
+ b=jsjy8UahxOIV79S4ZkseihlZlZmM0Z+PhT5FzOKkOtiQNEzdZPrWfiHzJoPYIkSGZY
+ 8JDG89XnE33vxBAzZ3tHDe3WBObIn2HFeE8dXHdKHFsid3rh9r+ipgO3hqRZYnTgxyNl
+ E3Mr0PTFfZ1c4ThlzKqvzSjBHXpbuR2a7pDUXa6JQdxPPF5n2J45eBpNrvCfYGmfAJls
+ 7oiwTGmEtUB6SyyKmPQGUEecPb9kmzjPnADX6PCIOCWGp76Bz1s30wbih8WDN3x+734l
+ 14CzzvqwclYrF6jTWK502ivC3nE6u5VJKh46vtzWnL2ZVvf8If/OtD+0F8aC7QXnCMDF
+ Ox9w==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to;
+ bh=0kNeVu5O1/Er3qPxqBYKcrWwjq25w/8rgELWbLGY+7Q=;
+ b=icbPLw8i8Njk8ZkaCHsIQ0s9iQHABR3EIMEmmisP9kAGzOeuOu8h8y3CMjy+ffLx4+
+ bpjPI4wUU5ZXnE4tCFATNuNPTYWc0rXsjZVlc3MOyp9BSdea2teBYtHnwxyQXDhkXiau
+ 6NCOdYkp4TbHsnBzcFqKPOog11gwFTH5ad2v4q6OD0ZK2uWJC3EyLHVyP78DYJzT0oVb
+ ipNimOeqZqVP2uLfI4xYJpT+5bsGu6qNpRUeFwjIkYKnFDhgBkwN3CBTItOHFkkoNKrn
+ 4vfySnRh/tag4c2ZtUa0BKZLBf4h60tXpOUzxXxGFYljt8iyGiq8ZtsINCYBecRdnPGx
+ HtbQ==
+X-Gm-Message-State: AJcUukc/vy+cGnVHzKbH6/jnKzj+dE6T2QlDIkvKKsRIZLM2Ar/wja97
+ Ezc6h4yvaT9TTa7M9rO9cbdccBv8Ya8nntqDT7E=
+X-Google-Smtp-Source: ALg8bN75vClOdi24njLRAJQm6VndruX3WhkaFTP+6pss59isnYlYisPncZWcdgoydOWwRhH+Wg/jxk7G66ZdDU9f9K4=
+X-Received: by 2002:a9d:3bc7:: with SMTP id k65mr37219576otc.11.1546620737846; 
+ Fri, 04 Jan 2019 08:52:17 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <CA+CK2bCZHCp7d3SyiE2UpZr=K-NMPcGPVS0d-iU_7_tfcVmaGw@mail.gmail.com>
-Content-Language: en-US
+References: <CAGUNXRRpPBLkN6CQMKsKn5GxWJHxkat2TsWfpxO8wsxXDiqqBw@mail.gmail.com>
+ <CAGUNXRQquMJ7od5Z_+YPJ-6bUxQpNgpzFC3u5jYDedjQKKEiTQ@mail.gmail.com>
+In-Reply-To: <CAGUNXRQquMJ7od5Z_+YPJ-6bUxQpNgpzFC3u5jYDedjQKKEiTQ@mail.gmail.com>
+From: Chris Spencer <spencercw@gmail.com>
+Date: Fri, 4 Jan 2019 16:52:05 +0000
+Message-ID: <CAGUNXRTEArPTcTBuoqVixF_ZAcJPVVDUPiKW7FjEEAuqfhj_sQ@mail.gmail.com>
+Subject: Re: imx8mq-evk: Outbound network packets lost
+To: linux-imx@nxp.com, U-Boot-Denx <u-boot@lists.denx.de>, 
+ linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190104_084956_770693_B0309BAB 
-X-CRM114-Status: GOOD (  25.23  )
+X-CRM114-CacheID: sfid-20190104_085219_059226_A79D514C 
+X-CRM114-Status: GOOD (  29.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -118,134 +92,183 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Michal Hocko <mhocko@suse.com>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- sboyd@kernel.org, catalin.marinas@arm.com, Will Deacon <will.deacon@arm.com>,
- LKML <linux-kernel@vger.kernel.org>, rppt@linux.vnet.ibm.com,
- james.morse@arm.com, andrew.murray@arm.com,
- Andrew Morton <akpm@linux-foundation.org>,
- linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 04/01/2019 16:23, Pavel Tatashin wrote:
+On Fri, 4 Jan 2019 at 15:33, Chris Spencer <spencercw@gmail.com> wrote:
+>
+> On Thu, 3 Jan 2019 at 12:53, Chris Spencer <spencercw@gmail.com> wrote:
+> > Hi,
+> >
+> > I'm trying to get the i.MX8MQ-EVK board up and running with the
+> > recently added kernel support (I'm currently working off
+> > arm-soc/for-next) and am having some trouble with the networking. If I
+> > issue a ping from my test machine with tcpdump running on both sides I
+> > see this:
+> >
+> > On dev machine:
+> > 10:57:52.655882 ARP, Request who-has 10.60.9.15 tell linux-dev, length 28
+> > 10:57:53.677046 ARP, Request who-has 10.60.9.15 tell linux-dev, length 28
+> > 10:57:54.701024 ARP, Request who-has 10.60.9.15 tell linux-dev, length 28
+> > 10:57:55.725050 ARP, Request who-has 10.60.9.15 tell linux-dev, length 28
+> >
+> > On imx8:
+> > 00:05:16.514604 ARP, Request who-has 10.60.9.15 tell 10.60.9.101, length 46
+> > 00:05:16.514651 ARP, Reply 10.60.9.15 is-at 00:04:9f:05:a5:a5 (oui
+> > Freescale), length 28
+> > 00:05:17.578275 ARP, Request who-has 10.60.9.15 tell 10.60.9.101, length 46
+> > 00:05:17.578298 ARP, Reply 10.60.9.15 is-at 00:04:9f:05:a5:a5 (oui
+> > Freescale), length 28
+> > 00:05:18.644896 ARP, Request who-has 10.60.9.15 tell 10.60.9.101, length 46
+> > 00:05:18.644932 ARP, Reply 10.60.9.15 is-at 00:04:9f:05:a5:a5 (oui
+> > Freescale), length 28
+> > 00:05:19.711548 ARP, Request who-has 10.60.9.15 tell 10.60.9.101, length 46
+> > 00:05:19.711561 ARP, Reply 10.60.9.15 is-at 00:04:9f:05:a5:a5 (oui
+> > Freescale), length 28
+> >
+> > So the imx8 can receive packets, but anything it sends back seems to
+> > be lost. The machines are connected directly with a standard patch
+> > cable. I have tried with two different test machines and network
+> > cables with the same results. Firewalls are disabled on both sides.
+> > tcpdump shows 0 packets dropped by kernel on both sides.
+> >
+> > Kernel output related to the Ethernet controller:
+> > [    0.550204] libphy: Fixed MDIO Bus: probed
+> > [    0.555023] fec 30be0000.ethernet: 30be0000.ethernet supply phy not
+> > found, using dummy regulator
+> > [    0.564204] fec 30be0000.ethernet: Linked as a consumer to regulator.0
+> > [    0.575518] libphy: fec_enet_mii_bus: probed
+> > ...
+> > [    6.479277] fec 30be0000.ethernet eth0: Link is Up - 1Gbps/Full -
+> > flow control rx/tx
+> > [    6.487386] IPv6: ADDRCONF(NETDEV_CHANGE): eth0: link becomes ready
+> >
+> > Potentially useful command output:
+> > # ip addr
+> > ...
+> > 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq qlen 1000
+> >     link/ether 00:04:9f:05:a5:a5 brd ff:ff:ff:ff:ff:ff
+> >     inet 10.60.9.15/24 brd 10.60.9.255 scope global eth0
+> >        valid_lft forever preferred_lft forever
+> >     inet6 fe80::204:9fff:fe05:a5a5/64 scope link
+> >        valid_lft forever preferred_lft forever
+> > # ifconfig eth0
+> > eth0      Link encap:Ethernet  HWaddr 00:04:9F:05:A5:A5
+> >           inet addr:10.60.9.15  Bcast:10.60.9.255  Mask:255.255.255.0
+> >           inet6 addr: fe80::204:9fff:fe05:a5a5/64 Scope:Link
+> >           UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+> >           RX packets:32 errors:0 dropped:0 overruns:0 frame:0
+> >           TX packets:20 errors:0 dropped:0 overruns:0 carrier:0
+> >           collisions:0 txqueuelen:1000
+> >           RX bytes:2332 (2.2 KiB)  TX bytes:1080 (1.0 KiB)
+> >
+> > Is anyone able to provide some insight on what might be happening here?
+> >
+> > Thanks,
+> > Chris
+>
+> I've been digging into this further and it seems to be potentially
+> related to U-Boot. If I use the version of U-Boot that is shipped with
+> the device on the eMMC and use that to manually boot into my SD card
+> then the Ethernet controller seems to work fine.
+>
+> It looks like perhaps the physical layer is not being initialised
+> properly. If I execute the following commands on the bundled U-Boot
+> everything looks normal:
+>
+> u-boot=> mdio list
+> FEC0:
+> 0 - AR8031/AR8033 <--> ethernet@30be0000
+> u-boot=> mii info
+> PHY 0x00: OUI = 0x1374, Model = 0x07, Rev = 0x04, 1000baseX, FDX
+> u-boot=> mii read 0 2
+> 004D
+> u-boot=> mii read 0 3
+> D074
+>
+> But on my own build of U-Boot (current master
+> 7436f5e54d35bcad53befec90e2e67288071f74e), it seems every request to
+> the physical layer is returning zero, resulting in it using the
+> generic PHY driver instead of the AR8031:
+>
+> u-boot=> mdio list
+> FEC0:
+> 0 - Generic PHY <--> ethernet@30be0000
+> u-boot=> mii info
+> PHY 0x00: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x01: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x02: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x03: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x04: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x05: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x06: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x07: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x08: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x09: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x0A: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x0B: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x0C: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x0D: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x0E: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x0F: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x10: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x11: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x12: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x13: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x14: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x15: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x16: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x17: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x18: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x19: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x1A: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x1B: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x1C: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x1D: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x1E: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> PHY 0x1F: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> u-boot=> mii read 0 2
+> 0000
+> u-boot=> mii read 0 3
+> 0000
+>
+> I have added some tracing to drivers/net/fec_mxc.c:fec_mdio_read() and
+> the read seems to be proceeding normally (i.e., it gets an interrupt
+> indicating that the read has completed), but the value always comes
+> back as zero.
+>
+> # Clear MII interrupt in ENET_EIR
+> writel(800000, 30be0004)
+> # Re-check ENET_EIR; as expected, the interrupt is not set
+> readl(30be0004) => 0
+> # Issue a read request to ENET_MMFR for phy 0 reg 2
+> writel(600a0000, 30be0040)
+> # Check ENET_EIR; the MII interrupt has been set, indicating the
+> transfer has completed
+> readl(30be0004) => 800000
+> # Clear the interrupt
+> writel(800000, 30be0004)
+> # Read the data from ENET_MMFR; the value is zero. I would expect to
+> see 004d in the lower 16 bits here
+> readl(30be0040) => 600a0000
+>
+> There's a decent chance I'm missing something obvious, but I'm not seeing it..
+>
+> Thanks,
+> Chris
 
-Hi Pavel,
+The plot thickens... I updated my Trusted Firmware-A BL31 [1] and that
+seems to have fixed the problem on the Linux side. I'm not sure what
+revision I was on before, but it would have been around 2-3 weeks out
+of date. It still doesn't work at all in U-Boot, although I'm not
+going to lose too much sleep if I can't get that to work.
 
->>> We could limit arm64 approach only for chips where cntvct_el0 is
->>> working: i.e. frequency is known, and the clock is stable, meaning
->>> cannot go backward. Perhaps we would start early clock a little later,
->>> but at least it will be available for the sane chips. The only
->>> question, where during boot time this is known.
->>
->> How do you propose we do that? Defective timers can be a property of
->> the implementation, of the integration, or both. In any case, it
->> requires firmware support (DT, ACPI). All that is only available quite
->> late, and moving it earlier is not easily doable.
-> 
-> OK, but could we at least whitelist something early with expectation
-> that the future chips won't be bogus?
+Chris
 
-Just as I wish we had universal world peace. Timer integration is
-probably the most broken thing in the whole ARM ecosystem (clock
-domains, Gray code and general incompetence do get in the way). And as I
-said above, retecting a broken implementation usually relies on some
-firmware indication, which is only available at a later time (and I'm
-trying really hard to keep the errata handling in the timer code).
-
->>> Another approach is to modify sched_clock() in
->>> kernel/time/sched_clock.c to never return backward value during boot.
->>>
->>> 1. Rename  current implementation of sched_clock() to sched_clock_raw()
->>> 2. New sched_clock() would look like this:
->>>
->>> u64 sched_clock(void)
->>> {
->>>    if (static_branch(early_unstable_clock))
->>>       return sched_clock_unstable();
->>>    else
->>>       return sched_clock_raw();
->>> }
->>>
->>> 3. sched_clock_unstable() would look like this:
->>>
->>> u64 sched_clock_unstable(void)
->>> {
->>> again:
->>>   static u64 old_clock;
->>>   u64 new_clock = sched_clock_raw();
->>>   static u64 old_clock_read =   READ_ONCE(old_clock);
->>>   /* It is ok if time does not progress, but don't allow to go backward */
->>>   if (new_clock < old_clock_read)
->>>     return old_clock_read;
->>>    /* update the old_clock value */
->>>    if (cmpxchg64(&old_clock, old_clock_read, new_clock) != old_clock_read)
->>>       goto again;
->>>    return new_clock;
->>> }
->>
->> You now have an "unstable" clock that is only allowed to move forward,
->> until you switch to the real one. And at handover time, anything can
->> happen.
->>
->> It is one thing to allow for the time stamping to be imprecise. But
->> imposing the same behaviour on other parts of the kernel that have so
->> far relied on a strictly monotonic sched_clock feels like a bad idea.
-> 
-> sched_clock() will still be strictly monotonic. During switch over we
-> will guarantee to continue from where the early clock left.
-
-Not quite. There is at least one broken integration that results in
-large, spurious jumps ahead. If one of these jumps happens during the
-"unstable" phase, we'll only return old_clock. At some point, we switch
-early_unstable_clock to be false, as we've now properly initialized the
-timer and found the appropriate workaround. We'll now return a much
-smaller value. sched_clock continuity doesn't seem to apply here, as
-you're not registering a new sched_clock (or at least that's not how I
-understand your code above).
-
->> What I'm proposing is that we allow architectures to override the hard
->> tie between local_clock/sched_clock and kernel log time stamping, with
->> the default being of course what we have today. This gives a clean
->> separation between the two when the architecture needs to delay the
->> availability of sched_clock until implementation requirements are
->> discovered. It also keep sched_clock simple and efficient.
->>
->> To illustrate what I'm trying to argue for, I've pushed out a couple
->> of proof of concept patches here[1]. I've briefly tested them in a
->> guest, and things seem to work OK.
-> 
-> What I am worried is that decoupling time stamps from the
-> sched_clock() will cause uptime and other commands that show boot time
-> not to correlate with timestamps in dmesg with these changes. For them
-> to correlate we would still have to have a switch back to
-> local_clock() in timestamp_clock() after we are done with early boot,
-> which brings us back to using a temporarily unstable clock that I
-> proposed above but without adding an architectural hook for it. Again,
-> we would need to solve the problem of time continuity during switch
-> over, which is not a hard problem to solve, as we do it already in
-> sched_clock.c, and everytime clocksource changes.
-> 
-> During early boot time stamps project for x86 we were extra careful to
-> make sure that they stay the same.
-
-I can see two ways to achieve this requirement:
-
-- we allow timestamp_clock to fall-back to sched_clock once it becomes
-non-zero. It has the drawback of resetting the time stamping in the
-middle of the boot, which isn't great.
-
-- we allow sched_clock to inherit the timestamp_clock value instead of
-starting at zero like it does now. Not sure if that breaks anything, but
-that's worth trying (it should be a matter of setting new_epoch to zero
-in sched_clock_register).
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+[1] https://github.com/ARM-software/arm-trusted-firmware
+9a207532f8216bf83fed0891fed9ed0bc72ca450
 
 _______________________________________________
 linux-arm-kernel mailing list
