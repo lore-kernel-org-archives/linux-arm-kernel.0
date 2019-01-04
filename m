@@ -2,90 +2,77 @@ Return-Path: <SRS0=E6Hv=PM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,TVD_SPACE_RATIO,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 218CDC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 13:27:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 29C10C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 13:27:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CB77A21874
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 13:27:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EB5C0208E3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 13:27:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="j3/ir/dC";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="gI7M1jya"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CB77A21874
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PtO3EdGg";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="T71C8CJx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EB5C0208E3
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=VaCqp04NCii9crmOhPiEEyWh8FOWqDLKgkfz0F9DfQ8=; b=j3/ir/dC7nK52gVn/NV+mkDidN
-	L2td18Qt3k4LPzfNbNFOTtLOPa+EWnO1nI6LPr541ta+RknSuZZySlqqT66oiYCtAbE6zzEsBanTy
-	v63rSRq1tGY4uvIko1JEddmCqdYjinNdYYzW+eNkS/A1vIvTVpLeuAiau58EJst6YNJgxH0UP+lpi
-	kANVs+4BXvJLRCU8iAhI01+8yVWiDbhMD1OvEIQglzA0663o6aqyGaEHey7kO8JwPsILmYcZCipZw
-	iiAoG2i5XbiSE0WJAINMs3Xu3hM05Q9NuNjOIo9IMizQ99/8SzmMakbyxHRWcYPCUl3k8kmvClaVL
-	O/gO3Btg==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=/ajejpp8K4bkTd+rzF0cnLwcEqzzCiw096a3uxzATag=; b=PtO3EdGg5svJTh
+	A7PyBIyXQKba9dpRwbUIAQgNRh0xS196qzSFG7PIHJJv8W3LX4x5L9qnLdM4C11nRqiOIJDl43iZt
+	BJ/f2P1h7GTr5R7uZ2JFPx7NILUf0ZbRtdocdFysU/NTPnTZCSSW7DTQnFLlRrExiZtzIwPM5zhG1
+	4LSXJ9wGZbyKEifPu+mDgc0eXgJkHrfKQzpHoirMBRaQKzDjYXxzQmtcDzrztyAgYBHYW9m6HTSKj
+	VTbic84ZX2zdt7c22ARWBlxjeqTmmyvBRNlwx43lBpjR8AOzDevbAyiyGggLP2fiZlz2npFlrh9WM
+	mtPedsV2SP5cbC0i6w/g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfPVC-0005DH-Dx; Fri, 04 Jan 2019 13:27:06 +0000
-Received: from mail-wr1-x435.google.com ([2a00:1450:4864:20::435])
+	id 1gfPVm-0005or-Qx; Fri, 04 Jan 2019 13:27:42 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfPUo-0004m4-AB
- for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 13:26:45 +0000
-Received: by mail-wr1-x435.google.com with SMTP id x10so36578592wrs.8
+ id 1gfPVa-0005jO-Ul
+ for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 13:27:40 +0000
+Received: from mail-lf1-f47.google.com (mail-lf1-f47.google.com
+ [209.85.167.47])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id DFA9921874
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 04 Jan 2019 05:26:41 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=pIFsWny5q/WsJE1wcYjhqdWSvWgqlyyQ7NlwfpbMEFw=;
- b=gI7M1jyaZfLlOgZDf02fjt3U3ZAwhj8Mw12v1C60b90tBRmFzWQ41ChygCIXc7VlAI
- rUhSDeNTw0q9zko5BTjE4jBKJPR/S52sQtFw6bVGDxMJC9VjIKK4zcOGG6SbYhw+9Yq5
- SN/MFtur5KySHE2oeGIbLy6W+AcPVqvJo1VqhqUS8fMzP7pzgym07UhEeEjvsF1kyU34
- csWdzvSMGkzPd0icjIkVStkOCS+0qHXLhtNupHS4gKv89Dam1JszlmxIbcVKhsdzrsK1
- dvtloygOYQxd9kyHP7yp9FtlfrraTRUPQdE/CAcYJMXCVgymt1W35tMRPifem89dOb/r
- ENgA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=pIFsWny5q/WsJE1wcYjhqdWSvWgqlyyQ7NlwfpbMEFw=;
- b=Jtck+FQSl56aqzJBmXVdmqsgxHxdGVobKTKlfGG3/IIV/s9jrDKf265G9YbkEon/ly
- Cmc2a1AKw3feOFr0BuQzyQrVKJzUkJ0G44N9XRHZpjAG53sTW3AxGQ9l7ElJszm8e+oB
- WabqKOEFa8zuP1M4SaNI07gvh6tMsRKf3jP26WpM8ADvDVgRkg019XdfdfTOKYIlQZra
- iakEV33QPiA3gL3jOBHQ/yET6gFssjkhq3Zavsti584PUTL3bPGkMBFs1DSf4mlZT1EP
- F0O1FfxeqoCX4JzMIMf2MEZRB/c/w1cIfW+yFPX8bjNNKcRo91H7umYDx2smBTDPck6S
- HGGQ==
-X-Gm-Message-State: AJcUukdzsx+JsP4RwSvv/LbJq/L9SIfyv5VHU4URWm+mpAgkUHiKLxJ3
- np1oEeIGzblIYbNEugd1pg9gwsg4Xv4=
-X-Google-Smtp-Source: ALg8bN4LOQj77CTiwO5wrLIcS2RilPzS6f7iKG2uFZVjScUd26cAvfkoJotZ3yLdVifQorMDrXNteQ==
-X-Received: by 2002:adf:ea11:: with SMTP id q17mr42540039wrm.328.1546608399998; 
- Fri, 04 Jan 2019 05:26:39 -0800 (PST)
-Received: from localhost (ip1f11350a.dynamic.kabel-deutschland.de.
- [31.17.53.10])
- by smtp.gmail.com with ESMTPSA id i186sm1211415wmd.19.2019.01.04.05.26.39
- (version=TLS1_2 cipher=AES128-SHA bits=128/128);
- Fri, 04 Jan 2019 05:26:39 -0800 (PST)
-From: Oliver Graute <oliver.graute@gmail.com>
-X-Google-Original-From: Oliver Graute <oliver2000@gmx.net>
-To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCHv2] ARM: dts: add imx6ul-var-dart-nand-wifi.dtb
-Date: Fri,  4 Jan 2019 14:26:11 +0100
-Message-Id: <1546608371-31472-3-git-send-email-oliver2000@gmx.net>
-X-Mailer: git-send-email 1.9.1
-In-Reply-To: <1546608371-31472-1-git-send-email-oliver2000@gmx.net>
-References: <1546608371-31472-1-git-send-email-oliver2000@gmx.net>
+ Fri,  4 Jan 2019 13:27:29 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1546608450;
+ bh=PDUOT9GqHNLgBUUCCinSABv67vhBVK/eeCRUaV6y1bg=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=T71C8CJxrdIlcnz1JTmX1ui6Acw+Vfqt5K8EhCxHe1/EeH6P8ruqo7LKF6g35yFg4
+ k47mpzHX8ZddoL12vDQ7CLVbEGYB6CTlpG6wZpnHK844aUwSigOCm0ZQS0rqHb1TAc
+ 2AZXH95idY1X0yi4zsnWqP02EN1yBiTYxamCLK34=
+Received: by mail-lf1-f47.google.com with SMTP id n18so25415230lfh.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 04 Jan 2019 05:27:29 -0800 (PST)
+X-Gm-Message-State: AJcUukfS32Z516n+qGA5x6wsuLu522v/RDukTAbrCLP6XIp5u7ty0T1M
+ 1PgFOSBJSnoifDUtcLd5zumm8t5IrSJ3zn7iv7A=
+X-Google-Smtp-Source: ALg8bN5HQLbkMfD/IuQ1ZhmsQdSY5/tEDnBNfnxC1PM6G42HUKAJJOSsGvY+9+kSSEbpBrTa2mvoBdPV42q/KXU0TUE=
+X-Received: by 2002:ac2:554b:: with SMTP id l11mr1112300lfk.92.1546608447997; 
+ Fri, 04 Jan 2019 05:27:27 -0800 (PST)
+MIME-Version: 1.0
+References: <20190103201408.GA27754@embeddedor>
+In-Reply-To: <20190103201408.GA27754@embeddedor>
+From: Krzysztof Kozlowski <krzk@kernel.org>
+Date: Fri, 4 Jan 2019 14:27:17 +0100
+X-Gmail-Original-Message-ID: <CAJKOXPcihzhU+K72p+B83kwXQECYgekSSjy3wZ9eaFi5qTnY_w@mail.gmail.com>
+Message-ID: <CAJKOXPcihzhU+K72p+B83kwXQECYgekSSjy3wZ9eaFi5qTnY_w@mail.gmail.com>
+Subject: Re: [PATCH] ARM: mach-s3c24xx: Fix boolean expressions in
+ osiris_dvs_notify
+To: "Gustavo A. R. Silva" <gustavo@embeddedor.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190104_052642_599068_252617AA 
-X-CRM114-Status: GOOD (  13.35  )
+X-CRM114-CacheID: sfid-20190104_052731_203174_362FFC59 
+X-CRM114-Status: GOOD (  18.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,53 +84,50 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: s.hauer@pengutronix.de, Oliver Graute <oliver.graute@gmail.com>,
- linux-imx@nxp.com, kernel@pengutronix.de, fabio.estevam@nxp.com,
- shawnguo@kernel.org
-MIME-Version: 1.0
+Cc: "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
+ Russell King <linux@armlinux.org.uk>, linux-kernel@vger.kernel.org,
+ Ben Dooks <ben@simtec.co.uk>, Kukjin Kim <kgene@kernel.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Oliver Graute <oliver.graute@gmail.com>
+On Thu, 3 Jan 2019 at 21:46, Gustavo A. R. Silva <gustavo@embeddedor.com> wrote:
+>
+> Fix boolean expressions by using logical AND operator '&&'
+> instead of bitwise operator '&'.
+>
+> This issue was detected with the help of Coccinelle.
+>
+> Fixes: 4fa084af28ca ("ARM: OSIRIS: DVS (Dynamic Voltage Scaling) supoort.")
+> Cc: stable@vger.kernel.org
+> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
+> ---
+>  arch/arm/mach-s3c24xx/mach-osiris-dvs.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mach-s3c24xx/mach-osiris-dvs.c b/arch/arm/mach-s3c24xx/mach-osiris-dvs.c
+> index 058ce73137e8..ccbd7b7965ca 100644
+> --- a/arch/arm/mach-s3c24xx/mach-osiris-dvs.c
+> +++ b/arch/arm/mach-s3c24xx/mach-osiris-dvs.c
+> @@ -65,16 +65,16 @@ static int osiris_dvs_notify(struct notifier_block *nb,
+>
+>         switch (val) {
+>         case CPUFREQ_PRECHANGE:
+> -               if (old_dvs & !new_dvs ||
+> -                   cur_dvs & !new_dvs) {
+> +               if (old_dvs && !new_dvs ||
+> +                   cur_dvs && !new_dvs) {
 
-added imx6ul-var-dart-nand-wifi.dts
-updated Makefile
+Technically the old code will work fine because all variables are
+bools (so 0 or 1). Therefore I am not sure whether this should be
+ported to stable.
 
-Signed-off-by: Oliver Graute <oliver.graute@gmail.com>
----
- arch/arm/boot/dts/Makefile                      | 1 +
- arch/arm/boot/dts/imx6ul-var-dart-nand-wifi.dts | 5 +++++
- 2 files changed, 6 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6ul-var-dart-nand-wifi.dts
+Anyway the patch is itself okay and I will take it after merge window. Thanks!
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index bd40148..64dc9df 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -564,6 +564,7 @@ dtb-$(CONFIG_SOC_IMX6UL) += \
- 	imx6ul-tx6ul-0010.dtb \
- 	imx6ul-tx6ul-0011.dtb \
- 	imx6ul-tx6ul-mainboard.dtb \
-+	imx6ul-var-dart-nand-wifi.dts \
- 	imx6ull-14x14-evk.dtb \
- 	imx6ull-colibri-eval-v3.dtb \
- 	imx6ull-colibri-wifi-eval-v3.dtb \
-diff --git a/arch/arm/boot/dts/imx6ul-var-dart-nand-wifi.dts b/arch/arm/boot/dts/imx6ul-var-dart-nand-wifi.dts
-new file mode 100644
-index 0000000..66d7acb
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6ul-var-dart-nand-wifi.dts
-@@ -0,0 +1,5 @@
-+// SPDX-License-Identifier: (GPL-2.0)
-+/*
-+ * Copyright (C) 2015-2016 Variscite Ltd. - http://www.variscite.com
-+ */
-+#include "imx6ul-var-dart.dtsi"
--- 
-1.9.1
-
+Best regards,
+Krzysztof
 
 _______________________________________________
 linux-arm-kernel mailing list
