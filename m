@@ -2,22 +2,23 @@ Return-Path: <SRS0=E6Hv=PM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+X-Spam-Status: No, score=-8.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7F4EDC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 10:13:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 309A2C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 10:16:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4EB3621872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 10:13:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 00D8120874
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 10:16:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t+vO6TsS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4EB3621872
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="juYs027T";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="dNVQenO4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 00D8120874
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,46 +26,65 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Fw3czNuONszy9rWGAorCv/9Nh9sileuMLnP3gXhmLMo=; b=t+vO6TsSCXISDG
-	1FJAOR7+Qv5I2SlXw+RQU+P3QqtqBaT9av06/SpfcItemjilIB1B3jXlso8EMSHidjCEqTe05hL4j
-	UBOGDBoTSkpomhawkpYP9C6X1U4LnusT4+envxYiRG18HnavmjZQfl1vSU9PL9HbWLh4OnTtEC+Kw
-	iiV5LK35UOfQfHl381vGiHYgwr/dnfZJGA2qfqClsBatSxwLh0HTYceb2rCvNKvPNpXAdlV/ZD+m5
-	nNWe3iQbLnCyqGozJ3Tq0sjt5f09pNc4SB2fXyqXyF6IUrkdkacc2zrUO1IVW4/s92v4ffumxX/nX
-	agb4o3iPuQ9NZtoHtDbA==;
+	List-Owner; bh=+ECaUXvTo28rB/i7Skdl5JkTZ9BrOfYo41491Yx4oKk=; b=juYs027TlUc706
+	zpvvaNTFM3vNf0R6TpoU6FNlcbAC86IcCfYH3rVia+ywdG4j9jQhkwKp2ThhrPkuvGtWCrwgL4eoK
+	WAXDbhtNFmBnpgrI7eCXFHE4cuZaACFzenVAoVwdZYGNOMqiehB1BUatkwCRNLiSMXadXJKxq/6GI
+	aFK5Xo/FrB+D0gODthQfU6BHTcooU4VVEYSuJTgtsJmpck3yNILdIa8q7gcY3xLsx5U4++hbtgwTv
+	SpzdSJJr2gS++BNGtRWXsd0a3seSJnPysHK47nzNKQFc7FQpYhTT00ZXSMprMgWcBa5gFPipqckMX
+	KmqFc/MPpKkT/KzdJPtg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfMTc-0005SU-8v; Fri, 04 Jan 2019 10:13:16 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfMTY-0005S0-84
- for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 10:13:13 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B895DEBD;
- Fri,  4 Jan 2019 02:13:11 -0800 (PST)
-Received: from edgewater-inn.cambridge.arm.com
- (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 84A453F575;
- Fri,  4 Jan 2019 02:13:11 -0800 (PST)
-Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
- id 074761AE0C51; Fri,  4 Jan 2019 10:13:12 +0000 (GMT)
-Date: Fri, 4 Jan 2019 10:13:11 +0000
-From: Will Deacon <will.deacon@arm.com>
-To: Jeremy Linton <jeremy.linton@arm.com>
-Subject: Re: [PATCH v2 1/7] sysfs/cpu: Add "Unknown" vulnerability state
-Message-ID: <20190104101311.GB24160@edgewater-inn.cambridge.arm.com>
-References: <20190103004921.1928921-1-jeremy.linton@arm.com>
- <20190103004921.1928921-2-jeremy.linton@arm.com>
- <20190103163740.GC3529@e103592.cambridge.arm.com>
- <db5968e6-609b-1a1f-464d-436327dd1738@arm.com>
- <1951199845.271163.1546543806398@email.ionos.de>
- <5818faa8-e820-7aee-5aaa-42ced65d6f9d@arm.com>
+	id 1gfMWO-00078J-AL; Fri, 04 Jan 2019 10:16:08 +0000
+Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gfMWL-00077x-JP
+ for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 10:16:07 +0000
+Received: by mail-pl1-x644.google.com with SMTP id e11so17248168plt.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 04 Jan 2019 02:16:05 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=e0v/J119cUda2esQEjVh+aFzshtuHBTqU46owA02KgI=;
+ b=dNVQenO4JCbAMAAPJDJSdlvv4NXOnbaA6TGUFuyLb9neNo2zroesebC8tUb/sKmnUR
+ d+wM3D8zDhr6/MfSASAIgXp2mqX5cJuUaLy6pIloeiXTji9we1abvHZiFAYRNN1htwz9
+ 7kGznB5U5edZayNyg4HWGZ7nUnhu95dTBWjEw=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=e0v/J119cUda2esQEjVh+aFzshtuHBTqU46owA02KgI=;
+ b=kDlMvUGtY8Sdhmfd8731b6tmx8b361KYRFSYjg940ItzA2fu1CAuCPh5tI1ZI6Viwg
+ oduHi5qjPn5A2zTlYHCRG7ClTb9/hskBfXWLjztJm1YpWJ+3Fuf+I9L+6RfPzZK4eZc2
+ SP6hsuu8fKgXoyiCttE6f8sIAxpxtBj7c6WSMKKXfA7KlMVN7Hag+sYN03Xrz4DHg6rp
+ x1fPFVRfzqpKnpBK6SQQkMhCmbU9EQxZvMjJnVpfv/yntZrSPAznWiW6lQ3b7sNTzOAr
+ FuuPUPpxm7if8wlFXCb8/7/yWDuAI29IskiWdKxLyvJqOBupCLuMg7BCCfTgOa/hQlxL
+ VILQ==
+X-Gm-Message-State: AJcUukftALYlhA7d/ehdtcUA3Sgo+yjRk/+O4vQo98M+RFHTbOKG78rU
+ RgGzZX0DbLFZLwpnumvcG6ljlg==
+X-Google-Smtp-Source: ALg8bN4shCnfxgvs1tyOF58w+3udY2yziO8YKNPPSRVIxYteRyIp9CT295A9l1cv+823xkM65TeR/w==
+X-Received: by 2002:a17:902:7e0d:: with SMTP id
+ b13mr50960281plm.154.1546596964671; 
+ Fri, 04 Jan 2019 02:16:04 -0800 (PST)
+Received: from localhost ([122.166.131.155])
+ by smtp.gmail.com with ESMTPSA id x27sm108630943pfe.178.2019.01.04.02.16.03
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 04 Jan 2019 02:16:03 -0800 (PST)
+Date: Fri, 4 Jan 2019 15:46:01 +0530
+From: Viresh Kumar <viresh.kumar@linaro.org>
+To: "Rafael J. Wysocki" <rafael@kernel.org>
+Subject: Re: [PATCH] cpufreq: scpi/scmi: Fix freeing of dynamic OPPs
+Message-ID: <20190104101601.mpo4vpfcvsfauk2u@vireshk-i7>
+References: <a2a42913-04e0-e6fc-d9ee-a2e355ac22c9@arm.com>
+ <7dddbeabb434225d9b3d02600ea4a2313622ca26.1546594910.git.viresh.kumar@linaro.org>
+ <CAJZ5v0g4ABiPGGeLuzLN=1cT+7ejUP5hCgoN3_nhvr=Foaxa6Q@mail.gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <5818faa8-e820-7aee-5aaa-42ced65d6f9d@arm.com>
-User-Agent: Mutt/1.11.1+30 (d10eec459b35) ()
+In-Reply-To: <CAJZ5v0g4ABiPGGeLuzLN=1cT+7ejUP5hCgoN3_nhvr=Foaxa6Q@mail.gmail.com>
+User-Agent: NeoMutt/20180323-120-3dd1ac
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190104_021312_543029_7227FF74 
-X-CRM114-Status: GOOD (  24.05  )
+X-CRM114-CacheID: sfid-20190104_021605_647181_8CE71A19 
+X-CRM114-Status: GOOD (  16.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,69 +96,56 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Stefan Wahren <stefan.wahren@i2se.com>, mark.rutland@arm.com,
- mlangsdo@redhat.com, Thomas Gleixner <tglx@linutronix.de>,
- "Rafael J . Wysocki" <rafael.j.wysocki@intel.com>,
- Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>, marc.zyngier@arm.com,
- catalin.marinas@arm.com, julien.thierry@arm.com, ykaukab@suse.de,
- linux-kernel@vger.kernel.org, steven.price@arm.com,
- Dave Hansen <dave.hansen@intel.com>, Peter Zijlstra <peterz@infradead.org>,
- Borislav Petkov <bp@alien8.de>, shankerd@codeaurora.org,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- David Woodhouse <dwmw@amazon.co.uk>, Dave Martin <Dave.Martin@arm.com>,
- suzuki.poulose@arm.com, linux-arm-kernel@lists.infradead.org
+Cc: Nishanth Menon <nm@ti.com>, Vincent Guittot <vincent.guittot@linaro.org>,
+ Linux PM <linux-pm@vger.kernel.org>, Stephen Boyd <sboyd@kernel.org>,
+ "Rafael J. Wysocki" <rjw@rjwysocki.net>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ "4 . 20" <stable@vger.kernel.org>, Dietmar Eggemann <dietmar.eggemann@arm.com>,
+ Quentin Perret <quentin.perret@arm.com>, Sudeep Holla <sudeep.holla@arm.com>,
+ Douglas.Raillard@arm.com, Valentin Schneider <valentin.schneider@arm.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 03, 2019 at 02:32:44PM -0600, Jeremy Linton wrote:
-> On 01/03/2019 01:30 PM, Stefan Wahren wrote:
-> > > Jeremy Linton <jeremy.linton@arm.com> hat am 3. Januar 2019 um 17:46 geschrieben:
-> > > On 01/03/2019 10:37 AM, Dave Martin wrote:
-> > > > On Wed, Jan 02, 2019 at 06:49:15PM -0600, Jeremy Linton wrote:
-> > > > > There is a lot of variation in the Arm ecosystem. Because of this,
-> > > > > there exist possible cases where the kernel cannot authoritatively
-> > > > > determine if a machine is vulnerable.
-> > > > > 
-> > > > > Rather than guess the vulnerability status in cases where
-> > > > > the mitigation is disabled or the firmware isn't responding
-> > > > > correctly, we need to display an "Unknown" state.
-> > > > > 
-> > 
-> > i applied your patch series on linux-next-20190103. On my Raspberry Pi 3B+ (defconfig) i'm getting this from sysfs:
-> > 
-> > l1tf:Not affected
-> > meltdown:Not affected
-> > spec_store_bypass:Unknown
-> > spectre_v1:Mitigation: __user pointer sanitization
-> > spectre_v2:Unknown
-> > 
-> > AFAIK it has 4 Cortex-A53 cores (no PSCI firmware), so shouldn't be affected.
+On 04-01-19, 11:10, Rafael J. Wysocki wrote:
+> On Fri, Jan 4, 2019 at 10:44 AM Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> >
+> > Since the commit 2a4eb7358aba ("OPP: Don't remove dynamic OPPs from
+> > _dev_pm_opp_remove_table()"), dynamically created OPP aren't
+> > automatically removed anymore by dev_pm_opp_cpumask_remove_table(). This
+> > affects the scpi and scmi cpufreq drivers which no longer free OPPs on
+> > failures or on invocations of the policy->exit() callback.
+> >
+> > Create a generic OPP helper dev_pm_opp_remove_all_dynamic() which can be
+> > called from these drivers instead of dev_pm_opp_cpumask_remove_table().
+> >
+> > In dev_pm_opp_remove_all_dynamic(), we need to make sure that the
+> > opp_list isn't getting accessed simultaneously from other parts of the
+> > OPP core while the helper is freeing dynamic OPPs, i.e. we can't drop
+> > the opp_table->lock while traversing through the OPP list. And to
+> > accomplish that, this patch also creates _opp_kref_release_unlocked()
+> > which can be called from this new helper with the opp_table lock already
+> > held.
+> >
+> > Cc: 4.20 <stable@vger.kernel.org> # v4.20
+> > Reported-by: Valentin Schneider <valentin.schneider@arm.com>
+> > Fixes: 2a4eb7358aba ("OPP: Don't remove dynamic OPPs from _dev_pm_opp_remove_table()")
+> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 > 
-> So, for spec_store_bypass, as you noted your getting hit by the lack of
-> psci/smccc to report the ssb state, and this patch is just reflecting that.
-> 
-> In the case of spectrev2 it may be correct to blame this patch set because
-> its displaying "unknown" since your core isn't in the black list, and your
-> core isn't new enough to have the csv2 bit indicating its not vulnerable. In
-> this case if we do away with the unknown state, we should probably depend
-> entirely on the black list and simply display "Not affected" if the core
-> isn't listed. (meaning we may report cores not affected when they are
-> missing from the blacklist).
-> 
-> 
-> > How can this be fixed?
-> 
-> For ssb, the correct answer is probably fix the firmware, but given the
-> situation, its likely this kind of machine is going to force an additional
-> MIDR list to report the state correctly. Maybe Will or someone can chime in
-> here?
+> I guess I'll pick it up by hand.
 
-Marc Z is already working on this iirc, since we need it to fix the message
-printed to dmesg about the mitigation status anyway.
+Sure.
 
-Will
+> I'm assuming that you have tested it, have you?
+
+Yes, but I had to fake few dynamic OPPs and ignore the static ones
+coming from DT. Lets wait for Sudeep or Valentin to test this, who
+have real hardware to fix with this patch.
+
+-- 
+viresh
 
 _______________________________________________
 linux-arm-kernel mailing list
