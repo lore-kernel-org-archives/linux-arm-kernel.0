@@ -2,69 +2,78 @@ Return-Path: <SRS0=E6Hv=PM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=unavailable
+X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C131DC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 13:32:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E5C4C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 13:47:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 88FD2208E3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 13:32:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6E74D2070C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 13:47:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AGnaponT";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="IgPGLNXc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 88FD2208E3
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="J/+Fi6VE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6E74D2070C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=f/bw1lg0yVdBHgQzlGkaWyD2qitTuG511kkXFdF7jcE=; b=AGnaponT5zCynG
-	2JxSHRtNBbn+f/QkmL7OK+BnrrElAxJ2wGcyzgBwpSyMJk0mRUZKsGO9Lce1H170qN855LpvuyVXS
-	2ivWzXDpkT3kRWaaRY7BYyMTZQK49xh3A+dLLDPwnF3LMVy19xPTmimKPQeqQzm7kMeAfLiFc1uNS
-	hfuV2A/2STKOJo0yDvjS0FAi2VE7c288ya7XvOMR6seZVTuRaHGtrANu9dkYYjhLKq6wAoM/naC/X
-	1rD20AhaufsAQUb2StCus26Lw4suEUwgbEHZJe80lnHwrPzhW7UT0SNvoOqp4zHp5xdMH1jF7rO46
-	Ugt9IpdKZ3of7KNYMjrg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=Nu9Exc7Q54oFIC9J3M3FeZI8aCM5MpWB33WmlVXeLiU=; b=J/+Fi6VEvpps1C
+	AKYPYmgpqrooWEqHAGI37p6nQV8bVj/KCj1raf27QgzHg3URUmAz2fyY6rbMcEDbq2yV3/y2Z6aao
+	H+8sihqEe7OeLLZe5kNJnVgaq0HVArz3giHrmcu2RI68bSu45XPAze/zdD9AgH2uHJaop5L+qjyb7
+	UxXLEHPH69J4/XUJzdzYCkSAxWS7xHrm/2Z/FucfzVM8LA+B1ybyC9lc9MRmcDcQoIBMxIkQvfUrE
+	QoW6BbXJ4CEieIzRxWGAUbuboQcmdpHzgsHr65D12OL4eqAEKYZrmxYdpzCvLBs9gFujI9ShMrgrS
+	trq2n/k3qEAEFhvGuYnw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfPao-0008CE-Ex; Fri, 04 Jan 2019 13:32:54 +0000
-Received: from kirsty.vergenet.net ([202.4.237.240])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfPV5-00056x-OL
- for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 13:27:19 +0000
-Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
- by kirsty.vergenet.net (Postfix) with ESMTPA id 5A50B25B791;
- Sat,  5 Jan 2019 00:26:58 +1100 (AEDT)
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1546608418; bh=isCh6H0lOt3l85QDngid6rzi+HqrpFKJieTA3z5sGqQ=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=IgPGLNXcrpB1bvifQlOUznSkoe/1jL1lEN+g9ILUb9c9gWn5S8VZi52eSVd7xD6fG
- VYiJ9M0RfJiWzBnE/z79f+4Y16YJvL12gLOMjY1HxkafITgLBUvbP06p7PoR+R1Ab1
- +P6G5DwMhO2pmBXVFQAYEoIhLZT/hEY3VeF0Hdw4=
-Received: by reginn.horms.nl (Postfix, from userid 7100)
- id 4C975940376; Fri,  4 Jan 2019 14:26:56 +0100 (CET)
-Date: Fri, 4 Jan 2019 14:26:56 +0100
-From: Simon Horman <horms@verge.net.au>
-To: Geert Uytterhoeven <geert@linux-m68k.org>
-Subject: Re: [PATCH/RFT] arm64: dts: renesas: r8a77990-ebisu: Add BD9571 PMIC
-Message-ID: <20190104132655.usp2mjyh2sdqds4w@verge.net.au>
-References: <1543675408-11382-1-git-send-email-ykaneko0929@gmail.com>
- <CAMuHMdXvGEZpuDr6oWH0QGxVtfx-EUiQJ+_Jt33dZhn_Lw4EYQ@mail.gmail.com>
+	id 1gfPpK-0004gD-4w; Fri, 04 Jan 2019 13:47:54 +0000
+Received: from mx08-00178001.pphosted.com ([91.207.212.93]
+ helo=mx07-00178001.pphosted.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gfPp7-0004XC-T7
+ for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 13:47:43 +0000
+Received: from pps.filterd (m0046661.ppops.net [127.0.0.1])
+ by mx08-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x04DfW9t004402; Fri, 4 Jan 2019 14:47:32 +0100
+Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
+ by mx08-00178001.pphosted.com with ESMTP id 2pp0pm8m79-1
+ (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
+ Fri, 04 Jan 2019 14:47:32 +0100
+Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id E445A34;
+ Fri,  4 Jan 2019 13:47:31 +0000 (GMT)
+Received: from Webmail-eu.st.com (Safex1hubcas22.st.com [10.75.90.92])
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id C3BE9530D;
+ Fri,  4 Jan 2019 13:47:31 +0000 (GMT)
+Received: from SAFEX1HUBCAS23.st.com (10.75.90.47) by Safex1hubcas22.st.com
+ (10.75.90.92) with Microsoft SMTP Server (TLS) id 14.3.361.1; Fri, 4 Jan 2019
+ 14:47:31 +0100
+Received: from localhost (10.129.4.161) by webmail-ga.st.com (10.75.90.48)
+ with Microsoft SMTP Server (TLS) id 14.3.361.1; Fri, 4 Jan 2019 14:47:31
+ +0100
+From: Fabien Dessenne <fabien.dessenne@st.com>
+To: Jassi Brar <jassisinghbrar@gmail.com>, Maxime Coquelin
+ <mcoquelin.stm32@gmail.com>, Alexandre Torgue <alexandre.torgue@st.com>,
+ <linux-kernel@vger.kernel.org>, <linux-stm32@st-md-mailman.stormreply.com>,
+ <linux-arm-kernel@lists.infradead.org>
+Subject: [PATCH 1/2] mailbox: mailbox-test: fix debugfs in multi-instances
+Date: Fri, 4 Jan 2019 14:47:15 +0100
+Message-ID: <1546609637-6411-1-git-send-email-fabien.dessenne@st.com>
+X-Mailer: git-send-email 2.7.4
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CAMuHMdXvGEZpuDr6oWH0QGxVtfx-EUiQJ+_Jt33dZhn_Lw4EYQ@mail.gmail.com>
-Organisation: Horms Solutions BV
-User-Agent: NeoMutt/20170113 (1.7.2)
+X-Originating-IP: [10.129.4.161]
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2019-01-04_05:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190104_052700_354134_8981A069 
-X-CRM114-Status: GOOD (  20.69  )
+X-CRM114-CacheID: sfid-20190104_054742_257174_D1CC84F4 
+X-CRM114-Status: GOOD (  11.66  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,85 +85,76 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
- Magnus Damm <magnus.damm@gmail.com>, Yoshihiro Kaneko <ykaneko0929@gmail.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Marek Vasut <marek.vasut@gmail.com>
+Cc: Arnaud Pouliquen <arnaud.pouliquen@st.com>,
+ Benjamin Gaignard <benjamin.gaignard@st.com>,
+ Ludovic Barre <ludovic.barre@st.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 03, 2018 at 09:25:30AM +0100, Geert Uytterhoeven wrote:
-> Hi Kaneko-san,
-> 
-> On Sat, Dec 1, 2018 at 3:43 PM Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
-> > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> >
-> > This patch adds the regulator definition required for operation of
-> > S2RAM.
-> >
-> > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-> 
-> Thanks for your patch!
-> 
-> > --- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-> > +++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-> > @@ -425,6 +425,26 @@
-> >         };
-> >  };
-> >
-> > +&i2c_dvfs {
-> > +       status = "okay";
-> > +
-> > +       clock-frequency = <400000>;
-> > +
-> > +       pmic: pmic@30 {
-> > +               pinctrl-0 = <&irq0_pins>;
-> > +               pinctrl-names = "default";
-> > +
-> > +               compatible = "rohm,bd9571mwv";
-> > +               reg = <0x30>;
-> > +               interrupt-parent = <&intc_ex>;
-> > +               interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-> > +               interrupt-controller;
-> > +               #interrupt-cells = <2>;
-> > +               gpio-controller;
-> > +               #gpio-cells = <2>;
-> 
-> Just adding this node is not sufficient to make S2RAM work.
-> As per Documentation/devicetree/bindings/mfd/bd9571mwv.txt, you also have
-> to describe the DDR-Backup Power configuration.
-> 
-> On the Ebisu-4D development board, only the DDR0 power rail is used, and
-> needs to be kept powered when backup mode is enabled.
-> 
->         rohm,ddr-backup-power = <0x1>;
->         rohm,rstbmode-level;
-> 
-> Unfortunately resume from s2ram doesn't work with this, probably due to an
-> issue in ATF.  This may have been fixed in IPL and Secure Monitor Rev1.0.22,
-> which claims to add support for the Ebisu-4D board.
+Create one debug entry directory per instance to support the multi
+instantiation.
 
-Thanks, do you know of any information on how to get IPL and Secure Monitor
-running / updated on Ebisu-4D?
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+Signed-off-by: Fabien Dessenne <fabien.dessenne@st.com>
+---
+ drivers/mailbox/mailbox-test.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-> I don't know if plain Ebisu needs a different configuration.
-> 
-> > +       };
-> > +};
-> > +
-> >  &lvds0 {
-> >         status = "okay";
-> >
-> 
-> The rest is fine, hence with the above fixed and tested:
-> 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+diff --git a/drivers/mailbox/mailbox-test.c b/drivers/mailbox/mailbox-test.c
+index 58bfafc..4e2bfba 100644
+--- a/drivers/mailbox/mailbox-test.c
++++ b/drivers/mailbox/mailbox-test.c
+@@ -31,7 +31,6 @@
+ 				 (MBOX_MAX_MSG_LEN / MBOX_BYTES_PER_LINE))
+ 
+ static bool mbox_data_ready;
+-static struct dentry *root_debugfs_dir;
+ 
+ struct mbox_test_device {
+ 	struct device		*dev;
+@@ -45,6 +44,7 @@ struct mbox_test_device {
+ 	spinlock_t		lock;
+ 	wait_queue_head_t	waitq;
+ 	struct fasync_struct	*async_queue;
++	struct dentry		*root_debugfs_dir;
+ };
+ 
+ static ssize_t mbox_test_signal_write(struct file *filp,
+@@ -262,16 +262,16 @@ static int mbox_test_add_debugfs(struct platform_device *pdev,
+ 	if (!debugfs_initialized())
+ 		return 0;
+ 
+-	root_debugfs_dir = debugfs_create_dir("mailbox", NULL);
+-	if (!root_debugfs_dir) {
++	tdev->root_debugfs_dir = debugfs_create_dir(dev_name(&pdev->dev), NULL);
++	if (!tdev->root_debugfs_dir) {
+ 		dev_err(&pdev->dev, "Failed to create Mailbox debugfs\n");
+ 		return -EINVAL;
+ 	}
+ 
+-	debugfs_create_file("message", 0600, root_debugfs_dir,
++	debugfs_create_file("message", 0600, tdev->root_debugfs_dir,
+ 			    tdev, &mbox_test_message_ops);
+ 
+-	debugfs_create_file("signal", 0200, root_debugfs_dir,
++	debugfs_create_file("signal", 0200, tdev->root_debugfs_dir,
+ 			    tdev, &mbox_test_signal_ops);
+ 
+ 	return 0;
+@@ -416,7 +416,7 @@ static int mbox_test_remove(struct platform_device *pdev)
+ {
+ 	struct mbox_test_device *tdev = platform_get_drvdata(pdev);
+ 
+-	debugfs_remove_recursive(root_debugfs_dir);
++	debugfs_remove_recursive(tdev->root_debugfs_dir);
+ 
+ 	if (tdev->tx_channel)
+ 		mbox_free_channel(tdev->tx_channel);
+-- 
+2.7.4
 
-I assume that working S2RAM is part of such testing.
-Is that correct?
 
 _______________________________________________
 linux-arm-kernel mailing list
