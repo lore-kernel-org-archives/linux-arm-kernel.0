@@ -2,70 +2,76 @@ Return-Path: <SRS0=E6Hv=PM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-14.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8B386C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 10:02:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 38AAAC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 10:10:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 59BCD21872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 10:02:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 05BE321871
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 10:10:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="p5s1b419"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 59BCD21872
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JqEYlWHp";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="ZS8+vmjj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 05BE321871
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1c09LmWaMLvq9kxD89N1jwyftJBxi7oHWvGHpy4lGj8=; b=p5s1b419UqCx0Y
-	0wUDnfbBc+oaDDNYFfpT08NT9LgcNOrzc8iYjNe42fQyQJ2zo04MmVayZzJ34g9Emup4FBDuy0Yd6
-	aq5NhWCr3T9lRtuWSLNpWxhgEfhQM1IuQB0R81MUQJsPmRRO9Mjlxlo/fp9f+IweOyLT+95qHYbrZ
-	DSS9Dl33I0WDSMmNm9lRSphXl4ApckLtiNNmPXxhm5Vm3ni/6A3ja/tbxlpSgiSPZfDC+yINkzVP9
-	QWfOnL5RSRWFeu9QMDjQgxKAP5R/t1OyGP1t2F6WxpjUdqv0+lHDYvCEaLoCuEQNsqTRw82iEmBu5
-	dWkmfnylYhE4W4wkiphg==;
+	List-Owner; bh=9nlWQUOruBXP315fRuwxNb4e5xvwc3bXknSBPPldZeI=; b=JqEYlWHpsK/Y5I
+	W3lA1QxE6vp8Z9PGmWd8u93Vogc7URy1/guCL8iMu9tTfk4PY6A50QR3y5gJHonWqCx0eKgxhHLHJ
+	KUTAp9WagXoiKX7Bq2VFQ2dtOCWEzcAL3udvN1stDaNuSolrJBxoW4a9e5ylA+699aHhFaTkomx3W
+	Pid91vLgGPk+In4twPKMLgrCIz3kROIam7LoSpFR3dk4mL6ueugku7khs/mpN7ZjZX7yBYAiGHb4T
+	Co9//7XSnke0vkq8XZzVQIoh/MbG2XJSCwH+SV6DkjkmxFiIWqEKkvuztqpwMcewg5YDaaRNVmT8V
+	+dN0jffbt79ZFZU+SUAw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfMIe-0001LI-0L; Fri, 04 Jan 2019 10:01:56 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1gfMQf-0004Ue-6m; Fri, 04 Jan 2019 10:10:13 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfMIZ-0001KN-E0; Fri, 04 Jan 2019 10:01:53 +0000
-X-UUID: b0e4fdf96e8b4e159395641178bfcd12-20190104
-X-UUID: b0e4fdf96e8b4e159395641178bfcd12-20190104
-Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw01.mediatek.com
- (envelope-from <ck.hu@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1822763611; Fri, 04 Jan 2019 02:01:30 -0800
-Received: from mtkexhb01.mediatek.inc (172.21.101.102) by
- MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Fri, 4 Jan 2019 02:01:29 -0800
-Received: from MTKCAS06.mediatek.inc (172.21.101.30) by mtkexhb01.mediatek.inc
- (172.21.101.102) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Fri, 4 Jan 2019 18:01:15 +0800
-Received: from [172.21.77.4] (172.21.77.4) by MTKCAS06.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Fri, 4 Jan 2019 18:01:15 +0800
-Message-ID: <1546596075.27100.17.camel@mtksdaap41>
-Subject: Re: [PATCH] drm/mediatek: Add MTK Framebuffer-Device (mt7623)
-From: CK Hu <ck.hu@mediatek.com>
-To: Frank Wunderlich <frank-w@public-files.de>
-Date: Fri, 4 Jan 2019 18:01:15 +0800
-In-Reply-To: <20190102122540.7002-2-frank-w@public-files.de>
-References: <20190102122540.7002-1-frank-w@public-files.de>
- <20190102122540.7002-2-frank-w@public-files.de>
-X-Mailer: Evolution 3.10.4-0ubuntu2 
+ id 1gfMQb-0004Pj-KN; Fri, 04 Jan 2019 10:10:11 +0000
+Received: from mail-wm1-f46.google.com (mail-wm1-f46.google.com
+ [209.85.128.46])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id A361D21874;
+ Fri,  4 Jan 2019 10:10:08 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1546596608;
+ bh=/ATKXxpPYYanELSr+T0wqMipesNZcLGZffwCDyYxhng=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=ZS8+vmjjrEOefLzEA0lB0fQNlrI68cyvqAmeNGjMsj+yGVSS0Se1GmNCynBxIzHEM
+ q31XhETiTPPqitbpdN4P93dfFqCi5CVo9+19ZOEUI8iFLoYkANuNUOEKu8pJZr+Myh
+ BzD7OoxrJ7oerAEPRNLKRu9NgHIUklqmO3AgknT8=
+Received: by mail-wm1-f46.google.com with SMTP id a62so660761wmh.4;
+ Fri, 04 Jan 2019 02:10:08 -0800 (PST)
+X-Gm-Message-State: AJcUukcAShAkIRs9W3BsbbpyjeewTTzzVY7EFPEzvw1ie0dOo0lg7oqT
+ bnIebDEJq2HlVvHz/jhYed/GiDPjsWvX/+Jix1Y=
+X-Google-Smtp-Source: ALg8bN4C7DEtDx0duBL1+r5A1UN08eiRqD1PYTQV3EUEBFs9UD5I1oQBE1vbrOwhIvhic9RCUG4yquVY2syBzqAJdsU=
+X-Received: by 2002:a1c:e18a:: with SMTP id y132mr933389wmg.48.1546596607052; 
+ Fri, 04 Jan 2019 02:10:07 -0800 (PST)
 MIME-Version: 1.0
-X-MTK: N
+References: <20181211080123.1397-1-zhiyong.tao@mediatek.com>
+ <20181211080123.1397-2-zhiyong.tao@mediatek.com>
+ <CAGp9Lzo89syaHWDgtS2JpDzSS-_AAbHENFmXrxttUqcQhMj04g@mail.gmail.com>
+ <1546591686.21915.12.camel@mhfsdcap03>
+In-Reply-To: <1546591686.21915.12.camel@mhfsdcap03>
+From: Sean Wang <sean.wang@kernel.org>
+Date: Fri, 4 Jan 2019 02:11:00 -0800
+X-Gmail-Original-Message-ID: <CAGp9Lzrh6gSJ6SF6CpuPvA6+TpH1Jb70aotA6twSn1Cd_=xpkA@mail.gmail.com>
+Message-ID: <CAGp9Lzrh6gSJ6SF6CpuPvA6+TpH1Jb70aotA6twSn1Cd_=xpkA@mail.gmail.com>
+Subject: Re: [PATCH] pinctrl: add drive for I2C related pins on MT8183
+To: Zhiyong Tao <zhiyong.tao@mediatek.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190104_020151_489581_93021BDC 
-X-CRM114-Status: GOOD (  25.73  )
+X-CRM114-CacheID: sfid-20190104_021009_710481_A2010CBD 
+X-CRM114-Status: GOOD (  34.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,439 +83,341 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Alexander Ryabchenko <d3adme4t@gmail.com>,
- linux-mediatek@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ =?UTF-8?B?SG9uZ2t1biBDYW8gKOabuea0quWdpCk=?= <Hongkun.Cao@mediatek.com>,
+ srv_heupstream <srv_heupstream@mediatek.com>,
+ =?UTF-8?B?Q2h1YW5qaWEgTGl1ICjmn7PkvKDlmIkp?= <Chuanjia.Liu@mediatek.com>,
+ =?UTF-8?B?QmlhbyBIdWFuZyAo6buE5b2qKQ==?= <Biao.Huang@mediatek.com>,
+ Linus Walleij <linus.walleij@linaro.org>,
+ =?UTF-8?B?TGlndW8gWmhhbmcgKOW8oOeri+WbvSk=?= <Liguo.Zhang@mediatek.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Hongzhou Yang <hongzhou.yang@mediatek.com>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>,
+ "linux-mediatek@lists.infradead.org" <linux-mediatek@lists.infradead.org>,
+ "linux-gpio@vger.kernel.org" <linux-gpio@vger.kernel.org>,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ =?UTF-8?B?RWRkaWUgSHVhbmcgKOm7g+aZuuWCkSk=?= <eddie.huang@mediatek.com>,
+ =?UTF-8?B?RXJpbiBMbyAo576F6ZuF6b2hKQ==?= <erin.lo@mediatek.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi, Frank:
+On Fri, Jan 4, 2019 at 12:48 AM Zhiyong Tao <zhiyong.tao@mediatek.com> wrote:
+>
+> On Wed, 2018-12-12 at 04:51 +0800, Sean Wang wrote:
+> > The subject should be refined to be close to the content
+> >
+> > On Tue, Dec 11, 2018 at 12:02 AM Zhiyong Tao <zhiyong.tao@mediatek.com> wrote:
+> > >
+> > > This patch provides the advanced drive for I2C used pins on MT8183.
+> > >
+> >
+> > Additionally, you should state more how much strength in mA given on
+> > each step E1, E0 move forward. This way would help to reuse the scheme
+> > on the similar SoCs.
+>
+> ==>
+> Hi sean,
+> Thanks for your suggestion.
+> when E1=0/E0=0, the strength is 0.125mA;
+> when E1=0/E0=1, the strength is 0.25mA;
+> when E1=1/E0=0, the strength is 0.5mA;
+> when E1=1/E0=1, the strength is 1mA;
+> we will add it in the commit message in the next version.
+>
 
-On Wed, 2019-01-02 at 13:25 +0100, Frank Wunderlich wrote:
-> From: CK Hu <ck.hu@mediatek.com>
-> 
-> This patch adds Framebuffer-Driver for Mediatek
-> 
-> currently tested on mt7623, maybe works on other platforms
-> MTK-FBDev written by CK Hu and ported from 4.4
-> 
-> based on patchset drm/hdmi for 7623 v5 (except last part included in 4.20)
->   https://patchwork.kernel.org/project/linux-mediatek/list/?series=25989
-> 
-> depends on
->   dts-patch (resend of 5/5, parts 1-4 already in 4.20):
->     "arm: dts: mt7623: add display subsystem related device nodes"
->     https://patchwork.kernel.org/patch/10588951/
->   2 bugfix-patches from bibby hsieh
->     fix-boot-up-for-720-and-480-but-1080
->     using-different-round-rate-for-mt7623
->   1 Patch from Ryder Lee
->     http://forum.banana-pi.org/t/kernel-4-19-rc1-for-testers/6618/52
-> 
-> full working tree here for reference:
-> https://github.com/frank-w/BPI-R2-4.14/commits/4.20-hdmiv5
-> 
-> Signed-off-by: CK Hu <ck.hu@mediatek.com>
-> Signed-off-by: Alexander Ryabchenko <d3adme4t@gmail.com>
-> Signed-off-by: Frank Wunderlich <frank-w@public-files.de>
-> Tested-by: Frank Wunderlich <frank-w@public-files.de>
-> ---
->  drivers/gpu/drm/mediatek/Makefile        |   1 +
->  drivers/gpu/drm/mediatek/mtk_drm_drv.c   |   6 +
->  drivers/gpu/drm/mediatek/mtk_drm_drv.h   |   4 +
->  drivers/gpu/drm/mediatek/mtk_drm_fb.c    |  13 ++
->  drivers/gpu/drm/mediatek/mtk_drm_fb.h    |   3 +
->  drivers/gpu/drm/mediatek/mtk_drm_fbdev.c | 178 +++++++++++++++++++++++
->  drivers/gpu/drm/mediatek/mtk_drm_fbdev.h |  25 ++++
->  7 files changed, 230 insertions(+)
->  create mode 100644 drivers/gpu/drm/mediatek/mtk_drm_fbdev.c
->  create mode 100644 drivers/gpu/drm/mediatek/mtk_drm_fbdev.h
-> 
-> diff --git a/drivers/gpu/drm/mediatek/Makefile b/drivers/gpu/drm/mediatek/Makefile
-> index 82ae49c64221..d71e57dea77a 100644
-> --- a/drivers/gpu/drm/mediatek/Makefile
-> +++ b/drivers/gpu/drm/mediatek/Makefile
-> @@ -14,6 +14,7 @@ mediatek-drm-y := mtk_disp_color.o \
->  		  mtk_mipi_tx.o \
->  		  mtk_dpi.o
->  
-> +mediatek-drm-$(CONFIG_DRM_FBDEV_EMULATION) += mtk_drm_fbdev.o
->  obj-$(CONFIG_DRM_MEDIATEK) += mediatek-drm.o
->  
->  mediatek-drm-hdmi-objs := mtk_cec.o \
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> index 7800822b4db1..51f1ec3412d3 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> @@ -32,6 +32,7 @@
->  #include "mtk_drm_ddp_comp.h"
->  #include "mtk_drm_drv.h"
->  #include "mtk_drm_fb.h"
-> +#include "mtk_drm_fbdev.h"
->  #include "mtk_drm_gem.h"
->  
->  #define DRIVER_NAME "mediatek"
-> @@ -299,6 +300,10 @@ static int mtk_drm_kms_init(struct drm_device *drm)
->  	drm_kms_helper_poll_init(drm);
->  	drm_mode_config_reset(drm);
->  
-> +	ret = mtk_fbdev_init(drm);
-> +	if (ret)
-> +		goto err_component_unbind;
-> +
->  	return 0;
->  
->  err_component_unbind:
-> @@ -311,6 +316,7 @@ static int mtk_drm_kms_init(struct drm_device *drm)
->  
->  static void mtk_drm_kms_deinit(struct drm_device *drm)
->  {
-> +	mtk_fbdev_fini(drm);
->  	drm_kms_helper_poll_fini(drm);
->  
->  	component_unbind_all(drm->dev, drm);
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> index 256a3ff2e66e..56129a21fb2b 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> @@ -14,6 +14,7 @@
->  #ifndef MTK_DRM_DRV_H
->  #define MTK_DRM_DRV_H
->  
-> +#include <drm/drm_fb_helper.h>
->  #include <linux/io.h>
->  #include "mtk_drm_ddp_comp.h"
->  
-> @@ -43,6 +44,7 @@ struct mtk_drm_private {
->  	struct drm_device *drm;
->  	struct device *dma_dev;
->  
-> +	struct drm_crtc *crtc[MAX_CRTC];
+Does the extra fine-tuned strength always plus on regular drive
+strength? or the device can be minus from regular drive strength.
 
-Useless, so remove it.
+Because the generic property drive-strength seems not able to accept a
+floating point as the argument, so it should probably be fine to use
+additional vendor property to indicate the extra fine-tuned strength.
 
->  	unsigned int num_pipes;
->  
->  	struct device_node *mutex_node;
-> @@ -59,6 +61,8 @@ struct mtk_drm_private {
->  	} commit;
->  
->  	struct drm_atomic_state *suspend_state;
-> +	struct drm_fb_helper fb_helper;
-> +	struct drm_gem_object *fbdev_bo;
->  };
->  
->  extern struct platform_driver mtk_ddp_driver;
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fb.c b/drivers/gpu/drm/mediatek/mtk_drm_fb.c
-> index be5f6f1daf55..7533aa4733d2 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_fb.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_fb.c
-> @@ -56,6 +56,19 @@ static struct drm_framebuffer *mtk_drm_framebuffer_init(struct drm_device *dev,
->  	return fb;
->  }
->  
-> +struct drm_framebuffer *mtk_drm_framebuffer_create(struct drm_device *dev,
-> +					const struct drm_mode_fb_cmd2 *mode,
-> +					struct drm_gem_object *obj)
-> +{
-> +	struct drm_framebuffer *mtk_fb;
-> +
-> +	mtk_fb = mtk_drm_framebuffer_init(dev, mode, obj);
-> +	if (IS_ERR(mtk_fb))
-> +		return ERR_CAST(mtk_fb);
-> +
-> +	return mtk_fb;
-> +}
+I'd prefer to add only one vendor property
+"mediatek,drive-strength-extra" in a human-readable way which only
+accepts an integer in mA to reach your goal and where the "extra" in
+the naming is that I am supposed the property can't work
+independently, it has to work together with general driving strength
+to determine the final driving strength.
 
-mtk_drm_framebuffer_create() is exactly the same as
-mtk_drm_framebuffer_init(), so remove this function and use
-mtk_drm_framebuffer_init() directly.
+For example:
+mediatek,drive-strenth-extra=<125>;
+mediatek,drive-strenth-extra=<250>;
+mediatek,drive-strenth-extra=<500>;
+mediatek,drive-strenth-extra=<1000>;
+mediatek,drive-strenth-extra=<-250>; /* if a minus can supported */
 
-> +
->  /*
->   * Wait for any exclusive fence in fb's gem object's reservation object.
->   *
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fb.h b/drivers/gpu/drm/mediatek/mtk_drm_fb.h
-> index 7f976b196a15..e49e015380d0 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_fb.h
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_fb.h
-> @@ -18,5 +18,8 @@ int mtk_fb_wait(struct drm_framebuffer *fb);
->  struct drm_framebuffer *mtk_drm_mode_fb_create(struct drm_device *dev,
->  					       struct drm_file *file,
->  					       const struct drm_mode_fb_cmd2 *cmd);
-> +struct drm_framebuffer *mtk_drm_framebuffer_create(struct drm_device *dev,
-> +		const struct drm_mode_fb_cmd2 *mode,
-> +		struct drm_gem_object *obj);
->  
->  #endif /* MTK_DRM_FB_H */
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fbdev.c b/drivers/gpu/drm/mediatek/mtk_drm_fbdev.c
-> new file mode 100644
-> index 000000000000..9670f50d1247
-> --- /dev/null
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_fbdev.c
-> @@ -0,0 +1,178 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright (c) 2018 MediaTek Inc.
-> + * Author: CK Hu <ck.hu@mediatek.com>
-> + */
-> +
-> +#include <drm/drmP.h>
-> +#include <drm/drm_crtc_helper.h>
-> +#include <drm/drm_fb_helper.h>
-> +#include <drm/drm_gem.h>
-> +
-> +#include "mtk_drm_drv.h"
-> +#include "mtk_drm_fb.h"
-> +#include "mtk_drm_gem.h"
-> +#include "mtk_drm_fbdev.h"
+About the driver implementation, the driver can round down or up to
+the closest value the user expects to (that can be done easily with
+macro DIV_ROUND_CLOSEST) and we have to state clearly what range can
+be supported for the SoC and the relationship with generic property
+drive-strength in both the dt-binding and the driver with proper
+comments.
 
-Alphabetic order.
-
-> +
-> +#define to_drm_private(x) \
-> +		container_of(x, struct mtk_drm_private, fb_helper)
-> +
-> +static int mtk_drm_fbdev_mmap(struct fb_info *info, struct vm_area_struct *vma)
-> +{
-> +	struct drm_fb_helper *helper = info->par;
-> +	struct mtk_drm_private *private = to_drm_private(helper);
-> +
-> +	return mtk_drm_gem_mmap_buf(private->fbdev_bo, vma);
-> +}
-> +
-> +static struct fb_ops mtk_fbdev_ops = {
-> +	.owner = THIS_MODULE,
-> +	DRM_FB_HELPER_DEFAULT_OPS,
-> +	.fb_fillrect = drm_fb_helper_cfb_fillrect,
-> +	.fb_copyarea = drm_fb_helper_cfb_copyarea,
-> +	.fb_imageblit = drm_fb_helper_cfb_imageblit,
-> +	.fb_check_var = drm_fb_helper_check_var,
-> +	.fb_set_par = drm_fb_helper_set_par,
-> +	.fb_blank = drm_fb_helper_blank,
-> +	.fb_pan_display = drm_fb_helper_pan_display,
-> +	.fb_setcmap = drm_fb_helper_setcmap,
-> +	.fb_mmap = mtk_drm_fbdev_mmap,
-> +};
-
-DRM_FB_HELPER_DEFAULT_OPS is defined as follow, so you should remove the
-same definition part.
-
-#define DRM_FB_HELPER_DEFAULT_OPS \
-	.fb_check_var	= drm_fb_helper_check_var, \
-	.fb_set_par	= drm_fb_helper_set_par, \
-	.fb_setcmap	= drm_fb_helper_setcmap, \
-	.fb_blank	= drm_fb_helper_blank, \
-	.fb_pan_display	= drm_fb_helper_pan_display, \
-	.fb_debug_enter = drm_fb_helper_debug_enter, \
-	.fb_debug_leave = drm_fb_helper_debug_leave, \
-	.fb_ioctl	= drm_fb_helper_ioctl
-
-> +
-> +static int mtk_fbdev_probe(struct drm_fb_helper *helper,
-> +			   struct drm_fb_helper_surface_size *sizes)
-> +{
-> +	struct drm_device *dev = helper->dev;
-> +	struct mtk_drm_private *private = to_drm_private(helper);
-> +	struct drm_mode_fb_cmd2 mode = { 0 };
-> +	struct mtk_drm_gem_obj *mtk_gem;
-> +	struct fb_info *info;
-> +	struct drm_framebuffer *fb;
-> +	unsigned int bytes_per_pixel;
-> +	unsigned long offset;
-> +	size_t size;
-> +	int err = 0;
-
-Need not initialize to zero.
-
-> +
-> +	bytes_per_pixel = DIV_ROUND_UP(sizes->surface_bpp, 8);
-> +
-> +	mode.width = sizes->surface_width;
-> +	mode.height = sizes->surface_height;
-> +	mode.pitches[0] = sizes->surface_width * bytes_per_pixel;
-> +	mode.pixel_format = drm_mode_legacy_fb_format(sizes->surface_bpp,
-> +						      sizes->surface_depth);
-> +
-> +	size = mode.pitches[0] * mode.height;
-> +
-> +	mtk_gem = mtk_drm_gem_create(dev, size, true);
-> +	if (IS_ERR(mtk_gem))
-> +		return PTR_ERR(mtk_gem);
-> +
-> +	private->fbdev_bo = &mtk_gem->base;
-> +
-> +	info = drm_fb_helper_alloc_fbi(helper);
-> +	if (IS_ERR(info)) {
-> +		DRM_DEV_ERROR(dev->dev,
-> +			"failed to allocate framebuffer info, %d\n",
-
-Align to the right of '('.
-
-> +			err);
-
-Why print err before assign it?
-
-> +		err = PTR_ERR(info);
-> +		goto out;
-> +	}
-> +
-> +	fb = mtk_drm_framebuffer_create(dev, &mode, private->fbdev_bo);
-> +	if (IS_ERR(fb)) {
-> +		DRM_DEV_ERROR(dev->dev,
-> +			"failed to allocate DRM framebuffer, %d\n",
-
-Align to the right of '('.
-
-> +			err);
-
-Why print err before assign it?
-
-> +		err = PTR_ERR(fb);
-> +		goto out;
-
-I think here should goto somewhere to undo drm_fb_helper_alloc_fbi().
-
-> +	}
-> +	helper->fb = fb;
-> +
-> +	info->par = helper;
-> +	info->flags = FBINFO_FLAG_DEFAULT;
-> +	info->fbops = &mtk_fbdev_ops;
-> +
-> +	drm_fb_helper_fill_fix(info, fb->pitches[0], fb->format->depth);
-> +	drm_fb_helper_fill_var(info, helper, sizes->fb_width, sizes->fb_height);
-> +
-> +	offset = info->var.xoffset * bytes_per_pixel;
-> +	offset += info->var.yoffset * fb->pitches[0];
-> +
-> +	dev->mode_config.fb_base = 0;
-> +	info->screen_base = mtk_gem->kvaddr + offset;
-> +	info->screen_size = size;
-> +	info->fix.smem_len = size;
-> +
-> +	DRM_DEBUG_KMS("FB [%ux%u]-%u offset=%lu size=%zd\n",
-> +		      fb->width, fb->height, fb->format->depth, offset, size);
-> +
-> +	info->skip_vt_switch = true;
-> +
-> +	return 0;
-> +
-> +out:
-
-I would like the label naming as 'err_gem_free_object'
-
-> +
-> +
-> +	mtk_drm_gem_free_object(&mtk_gem->base);
-> +	return err;
-> +}
-> +
-> +static const struct drm_fb_helper_funcs mtk_drm_fb_helper_funcs = {
-> +	.fb_probe = mtk_fbdev_probe,
-> +};
-> +
-> +int mtk_fbdev_init(struct drm_device *dev)
-> +{
-> +	struct mtk_drm_private *priv = dev->dev_private;
-> +	struct drm_fb_helper *helper = &priv->fb_helper;
-> +	int ret;
-> +
-> +	if (!dev->mode_config.num_crtc || !dev->mode_config.num_connector)
-> +		return -EINVAL;
-> +
-> +	drm_fb_helper_prepare(dev, helper, &mtk_drm_fb_helper_funcs);
-> +
-> +	ret = drm_fb_helper_init(dev, helper, dev->mode_config.num_connector);
-> +	if (ret < 0) {
-> +		DRM_DEV_ERROR(dev->dev,
-> +			"failed to initialize DRM FB helper, %d\n",
-> +			ret);
-> +//		goto fini;
-
-Remove useless line.
-
-> +		return ret;
-> +	}
-> +
-> +	ret = drm_fb_helper_single_add_all_connectors(helper);
-> +	if (ret < 0) {
-> +		DRM_DEV_ERROR(dev->dev, "failed to add connectors, %d\n", ret);
-> +		goto fini;
-> +	}
-> +
-> +	ret = drm_fb_helper_initial_config(helper, 32);
-> +	if (ret < 0) {
-> +		DRM_DEV_ERROR(dev->dev,
-> +			"failed to set initial configuration, %d\n",
-
-Align to the right of '('.
-
-> +			ret);
-> +		goto fini;
-> +	}
-> +
-> +	return 0;
-> +
-> +fini:
-
-I would like the label naming as err_fini.
-
-Regards,
-CK
-
-> +	drm_fb_helper_fini(helper);
-> +	return ret;
-> +}
-> +
-> +void mtk_fbdev_fini(struct drm_device *dev)
-> +{
-> +	struct mtk_drm_private *priv = dev->dev_private;
-> +	struct drm_fb_helper *helper = &priv->fb_helper;
-> +
-> +	drm_fb_helper_unregister_fbi(helper);
-> +
-> +	if (helper->fb) {
-> +		drm_framebuffer_unregister_private(helper->fb);
-> +		drm_framebuffer_remove(helper->fb);
-> +	}
-> +
-> +	drm_fb_helper_fini(helper);
-> +}
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fbdev.h b/drivers/gpu/drm/mediatek/mtk_drm_fbdev.h
-> new file mode 100644
-> index 000000000000..45717b642dc5
-> --- /dev/null
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_fbdev.h
-> @@ -0,0 +1,25 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> +/*
-> + * Copyright (c) 2018 MediaTek Inc.
-> + * Author: CK Hu <ck.hu@mediatek.com>
-> + */
-> +
-> +#ifndef MTK_DRM_FBDEV_H
-> +#define MTK_DRM_FBDEV_H
-> +
-> +#ifdef CONFIG_DRM_FBDEV_EMULATION
-> +int mtk_fbdev_init(struct drm_device *dev);
-> +void mtk_fbdev_fini(struct drm_device *dev);
-> +#else
-> +int mtk_fbdev_init(struct drm_device *dev)
-> +{
-> +	return 0;
-> +}
-> +
-> +void mtk_fbdev_fini(struct drm_device *dev)
-> +{
-> +
-> +}
-> +#endif /* CONFIG_DRM_FBDEV_EMULATION */
-> +
-> +#endif /* MTK_DRM_FBDEV_H */
-
-
+> Thanks.
+> >
+> > > Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+> > > ---
+> > >  drivers/pinctrl/mediatek/pinctrl-mt8183.c        | 50 ++++++++++++++++++++++++
+> > >  drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c | 45 +++++++++++++++++++++
+> > >  drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h | 13 ++++++
+> > >  drivers/pinctrl/mediatek/pinctrl-paris.c         | 20 ++++++++++
+> > >  4 files changed, 128 insertions(+)
+> > >
+> > > diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8183.c b/drivers/pinctrl/mediatek/pinctrl-mt8183.c
+> > > index 6262fd3678ea..5244e1b27b1d 100644
+> > > --- a/drivers/pinctrl/mediatek/pinctrl-mt8183.c
+> > > +++ b/drivers/pinctrl/mediatek/pinctrl-mt8183.c
+> > > @@ -472,6 +472,51 @@ static const struct mtk_pin_field_calc mt8183_pin_r1_range[] = {
+> > >         PIN_FIELD_BASE(133, 133, 8, 0x0D0, 0x10, 13, 1),
+> > >  };
+> > >
+> > > +static const struct mtk_pin_field_calc mt8183_pin_drv_en_dis_range[] = {
+> >
+> > I'd prefer using the word mt8183_pin_e1e0en_range to keep people away from
+> > be confused the relationship with the existing mt8183_pin_drv_range.
+> >
+> > > +       PIN_FIELD_BASE(48, 48, 3, 0x0F0, 0x10, 20, 1),
+> > > +       PIN_FIELD_BASE(49, 49, 3, 0x0F0, 0x10, 15, 1),
+> > > +       PIN_FIELD_BASE(50, 50, 4, 0x0F0, 0x10, 12, 1),
+> > > +       PIN_FIELD_BASE(51, 51, 4, 0x0F0, 0x10, 7, 1),
+> > > +       PIN_FIELD_BASE(81, 81, 5, 0x0F0, 0x10, 12, 1),
+> > > +       PIN_FIELD_BASE(82, 82, 5, 0x0F0, 0x10, 9, 1),
+> > > +       PIN_FIELD_BASE(83, 83, 5, 0x0F0, 0x10, 19, 1),
+> > > +       PIN_FIELD_BASE(84, 84, 5, 0x0F0, 0x10, 22, 1),
+> > > +       PIN_FIELD_BASE(103, 103, 6, 0x0F0, 0x10, 24, 1),
+> > > +       PIN_FIELD_BASE(104, 104, 6, 0x0F0, 0x10, 14, 1),
+> > > +       PIN_FIELD_BASE(105, 105, 6, 0x0F0, 0x10, 27, 1),
+> > > +       PIN_FIELD_BASE(106, 106, 6, 0x0F0, 0x10, 17, 1),
+> > > +};
+> > > +
+> > > +static const struct mtk_pin_field_calc mt8183_pin_drv_e0_range[] = {
+> >
+> > Ditto, I'd prefer using the word mt8183_pin_e0_range
+> >
+> > > +       PIN_FIELD_BASE(48, 48, 3, 0x0F0, 0x10, 21, 1),
+> > > +       PIN_FIELD_BASE(49, 49, 3, 0x0F0, 0x10, 16, 1),
+> > > +       PIN_FIELD_BASE(50, 50, 4, 0x0F0, 0x10, 13, 1),
+> > > +       PIN_FIELD_BASE(51, 51, 4, 0x0F0, 0x10, 8, 1),
+> > > +       PIN_FIELD_BASE(81, 81, 5, 0x0F0, 0x10, 13, 1),
+> > > +       PIN_FIELD_BASE(82, 82, 5, 0x0F0, 0x10, 10, 1),
+> > > +       PIN_FIELD_BASE(83, 83, 5, 0x0F0, 0x10, 20, 1),
+> > > +       PIN_FIELD_BASE(84, 84, 5, 0x0F0, 0x10, 23, 1),
+> > > +       PIN_FIELD_BASE(103, 103, 6, 0x0F0, 0x10, 25, 1),
+> > > +       PIN_FIELD_BASE(104, 104, 6, 0x0F0, 0x10, 15, 1),
+> > > +       PIN_FIELD_BASE(105, 105, 6, 0x0F0, 0x10, 28, 1),
+> > > +       PIN_FIELD_BASE(106, 106, 6, 0x0F0, 0x10, 18, 1),
+> > > +};
+> > > +
+> > > +static const struct mtk_pin_field_calc mt8183_pin_drv_e1_range[] = {
+> >
+> > Ditto, I'd prefer using the word mt8183_pin_e1_range
+> >
+> > > +       PIN_FIELD_BASE(48, 48, 3, 0x0F0, 0x10, 22, 1),
+> > > +       PIN_FIELD_BASE(49, 49, 3, 0x0F0, 0x10, 17, 1),
+> > > +       PIN_FIELD_BASE(50, 50, 4, 0x0F0, 0x10, 14, 1),
+> > > +       PIN_FIELD_BASE(51, 51, 4, 0x0F0, 0x10, 9, 1),
+> > > +       PIN_FIELD_BASE(81, 81, 5, 0x0F0, 0x10, 14, 1),
+> > > +       PIN_FIELD_BASE(82, 82, 5, 0x0F0, 0x10, 11, 1),
+> > > +       PIN_FIELD_BASE(83, 83, 5, 0x0F0, 0x10, 21, 1),
+> > > +       PIN_FIELD_BASE(84, 84, 5, 0x0F0, 0x10, 24, 1),
+> > > +       PIN_FIELD_BASE(103, 103, 6, 0x0F0, 0x10, 26, 1),
+> > > +       PIN_FIELD_BASE(104, 104, 6, 0x0F0, 0x10, 16, 1),
+> > > +       PIN_FIELD_BASE(105, 105, 6, 0x0F0, 0x10, 29, 1),
+> > > +       PIN_FIELD_BASE(106, 106, 6, 0x0F0, 0x10, 19, 1),
+> > > +};
+> > > +
+> > >  static const struct mtk_pin_reg_calc mt8183_reg_cals[PINCTRL_PIN_REG_MAX] = {
+> > >         [PINCTRL_PIN_REG_MODE] = MTK_RANGE(mt8183_pin_mode_range),
+> > >         [PINCTRL_PIN_REG_DIR] = MTK_RANGE(mt8183_pin_dir_range),
+> > > @@ -485,6 +530,9 @@ static const struct mtk_pin_reg_calc mt8183_reg_cals[PINCTRL_PIN_REG_MAX] = {
+> > >         [PINCTRL_PIN_REG_PUPD] = MTK_RANGE(mt8183_pin_pupd_range),
+> > >         [PINCTRL_PIN_REG_R0] = MTK_RANGE(mt8183_pin_r0_range),
+> > >         [PINCTRL_PIN_REG_R1] = MTK_RANGE(mt8183_pin_r1_range),
+> > > +       [PINCTRL_PIN_REG_DRV_EN_DIS] = MTK_RANGE(mt8183_pin_drv_en_dis_range),
+> > > +       [PINCTRL_PIN_REG_DRV_E0] = MTK_RANGE(mt8183_pin_drv_e0_range),
+> > > +       [PINCTRL_PIN_REG_DRV_E1] = MTK_RANGE(mt8183_pin_drv_e1_range),
+> > >  };
+> > >
+> > >  static const char * const mt8183_pinctrl_register_base_names[] = {
+> > > @@ -517,6 +565,8 @@ static const struct mtk_pin_soc mt8183_data = {
+> > >         .drive_get = mtk_pinconf_drive_get_rev1,
+> > >         .adv_pull_get = mtk_pinconf_adv_pull_get,
+> > >         .adv_pull_set = mtk_pinconf_adv_pull_set,
+> > > +       .adv_drive_get = mtk_pinconf_adv_drive_get,
+> > > +       .adv_drive_set = mtk_pinconf_adv_drive_set,
+> >
+> > DT property drive-strength is generic enough to all SoCs so we don't
+> > need to create extra callbacks to serve the extra property about the
+> > driving adjustment.
+> >
+> > And DRV register working for i2c pins 48-51, 81-84 and 103-106 implies
+> > that E1 and E0 work like more an extra fine adjustment related to DRV
+> > register have done to give more accurate strength than only DRV
+> > register can support. Thus, DRV, E0, and E1 should be more
+> > consolidated to in the same function instead of making them apart.
+> >
+> > If we know how much driving strength on each step of e1, e0, it would
+> > be easy to add E1 and E0 support into current driving adjustment
+> > procedure mtk_pinconf_drive_set_rev1 and mtk_pinconf_drive_get_rev1.
+> >
+> > >  };
+> > >
+> > >  static const struct of_device_id mt8183_pinctrl_of_match[] = {
+> > > diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
+> > > index 4a9e0d4c2bbc..da024279ec59 100644
+> > > --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
+> > > +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
+> > > @@ -668,3 +668,48 @@ int mtk_pinconf_adv_pull_get(struct mtk_pinctrl *hw,
+> > >
+> > >         return 0;
+> > >  }
+> > > +
+> > > +int mtk_pinconf_adv_drive_set(struct mtk_pinctrl *hw,
+> > > +                             const struct mtk_pin_desc *desc, bool enable,
+> > > +                             u32 arg)
+> > > +{
+> > > +       int err;
+> > > +
+> > > +       err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_DRV_E0, arg & 1);
+> > > +       if (err)
+> > > +               return 0;
+> > > +
+> > > +       err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_DRV_E1,
+> > > +                              !!(arg & 2));
+> > > +       if (err)
+> > > +               return 0;
+> > > +
+> > > +       arg = enable ? 1 : 0;
+> > > +
+> > > +       err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_DRV_EN_DIS, arg);
+> > > +
+> > > +       return err;
+> > > +}
+> > > +
+> > > +int mtk_pinconf_adv_drive_get(struct mtk_pinctrl *hw,
+> > > +                             const struct mtk_pin_desc *desc, u32 *val)
+> > > +{
+> > > +       u32 en, e0, e1;
+> > > +       int err;
+> > > +
+> > > +       err = mtk_hw_get_value(hw, desc, PINCTRL_PIN_REG_DRV_EN_DIS, &en);
+> > > +       if (err)
+> > > +               return err;
+> > > +
+> > > +       err = mtk_hw_get_value(hw, desc, PINCTRL_PIN_REG_DRV_E0, &e0);
+> > > +       if (err)
+> > > +               return err;
+> > > +
+> > > +       err = mtk_hw_get_value(hw, desc, PINCTRL_PIN_REG_DRV_E1, &e1);
+> > > +       if (err)
+> > > +               return err;
+> > > +
+> > > +       *val = (e0 | e1 << 1 | en << 2) & 0x7;
+> > > +
+> > > +       return 0;
+> > > +}
+> > > diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h
+> > > index 6d24522739d9..795a3b10d54e 100644
+> > > --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h
+> > > +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h
+> > > @@ -63,6 +63,9 @@ enum {
+> > >         PINCTRL_PIN_REG_IES,
+> > >         PINCTRL_PIN_REG_PULLEN,
+> > >         PINCTRL_PIN_REG_PULLSEL,
+> > > +       PINCTRL_PIN_REG_DRV_EN_DIS,
+> > > +       PINCTRL_PIN_REG_DRV_E0,
+> > > +       PINCTRL_PIN_REG_DRV_E1,
+> > >         PINCTRL_PIN_REG_MAX,
+> > >  };
+> > >
+> > > @@ -224,6 +227,11 @@ struct mtk_pin_soc {
+> > >         int (*adv_pull_get)(struct mtk_pinctrl *hw,
+> > >                             const struct mtk_pin_desc *desc, bool pullup,
+> > >                             u32 *val);
+> > > +       int (*adv_drive_set)(struct mtk_pinctrl *hw,
+> > > +                            const struct mtk_pin_desc *desc, bool enable,
+> > > +                            u32 arg);
+> > > +       int (*adv_drive_get)(struct mtk_pinctrl *hw,
+> > > +                            const struct mtk_pin_desc *desc, u32 *val);
+> > >
+> > >         /* Specific driver data */
+> > >         void                            *driver_data;
+> > > @@ -287,5 +295,10 @@ int mtk_pinconf_adv_pull_set(struct mtk_pinctrl *hw,
+> > >  int mtk_pinconf_adv_pull_get(struct mtk_pinctrl *hw,
+> > >                              const struct mtk_pin_desc *desc, bool pullup,
+> > >                              u32 *val);
+> > > +int mtk_pinconf_adv_drive_set(struct mtk_pinctrl *hw,
+> > > +                             const struct mtk_pin_desc *desc, bool enable,
+> > > +                            u32 arg);
+> > > +int mtk_pinconf_adv_drive_get(struct mtk_pinctrl *hw,
+> > > +                             const struct mtk_pin_desc *desc, u32 *val);
+> > >
+> > >  #endif /* __PINCTRL_MTK_COMMON_V2_H */
+> > > diff --git a/drivers/pinctrl/mediatek/pinctrl-paris.c b/drivers/pinctrl/mediatek/pinctrl-paris.c
+> > > index d2179028f134..ef4ccaa59e55 100644
+> > > --- a/drivers/pinctrl/mediatek/pinctrl-paris.c
+> > > +++ b/drivers/pinctrl/mediatek/pinctrl-paris.c
+> > > @@ -20,12 +20,16 @@
+> > >  #define MTK_PIN_CONFIG_RDSEL   (PIN_CONFIG_END + 2)
+> > >  #define MTK_PIN_CONFIG_PU_ADV  (PIN_CONFIG_END + 3)
+> > >  #define MTK_PIN_CONFIG_PD_ADV  (PIN_CONFIG_END + 4)
+> > > +#define MTK_PIN_CONFIG_DRV_EN_ADV      (PIN_CONFIG_END + 5)
+> > > +#define MTK_PIN_CONFIG_DRV_DIS_ADV     (PIN_CONFIG_END + 6)
+> > >
+> > >  static const struct pinconf_generic_params mtk_custom_bindings[] = {
+> > >         {"mediatek,tdsel",      MTK_PIN_CONFIG_TDSEL,           0},
+> > >         {"mediatek,rdsel",      MTK_PIN_CONFIG_RDSEL,           0},
+> > >         {"mediatek,pull-up-adv", MTK_PIN_CONFIG_PU_ADV,         1},
+> > >         {"mediatek,pull-down-adv", MTK_PIN_CONFIG_PD_ADV,       1},
+> > > +       {"mediatek,drive-enable-adv", MTK_PIN_CONFIG_DRV_EN_ADV,        2},
+> > > +       {"mediatek,drive-disable-adv", MTK_PIN_CONFIG_DRV_DIS_ADV,      2},
+> > >  };
+> > >
+> > >  #ifdef CONFIG_DEBUG_FS
+> > > @@ -34,6 +38,8 @@ static const struct pin_config_item mtk_conf_items[] = {
+> > >         PCONFDUMP(MTK_PIN_CONFIG_RDSEL, "rdsel", NULL, true),
+> > >         PCONFDUMP(MTK_PIN_CONFIG_PU_ADV, "pu-adv", NULL, true),
+> > >         PCONFDUMP(MTK_PIN_CONFIG_PD_ADV, "pd-adv", NULL, true),
+> > > +       PCONFDUMP(MTK_PIN_CONFIG_DRV_EN_ADV, "drive-enable-adv", NULL, true),
+> > > +       PCONFDUMP(MTK_PIN_CONFIG_DRV_DIS_ADV, "drive-disable-adv", NULL, true),
+> > >  };
+> > >  #endif
+> > >
+> > > @@ -311,6 +317,20 @@ static int mtk_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
+> > >                         return -ENOTSUPP;
+> > >                 }
+> > >                 break;
+> > > +       case MTK_PIN_CONFIG_DRV_EN_ADV:
+> > > +       case MTK_PIN_CONFIG_DRV_DIS_ADV:
+> > > +               if (hw->soc->adv_drive_set) {
+> > > +                       bool enable;
+> > > +
+> > > +                       enable = param == MTK_PIN_CONFIG_DRV_EN_ADV;
+> > > +                       err = hw->soc->adv_drive_set(hw, desc, enable,
+> > > +                                                   arg);
+> > > +                       if (err)
+> > > +                               return err;
+> > > +               } else {
+> > > +                       return -ENOTSUPP;
+> > > +               }
+> > > +               break;
+> > >         default:
+> > >                 err = -ENOTSUPP;
+> > >         }
+> > > --
+> > > 2.12.5
+> > >
+> > >
+> > > _______________________________________________
+> > > Linux-mediatek mailing list
+> > > Linux-mediatek@lists.infradead.org
+> > > http://lists.infradead.org/mailman/listinfo/linux-mediatek
+>
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
