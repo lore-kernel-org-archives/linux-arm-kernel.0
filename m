@@ -2,21 +2,22 @@ Return-Path: <SRS0=E6Hv=PM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8DA4BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 14:13:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8BA88C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 14:15:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5CADF208E3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 14:13:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5BFED208E3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 14:15:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aCzxl60k"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5CADF208E3
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="urhEUQlD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5BFED208E3
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,40 +25,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=t7GnHbmIwMwLgg206kKVs925iR55Sg7BNucQIeEotR4=; b=aCzxl60kyxGk2z
-	gA/GZu+Rh9jfUymHlY2GkyT5Rv4S3QGZVD24Mb+Er2Qh2tkNK2n2vVdGi7khtvP1Miu8hZJy2DVfO
-	yR34XrJQOVPd4aezHTzm7qZIDpgCFX+z22d8Su5P+p8iTiADQg7+Yk364G+k4loegnN3eNFw2gMux
-	xcld7h3J5GLnhsO63xy/LCnpgAGFX+/o2LjqxIaoJIT5FV3jFit1va0ViuaXvjigcz+zR471LProF
-	fpTXWTSzc89ABKZDQmjsl3GXbIzvX8nWEMKyJfO7zrlKqsnoTxpF6+fxNUuUuF94rhF84qP2LBGrS
-	Vyq2C5UoaDEEuKUgUVdw==;
+	List-Owner; bh=EUxp3jXsTzlfx5akXwbNQTbwCigQrpLD4SYEYZhTkeQ=; b=urhEUQlDXjBAnM
+	7OJRVg4tzjN6MRM4inWAATFBu2e4d3Kza9UFrKmvaDUWlZnGoy09SjpjdCTakyK3mqtfSf3KeZnSc
+	jCR4ltSTZ4CJzHB+wChwtXZBWFvZc7cXeH21oh2E81qtvC2yXik81PHrHRQwUOZ49vVfFw+ZycmWl
+	/tqJRAU2M0BmgvRU9uY8RTU9g2s6TFSksBzpihvNYDpqchfk/oNY7fJrncblgbaglNpvD4HeHYobu
+	mS30c7c5Vi+/6WyjfbkoPOvIdrzfnGZS3rKX9/VaS57hJ7/5UpEVB8Si26okJhMFGEeNHkRmGGyWB
+	K5+cG0kMIlVaHkwgJTyQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfQED-0007Cd-Um; Fri, 04 Jan 2019 14:13:37 +0000
-Received: from verein.lst.de ([213.95.11.211] helo=newverein.lst.de)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfQEB-0007CG-FB
- for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 14:13:36 +0000
-Received: by newverein.lst.de (Postfix, from userid 2005)
- id 0917068D93; Fri,  4 Jan 2019 15:13:34 +0100 (CET)
-Date: Fri, 4 Jan 2019 15:13:34 +0100
-From: Torsten Duwe <duwe@lst.de>
-To: Amit Daniel Kachhap <amit.kachhap@arm.com>
-Subject: Re: [PATCH v5] arm64: implement ftrace with regs
-Message-ID: <20190104141333.GA21411@lst.de>
-References: <20181130162015.83FE767357@newverein.lst.de>
- <CADGdYn46uQWfoDmRjk1OFj9fYXYbC669Ar=oVtnx141HcMFr8w@mail.gmail.com>
- <20181214094714.GA30043@lst.de>
- <CADGdYn69reXed-DBMTCezNyNEgKn-h0NA-D6dnoRrJx2_bE71Q@mail.gmail.com>
- <20181215134144.6b0cc45b@blackhole.lan>
- <CADGdYn5rrLZGrXUPA+HcKfA1pECYnwT0B1-j3YBzdt773zjORw@mail.gmail.com>
+	id 1gfQFi-0000Tr-EE; Fri, 04 Jan 2019 14:15:10 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gfQFf-0008Qy-Ik
+ for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 14:15:09 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C5CBBEBD;
+ Fri,  4 Jan 2019 06:15:06 -0800 (PST)
+Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id D5D123F575;
+ Fri,  4 Jan 2019 06:15:05 -0800 (PST)
+Date: Fri, 4 Jan 2019 14:15:03 +0000
+From: Dave Martin <Dave.Martin@arm.com>
+To: Will Deacon <will.deacon@arm.com>
+Subject: Re: [PATCH 1/3] arm64: compat: Avoid sending SIGILL for unallocated
+ syscall numbers
+Message-ID: <20190104141503.GD3571@e103592.cambridge.arm.com>
+References: <1546539240-20647-1-git-send-email-will.deacon@arm.com>
+ <1546539240-20647-2-git-send-email-will.deacon@arm.com>
+ <20190104125425.GB3571@e103592.cambridge.arm.com>
+ <20190104134749.GA28158@edgewater-inn.cambridge.arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <CADGdYn5rrLZGrXUPA+HcKfA1pECYnwT0B1-j3YBzdt773zjORw@mail.gmail.com>
-User-Agent: Mutt/1.5.17 (2007-11-01)
+In-Reply-To: <20190104134749.GA28158@edgewater-inn.cambridge.arm.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190104_061335_656882_7A80BF64 
-X-CRM114-Status: UNSURE (   7.78  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190104_061507_639863_E175BAFE 
+X-CRM114-Status: GOOD (  31.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,33 +74,108 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnd Bergmann <arnd@arndb.de>, julien.thierry@arm.com,
- Catalin Marinas <catalin.marinas@arm.com>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, rostedt@goodmis.org, takahiro.akashi@linaro.org,
- mingo@redhat.com, jpoimboe@redhat.com, live-patching@vger.kernel.org,
- LAK <linux-arm-kernel@lists.infradead.org>
+Cc: linux-arm-kernel@lists.infradead.org, stable@vger.kernel.org,
+ pihsun@chromium.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 17, 2018 at 09:52:04AM +0530, Amit Daniel Kachhap wrote:
-> There is no error message or crash but no useful output like below,
+On Fri, Jan 04, 2019 at 01:47:49PM +0000, Will Deacon wrote:
+> On Fri, Jan 04, 2019 at 12:54:26PM +0000, Dave Martin wrote:
+> > On Thu, Jan 03, 2019 at 06:13:58PM +0000, Will Deacon wrote:
+> > > The ARM Linux kernel handles the EABI syscall numbers as follows:
+> > > 
+> > >   0           - NR_SYSCALLS-1	: Invoke syscall via syscall table
+> > >   NR_SYSCALLS - 0xeffff		: -ENOSYS (to be allocated in future)
+> > >   0xf0000     - 0xf07ff		: Private syscall or -ENOSYS if not allocated
+> > >   > 0xf07ff			: SIGILL
+> > > 
+> > > Our compat code gets this wrong and ends up sending SIGILL in response
+> > > to all syscalls greater than NR_SYSCALLS which have a value greater
+> > > than 0x7ff in the bottom 16 bits.
+> > > 
+> > > Fix this by defining the end of the ARM private syscall region and
+> > > checking the syscall number against that directly. Update the comment
+> > > while we're at it.
+> > > 
+> > > Cc: <stable@vger.kernel.org>
+> > > Cc: Dave Martin <Dave.Martin@arm.com>
+> > > Reported-by: Pi-Hsun Shih <pihsun@chromium.org>
+> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > > ---
+> > >  arch/arm64/include/asm/unistd.h | 5 +++--
+> > >  arch/arm64/kernel/sys_compat.c  | 4 ++--
+> > >  2 files changed, 5 insertions(+), 4 deletions(-)
+> > > 
+> > > diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
+> > > index b13ca091f833..be66a54ee3a1 100644
+> > > --- a/arch/arm64/include/asm/unistd.h
+> > > +++ b/arch/arm64/include/asm/unistd.h
+> > > @@ -40,8 +40,9 @@
+> > >   * The following SVCs are ARM private.
+> > >   */
+> > >  #define __ARM_NR_COMPAT_BASE		0x0f0000
+> > > -#define __ARM_NR_compat_cacheflush	(__ARM_NR_COMPAT_BASE+2)
+> > > -#define __ARM_NR_compat_set_tls		(__ARM_NR_COMPAT_BASE+5)
+> > > +#define __ARM_NR_compat_cacheflush	(__ARM_NR_COMPAT_BASE + 2)
+> > > +#define __ARM_NR_compat_set_tls		(__ARM_NR_COMPAT_BASE + 5)
+> > > +#define __ARM_NR_compat_syscall_end	(__ARM_NR_COMPAT_BASE + 0x800)
+> > 
+> > Nit: there is no compat_syscall_end().  Can we make this #define upper
+> > case, like __ARM_NR_COMPAT_BASE, since a symbolic bound, not a syscall
+> > number?
 > 
-> /sys/kernel/tracing # echo wake_up_process > set_graph_function
-> /sys/kernel/tracing # echo function_graph > current_tracer
-> /sys/kernel/tracing # cat trace
-> # tracer: function_graph
-> #
-> # CPU  DURATION                  FUNCTION CALLS
-> # |     |   |                     |   |   |   |
+> That's fair; I'll rename it to __ARM_NR_COMPAT_END.
 
-It turned out the graph caller works perfectly, I only broke the filtering.
-Fixed now in v6; thanks a lot for testing!
+Thanks
 
-	Torsten
+> 
+> > >  #define __NR_compat_syscalls		399
+> > >  #endif
+> > > diff --git a/arch/arm64/kernel/sys_compat.c b/arch/arm64/kernel/sys_compat.c
+> > > index 32653d156747..5972b7533fa0 100644
+> > > --- a/arch/arm64/kernel/sys_compat.c
+> > > +++ b/arch/arm64/kernel/sys_compat.c
+> > > @@ -102,12 +102,12 @@ long compat_arm_syscall(struct pt_regs *regs)
+> > >  
+> > >  	default:
+> > >  		/*
+> > > -		 * Calls 9f00xx..9f07ff are defined to return -ENOSYS
+> > > +		 * Calls 0xf0xxx..0xf07ff are defined to return -ENOSYS
+> > >  		 * if not implemented, rather than raising SIGILL. This
+> > >  		 * way the calling program can gracefully determine whether
+> > >  		 * a feature is supported.
+> > >  		 */
+> > > -		if ((no & 0xffff) <= 0x7ff)
+> > > +		if (no < __ARM_NR_compat_syscall_end)
+> > 
+> > arm_syscall() in arch/arm is not responsible for handling syscalls less
+> > __ARM_NR_BASE; the code in entry-common.S redirects those directly to
+> > sys_ni_syscall() instead.
+> > 
+> > Given how fiddly this is I think it's preferable if we keep to the
+> > arch/arm code structure as much as possible, and call this function only
+> > when no >= __ARM_NR_COMPAT_BASE?
+> 
+> I don't think we should be using the arm code structure as a template here.
+> Although we're providing the same interface, we don't have to worry about
+> things like OABI or ARM vs THUMB entry code. We're also in the process of
+> moving more of this out of assembly and into C, so I'd rather keep the
+> compat code as self-contained as possible.
+> 
+> Even if we did modify the caller so that we only call compat_arm_syscall()
+> for numbers >= __ARM_NR_COMPAT_BASE, we'd still need the check above to
+> handle numbers >= __ARM_NR_COMPAT_END, so I don't think we gain anything.
 
+Well, I can live with it either way.
+
+Cross-referencing the arm64 and arm trees for this functionality is
+challenging, and will tend to get harder as the code diverges...  but
+hopefully it's gone about as far as it's going to go by this point.
+
+Cheers
+---Dave
 
 _______________________________________________
 linux-arm-kernel mailing list
