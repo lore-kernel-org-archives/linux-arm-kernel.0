@@ -8,17 +8,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 52AADC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 17:51:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 60DF6C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 17:51:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2ADA6218CD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 17:51:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2CAEE21872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 17:51:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZMT/yBNC";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="cIQDFnbb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2ADA6218CD
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GuZIlMfn";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="puOa+Oa5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2CAEE21872
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,66 +27,65 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=OMN7vOg+R1qirVy5O3nXR2NAGyqAjjEPR3o2k2Aju/c=; b=ZMT/yBNCaO5CDj
-	W/0alQqlrDLcdpR62JptT/ewMXalP+K0lD2bYRcjI1P3rdsaQH8UGmY2rztrPIIlqZrzG6nfTPVfN
-	4mUjclFRA6CmCDtqpRaNgfy6n2lV62OS6X7vMfvBRmCZ9mp8TI2TmJvEW7fZXBphLq6vfupGZqYMh
-	983NVZXe8Nqb4HNEiYz+uYmytEVGJINgSXuzxZZM7n61Ehr5ZsVoEtiKLTkFWfTe94N1VVV4Y3RqC
-	IsAbZ5z+tSXAT3S5DsPxt4VoQaDZ9/FJsauzKvanm8E/RknO87x2D+QyYT9rwPX42d5mpSny0UUuu
-	Cijx159WhjBTSkEvniZA==;
+	List-Owner; bh=jgnatUXscBnDEJP5Q21b9N6W+vBUjQuEUKsFe97QZpw=; b=GuZIlMfn7CGeTG
+	W5J4r0ff0sCeyk7ob0KHdndkbaWMyk91bOjQFjfor5mrlhYITYuDcUIulkSYKdFsfr0RDMsBinRHU
+	vN5pDxYidhZx6vlawtHMD3N8l0xlComVnv1pmw2WmZm2gkphzFdbm6BwOSc5DK1vg7mrLYlXQYZ+E
+	rxCT5wW0FaC9c7i1luvDHLqsbYHlMu3J4DvQCmyM3T4oAATLXMc8tElny42kkpc6o2m/ZhF6RAqVo
+	sgV0dHm+fV8vC3w5sAzdXR5apjxqlZIBAw+s4y0qUqriZjmXSCgh080tY6HqQGodj48KK/p3IhPeq
+	qz/zPa7kWsLO1xX1UPdw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfTco-0006ok-Vq; Fri, 04 Jan 2019 17:51:15 +0000
-Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
+	id 1gfTd5-00077z-R1; Fri, 04 Jan 2019 17:51:31 +0000
+Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfTbU-0004D4-41
- for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 17:50:03 +0000
-Received: by mail-pg1-x542.google.com with SMTP id y4so17766733pgc.12
+ id 1gfTbV-0004Ft-TV
+ for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 17:50:09 +0000
+Received: by mail-pf1-x441.google.com with SMTP id 64so18619611pfr.9
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 04 Jan 2019 09:49:51 -0800 (PST)
+ Fri, 04 Jan 2019 09:49:53 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=3VOwOJYTEi9UR4UgeiKLcvLz0osJ4eyuFQfv798N0kw=;
- b=cIQDFnbbZQ7zun0bPoYcKlx4CAsV3EdWh8sQLP0WqF9Y45of71SulNq2FVC8xni2F0
- NW7GmTzooeTKpkIuN/g2s879lKeRldJQNhRxB0FpP7j+m9mBmZSSyHklkczn+yfZI6Xz
- BWjQl6TtJNNh964Grs9JFAUqrD7oAmW5nRJ2vasVyDn0pnMm4PgKlkEXdSLibNVdsi8w
- 9xQEhxC6V6KwlpXt+wbL7QbIigPIGkuTpl8zWtYUvmupl+q4L2ENNZE7OMPHDlWdDH+7
- Ekno1l0RTMm69qLLs6FPaiUl5Zamvg+3jST6R9lJMWCOY0AGyEIR4DZahVRmpH7z1jlw
- Ww+w==
+ bh=QhqhT8k9cRoxWOByjnw4+D3pr2bPAqv3RKgBmGiID7Y=;
+ b=puOa+Oa5mf9v7e1IlYNfFflOsFbHuywQvz56JQu5xhuT1CWhPCFLj5SYPYM0yYmSxf
+ /3ltIOT1DOuf/cpIxyBhUhuMcaU4KjjEeEw1v4Vp+uJ3/5Wswg9DE0gIpvZBEf4NTwgG
+ g/Z+0G0NDf6OlV+Ajjkw/F4DhmocblP0TRHEL3hokf2GHWJ5twOYmMsVgsUhoPqohYz7
+ zbbrvcYT13Eyp+txwqEY8zgTO1SEd+AEvdzWdSzcHuZwLdtEfyg5o2uw7tTj3v0ngKwP
+ hQfOk4ZWVwOUb0AxvHfRCFHbgaChQbx7CK2zY/tDmCMQZNrW/4FH8cjdhfuUu68LEUd7
+ YgPQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=3VOwOJYTEi9UR4UgeiKLcvLz0osJ4eyuFQfv798N0kw=;
- b=dsU9ncwkW4wWKTZ0mShpHjuODVfLQuCzxOF8Vc+UIPNYbkQMJ3iHto9PjrqbwQomwF
- JmxqUSqFxz2LbtxLQV2oL1+PmuyQKj+ysL6xYtNgW3sdUmrEDeNy3EYFzZ5dWgCKTgGc
- 0GD6fGWMizm6Eyrq/ZX0V/UmBydR52myTmF5SCo0PwI7DGX+d9Th9jY+FbnsC/RwsM4Z
- 1gButU0dW+Cc+Ivpe1VO7kzpQnxCm5V8s7mMvDGOsK9BpkaCKk0XFw1Dv5Q4EXMzgA8K
- dkC5n/KNWwomzQ4RcfkpxMqHoU0YgcRDiht+sEAumL926SFlyLQCXD7FrC1nfGWmKk5N
- Ezow==
-X-Gm-Message-State: AJcUukcKQuF5uqTxvm3LtGvz4+J9U+nQxXvxnRSxwrTovC2teDJekjND
- g6hybZJW4OhTtkU5ZfyjWns=
-X-Google-Smtp-Source: ALg8bN63AGT6KHsPf4+9iTaT+C2aMgpdrT4E6ZaEu9GWtQHOwSDB5//W1Fa3tk9pOsUCFndg/m44ow==
-X-Received: by 2002:a63:1904:: with SMTP id z4mr2364785pgl.135.1546624191241; 
- Fri, 04 Jan 2019 09:49:51 -0800 (PST)
+ bh=QhqhT8k9cRoxWOByjnw4+D3pr2bPAqv3RKgBmGiID7Y=;
+ b=V2xEYeoRlGVdB+KxplPxJQIalsZb6ODAfgCxS1niOPfyu2zgVBo/P0Iw/msm+Jx4Xq
+ /SI6BOVMHI3sVwlS3V4x+MzY0Ys6nunug/JUfXlyLSFTnlJtc+qWaWXvKCwF+Jp8i0C/
+ ie4qH6049bhW7VlfXXB854/x0dCqU2ggUCj2b96+wGndKPjVFq24UrrdlA+xuPvD3Sp8
+ Z+ijNQH/h3Xledt8Mvav69tGfHjAzjfkcusEhUb71/99Mc2LS9xM8NcXrGgyWZqf2oPD
+ Rz6p8xF794g1sc9JwPWtneRVAZFPWlHXT4u6RMZHVKkR3VH9fWTB8sCTW7KFbc0VBRNV
+ 9tOw==
+X-Gm-Message-State: AJcUukcEGyvZD+dTfNjtg80PpDcybRJudySMl8C8XjffHNWJ7AKnAsnm
+ IyQ2+SvK+6yj+WQIPa9xhMsqW2KLE9I=
+X-Google-Smtp-Source: ALg8bN4LPvul9EoVP+PUo/2OYcZzz1whMoTFA5PuuZ/nPLmsezd3LBKPNU19q/O3Rnl3lTb/V3kfzg==
+X-Received: by 2002:a63:c00b:: with SMTP id h11mr2485051pgg.429.1546624193159; 
+ Fri, 04 Jan 2019 09:49:53 -0800 (PST)
 Received: from squirtle.lan (c-24-22-235-96.hsd1.wa.comcast.net.
  [24.22.235.96])
- by smtp.gmail.com with ESMTPSA id i193sm100699632pgc.22.2019.01.04.09.49.49
+ by smtp.gmail.com with ESMTPSA id i193sm100699632pgc.22.2019.01.04.09.49.51
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 04 Jan 2019 09:49:50 -0800 (PST)
+ Fri, 04 Jan 2019 09:49:52 -0800 (PST)
 From: Andrey Smirnov <andrew.smirnov@gmail.com>
 To: linux-pci@vger.kernel.org
-Subject: [PATCH v2 06/20] PCI: imx6: Remove PCIE_PHY_RX_ASIC_OUT* constants
-Date: Fri,  4 Jan 2019 09:49:11 -0800
-Message-Id: <20190104174925.17153-7-andrew.smirnov@gmail.com>
+Subject: [PATCH v2 07/20] PCI: dwc: Make use of IS_ALIGNED()
+Date: Fri,  4 Jan 2019 09:49:12 -0800
+Message-Id: <20190104174925.17153-8-andrew.smirnov@gmail.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190104174925.17153-1-andrew.smirnov@gmail.com>
 References: <20190104174925.17153-1-andrew.smirnov@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190104_094952_532111_B58D5FBB 
-X-CRM114-Status: UNSURE (   9.81  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190104_094954_700625_4FEA34FA 
+X-CRM114-Status: GOOD (  12.56  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,7 +100,8 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
 Cc: "A.s. Dong" <aisheng.dong@nxp.com>,
  Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
  Richard Zhu <hongxing.zhu@nxp.com>, linux-arm-kernel@lists.infradead.org,
- Andrey Smirnov <andrew.smirnov@gmail.com>, linux-kernel@vger.kernel.org,
+ Andrey Smirnov <andrew.smirnov@gmail.com>,
+ Gustavo Pimentel <gustavo.pimentel@synopsys.com>, linux-kernel@vger.kernel.org,
  Fabio Estevam <fabio.estevam@nxp.com>, linux-imx@nxp.com,
  Bjorn Helgaas <bhelgaas@google.com>, Leonard Crestez <leonard.crestez@nxp.com>,
  Chris Healy <cphealy@gmail.com>, Lucas Stach <l.stach@pengutronix.de>
@@ -110,8 +110,9 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Code using these constants was removed in commit a77c5422d758 ("PCI:
-imx6: Remove broken Gen2 workaround"). No functional change intended.
+Make the intent a bit more clear as well as get rid of explicit
+arithmetic by using IS_ALIGNED() to determine if "addr" is aligned to
+"size". No functional change intended.
 
 Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
@@ -125,25 +126,34 @@ Cc: linux-imx@nxp.com
 Cc: linux-arm-kernel@lists.infradead.org
 Cc: linux-kernel@vger.kernel.org
 Cc: linux-pci@vger.kernel.org
+Acked-by: Gustavo Pimentel <gustavo.pimentel@synopsys.com>
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/pci/controller/dwc/pci-imx6.c | 3 ---
- 1 file changed, 3 deletions(-)
+ drivers/pci/controller/dwc/pcie-designware.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
-index a7192b9e0e71..282b09076fea 100644
---- a/drivers/pci/controller/dwc/pci-imx6.c
-+++ b/drivers/pci/controller/dwc/pci-imx6.c
-@@ -123,9 +123,6 @@ struct imx6_pcie {
- #define  PCIE_PHY_MPLL_MULTIPLIER_MASK		0x7f
- #define  PCIE_PHY_MPLL_MULTIPLIER_OVRD		(0x1 << 9)
+diff --git a/drivers/pci/controller/dwc/pcie-designware.c b/drivers/pci/controller/dwc/pcie-designware.c
+index 93ef8c31fb39..67236379c61a 100644
+--- a/drivers/pci/controller/dwc/pcie-designware.c
++++ b/drivers/pci/controller/dwc/pcie-designware.c
+@@ -22,7 +22,7 @@
  
--#define PCIE_PHY_RX_ASIC_OUT 0x100D
--#define PCIE_PHY_RX_ASIC_OUT_VALID	(1 << 0)
--
- #define PHY_RX_OVRD_IN_LO 0x1005
- #define PHY_RX_OVRD_IN_LO_RX_DATA_EN (1 << 5)
- #define PHY_RX_OVRD_IN_LO_RX_PLL_EN (1 << 3)
+ int dw_pcie_read(void __iomem *addr, int size, u32 *val)
+ {
+-	if ((uintptr_t)addr & (size - 1)) {
++	if (!IS_ALIGNED((uintptr_t)addr, size)) {
+ 		*val = 0;
+ 		return PCIBIOS_BAD_REGISTER_NUMBER;
+ 	}
+@@ -43,7 +43,7 @@ int dw_pcie_read(void __iomem *addr, int size, u32 *val)
+ 
+ int dw_pcie_write(void __iomem *addr, int size, u32 val)
+ {
+-	if ((uintptr_t)addr & (size - 1))
++	if (!IS_ALIGNED((uintptr_t)addr, size))
+ 		return PCIBIOS_BAD_REGISTER_NUMBER;
+ 
+ 	if (size == 4)
 -- 
 2.20.1
 
