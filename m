@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 46A27C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 21:31:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E5DC7C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 21:35:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 12AD821872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 21:31:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B1D4A21872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 21:35:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eequjw5M"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 12AD821872
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BTdmwGcO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B1D4A21872
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=embeddedor.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,36 +25,36 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
 	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=6bUNnrV/8dsclFBUSBz0JbVvFo22L8mD0ztxFgstKC0=; b=eequjw5MidQIf0
-	iotfVZBMj21iPxZuHWYOCHkElhnNiHQhcYXULN0ETwoWzQ7kpJRstySL0hqOLlskBjF4dQyAHrlHf
-	0Gf1x5kTmw6YXvTmWcOApJdEOi95wSvMwHT25Dcd9Gexd5BRTcECUp6EEXQgh9VBlFtYPRhO5IROx
-	DxR2u5SfoclLt/kRBOaG+/4hDqcIjKBrwvIV8ZNYZPEYpBwajvu34QuI730eJ3uTT3LHSUqEcI4nG
-	xsgfDZ6IIPjoa1pxhtJZYki6a9GrHKnUt7T11ync2XOQfq3aZ6nwIJL0vnpGgTslq0wLEp+PmfK5U
-	onbZ29+dQIKfxviFhRCQ==;
+	List-Owner; bh=AeqH59ZeM+uwoVSwDDKYSxPcxoKxLNBkZ9KvFrClSzg=; b=BTdmwGcOI7V28y
+	XppnUrCkFLlv3kngDaj3iRJB1MoWQF6JOPdmh2rX9TBG6jMyI1fuOuLdDEX2xr2pONvUfsRsM4oM9
+	fivzoq1fssewgitM5Ua6MccXP/gsMhSzwiiIE4gxh3dRXc/ZBjRQWoDIoeONX6vcosdHJF7s6zjsz
+	80LvcYdQdXPmf64vY10rfbtTql9dcOpNclbuljjmaHYJYCMVMpSEuqO0BP9R6McuGdxKudyFMlQEj
+	lFD22d+sIBp0vEd8Iuoy9yO5gdv59CNeRQTCfuHoVyQc1jbwrxYccYql2QW07SzrGg6OwcLS9vBzx
+	Hqbn1BhtF7chiclouhcg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfX3d-0002HE-85; Fri, 04 Jan 2019 21:31:09 +0000
-Received: from gateway32.websitewelcome.com ([192.185.145.171])
+	id 1gfX7c-00045R-55; Fri, 04 Jan 2019 21:35:16 +0000
+Received: from gateway34.websitewelcome.com ([192.185.148.222])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfX3Z-0002Fm-K3
- for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 21:31:07 +0000
-Received: from cm17.websitewelcome.com (cm17.websitewelcome.com [100.42.49.20])
- by gateway32.websitewelcome.com (Postfix) with ESMTP id 170D25E304D
+ id 1gfX7Y-00044n-Ja
+ for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 21:35:14 +0000
+Received: from cm12.websitewelcome.com (cm12.websitewelcome.com [100.42.49.8])
+ by gateway34.websitewelcome.com (Postfix) with ESMTP id 236FE41395
  for <linux-arm-kernel@lists.infradead.org>;
- Fri,  4 Jan 2019 15:30:52 -0600 (CST)
+ Fri,  4 Jan 2019 15:35:11 -0600 (CST)
 Received: from gator4166.hostgator.com ([108.167.133.22]) by cmsmtp with SMTP
- id fX3LgWL2390onfX3Lg1GAF; Fri, 04 Jan 2019 15:30:51 -0600
+ id fX7XggzH0iQerfX7XgjL6G; Fri, 04 Jan 2019 15:35:11 -0600
 X-Authority-Reason: nr=8
-Received: from [189.250.130.205] (port=41140 helo=embeddedor)
+Received: from [189.250.130.205] (port=41174 helo=embeddedor)
  by gator4166.hostgator.com with esmtpa (Exim 4.91)
  (envelope-from <gustavo@embeddedor.com>)
- id 1gfX3K-0033Fu-DA; Fri, 04 Jan 2019 15:30:50 -0600
-Date: Fri, 4 Jan 2019 15:30:47 -0600
+ id 1gfX7W-0036JA-E1; Fri, 04 Jan 2019 15:35:10 -0600
+Date: Fri, 4 Jan 2019 15:35:08 -0600
 From: "Gustavo A. R. Silva" <gustavo@embeddedor.com>
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Matthias Brugger <matthias.bgg@gmail.com>
-Subject: [PATCH] staging: mt7621-dma: Use struct_size() in devm_kzalloc()
-Message-ID: <20190104213047.GA19391@embeddedor>
+To: Linus Walleij <linus.walleij@linaro.org>,
+	Barry Song <baohua@kernel.org>
+Subject: [PATCH] pinctrl: sirf: atlas7: use struct_size() in devm_kzalloc()
+Message-ID: <20190104213508.GA20333@embeddedor>
 MIME-Version: 1.0
 Content-Disposition: inline
 User-Agent: Mutt/1.9.4 (2018-02-28)
@@ -67,18 +67,19 @@ X-AntiAbuse: Sender Address Domain - embeddedor.com
 X-BWhitelist: no
 X-Source-IP: 189.250.130.205
 X-Source-L: No
-X-Exim-ID: 1gfX3K-0033Fu-DA
+X-Exim-ID: 1gfX7W-0036JA-E1
 X-Source: 
 X-Source-Args: 
 X-Source-Dir: 
-X-Source-Sender: (embeddedor) [189.250.130.205]:41140
+X-Source-Sender: (embeddedor) [189.250.130.205]:41174
 X-Source-Auth: gustavo@embeddedor.com
-X-Email-Count: 25
+X-Email-Count: 31
 X-Source-Cap: Z3V6aWRpbmU7Z3V6aWRpbmU7Z2F0b3I0MTY2Lmhvc3RnYXRvci5jb20=
 X-Local-Domain: yes
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190104_133105_759049_1193D2E4 
-X-CRM114-Status: GOOD (  10.09  )
+X-CRM114-CacheID: sfid-20190104_133512_695283_F821BFE6 
+X-CRM114-Status: UNSURE (   9.44  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,8 +91,8 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devel@driverdev.osuosl.org, linux-mediatek@lists.infradead.org,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+Cc: linux-gpio@vger.kernel.org, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org,
  "Gustavo A. R. Silva" <gustavo@embeddedor.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -118,26 +119,24 @@ This code was detected with the help of Coccinelle.
 
 Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
 ---
- drivers/staging/mt7621-dma/ralink-gdma.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/pinctrl/sirf/pinctrl-atlas7.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/mt7621-dma/ralink-gdma.c b/drivers/staging/mt7621-dma/ralink-gdma.c
-index 792a63bd55d4..d78042eba6dd 100644
---- a/drivers/staging/mt7621-dma/ralink-gdma.c
-+++ b/drivers/staging/mt7621-dma/ralink-gdma.c
-@@ -821,9 +821,9 @@ static int gdma_dma_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	data = (struct gdma_data *) match->data;
+diff --git a/drivers/pinctrl/sirf/pinctrl-atlas7.c b/drivers/pinctrl/sirf/pinctrl-atlas7.c
+index 4ba171827428..8a0eee044264 100644
+--- a/drivers/pinctrl/sirf/pinctrl-atlas7.c
++++ b/drivers/pinctrl/sirf/pinctrl-atlas7.c
+@@ -6007,8 +6007,8 @@ static int atlas7_gpio_probe(struct platform_device *pdev)
+ 	}
  
--	dma_dev = devm_kzalloc(&pdev->dev, sizeof(*dma_dev) +
--			(sizeof(struct gdma_dmaengine_chan) * data->chancnt),
--			GFP_KERNEL);
-+	dma_dev = devm_kzalloc(&pdev->dev,
-+			       struct_size(dma_dev, chan, data->chancnt),
-+			       GFP_KERNEL);
- 	if (!dma_dev) {
- 		dev_err(&pdev->dev, "alloc dma device failed\n");
- 		return -EINVAL;
+ 	/* retrieve gpio descriptor data */
+-	a7gc = devm_kzalloc(&pdev->dev, sizeof(*a7gc) +
+-			sizeof(struct atlas7_gpio_bank) * nbank, GFP_KERNEL);
++	a7gc = devm_kzalloc(&pdev->dev, struct_size(a7gc, banks, nbank),
++			    GFP_KERNEL);
+ 	if (!a7gc)
+ 		return -ENOMEM;
+ 
 -- 
 2.20.1
 
