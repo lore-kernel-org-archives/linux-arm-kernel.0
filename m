@@ -2,22 +2,21 @@ Return-Path: <SRS0=E6Hv=PM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A5366C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 09:13:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 02B13C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 09:17:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7545921871
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 09:13:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C5FC2217F5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 09:17:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ziv0ISw6";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="Iliswcbs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7545921871
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kfyG2Oe5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C5FC2217F5
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-m68k.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,52 +24,53 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pJFSdT1OvazLLwi0nR6TfYN9wNR9DOP2A+cbZPrziUM=; b=Ziv0ISw699ckf5
-	5U+L+6vY5bfGw6olZkSZxmWaonQo0yJsm339fTT0iIT0IanuZwksUM30vkywLshtzr2a96bE4JOMl
-	E5AHG1e6fYWX3t5swoZ6aDfKk8SoQL05mHYH+q5R4dzqEsCmpDhKodPxcnEI6unv7ZP8uLpIvDHPs
-	mpI6P1QMDuq/GQBbfqlCRGDf/dbSlvluKquiAS9TmeNtgh9lRXOATZt4ez1uLejoailElSiDqgtJ6
-	Nmy/Umnu4p/rytY6Ysr5Csdi+vit1ImH9PlB/7JkM9F56JnES8V9Y3TgKPifmf4ufnATggEnuW+qC
-	EKdrKnYZh+4hfBxnZymg==;
+	List-Owner; bh=GP4a1FFFzWPI0HTNGILKyGzsINa9AhHOmUbeIswBfng=; b=kfyG2Oe5iryCig
+	NjOf4x9FP7nPuKvHSXy0fg4IhRwA1YdsN2U2+378VauyyzkCSlX0HFggGAfx+aZkZsfZJsCbuqwuP
+	xesSgjnroRPnbX6F1cSDZ2/s9904kelumod6BYC5gd9i7B9LMMXJf4cDorLi+ylFHGds/af62z2XP
+	5XdIk+QM0NusaFuGUWetFxg6BLXjEaluRQYCgVlNQv6/hsLJS7cRqLzgyyHrdKS8gJRDYE4Z+wmjm
+	JnfEIful+HGSVQujMH+ONLn7vL8pPNLe65zDTZvfMchM133bwRt6O7AumLdt75D/VCY8+HoFU6cld
+	0LLUZWB3Fn+TICNFJq1Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfLY2-0000MK-Hj; Fri, 04 Jan 2019 09:13:46 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gfLbf-00029p-Jf; Fri, 04 Jan 2019 09:17:31 +0000
+Received: from mail-vs1-f65.google.com ([209.85.217.65])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfLXy-0000Lt-CP; Fri, 04 Jan 2019 09:13:44 +0000
-Received: from mail-wm1-f41.google.com (mail-wm1-f41.google.com
- [209.85.128.41])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 789F8218D2;
- Fri,  4 Jan 2019 09:13:41 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1546593221;
- bh=kRhrn0GqHvLVBSyJaj2/l/wYC/wLT07POAcDWSryzu4=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=IliswcbsjSqTWCHPatLUuVbKCXo5vhEEY0TibX2RTwfD8uPoCiVYFRCBdojgy0iaS
- hx+JCXeT/PWzB6M0wGAaDsQDbzwwSDkT9c8ZKZQTrg8kJ5wXXVFHl+8p8vjhWQ6ypW
- Kiu0oKNOxsoS5q5C0LcDWuMay1u9Q7wcG54f/zqA=
-Received: by mail-wm1-f41.google.com with SMTP id d15so529590wmb.3;
- Fri, 04 Jan 2019 01:13:41 -0800 (PST)
-X-Gm-Message-State: AJcUukdZ/8fz2B0yP582lbCb2NE/GN//Pxoxn6DNld5bbhru/K4Xgw5F
- huJAXJXolwIlvbCkCPwFRUH3TSa7PSMjvwFyb9A=
-X-Google-Smtp-Source: ALg8bN4sm7mDJpejChjSCdMCz9hr08Pid6kmIZPlBlHIYCujFFWyDbvMA1J3GH9hcqX2oL5yR76D5auxwGJecMtuSFg=
-X-Received: by 2002:a1c:2e43:: with SMTP id u64mr751976wmu.52.1546593219832;
- Fri, 04 Jan 2019 01:13:39 -0800 (PST)
+ id 1gfLbc-00029G-DJ
+ for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 09:17:29 +0000
+Received: by mail-vs1-f65.google.com with SMTP id h78so22301425vsi.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 04 Jan 2019 01:17:27 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=vnaQvff+1MMNvxAriP2cdEUPk+alErVVISPfkgY60B8=;
+ b=TRZTyFyuqwm8ekYSA4+1CMWXMCYJyIOM/XAzBj/EBQkRaO0kIi3BrSdJD80Khisr4b
+ KZBjm2rZr+a/PUShYlnDD+2/u92ScKHPX/uMceRjIzIAwYE5g1VsLFQLKBMsaIdcXsH1
+ 8qSR4OD0RHHYGa1pBeJ5gyWKUhqT/iPXTn13WpnJQhRCjEuSGpm4tYlIigkVFFkrJeg0
+ 8PbCE1nPORakdl2d6TTz86LRsKcP57j7QZ7Nc4wY/B+yFnEcB74JeDzcJSPxmMxcJEYV
+ 8M+1Fg6yZzTkJK2p7VDOGzyQX+ijoM0btlFTurlJUtPE3TKvJ4h2hmpBT4NyRrK2P2dc
+ ggRg==
+X-Gm-Message-State: AA+aEWbd/gPk074lf2CfWsVR38Tnn9+FezpwtbdO33jqy5XhMeEORXWk
+ /0lhBalTmN9dqQAlWphWWfaOJMwvL6oadNMK+IjsH87VMck=
+X-Google-Smtp-Source: AFSGD/Un1yptL8aHgggs9K9IytFP1DH93NL2tkwBRhX+1rqy/WAy08s9BZthWFCXiiYC0YbGYN4LdXXb0ywqO0pf93g=
+X-Received: by 2002:a67:b60d:: with SMTP id d13mr21139120vsm.152.1546593446696; 
+ Fri, 04 Jan 2019 01:17:26 -0800 (PST)
 MIME-Version: 1.0
-References: <1545984581-25843-1-git-send-email-erin.lo@mediatek.com>
- <1545984581-25843-6-git-send-email-erin.lo@mediatek.com>
- <20181228220405.GA8739@bogus> <1546585723.21915.7.camel@mhfsdcap03>
-In-Reply-To: <1546585723.21915.7.camel@mhfsdcap03>
-From: Sean Wang <sean.wang@kernel.org>
-Date: Fri, 4 Jan 2019 01:14:33 -0800
-X-Gmail-Original-Message-ID: <CAGp9LzoAyZqC53eo4JKcouu=pNgsGm9FFm1GaxbH1Jc1OD8Bvw@mail.gmail.com>
-Message-ID: <CAGp9LzoAyZqC53eo4JKcouu=pNgsGm9FFm1GaxbH1Jc1OD8Bvw@mail.gmail.com>
-Subject: Re: [PATCH v5 5/6] dt-bindings: pinctrl: mt8183: add binding document
-To: Zhiyong Tao <zhiyong.tao@mediatek.com>
+References: <20190102095154.25839-1-horms+renesas@verge.net.au>
+ <CAMuHMdU=aR8mSwd876LV=DG_vh6Bx45zxRTfMXuX3BQpy0M=ow@mail.gmail.com>
+ <20190104085720.36ccxhtcbyyzgfrk@verge.net.au>
+ <CAMuHMdWf=_-WZT9XUqPCZocNs1As3RJnXMYRYc05Y4td6SciFg@mail.gmail.com>
+ <20190104091216.dgbnkxuuamgicysg@verge.net.au>
+In-Reply-To: <20190104091216.dgbnkxuuamgicysg@verge.net.au>
+From: Geert Uytterhoeven <geert@linux-m68k.org>
+Date: Fri, 4 Jan 2019 10:17:15 +0100
+Message-ID: <CAMuHMdWhCf-DSvVw7Z-uNpCJZ_kdGzf297OSFLZzc5TZvTNS3A@mail.gmail.com>
+Subject: Re: [PATCH v2] arm64: defconfig: Enable R-Car thermal driver
+To: Simon Horman <horms@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190104_011342_455072_21D6229B 
-X-CRM114-Status: GOOD (  30.80  )
+X-CRM114-CacheID: sfid-20190104_011728_461025_6D9ECCF9 
+X-CRM114-Status: GOOD (  21.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,201 +82,72 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh@kernel.org>,
- Jason Cooper <jason@lakedaemon.net>,
- srv_heupstream <srv_heupstream@mediatek.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Marc Zyngier <marc.zyngier@arm.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- =?UTF-8?B?RXJpbiBMbyAo576F6ZuF6b2hKQ==?= <erin.lo@mediatek.com>,
- Stephen Boyd <sboyd@codeaurora.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "linux-mediatek@lists.infradead.org" <linux-mediatek@lists.infradead.org>,
- "linux-serial@vger.kernel.org" <linux-serial@vger.kernel.org>,
- =?UTF-8?B?WWluZ2pvZSBDaGVuICjpmbPoi7HmtLIp?= <Yingjoe.Chen@mediatek.com>,
- Matthias Brugger <matthias.bgg@gmail.com>,
- =?UTF-8?B?TWFycyBDaGVuZyAo6YSt5qOu5Y+LKQ==?= <Mars.Cheng@mediatek.com>,
- Thomas Gleixner <tglx@linutronix.de>,
- =?UTF-8?B?RWRkaWUgSHVhbmcgKOm7g+aZuuWCkSk=?= <eddie.huang@mediatek.com>,
- "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
+ Magnus Damm <magnus.damm@gmail.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 3, 2019 at 11:09 PM Zhiyong Tao <zhiyong.tao@mediatek.com> wrote:
->
-> On Sat, 2018-12-29 at 06:04 +0800, Rob Herring wrote:
-> > On Fri, Dec 28, 2018 at 04:09:40PM +0800, Erin Lo wrote:
-> > > From: Zhiyong Tao <zhiyong.tao@mediatek.com>
-> > >
-> > > The commit adds mt8183 compatible node in binding document.
-> > >
-> > > Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
-> > > Signed-off-by: Erin Lo <erin.lo@mediatek.com>
-> > > ---
-> > >  .../devicetree/bindings/pinctrl/pinctrl-mt8183.txt | 110 +++++++++++++++++++++
-> > >  1 file changed, 110 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt
-> > >
-> > > diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt
-> > > new file mode 100644
-> > > index 0000000..7b5285e
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt
-> > > @@ -0,0 +1,110 @@
-> > > +* Mediatek MT8183 Pin Controller
-> > > +
-> > > +The Mediatek's Pin controller is used to control SoC pins.
-> > > +
-> > > +Required properties:
-> > > +- compatible: value should be one of the following.
-> > > +   "mediatek,mt8183-pinctrl", compatible with mt8183 pinctrl.
-> > > +- gpio-controller : Marks the device node as a gpio controller.
-> > > +- #gpio-cells: number of cells in GPIO specifier. Since the generic GPIO
-> > > +  binding is used, the amount of cells must be specified as 2. See the below
-> > > +  mentioned gpio binding representation for description of particular cells.
-> > > +- gpio-ranges : gpio valid number range.
-> > > +
-> > > +   Eg: <&pio 6 0>
-> > > +   <[phandle of the gpio controller node]
-> > > +   [line number within the gpio controller]
-> > > +   [flags]>
-> > > +
-> > > +   Values for gpio specifier:
-> > > +   - Line number: is a value between 0 to 202.
-> > > +   - Flags:  bit field of flags, as defined in <dt-bindings/gpio/gpio.h>.
-> > > +            Only the following flags are supported:
-> > > +            0 - GPIO_ACTIVE_HIGH
-> > > +            1 - GPIO_ACTIVE_LOW
-> > > +
-> > > +Optional properties:
-> > > +- reg: physicall address base for gpio base registers.
-> >
-> > s/physicall/physical/
-> >
-> > reg should never be optional.
-> >
-> > Need to say how many reg entries.
->
-> ==> Thanks for your suggestion. We will change 'reg' to Required
-> properties and add the reg entries in next version.
-> >
-> > > +- reg-names: gpio base registers name.
-> >
-> > Need to say what are the names. However, I don't find the names in the
-> > example all that useful, so I'd just drop it.
->
-> ==> we will add the reg-names in next version.
-> They are used in the sample code, such as:
-> > +             reg-names = "iocfg0", "iocfg1", "iocfg2",
-> > > +                       "iocfg3", "iocfg4", "iocfg5",
-> > > +                       "iocfg6", "iocfg7", "iocfg8";
->
-> >
-> > > +- interrupt-controller: Marks the device node as an interrupt controller
-> > > +- #interrupt-cells: Should be two.
-> > > +- interrupts : The interrupt outputs from the controller.
-> > > +
-> > > +Please refer to pinctrl-bindings.txt in this directory for details of the
-> > > +common pinctrl bindings used by client devices.
-> > > +
-> > > +Subnode format
-> > > +A pinctrl node should contain at least one subnodes representing the
-> > > +pinctrl groups available on the machine. Each subnode will list the
-> > > +pins it needs, and how they should be configured, with regard to muxer
-> > > +configuration, pullups, drive strength, input enable/disable and input schmitt.
-> > > +
-> > > +    node {
-> > > +   pinmux = <PIN_NUMBER_PINMUX>;
-> > > +   GENERIC_PINCONFIG;
-> > > +    };
-> > > +
-> > > +Required properties:
-> > > +- pinmux: integer array, represents gpio pin number and mux setting.
-> > > +    Supported pin number and mux varies for different SoCs, and are defined
-> > > +    as macros in boot/dts/<soc>-pinfunc.h directly.
-> > > +
-> > > +Optional properties:
-> > > +- GENERIC_PINCONFIG: is the generic pinconfig options to use, bias-disable,
-> > > +    bias-pull-down, bias-pull-up, input-enable, input-disable, output-low, output-high,
-> > > +    input-schmitt-enable, input-schmitt-disable and drive-strength are valid.
-> > > +
-> > > +    Some special pins have extra pull up strength, there are R0 and R1 pull-up
-> > > +    resistors available, but for user, it's only need to set R1R0 as 00, 01, 10 or 11.
-> > > +    So when config mediatek,pull-up-adv or mediatek,pull-down-adv,
-> > > +    it support arguments for those special pins.
-> > > +
-> > > +    When config drive-strength, it can support some arguments, such as
-> > > +    MTK_DRIVE_4mA, MTK_DRIVE_6mA, etc. See dt-bindings/pinctrl/mt65xx.h.
-> > > +
+Hi Simon,
 
-One point we can fix more is the drive-strength already is supported
-as the generic one, not need to depend on a dedicated header file.
-
-> > > +Examples:
-> > > +
-> > > +#include "mt8183-pinfunc.h"
-> > > +
-> > > +...
-> > > +{
-> > > +   pio: pinctrl@10005000 {
-> > > +           compatible = "mediatek,mt8183-pinctrl";
-> > > +           reg = <0 0x10005000 0 0x1000>,
-> > > +                 <0 0x11F20000 0 0x1000>,
-> > > +                 <0 0x11E80000 0 0x1000>,
-> > > +                 <0 0x11E70000 0 0x1000>,
-> > > +                 <0 0x11E90000 0 0x1000>,
-> > > +                 <0 0x11D30000 0 0x1000>,
-> > > +                 <0 0x11D20000 0 0x1000>,
-> > > +                 <0 0x11C50000 0 0x1000>,
-> > > +                 <0 0x11F30000 0 0x1000>;
-> > > +           reg-names = "iocfg0", "iocfg1", "iocfg2",
-> > > +                       "iocfg3", "iocfg4", "iocfg5",
-> > > +                       "iocfg6", "iocfg7", "iocfg8";
-> > > +           gpio-controller;
-> > > +           #gpio-cells = <2>;
-> > > +           gpio-ranges = <&pio 0 0 192>;
-> > > +           interrupt-controller;
-> > > +           interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
-> > > +           interrupt-parent = <&gic>;
-> > > +           #interrupt-cells = <2>;
-> > > +
-> > > +           i2c0_pins_a: i2c0@0 {
-> >
-> > unit-address without reg property is not valid.
->
-> ==> we will change "i2c0_pins_a: i2c0@0" to "i2c0_pins_a: i2c0" in the
-> next version.
-> >
-> > > +                   pins1 {
-> > > +                           pinmux = <PINMUX_GPIO48__FUNC_SCL5>,
-> > > +                                    <PINMUX_GPIO49__FUNC_SDA5>;
-> > > +                           mediatek,pull-up-adv = <11>;
-> > > +                   };
-> > > +           };
-> > > +
-> > > +           i2c1_pins_a: i2c1@0 {
-> > > +                   pins {
-> > > +                           pinmux = <PINMUX_GPIO50__FUNC_SCL3>,
-> > > +                                    <PINMUX_GPIO51__FUNC_SDA3>;
-> > > +                           mediatek,pull-down-adv = <10>;
-> > > +                   };
-> > > +           };
-> > > +           ...
-> > > +   };
-> > > +};
-> > > --
-> > > 1.9.1
+On Fri, Jan 4, 2019 at 10:12 AM Simon Horman <horms@verge.net.au> wrote:
+> On Fri, Jan 04, 2019 at 10:01:13AM +0100, Geert Uytterhoeven wrote:
+> > On Fri, Jan 4, 2019 at 9:57 AM Simon Horman <horms@verge.net.au> wrote:
+> > > On Wed, Jan 02, 2019 at 11:45:37AM +0100, Geert Uytterhoeven wrote:
+> > > > On Wed, Jan 2, 2019 at 10:53 AM Simon Horman <horms+renesas@verge.net.au> wrote:
+> > > > > Enable the R-Car thermal driver as a built-in.
+> > > > >
+> > > > > This driver is used in conjunction with the R-Car V3M (r8a77970),
+> > > > > E3 (r8a77990) and D3 (r8a77995) SoCs.
+> > > >
+> > > > > [v2] Enable as a built-in rather than a module as this seems
+> > > > >      safer from the point of view of protecting equipment from
+> > > > >      overheating.
+> > > >
+> > > > Shouldn't the above paragraph be moved below the ---?
 > > >
+> > > I have recently come to believe that its a matter of taste. And I think in
+> > > this case it captures important information that is worthy of inclusion in
+> > > the changelog.
+> >
+> > The rationale behind doing it this way could still be appended to the
+> > first line of the body of the patch decription.
 >
->
->
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek@lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+> Sorry, I'm having a little trouble parsing that. Do you mean that it could
+> be appended to the body of the changelog at apply-time?
+
+I mean the rationale could have been part of the patch description, i.e.
+above the ---, e.g.:
+
+    Subject: [PATCH v2] arm64: defconfig: Enable R-Car thermal driver
+
+    Enable the R-Car thermal driver as a built-in.
+    Built-in seems safer than modular from the point of view of protecting
+    equipment from overheating.
+
+    This driver is used in conjunction with the R-Car V3M (r8a77970),
+    E3 (r8a77990) and D3 (r8a77995) SoCs.
+
+    Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+    ---
+    v2:
+      - Switch from built-in to modular.
+
+     arch/arm64/configs/defconfig | 1 +
+     1 file changed, 1 insertion(+)
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert@linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
 
 _______________________________________________
 linux-arm-kernel mailing list
