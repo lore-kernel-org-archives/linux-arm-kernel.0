@@ -2,81 +2,77 @@ Return-Path: <SRS0=E6Hv=PM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9DF8AC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 00:25:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E0D37C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 01:41:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 68F99217F5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 00:25:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A2C4A2184B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 01:41:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nbboX7Tk";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="EQVaNHHD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 68F99217F5
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="apxk9rVz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A2C4A2184B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ossystems.com.br
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=C210YGIb+RYkXrlFe6giP4vWUORVsr73EZ4vj3KXTfs=; b=nbboX7TkPpqq0O
-	kIaJDzMtdWzPKfVtRASpODzYEJn3q4uDyYLcXW+4QXBKK4bnsJ5W2Qedgix0DkR9i7q3yloe3lbyQ
-	jlC0RKoYz9iMrWdi53YIhnhE3jbhQf13HN3If8CpJQnF3gc7DMK6QRGPX5YNdz9ldH4MAh7WWMhQg
-	a+zlLSRTKzv/vW0tWC89oWMovcoU26DsviEc5orXLURgtUZPJ40j1zwpEwnCaJJ9cHZl7PUIbYSRz
-	DrtG9apnyn1FLeJF+TzFbpLZ/LZoUtmYAuHSW9kEQ4dW8FPSqJU56/VZSBjSkbI2i1yWCAf1nQoxV
-	Ecjm7eIIfw2RDpvlCPZA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=iGTEkk0RU0ldXvQWddDCzxoN+atozy8nqfvP+/kCLgU=; b=apxk9rVzTHd//q
+	vUfo3iHSq104YPMXl2BOi7QbNXvubm5YU+Vro2UJ+Qo4JuXsxbYqL6ENmN5viZMdyJEErwtmICewI
+	AnIHpLKTwkQAfKTelqRqqLvaNABfSHMK0VQ+lwBJ3a+2cW43Po+jZFdJEoySPfxE8WckUsoEnILA7
+	NJnmFUJBzw2gXd7iNJ8TYX3USnx23ZGEoPJi1SgkI2VHgd7/NBNZCJ+E7nwyXx8VL5NkA1HmuBSQB
+	LbAannGB3BtIBK+9TQFZXxUqdL7m1e6UVExxeiFCzB1boy6ANTtEdqZfcy/FqA8GsPLo5QloS2O1v
+	zU6gtNdwYlULfvwMFlFw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfDIX-0005Xf-If; Fri, 04 Jan 2019 00:25:13 +0000
-Received: from conssluserg-05.nifty.com ([210.131.2.90])
+	id 1gfETj-0002Bc-Ti; Fri, 04 Jan 2019 01:40:51 +0000
+Received: from mail-qt1-f194.google.com ([209.85.160.194])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfDIU-0005RP-H0
- for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 00:25:12 +0000
-Received: from mail-vk1-f173.google.com (mail-vk1-f173.google.com
- [209.85.221.173]) (authenticated)
- by conssluserg-05.nifty.com with ESMTP id x040Ot4P027688
- for <linux-arm-kernel@lists.infradead.org>; Fri, 4 Jan 2019 09:24:55 +0900
-DKIM-Filter: OpenDKIM Filter v2.10.3 conssluserg-05.nifty.com x040Ot4P027688
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
- s=dec2015msa; t=1546561495;
- bh=Z+Gv25mzqE+Yw75/hsSqQ+Lf4AxdSw/wX4Y1Bj16CpY=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=EQVaNHHDafyS2BJK3wguTYIEaLy4ikXivrk8+Wc1sfLqE3NuXo//OJjaqIO+Rvw6M
- Ib+LHCKkm9H00yxIUGy5Zehh5s4+V9Ct13/PHLigzV4gPL6Te1K0oLwBvr/kyhaUDE
- giaLtBobveiB+I+shc/G7nfwXDYLU3jhr+8IOwk2S41CtOO8ujqKvjnil3idBih/oS
- vGGE0dBnJWbnjatpAYuUBuH+c9Ih64bW+4SRWZqwtQRo8ty5Tne5xkMKt9Md9wVS9I
- bRWEaXwt7NjFUxRtSW0ldr8H0fkLQjg/Jrac4U/Qklrhx16Xk00iNS92YHOQUCqA1C
- 3U5ztUlI2RUaQ==
-X-Nifty-SrcIP: [209.85.221.173]
-Received: by mail-vk1-f173.google.com with SMTP id 197so7631045vkf.4
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 03 Jan 2019 16:24:55 -0800 (PST)
-X-Gm-Message-State: AJcUukckJBHH+6GulXYRZWeY73HQh/OcUxu6RkOqu4ycfQHkfiI5q68Q
- 8erPzR0pUxWQ/S22d2PZak1hLJLLZREpPQPmFSM=
-X-Google-Smtp-Source: ALg8bN5/Z8Gy2QTgsmOI6Dc3eiuMgamPh/YzM+FyZaHzoOCOlluYvoQ6qFDFiRFsbFujpONs7lctNE9ym1D5n3StmzY=
-X-Received: by 2002:a1f:27d7:: with SMTP id n206mr18601814vkn.0.1546561494352; 
- Thu, 03 Jan 2019 16:24:54 -0800 (PST)
+ id 1gfETg-0002B1-Dr; Fri, 04 Jan 2019 01:40:50 +0000
+Received: by mail-qt1-f194.google.com with SMTP id t33so38978400qtt.4;
+ Thu, 03 Jan 2019 17:40:47 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :organization:content-transfer-encoding;
+ bh=wT9chDbjHabejsC31dm/LWr/Az0apw1XM1hEQNEg7GQ=;
+ b=qzD7mq/IwSoECIDnR6uKV1RIUPuCCbEfzY5bAsIHupTPgmdsmdJ+ZsrtQhwPD8B2Ge
+ AKtfe2yXQinHQKubyyklqravgGEoTXm9BFGx+zLEBY45KJFkx8wtzMACYxpExuPgh+VU
+ 4Jeb9lh2kuJBpA/Uvgb2UCnMa/ZMTOSl3UNrlVnnMTre3iSZ4hdtF29o02lO4MxhrDz1
+ xY5+3ordArXLIlfSV9iWQPYf3N6A7a6R4dljfTnZDXhdx9T0R8rWRnxR6RNE2uCHLUZT
+ LRXc9KKPAwoH3/nt2p0e5C0YuV1TJwM5Bb2oZ0+fSWk8vtlAQcqZwnwih5IiMFcyFX1v
+ MK3A==
+X-Gm-Message-State: AJcUukdwb18BuiZY3HyyD258Eytk+1/do88ok24vN/Obo15WCfsDmGpv
+ xnweL6XT4nLFKHR9kOQuVDC/BdRR
+X-Google-Smtp-Source: ALg8bN5VqXa/bLXMWeIuMaIsPlIKOYFrNEeOfPegytnjMSwQGZ2G8ZZMgvOeWWPVXiEWjFTYLQr0UA==
+X-Received: by 2002:a0c:a90a:: with SMTP id y10mr47631078qva.232.1546566046602; 
+ Thu, 03 Jan 2019 17:40:46 -0800 (PST)
+Received: from localhost.localdomain ([181.220.84.254])
+ by smtp.gmail.com with ESMTPSA id z207sm23662928qka.57.2019.01.03.17.40.41
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Thu, 03 Jan 2019 17:40:45 -0800 (PST)
+Received: by localhost.localdomain (sSMTP sendmail emulation);
+ Thu, 03 Jan 2019 23:40:38 -0200
+From: Otavio Salvador <otavio@ossystems.com.br>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [PATCH 1/4] ARM: dts: rockchip: Add missing dma-names SPI support for
+ rv1108
+Date: Thu,  3 Jan 2019 23:40:20 -0200
+Message-Id: <20190104014023.17973-1-otavio@ossystems.com.br>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-References: <1544760112-5378-1-git-send-email-yamada.masahiro@socionext.com>
- <20181214095155.GA1872@edgewater-inn.cambridge.arm.com>
- <CAK7LNATTGxopJJsj=sakmqxwpyETgG7ToS8tm4kLcF2jekNcFw@mail.gmail.com>
- <20181214103721.GC1872@edgewater-inn.cambridge.arm.com>
-In-Reply-To: <20181214103721.GC1872@edgewater-inn.cambridge.arm.com>
-From: Masahiro Yamada <yamada.masahiro@socionext.com>
-Date: Fri, 4 Jan 2019 09:24:18 +0900
-X-Gmail-Original-Message-ID: <CAK7LNARztSNM1XwqxcZrZ7Y5GKs_53R3LnbPGhDSLOr_1awoKg@mail.gmail.com>
-Message-ID: <CAK7LNARztSNM1XwqxcZrZ7Y5GKs_53R3LnbPGhDSLOr_1awoKg@mail.gmail.com>
-Subject: Re: [PATCH] arm64: replace arm64-obj-* in Makefile with obj-*
-To: Will Deacon <will.deacon@arm.com>
+Organization: O.S. Systems Software LTDA.
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190103_162510_779450_DB4E17AD 
-X-CRM114-Status: GOOD (  15.03  )
+X-CRM114-CacheID: sfid-20190103_174048_472959_829DA638 
+X-CRM114-Status: GOOD (  14.05  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,58 +84,41 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <catalin.marinas@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Jason Zhu <jason.zhu@rock-chips.com>, devicetree@vger.kernel.org,
+ Heiko Stuebner <heiko@sntech.de>, Otavio Salvador <otavio@ossystems.com.br>,
+ linux-kernel@vger.kernel.org, linux-rockchip@lists.infradead.org,
+ Rob Herring <robh+dt@kernel.org>, Vicent Chi <vicent.chi@rock-chips.com>,
+ Andy Yan <andy.yan@rock-chips.com>, Mark Rutland <mark.rutland@arm.com>,
+ Philipp Tomsic <philipp.tomsich@theobroma-systems.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Will,
+Pass the 'dma-names' property to the SPI ports so that DMA can
+be supported.
 
-On Fri, Dec 14, 2018 at 7:40 PM Will Deacon <will.deacon@arm.com> wrote:
->
-> On Fri, Dec 14, 2018 at 07:35:57PM +0900, Masahiro Yamada wrote:
-> > Hi Will,
-> >
-> > On Fri, Dec 14, 2018 at 6:54 PM Will Deacon <will.deacon@arm.com> wrote:
-> > >
-> > > Hi Masahiro,
-> > >
-> > > On Fri, Dec 14, 2018 at 01:01:52PM +0900, Masahiro Yamada wrote:
-> > > > Use the standard obj-$(CONFIG_...) syntex. The behavior is still the
-> > > > same.
-> > > >
-> > > > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> > > > ---
-> > > >
-> > > >  arch/arm64/kernel/Makefile | 59 +++++++++++++++++++++++-----------------------
-> > > >  1 file changed, 29 insertions(+), 30 deletions(-)
-> > >
-> > > I'm fine with this patch, but I think I'd prefer to apply it at -rc1 so
-> > > we don't end up with lots of silly conflicts in the Makefile for any new
-> > > files added during the merge window.
-> > >
-> > > Is that ok with you?
-> >
-> > Sure!
->
-> Brill. Please poke me again in January if it hasn't landed by then ;)
->
-> Will
+Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+---
 
+ arch/arm/boot/dts/rv1108.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-I just sent v2.
-
-https://lore.kernel.org/patchwork/patch/1028882/
-
-
-Thanks.
-
+diff --git a/arch/arm/boot/dts/rv1108.dtsi b/arch/arm/boot/dts/rv1108.dtsi
+index d31370ff28f4..cb26d9d98c34 100644
+--- a/arch/arm/boot/dts/rv1108.dtsi
++++ b/arch/arm/boot/dts/rv1108.dtsi
+@@ -207,6 +207,7 @@
+ 		clocks = <&cru SCLK_SPI>, <&cru PCLK_SPI>;
+ 		clock-names = "spiclk", "apb_pclk";
+ 		dmas = <&pdma 8>, <&pdma 9>;
++		dma-names = "tx", "rx";
+ 		#dma-cells = <2>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
 -- 
-Best Regards
-Masahiro Yamada
+2.20.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
