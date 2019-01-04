@@ -2,22 +2,22 @@ Return-Path: <SRS0=E6Hv=PM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 83148C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 08:07:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 574E7C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 08:15:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4EDAE20665
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 08:07:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2435F2184B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 08:15:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rHaolXjG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4EDAE20665
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AN4trYuZ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="OYXvvAWw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2435F2184B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,54 +25,59 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wXjiWpACbSOcqQccDFh6mibD+fEGOd3s1sU36p7EceE=; b=rHaolXjGpAVtg4
-	6sb4RhxJEti8NEj5rPtm5znKmIM4S8nYEvK+6+G0++WR8+aVgGvFw4JtOxq7CVYWgGqN5AeTxCBhZ
-	aIXUxnOWhcwuG8kapBpTm5z4wXyeXxTUX/w7tHt98rDJC/psrzpWLV57anYzPcfJ5P4jjODEX/lRw
-	fI28Jph/PQaZxpYdbuKTcFyvGTJEwMoTUEmizpIFflw83hSXwB40Vmd7PH3xXyfm1DqjhicCjVdZM
-	nDmj2F6gyxOHodC3IwnDpYCTRQLozbWJKUd+xUgschvNv4UKbVFvqk5IVDVS1p4WdC6fS++4ljjZi
-	QwBjqw7NxAOrypej1ZxA==;
+	List-Owner; bh=/s3tte4OZb5OubOEIau8pnI3ZVL6zeLf7ToGbkwAldE=; b=AN4trYuZVEgmY+
+	8g908ZzZlxYyboJMhP+B0Cf+ap1HN7vlDcabkhPhIBCH3TYtCZ0MK9lGSm7QfJVak94ULC9F0q3C3
+	ZeGbIqbXqM2kl8OtOAT42rCudbOtsZ5IxBoJRgumxJiQVBmmP9DxnXYefuvT8gdSi1r7kWupV5yjQ
+	5276O75Ws20vY2vd9XZM8z7huYlf3M2eeQ1TBr9kUyLI1gD+gSoFholvFNTGTj3iOjVjUEhZQc4BO
+	yM2ksojMnpqnKCLv+wVqlkCCYGsGsBnbEWjlGaKEabNNc7m3haqtJugTO39Fqan+ydYfRb7JEZnh9
+	YmBw6ofab8PYcRMviOkg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfKVY-0006rG-BK; Fri, 04 Jan 2019 08:07:08 +0000
-Received: from mx07-00178001.pphosted.com ([62.209.51.94])
+	id 1gfKdo-0001tU-Ph; Fri, 04 Jan 2019 08:15:40 +0000
+Received: from lelv0143.ext.ti.com ([198.47.23.248])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfKVS-0006qC-VA
- for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 08:07:06 +0000
-Received: from pps.filterd (m0046668.ppops.net [127.0.0.1])
- by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x0485tJ9003055; Fri, 4 Jan 2019 09:06:51 +0100
-Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx07-00178001.pphosted.com with ESMTP id 2psx6msdvx-1
- (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Fri, 04 Jan 2019 09:06:51 +0100
-Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id E3C3631;
- Fri,  4 Jan 2019 08:06:49 +0000 (GMT)
-Received: from Webmail-eu.st.com (sfhdag5node2.st.com [10.75.127.14])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id B8FF6267B;
- Fri,  4 Jan 2019 08:06:49 +0000 (GMT)
-Received: from [10.129.7.168] (10.75.127.47) by SFHDAG5NODE2.st.com
- (10.75.127.14) with Microsoft SMTP Server (TLS) id 15.0.1347.2; Fri, 4 Jan
- 2019 09:06:48 +0100
-Subject: Re: [PATCH] dmaengine: stm32-mdma: Add a check on read_u32_array
-To: Aditya Pakki <pakki001@umn.edu>
-References: <20181228192641.9713-1-pakki001@umn.edu>
-From: Pierre Yves MORDRET <pierre-yves.mordret@st.com>
-Message-ID: <8412ac64-cd6d-7390-87a1-24f5e7cdf87a@st.com>
-Date: Fri, 4 Jan 2019 09:05:55 +0100
+ id 1gfKdm-0001sz-7a
+ for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 08:15:39 +0000
+Received: from lelv0265.itg.ti.com ([10.180.67.224])
+ by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x048FPVx038962;
+ Fri, 4 Jan 2019 02:15:25 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1546589725;
+ bh=vbvrVJNwKIKhkHxnypRDchy5NV72bmiqD460jYFEfgI=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=OYXvvAWwi7XZLftbds86PBb2TUstTxD6l/O85mmwUlM+A/kqJ0K/hktZsHCqyqeqn
+ zWLhpa+9GTkODmz/RiNVdBe7CCqjQIWesFCmSIm0bCKqvU7GHOubGOc9ZYL3uPap1f
+ O/0/5cQwSofUH2mNGOFwCTE27dp1wQcSTcx8vSOE=
+Received: from DFLE108.ent.ti.com (dfle108.ent.ti.com [10.64.6.29])
+ by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x048FPtA062821
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Fri, 4 Jan 2019 02:15:25 -0600
+Received: from DFLE107.ent.ti.com (10.64.6.28) by DFLE108.ent.ti.com
+ (10.64.6.29) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Fri, 4
+ Jan 2019 02:15:25 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE107.ent.ti.com
+ (10.64.6.28) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Fri, 4 Jan 2019 02:15:25 -0600
+Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x048FMNr004915;
+ Fri, 4 Jan 2019 02:15:23 -0600
+Subject: Re: [PATCH 0/5] ARM: davinci: fix label names in GPIO lookup entries
+To: Bartosz Golaszewski <brgl@bgdev.pl>, Kevin Hilman <khilman@kernel.org>
+References: <20190103151104.11839-1-brgl@bgdev.pl>
+From: Sekhar Nori <nsekhar@ti.com>
+Message-ID: <a404f59d-6abd-2711-1f4e-0824489a27ad@ti.com>
+Date: Fri, 4 Jan 2019 13:45:22 +0530
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20181228192641.9713-1-pakki001@umn.edu>
+In-Reply-To: <20190103151104.11839-1-brgl@bgdev.pl>
 Content-Language: en-US
-X-Originating-IP: [10.75.127.47]
-X-ClientProxiedBy: SFHDAG5NODE3.st.com (10.75.127.15) To SFHDAG5NODE2.st.com
- (10.75.127.14)
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2019-01-04_04:, , signatures=0
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190104_000704_484954_1624D6B5 
-X-CRM114-Status: GOOD (  15.94  )
+X-CRM114-CacheID: sfid-20190104_001538_356841_BDEC44E3 
+X-CRM114-Status: GOOD (  14.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,50 +89,30 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Alexandre Torgue <alexandre.torgue@st.com>, kjlu@umn.edu,
- linux-kernel@vger.kernel.org, Vinod Koul <vkoul@kernel.org>,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>, dmaengine@vger.kernel.org,
- Dan Williams <dan.j.williams@intel.com>,
- linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org
+Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ Linus Walleij <linus.walleij@linaro.org>, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, "Andrew F . Davis" <afd@ti.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello
+Hi Bartosz,
 
-Acked-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+On 03/01/19 8:40 PM, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> Hi Sekhar,
+> 
+> I noticed some more breakage resulting from commit 587f7a694f01 ("gpio:
+> davinci: Use dev name for label and automatic base selection"). This
+> series fixes GPIO lookups in legacy mode for DaVinci.
 
-Regards
+Thanks for the fixes, look good to me. Will send them once v4.21-rc1
+comes out.
 
-On 12/28/18 8:26 PM, Aditya Pakki wrote:
-> In stm32_mdma_probe, after reading the property "st,ahb-addr-masks", the
-> second call is not checked for failure. This time of check to time of use
-> case of "count" error is sent upstream.
-> 
-> Signed-off-by: Aditya Pakki <pakki001@umn.edu>
-> ---
->  drivers/dma/stm32-mdma.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/dma/stm32-mdma.c b/drivers/dma/stm32-mdma.c
-> index 390e4cae0e1a..485dea177704 100644
-> --- a/drivers/dma/stm32-mdma.c
-> +++ b/drivers/dma/stm32-mdma.c
-> @@ -1579,9 +1579,11 @@ static int stm32_mdma_probe(struct platform_device *pdev)
->  
->  	dmadev->nr_channels = nr_channels;
->  	dmadev->nr_requests = nr_requests;
-> -	device_property_read_u32_array(&pdev->dev, "st,ahb-addr-masks",
-> +	ret = device_property_read_u32_array(&pdev->dev, "st,ahb-addr-masks",
->  				       dmadev->ahb_addr_masks,
->  				       count);
-> +	if (ret)
-> +		return ret;
->  	dmadev->nr_ahb_addr_masks = count;
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> 
+Thanks,
+Sekhar
 
 _______________________________________________
 linux-arm-kernel mailing list
