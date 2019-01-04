@@ -1,80 +1,72 @@
-Return-Path: <SRS0=5A9c=PL=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
+Return-Path: <SRS0=E6Hv=PM=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B4518C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 23:21:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B71A9C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 00:19:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8422C208E3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  3 Jan 2019 23:21:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 85E40217F5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 00:19:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dVlL9Fw1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8422C208E3
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K55094Ao";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="Xl2Jxpxi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 85E40217F5
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tY1isOwr1xvq5c460wtCz+8KRQgdW45ZbLe6+yzS/1Q=; b=dVlL9Fw1+LX34G
-	ajR3oytGtTCaetq4wUK3pd75NQzVOfhbpH5DGEWtjc5zZuqbqZI6LCdzCYNDUU1zAcRJkMDGHshLJ
-	4AHhJHPfeqH2E0txKyrm80dtfN4NhKj7yK6obd9nkrPf+eKt/dnBuzf+zIr+lD6+vhUr03i7uHsKw
-	6HACNb1GKfZc2BUjhNCCXYOvQRscfLl/aLwdQf2vF4WjPS5CHL9PRDyXAlCch4gz7/IGtuc6qF8Nq
-	xlnmO5kro6+L6vKgSt0Nx1lG81CeIL/9Tc/+DflM1Ocl9ZkfesaUkOhO1XMQOhRQeHWmSdNA2HOln
-	O1YfEPlKDSlunkgdhBkA==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=FgaXqev+Gziy+BeGxRuZVU1F9UcK1QQRndq+64BDHAg=; b=K55
+	094Aot6+WUMeFMna3pIW10DHWilAXRZNqywK9i+QqkIqIOGW9Zz/sFqG2UAqwY1l0WA3rbSx+2guf
+	G33llIaMcXfXAAuro+ZtJnKgK78p4s0IO9MTXfjA0jmcJFY080TYB/OBh/XdTboppzpegkT00vB3M
+	pkO9/x8po7Q1chmefbyqryM5i+ms6agN+63ks3V5USLPleJ3XUxfQGq5LevnSB/aZ+fCLBl1XzORk
+	CbxnzQ/FEUjk/X5SjgWSkA4tPG9hgxJAtEaCS7DLXbgT32ioHkIwwzaWSuXgyIb/+BxFXKf95UJOJ
+	+zRojA3wGOSHHehn+vSjW6dhX/RfLWQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfCJH-0000Rh-Hc; Thu, 03 Jan 2019 23:21:55 +0000
-Received: from mail-io1-f66.google.com ([209.85.166.66])
+	id 1gfDCi-0002a6-Je; Fri, 04 Jan 2019 00:19:12 +0000
+Received: from conuserg-10.nifty.com ([210.131.2.77])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfCJE-0000GJ-EA
- for linux-arm-kernel@lists.infradead.org; Thu, 03 Jan 2019 23:21:53 +0000
-Received: by mail-io1-f66.google.com with SMTP id t24so28315671ioi.0
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 03 Jan 2019 15:21:51 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=t0GSUHJkdf7A98ACvSRb5N0KlJsjQDdljT+v5mzWcng=;
- b=NNcigZ3CPdpAsYyGK70aCbppQBjR87yz8Vm4Z1KF0vZEDczpyv2emU6hS8MOo3MygZ
- kTGbGCaM21VhHC7BPOHWEbPyS0i66K6VII4Ox11Bh6/B5OtnQc6bAbRak50K5oi+hB0h
- MM//fFdWwH0Bjexx1TcJNOMw584aiBFfEKQDi0jFMZ70J5hkR3aEXYrT5ybPe0gzqCwO
- S6qA4g95UcD9/87CH1ee3e0AlrbhUaty7ALmkAhMNTFfDsHrpsvIROCuoeDofCl3gV+t
- wXzenSWdg2QY32bEuwC5JUIKKXemTDvQAaKxkpNRZsEsos7VDobmA0SYKUHnNJYeIC9t
- EnVQ==
-X-Gm-Message-State: AJcUukde3AmhkR53qneivHiQqqVmA6jmJWuoO8nZ+gGyRpU0qwyrPUkx
- TKWYkcbhvGvPFdysnGKFKQ==
-X-Google-Smtp-Source: ALg8bN7nGzB2+t8W/4kEM9c+6HojlLRCiPxYeSafGIb7MY6yUqAZBvlpojBV+l7ABQlR/Ae+nmWsGA==
-X-Received: by 2002:a6b:5a14:: with SMTP id o20mr32580034iob.206.1546557710707; 
- Thu, 03 Jan 2019 15:21:50 -0800 (PST)
-Received: from localhost ([24.51.61.172])
- by smtp.gmail.com with ESMTPSA id e141sm24917821itc.40.2019.01.03.15.21.49
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 03 Jan 2019 15:21:50 -0800 (PST)
-Date: Thu, 3 Jan 2019 17:21:44 -0600
-From: Rob Herring <robh@kernel.org>
-To: h00249924 <hutenghui@huawei.com>
-Subject: Re: [PATCH 2/3] dmaengine: Extend the k3dma driver binding
-Message-ID: <20190103232144.GA17431@bogus>
-References: <1545978983-124360-1-git-send-email-hutenghui@huawei.com>
- <1545978983-124360-2-git-send-email-hutenghui@huawei.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1545978983-124360-2-git-send-email-hutenghui@huawei.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+ id 1gfDCd-0002Zm-Qx
+ for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 00:19:10 +0000
+Received: from grover.tkatk1.zaq.ne.jp (zaqdadce369.zaq.ne.jp
+ [218.220.227.105]) (authenticated)
+ by conuserg-10.nifty.com with ESMTP id x040Ijxk017309;
+ Fri, 4 Jan 2019 09:18:45 +0900
+DKIM-Filter: OpenDKIM Filter v2.10.3 conuserg-10.nifty.com x040Ijxk017309
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
+ s=dec2015msa; t=1546561126;
+ bh=IaD/HolgSGMUeGhnmpsyJZDiXgKRDX2gM/yw9Qup5i8=;
+ h=From:To:Cc:Subject:Date:From;
+ b=Xl2JxpxisNF6Imk/pq54MMqSBlX/6Z6plo4qk/hUSdPSDpIL5/pUtMGCEUYEr8Bfu
+ kqw5SIAJmZ9wQFYdrwKH50EyxdZ/FEKiOKzWt90pqHJYBypJMb0Rhmwk86XGuxfp1S
+ VTVdE1zWuXs3pU5HbucW58RT4I9S+X0kV4Fa3cTGiwzFqsOJHXP6RUYbBHW/Li27kC
+ jw1EpUDIC5oI4WtfxBbcafBDxlEJXKIi4nURhzvWBghvwFAjzidyUUMpHA4oAVOHF7
+ STcTVSOBH6yoRMakE4eLDrzRlHSC1y39UoBMHb79KWYQyArwIZ8NRnnO4Ww4Q1hQA5
+ w992o92rQo1kQ==
+X-Nifty-SrcIP: [218.220.227.105]
+From: Masahiro Yamada <yamada.masahiro@socionext.com>
+To: Will Deacon <will.deacon@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ linux-arm-kernel@lists.infradead.org
+Subject: [PATCH v2] arm64: replace arm64-obj-* in Makefile with obj-*
+Date: Fri,  4 Jan 2019 09:18:41 +0900
+Message-Id: <1546561121-23086-1-git-send-email-yamada.masahiro@socionext.com>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190103_152152_481255_3676473A 
-X-CRM114-Status: GOOD (  18.29  )
+X-CRM114-CacheID: sfid-20190103_161908_210031_E68EB52D 
+X-CRM114-Status: UNSURE (   6.54  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,86 +78,113 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Youlin Wang <wwx575822@notesmail.huawei.com>, hanxiaolong3@hisilicon.com,
- suzhuangluan@hisilicon.com, hantanglei@huawei.com,
- linux-kernel@vger.kernel.org, kongfei@hisilicon.com, ninggaoyu@hisilicon.com,
- Vinod Koul <vkoul@kernel.org>, liyuequan@hisilicon.com,
- dmaengine@vger.kernel.org, huangli295@hisilicon.com, wangyoulin1@hisilicon.com,
- linux-arm-kernel@lists.infradead.org, cash.qianli@hisilicon.com
+Cc: Masahiro Yamada <yamada.masahiro@socionext.com>,
+ linux-kernel@vger.kernel.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 28, 2018 at 02:36:22PM +0800, h00249924 wrote:
-> From: Youlin Wang <wwx575822@notesmail.huawei.com>
-> 
-> Extend the k3dma driver binding to support hisi-asp hardware variants.
-> 
-> Signed-off-by: Youlin Wang <wwx575822@notesmail.huawei.com>
-> Signed-off-by: Tanglei Han <hantanglei@huawei.com>
-> Cc: Vinod Koul <vkoul@kernel.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> ---
->  Documentation/devicetree/bindings/dma/k3dma.txt | 33 ++++++++++++++++++++++++-
->  1 file changed, 32 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/k3dma.txt b/Documentation/devicetree/bindings/dma/k3dma.txt
-> index 4945aea..cd21b82 100644
-> --- a/Documentation/devicetree/bindings/dma/k3dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/k3dma.txt
-> @@ -3,7 +3,9 @@
->  See dma.txt first
->  
->  Required properties:
-> -- compatible: Should be "hisilicon,k3-dma-1.0"
-> +- compatible: Must be one of
-> +-		"hisilicon,k3-dma-1.0"
-> +-		"hisilicon,hisi-pcm-asp-dma-1.0"
->  - reg: Should contain DMA registers location and length.
->  - interrupts: Should contain one interrupt shared by all channel
->  - #dma-cells: see dma.txt, should be 1, para number
-> @@ -43,3 +45,32 @@ For example, i2c0 read channel request line is 18, while write channel use 19
->  			dma-names = "rx", "tx";
->  		};
->  
-> +
-> +
-> +
-> +Controller:
+Use the standard obj-$(CONFIG_...) syntex. The behavior is still the
+same.
 
-Why is a new example needed just for a new compatible string?
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-> +		asp_dmac: asp_dmac@E804B000 {
-> +			compatible = "hisilicon,hisi-pcm-asp-dma-1.0";
-> +			reg = <0x0 0xe804b000 0x0 0x1000>;
-> +			#dma-cells = <1>;
-> +			dma-channels = <16>;
-> +			dma-requests = <32>;
-> +			dma-min-chan = <0>;
-> +			dma-used-chans = <0xFFFE>;
-> +			dma-share;
-> +			interrupts = <0 216 4>;
-> +			interrupt-names = "asp_dma_irq";
-> +			status = "ok";
-> +		};
-> +
-> +Client:
-> +		i2s2: hisi_i2s {
-> +			compatible = "hisilicon,hisi-i2s";
-> +			reg = <0x0 0xe804f800 0x0 0x400>,
-> +				<0x0 0xe804e000 0x0 0x400>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2s2_pmx_func &i2s2_cfg_func>;
-> +			dmas = <&asp_dmac 18 &asp_dmac 19>;
-> +			dma-names = "rx", "tx";
-> +			#sound-dai-cells = <0>;
-> +		};
-> -- 
-> 1.9.1
-> 
+Changes in v2:
+  - Rebase
+
+ arch/arm64/kernel/Makefile | 61 +++++++++++++++++++++++-----------------------
+ 1 file changed, 30 insertions(+), 31 deletions(-)
+
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index df08d73..cd434d0 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -12,7 +12,7 @@ CFLAGS_REMOVE_insn.o = -pg
+ CFLAGS_REMOVE_return_address.o = -pg
+ 
+ # Object file lists.
+-arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
++obj-y			:= debug-monitors.o entry.o irq.o fpsimd.o		\
+ 			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
+ 			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
+ 			   hyp-stub.o psci.o cpu_ops.o insn.o	\
+@@ -27,41 +27,40 @@ OBJCOPYFLAGS := --prefix-symbols=__efistub_
+ $(obj)/%.stub.o: $(obj)/%.o FORCE
+ 	$(call if_changed,objcopy)
+ 
+-arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
++obj-$(CONFIG_COMPAT)			+= sys32.o kuser32.o signal32.o 	\
+ 					   sys_compat.o
+-arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+-arm64-obj-$(CONFIG_MODULES)		+= module.o
+-arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
+-arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o perf_callchain.o
+-arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+-arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
+-arm64-obj-$(CONFIG_CPU_PM)		+= sleep.o suspend.o
+-arm64-obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+-arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
+-arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
+-arm64-obj-$(CONFIG_EFI)			+= efi.o efi-entry.stub.o		\
++obj-$(CONFIG_FUNCTION_TRACER)		+= ftrace.o entry-ftrace.o
++obj-$(CONFIG_MODULES)			+= module.o
++obj-$(CONFIG_ARM64_MODULE_PLTS)		+= module-plts.o
++obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o perf_callchain.o
++obj-$(CONFIG_HW_PERF_EVENTS)		+= perf_event.o
++obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
++obj-$(CONFIG_CPU_PM)			+= sleep.o suspend.o
++obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
++obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
++obj-$(CONFIG_KGDB)			+= kgdb.o
++obj-$(CONFIG_EFI)			+= efi.o efi-entry.stub.o		\
+ 					   efi-rt-wrapper.o
+-arm64-obj-$(CONFIG_PCI)			+= pci.o
+-arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
+-arm64-obj-$(CONFIG_ACPI)		+= acpi.o
+-arm64-obj-$(CONFIG_ACPI_NUMA)		+= acpi_numa.o
+-arm64-obj-$(CONFIG_ARM64_ACPI_PARKING_PROTOCOL)	+= acpi_parking_protocol.o
+-arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
+-arm64-obj-$(CONFIG_RANDOMIZE_BASE)	+= kaslr.o
+-arm64-obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
+-arm64-obj-$(CONFIG_KEXEC_CORE)		+= machine_kexec.o relocate_kernel.o	\
++obj-$(CONFIG_PCI)			+= pci.o
++obj-$(CONFIG_ARMV8_DEPRECATED)		+= armv8_deprecated.o
++obj-$(CONFIG_ACPI)			+= acpi.o
++obj-$(CONFIG_ACPI_NUMA)			+= acpi_numa.o
++obj-$(CONFIG_ARM64_ACPI_PARKING_PROTOCOL)	+= acpi_parking_protocol.o
++obj-$(CONFIG_PARAVIRT)			+= paravirt.o
++obj-$(CONFIG_RANDOMIZE_BASE)		+= kaslr.o
++obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
++obj-$(CONFIG_KEXEC_CORE)		+= machine_kexec.o relocate_kernel.o	\
+ 					   cpu-reset.o
+-arm64-obj-$(CONFIG_KEXEC_FILE)		+= machine_kexec_file.o kexec_image.o
+-arm64-obj-$(CONFIG_ARM64_RELOC_TEST)	+= arm64-reloc-test.o
++obj-$(CONFIG_KEXEC_FILE)		+= machine_kexec_file.o kexec_image.o
++obj-$(CONFIG_ARM64_RELOC_TEST)		+= arm64-reloc-test.o
+ arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
+-arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
+-arm64-obj-$(CONFIG_CRASH_CORE)		+= crash_core.o
+-arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o
+-arm64-obj-$(CONFIG_ARM64_SSBD)		+= ssbd.o
+-arm64-obj-$(CONFIG_ARM64_PTR_AUTH)	+= pointer_auth.o
++obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
++obj-$(CONFIG_CRASH_CORE)		+= crash_core.o
++obj-$(CONFIG_ARM_SDE_INTERFACE)		+= sdei.o
++obj-$(CONFIG_ARM64_SSBD)		+= ssbd.o
++obj-$(CONFIG_ARM64_PTR_AUTH)		+= pointer_auth.o
+ 
+-obj-y					+= $(arm64-obj-y) vdso/ probes/
+-obj-m					+= $(arm64-obj-m)
++obj-y					+= vdso/ probes/
+ head-y					:= head.o
+ extra-y					+= $(head-y) vmlinux.lds
+ 
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
