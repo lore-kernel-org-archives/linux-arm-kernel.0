@@ -2,62 +2,73 @@ Return-Path: <SRS0=E6Hv=PM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+X-Spam-Status: No, score=-8.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 99B20C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 13:10:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AC91DC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 13:15:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 606242070C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 13:10:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 79E4A21871
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 13:15:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tHYMyPGQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 606242070C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="J/joTCO/";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="Emj4sbRP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 79E4A21871
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=S8gx9++ByAWokYk8F+h2WgTyOf5yiFVHkFP7p2H8Boc=; b=tHYMyPGQ2t02m7EKeWKs61IVbC
-	o77ZClmwKCjg1yehbd4wuto13KqghZlzu18lOaHNeX9csdxNUbRBqwMU5FSc/AvZG08iZ90igc33p
-	/o6xm1CpFl4yNEuPBcjGPtZ27/f0DUHcBX7WwYk8Ojq20vz3paeVK3hKq8UslFfVdzf7Zf4R3d2b5
-	7EOv+RK0P83/7oHHMq7nLy+ajAJ8L89kLPSJlcHVj+J1pSiIev2GX/xEJRtlC9iJ9nxzSsqR0FLCc
-	9O/8sxGQUN5uHw6LlO1fnFwPW4+qTU0NacWl2kzg6NB2vRLSHFPxTifBZbJtf01KXS+KGZon/bgiv
-	F3pJWwRg==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=+mELGS7ii1Mzgu3rHtapEL0PHQOEgY3pdKLgXhvHm6w=; b=J/joTCO/9mAB40
+	wETvXLwh7qZ7int3HktQWaVB97K3eIfm1tClDxwOyCSvrii5+zVu3Id8piwqfGLG71hf+9Bcl/t5z
+	KOhqhMwSGVuEvW/P48uo7HuVuDCZlnzeefAvuuMPQgGZPRimnyy12TT69SoxQwq5CSJEOGg3QPp8l
+	n9GcUegVQnsHXfN5aTHLlaS/eOhjv5/YB8uxV75y9AnhQ02jcgIgdvqxFgx8j/p4l1R5poNPqzh0Z
+	CmXrVZLBowFwHtHvYeZjuTVbe90Imsep6RSJro8+Fh4f8WpEe83Gqkx+tTJvBKgKv2N8Jf4iuJTfG
+	WNgtKd0hFoCBF+mT7oEA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfPFU-0007sv-CZ; Fri, 04 Jan 2019 13:10:52 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gfPKE-0001KP-KZ; Fri, 04 Jan 2019 13:15:46 +0000
+Received: from kirsty.vergenet.net ([202.4.237.240])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfPFH-0007hj-NY
- for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 13:10:41 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A12ED15BE;
- Fri,  4 Jan 2019 05:10:39 -0800 (PST)
-Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id B20C23F575;
- Fri,  4 Jan 2019 05:10:38 -0800 (PST)
-From: Dave Martin <Dave.Martin@arm.com>
-To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v2 2/2] arm64/sve: Disentangle <uapi/asm/ptrace.h> from
- <uapi/asm/sigcontext.h>
-Date: Fri,  4 Jan 2019 13:09:51 +0000
-Message-Id: <1546607391-3850-3-git-send-email-Dave.Martin@arm.com>
-X-Mailer: git-send-email 2.1.4
-In-Reply-To: <1546607391-3850-1-git-send-email-Dave.Martin@arm.com>
-References: <1546607391-3850-1-git-send-email-Dave.Martin@arm.com>
+ id 1gfPKA-0001Jp-It
+ for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 13:15:44 +0000
+Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
+ by kirsty.vergenet.net (Postfix) with ESMTPA id 42C4D25B747;
+ Sat,  5 Jan 2019 00:15:34 +1100 (AEDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
+ t=1546607734; bh=duS/C5f2ArnpxMnYmNAJSSPfOzi2JSwQQ96/l/mJGFc=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=Emj4sbRP7g6lmvM3pdXlji3ZgJq8f/QLYlqv2D3aNRPuGQrKkFHCh938VY7dRiKG1
+ mjZN8A/utnjachCVVg3sA83XgN0qTA8lkLD6TCkAj2tlkgyP0t5vG0fKtKOjvwX3kV
+ 9tgocp9RQ8u1IFVpp/7oESCz8XRSe9MymV81W0i0=
+Received: by reginn.horms.nl (Postfix, from userid 7100)
+ id 37D94940376; Fri,  4 Jan 2019 14:15:32 +0100 (CET)
+Date: Fri, 4 Jan 2019 14:15:32 +0100
+From: Simon Horman <horms@verge.net.au>
+To: Geert Uytterhoeven <geert@linux-m68k.org>
+Subject: Re: [PATCH v2] arm64: defconfig: Enable R-Car thermal driver
+Message-ID: <20190104131531.yqw2drds5rjpe6bg@verge.net.au>
+References: <20190102095154.25839-1-horms+renesas@verge.net.au>
+ <CAMuHMdU=aR8mSwd876LV=DG_vh6Bx45zxRTfMXuX3BQpy0M=ow@mail.gmail.com>
+ <20190104085720.36ccxhtcbyyzgfrk@verge.net.au>
+ <CAMuHMdWf=_-WZT9XUqPCZocNs1As3RJnXMYRYc05Y4td6SciFg@mail.gmail.com>
+ <20190104091216.dgbnkxuuamgicysg@verge.net.au>
+ <CAMuHMdWhCf-DSvVw7Z-uNpCJZ_kdGzf297OSFLZzc5TZvTNS3A@mail.gmail.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <CAMuHMdWhCf-DSvVw7Z-uNpCJZ_kdGzf297OSFLZzc5TZvTNS3A@mail.gmail.com>
+Organisation: Horms Solutions BV
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190104_051039_776670_2747C02A 
-X-CRM114-Status: GOOD (  18.56  )
+X-CRM114-CacheID: sfid-20190104_051543_271924_69273AC8 
+X-CRM114-Status: GOOD (  23.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,311 +80,77 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Szabolcs Nagy <szabolcs.nagy@arm.com>, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, Alan Hayward <alan.hayward@arm.com>
-MIME-Version: 1.0
+Cc: Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
+ Magnus Damm <magnus.damm@gmail.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Currently, <uapi/asm/sigcontext.h> provides common definitions for
-describing SVE context structures that are also used by the ptrace
-definitions in <uapi/asm/ptrace.h>.
+On Fri, Jan 04, 2019 at 10:17:15AM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
+> On Fri, Jan 4, 2019 at 10:12 AM Simon Horman <horms@verge.net.au> wrote:
+> > On Fri, Jan 04, 2019 at 10:01:13AM +0100, Geert Uytterhoeven wrote:
+> > > On Fri, Jan 4, 2019 at 9:57 AM Simon Horman <horms@verge.net.au> wrote:
+> > > > On Wed, Jan 02, 2019 at 11:45:37AM +0100, Geert Uytterhoeven wrote:
+> > > > > On Wed, Jan 2, 2019 at 10:53 AM Simon Horman <horms+renesas@verge.net.au> wrote:
+> > > > > > Enable the R-Car thermal driver as a built-in.
+> > > > > >
+> > > > > > This driver is used in conjunction with the R-Car V3M (r8a77970),
+> > > > > > E3 (r8a77990) and D3 (r8a77995) SoCs.
+> > > > >
+> > > > > > [v2] Enable as a built-in rather than a module as this seems
+> > > > > >      safer from the point of view of protecting equipment from
+> > > > > >      overheating.
+> > > > >
+> > > > > Shouldn't the above paragraph be moved below the ---?
+> > > >
+> > > > I have recently come to believe that its a matter of taste. And I think in
+> > > > this case it captures important information that is worthy of inclusion in
+> > > > the changelog.
+> > >
+> > > The rationale behind doing it this way could still be appended to the
+> > > first line of the body of the patch decription.
+> >
+> > Sorry, I'm having a little trouble parsing that. Do you mean that it could
+> > be appended to the body of the changelog at apply-time?
+> 
+> I mean the rationale could have been part of the patch description, i.e.
+> above the ---, e.g.:
 
-For this reason, a #include of <asm/sigcontext.h> was added in
-ptrace.h, but it this turns out that this can interact badly with
-userspace code that tries to include ptrace.h on top of the libc
-headers (which may provide their own shadow definitions for
-sigcontext.h).
+Thanks, I understand now.
 
-To make the headers easier for userspace to consume, this patch
-bounces the common definitions into an __SVE_* namespace and moves
-them to a backend header <uapi/asm/sve_context.h> that can be
-included by the other headers as appropriate.  This should allow
-ptrace.h to be used alongside libc's sigcontext.h (if any) without
-ill effects.
-
-This should make the situation unambiguous: <asm/sigcontext.h> is
-the header to include for the sigframe-specific definitions, while
-<asm/ptrace.h> is the header to include for ptrace-specific
-definitions.
-
-To avoid conflicting with existing usage, <asm/sigcontext.h>
-remains the canonical way to get the common definitions for
-SVE_VQ_MIN, sve_vq_from_vl() etc., both in userspace and in the
-kernel: relying on these being defined as a side effect of
-including just <asm/ptrace.h> was never intended to be safe.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-
----
-
-Changes since v1:
-
- * Remove check for inappropriate inclusion of sve_context.h.
-
-   A comment is added instead to document this usage restriction.
-
- * Include <linux/types.h> in sve_context.h for __u32 (thanks, kbuild
-   test robot)
-
-   Annoyingly, the __u32 cast is not really needed in expected use, but
-   it is possible that userspace is accidentally relying on it.
----
- arch/arm64/include/uapi/asm/ptrace.h      | 39 ++++++++++-----------
- arch/arm64/include/uapi/asm/sigcontext.h  | 56 +++++++++++++++----------------
- arch/arm64/include/uapi/asm/sve_context.h | 53 +++++++++++++++++++++++++++++
- 3 files changed, 99 insertions(+), 49 deletions(-)
- create mode 100644 arch/arm64/include/uapi/asm/sve_context.h
-
-diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
-index 65ef8b0..cff79c5 100644
---- a/arch/arm64/include/uapi/asm/ptrace.h
-+++ b/arch/arm64/include/uapi/asm/ptrace.h
-@@ -23,7 +23,7 @@
- #include <linux/types.h>
- 
- #include <asm/hwcap.h>
--#include <asm/sigcontext.h>
-+#include <asm/sve_context.h>
- 
- 
- /*
-@@ -130,9 +130,9 @@ struct user_sve_header {
-  */
- 
- /* Offset from the start of struct user_sve_header to the register data */
--#define SVE_PT_REGS_OFFSET					\
--	((sizeof(struct user_sve_header) + (SVE_VQ_BYTES - 1))	\
--		/ SVE_VQ_BYTES * SVE_VQ_BYTES)
-+#define SVE_PT_REGS_OFFSET						\
-+	((sizeof(struct user_sve_header) + (__SVE_VQ_BYTES - 1))	\
-+		/ __SVE_VQ_BYTES * __SVE_VQ_BYTES)
- 
- /*
-  * The register data content and layout depends on the value of the
-@@ -178,39 +178,36 @@ struct user_sve_header {
-  * Additional data might be appended in the future.
-  */
- 
--#define SVE_PT_SVE_ZREG_SIZE(vq)	SVE_SIG_ZREG_SIZE(vq)
--#define SVE_PT_SVE_PREG_SIZE(vq)	SVE_SIG_PREG_SIZE(vq)
--#define SVE_PT_SVE_FFR_SIZE(vq)		SVE_SIG_FFR_SIZE(vq)
-+#define SVE_PT_SVE_ZREG_SIZE(vq)	__SVE_ZREG_SIZE(vq)
-+#define SVE_PT_SVE_PREG_SIZE(vq)	__SVE_PREG_SIZE(vq)
-+#define SVE_PT_SVE_FFR_SIZE(vq)		__SVE_FFR_SIZE(vq)
- #define SVE_PT_SVE_FPSR_SIZE		sizeof(__u32)
- #define SVE_PT_SVE_FPCR_SIZE		sizeof(__u32)
- 
--#define __SVE_SIG_TO_PT(offset) \
--	((offset) - SVE_SIG_REGS_OFFSET + SVE_PT_REGS_OFFSET)
--
- #define SVE_PT_SVE_OFFSET		SVE_PT_REGS_OFFSET
- 
- #define SVE_PT_SVE_ZREGS_OFFSET \
--	__SVE_SIG_TO_PT(SVE_SIG_ZREGS_OFFSET)
-+	(SVE_PT_REGS_OFFSET + __SVE_ZREGS_OFFSET)
- #define SVE_PT_SVE_ZREG_OFFSET(vq, n) \
--	__SVE_SIG_TO_PT(SVE_SIG_ZREG_OFFSET(vq, n))
-+	(SVE_PT_REGS_OFFSET + __SVE_ZREG_OFFSET(vq, n))
- #define SVE_PT_SVE_ZREGS_SIZE(vq) \
--	(SVE_PT_SVE_ZREG_OFFSET(vq, SVE_NUM_ZREGS) - SVE_PT_SVE_ZREGS_OFFSET)
-+	(SVE_PT_SVE_ZREG_OFFSET(vq, __SVE_NUM_ZREGS) - SVE_PT_SVE_ZREGS_OFFSET)
- 
- #define SVE_PT_SVE_PREGS_OFFSET(vq) \
--	__SVE_SIG_TO_PT(SVE_SIG_PREGS_OFFSET(vq))
-+	(SVE_PT_REGS_OFFSET + __SVE_PREGS_OFFSET(vq))
- #define SVE_PT_SVE_PREG_OFFSET(vq, n) \
--	__SVE_SIG_TO_PT(SVE_SIG_PREG_OFFSET(vq, n))
-+	(SVE_PT_REGS_OFFSET + __SVE_PREG_OFFSET(vq, n))
- #define SVE_PT_SVE_PREGS_SIZE(vq) \
--	(SVE_PT_SVE_PREG_OFFSET(vq, SVE_NUM_PREGS) - \
-+	(SVE_PT_SVE_PREG_OFFSET(vq, __SVE_NUM_PREGS) - \
- 		SVE_PT_SVE_PREGS_OFFSET(vq))
- 
- #define SVE_PT_SVE_FFR_OFFSET(vq) \
--	__SVE_SIG_TO_PT(SVE_SIG_FFR_OFFSET(vq))
-+	(SVE_PT_REGS_OFFSET + __SVE_FFR_OFFSET(vq))
- 
- #define SVE_PT_SVE_FPSR_OFFSET(vq)				\
- 	((SVE_PT_SVE_FFR_OFFSET(vq) + SVE_PT_SVE_FFR_SIZE(vq) +	\
--			(SVE_VQ_BYTES - 1))			\
--		/ SVE_VQ_BYTES * SVE_VQ_BYTES)
-+			(__SVE_VQ_BYTES - 1))			\
-+		/ __SVE_VQ_BYTES * __SVE_VQ_BYTES)
- #define SVE_PT_SVE_FPCR_OFFSET(vq) \
- 	(SVE_PT_SVE_FPSR_OFFSET(vq) + SVE_PT_SVE_FPSR_SIZE)
- 
-@@ -221,8 +218,8 @@ struct user_sve_header {
- 
- #define SVE_PT_SVE_SIZE(vq, flags)					\
- 	((SVE_PT_SVE_FPCR_OFFSET(vq) + SVE_PT_SVE_FPCR_SIZE		\
--			- SVE_PT_SVE_OFFSET + (SVE_VQ_BYTES - 1))	\
--		/ SVE_VQ_BYTES * SVE_VQ_BYTES)
-+			- SVE_PT_SVE_OFFSET + (__SVE_VQ_BYTES - 1))	\
-+		/ __SVE_VQ_BYTES * __SVE_VQ_BYTES)
- 
- #define SVE_PT_SIZE(vq, flags)						\
- 	 (((flags) & SVE_PT_REGS_MASK) == SVE_PT_REGS_SVE ?		\
-diff --git a/arch/arm64/include/uapi/asm/sigcontext.h b/arch/arm64/include/uapi/asm/sigcontext.h
-index dca8f8b..5f3c0ce 100644
---- a/arch/arm64/include/uapi/asm/sigcontext.h
-+++ b/arch/arm64/include/uapi/asm/sigcontext.h
-@@ -130,6 +130,8 @@ struct sve_context {
- 
- #endif /* !__ASSEMBLY__ */
- 
-+#include <asm/sve_context.h>
-+
- /*
-  * The SVE architecture leaves space for future expansion of the
-  * vector length beyond its initial architectural limit of 2048 bits
-@@ -138,21 +140,20 @@ struct sve_context {
-  * See linux/Documentation/arm64/sve.txt for a description of the VL/VQ
-  * terminology.
-  */
--#define SVE_VQ_BYTES		16	/* number of bytes per quadword */
-+#define SVE_VQ_BYTES		__SVE_VQ_BYTES	/* bytes per quadword */
- 
--#define SVE_VQ_MIN		1
--#define SVE_VQ_MAX		512
-+#define SVE_VQ_MIN		__SVE_VQ_MIN
-+#define SVE_VQ_MAX		__SVE_VQ_MAX
- 
--#define SVE_VL_MIN		(SVE_VQ_MIN * SVE_VQ_BYTES)
--#define SVE_VL_MAX		(SVE_VQ_MAX * SVE_VQ_BYTES)
-+#define SVE_VL_MIN		__SVE_VL_MIN
-+#define SVE_VL_MAX		__SVE_VL_MAX
- 
--#define SVE_NUM_ZREGS		32
--#define SVE_NUM_PREGS		16
-+#define SVE_NUM_ZREGS		__SVE_NUM_ZREGS
-+#define SVE_NUM_PREGS		__SVE_NUM_PREGS
- 
--#define sve_vl_valid(vl) \
--	((vl) % SVE_VQ_BYTES == 0 && (vl) >= SVE_VL_MIN && (vl) <= SVE_VL_MAX)
--#define sve_vq_from_vl(vl)	((vl) / SVE_VQ_BYTES)
--#define sve_vl_from_vq(vq)	((vq) * SVE_VQ_BYTES)
-+#define sve_vl_valid(vl)	__sve_vl_valid(vl)
-+#define sve_vq_from_vl(vl)	__sve_vq_from_vl(vl)
-+#define sve_vl_from_vq(vq)	__sve_vl_from_vq(vq)
- 
- /*
-  * If the SVE registers are currently live for the thread at signal delivery,
-@@ -205,34 +206,33 @@ struct sve_context {
-  * Additional data might be appended in the future.
-  */
- 
--#define SVE_SIG_ZREG_SIZE(vq)	((__u32)(vq) * SVE_VQ_BYTES)
--#define SVE_SIG_PREG_SIZE(vq)	((__u32)(vq) * (SVE_VQ_BYTES / 8))
--#define SVE_SIG_FFR_SIZE(vq)	SVE_SIG_PREG_SIZE(vq)
-+#define SVE_SIG_ZREG_SIZE(vq)	__SVE_ZREG_SIZE(vq)
-+#define SVE_SIG_PREG_SIZE(vq)	__SVE_PREG_SIZE(vq)
-+#define SVE_SIG_FFR_SIZE(vq)	__SVE_FFR_SIZE(vq)
- 
- #define SVE_SIG_REGS_OFFSET					\
--	((sizeof(struct sve_context) + (SVE_VQ_BYTES - 1))	\
--		/ SVE_VQ_BYTES * SVE_VQ_BYTES)
-+	((sizeof(struct sve_context) + (__SVE_VQ_BYTES - 1))	\
-+		/ __SVE_VQ_BYTES * __SVE_VQ_BYTES)
- 
--#define SVE_SIG_ZREGS_OFFSET	SVE_SIG_REGS_OFFSET
-+#define SVE_SIG_ZREGS_OFFSET \
-+		(SVE_SIG_REGS_OFFSET + __SVE_ZREGS_OFFSET)
- #define SVE_SIG_ZREG_OFFSET(vq, n) \
--	(SVE_SIG_ZREGS_OFFSET + SVE_SIG_ZREG_SIZE(vq) * (n))
--#define SVE_SIG_ZREGS_SIZE(vq) \
--	(SVE_SIG_ZREG_OFFSET(vq, SVE_NUM_ZREGS) - SVE_SIG_ZREGS_OFFSET)
-+		(SVE_SIG_REGS_OFFSET + __SVE_ZREG_OFFSET(vq, n))
-+#define SVE_SIG_ZREGS_SIZE(vq) __SVE_ZREGS_SIZE(vq)
- 
- #define SVE_SIG_PREGS_OFFSET(vq) \
--	(SVE_SIG_ZREGS_OFFSET + SVE_SIG_ZREGS_SIZE(vq))
-+		(SVE_SIG_REGS_OFFSET + __SVE_PREGS_OFFSET(vq))
- #define SVE_SIG_PREG_OFFSET(vq, n) \
--	(SVE_SIG_PREGS_OFFSET(vq) + SVE_SIG_PREG_SIZE(vq) * (n))
--#define SVE_SIG_PREGS_SIZE(vq) \
--	(SVE_SIG_PREG_OFFSET(vq, SVE_NUM_PREGS) - SVE_SIG_PREGS_OFFSET(vq))
-+		(SVE_SIG_REGS_OFFSET + __SVE_PREG_OFFSET(vq, n))
-+#define SVE_SIG_PREGS_SIZE(vq) __SVE_PREGS_SIZE(vq)
- 
- #define SVE_SIG_FFR_OFFSET(vq) \
--	(SVE_SIG_PREGS_OFFSET(vq) + SVE_SIG_PREGS_SIZE(vq))
-+		(SVE_SIG_REGS_OFFSET + __SVE_FFR_OFFSET(vq))
- 
- #define SVE_SIG_REGS_SIZE(vq) \
--	(SVE_SIG_FFR_OFFSET(vq) + SVE_SIG_FFR_SIZE(vq) - SVE_SIG_REGS_OFFSET)
--
--#define SVE_SIG_CONTEXT_SIZE(vq) (SVE_SIG_REGS_OFFSET + SVE_SIG_REGS_SIZE(vq))
-+		(__SVE_FFR_OFFSET(vq) + __SVE_FFR_SIZE(vq))
- 
-+#define SVE_SIG_CONTEXT_SIZE(vq) \
-+		(SVE_SIG_REGS_OFFSET + SVE_SIG_REGS_SIZE(vq))
- 
- #endif /* _UAPI__ASM_SIGCONTEXT_H */
-diff --git a/arch/arm64/include/uapi/asm/sve_context.h b/arch/arm64/include/uapi/asm/sve_context.h
-new file mode 100644
-index 0000000..754ab75
---- /dev/null
-+++ b/arch/arm64/include/uapi/asm/sve_context.h
-@@ -0,0 +1,53 @@
-+/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
-+/* Copyright (C) 2017-2018 ARM Limited */
-+
-+/*
-+ * For use by other UAPI headers only.
-+ * Do not make direct use of header or its definitions.
-+ */
-+
-+#ifndef _UAPI__ASM_SVE_CONTEXT_H
-+#define _UAPI__ASM_SVE_CONTEXT_H
-+
-+#include <linux/types.h>
-+
-+#define __SVE_VQ_BYTES		16	/* number of bytes per quadword */
-+
-+#define __SVE_VQ_MIN		1
-+#define __SVE_VQ_MAX		512
-+
-+#define __SVE_VL_MIN		(__SVE_VQ_MIN * __SVE_VQ_BYTES)
-+#define __SVE_VL_MAX		(__SVE_VQ_MAX * __SVE_VQ_BYTES)
-+
-+#define __SVE_NUM_ZREGS		32
-+#define __SVE_NUM_PREGS		16
-+
-+#define __sve_vl_valid(vl)			\
-+	((vl) % __SVE_VQ_BYTES == 0 &&		\
-+	 (vl) >= __SVE_VL_MIN &&		\
-+	 (vl) <= __SVE_VL_MAX)
-+
-+#define __sve_vq_from_vl(vl)	((vl) / __SVE_VQ_BYTES)
-+#define __sve_vl_from_vq(vq)	((vq) * __SVE_VQ_BYTES)
-+
-+#define __SVE_ZREG_SIZE(vq)	((__u32)(vq) * __SVE_VQ_BYTES)
-+#define __SVE_PREG_SIZE(vq)	((__u32)(vq) * (__SVE_VQ_BYTES / 8))
-+#define __SVE_FFR_SIZE(vq)	__SVE_PREG_SIZE(vq)
-+
-+#define __SVE_ZREGS_OFFSET	0
-+#define __SVE_ZREG_OFFSET(vq, n) \
-+	(__SVE_ZREGS_OFFSET + __SVE_ZREG_SIZE(vq) * (n))
-+#define __SVE_ZREGS_SIZE(vq) \
-+	(__SVE_ZREG_OFFSET(vq, __SVE_NUM_ZREGS) - __SVE_ZREGS_OFFSET)
-+
-+#define __SVE_PREGS_OFFSET(vq) \
-+	(__SVE_ZREGS_OFFSET + __SVE_ZREGS_SIZE(vq))
-+#define __SVE_PREG_OFFSET(vq, n) \
-+	(__SVE_PREGS_OFFSET(vq) + __SVE_PREG_SIZE(vq) * (n))
-+#define __SVE_PREGS_SIZE(vq) \
-+	(__SVE_PREG_OFFSET(vq, __SVE_NUM_PREGS) - __SVE_PREGS_OFFSET(vq))
-+
-+#define __SVE_FFR_OFFSET(vq) \
-+	(__SVE_PREGS_OFFSET(vq) + __SVE_PREGS_SIZE(vq))
-+
-+#endif /* ! _UAPI__ASM_SVE_CONTEXT_H */
--- 
-2.1.4
-
+> 
+>     Subject: [PATCH v2] arm64: defconfig: Enable R-Car thermal driver
+> 
+>     Enable the R-Car thermal driver as a built-in.
+>     Built-in seems safer than modular from the point of view of protecting
+>     equipment from overheating.
+> 
+>     This driver is used in conjunction with the R-Car V3M (r8a77970),
+>     E3 (r8a77990) and D3 (r8a77995) SoCs.
+> 
+>     Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>     ---
+>     v2:
+>       - Switch from built-in to modular.
+> 
+>      arch/arm64/configs/defconfig | 1 +
+>      1 file changed, 1 insertion(+)
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> -- 
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert@linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
