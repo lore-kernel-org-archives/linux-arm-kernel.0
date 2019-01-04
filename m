@@ -2,65 +2,86 @@ Return-Path: <SRS0=E6Hv=PM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+X-Spam-Status: No, score=-3.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 39241C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 18:14:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 50B4BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 18:23:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0CD51218CD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 18:14:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 23A6B218CD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 18:23:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pdbD7xni";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="jeYfp4Ho"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0CD51218CD
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aiyMcstT"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 23A6B218CD
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=embeddedor.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ltZBYE3loyidGQ8LJOQ/6oor11v6ivFPJ5k9xkuGIwg=; b=pdbD7xniASKRGI
-	R8eFS3VcHNCJ8YPDUQjnCJIZxKeSeA99fv+Sf5Vzy9MfjoAi2yztXLtsL37wrjcyuomgrs86ioPeK
-	uUqDIbiVG7HhrUD+tu13U49h3+Sdn+IsQXW/7YlLusTqP9FqyaPCKo2RKfDCfr2UNnf+TqWKzSZZE
-	wIA97CK+rq0KYaj0AxvjwcfXFRvPsBYPxPfgafkMyDmhCX1WrCna9SgclRowhEVxn/4TfS5f5QxWK
-	DrBLbqp12jhG8q9m3EBSU3Bv1bJ3yLiuXZrMa0l/ynEplnyjtIkk9J0pKxD5tf/9AJ7sfGoGjZxd9
-	jh6oKPasA8njZ1Szg5iA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=V/DUTATwSmwCN7hw8GOslTi8gFXXIU+o6kDtAKPnLQI=; b=aiyMcstThI9Obi373Gfp6iNuw
+	oowKcRJ4qPlPoKL7CeucT36LNGyo1zk63n7LH9biODegSozOaomcs9um8EPRyw7RAptTZ4yrW8q8B
+	Br8E9Yw65ewza6t0UmPluj7lq5gU1tEXSfn1iCoHfOWEGVY3Kqz0EFizqVMFyjR56poTytVdNx+oS
+	LlZRN9ddxag7Y9UqfuscjGSsmYTJEPD8XtxHISXgdvb5nqJBLHUFuiwcndXqm0/OLNrbPUMJHRmXz
+	wcxi2YLQdzWSHA4KTjivgPpKPoNmVvUNDUIwPWwMyx6S4ShmYj+fqwbdQ/8b9F4W/6W1/jXhmf/57
+	1fb2tak1Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfTzM-0005m8-8V; Fri, 04 Jan 2019 18:14:32 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gfU7g-0001aN-E3; Fri, 04 Jan 2019 18:23:08 +0000
+Received: from gateway33.websitewelcome.com ([192.185.146.87])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfTzH-0005lJ-Vv; Fri, 04 Jan 2019 18:14:29 +0000
-Received: from bbrezillon (91-160-177-164.subs.proxad.net [91.160.177.164])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 9A32F218CD;
- Fri,  4 Jan 2019 18:14:22 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1546625666;
- bh=yl70YXMnOZY6TSWDtyNoEOT2T8HudqSdL5M+ycZzo4k=;
- h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
- b=jeYfp4Ho0q+FsMu0WoOzLu7YvbSENGHAKm+xB0VKXFzxsC9HABESIKaFqUKil4Dpu
- hZxGPuLZn6CmiIm/ANuld9kef8WTWlPqogSo8GgkB4iHqX1zIlCO2DE8bARPPZ91nB
- YYk2Uc5tBCJNAU+XM23zZUtHJfiMzRoR/HpK+j4c=
-Date: Fri, 4 Jan 2019 19:14:15 +0100
-From: Boris Brezillon <bbrezillon@kernel.org>
-To: "Gustavo A. R. Silva" <gustavo@embeddedor.com>
+ id 1gfU7e-0001Ze-2T
+ for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 18:23:07 +0000
+Received: from cm11.websitewelcome.com (cm11.websitewelcome.com [100.42.49.5])
+ by gateway33.websitewelcome.com (Postfix) with ESMTP id 93C82412C6B
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri,  4 Jan 2019 12:23:04 -0600 (CST)
+Received: from gator4166.hostgator.com ([108.167.133.22]) by cmsmtp with SMTP
+ id fU7cgmWePdnCefU7cgtIBa; Fri, 04 Jan 2019 12:23:04 -0600
+X-Authority-Reason: nr=8
+Received: from [189.250.130.205] (port=45416 helo=[192.168.43.131])
+ by gator4166.hostgator.com with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.91)
+ (envelope-from <gustavo@embeddedor.com>)
+ id 1gfU7b-000vV2-Ia; Fri, 04 Jan 2019 12:23:04 -0600
 Subject: Re: [PATCH] mtd: rawnand: sunxi: Use struct_size() in devm_kzalloc()
-Message-ID: <20190104191415.126e4a07@bbrezillon>
-In-Reply-To: <20190104172637.GA28084@embeddedor>
+To: Boris Brezillon <bbrezillon@kernel.org>
 References: <20190104172637.GA28084@embeddedor>
-X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
+ <20190104191415.126e4a07@bbrezillon>
+From: "Gustavo A. R. Silva" <gustavo@embeddedor.com>
+Message-ID: <02580805-17f7-1cc1-936c-5c73f00fe819@embeddedor.com>
+Date: Fri, 4 Jan 2019 12:22:55 -0600
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
+In-Reply-To: <20190104191415.126e4a07@bbrezillon>
+Content-Language: en-US
+X-AntiAbuse: This header was added to track abuse,
+ please include it with any abuse report
+X-AntiAbuse: Primary Hostname - gator4166.hostgator.com
+X-AntiAbuse: Original Domain - lists.infradead.org
+X-AntiAbuse: Originator/Caller UID/GID - [47 12] / [47 12]
+X-AntiAbuse: Sender Address Domain - embeddedor.com
+X-BWhitelist: no
+X-Source-IP: 189.250.130.205
+X-Source-L: No
+X-Exim-ID: 1gfU7b-000vV2-Ia
+X-Source: 
+X-Source-Args: 
+X-Source-Dir: 
+X-Source-Sender: ([192.168.43.131]) [189.250.130.205]:45416
+X-Source-Auth: gustavo@embeddedor.com
+X-Email-Count: 23
+X-Source-Cap: Z3V6aWRpbmU7Z3V6aWRpbmU7Z2F0b3I0MTY2Lmhvc3RnYXRvci5jb20=
+X-Local-Domain: yes
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190104_101428_040744_521B3EB9 
-X-CRM114-Status: GOOD (  19.38  )
+X-CRM114-CacheID: sfid-20190104_102306_161227_22EC74F4 
+X-CRM114-Status: GOOD (  11.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,59 +99,30 @@ Cc: Maxime Ripard <maxime.ripard@bootlin.com>,
  linux-mtd@lists.infradead.org, Miquel Raynal <miquel.raynal@bootlin.com>,
  Brian Norris <computersforpeace@gmail.com>,
  David Woodhouse <dwmw2@infradead.org>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Gustavo,
+Hey Boris,
 
-On Fri, 4 Jan 2019 11:26:37 -0600
-"Gustavo A. R. Silva" <gustavo@embeddedor.com> wrote:
+On 1/4/19 12:14 PM, Boris Brezillon wrote:
 
-> One of the more common cases of allocation size calculations is finding
-> the size of a structure that has a zero-sized array at the end, along
-> with memory for some number of elements for that array. For example:
 > 
-> struct foo {
->     int stuff;
->     void *entry[];
-> };
+> I posted the same patch a few days back [1].
 > 
-> instance = devm_kzalloc(dev, sizeof(struct foo) + sizeof(void *) * count, GFP_KERNEL);
+> [1]http://patchwork.ozlabs.org/patch/1013855/
 > 
-> Instead of leaving these open-coded and prone to type mistakes, we can
-> now use the new struct_size() helper:
-> 
-> instance = devm_kzalloc(dev, struct_size(instance, entry, count), GFP_KERNEL);
-> 
-> This code was detected with the help of Coccinelle.
-> 
-> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
-> ---
->  drivers/mtd/nand/raw/sunxi_nand.c | 5 +----
->  1 file changed, 1 insertion(+), 4 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/raw/sunxi_nand.c b/drivers/mtd/nand/raw/sunxi_nand.c
-> index e828ee50a201..f66fffe663bf 100644
-> --- a/drivers/mtd/nand/raw/sunxi_nand.c
-> +++ b/drivers/mtd/nand/raw/sunxi_nand.c
-> @@ -1870,10 +1870,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
->  		return -EINVAL;
->  	}
->  
-> -	chip = devm_kzalloc(dev,
-> -			    sizeof(*chip) +
-> -			    (nsels * sizeof(struct sunxi_nand_chip_sel)),
-> -			    GFP_KERNEL);
-> +	chip = devm_kzalloc(dev, struct_size(chip, sels, nsels), GFP_KERNEL);
->  	if (!chip) {
->  		dev_err(dev, "could not allocate chip\n");
->  		return -ENOMEM;
 
-I posted the same patch a few days back [1].
+Oh, that's great.
 
-[1]http://patchwork.ozlabs.org/patch/1013855/
+It's good to see people adopting the struct_size helper. :)
+
+Happy new year.
+
+Thanks
+--
+Gustavo
 
 _______________________________________________
 linux-arm-kernel mailing list
