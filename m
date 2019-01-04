@@ -7,80 +7,78 @@ X-Spam-Status: No, score=-10.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 31399C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 21:27:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 46A27C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 21:31:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F00FF21872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 21:27:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 12AD821872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 21:31:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="j+J5buUp";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="WUvAQuSS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F00FF21872
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=intel.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eequjw5M"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 12AD821872
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=embeddedor.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wVmY3cLTt5oAP1/g5UmUT6olNkEqRZkiCij90mDqV7I=; b=j+J5buUpTTNC/M
-	+kCz9xzatKX7R3W9igYAIKHVNWaYtoOxx1fSapOvJrQHJtuCNpjVznp1cb7yHupahSMLuX2/Y7EBw
-	k07nkwcYy36fS01hLq049pWgPjQyUcIwOIx3lby2t9McYFzib5HxbS24DZBfyi2vOFxRY42xLolAI
-	k+FueGF9I1B8q3DvpTjs7GvWF2IAC2TUoW/nksNZWtqH7GyEub1v5QglNgDmC7xBgjv6WZAfT5oaG
-	SkNkfRu8NkkVnjE9kSFD0B9HhTarb5p1gd5goxzToWiHKO0qp6gBTjoQyuOpav8aArtki+BbphXC2
-	Qj1EA3ERjxV3R87t/CHA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=6bUNnrV/8dsclFBUSBz0JbVvFo22L8mD0ztxFgstKC0=; b=eequjw5MidQIf0
+	iotfVZBMj21iPxZuHWYOCHkElhnNiHQhcYXULN0ETwoWzQ7kpJRstySL0hqOLlskBjF4dQyAHrlHf
+	0Gf1x5kTmw6YXvTmWcOApJdEOi95wSvMwHT25Dcd9Gexd5BRTcECUp6EEXQgh9VBlFtYPRhO5IROx
+	DxR2u5SfoclLt/kRBOaG+/4hDqcIjKBrwvIV8ZNYZPEYpBwajvu34QuI730eJ3uTT3LHSUqEcI4nG
+	xsgfDZ6IIPjoa1pxhtJZYki6a9GrHKnUt7T11ync2XOQfq3aZ6nwIJL0vnpGgTslq0wLEp+PmfK5U
+	onbZ29+dQIKfxviFhRCQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfWzw-0000cc-P6; Fri, 04 Jan 2019 21:27:20 +0000
-Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+	id 1gfX3d-0002HE-85; Fri, 04 Jan 2019 21:31:09 +0000
+Received: from gateway32.websitewelcome.com ([192.185.145.171])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfWzv-0000cW-31
- for linux-arm-kernel@bombadil.infradead.org; Fri, 04 Jan 2019 21:27:19 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=In-Reply-To:Content-Type:MIME-Version:
- References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=M0/WqjEFBOBxF3WhSh93UacXL4+Qhil1296ev4EO57Q=; b=WUvAQuSSn57PN3hP4Y1OJgBwY
- 4w/YqN5lh2obiB+PCvIYH4MOmigfdkziCuphd68jfUCIQSVAxlGLSZSpD4A1r2UWbBHh47rRk1mLs
- avM1DwqRw+I1n0dJSDE31oAS5w+dG5Lyc0UkS+6aF3/QxF5+dAkPmj3hPOmxhpW9tZCPpsdzu5ZlF
- SUWYHGCXca8Gx4+BJUl5JlQeQKjxcsBwhII/fVid64spWu2yC9WBqs172IUEe44aZ0GQncfmg7tX9
- WRbFcMtLjzQfB6D1C0e/sQu1vlhzXsTnDxsI5JbpFGkREJx811IeHnuEJN0TJzRgt7FGWfcaqNkcB
- nO9yqk7pQ==;
-Received: from mga18.intel.com ([134.134.136.126])
- by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfWzq-0001gK-UB
- for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 21:27:17 +0000
-X-Amp-Result: UNSCANNABLE
-X-Amp-File-Uploaded: False
-Received: from fmsmga006.fm.intel.com ([10.253.24.20])
- by orsmga106.jf.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
- 04 Jan 2019 13:27:03 -0800
-X-ExtLoop1: 1
-X-IronPort-AV: E=Sophos;i="5.56,439,1539673200"; d="scan'208";a="307580654"
-Received: from sjchrist-coffee.jf.intel.com (HELO linux.intel.com)
- ([10.54.74.154])
- by fmsmga006.fm.intel.com with ESMTP; 04 Jan 2019 13:27:02 -0800
-Date: Fri, 4 Jan 2019 13:27:02 -0800
-From: Sean Christopherson <sean.j.christopherson@intel.com>
-To: lantianyu1986@gmail.com
-Subject: Re: [PATCH 7/11] KVM: Remove redundant check in the
- kvm_get_dirty_log_protect()
-Message-ID: <20190104212702.GD11288@linux.intel.com>
-References: <20190104085405.40356-1-Tianyu.Lan@microsoft.com>
- <20190104085405.40356-8-Tianyu.Lan@microsoft.com>
- <20190104155036.GA11288@linux.intel.com>
+ id 1gfX3Z-0002Fm-K3
+ for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 21:31:07 +0000
+Received: from cm17.websitewelcome.com (cm17.websitewelcome.com [100.42.49.20])
+ by gateway32.websitewelcome.com (Postfix) with ESMTP id 170D25E304D
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri,  4 Jan 2019 15:30:52 -0600 (CST)
+Received: from gator4166.hostgator.com ([108.167.133.22]) by cmsmtp with SMTP
+ id fX3LgWL2390onfX3Lg1GAF; Fri, 04 Jan 2019 15:30:51 -0600
+X-Authority-Reason: nr=8
+Received: from [189.250.130.205] (port=41140 helo=embeddedor)
+ by gator4166.hostgator.com with esmtpa (Exim 4.91)
+ (envelope-from <gustavo@embeddedor.com>)
+ id 1gfX3K-0033Fu-DA; Fri, 04 Jan 2019 15:30:50 -0600
+Date: Fri, 4 Jan 2019 15:30:47 -0600
+From: "Gustavo A. R. Silva" <gustavo@embeddedor.com>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Matthias Brugger <matthias.bgg@gmail.com>
+Subject: [PATCH] staging: mt7621-dma: Use struct_size() in devm_kzalloc()
+Message-ID: <20190104213047.GA19391@embeddedor>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190104155036.GA11288@linux.intel.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+User-Agent: Mutt/1.9.4 (2018-02-28)
+X-AntiAbuse: This header was added to track abuse,
+ please include it with any abuse report
+X-AntiAbuse: Primary Hostname - gator4166.hostgator.com
+X-AntiAbuse: Original Domain - lists.infradead.org
+X-AntiAbuse: Originator/Caller UID/GID - [47 12] / [47 12]
+X-AntiAbuse: Sender Address Domain - embeddedor.com
+X-BWhitelist: no
+X-Source-IP: 189.250.130.205
+X-Source-L: No
+X-Exim-ID: 1gfX3K-0033Fu-DA
+X-Source: 
+X-Source-Args: 
+X-Source-Dir: 
+X-Source-Sender: (embeddedor) [189.250.130.205]:41140
+X-Source-Auth: gustavo@embeddedor.com
+X-Email-Count: 25
+X-Source-Cap: Z3V6aWRpbmU7Z3V6aWRpbmU7Z2F0b3I0MTY2Lmhvc3RnYXRvci5jb20=
+X-Local-Domain: yes
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190104_212715_284629_6B8217A3 
-X-CRM114-Status: GOOD (  22.43  )
+X-CRM114-CacheID: sfid-20190104_133105_759049_1193D2E4 
+X-CRM114-Status: GOOD (  10.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,60 +90,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kvm@vger.kernel.org, rkrcmar@redhat.com, catalin.marinas@arm.com,
- will.deacon@arm.com, christoffer.dall@arm.com, paulus@ozlabs.org,
- hpa@zytor.com, kys@microsoft.com, kvmarm@lists.cs.columbia.edu,
- mpe@ellerman.id.au, x86@kernel.org, linux@armlinux.org.uk,
- michael.h.kelley@microsoft.com, mingo@redhat.com, benh@kernel.crashing.org,
- jhogan@kernel.org, linux-mips@vger.kernel.org,
- Lan Tianyu <Tianyu.Lan@microsoft.com>, marc.zyngier@arm.com,
- kvm-ppc@vger.kernel.org, bp@alien8.de, tglx@linutronix.de,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
- ralf@linux-mips.org, paul.burton@mips.com, pbonzini@redhat.com,
- vkuznets@redhat.com, linuxppc-dev@lists.ozlabs.org
+Cc: devel@driverdev.osuosl.org, linux-mediatek@lists.infradead.org,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ "Gustavo A. R. Silva" <gustavo@embeddedor.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 04, 2019 at 07:50:36AM -0800, Sean Christopherson wrote:
-> On Fri, Jan 04, 2019 at 04:54:01PM +0800, lantianyu1986@gmail.com wrote:
-> > From: Lan Tianyu <Tianyu.Lan@microsoft.com>
-> > 
-> > The dirty bits have already been checked in the previous check of
-> > "dirty_bitmap" and mask must be non-zero value at this point.
-> > 
-> > Signed-off-by: Lan Tianyu <Tianyu.Lan@microsoft.com>
-> > ---
-> >  virt/kvm/kvm_main.c | 8 +++-----
-> >  1 file changed, 3 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-> > index cf7cc0554094..e75dbb15fd09 100644
-> > --- a/virt/kvm/kvm_main.c
-> > +++ b/virt/kvm/kvm_main.c
-> > @@ -1206,11 +1206,9 @@ int kvm_get_dirty_log_protect(struct kvm *kvm,
-> >  			mask = xchg(&dirty_bitmap[i], 0);
-> >  			dirty_bitmap_buffer[i] = mask;
-> >  
-> > -			if (mask) {
-> > -				offset = i * BITS_PER_LONG;
-> > -				kvm_arch_mmu_enable_log_dirty_pt_masked(kvm, memslot,
-> > -									offset, mask);
-> > -			}
-> > +			offset = i * BITS_PER_LONG;
-> > +			kvm_arch_mmu_enable_log_dirty_pt_masked(kvm, memslot,
-> > +								offset, mask);
-> 
-> Hmm, the check against mask was explicitly added by commit 58d2930f4ee3
-> ("KVM: Eliminate extra function calls in kvm_get_dirty_log_protect()").
-> AFAIK KVM only *sets* bits in dirty_bitmap without holding slots_lock
-> and/or mmu_lock, so I agree that checking mask is redundant, but it'd be
-> nice to elaborate a bit more in the changelog.
-> 
-> At the very least this needs a Fixes tag for the aforementioned commit.
+One of the more common cases of allocation size calculations is finding
+the size of a structure that has a zero-sized array at the end, along
+with memory for some number of elements for that array. For example:
 
-Actually, this can be a straight revert of 58d2930f4ee3.
+struct foo {
+    int stuff;
+    void *entry[];
+};
+
+instance = devm_kzalloc(dev, sizeof(struct foo) + sizeof(void *) * count, GFP_KERNEL);
+
+Instead of leaving these open-coded and prone to type mistakes, we can
+now use the new struct_size() helper:
+
+instance = devm_kzalloc(dev, struct_size(instance, entry, count), GFP_KERNEL);
+
+This code was detected with the help of Coccinelle.
+
+Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
+---
+ drivers/staging/mt7621-dma/ralink-gdma.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/staging/mt7621-dma/ralink-gdma.c b/drivers/staging/mt7621-dma/ralink-gdma.c
+index 792a63bd55d4..d78042eba6dd 100644
+--- a/drivers/staging/mt7621-dma/ralink-gdma.c
++++ b/drivers/staging/mt7621-dma/ralink-gdma.c
+@@ -821,9 +821,9 @@ static int gdma_dma_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	data = (struct gdma_data *) match->data;
+ 
+-	dma_dev = devm_kzalloc(&pdev->dev, sizeof(*dma_dev) +
+-			(sizeof(struct gdma_dmaengine_chan) * data->chancnt),
+-			GFP_KERNEL);
++	dma_dev = devm_kzalloc(&pdev->dev,
++			       struct_size(dma_dev, chan, data->chancnt),
++			       GFP_KERNEL);
+ 	if (!dma_dev) {
+ 		dev_err(&pdev->dev, "alloc dma device failed\n");
+ 		return -EINVAL;
+-- 
+2.20.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
