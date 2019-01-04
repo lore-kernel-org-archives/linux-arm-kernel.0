@@ -2,22 +2,22 @@ Return-Path: <SRS0=E6Hv=PM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BAB82C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 12:37:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 67841C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 12:40:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 89EB720656
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 12:37:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 342FC21874
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 12:40:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="D7pHL3p4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 89EB720656
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Zx8bigh+";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="qVHBNgit"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 342FC21874
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,41 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=fp54dVYu1J6fC7tBGImbneXT8LuQ9x1XrkC2Cyp4lLU=; b=D7pHL3p4eEsyqu
-	ox9B+1ftX55uP2Z+WQV6sciZNmbJzeWNptX1vmjkV5tans2B0bQH/sPH58KF2pZvtxd2jKxsXPOMz
-	5xLxceKm27J9yHg8t56z2F3h63iu7d9exU4G2Jwec1OFk+pei7SO8w0f3+qY8MTPCkZlqRzvR3j5S
-	KN5DlKM85BpSU3gEyhtZHEU90aSlMj621YWu/c3S6OqJR3ND7fSo+ysFAZDpUCUqEEMYudsY4LcDl
-	pFW+Fe1xl86qiwYCD/kLwqwUWS8LR9RPXKOP/Xdo+oTVy6aR7MKr2ytxNoMEK1+PpMt0CaL7x0bEO
-	SFBp0nTD+Eqe04kGKSGg==;
+	List-Owner; bh=Yd+UPr5eMcp/GpKWUAgENAPBt3YorIgV3gyuAOOT1TU=; b=Zx8bigh+QhVGkl
+	lr/SodlAPOTQd5Xmgyl6hnQSjDaVfS85vPLBIwpxbeiF6WnuCwuHd9S0KhtFNis6pPqGr3iqa5h8Y
+	FftI09Yf+NXNYq4vUYMmEsl/KnUKQb9e5phgQDx4aN87b+TYNLm+YYAcKRlV9PRY2FnmnEo4IPKCG
+	U11BWJwbjklCU7oa2bUQzGA//PkFi34fG+9CwCcWLA2R8YKRUqDvJ+FysGh5QLSlK8wFvV1E/ujf2
+	5nO5uSL6UgdaGMmAwJLP2qACzMYMbu4gz1FqXSjh+Z79zSk3kVrDds1c3CEc1LoIWLJxmmmVJVU/y
+	EyzhHwfqBTE9bacvDFDQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfOjG-0003IX-K4; Fri, 04 Jan 2019 12:37:34 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfOjC-0003Hz-H9
- for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 12:37:32 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id BB64EEBD;
- Fri,  4 Jan 2019 04:37:25 -0800 (PST)
-Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id CBA4B3F5D4;
- Fri,  4 Jan 2019 04:37:24 -0800 (PST)
-Date: Fri, 4 Jan 2019 12:37:19 +0000
-From: Dave Martin <Dave.Martin@arm.com>
-To: Will Deacon <will.deacon@arm.com>
-Subject: Re: [PATCH 2/3] arm64: compat: Don't pull syscall number from regs
- in arm_compat_syscall
-Message-ID: <20190104123706.GA3571@e103592.cambridge.arm.com>
-References: <1546539240-20647-1-git-send-email-will.deacon@arm.com>
- <1546539240-20647-3-git-send-email-will.deacon@arm.com>
+	id 1gfOlw-00057N-GH; Fri, 04 Jan 2019 12:40:20 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gfOlt-00055m-6Y; Fri, 04 Jan 2019 12:40:18 +0000
+Received: from localhost (unknown [171.76.109.220])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 698EA21871;
+ Fri,  4 Jan 2019 12:40:13 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1546605614;
+ bh=hF2imHRmRVa4hohWZd0oeeeoZD7AkFa74s0AOUjVqHY=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=qVHBNgit3oF3Pp1nAd3FQe2IN3pMtMaQdv8osfozcqtJ47dqquyGEig8FYRw42dgz
+ 3d3lzosYYe7HrNJAaGo1G5Eli+69QPkoaFFn/58sd3Z9lj4hQssdWaPH9c8sYOclTq
+ yQR1BOl4Xs3Yl6OL400KR/hrx7HoGfsj1mry/YHw=
+Date: Fri, 4 Jan 2019 18:08:36 +0530
+From: Vinod Koul <vkoul@kernel.org>
+To: shun-chih.yu@mediatek.com
+Subject: Re: [PATCH 2/2] dmaengine: mediatek: Add MediaTek Command-Queue DMA
+ controller for MT6765 SoC
+Message-ID: <20190104123836.GB13372@vkoul-mobl.Dlink>
+References: <1545916258-18218-1-git-send-email-shun-chih.yu@mediatek.com>
+ <1545916258-18218-3-git-send-email-shun-chih.yu@mediatek.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1546539240-20647-3-git-send-email-will.deacon@arm.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+In-Reply-To: <1545916258-18218-3-git-send-email-shun-chih.yu@mediatek.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190104_043730_579880_7B949E0D 
-X-CRM114-Status: GOOD (  22.07  )
+X-CRM114-CacheID: sfid-20190104_044017_282668_9D5E5309 
+X-CRM114-Status: GOOD (  20.13  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,113 +75,225 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: pihsun@chromium.org, stable@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: devicetree@vger.kernel.org, Sean Wang <sean.wang@mediatek.com>,
+ linux-kernel@vger.kernel.org, srv_wsdupstream@mediatek.com,
+ dmaengine@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
+ linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
+ Dan Williams <dan.j.williams@intel.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 03, 2019 at 06:13:59PM +0000, Will Deacon wrote:
-> The syscall number may have been changed by a tracer, so we should pass
-> the actual number in from the caller instead of pulling it from the
-> saved r7 value directly.
+On 27-12-18, 21:10, shun-chih.yu@mediatek.com wrote:
+> From: Shun-Chih Yu <shun-chih.yu@mediatek.com>
+> 
 
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+This should be v4 of the patch series, why is it not tagged so?
 
-I was confused by the history here: commit 4141c857fd09 ("arm64: convert
-raw syscall invocation to C") breaks syscall changing via
-discarding the return from syscall_trace_enter() (which would also break
-this case for compat), but the subsequent patch that migrates the
-syscall code to C appears to fix it again.
+> MediaTek Command-Queue DMA controller (CQDMA) on MT6765 SoC is dedicated
+> to memory-to-memory transfer through queue based descriptor management.
 
+Have you tested this with dmatest, if so can you provide results of the
+test as well.
+
+> There are only 3 physical channels inside CQDMA, while the driver is
+> extended to support 32 virtual channels for multiple dma users to issue
+> dma requests onto the CQDMA simultaneously.
 > 
-> Cc: <stable@vger.kernel.org>
-> Cc: Dave Martin <Dave.Martin@arm.com>
-> Cc: Pi-Hsun Shih <pihsun@chromium.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/kernel/sys_compat.c | 9 ++++-----
->  arch/arm64/kernel/syscall.c    | 9 ++++-----
->  2 files changed, 8 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/sys_compat.c b/arch/arm64/kernel/sys_compat.c
-> index 5972b7533fa0..54c29cd38ff9 100644
-> --- a/arch/arm64/kernel/sys_compat.c
-> +++ b/arch/arm64/kernel/sys_compat.c
-> @@ -66,12 +66,11 @@ do_compat_cache_op(unsigned long start, unsigned long end, int flags)
->  /*
->   * Handle all unrecognised system calls.
->   */
-> -long compat_arm_syscall(struct pt_regs *regs)
-> +long compat_arm_syscall(struct pt_regs *regs, int scno)
->  {
-> -	unsigned int no = regs->regs[7];
->  	void __user *addr;
->  
-> -	switch (no) {
-> +	switch (scno) {
->  	/*
->  	 * Flush a region from virtual address 'r0' to virtual address 'r1'
->  	 * _exclusive_.  There is no alignment requirement on either address;
-> @@ -107,7 +106,7 @@ long compat_arm_syscall(struct pt_regs *regs)
->  		 * way the calling program can gracefully determine whether
->  		 * a feature is supported.
->  		 */
-> -		if (no < __ARM_NR_compat_syscall_end)
-> +		if (scno < __ARM_NR_compat_syscall_end)
->  			return -ENOSYS;
->  		break;
->  	}
-> @@ -116,6 +115,6 @@ long compat_arm_syscall(struct pt_regs *regs)
->  		(compat_thumb_mode(regs) ? 2 : 4);
->  
->  	arm64_notify_die("Oops - bad compat syscall(2)", regs,
-> -			 SIGILL, ILL_ILLTRP, addr, no);
-> +			 SIGILL, ILL_ILLTRP, addr, scno);
->  	return 0;
->  }
-> diff --git a/arch/arm64/kernel/syscall.c b/arch/arm64/kernel/syscall.c
-> index 032d22312881..5610ac01c1ec 100644
-> --- a/arch/arm64/kernel/syscall.c
-> +++ b/arch/arm64/kernel/syscall.c
-> @@ -13,16 +13,15 @@
->  #include <asm/thread_info.h>
->  #include <asm/unistd.h>
->  
-> -long compat_arm_syscall(struct pt_regs *regs);
-> -
-> +long compat_arm_syscall(struct pt_regs *regs, int scno);
->  long sys_ni_syscall(void);
->  
-> -asmlinkage long do_ni_syscall(struct pt_regs *regs)
-> +static long do_ni_syscall(struct pt_regs *regs, int scno)
->  {
->  #ifdef CONFIG_COMPAT
->  	long ret;
->  	if (is_compat_task()) {
-> -		ret = compat_arm_syscall(regs);
-> +		ret = compat_arm_syscall(regs, scno);
->  		if (ret != -ENOSYS)
->  			return ret;
->  	}
-> @@ -47,7 +46,7 @@ static void invoke_syscall(struct pt_regs *regs, unsigned int scno,
->  		syscall_fn = syscall_table[array_index_nospec(scno, sc_nr)];
->  		ret = __invoke_syscall(regs, syscall_fn);
->  	} else {
-> -		ret = do_ni_syscall(regs);
-> +		ret = do_ni_syscall(regs, scno);
->  	}
->  
->  	regs->regs[0] = ret;
-> -- 
-> 2.1.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel@lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Change-Id: I1e8d116c5ecbbc49190ffc925cb59a0d035d886b
+
+Please remove this from upstream, checkpatch would have warned that!
+
+> Signed-off-by: Shun-Chih Yu <shun-chih.yu@mediatek.com>
+> Reviewed-by: Vinod Koul <vkoul@kernel.org>
+
+This is _WRONG_ I have never provided such tag, can you explain why this
+was added without my approval?
+
+>  	  This controller provides the channels which is dedicated to
+>  	  memory-to-memory transfer to offload from CPU through ring-
+>  	  based descriptor management.
+> +
+> +config MTK_CQDMA
+> +	tristate "MediaTek Command-Queue DMA controller support"
+
+Am not sure if I asked this earlier but, what is difference with HSDMA?
+
+> +/**
+> + * struct mtk_cqdma_pchan - The struct holding info describing physical
+> + *                         channel (PC)
+> + * @queue:                 Queue for the CVDs issued to this PC
+> + * @base:                  The mapped register I/O base of this PC
+> + * @irq:                   The IRQ that this PC are using
+> + * @refcnt:                Track how many VCs are using this PC
+> + * @lock:                 Lock protect agaisting multiple VCs access PC
+
+Please maintain alignment!
+
+> + */
+> +struct mtk_cqdma_pchan {
+> +	struct list_head queue;
+> +	void __iomem *base;
+> +	u32 irq;
+> +	refcount_t refcnt;
+> +
+> +	/* lock to protect PC */
+
+This is not required, you already have above !
+
+> +	spinlock_t lock;
+> +};
+> +
+> +/**
+> + * struct mtk_cqdma_vchan - The struct holding info describing virtual
+> + *                         channel (VC)
+> + * @vc:                    An instance for struct virt_dma_chan
+> + * @pc:                    The pointer to the underlying PC
+> + * @issue_completion:	   The wait for all issued descriptors completited
+
+typo completited , am not sure why you need this
+
+> +static void mtk_dma_write(struct mtk_cqdma_pchan *pc, u32 reg, u32 val)
+> +{
+> +	writel_relaxed(val, pc->base + reg);
+
+Why is it relaxed one?
+
+> +static void mtk_cqdma_consume_work_queue(struct mtk_cqdma_pchan *pc)
+> +{
+> +	struct mtk_cqdma_vchan *cvc;
+> +	struct mtk_cqdma_vdesc *cvd;
+> +	size_t tlen;
+> +
+> +	/* consume a CVD from PC's queue */
+> +	cvd = list_first_entry_or_null(&pc->queue,
+> +				       struct mtk_cqdma_vdesc, node);
+
+you can use vchan_next_desc() and also remove your own queue as
+virt-desc already implements that logic!
+
+> +	if (unlikely(!cvd))
+> +		return;
+> +
+> +	cvc = to_cqdma_vchan(cvd->ch);
+> +
+> +	tlen = (cvd->len < MTK_CQDMA_MAX_LEN) ? cvd->len : MTK_CQDMA_MAX_LEN;
+> +	cvd->len -= tlen;
+> +	cvd->src += tlen;
+> +	cvd->dest += tlen;
+> +
+> +	/* check whether the CVD completed */
+> +	if (!cvd->len) {
+> +		/* delete CVD from PC's queue */
+> +		list_del(&cvd->node);
+> +
+> +		spin_lock(&cvc->vc.lock);
+> +
+> +		/* add the VD into list desc_completed */
+> +		vchan_cookie_complete(&cvd->vd);
+> +
+> +		/* setup completion if this VC is under synchronization */
+> +		if (cvc->issue_synchronize && !mtk_cqdma_is_vchan_active(cvc)) {
+> +			complete(&cvc->issue_completion);
+> +			cvc->issue_synchronize = false;
+> +		}
+
+why do you need your own completion?
+
+> +
+> +		spin_unlock(&cvc->vc.lock);
+> +	}
+> +
+> +	/* iterate on the next CVD if the current CVD completed */
+> +	if (!cvd->len)
+> +		cvd = list_first_entry_or_null(&pc->queue,
+> +					       struct mtk_cqdma_vdesc, node);
+> +
+> +	/* start the next transaction */
+> +	if (cvd)
+> +		mtk_cqdma_start(pc, cvd);
+
+most of this logic looks reduandant to me. Virt-dma was designed to do
+exactly this, have N physical channels and share with M virt channels.
+Please reuse and remove code from this driver.
+
+> +static struct virt_dma_desc *mtk_cqdma_find_active_desc(struct dma_chan *c,
+> +							dma_cookie_t cookie)
+> +{
+> +	struct mtk_cqdma_vchan *cvc = to_cqdma_vchan(c);
+> +	struct virt_dma_desc *vd;
+> +	unsigned long flags;
+> +
+> +	spin_lock_irqsave(&cvc->pc->lock, flags);
+> +	list_for_each_entry(vd, &cvc->pc->queue, node)
+> +		if (vd->tx.cookie == cookie) {
+> +			spin_unlock_irqrestore(&cvc->pc->lock, flags);
+> +			return vd;
+> +		}
+> +	spin_unlock_irqrestore(&cvc->pc->lock, flags);
+> +
+> +	list_for_each_entry(vd, &cvc->vc.desc_issued, node)
+> +		if (vd->tx.cookie == cookie)
+> +			return vd;
+
+vchan_find_desc() ??
+
+> +static enum dma_status mtk_cqdma_tx_status(struct dma_chan *c,
+> +					   dma_cookie_t cookie,
+> +					   struct dma_tx_state *txstate)
+> +{
+> +	struct mtk_cqdma_vchan *cvc = to_cqdma_vchan(c);
+> +	struct mtk_cqdma_vdesc *cvd;
+> +	struct virt_dma_desc *vd;
+> +	enum dma_status ret;
+> +	unsigned long flags;
+> +	size_t bytes = 0;
+> +
+> +	ret = dma_cookie_status(c, cookie, txstate);
+> +	if (ret == DMA_COMPLETE || !txstate)
+> +		return ret;
+> +
+> +	spin_lock_irqsave(&cvc->vc.lock, flags);
+> +	vd = mtk_cqdma_find_active_desc(c, cookie);
+> +	spin_unlock_irqrestore(&cvc->vc.lock, flags);
+> +
+> +	if (vd) {
+> +		cvd = to_cqdma_vdesc(vd);
+> +		bytes = cvd->len;
+> +	}
+> +
+> +	dma_set_residue(txstate, bytes);
+
+Have you tested this and are able to report residue properly?
+
+> +static void mtk_cqdma_free_inactive_desc(struct dma_chan *c)
+> +{
+> +	struct virt_dma_chan *vc = to_virt_chan(c);
+> +	unsigned long flags;
+> +	LIST_HEAD(head);
+> +
+> +	/*
+> +	 * set desc_allocated, desc_submitted,
+> +	 * and desc_issued as the candicates to be freed
+> +	 */
+> +	spin_lock_irqsave(&vc->lock, flags);
+> +	list_splice_tail_init(&vc->desc_allocated, &head);
+> +	list_splice_tail_init(&vc->desc_submitted, &head);
+> +	list_splice_tail_init(&vc->desc_issued, &head);
+
+You missed completed and didnt use vchan_get_all_descriptors() ??
+
+
+Looking at the driver, I feel things have been complicated a bit, you
+can reuse more code and routines in vchan layer and remove driver
+handling and make things with less bugs (used more tested generic code)
+and simpler to review ..
+
+Please do so in next rev and tag version properly!
+
+-- 
+~Vinod
 
 _______________________________________________
 linux-arm-kernel mailing list
