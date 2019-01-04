@@ -2,22 +2,23 @@ Return-Path: <SRS0=E6Hv=PM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8BA88C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 14:15:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5D1BAC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 14:18:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5BFED208E3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 14:15:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2498D208E3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  4 Jan 2019 14:18:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="urhEUQlD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5BFED208E3
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="beyBY/14";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="cw1791Uk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2498D208E3
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,44 +26,49 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=EUxp3jXsTzlfx5akXwbNQTbwCigQrpLD4SYEYZhTkeQ=; b=urhEUQlDXjBAnM
-	7OJRVg4tzjN6MRM4inWAATFBu2e4d3Kza9UFrKmvaDUWlZnGoy09SjpjdCTakyK3mqtfSf3KeZnSc
-	jCR4ltSTZ4CJzHB+wChwtXZBWFvZc7cXeH21oh2E81qtvC2yXik81PHrHRQwUOZ49vVfFw+ZycmWl
-	/tqJRAU2M0BmgvRU9uY8RTU9g2s6TFSksBzpihvNYDpqchfk/oNY7fJrncblgbaglNpvD4HeHYobu
-	mS30c7c5Vi+/6WyjfbkoPOvIdrzfnGZS3rKX9/VaS57hJ7/5UpEVB8Si26okJhMFGEeNHkRmGGyWB
-	K5+cG0kMIlVaHkwgJTyQ==;
+	List-Owner; bh=ZxL03G+9oDI5A4SEsKSJB+lVv8MFkWJb0ga4b7Y03Us=; b=beyBY/14OxuI4g
+	KahnoqO/XdvPhNF+jSsZj3QuwUXqjwcDBkYgkBZolXGg5t+HbJbylVAoAuht1U1FkDq2HYefvLyMm
+	PTaivEojPzPCnkkFbUdQrk9cL1OUKlizJsj0tL9gGmyT3rZsA9cK/NKJkjwu1ck9IPa1z84a8+e3z
+	Dr+CkQJDdu07t8yxIxdzgla+r7+1WRcNXGxmtEoH64TbhXGIIhAgNwNrLWQF7DKEeFIlSel9YXOQ4
+	7J2JG5QY9ALB3UbJFbidXFfjJh+tbU/dGyhjryIHb8Ixiix1Tfkd2qoIazVJFvH5PodIl/wzijQtF
+	gqsXMAHPLbKchGBjPYXw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfQFi-0000Tr-EE; Fri, 04 Jan 2019 14:15:10 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfQFf-0008Qy-Ik
- for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 14:15:09 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C5CBBEBD;
- Fri,  4 Jan 2019 06:15:06 -0800 (PST)
-Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id D5D123F575;
- Fri,  4 Jan 2019 06:15:05 -0800 (PST)
-Date: Fri, 4 Jan 2019 14:15:03 +0000
-From: Dave Martin <Dave.Martin@arm.com>
-To: Will Deacon <will.deacon@arm.com>
-Subject: Re: [PATCH 1/3] arm64: compat: Avoid sending SIGILL for unallocated
- syscall numbers
-Message-ID: <20190104141503.GD3571@e103592.cambridge.arm.com>
-References: <1546539240-20647-1-git-send-email-will.deacon@arm.com>
- <1546539240-20647-2-git-send-email-will.deacon@arm.com>
- <20190104125425.GB3571@e103592.cambridge.arm.com>
- <20190104134749.GA28158@edgewater-inn.cambridge.arm.com>
+	id 1gfQIe-0000rm-I8; Fri, 04 Jan 2019 14:18:12 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gfQIb-0000rH-83
+ for linux-arm-kernel@lists.infradead.org; Fri, 04 Jan 2019 14:18:10 +0000
+Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 9751B208E3;
+ Fri,  4 Jan 2019 14:18:07 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1546611488;
+ bh=lvh/revn/Ntxo2/w0uYzO0T0Wis5FHhyYbshoEFusdA=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=cw1791UkRLdC77XIzT6wQ2JVvIaXhrvUyiwU9L/9hx37uh2B7kXX1YvTF+/CHAsl+
+ TGKnu8tUJomrgNk1hNtAm9TQrvhTzr05iqf5dwyoRlqcs670BcIFHbt7btVFajlI0x
+ OmAo+sGYGGpKBuB6RSYrGQ2iZ2ET2DiGzqW2yFko=
+Date: Fri, 4 Jan 2019 15:18:05 +0100
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+To: Dave Martin <Dave.Martin@arm.com>
+Subject: Re: [PATCH v2 1/7] sysfs/cpu: Add "Unknown" vulnerability state
+Message-ID: <20190104141805.GA15939@kroah.com>
+References: <20190103004921.1928921-1-jeremy.linton@arm.com>
+ <20190103004921.1928921-2-jeremy.linton@arm.com>
+ <20190103093858.GA10794@kroah.com>
+ <c9e08010-3ca0-cb03-e5ad-ab19342ff63b@arm.com>
+ <20190103164831.GF14994@kroah.com>
+ <20190104140832.GC3571@e103592.cambridge.arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190104134749.GA28158@edgewater-inn.cambridge.arm.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+In-Reply-To: <20190104140832.GC3571@e103592.cambridge.arm.com>
+User-Agent: Mutt/1.11.1 (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190104_061507_639863_E175BAFE 
-X-CRM114-Status: GOOD (  31.53  )
+X-CRM114-CacheID: sfid-20190104_061809_319626_4BA66590 
+X-CRM114-Status: GOOD (  28.27  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,108 +80,92 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org, stable@vger.kernel.org,
- pihsun@chromium.org
+Cc: mark.rutland@arm.com, julien.thierry@arm.com, mlangsdo@redhat.com,
+ Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>, marc.zyngier@arm.com,
+ catalin.marinas@arm.com, "Rafael J . Wysocki" <rafael.j.wysocki@intel.com>,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ Jeremy Linton <jeremy.linton@arm.com>, steven.price@arm.com,
+ Dave Hansen <dave.hansen@intel.com>, Peter Zijlstra <peterz@infradead.org>,
+ Borislav Petkov <bp@alien8.de>, shankerd@codeaurora.org, ykaukab@suse.de,
+ Thomas Gleixner <tglx@linutronix.de>, suzuki.poulose@arm.com,
+ David Woodhouse <dwmw@amazon.co.uk>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 04, 2019 at 01:47:49PM +0000, Will Deacon wrote:
-> On Fri, Jan 04, 2019 at 12:54:26PM +0000, Dave Martin wrote:
-> > On Thu, Jan 03, 2019 at 06:13:58PM +0000, Will Deacon wrote:
-> > > The ARM Linux kernel handles the EABI syscall numbers as follows:
+On Fri, Jan 04, 2019 at 02:08:32PM +0000, Dave Martin wrote:
+> On Thu, Jan 03, 2019 at 05:48:31PM +0100, Greg Kroah-Hartman wrote:
+> > On Thu, Jan 03, 2019 at 10:38:16AM -0600, Jeremy Linton wrote:
+> > > On 01/03/2019 03:38 AM, Greg Kroah-Hartman wrote:
+> > > > On Wed, Jan 02, 2019 at 06:49:15PM -0600, Jeremy Linton wrote:
+> > > > > There is a lot of variation in the Arm ecosystem. Because of this,
+> > > > > there exist possible cases where the kernel cannot authoritatively
+> > > > > determine if a machine is vulnerable.
+> > > > 
+> > > > Really?  Why not?  What keeps you from "knowing" this?  Can't the
+> > > > developer of the chip tell you?
 > > > 
-> > >   0           - NR_SYSCALLS-1	: Invoke syscall via syscall table
-> > >   NR_SYSCALLS - 0xeffff		: -ENOSYS (to be allocated in future)
-> > >   0xf0000     - 0xf07ff		: Private syscall or -ENOSYS if not allocated
-> > >   > 0xf07ff			: SIGILL
-> > > 
-> > > Our compat code gets this wrong and ends up sending SIGILL in response
-> > > to all syscalls greater than NR_SYSCALLS which have a value greater
-> > > than 0x7ff in the bottom 16 bits.
-> > > 
-> > > Fix this by defining the end of the ARM private syscall region and
-> > > checking the syscall number against that directly. Update the comment
-> > > while we're at it.
-> > > 
-> > > Cc: <stable@vger.kernel.org>
-> > > Cc: Dave Martin <Dave.Martin@arm.com>
-> > > Reported-by: Pi-Hsun Shih <pihsun@chromium.org>
-> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > > ---
-> > >  arch/arm64/include/asm/unistd.h | 5 +++--
-> > >  arch/arm64/kernel/sys_compat.c  | 4 ++--
-> > >  2 files changed, 5 insertions(+), 4 deletions(-)
-> > > 
-> > > diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
-> > > index b13ca091f833..be66a54ee3a1 100644
-> > > --- a/arch/arm64/include/asm/unistd.h
-> > > +++ b/arch/arm64/include/asm/unistd.h
-> > > @@ -40,8 +40,9 @@
-> > >   * The following SVCs are ARM private.
-> > >   */
-> > >  #define __ARM_NR_COMPAT_BASE		0x0f0000
-> > > -#define __ARM_NR_compat_cacheflush	(__ARM_NR_COMPAT_BASE+2)
-> > > -#define __ARM_NR_compat_set_tls		(__ARM_NR_COMPAT_BASE+5)
-> > > +#define __ARM_NR_compat_cacheflush	(__ARM_NR_COMPAT_BASE + 2)
-> > > +#define __ARM_NR_compat_set_tls		(__ARM_NR_COMPAT_BASE + 5)
-> > > +#define __ARM_NR_compat_syscall_end	(__ARM_NR_COMPAT_BASE + 0x800)
+> > > There tends to be a few cases, possibly incomplete white/black lists,
 > > 
-> > Nit: there is no compat_syscall_end().  Can we make this #define upper
-> > case, like __ARM_NR_COMPAT_BASE, since a symbolic bound, not a syscall
-> > number?
-> 
-> That's fair; I'll rename it to __ARM_NR_COMPAT_END.
-
-Thanks
-
-> 
-> > >  #define __NR_compat_syscalls		399
-> > >  #endif
-> > > diff --git a/arch/arm64/kernel/sys_compat.c b/arch/arm64/kernel/sys_compat.c
-> > > index 32653d156747..5972b7533fa0 100644
-> > > --- a/arch/arm64/kernel/sys_compat.c
-> > > +++ b/arch/arm64/kernel/sys_compat.c
-> > > @@ -102,12 +102,12 @@ long compat_arm_syscall(struct pt_regs *regs)
-> > >  
-> > >  	default:
-> > >  		/*
-> > > -		 * Calls 9f00xx..9f07ff are defined to return -ENOSYS
-> > > +		 * Calls 0xf0xxx..0xf07ff are defined to return -ENOSYS
-> > >  		 * if not implemented, rather than raising SIGILL. This
-> > >  		 * way the calling program can gracefully determine whether
-> > >  		 * a feature is supported.
-> > >  		 */
-> > > -		if ((no & 0xffff) <= 0x7ff)
-> > > +		if (no < __ARM_NR_compat_syscall_end)
+> > Then fix the lists :)
 > > 
-> > arm_syscall() in arch/arm is not responsible for handling syscalls less
-> > __ARM_NR_BASE; the code in entry-common.S redirects those directly to
-> > sys_ni_syscall() instead.
+> > > firmware that isn't responding correctly, or the user didn't build in the
+> > > code to check the mitigation (possibly because its an embedded system and
+> > > they know its not vulnerable?).
 > > 
-> > Given how fiddly this is I think it's preferable if we keep to the
-> > arch/arm code structure as much as possible, and call this function only
-> > when no >= __ARM_NR_COMPAT_BASE?
+> > If the firmware doesn't respond, that would imply it is vulnerable :)
+> > 
+> > And if the code isn't built in, again, it's vulnerable.
+> > 
+> > > I would hope that it is an exceptional case.
+> > 
+> > Then have the default be vulnerable, don't give people false hope.
+> > 
+> > > > > Rather than guess the vulnerability status in cases where
+> > > > > the mitigation is disabled or the firmware isn't responding
+> > > > > correctly, we need to display an "Unknown" state.
+> > > > 
+> > > > Shouldn't "Unknown" really be the same thing as "Vulnerable"?  A user
+> > > > should treat it the same way, "Unknown" makes it feel like "maybe I can
+> > > > just ignore this and hope I really am safe", which is not a good idea at
+> > > > all.
+> > > 
+> > > I tend to agree its not clear what to do with "unknown".
+> > > 
+> > > OTOH, I think there is a hesitation to declare something vulnerable when it
+> > > isn't. Meltdown for example, is fairly rare given that it currently only
+> > > affects a few arm parts, so declaring someone vulnerable when they likely
+> > > aren't is going to be just as difficult to explain.
+> > 
+> > If you know it is rare, then you know how to properly detect it so
+> > "unknown" is not needed, correct?
+> > 
+> > Again, "unknown" is not going to help anyone out here, please don't do
+> > it.
 > 
-> I don't think we should be using the arm code structure as a template here.
-> Although we're providing the same interface, we don't have to worry about
-> things like OABI or ARM vs THUMB entry code. We're also in the process of
-> moving more of this out of assembly and into C, so I'd rather keep the
-> compat code as self-contained as possible.
+> Thinking about it, "unknown" is actually the common case.
 > 
-> Even if we did modify the caller so that we only call compat_arm_syscall()
-> for numbers >= __ARM_NR_COMPAT_BASE, we'd still need the check above to
-> handle numbers >= __ARM_NR_COMPAT_END, so I don't think we gain anything.
+> Kernels that predate the sysfs vulnerabilities interface effectively
+> report this for all vulnerabilities by omitting the sysfs entries
+> entirely.
+> 
+> Current kernels also don't know anything about future vulnerabilities
+> that may be added in sysfs later on (but which may nevertheless be
+> discovered subsequently to affect current hardware).
+> 
+> So, can we simply omit the sysfs entries for which we can't provide a
+> good answer?
 
-Well, I can live with it either way.
+As you say, we already do this for older systems.
 
-Cross-referencing the arm64 and arm trees for this functionality is
-challenging, and will tend to get harder as the code diverges...  but
-hopefully it's gone about as far as it's going to go by this point.
+But don't add new logic to explicitly not create the files just because
+we "can not figure it out".  For those systems, I would default to
+"vulnerable" as I think that's what we do today, right?
 
-Cheers
----Dave
+thanks,
+g
+reg k-h
 
 _______________________________________________
 linux-arm-kernel mailing list
