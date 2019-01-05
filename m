@@ -2,86 +2,92 @@ Return-Path: <SRS0=qjmB=PN=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A9104C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  5 Jan 2019 07:30:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9CB38C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  5 Jan 2019 07:36:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6FA5E208E3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  5 Jan 2019 07:30:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 640AF208E3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  5 Jan 2019 07:36:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JdKPdqwy";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="VHuOaFBs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6FA5E208E3
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A1rQhAsv";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="E9xpN1lY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 640AF208E3
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=peMd1KJdQmn+sMX4duoZ4Qk5oPdf/Thnh92I6vcLR7k=; b=JdKPdqwyR4DD+YtA0TL92lS2in
-	zvdFyR3eoSYHYZ1bweTZh29cyyrSHvcGdCqE7ti18tHhuy0SYcxv4ysxFByG/PlLN5lQ4K6/Q39oB
-	N7Y9yY7xn9SMpMUDve7Mgy+c4l780c1qYBRtnc08vIUwHhX7HW6uwRqqw7nIIMBBvBJ6FtEAS9vwF
-	LBQ4wKVOV8h9yIWg1sCrQZ3l+8+5lHdAtdR6KSjIvY3NhTu3zbqsGdxwKuD3yDEIsahSRts51SEFZ
-	RzGMVjpwXlEP9vNL8wTTD6gWYLwNVfKRrlOTlTh+V1Y4DUftgBYvokJaKa05KWvi8t3ENim0mQ0cB
-	ivb2pUEQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=WkpQ4HT4wOFNll/EDp+l6HwUgFGnAjKesCqkFDESDAE=; b=A1rQhAsv764iZJwLLin0OhKtP
+	FkBrlCd+RSf05XMdigRU+rNL3PB14NOLLY2RUlUg5owIq+Stj/TzoIfedgEF8L5PcrGN/J/OMA4h9
+	Y/pz1DvngGHZNxGEbZhS1DH7k9lNCzioLiSqDVcGsVZfRtL5KO5L/yzRZNb0u9fFjqHQLhfqZxqn2
+	OSE5fcTJNcWYdSw5xfBT61l5SRxkeKDaScECR35JDDrxR9N/1/SeBxFJpEt6B2PhSWdtNqv5eTRo3
+	V2HKaoq5qNVhlFLENqMZZRgDeNJthIP7YlufWCoQqAycLw6ePfWjRh51EmROSFnahICOk59DTiKUn
+	klt/Ph+8g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfgPR-0006MJ-GV; Sat, 05 Jan 2019 07:30:17 +0000
-Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
+	id 1gfgVg-0000Zj-T9; Sat, 05 Jan 2019 07:36:44 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfgOo-00053P-5u
- for linux-arm-kernel@lists.infradead.org; Sat, 05 Jan 2019 07:29:49 +0000
-Received: by mail-pl1-x643.google.com with SMTP id 101so18437376pld.6
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 04 Jan 2019 23:29:37 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=jxq8DubluUc6WyBU2XbyE9/uiwXvqfVs8mJ2HYI7f2c=;
- b=VHuOaFBs6m56MPsVgJoQH34fibOL3Zi3mGtkpVTbS17Pa8mkMUWi5egWWl+72Mu+xp
- pWR3cg3Z2rW4LrmMxHwlf4onnNEvIFpnQXoMIj9M2muqHGEaEUf+hPR10vcXxwXf7MIy
- WIaCk3bd2zbje3P1ytAw1MHxgtUsqkyaBIrD8=
+ id 1gfgVc-0000ZF-9P; Sat, 05 Jan 2019 07:36:42 +0000
+Received: by mail-wr1-x443.google.com with SMTP id p4so38424119wrt.7;
+ Fri, 04 Jan 2019 23:36:39 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=sender:subject:to:cc:references:from:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=3zIzCd9FLMIPQDxVpJpe04QlX8YVQiLj5UEU4B+o1K8=;
+ b=E9xpN1lYnKPO5j6HZ4eyt0Fn2bqXfe4/rJ5fpqvp4NFh+6rEkZq3s3+Uf08HOztiKs
+ sH8jPMr5+nFRweftd+iMIusFfIjnpuyE+lXAkyT7+nzCBirmX5IA5XapTN9sZS7oSIWX
+ +seuolWjEaoCYwwltxrprM/ydVEVdneCLuq6dW2DlnwYYczCZjtimHxy5B2o+mSxCyh5
+ rSPV4tYhh59t3SI1eM1UWZDJdvA4Ivze4xy9JZ9TIRLb0+JEVVVNsZEtrQFW0Z3yKGix
+ rRjd0epkS4TdsoDuGECqwPZr9uUjmUTE24SVeSnjRUAB2yprGni+LgAIJvnm+HUfG0Im
+ rCcQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=jxq8DubluUc6WyBU2XbyE9/uiwXvqfVs8mJ2HYI7f2c=;
- b=plwZxK+ySV/HGXaeZ/XvQiaGSM1m+ii9WKAQ8R5vKdliQvmmUPlbdYyQerNUJVXvdp
- vwD4uRmSZ9I3KlomJj0bzibZgwDHzq/vFrqvtap0IN/C58qQuPuCX3IDuV93m/bBV0jE
- 9p8G9yjpf0iyIXSUlrkDfXEqV3MYpupJ6SCbimCD6gGcDcHAJEONu4Eq64kwezz01eKl
- IUHVvhsjUoH5LJ1nXij/HDXAqQEqWqpHRSLVAoRQBQ0jxL6njyg1Wa5hEdbng/8YQUwc
- KKWAI5g7k5n9roUyy6+Z/2N5ybnP913kT+6wjGJIEPFlhJ6j66I33NXYBrt8FJXQTZJh
- yaGA==
-X-Gm-Message-State: AJcUukdy3LSJqLbnmPQPcHbcKIsBwgAIJHBdUYVqoNTFzeA5JIQMT3UX
- /8SuahP5/RHKtFOBJcnbACYM
-X-Google-Smtp-Source: ALg8bN730/Kx7GMd6qrv8SI3exT0EqpbGMIc8Byq2ZtoR7ezU9tNjR+f9shWEDBiQumRMNDA80+Abw==
-X-Received: by 2002:a17:902:2868:: with SMTP id
- e95mr53921755plb.317.1546673377136; 
- Fri, 04 Jan 2019 23:29:37 -0800 (PST)
-Received: from localhost.localdomain ([2405:204:72cb:a88d:406c:3ac8:e78f:4779])
- by smtp.gmail.com with ESMTPSA id k24sm90677367pfj.13.2019.01.04.23.29.30
+ h=x-gm-message-state:sender:subject:to:cc:references:from:message-id
+ :date:user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=3zIzCd9FLMIPQDxVpJpe04QlX8YVQiLj5UEU4B+o1K8=;
+ b=QFTGxHoA/KP6F7FPhGR2BsjWYVCCM7AWv3SqH1QR+uT9QfY5XneXQ3Y2Wnfke/aQCI
+ CbnuGanCBoN7jBC2qq01L3UfWuRqeMobMn77FoONgikyTbEU2SNDwrUBkA6R7G76hua0
+ b2SLVb4eKAeTJgny/I45Ybt2bNvSX72fRq3NTEYtJ0LRwmEyeqUyoh6XT2kwW8rrTkwh
+ pFWcatA9VpcttMZGIN7xkZCD49QrhKMUVUczYMs2WZwDy3wZE24IqfIOCDhthMMUablb
+ 9pNgz3gfXUn0E91rdg0YQImWkwQfzR4bRNT0dCu4tIWWBHt+qyGaFiXnMNi08PgQz03d
+ wu+Q==
+X-Gm-Message-State: AJcUukddbMwOCDFK/aUcNrodNb3IyyPqAXIMlccFfYglXQHPFY5e8P7Q
+ L0fvSpUeRSHUQZ+mH8Qd0+xfWcivLy2xCd4g
+X-Google-Smtp-Source: ALg8bN5ghhSisNrdrmlvHCvf7653eV43E3e4kvsLv3x4yOKvb5W7w83NdPP4UQMOinzh/OOqztnmGg==
+X-Received: by 2002:adf:cc91:: with SMTP id p17mr47511835wrj.118.1546673798087; 
+ Fri, 04 Jan 2019 23:36:38 -0800 (PST)
+Received: from [10.8.8.190] ([89.238.186.237])
+ by smtp.gmail.com with ESMTPSA id o5sm3784958wmg.25.2019.01.04.23.36.33
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 04 Jan 2019 23:29:36 -0800 (PST)
-From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-To: vinholikatti@gmail.com, jejb@linux.vnet.ibm.com,
- martin.petersen@oracle.com, liwei213@huawei.com, robh+dt@kernel.org
-Subject: [PATCH v2 3/3] scsi: ufs: Add HI3670 SoC UFS driver support
-Date: Sat,  5 Jan 2019 12:58:59 +0530
-Message-Id: <20190105072859.9134-4-manivannan.sadhasivam@linaro.org>
-X-Mailer: git-send-email 2.17.1
-In-Reply-To: <20190105072859.9134-1-manivannan.sadhasivam@linaro.org>
-References: <20190105072859.9134-1-manivannan.sadhasivam@linaro.org>
+ Fri, 04 Jan 2019 23:36:37 -0800 (PST)
+Subject: Re: [PATCH RFC lora-next 1/4] net: lora: sx125x sx1301: correct style
+ warnings
+To: =?UTF-8?Q?Andreas_F=c3=a4rber?= <afaerber@suse.de>
+References: <20181219155616.9547-1-ben.whitten@lairdtech.com>
+ <20181219155616.9547-2-ben.whitten@lairdtech.com>
+ <62a3e030-98eb-3e63-d193-092b319bd4b1@suse.de>
+From: Ben Whitten <ben.whitten@gmail.com>
+Message-ID: <60a4e44a-fc63-4434-0986-1d63111623d1@gmail.com>
+Date: Sat, 5 Jan 2019 16:36:28 +0900
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
+MIME-Version: 1.0
+In-Reply-To: <62a3e030-98eb-3e63-d193-092b319bd4b1@suse.de>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190104_232939_048913_115262C7 
-X-CRM114-Status: GOOD (  18.30  )
+X-CRM114-CacheID: sfid-20190104_233640_362983_7EB127A9 
+X-CRM114-Status: GOOD (  16.94  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,274 +99,44 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, guodong.xu@linaro.org,
- linux-scsi@vger.kernel.org, linux-kernel@vger.kernel.org,
- amit.kucheria@linaro.org, john.stultz@linaro.org,
- Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
- linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: jiri@resnulli.us, Ben Whitten <ben.whitten@lairdtech.com>,
+ netdev@vger.kernel.org, linux-lpwan@lists.infradead.org,
+ linux-kernel@vger.kernel.org, starnight@g.ncu.edu.tw,
+ "David S. Miller" <davem@davemloft.net>, linux-arm-kernel@lists.infradead.org
+Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="utf-8"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add HI3670 SoC UFS driver support by extending the common ufs-hisi
-driver. One major difference between HI3660 ad HI3670 SoCs interms of
-UFS is the PHY. HI3670 has a 10nm variant PHY and hence this parameter is
-used to distinguish the configuration.
-
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- drivers/scsi/ufs/ufs-hisi.c | 127 +++++++++++++++++++++++++++++-------
- drivers/scsi/ufs/ufs-hisi.h |   4 ++
- 2 files changed, 109 insertions(+), 22 deletions(-)
-
-diff --git a/drivers/scsi/ufs/ufs-hisi.c b/drivers/scsi/ufs/ufs-hisi.c
-index 452e19f8fb47..f2d3df357a97 100644
---- a/drivers/scsi/ufs/ufs-hisi.c
-+++ b/drivers/scsi/ufs/ufs-hisi.c
-@@ -66,7 +66,7 @@ static int ufs_hisi_check_hibern8(struct ufs_hba *hba)
- 	return err;
- }
- 
--static void ufs_hi3660_clk_init(struct ufs_hba *hba)
-+static void ufs_hisi_clk_init(struct ufs_hba *hba)
- {
- 	struct ufs_hisi_host *host = ufshcd_get_variant(hba);
- 
-@@ -80,7 +80,7 @@ static void ufs_hi3660_clk_init(struct ufs_hba *hba)
- 	ufs_sys_ctrl_set_bits(host, BIT_SYSCTRL_REF_CLOCK_EN, PHY_CLK_CTRL);
- }
- 
--static void ufs_hi3660_soc_init(struct ufs_hba *hba)
-+static void ufs_hisi_soc_init(struct ufs_hba *hba)
- {
- 	struct ufs_hisi_host *host = ufshcd_get_variant(hba);
- 	u32 reg;
-@@ -139,6 +139,7 @@ static void ufs_hi3660_soc_init(struct ufs_hba *hba)
- 
- static int ufs_hisi_link_startup_pre_change(struct ufs_hba *hba)
- {
-+	struct ufs_hisi_host *host = ufshcd_get_variant(hba);
- 	int err;
- 	uint32_t value;
- 	uint32_t reg;
-@@ -153,6 +154,14 @@ static int ufs_hisi_link_startup_pre_change(struct ufs_hba *hba)
- 	ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x8121, 0x0), 0x2D);
- 	/* MPHY CBOVRCTRL3 */
- 	ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x8122, 0x0), 0x1);
-+
-+	if (host->caps & UFS_HISI_CAP_PHY10nm) {
-+		/* MPHY CBOVRCTRL4 */
-+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x8127, 0x0), 0x98);
-+		/* MPHY CBOVRCTRL5 */
-+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x8128, 0x0), 0x1);
-+	}
-+
- 	/* Unipro VS_MphyCfgUpdt */
- 	ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0xD085, 0x0), 0x1);
- 	/* MPHY RXOVRCTRL4 rx0 */
-@@ -173,10 +182,21 @@ static int ufs_hisi_link_startup_pre_change(struct ufs_hba *hba)
- 	ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x8113, 0x0), 0x1);
- 	ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0xD085, 0x0), 0x1);
- 
--	/* Tactive RX */
--	ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x008F, 0x4), 0x7);
--	/* Tactive RX */
--	ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x008F, 0x5), 0x7);
-+	if (host->caps & UFS_HISI_CAP_PHY10nm) {
-+		/* RX_Hibern8Time_Capability*/
-+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x0092, 0x4), 0xA);
-+		/* RX_Hibern8Time_Capability*/
-+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x0092, 0x5), 0xA);
-+		/* RX_Min_ActivateTime */
-+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x008f, 0x4), 0xA);
-+		/* RX_Min_ActivateTime*/
-+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x008f, 0x5), 0xA);
-+	} else {
-+		/* Tactive RX */
-+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x008F, 0x4), 0x7);
-+		/* Tactive RX */
-+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x008F, 0x5), 0x7);
-+	}
- 
- 	/* Gear3 Synclength */
- 	ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0x0095, 0x4), 0x4F);
-@@ -208,7 +228,8 @@ static int ufs_hisi_link_startup_pre_change(struct ufs_hba *hba)
- 	if (err)
- 		dev_err(hba->dev, "ufs_hisi_check_hibern8 error\n");
- 
--	ufshcd_writel(hba, UFS_HCLKDIV_NORMAL_VALUE, UFS_REG_HCLKDIV);
-+	if (!(host->caps & UFS_HISI_CAP_PHY10nm))
-+		ufshcd_writel(hba, UFS_HCLKDIV_NORMAL_VALUE, UFS_REG_HCLKDIV);
- 
- 	/* disable auto H8 */
- 	reg = ufshcd_readl(hba, REG_AUTO_HIBERNATE_IDLE_TIMER);
-@@ -253,7 +274,7 @@ static int ufs_hisi_link_startup_post_change(struct ufs_hba *hba)
- 	return 0;
- }
- 
--static int ufs_hi3660_link_startup_notify(struct ufs_hba *hba,
-+static int ufs_hisi_link_startup_notify(struct ufs_hba *hba,
- 					  enum ufs_notify_change_status status)
- {
- 	int err = 0;
-@@ -391,6 +412,28 @@ static void ufs_hisi_set_dev_cap(struct ufs_hisi_dev_params *hisi_param)
- 
- static void ufs_hisi_pwr_change_pre_change(struct ufs_hba *hba)
- {
-+	struct ufs_hisi_host *host = ufshcd_get_variant(hba);
-+
-+	if (host->caps & UFS_HISI_CAP_PHY10nm) {
-+		/*
-+		 * Boston platform need to set SaveConfigTime to 0x13,
-+		 * and change sync length to maximum value
-+		 */
-+		/* VS_DebugSaveConfigTime */
-+		ufshcd_dme_set(hba, UIC_ARG_MIB((u32)0xD0A0), 0x13);
-+		/* g1 sync length */
-+		ufshcd_dme_set(hba, UIC_ARG_MIB((u32)0x1552), 0x4f);
-+		/* g2 sync length */
-+		ufshcd_dme_set(hba, UIC_ARG_MIB((u32)0x1554), 0x4f);
-+		/* g3 sync length */
-+		ufshcd_dme_set(hba, UIC_ARG_MIB((u32)0x1556), 0x4f);
-+		/* PA_Hibern8Time */
-+		ufshcd_dme_set(hba, UIC_ARG_MIB((u32)0x15a7), 0xA);
-+		/* PA_Tactivate */
-+		ufshcd_dme_set(hba, UIC_ARG_MIB((u32)0x15a8), 0xA);
-+		ufshcd_dme_set(hba, UIC_ARG_MIB_SEL(0xd085, 0x0), 0x01);
-+	}
-+
- 	if (hba->dev_quirks & UFS_DEVICE_QUIRK_HOST_VS_DEBUGSAVECONFIGTIME) {
- 		pr_info("ufs flash device must set VS_DebugSaveConfigTime 0x10\n");
- 		/* VS_DebugSaveConfigTime */
-@@ -429,7 +472,7 @@ static void ufs_hisi_pwr_change_pre_change(struct ufs_hba *hba)
- 	ufshcd_dme_set(hba, UIC_ARG_MIB(0xd046), 32767);
- }
- 
--static int ufs_hi3660_pwr_change_notify(struct ufs_hba *hba,
-+static int ufs_hisi_pwr_change_notify(struct ufs_hba *hba,
- 				       enum ufs_notify_change_status status,
- 				       struct ufs_pa_layer_attr *dev_max_params,
- 				       struct ufs_pa_layer_attr *dev_req_params)
-@@ -567,25 +610,72 @@ static int ufs_hi3660_init(struct ufs_hba *hba)
- 		return ret;
- 	}
- 
--	ufs_hi3660_clk_init(hba);
-+	ufs_hisi_clk_init(hba);
-+
-+	ufs_hisi_soc_init(hba);
-+
-+	return 0;
-+}
-+
-+static int ufs_hi3670_init(struct ufs_hba *hba)
-+{
-+	int ret = 0;
-+	struct device *dev = hba->dev;
-+	struct ufs_hisi_host *host;
-+
-+	ret = ufs_hisi_init_common(hba);
-+	if (ret) {
-+		dev_err(dev, "%s: ufs common init fail\n", __func__);
-+		return ret;
-+	}
-+
-+	ufs_hisi_clk_init(hba);
-+
-+	ufs_hisi_soc_init(hba);
- 
--	ufs_hi3660_soc_init(hba);
-+	/* Add cap for 10nm PHY variant on HI3670 SoC */
-+	host = ufshcd_get_variant(hba);
-+	host->caps |= UFS_HISI_CAP_PHY10nm;
- 
- 	return 0;
- }
- 
--static struct ufs_hba_variant_ops ufs_hba_hisi_vops = {
-+static struct ufs_hba_variant_ops ufs_hba_hi3660_vops = {
- 	.name = "hi3660",
- 	.init = ufs_hi3660_init,
--	.link_startup_notify = ufs_hi3660_link_startup_notify,
--	.pwr_change_notify = ufs_hi3660_pwr_change_notify,
-+	.link_startup_notify = ufs_hisi_link_startup_notify,
-+	.pwr_change_notify = ufs_hisi_pwr_change_notify,
- 	.suspend = ufs_hisi_suspend,
- 	.resume = ufs_hisi_resume,
- };
- 
-+static struct ufs_hba_variant_ops ufs_hba_hi3670_vops = {
-+	.name = "hi3670",
-+	.init = ufs_hi3670_init,
-+	.link_startup_notify = ufs_hisi_link_startup_notify,
-+	.pwr_change_notify = ufs_hisi_pwr_change_notify,
-+	.suspend = ufs_hisi_suspend,
-+	.resume = ufs_hisi_resume,
-+};
-+
-+static const struct of_device_id ufs_hisi_of_match[] = {
-+	{ .compatible = "hisilicon,hi3660-ufs", .data = &ufs_hba_hi3660_vops },
-+	{ .compatible = "hisilicon,hi3670-ufs", .data = &ufs_hba_hi3670_vops },
-+	{},
-+};
-+
-+MODULE_DEVICE_TABLE(of, ufs_hisi_of_match);
-+
- static int ufs_hisi_probe(struct platform_device *pdev)
- {
--	return ufshcd_pltfrm_init(pdev, &ufs_hba_hisi_vops);
-+	const struct of_device_id *of_id;
-+	struct ufs_hba_variant_ops *vops;
-+	struct device *dev = &pdev->dev;
-+
-+	of_id = of_match_node(ufs_hisi_of_match, dev->of_node);
-+	vops = (struct ufs_hba_variant_ops *)of_id->data;
-+
-+	return ufshcd_pltfrm_init(pdev, vops);
- }
- 
- static int ufs_hisi_remove(struct platform_device *pdev)
-@@ -596,13 +686,6 @@ static int ufs_hisi_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--static const struct of_device_id ufs_hisi_of_match[] = {
--	{ .compatible = "hisilicon,hi3660-ufs" },
--	{},
--};
--
--MODULE_DEVICE_TABLE(of, ufs_hisi_of_match);
--
- static const struct dev_pm_ops ufs_hisi_pm_ops = {
- 	.suspend	= ufshcd_pltfrm_suspend,
- 	.resume		= ufshcd_pltfrm_resume,
-diff --git a/drivers/scsi/ufs/ufs-hisi.h b/drivers/scsi/ufs/ufs-hisi.h
-index 3df9cd7acc29..667dfe39b57e 100644
---- a/drivers/scsi/ufs/ufs-hisi.h
-+++ b/drivers/scsi/ufs/ufs-hisi.h
-@@ -91,6 +91,9 @@ enum {
- #define UFS_HISI_LIMIT_HS_RATE	PA_HS_MODE_B
- #define UFS_HISI_LIMIT_DESIRED_MODE	FAST
- 
-+#define UFS_HISI_CAP_RESERVED		BIT(0)
-+#define UFS_HISI_CAP_PHY10nm		BIT(1)
-+
- struct ufs_hisi_host {
- 	struct ufs_hba *hba;
- 	void __iomem *ufs_sys_ctrl;
-@@ -112,4 +115,5 @@ struct ufs_hisi_host {
- 	ufs_sys_ctrl_writel((host),                                            \
- 			    ((~(mask)) & (ufs_sys_ctrl_readl((host), (reg)))), \
- 			    (reg))
-+
- #endif /* UFS_HISI_H_ */
--- 
-2.17.1
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgQW5kcmVhcywKCk9uIDI5LzEyLzIwMTggMDk6MDUsIEFuZHJlYXMgRsOkcmJlciB3cm90ZToK
+PiBIaSBCZW4sCj4gCj4gQW0gMTkuMTIuMTggdW0gMTY6NTYgc2NocmllYiBCZW4gV2hpdHRlbjoK
+Pj4gQ2hlY2twYXRjaCBoaWdobGlnaHRzIHNvbWUgc3R5bGUgaXNzdWVzIHdoaWNoIG5lZWQgdG8g
+YmUgYWRkcmVzc2VkLgo+Pgo+PiBTaWduZWQtb2ZmLWJ5OiBCZW4gV2hpdHRlbiA8YmVuLndoaXR0
+ZW5AbGFpcmR0ZWNoLmNvbT4KPj4gLS0tCj4+ICAgZHJpdmVycy9uZXQvbG9yYS9zeDEyNXguYyB8
+IDIwICsrKysrKysrKy0tLS0tLQo+PiAgIGRyaXZlcnMvbmV0L2xvcmEvc3gxMzAxLmMgfCA1MiAr
+KysrKysrKysrKysrKysrKysrKysrLS0tLS0tLS0tLS0tLS0tLS0KPj4gICBkcml2ZXJzL25ldC9s
+b3JhL3N4MTMwMS5oIHwgIDcgKysrLS0tCj4+ICAgMyBmaWxlcyBjaGFuZ2VkLCA0NSBpbnNlcnRp
+b25zKCspLCAzNCBkZWxldGlvbnMoLSkKPiAKPiBUaGFua3MgZm9yIHNwbGl0dGluZyB0aGlzIG9m
+ZiBmcm9tIHRoZSBmdW5jdGlvbmFsIGNoYW5nZXMuIFRoaXMgd2lsbAo+IG5lZWQgc29tZSBtb3Jl
+IGV4cGxhbmF0aW9ucyBhbmQgZGlzY3Vzc2lvbi4gSW4gcGFydGljdWxhciB0aGUgY29tbWVudAo+
+IGNoYW5nZXMgbG9vayB3cm9uZyB0byBtZS4gQWxzbyBwbGVhc2UgZG9uJ3QgYnV0Y2hlciBjb2Rl
+IGp1c3QgYmVjYXVzZQo+IGNoZWNrcGF0Y2gucGwgbWF5IHdhcm4gYWJvdXQgbGluZSBsZW5ndGgg
+YXQgdGhpcyBlYXJseSBzdGFnZS4KClllaCB0aGV5IHNlZW1lZCBvZGQgYnV0IGNoZWNrcGF0Y2gg
+ZG9lc24ndCBsaWtlIGEgLyogb24gYSBsaW5lIGJ5IGl0cyAKc2VsZiBpdCBzZWVtcy4KCj4gCj4g
+QSBnb29kIGNhdGNoIGluIHRoZXJlIHdhcyB0aGUgdW5zaWduZWQgY2FzdHMsIHdoaWNoIGFyZSBu
+byBsb25nZXIKPiBuZWNlc3Nhcnkgc2luY2UgdGhlIHJlZ21hcCBjb252ZXJzaW9uLCBzbyB3ZSBz
+aG91bGQganVzdCBzcXVhc2ggdGhhdAo+IGludG8gdGhlIGVhcmxpZXIgY29tbWl0cy4KPiAKPiBO
+b3RlIHRoYXQgSSB1c2VkIHRvIHJ1biBjaGVja3BhdGNoLnBsIGFzIGdpdCBjb21taXQgaG9vazoK
+PiBodHRwOi8vYmxvZy52bXNwbGljZS5uZXQvMjAxMS8wMy9ob3ctdG8tYXV0b21hdGljYWxseS1y
+dW4tY2hlY2twYXRjaHBsLmh0bWwKPiBCdXQgc2luY2Ugc29tZSBnaXQgdXBkYXRlIHRoYXQgc3Rh
+cnRlZCB0byBicmVhayBnaXQgcmViYXNlIC1pIGluIGNhc2Ugb2YKPiBmYWxzZSBwb3NpdGl2ZXMg
+KHdpdGggcmViYXNlIHN0b3BwaW5nIGFuZCBvbiB0cnlpbmcgdG8gY29udGludWUgY29tbWl0cwo+
+IHVuaW50ZW50aW9uYWxseSBnZXR0aW5nIHNxdWFzaGVkKSwgc28gSSBkZWFjdGl2YXRlZCBpdCBh
+Z2FpbiBhbmQgZG9uJ3QKPiBtYW51YWxseSBjaGVjayBlYWNoIGNvbW1pdCBJIHN0YWdlIGFueW1v
+cmUsIGluIGZhdm9yIG9mIHNsb3dseQo+IGNvbXBsZXRpbmcgaW1wbGVtZW50YXRpb25zIHRvIGEg
+d29ya2luZyBwb2ludC4KCkdvb2QgdG8ga25vdywgSSdsbCBhdm9pZCBydW5uaW5nIGl0IGZvciB0
+aGUgdGltZSBhbmQgZHJvcCB0aGlzIGZyb20gdGhlIHYyCgpUaGFua3MhCkJlbiBXaGl0dGVuCgpf
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0t
+a2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcK
+aHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2Vy
+bmVsCg==
