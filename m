@@ -2,63 +2,86 @@ Return-Path: <SRS0=qjmB=PN=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A9839C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  5 Jan 2019 02:26:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 96A09C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  5 Jan 2019 03:37:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 69CDB218DE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  5 Jan 2019 02:26:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6513F21871
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  5 Jan 2019 03:37:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NFpAsGbK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 69CDB218DE
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i1gS89Q3";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="bGLgjRI5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6513F21871
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=BTeaBSyKSzzjMtFwIPVnfo/Q0DXbZayR8zBNUyimIIs=; b=NFpAsGbKn0/hVq
-	PANN7VsRYQucT1ItGvQWCTlYemUB11Kgs4MXcACCOF9hr4QvFiwSVLfqqX9Fnhk49Bhtw3mwU3tE+
-	WrFzOQh5JzoEPohAEZaAaKAquE1JGv/YogHQEhB93WNXyERaPA0uYtN/cHJBwT6MfMr97iHk19Jbj
-	dWebbfGd4seAJvKHjHPPQJrm2cHXHTizBfkFdUNc/v8bLBOlcRg9u3rrc5FOPRM4yb8qX8FVAhH+T
-	lWMXXhNHLUb3uHr/XGfGku1O93PFpQWpyDb8aHmi46EhZgpWSDU1uBtRG8ZCgT+GvYLtnQW387VJE
-	ZR50OyRMsl2sEXQjs8EQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=UVYDi4rqPBWadSgR9+odIZwPfRwuI69+2T0IP8MezH4=; b=i1gS89Q33X/2yG
+	BjVeqBfEc4PU+3awl8kR0LqyWcpxCs6tWMS/BIURCSIhKIyGApfm5R1Bs/4S06UfibnsAYc1Ajvgy
+	f9e+uO+zmWORMIIvCNZ3vcjLt6dAbIh6UiB36vERV7iuZh5YnOX9ldeL9vlE/29tPcbfmyDnPynYD
+	AHH/aSxfC19rvpwRPjc0HFHRlOJTcs6sPPT7eFWP0O1uPoBr+j86aNkZSk7UoQF8V4nW101plF1J8
+	06GjXcB3XpcoRCSGgCvTmvNNR2ychistOdgmyDpVeNll+NyEjKN+UI8XdOppf3Cu9ZAEwr1pbBLWa
+	ogYbzsafImX+e/39tBTw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfbfB-00080m-Fw; Sat, 05 Jan 2019 02:26:13 +0000
-Received: from szxga07-in.huawei.com ([45.249.212.35] helo=huawei.com)
+	id 1gfcmY-0004vJ-CC; Sat, 05 Jan 2019 03:37:54 +0000
+Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfbf7-00080O-JK
- for linux-arm-kernel@lists.infradead.org; Sat, 05 Jan 2019 02:26:11 +0000
-Received: from DGGEMS406-HUB.china.huawei.com (unknown [172.30.72.59])
- by Forcepoint Email with ESMTP id B389A178BDC2B;
- Sat,  5 Jan 2019 10:26:06 +0800 (CST)
-Received: from [127.0.0.1] (10.40.74.132) by DGGEMS406-HUB.china.huawei.com
- (10.3.19.206) with Microsoft SMTP Server id 14.3.408.0; Sat, 5 Jan 2019
- 10:26:03 +0800
-Subject: Re: [PATCH v2] arm64: lib: accelerate do_csum with NEON instruction
-To: Will Deacon <will.deacon@arm.com>
-References: <1546417860-30214-1-git-send-email-huanglingyan2@huawei.com>
- <20190103154444.GD16311@edgewater-inn.cambridge.arm.com>
-From: "huanglingyan (A)" <huanglingyan2@huawei.com>
-Message-ID: <38c214ce-a030-b7c7-298f-b235277e5386@huawei.com>
-Date: Sat, 5 Jan 2019 10:27:21 +0800
-User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.0
+ id 1gfcmV-0004uZ-06
+ for linux-arm-kernel@lists.infradead.org; Sat, 05 Jan 2019 03:37:52 +0000
+Received: by mail-pl1-x641.google.com with SMTP id p8so18252035plo.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 04 Jan 2019 19:37:49 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=U/VyUyzTj/Ns+LNXLQBk9Rd6U8O/FkeaSfUH8ZvZpNI=;
+ b=bGLgjRI5ZAb0Zw9jhKlEy4R4cyFc60RhxdnN4SztDzozjLku2nGtGTj4ZvSwWX6o5l
+ sG7Ui0/DsgGQd3zyYZgPrjap+tivhj4GfCZM4J8urBRt6KzoMdaFQZIc8/hLWdlRBeyA
+ K8TxQrkHBnJwxbQv4BrQKV5NugVRByOefYv/w=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=U/VyUyzTj/Ns+LNXLQBk9Rd6U8O/FkeaSfUH8ZvZpNI=;
+ b=KCp0UQ9fmuE/E3ZdwpnSzddWZf6zihbUpBa43esHo2Ov36YAuXw4/3HA+5FWfYZiLe
+ 0lk49LmjSkya4+0fFa0Jm+6XITivrrRoSlr7LRzSK435cu/DXlLsrR5utYeZjY0zoSIg
+ rZGE/Ifq/j1rV6fmHsnNhfUUrX0/8rPTpZBzCZU7hMegfSrjFeSQKwykwAjAbwGdI9A4
+ 0rIZznP/isnsm7u/Lnz8XcmwRMP9MRthALEHEvMTSPgf96slIZPjKetUFBcXEpSTAEXe
+ IOk+jZtNySuCvwz9mN4pGsQmIHbq10WrdtAKVO9c/HeN9HAfwIExrvQIZKFsEugh2WR6
+ 1B5w==
+X-Gm-Message-State: AJcUukdeVjwwy3GxzY1HewiW2urGjkPmyLDB4jtKBDPVzNcuN1b9i1Qn
+ JK9lhWWWPGQD16RqJVEP+10k
+X-Google-Smtp-Source: ALg8bN7RkvRnvHUC2VHG0Kfbm9d0Mh66AklAtvp41flEH/tYy1U98D2roVlbIkaFRsgjE+6oT3d30Q==
+X-Received: by 2002:a17:902:b40d:: with SMTP id
+ x13mr54211052plr.237.1546659468862; 
+ Fri, 04 Jan 2019 19:37:48 -0800 (PST)
+Received: from Mani-XPS-13-9360 ([2405:204:72cb:a88d:406c:3ac8:e78f:4779])
+ by smtp.gmail.com with ESMTPSA id 125sm111944623pfx.159.2019.01.04.19.37.41
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 04 Jan 2019 19:37:48 -0800 (PST)
+Date: Sat, 5 Jan 2019 09:07:38 +0530
+From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+To: John Stultz <john.stultz@linaro.org>
+Subject: Re: [PATCH 0/8 v2] k3dma patches to add support for hi3660/HiKey960
+Message-ID: <20190105033738.GA2477@Mani-XPS-13-9360>
+References: <1546635388-13795-1-git-send-email-john.stultz@linaro.org>
 MIME-Version: 1.0
-In-Reply-To: <20190103154444.GD16311@edgewater-inn.cambridge.arm.com>
-X-Originating-IP: [10.40.74.132]
-X-CFilter-Loop: Reflected
+Content-Disposition: inline
+In-Reply-To: <1546635388-13795-1-git-send-email-john.stultz@linaro.org>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190104_182609_810214_B63DF612 
-X-CRM114-Status: GOOD (  11.95  )
+X-CRM114-CacheID: sfid-20190104_193751_061775_8E286849 
+X-CRM114-Status: GOOD (  18.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,46 +93,76 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <catalin.marinas@arm.com>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="gbk"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Guodong Xu <guodong.xu@linaro.org>, Ryan Grachek <ryan@edited.us>,
+ Zhuangluan Su <suzhuangluan@hisilicon.com>,
+ Tanglei Han <hantanglei@huawei.com>, lkml <linux-kernel@vger.kernel.org>,
+ Wei Xu <xuwei5@hisilicon.com>, Vinod Koul <vkoul@kernel.org>,
+ Rob Herring <robh+dt@kernel.org>, dmaengine@vger.kernel.org,
+ Dan Williams <dan.j.williams@intel.com>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-CtTaIDIwMTkvMS8zIDIzOjQ0LCBXaWxsIERlYWNvbiDQtLXAOgo+IE9uIFdlZCwgSmFuIDAyLCAy
-MDE5IGF0IDA0OjMxOjAwUE0gKzA4MDAsIExpbmd5YW4gSHVhbmcgd3JvdGU6Cj4+IEZ1bmN0aW9u
-IGRvX2NzdW0oKSBpbiBsaWIvY2hlY2tzdW0uYyBpcyB1c2VkIHRvIGNvbXB1dGUgY2hlY2tzdW0s
-Cj4+IHdoaWNoIGlzIHR1cm5lZCBvdXQgdG8gYmUgc2xvd2x5IGFuZCBjb3N0cyBhIGxvdCBvZiBy
-ZXNvdXJjZXMuCj4+IExldCdzIHVzZSBuZW9uIGluc3RydWN0aW9ucyB0byBhY2NlbGVyYXRlIHRo
-ZSBjaGVja3N1bSBjb21wdXRhdGlvbgo+PiBmb3IgYXJtNjQuCj4+Cj4+IC0tLS0tLQo+PiBWMSA9
-PT4gVjI6Cj4+ICAgICBDaGFuZ2UgTkVPTiBhc3NlbWJseSBjb2RlIHRvIE5FT04gaW50cmluc2lj
-IGNvZGUgd2hpY2ggaXMgYnVpbHQKPj4gICAgIG9uIHRvcCBvZiBhcm1fbmVvbi5oIHRvIGF2b2lk
-IGRyb3BwaW5nIGludG8gYXNzZW1ibHkuCj4+IC0tLS0tLQo+Pgo+PiBIZXJlIGlzIHRoZSBjb21w
-YXJpc29uIHJlc3VsdHMgb2YgZnVuY3Rpb24gaXBfY29tcHV0ZV9jc3VtKCkgYmV0d2Vlbgo+PiBn
-ZW5lcmFsIGRvX2NzdW0oKSBhbmQgbmVvbiBpbnN0cnVjdGlvbiBkb19jc3VtKCkuCj4+Cj4+ICAg
-ICAgICAgbGVuKDEwMDBjeWNsZSkgICAgICBnZW5lcmFsKG5zKSAgICAgICAgZG9fY3N1bV9uZW9u
-KG5zKQo+PiAgICAgICAgICAgNjRCOiAgICAgICAgICAgICAgICA1ODA2MCAgICAgICAgICAgICAg
-ICAgNTk0NjAKPj4gICAgICAgICAgMTI4QjogICAgICAgICAgICAgICAgODI5MzAgICAgICAgICAg
-ICAgICAgIDgzOTMwCj4+ICAgICAgICAgIDI1NkI6ICAgICAgICAgICAgICAgMTMyNDgwICAgICAg
-ICAgICAgICAgICA3MzU3MAo+PiAgICAgICAgICA1MTJCOiAgICAgICAgICAgICAgIDIzMDEwMCAg
-ICAgICAgICAgICAgICAgODYyMzAKPj4gICAgICAgICAxMDI0QjogICAgICAgICAgICAgICA0MjY2
-MDAgICAgICAgICAgICAgICAgIDk4MjAwCj4+Cj4+Cj4+IENjOiBDYXRhbGluIE1hcmluYXMgPGNh
-dGFsaW4ubWFyaW5hc0Bhcm0uY29tPgo+PiBDYzogV2lsbCBEZWFjb24gPHdpbGwuZGVhY29uQGFy
-bS5jb20+Cj4+IFNpZ25lZC1vZmYtYnk6IExpbmd5YW4gSHVhbmcgPGh1YW5nbGluZ3lhbjJAaHVh
-d2VpLmNvbT4KPj4gLS0tCj4+ICBhcmNoL2FybTY0L2xpYi9NYWtlZmlsZSAgICAgICAgfCAgIDQg
-KysKPj4gIGFyY2gvYXJtNjQvbGliL2NoZWNrc3VtLmMgICAgICB8IDE0MCArKysrKysrKysrKysr
-KysrKysrKysrKysrKysrKysrKysrKysrKysrKwo+PiAgaW5jbHVkZS9hc20tZ2VuZXJpYy9jaGVj
-a3N1bS5oIHwgICAxICsKPj4gIGxpYi9jaGVja3N1bS5jICAgICAgICAgICAgICAgICB8ICAgOCAr
-Ky0KPj4gIDQgZmlsZXMgY2hhbmdlZCwgMTUyIGluc2VydGlvbnMoKyksIDEgZGVsZXRpb24oLSkK
-Pj4gIGNyZWF0ZSBtb2RlIDEwMDY0NCBhcmNoL2FybTY0L2xpYi9jaGVja3N1bS5jCj4gSSByZWNl
-aXZlZCBmaXZlIGNvcGllcyBvZiB0aGlzIHBhdGNoIDovCj4KPiBDYW4geW91IHNlbmQgYSB2MyAo
-anVzdCBvbmNlKSBzbyBpdCdzIGNsZWFyIHdoaWNoIGlzIHRoZSBsYXRlc3QgdmVyc2lvbiwKPiBw
-bGVhc2U/Cj4KPiBXaWxsCj4KPiAuCgoKSSdtIHNvIHNvcnJ5IGZvciB0aGUgdHJvdWJsZSBJIGNh
-dXNlZC4gSXQgc2VlbXMgbXkgbWFpbCBzZXJ2ZXIgaGFkIHNvbWUgcHJvYmxlbXMuIFRoZSB2MwoK
-dmVyc2lvbiBpcyBvbiB0aGUgd2F5LiBMb29raW5nIGZvcndhcmQgdG8geW91ciBzdWdnZXN0aW9u
-cy4KCkRlZXBseSBzb3JyeSBmb3IgdGhpcyBhY2NpZGVudC4KCi0gTGluZ3lhbiBIdWFuZwoKCgoK
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJt
-LWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3Jn
-Cmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtl
-cm5lbAo=
+Hi John,
+
+On Fri, Jan 04, 2019 at 12:56:20PM -0800, John Stultz wrote:
+> This patch series is based on recent work by Tanglei Han, and
+> adds support for hi3660 SoCs as found on the HiKey960 board,
+
+Not sure about the description/subject here! This patchset adds support
+for ASP DMAC found in HI3660 SoCs, Peripheral DMAC is already supported.
+
+Thanks,
+Mani
+
+> along with a few patches I've been carrying.
+> 
+> Review and feedback would be greatly appreciated!
+> 
+> thanks
+> -john
+> 
+> Cc: Tanglei Han <hantanglei@huawei.com>
+> Cc: Zhuangluan Su <suzhuangluan@hisilicon.com>
+> Cc: Dan Williams <dan.j.williams@intel.com>
+> Cc: Vinod Koul <vkoul@kernel.org>
+> Cc: Wei Xu <xuwei5@hisilicon.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Guodong Xu <guodong.xu@linaro.org>
+> Cc: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> Cc: Ryan Grachek <ryan@edited.us>
+> CC: devicetree@vger.kernel.org
+> Cc: dmaengine@vger.kernel.org
+> Cc: linux-arm-kernel@lists.infradead.org
+> 
+> John Stultz (3):
+>   Documentation: bindings: k3dma: Add binding for dma-avail-chan
+>   arm64: dts: hi3660: Add dma to uart nodes
+>   arm64: dts: hi3660: Fixup unofficial dma-min-chan to dma-avail-chan
+> 
+> Li Yu (2):
+>   dma: k3dma: Delete axi_config
+>   dma: k3dma: Add support to dma_avail_chan
+> 
+> Youlin Wang (3):
+>   Documentation: bindings: k3dma: Extend the k3dma driver binding to
+>     support hisi-asp
+>   dma: k3dma: Upgrade k3dma driver to support hisi_asp_dma hardware
+>   arm64: dts: hi3660: Add hisi asp dma device
+> 
+>  Documentation/devicetree/bindings/dma/k3dma.txt |  7 ++-
+>  arch/arm64/boot/dts/hisilicon/hi3660.dtsi       | 22 ++++++++-
+>  drivers/dma/k3dma.c                             | 60 +++++++++++++++++++++----
+>  3 files changed, 78 insertions(+), 11 deletions(-)
+> 
+> -- 
+> 2.7.4
+> 
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
