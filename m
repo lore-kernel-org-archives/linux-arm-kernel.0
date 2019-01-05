@@ -2,81 +2,87 @@ Return-Path: <SRS0=qjmB=PN=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 41DB2C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  5 Jan 2019 04:34:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DD3AEC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  5 Jan 2019 05:09:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F3A5020868
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  5 Jan 2019 04:34:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9CDCD218DE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  5 Jan 2019 05:09:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Wnrq6/X5";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="K8GTCkj7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F3A5020868
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XjLNZC/i";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="f1Kkj59+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9CDCD218DE
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=P5hejxxhKZYfyKNmAUh6aqPDcPM462XYdGsdNuTWDeY=; b=Wnrq6/X5jGjmRY
-	r4v3fJK8SRPNh96VZWXQWNGUggdvqeAmcYBHujAJi7uFTJm4VaLJ55lYPubOeOaMxt/s+/7DZ4z5h
-	LMUtTzI7wROScHnbHUK5WJOS/GaUqwfmEILqnHq2h0B/66e5EFiDIXvTRUQIp+Sp2xqHkCcCp58ku
-	MQggrG3H72hyiYNGQkSQn9nDOXjfaLqCDGdExItwf0e8HbYNLp8bHuL/+UEjRUZPs20+T9Xbee1IH
-	rhdEHkb9yHdKEqodQ7p/375e2NqatAzMAYRGSXD+ydXtEzLn9xr/VjfMNI0v/mQfN0MWqgBXIMn/G
-	+Z4whTldGGNt01uLQJiA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=4AH9vYbKAWpJwRcFcF5OwKKvAHfymOm8HVs5X4gBrHg=; b=XjLNZC/iiCXaTz
+	2tBdDFVJtfz57OJ357yc8qgX00gDAoTld7CKFB6Rq4JZAXoSsxSXm8XE4HrRIWnsiK7/SRzYICCGc
+	UgpkeBCKoLK4naFCsgWVvn/Z+1WO/yh8I8gMeKnpIE1wPPouWpwJ/H9n224F5icgVsOoitCT2E9Y1
+	y0Y5KcPeZuOy7RroOc0rskZlxSMTGDQO46d9A6EXd4UGYCcyIFHX3lhp38d89BfGWkPKJ41UwriDl
+	KWd9z6LFjEkrpEfnmJUzkigJu2ffmWp2ZMnyFT3djGBrpLahH9VmSduXizEaOuj+bcfGWTIsKISIH
+	EYJduH8qutOx3OgexkEw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfdfI-0006ab-56; Sat, 05 Jan 2019 04:34:28 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1gfeD3-00015n-TC; Sat, 05 Jan 2019 05:09:21 +0000
+Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfdfE-0006a2-MH
- for linux-arm-kernel@lists.infradead.org; Sat, 05 Jan 2019 04:34:26 +0000
-Received: by mail-wr1-x441.google.com with SMTP id p4so38239298wrt.7
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 04 Jan 2019 20:34:23 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=GQBlCadZCOotC7WcWUZWM/qHn03LQdG+fqIY9Ks3MnU=;
- b=K8GTCkj75/GqtULaOsxpp+gENtKPSfr/Y/tfM9cobdIs/fZlwWGQydpeyE3fRcYqhR
- P5PNy/OjWenoLv+Lria3qNVncmHLQwuh7oLRdk0IjTuaqtzqPtvBLUoxvAbNhH0aOZyd
- 7RHu76+IqsRdbeNWL3p9bm9SiGr7Nq6PqurAU=
+ id 1gfeCy-00014U-Q4; Sat, 05 Jan 2019 05:09:18 +0000
+Received: by mail-pg1-x543.google.com with SMTP id z11so18346124pgu.0;
+ Fri, 04 Jan 2019 21:09:13 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=date:from:to:cc:subject:message-id:mime-version:content-disposition
+ :user-agent; bh=MNMzRwNChS0yPDlWA2Dlmnwr40HNg0+jMjhl1JKiHgY=;
+ b=f1Kkj59+ln9J3nnrnqDXLOv+nIHmnhOvjscxdvptJpwNzuosYtcF1SPdJ1CjiQHzZP
+ oKcd9xjJRtsfDmfLHRekkheRITg3E0l3OaBoFLrcvqER06frNRcp04xUia7VsmR3tB51
+ T+8jZdN2Vu+HpLCD+N/nsynS5EC5KoQA7M7b31cR88Y3JB6eqYpSqWxjvKKilMzpTftI
+ EuQpES2BQvLjh7KS6W3Q+dpnos70vcEMZUOy+CbOTNvzUmxnZOBWqjbSG6pS/RYNvg6u
+ v/Cn1Cx15e4xfWT/N0KjoqNUZaf9HUiSmtUbmK9OViMAmuaRWPQF/woilVe0QrVjn2mB
+ c4FQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=GQBlCadZCOotC7WcWUZWM/qHn03LQdG+fqIY9Ks3MnU=;
- b=aNWebI5G05XfreezlRNali00HZQYER4lXTgUK2lDPnUxBBz77JYwZtjh3HOi9w3DP9
- ysxhCQ8smmzNJktKdjouDoPktS8BZ5GHg1TyoEpGVxgJdgXwsakM84hpQmPKcvjqcEp+
- pSai2A304GZKDCCxWtv0x5Ln5WYopHGYaUtIVcKxhkJTvTOCfTZEQEbmAMuxS+B/ymxu
- WOH7z8JIfHIydDwbZyyt00k0a34yiwm6SFrGfBiWbNMWEoP5Ta0Kbd+hgaIf8kz/wxtC
- HydHpeanVXo29s0E7eqn3ympy/mgK34z6N8uvo7WdIUU9J09c3atHIhzND/ltS2I/iNp
- zbaA==
-X-Gm-Message-State: AJcUuker4/W2pDfDvTbdLgMEu8LoMc08j7vmKoW25RBLVHLXvHZE0IWf
- biAJL5G2AoLAeMsmMK4uNj6yQKecAtcj5ZNFN+nLcg==
-X-Google-Smtp-Source: ALg8bN5uj/KAjavJwr/gTLPWp3pYg7X5NMl4VgeSAD26OrEIEX+1Yw9SC74EOHKzblMNyp6Gef4Lwfh/T8wE3QN7+rk=
-X-Received: by 2002:adf:c108:: with SMTP id r8mr47951498wre.233.1546662862430; 
- Fri, 04 Jan 2019 20:34:22 -0800 (PST)
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:mime-version
+ :content-disposition:user-agent;
+ bh=MNMzRwNChS0yPDlWA2Dlmnwr40HNg0+jMjhl1JKiHgY=;
+ b=G9jKqq+ZKFMjVTyOAy5TMKNmYxZGMgQ01uGlbnnzqCX8xSJCFqspgKeT9cdIErNx0u
+ tWvlPW9dTUxw7NAGICd67rlplxO98HENrD5Q7sUrqeF0LouLrbnb8Q+giPnZoX5XWDrV
+ rG12+g1B9YFBHG6m4lkatP1wynL5P9N+QGJwSJunh0ln1mYaDhAHZ/U4wAI4P1aQ0vHy
+ 4PhJpO+5IDbmkiPQaF6XyD74rQflXsJKy0bjdg/otyFYwTEk+LjS3KN/k75kkgGrpJ/R
+ MHlA/0C/8WfIZEGP6vMi18gx3Q4F2uvgVm5aSZu2l6m/zr2SGUKGn7wG+8wCCtMV1Qwx
+ DyHg==
+X-Gm-Message-State: AJcUukcHGHEb77gZQvm8C2VDYfEMLIF4c60+gX+qQl8Os64aYAsZpcvK
+ REvXtDiLcu/NHbPapZ145KU=
+X-Google-Smtp-Source: ALg8bN40RhT3ULq0Y9oDhTYS8FDRUSP+rbNeBKpWvQ1pNG1VajMUFqyKlNuZo1/pnz4nKbg6K3mtPg==
+X-Received: by 2002:a65:5c02:: with SMTP id u2mr3856226pgr.13.1546664953278;
+ Fri, 04 Jan 2019 21:09:13 -0800 (PST)
+Received: from hp-pavilion-15-notebook-pc-brajeswar ([47.11.225.208])
+ by smtp.gmail.com with ESMTPSA id m11sm77147259pgh.51.2019.01.04.21.09.11
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 04 Jan 2019 21:09:12 -0800 (PST)
+Date: Sat, 5 Jan 2019 10:39:07 +0530
+From: Brajeswar Ghosh <brajeswar.linux@gmail.com>
+To: dmitry.torokhov@gmail.com, matthias.bgg@gmail.com, lee.jones@linaro.org,
+ chen.zhong@mediatek.com
+Subject: [PATCH] keyboard/mtk-pmic-keys.c: Remove duplicate header
+Message-ID: <20190105050907.GA2525@hp-pavilion-15-notebook-pc-brajeswar>
 MIME-Version: 1.0
-References: <1546635388-13795-1-git-send-email-john.stultz@linaro.org>
- <1546635388-13795-7-git-send-email-john.stultz@linaro.org>
- <20190105034904.GD2477@Mani-XPS-13-9360>
-In-Reply-To: <20190105034904.GD2477@Mani-XPS-13-9360>
-From: John Stultz <john.stultz@linaro.org>
-Date: Fri, 4 Jan 2019 20:34:09 -0800
-Message-ID: <CALAqxLVGznbM8+rHHn8j_+m1P-E9+_jJNfRZKPVqF+pTQWG_Mg@mail.gmail.com>
-Subject: Re: [PATCH 6/8 v2] arm64: dts: hi3660: Add dma to uart nodes
-To: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+Content-Disposition: inline
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190104_203424_739011_042803BE 
-X-CRM114-Status: GOOD (  16.53  )
+X-CRM114-CacheID: sfid-20190104_210916_860768_674D1BB5 
+X-CRM114-Status: UNSURE (   8.38  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,65 +94,36 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>, Ryan Grachek <ryan@edited.us>,
- Zhuangluan Su <suzhuangluan@hisilicon.com>,
- Tanglei Han <hantanglei@huawei.com>, lkml <linux-kernel@vger.kernel.org>,
- Wei Xu <xuwei5@hisilicon.com>, Rob Herring <robh+dt@kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: linux-kernel@vger.kernel.org, linux-mediatek@lists.infradead.org,
+ jrdr.linux@gmail.com, linux-arm-kernel@lists.infradead.org,
+ linux-input@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 4, 2019 at 7:49 PM Manivannan Sadhasivam
-<manivannan.sadhasivam@linaro.org> wrote:
->
-> Hi John,
->
-> On Fri, Jan 04, 2019 at 12:56:26PM -0800, John Stultz wrote:
-> > Try to add DMA support to the uart nodes following
-> > the assignments made in the dts from the victoria vendor kernel
-> > here:
-> > https://consumer.huawei.com/en/opensource/detail/?siteCode=worldwide&keywords=p10&fileType=openSourceSoftware&pageSize=10&curPage=1
-> >
-> > Cc: Tanglei Han <hantanglei@huawei.com>
-> > Cc: Zhuangluan Su <suzhuangluan@hisilicon.com>
-> > Cc: Ryan Grachek <ryan@edited.us>
-> > Cc: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> > Cc: Wei Xu <xuwei5@hisilicon.com>
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: linux-arm-kernel@lists.infradead.org
-> > Cc: devicetree@vger.kernel.org
-> > Signed-off-by: John Stultz <john.stultz@linaro.org>
-> > ---
-> >  arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> > index 20ae40d..aaa2b04 100644
-> > --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> > +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> > @@ -466,6 +466,8 @@
-> >                       compatible = "arm,pl011", "arm,primecell";
-> >                       reg = <0x0 0xfdf02000 0x0 0x1000>;
-> >                       interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
-> > +                     dma-names = "rx", "tx";
-> > +                     dmas =  <&dma0 0 &dma0 1>;
->
-> Usage of DMA channel 0 contradicts with the description provided in
-> patch, "dma: k3dma: Add support to dma_avail_chan".
+Remove linux/kernel.h which is included more than once
 
-Hrm. Good point.  I'll double check w/ Dr Su on this, I'm not sure if
-that inconsistency is due to the the vendor kernel (where these came
-from) having different reserved channels or just something overlooked
-if the uart0 is not actually being used (as we find on hikey960 as
-well).
+Signed-off-by: Brajeswar Ghosh <brajeswar.linux@gmail.com>
+---
+ drivers/input/keyboard/mtk-pmic-keys.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-thanks
--john
+diff --git a/drivers/input/keyboard/mtk-pmic-keys.c b/drivers/input/keyboard/mtk-pmic-keys.c
+index 02c67a1749fc..5027ebb7b4e8 100644
+--- a/drivers/input/keyboard/mtk-pmic-keys.c
++++ b/drivers/input/keyboard/mtk-pmic-keys.c
+@@ -19,7 +19,6 @@
+ #include <linux/input.h>
+ #include <linux/interrupt.h>
+ #include <linux/platform_device.h>
+-#include <linux/kernel.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/regmap.h>
+-- 
+2.17.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
