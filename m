@@ -2,61 +2,63 @@ Return-Path: <SRS0=qjmB=PN=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7195FC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  5 Jan 2019 00:32:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 73AACC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  5 Jan 2019 02:04:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3FA0D208E3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  5 Jan 2019 00:32:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4503421871
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  5 Jan 2019 02:04:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="duEjRSRx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3FA0D208E3
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=dudau.co.uk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gm8Rucgl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4503421871
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.intel.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=3+wE7uKL72CazuG/NCFrOLaZo/w/plFx1qnK80XbcHo=; b=duEjRSRxHBGavS
-	VQxr9AzMdiMOEZcjLGxy7uGpyupmWJnJ4Srpe5J6GMy55qccbChOBDmWp6530etpwxUN8PQ7vS7kE
-	ozgki7yllhEhUd8RAY2TaoYT6xWRJy0EriveGF6l6mEO41RUEY+1Lgr/1/F14RwWPhwrM9tpEZx0w
-	oEY7c8YgN3fA8faKIWngCKRvPx9HVPOICZe4pqUlHEfTfb9xyP0xJk8NjUfQCtnIy4Xbvf9Mse8rt
-	xhNOcM2pyDxza06ozeWGqYPJJIjAe9u3PECKPv292B/K+vW8PVrmK8hz5OTHk5WYv4/DkssN2/iLD
-	ni+xDrJ+3INU2JpPQsbw==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=57JfUflooqNPX8KM38pGmeYcLrq8AfwmbHFfbx0bIUo=; b=gm8RucglvfvKkSlN3vIPxlWYFl
+	f8YoVB+6uuYPysVuP1OpfaZFxmu6EkaK67cG9WBYMB8BSnRZfM2hlIoLcexpiecDsAgjgCf73642n
+	Ha4pXAhlEEE9fabYKsd6S16Bsy+R6IJvcFn1+qbcL4qlJqQJSiWFkVCQttrfbBP2Outv+tDfHteHl
+	lhtGiKpxkTwYwfL4xXkAA/pfLPDXj2URj6K4U6sFIqqIbBFArXB8Fhll2bTNN8Y+ueJB3qyTh8OPx
+	GdZF1eSvzAUBXu0ENf7+KfKKWaa2rCuVX/KAsbOkifcgOLoJeon0CTmC+bMqP/zP1QMKmRNV/OMYM
+	ODYY6neA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfZt5-0005q5-0F; Sat, 05 Jan 2019 00:32:27 +0000
-Received: from dliviu.plus.com ([80.229.23.120] helo=smtp.dudau.co.uk)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfZt0-0005p3-Ig
- for linux-arm-kernel@lists.infradead.org; Sat, 05 Jan 2019 00:32:24 +0000
-Received: from mail.dudau.co.uk (bart.dudau.co.uk [192.168.14.2])
- by smtp.dudau.co.uk (Postfix) with SMTP id 31F1E40F840A;
- Sat,  5 Jan 2019 00:32:19 +0000 (GMT)
-Received: by mail.dudau.co.uk (sSMTP sendmail emulation);
- Sat, 05 Jan 2019 00:32:19 +0000
-Date: Sat, 5 Jan 2019 00:32:19 +0000
-From: Liviu Dudau <liviu@dudau.co.uk>
-To: Christoph Hellwig <hch@lst.de>
-Subject: Re: [REGRESSION, BISECTED] pci: nvme device with HMB fails on arm64
-Message-ID: <20190105003218.GG20342@bart.dudau.co.uk>
-References: <20190104125735.GF20342@bart.dudau.co.uk>
- <20190104173446.GA24554@lst.de>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190104173446.GA24554@lst.de>
-User-Agent: Mutt/1.11.1 (2018-12-01)
+	id 1gfbKA-0000GJ-AT; Sat, 05 Jan 2019 02:04:30 +0000
+Received: from mga14.intel.com ([192.55.52.115])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gfbK6-0000Fc-QK; Sat, 05 Jan 2019 02:04:28 +0000
+X-Amp-Result: SKIPPED(no attachment in message)
+X-Amp-File-Uploaded: False
+Received: from fmsmga006.fm.intel.com ([10.253.24.20])
+ by fmsmga103.fm.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
+ 04 Jan 2019 18:04:25 -0800
+X-ExtLoop1: 1
+X-IronPort-AV: E=Sophos;i="5.56,441,1539673200"; d="scan'208";a="307634826"
+Received: from kgandham-mobl1.amr.corp.intel.com (HELO
+ pbossart-mobl3.intel.com) ([10.251.139.169])
+ by fmsmga006.fm.intel.com with ESMTP; 04 Jan 2019 18:04:21 -0800
+From: Pierre-Louis Bossart <pierre-louis.bossart@linux.intel.com>
+To: alsa-devel@alsa-project.org
+Subject: [PATCH 17/21] ASoC: mt6351: remove unneeded variable
+Date: Fri,  4 Jan 2019 20:02:45 -0600
+Message-Id: <20190105020249.8639-18-pierre-louis.bossart@linux.intel.com>
+X-Mailer: git-send-email 2.17.1
+In-Reply-To: <20190105020249.8639-1-pierre-louis.bossart@linux.intel.com>
+References: <20190105020249.8639-1-pierre-louis.bossart@linux.intel.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190104_163222_923441_785E9F8C 
-X-CRM114-Status: GOOD (  25.46  )
+X-CRM114-CacheID: sfid-20190104_180426_863090_E89CC8CD 
+X-CRM114-Status: GOOD (  10.03  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,159 +70,55 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>, linux-pci@vger.kernel.org,
- LKML <linux-kernel@vger.kernel.org>, Bjorn Helgaas <bhelgaas@google.com>,
- Robin Murphy <robin.murphy@arm.com>,
- LAKML <linux-arm-kernel@lists.infradead.org>
+Cc: Liam Girdwood <lgirdwood@gmail.com>, tiwai@suse.de,
+ open list <linux-kernel@vger.kernel.org>, Takashi Iwai <tiwai@suse.com>,
+ Pierre-Louis Bossart <pierre-louis.bossart@linux.intel.com>,
+ Jaroslav Kysela <perex@perex.cz>, liam.r.girdwood@linux.intel.com,
+ broonie@kernel.org, Wei Yongjun <weiyongjun1@huawei.com>,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ "moderated list:ARM/Mediatek SoC support" <linux-mediatek@lists.infradead.org>,
+ "moderated list:ARM/Mediatek SoC support"
+ <linux-arm-kernel@lists.infradead.org>,
+ Kai Chieh Chuang <kaichieh.chuang@mediatek.com>
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 04, 2019 at 06:34:47PM +0100, Christoph Hellwig wrote:
-> Hi Liviu,
+Reported by Coccinelle:
+mt6351.c:1418:5-8: Unneeded variable: "ret". Return "0" on line 1437
 
-Hi Christoph,
+Signed-off-by: Pierre-Louis Bossart <pierre-louis.bossart@linux.intel.com>
+---
+ sound/soc/codecs/mt6351.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-> 
-> please try the patch below.  Note that this is in top of mainline,
-> as the commit you found already needed another fixup, which has
-> made it to Linus already.
-
-This patch does fix the issue with NVMe HMBs. You can add my:
-
-Tested-by: Liviu Dudau <liviu@dudau.co.uk>
-
-Now I need to go and try to figure out why the rk_gmac-dwmac driver gives this warning:
-
-[   11.277363] ------------[ cut here ]------------
-[   11.277800] DMA-API: rk_gmac-dwmac fe300000.ethernet: device driver frees DMA memory with wrong function [device address=0x00000000e7c21c02] [size=342 bytes] [mapped as page] [unmapped as single]
-[   11.279348] WARNING: CPU: 0 PID: 0 at kernel/dma/debug.c:1085 check_unmap+0x720/0x840
-[   11.280037] Modules linked in: pcie_rockchip_host phy_rockchip_pcie rockchip realtek dwmac_rk stmmac_platform stmmac
-[   11.280989] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.20.0-10990-gda3599602d2f-dirty #1
-[   11.281708] Hardware name: FriendlyARM NanoPC-T4 (DT)
-[   11.282162] pstate: 80000085 (Nzcv daIf -PAN -UAO)
-[   11.282592] pc : check_unmap+0x720/0x840
-[   11.282947] lr : check_unmap+0x720/0x840
-[   11.283299] sp : ffff000010003b90
-[   11.283597] x29: ffff000010003b90 x28: ffff8000e7d74800
-[   11.284075] x27: ffff8000f66fe410 x26: ffff000010f33370
-[   11.284551] x25: 0000000000000000 x24: ffff0000111163d0
-[   11.285027] x23: ffff000010f33000 x22: ffff000010f0d818
-[   11.285504] x21: ffff000010003c48 x20: ffff00001110dd80
-[   11.285981] x19: ffff8000f6657090 x18: 0000000000000010
-[   11.286457] x17: 0000000000000001 x16: 0000000000000007
-[   11.286933] x15: ffffffffffffffff x14: 5d32306331326337
-[   11.287409] x13: 6530303030303030 x12: 3078303d73736572
-[   11.287886] x11: 6464612065636976 x10: 65645b206e6f6974
-[   11.288363] x9 : 636e756620676e6f x8 : 2073612064657070
-[   11.288840] x7 : 616d6e755b205d65 x6 : 00000000000001d4
-[   11.289316] x5 : 0000000000000001 x4 : 00008000e685f000
-[   11.289793] x3 : ffff8000f774deb8 x2 : 0000000000000007
-[   11.290269] x1 : d5f5206026126100 x0 : 0000000000000000
-[   11.290746] Call trace:
-[   11.290974]  check_unmap+0x720/0x840
-[   11.291301]  debug_dma_unmap_page+0xc4/0xd0
-[   11.291719]  stmmac_napi_poll+0x214/0x1088 [stmmac]
-[   11.292160]  net_rx_action+0x12c/0x3d0
-[   11.292502]  __do_softirq+0x1a0/0x438
-[   11.292835]  irq_exit+0xcc/0xe0
-[   11.293124]  __handle_domain_irq+0x9c/0x108
-[   11.293500]  gic_handle_irq+0xb8/0x15c
-[   11.293839]  el1_irq+0xb4/0x130
-[   11.294127]  cpuidle_enter_state+0xbc/0x508
-[   11.294504]  cpuidle_enter+0x34/0x48
-[   11.294830]  call_cpuidle+0x44/0x68
-[   11.295148]  do_idle+0x264/0x2a0
-[   11.295445]  cpu_startup_entry+0x28/0x30
-[   11.295802]  rest_init+0xd4/0xe0
-[   11.296101]  arch_call_rest_init+0x14/0x1c
-[   11.296471]  start_kernel+0x48c/0x4b4
-[   11.296800] ---[ end trace c63a0054785f45a3 ]---
-[   11.297213] DMA-API: Mapped at:
-[   11.297531]  stmmac_xmit+0x4b8/0x1168 [stmmac]
-[   11.297934]  dev_hard_start_xmit+0xac/0x290
-[   11.298313]  sch_direct_xmit+0x120/0x330
-[   11.298667]  __qdisc_run+0x140/0x6e8
-[   11.298994]  __dev_queue_xmit+0x48c/0x718
-
-
-I've seen you have provided some other net driver reporter with a patch to make dma_map_single_attrs use
-dma_map_page_attrs, which I have applied, but that doesn't remove the WARN() for me.
-
-
-Many thanks,
-
-Liviu
-
-> 
-> --
-> From a959cc1a8ee00dcb274922f9d74f6ed632709047 Mon Sep 17 00:00:00 2001
-> From: Christoph Hellwig <hch@lst.de>
-> Date: Fri, 4 Jan 2019 18:31:48 +0100
-> Subject: dma-direct: fix DMA_ATTR_NO_KERNEL_MAPPING for remapped allocations
-> 
-> We need to return a dma_addr_t even if we don't have a kernel mapping.
-> Do so by consolidating the phys_to_dma call in a single place and jump
-> to it from all the branches that return successfully.
-> 
-> Fixes: bfd56cd60521 ("dma-mapping: support highmem in the generic remap allocator")
-> Reported-by: Liviu Dudau <liviu@dudau.co.uk
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> ---
->  kernel/dma/remap.c | 13 +++++++------
->  1 file changed, 7 insertions(+), 6 deletions(-)
-> 
-> diff --git a/kernel/dma/remap.c b/kernel/dma/remap.c
-> index 18cc09fc27b9..7a723194ecbe 100644
-> --- a/kernel/dma/remap.c
-> +++ b/kernel/dma/remap.c
-> @@ -204,8 +204,7 @@ void *arch_dma_alloc(struct device *dev, size_t size, dma_addr_t *dma_handle,
->  		ret = dma_alloc_from_pool(size, &page, flags);
->  		if (!ret)
->  			return NULL;
-> -		*dma_handle = phys_to_dma(dev, page_to_phys(page));
-> -		return ret;
-> +		goto done;
->  	}
->  
->  	page = __dma_direct_alloc_pages(dev, size, dma_handle, flags, attrs);
-> @@ -215,8 +214,10 @@ void *arch_dma_alloc(struct device *dev, size_t size, dma_addr_t *dma_handle,
->  	/* remove any dirty cache lines on the kernel alias */
->  	arch_dma_prep_coherent(page, size);
->  
-> -	if (attrs & DMA_ATTR_NO_KERNEL_MAPPING)
-> -		return page; /* opaque cookie */
-> +	if (attrs & DMA_ATTR_NO_KERNEL_MAPPING) {
-> +		ret = page; /* opaque cookie */
-> +		goto done;
-> +	}
->  
->  	/* create a coherent mapping */
->  	ret = dma_common_contiguous_remap(page, size, VM_USERMAP,
-> @@ -227,9 +228,9 @@ void *arch_dma_alloc(struct device *dev, size_t size, dma_addr_t *dma_handle,
->  		return ret;
->  	}
->  
-> -	*dma_handle = phys_to_dma(dev, page_to_phys(page));
->  	memset(ret, 0, size);
-> -
-> +done:
-> +	*dma_handle = phys_to_dma(dev, page_to_phys(page));
->  	return ret;
->  }
->  
-> -- 
-> 2.20.1
-> 
-
+diff --git a/sound/soc/codecs/mt6351.c b/sound/soc/codecs/mt6351.c
+index f73dcd753584..4b3ce01c5a93 100644
+--- a/sound/soc/codecs/mt6351.c
++++ b/sound/soc/codecs/mt6351.c
+@@ -1415,8 +1415,6 @@ static const struct snd_soc_dapm_route mt6351_dapm_routes[] = {
+ 
+ static int mt6351_codec_init_reg(struct snd_soc_component *cmpnt)
+ {
+-	int ret = 0;
+-
+ 	/* Disable CLKSQ 26MHz */
+ 	regmap_update_bits(cmpnt->regmap, MT6351_TOP_CLKSQ, 0x0001, 0x0);
+ 	/* disable AUDGLB */
+@@ -1434,7 +1432,7 @@ static int mt6351_codec_init_reg(struct snd_soc_component *cmpnt)
+ 	/* Reverse the PMIC clock*/
+ 	regmap_update_bits(cmpnt->regmap, MT6351_AFE_PMIC_NEWIF_CFG2,
+ 			   0x8000, 0x8000);
+-	return ret;
++	return 0;
+ }
+ 
+ static int mt6351_codec_probe(struct snd_soc_component *cmpnt)
 -- 
-           ________________________________________________________
-  ________|                                                        |_______
-  \       |  With enough courage, you can do without a reputation  |      /
-   \      |                                  -- Rhett Butler       |     /
-   /      |________________________________________________________|     \
-  /__________)                                                  (_________\
+2.17.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
