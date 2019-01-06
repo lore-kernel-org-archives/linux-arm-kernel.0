@@ -2,60 +2,77 @@ Return-Path: <SRS0=ikCU=PO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7D58CC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  6 Jan 2019 01:56:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4E30FC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  6 Jan 2019 01:58:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 449C1222CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  6 Jan 2019 01:56:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1D321222AE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  6 Jan 2019 01:58:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KJv42TNz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 449C1222CB
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kGbYGAIs";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="NMb79ZOQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1D321222AE
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=ihjOpZxP4uNjG9g55luwIJmgiAfRBvgOatPj8qDJ6Ts=; b=KJv42TNzeg6zhQ
-	gGGIkR4iye0VGeZ+X5NRWWEb8CaG90mm+PRMTEBfhGfw7wBQN6kGuIFWXyIeQWjF2KyvKBzDTjV4t
-	h6bINp0hnbAExWsZ1wiesBAg/m4mdfSmHQtp4/6782LvVPomvd7usVqLs9lHtM6g+dLQaA6FrECIM
-	lnPRH/O1RP5NdzxurPEj6DZC3123dbfH4Sfenm48hHXFWHKFpiVHBf5TgIKdOe6Wic5SorR0l6Zmd
-	H0AprxaJcujdIiydWf7GBJpbfN5pBO5WPn+DQb7NWPBpHoEO/Cm2g5+pcK98jUWgzP2tORWzYvnug
-	RbHXDlyPTIv2u3gVBODw==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=TGWa75LkS3oLJ1KBxWiXPMa7A2VMHtexGB1k1IArOwY=; b=kGbYGAIsYw7ESg
+	7gG22AEX55Fe0pvbyDwT9NiZzI52LZW7zkDA7XzIrEKmHZCRAtOOu58Ic7VdrKQsK6h3bZJM9p518
+	gP/1xwMrhGuVN/WsXl9HpVNEhGZHzNMxjWb5jsdhBaCYiXVx6E5lFP+0Nyo7OGOkpY026X7FiD/vk
+	aWmYPHVb5eoF4dCoOa17pxTn7pQ/vXA+TmdMppgHqT03oVntWEYbdSskzy+jBKArCRNd8y7rWamxt
+	mVdCUP0g4NgQ0PUpYaXmO4N7CL65g88pockVe7WawGKL/noxE11tgbU3TiKbK0L/y/T0N07tI5pd0
+	fLsjdN1IZOBPz6BI08wA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gfxfe-0004ag-3f; Sun, 06 Jan 2019 01:56:10 +0000
-Received: from szxga06-in.huawei.com ([45.249.212.32] helo=huawei.com)
+	id 1gfxhR-0004zF-I5; Sun, 06 Jan 2019 01:58:01 +0000
+Received: from conssluserg-02.nifty.com ([210.131.2.81])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gfxfZ-0004a9-Ae
- for linux-arm-kernel@lists.infradead.org; Sun, 06 Jan 2019 01:56:07 +0000
-Received: from DGGEMS401-HUB.china.huawei.com (unknown [172.30.72.58])
- by Forcepoint Email with ESMTP id 5784CA8EAB6BB6D74FA0;
- Sun,  6 Jan 2019 09:56:00 +0800 (CST)
-Received: from ubuntu.huawei.com (10.93.195.238) by
- DGGEMS401-HUB.china.huawei.com (10.3.19.201) with Microsoft SMTP Server id
- 14.3.408.0; Sun, 6 Jan 2019 09:54:53 +0800
-From: Lingyan Huang <huanglingyan2@huawei.com>
-To: <linux-arm-kernel@lists.infradead.org>
-Subject: [PATCH v3] arm64: lib: accelerate do_csum with NEON instruction
-Date: Sun, 6 Jan 2019 09:55:29 +0800
-Message-ID: <1546739729-17234-1-git-send-email-huanglingyan2@huawei.com>
-X-Mailer: git-send-email 2.7.4
+ id 1gfxhO-0004yT-31; Sun, 06 Jan 2019 01:58:00 +0000
+Received: from mail-ua1-f45.google.com (mail-ua1-f45.google.com
+ [209.85.222.45]) (authenticated)
+ by conssluserg-02.nifty.com with ESMTP id x061vW3Q016763;
+ Sun, 6 Jan 2019 10:57:32 +0900
+DKIM-Filter: OpenDKIM Filter v2.10.3 conssluserg-02.nifty.com x061vW3Q016763
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
+ s=dec2015msa; t=1546739853;
+ bh=Ci+cXksoanD9GGaO2bNjRFHAELAMOrzQailOkPVHQYE=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=NMb79ZOQRE/ukbnmEjDrJGA5tvivz2hGgHOaTgGfdgMT52BZ6MlaAr9OOu6gp/trS
+ WRvlISuskTt/C9w/iDminFk/VmuJ9K+4j7Xp/WpUFRpd9QfK1vzbMR5QAeZcE/reH/
+ JKKT7xjyR2AjKkSxK7daBO5QkIdGziiuUIo+2zrcX7Pu/9ITZX4x4iiWvBJBp/ogV6
+ 8/ZxSB0AwO1YKYucspCQrCKcY1jBhBoaL1g5l7VH3ibFUGPMPch9IcmjPm97i9eEma
+ aL5xyOpb5aKSxeaSWgIpHUpNGrB3jfSmAjh4fdN0Wp8MEDNtY9uvQkqSkHTti5ld5z
+ I9NT5bgUv2GDw==
+X-Nifty-SrcIP: [209.85.222.45]
+Received: by mail-ua1-f45.google.com with SMTP id d21so13161832uap.9;
+ Sat, 05 Jan 2019 17:57:32 -0800 (PST)
+X-Gm-Message-State: AJcUukfIHcyCpjS8NyLnen+nK6oqYLXiXk42HIFHsoO2SFE6xJ0vWgEf
+ hmPnmxPcz6q6VSaS9A5dKnK5hauY4qFMzP8Vj54=
+X-Google-Smtp-Source: ALg8bN6cT+r8bP+L/JY/qMkSv+NJJcFADhHCF/8lIgeiq0xHTMpVWWCrVYA9xZ/dikGtlkLGbnhtFyZaG0ON7Y1HgiA=
+X-Received: by 2002:a9f:3f41:: with SMTP id i1mr20163513uaj.42.1546739851430; 
+ Sat, 05 Jan 2019 17:57:31 -0800 (PST)
 MIME-Version: 1.0
-X-Originating-IP: [10.93.195.238]
-X-CFilter-Loop: Reflected
+References: <1546477840-14278-1-git-send-email-yamada.masahiro@socionext.com>
+In-Reply-To: <1546477840-14278-1-git-send-email-yamada.masahiro@socionext.com>
+From: Masahiro Yamada <yamada.masahiro@socionext.com>
+Date: Sun, 6 Jan 2019 10:56:55 +0900
+X-Gmail-Original-Message-ID: <CAK7LNATS79a=vBdjvy18oE4XNOvCTPWwh3=BN4fV2No+VUV3oQ@mail.gmail.com>
+Message-ID: <CAK7LNATS79a=vBdjvy18oE4XNOvCTPWwh3=BN4fV2No+VUV3oQ@mail.gmail.com>
+Subject: Re: [PATCH 1/5] riscv: remove redundant kernel-space generic-y
+To: Linux Kbuild mailing list <linux-kbuild@vger.kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190105_175605_736420_1E110968 
-X-CRM114-Status: GOOD (  16.91  )
+X-CRM114-CacheID: sfid-20190105_175758_380279_C46C8B5B 
+X-CRM114-Status: GOOD (  12.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,276 +84,142 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Lingyan Huang <huanglingyan2@huawei.com>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>, Will Deacon <will.deacon@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>
+Cc: linux-arch <linux-arch@vger.kernel.org>, linux-riscv@lists.infradead.org,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Function do_csum() in lib/checksum.c is used to compute checksum,
-which is turned out to be slowly and costs a lot of resources.
-Let's use neon instructions to accelerate the checksum computation
-for arm64.
+On Thu, Jan 3, 2019 at 10:32 AM Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+>
+> This commit removes redundant generic-y defines in
+> arch/riscv/include/asm/Kbuild.
+>
+> [1] It is redundant to define the same generic-y in both
+>     arch/$(ARCH)/include/asm/Kbuild and
+>     arch/$(ARCH)/include/uapi/asm/Kbuild.
+>
+>     Remove the following generic-y:
+>
+>       errno.h
+>       fcntl.h
+>       ioctl.h
+>       ioctls.h
+>       ipcbuf.h
+>       mman.h
+>       msgbuf.h
+>       param.h
+>       poll.h
+>       posix_types.h
+>       resource.h
+>       sembuf.h
+>       setup.h
+>       shmbuf.h
+>       signal.h
+>       socket.h
+>       sockios.h
+>       stat.h
+>       statfs.h
+>       swab.h
+>       termbits.h
+>       termios.h
+>       types.h
+>
+> [2] It is redundant to define generic-y when arch-specific
+>     implementation exists in arch/$(ARCH)/include/asm/*.h
+>
+>     Remove the following generic-y:
+>
+>       cacheflush.h
+>       module.h
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+>
+> Changes in v2:
+>   - rebase on Linus' tree
 
-------
-V2 ==> V3:
-    only modify the arm64 codes instead of modifying headers
-    under asm-generic and code in lib/checksum.c.
-------
-------
-V1 ==> V2:
-    Change NEON assembly code to NEON intrinsic code which is built
-    on top of arm_neon.h to avoid dropping into assembly.
-------
 
-Here is the comparison results of function ip_compute_csum() between
-general do_csum() and neon instruction do_csum(). The test platform 
-is HUAWEI 1620 server with TAISHAN cores.
-
-        len(1000cycle)      general(ns)        do_csum_neon(ns)
-          64B:                58060                 59460
-         128B:                82930                 83930
-         256B:               132480                 73570
-         512B:               230100                 86230
-        1024B:               426600                 98200
+Patch 1-4, applied to linux-kbuild.
 
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Lingyan Huang <huanglingyan2@huawei.com>
----
- arch/arm64/include/asm/checksum.h |   5 ++
- arch/arm64/lib/Makefile           |   8 +--
- arch/arm64/lib/checksum.c         |  26 ++++++++
- arch/arm64/lib/do_csum.c          | 136 ++++++++++++++++++++++++++++++++++++++
- 4 files changed, 171 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm64/lib/checksum.c
- create mode 100644 arch/arm64/lib/do_csum.c
 
-diff --git a/arch/arm64/include/asm/checksum.h b/arch/arm64/include/asm/checksum.h
-index 0b6f5a7..7acd713 100644
---- a/arch/arm64/include/asm/checksum.h
-+++ b/arch/arm64/include/asm/checksum.h
-@@ -26,6 +26,10 @@ static inline __sum16 csum_fold(__wsum csum)
- }
- #define csum_fold csum_fold
- 
-+#define do_csum do_csum
-+unsigned int do_csum(const unsigned char *buff, int len);
-+extern unsigned int do_csum_arm(const unsigned char *buff, int len);
-+
- static inline __sum16 ip_fast_csum(const void *iph, unsigned int ihl)
- {
- 	__uint128_t tmp;
-@@ -46,6 +50,7 @@ static inline __sum16 ip_fast_csum(const void *iph, unsigned int ihl)
- }
- #define ip_fast_csum ip_fast_csum
- 
-+
- #include <asm-generic/checksum.h>
- 
- #endif	/* __ASM_CHECKSUM_H */
-diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-index 5540a16..c0b5b8c 100644
---- a/arch/arm64/lib/Makefile
-+++ b/arch/arm64/lib/Makefile
-@@ -3,12 +3,12 @@ lib-y		:= clear_user.o delay.o copy_from_user.o		\
- 		   copy_to_user.o copy_in_user.o copy_page.o		\
- 		   clear_page.o memchr.o memcpy.o memmove.o memset.o	\
- 		   memcmp.o strcmp.o strncmp.o strlen.o strnlen.o	\
--		   strchr.o strrchr.o tishift.o
-+		   strchr.o strrchr.o tishift.o checksum.o
- 
- ifeq ($(CONFIG_KERNEL_MODE_NEON), y)
--obj-$(CONFIG_XOR_BLOCKS)	+= xor-neon.o
--CFLAGS_REMOVE_xor-neon.o	+= -mgeneral-regs-only
--CFLAGS_xor-neon.o		+= -ffreestanding
-+obj-y    += do_csum.o
-+CFLAGS_REMOVE_do_csum.o	+= -mgeneral-regs-only
-+CFLAGS_do_csum.o		+= -ffreestanding
- endif
- 
- # Tell the compiler to treat all general purpose registers (with the
-diff --git a/arch/arm64/lib/checksum.c b/arch/arm64/lib/checksum.c
-new file mode 100644
-index 0000000..15a31bb
---- /dev/null
-+++ b/arch/arm64/lib/checksum.c
-@@ -0,0 +1,26 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ *
-+ * Authors: Lingyan Huang <huanglingyan2@huawei.com>
-+ * Copyright (C) 2018 Hisilicon, Inc. All Rights Reserved.
-+ *
-+ * Generic C or neon implementation of do_csum operations.
-+ * Choose faster neon instructions when NEON is supported.
-+ *
-+ */
-+
-+#include <asm/neon.h>
-+#include <asm/simd.h>
-+#include <asm/checksum.h>
-+
-+#define CSUM_NEON_THRESHOLD 128
-+
-+unsigned int do_csum(const unsigned char *buff, int len)
-+{
-+#ifdef CONFIG_KERNEL_MODE_NEON
-+	if (len >= CSUM_NEON_THRESHOLD)
-+		return do_csum_arm(buff, len);
-+#endif  /* CONFIG_KERNEL_MODE_NEON */
-+#undef do_csum
-+	return 0;
-+}
-diff --git a/arch/arm64/lib/do_csum.c b/arch/arm64/lib/do_csum.c
-new file mode 100644
-index 0000000..893583f
---- /dev/null
-+++ b/arch/arm64/lib/do_csum.c
-@@ -0,0 +1,136 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Authors: Lingyan Huang <huanglingyan2@huawei.com>
-+ * Copyright (C) 2018 Hisilicon, Inc. All Rights Reserved.
-+ *
-+ * Generic C or neon implementation of do_csum operations.
-+ * Choose faster neon instructions when NEON is supported.
-+ *
-+ */
-+
-+#include <asm/neon.h>
-+#include <asm/simd.h>
-+#include <asm/checksum.h>
-+#include <asm/byteorder.h>
-+#include <asm/neon-intrinsics.h>
-+
-+#define CSUM_NEON_THRESHOLD 128
-+#ifdef CONFIG_KERNEL_MODE_NEON
-+static inline u32 from64to16(u64 x)
-+{
-+	/* add up 32-bit and 32-bit for 32+c bit */
-+	x = (x & 0xffffffff) + (x >> 32);
-+	/* add up carry.. */
-+	x = (x & 0xffffffff) + (x >> 32);
-+	/* add up 16-bit and 16-bit for 16+c bit */
-+	x = ((u32)x & 0xffff) + ((u32)x >> 16);
-+	/* add up carry.. */
-+	x = ((u32)x & 0xffff) + ((u32)x >> 16);
-+	return x;
-+}
-+
-+unsigned int do_csum_neon(const unsigned char *buff, int len)
-+{
-+	unsigned int odd, count;
-+	uint64_t result = 0;
-+	unsigned int count64;
-+	uint32x4_t vzero = (uint32x4_t){0, 0, 0, 0};
-+
-+	register uint32x4_t v0, v1, v2, v3;
-+
-+	if (unlikely(len <= 0))
-+		return result;
-+
-+	odd = 1 & (unsigned long)buff;
-+	if (unlikely(odd)) {
-+		result = *buff;
-+		len--;
-+		buff++;
-+	}
-+
-+	count = len >> 1;
-+	if (count) {
-+		if (2 & (unsigned long)buff) {
-+			result += *(unsigned short *)buff;
-+			count--;
-+			len -= 2;
-+			buff += 2;
-+		}
-+		count >>= 1;            /* nr of 32-bit words.. */
-+		if (count) {
-+			if (4 & (unsigned long)buff) {
-+				result += *(unsigned int *)buff;
-+				count--;
-+				len -= 4;
-+				buff += 4;
-+			}
-+			count >>= 1;    /* nr of 64-bit words.. */
-+
-+			v0 = vzero;
-+			v1 = vzero;
-+			v2 = vzero;
-+			v3 = vzero;
-+
-+			count64 = count >> 3;  /* compute 64 Byte circle */
-+			while (count64) {
-+				v0 = vpadalq_u16(v0,
-+					vld1q_u16((uint16_t *)buff + 0));
-+				v1 = vpadalq_u16(v1,
-+					vld1q_u16((uint16_t *)buff + 8));
-+				v2 = vpadalq_u16(v2,
-+					vld1q_u16((uint16_t *)buff + 16));
-+				v3 = vpadalq_u16(v3,
-+					vld1q_u16((uint16_t *)buff + 24));
-+				buff += 64;
-+				count64--;
-+			}
-+			v0 = vaddq_u32(v0, v1);
-+			v2 = vaddq_u32(v2, v3);
-+			v0 = vaddq_u32(v0, v2);
-+
-+			count %= 8;
-+			while (count >= 2) { /* compute 16 byte circle */
-+				v0 = vpadalq_u16(v0,
-+					vld1q_u16((uint16_t *)buff + 0));
-+				buff += 16;
-+				count -= 2;
-+			}
-+
-+			result += vgetq_lane_u32(v0, 0);
-+			result += vgetq_lane_u32(v0, 1);
-+			result += vgetq_lane_u32(v0, 2);
-+			result += vgetq_lane_u32(v0, 3);
-+			if (count & 1) {
-+				result += *(unsigned long long *)buff;
-+				buff += 8;
-+			}
-+			if (len & 4) {
-+				result += *(unsigned int *)buff;
-+				buff += 4;
-+			}
-+		}
-+		if (len & 2) {
-+			result += *(unsigned short *)buff;
-+			buff += 2;
-+		}
-+	}
-+	if (len & 1)
-+		result += *buff;
-+	result = from64to16(result);
-+	if (odd)
-+		result = ((result >> 8) & 0xff) | ((result & 0xff) << 8);
-+	return result;
-+}
-+#endif
-+
-+
-+unsigned int do_csum_arm(const unsigned char *buff, int len)
-+{
-+	unsigned int res;
-+
-+	kernel_neon_begin();
-+	res = do_csum_neon(buff, len);
-+	kernel_neon_end();
-+	return res;
-+}
-+
+>  arch/riscv/include/asm/Kbuild | 25 -------------------------
+>  1 file changed, 25 deletions(-)
+>
+> diff --git a/arch/riscv/include/asm/Kbuild b/arch/riscv/include/asm/Kbuild
+> index 6a646d9..cccd12c 100644
+> --- a/arch/riscv/include/asm/Kbuild
+> +++ b/arch/riscv/include/asm/Kbuild
+> @@ -1,5 +1,4 @@
+>  generic-y += bugs.h
+> -generic-y += cacheflush.h
+>  generic-y += checksum.h
+>  generic-y += compat.h
+>  generic-y += cputime.h
+> @@ -9,16 +8,11 @@ generic-y += dma.h
+>  generic-y += dma-contiguous.h
+>  generic-y += dma-mapping.h
+>  generic-y += emergency-restart.h
+> -generic-y += errno.h
+>  generic-y += exec.h
+>  generic-y += fb.h
+> -generic-y += fcntl.h
+>  generic-y += hardirq.h
+>  generic-y += hash.h
+>  generic-y += hw_irq.h
+> -generic-y += ioctl.h
+> -generic-y += ioctls.h
+> -generic-y += ipcbuf.h
+>  generic-y += irq_regs.h
+>  generic-y += irq_work.h
+>  generic-y += kdebug.h
+> @@ -27,34 +21,15 @@ generic-y += kvm_para.h
+>  generic-y += local.h
+>  generic-y += local64.h
+>  generic-y += mm-arch-hooks.h
+> -generic-y += mman.h
+> -generic-y += module.h
+> -generic-y += msgbuf.h
+>  generic-y += mutex.h
+> -generic-y += param.h
+>  generic-y += percpu.h
+> -generic-y += poll.h
+> -generic-y += posix_types.h
+>  generic-y += preempt.h
+> -generic-y += resource.h
+>  generic-y += scatterlist.h
+>  generic-y += sections.h
+> -generic-y += sembuf.h
+>  generic-y += serial.h
+> -generic-y += setup.h
+> -generic-y += shmbuf.h
+>  generic-y += shmparam.h
+> -generic-y += signal.h
+> -generic-y += socket.h
+> -generic-y += sockios.h
+> -generic-y += stat.h
+> -generic-y += statfs.h
+> -generic-y += swab.h
+> -generic-y += termbits.h
+> -generic-y += termios.h
+>  generic-y += topology.h
+>  generic-y += trace_clock.h
+> -generic-y += types.h
+>  generic-y += unaligned.h
+>  generic-y += user.h
+>  generic-y += vga.h
+> --
+> 2.7.4
+>
+
+
 -- 
-2.7.4
-
+Best Regards
+Masahiro Yamada
 
 _______________________________________________
 linux-arm-kernel mailing list
