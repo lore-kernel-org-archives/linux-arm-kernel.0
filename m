@@ -2,73 +2,71 @@ Return-Path: <SRS0=txfi=PP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-16.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 04E17C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 18:26:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6DCE6C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 18:58:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C3AE92173C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 18:26:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 35ED3206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 18:58:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="n8w08QdI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C3AE92173C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=v3.sk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RaPESyD8";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="enhOCcCA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 35ED3206B7
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Date:Message-Id:
+	In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hq5u9/dnxyEeIf5K3J6PRkNqE30QTjwCtk8EXgiVszk=; b=n8w08QdIq7D3vd
-	uTL4BWRCulHfM3fnV8hPFWnRH84NkcKXODzgcY8pi/gQVkYSW5CKuz/tFxYdYcgb/w0zwex6yj1FV
-	5ABctGWY8+10S8ylHcKEbQRXe4t+88EZ0B+3i5ccNVwPxxOP46keOQ95FMck0Odo3BANl2xnCSC0X
-	MtrmqGygylu4rdgl/2CvnuL8ECGW7l0YDaa8XRyKOgiJDhW0MkHgbIcT2oc20NmsMd19CQ3V6Djpe
-	Vf8r9Pw4DXGk6RaRgqLRmGBOvsC0TQvwatIBQRisKsvNkUw3/K1/k4HWM0Vlp0vosCACjfe1kui8n
-	uS4EN4UmeL9G7jx2WFGw==;
+	References:List-Owner; bh=keJCtuv3rz9e4CdyFb6cNKrg4eo9MYzQw95QLo9SuBk=; b=RaP
+	ESyD8YFk03oexFNVOMSWAKY8pBMZPVktZ3j3NWf+b//mvcQjZhTFgKY8dnXmUFd/pVl1WhjnD+l6h
+	uuwI4SsOeFTS0iZXBzi1SUEe0XuI1+Z6BtbNgk8dlZKYWcbe78E7xA2Of525Ek5jsc943NORI//Zd
+	fxhsqqxRvYOIY1oYjC0w/PRXmbUDwvWXp6qFqHNbn1nmtfXtpIfQl/M4Zeefw6Hjs04QsQ6MyrRMc
+	piw75RkxDbOPX8VXdDfa3yd2GmJy/zm8gDI3QemVdzishAtG/vhMl5eCezhH0fPHKmX1H0zxlz8cH
+	OqSSEJRhlmerQuR/8p9KsmHDioPgffg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggZbD-00006Q-RJ; Mon, 07 Jan 2019 18:26:07 +0000
-Received: from shell.v3.sk ([90.176.6.54])
+	id 1gga60-0001QX-3T; Mon, 07 Jan 2019 18:57:56 +0000
+Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggZb8-00005j-Uu
- for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 18:26:05 +0000
-Received: from localhost (localhost [127.0.0.1])
- by zimbra.v3.sk (Postfix) with ESMTP id E73C3FFD7D;
- Mon,  7 Jan 2019 19:25:58 +0100 (CET)
-Received: from shell.v3.sk ([127.0.0.1])
- by localhost (zimbra.v3.sk [127.0.0.1]) (amavisd-new, port 10032)
- with ESMTP id wkQBFvO01pwA; Mon,  7 Jan 2019 19:25:55 +0100 (CET)
-Received: from localhost (localhost [127.0.0.1])
- by zimbra.v3.sk (Postfix) with ESMTP id E1B35FFD7E;
- Mon,  7 Jan 2019 19:25:54 +0100 (CET)
-X-Virus-Scanned: amavisd-new at zimbra.v3.sk
-Received: from shell.v3.sk ([127.0.0.1])
- by localhost (zimbra.v3.sk [127.0.0.1]) (amavisd-new, port 10026)
- with ESMTP id LUdJIGp02hQm; Mon,  7 Jan 2019 19:25:53 +0100 (CET)
-Received: from belphegor (nat-pool-brq-t.redhat.com [213.175.37.10])
- by zimbra.v3.sk (Postfix) with ESMTPSA id 43495FFD7D;
- Mon,  7 Jan 2019 19:25:53 +0100 (CET)
-Message-ID: <4364d7c4dc1266ca45255cdad5ba40fb20a9bea3.camel@v3.sk>
-Subject: Re: [PATCH v2 13/17] power: supply: olpc_battery: Use DT to get
- battery version
-From: Lubomir Rintel <lkundrak@v3.sk>
-To: Sebastian Reichel <sebastian.reichel@collabora.com>
-Date: Mon, 07 Jan 2019 19:25:52 +0100
-In-Reply-To: <20181205205459.bsumxn57hjjzvqaj@earth.universe>
-References: <20181116162403.49854-1-lkundrak@v3.sk>
- <20181116162403.49854-14-lkundrak@v3.sk>
- <20181205205459.bsumxn57hjjzvqaj@earth.universe>
-User-Agent: Evolution 3.30.3 (3.30.3-1.fc29) 
-Mime-Version: 1.0
+ id 1gga5w-0001Pb-4K
+ for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 18:57:54 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=sirena.org.uk; s=20170815-heliosphere; h=Date:Message-Id:In-Reply-To:
+ Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:
+ List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:
+ List-Archive; bh=ZeeKJbXY+PtlLSFSqvZ/6Qdr3OBdTj8OLT5IZjfgqHg=; b=enhOCcCAh1KN
+ P4oBGUQAtiy0mqcUUCbciosYonfkwnuHeGZfbGbSFojgNwhUPR78tWiJ48+q+iMpaD2cnFd6a3wyu
+ P3uBQcHZ/nA3XX+nhLJSFrzDvldCDbHT0Hq859BUOcQOoZHp4sfBS6qHOKT4/OiJ7unfavBBHFXTj
+ JpkWk=;
+Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
+ ([82.37.168.47] helo=debutante.sirena.org.uk)
+ by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
+ (envelope-from <broonie@sirena.org.uk>)
+ id 1gga5r-0007km-Q4; Mon, 07 Jan 2019 18:57:47 +0000
+Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
+ id 6B9541127491; Mon,  7 Jan 2019 18:57:47 +0000 (GMT)
+From: Mark Brown <broonie@kernel.org>
+To: Maruthi Srinivas Bayyavarapu <maruthi.srinivas.bayyavarapu@xilinx.com>
+Subject: Applied "dt-bindings: ASoC: xlnx,
+ spdif: Document spdif bindings" to the asoc tree
+In-Reply-To: <1546538993-55473-2-git-send-email-maruthi.srinivas.bayyavarapu@xilinx.com>
+X-Patchwork-Hint: ignore
+Message-Id: <20190107185747.6B9541127491@debutante.sirena.org.uk>
+Date: Mon,  7 Jan 2019 18:57:47 +0000 (GMT)
+X-Bad-Reply: In-Reply-To but no 'Re:' in Subject.
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190107_102603_312522_D6F3A63B 
-X-CRM114-Status: GOOD (  20.02  )
+X-CRM114-CacheID: sfid-20190107_105752_333302_16295DB3 
+X-CRM114-Status: GOOD (  13.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,100 +79,94 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- devel@driverdev.osuosl.org, Eric Miao <eric.y.miao@gmail.com>,
- James Cameron <quozl@laptop.org>, Geert Uytterhoeven <geert+renesas@glider.be>,
- linux-pm@vger.kernel.org, Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
- linux-spi@vger.kernel.org, Mark Brown <broonie@kernel.org>,
- Haojian Zhuang <haojian.zhuang@gmail.com>, Daniel Mack <daniel@zonque.org>,
- Darren Hart <dvhart@infradead.org>, platform-driver-x86@vger.kernel.org,
- Robert Jarzmik <robert.jarzmik@free.fr>, Andy Shevchenko <andy@infradead.org>,
- linux-arm-kernel@lists.infradead.org
+ alsa-devel@alsa-project.org, linux-kernel@vger.kernel.org,
+ Takashi Iwai <tiwai@suse.com>, Rob Herring <robh+dt@kernel.org>,
+ Liam Girdwood <lgirdwood@gmail.com>, Mark Brown <broonie@kernel.org>,
+ linux-arm-kernel@lists.infradead.org, Jaroslav Kysela <perex@perex.cz>,
+ Michal Simek <michal.simek@xilinx.com>, Vishal Sagar <vsagar@xilinx.com>
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 2018-12-05 at 21:54 +0100, Sebastian Reichel wrote:
-> Hi,
-> 
-> On Fri, Nov 16, 2018 at 05:23:59PM +0100, Lubomir Rintel wrote:
-> > Avoid using the x86 OLPC platform specific call to get the board
-> > version. It won't work on FDT-based ARM MMP2 platform.
-> > 
-> > Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-> > Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
-> > Acked-by: Pavel Machek <pavel@ucw.cz>
-> > 
-> > ---
-> 
-> Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.com>
-> 
-> I assume this patch cannot be applied to power-supply without patch
-> 12 having been merged to avoid breaking XO1.5 devices temporarily?
+The patch
 
-That is true. What's the correct way to deal with a situation like
-this? Just hold the patch until the other changes get in, perhaps via
-linux-platform-drivers-x86.git? Or maybe this can go in together via
-that tree along with the other patches?
+   dt-bindings: ASoC: xlnx, spdif: Document spdif bindings
 
-Thanks
-Lubo
+has been applied to the asoc tree at
 
-> -- Sebastian
-> 
-> > Changes since v1:
-> > - Sort the new include a bit higher
-> > 
-> >  drivers/power/supply/olpc_battery.c | 10 +++++++---
-> >  1 file changed, 7 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/drivers/power/supply/olpc_battery.c
-> > b/drivers/power/supply/olpc_battery.c
-> > index 5a97e42a3547..5323987d9284 100644
-> > --- a/drivers/power/supply/olpc_battery.c
-> > +++ b/drivers/power/supply/olpc_battery.c
-> > @@ -14,6 +14,7 @@
-> >  #include <linux/types.h>
-> >  #include <linux/err.h>
-> >  #include <linux/device.h>
-> > +#include <linux/of.h>
-> >  #include <linux/platform_device.h>
-> >  #include <linux/power_supply.h>
-> >  #include <linux/jiffies.h>
-> > @@ -622,11 +623,13 @@ static int olpc_battery_probe(struct
-> > platform_device *pdev)
-> >  	olpc_ac = power_supply_register(&pdev->dev, &olpc_ac_desc,
-> > NULL);
-> >  	if (IS_ERR(olpc_ac))
-> >  		return PTR_ERR(olpc_ac);
-> > -
-> > -	if (olpc_board_at_least(olpc_board_pre(0xd0))) { /* XO-1.5 */
-> > +	if (of_property_match_string(pdev->dev.of_node, "compatible",
-> > +					"olpc,xo1.5-battery") >= 0) {
-> > +		/* XO-1.5 */
-> >  		olpc_bat_desc.properties = olpc_xo15_bat_props;
-> >  		olpc_bat_desc.num_properties =
-> > ARRAY_SIZE(olpc_xo15_bat_props);
-> > -	} else { /* XO-1 */
-> > +	} else {
-> > +		/* XO-1 */
-> >  		olpc_bat_desc.properties = olpc_xo1_bat_props;
-> >  		olpc_bat_desc.num_properties =
-> > ARRAY_SIZE(olpc_xo1_bat_props);
-> >  	}
-> > @@ -672,6 +675,7 @@ static int olpc_battery_remove(struct
-> > platform_device *pdev)
-> >  
-> >  static const struct of_device_id olpc_battery_ids[] = {
-> >  	{ .compatible = "olpc,xo1-battery" },
-> > +	{ .compatible = "olpc,xo1.5-battery" },
-> >  	{}
-> >  };
-> >  MODULE_DEVICE_TABLE(of, olpc_battery_ids);
-> > -- 
-> > 2.19.1
-> > 
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+From 2f00f7715e624d04e25d9cb8bb0f53884d3bcb59 Mon Sep 17 00:00:00 2001
+From: Maruthi Srinivas Bayyavarapu <maruthi.srinivas.bayyavarapu@xilinx.com>
+Date: Thu, 3 Jan 2019 23:39:51 +0530
+Subject: [PATCH] dt-bindings: ASoC: xlnx, spdif: Document spdif bindings
+
+Added documentation for SPDIF IP DT bindings.
+
+Signed-off-by: Maruthi Srinivas Bayyavarapu <maruthi.srinivas.bayyavarapu@xilinx.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ .../devicetree/bindings/sound/xlnx,spdif.txt  | 28 +++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/xlnx,spdif.txt
+
+diff --git a/Documentation/devicetree/bindings/sound/xlnx,spdif.txt b/Documentation/devicetree/bindings/sound/xlnx,spdif.txt
+new file mode 100644
+index 000000000000..15c2d64d247c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/xlnx,spdif.txt
+@@ -0,0 +1,28 @@
++Device-Tree bindings for Xilinx SPDIF IP
++
++The IP supports playback and capture of SPDIF audio
++
++Required properties:
++ - compatible: "xlnx,spdif-2.0"
++ - clock-names: List of input clocks.
++   Required elements: "s_axi_aclk", "aud_clk_i"
++ - clocks: Input clock specifier. Refer to common clock bindings.
++ - reg: Base address and address length of the IP core instance.
++ - interrupts-parent: Phandle for interrupt controller.
++ - interrupts: List of Interrupt numbers.
++ - xlnx,spdif-mode: 0 :- receiver mode
++		    1 :- transmitter mode
++ - xlnx,aud_clk_i: input audio clock value.
++
++Example:
++	spdif_0: spdif@80010000 {
++		clock-names = "aud_clk_i", "s_axi_aclk";
++		clocks = <&misc_clk_0>, <&clk 71>;
++		compatible = "xlnx,spdif-2.0";
++		interrupt-names = "spdif_interrupt";
++		interrupt-parent = <&gic>;
++		interrupts = <0 91 4>;
++		reg = <0x0 0x80010000 0x0 0x10000>;
++		xlnx,spdif-mode = <1>;
++		xlnx,aud_clk_i = <49152913>;
++	};
+-- 
+2.20.1
 
 
 _______________________________________________
