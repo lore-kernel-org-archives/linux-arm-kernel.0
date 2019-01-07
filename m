@@ -8,17 +8,17 @@ X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B4A80C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 17:15:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CB32EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 17:24:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 849942173C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 17:15:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 95FEC2089F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 17:24:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AJugCH9b";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="el3xz9iq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 849942173C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="txC9Qoz2";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Hfb0Huoh"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 95FEC2089F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,63 +27,65 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
 	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=EswQjGyTsTUVTUFQ9YccRc0BPAlbKCpHKHD6WL92JY4=; b=AJugCH9b9P0Qzu
-	0MOB55qWtd7WeMSrlJXXBWY8GHqbNFrsXfsuh+SdAoDmbszXyfl+FMRfVxhFjoR79+lFtTqhyprYQ
-	nOaH8I9TzhQvMB8/vDjXCqHCx7y8gDXzb1lhsTZ++jGjUigjb+2ZvlHnHe2DM4keQJvpkaSvDw4bo
-	cCcFUbS6pO+bZYyoFK98/b62ilZpobnHep+Hyh3JHXXSBkhOT/roTdJKu9/pvbJsh9SmhlyN3NyO4
-	/FBZA02eQGe5+DNcnBt/f5UjwTgtgPfiGlnm6sKgMCbm3EypnKB7TuFDzDJ/pvUFn7LpUSLXGGOvK
-	zO7GQbk6bmpgTLvR2QiA==;
+	List-Owner; bh=Ogiju7cOvsVDTO3cb3Kh8y6FGprXyaaQQKJM3WTC+SM=; b=txC9Qoz2Ufcbbr
+	4Ew158F69+25OUYo8aq1l7ndJJuApvQG+4eJH2qDq0VE7NBPSCr3ygZ1hq8bApFN05xlSkdZnysEQ
+	Wjh2Ic61Z2YK7svFw2cDo1qwrtuX0RfuDQGL+DEcFueJD1EgjXdDKz6X0VEoHFuKKyclSQUtYD6z+
+	GLf1JCDHHAs0fzg+DNCGwoAy0UWiR7hHKNlW2x6IQg0499Fb6LQbWpHLI4ETGIV6xFxh5IKnGin8X
+	NilosXlh6v6jj5YBspTxoHnWe9UGdboUnXk95jVAeHSA0qOM9Ydhe989G7Smlnkx0RWS5tRKvEaFr
+	/t2hsrvdYOpNVg3YaJdg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggYUc-0001Im-VT; Mon, 07 Jan 2019 17:15:14 +0000
-Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
+	id 1ggYdL-0003Qq-V4; Mon, 07 Jan 2019 17:24:15 +0000
+Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggYUZ-0001I3-Bj
- for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 17:15:13 +0000
-Received: by mail-pg1-x543.google.com with SMTP id c25so414923pgb.4
+ id 1ggYdI-0003QC-Jh
+ for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 17:24:13 +0000
+Received: by mail-pl1-x642.google.com with SMTP id gn14so440216plb.10
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 07 Jan 2019 09:15:10 -0800 (PST)
+ Mon, 07 Jan 2019 09:24:12 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=date:from:to:cc:subject:message-id:mime-version:content-disposition
- :user-agent; bh=x/QzmUyHJ6F27j7w4MWF17KHvW3Orfvcl1prMlNjj+8=;
- b=el3xz9iqaEkNf37pJLFnUYd+fMGNUQdfA54pCPwiKcmLJb6jSYvQTW1BldSNfp/Ry3
- qLCZr4mckISAinfRez97Ye1LmcpTWkAYrqPBVq9RCe/MDm2K8l/Jb7N8Xbm+fuDPTjLH
- +WepaiTP97E3Vaj9TxIDS5IS5h/9q+7HLwe9Q3UffQCuPNUl4pNSyCx37qSU0CL7WuBU
- IPwpxeTFO0L7PEHMNElk91JKGQ2gQ1nSxWJHWvFan5T4gxS5cU+/dYHQJ6UOjFTzjMEv
- RNI8Wl6LOAIoloSc8KDHD6I5LS7HKkavmQn7r/RCnE/60853gIrIhLQXhCIh2VcpqBEX
- dzxQ==
+ :user-agent; bh=h5MALT2X5pDliyqWk6KlkEi5unDMEOp/ldBTKlH3kTk=;
+ b=Hfb0HuohMJIyDMfHKGDS+Z0nlRBUfEo2wywrLh20vzNDHR+3MyOWMVfIZtei2Wk5jN
+ sZCefk7LxhtCltmgRxk7AgLeVDSg896kX8+JESOQgOPc4ohkEglHWPSwMK6Lx9h1YI4t
+ eyVMa6XQvrRJE0wZ9/+IE8HWirRsziX1M7M8n1s3EwIl5wOAXUe5VPlhN2GRFkTTDw2M
+ GVQuQedtag/IOtufRaE6Bizs7iDpCtOE90mfuBV5+hbroG6RFdDFKDKA+udHnm/w6jn9
+ vpFdQGBHy+866v29YO8QSe+Yl1TTiy4EgTjwOePFIB1r6NkWgkTBDp6IKmyRsKX0NeLj
+ AjWA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:mime-version
  :content-disposition:user-agent;
- bh=x/QzmUyHJ6F27j7w4MWF17KHvW3Orfvcl1prMlNjj+8=;
- b=RCC5ud+QmRLIVParAGJVgkYBN6UB1g8LUBD4MpcRwdsZfJimdgC1dR/ZkOxbMiiuIS
- cQVMSNPF1BoAlj8iteJyGMgnPN4GyzhESiyBIf3Fh6KXYAssubaMDCxZipXdC/+8XPpy
- ete5Y/LnZ12N+mnz3f8iY0aqEzeG8QAfVFbOrs0o5KMcoCU8wLXl9CXsaWSPnBLqbF7G
- lwjffUEuLXUXwk1ILj7Mf2eUvfVWkTldt4mj3/qbV2G0RDO8ayCFgO4FX0dn+M4wPiAM
- qZN0I0fmbEHLJQAzoruK487p6pSiaq1KCUiHWu5pkaaCxx0EuFY7iKc85SujiKtB1Tcn
- v3wA==
-X-Gm-Message-State: AA+aEWalurINrA2AHucyt2Om+RhU2T7WGDGnTdxjJDtZBAjYlYf9Oj0v
- Iz6dITWo4ND6mwsP3wf7rZI=
-X-Google-Smtp-Source: ALg8bN4hrojHm1+xmTxfWxSQfh+U9iWFKTVjoMf6FAqzNGy+dstoHCZ9/iGQowKlRYVAMqi3ZfCenA==
-X-Received: by 2002:a62:47d9:: with SMTP id p86mr62375182pfi.95.1546881310280; 
- Mon, 07 Jan 2019 09:15:10 -0800 (PST)
+ bh=h5MALT2X5pDliyqWk6KlkEi5unDMEOp/ldBTKlH3kTk=;
+ b=bQ7VNlmKwJGRCtOPBRtbO2dFmvOURM4mWLUBCH3h0GwoDpLR3Eg8cWFAAs+DLLhxuy
+ 6QnSsM1dGNxKVrTq5i5Y+qs+99h6LiGAJXnas1SPt4CHDkdG9VJRYPYGY4mxIb0ulgzx
+ hosdQCyKQXM4+HjoGRAJFgX9AX/dMaN1sCqA8CoWmtW8SVoF73p1TepS3BIL9gMtI7Gd
+ 97TLtD17A+ZULeSyDAsnTlw/15wHtjVEX2wqaoRiniTS8CEgVbyzU/36AL/mjHjyFMk3
+ 8Q6F2qQg7wlmrTLbaCllydO4i09l45doRlPQQlIcLcLAnO8pPkiIHHz2aPIC+arrYJJA
+ 0NtQ==
+X-Gm-Message-State: AJcUukdYUo6K+1b4R3yybkmfDDkHkW2nHCNjSUjFlutW3A5+fuKpsMA3
+ 2UM0nzH7p2cN+jafgPCYqXc=
+X-Google-Smtp-Source: ALg8bN6yPML3KHWfETYEKy6ZAhyax4PM9FZ88O6RVrdPTTSxfeug/qLYU8NI9NsZTLumjeNLFT0Kjg==
+X-Received: by 2002:a17:902:654a:: with SMTP id
+ d10mr60845311pln.324.1546881851351; 
+ Mon, 07 Jan 2019 09:24:11 -0800 (PST)
 Received: from jordon-HP-15-Notebook-PC ([106.51.19.175])
- by smtp.gmail.com with ESMTPSA id s190sm97380708pfb.103.2019.01.07.09.15.07
+ by smtp.gmail.com with ESMTPSA id v15sm96759729pfn.94.2019.01.07.09.24.09
  (version=TLS1 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Mon, 07 Jan 2019 09:15:08 -0800 (PST)
-Date: Mon, 7 Jan 2019 22:49:08 +0530
+ Mon, 07 Jan 2019 09:24:10 -0800 (PST)
+Date: Mon, 7 Jan 2019 22:58:06 +0530
 From: Souptick Joarder <jrdr.linux@gmail.com>
-To: linux@armlinux.org.uk, mchehab+samsung@kernel.org,
- linus.walleij@linaro.org, wsa@the-dreams.de
-Subject: [PATCH] arm/mach-sa1100/simpad.c: Remove duplicate header
-Message-ID: <20190107171908.GA5246@jordon-HP-15-Notebook-PC>
+To: linux@armlinux.org.uk, mhocko@suse.com, rppt@linux.vnet.ibm.com,
+ akpm@linux-foundation.org
+Subject: [PATCH] arch/arm/mm: Remove duplicate header
+Message-ID: <20190107172805.GA8462@jordon-HP-15-Notebook-PC>
 MIME-Version: 1.0
 Content-Disposition: inline
 User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190107_091511_411285_1FD8C820 
-X-CRM114-Status: GOOD (  10.38  )
+X-CRM114-CacheID: sfid-20190107_092412_650655_C6230BFA 
+X-CRM114-Status: UNSURE (   9.93  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -102,25 +104,33 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Remove linux/gpio/machine.h which is included more than once.
+Remove duplicate headers which are included twice.
 
 Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
 ---
- arch/arm/mach-sa1100/simpad.c | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/mm/mmu.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
-index 406487e..c7fb9a7 100644
---- a/arch/arm/mach-sa1100/simpad.c
-+++ b/arch/arm/mach-sa1100/simpad.c
-@@ -18,7 +18,6 @@
- #include <linux/mtd/partitions.h>
- #include <linux/io.h>
- #include <linux/gpio/driver.h>
--#include <linux/gpio/machine.h>
- 
- #include <mach/hardware.h>
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index f5cc1cc..dde3032 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -23,7 +23,6 @@
+ #include <asm/sections.h>
+ #include <asm/cachetype.h>
+ #include <asm/fixmap.h>
+-#include <asm/sections.h>
  #include <asm/setup.h>
+ #include <asm/smp_plat.h>
+ #include <asm/tlb.h>
+@@ -36,7 +35,6 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/pci.h>
+-#include <asm/fixmap.h>
+ 
+ #include "fault.h"
+ #include "mm.h"
 -- 
 1.9.1
 
