@@ -2,72 +2,151 @@ Return-Path: <SRS0=txfi=PP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CFD87C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 15:58:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 342F4C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 16:08:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9A2F62087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 15:58:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 023082173C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 16:08:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P2IsKRba"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9A2F62087F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.intel.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tvCLxEZT";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Pfd4JMrX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 023082173C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Cc:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NF13Y0LzBMwxCjNwoaAnT9SPjkg8nNv0cnbMnK3Sahc=; b=P2IsKRbaZ+/LJQ
-	9sj6wl8gzYPGRiEjq23OTKKqee6v2rdiqK2AmGrWOfIyxRDbqHiFyQr8vZw0g7ILG5Yef0utdbrj9
-	KUzwZ9+y6U2CzHEBor3bpj8CUzv5DUeajbTiPSINs9P/3PbQBVFaNCYVH+JOQqTUW23papqjZy92e
-	e4r5YWkNDoIwNWx6PWST5ftkAERTxuwm28l8JA0veg+FyddNLwP30J8U/YnTQU2y7jy6+xAEA7vRy
-	l4jksu7W/xHmV4CzDfE++6VRnGkcY9dA0DZ+PfhSI8PMSzH3GozYKpOsaJNFMGY3pSDy+O/DsPqs9
-	CvOxAnPuH/IYtiE88mkw==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ptvN7YOUzrtti8AL5/obSjPlq4HqD8GptZjj3VOk6wc=; b=tvCLxEZTwjcrxK
+	HhP4n1PjIccVnDEkBqTBjt8Amwn7j06XgN18zyCOu3DLDkPMN7hwFe2wIsPWZfkJ5y8MoNvPJPYfu
+	AsD1eAOn6rIst33w2FysEnsC3ZpiYVc5esiJq7MH0Nn4yWzu8SykbCU+i7a+DZ/ICDkcFTECvpNRd
+	Zx22gBfLwG9NX6b5qn02JZOF5cG5/AzWcH9Z6BI0HNXfCwlpodWOH7tta9I+DsoOvkhE/rkS2ZweH
+	IlKqVvas3ih2gHWxbEcrsc343vk+eRBKMRjn1sqO543gLdzIohbzsR12I6NzKRL4Da5CB3Rzdd4N/
+	8V03dTHbngYz4RfPwuDQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggXIO-0008Ey-V4; Mon, 07 Jan 2019 15:58:32 +0000
-Received: from mga09.intel.com ([134.134.136.24])
+	id 1ggXRe-0003IM-OL; Mon, 07 Jan 2019 16:08:06 +0000
+Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggXIL-0008E4-Ko
- for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 15:58:31 +0000
-X-Amp-Result: UNSCANNABLE
-X-Amp-File-Uploaded: False
-Received: from orsmga001.jf.intel.com ([10.7.209.18])
- by orsmga102.jf.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
- 07 Jan 2019 07:58:28 -0800
-X-ExtLoop1: 1
-X-IronPort-AV: E=Sophos;i="5.56,451,1539673200"; d="scan'208";a="124862031"
-Received: from smile.fi.intel.com (HELO smile) ([10.237.72.86])
- by orsmga001.jf.intel.com with ESMTP; 07 Jan 2019 07:58:26 -0800
-Received: from andy by smile with local (Exim 4.92-RC4)
- (envelope-from <andriy.shevchenko@linux.intel.com>)
- id 1ggXIH-0001Ur-5C; Mon, 07 Jan 2019 17:58:25 +0200
-Date: Mon, 7 Jan 2019 17:58:25 +0200
-From: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-To: Tsahee Zidenberg <tsahee@annapurnalabs.com>,
- Antoine Tenart <antoine.tenart@free-electrons.com>,
- linux-arm-kernel@lists.infradead.org, Thomas Gleixner <tglx@linutronix.de>,
- Jason Cooper <jason@lakedaemon.net>,
- Marc Zyngier <marc.zyngier@arm.com>, linux-kernel@vger.kernel.org
-Subject: Re: [PATCH v1 1/2] irqchip/gic-v3: Switch to bitmap_zalloc()
-Message-ID: <20190107155825.GS9170@smile.fi.intel.com>
-References: <20180830103114.60601-1-andriy.shevchenko@linux.intel.com>
+ id 1ggXRb-0003Hu-SE
+ for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 16:08:05 +0000
+Received: by mail-wr1-x442.google.com with SMTP id t27so979851wra.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 07 Jan 2019 08:08:03 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=sender:subject:to:cc:references:from:openpgp:autocrypt:message-id
+ :date:user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=D1kXDsIrRaGiuvpcXhul7eIrHZWAcX7Be7iXngO47mU=;
+ b=Pfd4JMrXW94JLhpb93PNrONLZqtI042xCGEnUApBzSI+I1Qktx/70Ak08yjw8CPDzD
+ M3I3qNUOUQ7MQIq5oZohly7mSJS0E7iuasgQEmsLixPcplEpvZmvAVnnPH+adJP0vmxn
+ gVybgMj2t8Iv9i8iofYiq+22Cn+5IfSeC3n1NUROo9Bda6Ii+0T+a6idJKH5WH8V3avq
+ MiXOE6b4g+1jXRDReud5SmVbTtMpEsrNmPf9dDAu3rUftqUwCVnhLtGa+YqgbaY4c3un
+ xkTIngjPKoPjbUwZE6ulvJv4P6yMHJY8+FzuBl3clJFhYg8QlWSjbqxXZzop09EzoAmO
+ cWSw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:sender:subject:to:cc:references:from:openpgp
+ :autocrypt:message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=D1kXDsIrRaGiuvpcXhul7eIrHZWAcX7Be7iXngO47mU=;
+ b=lWiotFag1lowlmFtqKtL5nFMJ8N0tQ8/k6/iiradewjFFQp9ds831Raqn7fFkwYCI8
+ Lw8ZX11XGW2QNj5fgky/A3KcR7RdL2v163JPvhnij+4n9TEST8jp/Dnzg320xGN0dIte
+ cnnFJSgO+pg0VHX0zDvFfNg43l2erANy/yHaWVcXrJtrWxaPGZjUS4n9Ejo/rVhdELar
+ aiutI8hp4XD5Y9vkon0PhO8qIWc+wSVyOy8i4bn/sZePgDtbqjLJF1acSO3ZwFIX1lBF
+ DwI/5X5cCC7X7Y4PAd0NfvOOvpOaOQDAGkiuVGRzYhij6YaSm5uCisZ4G2Gt4TRwUJ3l
+ akVg==
+X-Gm-Message-State: AJcUukfYfAszfaY74s/DM2R+P/s1HMibzLy/ZwSATay1p/z2zmDgkvm/
+ rKMoSTc5jPoKphcQM5sAGYI=
+X-Google-Smtp-Source: ALg8bN7kCmotn2Lkm6tNO33Zxglj/qRXgzoyZwqfavhkj+12KwHxH97DI/diz/R+btrsZA+A1bvudA==
+X-Received: by 2002:adf:e284:: with SMTP id v4mr50789999wri.26.1546877281636; 
+ Mon, 07 Jan 2019 08:08:01 -0800 (PST)
+Received: from ?IPv6:2001:b07:6468:f312:3473:41cf:8b30:f2e1?
+ ([2001:b07:6468:f312:3473:41cf:8b30:f2e1])
+ by smtp.googlemail.com with ESMTPSA id x10sm60879531wrn.29.2019.01.07.08.07.59
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 07 Jan 2019 08:08:01 -0800 (PST)
+Subject: Re: [PATCH 6/11] KVM/MMU: Flush tlb with range list in sync_page()
+To: Sean Christopherson <sean.j.christopherson@intel.com>,
+ lantianyu1986@gmail.com
+References: <20190104085405.40356-1-Tianyu.Lan@microsoft.com>
+ <20190104085405.40356-7-Tianyu.Lan@microsoft.com>
+ <20190104163035.GC11288@linux.intel.com>
+From: Paolo Bonzini <pbonzini@redhat.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=pbonzini@redhat.com; keydata=
+ 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
+ uUHgL9dKIfvpm+rNXRn9wAwGjk0X/A==
+Message-ID: <99e47cc1-43d6-ff05-46b8-6a96ebc34b2a@redhat.com>
+Date: Mon, 7 Jan 2019 17:07:58 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20180830103114.60601-1-andriy.shevchenko@linux.intel.com>
-Organization: Intel Finland Oy - BIC 0357606-4 - Westendinkatu 7, 02160 Espoo
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <20190104163035.GC11288@linux.intel.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190107_075829_730343_7AC44167 
-X-CRM114-Status: GOOD (  19.84  )
+X-CRM114-CacheID: sfid-20190107_080803_912503_BE06F88E 
+X-CRM114-Status: GOOD (  14.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,97 +158,51 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
+Cc: kvm@vger.kernel.org, rkrcmar@redhat.com, benh@kernel.crashing.org,
+ will.deacon@arm.com, linux-mips@vger.kernel.org, paulus@ozlabs.org,
+ hpa@zytor.com, kys@microsoft.com, kvmarm@lists.cs.columbia.edu,
+ mpe@ellerman.id.au, x86@kernel.org, linux@armlinux.org.uk,
+ michael.h.kelley@microsoft.com, mingo@redhat.com, catalin.marinas@arm.com,
+ jhogan@kernel.org, Lan Tianyu <Tianyu.Lan@microsoft.com>,
+ christoffer.dall@arm.com, marc.zyngier@arm.com, kvm-ppc@vger.kernel.org,
+ bp@alien8.de, tglx@linutronix.de, linux-arm-kernel@lists.infradead.org,
+ linux-kernel@vger.kernel.org, ralf@linux-mips.org, paul.burton@mips.com,
+ vkuznets@redhat.com, linuxppc-dev@lists.ozlabs.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Aug 30, 2018 at 01:31:13PM +0300, Andy Shevchenko wrote:
-> Switch to bitmap_zalloc() to show clearly what we are allocating.
-> Besides that it returns pointer of bitmap type instead of opaque void *.
+On 04/01/19 17:30, Sean Christopherson wrote:
+>> +
+>> +		if (kvm_available_flush_tlb_with_range()
+>> +		    && (tmp_spte_ret & SET_SPTE_NEED_REMOTE_TLB_FLUSH)) {
+>> +			struct kvm_mmu_page *leaf_sp = page_header(sp->spt[i]
+>> +					& PT64_BASE_ADDR_MASK);
+>> +			list_add(&leaf_sp->flush_link, &flush_list);
+>> +		}
+>> +
+>> +		set_spte_ret |= tmp_spte_ret;
+>> +
+>>  	}
+>>  
+>>  	if (set_spte_ret & SET_SPTE_NEED_REMOTE_TLB_FLUSH)
+>> -		kvm_flush_remote_tlbs(vcpu->kvm);
+>> +		kvm_flush_remote_tlbs_with_list(vcpu->kvm, &flush_list);
+> This is a bit confusing and potentially fragile.  It's not obvious that
+> kvm_flush_remote_tlbs_with_list() is guaranteed to call
+> kvm_flush_remote_tlbs() when kvm_available_flush_tlb_with_range() is
+> false, and you're relying on the kvm_flush_remote_tlbs_with_list() call
+> chain to never optimize away the empty list case.  Rechecking
+> kvm_available_flush_tlb_with_range() isn't expensive.
 > 
 
-Any comments on the patches?
+Alternatively, do not check it during the loop: always build the
+flush_list, and always call kvm_flush_remote_tlbs_with_list.  The
+function can then check whether the list is empty, and the OR of
+tmp_spte_ret on every iteration goes away.
 
-> Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 9 ++++-----
->  drivers/irqchip/irq-gic-v3-mbi.c | 5 ++---
->  2 files changed, 6 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 316a57530f6d..497589ebd950 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -1577,7 +1577,7 @@ static unsigned long *its_lpi_alloc(int nr_irqs, u32 *base, int *nr_ids)
->  	if (err)
->  		goto out;
->  
-> -	bitmap = kcalloc(BITS_TO_LONGS(nr_irqs), sizeof (long), GFP_ATOMIC);
-> +	bitmap = bitmap_zalloc(nr_irqs, GFP_ATOMIC);
->  	if (!bitmap)
->  		goto out;
->  
-> @@ -1593,7 +1593,7 @@ static unsigned long *its_lpi_alloc(int nr_irqs, u32 *base, int *nr_ids)
->  static void its_lpi_free(unsigned long *bitmap, u32 base, u32 nr_ids)
->  {
->  	WARN_ON(free_lpi_range(base, nr_ids));
-> -	kfree(bitmap);
-> +	bitmap_free(bitmap);
->  }
->  
->  static struct page *its_allocate_prop_table(gfp_t gfp_flags)
-> @@ -2215,8 +2215,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
->  	if (alloc_lpis) {
->  		lpi_map = its_lpi_alloc(nvecs, &lpi_base, &nr_lpis);
->  		if (lpi_map)
-> -			col_map = kcalloc(nr_lpis, sizeof(*col_map),
-> -					  GFP_KERNEL);
-> +			col_map = kcalloc(nr_lpis, sizeof(*col_map), GFP_KERNEL);
->  	} else {
->  		col_map = kcalloc(nr_ites, sizeof(*col_map), GFP_KERNEL);
->  		nr_lpis = 0;
-> @@ -2226,7 +2225,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
->  	if (!dev || !itt ||  !col_map || (!lpi_map && alloc_lpis)) {
->  		kfree(dev);
->  		kfree(itt);
-> -		kfree(lpi_map);
-> +		bitmap_free(lpi_map);
->  		kfree(col_map);
->  		return NULL;
->  	}
-> diff --git a/drivers/irqchip/irq-gic-v3-mbi.c b/drivers/irqchip/irq-gic-v3-mbi.c
-> index ad70e7c416e3..7d783fc56169 100644
-> --- a/drivers/irqchip/irq-gic-v3-mbi.c
-> +++ b/drivers/irqchip/irq-gic-v3-mbi.c
-> @@ -284,8 +284,7 @@ int __init mbi_init(struct fwnode_handle *fwnode, struct irq_domain *parent)
->  		if (ret)
->  			goto err_free_mbi;
->  
-> -		mbi_ranges[n].bm = kcalloc(BITS_TO_LONGS(mbi_ranges[n].nr_spis),
-> -					   sizeof(long), GFP_KERNEL);
-> +		mbi_ranges[n].bm = bitmap_zalloc(mbi_ranges[n].nr_spis, GFP_KERNEL);
->  		if (!mbi_ranges[n].bm) {
->  			ret = -ENOMEM;
->  			goto err_free_mbi;
-> @@ -323,7 +322,7 @@ int __init mbi_init(struct fwnode_handle *fwnode, struct irq_domain *parent)
->  err_free_mbi:
->  	if (mbi_ranges) {
->  		for (n = 0; n < mbi_range_nr; n++)
-> -			kfree(mbi_ranges[n].bm);
-> +			bitmap_free(mbi_ranges[n].bm);
->  		kfree(mbi_ranges);
->  	}
->  
-> -- 
-> 2.18.0
-> 
-
--- 
-With Best Regards,
-Andy Shevchenko
-
-
+Paolo
 
 _______________________________________________
 linux-arm-kernel mailing list
