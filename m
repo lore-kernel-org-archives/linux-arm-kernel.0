@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8BF3FC43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 16:20:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AFBD9C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 16:26:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 54F5A2147C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 16:20:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 775422147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 16:26:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qbwVD7um";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="eV+GpH4A"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 54F5A2147C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZCoyma3o";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="SweO434i"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 775422147C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,62 +25,61 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pIMNVrTh+op40o7haaAVCfPk4BA8LFO3R8evoz6UzsU=; b=qbwVD7umuP8y+M
-	TK4gE34dsqqs5GG48SxDeoYU5jov85uwmakysw9YYqAZeLtJnRPuTDDGbqxndB/LQ5etfIzasEHJ1
-	nMCSOBQZQ55hC1TG1wmqLhTh2IBWLF0DMZqdmAR4U+xip///+9w0Xuyo89b3CE4DQWpmwRNsEH64I
-	TXlzHSDTwtHbPGiqfxDf8IAclRrqzAWE9dvr9VlIkgbW4AulvE4eAMBDNsXs+QN0OUsouRtebUonH
-	pSmvqUQR+G8sFZalOLw/q3Ga9VQAWrWvVEfEfCPYpCOHU8YL6SERGs395cB3gBMkTPSif0hvqnEqE
-	e1rdkH8zQ33/rzgYgR+Q==;
+	List-Owner; bh=43G9gFEbz24xePPmuYjO4yZxslrrP9DVPtS6OTkcuwI=; b=ZCoyma3oVpffx7
+	hrMHCivdKgBngZrsfcmrb7p2ivzBDO1Re8Xn9J4l/MRfDn/2x3/FDhWUpRpPO4ApJiUa+R6sLlXXH
+	Vqv9lvlqoBiYjdejpp8h9ykSKQUfY59IhIxqkpvQaYi/JDZnKramh/GEasq/feznrEa66wbfXeYdr
+	wANHDGI0hst93+9rsVCUSDd+TbkO2F0JKoNppK9+IFMxbw6my3Hd+v1OMHAjd4j1Cgyl3hsRqS3vn
+	+QnlwscXzZtfEyIv8tr7YeVPemE2HpvyP75xmmkTkaiKM3mMV3OO6G2bJQBfq76nkwu8cHSCIolSj
+	BXM74cGxOtFuxqBk5t3Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggXds-0000gP-Ru; Mon, 07 Jan 2019 16:20:44 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1ggXjj-0002jA-Sd; Mon, 07 Jan 2019 16:26:47 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggXdm-0000aU-WC
- for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 16:20:41 +0000
-Received: by mail-wr1-x441.google.com with SMTP id v13so1033615wrw.5
+ id 1ggXjf-0002iM-6n
+ for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 16:26:45 +0000
+Received: by mail-wr1-x443.google.com with SMTP id x10so1033412wrs.8
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 07 Jan 2019 08:20:38 -0800 (PST)
+ Mon, 07 Jan 2019 08:26:42 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=sender:subject:to:cc:references:from:openpgp:autocrypt:message-id
  :date:user-agent:mime-version:in-reply-to:content-language
  :content-transfer-encoding;
- bh=wo6kvzYCEB9x6sNLpbzEiDdvddMlVBTQkNzc4peqcCQ=;
- b=eV+GpH4AQ6+7T7LIwNOOOejnJmtqZM2yXT2/VG308IJZHjjJWS3N9gcP2nHKtkdKM/
- JSHGL1niPKpht2EkJPG0TH/ZEyjxwZOOxHQZipQC4OkRjBRRecfDTw4YBB1LwHoXFC9v
- tlQODf899mTtivp7XmyjMbe28JPPTbJdZqkufAuDIxH0pbKvIfPCyG54kRacioV/ZCER
- OAScVNmXQW7hsXbXDhUsZHGvOibmdboZ/nz2xngABk4O5ZdLPs/ivMrBJql+rEHsT24D
- piOxUPf3ysxjycsEaKrpbN++XCo7/zdlGe4l+GI8qh4/k7k7sFCDyGb6M1UMqBpqMyGt
- wg4A==
+ bh=/U70qfKIXZfDtiR8L8OsjRjbuUkYcPLUD/fleteotXk=;
+ b=SweO434iWDy1IdSqUunohVYNhyzYgiE2pEiHkiqxgo7qhyAtL0Eiu23Gx6vr4pdFuW
+ sNscKecGB1c9z3VebNG+aC+0hxuHorwhJmPrT6EhjWrmjp82XsZ6lDopdKlZBzjHJqsS
+ 906fJCHUocNRq2/jg5m0WxI+tS53UdBRhufo8nwa4J8JOrr3AfaZf7IXzPenzAGtceiz
+ 3TDYrmSo2oDAcytg0LFTQcYFmR6ZCrvngXL8ttaxRZhEnNVCSbcrsR510lG8Cy502jPL
+ N3DCPIbuc+8SfPLGXF1RzZd1nIQtdk0I3QRzZGjHKpZrMZfqBEXm8cDx0FjqopsTwXQh
+ T6lg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:sender:subject:to:cc:references:from:openpgp
  :autocrypt:message-id:date:user-agent:mime-version:in-reply-to
  :content-language:content-transfer-encoding;
- bh=wo6kvzYCEB9x6sNLpbzEiDdvddMlVBTQkNzc4peqcCQ=;
- b=tnRfSWQ/P4kUJC4mOpGzOMsW1yGG6KGHvf1CDP+rssgY5Z4peZLJQJJp5RvnnuCNKb
- X4MEgi38Jbxf2Jeo0F7W4iP2xSY7fa7w+lFsePg7S5R+SpN/u8K8a5vzVPiavf8mJH23
- QYaSudfn51ec7j/lNMtIxHm1RzVuIw6qe0fcHdjSj4AODlwIEKuEhoU7rwVbu3hcq+eL
- a4dxQIsZ/vG10NeojpgWsBXiP4aTm10xZPwm+w8Asl0aj4T6iGoxZWz2v1T2lV7Xrw7q
- 37qMGlIsFv+DGX6Nw4PJZiLEikowLGPEIAGSl2kkT4GZ4dOW6fDMVorlNzRpGRZwpmLw
- NJRw==
-X-Gm-Message-State: AJcUukeB2jONBB1GY2Qdbg07VrB0IoRJuU6OaKFNCDFD4dCQtLrmRKIt
- cA/QZybhKXHxn1F7dD6GFoE=
-X-Google-Smtp-Source: ALg8bN75whlY2X8B+OnId7dxa6Gwo2IHtNNBq6DMkLET6wv0X8qN6sDjd1i2QO6EG+oSM13RIXDDEg==
-X-Received: by 2002:adf:f149:: with SMTP id y9mr56724337wro.284.1546878037106; 
- Mon, 07 Jan 2019 08:20:37 -0800 (PST)
+ bh=/U70qfKIXZfDtiR8L8OsjRjbuUkYcPLUD/fleteotXk=;
+ b=ssrdJviLE/660ZJtCD2hxckplZ4DXzSkc/geXVTthppb9FN8Ev3U/JrRy0hwl7u2T4
+ igmlpZYQq6GxqMhIUUnjpn+L1saAyiqQuag5tvblV0Dr8I+WzHERDW7odSRy5AYVUCCD
+ d93Lvo49gKDeaibL41QT4zWeGLqi432OvnyUlQkz64OYMAyLPCnZT5DcEV4eah4MX+8s
+ ILUf/fhwwJInDFhmYtm1kJGpZiJFO4l4Q0Z3+I6Azpm3NWN6GAcXhEdgl2eihYtKyRzW
+ DCx/Hmluap4mNIqC0SBdiB3gO3fzyPG9yYDlPJvAKE9Uy9jAzLDp5VBwXG8SDtcNKdBe
+ SDiQ==
+X-Gm-Message-State: AJcUukfvgRcRRZJxG9cYLuRQhYYZECeyQSWnOw1/mF78u5O1KT5JIzad
+ qJxUjzF32qdmMe/BtEk5DFc=
+X-Google-Smtp-Source: ALg8bN53Ae/LWk8R4oNfWY8JaVuQFl1l5dBEGbQBZ1oQw+MohX5T5j7ACyzpZfip9SWSnWHDOfTYEg==
+X-Received: by 2002:a05:6000:120a:: with SMTP id
+ e10mr52902210wrx.85.1546878401435; 
+ Mon, 07 Jan 2019 08:26:41 -0800 (PST)
 Received: from ?IPv6:2001:b07:6468:f312:3473:41cf:8b30:f2e1?
  ([2001:b07:6468:f312:3473:41cf:8b30:f2e1])
- by smtp.googlemail.com with ESMTPSA id j8sm19509377wmd.0.2019.01.07.08.20.35
+ by smtp.googlemail.com with ESMTPSA id n127sm8479381wmd.20.2019.01.07.08.26.36
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 07 Jan 2019 08:20:36 -0800 (PST)
-Subject: Re: [PATCH 7/11] KVM: Remove redundant check in the
- kvm_get_dirty_log_protect()
-To: Sean Christopherson <sean.j.christopherson@intel.com>,
- lantianyu1986@gmail.com
+ Mon, 07 Jan 2019 08:26:40 -0800 (PST)
+Subject: Re: [PATCH 9/11] KVM/MMU: Flush tlb in the
+ kvm_mmu_write_protect_pt_masked()
+To: lantianyu1986@gmail.com
 References: <20190104085405.40356-1-Tianyu.Lan@microsoft.com>
- <20190104085405.40356-8-Tianyu.Lan@microsoft.com>
- <20190104155036.GA11288@linux.intel.com>
+ <20190104085405.40356-10-Tianyu.Lan@microsoft.com>
 From: Paolo Bonzini <pbonzini@redhat.com>
 Openpgp: preference=signencrypt
 Autocrypt: addr=pbonzini@redhat.com; keydata=
@@ -138,16 +137,16 @@ Autocrypt: addr=pbonzini@redhat.com; keydata=
  DduC0U3xYkfbGAUvbxeepjgzp0uEnBXfPTy09JGpgWbg0w91GyfT/ujKaGd4vxG2Ei+MMNDm
  S1SMx7wu0evvQ5kT9NPzyq8R2GIhVSiAd2jioGuTjX6AZCFv3ToO53DliFMkVTecLptsXaes
  uUHgL9dKIfvpm+rNXRn9wAwGjk0X/A==
-Message-ID: <dad62bfb-e4c0-266f-ff36-8344d3952ba0@redhat.com>
-Date: Mon, 7 Jan 2019 17:20:30 +0100
+Message-ID: <7eb0cde4-9436-9719-dd13-caf4ab5083a2@redhat.com>
+Date: Mon, 7 Jan 2019 17:26:35 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.3.1
 MIME-Version: 1.0
-In-Reply-To: <20190104155036.GA11288@linux.intel.com>
+In-Reply-To: <20190104085405.40356-10-Tianyu.Lan@microsoft.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190107_082039_900396_B3345234 
-X-CRM114-Status: GOOD (  13.04  )
+X-CRM114-CacheID: sfid-20190107_082643_270130_B7B223AB 
+X-CRM114-Status: GOOD (  13.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -159,35 +158,56 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kvm@vger.kernel.org, rkrcmar@redhat.com, benh@kernel.crashing.org,
- will.deacon@arm.com, linux-mips@vger.kernel.org, paulus@ozlabs.org,
+Cc: kvm@vger.kernel.org, rkrcmar@redhat.com, catalin.marinas@arm.com,
+ will.deacon@arm.com, christoffer.dall@arm.com, paulus@ozlabs.org,
  hpa@zytor.com, kys@microsoft.com, kvmarm@lists.cs.columbia.edu,
  mpe@ellerman.id.au, x86@kernel.org, linux@armlinux.org.uk,
- michael.h.kelley@microsoft.com, mingo@redhat.com, catalin.marinas@arm.com,
- jhogan@kernel.org, Lan Tianyu <Tianyu.Lan@microsoft.com>,
- christoffer.dall@arm.com, marc.zyngier@arm.com, kvm-ppc@vger.kernel.org,
- bp@alien8.de, tglx@linutronix.de, linux-arm-kernel@lists.infradead.org,
- linux-kernel@vger.kernel.org, ralf@linux-mips.org, paul.burton@mips.com,
- vkuznets@redhat.com, linuxppc-dev@lists.ozlabs.org
+ michael.h.kelley@microsoft.com, mingo@redhat.com, benh@kernel.crashing.org,
+ jhogan@kernel.org, linux-mips@vger.kernel.org,
+ Lan Tianyu <Tianyu.Lan@microsoft.com>, marc.zyngier@arm.com,
+ kvm-ppc@vger.kernel.org, bp@alien8.de, tglx@linutronix.de,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
+ ralf@linux-mips.org, paul.burton@mips.com, vkuznets@redhat.com,
+ linuxppc-dev@lists.ozlabs.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 04/01/19 16:50, Sean Christopherson wrote:
-> Tangentially related, does mmu_lock actually need to be held while we
-> walk dirty_bitmap in kvm_{clear,get}_dirty_log_protect()?  The bitmap
-> itself is protected by slots_lock (a lockdep assertion would be nice
-> too), e.g. can we grab the lock iff dirty_bitmap[i] != 0?
+On 04/01/19 09:54, lantianyu1986@gmail.com wrote:
+>  		rmap_head = __gfn_to_rmap(slot->base_gfn + gfn_offset + __ffs(mask),
+>  					  PT_PAGE_TABLE_LEVEL, slot);
+> -		__rmap_write_protect(kvm, rmap_head, false);
+> +		flush |= __rmap_write_protect(kvm, rmap_head, false);
+>  
+>  		/* clear the first set bit */
+>  		mask &= mask - 1;
+>  	}
+> +
+> +	if (flush && kvm_available_flush_tlb_with_range()) {
+> +		kvm_flush_remote_tlbs_with_address(kvm,
+> +				slot->base_gfn + gfn_offset,
+> +				hweight_long(mask));
 
-Yes, we could avoid grabbing it as long as the bitmap is zero.  However,
-without kvm->manual_dirty_log_protect, the granularity of
-kvm_get_dirty_log_protect() is too coarse so it won't happen in
-practice.  Instead, with the new manual clear,
-kvm_get_dirty_log_protect() does not take the lock and a well-written
-userspace is not going to call the clear ioctl unless some bits are set.
+Mask is zero here, so this probably won't work.
+
+In addition, I suspect calling the hypercall once for every 64 pages is
+not very efficient.  Passing a flush list into
+kvm_mmu_write_protect_pt_masked, and flushing in
+kvm_arch_mmu_enable_log_dirty_pt_masked, isn't efficient either because
+kvm_arch_mmu_enable_log_dirty_pt_masked is also called once per word.
+
+I don't have any good ideas, except for moving the whole
+kvm_clear_dirty_log_protect loop into architecture-specific code (which
+is not the direction we want---architectures should share more code, not
+less).
 
 Paolo
+
+> +		flush = false;
+> +	}
+> +
+
 
 _______________________________________________
 linux-arm-kernel mailing list
