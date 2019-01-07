@@ -2,123 +2,85 @@ Return-Path: <SRS0=txfi=PP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B1EFEC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 09:41:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1AB9BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 09:42:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 81A512089F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 09:41:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D79B120859
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 09:42:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ETTnHYq7";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="WotuE2Vs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 81A512089F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UDmI8Alo";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="juclmqFl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D79B120859
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4i5s/6SN6Z3H8EMZ30rAaqVB9lDsqnKLOJfpq5Tg7oQ=; b=ETTnHYq7VO8Sc2
-	tGgL0ukps8qjbBsDMM5x2WnGViOFTYwr/9woCGvJoEgXhq80LDIPlqFP3YH4NUs7XQJqisGXaWsrh
-	JjufsbP2eoPpR0AA9HCMoeeGhmQwrrtUgvkVZjKkK+z8SBmnELs4OD8GH6fFMBg0PrreHsFQI5kcu
-	A3PhcnwoHZVL1aowXHw/6iV0bqQHXHjk9lkIG7XF3PSkVmoJTKfbM/wtuV+mU+ssx6T0hNhDO8J6s
-	0dYzBiL3SA9dRrCQ0miYAgwXLQN6t+ZdREzk06Ou3xdp+CopBMImp8XPJaAzOpAo3lnrUALVhMJ6q
-	UpPavIANueJq18ZH7ckw==;
+	List-Owner; bh=QINuwHi/nd/QVyhvM1eJLS175Kjh6PY83aCYsAVauCE=; b=UDmI8Alouzij2n
+	hLxCYMN3Wls0fFeBAWbbHZAtQKhoKT3kOh/syfLTFpOYSyHHlNEJu5q8KiPZrUyLEvyqhry174Hid
+	inscP5BpK98vLYhbUxBB6xKU098z6wL8IzrWNhmzxZ7Sy5uY8qoL0vMurSkfKwKddWwE5bSKn17+K
+	lUH/WRfGzeUZ/XxdPdaGmVjkcUE15YMJHGhHERTE94XzFuhA4CzglG6P2P5s++Av4N8T3LnIKdM0G
+	utc9SDZ2fUJKdMnAh8ClM/KXlyFpVQMysRuyUxSRD8uUgsBB4E1lZOI77Y5QraQFrd/MJyMyf3h4N
+	VkXg/kLPJsNn/swmJxxQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggRPm-0004Qe-FQ; Mon, 07 Jan 2019 09:41:46 +0000
-Received: from esa4.microchip.iphmx.com ([68.232.154.123])
+	id 1ggRQX-0004h6-P9; Mon, 07 Jan 2019 09:42:33 +0000
+Received: from mail-oi1-x242.google.com ([2607:f8b0:4864:20::242])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggRFO-0008D7-I9
- for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 09:31:49 +0000
-X-IronPort-AV: E=Sophos;i="5.56,450,1539673200"; d="scan'208";a="24729271"
-Received: from smtpout.microchip.com (HELO email.microchip.com)
- ([198.175.253.82])
- by esa4.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 07 Jan 2019 02:30:58 -0700
-Received: from NAM02-BL2-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.38) with Microsoft SMTP Server (TLS) id
- 14.3.352.0; Mon, 7 Jan 2019 02:31:35 -0700
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=microchiptechnology.onmicrosoft.com;
- s=selector1-microchiptechnology-onmicrosoft-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=iA9eRy7K7tOWgXKsvPvikobClDAamc4d8ySpCsuvDYQ=;
- b=WotuE2VstOXr096qxoxw6aKv73rn+GqeJz1FzXC0Ir0j32PPo2iXDJUHetZbR+dx/xO6jTtnDSO3HrummOfb9tA5iJNuI7hTYqxJuWxMt67HkVcI1KaAeTDmHc1QmM+wv2vEF8x6GXNdb0ip+11BFBMP/k3OVxXAEIBNNy0elpM=
-Received: from MWHPR11MB1920.namprd11.prod.outlook.com (10.175.54.19) by
- MWHPR11MB1760.namprd11.prod.outlook.com (10.175.53.11) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1495.6; Mon, 7 Jan 2019 09:30:55 +0000
-Received: from MWHPR11MB1920.namprd11.prod.outlook.com
- ([fe80::e553:ff9d:8c0b:9627]) by MWHPR11MB1920.namprd11.prod.outlook.com
- ([fe80::e553:ff9d:8c0b:9627%6]) with mapi id 15.20.1495.011; Mon, 7 Jan 2019
- 09:30:55 +0000
-From: <Claudiu.Beznea@microchip.com>
-To: <u.kleine-koenig@pengutronix.de>, <thierry.reding@gmail.com>
-Subject: Re: [PATCH v8 1/6] pwm: extend PWM framework with PWM modes
-Thread-Topic: [PATCH v8 1/6] pwm: extend PWM framework with PWM modes
-Thread-Index: AQHUo2hjF9SHYVC+/UyvQjeBLKSGN6WhLe0AgAJimAA=
-Date: Mon, 7 Jan 2019 09:30:55 +0000
-Message-ID: <67e881c5-0ea7-3d2f-5910-534729097d11@microchip.com>
-References: <1546522081-23659-1-git-send-email-claudiu.beznea@microchip.com>
- <1546522081-23659-2-git-send-email-claudiu.beznea@microchip.com>
- <20190105210522.ho2o2a4gc7r7ijeq@pengutronix.de>
-In-Reply-To: <20190105210522.ho2o2a4gc7r7ijeq@pengutronix.de>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: VI1P195CA0027.EURP195.PROD.OUTLOOK.COM
- (2603:10a6:802:5a::16) To MWHPR11MB1920.namprd11.prod.outlook.com
- (2603:10b6:300:110::19)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Claudiu.Beznea@microchip.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [94.177.32.154]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; MWHPR11MB1760;
- 6:yqowwRcDWwdtt0QILXJ3Gz7NW+QIjGO9+WAVjRyoOefVXiUPFSDdWk7wjDL0hYNX2PKWPwcWnFlD3CHxtbabfbt4Xf3aAlowZXDAjOuYxjieTZy4Zb1M4PzUu5rr3rImTziHeWS5iMx0lQPLUr6sI77Wme4zm9/i5AQLclCsum6KvKN/H6ktYoFmJXq1nWrdvWW+IoaDvJPdINXWyKQHTamsw+yruNcvbxjPeT8ex+0o89ahLJwSlj00WetGJyzbktfsmkEXbVaXa9lSAPuPD+S6ZImybwYYRUObhSJflFnYXGKy4JVYjEfUUCylPZ4Se3kauELw23s9m/t6Q4BTAMmw+V2a42CniW4roXvSWacxMkWF/iybFoMZKNSFy3tN+szO0vzebZl95chXovYlqBXWR2muFQ3V5av9NdjPtqFIXnK16wvdoznSKPymelTowc9E8jXuURgmu89eDArblQ==;
- 5:55dANSK1BoWHR58Ct4DhEdQr8m3DcRQ89AdyWpUBfUKPKflobEK6nK7YlM9FRcKwvmpdAI6xgpBvjrTGKZtnGVWiPJxP99PlMZ93MJ+5O0ePK2acgN6OmCIE2IGIvLJvFQi0ld8l0FLOCqnsL9pOrx8S2huFcii7DryrzDSCGzU5AmErMnHfNK1aHvVHDhzjVfoeivJwQEdGi81/5f06Wg==;
- 7:iojORA0FplvtLiEDwNMtz+TQEscIBccc+O5t981aLbrtZd/4NdZSvYKruYGWCookAqFj3UTwCopAjJ9I9dsHlC07k1nVW7yowWp/CTyCkCUiEQ3xA8DVokogHWhlBh+rfESHsULwq/nKi1dlmpbsEQ==
-x-ms-office365-filtering-correlation-id: a5847ebf-06df-440b-01c3-08d67482d28f
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(2017052603328)(7153060)(7193020);
- SRVR:MWHPR11MB1760; 
-x-ms-traffictypediagnostic: MWHPR11MB1760:
-x-microsoft-antispam-prvs: <MWHPR11MB1760D6B60D82A31E0CFE160087890@MWHPR11MB1760.namprd11.prod.outlook.com>
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(3230021)(908002)(999002)(5005026)(6040522)(8220060)(2401047)(8121501046)(3231475)(944501520)(52105112)(93006095)(93001095)(10201501046)(3002001)(6041310)(20161123558120)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123562045)(20161123560045)(20161123564045)(201708071742011)(7699051)(76991095);
- SRVR:MWHPR11MB1760; BCL:0; PCL:0; RULEID:; SRVR:MWHPR11MB1760; 
-x-forefront-prvs: 0910AAF391
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(366004)(39860400002)(136003)(396003)(376002)(346002)(199004)(189003)(51444003)(476003)(446003)(186003)(110136005)(316002)(54906003)(102836004)(97736004)(68736007)(2616005)(11346002)(386003)(71190400001)(86362001)(53546011)(99286004)(6506007)(76176011)(52116002)(71200400001)(5660300001)(31696002)(2906002)(305945005)(31686004)(7736002)(14444005)(256004)(105586002)(106356001)(26005)(39060400002)(8676002)(6436002)(66066001)(966005)(8936002)(6486002)(36756003)(3846002)(6116002)(14454004)(81156014)(81166006)(486006)(66574012)(53936002)(229853002)(6306002)(2501003)(6246003)(478600001)(25786009)(4326008)(72206003)(6512007);
- DIR:OUT; SFP:1101; SCL:1; SRVR:MWHPR11MB1760;
- H:MWHPR11MB1920.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: microchip.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: /gz1Ih3SsSaIZ4hf0GQ676TV11Gm+AqhrBOKPgweOyhACAqjVt/1dAUxY9OzxhqME3PKIVHDRdAJkTUPqmkUjDfllkG7J4X09r0wHcoS10r7ZTQp/4MFugliuUlgU6HG1Tk6m71rE2jjjYmKEoefaHBilTALM1z9uDPQb/Bmxq/y3FknCacZdXqe7MYI3WsfICDLVJMmt9boRA7XonnW0fRtMraaWG+3+N+qm9elcdTqvb2cHfmyJgXIfkoRCeERD0hxbDFg1fSr9qmxCG/Mohvu6NBkqh4vqnDnENhAjtx4cx7wFvM3W1jAVlIZNjjO
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
-Content-ID: <BC42B9F668D275479C29E3610322FFF9@namprd11.prod.outlook.com>
+ id 1ggRQU-0004gd-L2
+ for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 09:42:32 +0000
+Received: by mail-oi1-x242.google.com with SMTP id m6so35345356oig.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 07 Jan 2019 01:42:30 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=XnSIVwNVJ3gQjQTnYiN7ni0F5aGM4ukpC4+joBvWW9M=;
+ b=juclmqFlKl1wATvtcI+NUI6BGovOVb4l5AXwYvkxF5le+higzX4cWL9dLg5yljrJPJ
+ GZle7TibPDh3VbPGK6ihffVBcIz3KutCr2BQl5sAuUsUm3EX/25P3vfqpJg/P5rzo8gk
+ V4O5++mfNasuGSb0Y493UvFSUeQHWe0+BAYmd5WjrJtocfdEzLKgsGzU36PkySCPEJoH
+ tjS2N8fZKUxm3rfz80GUvsuSOjn4DDQApC0u2wQ/0BNTOrovZu1YRa37M0A2/4t9CFlG
+ 1SxGlwmBN2DbQkpYl5HxmgIxd/iRFOXwzrCp+JKsZeeLt1PeQiZPKFjvlUpycMk/HAik
+ T6hA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=XnSIVwNVJ3gQjQTnYiN7ni0F5aGM4ukpC4+joBvWW9M=;
+ b=GWrzgirypYsJbwFU2jOeNZT8ZNnYR8p9ixfpZmEG1FCIjc6ZR3WR0P3iG7lCK9vxzA
+ zulgWI/qyOUajpwoBjNXW8Yj4rFP+r/oGJKcYA39kqTv4gsnhdo+xBwWIDk+bUSc7fnj
+ kroX68q2+aCmZT5MJK4uhmYGj3h6pbNy3AnVlDY8qhrNK4g+NPdQL+ZzUG0fdg2E7C/t
+ PE71oL0SEBBXCDgB2JT32rkyvMb7DKYQ8r0LG/n+Xw3jypKLAVbBRevk+LSiOVP8qZEL
+ MtKxka4hGHpr2rWerD0Xs9C61nf+jiPf1yFt/KuD5Nmx5x0IlVl3dzI5uLBpBK4NHXkK
+ +zFw==
+X-Gm-Message-State: AJcUukdJK+ib38wz6cbYrUEkogghRUWZrqM9XAa7HEcpvcr7BHL+4/Xx
+ ikPd3mblutyO2uz2LlHO9lrJ1veYzQitwLpRuL8MgbDF
+X-Google-Smtp-Source: ALg8bN63W90liuZp2c6z3GXEBJsdaxjW3wkXbkFSbJELRltYCKp8sK3Klakcncn9kwwasdg3sbrr6qgN5CsLGwz7XDU=
+X-Received: by 2002:aca:51c6:: with SMTP id f189mr7287333oib.281.1546854149355; 
+ Mon, 07 Jan 2019 01:42:29 -0800 (PST)
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: a5847ebf-06df-440b-01c3-08d67482d28f
-X-MS-Exchange-CrossTenant-originalarrivaltime: 07 Jan 2019 09:30:55.0545 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR11MB1760
-X-OriginatorOrg: microchip.com
+References: <CAGUNXRRpPBLkN6CQMKsKn5GxWJHxkat2TsWfpxO8wsxXDiqqBw@mail.gmail.com>
+ <CAGUNXRQquMJ7od5Z_+YPJ-6bUxQpNgpzFC3u5jYDedjQKKEiTQ@mail.gmail.com>
+ <CAGUNXRTEArPTcTBuoqVixF_ZAcJPVVDUPiKW7FjEEAuqfhj_sQ@mail.gmail.com>
+In-Reply-To: <CAGUNXRTEArPTcTBuoqVixF_ZAcJPVVDUPiKW7FjEEAuqfhj_sQ@mail.gmail.com>
+From: Chris Spencer <spencercw@gmail.com>
+Date: Mon, 7 Jan 2019 09:42:17 +0000
+Message-ID: <CAGUNXRQw4KeLdrknP7yVvN6LP+itivtxM6DkJRxcjpe0tRA6=g@mail.gmail.com>
+Subject: Re: imx8mq-evk: Outbound network packets lost
+To: linux-imx@nxp.com, aisheng.dong@nxp.com, abel.vesa@nxp.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190107_013103_794828_D508133E 
-X-CRM114-Status: GOOD (  21.36  )
+X-CRM114-CacheID: sfid-20190107_014230_723689_27580801 
+X-CRM114-Status: GOOD (  37.33  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -130,79 +92,229 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-pwm@vger.kernel.org, alexandre.belloni@bootlin.com,
- linux-doc@vger.kernel.org, corbet@lwn.net, linux-kernel@vger.kernel.org,
- Ludovic.Desroches@microchip.com, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-DQoNCk9uIDA1LjAxLjIwMTkgMjM6MDUsIFV3ZSBLbGVpbmUtS8O2bmlnIHdyb3RlOg0KPiBIZWxs
-bywNCj4gDQo+IE9uIFRodSwgSmFuIDAzLCAyMDE5IGF0IDAxOjI5OjQ0UE0gKzAwMDAsIENsYXVk
-aXUuQmV6bmVhQG1pY3JvY2hpcC5jb20gd3JvdGU6DQo+PiBGcm9tOiBDbGF1ZGl1IEJlem5lYSA8
-Y2xhdWRpdS5iZXpuZWFAbWljcm9jaGlwLmNvbT4NCj4+DQo+PiBBZGQgYmFzaWMgUFdNIG1vZGVz
-OiBub3JtYWwgYW5kIGNvbXBsZW1lbnRhcnkuIFRoZXNlIG1vZGVzIHNob3VsZA0KPj4gZGlmZmVy
-ZW50aWF0ZSB0aGUgc2luZ2xlIG91dHB1dCBQV00gY2hhbm5lbHMgZnJvbSB0d28gb3V0cHV0cyBQ
-V00NCj4+IGNoYW5uZWxzLiBUaGVzZSBtb2RlcyBjb3VsZCBiZSBzZXQgYXMgZm9sbG93Og0KPj4g
-MS4gUFdNIGNoYW5uZWxzIHdpdGggb25lIG91dHB1dCBwZXIgY2hhbm5lbDoNCj4+IC0gbm9ybWFs
-IG1vZGUNCj4+IDIuIFBXTSBjaGFubmVscyB3aXRoIHR3byBvdXRwdXRzIHBlciBjaGFubmVsOg0K
-Pj4gLSBub3JtYWwgbW9kZQ0KPj4gLSBjb21wbGVtZW50YXJ5IG1vZGUNCj4+IFNpbmNlIHVzZXJz
-IGNvdWxkIHVzZSBhIFBXTSBjaGFubmVsIHdpdGggdHdvIG91dHB1dCBhcyBvbmUgb3V0cHV0IFBX
-TQ0KPj4gY2hhbm5lbCwgdGhlIFBXTSBub3JtYWwgbW9kZSBpcyBhbGxvd2VkIHRvIGJlIHNldCBm
-b3IgUFdNIGNoYW5uZWxzIHdpdGgNCj4+IHR3byBvdXRwdXRzOyBpbiBmYWN0IFBXTSBub3JtYWwg
-bW9kZSBzaG91bGQgYmUgc3VwcG9ydGVkIGJ5IGFsbCBQV01zLg0KPiANCj4gSSBzdGlsbCB0aGlu
-ayB0aGF0IG15IHN1Z2dlc3Rpb24gdGhhdCBJIHNlbnQgaW4gcmVwbHkgdG8geW91ciB2NSB1c2lu
-Zw0KPiAuYWx0X2R1dHlfY3ljbGUgYW5kIC5hbHRfb2Zmc2V0IGlzIHRoZSBiZXR0ZXIgb25lIGFz
-IGl0IGlzIG1vcmUgZ2VuZXJpYy4NCg0KSSBsaWtlIGl0IGJldHRlciBteSB3YXksIEkgZXhwbGFp
-bmVkIG15c2VsZiB3aHkuDQoNCj4gQSB3b3JkIGFib3V0IHRoYXQgZnJvbSBUaGllcnJ5IGJlZm9y
-ZSBwdXR0aW5nIHRoZSBtb2RlIGludG8gdGhlIHB3bSBBUEkNCj4gd291bGQgYmUgZ3JlYXQuDQoN
-ClllcywgbGV0J3Mgd2FpdCBUaGllcnJ5IGlucHV0cyBvbiB0aGlzLg0KDQo+IA0KPiBJIGRvbid0
-IHJlcGVhdCB3aGF0IEkgd3JvdGUgdGhlcmUgYXNzdW1pbmcgeW91IHN0aWxsIHJlbWVtYmVyIG9y
-IGFyZQ0KPiB3aWxsaW5nIHRvIGxvb2sgaXQgdXAgYXQNCj4gZS5nLiBodHRwczovL3d3dy5zcGlu
-aWNzLm5ldC9saXN0cy9saW51eC1wd20vbXNnMDgxNzQuaHRtbCAoaW4gdGhlIDJuZCBoYWxmDQo+
-IG9mIG15IG1haWwpLg0KDQpZZXMsIEkgcmVtZW1iZXIgaXQuDQoNCj4gDQo+IEFsc28gSSB0aGlu
-ayB0aGF0IGlmIHRoZSBjYXBhYmlsaXRpZXMgZnVuY3Rpb24gaXMgdGhlIHdheSBmb3J3YXJkIGFk
-ZGluZw0KPiBzdXBwb3J0IHRvIGRldGVjdCBhdmFpbGFiaWxpdHkgb2YgcG9sYXJpdHkgaW52ZXJz
-aW9uIHNob3VsZCBiZQ0KPiBjb25zaWRlcmVkLiANCg0KWWVwLCB3aHkgbm90LiBCdXQgaXQgc2hv
-dWxkIGJlIGRvbmUgaW4gYSBkaWZmZXJlbnQgcGF0Y2guIEl0IGlzIG5vdCByZWxhdGVkDQp0byB0
-aGlzIHNlcmllcy4NCg0KVGhpcyB3b3VsZCBhbHNvIGJlIGFuIG9wcG9ydHVuaXR5IHRvIHNwbGl0
-IHRoZSBpbnRyb2R1Y3Rpb24NCj4gb2YgdGhlIGNhcGFiaWxpdGllcyBmdW5jdGlvbiBhbmQgdGhl
-IGludHJvZHVjdGlvbiBvZiBjb21wbGVtZW50YXJ5IG1vZGUuDQo+IChCdXQgbXkgcGVyc29uYWwg
-cHJlZmVyZW5jZSB3b3VsZCBiZSB0byBqdXN0IGxldCAuYXBwbHkgZmFpbCB3aGVuIGFuDQo+IHVu
-c3VwcG9ydGVkIGNvbmZpZ3VyYXRpb24gaXMgcmVxdWVzdGVkLikNCg0KLmFwcGx5IGZhaWxzIHdo
-ZW4gc29tZXRoaW5nIHdyb25nIGlzIHJlcXVlc3RlZC4NCg0KPiANCj4+ICtzdGF0aWMgaW50IHB3
-bV9nZXRfZGVmYXVsdF9jYXBzKHN0cnVjdCBwd21fY2FwcyAqY2FwcykNCj4+ICt7DQo+PiArCXN0
-YXRpYyBjb25zdCBzdHJ1Y3QgcHdtX2NhcHMgZGVmYXVsdF9jYXBzID0gew0KPj4gKwkJLm1vZGVz
-X21zayA9IFBXTV9NT0RFX0JJVChOT1JNQUwpLA0KPj4gKwl9Ow0KPj4gKw0KPj4gKwlpZiAoIWNh
-cHMpDQo+PiArCQlyZXR1cm4gLUVJTlZBTDsNCj4+ICsNCj4+ICsJKmNhcHMgPSBkZWZhdWx0X2Nh
-cHM7DQo+PiArDQo+PiArCXJldHVybiAwOw0KPj4gK30NCj4+ICsNCj4+ICsvKioNCj4+ICsgKiBw
-d21fZ2V0X2NhcHMoKSAtIGdldCBQV00gY2FwYWJpbGl0aWVzIG9mIGEgUFdNIGRldmljZQ0KPj4g
-KyAqIEBwd206IFBXTSBkZXZpY2UgdG8gZ2V0IHRoZSBjYXBhYmlsaXRpZXMgZm9yDQo+PiArICog
-QGNhcHM6IHJldHVybmVkIGNhcGFiaWxpdGllcw0KPj4gKyAqDQo+PiArICogUmV0dXJuczogMCBv
-biBzdWNjZXNzIG9yIGEgbmVnYXRpdmUgZXJyb3IgY29kZSBvbiBmYWlsdXJlDQo+PiArICovDQo+
-PiAraW50IHB3bV9nZXRfY2Fwcyhjb25zdCBzdHJ1Y3QgcHdtX2RldmljZSAqcHdtLCBzdHJ1Y3Qg
-cHdtX2NhcHMgKmNhcHMpDQo+PiArew0KPj4gKwlpZiAoIXB3bSB8fCAhY2FwcykNCj4+ICsJCXJl
-dHVybiAtRUlOVkFMOw0KPj4gKw0KPj4gKwlpZiAocHdtLT5jaGlwLT5vcHMtPmdldF9jYXBzKQ0K
-Pj4gKwkJcmV0dXJuIHB3bS0+Y2hpcC0+b3BzLT5nZXRfY2Fwcyhwd20tPmNoaXAsIHB3bSwgY2Fw
-cyk7DQo+PiArDQo+PiArCXJldHVybiBwd21fZ2V0X2RlZmF1bHRfY2FwcyhjYXBzKTsNCj4gDQo+
-IEknZCBkcm9wIHB3bV9nZXRfZGVmYXVsdF9jYXBzICh1bmxlc3MgeW91IGludHJvZHVjZSBzb21l
-IG1vcmUgY2FsbGVycw0KPiBsYXRlcikgYW5kIGZvbGQgaXRzIGltcGxlbWVudGF0aW9uIGludG8g
-cHdtX2dldF9jYXBzLg0KDQpJIGRpZCBpdCBhcyBUaGllcnJ5IHByb3Bvc2VkLg0KDQo+IA0KPj4g
-K30NCj4+ICtFWFBPUlRfU1lNQk9MX0dQTChwd21fZ2V0X2NhcHMpOw0KPj4gWy4uLl0NCj4+IEBA
-IC01MywxMiArNzUsMTQgQEAgZW51bSB7DQo+PiAgICogQHBlcmlvZDogUFdNIHBlcmlvZCAoaW4g
-bmFub3NlY29uZHMpDQo+PiAgICogQGR1dHlfY3ljbGU6IFBXTSBkdXR5IGN5Y2xlIChpbiBuYW5v
-c2Vjb25kcykNCj4+ICAgKiBAcG9sYXJpdHk6IFBXTSBwb2xhcml0eQ0KPj4gKyAqIEBtb2RlYml0
-OiBQV00gbW9kZSBiaXQNCj4+ICAgKiBAZW5hYmxlZDogUFdNIGVuYWJsZWQgc3RhdHVzDQo+PiAg
-ICovDQo+PiAgc3RydWN0IHB3bV9zdGF0ZSB7DQo+PiAgCXVuc2lnbmVkIGludCBwZXJpb2Q7DQo+
-PiAgCXVuc2lnbmVkIGludCBkdXR5X2N5Y2xlOw0KPj4gIAllbnVtIHB3bV9wb2xhcml0eSBwb2xh
-cml0eTsNCj4+ICsJdW5zaWduZWQgbG9uZyBtb2RlYml0Ow0KPiANCj4gSSBmYWlsIHRvIHNlZSB0
-aGUgdXBzaWRlIG9mIHN0b3JpbmcgdGhlIG1vZGUgYXMgMl5tb2RlIGluc3RlYWQgb2YgYQ0KPiBw
-bGFpbiBlbnVtIHB3bV9tb2RlLiBHaXZlbiB0aGF0IHN0cnVjdCBwd21fc3RhdGUgaXMgdmlzaWJs
-ZSBmb3IgcHdtDQo+IHVzZXJzIGEgcGxhaW4gcHdtX21vZGUgd291bGQgYXQgbGVhc3QgYmUgbW9y
-ZSBpbnR1aXRpdmUuDQoNClRvIGhhdmUgYWxsIG1vZGVzIHN1cHBvcnRlZCBieSBhIGNvbnRyb2xs
-ZXIgZ3JvdXBlZCBpbiBwd21fY2Fwczo6bW9kZXNfbXNrLg0KDQo+IA0KPiBCZXN0IHJlZ2FyZHMN
-Cj4gVXdlDQo+IA0KX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5p
-bmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8v
-bGludXgtYXJtLWtlcm5lbAo=
+On Fri, 4 Jan 2019 at 16:52, Chris Spencer <spencercw@gmail.com> wrote:
+> On Fri, 4 Jan 2019 at 15:33, Chris Spencer <spencercw@gmail.com> wrote:
+> > On Thu, 3 Jan 2019 at 12:53, Chris Spencer <spencercw@gmail.com> wrote:
+> > > Hi,
+> > >
+> > > I'm trying to get the i.MX8MQ-EVK board up and running with the
+> > > recently added kernel support (I'm currently working off
+> > > arm-soc/for-next) and am having some trouble with the networking. If I
+> > > issue a ping from my test machine with tcpdump running on both sides I
+> > > see this:
+> > >
+> > > On dev machine:
+> > > 10:57:52.655882 ARP, Request who-has 10.60.9.15 tell linux-dev, length 28
+> > > 10:57:53.677046 ARP, Request who-has 10.60.9.15 tell linux-dev, length 28
+> > > 10:57:54.701024 ARP, Request who-has 10.60.9.15 tell linux-dev, length 28
+> > > 10:57:55.725050 ARP, Request who-has 10.60.9.15 tell linux-dev, length 28
+> > >
+> > > On imx8:
+> > > 00:05:16.514604 ARP, Request who-has 10.60.9.15 tell 10.60.9.101, length 46
+> > > 00:05:16.514651 ARP, Reply 10.60.9.15 is-at 00:04:9f:05:a5:a5 (oui
+> > > Freescale), length 28
+> > > 00:05:17.578275 ARP, Request who-has 10.60.9.15 tell 10.60.9.101, length 46
+> > > 00:05:17.578298 ARP, Reply 10.60.9.15 is-at 00:04:9f:05:a5:a5 (oui
+> > > Freescale), length 28
+> > > 00:05:18.644896 ARP, Request who-has 10.60.9.15 tell 10.60.9.101, length 46
+> > > 00:05:18.644932 ARP, Reply 10.60.9.15 is-at 00:04:9f:05:a5:a5 (oui
+> > > Freescale), length 28
+> > > 00:05:19.711548 ARP, Request who-has 10.60.9.15 tell 10.60.9.101, length 46
+> > > 00:05:19.711561 ARP, Reply 10.60.9.15 is-at 00:04:9f:05:a5:a5 (oui
+> > > Freescale), length 28
+> > >
+> > > So the imx8 can receive packets, but anything it sends back seems to
+> > > be lost. The machines are connected directly with a standard patch
+> > > cable. I have tried with two different test machines and network
+> > > cables with the same results. Firewalls are disabled on both sides.
+> > > tcpdump shows 0 packets dropped by kernel on both sides.
+> > >
+> > > Kernel output related to the Ethernet controller:
+> > > [    0.550204] libphy: Fixed MDIO Bus: probed
+> > > [    0.555023] fec 30be0000.ethernet: 30be0000.ethernet supply phy not
+> > > found, using dummy regulator
+> > > [    0.564204] fec 30be0000.ethernet: Linked as a consumer to regulator.0
+> > > [    0.575518] libphy: fec_enet_mii_bus: probed
+> > > ...
+> > > [    6.479277] fec 30be0000.ethernet eth0: Link is Up - 1Gbps/Full -
+> > > flow control rx/tx
+> > > [    6.487386] IPv6: ADDRCONF(NETDEV_CHANGE): eth0: link becomes ready
+> > >
+> > > Potentially useful command output:
+> > > # ip addr
+> > > ...
+> > > 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq qlen 1000
+> > >     link/ether 00:04:9f:05:a5:a5 brd ff:ff:ff:ff:ff:ff
+> > >     inet 10.60.9.15/24 brd 10.60.9.255 scope global eth0
+> > >        valid_lft forever preferred_lft forever
+> > >     inet6 fe80::204:9fff:fe05:a5a5/64 scope link
+> > >        valid_lft forever preferred_lft forever
+> > > # ifconfig eth0
+> > > eth0      Link encap:Ethernet  HWaddr 00:04:9F:05:A5:A5
+> > >           inet addr:10.60.9.15  Bcast:10.60.9.255  Mask:255.255.255.0
+> > >           inet6 addr: fe80::204:9fff:fe05:a5a5/64 Scope:Link
+> > >           UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+> > >           RX packets:32 errors:0 dropped:0 overruns:0 frame:0
+> > >           TX packets:20 errors:0 dropped:0 overruns:0 carrier:0
+> > >           collisions:0 txqueuelen:1000
+> > >           RX bytes:2332 (2.2 KiB)  TX bytes:1080 (1.0 KiB)
+> > >
+> > > Is anyone able to provide some insight on what might be happening here?
+> > >
+> > > Thanks,
+> > > Chris
+> >
+> > I've been digging into this further and it seems to be potentially
+> > related to U-Boot. If I use the version of U-Boot that is shipped with
+> > the device on the eMMC and use that to manually boot into my SD card
+> > then the Ethernet controller seems to work fine.
+> >
+> > It looks like perhaps the physical layer is not being initialised
+> > properly. If I execute the following commands on the bundled U-Boot
+> > everything looks normal:
+> >
+> > u-boot=> mdio list
+> > FEC0:
+> > 0 - AR8031/AR8033 <--> ethernet@30be0000
+> > u-boot=> mii info
+> > PHY 0x00: OUI = 0x1374, Model = 0x07, Rev = 0x04, 1000baseX, FDX
+> > u-boot=> mii read 0 2
+> > 004D
+> > u-boot=> mii read 0 3
+> > D074
+> >
+> > But on my own build of U-Boot (current master
+> > 7436f5e54d35bcad53befec90e2e67288071f74e), it seems every request to
+> > the physical layer is returning zero, resulting in it using the
+> > generic PHY driver instead of the AR8031:
+> >
+> > u-boot=> mdio list
+> > FEC0:
+> > 0 - Generic PHY <--> ethernet@30be0000
+> > u-boot=> mii info
+> > PHY 0x00: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x01: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x02: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x03: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x04: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x05: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x06: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x07: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x08: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x09: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x0A: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x0B: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x0C: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x0D: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x0E: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x0F: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x10: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x11: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x12: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x13: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x14: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x15: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x16: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x17: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x18: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x19: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x1A: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x1B: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x1C: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x1D: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x1E: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > PHY 0x1F: OUI = 0x0000, Model = 0x00, Rev = 0x00,  10baseT, HDX
+> > u-boot=> mii read 0 2
+> > 0000
+> > u-boot=> mii read 0 3
+> > 0000
+> >
+> > I have added some tracing to drivers/net/fec_mxc.c:fec_mdio_read() and
+> > the read seems to be proceeding normally (i.e., it gets an interrupt
+> > indicating that the read has completed), but the value always comes
+> > back as zero.
+> >
+> > # Clear MII interrupt in ENET_EIR
+> > writel(800000, 30be0004)
+> > # Re-check ENET_EIR; as expected, the interrupt is not set
+> > readl(30be0004) => 0
+> > # Issue a read request to ENET_MMFR for phy 0 reg 2
+> > writel(600a0000, 30be0040)
+> > # Check ENET_EIR; the MII interrupt has been set, indicating the
+> > transfer has completed
+> > readl(30be0004) => 800000
+> > # Clear the interrupt
+> > writel(800000, 30be0004)
+> > # Read the data from ENET_MMFR; the value is zero. I would expect to
+> > see 004d in the lower 16 bits here
+> > readl(30be0040) => 600a0000
+> >
+> > There's a decent chance I'm missing something obvious, but I'm not seeing it..
+> >
+> > Thanks,
+> > Chris
+>
+> The plot thickens... I updated my Trusted Firmware-A BL31 [1] and that
+> seems to have fixed the problem on the Linux side. I'm not sure what
+> revision I was on before, but it would have been around 2-3 weeks out
+> of date. It still doesn't work at all in U-Boot, although I'm not
+> going to lose too much sleep if I can't get that to work.
+>
+> Chris
+>
+> [1] https://github.com/ARM-software/arm-trusted-firmware
+> 9a207532f8216bf83fed0891fed9ed0bc72ca450
+
+Any chance somebody from NXP can comment on this?
+
+It seems updating the TF-A didn't actually do anything, it's just the
+problem is erratic.
+
+I have added some trace logging to the Linux 5.0-rc1 fec_main.c and
+have found that the very first MDIO read often incorrectly returns
+zero:
+
+[    0.584706] fec_enet_mdio_read(mii_id = 0, regnum = 2) => 0
+[    0.590566] fec_enet_mdio_read(mii_id = 0, regnum = 3) => d074
+
+This results in the Generic PHY driver being used instead of the
+Atheros 8031 and things don't work properly. Occasionally, the correct
+value will be returned any everything works fine:
+
+[    0.584674] fec_enet_mdio_read(mii_id = 0, regnum = 2) => 4d
+[    0.590623] fec_enet_mdio_read(mii_id = 0, regnum = 3) => d074
+
+I can work around the issue with this patch:
+
+diff --git a/drivers/net/ethernet/freescale/fec_main.c
+b/drivers/net/ethernet/freescale/fec_main.c
+index ae0f88bce9aa..802f51308b2d 100644
+--- a/drivers/net/ethernet/freescale/fec_main.c
++++ b/drivers/net/ethernet/freescale/fec_main.c
+@@ -1789,6 +1789,7 @@ static int fec_enet_mdio_read(struct mii_bus
+*bus, int mii_id, int regnum)
+         goto out;
+     }
+
++    udelay(100);
+     ret = FEC_MMFR_DATA(readl(fep->hwp + FEC_MII_DATA));
+
+ out:
+
+It seems that the interrupt is being triggered before the register is
+actually ready to be read. I tried a 10us delay but the value returned
+from the very first read was random and incorrect.
+
+Thanks,
+Chris
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
