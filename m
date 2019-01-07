@@ -2,22 +2,22 @@ Return-Path: <SRS0=txfi=PP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7A6E3C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 16:35:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AAB3BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 16:39:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4A8462147C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 16:35:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7ADB72147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 16:39:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="b2Oh+Ds1";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="GIzom4Tq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4A8462147C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lEll3auu";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="lqTLqygV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7ADB72147C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,110 +25,127 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=IR21f6J2FrEyuHxGCuDkh4ReV1uqu/dMToK6ZrvTvoE=; b=b2Oh+Ds1O0swxe
-	tqsq70gaf5Ah2r3gs0wcpMU8OpYcFA8PKvy++anUmadwVpAamt14q76hjK3EhOzxyTe30v9Q251bd
-	7QYaANlH6N72ur3hNoG7HJ8odU2znBAC0Gfz2/hvN1hMCa2eaToH8tM/8w0xpiqzE7KCnkp0RyZSG
-	N08ujPc+PY0CrF+43zYXR4cV9Wm5xU9YT3aZd6GL07WTm5+FSmiSwhzc7GhiBWw//KRx2yKgc4WYE
-	6R/LsK/KbcduEFbBtJQ47vSr3DVGUifaP+kEzAjbg30tNH2sQvfajH83lQDGXAwdq86ScqODbZWm6
-	wNGARLsWE3pm1HOOtUJw==;
+	List-Owner; bh=hgx49SIDU+vy4iJflF7OpHkXX79pmoWAKhDmniSqnJg=; b=lEll3auuTAlAIs
+	GX2Zj9sc7kqjiaM1uu+/VOU29OgIdOxa/lkhrsYH47C8r8+KfBMnOg0RztrG9SjCVKgAduhYNkwV5
+	ZP8d1lyEHp/OrKdk9rrb5PW35a4hR8QJMock5zavHu1xJw7sJnYCJPRtznUD0wD0+RQ7kPiUBw9qj
+	KskC/DC5p3B00Q86LZ75q7hfGjaD9WEoR4XRsapsC+vEFQvjN1NpmINr0Q8HLVfo/yH1/LS3uW9jo
+	hQzPdxMoB1An2InqhoJxFjhE8AIQ4qB8Lh/MP/pO/HH8onheIvGkvlT6kWI3OeECsQaN6l4fkeURc
+	OcPJAx4vdaE7VroCAoBA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggXrj-0007ht-O3; Mon, 07 Jan 2019 16:35:03 +0000
+	id 1ggXwE-0000wl-NC; Mon, 07 Jan 2019 16:39:42 +0000
 Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggXre-0007d9-O8
- for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 16:35:00 +0000
-Received: by mail-wr1-x444.google.com with SMTP id j2so1111340wrw.1
+ id 1ggXwC-0000wM-0f
+ for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 16:39:41 +0000
+Received: by mail-wr1-x444.google.com with SMTP id s12so1108132wrt.4
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 07 Jan 2019 08:34:58 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=7YBqIbHQ9ZwxMIqZMZXC2Ay5LiTjmxvVc1ig4yyK1n4=;
- b=GIzom4TqCtGaihlJ6zqKvM+p0J40YQLKNSbldkxDZGAP6OUK1ohfOjT/8gwR74tyhr
- 4Ns9vQzIuuD0l+hTOR9BSCq8FDAIgRqZvJFXD/mTTxm7AVbSIa2McwOX5uEpmPCTZiVc
- +LRDVkcO1Q/5ly6z243ynw/Q+IQPACjgGccZY=
+ Mon, 07 Jan 2019 08:39:39 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=sender:subject:to:cc:references:from:openpgp:autocrypt:message-id
+ :date:user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=BteyKLlXLM8xWhmFfx8rEo5j5LsIt2xkNi4G5K7nq30=;
+ b=lqTLqygV9eTX8EMiBHxdl51ZJjd30A0Q1vjaqc6FHVAA4EC6R2iIuVPrWNUNI/C8Bj
+ JHXDexAWZrtz48IFC5MgGCtCTsxDNN0Y/fiUZ6euEBzaKyi2HxYgAQtZ5J91oQMcDAYY
+ UyYZYQwNWIV5lVPu+VTyE0Cnc/0LnF6C18HXSD6g9KaCwtvrdTJiy7Wz3h+ZM9GKEVa9
+ kwazWvew+Xvo7jBwDWhyjMErEk7MS8Ix3KhsSjZK4hs1j8bSgSrwv/GLyIBJR6Xwi8xO
+ I4RA5kLnSD8I8SoEt9prBpjr9NZW1+XkqP1h5k532Gre6Q4Zk1L11t3ux3FkObfJuiop
+ moYg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :message-id:date:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=7YBqIbHQ9ZwxMIqZMZXC2Ay5LiTjmxvVc1ig4yyK1n4=;
- b=iLGJGK1Kc8AiVSpTo1R9TH6V4Lo+I2TJ75fw3lvBgpNjoJHtZOmLdQGIyGDJqp2ZmH
- 9mWYGX+J/LmhslJYhPR+863agOkrQxMcXE3QRPGpmcAIwjGEWmMbqeB0GvI5Lf00kM8G
- tDGorr7vJ2BNfhyzH5h3xN1Jj1Fj23Vf94780Z0N0PMqO0o0R8hmLxdBPf+yVCMbZYVi
- 3m9AwCLaBDQyOIJkDjeOVMBN5Z9j93shNgQ8cykNuh3R52uFmSEB55tT0y2QUSQcRvwY
- GkeNX2tsrJeKwSDF3zA4ooc7YRcIOP7tWtC5jpMg+zitI/K1JMB1ULNrXOxwCwyr6jZ/
- dZfA==
-X-Gm-Message-State: AJcUukeXb8zosj9MVPD13dQIUlGb7vto0bCzF6STTU6gQV9SDFuzjfLy
- 6yeDEZysm0TPZ0VIiDBEL3m+QQ==
-X-Google-Smtp-Source: ALg8bN6T8jzSHvXmImnIud88LgHLq4HQV4Aho6ghX1WilhshJ6uBtLRg6twx2wHpiL4RUKUAPX48UA==
-X-Received: by 2002:a5d:6487:: with SMTP id r7mr53747673wru.263.1546878896876; 
- Mon, 07 Jan 2019 08:34:56 -0800 (PST)
-Received: from [10.44.66.8] ([212.45.67.2])
+ h=x-gm-message-state:sender:subject:to:cc:references:from:openpgp
+ :autocrypt:message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=BteyKLlXLM8xWhmFfx8rEo5j5LsIt2xkNi4G5K7nq30=;
+ b=lqfVH4HQrLeP24BVt+lXHs9W3+6qvMfCs9ygJuhy38gjoNMwJ4GjPsxQ1ydl4RSFZv
+ w/6LYjdItXj05R9nJXt5Qn0GW6tmcIh4eqeiOMz8mKm4rauNHFRHtU8i4fQUvnSl2DjA
+ qB6GqJBB97ZSn3pbXtvzq/zlClGANseWlc+7Dkd+SSEDlJj5aGIPKLk8hbeAvjFX2SNf
+ Q+wjjLqENllaN+mH9tg4Hk3kvwdxZDB4nHvHKdfwCjw12Xu2bZoVVcXlgTTZeIyyAIjm
+ j2bnt4rb+GY9PRgOXH3bmaLnlf/E/E11I7oJ0Nkoa+gK4gxj71b6W0BUNcJl01NhyQON
+ vT6w==
+X-Gm-Message-State: AJcUukfOP9dC+amyywnJI4g3WQpG5cJHj5CXxydmUFyVnevrun9X13th
+ 0ZlsTrPAvwVMewS+/poi0dA=
+X-Google-Smtp-Source: ALg8bN5A4h2vi1OaJoHqPHyE7gYA/rx1zturjQ0g6r5Fu3Wm3FdHxIrKHDubTXPGhlOsjlB/7qNs7A==
+X-Received: by 2002:adf:b6a1:: with SMTP id j33mr52322444wre.55.1546879178246; 
+ Mon, 07 Jan 2019 08:39:38 -0800 (PST)
+Received: from ?IPv6:2001:b07:6468:f312:3473:41cf:8b30:f2e1?
+ ([2001:b07:6468:f312:3473:41cf:8b30:f2e1])
  by smtp.googlemail.com with ESMTPSA id
- h16sm121482201wrb.62.2019.01.07.08.34.55
+ l20sm111840324wrb.93.2019.01.07.08.39.35
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 07 Jan 2019 08:34:56 -0800 (PST)
-Subject: Re: [RFC RESEND PATCH 0/7] Add driver for dvfsrc and add support for
- active state of scpsys on mt8183
-To: Henry Chen <henryc.chen@mediatek.com>, Stephen Boyd <swboyd@chromium.org>
-References: <1546438198-1677-1-git-send-email-henryc.chen@mediatek.com>
- <154655603153.15366.7761694381359713995@swboyd.mtv.corp.google.com>
- <1546859080.6818.128.camel@mtksdaap41>
-From: Georgi Djakov <georgi.djakov@linaro.org>
+ Mon, 07 Jan 2019 08:39:37 -0800 (PST)
+Subject: Re: [PATCH 4/11] KVM/MMU: Introduce tlb flush with range list
+To: lantianyu1986@gmail.com
+References: <20190104085405.40356-1-Tianyu.Lan@microsoft.com>
+ <20190104085405.40356-5-Tianyu.Lan@microsoft.com>
+From: Paolo Bonzini <pbonzini@redhat.com>
 Openpgp: preference=signencrypt
-Autocrypt: addr=georgi.djakov@linaro.org; prefer-encrypt=mutual; keydata=
- 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
- KEmKjLDvB0pePJkdTw==
-Message-ID: <08d15fa8-7e53-518c-54bb-8050b0e4aabd@linaro.org>
-Date: Mon, 7 Jan 2019 18:34:54 +0200
+Autocrypt: addr=pbonzini@redhat.com; keydata=
+ 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
+ uUHgL9dKIfvpm+rNXRn9wAwGjk0X/A==
+Message-ID: <2c6f7a11-b406-d4f1-c934-e6dedf5b07fd@redhat.com>
+Date: Mon, 7 Jan 2019 17:39:33 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-In-Reply-To: <1546859080.6818.128.camel@mtksdaap41>
+In-Reply-To: <20190104085405.40356-5-Tianyu.Lan@microsoft.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190107_083458_790217_6E12C831 
-X-CRM114-Status: GOOD (  16.09  )
+X-CRM114-CacheID: sfid-20190107_083940_089497_937A6C18 
+X-CRM114-Status: GOOD (  13.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -140,58 +157,41 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, James Liao <jamesjj.liao@mediatek.com>,
- Ulf Hansson <ulf.hansson@linaro.org>, Kees Cook <keescook@chromium.org>,
- Weiyi Lu <weiyi.lu@mediatek.com>, linux-pm@vger.kernel.org,
- Viresh Kumar <vireshk@kernel.org>, linux-kernel@vger.kernel.org,
- Fan Chen <fan.chen@mediatek.com>, devicetree@vger.kernel.org,
- Rob Herring <robh+dt@kernel.org>, linux-mediatek@lists.infradead.org,
- Matthias Brugger <matthias.bgg@gmail.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: kvm@vger.kernel.org, benh@kernel.crashing.org, will.deacon@arm.com,
+ linux-mips@vger.kernel.org, paulus@ozlabs.org, hpa@zytor.com,
+ kys@microsoft.com, kvmarm@lists.cs.columbia.edu, mpe@ellerman.id.au,
+ x86@kernel.org, linux@armlinux.org.uk, michael.h.kelley@microsoft.com,
+ mingo@redhat.com, catalin.marinas@arm.com, jhogan@kernel.org,
+ Lan Tianyu <Tianyu.Lan@microsoft.com>, marc.zyngier@arm.com,
+ kvm-ppc@vger.kernel.org, bp@alien8.de, tglx@linutronix.de,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
+ ralf@linux-mips.org, paul.burton@mips.com, vkuznets@redhat.com,
+ linuxppc-dev@lists.ozlabs.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Henry,
+On 04/01/19 09:53, lantianyu1986@gmail.com wrote:
+>  struct kvm_mmu_page {
+>  	struct list_head link;
+> +
+> +	/*
+> +	 * Tlb flush with range list uses struct kvm_mmu_page as list entry
+> +	 * and all list operations should be under protection of mmu_lock.
+> +	 */
+> +	struct list_head flush_link;
+>  	struct hlist_node hash_link;
+>  	bool unsync;
+>  
+> @@ -443,6 +449,7 @@ struct kvm_mmu {
 
-On 1/7/19 13:04, Henry Chen wrote:
-> On Thu, 2019-01-03 at 14:53 -0800, Stephen Boyd wrote:
->> Quoting Henry Chen (2019-01-02 06:09:51)
->>> The patchsets add support for MediaTek hardware module named DVFSRC
->>> (dynamic voltage and frequency scaling resource collector). The DVFSRC is
->>> a HW module which is used to collect all the requests from both software
->>> and hardware and turn into the decision of minimum operating voltage and
->>> minimum DRAM frequency to fulfill those requests.
->>>
->>> So, This series is to implement the dvfsrc driver to collect all the
->>> requests of operating voltage or DRAM bandwidth from other device drivers
->>> likes GPU/Camera through 2 frameworks basically:
->>>
->>> 1. PM_QOS_MEMORY_BANDWIDTH from PM QOS: to aggregate the bandwidth
->>>    requirements from different clients
->>
->> Have you looked at using the interconnect framework for this instead of
->> using PM_QOS_MEMORY_BANDWIDTH? Qcom is pushing an interconnect framework
->> to do DRAM bandwidth requirement aggregation.
-> 
-> Sorry, I haven't heard that before. Do you mean is following series
-> patch?
-> https://patchwork.kernel.org/project/linux-arm-msm/list/?series=53775
-> 
+Again, it would be nice not to grow the struct too much, though I
+understand that it's already relatively big (168 bytes).
 
-Yes, this one. The idea is that consumer drivers like GPU, camera, video
-encoder etc. report their bandwidth needs by using the interconnect API.
-The framework does the aggregation and configures the hardware. In order
-to use it you need to implement a platform-specific dvfsrc interconnect
-provider driver that understands the SoC topology and knows how to
-configure the hardware. I am not familiar with DVFSRC, but it seems to
-me that it can fit as interconnect provider.
-Does this HW module support any QoS priority/latency configuration or is
-it only bandwidth and voltage?
+Can you at least make this an hlist, so that it only takes a single word?
 
-Thanks,
-Georgi
+Paolo
 
 _______________________________________________
 linux-arm-kernel mailing list
