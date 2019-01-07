@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 63B43C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 06:43:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2A5F6C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 06:44:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1033620881
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 06:43:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EAF422087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 06:44:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Fv4gkkaE";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="mNkGRDzs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1033620881
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GZH7IOT8";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="s4cGbFeT"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EAF422087F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,60 +26,60 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=PMweUPW6wil7D1xHOG106No7Uqxp1kHbLQrRDh/+VmY=; b=Fv4gkkaELNVTmq
-	uOryg7Mn4OxNnDpF9rfmAAM3KCmOQNmww1tw9YfItQho8pXJn2im2r/pDhMemdd3cdRdjfv2bnfc5
-	4tJbY2/poGfEJwLFENuA9K0FaLtQm+kFMHv+BsHhL95cE6AybGG//5nxKq1G9qaBC5DAYkdwcc7cN
-	knWpINuM3BR3FYVPF022h21uX04u5unkMfWSMIWGzN7TVyhgMSbN3b0yw+UsW9MX66cSfdUAwS0YU
-	aG6O/+B81nYaLRTtPlwcwddvXZEqfeYBw7MhjwQ+heoTrjGiXBxayL2wMDdFljdTkgNGrIzmeJLBP
-	jqFEo0YuuG3rXrL+U+6A==;
+	List-Owner; bh=ie58I16eOni/wlQ9T/XRE2+/DdSuvQiaQsG5huNBFOc=; b=GZH7IOT84dDb5G
+	e5U5/Wg2c1gNxDIELBgrf+Zwj+clry6f0dYkKrXLoylnMTCt5ccFB5PyWuFnvz+OF2BX4L6ug8pl1
+	WiEvWDFiU72MO+fXH95lHDjvMDHFffQmV336bV1E40FLmLiAOf79pd5EZ6jHGWGlgGAD8Gs6cMHI+
+	2ancdUG5A1ItAjOfXrsIKUUxHYxEy+DP+lXphNK+SRIAqnlOJz/1lSL/9iGRQApBGG1nSwt5LPZSE
+	7wrMlDxiOvZmHtRcgotMtBo020NrG5gAhcZfM0gLO748Mm1bs6rzz/xDOPQmW1BUaqqptBL8CPStB
+	9gxoOYNN653PUnIFj1xw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggOdY-0003QM-OP; Mon, 07 Jan 2019 06:43:48 +0000
-Received: from lelv0143.ext.ti.com ([198.47.23.248])
+	id 1ggOdn-0003i6-Ss; Mon, 07 Jan 2019 06:44:03 +0000
+Received: from fllv0015.ext.ti.com ([198.47.19.141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggOcu-0002bP-59; Mon, 07 Jan 2019 06:43:17 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x076gulx055152;
- Mon, 7 Jan 2019 00:42:56 -0600
+ id 1ggOcx-0002gL-Bj; Mon, 07 Jan 2019 06:43:18 +0000
+Received: from lelv0266.itg.ti.com ([10.180.67.225])
+ by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id x076h5fY058891;
+ Mon, 7 Jan 2019 00:43:05 -0600
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1546843376;
- bh=cErqiu0ARQGyKCvuDtnfQEI4ZlZ26OR+gjwxCf8dAg4=;
+ s=ti-com-17Q1; t=1546843385;
+ bh=TmIM90if+baASLKYtEih7oqZRQj9lMMND6SlULCYPWw=;
  h=From:To:CC:Subject:Date:In-Reply-To:References;
- b=mNkGRDzsJSoQ8ZeDWejeSfoGil7FdYS/sbmTF5HMpMiq0JIwEEjfCLA8B/GQouHAb
- hvLC+qB8thQvP+dvoNtDwrv82N2tvcXWsqQcCU5nn+1NmHjBU3J1Jzz2aqtDfYj2C6
- XKVPlKuQfBJYdjOmOuFFNwMN95DTydqsAXv+27dk=
-Received: from DLEE102.ent.ti.com (dlee102.ent.ti.com [157.170.170.32])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x076guv2048373
+ b=s4cGbFeTxcmy/RknkLx+VUGLIvRawQJSvkSLFiTGAhUuZYcyABTOXSx8LdfaIpVXE
+ f7fh4+y7fM+H063V63R4/fo0rckjdfqU84ClIb0dOjynSKCngBEPoLBxObLOvuwQBQ
+ FBsFYhg9nYUsqHcqj/JjmuBIlUIvxCAI+W3ef24M=
+Received: from DFLE106.ent.ti.com (dfle106.ent.ti.com [10.64.6.27])
+ by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x076h5XC071098
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Mon, 7 Jan 2019 00:42:56 -0600
-Received: from DLEE113.ent.ti.com (157.170.170.24) by DLEE102.ent.ti.com
- (157.170.170.32) with Microsoft SMTP Server (version=TLS1_2,
+ Mon, 7 Jan 2019 00:43:05 -0600
+Received: from DFLE115.ent.ti.com (10.64.6.36) by DFLE106.ent.ti.com
+ (10.64.6.27) with Microsoft SMTP Server (version=TLS1_2,
  cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Mon, 7
- Jan 2019 00:42:56 -0600
-Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE113.ent.ti.com
- (157.170.170.24) with Microsoft SMTP Server (version=TLS1_0,
+ Jan 2019 00:43:05 -0600
+Received: from dflp32.itg.ti.com (10.64.6.15) by DFLE115.ent.ti.com
+ (10.64.6.36) with Microsoft SMTP Server (version=TLS1_0,
  cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Mon, 7 Jan 2019 00:42:56 -0600
+ Mon, 7 Jan 2019 00:43:04 -0600
 Received: from a0393678ub.india.ti.com (ileax41-snat.itg.ti.com
  [10.172.224.153])
- by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x076gfnx002672;
- Mon, 7 Jan 2019 00:42:51 -0600
+ by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x076gfo1002672;
+ Mon, 7 Jan 2019 00:43:01 -0600
 From: Kishon Vijay Abraham I <kishon@ti.com>
 To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>, Bjorn Helgaas
  <bhelgaas@google.com>, Gustavo Pimentel <gustavo.pimentel@synopsys.com>,
  Alan Douglas <adouglas@cadence.com>, Shawn Lin <shawn.lin@rock-chips.com>
-Subject: [PATCH 02/15] PCI: dwc: Add ->get_features() callback function in
+Subject: [PATCH 04/15] PCI: pci-dra7xx: Populate ->get_features()
  dw_pcie_ep_ops
-Date: Mon, 7 Jan 2019 12:11:35 +0530
-Message-ID: <20190107064148.10152-3-kishon@ti.com>
+Date: Mon, 7 Jan 2019 12:11:37 +0530
+Message-ID: <20190107064148.10152-5-kishon@ti.com>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20190107064148.10152-1-kishon@ti.com>
 References: <20190107064148.10152-1-kishon@ti.com>
 MIME-Version: 1.0
 X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190106_224308_962908_0D01EC82 
-X-CRM114-Status: GOOD (  17.88  )
+X-CRM114-CacheID: sfid-20190106_224311_889570_B2CBB27A 
+X-CRM114-Status: GOOD (  16.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -102,59 +102,41 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Each platform using Designware PCIe core can support different set of
-endpoint features. Add a new callback function ->get_features() in
-dw_pcie_ep_ops so that each platform using Designware PCIe core can
-advertise its supported features to the endpoint function driver.
+Populate ->get_features() dw_pcie_ep_ops to return the EPC features
+supported by DRA7xx PCIe endpoint controller.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/pci/controller/dwc/pcie-designware-ep.c | 12 ++++++++++++
- drivers/pci/controller/dwc/pcie-designware.h    |  1 +
- 2 files changed, 13 insertions(+)
+ drivers/pci/controller/dwc/pci-dra7xx.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/pci/controller/dwc/pcie-designware-ep.c b/drivers/pci/controller/dwc/pcie-designware-ep.c
-index a543c45c7224..7a2925a16ab8 100644
---- a/drivers/pci/controller/dwc/pcie-designware-ep.c
-+++ b/drivers/pci/controller/dwc/pcie-designware-ep.c
-@@ -355,6 +355,17 @@ static int dw_pcie_ep_start(struct pci_epc *epc)
- 	return pci->ops->start_link(pci);
+diff --git a/drivers/pci/controller/dwc/pci-dra7xx.c b/drivers/pci/controller/dwc/pci-dra7xx.c
+index a32d6dde7a57..15620cfa617b 100644
+--- a/drivers/pci/controller/dwc/pci-dra7xx.c
++++ b/drivers/pci/controller/dwc/pci-dra7xx.c
+@@ -389,9 +389,22 @@ static int dra7xx_pcie_raise_irq(struct dw_pcie_ep *ep, u8 func_no,
+ 	return 0;
  }
  
++static const struct pci_epc_features dra7xx_pcie_epc_features = {
++	.linkup_notifier = true,
++	.msi_capable = true,
++	.msix_capable = false,
++};
++
 +static const struct pci_epc_features*
-+dw_pcie_ep_get_features(struct pci_epc *epc, u8 func_no)
++dra7xx_pcie_get_features(struct dw_pcie_ep *ep)
 +{
-+	struct dw_pcie_ep *ep = epc_get_drvdata(epc);
-+
-+	if (!ep->ops->get_features)
-+		return NULL;
-+
-+	return ep->ops->get_features(ep);
++	return &dra7xx_pcie_epc_features;
 +}
 +
- static const struct pci_epc_ops epc_ops = {
- 	.write_header		= dw_pcie_ep_write_header,
- 	.set_bar		= dw_pcie_ep_set_bar,
-@@ -368,6 +379,7 @@ static const struct pci_epc_ops epc_ops = {
- 	.raise_irq		= dw_pcie_ep_raise_irq,
- 	.start			= dw_pcie_ep_start,
- 	.stop			= dw_pcie_ep_stop,
-+	.get_features		= dw_pcie_ep_get_features,
+ static struct dw_pcie_ep_ops pcie_ep_ops = {
+ 	.ep_init = dra7xx_pcie_ep_init,
+ 	.raise_irq = dra7xx_pcie_raise_irq,
++	.get_features = dra7xx_pcie_get_features,
  };
  
- int dw_pcie_ep_raise_legacy_irq(struct dw_pcie_ep *ep, u8 func_no)
-diff --git a/drivers/pci/controller/dwc/pcie-designware.h b/drivers/pci/controller/dwc/pcie-designware.h
-index 9943d8c68335..1f56e6ae34ff 100644
---- a/drivers/pci/controller/dwc/pcie-designware.h
-+++ b/drivers/pci/controller/dwc/pcie-designware.h
-@@ -192,6 +192,7 @@ struct dw_pcie_ep_ops {
- 	void	(*ep_init)(struct dw_pcie_ep *ep);
- 	int	(*raise_irq)(struct dw_pcie_ep *ep, u8 func_no,
- 			     enum pci_epc_irq_type type, u16 interrupt_num);
-+	const struct pci_epc_features* (*get_features)(struct dw_pcie_ep *ep);
- };
- 
- struct dw_pcie_ep {
+ static int __init dra7xx_add_pcie_ep(struct dra7xx_pcie *dra7xx,
 -- 
 2.17.1
 
