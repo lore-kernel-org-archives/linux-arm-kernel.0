@@ -4,19 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-16.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4C4A3C43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 18:58:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 46F24C43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 18:58:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 08538206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 18:58:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 12BCC21855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 18:58:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="n9okpG6k";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="s6OAfqGY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 08538206B7
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RuNZ0KUB";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="lPT9+gwe"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 12BCC21855
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,47 +26,47 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Date:Message-Id:
 	In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	References:List-Owner; bh=By1Fn7CqPGm/5dTWPLwmfyqk7GxXuioZ++1tsH3rUSU=; b=n9o
-	kpG6k3G6iM5uCRDRxtHt+s+p0Jrba3C5XDWXAkOeGJnfFZRAnVQHoegq9cpYrbO/oJ0RbVHGCGJju
-	JBlQMAio0S6DkhMo/KeJvNsv1VfPhde2u1agxzlfuEwbqDatGlYo57uhhWwxnKyIbXiJM0pDnfu0P
-	7t1zWR7DISIhC4phvJVi09eXimnEfNw2Knagicctih0WafJA/FCLCWm1OQ2viZTzGaiNbwTvm3R1g
-	sQmTqELSPm40KdNofVYkgQfQrI88yqwJe5IeHPAXBZpHDWTQbrHDdCVF2PBST/eN2T0GA18CZ5uod
-	/FV4vLSADCQnmoJYEc5qCc/4kXk/ddw==;
+	References:List-Owner; bh=lEVWTOTKqgkaZXTR//Cqx36QM/k5oKuiHaFKv8LSgOU=; b=RuN
+	Z0KUB9QFku07Mz1ez+tqHUnJeuUzEHdE/qCxw1RkFTkbmzY37ZZAcZHCdglWSIm46ymN3eVoCxBXz
+	88/mKvYk5T/EBcjfSXSXfVpeQy+y7T4rDmFL1MsU+G+jXM+T+Ym0GfPZKg+rS0xRlR3KsiiAS3VmM
+	F11YDqgzYmnu+EtgQvFq1YvN5f4FZpCvrExwfhCE3YzM/KEQx57mQ2bZ1DJz8WKHskGoxTrxxKqVz
+	CLcQYF1fMAY6Hqn0jVQILR3FYYiZuw4rl840C8TlHYBGr5eNAtXUSsGMZ7fdEms6lzDPmMcSxNWWB
+	XZDeDiV+wqrzvrxyEroZ8z2ZntDO9sQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gga68-0001Y9-Fb; Mon, 07 Jan 2019 18:58:04 +0000
+	id 1gga6S-0001w1-B8; Mon, 07 Jan 2019 18:58:24 +0000
 Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gga5w-0001PU-4L
- for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 18:57:54 +0000
+ id 1gga5w-0001PX-4M
+ for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 18:57:56 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=sirena.org.uk; s=20170815-heliosphere; h=Date:Message-Id:In-Reply-To:
  Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
  Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
  Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:
  List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:
- List-Archive; bh=DXbnSKGu2zi+vy+okpd9odJIcZMqT7wN5wV78tIganE=; b=s6OAfqGYZ02X
- AKlyW7H14X0osi1SdkuluXGSvCZI165jxXnmJfa31xQ+OmpwD1ni+2Ay9ZE3QnIr3rmL3jnGkchXw
- p8bxD8bOQy1f05nCYNsL1sylHdUrLWBqiFzyp2QUBihJH9Tf3+UrtI8gVjaqTIykchyercsGp+eyp
- DUv9o=;
+ List-Archive; bh=bO2MIB4EvxiHijL8SQ9kBoir2s6cyWfmW48WEb14aYQ=; b=lPT9+gwecoQ6
+ 4tEZ97mjrEuW7n4BdWzbKocqc2wYmapuaNmgrLYgcn/YXEHTUUvVAWQwVbqfAxaxE6lQaARcMv2sa
+ 2Ab88kodAeB2ESL3Sic0myUybWfEqBjQFl/DpVw0JxT2yFgigkakPa5Vgeg4I4bwUWkNZ6UkGqT27
+ DVs2U=;
 Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
  ([82.37.168.47] helo=debutante.sirena.org.uk)
  by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
  (envelope-from <broonie@sirena.org.uk>)
- id 1gga5o-0007kX-3k; Mon, 07 Jan 2019 18:57:44 +0000
+ id 1gga5p-0007kc-Tz; Mon, 07 Jan 2019 18:57:45 +0000
 Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id B90241127491; Mon,  7 Jan 2019 18:57:43 +0000 (GMT)
+ id 912311127491; Mon,  7 Jan 2019 18:57:45 +0000 (GMT)
 From: Mark Brown <broonie@kernel.org>
 To: Maruthi Srinivas Bayyavarapu <maruthi.srinivas.bayyavarapu@xilinx.com>
-Subject: Applied "ASoC: xlnx: enable SPDIF driver build" to the asoc tree
-In-Reply-To: <1546538993-55473-4-git-send-email-maruthi.srinivas.bayyavarapu@xilinx.com>
+Subject: Applied "ASoC: xlnx: add SPDIF audio driver" to the asoc tree
+In-Reply-To: <1546538993-55473-3-git-send-email-maruthi.srinivas.bayyavarapu@xilinx.com>
 X-Patchwork-Hint: ignore
-Message-Id: <20190107185743.B90241127491@debutante.sirena.org.uk>
-Date: Mon,  7 Jan 2019 18:57:43 +0000 (GMT)
+Message-Id: <20190107185745.912311127491@debutante.sirena.org.uk>
+Date: Mon,  7 Jan 2019 18:57:45 +0000 (GMT)
 X-Bad-Reply: In-Reply-To but no 'Re:' in Subject.
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190107_105752_331153_FC5A61A0 
-X-CRM114-Status: GOOD (  11.60  )
+X-CRM114-CacheID: sfid-20190107_105752_358735_167E0DD6 
+X-CRM114-Status: GOOD (  19.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,7 +92,7 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 The patch
 
-   ASoC: xlnx: enable SPDIF driver build
+   ASoC: xlnx: add SPDIF audio driver
 
 has been applied to the asoc tree at
 
@@ -116,45 +117,366 @@ to this mail.
 Thanks,
 Mark
 
-From 47caf048a017ecc95cdd0802bc3b015a1559e601 Mon Sep 17 00:00:00 2001
+From b1d2a4cca20cb84ffe02116fd8d2b91a94d49d5e Mon Sep 17 00:00:00 2001
 From: Maruthi Srinivas Bayyavarapu <maruthi.srinivas.bayyavarapu@xilinx.com>
-Date: Thu, 3 Jan 2019 23:39:53 +0530
-Subject: [PATCH] ASoC: xlnx: enable SPDIF driver build
+Date: Thu, 3 Jan 2019 23:39:52 +0530
+Subject: [PATCH] ASoC: xlnx: add SPDIF audio driver
 
-Added SPDIF driver build related changes.
+Added SPDIF audio driver. This provides playback and capture of
+AES audio over SPDIF interface.
 
 Signed-off-by: Maruthi Srinivas Bayyavarapu <maruthi.srinivas.bayyavarapu@xilinx.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/xilinx/Kconfig  | 7 +++++++
- sound/soc/xilinx/Makefile | 2 ++
- 2 files changed, 9 insertions(+)
+ sound/soc/xilinx/xlnx_spdif.c | 339 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 339 insertions(+)
+ create mode 100644 sound/soc/xilinx/xlnx_spdif.c
 
-diff --git a/sound/soc/xilinx/Kconfig b/sound/soc/xilinx/Kconfig
-index ac48d6a00c36..47f606b924e4 100644
---- a/sound/soc/xilinx/Kconfig
-+++ b/sound/soc/xilinx/Kconfig
-@@ -13,3 +13,10 @@ config SND_SOC_XILINX_AUDIO_FORMATTER
-           Select this option to enable Xilinx audio formatter
-           support. This provides DMA platform device support for
-           audio functionality.
+diff --git a/sound/soc/xilinx/xlnx_spdif.c b/sound/soc/xilinx/xlnx_spdif.c
+new file mode 100644
+index 000000000000..3b9000fd8c49
+--- /dev/null
++++ b/sound/soc/xilinx/xlnx_spdif.c
+@@ -0,0 +1,339 @@
++// SPDX-License-Identifier: GPL-2.0
++//
++// Xilinx ASoC SPDIF audio support
++//
++// Copyright (C) 2018 Xilinx, Inc.
++//
++// Author: Maruthi Srinivas Bayyavarapu <maruthis@xilinx.com>
++//
 +
-+config SND_SOC_XILINX_SPDIF
-+        tristate "Audio support for the the Xilinx SPDIF"
-+        help
-+          Select this option to enable Xilinx SPDIF Audio.
-+          This provides playback and capture of SPDIF audio in
-+          AES format.
-diff --git a/sound/soc/xilinx/Makefile b/sound/soc/xilinx/Makefile
-index 432693b1cc79..d79fd38b094b 100644
---- a/sound/soc/xilinx/Makefile
-+++ b/sound/soc/xilinx/Makefile
-@@ -2,3 +2,5 @@ snd-soc-xlnx-i2s-objs      := xlnx_i2s.o
- obj-$(CONFIG_SND_SOC_XILINX_I2S) += snd-soc-xlnx-i2s.o
- snd-soc-xlnx-formatter-pcm-objs := xlnx_formatter_pcm.o
- obj-$(CONFIG_SND_SOC_XILINX_AUDIO_FORMATTER) += snd-soc-xlnx-formatter-pcm.o
-+snd-soc-xlnx-spdif-objs := xlnx_spdif.o
-+obj-$(CONFIG_SND_SOC_XILINX_SPDIF) += snd-soc-xlnx-spdif.o
++#include <linux/clk.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <sound/pcm_params.h>
++#include <sound/soc.h>
++
++#define XLNX_SPDIF_RATES \
++	(SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000 | \
++	SNDRV_PCM_RATE_88200 | SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_176400 | \
++	SNDRV_PCM_RATE_192000)
++
++#define XLNX_SPDIF_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE)
++
++#define XSPDIF_IRQ_STS_REG		0x20
++#define XSPDIF_IRQ_ENABLE_REG		0x28
++#define XSPDIF_SOFT_RESET_REG		0x40
++#define XSPDIF_CONTROL_REG		0x44
++#define XSPDIF_CHAN_0_STS_REG		0x4C
++#define XSPDIF_GLOBAL_IRQ_ENABLE_REG	0x1C
++#define XSPDIF_CH_A_USER_DATA_REG_0	0x64
++
++#define XSPDIF_CORE_ENABLE_MASK		BIT(0)
++#define XSPDIF_FIFO_FLUSH_MASK		BIT(1)
++#define XSPDIF_CH_STS_MASK		BIT(5)
++#define XSPDIF_GLOBAL_IRQ_ENABLE	BIT(31)
++#define XSPDIF_CLOCK_CONFIG_BITS_MASK	GENMASK(5, 2)
++#define XSPDIF_CLOCK_CONFIG_BITS_SHIFT	2
++#define XSPDIF_SOFT_RESET_VALUE		0xA
++
++#define MAX_CHANNELS			2
++#define AES_SAMPLE_WIDTH		32
++#define CH_STATUS_UPDATE_TIMEOUT	40
++
++struct spdif_dev_data {
++	u32 mode;
++	u32 aclk;
++	bool rx_chsts_updated;
++	void __iomem *base;
++	struct clk *axi_clk;
++	wait_queue_head_t chsts_q;
++};
++
++static irqreturn_t xlnx_spdifrx_irq_handler(int irq, void *arg)
++{
++	u32 val;
++	struct spdif_dev_data *ctx = arg;
++
++	val = readl(ctx->base + XSPDIF_IRQ_STS_REG);
++	if (val & XSPDIF_CH_STS_MASK) {
++		writel(val & XSPDIF_CH_STS_MASK,
++		       ctx->base + XSPDIF_IRQ_STS_REG);
++		val = readl(ctx->base +
++			    XSPDIF_IRQ_ENABLE_REG);
++		writel(val & ~XSPDIF_CH_STS_MASK,
++		       ctx->base + XSPDIF_IRQ_ENABLE_REG);
++
++		ctx->rx_chsts_updated = true;
++		wake_up_interruptible(&ctx->chsts_q);
++		return IRQ_HANDLED;
++	}
++
++	return IRQ_NONE;
++}
++
++static int xlnx_spdif_startup(struct snd_pcm_substream *substream,
++			      struct snd_soc_dai *dai)
++{
++	u32 val;
++	struct spdif_dev_data *ctx = dev_get_drvdata(dai->dev);
++
++	val = readl(ctx->base + XSPDIF_CONTROL_REG);
++	val |= XSPDIF_FIFO_FLUSH_MASK;
++	writel(val, ctx->base + XSPDIF_CONTROL_REG);
++
++	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
++		writel(XSPDIF_CH_STS_MASK,
++		       ctx->base + XSPDIF_IRQ_ENABLE_REG);
++		writel(XSPDIF_GLOBAL_IRQ_ENABLE,
++		       ctx->base + XSPDIF_GLOBAL_IRQ_ENABLE_REG);
++	}
++
++	return 0;
++}
++
++static void xlnx_spdif_shutdown(struct snd_pcm_substream *substream,
++				struct snd_soc_dai *dai)
++{
++	struct spdif_dev_data *ctx = dev_get_drvdata(dai->dev);
++
++	writel(XSPDIF_SOFT_RESET_VALUE, ctx->base + XSPDIF_SOFT_RESET_REG);
++}
++
++static int xlnx_spdif_hw_params(struct snd_pcm_substream *substream,
++				struct snd_pcm_hw_params *params,
++				struct snd_soc_dai *dai)
++{
++	u32 val, clk_div, clk_cfg;
++	struct spdif_dev_data *ctx = dev_get_drvdata(dai->dev);
++
++	clk_div = DIV_ROUND_CLOSEST(ctx->aclk, MAX_CHANNELS * AES_SAMPLE_WIDTH *
++				    params_rate(params));
++
++	switch (clk_div) {
++	case 4:
++		clk_cfg = 0;
++		break;
++	case 8:
++		clk_cfg = 1;
++		break;
++	case 16:
++		clk_cfg = 2;
++		break;
++	case 24:
++		clk_cfg = 3;
++		break;
++	case 32:
++		clk_cfg = 4;
++		break;
++	case 48:
++		clk_cfg = 5;
++		break;
++	case 64:
++		clk_cfg = 6;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	val = readl(ctx->base + XSPDIF_CONTROL_REG);
++	val &= ~XSPDIF_CLOCK_CONFIG_BITS_MASK;
++	val |= clk_cfg << XSPDIF_CLOCK_CONFIG_BITS_SHIFT;
++	writel(val, ctx->base + XSPDIF_CONTROL_REG);
++
++	return 0;
++}
++
++static int rx_stream_detect(struct snd_soc_dai *dai)
++{
++	int err;
++	struct spdif_dev_data *ctx = dev_get_drvdata(dai->dev);
++	unsigned long jiffies = msecs_to_jiffies(CH_STATUS_UPDATE_TIMEOUT);
++
++	/* start capture only if stream is detected within 40ms timeout */
++	err = wait_event_interruptible_timeout(ctx->chsts_q,
++					       ctx->rx_chsts_updated,
++					       jiffies);
++	if (!err) {
++		dev_err(dai->dev, "No streaming audio detected!\n");
++		return -EINVAL;
++	}
++	ctx->rx_chsts_updated = false;
++
++	return 0;
++}
++
++static int xlnx_spdif_trigger(struct snd_pcm_substream *substream, int cmd,
++			      struct snd_soc_dai *dai)
++{
++	u32 val;
++	int ret = 0;
++	struct spdif_dev_data *ctx = dev_get_drvdata(dai->dev);
++
++	val = readl(ctx->base + XSPDIF_CONTROL_REG);
++	switch (cmd) {
++	case SNDRV_PCM_TRIGGER_START:
++	case SNDRV_PCM_TRIGGER_RESUME:
++	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
++		val |= XSPDIF_CORE_ENABLE_MASK;
++		writel(val, ctx->base + XSPDIF_CONTROL_REG);
++		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
++			ret = rx_stream_detect(dai);
++		break;
++	case SNDRV_PCM_TRIGGER_STOP:
++	case SNDRV_PCM_TRIGGER_SUSPEND:
++	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
++		val &= ~XSPDIF_CORE_ENABLE_MASK;
++		writel(val, ctx->base + XSPDIF_CONTROL_REG);
++		break;
++	default:
++		ret = -EINVAL;
++	}
++
++	return ret;
++}
++
++static const struct snd_soc_dai_ops xlnx_spdif_dai_ops = {
++	.startup = xlnx_spdif_startup,
++	.shutdown = xlnx_spdif_shutdown,
++	.trigger = xlnx_spdif_trigger,
++	.hw_params = xlnx_spdif_hw_params,
++};
++
++static struct snd_soc_dai_driver xlnx_spdif_tx_dai = {
++	.name = "xlnx_spdif_tx",
++	.playback = {
++		.channels_min = 2,
++		.channels_max = 2,
++		.rates = XLNX_SPDIF_RATES,
++		.formats = XLNX_SPDIF_FORMATS,
++	},
++	.ops = &xlnx_spdif_dai_ops,
++};
++
++static struct snd_soc_dai_driver xlnx_spdif_rx_dai = {
++	.name = "xlnx_spdif_rx",
++	.capture = {
++		.channels_min = 2,
++		.channels_max = 2,
++		.rates = XLNX_SPDIF_RATES,
++		.formats = XLNX_SPDIF_FORMATS,
++	},
++	.ops = &xlnx_spdif_dai_ops,
++};
++
++static const struct snd_soc_component_driver xlnx_spdif_component = {
++	.name = "xlnx-spdif",
++};
++
++static const struct of_device_id xlnx_spdif_of_match[] = {
++	{ .compatible = "xlnx,spdif-2.0", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, xlnx_spdif_of_match);
++
++static int xlnx_spdif_probe(struct platform_device *pdev)
++{
++	int ret;
++	struct resource *res;
++	struct snd_soc_dai_driver *dai_drv;
++	struct spdif_dev_data *ctx;
++
++	struct device *dev = &pdev->dev;
++	struct device_node *node = dev->of_node;
++
++	ctx = devm_kzalloc(dev, sizeof(*ctx), GFP_KERNEL);
++	if (!ctx)
++		return -ENOMEM;
++
++	ctx->axi_clk = devm_clk_get(dev, "s_axi_aclk");
++	if (IS_ERR(ctx->axi_clk)) {
++		ret = PTR_ERR(ctx->axi_clk);
++		dev_err(dev, "failed to get s_axi_aclk(%d)\n", ret);
++		return ret;
++	}
++	ret = clk_prepare_enable(ctx->axi_clk);
++	if (ret) {
++		dev_err(dev, "failed to enable s_axi_aclk(%d)\n", ret);
++		return ret;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	ctx->base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(ctx->base)) {
++		ret = PTR_ERR(ctx->base);
++		goto clk_err;
++	}
++	ret = of_property_read_u32(node, "xlnx,spdif-mode", &ctx->mode);
++	if (ret < 0) {
++		dev_err(dev, "cannot get SPDIF mode\n");
++		goto clk_err;
++	}
++	if (ctx->mode) {
++		dai_drv = &xlnx_spdif_tx_dai;
++	} else {
++		res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
++		if (!res) {
++			dev_err(dev, "No IRQ resource found\n");
++			ret = -ENODEV;
++			goto clk_err;
++		}
++		ret = devm_request_irq(dev, res->start,
++				       xlnx_spdifrx_irq_handler,
++				       0, "XLNX_SPDIF_RX", ctx);
++		if (ret) {
++			dev_err(dev, "spdif rx irq request failed\n");
++			ret = -ENODEV;
++			goto clk_err;
++		}
++
++		init_waitqueue_head(&ctx->chsts_q);
++		dai_drv = &xlnx_spdif_rx_dai;
++	}
++
++	ret = of_property_read_u32(node, "xlnx,aud_clk_i", &ctx->aclk);
++	if (ret < 0) {
++		dev_err(dev, "cannot get aud_clk_i value\n");
++		goto clk_err;
++	}
++
++	dev_set_drvdata(dev, ctx);
++
++	ret = devm_snd_soc_register_component(dev, &xlnx_spdif_component,
++					      dai_drv, 1);
++	if (ret) {
++		dev_err(dev, "SPDIF component registration failed\n");
++		goto clk_err;
++	}
++
++	writel(XSPDIF_SOFT_RESET_VALUE, ctx->base + XSPDIF_SOFT_RESET_REG);
++	dev_info(dev, "%s DAI registered\n", dai_drv->name);
++
++clk_err:
++	clk_disable_unprepare(ctx->axi_clk);
++	return ret;
++}
++
++static int xlnx_spdif_remove(struct platform_device *pdev)
++{
++	struct spdif_dev_data *ctx = dev_get_drvdata(&pdev->dev);
++
++	clk_disable_unprepare(ctx->axi_clk);
++	return 0;
++}
++
++static struct platform_driver xlnx_spdif_driver = {
++	.driver = {
++		.name = "xlnx-spdif",
++		.of_match_table = xlnx_spdif_of_match,
++	},
++	.probe = xlnx_spdif_probe,
++	.remove = xlnx_spdif_remove,
++};
++module_platform_driver(xlnx_spdif_driver);
++
++MODULE_AUTHOR("Maruthi Srinivas Bayyavarapu <maruthis@xilinx.com>");
++MODULE_DESCRIPTION("XILINX SPDIF driver");
++MODULE_LICENSE("GPL v2");
 -- 
 2.20.1
 
