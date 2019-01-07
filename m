@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8065DC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 19:32:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 41DE3C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 19:32:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 38B652147C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 19:32:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 10BCA2147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 19:32:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="u/t3wEXF";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="jMHTpl/n"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 38B652147C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kyAp33nA";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="ict9RG7o"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 10BCA2147C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,41 +26,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=vvbmCfWdLMQ7cHnnhxIjZtqnxPdKDmLkecyD5eg8hvg=; b=u/t3wEXFvd33sx
-	dkSaPDdP55jCQDrNl3D8IFYOUGHatHK42Xf9fJZwUwTnCHpcGRakY4IT6xu6raZu6eXIVTdpnXsSc
-	qXHZaNG5ePvSwFd2mPf174BHDeKWsU2E0QFNFb1fhdOPelXMNX/owZF5JMIQa6fk3uOG2PWGYmIst
-	JgfU0eDLfB+nwic+HOwoixmZdtVMZph/lsgtIt+kD0gRlXC8P+mQtEXH0SBTKOu7Ud9qJEnCbkWJq
-	Z7FIfJg9GPlEbfvXoSsU67Hmx1xFYxyePEC8Bhw//ZL+/vG4xtVTFo6uW3+5/0y5Hmnzt++sXSDwx
-	pNnymY05BeRQbcWeLhzQ==;
+	List-Owner; bh=WREuS9AKjkIQp2z6QYrtzZcRb8lbuo6BQArIud1VPcc=; b=kyAp33nAMf9iGE
+	dN78xgDp99Xc1TEZVEMqKL7Tvnq3aXR4AHAIjRBv8RSHfAQO9ZxRnNWDIuHPR5gahpojvg4Aw90N/
+	OVXW4q3ck3S6NqVC3hrkZyQZ6H4/6/9LY832iK6aE1teO2kf0VgGQXVZitkJqqo0yo9Xrt8aj13jl
+	v/4RhRaz95bLJNVm2F1OIVLMlFF5Q5QB9J+KhFsWwwN+lihv4ZAfE9qHxETFP5+6XdScTyiPUoJxr
+	seKv4Hbnt+gg6NvKzyO3sZhO6U5Js/hQDKggWbvGrdenjgjQk6T0TRf4uFaKR8we1MT1R6NUPEGl6
+	Dqb0/2LMjAVvYbUlf0dg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggad1-0000ur-07; Mon, 07 Jan 2019 19:32:03 +0000
+	id 1ggadJ-0001F3-KW; Mon, 07 Jan 2019 19:32:21 +0000
 Received: from mail-eopbgr10076.outbound.protection.outlook.com ([40.107.1.76]
  helo=EUR02-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggacZ-0000QA-OB
- for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 19:31:37 +0000
+ id 1ggacc-0000QA-Ho
+ for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 19:31:43 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=i1fMnhOm+Y9U1AisH04cMbVFvziya26w9mslcL6hxfM=;
- b=jMHTpl/nb7TcA6G+k883j1b9ULO0iEfy9tckcjAPcMc18ZCQEO9A4qy3HNMiHYv9T+RTNk/7zzwcoS5sk1BuyFx3Qz5LOlSTCgLUPiuPV3JRGP1LJFHGZep+VVZ+Kj7LUk2RhBg8XSItMCE/NWjJwbc7Smkob88XcnfrB+DX9KA=
+ bh=r0VkuMg7xK/N4CkN0AJTNcH+x7A9tCxpTbv0K1uyAIM=;
+ b=ict9RG7opXJDzRgIPeaGnIEpJ+gcWpTELpAIPf68iAiW9FJ1huAVpYmeUsO3/Ganya7Q8bYqSy2agBI6GTLWJJNQJ5T4hyBtPBZSO0WG/NuqR7+aw1IP1AGI4rIy7lQuik4vkG8LuV+IS5rWEJVQ7q+yJYra5mRYH3ticewpmaI=
 Received: from VI1PR04MB5533.eurprd04.prod.outlook.com (20.178.122.159) by
  VI1PR04MB5311.eurprd04.prod.outlook.com (20.177.52.12) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1495.6; Mon, 7 Jan 2019 19:31:28 +0000
+ 15.20.1495.6; Mon, 7 Jan 2019 19:31:29 +0000
 Received: from VI1PR04MB5533.eurprd04.prod.outlook.com
  ([fe80::7d6d:ce34:3439:c184]) by VI1PR04MB5533.eurprd04.prod.outlook.com
  ([fe80::7d6d:ce34:3439:c184%5]) with mapi id 15.20.1495.011; Mon, 7 Jan 2019
- 19:31:28 +0000
+ 19:31:29 +0000
 From: Leonard Crestez <leonard.crestez@nxp.com>
 To: Masahiro Yamada <yamada.masahiro@socionext.com>, Rob Herring
  <robh+dt@kernel.org>, Olof Johansson <olof@lixom.net>, Shawn Guo
  <shawnguo@kernel.org>
-Subject: [PATCH 2/3] ARM: dts: imx: Use wilddt function
-Thread-Topic: [PATCH 2/3] ARM: dts: imx: Use wilddt function
-Thread-Index: AQHUpr+VLvSIVO/yykWz5BYmnc94SA==
-Date: Mon, 7 Jan 2019 19:31:28 +0000
-Message-ID: <1b21795fa78829dd8aee3e9e257ff91d91a76d93.1546888138.git.leonard.crestez@nxp.com>
+Subject: [PATCH 3/3] arm64: dts: freescale: Use wilddt function
+Thread-Topic: [PATCH 3/3] arm64: dts: freescale: Use wilddt function
+Thread-Index: AQHUpr+WBeSko1D/iEyQsecAnfiAfg==
+Date: Mon, 7 Jan 2019 19:31:29 +0000
+Message-ID: <3678c8f380da308469d6cdcda9938ce79f94d3ed.1546888138.git.leonard.crestez@nxp.com>
 References: <cover.1546888138.git.leonard.crestez@nxp.com>
 In-Reply-To: <cover.1546888138.git.leonard.crestez@nxp.com>
 Accept-Language: en-US
@@ -77,16 +77,16 @@ authentication-results: spf=none (sender IP is )
 x-ms-exchange-messagesentrepresentingtype: 1
 x-ms-publictraffictype: Email
 x-microsoft-exchange-diagnostics: 1; VI1PR04MB5311;
- 6:ruSw+twoXEO2YaBz6OrVSjnqKCYrJVc8YFgx0Jr2k2cAr4RljJC4hBE+l9xIYOX3Eyh8N4eMCvO4ubkDZ9FJbs3TJA9jLMsxYEfv4OoSG7ZRxyVlKJK6x+DhZu1BaPRPDHpvwAezOJrkaHSPgAZG+uRhmKr70AB+E68P7ocdlioSv+2f2BfuE2zG5fmPyjynjk993G3xE1esvucqqPjhnn1/z45wdSpIVhaazwNC4YOHsY9GtjIUMPgBlUxFI9MQT8OHrtbxhKwQJQOFU1iXPq4BqgRTIKBss/glcEXea8MZZxZghOp0HigB35lxtt2AfBYGf+EUD27bBLMqJkVjfFfAnIU1XgWiBt6e6o5orG1msjeZO+I7IdCifx5WuiJT7orZY9alB0iearODqgnjhL9kL9hDUajzsQnghIqaqC+i58sPWm2INYXss5T0BXP2i7Z1182MYfpkTVsKEu8TJg==;
- 5:6lFOudcgL0bo9/pGIwSU/rS/h51uE9HePon71jXhT6Pc551tFJhbAcQPtwE3Zx5PFLLerzSbi6hkcrmoYlzstAIKVTa57G442iSREeojIWGhshXASw7GZmtR8yV+5laecwmTy9SQ9bnIs3+lg7hl9EnAHa41+FcN/54elaNjDSuiYFpUp1ucZDE+3AIiD3QcP7x4gWmfIdhd7P00jbn6gw==;
- 7:b/lLcoEpDOyFmypkoKOY9xlvGsDsUuAYM6V+Om0DUusrut4x6Dpf+a0pUQ/lZpn7anEFRZWQlGjgRnIuMr3PNrNlhlSUbcOunR7WFf1csInccSO3HfnIDfGehTRj0oLUDRFn0swPRu88ztVA6o6I+Q==
-x-ms-office365-filtering-correlation-id: d27c1c41-95b0-428f-04b4-08d674d6b814
+ 6:5j/EtFqLA9NaeJqNMvbIEowZu7DN/sJQzCB6zbmz2dxCe7mSzukj1cEWoii63Yvh4qOU8IX/YvY+DW6ePEbRqsz3lWbutT0qM7r5oAoKVnRedhy+/a02Zx8VZDY0YHug9gvK8j6SmeiXc3cZXF+1gzCMLpe4XLBKivbuYyR1ScpzBj1VZCtNIroGL/kYv9NWRbsZ1lWZBau9e16YK5JJWXeDidDLS28ptj4feycIQNkIT/FVP436WyC+4+ddyRtjX6iYU3ItF7K7SST+KTXjcVi+GjytkmAE9TJbgUpMxIHEcNEjjT5jJBApa1DlyzNKtowR8sU+W5nOlItb0NSXvvTa5VOO9HI4tyY6ejdCmrqFag+CQ093N/XtAlYEr+W+eDNDDwNAagRCsPr2l4QPJU4VJ0FvTHn/VH3CmcuQJHeChhcLu1nOuXL+JyNGKBPWLpG6nG1vKp5eeDR7NyCjgw==;
+ 5:17/aLq5v98er90SEflk82gldyBfjnt/Wj/OsKZNVswPSs+tl56bD5uTmRfOz2KakU7PdiVCycryAM0g9anrN3627nL9snRHzkLXvrVk+FlVG8Z26ADybDLZicl+74fctRKiv6GEQgDrQDZ/4etZjgtUVLSZqeVXc3zHEHLOlJIL2Cb64Exd7VoqMF+2+NHUPzdvQDcg4qQMYI5ety7vAcA==;
+ 7:o9H7J8Cob5iVUniQDeP67/TtphSBUmLs1pNzojxNR39/C/JqPxPC4g1Gyk73s3YiH4Wo2a0oJYWseMd5PuCK7e0fpuAMjp/D9TtTL2LcU939u7ZIh3Snj0HnFzMeBWE0EwSwW2VHwgbytelFpbiU9A==
+x-ms-office365-filtering-correlation-id: 7a14a4c1-716d-4a93-3ccb-08d674d6b8ec
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
  SRVR:VI1PR04MB5311; 
 x-ms-traffictypediagnostic: VI1PR04MB5311:
-x-microsoft-antispam-prvs: <VI1PR04MB531139B298F656E7B5FA7489EE890@VI1PR04MB5311.eurprd04.prod.outlook.com>
+x-microsoft-antispam-prvs: <VI1PR04MB5311D0890E925CD2B3EA010CEE890@VI1PR04MB5311.eurprd04.prod.outlook.com>
 x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
  RULEID:(8211001083)(3230021)(908002)(999002)(5005026)(6040522)(8220060)(2401047)(8121501046)(3002001)(3231475)(944501520)(52105112)(10201501046)(93006095)(93001095)(6055026)(6041310)(20161123560045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123564045)(20161123562045)(20161123558120)(201708071742011)(7699051)(76991095);
  SRVR:VI1PR04MB5311; BCL:0; PCL:0; RULEID:; SRVR:VI1PR04MB5311; 
@@ -99,19 +99,19 @@ x-forefront-antispam-report: SFV:NSPM;
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: rVYuCqcF7XK06dTD19szq24Eo6IDSPUlLw7jEimZp4xlqmKAiRCxuw3flyH+U/h5OCNb/1qtCU/zFPIaUBZQiwFt8ysSg0RZgD0MULj6kdLL61M2p8OoRIH5jlf3vcxKVV2UCCrutzelKoa1H9aOs0GPaLDrVIsg8TxGsYyqmonP2N8lUNlfdAEosy+cwnS9GoKkWHx7ziMkse9wkgxoROH0vk9vvjL56lVVw8TGGSZExGBG6TUZYWKh60ieAk1IpBvgXQvUk2sYS0WWB/6d04qslv66QKCPcHtSpUhykiuJya9KaebwFmuQPByF3NSP
+x-microsoft-antispam-message-info: QD8GnYlegwePGG8LAh946dTz0+WVcTdnj3oETPp8Fr2M1f+UJdqjJ6gOHhHiP82FJoAaPpMitD50QaVzsLN7yay3XzogL1SfiK5MtRpQMlblQKgmfQ8FbJ4/WHqUVoyn/82EEZghIEpZ5eI7GFmd7+MjK5LC9DLMyb49GiwI7kERbcqoqsoVw9WnBoKhysXcnSU94CVp2XY6fBpeCUU6/wnb49n5itlQHDT8yJ0FTYANoFLpuPX+7Pz2RBpDm1NxmwnyYrryaZU7lRwGDu+8nkKs9x595rXqnUK5tryMOLD5D3GA1cyVc160Z4ltP5WO
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: d27c1c41-95b0-428f-04b4-08d674d6b814
-X-MS-Exchange-CrossTenant-originalarrivaltime: 07 Jan 2019 19:31:26.9529 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 7a14a4c1-716d-4a93-3ccb-08d674d6b8ec
+X-MS-Exchange-CrossTenant-originalarrivaltime: 07 Jan 2019 19:31:28.3599 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB5311
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190107_113135_921130_7AFA4C20 
-X-CRM114-Status: GOOD (  11.64  )
+X-CRM114-CacheID: sfid-20190107_113139_244906_39EF579B 
+X-CRM114-Status: GOOD (  11.72  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -138,237 +138,45 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Use the wilddt function instead of listing imx6/7 dts files. This
-shrinks the makefile and avoids needing future changes when boards are
-added.
+Use the wilddt function instead of listing dts files. This shrinks the
+makefile and avoids needing future changes when boards are added.
 
 Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 ---
- arch/arm/boot/dts/Makefile | 201 ++-----------------------------------
- 1 file changed, 11 insertions(+), 190 deletions(-)
+ arch/arm64/boot/dts/freescale/Makefile | 25 ++++---------------------
+ 1 file changed, 4 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index bd40148a15b2..b71c8af4cd57 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -385,206 +385,27 @@ dtb-$(CONFIG_SOC_IMX53) += \
- 	imx53-tx53-x03x.dtb \
- 	imx53-tx53-x13x.dtb \
- 	imx53-usbarmory.dtb \
- 	imx53-voipac-bsb.dtb
- dtb-$(CONFIG_SOC_IMX6Q) += \
--	imx6dl-apf6dev.dtb \
--	imx6dl-aristainetos_4.dtb \
--	imx6dl-aristainetos_7.dtb \
--	imx6dl-aristainetos2_4.dtb \
--	imx6dl-aristainetos2_7.dtb \
--	imx6dl-colibri-eval-v3.dtb \
--	imx6dl-cubox-i.dtb \
--	imx6dl-cubox-i-emmc-som-v15.dtb \
--	imx6dl-cubox-i-som-v15.dtb \
--	imx6dl-dfi-fs700-m60.dtb \
--	imx6dl-emcon-avari.dtb \
--	imx6dl-gw51xx.dtb \
--	imx6dl-gw52xx.dtb \
--	imx6dl-gw53xx.dtb \
--	imx6dl-gw54xx.dtb \
--	imx6dl-gw551x.dtb \
--	imx6dl-gw552x.dtb \
--	imx6dl-gw553x.dtb \
--	imx6dl-gw560x.dtb \
--	imx6dl-gw5903.dtb \
--	imx6dl-gw5904.dtb \
--	imx6dl-hummingboard.dtb \
--	imx6dl-hummingboard-emmc-som-v15.dtb \
--	imx6dl-hummingboard-som-v15.dtb \
--	imx6dl-hummingboard2.dtb \
--	imx6dl-hummingboard2-emmc-som-v15.dtb \
--	imx6dl-hummingboard2-som-v15.dtb \
--	imx6dl-icore.dtb \
--	imx6dl-icore-mipi.dtb \
--	imx6dl-icore-rqs.dtb \
--	imx6dl-mamoj.dtb \
--	imx6dl-nit6xlite.dtb \
--	imx6dl-nitrogen6x.dtb \
--	imx6dl-phytec-mira-rdk-nand.dtb \
--	imx6dl-phytec-pbab01.dtb \
--	imx6dl-rex-basic.dtb \
--	imx6dl-riotboard.dtb \
--	imx6dl-sabreauto.dtb \
--	imx6dl-sabrelite.dtb \
--	imx6dl-sabresd.dtb \
--	imx6dl-savageboard.dtb \
--	imx6dl-ts4900.dtb \
--	imx6dl-ts7970.dtb \
--	imx6dl-tx6dl-comtft.dtb \
--	imx6dl-tx6s-8034.dtb \
--	imx6dl-tx6s-8034-mb7.dtb \
--	imx6dl-tx6s-8035.dtb \
--	imx6dl-tx6s-8035-mb7.dtb \
--	imx6dl-tx6u-801x.dtb \
--	imx6dl-tx6u-80xx-mb7.dtb \
--	imx6dl-tx6u-8033.dtb \
--	imx6dl-tx6u-8033-mb7.dtb \
--	imx6dl-tx6u-811x.dtb \
--	imx6dl-tx6u-81xx-mb7.dtb \
--	imx6dl-udoo.dtb \
--	imx6dl-wandboard.dtb \
--	imx6dl-wandboard-revb1.dtb \
--	imx6dl-wandboard-revd1.dtb \
--	imx6q-apalis-eval.dtb \
--	imx6q-apalis-ixora.dtb \
--	imx6q-apalis-ixora-v1.1.dtb \
--	imx6q-apf6dev.dtb \
--	imx6q-arm2.dtb \
--	imx6q-b450v3.dtb \
--	imx6q-b650v3.dtb \
--	imx6q-b850v3.dtb \
--	imx6q-cm-fx6.dtb \
--	imx6q-cubox-i.dtb \
--	imx6q-cubox-i-emmc-som-v15.dtb \
--	imx6q-cubox-i-som-v15.dtb \
--	imx6q-dfi-fs700-m60.dtb \
--	imx6q-dhcom-pdk2.dtb \
--	imx6q-display5-tianma-tm070-1280x768.dtb \
--	imx6q-dmo-edmqmx6.dtb \
--	imx6q-dms-ba16.dtb \
--	imx6q-emcon-avari.dtb \
--	imx6q-evi.dtb \
--	imx6q-gk802.dtb \
--	imx6q-gw51xx.dtb \
--	imx6q-gw52xx.dtb \
--	imx6q-gw53xx.dtb \
--	imx6q-gw5400-a.dtb \
--	imx6q-gw54xx.dtb \
--	imx6q-gw551x.dtb \
--	imx6q-gw552x.dtb \
--	imx6q-gw553x.dtb \
--	imx6q-gw560x.dtb \
--	imx6q-gw5903.dtb \
--	imx6q-gw5904.dtb \
--	imx6q-h100.dtb \
--	imx6q-hummingboard.dtb \
--	imx6q-hummingboard-emmc-som-v15.dtb \
--	imx6q-hummingboard-som-v15.dtb \
--	imx6q-hummingboard2.dtb \
--	imx6q-hummingboard2-emmc-som-v15.dtb \
--	imx6q-hummingboard2-som-v15.dtb \
--	imx6q-icore.dtb \
--	imx6q-icore-mipi.dtb \
--	imx6q-icore-ofcap10.dtb \
--	imx6q-icore-ofcap12.dtb \
--	imx6q-icore-rqs.dtb \
--	imx6q-kp-tpc.dtb \
--	imx6q-marsboard.dtb \
--	imx6q-mccmon6.dtb \
--	imx6q-nitrogen6x.dtb \
--	imx6q-nitrogen6_max.dtb \
--	imx6q-nitrogen6_som2.dtb \
--	imx6q-novena.dtb \
--	imx6q-phytec-mira-rdk-emmc.dtb \
--	imx6q-phytec-mira-rdk-nand.dtb \
--	imx6q-phytec-pbab01.dtb \
--	imx6q-pistachio.dtb \
--	imx6q-rex-pro.dtb \
--	imx6q-sabreauto.dtb \
--	imx6q-sabrelite.dtb \
--	imx6q-sabresd.dtb \
--	imx6q-savageboard.dtb \
--	imx6q-sbc6x.dtb \
--	imx6q-tbs2910.dtb \
--	imx6q-ts4900.dtb \
--	imx6q-ts7970.dtb \
--	imx6q-tx6q-1010.dtb \
--	imx6q-tx6q-1010-comtft.dtb \
--	imx6q-tx6q-1020.dtb \
--	imx6q-tx6q-1020-comtft.dtb \
--	imx6q-tx6q-1036.dtb \
--	imx6q-tx6q-1036-mb7.dtb \
--	imx6q-tx6q-10x0-mb7.dtb \
--	imx6q-tx6q-1110.dtb \
--	imx6q-tx6q-11x0-mb7.dtb \
--	imx6q-udoo.dtb \
--	imx6q-utilite-pro.dtb \
--	imx6q-var-dt6customboard.dtb \
--	imx6q-wandboard.dtb \
--	imx6q-wandboard-revb1.dtb \
--	imx6q-wandboard-revd1.dtb \
--	imx6q-zii-rdu2.dtb \
--	imx6qp-nitrogen6_max.dtb \
--	imx6qp-nitrogen6_som2.dtb \
--	imx6qp-phytec-mira-rdk-nand.dtb \
--	imx6qp-sabreauto.dtb \
--	imx6qp-sabresd.dtb \
--	imx6qp-tx6qp-8037.dtb \
--	imx6qp-tx6qp-8037-mb7.dtb \
--	imx6qp-tx6qp-8137.dtb \
--	imx6qp-tx6qp-8137-mb7.dtb \
--	imx6qp-wandboard-revd1.dtb \
--	imx6qp-zii-rdu2.dtb
-+	$(call wilddt,imx6dl-*) \
-+	$(call wilddt,imx6q-*) \
-+	$(call wilddt,imx6qp-*)
- dtb-$(CONFIG_SOC_IMX6SL) += \
--	imx6sl-evk.dtb \
--	imx6sl-warp.dtb
-+	$(call wilddt,imx6sl-*)
- dtb-$(CONFIG_SOC_IMX6SLL) += \
--	imx6sll-evk.dtb
-+	$(call wilddt,imx6sll-*)
- dtb-$(CONFIG_SOC_IMX6SX) += \
--	imx6sx-nitrogen6sx.dtb \
--	imx6sx-sabreauto.dtb \
--	imx6sx-sdb-reva.dtb \
--	imx6sx-sdb-sai.dtb \
--	imx6sx-sdb.dtb \
--	imx6sx-softing-vining-2000.dtb \
--	imx6sx-udoo-neo-basic.dtb \
--	imx6sx-udoo-neo-extended.dtb \
--	imx6sx-udoo-neo-full.dtb
-+	$(call wilddt,imx6sx-*)
- dtb-$(CONFIG_SOC_IMX6UL) += \
--	imx6ul-14x14-evk.dtb \
--	imx6ul-ccimx6ulsbcexpress.dtb \
--	imx6ul-ccimx6ulsbcpro.dtb \
--	imx6ul-geam.dtb \
--	imx6ul-isiot-emmc.dtb \
--	imx6ul-isiot-nand.dtb \
--	imx6ul-liteboard.dtb \
--	imx6ul-opos6uldev.dtb \
--	imx6ul-pico-hobbit.dtb \
--	imx6ul-pico-pi.dtb \
--	imx6ul-tx6ul-0010.dtb \
--	imx6ul-tx6ul-0011.dtb \
--	imx6ul-tx6ul-mainboard.dtb \
--	imx6ull-14x14-evk.dtb \
--	imx6ull-colibri-eval-v3.dtb \
--	imx6ull-colibri-wifi-eval-v3.dtb \
--	imx6ulz-14x14-evk.dtb
-+	$(call wilddt,imx6ul-*) \
-+	$(call wilddt,imx6ull-*) \
-+	$(call wilddt,imx6ulz-*)
- dtb-$(CONFIG_SOC_IMX7D) += \
--	imx7d-cl-som-imx7.dtb \
--	imx7d-colibri-emmc-eval-v3.dtb \
--	imx7d-colibri-eval-v3.dtb \
--	imx7d-nitrogen7.dtb \
--	imx7d-pico-hobbit.dtb \
--	imx7d-pico-pi.dtb \
--	imx7d-sbc-imx7.dtb \
--	imx7d-sdb.dtb \
--	imx7d-sdb-reva.dtb \
--	imx7d-sdb-sht11.dtb \
--	imx7s-colibri-eval-v3.dtb \
--	imx7s-warp.dtb
-+	$(call wilddt,imx7[ds]-*)
- dtb-$(CONFIG_SOC_IMX7ULP) += \
--	imx7ulp-evk.dtb
-+	$(call wilddt,imx7ulp-*)
- dtb-$(CONFIG_SOC_LS1021A) += \
- 	ls1021a-moxa-uc-8410a.dtb \
- 	ls1021a-qds.dtb \
- 	ls1021a-twr.dtb
- dtb-$(CONFIG_SOC_VF610) += \
+diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+index f9be2426f83c..ab28e485179d 100644
+--- a/arch/arm64/boot/dts/freescale/Makefile
++++ b/arch/arm64/boot/dts/freescale/Makefile
+@@ -1,22 +1,5 @@
+ # SPDX-License-Identifier: GPL-2.0
+-dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-frdm.dtb
+-dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-frwy.dtb
+-dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-qds.dtb
+-dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-rdb.dtb
+-dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1028a-qds.dtb
+-dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1028a-rdb.dtb
+-dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-qds.dtb
+-dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-rdb.dtb
+-dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1046a-qds.dtb
+-dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1046a-rdb.dtb
+-dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1088a-qds.dtb
+-dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1088a-rdb.dtb
+-dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb
+-dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-rdb.dtb
+-dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
+-dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-qds.dtb
+-dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-rdb.dtb
+-dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-lx2160a-qds.dtb
+-dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-lx2160a-rdb.dtb
+-
+-dtb-$(CONFIG_ARCH_MXC) += imx8mq-evk.dtb
++dtb-$(CONFIG_ARCH_LAYERSCAPE) += \
++	$(call wilddt,fsl-ls*) \
++	$(call wilddt,fsl-lx*)
++dtb-$(CONFIG_ARCH_MXC) += $(call wilddt,imx*)
 -- 
 2.17.1
 
