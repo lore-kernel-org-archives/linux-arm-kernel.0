@@ -4,20 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-16.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F334DC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 18:58:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D8487C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 18:59:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C45ED206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 18:58:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 86AA3206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 18:59:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QKZJN05/";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="rPilN5hJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C45ED206B7
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HUjwajcM";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="XU3ZIdD9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 86AA3206B7
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,46 +25,47 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Date:Message-Id:
 	In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	References:List-Owner; bh=TablHZcsCbYp+2S8H/un2drRuifjpLL4uRXoZEAEV6A=; b=QKZ
-	JN05/9f6jQsgfj9ZIW7WM7Z0EiqcJYPrVOmm35OdE9xgrvTuMOuE4b8MVVp3e0M9n6Co+XSUw0m+r
-	ZgwvQgChonQc/vhgEpG3iDXzNTfH9XfB1cdUAqHD0fa85z+voTPFY/41q8FYOlAgxse6LHRE+eloN
-	xfknBnaieYOQR1kE1kwKgqog/cVeKUx4FtKDAr54VW4Yph9ztGsOAvqIB8J/4zS7GYh/puohjT7ju
-	HDi51zbe/KKx3BcRnCP6ZSBE0egCNaj93eORZIXyyeWj3qbh4I1YObs0ST+UFOMcuHw+C8GiQdulN
-	m1g4N0Fy5nQY+eKRI6VQmOtEjbD/vcQ==;
+	References:List-Owner; bh=oqN2cUn8tlU3aZ9sLFftfORFlIIigr2oNnZW2Jx0NEs=; b=HUj
+	wajcMnbiostjBPDTDjXkkXZ36bTwUqZHnJaESFQZnI8wpT3M9KHDWAxtp1WOvZfTgPSG8c5/XpQEA
+	kwqgUHBCHZKJnLk9bCofKUP1id8XXibNPFoZA2obSvX3CU0nQIqk348ziA5lUpCfhNVGjejXUPldt
+	3MsKbubxdl0Hv+qTluXOJT3WWgZ8Vq+RTVN8lg2v2K/JtLA6n6cIgsCQyJ2t4sqDbFRUHMA7R9n4U
+	2+P47gOukrmsa3HgugLO88EPJFEz23DkQena6IprV+2z+Db1hsVOQdxRywcMZcDzEtbS/xkY3+SOf
+	gxOLydXN78h4+7u2e7iYx+SSan1zunQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gga6o-0002Ft-5W; Mon, 07 Jan 2019 18:58:46 +0000
+	id 1gga7M-0002fd-BG; Mon, 07 Jan 2019 18:59:20 +0000
 Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gga6R-0001va-NA; Mon, 07 Jan 2019 18:58:43 +0000
+ id 1gga7C-0002bm-88
+ for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 18:59:18 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=sirena.org.uk; s=20170815-heliosphere; h=Date:Message-Id:In-Reply-To:
  Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
  Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
  Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:
  List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:
- List-Archive; bh=n4CR0s/sAHX3Jmyo1rxud2rBl816iwSwZ6KU31f6RcU=; b=rPilN5hJDcvl
- jhkU3KO/crUK74Iuze5mEp8Df3p8BLKFBoPPI6yLqINpxOguifN5uVid8YLT20rrYmee+Nt9aKKyA
- rohH+iRdApUFaiHm3OSa6q+WD2/Ta3mUMsanluNbccSQMtlEnsRH29pKsGbAs6WFf2mX9dSBr+bzj
- LcZRw=;
+ List-Archive; bh=j6IPE14bSTdSl8O64DoUax6quuqxKvjbwoSzT35o1F0=; b=XU3ZIdD9e8o1
+ 3FeUh5Z+YHJhu4cOBdQpbsRrlCM23VsUTD4lw49A0J4P4lCqi7ypSFWid3jn97BtcGsRV+3+M65dY
+ d1ATqCt6XaSY0BUGq55k1cOg/Di8DuSEmoU8yykTR5ev/HcI0VvESacPX10oLxTD0d4AdJ5GMBMuX
+ utu5w=;
 Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
  ([82.37.168.47] helo=debutante.sirena.org.uk)
  by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
  (envelope-from <broonie@sirena.org.uk>)
- id 1gga6F-0007mQ-3H; Mon, 07 Jan 2019 18:58:11 +0000
+ id 1gga77-0007qV-Or; Mon, 07 Jan 2019 18:59:05 +0000
 Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id B04001127491; Mon,  7 Jan 2019 18:58:05 +0000 (GMT)
+ id 6663D1127491; Mon,  7 Jan 2019 18:59:05 +0000 (GMT)
 From: Mark Brown <broonie@kernel.org>
-To: Pierre-Louis Bossart <pierre-louis.bossart@linux.intel.com>
-Subject: Applied "ASoC: mt6351: remove unneeded variable" to the asoc tree
-In-Reply-To: <20190105020249.8639-18-pierre-louis.bossart@linux.intel.com>
+To: Cezary Gapinski <cezary.gapinski@gmail.com>
+Subject: Applied "spi: stm32: rename interrupt function" to the spi tree
+In-Reply-To: <1545688840-23992-9-git-send-email-cezary.gapinski@gmail.com>
 X-Patchwork-Hint: ignore
-Message-Id: <20190107185805.B04001127491@debutante.sirena.org.uk>
-Date: Mon,  7 Jan 2019 18:58:05 +0000 (GMT)
+Message-Id: <20190107185905.6663D1127491@debutante.sirena.org.uk>
+Date: Mon,  7 Jan 2019 18:59:05 +0000 (GMT)
 X-Bad-Reply: In-Reply-To but no 'Re:' in Subject.
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190107_105824_353497_02E1B043 
-X-CRM114-Status: GOOD (  13.22  )
+X-CRM114-CacheID: sfid-20190107_105910_547754_1CF4772A 
+X-CRM114-Status: GOOD (  14.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,15 +77,12 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: alsa-devel@alsa-project.org, tiwai@suse.de,
- open list <linux-kernel@vger.kernel.org>, Takashi Iwai <tiwai@suse.com>,
- Liam Girdwood <lgirdwood@gmail.com>, liam.r.girdwood@linux.intel.com,
- broonie@kernel.org, Wei Yongjun <weiyongjun1@huawei.com>,
- Matthias Brugger <matthias.bgg@gmail.com>,
- "moderated list:ARM/Mediatek SoC support" <linux-mediatek@lists.infradead.org>,
- "moderated list:ARM/Mediatek SoC support"
- <linux-arm-kernel@lists.infradead.org>,
- Kai Chieh Chuang <kaichieh.chuang@mediatek.com>
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Amelie Delaunay <amelie.delaunay@st.com>,
+ Alexandre Torgue <alexandre.torgue@st.com>, Mark Brown <broonie@kernel.org>,
+ linux-kernel@vger.kernel.org, linux-spi@vger.kernel.org,
+ Rob Herring <robh+dt@kernel.org>, Maxime Coquelin <mcoquelin.stm32@gmail.com>,
+ linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -94,11 +91,11 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 The patch
 
-   ASoC: mt6351: remove unneeded variable
+   spi: stm32: rename interrupt function
 
-has been applied to the asoc tree at
+has been applied to the spi tree at
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
 
 All being well this means that it will be integrated into the linux-next
 tree (usually sometime in the next 24 hours) and sent to Linus during
@@ -119,42 +116,47 @@ to this mail.
 Thanks,
 Mark
 
-From d61780c155e8bef8dceb3ac98d29f79c24e264eb Mon Sep 17 00:00:00 2001
-From: Pierre-Louis Bossart <pierre-louis.bossart@linux.intel.com>
-Date: Fri, 4 Jan 2019 20:02:45 -0600
-Subject: [PATCH] ASoC: mt6351: remove unneeded variable
+From a9675337ad3e540cecb2411a7fc71fda133a3932 Mon Sep 17 00:00:00 2001
+From: Cezary Gapinski <cezary.gapinski@gmail.com>
+Date: Mon, 24 Dec 2018 23:00:34 +0100
+Subject: [PATCH] spi: stm32: rename interrupt function
 
-Reported by Coccinelle:
-mt6351.c:1418:5-8: Unneeded variable: "ret". Return "0" on line 1437
+Interrupt function is used as a thread so rename it to express
+meaning directly by more clear function name.
 
-Signed-off-by: Pierre-Louis Bossart <pierre-louis.bossart@linux.intel.com>
+Signed-off-by: Cezary Gapinski <cezary.gapinski@gmail.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/codecs/mt6351.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/spi/spi-stm32.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/sound/soc/codecs/mt6351.c b/sound/soc/codecs/mt6351.c
-index f73dcd753584..4b3ce01c5a93 100644
---- a/sound/soc/codecs/mt6351.c
-+++ b/sound/soc/codecs/mt6351.c
-@@ -1415,8 +1415,6 @@ static const struct snd_soc_dapm_route mt6351_dapm_routes[] = {
- 
- static int mt6351_codec_init_reg(struct snd_soc_component *cmpnt)
- {
--	int ret = 0;
--
- 	/* Disable CLKSQ 26MHz */
- 	regmap_update_bits(cmpnt->regmap, MT6351_TOP_CLKSQ, 0x0001, 0x0);
- 	/* disable AUDGLB */
-@@ -1434,7 +1432,7 @@ static int mt6351_codec_init_reg(struct snd_soc_component *cmpnt)
- 	/* Reverse the PMIC clock*/
- 	regmap_update_bits(cmpnt->regmap, MT6351_AFE_PMIC_NEWIF_CFG2,
- 			   0x8000, 0x8000);
--	return ret;
-+	return 0;
+diff --git a/drivers/spi/spi-stm32.c b/drivers/spi/spi-stm32.c
+index 2ece69a75ae4..9cb7d334a5cb 100644
+--- a/drivers/spi/spi-stm32.c
++++ b/drivers/spi/spi-stm32.c
+@@ -466,11 +466,11 @@ static bool stm32_spi_can_dma(struct spi_master *master,
  }
  
- static int mt6351_codec_probe(struct snd_soc_component *cmpnt)
+ /**
+- * stm32_spi_irq - Interrupt handler for SPI controller events
++ * stm32_spi_irq_thread - Thread of interrupt handler for SPI controller
+  * @irq: interrupt line
+  * @dev_id: SPI controller master interface
+  */
+-static irqreturn_t stm32_spi_irq(int irq, void *dev_id)
++static irqreturn_t stm32_spi_irq_thread(int irq, void *dev_id)
+ {
+ 	struct spi_master *master = dev_id;
+ 	struct stm32_spi *spi = spi_master_get_devdata(master);
+@@ -1113,7 +1113,7 @@ static int stm32_spi_probe(struct platform_device *pdev)
+ 		goto err_master_put;
+ 	}
+ 	ret = devm_request_threaded_irq(&pdev->dev, spi->irq, NULL,
+-					stm32_spi_irq, IRQF_ONESHOT,
++					stm32_spi_irq_thread, IRQF_ONESHOT,
+ 					pdev->name, master);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "irq%d request failed: %d\n", spi->irq,
 -- 
 2.20.1
 
