@@ -2,89 +2,88 @@ Return-Path: <SRS0=txfi=PP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 76B38C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 17:11:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B4A80C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 17:15:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 439C32183E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 17:11:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 849942173C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 17:15:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cR9ynOkD";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="3H6eiGHz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 439C32183E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AJugCH9b";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="el3xz9iq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 849942173C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=5t/TX3Oj8Vi35VbWKbGt0NAI4HWzpCiUfINbmNDqGIE=; b=cR9ynOkDkjtSIyvoAwkEIS9QS7
-	TaIrxY/+2oRRbeRfPzHwwnk/Hul4AX9JJLhZojzQCgDTlopgMINJBkKuFMOdJrJs4FldkPSD1G1r1
-	yEitPU13aYkUht36WhoHx+lLY/wKAM7fNv3oRBoYdAD7SQbYncLOeApU+Nx5azW8Wc/WtIVqwqCad
-	T+XAh5uCtNOIF6BPkKLdxRfnVUwKEb9cVSQYeMUdfJX2fgPVlvSUnzApVz6vo6fpRSVVxAUN2bdz9
-	Fozn8TwW4x0VhB8TnnzaYx0R8SPqN07Q/OnPBfrWwa33rMlXPleAnUdMmLvQnlisYux26cthIK/O4
-	DxJHMq9A==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=EswQjGyTsTUVTUFQ9YccRc0BPAlbKCpHKHD6WL92JY4=; b=AJugCH9b9P0Qzu
+	0MOB55qWtd7WeMSrlJXXBWY8GHqbNFrsXfsuh+SdAoDmbszXyfl+FMRfVxhFjoR79+lFtTqhyprYQ
+	nOaH8I9TzhQvMB8/vDjXCqHCx7y8gDXzb1lhsTZ++jGjUigjb+2ZvlHnHe2DM4keQJvpkaSvDw4bo
+	cCcFUbS6pO+bZYyoFK98/b62ilZpobnHep+Hyh3JHXXSBkhOT/roTdJKu9/pvbJsh9SmhlyN3NyO4
+	/FBZA02eQGe5+DNcnBt/f5UjwTgtgPfiGlnm6sKgMCbm3EypnKB7TuFDzDJ/pvUFn7LpUSLXGGOvK
+	zO7GQbk6bmpgTLvR2QiA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggYR8-0007pm-GS; Mon, 07 Jan 2019 17:11:38 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1ggYUc-0001Im-VT; Mon, 07 Jan 2019 17:15:14 +0000
+Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggYQg-0007KM-Bc
- for linux-arm-kernel@bombadil.infradead.org; Mon, 07 Jan 2019 17:11:10 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=References:In-Reply-To:Message-Id:Date:
- Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=Gw/wGGgI4459nvmbbMmNK4fccL2B62wc9iCDOFL9Qzo=; b=3H6eiGHzi0Q90ezXqYa1CC17D
- CmDK1oZhrZtDsYTHsGRWbI6g1ERpFHErje2K4BzvO4qpSUpsP4Ljh3W9z0+ByfkACAF69hLAKTSaq
- nUQ9+wy2w2aYNJJfA7lSufMKM5uHOHPI80HByVOa4C+j6wX4DKAD1hg6b7O3BEDGU6/p7O/vQLAkX
- zf5KMXcjWD9UknOQjqnoYttxUP0FxFuGBVf5jCdgW2HGf/W8gqsbH9k3z0/AL3seQzV2PFTf35lYF
- BrEEuu1UDUZ795UwFIdgkpirNVX58g6/MEfu4Sx5X0idslJ93OAtTwMHg8tgK0/1zwi7uth2Rx+LQ
- 8cL+OCgiA==;
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by merlin.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggXlX-0006Th-IF
- for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 16:28:40 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D44801713;
- Mon,  7 Jan 2019 08:28:38 -0800 (PST)
-Received: from e119886-lin.cambridge.arm.com (unknown [10.37.6.11])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 6012F3F5A0;
- Mon,  7 Jan 2019 08:28:34 -0800 (PST)
-From: Andrew Murray <andrew.murray@arm.com>
-To: Peter Zijlstra <peterz@infradead.org>, Ingo Molnar <mingo@redhat.com>,
- Arnaldo Carvalho de Melo <acme@kernel.org>,
- Richard Henderson <rth@twiddle.net>,
- Ivan Kokshaysky <ink@jurassic.park.msu.ru>,
- Matt Turner <mattst88@gmail.com>, Will Deacon <will.deacon@arm.com>,
- Mark Rutland <mark.rutland@arm.com>, Shawn Guo <shawnguo@kernel.org>,
- Sascha Hauer <s.hauer@pengutronix.de>,
- Benjamin Herrenschmidt <benh@kernel.crashing.org>,
- Paul Mackerras <paulus@samba.org>, Thomas Gleixner <tglx@linutronix.de>,
- Borislav Petkov <bp@alien8.de>, Russell King <linux@armlinux.org.uk>,
- suzuki.poulose@arm.com, robin.murphy@arm.com,
- Michael Ellerman <mpe@ellerman.id.au>
-Subject: [PATCH v4 12/13] perf/core: remove unused perf_flags
-Date: Mon,  7 Jan 2019 16:27:29 +0000
-Message-Id: <1546878450-20341-13-git-send-email-andrew.murray@arm.com>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1546878450-20341-1-git-send-email-andrew.murray@arm.com>
-References: <1546878450-20341-1-git-send-email-andrew.murray@arm.com>
+ id 1ggYUZ-0001I3-Bj
+ for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 17:15:13 +0000
+Received: by mail-pg1-x543.google.com with SMTP id c25so414923pgb.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 07 Jan 2019 09:15:10 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=date:from:to:cc:subject:message-id:mime-version:content-disposition
+ :user-agent; bh=x/QzmUyHJ6F27j7w4MWF17KHvW3Orfvcl1prMlNjj+8=;
+ b=el3xz9iqaEkNf37pJLFnUYd+fMGNUQdfA54pCPwiKcmLJb6jSYvQTW1BldSNfp/Ry3
+ qLCZr4mckISAinfRez97Ye1LmcpTWkAYrqPBVq9RCe/MDm2K8l/Jb7N8Xbm+fuDPTjLH
+ +WepaiTP97E3Vaj9TxIDS5IS5h/9q+7HLwe9Q3UffQCuPNUl4pNSyCx37qSU0CL7WuBU
+ IPwpxeTFO0L7PEHMNElk91JKGQ2gQ1nSxWJHWvFan5T4gxS5cU+/dYHQJ6UOjFTzjMEv
+ RNI8Wl6LOAIoloSc8KDHD6I5LS7HKkavmQn7r/RCnE/60853gIrIhLQXhCIh2VcpqBEX
+ dzxQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:mime-version
+ :content-disposition:user-agent;
+ bh=x/QzmUyHJ6F27j7w4MWF17KHvW3Orfvcl1prMlNjj+8=;
+ b=RCC5ud+QmRLIVParAGJVgkYBN6UB1g8LUBD4MpcRwdsZfJimdgC1dR/ZkOxbMiiuIS
+ cQVMSNPF1BoAlj8iteJyGMgnPN4GyzhESiyBIf3Fh6KXYAssubaMDCxZipXdC/+8XPpy
+ ete5Y/LnZ12N+mnz3f8iY0aqEzeG8QAfVFbOrs0o5KMcoCU8wLXl9CXsaWSPnBLqbF7G
+ lwjffUEuLXUXwk1ILj7Mf2eUvfVWkTldt4mj3/qbV2G0RDO8ayCFgO4FX0dn+M4wPiAM
+ qZN0I0fmbEHLJQAzoruK487p6pSiaq1KCUiHWu5pkaaCxx0EuFY7iKc85SujiKtB1Tcn
+ v3wA==
+X-Gm-Message-State: AA+aEWalurINrA2AHucyt2Om+RhU2T7WGDGnTdxjJDtZBAjYlYf9Oj0v
+ Iz6dITWo4ND6mwsP3wf7rZI=
+X-Google-Smtp-Source: ALg8bN4hrojHm1+xmTxfWxSQfh+U9iWFKTVjoMf6FAqzNGy+dstoHCZ9/iGQowKlRYVAMqi3ZfCenA==
+X-Received: by 2002:a62:47d9:: with SMTP id p86mr62375182pfi.95.1546881310280; 
+ Mon, 07 Jan 2019 09:15:10 -0800 (PST)
+Received: from jordon-HP-15-Notebook-PC ([106.51.19.175])
+ by smtp.gmail.com with ESMTPSA id s190sm97380708pfb.103.2019.01.07.09.15.07
+ (version=TLS1 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Mon, 07 Jan 2019 09:15:08 -0800 (PST)
+Date: Mon, 7 Jan 2019 22:49:08 +0530
+From: Souptick Joarder <jrdr.linux@gmail.com>
+To: linux@armlinux.org.uk, mchehab+samsung@kernel.org,
+ linus.walleij@linaro.org, wsa@the-dreams.de
+Subject: [PATCH] arm/mach-sa1100/simpad.c: Remove duplicate header
+Message-ID: <20190107171908.GA5246@jordon-HP-15-Notebook-PC>
+MIME-Version: 1.0
+Content-Disposition: inline
+User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190107_112839_700193_944B4CB7 
-X-CRM114-Status: GOOD (  13.88  )
+X-CRM114-CacheID: sfid-20190107_091511_411285_1FD8C820 
+X-CRM114-Status: GOOD (  10.38  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,50 +95,34 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: x86@kernel.org, linuxppc-dev@lists.ozlabs.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-alpha@vger.kernel.org
-MIME-Version: 1.0
+Cc: sabyasachi.linux@gmail.com, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, brajeswar.linux@gmail.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Now that perf_flags is not used we remove it.
+Remove linux/gpio/machine.h which is included more than once.
 
-Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
 ---
- include/uapi/linux/perf_event.h       | 2 --
- tools/include/uapi/linux/perf_event.h | 2 --
- 2 files changed, 4 deletions(-)
+ arch/arm/mach-sa1100/simpad.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/include/uapi/linux/perf_event.h b/include/uapi/linux/perf_event.h
-index 9de8780..ea19b5d 100644
---- a/include/uapi/linux/perf_event.h
-+++ b/include/uapi/linux/perf_event.h
-@@ -445,8 +445,6 @@ struct perf_event_query_bpf {
- 	__u32	ids[0];
- };
+diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
+index 406487e..c7fb9a7 100644
+--- a/arch/arm/mach-sa1100/simpad.c
++++ b/arch/arm/mach-sa1100/simpad.c
+@@ -18,7 +18,6 @@
+ #include <linux/mtd/partitions.h>
+ #include <linux/io.h>
+ #include <linux/gpio/driver.h>
+-#include <linux/gpio/machine.h>
  
--#define perf_flags(attr)	(*(&(attr)->read_format + 1))
--
- /*
-  * Ioctls that can be done on a perf event fd:
-  */
-diff --git a/tools/include/uapi/linux/perf_event.h b/tools/include/uapi/linux/perf_event.h
-index 9de8780..ea19b5d 100644
---- a/tools/include/uapi/linux/perf_event.h
-+++ b/tools/include/uapi/linux/perf_event.h
-@@ -445,8 +445,6 @@ struct perf_event_query_bpf {
- 	__u32	ids[0];
- };
- 
--#define perf_flags(attr)	(*(&(attr)->read_format + 1))
--
- /*
-  * Ioctls that can be done on a perf event fd:
-  */
+ #include <mach/hardware.h>
+ #include <asm/setup.h>
 -- 
-2.7.4
+1.9.1
 
 
 _______________________________________________
