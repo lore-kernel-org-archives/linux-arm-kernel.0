@@ -2,23 +2,21 @@ Return-Path: <SRS0=txfi=PP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D13DCC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 05:14:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 93F02C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 05:20:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A000A2087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 05:14:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5815A213A2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 05:20:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="simiJTMq";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="TDjNCFmo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A000A2087F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HDKv1nk8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5815A213A2
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,60 +24,62 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=uCttGHctLkjueboXsfrW//LmQ/D16JxkREmAT1n6XPM=; b=simiJTMqUA3kbh
-	qPyNfd0ottiyAqBaG66KQVTFlytAqwiW1KRhqo28oHwULPkIm8Xxgt6Iuunv0z9eCZgORiieeQyHc
-	BIuy81UQ9VMVuZKlEwh4UPWc7xXs1GxFguerPPEH/M5kwT9Hok1Ah7KdQHdIiDZSAvtAI2pwYn5AN
-	PtFBsCzOVaWVpqHrdEZlABV8Tj1a9kwAP590XTc4TnoPwCBqzbwhx2EuDlCfwLPbkbF4w/89BVt52
-	EgleAQuwPJmym2wMQIt9M6SHmEL4QnfSBpu2IdWQ+JyTx8xM4GO/bdUadukthkNysfdrhPGRMRHSN
-	BNbib443dvn79vYr4qiA==;
+	List-Owner; bh=6EnDqxrL+5ksZXl0dvfbOUGAfealKHVkmGj9eNoKN9k=; b=HDKv1nk8PCRO0K
+	CNilW9rfb7kf4fiQYi2YOmyTFUWWpg90HU3tdIWxZtOY1p63nzT/6qgScqdTzWlTPUsbgDSPS2n4x
+	qaIxdcEezy7t9pjtXVwRioqgzdXLsxhu39OS317Y9++GyY0SFxk6E5FPYKZ3lWH8X0kqKiHCe1ssg
+	LGYr1AU0py+Qi2PUAaVb3QjlfIp/jMK21H0WtR4ttjNHyMclhAZsobXsXsFh7PAWtLpPpFd147oC3
+	CNsrg4TZPn0wX5peaD+DOA3wkTa03jgEm/qCRCidpc3j7Jze5xSDVEEGyO8H/FjfF/aTfEeF7pTpn
+	Y3lfZPdUGbL3gCyrOcDg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggNEt-0007Vd-IW; Mon, 07 Jan 2019 05:14:15 +0000
-Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
+	id 1ggNKw-00023X-Qe; Mon, 07 Jan 2019 05:20:30 +0000
+Received: from mail-ed1-f65.google.com ([209.85.208.65])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggNEp-0007VD-Kd
- for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 05:14:13 +0000
-Received: by mail-pg1-x542.google.com with SMTP id d72so20187593pga.9
+ id 1ggNKt-000238-DF
+ for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 05:20:29 +0000
+Received: by mail-ed1-f65.google.com with SMTP id g22so36699260edr.7
  for <linux-arm-kernel@lists.infradead.org>;
- Sun, 06 Jan 2019 21:14:10 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=jkcm1HTbMQBDwve8/v16eQj6g2NpqtytScttFvde1sI=;
- b=TDjNCFmoJrm+GqQkTwUJs2zJ9JR4ndHopbHKyvuC3qFVRSV8H9d+pteoP53xeDgVJ/
- BVDSUiAmcgwcS4PiJmoJTK8R8C/E/d+OefgCTl88z0jEXs9ltiHJJqGN5Du15ClEX9vp
- qniTw3SKWriemK3Rddiv8yfbFJI8SvUZBezNiE08BtP6ikrGN+gzn0Ui3YF59Q7xIA2H
- eif0b60ulE18GWwu9mUPlliP4IRdxhzpqSjvPkHg62BzYeXG+7K5z+VoW9fHB4QMgy6U
- /a4qTeYgWZpk6WRCyKEmzlOTVqpf0ZlfS4KjQpV0SiOrUDaDWzrI0lXMzk6o5sZ7p6uI
- s/5Q==
+ Sun, 06 Jan 2019 21:20:26 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=jkcm1HTbMQBDwve8/v16eQj6g2NpqtytScttFvde1sI=;
- b=PKVPgYOS/rITFrr73HEzGnO8VFO+3JnbXxLfhdbO3YyGLqK5bd7yv25GLtDLDMWdVP
- 8sn3BBFBmrdaOGBTbcC5zvrMa61UI5FTmaff+eA2eR2W7JJ+f4rdutDcrlXP7WE+P1eh
- dUwuYt1iVYYtdpqD3lbXh56w5ovJLxG/JUKCijTTZ3pezz4pmQXp8GpcOXZlAXJWIFC8
- 2w+mqGGonBzHtgOrErHfu6rpeAQOkTD46zjFk7c7END1NMjoFryiPEHhDJqHTGIDRqiB
- NftVOgIZZ0o9L3EvDuf9Gz+vOG+462rms0ypDKIoRes27EonC0hKh7RfBNNDBIIyEWrE
- 9A2A==
-X-Gm-Message-State: AJcUukcadrOWfuhL7Kwnd0mIuGVdXYIxSdHnshCCDkuM2qmclFDYFLTq
- 8FofemNHONqgLeVOWaotacmTYuhK7pS9r+RRRJs=
-X-Google-Smtp-Source: ALg8bN6ETe1B9Q5up9Hz9+4Q4Khc8bwT2716MN0eJrPgrbPk5aEqN1u7xxt9RAxMs1TCeO7x9mqiJ4rAUgtKjunlSgk=
-X-Received: by 2002:a63:da14:: with SMTP id c20mr9334574pgh.233.1546838050378; 
- Sun, 06 Jan 2019 21:14:10 -0800 (PST)
+ bh=Z3MYpxG11VE2ZJ1b3f4Z820yibm6Cz7qhfanB0XAw6M=;
+ b=CDebi0/zb16YRXVaEltdWhNVOqM+XnSnEVZO0xDEiPcHPMpVghuOZEmdaf7DhbWfSQ
+ JqS4dw2Ad0TYTqv75Azq4LI5tE/1iD/NIy9YzXhetF11Dw7ghixyyJCoeUeChCtDbgsG
+ nrTWx6ObE69N18fhpK0+54W2Yb4lsTH7kbT8tTSaG+JZJWwIUTX6xy7yAThUTynXT4mj
+ aGuARoGXURZcPKwtIUevw9bG8lsc5B45kgTN8ZRF8/Kzfv5AI/QBMk49vZ23z9xHD3rj
+ jcApYjitp45vyEK86yuonrzp02fYMqaSrFbTshqs+AL1L4f2oKDWhH7Rewv2o/tmKtVT
+ CI4g==
+X-Gm-Message-State: AA+aEWZhtmWBFyynQfNOX7gTLML0GpRVN54r/gSqc9XfT9ds5YSUJOQV
+ RibOe052/UGJ9Wo46pR8V9I2NTiCtxE=
+X-Google-Smtp-Source: AFSGD/Wri+Ci7g7vyg8Wk5Z6HFbDTFK1lGY/qCDbc8wSPocfjFbefFJlc7Choh48qMrjgyo+HeHxcA==
+X-Received: by 2002:a50:95b4:: with SMTP id w49mr53584241eda.186.1546838424589; 
+ Sun, 06 Jan 2019 21:20:24 -0800 (PST)
+Received: from mail-wr1-f49.google.com (mail-wr1-f49.google.com.
+ [209.85.221.49])
+ by smtp.gmail.com with ESMTPSA id b45sm34742710eda.34.2019.01.06.21.20.24
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Sun, 06 Jan 2019 21:20:24 -0800 (PST)
+Received: by mail-wr1-f49.google.com with SMTP id z5so41869038wrt.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sun, 06 Jan 2019 21:20:24 -0800 (PST)
+X-Received: by 2002:adf:891a:: with SMTP id s26mr49988560wrs.44.1546838423934; 
+ Sun, 06 Jan 2019 21:20:23 -0800 (PST)
 MIME-Version: 1.0
-References: <20190104085405.40356-1-Tianyu.Lan@microsoft.com>
- <20190104085405.40356-7-Tianyu.Lan@microsoft.com>
- <20190104163035.GC11288@linux.intel.com>
-In-Reply-To: <20190104163035.GC11288@linux.intel.com>
-From: Tianyu Lan <lantianyu1986@gmail.com>
-Date: Mon, 7 Jan 2019 13:13:59 +0800
-Message-ID: <CAOLK0pyMbKuxA0KnsRz_92jr5j15YXb2yUP0GH-xE06BqO_zTA@mail.gmail.com>
-Subject: Re: [PATCH 6/11] KVM/MMU: Flush tlb with range list in sync_page()
-To: Sean Christopherson <sean.j.christopherson@intel.com>
+References: <cover.50931fbda5c95345087740e4c1ef5a57fdd53480.1544104801.git-series.maxime.ripard@bootlin.com>
+ <3401ca7517927243f567899819e0d02eee12984f.1544104801.git-series.maxime.ripard@bootlin.com>
+In-Reply-To: <3401ca7517927243f567899819e0d02eee12984f.1544104801.git-series.maxime.ripard@bootlin.com>
+From: Chen-Yu Tsai <wens@csie.org>
+Date: Mon, 7 Jan 2019 13:20:11 +0800
+X-Gmail-Original-Message-ID: <CAGb2v66m-BtUaWkOvjiaO1LybikqxVn-S7uOE9zV6QW9KHLL8Q@mail.gmail.com>
+Message-ID: <CAGb2v66m-BtUaWkOvjiaO1LybikqxVn-S7uOE9zV6QW9KHLL8Q@mail.gmail.com>
+Subject: Re: [PATCH 1/2] pinctrl: sunxi: Deal with per-bank regulators
+To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190106_211411_704549_E877807C 
-X-CRM114-Status: GOOD (  21.23  )
+X-CRM114-CacheID: sfid-20190106_212027_448142_4872C27F 
+X-CRM114-Status: GOOD (  17.81  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,109 +91,108 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kvm <kvm@vger.kernel.org>, Radim Krcmar <rkrcmar@redhat.com>,
- catalin.marinas@arm.com, will.deacon@arm.com, christoffer.dall@arm.com,
- paulus@ozlabs.org, "H. Peter Anvin" <hpa@zytor.com>, kys@microsoft.com,
- kvmarm@lists.cs.columbia.edu, mpe@ellerman.id.au,
- the arch/x86 maintainers <x86@kernel.org>, linux@armlinux.org.uk,
- michael.h.kelley@microsoft.com, Ingo Molnar <mingo@redhat.com>,
- benh@kernel.crashing.org, jhogan@kernel.org, linux-mips@vger.kernel.org,
- Lan Tianyu <Tianyu.Lan@microsoft.com>, marc.zyngier@arm.com,
- kvm-ppc@vger.kernel.org, bp@alien8.de, Thomas Gleixner <tglx@linutronix.de>,
- linux-arm-kernel@lists.infradead.org,
- "linux-kernel@vger kernel org" <linux-kernel@vger.kernel.org>,
- ralf@linux-mips.org, paul.burton@mips.com, Paolo Bonzini <pbonzini@redhat.com>,
- vkuznets@redhat.com, linuxppc-dev@lists.ozlabs.org
+Cc: linux-gpio@vger.kernel.org, Linus Walleij <linus.walleij@linaro.org>,
+ Mylene Josserand <mylene.josserand@bootlin.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, Jan 5, 2019 at 12:30 AM Sean Christopherson
-<sean.j.christopherson@intel.com> wrote:
+On Thu, Dec 6, 2018 at 10:02 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 >
-> On Fri, Jan 04, 2019 at 04:54:00PM +0800, lantianyu1986@gmail.com wrote:
-> > From: Lan Tianyu <Tianyu.Lan@microsoft.com>
-> >
-> > This patch is to flush tlb via flush list function.
+> The Allwinner SoCs have on most of their GPIO banks a regulator input.
 >
-> More explanation of why this is beneficial would be nice.  Without the
-> context of the overall series it's not immediately obvious what
-> kvm_flush_remote_tlbs_with_list() does without a bit of digging.
+> This issue was mainly ignored so far because either the regulator was a
+> static regulator that would be providing power anyway, or the bank was used
+> for a feature unsupported so far (CSI). For the odd cases, enabling it in
+> the bootloader was the preferred option.
 >
-> >
-> > Signed-off-by: Lan Tianyu <Tianyu.Lan@microsoft.com>
-> > ---
-> >  arch/x86/kvm/paging_tmpl.h | 16 ++++++++++++++--
-> >  1 file changed, 14 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/x86/kvm/paging_tmpl.h b/arch/x86/kvm/paging_tmpl.h
-> > index 833e8855bbc9..866ccdea762e 100644
-> > --- a/arch/x86/kvm/paging_tmpl.h
-> > +++ b/arch/x86/kvm/paging_tmpl.h
-> > @@ -973,6 +973,7 @@ static int FNAME(sync_page)(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp)
-> >       bool host_writable;
-> >       gpa_t first_pte_gpa;
-> >       int set_spte_ret = 0;
-> > +     LIST_HEAD(flush_list);
-> >
-> >       /* direct kvm_mmu_page can not be unsync. */
-> >       BUG_ON(sp->role.direct);
-> > @@ -980,6 +981,7 @@ static int FNAME(sync_page)(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp)
-> >       first_pte_gpa = FNAME(get_level1_sp_gpa)(sp);
-> >
-> >       for (i = 0; i < PT64_ENT_PER_PAGE; i++) {
-> > +             int tmp_spte_ret = 0;
-> >               unsigned pte_access;
-> >               pt_element_t gpte;
-> >               gpa_t pte_gpa;
-> > @@ -1029,14 +1031,24 @@ static int FNAME(sync_page)(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp)
-> >
-> >               host_writable = sp->spt[i] & SPTE_HOST_WRITEABLE;
-> >
-> > -             set_spte_ret |= set_spte(vcpu, &sp->spt[i],
-> > +             tmp_spte_ret = set_spte(vcpu, &sp->spt[i],
-> >                                        pte_access, PT_PAGE_TABLE_LEVEL,
-> >                                        gfn, spte_to_pfn(sp->spt[i]),
-> >                                        true, false, host_writable);
-> > +
-> > +             if (kvm_available_flush_tlb_with_range()
-> > +                 && (tmp_spte_ret & SET_SPTE_NEED_REMOTE_TLB_FLUSH)) {
-> > +                     struct kvm_mmu_page *leaf_sp = page_header(sp->spt[i]
-> > +                                     & PT64_BASE_ADDR_MASK);
-> > +                     list_add(&leaf_sp->flush_link, &flush_list);
-> > +             }
-> > +
-> > +             set_spte_ret |= tmp_spte_ret;
-> > +
-> >       }
-> >
-> >       if (set_spte_ret & SET_SPTE_NEED_REMOTE_TLB_FLUSH)
-> > -             kvm_flush_remote_tlbs(vcpu->kvm);
-> > +             kvm_flush_remote_tlbs_with_list(vcpu->kvm, &flush_list);
+> However, now that we are starting to support those features, and that we
+> can't really rely on the bootloader for this, we need to model those
+> regulators as such in the DT.
 >
-> This is a bit confusing and potentially fragile.  It's not obvious that
-> kvm_flush_remote_tlbs_with_list() is guaranteed to call
-> kvm_flush_remote_tlbs() when kvm_available_flush_tlb_with_range() is
-> false, and you're relying on the kvm_flush_remote_tlbs_with_list() call
-> chain to never optimize away the empty list case.  Rechecking
-> kvm_available_flush_tlb_with_range() isn't expensive.
-
-That makes sense. Will update. Thanks.
-
+> This is slightly more complicated than what it looks like, since some
+> regulators will be tied to the PMIC, and in order to have access to the
+> PMIC bus, you need to mux its pins, which will need the pinctrl driver,
+> that needs the regulator driver to be registered. And this is how you get a
+> circular dependency.
 >
-> >
-> >       return nr_present;
-> >  }
-> > --
-> > 2.14.4
-> >
+> In practice however, the hardware cannot fall into this case since it would
+> result in a completely unusable bus. In order to avoid that circular
+> dependency, we can thus get and enable the regulators at pin_request time.
+> We'll then need to account for the references of all the pins of a
+> particular branch to know when to put the reference, but it works pretty
+> nicely once implemented.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
+I'm getting a warning on my Bananapi M1+:
 
+[  +0.004918] sun4i-pinctrl 1c20800.pinctrl: 1c20800.pinctrl supply
+vcc-pa not found, using dummy regulator
+[  +0.009931] sun7i-dwmac 1c50000.ethernet: PTP uses main clock
+[  +0.005764] sun7i-dwmac 1c50000.ethernet: no reset control found
+[  +0.006111] ------------[ cut here ]------------
+[  +0.004640] WARNING: CPU: 1 PID: 1 at drivers/regulator/core.c:2054
+_regulator_put.part.8+0xf8/0xfc
+[  +0.009065] Modules linked in:
+[  +0.003085] CPU: 1 PID: 1 Comm: swapper/0 Not tainted 5.0.0-rc1 #5
+[  +0.006179] Hardware name: Allwinner sun7i (A20) Family
+[  +0.005252] [<c010eaf0>] (unwind_backtrace) from [<c010b854>]
+(show_stack+0x10/0x14)
+[  +0.007755] [<c010b854>] (show_stack) from [<c089ac28>] (dump_stack+0x88/0x9c)
+[  +0.007233] [<c089ac28>] (dump_stack) from [<c0127450>] (__warn+0xd4/0xf0)
+[  +0.006881] [<c0127450>] (__warn) from [<c01274ac>]
+(warn_slowpath_null+0x40/0x48)
+[  +0.007576] [<c01274ac>] (warn_slowpath_null) from [<c03fd25c>]
+(_regulator_put.part.8+0xf8/0xfc)
+[  +0.008876] [<c03fd25c>] (_regulator_put.part.8) from [<c03fd288>]
+(regulator_put+0x28/0x38)
+[  +0.008446] [<c03fd288>] (regulator_put) from [<c03c5f2c>]
+(sunxi_pmx_free+0x38/0x48)
+[  +0.007837] [<c03c5f2c>] (sunxi_pmx_free) from [<c03c2444>]
+(pin_free+0x9c/0xfc)
+[  +0.007402] [<c03c2444>] (pin_free) from [<c03c2fb0>]
+(pinmux_disable_setting+0x118/0x184)
+[  +0.008271] [<c03c2fb0>] (pinmux_disable_setting) from [<c03c0060>]
+(pinctrl_free+0x13c/0x144)
+[  +0.008619] [<c03c0060>] (pinctrl_free) from [<c048c6a0>]
+(release_nodes+0x1bc/0x200)
+[  +0.007839] [<c048c6a0>] (release_nodes) from [<c0488964>]
+(really_probe+0x110/0x2cc)
+[  +0.007838] [<c0488964>] (really_probe) from [<c0488c84>]
+(driver_probe_device+0x60/0x16c)
+[  +0.008270] [<c0488c84>] (driver_probe_device) from [<c0488e6c>]
+(__driver_attach+0xdc/0xe0)
+[  +0.008444] [<c0488e6c>] (__driver_attach) from [<c0486d44>]
+(bus_for_each_dev+0x74/0xb4)
+[  +0.008184] [<c0486d44>] (bus_for_each_dev) from [<c0487edc>]
+(bus_add_driver+0x1bc/0x200)
+[  +0.008270] [<c0487edc>] (bus_add_driver) from [<c04897ac>]
+(driver_register+0x74/0x108)
+[  +0.008098] [<c04897ac>] (driver_register) from [<c010270c>]
+(do_one_initcall+0x7c/0x1a8)
+[  +0.008187] [<c010270c>] (do_one_initcall) from [<c0d00e14>]
+(kernel_init_freeable+0x13c/0x1d8)
+[  +0.008705] [<c0d00e14>] (kernel_init_freeable) from [<c08b08b8>]
+(kernel_init+0x8/0x110)
+[  +0.008184] [<c08b08b8>] (kernel_init) from [<c01010e8>]
+(ret_from_fork+0x14/0x2c)
+[  +0.007570] Exception stack(0xef04ffb0 to 0xef04fff8)
+[  +0.005054] ffa0:                                     00000000
+00000000 00000000 00000000
+[  +0.008180] ffc0: 00000000 00000000 00000000 00000000 00000000
+00000000 00000000 00000000
+[  +0.008179] ffe0: 00000000 00000000 00000000 00000000 00000013 00000000
+[  +0.006654] ---[ end trace 2bdb4a597b3c54ef ]---
 
--- 
-Best regards
-Tianyu Lan
+Note that sun7i-dwmac probe is deferred here. The instance where the
+probe succeeds shows
+no warning.
+
+ChenYu
 
 _______________________________________________
 linux-arm-kernel mailing list
