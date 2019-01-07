@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 35DDEC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 16:28:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0DB12C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 16:28:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E7BAD206BB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 16:28:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CE29D2147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  7 Jan 2019 16:28:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nzaxXx5W"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E7BAD206BB
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="olcvEjbQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CE29D2147C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,25 +26,26 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=22l1bj90yux1f8y951FEe9lTPNi0MLYCP9LPFeLI1v4=; b=nzaxXx5WMkKi3i4JQoJQhBKWdI
-	WkjgdojVwfbMdlfr5ipOTClm1xG8RqxXvSzgYwBKx4KFky0Vb8roXBfoWdJM+TB6xzPLOkKJS/Dq8
-	Lzsh4R0yHLJUF/nhTMHOg5/aVcDdX/0Id54sLDHtS+/KhppK5S0l9OiwlLIXa5rI0rD49XNWER527
-	gvJDnjuNuY739TX4jLk3m25CS/JN2YeBV9Myrc+6OHTX0ITb0mWA7AJcDXYq7RaIcxWSsy7v4sUwv
-	HHmzxdPbo3axOSDAicZH8LDTtH3KuM2jPI+6jj6dWBC7VEM38hROLvqGRTsM88Sz4tNrBLhqHadYG
-	ylnuLhwA==;
+	bh=SI/h2gHIzmlDdE3n89kWPdqdEmkYoHJGFghDn0X6AFY=; b=olcvEjbQ7bzX+GlwNA0xNRbvNR
+	OOBCngsXrdAXKJ3OyQWz635eAss4jv4vaQN4It+/zoAdJzjEHLkU4VxQ0eZbPrWc9I6yrldHwV7HB
+	RS92eJCUj3RN7C+CBpXJJiVDpEKAUVopLHeKhmS4MADBkiBzv7JHH1gHnapZz4+mU5exM6n0jgwk/
+	p/W1fOaIdTtoNTpA0gqtW7gF72fvSgK0m4JExT3nDhKGD+im9Cjnuc3A0q6mLWlyEqWDFNTvFjgbS
+	7rdTaApGX61f71qGH9NPZQMEk4dxX4bh8cbRWD41P71G2wscvx6MK7CeNuDOC5OIAmlfwF2IUT9Fi
+	WSsr9HCA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggXks-0003JF-4N; Mon, 07 Jan 2019 16:27:58 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1ggXlA-0003hP-E9; Mon, 07 Jan 2019 16:28:16 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggXkg-00036G-Av
- for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 16:27:48 +0000
+ id 1ggXkl-0003CQ-82
+ for linux-arm-kernel@lists.infradead.org; Mon, 07 Jan 2019 16:27:56 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E9B3E15AB;
- Mon,  7 Jan 2019 08:27:45 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B8C5B1650;
+ Mon,  7 Jan 2019 08:27:50 -0800 (PST)
 Received: from e119886-lin.cambridge.arm.com (unknown [10.37.6.11])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 74EC33F5A0;
- Mon,  7 Jan 2019 08:27:41 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 42CF43F5A0;
+ Mon,  7 Jan 2019 08:27:46 -0800 (PST)
 From: Andrew Murray <andrew.murray@arm.com>
 To: Peter Zijlstra <peterz@infradead.org>, Ingo Molnar <mingo@redhat.com>,
  Arnaldo Carvalho de Melo <acme@kernel.org>,
@@ -58,16 +59,16 @@ To: Peter Zijlstra <peterz@infradead.org>, Ingo Molnar <mingo@redhat.com>,
  Borislav Petkov <bp@alien8.de>, Russell King <linux@armlinux.org.uk>,
  suzuki.poulose@arm.com, robin.murphy@arm.com,
  Michael Ellerman <mpe@ellerman.id.au>
-Subject: [PATCH v4 01/13] perf/doc: update design.txt for exclude_{host|guest}
+Subject: [PATCH v4 02/13] perf/core: add function to test for event exclusion
  flags
-Date: Mon,  7 Jan 2019 16:27:18 +0000
-Message-Id: <1546878450-20341-2-git-send-email-andrew.murray@arm.com>
+Date: Mon,  7 Jan 2019 16:27:19 +0000
+Message-Id: <1546878450-20341-3-git-send-email-andrew.murray@arm.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1546878450-20341-1-git-send-email-andrew.murray@arm.com>
 References: <1546878450-20341-1-git-send-email-andrew.murray@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190107_082746_606994_01C84F11 
-X-CRM114-Status: GOOD (  10.72  )
+X-CRM114-CacheID: sfid-20190107_082752_138206_2CFD514F 
+X-CRM114-Status: GOOD (  12.74  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,29 +88,34 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Update design.txt to reflect the presence of the exclude_host
-and exclude_guest perf flags.
+Add a function that tests if any of the perf event exclusion flags
+are set on a given event.
 
 Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 ---
- tools/perf/design.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+ include/linux/perf_event.h | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/tools/perf/design.txt b/tools/perf/design.txt
-index a28dca2..0453ba2 100644
---- a/tools/perf/design.txt
-+++ b/tools/perf/design.txt
-@@ -222,6 +222,10 @@ The 'exclude_user', 'exclude_kernel' and 'exclude_hv' bits provide a
- way to request that counting of events be restricted to times when the
- CPU is in user, kernel and/or hypervisor mode.
+diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
+index 1d5c551..54a78d2 100644
+--- a/include/linux/perf_event.h
++++ b/include/linux/perf_event.h
+@@ -1004,6 +1004,15 @@ perf_event__output_id_sample(struct perf_event *event,
+ extern void
+ perf_log_lost_samples(struct perf_event *event, u64 lost);
  
-+Furthermore the 'exclude_host' and 'exclude_guest' bits provide a way
-+to request counting of events restricted to guest and host contexts when
-+using Linux as the hypervisor.
++static inline bool event_has_any_exclude_flag(struct perf_event *event)
++{
++	struct perf_event_attr *attr = &event->attr;
 +
- The 'mmap' and 'munmap' bits allow recording of PROT_EXEC mmap/munmap
- operations, these can be used to relate userspace IP addresses to actual
- code, even after the mapping (or even the whole process) is gone,
++	return attr->exclude_idle || attr->exclude_user ||
++	       attr->exclude_kernel || attr->exclude_hv ||
++	       attr->exclude_guest || attr->exclude_host;
++}
++
+ static inline bool is_sampling_event(struct perf_event *event)
+ {
+ 	return event->attr.sample_period != 0;
 -- 
 2.7.4
 
