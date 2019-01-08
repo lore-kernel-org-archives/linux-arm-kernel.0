@@ -2,65 +2,80 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 73890C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 14:52:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DE004C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 14:53:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 427B5206BB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 14:52:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ACCCD20883
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 14:53:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fX9PHGu5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 427B5206BB
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GTUIL/Lp";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="0aslcSEg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ACCCD20883
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=T5Q0neldaPredrwDziadoh2+jy3SEcVWGMcx72aTRGM=; b=fX9PHGu590+mArJnz5pzEbn1c
-	TeyNZvJvNzto1X4IsXYbbBn7f0CGh48yXfhG+4NYZp3TBBRzmIXBOo9f2OBLptonAGZi5QEVgOsdb
-	ii+7Vgc8EkvAfLQeWk+LJ34qMRu+v99X6DZdBO/FmoEpzyNG/PguPH6rv/Ioy/iOQGr7UAO3MPt4w
-	Cgwx10Twz1Rt9bIiOnn9UyrZtPkBgv/Vi5xUOsm9NSQUyN7MbhfgOaoCXfkrMATiKyza5QJ/c+29N
-	4bIjgIPjridaUpX5hpbH6KS2oS6Hjn0A4rFv1+b4rxzKb39TGXf6l/9MYntX5lC+37nMUjKhgB/wy
-	1nHkSqHCA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=gAn0ULpmvNUxHQpmD09vCSClw3aArzlYqh+xvwY0DzE=; b=GTUIL/LpwttK1g
+	EXmo9yGX0nOtXWvxCuz4lsZ/mTc+ROmvx7Ts7xXUINp7MJ88gAPbS+b2orm3UX//YVhGaud/gmevA
+	JKVXjSbWVLwAJw9chFmKcWPzscZsPFcRvPTbTqpDYnMlSfz6QDykCXLntt0/R/wjBmg7Dwarrd0jw
+	fltbiqUJifkucL5hcq5H7AM5UunCaw62P0niDF2M/3RTb7wfMOyVrsQKC8d1/cv38cmihzkE8Pyee
+	SPi97V4JgeaXUAHC0LWVoX2ygSexFyoCasMZDPWKp4t/sUyeGOObU7o/+F1QeObmhMU3isNXBmRIj
+	DXFtGFwVokg89JEpJkjQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggsjX-0005r8-3x; Tue, 08 Jan 2019 14:51:59 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggsjS-0005qH-JU
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 14:51:56 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 863C680D;
- Tue,  8 Jan 2019 06:51:52 -0800 (PST)
-Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B50543F5AF;
- Tue,  8 Jan 2019 06:51:50 -0800 (PST)
-Subject: Re: [PATCH v8 15/26] arm64: alternative: Apply alternatives early in
- boot process
-To: Julien Thierry <julien.thierry@arm.com>,
- linux-arm-kernel@lists.infradead.org
-References: <1546956464-48825-1-git-send-email-julien.thierry@arm.com>
- <1546956464-48825-16-git-send-email-julien.thierry@arm.com>
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
-Message-ID: <cec17e88-d199-abb4-4919-deff7182a26f@arm.com>
-Date: Tue, 8 Jan 2019 14:51:48 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1ggsl4-0006FW-Gd; Tue, 08 Jan 2019 14:53:34 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ggsl2-0006F7-1T
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 14:53:33 +0000
+Received: from mail-qt1-f172.google.com (mail-qt1-f172.google.com
+ [209.85.160.172])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 08AEF20883
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue,  8 Jan 2019 14:53:31 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1546959211;
+ bh=dDcLr7PFigttfu9qxS0LqYl7q6wlG7peD973QvNyd3Y=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=0aslcSEgIrTXWD0Jf+6BfY8Uw5IVTffG8q3wYlIjdy2YP54yzUHGzJ+y3zNpxtGZp
+ zHIYp5y3b71eh6hdl0gObNjJADDz33Ct2NWTcRoFw6QOLst40pwcnSN4+Z9M80zruU
+ +E07QYjYEKhH6T5e8um41fKaMmL30xN9XW33lSTE=
+Received: by mail-qt1-f172.google.com with SMTP id u47so4608110qtj.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 08 Jan 2019 06:53:30 -0800 (PST)
+X-Gm-Message-State: AJcUukf+hxy356xKoTsIdr+b2L62sTLM18KJpKg6LePj7XS9MpbSEalc
+ R3jSs8s4qvWE7wQPBEXe8aczXfXDB9t937La/g==
+X-Google-Smtp-Source: ALg8bN5OGxu5emk9VpVjTgAoC4e6gwhWHhsD3YnTCVEEKOtdKzPp/ZPdgcSJuVjtVLcbXZzMwNYR1Pw/XH2yiZHeTms=
+X-Received: by 2002:aed:29a6:: with SMTP id o35mr1872256qtd.257.1546959210219; 
+ Tue, 08 Jan 2019 06:53:30 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <1546956464-48825-16-git-send-email-julien.thierry@arm.com>
-Content-Language: en-US
+References: <1545144107-88378-1-git-send-email-michal.vokac@ysoft.com>
+ <20181228232556.GA14277@bogus>
+ <49371bd4-6ab9-31c3-dd48-800becac17e3@ysoft.com>
+ <353b8f62-e265-c3c1-e352-d33c204eb6dc@ysoft.com>
+In-Reply-To: <353b8f62-e265-c3c1-e352-d33c204eb6dc@ysoft.com>
+From: Rob Herring <robh@kernel.org>
+Date: Tue, 8 Jan 2019 08:53:18 -0600
+X-Gmail-Original-Message-ID: <CAL_Jsq+k3BvjP=oY=yGRiHgvy+yXjnzfT6H8V9HjVGf8MOQAYA@mail.gmail.com>
+Message-ID: <CAL_Jsq+k3BvjP=oY=yGRiHgvy+yXjnzfT6H8V9HjVGf8MOQAYA@mail.gmail.com>
+Subject: Re: [PATCH v2] ARM: dts: imx: Add Y Soft IOTA Draco,
+ Hydra and Ursa boards
+To: =?UTF-8?B?Vm9rw6HEjSBNaWNoYWw=?= <Michal.Vokac@ysoft.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_065154_655391_BA6F2D04 
-X-CRM114-Status: GOOD (  26.73  )
+X-CRM114-CacheID: sfid-20190108_065332_098344_F9F37F73 
+X-CRM114-Status: GOOD (  13.45  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,194 +87,37 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, daniel.thompson@linaro.org, marc.zyngier@arm.com,
- catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
- christoffer.dall@arm.com, james.morse@arm.com, joel@joelfernandes.org
-Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Andrew Lunn <andrew@lunn.ch>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Fabio Estevam <fabio.estevam@nxp.com>, Shawn Guo <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Julien,
-
-On 08/01/2019 14:07, Julien Thierry wrote:
-> From: Daniel Thompson <daniel.thompson@linaro.org>
-> 
-> Currently alternatives are applied very late in the boot process (and
-> a long time after we enable scheduling). Some alternative sequences,
-> such as those that alter the way CPU context is stored, must be applied
-> much earlier in the boot sequence.
-> 
-> Introduce apply_boot_alternatives() to allow some alternatives to be
-> applied immediately after we detect the CPU features of the boot CPU.
-> 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> [julien.thierry@arm.com: rename to fit new cpufeature framework better,
-> 			 apply BOOT_SCOPE feature early in boot]
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->   arch/arm64/include/asm/alternative.h |  1 +
->   arch/arm64/include/asm/cpufeature.h  |  4 ++++
->   arch/arm64/kernel/alternative.c      | 43 +++++++++++++++++++++++++++++++-----
->   arch/arm64/kernel/cpufeature.c       |  6 +++++
->   arch/arm64/kernel/smp.c              |  7 ++++++
->   5 files changed, 56 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-> index 9806a23..b9f8d78 100644
-> --- a/arch/arm64/include/asm/alternative.h
-> +++ b/arch/arm64/include/asm/alternative.h
-> @@ -25,6 +25,7 @@ struct alt_instr {
->   typedef void (*alternative_cb_t)(struct alt_instr *alt,
->   				 __le32 *origptr, __le32 *updptr, int nr_inst);
->   
-> +void __init apply_boot_alternatives(void);
->   void __init apply_alternatives_all(void);
->   bool alternative_is_applied(u16 cpufeature);
->   
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index 89c3f31..e505e1f 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -391,6 +391,10 @@ static inline int cpucap_default_scope(const struct arm64_cpu_capabilities *cap)
->   extern struct static_key_false cpu_hwcap_keys[ARM64_NCAPS];
->   extern struct static_key_false arm64_const_caps_ready;
->   
-> +/* ARM64 CAPS + alternative_cb */
-> +#define ARM64_NPATCHABLE (ARM64_NCAPS + 1)
-> +extern DECLARE_BITMAP(boot_capabilities, ARM64_NPATCHABLE);
-> +
->   #define for_each_available_cap(cap)		\
->   	for_each_set_bit(cap, cpu_hwcaps, ARM64_NCAPS)
->   
-> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-> index c947d22..a9b4677 100644
-> --- a/arch/arm64/kernel/alternative.c
-> +++ b/arch/arm64/kernel/alternative.c
-> @@ -155,7 +155,8 @@ static void clean_dcache_range_nopatch(u64 start, u64 end)
->   	} while (cur += d_size, cur < end);
->   }
->   
-> -static void __apply_alternatives(void *alt_region, bool is_module)
-> +static void __apply_alternatives(void *alt_region,  bool is_module,
-> +				 unsigned long *feature_mask)
->   {
->   	struct alt_instr *alt;
->   	struct alt_region *region = alt_region;
-> @@ -165,6 +166,9 @@ static void __apply_alternatives(void *alt_region, bool is_module)
->   	for (alt = region->begin; alt < region->end; alt++) {
->   		int nr_inst;
->   
-> +		if (!test_bit(alt->cpufeature, feature_mask))
-> +			continue;
-> +
->   		/* Use ARM64_CB_PATCH as an unconditional patch */
->   		if (alt->cpufeature < ARM64_CB_PATCH &&
->   		    !cpus_have_cap(alt->cpufeature))
-> @@ -203,8 +207,11 @@ static void __apply_alternatives(void *alt_region, bool is_module)
->   		__flush_icache_all();
->   		isb();
->   
-> -		/* We applied all that was available */
-> -		bitmap_copy(applied_alternatives, cpu_hwcaps, ARM64_NCAPS);
-> +		/* Ignore ARM64_CB bit from feature mask */
-> +		bitmap_or(applied_alternatives, applied_alternatives,
-> +			  feature_mask, ARM64_NCAPS);
-> +		bitmap_and(applied_alternatives, applied_alternatives,
-> +			   cpu_hwcaps, ARM64_NCAPS);
->   	}
->   }
->   
-> @@ -225,8 +232,13 @@ static int __apply_alternatives_multi_stop(void *unused)
->   			cpu_relax();
->   		isb();
->   	} else {
-> +		DECLARE_BITMAP(remaining_capabilities, ARM64_NPATCHABLE);
-> +
-> +		bitmap_complement(remaining_capabilities, boot_capabilities,
-> +				  ARM64_NPATCHABLE);
-> +
->   		BUG_ON(all_alternatives_applied);
-> -		__apply_alternatives(&region, false);
-> +		__apply_alternatives(&region, false, remaining_capabilities);
->   		/* Barriers provided by the cache flushing */
->   		WRITE_ONCE(all_alternatives_applied, 1);
->   	}
-> @@ -240,6 +252,24 @@ void __init apply_alternatives_all(void)
->   	stop_machine(__apply_alternatives_multi_stop, NULL, cpu_online_mask);
->   }
->   
-> +/*
-> + * This is called very early in the boot process (directly after we run
-> + * a feature detect on the boot CPU). No need to worry about other CPUs
-> + * here.
-> + */
-> +void __init apply_boot_alternatives(void)
-> +{
-> +	struct alt_region region = {
-> +		.begin	= (struct alt_instr *)__alt_instructions,
-> +		.end	= (struct alt_instr *)__alt_instructions_end,
-> +	};
-> +
-> +	/* If called on non-boot cpu things could go wrong */
-> +	WARN_ON(smp_processor_id() != 0);
-> +
-> +	__apply_alternatives(&region, false, &boot_capabilities[0]);
-> +}
-> +
->   #ifdef CONFIG_MODULES
->   void apply_alternatives_module(void *start, size_t length)
->   {
-> @@ -247,7 +277,10 @@ void apply_alternatives_module(void *start, size_t length)
->   		.begin	= start,
->   		.end	= start + length,
->   	};
-> +	DECLARE_BITMAP(all_capabilities, ARM64_NPATCHABLE);
-> +
-> +	bitmap_fill(all_capabilities, ARM64_NPATCHABLE);
->   
-> -	__apply_alternatives(&region, true);
-> +	__apply_alternatives(&region, true, &all_capabilities[0]);
->   }
->   #endif
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 84fa5be..71c8d4f 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -54,6 +54,9 @@
->   EXPORT_SYMBOL(cpu_hwcaps);
->   static struct arm64_cpu_capabilities const __ro_after_init *cpu_hwcaps_ptrs[ARM64_NCAPS];
->   
-> +/* Need also bit for ARM64_CB_PATCH */
-> +DECLARE_BITMAP(boot_capabilities, ARM64_NPATCHABLE);
-> +
->   /*
->    * Flag to indicate if we have computed the system wide
->    * capabilities based on the boot time active CPUs. This
-> @@ -1672,6 +1675,9 @@ static void update_cpu_capabilities(u16 scope_mask)
->   		if (caps->desc)
->   			pr_info("detected: %s\n", caps->desc);
->   		cpus_set_cap(caps->capability);
-> +
-> +		if (caps->type & SCOPE_BOOT_CPU)
-
-You may want to do :
-		if (scope_mask & SCOPE_BOOT_CPU)
-
-for a tighter check to ensure this doesn't update the boot_capabilities
-after we have applied the boot_scope alternatives and miss applying the
-alternatives for those, should someone add a multi-scope (i.e SCOPE_BOOT_CPU and
-something else) capability (even by mistake).
-
-With that:
-
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gVHVlLCBKYW4gOCwgMjAxOSBhdCA4OjI1IEFNIFZva8OhxI0gTWljaGFsIDxNaWNoYWwuVm9r
+YWNAeXNvZnQuY29tPiB3cm90ZToKPgo+IE9uIDguMS4yMDE5IDEyOjQzLCBWb2vDocSNIE1pY2hh
+bCB3cm90ZToKPiA+IE9uIDI5LjEyLjIwMTggMDA6MjUsIFJvYiBIZXJyaW5nIHdyb3RlOgo+ID4+
+IE9uIFR1ZSwgRGVjIDE4LCAyMDE4IGF0IDAyOjQyOjExUE0gKzAwMDAsIFZva8OhxI0gTWljaGFs
+IHdyb3RlOgo+IFsuLi5dCj4gPj4+ICsmaTJjMyB7Cj4gPj4+ICsgICBjbG9jay1mcmVxdWVuY3kg
+PSA8MTAwMDAwPjsKPiA+Pj4gKyAgIHBpbmN0cmwtbmFtZXMgPSAiZGVmYXVsdCI7Cj4gPj4+ICsg
+ICBwaW5jdHJsLTAgPSA8JnBpbmN0cmxfaTJjMz47Cj4gPj4+ICsgICBzdGF0dXMgPSAiZGlzYWJs
+ZWQiOwo+ID4+PiArCj4gPj4+ICsgICBncGlvX29sZWQ6IGdwaW9ANDEgewo+ID4+PiArICAgICAg
+ICAgICBjb21wYXRpYmxlID0gIm54cCxwY2E5NTM2IjsKPiA+Pj4gKyAgICAgICAgICAgZ3Bpby1j
+b250cm9sbGVyOwo+ID4+PiArICAgICAgICAgICAjZ3Bpby1jZWxscyA9IDwyPjsKPiA+Pj4gKyAg
+ICAgICAgICAgcmVnID0gPDB4NDE+Owo+ID4+PiArICAgICAgICAgICB2Y2Mtc3VwcGx5ID0gPCZz
+dzJfcmVnPjsKPiA+Pj4gKyAgICAgICAgICAgc3RhdHVzID0gImRpc2FibGVkIjsKPiA+Pj4gKyAg
+IH07Cj4gPj4+ICsKPiA+Pj4gKyAgIG9sZWQ6IG9sZWRAM2Qgewo+ID4+PiArICAgICAgICAgICBj
+b21wYXRpYmxlID0gInNvbG9tb24sc3NkMTMwNWZiLWkyYyI7Cj4gPj4KPiA+PiBOb3QgZG9jdW1l
+bnRlZC4KPiA+Cj4gPiBPSywgSSB3aWxsIHNlbmQgYSBzZXBhcmF0ZSBwYXRjaCBmb3IgdGhhdC4K
+Pgo+IFJvYiwgSSBkb3VibGUgY2hlY2tlZCB0aGF0IGFuZCBpdCBhY3R1YWxseSBpcyBhbHJlYWR5
+IGRvY3VtZW50ZWQuCj4gTm90IGluIGEgd2F5IHRoYXQgeW91IHdvdWxkIGZpbmQgdGhlIHdob2xl
+IGNvbXBhdGlibGUgc3RyaW5nIHRob3VnaC4uCj4KPiBTZWUgaHR0cHM6Ly9lbGl4aXIuYm9vdGxp
+bi5jb20vbGludXgvdjUuMC1yYzEvc291cmNlL0RvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5k
+aW5ncy9kaXNwbGF5L3NzZDEzMDdmYi50eHQjTDQKPgo+IEFyZSB5b3UgT0sgd2l0aCB0aGF0IGFz
+IGl0IGlzPwoKQWgsIG9rYXkuIEl0J3MgZmluZS4KClJvYgoKX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QK
+bGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRl
+YWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
