@@ -2,22 +2,22 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E11F7C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 09:18:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E8E4AC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 09:18:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AB1282087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 09:18:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B7EE22089F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 09:18:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RK2RltsW";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="vL1UmvsI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AB1282087E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="u2he/A4z";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="Fu/QOCWK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B7EE22089F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,69 +26,68 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kmN1HnpQgbOygc7YUcUiMCrITFdQZow3iajHsOYfi3c=; b=RK2RltsW380HMp
-	ZV07/c9xUF/tWrcJiGR6A4kILXne2eTieuSILxhfkKvkAorcTE59+9DFdP09qzsrB6m0GLKlJG1hm
-	CpP4Vch+Pq+CRU5V4YQ/BS7VDxl2BKerJB0aEw1IZ4S158QRtwHhBg7dX5wIYOSkkQOAfmjenqTUf
-	KV/kNSDQHgGvLCB67M5osqqcGabNujasKJXg1bd0V4455Ulr1GcXmbLFYAsg5iA+MY7SoK904Hacm
-	jJdrEPPna47ZsCZMJaTqpATgGoDXQfJi1KJWvCLBnqrBB4xQ+/i5QaPmSgEX4NZXyY3vEar5JY/Ji
-	fBXBMQ7XJhH86IFxutOw==;
+	List-Owner; bh=oCDyH1DkHPIm9ycf859ayXPk3jUWoautsSv/1IgdEzM=; b=u2he/A4zftfsBx
+	EyChFydCzY4MPUwvlargu0I6oPVOVnQn+Sy6ypCCkFHKko94vFwsV+ADGH1K9sMpN0oJrObuTh+xa
+	xD1XGhuiLjQYLn5BjkJDnnjc2cQbl/Y2XDoQhDPVA4Ii7/s12VWza6KqHpxwdXyvVS11sYUHpGM11
+	dng1QDjs3MIE7crQhSTyeDxtzBuNGKMRno9ddmS3tQmjj3Spax9kHs3SdLmFVn4JbGCVFVonztJIW
+	/sQHsTtDl/CLpEveQv1lSjkcsW73XIhPNVT7Sv4VZDT+pdRa7LbDBb7d3/hLlI2juPBq3iX7MXxY/
+	xqYJI4RSNkwqfHmsA1HQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggnWF-0000Vw-8x; Tue, 08 Jan 2019 09:17:55 +0000
-Received: from mail-ed1-x541.google.com ([2a00:1450:4864:20::541])
+	id 1ggnWa-0000sg-D8; Tue, 08 Jan 2019 09:18:16 +0000
+Received: from mail-ed1-x542.google.com ([2a00:1450:4864:20::542])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggnUQ-0006zE-4r
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 09:16:09 +0000
-Received: by mail-ed1-x541.google.com with SMTP id p6so3498505eds.0
+ id 1ggnUS-00072R-TC
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 09:16:15 +0000
+Received: by mail-ed1-x542.google.com with SMTP id a20so3450403edc.8
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 08 Jan 2019 01:16:02 -0800 (PST)
+ Tue, 08 Jan 2019 01:16:04 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=+MhstBAWAWTvjV+7n2ZSuyCNluyXHXlSjobSaNP/M+U=;
- b=vL1UmvsIz4oOviOGu+y+fZ41BRFcWkeVgw9i9KziXEqHwOil6iPVYRonWegCiwd+DN
- ggp5Yl4L2DeT0q/ObFz5IXAfU8oaOaUcUouHk7h8AKxnZwimoYHKMDf2tgDMvqiKgeua
- eszgwAtSq7jr148OK9Aq39mMTNgIzfzrnNWXaag5g93ov+7s9SQCtIClM+SL4X9Mgast
- KrLIH7CEnEbrPE+ZFfRXiu6I6C/FjCMRclkUdoNLyDs4XKIgwo9l7WqUjN7DpKBHV+I0
- N4CMvD1OxojhZG1GzkfQn+ofpUZF5bkMK7Ae8yBMjXkjF9hBikyiKtVnzeELun3TPDkZ
- nzbQ==
+ bh=oXTGXgrClMlW8LabyP51oPTHLt1d9TPP5bN7Oy9yaTQ=;
+ b=Fu/QOCWKaQzM2CCroguKhoRNbbqYVmumF4ev4NEHPxj7T/7yCHXXnkIVLB0hTrpukK
+ 1t11LaomRucyU3qot62gzR0r9TZZAHscsL5atPEX+Ngqsj+xzuykuNkXPZjkVK/v8G5Y
+ om0lBoJtgLINU53aB9oSllH3KUr19uT2CCGKp/LG0OGrXa4ermeZ20jhiKjrNcTx4FNA
+ LD7MyuFMtLpw3w1vFGKSxd7Rr33nRYgCx5IhtvRzoO01e1RWawuVvfIB5XQdmxnwnmrh
+ VPwt672T7X0qIPlvqwPHVNUTKby3uuhKSV5l5RP2Xrr7hGCChClmb/wgHw1bbWNJkxnJ
+ mUKA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=+MhstBAWAWTvjV+7n2ZSuyCNluyXHXlSjobSaNP/M+U=;
- b=Sx6bAWkqHlf5vV/nDGkngY/DluRB3QsL3VLDt8CaLCVZkpu5xi5te1P0vL46GAbrdx
- 0MP6KW7rv/6H0PPy25G0bbpRFZI21xNbgDJcXk1tVWrek0cP1GIsjgIMaKCFoWhJOSnj
- GMBF3g1wG0lnvP0W9lOAXRVmYOBNQolAsboQkzLT0tYerPXQ2V3q8OZqcFHhb4eu9fFf
- KAnCd1MvuDnVQunGuSKAyrjwoNlzoXnrnNy6c45zdv6fYWM1MEIXMkQ+hfVd+r/ng2qX
- qhkf+OQof3kd/MUC3Sd98a1X0E+qciOrwFKMdl097oLsdEjJmxhYSKtN7GRcGFQBIPYW
- 6gsA==
-X-Gm-Message-State: AJcUuke80uqWbpzoP5zeg178DTUmSDsWQYPfah+Q7f5EBrAXDaRiq3ZH
- HW8/rMhGwzWwpd0d68uu+afcMQ==
-X-Google-Smtp-Source: ALg8bN7pp63gp0stxuU86/Ef5iHXUkzmZWnGk4PKZKPUyEmf6QzJY8UES63OULT/yDjVEWpIiz4QKA==
-X-Received: by 2002:a17:906:32c6:: with SMTP id
- k6-v6mr1199646ejk.48.1546938960756; 
- Tue, 08 Jan 2019 01:16:00 -0800 (PST)
+ bh=oXTGXgrClMlW8LabyP51oPTHLt1d9TPP5bN7Oy9yaTQ=;
+ b=Ri+CeukKAv72Ped4C6oUwaqMnpCxSKLW0iSP1fR3vogqVyu+U5BR4xk/3A57C/a6UT
+ BbQozS0WmgYmCBHRX/H8H+4yBJMoYHgrrAeZ10Le1rryM9zUAuSLbvQCNrjDxvzhNW9d
+ f/n/Usqe8B1OgGtwJmxwxgc8fdM7ZrRel/A6P+369aaGw6g/q8wfpBSxdHcSHLd5NRRn
+ B7/o7ymgn/fwFRiWg7YWyHcumonsZMbUiAQvTskroh54Fjk6w2e2INebcPkZqCSNr270
+ BNnodOEcdK0PAScOLethSEFLSt/gS1YqaeYrcAd8JPwkKAgLKeTGf/3YZ4VWbkOzcDTW
+ 44Uw==
+X-Gm-Message-State: AJcUukfb8r7JRWpUT6+Rv1ykfstxwqXbP3/BCplmmRLk9OYRcF+SxZSd
+ xvhbgl4sKvr2gCZbZorm+T2GDQ==
+X-Google-Smtp-Source: ALg8bN4Y0hzLVqHt9UX4a4qUt7Jtxi/praTdrf7KUCraeBLgRDkxBBiK7c3f5PBwTWZwlNSO4TE2yw==
+X-Received: by 2002:aa7:de06:: with SMTP id h6mr1274531edv.137.1546938963541; 
+ Tue, 08 Jan 2019 01:16:03 -0800 (PST)
 Received: from debian-brgl.home ([2a01:cb1d:af:5b00:6d6c:8493:1ab5:dad7])
- by smtp.gmail.com with ESMTPSA id gp22-v6sm18373560ejb.4.2019.01.08.01.15.59
+ by smtp.gmail.com with ESMTPSA id gp22-v6sm18373560ejb.4.2019.01.08.01.16.02
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 08 Jan 2019 01:16:00 -0800 (PST)
+ Tue, 08 Jan 2019 01:16:03 -0800 (PST)
 From: Bartosz Golaszewski <brgl@bgdev.pl>
 To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
  Arnd Bergmann <arnd@arndb.de>,
  Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Subject: [RESEND PATCH 09/12] ARM: davinci: remove dead code related to MAC
- address reading
-Date: Tue,  8 Jan 2019 10:15:36 +0100
-Message-Id: <20190108091539.16674-10-brgl@bgdev.pl>
+Subject: [RESEND PATCH 11/12] ARM: davinci: mityomapl138: use device
+ properties for at24 eeprom
+Date: Tue,  8 Jan 2019 10:15:38 +0100
+Message-Id: <20190108091539.16674-12-brgl@bgdev.pl>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20190108091539.16674-1-brgl@bgdev.pl>
 References: <20190108091539.16674-1-brgl@bgdev.pl>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_011602_892057_FBEF66E6 
-X-CRM114-Status: GOOD (  11.66  )
+X-CRM114-CacheID: sfid-20190108_011606_027263_A6209CDF 
+X-CRM114-Status: GOOD (  13.24  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -110,50 +109,63 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-There are no more users of davinci_get_mac_addr(). Remove it.
+We want to work towards phasing out the at24_platform_data structure.
+There are few users and its contents can be represented using generic
+device properties. Using device properties only will allow us to
+significantly simplify the at24 configuration code.
+
+Remove the at24_platform_data structure and replace it with an array
+of property entries. Drop the byte_len/size property, as the model name
+already implies the EEPROM's size.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/common.c | 15 ---------------
- include/linux/davinci_emac.h   |  1 -
- 2 files changed, 16 deletions(-)
+ arch/arm/mach-davinci/board-mityomapl138.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/common.c b/arch/arm/mach-davinci/common.c
-index e1d0f0d841ff..0c638fe15dcb 100644
---- a/arch/arm/mach-davinci/common.c
-+++ b/arch/arm/mach-davinci/common.c
-@@ -26,21 +26,6 @@ EXPORT_SYMBOL(davinci_soc_info);
- void __iomem *davinci_intc_base;
- int davinci_intc_type;
- 
--void davinci_get_mac_addr(struct nvmem_device *nvmem, void *context)
--{
--	char *mac_addr = davinci_soc_info.emac_pdata->mac_addr;
--	off_t offset = (off_t)context;
--
--	if (!IS_BUILTIN(CONFIG_NVMEM)) {
--		pr_warn("Cannot read MAC addr from EEPROM without CONFIG_NVMEM\n");
--		return;
--	}
--
--	/* Read MAC addr from EEPROM */
--	if (nvmem_device_read(nvmem, offset, ETH_ALEN, mac_addr) == ETH_ALEN)
--		pr_info("Read MAC addr from EEPROM: %pM\n", mac_addr);
--}
--
- static int __init davinci_init_id(struct davinci_soc_info *soc_info)
- {
- 	int			i;
-diff --git a/include/linux/davinci_emac.h b/include/linux/davinci_emac.h
-index 05b97144d342..28e6cf1356da 100644
---- a/include/linux/davinci_emac.h
-+++ b/include/linux/davinci_emac.h
-@@ -46,5 +46,4 @@ enum {
- 	EMAC_VERSION_2,	/* DM646x */
+diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+index ac1a1699d185..a381b26328d8 100644
+--- a/arch/arm/mach-davinci/board-mityomapl138.c
++++ b/arch/arm/mach-davinci/board-mityomapl138.c
+@@ -14,13 +14,13 @@
+ #include <linux/init.h>
+ #include <linux/console.h>
+ #include <linux/platform_device.h>
++#include <linux/property.h>
+ #include <linux/mtd/partitions.h>
+ #include <linux/notifier.h>
+ #include <linux/nvmem-consumer.h>
+ #include <linux/nvmem-provider.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/i2c.h>
+-#include <linux/platform_data/at24.h>
+ #include <linux/etherdevice.h>
+ #include <linux/spi/spi.h>
+ #include <linux/spi/flash.h>
+@@ -192,10 +192,10 @@ static struct nvmem_cell_lookup mityomapl138_nvmem_cell_lookup = {
+ 	.con_id		= "mac-address",
  };
  
--void davinci_get_mac_addr(struct nvmem_device *nvmem, void *context);
- #endif
+-static struct at24_platform_data mityomapl138_fd_chip = {
+-	.byte_len	= 256,
+-	.page_size	= 8,
+-	.flags		= AT24_FLAG_READONLY | AT24_FLAG_IRUGO,
++static const struct property_entry mityomapl138_fd_chip_properties[] = {
++	PROPERTY_ENTRY_U32("pagesize", 8),
++	PROPERTY_ENTRY_BOOL("read-only"),
++	{ }
+ };
+ 
+ static struct davinci_i2c_platform_data mityomap_i2c_0_pdata = {
+@@ -324,7 +324,7 @@ static struct i2c_board_info __initdata mityomap_tps65023_info[] = {
+ 	},
+ 	{
+ 		I2C_BOARD_INFO("24c02", 0x50),
+-		.platform_data = &mityomapl138_fd_chip,
++		.properties = mityomapl138_fd_chip_properties,
+ 	},
+ };
+ 
 -- 
 2.19.1
 
