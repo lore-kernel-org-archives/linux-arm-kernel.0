@@ -2,70 +2,113 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0F1F5C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 12:21:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 62056C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 12:31:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D25B120850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 12:21:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 33C9320685
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 12:31:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PfkmUG/b"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D25B120850
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ikTEnOdl";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=axentia.se header.i=@axentia.se header.b="nWox12er"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 33C9320685
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=axentia.se
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=g22T2XQpkKMqloBrhE7dY4rlMNyoWrg9oa5M7s/guZ8=; b=PfkmUG/bYYyELb
-	8ohvVuSKXdBFd1q1pIsQMJSTBZR9+tfw7DNU2UhxquQI1tcSX7LVP/u7RdXosA4xeo4M3mHQc7knO
-	WEWfoDtQXobZhLdYVDCwRKvbQpJivLSEDpBANV9lOVErz7zFJlZZwUG0fa4Fm1LzkIMiykY0MGtq0
-	OOpB9iD0h72sn3iwIQTCo0nY+mQM9fvEWAw+9LklAmoqZKf7T1Nc5WTtuIF6Y8jcqHnQrK7KJ93kJ
-	MWPiJlYCT47UQ6UN5u+LkSGL10JN1VunQzZ6qHhpAbuNPwln1liSQBaj9bz+hTLDDB98lhQL+ouF4
-	4jspaUEOAcmYhQD96f5A==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=90D2bQuL/NjPsaxcl4wWwagfGnHWEJAjIUHEwAs1Xhk=; b=ikTEnOdlABCeO0
+	D50ZxNmTEzkR13fZepigVSZqUsOdYDv6WibtZkf21YKdlxxis/+FQPbPzRzDYawyC9i5z04lqfHQw
+	zXC3rpzd+1laI0vETMIQ7FJmKjJZH9POaJKEf/0FTcW2gKzPeZgaRljOisPnXFKqzQN1O6RSvCpSy
+	KfQ2B675PXX4z6wgkev2nKDegmox3pK+M9DqOcSOtm4xJ/8SrcNMnGp4MBvElNzqrvn6YeEV66lMS
+	b9kkRC5ylpPGXf7DbZbeSa+sI3CbaxP3uu05p8Gr2GrO4GpDt5I4eUkiNQ7e6cqlHG2sj9pCP6COA
+	mKcbqBFeSpZQ+qypZgow==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggqNP-0006RU-NJ; Tue, 08 Jan 2019 12:20:59 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggqNM-0006Qz-Vr
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 12:20:58 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 51D9D1596;
- Tue,  8 Jan 2019 04:20:56 -0800 (PST)
-Received: from localhost (e113682-lin.copenhagen.arm.com [10.32.144.41])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id DCA923F70D;
- Tue,  8 Jan 2019 04:20:55 -0800 (PST)
-Date: Tue, 8 Jan 2019 13:20:54 +0100
-From: Christoffer Dall <christoffer.dall@arm.com>
-To: Marc Zyngier <marc.zyngier@arm.com>
-Subject: Re: [PATCH v8 4/5] arm64: arm_pmu: Add support for
- exclude_host/exclude_guest attributes
-Message-ID: <20190108122054.GP10769@e113682-lin.lund.arm.com>
-References: <1544610573-28446-1-git-send-email-andrew.murray@arm.com>
- <1544610573-28446-5-git-send-email-andrew.murray@arm.com>
- <20181218120226.GC25383@e113682-lin.lund.arm.com>
- <20190104153205.GA31479@edgewater-inn.cambridge.arm.com>
- <20190108101843.GH10769@e113682-lin.lund.arm.com>
- <20190108112512.GA56789@e119886-lin.cambridge.arm.com>
- <868szvbc64.wl-marc.zyngier@arm.com>
- <20190108120352.GN10769@e113682-lin.lund.arm.com>
- <b6a88173-56cb-dc20-37ce-6f1b352b60d8@arm.com>
+	id 1ggqXw-0001hi-3T; Tue, 08 Jan 2019 12:31:52 +0000
+Received: from mail-ve1eur01on070d.outbound.protection.outlook.com
+ ([2a01:111:f400:fe1f::70d]
+ helo=EUR01-VE1-obe.outbound.protection.outlook.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ggqXq-0001gG-9S
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 12:31:49 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=axentia.se;
+ s=selector1;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=l3ZE5h+DRG7Lp89aZpZv0LAB2aDRuRXDrL7SvAg/trQ=;
+ b=nWox12erisyDPg3D2P3Fws6O1zLW5oXrUn6QZC62WkdB50RmGAR4qwAVPv+e/vc1ENeqLQcu1go1Tf2Qgm4st+GhdPY0ewn17emOAqklp/heDqezspD3gntvMANrbLf+ZFhqiudXitjhenWR+dRjY1gNw4iAYWJRy4H+DofP48Q=
+Received: from AM6PR02MB4470.eurprd02.prod.outlook.com (20.177.191.218) by
+ AM6PR02MB3958.eurprd02.prod.outlook.com (20.177.112.91) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1495.7; Tue, 8 Jan 2019 12:31:36 +0000
+Received: from AM6PR02MB4470.eurprd02.prod.outlook.com
+ ([fe80::e5f3:a239:2ec4:4453]) by AM6PR02MB4470.eurprd02.prod.outlook.com
+ ([fe80::e5f3:a239:2ec4:4453%6]) with mapi id 15.20.1516.010; Tue, 8 Jan 2019
+ 12:31:36 +0000
+From: Peter Rosin <peda@axentia.se>
+To: "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
+Subject: [PATCH] drm/atmel-hlcdc: prevent divide by zero
+Thread-Topic: [PATCH] drm/atmel-hlcdc: prevent divide by zero
+Thread-Index: AQHUp04YoDtjtNas+0efeF6OnACb7A==
+Date: Tue, 8 Jan 2019 12:31:36 +0000
+Message-ID: <20190108123129.20031-1-peda@axentia.se>
+Accept-Language: en-US, sv-SE
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: git-send-email 2.11.0
+x-originating-ip: [85.226.244.23]
+x-clientproxiedby: HE1P190CA0006.EURP190.PROD.OUTLOOK.COM (2603:10a6:3:bc::16)
+ To AM6PR02MB4470.eurprd02.prod.outlook.com
+ (2603:10a6:20b:60::26)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=peda@axentia.se; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; AM6PR02MB3958;
+ 6:LexwGOx3soQKLeaFMx5X8TQbgedxUDcJysJPdKYu60/BPpBT0umQxYKPR9dMhk03qcrnitCgRBLSC51LwQMB253+ehbYIuPrvn8dvV0nxvUlRAJjMRK7IzUOotxK6mNEA+tmEoEHRTEwPrkFcaFEVY3bpw/qSaiB+na6yZ6PRh7JpaNgpCAtZj33xNdQdN66xc+oYsarF+UVPWBLuEjl/whxFD/4WObUQcFqmFpByg7x2Bg0HTCUEz/Qa0nYIPAxcKXsS5+b6ubxpIwb9vSS/YzMvzp99yiE14dYf0pqPr693AssIw3GH2bp+/PJtm5z4JQIBU4kLC2uJwi7Pm/v6J4/mrsPqKsGTvygYjH5fNkwxPTf8dD7vamF1jjeCple+bqvWMfNZNQ9J86uYyi8XpiwIcCcvF/P0I5ZdGE/QfkCTYdaWOmcGJ3erbt7ztD75pRey7mbaggMwaj/K2LzUQ==;
+ 5:FgI4zt/Hv71q8yC3h6Dn0OaXUztTk+pL3SAf0cYcqkZFlsqKjq2wALZeNmYD2lL1s/A+3ruo432sPDPopBhbTeDMPpK3U09a23TYHbximIPrHejydug6Dzi9WaaZm3uqe34EJF0r9E27Ppe31YtLxDpcGbS56Xs0cLyF0Vp7poW96u3BrKZ5inauLWoXHi9lkN98z9BWZWwVnAbFBFTjeQ==;
+ 7:B22BuRAMya10F8Pfaf1nO4m7p1H3OyEqpSSQ4GVphtxKwEHwATS2OX5P33bBmuJrz5HHH4q/i2Y34kKQWZUV9NuZlE6RQyIF0mmNcCxqLyrXI3CsvR6RVnUclnr5r1/N8JiDWx/77+G6yTQwIK2V/g==
+x-ms-office365-filtering-correlation-id: edf9deab-c000-4cbe-86f5-08d675653acf
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(7021145)(8989299)(4534185)(7022145)(4603075)(4627221)(201702281549075)(8990200)(7048125)(7024125)(7027125)(7023125)(5600109)(711020)(2017052603328)(7153060)(7193020);
+ SRVR:AM6PR02MB3958; 
+x-ms-traffictypediagnostic: AM6PR02MB3958:
+x-microsoft-antispam-prvs: <AM6PR02MB39586B83A4727C140D0899BABC8A0@AM6PR02MB3958.eurprd02.prod.outlook.com>
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(3230021)(908002)(999002)(5005026)(6040522)(8220060)(2401047)(8121501046)(93006095)(93001095)(3231475)(944501520)(52105112)(3002001)(10201501046)(6041310)(2016111802025)(20161123564045)(20161123558120)(20161123560045)(20161123562045)(6043046)(201708071742011)(7699051)(76991095);
+ SRVR:AM6PR02MB3958; BCL:0; PCL:0; RULEID:; SRVR:AM6PR02MB3958; 
+x-forefront-prvs: 0911D5CE78
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10019020)(396003)(39830400003)(376002)(346002)(366004)(136003)(199004)(189003)(5640700003)(2501003)(186003)(74482002)(2616005)(97736004)(99286004)(6436002)(476003)(2906002)(81156014)(81166006)(54906003)(8936002)(86362001)(71200400001)(71190400001)(102836004)(386003)(6506007)(52116002)(26005)(8676002)(50226002)(316002)(105586002)(3846002)(14444005)(256004)(6116002)(508600001)(7736002)(305945005)(486006)(2351001)(25786009)(106356001)(1076003)(4326008)(66066001)(6916009)(6486002)(36756003)(53936002)(68736007)(5660300001)(6512007)(14454004);
+ DIR:OUT; SFP:1102; SCL:1; SRVR:AM6PR02MB3958;
+ H:AM6PR02MB4470.eurprd02.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: axentia.se does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: oE4K3z2soc4XfwqSBmJO1ZDiIedpSHINnOFZOY1zZ47GjYgRYleDkakoHJdW3As4QoA+UCpagICdR/nyVW9bsKVFisTeqLdJDfqg7IHVBvYc7dOundzgJ6KPYGfkElgE80vCLaSBqTgRby9ZTFvGB2UOznsdCRwC2uM950VDKIrlvEBlNOwXH2fJp0imEAEbBV724ZU5UGpxUrUDpgLezw1KUL0eNCgqmoZ7f+t+E2kTiYCprSyrJ23rqWhxdBn6jsB3Ca0zulKzqzvXfPe/R61coEpVoxB9ke5gwgPYPqSFhGVeKh0xhcqm3+ftEtyS
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <b6a88173-56cb-dc20-37ce-6f1b352b60d8@arm.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+X-OriginatorOrg: axentia.se
+X-MS-Exchange-CrossTenant-Network-Message-Id: edf9deab-c000-4cbe-86f5-08d675653acf
+X-MS-Exchange-CrossTenant-originalarrivaltime: 08 Jan 2019 12:31:35.3285 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 4ee68585-03e1-4785-942a-df9c1871a234
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR02MB3958
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_042057_035234_3E46F9B7 
-X-CRM114-Status: GOOD (  28.27  )
+X-CRM114-CacheID: sfid-20190108_043146_504197_3B90ED49 
+X-CRM114-Status: GOOD (  11.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,99 +120,68 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Julien Thierry <julien.thierry@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, joro@8bytes.org,
- Suzuki K Poulose <suzuki.poulose@arm.com>, Will Deacon <will.deacon@arm.com>,
- Andrew Murray <andrew.murray@arm.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org
+Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>,
+ David Airlie <airlied@linux.ie>,
+ "dri-devel@lists.freedesktop.org" <dri-devel@lists.freedesktop.org>,
+ Boris Brezillon <boris.brezillon@bootlin.com>, Peter Rosin <peda@axentia.se>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Jan 08, 2019 at 12:12:13PM +0000, Marc Zyngier wrote:
-> On 08/01/2019 12:03, Christoffer Dall wrote:
-> > On Tue, Jan 08, 2019 at 11:50:59AM +0000, Marc Zyngier wrote:
-> >> On Tue, 08 Jan 2019 11:25:13 +0000,
-> >> Andrew Murray <andrew.murray@arm.com> wrote:
-> >>
-> >> Hi Andrew,
-> >>
-> >>> My only doubt about this is as follows. If, on a KVM host you run this:
-> >>>
-> >>> perf stat -e cycles:H lkvm run ...
-> >>>
-> >>> then on the VHE host the cycles reported represents the entire non-guest cycles
-> >>> associated with running the guest.
-> >>>
-> >>> On a !VHE, the cycles reported exclude EL2 (with or without this patch) and
-> >>> thus you don't get a representation of all the non-guest cycles associated with
-> >>> the guest. However without this patch you could at least still run:
-> >>>
-> >>> perf stat -e cycles:H -e cycles:h lkvm run ...
-> >>>
-> >>> and then add the two cycle counts together to get something comparative with
-> >>> the VHE host.
-> >>>
-> >>> If the above patch represents the desired semantics, then perhaps we must count
-> >>> both EL1 and *EL2* for !exclude_kernel on !VHE. In fact I think we should do
-> >>> this anyway and remove a little complexity from armv8pmu_set_event_filter.
-> >>> Thoughts?
-> >>
-> >> I'm not sure we should hide the architectural differences between VHE
-> >> and !VHE. If you're trying to measure what is happening at in the
-> >> hypervisor, you can't reason about it while ignoring the dual nature
-> >> of !VHE.
-> >>
-> > 
-> > How do you define hypervisor here?  Is that just the code that runs at
-> > EL2 or also parts of KVM that runs at EL1?
-> 
-> I define it as "not a guest". Whatever is used to support a guest is the
-> hypervisor.
-> 
-> > It remains unclear to me why you'd want to measure a subset of KVM,
-> > which happens to run in EL2, in your host (and hypervisor-enabled)
-> > kernel, and you are even precluded from measuring a comparable portion
-> > of your implementation on other Arm systems (VHE).
-> 
-> Because I'm not trying to compare apples (VHE) and oranges (!VHE). My
-> use-case for perf is to measure the impact of a change on a given
-> implementation, and the more I can narrow the impact of that change, the
-> better (specially when !VHE precludes the use of other techniques such
-> as sampling).
-> 
+While trying to temporarily hide a plane, one thing that was attempted
+was to call (from libdrm)
 
-Fair enough.  I don't know if that's the only use case for perf we
-should consider though.
+	drmModeSetPlane(fd, plane_id, crtc_id, fb_id, 0,
+			0, 0, 0, 0, 0, 0, 0, 0);
 
-> > Admittedly, I'm not at export in using perf, but I find this EL1/EL2
-> > distinction out of place as it relates to exlude_kernel, exlude_user,
-> > and exlude_hv.  Will we have a fourth Arm-specific flag which takes the
-> > place of exclude_hv on PowerPC, which excludes an underlying hypervisor
-> > when running a guest, should we ever support counting that in the
-> > future?
-> In all honestly, exclude_hv doesn't make much sense to me on a VHE
-> system, unless you define an arbitrary cutting point where things are on
-> one side or the other. As for a fourth flag, I have no idea.
-> 
+This call causes a pair of "Division by zero in kernel." messages. Kill
+those messages, but preserve the current behaviour that also happen to
+make the plane disappear with the above call.
 
-I think this all boils down to how these flags are interpreted and
-represented to a user via tooling.  If these flags must be considered
-in complete isolation on a particular system and architecture, then
-fine, we can define it as whatever we want, giving us a little bit more
-insight on where things happen on a !VHE system.
+Signed-off-by: Peter Rosin <peda@axentia.se>
+---
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
 
-If we care about these flags representing similar semantics to other
-architectures, then I contend that we are abusing the exclude_hv flag
-today, and exclude_hv should only ever have an effect when set within
-a guest, not in a host.
+Side note, when comparing with drm_atomic_helper_check_plane_state(), I get
+the feeling that the src rect should be clipped together with the crtc rect
+if/when clipping is needed. That function calls drm_rect_clip_scaled(), and
+the equivalent does not seem to happen here. Should clipping be performed
+on the src rect?
 
+Cheers,
+Peter
 
-Thanks,
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+index 3cc489b870fe..1bdb30dc218c 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+@@ -675,10 +675,16 @@ static int atmel_hlcdc_plane_atomic_check(struct drm_plane *p,
+ 		state->crtc_y = 0;
+ 	}
+ 
+-	patched_src_w = DIV_ROUND_CLOSEST(patched_crtc_w * state->src_w,
+-					  state->crtc_w);
+-	patched_src_h = DIV_ROUND_CLOSEST(patched_crtc_h * state->src_h,
+-					  state->crtc_h);
++	if (state->crtc_w)
++		patched_src_w = DIV_ROUND_CLOSEST(patched_crtc_w * state->src_w,
++						  state->crtc_w);
++	else
++		patched_src_w = 0;
++	if (state->crtc_h)
++		patched_src_h = DIV_ROUND_CLOSEST(patched_crtc_h * state->src_h,
++						  state->crtc_h);
++	else
++		patched_src_h = 0;
+ 
+ 	hsub = drm_format_horz_chroma_subsampling(fb->format->format);
+ 	vsub = drm_format_vert_chroma_subsampling(fb->format->format);
+-- 
+2.11.0
 
-    Christoffer
 
 _______________________________________________
 linux-arm-kernel mailing list
