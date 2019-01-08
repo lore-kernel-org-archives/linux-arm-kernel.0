@@ -2,91 +2,70 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.2 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,UPPERCASE_50_75,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 43E93C43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 16:57:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 50C7BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 17:01:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 098BB20827
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 16:57:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 20F1A2173C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 17:01:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QCz+bgPI";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="FZkVdldL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 098BB20827
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Cj/7D/Dc";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="qVH07tF8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 20F1A2173C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=A5T/bvksLt1fQ3FT+J5oALJCbFiniJxGh24YWOPAUkM=; b=QCz+bgPINgw2W6
-	BgNNs4cp73xP9Pd9+rTEdfgFCNfrBeZ19zEDXFQ4TnrHPdjmZk62+75Ir2x+1iCCiyl3FUHMk0bCc
-	6m8FtQljkgJjQpTXNdcJsqP2NkJ0S+7szVrztzTmujMiyOmkzG9/b6Ra5se4zcV3Km8l1OWzByKTA
-	ruYo9HYsj/SovmERhwjASK/l+6ob0dYoG8YS2pt0LDu9DMfgcI3ukMN42gfzLS5Q/xtxyQvLyvnx7
-	lfldAOJvaz8WsX3ZsHN8zdR3e2WkbE8BaqUJS4TZEiHog1MVaP/brG1QATCpS0j29GywSAU+pS72v
-	AnuHgzc6cc2w2VVV5gQg==;
+	List-Owner; bh=Y2QvA9R9j4q5x+oXJ+fQHT4z/GZsNIWA5Sup/GjtRY4=; b=Cj/7D/Dcf0EfrG
+	jd3AkuaiALhDLC9R4ZbFBcZANgYOxRTmKYbKOQ+NIyTFMcDWM2QyMX8yfgwmBEoqN/BMfasEhdB4U
+	U3ZCLZ4ZmKEUGR67E5nfEQ6xLfntUEcDg0TD4hyUkInoG2RRFubhrnpZsIN9WjC78xFSEvhBLgLkJ
+	TCAfUEsmK1QalxPiory7W8vw0XnvVm0mdc3YXNWCf7eAAtDOnaE4S7VU4GMTnWDpqk34tGOgipd8H
+	6aD9+cYaex8tl6G/ytCgIb64CX3pvUs9OXFmrSccx0IxPZ3oOWC+/WJ98XcAyQaMVVI7agIw+c7Qt
+	58Z7VgBTXNwjsoruTYMw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggugt-0004Nb-3y; Tue, 08 Jan 2019 16:57:23 +0000
-Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
+	id 1ggukq-0006wr-GA; Tue, 08 Jan 2019 17:01:28 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggufn-0003HH-5B
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 16:56:24 +0000
-Received: by mail-lf1-x144.google.com with SMTP id n18so3458856lfh.6
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 08 Jan 2019 08:56:14 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=9OvXwhCxM1xt9LzERNCzqQZpA6Q4+BEkTsZDw6x8xAY=;
- b=FZkVdldLnxOjxCc/kM2yZ1u7C8PnG93EeYuHqIWVIbzRq//gDBuuXImP9AkoU3Z/uY
- nsxzzWVmtSi7KfKpOgLOSmIvhT0jB0F7hQ8LlFc4MBHN0+CwbhlkfDk27tBMkFvGz8K4
- N96fwkBPP8usIX0511fM6DtsFmjMm1pErvfaYXIx9TAqh9Qf6hw/TNsJJkHJ6UTfNJYf
- qOSw1d0h/4Qqgwq3iZ1q1jwH8fKRDmvd/PZIBN5y2p2wW3bc6TjOA1AmZJOwlIjGZFDj
- PCnyUSh0U3cbK0W6M8bq8T9Q06ZhwpIN2YxrfLuEKcUFL3jfOeoUYfnjXH25V1iBshkj
- IqIg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=9OvXwhCxM1xt9LzERNCzqQZpA6Q4+BEkTsZDw6x8xAY=;
- b=Uk76XJ986tu9+/Y8h9W1FFKRTFCzyeXFJuYF0KtCmW/3aJlXTLPkXJTrka76Icagtd
- 1dzjxI4O9lbqoUJ1n65ruLhslpiojriKpBESwRwmAY/m8rGO/iNyw2KKY8ZTQwSD9DNl
- EDf6+flNHh4MPcoQiaaB81Un8oGcvCT+KP/JWYu9HB+V4OxIDQ0ysfWP//OsCvFYK/Zj
- OvcUrihvsaIYYPBbYgTXRrHQEzR2qy63smgkA8aCgY3sSrnBM1O6PJbvGsmPlpqi4/0b
- fEBKmsRtMHd5PdaZN/EOZosarXuOW6FXtK9C37chFbW820eVfKUEcd2etCiBe0FqwoVp
- BVmA==
-X-Gm-Message-State: AJcUuke5jVVldX/aKtzHAhFzV5utURM10nmnHpX09Njgp9ImmWAtttTE
- nfj390Vm0IcIXinTmdnIDYA=
-X-Google-Smtp-Source: ALg8bN6zN9PKHP7RMlsjyM6/i6cKoC2Pn/kP532vlyE5Im2xZ/tntbC1JpqgRVvuWNwwKp/iSa/ykQ==
-X-Received: by 2002:a19:f20:: with SMTP id e32mr1544783lfi.51.1546966573132;
- Tue, 08 Jan 2019 08:56:13 -0800 (PST)
-Received: from localhost.localdomain
- ([2a02:a315:5445:5300:d033:e708:8ec7:810d])
- by smtp.googlemail.com with ESMTPSA id f8sm14687989lfe.72.2019.01.08.08.56.11
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 08 Jan 2019 08:56:12 -0800 (PST)
-From: =?UTF-8?q?Pawe=C5=82=20Chmiel?= <pawel.mikolaj.chmiel@gmail.com>
-To: krzk@kernel.org
-Subject: [PATCH v2 4/4] ARM: defconfig: s5pv210: Enable more drivers present
- on Samsung Aries
-Date: Tue,  8 Jan 2019 17:56:01 +0100
-Message-Id: <20190108165601.25708-5-pawel.mikolaj.chmiel@gmail.com>
-X-Mailer: git-send-email 2.17.1
-In-Reply-To: <20190108165601.25708-1-pawel.mikolaj.chmiel@gmail.com>
-References: <20190108165601.25708-1-pawel.mikolaj.chmiel@gmail.com>
+ id 1ggukm-0006wH-Gn; Tue, 08 Jan 2019 17:01:26 +0000
+Received: from localhost (unknown [171.76.109.220])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id C564C20827;
+ Tue,  8 Jan 2019 17:01:22 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1546966883;
+ bh=ZRtsnS+5LBwEuU4GkKiAOJXa+BwPlS5MtTkpo09pNPE=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=qVH07tF8I4q5dXW82bQCSPyJD92jXj539t+sMbLkGDXL8NEzHmxbiSIbZJz7pKug9
+ MkxkXF7uiRt02cyDPpcIiakHk/TuNSTlAr7QZqOLuYOe0zSvB7tx4+mFGChA72WOmG
+ nJYAOaVyLBDtWO4qg/mwAC078DTWF7aBVSi5JNCg=
+Date: Tue, 8 Jan 2019 22:29:46 +0530
+From: Vinod Koul <vkoul@kernel.org>
+To: "Shun-Chih.Yu" <shun-chih.yu@mediatek.com>
+Subject: Re: [PATCH 2/2] dmaengine: mediatek: Add MediaTek Command-Queue DMA
+ controller for MT6765 SoC
+Message-ID: <20190108165946.GQ13372@vkoul-mobl.Dlink>
+References: <1545916258-18218-1-git-send-email-shun-chih.yu@mediatek.com>
+ <1545916258-18218-3-git-send-email-shun-chih.yu@mediatek.com>
+ <20190104123836.GB13372@vkoul-mobl.Dlink>
+ <1546949984.25257.96.camel@mtkswgap22>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <1546949984.25257.96.camel@mtkswgap22>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_085615_492950_1244CF69 
-X-CRM114-Status: GOOD (  13.52  )
+X-CRM114-CacheID: sfid-20190108_090124_588559_1E7235E0 
+X-CRM114-Status: GOOD (  19.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,60 +77,105 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
- linux-samsung-soc@vger.kernel.org, xc-racer2@live.ca, linux@armlinux.org.uk,
- robh+dt@kernel.org, linux-kernel@vger.kernel.org, kgene@kernel.org,
- linux-arm-kernel@lists.infradead.org, pawel.mikolaj.chmiel@gmail.com
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: devicetree@vger.kernel.org, Sean Wang <sean.wang@mediatek.com>,
+ linux-kernel@vger.kernel.org, srv_wsdupstream@mediatek.com,
+ Matthias Brugger <matthias.bgg@gmail.com>, Rob Herring <robh+dt@kernel.org>,
+ linux-mediatek@lists.infradead.org, dmaengine@vger.kernel.org,
+ Dan Williams <dan.j.williams@intel.com>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-VGhpcyBjb21taXQgZW5hYmxlcyBmb2xsb3dpbmcgZHJpdmVyczoKLSBpMmMgc3VwcG9ydCAodXNp
-bmcgczNjMjQxMCBkcml2ZXIpCi0gczVwLWpwZWcKLSBzNXAtbWZjCi0gZXh5bm9zIGRybSByb3Rh
-dG9yCi0gcHdtIHN1cHBvcnQKLSBwd20gdmlicmF0b3IKLSBmaXhlZCByZWd1bGF0b3IKLSBzeXNj
-b24gcG93ZXJvZmYKLSBBdG1lbCBtYVhUb3VjaCB0b3VjaHNjcmVlbgotIEJyb2FkY29tIEJDTTQz
-MjkgYmx1ZXRvb3RoIG92ZXIgdWFydDAKLSBkbWEgZGV2aWNlcyAoc28gd2UgY2FuIHVzZSBwbDMz
-MCBkbWEgZHJpdmVyKQoKRGlzYWJsZSBERUJVR19MTC4gSXQncyBjdXJyZW50bHkgc2V0IHRvIHVh
-cnQxLCBidXQgaWYgd2Ugd2FudCB0byB1c2UgaXQKb24gQXJpZXMsIHdlIHdvdWxkIG5lZWQgdG8g
-c3dpdGNoIGl0IHRvIHVhcnQyLCB0byBnZXQgYW55IGxvZ3MuCgpTaWduZWQtb2ZmLWJ5OiBQYXdl
-xYIgQ2htaWVsIDxwYXdlbC5taWtvbGFqLmNobWllbEBnbWFpbC5jb20+ClNpZ25lZC1vZmYtYnk6
-IEpvbmF0aGFuIEJha2tlciA8eGMtcmFjZXIyQGxpdmUuY2E+Ci0tLQogYXJjaC9hcm0vY29uZmln
-cy9zNXB2MjEwX2RlZmNvbmZpZyB8IDI1ICsrKysrKysrKysrKysrKysrKysrKystLS0KIDEgZmls
-ZSBjaGFuZ2VkLCAyMiBpbnNlcnRpb25zKCspLCAzIGRlbGV0aW9ucygtKQoKZGlmZiAtLWdpdCBh
-L2FyY2gvYXJtL2NvbmZpZ3MvczVwdjIxMF9kZWZjb25maWcgYi9hcmNoL2FybS9jb25maWdzL3M1
-cHYyMTBfZGVmY29uZmlnCmluZGV4IDAxNTk2MzZkNGMwZC4uOTUxMTk2YmRmMDA4IDEwMDY0NAot
-LS0gYS9hcmNoL2FybS9jb25maWdzL3M1cHYyMTBfZGVmY29uZmlnCisrKyBiL2FyY2gvYXJtL2Nv
-bmZpZ3MvczVwdjIxMF9kZWZjb25maWcKQEAgLTI3LDYgKzI3LDExIEBAIENPTkZJR19JUF9QTlA9
-eQogQ09ORklHX0lQX1BOUF9ESENQPXkKIENPTkZJR19JUF9QTlBfQk9PVFA9eQogQ09ORklHX0lQ
-X1BOUF9SQVJQPXkKK0NPTkZJR19CVD1tCitDT05GSUdfQlRfUkZDT01NPXkKK0NPTkZJR19CVF9C
-TkVQPXkKK0NPTkZJR19CVF9IQ0lVQVJUPW0KK0NPTkZJR19CVF9IQ0lVQVJUX0JDTT15CiBDT05G
-SUdfQ0ZHODAyMTE9bQogQ09ORklHX01BQzgwMjExPW0KIENPTkZJR19VRVZFTlRfSEVMUEVSX1BB
-VEg9Ii9zYmluL2hvdHBsdWciCkBAIC00NCwyMSArNDksMzUgQEAgQ09ORklHX0lOUFVUX0VWREVW
-PXkKIENPTkZJR19LRVlCT0FSRF9HUElPPXkKICMgQ09ORklHX0lOUFVUX01PVVNFIGlzIG5vdCBz
-ZXQKIENPTkZJR19JTlBVVF9UT1VDSFNDUkVFTj15CitDT05GSUdfVE9VQ0hTQ1JFRU5fQVRNRUxf
-TVhUPW0KK0NPTkZJR19JTlBVVF9NSVNDPXkKK0NPTkZJR19JTlBVVF9QV01fVklCUkE9bQogQ09O
-RklHX1NFUklBTF84MjUwPXkKIENPTkZJR19TRVJJQUxfU0FNU1VORz15CiBDT05GSUdfU0VSSUFM
-X1NBTVNVTkdfQ09OU09MRT15CitDT05GSUdfU0VSSUFMX0RFVl9CVVM9eQogQ09ORklHX0hXX1JB
-TkRPTT15CiBDT05GSUdfSTJDX0dQSU89eQorQ09ORklHX0kyQ19TM0MyNDEwPXkKK0NPTkZJR19Q
-T1dFUl9SRVNFVD15CitDT05GSUdfUE9XRVJfUkVTRVRfU1lTQ09OX1BPV0VST0ZGPXkKIENPTkZJ
-R19QT1dFUl9TVVBQTFk9eQogQ09ORklHX0JBVFRFUllfTUFYMTcwNDA9eQogIyBDT05GSUdfSFdN
-T04gaXMgbm90IHNldAogQ09ORklHX01GRF9NQVg4OTk4PXkKIENPTkZJR19SRUdVTEFUT1I9eQor
-Q09ORklHX1JFR1VMQVRPUl9GSVhFRF9WT0xUQUdFPXkKIENPTkZJR19SRUdVTEFUT1JfTUFYODk5
-OD15CitDT05GSUdfTUVESUFfU1VQUE9SVD1tCitDT05GSUdfTUVESUFfQ0FNRVJBX1NVUFBPUlQ9
-eQorQ09ORklHX1Y0TF9NRU0yTUVNX0RSSVZFUlM9eQorQ09ORklHX1ZJREVPX1NBTVNVTkdfUzVQ
-X0pQRUc9bQorQ09ORklHX1ZJREVPX1NBTVNVTkdfUzVQX01GQz1tCiBDT05GSUdfRFJNPXkKIENP
-TkZJR19EUk1fRVhZTk9TPXkKIENPTkZJR19EUk1fRVhZTk9TX0ZJTUQ9eQogQ09ORklHX0RSTV9F
-WFlOT1NfRFBJPXkKK0NPTkZJR19EUk1fRVhZTk9TX1JPVEFUT1I9eQogQ09ORklHX1VTQj15CiBD
-T05GSUdfVVNCX09URz15CiBDT05GSUdfVVNCX0VIQ0lfSENEPXkKQEAgLTcyLDYgKzkxLDkgQEAg
-Q09ORklHX01NQ19TREhDSV9TM0M9eQogQ09ORklHX01NQ19TREhDSV9TM0NfRE1BPXkKIENPTkZJ
-R19SVENfQ0xBU1M9eQogQ09ORklHX1JUQ19EUlZfTUFYODk5OD1tCitDT05GSUdfRE1BREVWSUNF
-Uz15CitDT05GSUdfUFdNPXkKK0NPTkZJR19QV01fU0FNU1VORz15CiBDT05GSUdfUEhZX1NBTVNV
-TkdfVVNCMj1tCiBDT05GSUdfUEhZX1M1UFYyMTBfVVNCMj15CiBDT05GSUdfRVhUMl9GUz15CkBA
-IC05Nyw2ICsxMTksMyBAQCBDT05GSUdfREVCVUdfU1BJTkxPQ0s9eQogQ09ORklHX0RFQlVHX01V
-VEVYRVM9eQogQ09ORklHX0RFQlVHX0FUT01JQ19TTEVFUD15CiBDT05GSUdfREVCVUdfVVNFUj15
-Ci1DT05GSUdfREVCVUdfTEw9eQotQ09ORklHX0RFQlVHX1MzQ19VQVJUMT15Ci1DT05GSUdfRUFS
-TFlfUFJJTlRLPXkKLS0gCjIuMTcuMQoKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1r
-ZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWls
-bWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+On 08-01-19, 20:19, Shun-Chih.Yu wrote:
+> On Fri, 2019-01-04 at 18:08 +0530, Vinod Koul wrote:
+> > On 27-12-18, 21:10, shun-chih.yu@mediatek.com wrote:
+> > > From: Shun-Chih Yu <shun-chih.yu@mediatek.com>
+
+> > Have you tested this with dmatest, if so can you provide results of the
+> > test as well.
+> Yes, I tested with dmatest in multi-thread version. 
+> The results shown below, and I would attach them in the next revision if needed.
+> 
+> dmatest: dma0chan0-copy2: summary 5000 tests, 0 failures 3500 iops 28037
+> KB/s (0)
+> dmatest: dma0chan0-copy4: summary 5000 tests, 0 failures 3494 iops 27612
+> KB/s (0)
+> dmatest: dma0chan0-copy1: summary 5000 tests, 0 failures 3491 iops 27749
+> KB/s (0)
+> dmatest: dma0chan0-copy7: summary 5000 tests, 0 failures 3673 iops 29092
+> KB/s (0)
+> dmatest: dma0chan0-copy6: summary 5000 tests, 0 failures 3763 iops 30237
+> KB/s (0)
+> dmatest: dma0chan0-copy0: summary 5000 tests, 0 failures 3730 iops 30131
+> KB/s (0)
+> dmatest: dma0chan0-copy3: summary 5000 tests, 0 failures 3717 iops 29569
+> KB/s (0)
+> dmatest: dma0chan0-copy5: summary 5000 tests, 0 failures 3699 iops 29302
+> KB/s (0)
+
+Having them in cover letter helps :)
+
+> > > Signed-off-by: Shun-Chih Yu <shun-chih.yu@mediatek.com>
+> > > Reviewed-by: Vinod Koul <vkoul@kernel.org>
+> > 
+> > This is _WRONG_ I have never provided such tag, can you explain why this
+> > was added without my approval?
+> So sorry about this, I misunderstood the usage of reviewed-by tag and I
+> would remove this. Thanks for pointing out this mistake.
+
+This tag should be added _only_ when someone replies with
+Reviewed-by: ..., same goes for Acked-by and Tested-by: ... etc
+
+> > > +static void mtk_dma_write(struct mtk_cqdma_pchan *pc, u32 reg, u32 val)
+> > > +{
+> > > +	writel_relaxed(val, pc->base + reg);
+> > 
+> > Why is it relaxed one?
+> Most of the operations to the CQDMA hardware could be relaxed, and the 
+
+looks like you missed the rest of sentence
+
+> > > +static enum dma_status mtk_cqdma_tx_status(struct dma_chan *c,
+> > > +					   dma_cookie_t cookie,
+> > > +					   struct dma_tx_state *txstate)
+> > > +{
+> > > +	struct mtk_cqdma_vchan *cvc = to_cqdma_vchan(c);
+> > > +	struct mtk_cqdma_vdesc *cvd;
+> > > +	struct virt_dma_desc *vd;
+> > > +	enum dma_status ret;
+> > > +	unsigned long flags;
+> > > +	size_t bytes = 0;
+> > > +
+> > > +	ret = dma_cookie_status(c, cookie, txstate);
+> > > +	if (ret == DMA_COMPLETE || !txstate)
+> > > +		return ret;
+> > > +
+> > > +	spin_lock_irqsave(&cvc->vc.lock, flags);
+> > > +	vd = mtk_cqdma_find_active_desc(c, cookie);
+> > > +	spin_unlock_irqrestore(&cvc->vc.lock, flags);
+> > > +
+> > > +	if (vd) {
+> > > +		cvd = to_cqdma_vdesc(vd);
+> > > +		bytes = cvd->len;
+> > > +	}
+> > > +
+> > > +	dma_set_residue(txstate, bytes);
+> > 
+> > Have you tested this and are able to report residue properly?
+> > 
+> I tested and thought the residue report properly. But after checking the
+> definition of residue in tx_status again, I found that should be always
+> return 0 in the driver instead, since there is no state DMA_IN_PROGRESS
+> or DMA_PAUSED in the driver. I would fix this in the next revision.
+
+So memcpy is quite fast :D, that's why. This is more helpful in
+slave-dma which is relatively slow :)
+
+-- 
+~Vinod
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
