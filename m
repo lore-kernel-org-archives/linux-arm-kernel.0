@@ -2,58 +2,69 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 05311C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 22:43:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3BF32C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 23:03:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BEF472146F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 22:43:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 083232084D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 23:03:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pNKWKwMb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BEF472146F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PlSE20Q/";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=lentin.co.uk header.i=@lentin.co.uk header.b="HJR7aKIV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 083232084D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lentin.co.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=G+MfEmnp+6g1kneIJz5mjMdA2EgrAHAeitNwH/P7oyU=; b=pNKWKwMbq2nohu
-	iUajjG3U2e9pE5rr/UpPSqkv190HeMvEJyq8o/ZxcllCi71O2gWMw6FGrDgmqY0PMyDGup7s4Oy04
-	AkmndzH0Eqwfd9A3QtIgXP54Ck/9Cf82bAwIJ9hI5Tg0rCm+q4Gnf3683D+Lc9QHFryKuMmKT663l
-	WcXStWGCk79razEJYNYRBFkvLhkm8c+x1KRZi127b9se5fmpdB9k/Ta/I41V8reX6r9+48EQRHu5e
-	RnABbHYglpKq+Icqe5x7lffhlCCbN/QkUWKMIj0AVHjqtbta5MVv9uBHwlTHqefKPWUkmE5aF3N6M
-	JiPtC6pboO9lCX6J4Pfg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:MIME-Version:References:Message-ID:In-Reply-To:
+	Subject:To:From:Date:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=E1VcQFo9D2hS39zCQ/r1Yfz5jKCi6tTL9NsTcI3rRRw=; b=PlSE20Q/N6tKhpwLW+ZuBWTDu
+	KPD1DQIoIdxZyu8cf1LjCiA0BUoQOk5rZSNxZB1NcWduOuracveYvFldFPDfZCiFzrMuThLDuzBOA
+	zBOmKp+NaZNPPlAhcR+vPav/5l3eMHmKDs13jYWNcLj1qKCC1oQSw/j4xVGmxgTe0HP5BY9iD2Kya
+	S45hXXh0s8hxI5HyMFqKEnaOCWhsIv0n6HXvwbp4kPGqMp51M40DknUtQUiueYwNHrUhSo/ELgDuZ
+	p14svmkNJQ0rC/P8bI6ciIoyeqAw9UyHm0iQue+yo7u1B+X3NoCyq0YKJ4RGkShIcvWSbUezXWVXG
+	6CkPAT0Zw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gh05K-0007NX-0y; Tue, 08 Jan 2019 22:42:58 +0000
-Received: from gloria.sntech.de ([185.11.138.130])
+	id 1gh0Od-0005K0-M4; Tue, 08 Jan 2019 23:02:55 +0000
+Received: from marmot.wormnet.eu ([2a03:9800:10:2d:3203:b3a5:8bdc:5b68])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gh05F-0007Mi-Nd; Tue, 08 Jan 2019 22:42:55 +0000
-Received: from ip5f5a6320.dynamic.kabel-deutschland.de ([95.90.99.32]
- helo=phil.localnet)
- by gloria.sntech.de with esmtpsa (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256)
- (Exim 4.89) (envelope-from <heiko@sntech.de>)
- id 1gh05D-0002aJ-Ed; Tue, 08 Jan 2019 23:42:51 +0100
-From: Heiko Stuebner <heiko@sntech.de>
-To: Robin Murphy <robin.murphy@arm.com>
-Subject: Re: [PATCH 5/5] arm64: dts: rockchip: Fix nanopi4 uSD card detect
-Date: Tue, 08 Jan 2019 23:42:50 +0100
-Message-ID: <6925511.AQqqGbhmY3@phil>
-In-Reply-To: <83098c7ecc471a77dd89564f5f98fcf30c1ed431.1546981251.git.robin.murphy@arm.com>
-References: <cover.1546981251.git.robin.murphy@arm.com>
- <83098c7ecc471a77dd89564f5f98fcf30c1ed431.1546981251.git.robin.murphy@arm.com>
+ id 1gh0OY-0005Iq-Qc
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 23:02:54 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=lentin.co.uk; s=budgerigar; h=Content-Type:MIME-Version:References:
+ Message-ID:In-Reply-To:Subject:cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=3mCOcYXnj25W8gHL8a9V4Wo5AyqC/8Jzr3SEzQ3rZ1o=; b=HJR7aKIVnulkDSexmbb2fafCp
+ 47/5adPO4lBv/BQYt5acJG73R6k4jiu8oVcpR7iForf5IYeJ6E/LEJ9HtisTlEWNEB1Rmx6zAnlQ2
+ dyAx7DeU/Mq8RUXqL3gQCcA5CF4iHimfXXc3Bhu6QNTZOa1iRtHPi1OXdvm+2cAUXNJ68=;
+Received: from localhost ([127.0.0.1])
+ by marmot.wormnet.eu with esmtpsa (TLSv1.2:ECDHE-RSA-AES256-GCM-SHA384:256)
+ (Exim 4.91) (envelope-from <jm@lentin.co.uk>)
+ id 1gh0OF-0007VQ-UN; Tue, 08 Jan 2019 23:02:31 +0000
+Date: Tue, 8 Jan 2019 23:02:28 +0000 (GMT)
+From: Jamie Lentin <jm@lentin.co.uk>
+X-X-Sender: lentinj@marmot.wormnet.eu
+To: Linus Walleij <linus.walleij@linaro.org>
+Subject: Re: [PATCH] ARM: dts: kirkwood: Fix polarity of GPIO fan lines
+In-Reply-To: <20190107230818.6020-1-linus.walleij@linaro.org>
+Message-ID: <alpine.DEB.2.20.1901082243480.22787@marmot.wormnet.eu>
+References: <20190107230818.6020-1-linus.walleij@linaro.org>
+User-Agent: Alpine 2.20 (DEB 67 2015-01-07)
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_144253_920872_BED0A8B5 
-X-CRM114-Status: GOOD (  16.37  )
+X-CRM114-CacheID: sfid-20190108_150250_900939_5ED0A3BC 
+X-CRM114-Status: UNSURE (   7.25  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -65,67 +76,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-rockchip@lists.infradead.org, tomeu.vizoso@collabora.com,
- linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: Andrew Lunn <andrew@lunn.ch>, Jason Cooper <jason@lakedaemon.net>,
+ Gregory Clement <gregory.clement@bootlin.com>,
+ linux-arm-kernel@lists.infradead.org,
+ Julien D'Ascenzio <jdascenzio@posteo.net>, Guenter Roeck <linux@roeck-us.net>,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Am Dienstag, 8. Januar 2019, 22:57:27 CET schrieb Robin Murphy:
-> For whatever reason, the sdmmc_dectn function isn't working properly
-> as-is, and microSD insertion and removal goes unnoticed. Flipping the
-> pin into GPIO mode, however, does do the job, so let's just handle it
-> that way for now until someone feels inclined to figure out what GRF
-> voodoo or otherwise is needed for correct 'native' operation.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi
-> index 9c723038d8f8..2a183a6af150 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi
-> @@ -505,6 +505,10 @@
->  		sdmmc0_pwr_h: sdmmc0-pwr-h {
->  			rockchip,pins = <0 RK_PA1 RK_FUNC_GPIO &pcfg_pull_none>;
->  		};
-> +
-> +		sdmmc0_det_l: sdmmc0-det-l {
+On Tue, 8 Jan 2019, Linus Walleij wrote:
 
-alphabetically by node-name please,
-aka sdmmc0-det-* should be above sdmmc0-pwr-*
+> These two lines are active high, not active low. The bug was
+> found when we changed the kernel to respect the polarity defined
+> in the device tree.
+>
+> Fixes: 1b90e06b1429 ("ARM: kirkwood: Use devicetree to define DNS-32[05] fan")
+> Cc: Jamie Lentin <jm@lentin.co.uk>
+> Cc: Guenter Roeck <linux@roeck-us.net>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Gregory Clement <gregory.clement@bootlin.com>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Cc: Julien D'Ascenzio <jdascenzio@posteo.net>
+> Reported-by: Julien D'Ascenzio <jdascenzio@posteo.net>
+> Tested-by: Julien D'Ascenzio <jdascenzio@posteo.net>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-If you're respinning the whole series this should be fixed,
-otherwise I can also do that when applying.
+Tested-by: Jamie Lentin <jm@lentin.co.uk>
 
+...on a DNS-325 applied atop arm-soc/for-next. Apologies for not noticing 
+this sooner!
 
-Heiko
-
-> +			rockchip,pins = <0 RK_PA7 RK_FUNC_GPIO &pcfg_pull_up>;
-> +		};
->  	};
->  
->  	sdio-pwrseq {
-> @@ -563,9 +567,10 @@
->  	bus-width = <4>;
->  	cap-sd-highspeed;
->  	cap-mmc-highspeed;
-> +	cd-gpios = <&gpio0 RK_PA7 GPIO_ACTIVE_LOW>;
->  	disable-wp;
->  	pinctrl-names = "default";
-> -	pinctrl-0 = <&sdmmc_bus4 &sdmmc_cd &sdmmc_clk &sdmmc_cmd>;
-> +	pinctrl-0 = <&sdmmc_bus4 &sdmmc0_det_l &sdmmc_clk &sdmmc_cmd>;
->  	sd-uhs-sdr104;
->  	vmmc-supply = <&vcc3v0_sd>;
->  	vqmmc-supply = <&vcc_sdio>;
-> 
-
-
-
-
+Cheers,
 
 _______________________________________________
 linux-arm-kernel mailing list
