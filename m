@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DE004C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 14:53:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 842D8C43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 14:57:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ACCCD20883
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 14:53:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 55CF520827
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 14:57:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GTUIL/Lp";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="0aslcSEg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ACCCD20883
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DSzK5QeD";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="GpUQ6y2e"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 55CF520827
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,57 +25,56 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=gAn0ULpmvNUxHQpmD09vCSClw3aArzlYqh+xvwY0DzE=; b=GTUIL/LpwttK1g
-	EXmo9yGX0nOtXWvxCuz4lsZ/mTc+ROmvx7Ts7xXUINp7MJ88gAPbS+b2orm3UX//YVhGaud/gmevA
-	JKVXjSbWVLwAJw9chFmKcWPzscZsPFcRvPTbTqpDYnMlSfz6QDykCXLntt0/R/wjBmg7Dwarrd0jw
-	fltbiqUJifkucL5hcq5H7AM5UunCaw62P0niDF2M/3RTb7wfMOyVrsQKC8d1/cv38cmihzkE8Pyee
-	SPi97V4JgeaXUAHC0LWVoX2ygSexFyoCasMZDPWKp4t/sUyeGOObU7o/+F1QeObmhMU3isNXBmRIj
-	DXFtGFwVokg89JEpJkjQ==;
+	List-Owner; bh=/D8G4xXq/QvYBq9xuyIshKQpKxSqGCqESRBzLIqZnLw=; b=DSzK5QeDDbBxwe
+	7VomoxL5CvM74oLXPp2BL+x9bUe++DeTktiboQf7COFcsSRzNCpqyEv4Gd2ZxVVhspfLAp/IIs2bA
+	V5uyp0Zf2svOgTmOqhrV9+vPLZQN+Bf+QEUXqdjmg0OLvDShild14hv3iJr2IP9oHuLma4yNmNZdZ
+	hrL/5YZyRjXzhTN12bKbnwS2bAHXCMRqhzzaqvNPry+VG4biIjxLkMn0yOYpORLCJhVd7conLiiUL
+	QBytY60oTeIb5Uvq1LDqhtUW0h4H0v5yOsws+jDPyHuwxRoQz4GB6VLqmYI3jKIf96FhqgyGh2ZjR
+	Av8NUD6SInUMlZlGBQpQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggsl4-0006FW-Gd; Tue, 08 Jan 2019 14:53:34 +0000
+	id 1ggsoT-00087M-Q3; Tue, 08 Jan 2019 14:57:05 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggsl2-0006F7-1T
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 14:53:33 +0000
+ id 1ggsoP-00086u-RH
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 14:57:03 +0000
 Received: from mail-qt1-f172.google.com (mail-qt1-f172.google.com
  [209.85.160.172])
  (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 08AEF20883
+ by mail.kernel.org (Postfix) with ESMTPSA id 5316620883
  for <linux-arm-kernel@lists.infradead.org>;
- Tue,  8 Jan 2019 14:53:31 +0000 (UTC)
+ Tue,  8 Jan 2019 14:57:01 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1546959211;
- bh=dDcLr7PFigttfu9qxS0LqYl7q6wlG7peD973QvNyd3Y=;
+ s=default; t=1546959421;
+ bh=ermArLtvls1wgNieOXTgJ3O6kO3RHBy5b15Gt5oH92U=;
  h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=0aslcSEgIrTXWD0Jf+6BfY8Uw5IVTffG8q3wYlIjdy2YP54yzUHGzJ+y3zNpxtGZp
- zHIYp5y3b71eh6hdl0gObNjJADDz33Ct2NWTcRoFw6QOLst40pwcnSN4+Z9M80zruU
- +E07QYjYEKhH6T5e8um41fKaMmL30xN9XW33lSTE=
-Received: by mail-qt1-f172.google.com with SMTP id u47so4608110qtj.6
+ b=GpUQ6y2ek6S+NtAqULX25wso+Zx9r5VH60GM1xJvBV8IY1YsNv3HA2T364NsHU4QF
+ tFBGvFCuhfp8K1jXv8hHujG+C4Un9VOLmz2puBM3s9oZ7xKAc/AdZj6HQ+E8n1njIO
+ n0WNGeRKdxx3H1uziedWt+1L75JEF5jUAjqFEhD4=
+Received: by mail-qt1-f172.google.com with SMTP id l12so4608369qtf.8
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 08 Jan 2019 06:53:30 -0800 (PST)
-X-Gm-Message-State: AJcUukf+hxy356xKoTsIdr+b2L62sTLM18KJpKg6LePj7XS9MpbSEalc
- R3jSs8s4qvWE7wQPBEXe8aczXfXDB9t937La/g==
-X-Google-Smtp-Source: ALg8bN5OGxu5emk9VpVjTgAoC4e6gwhWHhsD3YnTCVEEKOtdKzPp/ZPdgcSJuVjtVLcbXZzMwNYR1Pw/XH2yiZHeTms=
-X-Received: by 2002:aed:29a6:: with SMTP id o35mr1872256qtd.257.1546959210219; 
- Tue, 08 Jan 2019 06:53:30 -0800 (PST)
+ Tue, 08 Jan 2019 06:57:01 -0800 (PST)
+X-Gm-Message-State: AJcUukdFvz8e9THZ8GKJ6bp9q1hb2oaXS0VXYNQNzCLQjYu7dRTScJ5L
+ yYYfUsaycpZPOM1oE7b1IDzIHQvWfKPPCZmwMg==
+X-Google-Smtp-Source: ALg8bN4DTMPwuqi6GrKoOjHsoXa/AUhAr7ZBhJzYYrOtIh6+jPTcCnmr+EZ6HYQtZevVA99ege7oDhlPWDFgZ6rKDiE=
+X-Received: by 2002:aed:29a6:: with SMTP id o35mr1882981qtd.257.1546959420549; 
+ Tue, 08 Jan 2019 06:57:00 -0800 (PST)
 MIME-Version: 1.0
 References: <1545144107-88378-1-git-send-email-michal.vokac@ysoft.com>
  <20181228232556.GA14277@bogus>
  <49371bd4-6ab9-31c3-dd48-800becac17e3@ysoft.com>
- <353b8f62-e265-c3c1-e352-d33c204eb6dc@ysoft.com>
-In-Reply-To: <353b8f62-e265-c3c1-e352-d33c204eb6dc@ysoft.com>
+In-Reply-To: <49371bd4-6ab9-31c3-dd48-800becac17e3@ysoft.com>
 From: Rob Herring <robh@kernel.org>
-Date: Tue, 8 Jan 2019 08:53:18 -0600
-X-Gmail-Original-Message-ID: <CAL_Jsq+k3BvjP=oY=yGRiHgvy+yXjnzfT6H8V9HjVGf8MOQAYA@mail.gmail.com>
-Message-ID: <CAL_Jsq+k3BvjP=oY=yGRiHgvy+yXjnzfT6H8V9HjVGf8MOQAYA@mail.gmail.com>
+Date: Tue, 8 Jan 2019 08:56:49 -0600
+X-Gmail-Original-Message-ID: <CAL_JsqJyZt=VCv2bX1YYFQt91BcFqDWfeAqkJVcF7eFD0_JM1g@mail.gmail.com>
+Message-ID: <CAL_JsqJyZt=VCv2bX1YYFQt91BcFqDWfeAqkJVcF7eFD0_JM1g@mail.gmail.com>
 Subject: Re: [PATCH v2] ARM: dts: imx: Add Y Soft IOTA Draco,
  Hydra and Ursa boards
 To: =?UTF-8?B?Vm9rw6HEjSBNaWNoYWw=?= <Michal.Vokac@ysoft.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_065332_098344_F9F37F73 
-X-CRM114-Status: GOOD (  13.45  )
+X-CRM114-CacheID: sfid-20190108_065701_906106_3097721A 
+X-CRM114-Status: GOOD (  13.03  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,27 +96,20 @@ Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gVHVlLCBKYW4gOCwgMjAxOSBhdCA4OjI1IEFNIFZva8OhxI0gTWljaGFsIDxNaWNoYWwuVm9r
-YWNAeXNvZnQuY29tPiB3cm90ZToKPgo+IE9uIDguMS4yMDE5IDEyOjQzLCBWb2vDocSNIE1pY2hh
-bCB3cm90ZToKPiA+IE9uIDI5LjEyLjIwMTggMDA6MjUsIFJvYiBIZXJyaW5nIHdyb3RlOgo+ID4+
-IE9uIFR1ZSwgRGVjIDE4LCAyMDE4IGF0IDAyOjQyOjExUE0gKzAwMDAsIFZva8OhxI0gTWljaGFs
-IHdyb3RlOgo+IFsuLi5dCj4gPj4+ICsmaTJjMyB7Cj4gPj4+ICsgICBjbG9jay1mcmVxdWVuY3kg
-PSA8MTAwMDAwPjsKPiA+Pj4gKyAgIHBpbmN0cmwtbmFtZXMgPSAiZGVmYXVsdCI7Cj4gPj4+ICsg
-ICBwaW5jdHJsLTAgPSA8JnBpbmN0cmxfaTJjMz47Cj4gPj4+ICsgICBzdGF0dXMgPSAiZGlzYWJs
-ZWQiOwo+ID4+PiArCj4gPj4+ICsgICBncGlvX29sZWQ6IGdwaW9ANDEgewo+ID4+PiArICAgICAg
-ICAgICBjb21wYXRpYmxlID0gIm54cCxwY2E5NTM2IjsKPiA+Pj4gKyAgICAgICAgICAgZ3Bpby1j
-b250cm9sbGVyOwo+ID4+PiArICAgICAgICAgICAjZ3Bpby1jZWxscyA9IDwyPjsKPiA+Pj4gKyAg
-ICAgICAgICAgcmVnID0gPDB4NDE+Owo+ID4+PiArICAgICAgICAgICB2Y2Mtc3VwcGx5ID0gPCZz
-dzJfcmVnPjsKPiA+Pj4gKyAgICAgICAgICAgc3RhdHVzID0gImRpc2FibGVkIjsKPiA+Pj4gKyAg
-IH07Cj4gPj4+ICsKPiA+Pj4gKyAgIG9sZWQ6IG9sZWRAM2Qgewo+ID4+PiArICAgICAgICAgICBj
-b21wYXRpYmxlID0gInNvbG9tb24sc3NkMTMwNWZiLWkyYyI7Cj4gPj4KPiA+PiBOb3QgZG9jdW1l
-bnRlZC4KPiA+Cj4gPiBPSywgSSB3aWxsIHNlbmQgYSBzZXBhcmF0ZSBwYXRjaCBmb3IgdGhhdC4K
-Pgo+IFJvYiwgSSBkb3VibGUgY2hlY2tlZCB0aGF0IGFuZCBpdCBhY3R1YWxseSBpcyBhbHJlYWR5
-IGRvY3VtZW50ZWQuCj4gTm90IGluIGEgd2F5IHRoYXQgeW91IHdvdWxkIGZpbmQgdGhlIHdob2xl
-IGNvbXBhdGlibGUgc3RyaW5nIHRob3VnaC4uCj4KPiBTZWUgaHR0cHM6Ly9lbGl4aXIuYm9vdGxp
-bi5jb20vbGludXgvdjUuMC1yYzEvc291cmNlL0RvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5k
-aW5ncy9kaXNwbGF5L3NzZDEzMDdmYi50eHQjTDQKPgo+IEFyZSB5b3UgT0sgd2l0aCB0aGF0IGFz
-IGl0IGlzPwoKQWgsIG9rYXkuIEl0J3MgZmluZS4KClJvYgoKX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QK
-bGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRl
-YWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+T24gVHVlLCBKYW4gOCwgMjAxOSBhdCA1OjQzIEFNIFZva8OhxI0gTWljaGFsIDxNaWNoYWwuVm9r
+YWNAeXNvZnQuY29tPiB3cm90ZToKPgo+IE9uIDI5LjEyLjIwMTggMDA6MjUsIFJvYiBIZXJyaW5n
+IHdyb3RlOgo+ID4gT24gVHVlLCBEZWMgMTgsIDIwMTggYXQgMDI6NDI6MTFQTSArMDAwMCwgVm9r
+w6HEjSBNaWNoYWwgd3JvdGU6Cj4gPj4gVGhlc2UgYXJlIGkuTVg2Uy9ETCBiYXNlZCBTQkNzIGVt
+YmVkZGVkIGluIHZhcmlvdXMgWSBTb2Z0IHByb2R1Y3RzLgo+ID4+IEFsbCBzaGFyZSB0aGUgc2Ft
+ZSBib2FyZCBkZXNpZ24gYnV0IGhhdmUgc2xpZ2h0bHkgZGlmZmVyZW50IEhXCj4gPj4gY29uZmln
+dXJhdGlvbi4KClsuLi5dCgo+ID4+ICsvIHsKPiA+PiArICAgIG1vZGVsID0gIlkgU29mdCBJT1RB
+IERyYWNvIGkuTVg2U29sbyBib2FyZCI7Cj4gPj4gKyAgICBjb21wYXRpYmxlID0gInlzb2Z0LGlt
+eDZkbC15YXBwNC1kcmFjbyIsICJmc2wsaW14NmRsIjsKPiA+Cj4gPiBBbGwgY29tcGF0aWJsZSBz
+dHJpbmdzIHNob3VsZCBiZSBkb2N1bWVudGVkLCBub3QganVzdCBTb0MgdmVuZG9yIGJvYXJkcy4K
+Pgo+IE9LLCBJIHdpbGwgYWRkIGEgRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL2Fy
+bS95c29mdC55YW1sIGZpbGUgZm9yIHRoYXQuCgpBY3R1YWxseSwgaXQgc2hvdWxkIGdvIGluIGZz
+bC55YW1sLiBUaGUgZmlsZSBmb3IgZXZlcnkgYm9hcmQgdmVuZG9yIGlzCmdvbmUuIGkuTVggd2Fz
+IHByZXR0eSBtdWNoIHRoZSBvbmx5IHBsYXRmb3JtIGRvaW5nIHRoYXQuCgpSb2IKCl9fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwg
+bWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8v
+bGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
