@@ -2,63 +2,59 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F24DEC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 13:54:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2096EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 13:58:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BBCA72087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 13:54:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E66AB206BB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 13:58:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ok5x4AQk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BBCA72087E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DPxMg1qr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E66AB206BB
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HJTAZZmodB8CW+iLvpub5n0a4a6PFn4gj51BfxSxqOk=; b=Ok5x4AQkXxJa6c
-	xUFR8H2lA8irk1zzNH7Lm2y2obOdEEX9C+extkxpcVSAQ71YefPuXWqsSgLIMKdfiAtxat6mUNZt8
-	TfH9P42580Y5ifZQ7+aSP0wkdTT/ifQ7Q/UMLz3hHKTHdzpwr60cEHGTM6CzEc/d79/NHQSsazl7X
-	ZMZTtxh3aeQJdwlonkyn4V6ZG0y7sCUnPslKPNKdzuvBfLSVJI+IuwyDYtZX11QwCIo6P1yxSE0Jm
-	r1oA7HGS8zY3F39Sl+Ib1kal5akxAgz4w1eIMY1tTgifHX5ZU9zTesd8tYoK3dIpl2Re79Jwdng43
-	gqIFO4jqI+jZryFUIfHA==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=paNpb/yjqNC5/Dyudpe090xKonAnZbXHnvecCxAEOtI=; b=DPx
+	Mg1qrOAZXn/QceXuPTxTqUgkWJQWuooCLEo6MRP7XOgDtLppIsZbisUZyUHFJ+vNReLo9CwIzTWT5
+	8zvdcG9Q+ubHuGM/ULKh/zOriBtmOKenltQAFjoawTM8Dh3Psv1hwqBb8KJfY10ocyHzc6o1U/dMq
+	0HL5cQgiqB9GC4bBvxPj3szEPtphCNZlzkFCMCPFYjRQeieIMzQ1vrDd1sZpU/42CjV+/8eiG3iOz
+	0tcT3YY/ygMbQw8NaK6u8spFXFOLGoX2bzJoIB8bwUciu+Dt6ri8yiaoiLa8tA8qqTuPGU6olEJzK
+	H/ZJ0Y+J/rKLspif8ROnFZK4miRtciQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggrqH-0001AJ-BD; Tue, 08 Jan 2019 13:54:53 +0000
+	id 1ggru7-0003Rz-HO; Tue, 08 Jan 2019 13:58:51 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggrqD-00019r-Hf
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 13:54:50 +0000
+ id 1ggru4-0003R8-4Q
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 13:58:49 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id AD59980D;
- Tue,  8 Jan 2019 05:54:47 -0800 (PST)
-Received: from fuggles.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id BDE993F70D;
- Tue,  8 Jan 2019 05:54:46 -0800 (PST)
-Date: Tue, 8 Jan 2019 13:54:44 +0000
-From: Will Deacon <will.deacon@arm.com>
-To: "huanglingyan (A)" <huanglingyan2@huawei.com>
-Subject: Re: [PATCH v3] arm64: lib: accelerate do_csum with NEON instruction
-Message-ID: <20190108135444.GB14476@fuggles.cambridge.arm.com>
-References: <1546739729-17234-1-git-send-email-huanglingyan2@huawei.com>
- <CAKv+Gu_wsK1UNXSp=5Hvd7XCHKC3cVkYjTYHhvqM4Xt09A9iKg@mail.gmail.com>
- <9129b882-60f3-8046-0cb9-e0b2452a118d@huawei.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <9129b882-60f3-8046-0cb9-e0b2452a118d@huawei.com>
-User-Agent: Mutt/1.11.1+86 (6f28e57d73f2) ()
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5819980D;
+ Tue,  8 Jan 2019 05:58:45 -0800 (PST)
+Received: from e107985-lin.cambridge.arm.com (e107985-lin.cambridge.arm.com
+ [10.1.194.38])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 455EF3F70D;
+ Tue,  8 Jan 2019 05:58:44 -0800 (PST)
+From: Dietmar Eggemann <dietmar.eggemann@arm.com>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [PATCH] ARM: irq: Add IRQ_SET_MASK_OK_DONE handling in
+ migrate_one_irq()
+Date: Tue,  8 Jan 2019 13:58:05 +0000
+Message-Id: <20190108135805.5535-1-dietmar.eggemann@arm.com>
+X-Mailer: git-send-email 2.11.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_055449_583554_05D8DE6E 
-X-CRM114-Status: GOOD (  12.98  )
+X-CRM114-CacheID: sfid-20190108_055848_175696_74E3EA50 
+X-CRM114-Status: GOOD (  16.15  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,38 +66,101 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Zhangshaokun <zhangshaokun@hisilicon.com>,
- linux-arm-kernel@lists.infradead.org, ard.biesheuvel@linaro.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Marc Zyngier <Marc.Zyngier@arm.com>, linux-kernel@vger.kernel.org,
+ Russell King - ARM Linux <linux@armlinux.org.uk>,
+ Sudeep Holla <sudeep.holla@arm.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-W3JlLWFkZGluZyBBcmQgYW5kIExBS01MIC0tIG5vdCBzdXJlIHdoeSB0aGUgaGVhZGVycyBhcmUg
-c28gbXVuZ2VkXQoKT24gTW9uLCBKYW4gMDcsIDIwMTkgYXQgMTA6Mzg6NTVBTSArMDgwMCwgaHVh
-bmdsaW5neWFuIChBKSB3cm90ZToKPiDlnKggMjAxOS8xLzYgMTY6MjYsIEFyZCBCaWVzaGV1dmVs
-IOWGmemBkzoKPiAgICAgUGxlYXNlIGNoYW5nZSB0aGlzIGludG8KPiAKPiAgICAgaWYgKElTX0VO
-QUJMRUQoQ09ORklHX0tFUk5FTF9NT0RFX05FT04pICYmCj4gICAgICAgICBsZW4gPj0gQ1NVTV9O
-RU9OX1RIUkVTSE9MRCAmJgo+ICAgICAgICAgbWF5X3VzZV9zaW1kKCkpIHsKPiAgICAgICAgICAg
-ICBrZXJuZWxfbmVvbl9iZWdpbigpOwo+ICAgICAgICAgICAgIHJlcyA9IGRvX2NzdW1fbmVvbihi
-dWZmLCBsZW4pOwo+ICAgICAgICAgICAgIGtlcm5lbF9uZW9uX2VuZCgpOwo+ICAgICAgICAgfQo+
-IAo+ICAgICBhbmQgZHJvcCB0aGUgaW50ZXJtZWRpYXRlIGRvX2NzdW1fYXJtKCkKPiAKPiAKPiAg
-ICAgICAgICsgICAgICAgICAgICAgICByZXR1cm4gZG9fY3N1bV9hcm0oYnVmZiwgbGVuKTsKPiAg
-ICAgICAgICsjZW5kaWYgIC8qIENPTkZJR19LRVJORUxfTU9ERV9ORU9OICovCj4gCj4gICAgIE5v
-IGVsc2U/IFdoYXQgaGFwcGVucyBpZiBsZW4gPCBDU1VNX05FT05fVEhSRVNIT0xEID8KPiAKPiAK
-PiAgICAgICAgICsjdW5kZWYgZG9fY3N1bQo+IAo+ICAgICBDYW4gd2UgZHJvcCB0aGlzPwo+IAo+
-IFVzaW5nIE5FT04gaW5zdHJ1Y3Rpb25zIHdpbGwgYnJpbmcgc29tZSBjb3N0cy4gVGhlIHNwZW5k
-aW5nIG1heWJlIGludHJvZHVjZWQKPiB3aGVuIHJlc2VydmVyaW5nL3Jlc3RvcmluZwo+IG5lb24g
-cmVnaXN0ZXJzIHdpdGgga2VybmVsX25lb25fYmVnaW4oKS9rZXJuZWxfbmVvbl9lbmQoKS4gVGhl
-cmVmb3JlIE5FT04gY29kZQo+IGlzIE9ubHkgdXNlZCB3aGVuCj4gdGhlIGxlbmd0aCBleGNlZWRz
-IENTVU1fTkVPTl9USFJFU0hPTEQuIEdlbmVyYWwgZG8gY3N1bSgpIGNvZGVzIGluIGxpYi8KPiBj
-aGVja3N1bS5jIHdpbGwgYmUgdXNlZCBpbgo+IHNob3J0ZXIgbGVuZ3RoLiBUbyBhY2hpZXZlIHRo
-aXMgZ29hbCwgSSB1c2UgdGhlICIjdW5kZWYgZG9fY3N1bSIgaW4gZWxzZSBjbGF1c2UKPiB0byBo
-YXZlIHRoZSBvcHBvdHVuaXR5IHRvCj4gdXRpbGl6ZSB0aGUgZ2VuZXJhbCBjb2Rlcy4KCkkgZG9u
-J3QgdGhpbmsgdGhhdCdzIGhvdyBpdCB3b3JrcyA6LwoKQmVmb3JlIHdlIGdldCBkZWVwZXIgaW50
-byB0aGUgaW1wbGVtZW50YXRpb24sIHBsZWFzZSBjb3VsZCB5b3UganVzdGlmeSB0aGUKbmVlZCBm
-b3IgYSBDUFUtb3B0aW1pc2VkIGNoZWNrc3VtIGltcGxlbWVudGF0aW9uIGF0IGFsbD8gSSB0aG91
-Z2h0IHRoaXMgd2FzCnVzdWFsbHkgb2ZmbG9hZGVkIHRvIHRoZSBOSUM/CgpXaWxsCgpfX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVs
-IG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDov
-L2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+Arm TC2 (multi_v7_defconfig plus CONFIG_ARM_BIG_LITTLE_CPUFREQ=y and
+CONFIG_ARM_VEXPRESS_SPC_CPUFREQ=y) fails hotplug stress tests.
+
+This issue was tracked down to a missing copy of the new affinity
+cpumask of the vexpress-spc interrupt into struct
+irq_common_data.affinity when the interrupt is migrated in
+migrate_one_irq().
+
+Commit 0407daceedfe ("irqchip/gic: Return IRQ_SET_MASK_OK_DONE in the
+set_affinity method") changed the return value of the irq_set_affinity()
+function of the GIC from IRQ_SET_MASK_OK to IRQ_SET_MASK_OK_DONE.
+
+In migrate_one_irq() if the current irq affinity mask and the cpu
+online mask do not share any CPU, the affinity mask is set to the cpu
+online mask. In this case (ret == true) and when the irq chip
+function irq_set_affinity() returns successfully (IRQ_SET_MASK_OK),
+struct irq_common_data.affinity should also be updated.
+
+Add IRQ_SET_MASK_OK_DONE next to IRQ_SET_MASK_OK when checking that the
+irq chip function irq_set_affinity() returns successfully.
+
+Commit 2cb625478f8c ("genirq: Add IRQ_SET_MASK_OK_DONE to support
+stacked irqchip") only added IRQ_SET_MASK_OK_DONE handling to
+irq_do_set_affinity() in the irq core and not to the Arm32 irq code.
+
+Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
+---
+
+The hotplug issue on Arm TC2 happens because the vexpress-spc interrupt
+(irq=22) is affine to CPU0. This occurs since it is setup early when the
+cpu_online_mask is still 0.
+But the problem with the missing copy of the affinity mask should occur
+with every interrupt which is forced to migrate.
+
+With additional debug in irq_setup_affinity():
+
+[0.000619] irq_setup_affinity(): irq=17 mask=0 cpu_online_mask=0 set=0-4
+[0.007065] irq_setup_affinity(): irq=22 mask=0 cpu_online_mask=0 set=0-4
+[3.372907] irq_setup_affinity(): irq=47 mask=0-4 cpu_online_mask=0-4
+set=0-4
+
+cat /proc/interrupts
+           CPU0       CPU1       CPU2       CPU3       CPU4
+22:        316          0          0          0          0     GIC-0 127
+Level     vexpress-spc
+
+cat /proc/irq/22/smp_affinity_list 
+0
+
+ arch/arm/kernel/irq.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 9908dacf9229..ddb828b0235b 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -117,6 +117,7 @@ static bool migrate_one_irq(struct irq_desc *desc)
+ 	const struct cpumask *affinity = irq_data_get_affinity_mask(d);
+ 	struct irq_chip *c;
+ 	bool ret = false;
++	int ret2;
+ 
+ 	/*
+ 	 * If this is a per-CPU interrupt, or the affinity does not
+@@ -131,9 +132,14 @@ static bool migrate_one_irq(struct irq_desc *desc)
+ 	}
+ 
+ 	c = irq_data_get_irq_chip(d);
+-	if (!c->irq_set_affinity)
++	if (!c->irq_set_affinity) {
+ 		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
+-	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && ret)
++		return ret;
++	}
++
++	ret2 = c->irq_set_affinity(d, affinity, false);
++
++	if ((ret2 == IRQ_SET_MASK_OK || ret2 == IRQ_SET_MASK_OK_DONE) && ret)
+ 		cpumask_copy(irq_data_get_affinity_mask(d), affinity);
+ 
+ 	return ret;
+-- 
+2.11.0
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
