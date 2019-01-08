@@ -2,68 +2,83 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2FEA8C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 22:21:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3FD3CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 22:32:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F0EBE20883
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 22:21:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 03A9920665
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 22:32:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FM7qCs+g"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F0EBE20883
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G7/MeLNt";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="o1OD97SN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 03A9920665
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mzu6EaMx0hctGrWX6HuCYYvT+5qx5kUqHIlAN/0Q51U=; b=FM7qCs+g7tVV57
-	1/qq3EDuaIRfBPMhsklg7bHO8KEHvn2GbMfGIp0aK/XwLQggBwreoXgb9/1xy7IIWXRh1GEzPjHjH
-	/kTn9e6kkCs+idXj3vmrZsHv4fCFoOkYbzi+B4gZJ77FZ5vZi7Xl9VtEiOfK/NVT5MI6L+R2ePbEs
-	QVmpfZz4eOcmV+lp4Pdb0F/LjacSZzT8WuBKxMDzi33m3hT5B67B4WC7CHEHIINs7tLNJQeLOYEeU
-	rT3o79JH56mDll9FRaR0UKL9RY3a0QHgnhX0KHqoKgS5IAXLSwt+YEj5M/cTRdK/Y2DWJmBPKWSkd
-	Tu3zbTNCoRZbEw8e0b/w==;
+	List-Owner; bh=nCXjVVVzuB67tCh05MGt5j1nvMMiPSS2Fs/AJJiQT04=; b=G7/MeLNtly3KRH
+	K1U3tGcTnRERpwhw/7/ZeAtQiesSAZF3O2QumO77uDmndJNdGqqP7ZB9x1IGMkW91CNmAfen2VCKh
+	wrK47AYop52NGWs0X1OnAMpZJd/6NiuMCf4No1GjIP+B+a6mdSn2ZK9KgnbxFclc0QFM4ow0Vf5o3
+	uXoRovVxOITbCLdBjzVH+d/HCz6+J8YhRqSlNWPJ3ThDLuLnNh97sGM2XtkzwfFESpS35wKrFCI7T
+	kdiPpqu8W8wfTZfIHG/7mQGmt2wJOfWnY0L1raKcM5J/1LLA0u4ok/v1Ck2R7ETIpn98vhyDZ4ypx
+	d8qtmWdvr0DyK1l16AGw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggzkB-0000Q7-LJ; Tue, 08 Jan 2019 22:21:07 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+	id 1ggzv0-0003rV-Am; Tue, 08 Jan 2019 22:32:18 +0000
+Received: from mail-oi1-x242.google.com ([2607:f8b0:4864:20::242])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggzk8-0000PZ-F9
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 22:21:06 +0000
-Received: from ptx.hi.pengutronix.de ([2001:67c:670:100:1d::c0])
- by metis.ext.pengutronix.de with esmtps
- (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1ggzk6-00032J-M5; Tue, 08 Jan 2019 23:21:02 +0100
-Received: from ukl by ptx.hi.pengutronix.de with local (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1ggzk6-0003Jh-5x; Tue, 08 Jan 2019 23:21:02 +0100
-Date: Tue, 8 Jan 2019 23:21:02 +0100
-From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
-To: Arthur LAMBERT <lambertarthur22@gmail.com>
-Subject: Re: Handle pwm with sysfs with recent kernel
-Message-ID: <20190108222102.hwv5oekspifhj7bh@pengutronix.de>
-References: <20190108100739.GA9046@arthur-bzh>
+ id 1ggzuv-0003qc-O4; Tue, 08 Jan 2019 22:32:15 +0000
+Received: by mail-oi1-x242.google.com with SMTP id y23so4731024oia.4;
+ Tue, 08 Jan 2019 14:32:13 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=googlemail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=lpHcHYZVECHCMmgw7nxoZ78ODtJVdZHm4b8ucqmAwqY=;
+ b=o1OD97SNchjEbwtPnTjPqEExOAVcXNCt+9nOpxW4qGpqoUy1IXSLNxxSZVFwDggi2X
+ q2EJuAComCIGsfyJjNg9CpOiq+WjJ9mni8ixKcXvlRy/3Ae5GoAL2iDFQujRtq70VXBC
+ fxjO4fRzFgChyLZPzAoUMV3GUYj1hCpufJrl5kftoT+mmN6Iw9jmM3rjJf5/cL+X2JUh
+ Xvlu8hPbWHDqDMqmjXVEnDscZ7Iw+yZwaWl3IkjvWt9TjKNPtvhq0GP9TYoNTgObkFDB
+ qa1OzIoX5vMf/OMJtElRZ6nr2n3CEKBb7/yINqOlCN6MqbbePjNrjPZi0uRpdqXhfA96
+ SQYg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=lpHcHYZVECHCMmgw7nxoZ78ODtJVdZHm4b8ucqmAwqY=;
+ b=M0GsoCdsU8EBobrKARKej9C1uLf5RWWbE9mUOQkTZpmY6a/INUNcZTkpE2TMa+Ajv4
+ KoUmrGmY2h62VGra8lipqXVD18n9KuGCBNdfN8ozYrHb6KC1B+H2/JELrgU8hBRH7w8H
+ mAolimSV8ar3HCUgAS3Whm1JNPFiJdIP0lA64hMS6ZHJsMW4lsc2m0PAGGekE/a5E6hA
+ whNSwcvcy2GzuFiJ++DhaMsL6iZ7aSZmfE8vMuGCMEKlQKXAOCOu7nIBOLLWlRX8glZ0
+ Hs5vXnqbWsVmJktc9UI0nYDwcYXOn8SHVZLccbJrkHIsjn2Gt6FotZIcSro3OLd4GSDF
+ uXIA==
+X-Gm-Message-State: AJcUukeiZl7kmlb4KoRnobpm4WalwBlfDLbPl+fNU04PLSYj8ALTvOaw
+ l5eBAT+ALHsRSMn5Ji2kFKexym9IOyRgD2g9Y9A=
+X-Google-Smtp-Source: ALg8bN6XcT9aBLpGKi4TTTSkwxCKME33vxjabBAkizY2aoCZ9u+Lqin81biIk1snuoGgcvDoi7IZw49UYClpSmIbmMk=
+X-Received: by 2002:aca:3586:: with SMTP id c128mr2432085oia.47.1546986732568; 
+ Tue, 08 Jan 2019 14:32:12 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190108100739.GA9046@arthur-bzh>
-User-Agent: NeoMutt/20170113 (1.7.2)
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c0
-X-SA-Exim-Mail-From: ukl@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+References: <20181219002620.12138-1-khilman@baylibre.com>
+ <20181219002620.12138-2-khilman@baylibre.com>
+ <CAFBinCCbPbSQZeF1mzfBfLt+cJ0P=ajHznZM2prn600NO7G3sA@mail.gmail.com>
+In-Reply-To: <CAFBinCCbPbSQZeF1mzfBfLt+cJ0P=ajHznZM2prn600NO7G3sA@mail.gmail.com>
+From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Date: Tue, 8 Jan 2019 23:32:01 +0100
+Message-ID: <CAFBinCB393w2cBacB6c_79Xt22suWWfx5omEKmzBJx02vb3fKw@mail.gmail.com>
+Subject: Re: [PATCH 2/2] arm64: dts: meson: add g12a x96 max board
+To: Kevin Hilman <khilman@baylibre.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_142104_664977_6E7C7958 
-X-CRM114-Status: GOOD (  16.02  )
+X-CRM114-CacheID: sfid-20190108_143213_809904_BC3EBC47 
+X-CRM114-Status: GOOD (  11.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,106 +90,51 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-pwm@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org,
+ devicetree@vger.kernel.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-[Cc: +=3D linux-pwm list]
+Hi Kevin,
 
-Hello Arthur,
+On Sat, Dec 22, 2018 at 5:57 PM Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+>
+> Hi Kevin,
+>
+> On Wed, Dec 19, 2018 at 1:26 AM Kevin Hilman <khilman@baylibre.com> wrote:
+> >
+> > Add the G12a (S905X2) based X96 Max board[1].
+> >
+> > There is no branding for the manufacturer anywhere on the product, so it
+> > took some digging to find the manufacturer.  But since there's nothing
+> > about the maker on the product I've left it out of the DT name because
+> > 1) nobody will no that name and 2) keeps the DT filename shorter.
+> based on the cnx-soft article and my own board I would add the
+> following section:
+> -----
+> There are three variants of this device:
+I had a chat with Chris Moore (who replied on the dt-bindings patch).
 
-On Tue, Jan 08, 2019 at 11:07:39AM +0100, Arthur LAMBERT wrote:
-> I am trying to update my kernel bsp from v4.1.X to v4.19.8 but I have som=
-e regressions
-> when I try to use pwm through sysfs from userspace. I have three pwm decl=
-ared as
-> follow in my device tree :
-> =
+> - 2GB LPDDR4, 16GB flash, 2.4G WiFi, 100M Ethernet
+> - 4GB LPDDR4, 32GB flash, dual band AC WiFi, Bluetooth 4.x, Gigabit Ethernet
+I have the 4GB LPDDR4, 32G flash variant which uses:
+RAM: SpecTek LPDDR4 (chip markings: PS082-062 BT / on the side it says R5JH)
+eMMC: Micron (chip markings: 8FAI8 SJJML / on the side it says JXML ->
+this might be "MTFC32GAKAECN-AIT")
+WiFi: Ampak AP6356S
 
-> 	leds {
-> 	     compatible =3D "pwm-leds";
-> 	     ledred {
-> 		pwms =3D <&pwm1>;
-> 		label =3D "red";
-> 		linux,default-trigger =3D "none";
-> 		default-state =3D "on";
-> 	     };
-> =
+> - 4GB LPDDR4, 64GB flash, dual band  AC WiFi, Bluetooth 4.x, Gigabit Ethernet
+Chris has the 4GB LPDDR4, 64GB flash variant.
+RAM: same as on mine
+eMMC: Samsung KLMCG4JENB-B041
+WiFi: same as on mine
 
-> 	     ledblue {
-> 	     	pwms =3D <&pwm5>;
-> 		label =3D "blue";
-> 		linux,default-trigger =3D "none";
-> 		default-state =3D "on";
-> 	     };
-> =
 
-> 	     ledgreen {
-> 	     	pwms =3D <&pwm6>;
-> 		label =3D "green";
-> 		linux,default-trigger =3D "none";
-> 		default-state =3D "on";
-> 	     };
-> 	};
-> =
-
-> First I have an issue with duplicate name :
-> sysfs: cannot create duplicate filename '/class/pwm/pwm0'
-> CPU: 0 PID: 653 Comm: XXXX
-> Hardware name: Freescale i.MX6 Ultralite (Device Tree)
-> [<8010dda8>] (unwind_backtrace) from [<8010b468>] (show_stack+0x10/0x14)
-> [<8010b468>] (show_stack) from [<8025ef0c>] (sysfs_warn_dup+0x58/0x64)
-> [<8025ef0c>] (sysfs_warn_dup) from [<8025f200>] (sysfs_do_create_link_sd+=
-0xd4/0xd8)
-> [<8025f200>] (sysfs_do_create_link_sd) from [<80458d6c>] (device_add+0x1e=
-c/0x5d4)
-> [<80458d6c>] (device_add) from [<8040b5a8>] (export_store+0xfc/0x17c)
-> [<8040b5a8>] (export_store) from [<80456904>] (dev_attr_store+0x18/0x24)
-> [<80456904>] (dev_attr_store) from [<8025e604>] (sysfs_kf_write+0x44/0x48)
-> [<8025e604>] (sysfs_kf_write) from [<8025dcb0>] (kernfs_fop_write+0xe8/0x=
-1d0)
-> [<8025dcb0>] (kernfs_fop_write) from [<801eaaf8>] (__vfs_write+0x28/0x144)
-> [<801eaaf8>] (__vfs_write) from [<801ead88>] (vfs_write+0xa4/0x164)
-> [<801ead88>] (vfs_write) from [<801eaf54>] (ksys_write+0x40/0x94)
-> [<801eaf54>] (ksys_write) from [<80101000>] (ret_fast_syscall+0x0
-> =
-
-> I was able to fix it by revert a patch : https://patchwork.kernel.org/pat=
-ch/9971821/
-> It is normal that this revert patch is not currently apply on last 4.19.X=
- tag (last one
-> seems to be 4.19.13)
-> =
-
-> Then I have another issue when I try to enable my pwm :
-> =
-
-> # ls /sys/class/pwm/
-> pwmchip0  pwmchip2  pwmchip4  pwmchip6
-> pwmchip1  pwmchip3  pwmchip5  pwmchip7
-> # echo 0 > /sys/class/pwm/pwmchip0/export
-> # echo 1 > /sys/class/pwm/pwmchip0/pwm0/enable
-> -sh: write error: Invalid argument
-
-Just a guess: did you check that /sys/class/pwm/pwmchip0/pwm0/enable
-actually exists?
-
-> Is there a new way to handle pwm in recent kernel ? My old process is
-> now deprecated or something ?
-
-Not sure what you want to achive and if pwmchip0/pwm0 is one of the pwms
-used in your dts snipped above. If the pwm is in use, don't expect it to
-be controllable via sysfs.
-
-Best regards
-Uwe
-
--- =
-
-Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards
+Martin
 
 _______________________________________________
 linux-arm-kernel mailing list
