@@ -2,85 +2,65 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 81552C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 17:49:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 59FD0C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 17:57:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 528902070B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 17:49:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 248D220827
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 17:57:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TfOaUyDC";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="ClkO9XVS";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="j9Ll7uuz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 528902070B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ok/LbTzB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 248D220827
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:Message-ID:
-	Subject:To:From:Date:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=maUysD8VintsbhdJ+ApjGrl+gOfyHBzbbXjpd78NibA=; b=TfOaUyDCJktuTZgM4VQ3s0Sj8
-	T9XSxxVmvs8xFXwKyjGXqHYhauOre5+1hDtUkBAGwMSrpEYo94lSwfmfAOvAD6CWE8mYa2FWJ9FN1
-	w/HpmdHhS6r4yacmCZoPqII/qL3Ps5TRkSh1blMs5hbXteH0FUnTQBqhGzF6zTqUvb+L1Jv9HqM5P
-	7S6NLhYvKsAnjWPR6R6rR1q0dYwVqVxH8+2+Xv3ohydYFpB9/5SI8BqAqhW82zWER4JxxxMGxliXa
-	d0xqdx4TWT9vvgf8vWwZpnoHQXvGKWfStJFw8yGLKK6aYOI7jpORGNJuvkP8E/6Getl8M5ZAL5HCu
-	8Dht6Ghfg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=A/3Cc2AJ1XthAS9jLXtojB/KmBxKWTzO2/Asr5uxnZ0=; b=Ok/LbTzBEtFVIk
+	FmSDJf1gX7/rPfwkXCXDeclIQJUfZkk8+v5VsoJxAkOyVL8jtoSz9UiEdOOWjmDzmfgyOBB9REkR9
+	jBvAcLzp053hr6GjU+Uz5wWhkTtUokqZtXGpZJbAqJ4VIzwHVTmGg+x/Uh5r9NFWwwX4I7d7oHmXC
+	9TuxIhr74DVO3mLbHLvwf4rUGTvHmvCj/6KJQiZu8ROL2oTWg03zgoailA+tYDleTnNmnqGIQ6gzv
+	3J/JHAd5UY0I157gTdU4Y0495CIsX1IS8iMnVfa73cPjgTEfP0l8liXUEBlvyMvtne4s4oRVDktJo
+	ageDvSgYHGdS/LQV+UMg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggvVa-0002B9-OP; Tue, 08 Jan 2019 17:49:46 +0000
-Received: from smtp.codeaurora.org ([198.145.29.96])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggvVW-0002AV-Lk
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 17:49:44 +0000
-Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id 43673601D7; Tue,  8 Jan 2019 17:49:40 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1546969780;
- bh=EMJHAzM74ccB/MMhceeTznZDqTAeyMSNcQ5HeOyd3qk=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=ClkO9XVS420yh6dTfXjoq9hIfzplBb8cogkQrO52GD8v4xbCpnXz9aqOoZwh+ypk8
- mEWMrQFaMadKYARqUQaofLfW/VejpWcdszDARPCMYG/Xu9P+duWuajPZjjo8PH6KHi
- b9Pqrz3A1KVnS5r4Hl2ZTmxhM8E0bGB7vX3o+YA8=
-Received: from localhost (i-global254.qualcomm.com [199.106.103.254])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- (Authenticated sender: ilina@smtp.codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id BFFAF601D7;
- Tue,  8 Jan 2019 17:49:38 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1546969778;
- bh=EMJHAzM74ccB/MMhceeTznZDqTAeyMSNcQ5HeOyd3qk=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=j9Ll7uuz6zRnFUK84bVvQLbAVc/uPomthpwH//HMbAi0jVlnux66Y3KvJavHXeUXQ
- Gf1H0IAZS/2Z3sjeQaWyFq7vOX+xDDiiDvPXrQkiVmvQii4wpQr90oTEftYSJWgvBN
- P8jByJjJ9aDXweQ3KISgi5xaeTuxRXfc6rQWtr38=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org BFFAF601D7
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- dmarc=none (p=none dis=none) header.from=codeaurora.org
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- spf=none smtp.mailfrom=ilina@codeaurora.org
-Date: Tue, 8 Jan 2019 10:49:38 -0700
-From: Lina Iyer <ilina@codeaurora.org>
-To: Stephen Boyd <swboyd@chromium.org>
-Subject: Re: [PATCH] soc: qcom: rpmh: Avoid accessing freed memory from batch
- API
-Message-ID: <20190108174938.GA22547@codeaurora.org>
-References: <20190103174657.251968-1-swboyd@chromium.org>
+	id 1ggvd6-0006YP-VQ; Tue, 08 Jan 2019 17:57:32 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ggvd3-0006Xr-7l
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 17:57:31 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 801B2A78;
+ Tue,  8 Jan 2019 09:57:28 -0800 (PST)
+Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id EF6903F5AF;
+ Tue,  8 Jan 2019 09:57:25 -0800 (PST)
+Subject: Re: [PATCH 2/2] EDAC: add ARM Cortex A15 L2 internal asynchronous
+ error detection driver
+To: Borislav Petkov <bp@alien8.de>,
+ "Wiebe, Wladislav (Nokia - DE/Ulm)" <wladislav.wiebe@nokia.com>
+References: <AM6PR0702MB379953E130CC1E1DEE18B79BFA8A0@AM6PR0702MB3799.eurprd07.prod.outlook.com>
+ <20190108104204.GA14243@zn.tnic>
+From: James Morse <james.morse@arm.com>
+Message-ID: <e1458b95-6d17-21be-5dd8-ee7ff8d8b3fb@arm.com>
+Date: Tue, 8 Jan 2019 17:57:24 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190103174657.251968-1-swboyd@chromium.org>
-User-Agent: Mutt/1.11.1 (2018-12-01)
+In-Reply-To: <20190108104204.GA14243@zn.tnic>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_094942_748046_021A7924 
-X-CRM114-Status: GOOD (  20.49  )
+X-CRM114-CacheID: sfid-20190108_095729_341946_7700F601 
+X-CRM114-Status: GOOD (  25.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,233 +72,223 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-msm@vger.kernel.org, linux-kernel@vger.kernel.org,
- Evan Green <evgreen@chromium.org>, Matthias Kaehlcke <mka@chromium.org>,
- Andy Gross <andy.gross@linaro.org>,
- "Raju P.L.S.S.S.N" <rplsssn@codeaurora.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "arnd@arndb.de" <arnd@arndb.de>,
+ "gregkh@linuxfoundation.org" <gregkh@linuxfoundation.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, "Sverdlin,
+ Alexander \(Nokia - DE/Ulm\)" <alexander.sverdlin@nokia.com>,
+ "mchehab+samsung@kernel.org" <mchehab+samsung@kernel.org>,
+ "akpm@linux-foundation.org" <akpm@linux-foundation.org>,
+ "mchehab@kernel.org" <mchehab@kernel.org>,
+ "davem@davemloft.net" <davem@davemloft.net>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "linux-edac@vger.kernel.org" <linux-edac@vger.kernel.org>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 03 2019 at 10:47 -0700, Stephen Boyd wrote:
->Using the batch API from the interconnect driver sometimes leads to a
->KASAN error due to an access to freed memory. This is easier to trigger
->with threadirqs on the kernel commandline.
->
-> BUG: KASAN: use-after-free in rpmh_tx_done+0x114/0x12c
-> Read of size 1 at addr fffffff51414ad84 by task irq/110-apps_rs/57
->
-> CPU: 0 PID: 57 Comm: irq/110-apps_rs Tainted: G        W         4.19.10 #72
-> Call trace:
->  dump_backtrace+0x0/0x2f8
->  show_stack+0x20/0x2c
->  __dump_stack+0x20/0x28
->  dump_stack+0xcc/0x10c
->  print_address_description+0x74/0x240
->  kasan_report+0x250/0x26c
->  __asan_report_load1_noabort+0x20/0x2c
->  rpmh_tx_done+0x114/0x12c
->  tcs_tx_done+0x450/0x768
->  irq_forced_thread_fn+0x58/0x9c
->  irq_thread+0x120/0x1dc
->  kthread+0x248/0x260
->  ret_from_fork+0x10/0x18
->
-> Allocated by task 385:
->  kasan_kmalloc+0xac/0x148
->  __kmalloc+0x170/0x1e4
->  rpmh_write_batch+0x174/0x540
->  qcom_icc_set+0x8dc/0x9ac
->  icc_set+0x288/0x2e8
->  a6xx_gmu_stop+0x320/0x3c0
->  a6xx_pm_suspend+0x108/0x124
->  adreno_suspend+0x50/0x60
->  pm_generic_runtime_suspend+0x60/0x78
->  __rpm_callback+0x214/0x32c
->  rpm_callback+0x54/0x184
->  rpm_suspend+0x3f8/0xa90
->  pm_runtime_work+0xb4/0x178
->  process_one_work+0x544/0xbc0
->  worker_thread+0x514/0x7d0
->  kthread+0x248/0x260
->  ret_from_fork+0x10/0x18
->
-> Freed by task 385:
->  __kasan_slab_free+0x12c/0x1e0
->  kasan_slab_free+0x10/0x1c
->  kfree+0x134/0x588
->  rpmh_write_batch+0x49c/0x540
->  qcom_icc_set+0x8dc/0x9ac
->  icc_set+0x288/0x2e8
->  a6xx_gmu_stop+0x320/0x3c0
->  a6xx_pm_suspend+0x108/0x124
->  adreno_suspend+0x50/0x60
-> cr50_spi spi5.0: SPI transfer timed out
->  pm_generic_runtime_suspend+0x60/0x78
->  __rpm_callback+0x214/0x32c
->  rpm_callback+0x54/0x184
->  rpm_suspend+0x3f8/0xa90
->  pm_runtime_work+0xb4/0x178
->  process_one_work+0x544/0xbc0
->  worker_thread+0x514/0x7d0
->  kthread+0x248/0x260
->  ret_from_fork+0x10/0x18
->
-> The buggy address belongs to the object at fffffff51414ac80
->  which belongs to the cache kmalloc-512 of size 512
-> The buggy address is located 260 bytes inside of
->  512-byte region [fffffff51414ac80, fffffff51414ae80)
-> The buggy address belongs to the page:
-> page:ffffffbfd4505200 count:1 mapcount:0 mapping:fffffff51e00c680 index:0x0 compound_mapcount: 0
-> flags: 0x4000000000008100(slab|head)
-> raw: 4000000000008100 ffffffbfd4529008 ffffffbfd44f9208 fffffff51e00c680
-> raw: 0000000000000000 0000000000200020 00000001ffffffff 0000000000000000
-> page dumped because: kasan: bad access detected
->
-> Memory state around the buggy address:
->  fffffff51414ac80: fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb
->  fffffff51414ad00: fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb
-> >fffffff51414ad80: fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb
->                    ^
->  fffffff51414ae00: fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb
->  fffffff51414ae80: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
->
->The batch API sets the same completion for each rpmh message that's sent
->and then loops through all the messages and waits for that single
->completion declared on the stack to be completed before returning from
->the function and freeing the message structures. Unfortunately, some
->messages may still be in process and 'stuck' in the TCS. At some later
->point, the tcs_tx_done() interrupt will run and try to process messages
->that have already been freed at the end of rpmh_write_batch(). This will
->in turn access the 'needs_free' member of the rpmh_request structure and
->cause KASAN to complain.
->
-Raju and I were discussing this solution and we think the issue may be
-because of a race condition between the thread calling the completion
-and the thread waiting for completion. Completion releases the waiting
-thread and then we try to read rpm_msg->needs_free after that. But, if
-we could read in the rpm_msg->needs_free before calling completion, we
-would not see the problem. How about this instead?
+Hi Boris, Wladislav,
 
-diff --git a/drivers/soc/qcom/rpmh.c b/drivers/soc/qcom/rpmh.c
-index c7beb6841289..0303a2971d4a 100644
---- a/drivers/soc/qcom/rpmh.c
-+++ b/drivers/soc/qcom/rpmh.c
-@@ -80,6 +80,7 @@ void rpmh_tx_done(const struct tcs_request *msg, int r)
-        struct rpmh_request *rpm_msg = container_of(msg, struct rpmh_request,
-                                                    msg);
-        struct completion *compl = rpm_msg->completion;
-+       bool free = rpm_msg->needs_free;
+On 08/01/2019 10:42, Borislav Petkov wrote:
+> + James and leaving in the rest for reference.
 
-        rpm_msg->err = r;
+(thanks!)
 
-@@ -94,7 +95,7 @@ void rpmh_tx_done(const struct tcs_request *msg, int r)
-        complete(compl);
+> So the first thing to figure out here is how generic is this and if
+> so, to make it a cortex_a15_edac.c driver which contains all the RAS
+> functionality for A15. Definitely not an EDAC driver per functional unit
+> but rather per vendor or even ARM core.
 
- exit:
--       if (rpm_msg->needs_free)
-+       if (free)
-                kfree(rpm_msg);
- }
+This is implementation-defined/specific-to-A15 and is documented in the TRM [0].
+(On the 'all the RAS functionality for A15' front: there are two more registers:
+L2MERRSR and CPUMERRSR. These are both accessible from the normal-world, and
+don't appear to need enabling.)
 
 
+But we have the usual pre-v8.2 problems, and in addition cluster-interrupts, as
+this signal might be per-cluster, or it might be combined.
 
->Let's fix this by allocating a chunk of completions for each message and
->waiting for all of them to be completed before returning from the batch
->API. Alternatively, we could wait for the last message in the batch, but
->that may be a more complicated change because it looks like
->tcs_tx_done() just iterates through the indices of the queue and
->completes each message instead of tracking the last inserted message and
->completing that first.
->
->Cc: Lina Iyer <ilina@codeaurora.org>
->Cc: "Raju P.L.S.S.S.N" <rplsssn@codeaurora.org>
->Cc: Matthias Kaehlcke <mka@chromium.org>
->Cc: Evan Green <evgreen@chromium.org>
->Fixes: c8790cb6da58 ("drivers: qcom: rpmh: add support for batch RPMH request")
->Signed-off-by: Stephen Boyd <swboyd@chromium.org>
->---
-> drivers/soc/qcom/rpmh.c | 25 +++++++++++++++++--------
-> 1 file changed, 17 insertions(+), 8 deletions(-)
->
->diff --git a/drivers/soc/qcom/rpmh.c b/drivers/soc/qcom/rpmh.c
->index c7beb6841289..3b3e8b0b2d95 100644
->--- a/drivers/soc/qcom/rpmh.c
->+++ b/drivers/soc/qcom/rpmh.c
->@@ -348,11 +348,12 @@ int rpmh_write_batch(const struct device *dev, enum rpmh_state state,
-> {
-> 	struct batch_cache_req *req;
-> 	struct rpmh_request *rpm_msgs;
->-	DECLARE_COMPLETION_ONSTACK(compl);
->+	struct completion *compls;
-> 	struct rpmh_ctrlr *ctrlr = get_rpmh_ctrlr(dev);
-> 	unsigned long time_left;
-> 	int count = 0;
-> 	int ret, i, j;
->+	void *ptr;
->
-> 	if (!cmd || !n)
-> 		return -EINVAL;
->@@ -362,10 +363,15 @@ int rpmh_write_batch(const struct device *dev, enum rpmh_state state,
-> 	if (!count)
-> 		return -EINVAL;
->
->-	req = kzalloc(sizeof(*req) + count * sizeof(req->rpm_msgs[0]),
->+	ptr = kzalloc(sizeof(*req) +
->+		      count * (sizeof(req->rpm_msgs[0]) + sizeof(*compls)),
-> 		      GFP_ATOMIC);
->-	if (!req)
->+	if (!ptr)
-> 		return -ENOMEM;
->+
->+	req = ptr;
->+	compls = ptr + sizeof(*req) + count * sizeof(*rpm_msgs);
->+
-> 	req->count = count;
-> 	rpm_msgs = req->rpm_msgs;
->
->@@ -380,7 +386,10 @@ int rpmh_write_batch(const struct device *dev, enum rpmh_state state,
-> 	}
->
-> 	for (i = 0; i < count; i++) {
->-		rpm_msgs[i].completion = &compl;
->+		struct completion *compl = &compls[i];
->+
->+		init_completion(compl);
->+		rpm_msgs[i].completion = compl;
-> 		ret = rpmh_rsc_send_data(ctrlr_to_drv(ctrlr), &rpm_msgs[i].msg);
-> 		if (ret) {
-> 			pr_err("Error(%d) sending RPMH message addr=%#x\n",
->@@ -393,12 +402,12 @@ int rpmh_write_batch(const struct device *dev, enum rpmh_state state,
->
-> 	time_left = RPMH_TIMEOUT_MS;
-> 	for (i = 0; i < count; i++) {
->-		time_left = wait_for_completion_timeout(&compl, time_left);
->+		time_left = wait_for_completion_timeout(&compls[i], time_left);
-> 		if (!time_left) {
-> 			/*
-> 			 * Better hope they never finish because they'll signal
->-			 * the completion on our stack and that's bad once
->-			 * we've returned from the function.
->+			 * the completion that we're going to free once
->+			 * we've returned from this function.
-> 			 */
-> 			WARN_ON(1);
-> 			ret = -ETIMEDOUT;
->@@ -407,7 +416,7 @@ int rpmh_write_batch(const struct device *dev, enum rpmh_state state,
-> 	}
->
-> exit:
->-	kfree(req);
->+	kfree(ptr);
->
-> 	return ret;
-> }
->-- 
->Sent by a computer through tubes
->
+Wladislav, I'm afraid we've had a few attempts at pre-8.2 EDAC drivers, the
+below list of problems is what we've learnt along the way. The upshot is that
+before the architected RAS extensions, the expectation is firmware will handle
+all this, as its difficult for the OS to deal with.
+
+
+My first question is how useful is a 'something bad happened' edac event? Before
+the v8.2 extensions with its classification of errors, we don't know anything more.
+
+The usual suspects are, (partly taken from the thread at [1]):
+* A15 exists in big/little configurations. We need to know which CPUs are A15.
+* We need to know we aren't running under a hypervisor, (a hypervisor can trap
+  accesses to these imp-def register, KVM does).
+* Nothing else should be clearing these bits, e.g. secure-world software, or
+  another CPU.
+* Secure-world needs to enable write-access to L2ECTLR, and we need to
+  know its done it. This needs doing on every CPU, and needs to not 'go missing'
+  over cpu-hotplug or cpu-idle.
+
+These are things that don't naturally live in the DT.
+
+
+The new-one is these cluster-interrupts: How do we know which set of CPUs each
+interrupt goes with? What happens if user-space tries to rebalance them?
+
+Another SoC with A15 may combine all the cluster-interrupts into a single
+'something bad happened' interrupt. Done like this, we would need to cross-call
+to the other CPUs when we take an interrupt - which is not something we can do.
+
+Is this a level or edge interrupt? Is it necessary to clear that bit in the
+register to lower the interrupt line?
+The TRM talks about 'pending L2 internal asynchronous error', pending makes me
+suspect this is at least possible. If it is, a level-interrupt to one CPU, that
+can only be cleared by another leads to deadlock.
+
+
+Thanks,
+
+James
+
+> On Tue, Jan 08, 2019 at 08:10:45AM +0000, Wiebe, Wladislav (Nokia - DE/Ulm) wrote:
+>> This driver adds support for L2 internal asynchronous error detection
+>> caused by L2 RAM double-bit ECC error or illegal writes to the
+>> Interrupt Controller memory-map region on the Cortex A15.
+
+>> diff --git a/drivers/edac/cortex_a15_l2_async_edac.c b/drivers/edac/cortex_a15_l2_async_edac.c
+>> new file mode 100644
+>> index 000000000000..26252568e961
+>> --- /dev/null
+>> +++ b/drivers/edac/cortex_a15_l2_async_edac.c
+>> @@ -0,0 +1,134 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +/*
+>> + * Copyright (C) 2018 Nokia Corporation
+
+(boiler plate not needed with the SPDX header)
+
+>> + */
+>> +
+>> +#include <linux/module.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/of.h>
+>> +
+>> +#include "edac_module.h"
+>> +
+>> +#define DRIVER_NAME "cortex_a15_l2_async_edac"
+>> +
+>> +#define L2ECTLR_L2_ASYNC_ERR BIT(30)
+>> +
+>> +static irqreturn_t cortex_a15_l2_async_edac_err_handler(int irq, void *dev_id)
+>> +{
+>> +	struct edac_device_ctl_info *dci = dev_id;
+>> +	u32 status = 0;
+>> +
+>> +	/*
+>> +	 * Read and clear L2ECTLR L2 ASYNC error bit caused by INTERRIRQ.
+>> +	 * Reason could be a L2 RAM double-bit ECC error or illegal writes
+>> +	 * to the Interrupt Controller memory-map region.
+>> +	 */
+>> +	asm("mrc p15, 1, %0, c9, c0, 3" : "=r" (status));
+
+"L2 internal asynchronous error caused by L2 RAM double-bit ECC error" doesn't
+tell us if a CPU consumed the error, or if the error has caused a write to go
+missing. Without the classification, this means 'something bad happened'.
+
+I'd prefer to panic() when we see one of these. I'd like it even more if
+firmware rebooted for us.
+
+
+>> +	if (status & L2ECTLR_L2_ASYNC_ERR) {
+>> +		status &= ~L2ECTLR_L2_ASYNC_ERR;
+>> +		asm("mcr p15, 1, %0, c9, c0, 3" : : "r" (status));
+
+4.3.49 "L2 Extended Control Register" of the A15 TRM says this field can be
+read-only/write-ignored for the normal world if NSACR.NS_L2ERR is 0.
+
+How do we know if firmware has set this bit on all CPUs? We can't clear the
+error otherwise.
+
+
+>> +		edac_printk(KERN_EMERG, DRIVER_NAME,
+>> +			    "L2 internal asynchronous error occurred!\n");
+>> +		edac_device_handle_ue(dci, 0, 0, dci->ctl_name);
+
+>> +
+>> +		return IRQ_HANDLED;
+>> +	}
+>> +
+>> +	return IRQ_NONE;
+>> +}
+>> +
+>> +static int cortex_a15_l2_async_edac_probe(struct platform_device *pdev)
+>> +{
+>> +	struct edac_device_ctl_info *dci;
+>> +	struct device_node *np = pdev->dev.of_node;
+>> +	char *ctl_name = (char *)np->name;
+>> +	int i = 0, ret = 0, err_irq = 0, irq_count = 0;
+>> +
+>> +	/* We can have multiple CPU clusters with one INTERRIRQ per cluster */
+
+Surely this an integration choice?
+
+You're accessing the cluster through a cpu register in the handler, what happens
+if the interrupt is delivered to the wrong cluster?
+How do we know which interrupt maps to which cluster?
+How do we stop user-space 'balancing' the interrupts?
+
+
+>> +	irq_count = platform_irq_count(pdev);
+>> +	if (irq_count < 0) {
+>> +		edac_printk(KERN_ERR, DRIVER_NAME,
+>> +			    "No L2 ASYNC error IRQ found!\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	dci = edac_device_alloc_ctl_info(0, ctl_name, 1, ctl_name,
+>> +					 irq_count, 0, NULL, 0,
+>> +					 edac_device_alloc_index());
+>> +	if (!dci)
+>> +		return -ENOMEM;
+>> +
+>> +	dci->dev = &pdev->dev;
+>> +	dci->mod_name = DRIVER_NAME;
+>> +	dci->ctl_name = ctl_name;
+>> +	dci->dev_name = dev_name(&pdev->dev);
+>> +	platform_set_drvdata(pdev, dci);
+>> +
+>> +	if (edac_device_add_device(dci))
+>> +		goto err;
+>> +
+>> +	for (i = 0; i < irq_count; i++) {
+>> +		err_irq = platform_get_irq(pdev, i);
+>> +		ret = devm_request_irq(&pdev->dev, err_irq,
+>> +				       cortex_a15_l2_async_edac_err_handler, 0,
+>> +				       dev_name(&pdev->dev), dci);
+>> +
+>> +		if (ret < 0) {
+>> +			edac_printk(KERN_ERR, DRIVER_NAME,
+>> +				    "Failed to register L2 ASYNC error IRQ %d\n",
+>> +				     err_irq);
+>> +			goto err2;
+>> +		}
+>> +	}
+>> +
+>> +	return 0;
+>> +err2:
+>> +	edac_device_del_device(&pdev->dev);
+>> +err:
+>> +	edac_device_free_ctl_info(dci);
+>> +
+>> +	return ret;
+>> +}
+
+
+[0]
+http://infocenter.arm.com/help/topic/com.arm.doc.ddi0438c/DDI0438C_cortex_a15_r2p0_trm.pdf
+[1] https://lore.kernel.org/lkml/1521073067-24348-1-git-send-email-york.sun@nxp.com/
 
 _______________________________________________
 linux-arm-kernel mailing list
