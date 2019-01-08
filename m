@@ -2,76 +2,83 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E3891C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 08:48:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7BD46C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 08:57:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B20D72070B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 08:48:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3561C2087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 08:57:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G3IvI80U"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B20D72070B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ok1hJB15";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="d5v80WBP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3561C2087F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Subject:References:
-	In-Reply-To:Message-ID:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hW52ponUpEOmKP/ny84YrApzeyujJsX+p4hIusT/x50=; b=G3IvI80UZhJJ6E
-	b3lqCLJsRMUGgO00Da+b8bkvlzcg10uLGSCmBbvBi+AxvLndFewWgyn1Wp1d+eLKONEVObYUbxwat
-	1qck0zvR/XPYZoX9QxsgRlF88kgCDRzzSk8PksfI7TrD/IYcygSg1tzGH3Nx4MI+1CBm/hYTU5PUe
-	wtlk/2a53vegoHTAzVV++J7Xsnid8ZzIVEovdRwd9qpkcNc9mU+osRlhhcFkt1Jkxaa0XsN0QZ3IR
-	ryHBWDDsC5zA1wvs5oUUpeEVLd5hexlzypSxNLyXaH8u+45S8w+Msh6EgI053FDnKNeAifsUAYirL
-	ruD01nPwGip+nJGfOwYg==;
+	List-Owner; bh=4v0ur4hxbTEvGddP0an970s7MihF11Az92x8lhnHQO0=; b=ok1hJB15lh5zel
+	5gNEvRTy4+NYwuI9FT+Zg8S9Y9YNRNihSR254lBRXnh0kNnMg10YRtdjpOZFoMpL0XrDshmGDKsWT
+	VkCMx+TQg5ueItzR5I3gTKrH6Hq0EdSB1lAxma9+T+w7KpkZWpGQtTsE/RNpyTT4ZVwGLetigARJo
+	cyeFUuKypKDFLUsqLqm/WQ0Zf78AsaU+q+TdsfwPv7lxNUth/Q4q4dFgQt4JsJYvq623suw4Mvxy1
+	xdybk9SlUerakoYvnUvc/3gTVudVYevm/8XVopbJur8VYpwxJ/smVsaTb9XmXCGPbtTXsK1avxS5n
+	ElbpqXhkjy6WkfV0dkFw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggn3j-0004NB-Fl; Tue, 08 Jan 2019 08:48:27 +0000
-Received: from mout.kundenserver.de ([212.227.17.10])
+	id 1ggnBy-0007pr-Pm; Tue, 08 Jan 2019 08:56:58 +0000
+Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggn3g-0004MZ-9o; Tue, 08 Jan 2019 08:48:26 +0000
-Received: from oxbsltgw38.schlund.de ([212.227.220.179]) by
- mrelayeu.kundenserver.de (mreue109 [213.165.67.113]) with ESMTPSA (Nemesis)
- id 1M5wTt-1gfRD63GWp-007XXB; Tue, 08 Jan 2019 09:48:11 +0100
-Date: Tue, 8 Jan 2019 09:48:09 +0100 (CET)
-From: Stefan Wahren <stefan.wahren@i2se.com>
-To: Peter Robinson <pbrobinson@gmail.com>
-Message-ID: <849520506.312349.1546937289972@email.ionos.de>
-In-Reply-To: <CALeDE9PX=2nR8=9JjT9wvsb470nrZ_h6JGFsrkYkexGOoOhXuA@mail.gmail.com>
+ id 1ggnBu-0007pI-TK; Tue, 08 Jan 2019 08:56:56 +0000
+Received: by mail-wr1-x444.google.com with SMTP id j2so3219340wrw.1;
+ Tue, 08 Jan 2019 00:56:54 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=6m8GZi/zEqa+7pc0pclu0Dkq63gNG9R2qA58cWIOkYU=;
+ b=d5v80WBPOltLDUXb1WhEaUehH5Zg5QtmxWgeYnI7NhD21GhsBASFll0gZVjJJ0roMR
+ fdR44GgbkQm86u2Jq/ft1edJgIven7r4ZO/vB3lN2ataUWHD40JKJZAuteZYJAQjkOR4
+ 7ZMKeS9WR90PynIk43DPu1LyXX9FKpjDtlWn1hDRxxVneZOn+odKVBvndZKII8MNnWQ6
+ vzVMtnmYdlyQ0UPWJ1wfGtAYPOpgG0IGTNeUVEnBpVitMjkwqcBaiLYSSciFjuLQZIuo
+ C2dWb0htQ0f0Q6/mJUVvX53kO3qglDNNR+KEhYORsXBWyzSKdqrl2GM7JovYPkfgJKOg
+ nQ3g==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=6m8GZi/zEqa+7pc0pclu0Dkq63gNG9R2qA58cWIOkYU=;
+ b=aciARYrBUbNIxC0c/cNp/+w4KRexvnhhhMHZ8ZQwV3o1IiG8R/Y/+ZgJNfGiTB//H7
+ foDLuVYXj1lacNO4gia7OTzAg+oBblDTzS2IJBGsAmJxfmI0ocxoWuVsIhDtecUkIDaB
+ HFxBE4y6xzq2SgdayMNSDzDDhXWBmveKmKt3xbpYyxpOwFRFpFPhufta7wK2QGsoevSb
+ vkVW2timy2Sz2bPtGoiSyMStt0YYhm/J3v3buwbDKzNFrcJy/cnAanm90apTAgrtpR11
+ N3TOiprDmxsaL4OgilqDE5JFnCwD0zZyZDduRhVFnk3mlkNbSIglUG9ji0Wm6OEfbhN9
+ s3xg==
+X-Gm-Message-State: AJcUukfiMQaPy/FV+PBwKGU3zzxKmvYaYGX8csYjaH8rbvI1mh3UlXkX
+ fbtg0Jw4vRTPOHoZDkLyAy3lEb21ol9AjO33FWk=
+X-Google-Smtp-Source: ALg8bN4nz2XsSn3hp9CNmYNaIp+pXteoGTJcVwejcuP0Nel8QnOr1cwennbCLRrolTcKonJN+PvG7WKiHsY/tqqTNwE=
+X-Received: by 2002:adf:9d85:: with SMTP id p5mr699472wre.41.1546937812883;
+ Tue, 08 Jan 2019 00:56:52 -0800 (PST)
+MIME-Version: 1.0
 References: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
  <CALeDE9PX=2nR8=9JjT9wvsb470nrZ_h6JGFsrkYkexGOoOhXuA@mail.gmail.com>
+ <849520506.312349.1546937289972@email.ionos.de>
+In-Reply-To: <849520506.312349.1546937289972@email.ionos.de>
+From: Peter Robinson <pbrobinson@gmail.com>
+Date: Tue, 8 Jan 2019 08:56:41 +0000
+Message-ID: <CALeDE9OYZi+LZCtnm3kZQ2g5oJ1BWXgfoX0MBD4X0Bz2Vj9Tng@mail.gmail.com>
 Subject: Re: [PATCH RFC 00/11] staging: vc04_services: Improve driver
  load/unload
-MIME-Version: 1.0
-X-Priority: 3
-Importance: Medium
-X-Mailer: Open-Xchange Mailer v7.8.4-Rev47
-X-Originating-Client: open-xchange-appsuite
-X-Provags-ID: V03:K1:QQtzDWFiEBY2hDFE75f/cCYJYegBzeTxMoNXDN7i5VC1tOSPukQ
- 1godxxmovAL8CUJNxdzDfgNfkGnFBxHheV6z5NbrreDiO0/seBGRvTe3WALhvItePw4sOL3
- 9HTCQmnuGHaPwjeaQQbNih7KLsEYV2rjw0xmr5yxODMutdOYb2WZc2oaus/cNvcZIjvPoF3
- 3YgaK0Rcj13JK/7IMYGKA==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:PxrWlaAjpm8=:UiPw4ieeK0kRXysGTc0Cwv
- nK0RZgBt2qyTepnGe66lNjoOJ291yIN6Pb9dd5rk0HactSogkDBlfN3cIWjS8gBBYAwpJE29r
- YboXXVauXb9sCBKw1z4cUxJBKSEqGuJ47fSlNLj8MnynfN1MpOW0H6JwN8959al2cnb5V9CHm
- 6y1COxd15ySRWMNRrVaJ8DrLmypAIzUMrNwS6NcVy61LClTf1DsrPEarabr5Xw/RtpmVRuAK2
- HAZiOwmsySyxP6i1D9O7p95z2pGfR+FgER2PrMC6ihBqvA0fhRnI7QJBasBR7BWl6hNgEdK5c
- Hmxg/UA0yIQH2XESJa/HXc7E2gSs01c9FjBq0XiEEgynhstQwyjifMPwnQ4CdrzFKxKDlBX7j
- h38iIPDFx5N0oLKoG23rCVj7Mqp93035+hTibghwib4R7+qGUIE4YcssjE2b5EtKJc7eWm9x0
- kSXMVN8gH+AEtD1ImTeWIguUSPqjuzG7bdsFhVdbkwz6AuSuwffob/G/diurwl4pTZtWNttqf
- pGS0Z9QrwUa/FORdsn9FilRFoCgxD2utsmoIwPZizVkH/K1FC2BZwtP8SaXKTF4aQ+8uOFfYG
- x8mgwvoBqEdTD9JxR35G2/oT9IsIg/I5SEf6grlGyTi9imgmpu2ccWNkaIU7T9z7aKLkyP3SH
- vkT/MLAuyeG4cIijVhSuWssXXFqBMMPuXFZEAorfSnjuoUHKEuE47dLAWWwAMhayJXbbIssPi
- Z3ygpkiGUQFdv1D6zrO4iJQSGxfpL7aIVLnm7sW2JMVdpKZ3lmM+Zp7ONDM=
+To: Stefan Wahren <stefan.wahren@i2se.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_004824_640320_FDAEA57B 
-X-CRM114-Status: GOOD (  14.66  )
+X-CRM114-CacheID: sfid-20190108_005654_947517_CDA2B23C 
+X-CRM114-Status: GOOD (  18.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,44 +100,57 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Peter,
+Hi Stefan,
 
-> Peter Robinson <pbrobinson@gmail.com> hat am 8. Januar 2019 um 08:21 geschrieben:
-> 
-> 
-> Hi Stefan,
-> 
-> > This patch series improves the load/unload of bcm2835 camera and audio
-> > drivers. It has been tested with Raspberry Pi 3 B and a camera module V1.
+> > > This patch series improves the load/unload of bcm2835 camera and audio
+> > > drivers. It has been tested with Raspberry Pi 3 B and a camera module V1.
+> > >
+> > > This series based on current linux-next and Phil Elwell's series ("Improve VCHIQ
+> > > cache line size handling"). After Nicolas' series ("staging: vc04_services:
+> > > Some dead code removal") has been applied, i will rebase my series.
 > >
-> > This series based on current linux-next and Phil Elwell's series ("Improve VCHIQ
-> > cache line size handling"). After Nicolas' series ("staging: vc04_services:
-> > Some dead code removal") has been applied, i will rebase my series.
-> 
-> I tried testing this series applied to 4.20 with the camera module.
+> > I tried testing this series applied to 4.20 with the camera module.
+>
+> first of all this crash should never happend.
 
-first of all this crash should never happend.
+What do you mean by that?
 
-But why didn't you applied the series which was actually applied to mainline?
-Did you apply the rest of Phil's DT series as mentioned in the cover letter?
+> But why didn't you applied the series which was actually applied to mainline?
+> Did you apply the rest of Phil's DT series as mentioned in the cover letter?
 
-> I
-> tried with qv4l2 (from v4l-utils) and using cheese, which in turn uses
-> gstreamer.
+I'm fairly certain I have Phil's "Improve VCHIQ cache line size
+handling" patch series applied if that's the one you mean, I will
+check (I'm currently dealing with 4 different kernels for maintenance
+so I'm sorry if my memory isn't exact).
 
-Please provide the exact commandline and version.
+> > I
+> > tried with qv4l2 (from v4l-utils) and using cheese, which in turn uses
+> > gstreamer.
+>
+> Please provide the exact commandline and version.
 
-> I basically get the same crash for both options. Desktop is
-> LXDE on 32 bit Fedora 29.
-> 
-> I've not yet tried with 5.0-rc1 but it looks like it has this patch
-> series and some other bits for the vchiq drivers in staging.
+That was the command line, it pops up a GUI and then just taking a
+still. The version is the latest upstream which is 1.16.3.
 
-Please try 5.0-rc1 which would be more helpful.
+> > I basically get the same crash for both options. Desktop is
+> > LXDE on 32 bit Fedora 29.
+> >
+> > I've not yet tried with 5.0-rc1 but it looks like it has this patch
+> > series and some other bits for the vchiq drivers in staging.
+>
+> Please try 5.0-rc1 which would be more helpful.
 
-Maybe this sounds like a lame excuse but the intension of this series wasn't to get the driver fully operational. I think this is more Dave's expertise.
+Yes, it's on my list.
 
-Stefan
+> Maybe this sounds like a lame excuse but the intension of this series wasn't to get the driver fully operational. I think this is more Dave's expertise.
+
+Well like so much stuff on the Raspberry Pi there's users that are
+testing it and want to use it so when people bother me I test it and
+provide feedback to the patches, if you don't want feedback I'll stop
+testing and just disable it and send people upstream for details so
+they don't bother me!
+
+Peter
 
 _______________________________________________
 linux-arm-kernel mailing list
