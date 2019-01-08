@@ -2,87 +2,76 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B1C68C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 18:52:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 78364C43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 19:07:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 80E0920827
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 18:52:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4E62F206BB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 19:07:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CgPD56NL";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="S7Hcy1Vb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 80E0920827
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MIazZ/Yc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4E62F206BB
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=public-files.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Date:Message-ID:References:From:
-	In-Reply-To:To:Subject:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:Date:Subject:To:
+	From:Message-ID:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=r+FYtP5llF+fwXMHPjFf3t4m8tx6/CulNV3CS2OoKpE=; b=CgPD56NLEW4jVy
-	NLGLmWvHv1SMPt34EEGMQk6FFYrKynqb02RDCip0d6EOnmaT8zrUZysFb3DaP35+R7pdOvSY8bOt/
-	NeJonDXbqg8VcLGoVIKECAqM15boOtUK3xBAUfRNmBnwwTSIOA/h7lzxIBhBaOdNiCRcVhGl34jM2
-	6uIJ4oCiQ4v/2pP0KaUyQPvbkv6KZytCwlZhC4guiJ3oGwdRSpIBwTyA1TI/hjGUgLL3nmn7Bvrua
-	vSpA20QuGoaWGPUA6wH/yldS8RjyL/NJXjspc27Xxh22PuSgyo9DBzspZSWcjE2Ow3VsMqC3OrX2M
-	DzwPPIu9ZVwQmMz3oXRg==;
+	List-Owner; bh=Zhb4ASUvX7v+h19CHwuxkr0TIvWVRvom15yhtPm9JcM=; b=MIazZ/Yc6+hp+W
+	hBUGwi2atOZZUgWSzx4EjvufeEq+qp+8yU4XzP+vmqXb1LuQOISqU8rh6XltN3qWiiZJWNQJCrIDy
+	xx8JcAGRT5oGSZ8QTzUUmQNLB2zDdpLT9EpVLuqxrIqFm7badch4UKp6r+3b/EOF2ES/6OPVNvyVt
+	Jo3Vx0YlD52ByuQk9DDVB/zwNf+iRqQoLCOXs5XmLWmlI2lkMSfKLneTbccLRRJclmufue7A/54Xn
+	trReXJpk1BzpQGqQkGsE9rbrRl7y7Usam8fbs17D9ftOpq7btcC1A9nAOx67AvKXLRLmbS+gkzm4T
+	PD7jodrQi6/Bn7YwscMg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggwUO-0001Ru-9s; Tue, 08 Jan 2019 18:52:36 +0000
-Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
+	id 1ggwiV-0007tS-3X; Tue, 08 Jan 2019 19:07:11 +0000
+Received: from mout.gmx.net ([212.227.15.18])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggwUK-0001Gt-Ft
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 18:52:33 +0000
-Received: by mail-pg1-x543.google.com with SMTP id j10so2132367pga.1
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 08 Jan 2019 10:52:31 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
- h=mime-version:content-transfer-encoding:subject:cc:to:in-reply-to
- :from:user-agent:references:message-id:date;
- bh=CZwbN/htHRHZzxXRs1Pr8UB4Vmqq/oNAuuczQzeEzQg=;
- b=S7Hcy1VbYi7dMcqS3COU1x2qHlp9q8BqZKsMuE+Zakvf1LTVUsJr48Ak/YUIBE9+tL
- 7aK7C4OSvwFF1zLdTd+zn9092p7+57So/fwfndGAT/epblCCEC6BMRs5NDSs/RqlUAu4
- CrngqgoM7kldSoNSF2fl6WGQUJSu6uLq9VuHQ=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:content-transfer-encoding:subject
- :cc:to:in-reply-to:from:user-agent:references:message-id:date;
- bh=CZwbN/htHRHZzxXRs1Pr8UB4Vmqq/oNAuuczQzeEzQg=;
- b=m+1WsBucqUV0sWWi2XjRRqpxSdySRRoITASjf/FYzy0N/yTXhdD6eS2lIZf5MYb2/U
- qxqfT9cabZUpkP7zq0WnEjaNxlA682Ho4dOH3bEVtf3E+VCDDiEHvASAcAX3DjKLPJDJ
- QzK/nCFpbhiK09pTx0QoRsIEbqTHM3WJANOX1ZIHc+r7I/dZMWUrUZp/9Eosweh9U/fk
- 58M072yTjEV62YurPrde9+Jp6X/Dez22ak/IOKLom/RUAEG9G7jD9JOA1eLdQASIbzlJ
- txYM+JAg2tH8hldF13Q/ED0FVYba4r/QQIE4hm/5o+Wc0J2vadnX+r1dtdWeyr/SObYU
- osBQ==
-X-Gm-Message-State: AJcUukcHoAj23rKcGa24pzdnS4I+YZmuv4uYgUcWEzDzM8U4HLCyj50G
- BNjDwNRl/mtzjT9Af4ydKok46A==
-X-Google-Smtp-Source: ALg8bN7VaArd9TyGYxhgoGC4vY1YqrWhhggm0iEH/+bFdGJ5HWCpjtvFgnJ4Xp1RDU8PJvAZsO435w==
-X-Received: by 2002:a63:ef47:: with SMTP id c7mr2587188pgk.386.1546973551377; 
- Tue, 08 Jan 2019 10:52:31 -0800 (PST)
-Received: from localhost ([2620:15c:202:1:fa53:7765:582b:82b9])
- by smtp.gmail.com with ESMTPSA id t87sm227611293pfk.122.2019.01.08.10.52.30
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 08 Jan 2019 10:52:30 -0800 (PST)
+ id 1ggwiR-0007sw-7F; Tue, 08 Jan 2019 19:07:09 +0000
+Received: from [91.14.64.214] ([91.14.64.214]) by web-mail.gmx.net
+ (3c-app-gmx-bs35.server.lan [172.19.170.87]) (via HTTP); Tue, 8 Jan 2019
+ 20:06:53 +0100
 MIME-Version: 1.0
-Subject: Re: [PATCH] soc: qcom: rpmh: Avoid accessing freed memory from batch
- API
-To: Evan Green <evgreen@chromium.org>, Lina Iyer <ilina@codeaurora.org>
-In-Reply-To: <CAE=gft6H29BM5k5q=t-eQ_2LT1GORqqhQReVQZ7VCKn7=Oz=Yg@mail.gmail.com>
-From: Stephen Boyd <swboyd@chromium.org>
-User-Agent: alot/0.8
-References: <20190103174657.251968-1-swboyd@chromium.org>
- <20190108174938.GA22547@codeaurora.org>
- <CAE=gft6H29BM5k5q=t-eQ_2LT1GORqqhQReVQZ7VCKn7=Oz=Yg@mail.gmail.com>
-Message-ID: <154697354993.15366.3623820425365137828@swboyd.mtv.corp.google.com>
-Date: Tue, 08 Jan 2019 10:52:29 -0800
+Message-ID: <trinity-4ceb1d55-424f-46b8-b8e7-989770b249a2-1546974413848@3c-app-gmx-bs35>
+From: "Frank Wunderlich" <frank-w@public-files.de>
+To: "Heiner Kallweit" <hkallweit1@gmail.com>
+Subject: Aw: Re: [PATCH] net: ethernet: mediatek: fix warning in phy_start_aneg
+Date: Tue, 8 Jan 2019 20:06:53 +0100
+Importance: normal
+Sensitivity: Normal
+In-Reply-To: <7acce775-4ab7-c867-c801-25ee004f6b38@gmail.com>
+References: <20190108160526.18928-1-frank-w@public-files.de>
+ <7acce775-4ab7-c867-c801-25ee004f6b38@gmail.com>
+X-UI-Message-Type: mail
+X-Priority: 3
+X-Provags-ID: V03:K1:ZJLH7Z5j6IMWKTHNDAq6EUnJKNx6pZWJhT+UxWNmhz4F977/b+WwiyKDgL3ti+DXmfHD9
+ Wgmm718q0bGENdKngNx39qqL/Jp3zPJlxWjjAg3TMgcJyZxbMVwa42KqxvhopBSGaDfKFzEtVdbq
+ 94mzoVKfARAGMNQkTUiHctnr15Oku8WMu3ujAp34NEngjMyGn5IJS3FS7wb8EfN5n0dhA6il5IBb
+ UWfdOKhMzUQVRga8dvv9xkMtwMNxjzh6m2ykbKU7Ad1M9HoU+knS2yCeGzIUQB6QY6QSdmDctroH
+ No=
+X-UI-Out-Filterresults: notjunk:1;V03:K0:gFXAB7BfwYo=:59sDYjgMRQNN0lLW5e66j5
+ 65hHbsys7LlrQ2dMTQjdy61Q7gYADs13JmEUcXQzg18QT963AePmLlQ2FxzuX6HA4dm0NXbBp
+ PUAz7pAsq6nvlpoI/Q/ULuV7nO/uARLeX9cLZfWKXsEGX0UrzNXSM9AMrWOXWKx+24zFaw/Bi
+ llQRkgl2clHzcC/mQ70SBRV8EfxUHo4MJXDLYBYQmQz1Sk/DSUR9Oq1xPMC+X8QZ90bVcS2xZ
+ EWBHVz4+5kJdJnUNiQWh1LQJ1wjodl7O/GIKN6j4RaYzcpmBOu1fF792y+zz+Ez8puA1qnaeT
+ gT3HI31hsbFIYVFEl8y0fyjyR+F7QPyucsx9iur5hScUFE2DkvehIq4ANXYhCbVGsXZpEmW+D
+ Ii5xQMvTKedrgALOPQx5Xw7+FkD0WRGtQDquG+RG8ApRYejqeIgDxn4ndlDrSlNRMh2nKWdx6
+ 5h2qWvwT9KNF4lZH1CKsBj5lbXuGwecsGXvHujcWQLZkO4smvp5ltDFzCOvyySvz57H9o40rw
+ Isvcjk3GMUM8i6pBiGiWo1AdfDD4V4BBWacLeCkCdwQLMjlTJc5GIUavebfE6DL9knfUfIQ8T
+ vVLl3NvIEboqQ=
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_105232_561041_6F32C133 
-X-CRM114-Status: GOOD (  19.78  )
+X-CRM114-CacheID: sfid-20190108_110707_559667_E13B45B5 
+X-CRM114-Status: UNSURE (   7.55  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,73 +83,51 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-msm@vger.kernel.org, linux-kernel@vger.kernel.org,
- Matthias Kaehlcke <mka@chromium.org>, Andy Gross <andy.gross@linaro.org>,
- "Raju P.L.S.S.S.N" <rplsssn@codeaurora.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Felix Fietkau <nbd@openwrt.org>, Nelson Chang <nelson.chang@mediatek.com>,
+ netdev@vger.kernel.org, Sean Wang <sean.wang@kernel.org>,
+ linux-kernel@vger.kernel.org, linux-mediatek@lists.infradead.org,
+ John Crispin <john@phrozen.org>, Matthias Brugger <matthias.bgg@gmail.com>,
+ "David S. Miller" <davem@davemloft.net>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Evan Green (2019-01-08 10:30:04)
-> On Tue, Jan 8, 2019 at 9:49 AM Lina Iyer <ilina@codeaurora.org> wrote:
-> >
-> > diff --git a/drivers/soc/qcom/rpmh.c b/drivers/soc/qcom/rpmh.c
-> > index c7beb6841289..0303a2971d4a 100644
-> > --- a/drivers/soc/qcom/rpmh.c
-> > +++ b/drivers/soc/qcom/rpmh.c
-> > @@ -80,6 +80,7 @@ void rpmh_tx_done(const struct tcs_request *msg, int r)
-> >         struct rpmh_request *rpm_msg = container_of(msg, struct rpmh_request,
-> >                                                     msg);
-> >         struct completion *compl = rpm_msg->completion;
-> > +       bool free = rpm_msg->needs_free;
-> >
-> >         rpm_msg->err = r;
-> >
-> > @@ -94,7 +95,7 @@ void rpmh_tx_done(const struct tcs_request *msg, int r)
-> >         complete(compl);
-> >
-> >  exit:
-> > -       if (rpm_msg->needs_free)
-> > +       if (free)
-> >                 kfree(rpm_msg);
-> >  }
-> >
+
+> In mtk_phy_connect() I would say this complete block can be removed.
+> All this is handled internally by phylib.
 > 
-> Hi Lina,
-> I think that's a worthy fix, too, and is needed to solve the issue you describe.
-
-Looks like we need both fixes so I can combine them together.
-
+> 	dev->phydev->autoneg = AUTONEG_ENABLE;
+> 	dev->phydev->speed = 0;
+> 	dev->phydev->duplex = 0;
 > 
-> But I think Stephen's fix is still needed. In the rpmh_write_batch
-> scenario, we queue N things into rpmh, but set the same completion for
-> all of them. If only the first one completes but not the others, then
-> the loop in rpmh_write_batch will call wait_for_completion_timeout N
-> times on the same completion, and then goes on to free all N requests,
-> even though only the first one is actually done and out of the system
-> (well, almost out of the system, with the bug you noticed above).
-
-This code looks an awful lot like kref_put() with a release function
-that's a kfree() of the rpm message. Would that simplify the code
-somewhat if we made a refcounter (that probably only counted up to 2)
-and then properly refcounted the messages? We would have to allocate a
-bunch of messages for the batch writing API, but I'm not sure that's a
-big deal either.
-
+> 	phy_set_max_speed(dev->phydev, SPEED_1000);
+> 	phy_support_asym_pause(dev->phydev);
+> 	linkmode_copy(dev->phydev->advertising, dev->phydev->supported);
+> 	linkmode_set_bit(ETHTOOL_LINK_MODE_Autoneg_BIT,
+> 			 dev->phydev->advertising);
+> 	phy_start_aneg(dev->phydev);
 > 
-> We considered having just one completion on the last transfer, but
-> then if there's an error part way through you have no way of waiting
-> on the transfers that did get submitted. So I think N completions are
-> needed.
+> Could you please test this?
 
-For that, I'd like to make the batch API know more about the TCS it's
-filling so it can know how to unwind the state if something fails. From
-what I can tell this function is implemented at the wrong abstraction
-level. It should be a lower level function so it can manage the queue
-and push multiple messages through.
+seems to work well, no warning in dmesg
 
+traffic 940Mbit sending, 900 receive
+
+> And a further proposal:
+> Instead of the open-coded dev_info() in mtk_phy_connect_node()
+> you could use phy_attached_info().
+
+have not tried this yet...because it's only an info-message and needs different parameters...have to look how i can convert it 
+
+> Calling phy_start() in the ndo_open callback is fine, you can leave
+> it there.
+
+have it re-added
+
+pushed to my repo: https://github.com/frank-w/BPI-R2-4.14/commits/5.0-rc
+
+regards Frank
 
 _______________________________________________
 linux-arm-kernel mailing list
