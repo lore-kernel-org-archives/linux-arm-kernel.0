@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9BFF0C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 13:52:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2FB77C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 13:52:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 55F102087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 13:52:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E50BA2087E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 13:52:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mSiYi3h7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 55F102087E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sESW+Wy8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E50BA2087E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amlogic.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,35 +25,36 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=48wHZqwcHQ6nokz28P/pZQjjvXx7CJSr/d7sURgmRf8=; b=mSiYi3h7Sw9ys6
-	tWkn9A91nJSOxRJDjbxfGGIy5MFAvuTH/2kookNOIQgRPmP8d2gfowX+UPH1S+a6jK/U7u3pHooUJ
-	nKbWtbbFzyjpxAXEkbp5S9MFIUDKIPOSw+E9kg+a5in3yWl5Yg1nKNkdUbhHUR5Do+mES//oc21io
-	rqhsHG5sHENojAu3dAd6Fhzqg+TxWqYTOwYl7hmtO6sU0oNv9lbHNDYKTRxDoqLXpR13st7CLH+U2
-	SZqkOleEdtHRAVpvE0J3HwSFTUK03fG+Avj2wiRa+rtNspXTgEVc/QK4nN5XqeaHy0bBk9GkyVtJ9
-	H4MssBS05TheQDuiihqQ==;
+	List-Owner; bh=gBtLa9UTWG8g/Fb56uI3E6efsVtn/aAoIztmT70sJdc=; b=sESW+Wy8ODCppC
+	eWHTzqvpkQUfW39+It/DpOFU1w+CDZtBUbtB2CnxXRuBVNL346JPi5CZDi93LuZ1Zzjy+9RlmiXbB
+	Jbm4xxs/lJaY1lV9A018NTzO5KmIycwFkoNCkRf/jVPGJ7auwBwdlojVhzmrXt6ysZ2uiJo3b7rEP
+	hCUpsfedSxYD/v2umtvQ/S6nncbw2QnRSBHCVkXEhHJr6YuEqhiWTIGWYry6GsK2cpZ8AS6ujFRUb
+	c7np30XFW9FGvTzM/9vi4dpguj3+6HzoIOXn7TpskVPgbKvZy3Gd9GNyaAJ4pQNt93aj0dNcOHbs8
+	e7xqcx41yftk77Y8GkXg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggrnZ-0008QO-6A; Tue, 08 Jan 2019 13:52:05 +0000
+	id 1ggrnt-0000HY-VT; Tue, 08 Jan 2019 13:52:25 +0000
 Received: from mail-sh2.amlogic.com ([58.32.228.45])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggrmi-0007Z8-Jq; Tue, 08 Jan 2019 13:51:16 +0000
+ id 1ggrmn-0007Z8-08; Tue, 08 Jan 2019 13:51:21 +0000
 Received: from localhost.localdomain (10.18.11.217) by mail-sh2.amlogic.com
  (10.18.11.6) with Microsoft SMTP Server id 15.0.1320.4; Tue, 8 Jan 2019
  21:51:32 +0800
 From: Jianxin Pan <jianxin.pan@amlogic.com>
 To: Jerome Brunet <jbrunet@baylibre.com>, Neil Armstrong
  <narmstrong@baylibre.com>
-Subject: [PATCH v9 2/4] clk: meson: add emmc sub clock phase delay driver
-Date: Tue, 8 Jan 2019 21:50:42 +0800
-Message-ID: <1546955444-7549-3-git-send-email-jianxin.pan@amlogic.com>
+Subject: [PATCH v9 3/4] clk: meson: add DT documentation for emmc clock
+ controller
+Date: Tue, 8 Jan 2019 21:50:43 +0800
+Message-ID: <1546955444-7549-4-git-send-email-jianxin.pan@amlogic.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1546955444-7549-1-git-send-email-jianxin.pan@amlogic.com>
 References: <1546955444-7549-1-git-send-email-jianxin.pan@amlogic.com>
 MIME-Version: 1.0
 X-Originating-IP: [10.18.11.217]
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_055112_974747_EE21D723 
-X-CRM114-Status: GOOD (  12.47  )
+X-CRM114-CacheID: sfid-20190108_055117_487062_B0DF81E9 
+X-CRM114-Status: GOOD (  10.37  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,134 +84,88 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Yixun Lan <yixun.lan@amlogic.com>
 
-Export the emmc sub clock phase delay ops which will be used
-by the emmc sub clock driver itself.
+Document the MMC sub clock controller driver, the potential consumer
+of this driver is MMC or NAND. Also add four clock bindings IDs which
+provided by this driver.
 
+Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 Signed-off-by: Jianxin Pan <jianxin.pan@amlogic.com>
 ---
- drivers/clk/meson/Makefile          |  1 +
- drivers/clk/meson/clk-phase-delay.c | 73 +++++++++++++++++++++++++++++++++++++
- drivers/clk/meson/clkc.h            |  7 ++++
- 3 files changed, 81 insertions(+)
- create mode 100644 drivers/clk/meson/clk-phase-delay.c
+ .../devicetree/bindings/clock/amlogic,mmc-clkc.txt | 39 ++++++++++++++++++++++
+ include/dt-bindings/clock/amlogic,mmc-clkc.h       | 17 ++++++++++
+ 2 files changed, 56 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
+ create mode 100644 include/dt-bindings/clock/amlogic,mmc-clkc.h
 
-diff --git a/drivers/clk/meson/Makefile b/drivers/clk/meson/Makefile
-index acd8694..d59620d 100644
---- a/drivers/clk/meson/Makefile
-+++ b/drivers/clk/meson/Makefile
-@@ -3,6 +3,7 @@
- #
- 
- obj-$(CONFIG_COMMON_CLK_AMLOGIC) += clk-pll.o clk-mpll.o clk-phase.o vid-pll-div.o
-+obj-$(CONFIG_COMMON_CLK_AMLOGIC) += clk-phase-delay.o
- obj-$(CONFIG_COMMON_CLK_AMLOGIC) += clk-input.o
- obj-$(CONFIG_COMMON_CLK_AMLOGIC) += sclk-div.o
- obj-$(CONFIG_COMMON_CLK_AMLOGIC_AUDIO) += clk-triphase.o
-diff --git a/drivers/clk/meson/clk-phase-delay.c b/drivers/clk/meson/clk-phase-delay.c
+diff --git a/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt b/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
 new file mode 100644
-index 0000000..a6e6600
+index 0000000..0f518e6
 --- /dev/null
-+++ b/drivers/clk/meson/clk-phase-delay.c
-@@ -0,0 +1,73 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++++ b/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
+@@ -0,0 +1,39 @@
++* Amlogic MMC Sub Clock Controller Driver
++
++The Amlogic MMC clock controller generates and supplies clock to support
++MMC and NAND controller
++
++Required Properties:
++
++- compatible: should be:
++		"amlogic,gx-mmc-clkc"
++		"amlogic,axg-mmc-clkc"
++
++- #clock-cells: should be 1.
++- clocks: phandles to clocks corresponding to the clock-names property
++- clock-names: list of parent clock names
++	- "clkin0", "clkin1"
++
++- reg: address of emmc sub clock register
++
++Example: Clock controller node:
++
++sd_mmc_c_clkc: clock-controller@7000 {
++	compatible = "amlogic,axg-mmc-clkc", "syscon";
++	reg = <0x0 0x7000 0x0 0x4>;
++	#clock-cells = <1>;
++
++	clock-names = "clkin0", "clkin1";
++	clocks = <&clkc CLKID_SD_MMC_C_CLK0>,
++		 <&clkc CLKID_FCLK_DIV2>;
++};
++
++sd_emmc_b_clkc: clock-controller@5000 {
++	compatible = "amlogic,axg-mmc-clkc", "syscon";
++	reg = <0x0 0x5000 0x0 0x4>;
++
++	#clock-cells = <1>;
++	clock-names = "clkin0", "clkin1";
++	clocks = <&clkc CLKID_SD_EMMC_B_CLK0>,
++		 <&clkc CLKID_FCLK_DIV2>;
++};
+diff --git a/include/dt-bindings/clock/amlogic,mmc-clkc.h b/include/dt-bindings/clock/amlogic,mmc-clkc.h
+new file mode 100644
+index 0000000..34a3c56
+--- /dev/null
++++ b/include/dt-bindings/clock/amlogic,mmc-clkc.h
+@@ -0,0 +1,17 @@
++/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 +/*
-+ * Amlogic Meson MMC Sub Clock Controller Driver
++ * Meson MMC sub clock tree IDs
 + *
-+ * Copyright (c) 2017 Baylibre SAS.
-+ * Author: Jerome Brunet <jbrunet@baylibre.com>
-+ *
-+ * Copyright (c) 2018 Amlogic, inc.
++ * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
 + * Author: Yixun Lan <yixun.lan@amlogic.com>
-+ * Author: Jianxin Pan <jianxin.pan@amlogic.com>
 + */
 +
-+#include <linux/clk-provider.h>
-+#include "clkc.h"
++#ifndef __MMC_CLKC_H
++#define __MMC_CLKC_H
 +
-+static inline struct meson_clk_phase_delay_data *
-+meson_clk_get_phase_delay_data(struct clk_regmap *clk)
-+{
-+	return clk->data;
-+}
++#define CLKID_MMC_DIV		0
++#define CLKID_MMC_PHASE_CORE	1
++#define CLKID_MMC_PHASE_TX	2
++#define CLKID_MMC_PHASE_RX	3
 +
-+static int meson_clk_phase_delay_get_phase(struct clk_hw *hw)
-+{
-+	struct clk_regmap *clk = to_clk_regmap(hw);
-+	struct meson_clk_phase_delay_data *ph;
-+	unsigned long period_ps, p, d;
-+	int degrees;
-+
-+	ph = meson_clk_get_phase_delay_data(clk);
-+	p = meson_parm_read(clk->map, &ph->phase);
-+	degrees = p * 360 / (1 << (ph->phase.width));
-+
-+	period_ps = DIV_ROUND_UP_ULL(NSEC_PER_SEC * 1000ull,
-+				     clk_hw_get_rate(hw));
-+
-+	d = meson_parm_read(clk->map, &ph->delay);
-+	degrees += d * ph->delay_step_ps * 360 / period_ps;
-+	degrees %= 360;
-+
-+	return degrees;
-+}
-+
-+static int meson_clk_phase_delay_set_phase(struct clk_hw *hw, int degrees)
-+{
-+	struct clk_regmap *clk = to_clk_regmap(hw);
-+	struct meson_clk_phase_delay_data *ph;
-+	unsigned long period_ps, d = 0;
-+	unsigned int p;
-+
-+	ph = meson_clk_get_phase_delay_data(clk);
-+	period_ps = DIV_ROUND_UP_ULL(NSEC_PER_SEC * 1000ull,
-+				     clk_hw_get_rate(hw));
-+
-+	/*
-+	 * First compute the phase index (p), the remainder (r) is the
-+	 * part we'll try to acheive using the delays (d).
-+	 */
-+	p = 360 / 1 << (ph->phase.width);
-+	degrees = degrees / p;
-+	d = DIV_ROUND_CLOSEST((degrees % p) * period_ps,
-+			      360 * ph->delay_step_ps);
-+	d = min(d, PMASK(ph->delay.width));
-+
-+	meson_parm_write(clk->map, &ph->phase, degrees);
-+	meson_parm_write(clk->map, &ph->delay, d);
-+	return 0;
-+}
-+
-+const struct clk_ops meson_clk_phase_delay_ops = {
-+	.get_phase = meson_clk_phase_delay_get_phase,
-+	.set_phase = meson_clk_phase_delay_set_phase,
-+};
-+EXPORT_SYMBOL_GPL(meson_clk_phase_delay_ops);
-diff --git a/drivers/clk/meson/clkc.h b/drivers/clk/meson/clkc.h
-index 00b3320..e6f0905 100644
---- a/drivers/clk/meson/clkc.h
-+++ b/drivers/clk/meson/clkc.h
-@@ -118,6 +118,12 @@ struct clk_regmap _name = {						\
- 	},								\
- };
- 
-+struct meson_clk_phase_delay_data {
-+	struct parm	phase;
-+	struct parm	delay;
-+	unsigned int	delay_step_ps;
-+};
-+
- /* clk_ops */
- extern const struct clk_ops meson_clk_pll_ro_ops;
- extern const struct clk_ops meson_clk_pll_ops;
-@@ -127,6 +133,7 @@ struct clk_regmap _name = {						\
- extern const struct clk_ops meson_clk_phase_ops;
- extern const struct clk_ops meson_vid_pll_div_ro_ops;
- extern const struct clk_ops meson_sclk_div_ops;
-+extern const struct clk_ops meson_clk_phase_delay_ops;
- 
- struct clk_hw *meson_clk_hw_register_input(struct device *dev,
- 					   const char *of_name,
++#endif
 -- 
 1.9.1
 
