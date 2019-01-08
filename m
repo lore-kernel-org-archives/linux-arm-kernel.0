@@ -2,72 +2,118 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6ABE7C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 10:49:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2901FC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 10:56:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 306A72087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 10:49:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E21E02087E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 10:56:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G/4bjmJH";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="uVnlZiqD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 306A72087E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kQO9BFzo";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="fEE5SHaQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E21E02087E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+qlKHdplP5fDdj0EMCgnsNMKi1R62iq8ijuX+R8IM+U=; b=G/4bjmJHvsJ+CH
-	igZdVtdoR90wHszqCUVQqxe81Nonrf71iepqbfxm0TedsRvhZ/E9dnbcKVWI8ehk4InXlJDHHOpyQ
-	SsCtuI9jWUlzTPXRT1JeVuPi7FYlR0LHzaE9GMlfZwHuRGYdwNGkVGFNc6IM+R8JERZH3kHG6YzpU
-	M4l7GXi6zdjM6Vrib9MU2k0ZGQeYX87By4G24RkeK2teN8C0nuGDyUhf/+mCFBf4h+8ZqnFO8Wrvh
-	u6fPe3e+Gh12a4jajh15mO2ypPY0cD/+oS1bn7HcUMrQpfxcbsszHee3y02QrUx0itYl2byoDWmWb
-	+2/jT9GIOQA6V5IIjZIA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=x5ANd0PB3qqzpu3jp2NsAZS3J6GCvZxCxU2gQhxGaoo=; b=kQO9BFzom9vQ8u
+	eqM49SLv9OXB/AtwAQE+/o71b8OI3NV/5diRLn0h1GokaMymel2HE7mqYqd/OTHuvcGT5fGhpekOh
+	p5uPMfK7QvlxeQNPGKwi8umHwIUSWWyh8m9+TYNtiB/YcIlk7etRayejr2D+A6unhjjKgroSgLWjf
+	un6bDiAWQRnntwTLF4BD1L+R6MWrWKKzTTHvw4RsaxTLYOrKeXRxVt9CnikXjmvIo7RnHrrBMuVMa
+	c66E1e6EZ/DHHOIrUS2N3fXs/jj0OnEobYrNn64oeSrWG7y96bQ5x2gdT8VM1MPl9xOw995Ecsknt
+	IvT3yitTyq0MPeSjodGA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggox7-0000If-Nq; Tue, 08 Jan 2019 10:49:45 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1ggp3h-0003mH-NH; Tue, 08 Jan 2019 10:56:33 +0000
+Received: from esa5.microchip.iphmx.com ([216.71.150.166])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggox6-0000IT-AY
- for linux-arm-kernel@bombadil.infradead.org; Tue, 08 Jan 2019 10:49:44 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
- References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=OnwtPs5be4ZWFbK8e++4kO+bbmnQAgKMSMIUXwvqZ74=; b=uVnlZiqDJqSeyKFfOli3GPUc1
- iEqVHqOPhWABh6R2Foby075U7DYteAbyFJ0uaSp7vffyX8YZvXaEIMzImbXX5B5CgvBKZLD7B7bJB
- ISqzcSH1vIINbEABvu2tkGXRioetvKjgouy7mUs3dvf0nGtU/QdaQyNJrrUSteo/zYJ70/BgVxbaL
- CHZdEO81Te7so71ZiMNq1OfG7hxdHp9T8D/cHumpAeaq5GCCiB4njv0lwwz9a6j0PFER2rofTxLDt
- O6uVfVvU0HWe6zjKwp/+yUfRjcZ9oq/LUtbxhF5CSHNonNIQdwx8RcMyEn20an2YufILOCtRtM7nT
- m0v42t79g==;
-Received: from j217100.upc-j.chello.nl ([24.132.217.100]
- helo=hirez.programming.kicks-ass.net)
- by merlin.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggox4-0003tQ-3x; Tue, 08 Jan 2019 10:49:42 +0000
-Received: by hirez.programming.kicks-ass.net (Postfix, from userid 1000)
- id E1344201BC2AE; Tue,  8 Jan 2019 11:49:40 +0100 (CET)
-Date: Tue, 8 Jan 2019 11:49:40 +0100
-From: Peter Zijlstra <peterz@infradead.org>
-To: Andrew Murray <andrew.murray@arm.com>
-Subject: Re: [PATCH v4 11/13] x86: perf/core: use PERF_PMU_CAP_NO_EXCLUDE for
- exclude incapable PMUs
-Message-ID: <20190108104940.GE6808@hirez.programming.kicks-ass.net>
-References: <1546878450-20341-1-git-send-email-andrew.murray@arm.com>
- <1546878450-20341-12-git-send-email-andrew.murray@arm.com>
+ id 1ggp3e-0003k4-2R
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 10:56:32 +0000
+X-IronPort-AV: E=Sophos;i="5.56,453,1539673200"; d="scan'208";a="23118873"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa5.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 08 Jan 2019 03:56:27 -0700
+Received: from NAM02-SN1-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.107) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Tue, 8 Jan 2019 03:56:26 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=IBhzeiq+wc7kA0tjwTg8O2rWiUCCpBEfQ9lTSrsd3mQ=;
+ b=fEE5SHaQtnn/VFnn0MwwLPrhlpCCx04EBfkkzwy7uF5eLOKnPsrPgrQgFa9FrhN93m2Dbly6ppvtSClr75eY8NxUVq8GbCahKsbrWg0BbyeW8kawJ4KawEkqPz/NIi9Ofs0GjP3oQ6Jt/qt1cHxkQ7bdw/HJJpAGUeuAJ5ZGFGI=
+Received: from CY4PR11MB1909.namprd11.prod.outlook.com (10.175.61.147) by
+ CY4PR11MB1399.namprd11.prod.outlook.com (10.173.17.13) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1495.9; Tue, 8 Jan 2019 10:56:25 +0000
+Received: from CY4PR11MB1909.namprd11.prod.outlook.com
+ ([fe80::5478:c9ff:e5b2:2b4e]) by CY4PR11MB1909.namprd11.prod.outlook.com
+ ([fe80::5478:c9ff:e5b2:2b4e%9]) with mapi id 15.20.1495.011; Tue, 8 Jan 2019
+ 10:56:25 +0000
+From: <Claudiu.Beznea@microchip.com>
+To: <Nicolas.Ferre@microchip.com>, <alexandre.belloni@bootlin.com>,
+ <Ludovic.Desroches@microchip.com>, <linux@armlinux.org.uk>,
+ <lgirdwood@gmail.com>, <broonie@kernel.org>, <rjw@rjwysocki.net>,
+ <pavel@ucw.cz>, <len.brown@intel.com>
+Subject: [PATCH v2 0/3] add support for power off check in suspend
+Thread-Topic: [PATCH v2 0/3] add support for power off check in suspend
+Thread-Index: AQHUp0DMK00T01NVNECI4VrUGS192w==
+Date: Tue, 8 Jan 2019 10:56:25 +0000
+Message-ID: <1546944944-13911-1-git-send-email-claudiu.beznea@microchip.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1PR04CA0113.eurprd04.prod.outlook.com
+ (2603:10a6:803:64::48) To CY4PR11MB1909.namprd11.prod.outlook.com
+ (2603:10b6:903:11f::19)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Claudiu.Beznea@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [94.177.32.154]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; CY4PR11MB1399;
+ 6:FHYnrGD6uYsprzMhS696lyJIqfttbWsl6zplpNNW3iPPjVBiVTGjZ38qtwJg16HP2HDVEvWpLUPicXcsWTn+Twr4tYdqIFHmA5hAAw0tfoTMn7NzPkBXe4fEWK+wg5ns49A/f3+PjwX0pe8Inl1LvDe/P8kvmMYW39otHMfpLOcnsVmScHNva0ph/kLJFVuo1AwB3HkQj1g+Q5F+gLSoZTK0QxdgrsgL94spCS5sfy7/74ufyJAdYXpLbgnIBZsYl/iVHgctMWnRhfgJDVQ0E0vV2Uy50yj9hyKQSuW7ppuYF2eeiebYe6RLE6yaJZWAP9EDvi4HheLk+X4MykKYVmkwceKMi5/TT6bUUjfPD78KBSOwL5WRN79u4BkozXTo4mzKSkOG97QwPqYXLjdbhHgI7QKJT3WewGsiCajZowSJaU1wGPLco6YBpGyTNg1QG07JWN2+OWp4ZfhFl/YzYA==;
+ 5:9XdVJJN7BUKwPYHkbyE3VjKfhgeAXuIxCDAR6pBzw5e6BFlJEVYt493KBOIJw6Gks3DlMd2wvMnnizh1u3DyE/rs7ZwFuvhkG5fNd49dL5YhadYUDyiZuFdQxvghDt4sumZV0HcCMbK9UUBfxTI1JJEci1zaRGVB1Poll1s1O023HLgSDgymWujOgvT/U4ZtY6rXtBQ3a4BsyJ1SxdQgEQ==;
+ 7:0t9Zm4RvcjU8d3CRyUiodfDv8F6OdMLgqe/bvGeSFP4lBx77H6T5guDqr+HJpFI7NINBjbmmiyCpv5MNklbHAh3iChRbmYkQlB+jFYnupU6jvG3Z+9KajHDjtaEnvBOtzcnI78fztovQy89RRC7hdg==
+x-ms-office365-filtering-correlation-id: 8b81da9f-eda0-4331-ff62-08d67557ef15
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(2017052603328)(7153060)(7193020);
+ SRVR:CY4PR11MB1399; 
+x-ms-traffictypediagnostic: CY4PR11MB1399:
+x-microsoft-antispam-prvs: <CY4PR11MB1399E9FE5FE3932ECE5A169C878A0@CY4PR11MB1399.namprd11.prod.outlook.com>
+x-forefront-prvs: 0911D5CE78
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(136003)(39860400002)(376002)(346002)(396003)(366004)(189003)(199004)(6512007)(966005)(72206003)(8936002)(2616005)(476003)(102836004)(478600001)(97736004)(36756003)(256004)(14444005)(86362001)(71190400001)(2906002)(71200400001)(66066001)(3846002)(6116002)(2201001)(316002)(54906003)(186003)(2501003)(110136005)(305945005)(7736002)(14454004)(6486002)(6436002)(8676002)(7416002)(6506007)(386003)(81156014)(81166006)(5660300001)(25786009)(99286004)(26005)(39060400002)(107886003)(15650500001)(106356001)(105586002)(6306002)(52116002)(68736007)(4326008)(486006)(53936002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:CY4PR11MB1399;
+ H:CY4PR11MB1909.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: 7dR9cfVlszI56Xc1M2xtr+ECIgNJAuna2nKF5UT23NaeTn4Kk7ebVL6RSK2bYhLgIwHrToYpqmLLGJb71/HSsSBv2eM4vIqwM8XSROw2KEZKpMFi3BIDd2QB9pWs+ehgrpwXbEcpanj45wqZz4ka3r5L92MrSsh3VZa6+fOjIdQk7u1/eoJkYjV9ipZhvpCuUfOuk7oOpP4Ib+k3Oozs005Pz/7IuTTJU4nbpq5FNQLkP44roGpL9YW+rLlKTocCWYIsu0O9UeFC7wDYacb/FwIwB39CugPyD4tGmOn+lIVT9r1wrpTV5ujLlYxsyByi
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1546878450-20341-12-git-send-email-andrew.murray@arm.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 8b81da9f-eda0-4331-ff62-08d67557ef15
+X-MS-Exchange-CrossTenant-originalarrivaltime: 08 Jan 2019 10:56:25.6273 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: CY4PR11MB1399
+X-OriginatorOrg: microchip.com
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20190108_025630_540889_BD6654CA 
+X-CRM114-Status: GOOD (  14.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,28 +125,77 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Benjamin Herrenschmidt <benh@kernel.crashing.org>,
- Will Deacon <will.deacon@arm.com>, Paul Mackerras <paulus@samba.org>,
- Shawn Guo <shawnguo@kernel.org>, Michael Ellerman <mpe@ellerman.id.au>,
- x86@kernel.org, Russell King <linux@armlinux.org.uk>,
- Ingo Molnar <mingo@redhat.com>, Matt Turner <mattst88@gmail.com>,
- suzuki.poulose@arm.com, Sascha Hauer <s.hauer@pengutronix.de>,
- Arnaldo Carvalho de Melo <acme@kernel.org>,
- Ivan Kokshaysky <ink@jurassic.park.msu.ru>,
- Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org,
- Richard Henderson <rth@twiddle.net>, robin.murphy@arm.com,
- linux-kernel@vger.kernel.org, linux-alpha@vger.kernel.org,
- Borislav Petkov <bp@alien8.de>, linuxppc-dev@lists.ozlabs.org
+Cc: Claudiu.Beznea@microchip.com, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-pm@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 07, 2019 at 04:27:28PM +0000, Andrew Murray wrote:
+From: Claudiu Beznea <claudiu.beznea@microchip.com>
 
-This patch has the exact same subject as the previous one.. that seems
-sub-optimal.
+Hi,
+
+AT91 platforms support a power saving mode where SoC's power is cut off (we call
+it backup mode). The resume is done with the help of bootloaders. To be able to
+suspend/resume Linux to/from this mode all the drivers suspend/resume callbacks
+should save/restore the content of all the active registers. We have 2 problems
+we are trying to solve:
+- some of these drivers are shared with other non Microchip SoCs (e.g. macb
+  driver) and we don't want to disturbe other users of corresponding IPs with
+  all the register save/restore operations;
+- the suspend/resume time for the rest of the power saving mode we are using
+  could be improved if we would know in drivers the suspend mode the platform
+  is switched to.
+
+A solution that would have been solve our problems was proposed in [1] but in
+the end it wasn't accepted. It ended up with the introduction of
+pm_suspend_target_state variable that could be used along with the changes in
+this series.
+
+While the discussion of [1] progressed it has been proposed (in [2]) to
+implement a function that would tell if the platform's power would be cut off
+at the end of the suspend procedure.
+
+The patches in this series does as follows:
+1/3 - add a new member to platform_suspend_ops that will tell if platform's
+      power will be cut off at the end of the suspend procedure; drivers could
+      use it via platform_off_in_suspend()
+2/3 - add a new function to regulator's core that could be used to check if a
+      proper regulator has been configured (via DT) to be powered off in
+      suspend. This is used on this series to check the CPU's regulator is
+      properly configured in DT to be turned off in suspend.
+3/3 - fill .off_in_suspend member of at91_pm_ops; the functionality in patch 2/3
+      is used to double check CPU's regulator would be turned off in suspend.
+
+Thank you,
+Claudiu Beznea
+
+[1] https://lkml.org/lkml/2017/6/22/938
+[2] https://lkml.org/lkml/2017/7/16/457
+
+Changes in v2:
+- remove !! instruction in regulator_is_disabled_in_suspend() and
+  at91_pm_state_allowed()
+- s/weather/wether in patch 1/1
+
+Claudiu Beznea (3):
+  PM / Suspend: Add support to check if platform's power is off in
+    suspend
+  regulator: core: add helper to check if regulator is disabled in
+    suspend
+  ARM: at91: pm: add support for .off_in_suspend
+
+ arch/arm/mach-at91/pm.c            | 61 +++++++++++++++++++++++++++++++++++---
+ drivers/regulator/core.c           | 17 +++++++++++
+ include/linux/regulator/consumer.h |  7 +++++
+ include/linux/suspend.h            |  6 ++++
+ kernel/power/suspend.c             | 13 ++++++++
+ 5 files changed, 100 insertions(+), 4 deletions(-)
+
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
