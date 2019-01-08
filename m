@@ -2,57 +2,163 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-12.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 57D2CC43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 20:09:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 29F39C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 21:19:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2665120660
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 20:09:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E66CC20883
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 21:19:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XPETlbAz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2665120660
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=the-dreams.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DArY8Umv";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=marvell.com header.i=@marvell.com header.b="kc8V9oA2";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=marvell.onmicrosoft.com header.i=@marvell.onmicrosoft.com header.b="uRQtxn0q"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E66CC20883
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=marvell.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=uejllwtK9DxdvZdpUPntISohggjSAu7X0O8vxbFo2Bg=; b=XPETlbAzazNXC6hErZ5aBx2Uu
-	yjrl+2ZgMpALzz2kcgTB84vaGzy6O4eQxMwyBVkQXa92VgDFHwnYEd8pUG/6v5MGJnsliYBBtUJFA
-	slVGscJ67NJ/u9vRUL9a1UScU6jaeKBuxRTOi+Y5+pGacaT1pxKWiIyTCNhBorCdA0ttNKdMqoF2c
-	Ir9xRUTR/CW6NWS5wCV+3JwkDyxPXKBFGsMBckQ+Hwcou7q+nwRolG/0DaLffMFNKkCTD00QiRjRO
-	X+lVkwWDVR0E3hYDSyU3/iO56ATPgf0vaBsZj2PDuwOaZ0oVw/Y7UYuVl+FVqHCMvRXEr2uapMVi3
-	jQ7po5sqg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=7MNMtCzgsj2o9/5idSZK6z3XOc/IWquE59RK9MFbAAE=; b=DArY8UmvbbqpVB
+	FCjtDg0D8v7LHNm6G3A16ONHIw4b7tQlTocHLp9RGd8FWcTKpDk3VonocIFisvm44zIL5uNdLBQyM
+	fOh5wPFEOoYBXzlxABKWoCKUTMSb47Ah5V1godsf8diNsEXgOTFIwBaRfc/CYj0AR4hsmTShNbLEa
+	kdwhkiK0aI98oT9beM8U8r9DCM7DZO+6l2DNTufxvTCCjQqf7NlB32Bv1KRor8WVzwcfb8j8JzkTF
+	TkJOKg4vW3aPpHfGoiuu5Abn1Kg6bbTlwV1gO7is+OtXDdJ8So/KDkEF4UUrWtrEcAHa7npBg72I+
+	oWhHQE1vW420b9JCO2pg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggxh5-0001sU-0r; Tue, 08 Jan 2019 20:09:47 +0000
-Received: from sauhun.de ([88.99.104.3] helo=pokefinder.org)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggxh0-0001rm-2Y
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 20:09:45 +0000
-Received: from localhost (p54B337DA.dip0.t-ipconnect.de [84.179.55.218])
- by pokefinder.org (Postfix) with ESMTPSA id 7E82B3E48B8;
- Tue,  8 Jan 2019 21:09:38 +0100 (CET)
-Date: Tue, 8 Jan 2019 21:09:38 +0100
-From: Wolfram Sang <wsa@the-dreams.de>
-To: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Subject: Re: [PATCH 00/10] i2c: move handling of suspended adapters to the core
-Message-ID: <20190108200937.bratvsbz4grk6m4e@ninjato>
-References: <20181219164827.20985-1-wsa+renesas@sang-engineering.com>
+	id 1ggymi-0007ZR-Nk; Tue, 08 Jan 2019 21:19:40 +0000
+Received: from mx0b-0016f401.pphosted.com ([67.231.156.173])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ggymf-0007Yq-E1
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 21:19:39 +0000
+Received: from pps.filterd (m0045851.ppops.net [127.0.0.1])
+ by mx0b-0016f401.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x08LCjHU007335; Tue, 8 Jan 2019 13:19:07 -0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=marvell.com;
+ h=from : to : cc :
+ subject : date : message-id : references : in-reply-to : content-type :
+ content-id : content-transfer-encoding : mime-version; s=pfpt0818;
+ bh=tQ4x20xoEiE5ygFuZZ2JZKkrLdWBilpFonpx9ZWad3I=;
+ b=kc8V9oA2dLaaktwFgtPoqB+wX8jNuZfQWZJ40c2rLqbDH4BSmroqeLmna4RTksbhSmdZ
+ zoFvRxb3SC96ub7W+oF50ZuJRm1ZfrMgIwmPS7FnynlBv5L6GZ7YdnL1xKcLVL0SnBrc
+ iNCDSnbiwn1mUNcppbX7FBAF5NcyuJ0o00Xnxlh0dpCuIrsLJZJcBxIhgRdku3TyoV3P
+ B7mUHP4sz7jD7N85zsyEPGJkVGcr2c+mFj1FrFOhw/vAAdHCC/kmaWOABgjRVkrvyg2E
+ FMkWSxfyCaeeNugo/JzUNDBzGGyQ1Oge4pEqZndAx60XZ3Tph/RLzhhvQQok+qXtCLpz rQ== 
+Received: from sc-exch01.marvell.com ([199.233.58.181])
+ by mx0b-0016f401.pphosted.com with ESMTP id 2pw18f8kcx-2
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-SHA384 bits=256 verify=NOT);
+ Tue, 08 Jan 2019 13:19:07 -0800
+Received: from SC-EXCH02.marvell.com (10.93.176.82) by SC-EXCH01.marvell.com
+ (10.93.176.81) with Microsoft SMTP Server (TLS) id 15.0.1367.3; Tue, 8 Jan
+ 2019 13:19:06 -0800
+Received: from NAM04-BN3-obe.outbound.protection.outlook.com (104.47.46.53) by
+ SC-EXCH02.marvell.com (10.93.176.82) with Microsoft SMTP Server
+ (TLS) id
+ 15.0.1367.3 via Frontend Transport; Tue, 8 Jan 2019 13:19:05 -0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=marvell.onmicrosoft.com; s=selector1-marvell-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=tQ4x20xoEiE5ygFuZZ2JZKkrLdWBilpFonpx9ZWad3I=;
+ b=uRQtxn0qaV7j7iAXy9QxygbtImEA/JifcZLhHjkp5oRglA4NUBtIB8tkvNd4nZWuwk2OV+Sd4ueRNUhtT5heUHwe8QSHTJ782JoZphFBxnlYpyzyhDzvwE7oBjWogYRn8ymgtbQWY3gAGzKqG1h+qEBzeENcgO4tVkA2jcse7NI=
+Received: from BYAPR18MB2888.namprd18.prod.outlook.com (20.179.58.203) by
+ BYAPR18MB2824.namprd18.prod.outlook.com (20.179.57.216) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1516.14; Tue, 8 Jan 2019 21:18:56 +0000
+Received: from BYAPR18MB2888.namprd18.prod.outlook.com
+ ([fe80::b8d1:8b50:2bc8:2b0c]) by BYAPR18MB2888.namprd18.prod.outlook.com
+ ([fe80::b8d1:8b50:2bc8:2b0c%3]) with mapi id 15.20.1516.010; Tue, 8 Jan 2019
+ 21:18:56 +0000
+From: Yuri Norov <ynorov@marvell.com>
+To: Catalin Marinas <catalin.marinas@arm.com>, Arnd Bergmann <arnd@arndb.de>, 
+ "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>, "linux-doc@vger.kernel.org"
+ <linux-doc@vger.kernel.org>, "linux-arch@vger.kernel.org"
+ <linux-arch@vger.kernel.org>, "linux-api@vger.kernel.org"
+ <linux-api@vger.kernel.org>,
+ Adam Borowski <kilobyte@angband.pl>, "Alexander Graf" <agraf@suse.de>,
+ Alexey Klimov <klimov.linux@gmail.com>, Andreas Schwab
+ <schwab@suse.de>, Andrew Pinski <pinskia@gmail.com>, Bamvor Zhangjian
+ <bamv2005@gmail.com>, Chris Metcalf <cmetcalf@mellanox.com>, "Christoph
+ Muellner" <christoph.muellner@theobroma-systems.com>, Dave Martin
+ <Dave.Martin@arm.com>, "David S . Miller" <davem@davemloft.net>, "Florian
+ Weimer" <fweimer@redhat.com>, Geert Uytterhoeven <geert@linux-m68k.org>,
+ "Heiko Carstens" <heiko.carstens@de.ibm.com>, James Hogan
+ <james.hogan@imgtec.com>, James Morse <james.morse@arm.com>, Joseph Myers
+ <joseph@codesourcery.com>, Lin Yongting <linyongting@huawei.com>, Manuel
+ Montezelo <manuel.montezelo@gmail.com>, Mark Brown <broonie@kernel.org>,
+ "Martin Schwidefsky" <schwidefsky@de.ibm.com>, Maxim Kuvyrkov
+ <maxim.kuvyrkov@linaro.org>, Nathan_Lynch <Nathan_Lynch@mentor.com>,
+ "Philipp Tomsich" <philipp.tomsich@theobroma-systems.com>, Prasun Kapoor
+ <Prasun.Kapoor@caviumnetworks.com>, Ramana Radhakrishnan
+ <ramana.gcc@googlemail.com>, Steve Ellcey <sellcey@caviumnetworks.com>,
+ Szabolcs Nagy <szabolcs.nagy@arm.com>, "yury.norov@gmail.com"
+ <yury.norov@gmail.com>
+Subject: [PATCH] arm64: introduce AUDIT_ARCH_AARCH64ILP32 for ilp32
+Thread-Topic: [PATCH] arm64: introduce AUDIT_ARCH_AARCH64ILP32 for ilp32
+Thread-Index: AQHUp5fD/ajdYeOKIUylrBlkcke37A==
+Date: Tue, 8 Jan 2019 21:18:56 +0000
+Message-ID: <20190108211840.GA13838@yury-thinkpad>
+References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
+ <20190107155028.GA25178@yury-thinkpad>
+In-Reply-To: <20190107155028.GA25178@yury-thinkpad>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1P189CA0014.EURP189.PROD.OUTLOOK.COM
+ (2603:10a6:802:2a::27) To BYAPR18MB2888.namprd18.prod.outlook.com
+ (2603:10b6:a03:10d::11)
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [212.58.114.230]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; BYAPR18MB2824;
+ 20:GVgADaVc10pzMa3PZXpifDUtqQsqXyJ+u7RZD0QkIXklkPqRAw/nFXl4IWe6k7LTodSR1DaqcR23DM6CN7E/uytGeRq/am2JooHL2pSBQvFj2SF8bQDF2KazF0y/Flzv9ozNaT/HtXUOO1oq3DkJPVuMyifT5W3kz7wjVOFf9BM=
+x-ms-office365-filtering-correlation-id: bcae0289-84aa-450d-2664-08d675aee5cc
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(2017052603328)(7153060)(7193020);
+ SRVR:BYAPR18MB2824; 
+x-ms-traffictypediagnostic: BYAPR18MB2824:
+x-microsoft-antispam-prvs: <BYAPR18MB2824065CA7A2C9948CB05B84CB8A0@BYAPR18MB2824.namprd18.prod.outlook.com>
+x-forefront-prvs: 0911D5CE78
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(7916004)(39860400002)(136003)(366004)(376002)(396003)(346002)(199004)(189003)(386003)(6506007)(102836004)(486006)(66066001)(110136005)(3846002)(6116002)(6436002)(52116002)(76176011)(2201001)(86362001)(186003)(26005)(2501003)(6486002)(1076003)(7406005)(68736007)(33896004)(7416002)(316002)(11346002)(305945005)(446003)(7736002)(106356001)(105586002)(97736004)(2906002)(256004)(476003)(33716001)(81166006)(81156014)(8936002)(8676002)(99286004)(4326008)(33656002)(478600001)(5660300001)(14454004)(71200400001)(71190400001)(6512007)(53936002)(39060400002)(9686003)(25786009)(921003)(1121003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BYAPR18MB2824;
+ H:BYAPR18MB2888.namprd18.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: marvell.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: Wrqhp8Q/sv5RRoNYcV5Cx2gQ4GrcYfO1+iT4p776KJrvZ2700+bdFH7B/jEnnBEPVMhItAaX5dCBmdLQ6X71mlSyavYohfDfwb6VvHvKmToxh0kwP6bZb6kAQDSJ5jjAAmQ//QhFBx0J+qD31mNF1iaf9tr5gHApeV+7qNwOPw8z6kvn1k1EXQLd2//0DM8JB9Y1D4PC2uINsqyBe2yettGRmkpLwA+nfJ+rTFWnJVNMfmKvLtA3EOSYLbNau06JIGzvBj3Gu14oLTdV77TaQFNDpZiVKHimq7jD0wC5dzgj2tn5Xp/J9poC0LVKFgFN
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+Content-ID: <ECFB331D797AC1488D832907AB4C052F@namprd18.prod.outlook.com>
 MIME-Version: 1.0
-In-Reply-To: <20181219164827.20985-1-wsa+renesas@sang-engineering.com>
-User-Agent: NeoMutt/20170113 (1.7.2)
+X-MS-Exchange-CrossTenant-Network-Message-Id: bcae0289-84aa-450d-2664-08d675aee5cc
+X-MS-Exchange-CrossTenant-originalarrivaltime: 08 Jan 2019 21:18:56.4937 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 70e1fb47-1155-421d-87fc-2e58f638b6e0
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BYAPR18MB2824
+X-OriginatorOrg: marvell.com
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2019-01-08_11:, , signatures=0
+X-Proofpoint-Details: rule=outbound_notspam policy=outbound score=0
+ priorityscore=1501
+ malwarescore=0 suspectscore=0 phishscore=0 bulkscore=0 spamscore=0
+ clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
+ mlxlogscore=999 adultscore=0 classifier=spam adjust=0 reason=mlx
+ scancount=1 engine=8.0.1-1810050000 definitions=main-1901080162
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_120942_415244_1E3A1D86 
-X-CRM114-Status: GOOD (  13.55  )
+X-CRM114-CacheID: sfid-20190108_131937_641402_EB8AC188 
+X-CRM114-Status: GOOD (  17.03  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -64,124 +170,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-samsung-soc@vger.kernel.org, linux-pm@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-renesas-soc@vger.kernel.org,
- Hans de Goede <hdegoede@redhat.com>, bcm-kernel-feedback-list@broadcom.com,
- linux-i2c@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============3705682281302399847=="
+Cc: Andy Lutomirski <luto@amacapital.net>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Make syscall_get_arch() distinguish arm64 and arm64/ilp32 by adding
+AUDIT_ARCH_AARCH64ILP32.
 
---===============3705682281302399847==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="mwtdafiryfs7cnw6"
-Content-Disposition: inline
+Sugested-by: Andy Lutomirski <luto@amacapital.net>
+Signed-off-by: Yury Norov <ynorov@marvell.com>
+---
+ arch/arm64/include/asm/syscall.h | 3 +++
+ include/uapi/linux/audit.h       | 1 +
+ 2 files changed, 4 insertions(+)
 
+diff --git a/arch/arm64/include/asm/syscall.h b/arch/arm64/include/asm/syscall.h
+index 73fbe08763b0..77578d703cb1 100644
+--- a/arch/arm64/include/asm/syscall.h
++++ b/arch/arm64/include/asm/syscall.h
+@@ -126,6 +126,9 @@ static inline int syscall_get_arch(void)
+ 	if (is_a32_compat_task())
+ 		return AUDIT_ARCH_ARM;
+ 
++	if (is_ilp32_compat_task())
++		return AUDIT_ARCH_AARCH64ILP32;
++
+ 	return AUDIT_ARCH_AARCH64;
+ }
+ 
+diff --git a/include/uapi/linux/audit.h b/include/uapi/linux/audit.h
+index 818ae690ab79..624127147404 100644
+--- a/include/uapi/linux/audit.h
++++ b/include/uapi/linux/audit.h
+@@ -374,6 +374,7 @@ enum {
+ #define __AUDIT_ARCH_LE	   0x40000000
+ 
+ #define AUDIT_ARCH_AARCH64	(EM_AARCH64|__AUDIT_ARCH_64BIT|__AUDIT_ARCH_LE)
++#define AUDIT_ARCH_AARCH64ILP32	(EM_AARCH64|__AUDIT_ARCH_LE)
+ #define AUDIT_ARCH_ALPHA	(EM_ALPHA|__AUDIT_ARCH_64BIT|__AUDIT_ARCH_LE)
+ #define AUDIT_ARCH_ARM		(EM_ARM|__AUDIT_ARCH_LE)
+ #define AUDIT_ARCH_ARMEB	(EM_ARM)
+-- 
+2.17.1
 
---mwtdafiryfs7cnw6
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Wed, Dec 19, 2018 at 05:48:16PM +0100, Wolfram Sang wrote:
-> Finally, here is the implementation Hans and I agreed on. Plus, all poten=
-tial
-> users I could spot already converted. Renesas R-Car driver was added on t=
-op.
-> This series was tested on a Renesas Lager board (R-Car H2). I had to hack=
- some
-> error cases into the code to verify the workings. Thanks for all the test=
-s so
-> far. Of course, more testing never hurts ;)
->=20
-> Please comment, review, test... a branch can be found here:
->=20
-> git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git renesas/i2c/c=
-ore-pm-helpers
->=20
-> Thanks,
->=20
->    Wolfram
->=20
-> Changes since RFC:
->=20
-> * don't use bitfields anymore but an unsigned long flags variable which i=
-s only
->   meant for flags to be changed when the adapter lock is held
->=20
-> * split the genereic accessor into _mark_suspended() and _mark_resumed()
->=20
-> * added kerneldoc and noted that using these helpers is optional
->=20
-> * documented -ESHUTDOWN as the error code when trying to transfer using an
->   already suspended adapter
->=20
-> * added acks from last series. Changes were minor enough to keep them. Pl=
-ease let
->   me know if you disagree.
->=20
->=20
-> Wolfram Sang (10):
->   i2c: add suspended flag and accessors for i2c adapters
->   i2c: reject new transfers when adapters are suspended
->   i2c: synquacer: remove unused is_suspended flag
->   i2c: brcmstb: use core helper to mark adapter suspended
->   i2c: zx2967: use core helper to mark adapter suspended
->   i2c: sprd: don't use pdev as variable name for struct device *
->   i2c: sprd: use core helper to mark adapter suspended
->   i2c: exynos5: use core helper to mark adapter suspended
->   i2c: s3c2410: use core helper to mark adapter suspended
->   i2c: rcar: add suspend/resume support
-
-After a long road, I applied this series now to for-next. I only
-squashed patches 1+2 to have the functionality in one place. And fixed a
-typo in patch 1. Thanks to the testers and reviewers, and especially
-Hans, for the input and discussions.
-
-This will now get a full test cycle in -next. Let's see what happens...
-
-And let's move on to how to add 'very late transfers without irqs' on
-top of this series.
-
-Happy hacking,
-
-   Wolfram
-
-
---mwtdafiryfs7cnw6
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQIzBAABCAAdFiEEOZGx6rniZ1Gk92RdFA3kzBSgKbYFAlw1A30ACgkQFA3kzBSg
-KbbxWw/8CGkkrx9NPVQwRLHRnix2QucE3r9aD0Df5ybapZtzhPdInKj5cJ6rtJjO
-Ly0VQzmjKc+6FirBXJKF2Zdu35+/8k4y7owr0oh8fNxRjeWU0Pukp4n9NoX9+CsO
-kXyzFEmbx8goTH1zzJgVz1yytO8ebGDCXX086M7D8MDW5ULx0mgzlIWcHkgy81Aj
-gUEmnOjbw/JbmeBL0l+gseT2gO5GWArBv/mUFNkuz7pH0AjV/BbkImZ7BuhlYpOV
-pvWM2PI2/7xbxpsjFIhIQbOs7hHY1iNkQjONftMT2sjCm8PKFRvf1Il+9K8AA/tp
-N13Jn7IGI/lRrxlxGZZ3zr8o715PohfdI4G1OPFpjSorTBs1UV4f8BatsodHk8bh
-fAKKjAkPw5/qRcMA8HnkyIrszoM7qCToOYFkBiMtv8+Drdtn5W13HCKL52PGiOds
-sE9QS5at1rGWtzQX1fkLpq93GQTyNvFMURJ21YvXnU2U47o1hVLQNQKLQFjNNaLj
-k9SOHjoI9xM7PWRgVghphFuUYqQMlHID9GHR1R0bS9uA++CxHzzP4/OTBwTIVBBl
-YpTlg4+UtKgmSTWmWR/QSjGAIpRGiAOSIt2mz8YcCF2E9QtLFm2wMTWXxe48Wavt
-9n/kVEg/kVdxR2yHZWu5guX3AmiPxUBiZxHhfKCYkrlFUuqL97Y=
-=Vtra
------END PGP SIGNATURE-----
-
---mwtdafiryfs7cnw6--
-
-
---===============3705682281302399847==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============3705682281302399847==--
-
