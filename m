@@ -2,92 +2,122 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-18.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3C9E2C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 09:18:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EAFE2C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 09:21:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E7F4E2087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 09:18:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B8FED2087E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 09:21:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fF63Q/4u";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="lMGGq/1/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E7F4E2087E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="plPEK5cZ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="weylR5xJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B8FED2087E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ONO1fiLKcf5xBn2LtFGkdUOQgjFcwrJu7lZ1pWeE9bY=; b=fF63Q/4uNX2hM6
-	fTdzoVfjaQt72twjdhP30BqGg18iAZ0+fr5jwy3YtNhTY1uzlyndYHsc4yQp1rEctFg0qb91nR57u
-	gHmYCjUlQ1R5M9EqXmP9Dr+epMhnexPbffAnMJPvXna7xS8rMa4bpKPstDl3/Wci2g3KOwyd3bCxy
-	0PQy2aPfV4qxTmLRShSgwPtcpE67uSJaT3ikowJ92K1X+oFB+s6Y+1SAGanRujA9t+r+9UT4SRFRs
-	qlMhGscFyIAfYSvlyryYoeURv9ws/H3wE0V3sJ57yltLLLA9i77xbcIxItz9xHajmjm4SCMHOTNbm
-	4+e0y3U1qk4PdN0xmeqw==;
+	List-Owner; bh=jN8frUvatavcRxFyQ/b36dco/MxEy7jQLINynmJ4JtQ=; b=plPEK5cZ+JEkNc
+	1ZgB1z0Rk04MG8QB8n0H4bs29MI3w1qF5/WUftrvqBvXT7XH1zupIJ73lcSdoOHS7PenV2eIi7LS+
+	sRpt8uHIKwCvIY10ct82TUNOLfRd1+b8ie/i5ktlJsRr0jTXypGPLBX8vjSVoXS9J89ZoUVdZJuGn
+	Wx+eoyNzQ3BLn7B9uoc0SgovTyBsFvol3fn9erNXCKLOwQdYGy3WHYRSDnkm89kU92I5rgJB5X+nB
+	41ju+wIbPPP1LHbzDR2dfOkt+yECdxkPNnv1XyDLwmZcSEG+1QzDFtN9Y4wUtw+Dhp/n0RnRjhPDd
+	zQS94DqnHMP4//h5Z3rg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggnWn-00015i-G8; Tue, 08 Jan 2019 09:18:29 +0000
-Received: from mail-ed1-x543.google.com ([2a00:1450:4864:20::543])
+	id 1ggnZy-0002ri-Bu; Tue, 08 Jan 2019 09:21:46 +0000
+Received: from esa4.microchip.iphmx.com ([68.232.154.123])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggnUU-00074Q-Hu
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 09:16:22 +0000
-Received: by mail-ed1-x543.google.com with SMTP id b3so3487497ede.1
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 08 Jan 2019 01:16:06 -0800 (PST)
+ id 1ggnZt-0002r9-IH
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 09:21:44 +0000
+X-IronPort-AV: E=Sophos;i="5.56,453,1539673200"; d="scan'208";a="24773260"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa4.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 08 Jan 2019 02:21:38 -0700
+Received: from NAM01-BN3-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.106) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Tue, 8 Jan 2019 02:21:37 -0700
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=tYduuyLykfVkK02cpHVrshV0EAassw2QUbxst2VbhOo=;
- b=lMGGq/1/+RrKG+Y5iaA+D1X2h4tWmXYaeKoUan2/+LY4VCG52v/a/N8FhFabzjD/aZ
- 6RUMHAabT3uwztPOYb32kL576UldulvYC3r+ev8KBIlfg9QFJYx+ZmyokTy7dKnHKdcI
- AL3qnndA/2nVB631bAQCMRjGXtjJ4+qgF7BdZiK/VkqxaPoj79RjL+6bjRcCX38gA6Px
- DiNzE0VNeFKanncYsZOm7KK0su6rc/vjolE7NE40n6QxCtfMrI7WfGpKhg3w4p3IUXIZ
- 8Xo0lARxBwv0BQIltA4C+lBvD1azWXt0wHjV6n84EEh5xFbXW8wCwPMgBMjv4LAcDuW6
- 90rw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=tYduuyLykfVkK02cpHVrshV0EAassw2QUbxst2VbhOo=;
- b=hoA9Seh1u/9YR6kUErdQFRd9OX4AA7hu0vqgkVH+t4ZOObr+WcsC1CEIgNB4M7SqZE
- H5oUrTXtJgMJ8lktM1CCz7yiofq0IeS2uk1gsVa65boPB+xlTWe/8LXFQGfYG8FAiffl
- f6HeMKV6WZhxiphSo5Vk4w+hBQYp7wo61Lh0rzghHzT4+QlglknX7tZoNj/pneovOXo1
- 0QZcBT2y8h6NjpyMexZBqR/KHS9elAwmgTLJpZB1KO21eRaoOHaB+j5nELYSM+i+bgQ+
- zUQQNJ50gqZsXzXMN9Z/1K4PAjuC/6/yPlXw8UJKSLhPvF7nzOoHbEqwA3wAx0lDeTKN
- hfNA==
-X-Gm-Message-State: AJcUukcmCkkk9PpnepBHMVMV7X7o4ofCLRVsaHNk6VMss03wCr1/KBi+
- Kr2qJLP3fT1381qnZPTJ6HWXJ1KbaYYqnQ==
-X-Google-Smtp-Source: ALg8bN7EBiqcXgy8zu4HyKYCXHdhSNO6sw6k4tpeRnsjRlFlsQIaCJc98mEtHhWPY6DIkqmj3wqeDg==
-X-Received: by 2002:a05:6402:1347:: with SMTP id
- y7mr1309667edw.114.1546938964858; 
- Tue, 08 Jan 2019 01:16:04 -0800 (PST)
-Received: from debian-brgl.home ([2a01:cb1d:af:5b00:6d6c:8493:1ab5:dad7])
- by smtp.gmail.com with ESMTPSA id gp22-v6sm18373560ejb.4.2019.01.08.01.16.03
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 08 Jan 2019 01:16:04 -0800 (PST)
-From: Bartosz Golaszewski <brgl@bgdev.pl>
-To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
- Arnd Bergmann <arnd@arndb.de>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Subject: [RESEND PATCH 12/12] eeprom: at24: remove at24_platform_data
-Date: Tue,  8 Jan 2019 10:15:39 +0100
-Message-Id: <20190108091539.16674-13-brgl@bgdev.pl>
-X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20190108091539.16674-1-brgl@bgdev.pl>
-References: <20190108091539.16674-1-brgl@bgdev.pl>
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=3esWkTiI3Aff84fEhDKNSu4RfArDxqZsj61VyXwZ2EY=;
+ b=weylR5xJfNBYTr407xDQK9EUiKhkmAO4lmjahwAQxN1vNqnK9ABYEZbLCo7xStFuORjmHtFR8RtvSjuQNxDKy2Nvt58d+yIqcfejBrQv072fDuCtAXjmICftlbLr5biXtxdDH4RXi10bpIT0FsaEPiaQin/XAjAHJAaB41tkYJw=
+Received: from MWHPR11MB1920.namprd11.prod.outlook.com (10.175.54.19) by
+ MWHPR11MB1438.namprd11.prod.outlook.com (10.172.53.20) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1495.8; Tue, 8 Jan 2019 09:21:35 +0000
+Received: from MWHPR11MB1920.namprd11.prod.outlook.com
+ ([fe80::e553:ff9d:8c0b:9627]) by MWHPR11MB1920.namprd11.prod.outlook.com
+ ([fe80::e553:ff9d:8c0b:9627%6]) with mapi id 15.20.1516.010; Tue, 8 Jan 2019
+ 09:21:35 +0000
+From: <Claudiu.Beznea@microchip.com>
+To: <u.kleine-koenig@pengutronix.de>
+Subject: Re: [PATCH v8 1/6] pwm: extend PWM framework with PWM modes
+Thread-Topic: [PATCH v8 1/6] pwm: extend PWM framework with PWM modes
+Thread-Index: AQHUo2hjF9SHYVC+/UyvQjeBLKSGN6WhLe0AgAJimACAANRQAIAAu2iA
+Date: Tue, 8 Jan 2019 09:21:34 +0000
+Message-ID: <0ef0b4f1-45c3-0280-c1f0-6d499957f74c@microchip.com>
+References: <1546522081-23659-1-git-send-email-claudiu.beznea@microchip.com>
+ <1546522081-23659-2-git-send-email-claudiu.beznea@microchip.com>
+ <20190105210522.ho2o2a4gc7r7ijeq@pengutronix.de>
+ <67e881c5-0ea7-3d2f-5910-534729097d11@microchip.com>
+ <20190107221040.uos5qlnkjmcayv73@pengutronix.de>
+In-Reply-To: <20190107221040.uos5qlnkjmcayv73@pengutronix.de>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1PR04CA0055.eurprd04.prod.outlook.com
+ (2603:10a6:802:2::26) To MWHPR11MB1920.namprd11.prod.outlook.com
+ (2603:10b6:300:110::19)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Claudiu.Beznea@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [94.177.32.154]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; MWHPR11MB1438;
+ 6:bM2zoSZbCXNGQk3RpkRU+s5TUls8kEmOySZuZ36z1n/RHw2XNze3wvSSi88G3WzZ7ZBJhLn3v2y7R5joqActgvM95k3jQzZ4nUWaQQXdqzr1XhBGqXSFNDr8zMWt+KckpQiLPqw3bkFXWBHQOLgchniuXC5oqboD+A6WO1L9speF/mQXTcC4vMvY7tcY6WeUwQY89feCKU7QTo/kYXfkcv/PynQJb5XiXqlYcAoa2VmFX9UFs61J7L8iPY6a/p0UcaTxBFFK2q7gTlSCg91sy6zv57/S7nOyPUcdQiT6cNEFenHJCWxFHuS0QlWpc3TiabRRWCJ7EWIDB4NJCZjbrObVH6TjX8TPGivPaPzx9cxaknVvnlmYcqrhWh0wfGx1X3pDt3O1z43z4osLBW/fl1d5Kce07ohv22tQIovaD9dCPPNrleLzlSrWBKgVXV48IV6VE2SENqEC7qTkAL4hRA==;
+ 5:ZI6Cayv/kdK8ngkYq6wKzGIuHSdG2CudRYNwfVtd3BpbPdLi0CJ8fYtLNyNDZxYaOaSRCT5kvjkCnOr45llZZSeGStwJTI2QjVtfj0qMxz3wO/qaUR84dhxaqNWtgmDEjYStU6SkEuRSC1AvYdB4K1hz774yUOKlu3zrGm4HbJbmR7mr5WoY3MxG7JdX9Adzxf65ktk3Oui9gQrozOZ18A==;
+ 7:CjHajF5HK8ytT8rj2/Df2b0AO6H2U5q6EcVDboiOgwTQnspOghjs+BnuyxTqPN2qDZ4izXcnFYNxGB5kfAnqWmojhE+TV1EHQYwvxsYRvWZeiakhV7M3EtxrLpt8qjfRX0Kpjmt27xOisB3nWvrl1w==
+x-ms-office365-filtering-correlation-id: b2a974d8-e8ac-46ee-b782-08d6754aaf21
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(2017052603328)(7153060)(7193020);
+ SRVR:MWHPR11MB1438; 
+x-ms-traffictypediagnostic: MWHPR11MB1438:
+x-microsoft-antispam-prvs: <MWHPR11MB1438941BF97F7D178462C622878A0@MWHPR11MB1438.namprd11.prod.outlook.com>
+x-forefront-prvs: 0911D5CE78
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(136003)(396003)(376002)(39860400002)(366004)(346002)(51444003)(199004)(189003)(5660300001)(6436002)(26005)(256004)(14444005)(478600001)(106356001)(36756003)(3846002)(52116002)(76176011)(305945005)(476003)(31696002)(81156014)(4326008)(81166006)(486006)(229853002)(68736007)(31686004)(6116002)(86362001)(2616005)(105586002)(66574012)(14454004)(53546011)(6506007)(97736004)(11346002)(386003)(99286004)(6486002)(54906003)(8676002)(72206003)(102836004)(6916009)(66066001)(39060400002)(93886005)(446003)(71190400001)(8936002)(71200400001)(7736002)(6306002)(6246003)(6512007)(966005)(2906002)(316002)(53936002)(25786009)(186003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:MWHPR11MB1438;
+ H:MWHPR11MB1920.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: JLBfVlBBd2P6Sz/9C939jHN8361V9fXc/S0QDttefJQn0IigFl/li1K5eRi9828/lp2fMwduCJt+PaDBCMlhqO0EE3yjh/8BhPc2PuNfzt/sV9o8g4YlebJt9UBQ16kHdxQTDgZFrBocUnNWodHbfny+czHwnafncAEMmKNsmaO4Bsj224ICo0OBcWBHyClYUXHs4pNt/ueUhDwlPB3Tq8qCvor88nedK1YA56IHGGJAO1MKiebRclDTLO/a6enxq7euxMJJKVJZ/G2GWK8FeDTEFnN007BjiFvwF1JB9sDw5vSicCLVIb1I/RebTWbQ
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+Content-ID: <7810EE4D285A4345B6FCDE26D44622A1@namprd11.prod.outlook.com>
 MIME-Version: 1.0
+X-MS-Exchange-CrossTenant-Network-Message-Id: b2a974d8-e8ac-46ee-b782-08d6754aaf21
+X-MS-Exchange-CrossTenant-originalarrivaltime: 08 Jan 2019 09:21:34.9889 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR11MB1438
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_011607_392004_0213A737 
-X-CRM114-Status: GOOD (  26.72  )
+X-CRM114-CacheID: sfid-20190108_012141_698766_A7E1C4E5 
+X-CRM114-Status: GOOD (  35.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,378 +129,138 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-i2c@vger.kernel.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-pwm@vger.kernel.org, alexandre.belloni@bootlin.com, corbet@lwn.net,
+ linux-doc@vger.kernel.org, linux-kernel@vger.kernel.org,
+ Ludovic.Desroches@microchip.com, thierry.reding@gmail.com,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-
-There are no more users of at24_platform_data. Remove the relevant
-header and modify the driver code to not use it anymore.
-
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- MAINTAINERS                        |   1 -
- drivers/misc/eeprom/at24.c         | 162 +++++++++++++----------------
- include/linux/platform_data/at24.h |  60 -----------
- 3 files changed, 75 insertions(+), 148 deletions(-)
- delete mode 100644 include/linux/platform_data/at24.h
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 32d444476a90..767c1e0e5cf7 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2503,7 +2503,6 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/brgl/linux.git
- S:	Maintained
- F:	Documentation/devicetree/bindings/eeprom/at24.txt
- F:	drivers/misc/eeprom/at24.c
--F:	include/linux/platform_data/at24.h
- 
- ATA OVER ETHERNET (AOE) DRIVER
- M:	"Ed L. Cashin" <ed.cashin@acm.org>
-diff --git a/drivers/misc/eeprom/at24.c b/drivers/misc/eeprom/at24.c
-index ddfcf4ade7bf..b806a403ca46 100644
---- a/drivers/misc/eeprom/at24.c
-+++ b/drivers/misc/eeprom/at24.c
-@@ -22,10 +22,24 @@
- #include <linux/i2c.h>
- #include <linux/nvmem-provider.h>
- #include <linux/regmap.h>
--#include <linux/platform_data/at24.h>
- #include <linux/pm_runtime.h>
- #include <linux/gpio/consumer.h>
- 
-+/* Address pointer is 16 bit. */
-+#define AT24_FLAG_ADDR16	BIT(7)
-+/* sysfs-entry will be read-only. */
-+#define AT24_FLAG_READONLY	BIT(6)
-+/* sysfs-entry will be world-readable. */
-+#define AT24_FLAG_IRUGO		BIT(5)
-+/* Take always 8 addresses (24c00). */
-+#define AT24_FLAG_TAKE8ADDR	BIT(4)
-+/* Factory-programmed serial number. */
-+#define AT24_FLAG_SERIAL	BIT(3)
-+/* Factory-programmed mac address. */
-+#define AT24_FLAG_MAC		BIT(2)
-+/* Does not auto-rollover reads to the next slave address. */
-+#define AT24_FLAG_NO_RDROL	BIT(1)
-+
- /*
-  * I2C EEPROMs from most vendors are inexpensive and mostly interchangeable.
-  * Differences between different vendor product lines (like Atmel AT24C or
-@@ -107,10 +121,6 @@ module_param_named(write_timeout, at24_write_timeout, uint, 0);
- MODULE_PARM_DESC(at24_write_timeout, "Time (in ms) to try writes (default 25)");
- 
- struct at24_chip_data {
--	/*
--	 * these fields mirror their equivalents in
--	 * struct at24_platform_data
--	 */
- 	u32 byte_len;
- 	u8 flags;
- };
-@@ -471,63 +481,11 @@ static int at24_write(void *priv, unsigned int off, void *val, size_t count)
- 	return 0;
- }
- 
--static void at24_properties_to_pdata(struct device *dev,
--				     struct at24_platform_data *chip)
--{
--	int err;
--	u32 val;
--
--	if (device_property_present(dev, "read-only"))
--		chip->flags |= AT24_FLAG_READONLY;
--	if (device_property_present(dev, "no-read-rollover"))
--		chip->flags |= AT24_FLAG_NO_RDROL;
--
--	err = device_property_read_u32(dev, "address-width", &val);
--	if (!err) {
--		switch (val) {
--		case 8:
--			if (chip->flags & AT24_FLAG_ADDR16)
--				dev_warn(dev, "Override address width to be 8, while default is 16\n");
--			chip->flags &= ~AT24_FLAG_ADDR16;
--			break;
--		case 16:
--			chip->flags |= AT24_FLAG_ADDR16;
--			break;
--		default:
--			dev_warn(dev, "Bad \"address-width\" property: %u\n",
--				 val);
--		}
--	}
--
--	err = device_property_read_u32(dev, "size", &val);
--	if (!err)
--		chip->byte_len = val;
--
--	err = device_property_read_u32(dev, "pagesize", &val);
--	if (!err) {
--		chip->page_size = val;
--	} else {
--		/*
--		 * This is slow, but we can't know all eeproms, so we better
--		 * play safe. Specifying custom eeprom-types via platform_data
--		 * is recommended anyhow.
--		 */
--		chip->page_size = 1;
--	}
--}
--
--static int at24_get_pdata(struct device *dev, struct at24_platform_data *pdata)
-+static const struct at24_chip_data *at24_get_chip_data(struct device *dev)
- {
- 	struct device_node *of_node = dev->of_node;
- 	const struct at24_chip_data *cdata;
- 	const struct i2c_device_id *id;
--	struct at24_platform_data *pd;
--
--	pd = dev_get_platdata(dev);
--	if (pd) {
--		memcpy(pdata, pd, sizeof(*pdata));
--		return 0;
--	}
- 
- 	id = i2c_match_id(at24_ids, to_i2c_client(dev));
- 
-@@ -544,13 +502,9 @@ static int at24_get_pdata(struct device *dev, struct at24_platform_data *pdata)
- 		cdata = acpi_device_get_match_data(dev);
- 
- 	if (!cdata)
--		return -ENODEV;
-+		return ERR_PTR(-ENODEV);
- 
--	pdata->byte_len = cdata->byte_len;
--	pdata->flags = cdata->flags;
--	at24_properties_to_pdata(dev, pdata);
--
--	return 0;
-+	return cdata;
- }
- 
- static void at24_remove_dummy_clients(struct at24_data *at24)
-@@ -619,7 +573,8 @@ static int at24_probe(struct i2c_client *client)
- {
- 	struct regmap_config regmap_config = { };
- 	struct nvmem_config nvmem_config = { };
--	struct at24_platform_data pdata = { };
-+	u32 byte_len, page_size, flags, addrw;
-+	const struct at24_chip_data *cdata;
- 	struct device *dev = &client->dev;
- 	bool i2c_fn_i2c, i2c_fn_block;
- 	unsigned int i, num_addresses;
-@@ -634,35 +589,72 @@ static int at24_probe(struct i2c_client *client)
- 	i2c_fn_block = i2c_check_functionality(client->adapter,
- 					       I2C_FUNC_SMBUS_WRITE_I2C_BLOCK);
- 
--	err = at24_get_pdata(dev, &pdata);
-+	cdata = at24_get_chip_data(dev);
-+	if (IS_ERR(cdata))
-+		return PTR_ERR(cdata);
-+
-+	err = device_property_read_u32(dev, "pagesize", &page_size);
- 	if (err)
--		return err;
-+		/*
-+		 * This is slow, but we can't know all eeproms, so we better
-+		 * play safe. Specifying custom eeprom-types via platform_data
-+		 * is recommended anyhow.
-+		 */
-+		page_size = 1;
-+
-+	flags = cdata->flags;
-+	if (device_property_present(dev, "read-only"))
-+		flags |= AT24_FLAG_READONLY;
-+	if (device_property_present(dev, "no-read-rollover"))
-+		flags |= AT24_FLAG_NO_RDROL;
-+
-+	err = device_property_read_u32(dev, "address-width", &addrw);
-+	if (!err) {
-+		switch (addrw) {
-+		case 8:
-+			if (flags & AT24_FLAG_ADDR16)
-+				dev_warn(dev,
-+					 "Override address width to be 8, while default is 16\n");
-+			flags &= ~AT24_FLAG_ADDR16;
-+			break;
-+		case 16:
-+			flags |= AT24_FLAG_ADDR16;
-+			break;
-+		default:
-+			dev_warn(dev, "Bad \"address-width\" property: %u\n",
-+				 addrw);
-+		}
-+	}
-+
-+	err = device_property_read_u32(dev, "size", &byte_len);
-+	if (err)
-+		byte_len = cdata->byte_len;
- 
- 	if (!i2c_fn_i2c && !i2c_fn_block)
--		pdata.page_size = 1;
-+		page_size = 1;
- 
--	if (!pdata.page_size) {
-+	if (!page_size) {
- 		dev_err(dev, "page_size must not be 0!\n");
- 		return -EINVAL;
- 	}
- 
--	if (!is_power_of_2(pdata.page_size))
-+	if (!is_power_of_2(page_size))
- 		dev_warn(dev, "page_size looks suspicious (no power of 2)!\n");
- 
--	if (pdata.flags & AT24_FLAG_TAKE8ADDR)
-+	if (flags & AT24_FLAG_TAKE8ADDR)
- 		num_addresses = 8;
- 	else
--		num_addresses =	DIV_ROUND_UP(pdata.byte_len,
--			(pdata.flags & AT24_FLAG_ADDR16) ? 65536 : 256);
-+		num_addresses =	DIV_ROUND_UP(byte_len,
-+			(flags & AT24_FLAG_ADDR16) ? 65536 : 256);
- 
--	if ((pdata.flags & AT24_FLAG_SERIAL) && (pdata.flags & AT24_FLAG_MAC)) {
-+	if ((flags & AT24_FLAG_SERIAL) && (flags & AT24_FLAG_MAC)) {
- 		dev_err(dev,
- 			"invalid device data - cannot have both AT24_FLAG_SERIAL & AT24_FLAG_MAC.");
- 		return -EINVAL;
- 	}
- 
- 	regmap_config.val_bits = 8;
--	regmap_config.reg_bits = (pdata.flags & AT24_FLAG_ADDR16) ? 16 : 8;
-+	regmap_config.reg_bits = (flags & AT24_FLAG_ADDR16) ? 16 : 8;
- 	regmap_config.disable_locking = true;
- 
- 	regmap = devm_regmap_init_i2c(client, &regmap_config);
-@@ -675,11 +667,11 @@ static int at24_probe(struct i2c_client *client)
- 		return -ENOMEM;
- 
- 	mutex_init(&at24->lock);
--	at24->byte_len = pdata.byte_len;
--	at24->page_size = pdata.page_size;
--	at24->flags = pdata.flags;
-+	at24->byte_len = byte_len;
-+	at24->page_size = page_size;
-+	at24->flags = flags;
- 	at24->num_addresses = num_addresses;
--	at24->offset_adj = at24_get_offset_adj(pdata.flags, pdata.byte_len);
-+	at24->offset_adj = at24_get_offset_adj(flags, byte_len);
- 	at24->client[0].client = client;
- 	at24->client[0].regmap = regmap;
- 
-@@ -687,10 +679,10 @@ static int at24_probe(struct i2c_client *client)
- 	if (IS_ERR(at24->wp_gpio))
- 		return PTR_ERR(at24->wp_gpio);
- 
--	writable = !(pdata.flags & AT24_FLAG_READONLY);
-+	writable = !(flags & AT24_FLAG_READONLY);
- 	if (writable) {
- 		at24->write_max = min_t(unsigned int,
--					pdata.page_size, at24_io_limit);
-+					page_size, at24_io_limit);
- 		if (!i2c_fn_i2c && at24->write_max > I2C_SMBUS_BLOCK_MAX)
- 			at24->write_max = I2C_SMBUS_BLOCK_MAX;
- 	}
-@@ -733,7 +725,7 @@ static int at24_probe(struct i2c_client *client)
- 	nvmem_config.priv = at24;
- 	nvmem_config.stride = 1;
- 	nvmem_config.word_size = 1;
--	nvmem_config.size = pdata.byte_len;
-+	nvmem_config.size = byte_len;
- 
- 	at24->nvmem = devm_nvmem_register(dev, &nvmem_config);
- 	if (IS_ERR(at24->nvmem)) {
-@@ -742,13 +734,9 @@ static int at24_probe(struct i2c_client *client)
- 	}
- 
- 	dev_info(dev, "%u byte %s EEPROM, %s, %u bytes/write\n",
--		 pdata.byte_len, client->name,
-+		 byte_len, client->name,
- 		 writable ? "writable" : "read-only", at24->write_max);
- 
--	/* export data to kernel code */
--	if (pdata.setup)
--		pdata.setup(at24->nvmem, pdata.context);
--
- 	return 0;
- 
- err_clients:
-diff --git a/include/linux/platform_data/at24.h b/include/linux/platform_data/at24.h
-deleted file mode 100644
-index 63507ff464ee..000000000000
---- a/include/linux/platform_data/at24.h
-+++ /dev/null
-@@ -1,60 +0,0 @@
--/*
-- * at24.h - platform_data for the at24 (generic eeprom) driver
-- * (C) Copyright 2008 by Pengutronix
-- * (C) Copyright 2012 by Wolfram Sang
-- * same license as the driver
-- */
--
--#ifndef _LINUX_AT24_H
--#define _LINUX_AT24_H
--
--#include <linux/types.h>
--#include <linux/nvmem-consumer.h>
--#include <linux/bitops.h>
--
--/**
-- * struct at24_platform_data - data to set up at24 (generic eeprom) driver
-- * @byte_len: size of eeprom in byte
-- * @page_size: number of byte which can be written in one go
-- * @flags: tunable options, check AT24_FLAG_* defines
-- * @setup: an optional callback invoked after eeprom is probed; enables kernel
--	code to access eeprom via nvmem, see example
-- * @context: optional parameter passed to setup()
-- *
-- * If you set up a custom eeprom type, please double-check the parameters.
-- * Especially page_size needs extra care, as you risk data loss if your value
-- * is bigger than what the chip actually supports!
-- *
-- * An example in pseudo code for a setup() callback:
-- *
-- * void get_mac_addr(struct nvmem_device *nvmem, void *context)
-- * {
-- *	u8 *mac_addr = ethernet_pdata->mac_addr;
-- *	off_t offset = context;
-- *
-- *	// Read MAC addr from EEPROM
-- *	if (nvmem_device_read(nvmem, offset, ETH_ALEN, mac_addr) == ETH_ALEN)
-- *		pr_info("Read MAC addr from EEPROM: %pM\n", mac_addr);
-- * }
-- *
-- * This function pointer and context can now be set up in at24_platform_data.
-- */
--
--struct at24_platform_data {
--	u32		byte_len;		/* size (sum of all addr) */
--	u16		page_size;		/* for writes */
--	u8		flags;
--#define AT24_FLAG_ADDR16	BIT(7)	/* address pointer is 16 bit */
--#define AT24_FLAG_READONLY	BIT(6)	/* sysfs-entry will be read-only */
--#define AT24_FLAG_IRUGO		BIT(5)	/* sysfs-entry will be world-readable */
--#define AT24_FLAG_TAKE8ADDR	BIT(4)	/* take always 8 addresses (24c00) */
--#define AT24_FLAG_SERIAL	BIT(3)	/* factory-programmed serial number */
--#define AT24_FLAG_MAC		BIT(2)	/* factory-programmed mac address */
--#define AT24_FLAG_NO_RDROL	BIT(1)	/* does not auto-rollover reads to */
--					/* the next slave address */
--
--	void		(*setup)(struct nvmem_device *nvmem, void *context);
--	void		*context;
--};
--
--#endif /* _LINUX_AT24_H */
--- 
-2.19.1
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgVXdlLA0KDQpPbiAwOC4wMS4yMDE5IDAwOjEwLCBVd2UgS2xlaW5lLUvDtm5pZyB3cm90ZToN
+Cj4gSGVsbG8gQ2xhdWRpdSwNCj4gDQo+IE9uIE1vbiwgSmFuIDA3LCAyMDE5IGF0IDA5OjMwOjU1
+QU0gKzAwMDAsIENsYXVkaXUuQmV6bmVhQG1pY3JvY2hpcC5jb20gd3JvdGU6DQo+PiBPbiAwNS4w
+MS4yMDE5IDIzOjA1LCBVd2UgS2xlaW5lLUvDtm5pZyB3cm90ZToNCj4+PiBPbiBUaHUsIEphbiAw
+MywgMjAxOSBhdCAwMToyOTo0NFBNICswMDAwLCBDbGF1ZGl1LkJlem5lYUBtaWNyb2NoaXAuY29t
+IHdyb3RlOg0KPj4+PiBGcm9tOiBDbGF1ZGl1IEJlem5lYSA8Y2xhdWRpdS5iZXpuZWFAbWljcm9j
+aGlwLmNvbT4NCj4+Pj4NCj4+Pj4gQWRkIGJhc2ljIFBXTSBtb2Rlczogbm9ybWFsIGFuZCBjb21w
+bGVtZW50YXJ5LiBUaGVzZSBtb2RlcyBzaG91bGQNCj4+Pj4gZGlmZmVyZW50aWF0ZSB0aGUgc2lu
+Z2xlIG91dHB1dCBQV00gY2hhbm5lbHMgZnJvbSB0d28gb3V0cHV0cyBQV00NCj4+Pj4gY2hhbm5l
+bHMuIFRoZXNlIG1vZGVzIGNvdWxkIGJlIHNldCBhcyBmb2xsb3c6DQo+Pj4+IDEuIFBXTSBjaGFu
+bmVscyB3aXRoIG9uZSBvdXRwdXQgcGVyIGNoYW5uZWw6DQo+Pj4+IC0gbm9ybWFsIG1vZGUNCj4+
+Pj4gMi4gUFdNIGNoYW5uZWxzIHdpdGggdHdvIG91dHB1dHMgcGVyIGNoYW5uZWw6DQo+Pj4+IC0g
+bm9ybWFsIG1vZGUNCj4+Pj4gLSBjb21wbGVtZW50YXJ5IG1vZGUNCj4+Pj4gU2luY2UgdXNlcnMg
+Y291bGQgdXNlIGEgUFdNIGNoYW5uZWwgd2l0aCB0d28gb3V0cHV0IGFzIG9uZSBvdXRwdXQgUFdN
+DQo+Pj4+IGNoYW5uZWwsIHRoZSBQV00gbm9ybWFsIG1vZGUgaXMgYWxsb3dlZCB0byBiZSBzZXQg
+Zm9yIFBXTSBjaGFubmVscyB3aXRoDQo+Pj4+IHR3byBvdXRwdXRzOyBpbiBmYWN0IFBXTSBub3Jt
+YWwgbW9kZSBzaG91bGQgYmUgc3VwcG9ydGVkIGJ5IGFsbCBQV01zLg0KPj4+DQo+Pj4gSSBzdGls
+bCB0aGluayB0aGF0IG15IHN1Z2dlc3Rpb24gdGhhdCBJIHNlbnQgaW4gcmVwbHkgdG8geW91ciB2
+NSB1c2luZw0KPj4+IC5hbHRfZHV0eV9jeWNsZSBhbmQgLmFsdF9vZmZzZXQgaXMgdGhlIGJldHRl
+ciBvbmUgYXMgaXQgaXMgbW9yZSBnZW5lcmljLg0KPj4NCj4+IEkgbGlrZSBpdCBiZXR0ZXIgbXkg
+d2F5LCBJIGV4cGxhaW5lZCBteXNlbGYgd2h5Lg0KPiANCj4gSSBjb3VsZG4ndCByZWFsbHkgZm9s
+bG93IHlvdXIgYXJndW1lbnQgdGhvdWdoLiBZb3Ugc2VlbWVkIHRvIGFja25vd2xlZGdlDQo+IHRo
+YXQgdXNpbmcgLmFsdF9kdXR5X2N5Y2xlIGFuZCAuYWx0X29mZnNldCBpcyBtb3JlIGdlbmVyaWMu
+DQoNClRydWUgaXQgaXMgbW9yZSBnZW5lcmljIGluIHRoZSB3YXkgdGhhdCBpdCBnaXZlcyB0aGUg
+cG9zc2liaWxpdHkgdG8NCmNvbmZpZ3VyZSBhbGwga2luZCBvZiB3YXZlZm9ybXMuIEJ1dCBub3Qg
+YWxsIGNvbnRyb2xsZXJzIHN1cHBvcnRzIHRoaXMuDQpUaGUgdXNlIGNhc2Ugb2YgdGhpcyB3b3Vs
+ZCBiZSB0byBoYXZlIGRlYWQtdGltZXMgd2l0aCBhbnkgdmFsdWVzLCByaWdodD8NCg0KPiBUaGVu
+IHlvdQ0KPiB3cm90ZSB0aGF0IHRoZSBwdXNoLXB1bGwgbW9kZSBpcyBoYXJkd2FyZSBnZW5lcmF0
+ZWQgb24gQXRtZWwgd2l0aCBzb21lDQo+IGltcGxlbWVudGF0aW9uIGRldGFpbHMuDQoNClllcywg
+SSB3YW50ZWQgdG8gc2F5IHRoYXQgQXRtZWwgUFdNIGdlbmVyYXRlcyBvbmx5IGEgc2V0IG9mIHdh
+dmVmb3Jtcy4NCg0KPiBJTUhPIHRoZXNlIGltcGxlbWVudGF0aW9uIGRldGFpbHMgc2hvdWxkbid0
+IGJlDQo+IHBhcnQgb2YgdGhlIFBXTSBBUEkgYW5kIGF0bWVsJ3MgLmFwcGx5IHNob3VsZCBsb29r
+IGFzIGZvbGxvd3M6DQo+IA0KPiAJaWYgKHN0YXRlLT5hbHRfZHV0eV9jeWNsZSA9PSAwKSB7DQo+
+IA0KPiAJCS4uLiBjb25maWd1cmUgZm9yIG5vcm1hbCBtb2RlIC4uLg0KPiANCj4gCX0gZWxzZSBp
+ZiAoc3RhdGUtPmR1dHlfY3ljbGUgPT0gc3RhdGUtPmFsdF9kdXR5X2N5Y2xlICYmDQo+IAkgICAg
+ICAgICAgIHN0YXRlLT5hbHRfb2Zmc2V0ID09IHN0YXRlLT5wZXJpb2QgLyAyKSB7DQo+IA0KPiAJ
+CS4uLiBjb25maWd1cmUgZm9yIHB1c2ggcHVsbCBtb2RlIC4uLg0KPiANCj4gCX0gZWxzZSBpZiAo
+c3RhdGUtPmR1dHlfY3ljbGUgKyBzdGF0ZS0+YWx0X2R1dHlfY3ljbGUgPT0gc3RhdGUtPnBlcmlv
+ZCAmJg0KPiAJCSAgIHN0YXRlLT5hbHRfb2Zmc2V0ID09IHN0YXRlLT5kdXR5X2N5Y2xlKSB7DQo+
+IA0KPiAJCS4uLiBjb25maWd1cmUgZm9yIGNvbXBsZW1lbnRhcnkgbW9kZSAuLi4NCj4gDQo+IAl9
+IGVsc2Ugew0KPiAJCXJldHVybiAtRUlOVkFMOw0KPiAJfQ0KDQpJZiBzbywgdGhlIHVzZXIgc2hv
+dWxkIGhhdmUgYmVlbiB0YWtlbiBjYXJlIG9mIHRoZSByZWxhdGlvbnMgYi93IHRoZXNlDQp2YWx1
+ZXMgaW4gb3JkZXIgdG8gY29uZmlndXJlIGEgcHJvcGVyIHdvcmtpbmcgbW9kZS4NCg0KSXQgd291
+bGQgYmUgZ29vZCB0byBoYXZlIFRoaWVycnkncyBpbnB1dHMgb24gdGhlc2UuDQoNCj4gDQo+IElm
+IGl0IHR1cm5zIG91dCB0byBiZSBhIGNvbW1vbiBwYXR0ZXJuLCB3ZSBjYW4gYWRkIGhlbHBlciBm
+dW5jdGlvbnMgw6AgbGENCj4gcHdtX2lzX2NvbXBsZW1lbnRhcnlfbW9kZShzdGF0ZSkgYW5kDQo+
+IHB3bV9zZXRfY29tcGxlbWVudGFyeV9tb2RlKHN0YXRlLCBwZXJpb2QsIGR1dHlfY3ljbGUpLiBU
+aGlzIGFsbG93cyB0bw0KPiBoYXZlIGEgZ2VuZXJpYyB3YXkgdG8gZGVzY3JpYmUgYSB3aWRlIHJh
+bmdlIG9mIHdhdmUgZm9ybXMgaW4gYSB1bmlmb3JtDQo+IHdheSBpbiB0aGUgQVBJICh3aGljaCBp
+cyBnb29kKSBhbmQgZWFjaCBkcml2ZXIgaW1wbGVtZW50cyB0aGUgcGFydHMgb2YNCj4gdGhpcyBy
+YW5nZSB0aGF0IGl0IGNhbiBzdXBwb3J0Lg0KPiANCj4+PiBJIGRvbid0IHJlcGVhdCB3aGF0IEkg
+d3JvdGUgdGhlcmUgYXNzdW1pbmcgeW91IHN0aWxsIHJlbWVtYmVyIG9yIGFyZQ0KPj4+IHdpbGxp
+bmcgdG8gbG9vayBpdCB1cCBhdA0KPj4+IGUuZy4gaHR0cHM6Ly93d3cuc3Bpbmljcy5uZXQvbGlz
+dHMvbGludXgtcHdtL21zZzA4MTc0Lmh0bWwgKGluIHRoZSAybmQgaGFsZg0KPj4+IG9mIG15IG1h
+aWwpLg0KPj4NCj4+IFllcywgSSByZW1lbWJlciBpdC4NCj4gDQo+IEkgZXhwZWN0ZWQgdGhhdCwg
+bXkgd29yZHMgd2VyZSBtb3JlIGRpcmVjdGVkIHRvIFRoaWVycnkgdGhhbiB5b3UuDQo+ICANCj4+
+PiBBbHNvIEkgdGhpbmsgdGhhdCBpZiB0aGUgY2FwYWJpbGl0aWVzIGZ1bmN0aW9uIGlzIHRoZSB3
+YXkgZm9yd2FyZCBhZGRpbmcNCj4+PiBzdXBwb3J0IHRvIGRldGVjdCBhdmFpbGFiaWxpdHkgb2Yg
+cG9sYXJpdHkgaW52ZXJzaW9uIHNob3VsZCBiZQ0KPj4+IGNvbnNpZGVyZWQuIA0KPj4NCj4+IFll
+cCwgd2h5IG5vdC4gQnV0IGl0IHNob3VsZCBiZSBkb25lIGluIGEgZGlmZmVyZW50IHBhdGNoLiBJ
+dCBpcyBub3QgcmVsYXRlZA0KPj4gdG8gdGhpcyBzZXJpZXMuDQo+IA0KPiBZZXMsIGdpdmVuIHRo
+YXQgcG9sYXJpdHkgYWxyZWFkeSBleGlzdHMsIHRoaXMgd291bGQgYmUgYSBnb29kDQo+IG9wcG9y
+dHVuaXR5IHRvIGludHJvZHVjZSB0aGUgY2FwYWJpbGl0eSBmdW5jdGlvbiBmb3IgdGhhdCBhbmQg
+b25seQ0KPiBhZnRlcndhcmRzIGFkZCB0aGUgbmV3IHVzZSBjYXNlIHdpdGggbW9kZXMuIChCdXQg
+aGF2aW5nIHNhaWQgdGhpcywgcmVhZA0KPiBmdXJ0aGVyIGFzIEkgdGhpbmsgdGhhdCB0aGlzIGNh
+cGFiaWxpdHkgZnVuY3Rpb24gaXMgYSBiYWQgaWRlYS4pDQo+IA0KPj4+IFRoaXMgd291bGQgYWxz
+byBiZSBhbiBvcHBvcnR1bml0eSB0byBzcGxpdCB0aGUgaW50cm9kdWN0aW9uDQo+Pj4gb2YgdGhl
+IGNhcGFiaWxpdGllcyBmdW5jdGlvbiBhbmQgdGhlIGludHJvZHVjdGlvbiBvZiBjb21wbGVtZW50
+YXJ5IG1vZGUuDQo+Pj4gKEJ1dCBteSBwZXJzb25hbCBwcmVmZXJlbmNlIHdvdWxkIGJlIHRvIGp1
+c3QgbGV0IC5hcHBseSBmYWlsIHdoZW4gYW4NCj4+PiB1bnN1cHBvcnRlZCBjb25maWd1cmF0aW9u
+IGlzIHJlcXVlc3RlZC4pDQo+Pg0KPj4gLmFwcGx5IGZhaWxzIHdoZW4gc29tZXRoaW5nIHdyb25n
+IGlzIHJlcXVlc3RlZC4NCj4gDQo+IElmIG15IGNvbnRyb2xsZXIgZG9lc24ndCBzdXBwb3J0IGEg
+c2Vjb25kIG91dHB1dCBpcyBpdCAid3JvbmciIHRvDQo+IHJlcXVlc3QgY29tcGxlbWVudGFyeSBt
+b2RlPyBJJ2Qgc2F5IHllcy4gU28geW91IGhhdmUgdG8gY2F0Y2ggdGhhdCBpbg0KPiAuYXBwbHkg
+YW55aG93IGFuZCB0aGVyZSBpcyBsaXR0bGUgYmVuZWZpdCB0byBiZSBhYmxlIHRvIGFzayB0aGUN
+Cj4gY29udHJvbGxlciBpZiBpdCBzdXBwb3J0cyBpdCBiZWZvcmVoYW5kLg0KDQpUaGlzIGlzIGNo
+ZWNrZWQgYnkgcHdtX3N1cHBvcnRzX21vZGUoKSBjYWxsZWQgaW4gcHdtX2FwcGx5X3N0YXRlKCku
+IElmDQpjb250cm9sbGVyIGRvZXNuJ3Qgc3VwcG9ydCB0aGUgbW9kZSwgdGhlIGFwcGx5IHdpbGwg
+ZmFpbC4NCg0KPiANCj4gSSBkb24ndCBoYXZlIGEgcHJvdmFibGUgc3RhdGlzdGljIGF0IGhhbmQs
+IGJ1dCBteSBmZWVsaW5nIGlzIHRoYXQgcXVpdGUNCj4gc29tZSB1c2VycyBvZiB0aGUgaTJjIGZy
+YW1lIHdvcmsgZ2V0IGl0IHdyb25nIHRvIGZpcnN0IGNoZWNrIHRoZQ0KPiBjYXBhYmlsaXRpZXMg
+YW5kIG9ubHkgdGhlbiB0cnkgdG8gdXNlIHRoZW0uIFRoaXMgaXMgYXQgbGVhc3QgZXJyb3IgcHJv
+bmUNCj4gYW5kIGhhcmRlciB0byB1c2UgdGhhbiB0aGUgYXBwbHkgZnVuY3Rpb24gcmV0dXJuaW5n
+IGFuIGVycm9yIGNvZGUuDQo+IEFuZCBvbiB0aGUgZHJpdmVyIHNpZGUgdGhlIHVwc2lkZSBpcyB0
+byBoYXZlIGFsbCBzdHVmZiByZWxhdGVkIHRvIHdoaWNoDQo+IHdhdmUgZm9ybSBjYW4gYmUgZ2Vu
+ZXJhdGVkIGFuZCB3aGljaCBjYW5ub3QgaXMgYSBzaW5nbGUgcGxhY2UuIChKdXN0DQo+IGNvbnNp
+ZGVyICJpbnZlcnRlZCBjb21wbGVtZW50YXJ5IG1vZGUiLiBUaGVvcmV0aWNhbGx5IHRoaXMgc2hv
+dWxkIHdvcmsNCj4gaWYgeW91ciBjb250cm9sbGVyIHN1cHBvcnRzIGNvbXBsZW1lbnRhcnkgbW9k
+ZSBhbmQgaW52ZXJ0ZWQgbW9kZS4gSWYgeW91DQo+IG5vdyBoYXZlIGEgZHJpdmVyIGZvciBhIGNv
+bnRyb2xsZXIgdGhhdCBjYW4gZG8gYm90aCwgYnV0IG5vdCBhdCB0aGUgc2FtZQ0KPiB0aW1lLCB0
+aGUgc2VwYXJhdGlvbiBnZXRzIHVnbHkuIE9LLCB0aGlzIGlzIGEgY29uc3RydWN0ZWQgZXhhbXBs
+ZSwgYnV0DQo+IGluIG15IGV4cGVyaWVuY2Ugc29tZXRoaW5nIGxpa2UgdGhhdCBoYXBwZW5zIGVh
+cmxpZXIgb3IgbGF0ZXIuKQ0KPiANCj4+Pj4gWy4uLl0NCj4+Pj4gQEAgLTUzLDEyICs3NSwxNCBA
+QCBlbnVtIHsNCj4+Pj4gICAqIEBwZXJpb2Q6IFBXTSBwZXJpb2QgKGluIG5hbm9zZWNvbmRzKQ0K
+Pj4+PiAgICogQGR1dHlfY3ljbGU6IFBXTSBkdXR5IGN5Y2xlIChpbiBuYW5vc2Vjb25kcykNCj4+
+Pj4gICAqIEBwb2xhcml0eTogUFdNIHBvbGFyaXR5DQo+Pj4+ICsgKiBAbW9kZWJpdDogUFdNIG1v
+ZGUgYml0DQo+Pj4+ICAgKiBAZW5hYmxlZDogUFdNIGVuYWJsZWQgc3RhdHVzDQo+Pj4+ICAgKi8N
+Cj4+Pj4gIHN0cnVjdCBwd21fc3RhdGUgew0KPj4+PiAgCXVuc2lnbmVkIGludCBwZXJpb2Q7DQo+
+Pj4+ICAJdW5zaWduZWQgaW50IGR1dHlfY3ljbGU7DQo+Pj4+ICAJZW51bSBwd21fcG9sYXJpdHkg
+cG9sYXJpdHk7DQo+Pj4+ICsJdW5zaWduZWQgbG9uZyBtb2RlYml0Ow0KPj4+DQo+Pj4gSSBmYWls
+IHRvIHNlZSB0aGUgdXBzaWRlIG9mIHN0b3JpbmcgdGhlIG1vZGUgYXMgMl5tb2RlIGluc3RlYWQg
+b2YgYQ0KPj4+IHBsYWluIGVudW0gcHdtX21vZGUuIEdpdmVuIHRoYXQgc3RydWN0IHB3bV9zdGF0
+ZSBpcyB2aXNpYmxlIGZvciBwd20NCj4+PiB1c2VycyBhIHBsYWluIHB3bV9tb2RlIHdvdWxkIGF0
+IGxlYXN0IGJlIG1vcmUgaW50dWl0aXZlLg0KPj4NCj4+IFRvIGhhdmUgYWxsIG1vZGVzIHN1cHBv
+cnRlZCBieSBhIGNvbnRyb2xsZXIgZ3JvdXBlZCBpbiBwd21fY2Fwczo6bW9kZXNfbXNrLg0KPiAN
+Cj4gTXkgcXVlc3Rpb24gd2FzIG5vdCBhYm91dCBzdHJ1Y3QgcHdtX2NhcHM6Om1vZGVzX21zayBi
+dXQgYWJvdXQNCj4gc3RydWN0IHB3bV9zdGF0ZTo6bW9kZWJpdC4gQXMgc3RydWN0IHB3bV9zdGF0
+ZSBoYXMgdmlzaWJpbGl0eSBldmVuDQo+IG91dHNpZGUgb2YgdGhlIHB3bSBBUEkgKGkuZS4gaXQg
+aXMgdXNlZCBieSBjb25zdW1lcnMpIGl0IGlzIGJlbmVmaWNpYWwNCj4gdG8ga2VlcCB0aGF0IHNp
+bXBsZS4gTGV0dGluZyBhIGNvbnN1bWVyIHBhc3MgaW4gdGhlIG1vZGUgaGUgd2FudHMgaXMNCj4g
+ZWFzaWVyIHRvIGV4cGxhaW4gdGhhbiBzZXR0aW5nIGEgc2luZ2xlIGJpdC4gQWxzbyBlcnJvciBj
+aGVja2luZyB3aXRoIGENCj4gcGxhaW4gZW51bSBpcyBlYXNpZXIgYmVjYXVzZSB5b3UganVzdCBk
+bzoNCj4gDQo+IAlpZiAobW9kZSA+PSBNT0RFX0NOVCkNCj4gCQllcnJvcigpDQo+IA0KPiB3aGlj
+aCBpcyBlYXN5IHRvIGdyYXNwLiBDb21wYXJlIHRoYXQgdG8NCj4gDQo+IAlpZiAoIWlzX3Bvd2Vy
+X29mX3R3byhtb2RlYml0KSB8fCBtb2RlYml0ID49IFBXTV9NT0RFX0JJVChDTlQpKQ0KPiAJCWVy
+cm9yKCkNCj4gDQo+IChtb2R1bG8gc3ludGFjdGljYWwgY29ycmVjdG5lc3MpLg0KDQpUaGUgcmVh
+c29uIEkgY2hvb3NlIHRvIGhhdmUgaXQgYXMgYml0IHdhcyB0aGUgbWVtY21wKCkgYXQgdGhlIGJl
+Z2lubmluZyBvZg0KcHdtX2FwcGx5X3N0YXRlKCkgYW5kIHRvIGF2b2lkIHN0YXJ0aW5nIGVudW0g
+cHdtX21vZGUgZnJvbSAxIGFuZCB0byBhdm9pZA0KaGF2aW5nIGJpdCAwIG9mIHB3bV9jYXBzOjpt
+b2Rlc19tc2sgdW51c2VkIChpbiB0aGUgZHJpdmVyIEknbSB1c2luZw0KUFdNX01PREVfQklUKCkg
+bWFjcm8gdG8gZmlsbCBpbiB0aGUgZHJpdmVyJ3Mgc3VwcG9ydGVkIG1vZGVzKS4NCg0KVGhhbmsg
+eW91LA0KQ2xhdWRpdSBCZXpuZWENCg0KPiANCj4gQmVzdCByZWdhcmRzDQo+IFV3ZQ0KPiANCl9f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1r
+ZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpo
+dHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJu
+ZWwK
