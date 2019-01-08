@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 56215C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 16:28:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D7556C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 16:31:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E0BC72070B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 16:28:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A0E7A20883
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 16:31:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aA1IwRc4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E0BC72070B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="utuKxzzS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A0E7A20883
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,42 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Z4SDTXJdU+XMQj0giP/nQwB3gcVtneiDJIWfV81apXU=; b=aA1IwRc4X/PRWA
-	SY9LWqLE3lzmIhdekZC1H2tgJ6PX2/nEp718GVSWfVga95wWRcCe3mS+z1Gp4rozCNdalYhSsDfdw
-	vdnX3ue6YORBpl+H8gBTxWwR05DogHOt9AhibSY8DOrp4ygFgLMRsAS6CKUEAGWoULTOdIgS0SPj1
-	0e4yrKHuVhEgjoob66chWAcijhRW5ImdKf09dmZaKTZNlR9v9Qa+nCDPog80cfrlJu5eP7V0DJj2u
-	ng4fyRVAVsNHNhbnK1Q73bNrdXaw0KkbcNOO7NRd4HTEKeAKbFs1TtiRadDf4fKrP50A1CwnQOha+
-	TfWcONX2Q8gCCBeD/tzg==;
+	List-Owner; bh=JUGRF/CHuAkYP8jmHhBoq72xFqyiWDK9/e0XiQxbUhM=; b=utuKxzzSULYX7X
+	sQnY1I32OwO96wwT9G/gfVo/ubsOiYECFDhomNnpF7hVcosKdoMB4n1h5HUfB9A2of5iYFE14PsvQ
+	tVETkKWB75OW7Hx3ADjUldEutR776BC8PJQrR4ZOmbfJF49S3Bst8N46yer8J/tZAON85FEzpPDFg
+	QG/lOiXzL8q9+zxOm3rhd5DbFMUgKZLXKgYYDHfCJMZf1EDcAUX3Z3BIXMU9CElH2wHk2nzaMbHZu
+	A2laIPWXl1Ybl6OCw4N8EkeM3toiQ+CjRPOR9lrFOzitPkJPzPw+FIAaNOrvrQj3uFBe5NzwoHyc7
+	KHXG4nETGvr/7QPirCAA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gguF7-0005gh-KZ; Tue, 08 Jan 2019 16:28:41 +0000
+	id 1gguI2-0007Yl-RI; Tue, 08 Jan 2019 16:31:42 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gguBP-0000fM-JY
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 16:25:01 +0000
+ id 1gguHy-0007WW-LG
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 16:31:40 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 8846D209D7; Tue,  8 Jan 2019 17:24:50 +0100 (CET)
+ id 10AAC209EF; Tue,  8 Jan 2019 17:31:37 +0100 (CET)
 Received: from localhost.localdomain
  (aaubervilliers-681-1-45-241.w90-88.abo.wanadoo.fr [90.88.163.241])
- by mail.bootlin.com (Postfix) with ESMTPSA id 286BF209C2;
- Tue,  8 Jan 2019 17:24:50 +0100 (CET)
+ by mail.bootlin.com (Postfix) with ESMTPSA id A2F2A20A08;
+ Tue,  8 Jan 2019 17:31:26 +0100 (CET)
 From: Miquel Raynal <miquel.raynal@bootlin.com>
 To: Gregory Clement <gregory.clement@bootlin.com>,
  Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
  Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Bjorn Helgaas <bhelgaas@google.com>
-Subject: [PATCH v3 15/15] ARM64: dts: marvell: armada-3720-espressobin:
- declare PCIe warm reset pin
-Date: Tue,  8 Jan 2019 17:24:40 +0100
-Message-Id: <20190108162441.5278-16-miquel.raynal@bootlin.com>
+ Kishon Vijay Abraham I <kishon@ti.com>
+Subject: [PATCH v5 2/7] phy: enumerate SATA PHY mode
+Date: Tue,  8 Jan 2019 17:31:19 +0100
+Message-Id: <20190108163124.6409-3-miquel.raynal@bootlin.com>
 X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20190108162441.5278-1-miquel.raynal@bootlin.com>
-References: <20190108162441.5278-1-miquel.raynal@bootlin.com>
+In-Reply-To: <20190108163124.6409-1-miquel.raynal@bootlin.com>
+References: <20190108163124.6409-1-miquel.raynal@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_082452_300595_D362CBA1 
-X-CRM114-Status: GOOD (  10.79  )
+X-CRM114-CacheID: sfid-20190108_083138_833113_62C26573 
+X-CRM114-Status: GOOD (  11.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,39 +71,43 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- Antoine Tenart <antoine.tenart@bootlin.com>, linux-pci@vger.kernel.org,
- linux-kernel@vger.kernel.org,
+ Antoine Tenart <antoine.tenart@bootlin.com>,
+ Grzegorz Jaszczyk <jaz@semihalf.com>, linux-kernel@vger.kernel.org,
  Maxime Chevallier <maxime.chevallier@bootlin.com>,
  Nadav Haklai <nadavh@marvell.com>, Rob Herring <robh+dt@kernel.org>,
- Miquel Raynal <miquel.raynal@bootlin.com>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Miquel Raynal <miquel.raynal@bootlin.com>, Marcin Wojtas <mw@semihalf.com>,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Ensure the PCIe endpoint card reset that is toggled by the PCIe
-controller itself is muxed correctly on the EspressoBin.
+From: Grzegorz Jaszczyk <jaz@semihalf.com>
 
+Add SATA mode to the PHY framework in preparation of upcoming PHYs
+that will handle it. For instance, SATA mode will be used by the
+Armada3700 COMPHY driver, which supports configuring SERDES lanes to
+be used by various controllers: Ethernet, USB3, SATA and PCIe.
+
+Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts | 2 ++
- 1 file changed, 2 insertions(+)
+ include/linux/phy/phy.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-index c5c72902c647..f19c1ecd5703 100644
---- a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-@@ -47,6 +47,8 @@
- &pcie0 {
- 	status = "okay";
- 	phys = <&comphy1 0>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pcie_reset_pins &pcie_clkreq_pins>;
+diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+index 1fdefadf150a..7fa18b684a7d 100644
+--- a/include/linux/phy/phy.h
++++ b/include/linux/phy/phy.h
+@@ -42,6 +42,7 @@ enum phy_mode {
+ 	PHY_MODE_PCIE,
+ 	PHY_MODE_ETHERNET,
+ 	PHY_MODE_MIPI_DPHY,
++	PHY_MODE_SATA,
  };
  
- /* J6 */
+ /**
 -- 
 2.19.1
 
