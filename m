@@ -2,22 +2,22 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7564EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 07:42:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1AFF3C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 08:00:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 458242089F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 07:42:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DB9F0218AF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 08:00:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dPDMogMW";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="XOhdmRkj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 458242089F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tBOxDkaw";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="FYL63tw/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DB9F0218AF
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,56 +25,55 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=rGXQLhDumKi21RA4VLEisBw7v7TerKZ8Wx/3Nh002LY=; b=dPDMogMWuF6qqK
-	kcNcEfVxMsWdb2quxvsthNvQ8un80gQYzEjBxseUK1dofpHKVfmw6+ledox9YgJ1ky0gKtoLZ63iX
-	YwzuIRr3NrgyAhPweQRfuCRbngpTtqqhZLBx5BLVmQ4Nn7nSFKek6VYI3LBw+9Bt8SbjyQGrdJdzV
-	SXQtFQoig7iwDd+9qGR2hBcVOl9FmCc1AjSxmcZ+RN0Qnnr5p8+U9Gpyuu/k8HAMPYJxMb0bm7FL4
-	5DhFzHFQoGZkMpFps5K7MhsRwjV/XOdY1PYEuVfP5YY7gayyXm+RrSr+yoXTacN23NNefiWRKKKDH
-	zpo4r+dmTsZ05FSKM1Kw==;
+	List-Owner; bh=1DpWRYqTTw5hFo7Q3oYtunCYVoc6VXxR9XNDRnMPN4A=; b=tBOxDkawfDSFGV
+	wsW636ekTmTEbgJe9xgpCWS2/U1HJS46ZYKdZEUlgObLe897MNQ8gr/lDyU5uMsyMkDTKbm3Cp5Mx
+	xBXl2fOGtqrCBg17shS2zt36hPGdYSxxgPZ/0fMukIWYMulJGWDYTpNV3dCtMJuK2wRAb6e4aGCo5
+	bw0Ewev2trAG3+aJhenIZUq/8tk/ThXfthlMcSTMU03wydywip+PjgQq2VoF82vndHT1sCqKa4zWW
+	22taK5rWwEzqI7FQLg430YVGoHXT881kZVIcoZsSy+JSP0F9Nl5RNSTK1xOyOsGcphNN8u/DuZc1j
+	R1DBbI2wlE8x+7QFcZlQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggm26-0004c0-Ej; Tue, 08 Jan 2019 07:42:42 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1ggmJ6-0002mG-V0; Tue, 08 Jan 2019 08:00:16 +0000
+Received: from mail-io1-xd2e.google.com ([2607:f8b0:4864:20::d2e])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggm22-0004bO-SW
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 07:42:40 +0000
-Received: from mail-lj1-f169.google.com (mail-lj1-f169.google.com
- [209.85.208.169])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 6314F2089F
+ id 1ggmIz-0002dG-81
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 08:00:14 +0000
+Received: by mail-io1-xd2e.google.com with SMTP id f4so2477283ion.2
  for <linux-arm-kernel@lists.infradead.org>;
- Tue,  8 Jan 2019 07:42:37 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1546933357;
- bh=U8LTxlLkvrlvXtFk9537u+7EhPu/K5r0M0XVwpMvKT4=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=XOhdmRkja7MF7K0aVcRp+AXSyViDqYmhsEiYYLqSi1/DbuJ+C6OLgrAjc4SHlgBem
- RnlIEPSfrrPrdMluukpWQZGfSeJmixYNf0/USVmEAGkN/qTnur4QoeB0Ufmjvpxu9U
- 6j6D9XfWLysYybFAsNSwivCLZktXH7WZX1mMQdY4=
-Received: by mail-lj1-f169.google.com with SMTP id v15-v6so2523918ljh.13
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 07 Jan 2019 23:42:37 -0800 (PST)
-X-Gm-Message-State: AJcUukfcBLdvn509khJPkDbvKU+r/vWTDlkQREaLycCW3zKCIFMASd4o
- UnROipjpT8IrBdWNwx3SEd/YxS77qslQH5aNbII=
-X-Google-Smtp-Source: ALg8bN7OBqxzlKH0KZu5F41cdSrGrbch8RvAS82mdlGAKtoAdE5QvwGvZFMbbmylzd0260PvadqwnrWCkHPHu7dqXXk=
-X-Received: by 2002:a2e:5d12:: with SMTP id r18-v6mr463850ljb.89.1546933355582; 
- Mon, 07 Jan 2019 23:42:35 -0800 (PST)
+ Tue, 08 Jan 2019 00:00:08 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=n80u3Bj0sRgCZ2Ib0Abtxqm5mtdRub1PL/fORDN6hnY=;
+ b=FYL63tw/QA90Ex09/G/sBbeL30LHGYI+8z03Z1/5O/1TtRMLuUNTgTE8VumYE/cXlL
+ nPU9jRF5B/ofMmki6ZZl227e7+f5XdetHdD4Ihri/acNdR3FvyMlhMfQQWc8RDgDJRnJ
+ stp71yeQIw7IF5rcPshtpeb1dfBtXUWb1U3lA=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=n80u3Bj0sRgCZ2Ib0Abtxqm5mtdRub1PL/fORDN6hnY=;
+ b=gSJwcox+X+JAck0w1Bz+KIrogNDRLfrQhSzKG7tSLp0tOCrbfwv6OnmOSoKGH2gZRj
+ o6IPTDi523/kCSEugV5ZMV8CsrSa9UBNFaBC0hxatgwqh+L3QddaC2OZYbQlDgTV7B7L
+ I4AMLbzpgFM0j0YvnsJzrwOr+E5Zxfth578Pf+yIea5zwE7EgRateVTmhFrPR6SN2vSW
+ 9tXP39ynE9AM0lugalKugpfb+DEq7NCqCYsUSU+kI5ByZ6t89KyaHJPqyErJb6GVeS0U
+ 2OhB50omdlkxi3oWI3/2F6pEhjjLZlcK2Szt3LzB32kYQu3cn4gGZx5nYSV2XBFZ6EQh
+ it6A==
+X-Gm-Message-State: AJcUukeZvCldmk3T/WlunTwIxTFld+K0MafoaiLGVUVOGzE6MoqkVedf
+ qpSHb1Q4aOhpuQgEFzjjGYV3jaE5CdL9X1TbJE+l1Q==
+X-Google-Smtp-Source: ALg8bN4EOpyRuSmrkPIRDEuI583rUwwU2H+mu6bJCCzwD1t2lBoGJOUM1na1y6cZpu0cWPcPpYtwAjKUj8Umw+rFSUY=
+X-Received: by 2002:a6b:c8c9:: with SMTP id y192mr375125iof.183.1546934407614; 
+ Tue, 08 Jan 2019 00:00:07 -0800 (PST)
 MIME-Version: 1.0
-References: <20190103201408.GA27754@embeddedor>
- <20190107194324.GC3313@kozik-lap>
- <1abcd26c-aa10-9481-ed53-3c3654842757@embeddedor.com>
-In-Reply-To: <1abcd26c-aa10-9481-ed53-3c3654842757@embeddedor.com>
-From: Krzysztof Kozlowski <krzk@kernel.org>
-Date: Tue, 8 Jan 2019 08:42:24 +0100
-X-Gmail-Original-Message-ID: <CAJKOXPcKgFpRbFufxw5LVv-boWwdvSq-zG9gw1u7P9-f+5BJMQ@mail.gmail.com>
-Message-ID: <CAJKOXPcKgFpRbFufxw5LVv-boWwdvSq-zG9gw1u7P9-f+5BJMQ@mail.gmail.com>
-Subject: Re: [PATCH] ARM: mach-s3c24xx: Fix boolean expressions in
- osiris_dvs_notify
-To: "Gustavo A. R. Silva" <gustavo@embeddedor.com>
+References: <20190107233833.GI5544@atomide.com>
+In-Reply-To: <20190107233833.GI5544@atomide.com>
+From: Vincent Guittot <vincent.guittot@linaro.org>
+Date: Tue, 8 Jan 2019 08:59:56 +0100
+Message-ID: <CAKfTPtDBEmcsLotp-6K1KU1wM9Ba1EpMp3niXScRxYgzjs0nog@mail.gmail.com>
+Subject: Re: Regression in v5.0-rc1 with autosuspend hrtimers
+To: Tony Lindgren <tony@atomide.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190107_234238_940848_70B370F4 
-X-CRM114-Status: GOOD (  16.24  )
+X-CRM114-CacheID: sfid-20190108_000009_289593_F6443FFE 
+X-CRM114-Status: GOOD (  12.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,48 +85,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
- Russell King <linux@armlinux.org.uk>, linux-kernel@vger.kernel.org,
- Ben Dooks <ben@simtec.co.uk>, Kukjin Kim <kgene@kernel.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Ulf Hansson <ulf.hansson@linaro.org>,
+ "open list:THERMAL" <linux-pm@vger.kernel.org>,
+ "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>, linux-omap@vger.kernel.org,
+ LAK <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 7 Jan 2019 at 21:33, Gustavo A. R. Silva <gustavo@embeddedor.com> wrote:
->
-> Hi Krzysztof,
->
-> On 1/7/19 1:43 PM, Krzysztof Kozlowski wrote:
-> > On Thu, Jan 03, 2019 at 02:14:08PM -0600, Gustavo A. R. Silva wrote:
-> >> Fix boolean expressions by using logical AND operator '&&'
-> >> instead of bitwise operator '&'.
-> >>
-> >> This issue was detected with the help of Coccinelle.
-> >>
-> >> Fixes: 4fa084af28ca ("ARM: OSIRIS: DVS (Dynamic Voltage Scaling) supoort.")
-> >> Cc: stable@vger.kernel.org
-> >> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
-> >> ---
-> >>   arch/arm/mach-s3c24xx/mach-osiris-dvs.c | 8 ++++----
-> >
-> > Thanks, applied with fixing up -Wparentheses warning. I think you should
-> > update your GCC.
-> >
->
-> Thanks for that.
->
-> I wonder if you could take these too:
->
-> https://lore.kernel.org/lkml/418252fcd77472413ce15ac3df167e448a4defe9.1546667177.git.gustavo@embeddedor.com/
-> https://lore.kernel.org/lkml/2795c5ba939fe23dda6c86135d56e68433f7d68a.1546667177.git.gustavo@embeddedor.com/
+Hi Tony,
 
-Can't do. I am maintainer only for ARM/Samsung platform and these are
-for Integrator.
+On Tue, 8 Jan 2019 at 00:38, Tony Lindgren <tony@atomide.com> wrote:
+>
+> Hi all,
+>
+> Looks like commit 8234f6734c5d ("PM-runtime: Switch autosuspend
+> over to using hrtimers") caused a regression on at least
+> omap5-uevm where 8250 UART rx wake no longer works. I have not
+> noticed this happening on others so far.
+>
+> The devices I've tested all are using 8250 with dedicated
+> wakeirqs configured for the rx pin. I can see the interrupt
+> increase on omap5-uevm after some one or more keypresses,
+> but then nothing. It seems that the uart just falls back
+> asleep right away or something.
+>
+> Any ideas what might be going wrong?
 
-Best regards,
-Krzysztof
+What is the autosuspend value ? Can it be that the autosuspend is set
+to a short value but was finally greater than 10-20ms on arm32. And
+now the autosuspend happens before and this has changed the sequence ?
+
+Regards,
+Vincent
+>
+> Regards,
+>
+> Tony
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
