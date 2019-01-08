@@ -2,92 +2,110 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1660FC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 15:44:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 355EDC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 15:51:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D9DC420827
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 15:44:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 00C7A20827
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 15:51:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jfXPYlJ5";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="zJW2AVPO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D9DC420827
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tHY4Y9uh"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 00C7A20827
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RM/YcdrtFGMyG09HdUs9zXDgL1TDxM7rEbGbQzqwKSk=; b=jfXPYlJ5rtLYA4
-	hqqswLImUJurXE9fcrK/gU/GIQ/7tldLIw23x2wLQXtvLCDR0pMeeXv75xyG4jzbA32BQL8McBUqr
-	0+5CuunV52KnMSewiV4teD0F6EOOC3CAqaB23WTns0a/B07FHgjGHBGlINavVoGeeTnKHQL9v6k6t
-	2bWBJ98noIVzAMXb4evzH9oazl4QZZz072RJbb/2S9h6NeZ1Txzs2CeMQYwFARBvRVRPP8dWhMYg8
-	ewi182I54bMf5baWbs9HoI2uY5jzK/Fv758pK9ehNGwxo1pFXXxXGMgi3oaWWBq3E5zwskIc2MfaL
-	cCzlLqAVvR5DrFOGgFfg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=aPqXUzCdB1VOVLGWvRCw9DnttGO6zxdiBFULRinOwjY=; b=tHY4Y9uhSNXJvg
+	aCkDoEohUA6Qn+DHT6d/W+rWCAz2tt0qTI0Lp5dzuMOF32NRO8YjeOPsTIAcS/rx3NRzkQ345yMlk
+	WvLdkpbFA1uSZ8CFUfLQKpTgKjwl2t5B1veaCpcUOgRX9v3PhUzJuHpSQi2MtnsjcwegkKgv76p3K
+	ucK3j94nOzR/PkgE++KmvUc1kAvlt9fZbs4t/8EUgyQjfG1gfV+XYPK+BLqKoeJqufj43mDZNcISA
+	wEaIvdxiC3EpFYoKSbuPG8rz+FmjD9tLxklh5GtCbMaYiZAX5PfkoYdyB4Q8RrxmXE5jPo2cJq4QY
+	hbAxlJm/hXk6GixCTnXw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggtYi-0005m7-G9; Tue, 08 Jan 2019 15:44:52 +0000
-Received: from fllv0015.ext.ti.com ([198.47.19.141])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggtYe-0005lK-Df; Tue, 08 Jan 2019 15:44:50 +0000
-Received: from fllv0034.itg.ti.com ([10.64.40.246])
- by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id x08FifZ6111050;
- Tue, 8 Jan 2019 09:44:41 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1546962281;
- bh=fachTKCPBIn7riJjZp5zchXJqEK3IgIyqJSzpthgUh0=;
- h=Date:From:To:CC:Subject:References:In-Reply-To;
- b=zJW2AVPOrdm92L5WzrUYjibA6UfDna2uicP+sgk5k92I99umyRF/C1KVcvE/XM+Cm
- RQW7p/cy7nRBSqY6zRwH6lz0nMMMsFhVLoodnIi3B48B3RNMwflrHSek/PooAMn3YX
- TO0BnRzGQnblsjSb9zJwQqr8ZyispAtHcJy5R6J0=
-Received: from DLEE103.ent.ti.com (dlee103.ent.ti.com [157.170.170.33])
- by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x08FifhL076909
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Tue, 8 Jan 2019 09:44:41 -0600
-Received: from DLEE114.ent.ti.com (157.170.170.25) by DLEE103.ent.ti.com
- (157.170.170.33) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 8
- Jan 2019 09:44:41 -0600
-Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE114.ent.ti.com
- (157.170.170.25) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Tue, 8 Jan 2019 09:44:41 -0600
-Received: from localhost (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x08FifZj014927;
- Tue, 8 Jan 2019 09:44:41 -0600
-Date: Tue, 8 Jan 2019 09:44:41 -0600
-From: Bin Liu <b-liu@ti.com>
-To: <min.guo@mediatek.com>
-Subject: Re: [PATCH 4/4] usb: musb: Add support for MediaTek musb controller
-Message-ID: <20190108154441.GG25910@uda0271908>
-Mail-Followup-To: Bin Liu <b-liu@ti.com>, min.guo@mediatek.com,
- Rob Herring <robh+dt@kernel.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Mark Rutland <mark.rutland@arm.com>,
- Matthias Brugger <matthias.bgg@gmail.com>,
- Alan Stern <stern@rowland.harvard.edu>, chunfeng.yun@mediatek.com,
- linux-usb@vger.kernel.org, devicetree@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-mediatek@lists.infradead.org,
- Yonglong Wu <yonglong.wu@mediatek.com>
-References: <1545896066-897-1-git-send-email-min.guo@mediatek.com>
- <1545896066-897-5-git-send-email-min.guo@mediatek.com>
+	id 1ggtf4-0001SX-7x; Tue, 08 Jan 2019 15:51:26 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ggtf0-0001S1-PA
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 15:51:24 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 20DC380D;
+ Tue,  8 Jan 2019 07:51:22 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ 06FA03F5AF; Tue,  8 Jan 2019 07:51:19 -0800 (PST)
+Subject: Re: [PATCH v8 12/26] arm64: irqflags: Use ICC_PMR_EL1 for interrupt
+ masking
+To: Dave Martin <Dave.Martin@arm.com>, Julien Thierry <julien.thierry@arm.com>
+References: <1546956464-48825-1-git-send-email-julien.thierry@arm.com>
+ <1546956464-48825-13-git-send-email-julien.thierry@arm.com>
+ <20190108153957.GA5840@e103592.cambridge.arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ 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
+Organization: ARM Ltd
+Message-ID: <8cae8016-d2c7-3c86-9832-f4278d42ea21@arm.com>
+Date: Tue, 8 Jan 2019 15:51:18 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1545896066-897-5-git-send-email-min.guo@mediatek.com>
-User-Agent: Mutt/1.5.21 (2010-09-15)
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+In-Reply-To: <20190108153957.GA5840@e103592.cambridge.arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_074448_584415_C07531E3 
-X-CRM114-Status: GOOD (  40.33  )
+X-CRM114-CacheID: sfid-20190108_075122_829349_9809A4D2 
+X-CRM114-Status: GOOD (  17.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,409 +117,55 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Yonglong Wu <yonglong.wu@mediatek.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-usb@vger.kernel.org,
- linux-kernel@vger.kernel.org, Matthias Brugger <matthias.bgg@gmail.com>,
- Rob Herring <robh+dt@kernel.org>, Alan Stern <stern@rowland.harvard.edu>,
- chunfeng.yun@mediatek.com, linux-mediatek@lists.infradead.org,
+Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>, catalin.marinas@arm.com,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org, christoffer.dall@arm.com,
+ james.morse@arm.com, Oleg Nesterov <oleg@redhat.com>, joel@joelfernandes.org,
  linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
-
-On Thu, Dec 27, 2018 at 03:34:26PM +0800, min.guo@mediatek.com wrote:
-> From: Min Guo <min.guo@mediatek.com>
-> 
-> This adds support for MediaTek musb controller in
-> host, peripheral and otg mode
-> 
-> Signed-off-by: Min Guo <min.guo@mediatek.com>
-> Signed-off-by: Yonglong Wu <yonglong.wu@mediatek.com>
-> ---
->  drivers/usb/musb/Kconfig     |   8 +-
->  drivers/usb/musb/Makefile    |   1 +
->  drivers/usb/musb/mediatek.c  | 562 +++++++++++++++++++++++++++++++++++++++++++
->  drivers/usb/musb/musb_core.c |  10 +
->  drivers/usb/musb/musb_core.h |   1 +
->  drivers/usb/musb/musb_dma.h  |   1 +
->  drivers/usb/musb/musb_host.c |  79 ++++--
->  drivers/usb/musb/musb_regs.h |   6 +
->  drivers/usb/musb/musbhsdma.c |  34 ++-
->  9 files changed, 671 insertions(+), 31 deletions(-)
->  create mode 100644 drivers/usb/musb/mediatek.c
-> 
-> diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
-> index ad08895..540fc9f 100644
-> --- a/drivers/usb/musb/Kconfig
-> +++ b/drivers/usb/musb/Kconfig
-> @@ -115,6 +115,12 @@ config USB_MUSB_JZ4740
->  	depends on USB_MUSB_GADGET
->  	depends on USB_OTG_BLACKLIST_HUB
->  
-> +config USB_MUSB_MEDIATEK
-> +	tristate "MediaTek platforms"
-> +	depends on ARCH_MEDIATEK
-
-Please also add '|| COMPILE_TEST' to make testing easier.
-
-> +	depends on NOP_USB_XCEIV
-> +	depends on GENERIC_PHY
-> +
->  config USB_MUSB_AM335X_CHILD
->  	tristate
->  
-> @@ -141,7 +147,7 @@ config USB_UX500_DMA
->  
->  config USB_INVENTRA_DMA
->  	bool 'Inventra'
-> -	depends on USB_MUSB_OMAP2PLUS
-> +	depends on USB_MUSB_OMAP2PLUS || USB_MUSB_MEDIATEK
->  	help
->  	  Enable DMA transfers using Mentor's engine.
->  
-> diff --git a/drivers/usb/musb/Makefile b/drivers/usb/musb/Makefile
-> index 3a88c79..63d82d0 100644
-> --- a/drivers/usb/musb/Makefile
-> +++ b/drivers/usb/musb/Makefile
-> @@ -24,6 +24,7 @@ obj-$(CONFIG_USB_MUSB_DA8XX)			+= da8xx.o
->  obj-$(CONFIG_USB_MUSB_UX500)			+= ux500.o
->  obj-$(CONFIG_USB_MUSB_JZ4740)			+= jz4740.o
->  obj-$(CONFIG_USB_MUSB_SUNXI)			+= sunxi.o
-> +obj-$(CONFIG_USB_MUSB_MEDIATEK)      		+= mediatek.o
->  
->  
->  obj-$(CONFIG_USB_MUSB_AM335X_CHILD)		+= musb_am335x.o
-> diff --git a/drivers/usb/musb/mediatek.c b/drivers/usb/musb/mediatek.c
-> new file mode 100644
-> index 0000000..15a6460
-> --- /dev/null
-> +++ b/drivers/usb/musb/mediatek.c
-
-[snip]
-I will review this section later after we sorted out other things.
-
-> diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
-> index b7d5627..d60f76f 100644
-> --- a/drivers/usb/musb/musb_core.c
-> +++ b/drivers/usb/musb/musb_core.c
-> @@ -1028,6 +1028,16 @@ static void musb_disable_interrupts(struct musb *musb)
->  	temp = musb_readb(mbase, MUSB_INTRUSB);
->  	temp = musb_readw(mbase, MUSB_INTRTX);
->  	temp = musb_readw(mbase, MUSB_INTRRX);
-> +
-> +	/*  MediaTek controller interrupt status is W1C */
-
-This W1C doesn't match to the MUSB Programming Guide that I have. Those
-registers are read-only.
-Is the difference due to the IP intergration in the mtk platforms? or is
-it a new version of the MUSB controller? If latter, what is the version?
-
-> +	if (musb->ops->quirks & MUSB_MTK_QUIRKS) {
-
-Basically we don't want to use this type of platform specific quirks if
-possible, so let's try to not use it.
-
-> +		musb_writeb(mbase, MUSB_INTRUSB,
-> +			musb_readb(mbase, MUSB_INTRUSB));
-
-For this clearing register bit operation, please create platform hooks
-musb_clearb() and musb_clearw() in struct musb_platform_ops instead,
-then follow how musb_readb() pointer is assigned in
-musb_init_controller() to use the W1C version for mtk platform.
-
-> +		musb_writew(mbase, MUSB_INTRRX,
-> +			musb_readw(mbase, MUSB_INTRRX));
-> +		musb_writew(mbase, MUSB_INTRTX,
-> +			musb_readw(mbase, MUSB_INTRTX));
-> +	}
->  }
->  
->  static void musb_enable_interrupts(struct musb *musb)
-> diff --git a/drivers/usb/musb/musb_core.h b/drivers/usb/musb/musb_core.h
-> index 04203b7..1bf4e9a 100644
-> --- a/drivers/usb/musb/musb_core.h
-> +++ b/drivers/usb/musb/musb_core.h
-> @@ -138,6 +138,7 @@ enum musb_g_ep0_state {
->   */
->  struct musb_platform_ops {
->  
-> +#define MUSB_MTK_QUIRKS	BIT(10)
->  #define MUSB_G_NO_SKB_RESERVE	BIT(9)
->  #define MUSB_DA8XX		BIT(8)
->  #define MUSB_PRESERVE_SESSION	BIT(7)
-> diff --git a/drivers/usb/musb/musb_dma.h b/drivers/usb/musb/musb_dma.h
-> index 281e75d3..b218210 100644
-> --- a/drivers/usb/musb/musb_dma.h
-> +++ b/drivers/usb/musb/musb_dma.h
-> @@ -197,6 +197,7 @@ static inline void musb_dma_controller_destroy(struct dma_controller *d) { }
->  extern struct dma_controller *
->  musbhs_dma_controller_create(struct musb *musb, void __iomem *base);
->  extern void musbhs_dma_controller_destroy(struct dma_controller *c);
-> +extern irqreturn_t dma_controller_irq(int irq, void *private_data);
->  
->  extern struct dma_controller *
->  tusb_dma_controller_create(struct musb *musb, void __iomem *base);
-> diff --git a/drivers/usb/musb/musb_host.c b/drivers/usb/musb/musb_host.c
-> index b59ce9a..b1b0216 100644
-> --- a/drivers/usb/musb/musb_host.c
-> +++ b/drivers/usb/musb/musb_host.c
-> @@ -292,20 +292,73 @@ static inline void musb_save_toggle(struct musb_qh *qh, int is_in,
->  {
->  	void __iomem		*epio = qh->hw_ep->regs;
->  	u16			csr;
-> +	struct musb *musb = qh->hw_ep->musb;
->  
->  	/*
->  	 * FIXME: the current Mentor DMA code seems to have
->  	 * problems getting toggle correct.
->  	 */
->  
-> -	if (is_in)
-> -		csr = musb_readw(epio, MUSB_RXCSR) & MUSB_RXCSR_H_DATATOGGLE;
-> -	else
-> -		csr = musb_readw(epio, MUSB_TXCSR) & MUSB_TXCSR_H_DATATOGGLE;
-> +	/* MediaTek controller has private toggle register */
-
-only one toggle register for all endpoints? how does it handle
-difference toggle values for different endpoints?
-
-> +	if (musb->ops->quirks & MUSB_MTK_QUIRKS) {
-> +		u16 toggle;
-> +		u8 epnum = qh->hw_ep->epnum;
-> +
-> +		if (is_in)
-> +			toggle = musb_readl(musb->mregs, MUSB_RXTOG);
-
-should use musb_readw() instead? MUSB_RXTOG seems to be 16bit.
-
-> +		else
-> +			toggle = musb_readl(musb->mregs, MUSB_TXTOG);
-> +
-> +		csr = toggle & (1 << epnum);
-> +	} else {
-> +		if (is_in)
-> +			csr = musb_readw(epio, MUSB_RXCSR)
-> +				& MUSB_RXCSR_H_DATATOGGLE;
-> +		else
-> +			csr = musb_readw(epio, MUSB_TXCSR)
-> +				& MUSB_TXCSR_H_DATATOGGLE;
-
-Does this logic still work for the mtk platform even if it has its own
-private toggle register? If so, we don't need to change here.
-
-If not, let's try to not use this quirk flag. Please create a hook
-musb_platform_get_toggle() in struct musb_platform_ops.
-
-> +	}
->  
->  	usb_settoggle(urb->dev, qh->epnum, !is_in, csr ? 1 : 0);
->  }
->  
-> +static inline u16 musb_set_toggle(struct musb_qh *qh, int is_in,
-> +					struct urb *urb)
-> +{
-> +	u16 csr = 0;
-> +	u16 toggle = 0;
-> +	struct musb *musb = qh->hw_ep->musb;
-> +	u8 epnum = qh->hw_ep->epnum;
-> +
-> +	toggle = usb_gettoggle(urb->dev, qh->epnum, !is_in);
-> +
-> +	/* MediaTek controller has private toggle register */
-> +	if (musb->ops->quirks & MUSB_MTK_QUIRKS) {
-> +		if (is_in) {
-> +			musb_writel(musb->mregs, MUSB_RXTOGEN, (1 << epnum));
-> +			musb_writel(musb->mregs, MUSB_RXTOG, (toggle << epnum));
-> +		} else {
-> +			musb_writel(musb->mregs, MUSB_TXTOGEN, (1 << epnum));
-> +			musb_writel(musb->mregs, MUSB_TXTOG, (toggle << epnum));
-> +		}
-> +	} else {
-> +		if (is_in) {
-> +			if (toggle)
-> +				csr = MUSB_RXCSR_H_WR_DATATOGGLE
-> +						| MUSB_RXCSR_H_DATATOGGLE;
-> +			else
-> +				csr = 0;
-> +		} else {
-> +			if (toggle)
-> +				csr |= MUSB_TXCSR_H_WR_DATATOGGLE
-> +						| MUSB_TXCSR_H_DATATOGGLE;
-> +			else
-> +				csr |= MUSB_TXCSR_CLRDATATOG;
-> +		}
-> +	}
-> +	return csr;
-
-Please create a seperate patch for this musb_set_toggle() without adding
-the mtk logic. It is a nice cleanup.
-
-> +}
-> +
->  /*
->   * Advance this hardware endpoint's queue, completing the specified URB and
->   * advancing to either the next URB queued to that qh, or else invalidating
-> @@ -772,13 +825,8 @@ static void musb_ep_program(struct musb *musb, u8 epnum,
->  					);
->  			csr |= MUSB_TXCSR_MODE;
->  
-> -			if (!hw_ep->tx_double_buffered) {
-> -				if (usb_gettoggle(urb->dev, qh->epnum, 1))
-> -					csr |= MUSB_TXCSR_H_WR_DATATOGGLE
-> -						| MUSB_TXCSR_H_DATATOGGLE;
-> -				else
-> -					csr |= MUSB_TXCSR_CLRDATATOG;
-> -			}
-> +			if (!hw_ep->tx_double_buffered)
-> +				csr |= musb_set_toggle(qh, !is_out, urb);
->  
->  			musb_writew(epio, MUSB_TXCSR, csr);
->  			/* REVISIT may need to clear FLUSHFIFO ... */
-> @@ -860,17 +908,12 @@ static void musb_ep_program(struct musb *musb, u8 epnum,
->  
->  	/* IN/receive */
->  	} else {
-> -		u16	csr;
-> +		u16	csr = 0;
->  
->  		if (hw_ep->rx_reinit) {
->  			musb_rx_reinit(musb, qh, epnum);
-> +			csr |= musb_set_toggle(qh, !is_out, urb);
->  
-> -			/* init new state: toggle and NYET, maybe DMA later */
-> -			if (usb_gettoggle(urb->dev, qh->epnum, 0))
-> -				csr = MUSB_RXCSR_H_WR_DATATOGGLE
-> -					| MUSB_RXCSR_H_DATATOGGLE;
-> -			else
-> -				csr = 0;
->  			if (qh->type == USB_ENDPOINT_XFER_INT)
->  				csr |= MUSB_RXCSR_DISNYET;
->  
-> diff --git a/drivers/usb/musb/musb_regs.h b/drivers/usb/musb/musb_regs.h
-> index 5cd7264..ffbe267 100644
-> --- a/drivers/usb/musb/musb_regs.h
-> +++ b/drivers/usb/musb/musb_regs.h
-> @@ -273,6 +273,12 @@
->  #define MUSB_RXHUBADDR		0x06
->  #define MUSB_RXHUBPORT		0x07
->  
-> +/* MediaTek controller toggle enable and status reg */
-> +#define MUSB_RXTOG		0x80
-> +#define MUSB_RXTOGEN		0x82
-> +#define MUSB_TXTOG		0x84
-> +#define MUSB_TXTOGEN		0x86
-
-Again, these offsets are for different registers in the MUSB version I
-have, please let me know if you have different version of the MUSB IP.
-
-> +
->  static inline u8 musb_read_configdata(void __iomem *mbase)
->  {
->  	musb_writeb(mbase, MUSB_INDEX, 0);
-> diff --git a/drivers/usb/musb/musbhsdma.c b/drivers/usb/musb/musbhsdma.c
-> index 824adcb..c545475 100644
-> --- a/drivers/usb/musb/musbhsdma.c
-> +++ b/drivers/usb/musb/musbhsdma.c
-> @@ -263,7 +263,7 @@ static int dma_channel_abort(struct dma_channel *channel)
->  	return 0;
->  }
->  
-> -static irqreturn_t dma_controller_irq(int irq, void *private_data)
-> +irqreturn_t dma_controller_irq(int irq, void *private_data)
->  {
->  	struct musb_dma_controller *controller = private_data;
->  	struct musb *musb = controller->private_data;
-> @@ -285,6 +285,8 @@ static irqreturn_t dma_controller_irq(int irq, void *private_data)
->  	spin_lock_irqsave(&musb->lock, flags);
->  
->  	int_hsdma = musb_readb(mbase, MUSB_HSDMA_INTR);
-> +	if (musb->ops->quirks & MUSB_MTK_QUIRKS)
-> +		musb_writeb(musb->mregs, MUSB_HSDMA_INTR, int_hsdma);
-
-you can use musb_clearb() defined above to get rid of this quirk.
-
->  
->  	if (!int_hsdma) {
->  		musb_dbg(musb, "spurious DMA irq");
-> @@ -377,15 +379,17 @@ static irqreturn_t dma_controller_irq(int irq, void *private_data)
->  	spin_unlock_irqrestore(&musb->lock, flags);
->  	return retval;
->  }
-> +EXPORT_SYMBOL_GPL(dma_controller_irq);
->  
->  void musbhs_dma_controller_destroy(struct dma_controller *c)
->  {
->  	struct musb_dma_controller *controller = container_of(c,
->  			struct musb_dma_controller, controller);
-> +	struct musb *musb = controller->private_data;
->  
->  	dma_controller_stop(controller);
->  
-> -	if (controller->irq)
-> +	if (!(musb->ops->quirks & MUSB_MTK_QUIRKS) && controller->irq)
->  		free_irq(controller->irq, c);
->  
->  	kfree(controller);
-> @@ -398,11 +402,15 @@ struct dma_controller *musbhs_dma_controller_create(struct musb *musb,
->  	struct musb_dma_controller *controller;
->  	struct device *dev = musb->controller;
->  	struct platform_device *pdev = to_platform_device(dev);
-> -	int irq = platform_get_irq_byname(pdev, "dma");
-> +	int irq = -1;
->  
-> -	if (irq <= 0) {
-> -		dev_err(dev, "No DMA interrupt line!\n");
-> -		return NULL;
-> +	if (!(musb->ops->quirks & MUSB_MTK_QUIRKS)) {
-> +		irq = platform_get_irq_byname(pdev, "dma");
-> +
-> +		if (irq < 0) {
-> +			dev_err(dev, "No DMA interrupt line!\n");
-> +			return NULL;
-> +		}
->  	}
-
-Please create musbhs_dma_controller_destroy_noirq() for your platform to
-not use the quirk.
-
->  
->  	controller = kzalloc(sizeof(*controller), GFP_KERNEL);
-> @@ -418,15 +426,17 @@ struct dma_controller *musbhs_dma_controller_create(struct musb *musb,
->  	controller->controller.channel_program = dma_channel_program;
->  	controller->controller.channel_abort = dma_channel_abort;
->  
-> -	if (request_irq(irq, dma_controller_irq, 0,
-> +	if (!(musb->ops->quirks & MUSB_MTK_QUIRKS)) {
-> +		if (request_irq(irq, dma_controller_irq, 0,
->  			dev_name(musb->controller), &controller->controller)) {
-> -		dev_err(dev, "request_irq %d failed!\n", irq);
-> -		musb_dma_controller_destroy(&controller->controller);
-> +			dev_err(dev, "request_irq %d failed!\n", irq);
-> +			musb_dma_controller_destroy(&controller->controller);
->  
-> -		return NULL;
-> -	}
-> +			return NULL;
-> +		}
->  
-> -	controller->irq = irq;
-> +		controller->irq = irq;
-> +	}
->  
->  	return &controller->controller;
->  }
-
-Same here, create musbhs_dma_controller_create_noirq(). Then use both
-new API for the mtk glue driver.
-
-Regards,
--Bin.
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gMDgvMDEvMjAxOSAxNTo0MCwgRGF2ZSBNYXJ0aW4gd3JvdGU6Cj4gT24gVHVlLCBKYW4gMDgs
+IDIwMTkgYXQgMDI6MDc6MzBQTSArMDAwMCwgSnVsaWVuIFRoaWVycnkgd3JvdGU6Cj4+IEluc3Rl
+YWQgZGlzYWJsaW5nIGludGVycnVwdHMgYnkgc2V0dGluZyB0aGUgUFNSLkkgYml0LCB1c2UgYSBw
+cmlvcml0eQo+PiBoaWdoZXIgdGhhbiB0aGUgb25lIHVzZWQgZm9yIGludGVycnVwdHMgdG8gbWFz
+ayB0aGVtIHZpYSBQTVIuCj4+Cj4+IFdoZW4gdXNpbmcgUE1SIHRvIGRpc2FibGUgaW50ZXJydXB0
+cywgdGhlIHZhbHVlIG9mIFBNUiB3aWxsIGJlIHVzZWQKPj4gaW5zdGVhZCBvZiBQU1IuW0RBSUZd
+IGZvciB0aGUgaXJxZmxhZ3MuCj4+Cj4+IFNpZ25lZC1vZmYtYnk6IEp1bGllbiBUaGllcnJ5IDxq
+dWxpZW4udGhpZXJyeUBhcm0uY29tPgo+PiBTdWdnZXN0ZWQtYnk6IERhbmllbCBUaG9tcHNvbiA8
+ZGFuaWVsLnRob21wc29uQGxpbmFyby5vcmc+Cj4+IENjOiBDYXRhbGluIE1hcmluYXMgPGNhdGFs
+aW4ubWFyaW5hc0Bhcm0uY29tPgo+PiBDYzogV2lsbCBEZWFjb24gPHdpbGwuZGVhY29uQGFybS5j
+b20+Cj4+IENjOiBBcmQgQmllc2hldXZlbCA8YXJkLmJpZXNoZXV2ZWxAbGluYXJvLm9yZz4KPj4g
+Q2M6IE9sZWcgTmVzdGVyb3YgPG9sZWdAcmVkaGF0LmNvbT4KPj4gLS0tCj4+ICBhcmNoL2FybTY0
+L2luY2x1ZGUvYXNtL2VmaS5oICAgICAgfCAgMTEgKysrKwo+PiAgYXJjaC9hcm02NC9pbmNsdWRl
+L2FzbS9pcnFmbGFncy5oIHwgMTIzICsrKysrKysrKysrKysrKysrKysrKysrKysrKysrLS0tLS0t
+LS0tCj4+ICAyIGZpbGVzIGNoYW5nZWQsIDEwNiBpbnNlcnRpb25zKCspLCAyOCBkZWxldGlvbnMo
+LSkKPiAKPiBbLi4uXQo+IAo+PiBkaWZmIC0tZ2l0IGEvYXJjaC9hcm02NC9pbmNsdWRlL2FzbS9p
+cnFmbGFncy5oIGIvYXJjaC9hcm02NC9pbmNsdWRlL2FzbS9pcnFmbGFncy5oCj4+IGluZGV4IDI0
+NjkyZWQuLmZhM2IwNmYgMTAwNjQ0Cj4+IC0tLSBhL2FyY2gvYXJtNjQvaW5jbHVkZS9hc20vaXJx
+ZmxhZ3MuaAo+PiArKysgYi9hcmNoL2FybTY0L2luY2x1ZGUvYXNtL2lycWZsYWdzLmgKPj4gQEAg
+LTE4LDcgKzE4LDkgQEAKPiAKPiBbLi4uXQo+IAo+PiAgc3RhdGljIGlubGluZSB2b2lkIGFyY2hf
+bG9jYWxfaXJxX2VuYWJsZSh2b2lkKQo+PiAgewo+PiAtCWFzbSB2b2xhdGlsZSgKPj4gLQkJIm1z
+cglkYWlmY2xyLCAjMgkJLy8gYXJjaF9sb2NhbF9pcnFfZW5hYmxlIgo+PiAtCQk6Cj4+ICsJdW5z
+aWduZWQgbG9uZyB1bm1hc2tlZCA9IEdJQ19QUklPX0lSUU9OOwo+PiArCj4+ICsJYXNtIHZvbGF0
+aWxlKEFMVEVSTkFUSVZFKAo+PiArCQkibXNyCWRhaWZjbHIsICMyCQkvLyBhcmNoX2xvY2FsX2ly
+cV9lbmFibGVcbiIKPj4gKwkJIm5vcCIsCj4+ICsJCSJtc3JfcyAgIiBfX3N0cmluZ2lmeShTWVNf
+SUNDX1BNUl9FTDEpICIsJTBcbiIKPj4gKwkJImRzYglzeSIsCj4gCj4gSSdtIHN0aWxsIG5vdCBj
+b252aW5jZWQgdGhlc2UgZHNicyBhcmUgbmVlZGVkLgo+IAo+IFdpdGhvdXQgdGhlIGRzYiwgd2Ug
+YXJlIHByb2JhYmx5IG5vdCBndWFyYW50ZWVkIHRvIHRha2UgYSBwZW5kaW5nCj4gaW50ZXJydXB0
+IF9pbW1lZGlhdGVseV8gb24gdW5tYXNraW5nLCBidXQgSSdtIG5vdCBzdXJlIHRoYXQncyBhCj4g
+cHJvYmxlbS4KPiAKPiBXaGF0IGdvZXMgd3JvbmcgaWYgd2Ugb21pdCB0aGVtPwoKVGhlbiB0aGUg
+R0lDIGRvZXNuJ3Qga25vdyBpdCBjYW4gbm93IGRlbGl2ZXIgaW50ZXJydXB0cyBvZiBhIGxvd2Vy
+CnByaW9yaXR5LiBPbmx5IGEgZHNiIGNhbiBndWFyYW50ZWUgdGhhdCB0aGUgR0lDJ3MgdmlldyBv
+ZiBQTVIgd2lsbCBnZXQKdXBkYXRlZC4KClNlZSA5LjEuNiAoT2JzZXJ2YWJpbGl0eSBvZiB0aGUg
+ZWZmZWN0cyBvZiBhY2Nlc3NlcyB0byB0aGUgR0lDCnJlZ2lzdGVycyksIHdoaWNoIHN0YXRlczoK
+CjxxdW90ZT4KQXJjaGl0ZWN0dXJhbCBleGVjdXRpb24gb2YgYSBEU0IgaW5zdHJ1Y3Rpb24gZ3Vh
+cmFudGVlcyB0aGF0CuKAlCBUaGUgbGFzdCB2YWx1ZSB3cml0dGVuIHRvIElDQ19QTVJfRUwxIG9y
+IEdJQ0NfUE1SIGlzIG9ic2VydmVkIGJ5IHRoZQphc3NvY2lhdGVkIFJlZGlzdHJpYnV0b3IuCjwv
+cXVvdGU+CgpTbyB5ZXMsIERTQiBpcyByZXF1aXJlZC4KClRoYW5rcywKCglNLgotLSAKSmF6eiBp
+cyBub3QgZGVhZC4gSXQganVzdCBzbWVsbHMgZnVubnkuLi4KCl9fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0
+CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFk
+ZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
