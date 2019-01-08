@@ -2,68 +2,85 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5E32EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 17:40:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 81552C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 17:49:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1C2DC20827
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 17:40:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 528902070B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 17:49:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DWqqzC/F"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1C2DC20827
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TfOaUyDC";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="ClkO9XVS";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="j9Ll7uuz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 528902070B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
 	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:Message-ID:
+	Subject:To:From:Date:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=C108PFeQGlAE1X0+LzZbMYZB7Rezzpa3biZgGWTnKME=; b=DWqqzC/Fizr1T9U4zvN0Rc8mm
-	xu5eMJt7VGDUVUJrW+ZUFWO0+BZSgLJWlQ94ORDQTDb1fSZNmuDuruUd711oUL4pUDQBIv5RuIx82
-	pr5WlSGjzBQKpucWH8b/aKlEY7ds1vLp4DGIvSoBFyDGF3YqfvqznTt9h0QDE93PZZJ4cKp0hGN5M
-	Qdmdn/zQSFowCwakkwxWLyEdw3qAnSx9PVtIvBgMTdnZ56ebMDGFFpU7gV1lTr2Tnpr5wtT6yYhLi
-	yGyWRBNxSzwo3qLnBmiA5OrgfRI014YkuZCL4IEVhraVfWZ/CKGJSPiI0ar/zyex5oTr+Gg/cMbqR
-	UjhpY6PTA==;
+	 bh=maUysD8VintsbhdJ+ApjGrl+gOfyHBzbbXjpd78NibA=; b=TfOaUyDCJktuTZgM4VQ3s0Sj8
+	T9XSxxVmvs8xFXwKyjGXqHYhauOre5+1hDtUkBAGwMSrpEYo94lSwfmfAOvAD6CWE8mYa2FWJ9FN1
+	w/HpmdHhS6r4yacmCZoPqII/qL3Ps5TRkSh1blMs5hbXteH0FUnTQBqhGzF6zTqUvb+L1Jv9HqM5P
+	7S6NLhYvKsAnjWPR6R6rR1q0dYwVqVxH8+2+Xv3ohydYFpB9/5SI8BqAqhW82zWER4JxxxMGxliXa
+	d0xqdx4TWT9vvgf8vWwZpnoHQXvGKWfStJFw8yGLKK6aYOI7jpORGNJuvkP8E/6Getl8M5ZAL5HCu
+	8Dht6Ghfg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggvMu-0008Mu-CQ; Tue, 08 Jan 2019 17:40:48 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggvMq-0008MP-8h
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 17:40:46 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 015DCA78;
- Tue,  8 Jan 2019 09:40:44 -0800 (PST)
-Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 20EFD3F5AF;
- Tue,  8 Jan 2019 09:40:41 -0800 (PST)
-Subject: Re: [PATCH v8 15/26] arm64: alternative: Apply alternatives early in
- boot process
-To: Julien Thierry <julien.thierry@arm.com>,
- linux-arm-kernel@lists.infradead.org
-References: <1546956464-48825-1-git-send-email-julien.thierry@arm.com>
- <1546956464-48825-16-git-send-email-julien.thierry@arm.com>
- <cec17e88-d199-abb4-4919-deff7182a26f@arm.com>
- <31a93d8b-9036-aef7-1b96-4de910a8d10b@arm.com>
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
-Message-ID: <21974e36-de7b-008b-49d6-b5960268501a@arm.com>
-Date: Tue, 8 Jan 2019 17:40:40 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1ggvVa-0002B9-OP; Tue, 08 Jan 2019 17:49:46 +0000
+Received: from smtp.codeaurora.org ([198.145.29.96])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ggvVW-0002AV-Lk
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 17:49:44 +0000
+Received: by smtp.codeaurora.org (Postfix, from userid 1000)
+ id 43673601D7; Tue,  8 Jan 2019 17:49:40 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1546969780;
+ bh=EMJHAzM74ccB/MMhceeTznZDqTAeyMSNcQ5HeOyd3qk=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=ClkO9XVS420yh6dTfXjoq9hIfzplBb8cogkQrO52GD8v4xbCpnXz9aqOoZwh+ypk8
+ mEWMrQFaMadKYARqUQaofLfW/VejpWcdszDARPCMYG/Xu9P+duWuajPZjjo8PH6KHi
+ b9Pqrz3A1KVnS5r4Hl2ZTmxhM8E0bGB7vX3o+YA8=
+Received: from localhost (i-global254.qualcomm.com [199.106.103.254])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ (Authenticated sender: ilina@smtp.codeaurora.org)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id BFFAF601D7;
+ Tue,  8 Jan 2019 17:49:38 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1546969778;
+ bh=EMJHAzM74ccB/MMhceeTznZDqTAeyMSNcQ5HeOyd3qk=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=j9Ll7uuz6zRnFUK84bVvQLbAVc/uPomthpwH//HMbAi0jVlnux66Y3KvJavHXeUXQ
+ Gf1H0IAZS/2Z3sjeQaWyFq7vOX+xDDiiDvPXrQkiVmvQii4wpQr90oTEftYSJWgvBN
+ P8jByJjJ9aDXweQ3KISgi5xaeTuxRXfc6rQWtr38=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org BFFAF601D7
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ dmarc=none (p=none dis=none) header.from=codeaurora.org
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ spf=none smtp.mailfrom=ilina@codeaurora.org
+Date: Tue, 8 Jan 2019 10:49:38 -0700
+From: Lina Iyer <ilina@codeaurora.org>
+To: Stephen Boyd <swboyd@chromium.org>
+Subject: Re: [PATCH] soc: qcom: rpmh: Avoid accessing freed memory from batch
+ API
+Message-ID: <20190108174938.GA22547@codeaurora.org>
+References: <20190103174657.251968-1-swboyd@chromium.org>
 MIME-Version: 1.0
-In-Reply-To: <31a93d8b-9036-aef7-1b96-4de910a8d10b@arm.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <20190103174657.251968-1-swboyd@chromium.org>
+User-Agent: Mutt/1.11.1 (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_094044_319406_0C0B847B 
-X-CRM114-Status: GOOD (  28.01  )
+X-CRM114-CacheID: sfid-20190108_094942_748046_021A7924 
+X-CRM114-Status: GOOD (  20.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,177 +92,235 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, daniel.thompson@linaro.org, marc.zyngier@arm.com,
- catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
- christoffer.dall@arm.com, james.morse@arm.com, joel@joelfernandes.org
-Content-Transfer-Encoding: base64
-Content-Type: text/plain; charset="utf-8"; Format="flowed"
+Cc: linux-arm-msm@vger.kernel.org, linux-kernel@vger.kernel.org,
+ Evan Green <evgreen@chromium.org>, Matthias Kaehlcke <mka@chromium.org>,
+ Andy Gross <andy.gross@linaro.org>,
+ "Raju P.L.S.S.S.N" <rplsssn@codeaurora.org>,
+ linux-arm-kernel@lists.infradead.org
+Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-CgpPbiAwOC8wMS8yMDE5IDE1OjIwLCBKdWxpZW4gVGhpZXJyeSB3cm90ZToKPiBIaSBTdXp1a2ks
-Cj4gCj4gT24gMDgvMDEvMjAxOSAxNDo1MSwgU3V6dWtpIEsgUG91bG9zZSB3cm90ZToKPj4gSGkg
-SnVsaWVuLAo+Pgo+PiBPbiAwOC8wMS8yMDE5IDE0OjA3LCBKdWxpZW4gVGhpZXJyeSB3cm90ZToK
-Pj4+IEZyb206IERhbmllbCBUaG9tcHNvbiA8ZGFuaWVsLnRob21wc29uQGxpbmFyby5vcmc+Cj4+
-Pgo+Pj4gQ3VycmVudGx5IGFsdGVybmF0aXZlcyBhcmUgYXBwbGllZCB2ZXJ5IGxhdGUgaW4gdGhl
-IGJvb3QgcHJvY2VzcyAoYW5kCj4+PiBhIGxvbmcgdGltZSBhZnRlciB3ZSBlbmFibGUgc2NoZWR1
-bGluZykuIFNvbWUgYWx0ZXJuYXRpdmUgc2VxdWVuY2VzLAo+Pj4gc3VjaCBhcyB0aG9zZSB0aGF0
-IGFsdGVyIHRoZSB3YXkgQ1BVIGNvbnRleHQgaXMgc3RvcmVkLCBtdXN0IGJlIGFwcGxpZWQKPj4+
-IG11Y2ggZWFybGllciBpbiB0aGUgYm9vdCBzZXF1ZW5jZS4KPj4+Cj4+PiBJbnRyb2R1Y2UgYXBw
-bHlfYm9vdF9hbHRlcm5hdGl2ZXMoKSB0byBhbGxvdyBzb21lIGFsdGVybmF0aXZlcyB0byBiZQo+
-Pj4gYXBwbGllZCBpbW1lZGlhdGVseSBhZnRlciB3ZSBkZXRlY3QgdGhlIENQVSBmZWF0dXJlcyBv
-ZiB0aGUgYm9vdCBDUFUuCj4+Pgo+Pj4gU2lnbmVkLW9mZi1ieTogRGFuaWVsIFRob21wc29uIDxk
-YW5pZWwudGhvbXBzb25AbGluYXJvLm9yZz4KPj4+IFtqdWxpZW4udGhpZXJyeUBhcm0uY29tOiBy
-ZW5hbWUgdG8gZml0IG5ldyBjcHVmZWF0dXJlIGZyYW1ld29yayBiZXR0ZXIsCj4+PiAgwqDCoMKg
-wqDCoMKgwqDCoMKgwqDCoMKgIGFwcGx5IEJPT1RfU0NPUEUgZmVhdHVyZSBlYXJseSBpbiBib290
-XQo+Pj4gU2lnbmVkLW9mZi1ieTogSnVsaWVuIFRoaWVycnkgPGp1bGllbi50aGllcnJ5QGFybS5j
-b20+Cj4+PiBDYzogQ2F0YWxpbiBNYXJpbmFzIDxjYXRhbGluLm1hcmluYXNAYXJtLmNvbT4KPj4+
-IENjOiBXaWxsIERlYWNvbiA8d2lsbC5kZWFjb25AYXJtLmNvbT4KPj4+IENjOiBDaHJpc3RvZmZl
-ciBEYWxsIDxjaHJpc3RvZmZlci5kYWxsQGFybS5jb20+Cj4+PiBDYzogU3V6dWtpIEsgUG91bG9z
-ZSA8c3V6dWtpLnBvdWxvc2VAYXJtLmNvbT4KPj4+IC0tLQo+Pj4gIMKgIGFyY2gvYXJtNjQvaW5j
-bHVkZS9hc20vYWx0ZXJuYXRpdmUuaCB8wqAgMSArCj4+PiAgwqAgYXJjaC9hcm02NC9pbmNsdWRl
-L2FzbS9jcHVmZWF0dXJlLmjCoCB8wqAgNCArKysrCj4+PiAgwqAgYXJjaC9hcm02NC9rZXJuZWwv
-YWx0ZXJuYXRpdmUuY8KgwqDCoMKgwqAgfCA0Mwo+Pj4gKysrKysrKysrKysrKysrKysrKysrKysr
-KysrKysrKy0tLS0tCj4+PiAgwqAgYXJjaC9hcm02NC9rZXJuZWwvY3B1ZmVhdHVyZS5jwqDCoMKg
-wqDCoMKgIHzCoCA2ICsrKysrCj4+PiAgwqAgYXJjaC9hcm02NC9rZXJuZWwvc21wLmPCoMKgwqDC
-oMKgwqDCoMKgwqDCoMKgwqDCoCB8wqAgNyArKysrKysKPj4+ICDCoCA1IGZpbGVzIGNoYW5nZWQs
-IDU2IGluc2VydGlvbnMoKyksIDUgZGVsZXRpb25zKC0pCj4+Pgo+Pj4gZGlmZiAtLWdpdCBhL2Fy
-Y2gvYXJtNjQvaW5jbHVkZS9hc20vYWx0ZXJuYXRpdmUuaAo+Pj4gYi9hcmNoL2FybTY0L2luY2x1
-ZGUvYXNtL2FsdGVybmF0aXZlLmgKPj4+IGluZGV4IDk4MDZhMjMuLmI5ZjhkNzggMTAwNjQ0Cj4+
-PiAtLS0gYS9hcmNoL2FybTY0L2luY2x1ZGUvYXNtL2FsdGVybmF0aXZlLmgKPj4+ICsrKyBiL2Fy
-Y2gvYXJtNjQvaW5jbHVkZS9hc20vYWx0ZXJuYXRpdmUuaAo+Pj4gQEAgLTI1LDYgKzI1LDcgQEAg
-c3RydWN0IGFsdF9pbnN0ciB7Cj4+PiAgwqAgdHlwZWRlZiB2b2lkICgqYWx0ZXJuYXRpdmVfY2Jf
-dCkoc3RydWN0IGFsdF9pbnN0ciAqYWx0LAo+Pj4gIMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKg
-wqDCoMKgwqDCoCBfX2xlMzIgKm9yaWdwdHIsIF9fbGUzMiAqdXBkcHRyLCBpbnQgbnJfaW5zdCk7
-Cj4+PiAgwqAgK3ZvaWQgX19pbml0IGFwcGx5X2Jvb3RfYWx0ZXJuYXRpdmVzKHZvaWQpOwo+Pj4g
-IMKgIHZvaWQgX19pbml0IGFwcGx5X2FsdGVybmF0aXZlc19hbGwodm9pZCk7Cj4+PiAgwqAgYm9v
-bCBhbHRlcm5hdGl2ZV9pc19hcHBsaWVkKHUxNiBjcHVmZWF0dXJlKTsKPj4+ICDCoCBkaWZmIC0t
-Z2l0IGEvYXJjaC9hcm02NC9pbmNsdWRlL2FzbS9jcHVmZWF0dXJlLmgKPj4+IGIvYXJjaC9hcm02
-NC9pbmNsdWRlL2FzbS9jcHVmZWF0dXJlLmgKPj4+IGluZGV4IDg5YzNmMzEuLmU1MDVlMWYgMTAw
-NjQ0Cj4+PiAtLS0gYS9hcmNoL2FybTY0L2luY2x1ZGUvYXNtL2NwdWZlYXR1cmUuaAo+Pj4gKysr
-IGIvYXJjaC9hcm02NC9pbmNsdWRlL2FzbS9jcHVmZWF0dXJlLmgKPj4+IEBAIC0zOTEsNiArMzkx
-LDEwIEBAIHN0YXRpYyBpbmxpbmUgaW50IGNwdWNhcF9kZWZhdWx0X3Njb3BlKGNvbnN0Cj4+PiBz
-dHJ1Y3QgYXJtNjRfY3B1X2NhcGFiaWxpdGllcyAqY2FwKQo+Pj4gIMKgIGV4dGVybiBzdHJ1Y3Qg
-c3RhdGljX2tleV9mYWxzZSBjcHVfaHdjYXBfa2V5c1tBUk02NF9OQ0FQU107Cj4+PiAgwqAgZXh0
-ZXJuIHN0cnVjdCBzdGF0aWNfa2V5X2ZhbHNlIGFybTY0X2NvbnN0X2NhcHNfcmVhZHk7Cj4+PiAg
-wqAgKy8qIEFSTTY0IENBUFMgKyBhbHRlcm5hdGl2ZV9jYiAqLwo+Pj4gKyNkZWZpbmUgQVJNNjRf
-TlBBVENIQUJMRSAoQVJNNjRfTkNBUFMgKyAxKQo+Pj4gK2V4dGVybiBERUNMQVJFX0JJVE1BUChi
-b290X2NhcGFiaWxpdGllcywgQVJNNjRfTlBBVENIQUJMRSk7Cj4+PiArCj4+PiAgwqAgI2RlZmlu
-ZSBmb3JfZWFjaF9hdmFpbGFibGVfY2FwKGNhcCnCoMKgwqDCoMKgwqDCoCBcCj4+PiAgwqDCoMKg
-wqDCoCBmb3JfZWFjaF9zZXRfYml0KGNhcCwgY3B1X2h3Y2FwcywgQVJNNjRfTkNBUFMpCj4+PiAg
-wqAgZGlmZiAtLWdpdCBhL2FyY2gvYXJtNjQva2VybmVsL2FsdGVybmF0aXZlLmMKPj4+IGIvYXJj
-aC9hcm02NC9rZXJuZWwvYWx0ZXJuYXRpdmUuYwo+Pj4gaW5kZXggYzk0N2QyMi4uYTliNDY3NyAx
-MDA2NDQKPj4+IC0tLSBhL2FyY2gvYXJtNjQva2VybmVsL2FsdGVybmF0aXZlLmMKPj4+ICsrKyBi
-L2FyY2gvYXJtNjQva2VybmVsL2FsdGVybmF0aXZlLmMKPj4+IEBAIC0xNTUsNyArMTU1LDggQEAg
-c3RhdGljIHZvaWQgY2xlYW5fZGNhY2hlX3JhbmdlX25vcGF0Y2godTY0IHN0YXJ0LAo+Pj4gdTY0
-IGVuZCkKPj4+ICDCoMKgwqDCoMKgIH0gd2hpbGUgKGN1ciArPSBkX3NpemUsIGN1ciA8IGVuZCk7
-Cj4+PiAgwqAgfQo+Pj4gIMKgIC1zdGF0aWMgdm9pZCBfX2FwcGx5X2FsdGVybmF0aXZlcyh2b2lk
-ICphbHRfcmVnaW9uLCBib29sIGlzX21vZHVsZSkKPj4+ICtzdGF0aWMgdm9pZCBfX2FwcGx5X2Fs
-dGVybmF0aXZlcyh2b2lkICphbHRfcmVnaW9uLMKgIGJvb2wgaXNfbW9kdWxlLAo+Pj4gK8KgwqDC
-oMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIHVuc2lnbmVkIGxvbmcgKmZlYXR1cmVfbWFzaykK
-Pj4+ICDCoCB7Cj4+PiAgwqDCoMKgwqDCoCBzdHJ1Y3QgYWx0X2luc3RyICphbHQ7Cj4+PiAgwqDC
-oMKgwqDCoCBzdHJ1Y3QgYWx0X3JlZ2lvbiAqcmVnaW9uID0gYWx0X3JlZ2lvbjsKPj4+IEBAIC0x
-NjUsNiArMTY2LDkgQEAgc3RhdGljIHZvaWQgX19hcHBseV9hbHRlcm5hdGl2ZXModm9pZCAqYWx0
-X3JlZ2lvbiwKPj4+IGJvb2wgaXNfbW9kdWxlKQo+Pj4gIMKgwqDCoMKgwqAgZm9yIChhbHQgPSBy
-ZWdpb24tPmJlZ2luOyBhbHQgPCByZWdpb24tPmVuZDsgYWx0KyspIHsKPj4+ICDCoMKgwqDCoMKg
-wqDCoMKgwqAgaW50IG5yX2luc3Q7Cj4+PiAgwqAgK8KgwqDCoMKgwqDCoMKgIGlmICghdGVzdF9i
-aXQoYWx0LT5jcHVmZWF0dXJlLCBmZWF0dXJlX21hc2spKQo+Pj4gK8KgwqDCoMKgwqDCoMKgwqDC
-oMKgwqAgY29udGludWU7Cj4+PiArCj4+PiAgwqDCoMKgwqDCoMKgwqDCoMKgIC8qIFVzZSBBUk02
-NF9DQl9QQVRDSCBhcyBhbiB1bmNvbmRpdGlvbmFsIHBhdGNoICovCj4+PiAgwqDCoMKgwqDCoMKg
-wqDCoMKgIGlmIChhbHQtPmNwdWZlYXR1cmUgPCBBUk02NF9DQl9QQVRDSCAmJgo+Pj4gIMKgwqDC
-oMKgwqDCoMKgwqDCoMKgwqDCoMKgICFjcHVzX2hhdmVfY2FwKGFsdC0+Y3B1ZmVhdHVyZSkpCj4+
-PiBAQCAtMjAzLDggKzIwNywxMSBAQCBzdGF0aWMgdm9pZCBfX2FwcGx5X2FsdGVybmF0aXZlcyh2
-b2lkCj4+PiAqYWx0X3JlZ2lvbiwgYm9vbCBpc19tb2R1bGUpCj4+PiAgwqDCoMKgwqDCoMKgwqDC
-oMKgIF9fZmx1c2hfaWNhY2hlX2FsbCgpOwo+Pj4gIMKgwqDCoMKgwqDCoMKgwqDCoCBpc2IoKTsK
-Pj4+ICDCoCAtwqDCoMKgwqDCoMKgwqAgLyogV2UgYXBwbGllZCBhbGwgdGhhdCB3YXMgYXZhaWxh
-YmxlICovCj4+PiAtwqDCoMKgwqDCoMKgwqAgYml0bWFwX2NvcHkoYXBwbGllZF9hbHRlcm5hdGl2
-ZXMsIGNwdV9od2NhcHMsIEFSTTY0X05DQVBTKTsKPj4+ICvCoMKgwqDCoMKgwqDCoCAvKiBJZ25v
-cmUgQVJNNjRfQ0IgYml0IGZyb20gZmVhdHVyZSBtYXNrICovCj4+PiArwqDCoMKgwqDCoMKgwqAg
-Yml0bWFwX29yKGFwcGxpZWRfYWx0ZXJuYXRpdmVzLCBhcHBsaWVkX2FsdGVybmF0aXZlcywKPj4+
-ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCBmZWF0dXJlX21hc2ssIEFSTTY0X05DQVBTKTsK
-Pj4+ICvCoMKgwqDCoMKgwqDCoCBiaXRtYXBfYW5kKGFwcGxpZWRfYWx0ZXJuYXRpdmVzLCBhcHBs
-aWVkX2FsdGVybmF0aXZlcywKPj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIGNwdV9o
-d2NhcHMsIEFSTTY0X05DQVBTKTsKPj4+ICDCoMKgwqDCoMKgIH0KPj4+ICDCoCB9Cj4+PiAgwqAg
-QEAgLTIyNSw4ICsyMzIsMTMgQEAgc3RhdGljIGludCBfX2FwcGx5X2FsdGVybmF0aXZlc19tdWx0
-aV9zdG9wKHZvaWQKPj4+ICp1bnVzZWQpCj4+PiAgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAg
-Y3B1X3JlbGF4KCk7Cj4+PiAgwqDCoMKgwqDCoMKgwqDCoMKgIGlzYigpOwo+Pj4gIMKgwqDCoMKg
-wqAgfSBlbHNlIHsKPj4+ICvCoMKgwqDCoMKgwqDCoCBERUNMQVJFX0JJVE1BUChyZW1haW5pbmdf
-Y2FwYWJpbGl0aWVzLCBBUk02NF9OUEFUQ0hBQkxFKTsKPj4+ICsKPj4+ICvCoMKgwqDCoMKgwqDC
-oCBiaXRtYXBfY29tcGxlbWVudChyZW1haW5pbmdfY2FwYWJpbGl0aWVzLCBib290X2NhcGFiaWxp
-dGllcywKPj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIEFSTTY0X05QQVRD
-SEFCTEUpOwo+Pj4gKwo+Pj4gIMKgwqDCoMKgwqDCoMKgwqDCoCBCVUdfT04oYWxsX2FsdGVybmF0
-aXZlc19hcHBsaWVkKTsKPj4+IC3CoMKgwqDCoMKgwqDCoCBfX2FwcGx5X2FsdGVybmF0aXZlcygm
-cmVnaW9uLCBmYWxzZSk7Cj4+PiArwqDCoMKgwqDCoMKgwqAgX19hcHBseV9hbHRlcm5hdGl2ZXMo
-JnJlZ2lvbiwgZmFsc2UsIHJlbWFpbmluZ19jYXBhYmlsaXRpZXMpOwo+Pj4gIMKgwqDCoMKgwqDC
-oMKgwqDCoCAvKiBCYXJyaWVycyBwcm92aWRlZCBieSB0aGUgY2FjaGUgZmx1c2hpbmcgKi8KPj4+
-ICDCoMKgwqDCoMKgwqDCoMKgwqAgV1JJVEVfT05DRShhbGxfYWx0ZXJuYXRpdmVzX2FwcGxpZWQs
-IDEpOwo+Pj4gIMKgwqDCoMKgwqAgfQo+Pj4gQEAgLTI0MCw2ICsyNTIsMjQgQEAgdm9pZCBfX2lu
-aXQgYXBwbHlfYWx0ZXJuYXRpdmVzX2FsbCh2b2lkKQo+Pj4gIMKgwqDCoMKgwqAgc3RvcF9tYWNo
-aW5lKF9fYXBwbHlfYWx0ZXJuYXRpdmVzX211bHRpX3N0b3AsIE5VTEwsCj4+PiBjcHVfb25saW5l
-X21hc2spOwo+Pj4gIMKgIH0KPj4+ICDCoCArLyoKPj4+ICsgKiBUaGlzIGlzIGNhbGxlZCB2ZXJ5
-IGVhcmx5IGluIHRoZSBib290IHByb2Nlc3MgKGRpcmVjdGx5IGFmdGVyIHdlIHJ1bgo+Pj4gKyAq
-IGEgZmVhdHVyZSBkZXRlY3Qgb24gdGhlIGJvb3QgQ1BVKS4gTm8gbmVlZCB0byB3b3JyeSBhYm91
-dCBvdGhlciBDUFVzCj4+PiArICogaGVyZS4KPj4+ICsgKi8KPj4+ICt2b2lkIF9faW5pdCBhcHBs
-eV9ib290X2FsdGVybmF0aXZlcyh2b2lkKQo+Pj4gK3sKPj4+ICvCoMKgwqAgc3RydWN0IGFsdF9y
-ZWdpb24gcmVnaW9uID0gewo+Pj4gK8KgwqDCoMKgwqDCoMKgIC5iZWdpbsKgwqDCoCA9IChzdHJ1
-Y3QgYWx0X2luc3RyICopX19hbHRfaW5zdHJ1Y3Rpb25zLAo+Pj4gK8KgwqDCoMKgwqDCoMKgIC5l
-bmTCoMKgwqAgPSAoc3RydWN0IGFsdF9pbnN0ciAqKV9fYWx0X2luc3RydWN0aW9uc19lbmQsCj4+
-PiArwqDCoMKgIH07Cj4+PiArCj4+PiArwqDCoMKgIC8qIElmIGNhbGxlZCBvbiBub24tYm9vdCBj
-cHUgdGhpbmdzIGNvdWxkIGdvIHdyb25nICovCj4+PiArwqDCoMKgIFdBUk5fT04oc21wX3Byb2Nl
-c3Nvcl9pZCgpICE9IDApOwo+Pj4gKwo+Pj4gK8KgwqDCoCBfX2FwcGx5X2FsdGVybmF0aXZlcygm
-cmVnaW9uLCBmYWxzZSwgJmJvb3RfY2FwYWJpbGl0aWVzWzBdKTsKPj4+ICt9Cj4+PiArCj4+PiAg
-wqAgI2lmZGVmIENPTkZJR19NT0RVTEVTCj4+PiAgwqAgdm9pZCBhcHBseV9hbHRlcm5hdGl2ZXNf
-bW9kdWxlKHZvaWQgKnN0YXJ0LCBzaXplX3QgbGVuZ3RoKQo+Pj4gIMKgIHsKPj4+IEBAIC0yNDcs
-NyArMjc3LDEwIEBAIHZvaWQgYXBwbHlfYWx0ZXJuYXRpdmVzX21vZHVsZSh2b2lkICpzdGFydCwK
-Pj4+IHNpemVfdCBsZW5ndGgpCj4+PiAgwqDCoMKgwqDCoMKgwqDCoMKgIC5iZWdpbsKgwqDCoCA9
-IHN0YXJ0LAo+Pj4gIMKgwqDCoMKgwqDCoMKgwqDCoCAuZW5kwqDCoMKgID0gc3RhcnQgKyBsZW5n
-dGgsCj4+PiAgwqDCoMKgwqDCoCB9Owo+Pj4gK8KgwqDCoCBERUNMQVJFX0JJVE1BUChhbGxfY2Fw
-YWJpbGl0aWVzLCBBUk02NF9OUEFUQ0hBQkxFKTsKPj4+ICsKPj4+ICvCoMKgwqAgYml0bWFwX2Zp
-bGwoYWxsX2NhcGFiaWxpdGllcywgQVJNNjRfTlBBVENIQUJMRSk7Cj4+PiAgwqAgLcKgwqDCoCBf
-X2FwcGx5X2FsdGVybmF0aXZlcygmcmVnaW9uLCB0cnVlKTsKPj4+ICvCoMKgwqAgX19hcHBseV9h
-bHRlcm5hdGl2ZXMoJnJlZ2lvbiwgdHJ1ZSwgJmFsbF9jYXBhYmlsaXRpZXNbMF0pOwo+Pj4gIMKg
-IH0KPj4+ICDCoCAjZW5kaWYKPj4+IGRpZmYgLS1naXQgYS9hcmNoL2FybTY0L2tlcm5lbC9jcHVm
-ZWF0dXJlLmMKPj4+IGIvYXJjaC9hcm02NC9rZXJuZWwvY3B1ZmVhdHVyZS5jCj4+PiBpbmRleCA4
-NGZhNWJlLi43MWM4ZDRmIDEwMDY0NAo+Pj4gLS0tIGEvYXJjaC9hcm02NC9rZXJuZWwvY3B1ZmVh
-dHVyZS5jCj4+PiArKysgYi9hcmNoL2FybTY0L2tlcm5lbC9jcHVmZWF0dXJlLmMKPj4+IEBAIC01
-NCw2ICs1NCw5IEBACj4+PiAgwqAgRVhQT1JUX1NZTUJPTChjcHVfaHdjYXBzKTsKPj4+ICDCoCBz
-dGF0aWMgc3RydWN0IGFybTY0X2NwdV9jYXBhYmlsaXRpZXMgY29uc3QgX19yb19hZnRlcl9pbml0
-Cj4+PiAqY3B1X2h3Y2Fwc19wdHJzW0FSTTY0X05DQVBTXTsKPj4+ICDCoCArLyogTmVlZCBhbHNv
-IGJpdCBmb3IgQVJNNjRfQ0JfUEFUQ0ggKi8KPj4+ICtERUNMQVJFX0JJVE1BUChib290X2NhcGFi
-aWxpdGllcywgQVJNNjRfTlBBVENIQUJMRSk7Cj4+PiArCj4+PiAgwqAgLyoKPj4+ICDCoMKgICog
-RmxhZyB0byBpbmRpY2F0ZSBpZiB3ZSBoYXZlIGNvbXB1dGVkIHRoZSBzeXN0ZW0gd2lkZQo+Pj4g
-IMKgwqAgKiBjYXBhYmlsaXRpZXMgYmFzZWQgb24gdGhlIGJvb3QgdGltZSBhY3RpdmUgQ1BVcy4g
-VGhpcwo+Pj4gQEAgLTE2NzIsNiArMTY3NSw5IEBAIHN0YXRpYyB2b2lkIHVwZGF0ZV9jcHVfY2Fw
-YWJpbGl0aWVzKHUxNiBzY29wZV9tYXNrKQo+Pj4gIMKgwqDCoMKgwqDCoMKgwqDCoCBpZiAoY2Fw
-cy0+ZGVzYykKPj4+ICDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCBwcl9pbmZvKCJkZXRlY3Rl
-ZDogJXNcbiIsIGNhcHMtPmRlc2MpOwo+Pj4gIMKgwqDCoMKgwqDCoMKgwqDCoCBjcHVzX3NldF9j
-YXAoY2Fwcy0+Y2FwYWJpbGl0eSk7Cj4+PiArCj4+PiArwqDCoMKgwqDCoMKgwqAgaWYgKGNhcHMt
-PnR5cGUgJiBTQ09QRV9CT09UX0NQVSkKPj4KPj4gWW91IG1heSB3YW50IHRvIGRvIDoKPj4gIMKg
-wqDCoMKgwqDCoMKgIGlmIChzY29wZV9tYXNrICYgU0NPUEVfQk9PVF9DUFUpCj4+Cj4+IGZvciBh
-IHRpZ2h0ZXIgY2hlY2sgdG8gZW5zdXJlIHRoaXMgZG9lc24ndCB1cGRhdGUgdGhlIGJvb3RfY2Fw
-YWJpbGl0aWVzCj4+IGFmdGVyIHdlIGhhdmUgYXBwbGllZCB0aGUgYm9vdF9zY29wZSBhbHRlcm5h
-dGl2ZXMgYW5kIG1pc3MgYXBwbHlpbmcgdGhlCj4+IGFsdGVybmF0aXZlcyBmb3IgdGhvc2UsIHNo
-b3VsZCBzb21lb25lIGFkZCBhIG11bHRpLXNjb3BlIChpLmUKPj4gU0NPUEVfQk9PVF9DUFUgYW5k
-Cj4+IHNvbWV0aGluZyBlbHNlKSBjYXBhYmlsaXR5IChldmVuIGJ5IG1pc3Rha2UpLgo+Pgo+IAo+
-IEJ1dCBhIG11bHRpLXNjb3BlIGNhcGFiaWxpdHkgY29udGFpbmluZyBTQ09QRV9CT09UX0NQVSBz
-aG91bGQgYWxyZWFkeQo+IGdldCB1cGRhdGVkIGZvciBzZXR1cF9ib290X2NwdV9jYXBhYmlsaXRp
-ZXMuIENhcGFiaWxpdGllcyBtYXJrZWQgd2l0aAo+IFNDT1BFX0JPT1RfQ1BVIG5lZWQgdG8gYmUg
-ZW5hYmxlZCBvbiB0aGUgYm9vdCBDUFUgb3Igbm90IGF0IGFsbC4KClllcywgeW91J3JlIHJpZ2h0
-LiBJdCBpcyBub3Qgbm9ybWFsIHRvIGhhdmUgbXVsdGlwbGUgU0NPUEUgZm9yIGEgImNhcGFiaWxp
-dHkiLgpCdXQgaWYgc29tZW9uZSBjb21lcyB3aXRoIHN1Y2ggYSBjYXAsIHdlIG1heSBtaXNzIGhh
-bmRsaW5nIHRoaXMgY2FzZS4gSXQgaXMKYWx3YXlzIGJldHRlciB0byBiZSBzYWZlci4KCj4gCj4g
-U2hvdWxkbid0IHRoZSBjYWxsIHRvIGNhcHMtPm1hdGNoZXMoKSBmYWlsIGZvciBhIGJvb3QgZmVh
-dHVyZSB0aGF0IHdhcwo+IG5vdCBmb3VuZCBvbiB0aGUgYm9vdCBjcHU/Cj4gCj4gQWxzbywgeW91
-IG1hZGUgdGhlIG9wcG9zaXRlIHN1Z2dlc3Rpb24gNCB2ZXJzaW9uIGFnbyB3aXRoIGEgbW9yZQo+
-IHdvcnJ5aW5nIHNjZW5hcmlvIDopIDoKPiBodHRwczovL2xrbWwub3JnL2xrbWwvMjAxOC81LzI1
-LzIwOAoKQWgsIHlvdSdyZSByaWdodC4gSSBtaXNzZWQgdGhhdC4gV2UgbmVlZCB0aGUgYWRkaXRp
-b25hbCBjaGVjayBhcyB5b3UgbWVudGlvbgpiZWxvdy4KCj4gCj4gT3RoZXJ3aXNlLCBpZiBteSBh
-c3N1bXB0aW9uIGFib3ZlIGlzIHdyb25nLCBpdCBtZWFucyB0aGUgY2hlY2sgc2hvdWxkCj4gcHJv
-YmFibHkgYmU6Cj4gCWlmIChjYXBzLT50eXBlICYgU0NPUEVfQk9PVF9DUFUgJiYgc2NvcGVfbWFz
-ayAmIFNDT1BFX0JPT1RfQ1BVKQoKWWVzLCB0aGlzIGlzIHdoYXQgd2Ugd2FudC4KCgo+IEJ1dCBt
-eSBjdXJyZW50IHVuZGVyc3RhbmRpbmcgaXMgdGhhdCB3ZSBkb24ndCBuZWVkIHRoYXQuCj4gCj4+
-IFdpdGggdGhhdDoKPj4KPj4gUmV2aWV3ZWQtYnk6IFN1enVraSBLIFBvdWxvc2UgPHN1enVraS5w
-b3Vsb3NlQGFybS5jb20+CgoKQ2hlZXJzClN1enVraQoKX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGlu
-dXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQu
-b3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+On Thu, Jan 03 2019 at 10:47 -0700, Stephen Boyd wrote:
+>Using the batch API from the interconnect driver sometimes leads to a
+>KASAN error due to an access to freed memory. This is easier to trigger
+>with threadirqs on the kernel commandline.
+>
+> BUG: KASAN: use-after-free in rpmh_tx_done+0x114/0x12c
+> Read of size 1 at addr fffffff51414ad84 by task irq/110-apps_rs/57
+>
+> CPU: 0 PID: 57 Comm: irq/110-apps_rs Tainted: G        W         4.19.10 #72
+> Call trace:
+>  dump_backtrace+0x0/0x2f8
+>  show_stack+0x20/0x2c
+>  __dump_stack+0x20/0x28
+>  dump_stack+0xcc/0x10c
+>  print_address_description+0x74/0x240
+>  kasan_report+0x250/0x26c
+>  __asan_report_load1_noabort+0x20/0x2c
+>  rpmh_tx_done+0x114/0x12c
+>  tcs_tx_done+0x450/0x768
+>  irq_forced_thread_fn+0x58/0x9c
+>  irq_thread+0x120/0x1dc
+>  kthread+0x248/0x260
+>  ret_from_fork+0x10/0x18
+>
+> Allocated by task 385:
+>  kasan_kmalloc+0xac/0x148
+>  __kmalloc+0x170/0x1e4
+>  rpmh_write_batch+0x174/0x540
+>  qcom_icc_set+0x8dc/0x9ac
+>  icc_set+0x288/0x2e8
+>  a6xx_gmu_stop+0x320/0x3c0
+>  a6xx_pm_suspend+0x108/0x124
+>  adreno_suspend+0x50/0x60
+>  pm_generic_runtime_suspend+0x60/0x78
+>  __rpm_callback+0x214/0x32c
+>  rpm_callback+0x54/0x184
+>  rpm_suspend+0x3f8/0xa90
+>  pm_runtime_work+0xb4/0x178
+>  process_one_work+0x544/0xbc0
+>  worker_thread+0x514/0x7d0
+>  kthread+0x248/0x260
+>  ret_from_fork+0x10/0x18
+>
+> Freed by task 385:
+>  __kasan_slab_free+0x12c/0x1e0
+>  kasan_slab_free+0x10/0x1c
+>  kfree+0x134/0x588
+>  rpmh_write_batch+0x49c/0x540
+>  qcom_icc_set+0x8dc/0x9ac
+>  icc_set+0x288/0x2e8
+>  a6xx_gmu_stop+0x320/0x3c0
+>  a6xx_pm_suspend+0x108/0x124
+>  adreno_suspend+0x50/0x60
+> cr50_spi spi5.0: SPI transfer timed out
+>  pm_generic_runtime_suspend+0x60/0x78
+>  __rpm_callback+0x214/0x32c
+>  rpm_callback+0x54/0x184
+>  rpm_suspend+0x3f8/0xa90
+>  pm_runtime_work+0xb4/0x178
+>  process_one_work+0x544/0xbc0
+>  worker_thread+0x514/0x7d0
+>  kthread+0x248/0x260
+>  ret_from_fork+0x10/0x18
+>
+> The buggy address belongs to the object at fffffff51414ac80
+>  which belongs to the cache kmalloc-512 of size 512
+> The buggy address is located 260 bytes inside of
+>  512-byte region [fffffff51414ac80, fffffff51414ae80)
+> The buggy address belongs to the page:
+> page:ffffffbfd4505200 count:1 mapcount:0 mapping:fffffff51e00c680 index:0x0 compound_mapcount: 0
+> flags: 0x4000000000008100(slab|head)
+> raw: 4000000000008100 ffffffbfd4529008 ffffffbfd44f9208 fffffff51e00c680
+> raw: 0000000000000000 0000000000200020 00000001ffffffff 0000000000000000
+> page dumped because: kasan: bad access detected
+>
+> Memory state around the buggy address:
+>  fffffff51414ac80: fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb
+>  fffffff51414ad00: fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb
+> >fffffff51414ad80: fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb
+>                    ^
+>  fffffff51414ae00: fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb
+>  fffffff51414ae80: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
+>
+>The batch API sets the same completion for each rpmh message that's sent
+>and then loops through all the messages and waits for that single
+>completion declared on the stack to be completed before returning from
+>the function and freeing the message structures. Unfortunately, some
+>messages may still be in process and 'stuck' in the TCS. At some later
+>point, the tcs_tx_done() interrupt will run and try to process messages
+>that have already been freed at the end of rpmh_write_batch(). This will
+>in turn access the 'needs_free' member of the rpmh_request structure and
+>cause KASAN to complain.
+>
+Raju and I were discussing this solution and we think the issue may be
+because of a race condition between the thread calling the completion
+and the thread waiting for completion. Completion releases the waiting
+thread and then we try to read rpm_msg->needs_free after that. But, if
+we could read in the rpm_msg->needs_free before calling completion, we
+would not see the problem. How about this instead?
+
+diff --git a/drivers/soc/qcom/rpmh.c b/drivers/soc/qcom/rpmh.c
+index c7beb6841289..0303a2971d4a 100644
+--- a/drivers/soc/qcom/rpmh.c
++++ b/drivers/soc/qcom/rpmh.c
+@@ -80,6 +80,7 @@ void rpmh_tx_done(const struct tcs_request *msg, int r)
+        struct rpmh_request *rpm_msg = container_of(msg, struct rpmh_request,
+                                                    msg);
+        struct completion *compl = rpm_msg->completion;
++       bool free = rpm_msg->needs_free;
+
+        rpm_msg->err = r;
+
+@@ -94,7 +95,7 @@ void rpmh_tx_done(const struct tcs_request *msg, int r)
+        complete(compl);
+
+ exit:
+-       if (rpm_msg->needs_free)
++       if (free)
+                kfree(rpm_msg);
+ }
+
+
+
+>Let's fix this by allocating a chunk of completions for each message and
+>waiting for all of them to be completed before returning from the batch
+>API. Alternatively, we could wait for the last message in the batch, but
+>that may be a more complicated change because it looks like
+>tcs_tx_done() just iterates through the indices of the queue and
+>completes each message instead of tracking the last inserted message and
+>completing that first.
+>
+>Cc: Lina Iyer <ilina@codeaurora.org>
+>Cc: "Raju P.L.S.S.S.N" <rplsssn@codeaurora.org>
+>Cc: Matthias Kaehlcke <mka@chromium.org>
+>Cc: Evan Green <evgreen@chromium.org>
+>Fixes: c8790cb6da58 ("drivers: qcom: rpmh: add support for batch RPMH request")
+>Signed-off-by: Stephen Boyd <swboyd@chromium.org>
+>---
+> drivers/soc/qcom/rpmh.c | 25 +++++++++++++++++--------
+> 1 file changed, 17 insertions(+), 8 deletions(-)
+>
+>diff --git a/drivers/soc/qcom/rpmh.c b/drivers/soc/qcom/rpmh.c
+>index c7beb6841289..3b3e8b0b2d95 100644
+>--- a/drivers/soc/qcom/rpmh.c
+>+++ b/drivers/soc/qcom/rpmh.c
+>@@ -348,11 +348,12 @@ int rpmh_write_batch(const struct device *dev, enum rpmh_state state,
+> {
+> 	struct batch_cache_req *req;
+> 	struct rpmh_request *rpm_msgs;
+>-	DECLARE_COMPLETION_ONSTACK(compl);
+>+	struct completion *compls;
+> 	struct rpmh_ctrlr *ctrlr = get_rpmh_ctrlr(dev);
+> 	unsigned long time_left;
+> 	int count = 0;
+> 	int ret, i, j;
+>+	void *ptr;
+>
+> 	if (!cmd || !n)
+> 		return -EINVAL;
+>@@ -362,10 +363,15 @@ int rpmh_write_batch(const struct device *dev, enum rpmh_state state,
+> 	if (!count)
+> 		return -EINVAL;
+>
+>-	req = kzalloc(sizeof(*req) + count * sizeof(req->rpm_msgs[0]),
+>+	ptr = kzalloc(sizeof(*req) +
+>+		      count * (sizeof(req->rpm_msgs[0]) + sizeof(*compls)),
+> 		      GFP_ATOMIC);
+>-	if (!req)
+>+	if (!ptr)
+> 		return -ENOMEM;
+>+
+>+	req = ptr;
+>+	compls = ptr + sizeof(*req) + count * sizeof(*rpm_msgs);
+>+
+> 	req->count = count;
+> 	rpm_msgs = req->rpm_msgs;
+>
+>@@ -380,7 +386,10 @@ int rpmh_write_batch(const struct device *dev, enum rpmh_state state,
+> 	}
+>
+> 	for (i = 0; i < count; i++) {
+>-		rpm_msgs[i].completion = &compl;
+>+		struct completion *compl = &compls[i];
+>+
+>+		init_completion(compl);
+>+		rpm_msgs[i].completion = compl;
+> 		ret = rpmh_rsc_send_data(ctrlr_to_drv(ctrlr), &rpm_msgs[i].msg);
+> 		if (ret) {
+> 			pr_err("Error(%d) sending RPMH message addr=%#x\n",
+>@@ -393,12 +402,12 @@ int rpmh_write_batch(const struct device *dev, enum rpmh_state state,
+>
+> 	time_left = RPMH_TIMEOUT_MS;
+> 	for (i = 0; i < count; i++) {
+>-		time_left = wait_for_completion_timeout(&compl, time_left);
+>+		time_left = wait_for_completion_timeout(&compls[i], time_left);
+> 		if (!time_left) {
+> 			/*
+> 			 * Better hope they never finish because they'll signal
+>-			 * the completion on our stack and that's bad once
+>-			 * we've returned from the function.
+>+			 * the completion that we're going to free once
+>+			 * we've returned from this function.
+> 			 */
+> 			WARN_ON(1);
+> 			ret = -ETIMEDOUT;
+>@@ -407,7 +416,7 @@ int rpmh_write_batch(const struct device *dev, enum rpmh_state state,
+> 	}
+>
+> exit:
+>-	kfree(req);
+>+	kfree(ptr);
+>
+> 	return ret;
+> }
+>-- 
+>Sent by a computer through tubes
+>
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
