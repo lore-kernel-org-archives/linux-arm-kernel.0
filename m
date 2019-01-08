@@ -2,76 +2,70 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 78364C43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 19:07:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B502BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 19:12:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4E62F206BB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 19:07:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 869D9206B6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 19:12:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MIazZ/Yc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4E62F206BB
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=public-files.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cAuujjuq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 869D9206B6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:Date:Subject:To:
-	From:Message-ID:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Zhb4ASUvX7v+h19CHwuxkr0TIvWVRvom15yhtPm9JcM=; b=MIazZ/Yc6+hp+W
-	hBUGwi2atOZZUgWSzx4EjvufeEq+qp+8yU4XzP+vmqXb1LuQOISqU8rh6XltN3qWiiZJWNQJCrIDy
-	xx8JcAGRT5oGSZ8QTzUUmQNLB2zDdpLT9EpVLuqxrIqFm7badch4UKp6r+3b/EOF2ES/6OPVNvyVt
-	Jo3Vx0YlD52ByuQk9DDVB/zwNf+iRqQoLCOXs5XmLWmlI2lkMSfKLneTbccLRRJclmufue7A/54Xn
-	trReXJpk1BzpQGqQkGsE9rbrRl7y7Usam8fbs17D9ftOpq7btcC1A9nAOx67AvKXLRLmbS+gkzm4T
-	PD7jodrQi6/Bn7YwscMg==;
+	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:References:To:Subject:From:Reply-To:Cc:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=myytboNslm6OCH5hnqx2TT/QbdY2eGCE3IG5GDnJUA8=; b=cAuujjuqxcz5G+dfad7WT/o8kq
+	8JDGABj8Vjtho153iRj4J4d6SN4UCXWCPPzjPcZlpYHNInpejCYIQ+ycRE9qRH3l4+HHAIkyI5XeK
+	5EHj5tmYou1Er8HXh5sdAR1pj1TF2p7fgc/bMf4CgogFD/RkbpmOvOGPdJKIck54Uf/+Vqn8Wk9pF
+	BO2LaMAtx0vLPpP6l5Ly32/4YYe9ePH8cvhvcixs6sbYsTZXedHajtUEmNruXC8FASsX5DjUjWvYS
+	y1ulzxT2LUPUZa8/8c7gWWJ+3ghsAwZav5rjXi+BDyMTeDuA9xcD3hjNulLDQe1Y0mpS0IgXin3yp
+	QDQJf+0A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggwiV-0007tS-3X; Tue, 08 Jan 2019 19:07:11 +0000
-Received: from mout.gmx.net ([212.227.15.18])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggwiR-0007sw-7F; Tue, 08 Jan 2019 19:07:09 +0000
-Received: from [91.14.64.214] ([91.14.64.214]) by web-mail.gmx.net
- (3c-app-gmx-bs35.server.lan [172.19.170.87]) (via HTTP); Tue, 8 Jan 2019
- 20:06:53 +0100
+	id 1ggwny-0001Ir-Mh; Tue, 08 Jan 2019 19:12:50 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ggwnu-0001IO-Bf
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 19:12:47 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 33EF5A78;
+ Tue,  8 Jan 2019 11:12:44 -0800 (PST)
+Received: from [10.1.197.78] (ostrya.cambridge.arm.com [10.1.197.78])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 42C213F70D;
+ Tue,  8 Jan 2019 11:12:43 -0800 (PST)
+From: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+Subject: Re: question about broadcast invalidation and atc invalidation
+To: Zhongmiao <zhongmiao@hisilicon.com>,
+ "Liujunlong (June)" <Junlong.Liu@hisilicon.com>,
+ Will Deacon <Will.Deacon@arm.com>, "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>,
+ "zhongmiao@huawei.com" <zhongmiao@huawei.com>
+References: <e33aad8d-ab12-e1c7-0b8b-85fe09260270@hisilicon.com>
+ <fb76a20b-0ff4-d64e-4f9c-c160254b07ce@arm.com>
+ <8CD08B4737CACA4ABE0228F45E441A91638DE813@dggemm521-mbs.china.huawei.com>
+ <29168a05-815f-1dc4-abb7-61c273ce4fb4@hisilicon.com>
+Message-ID: <d4b74306-b9ae-2b60-0b9f-b351de845467@arm.com>
+Date: Tue, 8 Jan 2019 19:12:29 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.0
 MIME-Version: 1.0
-Message-ID: <trinity-4ceb1d55-424f-46b8-b8e7-989770b249a2-1546974413848@3c-app-gmx-bs35>
-From: "Frank Wunderlich" <frank-w@public-files.de>
-To: "Heiner Kallweit" <hkallweit1@gmail.com>
-Subject: Aw: Re: [PATCH] net: ethernet: mediatek: fix warning in phy_start_aneg
-Date: Tue, 8 Jan 2019 20:06:53 +0100
-Importance: normal
-Sensitivity: Normal
-In-Reply-To: <7acce775-4ab7-c867-c801-25ee004f6b38@gmail.com>
-References: <20190108160526.18928-1-frank-w@public-files.de>
- <7acce775-4ab7-c867-c801-25ee004f6b38@gmail.com>
-X-UI-Message-Type: mail
-X-Priority: 3
-X-Provags-ID: V03:K1:ZJLH7Z5j6IMWKTHNDAq6EUnJKNx6pZWJhT+UxWNmhz4F977/b+WwiyKDgL3ti+DXmfHD9
- Wgmm718q0bGENdKngNx39qqL/Jp3zPJlxWjjAg3TMgcJyZxbMVwa42KqxvhopBSGaDfKFzEtVdbq
- 94mzoVKfARAGMNQkTUiHctnr15Oku8WMu3ujAp34NEngjMyGn5IJS3FS7wb8EfN5n0dhA6il5IBb
- UWfdOKhMzUQVRga8dvv9xkMtwMNxjzh6m2ykbKU7Ad1M9HoU+knS2yCeGzIUQB6QY6QSdmDctroH
- No=
-X-UI-Out-Filterresults: notjunk:1;V03:K0:gFXAB7BfwYo=:59sDYjgMRQNN0lLW5e66j5
- 65hHbsys7LlrQ2dMTQjdy61Q7gYADs13JmEUcXQzg18QT963AePmLlQ2FxzuX6HA4dm0NXbBp
- PUAz7pAsq6nvlpoI/Q/ULuV7nO/uARLeX9cLZfWKXsEGX0UrzNXSM9AMrWOXWKx+24zFaw/Bi
- llQRkgl2clHzcC/mQ70SBRV8EfxUHo4MJXDLYBYQmQz1Sk/DSUR9Oq1xPMC+X8QZ90bVcS2xZ
- EWBHVz4+5kJdJnUNiQWh1LQJ1wjodl7O/GIKN6j4RaYzcpmBOu1fF792y+zz+Ez8puA1qnaeT
- gT3HI31hsbFIYVFEl8y0fyjyR+F7QPyucsx9iur5hScUFE2DkvehIq4ANXYhCbVGsXZpEmW+D
- Ii5xQMvTKedrgALOPQx5Xw7+FkD0WRGtQDquG+RG8ApRYejqeIgDxn4ndlDrSlNRMh2nKWdx6
- 5h2qWvwT9KNF4lZH1CKsBj5lbXuGwecsGXvHujcWQLZkO4smvp5ltDFzCOvyySvz57H9o40rw
- Isvcjk3GMUM8i6pBiGiWo1AdfDD4V4BBWacLeCkCdwQLMjlTJc5GIUavebfE6DL9knfUfIQ8T
- vVLl3NvIEboqQ=
+In-Reply-To: <29168a05-815f-1dc4-abb7-61c273ce4fb4@hisilicon.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_110707_559667_E13B45B5 
-X-CRM114-Status: UNSURE (   7.55  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190108_111246_398184_CC9B82D2 
+X-CRM114-Status: GOOD (  18.99  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,51 +77,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Felix Fietkau <nbd@openwrt.org>, Nelson Chang <nelson.chang@mediatek.com>,
- netdev@vger.kernel.org, Sean Wang <sean.wang@kernel.org>,
- linux-kernel@vger.kernel.org, linux-mediatek@lists.infradead.org,
- John Crispin <john@phrozen.org>, Matthias Brugger <matthias.bgg@gmail.com>,
- "David S. Miller" <davem@davemloft.net>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi Miao,
 
-> In mtk_phy_connect() I would say this complete block can be removed.
-> All this is handled internally by phylib.
+On 24/12/2018 06:44, Zhongmiao wrote:
+> Hi Jean:
+> On 2018/12/24 14:36, Zhongmiao wrote:
+>>
+>>
+>>
+>> Hi,
+>>
+>> On 21/12/2018 09:31, Zhongmiao wrote:
+>>> Hi Jean:
+>>> 	Now Soft need to make sure build atc inv cmd to smmu after Execute
+>>> "TLBI" (dvm sync). I don't think it's very reasonable. Why  Smmu The
+>>> smmu automatically sends the inv atc command when smmu receive
+>>> broadcast invalidation ?
+>>
+>> I'd also like to see this done by hardware, but it's not straightforward. I see two difficulties with turning broadcast TLBI into ATC invalidation:
+>>
+>> * TLBI uses VMID and ASID to target the TLB entries to invalidate, but ATS uses RID and PASID. The SMMU would need to do a reverse lookup to convert VMID:ASID into RID:PASID, and there may be multiple RID:PASID pairs associated to one VMID:ASID.
+>>
+>> * ATS flow control. Each endpoint has a limited number of in-flight ATC invalidate requests. If the CPU is sending TLBI too fast, the SMMU would have to buffer them or back-pressure the interconnect, while waiting for in-flight ATC invalidate to complete.>>
+>> So for the moment the architecture doesn't support this. We use MMU notifiers to convert VMID:ASID into RID:PASID and wait for ATC invalidation to complete.
+>>
 > 
-> 	dev->phydev->autoneg = AUTONEG_ENABLE;
-> 	dev->phydev->speed = 0;
-> 	dev->phydev->duplex = 0;
-> 
-> 	phy_set_max_speed(dev->phydev, SPEED_1000);
-> 	phy_support_asym_pause(dev->phydev);
-> 	linkmode_copy(dev->phydev->advertising, dev->phydev->supported);
-> 	linkmode_set_bit(ETHTOOL_LINK_MODE_Autoneg_BIT,
-> 			 dev->phydev->advertising);
-> 	phy_start_aneg(dev->phydev);
-> 
-> Could you please test this?
+> I got it about this.But How does the software(application) know to go to 
+> invalidate remote ATC? This entry may not be cached at remote ATC.
 
-seems to work well, no warning in dmesg
+Software doesn't know which entry has been cached in the ATC, so it must
+invalidate any address that could have been cached. The mm subsystem
+calls mmu_notifier_invalidate_range*() or mmu_notifier_change_pte() any
+time it changes or deletes a mapping, which means that we'll send plenty
+of spurious ATC INV for entries that don't exist.
 
-traffic 940Mbit sending, 900 receive
+I don't think we can do much to optimize this. We could theoretically
+rely on the PTE access flag to know if an address might have been
+cached, and don't send an ATC INV if the access flag was already unset
+when clearing the PTE. But the mm subsystem doesn't seem to have any
+infrastructure for this at the moment, and I think that adding it would
+be too invasive, and the performance improvement too small.
 
-> And a further proposal:
-> Instead of the open-coded dev_info() in mtk_phy_connect_node()
-> you could use phy_attached_info().
-
-have not tried this yet...because it's only an info-message and needs different parameters...have to look how i can convert it 
-
-> Calling phy_start() in the ndo_open callback is fine, you can leave
-> it there.
-
-have it re-added
-
-pushed to my repo: https://github.com/frank-w/BPI-R2-4.14/commits/5.0-rc
-
-regards Frank
+Thanks,
+Jean
 
 _______________________________________________
 linux-arm-kernel mailing list
