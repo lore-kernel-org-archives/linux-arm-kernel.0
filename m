@@ -2,88 +2,65 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0A187C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 10:07:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DCE36C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 10:18:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C7E9E2087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 10:07:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AD0AD2087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 10:18:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P9ZgXJ6C";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="GPqfeNwA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C7E9E2087E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="W9ePKXz8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AD0AD2087F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
-	:Date:Reply-To:Cc:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=sev28YpdzWBJ42IazOUWwwzNpcgvnRd1vuECKeLkRtU=; b=P9ZgXJ6Cuqi40M
-	OHkjpqm1g5JKHE8l2tQqoxYJwaDrIYhKgovizSs07+83DJGI8VYyCYCaWn4GYhSTek06speTyiXju
-	FnRgbZc6soQ7ClpPU/4fUKTF8eOCnfHwDmzFtARnPsnORw4JjGlxaSsfI1SqXEFuGBwmI//3gK2y5
-	3DDcDxiMT4a/XP7TOJIRuCMYdm3tMWqLiMqai6BUcX6mKTWq89Gqejt80KlqxM/7I/zakGH8CD4ft
-	80fZYkFe+8aHF3P+9m3aELmzzWK5zIM5EZuPL3vG+CYdV1jzPnkAPrna4N6s8HWkPj3q3+sMo+YPA
-	3s9gC/ys/xWcrROdqygA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=o/qyyhsuv5tiR7m3qOnQeepwarisljwyY6Sz5sWPx4M=; b=W9ePKXz8nfIExQ
+	7tTXBr2tJETk/7SJoD0AwgoYaXY7ETV2wxlmqLxmc/Uy0UNdFtR4ijNSxv9LaYcyiG+2AXGwr84z5
+	eJwPaEL2Da1YWoNvlwcn8/Bz7qjNXLvZqaLOihJV7cpV4Cor9iGicG9kIUx1GdF54JA8Y2JptFnRs
+	qsoQUr8p8YLoYZvk3F2JjPnoUVSUyFAZwQZRqUzoECsDFl7QWXo+l367sK9L2LhA/+LRyDzx++fFd
+	CgHwQXpnLK9/BbNYFp2NJ9vksOX3xg3uLP0ZIDfWx/06dAx8Gy5WI9uWdt+obk/YQ264ioafyLzVV
+	hV8NaEM6XkJI3A09NYsw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggoIV-00016z-OU; Tue, 08 Jan 2019 10:07:47 +0000
-Received: from mail-ed1-x52f.google.com ([2a00:1450:4864:20::52f])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggoIS-00016S-4C
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 10:07:45 +0000
-Received: by mail-ed1-x52f.google.com with SMTP id d39so3580015edb.12
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 08 Jan 2019 02:07:43 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=date:from:to:subject:message-id:mime-version:content-disposition
- :user-agent; bh=bkaMWtTpESawvoOLxRuAs8lIKhxRNP1HBs58Vo4C1QM=;
- b=GPqfeNwAKNwodLKf/pfdqR49wJuUJQPvD1xpvI4/sFB4gMKaVr4gZai73bfaGwMTan
- Cg1II7X0VG/mc+c1t6usWm/ck2qZhu9bLqGYeB/cGkpoaOBRvm7267Ei0A+1NPPaNngF
- 29da1q2DbXimE9UI34kqJ5EKAWcPocMBxCkeuM4dJ85Jr7uNQ7JiEWLfaVDQ56QgeqWr
- +e5Q29gdrzg1ND97D1fpsQjTD0bUrw0kEhtvYU4QaVxk4fPppRfI6m84rrIOHetvWAi2
- 7JWrfJsnTy7fw6saNbeluLT1Yg0dv9AzaiXikvrwJr+KX9oAQ3vClw5yM73+LuJDVpHv
- kvoA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:subject:message-id:mime-version
- :content-disposition:user-agent;
- bh=bkaMWtTpESawvoOLxRuAs8lIKhxRNP1HBs58Vo4C1QM=;
- b=rXv/0tMld2rudVnnA5F7fK8lGQXfBgS+jteTUDIQoNazQ0utuah4RYo3snI5qanPuF
- if/d+NSZM2iYqXQwUgWt0tAuqEMiuDb39srXpQJ/rljUWR8ZDd1HINat6HExC57do2u2
- dcyQX++QqzQa+lnlKsM9mGL0UL+QnO5uFJtBMxfhhRVd/yMBMm13zWZ/OtxqhyUrq7xh
- /iEHBclhLCs9FA78esY8sh/a2mu7omdc908/92fT6YrhIsUW9BkXYCFVReXKmaupgI8Z
- uk+T4jYb2hWN1gNfXoUA2GuPUHfavf6zTmclT7O5tseFR8DYgREafcEAkAehxJIUZoB6
- 7pAw==
-X-Gm-Message-State: AJcUukf9yu9BSPLfe5mRubJkdOOZfXhqUflYFRQswoEmjrkV70QK+lQ3
- G7tezwf7tr0/HDQPmtBhU86xPuk9
-X-Google-Smtp-Source: ALg8bN5DeSWxRNZMEg8PuT7ZMJIXr1fzs5j2dUt6exhANSdEK8DwfZ8sJ2+IQsThc/lb9HUYR7kX+A==
-X-Received: by 2002:a50:94b6:: with SMTP id s51mr1477306eda.22.1546942061663; 
- Tue, 08 Jan 2019 02:07:41 -0800 (PST)
-Received: from localhost (rytm-gw1.ter1.ncp1.par.cust.as8218.eu.
- [83.167.32.99])
- by smtp.gmail.com with ESMTPSA id f6sm38146550ede.53.2019.01.08.02.07.39
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 08 Jan 2019 02:07:40 -0800 (PST)
-Date: Tue, 8 Jan 2019 11:07:39 +0100
-From: Arthur LAMBERT <lambertarthur22@gmail.com>
-To: linux-arm-kernel@lists.infradead.org
-Subject: Handle pwm with sysfs with recent kernel
-Message-ID: <20190108100739.GA9046@arthur-bzh>
+	id 1ggoTD-0004n4-Ul; Tue, 08 Jan 2019 10:18:51 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ggoTA-0004mT-CV
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 10:18:50 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id F1047EBD;
+ Tue,  8 Jan 2019 02:18:45 -0800 (PST)
+Received: from localhost (e113682-lin.copenhagen.arm.com [10.32.144.41])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 86EEE3F6CF;
+ Tue,  8 Jan 2019 02:18:45 -0800 (PST)
+Date: Tue, 8 Jan 2019 11:18:43 +0100
+From: Christoffer Dall <christoffer.dall@arm.com>
+To: Will Deacon <will.deacon@arm.com>
+Subject: Re: [PATCH v8 4/5] arm64: arm_pmu: Add support for
+ exclude_host/exclude_guest attributes
+Message-ID: <20190108101843.GH10769@e113682-lin.lund.arm.com>
+References: <1544610573-28446-1-git-send-email-andrew.murray@arm.com>
+ <1544610573-28446-5-git-send-email-andrew.murray@arm.com>
+ <20181218120226.GC25383@e113682-lin.lund.arm.com>
+ <20190104153205.GA31479@edgewater-inn.cambridge.arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
+In-Reply-To: <20190104153205.GA31479@edgewater-inn.cambridge.arm.com>
 User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_020744_171004_5779DAEA 
-X-CRM114-Status: GOOD (  10.72  )
+X-CRM114-CacheID: sfid-20190108_021848_437964_F7B01D7F 
+X-CRM114-Status: GOOD (  28.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,70 +72,150 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Julien Thierry <julien.thierry@arm.com>, Marc Zyngier <marc.zyngier@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, joro@8bytes.org,
+ Suzuki K Poulose <suzuki.poulose@arm.com>,
+ Andrew Murray <andrew.murray@arm.com>, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-I am trying to update my kernel bsp from v4.1.X to v4.19.8 but I have some regressions
-when I try to use pwm through sysfs from userspace. I have three pwm declared as
-follow in my device tree :
+On Fri, Jan 04, 2019 at 03:32:06PM +0000, Will Deacon wrote:
+> On Tue, Dec 18, 2018 at 01:02:26PM +0100, Christoffer Dall wrote:
+> > On Wed, Dec 12, 2018 at 10:29:32AM +0000, Andrew Murray wrote:
+> > > Add support for the :G and :H attributes in perf by handling the
+> > > exclude_host/exclude_guest event attributes.
+> > > 
+> > > We notify KVM of counters that we wish to be enabled or disabled on
+> > > guest entry/exit and thus defer from starting or stopping :G events
+> > > as per the events exclude_host attribute.
+> > > 
+> > > With both VHE and non-VHE we switch the counters between host/guest
+> > > at EL2. We are able to eliminate counters counting host events on
+> > > the boundaries of guest entry/exit when using :G by filtering out
+> > > EL2 for exclude_host. However when using :H unless exclude_hv is set
+> > > on non-VHE then there is a small blackout window at the guest
+> > > entry/exit where host events are not captured.
+> > > 
+> > > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> > > ---
+> > >  arch/arm64/kernel/perf_event.c | 51 ++++++++++++++++++++++++++++++++++++------
+> > >  1 file changed, 44 insertions(+), 7 deletions(-)
+> > > 
+> > > diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> > > index de564ae..4a3c73d 100644
+> > > --- a/arch/arm64/kernel/perf_event.c
+> > > +++ b/arch/arm64/kernel/perf_event.c
+> > > @@ -26,6 +26,7 @@
+> > >  
+> > >  #include <linux/acpi.h>
+> > >  #include <linux/clocksource.h>
+> > > +#include <linux/kvm_host.h>
+> > >  #include <linux/of.h>
+> > >  #include <linux/perf/arm_pmu.h>
+> > >  #include <linux/platform_device.h>
+> > > @@ -647,11 +648,26 @@ static inline int armv8pmu_enable_counter(int idx)
+> > >  
+> > >  static inline void armv8pmu_enable_event_counter(struct perf_event *event)
+> > >  {
+> > > +	struct perf_event_attr *attr = &event->attr;
+> > >  	int idx = event->hw.idx;
+> > > +	int flags = 0;
+> > > +	u32 counter_bits = BIT(ARMV8_IDX_TO_COUNTER(idx));
+> > >  
+> > > -	armv8pmu_enable_counter(idx);
+> > >  	if (armv8pmu_event_is_chained(event))
+> > > -		armv8pmu_enable_counter(idx - 1);
+> > > +		counter_bits |= BIT(ARMV8_IDX_TO_COUNTER(idx - 1));
+> > > +
+> > > +	if (!attr->exclude_host)
+> > > +		flags |= KVM_PMU_EVENTS_HOST;
+> > > +	if (!attr->exclude_guest)
+> > > +		flags |= KVM_PMU_EVENTS_GUEST;
+> > > +
+> > > +	kvm_set_pmu_events(counter_bits, flags);
+> > > +
+> > > +	if (!attr->exclude_host) {
+> > > +		armv8pmu_enable_counter(idx);
+> > > +		if (armv8pmu_event_is_chained(event))
+> > > +			armv8pmu_enable_counter(idx - 1);
+> > > +	}
+> > >  }
+> > >  
+> > >  static inline int armv8pmu_disable_counter(int idx)
+> > > @@ -664,11 +680,20 @@ static inline int armv8pmu_disable_counter(int idx)
+> > >  static inline void armv8pmu_disable_event_counter(struct perf_event *event)
+> > >  {
+> > >  	struct hw_perf_event *hwc = &event->hw;
+> > > +	struct perf_event_attr *attr = &event->attr;
+> > >  	int idx = hwc->idx;
+> > > +	u32 counter_bits = BIT(ARMV8_IDX_TO_COUNTER(idx));
+> > >  
+> > >  	if (armv8pmu_event_is_chained(event))
+> > > -		armv8pmu_disable_counter(idx - 1);
+> > > -	armv8pmu_disable_counter(idx);
+> > > +		counter_bits |= BIT(ARMV8_IDX_TO_COUNTER(idx - 1));
+> > > +
+> > > +	kvm_clr_pmu_events(counter_bits);
+> > > +
+> > > +	if (!attr->exclude_host) {
+> > > +		if (armv8pmu_event_is_chained(event))
+> > > +			armv8pmu_disable_counter(idx - 1);
+> > > +		armv8pmu_disable_counter(idx);
+> > > +	}
+> > >  }
+> > >  
+> > >  static inline int armv8pmu_enable_intens(int idx)
+> > > @@ -943,16 +968,25 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
+> > >  	 * Therefore we ignore exclude_hv in this configuration, since
+> > >  	 * there's no hypervisor to sample anyway. This is consistent
+> > >  	 * with other architectures (x86 and Power).
+> > > +	 *
+> > > +	 * To eliminate counting host events on the boundaries of
+> > > +	 * guest entry/exit we ensure EL2 is not included in hyp mode
+> > > +	 * with !exclude_host.
+> > >  	 */
+> > >  	if (is_kernel_in_hyp_mode()) {
+> > > -		if (!attr->exclude_kernel)
+> > > +		if (!attr->exclude_kernel && !attr->exclude_host)
+> > >  			config_base |= ARMV8_PMU_INCLUDE_EL2;
+> > >  	} else {
+> > > -		if (attr->exclude_kernel)
+> > > -			config_base |= ARMV8_PMU_EXCLUDE_EL1;
+> > >  		if (!attr->exclude_hv)
+> > >  			config_base |= ARMV8_PMU_INCLUDE_EL2;
+> > 
+> > I'm not sure about the current use of exclude_hv here.  The comment says
+> > it's consistent with other architectures, but I can't find an example to
+> > confirm this, and I don't think we have a comparable thing to the split
+> > of the hypervisor between EL1 and EL2 we have on non-VHE.
+> 
+> FWIW, that comment came from this thread:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/503908.html
+> 
+> That was painful enough at the time, so I'd /really/ prefer not to change
+> the semantics of this again if we can avoid it.
 
-	leds {
-	     compatible = "pwm-leds";
-	     ledred {
-		pwms = <&pwm1>;
-		label = "red";
-		linux,default-trigger = "none";
-		default-state = "on";
-	     };
+The comment makes sense for the is_kernel_in_hyp_mode() case.
 
-	     ledblue {
-	     	pwms = <&pwm5>;
-		label = "blue";
-		linux,default-trigger = "none";
-		default-state = "on";
-	     };
+However, for the !is_kernel_in_hyp_mode() case I can't see the current
+behavior of exclude_hv being similar in other architectures.
 
-	     ledgreen {
-	     	pwms = <&pwm6>;
-		label = "green";
-		linux,default-trigger = "none";
-		default-state = "on";
-	     };
-	};
+I don't think the current semantics of excluding EL2 on a non-VHE host
+system makes much sense, and I doubt anyone is using that for something
+meaningful.  I think changing behavior for excldue_hv to depend on
+is_hyp_mode_available rather than is_kernel_in_hyp_mode is the right
+thing to do which would also align the semantics with other
+architectures and between VHE and non-VHE.
 
-First I have an issue with duplicate name :
-sysfs: cannot create duplicate filename '/class/pwm/pwm0'
-CPU: 0 PID: 653 Comm: XXXX
-Hardware name: Freescale i.MX6 Ultralite (Device Tree)
-[<8010dda8>] (unwind_backtrace) from [<8010b468>] (show_stack+0x10/0x14)
-[<8010b468>] (show_stack) from [<8025ef0c>] (sysfs_warn_dup+0x58/0x64)
-[<8025ef0c>] (sysfs_warn_dup) from [<8025f200>] (sysfs_do_create_link_sd+0xd4/0xd8)
-[<8025f200>] (sysfs_do_create_link_sd) from [<80458d6c>] (device_add+0x1ec/0x5d4)
-[<80458d6c>] (device_add) from [<8040b5a8>] (export_store+0xfc/0x17c)
-[<8040b5a8>] (export_store) from [<80456904>] (dev_attr_store+0x18/0x24)
-[<80456904>] (dev_attr_store) from [<8025e604>] (sysfs_kf_write+0x44/0x48)
-[<8025e604>] (sysfs_kf_write) from [<8025dcb0>] (kernfs_fop_write+0xe8/0x1d0)
-[<8025dcb0>] (kernfs_fop_write) from [<801eaaf8>] (__vfs_write+0x28/0x144)
-[<801eaaf8>] (__vfs_write) from [<801ead88>] (vfs_write+0xa4/0x164)
-[<801ead88>] (vfs_write) from [<801eaf54>] (ksys_write+0x40/0x94)
-[<801eaf54>] (ksys_write) from [<80101000>] (ret_fast_syscall+0x0
 
-I was able to fix it by revert a patch : https://patchwork.kernel.org/patch/9971821/
-It is normal that this revert patch is not currently apply on last 4.19.X tag (last one
-seems to be 4.19.13)
+Thanks,
 
-Then I have another issue when I try to enable my pwm :
-
-# ls /sys/class/pwm/
-pwmchip0  pwmchip2  pwmchip4  pwmchip6
-pwmchip1  pwmchip3  pwmchip5  pwmchip7
-# echo 0 > /sys/class/pwm/pwmchip0/export
-# echo 1 > /sys/class/pwm/pwmchip0/pwm0/enable
--sh: write error: Invalid argument
-
-Is there a new way to handle pwm in recent kernel ? My old process is now deprecated or something ?
+    Christoffer
 
 _______________________________________________
 linux-arm-kernel mailing list
