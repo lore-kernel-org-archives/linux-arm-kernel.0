@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B618CC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 05:27:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F2337C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 05:27:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7FE1E2087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 05:27:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BE4EE2087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 05:27:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="L0huqrg1";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="d68FGu8n"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7FE1E2087F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Qo36+LXb";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="UqHqJcTR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BE4EE2087F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,62 +26,62 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=nxk72jpQObJTfNc9YuSOkzXnpfT8wr/LdOgoCzKLV3Q=; b=L0huqrg1/0o01x
-	IVrxMeQmIb9TzSRyOznJu9oN6Mtn82ktuV8cqR4s0y3+FBsWtKRd13w4XsOOFMbiEnz7Ndbtm/XHO
-	yvA7UoPWkX7l3x8DvmEWi9Dy10wAgvqoijsdtrQavD0bHRlSagL7hoWyx5eq+OxDkk9xGnzANrwcP
-	e2ZeH1LZJ/aHfVOASU7jDjuMqVT+lf0GoUnhqi0mPmN63lxyqWq4RFDVJLiHlhx+80ZnZNnZeMBc4
-	3CM9bcD9PdAwsnni6NoEP7FPT04fTeZFe2+tCuDf4YeprdRv+vjvwXbA1jfacZa1v3mBlREmasNro
-	wk40zMTOp2E1Y1xJTcmA==;
+	List-Owner; bh=++YSc6GqMbgtDccuK/jvEYoeSzlvL2EZrRiToqdE7J8=; b=Qo36+LXb2eROLT
+	c16YddqRf690irpPvgyLT5B/1u9aISvlCx+9+Oo6Fm9hFrjlNUSID6osAKgQv4pBvl5QlryB19w+m
+	06H1Ze+Nn3FegcsBHEd8LaTwHeG6gWCNl2V3NrHxgeDr/DiO4wFLqchPv8Gpu7l7eaY7r0EyUr44o
+	DQ6WRO4u72H+r6L7MnU8e/hTs1rSK7aMDK2RTo2oBxTEqCUOIgEiRM9XCYgIjjYfQH0omFZXDYE1l
+	WfKNn1CyCf1Q1NDB5oN8SL3LCpTxMJ5NQKYxtZf7/7bDwnFSxtjTWj4DZO95/SZi9PAERlnjHKYjV
+	pfeLxLNCc5/DGdYFJezQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggjuz-0003TG-MZ; Tue, 08 Jan 2019 05:27:13 +0000
-Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
+	id 1ggjvJ-0003lS-0J; Tue, 08 Jan 2019 05:27:33 +0000
+Received: from mail-pg1-x541.google.com ([2607:f8b0:4864:20::541])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggjuD-0002cD-GE
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 05:26:34 +0000
-Received: by mail-pf1-x444.google.com with SMTP id g62so1321473pfd.12
+ id 1ggjuP-0002po-Td
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 05:26:54 +0000
+Received: by mail-pg1-x541.google.com with SMTP id g189so1199300pgc.5
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 07 Jan 2019 21:26:25 -0800 (PST)
+ Mon, 07 Jan 2019 21:26:37 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=jFn/Y+47v0jJKJg7Gq5/S7izU51skALRwBbX7+OVooU=;
- b=d68FGu8nudeU2Pz1gN/IWTWnPNXtMCOQfjOhH33S0v9cykmsHDg0WWdLAf1zXU3w80
- kay0QW+cO66aNhabm8fcPKAkkDFFDrBPddJC88HfZMgmYRi0tlVFVJL/6k1B6QSpTUce
- XQCNAW/AHly9TvObBLUnK52YwqmtznQRXp0U8=
+ bh=l4oaJitf9e3QzSlIMVK6poPt7p39OdyXKFn0n02R9W8=;
+ b=UqHqJcTRu3rJY1Mz4NWH329mel38tzLy3ICF81whlwENJC1Fo8JACCewokZsDO39JF
+ qfsDk+agbDTt7cqiWcOTjvxJw0iMJkvxEWCHXSfL8RAVy7V+Gjx3qPXdaxBiQXn2FLyo
+ RXwkgCQRHc6nzQAf/sF1hzTjRuunzUaNKWEnA=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=jFn/Y+47v0jJKJg7Gq5/S7izU51skALRwBbX7+OVooU=;
- b=XoTPq7lF2gfSrQvw5g+3PXD6SJtld63oGOR7hV8uaET2e6CEpJtwxxtlmgYHDYMU0t
- lA7fNE59fWfADEacQapocOIlXcIRBU+Ox3kI3iPiSjiagKZupmkOi9fFI59SfldkxJn3
- FpZdU9SXM2g9qVQGAJMRLDz5cZb26uh5r53fb5/dsmUhSlPVAh3jKnIJciEKoKWPMqJ+
- OvdTXJR0Vn4LGL8+nnVpZ89RvqH51DbyCFwnJhZKAILmCqd8/FjO1kkmWVZlzaX0/+i1
- LpC2HFMGWhHEkEUZrGhaVUsZbODsshpomRFiiOEVFPl9s80Z7JNQX+f0Dk391cObEIuE
- OMcQ==
-X-Gm-Message-State: AJcUukeQormR/XWsrof05mw80Revsn4OI4RhLT8iaJDzLjNJTDuEMx8h
- JgH73KupA6ktrRsbaNGlZp+BGZ/DzZalyw==
-X-Google-Smtp-Source: ALg8bN7UpVUmZ86x59OYTnXJge+QCWVOcG29mLAsfK1OlBumWVPGQ1GsEq+tw+jbH6aoQmUMia9Z7A==
-X-Received: by 2002:a63:e950:: with SMTP id q16mr343555pgj.138.1546925184407; 
- Mon, 07 Jan 2019 21:26:24 -0800 (PST)
+ bh=l4oaJitf9e3QzSlIMVK6poPt7p39OdyXKFn0n02R9W8=;
+ b=Ofo8i5iSWyxAhV1se1nqiL369Gs+115qzcn8jvyH7bJu60jhhQB271q0Rbz+T+i3HC
+ q0ehRokM4CRIEHkDX4oePgqu/LhZidTrxSHAkqdGGwtYPNZk1IbElm1JsaHa2SGk/46Z
+ K2cSubBrA5JtwkQtcn6mEmibYtamy96k00Kw6wIpyqtmkHPmOAk5SYx6eXWqf/SgjHoU
+ 8x4gPlzoeR/vHkyp/99/f9isGsNKznBSnUOy6n3B0Ut2Tl8WN1Fw0kbk6NwUghDzMNpo
+ +Z7LIx2UwMeAgUF1jeP7ZBVMEQNN0zAwIwPEHf8K2jAOvPRw6hSu4G2W3tJ/7ettHLMT
+ 3Yrg==
+X-Gm-Message-State: AJcUukfH9bvtpe2osLMS5ahxHqwld0I6UAenrvCc8JlzLZEXZlOJmAFH
+ 7pnhyusR4CgsC7Zgt4hM5/6Oug==
+X-Google-Smtp-Source: ALg8bN4/TaN9eyy1YA7qjhW6lZSLuKzVCQCk6AWN58tavy0p8vM91Ppkr6ftg4ccEe4M0HRzEb8Khw==
+X-Received: by 2002:a62:15d5:: with SMTP id 204mr378701pfv.103.1546925196799; 
+ Mon, 07 Jan 2019 21:26:36 -0800 (PST)
 Received: from pihsun-z840.tpe.corp.google.com
  ([2401:fa00:1:10:7889:7a43:f899:134c])
- by smtp.googlemail.com with ESMTPSA id 64sm88106874pff.101.2019.01.07.21.26.22
+ by smtp.googlemail.com with ESMTPSA id 64sm88106874pff.101.2019.01.07.21.26.34
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 07 Jan 2019 21:26:23 -0800 (PST)
+ Mon, 07 Jan 2019 21:26:36 -0800 (PST)
 From: Pi-Hsun Shih <pihsun@chromium.org>
 To: 
-Subject: [RFC v2 2/6] remoteproc/mediatek: add SCP support for mt8183
-Date: Tue,  8 Jan 2019 13:26:02 +0800
-Message-Id: <20190108052606.59426-3-pihsun@chromium.org>
+Subject: [RFC v2 4/6] rpmsg: add rpmsg support for mt8183 SCP.
+Date: Tue,  8 Jan 2019 13:26:04 +0800
+Message-Id: <20190108052606.59426-5-pihsun@chromium.org>
 X-Mailer: git-send-email 2.20.1.97.g81188d93c3-goog
 In-Reply-To: <20190108052606.59426-1-pihsun@chromium.org>
 References: <20190108052606.59426-1-pihsun@chromium.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190107_212626_225035_C80C1A77 
-X-CRM114-Status: GOOD (  23.53  )
+X-CRM114-CacheID: sfid-20190107_212638_642570_99E2237B 
+X-CRM114-Status: GOOD (  32.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,777 +107,603 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Erin Lo <erin.lo@mediatek.com>
+Add a simple rpmsg support for mt8183 SCP, that use IPI / IPC directly.
+Lots of TODO, and I'm not sure on all file / type / variable namings.
 
-Provide a basic driver to control Cortex M4 co-processor
-
-Signed-off-by: Erin Lo <erin.lo@mediatek.com>
-Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
+Signed-off-by: Pi-Hsun Shih <pihsun@chromium.org>
 ---
 Changes from v1:
- - Extract functions and rename variables in mtk_scp.c.
+ - Do cleanup properly in mtk_rpmsg.c, which also removes the problem of
+   short-lived work items.
+ - Fix several issues checkpatch found.
 ---
- drivers/remoteproc/Kconfig            |   9 +
- drivers/remoteproc/Makefile           |   1 +
- drivers/remoteproc/mtk_scp.c          | 587 ++++++++++++++++++++++++++
- include/linux/platform_data/mtk_scp.h | 122 ++++++
- 4 files changed, 719 insertions(+)
- create mode 100644 drivers/remoteproc/mtk_scp.c
- create mode 100644 include/linux/platform_data/mtk_scp.h
+ drivers/remoteproc/mtk_common.h       |   3 +
+ drivers/remoteproc/mtk_scp.c          |  29 +-
+ drivers/remoteproc/mtk_scp_ipi.c      |   2 +-
+ drivers/rpmsg/Kconfig                 |   5 +
+ drivers/rpmsg/Makefile                |   1 +
+ drivers/rpmsg/mtk_rpmsg.c             | 382 ++++++++++++++++++++++++++
+ include/linux/platform_data/mtk_scp.h |  12 +-
+ include/linux/rpmsg/mtk_rpmsg.h       |  35 +++
+ 8 files changed, 464 insertions(+), 5 deletions(-)
+ create mode 100644 drivers/rpmsg/mtk_rpmsg.c
+ create mode 100644 include/linux/rpmsg/mtk_rpmsg.h
 
-diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
-index f0abd260804473..ee0bda23768938 100644
---- a/drivers/remoteproc/Kconfig
-+++ b/drivers/remoteproc/Kconfig
-@@ -22,6 +22,15 @@ config IMX_REMOTEPROC
- 
- 	  It's safe to say N here.
- 
-+config MTK_SCP
-+        tristate "Mediatek SCP support"
-+        depends on ARCH_MEDIATEK
-+        help
-+          Say y here to support Mediatek's SCP (Cortex M4
-+          on MT8183) via the remote processor framework.
+diff --git a/drivers/remoteproc/mtk_common.h b/drivers/remoteproc/mtk_common.h
+index e97287a4eb25cc..3e9688082edbdc 100644
+--- a/drivers/remoteproc/mtk_common.h
++++ b/drivers/remoteproc/mtk_common.h
+@@ -54,6 +54,9 @@ struct mtk_scp {
+ 	void __iomem *cpu_addr;
+ 	phys_addr_t phys_addr;
+ 	size_t dram_size;
 +
-+          It's safe to say N here.
-+
- config OMAP_REMOTEPROC
- 	tristate "OMAP remoteproc support"
- 	depends on ARCH_OMAP4 || SOC_OMAP5
-diff --git a/drivers/remoteproc/Makefile b/drivers/remoteproc/Makefile
-index ce5d061e92be52..98e3498dbbe0e2 100644
---- a/drivers/remoteproc/Makefile
-+++ b/drivers/remoteproc/Makefile
-@@ -10,6 +10,7 @@ remoteproc-y				+= remoteproc_sysfs.o
- remoteproc-y				+= remoteproc_virtio.o
- remoteproc-y				+= remoteproc_elf_loader.o
- obj-$(CONFIG_IMX_REMOTEPROC)		+= imx_rproc.o
-+obj-$(CONFIG_MTK_SCP)			+= mtk_scp.o
- obj-$(CONFIG_OMAP_REMOTEPROC)		+= omap_remoteproc.o
- obj-$(CONFIG_WKUP_M3_RPROC)		+= wkup_m3_rproc.o
- obj-$(CONFIG_DA8XX_REMOTEPROC)		+= da8xx_remoteproc.o
++	struct platform_device *pdev;
++	struct rproc_subdev *rpmsg_subdev;
+ };
+ 
+ /**
 diff --git a/drivers/remoteproc/mtk_scp.c b/drivers/remoteproc/mtk_scp.c
-new file mode 100644
-index 00000000000000..6e2e17a227d018
---- /dev/null
+index 3e84c696523436..7f4d9261504c30 100644
+--- a/drivers/remoteproc/mtk_scp.c
 +++ b/drivers/remoteproc/mtk_scp.c
-@@ -0,0 +1,587 @@
+@@ -12,6 +12,7 @@
+ #include <linux/platform_data/mtk_scp.h>
+ #include <linux/platform_device.h>
+ #include <linux/remoteproc.h>
++#include <linux/rpmsg/mtk_rpmsg.h>
+ 
+ #include "mtk_common.h"
+ #include "remoteproc_internal.h"
+@@ -296,6 +297,23 @@ static int scp_map_memory_region(struct mtk_scp *scp)
+ 	return 0;
+ }
+ 
++static void scp_add_rpmsg_subdev(struct mtk_scp *scp)
++{
++	scp->rpmsg_subdev =
++		mtk_rpmsg_create_rproc_subdev(scp->pdev, scp->rproc);
++	if (scp->rpmsg_subdev)
++		rproc_add_subdev(scp->rproc, scp->rpmsg_subdev);
++}
++
++static void scp_remove_rpmsg_subdev(struct mtk_scp *scp)
++{
++	if (scp->rpmsg_subdev) {
++		rproc_remove_subdev(scp->rproc, scp->rpmsg_subdev);
++		mtk_rpmsg_destroy_rproc_subdev(scp->rpmsg_subdev);
++		scp->rpmsg_subdev = NULL;
++	}
++}
++
+ static int mtk_scp_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -319,6 +337,7 @@ static int mtk_scp_probe(struct platform_device *pdev)
+ 	scp = (struct mtk_scp *)rproc->priv;
+ 	scp->rproc = rproc;
+ 	scp->dev = dev;
++	scp->pdev = pdev;
+ 	platform_set_drvdata(pdev, scp);
+ 
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "sram");
+@@ -390,13 +409,16 @@ static int mtk_scp_probe(struct platform_device *pdev)
+ 	init_waitqueue_head(&scp->run.wq);
+ 	init_waitqueue_head(&scp->ack_wq);
+ 
++	scp_add_rpmsg_subdev(scp);
++
+ 	ret = rproc_add(rproc);
+ 	if (ret)
+-		goto destroy_mutex;
++		goto remove_subdev;
+ 
+-	return ret;
++	return 0;
+ 
+-destroy_mutex:
++remove_subdev:
++	scp_remove_rpmsg_subdev(scp);
+ 	mutex_destroy(&scp->scp_mutex);
+ free_rproc:
+ 	rproc_free(rproc);
+@@ -408,6 +430,7 @@ static int mtk_scp_remove(struct platform_device *pdev)
+ {
+ 	struct mtk_scp *scp = platform_get_drvdata(pdev);
+ 
++	scp_remove_rpmsg_subdev(scp);
+ 	rproc_del(scp->rproc);
+ 	rproc_free(scp->rproc);
+ 
+diff --git a/drivers/remoteproc/mtk_scp_ipi.c b/drivers/remoteproc/mtk_scp_ipi.c
+index 3aa18a387056d3..e51d0b970e500f 100644
+--- a/drivers/remoteproc/mtk_scp_ipi.c
++++ b/drivers/remoteproc/mtk_scp_ipi.c
+@@ -49,7 +49,7 @@ int scp_ipi_send(struct platform_device *pdev,
+ 	unsigned long timeout;
+ 	int ret;
+ 
+-	if (WARN(id <= SCP_IPI_INIT || id >= SCP_IPI_MAX ||
++	if (WARN(id <= SCP_IPI_NS_SERVICE || id >= SCP_IPI_MAX ||
+ 	    len > sizeof(send_obj->share_buf) || !buf,
+ 	    "failed to send ipi message\n"))
+ 		return -EINVAL;
+diff --git a/drivers/rpmsg/Kconfig b/drivers/rpmsg/Kconfig
+index d0322b41eca54c..b8364a397bb606 100644
+--- a/drivers/rpmsg/Kconfig
++++ b/drivers/rpmsg/Kconfig
+@@ -55,4 +55,9 @@ config RPMSG_VIRTIO
+ 	select RPMSG
+ 	select VIRTIO
+ 
++config RPMSG_MTK_SCP
++	tristate "MediaTek SCP"
++	depends on MTK_SCP
++	select RPMSG
++
+ endmenu
+diff --git a/drivers/rpmsg/Makefile b/drivers/rpmsg/Makefile
+index 9aa859502d2752..a0c1dcefa36ee4 100644
+--- a/drivers/rpmsg/Makefile
++++ b/drivers/rpmsg/Makefile
+@@ -6,3 +6,4 @@ obj-$(CONFIG_RPMSG_QCOM_GLINK_NATIVE) += qcom_glink_native.o
+ obj-$(CONFIG_RPMSG_QCOM_GLINK_SMEM) += qcom_glink_smem.o
+ obj-$(CONFIG_RPMSG_QCOM_SMD)	+= qcom_smd.o
+ obj-$(CONFIG_RPMSG_VIRTIO)	+= virtio_rpmsg_bus.o
++obj-$(CONFIG_RPMSG_MTK_SCP)	+= mtk_rpmsg.o
+diff --git a/drivers/rpmsg/mtk_rpmsg.c b/drivers/rpmsg/mtk_rpmsg.c
+new file mode 100644
+index 00000000000000..d7330f5626d8b5
+--- /dev/null
++++ b/drivers/rpmsg/mtk_rpmsg.c
+@@ -0,0 +1,382 @@
 +// SPDX-License-Identifier: GPL-2.0
 +//
-+// Copyright (c) 2018 MediaTek Inc.
++// Copyright 2018 Google LLC.
 +
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/interrupt.h>
 +#include <linux/kernel.h>
 +#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/of_platform.h>
++#include <linux/of.h>
 +#include <linux/platform_data/mtk_scp.h>
 +#include <linux/platform_device.h>
 +#include <linux/remoteproc.h>
++#include <linux/rpmsg/mtk_rpmsg.h>
++#include <linux/workqueue.h>
 +
-+#include "remoteproc_internal.h"
++#include "rpmsg_internal.h"
 +
-+#define MT8183_SW_RSTN			0x0
-+#define MT8183_SW_RSTN_BIT		BIT(0)
-+#define MT8183_SCP_TO_HOST		0x1C
-+#define MT8183_SCP_IPC_INT_BIT		BIT(0)
-+#define MT8183_SCP_WDT_INT_BIT		BIT(8)
-+#define MT8183_HOST_TO_SCP		0x28
-+#define MT8183_HOST_IPC_INT_BIT		BIT(0)
-+#define MT8183_SCP_SRAM_PDN		0x402C
++/*
++ * TODO: This is built on top of scp_ipi_register / scp_ipi_send in mtk_scp.h.
++ * It's probably better to move the implementation of register / send to here
++ * instead of in remoteproc/mtk_scp_ipi.c
++ */
++/*
++ * TODO: Do we need some sort of vring for performance? We may be able to get
++ * rid of this file if so, but that would require SCP firmware support too.
++ */
 +
-+#define SCP_FW_VER_LEN		32
-+
-+#define MAX_CODE_SIZE 0x500000
-+
-+struct scp_run {
-+	u32 signaled;
-+	s8 fw_ver[SCP_FW_VER_LEN];
-+	u32 dec_capability;
-+	u32 enc_capability;
-+	wait_queue_head_t wq;
++struct mtk_rpmsg_device {
++	struct rpmsg_device rpdev;
++	struct platform_device *scp_pdev;
 +};
 +
-+struct scp_ipi_desc {
-+	scp_ipi_handler_t handler;
-+	const char *name;
-+	void *priv;
++struct mtk_rpmsg_endpoint {
++	struct rpmsg_endpoint ept;
++	struct platform_device *scp_pdev;
 +};
 +
-+struct mtk_scp {
-+	struct device *dev;
-+	struct rproc *rproc;
-+	struct clk *clk;
-+	void __iomem *reg_base;
-+	void __iomem *sram_base;
-+	size_t sram_size;
++/* TODO: Naming is hard... */
++struct mtk_rpmsg_rproc_subdev {
++	struct rproc *scp_rproc;
++	struct platform_device *scp_pdev;
++	struct rpmsg_endpoint *ns_ept;
++	struct rproc_subdev subdev;
 +
-+	struct share_obj *recv_buf;
-+	struct share_obj *send_buf;
-+	struct scp_run run;
-+	struct mutex scp_mutex; /* for protecting mtk_scp data structure */
-+	struct scp_ipi_desc ipi_desc[SCP_IPI_MAX];
-+	bool ipi_id_ack[SCP_IPI_MAX];
-+	wait_queue_head_t ack_wq;
++	struct work_struct register_work;
++	struct list_head rpmsg_channel_info_list;
++};
 +
-+	void __iomem *cpu_addr;
-+	phys_addr_t phys_addr;
-+	size_t dram_size;
++#define to_mtk_subdev(d) container_of(d, struct mtk_rpmsg_rproc_subdev, subdev)
++
++struct mtk_rpmsg_channel_info {
++	struct rpmsg_channel_info info;
++	bool registered;
++	struct list_head list;
 +};
 +
 +/**
-+ * struct share_obj - SRAM buffer shared with
-+ *		      AP and SCP
++ * TODO: This is copied from virtio_rpmsg_bus.
++ * struct rpmsg_ns_msg - dynamic name service announcement message
++ * @name: name of remote service that is published
++ * @addr: address of remote service that is published
 + *
-+ * @id:		IPI id
-+ * @len:	share buffer length
-+ * @share_buf:	share buffer data
++ * This message is sent across to publish a new service, or announce
++ * about its removal. When we receive these messages, an appropriate
++ * rpmsg channel (i.e device) is created/destroyed. In turn, the ->probe()
++ * or ->remove() handler of the appropriate rpmsg driver will be invoked
++ * (if/as-soon-as one is registered).
 + */
-+struct share_obj {
-+	s32 id;
-+	u32 len;
-+	u8 share_buf[288];
-+};
++struct rpmsg_ns_msg {
++	char name[RPMSG_NAME_SIZE];
++	u32 addr;
++} __packed;
 +
-+int scp_ipi_register(struct platform_device *pdev,
-+		     enum scp_ipi_id id,
-+		     scp_ipi_handler_t handler,
-+		     const char *name,
-+		     void *priv)
++#define to_scp_device(r)	container_of(r, struct mtk_rpmsg_device, rpdev)
++#define to_scp_endpoint(r)	container_of(r, struct mtk_rpmsg_endpoint, ept)
++
++static const struct rpmsg_endpoint_ops mtk_rpmsg_endpoint_ops;
++
++static void __ept_release(struct kref *kref)
 +{
-+	struct mtk_scp *scp = platform_get_drvdata(pdev);
-+	struct scp_ipi_desc *ipi_desc;
-+
-+	if (!scp) {
-+		dev_err(&pdev->dev, "scp device is not ready\n");
-+		return -EPROBE_DEFER;
-+	}
-+
-+	if (WARN(id < 0 ||  id >= SCP_IPI_MAX || handler == NULL,
-+	    "register scp ipi id %d with invalid arguments\n", id))
-+		return -EINVAL;
-+
-+	ipi_desc = scp->ipi_desc;
-+	ipi_desc[id].name = name;
-+	ipi_desc[id].handler = handler;
-+	ipi_desc[id].priv = priv;
-+
-+	return 0;
++	struct rpmsg_endpoint *ept = container_of(kref, struct rpmsg_endpoint,
++						  refcount);
++	kfree(to_scp_endpoint(ept));
 +}
-+EXPORT_SYMBOL_GPL(scp_ipi_register);
 +
-+int scp_ipi_send(struct platform_device *pdev,
-+		 enum scp_ipi_id id,
-+		 void *buf,
-+		 unsigned int len,
-+		 unsigned int wait)
++static void mtk_rpmsg_ipi_handler(void *data, unsigned int len, void *priv)
 +{
-+	struct mtk_scp *scp = platform_get_drvdata(pdev);
-+	struct share_obj *send_obj = scp->send_buf;
-+	unsigned long timeout;
++	struct mtk_rpmsg_endpoint *mept = priv;
++	struct rpmsg_endpoint *ept = &mept->ept;
++
++	/* TODO: What if the cb() returns error? */
++	(*ept->cb)(ept->rpdev, data, len, ept->priv, ept->addr);
++}
++
++static struct rpmsg_endpoint *
++__rpmsg_create_ept(struct platform_device *scp_pdev, struct rpmsg_device *rpdev,
++		   rpmsg_rx_cb_t cb, void *priv,
++		   u32 id, const char *name)
++{
++	struct mtk_rpmsg_endpoint *mept;
++	struct rpmsg_endpoint *ept;
++
 +	int ret;
 +
-+	if (WARN(id <= SCP_IPI_INIT || id >= SCP_IPI_MAX ||
-+	    len > sizeof(send_obj->share_buf) || !buf,
-+	    "failed to send ipi message\n"))
-+		return -EINVAL;
++	mept = kzalloc(sizeof(*mept), GFP_KERNEL);
++	if (!mept)
++		return NULL;
++	mept->scp_pdev = scp_pdev;
 +
-+	ret = clk_prepare_enable(scp->clk);
++	ept = &mept->ept;
++	kref_init(&ept->refcount);
++
++	ept->rpdev = rpdev;
++	ept->cb = cb;
++	ept->priv = priv;
++	ept->ops = &mtk_rpmsg_endpoint_ops;
++	ept->addr = id;
++
++	ret = scp_ipi_register(scp_pdev, id, mtk_rpmsg_ipi_handler, name, mept);
 +	if (ret) {
-+		dev_err(scp->dev, "failed to enable clock\n");
-+		return ret;
-+	}
-+
-+	mutex_lock(&scp->scp_mutex);
-+
-+	 /* Wait until SCP receives the last command */
-+	timeout = jiffies + msecs_to_jiffies(2000);
-+	do {
-+		if (time_after(jiffies, timeout)) {
-+			dev_err(scp->dev, "scp_ipi_send: IPI timeout!\n");
-+			ret = -EIO;
-+			mutex_unlock(&scp->scp_mutex);
-+			goto clock_disable;
-+		}
-+	} while (readl(scp->reg_base + MT8183_HOST_TO_SCP));
-+
-+	memcpy(send_obj->share_buf, buf, len);
-+	send_obj->len = len;
-+	send_obj->id = id;
-+
-+	scp->ipi_id_ack[id] = false;
-+	/* send the command to SCP */
-+	writel(MT8183_HOST_IPC_INT_BIT, scp->reg_base + MT8183_HOST_TO_SCP);
-+
-+	mutex_unlock(&scp->scp_mutex);
-+
-+	if (wait) {
-+		/* wait for SCP's ACK */
-+		timeout = msecs_to_jiffies(wait);
-+		ret = wait_event_timeout(scp->ack_wq,
-+					 scp->ipi_id_ack[id],
-+					 timeout);
-+		scp->ipi_id_ack[id] = false;
-+		if (WARN(!ret,
-+			 "scp ipi %d ack time out !", id))
-+			ret = -EIO;
-+		else
-+			ret = 0;
-+	}
-+
-+clock_disable:
-+	clk_disable_unprepare(scp->clk);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(scp_ipi_send);
-+
-+struct platform_device *scp_get_plat_device(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct device_node *scp_node;
-+	struct platform_device *scp_pdev;
-+
-+	scp_node = of_parse_phandle(dev->of_node, "mediatek,scp", 0);
-+	if (!scp_node) {
-+		dev_err(dev, "can't get scp node\n");
++		dev_err(&scp_pdev->dev, "ipi register failed, id = %d", id);
++		kref_put(&ept->refcount, __ept_release);
 +		return NULL;
 +	}
 +
-+	scp_pdev = of_find_device_by_node(scp_node);
-+	if (WARN_ON(!scp_pdev)) {
-+		dev_err(dev, "scp pdev failed\n");
-+		of_node_put(scp_node);
-+		return NULL;
-+	}
-+
-+	return scp_pdev;
++	return ept;
 +}
-+EXPORT_SYMBOL_GPL(scp_get_plat_device);
 +
-+static void scp_wdt_handler(struct mtk_scp *scp)
++static struct rpmsg_endpoint *
++mtk_rpmsg_create_ept(struct rpmsg_device *rpdev, rpmsg_rx_cb_t cb, void *priv,
++		     struct rpmsg_channel_info chinfo)
 +{
-+	rproc_report_crash(scp->rproc, RPROC_WATCHDOG);
++	struct platform_device *scp_pdev = to_scp_device(rpdev)->scp_pdev;
++	/* TODO: Is using src as IPI id "correct"? */
++	return __rpmsg_create_ept(scp_pdev, rpdev, cb, priv, chinfo.src,
++				  chinfo.name);
 +}
 +
-+static void scp_init_ipi_handler(void *data, unsigned int len, void *priv)
-+{
-+	struct mtk_scp *scp = (struct mtk_scp *)priv;
-+	struct scp_run *run = (struct scp_run *)data;
-+
-+	scp->run.signaled = run->signaled;
-+	strncpy(scp->run.fw_ver, run->fw_ver, SCP_FW_VER_LEN);
-+	scp->run.dec_capability = run->dec_capability;
-+	scp->run.enc_capability = run->enc_capability;
-+	wake_up_interruptible(&scp->run.wq);
-+}
-+
-+static void scp_ipi_handler(struct mtk_scp *scp)
-+{
-+	struct share_obj *rcv_obj = scp->recv_buf;
-+	struct scp_ipi_desc *ipi_desc = scp->ipi_desc;
-+	u8 tmp_data[288];
-+
-+	if (rcv_obj->id < SCP_IPI_MAX && ipi_desc[rcv_obj->id].handler) {
-+		memcpy_fromio(tmp_data, &rcv_obj->share_buf, rcv_obj->len);
-+		ipi_desc[rcv_obj->id].handler(&tmp_data[0],
-+					      rcv_obj->len,
-+					      ipi_desc[rcv_obj->id].priv);
-+		scp->ipi_id_ack[rcv_obj->id] = true;
-+		wake_up(&scp->ack_wq);
-+	} else {
-+		dev_err(scp->dev, "No such ipi id = %d\n", rcv_obj->id);
-+	}
-+}
-+
-+static int scp_ipi_init(struct mtk_scp *scp)
-+{
-+	size_t send_offset = 0x800 - sizeof(struct share_obj);
-+	size_t recv_offset = send_offset - sizeof(struct share_obj);
-+
-+	/* Disable SCP to host interrupt */
-+	writel(MT8183_SCP_IPC_INT_BIT, scp->reg_base + MT8183_SCP_TO_HOST);
-+
-+	/* shared buffer initialization */
-+	scp->recv_buf = (__force struct share_obj *)(scp->sram_base +
-+						recv_offset);
-+	scp->send_buf = (__force struct share_obj *)(scp->sram_base +
-+						send_offset);
-+	memset_io(scp->recv_buf, 0, sizeof(scp->recv_buf));
-+	memset_io(scp->send_buf, 0, sizeof(scp->send_buf));
-+
-+	return 0;
-+}
-+
-+static void mtk_scp_reset_assert(const struct mtk_scp *scp)
-+{
-+	u32 val;
-+
-+	val = readl(scp->reg_base + MT8183_SW_RSTN);
-+	val &= ~MT8183_SW_RSTN_BIT;
-+	writel(val, scp->reg_base + MT8183_SW_RSTN);
-+}
-+
-+static void mtk_scp_reset_deassert(const struct mtk_scp *scp)
-+{
-+	u32 val;
-+
-+	val = readl(scp->reg_base + MT8183_SW_RSTN);
-+	val |= MT8183_SW_RSTN_BIT;
-+	writel(val, scp->reg_base + MT8183_SW_RSTN);
-+}
-+
-+static irqreturn_t scp_irq_handler(int irq, void *priv)
-+{
-+	struct mtk_scp *scp = priv;
-+	u32 scp_to_host;
-+
-+	scp_to_host = readl(scp->reg_base + MT8183_SCP_TO_HOST);
-+	if (scp_to_host & MT8183_SCP_IPC_INT_BIT) {
-+		scp_ipi_handler(scp);
-+	} else {
-+		dev_err(scp->dev, "scp watchdog timeout! 0x%x", scp_to_host);
-+		scp_wdt_handler(scp);
-+	}
-+
-+	/* SCP won't send another interrupt until we set SCP_TO_HOST to 0. */
-+	writel(MT8183_SCP_IPC_INT_BIT | MT8183_SCP_WDT_INT_BIT,
-+	       scp->reg_base + MT8183_SCP_TO_HOST);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int mtk_scp_load(struct rproc *rproc, const struct firmware *fw)
-+{
-+	const struct mtk_scp *scp = rproc->priv;
-+	struct device *dev = scp->dev;
-+	int ret;
-+
-+	/* Hold SCP in reset while loading FW. */
-+	mtk_scp_reset_assert(scp);
-+
-+	ret = clk_prepare_enable(scp->clk);
-+	if (ret) {
-+		dev_err(dev, "failed to enable clocks\n");
-+		return ret;
-+	}
-+
-+	writel(0x0, scp->reg_base + MT8183_SCP_SRAM_PDN);
-+
-+	memcpy(scp->sram_base, fw->data, fw->size);
-+	return ret;
-+}
-+
-+static int mtk_scp_start(struct rproc *rproc)
-+{
-+	struct mtk_scp *scp = (struct mtk_scp *)rproc->priv;
-+	struct device *dev = scp->dev;
-+	struct scp_run *run;
-+	int ret;
-+
-+	ret = clk_prepare_enable(scp->clk);
-+	if (ret) {
-+		dev_err(dev, "failed to enable clocks\n");
-+		return ret;
-+	}
-+
-+	mtk_scp_reset_deassert(scp);
-+
-+	run = &scp->run;
-+
-+	ret = wait_event_interruptible_timeout(
-+					run->wq,
-+					run->signaled,
-+					msecs_to_jiffies(2000));
-+
-+	if (ret == 0) {
-+		dev_err(dev, "wait scp initialization timeout!\n");
-+		ret = -ETIME;
-+		goto stop;
-+	}
-+	if (ret == -ERESTARTSYS) {
-+		dev_err(dev, "wait scp interrupted by a signal!\n");
-+		goto stop;
-+	}
-+	dev_info(dev, "scp is ready. Fw version %s\n", run->fw_ver);
-+
-+	return 0;
-+
-+stop:
-+	mtk_scp_reset_assert(scp);
-+	clk_disable_unprepare(scp->clk);
-+	return ret;
-+}
-+
-+static void *mtk_scp_da_to_va(struct rproc *rproc, u64 da, int len)
-+{
-+	struct mtk_scp *scp = (struct mtk_scp *)rproc->priv;
-+	int offset;
-+
-+	if (da < scp->sram_size) {
-+		offset = da;
-+		if (offset >= 0 && ((offset + len) < scp->sram_size)) {
-+			return (__force void *)(scp->sram_base + offset);
-+		}
-+	} else if (da >= scp->sram_size && da < (scp->sram_size + MAX_CODE_SIZE)) {
-+		offset = da - scp->sram_size;
-+		if (offset >= 0 && (offset + len) < MAX_CODE_SIZE) {
-+			return scp->cpu_addr + offset;
-+		}
-+	} else {
-+		offset = da - scp->phys_addr;
-+		if (offset >= 0 && (offset + len) < (scp->dram_size - MAX_CODE_SIZE)) {
-+			return scp->cpu_addr + offset;
-+		}
-+	}
-+
-+	return NULL;
-+}
-+
-+static int mtk_scp_stop(struct rproc *rproc)
-+{
-+	struct mtk_scp *scp = (struct mtk_scp *)rproc->priv;
-+
-+	mtk_scp_reset_assert(scp);
-+	clk_disable_unprepare(scp->clk);
-+
-+	return 0;
-+}
-+
-+static const struct rproc_ops mtk_scp_ops = {
-+	.start		= mtk_scp_start,
-+	.stop		= mtk_scp_stop,
-+	.load		= mtk_scp_load,
-+	.da_to_va	= mtk_scp_da_to_va,
++static const struct rpmsg_device_ops mtk_rpmsg_device_ops = {
++	.create_ept = mtk_rpmsg_create_ept,
 +};
 +
-+unsigned int scp_get_vdec_hw_capa(struct platform_device *pdev)
++static void mtk_rpmsg_destroy_ept(struct rpmsg_endpoint *ept)
 +{
-+	struct mtk_scp *scp = platform_get_drvdata(pdev);
-+
-+	return scp->run.dec_capability;
++	kref_put(&ept->refcount, __ept_release);
 +}
-+EXPORT_SYMBOL_GPL(scp_get_vdec_hw_capa);
 +
-+unsigned int scp_get_venc_hw_capa(struct platform_device *pdev)
++static int __mtk_rpmsg_send(struct mtk_rpmsg_endpoint *mept, void *data,
++			    int len, bool wait)
 +{
-+	struct mtk_scp *scp = platform_get_drvdata(pdev);
-+
-+	return scp->run.enc_capability;
++	/*
++	 * TODO: The "wait" is not same as what scp_ipi_send's "wait" means, so
++	 * this is not correct.
++	 * (first wait for there's space of tx buffer, second wait for the ack
++	 * from scp.)
++	 */
++	return scp_ipi_send(mept->scp_pdev, mept->ept.addr, data, len,
++			    wait ? 200 : 0);
 +}
-+EXPORT_SYMBOL_GPL(scp_get_venc_hw_capa);
 +
-+void *scp_mapping_dm_addr(struct platform_device *pdev, u32 mem_addr)
++static int mtk_rpmsg_send(struct rpmsg_endpoint *ept, void *data, int len)
 +{
-+	struct mtk_scp *scp = platform_get_drvdata(pdev);
-+	void *ptr = NULL;
++	struct mtk_rpmsg_endpoint *mept = to_scp_endpoint(ept);
 +
-+	ptr = mtk_scp_da_to_va(scp->rproc, mem_addr, 0);
-+
-+	if (ptr)
-+		return ptr;
-+	else
-+		return ERR_PTR(-EINVAL);
++	return __mtk_rpmsg_send(mept, data, len, true);
 +}
-+EXPORT_SYMBOL_GPL(scp_mapping_dm_addr);
 +
-+static int scp_map_memory_region(struct mtk_scp *scp)
++static int mtk_rpmsg_trysend(struct rpmsg_endpoint *ept, void *data, int len)
 +{
-+	struct device_node *node;
-+	struct resource r;
++	struct mtk_rpmsg_endpoint *mept = to_scp_endpoint(ept);
++
++	return __mtk_rpmsg_send(mept, data, len, false);
++}
++
++static const struct rpmsg_endpoint_ops mtk_rpmsg_endpoint_ops = {
++	.destroy_ept = mtk_rpmsg_destroy_ept,
++	.send = mtk_rpmsg_send,
++	.trysend = mtk_rpmsg_trysend,
++};
++
++static void mtk_rpmsg_release_device(struct device *dev)
++{
++	struct rpmsg_device *rpdev = to_rpmsg_device(dev);
++	struct mtk_rpmsg_device *mdev = to_scp_device(rpdev);
++
++	kfree(mdev);
++}
++
++static int mtk_rpmsg_register_device(struct platform_device *scp_pdev,
++				     struct rpmsg_channel_info *info)
++{
++	struct rpmsg_device *rpdev;
++	struct mtk_rpmsg_device *mdev;
 +	int ret;
 +
-+	node = of_parse_phandle(scp->dev->of_node, "memory-region", 0);
-+	if (!node) {
-+		dev_err(scp->dev, "no memory-region specified\n");
-+		return -EINVAL;
-+	}
++	mdev = kzalloc(sizeof(*mdev), GFP_KERNEL);
++	if (!mdev)
++		return -ENOMEM;
 +
-+	ret = of_address_to_resource(node, 0, &r);
++	mdev->scp_pdev = scp_pdev;
++
++	rpdev = &mdev->rpdev;
++	rpdev->ops = &mtk_rpmsg_device_ops;
++	rpdev->src = info->src;
++	rpdev->dst = info->dst;
++	strncpy(rpdev->id.name, info->name, RPMSG_NAME_SIZE);
++
++	rpdev->dev.parent = &scp_pdev->dev;
++	rpdev->dev.release = mtk_rpmsg_release_device;
++
++	ret = rpmsg_register_device(rpdev);
 +	if (ret)
 +		return ret;
 +
-+	scp->phys_addr = r.start;
-+	scp->dram_size = resource_size(&r);
-+	scp->cpu_addr = devm_ioremap_wc(scp->dev, scp->phys_addr, scp->dram_size);
++	return 0;
++}
 +
-+	if (!scp->cpu_addr) {
-+		dev_err(scp->dev, "unable to map memory region: %pa+%zx\n",
-+			&r.start, scp->dram_size);
-+		return -EBUSY;
++static void mtk_register_device_work_function(struct work_struct *register_work)
++{
++	struct mtk_rpmsg_rproc_subdev *mtk_subdev = container_of(
++		register_work, struct mtk_rpmsg_rproc_subdev, register_work);
++	struct platform_device *scp_pdev = mtk_subdev->scp_pdev;
++
++	int ret;
++
++	struct mtk_rpmsg_channel_info *info;
++
++	/* TODO: lock the list */
++	list_for_each_entry(info, &mtk_subdev->rpmsg_channel_info_list, list) {
++		if (info->registered)
++			continue;
++
++		ret = mtk_rpmsg_register_device(scp_pdev, &info->info);
++		if (ret) {
++			dev_err(&scp_pdev->dev, "Can't create rpmsg_device\n");
++			continue;
++		}
++
++		info->registered = true;
++	}
++}
++
++static int mtk_rpmsg_create_device(struct mtk_rpmsg_rproc_subdev *mtk_subdev,
++				   char *name, u32 addr)
++{
++	struct mtk_rpmsg_channel_info *info;
++
++	/* This is called in interrupt context from name service callback. */
++	info = kzalloc(sizeof(*info), GFP_ATOMIC);
++	if (!info)
++		return -ENOMEM;
++
++	strncpy(info->info.name, name, RPMSG_NAME_SIZE);
++	info->info.src = addr;
++	info->info.dst = RPMSG_ADDR_ANY;
++	/* TODO: lock the list. */
++	list_add(&info->list, &mtk_subdev->rpmsg_channel_info_list);
++
++	schedule_work(&mtk_subdev->register_work);
++	return 0;
++}
++
++static int mtk_rpmsg_ns_cb(struct rpmsg_device *rpdev, void *data, int len,
++			   void *priv, u32 src)
++{
++	struct rpmsg_ns_msg *msg = data;
++	struct mtk_rpmsg_rproc_subdev *mtk_subdev = priv;
++	struct device *dev = &mtk_subdev->scp_pdev->dev;
++
++	int ret;
++
++	if (len != sizeof(*msg)) {
++		dev_err(dev, "malformed ns msg (%d)\n", len);
++		return -EINVAL;
++	}
++
++	/*
++	 * the name service ept does _not_ belong to a real rpmsg channel,
++	 * and is handled by the rpmsg bus itself.
++	 * for sanity reasons, make sure a valid rpdev has _not_ sneaked
++	 * in somehow.
++	 */
++	if (rpdev) {
++		dev_err(dev, "anomaly: ns ept has an rpdev handle\n");
++		return -EINVAL;
++	}
++
++	/* don't trust the remote processor for null terminating the name */
++	msg->name[RPMSG_NAME_SIZE - 1] = '\0';
++
++	dev_info(dev, "creating channel %s addr 0x%x\n", msg->name, msg->addr);
++
++	ret = mtk_rpmsg_create_device(mtk_subdev, msg->name, msg->addr);
++	if (ret) {
++		dev_err(dev, "create rpmsg device failed\n");
++		return ret;
 +	}
 +
 +	return 0;
 +}
 +
-+static int mtk_scp_probe(struct platform_device *pdev)
++int mtk_rpmsg_prepare(struct rproc_subdev *subdev)
 +{
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	struct mtk_scp *scp;
-+	struct rproc *rproc;
-+	struct resource *res;
-+	char *fw_name = "scp.img";
-+	int ret;
++	struct mtk_rpmsg_rproc_subdev *mtk_subdev;
++	struct platform_device *scp_pdev;
 +
-+	rproc = rproc_alloc(dev,
-+			    np->name,
-+			    &mtk_scp_ops,
-+			    fw_name,
-+			    sizeof(*scp));
-+	if (!rproc) {
-+		dev_err(dev, "unable to allocate remoteproc\n");
++	mtk_subdev = to_mtk_subdev(subdev);
++	scp_pdev = mtk_subdev->scp_pdev;
++
++	/* a dedicated endpoint handles the name service msgs */
++	mtk_subdev->ns_ept =
++		__rpmsg_create_ept(scp_pdev, NULL, mtk_rpmsg_ns_cb, mtk_subdev,
++				   SCP_IPI_NS_SERVICE, "name-service");
++	if (!mtk_subdev->ns_ept) {
++		dev_err(&scp_pdev->dev,
++			"failed to create name service endpoint\n");
 +		return -ENOMEM;
 +	}
 +
-+	scp = (struct mtk_scp *)rproc->priv;
-+	scp->rproc = rproc;
-+	scp->dev = dev;
-+	platform_set_drvdata(pdev, scp);
-+
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "sram");
-+	scp->sram_base = devm_ioremap_resource(dev, res);
-+	scp->sram_size = resource_size(res);
-+	if (IS_ERR((__force void *)scp->sram_base)) {
-+		dev_err(dev, "Failed to parse and map sram memory\n");
-+		ret = PTR_ERR((__force void *)scp->sram_base);
-+		goto free_rproc;
-+	}
-+
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "cfg");
-+	scp->reg_base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR((__force void *)scp->reg_base)) {
-+		dev_err(dev, "Failed to parse and map cfg memory\n");
-+		ret = PTR_ERR((__force void *)scp->reg_base);
-+		goto free_rproc;
-+	}
-+
-+	ret = scp_map_memory_region(scp);
-+	if (ret)
-+		goto free_rproc;
-+
-+	scp->clk = devm_clk_get(dev, "main");
-+	if (IS_ERR(scp->clk)) {
-+		dev_err(dev, "Failed to get clock\n");
-+		ret = PTR_ERR(scp->clk);
-+		goto free_rproc;
-+	}
-+
-+	ret = clk_prepare_enable(scp->clk);
-+	if (ret) {
-+		dev_err(dev, "failed to enable clocks\n");
-+		goto free_rproc;
-+	}
-+
-+	ret = scp_ipi_init(scp);
-+	clk_disable_unprepare(scp->clk);
-+	if (ret) {
-+		dev_err(dev, "Failed to init ipi\n");
-+		goto free_rproc;
-+	}
-+
-+	/* register scp initialization IPI */
-+	ret = scp_ipi_register(pdev,
-+			       SCP_IPI_INIT,
-+			       scp_init_ipi_handler,
-+			       "scp_init",
-+			       scp);
-+	if (ret) {
-+		dev_err(dev, "Failed to register IPI_SCP_INIT\n");
-+		goto free_rproc;
-+	}
-+
-+	ret = devm_request_irq(dev,
-+			       platform_get_irq(pdev, 0),
-+			       scp_irq_handler,
-+			       0,
-+			       pdev->name,
-+			       scp);
-+
-+	if (ret) {
-+		dev_err(dev, "failed to request irq\n");
-+		goto free_rproc;
-+	}
-+
-+	mutex_init(&scp->scp_mutex);
-+
-+	init_waitqueue_head(&scp->run.wq);
-+	init_waitqueue_head(&scp->ack_wq);
-+
-+	ret = rproc_add(rproc);
-+	if (ret)
-+		goto destroy_mutex;
-+
-+	return ret;
-+
-+destroy_mutex:
-+	mutex_destroy(&scp->scp_mutex);
-+free_rproc:
-+	rproc_free(rproc);
-+
-+	return ret;
-+}
-+
-+static int mtk_scp_remove(struct platform_device *pdev)
-+{
-+	struct mtk_scp *scp = platform_get_drvdata(pdev);
-+
-+	rproc_del(scp->rproc);
-+	rproc_free(scp->rproc);
-+
 +	return 0;
 +}
 +
-+static const struct of_device_id mtk_scp_of_match[] = {
-+	{ .compatible = "mediatek,mt8183-scp"},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, mtk_scp_of_match);
++void mtk_rpmsg_unprepare(struct rproc_subdev *subdev)
++{
++	struct mtk_rpmsg_channel_info *info, *next;
++	struct device *dev;
++	struct mtk_rpmsg_rproc_subdev *mtk_subdev = to_mtk_subdev(subdev);
 +
-+static struct platform_driver mtk_scp_driver = {
-+	.probe = mtk_scp_probe,
-+	.remove = mtk_scp_remove,
-+	.driver = {
-+		.name = "mtk-scp",
-+		.of_match_table = of_match_ptr(mtk_scp_of_match),
-+	},
-+};
++	dev = &mtk_subdev->scp_pdev->dev;
 +
-+module_platform_driver(mtk_scp_driver);
++	/* TODO: cancel pending work, lock the list */
++	list_for_each_entry(info, &mtk_subdev->rpmsg_channel_info_list, list) {
++		if (!info->registered)
++			continue;
++		if (rpmsg_unregister_device(dev, &info->info)) {
++			dev_warn(
++				dev,
++				"rpmsg_unregister_device failed for %s.%d.%d\n",
++				info->info.name, info->info.src,
++				info->info.dst);
++		}
++	}
++
++	list_for_each_entry_safe(info, next,
++				 &mtk_subdev->rpmsg_channel_info_list, list) {
++		list_del(&info->list);
++		kfree(info);
++	}
++
++	kref_put(&mtk_subdev->ns_ept->refcount, __ept_release);
++}
++
++struct rproc_subdev *
++mtk_rpmsg_create_rproc_subdev(struct platform_device *scp_pdev,
++			      struct rproc *scp_rproc)
++{
++	struct mtk_rpmsg_rproc_subdev *mtk_subdev;
++
++	mtk_subdev = kzalloc(sizeof(*mtk_subdev), GFP_KERNEL);
++	if (!mtk_subdev)
++		return NULL;
++
++	mtk_subdev->scp_pdev = scp_pdev;
++	mtk_subdev->scp_rproc = scp_rproc;
++	mtk_subdev->subdev.prepare = mtk_rpmsg_prepare;
++	mtk_subdev->subdev.unprepare = mtk_rpmsg_unprepare;
++	INIT_LIST_HEAD(&mtk_subdev->rpmsg_channel_info_list);
++	INIT_WORK(&mtk_subdev->register_work,
++		  mtk_register_device_work_function);
++
++	return &mtk_subdev->subdev;
++}
++EXPORT_SYMBOL_GPL(mtk_rpmsg_create_rproc_subdev);
++
++void mtk_rpmsg_destroy_rproc_subdev(struct rproc_subdev *subdev)
++{
++	struct mtk_rpmsg_rproc_subdev *mtk_subdev = to_mtk_subdev(subdev);
++
++	kfree(mtk_subdev);
++}
++EXPORT_SYMBOL_GPL(mtk_rpmsg_destroy_rproc_subdev);
 +
 +MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("MediaTek scp control driver");
++MODULE_DESCRIPTION("MediaTek scp rpmsg driver");
 diff --git a/include/linux/platform_data/mtk_scp.h b/include/linux/platform_data/mtk_scp.h
-new file mode 100644
-index 00000000000000..23df7453eeacd0
---- /dev/null
+index 23df7453eeacd0..3694ba61863395 100644
+--- a/include/linux/platform_data/mtk_scp.h
 +++ b/include/linux/platform_data/mtk_scp.h
-@@ -0,0 +1,122 @@
+@@ -27,8 +27,18 @@ typedef void (*scp_ipi_handler_t) (void *data,
+ 
+ enum scp_ipi_id {
+ 	SCP_IPI_INIT = 0,
+-	SCP_IPI_CROS_HOST_CMD,
++	/*
++	 * TODO: Should this just be part of the response of IPI_SCP_INIT
++	 * instead? e.g. the initial IPI_SCP_INIT from SCP sends a list of
++	 * channels.
++	 */
++	SCP_IPI_NS_SERVICE,
+ 	SCP_IPI_MDP,
++	/*
++	 * TODO: Since we'll not be having all IPI numbers here after the name
++	 * service & rpmsg, this IPI_MAX need to be manually specified and sync
++	 * with the firmware.
++	 */
+ 	SCP_IPI_MAX,
+ };
+ 
+diff --git a/include/linux/rpmsg/mtk_rpmsg.h b/include/linux/rpmsg/mtk_rpmsg.h
+new file mode 100644
+index 00000000000000..8d21cd3d35b012
+--- /dev/null
++++ b/include/linux/rpmsg/mtk_rpmsg.h
+@@ -0,0 +1,35 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +/*
-+ * Copyright (c) 2018 MediaTek Inc.
++ * Copyright 2018 Google LLC.
 + */
 +
-+#ifndef _MTK_SCP_H
-+#define _MTK_SCP_H
++#ifndef __LINUX_RPMSG_MTK_RPMSG_H
++#define __LINUX_RPMSG_MTK_RPMSG_H
 +
-+#include <linux/platform_device.h>
++#include <linux/device.h>
++#include <linux/remoteproc.h>
 +
-+typedef void (*scp_ipi_handler_t) (void *data,
-+				   unsigned int len,
-+				   void *priv);
++#if IS_ENABLED(CONFIG_RPMSG_MTK_SCP)
 +
-+/**
-+ * enum ipi_id - the id of inter-processor interrupt
-+ *
-+ * @SCP_IPI_INIT:	 The interrupt from scp is to notfiy kernel
-+ *			 SCP initialization completed.
-+ *			 IPI_SCP_INIT is sent from SCP when firmware is
-+ *			 loaded. AP doesn't need to send IPI_SCP_INIT
-+ *			 command to SCP.
-+ *			 For other IPI below, AP should send the request
-+ *			 to SCP to trigger the interrupt.
-+ * @IPI_MAX:		 The maximum IPI number
-+ */
++struct rproc_subdev *
++mtk_rpmsg_create_rproc_subdev(struct platform_device *scp_pdev,
++			      struct rproc *scp_rproc);
 +
-+enum scp_ipi_id {
-+	SCP_IPI_INIT = 0,
-+	SCP_IPI_CROS_HOST_CMD,
-+	SCP_IPI_MDP,
-+	SCP_IPI_MAX,
-+};
++void mtk_rpmsg_destroy_rproc_subdev(struct rproc_subdev *subdev);
 +
-+/**
-+ * scp_ipi_register - register an ipi function
-+ *
-+ * @pdev:	SCP platform device
-+ * @id:		IPI ID
-+ * @handler:	IPI handler
-+ * @name:	IPI name
-+ * @priv:	private data for IPI handler
-+ *
-+ * Register an ipi function to receive ipi interrupt from SCP.
-+ *
-+ * Return: Return 0 if ipi registers successfully, otherwise it is failed.
-+ */
-+int scp_ipi_register(struct platform_device *pdev,
-+		     enum scp_ipi_id id,
-+		     scp_ipi_handler_t handler,
-+		     const char *name,
-+		     void *priv);
++#else
 +
-+/**
-+ * scp_ipi_send - send data from AP to scp.
-+ *
-+ * @pdev:	SCP platform device
-+ * @id:		IPI ID
-+ * @buf:	the data buffer
-+ * @len:	the data buffer length
-+ * @wait:	1: need ack
-+ *
-+ * This function is thread-safe. When this function returns,
-+ * SCP has received the data and starts the processing.
-+ * When the processing completes, IPI handler registered
-+ * by scp_ipi_register will be called in interrupt context.
-+ *
-+ * Return: Return 0 if sending data successfully, otherwise it is failed.
-+ **/
-+int scp_ipi_send(struct platform_device *pdev,
-+		 enum scp_ipi_id id,
-+		 void *buf,
-+		 unsigned int len,
-+		 unsigned int wait);
++static inline struct rproc_subdev *
++mtk_rpmsg_create_rproc_subdev(struct platform_device *scp_pdev,
++			      struct rproc *scp_rproc)
++{
++	return NULL;
++}
 +
-+/**
-+ * scp_get_plat_device - get SCP's platform device
-+ *
-+ * @pdev:	the platform device of the module requesting SCP platform
-+ *		device for using SCP API.
-+ *
-+ * Return: Return NULL if it is failed.
-+ * otherwise it is SCP's platform device
-+ **/
-+struct platform_device *scp_get_plat_device(struct platform_device *pdev);
++static inline void mtk_rpmsg_destroy_rproc_subdev(struct rproc_subdev *subdev)
++{
++}
 +
-+/**
-+ * scp_get_vdec_hw_capa - get video decoder hardware capability
-+ *
-+ * @pdev:	SCP platform device
-+ *
-+ * Return: video decoder hardware capability
-+ **/
-+unsigned int scp_get_vdec_hw_capa(struct platform_device *pdev);
++#endif
 +
-+/**
-+ * scp_get_venc_hw_capa - get video encoder hardware capability
-+ *
-+ * @pdev:	SCP platform device
-+ *
-+ * Return: video encoder hardware capability
-+ **/
-+unsigned int scp_get_venc_hw_capa(struct platform_device *pdev);
-+
-+/**
-+ * scp_mapping_dm_addr - Mapping SRAM/DRAM to kernel virtual address
-+ *
-+ * @pdev:	SCP platform device
-+ * @mem_addr:	SCP views memory address
-+ *
-+ * Mapping the SCP's SRAM address /
-+ * DMEM (Data Extended Memory) memory address /
-+ * Working buffer memory address to
-+ * kernel virtual address.
-+ *
-+ * Return: Return ERR_PTR(-EINVAL) if mapping failed,
-+ * otherwise the mapped kernel virtual address
-+ **/
-+void *scp_mapping_dm_addr(struct platform_device *pdev,
-+			  u32 mem_addr);
-+
-+#endif /* _MTK_SCP_H */
++#endif
 -- 
 2.20.1.97.g81188d93c3-goog
 
