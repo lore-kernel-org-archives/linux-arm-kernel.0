@@ -2,61 +2,62 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 72A36C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 16:21:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 311B6C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 16:21:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2759A2087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 16:21:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E9355214C6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 16:21:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rGxIby4T"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2759A2087F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fhBasBxK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E9355214C6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=bAEEiOuneMLquZWae0YwWLvjnenw0V2m/xpZzHuylcU=; b=rGxIby4TJyPUkL
-	QTpDhPqxmCIterMAFjoEmV2JD70JuoEFo88FU4t+ShEzqzoEa8BCe9qQs4QvdOdbm8QtNvvVKZjHG
-	5yomE+BRq6RHrbl9tikHlhx3j6JdLOoiyd2kef6gNBVZ3gnG36MxsZqJ5l5XT9ztC58XEH/6RE5t3
-	BVACNAnUrzkA0dvcsUrsdTRp4+NIsBrS97tlC0iT5SjsTFtqxZqe5boQW7XQXmebSO+vri8G08f8b
-	aBGu8cG7TVVk/OumfyF2u63IlVptOpOxSPb+xyYu9r4SwePuZS/CxTE8Z7Wd7RtYcpf9cAKgRH7Zp
-	GeBvcLyhj61UOr0bX37A==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=7MLfm5uz5k5zgv4FFyK/VPnmqWxjXhJJCi/h10tEuxk=; b=fhBasBxKmntDew
+	sQK+AJZH0SViPbmc08Sm05rLjoqXpiGvAbXI2C9S5E76iXKjNiCW+cj8AD3Ogk9lqBuAUciAvYzZL
+	JX4vSBfCTtdaqS1GqNIUKTzRuYOAmD0EnzEI/0Ib/VR5Zq8LTrpCkV+ysNZPwJtMo4N2BpOXapbAL
+	/kAhy4YuWypeeI753Voa2JYCiI3udU8GLuCF2mjQsE3/dmBEf5DpTpVW8tWJV4qQfe1yh0WEnFI8p
+	XRp+FApzYRt/GsFRBH3vrVtX6B4fZO092zfNuJt6eY2Xf/2jEriemiFhrhtmq+q2y1jJ6++VgoBq3
+	QVhltXntsD0QDxR5E8zQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggu7f-0007ky-AA; Tue, 08 Jan 2019 16:20:59 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggu6R-0005Oy-GS
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 16:19:47 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id AFD82209EF; Tue,  8 Jan 2019 17:19:41 +0100 (CET)
-Received: from localhost.localdomain
- (aaubervilliers-681-1-45-241.w90-88.abo.wanadoo.fr [90.88.163.241])
- by mail.bootlin.com (Postfix) with ESMTPSA id 62E1C207A3;
- Tue,  8 Jan 2019 17:19:41 +0100 (CET)
-From: Miquel Raynal <miquel.raynal@bootlin.com>
-To: Michael Turquette <mturquette@baylibre.com>,
- Stephen Boyd <sboyd@kernel.org>, Russell King <linux@armlinux.org.uk>
-Subject: [PATCH v4 1/4] clk: core: link consumer with clock driver
-Date: Tue,  8 Jan 2019 17:19:37 +0100
-Message-Id: <20190108161940.4814-2-miquel.raynal@bootlin.com>
-X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20190108161940.4814-1-miquel.raynal@bootlin.com>
-References: <20190108161940.4814-1-miquel.raynal@bootlin.com>
+	id 1ggu88-000858-FI; Tue, 08 Jan 2019 16:21:28 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ggu83-00084K-CW
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 16:21:27 +0000
+Received: from dude02.hi.pengutronix.de ([2001:67c:670:100:1d::28]
+ helo=dude02.pengutronix.de.)
+ by metis.ext.pengutronix.de with esmtp (Exim 4.89)
+ (envelope-from <l.stach@pengutronix.de>)
+ id 1ggu7x-0006Mm-3s; Tue, 08 Jan 2019 17:21:17 +0100
+From: Lucas Stach <l.stach@pengutronix.de>
+To: Stephen Boyd <sboyd@kernel.org>
+Subject: [PATCH] clk: imx5: add imx5_SCC2_IPG_GATE
+Date: Tue,  8 Jan 2019 17:21:15 +0100
+Message-Id: <20190108162115.1998-1-l.stach@pengutronix.de>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::28
+X-SA-Exim-Mail-From: l.stach@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_081943_859490_32FBAF76 
-X-CRM114-Status: GOOD (  16.18  )
+X-CRM114-CacheID: sfid-20190108_082123_700142_851ACDB4 
+X-CRM114-Status: GOOD (  10.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,182 +69,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Antoine Tenart <antoine.tenart@bootlin.com>,
- Gregory Clement <gregory.clement@bootlin.com>, linux-kernel@vger.kernel.org,
- Maxime Chevallier <maxime.chevallier@bootlin.com>,
- Nadav Haklai <nadavh@marvell.com>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Miquel Raynal <miquel.raynal@bootlin.com>, linux-clk@vger.kernel.org,
+Cc: Michael Turquette <mturquette@baylibre.com>, patchwork-lst@pengutronix.de,
+ NXP Linux Team <linux-imx@nxp.com>, kernel@pengutronix.de,
+ Shawn Guo <shawnguo@kernel.org>, linux-clk@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-One major concern when, for instance, suspending/resuming a platform
-is to never access registers before the underlying clock has been
-resumed, otherwise most of the time the kernel will just crash. One
-solution is to use syscore operations when registering clock drivers
-suspend/resume callbacks. One problem of using syscore_ops is that the
-suspend/resume scheduling will depend on the order of the
-registrations, which brings (unacceptable) randomness in the process.
+From: Michael Grzeschik <m.grzeschik@pengutronix.de>
 
-A feature called device links has been introduced to handle such
-situation. It creates dependencies between consumers and providers,
-enforcing e.g. the suspend/resume order when needed. Such feature is
-already in use for regulators.
+This adds the missing clock for the SCC2 peripheral unit.
 
-Add device links support in the clock subsystem by creating/deleting
-the links at get/put time.
-
-Example of a boot (ESPRESSObin, A3700 SoC) with devices linked to clocks:
-
-marvell-armada-3700-tbg-clock d0013200.tbg: Linked as a consumer to d0013800.pinctrl:xtal-clk
-marvell-armada-3700-tbg-clock d0013200.tbg: Dropping the link to d0013800.pinctrl:xtal-clk
-marvell-armada-3700-tbg-clock d0013200.tbg: Linked as a consumer to d0013800.pinctrl:xtal-clk
-marvell-armada-3700-periph-clock d0013000.nb-periph-clk: Linked as a consumer to d0013200.tbg
-marvell-armada-3700-periph-clock d0013000.nb-periph-clk: Linked as a consumer to d0013800.pinctrl:xtal-clk
-marvell-armada-3700-periph-clock d0018000.sb-periph-clk: Linked as a consumer to d0013200.tbg
-mvneta d0030000.ethernet: Linked as a consumer to d0018000.sb-periph-clk
-xhci-hcd d0058000.usb: Linked as a consumer to d0018000.sb-periph-clk
-xenon-sdhci d00d0000.sdhci: Linked as a consumer to d0013000.nb-periph-clk
-xenon-sdhci d00d0000.sdhci: Dropping the link to d0013000.nb-periph-clk
-mvebu-uart d0012000.serial: Linked as a consumer to d0013800.pinctrl:xtal-clk
-advk-pcie d0070000.pcie: Linked as a consumer to d0018000.sb-periph-clk
-xenon-sdhci d00d0000.sdhci: Linked as a consumer to d0013000.nb-periph-clk
-xenon-sdhci d00d0000.sdhci: Linked as a consumer to regulator.1
-cpu cpu0: Linked as a consumer to d0013000.nb-periph-clk
-cpu cpu0: Dropping the link to d0013000.nb-periph-clk
-cpu cpu0: Linked as a consumer to d0013000.nb-periph-clk
-
-Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- drivers/clk/clk.c | 50 ++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 49 insertions(+), 1 deletion(-)
+ drivers/clk/imx/clk-imx51-imx53.c      | 1 +
+ include/dt-bindings/clock/imx5-clock.h | 3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index e1449db544c7..5c36ff52cb72 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -78,6 +78,7 @@ struct clk_core {
- 	struct hlist_node	debug_node;
- #endif
- 	struct kref		ref;
-+	struct device_link	*parent_clk_link;
- };
+diff --git a/drivers/clk/imx/clk-imx51-imx53.c b/drivers/clk/imx/clk-imx51-imx53.c
+index fc8e782d817b..e91c826bce70 100644
+--- a/drivers/clk/imx/clk-imx51-imx53.c
++++ b/drivers/clk/imx/clk-imx51-imx53.c
+@@ -428,6 +428,7 @@ static void __init mx51_clocks_init(struct device_node *np)
+ 	clk[IMX5_CLK_ESDHC4_PER_GATE]	= imx_clk_gate2("esdhc4_per_gate", "esdhc_d_sel", MXC_CCM_CCGR3, 14);
+ 	clk[IMX5_CLK_USB_PHY_GATE]	= imx_clk_gate2("usb_phy_gate", "usb_phy_sel", MXC_CCM_CCGR2, 0);
+ 	clk[IMX5_CLK_HSI2C_GATE]	= imx_clk_gate2("hsi2c_gate", "ipg", MXC_CCM_CCGR1, 22);
++	clk[IMX5_CLK_SCC2_IPG_GATE]	= imx_clk_gate2("scc2_gate", "ipg", MXC_CCM_CCGR1, 30);
+ 	clk[IMX5_CLK_MIPI_HSC1_GATE]	= imx_clk_gate2_flags("mipi_hsc1_gate", "ipg", MXC_CCM_CCGR4, 6, CLK_IS_CRITICAL);
+ 	clk[IMX5_CLK_MIPI_HSC2_GATE]	= imx_clk_gate2_flags("mipi_hsc2_gate", "ipg", MXC_CCM_CCGR4, 8, CLK_IS_CRITICAL);
+ 	clk[IMX5_CLK_MIPI_ESC_GATE]	= imx_clk_gate2_flags("mipi_esc_gate", "ipg", MXC_CCM_CCGR4, 10, CLK_IS_CRITICAL);
+diff --git a/include/dt-bindings/clock/imx5-clock.h b/include/dt-bindings/clock/imx5-clock.h
+index d382fc71aa83..a81be5be6700 100644
+--- a/include/dt-bindings/clock/imx5-clock.h
++++ b/include/dt-bindings/clock/imx5-clock.h
+@@ -214,6 +214,7 @@
+ #define IMX5_CLK_IEEE1588_SEL		202
+ #define IMX5_CLK_IEEE1588_PODF		203
+ #define IMX5_CLK_IEEE1588_GATE		204
+-#define IMX5_CLK_END			205
++#define IMX5_CLK_SCC2_IPG_GATE		205
++#define IMX5_CLK_END			206
  
- #define CREATE_TRACE_POINTS
-@@ -92,6 +93,7 @@ struct clk {
- 	unsigned long max_rate;
- 	unsigned int exclusive_count;
- 	struct hlist_node clks_node;
-+	struct device_link *consumer_link;
- };
- 
- /***           runtime pm          ***/
-@@ -276,6 +278,35 @@ struct clk_hw *clk_hw_get_parent(const struct clk_hw *hw)
- }
- EXPORT_SYMBOL_GPL(clk_hw_get_parent);
- 
-+static void clk_link_consumer(struct device *consumer, struct clk *clk)
-+{
-+	if (consumer && clk)
-+		clk->consumer_link = device_link_add(consumer, clk->core->dev,
-+						     DL_FLAG_STATELESS);
-+}
-+
-+static void clk_unlink_consumer(struct clk *clk)
-+{
-+	if (clk && clk->consumer_link)
-+		device_link_del(clk->consumer_link);
-+}
-+
-+static void clk_link_hierarchy(struct clk_core *consumer,
-+			       struct clk_core *provider)
-+{
-+	if (consumer && provider)
-+		consumer->parent_clk_link = device_link_add(consumer->dev,
-+							    provider->dev,
-+							    DL_FLAG_STATELESS);
-+}
-+
-+static void clk_unlink_hierarchy(struct clk_core *consumer,
-+				 struct clk_core *provider)
-+{
-+	if (consumer && provider && consumer->parent_clk_link)
-+		device_link_del(consumer->parent_clk_link);
-+}
-+
- static struct clk_core *__clk_lookup_subtree(const char *name,
- 					     struct clk_core *core)
- {
-@@ -1599,6 +1630,9 @@ static void clk_reparent(struct clk_core *core, struct clk_core *new_parent)
- 
- 	hlist_del(&core->child_node);
- 
-+	if (core->parent)
-+		clk_unlink_hierarchy(core, core->parent);
-+
- 	if (new_parent) {
- 		bool becomes_orphan = new_parent->orphan;
- 
-@@ -1610,6 +1644,8 @@ static void clk_reparent(struct clk_core *core, struct clk_core *new_parent)
- 
- 		if (was_orphan != becomes_orphan)
- 			clk_core_update_orphan_status(core, becomes_orphan);
-+
-+		clk_link_hierarchy(core, new_parent);
- 	} else {
- 		hlist_add_head(&core->child_node, &clk_orphan_list);
- 		if (!was_orphan)
-@@ -2336,6 +2372,8 @@ __clk_init_parent(struct clk_core *core, bool update_orphan)
- 	if (!parent_hw)
- 		return NULL;
- 
-+	clk_link_hierarchy(core, parent_hw->core);
-+
- 	return parent_hw->core;
- }
- 
-@@ -3411,6 +3449,7 @@ struct clk *clk_hw_create_clk(struct device *dev, struct clk_hw *hw,
- 	}
- 
- 	kref_get(&core->ref);
-+	clk_link_consumer(dev, clk);
- 	clk_core_link_consumer(core, clk);
- 
- 	return clk;
-@@ -3633,11 +3672,18 @@ void clk_unregister(struct clk *clk)
- 	clk->core->ops = &clk_nodrv_ops;
- 	clk_enable_unlock(flags);
- 
-+	clk_unlink_hierarchy(clk->core, clk->core->parent);
-+
- 	if (!hlist_empty(&clk->core->children)) {
- 		struct clk_core *child;
- 		struct hlist_node *t;
- 
--		/* Reparent all children to the orphan list. */
-+		/*
-+		 * Reparent all children to the orphan list.
-+		 *
-+		 * No need to unlink the child clock manually, this will be
-+		 * handled by clk_reparent().
-+		 */
- 		hlist_for_each_entry_safe(child, t, &clk->core->children,
- 					  child_node)
- 			clk_core_set_parent_nolock(child, NULL);
-@@ -3799,6 +3845,8 @@ void __clk_put(struct clk *clk)
- 
- 	clk_prepare_lock();
- 
-+	clk_unlink_consumer(clk);
-+
- 	/*
- 	 * Before calling clk_put, all calls to clk_rate_exclusive_get() from a
- 	 * given user should be balanced with calls to clk_rate_exclusive_put()
+ #endif /* __DT_BINDINGS_CLOCK_IMX5_H */
 -- 
-2.19.1
+2.20.1
 
 
 _______________________________________________
