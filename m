@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A6474C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 14:10:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 376A0C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 14:11:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 698C9206C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 14:10:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 010D2206C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 14:11:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nU7mJbzk";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="nbUtxbn0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 698C9206C0
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tE6+JTTb";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="hUdYB/+6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 010D2206C0
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,54 +27,53 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=mFJ1uUqOZLRR6dOtKcqa1FJs+eLyyK5AmG+NteDxAQs=; b=nU7mJbzk+BoewZfSUP8hwps8R2
-	5ZVHX4Je07efPFoe3YUxTHZeS3icFkm/3p+Ocv8xycBBZrDQn35bMJeLyumZPs0uhABXb6qTO7O4J
-	CREE/tcF0qm4SFAvFJnHQp6vs82+tdIpwkKWHtxU2N8TrsQxLwh4X73l+BGrsjitQwRZIYT6y3kcB
-	AJDCtYFUdPkGlxgI/oBz0764OsmohXAiE3euHoXQDFp35vuhWX2OGRGttlU5yb6DwONPudZu84vbI
-	9bQJ58tUOlNtnEKizhP+HjQpMnHVkV03AGrVQz/qu38WHeMPKop2/DCC63PAmBo2OoORZ4vkRFvw7
-	xOUoH9RQ==;
+	bh=dVWm3d7FaB13jFFt9KoM9QOKWJ2ZO45pXytvp2EvCGo=; b=tE6+JTTbWLh0zjzDpi5cIU34r1
+	gCAHrDEquXvKFg2lHfYqT5QlT1K5u9dPHUFPE1Vk37au9AXiuVUnAM0Lg+cFRLv0Yfb6viQQVeFHS
+	+dgk0qOxTmozOXfWki/7sTDOTXUVlQcD0aY7Yd0G8FbTLk4jc3nIY2tBnNoy+MzlCW/opWb/9K9yW
+	rAeJAJ97+M6bUjHp5xID3XeftE8swg3Uu6ybdlywQJ/zq3CfskkcVWdAP7KB2K/CJ4Y2XLa2pOYBF
+	Ai1KmDMu174R0nf0Ijgc3T9t1pvO2UNq+2eXd8tFQszdsNr60X/muPPcRGoaKFhUyOlmFtUE4FCCA
+	AmmoU30A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggs5Z-0002Wc-Kw; Tue, 08 Jan 2019 14:10:41 +0000
+	id 1ggs5r-0002ti-Bn; Tue, 08 Jan 2019 14:10:59 +0000
 Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggs3h-0007fG-LD
- for linux-arm-kernel@bombadil.infradead.org; Tue, 08 Jan 2019 14:08:45 +0000
+ id 1ggs3j-0007fG-34
+ for linux-arm-kernel@bombadil.infradead.org; Tue, 08 Jan 2019 14:08:47 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=infradead.org; s=merlin.20170209; h=References:In-Reply-To:Message-Id:Date:
  Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
  Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
  Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
  List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=0THuG1JZq7kvlgqlty8reTMUysD3YUt9PRwA1TOSMmM=; b=nbUtxbn0Oz/Sxbv+hrkof/5+s
- LBtKf2r4nZsIjcqhTOSVZk3oIdFFVbCTptv5f14FTMBQ9pbzPwmcxvQ12VEhdmtGMaz+G+6+EVfcl
- pinog290T+H3MFseVetCkQFRx+olEpAef4jJvA+TLH57+/yGvYoYpL0QvvV2JAQQ7Bpu4KunNqgp+
- jT6wrGJ0pBzemra1CY9wGWeUYu4rK66sMqKl37xg7DwhAF3J+XnBdCTu8Shv119nTspIQGWm+mI++
- 5gak/j64OECL6jrlUiuo6aVOobTZtW/ryYZsDRRJvEqJXvRNqArqlLt9CVO/XLNO5pno0TiiQywh1
- isKPFdBxg==;
+ bh=c619ITt886u5yIN7bZeBWLTQjmRP6uMZ5YGpRFN2WuE=; b=hUdYB/+6Yc5EbwBej5PeRUg90
+ 1225k2p+jJCOzni8jd+cyqXu1j6RuCJt4WS3H5BIC4JjZqBwjZh1oIYIzZqbKWM8VA8TTgBEYz6Gl
+ akRYpMxEgRLo8j+paiJndTeX37ihimjJf1jlUhzDTlbntkg+EFE7IAhY1IShLWAzKi5ZnmjoCfISW
+ LHlds2ujZK9HGEi2pU8yGYV8p56ReSk4KPEEMUdVuP2NhxrkEzLzVh5b7XPBDgsm4qeKeFDRRQD2m
+ Deq6MN8tXIN+0SGQPqZmsuu2K+9FcnYILeyMrJluipSlnLntAad9T2gk0v3Ht0W5BxqG95vQr9hbR
+ uPyQQL8ow==;
 Received: from foss.arm.com ([217.140.101.70])
  by merlin.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggs3e-0000B8-Ae
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 14:08:43 +0000
+ id 1ggs3e-0000BG-Sy
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 14:08:44 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 45CDD15AD;
- Tue,  8 Jan 2019 06:08:35 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 37FA91B55;
+ Tue,  8 Jan 2019 06:08:42 -0800 (PST)
 Received: from e112298-lin.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 026593F70D;
- Tue,  8 Jan 2019 06:08:32 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id F1C0C3F70D;
+ Tue,  8 Jan 2019 06:08:39 -0800 (PST)
 From: Julien Thierry <julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v8 16/26] irqchip/gic-v3: Factor group0 detection into
- functions
-Date: Tue,  8 Jan 2019 14:07:34 +0000
-Message-Id: <1546956464-48825-17-git-send-email-julien.thierry@arm.com>
+Subject: [PATCH v8 19/26] irqchip/gic-v3: Detect if GIC can support pseudo-NMIs
+Date: Tue,  8 Jan 2019 14:07:37 +0000
+Message-Id: <1546956464-48825-20-git-send-email-julien.thierry@arm.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1546956464-48825-1-git-send-email-julien.thierry@arm.com>
 References: <1546956464-48825-1-git-send-email-julien.thierry@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_090842_552255_85D22BA6 
-X-CRM114-Status: GOOD (  16.22  )
+X-CRM114-CacheID: sfid-20190108_090843_142270_A13E5265 
+X-CRM114-Status: GOOD (  20.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,7 +87,8 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
  Jason Cooper <jason@lakedaemon.net>, Julien Thierry <julien.thierry@arm.com>,
- marc.zyngier@arm.com, catalin.marinas@arm.com, will.deacon@arm.com,
+ marc.zyngier@arm.com, catalin.marinas@arm.com,
+ Jonathan Corbet <corbet@lwn.net>, will.deacon@arm.com,
  linux-kernel@vger.kernel.org, christoffer.dall@arm.com, james.morse@arm.com,
  joel@joelfernandes.org, Thomas Gleixner <tglx@linutronix.de>
 MIME-Version: 1.0
@@ -97,100 +97,157 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The code to detect whether Linux has access to group0 interrupts can
-prove useful in other parts of the driver.
+The values non secure EL1 needs to use for PMR and RPR registers depends on
+the value of SCR_EL3.FIQ.
 
-Provide a separate function to do this.
+The values non secure EL1 sees from the distributor and redistributor
+depend on whether security is enabled for the GIC or not.
+
+To avoid having to deal with two sets of values for PMR
+masking/unmasking, only enable pseudo-NMIs when GIC has non-secure view
+of priorities.
+
+Also, add firmware requirements related to SCR_EL3.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Jonathan Corbet <corbet@lwn.net>
 Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3.c | 55 +++++++++++++++++++++++++++++---------------
- 1 file changed, 36 insertions(+), 19 deletions(-)
+ Documentation/arm64/booting.txt |  5 ++++
+ drivers/irqchip/irq-gic-v3.c    | 58 ++++++++++++++++++++++++++++++++++++-----
+ 2 files changed, 57 insertions(+), 6 deletions(-)
 
+diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+index 8df9f46..fbab7e2 100644
+--- a/Documentation/arm64/booting.txt
++++ b/Documentation/arm64/booting.txt
+@@ -188,6 +188,11 @@ Before jumping into the kernel, the following conditions must be met:
+   the kernel image will be entered must be initialised by software at a
+   higher exception level to prevent execution in an UNKNOWN state.
+ 
++  - SCR_EL3.FIQ must have the same value across all CPUs the kernel is
++    executing on.
++  - The value of SCR_EL3.FIQ must be the same as the one present at boot
++    time whenever the kernel is executing.
++
+   For systems with a GICv3 interrupt controller to be used in v3 mode:
+   - If EL3 is present:
+     ICC_SRE_EL3.Enable (bit 3) must be initialiased to 0b1.
 diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 8148a92..da547e0 100644
+index 5a703ae..5374b43 100644
 --- a/drivers/irqchip/irq-gic-v3.c
 +++ b/drivers/irqchip/irq-gic-v3.c
-@@ -400,6 +400,39 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
- 	}
+@@ -66,6 +66,31 @@ struct gic_chip_data {
+ static struct gic_chip_data gic_data __read_mostly;
+ static DEFINE_STATIC_KEY_TRUE(supports_deactivate_key);
+ 
++/*
++ * The behaviours of RPR and PMR registers differ depending on the value of
++ * SCR_EL3.FIQ, and the behaviour of non-secure priority registers of the
++ * distributor and redistributors depends on whether security is enabled in the
++ * GIC.
++ *
++ * When security is enabled, non-secure priority values from the (re)distributor
++ * are presented to the GIC CPUIF as follow:
++ *     (GIC_(R)DIST_PRI[irq] >> 1) | 0x80;
++ *
++ * If SCR_EL3.FIQ == 1, the values writen to/read from PMR and RPR at non-secure
++ * EL1 are subject to a similar operation thus matching the priorities presented
++ * from the (re)distributor when security is enabled.
++ *
++ * see GICv3/GICv4 Architecture Specification (IHI0069D):
++ * - section 4.8.1 Non-secure accesses to register fields for Secure interrupt
++ *   priorities.
++ * - Figure 4-7 Secure read of the priority field for a Non-secure Group 1
++ *   interrupt.
++ *
++ * For now, we only support pseudo-NMIs if we have non-secure view of
++ * priorities.
++ */
++static DEFINE_STATIC_KEY_FALSE(supports_pseudo_nmis);
++
+ static struct gic_kvm_info gic_v3_kvm_info;
+ static DEFINE_PER_CPU(bool, has_rss);
+ 
+@@ -232,6 +257,12 @@ static void gic_unmask_irq(struct irq_data *d)
+ 	gic_poke_irq(d, GICD_ISENABLER);
  }
  
-+static u32 gic_get_pribits(void)
++static inline bool gic_supports_nmi(void)
 +{
-+	u32 pribits;
-+
-+	pribits = gic_read_ctlr();
-+	pribits &= ICC_CTLR_EL1_PRI_BITS_MASK;
-+	pribits >>= ICC_CTLR_EL1_PRI_BITS_SHIFT;
-+	pribits++;
-+
-+	return pribits;
++	return IS_ENABLED(CONFIG_ARM64_PSEUDO_NMI) &&
++	       static_branch_likely(&supports_pseudo_nmis);
 +}
 +
-+static bool gic_has_group0(void)
-+{
-+	u32 val;
-+
-+	/*
-+	 * Let's find out if Group0 is under control of EL3 or not by
-+	 * setting the highest possible, non-zero priority in PMR.
-+	 *
-+	 * If SCR_EL3.FIQ is set, the priority gets shifted down in
-+	 * order for the CPU interface to set bit 7, and keep the
-+	 * actual priority in the non-secure range. In the process, it
-+	 * looses the least significant bit and the actual priority
-+	 * becomes 0x80. Reading it back returns 0, indicating that
-+	 * we're don't have access to Group0.
-+	 */
-+	gic_write_pmr(BIT(8 - gic_get_pribits()));
-+	val = gic_read_pmr();
-+
-+	return val != 0;
-+}
-+
- static void __init gic_dist_init(void)
+ static int gic_irq_set_irqchip_state(struct irq_data *d,
+ 				     enum irqchip_irq_state which, bool val)
  {
- 	unsigned int i;
-@@ -541,7 +574,7 @@ static void gic_cpu_sys_reg_init(void)
- 	u64 mpidr = cpu_logical_map(cpu);
- 	u64 need_rss = MPIDR_RS(mpidr);
- 	bool group0;
--	u32 val, pribits;
-+	u32 pribits;
+@@ -573,6 +604,12 @@ static void gic_update_vlpi_properties(void)
+ 		!gic_data.rdists.has_direct_lpi ? "no " : "");
+ }
+ 
++/* Check whether it's single security state view */
++static inline bool gic_dist_security_disabled(void)
++{
++	return readl_relaxed(gic_data.dist_base + GICD_CTLR) & GICD_CTLR_DS;
++}
++
+ static void gic_cpu_sys_reg_init(void)
+ {
+ 	int i, cpu = smp_processor_id();
+@@ -598,6 +635,9 @@ static void gic_cpu_sys_reg_init(void)
+ 	/* Set priority mask register */
+ 	if (!gic_prio_masking_enabled())
+ 		write_gicreg(DEFAULT_PMR_VALUE, ICC_PMR_EL1);
++	else if (gic_supports_nmi() && group0)
++		/* Mismatch configuration with boot CPU */
++		WARN_ON(!gic_dist_security_disabled());
  
  	/*
- 	 * Need to check that the SRE bit has actually been set. If
-@@ -553,25 +586,9 @@ static void gic_cpu_sys_reg_init(void)
- 	if (!gic_enable_sre())
- 		pr_err("GIC: unable to set SRE (disabled at EL2), panic ahead\n");
+ 	 * Some firmwares hand over to the kernel with the BPR changed from
+@@ -852,12 +892,6 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ #endif
  
--	pribits = gic_read_ctlr();
--	pribits &= ICC_CTLR_EL1_PRI_BITS_MASK;
--	pribits >>= ICC_CTLR_EL1_PRI_BITS_SHIFT;
--	pribits++;
-+	pribits = gic_get_pribits();
+ #ifdef CONFIG_CPU_PM
+-/* Check whether it's single security state view */
+-static bool gic_dist_security_disabled(void)
+-{
+-	return readl_relaxed(gic_data.dist_base + GICD_CTLR) & GICD_CTLR_DS;
+-}
+-
+ static int gic_cpu_pm_notifier(struct notifier_block *self,
+ 			       unsigned long cmd, void *v)
+ {
+@@ -1110,6 +1144,11 @@ static bool gic_enable_quirk_msm8996(void *data)
+ 	return true;
+ }
  
--	/*
--	 * Let's find out if Group0 is under control of EL3 or not by
--	 * setting the highest possible, non-zero priority in PMR.
--	 *
--	 * If SCR_EL3.FIQ is set, the priority gets shifted down in
--	 * order for the CPU interface to set bit 7, and keep the
--	 * actual priority in the non-secure range. In the process, it
--	 * looses the least significant bit and the actual priority
--	 * becomes 0x80. Reading it back returns 0, indicating that
--	 * we're don't have access to Group0.
--	 */
--	write_gicreg(BIT(8 - pribits), ICC_PMR_EL1);
--	val = read_gicreg(ICC_PMR_EL1);
--	group0 = val != 0;
-+	group0 = gic_has_group0();
++static void gic_enable_nmi_support(void)
++{
++	static_branch_enable(&supports_pseudo_nmis);
++}
++
+ static int __init gic_init_bases(void __iomem *dist_base,
+ 				 struct redist_region *rdist_regs,
+ 				 u32 nr_redist_regions,
+@@ -1179,6 +1218,13 @@ static int __init gic_init_bases(void __iomem *dist_base,
+ 		its_cpu_init();
+ 	}
  
- 	/* Set priority mask register */
- 	write_gicreg(DEFAULT_PMR_VALUE, ICC_PMR_EL1);
++	if (gic_prio_masking_enabled()) {
++		if (!gic_has_group0() || gic_dist_security_disabled())
++			gic_enable_nmi_support();
++		else
++			pr_warn("SCR_EL3.FIQ is cleared, cannot enable use of pseudo-NMIs\n");
++	}
++
+ 	return 0;
+ 
+ out_free:
 -- 
 1.9.1
 
