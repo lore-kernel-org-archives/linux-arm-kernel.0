@@ -2,62 +2,108 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 511A7C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 14:13:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C3691C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 14:16:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 228FD20827
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 14:13:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 90DD220827
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 14:16:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JAfN4438"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 228FD20827
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cmdvhfDC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 90DD220827
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=sBOq/5RB7sDBDmri2nJ5zbBllCiDRrlFjDbwvd+F0Ws=; b=JAfN4438oPy0YrZvl0Tr1U4AaJ
-	85fghO9LcpYUAB3TauNEGPmKDs78WYsg5bPwbE6MiUBFGaTZRVVWSKgsJ0xu3tj7fRzU9pe9ESjfk
-	uRlhMgo4jDzrGpj+cHbkp6f7o/9vUhw4v/6o69mfc7ENvm8sNBL/YiSLLeHUhJGKDsUPsWTwOHcWA
-	wRDQlPg1k6bNszqg/iw9V3KoLROlndNcnyrUMgvIroV+T6afvs6UGa/QLMxDgfRfBwXex2rJUoA/V
-	fGtT5py9csRIttm+OvV7CmiFfhU1YE4NVQ7fvWYC8Cf8IBFheIqXxc8jeVQbq5RHfCAOeSesK8vTu
-	jkF8bBrw==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=K4f0amtYT5c7w+Pzpwp3iBL3aSqUNwPCqPMYXPWQzpw=; b=cmdvhfDCXRGbB9
+	rPl+1GO31uOv9940wIWLfEgodNV1rRIYUqdi0f3Q2W3gE7/1daItFxkDeyNRNgHdmfZl3Qi7XWxdz
+	BEGtzFZej3cKjXubVNbfAHhDgy11eUf0j6P5qBnEL3wrlOt5kOnVjhIvh+ny7PKPD2LsXQwsXdT4j
+	9GqCx5Fg1mDLdyjQ/pEBqcFs8+ScgRsimHAGOyfltRgBO/6AuHMROgaqwH8gpi0TVvHneiejgDn9H
+	YjUpynPJOA1NU9NEhvFI170U1t+0/VN4Yp5VLq6k3mI2Zy29QBJJXWJUyjsa9ZMmElQp7mUIpUSA5
+	Zu6jYFVv0tcSsRwN4oyQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggs7w-0005PL-Ak; Tue, 08 Jan 2019 14:13:08 +0000
+	id 1ggsBM-0007b3-KR; Tue, 08 Jan 2019 14:16:40 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggs3j-0007iS-JK
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 14:09:26 +0000
+ id 1ggsBJ-0007ab-Jm
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 14:16:39 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 41BF115AD;
- Tue,  8 Jan 2019 06:08:47 -0800 (PST)
-Received: from e112298-lin.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id F33AC3F70D;
- Tue,  8 Jan 2019 06:08:44 -0800 (PST)
-From: Julien Thierry <julien.thierry@arm.com>
-To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v8 21/26] irqchip/gic: Add functions to access irq priorities
-Date: Tue,  8 Jan 2019 14:07:39 +0000
-Message-Id: <1546956464-48825-22-git-send-email-julien.thierry@arm.com>
-X-Mailer: git-send-email 1.9.1
-In-Reply-To: <1546956464-48825-1-git-send-email-julien.thierry@arm.com>
-References: <1546956464-48825-1-git-send-email-julien.thierry@arm.com>
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3455780D;
+ Tue,  8 Jan 2019 06:16:37 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ 445BE3F5D4; Tue,  8 Jan 2019 06:16:36 -0800 (PST)
+Subject: Re: [PATCH] ARM: irq: Add IRQ_SET_MASK_OK_DONE handling in
+ migrate_one_irq()
+To: Dietmar Eggemann <dietmar.eggemann@arm.com>,
+ linux-arm-kernel@lists.infradead.org
+References: <20190108135805.5535-1-dietmar.eggemann@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ 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
+Organization: ARM Ltd
+Message-ID: <9288fdeb-8eb1-28ca-f950-ccf36d63688a@arm.com>
+Date: Tue, 8 Jan 2019 14:16:34 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
+MIME-Version: 1.0
+In-Reply-To: <20190108135805.5535-1-dietmar.eggemann@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_060848_520717_AAB791FA 
-X-CRM114-Status: GOOD (  10.89  )
+X-CRM114-CacheID: sfid-20190108_061637_659423_9A63EC92 
+X-CRM114-Status: GOOD (  29.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,65 +115,112 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
- Jason Cooper <jason@lakedaemon.net>, Julien Thierry <julien.thierry@arm.com>,
- marc.zyngier@arm.com, catalin.marinas@arm.com, will.deacon@arm.com,
- linux-kernel@vger.kernel.org, christoffer.dall@arm.com, james.morse@arm.com,
- joel@joelfernandes.org, Thomas Gleixner <tglx@linutronix.de>
-MIME-Version: 1.0
+Cc: linux-kernel@vger.kernel.org,
+ Russell King - ARM Linux <linux@armlinux.org.uk>,
+ Sudeep Holla <sudeep.holla@arm.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add accessors to the GIC distributor/redistributors priority registers.
+Hi Dietmar,
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic-common.c | 10 ++++++++++
- drivers/irqchip/irq-gic-common.h |  2 ++
- 2 files changed, 12 insertions(+)
+On 08/01/2019 13:58, Dietmar Eggemann wrote:
+> Arm TC2 (multi_v7_defconfig plus CONFIG_ARM_BIG_LITTLE_CPUFREQ=y and
+> CONFIG_ARM_VEXPRESS_SPC_CPUFREQ=y) fails hotplug stress tests.
+> 
+> This issue was tracked down to a missing copy of the new affinity
+> cpumask of the vexpress-spc interrupt into struct
+> irq_common_data.affinity when the interrupt is migrated in
+> migrate_one_irq().
+> 
+> Commit 0407daceedfe ("irqchip/gic: Return IRQ_SET_MASK_OK_DONE in the
+> set_affinity method") changed the return value of the irq_set_affinity()
+> function of the GIC from IRQ_SET_MASK_OK to IRQ_SET_MASK_OK_DONE.
+> 
+> In migrate_one_irq() if the current irq affinity mask and the cpu
+> online mask do not share any CPU, the affinity mask is set to the cpu
+> online mask. In this case (ret == true) and when the irq chip
+> function irq_set_affinity() returns successfully (IRQ_SET_MASK_OK),
+> struct irq_common_data.affinity should also be updated.
+> 
+> Add IRQ_SET_MASK_OK_DONE next to IRQ_SET_MASK_OK when checking that the
+> irq chip function irq_set_affinity() returns successfully.
+> 
+> Commit 2cb625478f8c ("genirq: Add IRQ_SET_MASK_OK_DONE to support
+> stacked irqchip") only added IRQ_SET_MASK_OK_DONE handling to
+> irq_do_set_affinity() in the irq core and not to the Arm32 irq code.
+> 
+> Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
+> ---
+> 
+> The hotplug issue on Arm TC2 happens because the vexpress-spc interrupt
+> (irq=22) is affine to CPU0. This occurs since it is setup early when the
+> cpu_online_mask is still 0.
+> But the problem with the missing copy of the affinity mask should occur
+> with every interrupt which is forced to migrate.
+> 
+> With additional debug in irq_setup_affinity():
+> 
+> [0.000619] irq_setup_affinity(): irq=17 mask=0 cpu_online_mask=0 set=0-4
+> [0.007065] irq_setup_affinity(): irq=22 mask=0 cpu_online_mask=0 set=0-4
+> [3.372907] irq_setup_affinity(): irq=47 mask=0-4 cpu_online_mask=0-4
+> set=0-4
+> 
+> cat /proc/interrupts
+>            CPU0       CPU1       CPU2       CPU3       CPU4
+> 22:        316          0          0          0          0     GIC-0 127
+> Level     vexpress-spc
+> 
+> cat /proc/irq/22/smp_affinity_list 
+> 0
+> 
+>  arch/arm/kernel/irq.c | 10 ++++++++--
+>  1 file changed, 8 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+> index 9908dacf9229..ddb828b0235b 100644
+> --- a/arch/arm/kernel/irq.c
+> +++ b/arch/arm/kernel/irq.c
+> @@ -117,6 +117,7 @@ static bool migrate_one_irq(struct irq_desc *desc)
+>  	const struct cpumask *affinity = irq_data_get_affinity_mask(d);
+>  	struct irq_chip *c;
+>  	bool ret = false;
+> +	int ret2;
+>  
+>  	/*
+>  	 * If this is a per-CPU interrupt, or the affinity does not
+> @@ -131,9 +132,14 @@ static bool migrate_one_irq(struct irq_desc *desc)
+>  	}
+>  
+>  	c = irq_data_get_irq_chip(d);
+> -	if (!c->irq_set_affinity)
+> +	if (!c->irq_set_affinity) {
+>  		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
+> -	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && ret)
+> +		return ret;
+> +	}
+> +
+> +	ret2 = c->irq_set_affinity(d, affinity, false);
+> +
+> +	if ((ret2 == IRQ_SET_MASK_OK || ret2 == IRQ_SET_MASK_OK_DONE) && ret)
+>  		cpumask_copy(irq_data_get_affinity_mask(d), affinity);
+>  
+>  	return ret;
+> 
 
-diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
-index 3c93c6f..04eadbc 100644
---- a/drivers/irqchip/irq-gic-common.c
-+++ b/drivers/irqchip/irq-gic-common.c
-@@ -110,6 +110,16 @@ int gic_configure_irq(unsigned int irq, unsigned int type,
- 	return ret;
- }
- 
-+void gic_set_irq_prio(unsigned int irq, void __iomem *base, u8 prio)
-+{
-+	writeb_relaxed(prio, base + GIC_DIST_PRI + irq);
-+}
-+
-+u8 gic_get_irq_prio(unsigned int irq, void __iomem *base)
-+{
-+	return readb_relaxed(base + GIC_DIST_PRI + irq);
-+}
-+
- void gic_dist_config(void __iomem *base, int gic_irqs,
- 		     void (*sync_access)(void))
- {
-diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
-index 97e58fb..f1c6f5a 100644
---- a/drivers/irqchip/irq-gic-common.h
-+++ b/drivers/irqchip/irq-gic-common.h
-@@ -38,6 +38,8 @@ void gic_enable_quirks(u32 iidr, const struct gic_quirk *quirks,
- 		void *data);
- void gic_enable_of_quirks(const struct device_node *np,
- 			  const struct gic_quirk *quirks, void *data);
-+void gic_set_irq_prio(unsigned int irq, void __iomem *base, u8 prio);
-+u8 gic_get_irq_prio(unsigned int irq, void __iomem *base);
- 
- void gic_set_kvm_info(const struct gic_kvm_info *info);
- 
+On the arm64 side, we've solved the exact same issue by getting rid of
+this code and using the generic implementation. See 217d453d473c5
+("arm64: fix a migrating irq bug when hotplug cpu"), which uses
+irq_migrate_all_off_this_cpu instead.
+
+I'm not sure there is much value in not using the core code in this case.
+
+Thanks,
+
+	M.
 -- 
-1.9.1
-
+Jazz is not dead. It just smells funny...
 
 _______________________________________________
 linux-arm-kernel mailing list
