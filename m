@@ -3,77 +3,121 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1AFF3C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 08:00:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 976B7C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 08:10:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DB9F0218AF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 08:00:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6397A218AD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 08:10:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tBOxDkaw";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="FYL63tw/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DB9F0218AF
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eESld1XV";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nokia.onmicrosoft.com header.i=@nokia.onmicrosoft.com header.b="sJJzV2TV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6397A218AD
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nokia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1DpWRYqTTw5hFo7Q3oYtunCYVoc6VXxR9XNDRnMPN4A=; b=tBOxDkawfDSFGV
-	wsW636ekTmTEbgJe9xgpCWS2/U1HJS46ZYKdZEUlgObLe897MNQ8gr/lDyU5uMsyMkDTKbm3Cp5Mx
-	xBXl2fOGtqrCBg17shS2zt36hPGdYSxxgPZ/0fMukIWYMulJGWDYTpNV3dCtMJuK2wRAb6e4aGCo5
-	bw0Ewev2trAG3+aJhenIZUq/8tk/ThXfthlMcSTMU03wydywip+PjgQq2VoF82vndHT1sCqKa4zWW
-	22taK5rWwEzqI7FQLg430YVGoHXT881kZVIcoZsSy+JSP0F9Nl5RNSTK1xOyOsGcphNN8u/DuZc1j
-	R1DBbI2wlE8x+7QFcZlQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=85djmeT0HY8Xx5cSyMnOuxk+e+hVTqUEkEOTvcmila0=; b=eESld1XVZS7w8H
+	K4HI9Ec9Exx2B2ZM+kjopbGVGN7mxYP1tI++hiO3YFKwWgh3CUtX44MR4na5EGIZxmsPUnjQkYLaf
+	KTfjpfKyo9VSV8K1nkAxxANBjEEDlRWTnkq+cQkSareqHys9IQhLsAPu0T3lCGrl0C+duxjZGEDhZ
+	NRmuuJT7ka7bAvpksAl9VLILs2Q1KFbj58ulKqZZ4r3vtIIC9iEAwSPFzxOfjouFDx0W/G3YhTRwr
+	s+/0AoR8KCvdJCUM8iPaEkBsLHPOErSozYDGyhYGTyXLjRXMRrPcTyFO1Hq1ckiLxLTASrWgOJ1Oj
+	kdOW0ASQ1lFlVSFtzgaA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggmJ6-0002mG-V0; Tue, 08 Jan 2019 08:00:16 +0000
-Received: from mail-io1-xd2e.google.com ([2607:f8b0:4864:20::d2e])
+	id 1ggmT0-0006ZH-Sv; Tue, 08 Jan 2019 08:10:30 +0000
+Received: from mail-eopbgr140133.outbound.protection.outlook.com
+ ([40.107.14.133] helo=EUR01-VE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggmIz-0002dG-81
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 08:00:14 +0000
-Received: by mail-io1-xd2e.google.com with SMTP id f4so2477283ion.2
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 08 Jan 2019 00:00:08 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=n80u3Bj0sRgCZ2Ib0Abtxqm5mtdRub1PL/fORDN6hnY=;
- b=FYL63tw/QA90Ex09/G/sBbeL30LHGYI+8z03Z1/5O/1TtRMLuUNTgTE8VumYE/cXlL
- nPU9jRF5B/ofMmki6ZZl227e7+f5XdetHdD4Ihri/acNdR3FvyMlhMfQQWc8RDgDJRnJ
- stp71yeQIw7IF5rcPshtpeb1dfBtXUWb1U3lA=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=n80u3Bj0sRgCZ2Ib0Abtxqm5mtdRub1PL/fORDN6hnY=;
- b=gSJwcox+X+JAck0w1Bz+KIrogNDRLfrQhSzKG7tSLp0tOCrbfwv6OnmOSoKGH2gZRj
- o6IPTDi523/kCSEugV5ZMV8CsrSa9UBNFaBC0hxatgwqh+L3QddaC2OZYbQlDgTV7B7L
- I4AMLbzpgFM0j0YvnsJzrwOr+E5Zxfth578Pf+yIea5zwE7EgRateVTmhFrPR6SN2vSW
- 9tXP39ynE9AM0lugalKugpfb+DEq7NCqCYsUSU+kI5ByZ6t89KyaHJPqyErJb6GVeS0U
- 2OhB50omdlkxi3oWI3/2F6pEhjjLZlcK2Szt3LzB32kYQu3cn4gGZx5nYSV2XBFZ6EQh
- it6A==
-X-Gm-Message-State: AJcUukeZvCldmk3T/WlunTwIxTFld+K0MafoaiLGVUVOGzE6MoqkVedf
- qpSHb1Q4aOhpuQgEFzjjGYV3jaE5CdL9X1TbJE+l1Q==
-X-Google-Smtp-Source: ALg8bN4EOpyRuSmrkPIRDEuI583rUwwU2H+mu6bJCCzwD1t2lBoGJOUM1na1y6cZpu0cWPcPpYtwAjKUj8Umw+rFSUY=
-X-Received: by 2002:a6b:c8c9:: with SMTP id y192mr375125iof.183.1546934407614; 
- Tue, 08 Jan 2019 00:00:07 -0800 (PST)
+ id 1ggmSx-0006Yj-1o
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 08:10:28 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nokia.onmicrosoft.com; 
+ s=selector1-nokia-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=XH3oWLTzSGkEnr8YqdsOvYPDGQ1x3b7FO3FnSfVJzpo=;
+ b=sJJzV2TVwQ4vfdFUo/7NpdIWWKXhqauWwTTRgCMVlL6j8iiFE/SikUAlsx4E0XJEwrwTbdwl/pV/Us+jTKKD8Fca89WRwPoL0QnDNZ8L7alNOmvmhqRgmgq7i0utHmQJS1IAmSHXyRWSAQytC3ihsAU3M3fIPy4zV59PDyDYsrE=
+Received: from AM6PR0702MB3799.eurprd07.prod.outlook.com (52.133.24.160) by
+ AM6PR0702MB3672.eurprd07.prod.outlook.com (52.133.24.150) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1516.4; Tue, 8 Jan 2019 08:10:21 +0000
+Received: from AM6PR0702MB3799.eurprd07.prod.outlook.com
+ ([fe80::356d:ce77:fa30:c04b]) by AM6PR0702MB3799.eurprd07.prod.outlook.com
+ ([fe80::356d:ce77:fa30:c04b%5]) with mapi id 15.20.1516.010; Tue, 8 Jan 2019
+ 08:10:20 +0000
+From: "Wiebe, Wladislav (Nokia - DE/Ulm)" <wladislav.wiebe@nokia.com>
+To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
+ <mark.rutland@arm.com>, "mchehab+samsung@kernel.org"
+ <mchehab+samsung@kernel.org>, "gregkh@linuxfoundation.org"
+ <gregkh@linuxfoundation.org>, "davem@davemloft.net" <davem@davemloft.net>,
+ "akpm@linux-foundation.org" <akpm@linux-foundation.org>,
+ "nicolas.ferre@microchip.com" <nicolas.ferre@microchip.com>, "arnd@arndb.de"
+ <arnd@arndb.de>, "linux-edac@vger.kernel.org" <linux-edac@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "bp@alien8.de" <bp@alien8.de>,
+ "mchehab@kernel.org" <mchehab@kernel.org>, "akpm@linux-foundation.org"
+ <akpm@linux-foundation.org>, "nicolas.ferre@microchip.com"
+ <nicolas.ferre@microchip.com>, "arnd@arndb.de" <arnd@arndb.de>, "Sverdlin,
+ Alexander (Nokia - DE/Ulm)" <alexander.sverdlin@nokia.com>
+Subject: [PATCH 0/2] Support for ARM Cortex A15 L2 internal asynchronous error
+ detection
+Thread-Topic: [PATCH 0/2] Support for ARM Cortex A15 L2 internal asynchronous
+ error detection
+Thread-Index: AdSCPkWA9gnkAwk6Sm+svCBlSH1vnQ==
+Date: Tue, 8 Jan 2019 08:10:20 +0000
+Message-ID: <AM6PR0702MB3799317C93057F1EA6C86393FA8A0@AM6PR0702MB3799.eurprd07.prod.outlook.com>
+Accept-Language: de-DE, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=wladislav.wiebe@nokia.com; 
+x-originating-ip: [131.228.32.189]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; AM6PR0702MB3672;
+ 6:DsSDouvw8e6/GgFpvUP2uD01nSInGvrhx8KsI8xTWM4ZHGoFoDWP1wlfENQlJCsG8uJjykgiRChvpjPUZGr0eTT/O2ul57OaBF8I2uoA2Eys5NoMeiQ5crNvYAHp7ohXKBucnuJyIYeGvsYghs6mz4NT+Tk76k6YIrABk75dt2KQAR4QTBD0SeQI1jjGId7CL1AcXp0EsKqvlgIukhM8tOMI59MCxusxEubUysm9M11gj5SnnGs8UBmM/EuatYhsjQSWAESnWU0F48E0kAyoGIyde/z2GoCITL/UeRyjaIYZqWVIcY8z+bxb2MP7v6YvkWggVv60TIVCuW8QzZcJKyUWcRzihExgH42jaPXrV9wJ4z1agUYQsg1mgfk2spW8PWBZWW5h1+SZ3qzuyChn0LXAwO1r4Up/WTLgiq3Z1KfJCffKXkpmkrT++ZtR+PChx7k2Fe7m85Jv2vGWzdLe5A==;
+ 5:tUMsWvbPQRt1IMrblRPjV/wuGe0YuaaNFDDXY/oNHOzPdJ3DoOwhWc/MlcvDXoUhHlMygGPk0Ap10tXBsGWXiRSHjqSnCXRmZ20WZD5xcKe4tXgS9eybsrF5g0AX/2JapOIdQ4wZZzT/NuSAhRv5gSjg7oyIGwBiX264MqZuLd0S2vBuV4vAO5wwYhf7b3UiLVKeOB9cP8jgRyYYK7HrQQ==;
+ 7:xT1Pz7Z5Gw0p5yyi7tLkhx8O7vcndx6SC5vIbH5Ya+bloYkZh99/0lWPfP4oGPEij1w+ZO8JJXd+i2P7929ZVzUGOaMgLCyCJhbpfRkvyhIwlj6pa1PKsxQQlo0U7nCCnGP9EuNSbmtPbaAAjfdLvg==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;SOR;
+x-forefront-antispam-report: SFV:SKI; SCL:-1; SFV:NSPM;
+ SFS:(10019020)(376002)(136003)(39860400002)(366004)(346002)(396003)(199004)(189003)(74316002)(7416002)(5660300001)(14454004)(81166006)(186003)(478600001)(68736007)(53936002)(110136005)(9686003)(316002)(6116002)(54906003)(2201001)(305945005)(486006)(2906002)(256004)(25786009)(3846002)(4326008)(99286004)(71200400001)(7736002)(26005)(33656002)(476003)(71190400001)(6636002)(66066001)(8676002)(81156014)(7696005)(86362001)(6436002)(105586002)(2501003)(55016002)(6506007)(106356001)(102836004)(97736004)(8936002)(921003)(1121003);
+ DIR:OUT; SFP:1102; SCL:1; SRVR:AM6PR0702MB3672;
+ H:AM6PR0702MB3799.eurprd07.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+x-ms-office365-filtering-correlation-id: 097c5993-d098-4bc8-b1cd-08d67540bbaf
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(5600109)(711020)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7193020);
+ SRVR:AM6PR0702MB3672; 
+x-ms-traffictypediagnostic: AM6PR0702MB3672:
+x-microsoft-antispam-prvs: <AM6PR0702MB3672F99CA1EFFEC418ECC160FA8A0@AM6PR0702MB3672.eurprd07.prod.outlook.com>
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(3230021)(908002)(999002)(11241501185)(806100)(5005026)(6040522)(8220060)(2401047)(8121501046)(3231475)(944501520)(52105112)(3002001)(93006095)(93001095)(10201501046)(6055026)(6041310)(20161123564045)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(20161123560045)(201708071742011)(7699051)(76991095);
+ SRVR:AM6PR0702MB3672; BCL:0; PCL:0; RULEID:; SRVR:AM6PR0702MB3672; 
+x-forefront-prvs: 0911D5CE78
+received-spf: None (protection.outlook.com: nokia.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: tMRRSHLZeFJBaf5c6MUze7YRj7H6vGjUCXUMonDfTBB323LsQpu/b+fR/VWUE77yy3y1uE4HnwEn8q5hInoiBDKEsdJ19pOALuhdEulLK3ZLGQg5kpOYnPlwGnafUzyo3iRNA+5gXxHqi9ceOT1aGJ56PXztotZyc/7k+qLdYR+osOBuT3GHUNqHWAvJ8gVoyC/Bpil7vePV54NJxQZ+G+VjvQrqUHMWQj/pV/Qwf/Ci9MoNsUnxKYVOzo9/He4qv/K3NxlZnL+yKTGr2IL94tiAn5kz3DcJDKV/hxbgzW9eyu/na5LP5+KFipqqPo5G
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-References: <20190107233833.GI5544@atomide.com>
-In-Reply-To: <20190107233833.GI5544@atomide.com>
-From: Vincent Guittot <vincent.guittot@linaro.org>
-Date: Tue, 8 Jan 2019 08:59:56 +0100
-Message-ID: <CAKfTPtDBEmcsLotp-6K1KU1wM9Ba1EpMp3niXScRxYgzjs0nog@mail.gmail.com>
-Subject: Re: Regression in v5.0-rc1 with autosuspend hrtimers
-To: Tony Lindgren <tony@atomide.com>
+X-OriginatorOrg: nokia.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 097c5993-d098-4bc8-b1cd-08d67540bbaf
+X-MS-Exchange-CrossTenant-originalarrivaltime: 08 Jan 2019 08:10:20.5593 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 5d471751-9675-428d-917b-70f44f9630b0
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR0702MB3672
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_000009_289593_F6443FFE 
-X-CRM114-Status: GOOD (  12.01  )
+X-CRM114-CacheID: sfid-20190108_001027_137035_226FF39C 
+X-CRM114-Status: GOOD (  10.67  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,46 +129,38 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>,
- "open list:THERMAL" <linux-pm@vger.kernel.org>,
- "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>,
- linux-kernel <linux-kernel@vger.kernel.org>, linux-omap@vger.kernel.org,
- LAK <linux-arm-kernel@lists.infradead.org>
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Tony,
+This patch series adds support for L2 internal asynchronous error detection
+caused by L2 RAM double-bit ECC error or illegal writes to the
+Interrupt Controller memory-map region on the Cortex A15.
 
-On Tue, 8 Jan 2019 at 00:38, Tony Lindgren <tony@atomide.com> wrote:
->
-> Hi all,
->
-> Looks like commit 8234f6734c5d ("PM-runtime: Switch autosuspend
-> over to using hrtimers") caused a regression on at least
-> omap5-uevm where 8250 UART rx wake no longer works. I have not
-> noticed this happening on others so far.
->
-> The devices I've tested all are using 8250 with dedicated
-> wakeirqs configured for the rx pin. I can see the interrupt
-> increase on omap5-uevm after some one or more keypresses,
-> but then nothing. It seems that the uart just falls back
-> asleep right away or something.
->
-> Any ideas what might be going wrong?
+Testing:
+- works as module (loadable & unloadable) - OK
+- works as build in kernel driver - OK
+- interrupt registration - OK
+- appears in EDAC subsystem/sysfs - OK
 
-What is the autosuspend value ? Can it be that the autosuspend is set
-to a short value but was finally greater than 10-20ms on arm32. And
-now the autosuspend happens before and this has changed the sequence ?
+Wladislav Wiebe (2):
+  dt-bindings: edac: ARM Cortex A15 L2 asynchronous error detection
+  EDAC: add ARM Cortex A15 L2 internal asynchronous error detection driver
 
-Regards,
-Vincent
->
-> Regards,
->
-> Tony
->
+ .../bindings/edac/cortex_a15_l2_async_edac.txt     |  22 ++++
+ MAINTAINERS                                        |   8 ++
+ drivers/edac/Kconfig                               |  11 ++
+ drivers/edac/Makefile                              |   1 +
+ drivers/edac/cortex_a15_l2_async_edac.c            | 134 +++++++++++++++++++++
+ 5 files changed, 176 insertions(+)
+ create mode 100644 .../bindings/edac/cortex_a15_l2_async_edac.txt
+ create mode 100644 drivers/edac/cortex_a15_l2_async_edac.c
+
+-- 
+2.16.1
 
 _______________________________________________
 linux-arm-kernel mailing list
