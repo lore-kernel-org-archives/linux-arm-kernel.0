@@ -2,121 +2,80 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8AB70C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 10:57:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D15DEC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 10:57:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5802B21019
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 10:57:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8A4AD206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 10:57:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZpYboDhJ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="W1KiKe8E"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5802B21019
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VJ1cb66Q";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="da0gHnAe"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8A4AD206B7
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SQiHkz20XQTGqhtbx7JtHXnxVRddblOvaJZZC2oHyDs=; b=ZpYboDhJNFTLxp
-	mRzRvMbqfWTozgkoP+mAM5h1Hv4YNP0NtR6lPtZ4RLAVUM8ut9FPuvKLZxCJGxTwjEQM0b4bfQj8j
-	mRru23nVUZh4Myax+j3t+yO0Bowv+E0ILvk3olb83iz8seOsT4TSwgJ4B+U+DTnoQUVfafjgN0SVH
-	ePqqxTAyxLc4DtqF5YiW1HlGhQynUKs/F2H1e9junRiqnSMlvVwbzRpOE0okbbcllZ8JQDC1GCLCh
-	oXDM5G0xvyo6F4GjfODb7bus7J+83bDClCPtnktVoAastWkbW1+4WYembzE7FBdS86IveEVaBVL9R
-	91aa1rC81eAXZO3qF3EQ==;
+	List-Owner; bh=JmEqNDXfP+urM4Rdge9UMo7NL7tfM/vwgEA2/6J89nU=; b=VJ1cb66QwGCcqp
+	ndOrunveRUrdlj4wvFZK1elcIK2G+LzdAigEcKjRkLB2gLAqBzBlHcjdyMt9kXXTnyIJmShS2f1NE
+	5hmfvnzTG+WTdTj/UonnSIzIQGDntmvDiRLIkbY/LMkqu70babjL5tM/Ndv8mUuC04sR1sVibY/7o
+	i6WhWKXR+YEHvWrVqFtCCpZfVosjqYD6LKxFrmY3H98LMtjoYyMjctE6OgwLvpiF4Nz/n512tV05D
+	fMB7485R9hEmsHfWVKGHiXTPsouJ8kjsRe7iZP311yAyPHOTJYSTnic0UdkQ54y6ZkKrOUwLlkxsG
+	M4plt4DE7OcZX6jo6s3A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggp4R-0004aO-5q; Tue, 08 Jan 2019 10:57:19 +0000
-Received: from esa5.microchip.iphmx.com ([216.71.150.166])
+	id 1ggp4t-0004tP-Ex; Tue, 08 Jan 2019 10:57:47 +0000
+Received: from mail-oi1-x22d.google.com ([2607:f8b0:4864:20::22d])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggp3m-0003qt-96
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 10:56:45 +0000
-X-IronPort-AV: E=Sophos;i="5.56,453,1539673200"; d="scan'208";a="23118877"
-Received: from smtpout.microchip.com (HELO email.microchip.com)
- ([198.175.253.82])
- by esa5.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 08 Jan 2019 03:56:38 -0700
-Received: from NAM02-SN1-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.106) with Microsoft SMTP Server (TLS)
- id 14.3.352.0; Tue, 8 Jan 2019 03:56:36 -0700
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=microchiptechnology.onmicrosoft.com;
- s=selector1-microchiptechnology-onmicrosoft-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=0jjXhJLdT1geE9ulSsjd5ZzNAHclKGpmSIcGE+hVYCw=;
- b=W1KiKe8Es9h+lUdsZ3AO4XeIgsiM6jfHLG8bYPiKwoHdLRBMtTJvH274odCLxV6/YmoKC+wBYzAI7jHtGk3KiSai0JAkO/nqvrtSAv0k18zJ197tAZfJ/wy4QTzAlNPA9yLaX/tHrUHt2Bp5g0YBK4/REQwb/OhmKl5SQuXo/iY=
-Received: from CY4PR11MB1909.namprd11.prod.outlook.com (10.175.61.147) by
- CY4PR11MB1399.namprd11.prod.outlook.com (10.173.17.13) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1495.9; Tue, 8 Jan 2019 10:56:35 +0000
-Received: from CY4PR11MB1909.namprd11.prod.outlook.com
- ([fe80::5478:c9ff:e5b2:2b4e]) by CY4PR11MB1909.namprd11.prod.outlook.com
- ([fe80::5478:c9ff:e5b2:2b4e%9]) with mapi id 15.20.1495.011; Tue, 8 Jan 2019
- 10:56:35 +0000
-From: <Claudiu.Beznea@microchip.com>
-To: <Nicolas.Ferre@microchip.com>, <alexandre.belloni@bootlin.com>,
- <Ludovic.Desroches@microchip.com>, <linux@armlinux.org.uk>,
- <lgirdwood@gmail.com>, <broonie@kernel.org>, <rjw@rjwysocki.net>,
- <pavel@ucw.cz>, <len.brown@intel.com>
-Subject: [PATCH v2 3/3] ARM: at91: pm: add support for .off_in_suspend
-Thread-Topic: [PATCH v2 3/3] ARM: at91: pm: add support for .off_in_suspend
-Thread-Index: AQHUp0DSqhp6gp2dHEi7kDW5NVtLFg==
-Date: Tue, 8 Jan 2019 10:56:35 +0000
-Message-ID: <1546944944-13911-4-git-send-email-claudiu.beznea@microchip.com>
-References: <1546944944-13911-1-git-send-email-claudiu.beznea@microchip.com>
-In-Reply-To: <1546944944-13911-1-git-send-email-claudiu.beznea@microchip.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: VI1PR04CA0113.eurprd04.prod.outlook.com
- (2603:10a6:803:64::48) To CY4PR11MB1909.namprd11.prod.outlook.com
- (2603:10b6:903:11f::19)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Claudiu.Beznea@microchip.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [94.177.32.154]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; CY4PR11MB1399;
- 6:CfO4UyLDMsICUQSx7Vytv4w6cSTqKrNFUZTHUn0jau9qjKgJzqTVqBKAkHtMqUSwfX5V/WzSMep37sITZiVmVw0lxnKmnFjMuXbQQZTVR+aSbar6GiQKPCd/B13jaCI//c3B66Hr/QVHELKKlX8M73muAtuCenNWclPVeryeTHkBBoSnL0MvochQJUHC8md+nf09q+PbF12cS8y9LrLigRgsUBRDr/Vv5oVSD4X0uCjHkfGCXXkb499g156AeonjBGLTrdX9YNdFi12nlhhwJnXfQv0Xcci/gLYJE+L4YLrIizRDmJr9UzOQXUYNCZzfEYgxHtgZhFnkpV4G6IdjL9KjNd5UQvRf2jpQHrZXr2ZSph8UksDBWQ0wB1SZo8pn78wmg2rAGTvIFBZD5poAmpsPmjOtl811tka0m/9II1I43vh9OQrg9SpYUyLuqHek9FSsP0EEOurl/BF/GOIPRQ==;
- 5:2jFMTt5OtCb0pbsjo7ZcXWJDU2NsRbKutlH4c9+K42TO8vKXefF913BL2/4hc8zgFrDnmJuswAuJnT8Tk0nFq2K97x0kJMi9mGrPiisdMkEyqrZ9OXmB7C/Z2uk7yxuf8Uk+QOu/DGn0swpqmwWZ/NOR7s/uhyQ488VrcSacnGs7BtNuiEzBvfVEnVjO3XYlYxmbW/S6eSxG+KL8uC0Spg==;
- 7:/xne6YrQbRV1JS1LSLxpwIB4obPNG/E27+DC7Kbjga4IggDNHF4YDp9UzPhuBbcrKbi+i+8sBHSPAeEv6cqkstN6Li4TAYo3JW4yr6JeHG2cHZCPd2BZ3Ly/7JmMYsN0AgQ4ZpoiB1eYoqNoEOKS2A==
-x-ms-office365-filtering-correlation-id: 550574c7-b04b-4ab8-0090-08d67557f4e8
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(2017052603328)(7153060)(7193020);
- SRVR:CY4PR11MB1399; 
-x-ms-traffictypediagnostic: CY4PR11MB1399:
-x-microsoft-antispam-prvs: <CY4PR11MB1399AB8F25AD97F56E643167878A0@CY4PR11MB1399.namprd11.prod.outlook.com>
-x-forefront-prvs: 0911D5CE78
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(136003)(39860400002)(376002)(346002)(396003)(366004)(189003)(199004)(6512007)(72206003)(8936002)(2616005)(476003)(102836004)(478600001)(11346002)(97736004)(36756003)(256004)(14444005)(86362001)(71190400001)(2906002)(71200400001)(66066001)(3846002)(6116002)(2201001)(316002)(54906003)(186003)(2501003)(110136005)(305945005)(7736002)(14454004)(446003)(6486002)(6436002)(8676002)(7416002)(6506007)(386003)(81156014)(81166006)(5660300001)(25786009)(99286004)(26005)(39060400002)(107886003)(106356001)(105586002)(76176011)(52116002)(68736007)(4326008)(486006)(53936002)(142923001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:CY4PR11MB1399;
- H:CY4PR11MB1909.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: microchip.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: 4rvXcTFMV1t9ioX0fK9bLxaOH+pdyDCzqRpU3l0vuh8ZCNrM7Vo325Gfajk98eWZqn/E2F/4lUjFZ5LY0mBLEnb0GlqKVwAfPjxojAzEP+YkGsW0WO5e7ruVakl6GaR5tj/QFkAdcxMQuBxcoV+/h0ShvELIOgTHkfP1txej7/cctjaVVOZQoVmrFRXrq2MkzwpCOYYALJcpN8u4dq5i4wFQwi842itkR1D1VgTDRCKMhdbV+Nepll1aKVYQTkL+IVYXv+vdkhQCd7cSHqSOf6qTDlQWSge3AqpM4ggYc1KE8I6/rkEIdiUHERuQAaqD
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1ggp4Y-0004gi-De
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 10:57:45 +0000
+Received: by mail-oi1-x22d.google.com with SMTP id w13so2926926oiw.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 08 Jan 2019 02:57:25 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc:content-transfer-encoding;
+ bh=xWpzVdg/e6UzVOjrd4RtIckInPRkRyaSSS21wxmlbwE=;
+ b=da0gHnAe+uyOwsRktXvfE71bVxMFbgEknQBo2D2+GGapQ6j6CWkaA9mrLq/9UeWD5N
+ 2817lc9ysrpAgHmY1vTrhVh5C125a4jSO0tPE/JdUcLLWYLzV4IFB3R1p45DLDlHdk/1
+ RbMVB1lmLbn0er0GvmSOinw6IQI3E6LGjvXPg=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc:content-transfer-encoding;
+ bh=xWpzVdg/e6UzVOjrd4RtIckInPRkRyaSSS21wxmlbwE=;
+ b=UVVDSZgc2gN2z/OVvayQiG8Onuoj/v+xI5r2MCPhEWqcjgK1yWJD5wwRM0KJmMCKx+
+ frItEv1/IEF7WI4S8PbexzYviCnCQjYO0xsh8LOMhQlQqUaGsdwe9X65B+jCNz6hjY/v
+ BJqpoUt1Ugx5Itkson3Ha9iny4++QWbUDPwJyOOdxL4DdF8Lkm9R5p/m4R5upxRjIvKb
+ 4DcUEwXWs4ab7fDB8MDEL+IL+WvEpPmLUlgP9ExnVfDAAORthJLmcqoiu0eIXWDGUmXS
+ iPAd/mIpJhJ5wvICtrSrvR1zt1CkEGw5BpimkR7+zpbrnJ+g6GdP1qtNZxyMvLdT1qFA
+ o5aA==
+X-Gm-Message-State: AJcUuke3BmwpRZqi3nV53WCLPq6+YhM/EaCMeJwMxqfdULxkOtET1kfO
+ nnqDqGkjgSujZrikVHr6aAoXgZuIYaHpz2PDW1Wh9w==
+X-Google-Smtp-Source: ALg8bN785s8id1Mhe/zipIcUqyQef83MGcXhYd7OHCu7MT/49DFLViIwU3g2vSL/Z1k2XsLyvWZ9lDPZruQWGHRhtCc=
+X-Received: by 2002:aca:f103:: with SMTP id p3mr805419oih.94.1546945044745;
+ Tue, 08 Jan 2019 02:57:24 -0800 (PST)
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: 550574c7-b04b-4ab8-0090-08d67557f4e8
-X-MS-Exchange-CrossTenant-originalarrivaltime: 08 Jan 2019 10:56:35.3609 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: CY4PR11MB1399
-X-OriginatorOrg: microchip.com
+References: <CAKKE0ZHmODzhvjPNJFVgT2cF_F=f2kNKr5K_CGP+0XgA5XZokw@mail.gmail.com>
+ <20190108004632.GA3247@icarus>
+In-Reply-To: <20190108004632.GA3247@icarus>
+From: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Date: Tue, 8 Jan 2019 11:57:13 +0100
+Message-ID: <CA+M3ks7wX6MxvapDi_5SQ0rkJWoV+BcmzmbvtiqHVBzrrwAp4g@mail.gmail.com>
+Subject: Re: New IIO/counter driver
+To: William Breathitt Gray <vilhelm.gray@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_025638_972422_78DD3EBF 
-X-CRM114-Status: GOOD (  14.52  )
+X-CRM114-CacheID: sfid-20190108_025726_983691_9615650F 
+X-CRM114-Status: GOOD (  20.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -128,123 +87,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Claudiu.Beznea@microchip.com, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-pm@vger.kernel.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: devicetree@vger.kernel.org, Lars-Peter Clausen <lars@metafoo.de>,
+ Benjamin GAIGNARD <benjamin.gaignard@st.com>, linux-iio@vger.kernel.org,
+ Patrick Havelange <patrick.havelange@essensium.com>,
+ Hartmut Knaack <knaack.h@gmx.de>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Peter Meerwald-Stadler <pmeerw@pmeerw.net>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Andrew Morton <akpm@linux-foundation.org>,
+ Fabrice Gasnier <fabrice.gasnier@st.com>, Jonathan Cameron <jic23@kernel.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Claudiu Beznea <claudiu.beznea@microchip.com>
-
-Add support to check if platform is off in suspend. The check is based on
-pm_data.mode and CPU's regulator which will be turn off in suspend.
-
-Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
----
- arch/arm/mach-at91/pm.c | 61 +++++++++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 57 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 51e808adb00c..be9bd482772b 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -16,6 +16,7 @@
- #include <linux/of.h>
- #include <linux/of_platform.h>
- #include <linux/parser.h>
-+#include <linux/regulator/consumer.h>
- #include <linux/suspend.h>
- 
- #include <linux/clk/at91_pmc.h>
-@@ -164,6 +165,47 @@ static int at91_pm_config_ws(unsigned int pm_mode, bool set)
- 	return mode ? 0 : -EPERM;
- }
- 
-+static const struct of_device_id sama5d2_cpu_reg_ids[] = {
-+	{ .compatible = "active-semi,act8945a",		.data = "VDD_1V2" },
-+	{ /* sentinel */ }
-+};
-+
-+static struct regulator *at91_pm_cpu_regulator_get(void)
-+{
-+	struct device *cpu_dev = get_cpu_device(0);
-+	static struct regulator *cpu_reg;
-+	const struct of_device_id *match;
-+	struct platform_device *pdev;
-+	struct device_node *np;
-+
-+	if (!cpu_dev)
-+		return cpu_reg;
-+
-+	if (!cpu_reg) {
-+		for_each_matching_node_and_match(np, sama5d2_cpu_reg_ids,
-+						 &match) {
-+			pdev = of_find_device_by_node(np);
-+			if (!pdev)
-+				continue;
-+
-+			cpu_reg = regulator_get(cpu_dev, match->data);
-+			put_device(&pdev->dev);
-+			break;
-+		}
-+	}
-+
-+	return cpu_reg;
-+}
-+
-+static bool at91_pm_state_allowed(suspend_state_t state)
-+{
-+	struct regulator *reg;
-+
-+	reg = at91_pm_cpu_regulator_get();
-+
-+	return reg && regulator_is_disabled_in_suspend(reg, state);
-+}
-+
- /*
-  * Called after processes are frozen, but before we shutdown devices.
-  */
-@@ -182,6 +224,9 @@ static int at91_pm_begin(suspend_state_t state)
- 		pm_data.mode = -1;
- 	}
- 
-+	if (pm_data.mode == AT91_PM_BACKUP && !at91_pm_state_allowed(state))
-+		return -EPERM;
-+
- 	return at91_pm_config_ws(pm_data.mode, true);
- }
- 
-@@ -321,12 +366,20 @@ static void at91_pm_end(void)
- 	at91_pm_config_ws(pm_data.mode, false);
- }
- 
-+static bool at91_pm_off_in_suspend(suspend_state_t state)
-+{
-+	if (pm_data.mode != AT91_PM_BACKUP)
-+		return false;
-+
-+	return at91_pm_state_allowed(state);
-+}
- 
- static const struct platform_suspend_ops at91_pm_ops = {
--	.valid	= at91_pm_valid_state,
--	.begin	= at91_pm_begin,
--	.enter	= at91_pm_enter,
--	.end	= at91_pm_end,
-+	.valid		= at91_pm_valid_state,
-+	.begin		= at91_pm_begin,
-+	.enter		= at91_pm_enter,
-+	.end		= at91_pm_end,
-+	.off_in_suspend	= at91_pm_off_in_suspend,
- };
- 
- static struct platform_device at91_cpuidle_device = {
--- 
-2.7.4
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+TGUgbWFyLiA4IGphbnYuIDIwMTkgw6AgMDE6NDYsIFdpbGxpYW0gQnJlYXRoaXR0IEdyYXkKPHZp
+bGhlbG0uZ3JheUBnbWFpbC5jb20+IGEgw6ljcml0IDoKPgo+IE9uIE1vbiwgSmFuIDA3LCAyMDE5
+IGF0IDAyOjQ1OjM3UE0gKzAxMDAsIFBhdHJpY2sgSGF2ZWxhbmdlIHdyb3RlOgo+ID4gSGVsbG8s
+Cj4gPgo+ID4gSSdtIGluIHRoZSBwcm9jZXNzIG9mIGFkZGluZyBhIG5ldyBJSU8vY291bnRlciBk
+cml2ZXIsIGhvd2V2ZXIgSSBhbHNvIHNhdwo+ID4gdGhhdCB0aGVyZSB3YXMgYSB3b3JrIGluIHBy
+b2dyZXNzIHRvIGhhdmUgYSBzZXBhcmF0ZSBjb3VudGVyIHN1YnN5c3RlbSAoCj4gPiBodHRwczov
+L21hcmMuaW5mby8/bD1saW51eC1paW8mbT0xNTM5NzQxNjc3MjcyMDYgKS4gQnV0IGl0IHNlZW1z
+IHRoZXJlIGlzCj4gPiBubyByZWNlbnQgcHJvZ3Jlc3Mgb24gaXQuCj4gPiBXaGF0IGlzIHRoZSBz
+dGF0ZSBvZiB0aG9zZSBwYXRjaGVzID8gSXMgaXQgc3RpbGwgaW50ZXJlc3RpbmcgdG8gZGV2ZWxv
+cCB0aGUKPiA+IGRyaXZlciBhcyBhbiBJSU8vY291bnRlciAsIG9yIHNob3VsZCBJIHVzZSBhbHJl
+YWR5IHRoYXQgbmV3IHN1YnN5c3RlbSA/Cj4gPgo+ID4gQmVzdCBSZWdhcmRzLAo+ID4KPiA+IFBh
+dHJpY2sgSGF2ZWxhbmdlLgo+Cj4gSGVsbG8sCj4KPiBJIGFtIHN0aWxsIG9wZW4gdG8gbWVyZ2lu
+ZyB0aGlzIHBhdGNoc2V0IGFuZCBtYWludGFpbmluZyB0aGUgQ291bnRlcgo+IHN1YnN5c3RlbS4g
+SG93ZXZlciwgSSB0b29rIHRoZSBsYWNrIG9mIHJlc3BvbnNlIGZvciBteSBsYXRlc3QKPiBzdWJt
+aXNzaW9uIHRvIGluZGljYXRlIGEgbG9zcyBvZiBpbnRlcmVzdCBpbiB0aGlzIHBhdGNoc2V0J3Mg
+YXBwcm9hY2guCj4gSWYgdGhlcmUgYXJlIHN0aWxsIHBlb3BsZSB3aG8gd2FudCB0aGlzLCBJIGNh
+biByZWJhc2UgYW5kIHJlc2VuZCB0aGlzCj4gcGF0Y2hzZXQgZm9yIHN1Ym1pc3Npb247IHRoZSBw
+YXN0IGZldyB2ZXJzaW9ucyBoYXZlIHByaW1hcmlseSBiZWVuIGNvZGUKPiBjbGFyaXR5IGFuZCBk
+b2N1bWVudGF0aW9uIGNoYW5nZXMgc28gSSBiZWxpZXZlIHRoZSBjb3JlIGRlc2lnbiBpdHNlbGYg
+aXMKPiBzb21ld2hhdCBzdGFibGUgbm93Lgo+Cj4gSnVzdCBsZXQgbWUga25vdyBob3cgYmVzdCB0
+byBwcm9jZWVkIGFuZCBJIHNoYWxsIGJlIGhhcHB5IHRvIG9ibGlnZSAtLQo+IHdoZXRoZXIgdG8g
+Y29udGludWUgbWFpbnRhaW5pbmcgdGhpcyBwYXRjaHNldCBvciB0byBkcm9wIHRoaXMgZGVzaWdu
+IGluCj4gZmF2b3Igb2YgaW1wcm92aW5nIHRoZSBleGlzdGluZyBJSU8gQ291bnRlciBjb2RlIGlu
+IHRoZSBrZXJuZWwuCj4KPiBJJ2xsIENDIHRob3NlIGZyb20gdGhlIHBhdGNoc2V0IHN1Ym1pc3Np
+b24gdG8ga2VlcCB0aGVtIGluIHRoZSBsb29wLgoKSSBjb25maXJtIHRoYXQgSSBzdGlsbCBpbnRl
+cmVzdGVkIHRvIGdldCB0aG9zZSBwYXRjaGVzIG1lcmdlZC4KClJlZ2FyZHMsCkJlbmphbWluCj4K
+PiBTaW5jZXJlbHksCj4KPiBXaWxsaWFtIEJyZWF0aGl0dCBHcmF5Cj4KPiBfX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwo+IGxpbnV4LWFybS1rZXJuZWwgbWFp
+bGluZyBsaXN0Cj4gbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCj4gaHR0cDov
+L2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCgoK
+Ci0tIApCZW5qYW1pbiBHYWlnbmFyZAoKR3JhcGhpYyBTdHVkeSBHcm91cAoKTGluYXJvLm9yZyDi
+lIIgT3BlbiBzb3VyY2Ugc29mdHdhcmUgZm9yIEFSTSBTb0NzCgpGb2xsb3cgTGluYXJvOiBGYWNl
+Ym9vayB8IFR3aXR0ZXIgfCBCbG9nCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2Vy
+bmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1h
+bi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
