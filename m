@@ -2,85 +2,65 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CF376C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 15:28:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E5822C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 15:40:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9CCDE20657
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 15:28:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B6B4C20883
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 15:40:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OYN+3NZB";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="HTr1FAIf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9CCDE20657
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dpHljnrR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B6B4C20883
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=It6OfEYxh0d4VbUmxLKLEQistajE6y6J6dnhwptd+Yc=; b=OYN+3NZBYcWORW
-	A3+a+3TjRGbr4EcnhTKCtRbCsRJIv9ZmIkroqBrqu/fhlGl53DaGUPgodgYyZr8Nc+QLEyCDRjf7G
-	szJn230PA5KaI9mvalbF6BJczICmwqmGw1vIzNt4bqy2XEma9B5xpM9o7mEE1JqVcOCOsdL3V81Uy
-	WH8r/KyUFBS6bnzq54wDChxZ9oU7E8LJWswwvrE3BMZkXsc3Fk0eIG95JjXhEYUuuOwjxzbX9bnSl
-	XuCLyNb4CUE6+1nmylb0iGKY9HwzANbIv85fOHauQ1pOJz4nXK6eLC7VY2PWis93gxEtBv1BvKOBr
-	FWvfq39JK8J2s1TZybsA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=+rZEAFPKldhF2lWPYYllGNmWY+pdbnfQ86TEqQY8AKo=; b=dpHljnrRN1fdep
+	hQnNfWJTZB64mlrlwIcXtAKleJr2AD16GUKkDH5io/MwworJbHs/2+U8sUe0/5SxMfFg5hZ+ML72E
+	2F+HvZHNy+BXPUKQj87UYgWpejMcpq3cANAmLnOQqJtXhaS8B7d3taXA6kDJQ1H82zOGVx2BCYNCe
+	6RhS5PIe1g75ZnqcJ/o3v7pqMEI1bBt1j9UhRDHemfNPkuF3XftNNnd2ST3s4J7zpXV7J7yY2lRTp
+	JqQMG7persUq+pMpNlrBnKZiYcnSWwL/ZL2n3cVzJESMtwTfvAZjEUqNN2xSsz0Qny0kFOuaPNQzW
+	4tvKBkYRymYru063jk7Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggtJ3-0006aJ-HI; Tue, 08 Jan 2019 15:28:41 +0000
-Received: from mail-ed1-x544.google.com ([2a00:1450:4864:20::544])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggtJ0-0006Zn-9O
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 15:28:39 +0000
-Received: by mail-ed1-x544.google.com with SMTP id h15so4621420edb.4
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 08 Jan 2019 07:28:37 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=4K6IrfJGLuqOXV0rX4sdp3u8fI3xqpWy1jqXH78SKIU=;
- b=HTr1FAIfKdIpzMCSqSHifDPKvfZQ5ijKIqyxAnzCi6g+18bJJRAYJuSaxfi0gCcH4j
- RBOPMO/39tjOYjMTrkw23K7iszPzbSV44PnfbAewgf89PWnO2woiZ9lFTs0ZsbAjpo0K
- AoB0adGfIfHS546s3DhS1X4e8Apo0TCdZdKHg=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=4K6IrfJGLuqOXV0rX4sdp3u8fI3xqpWy1jqXH78SKIU=;
- b=IfdzEtrY6xW7rXPPcwFybdd4zAocC2MnIehE5lyYLJ9fR15Sm/s7mTo/Ae+09F50jq
- RkLod+EyLw34hbu1Pgvcw5P0D0QYDSc8Iwta1iXCN3SVOUFCcSiXgdO8t6lZv5QjAjep
- Kpm5spsneICMougCjN2d4KLDgKqFU5kXD7zxO+idyWVmc1ICPr8/suwrlEUOkHZkFei/
- 3o0VZW5VIAkH5hKlHgvglLML6yXtvpU0oOJxAWSYY0biRKpfQ6bq91Vlw6nTubKjXirs
- 1FJBUAFcuLzErJpLocxlueNTSAUrizXU8SfaYwAT7Us02Y6Ielw8HjOybXWjwPruY8w9
- hStg==
-X-Gm-Message-State: AJcUukcFBnQIc9BfCL8+i1ZFHmuD97LQNnvVQg9yzfBiDA/WlwTSm4N1
- CQJugoO2WoirNe+eXaCxJ9vSHA==
-X-Google-Smtp-Source: ALg8bN7lsSRempJZTBNRWcnOR1FM2UfPRGxKEqGRxAcuFv/MbR66pL1icSrLU/ho7bOsU2q96l/QBw==
-X-Received: by 2002:a17:906:1189:: with SMTP id
- n9-v6mr2216625eja.2.1546961315691; 
- Tue, 08 Jan 2019 07:28:35 -0800 (PST)
-Received: from localhost.localdomain
- (laubervilliers-657-1-83-120.w92-154.abo.wanadoo.fr. [92.154.90.120])
- by smtp.gmail.com with ESMTPSA id m44sm65715edm.54.2019.01.08.07.28.34
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 08 Jan 2019 07:28:34 -0800 (PST)
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-To: linux-efi@vger.kernel.org
-Subject: [PATCH] efi: use 32-bit alignment for efi_guid_t
-Date: Tue,  8 Jan 2019 16:28:29 +0100
-Message-Id: <20190108152829.11579-1-ard.biesheuvel@linaro.org>
-X-Mailer: git-send-email 2.20.1
+	id 1ggtUS-000496-P5; Tue, 08 Jan 2019 15:40:28 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ggtUO-000488-Au
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 15:40:26 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4BF9780D;
+ Tue,  8 Jan 2019 07:40:21 -0800 (PST)
+Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 1007D3F5AF;
+ Tue,  8 Jan 2019 07:40:18 -0800 (PST)
+Date: Tue, 8 Jan 2019 15:40:13 +0000
+From: Dave Martin <Dave.Martin@arm.com>
+To: Julien Thierry <julien.thierry@arm.com>
+Subject: Re: [PATCH v8 12/26] arm64: irqflags: Use ICC_PMR_EL1 for interrupt
+ masking
+Message-ID: <20190108153957.GA5840@e103592.cambridge.arm.com>
+References: <1546956464-48825-1-git-send-email-julien.thierry@arm.com>
+ <1546956464-48825-13-git-send-email-julien.thierry@arm.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <1546956464-48825-13-git-send-email-julien.thierry@arm.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_072838_332346_F8FF3A9D 
-X-CRM114-Status: GOOD (  11.90  )
+X-CRM114-CacheID: sfid-20190108_074024_384982_BDFC7E27 
+X-CRM114-Status: GOOD (  18.05  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,61 +72,72 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Heinrich Schuchardt <xypron.glpk@gmx.de>, leif.lindholm@linaro.org,
- lersek@redhat.com, mingo@kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>, marc.zyngier@arm.com,
+ catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ christoffer.dall@arm.com, james.morse@arm.com, Oleg Nesterov <oleg@redhat.com>,
+ joel@joelfernandes.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The UEFI spec and EDK2 reference implementation both define EFI_GUID as
-struct { u32 a; u16; b; u16 c; u8 d[8]; }; and so the implied alignment
-is 32 bits not 8 bits like our guid_t. In some cases (i.e., on 32-bit ARM),
-this means that firmware services invoked by the kernel may assume that
-efi_guid_t* arguments are 32-bit aligned, and use memory accessors that
-do not tolerate misalignment. So let's set the minimum alignment to 32 bits.
+On Tue, Jan 08, 2019 at 02:07:30PM +0000, Julien Thierry wrote:
+> Instead disabling interrupts by setting the PSR.I bit, use a priority
+> higher than the one used for interrupts to mask them via PMR.
+> 
+> When using PMR to disable interrupts, the value of PMR will be used
+> instead of PSR.[DAIF] for the irqflags.
+> 
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Oleg Nesterov <oleg@redhat.com>
+> ---
+>  arch/arm64/include/asm/efi.h      |  11 ++++
+>  arch/arm64/include/asm/irqflags.h | 123 +++++++++++++++++++++++++++++---------
+>  2 files changed, 106 insertions(+), 28 deletions(-)
 
-Note that the UEFI spec as well as some comments in the EDK2 code base
-suggest that EFI_GUID should be 64-bit aligned, but this appears to be
-a mistake, given that no code seems to exist that actually enforces that
-or relies on it.
+[...]
 
-Reported-by: Heinrich Schuchardt <xypron.glpk@gmx.de>,
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- include/linux/efi.h | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+> diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
+> index 24692ed..fa3b06f 100644
+> --- a/arch/arm64/include/asm/irqflags.h
+> +++ b/arch/arm64/include/asm/irqflags.h
+> @@ -18,7 +18,9 @@
 
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index 45ff763fba76..be08518c2553 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -48,7 +48,20 @@ typedef u16 efi_char16_t;		/* UNICODE character */
- typedef u64 efi_physical_addr_t;
- typedef void *efi_handle_t;
- 
--typedef guid_t efi_guid_t;
-+/*
-+ * The UEFI spec and EDK2 reference implementation both define EFI_GUID as
-+ * struct { u32 a; u16; b; u16 c; u8 d[8]; }; and so the implied alignment
-+ * is 32 bits not 8 bits like our guid_t. In some cases (i.e., on 32-bit ARM),
-+ * this means that firmware services invoked by the kernel may assume that
-+ * efi_guid_t* arguments are 32-bit aligned, and use memory accessors that
-+ * do not tolerate misalignment. So let's set the minimum alignment to 32 bits.
-+ *
-+ * Note that the UEFI spec as well as some comments in the EDK2 code base
-+ * suggest that EFI_GUID should be 64-bit aligned, but this appears to be
-+ * a mistake, given that no code seems to exist that actually enforces that
-+ * or relies on it.
-+ */
-+typedef guid_t efi_guid_t __aligned(__alignof__(u32));
- 
- #define EFI_GUID(a,b,c,d0,d1,d2,d3,d4,d5,d6,d7) \
- 	GUID_INIT(a, b, c, d0, d1, d2, d3, d4, d5, d6, d7)
--- 
-2.20.1
+[...]
 
+>  static inline void arch_local_irq_enable(void)
+>  {
+> -	asm volatile(
+> -		"msr	daifclr, #2		// arch_local_irq_enable"
+> -		:
+> +	unsigned long unmasked = GIC_PRIO_IRQON;
+> +
+> +	asm volatile(ALTERNATIVE(
+> +		"msr	daifclr, #2		// arch_local_irq_enable\n"
+> +		"nop",
+> +		"msr_s  " __stringify(SYS_ICC_PMR_EL1) ",%0\n"
+> +		"dsb	sy",
+
+I'm still not convinced these dsbs are needed.
+
+Without the dsb, we are probably not guaranteed to take a pending
+interrupt _immediately_ on unmasking, but I'm not sure that's a
+problem.
+
+What goes wrong if we omit them?
+
+(My attempts to answer these questions using the GIC architecture spec
+have met with limited success so far...)
+
+[...]
+
+Cheers
+---Dave
 
 _______________________________________________
 linux-arm-kernel mailing list
