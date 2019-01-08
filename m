@@ -2,64 +2,75 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 741F8C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 23:22:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2637BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 23:32:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3870D20665
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 23:22:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E6E42214C6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 23:32:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gBjKpSJH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3870D20665
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iBwlmlnA";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="YSCC/Iuu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E6E42214C6
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=imoxaYVIMbJ/yRtIV9ALycoHQYAvzVjYjx9yc1YKy/Y=; b=gBjKpSJHaL9ionXGx9cJIGvsh
-	8aL+HQu4009LmF7nuSu0F1EfxxAiWyermCT8SSf04CuRlyIkZjY3iuSxWBvZoIKIo5qy0VM+CoMmU
-	CcFM0PWr9vxlkU2fG/HzCMB9u2ETwkswQJvC+SgTRZAYz7QhQXlBT8gpMXoBrD/+q+NfKpUPxFNm/
-	CgCn+3b8I/IJfTos0R8e8+hb6Tp/JuMVXHK6okw7wqg1+0hTGf0EqVHu3/pvm7uNKnad6aXc9Txgv
-	yrq+s1Hqxfp8vt5rFyJJzuhE1FSiStFp9/uparHFWCpRM5xBz2K8sNCSY+w+it84KsEeRZHCdjAzi
-	qx0Aqn4uQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=KCxgT5jG2/8E9QsKko6oszOlhcwT7HBra/aHXtfavls=; b=iBwlmlnACGGwXH
+	5ML5qOpS7hs5nC5csgrtS3Y9gPec4h8WbIXT+ZoCzjhzj/qURAcyuTsDLHOzBdFhMOrSOpYeBABm3
+	LEQGpIrACgBt/f/vfnsW2fYJ0AIrTU/RQnk37KY4UbgykQJE2iOOiet481Almi66aeGfvMb1GlS9S
+	uQnZfDk/Yw7MhbdM3yNI3KGyANlRihv8DNuCrk7Gn9ZVIIvRyDS0PZeHi+qqRGveRqTfiglDxF0Cq
+	FtE2Am9nKZpAU8NphnoYfv82vT1T4EjAMxsPKOwnu9CZRkXmxrN3orsDC0a+Wp7tx6hOsVe9RHu2n
+	6Ob6Z1za8pZ2t2nLdPeg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gh0hJ-0003W8-K3; Tue, 08 Jan 2019 23:22:13 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gh0hE-0003Vb-Rx; Tue, 08 Jan 2019 23:22:10 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id CB86980D;
- Tue,  8 Jan 2019 15:22:04 -0800 (PST)
-Received: from [192.168.1.123] (usa-sjc-mx-foss1.foss.arm.com [217.140.101.70])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 7D3E93F5AF;
- Tue,  8 Jan 2019 15:22:03 -0800 (PST)
-Subject: Re: [PATCH 5/5] arm64: dts: rockchip: Fix nanopi4 uSD card detect
-To: Heiko Stuebner <heiko@sntech.de>
-References: <cover.1546981251.git.robin.murphy@arm.com>
- <83098c7ecc471a77dd89564f5f98fcf30c1ed431.1546981251.git.robin.murphy@arm.com>
- <6925511.AQqqGbhmY3@phil>
-From: Robin Murphy <robin.murphy@arm.com>
-Message-ID: <c2c40662-f7aa-75d5-572e-c58b21170b59@arm.com>
-Date: Tue, 8 Jan 2019 23:22:01 +0000
-User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:60.0) Gecko/20100101
- Thunderbird/60.3.3
+	id 1gh0qs-00074E-G6; Tue, 08 Jan 2019 23:32:06 +0000
+Received: from pandora.armlinux.org.uk
+ ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gh0qp-00073I-0q
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 23:32:05 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=ZDpqMIOfSr80qqy4WqGmoqDm1tA8iRjzyqUWs77v9hw=; b=YSCC/Iuu4hcibcnt+3fd/pdu4
+ VI6WQA0g6fGBNHBuaPXlISIs3/naf9d0hwkDuj9jYXCNGwGR1oCV7+zP+JbKCbnaRG7NhiDwiQaON
+ FYQ5RVYeo7wVcxELm7psFb/PrELdekvRzbEbZ0k1x56ujZtBRn7fAtpeLacAhvyXENQrU=;
+Received: from n2100.armlinux.org.uk
+ ([fd8f:7570:feb6:1:214:fdff:fe10:4f86]:38817)
+ by pandora.armlinux.org.uk with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
+ (envelope-from <linux@armlinux.org.uk>)
+ id 1gh0qT-0004wk-Dp; Tue, 08 Jan 2019 23:31:41 +0000
+Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
+ (envelope-from <linux@n2100.armlinux.org.uk>)
+ id 1gh0qQ-0007a6-QT; Tue, 08 Jan 2019 23:31:39 +0000
+Date: Tue, 8 Jan 2019 23:31:37 +0000
+From: Russell King - ARM Linux <linux@armlinux.org.uk>
+To: Lubomir Rintel <lkundrak@v3.sk>
+Subject: Re: [PATCH v4 01/15] ARM: export arm_pm_restart()
+Message-ID: <20190108233137.GW11171@n2100.armlinux.org.uk>
+References: <20190108175818.705110-1-lkundrak@v3.sk>
+ <20190108175818.705110-2-lkundrak@v3.sk>
 MIME-Version: 1.0
-In-Reply-To: <6925511.AQqqGbhmY3@phil>
-Content-Language: en-GB
+Content-Disposition: inline
+In-Reply-To: <20190108175818.705110-2-lkundrak@v3.sk>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_152208_907310_3B6920CC 
-X-CRM114-Status: GOOD (  21.06  )
+X-CRM114-CacheID: sfid-20190108_153203_070367_35235507 
+X-CRM114-Status: GOOD (  11.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,83 +82,34 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-rockchip@lists.infradead.org, tomeu.vizoso@collabora.com,
- linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ James Cameron <quozl@laptop.org>, linux-pm@vger.kernel.org,
+ linux-kernel@vger.kernel.org, x86@kernel.org,
+ Sebastian Reichel <sre@kernel.org>, platform-driver-x86@vger.kernel.org,
+ Rob Herring <robh+dt@kernel.org>, linux-arm-kernel@lists.infradead.org,
+ Pavel Machek <pavel@ucw.cz>, Darren Hart <dvhart@infradead.org>,
+ Andy Shevchenko <andy@infradead.org>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 2019-01-08 10:42 pm, Heiko Stuebner wrote:
-> Am Dienstag, 8. Januar 2019, 22:57:27 CET schrieb Robin Murphy:
->> For whatever reason, the sdmmc_dectn function isn't working properly
->> as-is, and microSD insertion and removal goes unnoticed. Flipping the
->> pin into GPIO mode, however, does do the job, so let's just handle it
->> that way for now until someone feels inclined to figure out what GRF
->> voodoo or otherwise is needed for correct 'native' operation.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>   arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi | 7 ++++++-
->>   1 file changed, 6 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi
->> index 9c723038d8f8..2a183a6af150 100644
->> --- a/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi
->> +++ b/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi
->> @@ -505,6 +505,10 @@
->>   		sdmmc0_pwr_h: sdmmc0-pwr-h {
->>   			rockchip,pins = <0 RK_PA1 RK_FUNC_GPIO &pcfg_pull_none>;
->>   		};
->> +
->> +		sdmmc0_det_l: sdmmc0-det-l {
-> 
-> alphabetically by node-name please,
-> aka sdmmc0-det-* should be above sdmmc0-pwr-*
+On Tue, Jan 08, 2019 at 06:58:04PM +0100, Lubomir Rintel wrote:
+> The OLPC XO 1.75 laptop is rebooted with a command to the Embedded
+> Controller. The EC driver should be a module, since most people don't need
+> it to be compiled in.
 
-Right you are, not sure how that one slipped through.
+Why do you need this - is there a reason why you can't hook onto the
+restart_handler_list using register_restart_handler()?  The registered
+handlers are passed the command.
 
-> If you're respinning the whole series this should be fixed,
-> otherwise I can also do that when applying.
+I would rather this is not exported to modules, it is generally unsafe
+to hook stuff by directly poking function pointers from module code.
 
-I've fixed it up locally, although it might be worth holding off on this 
-particular patch for the moment now that I've taken another look through 
-the TRM and noticed those smoking-gun-looking bits in 
-GRF_SIG_DETECT_CON{0,1} - I'll investigate...
-
-[ side note - do you reckon there'd be any value in bolting a debugfs 
-interface onto the GRF driver, or is the realistic answer to just use 
-/dev/mem like everyone else and stop having silly ideas? ]
-
-Thanks,
-Robin.
-
-> 
-> 
-> Heiko
-> 
->> +			rockchip,pins = <0 RK_PA7 RK_FUNC_GPIO &pcfg_pull_up>;
->> +		};
->>   	};
->>   
->>   	sdio-pwrseq {
->> @@ -563,9 +567,10 @@
->>   	bus-width = <4>;
->>   	cap-sd-highspeed;
->>   	cap-mmc-highspeed;
->> +	cd-gpios = <&gpio0 RK_PA7 GPIO_ACTIVE_LOW>;
->>   	disable-wp;
->>   	pinctrl-names = "default";
->> -	pinctrl-0 = <&sdmmc_bus4 &sdmmc_cd &sdmmc_clk &sdmmc_cmd>;
->> +	pinctrl-0 = <&sdmmc_bus4 &sdmmc0_det_l &sdmmc_clk &sdmmc_cmd>;
->>   	sd-uhs-sdr104;
->>   	vmmc-supply = <&vcc3v0_sd>;
->>   	vqmmc-supply = <&vcc_sdio>;
->>
-> 
-> 
-> 
-> 
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
 
 _______________________________________________
 linux-arm-kernel mailing list
