@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A25A7C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 09:17:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C3195C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 09:17:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4FDDB2089F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 09:17:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 83D252089F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 09:17:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Om94nsM7";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="t/6BSrAC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4FDDB2089F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cSMxEkPQ";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="SkoiwJ7m"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 83D252089F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,68 +26,68 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kurp9JMaJh0Rbe/O45wpE3nSxQgrnusFC0h17qfu7kQ=; b=Om94nsM78KPaAs
-	WBY6JsP+IdiJwHICVZsNYBLnFroIq+HyMbbsQEiWw+Fi0tsd8MUyZCuQYj7lH8guK7NjMYODxqUY4
-	fhR0dy8hhfBV23o7ek6ZkTEY+FS8MJOSQH8/JvGzt0z1ZXIJwyvOFJk1e4m1qds5TQmfYsKmyjpkB
-	g1Cdgz053yrfE4Fln7r0zd62PJzzARVoWxV2arkmJEk9SgfS6vwpZ+djRJ5+VOPMMDkfpgaX8MFfR
-	zONnxh6y5YWhTU5fVmNzfPhuTQQvbd1AVm61dKnTqcALy/vqnvxiny0v63UO94UBecz9WbadBuuT8
-	8U+jVlu1/I4vtgGFe5Aw==;
+	List-Owner; bh=PBhkTvIOigkr7cf8rmvH+ZbjrYKqcWK6vBlngWqipec=; b=cSMxEkPQKSv/Kb
+	k4Y1VNbe6h0BjT3OBqv4EDQyH/1+3ZCGlE2W3xHBh+qI4XxjPDyvwp4hNHUJoVPRh79F9eZ+1o+cu
+	0kBKllmwgJv3mM2k0hSHixyYNzwWwaWCqLAZ1X9Qk8wCR/FAnfkalOpvrDOk8xDlL1jqN8v2ajagC
+	011rqJt7XYj+uG1jFaUSCHACI76EDEHFPGrTh1egqph4vttoOzd2ph7qyr2zhQ0CwTwnmT9LK/yDn
+	vGmU4YWQK9WBFOPSvi8532qszHgArzcWIR2sO3g1XF4wMBIwrUkeIb7nBYN8w/+Zb8+ZzPRRHrXF6
+	L4a1AO6JKeMx3ldkpzUg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggnVZ-0008E3-9t; Tue, 08 Jan 2019 09:17:13 +0000
-Received: from mail-ed1-x544.google.com ([2a00:1450:4864:20::544])
+	id 1ggnVm-0008SW-U6; Tue, 08 Jan 2019 09:17:26 +0000
+Received: from mail-ed1-x543.google.com ([2a00:1450:4864:20::543])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggnUK-0006sv-TE
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 09:16:01 +0000
-Received: by mail-ed1-x544.google.com with SMTP id y20so3439003edw.9
+ id 1ggnUL-0006to-Nr
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 09:16:02 +0000
+Received: by mail-ed1-x543.google.com with SMTP id x30so3485314edx.2
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 08 Jan 2019 01:15:56 -0800 (PST)
+ Tue, 08 Jan 2019 01:15:57 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=NtdPGnoNcOA+uAMeykOlFvJi5M25GSj2otU8Jlp5mq4=;
- b=t/6BSrACMpojsU1VWdUposfrHgGClFWcP71qT2s+vhPd/29df5n7Ij1XEIkIpX3trL
- Ng0MgVNjxdG8ubvZUNa5zZLkG5dheBnqizItOOhgONxNx/eyS9KTcjKDTeANVeRPf6UO
- zJMQmr/kkrSCSqcLoqc6J5iPa83k2FKKpUaRPVsmLDK1VnY2wx4fCVi2/l3E15nwXem4
- q9K6APrr05FYA/HC093TIqL6BiD0WWAuCYBcfsDPC/qaF+wCBvs4uTjCvX7BDzSq1wn8
- afdElkXMePx1AXpaQ9JW0FsxZUUJM4Q1znYXW8A0gCDU/LIzplp2S240APmLJjWaGBl0
- M/cA==
+ bh=hh5b2k/7h0Wkn2rLn6NIi7mvwMbeZ/cPsG4EAD277Kg=;
+ b=SkoiwJ7mSICbm05UcVobOCupwPj7xv1ZeuUR0Khw9wxNITzWgKNtdimlgv7XTUWAis
+ 2ugNlNJEvdY9KG5yJ9922gDbYhSWs5Nz0ghJwbYqrg2Y51kMeueMvewtjf1UVBc8gaWc
+ M4VV7MPIDiv95So++iXt/5Dlv1ec3R0cYyZeRKB4nPJUSFcz5c6891WOdCbX42Oo42lo
+ p5NvKyBdNhLXTJNFUR+eNNVOkNn6R4yORHZIhX9d+EqjcR3mWEdymo0ZNxDztspCSXxF
+ XB3wFSYErdZYf/WSdhYwIE59inECFrbHcoMCxrrsWjLlcYfiLOIZCDifDpUgJXcVORKn
+ bsKw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=NtdPGnoNcOA+uAMeykOlFvJi5M25GSj2otU8Jlp5mq4=;
- b=lN0GwIe/INIs8rMmpzb5OPk/CczoUxNk9dx7ROhNw8+I4RZMQSEiSV+1kRm+nSOxEp
- I9ZVOliPFTdJRzFFW4qrK+lph89pl2unRL6SknpmgWqCML+EOhR/d/pfQKZsVqMgeSPO
- b7NO4BbhyKTssApRPgXJEcW/uVsOdV8Dc84fNvb2h3bhjEEc01IbVJFf1ABjy+1f1lvG
- GRRRdP22JExduhdfXLN0Y/u8gkHVjK8rH93GqgUo40fFNQDqBrKCH58uhhHRnMybGNxb
- XPoPNKGJC4T6fpdxdcMxvHZHxxydIrgPwvGoeT4SGhaoLFlaX5l5h43FgZB2PKKJxXoA
- h3Aw==
-X-Gm-Message-State: AJcUukel5Lq04XjfcyCWg6TZsAKrFGeMsXVhPi9d1lJVFo/0HrJXXKiy
- bgt5ox1KoKmXlamhYZhN7gCk1g==
-X-Google-Smtp-Source: ALg8bN6piq7qJ+WWVxnfv6jG2DOxdEePGwG+y2iIZUUo5LaSwZYTsK5Ajo1QMxe2Al6D7q6w0wW7Eg==
-X-Received: by 2002:a50:f5af:: with SMTP id u44mr1351249edm.172.1546938955234; 
- Tue, 08 Jan 2019 01:15:55 -0800 (PST)
+ bh=hh5b2k/7h0Wkn2rLn6NIi7mvwMbeZ/cPsG4EAD277Kg=;
+ b=AQUZ56hDZpNtJdWo0wH+nYzHCkPHn5xgebs9MfSEATijXrC0kUHi+nwV7xUgubcc3a
+ /0V34poNH8L9NL/gWine3WS2xeUrB6ypW/Mnp3HHxiLkU/LkuEnfrHXKy7ZaaMfNIe+f
+ EMxz8j0/uFptrLOIpf7F3zBUDHlGKP0+TqV8kMpJb7RJ4rbI0nEKMrhbNkWkPgc60bze
+ yPQDQpNAfJGZTmQfaXDpviIfzDZZrl5yGgpokLtn4ZzJYv7v1iJTB9iqQ6PX2Reen26d
+ 7JEZv1xP+XZ0DK9+hbEAJ5X/yzw6jAMFhoyMGPRv2LpZ3HAvwOsWnaSGw0Zv45jH0i8F
+ Kr5w==
+X-Gm-Message-State: AJcUukfwQaosqM36+m6/RC4//GaI5jTUFeJiRUMwSIKMCSnrdRx/kWrb
+ kLz6hmjX+wa6ALGFKNHznA5W7nZUUdNM5g==
+X-Google-Smtp-Source: ALg8bN5F3/ZKizjRyhig9R6zB1qpI+G0nZ57edJzgP5cBXVtwrjxKMkPImYuXsbq4gITuBWf0HljYg==
+X-Received: by 2002:a50:ad55:: with SMTP id z21mr1310568edc.74.1546938956451; 
+ Tue, 08 Jan 2019 01:15:56 -0800 (PST)
 Received: from debian-brgl.home ([2a01:cb1d:af:5b00:6d6c:8493:1ab5:dad7])
- by smtp.gmail.com with ESMTPSA id gp22-v6sm18373560ejb.4.2019.01.08.01.15.53
+ by smtp.gmail.com with ESMTPSA id gp22-v6sm18373560ejb.4.2019.01.08.01.15.55
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 08 Jan 2019 01:15:54 -0800 (PST)
+ Tue, 08 Jan 2019 01:15:55 -0800 (PST)
 From: Bartosz Golaszewski <brgl@bgdev.pl>
 To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
  Arnd Bergmann <arnd@arndb.de>,
  Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Subject: [RESEND PATCH 05/12] ARM: davinci: dm644x-evm: use device properties
+Subject: [RESEND PATCH 06/12] ARM: davinci: dm646x-evm: use device properties
  for at24 eeprom
-Date: Tue,  8 Jan 2019 10:15:32 +0100
-Message-Id: <20190108091539.16674-6-brgl@bgdev.pl>
+Date: Tue,  8 Jan 2019 10:15:33 +0100
+Message-Id: <20190108091539.16674-7-brgl@bgdev.pl>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20190108091539.16674-1-brgl@bgdev.pl>
 References: <20190108091539.16674-1-brgl@bgdev.pl>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_011557_156837_71595ECB 
-X-CRM114-Status: GOOD (  13.49  )
+X-CRM114-CacheID: sfid-20190108_011558_192587_EEB7E4A5 
+X-CRM114-Status: GOOD (  13.42  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -121,48 +121,47 @@ already implies the EEPROM's size.
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
 ---
- arch/arm/mach-davinci/board-dm644x-evm.c | 13 +++++--------
+ arch/arm/mach-davinci/board-dm646x-evm.c | 13 +++++--------
  1 file changed, 5 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-index e1428115067f..efe4e170e87d 100644
---- a/arch/arm/mach-davinci/board-dm644x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-@@ -16,8 +16,8 @@
- #include <linux/gpio/machine.h>
+diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+index 8d5be6dd2019..02b57face113 100644
+--- a/arch/arm/mach-davinci/board-dm646x-evm.c
++++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+@@ -22,7 +22,7 @@
+ #include <linux/gpio.h>
+ #include <linux/platform_device.h>
  #include <linux/i2c.h>
- #include <linux/platform_data/pcf857x.h>
 -#include <linux/platform_data/at24.h>
- #include <linux/platform_data/gpio-davinci.h>
 +#include <linux/property.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/rawnand.h>
- #include <linux/mtd/partitions.h>
-@@ -532,12 +532,9 @@ static struct nvmem_cell_lookup dm644evm_nvmem_cell_lookup = {
+ #include <linux/platform_data/pcf857x.h>
+ #include <linux/platform_data/ti-aemif.h>
+ 
+@@ -364,12 +364,9 @@ static struct nvmem_cell_lookup dm646x_evm_nvmem_cell_lookup = {
  	.con_id		= "mac-address",
  };
  
 -static struct at24_platform_data eeprom_info = {
--	.byte_len	= (256*1024) / 8,
--	.page_size	= 64,
--	.flags		= AT24_FLAG_ADDR16,
+-	.byte_len       = (256*1024) / 8,
+-	.page_size      = 64,
+-	.flags          = AT24_FLAG_ADDR16,
 -	.setup          = davinci_get_mac_addr,
 -	.context	= (void *)0x7f00,
 +static const struct property_entry eeprom_properties[] = {
 +	PROPERTY_ENTRY_U32("pagesize", 64),
 +	{ }
  };
+ #endif
  
- /*
-@@ -647,7 +644,7 @@ static struct i2c_board_info __initdata i2c_info[] =  {
- 	},
+@@ -440,7 +437,7 @@ static void evm_init_cpld(void)
+ static struct i2c_board_info __initdata i2c_info[] =  {
  	{
  		I2C_BOARD_INFO("24c256", 0x50),
--		.platform_data	= &eeprom_info,
-+		.properties = eeprom_properties,
+-		.platform_data  = &eeprom_info,
++		.properties  = eeprom_properties,
  	},
  	{
- 		I2C_BOARD_INFO("tlv320aic33", 0x1b),
+ 		I2C_BOARD_INFO("pcf8574a", 0x38),
 -- 
 2.19.1
 
