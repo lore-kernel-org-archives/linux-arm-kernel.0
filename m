@@ -2,61 +2,56 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 29AC8C43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 21:37:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B6DA6C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 21:57:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D297520883
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 21:37:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 794AD2146F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 21:57:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qous/lqf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D297520883
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hDBl7O0z"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 794AD2146F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=GHKdXlmo5dnK3+m4gaKXuHt2MOM0K/DcgQ/KjKPX5eE=; b=qous/lqftuN8pq
-	voHAd8R3njMDjPQ1Ipn9ioCL47ArXVi3SvyR5J8Izu0YJBSEXLt1JkjJkf3NW95eHRjf/OD9n4jLT
-	03aQ2frOWgMiSau7AcQM29M/fUsm/2bsH8LB8bd0cYy3EXkuEuPL6/danwlAqFyLys0Eef+KPNvVf
-	5hanCarLPJBvcE2i88aij7UdAElYDEHDbghGRGPKHHxrf5V0d1Mh3WEDDSuZgp3doJjR/R+DWW26m
-	auBskh4wtzywh3yp1zBIzu0oUHLI0fBZrOcnWiPNPQYcipBUljovC+PEMi//R6x3ri+Dr6XWjwCS1
-	8FL18B2fWTy/921Z3arA==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=Pf6NX1sNT/EsHWgCJvK6FBdPLutMj+50kTtNZ1jMOVE=; b=hDB
+	l7O0zTVkamMfOjiP77Q6nUG5mn8rSwkedQBpJrk7zDHXN2QZKF8k5NPF6NN72iBDzPFGJtJ58iHrD
+	JycrDF7y6i9j8yVlkv5teU7kXigJrSw9YuPkUgKkKdwgesihJhkAmUqPco1ytUzDH49cCJLvBNXdC
+	t9jEyU3lS43XBEvJLFE/nYT0/tQvlT4OQLFdC1/j7N7sCM+DhchLd4KXNaglhj5kETli4wHufjMjZ
+	isY1PXVASqPJvrQ+GOg474P4oHnJQXL5wq7Y8vrjQgvadpoXPoxIWRDL3Y4drZpfkNXWUKq9jKWyu
+	BlnstY1gKG0nFO41EUni6H0ppeqr33w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggz4J-0005Uz-Hm; Tue, 08 Jan 2019 21:37:51 +0000
-Received: from muru.com ([72.249.23.125])
+	id 1ggzNW-0003nF-TG; Tue, 08 Jan 2019 21:57:42 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggz4F-0005UE-Jd
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 21:37:49 +0000
-Received: from atomide.com (localhost [127.0.0.1])
- by muru.com (Postfix) with ESMTPS id 4CEBD8080;
- Tue,  8 Jan 2019 21:37:52 +0000 (UTC)
-Date: Tue, 8 Jan 2019 13:37:43 -0800
-From: Tony Lindgren <tony@atomide.com>
-To: Vincent Guittot <vincent.guittot@linaro.org>
-Subject: Re: Regression in v5.0-rc1 with autosuspend hrtimers
-Message-ID: <20190108213743.GN5544@atomide.com>
-References: <20190107233833.GI5544@atomide.com>
- <CAKfTPtDBEmcsLotp-6K1KU1wM9Ba1EpMp3niXScRxYgzjs0nog@mail.gmail.com>
- <20190108155354.GL5544@atomide.com>
- <CAKfTPtCoOK-cYLXJ--sOfpVa9RVmzOAEN1+zB2qHMCzkJN0qaQ@mail.gmail.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CAKfTPtCoOK-cYLXJ--sOfpVa9RVmzOAEN1+zB2qHMCzkJN0qaQ@mail.gmail.com>
-User-Agent: Mutt/1.11.1 (2018-12-01)
+ id 1ggzNU-0003mQ-3Y; Tue, 08 Jan 2019 21:57:41 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9125F80D;
+ Tue,  8 Jan 2019 13:57:37 -0800 (PST)
+Received: from DESKTOP-VLO843J.lan (usa-sjc-mx-foss1.foss.arm.com
+ [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 1A2A43F5AF;
+ Tue,  8 Jan 2019 13:57:35 -0800 (PST)
+From: Robin Murphy <robin.murphy@arm.com>
+To: heiko@sntech.de
+Subject: [PATCH 0/5] NanoPC-T4 (and a bit of NanoPi M4) support
+Date: Tue,  8 Jan 2019 21:57:22 +0000
+Message-Id: <cover.1546981251.git.robin.murphy@arm.com>
+X-Mailer: git-send-email 2.17.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_133747_690177_8CA8C3B2 
-X-CRM114-Status: UNSURE (   8.19  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190108_135740_153390_BBFBB889 
+X-CRM114-Status: GOOD (  12.05  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,39 +63,48 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>,
- "open list:THERMAL" <linux-pm@vger.kernel.org>,
- "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>,
- linux-kernel <linux-kernel@vger.kernel.org>, linux-omap@vger.kernel.org,
- LAK <linux-arm-kernel@lists.infradead.org>
+Cc: linux-rockchip@lists.infradead.org, tomeu.vizoso@collabora.com,
+ linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-* Vincent Guittot <vincent.guittot@linaro.org> [190108 16:42]:
-> On Tue, 8 Jan 2019 at 16:53, Tony Lindgren <tony@atomide.com> wrote:
-> > Hmm so could it be that we now rely on timers that that may
-> > not be capable of waking up the system from idle states with
-> > hrtimer?
-> 
-> With nohz and hrtimer enabled,  timer relies on hrtimer to generate
-> the tick so you should use the same interrupt.
+Hi all,
 
-OK yeah looks like that part is working just fine.
+Since I finally got to spend some quality time with my NanoPC-T4 over
+the holidays, I set to testing Tomeu's v4 patch, and ended up poring
+over the schematics of all 3 boards and doing a fair bit more hacking.
+I've taken the liberty of addressing the remaining review comments and
+posting it as v5 here so as to also start adding stuff on top. My
+current step is trying to get Wifi and Bluetooth working reliably...
 
-Adding some printks and debugging over ssh, looks like
-omap8250_runtime_resume() gets called just fine based on a wakeirq,
-but then omap8250_runtime_suspend() runs immediately instead of
-waiting for the three second timeout.
+Robin.
 
-Lowering the autosuspend_delay_ms to 2100 ms makes things work again.
-Anything higher than 2200 ms seems to somehow time out immediately
-now :)
 
-Regards,
+Robin Murphy (4):
+  arm64: dts: rockchip: Add DT for NanoPi M4
+  arm64: dts: rockchip: Refine nanopi4 differences
+  arm64: dts: rockchip: Add NanoPC-T4 IR receiver
+  arm64: dts: rockchip: Fix nanopi4 uSD card detect
 
-Tony
+Tomeu Vizoso (1):
+  arm64: dts: rockchip: Add DT for NanoPC-T4
+
+ .../devicetree/bindings/arm/rockchip.yaml     |  10 +
+ arch/arm64/boot/dts/rockchip/Makefile         |   2 +
+ .../boot/dts/rockchip/rk3399-nanopc-t4.dts    |  91 +++
+ .../boot/dts/rockchip/rk3399-nanopi-m4.dts    |  66 ++
+ .../boot/dts/rockchip/rk3399-nanopi4.dtsi     | 677 ++++++++++++++++++
+ 5 files changed, 846 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-nanopc-t4.dts
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-nanopi-m4.dts
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi
+
+-- 
+2.17.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
