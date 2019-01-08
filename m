@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 77E9FC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 03:15:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D8E77C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 03:15:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 45B1B206A3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 03:15:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A91E92173C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 03:15:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PPOMfF0l"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 45B1B206A3
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NCk7KLYS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A91E92173C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,29 +26,29 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=ONlNFIwq+p8bFuw6rimG7w4zzaiP0XjmBHJ79TjqFkY=; b=PPOMfF0lTbqwqtVF/j/c3MVtjB
-	7ubqPqVOSyGm5NhuoPGCH6MdL+YVQ7BimqDAHUV4bY6dmC7dx0nnCZrZ207DaiRZE2giGVQaaaTQx
-	k0HTVdaAHZ+3TgEY3Hw/NmWI0wBBmPp9E3vn4+BLXsAVQzXaG5UG1QkW/HeIJNf+ta5TZlr/vqlfG
-	+gPkx47aTZoYnBcR5MzjJoG8/ltxQyZ5y4Aq2ASUm1jTVMjMswj0X1ucJUKln7OLN7+VPaUMBpOR0
-	qG7rlvAyd+l+edo6KgOtrQW2Zvj3xw6nXpijF5m6x7J6gvb0/c8fZCxZ7zFhq7WmAYbx0a+okUTX1
-	vvTqwdSw==;
+	bh=ZoZiRnplUHEexACMXGrax/wOnuELMLBVLEEbDeYR6V8=; b=NCk7KLYSEj9p13mMySsXH56DmH
+	GnZT38RgiOC/t4AJu4k4qfQBsfinDnejHhoE2AiuuI9u0P0luNtx8sPWmAwekX7YRpGfsrGP0zHs1
+	eUpLtB42uCamO4XTaB8xgJ1hRRF/xymRedFUciL37/hiNWKTtl0UeXvVhhvB6IcVFHcCzUoIcjuGS
+	DCi1ivNbtZssH7tBeZ+pdwJu10O9hTOBLY1J45UnL2lybP9D5I8o4LhDchOvhnb9u16AqWOrafrwQ
+	CKfiVIBxxXfDHDupcvvaEzmH3O2/qwFk8Anw/dj5YTylVSlhD/mzla5PAzKZNk69fvWpWfdECmxj3
+	bk/Y3Ylg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gghrb-0000Up-KW; Tue, 08 Jan 2019 03:15:35 +0000
-Received: from inva020.nxp.com ([92.121.34.13])
+	id 1gghrr-0000jz-55; Tue, 08 Jan 2019 03:15:51 +0000
+Received: from inva021.nxp.com ([92.121.34.21])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gghr6-0007Ic-IS
+ id 1gghr7-00079d-0h
  for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 03:15:07 +0000
-Received: from inva020.nxp.com (localhost [127.0.0.1])
- by inva020.eu-rdc02.nxp.com (Postfix) with ESMTP id 3BA1A1A04EA;
- Tue,  8 Jan 2019 04:15:03 +0100 (CET)
+Received: from inva021.nxp.com (localhost [127.0.0.1])
+ by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 0BABE2002AB;
+ Tue,  8 Jan 2019 04:14:59 +0100 (CET)
 Received: from invc005.ap-rdc01.nxp.com (invc005.ap-rdc01.nxp.com
  [165.114.16.14])
- by inva020.eu-rdc02.nxp.com (Postfix) with ESMTP id 4F7BF1A02A6;
- Tue,  8 Jan 2019 04:14:51 +0100 (CET)
+ by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 1F357200011;
+ Tue,  8 Jan 2019 04:14:47 +0100 (CET)
 Received: from titan.ap.freescale.net (TITAN.ap.freescale.net [10.192.208.233])
- by invc005.ap-rdc01.nxp.com (Postfix) with ESMTP id 0FFC8402CA;
- Tue,  8 Jan 2019 11:14:37 +0800 (SGT)
+ by invc005.ap-rdc01.nxp.com (Postfix) with ESMTP id D4DB4402C8;
+ Tue,  8 Jan 2019 11:14:33 +0800 (SGT)
 From: Xiaowei Bao <xiaowei.bao@nxp.com>
 To: bhelgaas@google.com, robh+dt@kernel.org, mark.rutland@arm.com,
  shawnguo@kernel.org, leoyang.li@nxp.com, kishon@ti.com,
@@ -59,17 +59,16 @@ To: bhelgaas@google.com, robh+dt@kernel.org, mark.rutland@arm.com,
  linux-pci@vger.kernel.org, devicetree@vger.kernel.org,
  linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
  linuxppc-dev@lists.ozlabs.org
-Subject: [PATCHv4 4/4] misc: pci_endpoint_test: Add the layerscape EP device
- support
-Date: Tue,  8 Jan 2019 11:09:22 +0800
-Message-Id: <20190108030922.24031-4-xiaowei.bao@nxp.com>
+Subject: [PATCHv4 2/4] arm64: dts: Add the PCIE EP node in dts
+Date: Tue,  8 Jan 2019 11:09:20 +0800
+Message-Id: <20190108030922.24031-2-xiaowei.bao@nxp.com>
 X-Mailer: git-send-email 2.14.1
 In-Reply-To: <20190108030922.24031-1-xiaowei.bao@nxp.com>
 References: <20190108030922.24031-1-xiaowei.bao@nxp.com>
 X-Virus-Scanned: ClamAV using ClamSMTP
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190107_191504_768770_C5282F5E 
-X-CRM114-Status: UNSURE (   8.66  )
+X-CRM114-CacheID: sfid-20190107_191505_214290_91681B16 
+X-CRM114-Status: UNSURE (   8.03  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -89,32 +88,86 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add the layerscape EP device support in pci_endpoint_test driver.
+Add the PCIE EP node in dts for ls1046a.
 
 Signed-off-by: Xiaowei Bao <xiaowei.bao@nxp.com>
 ---
 v2:
- - no change
+ - Add the SoC specific compatibles. 
 v3:
  - no change
 v4:
- - delate the comments.
+ - no change
 
- drivers/misc/pci_endpoint_test.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi |   34 +++++++++++++++++++++++-
+ 1 files changed, 33 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/misc/pci_endpoint_test.c b/drivers/misc/pci_endpoint_test.c
-index 896e2df..29582fe 100644
---- a/drivers/misc/pci_endpoint_test.c
-+++ b/drivers/misc/pci_endpoint_test.c
-@@ -788,6 +788,7 @@ static void pci_endpoint_test_remove(struct pci_dev *pdev)
- static const struct pci_device_id pci_endpoint_test_tbl[] = {
- 	{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_DRA74x) },
- 	{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_DRA72x) },
-+	{ PCI_DEVICE(PCI_VENDOR_ID_FREESCALE, 0x81c0) },
- 	{ PCI_DEVICE(PCI_VENDOR_ID_SYNOPSYS, 0xedda) },
- 	{ }
- };
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+index 9a2106e..e373826 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+@@ -657,6 +657,17 @@
+ 			status = "disabled";
+ 		};
+ 
++		pcie_ep@3400000 {
++			compatible = "fsl,ls1046a-pcie-ep","fsl,ls-pcie-ep";
++			reg = <0x00 0x03400000 0x0 0x00100000
++				0x40 0x00000000 0x8 0x00000000>;
++			reg-names = "regs", "addr_space";
++			num-ib-windows = <6>;
++			num-ob-windows = <6>;
++			num-lanes = <2>;
++			status = "disabled";
++		};
++
+ 		pcie@3500000 {
+ 			compatible = "fsl,ls1046a-pcie";
+ 			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
+@@ -683,6 +694,17 @@
+ 			status = "disabled";
+ 		};
+ 
++		pcie_ep@3500000 {
++			compatible = "fsl,ls1046a-pcie-ep","fsl,ls-pcie-ep";
++			reg = <0x00 0x03500000 0x0 0x00100000
++				0x48 0x00000000 0x8 0x00000000>;
++			reg-names = "regs", "addr_space";
++			num-ib-windows = <6>;
++			num-ob-windows = <6>;
++			num-lanes = <2>;
++			status = "disabled";
++		};
++
+ 		pcie@3600000 {
+ 			compatible = "fsl,ls1046a-pcie";
+ 			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
+@@ -709,6 +731,17 @@
+ 			status = "disabled";
+ 		};
+ 
++		pcie_ep@3600000 {
++			compatible = "fsl,ls1046a-pcie-ep", "fsl,ls-pcie-ep";
++			reg = <0x00 0x03600000 0x0 0x00100000
++				0x50 0x00000000 0x8 0x00000000>;
++			reg-names = "regs", "addr_space";
++			num-ib-windows = <6>;
++			num-ob-windows = <6>;
++			num-lanes = <2>;
++			status = "disabled";
++		};
++
+ 		qdma: dma-controller@8380000 {
+ 			compatible = "fsl,ls1046a-qdma", "fsl,ls1021a-qdma";
+ 			reg = <0x0 0x8380000 0x0 0x1000>, /* Controller regs */
+@@ -729,7 +762,6 @@
+ 			queue-sizes = <64 64>;
+ 			big-endian;
+ 		};
+-
+ 	};
+ 
+ 	reserved-memory {
 -- 
 1.7.1
 
