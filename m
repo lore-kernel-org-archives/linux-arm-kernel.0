@@ -2,72 +2,83 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 58AC1C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 05:17:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 39103C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 05:26:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1755E2087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 05:17:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F39882087E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 05:26:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LWY21vzZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1755E2087E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AxZRYslH";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="Af9kWOHU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F39882087E
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ACILB7MLomI6wSWUcIkvzKaxHPsP/Bqq+WUlEtwvNjA=; b=LWY21vzZ0Gcx0e
-	znZJpX5q+g/YVZFA7nJaW0iV3IBfuWMa7FMpG3NEDitAar/9a0Pm9U7JpVbTAZJj6zmCcGZSpkPTL
-	X9U4SviH4BcBf+px9pPzoSEbemMnEEQ1SO7iBEWpdDTUa1L1jlzGdTtvOZMBLzqdwM+obG2qf6MSB
-	NnLa3IOEoq0l462BToDgpCpQRDXirWthXcGyK5l5iMJyZHY30BKglHSJlrm65STzZ1VKTQyba0F5l
-	HVl0JStWyzF76iE4qH2yLPyG/q0iHayxjofMMVzy5OV7beOlJ9DX1HfHLOWjTioNT5lkPMitts8Lh
-	7WYddwI7+om2JNIU8u7Q==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=ShfSZ/Hloz5Ah3UzRkvU4EJ1svfJi63GnhHLvKA40kw=; b=AxZRYslHfHU8Uf
+	oNVSWLGXA8Ph93ojy58luzSXV+Z24G90TA1Khs8TRhdblO7MclUXzcVOzHE84p+JUoTuAEpMnBp6r
+	1Unn1nTZNkS+R37X1q6UjPBiBGphAFFvY+ruc85L132hswdXxydC5LmZNJQhA8E95rt3G87N8tDCS
+	Gc8vmJg7KUrVcCIKJVPqZc7ne35+9Eh/CvWsHoC0xBnmtSRCCvHagyHarciYts0/P1ha14HTFPo4Y
+	hM1P9aQjsMfXzapGGWTHE9KpeQgjDsEs/Btdbq8qMpvNATemfupujowy9whJJWTwgEUIGsoRq1dcZ
+	XQ3jrFI19yd5f19MAXTg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggjlP-0007Vi-FY; Tue, 08 Jan 2019 05:17:19 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggjlM-0007Uf-Mg
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 05:17:18 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2C98415BF
+	id 1ggju4-0002S6-DX; Tue, 08 Jan 2019 05:26:16 +0000
+Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ggju0-0002RH-Ht
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 05:26:14 +0000
+Received: by mail-pg1-x542.google.com with SMTP id t13so1182659pgr.11
  for <linux-arm-kernel@lists.infradead.org>;
- Mon,  7 Jan 2019 21:17:10 -0800 (PST)
-Received: from mail-it1-f179.google.com (usa-sjc-mx-foss1.foss.arm.com
- [217.140.101.70])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 112E13FA1C
- for <linux-arm-kernel@lists.infradead.org>;
- Mon,  7 Jan 2019 21:17:10 -0800 (PST)
-Received: by mail-it1-f179.google.com with SMTP id h65so4453716ith.3
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 07 Jan 2019 21:17:10 -0800 (PST)
-X-Gm-Message-State: AJcUuke8rRotTQh83340eIsTPyYl8YXpBb+w3wF65aPmbIobKaaLVhbR
- akI/MbXSVT93sVqBYtFTk8z+2toAJVgSdcxlvXo=
-X-Google-Smtp-Source: ALg8bN5jOivGOJ6rm60HQqQS9gtjzbplv4nZPleyUfKiyZTh2+nRgYIwNVWeT0oymJCh84cFgsO7oZ9MQOuCx60MSFE=
-X-Received: by 2002:a02:650d:: with SMTP id u13mr207237jab.136.1546924629177; 
- Mon, 07 Jan 2019 21:17:09 -0800 (PST)
+ Mon, 07 Jan 2019 21:26:11 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=mDe0ZaHlOJKTGA+krCM2g71oz8tu91Sp3uzVesKhIQs=;
+ b=Af9kWOHUzpZaS3AVYOtaZlNCdVr6aeJJHifNMcL3i7NdyE4x6DBw1AUAHpYrcYx33s
+ j2G0Yh0GGW3SryZ5V3iwXQclvOz1BpjLAQkaq+kfBSAgJybNfAJpKThgYBOyXrUTqjAP
+ LhNmpoWuol+mswQq/oRyOdcATchf0pz8YJCbA=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=mDe0ZaHlOJKTGA+krCM2g71oz8tu91Sp3uzVesKhIQs=;
+ b=iHdkGQ2oJm+RSPKcfmNF1RmvLh/Hwdlut307DANqex3olcsPtUyQd6hKKhVpYNQBBk
+ R27HW8c7LFBugciBPD021gmgzDtu6We0tvWEZjZPXgHrms/pRnBRgE+Eb+vsuAMaLHSa
+ NZw/VPwuqvi276JLo4rx9k4TOVHaQyEx5tpK0kq8AZrUT75ccCaiZHwOUjz7ha8pcRBX
+ cPmIYigKkzgXN14SwTetf+i6c5fji+mgKIIi0WZPf1brZj3DsFowRv//9mqMWuwKQYh4
+ ExUyD7Cuh3BwR1S8HrwXEvrt/cmPL6f5j+aXVCqPu4g4uZG2POZAlrAPTziktQCk1fp/
+ uIvA==
+X-Gm-Message-State: AJcUukcnXSTvt+Hpg+LsfP7YDKreQ+1X01juvkXU0AaS/Hvn8UygStMX
+ 2pHCGf6loWD526csvr7JvcKUgw==
+X-Google-Smtp-Source: ALg8bN7WrOG7M3i8Kcun9NENz+v6MnvKrthCZ4E6CIOqkx5sJBvBe4tiW/6lIcnhkbUaJG2gNvCgPw==
+X-Received: by 2002:a63:6f0d:: with SMTP id k13mr345842pgc.42.1546925170851;
+ Mon, 07 Jan 2019 21:26:10 -0800 (PST)
+Received: from pihsun-z840.tpe.corp.google.com
+ ([2401:fa00:1:10:7889:7a43:f899:134c])
+ by smtp.googlemail.com with ESMTPSA id 64sm88106874pff.101.2019.01.07.21.26.08
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 07 Jan 2019 21:26:10 -0800 (PST)
+From: Pi-Hsun Shih <pihsun@chromium.org>
+To: 
+Subject: [RFC v2 0/6] Add support for mt8183 SCP.
+Date: Tue,  8 Jan 2019 13:26:00 +0800
+Message-Id: <20190108052606.59426-1-pihsun@chromium.org>
+X-Mailer: git-send-email 2.20.1.97.g81188d93c3-goog
 MIME-Version: 1.0
-References: <1545119810-12182-1-git-send-email-amit.kachhap@arm.com>
- <1545119810-12182-2-git-send-email-amit.kachhap@arm.com>
- <47a81c5b-1b1b-2c87-8c90-af5ef63d1364@arm.com>
-In-Reply-To: <47a81c5b-1b1b-2c87-8c90-af5ef63d1364@arm.com>
-From: Amit Daniel Kachhap <amit.kachhap@arm.com>
-Date: Tue, 8 Jan 2019 10:46:57 +0530
-X-Gmail-Original-Message-ID: <CADGdYn5VvAgmTbjmA_1hM0LFoOcvzMO6BziSvWax85Q1hSPxsQ@mail.gmail.com>
-Message-ID: <CADGdYn5VvAgmTbjmA_1hM0LFoOcvzMO6BziSvWax85Q1hSPxsQ@mail.gmail.com>
-Subject: Re: [PATCH v4 1/6] arm64/kvm: preserve host HCR_EL2 value
-To: James Morse <james.morse@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190107_211716_754742_85788284 
-X-CRM114-Status: GOOD (  28.93  )
+X-CRM114-CacheID: sfid-20190107_212612_637655_A9D72266 
+X-CRM114-Status: GOOD (  13.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,174 +90,82 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, Kristina Martsenko <kristina.martsenko@arm.com>,
- Dave Martin <Dave.Martin@arm.com>,
- Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>,
- kvmarm@lists.cs.columbia.edu, LAK <linux-arm-kernel@lists.infradead.org>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>,
+ Nicolas Boichat <drinkcat@chromium.org>,
+ "moderated list:ARM/Mediatek SoC support" <linux-mediatek@lists.infradead.org>,
+ "moderated list:ARM/Mediatek SoC support"
+ <linux-arm-kernel@lists.infradead.org>, Pi-Hsun Shih <pihsun@chromium.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+Add support for controlling and communicating with mt8183's system
+control processor (SCP), using the remoteproc & rpmsg framework.
+And also add a cros_ec driver for CrOS EC host command over rpmsg.
 
-On Sat, Jan 5, 2019 at 12:05 AM James Morse <james.morse@arm.com> wrote:
->
-> Hi Amit,
->
-> On 18/12/2018 07:56, Amit Daniel Kachhap wrote:
-> > When restoring HCR_EL2 for the host, KVM uses HCR_HOST_VHE_FLAGS, which
-> > is a constant value. This works today, as the host HCR_EL2 value is
-> > always the same, but this will get in the way of supporting extensions
-> > that require HCR_EL2 bits to be set conditionally for the host.
-> >
-> > To allow such features to work without KVM having to explicitly handle
-> > every possible host feature combination, this patch has KVM save/restore
-> > the host HCR when switching to/from a guest HCR. The saving of the
-> > register is done once during cpu hypervisor initialization state and is
-> > just restored after switch from guest.
-> >
-> > For fetching HCR_EL2 during kvm initilisation, a hyp call is made using
->
-> (initialisation)
->
->
-> > kvm_call_hyp and is helpful in NHVE case.
-> >
-> > For the hyp TLB maintenance code, __tlb_switch_to_host_vhe() is updated
-> > to toggle the TGE bit with a RMW sequence, as we already do in
-> > __tlb_switch_to_guest_vhe().
->
->
-> > diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-> > index aea01a0..25ac9fa 100644
-> > --- a/arch/arm64/include/asm/kvm_asm.h
-> > +++ b/arch/arm64/include/asm/kvm_asm.h
-> > @@ -73,6 +73,8 @@ extern void __vgic_v3_init_lrs(void);
-> >
-> >  extern u32 __kvm_get_mdcr_el2(void);
-> >
-> > +extern u64 __read_hyp_hcr_el2(void);
->
-> How come this isn't __kvm_get_hcr_el2() like mdcr?
-yes.
->
->
-> > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> > index 52fbc82..1b9eed9 100644
-> > --- a/arch/arm64/include/asm/kvm_host.h
-> > +++ b/arch/arm64/include/asm/kvm_host.h
-> > @@ -196,13 +196,17 @@ enum vcpu_sysreg {
-> >
-> >  #define NR_COPRO_REGS        (NR_SYS_REGS * 2)
-> >
-> > +struct kvm_cpu_init_host_regs {
-> > +     u64 hcr_el2;
-> > +};
-> > +
-> >  struct kvm_cpu_context {
-> >       struct kvm_regs gp_regs;
-> >       union {
-> >               u64 sys_regs[NR_SYS_REGS];
-> >               u32 copro[NR_COPRO_REGS];
-> >       };
-> > -
-> > +     struct kvm_cpu_init_host_regs init_regs;
-> >       struct kvm_vcpu *__hyp_running_vcpu;
-> >  };
->
-> Hmm, so we grow every vcpu's struct kvm_cpu_context with some host-only registers...
->
->
-> > @@ -211,7 +215,7 @@ typedef struct kvm_cpu_context kvm_cpu_context_t;
-> >  struct kvm_vcpu_arch {
-> >       struct kvm_cpu_context ctxt;
-> >
-> > -     /* HYP configuration */
-> > +     /* Guest HYP configuration */
-> >       u64 hcr_el2;
-> >       u32 mdcr_el2;
->
-> ... but they aren't actually host-only.
->
->
-> I think it would be tidier to move these two into struct kvm_cpu_context (not as
-> some init_host state), as both host and vcpu's have these values.
-> You could then add the mdcr_el2 stashing to your __cpu_copy_host_registers()
-> too. This way they both work in the same way, otherwise one is per-cpu, the
-> other is in a special bit of only the host's kvm_cpu_context.
->
-Your suggestion looks doable. I will implement in next iteration.
->
-> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> > index f6e02cc..85a2a5c 100644
-> > --- a/arch/arm64/kvm/hyp/switch.c
-> > +++ b/arch/arm64/kvm/hyp/switch.c
-> > @@ -139,15 +139,15 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
-> >               __activate_traps_nvhe(vcpu);
-> >  }
-> >
-> > -static void deactivate_traps_vhe(void)
-> > +static void deactivate_traps_vhe(struct kvm_cpu_context *host_ctxt)
-> >  {
-> >       extern char vectors[];  /* kernel exception vectors */
-> > -     write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
-> > +     write_sysreg(host_ctxt->init_regs.hcr_el2, hcr_el2);
-> >       write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
-> >       write_sysreg(vectors, vbar_el1);
-> >  }
-> >
-> > -static void __hyp_text __deactivate_traps_nvhe(void)
-> > +static void __hyp_text __deactivate_traps_nvhe(struct kvm_cpu_context *host_ctxt)
-> >  {
-> >       u64 mdcr_el2 = read_sysreg(mdcr_el2);
-> >
-> > @@ -157,12 +157,15 @@ static void __hyp_text __deactivate_traps_nvhe(void)
-> >       mdcr_el2 |= MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT;
-> >
-> >       write_sysreg(mdcr_el2, mdcr_el2);
->
-> Strangely we try to rebuild the host's mdcr value here. If we had the host mdcr
-> value in host_ctxt we could restore it directly.
-yes. I will check if initial value host value is same as calculated.
->
->
-> > -     write_sysreg(HCR_HOST_NVHE_FLAGS, hcr_el2);
-> > +     write_sysreg(host_ctxt->init_regs.hcr_el2, hcr_el2);
-> >       write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
-> >  }
->
-> >  static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
-> >  {
-> > +     struct kvm_cpu_context *host_ctxt;
-> > +
-> > +     host_ctxt = vcpu->arch.host_cpu_context;
-> >       /*
-> >        * If we pended a virtual abort, preserve it until it gets
-> >        * cleared. See D1.14.3 (Virtual Interrupts) for details, but
-> > @@ -173,9 +176,9 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
-> >               vcpu->arch.hcr_el2 = read_sysreg(hcr_el2);
-> >
-> >       if (has_vhe())
-> > -             deactivate_traps_vhe();
-> > +             deactivate_traps_vhe(host_ctxt);
-> >       else
-> > -             __deactivate_traps_nvhe();
-> > +             __deactivate_traps_nvhe(host_ctxt);
-> >  }
->
-> (Alternatively each of these deactivate_traps() calls could retrieve the
-> host_ctxt directly as its a per-cpu variable, but as we have the struct vcpu
-> here, this is probably better.)
->
->
-> Thanks,
->
-> James
+The overall structure of the series is:
+* remoteproc/mtk_scp.c: Control the start / stop of SCP (Patch 2).
+* remoteproc/mtk_scp_ipi.c: Communicates to SCP using inter-processor
+  interrupt (IPI) and shared memory (Patch 2, 3).
+* rpmsg/mtk_rpmsg.c: Wrapper to wrap the IPI communication into a rpmsg
+  device. Supports name service for SCP firmware to
+  announce channels (Patch 4).
+* platform/chrome/cros_ec_rpmsg.c: Communicates with the SCP over the
+  rpmsg framework (like what platform/chrome/cros_ec_{i2c,spi}.c does)
+  (Patch 5).
 
-//Amit
+Since I'm not familiar with the remoteproc / rpmsg framework, and there
+are not much other custom rpmsg driver for reference, would like some
+review / comments on the overall structure of the driver.
+
+Changes from v1:
+ - Extract functions and rename variables in mtk_scp.c.
+ - Do cleanup properly in mtk_rpmsg.c, which also removes the problem of
+   short-lived work items.
+ - Code format fix based on feedback for cros_ec_rpmsg.c.
+ - Extract feature detection for SCP into separate patch (Patch 6).
+
+Erin Lo (2):
+  dt-bindings: Add a binding for Mediatek SCP
+  remoteproc/mediatek: add SCP support for mt8183
+
+Pi-Hsun Shih (4):
+  remoteproc: move IPI interface into separate file.
+  rpmsg: add rpmsg support for mt8183 SCP.
+  mfd: add EC host command support using rpmsg.
+  cros_ec: differentiate SCP from EC by feature bit.
+
+ .../bindings/remoteproc/mtk,scp.txt           |  10 +
+ drivers/mfd/cros_ec_dev.c                     |   9 +
+ drivers/platform/chrome/Kconfig               |   8 +
+ drivers/platform/chrome/Makefile              |   1 +
+ drivers/platform/chrome/cros_ec_rpmsg.c       | 159 ++++++
+ drivers/remoteproc/Kconfig                    |   9 +
+ drivers/remoteproc/Makefile                   |   1 +
+ drivers/remoteproc/mtk_common.h               |  76 +++
+ drivers/remoteproc/mtk_scp.c                  | 459 ++++++++++++++++++
+ drivers/remoteproc/mtk_scp_ipi.c              | 108 +++++
+ drivers/rpmsg/Kconfig                         |   5 +
+ drivers/rpmsg/Makefile                        |   1 +
+ drivers/rpmsg/mtk_rpmsg.c                     | 384 +++++++++++++++
+ include/linux/mfd/cros_ec.h                   |   1 +
+ include/linux/mfd/cros_ec_commands.h          |   2 +
+ include/linux/platform_data/mtk_scp.h         | 132 +++++
+ include/linux/rpmsg/mtk_rpmsg.h               |  34 ++
+ 17 files changed, 1399 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/remoteproc/mtk,scp.txt
+ create mode 100644 drivers/platform/chrome/cros_ec_rpmsg.c
+ create mode 100644 drivers/remoteproc/mtk_common.h
+ create mode 100644 drivers/remoteproc/mtk_scp.c
+ create mode 100644 drivers/remoteproc/mtk_scp_ipi.c
+ create mode 100644 drivers/rpmsg/mtk_rpmsg.c
+ create mode 100644 include/linux/platform_data/mtk_scp.h
+ create mode 100644 include/linux/rpmsg/mtk_rpmsg.h
+
+-- 
+2.20.1.97.g81188d93c3-goog
+
 
 _______________________________________________
 linux-arm-kernel mailing list
