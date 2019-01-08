@@ -2,80 +2,76 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-15.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A5785C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 08:43:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E3891C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 08:48:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 755EC2070B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 08:43:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B20D72070B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 08:48:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dup1eJOq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 755EC2070B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G3IvI80U"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B20D72070B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:References:
-	To:From:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=qwnFN45/w5uUxm4RFoieV2Cb99hBxVfkA0k3k6bUMPE=; b=dup1eJOq+ayDntR8JajgG57z3
-	4dCHU3XK6EJpQ5yxQl70mewhD+6zc5x4rdDoukt+d/pzzx7KS0QikWsgd5vC3iaqVQpSflUj8WhQ3
-	acoeLAkxhG02j6Jng33nH/azh1baDlNUu7ureUqjcFPyW8BDYJ0wurUG8NSmcBDuL+7uooa5VE96P
-	3FAutseEAem+YSRUOmiXOVpbAnfFSfA/dkFeB/BCB2Y55VoTZtJC1+yvvVNQMxcLielqFNMOuOIXk
-	5XumTCi8PWAYTwwppA44vpSOUP/e40GWtRtI8NtWhBO3pKF7D10C6NNr/VJUvhxh5lbx5/Imx8dUg
-	8XQT9pE3A==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Subject:References:
+	In-Reply-To:Message-ID:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=hW52ponUpEOmKP/ny84YrApzeyujJsX+p4hIusT/x50=; b=G3IvI80UZhJJ6E
+	b3lqCLJsRMUGgO00Da+b8bkvlzcg10uLGSCmBbvBi+AxvLndFewWgyn1Wp1d+eLKONEVObYUbxwat
+	1qck0zvR/XPYZoX9QxsgRlF88kgCDRzzSk8PksfI7TrD/IYcygSg1tzGH3Nx4MI+1CBm/hYTU5PUe
+	wtlk/2a53vegoHTAzVV++J7Xsnid8ZzIVEovdRwd9qpkcNc9mU+osRlhhcFkt1Jkxaa0XsN0QZ3IR
+	ryHBWDDsC5zA1wvs5oUUpeEVLd5hexlzypSxNLyXaH8u+45S8w+Msh6EgI053FDnKNeAifsUAYirL
+	ruD01nPwGip+nJGfOwYg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggmyW-0002HH-VD; Tue, 08 Jan 2019 08:43:04 +0000
-Received: from mx07-00178001.pphosted.com ([62.209.51.94])
+	id 1ggn3j-0004NB-Fl; Tue, 08 Jan 2019 08:48:27 +0000
+Received: from mout.kundenserver.de ([212.227.17.10])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggmyT-0002Gk-JR
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 08:43:03 +0000
-Received: from pps.filterd (m0046037.ppops.net [127.0.0.1])
- by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x088ZmW5013401; Tue, 8 Jan 2019 09:42:55 +0100
-Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx07-00178001.pphosted.com with ESMTP id 2ptybmv747-1
- (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Tue, 08 Jan 2019 09:42:55 +0100
-Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id CE27634;
- Tue,  8 Jan 2019 08:42:54 +0000 (GMT)
-Received: from Webmail-eu.st.com (sfhdag3node2.st.com [10.75.127.8])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 9841C2751;
- Tue,  8 Jan 2019 08:42:54 +0000 (GMT)
-Received: from [10.129.4.234] (10.75.127.50) by SFHDAG3NODE2.st.com
- (10.75.127.8) with Microsoft SMTP Server (TLS) id 15.0.1347.2; Tue, 8 Jan
- 2019 09:42:53 +0100
-Subject: Re: [GIT PULL] STM32 DT changes for v4.21 #1
-From: Alexandre Torgue <alexandre.torgue@st.com>
-To: Arnd Bergmann <arnd@arndb.de>, Kevin Hilman <khilman@baylibre.com>,
- arm-soc <arm@kernel.org>, Olof Johansson <olof@lixom.net>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-References: <3fb58758-a67f-3a0f-72d2-abbfd71b6ae0@st.com>
- <6a490c72-c76a-51ef-7c5d-2178d2adcc83@st.com>
-Message-ID: <17acd15d-6fdb-c797-c37c-37bab49ac3b6@st.com>
-Date: Tue, 8 Jan 2019 09:42:49 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1ggn3g-0004MZ-9o; Tue, 08 Jan 2019 08:48:26 +0000
+Received: from oxbsltgw38.schlund.de ([212.227.220.179]) by
+ mrelayeu.kundenserver.de (mreue109 [213.165.67.113]) with ESMTPSA (Nemesis)
+ id 1M5wTt-1gfRD63GWp-007XXB; Tue, 08 Jan 2019 09:48:11 +0100
+Date: Tue, 8 Jan 2019 09:48:09 +0100 (CET)
+From: Stefan Wahren <stefan.wahren@i2se.com>
+To: Peter Robinson <pbrobinson@gmail.com>
+Message-ID: <849520506.312349.1546937289972@email.ionos.de>
+In-Reply-To: <CALeDE9PX=2nR8=9JjT9wvsb470nrZ_h6JGFsrkYkexGOoOhXuA@mail.gmail.com>
+References: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
+ <CALeDE9PX=2nR8=9JjT9wvsb470nrZ_h6JGFsrkYkexGOoOhXuA@mail.gmail.com>
+Subject: Re: [PATCH RFC 00/11] staging: vc04_services: Improve driver
+ load/unload
 MIME-Version: 1.0
-In-Reply-To: <6a490c72-c76a-51ef-7c5d-2178d2adcc83@st.com>
-Content-Language: en-US
-X-Originating-IP: [10.75.127.50]
-X-ClientProxiedBy: SFHDAG8NODE3.st.com (10.75.127.24) To SFHDAG3NODE2.st.com
- (10.75.127.8)
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2019-01-08_05:, , signatures=0
+X-Priority: 3
+Importance: Medium
+X-Mailer: Open-Xchange Mailer v7.8.4-Rev47
+X-Originating-Client: open-xchange-appsuite
+X-Provags-ID: V03:K1:QQtzDWFiEBY2hDFE75f/cCYJYegBzeTxMoNXDN7i5VC1tOSPukQ
+ 1godxxmovAL8CUJNxdzDfgNfkGnFBxHheV6z5NbrreDiO0/seBGRvTe3WALhvItePw4sOL3
+ 9HTCQmnuGHaPwjeaQQbNih7KLsEYV2rjw0xmr5yxODMutdOYb2WZc2oaus/cNvcZIjvPoF3
+ 3YgaK0Rcj13JK/7IMYGKA==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:PxrWlaAjpm8=:UiPw4ieeK0kRXysGTc0Cwv
+ nK0RZgBt2qyTepnGe66lNjoOJ291yIN6Pb9dd5rk0HactSogkDBlfN3cIWjS8gBBYAwpJE29r
+ YboXXVauXb9sCBKw1z4cUxJBKSEqGuJ47fSlNLj8MnynfN1MpOW0H6JwN8959al2cnb5V9CHm
+ 6y1COxd15ySRWMNRrVaJ8DrLmypAIzUMrNwS6NcVy61LClTf1DsrPEarabr5Xw/RtpmVRuAK2
+ HAZiOwmsySyxP6i1D9O7p95z2pGfR+FgER2PrMC6ihBqvA0fhRnI7QJBasBR7BWl6hNgEdK5c
+ Hmxg/UA0yIQH2XESJa/HXc7E2gSs01c9FjBq0XiEEgynhstQwyjifMPwnQ4CdrzFKxKDlBX7j
+ h38iIPDFx5N0oLKoG23rCVj7Mqp93035+hTibghwib4R7+qGUIE4YcssjE2b5EtKJc7eWm9x0
+ kSXMVN8gH+AEtD1ImTeWIguUSPqjuzG7bdsFhVdbkwz6AuSuwffob/G/diurwl4pTZtWNttqf
+ pGS0Z9QrwUa/FORdsn9FilRFoCgxD2utsmoIwPZizVkH/K1FC2BZwtP8SaXKTF4aQ+8uOFfYG
+ x8mgwvoBqEdTD9JxR35G2/oT9IsIg/I5SEf6grlGyTi9imgmpu2ccWNkaIU7T9z7aKLkyP3SH
+ vkT/MLAuyeG4cIijVhSuWssXXFqBMMPuXFZEAorfSnjuoUHKEuE47dLAWWwAMhayJXbbIssPi
+ Z3ygpkiGUQFdv1D6zrO4iJQSGxfpL7aIVLnm7sW2JMVdpKZ3lmM+Zp7ONDM=
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_004301_933681_7D7A025E 
-X-CRM114-Status: GOOD (  19.89  )
+X-CRM114-CacheID: sfid-20190108_004824_640320_FDAEA57B 
+X-CRM114-Status: GOOD (  14.66  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,56 +83,56 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-Content-Transfer-Encoding: base64
-Content-Type: text/plain; charset="utf-8"; Format="flowed"
+Cc: devel@driverdev.osuosl.org, tiwai@suse.de, gregkh@linuxfoundation.org,
+ mikebrady@eircom.net, Eric Anholt <eric@anholt.net>,
+ linux-rpi-kernel@lists.infradead.org,
+ Dave Stevenson <dave.stevenson@raspberrypi.org>, nsaenzjulienne@suse.de,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkKCk9uIDEvOC8xOSA4OjI5IEFNLCBBbGV4YW5kcmUgVG9yZ3VlIHdyb3RlOgo+IEhpIGd1eXMK
-PiAKPiBPbiAxMi8zLzE4IDEyOjE4IFBNLCBBbGV4YW5kcmUgVG9yZ3VlIHdyb3RlOgo+PiBIaSBB
-cm5kLCBPbG9mIGFuZCBLZXZpbiwKPj4KPj4gUGxlYXNlIGNvbnNpZGVyIHRoaXMgZmlyc3Qgcm91
-bmQgb2YgU1RNMzIgRFQgdXBkYXRlcyBmb3IgdjQuMjEuCj4+Cj4+IFRoYW5rcy4KPj4gQWxleAo+
-Pgo+IAo+IFRoaXMgUFIgaGFzIG5vdCBiZWVuIG1lcmdlZCBpbiA1LjAtcmMxLiBJcyB0aGVyZSBh
-biBpc3N1ZSAoZXhjZXB0IHRoYW4gCj4gdjQuMjEgZG9lc24ndCBleGlzdCA6KSkgPwo+IElmIG5v
-dCwgaXMgaXQgcG9zc2libGUgdG8gZ2V0IGl0IGluIG5leHQgNS4wIHJjID8KPiAKClNvcnJ5IGZv
-ciB0aGUgbGFzdCBwb3N0LiBJIGNvbXBsZXRlbHkgbWlzc2VkIE9sb2YgYW5zd2VyOgoKIkkgdGhp
-bmsgeW91IG1pZ2h0IGhhdmUgbWlzc2VkIHB1c2hpbmcgdGhlIHRhZyB0byB0aGUgcmVtb3RlPwot
-T2xvZgoiCgpNeSB0YWcgaXMgbm93IHB1c2hlZC4gSXMgdGhlcmUgYSBjaGFuY2UgdG8gZ2V0IGl0
-IGluIG5leHQgUkMgPwoKU29ycnkgZm9yIGluY29udmVuaWVuY2UuCgpBbGV4Cgo+IFRoYW5rcyBp
-biBhZHZhbmNlCj4gQWxleAo+IAo+IAo+PiBUaGUgZm9sbG93aW5nIGNoYW5nZXMgc2luY2UgY29t
-bWl0IAo+PiA2NTEwMjIzODJjN2Y4ZGE0NmNiNDg3MmE1NDVlZTFkYTZkMDk3ZDJhOgo+Pgo+PiDC
-oMKgIExpbnV4IDQuMjAtcmMxICgyMDE4LTExLTA0IDE1OjM3OjUyIC0wODAwKQo+Pgo+PiBhcmUg
-YXZhaWxhYmxlIGluIHRoZSBnaXQgcmVwb3NpdG9yeSBhdDoKPj4KPj4gwqDCoCBnaXQ6Ly9naXQu
-a2VybmVsLm9yZy9wdWIvc2NtL2xpbnV4L2tlcm5lbC9naXQvYXRvcmd1ZS9zdG0zMi5naXQgCj4+
-IHN0bTMyLWR0LWZvci12NC4yMS0xCj4+Cj4+IGZvciB5b3UgdG8gZmV0Y2ggY2hhbmdlcyB1cCB0
-byA4OTE0YjYzYmFiM2M0M2E1MjkzMTZiYTI4NTgxMzdiYzU3Yjc0ZmExOgo+Pgo+PiDCoMKgIEFS
-TTogZHRzOiBzdG0zMjogYWRkIHRoZXJtYWwgc2Vuc29yIHN1cHBvcnQgb24gU1RNMzJNUDE1N2Mg
-Cj4+ICgyMDE4LTEyLTAzIDEwOjQzOjI2ICswMTAwKQo+Pgo+PiAtLS0tLS0tLS0tLS0tLS0tLS0t
-LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCj4+IFNUTTMyIERU
-IHVwZGF0ZXMgZm9yIHY0LjIxLCByb3VuZCAxCj4+Cj4+IEhpZ2hsaWdodHM6Cj4+IC0tLS0tLS0t
-LS0KPj4KPj4gLU1QVSBTVE0zMk1QMTU3IHBsYXRmb3JtIHVwZGF0ZToKPj4gwqDCoC1EZWNsYXJl
-IERNQXMgZm9yIHRpbWVycwo+PiDCoMKgLUFkZCBzbGVlcCBzdXBwb3J0IGZvciBDQU4KPj4gwqDC
-oC1TcGxpdCBDQU4gUkFNIG1hcHBpbmcgYmV0d2VlbiB0aGUgMiBGRENBTiBpbnN0YW5jZXMKPj4g
-wqDCoC1BZGQgc3VwcG9ydCBvZiB0aGVybWFsIHNlbnNvciAoRFRTKQo+Pgo+PiAtLS0tLS0tLS0t
-LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCj4+
-IEJpY2ggSEVNT04gKDMpOgo+PiDCoMKgwqDCoMKgwqAgQVJNOiBkdHM6IHN0bTMyOiBjaGFuZ2Ug
-Q0FOIFJBTSBtYXBwaW5nIG9uIHN0bTMybXAxNTdjCj4+IMKgwqDCoMKgwqDCoCBBUk06IGR0czog
-c3RtMzI6IGFkZCBjYW4xIHNsZWVwIHBpbnMgbXV4aW5nCj4+IMKgwqDCoMKgwqDCoCBBUk06IGR0
-czogc3RtMzI6IGFkZCBjYW4xIHNsZWVwIHBpbnMgbXV4aW5nIG9uIHN0bTMybXAxNTdjLWV2MSAK
-Pj4gYm9hcmQKPj4KPj4gRGF2aWQgSGVybmFuZGV6IFNhbmNoZXogKDEpOgo+PiDCoMKgwqDCoMKg
-wqAgQVJNOiBkdHM6IHN0bTMyOiBhZGQgdGhlcm1hbCBzZW5zb3Igc3VwcG9ydCBvbiBTVE0zMk1Q
-MTU3Ywo+Pgo+PiBGYWJyaWNlIEdhc25pZXIgKDMpOgo+PiDCoMKgwqDCoMKgwqAgQVJNOiBkdHM6
-IHN0bTMyOiBBZGQgZG1hcyB0byB0aW1lciBvbiBzdG0zMm1wMTU3Ywo+PiDCoMKgwqDCoMKgwqAg
-QVJNOiBkdHM6IHN0bTMyOiBkb24ndCB1c2UgdGltZXJzIGRtYXMgb24gc3RtMzJtcDE1N2MtZWQx
-Cj4+IMKgwqDCoMKgwqDCoCBBUk06IGR0czogc3RtMzI6IGRvbid0IHVzZSB0aW1lcnMgZG1hcyBv
-biBzdG0zMm1wMTU3Yy1ldjEKPj4KPj4gwqDCoGFyY2gvYXJtL2Jvb3QvZHRzL3N0bTMybXAxNTct
-cGluY3RybC5kdHNpIHzCoCA3ICsrKwo+PiDCoMKgYXJjaC9hcm0vYm9vdC9kdHMvc3RtMzJtcDE1
-N2MtZWQxLmR0c8KgwqDCoMKgIHzCoCAzICsKPj4gwqDCoGFyY2gvYXJtL2Jvb3QvZHRzL3N0bTMy
-bXAxNTdjLWV2MS5kdHPCoMKgwqDCoCB8IDEwICsrKy0KPj4gwqDCoGFyY2gvYXJtL2Jvb3QvZHRz
-L3N0bTMybXAxNTdjLmR0c2nCoMKgwqDCoMKgwqDCoCB8IDk3IAo+PiArKysrKysrKysrKysrKysr
-KysrKysrKysrKysrKystCj4+IMKgwqA0IGZpbGVzIGNoYW5nZWQsIDExNCBpbnNlcnRpb25zKCsp
-LCAzIGRlbGV0aW9ucygtKQoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBs
-aXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlz
-dGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+Hi Peter,
+
+> Peter Robinson <pbrobinson@gmail.com> hat am 8. Januar 2019 um 08:21 geschrieben:
+> 
+> 
+> Hi Stefan,
+> 
+> > This patch series improves the load/unload of bcm2835 camera and audio
+> > drivers. It has been tested with Raspberry Pi 3 B and a camera module V1.
+> >
+> > This series based on current linux-next and Phil Elwell's series ("Improve VCHIQ
+> > cache line size handling"). After Nicolas' series ("staging: vc04_services:
+> > Some dead code removal") has been applied, i will rebase my series.
+> 
+> I tried testing this series applied to 4.20 with the camera module.
+
+first of all this crash should never happend.
+
+But why didn't you applied the series which was actually applied to mainline?
+Did you apply the rest of Phil's DT series as mentioned in the cover letter?
+
+> I
+> tried with qv4l2 (from v4l-utils) and using cheese, which in turn uses
+> gstreamer.
+
+Please provide the exact commandline and version.
+
+> I basically get the same crash for both options. Desktop is
+> LXDE on 32 bit Fedora 29.
+> 
+> I've not yet tried with 5.0-rc1 but it looks like it has this patch
+> series and some other bits for the vchiq drivers in staging.
+
+Please try 5.0-rc1 which would be more helpful.
+
+Maybe this sounds like a lame excuse but the intension of this series wasn't to get the driver fully operational. I think this is more Dave's expertise.
+
+Stefan
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
