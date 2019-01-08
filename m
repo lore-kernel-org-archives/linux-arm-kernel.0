@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DD5AAC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 18:00:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5999AC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 18:01:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B31BA217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 18:00:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2EF74206A3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 18:01:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="J1WnI7ki"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B31BA217D9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uX5zJG5L"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2EF74206A3
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=v3.sk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,50 +25,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KvZM12QnsXmdhjzTyDYmIDHXG8Ve2AWLCD3VUHrB2t0=; b=J1WnI7kiu34LFK
-	XgrHgoCtAR6+dH8//5WuvZynfLeirAGaF0gKhPiX56/j/mzFtHc6CRaVsWYMlK2x9RHyHYsYjQdlM
-	K7tDOcM1Z+pKFagKcMKhOvdFuNc3Nu7CV40W82H0QjL+zZY2RNtkGdqs5tEO1SMmv0sU9IniL3VTY
-	xnc8MLeC0R+l6TO9sHmzQ0u+lfn2TwGMI4bIGRCMjJvT8te+h2yrAQSPtZ6JKtIgiNyC36Uyahb6g
-	gqADbzHCR+HrxZkCkSp4KOmoDLKboLSYMChcR36jxkcYw1Ot8vyL9eaIeJ7OTrUOPxQMn7QRLefI/
-	WSDIgfBQx//cUSFQxc9w==;
+	List-Owner; bh=JoJXDi9rgFWPhfGdIeUnVIX3bGhkijxIf1Hqt/97lkw=; b=uX5zJG5LfVN3w6
+	uvKmeFRzGq9r+PXI/qEHIyIyl7AJVwIv9uUflDJZMKnu29f/FY5HcLZYquBuH6i7EI7QRSscpHsqY
+	q/Y8FH8yPmZFJnjERw9i1x4qXV5THT9nnlb3PZw00leF057e2ky5YQY/IDIG4KmqwVYzAWTlpD/8+
+	B1/bl0rROdeAtSg0RBMn4jLmOAQt3mhPS8dCjJSKQ7OrjKpmVnsm6Zdz2nclDjx/hT9QzM5oYSz5r
+	9uX8pfOqQFTdhOTOzMxKCJNqHoS+c+8YldeROnryxuHgPHhmfoZ+LU4zlceXXf/kat9tWC7Zx8PGT
+	u0iwJATAkzSkxO3h7Nig==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggvgC-0001jp-3J; Tue, 08 Jan 2019 18:00:44 +0000
+	id 1ggvgQ-0001zI-Fg; Tue, 08 Jan 2019 18:00:58 +0000
 Received: from shell.v3.sk ([90.176.6.54])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggveV-0007EE-8h
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 17:59:15 +0000
+ id 1ggvee-0007Pe-70
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 17:59:22 +0000
 Received: from localhost (localhost [127.0.0.1])
- by zimbra.v3.sk (Postfix) with ESMTP id 52C0B100056;
- Tue,  8 Jan 2019 18:58:57 +0100 (CET)
+ by zimbra.v3.sk (Postfix) with ESMTP id 730B710005E;
+ Tue,  8 Jan 2019 18:59:06 +0100 (CET)
 Received: from shell.v3.sk ([127.0.0.1])
  by localhost (zimbra.v3.sk [127.0.0.1]) (amavisd-new, port 10032)
- with ESMTP id BCYiUlhQpEPb; Tue,  8 Jan 2019 18:58:40 +0100 (CET)
+ with ESMTP id rPIeekuZMKPj; Tue,  8 Jan 2019 18:58:51 +0100 (CET)
 Received: from localhost (localhost [127.0.0.1])
- by zimbra.v3.sk (Postfix) with ESMTP id A6486100052;
- Tue,  8 Jan 2019 18:58:30 +0100 (CET)
+ by zimbra.v3.sk (Postfix) with ESMTP id 8547FFFF78;
+ Tue,  8 Jan 2019 18:58:33 +0100 (CET)
 X-Virus-Scanned: amavisd-new at zimbra.v3.sk
 Received: from shell.v3.sk ([127.0.0.1])
  by localhost (zimbra.v3.sk [127.0.0.1]) (amavisd-new, port 10026)
- with ESMTP id exfZ-Ige95WI; Tue,  8 Jan 2019 18:58:28 +0100 (CET)
+ with ESMTP id R5Gzyaz9tEnx; Tue,  8 Jan 2019 18:58:30 +0100 (CET)
 Received: from belphegor.brq.redhat.com (nat-pool-brq-t.redhat.com
  [213.175.37.10])
- by zimbra.v3.sk (Postfix) with ESMTPSA id A409D10004D;
- Tue,  8 Jan 2019 18:58:25 +0100 (CET)
+ by zimbra.v3.sk (Postfix) with ESMTPSA id 2FB5C10005E;
+ Tue,  8 Jan 2019 18:58:27 +0100 (CET)
 From: Lubomir Rintel <lkundrak@v3.sk>
 To: Andy Shevchenko <andy@infradead.org>, Darren Hart <dvhart@infradead.org>,
  platform-driver-x86@vger.kernel.org, Russell King <linux@armlinux.org.uk>
-Subject: [PATCH v4 10/15] x86,
- olpc: Use a correct version when making up a battery node
-Date: Tue,  8 Jan 2019 18:58:13 +0100
-Message-Id: <20190108175818.705110-11-lkundrak@v3.sk>
+Subject: [PATCH v4 14/15] power: supply: olpc_battery: Avoid using
+ platform_info
+Date: Tue,  8 Jan 2019 18:58:17 +0100
+Message-Id: <20190108175818.705110-15-lkundrak@v3.sk>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190108175818.705110-1-lkundrak@v3.sk>
 References: <20190108175818.705110-1-lkundrak@v3.sk>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_095902_054996_86BDDCFC 
-X-CRM114-Status: GOOD (  12.10  )
+X-CRM114-CacheID: sfid-20190108_095908_830975_B5246B14 
+X-CRM114-Status: GOOD (  17.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,139 +84,113 @@ Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
  James Cameron <quozl@laptop.org>, linux-pm@vger.kernel.org, x86@kernel.org,
  Sebastian Reichel <sre@kernel.org>, linux-kernel@vger.kernel.org,
  Lubomir Rintel <lkundrak@v3.sk>, Rob Herring <robh+dt@kernel.org>,
- Pavel Machek <pavel@ucw.cz>, linux-arm-kernel@lists.infradead.org
+ Pavel Machek <pavel@ucw.cz>,
+ Sebastian Reichel <sebastian.reichel@collabora.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The XO-1 and XO-1.5 batteries apparently differ in an ability to report
-ambient temperature. Add a different compatible string to the 1.5
-battery.
+This wouldn't work on the DT-based ARM platform. Let's read the EC version
+directly from the EC driver instead.
+
+This makes the driver no longer x86 specific.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 Acked-by: Pavel Machek <pavel@ucw.cz>
+Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.com>
 
 ---
+Changes since v2:
+- Move the priv data allocation hunk from this patch to a proper place
+
 Changes since v1:
-- Avoid splitting string literals
+- Use uint8_t instead of unsigned char [1] for ecver
 
- arch/x86/platform/olpc/olpc_dt.c | 84 +++++++++++++++++++++-----------
- 1 file changed, 56 insertions(+), 28 deletions(-)
+ drivers/power/supply/Kconfig        |  2 +-
+ drivers/power/supply/olpc_battery.c | 27 ++++++++++++++++++---------
+ 2 files changed, 19 insertions(+), 10 deletions(-)
 
-diff --git a/arch/x86/platform/olpc/olpc_dt.c b/arch/x86/platform/olpc/olpc_dt.c
-index b4ab779f1d47..8557add82752 100644
---- a/arch/x86/platform/olpc/olpc_dt.c
-+++ b/arch/x86/platform/olpc/olpc_dt.c
-@@ -217,10 +217,28 @@ static u32 __init olpc_dt_get_board_revision(void)
- 	return be32_to_cpu(rev);
- }
+diff --git a/drivers/power/supply/Kconfig b/drivers/power/supply/Kconfig
+index e901b9879e7e..67a3bb26da39 100644
+--- a/drivers/power/supply/Kconfig
++++ b/drivers/power/supply/Kconfig
+@@ -151,7 +151,7 @@ config BATTERY_PMU
  
--void __init olpc_dt_fixup(void)
-+int olpc_dt_compatible_match(phandle node, const char *compat)
+ config BATTERY_OLPC
+ 	tristate "One Laptop Per Child battery"
+-	depends on X86_32 && OLPC
++	depends on OLPC
+ 	help
+ 	  Say Y to enable support for the battery on the OLPC laptop.
+ 
+diff --git a/drivers/power/supply/olpc_battery.c b/drivers/power/supply/olpc_battery.c
+index 0c9f7ce6b26b..8ebb4284cf05 100644
+--- a/drivers/power/supply/olpc_battery.c
++++ b/drivers/power/supply/olpc_battery.c
+@@ -20,8 +20,6 @@
+ #include <linux/jiffies.h>
+ #include <linux/sched.h>
+ #include <linux/olpc-ec.h>
+-#include <asm/olpc.h>
+-
+ 
+ #define EC_BAT_VOLTAGE	0x10	/* uint16_t,	*9.76/32,    mV   */
+ #define EC_BAT_CURRENT	0x11	/* int16_t,	*15.625/120, mA   */
+@@ -57,6 +55,7 @@ struct olpc_battery_data {
+ 	struct power_supply *olpc_ac;
+ 	struct power_supply *olpc_bat;
+ 	char bat_serial[17];
++	int new_proto;
+ };
+ 
+ /*********************************************************************
+@@ -100,7 +99,7 @@ static const struct power_supply_desc olpc_ac_desc = {
+ static int olpc_bat_get_status(struct olpc_battery_data *data,
+ 		union power_supply_propval *val, uint8_t ec_byte)
  {
--	int r;
- 	char buf[64];
-+	int plen;
-+	char *p;
-+	int len;
-+
-+	plen = olpc_dt_getproperty(node, "compatible", buf, sizeof(buf));
-+	if (plen <= 0)
-+		return 0;
-+
-+	len = strlen(compat);
-+	for (p = buf; p < buf + plen; p += strlen(p) + 1) {
-+		if (strcmp(p, compat) == 0)
-+			return 1;
-+	}
-+
-+	return 0;
-+}
-+
-+void __init olpc_dt_fixup(void)
-+{
- 	phandle node;
- 	u32 board_rev;
+-	if (olpc_platform_info.ecver > 0x44) {
++	if (data->new_proto) {
+ 		if (ec_byte & (BAT_STAT_CHARGING | BAT_STAT_TRICKLE))
+ 			val->intval = POWER_SUPPLY_STATUS_CHARGING;
+ 		else if (ec_byte & BAT_STAT_DISCHARGING)
+@@ -608,19 +607,29 @@ static int olpc_battery_probe(struct platform_device *pdev)
+ 	struct power_supply_config psy_cfg = {};
+ 	struct olpc_battery_data *data;
+ 	uint8_t status;
++	uint8_t ecver;
++	int ret;
  
-@@ -228,41 +246,51 @@ void __init olpc_dt_fixup(void)
- 	if (!node)
- 		return;
+ 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+ 	if (!data)
+ 		return -ENOMEM;
+ 	platform_set_drvdata(pdev, data);
  
 -	/*
--	 * If the battery node has a compatible property, we are running a new
--	 * enough firmware and don't have fixups to make.
+-	 * We've seen a number of EC protocol changes; this driver requires
+-	 * the latest EC protocol, supported by 0x44 and above.
 -	 */
--	r = olpc_dt_getproperty(node, "compatible", buf, sizeof(buf));
--	if (r > 0)
--		return;
--
--	pr_info("PROM DT: Old firmware detected, applying fixes\n");
--
--	/* Add olpc,xo1-battery compatible marker to battery node */
--	olpc_dt_interpret("\" /battery@0\" find-device"
--		" \" olpc,xo1-battery\" +compatible"
--		" device-end");
--
- 	board_rev = olpc_dt_get_board_revision();
- 	if (!board_rev)
- 		return;
- 
- 	if (board_rev >= olpc_board_pre(0xd0)) {
-+		if (olpc_dt_compatible_match(node, "olpc,xo1.5-battery"))
-+			return;
+-	if (olpc_platform_info.ecver < 0x44) {
++	/* See if the EC is already there and get the EC revision */
++	ret = olpc_ec_cmd(EC_FIRMWARE_REV, NULL, 0, &ecver, 1);
++	if (ret)
++		return ret;
 +
-+		/* Add olpc,xo1.5-battery compatible marker to battery node */
-+		olpc_dt_interpret("\" /battery@0\" find-device");
-+		olpc_dt_interpret("  \" olpc,xo1.5-battery\" +compatible");
-+		olpc_dt_interpret("device-end");
-+
-+		/* We're running a very old firmware if this is missing. */
-+		if (olpc_dt_compatible_match(node, "olpc,xo1-battery"))
-+			return;
-+
- 		/* XO-1.5: add dcon device */
--		olpc_dt_interpret("\" /pci/display@1\" find-device"
--			" new-device"
--			" \" dcon\" device-name \" olpc,xo1-dcon\" +compatible"
--			" finish-device device-end");
-+		olpc_dt_interpret("\" /pci/display@1\" find-device");
-+		olpc_dt_interpret("  new-device");
-+		olpc_dt_interpret("    \" dcon\" device-name");
-+		olpc_dt_interpret("    \" olpc,xo1-dcon\" +compatible");
-+		olpc_dt_interpret("  finish-device");
-+		olpc_dt_interpret("device-end");
- 	} else {
-+		/* We're running a very old firmware if this is missing. */
-+		if (olpc_dt_compatible_match(node, "olpc,xo1-battery"))
-+			return;
-+
- 		/* XO-1: add dcon device, mark RTC as olpc,xo1-rtc */
--		olpc_dt_interpret("\" /pci/display@1,1\" find-device"
--			" new-device"
--			" \" dcon\" device-name \" olpc,xo1-dcon\" +compatible"
--			" finish-device device-end"
--			" \" /rtc\" find-device"
--			" \" olpc,xo1-rtc\" +compatible"
--			" device-end");
-+		olpc_dt_interpret("\" /pci/display@1,1\" find-device");
-+		olpc_dt_interpret("  new-device");
-+		olpc_dt_interpret("    \" dcon\" device-name");
-+		olpc_dt_interpret("    \" olpc,xo1-dcon\" +compatible");
-+		olpc_dt_interpret("  finish-device");
-+		olpc_dt_interpret("device-end");
-+		olpc_dt_interpret("\" /rtc\" find-device");
-+		olpc_dt_interpret("  \" olpc,xo1-rtc\" +compatible");
-+		olpc_dt_interpret("device-end");
++	if (ecver > 0x44) {
++		/* XO 1 or 1.5 with a new EC firmware. */
++		data->new_proto = 1;
++	} else if (ecver < 0x44) {
++		/*
++		 * We've seen a number of EC protocol changes; this driver
++		 * requires the latest EC protocol, supported by 0x44 and above.
++		 */
+ 		printk(KERN_NOTICE "OLPC EC version 0x%02x too old for "
+-			"battery driver.\n", olpc_platform_info.ecver);
++			"battery driver.\n", ecver);
+ 		return -ENXIO;
  	}
-+
-+	/* Add olpc,xo1-battery compatible marker to battery node */
-+	olpc_dt_interpret("\" /battery@0\" find-device");
-+	olpc_dt_interpret("  \" olpc,xo1-battery\" +compatible");
-+	olpc_dt_interpret("device-end");
- }
  
- void __init olpc_dt_build_devicetree(void)
 -- 
 2.20.1
 
