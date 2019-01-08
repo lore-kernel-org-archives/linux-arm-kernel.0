@@ -2,69 +2,73 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 541E8C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 02:40:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2A7C1C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 03:05:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1E52E206A3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 02:40:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EE6AD2070C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 03:05:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JJiI/5EG";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="kxdHCejo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1E52E206A3
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rsHsvnCB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EE6AD2070C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Message-Id:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=PBwTPd7gelXw5SIKTVGtYtEI1w2Xtvi1Pj+2wbWU1Fs=; b=JJiI/5EGysoWw7
-	KOHvvbJ+1BVDVERAqTcBZsl6tEFi3N1Aq4I4oAFIX5Rv27KpmS2b1Kx7dgPzOqdsckZtyDmMGEqdZ
-	8LIRNkEsCbPNeTXkXniYa4u/0D6pfWaDmoz6h0kqs5IRC1ooqG2NQfW0fFdl56WEwTTjF11nj+lML
-	MWG/5eU6Ommetz+I55UA0gZn0Epb6Sb/Qn8+KxMQSfDL2C80iMXZhEOQ7RQQNftW8YFRNmqHxOZuk
-	yQYL54jUb9qy2TI0uWy8/I7a59KxH828E7AwHiHQHO0k4rTqbVp9RU4BqCOfIteFI8wo3dg1RzI/u
-	CuywqfMO7ibMRP+cvsaw==;
+	List-Owner; bh=C5Y40/XjbSsj0q03y7hDa2tVdpRsPXXIX2PXXwe+VOE=; b=rsHsvnCBKOQP2t
+	exs2xK9JIO+p9VZq6t1o39gWGwefg6+r7zhSQs3owIqgaVzZYEJWp1fohsnHPUkJaeZrQv/Jy6Eqj
+	uAYSzovDQZsbvg9OeJNQzsVvQfRoAiaV2dTh8MkCGQwN0py1GWZdXbZ+i0dDmuawPEhmS8IcU5ZgO
+	JPDOq0qclCX9gyTLqIuxi6yMWVvhRORaTuukrhVJL/PjD/rxKpr+2S2HW3BXhYvecHibXBxoJAc8f
+	XOJzPhXGn/zcT85fBYV/EWANfD3YlfqBTLs3O/VvZKpPdW16YUgjkpAViGCYhJhm6wkrpkQhTbKoB
+	kgIQ09zLeuwHW4Nd7/pQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gghJC-0004HW-GQ; Tue, 08 Jan 2019 02:40:02 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gghhw-00051Y-IP; Tue, 08 Jan 2019 03:05:36 +0000
+Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gghJ8-0004EY-5e
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 02:39:59 +0000
-Received: from devbox (NE2965lan1.rev.em-net.ne.jp [210.141.244.193])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 0B312206A3;
- Tue,  8 Jan 2019 02:39:54 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1546915196;
- bh=VT0+XNUdZwsmaGLxFPXM9zwdwnbcsTw9cqA1fMecFRc=;
- h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
- b=kxdHCejoo7hs1seGOIlYhPyhqOgP6q4raLbVYdBr9TZ879haspLbpoPKnS3ot4hfv
- 7TgO+x/UAwi6Vq2F3Y4TLDhYDH/m0ul+YrDM06Ep/V3NSktzs53+vCQG13POcdaGHs
- tsHAuPnTwt7OXyYtuJHzuzldmRBZpoEMJbeB1WQU=
-Date: Tue, 8 Jan 2019 11:39:53 +0900
-From: Masami Hiramatsu <mhiramat@kernel.org>
-To: James Morse <james.morse@arm.com>
-Subject: Re: [PATCH 1/3] arm64: kprobes: Move extable address check into
- arch_prepare_kprobe()
-Message-Id: <20190108113953.8bc0cc7d196ddba370377217@kernel.org>
-In-Reply-To: <aec51c10-d744-df0f-1216-d3372e779cb1@arm.com>
-References: <154502881646.30629.9938335052821665530.stgit@devbox>
- <154502884653.30629.3172839440883293817.stgit@devbox>
- <aec51c10-d744-df0f-1216-d3372e779cb1@arm.com>
-X-Mailer: Sylpheed 3.5.1 (GTK+ 2.24.31; x86_64-redhat-linux-gnu)
-Mime-Version: 1.0
+ id 1gghhr-00050P-8T; Tue, 08 Jan 2019 03:05:33 +0000
+X-UUID: c478d28b9e914dbc98353012ad056c88-20190107
+X-UUID: c478d28b9e914dbc98353012ad056c88-20190107
+Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw02.mediatek.com
+ (envelope-from <mars.cheng@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 931364329; Mon, 07 Jan 2019 19:05:07 -0800
+Received: from MTKMBS01N2.mediatek.inc (172.21.101.79) by
+ MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Mon, 7 Jan 2019 19:05:06 -0800
+Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
+ mtkmbs01n2.mediatek.inc (172.21.101.79) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Tue, 8 Jan 2019 11:05:04 +0800
+Received: from [172.21.77.33] (172.21.77.33) by MTKCAS06.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Tue, 8 Jan 2019 11:05:04 +0800
+Message-ID: <1546916704.4994.3.camel@mtkswgap22>
+Subject: Re: [PATCH v2 0/3] Mark clocks as critical for MT6797
+From: Mars Cheng <mars.cheng@mediatek.com>
+To: Stephen Boyd <sboyd@kernel.org>
+Date: Tue, 8 Jan 2019 11:05:04 +0800
+In-Reply-To: <154689458947.15366.14390825810412394676@swboyd.mtv.corp.google.com>
+References: <20181116180901.17737-1-matthias.bgg@kernel.org>
+ <154356044342.88331.13729809794593193239@swboyd.mtv.corp.google.com>
+ <8e8b9c0f-7647-daa4-504b-7b86bcd45a04@gmail.com>
+ <154689458947.15366.14390825810412394676@swboyd.mtv.corp.google.com>
+X-Mailer: Evolution 3.2.3-0ubuntu6 
+MIME-Version: 1.0
+X-TM-SNTS-SMTP: EEC90C1E2BC24CAD9F1D04DCAE853DD2CC27D9F55A8D1640A3E6C066578E56382000:8
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190107_183958_256682_42A4666E 
-X-CRM114-Status: GOOD (  19.78  )
+X-CRM114-CacheID: sfid-20190107_190531_324943_43DF5C54 
+X-CRM114-Status: GOOD (  20.34  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,106 +80,80 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Pratyush Anand <panand@redhat.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- linux-kernel <linux-kernel@vger.kernel.org>,
- "David A . Long" <dave.long@linaro.org>, linux-arm-kernel@lists.infradead.org
+Cc: Matthias Brugger <mbrugger@suse.com>, mturquette@baylibre.com,
+ sean.wang@kernel.org, linux-kernel@vger.kernel.org,
+ Kevin-CW Chen <kevin-cw.chen@mediatek.com>, linux-mediatek@lists.infradead.org,
+ matthias.bgg@kernel.org, Matthias Brugger <matthias.bgg@gmail.com>,
+ jasu@njomotys.info, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 3 Jan 2019 17:05:18 +0000
-James Morse <james.morse@arm.com> wrote:
+Hi Stephen/Matthias
 
-> Hi!
-> 
-> On 17/12/2018 06:40, Masami Hiramatsu wrote:
-> > Move extable address check into arch_prepare_kprobe() from
-> > arch_within_kprobe_blacklist().
-> 
-> I'm trying to work out the pattern for what should go in the blacklist, and what
-> should be rejected by the arch code.
-> 
-> It seems address-ranges should be blacklisted as the contents don't matter.
-> easy-example: the idmap text.
-
-Yes, more precisely, the code smaller than a function (symbol), it must be
-rejected by arch_prepare_kprobe(), since blacklist is poplated based on
-kallsyms.
-
-> The arch code should also reject instructions that can't be probed from
-> arch_prepare_kprobe(). easy-example: exclusive load or store.
-> 
-> 
-> > Please do not blacklisting instructions on exception_table,
-> > since it is a kind of architectural unsupported instruction.
-> 
-> This doesn't fit the pattern, ... what should it be?
-
-Some kind of instructions can not be instrumented by kprobes, such instruction
-level rejection must be done in arch_prepare_kprobe(), instead of blacklist.
-
-> The instructions in the exception_table don't matter, its the address that
-> indicates there is a fixup for page-faults that occur here. We don't need to
-> look at the instruction to determine this, why can't we treated these as a
-> blacklisted range?
-
-Sorry for your confusion, it was my mis-describing.
-
-As I pointed, the exception_table contains some range of code which inside
-functions, must be smaller than function.
-Since those instructions are expected to cause exception (that is main reason
-why it can not be probed on arm64), I thought such situation was similar to
-the limitation of instruction.
-
-So I think below will be better.
-----
-Please do not blacklisting instructions on exception_table,
-since those are smaller than one function.
-----
-
-
-Thank you,
-
-> 
-> 
-> Thanks,
-> 
-> James
-> 
-> 
-> > diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
-> > index 2a5b338b2542..b2d4b7428ebc 100644
-> > --- a/arch/arm64/kernel/probes/kprobes.c
-> > +++ b/arch/arm64/kernel/probes/kprobes.c
-> > @@ -102,6 +102,10 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
-> >  
-> >  	if (in_exception_text(probe_addr))
-> >  		return -EINVAL;
-> > +
-> > +	if (search_exception_tables(probe_addr))
-> > +		return -EINVAL;
-> > +
-> >  	if (probe_addr >= (unsigned long) __start_rodata &&
-> >  	    probe_addr <= (unsigned long) __end_rodata)
-> >  		return -EINVAL;
-> > @@ -477,8 +481,7 @@ bool arch_within_kprobe_blacklist(unsigned long addr)
-> >  	    (addr >= (unsigned long)__entry_text_start &&
-> >  	    addr < (unsigned long)__entry_text_end) ||
-> >  	    (addr >= (unsigned long)__idmap_text_start &&
-> > -	    addr < (unsigned long)__idmap_text_end) ||
-> > -	    !!search_exception_tables(addr))
-> > +	    addr < (unsigned long)__idmap_text_end))
-> >  		return true;
-> >  
-> >  	if (!is_kernel_in_hyp_mode()) {
+On Mon, 2019-01-07 at 12:56 -0800, Stephen Boyd wrote:
+> Quoting Matthias Brugger (2018-11-30 01:04:02)
 > > 
+> > 
+> > On 30/11/2018 07:47, Stephen Boyd wrote:
+> > > Quoting matthias.bgg@kernel.org (2018-11-16 10:08:58)
+> > >> From: Matthias Brugger <mbrugger@suse.com>
+> > >>
+> > >> Jasper send this series some month ago. As there was no reaction from
+> > >> his side, I'll do a friendly take-over.
+> > >> I tested the patches on my Helios X20 boards and they fix the issue.
+> > >> I didn't add a Tested-by tag as I added my Signed-off-by.
+> > >>
+> > >> Changes since v1:
+> > >> - add a fixes tag.
+> > >>
+> > >> ---
+> > >>
+> > >> Currently, DRAM-related clocks and the axi_sel MUX are not marked with
+> > >> CLK_IS_CRITICAL for MT6797. This causes memory corruption when the
+> > >> system is booted without clk_ignore_unused.
+> > >>
+> > >> This patchset
+> > >>
+> > >> 1. Makes it possible to mark outputs of MUXes as critical by introducing
+> > >>    a new macro, MUX_FLAGS,
+> > >> 2. Makes it possible to mark gates as critical by adding flags to
+> > >>    mtk_gate, and
+> > >> 3. Marks axi_sel, ddrphycfg_sel, infra_dramc_f26m and infra_dramc_b_f26m
+> > >>    as critical.
+> > >>
+> > >> The addition of flags to mtk_gate also exists in the patch series "Add
+> > >> basic and clock support for Mediatek MT8183 SoC" [1].  The type of
+> > >> flags is unsigned int in that series, but the real type is unsigned
+> > >> long, so my patch differs from that patch.
+> > > 
+> > > Will anyone from Mediatek review this? Why aren't the people who signed
+> > > off on drivers/clk/mediatek/clk-mt6797.c included on this patch series?
+> > > They no longer work there?
+> > > 
+> > 
+> > My fault, I'll resend 3/3 with the comments you made. Added Kevin-CW now...
+> 
+> I never saw anything on the list. Did I miss anything? I have the first
+> two patches in my local queue still but I never merged it to clk-next
+> because nobody replied or resent anything. Please resend the whole
+> series because I've lost track of what's going on now. Sorry.
+> 
 > 
 
+sorry for late response. Kelvin-CW and I are responsible for 6797
+clk.You have my Ack:
+Acked-by: Mars Cheng <mars.cheng@mediatek.com>
 
--- 
-Masami Hiramatsu <mhiramat@kernel.org>
+Thanks.
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek@lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
