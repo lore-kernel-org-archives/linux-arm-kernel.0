@@ -2,92 +2,61 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4C31CC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 09:41:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 547A8C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 09:52:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EE8A2206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 09:41:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1FEB020827
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 09:52:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IC/RZhbe";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="mscUU3ZW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EE8A2206B7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BeSMwkst"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1FEB020827
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=soulik.info
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hS938JsgAvQB3Ub2lOFujUgGLcf6RkwCmz8ZVQqG6Gg=; b=IC/RZhbeuRBrlo
-	N8tiaN+rf0BIOIN6yZcAZkUA3KuHby8uDjOb09b7g0unwc0PR7alKAxymdWsjUzoHUQ5t01oj02O4
-	JroQIOEwLPKAeUFuam+aMIzuBZW7MOqLKw0rFyLGRnCKZKT5Tmy2d7yLTSa2aDnRUqKY0oUNHiwAa
-	Kuew/Ur8v5wVn07s5KF4ZXVJLh4nQOCFaUjRISrpPDz7tOwQn5Tktr3IK1IYOf+wuxuVYEuH4jG7e
-	GhKu28Mdhe93VSY2Jdn2cZ/J51euspBHbJvML94+VGHx8/2OjXiW147HyyOCc7JQEb0/e9Zyk/uyH
-	AFuPMQGZorWO23TropuA==;
+	List-Owner; bh=4b7+88AdkWFpnI2ZOUwcMp4JvBTZcp1O6rdwRjkgvU8=; b=BeSMwkst48wsU/
+	du4H/JC/za3ONz5oI1l+f5OGqeDbzSocAgFufkEoUNkDcORDN/Jw8JNcaLjPTh+t3dDqLVVmFJXzZ
+	7Yol0PvyWJV+ln81fVapfGbXr4HOEMy6Arqf2m0t6xsP4WneYZb+BzQUdMhRUOsnsjkBmbh7jyrlN
+	DN1JR02/kJOJC8dUI1Ucql2G7JUoF3aN61P9wKlcbuU2szI+QdfmgGTUOHq/0498QWsMZoCO9BINm
+	ZlDa2K3O2nu+55/VY31UdYtfblFGA9vyO/NpPacRcax5eNoXPTYEjlY4aKgv14XAHVGaXzqVdYWJs
+	6WqmmX+tMGQ6okCChULg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggnt2-0005Z8-FO; Tue, 08 Jan 2019 09:41:28 +0000
-Received: from mail-ed1-x543.google.com ([2a00:1450:4864:20::543])
+	id 1ggo45-0001O4-Kl; Tue, 08 Jan 2019 09:52:53 +0000
+Received: from kozue.soulik.info ([2001:19f0:7000:8404:5054:ff:fe75:428f])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggnUR-00070o-EQ
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 09:16:14 +0000
-Received: by mail-ed1-x543.google.com with SMTP id b14so3461250edt.6
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 08 Jan 2019 01:16:03 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=syCNYOhWI2Fa3CkPeYThsu7drj9CGAM/9EZeMe/84fg=;
- b=mscUU3ZWKPFNJHUEfNCsIH9Q6oMXrfnX4GjoBcDTTRTCfpTqqskB8ocUk3JJS6f7nH
- F1QPu6fR0Qc/E10AyfaUCOcJ9Jn3owXgOnusdSM3Wa953EWG+ixmUezdY1iXoo3X/SAM
- Y+tqYuuJrzNetOMRfLn62Ki31x5ODVN8O+Tassm3sW7pgpIBNeMPIRgJr7s2e6UkIGCz
- 05PF/B9vBpQp++4E3934cLafg0iezy9iHXPYypudW6fD29Et8K6rxh18Ni12NwuXSOfU
- shPXkmpCuR1BbJCz+O4a6UyJ8su0KQPQ2ye74GXElSqM92Aifsb53Ao4lkBtES/sQZ0c
- uOhg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=syCNYOhWI2Fa3CkPeYThsu7drj9CGAM/9EZeMe/84fg=;
- b=Q5e+v6s1W+2VxzkpCYUksJZjvPObxGN2o9tmq6pjoCAqQ8KBtdr5Ew/uLiljCaB/7G
- G7azzldefHisSJ4KwcQYLDy2auYGFRDwnpP9N641gHWDCmq7GVictsFjwF8ocfJpsUbY
- JzvBBNbI3GOt+V2sXTfjrCbrp1PT6/TCVSepwbZrnRU9bTz2L5uFTC1k1gAKy/FKHW7I
- DEAznTjYwcbqoppc8f9j+i3uUzpR0WoJMwhdj2T69qR6/3qScBCcJvCrZXfwDmQoNoiT
- b2F/Q/yUePqsKT53rYsAKoQ8uX7Q4+Fv7WJ3H3zF/WW8lIAXKC1/ZgqyEqsWK2/+cE02
- LVBQ==
-X-Gm-Message-State: AJcUukdj5J7RHt72I3koi/FkOytaiJPGqJV+FbNAvKnMC6Kamq+QDgOL
- O94M7Bb9CsF02lH8G6XxGoV7Cg==
-X-Google-Smtp-Source: ALg8bN4dDw5IvyscDJ7IN+fJkMMKyW2fwpGh6nsmSR42EOQznEqT9Y6G2fSaVLrGxUkS9e2x57NcyA==
-X-Received: by 2002:a17:906:5202:: with SMTP id
- g2-v6mr1163630ejm.139.1546938962046; 
- Tue, 08 Jan 2019 01:16:02 -0800 (PST)
-Received: from debian-brgl.home ([2a01:cb1d:af:5b00:6d6c:8493:1ab5:dad7])
- by smtp.gmail.com with ESMTPSA id gp22-v6sm18373560ejb.4.2019.01.08.01.16.00
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 08 Jan 2019 01:16:01 -0800 (PST)
-From: Bartosz Golaszewski <brgl@bgdev.pl>
-To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
- Arnd Bergmann <arnd@arndb.de>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Subject: [RESEND PATCH 10/12] ARM: davinci: mityomapl138: use nvmem notifiers
-Date: Tue,  8 Jan 2019 10:15:37 +0100
-Message-Id: <20190108091539.16674-11-brgl@bgdev.pl>
-X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20190108091539.16674-1-brgl@bgdev.pl>
-References: <20190108091539.16674-1-brgl@bgdev.pl>
+ id 1ggo40-0001M5-2c
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 09:52:51 +0000
+Received: from misaki.sumomo.pri (unknown
+ [IPv6:2001:470:b30d:2:c604:15ff:0:401])
+ by kozue.soulik.info (Postfix) with ESMTPSA id 10F54100F34;
+ Tue,  8 Jan 2019 18:53:19 +0900 (JST)
+Date: Tue, 8 Jan 2019 17:52:28 +0800
+From: Randy 'ayaka' Li <ayaka@soulik.info>
+To: Maxime Ripard <maxime.ripard@bootlin.com>
+Subject: Re: [PATCH v2 1/2] media: uapi: Add H264 low-level decoder API
+ compound controls.
+Message-ID: <20190108095228.GA5161@misaki.sumomo.pri>
+References: <20181115145650.9827-1-maxime.ripard@bootlin.com>
+ <20181115145650.9827-2-maxime.ripard@bootlin.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20181115145650.9827-2-maxime.ripard@bootlin.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_011604_483279_9E23E24C 
-X-CRM114-Status: GOOD (  15.14  )
+X-CRM114-CacheID: sfid-20190108_015248_373048_1750C5E5 
+X-CRM114-Status: GOOD (  20.05  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,89 +68,889 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-i2c@vger.kernel.org
+Cc: linux-arm-kernel@lists.infradead.org, nicolas.dufresne@collabora.com,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>, acourbot@chromium.org,
+ linux-kernel@vger.kernel.org, tfiga@chromium.org,
+ Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
+ linux-sunxi@googlegroups.com, hans.verkuil@cisco.com, jenskuske@gmail.com,
+ sakari.ailus@linux.intel.com, Guenter Roeck <groeck@chromium.org>,
+ Chen-Yu Tsai <wens@csie.org>, linux-media@vger.kernel.org,
+ posciak@chromium.org, Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Thu, Nov 15, 2018 at 03:56:49PM +0100, Maxime Ripard wrote:
+> From: Pawel Osciak <posciak@chromium.org>
+> 
+> Stateless video codecs will require both the H264 metadata and slices in
+> order to be able to decode frames.
+> 
+> This introduces the definitions for a new pixel format for H264 slices that
+> have been parsed, as well as the structures used to pass the metadata from
+> the userspace to the kernel.
+> 
+> Co-Developed-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> Signed-off-by: Pawel Osciak <posciak@chromium.org>
+> Signed-off-by: Guenter Roeck <groeck@chromium.org>
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> ---
+>  Documentation/media/uapi/v4l/biblio.rst       |   9 +
+>  .../media/uapi/v4l/extended-controls.rst      | 364 ++++++++++++++++++
+>  .../media/uapi/v4l/pixfmt-compressed.rst      |  20 +
+>  .../media/uapi/v4l/vidioc-queryctrl.rst       |  30 ++
+>  .../media/videodev2.h.rst.exceptions          |   5 +
+>  drivers/media/v4l2-core/v4l2-ctrls.c          |  42 ++
+>  drivers/media/v4l2-core/v4l2-ioctl.c          |   1 +
+>  include/media/v4l2-ctrls.h                    |  10 +
+>  include/uapi/linux/v4l2-controls.h            | 166 ++++++++
+>  include/uapi/linux/videodev2.h                |  11 +
+>  10 files changed, 658 insertions(+)
+> 
+> diff --git a/Documentation/media/uapi/v4l/biblio.rst b/Documentation/media/uapi/v4l/biblio.rst
+> index 386d6cf83e9c..73aeb7ce47d2 100644
+> --- a/Documentation/media/uapi/v4l/biblio.rst
+> +++ b/Documentation/media/uapi/v4l/biblio.rst
+> @@ -115,6 +115,15 @@ ITU BT.1119
+>  
+>  :author:    International Telecommunication Union (http://www.itu.ch)
+>  
+> +.. _h264:
+> +
+> +ITU H.264
+> +=========
+> +
+> +:title:     ITU-T Recommendation H.264 "Advanced Video Coding for Generic Audiovisual Services"
+> +
+> +:author:    International Telecommunication Union (http://www.itu.ch)
+> +
+>  .. _jfif:
+>  
+>  JFIF
+> diff --git a/Documentation/media/uapi/v4l/extended-controls.rst b/Documentation/media/uapi/v4l/extended-controls.rst
+> index 65a1d873196b..87c0d151577f 100644
+> --- a/Documentation/media/uapi/v4l/extended-controls.rst
+> +++ b/Documentation/media/uapi/v4l/extended-controls.rst
+> @@ -1674,6 +1674,370 @@ enum v4l2_mpeg_video_h264_hierarchical_coding_type -
+>  	non-intra-coded frames, in zigzag scanning order. Only relevant for
+>  	non-4:2:0 YUV formats.
+>  
+> +.. _v4l2-mpeg-h264:
+> +
+> +``V4L2_CID_MPEG_VIDEO_H264_SPS (struct)``
+> +    Specifies the sequence parameter set (as extracted from the
+> +    bitstream) for the associated H264 slice data. This includes the
+> +    necessary parameters for configuring a stateless hardware decoding
+> +    pipeline for H264.  The bitstream parameters are defined according
+> +    to :ref:`h264`. Unless there's a specific comment, refer to the
+> +    specification for the documentation of these fields.
+> +
+> +.. c:type:: v4l2_ctrl_h264_sps
+> +
+> +.. cssclass:: longtable
+> +
+> +.. flat-table:: struct v4l2_ctrl_h264_sps
+> +    :header-rows:  0
+> +    :stub-columns: 0
+> +    :widths:       1 1 2
+> +
+> +    * - __u8
+> +      - ``profile_idc``
+> +      -
+> +    * - __u8
+> +      - ``constraint_set_flags``
+> +      - TODO
+> +    * - __u8
+> +      - ``level_idc``
+> +      -
+> +    * - __u8
+> +      - ``seq_parameter_set_id``
+> +      -
+> +    * - __u8
+> +      - ``chroma_format_idc``
+> +      -
+> +    * - __u8
+> +      - ``bit_depth_luma_minus8``
+> +      -
+> +    * - __u8
+> +      - ``bit_depth_chroma_minus8``
+> +      -
+> +    * - __u8
+> +      - ``log2_max_frame_num_minus4``
+> +      -
+> +    * - __u8
+> +      - ``pic_order_cnt_type``
+> +      -
+> +    * - __u8
+> +      - ``log2_max_pic_order_cnt_lsb_minus4``
+> +      -
+> +    * - __u8
+> +      - ``max_num_ref_frames``
+> +      -
+> +    * - __u8
+> +      - ``num_ref_frames_in_pic_order_cnt_cycle``
+> +      -
+> +    * - __s32
+> +      - ``offset_for_ref_frame[255]``
+> +      -
+> +    * - __s32
+> +      - ``offset_for_non_ref_pic``
+> +      -
+> +    * - __s32
+> +      - ``offset_for_top_to_bottom_field``
+> +      -
+> +    * - __u16
+> +      - ``pic_width_in_mbs_minus1``
+> +      -
+> +    * - __u16
+> +      - ``pic_height_in_map_units_minus1``
+> +      -
+> +    * - __u8
+> +      - ``flags``
+> +      - TODO
+> +
+> +``V4L2_CID_MPEG_VIDEO_H264_PPS (struct)``
+> +    Specifies the picture parameter set (as extracted from the
+> +    bitstream) for the associated H264 slice data. This includes the
+> +    necessary parameters for configuring a stateless hardware decoding
+> +    pipeline for H264.  The bitstream parameters are defined according
+> +    to :ref:`h264`. Unless there's a specific comment, refer to the
+> +    specification for the documentation of these fields.
+> +
+> +.. c:type:: v4l2_ctrl_h264_pps
+> +
+> +.. cssclass:: longtable
+> +
+> +.. flat-table:: struct v4l2_ctrl_h264_pps
+> +    :header-rows:  0
+> +    :stub-columns: 0
+> +    :widths:       1 1 2
+> +
+> +    * - __u8
+> +      - ``pic_parameter_set_id``
+> +      -
+> +    * - __u8
+> +      - ``seq_parameter_set_id``
+> +      -
+> +    * - __u8
+> +      - ``num_slice_groups_minus1``
+> +      -
+> +    * - __u8
+> +      - ``num_ref_idx_l0_default_active_minus1``
+> +      -
+> +    * - __u8
+> +      - ``num_ref_idx_l1_default_active_minus1``
+> +      -
+> +    * - __u8
+> +      - ``weighted_bipred_idc``
+> +      -
+> +    * - __s8
+> +      - ``pic_init_qp_minus26``
+> +      -
+> +    * - __s8
+> +      - ``pic_init_qs_minus26``
+> +      -
+> +    * - __s8
+> +      - ``chroma_qp_index_offset``
+> +      -
+> +    * - __s8
+> +      - ``second_chroma_qp_index_offset``
+> +      -
+> +    * - __u8
+> +      - ``flags``
+> +      - TODO
+> +
+> +``V4L2_CID_MPEG_VIDEO_H264_SCALING_MATRIX (struct)``
+> +    Specifies the scaling matrix (as extracted from the bitstream) for
+> +    the associated H264 slice data. The bitstream parameters are
+> +    defined according to :ref:`h264`. Unless there's a specific
+> +    comment, refer to the specification for the documentation of these
+> +    fields.
+> +
+> +.. c:type:: v4l2_ctrl_h264_scaling_matrix
+> +
+> +.. cssclass:: longtable
+> +
+> +.. flat-table:: struct v4l2_ctrl_h264_scaling_matrix
+> +    :header-rows:  0
+> +    :stub-columns: 0
+> +    :widths:       1 1 2
+> +
+> +    * - __u8
+> +      - ``scaling_list_4x4[6][16]``
+> +      -
+> +    * - __u8
+> +      - ``scaling_list_8x8[6][64]``
+> +      -
+> +
+> +``V4L2_CID_MPEG_VIDEO_H264_SLICE_PARAMS (struct)``
+> +    Specifies the slice parameters (as extracted from the bitstream)
+> +    for the associated H264 slice data. This includes the necessary
+> +    parameters for configuring a stateless hardware decoding pipeline
+> +    for H264.  The bitstream parameters are defined according to
+> +    :ref:`h264`. Unless there's a specific comment, refer to the
+> +    specification for the documentation of these fields.
+> +
+> +.. c:type:: v4l2_ctrl_h264_slice_param
+> +
+> +.. cssclass:: longtable
+> +
+> +.. flat-table:: struct v4l2_ctrl_h264_slice_param
+> +    :header-rows:  0
+> +    :stub-columns: 0
+> +    :widths:       1 1 2
+> +
+> +    * - __u32
+> +      - ``size``
+> +      -
+> +    * - __u32
+> +      - ``header_bit_size``
+> +      -
+> +    * - __u16
+> +      - ``first_mb_in_slice``
+> +      -
+> +    * - __u8
+> +      - ``slice_type``
+> +      -
+> +    * - __u8
+> +      - ``pic_parameter_set_id``
+> +      -
+> +    * - __u8
+> +      - ``colour_plane_id``
+> +      -
+> +    * - __u16
+> +      - ``frame_num``
+> +      -
+> +    * - __u16
+> +      - ``idr_pic_id``
+> +      -
+> +    * - __u16
+> +      - ``pic_order_cnt_lsb``
+> +      -
+> +    * - __s32
+> +      - ``delta_pic_order_cnt_bottom``
+> +      -
+> +    * - __s32
+> +      - ``delta_pic_order_cnt0``
+> +      -
+> +    * - __s32
+> +      - ``delta_pic_order_cnt1``
+> +      -
+> +    * - __u8
+> +      - ``redundant_pic_cnt``
+> +      -
+> +    * - struct :c:type:`v4l2_h264_pred_weight_table`
+> +      - ``pred_weight_table``
+> +      -
+> +    * - __u32
+> +      - ``dec_ref_pic_marking_bit_size``
+> +      -
+> +    * - __u32
+> +      - ``pic_order_cnt_bit_size``
+> +      -
+> +    * - __u8
+> +      - ``cabac_init_idc``
+> +      -
+> +    * - __s8
+> +      - ``slice_qp_delta``
+> +      -
+> +    * - __s8
+> +      - ``slice_qs_delta``
+> +      -
+> +    * - __u8
+> +      - ``disable_deblocking_filter_idc``
+> +      -
+> +    * - __s8
+> +      - ``slice_alpha_c0_offset_div2``
+> +      -
+> +    * - __s8
+> +      - ``slice_beta_offset_div2``
+> +      -
+> +    * - __u32
+> +      - ``slice_group_change_cycle``
+> +      -
+> +    * - __u8
+> +      - ``num_ref_idx_l0_active_minus1``
+> +      -
+> +    * - __u8
+> +      - ``num_ref_idx_l1_active_minus1``
+> +      -
+> +    * - __u8
+> +      - ``ref_pic_list0[32]``
+> +      -
+> +    * - __u8
+> +      - ``ref_pic_list1[32]``
+> +      -
+> +    * - __u8
+> +      - ``flags``
+> +      - TODO
+> +
+> +.. c:type:: v4l2_h264_pred_weight_table
+> +
+> +.. cssclass:: longtable
+> +
+> +.. flat-table:: struct v4l2_h264_pred_weight_table
+> +    :header-rows:  0
+> +    :stub-columns: 0
+> +    :widths:       1 1 2
+> +
+> +    * - __u8
+> +      - ``luma_log2_weight_denom``
+> +      -
+> +    * - __u8
+> +      - ``chroma_log2_weight_denom``
+> +      -
+> +    * - struct :c:type:`v4l2_h264_weight_factors`
+> +      - ``weight_factors[2]``
+> +      -
+> +
+> +.. c:type:: v4l2_h264_weight_factors
+> +
+> +.. cssclass:: longtable
+> +
+> +.. flat-table:: struct v4l2_h264_weight_factors
+> +    :header-rows:  0
+> +    :stub-columns: 0
+> +    :widths:       1 1 2
+> +
+> +    * - __s8
+> +      - ``luma_weight[32]``
+> +      -
+> +    * - __s8
+> +      - ``luma_offset[32]``
+> +      -
+> +    * - __s8
+> +      - ``chroma_weight[32][2]``
+> +      -
+> +    * - __s8
+> +      - ``chroma_offset[32][2]``
+> +      -
+> +
+> +``V4L2_CID_MPEG_VIDEO_H264_DECODE_PARAMS (struct)``
+> +    Specifies the decode parameters (as extracted from the bitstream)
+> +    for the associated H264 slice data. This includes the necessary
+> +    parameters for configuring a stateless hardware decoding pipeline
+> +    for H264.  The bitstream parameters are defined according to
+> +    :ref:`h264`. Unless there's a specific comment, refer to the
+> +    specification for the documentation of these fields.
+> +
+> +.. c:type:: v4l2_ctrl_h264_decode_param
+> +
+> +.. cssclass:: longtable
+> +
+> +.. flat-table:: struct v4l2_ctrl_h264_decode_param
+> +    :header-rows:  0
+> +    :stub-columns: 0
+> +    :widths:       1 1 2
+> +
+> +    * - __u32
+> +      - ``num_slices``
+> +      -
+> +    * - __u8
+> +      - ``idr_pic_flag``
+> +      -
+> +    * - __u8
+> +      - ``nal_ref_idc``
+> +      -
+> +    * - __s32
+> +      - ``top_field_order_cnt``
+> +      -
+> +    * - __s32
+> +      - ``bottom_field_order_cnt``
+> +      -
+> +    * - __u8
+> +      - ``ref_pic_list_p0[32]``
+> +      -
+> +    * - __u8
+> +      - ``ref_pic_list_b0[32]``
+> +      -
+> +    * - __u8
+> +      - ``ref_pic_list_b1[32]``
+> +      -
+> +    * - struct :c:type:`v4l2_h264_dpb_entry`
+> +      - ``dpb[16]``
+> +      -
+> +
+> +.. c:type:: v4l2_h264_dpb_entry
+> +
+> +.. cssclass:: longtable
+> +
+> +.. flat-table:: struct v4l2_h264_dpb_entry
+> +    :header-rows:  0
+> +    :stub-columns: 0
+> +    :widths:       1 1 2
+> +
+> +    * - __u32
+> +      - ``tag``
+> +      - tag to identify the buffer containing the reference frame
+> +    * - __u16
+> +      - ``frame_num``
+> +      -
+> +    * - __u16
+> +      - ``pic_num``
+> +      -
+> +    * - __s32
+> +      - ``top_field_order_cnt``
+> +      -
+> +    * - __s32
+> +      - ``bottom_field_order_cnt``
+> +      -
+> +    * - __u8
+> +      - ``flags``
+> +      -
+> +
+>  MFC 5.1 MPEG Controls
+>  ---------------------
+>  
+> diff --git a/Documentation/media/uapi/v4l/pixfmt-compressed.rst b/Documentation/media/uapi/v4l/pixfmt-compressed.rst
+> index ba0f6c49d9bf..f15fc1c8d479 100644
+> --- a/Documentation/media/uapi/v4l/pixfmt-compressed.rst
+> +++ b/Documentation/media/uapi/v4l/pixfmt-compressed.rst
+> @@ -45,6 +45,26 @@ Compressed Formats
+>        - ``V4L2_PIX_FMT_H264_MVC``
+>        - 'M264'
+>        - H264 MVC video elementary stream.
+> +    * .. _V4L2-PIX-FMT-H264-SLICE:
+> +
+> +      - ``V4L2_PIX_FMT_H264_SLICE``
+> +      - 'S264'
+> +      - H264 parsed slice data, as extracted from the H264 bitstream.
+> +	This format is adapted for stateless video decoders that
+> +	implement an H264 pipeline (using the :ref:`codec` and
+> +	:ref:`media-request-api`).  Metadata associated with the frame
+> +	to decode are required to be passed through the
+> +	``V4L2_CID_MPEG_VIDEO_H264_SPS``,
+> +	``V4L2_CID_MPEG_VIDEO_H264_PPS`` and
+> +	``V4L2_CID_MPEG_VIDEO_H264_SLICE_PARAMS`` and
+> +	``V4L2_CID_MPEG_VIDEO_H264_DECODE_PARAMS`` controls and
+> +	scaling matrices can optionally be specified through the
+> +	``V4L2_CID_MPEG_VIDEO_H264_SCALING_MATRIX`` control.  See the
+> +	:ref:`associated Codec Control IDs <v4l2-mpeg-h264>`.
+> +	Exactly one output and one capture buffer must be provided for
+> +	use with this pixel format. The output buffer must contain the
+> +	appropriate number of macroblocks to decode a full
+> +	corresponding frame to the matching capture buffer.
+>      * .. _V4L2-PIX-FMT-H263:
+>  
+>        - ``V4L2_PIX_FMT_H263``
+> diff --git a/Documentation/media/uapi/v4l/vidioc-queryctrl.rst b/Documentation/media/uapi/v4l/vidioc-queryctrl.rst
+> index 258f5813f281..38a9c988124c 100644
+> --- a/Documentation/media/uapi/v4l/vidioc-queryctrl.rst
+> +++ b/Documentation/media/uapi/v4l/vidioc-queryctrl.rst
+> @@ -436,6 +436,36 @@ See also the examples in :ref:`control`.
+>        - n/a
+>        - A struct :c:type:`v4l2_ctrl_mpeg2_quantization`, containing MPEG-2
+>  	quantization matrices for stateless video decoders.
+> +    * - ``V4L2_CTRL_TYPE_H264_SPS``
+> +      - n/a
+> +      - n/a
+> +      - n/a
+> +      - A struct :c:type:`v4l2_ctrl_h264_sps`, containing H264
+> +	sequence parameters for stateless video decoders.
+> +    * - ``V4L2_CTRL_TYPE_H264_PPS``
+> +      - n/a
+> +      - n/a
+> +      - n/a
+> +      - A struct :c:type:`v4l2_ctrl_h264_pps`, containing H264
+> +	picture parameters for stateless video decoders.
+> +    * - ``V4L2_CTRL_TYPE_H264_SCALING_MATRIX``
+> +      - n/a
+> +      - n/a
+> +      - n/a
+> +      - A struct :c:type:`v4l2_ctrl_h264_scaling_matrix`, containing H264
+> +	scaling matrices for stateless video decoders.
+> +    * - ``V4L2_CTRL_TYPE_H264_SLICE_PARAMS``
+> +      - n/a
+> +      - n/a
+> +      - n/a
+> +      - A struct :c:type:`v4l2_ctrl_h264_slice_param`, containing H264
+> +	slice parameters for stateless video decoders.
+> +    * - ``V4L2_CTRL_TYPE_H264_DECODE_PARAMS``
+> +      - n/a
+> +      - n/a
+> +      - n/a
+> +      - A struct :c:type:`v4l2_ctrl_h264_decode_param`, containing H264
+> +	decode parameters for stateless video decoders.
+>  
+>  .. tabularcolumns:: |p{6.6cm}|p{2.2cm}|p{8.7cm}|
+>  
+> diff --git a/Documentation/media/videodev2.h.rst.exceptions b/Documentation/media/videodev2.h.rst.exceptions
+> index 1ec425a7c364..99f1bd2bc44c 100644
+> --- a/Documentation/media/videodev2.h.rst.exceptions
+> +++ b/Documentation/media/videodev2.h.rst.exceptions
+> @@ -133,6 +133,11 @@ replace symbol V4L2_CTRL_TYPE_U32 :c:type:`v4l2_ctrl_type`
+>  replace symbol V4L2_CTRL_TYPE_U8 :c:type:`v4l2_ctrl_type`
+>  replace symbol V4L2_CTRL_TYPE_MPEG2_SLICE_PARAMS :c:type:`v4l2_ctrl_type`
+>  replace symbol V4L2_CTRL_TYPE_MPEG2_QUANTIZATION :c:type:`v4l2_ctrl_type`
+> +replace symbol V4L2_CTRL_TYPE_H264_SPS :c:type:`v4l2_ctrl_type`
+> +replace symbol V4L2_CTRL_TYPE_H264_PPS :c:type:`v4l2_ctrl_type`
+> +replace symbol V4L2_CTRL_TYPE_H264_SCALING_MATRIX :c:type:`v4l2_ctrl_type`
+> +replace symbol V4L2_CTRL_TYPE_H264_SLICE_PARAMS :c:type:`v4l2_ctrl_type`
+> +replace symbol V4L2_CTRL_TYPE_H264_DECODE_PARAMS :c:type:`v4l2_ctrl_type`
+>  
+>  # V4L2 capability defines
+>  replace define V4L2_CAP_VIDEO_CAPTURE device-capabilities
+> diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
+> index b854cceb19dc..e96c453208e8 100644
+> --- a/drivers/media/v4l2-core/v4l2-ctrls.c
+> +++ b/drivers/media/v4l2-core/v4l2-ctrls.c
+> @@ -825,6 +825,11 @@ const char *v4l2_ctrl_get_name(u32 id)
+>  	case V4L2_CID_MPEG_VIDEO_H264_HIERARCHICAL_CODING_LAYER:return "H264 Number of HC Layers";
+>  	case V4L2_CID_MPEG_VIDEO_H264_HIERARCHICAL_CODING_LAYER_QP:
+>  								return "H264 Set QP Value for HC Layers";
+> +	case V4L2_CID_MPEG_VIDEO_H264_SPS:			return "H264 SPS";
+> +	case V4L2_CID_MPEG_VIDEO_H264_PPS:			return "H264 PPS";
+> +	case V4L2_CID_MPEG_VIDEO_H264_SCALING_MATRIX:		return "H264 Scaling Matrix";
+> +	case V4L2_CID_MPEG_VIDEO_H264_SLICE_PARAMS:		return "H264 Slice Parameters";
+> +	case V4L2_CID_MPEG_VIDEO_H264_DECODE_PARAMS:		return "H264 Decode Parameters";
+>  	case V4L2_CID_MPEG_VIDEO_MPEG4_I_FRAME_QP:		return "MPEG4 I-Frame QP Value";
+>  	case V4L2_CID_MPEG_VIDEO_MPEG4_P_FRAME_QP:		return "MPEG4 P-Frame QP Value";
+>  	case V4L2_CID_MPEG_VIDEO_MPEG4_B_FRAME_QP:		return "MPEG4 B-Frame QP Value";
+> @@ -1300,6 +1305,21 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
+>  	case V4L2_CID_MPEG_VIDEO_MPEG2_QUANTIZATION:
+>  		*type = V4L2_CTRL_TYPE_MPEG2_QUANTIZATION;
+>  		break;
+> +	case V4L2_CID_MPEG_VIDEO_H264_SPS:
+> +		*type = V4L2_CTRL_TYPE_H264_SPS;
+> +		break;
+> +	case V4L2_CID_MPEG_VIDEO_H264_PPS:
+> +		*type = V4L2_CTRL_TYPE_H264_PPS;
+> +		break;
+> +	case V4L2_CID_MPEG_VIDEO_H264_SCALING_MATRIX:
+> +		*type = V4L2_CTRL_TYPE_H264_SCALING_MATRIX;
+> +		break;
+> +	case V4L2_CID_MPEG_VIDEO_H264_SLICE_PARAMS:
+> +		*type = V4L2_CTRL_TYPE_H264_SLICE_PARAMS;
+> +		break;
+> +	case V4L2_CID_MPEG_VIDEO_H264_DECODE_PARAMS:
+> +		*type = V4L2_CTRL_TYPE_H264_DECODE_PARAMS;
+> +		break;
+>  	default:
+>  		*type = V4L2_CTRL_TYPE_INTEGER;
+>  		break;
+> @@ -1665,6 +1685,13 @@ static int std_validate(const struct v4l2_ctrl *ctrl, u32 idx,
+>  	case V4L2_CTRL_TYPE_MPEG2_QUANTIZATION:
+>  		return 0;
+>  
+> +	case V4L2_CTRL_TYPE_H264_SPS:
+> +	case V4L2_CTRL_TYPE_H264_PPS:
+> +	case V4L2_CTRL_TYPE_H264_SCALING_MATRIX:
+> +	case V4L2_CTRL_TYPE_H264_SLICE_PARAMS:
+> +	case V4L2_CTRL_TYPE_H264_DECODE_PARAMS:
+> +		return 0;
+> +
+>  	default:
+>  		return -EINVAL;
+>  	}
+> @@ -2245,6 +2272,21 @@ static struct v4l2_ctrl *v4l2_ctrl_new(struct v4l2_ctrl_handler *hdl,
+>  	case V4L2_CTRL_TYPE_MPEG2_QUANTIZATION:
+>  		elem_size = sizeof(struct v4l2_ctrl_mpeg2_quantization);
+>  		break;
+> +	case V4L2_CTRL_TYPE_H264_SPS:
+> +		elem_size = sizeof(struct v4l2_ctrl_h264_sps);
+> +		break;
+> +	case V4L2_CTRL_TYPE_H264_PPS:
+> +		elem_size = sizeof(struct v4l2_ctrl_h264_pps);
+> +		break;
+> +	case V4L2_CTRL_TYPE_H264_SCALING_MATRIX:
+> +		elem_size = sizeof(struct v4l2_ctrl_h264_scaling_matrix);
+> +		break;
+> +	case V4L2_CTRL_TYPE_H264_SLICE_PARAMS:
+> +		elem_size = sizeof(struct v4l2_ctrl_h264_slice_param);
+> +		break;
+> +	case V4L2_CTRL_TYPE_H264_DECODE_PARAMS:
+> +		elem_size = sizeof(struct v4l2_ctrl_h264_decode_param);
+> +		break;
+>  	default:
+>  		if (type < V4L2_CTRL_COMPOUND_TYPES)
+>  			elem_size = sizeof(s32);
+> diff --git a/drivers/media/v4l2-core/v4l2-ioctl.c b/drivers/media/v4l2-core/v4l2-ioctl.c
+> index 49103787d19a..aa63f1794272 100644
+> --- a/drivers/media/v4l2-core/v4l2-ioctl.c
+> +++ b/drivers/media/v4l2-core/v4l2-ioctl.c
+> @@ -1309,6 +1309,7 @@ static void v4l_fill_fmtdesc(struct v4l2_fmtdesc *fmt)
+>  		case V4L2_PIX_FMT_H264:		descr = "H.264"; break;
+>  		case V4L2_PIX_FMT_H264_NO_SC:	descr = "H.264 (No Start Codes)"; break;
+>  		case V4L2_PIX_FMT_H264_MVC:	descr = "H.264 MVC"; break;
+> +		case V4L2_PIX_FMT_H264_SLICE:	descr = "H.264 Parsed Slice"; break;
+>  		case V4L2_PIX_FMT_H263:		descr = "H.263"; break;
+>  		case V4L2_PIX_FMT_MPEG1:	descr = "MPEG-1 ES"; break;
+>  		case V4L2_PIX_FMT_MPEG2:	descr = "MPEG-2 ES"; break;
+> diff --git a/include/media/v4l2-ctrls.h b/include/media/v4l2-ctrls.h
+> index 83ce0593b275..b4ca95710d2d 100644
+> --- a/include/media/v4l2-ctrls.h
+> +++ b/include/media/v4l2-ctrls.h
+> @@ -43,6 +43,11 @@ struct poll_table_struct;
+>   * @p_char:			Pointer to a string.
+>   * @p_mpeg2_slice_params:	Pointer to a MPEG2 slice parameters structure.
+>   * @p_mpeg2_quantization:	Pointer to a MPEG2 quantization data structure.
+> + * @p_h264_sps:			Pointer to a struct v4l2_ctrl_h264_sps.
+> + * @p_h264_pps:			Pointer to a struct v4l2_ctrl_h264_pps.
+> + * @p_h264_scal_mtrx:		Pointer to a struct v4l2_ctrl_h264_scaling_matrix.
+> + * @p_h264_slice_param:		Pointer to a struct v4l2_ctrl_h264_slice_param.
+> + * @p_h264_decode_param:	Pointer to a struct v4l2_ctrl_h264_decode_param.
+>   * @p:				Pointer to a compound value.
+>   */
+>  union v4l2_ctrl_ptr {
+> @@ -54,6 +59,11 @@ union v4l2_ctrl_ptr {
+>  	char *p_char;
+>  	struct v4l2_ctrl_mpeg2_slice_params *p_mpeg2_slice_params;
+>  	struct v4l2_ctrl_mpeg2_quantization *p_mpeg2_quantization;
+> +	struct v4l2_ctrl_h264_sps *p_h264_sps;
+> +	struct v4l2_ctrl_h264_pps *p_h264_pps;
+> +	struct v4l2_ctrl_h264_scaling_matrix *p_h264_scal_mtrx;
+> +	struct v4l2_ctrl_h264_slice_param *p_h264_slice_param;
+> +	struct v4l2_ctrl_h264_decode_param *p_h264_decode_param;
+>  	void *p;
+>  };
+>  
+> diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
+> index 76f5322ec543..fb1469ec1b90 100644
+> --- a/include/uapi/linux/v4l2-controls.h
+> +++ b/include/uapi/linux/v4l2-controls.h
+> @@ -50,6 +50,8 @@
+>  #ifndef __LINUX_V4L2_CONTROLS_H
+>  #define __LINUX_V4L2_CONTROLS_H
+>  
+> +#include <linux/types.h>
+> +
+>  /* Control classes */
+>  #define V4L2_CTRL_CLASS_USER		0x00980000	/* Old-style 'user' controls */
+>  #define V4L2_CTRL_CLASS_MPEG		0x00990000	/* MPEG-compression controls */
+> @@ -534,6 +536,12 @@ enum v4l2_mpeg_video_h264_hierarchical_coding_type {
+>  };
+>  #define V4L2_CID_MPEG_VIDEO_H264_HIERARCHICAL_CODING_LAYER	(V4L2_CID_MPEG_BASE+381)
+>  #define V4L2_CID_MPEG_VIDEO_H264_HIERARCHICAL_CODING_LAYER_QP	(V4L2_CID_MPEG_BASE+382)
+> +#define V4L2_CID_MPEG_VIDEO_H264_SPS		(V4L2_CID_MPEG_BASE+383)
+> +#define V4L2_CID_MPEG_VIDEO_H264_PPS		(V4L2_CID_MPEG_BASE+384)
+> +#define V4L2_CID_MPEG_VIDEO_H264_SCALING_MATRIX	(V4L2_CID_MPEG_BASE+385)
+> +#define V4L2_CID_MPEG_VIDEO_H264_SLICE_PARAMS	(V4L2_CID_MPEG_BASE+386)
+> +#define V4L2_CID_MPEG_VIDEO_H264_DECODE_PARAMS	(V4L2_CID_MPEG_BASE+387)
+> +
+>  #define V4L2_CID_MPEG_VIDEO_MPEG4_I_FRAME_QP	(V4L2_CID_MPEG_BASE+400)
+>  #define V4L2_CID_MPEG_VIDEO_MPEG4_P_FRAME_QP	(V4L2_CID_MPEG_BASE+401)
+>  #define V4L2_CID_MPEG_VIDEO_MPEG4_B_FRAME_QP	(V4L2_CID_MPEG_BASE+402)
+> @@ -1156,4 +1164,162 @@ struct v4l2_ctrl_mpeg2_quantization {
+>  	__u8	chroma_non_intra_quantiser_matrix[64];
+>  };
+>  
+> +/* Compounds controls */
+> +
+> +#define V4L2_H264_SPS_CONSTRAINT_SET0_FLAG			0x01
+> +#define V4L2_H264_SPS_CONSTRAINT_SET1_FLAG			0x02
+> +#define V4L2_H264_SPS_CONSTRAINT_SET2_FLAG			0x04
+> +#define V4L2_H264_SPS_CONSTRAINT_SET3_FLAG			0x08
+> +#define V4L2_H264_SPS_CONSTRAINT_SET4_FLAG			0x10
+> +#define V4L2_H264_SPS_CONSTRAINT_SET5_FLAG			0x20
+> +
+> +#define V4L2_H264_SPS_FLAG_SEPARATE_COLOUR_PLANE		0x01
+> +#define V4L2_H264_SPS_FLAG_QPPRIME_Y_ZERO_TRANSFORM_BYPASS	0x02
+> +#define V4L2_H264_SPS_FLAG_DELTA_PIC_ORDER_ALWAYS_ZERO		0x04
+> +#define V4L2_H264_SPS_FLAG_GAPS_IN_FRAME_NUM_VALUE_ALLOWED	0x08
+> +#define V4L2_H264_SPS_FLAG_FRAME_MBS_ONLY			0x10
+> +#define V4L2_H264_SPS_FLAG_MB_ADAPTIVE_FRAME_FIELD		0x20
+> +#define V4L2_H264_SPS_FLAG_DIRECT_8X8_INFERENCE			0x40
+> +
+> +struct v4l2_ctrl_h264_sps {
+> +	__u8 profile_idc;
+> +	__u8 constraint_set_flags;
+> +	__u8 level_idc;
+> +	__u8 seq_parameter_set_id;
+> +	__u8 chroma_format_idc;
+> +	__u8 bit_depth_luma_minus8;
+> +	__u8 bit_depth_chroma_minus8;
+> +	__u8 log2_max_frame_num_minus4;
+> +	__u8 pic_order_cnt_type;
+> +	__u8 log2_max_pic_order_cnt_lsb_minus4;
+> +	__u8 max_num_ref_frames;
+> +	__u8 num_ref_frames_in_pic_order_cnt_cycle;
+> +	__s32 offset_for_ref_frame[255];
+> +	__s32 offset_for_non_ref_pic;
+> +	__s32 offset_for_top_to_bottom_field;
+> +	__u16 pic_width_in_mbs_minus1;
+> +	__u16 pic_height_in_map_units_minus1;
+> +	__u8 flags;
+> +};
+> +
+> +#define V4L2_H264_PPS_FLAG_ENTROPY_CODING_MODE				0x0001
+> +#define V4L2_H264_PPS_FLAG_BOTTOM_FIELD_PIC_ORDER_IN_FRAME_PRESENT	0x0002
+> +#define V4L2_H264_PPS_FLAG_WEIGHTED_PRED				0x0004
+> +#define V4L2_H264_PPS_FLAG_DEBLOCKING_FILTER_CONTROL_PRESENT		0x0008
+> +#define V4L2_H264_PPS_FLAG_CONSTRAINED_INTRA_PRED			0x0010
+> +#define V4L2_H264_PPS_FLAG_REDUNDANT_PIC_CNT_PRESENT			0x0020
+> +#define V4L2_H264_PPS_FLAG_TRANSFORM_8X8_MODE				0x0040
+> +#define V4L2_H264_PPS_FLAG_PIC_SCALING_MATRIX_PRESENT			0x0080
+> +
+> +struct v4l2_ctrl_h264_pps {
+> +	__u8 pic_parameter_set_id;
+> +	__u8 seq_parameter_set_id;
+> +	__u8 num_slice_groups_minus1;
+> +	__u8 num_ref_idx_l0_default_active_minus1;
+> +	__u8 num_ref_idx_l1_default_active_minus1;
+> +	__u8 weighted_bipred_idc;
+> +	__s8 pic_init_qp_minus26;
+> +	__s8 pic_init_qs_minus26;
+> +	__s8 chroma_qp_index_offset;
+> +	__s8 second_chroma_qp_index_offset;
+> +	__u8 flags;
+> +};
+> +
+> +struct v4l2_ctrl_h264_scaling_matrix {
+> +	__u8 scaling_list_4x4[6][16];
+> +	__u8 scaling_list_8x8[6][64];
+> +};
 
-Stop using the at24_platform_data setup callback in favor of nvmem
-notifiers.
+I wonder which decoder want this.
+> +
+> +struct v4l2_h264_weight_factors {
+> +	__s8 luma_weight[32];
+> +	__s8 luma_offset[32];
+> +	__s8 chroma_weight[32][2];
+> +	__s8 chroma_offset[32][2];
+> +};
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/mach-davinci/board-mityomapl138.c | 18 +++++++++++++++---
- 1 file changed, 15 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-index 3286dc2457a5..ac1a1699d185 100644
---- a/arch/arm/mach-davinci/board-mityomapl138.c
-+++ b/arch/arm/mach-davinci/board-mityomapl138.c
-@@ -15,6 +15,8 @@
- #include <linux/console.h>
- #include <linux/platform_device.h>
- #include <linux/mtd/partitions.h>
-+#include <linux/notifier.h>
-+#include <linux/nvmem-consumer.h>
- #include <linux/nvmem-provider.h>
- #include <linux/regulator/machine.h>
- #include <linux/i2c.h>
-@@ -117,10 +119,15 @@ static void mityomapl138_cpufreq_init(const char *partnum)
- static void mityomapl138_cpufreq_init(const char *partnum) { }
- #endif
- 
--static void read_factory_config(struct nvmem_device *nvmem, void *context)
-+static int read_factory_config(struct notifier_block *nb,
-+			       unsigned long event, void *data)
- {
- 	int ret;
- 	const char *partnum = NULL;
-+	struct nvmem_device *nvmem = data;
-+
-+	if (strcmp(nvmem_dev_name(nvmem), "1-00500") != 0)
-+		return NOTIFY_DONE;
- 
- 	if (!IS_BUILTIN(CONFIG_NVMEM)) {
- 		pr_warn("Factory Config not available without CONFIG_NVMEM\n");
-@@ -152,8 +159,14 @@ static void read_factory_config(struct nvmem_device *nvmem, void *context)
- bad_config:
- 	/* default maximum speed is valid for all platforms */
- 	mityomapl138_cpufreq_init(partnum);
-+
-+	return NOTIFY_STOP;
- }
- 
-+static struct notifier_block mityomapl138_nvmem_notifier = {
-+	.notifier_call = read_factory_config,
-+};
-+
- /*
-  * We don't define a cell for factory config as it will be accessed from the
-  * board file using the nvmem notifier chain.
-@@ -183,8 +196,6 @@ static struct at24_platform_data mityomapl138_fd_chip = {
- 	.byte_len	= 256,
- 	.page_size	= 8,
- 	.flags		= AT24_FLAG_READONLY | AT24_FLAG_IRUGO,
--	.setup		= read_factory_config,
--	.context	= NULL,
- };
- 
- static struct davinci_i2c_platform_data mityomap_i2c_0_pdata = {
-@@ -561,6 +572,7 @@ static void __init mityomapl138_init(void)
- 
- 	davinci_serial_init(da8xx_serial_device);
- 
-+	nvmem_register_notifier(&mityomapl138_nvmem_notifier);
- 	nvmem_add_cell_table(&mityomapl138_nvmem_cell_table);
- 	nvmem_add_cell_lookups(&mityomapl138_nvmem_cell_lookup, 1);
- 
--- 
-2.19.1
+> +
+> +struct v4l2_h264_pred_weight_table {
+> +	__u8 luma_log2_weight_denom;
+> +	__u8 chroma_log2_weight_denom;
+> +	struct v4l2_h264_weight_factors weight_factors[2];
+> +};
+> +
+> +#define V4L2_H264_SLICE_TYPE_P				0
+> +#define V4L2_H264_SLICE_TYPE_B				1
+> +#define V4L2_H264_SLICE_TYPE_I				2
+> +#define V4L2_H264_SLICE_TYPE_SP				3
+> +#define V4L2_H264_SLICE_TYPE_SI				4
+> +
+> +#define V4L2_H264_SLICE_FLAG_FIELD_PIC			0x01
+> +#define V4L2_H264_SLICE_FLAG_BOTTOM_FIELD		0x02
+> +#define V4L2_H264_SLICE_FLAG_DIRECT_SPATIAL_MV_PRED	0x04
+> +#define V4L2_H264_SLICE_FLAG_SP_FOR_SWITCH		0x08
+> +
+> +struct v4l2_ctrl_h264_slice_param {
+> +	/* Size in bytes, including header */
+> +	__u32 size;
+> +	/* Offset in bits to slice_data() from the beginning of this slice. */
+> +	__u32 header_bit_size;
+> +
+> +	__u16 first_mb_in_slice;
+> +	__u8 slice_type;
+> +	__u8 pic_parameter_set_id;
+> +	__u8 colour_plane_id;
+> +	__u16 frame_num;
+> +	__u16 idr_pic_id;
+> +	__u16 pic_order_cnt_lsb;
+> +	__s32 delta_pic_order_cnt_bottom;
+> +	__s32 delta_pic_order_cnt0;
+> +	__s32 delta_pic_order_cnt1;
+> +	__u8 redundant_pic_cnt;
+> +
+> +	struct v4l2_h264_pred_weight_table pred_weight_table;
+> +	/* Size in bits of dec_ref_pic_marking() syntax element. */
+> +	__u32 dec_ref_pic_marking_bit_size;
+> +	/* Size in bits of pic order count syntax. */
+> +	__u32 pic_order_cnt_bit_size;
+> +
+> +	__u8 cabac_init_idc;
+> +	__s8 slice_qp_delta;
+> +	__s8 slice_qs_delta;
+> +	__u8 disable_deblocking_filter_idc;
+> +	__s8 slice_alpha_c0_offset_div2;
+> +	__s8 slice_beta_offset_div2;
+> +	__u32 slice_group_change_cycle;
+> +
+> +	__u8 num_ref_idx_l0_active_minus1;
+> +	__u8 num_ref_idx_l1_active_minus1;
+> +	/*  Entries on each list are indices
+> +	 *  into v4l2_ctrl_h264_decode_param.dpb[]. */
+> +	__u8 ref_pic_list0[32];
+> +	__u8 ref_pic_list1[32];
+> +
+> +	__u8 flags;
+> +};
+> +
+We need some addtional properties or the Rockchip won't work.
+1. u16 idr_pic_id for identifies IDR (instantaneous decoding refresh)
+picture
+2. u16 ref_pic_mk_len for length of decoded reference picture marking bits
+3. u8 poc_length for length of picture order count field in stream
 
+The last two are used for the hardware to skip a part stream.
+
+> +#define V4L2_H264_DPB_ENTRY_FLAG_VALID		0x01
+> +#define V4L2_H264_DPB_ENTRY_FLAG_ACTIVE		0x02
+> +#define V4L2_H264_DPB_ENTRY_FLAG_LONG_TERM	0x04
+> +
+> +struct v4l2_h264_dpb_entry {
+> +	__u32 tag;
+> +	__u16 frame_num;
+> +	__u16 pic_num;
+
+Although the long term reference would use picture order count
+and short term for frame num, but only one of them is used
+for a entry of a dpb.
+
+Besides, for a frame picture frame_num = pic_num * 2,
+and frame_num = pic_num * 2 + 1 for a filed.
+> +	/* Note that field is indicated by v4l2_buffer.field */
+> +	__s32 top_field_order_cnt;
+> +	__s32 bottom_field_order_cnt;
+> +	__u8 flags; /* V4L2_H264_DPB_ENTRY_FLAG_* */
+> +};
+> +
+> +struct v4l2_ctrl_h264_decode_param {
+> +	__u32 num_slices;
+> +	__u8 idr_pic_flag;
+> +	__u8 nal_ref_idc;
+> +	__s32 top_field_order_cnt;
+> +	__s32 bottom_field_order_cnt;
+> +	__u8 ref_pic_list_p0[32];
+> +	__u8 ref_pic_list_b0[32];
+> +	__u8 ref_pic_list_b1[32];
+I would prefer to keep only two list, list0 and list 1.
+Anyway P slice just use the list0 and B would use the both.
+> +	struct v4l2_h264_dpb_entry dpb[16];
+> +};
+> +
+>  #endif
+> diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+> index 173a94d2cbef..dd028e0bf306 100644
+> --- a/include/uapi/linux/videodev2.h
+> +++ b/include/uapi/linux/videodev2.h
+> @@ -643,6 +643,7 @@ struct v4l2_pix_format {
+>  #define V4L2_PIX_FMT_H264     v4l2_fourcc('H', '2', '6', '4') /* H264 with start codes */
+>  #define V4L2_PIX_FMT_H264_NO_SC v4l2_fourcc('A', 'V', 'C', '1') /* H264 without start codes */
+>  #define V4L2_PIX_FMT_H264_MVC v4l2_fourcc('M', '2', '6', '4') /* H264 MVC */
+> +#define V4L2_PIX_FMT_H264_SLICE v4l2_fourcc('S', '2', '6', '4') /* H264 parsed slices */
+>  #define V4L2_PIX_FMT_H263     v4l2_fourcc('H', '2', '6', '3') /* H263          */
+>  #define V4L2_PIX_FMT_MPEG1    v4l2_fourcc('M', 'P', 'G', '1') /* MPEG-1 ES     */
+>  #define V4L2_PIX_FMT_MPEG2    v4l2_fourcc('M', 'P', 'G', '2') /* MPEG-2 ES     */
+> @@ -1631,6 +1632,11 @@ struct v4l2_ext_control {
+>  		__u32 __user *p_u32;
+>  		struct v4l2_ctrl_mpeg2_slice_params __user *p_mpeg2_slice_params;
+>  		struct v4l2_ctrl_mpeg2_quantization __user *p_mpeg2_quantization;
+> +		struct v4l2_ctrl_h264_sps __user *p_h264_sps;
+> +		struct v4l2_ctrl_h264_pps __user *p_h264_pps;
+> +		struct v4l2_ctrl_h264_scaling_matrix __user *p_h264_scal_mtrx;
+> +		struct v4l2_ctrl_h264_slice_param __user *p_h264_slice_param;
+> +		struct v4l2_ctrl_h264_decode_param __user *p_h264_decode_param;
+>  		void __user *ptr;
+>  	};
+>  } __attribute__ ((packed));
+> @@ -1678,6 +1684,11 @@ enum v4l2_ctrl_type {
+>  	V4L2_CTRL_TYPE_U32	     = 0x0102,
+>  	V4L2_CTRL_TYPE_MPEG2_SLICE_PARAMS = 0x0103,
+>  	V4L2_CTRL_TYPE_MPEG2_QUANTIZATION = 0x0104,
+> +	V4L2_CTRL_TYPE_H264_SPS      = 0x0105,
+> +	V4L2_CTRL_TYPE_H264_PPS      = 0x0106,
+> +	V4L2_CTRL_TYPE_H264_SCALING_MATRIX = 0x0107,
+> +	V4L2_CTRL_TYPE_H264_SLICE_PARAMS = 0x0108,
+> +	V4L2_CTRL_TYPE_H264_DECODE_PARAMS = 0x0109,
+>  };
+>  
+>  /*  Used in the VIDIOC_QUERYCTRL ioctl for querying controls */
 
 _______________________________________________
 linux-arm-kernel mailing list
