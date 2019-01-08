@@ -2,117 +2,114 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,FROM_EXCESS_BASE64,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0D333C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 11:41:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CBE90C43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 11:42:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CCB362087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 11:41:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 961462087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 11:42:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KXhxTZnf";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ysoft.com header.i=@ysoft.com header.b="P1miwXpD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CCB362087E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=ysoft.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UFaYiB3D";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="C/tbXVzv"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 961462087F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=PrUtGFUVNk+cqq+25UG/U5uJ1gW84tDcpwnnzHPRLlw=; b=KXhxTZnfG//Hnx
-	/YyQH9VWnzVWs6piHW7ntOCDfqUeWuv91LmEYb8a56Tin9HZSMaRIG9gs4r7Ow79QDGeikG20nLW4
-	uEvrlSTBUwy8cbW6OVQjyqjwMpxjnUDot37RmZhb1AwYlBrg3tR9u/FIxqZ80TT3YngMa4oIlSNDZ
-	aGjibnSBLf0hIyp4Allgj2fSTc9coPsoervt0nO4sP7iyAEdRG4+oYbCVMySy1afGeFHxEkEMNrs9
-	swTJBbXCStmlq//KOIHyRkj99I2PGq1Tb1n4dwEJm7tZ+wnQa7TsaM7sl0+UtcVAk9a0n4c7ZM+O4
-	Ht3xGU8ULZ9eIXNlIxBA==;
+	List-Owner; bh=KARWZXbLLuGceFqimaLOlVpQIsxbr47r7iuYHSI03R0=; b=UFaYiB3DBiJL5Z
+	hjinZBHvLibEB3prdGOZXIZ3YY4ThfBOixMyktfr34RvrYpMCptkixTQ2xC2OTttbPnjx1h13R1s3
+	3tsuYEJ/aUQuQog9SmOZrsfA5XcH8Frio8x0nc/ifpoaRY8/f4mR1iJdt8+jqNRtTYN30CC6jkPK9
+	cM6efMFCeKIFhlrMcHRg796gNFjXv7qli7jm+Wd0sfM4KsmaHtgfCS6rCFjrkUtgcoJk2MfeiA5y/
+	vs4YjRNJ/1Y4gAi9lJCTiuEglUA4y4uPyyXgvyp14o2yc+U/GVURBgRtHcbbyfGM/eS61ykkwkhA4
+	dVbjk90oJOQa2UJND2kQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggpkp-0004I7-1h; Tue, 08 Jan 2019 11:41:07 +0000
-Received: from mail-db3eur04on060e.outbound.protection.outlook.com
- ([2a01:111:f400:fe0c::60e]
- helo=EUR04-DB3-obe.outbound.protection.outlook.com)
+	id 1ggplo-0004aa-TJ; Tue, 08 Jan 2019 11:42:08 +0000
+Received: from mail-bl2nam02on0606.outbound.protection.outlook.com
+ ([2a01:111:f400:fe46::606]
+ helo=NAM02-BL2-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggpkk-0004HI-Ty
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 11:41:05 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ysoft.com; s=selector1;
+ id 1ggpll-0004Zq-4i
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 11:42:07 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=fh6y/9XDS3fyu8D9W6p+TxUyTWbMGHYahIsiuJxd63c=;
- b=P1miwXpDFCB1NLeDfTfbhCEDHfuPR+iswZN/2lgLWJp2QZ2Z1ZcKpci3PL7glYpAVKLuyLaXBXTOSYz2E7lxQeyb70u3WnlLgWR1i1m9WuJTijvsJGKG/8XC+NS48+3cpbBrjIzhWVX35C693d0LO5HG2vyslLKRxawBZ8yBYVc=
-Received: from AM0PR0402MB3716.eurprd04.prod.outlook.com (52.133.38.156) by
- AM0PR0402MB3521.eurprd04.prod.outlook.com (52.133.45.150) with Microsoft SMTP
+ bh=RxXFisNTWvoE/8Gg5TDDsEH94IdhINaKy+05vZxybtU=;
+ b=C/tbXVzv48oBvhPAl5tbAb9jtqFNKBqQseSs8LSG5jCusCvNr89DHHu7BWyX07QW59nCJZtqB4pUGL/+Sj5VvDM57wBoibwRvrZW2W8amWuk5rL7sZoe0vf70RJo6UQf5bE1+SPT8xsuR/V5ysrmGq657PZxZWfy30xkV4gnw/E=
+Received: from CY4PR02MB2709.namprd02.prod.outlook.com (10.175.59.19) by
+ CY4PR02MB2583.namprd02.prod.outlook.com (10.173.41.18) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1516.13; Tue, 8 Jan 2019 11:40:51 +0000
-Received: from AM0PR0402MB3716.eurprd04.prod.outlook.com
- ([fe80::3cc1:26a4:94be:1d72]) by AM0PR0402MB3716.eurprd04.prod.outlook.com
- ([fe80::3cc1:26a4:94be:1d72%5]) with mapi id 15.20.1495.011; Tue, 8 Jan 2019
- 11:40:51 +0000
-From: =?utf-8?B?Vm9rw6HEjSBNaWNoYWw=?= <Michal.Vokac@ysoft.com>
-To: Fabio Estevam <festevam@gmail.com>
-Subject: Re: [PATCH v2] ARM: dts: imx: Add Y Soft IOTA Draco, Hydra and Ursa
- boards
-Thread-Topic: [PATCH v2] ARM: dts: imx: Add Y Soft IOTA Draco, Hydra and Ursa
- boards
-Thread-Index: AQHUlt/bwU7HN6OdJEGSFUlfmMcu7qWUhk+AgBDZ8YA=
-Date: Tue, 8 Jan 2019 11:40:51 +0000
-Message-ID: <f3a0e689-b0d5-e08c-b0b8-faf2a366dd93@ysoft.com>
-References: <1545144107-88378-1-git-send-email-michal.vokac@ysoft.com>
- <CAOMZO5CuPr_BxMP_wjPuZNTCinHQ-cb08wPHr=Od_Qw_aafPTw@mail.gmail.com>
-In-Reply-To: <CAOMZO5CuPr_BxMP_wjPuZNTCinHQ-cb08wPHr=Od_Qw_aafPTw@mail.gmail.com>
+ 15.20.1495.9; Tue, 8 Jan 2019 11:42:00 +0000
+Received: from CY4PR02MB2709.namprd02.prod.outlook.com
+ ([fe80::208e:498e:e558:12]) by CY4PR02MB2709.namprd02.prod.outlook.com
+ ([fe80::208e:498e:e558:12%3]) with mapi id 15.20.1495.011; Tue, 8 Jan 2019
+ 11:41:58 +0000
+From: Vishal Sagar <vsagar@xilinx.com>
+To: Rob Herring <robh@kernel.org>, Vishal Sagar <vishal.sagar@xilinx.com>
+Subject: RE: [PATCH 1/2] media: dt-bindings: media: xilinx: Add Xilinx MIPI
+ CSI-2 Rx Subsystem
+Thread-Topic: [PATCH 1/2] media: dt-bindings: media: xilinx: Add Xilinx MIPI
+ CSI-2 Rx Subsystem
+Thread-Index: AQHT937v9yVBRVhU3kSv/sTypyy0J6RdIekAgUfxthA=
+Date: Tue, 8 Jan 2019 11:41:58 +0000
+Message-ID: <CY4PR02MB27094F7483A1628CB269AB3CA78A0@CY4PR02MB2709.namprd02.prod.outlook.com>
+References: <1527620084-94864-1-git-send-email-vishal.sagar@xilinx.com>
+ <1527620084-94864-2-git-send-email-vishal.sagar@xilinx.com>
+ <20180612200338.GA31620@rob-hp-laptop>
+In-Reply-To: <20180612200338.GA31620@rob-hp-laptop>
 Accept-Language: en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
+X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
 X-MS-TNEF-Correlator: 
-x-clientproxiedby: AM6P194CA0060.EURP194.PROD.OUTLOOK.COM
- (2603:10a6:209:84::37) To AM0PR0402MB3716.eurprd04.prod.outlook.com
- (2603:10a6:208:d::28)
 authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Michal.Vokac@ysoft.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [89.24.100.190]
+ smtp.mailfrom=vsagar@xilinx.com; 
+x-originating-ip: [149.199.50.133]
 x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; AM0PR0402MB3521;
- 6:oOxRcCQqqptxLshuJaocn66bxXkh5PvCxWwa5w0GvcZPtV8CMYHCuYy22JEm6UQezz34skzGyTWyWkwQg+qaeXQ9YoDj7j96MKrDSGd6/p9bBcmNatjlyatJdxYtTXGcKJoncuVpD/JWHFqdATZ7jG1nyYgUb5y2gbBNECPTyx/r6TNYPg4uQ7CLX4oOhGjFbzkqIHbcooX7MerfX7OooyVnG5j9r2PAiIt4Kd1dyqEEs03I7/IVJxtBKqMY3hI+pD/jElVkVN3TU8lxHkpvMsG3av3jDPyoa6uYEfdajR17Db1MPKyMSEY8yivS1aRv12USngjgEeEvCpdVodQz1qiDGBrJ2tj3CK3nb8SUjo/8Tgh+IKCArkb28qrtbYKYFiVfjH6Wkv3Qb+EhTD6UZ7ATiHHn2ehwiS5Uwwv84MnjUcudvmRrFNhfAiuqnalKAs9U3aCemkQ/n1pWhLQ+1g==;
- 5:jbXSOyfF22H4XRTKzqLpkxfnUP08NMddkynQoS0CJjI3oQZV2DPG1Ja8mGB1v2mPOeJKHqBsNuokd2ITf2K3vK7tDcZFQjkhF4zhYM6/X6vNsI/nnKezER/hrClUuIMn9GewoWRAQR7vxwcWbosNBpapn3if3Oq3fbyqlmow2OfMx0dEL2JjunSYqa0Oxss1OcnIWorkzwKqetEStdu+Xg==;
- 7:o1dedIj/0XA7FYXhq1Hc7gpRsVo46Qfha1f/rQ36WqQvexd1cqCxZPrvPhifWEfwiL4JM9Z6LpaDjkfX6435vjTouElbW+iiwWKhaBRawjh6Pu0Q9YxVsiOWA7aIGsO3L6TiPgMMg3xbY6MpvNdTMw==
-x-ms-office365-filtering-correlation-id: 8bf68b0b-c373-4e83-47e4-08d6755e23d6
+x-microsoft-exchange-diagnostics: 1; CY4PR02MB2583;
+ 6:AgPXVUAlOxhh65pBLQCs8qcj3nzIEkEuSwdSAM5s0SNCBxg5LTJrrh7Tk48tj2HMtkgDAPUPWQDkj9QuycEo5xQdLpCZufo+n7xi+uXx7fazH3OyeN/Nq0RKmKX+mblNH9S9U8nk4O/u4nnYDKbdMWzo/IPEOQ4MP4kKhy1p0gPgyrnxJIE76dEu3lcGwyt3tVCkYL3UskdgQ7GiHaICP9mchVBIhHXVeUL0ZWjWJlfOjd67uacWpVMy48DiU6/PBt102Nf0OML6kwHTzRb7BVAoT50WOL8QxnBcI/yt2DfA2OV7diBEwNgTX5hN5NJxQFX8X57Ujzzm6CsVXZMCGnQPiRGCiTAhu1QVaTkMvo99eg7bxTXXAUrLO7n4MocQekhYYsOM/Y7sqnuL+rGoZCM0bIu016P23q5uGJqj9YqIprDE03B+t8Rwvv0fQ61xKaMZvlJwd4t40eI3mUNx/w==;
+ 5:nrXy7eoAEWdyv5CRj2j/PvddjIHq/0+HINvgfU7bU1ABI44FMeUyRJ6bCRPDmoZmP2XIfmKiaXKeCFEfb4mndDukh34TM+MFLq13CF2GPoQ8GLT2s11Q180ECcMV6JnMUDFrf8pWf+lIuwpPlKbYGmUG5dAoCT8k5ZA+5BspXvcFlKUGdE0M6Ha1krPYnKT6yN1oICtImcF9FXW7+z9SyA==;
+ 7:XjoqsyvXgLNZwenpMiUb8yp7h9bQrLBps949FdYxygaorQLta3Pv/9LebMlminT2sAewbwBMXa+lcDSRWP3/56zu2nv61NX22Ee8FIerujS4JTOPi3N4A5h+DJ0kVcinVClCureUNeSLXqlNo7xw4g==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;SOR;
+x-forefront-antispam-report: SFV:SKI; SCL:-1; SFV:NSPM;
+ SFS:(10009020)(136003)(376002)(366004)(346002)(39860400002)(396003)(189003)(199004)(13464003)(51914003)(107886003)(966005)(25786009)(229853002)(478600001)(74316002)(14444005)(5024004)(14454004)(316002)(256004)(6306002)(9686003)(33656002)(81166006)(26005)(476003)(4326008)(7736002)(55016002)(53936002)(6436002)(305945005)(486006)(8936002)(110136005)(54906003)(6246003)(99286004)(106356001)(6636002)(8676002)(3846002)(6116002)(7416002)(105586002)(71200400001)(76176011)(53546011)(6506007)(66066001)(71190400001)(81156014)(97736004)(11346002)(86362001)(2906002)(446003)(5660300001)(7696005)(68736007)(186003)(102836004);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:CY4PR02MB2583;
+ H:CY4PR02MB2709.namprd02.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+x-ms-office365-filtering-correlation-id: 06736ca7-6227-44f8-107c-08d6755e4c0b
+x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(2017052603328)(7153060)(7193020);
- SRVR:AM0PR0402MB3521; 
-x-ms-traffictypediagnostic: AM0PR0402MB3521:
-x-microsoft-antispam-prvs: <AM0PR0402MB352106456D1D8F214822C5239E8A0@AM0PR0402MB3521.eurprd04.prod.outlook.com>
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(3230021)(908002)(999002)(5005026)(6040522)(8220060)(2401047)(8121501046)(10201501046)(93006095)(93001095)(3231475)(944501520)(52105112)(3002001)(6041310)(20161123560045)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(20161123564045)(201708071742011)(7699051)(76991095);
- SRVR:AM0PR0402MB3521; BCL:0; PCL:0; RULEID:; SRVR:AM0PR0402MB3521; 
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:CY4PR02MB2583; 
+x-ms-traffictypediagnostic: CY4PR02MB2583:
+x-microsoft-antispam-prvs: <CY4PR02MB2583AC9F3999534F3F377904A78A0@CY4PR02MB2583.namprd02.prod.outlook.com>
 x-forefront-prvs: 0911D5CE78
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(396003)(136003)(366004)(346002)(39850400004)(376002)(199004)(189003)(52116002)(316002)(97736004)(68736007)(5660300001)(66066001)(76176011)(229853002)(6436002)(54906003)(102836004)(6486002)(26005)(53546011)(36756003)(6916009)(6506007)(386003)(6512007)(6246003)(8676002)(85182001)(14454004)(4326008)(81156014)(39060400002)(81166006)(6116002)(3846002)(8936002)(53936002)(71190400001)(71200400001)(72206003)(478600001)(186003)(25786009)(2906002)(446003)(476003)(11346002)(305945005)(2616005)(7736002)(31696002)(486006)(86362001)(345774005)(106356001)(31686004)(105586002)(1411001)(256004)(14444005)(99286004);
- DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR0402MB3521;
- H:AM0PR0402MB3716.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: ysoft.com does not designate
+received-spf: None (protection.outlook.com: xilinx.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: /4JBHcbl3dOBRq/gvtHolx9X8iGVxRMCkg2kWcspqInRqNfuHJJFCArxx1FWVjMmEgPKDSrf7w2GpT/5dxYPC6hmk2DmDxl/OjlfVJX1nQon2LGfY6aVhzkwkrB50qiJd36FuIafwhpnFhN0qcWxIZ24FZlrkIEwcL3IzQCdskdfAEmVir2hWQaDig8Yc7RxGlwlG9CsIL+eSfn30TFT9U7LZmpgbuv+Nr5XkkeyePHR2VZilSueQskvZVQOIt0FtXbT1Ir7znxOkTiBgG0re6C/G6zWpu4GgWoPRC4yU3ynhQGyJGpKLH3MU9vKSKje
+x-microsoft-antispam-message-info: r00ZeARHr8ZXn5s8Jf1IdfFEynwCIvH3KSKBO3/MUV3GE0zETad9NojuynTXQAYqf+9da9yhGvddk2sy5SWuDOXB+1x2y5oY9whFTdH558NvDPDZNcI+4DOwkIFS4QP/hFhL1VmV3qxe9jixvlDDl/g9xWO+3NH1qROA8KnMAxQ/yHNS6cyaep2j3WJL3mr45Ruv2jnlBEmyGlsOjQxVAiXf00YB+Y8/Eaqxas9IbFHTuvbl+im3HnPU8xxGSaMG/hXggD55os5Jx+wSiU01hdtgwL36t5gnjVSNnwbgauzrKbQ5PpGuJBp/N3Pn5Ev/
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
-Content-ID: <14560E487B979C479F72CE2D5A9827B9@eurprd04.prod.outlook.com>
 MIME-Version: 1.0
-X-OriginatorOrg: ysoft.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 8bf68b0b-c373-4e83-47e4-08d6755e23d6
-X-MS-Exchange-CrossTenant-originalarrivaltime: 08 Jan 2019 11:40:50.5312 (UTC)
+X-OriginatorOrg: xilinx.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 06736ca7-6227-44f8-107c-08d6755e4c0b
+X-MS-Exchange-CrossTenant-originalarrivaltime: 08 Jan 2019 11:41:58.0611 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: b5839965-430f-4be2-b282-d7a3149f2b37
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR0402MB3521
+X-MS-Exchange-CrossTenant-id: 657af505-d5df-48d0-8300-c31994686c5c
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: CY4PR02MB2583
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_034103_455729_524EE785 
-X-CRM114-Status: GOOD (  17.75  )
+X-CRM114-CacheID: sfid-20190108_034205_438983_517C3D91 
+X-CRM114-Status: GOOD (  32.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -124,50 +121,262 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Andrew Lunn <andrew@lunn.ch>,
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Dinesh Kumar <dineshk@xilinx.com>, Hyun Kwon <hyunk@xilinx.com>,
+ Sandip Kothari <sandipk@xilinx.com>,
  "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Rob Herring <robh+dt@kernel.org>, Fabio Estevam <fabio.estevam@nxp.com>,
- Shawn Guo <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+ Michal Simek <michals@xilinx.com>,
+ "laurent.pinchart@ideasonboard.com" <laurent.pinchart@ideasonboard.com>,
+ "sakari.ailus@linux.intel.com" <sakari.ailus@linux.intel.com>,
+ "hans.verkuil@cisco.com" <hans.verkuil@cisco.com>,
+ "mchehab@kernel.org" <mchehab@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "linux-media@vger.kernel.org" <linux-media@vger.kernel.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMjguMTIuMjAxOCAxOToyMCwgRmFiaW8gRXN0ZXZhbSB3cm90ZToNCj4gT24gVHVlLCBEZWMg
-MTgsIDIwMTggYXQgMTI6NDIgUE0gVm9rw6HEjSBNaWNoYWwgPE1pY2hhbC5Wb2thY0B5c29mdC5j
-b20+IHdyb3RlOg0KPiANCj4+ICsmZmVjIHsNCj4+ICsgICAgICAgcGluY3RybC1uYW1lcyA9ICJk
-ZWZhdWx0IjsNCj4+ICsgICAgICAgcGluY3RybC0wID0gPCZwaW5jdHJsX2VuZXQ+Ow0KPj4gKyAg
-ICAgICBwaHktbW9kZSA9ICJyZ21paS1pZCI7DQo+PiArICAgICAgIHBoeS1yZXNldC1ncGlvcyA9
-IDwmZ3BpbzEgMjUgR1BJT19BQ1RJVkVfSElHSD47DQo+IA0KPiBBcmUgeW91IHN1cmUgdGhpcyBp
-cyBhY3RpdmUgaGlnaD8NCj4gDQo+IFRoZSBGRUMgZHJpdmVyIGlnbm9yZXMgdGhlIHBvbGFyaXR5
-IG9mIHBoeS1yZXNldC1ncGlvcyBhbmQgaXQgYXNzdW1lcw0KPiB0aGUgR1BJTyByZXNldCBhcyBh
-Y3RpdmUgbG93Lg0KPiANCj4gSWYgaXQgcmVhbGx5IGlzIGFjdGl2ZSBoaWdoLCB0aGVuIHlvdSB3
-b3VsZCBuZWVkIHRvIHBhc3MgdGhlDQo+ICJwaHktcmVzZXQtYWN0aXZlLWhpZ2giIHByb3BlcnR5
-Lg0KDQpHb29kIGNhdGNoISBPcmlnaW5hbGx5IGl0IHdhcyBwaHktcmVzZXQtZ3Bpb3MgPSA8Jmdw
-aW8xIDI1IDA+IHdoaWNoIGlzDQphY3RpdmUgaGlnaCBhcyB3ZWxsLiBBbmQgYXMgeW91IHNheSwg
-dGhlIHBvbGFyaXR5IGlzIGlnbm9yZWQuIExhdGVyIG9uDQpJIGRlY2lkZWQgdG8gY2hhbmdlIGFs
-bCB0aGUgR1BJTyBzcGVjaWZpZXJzIHRvIHVzZSBkZWZpbmVzIGluc3RlYWQgb2YNCm51bWJlcnMu
-IEkganVzdCBzd2FwcGVkIDAgZm9yIEdQSU9fQUNUSVZFX0hJR0ggd2l0aG91dCB1c2luZyBicmFp
-biBjZWxscy4NCg0KSSB3aWxsIHVzZSBHUElPX0FDVElWRV9MT1cgdGhlcmUgdG8gYmUgY29ycmVj
-dCBldmVuIHRob3VnaCBpdCBpcyBpZ25vcmVkLg0KDQo+PiArLyB7DQo+PiArICAgICAgIG1vZGVs
-ID0gIlkgU29mdCBJT1RBIERyYWNvIGkuTVg2U29sbyBib2FyZCI7DQo+PiArICAgICAgIGNvbXBh
-dGlibGUgPSAieXNvZnQsaW14NmRsLXlhcHA0LWRyYWNvIiwgImZzbCxpbXg2ZGwiOw0KPj4gKw0K
-Pj4gKyAgICAgICBjcHVzIHsNCj4+ICsgICAgICAgICAgICAgICAvZGVsZXRlLW5vZGUvIGNwdUAx
-Ow0KPiANCj4gSXMgdGhpcyByZWFsbHkgbmVlZGVkPyBXZSBkb24ndCB1c3VhbGx5IGRvIHRoaXMg
-b24gaW14NnNvbG8gZHRzIGJvYXJkIGZpbGVzLg0KPiANCj4gT25seSBvbmUgQ1BVIHdpbGwgYmUg
-YnJvdWdodCB1cCBvbmxpbmUgb24gaW14NnNvbG8gYW55d2F5Lg0KDQpPSywgaXQgaXMgcmVhbGx5
-IG5vdCBuZWNlc3NhcnkuIEkgd2lsbCByZW1vdmUgaXQuDQoNCj4+ICsgICAgICAgfTsNCj4+ICsN
-Cj4+ICsgICAgICAgbWVtb3J5QDEwMDAwMDAwIHsNCj4gDQo+IE5lZWQgdG8gcGFzcyAiZGV2aWNl
-X3R5cGUgPSAibWVtb3J5IjsiDQoNCk9LLg0KDQo+PiArLyB7DQo+PiArICAgICAgIG1vZGVsID0g
-IlkgU29mdCBJT1RBIEh5ZHJhIGkuTVg2RHVhbExpdGUgYm9hcmQiOw0KPj4gKyAgICAgICBjb21w
-YXRpYmxlID0gInlzb2Z0LGlteDZkbC15YXBwNC1oeWRyYSIsICJmc2wsaW14NmRsIjsNCj4+ICsN
-Cj4+ICsgICAgICAgbWVtb3J5QDEwMDAwMDAwIHsNCj4gDQo+IE5lZWQgdG8gcGFzcyAiZGV2aWNl
-X3R5cGUgPSAibWVtb3J5IjsiDQoNCk9LLg0KDQo+PiArICAgICAgIG1lbW9yeUAxMDAwMDAwMCB7
-DQo+IA0KPiBOZWVkIHRvIHBhc3MgImRldmljZV90eXBlID0gIm1lbW9yeSI7Ig0KDQpPSy4NCg0K
-VGhhbmsgeW91IGZvciB0aGUgcmV2aWV3IEZhYmlvLg0KQWxsIHRoZSBiZXN0LA0KTWljaGFsDQoN
-Cl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFy
-bS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9y
-ZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1r
-ZXJuZWwK
+Hi Rob,
+
+Thanks for the review.
+
+> -----Original Message-----
+> From: Rob Herring [mailto:robh@kernel.org]
+> Sent: Wednesday, June 13, 2018 1:34 AM
+> To: Vishal Sagar <vishal.sagar@xilinx.com>
+> Cc: Hyun Kwon <hyunk@xilinx.com>; laurent.pinchart@ideasonboard.com;
+> michal.simek@xilinx.com; linux-media@vger.kernel.org;
+> devicetree@vger.kernel.org; mark.rutland@arm.com; mchehab@kernel.org;
+> linux-kernel@vger.kernel.org; hans.verkuil@cisco.com;
+> sakari.ailus@linux.intel.com; Dinesh Kumar <dineshk@xilinx.com>; linux-arm-
+> kernel@lists.infradead.org
+> Subject: Re: [PATCH 1/2] media: dt-bindings: media: xilinx: Add Xilinx MIPI CSI-2
+> Rx Subsystem
+> 
+> On Wed, May 30, 2018 at 12:24:43AM +0530, Vishal Sagar wrote:
+> > Add bindings documentation for Xilinx MIPI CSI-2 Rx Subsystem.
+> >
+> > The Xilinx MIPI CSI-2 Rx Subsystem consists of a DPHY, CSI-2 Rx, an
+> > optional I2C controller and an optional Video Format Bridge (VFB). The
+> > active lanes can be configured at run time if enabled in the IP. The
+> > DPHY register interface may also be enabled.
+> >
+> > Signed-off-by: Vishal Sagar <vishal.sagar@xilinx.com>
+> > ---
+> >  .../bindings/media/xilinx/xlnx,csi2rxss.txt        | 117
+> +++++++++++++++++++++
+> >  1 file changed, 117 insertions(+)
+> >  create mode 100644
+> Documentation/devicetree/bindings/media/xilinx/xlnx,csi2rxss.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/media/xilinx/xlnx,csi2rxss.txt
+> b/Documentation/devicetree/bindings/media/xilinx/xlnx,csi2rxss.txt
+> > new file mode 100644
+> > index 0000000..31ed721
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/media/xilinx/xlnx,csi2rxss.txt
+> > @@ -0,0 +1,117 @@
+> > +
+> > +Xilinx MIPI CSI2 Receiver Subsystem Device Tree Bindings
+> > +--------------------------------------------------------
+> > +
+> > +The Xilinx MIPI CSI2 Receiver Subsystem is used to capture MIPI CSI2 traffic
+> > +from compliant camera sensors and send the output as AXI4 Stream video
+> data
+> > +for image processing.
+> > +
+> > +The subsystem consists of a MIPI DPHY in slave mode which captures the
+> > +data packets. This is passed along the MIPI CSI2 Rx IP which extracts the
+> > +packet data. This data is taken in by the Video Format Bridge (VFB),
+> > +if selected, and converted into AXI4 Stream video data at selected
+> > +pixels per clock as per AXI4-Stream Video IP and System Design UG934.
+> > +
+> > +For more details, please refer to PG232 MIPI CSI-2 Receiver Subsystem.
+> >
+> +https://www.xilinx.com/support/documentation/ip_documentation/mipi_csi
+> 2_rx_subsystem/v3_0/pg232-mipi-csi2-rx.pdf
+> > +
+> > +Required properties:
+> > +
+> > +- compatible: Must contain "xlnx,mipi-csi2-rx-subsystem-2.0" or
+> > +  "xlnx,mipi-csi2-rx-subsystem-3.0"
+> > +
+> > +- reg: Physical base address and length of the registers set for the device.
+> > +
+> > +- interrupt-parent: specifies the phandle to the parent interrupt controller
+> > +
+> > +- interrupts: Property with a value describing the interrupt number.
+> > +
+> > +- xlnx,max-lanes: Maximum active lanes in the design.
+> 
+> There's already a property defined in video-interfaces.txt to limit
+> lanes.
+> 
+
+Ok I will use the standard data-lanes and remove this.
+
+> > +
+> > +- xlnx,vc: Virtual Channel, specifies virtual channel number to be filtered.
+> > +  If this is 4 then all virtual channels are allowed.
+> > +
+> > +- xlnx,csi-pxl-format: This denotes the CSI Data type selected in hw design.
+> > +  Packets other than this data type (except for RAW8 and User defined data
+> > +  types) will be filtered out. Possible values are RAW6, RAW7, RAW8, RAW10,
+> > +  RAW12, RAW14, RGB444, RGB555, RGB565, RGB666, RGB888 and
+> YUV4228bit.
+> 
+> This should be standard property.
+
+I don't see a standard property for the CSI pixel formats.
+Do you mean media bus formats?
+
+> 
+> > +
+> > +- xlnx,axis-tdata-width: AXI Stream width, This denotes the AXI Stream width.
+> > +  It depends on Data type chosen, Video Format Bridge enabled/disabled and
+> > +  pixels per clock. If VFB is disabled then its value is either 0x20 (32 bit)
+> > +  or 0x40(64 bit) width.
+> > +
+> > +- xlnx,video-format, xlnx,video-width: Video format and width, as defined in
+> > +  video.txt.
+> 
+> This doc needs to define what are valid values.
+> 
+
+Ok. The valid values list will be added in next revision.
+
+> Why do you need this on both ports? Can there be a conversion in this
+> block? At least for the MIPI CSI interface part, this should be a common
+> property. Not sure offhand if we have defined one. We have for parallel
+> interfaces.
+> 
+> And 'width' doesn't seem like the right term for what this is defined to
+> be.
+> 
+
+This is put on both ports to keep it consistent with other drivers.
+The video-format values are specific to Xilinx. 
+The width here means bit per component.
+
+> > +
+> > +- port: Video port, using the DT bindings defined in ../video-interfaces.txt.
+> 
+> port is not a property. It goes in its own section. And port properties
+> should be under it.
+
+I will update this in next version.
+
+> 
+> > +  The CSI 2 Rx Subsystem has a two ports, one input port for connecting to
+> > +  camera sensor and other is output port.
+> 
+> Need be specific port #0 is ?? and port #1 is ??.
+> 
+
+Right. I will describe them in the next version correctly.
+0 will be sink pad and 1 will source pad.
+
+> > +
+> > +- data-lanes: The number of data lanes through which CSI2 Rx Subsystem is
+> > +  connected to the camera sensor as per video-interfaces.txt
+> 
+> Why do you need both this and max-lanes?
+
+I didn't know more and added both. I will keep this.
+
+> 
+> > +
+> > +Optional properties:
+> > +
+> > +- xlnx,en-active-lanes: Enable Active lanes configuration in Protocol
+> > +  Configuration Register.
+> > +
+> > +- xlnx,dphy-present: This is equivalent to whether DPHY register interface is
+> > +  enabled or not.
+> > +
+> > +- xlnx,iic-present: This shows whether subsystem's IIC is present or not. This
+> > +  affects the base address of the DPHY.
+> 
+> Perhaps you should break up reg into ranges for each submodule (or make
+> the DPHY a separate node and use the phy binding.
+> 
+
+Ok I will break the range into 2 parts and access DPHY accordingly.
+
+Regards
+Vishal Sagar
+
+> > +
+> > +- xlnx,vfb: Video Format Bridge, Denotes if Video Format Bridge is selected
+> > +  so that output is as per AXI stream documented in UG934.
+> > +
+> > +- xlnx,ppc: Pixels per clock, Number of pixels to be transferred per pixel
+> > +  clock. This is valid only if xlnx,vfb property is present.
+> > +
+> > +Example:
+> > +
+> > +       csiss_1: csiss@a0020000 {
+> > +               compatible = "xlnx,mipi-csi2-rx-subsystem-3.0";
+> > +               reg = <0x0 0xa0020000 0x0 0x20000>;
+> > +               interrupt-parent = <&gic>;
+> > +               interrupts = <0 95 4>;
+> > +
+> > +               xlnx,max-lanes = <0x4>;
+> > +               xlnx,en-active-lanes;
+> > +               xlnx,dphy-present;
+> > +               xlnx,iic-present;
+> > +               xlnx,vc = <0x4>;
+> > +               xlnx,csi-pxl-format = "RAW8";
+> > +               xlnx,vfb;
+> > +               xlnx,ppc = <0x4>;
+> > +               xlnx,axis-tdata-width = <0x20>;
+> > +
+> > +               ports {
+> > +                       #address-cells = <1>;
+> > +                       #size-cells = <0>;
+> > +
+> > +                       port@0 {
+> > +                               reg = <0>;
+> > +
+> > +                               xlnx,video-format = <XVIP_VF_YUV_422>;
+> > +                               xlnx,video-width = <8>;
+> > +                               csiss_out: endpoint {
+> > +                                       remote-endpoint = <&vcap_csiss_in>;
+> > +                               };
+> > +                       };
+> > +                       port@1 {
+> > +                               reg = <1>;
+> > +
+> > +                               xlnx,video-format = <XVIP_VF_YUV_422>;
+> > +                               xlnx,video-width = <8>;
+> > +
+> > +                               csiss_in: endpoint {
+> > +                                       data-lanes = <1 2 3 4>;
+> > +                                       /* MIPI CSI2 Camera handle */
+> > +                                       remote-endpoint = <&vs2016_out>;
+> > +                               };
+> > +
+> > +                       };
+> > +
+> > +               };
+> > +       };
+> > --
+> > 2.7.4
+> >
+> > This email and any attachments are intended for the sole use of the named
+> recipient(s) and contain(s) confidential information that may be proprietary,
+> privileged or copyrighted under applicable law. If you are not the intended
+> recipient, do not read, copy, or forward this email message or any attachments.
+> Delete this email message and any attachments immediately.
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel@lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
