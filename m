@@ -2,84 +2,73 @@ Return-Path: <SRS0=tBLO=PQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 48F89C43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 22:03:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 05907C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 22:08:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 155D8214C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 22:03:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AD12B2146F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 22:08:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HmmCf8D1";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="BM87YX8L"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 155D8214C6
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aYzdGgZP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AD12B2146F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=k6Aa61r/cV4jJQZKC6U9ydUBlHXRBKlCikoZ8HJO5Mc=; b=HmmCf8D1BE98rD
-	LanS1EPjnZqVS2Z110ySAc36FNQ6l7l+td0SB1g+oO/9UAsPcaitgRb8ypgKAZsxqMSbpce3Qzwc6
-	Z1CF+x2GXNBnKgPHybk9Y5DiNQ3DRALlPiXsPQhm+BGsXYJ8AnYggJZKDiZSZ0amvgQjMSHAHoQfK
-	o4Coc5dYN1QDDHcU1nSkoFrDZJ0D0YGqKEWKFyJEl9/XFC3eWlMo4y9RFHj5rUDjdqXxhkKz3Diem
-	UYzZd9+rEIpEPIVY1GxtqOknDCTj6QIfzZCz2QSugVMfCCWl0F8A29z+NZg9Kk9bfrAFR+pFxgj+S
-	yejFtF0I9Ob/NlFESU8w==;
+	List-Owner; bh=7lKMFk2nm7rkk/13FITsaJqzdBgsf1Vu39As5DMkn2w=; b=aYzdGgZPRmlJ/e
+	O2dDUmVSaXU6ohRyNYsbrd/Lyf3t8KR8A59b5tvHgVH1D2vR9hEUPVCp44dOwilBKNGWxZS7PXhsw
+	HfBPucXuMr4Iggbu7TlqRqevlPqpql24f9/J43tx73o0Jri9xivCpRZwWt/tJJUQdrFPyqcKC9q27
+	uPYHt8a37xjRxo573Heyn63vMJz8K9031yrdm/xn5vgkWRohPHtKj8cFb5z/lAZqfx9h1VTpAj2aN
+	3GdX76CMjlbxcR//vHHJ6ikIaWRXQ9VcHHRNVOPRRWvhBgucy8H5aL8yag7qtBcOoc0QMfhj6qsnE
+	wOtlV8dZOuirRx2JNXVA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggzSa-00085i-4A; Tue, 08 Jan 2019 22:02:56 +0000
-Received: from mail-oi1-x242.google.com ([2607:f8b0:4864:20::242])
+	id 1ggzYP-0003pO-6r; Tue, 08 Jan 2019 22:08:57 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggzSU-000843-2y; Tue, 08 Jan 2019 22:02:52 +0000
-Received: by mail-oi1-x242.google.com with SMTP id i6so4664201oia.6;
- Tue, 08 Jan 2019 14:02:49 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=googlemail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=yeRzpbcbgjbI0lLhadxvwvgMS0KwUgW5YCjFRCqRO5o=;
- b=BM87YX8L351IUkFQyLgOZz4LHFdXPPzu6qHalOc+0nMB6swynxEjEULDFbJIJBdkKi
- XUY+jjYY1ivdoA9eiZnsslUSL+KCDpa7fjtF2NAdbLe+HLbp+psvHi5si5HAvnfsDrEk
- lEfg0gtcQi54DsNO5eLiVyFBNCtICM8e2usv+ofS0ldRhazJIOTmLw7Ra2EEePpzm/p7
- 7Q7vY2vo1ynNbTjytq1qScDrnnETs0rWXdePvvtS/dfOtfyAQ1wcvpXoKwQfr6vB2aRi
- tWs3Ejdpk1hIVHcUj9brBuJo/uGiVb7S9bNGttWAjadEI+IUxSh1ZczrOH/W/XkOuNSR
- WcpA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=yeRzpbcbgjbI0lLhadxvwvgMS0KwUgW5YCjFRCqRO5o=;
- b=tyEmjkOUVv8QEt7jlwCEwfk3OSAXuHxGBJEuHWBk+igYha/BBK65CtrQ42jOYOk8xG
- HzVdW2zLy67/qO/dzN88YGPYVV63VzkBeAvBsrr8+HGMVCPKrwgJB7jYCPM7R8heE6w0
- NP/yadrpRg8ek4SQhBwJphvwqt+gwYrTKaz5XmtIIpsOwld7uWjq3MBMVPFpFp8Pn7yf
- 6tAGpunKWSp4ow8czpsLCIEKE+LlF8Pe2ThaZiqBj8xXY8TDktV8EQMLL6Aa21/hga+9
- S10dwDmYnXtSbmxHuatbEvLgMR9wR5TI9CFkHD4mvK2XvQZrrUEvAerJLojR/BJhpnba
- JnSw==
-X-Gm-Message-State: AJcUukeVtsHN/2uNr57oOLXQnpLV3pbOHJew1ZxUqBqFzBQdXBO7xCyZ
- VEMjIYwq/wr8HeDfl+b95Wz1M3fGMAjW2FcaYhs=
-X-Google-Smtp-Source: ALg8bN7P51/jqB+bkFgTZpb06PMT3+o9vsQB+Pam0L0oni5TcWVpMqzKi0oPZOK55cKh9170xpCkLlyvOpyuez3/n5c=
-X-Received: by 2002:aca:34c2:: with SMTP id b185mr2297343oia.321.1546984968358; 
- Tue, 08 Jan 2019 14:02:48 -0800 (PST)
+ id 1ggzYK-0003oq-D9
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 22:08:54 +0000
+Received: from ptx.hi.pengutronix.de ([2001:67c:670:100:1d::c0])
+ by metis.ext.pengutronix.de with esmtps
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1ggzY8-0001yS-Cz; Tue, 08 Jan 2019 23:08:40 +0100
+Received: from ukl by ptx.hi.pengutronix.de with local (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1ggzY6-0002vf-Ug; Tue, 08 Jan 2019 23:08:38 +0100
+Date: Tue, 8 Jan 2019 23:08:38 +0100
+From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
+To: Claudiu.Beznea@microchip.com
+Subject: Re: [PATCH v8 1/6] pwm: extend PWM framework with PWM modes
+Message-ID: <20190108220838.amrun6jsa24yeisg@pengutronix.de>
+References: <1546522081-23659-1-git-send-email-claudiu.beznea@microchip.com>
+ <1546522081-23659-2-git-send-email-claudiu.beznea@microchip.com>
+ <20190105210522.ho2o2a4gc7r7ijeq@pengutronix.de>
+ <67e881c5-0ea7-3d2f-5910-534729097d11@microchip.com>
+ <20190107221040.uos5qlnkjmcayv73@pengutronix.de>
+ <0ef0b4f1-45c3-0280-c1f0-6d499957f74c@microchip.com>
 MIME-Version: 1.0
-References: <20181229125711.5205-1-martin.blumenstingl@googlemail.com>
- <20181229125711.5205-2-martin.blumenstingl@googlemail.com>
- <CANAwSgQjoXqbV2hDs4W3kR=7ULK0gkR24V6SiEJw2+mYsaNcVQ@mail.gmail.com>
-In-Reply-To: <CANAwSgQjoXqbV2hDs4W3kR=7ULK0gkR24V6SiEJw2+mYsaNcVQ@mail.gmail.com>
-From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Date: Tue, 8 Jan 2019 23:02:37 +0100
-Message-ID: <CAFBinCCRTCV2TUhaDGtjQbXp2bSh4cnP6pW25B0JVpCK64qYVg@mail.gmail.com>
-Subject: Re: [PATCH 1/3] ARM: dts: meson8b: odroidc1: mark the SD card
- detection GPIO active-low
-To: Anand Moon <linux.amoon@gmail.com>
+Content-Disposition: inline
+In-Reply-To: <0ef0b4f1-45c3-0280-c1f0-6d499957f74c@microchip.com>
+User-Agent: NeoMutt/20170113 (1.7.2)
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c0
+X-SA-Exim-Mail-From: ukl@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_140250_274872_830B52E3 
-X-CRM114-Status: GOOD (  24.32  )
+X-CRM114-CacheID: sfid-20190108_140852_600873_9D251EC5 
+X-CRM114-Status: GOOD (  21.99  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,84 +80,108 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: =?UTF-8?Q?Linus_L=C3=BCssing?= <linus.luessing@c0d3.blue>,
- linux-gpio@vger.kernel.org, balbes-150@yandex.ru,
- Kevin Hilman <khilman@baylibre.com>, Linus Walleij <linus.walleij@linaro.org>,
- linux-mmc@vger.kernel.org, bgolaszewski@baylibre.com,
- Guenter Roeck <linux@roeck-us.net>, linux-amlogic@lists.infradead.org,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-pwm@vger.kernel.org, alexandre.belloni@bootlin.com,
+ linux-doc@vger.kernel.org, corbet@lwn.net, linux-kernel@vger.kernel.org,
+ Ludovic.Desroches@microchip.com, thierry.reding@gmail.com,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Anand,
+On Tue, Jan 08, 2019 at 09:21:34AM +0000, Claudiu.Beznea@microchip.com wrot=
+e:
+> Hi Uwe,
+> =
 
-On Mon, Jan 7, 2019 at 9:51 AM Anand Moon <linux.amoon@gmail.com> wrote:
->
-> Hi Martin,
->
-> On Sat, 29 Dec 2018 at 18:28, Martin Blumenstingl
-> <martin.blumenstingl@googlemail.com> wrote:
-> >
-> > After commit 89a5e15bcba87d ("gpio/mmc/of: Respect polarity in the device
-> > tree") SD cards are not detected anymore.
-> >
-> > The CD GPIO is "active low" on Odroid-C1. The MMC dt-bindings specify:
-> > "[...] using the "cd-inverted" property means, that the CD line is active
-> > high, i.e. it is high, when a card is inserted".
-> >
-> > Fix the description of the SD card by marking it as GPIO_ACTIVE_LOW and
-> > drop the "cd-inverted" property. This makes the definition consistent
-> > with the existing dt-bindings and fixes the check whether an SD card is
-> > inserted.
-> >
-> > Fixes: e03efbce6bebf5 ("ARM: dts: meson8b-odroidc1: add microSD support")
-> > Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> > ---
-> >  arch/arm/boot/dts/meson8b-odroidc1.dts | 3 +--
-> >  1 file changed, 1 insertion(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/meson8b-odroidc1.dts b/arch/arm/boot/dts/meson8b-odroidc1.dts
-> > index 58669abda259..070d69889f3e 100644
-> > --- a/arch/arm/boot/dts/meson8b-odroidc1.dts
-> > +++ b/arch/arm/boot/dts/meson8b-odroidc1.dts
-> > @@ -273,8 +273,7 @@
-> >                 cap-sd-highspeed;
-> >                 disable-wp;
-> >
-> > -               cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
-> > -               cd-inverted;
-> > +               cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
-> >
-> >                 vmmc-supply = <&tflash_vdd>;
-> >                 vqmmc-supply = <&tf_io>;
-> > --
-> > 2.20.1
-> >
->
-> Please add my on my Odroid c1+
->
-> Tested-by: Anand Moon <linux.amoon@gmail.com>
-thank you for testing this!
+> On 08.01.2019 00:10, Uwe Kleine-K=F6nig wrote:
+> > Hello Claudiu,
+> > =
 
-> My Odroid C2 is also fails to bootup with out these changes.
-> Can you send patch to fix them as well.
-I sent a more generic patch (after a discussion with Linus) which will
-fix all boards with the "cd-inverted" property even if we don't fix
-the .dts files: [0]
-(that doesn't mean that this patch is obsolete, but it means that we
-restore compatibility with .dts which use the "cd-inverted" property)
+> > On Mon, Jan 07, 2019 at 09:30:55AM +0000, Claudiu.Beznea@microchip.com =
+wrote:
+> >> On 05.01.2019 23:05, Uwe Kleine-K=F6nig wrote:
+> >>> On Thu, Jan 03, 2019 at 01:29:44PM +0000, Claudiu.Beznea@microchip.co=
+m wrote:
+> >>>> From: Claudiu Beznea <claudiu.beznea@microchip.com>
+> >>>>
+> >>>> Add basic PWM modes: normal and complementary. These modes should
+> >>>> differentiate the single output PWM channels from two outputs PWM
+> >>>> channels. These modes could be set as follow:
+> >>>> 1. PWM channels with one output per channel:
+> >>>> - normal mode
+> >>>> 2. PWM channels with two outputs per channel:
+> >>>> - normal mode
+> >>>> - complementary mode
+> >>>> Since users could use a PWM channel with two output as one output PWM
+> >>>> channel, the PWM normal mode is allowed to be set for PWM channels w=
+ith
+> >>>> two outputs; in fact PWM normal mode should be supported by all PWMs.
+> >>>
+> >>> I still think that my suggestion that I sent in reply to your v5 using
+> >>> .alt_duty_cycle and .alt_offset is the better one as it is more gener=
+ic.
+> >>
+> >> I like it better my way, I explained myself why.
+> > =
 
-it would be great if you could test that on your Odroid-C2 and give
-your Tested-by on that as well!
+> > I couldn't really follow your argument though. You seemed to acknowledge
+> > that using .alt_duty_cycle and .alt_offset is more generic.
+> =
 
+> True it is more generic in the way that it gives the possibility to
+> configure all kind of waveforms. But not all controllers supports this.
+> The use case of this would be to have dead-times with any values, right?
 
-Regards
-Martin
+Well, I didn't target that. The model I suggested is just a generic set
+of parameters that are able to describe the wave forms for all three
+modes you suggested. That it allows to express dead-times is just a nice
+by-product.
 
+> >>> I fail to see the upside of storing the mode as 2^mode instead of a
+> >>> plain enum pwm_mode. Given that struct pwm_state is visible for pwm
+> >>> users a plain pwm_mode would at least be more intuitive.
+> >>
+> >> To have all modes supported by a controller grouped in pwm_caps::modes=
+_msk.
+> > =
 
-[0] https://patchwork.kernel.org/patch/10745961/
+> > My question was not about struct pwm_caps::modes_msk but about
+> > struct pwm_state::modebit. As struct pwm_state has visibility even
+> > outside of the pwm API (i.e. it is used by consumers) it is beneficial
+> > to keep that simple. Letting a consumer pass in the mode he wants is
+> > easier to explain than setting a single bit. Also error checking with a
+> > plain enum is easier because you just do:
+> > =
+
+> > 	if (mode >=3D MODE_CNT)
+> > 		error()
+> > =
+
+> > which is easy to grasp. Compare that to
+> > =
+
+> > 	if (!is_power_of_two(modebit) || modebit >=3D PWM_MODE_BIT(CNT))
+> > 		error()
+> > =
+
+> > (modulo syntactical correctness).
+> =
+
+> The reason I choose to have it as bit was the memcmp() at the beginning of
+> pwm_apply_state() and to avoid starting enum pwm_mode from 1 and to avoid
+> having bit 0 of pwm_caps::modes_msk unused (in the driver I'm using
+> PWM_MODE_BIT() macro to fill in the driver's supported modes).
+
+Does that mean you are convinced by my argument?
+
+Best regards
+Uwe
+
+-- =
+
+Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 
 _______________________________________________
 linux-arm-kernel mailing list
