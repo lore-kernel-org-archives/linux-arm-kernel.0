@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 23EA9C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 15:11:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 34BBDC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 15:11:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E5D3320827
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 15:11:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DBA4B20827
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 15:11:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="erZodABY";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="cGuITeLv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E5D3320827
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="npsRGTcC";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="N4CL8c0b"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DBA4B20827
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,53 +27,54 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=Z90jEwGbk0v0k0ILfrt8xrzEIqE9lm1b2Zg97I9S6Js=; b=erZodABYLWi14fsu/Fas+jLb+a
-	UIp6i4Bm3xBInKs/0K/jm5CyqOzkLAaEIqCI0pc4vimPeGyGOzxXepS4X8lfWZcN1ds7WZZhpTH6P
-	2TIFfEWRNfLRh/Ifsq3PS/Ct+nfjNL28+d4eALqIqRzIHcXU0XUr5pZrASpvnuiuSfKfQBI+B2Jze
-	9lFAqZhDaKEaIxAjEE2K1+ohb+AhLuNUZ2IRy6cVXGoOTnc5Ir4zk14HF9LKyj4Kke95VyvLd1CEj
-	wHXNl+VgGe3QE8uIA7Ed73Nd+Zb8+db8yvVGxCkvhHXzJvflPFNGJc3Ju3wNvSKN+8sKtp/a/bA8H
-	HbTxkDzA==;
+	bh=Sn7aw5IKLaDRrX8e5BmyAmjG55O4WWs76+vD0Cv9Bmg=; b=npsRGTcCuTN8AnqqgNRzDKr4da
+	e03G6dJx2Qf6jVo4chLe5E/mLN7kG1E43Rg7AX/cAjIZ6KTm4B0Ykf/PsEW75fxHkn9CTXCdIIw8w
+	w2Z7kFJmyfpqBzXd+oPkjE+kxGYQnLyVEQnNQe8L2XQtic8vCmPEbAhXtt5AAbfk77iG4mnlT3Q3W
+	h5xs2jhsBvlviMmBqeY0HHiVYUj84R0S+mJFsR6noGPkpIHyri9QsyWj+b+MKIhXu131V7gADyBNx
+	2mYgSTDUcVe+Z1zdTmq3mrIpxIznVVLPn4Gn3n88gAF4SJ108G0niaFce7Fpwu8ocSdr8nvb4J4FB
+	/YMTK4PQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggt29-0008JF-1U; Tue, 08 Jan 2019 15:11:13 +0000
+	id 1ggt2N-000078-VB; Tue, 08 Jan 2019 15:11:27 +0000
 Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggt1m-0007ru-Kt
- for linux-arm-kernel@bombadil.infradead.org; Tue, 08 Jan 2019 15:10:50 +0000
+ id 1ggt1o-0007ru-53
+ for linux-arm-kernel@bombadil.infradead.org; Tue, 08 Jan 2019 15:10:52 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=infradead.org; s=merlin.20170209; h=References:In-Reply-To:Message-Id:Date:
  Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
  Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
  Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
  List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=EVYLVCybrBltv0j2WAxlzY7/UNQoFGDeU4FtQw46wuU=; b=cGuITeLvHzyC/ZDahflUVrWOk
- I8bpBNy18vSDt4HXLdqEQGMPVaE6xrk3ZLDJN7Vg+SmZ4U9xJualjHBMso5FBNVhOoFeeYpWpt3yX
- Ls5V7g70obX5dCakm7zZeQQJj+yXXL+VD9PPoUyF4tkOtJW4t3a0tsJKW/U+Vaz3oSIMvYrci/cPm
- 4iQJYpMFRQQD/KqPOX6bxVL0zt2PPJeyWrj9snY+nY51E4yG1qvHHJPsSD7aLgFCrFV0SdwDFg8aV
- GuvFQE/hSe0KoKZmRMa1Q3SNYJ8C6xGwsPVw0OEuDTk1GOuHlMO44onKTZBgixO2w+ovUftik7g/B
- Z4pEVoo5w==;
+ bh=+5UUK7YANK9oxtubve1frYu4+lRYO0+2kQNs2J0jJYQ=; b=N4CL8c0bEfPKubNL73mXWEuDQ
+ XyzusKW39f0aeKMgAGwfdBLTrvrUhra6V7N4XASkFfma2Sl7K0lDYA89X5AD5biUqyu1QBY6sPUzP
+ yHGckcbU88kjRw8+GebAWBfSz51knw831Sw4cLK8e4lWqiMVCxaA5Gg/onza56/WWFkBj1OXjXaLO
+ tl9FS2YqMO+JE/kG7Mg+0J7hkkAKDk6zW2AwSfX7V5dJA06GVfzanajnO52Q34+D3x3dWCcS8lbIU
+ w+havJuQjlRVTTNVUXpnm0DSe9u9rWiIDi2lV3wxBUiZMYQD+VbcDid3DrlbpqVVqwHAhu7v24Bog
+ TxbagNevA==;
 Received: from foss.arm.com ([217.140.101.70])
  by merlin.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggs3o-0000D1-90
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 14:08:53 +0000
+ id 1ggs3m-0000D1-GO
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 14:08:51 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2132E168F;
- Tue,  8 Jan 2019 06:08:52 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B8CA71650;
+ Tue,  8 Jan 2019 06:08:49 -0800 (PST)
 Received: from e112298-lin.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 0189F3F70D;
- Tue,  8 Jan 2019 06:08:49 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 7E3993F70D;
+ Tue,  8 Jan 2019 06:08:47 -0800 (PST)
 From: Julien Thierry <julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v8 23/26] arm64: Handle serror in NMI context
-Date: Tue,  8 Jan 2019 14:07:41 +0000
-Message-Id: <1546956464-48825-24-git-send-email-julien.thierry@arm.com>
+Subject: [PATCH v8 22/26] irqchip/gic-v3: Allow interrupts to be set as
+ pseudo-NMI
+Date: Tue,  8 Jan 2019 14:07:40 +0000
+Message-Id: <1546956464-48825-23-git-send-email-julien.thierry@arm.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1546956464-48825-1-git-send-email-julien.thierry@arm.com>
 References: <1546956464-48825-1-git-send-email-julien.thierry@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_090852_430580_8F11E365 
-X-CRM114-Status: GOOD (  12.47  )
+X-CRM114-CacheID: sfid-20190108_090850_702047_F7ED9F3A 
+X-CRM114-Status: GOOD (  19.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,57 +87,160 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
- Julien Thierry <julien.thierry@arm.com>, marc.zyngier@arm.com,
- catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
- christoffer.dall@arm.com, james.morse@arm.com, joel@joelfernandes.org,
- Dave Martin <dave.martin@arm.com>
+ Jason Cooper <jason@lakedaemon.net>, Julien Thierry <julien.thierry@arm.com>,
+ marc.zyngier@arm.com, catalin.marinas@arm.com, will.deacon@arm.com,
+ linux-kernel@vger.kernel.org, christoffer.dall@arm.com, james.morse@arm.com,
+ joel@joelfernandes.org, Thomas Gleixner <tglx@linutronix.de>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Per definition of the daifflags, Serrors can occur during any interrupt
-context, that includes NMI contexts. Trying to nmi_enter in an nmi context
-will crash.
+Implement NMI callbacks for GICv3 irqchip. Install NMI safe handlers
+when setting up interrupt line as NMI.
 
-Skip nmi_enter/nmi_exit when serror occurred during an NMI.
+Only SPIs and PPIs are allowed to be set up as NMI.
 
-Suggested-by: James Morse <james.morse@arm.com>
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Dave Martin <dave.martin@arm.com>
-Cc: James Morse <james.morse@arm.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kernel/traps.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ drivers/irqchip/irq-gic-v3.c | 84 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 84 insertions(+)
 
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 4e2fb87..8ad119c 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -898,13 +898,17 @@ bool arm64_is_fatal_ras_serror(struct pt_regs *regs, unsigned int esr)
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 4df1e94..447d8ab 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -27,6 +27,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/percpu.h>
++#include <linux/refcount.h>
+ #include <linux/slab.h>
  
- asmlinkage void do_serror(struct pt_regs *regs, unsigned int esr)
- {
--	nmi_enter();
-+	const bool was_in_nmi = in_nmi();
+ #include <linux/irqchip.h>
+@@ -93,6 +94,9 @@ struct gic_chip_data {
+  */
+ static DEFINE_STATIC_KEY_FALSE(supports_pseudo_nmis);
+ 
++/* ppi_nmi_refs[n] == number of cpus having ppi[n + 16] set as NMI */
++static refcount_t ppi_nmi_refs[16];
 +
-+	if (!was_in_nmi)
-+		nmi_enter();
+ static struct gic_kvm_info gic_v3_kvm_info;
+ static DEFINE_PER_CPU(bool, has_rss);
  
- 	/* non-RAS errors are not containable */
- 	if (!arm64_is_ras_serror(esr) || arm64_is_fatal_ras_serror(regs, esr))
- 		arm64_serror_panic(regs, esr);
- 
--	nmi_exit();
-+	if (!was_in_nmi)
-+		nmi_exit();
+@@ -320,6 +324,72 @@ static int gic_irq_get_irqchip_state(struct irq_data *d,
+ 	return 0;
  }
  
- void __pte_error(const char *file, int line, unsigned long val)
++static int gic_irq_nmi_setup(struct irq_data *d)
++{
++	struct irq_desc *desc = irq_to_desc(d->irq);
++
++	if (!gic_supports_nmi())
++		return -EINVAL;
++
++	if (gic_peek_irq(d, GICD_ISENABLER)) {
++		pr_err("Cannot set NMI property of enabled IRQ %u\n", d->irq);
++		return -EINVAL;
++	}
++
++	/*
++	 * A secondary irq_chip should be in charge of LPI request,
++	 * it should not be possible to get there
++	 */
++	if (WARN_ON(gic_irq(d) >= 8192))
++		return -EINVAL;
++
++	/* desc lock should already be held */
++	if (gic_irq(d) < 32) {
++		/* Setting up PPI as NMI, only switch handler for first NMI */
++		if (!refcount_inc_not_zero(&ppi_nmi_refs[gic_irq(d) - 16])) {
++			refcount_set(&ppi_nmi_refs[gic_irq(d) - 16], 1);
++			desc->handle_irq = handle_percpu_devid_fasteoi_nmi;
++		}
++	} else {
++		desc->handle_irq = handle_fasteoi_nmi;
++	}
++
++	gic_set_irq_prio(gic_irq(d), gic_dist_base(d), GICD_INT_NMI_PRI);
++
++	return 0;
++}
++
++static void gic_irq_nmi_teardown(struct irq_data *d)
++{
++	struct irq_desc *desc = irq_to_desc(d->irq);
++
++	if (WARN_ON(!gic_supports_nmi()))
++		return;
++
++	if (gic_peek_irq(d, GICD_ISENABLER)) {
++		pr_err("Cannot set NMI property of enabled IRQ %u\n", d->irq);
++		return;
++	}
++
++	/*
++	 * A secondary irq_chip should be in charge of LPI request,
++	 * it should not be possible to get there
++	 */
++	if (WARN_ON(gic_irq(d) >= 8192))
++		return;
++
++	/* desc lock should already be held */
++	if (gic_irq(d) < 32) {
++		/* Tearing down NMI, only switch handler for last NMI */
++		if (refcount_dec_and_test(&ppi_nmi_refs[gic_irq(d) - 16]))
++			desc->handle_irq = handle_percpu_devid_irq;
++	} else {
++		desc->handle_irq = handle_fasteoi_irq;
++	}
++
++	gic_set_irq_prio(gic_irq(d), gic_dist_base(d), GICD_INT_DEF_PRI);
++}
++
+ static void gic_eoi_irq(struct irq_data *d)
+ {
+ 	gic_write_eoir(gic_irq(d));
+@@ -958,6 +1028,8 @@ static inline void gic_cpu_pm_init(void) { }
+ 	.irq_set_affinity	= gic_set_affinity,
+ 	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
+ 	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
++	.irq_nmi_setup		= gic_irq_nmi_setup,
++	.irq_nmi_teardown	= gic_irq_nmi_teardown,
+ 	.flags			= IRQCHIP_SET_TYPE_MASKED |
+ 				  IRQCHIP_SKIP_SET_WAKE |
+ 				  IRQCHIP_MASK_ON_SUSPEND,
+@@ -973,6 +1045,8 @@ static inline void gic_cpu_pm_init(void) { }
+ 	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
+ 	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
+ 	.irq_set_vcpu_affinity	= gic_irq_set_vcpu_affinity,
++	.irq_nmi_setup		= gic_irq_nmi_setup,
++	.irq_nmi_teardown	= gic_irq_nmi_teardown,
+ 	.flags			= IRQCHIP_SET_TYPE_MASKED |
+ 				  IRQCHIP_SKIP_SET_WAKE |
+ 				  IRQCHIP_MASK_ON_SUSPEND,
+@@ -1176,7 +1250,17 @@ static bool gic_enable_quirk_msm8996(void *data)
+ 
+ static void gic_enable_nmi_support(void)
+ {
++	int i;
++
++	for (i = 0; i < 16; i++)
++		refcount_set(&ppi_nmi_refs[i], 0);
++
+ 	static_branch_enable(&supports_pseudo_nmis);
++
++	if (static_branch_likely(&supports_deactivate_key))
++		gic_eoimode1_chip.flags |= IRQCHIP_SUPPORTS_NMI;
++	else
++		gic_chip.flags |= IRQCHIP_SUPPORTS_NMI;
+ }
+ 
+ static int __init gic_init_bases(void __iomem *dist_base,
 -- 
 1.9.1
 
