@@ -3,22 +3,21 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6A4BEC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 18:12:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2A792C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 18:13:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 41D22206C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 18:12:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 008A820645
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  8 Jan 2019 18:13:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RdRqIw/g";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="eLxsFTEE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 41D22206C0
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K5zA60Ci"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 008A820645
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,47 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Cb2oMPgEtkGFkkcuT8nZPNoBNjTAr+mBEvaEd1VRD+U=; b=RdRqIw/gHW2aHv
-	X7KfliCOCViOBaze8WWgbKE+SAGlmP7BL4hR3jjnomg8ubw8K4P1miB8UPkzFmoSso9gLRfOSz+4j
-	jLR/ksZ1IkDemNXG9gY6oGDPL+hCDahIbCQohV0srC1XAgSee8z1cIGNhlrwZ+AoDL/ZGgNS/WLSM
-	JXHI8zXG5jeqtPq1/0g7Q1IKMfoGAMOcAsrTqPYTetQk7P0kj3VkJLyBpoC/5133TEpnTfB2Lyag5
-	TWx4a5TYx05Kp9hscgKX21SAIebeqowLXFOOzQygoYG6LTjPkNQ7TrbTr4Cno24EG7rOTNidpQBEm
-	ZVktMOPjkb6VhPRXBBCw==;
+	List-Owner; bh=qDmtnI/2fmHYNYtY7DKWim51bKv/+RtoUUdXFuhFKhw=; b=K5zA60CiG4Nyzs
+	sQNT0m87tBVD2029BxKlXGDDeHLzUdE7Kq1+m6gO2Ub4bIwP2JflZRLHUJ9gbXrMwaB+U1qwDxD8Y
+	s8Wt2opMOx9mabuawLGizLiktFckt0gLrnGenWW09mTJRiTsHUWpV7iwQnOtenG8y/aEPJwKfjFla
+	UuvxMo+6Z2FcmpRoWiFnKPs96IbIj0KRFNLL1ZLLQktHe2PWqC9hZ+N7hGkF6LsLmhYbpon3mI9PH
+	WoWYyqKcf6WpSLywf2nm4/1WWERfH7JmY3XbiEPrm0Um+AgKPzzPqXTkkSiNI48w98+hgilt+Ab9l
+	wEd40CngpvHbkPW+p0hQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ggvrP-00007o-98; Tue, 08 Jan 2019 18:12:19 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ggvrE-0008P9-VP
- for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 18:12:11 +0000
-Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id ACBC12070B;
- Tue,  8 Jan 2019 18:12:07 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1546971128;
- bh=ycyEbDy7tDUV+zF8jQhABMpd4RbKVUFLuSCweXzfHaw=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=eLxsFTEEJO9uZtKk+KgSyZzUu20ijjxL/7tVvCbm2Sw3RYPugjdQosgCJFyv6HLUA
- H01J49FkWLqZUHIFcEkAWM+iS79TtZekj6iBn0uGk+p8bLKZCEbtsBdVJsvQg9/JbU
- fPjm2jRfH2aumEnuhyJgIWC1Bn+eeym9KWwdcbI8=
-Date: Tue, 8 Jan 2019 19:12:06 +0100
-From: "gregkh@linuxfoundation.org" <gregkh@linuxfoundation.org>
-To: James Morse <james.morse@arm.com>
-Subject: Re: [PATCH 2/2] EDAC: add ARM Cortex A15 L2 internal asynchronous
- error detection driver
-Message-ID: <20190108181206.GA3848@kroah.com>
-References: <AM6PR0702MB379953E130CC1E1DEE18B79BFA8A0@AM6PR0702MB3799.eurprd07.prod.outlook.com>
- <20190108104204.GA14243@zn.tnic>
- <e1458b95-6d17-21be-5dd8-ee7ff8d8b3fb@arm.com>
+	id 1ggvsq-0000ZN-Bv; Tue, 08 Jan 2019 18:13:48 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ggvsm-0000Yn-95
+ for linux-arm-kernel@lists.infradead.org; Tue, 08 Jan 2019 18:13:46 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id B05EF2078F; Tue,  8 Jan 2019 19:13:40 +0100 (CET)
+Received: from localhost (alyon-652-1-61-72.w109-213.abo.wanadoo.fr
+ [109.213.84.72])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 7BFFC2074F;
+ Tue,  8 Jan 2019 19:13:40 +0100 (CET)
+Date: Tue, 8 Jan 2019 19:13:40 +0100
+From: Alexandre Belloni <alexandre.belloni@bootlin.com>
+To: Sudeep Holla <sudeep.holla@arm.com>
+Subject: Re: [PATCH] ARM: dts: at91: replace gpio-key,wakeup with
+ wakeup-source property
+Message-ID: <20190108181340.GD10218@piout.net>
+References: <20181221181149.6708-1-sudeep.holla@arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <e1458b95-6d17-21be-5dd8-ee7ff8d8b3fb@arm.com>
-User-Agent: Mutt/1.11.2 (2019-01-07)
+In-Reply-To: <20181221181149.6708-1-sudeep.holla@arm.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_101209_438331_9BFD1B0A 
-X-CRM114-Status: GOOD (  11.39  )
+X-CRM114-CacheID: sfid-20190108_101344_454689_B9B15585 
+X-CRM114-Status: GOOD (  11.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,48 +69,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "arnd@arndb.de" <arnd@arndb.de>, "Sverdlin,
- Alexander \(Nokia - DE/Ulm\)" <alexander.sverdlin@nokia.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>, Borislav Petkov <bp@alien8.de>,
- "mchehab+samsung@kernel.org" <mchehab+samsung@kernel.org>, "Wiebe,
- Wladislav \(Nokia - DE/Ulm\)" <wladislav.wiebe@nokia.com>,
- "akpm@linux-foundation.org" <akpm@linux-foundation.org>,
- "mchehab@kernel.org" <mchehab@kernel.org>,
- "davem@davemloft.net" <davem@davemloft.net>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- "linux-edac@vger.kernel.org" <linux-edac@vger.kernel.org>
+Cc: devicetree@vger.kernel.org, Peter Rosin <peda@axentia.se>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Jan 08, 2019 at 05:57:24PM +0000, James Morse wrote:
-> >> diff --git a/drivers/edac/cortex_a15_l2_async_edac.c b/drivers/edac/cortex_a15_l2_async_edac.c
-> >> new file mode 100644
-> >> index 000000000000..26252568e961
-> >> --- /dev/null
-> >> +++ b/drivers/edac/cortex_a15_l2_async_edac.c
-> >> @@ -0,0 +1,134 @@
-> >> +// SPDX-License-Identifier: GPL-2.0
-> >> +/*
-> >> + * Copyright (C) 2018 Nokia Corporation
+On 21/12/2018 18:11:49+0000, Sudeep Holla wrote:
+> Most of the legacy "gpio-key,wakeup" property are already replaced
+> with "wakeup-source". However few occurrences of old property has
+> popped up again, probably from the remnants in downstream trees.
+> Almost all of those were remove couple of years back.
 > 
-> (boiler plate not needed with the SPDX header)
+> Replace the legacy properties with the unified "wakeup-source"
+> property introduced in the commit 700a38b27eef ("Input: gpio_keys -
+> switch to using generic device properties")
+> 
+> Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> Cc: Peter Rosin <peda@axentia.se>
+> Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  arch/arm/boot/dts/at91-nattis-2-natte-2.dts | 2 +-
+>  arch/arm/boot/dts/at91-wb45n.dts            | 2 +-
+>  arch/arm/boot/dts/at91-wb50n.dts            | 4 ++--
+>  3 files changed, 4 insertions(+), 4 deletions(-)
+> 
+Applied, thanks.
 
-Not true at all.  Copyright is not the same thing as an SPDX license
-identifier in any way, shape, or form.  As-is, this is just fine.
-
-Now I will not go into the issues where a "Copyright..." line really
-means nothing at all anymore, as lawyers like to cargo-cult worse than
-programmers do, so it's good to have those lines there just to make them
-happy :)
-
-thanks,
-
-greg k-h
+-- 
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
 
 _______________________________________________
 linux-arm-kernel mailing list
