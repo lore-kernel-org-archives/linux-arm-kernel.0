@@ -2,66 +2,59 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+X-Spam-Status: No, score=-7.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B0A66C43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 13:52:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 250D1C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 13:55:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 826B22064C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 13:52:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E835C206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 13:55:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OL+pNkEg";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="UOTn7Q86"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 826B22064C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZpRVW+gD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E835C206B7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:List-Subscribe:List-Help:
-	List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:Subject:To:
-	From:Reply-To:Cc:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=zb0TPW71vssFk2C+SCDu9iSWFJeQd9EtqCdPAsgWXOw=; b=OL+pNkEgq2i82G
-	rvmuVYmg2JnLVk48z0ry6oDm+kJ2HZTPehM3LX8YaiMUsOhKRquzOVu4aKSegc22PGc5jPOOwTv7D
-	gA3BhkL/jm6wdyCsJqPJGqtLlxbPSrErpVDpO5kYRjD9j/a5GrYWDm22WQyO9FCBBsrrGuNY6E/UG
-	YlvynNEc1iNYGlgbPmTIgcvxOQ/mCgGin/NkzAv2uO46fRp4zQJI+grJgoLnf0xn3rNnm42Cj778d
-	gpcEvkA3k4lNUoBNPSUd3USyVrzmMfIbIUOfM5SepIPyUG72QuAsWzOMizzmrAmZ0WjM3dyZzz5hk
-	bNWt+9i+X+6gX5byEpag==;
+	List-Owner; bh=ciTXs0x80fnktNa6pzcqCZb2zJ+pLD9lMp+1yIDfcnc=; b=ZpRVW+gDcpHlgI
+	ubGuUiUJDxoi0EW4chBoiHC7ymPuzmRlR+2wR2hm3uGLRXkRlVsOi248TCb8r45Z3FE1ssP8Wp15s
+	YhHFTBq75Msof0roe1m+OVBe2eobihmyETx9AnDg1ND5bBEoyqnZ8whAb4vOnuXV/X7llZgoq0R4U
+	Wd3EFQ5XKaG1eYzykfL3mO9XzwY+XPfqXOaWafIjg+NmTuXR0mej6IEPQbEWHlnsSyh6TKWZlxmZm
+	cQCV5VhW2LN0LKmqxb96fbX+ZqycfCphMsIoWtk4GBrd+fSFcM/mdduWil3j84/n4+bbEGQzSHUw9
+	qW9U4cd/cQfvWs1aUvrQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghEHw-0003GH-Fn; Wed, 09 Jan 2019 13:52:56 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghEHs-0003Fn-Oc
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 13:52:54 +0000
-Received: from PC-kkoz.proceq.com (unknown [213.160.61.66])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id BD78C206B7;
- Wed,  9 Jan 2019 13:52:50 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1547041972;
- bh=V8Aa4L9MFustJlRlebWUaU+P7eKpfXr/Qrn9gilL8z4=;
- h=From:To:Subject:Date:From;
- b=UOTn7Q86pqZSU6hEoTv3iPwc3WyUH6edcMQCFiA440hU9ZA0bEBU3HbU1njsDaNN9
- vR8l0JizBLHVWTrIbrLi4DvohQKh8V1wJC02bIaAGvbfaJlA/sPkQ6D8QyRWr6oH/+
- P2e4uKrz8zpvOLxVi3alcZBQxaHFkpazgiAhfKHw=
-From: Krzysztof Kozlowski <krzk@kernel.org>
-To: Kukjin Kim <kgene@kernel.org>, Krzysztof Kozlowski <krzk@kernel.org>,
- Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- linux-arm-kernel@lists.infradead.org, linux-samsung-soc@vger.kernel.org,
- devicetree@vger.kernel.org, linux-kernel@vger.kernel.org
-Subject: [PATCH] ARM: dts: s3c2416: Fix xti node's missing reg property warning
-Date: Wed,  9 Jan 2019 14:52:48 +0100
-Message-Id: <1547041968-7513-1-git-send-email-krzk@kernel.org>
-X-Mailer: git-send-email 2.7.4
+	id 1ghEJu-0003a4-FH; Wed, 09 Jan 2019 13:54:58 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghEJq-0003Yo-S2
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 13:54:56 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6E8B280D;
+ Wed,  9 Jan 2019 05:54:52 -0800 (PST)
+Received: from filthy-habits.cambridge.arm.com
+ (filthy-habits.cambridge.arm.com [10.1.196.62])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 7FC9C3F6CF;
+ Wed,  9 Jan 2019 05:54:51 -0800 (PST)
+From: Marc Zyngier <marc.zyngier@arm.com>
+To: kvm@vger.kernel.org, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org
+Subject: [PATCH 0/3] arm64: KVM: Allow direct function calls on VHE
+Date: Wed,  9 Jan 2019 13:54:32 +0000
+Message-Id: <20190109135435.178664-1-marc.zyngier@arm.com>
+X-Mailer: git-send-email 2.20.1
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_055252_819539_ABDB9D75 
-X-CRM114-Status: GOOD (  10.27  )
+X-CRM114-CacheID: sfid-20190109_055454_907302_E72A3D0D 
+X-CRM114-Status: GOOD (  12.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,42 +66,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-MIME-Version: 1.0
+Cc: Christoffer Dall <christoffer.dall@arm.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Fix the DTC warning for xti node:
+It recently appeared that the nasty hack we use to call a HYP function
+on a non-VHE system has an interesting side effect on VHE: We wrap any
+such call into a hypercall, losing any form of type checking between
+the caller and the callee.
 
-    arch/arm/boot/dts/s3c2416-smdk2416.dts:23.12-28.5:
-        Warning (simple_bus_reg): /clocks/xti: missing or empty reg/ranges property
+This isn't a big deal if you can guarantee to write code that is
+always 100% correct, but it appears that I'm not you.
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- arch/arm/boot/dts/s3c2416-smdk2416.dts | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+In order to restore some sanity, let's use the following property: On
+a VHE system, it is always possible to call any function directly as
+they live in the same address space. We can thus always emit a direct
+call, and use a static key to flip from one to the other. As a bonus,
+this also sanitizes !VHE systems as we always generate code for noth
+revisions of the architecture.
 
-diff --git a/arch/arm/boot/dts/s3c2416-smdk2416.dts b/arch/arm/boot/dts/s3c2416-smdk2416.dts
-index 5164386aff3a..cb371bf72f64 100644
---- a/arch/arm/boot/dts/s3c2416-smdk2416.dts
-+++ b/arch/arm/boot/dts/s3c2416-smdk2416.dts
-@@ -19,9 +19,12 @@
- 
- 	clocks {
- 		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
- 
--		xti: xti {
-+		xti: xti@0 {
- 			compatible = "fixed-clock";
-+			reg = <0>;
- 			clock-frequency = <12000000>;
- 			clock-output-names = "xti";
- 			#clock-cells = <0>;
+Marc Zyngier (3):
+  arm/arm64: KVM: Introduce kvm_call_hyp_ret()
+  arm64: KVM: Allow for direct call of HYP functions when using VHE
+  arm64: KVM: Drop VHE-specific HYP call stub
+
+ arch/arm/include/asm/kvm_host.h   |  3 +++
+ arch/arm64/include/asm/kvm_host.h | 31 ++++++++++++++++++++++++++++++-
+ arch/arm64/kvm/debug.c            |  2 +-
+ arch/arm64/kvm/hyp.S              |  3 ---
+ arch/arm64/kvm/hyp/hyp-entry.S    | 12 ------------
+ virt/kvm/arm/arm.c                |  2 +-
+ virt/kvm/arm/vgic/vgic-v3.c       |  4 ++--
+ 7 files changed, 37 insertions(+), 20 deletions(-)
+
 -- 
-2.7.4
+2.20.1
 
 
 _______________________________________________
