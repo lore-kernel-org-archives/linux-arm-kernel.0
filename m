@@ -2,67 +2,68 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 36DD9C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 14:52:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9321CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 14:55:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EA599206BB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 14:52:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5F3CF206BB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 14:55:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iP0cIEPM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EA599206BB
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cMzZHaYK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5F3CF206BB
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:References:To:From:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8alGhwOc0ZBsMs9TG9vdBFefTCqUlregdkMRbUFRByE=; b=iP0cIEPMs2zany
-	FXb+K3drumSE7Hy7QxltSfbBXdW0VGBuVYWvOFHwN5kHFnQTsOgq/6zBtiOABUB8i4v7tzJB+SRzK
-	kwhTdSaduNB6MC5D+c/V3Qrb9bPPsfbPgCO8bs0S/rG1g4MoNncP+h4QDn0hYT3Mcbi+qSUqR2dy6
-	kHvRDBrW1sNp02ANtApw1tmWFlkvO1vKrV4OkctHBNit6fATODe7lnzpc6lYibX+q5YR+LrQZ3ZBC
-	zlAz4e5OEoRvy+0MkOYtAK1j0YOfqUeyfUvdhSi4AmmbGLhqzGNZI9AT8Yij6bvfwtsdtav8QohU1
-	GuQyFlPkFWDuDWIjFRkQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=3rwFnCnXoKCRRmyRRlv43q8p8GrDRkgoOPLzBhTw1bg=; b=cMzZHaYKTnD6ROotogjvXS8EC
+	PtFefR68+fLR6xwRuKiPqnhWePHuc0UF3vz1QLKRkHX86dq+CYDH1cl2D8wLfvc1/o3dYMnjs4+QC
+	PE9IVdYmzPMgbShfPXuEpXKcarKA9WXywunTupLpSoY6Zm1OdDPPHv8t94r3dQTkJhc0pXYDCrXWt
+	DOB5NAs6s9w/3bC7SXmjgGKuEhPX3MU9DvmVYlxffyQgBZxrNWnMCskxMa0UuayCVmF5EgJc2WCEI
+	lZL/TzNwcRzgIOaawA3RrQ0FWmVwvPJTQ2abX0DST54SAyex2Mrxnwwvko5nPho/FyzuRzU9XRqZC
+	zbaIZT2tg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghFDD-0005Vq-KY; Wed, 09 Jan 2019 14:52:07 +0000
+	id 1ghFGu-0007BF-EJ; Wed, 09 Jan 2019 14:55:56 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghFD9-0005VG-P8
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 14:52:05 +0000
+ id 1ghFGq-0007AT-3F
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 14:55:53 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 16EE780D;
- Wed,  9 Jan 2019 06:52:03 -0800 (PST)
-Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 27BA63F694;
- Wed,  9 Jan 2019 06:52:02 -0800 (PST)
-Subject: Re: [PATCH 2/3] arm64: KVM: Allow for direct call of HYP functions
- when using VHE
-From: Julien Thierry <julien.thierry@arm.com>
-To: Marc Zyngier <marc.zyngier@arm.com>, Andrew Murray <andrew.murray@arm.com>
-References: <20190109135435.178664-1-marc.zyngier@arm.com>
- <20190109135435.178664-3-marc.zyngier@arm.com>
- <20190109142407.GH56789@e119886-lin.cambridge.arm.com>
- <a4f68a4c-5e5c-a60e-2f24-712028689422@arm.com>
- <e09db09d-e781-00d7-5247-525969413e44@arm.com>
-Message-ID: <84607194-797f-cb82-ff64-f106a447c45a@arm.com>
-Date: Wed, 9 Jan 2019 14:52:00 +0000
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id AD80680D;
+ Wed,  9 Jan 2019 06:55:49 -0800 (PST)
+Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 909F23F694;
+ Wed,  9 Jan 2019 06:55:46 -0800 (PST)
+Subject: Re: [RESEND PATCH v5 4/6] coresight: Use PMU driver configuration for
+ sink selection
+To: mathieu.poirier@linaro.org
+References: <1545067306-31687-1-git-send-email-mathieu.poirier@linaro.org>
+ <1545067306-31687-5-git-send-email-mathieu.poirier@linaro.org>
+ <48afc315-d4ed-8779-a808-757fa4203bb7@arm.com>
+ <CANLsYkyvq-K1M7jZ=rOEcGBySTktV_c7D4S2jBV_nS3cj8a8wg@mail.gmail.com>
+ <bb313a2d-b5fc-9329-5db6-4bf661d278bb@arm.com>
+ <CANLsYkx_-QHs=3syOXrazU_nA2x-QT9VjvzWubGjVGtz_01dAQ@mail.gmail.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Message-ID: <b082bf81-2148-2b43-5b1a-0bdf4b1e62c0@arm.com>
+Date: Wed, 9 Jan 2019 14:55:44 +0000
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <e09db09d-e781-00d7-5247-525969413e44@arm.com>
+In-Reply-To: <CANLsYkx_-QHs=3syOXrazU_nA2x-QT9VjvzWubGjVGtz_01dAQ@mail.gmail.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_065203_823055_18E636E2 
-X-CRM114-Status: GOOD (  22.51  )
+X-CRM114-CacheID: sfid-20190109_065552_148058_1A0F600F 
+X-CRM114-Status: GOOD (  27.99  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,100 +75,113 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org,
- kvm@vger.kernel.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: mark.rutland@arm.com, linux-s390@vger.kernel.org, Suzuki.Poulose@arm.com,
+ peterz@infradead.org, gregkh@linuxfoundation.org, heiko.carstens@de.ibm.com,
+ adrian.hunter@intel.com, acme@kernel.org, ast@kernel.org,
+ alexander.shishkin@linux.intel.com, mingo@redhat.com, will.deacon@arm.com,
+ hpa@zytor.com, schwidefsky@de.ibm.com, namhyung@kernel.org, tglx@linutronix.de,
+ jolsa@redhat.com, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi Mathieu,
 
-
-On 09/01/2019 14:51, Julien Thierry wrote:
-> 
-> 
-> On 09/01/2019 14:45, Marc Zyngier wrote:
->> Hi Andrew,
+On 07/01/2019 18:18, Mathieu Poirier wrote:
+> On Wed, 19 Dec 2018 at 02:40, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
 >>
->> On 09/01/2019 14:24, Andrew Murray wrote:
->>> On Wed, Jan 09, 2019 at 01:54:34PM +0000, Marc Zyngier wrote:
->>>> When running VHE, there is no need to jump via some stub to perform
->>>> a "HYP" function call, as there is a single address space.
->>>>
->>>> Let's thus change kvm_call_hyp() and co to perform a direct call
->>>> in this case. Although this results in a bit of code expansion,
->>>> it allows the compiler to check for type compatibility, something
->>>> that we are missing so far.
->>>>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>>  arch/arm64/include/asm/kvm_host.h | 32 +++++++++++++++++++++++++++++--
->>>>  1 file changed, 30 insertions(+), 2 deletions(-)
->>>>
->>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->>>> index e54cb7c88a4e..df32edbadd69 100644
->>>> --- a/arch/arm64/include/asm/kvm_host.h
->>>> +++ b/arch/arm64/include/asm/kvm_host.h
->>>> @@ -370,8 +370,36 @@ void kvm_arm_halt_guest(struct kvm *kvm);
->>>>  void kvm_arm_resume_guest(struct kvm *kvm);
->>>>  
->>>>  u64 __kvm_call_hyp(void *hypfn, ...);
->>>> -#define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
->>>> -#define kvm_call_hyp_ret(f, ...) kvm_call_hyp(f, ##__VA_ARGS__)
->>>> +
->>>> +/*
->>>> + * The couple of isb() below are there to guarantee the same behaviour
->>>> + * on VHE as on !VHE, where the eret to EL1 acts as a context
->>>> + * synchronization event.
->>>> + */
->>>> +#define kvm_call_hyp(f, ...)						\
->>>> +	do {								\
->>>> +		if (cpus_have_const_cap(ARM64_HAS_VIRT_HOST_EXTN)) {	\
->>>> +			f(__VA_ARGS__);					\
->>>> +			isb();						\
->>>> +		} else {						\
->>>> +			__kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__); \
->>>> +		}							\
->>>> +	} while(0)
->>>> +
->>>> +#define kvm_call_hyp_ret(f, ...)					\
->>>> +	({								\
->>>> +		u64 ret;						\
->>>> +									\
->>>> +		if (cpus_have_const_cap(ARM64_HAS_VIRT_HOST_EXTN)) {	\
->>>> +			ret = f(__VA_ARGS__);				\
+>>
+>>
+>> On 18/12/2018 17:34, Mathieu Poirier wrote:
+>>> Good day Suzuki,
 >>>
->>> __kvm_get_mdcr_el2 and __kvm_vcpu_run_nvhe don't return u64 type, they
->>> return a smaller type. I guess any issues would be picked up when compiling,
->>> but should the name of the macro be clearer as to the assumptions it makes?
->>> Or perhaps take an argument which is the type of ret?
->>
->> kvm_call_hyp has always returned a u64, so no semantic has changed here.
->>
->> Otherwise, your suggestion of specifying a return type is interesting,
->> but it also gives the programmer another chance to shoot itself in the
->> foot by not providing the return type corresponding to the function that
->> is called.
->>
->> Unless we can extract the return type by pure magic, I'm not sure we
->> gain much.
->>
-> 
-> Would the following work?
-> 
-> 	typeof(f(__VA_ARGS__)) ret;
-> 
-> If typeof works anything like sizeof, I'd expect it would evaluate stuff
+>>> On Tue, 18 Dec 2018 at 07:14, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
 
-it wouldn't*
-
-> passed as argument and we'd have the return type of the function.
+>>>> We could assign a static "id/key" exported either via the device sysfs dir or
+>>>> the "pmu" dir. I prefer the latter.
+>>>
+>>> Not sure what you mean by "pmu" directory - would you mind expanding
+>>> on that?  Using sysfs would be quite easy but I am reluctant to create
+>>> a new id/key mechanism and introduce another entry when we have the
+>>> component address that is unique and already available in the amba
+>>> directory structure.
+>>
+>> We could add another directory under :
+>>
+>> /sys/bus/event_source/devices/<PMU>/
+>>                                  \_ events/
+>>                                  \_ format/
+>> say :
+>>                  \_ drv_config/
+>>                  Or
+>>                  \_ sinks/
+>>
+>> and list the sinks, eg:
+>> # cd $sysfs_pmu_dir/sinks
+>> # cat <name_of_the_sink>
+>> ID_of_the_sink
 > 
-> Cheers,
-> 
+> There is merit to this idea.  Thinking along those lines simply using
+> "sinks" is probably a better approach since we don't yet know how PMU
+> configuration will unfold.  I'm also wondering if we have to
+> explicitly list the ID of the sink.  The ID itself should be fetch
+> from the device specific entries in sysfs like the "resource" property
+> of sinks that show up on the AMBA bus.  Sinks that don't show up on
+> the AMBA bus will likely have a "reg" property of something similar
+> and that is where the ID should be taken from.
 
--- 
-Julien Thierry
+I would recommend this be done by the PMU driver and expose it, rather
+than specifying what is expected. If we keep it simple like an integer,
+which is then mapped to the sink-device, we could save some bits in the
+config field for further use and a the complex set of rules for the ID.
+
+> 
+> Lastly it may be tricky to add a new directory structure to the PMU
+> entry as it is generic for all PMUs in the system.  But that is up for
+> investigation and I will look into doing something like that.
+
+I don't think this is particularly problematic. The PMU driver can provide
+a list of attribute_groups which should eventually appear in the device
+directory under the "bus/event_source/devices/<PMU>/". And that provides
+a central place for finding the SINK id for all the available sinks, rather
+than scanning for a sink under all the buses (e.g, platform, amba) wherever
+that might show up.
+
+> 
+>>
+>> Btw, I am always inclined to using some bits off one of the "config" fields
+>> ("config1" or "config2") for the sink configuration. But I understand that
+>> you have explored that avenue and chose this approach as we have further
+>> configurations required for complex ETM settings.
+> 
+> I've had a good conversation with myself over the holidays on that
+> topic (hence the late-ish reply).  My original approach was to use the
+> same ioctl() mechanism to do sink selection and complex PMU
+> configuration.  But as Greg confirmed with his comment on the previous
+> patch doing so requires to iron out how the latter will be done on ARM
+> (and probably on Intel too), something that is a different deal
+> altogether.
+> 
+> Taking a step back and forgetting about complex PMU configuration for
+> a minute, the ID of a sink can easily be stuffed in one of the
+> "config" fields of the perf_event_attr structure, something I alluded
+> to in the patchset's cover letter.  That way we can move along with
+> this feature and leave the discussion on complex PMU configuration for
+> another day.
+
+Cool ! I completely agree with this.
+
+> 
+> I'll do a respin with the above in mind.
+> 
+> A happy new year to you,
+
+You too.
+
+Cheers
+Suzuki
 
 _______________________________________________
 linux-arm-kernel mailing list
