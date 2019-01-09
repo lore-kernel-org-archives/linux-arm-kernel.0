@@ -2,69 +2,188 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 71A1EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 16:58:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9618EC43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 16:58:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 35B0720859
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 16:58:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4B286206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 16:58:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="piqjbOGt";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="qtnHsmtn"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 35B0720859
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hGN07wiL";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ctnAFJXc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4B286206B7
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wW8prebASFyD4LhL0+SYVw7+2flTRaDr8es/9zT02/E=; b=piqjbOGtHTkOc0
-	pMnzh2fecov2aL/ErWVlj/VMbZR1ryHlEjBctccAYeN8fh9psfWoP8plrPg7KL/K1tiJ5FQMgEc0X
-	xEKNvArS84tgdPJouORE/TCOU0ljzGDisIqG/1WATNt7rJ3SHRCn+LRzzkX+S2N1BeeWoIXNWejwO
-	yGbpuBnE+m6eCGYzJsOWYDVhtJifof/1l/zYOMhlMQD+AVEGzL9/S1wSPYZ551mD/0hrJW1+mSef6
-	fF5BuaVGeWLR+itjQTohm8Y3yf5z2qsNGvoNxNC63POr4pUAuOt/d9YsmDLDj1K9icmUS76Dytu5S
-	HIsa6vcURF96GHJeQeTA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=WiKO8WMyphTKI42aSvsk7NyBzxrNIWTaVfe7/+g+0+Q=; b=hGN07wiLAwYYx/
+	sHmZWILHHU2kUvowog7iRkfMqaMwe205TzI78qFiS9e3OAcsEJ3x82Msz/26XuZeUp/sUpsfygNWc
+	IuzXsPueR9fsrjhV3lJ2/v/cSTaUsIllRT/HHBjmzpE/To9Ni/b/wyAqHqi1PbCTBpRBh47IUwBTr
+	6KHr1LxZ+W5fblDUQqSn5/bsrXB+TGW3arZ3PvHKMC9mFrIL2FYEgI/jU4PS1Cv/tOf8DBKAfI101
+	RaKsiotQK0M56jT5gT62dyQvEfALTIJ3sNLnYxVUNY4LBLU5Qi2TfrPLVEJeRB78o7fMVO22OXMOC
+	M8NQwI8nM6zHgzbkklGg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghHBa-0006c4-Ot; Wed, 09 Jan 2019 16:58:34 +0000
-Received: from kirsty.vergenet.net ([202.4.237.240])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghHBV-0006ay-Bl
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 16:58:32 +0000
-Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
- by kirsty.vergenet.net (Postfix) with ESMTPA id C379C25B780;
- Thu, 10 Jan 2019 03:58:25 +1100 (AEDT)
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1547053106; bh=dznEJDjOOjNrhlXP3RBUxBg40PRs5r4ApPNfVC0oEhQ=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=qtnHsmtnqtahyTCQCsZR8Juo+oCkkPTBhwEMdIKiLt/JU/YohU2mZKwm1T51lKD8j
- TS1XP5BbDk393ZsXW6nsoAOWwPFTlzla/ByoUM1mV4B8YulxyjXN7nvjXe9+LApYYz
- pK4u8Ypd1oVWsl3fifV69eqlzC89JpkpVmhdNWwM=
-Received: by reginn.horms.nl (Postfix, from userid 7100)
- id 9B886940420; Wed,  9 Jan 2019 17:58:23 +0100 (CET)
-Date: Wed, 9 Jan 2019 17:58:23 +0100
-From: Simon Horman <horms@verge.net.au>
-To: Geert Uytterhoeven <geert@linux-m68k.org>
-Subject: Re: [PATCH] arm64: dts: renesas: r8a77990: ebisu: Fix backlight
- regulator numbering
-Message-ID: <20190109165822.tmj7qbho46f7clvg@verge.net.au>
-References: <20190109140045.17449-1-marek.vasut@gmail.com>
- <CAMuHMdX3bP_WCYNRRMmVRPwV52e72NOZMtW8cf29Fo+E9_CvcQ@mail.gmail.com>
+	id 1ghHBv-0006uO-7I; Wed, 09 Jan 2019 16:58:55 +0000
+Received: from mail-ed1-x541.google.com ([2a00:1450:4864:20::541])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghHBo-0006pR-EI; Wed, 09 Jan 2019 16:58:50 +0000
+Received: by mail-ed1-x541.google.com with SMTP id h15so7899100edb.4;
+ Wed, 09 Jan 2019 08:58:47 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=ebhkDWtBg6CHyHPDsK+OZ70/Z/Z5L2hCVRJ6xeiqAh4=;
+ b=ctnAFJXc6NVqYXZm9KoW7rvwTDqfmlTz4nWK/6cDxL47z/p/9BraB78FzBltKo/Hu0
+ Iu8azaF9jKmcpEeihpPUMgYX19KT5bziP7qAL+7fPxt/KC8VbMqHLSwd2Fy5HXB2CXkO
+ 90X3/mWPaDqVzhW88gMaph/tsg/UzevXcaneY7nSrab8K40AyxZR5NM1lYwxfTEUxGWu
+ xfarKZc1UJeGfHh2uD28lTLNlX0xlPifyMy5giwv0c//xXmauqnJxlbZkjTsNEhEcVXV
+ EG5Tjat94Co84KGRyJ2mfHTd67VxhyV/XWl8nTOJoECM5Fy1MM0DIIaUFSvwVD2gHxG5
+ 4FWQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
+ :message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=ebhkDWtBg6CHyHPDsK+OZ70/Z/Z5L2hCVRJ6xeiqAh4=;
+ b=ratfm82HYBB6A3hgyDDr3U13ib1MZ5BhL2M77cMcGprWmXO+BHs/zG84bg9vdUpJ1Z
+ o9BjRN0bwhZmRne/dY/ebJd7iKUkgvqgMDtN+xaotiVU3XYd21ei5muU8ghdqsnAZgZp
+ ep9c1gIleSGy3wIpHgUq41KZWQILQxN5tqo00O2aNRWzzOqWNtY8m3T7jcRAYtDTKoJ/
+ k1BrjxshW5qf7hdYyLvntRNVMDx2mc/PhP/FFmxQUwb39/nw7l+nsnX8HZbF+Mxuuu0C
+ GL4+3c9d0uirTTROWn1T9W1UxXdF1aDHI04WFmujnLn0lRRvHLLkbwL7EDOCOizLVT27
+ JazQ==
+X-Gm-Message-State: AJcUukeakjwdNhbK8PZLpkr56ftf/hxaH6tJ3v6vbiMk17abwVy0tWlQ
+ XrWoBYekZz+FYTY6dyfV1NWyz5Oq
+X-Google-Smtp-Source: ALg8bN5f5FDB0e+W1iEeDEQ1UjQuh2B6zPCJwLAB68Pq7YgSHoq5iL9jPZvvWHtATOfeyCsQh9tiJg==
+X-Received: by 2002:a50:afa3:: with SMTP id h32mr6681228edd.150.1547053126586; 
+ Wed, 09 Jan 2019 08:58:46 -0800 (PST)
+Received: from ziggy.stardust ([37.223.147.38])
+ by smtp.gmail.com with ESMTPSA id b45sm1349499eda.34.2019.01.09.08.58.45
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 09 Jan 2019 08:58:45 -0800 (PST)
+Subject: Re: [PATCH 9/9] drm/mediatek: add dpi dual edge support
+To: chunhui dai <chunhui.dai@mediatek.com>,
+ --to=Michael Turquette <mturquette@baylibre.com>,
+ Stephen Boyd <sboyd@kernel.org>, CK Hu <ck.hu@mediatek.com>
+References: <1546585439-30455-1-git-send-email-chunhui.dai@mediatek.com>
+ <1546585439-30455-10-git-send-email-chunhui.dai@mediatek.com>
+From: Matthias Brugger <matthias.bgg@gmail.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
+ 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
+ jrHWeQEI2ucSKsNa8FllDmG/fQ==
+Message-ID: <ae8eeb33-43cd-f4b8-a564-95eeecea7d31@gmail.com>
+Date: Wed, 9 Jan 2019 17:58:44 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.3
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CAMuHMdX3bP_WCYNRRMmVRPwV52e72NOZMtW8cf29Fo+E9_CvcQ@mail.gmail.com>
-Organisation: Horms Solutions BV
-User-Agent: NeoMutt/20170113 (1.7.2)
+In-Reply-To: <1546585439-30455-10-git-send-email-chunhui.dai@mediatek.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_085829_620576_84787375 
-X-CRM114-Status: GOOD (  15.59  )
+X-CRM114-CacheID: sfid-20190109_085848_647454_68F1A2BF 
+X-CRM114-Status: GOOD (  18.93  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,53 +195,114 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>,
- Wolfram Sang <wsa+renesas@sang-engineering.com>,
- Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
- Marek Vasut <marek.vasut@gmail.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Marek Vasut <marek.vasut+renesas@gmail.com>
+Cc: jamesjj.liao@mediatek.com, Ryder Lee <ryder.lee@mediatek.com>,
+ jitao.shi@mediatek.com, bibby.hsieh@mediatek.com, srv_heupstream@mediatek.com,
+ David Airlie <airlied@linux.ie>, Sean Wang <sean.wang@mediatek.com>,
+ linux-kernel@vger.kernel.org, dri-devel@lists.freedesktop.org,
+ linux-mediatek@lists.infradead.org, Philipp Zabel <p.zabel@pengutronix.de>,
+ Colin Ian King <colin.king@canonical.com>, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 09, 2019 at 04:26:25PM +0100, Geert Uytterhoeven wrote:
-> On Wed, Jan 9, 2019 at 3:01 PM <marek.vasut@gmail.com> wrote:
-> > From: Marek Vasut <marek.vasut+renesas@gmail.com>
-> >
-> > There are two regulator1 nodes in the Ebisu DTS right now, one 3.3V for
-> > the eMMC and one 12V for the backlight. This causes one to be overwritten
-> > by the other, ultimatelly resulting in inoperable eMMC, which depends on
-> > the former. Fix this by renumbering the backlight regulator to regulator2.
-> >
-> > Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-> > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > Cc: Simon Horman <horms+renesas@verge.net.au>
-> > Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> > Cc: linux-renesas-soc@vger.kernel.org
-> > Reported-by: Simon Horman <horms+renesas@verge.net.au>
-> > Fixes: 9d16c4a10e07 ("arm64: dts: renesas: r8a77990: ebisu: Add backlight")
-> 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> > --- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-> > +++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-> > @@ -191,7 +191,7 @@
-> >                 clock-frequency = <24576000>;
-> >         };
-> >
-> > -       reg_12p0v: regulator1 {
-> > +       reg_12p0v: regulator2 {
-> >                 compatible = "regulator-fixed";
-> >                 regulator-name = "D12.0V";
-> >                 regulator-min-microvolt = <12000000>;
-> 
-> Perhaps the node name should get a more descriptive suffix
-> (e.g. "regulator-12p0v"), like is already done for some of the other
-> regulators?
 
-I think I would prefer that addressed in a follow-up patch.
+
+On 04/01/2019 08:03, chunhui dai wrote:
+> DPI sample on rising and falling edge. It can reduce half data io.
+> 
+> Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+> Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_dpi.c | 30 ++++++++++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
+> index 4a2f4a6..acb4f47 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
+> @@ -117,6 +117,7 @@ struct mtk_dpi_conf {
+>  	unsigned int (*cal_factor)(int clock);
+>  	u32 reg_h_fre_con;
+>  	bool edge_sel_en;
+> +	bool dual_edge;
+>  };
+>  
+>  static void mtk_dpi_mask(struct mtk_dpi *dpi, u32 offset, u32 val, u32 mask)
+> @@ -353,6 +354,15 @@ static void mtk_dpi_config_disable_edge(struct mtk_dpi *dpi)
+>  		mtk_dpi_mask(dpi, dpi->conf->reg_h_fre_con, 0, EDGE_SEL_EN);
+>  }
+>  
+> +static void mtk_dpi_config_dual_edge(struct mtk_dpi *dpi)
+
+I think it is clearer if you rename the function to something like:
+mtk_dpi_enable_dual_edge and call it in mtk_dpi_set_display_mode if
+dpi->conf->dual_edge is true.
+
+Regards,
+Matthias
+
+> +{
+> +	if (dpi->conf->dual_edge) {
+> +		mtk_dpi_mask(dpi, DPI_DDR_SETTING, DDR_EN |
+> +				DDR_4PHASE, DDR_EN | DDR_4PHASE);
+> +		mtk_dpi_mask(dpi, DPI_OUTPUT_SETTING, EDGE_SEL, EDGE_SEL);
+> +	}
+> +}
+> +
+>  static void mtk_dpi_config_color_format(struct mtk_dpi *dpi,
+>  					enum mtk_dpi_out_color_format format)
+>  {
+> @@ -509,6 +519,7 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
+>  	mtk_dpi_config_color_format(dpi, dpi->color_format);
+>  	mtk_dpi_config_2n_h_fre(dpi);
+>  	mtk_dpi_config_disable_edge(dpi);
+> +	mtk_dpi_config_dual_edge(dpi);
+>  	mtk_dpi_sw_reset(dpi, false);
+>  
+>  	return 0;
+> @@ -669,6 +680,16 @@ static unsigned int mt2701_calculate_factor(int clock)
+>  		return 1;
+>  }
+>  
+> +static unsigned int mt8183_calculate_factor(int clock)
+> +{
+> +	if (clock <= 27000)
+> +		return 8;
+> +	else if (clock <= 167000)
+> +		return 4;
+> +	else
+> +		return 2;
+> +}
+> +
+>  static const struct mtk_dpi_conf mt8173_conf = {
+>  	.cal_factor = mt8173_calculate_factor,
+>  	.reg_h_fre_con = 0xe0,
+> @@ -680,6 +701,12 @@ static unsigned int mt2701_calculate_factor(int clock)
+>  	.edge_sel_en = true,
+>  };
+>  
+> +static const struct mtk_dpi_conf mt8183_conf = {
+> +	.cal_factor = mt8183_calculate_factor,
+> +	.reg_h_fre_con = 0xe0,
+> +	.dual_edge = true,
+> +};
+> +
+>  static int mtk_dpi_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+> @@ -775,6 +802,9 @@ static int mtk_dpi_remove(struct platform_device *pdev)
+>  	{ .compatible = "mediatek,mt8173-dpi",
+>  	  .data = &mt8173_conf,
+>  	},
+> +	{ .compatible = "mediatek,mt8183-dpi",
+> +	  .data = &mt8183_conf,
+> +	},
+>  	{ },
+>  };
+>  
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
