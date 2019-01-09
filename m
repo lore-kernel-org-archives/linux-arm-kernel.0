@@ -2,22 +2,22 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 19347C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 11:14:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5C6A4C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 11:15:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D2AD4217F9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 11:14:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2DE0E21783
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 11:15:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uRBW7tEK";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="XykRR9YQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D2AD4217F9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uf5V8q5M";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="hPeMbZpm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2DE0E21783
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,60 +26,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Q/5I78GbOe/3edMPQfz1IRyXlPp1ik+n27PBzdYFYcw=; b=uRBW7tEKPJdhJv
-	PoJOWCra5Gd44qMiZ6bOVhpwIQAC9eKukymonXCC4OxzQjIQazqYtlSItWqgoK0rZyDRm0sjIa+5r
-	Tp7grP4ji2Bb70R0w3b/Cd1/16wLSQmciwr1L3tgJL4XbvRX4haCmOSE8IryZ6cK3GT2fX5RMh0UI
-	0shzwxuVt/ZpKCakS8ZOcz/j9kTYN+yEhSG6ULmakEVygNr2rb7if2bwmJTeiCce4GOyA5d61vT9m
-	pDbAl3At5TA2+t5jZeRN0pMQybeHEufBbzraJOPUJ2o8se2HTo5DJUorppfb5tfb4V63fH0qp2dLt
-	jITKmMqevaE2+Qeq/nVQ==;
+	List-Owner; bh=zktcUFLUWSO1bcj0uf7tzEpQ8s/+TtDd7cVCPqgIBUs=; b=uf5V8q5MTFnt9U
+	8uDike5+5wNklM+bJyObL0KfIZ5lH0BCfDB4min6+k5si41CrP+/heZ7PgQ2luoJ8oyrPWsKSA++x
+	IqVG1YJAvIJy0ARQJi9ItyZYRi60qLe1cMOXVhsYWU+dOr9J/tY8VQ1RN22py6EJZzG1aBTmjaLWS
+	6nvJFmMN08d1F/H8LWsUhVHnCVEFKmslyHEBwyKESz/wASnXNW6TOdfpNCzW4tjdXb4qmkUQ8zOrX
+	bdexQZ50EoPytKJZ+Yom7K8Prvt1CZLPIuNvAOKrQCMaT1os/0DEtqJZDAvcByVNp5BtQ0Qu4JTSz
+	FVjfy1wDm+ay2p/TamJA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghBoU-0007g4-TG; Wed, 09 Jan 2019 11:14:22 +0000
-Received: from mail-pf1-x442.google.com ([2607:f8b0:4864:20::442])
+	id 1ghBpu-00012g-1i; Wed, 09 Jan 2019 11:15:50 +0000
+Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghBoR-0007fh-VW
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 11:14:21 +0000
-Received: by mail-pf1-x442.google.com with SMTP id r136so3507875pfc.6
+ id 1ghBpq-00012B-QP
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 11:15:48 +0000
+Received: by mail-pg1-x544.google.com with SMTP id d72so3166946pga.9
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 09 Jan 2019 03:14:19 -0800 (PST)
+ Wed, 09 Jan 2019 03:15:46 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=/eNZY9q6gMJBzLpRRrOPLNavhG3GG/u1nKZ8Oan4i3M=;
- b=XykRR9YQuf7yi/o+TBvhRT+b9CRbZgWn4kboppAUocs8xJDaXIRe5pWmWK0+5PpKqq
- +oQ2cbeDA3SH9Z6IwTBGanbn3wVNxPPerzWYapCdngt4i/M0vQ9HheXLD4f9f8GdKfmk
- NcRazBf6Vk2gV3g1Ou+LE0+6lG1RIGMvwyk/Z5t70J11CkhucOBD+ipSPclhdRZxigc5
- Tx1YgTHgng19FKpowh/Do1WDCgZE6YOEgDNRuILAXf8nKbPTZN6KL4RWvzm+46e0AV9T
- lYXKFdxsj45yjdJoD0FGDKt/huVNg6FbkbZ61Oc4DICNWnX+Zt3elswR2KPAtnGg/GOL
- O2yA==
+ :cc; bh=eacqgTZrpjzcqQzKQWY4B35kDdh5bBoqeUPPxbaU/l4=;
+ b=hPeMbZpms10uyzfoVo1BusSjyvkih/jyrCP4qJRS/YC/X2dQetsPeArSVRt3eAeXMI
+ uX4EQweYdm+VdBnVTKrzCjEPd2o81pTxhqf7bkmhr+RZSd4svATHWiTGM7CdU9NZBCUQ
+ O+sB8GZfWUwVH2UcunB266bDGgosbY6OiqE1o1nKWNiIR2uzeEVxvxWv8WFOmxs89JCI
+ AWr85cO6F5XXLj5VW96jvpi+dDSIwZ3pLx+F/s//X23AARy0vrI6NOHsybZmBJVXb/eq
+ b4vxVK7gqt5dTyT3zk5s/DMZL/QqIaYR++opsmgFuKLo/TuPQJF1z4/+xXYc0JMJvbuN
+ hIdg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=/eNZY9q6gMJBzLpRRrOPLNavhG3GG/u1nKZ8Oan4i3M=;
- b=BSUbnWNKQgNUrO5NNvqCxNcIaztCaLxNLoR+b2MdA06J0X/NXHVbbDhhrVY5AfsSX8
- bLMQxYxj0Bz3W1pLzotEsA+g/v8Ruc0HMeF+WEnteml38E/I34ze8reCWiJGtS52aPUW
- D98uu/FGUFyTiohhOnvLzTna/47P6YvdOdKHJfVaUbNHylmdXA+WtRgWwsYH26o6eIo6
- L9aHpBPhseqCPIqK3N0+dLKbHYD2wBNQlwxApJDMxFLIWMUOqkOLjKtDhf1vxMA9DVym
- sM+c7NUIqK9DEum2z61qf3rbtGDcylAyUa37tm+Tw4LjWU1pDp7B44LvldAgaI6Ub+Qi
- A8pw==
-X-Gm-Message-State: AJcUukfEMdbJgWfTtJP+rzKZ7Yp3x6BHtAR72QtKANmcrEIB9YmlywLS
- atRFra44O41bLUziSo3W2jbxmx8TJHkAtbnUMcs=
-X-Google-Smtp-Source: ALg8bN6Ii0qL+nFHo00LYgP8+gc2FFonpfKji2qQUiXyg/1u3ZeLEza3v51nAoaZOOwiAcmerM5QdD/LF/fdajxu8TU=
-X-Received: by 2002:a63:f615:: with SMTP id m21mr5098236pgh.428.1547032459101; 
- Wed, 09 Jan 2019 03:14:19 -0800 (PST)
+ bh=eacqgTZrpjzcqQzKQWY4B35kDdh5bBoqeUPPxbaU/l4=;
+ b=X6A2ues24t6Q7mq8G3dEOi1yR12r4bdwSzVleVT1QxKDuYF9iCCJ5WV6W/ijH/w17N
+ 0mjIVBVM2ZDBP2ZrLJgeHwTxQl1CDXui+SukqnM5PmDfT545u+u7tZf46Ug3Z1jMIr7c
+ F9yhi3UGYuUjIMtf10RyhZbtQ9uh3U6L8jD4xVo79zol0Ka4MVVyrAS/Mjbv3l0FvVn8
+ il6i56F0lQbx5oTr3iRwPdVwPXnEo8JuqPwJKoEKkTPAGvGGWMZyhV3R4NjhsyToRUCL
+ f9SLae7L1bHp2Y/9t0MXPYzHFU6vDd7heJElYnurADDxyfG+P4RsJ13XymFTaLaLjWMF
+ mU+g==
+X-Gm-Message-State: AJcUukeJ0zUWX7D2VKZu0zjXL3CXelUaC7QlxMoVtpAxzJ5w9lW4yYAn
+ JNykeGZx4XOb4QWdIE1SJKVb9tc3dKzvj9bu8ZQ=
+X-Google-Smtp-Source: ALg8bN6oovhhl339ABpM7OHWhdMHFk5MLvzh+EMmhdyuSeCossigT+8tGqoXGbXsV0ki3/ziUM/2neg7t+JUf1uN9Ms=
+X-Received: by 2002:a63:f615:: with SMTP id m21mr5103263pgh.428.1547032546312; 
+ Wed, 09 Jan 2019 03:15:46 -0800 (PST)
 MIME-Version: 1.0
 References: <20190108175818.705110-1-lkundrak@v3.sk>
- <20190108175818.705110-8-lkundrak@v3.sk>
-In-Reply-To: <20190108175818.705110-8-lkundrak@v3.sk>
+In-Reply-To: <20190108175818.705110-1-lkundrak@v3.sk>
 From: Andy Shevchenko <andy.shevchenko@gmail.com>
-Date: Wed, 9 Jan 2019 13:14:08 +0200
-Message-ID: <CAHp75Vf=B4TxZ5ETXaezQAm3HGzQ6cNkApwxq+3_fw92phumkw@mail.gmail.com>
-Subject: Re: [PATCH v4 07/15] Platform: OLPC: Use BIT() and GENMASK() for
- event masks
+Date: Wed, 9 Jan 2019 13:15:35 +0200
+Message-ID: <CAHp75VcDXmARXAyE1tPouj0cLqg1Ohs5hq+LZ7dsoGY8pJWO2g@mail.gmail.com>
+Subject: Re: [PATCH v4 00/15] Add support for OLPC XO 1.75 Embedded Controller
 To: Lubomir Rintel <lkundrak@v3.sk>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_031420_013716_BEB98E4B 
-X-CRM114-Status: GOOD (  14.84  )
+X-CRM114-CacheID: sfid-20190109_031546_860947_CA4AADFF 
+X-CRM114-Status: GOOD (  19.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -109,63 +107,52 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 On Tue, Jan 8, 2019 at 7:58 PM Lubomir Rintel <lkundrak@v3.sk> wrote:
 >
-> Just a cosmetic tidy-up.
+> Hello!
 >
+> This is a fourth spin of the patch set that adds support for the
+> Embedded Controller on an OLPC XO 1.75 machine.
+>
+> It hopefully incorporated all feedback received previously and also
+> fixes the kbuild test bot failures. The failed builds were generally
+> caused by configurations where the EC driver was built as module.
+>
+> It turned out that the patch that turned the OLPC EC common code into
+> a module was not the brightest idea. I now dropped it and modified the
+> 04/15 to not require it.
+>
+> Also, the 01/15 patch has been added to allow the module to provide a
+> reboot handler. Patch 15/15 depends on it.
 
-Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+Isn't it a quite big distance between provider and consumer?
+Especially taking into consideration concerns about patch 1 which
+blocks the series.
+Perhaps you may drop it as a patch 1 and do something on top of patch
+15 as feature extension?
 
-> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+
 >
-> ---
-> Changes since v1:
-> - This patch was added to the set.
+> Tested to work on an OLPC XO 1.75 and also tested not to break x86
+> support with an OLPC XO 1 machine. I don't have a XO 1.5, but it's
+> unlikely this breaks it when XO 1 works.
 >
->  include/linux/olpc-ec.h | 23 ++++++++++++-----------
->  1 file changed, 12 insertions(+), 11 deletions(-)
+> [01/15] ARM: export arm_pm_restart()
+> [02/15] dt-bindings: olpc,xo1.75-ec: Add OLPC XO-1.75 EC bindings
+> [03/15] Platform: OLPC: Remove an unused include
+> [04/15] Platform: OLPC: Add XO-1.75 EC driver
+> [05/15] Platform: OLPC: Avoid a warning if the EC didn't register yet
+> [06/15] Platform: OLPC: Move EC-specific functionality out from x86
+> [07/15] Platform: OLPC: Use BIT() and GENMASK() for event masks
+> [08/15] Platform: OLPC: add a regulator for the DCON
+> [09/15] dt-bindings: olpc_battery: Add XO-1.5 battery
+> [10/15] x86, olpc: Use a correct version when making up a battery node
+> [11/15] power: supply: olpc_battery: Use DT to get battery version
+> [12/15] power: supply: olpc_battery: Move priv data to a struct
+> [13/15] power: supply: olpc_battery: Use devm_power_supply_register()
+> [14/15] power: supply: olpc_battery: Avoid using platform_info
+> [15/15] power: supply: olpc_battery: Add OLPC XO 1.75 support
 >
-> diff --git a/include/linux/olpc-ec.h b/include/linux/olpc-ec.h
-> index e28f72416a57..c4602364e909 100644
-> --- a/include/linux/olpc-ec.h
-> +++ b/include/linux/olpc-ec.h
-> @@ -2,6 +2,8 @@
->  #ifndef _LINUX_OLPC_EC_H
->  #define _LINUX_OLPC_EC_H
+> Lubo
 >
-> +#include <linux/bits.h>
-> +
->  /* XO-1 EC commands */
->  #define EC_FIRMWARE_REV                        0x08
->  #define EC_WRITE_SCI_MASK              0x1b
-> @@ -17,17 +19,16 @@
->  #define EC_EXT_SCI_QUERY               0x85
->
->  /* SCI source values */
-> -#define EC_SCI_SRC_EMPTY        0x00
-> -#define EC_SCI_SRC_GAME         0x01
-> -#define EC_SCI_SRC_BATTERY      0x02
-> -#define EC_SCI_SRC_BATSOC       0x04
-> -#define EC_SCI_SRC_BATERR       0x08
-> -#define EC_SCI_SRC_EBOOK        0x10    /* XO-1 only */
-> -#define EC_SCI_SRC_WLAN         0x20    /* XO-1 only */
-> -#define EC_SCI_SRC_ACPWR        0x40
-> -#define EC_SCI_SRC_BATCRIT      0x80
-> -#define EC_SCI_SRC_GPWAKE       0x100   /* XO-1.5 only */
-> -#define EC_SCI_SRC_ALL          0x1FF
-> +#define EC_SCI_SRC_GAME         BIT(0)
-> +#define EC_SCI_SRC_BATTERY      BIT(1)
-> +#define EC_SCI_SRC_BATSOC       BIT(2)
-> +#define EC_SCI_SRC_BATERR       BIT(3)
-> +#define EC_SCI_SRC_EBOOK        BIT(4)    /* XO-1 only */
-> +#define EC_SCI_SRC_WLAN         BIT(5)    /* XO-1 only */
-> +#define EC_SCI_SRC_ACPWR        BIT(6)
-> +#define EC_SCI_SRC_BATCRIT      BIT(7)
-> +#define EC_SCI_SRC_GPWAKE       BIT(8)   /* XO-1.5 only */
-> +#define EC_SCI_SRC_ALL          GENMASK(8, 0)
->
->  struct platform_device;
->
-> --
-> 2.20.1
 >
 
 
