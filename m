@@ -4,68 +4,84 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A2B31C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 16:37:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AAC5EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 16:48:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6C818206B6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 16:37:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 79D0A206BB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 16:48:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d2KFj5rW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6C818206B6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=v3.sk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tcI27/IU";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="BFqBCiAD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 79D0A206BB
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=IAxW9BX1iVcomZOaIEAKhOqKw+oovDvxbF4WmjNPi3A=; b=d2KFj5rW0xocNH
-	EH/YW9YrsD8+7IsV8J4gCAlx3ABhhZl3kuc5pUzk3kPyoj+ltYShhM2+dkALWn0vhnLS6m2Tduo5U
-	fG+CIJRvpZNuTlQYd0KnMFSiPE7glj3bbNPeq5Ay6BSfJUT7x98Ck0C02t5eoRJTc9ksyQtrMxyRe
-	otwGh2jdTxxPykyrIRV3jfqkKp28mRe+FGi9kRHcl6neXZLW/mdGuL2FChGLZH4DF0AF07xmmyvnz
-	w8RZ1LopUyfx4IEHVMHtuEaq7hPUCdnfrvpWGu0iReawhlF4oE8TBeyJ8H1GF8C054wTk9+/RyYXe
-	1I5PB5zcazSjIXE4WbFQ==;
+	List-Owner; bh=DVJnL2ZiKJVmOZJh6NSFPsGKyfiygpVHtXA7ZT3KZkc=; b=tcI27/IUVRusbz
+	6QqpUqFoc63AHExD4VUD5EwofDE1kOqpe+YSgdeFSgCmEM+fRTCC4SkUMFPsmPC0zVSwWNi6RrFGQ
+	+A3kmZNShKrX+nAltkbxlAgJ6B1I2PF1n7MM6yfaZxKBXTxmVKKkuF+Yb6xbdFRl98CRucGHIBhHH
+	8mQyJXqd62ucUCn2MGYg7RGXe6bVwhXBJb7yOWugqebCoaj+JRB/1GIYxSCXlO1bmOdaPa1borJcy
+	mwFbel0GSPVkdiBqxpNKrDKUXM+NCBnoa93kiV2DoohShgJCtqGRxDmH3Rx4xUtQrVZQpF8JIGA6o
+	mrazzDpUJo51GLK7MNkg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghGrO-0005Ut-HX; Wed, 09 Jan 2019 16:37:42 +0000
-Received: from shell.v3.sk ([90.176.6.54])
+	id 1ghH20-0001lm-2Q; Wed, 09 Jan 2019 16:48:40 +0000
+Received: from mail-io1-xd44.google.com ([2607:f8b0:4864:20::d44])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghGrJ-0005UG-KB
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 16:37:39 +0000
-Received: from localhost (localhost [127.0.0.1])
- by zimbra.v3.sk (Postfix) with ESMTP id 68B7A1000C5;
- Wed,  9 Jan 2019 17:37:34 +0100 (CET)
-Received: from shell.v3.sk ([127.0.0.1])
- by localhost (zimbra.v3.sk [127.0.0.1]) (amavisd-new, port 10032)
- with ESMTP id Hh05FATkgNsK; Wed,  9 Jan 2019 17:37:31 +0100 (CET)
-Received: from localhost (localhost [127.0.0.1])
- by zimbra.v3.sk (Postfix) with ESMTP id D7FBF10018A;
- Wed,  9 Jan 2019 17:37:30 +0100 (CET)
-X-Virus-Scanned: amavisd-new at zimbra.v3.sk
-Received: from shell.v3.sk ([127.0.0.1])
- by localhost (zimbra.v3.sk [127.0.0.1]) (amavisd-new, port 10026)
- with ESMTP id azRuJ2pndiVY; Wed,  9 Jan 2019 17:37:30 +0100 (CET)
-Received: from belphegor (nat-pool-brq-t.redhat.com [213.175.37.10])
- by zimbra.v3.sk (Postfix) with ESMTPSA id D1107100189;
- Wed,  9 Jan 2019 17:37:29 +0100 (CET)
-Message-ID: <3b9c5e7e35ae25316bf4551ebf7ae21238d64f03.camel@v3.sk>
-Subject: Re: [PATCH v4 00/15] Add support for OLPC XO 1.75 Embedded Controller
-From: Lubomir Rintel <lkundrak@v3.sk>
-To: Andy Shevchenko <andy.shevchenko@gmail.com>
-Date: Wed, 09 Jan 2019 17:37:28 +0100
-In-Reply-To: <CAHp75VcDXmARXAyE1tPouj0cLqg1Ohs5hq+LZ7dsoGY8pJWO2g@mail.gmail.com>
-References: <20190108175818.705110-1-lkundrak@v3.sk>
- <CAHp75VcDXmARXAyE1tPouj0cLqg1Ohs5hq+LZ7dsoGY8pJWO2g@mail.gmail.com>
-User-Agent: Evolution 3.30.3 (3.30.3-1.fc29) 
-Mime-Version: 1.0
+ id 1ghH1x-0001lG-6Z
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 16:48:38 +0000
+Received: by mail-io1-xd44.google.com with SMTP id b23so6521764ios.10
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 09 Jan 2019 08:48:35 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc:content-transfer-encoding;
+ bh=fdCynCQXJR51Uq88sO1InC8ROmQ7T31Q2pMI8I3KRIY=;
+ b=BFqBCiADprgxye+2BS0wxgDl9lErgr8cSN6izzYo8ORz7+eTVv76AIP+9ORHl9CJco
+ 2wvdQX/qWVKUwMfr5hC0oyLaXyyQQQ/P/nufVdFam6MOx9ZyMX2kHfX8g93gQ5bmdJy6
+ xyrmWN4DLI7ohts8fK85H6eCs7gjl4dz6ydx0=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc:content-transfer-encoding;
+ bh=fdCynCQXJR51Uq88sO1InC8ROmQ7T31Q2pMI8I3KRIY=;
+ b=iqsMfxlTpbBTW30wK0DrTvd8VVgJlWxGHd0VxiEDTbhzyrlCYqnUl0TZGeQkHbqC1S
+ ffvT0IsQ+He17CpMiVUO/AEtsBNZwS4uC4cCSz9pbt6sbKJqXE979UiCD+8LSRYnqCjI
+ Wwe2HzKX90yyIFVrP5TiqtJQA/d/OaA/Zb/H0TNo5N4ndwaeEZEJKJRA9Akrv2GpR8nr
+ TDx6Tu7/+946mw3+ZiVBHQzSEQZOfCgtfnVGUlmzrbKfJfRtOj8gtQVjdItLxLUMScNg
+ Iuky8to7prx0FzM7ULcp9GT3FUh6r/MSCs+Mc1z//NUSVtydYyB6SZ4hR0ax8ywwjBc+
+ 6svw==
+X-Gm-Message-State: AJcUukfwyK3O+1fMFGZQuRa+wQiTt7Z63hnPCgWhurqzNLXgMRkCovRo
+ ah1VSdjzoxPTONg9wKzE5GV2x+7QmFxuklZx30ULwg==
+X-Google-Smtp-Source: ALg8bN46TfwF2T9uKnRpMHXxc2amErUpK307V7pvh/LihSLwY/nSB41VOSrL8lYO01v+ZQU/+Cc9DbX0Pwb4CqrjaUc=
+X-Received: by 2002:a6b:c8c9:: with SMTP id y192mr4084607iof.183.1547052514283; 
+ Wed, 09 Jan 2019 08:48:34 -0800 (PST)
+MIME-Version: 1.0
+References: <20190107233833.GI5544@atomide.com>
+ <CAKfTPtDBEmcsLotp-6K1KU1wM9Ba1EpMp3niXScRxYgzjs0nog@mail.gmail.com>
+ <20190108155354.GL5544@atomide.com>
+ <CAKfTPtCoOK-cYLXJ--sOfpVa9RVmzOAEN1+zB2qHMCzkJN0qaQ@mail.gmail.com>
+ <20190108213743.GN5544@atomide.com> <20190109014218.GA8363@linaro.org>
+ <20190109015124.GO5544@atomide.com>
+ <CAJZ5v0hi5sVESKPbZoniikOhNxdUDtJhQrs39Fib8B03MYoMMQ@mail.gmail.com>
+ <20190109162846.GP5544@atomide.com>
+In-Reply-To: <20190109162846.GP5544@atomide.com>
+From: Vincent Guittot <vincent.guittot@linaro.org>
+Date: Wed, 9 Jan 2019 17:48:23 +0100
+Message-ID: <CAKfTPtBzE9fqDgUOJ4uTj_Dtfe2KCp+R4FajAaQqpV02upQZJA@mail.gmail.com>
+Subject: Re: Regression in v5.0-rc1 with autosuspend hrtimers
+To: Tony Lindgren <tony@atomide.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_083737_971734_0E34AC75 
-X-CRM114-Status: GOOD (  20.94  )
+X-CRM114-CacheID: sfid-20190109_084837_242234_BCD6D4D7 
+X-CRM114-Status: GOOD (  12.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,89 +93,44 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>, James Cameron <quozl@laptop.org>,
- Linux PM <linux-pm@vger.kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, "maintainer:X86
- ARCHITECTURE \(32-BIT AND 64-BIT\)" <x86@kernel.org>,
- Russell King <linux@armlinux.org.uk>,
- Platform Driver <platform-driver-x86@vger.kernel.org>,
- Rob Herring <robh+dt@kernel.org>,
- linux-arm Mailing List <linux-arm-kernel@lists.infradead.org>,
- Pavel Machek <pavel@ucw.cz>, Sebastian Reichel <sre@kernel.org>,
- Darren Hart <dvhart@infradead.org>, Andy Shevchenko <andy@infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Ulf Hansson <ulf.hansson@linaro.org>, Ladislav Michl <ladis@linux-mips.org>,
+ "open list:THERMAL" <linux-pm@vger.kernel.org>,
+ "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>,
+ "Rafael J. Wysocki" <rafael@kernel.org>,
+ Linux OMAP Mailing List <linux-omap@vger.kernel.org>,
+ LAK <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 2019-01-09 at 13:15 +0200, Andy Shevchenko wrote:
-> On Tue, Jan 8, 2019 at 7:58 PM Lubomir Rintel <lkundrak@v3.sk> wrote:
-> > Hello!
-> > 
-> > This is a fourth spin of the patch set that adds support for the
-> > Embedded Controller on an OLPC XO 1.75 machine.
-> > 
-> > It hopefully incorporated all feedback received previously and also
-> > fixes the kbuild test bot failures. The failed builds were
-> > generally
-> > caused by configurations where the EC driver was built as module.
-> > 
-> > It turned out that the patch that turned the OLPC EC common code
-> > into
-> > a module was not the brightest idea. I now dropped it and modified
-> > the
-> > 04/15 to not require it.
-> > 
-> > Also, the 01/15 patch has been added to allow the module to provide
-> > a
-> > reboot handler. Patch 15/15 depends on it.
-> 
-> Isn't it a quite big distance between provider and consumer?
-> Especially taking into consideration concerns about patch 1 which
-> blocks the series.
-> Perhaps you may drop it as a patch 1 and do something on top of patch
-> 15 as feature extension?
-
-Yes, that is a good idea. I'll do so when I submit a new version of the
-set (in few days' time).
-
-I think the battery part can be split from the EC part too. Would that
-be a good idea to send them as separate patch sets next time? It seems
-to me now that they probably ought to end up going in via different
-trees (linux-power-supply vs linux-platform-drivers-x86).
-
-> > Tested to work on an OLPC XO 1.75 and also tested not to break x86
-> > support with an OLPC XO 1 machine. I don't have a XO 1.5, but it's
-> > unlikely this breaks it when XO 1 works.
-> > 
-> > [01/15] ARM: export arm_pm_restart()
-> > [02/15] dt-bindings: olpc,xo1.75-ec: Add OLPC XO-1.75 EC bindings
-> > [03/15] Platform: OLPC: Remove an unused include
-> > [04/15] Platform: OLPC: Add XO-1.75 EC driver
-> > [05/15] Platform: OLPC: Avoid a warning if the EC didn't register
-> > yet
-> > [06/15] Platform: OLPC: Move EC-specific functionality out from x86
-> > [07/15] Platform: OLPC: Use BIT() and GENMASK() for event masks
-> > [08/15] Platform: OLPC: add a regulator for the DCON
-> > [09/15] dt-bindings: olpc_battery: Add XO-1.5 battery
-> > [10/15] x86, olpc: Use a correct version when making up a battery
-> > node
-> > [11/15] power: supply: olpc_battery: Use DT to get battery version
-> > [12/15] power: supply: olpc_battery: Move priv data to a struct
-> > [13/15] power: supply: olpc_battery: Use
-> > devm_power_supply_register()
-> > [14/15] power: supply: olpc_battery: Avoid using platform_info
-> > [15/15] power: supply: olpc_battery: Add OLPC XO 1.75 support
-> > 
-> > Lubo
-> > 
-> > 
-> 
-> 
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gV2VkLCA5IEphbiAyMDE5IGF0IDE3OjI4LCBUb255IExpbmRncmVuIDx0b255QGF0b21pZGUu
+Y29tPiB3cm90ZToKPgo+ICogUmFmYWVsIEouIFd5c29ja2kgPHJhZmFlbEBrZXJuZWwub3JnPiBb
+MTkwMTA5IDA5OjQ0XToKPiA+IE9uIFdlZCwgSmFuIDksIDIwMTkgYXQgMjo1MSBBTSBUb255IExp
+bmRncmVuIDx0b255QGF0b21pZGUuY29tPiB3cm90ZToKPiA+ID4KPiA+ID4gKiBWaW5jZW50IEd1
+aXR0b3QgPHZpbmNlbnQuZ3VpdHRvdEBsaW5hcm8ub3JnPiBbMTkwMTA5IDAxOjQyXToKPiA+ID4g
+PiBMZSBUdWVzZGF5IDA4IEphbiAyMDE5IMOgIDEzOjM3OjQzICgtMDgwMCksIFRvbnkgTGluZGdy
+ZW4gYSDDqWNyaXQgOgo+ID4gPiA+ID4gTG93ZXJpbmcgdGhlIGF1dG9zdXNwZW5kX2RlbGF5X21z
+IHRvIDIxMDAgbXMgbWFrZXMgdGhpbmdzIHdvcmsgYWdhaW4uCj4gPiA+ID4gPiBBbnl0aGluZyBo
+aWdoZXIgdGhhbiAyMjAwIG1zIHNlZW1zIHRvIHNvbWVob3cgdGltZSBvdXQgaW1tZWRpYXRlbHkK
+PiA+ID4gPiA+IG5vdyA6KQo+ID4gPiA+Cj4gPiA+ID4gVGhpcyBpcyBxdWl0ZSBjbG9zZSB0byB0
+aGUgbWF4IG5zIG9mIGFuIGludCBvbiBhcm0gMzJiaXRzCj4gPiA+ID4KPiA+ID4gPiBDb3VsZCB5
+b3UgdHJ5IHRoZSBwYXRjaCBiZWxvdyA/Cj4gPiA+Cj4gPiA+IFl1cCBncmVhdCB0aGFua3MsIHRo
+YXQncyBpdDoKPiA+ID4KPiA+ID4gVGVzdGVkLWJ5OiBUb255IExpbmRncmVuIDx0b255QGF0b21p
+ZGUuY29tPgo+ID4KPiA+IENvb2wuICBUaGFua3MgZm9yIGdldHRpbmcgdG8gdGhlIGJvdHRvbSBv
+ZiB0aGlzIQo+Cj4gTm8gcHJvYmxlbS4KPgo+IE9uZSBtb3JlIHRoaW5nIEkgbm90aWNlZDogVGhl
+IDI1JSBzbGFjayBjYW4gZ2V0IG5vdGljZWFibGUKPiBmb3IgbGFyZ2VyIHZhbHVlcy4gRm9yIHRo
+aW5ncyBsaWtlIGEgMyBzZWNvbmQgdWFydCBjb25zb2xlCj4gdGltZW91dCBzbGFjayBvZiA3NTAg
+bXMgaXMgcXVpdGUgbGFyZ2UgdmFyaWF0aW9uLgo+Cj4gU2hvdWxkIHdlIGhhdmUgYSBsaW1pdCBv
+ZiBtYXggMTAwIG1zIGZvciB0aGUgc2xhY2s/CgpLZWVwIGluIG1pbmQgdGhhdCB3aGVuIGppZmZp
+ZXMgd2VyZSB1c2VkLCBleHBpcmVzIHdhcyByb3VuZGVkIHRvIGEKZnVsbCBzZWNvbmQgd2hlbiBk
+ZWxheSB3YXMgZ3JlYXRlciB0aGFuIGEgc2Vjb25kLiBTbyB5b3UgY291bGQgYWxyZWFkeQpoYXZl
+IGRpZmZlcmVuY2Ugb2YgdXAgOTkwbXMgb24gYXJtIGJlZm9yZSB0aGlzIHBhdGNoCkFuZCBpIGRv
+bid0IHRha2UgaW50byBhY2NvdW50IHRoZSByZXdvcmsgb2YgdGltZXIgaW5mcmEgd2hpY2ggYWRk
+CmFub3RoZXIgbGV2ZWwgb2YgdmFyaWF0aW9uLCBzb21ldGhpbmcgbGlrZSB1cCB0byA2NDAgbXMg
+bW9yZSB3aGVuIHRoZQp0aW1lciBpcyBncmVhdGVyIHRoYW4gMjg4MCBtcyBmb3IgYXJtIElJUkMK
+Pgo+IFJlZ2FyZHMsCj4KPiBUb255CgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2Vy
+bmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1h
+bi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
