@@ -2,78 +2,108 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-11.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C7B15C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 09:44:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 13C19C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 09:52:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8956821773
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 09:44:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D537F20651
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 09:52:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kiya8rLO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8956821773
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GlvdFOkk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D537F20651
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zXe+JYgj4d2TjPfrWybA9fPQK93Ut1kenufh9gZVIYE=; b=kiya8rLOacZIF5
-	pUJ1gxjrqvlvACLqcsnJRLVO80mqb3bJUZtA8Dq8VPR5++NaBospRpIuZ74RjEbNqXZKL6LCddKKY
-	JhjUq2uoXKOAZeTvjlRyd8Od0T552k/IURuAf608dTnwmmm9FRQzjTXVJsbDrwrezRb4IcmsJfNVK
-	RdWZA3afKdPzOTvve0VGTBcGzgFpcqPMeJ66zz0Mkw76qpQ2DZMTh6SqEHSCAuHPGsfOkJ9ukr1ts
-	i6DtGHZYZIEFzGwc6g0UWikAwCH6lF8zlORtJqULpS6eguPcgwnKsOBCNoe6H/lpjZah3TqEIE4jL
-	xwieOMy7RsTf62JI83zg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=fMb9lTjol2BghncEKzmzMVRgNzR2eBfO7lYnnkjDUDY=; b=GlvdFOkkUBg8nK
+	RwDkQMufGlncDYUWc276lsXxK8XE3R4HZ+errL+v+SfjHCDWqUYZiZ0J9wGVi5Cxs9KZckQjs6cdL
+	8nsu4wSNLInrhDL6ZYwfluu0bR1AU8pntRceRalpE5N7/pr9NE5xdMBI/6lJ71+wHOlLqhS1AvG2K
+	wL95zic0oQAXrNgRpx+74WOkB+il+iz+F89FdYvBRx8SrBGr3p6P9UUSV8l0+/R6YlrT0lXRrKscG
+	tigfrf+7cW/DvuP8WNXj3zIPJOlTqIsURWbRz1nkoG4LubZpFhCBTuz1tjJw/SmfWWQQ+n/jr3ROi
+	+CPS9vmaEogRLIKdHcZw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghAP7-0003pB-Ng; Wed, 09 Jan 2019 09:44:05 +0000
-Received: from mail-oi1-f175.google.com ([209.85.167.175])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghAP5-0003oq-3o
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 09:44:04 +0000
-Received: by mail-oi1-f175.google.com with SMTP id y23so5805602oia.4
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 09 Jan 2019 01:44:02 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc:content-transfer-encoding;
- bh=zbwo1Voy/TDZYXcAJfit3k7umA8oVRutjv4ekO+a860=;
- b=QD6bbWxbi8wAXQCukhcKTjI7ubDRWVucMAROm/hF8rOEykMA7qA/hNqe8JePOAWAun
- yvh14kAJuMbeKBFVzvWeb0dK5OgRl0IAtqAn7SRyzCfg3CQKprfDmZ6KhJ73Ch9GZe6/
- dtCPxPtA+oxua8VDSQ7Q6e8Xp0gw734whexeJBPNSjTM16iz1eirp3RdE5M6aDnk1lqb
- RkVmocAGnvfCiTCxG5eEQF4BDlbbd5UoNxG4G9EOM6gp+SchtmbMxUZMZD85FG0gBbzN
- eq+Bhp5HiEbD/VyN1mahzZ/I17b+rPY11xQIw+bWef8gACbKoTegd/uaXefoMv3S4Jlk
- UsEQ==
-X-Gm-Message-State: AJcUukeyDqMKCRjO7q9nk8+mw22NJI9ALHKVwE98XkKAaqKDJpkwgwQq
- DtjbcemH1FY46Nki/+G5Uk/+77Qpcdut/tbFCYk=
-X-Google-Smtp-Source: ALg8bN5iY6Da81NiaUUra/cTcpi6K1GVqj8em5N44VvknmK3B+7hw3x146V55h/6hSGuiETNgZobZv9VRNVuS9wjBOI=
-X-Received: by 2002:aca:195:: with SMTP id 143mr3247104oib.322.1547027042043; 
- Wed, 09 Jan 2019 01:44:02 -0800 (PST)
+	id 1ghAX2-0007WH-2C; Wed, 09 Jan 2019 09:52:16 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghAWx-0007VY-Qc
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 09:52:13 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3C49980D;
+ Wed,  9 Jan 2019 01:52:11 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ 050403F70D; Wed,  9 Jan 2019 01:52:09 -0800 (PST)
+Subject: Re: [RESEND 1/1] gic: its: Make sure a LPI is discarded before free.
+To: "Zhao, Yuanyuan" <yuanyuan.zhao@hxt-semitech.com>
+References: <e37e3f5e0146be65c60092a457ca5c82e25581a0.1545292748.git.yuanyuan.zhao@hxt-semitech.com>
+ <20190109074324.6445118d@why.wild-wind.fr.eu.org>
+ <c81f42aa93904353bbeac590da7b0945@HXTBJIDCEMVIW02.hxtcorp.net>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ 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
+Organization: ARM Ltd
+Message-ID: <38d7afaf-e800-f6e7-83e3-eb006f4d6f4c@arm.com>
+Date: Wed, 9 Jan 2019 09:52:08 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-References: <20190107233833.GI5544@atomide.com>
- <CAKfTPtDBEmcsLotp-6K1KU1wM9Ba1EpMp3niXScRxYgzjs0nog@mail.gmail.com>
- <20190108155354.GL5544@atomide.com>
- <CAKfTPtCoOK-cYLXJ--sOfpVa9RVmzOAEN1+zB2qHMCzkJN0qaQ@mail.gmail.com>
- <20190108213743.GN5544@atomide.com> <20190109014218.GA8363@linaro.org>
- <20190109015124.GO5544@atomide.com>
-In-Reply-To: <20190109015124.GO5544@atomide.com>
-From: "Rafael J. Wysocki" <rafael@kernel.org>
-Date: Wed, 9 Jan 2019 10:43:51 +0100
-Message-ID: <CAJZ5v0hi5sVESKPbZoniikOhNxdUDtJhQrs39Fib8B03MYoMMQ@mail.gmail.com>
-Subject: Re: Regression in v5.0-rc1 with autosuspend hrtimers
-To: Tony Lindgren <tony@atomide.com>,
- Vincent Guittot <vincent.guittot@linaro.org>
+In-Reply-To: <c81f42aa93904353bbeac590da7b0945@HXTBJIDCEMVIW02.hxtcorp.net>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_014403_152193_FFC325F6 
-X-CRM114-Status: UNSURE (   9.97  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190109_015211_876524_9BC2D3A9 
+X-CRM114-Status: GOOD (  16.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,28 +115,103 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>,
- "open list:THERMAL" <linux-pm@vger.kernel.org>,
- "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>,
- linux-kernel <linux-kernel@vger.kernel.org>,
- Linux OMAP Mailing List <linux-omap@vger.kernel.org>,
- LAK <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: "Wang, Dongsheng" <dongsheng.wang@hxt-semitech.com>,
+ "jason@lakedaemon.net" <jason@lakedaemon.net>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "tglx@linutronix.de" <tglx@linutronix.de>, "Zheng,
+ Joey" <yu.zheng@hxt-semitech.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="iso-2022-jp"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gV2VkLCBKYW4gOSwgMjAxOSBhdCAyOjUxIEFNIFRvbnkgTGluZGdyZW4gPHRvbnlAYXRvbWlk
-ZS5jb20+IHdyb3RlOgo+Cj4gKiBWaW5jZW50IEd1aXR0b3QgPHZpbmNlbnQuZ3VpdHRvdEBsaW5h
-cm8ub3JnPiBbMTkwMTA5IDAxOjQyXToKPiA+IExlIFR1ZXNkYXkgMDggSmFuIDIwMTkgw6AgMTM6
-Mzc6NDMgKC0wODAwKSwgVG9ueSBMaW5kZ3JlbiBhIMOpY3JpdCA6Cj4gPiA+IExvd2VyaW5nIHRo
-ZSBhdXRvc3VzcGVuZF9kZWxheV9tcyB0byAyMTAwIG1zIG1ha2VzIHRoaW5ncyB3b3JrIGFnYWlu
-Lgo+ID4gPiBBbnl0aGluZyBoaWdoZXIgdGhhbiAyMjAwIG1zIHNlZW1zIHRvIHNvbWVob3cgdGlt
-ZSBvdXQgaW1tZWRpYXRlbHkKPiA+ID4gbm93IDopCj4gPgo+ID4gVGhpcyBpcyBxdWl0ZSBjbG9z
-ZSB0byB0aGUgbWF4IG5zIG9mIGFuIGludCBvbiBhcm0gMzJiaXRzCj4gPgo+ID4gQ291bGQgeW91
-IHRyeSB0aGUgcGF0Y2ggYmVsb3cgPwo+Cj4gWXVwIGdyZWF0IHRoYW5rcywgdGhhdCdzIGl0Ogo+
-Cj4gVGVzdGVkLWJ5OiBUb255IExpbmRncmVuIDx0b255QGF0b21pZGUuY29tPgoKQ29vbC4gIFRo
-YW5rcyBmb3IgZ2V0dGluZyB0byB0aGUgYm90dG9tIG9mIHRoaXMhCgpfX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcg
-bGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmlu
-ZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+On 09/01/2019 09:29, Zhao, Yuanyuan wrote:
+> Hi Marc:
+> 
+> Thank you for your reply. 
+> 
+> As you said, APIs such as free_irq will deactivate irq
+> before free it. But deactivation is not forced by every API,
+> for example irq_dispose_mapping.  So I think it's better to check 
+> that irq was deactivated as expected.
+
+In general, we should fix the problem at the core API level instead of
+hacking individual drivers.
+
+But more to the point, irq_dispose_mapping is not supposed to do
+anything with the an active irq, as it doesn't have the required
+information to safely remove it.
+
+So calling irq_dispose_mapping on an interrupt that still has registered
+actions is a bug, and I'm not convinced we want to cater for such a
+case. Do you have a concrete example of some kernel code expecting this
+behaviour?
+
+Thanks,
+
+	M.
+
+> 
+> BRs,
+> Yuanyuan
+> 
+> 
+>> -----Original Message-----
+>> From: Marc Zyngier [mailto:marc.zyngier@arm.com]
+>> Sent: 2019年1月9日 15:43
+>> To: Zhao, Yuanyuan <yuanyuan.zhao@hxt-semitech.com>
+>> Cc: tglx@linutronix.de; jason@lakedaemon.net; linux-
+>> kernel@vger.kernel.org; linux-arm-kernel@lists.infradead.org; Zheng, Joey
+>> <yu.zheng@hxt-semitech.com>; Wang, Dongsheng <dongsheng.wang@hxt-
+>> semitech.com>
+>> Subject: Re: [RESEND 1/1] gic: its: Make sure a LPI is discarded before free.
+>>
+>> On Wed, 9 Jan 2019 11:53:27 +0800
+>> Zhao Yuanyuan <yuanyuan.zhao@hxt-semitech.com> wrote:
+>>
+>> Hi Zhao,
+>>
+>>> Its device will be removed after all events be freed.
+>>> Undisarded events can lead to unpredictable behaviar.
+>>>
+>>> Signed-off-by: Zhao Yuanyuan <yuanyuan.zhao@hxt-semitech.com>
+>>> ---
+>>>  drivers/irqchip/irq-gic-v3-its.c | 4 ++++
+>>>  1 file changed, 4 insertions(+)
+>>>
+>>> diff --git a/drivers/irqchip/irq-gic-v3-its.c
+>>> b/drivers/irqchip/irq-gic-v3-its.c
+>>> index db20e99..4fee008 100644
+>>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>>> @@ -2572,6 +2572,10 @@ static void its_irq_domain_free(struct
+>> irq_domain *domain, unsigned int virq,
+>>>  								virq + i);
+>>>  		u32 event = its_get_event_id(data);
+>>>
+>>> +		/* Discard irq before free */
+>>> +		if (irqd_is_activated(d))
+>>> +			its_send_discard(its_dev, event);
+>>> +
+>>>  		/* Mark interrupt index as unused */
+>>>  		clear_bit(event, its_dev->event_map.lpi_map);
+>>>
+>>
+>> But we already do send a discard on deactivate, which logically happens
+>> before we free the domain. So what are you fixing here?
+>>
+>> Thanks,
+>>
+>> 	M.
+>> --
+>> Without deviation from the norm, progress is not possible.
+
+
+-- 
+Jazz is not dead. It just smells funny...
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
