@@ -2,69 +2,70 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=unavailable
+X-Spam-Status: No, score=-12.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2E947C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 10:49:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 73B06C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 10:52:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EEFC620883
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 10:49:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 41AC721773
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 10:52:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G2CkzYDF";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="LqktMtST"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EEFC620883
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jDshj02X"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 41AC721773
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=intel.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=bOgwwqhkkBcjgqQczQeQy1uoMKtUZupUyg+Cr1/5dSQ=; b=G2CkzYDFdYYxyW
-	r3ug85OQwtHvTMfVLbK6oFKUrNQJ4XmJq0A3Sk8COq23XEEmmPPFlxXLTzZZD2LLCEkSgUAVyNsTb
-	EKumUASC/2Ftaf/SuImXlyLlBhVh9alnJ9jKm623/EXhHcpMWL9FZiXmZS2T9lIDr0DB362i4P3e4
-	rO+8hQulcRlLrPFadiZE7QF3PrsTjrHzApYeYDj37EoeU/g4gui/Qlf5w01cDryN+yJQqekuUelTV
-	wKafo+HrkgYUwztSGP4XJsc0uwwk4uN6hkUaOWJ7E01vDLKRmcDaIeOlfi6EzPdqd7u3dGnRvKfpN
-	IOz81ddCehjR4u5Dxf0g==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Content-Type:
+	MIME-Version:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=ICmLWk5BLhRNlN1Rz6LyUGLP/Z//3azcveGpGoNtnqQ=; b=jDs
+	hj02Xsw6FfxiCrgra7eWJi6pyhRTaH/VM+1swY6Q1BGRXfVoLoYxo40sBNYNcfXtKbIT8zxKXycY+
+	8JSBZPc68yvtTGtaTVIIZW4Mb6n4FkGZeiMLbr+QEzMa45Vn66V5SA/jkzJ1vSbUbMNoE3QENtLWM
+	4qqj45SlGY2RGiH4R8yt+tb5TKSMCv4oP9zc/qlsdvcCVX2HpkuE+oq0vY25+ASZGrxCr93L9E8gS
+	LAwlo+v06ft4n8IScbb///5Bo9GZiaWfKPCr2kJdXmme4y+Dn8+OC6LKltR+uvrnlFTHOkKU4L5wg
+	l1y47qKQCTZ2qA/Cmc2sc1CcmJx7kog==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghBQY-0005h0-PU; Wed, 09 Jan 2019 10:49:38 +0000
-Received: from kirsty.vergenet.net ([202.4.237.240])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghBQU-0005g1-Db
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 10:49:36 +0000
-Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
- by kirsty.vergenet.net (Postfix) with ESMTPA id 8094B25B80E;
- Wed,  9 Jan 2019 21:49:29 +1100 (AEDT)
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1547030969; bh=LKXO8zcXECK3Z+jgyKSjhVkgQgL5dGIf+8p3A1CZhoQ=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=LqktMtSTgksgQL8urbGfpXwVrsBYA/T7IWzQWHQfFRVtG/IeELuyrllJNIm97DrMA
- 3dm/wZV8m5ajOTjro3uZ+2dYIUO9TC3kfSZjX/WrGu6HPGTPKeO+voGFxOkJU2//ss
- +DFCnkY/Y7nf3t1/If0scKkQX4lRS0Zk8R/V3w4E=
-Received: by reginn.horms.nl (Postfix, from userid 7100)
- id C4BB9940420; Wed,  9 Jan 2019 11:49:27 +0100 (CET)
-Date: Wed, 9 Jan 2019 11:49:27 +0100
-From: Simon Horman <horms@verge.net.au>
-To: Marek Vasut <marek.vasut@gmail.com>
-Subject: Re: [PATCH V3] arm64: dts: r8a77990: ebisu: Add and enable SDHI
- device nodes
-Message-ID: <20190109104922.z6g772vgncdqqbqt@verge.net.au>
-References: <20181106204647.18051-1-marek.vasut+renesas@gmail.com>
+	id 1ghBTK-0007bG-0Q; Wed, 09 Jan 2019 10:52:30 +0000
+Received: from mga05.intel.com ([192.55.52.43])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghBTF-0007ao-LE
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 10:52:27 +0000
+X-Amp-Result: UNKNOWN
+X-Amp-Original-Verdict: FILE UNKNOWN
+X-Amp-File-Uploaded: False
+Received: from fmsmga006.fm.intel.com ([10.253.24.20])
+ by fmsmga105.fm.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
+ 09 Jan 2019 02:52:25 -0800
+X-ExtLoop1: 1
+X-IronPort-AV: E=Sophos;i="5.56,457,1539673200"; 
+ d="gz'50?scan'50,208,50";a="308861263"
+Received: from lkp-server01.sh.intel.com (HELO lkp-server01) ([10.239.97.150])
+ by fmsmga006.fm.intel.com with ESMTP; 09 Jan 2019 02:52:23 -0800
+Received: from kbuild by lkp-server01 with local (Exim 4.89)
+ (envelope-from <lkp@intel.com>)
+ id 1ghBTD-000Bxv-4v; Wed, 09 Jan 2019 18:52:23 +0800
+Date: Wed, 9 Jan 2019 18:51:53 +0800
+From: kbuild test robot <lkp@intel.com>
+To: Christoffer Dall <christoffer.dall@arm.com>
+Subject: [kvmarm:kvm-arm64/nv-wip-v5.0-rc1 53/75]
+ arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:78:7: error: implicit
+ declaration of function 'is_hyp_ctxt'; did you mean '__hyp_text'?
+Message-ID: <201901091857.7ZZI4n0e%fengguang.wu@intel.com>
 MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="0F1p//8PRICkK4MW"
 Content-Disposition: inline
-In-Reply-To: <20181106204647.18051-1-marek.vasut+renesas@gmail.com>
-Organisation: Horms Solutions BV
-User-Agent: NeoMutt/20170113 (1.7.2)
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_024934_831823_0A92F262 
-X-CRM114-Status: GOOD (  12.28  )
+X-CRM114-CacheID: sfid-20190109_025225_716295_682CC269 
+X-CRM114-Status: GOOD (  14.72  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,117 +77,565 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Takeshi Kihara <takeshi.kihara.df@renesas.com>,
- Geert Uytterhoeven <geert+renesas@glider.be>, Wolfram Sang <wsa@the-dreams.de>,
- Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>,
- linux-renesas-soc@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Marek Vasut <marek.vasut+renesas@gmail.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Marc Zyngier <marc.zyngier@arm.com>, kbuild-all@01.org,
+ linux-arm-kernel@lists.infradead.org, kvmarm@lists.cs.columbia.edu
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Nov 06, 2018 at 09:46:47PM +0100, Marek Vasut wrote:
-> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> 
-> This patch adds SDHI{0,1,3} device nodes for the r8a77990 SoC
-> and enables SD card slot connected to SDHI0, micro SD card slot
-> connected to SDHI1 and eMMC connected to SDHI3 on the Ebisu board
-> using the R8A77990 SoC.
-> 
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Simon Horman <horms+renesas@verge.net.au>
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-> Cc: linux-renesas-soc@vger.kernel.org
-> Cc: linux-arm-kernel@lists.infradead.org
-> ---
-> V2: - Deduplicated regular and UHS pins
->     - Added sdhi3_ds pin pinmux
-> V3: - Squash two patches, one adding SDHI nodes to R8A77990 E3 DTSI
->       and another enabling them on E3 Ebisu, together.
 
-Hi,
+--0F1p//8PRICkK4MW
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
 
-I am wondering if something special is required in order to use eMMC
-connected to SDHI3. Using renesas-drivers-2019-01-08-v5.0-rc1 I do not see
-that device initialised to the point where a corresponding block device is
-present.
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git kvm-arm64/nv-wip-v5.0-rc1
+head:   688c386ca096f2c1f2eee386697586c88df5d5bc
+commit: 4fb08a5a9975b41829daec65774877666461e75f [53/75] KVM: arm64: nv: arch_timer: Support hyp timer emulation
+config: arm-axm55xx_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 4fb08a5a9975b41829daec65774877666461e75f
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm 
 
-[    0.000127] NOTICE:  BL2: R-Car Gen3 Initial Program Loader(CA53)
-Rev.1.0.21
-[    0.005703] NOTICE:  BL2: PRR is R-Car E3 Ver.1.0
-[    0.010361] NOTICE:  BL2: PLL1 nonSSCG Clock select
-[    0.015356] NOTICE:  BL2: Board is Ebisu-4D Rev.1.0
-[    0.020041] NOTICE:  BL2: Boot device is HyperFlash(80MHz)
-[    0.025479] NOTICE:  BL2: LCM state is CM
-[    0.029445] NOTICE:  BL2: 0x400000000 - 0x480000000, 2 GiB
-[    0.034877] NOTICE:  BL2: DDR1856(rev.0.07)NOTICE:  ..0
-[    0.040425] NOTICE:  BL2: DRAM Split is OFF
-[    0.044304] NOTICE:  BL2: QoS is default setting(rev.0.02)
-[    0.049748] NOTICE:  BL2: DRAM refresh interval 3.9 usec
-[    0.055089] NOTICE:  BL2: v1.4(release):15dba6b-dirty
-[    0.060029] NOTICE:  BL2: Built : 04:48:01, Jun 26 2018
-[    0.065217] NOTICE:  BL2: Normal boot
-[    0.068872] NOTICE:  BL2: dst=0xe6311d00 src=0x8180000 len=512(0x200)
-[    0.075247] NOTICE:  BL2: dst=0x43f00000 src=0x8180400 len=6144(0x1800)
-[    0.081874] NOTICE:  BL2: dst=0x44000000 src=0x81c0000 len=65536(0x10000)
-[    0.089118] NOTICE:  BL2: dst=0x44100000 src=0x8200000 len=1048576(0x100000)
-[    0.103992] NOTICE:  BL2: dst=0x50000000 src=0x8640000 len=1048576(0x100000)
+All errors (new ones prefixed by >>):
 
-# dmesg | egrep "(sd|mmc)"
-[    2.872441] renesas_sdhi_internal_dmac ee100000.sd: Got CD GPIO
-[    2.878587] renesas_sdhi_internal_dmac ee100000.sd: Got WP GPIO
-[    2.885806] renesas_sdhi_internal_dmac ee120000.sd: Got CD GPIO
-[    2.893284] renesas_sdhi_internal_dmac ee160000.sd: Linked as a consumer to regulator.2
-[    2.901602] renesas_sdhi_internal_dmac ee160000.sd: Linked as a consumer to regulator.1
-[    2.909708] renesas_sdhi_internal_dmac ee160000.sd: Failed getting OCR mask: 0
-[    2.917236] renesas_sdhi_internal_dmac ee160000.sd: Dropping the link to regulator.1
-[    2.925214] renesas_sdhi_internal_dmac ee160000.sd: Dropping the link to regulator.2
-[    3.295711] renesas_sdhi_internal_dmac ee100000.sd: Got CD GPIO
-[    3.301808] renesas_sdhi_internal_dmac ee100000.sd: Got WP GPIO
-[    3.308042] renesas_sdhi_internal_dmac ee100000.sd: Linked as a consumer to regulator.4
-[    3.316268] renesas_sdhi_internal_dmac ee100000.sd: Linked as a consumer to regulator.6
-[    3.373714] renesas_sdhi_internal_dmac ee100000.sd: mmc0 base at 0xee100000 max clock rate 200 MHz
-[    3.384547] renesas_sdhi_internal_dmac ee120000.sd: Got CD GPIO
-[    3.390915] renesas_sdhi_internal_dmac ee120000.sd: Linked as a consumer to regulator.5
-[    3.399171] renesas_sdhi_internal_dmac ee120000.sd: Linked as a consumer to regulator.7
-[    3.456829] renesas_sdhi_internal_dmac ee120000.sd: mmc1 base at 0xee120000 max clock rate 200 MHz
-[    3.468133] renesas_sdhi_internal_dmac ee160000.sd: Linked as a consumer to regulator.2
-[    3.476448] renesas_sdhi_internal_dmac ee160000.sd: Linked as a consumer to regulator.1
-[    3.484635] renesas_sdhi_internal_dmac ee160000.sd: Failed getting OCR mask: 0
-[    3.492147] renesas_sdhi_internal_dmac ee160000.sd: Dropping the link to regulator.1
-[    3.500110] renesas_sdhi_internal_dmac ee160000.sd: Dropping the link to regulator.2
-[    3.562322] renesas_sdhi_internal_dmac ee160000.sd: Linked as a consumer to regulator.2
-[    3.570834] renesas_sdhi_internal_dmac ee160000.sd: Linked as a consumer to regulator.1
-[    3.579021] renesas_sdhi_internal_dmac ee160000.sd: Failed getting OCR mask: 0
-[    3.586657] renesas_sdhi_internal_dmac ee160000.sd: Dropping the link to regulator.1
-[    3.594653] renesas_sdhi_internal_dmac ee160000.sd: Dropping the link to regulator.2
-[    3.640782] renesas_sdhi_internal_dmac ee160000.sd: Linked as a consumer to regulator.2
-[    3.649110] renesas_sdhi_internal_dmac ee160000.sd: Linked as a consumer to regulator.1
-[    3.657213] renesas_sdhi_internal_dmac ee160000.sd: Failed getting OCR mask: 0
-[    3.664677] renesas_sdhi_internal_dmac ee160000.sd: Dropping the link to regulator.1
-[    3.672599] renesas_sdhi_internal_dmac ee160000.sd: Dropping the link to regulator.2
-[    3.688811] mmc0: new ultra high speed SDR104 SDXC card at address 0007
-[    3.698572] mmcblk0: mmc0:0007 SL64G 58.3 GiB 
-[    3.726399]  mmcblk0: p1
-[    3.763694] mmc1: new ultra high speed SDR104 SDHC card at address 0001
-[    3.772525] renesas_sdhi_internal_dmac ee160000.sd: Linked as a consumer to regulator.2
-[    3.781623] mmcblk1: mmc1:0001 00000 29.8 GiB 
-[    3.786779] renesas_sdhi_internal_dmac ee160000.sd: Linked as a consumer to regulator.1
-[    3.795548] renesas_sdhi_internal_dmac ee160000.sd: Failed getting OCR mask: 0
-[    3.803099] renesas_sdhi_internal_dmac ee160000.sd: Dropping the link to regulator.1
-[    3.811006]  mmcblk1: p1
-[    3.815437] renesas_sdhi_internal_dmac ee160000.sd: Dropping the link to regulator.2
-[    3.856991] renesas_sdhi_internal_dmac ee160000.sd: Linked as a consumer to regulator.2
-[    3.865263] renesas_sdhi_internal_dmac ee160000.sd: Linked as a consumer to regulator.1
-[    3.873371] renesas_sdhi_internal_dmac ee160000.sd: Failed getting OCR mask: 0
-[    3.880864] renesas_sdhi_internal_dmac ee160000.sd: Dropping the link to regulator.1
-[    3.888786] renesas_sdhi_internal_dmac ee160000.sd: Dropping the link to regulator.2
+   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c: In function 'get_timer_map':
+>> arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:78:7: error: implicit declaration of function 'is_hyp_ctxt'; did you mean '__hyp_text'? [-Werror=implicit-function-declaration]
+      if (is_hyp_ctxt(vcpu)) {
+          ^~~~~~~~~~~
+          __hyp_text
+   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c: In function 'kvm_timer_should_fire':
+   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:277:1: error: macro "__read_sysreg" requires 4 arguments, but only 1 given
+       cnt_ctl = read_sysreg_el0(cntp_ctl);
+    ^  ~~~~~~~~~
+   In file included from arch/arm/include/asm/kvm_hyp.h:23:0,
+                    from arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:29:
+   arch/arm/include/asm/cp15.h:63:27: error: '__read_sysreg' undeclared (first use in this function); did you mean 'vcpu_sysreg'?
+    #define read_sysreg(...)  __read_sysreg(__VA_ARGS__)
+                              ^
+   arch/arm/include/asm/kvm_hyp.h:94:29: note: in expansion of macro 'read_sysreg'
+    #define read_sysreg_el0(r)  read_sysreg(r##_el0)
+                                ^~~~~~~~~~~
+   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:277:14: note: in expansion of macro 'read_sysreg_el0'
+       cnt_ctl = read_sysreg_el0(cntp_ctl);
+                 ^~~~~~~~~~~~~~~
+   arch/arm/include/asm/cp15.h:63:27: note: each undeclared identifier is reported only once for each function it appears in
+    #define read_sysreg(...)  __read_sysreg(__VA_ARGS__)
+                              ^
+   arch/arm/include/asm/kvm_hyp.h:94:29: note: in expansion of macro 'read_sysreg'
+    #define read_sysreg_el0(r)  read_sysreg(r##_el0)
+                                ^~~~~~~~~~~
+   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:277:14: note: in expansion of macro 'read_sysreg_el0'
+       cnt_ctl = read_sysreg_el0(cntp_ctl);
+                 ^~~~~~~~~~~~~~~
+   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c: In function 'timer_save_state':
+   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:398:1: error: macro "__read_sysreg" requires 4 arguments, but only 1 given
+      ctx->cnt_ctl = read_sysreg_el0(cntp_ctl);
+    ^ ~~~~~~~~~~
+   In file included from arch/arm/include/asm/kvm_hyp.h:23:0,
+                    from arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:29:
+   arch/arm/include/asm/cp15.h:63:27: error: '__read_sysreg' undeclared (first use in this function); did you mean 'vcpu_sysreg'?
+    #define read_sysreg(...)  __read_sysreg(__VA_ARGS__)
+                              ^
+   arch/arm/include/asm/kvm_hyp.h:94:29: note: in expansion of macro 'read_sysreg'
+    #define read_sysreg_el0(r)  read_sysreg(r##_el0)
+                                ^~~~~~~~~~~
+   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:398:18: note: in expansion of macro 'read_sysreg_el0'
+      ctx->cnt_ctl = read_sysreg_el0(cntp_ctl);
+                     ^~~~~~~~~~~~~~~
+   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:399:1: error: macro "__read_sysreg" requires 4 arguments, but only 1 given
+      ctx->cnt_cval = read_sysreg_el0(cntp_cval);
+    ^ ~~~~~~~~~~~
+   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:402:1: error: macro "__write_sysreg" requires 5 arguments, but only 2 given
+      write_sysreg_el0(0, cntp_ctl);
+    ^ ~~~~~~~~~~
+   In file included from arch/arm/include/asm/kvm_hyp.h:23:0,
+                    from arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:29:
+   arch/arm/include/asm/cp15.h:66:31: error: '__write_sysreg' undeclared (first use in this function); did you mean '__read_sysreg'?
+    #define write_sysreg(v, ...)  __write_sysreg(v, __VA_ARGS__)
+                                  ^
+   arch/arm/include/asm/kvm_hyp.h:95:33: note: in expansion of macro 'write_sysreg'
+    #define write_sysreg_el0(v, r)  write_sysreg(v, r##_el0)
+                                    ^~~~~~~~~~~~
+   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:402:3: note: in expansion of macro 'write_sysreg_el0'
+      write_sysreg_el0(0, cntp_ctl);
+      ^~~~~~~~~~~~~~~~
+   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c: In function 'timer_restore_state':
+   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:476:1: error: macro "__write_sysreg" requires 5 arguments, but only 2 given
+      write_sysreg_el0(ctx->cnt_cval, cntp_cval);
+    ^ ~~~~~~~~~~~
+   In file included from arch/arm/include/asm/kvm_hyp.h:23:0,
+                    from arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:29:
+   arch/arm/include/asm/cp15.h:66:31: error: '__write_sysreg' undeclared (first use in this function); did you mean '__write_msi_msg'?
+    #define write_sysreg(v, ...)  __write_sysreg(v, __VA_ARGS__)
+                                  ^
+   arch/arm/include/asm/kvm_hyp.h:95:33: note: in expansion of macro 'write_sysreg'
+    #define write_sysreg_el0(v, r)  write_sysreg(v, r##_el0)
+                                    ^~~~~~~~~~~~
+   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:476:3: note: in expansion of macro 'write_sysreg_el0'
+      write_sysreg_el0(ctx->cnt_cval, cntp_cval);
+      ^~~~~~~~~~~~~~~~
+   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:478:1: error: macro "__write_sysreg" requires 5 arguments, but only 2 given
+      write_sysreg_el0(ctx->cnt_ctl, cntp_ctl);
+    ^ ~~~~~~~~~~
+   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c: In function 'get_timer_from_sysreg':
+   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:889:7: error: 'SYS_CNTP_TVAL_EL0' undeclared (first use in this function)
+     case SYS_CNTP_TVAL_EL0:
+          ^~~~~~~~~~~~~~~~~
+   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:890:7: error: 'SYS_CNTP_CTL_EL0' undeclared (first use in this function); did you mean 'SYS_CNTP_TVAL_EL0'?
+     case SYS_CNTP_CTL_EL0:
+          ^~~~~~~~~~~~~~~~
+          SYS_CNTP_TVAL_EL0
+   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:891:7: error: 'SYS_CNTP_CVAL_EL0' undeclared (first use in this function); did you mean 'SYS_CNTP_TVAL_EL0'?
+     case SYS_CNTP_CVAL_EL0:
+          ^~~~~~~~~~~~~~~~~
+          SYS_CNTP_TVAL_EL0
+   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:892:7: error: 'SYS_AARCH32_CNTP_TVAL' undeclared (first use in this function)
+     case SYS_AARCH32_CNTP_TVAL:
+          ^~~~~~~~~~~~~~~~~~~~~
+   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:893:7: error: 'SYS_AARCH32_CNTP_CTL' undeclared (first use in this function); did you mean 'SYS_AARCH32_CNTP_TVAL'?
+     case SYS_AARCH32_CNTP_CTL:
+          ^~~~~~~~~~~~~~~~~~~~
+          SYS_AARCH32_CNTP_TVAL
+   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:894:7: error: 'SYS_AARCH32_CNTP_CVAL' undeclared (first use in this function); did you mean 'SYS_AARCH32_CNTP_TVAL'?
+     case SYS_AARCH32_CNTP_CVAL:
+          ^~~~~~~~~~~~~~~~~~~~~
+          SYS_AARCH32_CNTP_TVAL
+
+vim +78 arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c
+
+    74	
+    75	static void get_timer_map(struct kvm_vcpu *vcpu, struct timer_map *map)
+    76	{
+    77		if (nested_virt_in_use(vcpu)) {
+  > 78			if (is_hyp_ctxt(vcpu)) {
+    79				map->direct_vtimer = vcpu_hvtimer(vcpu);
+    80				map->direct_ptimer = vcpu_hptimer(vcpu);
+    81				map->emul_vtimer = vcpu_vtimer(vcpu);
+    82				map->emul_ptimer = vcpu_ptimer(vcpu);
+    83			} else {
+    84				map->direct_vtimer = vcpu_vtimer(vcpu);
+    85				map->direct_ptimer = vcpu_ptimer(vcpu);
+    86				map->emul_vtimer = vcpu_hvtimer(vcpu);
+    87				map->emul_ptimer = vcpu_hptimer(vcpu);
+    88			}
+    89		} else if (has_vhe()) {
+    90			map->direct_vtimer = vcpu_vtimer(vcpu);
+    91			map->direct_ptimer = vcpu_ptimer(vcpu);
+    92			map->emul_vtimer = NULL;
+    93			map->emul_ptimer = NULL;
+    94		} else {
+    95			map->direct_vtimer = vcpu_vtimer(vcpu);
+    96			map->direct_ptimer = NULL;
+    97			map->emul_vtimer = NULL;
+    98			map->emul_ptimer = vcpu_ptimer(vcpu);
+    99		}
+   100	
+   101		trace_kvm_get_timer_map(vcpu->vcpu_id, map);
+   102	}
+   103	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+
+--0F1p//8PRICkK4MW
+Content-Type: application/gzip
+Content-Disposition: attachment; filename=".config.gz"
+Content-Transfer-Encoding: base64
+
+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
+iHk8Ter/XKNaf6hNAQA=
+
+--0F1p//8PRICkK4MW
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--0F1p//8PRICkK4MW--
+
