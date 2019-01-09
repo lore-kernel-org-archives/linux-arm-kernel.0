@@ -4,65 +4,84 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2558CC43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 13:56:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0329DC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 13:56:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EABC2206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 13:56:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C50F12075C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 13:56:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="O+qxbg3i"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EABC2206B7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pschenker.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gJYSyJ0g";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="X9mfjQGC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C50F12075C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=vE+d2Y0aHbLnHI+sn/DHoC2jyapUB/jyGnnZqi7yCBM=; b=O+qxbg3is6IpIw
-	YmNcQJVjsmyJTXng6pgrZu0YadWeF8+GXhgV9DsV88nuwvTj06M3YKM7sIYtz3xjpgoL5eiP0HiRq
-	M2pWWaEouqFFD5BFdzV1dCgrZ5VkpWKGEi1tZb5UYDF26xKgbNd8+2dFCOv4sWvXFmVdeZslPRtrz
-	arXESzqLNhbTO4tSsDYOyMCagsys8VLowMn6wtFncnJm2TSfBKcmrAZoT40rSYusPkmn7qdpFAGUP
-	KqucLOg697ND/ymE8Mzo/0ZuTpleJCN0hPWhxlV74z+Prc/gY97aRDkV6ns+iTfg2O2xwCP2sgUg5
-	8B8noNqtVn3ZUTyTSGlg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=Ml2l1yPhEQbCyFO8Mmb7cE0S6O+Wldc3qmsF23jBuuY=; b=gJY
+	SyJ0gjXBwb9Du2vRxbNENAA5AxG3Lwie6xXCSZdoo+eiBsTVK5lOnmKoOwjtal9k2j9lbhBzhbaP9
+	tSMwlNJ+DpbcdHs6G2FkvBwbj3V5jqg4Gs3X1FClqe6SYTBh8KPjViYNlTeZc1PHZxnigk8UyH+Bk
+	p9hZHpvD+MvP1c2x2Nk+YHeWvwIJxXmhLYwQbPuTmOrOcoaSoze8gXOsolelDAY0OTcyvgfDFZPnh
+	o6vKgUb4ZL92MDT9UeNqkE+831wcFtgA/cVH7BiwZZA+xU41VQrjCrp1nmBhiheA9kNNJDzUBbDRQ
+	sQG8Ayx2aR0G+0jhjbqJ5csZaIZ0crQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghELX-00066P-Cs; Wed, 09 Jan 2019 13:56:39 +0000
-Received: from mxout012.mail.hostpoint.ch ([2a00:d70:0:e::312])
+	id 1ghELh-0006Es-0E; Wed, 09 Jan 2019 13:56:49 +0000
+Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghE7u-0006C1-Da
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 13:42:38 +0000
-Received: from [10.0.2.45] (helo=asmtp012.mail.hostpoint.ch)
- by mxout012.mail.hostpoint.ch with esmtp (Exim 4.91 (FreeBSD))
- (envelope-from <dev@pschenker.ch>)
- id 1ghE7j-000DGa-Me; Wed, 09 Jan 2019 14:42:23 +0100
-Received: from 252.222.41.212.static.wline.lns.sme.cust.swisscom.ch
- ([212.41.222.252] helo=philippe-pc.toradex.int)
- by asmtp012.mail.hostpoint.ch with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES256-GCM-SHA384:256) (Exim 4.91 (FreeBSD))
- (envelope-from <dev@pschenker.ch>)
- id 1ghE7j-0006KA-Gg; Wed, 09 Jan 2019 14:42:23 +0100
-X-Authenticated-Sender-Id: dev@pschenker.ch
-From: Philippe Schenker <dev@pschenker.ch>
-To: jic23@kernel.org,
-	marcel.ziswiler@toradex.com,
-	stefan@agner.ch
-Subject: [PATCH v6 2/8] mfd: stmpe: Move ADC related defines to header of mfd
-Date: Wed,  9 Jan 2019 14:42:01 +0100
-Message-Id: <20190109134208.5660-3-dev@pschenker.ch>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190109134208.5660-1-dev@pschenker.ch>
-References: <20190109134208.5660-1-dev@pschenker.ch>
-MIME-Version: 1.0
+ id 1ghELc-0006BG-Hw
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 13:56:46 +0000
+Received: by mail-wr1-x442.google.com with SMTP id p4so7763877wrt.7
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 09 Jan 2019 05:56:44 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:date:message-id;
+ bh=Awf98hG54rdI8pmMtli9QyfIsBrAW657JsBg39iVlpQ=;
+ b=X9mfjQGCpSnWsLgevmhg8WeBo4mHoaeMOdfBLve8+GI4McnbVb/+0rPCv+rjsilFdZ
+ 89MhFbqdaFwhICQ0x82U1YsMS3RWiGg6J7mxMvP1DaEip4/mrEbgW5xFpuY2od1QwyGk
+ Kh5uj7LHHUkgWb+Y+EyROZoqqkTsbtQYE6DfG/e3Ovdwyq0vLAnFIyc4pJTlFcItQBl5
+ qOpkGAHoaObsJDAR4IJeWu0OLlOm8EENPPAzd7tm5m9kLjEMlSosHPcUJdCfpYubK2OC
+ PGMm/dhKKlv9642KVCfU4KC/fS4T53CEBavOK5xt2kJD5AhoWRuIoSpPt03XXvjM1e8K
+ Z+9A==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=Awf98hG54rdI8pmMtli9QyfIsBrAW657JsBg39iVlpQ=;
+ b=uAeObj8dA58BqEtN93gusnczDm0h9C1vTC5z/Bct6Uk2V6kAIGWtI7T4JGqVv4m4Nl
+ xt0FEVMp/udg9E43Y2bhSFSVg+6ax0+e+Qo1JTJSa9RMfUdAMg8+C8YfzdHUGRL2CqjZ
+ PoN3rDXed1gTLBR5SklfmDrMnxJumRiwjjgGjXLdexgGhmihkojhaLNfCfsf+KZvJUCe
+ Qma8kQB1IzLI0tOL0WdMW/xEj6yC2ht2xEJONWGCngemSV0yTOUXAc65nWN7cqftXzwN
+ +kftFzLrs+WvIpoJGFBqW1aVUGJXyf630MtUVeUzslizyFAFDjltQpqgrJ61Q3PcGSHH
+ pGLQ==
+X-Gm-Message-State: AJcUukfgJt7X/f0AoeprsyUPukimnpyIdfWPeS4z3nIgU8fjRGGB1DVW
+ Zk8hvqg+XpXZIuYrXbRxCstwMzWl60y6MSFYHRU=
+X-Google-Smtp-Source: ALg8bN57LaRohlkCyOeHcsDmmkTRBoqT8EG8lyBnzHAxA7e/FcA46+A0VxZ6T0wx6nhoYvFoV791Mg==
+X-Received: by 2002:a5d:6988:: with SMTP id g8mr4994557wru.33.1547042202742;
+ Wed, 09 Jan 2019 05:56:42 -0800 (PST)
+Received: from loys-ubuntu-BY1835A49200471.baylibre.local
+ (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr. [90.63.244.31])
+ by smtp.googlemail.com with ESMTPSA id c13sm59601671wrb.38.2019.01.09.05.56.41
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Wed, 09 Jan 2019 05:56:41 -0800 (PST)
+From: Loys Ollivier <lollivier@baylibre.com>
+To: devicetree@vger.kernel.org, Kevin Hilman <khilman@baylibre.com>,
+ linux-amlogic@lists.infradead.org
+Subject: [PATCH v2] arm64: dts: meson: Fix mmc cd-gpio polarity
+Date: Wed,  9 Jan 2019 14:56:38 +0100
+Message-Id: <1547042198-17601-1-git-send-email-lollivier@baylibre.com>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_054234_515295_7A305A0F 
-X-CRM114-Status: GOOD (  10.30  )
+X-CRM114-CacheID: sfid-20190109_055644_629301_2144ED6B 
+X-CRM114-Status: GOOD (  10.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,155 +93,244 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: robh@kernel.org, alexandre.torgue@st.com, lee.jones@linaro.org,
- dmitry.torokhov@gmail.com, linux-kernel@vger.kernel.org,
- Philippe Schenker <philippe.schenker@toradex.com>, thierry.reding@gmail.com,
- mcoquelin.stm32@gmail.com, linux-input@vger.kernel.org, digetx@gmail.com,
- shawnguo@kernel.org, linux-stm32@st-md-mailman.stormreply.com,
- linux-arm-kernel@lists.infradead.org
+Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ Linus Walleij <linus.walleij@linaro.org>,
+ Loys Ollivier <lollivier@baylibre.com>, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, Jerome Brunet <jbrunet@baylibre.com>
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Philippe Schenker <philippe.schenker@toradex.com>
+Commit 89a5e15bcba8 ("gpio/mmc/of: Respect polarity in the device tree")
+changed the behavior of "cd-inverted" to follow the device tree bindings
+specification.
+Lines specifying "cd-inverted" are now "acitve high".
 
-Move defines that are ADC related to the header of the overlying mfd,
-so they can be used from multiple sub-devices.
+Fix the SD card for meson by setting the cd-gpio as "active low" according
+to the boards specifications.
 
-Signed-off-by: Philippe Schenker <philippe.schenker@toradex.com>
-Acked-by: Lee Jones <lee.jones@linaro.org>
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-
+Fixes: 89a5e15bcba8 ("gpio/mmc/of: Respect polarity in the device tree")
+Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
 ---
 
-Changes in v6: None
-Changes in v5:
- - Changed author of commit to use correct email
+v2: fix more occurences, also in other meson boards.
 
-Changes in v4:
- - Added Lee Jone's Ack
- - Added Dmitry Torokhov's Ack
+ arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi            | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts           | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts         | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts            | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi               | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi           | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi              | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts   | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts    | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi          | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts          | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts            | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts             | 3 +--
+ 14 files changed, 14 insertions(+), 28 deletions(-)
 
-Changes in v3: None
-Changes in v2:
- - This is a new added commit. Separate commit for moving the defines
-   out of drivers/input/touchscreen/stmpe-ts.c to overlying mfd-device
-   drivers/mfd/stmpe.c
- - Pre-fix defines with STMPE_
-
- drivers/input/touchscreen/stmpe-ts.c | 34 +++++++++++-----------------
- include/linux/mfd/stmpe.h            | 11 +++++++++
- 2 files changed, 24 insertions(+), 21 deletions(-)
-
-diff --git a/drivers/input/touchscreen/stmpe-ts.c b/drivers/input/touchscreen/stmpe-ts.c
-index 2a78e27b4495..c5d9006588a2 100644
---- a/drivers/input/touchscreen/stmpe-ts.c
-+++ b/drivers/input/touchscreen/stmpe-ts.c
-@@ -49,17 +49,6 @@
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
+index e14e0ce7e89f..016641a41694 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
+@@ -187,8 +187,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
  
- #define STMPE_IRQ_TOUCH_DET		0
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
  
--#define SAMPLE_TIME(x)			((x & 0xf) << 4)
--#define MOD_12B(x)			((x & 0x1) << 3)
--#define REF_SEL(x)			((x & 0x1) << 1)
--#define ADC_FREQ(x)			(x & 0x3)
--#define AVE_CTRL(x)			((x & 0x3) << 6)
--#define DET_DELAY(x)			((x & 0x7) << 3)
--#define SETTLING(x)			(x & 0x7)
--#define FRACTION_Z(x)			(x & 0x7)
--#define I_DRIVE(x)			(x & 0x1)
--#define OP_MODE(x)			((x & 0x7) << 1)
--
- #define STMPE_TS_NAME			"stmpe-ts"
- #define XY_MASK				0xfff
+ 	vmmc-supply = <&vddao_3v3>;
+ 	vqmmc-supply = <&vddio_boot>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
+index 8cd50b75171d..ade2ee09ae96 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
+@@ -305,8 +305,7 @@
+ 	max-frequency = <200000000>;
+ 	disable-wp;
  
-@@ -213,9 +202,10 @@ static int stmpe_init_hw(struct stmpe_touch *ts)
- 		return ret;
- 	}
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
  
--	adc_ctrl1 = SAMPLE_TIME(ts->sample_time) | MOD_12B(ts->mod_12b) |
--		REF_SEL(ts->ref_sel);
--	adc_ctrl1_mask = SAMPLE_TIME(0xff) | MOD_12B(0xff) | REF_SEL(0xff);
-+	adc_ctrl1 = STMPE_SAMPLE_TIME(ts->sample_time) |
-+		    STMPE_MOD_12B(ts->mod_12b) | STMPE_REF_SEL(ts->ref_sel);
-+	adc_ctrl1_mask = STMPE_SAMPLE_TIME(0xff) | STMPE_MOD_12B(0xff) |
-+			 STMPE_REF_SEL(0xff);
+ 	vmmc-supply = <&vddio_ao3v3>;
+ 	vqmmc-supply = <&vddio_tf>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+index 4cf7f6e80c6a..25105ac96d55 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+@@ -238,8 +238,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
  
- 	ret = stmpe_set_bits(stmpe, STMPE_REG_ADC_CTRL1,
- 			adc_ctrl1_mask, adc_ctrl1);
-@@ -225,15 +215,17 @@ static int stmpe_init_hw(struct stmpe_touch *ts)
- 	}
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
  
- 	ret = stmpe_set_bits(stmpe, STMPE_REG_ADC_CTRL2,
--			ADC_FREQ(0xff), ADC_FREQ(ts->adc_freq));
-+			STMPE_ADC_FREQ(0xff), STMPE_ADC_FREQ(ts->adc_freq));
- 	if (ret) {
- 		dev_err(dev, "Could not setup ADC\n");
- 		return ret;
- 	}
+ 	vmmc-supply = <&vddao_3v3>;
+ 	vqmmc-supply = <&vddio_card>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+index 2e1cd5e3a246..1cc9dc68ef00 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+@@ -258,8 +258,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
  
--	tsc_cfg = AVE_CTRL(ts->ave_ctrl) | DET_DELAY(ts->touch_det_delay) |
--			SETTLING(ts->settling);
--	tsc_cfg_mask = AVE_CTRL(0xff) | DET_DELAY(0xff) | SETTLING(0xff);
-+	tsc_cfg = STMPE_AVE_CTRL(ts->ave_ctrl) |
-+		  STMPE_DET_DELAY(ts->touch_det_delay) |
-+		  STMPE_SETTLING(ts->settling);
-+	tsc_cfg_mask = STMPE_AVE_CTRL(0xff) | STMPE_DET_DELAY(0xff) |
-+		       STMPE_SETTLING(0xff);
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
  
- 	ret = stmpe_set_bits(stmpe, STMPE_REG_TSC_CFG, tsc_cfg_mask, tsc_cfg);
- 	if (ret) {
-@@ -242,14 +234,14 @@ static int stmpe_init_hw(struct stmpe_touch *ts)
- 	}
+ 	vmmc-supply = <&tflash_vdd>;
+ 	vqmmc-supply = <&tf_io>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+index ce862266b9aa..0be0f2a5d2fe 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+@@ -196,8 +196,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
  
- 	ret = stmpe_set_bits(stmpe, STMPE_REG_TSC_FRACTION_Z,
--			FRACTION_Z(0xff), FRACTION_Z(ts->fraction_z));
-+			STMPE_FRACTION_Z(0xff), STMPE_FRACTION_Z(ts->fraction_z));
- 	if (ret) {
- 		dev_err(dev, "Could not config touch\n");
- 		return ret;
- 	}
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
  
- 	ret = stmpe_set_bits(stmpe, STMPE_REG_TSC_I_DRIVE,
--			I_DRIVE(0xff), I_DRIVE(ts->i_drive));
-+			STMPE_I_DRIVE(0xff), STMPE_I_DRIVE(ts->i_drive));
- 	if (ret) {
- 		dev_err(dev, "Could not config touch\n");
- 		return ret;
-@@ -263,7 +255,7 @@ static int stmpe_init_hw(struct stmpe_touch *ts)
- 	}
+ 	vmmc-supply = <&vddao_3v3>;
+ 	vqmmc-supply = <&vddio_card>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
+index 93a4acf2c46c..ad4d50bd9d77 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
+@@ -154,8 +154,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
  
- 	ret = stmpe_set_bits(stmpe, STMPE_REG_TSC_CTRL,
--			OP_MODE(0xff), OP_MODE(OP_MOD_XYZ));
-+			STMPE_OP_MODE(0xff), STMPE_OP_MODE(OP_MOD_XYZ));
- 	if (ret) {
- 		dev_err(dev, "Could not set mode\n");
- 		return ret;
-diff --git a/include/linux/mfd/stmpe.h b/include/linux/mfd/stmpe.h
-index 4a827af17e59..c0353f6431f9 100644
---- a/include/linux/mfd/stmpe.h
-+++ b/include/linux/mfd/stmpe.h
-@@ -10,6 +10,17 @@
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
  
- #include <linux/mutex.h>
+ 	vmmc-supply = <&vcc_3v3>;
+ };
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi
+index ec09bb5792b7..2d2db783c44c 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi
+@@ -211,8 +211,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
  
-+#define STMPE_SAMPLE_TIME(x)	((x & 0xf) << 4)
-+#define STMPE_MOD_12B(x)	((x & 0x1) << 3)
-+#define STMPE_REF_SEL(x)	((x & 0x1) << 1)
-+#define STMPE_ADC_FREQ(x)	(x & 0x3)
-+#define STMPE_AVE_CTRL(x)	((x & 0x3) << 6)
-+#define STMPE_DET_DELAY(x)	((x & 0x7) << 3)
-+#define STMPE_SETTLING(x)	(x & 0x7)
-+#define STMPE_FRACTION_Z(x)	(x & 0x7)
-+#define STMPE_I_DRIVE(x)	(x & 0x1)
-+#define STMPE_OP_MODE(x)	((x & 0x7) << 1)
-+
- struct device;
- struct regulator;
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
  
+ 	vmmc-supply = <&vddao_3v3>;
+ 	vqmmc-supply = <&vcc_3v3>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts
+index f1c410e2da2b..796baea7a0bf 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts
+@@ -131,8 +131,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
+ 
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
+ 
+ 	vmmc-supply = <&vddao_3v3>;
+ 	vqmmc-supply = <&vddio_card>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
+index db293440e4ca..255cede7b447 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
+@@ -238,8 +238,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
+ 
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
+ 
+ 	vmmc-supply = <&vcc_3v3>;
+ 	vqmmc-supply = <&vcc_card>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
+index 6739697be1de..9cbdb85fb591 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
+@@ -183,8 +183,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
+ 
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
+ 
+ 	vmmc-supply = <&vddao_3v3>;
+ 	vqmmc-supply = <&vddio_card>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
+index a1b31013ab6e..bc811a2faf42 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
+@@ -137,8 +137,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
+ 
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
+ 
+ 	vmmc-supply = <&vddao_3v3>;
+ 	vqmmc-supply = <&vddio_boot>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
+index 3c3a667a8df8..3f086ed7de05 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
+@@ -356,8 +356,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
+ 
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
+ 
+ 	vmmc-supply = <&vddao_3v3>;
+ 	vqmmc-supply = <&vddio_boot>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
+index f7a1cffab4a8..8acfd40090d2 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
+@@ -147,8 +147,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
+ 
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
+ 
+ 	vmmc-supply = <&vddao_3v3>;
+ 	vqmmc-supply = <&vddio_boot>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts
+index 7212dc4531e4..7fa20a8ede17 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts
+@@ -170,8 +170,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
+ 
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
+ 
+ 	vmmc-supply = <&vddao_3v3>;
+ 	vqmmc-supply = <&vddio_boot>;
 -- 
-2.20.1
+2.7.4
 
 
 _______________________________________________
