@@ -2,73 +2,90 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	FROM_EXCESS_BASE64,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 996E3C43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 14:30:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 26E9CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 14:31:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 69AF3206B6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 14:30:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E34EC206B6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 14:31:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XrXzPy6S"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 69AF3206B6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xs4all.nl
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Cx4L96UU";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="g0Z0zz8x"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E34EC206B6
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Mk8IGL6pDhKNpdBN9rN2NaQKjdZRjw4Q4XwT5bXSmSk=; b=XrXzPy6S/vrwHL
-	GyiHJWb/eV8unUu5d3AfhbQL4vaw3GZ2U5nSqI+9QP1UUnKb553aTLzmgmPA+bA6+nOloHli8xESe
-	FJ3xyztyUySf7WJBUV5Xr/fRUaiH5Ry7r7kysEKjZrcrHAzXMf0n+GKocF8dQ59QZ7CBk32K4mXnx
-	Qi3yZDGzdJJTKCVV6GvCYF/wKI+4zilboQZfuamqC/n3iXxt3t8Asz3sWG1QpO6QkTCDpsyCnMX+u
-	rbrVfN7jnMoVF2wKRV7C9+89ksrjelddLUHdfIITYMSZgzQ+tU3cvrQbwRg6PX7M7sAHzKDAdQAi5
-	R9ZFQVCa5vN3557hfTrg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=8CeX74TW6D8w7p+jlELazWSlk3e/kzt6sdSNeSpx0RU=; b=Cx4L96UUN3nLSZ
+	1UnQ3rc96f39TIlq7Xfw/QzWJuEXO8Kzkj5+XHfV7dsjG8zjTSH3yPhz+RBRU6G0dtSs8Yg+OxjTM
+	El+2FU2eG+RDVtmEUHYjXnNRjEx5WpB5VICCFfxIGyrJPwZvWuDesT2XcJhGmBdsVpV1boEcXBA53
+	VxOTWnIbORbhYtJEiDYU462Qmwmejl5kx4NETC53Sq9CeHYYL479R39qFcDb5xVG4aYG7FhdwcV+g
+	vCbF6pCKevZsTvleSfoGwed9t0tXuO7HdJtEPJTw0Rg1hZH24KUHLNe7AYgaQIWeQHrgfP607HBSF
+	MlESDlvAkLiSZ71hVgxA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghErv-0004ZQ-8k; Wed, 09 Jan 2019 14:30:07 +0000
-Received: from lb3-smtp-cloud7.xs4all.net ([194.109.24.31])
+	id 1ghEt3-0005U1-9x; Wed, 09 Jan 2019 14:31:17 +0000
+Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghErq-0003t2-Np
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 14:30:05 +0000
-Received: from [IPv6:2001:420:44c1:2579:f8c4:4546:22d:c704]
- ([IPv6:2001:420:44c1:2579:f8c4:4546:22d:c704])
- by smtp-cloud7.xs4all.net with ESMTPA
- id hErYgk5pABDyIhErbgX5lK; Wed, 09 Jan 2019 15:29:55 +0100
-Subject: Re: [PATCH 2/2] media: cedrus: Allow using the current dst buffer as
- reference
-To: Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- linux-media@vger.kernel.org, devel@driverdev.osuosl.org,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
- linux-sunxi@googlegroups.com
-References: <20190109141920.12677-1-paul.kocialkowski@bootlin.com>
- <20190109141920.12677-2-paul.kocialkowski@bootlin.com>
-From: Hans Verkuil <hverkuil@xs4all.nl>
-Message-ID: <9a624f6a-0c38-f2c9-3f2d-2758f9a19299@xs4all.nl>
-Date: Wed, 9 Jan 2019 15:29:44 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.2.1
+ id 1ghEt0-0005T4-32
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 14:31:15 +0000
+Received: by mail-lf1-x143.google.com with SMTP id l10so5770809lfh.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 09 Jan 2019 06:31:09 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=kuRc1byMVfVvYAQSmiN0h3OtipOlQk0WsxsJ7A6MPuI=;
+ b=g0Z0zz8xa9oDo0mjfvt1dUTlQzcDVLhqpB7hOX+W1u32+4T2FS9v/nJeUCNXvXbFxf
+ inhUeRiJmSXlxTBmlFFTncHRtUngzLs3nvfznrJptWjJbfN80CL9uWJ/OfgZJl1/RS92
+ NQo5UMVLqf94Ok2nxnmTkjR8hkPo8Sk4diwFGguWnPCDt5t6reVAxNaxNMeSltUoO9Kk
+ vPGD4vhvtnMLsmAgDXEKk/bcRMdfT6Jz7Le7aQZ0t8W1KD3OUgA3/cpC0hTVVfX+re6H
+ vefgjz2EW/viVJXHpR2lfFnDQfSfoJnuzFpmmZVDJSmf7MTLu5N84KetsCYeNbo5PR1W
+ 4pNQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=kuRc1byMVfVvYAQSmiN0h3OtipOlQk0WsxsJ7A6MPuI=;
+ b=lCIFJbN1Zk6KEzqdWN7epC2V9sxrvLF/OTmoKByyX+6+olMtzQNHafgkR6PERiRlyc
+ vcBnEAn6Caff8kVCTyTz1FFLLltPcpTU46HmEtfCZTREWcsbNvwPG/Bai4ZXZ3am7+SM
+ 2aYPH+xS/iTnHwh/G2Nc9pY/4nmC1E8/LS2ZVnvE1CxjYWxiZ+d2DDGTdwhDQd6rMPr1
+ MUMjR80XVMZKUcciaNzpxivg0HJrD59A29gM5F0I9YbFys/TSCV+/Wmm6GRBbrkcS3/d
+ YLmc/yJyfC5a+LPKzSMr1wF4oeCYmks8rpkxLrAaCnX0H0aGQ7oI9FOkNWlwfhpNh5Ey
+ BtKg==
+X-Gm-Message-State: AJcUukdsRacICHu7+rIUvOjnjtIcf8capx9k8ZXxo7eUoZPbll0ffWX4
+ DMgCHIh4l2ivyYAgfHL5W8M=
+X-Google-Smtp-Source: ALg8bN6EhaBj6aNB7S/H0Fg/oAyB7pzLg450eevrpw+jQVhMe4d7grezXYVPDnwY4C2UBqUrhU0g7w==
+X-Received: by 2002:a19:945b:: with SMTP id w88mr3416873lfd.15.1547044268297; 
+ Wed, 09 Jan 2019 06:31:08 -0800 (PST)
+Received: from acerlaptop.localnet ([2a02:a315:5445:5300:c1c3:bc43:64cd:2432])
+ by smtp.gmail.com with ESMTPSA id
+ g15sm13540758lfb.1.2019.01.09.06.31.06
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Wed, 09 Jan 2019 06:31:07 -0800 (PST)
+From: =?utf-8?B?UGF3ZcWC?= Chmiel <pawel.mikolaj.chmiel@gmail.com>
+To: Krzysztof Kozlowski <krzk@kernel.org>
+Subject: Re: [PATCH] ARM: dts: s5pv210: Fix onenand's unit address format
+ warning
+Date: Wed, 09 Jan 2019 15:31:06 +0100
+Message-ID: <2629067.mKC4sQJUgE@acerlaptop>
+In-Reply-To: <1547041383-16924-1-git-send-email-krzk@kernel.org>
+References: <1547041383-16924-1-git-send-email-krzk@kernel.org>
 MIME-Version: 1.0
-In-Reply-To: <20190109141920.12677-2-paul.kocialkowski@bootlin.com>
-Content-Language: en-US
-X-CMAE-Envelope: MS4wfHvQpieu/qhYiJABI7cDkWdbhBzdhR89AXpd3rc78imSyE5YzzwGte5E9IpIGNdUOJ61vx6mvqPuwg93UA6ZbcHEzajFmAAoY8wY2Xeo+76nStXZtvXo
- A42cSvcQwNuqpbHultnZ+RGSx/T6o/cgfB/t0ht7c+ynVrwA6hz1+jk5EKiWty2gE1WmxLEpupOqlnoTFw9doWupcYOV2py3LIutLYQ8YsStyIDOvLy7G4gg
- qPLJ0PaIn3b1+FbTy0IdwCMYDHxBEadtlwIGZOcrqT9/S6vYxEsLoRb4DaEBnt6j1MP5EEqx9J67atroa1wr2RN7iB/F7nRNAzFgWdX3kSt8K6GZPTIkxjc5
- tIiEZtwj8lcNovcH/M67rIK9gOKkL12fu82b5GwQxv5Z84c1IGBFOY9wyVAale4AdqHtbO6bYJG/QpV0xpMZmHK28AtXBb7DA1uVxvwoSDhaNqt5DS5gYGNu
- 3TUGlAELU1l+Vy/Ay8RwjPwBAKKf7/XDbUDKHqlAQgWLG6igfWQCCUMC5UGzMuSmgGY5YBqPssif95mcpJ5SwYhu1KyNCJHUoHP35x//WRVF12U0WhVSTy2y
- eJk9G/j7dYn58Z3gkBcj/MIt5ND5bA/RqjtTcHnx4VGAF/oK+C/OzS+ZNuOaimRZSDZFvYR0awLiJd/rw6Mp8sTV4fLg8OcBIP+SCGaz1VSAEz6xdKwBPCOC
- S9i7Pw0OEvt+cpU9NrN/kO9TgGqFnxw4S+EulPQgd+nrkSAKpmdMIU3y//IXfaw6rrIAz1RIhxsZBG13cWiMPLqiLrfKQ+ZcLkUYNAeWevLlSPPixQjkDnOE
- cxmNGAvruG/GLhAu7yE=
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_063002_956383_EC4DF89A 
-X-CRM114-Status: GOOD (  21.63  )
+X-CRM114-CacheID: sfid-20190109_063114_134574_54C5EE89 
+X-CRM114-Status: GOOD (  16.50  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,123 +97,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Alexandre Courbot <acourbot@chromium.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Randy Li <ayaka@soulik.info>,
- Tomasz Figa <tfiga@chromium.org>, Chen-Yu Tsai <wens@csie.org>,
- Sakari Ailus <sakari.ailus@linux.intel.com>,
- Mauro Carvalho Chehab <mchehab@kernel.org>,
- Ezequiel Garcia <ezequiel@collabora.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ linux-samsung-soc@vger.kernel.org, linux-kernel@vger.kernel.org,
+ Rob Herring <robh+dt@kernel.org>, Tomasz Figa <tomasz.figa@gmail.com>,
+ Kukjin Kim <kgene@kernel.org>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 01/09/19 15:19, Paul Kocialkowski wrote:
-> It was reported that some cases of interleaved video decoding require
-> using the current destination buffer as a reference. However, this is
-> no longer possible after the move to vb2_find_timestamp because only
-> dequeued and done buffers are considered.
-> 
-> Add a helper in our driver that also considers the current destination
-> buffer before resorting to vb2_find_timestamp and use it in MPEG-2.
-
-This patch looks good, but can you also add checks to handle the case
-when no buffer with the given timestamp was found? Probably should be done
-in a third patch.
-
-I suspect the driver will crash if an unknown timestamp is passed on to the
-driver. I would really like to see that corner case fixed.
-
-Regards,
-
-	Hans
-
-> 
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> ---
->  drivers/staging/media/sunxi/cedrus/cedrus_dec.c   | 13 +++++++++++++
->  drivers/staging/media/sunxi/cedrus/cedrus_dec.h   |  2 ++
->  drivers/staging/media/sunxi/cedrus/cedrus_mpeg2.c | 10 ++++++----
->  3 files changed, 21 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/staging/media/sunxi/cedrus/cedrus_dec.c b/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
-> index 443fb037e1cf..2c295286766c 100644
-> --- a/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
-> +++ b/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
-> @@ -22,6 +22,19 @@
->  #include "cedrus_dec.h"
->  #include "cedrus_hw.h"
->  
-> +int cedrus_reference_index_find(struct vb2_queue *queue,
-> +				struct vb2_buffer *vb2_buf, u64 timestamp)
-> +{
-> +	/*
-> +	 * Allow using the current capture buffer as reference, which can occur
-> +	 * for field-coded pictures.
-> +	 */
-> +	if (vb2_buf->timestamp == timestamp)
-> +		return vb2_buf->index;
-> +	else
-> +		return vb2_find_timestamp(queue, timestamp, 0);
-> +}
-> +
->  void cedrus_device_run(void *priv)
->  {
->  	struct cedrus_ctx *ctx = priv;
-> diff --git a/drivers/staging/media/sunxi/cedrus/cedrus_dec.h b/drivers/staging/media/sunxi/cedrus/cedrus_dec.h
-> index d1ae7903677b..8d0fc248220f 100644
-> --- a/drivers/staging/media/sunxi/cedrus/cedrus_dec.h
-> +++ b/drivers/staging/media/sunxi/cedrus/cedrus_dec.h
-> @@ -16,6 +16,8 @@
->  #ifndef _CEDRUS_DEC_H_
->  #define _CEDRUS_DEC_H_
->  
-> +int cedrus_reference_index_find(struct vb2_queue *queue,
-> +				struct vb2_buffer *vb2_buf, u64 timestamp);
->  void cedrus_device_run(void *priv);
->  
->  #endif
-> diff --git a/drivers/staging/media/sunxi/cedrus/cedrus_mpeg2.c b/drivers/staging/media/sunxi/cedrus/cedrus_mpeg2.c
-> index cb45fda9aaeb..81c66a8aa1ac 100644
-> --- a/drivers/staging/media/sunxi/cedrus/cedrus_mpeg2.c
-> +++ b/drivers/staging/media/sunxi/cedrus/cedrus_mpeg2.c
-> @@ -10,6 +10,7 @@
->  #include <media/videobuf2-dma-contig.h>
->  
->  #include "cedrus.h"
-> +#include "cedrus_dec.h"
->  #include "cedrus_hw.h"
->  #include "cedrus_regs.h"
->  
-> @@ -159,8 +160,8 @@ static void cedrus_mpeg2_setup(struct cedrus_ctx *ctx, struct cedrus_run *run)
->  	cedrus_write(dev, VE_DEC_MPEG_PICBOUNDSIZE, reg);
->  
->  	/* Forward and backward prediction reference buffers. */
-> -	forward_idx = vb2_find_timestamp(cap_q,
-> -					 slice_params->forward_ref_ts, 0);
-> +	forward_idx = cedrus_reference_index_find(cap_q, &run->dst->vb2_buf,
-> +						  slice_params->forward_ref_ts);
->  
->  	fwd_luma_addr = cedrus_dst_buf_addr(ctx, forward_idx, 0);
->  	fwd_chroma_addr = cedrus_dst_buf_addr(ctx, forward_idx, 1);
-> @@ -168,8 +169,9 @@ static void cedrus_mpeg2_setup(struct cedrus_ctx *ctx, struct cedrus_run *run)
->  	cedrus_write(dev, VE_DEC_MPEG_FWD_REF_LUMA_ADDR, fwd_luma_addr);
->  	cedrus_write(dev, VE_DEC_MPEG_FWD_REF_CHROMA_ADDR, fwd_chroma_addr);
->  
-> -	backward_idx = vb2_find_timestamp(cap_q,
-> -					  slice_params->backward_ref_ts, 0);
-> +	backward_idx = cedrus_reference_index_find(cap_q, &run->dst->vb2_buf,
-> +						   slice_params->backward_ref_ts);
-> +
->  	bwd_luma_addr = cedrus_dst_buf_addr(ctx, backward_idx, 0);
->  	bwd_chroma_addr = cedrus_dst_buf_addr(ctx, backward_idx, 1);
->  
-> 
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+RG5pYSDFm3JvZGEsIDkgc3R5Y3puaWEgMjAxOSAxNDo0MzowMyBDRVQgS3J6eXN6dG9mIEtvemxv
+d3NraSBwaXN6ZToKPiBBY2NvcmRpbmcgdG8gRGV2aWNldHJlZSBzcGVjaWZpY2F0aW9uLCB0aGUg
+dW5pdC1hZGRyZXNzIG11c3QgbWF0Y2ggdGhlCj4gZmlyc3QgYWRkcmVzcyBzcGVjaWZpZWQgaW4g
+dGhlIHJlZyBwcm9wZXJ0eSBvZiB0aGUgbm9kZS4gIEZpeCB0aGUgRFRDCj4gd2FybmluZyBvbmVu
+YW5kIG5vZGU6Cj4gCj4gICAgIGFyY2gvYXJtL2Jvb3QvZHRzL3M1cHYyMTAuZHRzaTo4MS4yOS05
+My41Ogo+ICAgICAgICAgV2FybmluZyAoc2ltcGxlX2J1c19yZWcpOiAvc29jL29uZW5hbmRAYjAw
+MDAwMDA6IHNpbXBsZS1idXMgdW5pdCBhZGRyZXNzIGZvcm1hdCBlcnJvciwgZXhwZWN0ZWQgImIw
+NjAwMDAwIgo+IAo+IFNpZ25lZC1vZmYtYnk6IEtyenlzenRvZiBLb3psb3dza2kgPGtyemtAa2Vy
+bmVsLm9yZz4KPiAKPiAtLS0KPiAKPiBUaGUgcmVtYWluaW5nIHdhcm5pbmcgaXMgd3JvbmcgY2xv
+Y2stY29udHJvbGxlciBzdWJub2RlIG9mIGZpbWMgY2FtZXJhLgo+ICAgICBhcmNoL2FybS9ib290
+L2R0cy9zNXB2MjEwLmR0c2k6NTc4LjMyLTU4MC42OiBXYXJuaW5nIChzaW1wbGVfYnVzX3JlZyk6
+IC9zb2MvY2FtZXJhL2Nsb2NrLWNvbnRyb2xsZXI6IG1pc3Npbmcgb3IgZW1wdHkgcmVnL3Jhbmdl
+cyBwcm9wZXJ0eQo+IFRoZSBzdWJub2RlIGluIG15IHVuZGVyc3RhbmRpbmcgZG9lcyBub3QgZm9s
+bG93IGJpbmRpbmdzIGFuZCB0aGUgZHJpdmVyLgo+IFRoZSBkcml2ZXIgd2l0aCBjdXJyZW50IHM1
+cHYyMTAuZHRzaSB3aWxsIG5vdCByZWdpc3RlciBhIGNsb2NrIHByb3ZpZGVyLi4uIGJ1dAo+IEkg
+ZG8gbm90IGhhdmUgYSBkZXZpY2UgdG8gY29uZmlybSB0aGlzLgo+IC0tLQo+ICBhcmNoL2FybS9i
+b290L2R0cy9zNXB2MjEwLmR0c2kgfCAyICstCj4gIDEgZmlsZSBjaGFuZ2VkLCAxIGluc2VydGlv
+bigrKSwgMSBkZWxldGlvbigtKQo+IAo+IGRpZmYgLS1naXQgYS9hcmNoL2FybS9ib290L2R0cy9z
+NXB2MjEwLmR0c2kgYi9hcmNoL2FybS9ib290L2R0cy9zNXB2MjEwLmR0c2kKPiBpbmRleCBjYzIy
+YzlkYjgwZDIuLjI2ZWE1YzY2ZDhjZSAxMDA2NDQKPiAtLS0gYS9hcmNoL2FybS9ib290L2R0cy9z
+NXB2MjEwLmR0c2kKPiArKysgYi9hcmNoL2FybS9ib290L2R0cy9zNXB2MjEwLmR0c2kKPiBAQCAt
+NzgsNyArNzgsNyBAQAo+ICAJCQl9Owo+ICAJCX07Cj4gIAo+IC0JCW9uZW5hbmQ6IG9uZW5hbmRA
+YjAwMDAwMDAgewo+ICsJCW9uZW5hbmQ6IG9uZW5hbmRAYjA2MDAwMDAgewo+ICAJCQljb21wYXRp
+YmxlID0gInNhbXN1bmcsczVwdjIxMC1vbmVuYW5kIjsKPiAgCQkJcmVnID0gPDB4YjA2MDAwMDAg
+MHgyMDAwPiwKPiAgCQkJCTwweGIwMDAwMDAwIDB4MjAwMDA+LAo+IApDaGVja2VkIG9uIFNhbXN1
+bmcgR2FsYXh5IFMgKHdpdGggbG9jYWwsIG5vdCB5ZXQgc3VibWl0ZWQgcGF0Y2hlcyBmb3IgZGV2
+aWNldHJlZSBzdXBwb3J0IGZvciBvbmVuYW5kLCB3aGljaCBpcyBtaXNzaW5nIGluIG1haW5saW5l
+KSBhbmQgaXQgbG9va3Mgb2sgKGRldmljZSBwcm9iZWQsIHdhcyBhYmxlIHRvIHVzZSB1YmkgdG9v
+bHMpLgpUZXN0ZWQtYnk6IFBhd2XFgiBDaG1pZWwgPHBhd2VsLm1pa29sYWouY2htaWVsQGdtYWls
+LmNvbT4KCgoKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+CmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5m
+cmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xp
+bnV4LWFybS1rZXJuZWwK
