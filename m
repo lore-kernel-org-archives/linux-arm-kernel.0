@@ -2,63 +2,63 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C74E0C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 14:20:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7E3E3C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 14:24:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 90B712075C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 14:20:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4AF98206B6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 14:24:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ngfY7uhw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 90B712075C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jTr36ZyS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4AF98206B6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=I3JXksG8v8bZI1jFYOOdrgZBRcmkNX5E9438AT1E1YQ=; b=ngfY7uhwMSU8da
-	g6JuzM637JgbKI82eB1iouItFGsacM+vo3KGRMwPW1xGhqJ4MPCVIbmGWUR2v/1YUM8JpVlzChWAU
-	pjbhM2bLf3GsR464xgxTDw2cI/y02ApsuE5NBWrPUdM/rNEhik/inURcR7i1u07na7hqgewhhgMjR
-	2ew4sq9VkrLghfbvASRxBp1iwKdyz2QWzuXeXO3XO4JTti9RkOKJZZfY39mMbq4qqn1sGQ3micKgz
-	R0/n+3KEUurm/HdjhqT3sOg1t/rwwk1oITWiMKAavJR2r9wkgyuvBcXh7a4yNMLzedkEa4yCfs6gq
-	mrtxDcoyMEYBTermWDHw==;
+	List-Owner; bh=ElfiNHAsPuDZ6K3Y9bx/I5WCehWyLxCzoOOhOrlM2FQ=; b=jTr36ZySWKmjWV
+	GYCrG6GUG+bR9AxdypMxw/IVZKnrgyzHfzFjlVFFs3LYTwppFSndrm9EffMlRqmgQJ8uC7lzXNTUz
+	ZPW38p8tMZ3z9VLG5W/h+Eo8izMMJ4IpKAiqz+U+J2hyrUbDrrxy9WRdZWGviQokxcqF1bcB529Cm
+	0YLnROB19uy1NuH0TS1BPa8fzz8eOO+vQauApHWl2kaOLayBg94Ze7zh5V4UXX5nu1yboCkoRsW5n
+	QJk+Zphl/ZmFJjxm2GGHZP+7nQ7ilC9l78yHp7Zgm3XRb/GI6jupZphO+wc2ghUZtP2RqCmGZuO9f
+	5U2K7GLUut9fPuN4XU0g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghEiq-0000Y0-UR; Wed, 09 Jan 2019 14:20:44 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
+	id 1ghEmE-00011M-0K; Wed, 09 Jan 2019 14:24:14 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghEid-0000MA-LW
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 14:20:33 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id E9EEC20A11; Wed,  9 Jan 2019 15:20:28 +0100 (CET)
-Received: from localhost.localdomain
- (aaubervilliers-681-1-45-241.w90-88.abo.wanadoo.fr [90.88.163.241])
- by mail.bootlin.com (Postfix) with ESMTPSA id 4BA65209C2;
- Wed,  9 Jan 2019 15:20:18 +0100 (CET)
-From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-To: linux-media@vger.kernel.org, devel@driverdev.osuosl.org,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
- linux-sunxi@googlegroups.com
-Subject: [PATCH 2/2] media: cedrus: Allow using the current dst buffer as
- reference
-Date: Wed,  9 Jan 2019 15:19:20 +0100
-Message-Id: <20190109141920.12677-2-paul.kocialkowski@bootlin.com>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190109141920.12677-1-paul.kocialkowski@bootlin.com>
-References: <20190109141920.12677-1-paul.kocialkowski@bootlin.com>
+ id 1ghEmB-00010y-62
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 14:24:12 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A6DE480D;
+ Wed,  9 Jan 2019 06:24:10 -0800 (PST)
+Received: from localhost (unknown [10.37.6.11])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 38E613F6CF;
+ Wed,  9 Jan 2019 06:24:10 -0800 (PST)
+Date: Wed, 9 Jan 2019 14:24:08 +0000
+From: Andrew Murray <andrew.murray@arm.com>
+To: Marc Zyngier <marc.zyngier@arm.com>
+Subject: Re: [PATCH 2/3] arm64: KVM: Allow for direct call of HYP functions
+ when using VHE
+Message-ID: <20190109142407.GH56789@e119886-lin.cambridge.arm.com>
+References: <20190109135435.178664-1-marc.zyngier@arm.com>
+ <20190109135435.178664-3-marc.zyngier@arm.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20190109135435.178664-3-marc.zyngier@arm.com>
+User-Agent: Mutt/1.10.1+81 (426a6c1) (2018-08-26)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_062032_017771_1FC83993 
-X-CRM114-Status: GOOD (  12.55  )
+X-CRM114-CacheID: sfid-20190109_062411_230736_9BBD1DEC 
+X-CRM114-Status: GOOD (  21.77  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,111 +70,85 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Hans Verkuil <hverkuil@xs4all.nl>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Alexandre Courbot <acourbot@chromium.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Randy Li <ayaka@soulik.info>,
- Tomasz Figa <tfiga@chromium.org>,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- Chen-Yu Tsai <wens@csie.org>, Sakari Ailus <sakari.ailus@linux.intel.com>,
- Mauro Carvalho Chehab <mchehab@kernel.org>,
- Ezequiel Garcia <ezequiel@collabora.com>
+Cc: linux-arm-kernel@lists.infradead.org, kvmarm@lists.cs.columbia.edu,
+ kvm@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-It was reported that some cases of interleaved video decoding require
-using the current destination buffer as a reference. However, this is
-no longer possible after the move to vb2_find_timestamp because only
-dequeued and done buffers are considered.
+On Wed, Jan 09, 2019 at 01:54:34PM +0000, Marc Zyngier wrote:
+> When running VHE, there is no need to jump via some stub to perform
+> a "HYP" function call, as there is a single address space.
+> 
+> Let's thus change kvm_call_hyp() and co to perform a direct call
+> in this case. Although this results in a bit of code expansion,
+> it allows the compiler to check for type compatibility, something
+> that we are missing so far.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/kvm_host.h | 32 +++++++++++++++++++++++++++++--
+>  1 file changed, 30 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index e54cb7c88a4e..df32edbadd69 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -370,8 +370,36 @@ void kvm_arm_halt_guest(struct kvm *kvm);
+>  void kvm_arm_resume_guest(struct kvm *kvm);
+>  
+>  u64 __kvm_call_hyp(void *hypfn, ...);
+> -#define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
+> -#define kvm_call_hyp_ret(f, ...) kvm_call_hyp(f, ##__VA_ARGS__)
+> +
+> +/*
+> + * The couple of isb() below are there to guarantee the same behaviour
+> + * on VHE as on !VHE, where the eret to EL1 acts as a context
+> + * synchronization event.
+> + */
+> +#define kvm_call_hyp(f, ...)						\
+> +	do {								\
+> +		if (cpus_have_const_cap(ARM64_HAS_VIRT_HOST_EXTN)) {	\
+> +			f(__VA_ARGS__);					\
+> +			isb();						\
+> +		} else {						\
+> +			__kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__); \
+> +		}							\
+> +	} while(0)
+> +
+> +#define kvm_call_hyp_ret(f, ...)					\
+> +	({								\
+> +		u64 ret;						\
+> +									\
+> +		if (cpus_have_const_cap(ARM64_HAS_VIRT_HOST_EXTN)) {	\
+> +			ret = f(__VA_ARGS__);				\
 
-Add a helper in our driver that also considers the current destination
-buffer before resorting to vb2_find_timestamp and use it in MPEG-2.
+__kvm_get_mdcr_el2 and __kvm_vcpu_run_nvhe don't return u64 type, they
+return a smaller type. I guess any issues would be picked up when compiling,
+but should the name of the macro be clearer as to the assumptions it makes?
+Or perhaps take an argument which is the type of ret?
 
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
----
- drivers/staging/media/sunxi/cedrus/cedrus_dec.c   | 13 +++++++++++++
- drivers/staging/media/sunxi/cedrus/cedrus_dec.h   |  2 ++
- drivers/staging/media/sunxi/cedrus/cedrus_mpeg2.c | 10 ++++++----
- 3 files changed, 21 insertions(+), 4 deletions(-)
+Andrew Murray
 
-diff --git a/drivers/staging/media/sunxi/cedrus/cedrus_dec.c b/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
-index 443fb037e1cf..2c295286766c 100644
---- a/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
-+++ b/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
-@@ -22,6 +22,19 @@
- #include "cedrus_dec.h"
- #include "cedrus_hw.h"
- 
-+int cedrus_reference_index_find(struct vb2_queue *queue,
-+				struct vb2_buffer *vb2_buf, u64 timestamp)
-+{
-+	/*
-+	 * Allow using the current capture buffer as reference, which can occur
-+	 * for field-coded pictures.
-+	 */
-+	if (vb2_buf->timestamp == timestamp)
-+		return vb2_buf->index;
-+	else
-+		return vb2_find_timestamp(queue, timestamp, 0);
-+}
-+
- void cedrus_device_run(void *priv)
- {
- 	struct cedrus_ctx *ctx = priv;
-diff --git a/drivers/staging/media/sunxi/cedrus/cedrus_dec.h b/drivers/staging/media/sunxi/cedrus/cedrus_dec.h
-index d1ae7903677b..8d0fc248220f 100644
---- a/drivers/staging/media/sunxi/cedrus/cedrus_dec.h
-+++ b/drivers/staging/media/sunxi/cedrus/cedrus_dec.h
-@@ -16,6 +16,8 @@
- #ifndef _CEDRUS_DEC_H_
- #define _CEDRUS_DEC_H_
- 
-+int cedrus_reference_index_find(struct vb2_queue *queue,
-+				struct vb2_buffer *vb2_buf, u64 timestamp);
- void cedrus_device_run(void *priv);
- 
- #endif
-diff --git a/drivers/staging/media/sunxi/cedrus/cedrus_mpeg2.c b/drivers/staging/media/sunxi/cedrus/cedrus_mpeg2.c
-index cb45fda9aaeb..81c66a8aa1ac 100644
---- a/drivers/staging/media/sunxi/cedrus/cedrus_mpeg2.c
-+++ b/drivers/staging/media/sunxi/cedrus/cedrus_mpeg2.c
-@@ -10,6 +10,7 @@
- #include <media/videobuf2-dma-contig.h>
- 
- #include "cedrus.h"
-+#include "cedrus_dec.h"
- #include "cedrus_hw.h"
- #include "cedrus_regs.h"
- 
-@@ -159,8 +160,8 @@ static void cedrus_mpeg2_setup(struct cedrus_ctx *ctx, struct cedrus_run *run)
- 	cedrus_write(dev, VE_DEC_MPEG_PICBOUNDSIZE, reg);
- 
- 	/* Forward and backward prediction reference buffers. */
--	forward_idx = vb2_find_timestamp(cap_q,
--					 slice_params->forward_ref_ts, 0);
-+	forward_idx = cedrus_reference_index_find(cap_q, &run->dst->vb2_buf,
-+						  slice_params->forward_ref_ts);
- 
- 	fwd_luma_addr = cedrus_dst_buf_addr(ctx, forward_idx, 0);
- 	fwd_chroma_addr = cedrus_dst_buf_addr(ctx, forward_idx, 1);
-@@ -168,8 +169,9 @@ static void cedrus_mpeg2_setup(struct cedrus_ctx *ctx, struct cedrus_run *run)
- 	cedrus_write(dev, VE_DEC_MPEG_FWD_REF_LUMA_ADDR, fwd_luma_addr);
- 	cedrus_write(dev, VE_DEC_MPEG_FWD_REF_CHROMA_ADDR, fwd_chroma_addr);
- 
--	backward_idx = vb2_find_timestamp(cap_q,
--					  slice_params->backward_ref_ts, 0);
-+	backward_idx = cedrus_reference_index_find(cap_q, &run->dst->vb2_buf,
-+						   slice_params->backward_ref_ts);
-+
- 	bwd_luma_addr = cedrus_dst_buf_addr(ctx, backward_idx, 0);
- 	bwd_chroma_addr = cedrus_dst_buf_addr(ctx, backward_idx, 1);
- 
--- 
-2.20.1
-
+> +			isb();						\
+> +		} else {						\
+> +			ret = __kvm_call_hyp(kvm_ksym_ref(f),		\
+> +					     ##__VA_ARGS__);		\
+> +		}							\
+> +									\
+> +		ret;							\
+> +	})
+>  
+>  void force_vm_exit(const cpumask_t *mask);
+>  void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+> -- 
+> 2.20.1
+> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm@lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
 
 _______________________________________________
 linux-arm-kernel mailing list
