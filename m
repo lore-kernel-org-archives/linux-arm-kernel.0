@@ -2,86 +2,67 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D7FCEC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 13:24:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3A2E2C43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 13:42:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A4E6B206BA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 13:24:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0AF96206B6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 13:42:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HDKvVt7T";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="cBivxxLo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A4E6B206BA
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QXpNEguJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0AF96206B6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pschenker.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tYTb5fRuf1dKY8bZ1UP0gBDg/pR8fYe7uphN/OvcG5Q=; b=HDKvVt7T1e2pe9
-	2k3Tt7MBh6L43tpMyc0jzn7Ja+X16rF1llQ0WANg19EmYaVXlMbqVmnmzTJ6JIJyOtvbpZCZYA6n7
-	d4klQYcFY2jvg72GZtHO4g24hGZlAbPyjgg9lnRHN7lUEW5Zca289SZe267Gxcne8i6Y/WTf+YBLX
-	1We/ytySy+ts06fy6ssNau1jk5WNlohRiRcaBqD6NQx0HLdqAH6CqonRmAKpX0brMYa49PLdfsuGb
-	P/pbkNbl8coptCMZdnJ+lWcxMQ1zQQ1l27xKpCxJD2ZKlAjxFIqdO/A1kbAf0iQCppygE8Irw/bhT
-	SURd7WPq2yGtk4CsIDAQ==;
+	List-Owner; bh=xs/ntA/JJMR8jX9yK/VQoNvnYwQ4n5bLcEZ1T5A76vQ=; b=QXpNEguJdDRD+d
+	4NcqeePH4hRKdlaG5d1eO34tROAU5Ath7smRfc4HHoYqSXJS84TbsdqfqGJJnzZ3c8i62mm+JQIrU
+	AECF36dgFH0bs2rA8oGGuy9o5dnzDH6xq+s5IMlAbPVLO8S81hhLDCZG5UuZf0aXUHrvHORg6J1gn
+	iffISuLlhOMFt/b6maWj4sZCWZLZmnoSVyTlWRv6RAyXwuE/nExGJnBlx7kja5U2yWE6GajlG+pGP
+	jTmzdsy5Xhshf14a6Cj0L0auPliSnuR+SV8u+ZfSNsWXw2AxYzSNPMcNbmK90BoOZAxmnR4dXi270
+	Yb8tlaNxYilAeKXwjCnw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghDqn-0007qz-AR; Wed, 09 Jan 2019 13:24:53 +0000
-Received: from mail-io1-xd41.google.com ([2607:f8b0:4864:20::d41])
+	id 1ghE7y-0006Di-EA; Wed, 09 Jan 2019 13:42:38 +0000
+Received: from mxout014.mail.hostpoint.ch ([2a00:d70:0:e::314])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghDqk-0007qV-D9
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 13:24:52 +0000
-Received: by mail-io1-xd41.google.com with SMTP id g8so5999248iok.4
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 09 Jan 2019 05:24:49 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc:content-transfer-encoding;
- bh=5hsdTeezotDqIwqu1cpLVURCriWtQKJNakUlAd/T5M8=;
- b=cBivxxLopiyns29Buj8DXZhRdxv0QVQ7JpNDg6m4Uy8zENx1YEZh2iioI3AC99ILg+
- C5Dv4uvcH9wr3ADtxhcbQqZWqdkNtFFOH0AJev2sXlXF/s/+ayFByifmAbQUhfLA2v/z
- oRFHXMKrrwiEf5i8Z5Cji2+RIySMRPqr49dPg=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc:content-transfer-encoding;
- bh=5hsdTeezotDqIwqu1cpLVURCriWtQKJNakUlAd/T5M8=;
- b=iZNcWs1bTs/GLbCLYK1YxA9gJWQJnO5CQzGGMCHVboCrebAvcLRgF4dbpd9/nlXLgF
- bnvafU0+L8hQOFDpkIy4Pkc23goB/HDcDZC5qB72nsirlp1ZA0tt8w87cUtzz2+5kmH1
- GW8FUm6N/4ZHcJxaQ+ECHB2OblipCvybipKtv6BX3b0EvIqgTa7mNgJReD1Q76hxYnzF
- 6pftfMcBYjUXSvkUKFa3uGcsSkLtCmkuUcDgC+D5Z6aTjh/CtUHvoFgndryx0HY+v0X3
- y/grdI436X+FCbAHv8NcaOiHD5yFkJJ5nrCISaRfm8Bf26qMmBKQlDe4SxcLcDz86STa
- 5KMQ==
-X-Gm-Message-State: AJcUukfO9e5dchxOsEfNLpF3nrW6bOKhz6Yvhsx/yxH+MeBIajPWpIPL
- Uta++qP0/S2uCOIDtunYpHVApaMzNK+imywe26pM3w==
-X-Google-Smtp-Source: ALg8bN7r3Q5mBhMW/YN+kdyWFcyVCBLJX6/vR+CAzPTAt79hgENFZVQOfQqc59tz29Edb8k4cls4b0PfV3fmzQoRFUI=
-X-Received: by 2002:a6b:fe13:: with SMTP id x19mr3606580ioh.294.1547040288779; 
- Wed, 09 Jan 2019 05:24:48 -0800 (PST)
+ id 1ghE7u-0006C0-CJ
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 13:42:36 +0000
+Received: from [10.0.2.45] (helo=asmtp012.mail.hostpoint.ch)
+ by mxout014.mail.hostpoint.ch with esmtp (Exim 4.91 (FreeBSD))
+ (envelope-from <dev@pschenker.ch>)
+ id 1ghE7k-0007Wt-Sd; Wed, 09 Jan 2019 14:42:24 +0100
+Received: from 252.222.41.212.static.wline.lns.sme.cust.swisscom.ch
+ ([212.41.222.252] helo=philippe-pc.toradex.int)
+ by asmtp012.mail.hostpoint.ch with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES256-GCM-SHA384:256) (Exim 4.91 (FreeBSD))
+ (envelope-from <dev@pschenker.ch>)
+ id 1ghE7k-0006KA-Mb; Wed, 09 Jan 2019 14:42:24 +0100
+X-Authenticated-Sender-Id: dev@pschenker.ch
+From: Philippe Schenker <dev@pschenker.ch>
+To: jic23@kernel.org,
+	marcel.ziswiler@toradex.com,
+	stefan@agner.ch
+Subject: [PATCH v6 3/8] mfd: stmpe: preparations for STMPE ADC driver
+Date: Wed,  9 Jan 2019 14:42:02 +0100
+Message-Id: <20190109134208.5660-4-dev@pschenker.ch>
+X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190109134208.5660-1-dev@pschenker.ch>
+References: <20190109134208.5660-1-dev@pschenker.ch>
 MIME-Version: 1.0
-References: <20190107233833.GI5544@atomide.com>
- <CAKfTPtDBEmcsLotp-6K1KU1wM9Ba1EpMp3niXScRxYgzjs0nog@mail.gmail.com>
- <20190108155354.GL5544@atomide.com>
- <CAKfTPtCoOK-cYLXJ--sOfpVa9RVmzOAEN1+zB2qHMCzkJN0qaQ@mail.gmail.com>
- <20190108213743.GN5544@atomide.com> <20190109014218.GA8363@linaro.org>
- <20190109111703.GA28605@lenoch>
- <CAKfTPtBvzZvJNxBRMbGbNFBYG0-pAR-P7X2=KrBWH01OMWvJYA@mail.gmail.com>
- <20190109115824.GA1353@lenoch>
-In-Reply-To: <20190109115824.GA1353@lenoch>
-From: Vincent Guittot <vincent.guittot@linaro.org>
-Date: Wed, 9 Jan 2019 14:24:37 +0100
-Message-ID: <CAKfTPtAAgYYW8A1LDg18bM=5vCAMDbQ05APp9QWSaifW=F0SgQ@mail.gmail.com>
-Subject: Re: Regression in v5.0-rc1 with autosuspend hrtimers
-To: Ladislav Michl <ladis@linux-mips.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_052450_446232_E09BF9FB 
-X-CRM114-Status: GOOD (  27.73  )
+X-CRM114-CacheID: sfid-20190109_054234_419717_8C16EE0D 
+X-CRM114-Status: GOOD (  16.15  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,104 +74,227 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>,
- "open list:THERMAL" <linux-pm@vger.kernel.org>,
- Tony Lindgren <tony@atomide.com>,
- "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>,
- linux-kernel <linux-kernel@vger.kernel.org>, linux-omap@vger.kernel.org,
- LAK <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: robh@kernel.org, Max Krummenacher <max.krummenacher@toradex.com>,
+ alexandre.torgue@st.com, lee.jones@linaro.org, dmitry.torokhov@gmail.com,
+ linux-kernel@vger.kernel.org,
+ Philippe Schenker <philippe.schenker@toradex.com>, thierry.reding@gmail.com,
+ mcoquelin.stm32@gmail.com, digetx@gmail.com, shawnguo@kernel.org,
+ linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gV2VkLCA5IEphbiAyMDE5IGF0IDEyOjU4LCBMYWRpc2xhdiBNaWNobCA8bGFkaXNAbGludXgt
-bWlwcy5vcmc+IHdyb3RlOgo+Cj4gT24gV2VkLCBKYW4gMDksIDIwMTkgYXQgMTI6Mjc6NTdQTSAr
-MDEwMCwgVmluY2VudCBHdWl0dG90IHdyb3RlOgo+ID4gT24gV2VkLCA5IEphbiAyMDE5IGF0IDEy
-OjE3LCBMYWRpc2xhdiBNaWNobCA8bGFkaXNAbGludXgtbWlwcy5vcmc+IHdyb3RlOgo+ID4gPgo+
-ID4gPiBPbiBXZWQsIEphbiAwOSwgMjAxOSBhdCAwMjo0MjoxOEFNICswMTAwLCBWaW5jZW50IEd1
-aXR0b3Qgd3JvdGU6Cj4gPiA+ID4gTGUgVHVlc2RheSAwOCBKYW4gMjAxOSDDoCAxMzozNzo0MyAo
-LTA4MDApLCBUb255IExpbmRncmVuIGEgw6ljcml0IDoKPiA+ID4gPiA+ICogVmluY2VudCBHdWl0
-dG90IDx2aW5jZW50Lmd1aXR0b3RAbGluYXJvLm9yZz4gWzE5MDEwOCAxNjo0Ml06Cj4gPiA+ID4g
-PiA+IE9uIFR1ZSwgOCBKYW4gMjAxOSBhdCAxNjo1MywgVG9ueSBMaW5kZ3JlbiA8dG9ueUBhdG9t
-aWRlLmNvbT4gd3JvdGU6Cj4gPiA+ID4gPiA+ID4gSG1tIHNvIGNvdWxkIGl0IGJlIHRoYXQgd2Ug
-bm93IHJlbHkgb24gdGltZXJzIHRoYXQgdGhhdCBtYXkKPiA+ID4gPiA+ID4gPiBub3QgYmUgY2Fw
-YWJsZSBvZiB3YWtpbmcgdXAgdGhlIHN5c3RlbSBmcm9tIGlkbGUgc3RhdGVzIHdpdGgKPiA+ID4g
-PiA+ID4gPiBocnRpbWVyPwo+ID4gPiA+ID4gPgo+ID4gPiA+ID4gPiBXaXRoIG5vaHogYW5kIGhy
-dGltZXIgZW5hYmxlZCwgIHRpbWVyIHJlbGllcyBvbiBocnRpbWVyIHRvIGdlbmVyYXRlCj4gPiA+
-ID4gPiA+IHRoZSB0aWNrIHNvIHlvdSBzaG91bGQgdXNlIHRoZSBzYW1lIGludGVycnVwdC4KPiA+
-ID4gPiA+Cj4gPiA+ID4gPiBPSyB5ZWFoIGxvb2tzIGxpa2UgdGhhdCBwYXJ0IGlzIHdvcmtpbmcg
-anVzdCBmaW5lLgo+ID4gPiA+ID4KPiA+ID4gPiA+IEFkZGluZyBzb21lIHByaW50a3MgYW5kIGRl
-YnVnZ2luZyBvdmVyIHNzaCwgbG9va3MgbGlrZQo+ID4gPiA+ID4gb21hcDgyNTBfcnVudGltZV9y
-ZXN1bWUoKSBnZXRzIGNhbGxlZCBqdXN0IGZpbmUgYmFzZWQgb24gYSB3YWtlaXJxLAo+ID4gPiA+
-ID4gYnV0IHRoZW4gb21hcDgyNTBfcnVudGltZV9zdXNwZW5kKCkgcnVucyBpbW1lZGlhdGVseSBp
-bnN0ZWFkIG9mCj4gPiA+ID4gPiB3YWl0aW5nIGZvciB0aGUgdGhyZWUgc2Vjb25kIHRpbWVvdXQu
-Cj4gPiA+ID4gPgo+ID4gPiA+ID4gTG93ZXJpbmcgdGhlIGF1dG9zdXNwZW5kX2RlbGF5X21zIHRv
-IDIxMDAgbXMgbWFrZXMgdGhpbmdzIHdvcmsgYWdhaW4uCj4gPiA+ID4gPiBBbnl0aGluZyBoaWdo
-ZXIgdGhhbiAyMjAwIG1zIHNlZW1zIHRvIHNvbWVob3cgdGltZSBvdXQgaW1tZWRpYXRlbHkKPiA+
-ID4gPiA+IG5vdyA6KQo+ID4gPiA+Cj4gPiA+ID4gVGhpcyBpcyBxdWl0ZSBjbG9zZSB0byB0aGUg
-bWF4IG5zIG9mIGFuIGludCBvbiBhcm0gMzJiaXRzCj4gPiA+ID4KPiA+ID4gPiBDb3VsZCB5b3Ug
-dHJ5IHRoZSBwYXRjaCBiZWxvdyA/Cj4gPiA+ID4KPiA+ID4gPiAtLS0KPiA+ID4gPiAgZHJpdmVy
-cy9iYXNlL3Bvd2VyL3J1bnRpbWUuYyB8IDIgKy0KPiA+ID4gPiAgMSBmaWxlIGNoYW5nZWQsIDEg
-aW5zZXJ0aW9uKCspLCAxIGRlbGV0aW9uKC0pCj4gPiA+ID4KPiA+ID4gPiBkaWZmIC0tZ2l0IGEv
-ZHJpdmVycy9iYXNlL3Bvd2VyL3J1bnRpbWUuYyBiL2RyaXZlcnMvYmFzZS9wb3dlci9ydW50aW1l
-LmMKPiA+ID4gPiBpbmRleCA3MDYyNDY5Li40NGM1Yzc2IDEwMDY0NAo+ID4gPiA+IC0tLSBhL2Ry
-aXZlcnMvYmFzZS9wb3dlci9ydW50aW1lLmMKPiA+ID4gPiArKysgYi9kcml2ZXJzL2Jhc2UvcG93
-ZXIvcnVudGltZS5jCj4gPiA+ID4gQEAgLTE0MSw3ICsxNDEsNyBAQCB1NjQgcG1fcnVudGltZV9h
-dXRvc3VzcGVuZF9leHBpcmF0aW9uKHN0cnVjdCBkZXZpY2UgKmRldikKPiA+ID4gPgo+ID4gPiA+
-ICAgICAgIGxhc3RfYnVzeSA9IFJFQURfT05DRShkZXYtPnBvd2VyLmxhc3RfYnVzeSk7Cj4gPiA+
-ID4KPiA+ID4gPiAtICAgICBleHBpcmVzID0gbGFzdF9idXN5ICsgYXV0b3N1c3BlbmRfZGVsYXkg
-KiBOU0VDX1BFUl9NU0VDOwo+ID4gPiA+ICsgICAgIGV4cGlyZXMgPSBsYXN0X2J1c3kgKyAodTY0
-KShhdXRvc3VzcGVuZF9kZWxheSkgKiBOU0VDX1BFUl9NU0VDOwo+ID4gPiA+ICAgICAgIGlmIChl
-eHBpcmVzIDw9IG5vdykKPiA+ID4gPiAgICAgICAgICAgICAgIGV4cGlyZXMgPSAwOyAgICAvKiBB
-bHJlYWR5IGV4cGlyZWQuICovCj4gPiA+Cj4gPiA+IEhtbSwgY29tbWVudCBhYm92ZSBmdW5jdGlv
-biBzdGF0ZXMgaXQgcmV0dXJucyAidGhlIGV4cGlyYXRpb24gdGltZSBpbiBqaWZmaWVzCj4gPiA+
-IChhZGp1c3RlZCB0byBiZSBub256ZXJvKSIsIHNvIHRoZXJlJ3MgcHJvYmFibHkgbW9yZSB0byBm
-aXguLi4KPiA+Cj4gPiBUaGUgY29tbWVudCBpcyB3cm9uZyBhbmQgc2hvdWxkIGJlIHVwZGF0ZWQg
-YXMgY29tbWl0IDgyMzRmNjczNGM1ZCBoYXMKPiA+IG1vdmVkIG9uIGhydGltZXIgYW5kIGV4cGly
-ZXMgaXMgbm93IGluIHJhdyBucyB1bml0Cj4KPiBZdXAuIFdobydsbCBzZW5kIGEgcGF0Y2g/IElz
-IGl0IHdvcnRoIG9wdGltaXppbmcgYXMgYmVsbG93PyBJJ20gZmluZSB3aXRoIGRvaW5nCgpZb3Ug
-Y2FuIHNlbmQgYSBwYXRjaCBmb3IgdXBkYXRpbmcgdGhlIGNvbW1lbnQuCgo+IGJvdGguCgpSZWdh
-cmRpbmcgcHJvcG9zYWwgYmVsb3c6Ci0gcG1fcnVudGltZV9hdXRvc3VzcGVuZF9leHBpcmF0aW9u
-KCkgcmV0dXJucyB1NjQgYW5kIG5vdCBrdGltZV90Ci0gdXNlIGhlbHBlciBrdGltZV9iZWZvcmUv
-YWZ0ZXIgdG8gY29tcGFyZSBrdGltZV90IHZhbHVlCgpVc2luZyBrdGltZSBoZWxwZXIgZnVuY3Rp
-b24gbWFrZXMgdGhlIGNvZGUgbGVzcyByZWFkYWJsZSBhbmQgdGhlCnByb3Bvc2FsIG1ha2UgdGhl
-IGZ1bmN0aW9uIG1vcmUgZGlmZmljdWx0IHRvIHJlYWQgSU1ITyB3aGVuIHlvdQpjb21wYXJlCiAg
-ZXhwaXJlcyA9IGxhc3RfYnVzeSArIGF1dG9zdXNwZW5kX2RlbGF5ICogTlNFQ19QRVJfTVNFQzsK
-d2l0aAogIGV4cGlyZXMgPSBrdGltZV9hZGRfbnMobXNfdG9fa3RpbWUoYXV0b3N1c3BlbmRfZGVs
-YXkpLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICBSRUFEX09OQ0UoZGV2LT5wb3dlci5s
-YXN0X2J1c3kpKTsKb3Igd2hlbiB5b3UgY29tcGFyZQogaWYgKGV4cGlyZXMgPD0gbm93KQp3aXRo
-CiBpZiAoa3RpbWVfYWZ0ZXIobm93LCBleHBpcmVzKSkKCkFuZCAgSSdtIG5vdCBzdXJlIHRoYXQg
-dGhpcyB3aWxsIG9wdGltaXplIHRoZSBjb2RlIGF0IHRoZSBlbmQKCk9ubHkgdGhlIHJlcGxhY2Vt
-ZW50IG9mIHRoZSAiZ290byBvdXQiIGJ5IHJldHVybiAwIHdvdWxkIG1ha2Ugc2Vuc2UgSU1PCgpS
-ZWdhcmRzLApWaW5jZW50Cgo+Cj4gPiA+IFlvdSBjYW4gYWxzbyBjb25zaWRlciBjaGFuZ2UgbGlr
-ZSB0aGlzIChzdGlsbCBkb2VzIG5vdCByZXR1cm4gamlmZmllcyk6Cj4gPiA+IGRpZmYgLS1naXQg
-YS9kcml2ZXJzL2Jhc2UvcG93ZXIvcnVudGltZS5jIGIvZHJpdmVycy9iYXNlL3Bvd2VyL3J1bnRp
-bWUuYwo+ID4gPiBpbmRleCA3MDYyNDY5NWI2ZDUuLmM3MmVhZjIxYTYxYyAxMDA2NDQKPiA+ID4g
-LS0tIGEvZHJpdmVycy9iYXNlL3Bvd2VyL3J1bnRpbWUuYwo+ID4gPiArKysgYi9kcml2ZXJzL2Jh
-c2UvcG93ZXIvcnVudGltZS5jCj4gPiA+IEBAIC0xMjksMjMgKzEyOSwyMCBAQCBzdGF0aWMgdm9p
-ZCBwbV9ydW50aW1lX2NhbmNlbF9wZW5kaW5nKHN0cnVjdCBkZXZpY2UgKmRldikKPiA+ID4gIHU2
-NCBwbV9ydW50aW1lX2F1dG9zdXNwZW5kX2V4cGlyYXRpb24oc3RydWN0IGRldmljZSAqZGV2KQo+
-ID4gPiAgewo+ID4gPiAgICAgICAgIGludCBhdXRvc3VzcGVuZF9kZWxheTsKPiA+ID4gLSAgICAg
-ICB1NjQgbGFzdF9idXN5LCBleHBpcmVzID0gMDsKPiA+ID4gLSAgICAgICB1NjQgbm93ID0ga3Rp
-bWVfdG9fbnMoa3RpbWVfZ2V0KCkpOwo+ID4gPiArICAgICAgIGt0aW1lX3QgZXhwaXJlczsKPiA+
-ID4KPiA+ID4gICAgICAgICBpZiAoIWRldi0+cG93ZXIudXNlX2F1dG9zdXNwZW5kKQo+ID4gPiAt
-ICAgICAgICAgICAgICAgZ290byBvdXQ7Cj4gPiA+ICsgICAgICAgICAgICAgICByZXR1cm4gMDsK
-PiA+ID4KPiA+ID4gICAgICAgICBhdXRvc3VzcGVuZF9kZWxheSA9IFJFQURfT05DRShkZXYtPnBv
-d2VyLmF1dG9zdXNwZW5kX2RlbGF5KTsKPiA+ID4gICAgICAgICBpZiAoYXV0b3N1c3BlbmRfZGVs
-YXkgPCAwKQo+ID4gPiAtICAgICAgICAgICAgICAgZ290byBvdXQ7Cj4gPiA+IC0KPiA+ID4gLSAg
-ICAgICBsYXN0X2J1c3kgPSBSRUFEX09OQ0UoZGV2LT5wb3dlci5sYXN0X2J1c3kpOwo+ID4gPiAr
-ICAgICAgICAgICAgICAgcmV0dXJuIDA7Cj4gPiA+Cj4gPiA+IC0gICAgICAgZXhwaXJlcyA9IGxh
-c3RfYnVzeSArIGF1dG9zdXNwZW5kX2RlbGF5ICogTlNFQ19QRVJfTVNFQzsKPiA+ID4gLSAgICAg
-ICBpZiAoZXhwaXJlcyA8PSBub3cpCj4gPiA+IC0gICAgICAgICAgICAgICBleHBpcmVzID0gMDsg
-ICAgLyogQWxyZWFkeSBleHBpcmVkLiAqLwo+ID4gPiArICAgICAgIGV4cGlyZXMgPSBrdGltZV9h
-ZGRfbnMobXNfdG9fa3RpbWUoYXV0b3N1c3BlbmRfZGVsYXkpLAo+ID4gPiArICAgICAgICAgICAg
-ICAgICAgICAgICAgICAgICAgUkVBRF9PTkNFKGRldi0+cG93ZXIubGFzdF9idXN5KSk7Cj4gPiA+
-ICsgICAgICAgaWYgKGV4cGlyZXMgPD0ga3RpbWVfZ2V0KCkpCj4gPiA+ICsgICAgICAgICAgICAg
-ICByZXR1cm4gMDsgICAgICAgLyogQWxyZWFkeSBleHBpcmVkLiAqLwo+ID4gPgo+ID4gPiAtIG91
-dDoKPiA+ID4gICAgICAgICByZXR1cm4gZXhwaXJlczsKPiA+ID4gIH0KPiA+ID4gIEVYUE9SVF9T
-WU1CT0xfR1BMKHBtX3J1bnRpbWVfYXV0b3N1c3BlbmRfZXhwaXJhdGlvbik7Cj4gPiA+Cj4gPiA+
-IFJlZ2FyZHMsCj4gPiA+ICAgICAgICAgbGFkaXMKCl9fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4
-LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9y
-Zy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+From: Stefan Agner <stefan@agner.ch>
+
+This prepares the MFD for the STMPE ADC driver. This commit introduces
+devicetree settings that are used by the ADC and adds an init function.
+Common ADC settings that are shared with the touchscreen driver can now
+reside in the overlying MFD.
+
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+Signed-off-by: Max Krummenacher <max.krummenacher@toradex.com>
+Signed-off-by: Philippe Schenker <philippe.schenker@toradex.com>
+Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+
+---
+
+Changes in v6: None
+Changes in v5:
+ - Added Lee Jone's Ack
+ - Changed author of commit. Previous patch versions author was wrong
+   by mistake.
+
+Changes in v4:
+ - New patch: split mfd changes into this precursor patch
+ - Export the added stmpe811_adc_commmon_init function
+ - Disabling adc when mfd is removed
+
+Changes in v3: None
+Changes in v2:
+ - Move code to setup ADC to MFD device, as it is used by both drivers
+   adc and touchscreen
+
+ drivers/mfd/Kconfig       |  3 +-
+ drivers/mfd/stmpe.c       | 68 +++++++++++++++++++++++++++++++++++++++
+ include/linux/mfd/stmpe.h | 10 ++++++
+ 3 files changed, 80 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 8c5dfdce4326..bba159e8eaa4 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -1204,7 +1204,7 @@ config MFD_STMPE
+ 
+ 	  Currently supported devices are:
+ 
+-		STMPE811: GPIO, Touchscreen
++		STMPE811: GPIO, Touchscreen, ADC
+ 		STMPE1601: GPIO, Keypad
+ 		STMPE1801: GPIO, Keypad
+ 		STMPE2401: GPIO, Keypad
+@@ -1217,6 +1217,7 @@ config MFD_STMPE
+ 		GPIO: stmpe-gpio
+ 		Keypad: stmpe-keypad
+ 		Touchscreen: stmpe-ts
++		ADC: stmpe-adc
+ 
+ menu "STMicroelectronics STMPE Interface Drivers"
+ depends on MFD_STMPE
+diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
+index 566caca4efd8..f582531a8f3e 100644
+--- a/drivers/mfd/stmpe.c
++++ b/drivers/mfd/stmpe.c
+@@ -463,6 +463,28 @@ static const struct mfd_cell stmpe_ts_cell = {
+ 	.num_resources	= ARRAY_SIZE(stmpe_ts_resources),
+ };
+ 
++/*
++ * ADC (STMPE811)
++ */
++
++static struct resource stmpe_adc_resources[] = {
++	{
++		.name	= "STMPE_TEMP_SENS",
++		.flags	= IORESOURCE_IRQ,
++	},
++	{
++		.name	= "STMPE_ADC",
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static const struct mfd_cell stmpe_adc_cell = {
++	.name		= "stmpe-adc",
++	.of_compatible	= "st,stmpe-adc",
++	.resources	= stmpe_adc_resources,
++	.num_resources	= ARRAY_SIZE(stmpe_adc_resources),
++};
++
+ /*
+  * STMPE811 or STMPE610
+  */
+@@ -497,6 +519,11 @@ static struct stmpe_variant_block stmpe811_blocks[] = {
+ 		.irq	= STMPE811_IRQ_TOUCH_DET,
+ 		.block	= STMPE_BLOCK_TOUCHSCREEN,
+ 	},
++	{
++		.cell	= &stmpe_adc_cell,
++		.irq	= STMPE811_IRQ_TEMP_SENS,
++		.block	= STMPE_BLOCK_ADC,
++	},
+ };
+ 
+ static int stmpe811_enable(struct stmpe *stmpe, unsigned int blocks,
+@@ -517,6 +544,35 @@ static int stmpe811_enable(struct stmpe *stmpe, unsigned int blocks,
+ 				enable ? 0 : mask);
+ }
+ 
++int stmpe811_adc_common_init(struct stmpe *stmpe)
++{
++	int ret;
++	u8 adc_ctrl1, adc_ctrl1_mask;
++
++	adc_ctrl1 = STMPE_SAMPLE_TIME(stmpe->sample_time) |
++		    STMPE_MOD_12B(stmpe->mod_12b) |
++		    STMPE_REF_SEL(stmpe->ref_sel);
++	adc_ctrl1_mask = STMPE_SAMPLE_TIME(0xff) | STMPE_MOD_12B(0xff) |
++			 STMPE_REF_SEL(0xff);
++
++	ret = stmpe_set_bits(stmpe, STMPE811_REG_ADC_CTRL1,
++			adc_ctrl1_mask, adc_ctrl1);
++	if (ret) {
++		dev_err(stmpe->dev, "Could not setup ADC\n");
++		return ret;
++	}
++
++	ret = stmpe_set_bits(stmpe, STMPE811_REG_ADC_CTRL2,
++			STMPE_ADC_FREQ(0xff), STMPE_ADC_FREQ(stmpe->adc_freq));
++	if (ret) {
++		dev_err(stmpe->dev, "Could not setup ADC\n");
++		return ret;
++	}
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(stmpe811_adc_common_init);
++
+ static int stmpe811_get_altfunc(struct stmpe *stmpe, enum stmpe_block block)
+ {
+ 	/* 0 for touchscreen, 1 for GPIO */
+@@ -1325,6 +1381,7 @@ int stmpe_probe(struct stmpe_client_info *ci, enum stmpe_partnum partnum)
+ 	struct device_node *np = ci->dev->of_node;
+ 	struct stmpe *stmpe;
+ 	int ret;
++	u32 val;
+ 
+ 	pdata = devm_kzalloc(ci->dev, sizeof(*pdata), GFP_KERNEL);
+ 	if (!pdata)
+@@ -1342,6 +1399,15 @@ int stmpe_probe(struct stmpe_client_info *ci, enum stmpe_partnum partnum)
+ 	mutex_init(&stmpe->irq_lock);
+ 	mutex_init(&stmpe->lock);
+ 
++	if (!of_property_read_u32(np, "st,sample-time", &val))
++		stmpe->sample_time = val;
++	if (!of_property_read_u32(np, "st,mod-12b", &val))
++		stmpe->mod_12b = val;
++	if (!of_property_read_u32(np, "st,ref-sel", &val))
++		stmpe->ref_sel = val;
++	if (!of_property_read_u32(np, "st,adc-freq", &val))
++		stmpe->adc_freq = val;
++
+ 	stmpe->dev = ci->dev;
+ 	stmpe->client = ci->client;
+ 	stmpe->pdata = pdata;
+@@ -1433,6 +1499,8 @@ int stmpe_remove(struct stmpe *stmpe)
+ 	if (!IS_ERR(stmpe->vcc))
+ 		regulator_disable(stmpe->vcc);
+ 
++	__stmpe_disable(stmpe, STMPE_BLOCK_ADC);
++
+ 	mfd_remove_devices(stmpe->dev);
+ 
+ 	return 0;
+diff --git a/include/linux/mfd/stmpe.h b/include/linux/mfd/stmpe.h
+index c0353f6431f9..07f55aac9390 100644
+--- a/include/linux/mfd/stmpe.h
++++ b/include/linux/mfd/stmpe.h
+@@ -21,6 +21,9 @@
+ #define STMPE_I_DRIVE(x)	(x & 0x1)
+ #define STMPE_OP_MODE(x)	((x & 0x7) << 1)
+ 
++#define STMPE811_REG_ADC_CTRL1	0x20
++#define STMPE811_REG_ADC_CTRL2	0x21
++
+ struct device;
+ struct regulator;
+ 
+@@ -134,6 +137,12 @@ struct stmpe {
+ 	u8 ier[2];
+ 	u8 oldier[2];
+ 	struct stmpe_platform_data *pdata;
++
++	/* For devices that use an ADC */
++	u8 sample_time;
++	u8 mod_12b;
++	u8 ref_sel;
++	u8 adc_freq;
+ };
+ 
+ extern int stmpe_reg_write(struct stmpe *stmpe, u8 reg, u8 data);
+@@ -147,6 +156,7 @@ extern int stmpe_set_altfunc(struct stmpe *stmpe, u32 pins,
+ 			     enum stmpe_block block);
+ extern int stmpe_enable(struct stmpe *stmpe, unsigned int blocks);
+ extern int stmpe_disable(struct stmpe *stmpe, unsigned int blocks);
++extern int stmpe811_adc_common_init(struct stmpe *stmpe);
+ 
+ #define STMPE_GPIO_NOREQ_811_TOUCH	(0xf0)
+ 
+-- 
+2.20.1
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
