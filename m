@@ -2,23 +2,22 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-11.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B2CA2C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 22:30:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0F2CBC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 22:36:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 81346206BB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 22:30:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CBDE3206BB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 22:36:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YFNvGvsG";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="Xr55jgAi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 81346206BB
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ru/rPgr0";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="xyjlDxsm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CBDE3206BB
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,61 +25,51 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=PPHVHJF51TenrD0g8rLRvg7mO09hfPWhgSTc/ZY0jvU=; b=YFNvGvsGVDD6XX
-	noM3zPbl753VKJK8iZnsiAm2QdPvuTMAFGv6XioUfAmshOIdaYnCavxu8sQpHooCdTRrexKoNaMGv
-	5PshOedig8KquTejuvCr+bL9U5TgVIx0lr95pxmEqxLhSM9iH769hPR4x7iG9lO+/Jw2WVJBaHNlQ
-	I0SKxE/NduUPsapyhpIcgak1Z+G1Lx7CRr1rGuRRSDzQwF8bfhq8nZaZa0vg/Hy/L8sqgrpDFqPaq
-	rSMY3c1y0XMQ1B2oYV6b5ct/ZyzZwLS48cGKzfxfLNc1Gd/7fEmej8CpWX1tRGP/qm1Pt0fee2bqh
-	ht79UIqeNjZu9K5vkdGQ==;
+	List-Owner; bh=CkaYLa9+HaNOuIvvVP6XILWawjXFmR3iiH5GHk6SGPE=; b=Ru/rPgr0WRpDsP
+	g5JCPqhSXzm+ZEuPX1KFw9HHV3EiPePQ78llaqWOYoXsrQuwRhb7kp59HqtZ/obcWDGTWKecfMxpm
+	Q8Jgz2BZFEJCHM0KIc6Wtee/Z/Hyk7KXrjjwTyNyYuRC7k5MhTeXaBPaDbaf60cU/R0EkwoUsOVfl
+	RRLaNdTd4E/7bMZzZsQbC39p2qv+V1yqJq+L2yCjQzwhU3ild3TnjQOh6x3Dt8BRQDU6GPFGXAzMJ
+	4nXc1JTRBgJ71938Qjm3kF+8iZNsPExwP/wHF3LQwYnCCryQCGv+L6V8EWuw1KpXu8O5fSQ2l/jhN
+	m3tPsiOwQYrKGSm4Pc7A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghMMy-0002Zv-3f; Wed, 09 Jan 2019 22:30:40 +0000
-Received: from mail-ot1-x343.google.com ([2607:f8b0:4864:20::343])
+	id 1ghMSw-0004VG-0a; Wed, 09 Jan 2019 22:36:50 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghMMu-0002ZJ-Ro
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 22:30:38 +0000
-Received: by mail-ot1-x343.google.com with SMTP id k98so8209614otk.3
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 09 Jan 2019 14:30:36 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=googlemail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=xLWY6Pk/ualqBVtv+OfnoGEuQRZ9pIAPaVj1nvw9h/c=;
- b=Xr55jgAiVrMt/SKUOwSy3JhjfieyRHJqOlLNx2YsJNzJnSp2VhGrPYkgzAPVCIn5C0
- VQXiKH9ENIoNzIl6cJR79y3bAGIEfht2JNNjs34kFFt74W6DZNDlUcly/QvAQu0ePLph
- CdgAQWXOunKtbJJkKwK52Geifug7VMp5h/WcNloOxGNnvlYW8Rm4M++kd4bnsiLbD9Zh
- Vzk0PZRmjRul9bGQxXxHYP1lIdyDW/oFJ40u4b8P5mx0IkuUVZgXUDnmALz32WrOK0+f
- YKaEkqfPNwwBENbAsc0aTqTtMtJGuJ+oqWHkj+tVzAV+QDAy3rrvD0IXBLkXjXTTWVUb
- UqRQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=xLWY6Pk/ualqBVtv+OfnoGEuQRZ9pIAPaVj1nvw9h/c=;
- b=DwnBY0OGr6pzuG1502wQvsyUJKXRIoC463CYJJAfLyqUKgZ4uJIkWEX+SYui/Nzmv6
- 0t8gMdyQGkIG/HrhgsD2bqcgtKg1+NdvEgih6S0AoT6zSGi+Ak7KCBMI4McdxKAPTiG1
- qaBzll3OL5xdemcX0khzHkTPPVdvZDXri7KpKhxsWSgvkLVyH9okH5jIOkx2LZn2lri/
- Mwy3JBWwWvQrcfVLcRmQ7yqAfUUMngk+HeLwdaAaK8MEfosba2mpR/kIwAl3DfH5geNy
- qt4xE/1jH7J4SwuSKnUSgFxbRKY8gweeW2KSJAI6fuV+r+m9h6evUYFOzM65PCeS23TD
- R91Q==
-X-Gm-Message-State: AJcUukeb2svBfqay1bboNdfmDU7/j+oLJnRlv76Bm6Y92wmvMfMYrGIj
- ePc8RVnFa/vzgiDhJBjJsUIW+pIb956+dUjxlag=
-X-Google-Smtp-Source: ALg8bN4KMr5LYE/CvqC1gBMKCYEb9cuejjk3Bnd9kCO9zHMbKGdbgZRVUjLdyxZCqMkoSCdWBdOsdqY4NXAtnNmr458=
-X-Received: by 2002:a9d:715d:: with SMTP id y29mr5331851otj.148.1547073035745; 
- Wed, 09 Jan 2019 14:30:35 -0800 (PST)
+ id 1ghMSr-0004Up-Rj; Wed, 09 Jan 2019 22:36:47 +0000
+Received: from mail-wm1-f42.google.com (mail-wm1-f42.google.com
+ [209.85.128.42])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id C411B20859;
+ Wed,  9 Jan 2019 22:36:44 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1547073405;
+ bh=NVODrl36tVRwjwU3uYpAGfxPK2KVsqivgoJi//Yxz0A=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=xyjlDxsmsBfGaP1sVYqKA5ebVuGu8QzcYFbKfUVUD6NYqCIJ5Mlq8NfMtmn886vpF
+ hDtIShD29lMh73qVN1qWwrsKgpgYDGzBxlYrVr2tlA4TiDMTOA+ojvnxHkGcIgf0wZ
+ 3yJLkCycqdEe5FvJ2pP71f3SnjnJzsAu9qBn6e3o=
+Received: by mail-wm1-f42.google.com with SMTP id r24so11987047wmh.0;
+ Wed, 09 Jan 2019 14:36:44 -0800 (PST)
+X-Gm-Message-State: AJcUukcsRgOCNzf0c/ugnK+IPciGwYjkiRb4CTLAz7bL7mfF/rWk+V0r
+ RMMlecH/7b5n250S20EXNMnRFRbvJT8bkS0FQZo=
+X-Google-Smtp-Source: ALg8bN4JLaklnBsZLevGFC0WuDFpoj6LltFJv9AwqwfjbOygPdEwKX8uavgvE6LoK/MJ+xCaC9hAjjJDpv9tbpkBJnA=
+X-Received: by 2002:a1c:4d12:: with SMTP id o18mr7697032wmh.92.1547073403098; 
+ Wed, 09 Jan 2019 14:36:43 -0800 (PST)
 MIME-Version: 1.0
-References: <20181223235836.12466-1-martin.blumenstingl@googlemail.com>
- <20181223235836.12466-2-martin.blumenstingl@googlemail.com>
- <154705938114.15366.1098954164811397084@swboyd.mtv.corp.google.com>
-In-Reply-To: <154705938114.15366.1098954164811397084@swboyd.mtv.corp.google.com>
-From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Date: Wed, 9 Jan 2019 23:30:24 +0100
-Message-ID: <CAFBinCAginPSuBObJE52puvbay-S698OjAj6aLEm5kfn0SdU0A@mail.gmail.com>
-Subject: Re: [PATCH 1/1] clk: meson: meson8b: fix naming of the APB clocks
-To: Stephen Boyd <sboyd@kernel.org>, Neil Armstrong <narmstrong@baylibre.com>
+References: <64a23e6f8751ee6f1387a611a9d5dba43694b0d0.1546999151.git.ryder.lee@mediatek.com>
+In-Reply-To: <64a23e6f8751ee6f1387a611a9d5dba43694b0d0.1546999151.git.ryder.lee@mediatek.com>
+From: Sean Wang <sean.wang@kernel.org>
+Date: Wed, 9 Jan 2019 14:38:00 -0800
+X-Gmail-Original-Message-ID: <CAGp9Lzo9K4CaY=0m4i9STC0dCVqzojAz8CKP5FBKtoVghnL+Aw@mail.gmail.com>
+Message-ID: <CAGp9Lzo9K4CaY=0m4i9STC0dCVqzojAz8CKP5FBKtoVghnL+Aw@mail.gmail.com>
+Subject: Re: [PATCH] pinctrl: mediatek: fix build errors for moore core when
+ CONFIG_OF is not enabled
+To: Ryder Lee <ryder.lee@mediatek.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_143036_920803_C0FF4736 
-X-CRM114-Status: GOOD (  12.67  )
+X-CRM114-CacheID: sfid-20190109_143645_935126_74ED2FDD 
+X-CRM114-Status: GOOD (  20.27  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,45 +81,246 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mturquette@baylibre.com, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, jbrunet@baylibre.com
+Cc: Linus Walleij <linus.walleij@linaro.org>,
+ Weijie Gao <weijie.gao@mediatek.com>, linux-kernel@vger.kernel.org,
+ stable@vger.kernel.org, linux-gpio@vger.kernel.org,
+ linux-mediatek@lists.infradead.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Stephen, Hi Neil,
-
-On Wed, Jan 9, 2019 at 7:43 PM Stephen Boyd <sboyd@kernel.org> wrote:
+On Tue, Jan 8, 2019 at 6:14 PM Ryder Lee <ryder.lee@mediatek.com> wrote:
 >
-> Quoting Martin Blumenstingl (2018-12-23 15:58:36)
-> > Fix a typo in the APB clock names by renaming them from "abp" to "apb".
-> > No functional changes.
-> >
-> > Fixes: 8e1dd17c8b0e3f ("dt-bindings: clock: meson8b: export the CPU post dividers")
-> > Fixes: a7d19b05ce817d ("clk: meson: meson8b: add the CPU clock post divider clocks")
-> > Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> > ---
+> on i386 or x86_64:
 >
-> Can I apply this directly to fixes? Or it's not critical so we can punt
-> until next merge window?
-actually it's not critical:
-I'm not aware of any IP block that I needs the APB clock as input (I'm
-pretty sure there is some, but I'm not aware of it so it can wait).
+> Lots of build errors for drivers/pinctrl/mediatek/pinctrl-moore.c when
+> CONFIG_OF is not enabled (but COMPILE_TEST is).
+>
+> first this:
+> WARNING: unmet direct dependencies detected for PINCTRL_MTK_MOORE
+>   Depends on [n]: PINCTRL [=y] && (ARCH_MEDIATEK || COMPILE_TEST [=y]) && OF [=n]
+>   Selected by [y]:
+>   - PINCTRL_MT7623 [=y] && PINCTRL [=y] && (ARCH_MEDIATEK || COMPILE_TEST [=y]) && (MACH_MT7623 || COMPILE_TEST [=y])
+>
+> and then:
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:22:44: error: array type has incomplete element type
+>  static const struct pinconf_generic_params mtk_custom_bindings[] = {
+>                                             ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c: In function 'mtk_pinmux_set_mux':
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:46:2: error: implicit declaration of function 'pinmux_generic_get_function' [-Werror=implicit-function-declaration]
+>   func = pinmux_generic_get_function(pctldev, selector);
+>   ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:46:7: warning: assignment makes pointer from integer without a cast [enabled by default]
+>   func = pinmux_generic_get_function(pctldev, selector);
+>        ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:50:2: error: implicit declaration of function 'pinctrl_generic_get_group' [-Werror=implicit-function-declaration]
+>   grp = pinctrl_generic_get_group(pctldev, group);
+>   ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:50:6: warning: assignment makes pointer from integer without a cast [enabled by default]
+>   grp = pinctrl_generic_get_group(pctldev, group);
+>       ^
+> In file included from ../include/linux/printk.h:331:0,
+>                  from ../include/linux/kernel.h:14,
+>                  from ../include/linux/list.h:9,
+>                  from ../include/linux/kobject.h:19,
+>                  from ../include/linux/device.h:16,
+>                  from ../include/linux/gpio/driver.h:5,
+>                  from ../drivers/pinctrl/mediatek/pinctrl-moore.c:11:
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:55:7: error: dereferencing pointer to incomplete type
+>    func->name, grp->name);
+>        ^
+> ../include/linux/dynamic_debug.h:136:9: note: in definition of macro 'dynamic_dev_dbg'
+>        ##__VA_ARGS__);  \
+>          ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:54:2: note: in expansion of macro 'dev_dbg'
+>   dev_dbg(pctldev->dev, "enable function %s group %s\n",
+>   ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:55:18: error: dereferencing pointer to incomplete type
+>    func->name, grp->name);
+>                   ^
+> ../include/linux/dynamic_debug.h:136:9: note: in definition of macro 'dynamic_dev_dbg'
+>        ##__VA_ARGS__);  \
+>          ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:54:2: note: in expansion of macro 'dev_dbg'
+>   dev_dbg(pctldev->dev, "enable function %s group %s\n",
+>   ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:57:21: error: dereferencing pointer to incomplete type
+>   for (i = 0; i < grp->num_pins; i++) {
+>                      ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:59:23: error: dereferencing pointer to incomplete type
+>    int *pin_modes = grp->data;
+>                        ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:60:16: error: dereferencing pointer to incomplete type
+>    int pin = grp->pins[i];
+>                 ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c: In function 'mtk_pinconf_group_get':
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:357:2: error: implicit declaration of function 'pinctrl_generic_get_group_pins' [-Werror=implicit-function-declaration]
+>   ret = pinctrl_generic_get_group_pins(pctldev, group, &pins, &npins);
+>   ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c: At top level:
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:397:22: error: 'pinctrl_generic_get_group_count' undeclared here (not in a function)
+>   .get_groups_count = pinctrl_generic_get_group_count,
+>                       ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:398:20: error: 'pinctrl_generic_get_group_name' undeclared here (not in a function)
+>   .get_group_name = pinctrl_generic_get_group_name,
+>                     ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:399:20: error: 'pinctrl_generic_get_group_pins' undeclared here (not in a function)
+>   .get_group_pins = pinctrl_generic_get_group_pins,
+>                     ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:400:20: error: 'pinconf_generic_dt_node_to_map_all' undeclared here (not in a function)
+>   .dt_node_to_map = pinconf_generic_dt_node_to_map_all,
+>                     ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:401:17: error: 'pinconf_generic_dt_free_map' undeclared here (not in a function)
+>   .dt_free_map = pinconf_generic_dt_free_map,
+>                  ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:405:25: error: 'pinmux_generic_get_function_count' undeclared here (not in a function)
+>   .get_functions_count = pinmux_generic_get_function_count,
+>                          ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:406:23: error: 'pinmux_generic_get_function_name' undeclared here (not in a function)
+>   .get_function_name = pinmux_generic_get_function_name,
+>                        ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:407:25: error: 'pinmux_generic_get_function_groups' undeclared here (not in a function)
+>   .get_function_groups = pinmux_generic_get_function_groups,
+>                          ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c: In function 'mtk_build_gpiochip':
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:521:6: error: 'struct gpio_chip' has no member named 'of_node'
+>   chip->of_node  = np;
+>       ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:522:6: error: 'struct gpio_chip' has no member named 'of_gpio_n_cells'
+>   chip->of_gpio_n_cells = 2;
+>       ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c: In function 'mtk_build_groups':
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:552:16: error: invalid use of undefined type 'struct group_desc'
+>    const struct group_desc *group = hw->soc->grps + i;
+>                 ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:554:3: error: implicit declaration of function 'pinctrl_generic_add_group' [-Werror=implicit-function-declaration]
+>    err = pinctrl_generic_add_group(hw->pctrl, group->name,
+>    ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:554:51: error: dereferencing pointer to incomplete type
+>    err = pinctrl_generic_add_group(hw->pctrl, group->name,
+>                                                    ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:555:12: error: dereferencing pointer to incomplete type
+>        group->pins, group->num_pins,
+>             ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:555:25: error: dereferencing pointer to incomplete type
+>        group->pins, group->num_pins,
+>                          ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:556:12: error: dereferencing pointer to incomplete type
+>        group->data);
+>             ^
+> In file included from ../include/linux/gpio/driver.h:5:0,
+>                  from ../drivers/pinctrl/mediatek/pinctrl-moore.c:11:
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:559:10: error: dereferencing pointer to incomplete type
+>      group->name);
+>           ^
+> ../include/linux/device.h:1463:32: note: in definition of macro 'dev_err'
+>   _dev_err(dev, dev_fmt(fmt), ##__VA_ARGS__)
+>                                 ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c: In function 'mtk_build_functions':
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:572:16: error: invalid use of undefined type 'struct function_desc'
+>    const struct function_desc *func = hw->soc->funcs + i;
+>                 ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:574:3: error: implicit declaration of function 'pinmux_generic_add_function' [-Werror=implicit-function-declaration]
+>    err = pinmux_generic_add_function(hw->pctrl, func->name,
+>    ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:574:52: error: dereferencing pointer to incomplete type
+>    err = pinmux_generic_add_function(hw->pctrl, func->name,
+>                                                     ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:575:13: error: dereferencing pointer to incomplete type
+>          func->group_names,
+>              ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:576:13: error: dereferencing pointer to incomplete type
+>          func->num_group_names,
+>              ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:577:13: error: dereferencing pointer to incomplete type
+>          func->data);
+>              ^
+> In file included from ../include/linux/gpio/driver.h:5:0,
+>                  from ../drivers/pinctrl/mediatek/pinctrl-moore.c:11:
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:580:9: error: dereferencing pointer to incomplete type
+>      func->name);
+>          ^
+> ../include/linux/device.h:1463:32: note: in definition of macro 'dev_err'
+>   _dev_err(dev, dev_fmt(fmt), ##__VA_ARGS__)
+>                                 ^
+> In file included from ../include/linux/kernel.h:15:0,
+>                  from ../include/linux/list.h:9,
+>                  from ../include/linux/kobject.h:19,
+>                  from ../include/linux/device.h:16,
+>                  from ../include/linux/gpio/driver.h:5,
+>                  from ../drivers/pinctrl/mediatek/pinctrl-moore.c:11:
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c: In function 'mtk_moore_pinctrl_probe':
+> ../include/linux/build_bug.h:16:45: error: bit-field '<anonymous>' width not an integer constant
+>  #define BUILD_BUG_ON_ZERO(e) (sizeof(struct { int:(-!!(e)); }))
+>                                              ^
+> ../include/linux/compiler.h:349:28: note: in expansion of macro 'BUILD_BUG_ON_ZERO'
+>  #define __must_be_array(a) BUILD_BUG_ON_ZERO(__same_type((a), &(a)[0]))
+>                             ^
+> ../include/linux/kernel.h:72:59: note: in expansion of macro '__must_be_array'
+>  #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
+>                                                            ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:643:31: note: in expansion of macro 'ARRAY_SIZE'
+>   mtk_desc.num_custom_params = ARRAY_SIZE(mtk_custom_bindings);
+>                                ^
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c: At top level:
+> ../drivers/pinctrl/mediatek/pinctrl-moore.c:22:44: warning: 'mtk_custom_bindings' defined but not used [-Wunused-variable]
+>  static const struct pinconf_generic_params mtk_custom_bindings[] = {
+>                                             ^
+> cc1: some warnings being treated as errors
+> ../scripts/Makefile.build:276: recipe for target 'drivers/pinctrl/mediatek/pinctrl-moore.o' failed
+> make[4]: *** [drivers/pinctrl/mediatek/pinctrl-moore.o] Error 1
+>
+> Fixes: b5af33df50e9 ("pinctrl: mediatek: improve Kconfig dependencies")
+> Cc: stable@vger.kernel.org
+> Reported-by: Randy Dunlap <rdunlap@infradead.org>
+> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 
-Neil already applied another patch for -next which conflicts with this.
-we can choose now:
-1. Stephen takes this patch, Neil drops the (conflicting) GPU clock
-patches from -next and I re-send the GPU clock patches
-2. Stephen and Neil don't do anything, I re-send this patch on top of
-the GPU clock patches
+The content looks good to me
 
-I'm fine either way, but #2 is less work for you guys.
-if I don't hear back from you then I'll go with option #2
+Acked-by: Sean Wang <sean.wang@kernel.org>
 
+Hi Linus,
 
-Regards
-Martin
+If you don't like such a long message, you can feel free trim it to a
+short one when you merge.
+
+Sean
+
+> ---
+>  drivers/pinctrl/mediatek/Kconfig | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/drivers/pinctrl/mediatek/Kconfig b/drivers/pinctrl/mediatek/Kconfig
+> index 1817786..a005cbc 100644
+> --- a/drivers/pinctrl/mediatek/Kconfig
+> +++ b/drivers/pinctrl/mediatek/Kconfig
+> @@ -45,12 +45,14 @@ config PINCTRL_MT2701
+>  config PINCTRL_MT7623
+>         bool "Mediatek MT7623 pin control with generic binding"
+>         depends on MACH_MT7623 || COMPILE_TEST
+> +       depends on OF
+>         default MACH_MT7623
+>         select PINCTRL_MTK_MOORE
+>
+>  config PINCTRL_MT7629
+>         bool "Mediatek MT7629 pin control"
+>         depends on MACH_MT7629 || COMPILE_TEST
+> +       depends on OF
+>         default MACH_MT7629
+>         select PINCTRL_MTK_MOORE
+>
+> @@ -92,6 +94,7 @@ config PINCTRL_MT6797
+>
+>  config PINCTRL_MT7622
+>         bool "MediaTek MT7622 pin control"
+> +       depends on OF
+>         depends on ARM64 || COMPILE_TEST
+>         default ARM64 && ARCH_MEDIATEK
+>         select PINCTRL_MTK_MOORE
+> --
+> 1.9.1
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
