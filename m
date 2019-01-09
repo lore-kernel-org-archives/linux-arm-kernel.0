@@ -2,71 +2,72 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CDACBC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 12:31:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D7CF3C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 12:33:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9916120665
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 12:31:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A6DDF20660
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 12:33:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nyHrIYkX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9916120665
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K+S08jcx";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="Fu/39nkJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A6DDF20660
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=01wm+9Jh/TZC1yBU+dLadOGyXyET1BIW3yI5Yr/T5CE=; b=nyHrIYkXFGfR2p
-	BvYDF0HVMe3jK+zHpKULlmgbMWV+YMh41jZg7QW+qheMzQ4tP1/6JO3019aoM0fR0U0bbNcOyEGbL
-	BiHHSDGubmU/3dKkh1M51jLzbOG/bpfpXSwXLdP7M/FMBrDsRxPvmnO3IKJiMmkl916IAO/t5c/+D
-	YHuThgyVmfFlWsQj6ARgpB5651BBFA/PEYbithtXcXVv0j+Yc20WeU3MrTtDEOhJqY3q6X/LcaXnT
-	zg77241nVjXvUNF+K3MjQQG1Qg0p28Ng7FXPOUz3iZyeYwdVLjbDlNW79t6pdN6LhhMkiWSA1D2Nv
-	YHt1rQZC0QZb5Its+oEg==;
+	List-Owner; bh=HHv9A4VO1SuTX0jNJaREoht5bQSfahl/QxAD+Dyl8gQ=; b=K+S08jcxm/notr
+	/d687Fs4k7iakrH1PAnYTjMkvBYd3m06gYXAJCZfQgwwdKKcFLSMIH8mzmflsN9OawYaSEQ4Cwu+g
+	WD2jLt7SZMTJWJYiDbT3+jS4JnBH1zuTonEw0swlykNDU8fCDjNwOHItHMWB63sYbLUFDl78JKJ+2
+	348kTlROJxnHC2fSqvHMUcX3Jyke6xyuS/N1HdiD0wRKYXidMmq3NN/veFTlbh440a23+k4CADPb+
+	bv9aZJ3HtaoYxTOBmPn+0XY6HgWS/ZbEGD735BfTwVmAULNQRLw9y/zgQPVFOkSDQgdHwdcyilnW3
+	i0JAsIy2AsRvHD5jlBWQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghD12-0004rH-RW; Wed, 09 Jan 2019 12:31:24 +0000
-Received: from mailgw02.mediatek.com ([216.200.240.185])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghD0z-0004qL-0M; Wed, 09 Jan 2019 12:31:23 +0000
-X-UUID: 1751dd398df44348b2be5f6272540491-20190109
-X-UUID: 1751dd398df44348b2be5f6272540491-20190109
-Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw02.mediatek.com
- (envelope-from <min.guo@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 956320011; Wed, 09 Jan 2019 04:31:13 -0800
-Received: from MTKMBS31N2.mediatek.inc (172.27.4.87) by
- MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Wed, 9 Jan 2019 04:31:11 -0800
-Received: from MTKCAS36.mediatek.inc (172.27.4.186) by MTKMBS31N2.mediatek.inc
- (172.27.4.87) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Wed, 9 Jan 2019 20:31:08 +0800
-Received: from [10.17.3.153] (10.17.3.153) by MTKCAS36.mediatek.inc
- (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Wed, 9 Jan 2019 20:31:08 +0800
-Message-ID: <1547037068.4433.122.camel@mhfsdcap03>
-Subject: Re: [PATCH 4/4] usb: musb: Add support for MediaTek musb controller
-From: Min Guo <min.guo@mediatek.com>
-To: Bin Liu <b-liu@ti.com>
-Date: Wed, 9 Jan 2019 20:31:08 +0800
-In-Reply-To: <20190108154441.GG25910@uda0271908>
-References: <1545896066-897-1-git-send-email-min.guo@mediatek.com>
- <1545896066-897-5-git-send-email-min.guo@mediatek.com>
- <20190108154441.GG25910@uda0271908>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+	id 1ghD2f-0005Hl-Hd; Wed, 09 Jan 2019 12:33:05 +0000
+Received: from kirsty.vergenet.net ([202.4.237.240])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghD2d-0005HN-3G
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 12:33:04 +0000
+Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
+ by kirsty.vergenet.net (Postfix) with ESMTPA id 934A225B80E;
+ Wed,  9 Jan 2019 23:33:01 +1100 (AEDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
+ t=1547037181; bh=c0kudzL6mJdqc9pijvmi75mvURmSmwTS0RjBJOL/YYc=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=Fu/39nkJJISbYItVPnHrA4X86gLh4fHczQx4sZ1rG+jNK3eq+2eTVe7O6xReYbdM6
+ +NAitHu4h79YZ0EP8aukKbCNNmc+BtOfSZSXmSd7QtFkCwX6YBC7wSjjS+RL5oB0pz
+ wZhAWrvumAhR1+HMpN5u+eUN181E90ep+Ffv64zQ=
+Received: by reginn.horms.nl (Postfix, from userid 7100)
+ id 0BDD7940420; Wed,  9 Jan 2019 13:32:59 +0100 (CET)
+Date: Wed, 9 Jan 2019 13:32:59 +0100
+From: Simon Horman <horms@verge.net.au>
+To: Marek Vasut <marek.vasut@gmail.com>
+Subject: Re: [PATCH V3] arm64: dts: r8a77990: ebisu: Add and enable SDHI
+ device nodes
+Message-ID: <20190109123259.cpql62omcvypafdu@verge.net.au>
+References: <20181106204647.18051-1-marek.vasut+renesas@gmail.com>
+ <20190109104922.z6g772vgncdqqbqt@verge.net.au>
+ <20190109105754.vvqx6uvsktvxeq7a@ninjato>
+ <34cd1769-f0c9-0c2b-8947-4fceca9a9fb2@gmail.com>
 MIME-Version: 1.0
-X-MTK: N
+Content-Disposition: inline
+In-Reply-To: <34cd1769-f0c9-0c2b-8947-4fceca9a9fb2@gmail.com>
+Organisation: Horms Solutions BV
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_043121_054473_388DA155 
-X-CRM114-Status: GOOD (  39.73  )
+X-CRM114-CacheID: sfid-20190109_043303_284943_237AEC45 
+X-CRM114-Status: GOOD (  10.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,456 +79,44 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Yonglong Wu <yonglong.wu@mediatek.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-usb@vger.kernel.org,
- linux-kernel@vger.kernel.org, Matthias
- Brugger <matthias.bgg@gmail.com>, Rob Herring <robh+dt@kernel.org>,
- Alan Stern <stern@rowland.harvard.edu>, chunfeng.yun@mediatek.com,
- linux-mediatek@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Cc: devicetree@vger.kernel.org, Takeshi Kihara <takeshi.kihara.df@renesas.com>,
+ Geert Uytterhoeven <geert+renesas@glider.be>, Wolfram Sang <wsa@the-dreams.de>,
+ Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>,
+ linux-renesas-soc@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ Marek Vasut <marek.vasut+renesas@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Bin,
-On Tue, 2019-01-08 at 09:44 -0600, Bin Liu wrote:
-> Hi,
-> 
-> On Thu, Dec 27, 2018 at 03:34:26PM +0800, min.guo@mediatek.com wrote:
-> > From: Min Guo <min.guo@mediatek.com>
+On Wed, Jan 09, 2019 at 01:02:00PM +0100, Marek Vasut wrote:
+> On 1/9/19 11:57 AM, Wolfram Sang wrote:
+> >> [    3.373714] renesas_sdhi_internal_dmac ee100000.sd: mmc0 base at 0xee100000 max clock rate 200 MHz
+> >> [    3.456829] renesas_sdhi_internal_dmac ee120000.sd: mmc1 base at 0xee120000 max clock rate 200 MHz
 > > 
-> > This adds support for MediaTek musb controller in
-> > host, peripheral and otg mode
-> > 
-> > Signed-off-by: Min Guo <min.guo@mediatek.com>
-> > Signed-off-by: Yonglong Wu <yonglong.wu@mediatek.com>
-> > ---
-> >  drivers/usb/musb/Kconfig     |   8 +-
-> >  drivers/usb/musb/Makefile    |   1 +
-> >  drivers/usb/musb/mediatek.c  | 562 +++++++++++++++++++++++++++++++++++++++++++
-> >  drivers/usb/musb/musb_core.c |  10 +
-> >  drivers/usb/musb/musb_core.h |   1 +
-> >  drivers/usb/musb/musb_dma.h  |   1 +
-> >  drivers/usb/musb/musb_host.c |  79 ++++--
-> >  drivers/usb/musb/musb_regs.h |   6 +
-> >  drivers/usb/musb/musbhsdma.c |  34 ++-
-> >  9 files changed, 671 insertions(+), 31 deletions(-)
-> >  create mode 100644 drivers/usb/musb/mediatek.c
-> > 
-> > diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
-> > index ad08895..540fc9f 100644
-> > --- a/drivers/usb/musb/Kconfig
-> > +++ b/drivers/usb/musb/Kconfig
-> > @@ -115,6 +115,12 @@ config USB_MUSB_JZ4740
-> >  	depends on USB_MUSB_GADGET
-> >  	depends on USB_OTG_BLACKLIST_HUB
-> >  
-> > +config USB_MUSB_MEDIATEK
-> > +	tristate "MediaTek platforms"
-> > +	depends on ARCH_MEDIATEK
+> > No mmc2 initialized. That should work regardless of eMMC. Probably
+> > something wrong in the DT somewhere.
 > 
-> Please also add '|| COMPILE_TEST' to make testing easier.
-
-Ok
-
-> > +	depends on NOP_USB_XCEIV
-> > +	depends on GENERIC_PHY
-> > +
-> >  config USB_MUSB_AM335X_CHILD
-> >  	tristate
-> >  
-> > @@ -141,7 +147,7 @@ config USB_UX500_DMA
-> >  
-> >  config USB_INVENTRA_DMA
-> >  	bool 'Inventra'
-> > -	depends on USB_MUSB_OMAP2PLUS
-> > +	depends on USB_MUSB_OMAP2PLUS || USB_MUSB_MEDIATEK
-> >  	help
-> >  	  Enable DMA transfers using Mentor's engine.
-> >  
-> > diff --git a/drivers/usb/musb/Makefile b/drivers/usb/musb/Makefile
-> > index 3a88c79..63d82d0 100644
-> > --- a/drivers/usb/musb/Makefile
-> > +++ b/drivers/usb/musb/Makefile
-> > @@ -24,6 +24,7 @@ obj-$(CONFIG_USB_MUSB_DA8XX)			+= da8xx.o
-> >  obj-$(CONFIG_USB_MUSB_UX500)			+= ux500.o
-> >  obj-$(CONFIG_USB_MUSB_JZ4740)			+= jz4740.o
-> >  obj-$(CONFIG_USB_MUSB_SUNXI)			+= sunxi.o
-> > +obj-$(CONFIG_USB_MUSB_MEDIATEK)      		+= mediatek.o
-> >  
-> >  
-> >  obj-$(CONFIG_USB_MUSB_AM335X_CHILD)		+= musb_am335x.o
-> > diff --git a/drivers/usb/musb/mediatek.c b/drivers/usb/musb/mediatek.c
-> > new file mode 100644
-> > index 0000000..15a6460
-> > --- /dev/null
-> > +++ b/drivers/usb/musb/mediatek.c
+> Weird, it worked in next-20181102 with these patches, I just rechecked:
 > 
-> [snip]
-> I will review this section later after we sorted out other things.
+> 7818a9f06df1 mmc: renesas_sdhi: Whitelist R8A77990 SDHI
+> a05a906776f8 pinctrl: sh-pfc: r8a77990: Add voltage switch operations
+> for SDHI
+> 2cc9d3a293e9 pinctrl: sh-pfc: r8a77990: Add SDHI pins, groups and functions
+> 6b8d151613b7 pinctrl: sh-pfc: r8a77990: Add Audio SSI pins, groups and
+> functions
+> 9167b22938f7 pinctrl: sh-pfc: r8a77990: Add Audio clock pins, groups and
+> functions
+> 000cc50fc942 arm64: dts: r8a77990-ebisu: Enable HS200 of SDHI3
+> d3f59bbbf7ce arm64: dts: r8a77990-ebisu: Enable eMMC of SDHI3
+> 5928c59bff8d arm64: dts: r8a77990-ebisu: Enable UHS-I of SDHI0 and SDHI1
+> dae32a3172b8 arm64: dts: r8a77990-ebisu: Enable SD card of SDHI0 and SDHI1
+> 8feef039c6c6 arm64: dts: r8a77990: Add SDHI device nodes
+> 25e9471b6a27 (tag: next-20181102) Add linux-next specific files for 20181102
 > 
-> > diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
-> > index b7d5627..d60f76f 100644
-> > --- a/drivers/usb/musb/musb_core.c
-> > +++ b/drivers/usb/musb/musb_core.c
-> > @@ -1028,6 +1028,16 @@ static void musb_disable_interrupts(struct musb *musb)
-> >  	temp = musb_readb(mbase, MUSB_INTRUSB);
-> >  	temp = musb_readw(mbase, MUSB_INTRTX);
-> >  	temp = musb_readw(mbase, MUSB_INTRRX);
-> > +
-> > +	/*  MediaTek controller interrupt status is W1C */
-> 
-> This W1C doesn't match to the MUSB Programming Guide that I have. Those
-> registers are read-only.
-> Is the difference due to the IP intergration in the mtk platforms? or is
-> it a new version of the MUSB controller? If latter, what is the version?
+> I'll let you know once I figure it out.
 
-This is difference due to the IP intergration in mtk platforms. W1C is
-easy for CpdeViser debug.
-
-> > +	if (musb->ops->quirks & MUSB_MTK_QUIRKS) {
-> 
-> Basically we don't want to use this type of platform specific quirks if
-> possible, so let's try to not use it.
-
-I will try my best to avoid using it.
-
-> > +		musb_writeb(mbase, MUSB_INTRUSB,
-> > +			musb_readb(mbase, MUSB_INTRUSB));
-> 
-> For this clearing register bit operation, please create platform hooks
-> musb_clearb() and musb_clearw() in struct musb_platform_ops instead,
-> then follow how musb_readb() pointer is assigned in
-> musb_init_controller() to use the W1C version for mtk platform.
-
-I have tried implementing musb_readb(), musb_readw() interface with
-interrupt status W1C function in struct musb_platform_ops. But this
-interface will require a global variable to hold MAC basic address for
-judgment, and then special handling of the interrupt state. A global
-variable will make the driver work with only a single instance, so it
-can't work on some MTK platforms which have two instances.
-How about creating musb_clearb/w() as following:
-void (*clearb)(void __iomem *addr, unsigned offset, u8 data);
-void (*clearw)(void __iomem *addr, unsigned offset, u16 data);
-
-
-> > +		musb_writew(mbase, MUSB_INTRRX,
-> > +			musb_readw(mbase, MUSB_INTRRX));
-> > +		musb_writew(mbase, MUSB_INTRTX,
-> > +			musb_readw(mbase, MUSB_INTRTX));
-> > +	}
-> >  }
-> >  
-> >  static void musb_enable_interrupts(struct musb *musb)
-> > diff --git a/drivers/usb/musb/musb_core.h b/drivers/usb/musb/musb_core.h
-> > index 04203b7..1bf4e9a 100644
-> > --- a/drivers/usb/musb/musb_core.h
-> > +++ b/drivers/usb/musb/musb_core.h
-> > @@ -138,6 +138,7 @@ enum musb_g_ep0_state {
-> >   */
-> >  struct musb_platform_ops {
-> >  
-> > +#define MUSB_MTK_QUIRKS	BIT(10)
-> >  #define MUSB_G_NO_SKB_RESERVE	BIT(9)
-> >  #define MUSB_DA8XX		BIT(8)
-> >  #define MUSB_PRESERVE_SESSION	BIT(7)
-> > diff --git a/drivers/usb/musb/musb_dma.h b/drivers/usb/musb/musb_dma.h
-> > index 281e75d3..b218210 100644
-> > --- a/drivers/usb/musb/musb_dma.h
-> > +++ b/drivers/usb/musb/musb_dma.h
-> > @@ -197,6 +197,7 @@ static inline void musb_dma_controller_destroy(struct dma_controller *d) { }
-> >  extern struct dma_controller *
-> >  musbhs_dma_controller_create(struct musb *musb, void __iomem *base);
-> >  extern void musbhs_dma_controller_destroy(struct dma_controller *c);
-> > +extern irqreturn_t dma_controller_irq(int irq, void *private_data);
-> >  
-> >  extern struct dma_controller *
-> >  tusb_dma_controller_create(struct musb *musb, void __iomem *base);
-> > diff --git a/drivers/usb/musb/musb_host.c b/drivers/usb/musb/musb_host.c
-> > index b59ce9a..b1b0216 100644
-> > --- a/drivers/usb/musb/musb_host.c
-> > +++ b/drivers/usb/musb/musb_host.c
-> > @@ -292,20 +292,73 @@ static inline void musb_save_toggle(struct musb_qh *qh, int is_in,
-> >  {
-> >  	void __iomem		*epio = qh->hw_ep->regs;
-> >  	u16			csr;
-> > +	struct musb *musb = qh->hw_ep->musb;
-> >  
-> >  	/*
-> >  	 * FIXME: the current Mentor DMA code seems to have
-> >  	 * problems getting toggle correct.
-> >  	 */
-> >  
-> > -	if (is_in)
-> > -		csr = musb_readw(epio, MUSB_RXCSR) & MUSB_RXCSR_H_DATATOGGLE;
-> > -	else
-> > -		csr = musb_readw(epio, MUSB_TXCSR) & MUSB_TXCSR_H_DATATOGGLE;
-> > +	/* MediaTek controller has private toggle register */
-> 
-> only one toggle register for all endpoints? how does it handle
-> difference toggle values for different endpoints?
-
-MediaTek controller has separate registers to describe TX/RX toggle.
-
-> > +	if (musb->ops->quirks & MUSB_MTK_QUIRKS) {
-> > +		u16 toggle;
-> > +		u8 epnum = qh->hw_ep->epnum;
-> > +
-> > +		if (is_in)
-> > +			toggle = musb_readl(musb->mregs, MUSB_RXTOG);
-> 
-> should use musb_readw() instead? MUSB_RXTOG seems to be 16bit.
-
-Ok
-
-> > +		else
-> > +			toggle = musb_readl(musb->mregs, MUSB_TXTOG);
-> > +
-> > +		csr = toggle & (1 << epnum);
-> > +	} else {
-> > +		if (is_in)
-> > +			csr = musb_readw(epio, MUSB_RXCSR)
-> > +				& MUSB_RXCSR_H_DATATOGGLE;
-> > +		else
-> > +			csr = musb_readw(epio, MUSB_TXCSR)
-> > +				& MUSB_TXCSR_H_DATATOGGLE;
-> 
-> Does this logic still work for the mtk platform even if it has its own
-> private toggle register? If so, we don't need to change here.
-
-Sorry, this logic can not work on mtk platform, bit
-MUSB_RXCSR_H_DATATOGGLE and MUSB_TXCSR_H_DATATOGGLE are used for other
-function.
-
-> If not, let's try to not use this quirk flag. Please create a hook
-> musb_platform_get_toggle() in struct musb_platform_ops.
-
-Does the method of implement musb_platform_get_toggle() is prepare
-musb_default_get_toggle with common function, then follow how
-musb_readb() pointer is assigned in musb_init_controller()?
-
-How about creating musb_platform_get_toggle() as following:
-u16 (*get_toggle)(struct musb* musb, struct musb_qh *qh, int is_in);
-
-> > +	}
-> >  
-> >  	usb_settoggle(urb->dev, qh->epnum, !is_in, csr ? 1 : 0);
-> >  }
-> >  
-> > +static inline u16 musb_set_toggle(struct musb_qh *qh, int is_in,
-> > +					struct urb *urb)
-> > +{
-> > +	u16 csr = 0;
-> > +	u16 toggle = 0;
-> > +	struct musb *musb = qh->hw_ep->musb;
-> > +	u8 epnum = qh->hw_ep->epnum;
-> > +
-> > +	toggle = usb_gettoggle(urb->dev, qh->epnum, !is_in);
-> > +
-> > +	/* MediaTek controller has private toggle register */
-> > +	if (musb->ops->quirks & MUSB_MTK_QUIRKS) {
-> > +		if (is_in) {
-> > +			musb_writel(musb->mregs, MUSB_RXTOGEN, (1 << epnum));
-> > +			musb_writel(musb->mregs, MUSB_RXTOG, (toggle << epnum));
-> > +		} else {
-> > +			musb_writel(musb->mregs, MUSB_TXTOGEN, (1 << epnum));
-> > +			musb_writel(musb->mregs, MUSB_TXTOG, (toggle << epnum));
-> > +		}
-> > +	} else {
-> > +		if (is_in) {
-> > +			if (toggle)
-> > +				csr = MUSB_RXCSR_H_WR_DATATOGGLE
-> > +						| MUSB_RXCSR_H_DATATOGGLE;
-> > +			else
-> > +				csr = 0;
-> > +		} else {
-> > +			if (toggle)
-> > +				csr |= MUSB_TXCSR_H_WR_DATATOGGLE
-> > +						| MUSB_TXCSR_H_DATATOGGLE;
-> > +			else
-> > +				csr |= MUSB_TXCSR_CLRDATATOG;
-> > +		}
-> > +	}
-> > +	return csr;
-> 
-> Please create a seperate patch for this musb_set_toggle() without adding
-> the mtk logic. It is a nice cleanup.
-
-Does this like get toggle implementation, create a hook
-musb_platform_set_toggle() in struct musb_platform_ops?
-
-> > +}
-> > +
-> >  /*
-> >   * Advance this hardware endpoint's queue, completing the specified URB and
-> >   * advancing to either the next URB queued to that qh, or else invalidating
-> > @@ -772,13 +825,8 @@ static void musb_ep_program(struct musb *musb, u8 epnum,
-> >  					);
-> >  			csr |= MUSB_TXCSR_MODE;
-> >  
-> > -			if (!hw_ep->tx_double_buffered) {
-> > -				if (usb_gettoggle(urb->dev, qh->epnum, 1))
-> > -					csr |= MUSB_TXCSR_H_WR_DATATOGGLE
-> > -						| MUSB_TXCSR_H_DATATOGGLE;
-> > -				else
-> > -					csr |= MUSB_TXCSR_CLRDATATOG;
-> > -			}
-> > +			if (!hw_ep->tx_double_buffered)
-> > +				csr |= musb_set_toggle(qh, !is_out, urb);
-> >  
-> >  			musb_writew(epio, MUSB_TXCSR, csr);
-> >  			/* REVISIT may need to clear FLUSHFIFO ... */
-> > @@ -860,17 +908,12 @@ static void musb_ep_program(struct musb *musb, u8 epnum,
-> >  
-> >  	/* IN/receive */
-> >  	} else {
-> > -		u16	csr;
-> > +		u16	csr = 0;
-> >  
-> >  		if (hw_ep->rx_reinit) {
-> >  			musb_rx_reinit(musb, qh, epnum);
-> > +			csr |= musb_set_toggle(qh, !is_out, urb);
-> >  
-> > -			/* init new state: toggle and NYET, maybe DMA later */
-> > -			if (usb_gettoggle(urb->dev, qh->epnum, 0))
-> > -				csr = MUSB_RXCSR_H_WR_DATATOGGLE
-> > -					| MUSB_RXCSR_H_DATATOGGLE;
-> > -			else
-> > -				csr = 0;
-> >  			if (qh->type == USB_ENDPOINT_XFER_INT)
-> >  				csr |= MUSB_RXCSR_DISNYET;
-> >  
-> > diff --git a/drivers/usb/musb/musb_regs.h b/drivers/usb/musb/musb_regs.h
-> > index 5cd7264..ffbe267 100644
-> > --- a/drivers/usb/musb/musb_regs.h
-> > +++ b/drivers/usb/musb/musb_regs.h
-> > @@ -273,6 +273,12 @@
-> >  #define MUSB_RXHUBADDR		0x06
-> >  #define MUSB_RXHUBPORT		0x07
-> >  
-> > +/* MediaTek controller toggle enable and status reg */
-> > +#define MUSB_RXTOG		0x80
-> > +#define MUSB_RXTOGEN		0x82
-> > +#define MUSB_TXTOG		0x84
-> > +#define MUSB_TXTOGEN		0x86
-> 
-> Again, these offsets are for different registers in the MUSB version I
-> have, please let me know if you have different version of the MUSB IP.
-
-Sorry, these are MediaTek controller private registers used for control
-toggle.
-
-> > +
-> >  static inline u8 musb_read_configdata(void __iomem *mbase)
-> >  {
-> >  	musb_writeb(mbase, MUSB_INDEX, 0);
-> > diff --git a/drivers/usb/musb/musbhsdma.c b/drivers/usb/musb/musbhsdma.c
-> > index 824adcb..c545475 100644
-> > --- a/drivers/usb/musb/musbhsdma.c
-> > +++ b/drivers/usb/musb/musbhsdma.c
-> > @@ -263,7 +263,7 @@ static int dma_channel_abort(struct dma_channel *channel)
-> >  	return 0;
-> >  }
-> >  
-> > -static irqreturn_t dma_controller_irq(int irq, void *private_data)
-> > +irqreturn_t dma_controller_irq(int irq, void *private_data)
-> >  {
-> >  	struct musb_dma_controller *controller = private_data;
-> >  	struct musb *musb = controller->private_data;
-> > @@ -285,6 +285,8 @@ static irqreturn_t dma_controller_irq(int irq, void *private_data)
-> >  	spin_lock_irqsave(&musb->lock, flags);
-> >  
-> >  	int_hsdma = musb_readb(mbase, MUSB_HSDMA_INTR);
-> > +	if (musb->ops->quirks & MUSB_MTK_QUIRKS)
-> > +		musb_writeb(musb->mregs, MUSB_HSDMA_INTR, int_hsdma);
-> 
-> you can use musb_clearb() defined above to get rid of this quirk.
-
-OK. 
-
-> >  
-> >  	if (!int_hsdma) {
-> >  		musb_dbg(musb, "spurious DMA irq");
-> > @@ -377,15 +379,17 @@ static irqreturn_t dma_controller_irq(int irq, void *private_data)
-> >  	spin_unlock_irqrestore(&musb->lock, flags);
-> >  	return retval;
-> >  }
-> > +EXPORT_SYMBOL_GPL(dma_controller_irq);
-> >  
-> >  void musbhs_dma_controller_destroy(struct dma_controller *c)
-> >  {
-> >  	struct musb_dma_controller *controller = container_of(c,
-> >  			struct musb_dma_controller, controller);
-> > +	struct musb *musb = controller->private_data;
-> >  
-> >  	dma_controller_stop(controller);
-> >  
-> > -	if (controller->irq)
-> > +	if (!(musb->ops->quirks & MUSB_MTK_QUIRKS) && controller->irq)
-> >  		free_irq(controller->irq, c);
-> >  
-> >  	kfree(controller);
-> > @@ -398,11 +402,15 @@ struct dma_controller *musbhs_dma_controller_create(struct musb *musb,
-> >  	struct musb_dma_controller *controller;
-> >  	struct device *dev = musb->controller;
-> >  	struct platform_device *pdev = to_platform_device(dev);
-> > -	int irq = platform_get_irq_byname(pdev, "dma");
-> > +	int irq = -1;
-> >  
-> > -	if (irq <= 0) {
-> > -		dev_err(dev, "No DMA interrupt line!\n");
-> > -		return NULL;
-> > +	if (!(musb->ops->quirks & MUSB_MTK_QUIRKS)) {
-> > +		irq = platform_get_irq_byname(pdev, "dma");
-> > +
-> > +		if (irq < 0) {
-> > +			dev_err(dev, "No DMA interrupt line!\n");
-> > +			return NULL;
-> > +		}
-> >  	}
-> 
-> Please create musbhs_dma_controller_destroy_noirq() for your platform to
-> not use the quirk.
-
-OK.
-
-> >  
-> >  	controller = kzalloc(sizeof(*controller), GFP_KERNEL);
-> > @@ -418,15 +426,17 @@ struct dma_controller *musbhs_dma_controller_create(struct musb *musb,
-> >  	controller->controller.channel_program = dma_channel_program;
-> >  	controller->controller.channel_abort = dma_channel_abort;
-> >  
-> > -	if (request_irq(irq, dma_controller_irq, 0,
-> > +	if (!(musb->ops->quirks & MUSB_MTK_QUIRKS)) {
-> > +		if (request_irq(irq, dma_controller_irq, 0,
-> >  			dev_name(musb->controller), &controller->controller)) {
-> > -		dev_err(dev, "request_irq %d failed!\n", irq);
-> > -		musb_dma_controller_destroy(&controller->controller);
-> > +			dev_err(dev, "request_irq %d failed!\n", irq);
-> > +			musb_dma_controller_destroy(&controller->controller);
-> >  
-> > -		return NULL;
-> > -	}
-> > +			return NULL;
-> > +		}
-> >  
-> > -	controller->irq = irq;
-> > +		controller->irq = irq;
-> > +	}
-> >  
-> >  	return &controller->controller;
-> >  }
-> 
-> Same here, create musbhs_dma_controller_create_noirq(). Then use both
-> new API for the mtk glue driver.
-
-OK.
-
-> Regards,
-> -Bin.
-
-
+Could it be related to potentially old U-Boot etc.. on the board I am using?
 
 _______________________________________________
 linux-arm-kernel mailing list
