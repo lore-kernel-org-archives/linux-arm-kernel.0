@@ -2,65 +2,86 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0BA4BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 10:43:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DBF05C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 10:45:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A593A21783
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 10:43:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AB12621783
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 10:45:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="u0XMlvH1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A593A21783
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iHCxBBvg";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="N5TAwlET"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AB12621783
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=YXZV3vEJ+omTXbZ7+1PUmz6o9CT3/Ov6CR3O5dA4tz4=; b=u0XMlvH1/cYQD6
-	j0CBa9gmR/pBPe+/x4nrxHH9TcoBRp7budOZD6UMbhvLS8YA1nVU5Y01bEXZM3MgvZ+OfUAZ/3QPt
-	RzoRdm/aPF8y7XsKP5ln0zrfY0YXpuXeZWPpAYib/ptfiBSKVa7okxz/N59lhV3DTXcgVEphaxbso
-	z0cn5qCx3rGHWOEQZ61kxYWci+sHG5x/n+Go2WYvZgyI3RlrBGFJfbzAc8lkiWBIMAYyrhBMovPJr
-	4fS3riBRR0i9bNID7oBI7P+xfi1R5nDtatLeGt+m0FR8/YFDh6jwfyS6ANzE8zuUuPSfSKsM3TxkO
-	im6NG4vgP5EeadxHPsJA==;
+	List-Owner; bh=hs1ORx98Nl/uXUNxEgETL3xMkyywTMU+FmC4pARuFXo=; b=iHCxBBvgonPivK
+	6gP8+360KZ2ctqoC0ZVu1Pe7kgkA9tDzDqONxWX937udVo70DxA3W4oCkFSM1yDalRxNSeV9HHgEl
+	BM/Xb1DXgkWbjnN/tcXKksQ37YqRSFMLC6dWW9U+Mh8PktOTSwS02ilBdYXdHdPlumvgPUBVJP1VU
+	eugz+L9PjOWBVAHrROINFlID4VkxL/PY24KUSy2vX9T7zql9p/k1mxZEHY1xHNbZUmIt4F81FFaC9
+	ZeS04wF6A18a4ZgoHxr0efxD5pkpJKSATOPrL+2UaFZDYuMSqFZrJDNr+E4dF2X5MUGAGS4iO/X3J
+	8NhrWOU8dBXXKm910gkA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghBKy-00036B-TT; Wed, 09 Jan 2019 10:43:52 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghBKv-00035m-MP
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 10:43:51 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id CF833A78;
- Wed,  9 Jan 2019 02:43:48 -0800 (PST)
-Received: from donnerap.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E09A33F70D;
- Wed,  9 Jan 2019 02:43:47 -0800 (PST)
-Date: Wed, 9 Jan 2019 10:43:42 +0000
-From: Andre Przywara <andre.przywara@arm.com>
-To: Marc Zyngier <marc.zyngier@arm.com>
-Subject: Re: [kvmarm:kvm-arm64/nv-wip-v5.0-rc1 4/75]
- arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:700:7: error:
- 'SYS_CNTP_TVAL_EL0' undeclared
-Message-ID: <20190109104342.7c8ead84@donnerap.cambridge.arm.com>
-In-Reply-To: <8fd0977c-9ca1-8ad8-a6b7-e36e115745b8@arm.com>
-References: <201901091219.igdmvhpC%fengguang.wu@intel.com>
- <a82a7868-f3c0-0b3e-d0b7-182992c268fa@arm.com>
- <8fd0977c-9ca1-8ad8-a6b7-e36e115745b8@arm.com>
-Organization: ARM
-X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; aarch64-unknown-linux-gnu)
+	id 1ghBMN-0004fR-A8; Wed, 09 Jan 2019 10:45:19 +0000
+Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghBMJ-0004eq-9Q
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 10:45:17 +0000
+Received: by mail-pg1-x544.google.com with SMTP id d72so3135093pga.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 09 Jan 2019 02:45:14 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=67GrVLf7hFi9VONq8bTSm/8BTwQn+GCaptdda3hBrtA=;
+ b=N5TAwlETy5C2HosyyXtrGopuNGBfWBLXK2DNG5mSSJxLOjJK8PRvwExsX3XUv4CLzM
+ cY4UQc3nTBoEt5vOk2+ierhTQWTFnfH1IK1JCsHuO6bGoV7mgHaLeuul8RKpjortFRNz
+ Agmt9sgnJKdSipg0jVWkhMN9u5mAzOUrgW0EY=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=67GrVLf7hFi9VONq8bTSm/8BTwQn+GCaptdda3hBrtA=;
+ b=FpIUtk0IysomNZcdbw3ywLL7vU/+eXm7dNjcc++4YKLmD/NcTzI15A4zk/kOkf5sWp
+ xWQXmctOSR59NA097nrR8XhTBVmhqjOJaTLbjovVPH71m44s96jEo6Af7xQUpCdCuk/k
+ TPqJ2YtcJA3rkvdzVdEtdEvfZUtvMOX4e0Ss0RsooubrW3NXmhpw4TUTmHhnNquOorUX
+ u/6k2kMOg37QEdKt/sXsBoK7k/+MseAzfj8aCu4lii5uS9PO3yyyjNizZNiMoiS9RWUs
+ NxWCTX29KRhCCfq9NBT5rAbS0QM7B9KiP5PBqse9tBsib6KA5N+JjpwZUnE3WsD1TvGD
+ QV4Q==
+X-Gm-Message-State: AJcUukdSmxPiU938eGU8O/RSpdn+NXxFL3EPtRgkAhHCPGUou7OTMz7n
+ x2Xdepv/tq4OAEcp5hdYlZZNDA==
+X-Google-Smtp-Source: ALg8bN4S90W6A9tOkdCZTh7Jpa0HU0vimgVjXgqikQK3BpZn6qJnDfaBAwBFIrc4C4XDzTEjH3s+GA==
+X-Received: by 2002:a62:cd44:: with SMTP id o65mr5435769pfg.222.1547030714197; 
+ Wed, 09 Jan 2019 02:45:14 -0800 (PST)
+Received: from localhost ([122.166.131.155])
+ by smtp.gmail.com with ESMTPSA id a4sm81235549pgv.70.2019.01.09.02.45.13
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 09 Jan 2019 02:45:13 -0800 (PST)
+Date: Wed, 9 Jan 2019 16:15:11 +0530
+From: Viresh Kumar <viresh.kumar@linaro.org>
+To: Quentin Perret <quentin.perret@arm.com>
+Subject: Re: [PATCH] cpufreq: scmi: Fix frequency invariance in slow path
+Message-ID: <20190109104511.mi3gtdcytkky4eyn@vireshk-i7>
+References: <20190109104236.6532-1-quentin.perret@arm.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20190109104236.6532-1-quentin.perret@arm.com>
+User-Agent: NeoMutt/20180323-120-3dd1ac
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_024349_740774_B18FD13A 
-X-CRM114-Status: GOOD (  18.95  )
+X-CRM114-CacheID: sfid-20190109_024515_347188_414F5B5D 
+X-CRM114-Status: GOOD (  15.61  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,56 +93,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Christoffer Dall <christoffer.dall@arm.com>,
- linux-arm-kernel@lists.infradead.org, kvmarm@lists.cs.columbia.edu
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: linux-pm@vger.kernel.org, rjw@rjwysocki.net, linux-kernel@vger.kernel.org,
+ qais.yousef@arm.com, sudeep.holla@arm.com, dietmar.eggemann@arm.com,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gV2VkLCA5IEphbiAyMDE5IDEwOjA5OjUxICswMDAwCk1hcmMgWnluZ2llciA8bWFyYy56eW5n
-aWVyQGFybS5jb20+IHdyb3RlOgoKPiBPbiAwOS8wMS8yMDE5IDA5OjEzLCBBbmRyw6kgUHJ6eXdh
-cmEgd3JvdGU6Cj4gPiBPbiAwOS8wMS8yMDE5IDA0OjQwLCBrYnVpbGQgdGVzdCByb2JvdCB3cm90
-ZToKPiA+IAo+ID4gTWFyYywgQ2hyaXN0b2ZmZXIsCj4gPiAgIAo+ID4+IHRyZWU6Cj4gPj4gaHR0
-cHM6Ly9naXQua2VybmVsLm9yZy9wdWIvc2NtL2xpbnV4L2tlcm5lbC9naXQva3ZtYXJtL2t2bWFy
-bS5naXQKPiA+PiBrdm0tYXJtNjQvbnYtd2lwLXY1LjAtcmMxIGhlYWQ6Cj4gPj4gNjg4YzM4NmNh
-MDk2ZjJjMWYyZWVlMzg2Njk3NTg2Yzg4ZGY1ZDViYyBjb21taXQ6Cj4gPj4gMmIxMjY1YzU4YTg3
-M2Q5MTdlOTlhYzc2MmUyNDNjMTI3NDQ4MWRiZiBbNC83NV0gS1ZNOiBhcm0vYXJtNjQ6Cj4gPj4g
-Y29uc29saWRhdGUgYXJjaCB0aW1lciB0cmFwIGhhbmRsZXJzIGNvbmZpZzogYXJtLWF4bTU1eHhf
-ZGVmY29uZmlnCj4gPj4gKGF0dGFjaGVkIGFzIC5jb25maWcpIGNvbXBpbGVyOiBhcm0tbGludXgt
-Z251ZWFiaS1nY2MgKERlYmlhbgo+ID4+IDcuMi4wLTExKSA3LjIuMCByZXByb2R1Y2U6IHdnZXQK
-PiA+PiBodHRwczovL3Jhdy5naXRodWJ1c2VyY29udGVudC5jb20vaW50ZWwvbGtwLXRlc3RzL21h
-c3Rlci9zYmluL21ha2UuY3Jvc3MKPiA+PiAtTyB+L2Jpbi9tYWtlLmNyb3NzIGNobW9kICt4IH4v
-YmluL21ha2UuY3Jvc3MgZ2l0IGNoZWNrb3V0Cj4gPj4gMmIxMjY1YzU4YTg3M2Q5MTdlOTlhYzc2
-MmUyNDNjMTI3NDQ4MWRiZiAjIHNhdmUgdGhlCj4gPj4gYXR0YWNoZWQgLmNvbmZpZyB0byBsaW51
-eCBidWlsZCB0cmVlIEdDQ19WRVJTSU9OPTcuMi4wIG1ha2UuY3Jvc3MKPiA+PiBBUkNIPWFybSAK
-PiA+Pgo+ID4+IEFsbCBlcnJvcnMgKG5ldyBvbmVzIHByZWZpeGVkIGJ5ID4+KTogIAo+ID4gCj4g
-PiBJIHdhcyBsb29raW5nIGF0IHRoaXMgeWVzdGVyZGF5OiBJdCdzIGEgYml0IG5hc3R5LCBkb24n
-dCBrbm93IGEgZ29vZAo+ID4gc29sdXRpb24gYmVzaWRlIGJyaW5naW5nIGJhY2sgdGhpcyBwYXJ0
-IG9mIG15IG9yaWdpbmFsIHRpbWVyIHJld29yawo+ID4gc2VyaWVzLiBUaGUgcHJvYmxlbSBpcyB0
-aGF0IHRob3NlIHN5bWJvbHMgY29udGFpbnMgdGhlIEFhcmNoNjQKPiA+IHNwZWNpZmljIChpbnN0
-cnVjdGlvbikgZW5jb2Rpbmcgb2YgdGhlIHRpbWVyIHJlZ2lzdGVycywgcGx1cyB3ZQo+ID4gbmVl
-ZCB0aGUgQUFyY2gzMiBlbmNvZGluZ3MgZm9yIDMyLW9uLTY0IGd1ZXN0cy4gIAo+IAo+IFdoeT8g
-VGhlcmUgaXMgZXhhY3RseSBvbmUgdGltZXIgdGhhdCBuZWVkcyB0cmFwcGluZyBmb3IgQUFyY2gz
-MiAodGhlCj4gRUwxIHBoeXNpY2FsIHRpbWVyKS4gQWxsIHdlIG5lZWQgaXM6Cj4gCj4gLSB0aGUg
-U1lTX0FBUkNIMzJfQ05UUF8qIGVuY29kaW5ncyBvbiAzMmJpdAo+IC0gc29tZSBDUFAgbWFnaWMg
-dG8gcHJldmVudCB0aGUgY29tcGlsYXRpb24gZnJvbSBicmVha2luZwoKRmFpciBlbm91Z2gsIGlm
-IHlvdSBhcmUgT0sgd2l0aCB0aGlzLiBJIGhhZCBzb21ldGhpbmcgbGlrZSB0aGlzIGJlZm9yZSwK
-YnV0IGl0IGxvb2tlZCBraW5kIG9mIGhhY2tpc2ggdG8gbWUsIHNvIEkgd2FzIGxvb2tpbmcgYXQg
-c29tZSBwcm9wZXIoVE0pCnNvbHV0aW9uLgoKPiA+IAo+ID4gVGhhdCdzIHdoeSBJIHVzZWQgdGhl
-IGdlbmVyaWMgVUFQSSBlbmNvZGluZyBmb3IgdGhlIHJlZ2lzdGVycywKPiA+IGJlY2F1c2Ugd2Ug
-b25seSBuZWVkICpzb21lKiBpZGVudGlmaWNhdGlvbiBmb3IgdGhlbSwgaXQgZG9lc24ndAo+ID4g
-bmVlZCB0byBiZSBzb21ldGhpbmcgZGVmaW5lZCBieSB0aGUgYXJjaGl0ZWN0dXJlLiAgCj4gCj4g
-SSBkaXNhZ3JlZS4gQnkgZG9pbmcgc28sIHlvdSdyZSBjb25mbGF0aW5nIHVzZXJzcGFjZSBhY2Nl
-c3MgYW5kCj4gdHJhcHBpbmcsIHdoaWNoIGhhcyBwcm92ZWQgdG8gYmUgYSBiYWQgaWRlYSBpbiB0
-aGUgcGFzdC4gRm9yIGV4YW1wbGUsCj4geW91J2QgZW5kLXVwIGhhdmluZyBib3RoIENWQUwgYW5k
-IFRWQUwgaW4gVUFQSSwgd2hpY2ggaXMgbm90IHNvbWV0aGluZwo+IEknbSBrZWVuIHRvIGhhdmUu
-IE9uIHRoZSBvdGhlciBoYW5kLCB0aGUgdHJhcHBpbmcgZnVuY3Rpb24gZG8gbmVlZCB0bwo+IGJl
-IGFibGUgdG8gaGFuZGxlIHRoZXNlLgoKRmFpciBlbm91Z2gsIEkgd2FzIGp1c3QgKmhvcGluZyog
-d2UgY2FuIGtlZXAgYXJjaF90aW1lci5jIGNsZWFuIG9mIGFyY2gKc3BlY2lmaWMgZW5jb2Rpbmdz
-LiBJIGNhbiB1bmRlcnN0YW5kIHRoYXQgd2l0aCBhbGwgdGhlIGFkZGVkCmNvbXBsZXhpdHkgb2Yg
-dGhlIG5lc3RlZCB0aW1lcnMgdGhpcyBpcyBwcm9iYWJseSBub3QgZmVhc2libGUgYW55bW9yZS4K
-CkNoZWVycywKQW5kcmUuCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxp
-c3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0
-aW5mby9saW51eC1hcm0ta2VybmVsCg==
+On 09-01-19, 10:42, Quentin Perret wrote:
+> The scmi-cpufreq driver calls the arch_set_freq_scale() callback on
+> frequency changes to provide scale-invariant load-tracking signals to
+> the scheduler. However, in the slow path, it does so while specifying
+> the current and max frequencies in different units, hence resulting in a
+> broken freq_scale factor.
+> 
+> Fix this by passing all frequencies in KHz, as stored in the CPUFreq
+> frequency table.
+> 
+> Fixes: 99d6bdf33877 ("cpufreq: add support for CPU DVFS based on SCMI
+> message protocol")
+> Signed-off-by: Quentin Perret <quentin.perret@arm.com>
+> ---
+>  drivers/cpufreq/scmi-cpufreq.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/scmi-cpufreq.c b/drivers/cpufreq/scmi-cpufreq.c
+> index 50b1551ba894..3f0693439486 100644
+> --- a/drivers/cpufreq/scmi-cpufreq.c
+> +++ b/drivers/cpufreq/scmi-cpufreq.c
+> @@ -52,9 +52,9 @@ scmi_cpufreq_set_target(struct cpufreq_policy *policy, unsigned int index)
+>  	int ret;
+>  	struct scmi_data *priv = policy->driver_data;
+>  	struct scmi_perf_ops *perf_ops = handle->perf_ops;
+> -	u64 freq = policy->freq_table[index].frequency * 1000;
+> +	u64 freq = policy->freq_table[index].frequency;
+>  
+> -	ret = perf_ops->freq_set(handle, priv->domain_id, freq, false);
+> +	ret = perf_ops->freq_set(handle, priv->domain_id, freq * 1000, false);
+>  	if (!ret)
+>  		arch_set_freq_scale(policy->related_cpus, freq,
+>  				    policy->cpuinfo.max_freq);
+
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+-- 
+viresh
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
