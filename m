@@ -2,68 +2,96 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CBA43C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 12:00:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C2B1EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 12:02:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 96F01206BA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 12:00:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8FE42206B6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 12:02:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Mq19icDk";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="h2gWqV+I"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 96F01206BA
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l0z//zIN";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="cNNv1zEU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8FE42206B6
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=u9HvE3xIf+Sctt68bBgOW5+ElFheDYGmAP7UjiTvt/g=; b=Mq19icDkxlOxtQ
-	3ecjsA97kZKZhJVFimfUhjl/q/gNvQ1oN/cXYTQCm0VT9qNJP1iZXPpUYJzJNUe5sKEd0Sq6ujZXJ
-	cqxBDuJxFOt5GXjKgGSX4FqSWAUwwnsITUFHF7YJnAMT9USZ/nJbS2aPZNuz3G6Ro6+lmyz0VW3bm
-	hrTuuxVpaBCIwFKFbN130OYc+YgemiyaiqFikKFHHJn3ebqGqFSZpFKlB59NY7nIl9/YF/aAlRp+L
-	E7FV6yoTg/Gt2A0iwM9pYMS0uRS4kMkgiboIimCMtV4LlQeVz1m/vOtjwsh8XINM9eP3fiIn6rtVR
-	DVngnQmFGNxxrFSdwBNQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=6EqiVCK5dxGB9kK79ZvVP6x9sasnsJkWaG/UdqmggPs=; b=l0z//zINgJtQtv
+	T9UXI4dsyna1sC6oX9hw2qw9xIpFfpFVv108Onc/dgTqpe8jqh4D9WhHzVMqbNx4S2jblqWdJW31y
+	xNzkOJOm8nbsWTY36WSK5ZLCYZVPNp1OYNxG8DVm28quWSkeZXYgefYcrK10QZaH0a+FKB7b3mcMx
+	wEL8TJtmsmH593CsKgjA3ygHhI4sEC0pZow3G6vfabjFbpWEpCUS6quFQK75ExtPNhoL1sWjX2Eyl
+	E+O0gNeOYNPNO4YXgpf8k1OXUeLFinFVJPwsM0663Ki6h1kyrirfNUn0wAby9shz4swuEJ4CdKKUJ
+	iq1lOgVENkUVkHnj2uBg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghCX1-0002CU-Av; Wed, 09 Jan 2019 12:00:23 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1ghCYm-0002Vo-HP; Wed, 09 Jan 2019 12:02:12 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghCWx-0002C3-Ta
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 12:00:21 +0000
-Received: from bbrezillon (91-160-177-164.subs.proxad.net [91.160.177.164])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 259CE206B6;
- Wed,  9 Jan 2019 12:00:15 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1547035219;
- bh=TwI3gTLhbBNd1cYXCGa3vZ8P336E2Tv4RllKn2O0a5A=;
- h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
- b=h2gWqV+Ilp+6yZbP7H4pV+YOZWQNGM0OaA5DRrcRyOB8ax8QxplhOo5uo9kX+pYQx
- kQ85VIt3cmJNGeXwsji2tNiOsWh6hP30mJdYUcZFW411LwzirW7xXD0D9wa41r1/6D
- +bugV8XiOFX/FbOhH/RvQnP1PxTQxSOv1bGRqaT8=
-Date: Wed, 9 Jan 2019 13:00:08 +0100
-From: Boris Brezillon <bbrezillon@kernel.org>
-To: Peter Rosin <peda@axentia.se>
-Subject: Re: [PATCH] drm/atmel-hlcdc: prevent divide by zero
-Message-ID: <20190109125833.0af5dc52@bbrezillon>
-In-Reply-To: <9b73f5fa-e5c2-ea55-8d96-be6de8a1f34a@axentia.se>
-References: <20190108123129.20031-1-peda@axentia.se>
- <20190109101224.GT21184@phenom.ffwll.local>
- <9b73f5fa-e5c2-ea55-8d96-be6de8a1f34a@axentia.se>
-X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
+ id 1ghCYe-0002VL-R7
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 12:02:10 +0000
+Received: by mail-wr1-x443.google.com with SMTP id v13so7397145wrw.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 09 Jan 2019 04:02:04 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=subject:to:cc:references:from:openpgp:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=tbjNS7GqTZk7ZoP+3UmQlPWvbkXrNwlmwvUJX3Vz3xc=;
+ b=cNNv1zEULjB4v4Wy0+JMOya1Oro64MK+SqlXs/FrQ54Z98WvVrxhC2ZpB6dY/NnxAw
+ A8ftbJ9h72/nAjCTc/fbr5h7myHh5kOIeNmmgLwcbEh4YJZwi9b3xKnntb+Uf1ZiZRY1
+ HiGRhD/JKPmX5OLVfcdJE00jATRoekjqkiMIeM7fGc9efglvZ6JNFO3FXKuA4n1Q03gw
+ 157s35QSAxPHVn7VtF+uIiZkP7ZVuRtAn+RvxxIYX5yeQzbDuAiTiNvPruviLORzx+9N
+ DMN2HE0/jQ86Vb3QSMHMhp3XxrK/b+N2CjXU/2Hy2bwPnzEj3FgDJxMqiRytY4QiC6ko
+ 3o4w==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:openpgp:message-id
+ :date:user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=tbjNS7GqTZk7ZoP+3UmQlPWvbkXrNwlmwvUJX3Vz3xc=;
+ b=Da5z8K0rT3QEdkf+1rCQadKycTL2H4T1+2IS5i93kPv03GoqBIU/fxiEEX4bXyuQuR
+ lMtWzyp6wOdjye+eljb5vn1W6318yq0ZaOFChT8GbZ88QjugAc7EgI29nz1WaOaGbb9C
+ JggJjBxmbu3hq4jXRkJE2oWMvLGpfnI3IYyTw+QYIVaFDLvxge8R6SISrmrqaNLP0Rwf
+ K4GkEz8nYW4C8dXmWo0KjqJVB8aG8JYJE6cHqBtDlUKoKF/wXaQj1ucAq03tIYrAfulo
+ 48iJttJsZsal1Xrnlz/PAyLlUyFtmn0cKebTyozPGjMGI5KZxKPcewzGRJyCgGyoF5vP
+ 726A==
+X-Gm-Message-State: AJcUukd99EmRce6frKDoQWP5sCo+TxyV+bNS5kMxQJS5mwcgyPDfBBtt
+ YIakfFo0C3ffzG0EE+sfGGQqwEpJ
+X-Google-Smtp-Source: ALg8bN56r/10gCk8urIKRA/O65t9SxaXxjuPaP1eZR8z+7kZo810AfM0Gwz/O0GaLN+RlkqUmDRL/Q==
+X-Received: by 2002:a5d:6244:: with SMTP id m4mr4707233wrv.314.1547035322276; 
+ Wed, 09 Jan 2019 04:02:02 -0800 (PST)
+Received: from [192.168.1.4] (ip-86-49-110-70.net.upcbroadband.cz.
+ [86.49.110.70])
+ by smtp.gmail.com with ESMTPSA id s1sm83815101wro.9.2019.01.09.04.02.00
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 09 Jan 2019 04:02:01 -0800 (PST)
+Subject: Re: [PATCH V3] arm64: dts: r8a77990: ebisu: Add and enable SDHI
+ device nodes
+To: Wolfram Sang <wsa@the-dreams.de>, Simon Horman <horms@verge.net.au>
+References: <20181106204647.18051-1-marek.vasut+renesas@gmail.com>
+ <20190109104922.z6g772vgncdqqbqt@verge.net.au>
+ <20190109105754.vvqx6uvsktvxeq7a@ninjato>
+From: Marek Vasut <marek.vasut@gmail.com>
+Openpgp: preference=signencrypt
+Message-ID: <34cd1769-f0c9-0c2b-8947-4fceca9a9fb2@gmail.com>
+Date: Wed, 9 Jan 2019 13:02:00 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
+In-Reply-To: <20190109105754.vvqx6uvsktvxeq7a@ninjato>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_040019_973585_8C2CD78C 
-X-CRM114-Status: GOOD (  20.17  )
+X-CRM114-CacheID: sfid-20190109_040204_903066_BEAE7F09 
+X-CRM114-Status: GOOD (  10.73  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,66 +103,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>,
- David Airlie <airlied@linux.ie>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "dri-devel@lists.freedesktop.org" <dri-devel@lists.freedesktop.org>,
- Boris Brezillon <boris.brezillon@bootlin.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: devicetree@vger.kernel.org, Takeshi Kihara <takeshi.kihara.df@renesas.com>,
+ Geert Uytterhoeven <geert+renesas@glider.be>,
+ Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>,
+ linux-renesas-soc@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ Marek Vasut <marek.vasut+renesas@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 9 Jan 2019 11:37:19 +0000
-Peter Rosin <peda@axentia.se> wrote:
-
-> On 2019-01-09 11:12, Daniel Vetter wrote:
-> > On Tue, Jan 08, 2019 at 12:31:36PM +0000, Peter Rosin wrote:  
-> >> While trying to temporarily hide a plane, one thing that was attempted
-> >> was to call (from libdrm)
-> >>
-> >> 	drmModeSetPlane(fd, plane_id, crtc_id, fb_id, 0,
-> >> 			0, 0, 0, 0, 0, 0, 0, 0);
-> >>
-> >> This call causes a pair of "Division by zero in kernel." messages. Kill
-> >> those messages, but preserve the current behaviour that also happen to
-> >> make the plane disappear with the above call.
-> >>
-> >> Signed-off-by: Peter Rosin <peda@axentia.se>
-> >> ---
-> >>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 14 ++++++++++----
-> >>  1 file changed, 10 insertions(+), 4 deletions(-)
-> >>
-> >> Side note, when comparing with drm_atomic_helper_check_plane_state(), I get
-> >> the feeling that the src rect should be clipped together with the crtc rect
-> >> if/when clipping is needed. That function calls drm_rect_clip_scaled(), and
-> >> the equivalent does not seem to happen here. Should clipping be performed
-> >> on the src rect?  
-> > 
-> > Any reasons atmel can't switch over to that helper? Would compute a nice  
-> > ->visible state variable for you ...  
-> > -Daniel  
+On 1/9/19 11:57 AM, Wolfram Sang wrote:
+>> [    3.373714] renesas_sdhi_internal_dmac ee100000.sd: mmc0 base at 0xee100000 max clock rate 200 MHz
+>> [    3.456829] renesas_sdhi_internal_dmac ee120000.sd: mmc1 base at 0xee120000 max clock rate 200 MHz
 > 
-> I have not researched that, and as stated above, I was not sure if that was the
-> correct approach to begin with. Boris, any insights?
+> No mmc2 initialized. That should work regardless of eMMC. Probably
+> something wrong in the DT somewhere.
 
-You can look at vc4_plane.c if you want an example of how this helper
-can be used to get clipped dimensions of the plane.
+Weird, it worked in next-20181102 with these patches, I just rechecked:
 
-> Does this code predate the
-> helper or something?
+7818a9f06df1 mmc: renesas_sdhi: Whitelist R8A77990 SDHI
+a05a906776f8 pinctrl: sh-pfc: r8a77990: Add voltage switch operations
+for SDHI
+2cc9d3a293e9 pinctrl: sh-pfc: r8a77990: Add SDHI pins, groups and functions
+6b8d151613b7 pinctrl: sh-pfc: r8a77990: Add Audio SSI pins, groups and
+functions
+9167b22938f7 pinctrl: sh-pfc: r8a77990: Add Audio clock pins, groups and
+functions
+000cc50fc942 arm64: dts: r8a77990-ebisu: Enable HS200 of SDHI3
+d3f59bbbf7ce arm64: dts: r8a77990-ebisu: Enable eMMC of SDHI3
+5928c59bff8d arm64: dts: r8a77990-ebisu: Enable UHS-I of SDHI0 and SDHI1
+dae32a3172b8 arm64: dts: r8a77990-ebisu: Enable SD card of SDHI0 and SDHI1
+8feef039c6c6 arm64: dts: r8a77990: Add SDHI device nodes
+25e9471b6a27 (tag: next-20181102) Add linux-next specific files for 20181102
 
-Yes, and I must admit I'm not actively maintaining the driver, so there
-are probably a few other things we could simplify by using generic
-helpers.
+I'll let you know once I figure it out.
 
-> 
-> Maybe there's some register bit that hides a plane explicitly, matching the
-> ->visible state variable? I haven't looked at that either...
-
-I don't think so, but you can simply disable the plane when ->visible
-is false.
+-- 
+Best regards,
+Marek Vasut
 
 _______________________________________________
 linux-arm-kernel mailing list
