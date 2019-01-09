@@ -2,62 +2,68 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 76CE1C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 11:59:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CBA43C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 12:00:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3E5B8206B6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 11:59:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 96F01206BA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 12:00:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cepJCxZv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3E5B8206B6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=suse.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Mq19icDk";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="h2gWqV+I"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 96F01206BA
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	Mime-Version:References:In-Reply-To:Date:To:From:Subject:Message-ID:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=afXS9ZaOsPyedmNnROz89KhhT90tgc6uJFIW45y+YuY=; b=cepJCxZv7ALsVlmrRfpvJta4I
-	89vU9LZSwMRh/74WKxNt15pLAK73VsDHBA6Qq3yuUWgmmykWMvgNDx/jS4/DI6qMHerZvVH3fIvfW
-	KVYf7++GmNbZQlBpPSv9AzdFY25v2FHfZve7mdGigrALBl80zhWqJIx8nNIVvr0C4eTYUKf3Wk9s6
-	7nvfETyF2WW6iTohM1kkvBIxzqwtciqulDIeK1+hXOBUoD0y2wEcXp6c5/xTo6GLBLdfmMNfAXvAp
-	weCxoHCH8Tdw0QCO4D5HP7fSVHxVm+PmrgvcyIHuiBJK3h0DVJH5hO48b1pSlICSJmJSL9pSCfxIu
-	RIPjVMMeA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=u9HvE3xIf+Sctt68bBgOW5+ElFheDYGmAP7UjiTvt/g=; b=Mq19icDkxlOxtQ
+	3ecjsA97kZKZhJVFimfUhjl/q/gNvQ1oN/cXYTQCm0VT9qNJP1iZXPpUYJzJNUe5sKEd0Sq6ujZXJ
+	cqxBDuJxFOt5GXjKgGSX4FqSWAUwwnsITUFHF7YJnAMT9USZ/nJbS2aPZNuz3G6Ro6+lmyz0VW3bm
+	hrTuuxVpaBCIwFKFbN130OYc+YgemiyaiqFikKFHHJn3ebqGqFSZpFKlB59NY7nIl9/YF/aAlRp+L
+	E7FV6yoTg/Gt2A0iwM9pYMS0uRS4kMkgiboIimCMtV4LlQeVz1m/vOtjwsh8XINM9eP3fiIn6rtVR
+	DVngnQmFGNxxrFSdwBNQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghCVV-0000fM-Fc; Wed, 09 Jan 2019 11:58:49 +0000
-Received: from mx2.suse.de ([195.135.220.15] helo=mx1.suse.de)
+	id 1ghCX1-0002CU-Av; Wed, 09 Jan 2019 12:00:23 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghCVR-0000et-Hw; Wed, 09 Jan 2019 11:58:46 +0000
-X-Virus-Scanned: by amavisd-new at test-mx.suse.de
-Received: from relay1.suse.de (unknown [195.135.220.254])
- by mx1.suse.de (Postfix) with ESMTP id 4D823ABDC;
- Wed,  9 Jan 2019 11:58:41 +0000 (UTC)
-Message-ID: <64799d4495a4cbc43c3a8f61afda17a0ae70c2fc.camel@suse.de>
-Subject: Re: [PATCH RFC 00/11] staging: vc04_services: Improve driver
- load/unload
-From: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
-To: Stefan Wahren <stefan.wahren@i2se.com>, Dave Stevenson
- <dave.stevenson@raspberrypi.org>, Peter Robinson <pbrobinson@gmail.com>
-Date: Wed, 09 Jan 2019 12:58:39 +0100
-In-Reply-To: <537778454.382280.1547022816273@email.ionos.de>
-References: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
- <CALeDE9PX=2nR8=9JjT9wvsb470nrZ_h6JGFsrkYkexGOoOhXuA@mail.gmail.com>
- <CAAoAYcNJdzJW9X=hr5+5oAFWcVUexwY9zGQ_-T9X-M89jpnipQ@mail.gmail.com>
- <537778454.382280.1547022816273@email.ionos.de>
-User-Agent: Evolution 3.30.3 
-Mime-Version: 1.0
+ id 1ghCWx-0002C3-Ta
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 12:00:21 +0000
+Received: from bbrezillon (91-160-177-164.subs.proxad.net [91.160.177.164])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 259CE206B6;
+ Wed,  9 Jan 2019 12:00:15 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1547035219;
+ bh=TwI3gTLhbBNd1cYXCGa3vZ8P336E2Tv4RllKn2O0a5A=;
+ h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
+ b=h2gWqV+Ilp+6yZbP7H4pV+YOZWQNGM0OaA5DRrcRyOB8ax8QxplhOo5uo9kX+pYQx
+ kQ85VIt3cmJNGeXwsji2tNiOsWh6hP30mJdYUcZFW411LwzirW7xXD0D9wa41r1/6D
+ +bugV8XiOFX/FbOhH/RvQnP1PxTQxSOv1bGRqaT8=
+Date: Wed, 9 Jan 2019 13:00:08 +0100
+From: Boris Brezillon <bbrezillon@kernel.org>
+To: Peter Rosin <peda@axentia.se>
+Subject: Re: [PATCH] drm/atmel-hlcdc: prevent divide by zero
+Message-ID: <20190109125833.0af5dc52@bbrezillon>
+In-Reply-To: <9b73f5fa-e5c2-ea55-8d96-be6de8a1f34a@axentia.se>
+References: <20190108123129.20031-1-peda@axentia.se>
+ <20190109101224.GT21184@phenom.ffwll.local>
+ <9b73f5fa-e5c2-ea55-8d96-be6de8a1f34a@axentia.se>
+X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_035845_737677_6845AF74 
-X-CRM114-Status: UNSURE (   8.48  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190109_040019_973585_8C2CD78C 
+X-CRM114-Status: GOOD (  20.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,78 +75,68 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devel@driverdev.osuosl.org, Arnd Bergmann <arnd@arndb.de>, tiwai@suse.de,
- Greg KH <gregkh@linuxfoundation.org>, mikebrady@eircom.net,
- Eric Anholt <eric@anholt.net>, "moderated list:BROADCOM BCM2835 ARM
- ARCHITECTURE" <linux-rpi-kernel@lists.infradead.org>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============0873753435857482417=="
+Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>,
+ David Airlie <airlied@linux.ie>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "dri-devel@lists.freedesktop.org" <dri-devel@lists.freedesktop.org>,
+ Boris Brezillon <boris.brezillon@bootlin.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Wed, 9 Jan 2019 11:37:19 +0000
+Peter Rosin <peda@axentia.se> wrote:
 
---===============0873753435857482417==
-Content-Type: multipart/signed; micalg="pgp-sha256";
-	protocol="application/pgp-signature"; boundary="=-Tl3YcpFtQvfgVSoy1OVI"
+> On 2019-01-09 11:12, Daniel Vetter wrote:
+> > On Tue, Jan 08, 2019 at 12:31:36PM +0000, Peter Rosin wrote:  
+> >> While trying to temporarily hide a plane, one thing that was attempted
+> >> was to call (from libdrm)
+> >>
+> >> 	drmModeSetPlane(fd, plane_id, crtc_id, fb_id, 0,
+> >> 			0, 0, 0, 0, 0, 0, 0, 0);
+> >>
+> >> This call causes a pair of "Division by zero in kernel." messages. Kill
+> >> those messages, but preserve the current behaviour that also happen to
+> >> make the plane disappear with the above call.
+> >>
+> >> Signed-off-by: Peter Rosin <peda@axentia.se>
+> >> ---
+> >>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 14 ++++++++++----
+> >>  1 file changed, 10 insertions(+), 4 deletions(-)
+> >>
+> >> Side note, when comparing with drm_atomic_helper_check_plane_state(), I get
+> >> the feeling that the src rect should be clipped together with the crtc rect
+> >> if/when clipping is needed. That function calls drm_rect_clip_scaled(), and
+> >> the equivalent does not seem to happen here. Should clipping be performed
+> >> on the src rect?  
+> > 
+> > Any reasons atmel can't switch over to that helper? Would compute a nice  
+> > ->visible state variable for you ...  
+> > -Daniel  
+> 
+> I have not researched that, and as stated above, I was not sure if that was the
+> correct approach to begin with. Boris, any insights?
 
+You can look at vc4_plane.c if you want an example of how this helper
+can be used to get clipped dimensions of the plane.
 
---=-Tl3YcpFtQvfgVSoy1OVI
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
+> Does this code predate the
+> helper or something?
 
-Hi Stefan,
+Yes, and I must admit I'm not actively maintaining the driver, so there
+are probably a few other things we could simplify by using generic
+helpers.
 
-On Wed, 2019-01-09 at 09:33 +0100, Stefan Wahren wrote:
->=20
-> But i noticed a regression introduced in 5.0-rc1, which might be
-> related. I
-> tried to run "vchiq_test -f 1" and it never completes. After
-> reverting commit
-> 852b2876a8a8 ("staging: vchiq: rework remove_event handling")
-> vchiq_test [1]
-> works as expected again.
+> 
+> Maybe there's some register bit that hides a plane explicitly, matching the
+> ->visible state variable? I haven't looked at that either...
 
-I had a look at that one, it seems that it's due to the fact that vchiq
-relies on completions only sleeping whenever their internal count
-reaches 0 (it's incremented on every complete()). As opposed to
-wait_queues, which will wait until an event is triggered regardless of
-previous state.
-
-Regards,
-Nicolas
-
---=-Tl3YcpFtQvfgVSoy1OVI
-Content-Type: application/pgp-signature; name="signature.asc"
-Content-Description: This is a digitally signed message part
-Content-Transfer-Encoding: 7bit
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAABCAAdFiEErOkkGDHCg2EbPcGjlfZmHno8x/4FAlw14e8ACgkQlfZmHno8
-x/63Qgf7BMUVlAerDE9bM0mOVzDcOhe6Sh1T/4gVngHLqlwhpKytJBZIe3/pCk8Q
-08h25nh8uxxj5AjoxbrsPFgHiptVzsU8VV0z+5CvO0qxaSRN3T2AfloeiCSQJ+8C
-NxG4TwR+OO9iBteydbB/rW4Q23hBVjCCHYMeEpra6jVPttqyXm2RUpi+jl8qx0su
-1AudOBnna1q3K7Qeza33PEvJHox7SFJIG8NmvN7OrjtQYHJMtk10g0zzrT1MaxXq
-QytabylVAZs6eYFh95ias+GzM5VxKVFvsr7loBelb+ISpSxO278qElNGaWH8dFU6
-ReQD9FJWAyZMzXekSAKskO5PYUyx/g==
-=6Hsv
------END PGP SIGNATURE-----
-
---=-Tl3YcpFtQvfgVSoy1OVI--
-
-
-
---===============0873753435857482417==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+I don't think so, but you can simply disable the plane when ->visible
+is false.
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============0873753435857482417==--
-
-
