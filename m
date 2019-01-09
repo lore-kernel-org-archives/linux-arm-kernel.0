@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D0395C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 23:57:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6C85EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 23:57:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 952D3206BB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 23:57:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 152CC206BB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 23:57:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KeyfaR/U"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 952D3206BB
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pTnnFXnq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 152CC206BB
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,39 +26,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=9LylZ6FS4SwBTAI+MQz04AvoeT7Ed12EJT/qO7ZT8sQ=; b=KeyfaR/UuvvpXDWDZIypFSjaVX
-	zt+U6jKBG/yWTsDCHPOe0OTAZyoOiOcnaJmvl6ta3cKZdZVLHZzXvkQIvITDsULKULNyWoWtrisHJ
-	yU5oeUQRZvw27kjPAKsU047MwdD8lmR1jRaUMl40RQcofNMZZHSZrRJ/C7cTbzi2dipstICPOso4k
-	o04j9siEf24Ke40Ziw5Mk9FevBJc30c+yORauZU9e0MJrVO0P/Hyk4c/BUwzo/YDlCrbP2RRym25B
-	1TZoGpeQe5CUGxf2tOA8EINoaPuQhsKmMrtJaJIbrBTUlm8u2qQ5hRh3Kh2QKP2uuppwpbuCaYgxv
-	Ld6z00tQ==;
+	bh=SPJgMzWiPH21f8u/27fFO3Vg1B9hiF63mG6E8wUAD0I=; b=pTnnFXnq37nd9qB5nOhCEf6LZm
+	XDeQD+YOES3PrHfFLc4AMBQIT3nPZweXX9JCMj1JZcw8Gc/vPAOwFTMBhkfVmthbHaqdT+Qb0DwDx
+	6vKdmZQWbJrzyKR/uWnQuFz2whNclM3z45KIwXdaewWeL86ixtBDIvHDOchHrxb/VYJvDNgnZ3vL/
+	W6Ctb5Rek7X2EWU+F0j+OqvY2uO1l+mjDUa/wWa9DoRyxyJMEg9aLNPdIFbUT+c5YNyiWnoxCH+Hx
+	4454mfu1l5MZ2bAcm/UluWP0PSdxrOmugBcnT9PStoow76XbedCHiY6v2W/urJ5s2Ix3JVCrQEjLt
+	bz4g/0cA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghNiw-0007Pl-0u; Wed, 09 Jan 2019 23:57:26 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1ghNjA-0007d7-6N; Wed, 09 Jan 2019 23:57:40 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghNhV-00061X-QC
+ id 1ghNhW-0005xZ-PK
  for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 23:56:06 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 71001165C;
- Wed,  9 Jan 2019 15:55:57 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id AF24515BF;
+ Wed,  9 Jan 2019 15:55:58 -0800 (PST)
 Received: from beelzebub.austin.arm.com (beelzebub.austin.arm.com
  [10.118.12.119])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id C9AAA3F5AF;
- Wed,  9 Jan 2019 15:55:56 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 08D263F5AF;
+ Wed,  9 Jan 2019 15:55:57 -0800 (PST)
 From: Jeremy Linton <jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v3 6/7] arm64: add sysfs vulnerability show for speculative
- store bypass
-Date: Wed,  9 Jan 2019 17:55:43 -0600
-Message-Id: <20190109235544.2992426-7-jeremy.linton@arm.com>
+Subject: [PATCH v3 7/7] arm64: enable generic CPU vulnerabilites support
+Date: Wed,  9 Jan 2019 17:55:44 -0600
+Message-Id: <20190109235544.2992426-8-jeremy.linton@arm.com>
 X-Mailer: git-send-email 2.17.2
 In-Reply-To: <20190109235544.2992426-1-jeremy.linton@arm.com>
 References: <20190109235544.2992426-1-jeremy.linton@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_155558_321621_E6481943 
-X-CRM114-Status: GOOD (  13.03  )
+X-CRM114-CacheID: sfid-20190109_155559_211258_1B492CE0 
+X-CRM114-Status: UNSURE (   8.69  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,112 +80,29 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Return status based on ssbd_state and the arm64 SSBS feature. If
-the mitigation is disabled, or the firmware isn't responding then
-return the expected machine state based on a new blacklist of known
-vulnerable cores.
+From: Mian Yousaf Kaukab <ykaukab@suse.de>
 
+Enable CPU vulnerabilty show functions for spectre_v1, spectre_v2,
+meltdown and store-bypass.
+
+Signed-off-by: Mian Yousaf Kaukab <ykaukab@suse.de>
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- arch/arm64/kernel/cpu_errata.c | 48 ++++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+ arch/arm64/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index ee286d606d9b..c8ff96158b94 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -288,6 +288,7 @@ enable_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
- DEFINE_PER_CPU_READ_MOSTLY(u64, arm64_ssbd_callback_required);
- 
- int ssbd_state __read_mostly = ARM64_SSBD_KERNEL;
-+static bool __ssb_safe = true;
- 
- static const struct ssbd_options {
- 	const char	*str;
-@@ -385,10 +386,18 @@ static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
- {
- 	struct arm_smccc_res res;
- 	bool required = true;
-+	bool is_vul;
- 	s32 val;
- 
- 	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
- 
-+	is_vul = is_midr_in_range_list(read_cpuid_id(), entry->midr_range_list);
-+
-+	if (is_vul)
-+		__ssb_safe = false;
-+
-+	arm64_requested_vuln_attrs |= VULN_SSB;
-+
- 	if (this_cpu_has_cap(ARM64_SSBS)) {
- 		required = false;
- 		goto out_printmsg;
-@@ -422,6 +431,7 @@ static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
- 		ssbd_state = ARM64_SSBD_UNKNOWN;
- 		return false;
- 
-+	/* machines with mixed mitigation requirements must not return this */
- 	case SMCCC_RET_NOT_REQUIRED:
- 		pr_info_once("%s mitigation not required\n", entry->desc);
- 		ssbd_state = ARM64_SSBD_MITIGATED;
-@@ -476,6 +486,17 @@ static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
- 
- 	return required;
- }
-+
-+/* known vulnerable cores */
-+static const struct midr_range arm64_ssb_cpus[] = {
-+	MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
-+	MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
-+	MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
-+	MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
-+	MIDR_ALL_VERSIONS(MIDR_CORTEX_A76),
-+	{},
-+};
-+
- #endif	/* CONFIG_ARM64_SSBD */
- 
- static void __maybe_unused
-@@ -762,6 +783,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 		.capability = ARM64_SSBD,
- 		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
- 		.matches = has_ssbd_mitigation,
-+		.midr_range_list = arm64_ssb_cpus,
- 	},
- #endif
- #ifdef CONFIG_ARM64_ERRATUM_1188873
-@@ -809,4 +831,30 @@ ssize_t cpu_show_spectre_v2(struct device *dev, struct device_attribute *attr,
- 	return sprintf(buf, "Vulnerable\n");
- }
- 
-+ssize_t cpu_show_spec_store_bypass(struct device *dev,
-+		struct device_attribute *attr, char *buf)
-+{
-+	/*
-+	 *  Two assumptions: First, get_ssbd_state() reflects the worse case
-+	 *  for hetrogenous machines, and that if SSBS is supported its
-+	 *  supported by all cores.
-+	 */
-+	switch (arm64_get_ssbd_state()) {
-+	case ARM64_SSBD_MITIGATED:
-+		return sprintf(buf, "Not affected\n");
-+
-+	case ARM64_SSBD_KERNEL:
-+	case ARM64_SSBD_FORCE_ENABLE:
-+		if (cpus_have_cap(ARM64_SSBS))
-+			return sprintf(buf, "Not affected\n");
-+		return sprintf(buf,
-+			"Mitigation: Speculative Store Bypass disabled\n");
-+	}
-+
-+	if (__ssb_safe)
-+		return sprintf(buf, "Not affected\n");
-+
-+	return sprintf(buf, "Vulnerable\n");
-+}
-+
- #endif
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index a4168d366127..be9872ee1d61 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -88,6 +88,7 @@ config ARM64
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_CLOCKEVENTS_BROADCAST
+ 	select GENERIC_CPU_AUTOPROBE
++	select GENERIC_CPU_VULNERABILITIES
+ 	select GENERIC_EARLY_IOREMAP
+ 	select GENERIC_IDLE_POLL_SETUP
+ 	select GENERIC_IRQ_MULTI_HANDLER
 -- 
 2.17.2
 
