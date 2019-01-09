@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 715D5C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 13:43:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 39FB9C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 13:44:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3EF35206B6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 13:43:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E0F9B2075C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 13:44:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Gvs+NCoK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3EF35206B6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iwxLAoVd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E0F9B2075C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pschenker.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,44 +25,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4XtHkzLzDR9IJ3W3+elBk6ag/C3TcgWNgyQ/wWHj2I0=; b=Gvs+NCoK/WnhAx
-	PyatFvGMBZv4U0TECg4yI3oHat/n32Jjm3/LijmMvNAzAXi1GZBDBIomdOyl7f3wk9OiFZ51GUWSr
-	g/mOa/lHFdAlLzq5iljSY+HNsw8R4XHFcuQ/laxMxKG9jCa0/VMdPpgFCbn9gYRhy6CXdQWYcJCga
-	OnMxozWVDDtQNIylWA0bAZtrrw7r+KJM9oWQJXDoxnWItQlPoToP0+niu73I3SCoyCLS+/sV86qWr
-	yqi7hWeg4uUHr3QiwoJGls7Lsb+IwNJ2kQpQe9J8SoPHTlv2LtClMn3WSzuiwwMxU1M5f5wsr0Dnu
-	krHWCBEhUTB7NRom8gQw==;
+	List-Owner; bh=MXXvdE9nCdvzBVQVWl8sRKe9Q+CjCKatFG7UjwBdtSM=; b=iwxLAoVdvzIDY0
+	V2tB07Vt1ZNOnhkUK72pt4VAXM7itPgRCKhqx+DBdF/aSGPD/FiO0j1owptvGV1O0XiTpwVXrhp4L
+	J3XYuJiJdUvJHsfennqfXvs8eZ1gmiIvlBQj4yt8rSlJI6rgMzsziwQAT0ahydNXbpcDWGs+eKTrG
+	GGmydVLzkxq/8A6NfxM24Yk1tioha3gLObhMtcwecbL65TgUEsjRSIfGl9ajpxim6YffwZ5JX2ZZA
+	kmnT3xnDmE30WrUo1WhLFUxehCaT2Ja354CukkLR9aA5mDl1hcmvmQDgJTif1R3avgQXfKvyt9Jqn
+	qXtEeOT7M9bcCR5L8TzA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghE95-0007QO-48; Wed, 09 Jan 2019 13:43:47 +0000
-Received: from mxout014.mail.hostpoint.ch ([2a00:d70:0:e::314])
+	id 1ghE9L-0007ed-S5; Wed, 09 Jan 2019 13:44:03 +0000
+Received: from mxout013.mail.hostpoint.ch ([2a00:d70:0:e::313])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghE7y-0006Dg-Ji
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 13:42:47 +0000
+ id 1ghE8A-0006QF-UX
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 13:43:14 +0000
 Received: from [10.0.2.45] (helo=asmtp012.mail.hostpoint.ch)
- by mxout014.mail.hostpoint.ch with esmtp (Exim 4.91 (FreeBSD))
+ by mxout013.mail.hostpoint.ch with esmtp (Exim 4.91 (FreeBSD))
  (envelope-from <dev@pschenker.ch>)
- id 1ghE7o-0007Zg-8M; Wed, 09 Jan 2019 14:42:28 +0100
+ id 1ghE7n-0002he-5B; Wed, 09 Jan 2019 14:42:27 +0100
 Received: from 252.222.41.212.static.wline.lns.sme.cust.swisscom.ch
  ([212.41.222.252] helo=philippe-pc.toradex.int)
  by asmtp012.mail.hostpoint.ch with esmtpsa
  (TLSv1.2:ECDHE-RSA-AES256-GCM-SHA384:256) (Exim 4.91 (FreeBSD))
  (envelope-from <dev@pschenker.ch>)
- id 1ghE7o-0006KA-24; Wed, 09 Jan 2019 14:42:28 +0100
+ id 1ghE7m-0006KA-U2; Wed, 09 Jan 2019 14:42:27 +0100
 X-Authenticated-Sender-Id: dev@pschenker.ch
 From: Philippe Schenker <dev@pschenker.ch>
 To: jic23@kernel.org,
 	marcel.ziswiler@toradex.com,
 	stefan@agner.ch
-Subject: [PATCH v6 6/8] iio: adc: add STMPE ADC devicetree bindings
-Date: Wed,  9 Jan 2019 14:42:05 +0100
-Message-Id: <20190109134208.5660-7-dev@pschenker.ch>
+Subject: [PATCH v6 5/8] iio: adc: add STMPE ADC driver using IIO framework
+Date: Wed,  9 Jan 2019 14:42:04 +0100
+Message-Id: <20190109134208.5660-6-dev@pschenker.ch>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190109134208.5660-1-dev@pschenker.ch>
 References: <20190109134208.5660-1-dev@pschenker.ch>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_054239_162989_A63CFA15 
-X-CRM114-Status: GOOD (  17.76  )
+X-CRM114-CacheID: sfid-20190109_054252_079825_198C4D2B 
+X-CRM114-Status: GOOD (  23.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,240 +74,241 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Peter Meerwald-Stadler <pmeerw@pmeerw.net>, linux-iio@vger.kernel.org,
+Cc: Charles-Antoine Couret <charles-antoine.couret@essensium.com>,
+ dmitry.torokhov@gmail.com, Peter Meerwald-Stadler <pmeerw@pmeerw.net>,
+ linux-iio@vger.kernel.org, Jonathan Bakker <xc-racer2@live.ca>,
  thierry.reding@gmail.com, Max Krummenacher <max.krummenacher@toradex.com>,
- digetx@gmail.com, lee.jones@linaro.org,
+ digetx@gmail.com, Freeman Liu <freeman.liu@spreadtrum.com>,
  linux-stm32@st-md-mailman.stormreply.com, robh@kernel.org,
- Lars-Peter Clausen <lars@metafoo.de>, linux-input@vger.kernel.org,
- devicetree@vger.kernel.org, alexandre.torgue@st.com,
+ Marcus Folkesson <marcus.folkesson@gmail.com>,
+ Lars-Peter Clausen <lars@metafoo.de>, lee.jones@linaro.org,
+ Geert Uytterhoeven <geert@linux-m68k.org>,
+ Stefan Popa <stefan.popa@analog.com>, alexandre.torgue@st.com,
+ William Breathitt Gray <vilhelm.gray@gmail.com>,
+ Siddartha Mohanadoss <smohanad@codeaurora.org>,
  Philippe Schenker <philippe.schenker@toradex.com>,
- Rob Herring <robh+dt@kernel.org>,
+ Mark Brown <broonie@kernel.org>,
  Jonathan Cameron <Jonathan.Cameron@huawei.com>,
- linux-arm-kernel@lists.infradead.org, dmitry.torokhov@gmail.com,
- linux-kernel@vger.kernel.org, mcoquelin.stm32@gmail.com,
- Hartmut Knaack <knaack.h@gmx.de>, shawnguo@kernel.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+ linux-arm-kernel@lists.infradead.org, Randy Dunlap <rdunlap@infradead.org>,
+ Arnaud Pouliquen <arnaud.pouliquen@st.com>, linux-kernel@vger.kernel.org,
+ mcoquelin.stm32@gmail.com, Hartmut Knaack <knaack.h@gmx.de>,
+ Eugen Hristev <eugen.hristev@microchip.com>, Kent Gustavsson <kent@minoris.se>,
+ shawnguo@kernel.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Stefan Agner <stefan@agner.ch>
-
-This adds the devicetree bindings for the STMPE ADC. This also corrects
-a typo in st,sample-time it is rather "6 -> 124 clocks" according
-to the datasheet and not 144.
-We need to use the naming stmpe_adc in devicetree because this is given
-by the mfd device.
-
-Signed-off-by: Stefan Agner <stefan@agner.ch>
-Signed-off-by: Max Krummenacher <max.krummenacher@toradex.com>
-Signed-off-by: Philippe Schenker <philippe.schenker@toradex.com>
-Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
-
----
-
-Changes in v6:
- - Added Rob's Reviewed-by
-
-Changes in v5:
- - Made a one column list
- - Cleared note about precedence
- - Changed example to a full STMPE811 device with MFD, touchscreen, and the new
-   stmpe_adc driver.
- - Added Jonathan Cameron's Reviewed-by
-
-Changes in v4:
- - Put reformatting in a separate precursor patch.
-
-Changes in v3:
- - Reformatted documentation for touchscreen to use tabs and have a better
-   overview of the settings.
- - Added note which adc-settings will take precedence.
- - changed typo in sample-time setting from 144 clocks to 124 clocks, as stated
-   in the datasheet.
-
-Changes in v2:
- - Moved the bindings for ADC to the overlying mfd.
- - Reformatted for better readability
-
- .../devicetree/bindings/iio/adc/stmpe-adc.txt | 21 +++++
- .../bindings/input/touchscreen/stmpe.txt      | 88 +++++++++++++------
- .../devicetree/bindings/mfd/stmpe.txt         | 14 +++
- 3 files changed, 98 insertions(+), 25 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/iio/adc/stmpe-adc.txt
-
-diff --git a/Documentation/devicetree/bindings/iio/adc/stmpe-adc.txt b/Documentation/devicetree/bindings/iio/adc/stmpe-adc.txt
-new file mode 100644
-index 000000000000..480e66422625
---- /dev/null
-+++ b/Documentation/devicetree/bindings/iio/adc/stmpe-adc.txt
-@@ -0,0 +1,21 @@
-+STMPE ADC driver
-+----------------
-+
-+Required properties:
-+ - compatible: "st,stmpe-adc"
-+
-+Optional properties:
-+Note that the ADC is shared with the STMPE touchscreen. ADC related settings
-+have to be done in the mfd.
-+- st,norequest-mask: bitmask specifying which ADC channels should _not_ be
-+  requestable due to different usage (e.g. touch)
-+
-+Node name must be stmpe_adc and should be child node of stmpe node to
-+which it belongs.
-+
-+Example:
-+
-+	stmpe_adc {
-+		compatible = "st,stmpe-adc";
-+		st,norequest-mask = <0x0F>; /* dont use ADC CH3-0 */
-+	};
-diff --git a/Documentation/devicetree/bindings/input/touchscreen/stmpe.txt b/Documentation/devicetree/bindings/input/touchscreen/stmpe.txt
-index bf66a55a7de5..c549924603d2 100644
---- a/Documentation/devicetree/bindings/input/touchscreen/stmpe.txt
-+++ b/Documentation/devicetree/bindings/input/touchscreen/stmpe.txt
-@@ -5,24 +5,6 @@ Required properties:
-  - compatible: "st,stmpe-ts"
- 
- Optional properties:
--- st,sample-time	: ADC conversion time in number of clock.
--				0 -> 36 clocks
--				1 -> 44 clocks
--				2 -> 56 clocks
--				3 -> 64 clocks
--				4 -> 80 clocks (recommended)
--				5 -> 96 clocks
--				6 -> 144 clocks
--- st,mod-12b		: ADC Bit mode
--				0 -> 10bit ADC
--				1 -> 12bit ADC
--- st,ref-sel		: ADC reference source
--				0 -> internal
--				1 -> external
--- st,adc-freq		: ADC Clock speed
--				0 -> 1.625 MHz
--				1 -> 3.25 MHz
--				2 || 3 -> 6.5 MHz
- - st,ave-ctrl		: Sample average control
- 				0 -> 1 sample
- 				1 -> 2 samples
-@@ -52,20 +34,76 @@ Optional properties:
- 				0 -> 20 mA (typical 35mA max)
- 				1 -> 50 mA (typical 80 mA max)
- 
-+Optional properties common with MFD (deprecated):
-+ - st,sample-time	: ADC conversion time in number of clock.
-+				0 -> 36 clocks
-+				1 -> 44 clocks
-+				2 -> 56 clocks
-+				3 -> 64 clocks
-+				4 -> 80 clocks (recommended)
-+				5 -> 96 clocks
-+				6 -> 124 clocks
-+ - st,mod-12b		: ADC Bit mode
-+				0 -> 10bit ADC
-+				1 -> 12bit ADC
-+ - st,ref-sel		: ADC reference source
-+				0 -> internal
-+				1 -> external
-+ - st,adc-freq		: ADC Clock speed
-+				0 -> 1.625 MHz
-+				1 -> 3.25 MHz
-+				2 || 3 -> 6.5 MHz
-+
- Node name must be stmpe_touchscreen and should be child node of stmpe node to
- which it belongs.
- 
-+Note that common ADC settings of stmpe_touchscreen (child) will take precedence
-+over the settings done in MFD.
-+
- Example:
- 
-+stmpe811@41 {
-+	compatible = "st,stmpe811";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_touch_int>;
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	reg = <0x41>;
-+	interrupts = <10 IRQ_TYPE_LEVEL_LOW>;
-+	interrupt-parent = <&gpio4>;
-+	interrupt-controller;
-+	id = <0>;
-+	blocks = <0x5>;
-+	irq-trigger = <0x1>;
-+	/* Common ADC settings */
-+	/* 3.25 MHz ADC clock speed */
-+	st,adc-freq = <1>;
-+	/* 12-bit ADC */
-+	st,mod-12b = <1>;
-+	/* internal ADC reference */
-+	st,ref-sel = <0>;
-+	/* ADC converstion time: 80 clocks */
-+	st,sample-time = <4>;
-+
- 	stmpe_touchscreen {
- 		compatible = "st,stmpe-ts";
--		st,sample-time = <4>;
--		st,mod-12b = <1>;
--		st,ref-sel = <0>;
--		st,adc-freq = <1>;
--		st,ave-ctrl = <1>;
--		st,touch-det-delay = <2>;
--		st,settling = <2>;
-+		reg = <0>;
-+		/* 8 sample average control */
-+		st,ave-ctrl = <3>;
-+		/* 5 ms touch detect interrupt delay */
-+		st,touch-det-delay = <5>;
-+		/* 1 ms panel driver settling time */
-+		st,settling = <3>;
-+		/* 7 length fractional part in z */
- 		st,fraction-z = <7>;
-+		/*
-+		 * 50 mA typical 80 mA max touchscreen drivers
-+		 * current limit value
-+		 */
- 		st,i-drive = <1>;
- 	};
-+	stmpe_adc {
-+		compatible = "st,stmpe-adc";
-+		st,norequest-mask = <0x0F>;
-+	};
-+};
-diff --git a/Documentation/devicetree/bindings/mfd/stmpe.txt b/Documentation/devicetree/bindings/mfd/stmpe.txt
-index a46e7177195d..d4408a417193 100644
---- a/Documentation/devicetree/bindings/mfd/stmpe.txt
-+++ b/Documentation/devicetree/bindings/mfd/stmpe.txt
-@@ -14,6 +14,20 @@ Optional properties:
-  - st,autosleep-timeout		: Valid entries (ms); 4, 16, 32, 64, 128, 256, 512 and 1024
-  - irq-gpio			: If present, which GPIO to use for event IRQ
- 
-+Optional properties for devices with touch and ADC (STMPE811|STMPE610):
-+ - st,sample-time		: ADC conversion time in number of clock.
-+					0 -> 36 clocks		4 -> 80 clocks (recommended)
-+					1 -> 44 clocks		5 -> 96 clocks
-+					2 -> 56 clocks		6 -> 124 clocks
-+					3 -> 64 clocks
-+ - st,mod-12b			: ADC Bit mode
-+					0 -> 10bit ADC		1 -> 12bit ADC
-+ - st,ref-sel			: ADC reference source
-+					0 -> internal		1 -> external
-+ - st,adc-freq			: ADC Clock speed
-+					0 -> 1.625 MHz		2 || 3 -> 6.5 MHz
-+					1 -> 3.25 MHz
-+
- Example:
- 
- 	stmpe1601: stmpe1601@40 {
--- 
-2.20.1
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+RnJvbTogU3RlZmFuIEFnbmVyIDxzdGVmYW5AYWduZXIuY2g+CgpUaGlzIGFkZHMgYW4gQURDIGRy
+aXZlciBmb3IgdGhlIFNUTVBFIGRldmljZSB1c2luZyB0aGUgaW5kdXN0cmlhbAppbnB1dC9vdXRw
+dXQgaW50ZXJmYWNlLiBUaGUgZHJpdmVyIHN1cHBvcnRzIHJhdyByZWFkaW5nIG9mIHZhbHVlcy4K
+VGhlIGRyaXZlciBkZXBlbmRzIG9uIHRoZSBNRkQgU1RNUEUgZHJpdmVyLiBJZiB0aGUgdG91Y2hz
+Y3JlZW4KYmxvY2sgaXMgZW5hYmxlZCB0b28sIG9ubHkgZm91ciBvZiB0aGUgOCBBREMgY2hhbm5l
+bHMgYXJlIGF2YWlsYWJsZS4KClNpZ25lZC1vZmYtYnk6IFN0ZWZhbiBBZ25lciA8c3RlZmFuQGFn
+bmVyLmNoPgpTaWduZWQtb2ZmLWJ5OiBNYXggS3J1bW1lbmFjaGVyIDxtYXgua3J1bW1lbmFjaGVy
+QHRvcmFkZXguY29tPgpTaWduZWQtb2ZmLWJ5OiBQaGlsaXBwZSBTY2hlbmtlciA8cGhpbGlwcGUu
+c2NoZW5rZXJAdG9yYWRleC5jb20+ClJldmlld2VkLWJ5OiBKb25hdGhhbiBDYW1lcm9uIDxKb25h
+dGhhbi5DYW1lcm9uQGh1YXdlaS5jb20+CgotLS0KCkNoYW5nZXMgaW4gdjY6IE5vbmUKQ2hhbmdl
+cyBpbiB2NToKIC0gUmVtb3ZlZCBkZXZtX2FkZF9hY3Rpb25fb3JfcmVzZXQKIC0gQ2hhbmdlZCBp
+aW9fZGV2aWNlX3JlZ2lzdGVyIHRvIGRldm1faWlvX2RldmljZV9yZWdpc3RlcgogLSBBZGRlZCBK
+b25hdGhhbiBDYW1lcm9uJ3MgUmV2aWV3ZWQtYnkKIC0gQWRkZWQgY29ycmVjdCBhdXRob3Igb2Yg
+Y29tbWl0LCBhcyB0aGlzIGNoYW5nZWQgYnkgYWNjaWRlbnQKCkNoYW5nZXMgaW4gdjQ6CiAtIE1v
+dmVkIE1GRCBjaGFuZ2VzIHRvIGEgcHJlY3Vyc29yIHBhdGNoCiAtIE1vdmVkIHN0bXBlLXRzIGNo
+YW5nZXMgdG8gYSBwcmVjdXJzb3IgcGF0Y2gKIC0gQ3JlYXRlZCBzdG1wZV9yZWFkX3RlbXAgYW5k
+IHN0bXBlX3JlYWRfdm9sdGFnZSBmdW5jdGlvbnMgdG8gbWFrZQogICByZWFkX3JhdyBtb3JlIHJl
+YWRhYmxlCiAtIEFkZGVkIGxvY2FsIGxvY2sgaW5zdGVhZCBvZiB1c2luZyBpbmRpb19kZXYncyBt
+bG9jawogLSBVc2UgYmUxNl90b19jcHUoKSBtYWNybyBpbnN0ZWFkIG9mIGJpdHNoaWZ0aW5nCiAt
+IEFkZGVkIHN0bXBlX2VuYWJsZSBhZ2FpbiB0byBzdG1wZV9hZGNfaW5pdF9odwogLSBVc2UgZGV2
+bV9hZGRfYWN0aW9uX29yX3Jlc2V0IHRvIGdldCByaWQgb2YgdGhlIHJlbW92ZSBmdW5jdGlvbgog
+ICAoSSB0ZXN0ZWQgaWYgdGhhdCBhY3R1YWxseSB3b3JrcykKCkNoYW5nZXMgaW4gdjM6CiAtIFJl
+bW92ZWQgQ09NUElMRV9URVNUIGZyb20gZGVwZW5kaW5ncyBpbiBLY29uZmlnCiAtIFJlbW92ZWQg
+c3RtcGVfYWRjX2dldF9wbGF0Zm9ybV9pbmZvKCkgZnVuY3Rpb24gYW5kIGludGVncmF0ZWQgdGhl
+CiAgIGZldyBjb2RlIGxpbmVzIGluIHRoZSBvdGhlciBmdW5jdGlvbgoKQ2hhbmdlcyBpbiB2MjoK
+IC0gQ29kZSBmb3JtYXR0aW5nCiAtIFJlbW92ZWQgdW51c2VkIGluY2x1ZGVzCiAtIERlZmluZWQg
+dGhlIG1hY3JvIFNUTVBFX1NUQVJUX09ORV9URU1QX0NPTlYgd2l0aCBvdGhlciBtYWNyb3MuCiAt
+IEFkZGVkIG5ldyBtYWNybyB0aGF0IGRlZmluZXMgdGhlIGNoYW5uZWwgb2YgdGhlIHRlbXBlcmF0
+dXJlIHNlbnNvci4KICAgVG9vayBuZXcgbmFtZSBmb3IgU1RNUEVfTUFYX0FEQy0+U1RNUEVfQURD
+X0xBU1RfTlIgYW5kIHVzZWQgaXQKICAgdGhyb3VnaG91dCB0aGUgY29kZSBmb3IgYmV0dGVyIHJl
+YWRhYmlsaXR5LgogLSBBZGRlZCBtdXRleF91bmxvY2sgd2hlcmUgbWlzc2luZy4KCiBkcml2ZXJz
+L2lpby9hZGMvS2NvbmZpZyAgICAgfCAgIDcgKwogZHJpdmVycy9paW8vYWRjL01ha2VmaWxlICAg
+IHwgICAxICsKIGRyaXZlcnMvaWlvL2FkYy9zdG1wZS1hZGMuYyB8IDM2MyArKysrKysrKysrKysr
+KysrKysrKysrKysrKysrKysrKysrKysKIDMgZmlsZXMgY2hhbmdlZCwgMzcxIGluc2VydGlvbnMo
+KykKIGNyZWF0ZSBtb2RlIDEwMDY0NCBkcml2ZXJzL2lpby9hZGMvc3RtcGUtYWRjLmMKCmRpZmYg
+LS1naXQgYS9kcml2ZXJzL2lpby9hZGMvS2NvbmZpZyBiL2RyaXZlcnMvaWlvL2FkYy9LY29uZmln
+CmluZGV4IDdhM2NhNGVjMGNiNy4uNWI3MmUyOTYzMTUzIDEwMDY0NAotLS0gYS9kcml2ZXJzL2lp
+by9hZGMvS2NvbmZpZworKysgYi9kcml2ZXJzL2lpby9hZGMvS2NvbmZpZwpAQCAtNzU1LDYgKzc1
+NSwxMyBAQCBjb25maWcgU1RNMzJfREZTRE1fQURDCiAJICBUaGlzIGRyaXZlciBjYW4gYWxzbyBi
+ZSBidWlsdCBhcyBhIG1vZHVsZS4gIElmIHNvLCB0aGUgbW9kdWxlCiAJICB3aWxsIGJlIGNhbGxl
+ZCBzdG0zMi1kZnNkbS1hZGMuCiAKK2NvbmZpZyBTVE1QRV9BREMKKwl0cmlzdGF0ZSAiU1RNaWNy
+b2VsZWN0cm9uaWNzIFNUTVBFIEFEQyBkcml2ZXIiCisJZGVwZW5kcyBvbiBPRiAmJiBNRkRfU1RN
+UEUKKwloZWxwCisJICBTYXkgeWVzIGhlcmUgdG8gYnVpbGQgc3VwcG9ydCBmb3IgU1QgTWljcm9l
+bGVjdHJvbmljcyBTVE1QRQorCSAgYnVpbHQtaW4gQURDIGJsb2NrIChzdG1wZTgxMSkuCisKIGNv
+bmZpZyBTVFgxMDQKIAl0cmlzdGF0ZSAiQXBleCBFbWJlZGRlZCBTeXN0ZW1zIFNUWDEwNCBkcml2
+ZXIiCiAJZGVwZW5kcyBvbiBQQzEwNCAmJiBYODYKZGlmZiAtLWdpdCBhL2RyaXZlcnMvaWlvL2Fk
+Yy9NYWtlZmlsZSBiL2RyaXZlcnMvaWlvL2FkYy9NYWtlZmlsZQppbmRleCAwN2RmMzdmNjIxYmQu
+LjZkNGUzMTQ5YWMxNSAxMDA2NDQKLS0tIGEvZHJpdmVycy9paW8vYWRjL01ha2VmaWxlCisrKyBi
+L2RyaXZlcnMvaWlvL2FkYy9NYWtlZmlsZQpAQCAtNzEsNiArNzEsNyBAQCBvYmotJChDT05GSUdf
+U1RNMzJfQURDX0NPUkUpICs9IHN0bTMyLWFkYy1jb3JlLm8KIG9iai0kKENPTkZJR19TVE0zMl9B
+REMpICs9IHN0bTMyLWFkYy5vCiBvYmotJChDT05GSUdfU1RNMzJfREZTRE1fQ09SRSkgKz0gc3Rt
+MzItZGZzZG0tY29yZS5vCiBvYmotJChDT05GSUdfU1RNMzJfREZTRE1fQURDKSArPSBzdG0zMi1k
+ZnNkbS1hZGMubworb2JqLSQoQ09ORklHX1NUTVBFX0FEQykgKz0gc3RtcGUtYWRjLm8KIG9iai0k
+KENPTkZJR19USV9BREMwODFDKSArPSB0aS1hZGMwODFjLm8KIG9iai0kKENPTkZJR19USV9BREMw
+ODMyKSArPSB0aS1hZGMwODMyLm8KIG9iai0kKENPTkZJR19USV9BREMwODRTMDIxKSArPSB0aS1h
+ZGMwODRzMDIxLm8KZGlmZiAtLWdpdCBhL2RyaXZlcnMvaWlvL2FkYy9zdG1wZS1hZGMuYyBiL2Ry
+aXZlcnMvaWlvL2FkYy9zdG1wZS1hZGMuYwpuZXcgZmlsZSBtb2RlIDEwMDY0NAppbmRleCAwMDAw
+MDAwMDAwMDAuLjM3ZjRiNzRhNWQzMgotLS0gL2Rldi9udWxsCisrKyBiL2RyaXZlcnMvaWlvL2Fk
+Yy9zdG1wZS1hZGMuYwpAQCAtMCwwICsxLDM2MyBAQAorLy8gU1BEWC1MaWNlbnNlLUlkZW50aWZp
+ZXI6IEdQTC0yLjAKKy8qCisgKiAgU1RNaWNyb2VsZWN0cm9uaWNzIFNUTVBFODExIElJTyBBREMg
+RHJpdmVyCisgKgorICogIDQgY2hhbm5lbCwgMTAvMTItYml0IEFEQworICoKKyAqICBDb3B5cmln
+aHQgKEMpIDIwMTMtMjAxOCBUb3JhZGV4IEFHIDxzdGVmYW4uYWduZXJAdG9yYWRleC5jb20+Cisg
+Ki8KKworI2luY2x1ZGUgPGxpbnV4L2NvbXBsZXRpb24uaD4KKyNpbmNsdWRlIDxsaW51eC9lcnIu
+aD4KKyNpbmNsdWRlIDxsaW51eC9paW8vaWlvLmg+CisjaW5jbHVkZSA8bGludXgvaW50ZXJydXB0
+Lmg+CisjaW5jbHVkZSA8bGludXgva2VybmVsLmg+CisjaW5jbHVkZSA8bGludXgvbWZkL3N0bXBl
+Lmg+CisjaW5jbHVkZSA8bGludXgvbW9kdWxlLmg+CisjaW5jbHVkZSA8bGludXgvb2ZfcGxhdGZv
+cm0uaD4KKyNpbmNsdWRlIDxsaW51eC9wbGF0Zm9ybV9kZXZpY2UuaD4KKyNpbmNsdWRlIDxsaW51
+eC9kZXZpY2UuaD4KKworI2RlZmluZSBTVE1QRV9SRUdfSU5UX1NUQQkJMHgwQgorI2RlZmluZSBT
+VE1QRV9SRUdfQURDX0lOVF9FTgkJMHgwRQorI2RlZmluZSBTVE1QRV9SRUdfQURDX0lOVF9TVEEJ
+CTB4MEYKKworI2RlZmluZSBTVE1QRV9SRUdfQURDX0NUUkwxCQkweDIwCisjZGVmaW5lIFNUTVBF
+X1JFR19BRENfQ1RSTDIJCTB4MjEKKyNkZWZpbmUgU1RNUEVfUkVHX0FEQ19DQVBUCQkweDIyCisj
+ZGVmaW5lIFNUTVBFX1JFR19BRENfREFUQV9DSChjaGFubmVsKQkoMHgzMCArIDIgKiAoY2hhbm5l
+bCkpCisKKyNkZWZpbmUgU1RNUEVfUkVHX1RFTVBfQ1RSTAkJMHg2MAorI2RlZmluZSBTVE1QRV9U
+RU1QX0NUUkxfRU5BQkxFCQlCSVQoMCkKKyNkZWZpbmUgU1RNUEVfVEVNUF9DVFJMX0FDUQkJQklU
+KDEpCisjZGVmaW5lIFNUTVBFX1RFTVBfQ1RSTF9USFJFU19FTglCSVQoMykKKyNkZWZpbmUgU1RN
+UEVfU1RBUlRfT05FX1RFTVBfQ09OVgkoU1RNUEVfVEVNUF9DVFJMX0VOQUJMRSB8IFwKKwkJCQkJ
+U1RNUEVfVEVNUF9DVFJMX0FDUSB8IFwKKwkJCQkJU1RNUEVfVEVNUF9DVFJMX1RIUkVTX0VOKQor
+I2RlZmluZSBTVE1QRV9SRUdfVEVNUF9EQVRBCQkweDYxCisjZGVmaW5lIFNUTVBFX1JFR19URU1Q
+X1RICQkweDYzCisjZGVmaW5lIFNUTVBFX0FEQ19MQVNUX05SCQk3CisjZGVmaW5lIFNUTVBFX1RF
+TVBfQ0hBTk5FTAkJKFNUTVBFX0FEQ19MQVNUX05SICsgMSkKKworI2RlZmluZSBTVE1QRV9BRENf
+Q0goY2hhbm5lbCkJCSgoMSA8PCAoY2hhbm5lbCkpICYgMHhmZikKKworI2RlZmluZSBTVE1QRV9B
+RENfVElNRU9VVAkJbXNlY3NfdG9famlmZmllcygxMDAwKQorCitzdHJ1Y3Qgc3RtcGVfYWRjIHsK
+KwlzdHJ1Y3Qgc3RtcGUgKnN0bXBlOworCXN0cnVjdCBjbGsgKmNsazsKKwlzdHJ1Y3QgZGV2aWNl
+ICpkZXY7CisJc3RydWN0IG11dGV4IGxvY2s7CisKKwkvKiBXZSBhcmUgYWxsb2NhdGluZyBwbHVz
+IG9uZSBmb3IgdGhlIHRlbXBlcmF0dXJlIGNoYW5uZWwgKi8KKwlzdHJ1Y3QgaWlvX2NoYW5fc3Bl
+YyBzdG1wZV9hZGNfaWlvX2NoYW5uZWxzW1NUTVBFX0FEQ19MQVNUX05SICsgMl07CisKKwlzdHJ1
+Y3QgY29tcGxldGlvbiBjb21wbGV0aW9uOworCisJdTggY2hhbm5lbDsKKwl1MzIgdmFsdWU7Cit9
+OworCitzdGF0aWMgaW50IHN0bXBlX3JlYWRfdm9sdGFnZShzdHJ1Y3Qgc3RtcGVfYWRjICppbmZv
+LAorCQlzdHJ1Y3QgaWlvX2NoYW5fc3BlYyBjb25zdCAqY2hhbiwgaW50ICp2YWwpCit7CisJbG9u
+ZyByZXQ7CisKKwltdXRleF9sb2NrKCZpbmZvLT5sb2NrKTsKKworCWluZm8tPmNoYW5uZWwgPSAo
+dTgpY2hhbi0+Y2hhbm5lbDsKKworCWlmIChpbmZvLT5jaGFubmVsID4gU1RNUEVfQURDX0xBU1Rf
+TlIpIHsKKwkJbXV0ZXhfdW5sb2NrKCZpbmZvLT5sb2NrKTsKKwkJcmV0dXJuIC1FSU5WQUw7CisJ
+fQorCisJc3RtcGVfcmVnX3dyaXRlKGluZm8tPnN0bXBlLCBTVE1QRV9SRUdfQURDX0lOVF9FTiwK
+KwkJCVNUTVBFX0FEQ19DSChpbmZvLT5jaGFubmVsKSk7CisKKwlzdG1wZV9yZWdfd3JpdGUoaW5m
+by0+c3RtcGUsIFNUTVBFX1JFR19BRENfQ0FQVCwKKwkJCVNUTVBFX0FEQ19DSChpbmZvLT5jaGFu
+bmVsKSk7CisKKwkqdmFsID0gaW5mby0+dmFsdWU7CisKKwlyZXQgPSB3YWl0X2Zvcl9jb21wbGV0
+aW9uX2ludGVycnVwdGlibGVfdGltZW91dAorCQkoJmluZm8tPmNvbXBsZXRpb24sIFNUTVBFX0FE
+Q19USU1FT1VUKTsKKworCWlmIChyZXQgPD0gMCkgeworCQltdXRleF91bmxvY2soJmluZm8tPmxv
+Y2spOworCQlpZiAocmV0ID09IDApCisJCQlyZXR1cm4gLUVUSU1FRE9VVDsKKwkJZWxzZQorCQkJ
+cmV0dXJuIHJldDsKKwl9CisKKwkqdmFsID0gaW5mby0+dmFsdWU7CisKKwltdXRleF91bmxvY2so
+JmluZm8tPmxvY2spOworCisJcmV0dXJuIDA7Cit9CisKK3N0YXRpYyBpbnQgc3RtcGVfcmVhZF90
+ZW1wKHN0cnVjdCBzdG1wZV9hZGMgKmluZm8sCisJCXN0cnVjdCBpaW9fY2hhbl9zcGVjIGNvbnN0
+ICpjaGFuLCBpbnQgKnZhbCkKK3sKKwlsb25nIHJldDsKKworCW11dGV4X2xvY2soJmluZm8tPmxv
+Y2spOworCisJaW5mby0+Y2hhbm5lbCA9ICh1OCljaGFuLT5jaGFubmVsOworCisJaWYgKGluZm8t
+PmNoYW5uZWwgIT0gU1RNUEVfVEVNUF9DSEFOTkVMKSB7CisJCW11dGV4X3VubG9jaygmaW5mby0+
+bG9jayk7CisJCXJldHVybiAtRUlOVkFMOworCX0KKworCXN0bXBlX3JlZ193cml0ZShpbmZvLT5z
+dG1wZSwgU1RNUEVfUkVHX1RFTVBfQ1RSTCwKKwkJCVNUTVBFX1NUQVJUX09ORV9URU1QX0NPTlYp
+OworCisJcmV0ID0gd2FpdF9mb3JfY29tcGxldGlvbl9pbnRlcnJ1cHRpYmxlX3RpbWVvdXQKKwkJ
+KCZpbmZvLT5jb21wbGV0aW9uLCBTVE1QRV9BRENfVElNRU9VVCk7CisKKwlpZiAocmV0IDw9IDAp
+IHsKKwkJbXV0ZXhfdW5sb2NrKCZpbmZvLT5sb2NrKTsKKwkJaWYgKHJldCA9PSAwKQorCQkJcmV0
+dXJuIC1FVElNRURPVVQ7CisJCWVsc2UKKwkJCXJldHVybiByZXQ7CisJfQorCisJLyoKKwkgKiBh
+YnNvbHV0ZSB0ZW1wID0gK1YzLjMgKiB2YWx1ZSAvNy41MSBbS10KKwkgKiBzY2FsZSB0byBbbWls
+bGkgwrBDXQorCSAqLworCSp2YWwgPSAoKDQ0OTk2MGwgKiBpbmZvLT52YWx1ZSkgLyAxMDI0bCkg
+LSAyNzMxNTA7CisKKwltdXRleF91bmxvY2soJmluZm8tPmxvY2spOworCisJcmV0dXJuIDA7Cit9
+CisKK3N0YXRpYyBpbnQgc3RtcGVfcmVhZF9yYXcoc3RydWN0IGlpb19kZXYgKmluZGlvX2RldiwK
+KwkJCSAgc3RydWN0IGlpb19jaGFuX3NwZWMgY29uc3QgKmNoYW4sCisJCQkgIGludCAqdmFsLAor
+CQkJICBpbnQgKnZhbDIsCisJCQkgIGxvbmcgbWFzaykKK3sKKwlzdHJ1Y3Qgc3RtcGVfYWRjICpp
+bmZvID0gaWlvX3ByaXYoaW5kaW9fZGV2KTsKKwlsb25nIHJldDsKKworCXN3aXRjaCAobWFzaykg
+eworCWNhc2UgSUlPX0NIQU5fSU5GT19SQVc6CisJY2FzZSBJSU9fQ0hBTl9JTkZPX1BST0NFU1NF
+RDoKKworCQlzd2l0Y2ggKGNoYW4tPnR5cGUpIHsKKwkJY2FzZSBJSU9fVk9MVEFHRToKKwkJCXJl
+dCA9IHN0bXBlX3JlYWRfdm9sdGFnZShpbmZvLCBjaGFuLCB2YWwpOworCQkJYnJlYWs7CisKKwkJ
+Y2FzZSBJSU9fVEVNUDoKKwkJCXJldCA9IHN0bXBlX3JlYWRfdGVtcChpbmZvLCBjaGFuLCB2YWwp
+OworCQkJYnJlYWs7CisJCWRlZmF1bHQ6CisJCQlyZXR1cm4gLUVJTlZBTDsKKwkJfQorCisJCWlm
+IChyZXQgPCAwKQorCQkJcmV0dXJuIHJldDsKKworCQlyZXR1cm4gSUlPX1ZBTF9JTlQ7CisKKwlj
+YXNlIElJT19DSEFOX0lORk9fU0NBTEU6CisJCSp2YWwgPSAzMzAwOworCQkqdmFsMiA9IGluZm8t
+PnN0bXBlLT5tb2RfMTJiID8gMTIgOiAxMDsKKwkJcmV0dXJuIElJT19WQUxfRlJBQ1RJT05BTF9M
+T0cyOworCisJZGVmYXVsdDoKKwkJYnJlYWs7CisJfQorCisJcmV0dXJuIC1FSU5WQUw7Cit9CisK
+K3N0YXRpYyBpcnFyZXR1cm5fdCBzdG1wZV9hZGNfaXNyKGludCBpcnEsIHZvaWQgKmRldl9pZCkK
+K3sKKwlzdHJ1Y3Qgc3RtcGVfYWRjICppbmZvID0gKHN0cnVjdCBzdG1wZV9hZGMgKilkZXZfaWQ7
+CisJdTE2IGRhdGE7CisKKwlpZiAoaW5mby0+Y2hhbm5lbCA+IFNUTVBFX1RFTVBfQ0hBTk5FTCkK
+KwkJcmV0dXJuIElSUV9OT05FOworCisJaWYgKGluZm8tPmNoYW5uZWwgPD0gU1RNUEVfQURDX0xB
+U1RfTlIpIHsKKwkJaW50IGludF9zdGE7CisKKwkJaW50X3N0YSA9IHN0bXBlX3JlZ19yZWFkKGlu
+Zm8tPnN0bXBlLCBTVE1QRV9SRUdfQURDX0lOVF9TVEEpOworCisJCS8qIElzIHRoZSBpbnRlcnJ1
+cHQgcmVsZXZhbnQgKi8KKwkJaWYgKCEoaW50X3N0YSAmIFNUTVBFX0FEQ19DSChpbmZvLT5jaGFu
+bmVsKSkpCisJCQlyZXR1cm4gSVJRX05PTkU7CisKKwkJLyogUmVhZCB2YWx1ZSAqLworCQlzdG1w
+ZV9ibG9ja19yZWFkKGluZm8tPnN0bXBlLAorCQkJU1RNUEVfUkVHX0FEQ19EQVRBX0NIKGluZm8t
+PmNoYW5uZWwpLCAyLCAodTggKikgJmRhdGEpOworCisJCXN0bXBlX3JlZ193cml0ZShpbmZvLT5z
+dG1wZSwgU1RNUEVfUkVHX0FEQ19JTlRfU1RBLCBpbnRfc3RhKTsKKwl9IGVsc2UgaWYgKGluZm8t
+PmNoYW5uZWwgPT0gU1RNUEVfVEVNUF9DSEFOTkVMKSB7CisJCS8qIFJlYWQgdmFsdWUgKi8KKwkJ
+c3RtcGVfYmxvY2tfcmVhZChpbmZvLT5zdG1wZSwgU1RNUEVfUkVHX1RFTVBfREFUQSwgMiwKKwkJ
+CQkodTggKikgJmRhdGEpOworCX0KKworCWluZm8tPnZhbHVlID0gKHUzMikgYmUxNl90b19jcHUo
+ZGF0YSk7CisJY29tcGxldGUoJmluZm8tPmNvbXBsZXRpb24pOworCisJcmV0dXJuIElSUV9IQU5E
+TEVEOworfQorCitzdGF0aWMgY29uc3Qgc3RydWN0IGlpb19pbmZvIHN0bXBlX2FkY19paW9faW5m
+byA9IHsKKwkucmVhZF9yYXcgPSAmc3RtcGVfcmVhZF9yYXcsCit9OworCitzdGF0aWMgdm9pZCBz
+dG1wZV9hZGNfdm9sdGFnZV9jaGFuKHN0cnVjdCBpaW9fY2hhbl9zcGVjICppY3MsIGludCBjaGFu
+KQoreworCWljcy0+dHlwZSA9IElJT19WT0xUQUdFOworCWljcy0+aW5mb19tYXNrX3NlcGFyYXRl
+ID0gQklUKElJT19DSEFOX0lORk9fUkFXKTsKKwlpY3MtPmluZm9fbWFza19zaGFyZWRfYnlfdHlw
+ZSA9IEJJVChJSU9fQ0hBTl9JTkZPX1NDQUxFKTsKKwlpY3MtPmluZGV4ZWQgPSAxOworCWljcy0+
+Y2hhbm5lbCA9IGNoYW47Cit9CisKK3N0YXRpYyB2b2lkIHN0bXBlX2FkY190ZW1wX2NoYW4oc3Ry
+dWN0IGlpb19jaGFuX3NwZWMgKmljcywgaW50IGNoYW4pCit7CisJaWNzLT50eXBlID0gSUlPX1RF
+TVA7CisJaWNzLT5pbmZvX21hc2tfc2VwYXJhdGUgPSBCSVQoSUlPX0NIQU5fSU5GT19QUk9DRVNT
+RUQpOworCWljcy0+aW5kZXhlZCA9IDE7CisJaWNzLT5jaGFubmVsID0gY2hhbjsKK30KKworc3Rh
+dGljIGludCBzdG1wZV9hZGNfaW5pdF9odyhzdHJ1Y3Qgc3RtcGVfYWRjICphZGMpCit7CisJaW50
+IHJldDsKKwlzdHJ1Y3Qgc3RtcGUgKnN0bXBlID0gYWRjLT5zdG1wZTsKKworCXJldCA9IHN0bXBl
+X2VuYWJsZShzdG1wZSwgU1RNUEVfQkxPQ0tfQURDKTsKKwlpZiAocmV0KSB7CisJCWRldl9lcnIo
+c3RtcGUtPmRldiwgIkNvdWxkIG5vdCBlbmFibGUgY2xvY2sgZm9yIEFEQ1xuIik7CisJCXJldHVy
+biByZXQ7CisJfQorCisJcmV0ID0gc3RtcGU4MTFfYWRjX2NvbW1vbl9pbml0KHN0bXBlKTsKKwlp
+ZiAocmV0KSB7CisJCXN0bXBlX2Rpc2FibGUoc3RtcGUsIFNUTVBFX0JMT0NLX0FEQyk7CisJCXJl
+dHVybiByZXQ7CisJfQorCisJLyogdXNlIHRlbXAgaXJxIGZvciBlYWNoIGNvbnZlcnNpb24gY29t
+cGxldGlvbiAqLworCXN0bXBlX3JlZ193cml0ZShzdG1wZSwgU1RNUEVfUkVHX1RFTVBfVEgsIDAp
+OworCXN0bXBlX3JlZ193cml0ZShzdG1wZSwgU1RNUEVfUkVHX1RFTVBfVEggKyAxLCAwKTsKKwor
+CXJldHVybiAwOworfQorCitzdGF0aWMgaW50IHN0bXBlX2FkY19wcm9iZShzdHJ1Y3QgcGxhdGZv
+cm1fZGV2aWNlICpwZGV2KQoreworCXN0cnVjdCBpaW9fZGV2ICppbmRpb19kZXY7CisJc3RydWN0
+IHN0bXBlX2FkYyAqaW5mbzsKKwlzdHJ1Y3QgZGV2aWNlX25vZGUgKm5wOworCXUzMiBub3JlcXVl
+c3RfbWFzayA9IDA7CisJaW50IGlycV90ZW1wLCBpcnFfYWRjOworCWludCBudW1fY2hhbiA9IDA7
+CisJaW50IGkgPSAwOworCWludCByZXQ7CisKKwlpcnFfYWRjID0gcGxhdGZvcm1fZ2V0X2lycV9i
+eW5hbWUocGRldiwgIlNUTVBFX0FEQyIpOworCWlmIChpcnFfYWRjIDwgMCkKKwkJcmV0dXJuIGly
+cV9hZGM7CisKKwlpbmRpb19kZXYgPSBkZXZtX2lpb19kZXZpY2VfYWxsb2MoJnBkZXYtPmRldiwg
+c2l6ZW9mKHN0cnVjdCBzdG1wZV9hZGMpKTsKKwlpZiAoIWluZGlvX2RldikgeworCQlkZXZfZXJy
+KCZwZGV2LT5kZXYsICJmYWlsZWQgYWxsb2NhdGluZyBpaW8gZGV2aWNlXG4iKTsKKwkJcmV0dXJu
+IC1FTk9NRU07CisJfQorCisJaW5mbyA9IGlpb19wcml2KGluZGlvX2Rldik7CisJbXV0ZXhfaW5p
+dCgmaW5mby0+bG9jayk7CisKKwlpbml0X2NvbXBsZXRpb24oJmluZm8tPmNvbXBsZXRpb24pOwor
+CXJldCA9IGRldm1fcmVxdWVzdF90aHJlYWRlZF9pcnEoJnBkZXYtPmRldiwgaXJxX2FkYywgTlVM
+TCwKKwkJCQkJc3RtcGVfYWRjX2lzciwgSVJRRl9PTkVTSE9ULAorCQkJCQkic3RtcGUtYWRjIiwg
+aW5mbyk7CisJaWYgKHJldCA8IDApIHsKKwkJZGV2X2VycigmcGRldi0+ZGV2LCAiZmFpbGVkIHJl
+cXVlc3RpbmcgaXJxLCBpcnEgPSAlZFxuIiwKKwkJCQlpcnFfYWRjKTsKKwkJcmV0dXJuIHJldDsK
+Kwl9CisKKwlpcnFfdGVtcCA9IHBsYXRmb3JtX2dldF9pcnFfYnluYW1lKHBkZXYsICJTVE1QRV9U
+RU1QX1NFTlMiKTsKKwlpZiAoaXJxX3RlbXAgPj0gMCkgeworCQlyZXQgPSBkZXZtX3JlcXVlc3Rf
+dGhyZWFkZWRfaXJxKCZwZGV2LT5kZXYsIGlycV90ZW1wLCBOVUxMLAorCQkJCQkJc3RtcGVfYWRj
+X2lzciwgSVJRRl9PTkVTSE9ULAorCQkJCQkJInN0bXBlLWFkYyIsIGluZm8pOworCQlpZiAocmV0
+IDwgMCkKKwkJCWRldl93YXJuKCZwZGV2LT5kZXYsICJmYWlsZWQgcmVxdWVzdGluZyBpcnEgZm9y
+IgorCQkJCSAiIHRlbXAgc2Vuc29yLCBpcnEgPSAlZFxuIiwgaXJxX3RlbXApOworCX0KKworCXBs
+YXRmb3JtX3NldF9kcnZkYXRhKHBkZXYsIGluZGlvX2Rldik7CisKKwlpbmRpb19kZXYtPm5hbWUJ
+CT0gZGV2X25hbWUoJnBkZXYtPmRldik7CisJaW5kaW9fZGV2LT5kZXYucGFyZW50CT0gJnBkZXYt
+PmRldjsKKwlpbmRpb19kZXYtPmluZm8JCT0gJnN0bXBlX2FkY19paW9faW5mbzsKKwlpbmRpb19k
+ZXYtPm1vZGVzCT0gSU5ESU9fRElSRUNUX01PREU7CisKKwlpbmZvLT5zdG1wZSA9IGRldl9nZXRf
+ZHJ2ZGF0YShwZGV2LT5kZXYucGFyZW50KTsKKworCW5wID0gcGRldi0+ZGV2Lm9mX25vZGU7CisK
+KwlpZiAoIW5wKQorCQlkZXZfZXJyKCZwZGV2LT5kZXYsICJubyBkZXZpY2UgdHJlZSBub2RlIGZv
+dW5kXG4iKTsKKworCW9mX3Byb3BlcnR5X3JlYWRfdTMyKG5wLCAic3Qsbm9yZXF1ZXN0LW1hc2si
+LCAmbm9yZXF1ZXN0X21hc2spOworCisJZm9yX2VhY2hfY2xlYXJfYml0KGksICh1bnNpZ25lZCBs
+b25nICopICZub3JlcXVlc3RfbWFzaywKKwkJCSAgIChTVE1QRV9BRENfTEFTVF9OUiArIDEpKSB7
+CisJCXN0bXBlX2FkY192b2x0YWdlX2NoYW4oJmluZm8tPnN0bXBlX2FkY19paW9fY2hhbm5lbHNb
+bnVtX2NoYW5dLCBpKTsKKwkJbnVtX2NoYW4rKzsKKwl9CisJc3RtcGVfYWRjX3RlbXBfY2hhbigm
+aW5mby0+c3RtcGVfYWRjX2lpb19jaGFubmVsc1tudW1fY2hhbl0sIGkpOworCW51bV9jaGFuKys7
+CisJaW5kaW9fZGV2LT5jaGFubmVscyA9IGluZm8tPnN0bXBlX2FkY19paW9fY2hhbm5lbHM7CisJ
+aW5kaW9fZGV2LT5udW1fY2hhbm5lbHMgPSBudW1fY2hhbjsKKworCXJldCA9IHN0bXBlX2FkY19p
+bml0X2h3KGluZm8pOworCWlmIChyZXQpCisJCXJldHVybiByZXQ7CisKKwlyZXR1cm4gZGV2bV9p
+aW9fZGV2aWNlX3JlZ2lzdGVyKCZwZGV2LT5kZXYsIGluZGlvX2Rldik7Cit9CisKK3N0YXRpYyBp
+bnQgX19tYXliZV91bnVzZWQgc3RtcGVfYWRjX3Jlc3VtZShzdHJ1Y3QgZGV2aWNlICpkZXYpCit7
+CisJc3RydWN0IGlpb19kZXYgKmluZGlvX2RldiA9IGRldl9nZXRfZHJ2ZGF0YShkZXYpOworCXN0
+cnVjdCBzdG1wZV9hZGMgKmluZm8gPSBpaW9fcHJpdihpbmRpb19kZXYpOworCisJc3RtcGVfYWRj
+X2luaXRfaHcoaW5mbyk7CisKKwlyZXR1cm4gMDsKK30KKworc3RhdGljIFNJTVBMRV9ERVZfUE1f
+T1BTKHN0bXBlX2FkY19wbV9vcHMsIE5VTEwsIHN0bXBlX2FkY19yZXN1bWUpOworCitzdGF0aWMg
+c3RydWN0IHBsYXRmb3JtX2RyaXZlciBzdG1wZV9hZGNfZHJpdmVyID0geworCS5wcm9iZQkJPSBz
+dG1wZV9hZGNfcHJvYmUsCisJLmRyaXZlcgkJPSB7CisJCS5uYW1lCT0gInN0bXBlLWFkYyIsCisJ
+CS5wbQk9ICZzdG1wZV9hZGNfcG1fb3BzLAorCX0sCit9OworCittb2R1bGVfcGxhdGZvcm1fZHJp
+dmVyKHN0bXBlX2FkY19kcml2ZXIpOworCitNT0RVTEVfQVVUSE9SKCJTdGVmYW4gQWduZXIgPHN0
+ZWZhbi5hZ25lckB0b3JhZGV4LmNvbT4iKTsKK01PRFVMRV9ERVNDUklQVElPTigiU1RNUEVYWFgg
+QURDIGRyaXZlciIpOworTU9EVUxFX0xJQ0VOU0UoIkdQTCB2MiIpOworTU9EVUxFX0FMSUFTKCJw
+bGF0Zm9ybTpzdG1wZS1hZGMiKTsKLS0gCjIuMjAuMQoKCl9fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0Cmxp
+bnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFk
+Lm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
