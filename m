@@ -2,87 +2,70 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0BDBBC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 16:32:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A2B31C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 16:37:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CDBFC2054F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 16:32:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6C818206B6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 16:37:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QSVMnjJA";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="hZRaa5lV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CDBFC2054F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d2KFj5rW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6C818206B6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=v3.sk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=nitw9QPKOsAW2Y3loyFv67FWnJ0GTJyMc6Whb8nsQyE=; b=QSVMnjJAXq/iFm
-	7LDALZI4tsdlfNMdKTH+Oclkg+OzFo6f+KiEQDmyErn0fC9EoZIljtT5YktKWGhOt6uNn64bI2guy
-	hbJnwNy1P3qgcf/9tt8FfRPGk7p97OM6JMckiAL3bgVSJbcA4xZnmuj698ouoznT/7noxxo8jDIe2
-	DXDatwqyx3tvUZNP7vNeputV/bGyCxinF8kk0oxR74RM7sIwDNRjsXbat99BGldvRXlwmzqM8SDaT
-	AXedNiAA7mmQDF701CIZykCsKcVY/8ZMrPq7wRBJkGMLaTlO5Fvu+mg5UmO49iw87j1s1MpDaT4vH
-	+njqHOe0VuxzmjwdzZdQ==;
+	List-Owner; bh=IAxW9BX1iVcomZOaIEAKhOqKw+oovDvxbF4WmjNPi3A=; b=d2KFj5rW0xocNH
+	EH/YW9YrsD8+7IsV8J4gCAlx3ABhhZl3kuc5pUzk3kPyoj+ltYShhM2+dkALWn0vhnLS6m2Tduo5U
+	fG+CIJRvpZNuTlQYd0KnMFSiPE7glj3bbNPeq5Ay6BSfJUT7x98Ck0C02t5eoRJTc9ksyQtrMxyRe
+	otwGh2jdTxxPykyrIRV3jfqkKp28mRe+FGi9kRHcl6neXZLW/mdGuL2FChGLZH4DF0AF07xmmyvnz
+	w8RZ1LopUyfx4IEHVMHtuEaq7hPUCdnfrvpWGu0iReawhlF4oE8TBeyJ8H1GF8C054wTk9+/RyYXe
+	1I5PB5zcazSjIXE4WbFQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghGmd-0003n6-Ae; Wed, 09 Jan 2019 16:32:47 +0000
-Received: from mail-it1-x144.google.com ([2607:f8b0:4864:20::144])
+	id 1ghGrO-0005Ut-HX; Wed, 09 Jan 2019 16:37:42 +0000
+Received: from shell.v3.sk ([90.176.6.54])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghGmZ-0003mc-Ub
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 16:32:45 +0000
-Received: by mail-it1-x144.google.com with SMTP id h193so11850995ita.5
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 09 Jan 2019 08:32:43 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=IBIo32ByRPmxBTL9AaGtSZq85lohSWTcbPLNjN16JkQ=;
- b=hZRaa5lVc+882BwwPaUmtGmcyGuGKCN1RnSJ+GP0rMtoChXxCXX20WV253RdBGQuoW
- ZIxuIVDSfaNk/0Iw4anXOVRxAiNba52FpWFYmO36xpe8X/N1w0mpuYl+H1VHp6qDhup3
- pbg8da8ScdtkJxBlV7tcg+eq9AYUM7Rj6CaR8=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=IBIo32ByRPmxBTL9AaGtSZq85lohSWTcbPLNjN16JkQ=;
- b=W1x+q6ZK7lly2mB9f3leJgGzctOQPPn/0oXP+50APsI7jxSJHShkY9xWS5XMy30A73
- 505EnaaZsJRi5MnIMGdo1pEhd8IIYbLK5u+6I/RKn39UeRcGBvqk8AKRsw7SQMH2FniN
- bzpc7Q1geh7N+szaLjQnig5Bc+Q5lkLgkcBpdnE4T6rwyPfGZKPqnzgLV2XVrnEtMPph
- B5yASGlpIN6t2L2AoUtkZhq96lgAEE0/GMfIudrQBJvQXtaJVjq6XSwlTKlu+V18TJHz
- Mkck49Zd60BYlwdYWomWFxMaE0Wdq8+thLDVkvMQbNNGJplP4bJ0NzCqTG0OIFBnQ5vX
- cXRQ==
-X-Gm-Message-State: AJcUukddK6RGmws5lNZKJonKhy5zVAbX40rUkmHrI1pImuNe1TmGhlfB
- 9LGWz0pfNxxfnXY7VnWADlCIyPbA6j9ItZwta8Z9jA==
-X-Google-Smtp-Source: ALg8bN6JMmbuEHes8OSnSxkfO1p8jaIA83uecfDTyCj/WWccLAgugf2bKV3i49L/2T2UcFUhHnKKqVYQOSsu8y9wOLk=
-X-Received: by 2002:a02:6019:: with SMTP id i25mr4669057jac.137.1547051562293; 
- Wed, 09 Jan 2019 08:32:42 -0800 (PST)
-MIME-Version: 1.0
-References: <20190108155354.GL5544@atomide.com>
- <CAKfTPtCoOK-cYLXJ--sOfpVa9RVmzOAEN1+zB2qHMCzkJN0qaQ@mail.gmail.com>
- <20190108213743.GN5544@atomide.com> <20190109014218.GA8363@linaro.org>
- <20190109111703.GA28605@lenoch>
- <CAKfTPtBvzZvJNxBRMbGbNFBYG0-pAR-P7X2=KrBWH01OMWvJYA@mail.gmail.com>
- <20190109115824.GA1353@lenoch>
- <CAKfTPtAAgYYW8A1LDg18bM=5vCAMDbQ05APp9QWSaifW=F0SgQ@mail.gmail.com>
- <20190109133337.GA13579@lenoch>
- <CAKfTPtAsENRKh_wTFXCLW2_MdMBug+tV2KtjC7x6RigN7hgPmw@mail.gmail.com>
- <20190109160736.GA7416@lenoch>
-In-Reply-To: <20190109160736.GA7416@lenoch>
-From: Vincent Guittot <vincent.guittot@linaro.org>
-Date: Wed, 9 Jan 2019 17:32:31 +0100
-Message-ID: <CAKfTPtBnNA6knrsHsZXeaotBSn5mS12xNWNUKdSwZ1EUvueQkA@mail.gmail.com>
-Subject: Re: Regression in v5.0-rc1 with autosuspend hrtimers
-To: Ladislav Michl <ladis@linux-mips.org>
+ id 1ghGrJ-0005UG-KB
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 16:37:39 +0000
+Received: from localhost (localhost [127.0.0.1])
+ by zimbra.v3.sk (Postfix) with ESMTP id 68B7A1000C5;
+ Wed,  9 Jan 2019 17:37:34 +0100 (CET)
+Received: from shell.v3.sk ([127.0.0.1])
+ by localhost (zimbra.v3.sk [127.0.0.1]) (amavisd-new, port 10032)
+ with ESMTP id Hh05FATkgNsK; Wed,  9 Jan 2019 17:37:31 +0100 (CET)
+Received: from localhost (localhost [127.0.0.1])
+ by zimbra.v3.sk (Postfix) with ESMTP id D7FBF10018A;
+ Wed,  9 Jan 2019 17:37:30 +0100 (CET)
+X-Virus-Scanned: amavisd-new at zimbra.v3.sk
+Received: from shell.v3.sk ([127.0.0.1])
+ by localhost (zimbra.v3.sk [127.0.0.1]) (amavisd-new, port 10026)
+ with ESMTP id azRuJ2pndiVY; Wed,  9 Jan 2019 17:37:30 +0100 (CET)
+Received: from belphegor (nat-pool-brq-t.redhat.com [213.175.37.10])
+ by zimbra.v3.sk (Postfix) with ESMTPSA id D1107100189;
+ Wed,  9 Jan 2019 17:37:29 +0100 (CET)
+Message-ID: <3b9c5e7e35ae25316bf4551ebf7ae21238d64f03.camel@v3.sk>
+Subject: Re: [PATCH v4 00/15] Add support for OLPC XO 1.75 Embedded Controller
+From: Lubomir Rintel <lkundrak@v3.sk>
+To: Andy Shevchenko <andy.shevchenko@gmail.com>
+Date: Wed, 09 Jan 2019 17:37:28 +0100
+In-Reply-To: <CAHp75VcDXmARXAyE1tPouj0cLqg1Ohs5hq+LZ7dsoGY8pJWO2g@mail.gmail.com>
+References: <20190108175818.705110-1-lkundrak@v3.sk>
+ <CAHp75VcDXmARXAyE1tPouj0cLqg1Ohs5hq+LZ7dsoGY8pJWO2g@mail.gmail.com>
+User-Agent: Evolution 3.30.3 (3.30.3-1.fc29) 
+Mime-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_083244_005210_DD1617F1 
-X-CRM114-Status: GOOD (  24.13  )
+X-CRM114-CacheID: sfid-20190109_083737_971734_0E34AC75 
+X-CRM114-Status: GOOD (  20.94  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,174 +77,87 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>,
- "open list:THERMAL" <linux-pm@vger.kernel.org>,
- Tony Lindgren <tony@atomide.com>,
- "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>,
- linux-kernel <linux-kernel@vger.kernel.org>, linux-omap@vger.kernel.org,
- LAK <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>, James Cameron <quozl@laptop.org>,
+ Linux PM <linux-pm@vger.kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, "maintainer:X86
+ ARCHITECTURE \(32-BIT AND 64-BIT\)" <x86@kernel.org>,
+ Russell King <linux@armlinux.org.uk>,
+ Platform Driver <platform-driver-x86@vger.kernel.org>,
+ Rob Herring <robh+dt@kernel.org>,
+ linux-arm Mailing List <linux-arm-kernel@lists.infradead.org>,
+ Pavel Machek <pavel@ucw.cz>, Sebastian Reichel <sre@kernel.org>,
+ Darren Hart <dvhart@infradead.org>, Andy Shevchenko <andy@infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 9 Jan 2019 at 17:07, Ladislav Michl <ladis@linux-mips.org> wrote:
->
-> On Wed, Jan 09, 2019 at 03:12:25PM +0100, Vincent Guittot wrote:
-> > Please keep all thread list when replying :-)
->
-> Ahh, sorry for that...
-> [snip]
-> > On Wed, 9 Jan 2019 at 14:33, Ladislav Michl <ladis@linux-mips.org> wrote:
-> > > I agree, but it doea all the magic correctly, so you won't need
-> > > to touch that code is ktime_t changes (I know, unlikely..)
-> >
-> > But the current implementation doesn't care of any changes in ktime_t
-> > as it uses raw ns
->
-> Fair enough, so let's go back to:
+On Wed, 2019-01-09 at 13:15 +0200, Andy Shevchenko wrote:
+> On Tue, Jan 8, 2019 at 7:58 PM Lubomir Rintel <lkundrak@v3.sk> wrote:
+> > Hello!
+> > 
+> > This is a fourth spin of the patch set that adds support for the
+> > Embedded Controller on an OLPC XO 1.75 machine.
+> > 
+> > It hopefully incorporated all feedback received previously and also
+> > fixes the kbuild test bot failures. The failed builds were
+> > generally
+> > caused by configurations where the EC driver was built as module.
+> > 
+> > It turned out that the patch that turned the OLPC EC common code
+> > into
+> > a module was not the brightest idea. I now dropped it and modified
+> > the
+> > 04/15 to not require it.
+> > 
+> > Also, the 01/15 patch has been added to allow the module to provide
+> > a
+> > reboot handler. Patch 15/15 depends on it.
+> 
+> Isn't it a quite big distance between provider and consumer?
+> Especially taking into consideration concerns about patch 1 which
+> blocks the series.
+> Perhaps you may drop it as a patch 1 and do something on top of patch
+> 15 as feature extension?
 
-This one looks good for me
+Yes, that is a good idea. I'll do so when I submit a new version of the
+set (in few days' time).
 
-> diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
-> index 70624695b6d5..e61ee9b47a26 100644
-> --- a/drivers/base/power/runtime.c
-> +++ b/drivers/base/power/runtime.c
-> @@ -121,7 +121,7 @@ static void pm_runtime_cancel_pending(struct device *dev)
->   * Compute the autosuspend-delay expiration time based on the device's
->   * power.last_busy time.  If the delay has already expired or is disabled
->   * (negative) or the power.use_autosuspend flag isn't set, return 0.
-> - * Otherwise return the expiration time in jiffies (adjusted to be nonzero).
-> + * Otherwise return the expiration time in nanoseconds (adjusted to be nonzero).
->   *
->   * This function may be called either with or without dev->power.lock held.
->   * Either way it can be racy, since power.last_busy may be updated at any time.
-> @@ -129,24 +129,21 @@ static void pm_runtime_cancel_pending(struct device *dev)
->  u64 pm_runtime_autosuspend_expiration(struct device *dev)
->  {
->         int autosuspend_delay;
-> -       u64 last_busy, expires = 0;
-> -       u64 now = ktime_to_ns(ktime_get());
-> +       u64 expires;
->
->         if (!dev->power.use_autosuspend)
-> -               goto out;
-> +               return 0;
->
->         autosuspend_delay = READ_ONCE(dev->power.autosuspend_delay);
->         if (autosuspend_delay < 0)
-> -               goto out;
-> -
-> -       last_busy = READ_ONCE(dev->power.last_busy);
-> +               return 0;
->
-> -       expires = last_busy + autosuspend_delay * NSEC_PER_MSEC;
-> -       if (expires <= now)
-> -               expires = 0;    /* Already expired. */
-> +       expires  = READ_ONCE(dev->power.last_busy);
-> +       expires += NSEC_PER_MSEC * (u64)autosuspend_delay;
-> +       if (expires > ktime_to_ns(ktime_get()))
-> +               return expires; /* Expires in the future */
->
-> - out:
-> -       return expires;
-> +       return 0;
->  }
->  EXPORT_SYMBOL_GPL(pm_runtime_autosuspend_expiration);
->
-> Which gives for arm:
-> 00000480 <pm_runtime_autosuspend_expiration>:
->      480:       e92d41f0        push    {r4, r5, r6, r7, r8, lr}
->      484:       e5d030d1        ldrb    r3, [r0, #209]  ; 0xd1
->      488:       e3130004        tst     r3, #4
->      48c:       0a00000c        beq     4c4 <pm_runtime_autosuspend_expiration+0x44>
->      490:       e59030e4        ldr     r3, [r0, #228]  ; 0xe4
->      494:       e3530000        cmp     r3, #0
->      498:       ba000009        blt     4c4 <pm_runtime_autosuspend_expiration+0x44>
->      49c:       e28050e8        add     r5, r0, #232    ; 0xe8
->      4a0:       e8950030        ldm     r5, {r4, r5}
->      4a4:       e59f2030        ldr     r2, [pc, #48]   ; 4dc <pm_runtime_autosuspend_expiration+0x5c>
->      4a8:       e0e54392        smlal   r4, r5, r2, r3
->      4ac:       ebfffffe        bl      0 <ktime_get>
->      4b0:       e1550001        cmp     r5, r1
->      4b4:       01540000        cmpeq   r4, r0
->      4b8:       e1a06004        mov     r6, r4
->      4bc:       e1a07005        mov     r7, r5
->      4c0:       8a000001        bhi     4cc <pm_runtime_autosuspend_expiration+0x4c>
->      4c4:       e3a06000        mov     r6, #0
->      4c8:       e3a07000        mov     r7, #0
->      4cc:       e1a00006        mov     r0, r6
->      4d0:       e1a01007        mov     r1, r7
->      4d4:       e8bd41f0        pop     {r4, r5, r6, r7, r8, lr}
->      4d8:       e12fff1e        bx      lr
->      4dc:       000f4240        .word   0x000f4240
->
-> And x86:
-> 0000000000000230 <pm_runtime_autosuspend_expiration.part.0>:
->      230:       8b 87 a4 01 00 00       mov    0x1a4(%rdi),%eax
->      236:       53                      push   %rbx
->      237:       85 c0                   test   %eax,%eax
->      239:       78 1e                   js     259 <pm_runtime_autosuspend_expiration.part.0+0x29>
->      23b:       48 63 d8                movslq %eax,%rbx
->      23e:       48 8b 97 a8 01 00 00    mov    0x1a8(%rdi),%rdx
->      245:       48 69 db 40 42 0f 00    imul   $0xf4240,%rbx,%rbx
->      24c:       48 01 d3                add    %rdx,%rbx
->      24f:       e8 00 00 00 00          callq  254 <pm_runtime_autosuspend_expiration.part.0+0x24>
->      254:       48 39 c3                cmp    %rax,%rbx
->      257:       77 02                   ja     25b <pm_runtime_autosuspend_expiration.part.0+0x2b>
->      259:       31 db                   xor    %ebx,%ebx
->      25b:       48 89 d8                mov    %rbx,%rax
->      25e:       5b                      pop    %rbx
->      25f:       c3                      retq
->
-> 00000000000002a0 <pm_runtime_autosuspend_expiration>:
->      2a0:       f6 87 91 01 00 00 04    testb  $0x4,0x191(%rdi)
->      2a7:       74 02                   je     2ab <pm_runtime_autosuspend_expiration+0xb>
->      2a9:       eb 85                   jmp    230 <pm_runtime_autosuspend_expiration.part.0>
->      2ab:       31 c0                   xor    %eax,%eax
->      2ad:       c3                      retq
->      2ae:       66 90                   xchg   %ax,%ax
->
->
-> [snip]
-> > > Well, main concern was not to call ktime_get at the beginning of function
-> > > as it is not too cheap.
-> >
-> > Doesn't the compiler optimize that to just before the test ?
->
-> No (compare with above). And it is also almost certain that someone will run
-> script and send "...do not needlesly initialize..." patch :)
->
-> gcc version 8.2.1 20181130 (OSELAS.Toolchain-2018.12.0 8-20181130)
->
-> 00000110 <pm_runtime_autosuspend_expiration>:
->      110:       e92d41f0        push    {r4, r5, r6, r7, r8, lr}
->      114:       e1a06000        mov     r6, r0
->      118:       ebfffffe        bl      0 <ktime_get>
->      11c:       e5d630d1        ldrb    r3, [r6, #209]  ; 0xd1
->      120:       e3130004        tst     r3, #4
->      124:       0a00000d        beq     160 <pm_runtime_autosuspend_expiration+0x50>
->      128:       e596c0e4        ldr     ip, [r6, #228]  ; 0xe4
->      12c:       e35c0000        cmp     ip, #0
->      130:       ba00000a        blt     160 <pm_runtime_autosuspend_expiration+0x50>
->      134:       e28630e8        add     r3, r6, #232    ; 0xe8
->      138:       e893000c        ldm     r3, {r2, r3}
->      13c:       e1a05001        mov     r5, r1
->      140:       e1a04000        mov     r4, r0
->      144:       e59f002c        ldr     r0, [pc, #44]   ; 178 <pm_runtime_autosuspend_expiration+0x68>
->      148:       e0010c90        mul     r1, r0, ip
->      14c:       e0926001        adds    r6, r2, r1
->      150:       e0a37fc1        adc     r7, r3, r1, asr #31
->      154:       e1550007        cmp     r5, r7
->      158:       01540006        cmpeq   r4, r6
->      15c:       3a000001        bcc     168 <pm_runtime_autosuspend_expiration+0x58>
->      160:       e3a06000        mov     r6, #0
->      164:       e3a07000        mov     r7, #0
->      168:       e1a00006        mov     r0, r6
->      16c:       e1a01007        mov     r1, r7
->      170:       e8bd41f0        pop     {r4, r5, r6, r7, r8, lr}
->      174:       e12fff1e        bx      lr
->      178:       000f4240        .word   0x000f4240
+I think the battery part can be split from the EC part too. Would that
+be a good idea to send them as separate patch sets next time? It seems
+to me now that they probably ought to end up going in via different
+trees (linux-power-supply vs linux-platform-drivers-x86).
+
+> > Tested to work on an OLPC XO 1.75 and also tested not to break x86
+> > support with an OLPC XO 1 machine. I don't have a XO 1.5, but it's
+> > unlikely this breaks it when XO 1 works.
+> > 
+> > [01/15] ARM: export arm_pm_restart()
+> > [02/15] dt-bindings: olpc,xo1.75-ec: Add OLPC XO-1.75 EC bindings
+> > [03/15] Platform: OLPC: Remove an unused include
+> > [04/15] Platform: OLPC: Add XO-1.75 EC driver
+> > [05/15] Platform: OLPC: Avoid a warning if the EC didn't register
+> > yet
+> > [06/15] Platform: OLPC: Move EC-specific functionality out from x86
+> > [07/15] Platform: OLPC: Use BIT() and GENMASK() for event masks
+> > [08/15] Platform: OLPC: add a regulator for the DCON
+> > [09/15] dt-bindings: olpc_battery: Add XO-1.5 battery
+> > [10/15] x86, olpc: Use a correct version when making up a battery
+> > node
+> > [11/15] power: supply: olpc_battery: Use DT to get battery version
+> > [12/15] power: supply: olpc_battery: Move priv data to a struct
+> > [13/15] power: supply: olpc_battery: Use
+> > devm_power_supply_register()
+> > [14/15] power: supply: olpc_battery: Avoid using platform_info
+> > [15/15] power: supply: olpc_battery: Add OLPC XO 1.75 support
+> > 
+> > Lubo
+> > 
+> > 
+> 
+> 
+
 
 _______________________________________________
 linux-arm-kernel mailing list
