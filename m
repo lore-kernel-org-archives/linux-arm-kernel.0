@@ -2,74 +2,69 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A3C88C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 16:57:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 71A1EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 16:58:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 712C6206BB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 16:57:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 35B0720859
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 16:58:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IKggp8GP";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="sfXCxRNH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 712C6206BB
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="piqjbOGt";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="qtnHsmtn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 35B0720859
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=zQvDSWlCSrfx+o2STCNQ9xdFZcvd2Hi2UN2BEfI+ZYg=; b=IKggp8GPObe/7T4lBIO6yf8hr
-	uWRvMJ5v4VrMPUMXIwMsT/ru7cTp1vDmVPibYkv9rN6i0q0o9Doneczf23GfmRdv98svYEAH/jiyT
-	SIQsf+qfPNJiQ3IYUUdKwh/Pp4QeWVxzgV6o7eRjwzwiPGSaOS8N0T6mTjQlX/8HgFlWCIhETuqT/
-	NFKpuik8JyjHOz7exFUN5O/tJhhOc03dSviR8xp7EK9ub0OJN9ytSj2eC/AbAeKwRxH6x/QVpPEdH
-	0/FwFkDWVPp7dSj6iBj9fB30qb0I7cH67uta5rTmTj7fb7R+50fDn0q2j1h6mBi42BVLFo15GGjZ4
-	O6CvQkVTQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=wW8prebASFyD4LhL0+SYVw7+2flTRaDr8es/9zT02/E=; b=piqjbOGtHTkOc0
+	pMnzh2fecov2aL/ErWVlj/VMbZR1ryHlEjBctccAYeN8fh9psfWoP8plrPg7KL/K1tiJ5FQMgEc0X
+	xEKNvArS84tgdPJouORE/TCOU0ljzGDisIqG/1WATNt7rJ3SHRCn+LRzzkX+S2N1BeeWoIXNWejwO
+	yGbpuBnE+m6eCGYzJsOWYDVhtJifof/1l/zYOMhlMQD+AVEGzL9/S1wSPYZ551mD/0hrJW1+mSef6
+	fF5BuaVGeWLR+itjQTohm8Y3yf5z2qsNGvoNxNC63POr4pUAuOt/d9YsmDLDj1K9icmUS76Dytu5S
+	HIsa6vcURF96GHJeQeTA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghHAT-0006H3-0q; Wed, 09 Jan 2019 16:57:25 +0000
-Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghHAQ-0006Gl-62
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 16:57:23 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=sirena.org.uk; s=20170815-heliosphere; h=In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=GvYq4vyRjqFQymgiui7P+XqGYvBX6YU3Js1Sl+P4P8Q=; b=sfXCxRNHaZrSJ5ywr7tXNaRp2
- iPb7mhy5LZSpXOuZzqUuq4CskicaTM+3BPwgalfUPkdw7F9L5QbgyL9zQNi9BgsDIXz5nOhzzdaWt
- 0/DuPqVeFRYz2GsZN2bAyd/GteJo6FnVlqjVtxYz9pgnFhLOKp6Ma6V+Dzq7cW1lRS6zg=;
-Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
- ([82.37.168.47] helo=debutante.sirena.org.uk)
- by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
- (envelope-from <broonie@sirena.org.uk>)
- id 1ghHAB-00009u-EC; Wed, 09 Jan 2019 16:57:07 +0000
-Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id D8D831127528; Wed,  9 Jan 2019 16:57:06 +0000 (GMT)
-Date: Wed, 9 Jan 2019 16:57:06 +0000
-From: Mark Brown <broonie@kernel.org>
-To: Claudiu.Beznea@microchip.com
-Subject: Re: [PATCH v2 2/3] regulator: core: add helper to check if regulator
- is disabled in suspend
-Message-ID: <20190109165706.GG10405@sirena.org.uk>
-References: <1546944944-13911-1-git-send-email-claudiu.beznea@microchip.com>
- <1546944944-13911-3-git-send-email-claudiu.beznea@microchip.com>
+	id 1ghHBa-0006c4-Ot; Wed, 09 Jan 2019 16:58:34 +0000
+Received: from kirsty.vergenet.net ([202.4.237.240])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghHBV-0006ay-Bl
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 16:58:32 +0000
+Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
+ by kirsty.vergenet.net (Postfix) with ESMTPA id C379C25B780;
+ Thu, 10 Jan 2019 03:58:25 +1100 (AEDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
+ t=1547053106; bh=dznEJDjOOjNrhlXP3RBUxBg40PRs5r4ApPNfVC0oEhQ=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=qtnHsmtnqtahyTCQCsZR8Juo+oCkkPTBhwEMdIKiLt/JU/YohU2mZKwm1T51lKD8j
+ TS1XP5BbDk393ZsXW6nsoAOWwPFTlzla/ByoUM1mV4B8YulxyjXN7nvjXe9+LApYYz
+ pK4u8Ypd1oVWsl3fifV69eqlzC89JpkpVmhdNWwM=
+Received: by reginn.horms.nl (Postfix, from userid 7100)
+ id 9B886940420; Wed,  9 Jan 2019 17:58:23 +0100 (CET)
+Date: Wed, 9 Jan 2019 17:58:23 +0100
+From: Simon Horman <horms@verge.net.au>
+To: Geert Uytterhoeven <geert@linux-m68k.org>
+Subject: Re: [PATCH] arm64: dts: renesas: r8a77990: ebisu: Fix backlight
+ regulator numbering
+Message-ID: <20190109165822.tmj7qbho46f7clvg@verge.net.au>
+References: <20190109140045.17449-1-marek.vasut@gmail.com>
+ <CAMuHMdX3bP_WCYNRRMmVRPwV52e72NOZMtW8cf29Fo+E9_CvcQ@mail.gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <1546944944-13911-3-git-send-email-claudiu.beznea@microchip.com>
-X-Cookie: VMS version 2.0 ==>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+Content-Disposition: inline
+In-Reply-To: <CAMuHMdX3bP_WCYNRRMmVRPwV52e72NOZMtW8cf29Fo+E9_CvcQ@mail.gmail.com>
+Organisation: Horms Solutions BV
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_085722_370435_DB44DA24 
-X-CRM114-Status: UNSURE (   9.34  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190109_085829_620576_84787375 
+X-CRM114-Status: GOOD (  15.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,71 +76,55 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: len.brown@intel.com, alexandre.belloni@bootlin.com,
- linux-pm@vger.kernel.org, linux-kernel@vger.kernel.org, rjw@rjwysocki.net,
- lgirdwood@gmail.com, Ludovic.Desroches@microchip.com, pavel@ucw.cz,
- linux@armlinux.org.uk, linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============4827744518063021447=="
+Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>,
+ Wolfram Sang <wsa+renesas@sang-engineering.com>,
+ Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
+ Marek Vasut <marek.vasut@gmail.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Marek Vasut <marek.vasut+renesas@gmail.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Wed, Jan 09, 2019 at 04:26:25PM +0100, Geert Uytterhoeven wrote:
+> On Wed, Jan 9, 2019 at 3:01 PM <marek.vasut@gmail.com> wrote:
+> > From: Marek Vasut <marek.vasut+renesas@gmail.com>
+> >
+> > There are two regulator1 nodes in the Ebisu DTS right now, one 3.3V for
+> > the eMMC and one 12V for the backlight. This causes one to be overwritten
+> > by the other, ultimatelly resulting in inoperable eMMC, which depends on
+> > the former. Fix this by renumbering the backlight regulator to regulator2.
+> >
+> > Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+> > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > Cc: Simon Horman <horms+renesas@verge.net.au>
+> > Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> > Cc: linux-renesas-soc@vger.kernel.org
+> > Reported-by: Simon Horman <horms+renesas@verge.net.au>
+> > Fixes: 9d16c4a10e07 ("arm64: dts: renesas: r8a77990: ebisu: Add backlight")
+> 
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+> > --- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+> > +++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+> > @@ -191,7 +191,7 @@
+> >                 clock-frequency = <24576000>;
+> >         };
+> >
+> > -       reg_12p0v: regulator1 {
+> > +       reg_12p0v: regulator2 {
+> >                 compatible = "regulator-fixed";
+> >                 regulator-name = "D12.0V";
+> >                 regulator-min-microvolt = <12000000>;
+> 
+> Perhaps the node name should get a more descriptive suffix
+> (e.g. "regulator-12p0v"), like is already done for some of the other
+> regulators?
 
---===============4827744518063021447==
-Content-Type: multipart/signed; micalg=pgp-sha512;
-	protocol="application/pgp-signature"; boundary="KR/qxknboQ7+Tpez"
-Content-Disposition: inline
-
-
---KR/qxknboQ7+Tpez
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Tue, Jan 08, 2019 at 10:56:32AM +0000, Claudiu.Beznea@microchip.com wrot=
-e:
-> From: Claudiu Beznea <claudiu.beznea@microchip.com>
->=20
-> Add helper to check if regulator will be disabled in suspend.
->=20
-> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
-
-This feels like it's the wrong way round - if this is configurable I'd
-expect something to configure the suspend mode and then for that to
-arrange to configure the regulator appropriately (along with anything
-else that needs doing) rather than to infer the configuration from the
-regulator state which feels fragile.  But based on the cover letter
-that's kind of like what the initial proposal about target states was so
-perhaps this is the way we end up going...  this certainly looks a lot
-less impactful that the target state stuff though.
-
---KR/qxknboQ7+Tpez
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAABCgAdFiEEreZoqmdXGLWf4p/qJNaLcl1Uh9AFAlw2J+IACgkQJNaLcl1U
-h9DcRQf/f2syn6A2vAA52taqMOX2yicco2vyAygNn47KH3gVlPg1zONPpEQpIgbA
-bLBFQrcsF6qDNKhaFtuyoAf6OhTW0Zhx7GMGpiUAeGO1MhG4YH1KYw+bGMG6BxW6
-QwaIOK15x1wagCtuI+837xmUUaWDHESLog4uvgpg7lEjZxfeXgsiPc9pCkLlrI2o
-2ed96DyT4s/wHdwz61gi5INpScrynAEfzkyHhluYnHVES+6yS52E3NhipLgqbIj8
-EhunSZJQFh+QpM3AG5ithO237q3mvPsKV0tUmBjWRZsuL/xrUlqd26J7iDye/52r
-CZzk8FIhWeH/0fODpyARFAjqacYa5Q==
-=Oh5J
------END PGP SIGNATURE-----
-
---KR/qxknboQ7+Tpez--
-
-
---===============4827744518063021447==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+I think I would prefer that addressed in a follow-up patch.
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============4827744518063021447==--
-
