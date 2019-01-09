@@ -2,90 +2,62 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C848AC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 14:19:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 76CC3C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 14:20:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8DA422075C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 14:19:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 40768206B6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 14:20:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KW4QNk5S"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8DA422075C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=kontron.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aOpo08fO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 40768206B6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=q8XjRWE7/wQpMDTRhtFmdda1MuAnn7ZiSQMoVoSqxNY=; b=KW4QNk5Ss1E5MQ
-	y8iE5YqDApZSescoHDWMfDVPyrbCme/A2PBlLlm9RzrajZ3RTLBulqieaIvm8rviedhJSCgdPtcvy
-	XhonfwA26lk3x2w0R3AWrSTwFdnaqGsdsAAg4HiXIa3ryf2EqN1LLNPksB7+zb060izyW9N56f274
-	KfoEpHT1YHr6PNkuUNFiiMUt07dMBYvRad2KLIQS2MDwyO06tTRFetIgx0j+yZuWIRyCfg35Xlr43
-	JeFrJ0kc8ZWBSHjhF4/ApCck+NoZai+xpVM8Go9r6Q6RL7x3h4ALXVW/mIR56t9WMcVLD3Y8sur1B
-	+hcGfvIKb2AWE3AXprgw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=wllwcomJhxijiqKZ56hz53kgcmTTbX1+0mZwp/gREso=; b=aOpo08fOEdV+x4
+	oJOUu/Tjlslf01lQhf5HtiTSylDPOpageGUMvMlYxQtfhFHec73TG96abe3neLh9kYhL75i0V9tJQ
+	p4SE4+xURwUlI69NyYBXKV6/fymEK+L7dSEwftFluozB98RkCCNFhAHN7kenlX+ew2Dpuc8YnvCxS
+	c/ZQ05n7ZoN8AT4geNfZlyrrayWPH8xF64gBu5JBdWZ1onQHGrGYHm9WaWrYYUGWOuqUzYPuisoqe
+	As39ZaUT9R8OdQijS50PhDODCw+xIZ03XQoG1L2OG4fYV0/YAJZYvnmM4LnAWACkrxYwmlItEkkp2
+	BpJeapPQS3OxKc8s7jgQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghEhU-00073w-Un; Wed, 09 Jan 2019 14:19:20 +0000
-Received: from skedge04.snt-world.com ([91.208.41.69])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghEhQ-00072r-MI; Wed, 09 Jan 2019 14:19:19 +0000
-Received: from sntmail11s.snt-is.com (unknown [10.203.32.181])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by skedge04.snt-world.com (Postfix) with ESMTPS id 7B11567A8CB;
- Wed,  9 Jan 2019 15:19:09 +0100 (CET)
-Received: from sntmail12r.snt-is.com (10.203.32.182) by sntmail11s.snt-is.com
- (10.203.32.181) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256) id 15.1.1466.3; Wed, 9 Jan 2019
- 15:19:09 +0100
-Received: from sntmail12r.snt-is.com ([fe80::e551:8750:7bba:3305]) by
- sntmail12r.snt-is.com ([fe80::e551:8750:7bba:3305%5]) with mapi id
- 15.01.1466.003; Wed, 9 Jan 2019 15:19:09 +0100
-From: Schrempf Frieder <frieder.schrempf@kontron.de>
-To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>,
- "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
- "boris.brezillon@bootlin.com" <boris.brezillon@bootlin.com>,
- "marek.vasut@gmail.com" <marek.vasut@gmail.com>, "broonie@kernel.org"
- <broonie@kernel.org>, "linux-spi@vger.kernel.org"
- <linux-spi@vger.kernel.org>, "devicetree@vger.kernel.org"
- <devicetree@vger.kernel.org>
-Subject: Re: [PATCH v6 0/5] spi: spi-mem: Add driver for NXP FlexSPI controller
-Thread-Topic: [PATCH v6 0/5] spi: spi-mem: Add driver for NXP FlexSPI
- controller
-Thread-Index: AQHUpzP4PV9+XjynmUWrRoOqEAtjTqWm7WUA
-Date: Wed, 9 Jan 2019 14:19:08 +0000
-Message-ID: <7188c406-3dd2-88a6-b6ed-d5e8bf678df8@kontron.de>
-References: <1546939346-20181-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-In-Reply-To: <1546939346-20181-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-Accept-Language: de-DE, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-originating-ip: [172.25.9.43]
-x-c2processedorg: 51b406b7-48a2-4d03-b652-521f56ac89f3
-Content-ID: <D484D617F02B3D468BA088497AB4F7A5@snt-world.com>
-MIME-Version: 1.0
-X-SnT-MailScanner-Information: Please contact the ISP for more information
-X-SnT-MailScanner-ID: 7B11567A8CB.A005C
-X-SnT-MailScanner: Found to be clean
-X-SnT-MailScanner-SpamCheck: 
-X-SnT-MailScanner-From: frieder.schrempf@kontron.de
-X-SnT-MailScanner-To: boris.brezillon@bootlin.com, broonie@kernel.org,
- computersforpeace@gmail.com, devicetree@vger.kernel.org,
+	id 1ghEig-0000N1-MZ; Wed, 09 Jan 2019 14:20:34 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghEid-0000M9-LR
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 14:20:33 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 5EFB720A13; Wed,  9 Jan 2019 15:20:28 +0100 (CET)
+Received: from localhost.localdomain
+ (aaubervilliers-681-1-45-241.w90-88.abo.wanadoo.fr [90.88.163.241])
+ by mail.bootlin.com (Postfix) with ESMTPSA id E70E32078E;
+ Wed,  9 Jan 2019 15:20:17 +0100 (CET)
+From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+To: linux-media@vger.kernel.org, devel@driverdev.osuosl.org,
  linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
- linux-mtd@lists.infradead.org, linux-spi@vger.kernel.org,
- marek.vasut@gmail.com, mark.rutland@arm.com, robh@kernel.org,
- shawnguo@kernel.org, yogeshnarayan.gaur@nxp.com
+ linux-sunxi@googlegroups.com
+Subject: [PATCH 1/2] media: cedrus: Cleanup duplicate declarations from
+ cedrus_dec header
+Date: Wed,  9 Jan 2019 15:19:19 +0100
+Message-Id: <20190109141920.12677-1-paul.kocialkowski@bootlin.com>
+X-Mailer: git-send-email 2.20.1
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_061917_049680_224D380E 
-X-CRM114-Status: GOOD (  15.33  )
+X-CRM114-CacheID: sfid-20190109_062031_834123_206EACD5 
+X-CRM114-Status: UNSURE (   8.57  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,85 +69,50 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "robh@kernel.org" <robh@kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "computersforpeace@gmail.com" <computersforpeace@gmail.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Hans Verkuil <hverkuil@xs4all.nl>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Alexandre Courbot <acourbot@chromium.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Randy Li <ayaka@soulik.info>,
+ Tomasz Figa <tfiga@chromium.org>,
+ Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
+ Chen-Yu Tsai <wens@csie.org>, Sakari Ailus <sakari.ailus@linux.intel.com>,
+ Mauro Carvalho Chehab <mchehab@kernel.org>,
+ Ezequiel Garcia <ezequiel@collabora.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 08.01.19 10:24, Yogesh Narayan Gaur wrote:
-> - Add driver for NXP FlexSPI host controller
-> 
->   FlexSPI is a flexsible SPI host controller [1], Chapter 30 page 1475,
->   which supports two SPI channels and up to 4 external devices.
->   Each channel supports Single/Dual/Quad/Octal mode data transfer (1/2/4/8 bidirectional data lines)
->   i.e. FlexSPI acts as an interface to external devices, maximum 4, each with up to 8
->   bidirectional data lines.
-> 
-> - Tested this driver with mtd_debug(Erase/Write/Read) utility and JFFS2
->   filesystem mounting and booting on NXP LX2160ARDB[2] and LX2160AQDS targets.
->   LX2160ARDB is having two NOR slave device connected on single bus A
->   i.e. A0 and A1 (CS0 and CS1).
->   LX2160AQDS is having two NOR slave device connected on separate buses
->   one flash on A0 and second on B1 i.e. (CS0 and CS3).
->   Verified this driver on following SPI NOR flashes:
->     Micron, mt35xu512aba, [Read - 1 bit mode]
->     Cypress, s25fl512s, [Read - 1/2/4 bit mode]
-> 
-> [1] https://www.nxp.com/docs/en/reference-manual/IMXRT1050RM.pdf
-> [2] https://patchwork.kernel.org/project/linux-arm-kernel/list/?submitter=182097
-> 
-> Yogesh Narayan Gaur (5):
->    spi: spi-mem: Add driver for NXP FlexSPI controller
->    dt-bindings: spi: add binding file for NXP FlexSPI controller
->    arm64: dts: lx2160a: add FlexSPI node property
->    arm64: defconfig: enable NXP FlexSPI driver
->    MAINTAINERS: add maintainers for the NXP FlexSPI driver
-> 
-> Changes for v6:
-> - Rebase on top of v5.0-rc1.
+Some leftover declarations are still in the cedrus_dec header although
+they were moved to cedrus_video already. Clean them up.
 
-Your patches don't apply to v5.0-rc1. It seems like you have instead 
-rebased onto the for-5.1 or for-next branch of the SPI tree. I guess 
-this is okay, but you should have pointed that out correctly here.
+Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+---
+ drivers/staging/media/sunxi/cedrus/cedrus_dec.h | 6 ------
+ 1 file changed, 6 deletions(-)
 
-> - Incorporated review comments for
->    patch 'spi: spi-mem: Add driver for NXP FlexSPI controller'.
-> - Updated s-b tag in all patches.
-> Changes for v5:
-> - Rebase on top of v4.20-rc2
-> - Incorporated review comments for
->    patch 'spi: spi-mem: Add driver for NXP FlexSPI controller'.
-> Changes for v4:
-> - Incorporated review comments for
->    patch 'spi: spi-mem: Add driver for NXP FlexSPI controller'.
-> - Incorporated binding file review comments.
-> Changes for v3:
-> - Incorporated review comments for
->    patch 'spi: spi-mem: Add driver for NXP FlexSPI controller'.
-> Changes for v2:
-> - Incorporated Boris review comments and drop below patches as per the comments.
->   - Patch 'spi: add slave device size in spi_device struct'
->   - Patch 'spi: add flags for octal I/O data transfer'
-> - Incorporated DTS and Binding file review comments of Shawn Guo and Rob Herring.
-> 
->   .../devicetree/bindings/spi/spi-nxp-fspi.txt  |   39 +
->   MAINTAINERS                                   |    7 +
->   .../boot/dts/freescale/fsl-lx2160a-rdb.dts    |   22 +
->   .../arm64/boot/dts/freescale/fsl-lx2160a.dtsi |   13 +
->   arch/arm64/configs/defconfig                  |    1 +
->   drivers/spi/Kconfig                           |   10 +
->   drivers/spi/Makefile                          |    1 +
->   drivers/spi/spi-nxp-fspi.c                    | 1095 +++++++++++++++++
->   8 files changed, 1188 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
->   create mode 100644 drivers/spi/spi-nxp-fspi.c
-> 
+diff --git a/drivers/staging/media/sunxi/cedrus/cedrus_dec.h b/drivers/staging/media/sunxi/cedrus/cedrus_dec.h
+index 4f423d3a1cad..d1ae7903677b 100644
+--- a/drivers/staging/media/sunxi/cedrus/cedrus_dec.h
++++ b/drivers/staging/media/sunxi/cedrus/cedrus_dec.h
+@@ -16,12 +16,6 @@
+ #ifndef _CEDRUS_DEC_H_
+ #define _CEDRUS_DEC_H_
+ 
+-extern const struct v4l2_ioctl_ops cedrus_ioctl_ops;
+-
+-void cedrus_device_work(struct work_struct *work);
+ void cedrus_device_run(void *priv);
+ 
+-int cedrus_queue_init(void *priv, struct vb2_queue *src_vq,
+-		      struct vb2_queue *dst_vq);
+-
+ #endif
+-- 
+2.20.1
+
+
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
