@@ -2,61 +2,68 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_MUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_MUTT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 82963C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 17:23:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A8C21C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 17:26:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 53AD1214C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 17:23:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 79364214C6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 17:26:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CY2+ncCr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 53AD1214C6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G+YhuKmh"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 79364214C6
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-mips.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
-	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=Y8atEbrwDBniS33izd41KuvrzdFXEIrRCem8rkRN8X4=; b=CY2+ncCr4tgZp5
-	G1gMuX4dmfOQUhhMu7y0t2sFUS5+K7kHCEzPn7GHRtDxzR00NZnuBhW6rhmVuFuh3loIPeCXd19kt
-	g3rACSuVLZ2sjKdD8ixoZcEb40j2rwhnqIQRYCBX5cjcBnddzo3N9hncENHIdAn7GJ9D6/cMBLYsO
-	HcIF70yeI6woC8/50FyCclKPN+rRFdMeKgfM2/5EOKXbLXP85G8LfVGAe2jv5LfPd1DvOIy+uc+Br
-	HPGCqq1/MjLOxrLO0Y84DddnCQ5DsVHVbpyERGFhyK7wDQw06MT8gNwBpADgsWh/OaV/o42/O9orx
-	x/AD3McGcY+U5t+At6Vg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=uIGokAJJhrK9QWkDVY7ItyRxaaFDFbizYI6dv44HqOE=; b=G+YhuKmhEWN4Vm
+	H7qc0eYBkefwrOU6iqqIfLzja6mKfqRxAVsmbOovl+YPNgq7AWIk1M/Sfox0GXlomNv7bodsmpwcH
+	D75KwQf2ZNEMnBms2RdSrfn8t+k7LcZzVOLEkdSn0PEjFCMIz9VXCtb1AIRKJ3oF9xwDzLyf0RPXC
+	vY5F7UTDj3PtEpyNJXofcSq7sDpAbY50xl9lAKnjZKb4m3GFA0P4DbjOzv9PzrwecJl9oTMVRDjja
+	uKg9ASPbQkZPaOLeyuSt2ezaKyhcc7XVJqxQUAdiecuF7cOpw1WWkHsig37Q/e/ON5XNrLHGRpOWx
+	302S3yI1IOn1bP2ZA19g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghHa1-00006w-68; Wed, 09 Jan 2019 17:23:49 +0000
+	id 1ghHcc-00022e-D5; Wed, 09 Jan 2019 17:26:30 +0000
 Received: from eddie.linux-mips.org ([148.251.95.138] helo=cvs.linux-mips.org)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghHZx-00006B-KH
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 17:23:47 +0000
+ id 1ghHcY-00021t-M2
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 17:26:28 +0000
 Received: (from localhost user: 'ladis' uid#1021 fake: STDIN
  (ladis@eddie.linux-mips.org)) by eddie.linux-mips.org
- id S23993997AbfAIRXkz6Usf (ORCPT
+ id S23993997AbfAIR0YHuWuZ (ORCPT
  <rfc822;linux-arm-kernel@lists.infradead.org>);
- Wed, 9 Jan 2019 18:23:40 +0100
-Date: Wed, 9 Jan 2019 18:23:36 +0100
+ Wed, 9 Jan 2019 18:26:24 +0100
+Date: Wed, 9 Jan 2019 18:26:23 +0100
 From: Ladislav Michl <ladis@linux-mips.org>
-To: linux-pm@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-omap@vger.kernel.org,
- rjw@rjwysocki.net, ulf.hansson@linaro.org, tony@atomide.com
-Subject: [PATCH] PM/runtime: Fix 'jiffies' in comments after move to hrtimers
-Message-ID: <20190109172336.GA1711@lenoch>
+To: Vincent Guittot <vincent.guittot@linaro.org>
+Subject: Re: Regression in v5.0-rc1 with autosuspend hrtimers
+Message-ID: <20190109172623.GB1711@lenoch>
+References: <20190108213743.GN5544@atomide.com>
+ <20190109014218.GA8363@linaro.org> <20190109111703.GA28605@lenoch>
+ <CAKfTPtBvzZvJNxBRMbGbNFBYG0-pAR-P7X2=KrBWH01OMWvJYA@mail.gmail.com>
+ <20190109115824.GA1353@lenoch>
+ <CAKfTPtAAgYYW8A1LDg18bM=5vCAMDbQ05APp9QWSaifW=F0SgQ@mail.gmail.com>
+ <20190109133337.GA13579@lenoch>
+ <CAKfTPtAsENRKh_wTFXCLW2_MdMBug+tV2KtjC7x6RigN7hgPmw@mail.gmail.com>
+ <20190109160736.GA7416@lenoch>
+ <CAKfTPtBnNA6knrsHsZXeaotBSn5mS12xNWNUKdSwZ1EUvueQkA@mail.gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
+In-Reply-To: <CAKfTPtBnNA6knrsHsZXeaotBSn5mS12xNWNUKdSwZ1EUvueQkA@mail.gmail.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_092345_736265_8CCF74A6 
-X-CRM114-Status: UNSURE (   9.38  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190109_092626_718939_50B67BE5 
+X-CRM114-Status: GOOD (  22.26  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,45 +75,179 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Vincent Guittot <vincent.guittot@linaro.org>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>,
+ "open list:THERMAL" <linux-pm@vger.kernel.org>,
+ Tony Lindgren <tony@atomide.com>,
+ "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>, linux-omap@vger.kernel.org,
+ LAK <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-PM-runtime now uses the hrtimers infrastructure for autosuspend, however
-comments still reference 'jiffies'.
+On Wed, Jan 09, 2019 at 05:32:31PM +0100, Vincent Guittot wrote:
+> On Wed, 9 Jan 2019 at 17:07, Ladislav Michl <ladis@linux-mips.org> wrote:
+> >
+> > On Wed, Jan 09, 2019 at 03:12:25PM +0100, Vincent Guittot wrote:
+> > > Please keep all thread list when replying :-)
+> >
+> > Ahh, sorry for that...
+> > [snip]
+> > > On Wed, 9 Jan 2019 at 14:33, Ladislav Michl <ladis@linux-mips.org> wrote:
+> > > > I agree, but it doea all the magic correctly, so you won't need
+> > > > to touch that code is ktime_t changes (I know, unlikely..)
+> > >
+> > > But the current implementation doesn't care of any changes in ktime_t
+> > > as it uses raw ns
+> >
+> > Fair enough, so let's go back to:
+> 
+> This one looks good for me
 
-Fixes: 8234f6734c5d ("PM-runtime: Switch autosuspend over to using hrtimers")
-Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
----
- drivers/base/power/runtime.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Lets split is for 'comments fix' patch, which was just send and 'the rest'.
+Now, 'the rest' can either be v2 of your "PM/runtime: Fix autosuspend_delay on
+32bits arch" or will wait for 5.1. You decide :)
 
-diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
-index 70624695b6d5..096f7996d914 100644
---- a/drivers/base/power/runtime.c
-+++ b/drivers/base/power/runtime.c
-@@ -121,7 +121,7 @@ static void pm_runtime_cancel_pending(struct device *dev)
-  * Compute the autosuspend-delay expiration time based on the device's
-  * power.last_busy time.  If the delay has already expired or is disabled
-  * (negative) or the power.use_autosuspend flag isn't set, return 0.
-- * Otherwise return the expiration time in jiffies (adjusted to be nonzero).
-+ * Otherwise return the expiration time in nanoseconds (adjusted to be nonzero).
-  *
-  * This function may be called either with or without dev->power.lock held.
-  * Either way it can be racy, since power.last_busy may be updated at any time.
-@@ -905,7 +905,7 @@ static enum hrtimer_restart  pm_suspend_timer_fn(struct hrtimer *timer)
- 	spin_lock_irqsave(&dev->power.lock, flags);
- 
- 	expires = dev->power.timer_expires;
--	/* If 'expire' is after 'jiffies' we've been called too early. */
-+	/* If 'timer_expires' after 'now' we've been called too early. */
- 	if (expires > 0 && expires < ktime_to_ns(ktime_get())) {
- 		dev->power.timer_expires = 0;
- 		rpm_suspend(dev, dev->power.timer_autosuspends ?
--- 
-2.20.1
+> > diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
+> > index 70624695b6d5..e61ee9b47a26 100644
+> > --- a/drivers/base/power/runtime.c
+> > +++ b/drivers/base/power/runtime.c
+> > @@ -121,7 +121,7 @@ static void pm_runtime_cancel_pending(struct device *dev)
+> >   * Compute the autosuspend-delay expiration time based on the device's
+> >   * power.last_busy time.  If the delay has already expired or is disabled
+> >   * (negative) or the power.use_autosuspend flag isn't set, return 0.
+> > - * Otherwise return the expiration time in jiffies (adjusted to be nonzero).
+> > + * Otherwise return the expiration time in nanoseconds (adjusted to be nonzero).
+> >   *
+> >   * This function may be called either with or without dev->power.lock held.
+> >   * Either way it can be racy, since power.last_busy may be updated at any time.
+> > @@ -129,24 +129,21 @@ static void pm_runtime_cancel_pending(struct device *dev)
+> >  u64 pm_runtime_autosuspend_expiration(struct device *dev)
+> >  {
+> >         int autosuspend_delay;
+> > -       u64 last_busy, expires = 0;
+> > -       u64 now = ktime_to_ns(ktime_get());
+> > +       u64 expires;
+> >
+> >         if (!dev->power.use_autosuspend)
+> > -               goto out;
+> > +               return 0;
+> >
+> >         autosuspend_delay = READ_ONCE(dev->power.autosuspend_delay);
+> >         if (autosuspend_delay < 0)
+> > -               goto out;
+> > -
+> > -       last_busy = READ_ONCE(dev->power.last_busy);
+> > +               return 0;
+> >
+> > -       expires = last_busy + autosuspend_delay * NSEC_PER_MSEC;
+> > -       if (expires <= now)
+> > -               expires = 0;    /* Already expired. */
+> > +       expires  = READ_ONCE(dev->power.last_busy);
+> > +       expires += NSEC_PER_MSEC * (u64)autosuspend_delay;
+> > +       if (expires > ktime_to_ns(ktime_get()))
+> > +               return expires; /* Expires in the future */
+> >
+> > - out:
+> > -       return expires;
+> > +       return 0;
+> >  }
+> >  EXPORT_SYMBOL_GPL(pm_runtime_autosuspend_expiration);
+> >
+> > Which gives for arm:
+> > 00000480 <pm_runtime_autosuspend_expiration>:
+> >      480:       e92d41f0        push    {r4, r5, r6, r7, r8, lr}
+> >      484:       e5d030d1        ldrb    r3, [r0, #209]  ; 0xd1
+> >      488:       e3130004        tst     r3, #4
+> >      48c:       0a00000c        beq     4c4 <pm_runtime_autosuspend_expiration+0x44>
+> >      490:       e59030e4        ldr     r3, [r0, #228]  ; 0xe4
+> >      494:       e3530000        cmp     r3, #0
+> >      498:       ba000009        blt     4c4 <pm_runtime_autosuspend_expiration+0x44>
+> >      49c:       e28050e8        add     r5, r0, #232    ; 0xe8
+> >      4a0:       e8950030        ldm     r5, {r4, r5}
+> >      4a4:       e59f2030        ldr     r2, [pc, #48]   ; 4dc <pm_runtime_autosuspend_expiration+0x5c>
+> >      4a8:       e0e54392        smlal   r4, r5, r2, r3
+> >      4ac:       ebfffffe        bl      0 <ktime_get>
+> >      4b0:       e1550001        cmp     r5, r1
+> >      4b4:       01540000        cmpeq   r4, r0
+> >      4b8:       e1a06004        mov     r6, r4
+> >      4bc:       e1a07005        mov     r7, r5
+> >      4c0:       8a000001        bhi     4cc <pm_runtime_autosuspend_expiration+0x4c>
+> >      4c4:       e3a06000        mov     r6, #0
+> >      4c8:       e3a07000        mov     r7, #0
+> >      4cc:       e1a00006        mov     r0, r6
+> >      4d0:       e1a01007        mov     r1, r7
+> >      4d4:       e8bd41f0        pop     {r4, r5, r6, r7, r8, lr}
+> >      4d8:       e12fff1e        bx      lr
+> >      4dc:       000f4240        .word   0x000f4240
+> >
+> > And x86:
+> > 0000000000000230 <pm_runtime_autosuspend_expiration.part.0>:
+> >      230:       8b 87 a4 01 00 00       mov    0x1a4(%rdi),%eax
+> >      236:       53                      push   %rbx
+> >      237:       85 c0                   test   %eax,%eax
+> >      239:       78 1e                   js     259 <pm_runtime_autosuspend_expiration.part.0+0x29>
+> >      23b:       48 63 d8                movslq %eax,%rbx
+> >      23e:       48 8b 97 a8 01 00 00    mov    0x1a8(%rdi),%rdx
+> >      245:       48 69 db 40 42 0f 00    imul   $0xf4240,%rbx,%rbx
+> >      24c:       48 01 d3                add    %rdx,%rbx
+> >      24f:       e8 00 00 00 00          callq  254 <pm_runtime_autosuspend_expiration.part.0+0x24>
+> >      254:       48 39 c3                cmp    %rax,%rbx
+> >      257:       77 02                   ja     25b <pm_runtime_autosuspend_expiration.part.0+0x2b>
+> >      259:       31 db                   xor    %ebx,%ebx
+> >      25b:       48 89 d8                mov    %rbx,%rax
+> >      25e:       5b                      pop    %rbx
+> >      25f:       c3                      retq
+> >
+> > 00000000000002a0 <pm_runtime_autosuspend_expiration>:
+> >      2a0:       f6 87 91 01 00 00 04    testb  $0x4,0x191(%rdi)
+> >      2a7:       74 02                   je     2ab <pm_runtime_autosuspend_expiration+0xb>
+> >      2a9:       eb 85                   jmp    230 <pm_runtime_autosuspend_expiration.part.0>
+> >      2ab:       31 c0                   xor    %eax,%eax
+> >      2ad:       c3                      retq
+> >      2ae:       66 90                   xchg   %ax,%ax
+> >
+> >
+> > [snip]
+> > > > Well, main concern was not to call ktime_get at the beginning of function
+> > > > as it is not too cheap.
+> > >
+> > > Doesn't the compiler optimize that to just before the test ?
+> >
+> > No (compare with above). And it is also almost certain that someone will run
+> > script and send "...do not needlesly initialize..." patch :)
+> >
+> > gcc version 8.2.1 20181130 (OSELAS.Toolchain-2018.12.0 8-20181130)
+> >
+> > 00000110 <pm_runtime_autosuspend_expiration>:
+> >      110:       e92d41f0        push    {r4, r5, r6, r7, r8, lr}
+> >      114:       e1a06000        mov     r6, r0
+> >      118:       ebfffffe        bl      0 <ktime_get>
+> >      11c:       e5d630d1        ldrb    r3, [r6, #209]  ; 0xd1
+> >      120:       e3130004        tst     r3, #4
+> >      124:       0a00000d        beq     160 <pm_runtime_autosuspend_expiration+0x50>
+> >      128:       e596c0e4        ldr     ip, [r6, #228]  ; 0xe4
+> >      12c:       e35c0000        cmp     ip, #0
+> >      130:       ba00000a        blt     160 <pm_runtime_autosuspend_expiration+0x50>
+> >      134:       e28630e8        add     r3, r6, #232    ; 0xe8
+> >      138:       e893000c        ldm     r3, {r2, r3}
+> >      13c:       e1a05001        mov     r5, r1
+> >      140:       e1a04000        mov     r4, r0
+> >      144:       e59f002c        ldr     r0, [pc, #44]   ; 178 <pm_runtime_autosuspend_expiration+0x68>
+> >      148:       e0010c90        mul     r1, r0, ip
+> >      14c:       e0926001        adds    r6, r2, r1
+> >      150:       e0a37fc1        adc     r7, r3, r1, asr #31
+> >      154:       e1550007        cmp     r5, r7
+> >      158:       01540006        cmpeq   r4, r6
+> >      15c:       3a000001        bcc     168 <pm_runtime_autosuspend_expiration+0x58>
+> >      160:       e3a06000        mov     r6, #0
+> >      164:       e3a07000        mov     r7, #0
+> >      168:       e1a00006        mov     r0, r6
+> >      16c:       e1a01007        mov     r1, r7
+> >      170:       e8bd41f0        pop     {r4, r5, r6, r7, r8, lr}
+> >      174:       e12fff1e        bx      lr
+> >      178:       000f4240        .word   0x000f4240
 
 _______________________________________________
 linux-arm-kernel mailing list
