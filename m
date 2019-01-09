@@ -2,108 +2,65 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 13C19C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 09:52:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EE037C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 09:56:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D537F20651
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 09:52:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B586F21773
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 09:56:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GlvdFOkk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D537F20651
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kIqCxEKt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B586F21773
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=fMb9lTjol2BghncEKzmzMVRgNzR2eBfO7lYnnkjDUDY=; b=GlvdFOkkUBg8nK
-	RwDkQMufGlncDYUWc276lsXxK8XE3R4HZ+errL+v+SfjHCDWqUYZiZ0J9wGVi5Cxs9KZckQjs6cdL
-	8nsu4wSNLInrhDL6ZYwfluu0bR1AU8pntRceRalpE5N7/pr9NE5xdMBI/6lJ71+wHOlLqhS1AvG2K
-	wL95zic0oQAXrNgRpx+74WOkB+il+iz+F89FdYvBRx8SrBGr3p6P9UUSV8l0+/R6YlrT0lXRrKscG
-	tigfrf+7cW/DvuP8WNXj3zIPJOlTqIsURWbRz1nkoG4LubZpFhCBTuz1tjJw/SmfWWQQ+n/jr3ROi
-	+CPS9vmaEogRLIKdHcZw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=L4q32g9H/4xvnADkJh1wVu95j7c2y94Bke5VGR8Kibs=; b=kIqCxEKtoACKtN7SYFvcmQAuC
+	96hdTaRotVXKQben4CZj14q8gmTlgWuuUGzX5s9r7SkgKjjkUBpi0/9fiIcWAPol6hDv3x0nk/P/U
+	ZlbM7XUbjkCI2YcR+wT/Sxe/s38GBenw4PPupqghXWz8uIi3+0LtVvGNG+tIDlLmcl233L2mX+qwc
+	DrpSu/e5Cs74RXqRJzuyf7liMIyCzl1YLYOAmolClEu+Gcr/hUbSxymZvGf9LkHqduYzi3k9jApai
+	BFB2PS0KfxyuFlzs24GrIoYkQoSHMtm2HiIkjqT6kdCZKrzr31w24soJ5APcYUQCYniV+ozHCA4Df
+	PjBbpQ2Nw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghAX2-0007WH-2C; Wed, 09 Jan 2019 09:52:16 +0000
+	id 1ghAbT-0000oc-7A; Wed, 09 Jan 2019 09:56:51 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghAWx-0007VY-Qc
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 09:52:13 +0000
+ id 1ghAbP-0000o9-Vk
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 09:56:49 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3C49980D;
- Wed,  9 Jan 2019 01:52:11 -0800 (PST)
-Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 82D5D80D;
+ Wed,  9 Jan 2019 01:56:47 -0800 (PST)
+Received: from [172.16.1.159] (usa-sjc-mx-foss1.foss.arm.com [217.140.101.70])
  by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 050403F70D; Wed,  9 Jan 2019 01:52:09 -0800 (PST)
-Subject: Re: [RESEND 1/1] gic: its: Make sure a LPI is discarded before free.
-To: "Zhao, Yuanyuan" <yuanyuan.zhao@hxt-semitech.com>
-References: <e37e3f5e0146be65c60092a457ca5c82e25581a0.1545292748.git.yuanyuan.zhao@hxt-semitech.com>
- <20190109074324.6445118d@why.wild-wind.fr.eu.org>
- <c81f42aa93904353bbeac590da7b0945@HXTBJIDCEMVIW02.hxtcorp.net>
-From: Marc Zyngier <marc.zyngier@arm.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
- 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
-Organization: ARM Ltd
-Message-ID: <38d7afaf-e800-f6e7-83e3-eb006f4d6f4c@arm.com>
-Date: Wed, 9 Jan 2019 09:52:08 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
+ 65C363F70D; Wed,  9 Jan 2019 01:56:43 -0800 (PST)
+Subject: Re: [PATCH 2/2] EDAC: add ARM Cortex A15 L2 internal asynchronous
+ error detection driver
+To: "gregkh@linuxfoundation.org" <gregkh@linuxfoundation.org>
+References: <AM6PR0702MB379953E130CC1E1DEE18B79BFA8A0@AM6PR0702MB3799.eurprd07.prod.outlook.com>
+ <20190108104204.GA14243@zn.tnic>
+ <e1458b95-6d17-21be-5dd8-ee7ff8d8b3fb@arm.com>
+ <20190108181206.GA3848@kroah.com>
+From: James Morse <james.morse@arm.com>
+Message-ID: <52dc5125-9213-9ee4-eca6-cc8ffbc869f7@arm.com>
+Date: Wed, 9 Jan 2019 09:57:06 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.9.1
 MIME-Version: 1.0
-In-Reply-To: <c81f42aa93904353bbeac590da7b0945@HXTBJIDCEMVIW02.hxtcorp.net>
+In-Reply-To: <20190108181206.GA3848@kroah.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_015211_876524_9BC2D3A9 
-X-CRM114-Status: GOOD (  16.71  )
+X-CRM114-CacheID: sfid-20190109_015648_026520_7AB69A79 
+X-CRM114-Status: GOOD (  14.33  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -115,101 +72,55 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "Wang, Dongsheng" <dongsheng.wang@hxt-semitech.com>,
- "jason@lakedaemon.net" <jason@lakedaemon.net>,
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "arnd@arndb.de" <arnd@arndb.de>, "Sverdlin,
+ Alexander \(Nokia - DE/Ulm\)" <alexander.sverdlin@nokia.com>,
  "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "tglx@linutronix.de" <tglx@linutronix.de>, "Zheng,
- Joey" <yu.zheng@hxt-semitech.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="iso-2022-jp"
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, Borislav Petkov <bp@alien8.de>,
+ "mchehab+samsung@kernel.org" <mchehab+samsung@kernel.org>, "Wiebe,
+ Wladislav \(Nokia - DE/Ulm\)" <wladislav.wiebe@nokia.com>,
+ "akpm@linux-foundation.org" <akpm@linux-foundation.org>,
+ "mchehab@kernel.org" <mchehab@kernel.org>,
+ "davem@davemloft.net" <davem@davemloft.net>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "linux-edac@vger.kernel.org" <linux-edac@vger.kernel.org>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 09/01/2019 09:29, Zhao, Yuanyuan wrote:
-> Hi Marc:
+Hi Greg,
+
+On 01/08/2019 06:12 PM, gregkh@linuxfoundation.org wrote:
+> On Tue, Jan 08, 2019 at 05:57:24PM +0000, James Morse wrote:
+>>>> diff --git a/drivers/edac/cortex_a15_l2_async_edac.c b/drivers/edac/cortex_a15_l2_async_edac.c
+>>>> new file mode 100644
+>>>> index 000000000000..26252568e961
+>>>> --- /dev/null
+>>>> +++ b/drivers/edac/cortex_a15_l2_async_edac.c
+>>>> @@ -0,0 +1,134 @@
+>>>> +// SPDX-License-Identifier: GPL-2.0
+>>>> +/*
+>>>> + * Copyright (C) 2018 Nokia Corporation
+>>
+>> (boiler plate not needed with the SPDX header)
 > 
-> Thank you for your reply. 
-> 
-> As you said, APIs such as free_irq will deactivate irq
-> before free it. But deactivation is not forced by every API,
-> for example irq_dispose_mapping.  So I think it's better to check 
-> that irq was deactivated as expected.
+> Not true at all.  Copyright is not the same thing as an SPDX license
+> identifier in any way, shape, or form.  As-is, this is just fine.
 
-In general, we should fix the problem at the core API level instead of
-hacking individual drivers.
 
-But more to the point, irq_dispose_mapping is not supposed to do
-anything with the an active irq, as it doesn't have the required
-information to safely remove it.
+This looks funny because I removed the GPL license text that was here, 
+but left this comment when trimming the reply. I should have left a few 
+lines of it for context.
 
-So calling irq_dispose_mapping on an interrupt that still has registered
-actions is a bug, and I'm not convinced we want to cater for such a
-case. Do you have a concrete example of some kernel code expecting this
-behaviour?
+(Originally: 
+https://lore.kernel.org/lkml/20190108104204.GA14243@zn.tnic/T/#u)
+
 
 Thanks,
 
-	M.
-
-> 
-> BRs,
-> Yuanyuan
-> 
-> 
->> -----Original Message-----
->> From: Marc Zyngier [mailto:marc.zyngier@arm.com]
->> Sent: 2019年1月9日 15:43
->> To: Zhao, Yuanyuan <yuanyuan.zhao@hxt-semitech.com>
->> Cc: tglx@linutronix.de; jason@lakedaemon.net; linux-
->> kernel@vger.kernel.org; linux-arm-kernel@lists.infradead.org; Zheng, Joey
->> <yu.zheng@hxt-semitech.com>; Wang, Dongsheng <dongsheng.wang@hxt-
->> semitech.com>
->> Subject: Re: [RESEND 1/1] gic: its: Make sure a LPI is discarded before free.
->>
->> On Wed, 9 Jan 2019 11:53:27 +0800
->> Zhao Yuanyuan <yuanyuan.zhao@hxt-semitech.com> wrote:
->>
->> Hi Zhao,
->>
->>> Its device will be removed after all events be freed.
->>> Undisarded events can lead to unpredictable behaviar.
->>>
->>> Signed-off-by: Zhao Yuanyuan <yuanyuan.zhao@hxt-semitech.com>
->>> ---
->>>  drivers/irqchip/irq-gic-v3-its.c | 4 ++++
->>>  1 file changed, 4 insertions(+)
->>>
->>> diff --git a/drivers/irqchip/irq-gic-v3-its.c
->>> b/drivers/irqchip/irq-gic-v3-its.c
->>> index db20e99..4fee008 100644
->>> --- a/drivers/irqchip/irq-gic-v3-its.c
->>> +++ b/drivers/irqchip/irq-gic-v3-its.c
->>> @@ -2572,6 +2572,10 @@ static void its_irq_domain_free(struct
->> irq_domain *domain, unsigned int virq,
->>>  								virq + i);
->>>  		u32 event = its_get_event_id(data);
->>>
->>> +		/* Discard irq before free */
->>> +		if (irqd_is_activated(d))
->>> +			its_send_discard(its_dev, event);
->>> +
->>>  		/* Mark interrupt index as unused */
->>>  		clear_bit(event, its_dev->event_map.lpi_map);
->>>
->>
->> But we already do send a discard on deactivate, which logically happens
->> before we free the domain. So what are you fixing here?
->>
->> Thanks,
->>
->> 	M.
->> --
->> Without deviation from the norm, progress is not possible.
-
-
--- 
-Jazz is not dead. It just smells funny...
+James
 
 _______________________________________________
 linux-arm-kernel mailing list
