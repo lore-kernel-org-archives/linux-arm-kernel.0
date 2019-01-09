@@ -2,86 +2,110 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-11.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DBF05C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 10:45:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 21BADC43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 10:48:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AB12621783
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 10:45:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E2AE220883
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 10:48:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iHCxBBvg";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="N5TAwlET"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AB12621783
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IU+ZY2Dg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E2AE220883
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hs1ORx98Nl/uXUNxEgETL3xMkyywTMU+FmC4pARuFXo=; b=iHCxBBvgonPivK
-	6gP8+360KZ2ctqoC0ZVu1Pe7kgkA9tDzDqONxWX937udVo70DxA3W4oCkFSM1yDalRxNSeV9HHgEl
-	BM/Xb1DXgkWbjnN/tcXKksQ37YqRSFMLC6dWW9U+Mh8PktOTSwS02ilBdYXdHdPlumvgPUBVJP1VU
-	eugz+L9PjOWBVAHrROINFlID4VkxL/PY24KUSy2vX9T7zql9p/k1mxZEHY1xHNbZUmIt4F81FFaC9
-	ZeS04wF6A18a4ZgoHxr0efxD5pkpJKSATOPrL+2UaFZDYuMSqFZrJDNr+E4dF2X5MUGAGS4iO/X3J
-	8NhrWOU8dBXXKm910gkA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=NKkEtV7jFbqVWtcrxFgiDr2Xfu2elqGKlhhaR5Ha0YM=; b=IU+ZY2DgnviHNt
+	dzDdrovWrAKqBKTd/KNRcNJayPJ/zkBHdusOg+SipullIgRr6WT0510iBzZl0fGTcxWF3YGXil7KD
+	P0iTs6oX2TgALzcVqKMMgqXII89u1Z3Gs9OondIkbQwjb5AJzFQol85/5kXuG/sB3yfV7P2WGhwS5
+	sEroX06xROMPlOv6Sgt+oREs+a35WIkgzuGefYiHju4yQwZMDn3BEUuNESVFYtsSYjdjfZa7+dAXj
+	57newa/GLOtNyro/wzb+DdiomskD1dL58wZEAfp8yy66kIJFnTqUn2nbr/d9NiuMK44k/F4a4y06q
+	o/wHovDxH9pGOxBfM3Pg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghBMN-0004fR-A8; Wed, 09 Jan 2019 10:45:19 +0000
-Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghBMJ-0004eq-9Q
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 10:45:17 +0000
-Received: by mail-pg1-x544.google.com with SMTP id d72so3135093pga.9
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 09 Jan 2019 02:45:14 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=67GrVLf7hFi9VONq8bTSm/8BTwQn+GCaptdda3hBrtA=;
- b=N5TAwlETy5C2HosyyXtrGopuNGBfWBLXK2DNG5mSSJxLOjJK8PRvwExsX3XUv4CLzM
- cY4UQc3nTBoEt5vOk2+ierhTQWTFnfH1IK1JCsHuO6bGoV7mgHaLeuul8RKpjortFRNz
- Agmt9sgnJKdSipg0jVWkhMN9u5mAzOUrgW0EY=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=67GrVLf7hFi9VONq8bTSm/8BTwQn+GCaptdda3hBrtA=;
- b=FpIUtk0IysomNZcdbw3ywLL7vU/+eXm7dNjcc++4YKLmD/NcTzI15A4zk/kOkf5sWp
- xWQXmctOSR59NA097nrR8XhTBVmhqjOJaTLbjovVPH71m44s96jEo6Af7xQUpCdCuk/k
- TPqJ2YtcJA3rkvdzVdEtdEvfZUtvMOX4e0Ss0RsooubrW3NXmhpw4TUTmHhnNquOorUX
- u/6k2kMOg37QEdKt/sXsBoK7k/+MseAzfj8aCu4lii5uS9PO3yyyjNizZNiMoiS9RWUs
- NxWCTX29KRhCCfq9NBT5rAbS0QM7B9KiP5PBqse9tBsib6KA5N+JjpwZUnE3WsD1TvGD
- QV4Q==
-X-Gm-Message-State: AJcUukdSmxPiU938eGU8O/RSpdn+NXxFL3EPtRgkAhHCPGUou7OTMz7n
- x2Xdepv/tq4OAEcp5hdYlZZNDA==
-X-Google-Smtp-Source: ALg8bN4S90W6A9tOkdCZTh7Jpa0HU0vimgVjXgqikQK3BpZn6qJnDfaBAwBFIrc4C4XDzTEjH3s+GA==
-X-Received: by 2002:a62:cd44:: with SMTP id o65mr5435769pfg.222.1547030714197; 
- Wed, 09 Jan 2019 02:45:14 -0800 (PST)
-Received: from localhost ([122.166.131.155])
- by smtp.gmail.com with ESMTPSA id a4sm81235549pgv.70.2019.01.09.02.45.13
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 09 Jan 2019 02:45:13 -0800 (PST)
-Date: Wed, 9 Jan 2019 16:15:11 +0530
-From: Viresh Kumar <viresh.kumar@linaro.org>
-To: Quentin Perret <quentin.perret@arm.com>
-Subject: Re: [PATCH] cpufreq: scmi: Fix frequency invariance in slow path
-Message-ID: <20190109104511.mi3gtdcytkky4eyn@vireshk-i7>
-References: <20190109104236.6532-1-quentin.perret@arm.com>
+	id 1ghBPW-00053B-RA; Wed, 09 Jan 2019 10:48:34 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghBPS-00052j-SG
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 10:48:32 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A34F5A78;
+ Wed,  9 Jan 2019 02:48:30 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ 8F8E43F70D; Wed,  9 Jan 2019 02:48:29 -0800 (PST)
+Subject: Re: [PATCH v2 4/4] dt-bindings/irqchip/mbigen: add example of MBIGEN
+ generate SPIs
+To: Yang Yingliang <yangyingliang@huawei.com>,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
+References: <1540540280-26612-1-git-send-email-yangyingliang@huawei.com>
+ <1540540280-26612-5-git-send-email-yangyingliang@huawei.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ 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
+Organization: ARM Ltd
+Message-ID: <f3a4f987-21f5-ac08-7f40-7f3c03eaf81c@arm.com>
+Date: Wed, 9 Jan 2019 10:48:27 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190109104236.6532-1-quentin.perret@arm.com>
-User-Agent: NeoMutt/20180323-120-3dd1ac
+In-Reply-To: <1540540280-26612-5-git-send-email-yangyingliang@huawei.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_024515_347188_414F5B5D 
-X-CRM114-Status: GOOD (  15.61  )
+X-CRM114-CacheID: sfid-20190109_024830_929015_504A09FE 
+X-CRM114-Status: GOOD (  16.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,52 +117,69 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-pm@vger.kernel.org, rjw@rjwysocki.net, linux-kernel@vger.kernel.org,
- qais.yousef@arm.com, sudeep.holla@arm.com, dietmar.eggemann@arm.com,
- linux-arm-kernel@lists.infradead.org
+Cc: tglx@linutronix.de, Rob Herring <robh+dt@kernel.org>, guohanjun@huawei.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 09-01-19, 10:42, Quentin Perret wrote:
-> The scmi-cpufreq driver calls the arch_set_freq_scale() callback on
-> frequency changes to provide scale-invariant load-tracking signals to
-> the scheduler. However, in the slow path, it does so while specifying
-> the current and max frequencies in different units, hence resulting in a
-> broken freq_scale factor.
+On 26/10/2018 08:51, Yang Yingliang wrote:
+> Now MBIGEN can support to generate SPIs by writing
+> GICD_SETSPIR. Add dt example to help document.
 > 
-> Fix this by passing all frequencies in KHz, as stored in the CPUFreq
-> frequency table.
-> 
-> Fixes: 99d6bdf33877 ("cpufreq: add support for CPU DVFS based on SCMI
-> message protocol")
-> Signed-off-by: Quentin Perret <quentin.perret@arm.com>
+> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
 > ---
->  drivers/cpufreq/scmi-cpufreq.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  .../interrupt-controller/hisilicon,mbigen-v2.txt        | 17 ++++++++++++++++-
+>  1 file changed, 16 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/cpufreq/scmi-cpufreq.c b/drivers/cpufreq/scmi-cpufreq.c
-> index 50b1551ba894..3f0693439486 100644
-> --- a/drivers/cpufreq/scmi-cpufreq.c
-> +++ b/drivers/cpufreq/scmi-cpufreq.c
-> @@ -52,9 +52,9 @@ scmi_cpufreq_set_target(struct cpufreq_policy *policy, unsigned int index)
->  	int ret;
->  	struct scmi_data *priv = policy->driver_data;
->  	struct scmi_perf_ops *perf_ops = handle->perf_ops;
-> -	u64 freq = policy->freq_table[index].frequency * 1000;
-> +	u64 freq = policy->freq_table[index].frequency;
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt b/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
+> index a6813a0..298c033 100644
+> --- a/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
+> @@ -10,7 +10,7 @@ Hisilicon designed mbigen to collect and generate interrupt.
 >  
-> -	ret = perf_ops->freq_set(handle, priv->domain_id, freq, false);
-> +	ret = perf_ops->freq_set(handle, priv->domain_id, freq * 1000, false);
->  	if (!ret)
->  		arch_set_freq_scale(policy->related_cpus, freq,
->  				    policy->cpuinfo.max_freq);
+>  
+>  Non-pci devices can connect to mbigen and generate the
+> -interrupt by writing ITS register.
+> +interrupt by writing GICD or ITS register.
+>  
+>  The mbigen chip and devices connect to mbigen have the following properties:
+>  
+> @@ -64,6 +64,13 @@ Examples:
+>  				num-pins = <2>;
+>  				#interrupt-cells = <2>;
+>  			};
+> +
+> +			mbigen_spi_example:spi_example {
+> +				interrupt-controller;
+> +				msi-parent = <&gic>;
+> +				num-pins = <2>;
+> +				#interrupt-cells = <2>;
+> +			};
+>  	};
+>  
+>  Devices connect to mbigen required properties:
+> @@ -82,3 +89,11 @@ Examples:
+>  		interrupts =	<656 1>,
+>  				<657 1>;
+>  	};
+> +
+> +	spi_example: spi0@0 {
+> +		compatible = "spi,example";
+> +		reg = <0 0 0 0>;
+> +		interrupt-parent = <&mbigen_spi_example>;
+> +		interrupts = <13 4>,
+> +			     <14 4>;
+> +	};
+> 
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+I'd like an Ack of some sort from one of the DT maintainer. Rob?
 
+Thanks,
+	
+	M.
 -- 
-viresh
+Jazz is not dead. It just smells funny...
 
 _______________________________________________
 linux-arm-kernel mailing list
