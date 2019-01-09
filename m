@@ -2,84 +2,86 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B7539C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 04:11:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 30D3DC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 04:36:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7BEAC20883
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 04:11:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E98B32070B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 04:36:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uV9IVKoZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7BEAC20883
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=hxt-semitech.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KpzFZ6f1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E98B32070B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=AIKn/LQ0F85JbCDXesXNBPc8AO7FISm01GcEboojLng=; b=uV9IVKoZpTG101
-	uHvY1RCL2G2+HdrtUOwFZfM+aPAJVvk//Qr4lYlapqCQ4BztFQl32cWNFeUmwWWXCQHFgX0syOF/e
-	cMJonvnKFzK6ga0cCGtD5Qm39JLMc1dak9GiBWIvJ8Z+FUkXC1pupEL2S/xP0Z86badGY+u+0XhXs
-	xL9rU8Ai29q2Lmy1+Hn9ssQgFfdGhGTUTo3qkDAyPNoj5oE7rfXp7J7A1W/qF5ru+8nFCWhDUEIWE
-	3zpl2j4gS9GXA/hMyi8/gLf/hFoCW8RNOJnNkciJndyATH6zZhFJ3ShVMqrYPcNNuTCuIt+8yIzmB
-	cmTHm6OP6htog0I0ehyA==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=hxgeUqX1F4jL5YwmGM9QW3YEk6NzEoDaF9Cka9qdTHs=; b=KpzFZ6f1lJn3qR
+	ghy6pxMnUTv2fakE7BVRrBuHc1AjZ+ltx5nGtSpxLuvTxZgWAN1nE0OMa7SEX+bx/mXQzEIZPbrfK
+	IY33Q2oN5x2bp8nP60Li/PzrL5Z7S/JzDJVz+yhbivVUHAPILKs47kgvh25mZPJJ4D+DP6n0CGksu
+	A+qDevbt/NO0dagRXCkETThEcjZSdhJ3555YF3JbVNyF9PPn3rxkApHTTq5WVZEglfl4fDYzFrjl/
+	OzJ77k5o1pAagrfag/XMvvNWk+e58E1vmzqZxcO8wOMsX98BhS8SmamfwnKBwKOYP8SFcubukiHcz
+	qs6+oPw/yLF9JdbnRLoA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gh5Co-0004pR-PC; Wed, 09 Jan 2019 04:11:02 +0000
-Received: from [223.203.96.18] (helo=barracuda02.hxt-semitech.com)
+	id 1gh5bd-0004N1-RM; Wed, 09 Jan 2019 04:36:41 +0000
+Received: from mail-ed1-f68.google.com ([209.85.208.68])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gh5Cl-0004ok-BW
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 04:11:01 +0000
-X-ASG-Debug-ID: 1547006192-107606139f168010001-tbGyMd
-Received: from HXTBJIDCEMVIW02.hxtcorp.net ([10.128.0.15]) by
- barracuda02.hxt-semitech.com with ESMTP id 5EThfOD1x4QWd1H3 (version=TLSv1.2
- cipher=ECDHE-RSA-AES256-SHA384 bits=256 verify=NO);
- Wed, 09 Jan 2019 11:56:33 +0800 (CST)
-X-Barracuda-Envelope-From: yuanyuan.zhao@hxt-semitech.com
-Received: from localhost.localdomain.localdomain (10.64.5.29) by
- HXTBJIDCEMVIW02.hxtcorp.net (10.128.0.15) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Wed, 9 Jan 2019 11:56:26 +0800
-From: Zhao Yuanyuan <yuanyuan.zhao@hxt-semitech.com>
-To: <marc.zyngier@arm.com>
-Subject: [RESEND 1/1] gic: its: Make sure a LPI is discarded before free.
-Date: Wed, 9 Jan 2019 11:53:27 +0800
-X-ASG-Orig-Subj: [RESEND 1/1] gic: its: Make sure a LPI is discarded before
- free.
-Message-ID:
- <e37e3f5e0146be65c60092a457ca5c82e25581a0.1545292748.git.yuanyuan.zhao@hxt-semitech.com>
-X-Mailer: git-send-email 1.8.3.1
+ id 1gh5bZ-0004ML-LE
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 04:36:39 +0000
+Received: by mail-ed1-f68.google.com with SMTP id f23so6199357edb.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 08 Jan 2019 20:36:36 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=hMiRvmPPuL0u3Lwz9BpRp6GFfUAohmMtvIxqylc792s=;
+ b=eJFGzdkNaqbXN0mOrdvhDJx2709DD3TSbBmZShqVoNFqMHkiVv4BOgPJxP+gmn20D6
+ mPljTPfSINA2tssWl9sHkxzdPLYxpaxeVQ256+3wPEtAahlnwgsXa3Kz9yINd1uxy5wW
+ PPSEVuO7v0u2IiihIiUA4sVd2riji5acHfyDft+KIPhrsbnisDnIVuRBLyrUK6WHmLP+
+ NUhrAt9pgISRw4RE79yaeZXMsLp1MZYF449l+W0vs/qUmKVyh768M7drAz1cmpO+VeOb
+ /mT2/Jm/vir/DydSsb6ABwIf9wdhs2rQaxoi33Ssup9sREL4tBYepNtmRkeVuZdwlL2p
+ D6Jg==
+X-Gm-Message-State: AJcUukcNpqy1r46DKjVpVSFETyI2OJNBdpbjGmwgMSZIAw4OdhAGsiuT
+ qayjMP1gpaOrOkuY7/r0eJpApBORBbE=
+X-Google-Smtp-Source: ALg8bN7Nb3rbG5ml8LxhnImSSoZ1x/KL1U12nLLEXHbMWYXj6MkRvuLs0ZY8x5X9OJVswNr++VR5Eg==
+X-Received: by 2002:a17:906:6a14:: with SMTP id
+ o20-v6mr3989140ejr.71.1547008594423; 
+ Tue, 08 Jan 2019 20:36:34 -0800 (PST)
+Received: from mail-wm1-f45.google.com (mail-wm1-f45.google.com.
+ [209.85.128.45])
+ by smtp.gmail.com with ESMTPSA id k31sm1166897ede.5.2019.01.08.20.36.33
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Tue, 08 Jan 2019 20:36:34 -0800 (PST)
+Received: by mail-wm1-f45.google.com with SMTP id t200so6702326wmt.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 08 Jan 2019 20:36:33 -0800 (PST)
+X-Received: by 2002:a1c:c008:: with SMTP id q8mr3453866wmf.99.1547008593626;
+ Tue, 08 Jan 2019 20:36:33 -0800 (PST)
 MIME-Version: 1.0
-X-Originating-IP: [10.64.5.29]
-X-ClientProxiedBy: HXTBJIDCEMVIW01.hxtcorp.net (10.128.0.14) To
- HXTBJIDCEMVIW02.hxtcorp.net (10.128.0.15)
-X-Barracuda-Connect: UNKNOWN[10.128.0.15]
-X-Barracuda-Start-Time: 1547006193
-X-Barracuda-Encrypted: ECDHE-RSA-AES256-SHA384
-X-Barracuda-URL: https://192.168.50.102:443/cgi-mod/mark.cgi
-X-Barracuda-Scan-Msg-Size: 835
-X-Virus-Scanned: by bsmtpd at hxt-semitech.com
-X-Barracuda-BRTS-Status: 1
-X-Barracuda-Bayes: SPAM GLOBAL 0.9335 1.0000 3.5889
-X-Barracuda-Spam-Score: 4.19
-X-Barracuda-Spam-Status: No, SCORE=4.19 using global scores of TAG_LEVEL=1000.0
- QUARANTINE_LEVEL=1000.0 KILL_LEVEL=9.0 tests=MARKETING_SUBJECT
-X-Barracuda-Spam-Report: Code version 3.2, rules version 3.2.3.65361
- Rule breakdown below
- pts rule name              description
- ---- ---------------------- --------------------------------------------------
- 0.60 MARKETING_SUBJECT      Subject contains popular marketing words
+References: <cover.50931fbda5c95345087740e4c1ef5a57fdd53480.1544104801.git-series.maxime.ripard@bootlin.com>
+ <3401ca7517927243f567899819e0d02eee12984f.1544104801.git-series.maxime.ripard@bootlin.com>
+ <CAGb2v66m-BtUaWkOvjiaO1LybikqxVn-S7uOE9zV6QW9KHLL8Q@mail.gmail.com>
+In-Reply-To: <CAGb2v66m-BtUaWkOvjiaO1LybikqxVn-S7uOE9zV6QW9KHLL8Q@mail.gmail.com>
+From: Chen-Yu Tsai <wens@csie.org>
+Date: Wed, 9 Jan 2019 12:36:19 +0800
+X-Gmail-Original-Message-ID: <CAGb2v670u-nnb61i0pz-4jmWn+1E8BKm=MZcZ5TYsrCju4-w4A@mail.gmail.com>
+Message-ID: <CAGb2v670u-nnb61i0pz-4jmWn+1E8BKm=MZcZ5TYsrCju4-w4A@mail.gmail.com>
+Subject: Re: [PATCH 1/2] pinctrl: sunxi: Deal with per-bank regulators
+To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190108_201059_603405_0A04F2BE 
-X-CRM114-Status: UNSURE (   4.54  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190108_203637_697304_16A0E9E0 
+X-CRM114-Status: GOOD (  22.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,42 +93,113 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dongsheng.wang@hxt-semitech.com, jason@lakedaemon.net,
- linux-kernel@vger.kernel.org, Zhao Yuanyuan <yuanyuan.zhao@hxt-semitech.com>,
- tglx@linutronix.de, yu.zheng@hxt-semitech.com,
- linux-arm-kernel@lists.infradead.org
+Cc: linux-gpio@vger.kernel.org, Linus Walleij <linus.walleij@linaro.org>,
+ Mylene Josserand <mylene.josserand@bootlin.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
-Message-ID: <20190109035327.mYs_KXcwwYH8-qS9qlu2NM8o19YtenNXHGo7LgKojBc@z>
 
-Its device will be removed after all events be freed.
-Undisarded events can lead to unpredictable behaviar.
+On Mon, Jan 7, 2019 at 1:20 PM Chen-Yu Tsai <wens@csie.org> wrote:
+>
+> On Thu, Dec 6, 2018 at 10:02 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> >
+> > The Allwinner SoCs have on most of their GPIO banks a regulator input.
+> >
+> > This issue was mainly ignored so far because either the regulator was a
+> > static regulator that would be providing power anyway, or the bank was used
+> > for a feature unsupported so far (CSI). For the odd cases, enabling it in
+> > the bootloader was the preferred option.
+> >
+> > However, now that we are starting to support those features, and that we
+> > can't really rely on the bootloader for this, we need to model those
+> > regulators as such in the DT.
+> >
+> > This is slightly more complicated than what it looks like, since some
+> > regulators will be tied to the PMIC, and in order to have access to the
+> > PMIC bus, you need to mux its pins, which will need the pinctrl driver,
+> > that needs the regulator driver to be registered. And this is how you get a
+> > circular dependency.
+> >
+> > In practice however, the hardware cannot fall into this case since it would
+> > result in a completely unusable bus. In order to avoid that circular
+> > dependency, we can thus get and enable the regulators at pin_request time.
+> > We'll then need to account for the references of all the pins of a
+> > particular branch to know when to put the reference, but it works pretty
+> > nicely once implemented.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+>
+> I'm getting a warning on my Bananapi M1+:
+>
+> [  +0.004918] sun4i-pinctrl 1c20800.pinctrl: 1c20800.pinctrl supply
+> vcc-pa not found, using dummy regulator
+> [  +0.009931] sun7i-dwmac 1c50000.ethernet: PTP uses main clock
+> [  +0.005764] sun7i-dwmac 1c50000.ethernet: no reset control found
+> [  +0.006111] ------------[ cut here ]------------
+> [  +0.004640] WARNING: CPU: 1 PID: 1 at drivers/regulator/core.c:2054
+> _regulator_put.part.8+0xf8/0xfc
+> [  +0.009065] Modules linked in:
+> [  +0.003085] CPU: 1 PID: 1 Comm: swapper/0 Not tainted 5.0.0-rc1 #5
+> [  +0.006179] Hardware name: Allwinner sun7i (A20) Family
+> [  +0.005252] [<c010eaf0>] (unwind_backtrace) from [<c010b854>]
+> (show_stack+0x10/0x14)
+> [  +0.007755] [<c010b854>] (show_stack) from [<c089ac28>] (dump_stack+0x88/0x9c)
+> [  +0.007233] [<c089ac28>] (dump_stack) from [<c0127450>] (__warn+0xd4/0xf0)
+> [  +0.006881] [<c0127450>] (__warn) from [<c01274ac>]
+> (warn_slowpath_null+0x40/0x48)
+> [  +0.007576] [<c01274ac>] (warn_slowpath_null) from [<c03fd25c>]
+> (_regulator_put.part.8+0xf8/0xfc)
+> [  +0.008876] [<c03fd25c>] (_regulator_put.part.8) from [<c03fd288>]
+> (regulator_put+0x28/0x38)
+> [  +0.008446] [<c03fd288>] (regulator_put) from [<c03c5f2c>]
+> (sunxi_pmx_free+0x38/0x48)
+> [  +0.007837] [<c03c5f2c>] (sunxi_pmx_free) from [<c03c2444>]
+> (pin_free+0x9c/0xfc)
+> [  +0.007402] [<c03c2444>] (pin_free) from [<c03c2fb0>]
+> (pinmux_disable_setting+0x118/0x184)
+> [  +0.008271] [<c03c2fb0>] (pinmux_disable_setting) from [<c03c0060>]
+> (pinctrl_free+0x13c/0x144)
+> [  +0.008619] [<c03c0060>] (pinctrl_free) from [<c048c6a0>]
+> (release_nodes+0x1bc/0x200)
+> [  +0.007839] [<c048c6a0>] (release_nodes) from [<c0488964>]
+> (really_probe+0x110/0x2cc)
+> [  +0.007838] [<c0488964>] (really_probe) from [<c0488c84>]
+> (driver_probe_device+0x60/0x16c)
+> [  +0.008270] [<c0488c84>] (driver_probe_device) from [<c0488e6c>]
+> (__driver_attach+0xdc/0xe0)
+> [  +0.008444] [<c0488e6c>] (__driver_attach) from [<c0486d44>]
+> (bus_for_each_dev+0x74/0xb4)
+> [  +0.008184] [<c0486d44>] (bus_for_each_dev) from [<c0487edc>]
+> (bus_add_driver+0x1bc/0x200)
+> [  +0.008270] [<c0487edc>] (bus_add_driver) from [<c04897ac>]
+> (driver_register+0x74/0x108)
+> [  +0.008098] [<c04897ac>] (driver_register) from [<c010270c>]
+> (do_one_initcall+0x7c/0x1a8)
+> [  +0.008187] [<c010270c>] (do_one_initcall) from [<c0d00e14>]
+> (kernel_init_freeable+0x13c/0x1d8)
+> [  +0.008705] [<c0d00e14>] (kernel_init_freeable) from [<c08b08b8>]
+> (kernel_init+0x8/0x110)
+> [  +0.008184] [<c08b08b8>] (kernel_init) from [<c01010e8>]
+> (ret_from_fork+0x14/0x2c)
+> [  +0.007570] Exception stack(0xef04ffb0 to 0xef04fff8)
+> [  +0.005054] ffa0:                                     00000000
+> 00000000 00000000 00000000
+> [  +0.008180] ffc0: 00000000 00000000 00000000 00000000 00000000
+> 00000000 00000000 00000000
+> [  +0.008179] ffe0: 00000000 00000000 00000000 00000000 00000013 00000000
+> [  +0.006654] ---[ end trace 2bdb4a597b3c54ef ]---
+>
+> Note that sun7i-dwmac probe is deferred here. The instance where the
+> probe succeeds shows
+> no warning.
 
-Signed-off-by: Zhao Yuanyuan <yuanyuan.zhao@hxt-semitech.com>
----
- drivers/irqchip/irq-gic-v3-its.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Found the issue. There's a mismatch on the conditions when the regulator
+is enabled and disabled. I'll send a fix for it.
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index db20e99..4fee008 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -2572,6 +2572,10 @@ static void its_irq_domain_free(struct irq_domain *domain, unsigned int virq,
- 								virq + i);
- 		u32 event = its_get_event_id(data);
- 
-+		/* Discard irq before free */
-+		if (irqd_is_activated(d))
-+			its_send_discard(its_dev, event);
-+
- 		/* Mark interrupt index as unused */
- 		clear_bit(event, its_dev->event_map.lpi_map);
- 
--- 
-1.8.3.1
-
+ChenYu
 
 _______________________________________________
 linux-arm-kernel mailing list
