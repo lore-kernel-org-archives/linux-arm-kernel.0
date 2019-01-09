@@ -2,90 +2,89 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E0E9FC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 17:48:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2B961C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 18:01:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B046C206B6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 17:48:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F3E3020685
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 18:00:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="T9bAZMbF";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="HJ0qlwnt";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="IIcIFFaP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B046C206B6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PyyAcocT";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="nN3l1YHT"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F3E3020685
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=YlOfyy9m7vM3oNcOwKNB+4NMHZK8tU+g4iEFXDv9IBI=; b=T9bAZMbFKwOYub
-	O8IqGprWB0nHBLwBQNe3zqOL/R+j5rq+22ns24vEBH9mn10jQCDs5VlTBpz8MKmsqb6xqbk4EYUU3
-	GZ1ZUvPzG+5i0z8TZ7Dzv6Z2d07BTPGGWqDZC7gE4Pvlf5ZPvHPJEFID8uXs37hXiu4zsAG+5pPb+
-	VMEIaDAG1Ok3FlAIodiwDR1x+ESsAopQqeVRAMojoRFvqv+QfblbQ8G7DQGVZNq20Mktfk6stN8of
-	6FpvoHXZcLneNQmq9n7hszGGCvlC9J0u4sE4gjzQxZ9Yw/4kSzOVWsbT60ZXa8QpFzvLBvbMEhx3U
-	zV1FxFHzTC+JzcAE4LsA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=Kc7/IyKXYK/kYmIg3D/OPbGX4KAEKmq12Ut+GwwTnu0=; b=PyyAcocTHlvAr1
+	lmdc9hVa8WmP0QGG0snevjQeJ1D3mDjEAHLlsCvV0Fv7UXVqaP9CxAdhy4SvHLcUw69pE3KGXEerM
+	vcngYRCRrswNIDHlYkiCmA8o9kt1jPBb4LPXoNMlguFTMluagn7Km6UHH1rhEYHy0dT2iz0inYRHU
+	ac8ApRGMV2j3Ncm+83sFxMWT1CNm9IdvaQwFnZVf7nkXdVJZcg1ltkcOZw3SGMg2O1AbIqffz8wWA
+	lgQiqhw0m+5dhczLyARSoZRA5Rltdoe5LB+GpYRpooeyu9gwTJF6yrWX92EoBOqfGXK6WIZzEnk8+
+	4jCQ2UfDXhCx6wb1uaDw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghHxs-0002DU-6g; Wed, 09 Jan 2019 17:48:28 +0000
-Received: from smtp.codeaurora.org ([198.145.29.96])
+	id 1ghI9v-0006kN-Gw; Wed, 09 Jan 2019 18:00:55 +0000
+Received: from mail-lf1-x141.google.com ([2a00:1450:4864:20::141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghHxS-0001jm-Gv
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 17:48:06 +0000
-Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id 66B25608BA; Wed,  9 Jan 2019 17:47:59 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1547056081;
- bh=olT1kGRy6uHybt2z5aRB22gmbGYkk4427nt9SguPb7s=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=HJ0qlwntaPoJc/ggRscY2FRs9w42XPLQNtxtJaPiw3OxeRtzQwIwuWSwu8ZBDKKL+
- G2LBA3D1B9lCMvKl1ppmhX9XGaVML4pdNKdeQY/hZDiJZbWwHNCiQw1k715FgbKpaA
- gYMsjsEIycsL7a5kZdQsNvb+9CMo5dL6DxIxp38g=
-Received: from blr-ubuntu-253.qualcomm.com
- (blr-bdr-fw-01_globalnat_allzones-outside.qualcomm.com [103.229.18.19])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-SHA256 (128/128 bits))
- (No client certificate requested)
- (Authenticated sender: saiprakash.ranjan@codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id 0D8E0608FF;
- Wed,  9 Jan 2019 17:47:52 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1547056078;
- bh=olT1kGRy6uHybt2z5aRB22gmbGYkk4427nt9SguPb7s=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=IIcIFFaPyh2k4K2XfDbcJ4Rb9Zzkb3vxHFpYzhIl8oTOP+IIVIgPGXmB/Rm2jYADz
- geSamLyYbbY2P5x2x/qNSkKb0CwsO5CwbeyncQ9qFTeFlYtns66m1Bza6J8WOtRSgU
- 1Vp/0w8Ql5wlxu96NjswS7xI2xWif2VHba9gTDtk=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 0D8E0608FF
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- dmarc=none (p=none dis=none) header.from=codeaurora.org
-Authentication-Results: pdx-caf-mail.web.codeaurora.org; spf=none
- smtp.mailfrom=saiprakash.ranjan@codeaurora.org
-From: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
-To: Rob Herring <robh+dt@kernel.org>,
- Mathieu Poirier <mathieu.poirier@linaro.org>,
- Suzuki K Poulose <suzuki.poulose@arm.com>, Leo Yan <leo.yan@linaro.org>,
- Alexander Shishkin <alexander.shishkin@linux.intel.com>,
- Andy Gross <andy.gross@linaro.org>, David Brown <david.brown@linaro.org>,
- devicetree@vger.kernel.org, Mark Rutland <mark.rutland@arm.com>
-Subject: [PATCH 3/3] arm64: dts: qcom: sdm845: Remove the duplicate header
- inclusion
-Date: Wed,  9 Jan 2019 23:16:49 +0530
-Message-Id: <5f400b3a15cab5dd071e4a129d38cb21e7123b78.1547054308.git.saiprakash.ranjan@codeaurora.org>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <cover.1547054308.git.saiprakash.ranjan@codeaurora.org>
-References: <cover.1547054308.git.saiprakash.ranjan@codeaurora.org>
+ id 1ghI9s-0006jq-OA
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 18:00:54 +0000
+Received: by mail-lf1-x141.google.com with SMTP id y11so6328849lfj.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 09 Jan 2019 10:00:48 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=f/Exw1NcVYYqGrDV4q3XAZMtf+t2lHH10SHKVIs+s0M=;
+ b=nN3l1YHTwyNvgXU5aHouPLyz5RKleujjsUrUQZNpon475ZWiOOpJhVfzvr8J8jmsyo
+ 4J80CT+b2kpk0JndsiBspEE2vT08vfhyAM8SZVxkeRTpqrE+fZI3qhAHWCyeCLZZXdw7
+ HJuNtqnIKTOJiT+q1ZvS0vh87pBnDs8B2HWKr462Hk/xGzwy7gVb+C6tqI2j0rBi1BwK
+ 2WQu75lAirxUOH+Vwvou68ojYlRqFHKaRzPSJ4gRa5+5rj7DyoRX7yhttS/3hO/qz6dP
+ LTPlb/LnyO6SwXkP2Xp3VgG7tsmX97plEXlJHE56QAbKQ+w2O0qvTtVSWndptRT4KCuF
+ K4Sg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=f/Exw1NcVYYqGrDV4q3XAZMtf+t2lHH10SHKVIs+s0M=;
+ b=Y0T3xX/5mUPQd9ilD1rVhovRK3PpbdKN89skJTMdSs+KnY42sAJc6x3G4nzbyWEvqk
+ 9Ce4+gppq3KdjS3fs6ANK20o7m9lhiNlrYCXsXOppNUPHYg9uZi+HPpzKYIYDkYbk8u8
+ JcKwAfLTPa28Jnk+s9T5FAUvjtIl6tQldEvwE4Vo9ASkuPZ//YHTRQDkLjPIasoyPhEK
+ AG2JlTfnv9ymzTwyf+r9vUBNkAgo+enTpI9meOjoofFcc+Ja9GpO+VrviomcweCctDzz
+ JGzcdw/2JbeJwyvAVv52jgx0EhjFqqAwP+D6MXh7BTCoUJ83QElPJFPv34LTeE6LsZ9+
+ HwTg==
+X-Gm-Message-State: AJcUukeQ989ev1997exiHH7kvlgrk0RuOOgAr3sAWyLt5o/HMjzoJkJ6
+ nMcl6HBageR7QFNC+CWoZZY=
+X-Google-Smtp-Source: ALg8bN5fQjwNwyGqcTdgDv8HuAV34HEznubOvmzRp6xS1BVxGJxxbr7M5qR87k+TaO5am3Uy05NqNQ==
+X-Received: by 2002:a19:660a:: with SMTP id a10mr4350637lfc.146.1547056847286; 
+ Wed, 09 Jan 2019 10:00:47 -0800 (PST)
+Received: from localhost.localdomain
+ ([2a02:a315:5445:5300:c1c3:bc43:64cd:2432])
+ by smtp.googlemail.com with ESMTPSA id p67sm13817510lfe.14.2019.01.09.10.00.45
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 09 Jan 2019 10:00:46 -0800 (PST)
+From: =?UTF-8?q?Pawe=C5=82=20Chmiel?= <pawel.mikolaj.chmiel@gmail.com>
+To: andrzej.p@samsung.com
+Subject: [PATCH] media: s5p-jpeg: Correct step and max values for
+ V4L2_CID_JPEG_RESTART_INTERVAL
+Date: Wed,  9 Jan 2019 19:00:41 +0100
+Message-Id: <20190109180041.31052-1-pawel.mikolaj.chmiel@gmail.com>
+X-Mailer: git-send-email 2.17.1
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_094803_212270_878AA245 
-X-CRM114-Status: GOOD (  10.78  )
+X-CRM114-CacheID: sfid-20190109_100052_813793_C7E40548 
+X-CRM114-Status: GOOD (  12.12  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,43 +96,37 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>,
- Rajendra Nayak <rnayak@codeaurora.org>, linux-arm-msm@vger.kernel.org,
- linux-kernel@vger.kernel.org, Sibi Sankar <sibis@codeaurora.org>,
- Vivek Gautam <vivek.gautam@codeaurora.org>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-samsung-soc@vger.kernel.org,
+ =?UTF-8?q?Pawe=C5=82=20Chmiel?= <pawel.mikolaj.chmiel@gmail.com>,
+ linux-kernel@vger.kernel.org, jacek.anaszewski@gmail.com,
+ s.nawrocki@samsung.com, mchehab@kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Remove the duplicate inclusion of qcom,gcc-sdm845.h
-mistakenly introduced by commit 6e17f8140521 ("arm64:
-dts: sdm845: add prng-ee node").
-
-Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
----
- arch/arm64/boot/dts/qcom/sdm845.dtsi | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-index 03683179b8f7..8dced99f875e 100644
---- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-+++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-@@ -12,7 +12,6 @@
- #include <dt-bindings/phy/phy-qcom-qusb2.h>
- #include <dt-bindings/reset/qcom,sdm845-aoss.h>
- #include <dt-bindings/soc/qcom,rpmh-rsc.h>
--#include <dt-bindings/clock/qcom,gcc-sdm845.h>
- 
- / {
- 	interrupt-parent = <&intc>;
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+VGhpcyBjb21taXQgY29ycmVjdHMgbWF4IGFuZCBzdGVwIHZhbHVlcyBmb3IgdjRsMiBjb250cm9s
+IGZvcgpWNEwyX0NJRF9KUEVHX1JFU1RBUlRfSU5URVJWQUwuIE1heCBzaG91bGQgYmUgMHhmZmZm
+IGFuZCBzdGVwIHNob3VsZCBiZSAxLgpJdCB3YXMgZm91bmQgYnkgdXNpbmcgdjRsMi1jb21wbGlh
+bmNlIHRvb2wgYW5kIGNoZWNraW5nIHJlc3VsdCBvZgpWSURJT0NfUVVFUllfRVhUX0NUUkwvUVVF
+UllNRU5VIHRlc3QuClByZXZpb3VzbHkgaXQgd2FzIGNvbXBsYWluaW5nIHRoYXQgc3RlcCB3YXMg
+YmlnZ2VyIHRoYW4gZGlmZmVyZW5jZQpiZXR3ZWVuIG1heCBhbmQgbWluLgoKRml4ZXM6IDE1ZjRi
+YzNiMWY0MiAoIlttZWRpYV0gczVwLWpwZWc6IEFkZCBKUEVHIGNvbnRyb2xzIHN1cHBvcnQiKQpT
+aWduZWQtb2ZmLWJ5OiBQYXdlxYIgQ2htaWVsIDxwYXdlbC5taWtvbGFqLmNobWllbEBnbWFpbC5j
+b20+Ci0tLQogZHJpdmVycy9tZWRpYS9wbGF0Zm9ybS9zNXAtanBlZy9qcGVnLWNvcmUuYyB8IDIg
+Ky0KIDEgZmlsZSBjaGFuZ2VkLCAxIGluc2VydGlvbigrKSwgMSBkZWxldGlvbigtKQoKZGlmZiAt
+LWdpdCBhL2RyaXZlcnMvbWVkaWEvcGxhdGZvcm0vczVwLWpwZWcvanBlZy1jb3JlLmMgYi9kcml2
+ZXJzL21lZGlhL3BsYXRmb3JtL3M1cC1qcGVnL2pwZWctY29yZS5jCmluZGV4IDNmOTAwMGI3MDM4
+NS4uMzNlOTkyN2RiOWEwIDEwMDY0NAotLS0gYS9kcml2ZXJzL21lZGlhL3BsYXRmb3JtL3M1cC1q
+cGVnL2pwZWctY29yZS5jCisrKyBiL2RyaXZlcnMvbWVkaWEvcGxhdGZvcm0vczVwLWpwZWcvanBl
+Zy1jb3JlLmMKQEAgLTIwMDIsNyArMjAwMiw3IEBAIHN0YXRpYyBpbnQgczVwX2pwZWdfY29udHJv
+bHNfY3JlYXRlKHN0cnVjdCBzNXBfanBlZ19jdHggKmN0eCkKIAogCQl2NGwyX2N0cmxfbmV3X3N0
+ZCgmY3R4LT5jdHJsX2hhbmRsZXIsICZzNXBfanBlZ19jdHJsX29wcywKIAkJCQkgIFY0TDJfQ0lE
+X0pQRUdfUkVTVEFSVF9JTlRFUlZBTCwKLQkJCQkgIDAsIDMsIDB4ZmZmZiwgMCk7CisJCQkJICAw
+LCAweGZmZmYsIDEsIDApOwogCQlpZiAoY3R4LT5qcGVnLT52YXJpYW50LT52ZXJzaW9uID09IFNK
+UEVHX1M1UCkKIAkJCW1hc2sgPSB+MHgwNjsgLyogNDIyLCA0MjAgKi8KIAl9Ci0tIAoyLjE3LjEK
+CgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1h
+cm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5v
+cmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0t
+a2VybmVsCg==
