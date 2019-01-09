@@ -2,113 +2,65 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 03323C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 12:49:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4025AC43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 13:05:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C2484206B6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 12:49:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F3596206B6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 13:05:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XYIG9cCC";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="YgSytZb7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C2484206B6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nyT+yBEI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F3596206B6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=78pDw5HWmFbkvpwBMegNVVpQPyh8Q61tXBfEA79kf9Y=; b=XYIG9cCCdTayS6
-	JoHAua7dj9lXH7nzMo7Bk2pFp1zM+i5SqEC9iOwl/dIzA40prM/PK5ttLPaAE8sUm8om5C7lHp3Ol
-	y/EVIsuIYQ81N4U/dV5JENKH631fD8YTFfZ4WAta5l7FEbZwHr2sa/oReL6P74KyiMj4MU6WFsCOp
-	eqFJ46QxfE3H5WJuZVXGBt+rSwajqgl2v6UnkFmkCMS4rDwwt50heHD7XOMbqiltMqK5Vo8U1kEUs
-	CCPP4PDHcd1mF+rxvxHV/eHdWhFD7wxpRmNVW4RRAXdP0l4IexirR+q0kmXcMf7dtlg8unz/d54nz
-	KM48R2tdACWlYDPM2oJg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=YXN4HV9JqDtl2ytD4R7YAvItPoH7ixmwgUcQSkxGQPI=; b=nyT+yBEI8bYxlA
+	DYxary4O9xYAMoxjRzNgecdIif8uwjvZ7NbOK6qVhL+tORpRa4z/zVD0a+7TC5GQ+LHZ2aeeOajX0
+	FiGSmKoD5Fr3wmQn/oU4RS3BpOSvE7IcurPLvUytLXYeaI6eOb9dpwZL6eTTZLJPrEJWgB83RF+5T
+	LkEKl3xVNmAtuD5y1tkplGKCtyvtEMTCjj4nKCNK6ldGRYwneFWJOYCNrqxvyVdgwy0m1HDz3oldi
+	VLWYTIbOnMoETEvLkBnju/ClBRiHCQZdhZRJC2BSCRW7g3TfLr94TxLHGwcLQsyEbP6Eo64ePPf6x
+	ohsH8xQFYA27gyVvYxNA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghDIp-0004E6-Nc; Wed, 09 Jan 2019 12:49:47 +0000
-Received: from mail-eopbgr710062.outbound.protection.outlook.com
- ([40.107.71.62] helo=NAM05-BY2-obe.outbound.protection.outlook.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghDIb-0003zK-92
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 12:49:40 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=njhheSGyZeWo0HGDdVNkytxO42E9YqT5KBwaKloUzxQ=;
- b=YgSytZb7ZCtl0Z3MCKG5e3dppGCoGZnpMH25G9Yrgg4Z6DqsahxX6uCkgFGWTEQX6MLJQhHJcmQWnSIC2wDKj3/No38V/hp0PfzYiwdHNBs387uVi7y5Pe6GW61T9j1GeE0JCaCsZq4kjGA8Nfk1+1PM/IL1Ti71xNsDZ8+bY5U=
-Received: from MWHPR0201MB3628.namprd02.prod.outlook.com (10.167.162.139) by
- MWHPR0201MB3531.namprd02.prod.outlook.com (10.167.162.16) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1516.14; Wed, 9 Jan 2019 12:49:29 +0000
-Received: from MWHPR0201MB3628.namprd02.prod.outlook.com
- ([fe80::d493:42:780e:8d08]) by MWHPR0201MB3628.namprd02.prod.outlook.com
- ([fe80::d493:42:780e:8d08%3]) with mapi id 15.20.1495.011; Wed, 9 Jan 2019
- 12:49:27 +0000
-From: Radhey Shyam Pandey <radheys@xilinx.com>
-To: YueHaibing <yuehaibing@huawei.com>, Vinod Koul <vkoul@kernel.org>, Dan
- Williams <dan.j.williams@intel.com>, Michal Simek <michals@xilinx.com>,
- Andrea Merello <andrea.merello@gmail.com>, Appana Durga Kedareswara Rao
- <appanad@xilinx.com>
-Subject: RE: [PATCH -next] dmaengine: xilinx_dma: remove set but not used
- variable 'tail_segment'
-Thread-Topic: [PATCH -next] dmaengine: xilinx_dma: remove set but not used
- variable 'tail_segment'
-Thread-Index: AQHUqBN24V/NdvLqB0Kq1h2ulYqcsaWm4aqQ
-Date: Wed, 9 Jan 2019 12:49:27 +0000
-Message-ID: <MWHPR0201MB3628A0C417F4E28E03EFC422C78B0@MWHPR0201MB3628.namprd02.prod.outlook.com>
-References: <1547035837-87800-1-git-send-email-yuehaibing@huawei.com>
-In-Reply-To: <1547035837-87800-1-git-send-email-yuehaibing@huawei.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=radheys@xilinx.com; 
-x-originating-ip: [149.199.50.133]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; MWHPR0201MB3531;
- 6:Xx0NguFQqCvRHLk/6woqEiNkQJWxrDBnDUB3jaqyxvLC30obhuF2fjn48LJ87jjohMUJWnrHjTUswk6tjwku2ZYwpywMXlg7uJeZvFisOcReTGcJhO13wBRcKVGgPJBgxnK7By36ekHDVFy3ykqOkaqEHJD321OTOofP+ovSMCXdkaswwDDCnE9VFIgJzTYvSnb/7MLWoHL4dCaUNq4csDe5cxPVZHdQ3ziGzSR2Z+DlEkU53XAOGfUe4oeNPAIJ6hSrjbNYKc3WQKnb5Bdy8boXdKZyHsWzB/1kUuAeJ9bLXlqfKl1aSw9fnfwiLPeanaNwX26TguEERsrO8ZPHXyZu15U6EcBBxPdP1Sv1Lujk3DznTKbU1PY7yMsMlcyKW8fMOIXw8pnvne5cCaJjEd9j/KosjlS+WAmjUs29tLhI/KOdYhIyB+BRbzEUD1KpQCMHKCaf8znD27+zELAkLw==;
- 5:GWusjlSJHccH9o6LkkoR2yMtswdjVr7sIQhKvHka5kKhXMq5TF9W0ZxOTc4HmeNEZeO/4UgH0Z7uUH/vA4yy1ej35aKCT7bTFmrzXGv1oPu6fkBxzAWP1VOVrA6rogwkd1vdJC9ECQRnoogsRO8mTaRxmG9Ro08RcOuGNneHILQPcOYMt/OnVFTfV09PwnTKEaCgb5wy+xNLiaxo+9LPew==;
- 7:Ih/mZxzK07NsObdWvyq6qc84weY1gG0gWBA4Kxcw32JVHQBtAvZ5sdtrLsKhbmWKNjOXihFGoMbz048T1l8cEbPUZbAPLwS9OQq4zDVpaOo+oXMuVDmAVQUUyKfSMdltXhDrwYhwTUgvBAbHa2cbzA==
-x-ms-exchange-antispam-srfa-diagnostics: SOS;SOR;
-x-forefront-antispam-report: SFV:SKI; SCL:-1; SFV:NSPM;
- SFS:(10009020)(396003)(346002)(376002)(366004)(136003)(39860400002)(51914003)(199004)(189003)(13464003)(9686003)(33656002)(5660300001)(6506007)(7736002)(53546011)(71200400001)(71190400001)(305945005)(7696005)(105586002)(106356001)(6246003)(99286004)(478600001)(14454004)(39060400002)(4326008)(25786009)(53936002)(6116002)(3846002)(6636002)(76176011)(14444005)(74316002)(256004)(110136005)(26005)(8936002)(54906003)(186003)(86362001)(6436002)(81166006)(81156014)(8676002)(476003)(2906002)(486006)(97736004)(102836004)(66066001)(316002)(446003)(68736007)(229853002)(55016002)(11346002);
- DIR:OUT; SFP:1101; SCL:1; SRVR:MWHPR0201MB3531;
- H:MWHPR0201MB3628.namprd02.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-x-ms-office365-filtering-correlation-id: d2822652-30de-4416-ab03-08d67630e425
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:MWHPR0201MB3531; 
-x-ms-traffictypediagnostic: MWHPR0201MB3531:
-x-microsoft-antispam-prvs: <MWHPR0201MB3531C5D16536A72B51CBF4C1C78B0@MWHPR0201MB3531.namprd02.prod.outlook.com>
-x-forefront-prvs: 0912297777
-received-spf: None (protection.outlook.com: xilinx.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: a+80teVmgahYh6MSvuUQOdEDnmm7fUpO1MuJYsd/ZBIGKyPn7f9uTJGIupoRXJ4qRMk/eFfHQDHCbkiLeEb5InUXIcvYH91MkpJp4dGj7vxqYWXUZax9n/tPPBeUMvD9lrpidjJ1O+pmZYFUKnN0JvtNIAkR7iuuoeMGSvQRsOpqtCe7J9VqIFt7t7fKK1SmvnKyJITBAh7pT8sHNAMc8Y8Muw9DhCQ/PM0jOIVU8Myy2uHE3UtHdNBBJInwGM8c0dCeD4H/SdNPj8bWMljp4/KZigKKcCeRJAvLNSiphfvppZeKFgGHXQeIzNCOPMtV
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+	id 1ghDXq-0001pQ-Rs; Wed, 09 Jan 2019 13:05:18 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghDXn-0001oy-LF
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 13:05:17 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 08317A78;
+ Wed,  9 Jan 2019 05:05:15 -0800 (PST)
+Received: from [10.1.196.72] (e119884-lin.cambridge.arm.com [10.1.196.72])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 92A9F3F6CF;
+ Wed,  9 Jan 2019 05:05:10 -0800 (PST)
+Subject: Re: [RFC][PATCH 2/3] arm64: Define
+ Documentation/arm64/elf_at_flags.txt
+To: Dave Martin <Dave.Martin@arm.com>
+References: <cover.1544445454.git.andreyknvl@google.com>
+ <20181210143044.12714-1-vincenzo.frascino@arm.com>
+ <20181210143044.12714-3-vincenzo.frascino@arm.com>
+ <20181212173457.GA3505@e103592.cambridge.arm.com>
+From: Vincenzo Frascino <vincenzo.frascino@arm.com>
+Message-ID: <0947d735-c572-834a-efd3-8377d698ac8c@arm.com>
+Date: Wed, 9 Jan 2019 13:05:08 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-X-OriginatorOrg: xilinx.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: d2822652-30de-4416-ab03-08d67630e425
-X-MS-Exchange-CrossTenant-originalarrivaltime: 09 Jan 2019 12:49:27.5764 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 657af505-d5df-48d0-8300-c31994686c5c
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR0201MB3531
+In-Reply-To: <20181212173457.GA3505@e103592.cambridge.arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_044933_652218_75D85237 
-X-CRM114-Status: GOOD (  13.77  )
+X-CRM114-CacheID: sfid-20190109_050515_713920_7D2D115F 
+X-CRM114-Status: GOOD (  45.72  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -120,73 +72,269 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "dmaengine@vger.kernel.org" <dmaengine@vger.kernel.org>,
- "kernel-janitors@vger.kernel.org" <kernel-janitors@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Kate Stewart <kstewart@linuxfoundation.org>, linux-doc@vger.kernel.org,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ Kostya Serebryany <kcc@google.com>, linux-kselftest@vger.kernel.org,
+ Chintan Pandya <cpandya@codeaurora.org>, Shuah Khan <shuah@kernel.org>,
+ Ingo Molnar <mingo@kernel.org>, linux-arch@vger.kernel.org,
+ Jacob Bramley <Jacob.Bramley@arm.com>, linux-arm-kernel@lists.infradead.org,
+ Evgeniy Stepanov <eugenis@google.com>, Kees Cook <keescook@chromium.org>,
+ Ruben Ayrapetyan <Ruben.Ayrapetyan@arm.com>,
+ Andrey Konovalov <andreyknvl@google.com>, Lee Smith <Lee.Smith@arm.com>,
+ Alexander Viro <viro@zeniv.linux.org.uk>, Dmitry Vyukov <dvyukov@google.com>,
+ linux-mm@kvack.org, Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ linux-kernel@vger.kernel.org, Luc Van Oostenryck <luc.vanoostenryck@gmail.com>,
+ Ramana Radhakrishnan <Ramana.Radhakrishnan@arm.com>,
+ Andrew Morton <akpm@linux-foundation.org>, Robin Murphy <robin.murphy@arm.com>,
+ "Kirill A . Shutemov" <kirill.shutemov@linux.intel.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-> -----Original Message-----
-> From: YueHaibing <yuehaibing@huawei.com>
-> Sent: Wednesday, January 9, 2019 5:41 PM
-> To: Vinod Koul <vkoul@kernel.org>; Dan Williams
-> <dan.j.williams@intel.com>; Michal Simek <michals@xilinx.com>; Radhey
-> Shyam Pandey <radheys@xilinx.com>; Andrea Merello
-> <andrea.merello@gmail.com>; Appana Durga Kedareswara Rao
-> <appanad@xilinx.com>
-> Cc: YueHaibing <yuehaibing@huawei.com>; dmaengine@vger.kernel.org;
-> linux-arm-kernel@lists.infradead.org; kernel-janitors@vger.kernel.org
-> Subject: [PATCH -next] dmaengine: xilinx_dma: remove set but not used
-> variable 'tail_segment'
+On 12/12/2018 17:34, Dave Martin wrote:
+> On Mon, Dec 10, 2018 at 02:30:43PM +0000, Vincenzo Frascino wrote:
+>> On arm64 the TCR_EL1.TBI0 bit has been set since Linux 3.x hence
+>> the userspace (EL0) is allowed to set a non-zero value in the
+>> top byte but the resulting pointers are not allowed at the
+>> user-kernel syscall ABI boundary.
+>>
+>> With the relaxed ABI proposed through this document, it is now possible
+>> to pass tagged pointers to the syscalls, when these pointers are in
+>> memory ranges obtained by an anonymous (MAP_ANONYMOUS) mmap() or brk().
 > 
-> Fixes gcc '-Wunused-but-set-variable' warning:
-> 
-> drivers/dma/xilinx/xilinx_dma.c: In function 'xilinx_vdma_start_transfer':
-> drivers/dma/xilinx/xilinx_dma.c:1104:33: warning:
->  variable 'tail_segment' set but not used [-Wunused-but-set-variable]
-> 
-> It not used since commit b8349172b400 ("dmaengine: xilinx_dma: Drop SG
-> support
-> for VDMA IP")
-> 
-> Signed-off-by: YueHaibing <yuehaibing@huawei.com>
-Thanks for the patch.
-Reviewed-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
+> What about other anonymous memory such as the process stack?
+>
 
-> ---
->  drivers/dma/xilinx/xilinx_dma.c | 4 ----
->  1 file changed, 4 deletions(-)
-> 
-> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-> index d9431af..c8acd34 100644
-> --- a/drivers/dma/xilinx/xilinx_dma.c
-> +++ b/drivers/dma/xilinx/xilinx_dma.c
-> @@ -1101,7 +1101,6 @@ static void xilinx_vdma_start_transfer(struct
-> xilinx_dma_chan *chan)
->  	struct xilinx_vdma_config *config = &chan->config;
->  	struct xilinx_dma_tx_descriptor *desc, *tail_desc;
->  	u32 reg, j;
-> -	struct xilinx_vdma_tx_segment *tail_segment;
->  	struct xilinx_vdma_tx_segment *segment, *last = NULL;
->  	int i = 0;
-> 
-> @@ -1120,9 +1119,6 @@ static void xilinx_vdma_start_transfer(struct
-> xilinx_dma_chan *chan)
->  	tail_desc = list_last_entry(&chan->pending_list,
->  				    struct xilinx_dma_tx_descriptor, node);
-> 
-> -	tail_segment = list_last_entry(&tail_desc->segments,
-> -				       struct xilinx_vdma_tx_segment, node);
-> -
->  	/* Configure the hardware using info in the config structure */
->  	if (chan->has_vflip) {
->  		reg = dma_read(chan,
-> XILINX_VDMA_REG_ENABLE_VERTICAL_FLIP);
-> 
+The process stack is set up by the kernel as a consequence of the exec* family
+of system calls in a way that should be transparent to the userspace.
+For what concerns the userspace applications, the ones that are aware of the
+AT_FLAGS[0] should assume that the stack is always tagged.
+
+> What about MAP_PRIVATE mappings of /dev/zero (i.e., oldskool "anonymous"
+> mappings)?
 > 
 
+MAP_PRIVATE of /dev/zero is equivalent to MAP_ANONYMOUS | MAP_PRIVATE, hence it
+should follow the same rule of MAP_ANONYMOUS obtained memory ranges.
+
+> I wonder whether this should really say MAP_PRIVATE rather than
+> MAP_ANONYMOUS.  There are two requirements here:
+> 
+>  * the memory must be the exclusive property of a single process,
+>    otherwise tagging it on-the-fly could break some other process;
+> 
+
+I think that it is responsibility of the userspace to tag or not a shared area.
+I do not think that we should exclude MAP_ANONYMOUS | MAP_SHARED because if such
+an area is tagged improperly by a userspace process, the kernel will be able to
+detect the issue and report it.
+
+>  * the memory should be regular memory, i.e., not something like a
+>    mapped device.  Since copy-on-write mappings of devices make little
+>    sense, and we want writes to devices to propagate to the hardware
+>    directly, MAP_PRIVATE doesn't make a lot of sense for such mappings.
+> 
+
+What we are trying to target with this ABI change are only pointers in NORMAL
+memory ranges. DEVICE memory should be untagged.
+
+...
+
+> I'm assuming here that tagging some currently shared copy-on-write pages
+> would throw a page fault and trigger a copy, so that we end up tagging
+> the calling process's private copy of the page.
+> 
+> I also don't see how the above requirements conflict with regular file-
+> backed mappings (which would need to work if you want to be able to
+> tag objects in .bss or .data etc.)
+>
+
+I agree that we should look at the more general cases to make sure that we will
+not face any incompatibility in future, but, what I am proposing here, assumes
+that the memory areas that can be tagged are only the stack and the heap. This
+is because the features that will use it will be mostly looking for memory
+related errors in these areas.
+
+>> This change in the ABI requires a mechanism to inform the userspace
+>> that such an option is available.
+>>
+>> This patch specifies and documents the way on which AT_FLAGS can be
+>> used to advertise this feature to the userspace.
+>>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> CC: Andrey Konovalov <andreyknvl@google.com>
+>> Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
+>> ---
+>>  Documentation/arm64/elf_at_flags.txt | 111 +++++++++++++++++++++++++++
+>>  1 file changed, 111 insertions(+)
+>>  create mode 100644 Documentation/arm64/elf_at_flags.txt
+>>
+>> diff --git a/Documentation/arm64/elf_at_flags.txt b/Documentation/arm64/elf_at_flags.txt
+>> new file mode 100644
+>> index 000000000000..153e657c058a
+>> --- /dev/null
+>> +++ b/Documentation/arm64/elf_at_flags.txt
+>> @@ -0,0 +1,111 @@
+>> +ARM64 ELF AT_FLAGS
+>> +==================
+>> +
+>> +This document describes the usage and semantics of AT_FLAGS on arm64.
+>> +
+>> +1. Introduction
+>> +---------------
+>> +
+>> +AT_FLAGS is part of the Auxiliary Vector, contains the flags and it
+>> +is currently set to zero by the kernel on arm64.
+>> +
+>> +The auxiliary vector can be accessed by the userspace using the
+>> +getauxval() API provided by the C library.
+>> +getauxval() returns an unsigned long and when a flag is present in
+>> +the AT_FLAGS, the corresponding bit in the returned value is set to 1.
+>> +
+>> +The AT_FLAGS with a "defined semantic" on arm64 are exposed to the
+>> +userspace via user API (uapi/asm/atflags.h).
+>> +The AT_FLAGS bits with "undefined semantics" are set to zero by default.
+>> +This means that the AT_FLAGS bits to which this document does not assign
+>> +an explicit meaning are to be intended reserved for future use.
+>> +The kernel will populate all such bits with zero until meanings are
+>> +assigned to them. If and when meanings are assigned, it is guaranteed
+>> +that they will not impact the functional operation of existing userspace
+>> +software. Userspace software should ignore any AT_FLAGS bit whose meaning
+>> +is not defined when the software is written.
+>> +
+>> +The userspace software can test for features by acquiring the AT_FLAGS
+>> +entry of the auxiliary vector, and testing whether a relevant flag
+>> +is set.
+>> +
+>> +Example of a userspace test function:
+>> +
+>> +bool feature_x_is_present(void)
+>> +{
+>> +	unsigned long at_flags = getauxval(AT_FLAGS);
+>> +	if (at_flags & FEATURE_X)
+>> +		return true;
+>> +
+>> +	return false;
+>> +}
+>> +
+>> +Where the software relies on a feature advertised by AT_FLAGS, it
+>> +should check that the feature is present before attempting to
+>> +use it.
+>> +
+>> +2. Features exposed via AT_FLAGS
+>> +--------------------------------
+>> +
+>> +bit[0]: ARM64_AT_FLAGS_SYSCALL_TBI
+>> +
+>> +    On arm64 the TCR_EL1.TBI0 bit has been set since Linux 3.x hence
+>> +    the userspace (EL0) is allowed to set a non-zero value in the top
+>> +    byte but the resulting pointers are not allowed at the user-kernel
+>> +    syscall ABI boundary.
+>> +    When bit[0] is set to 1 the kernel is advertising to the userspace
+>> +    that a relaxed ABI is supported hence this type of pointers are now
+>> +    allowed to be passed to the syscalls, when these pointers are in
+>> +    memory ranges obtained by anonymous (MAP_ANONYMOUS) mmap() or brk().
+> 
+> "TBI" is a slightly odd name.
+> 
+> The kernel seems not to be ignoring the top byte, otherwise how could
+> it make a difference whehter the memory is anonymous or something else?
+> 
+> (With memory tagging enabled, the top byte is also not architecturally
+> ignored.)
+> 
+
+The top-byte is ignored for MMU translations hence it can carry information that
+are relevant for other aspects. This means that the kernel can not ignore that
+the top-byte could be set.
+
+>> +    In these cases the tag is preserved as the pointer goes through the
+>> +    kernel. Only when the kernel needs to check if a pointer is coming
+>> +    from userspace (i.e. access_ok()) an untag operation is required.
+> 
+> Does the last sentence belong here?  That's about kernel internals,
+> whereas the rest all seems user-facing.
+> 
+
+I put it here just to give an idea to the user on when the kernel is going to
+perform an untag operation. But if we want to keep the document completely
+user-facing, I am fine with removing it.
+
+>> +
+>> +3. ARM64_AT_FLAGS_SYSCALL_TBI
+>> +-----------------------------
+>> +
+>> +When ARM64_AT_FLAGS_SYSCALL_TBI is enabled every syscalls can accept tagged
+>> +pointers, when these pointers are in memory ranges obtained by an anonymous
+>> +(MAP_ANONYMOUS) mmap() or brk().
+>> +
+>> +A definition of the meaning of tagged pointers on arm64 can be found in:
+>> +Documentation/arm64/tagged-pointers.txt.
+>> +
+>> +When a pointer does not are in a memory range obtained by an anonymous mmap()
+>> +or brk(), this can not be passed to a syscall if it is tagged.
+>> +
+>> +To be more explicit: a syscall can accept pointers whose memory range is
+>> +obtained by a non-anonymous mmap() or brk() if and only if the tag encoded in
+>> +the top-byte is 0x00.
+>> +
+>> +When a new syscall is added, this can accept tagged pointers if and only if
+>> +these pointers are in memory ranges obtained by an anonymous (MAP_ANONYMOUS)
+>> +mmap() or brk(). In all the other cases, the tag encoded in the top-byte is
+>> +expected to be 0x00.
+> 
+> Does this apply to kernel interfaces that are not syscalls?
+> 
+
+Not at the moment, but it does not seem incompatible with a future extension.
+
+> And does it apply to ioctls in general (I think from discussions
+> elsewhere that it can't).
+> 
+
+Requiring that the pointers accepted by the syscalls belong to ranges that are
+obtained by anonymous mappings, should cover the drivers mmap() cases.
+
+> What about things that flow through the kernel, like an
+> si_value.sival_ptr that propagates from sigqueue(2) to the signal frame
+> of the signalled thread, or registered with the kernel via aio_read(2)?
+> 
+> This kind of thing is why I would like to define a set of rules for
+> making an educated guess about how the kernel should interpret
+> arbitrary arguments (in an ideal world).
+> 
+
+I think that to make an educated choice we need to restrict the problem we are
+trying to target (making sure that we do not take any assumption that could be
+incompatible with the general case) as a first step. Once we are confident that
+it works as expected we can try to extend it progressively.
+
+> 
+> With issues like this in the mix, it seems difficult to extract general
+> guarantees from ARM64_AT_FLAGS_SYSCALL_TBI.  If it means that just
+> certain specific uses of a few specific syscalls work with tagged
+> pointers, that may not be very useful by ifself?  It sounds like if
+> you are tagging memory at all, you suddenly need to port every random
+> library you're using.
+> 
+
+The ABI presented in this document seems quite general (it is not confined to
+specific syscalls). This means that an application that tags the memory can use
+any non tag aware random library as is (without porting it), as far as it
+sanitizes the pointers before and after calling it.
+
+> [...]
+> 
+> Cheers
+> ---Dave
+> 
+
+-- 
+Regards,
+Vincenzo
 
 _______________________________________________
 linux-arm-kernel mailing list
