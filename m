@@ -2,65 +2,61 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0B2AFC43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 12:42:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2F498C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 12:43:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BFE64206B6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 12:42:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EE8F9206B6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 12:43:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Mh2cgqTe"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BFE64206B6
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=iki.fi
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KXwO2S/f"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EE8F9206B6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=free.fr
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kodZRAUVsJTJ1g/Igw3Jfm2sulPNZSIEHg3KRV+lfz0=; b=Mh2cgqTeiI9vG8
-	Fy3KPTEBLgViMeQG1RnmD8XYNidSs+kS/0xNUvItAGYtpaYq7qMcTpKZunbiEQnxn2e9WAPLwFt1+
-	1BjS8ZBnzzgNaBI4r+Q89C6pDb1Npy+pKDZNZMum8ztCVgS12lO4VunWtxdrrT9CyMPrRO6PUHmz2
-	4q666cGxTX1ZeL5M4mL0VxK1TKPEiptHAPto5UseJnZ6VERstXWUNPLI8FdU9j16x3K8usM/2CLm2
-	c2FGiBc1Mxpf+/arEYWuJME3kYvFxyMmDpBWcBG93FgdG4gRa8/iKEjndQPAOnOr1Z/zc/b0rbOU/
-	8aCgGdlVrK7C3qMf8Kkw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:References:To:From:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=9Tc5acOpETPnTamUD4MwsckwLKCR5+64sN2LedXuFtY=; b=KXwO2S/fmbFxap
+	15PqwO4y96PUhUl3JjS5NiLUwLuG9C56Olmr7/Gcjsr3wcSDJEtJifjW1dTeaCVmviWKQ0p2L+5cd
+	PLkQaPnP5e2ZiedftwVwouzNNa/0nOGNG41QQvQVCWogMpWARV7Ml8kD9pseiwoReNyOXbiycrWcD
+	Ch9tUAUeVe0mrqz8IvFfgO9Tdh3V5uIQbz/DCJfomRO68IgcTiyQ+4Ey8FGLj8BMlZb1MZi/Lpfj9
+	I/VugTkht+mVlJhhwbv5ivcX4F8P1qmeMlP4JOqwDBu+F57jmfYH5s1/WZxqK+whGf5rSomcYDFmS
+	HBMkqpFIovzAUxFISE3A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghDBs-00010w-8x; Wed, 09 Jan 2019 12:42:36 +0000
-Received: from hillosipuli.retiisi.org.uk ([2001:1bc8:1a6:d3d5::81:2])
+	id 1ghDCK-0001Lk-A3; Wed, 09 Jan 2019 12:43:04 +0000
+Received: from smtp3-g21.free.fr ([2a01:e0c:1:1599::12])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghDBl-0000xU-HI
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 12:42:34 +0000
-Received: from valkosipuli.localdomain (valkosipuli.retiisi.org.uk
- [IPv6:2001:1bc8:1a6:d3d5::80:2])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by hillosipuli.retiisi.org.uk (Postfix) with ESMTPS id 74754634C7F;
- Wed,  9 Jan 2019 14:41:10 +0200 (EET)
-Received: from sailus by valkosipuli.localdomain with local (Exim 4.89)
- (envelope-from <sakari.ailus@retiisi.org.uk>)
- id 1ghDAT-0002ZP-S1; Wed, 09 Jan 2019 14:41:09 +0200
-Date: Wed, 9 Jan 2019 14:41:09 +0200
-From: Sakari Ailus <sakari.ailus@iki.fi>
-To: Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: Re: [PATCH v4 8/9] phy: Add Cadence D-PHY support
-Message-ID: <20190109124109.e57pdt473346npng@valkosipuli.retiisi.org.uk>
-References: <cover.5d91ef683e3f432342f536e0f2fe239dbcebcb3e.1547026369.git-series.maxime.ripard@bootlin.com>
- <a089ce6aaefe6d2ddf6b17f5558ec7eb0ebf3774.1547026369.git-series.maxime.ripard@bootlin.com>
+ id 1ghDCH-0001KI-1c
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 12:43:03 +0000
+Received: from [192.168.108.68] (unknown [213.36.7.13])
+ (Authenticated sender: marc.w.gonzalez)
+ by smtp3-g21.free.fr (Postfix) with ESMTPSA id DB7B013F8AC;
+ Wed,  9 Jan 2019 13:42:29 +0100 (CET)
+Subject: Re: [PATCH v1] scsi: ufs: Use explicit access size in ufshcd_dump_regs
+From: Marc Gonzalez <marc.w.gonzalez@free.fr>
+To: Bjorn Andersson <bjorn.andersson@linaro.org>,
+ Andy Gross <andy.gross@linaro.org>, Jeffrey Hugo <jhugo@codeaurora.org>
+References: <3bf7ea8e-4cf2-1f9b-7f46-15609dfcad19@free.fr>
+Message-ID: <214700f8-a381-5740-47c0-54923dae60b1@free.fr>
+Date: Wed, 9 Jan 2019 13:42:29 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <a089ce6aaefe6d2ddf6b17f5558ec7eb0ebf3774.1547026369.git-series.maxime.ripard@bootlin.com>
-User-Agent: NeoMutt/20170113 (1.7.2)
+In-Reply-To: <3bf7ea8e-4cf2-1f9b-7f46-15609dfcad19@free.fr>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_044229_926042_9DFE7E76 
-X-CRM114-Status: GOOD (  11.95  )
+X-CRM114-CacheID: sfid-20190109_044301_387328_E59A48AB 
+X-CRM114-Status: GOOD (  16.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,34 +68,98 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Archit Taneja <architt@codeaurora.org>, Rafal Ciepiela <rafalc@cadence.com>,
- Krzysztof Witos <kwitos@cadence.com>, linux-kernel@vger.kernel.org,
- dri-devel@lists.freedesktop.org, Kishon Vijay Abraham I <kishon@ti.com>,
- Andrzej Hajda <a.hajda@samsung.com>, Chen-Yu Tsai <wens@csie.org>,
- Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
+Cc: SCSI <linux-scsi@vger.kernel.org>,
+ "Martin K. Petersen" <martin.petersen@oracle.com>,
+ Joao Pinto <jpinto@synopsys.com>, MSM <linux-arm-msm@vger.kernel.org>,
+ Avri Altman <avri.altman@wdc.com>, Tomas Winkler <tomas.winkler@intel.com>,
+ Vinayak Holikatti <vinholikatti@gmail.com>,
+ Robin Murphy <robin.murphy@arm.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 09, 2019 at 10:33:25AM +0100, Maxime Ripard wrote:
-> Cadence has designed a D-PHY that can be used by the, currently in tree,
-> DSI bridge (DRM), CSI Transceiver and CSI Receiver (v4l2) drivers.
-> 
-> Only the DSI driver has an ad-hoc driver for that phy at the moment, while
-> the v4l2 drivers are completely missing any phy support. In order to make
-> that phy support available to all these drivers, without having to
-> duplicate that code three times, let's create a generic phy framework
-> driver.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Bjorn, Andy, Jeffrey,
 
-Reviewed-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+What do you think about the patch below?
 
--- 
-Sakari Ailus
+Regards.
+
+On 11/12/2018 15:18, Marc Gonzalez wrote:
+
+> memcpy_fromio() doesn't provide any control over access size.
+> For example, on arm64, it is implemented using readb and readq.
+> This may trigger a synchronous external abort:
+> 
+> [    3.729943] Internal error: synchronous external abort: 96000210 [#1] PREEMPT SMP
+> [    3.737000] Modules linked in:
+> [    3.744371] CPU: 2 PID: 1 Comm: swapper/0 Tainted: G S                4.20.0-rc4 #16
+> [    3.747413] Hardware name: Qualcomm Technologies, Inc. MSM8998 v1 MTP (DT)
+> [    3.755295] pstate: 00000005 (nzcv daif -PAN -UAO)
+> [    3.761978] pc : __memcpy_fromio+0x68/0x80
+> [    3.766718] lr : ufshcd_dump_regs+0x50/0xb0
+> [    3.770767] sp : ffff00000807ba00
+> [    3.774830] x29: ffff00000807ba00 x28: 00000000fffffffb
+> [    3.778344] x27: ffff0000089db068 x26: ffff8000f6e58000
+> [    3.783728] x25: 000000000000000e x24: 0000000000000800
+> [    3.789023] x23: ffff8000f6e587c8 x22: 0000000000000800
+> [    3.794319] x21: ffff000008908368 x20: ffff8000f6e1ab80
+> [    3.799615] x19: 000000000000006c x18: ffffffffffffffff
+> [    3.804910] x17: 0000000000000000 x16: 0000000000000000
+> [    3.810206] x15: ffff000009199648 x14: ffff000089244187
+> [    3.815502] x13: ffff000009244195 x12: ffff0000091ab000
+> [    3.820797] x11: 0000000005f5e0ff x10: ffff0000091998a0
+> [    3.826093] x9 : 0000000000000000 x8 : ffff8000f6e1ac00
+> [    3.831389] x7 : 0000000000000000 x6 : 0000000000000068
+> [    3.836676] x5 : ffff8000f6e1abe8 x4 : 0000000000000000
+> [    3.841971] x3 : ffff00000928c868 x2 : ffff8000f6e1abec
+> [    3.847267] x1 : ffff00000928c868 x0 : ffff8000f6e1abe8
+> [    3.852567] Process swapper/0 (pid: 1, stack limit = 0x(____ptrval____))
+> [    3.857900] Call trace:
+> [    3.864473]  __memcpy_fromio+0x68/0x80
+> [    3.866683]  ufs_qcom_dump_dbg_regs+0x1c0/0x370
+> [    3.870522]  ufshcd_print_host_regs+0x168/0x190
+> [    3.874946]  ufshcd_init+0xd4c/0xde0
+> [    3.879459]  ufshcd_pltfrm_init+0x3c8/0x550
+> [    3.883264]  ufs_qcom_probe+0x24/0x60
+> [    3.887188]  platform_drv_probe+0x50/0xa0
+> 
+> Assuming aligned 32-bit registers, let's use readl, after making sure
+> that 'offset' and 'len' are indeed multiples of 4.
+> 
+> Fixes: ba80917d9932d ("scsi: ufs: ufshcd_dump_regs to use memcpy_fromio")
+> Signed-off-by: Marc Gonzalez <marc.w.gonzalez@free.fr>
+> ---
+>  drivers/scsi/ufs/ufshcd.c | 10 ++++++++--
+>  1 file changed, 8 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/scsi/ufs/ufshcd.c b/drivers/scsi/ufs/ufshcd.c
+> index 535180c01ce8..320bbd9849bc 100644
+> --- a/drivers/scsi/ufs/ufshcd.c
+> +++ b/drivers/scsi/ufs/ufshcd.c
+> @@ -112,13 +112,19 @@
+>  int ufshcd_dump_regs(struct ufs_hba *hba, size_t offset, size_t len,
+>  		     const char *prefix)
+>  {
+> -	u8 *regs;
+> +	u32 *regs;
+> +	size_t pos;
+> +
+> +	if (offset % 4 != 0 || len % 4 != 0) /* keep readl happy */
+> +		return -EINVAL;
+>  
+>  	regs = kzalloc(len, GFP_KERNEL);
+>  	if (!regs)
+>  		return -ENOMEM;
+>  
+> -	memcpy_fromio(regs, hba->mmio_base + offset, len);
+> +	for (pos = 0; pos < len; pos += 4)
+> +		regs[pos / 4] = ufshcd_readl(hba, offset + pos);
+> +
+>  	ufshcd_hex_dump(prefix, regs, len);
+>  	kfree(regs);
+>  
 
 _______________________________________________
 linux-arm-kernel mailing list
