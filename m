@@ -2,60 +2,78 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AB58BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 09:41:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C7B15C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 09:44:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7AC0320883
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 09:41:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8956821773
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 09:44:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="T7WiJ8SN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7AC0320883
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kiya8rLO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8956821773
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/Z4J2o4Wy5/aPmVzDul50XL7bwcUaBa7MLMmJI7VWxc=; b=T7WiJ8SNFN8t3c
-	s+1mdpA2Qwh1BPnJLq0CX6frXuHR+U/hq0QR1pRqNflB9DuLehJlNTxdBHz0I2b8gvosBSXvmUPRE
-	y6fz9BmmHo90NCCC/iG3akmKK3zI08RMKJwQi66msj6PF+v+S47OsQfEf/pPUCsd1eEok2cmrxNWG
-	pUBdwa8TrVvXlYNsEf8mZ55sxQEVrhbwmYxeAvKrpHVoeBJ6ycITKrZ/RGMHGOJoHyhCKLJ2EhKU0
-	EDsFS/PKVB7SApIMvHh6fu8CHRb0TTj/RRAQgg+UqkRLKo6Gn0pS58J2Pkc2xutbD5T04Bie0WY78
-	+HpSzRokVhFr6chRs9gQ==;
+	List-Owner; bh=zXe+JYgj4d2TjPfrWybA9fPQK93Ut1kenufh9gZVIYE=; b=kiya8rLOacZIF5
+	pUJ1gxjrqvlvACLqcsnJRLVO80mqb3bJUZtA8Dq8VPR5++NaBospRpIuZ74RjEbNqXZKL6LCddKKY
+	JhjUq2uoXKOAZeTvjlRyd8Od0T552k/IURuAf608dTnwmmm9FRQzjTXVJsbDrwrezRb4IcmsJfNVK
+	RdWZA3afKdPzOTvve0VGTBcGzgFpcqPMeJ66zz0Mkw76qpQ2DZMTh6SqEHSCAuHPGsfOkJ9ukr1ts
+	i6DtGHZYZIEFzGwc6g0UWikAwCH6lF8zlORtJqULpS6eguPcgwnKsOBCNoe6H/lpjZah3TqEIE4jL
+	xwieOMy7RsTf62JI83zg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghAMj-0003aY-Qu; Wed, 09 Jan 2019 09:41:37 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghAF7-0006S3-4D
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 09:34:11 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 14CC920A24; Wed,  9 Jan 2019 10:33:44 +0100 (CET)
-Received: from localhost (aaubervilliers-681-1-45-241.w90-88.abo.wanadoo.fr
- [90.88.163.241])
- by mail.bootlin.com (Postfix) with ESMTPSA id EF63820A2F;
- Wed,  9 Jan 2019 10:33:30 +0100 (CET)
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Kishon Vijay Abraham I <kishon@ti.com>
-Subject: [PATCH v4 5/9] phy: Move Allwinner A31 D-PHY driver to drivers/phy/
-Date: Wed,  9 Jan 2019 10:33:22 +0100
-Message-Id: <3f10c3369eb9474967359553935f3c5e7c54a417.1547026369.git-series.maxime.ripard@bootlin.com>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <cover.5d91ef683e3f432342f536e0f2fe239dbcebcb3e.1547026369.git-series.maxime.ripard@bootlin.com>
-References: <cover.5d91ef683e3f432342f536e0f2fe239dbcebcb3e.1547026369.git-series.maxime.ripard@bootlin.com>
+	id 1ghAP7-0003pB-Ng; Wed, 09 Jan 2019 09:44:05 +0000
+Received: from mail-oi1-f175.google.com ([209.85.167.175])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghAP5-0003oq-3o
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 09:44:04 +0000
+Received: by mail-oi1-f175.google.com with SMTP id y23so5805602oia.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 09 Jan 2019 01:44:02 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc:content-transfer-encoding;
+ bh=zbwo1Voy/TDZYXcAJfit3k7umA8oVRutjv4ekO+a860=;
+ b=QD6bbWxbi8wAXQCukhcKTjI7ubDRWVucMAROm/hF8rOEykMA7qA/hNqe8JePOAWAun
+ yvh14kAJuMbeKBFVzvWeb0dK5OgRl0IAtqAn7SRyzCfg3CQKprfDmZ6KhJ73Ch9GZe6/
+ dtCPxPtA+oxua8VDSQ7Q6e8Xp0gw734whexeJBPNSjTM16iz1eirp3RdE5M6aDnk1lqb
+ RkVmocAGnvfCiTCxG5eEQF4BDlbbd5UoNxG4G9EOM6gp+SchtmbMxUZMZD85FG0gBbzN
+ eq+Bhp5HiEbD/VyN1mahzZ/I17b+rPY11xQIw+bWef8gACbKoTegd/uaXefoMv3S4Jlk
+ UsEQ==
+X-Gm-Message-State: AJcUukeyDqMKCRjO7q9nk8+mw22NJI9ALHKVwE98XkKAaqKDJpkwgwQq
+ DtjbcemH1FY46Nki/+G5Uk/+77Qpcdut/tbFCYk=
+X-Google-Smtp-Source: ALg8bN5iY6Da81NiaUUra/cTcpi6K1GVqj8em5N44VvknmK3B+7hw3x146V55h/6hSGuiETNgZobZv9VRNVuS9wjBOI=
+X-Received: by 2002:aca:195:: with SMTP id 143mr3247104oib.322.1547027042043; 
+ Wed, 09 Jan 2019 01:44:02 -0800 (PST)
 MIME-Version: 1.0
+References: <20190107233833.GI5544@atomide.com>
+ <CAKfTPtDBEmcsLotp-6K1KU1wM9Ba1EpMp3niXScRxYgzjs0nog@mail.gmail.com>
+ <20190108155354.GL5544@atomide.com>
+ <CAKfTPtCoOK-cYLXJ--sOfpVa9RVmzOAEN1+zB2qHMCzkJN0qaQ@mail.gmail.com>
+ <20190108213743.GN5544@atomide.com> <20190109014218.GA8363@linaro.org>
+ <20190109015124.GO5544@atomide.com>
+In-Reply-To: <20190109015124.GO5544@atomide.com>
+From: "Rafael J. Wysocki" <rafael@kernel.org>
+Date: Wed, 9 Jan 2019 10:43:51 +0100
+Message-ID: <CAJZ5v0hi5sVESKPbZoniikOhNxdUDtJhQrs39Fib8B03MYoMMQ@mail.gmail.com>
+Subject: Re: Regression in v5.0-rc1 with autosuspend hrtimers
+To: Tony Lindgren <tony@atomide.com>,
+ Vincent Guittot <vincent.guittot@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_013346_128602_02A93477 
-X-CRM114-Status: GOOD (  17.43  )
+X-CRM114-CacheID: sfid-20190109_014403_152193_FFC325F6 
+X-CRM114-Status: UNSURE (   9.97  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,755 +85,28 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Archit Taneja <architt@codeaurora.org>, Rafal Ciepiela <rafalc@cadence.com>,
- Krzysztof Witos <kwitos@cadence.com>,
- Maxime Ripard <maxime.ripard@bootlin.com>, linux-kernel@vger.kernel.org,
- dri-devel@lists.freedesktop.org, Andrzej Hajda <a.hajda@samsung.com>,
- Chen-Yu Tsai <wens@csie.org>,
- Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Ulf Hansson <ulf.hansson@linaro.org>,
+ "open list:THERMAL" <linux-pm@vger.kernel.org>,
+ "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>,
+ Linux OMAP Mailing List <linux-omap@vger.kernel.org>,
+ LAK <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Now that our MIPI D-PHY driver has been converted to the phy framework,
-let's move it into the drivers/phy directory.
-
-Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
----
- drivers/gpu/drm/sun4i/Kconfig               |  10 +-
- drivers/gpu/drm/sun4i/Makefile              |   1 +-
- drivers/gpu/drm/sun4i/sun6i_mipi_dphy.c     | 318 +---------------------
- drivers/phy/allwinner/Kconfig               |  12 +-
- drivers/phy/allwinner/Makefile              |   1 +-
- drivers/phy/allwinner/phy-sun6i-mipi-dphy.c | 318 +++++++++++++++++++++-
- 6 files changed, 332 insertions(+), 328 deletions(-)
- delete mode 100644 drivers/gpu/drm/sun4i/sun6i_mipi_dphy.c
- create mode 100644 drivers/phy/allwinner/phy-sun6i-mipi-dphy.c
-
-diff --git a/drivers/gpu/drm/sun4i/Kconfig b/drivers/gpu/drm/sun4i/Kconfig
-index 2b8db82c4bab..1dbbc3a1b763 100644
---- a/drivers/gpu/drm/sun4i/Kconfig
-+++ b/drivers/gpu/drm/sun4i/Kconfig
-@@ -45,20 +45,12 @@ config DRM_SUN6I_DSI
- 	default MACH_SUN8I
- 	select CRC_CCITT
- 	select DRM_MIPI_DSI
--	select DRM_SUN6I_DPHY
-+	select PHY_SUN6I_MIPI_DPHY
- 	help
- 	  Choose this option if you want have an Allwinner SoC with
- 	  MIPI-DSI support. If M is selected the module will be called
- 	  sun6i_mipi_dsi.
- 
--config DRM_SUN6I_DPHY
--	tristate "Allwinner A31 MIPI D-PHY Support"
--	select GENERIC_PHY_MIPI_DPHY
--	help
--	  Choose this option if you have an Allwinner SoC with
--	  MIPI-DSI support. If M is selected, the module will be
--	  called sun6i_mipi_dphy.
--
- config DRM_SUN8I_DW_HDMI
- 	tristate "Support for Allwinner version of DesignWare HDMI"
- 	depends on DRM_SUN4I
-diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
-index 1e2320d824b5..0d04f2447b01 100644
---- a/drivers/gpu/drm/sun4i/Makefile
-+++ b/drivers/gpu/drm/sun4i/Makefile
-@@ -34,7 +34,6 @@ ifdef CONFIG_DRM_SUN4I_BACKEND
- obj-$(CONFIG_DRM_SUN4I)		+= sun4i-frontend.o
- endif
- obj-$(CONFIG_DRM_SUN4I_HDMI)	+= sun4i-drm-hdmi.o
--obj-$(CONFIG_DRM_SUN6I_DPHY)	+= sun6i_mipi_dphy.o
- obj-$(CONFIG_DRM_SUN6I_DSI)	+= sun6i_mipi_dsi.o
- obj-$(CONFIG_DRM_SUN8I_DW_HDMI)	+= sun8i-drm-hdmi.o
- obj-$(CONFIG_DRM_SUN8I_MIXER)	+= sun8i-mixer.o
-diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dphy.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dphy.c
-deleted file mode 100644
-index 79c8af5c7c1d..000000000000
---- a/drivers/gpu/drm/sun4i/sun6i_mipi_dphy.c
-+++ /dev/null
-@@ -1,318 +0,0 @@
--// SPDX-License-Identifier: GPL-2.0+
--/*
-- * Copyright (c) 2016 Allwinnertech Co., Ltd.
-- * Copyright (C) 2017-2018 Bootlin
-- *
-- * Maxime Ripard <maxime.ripard@free-electrons.com>
-- */
--
--#include <linux/bitops.h>
--#include <linux/clk.h>
--#include <linux/module.h>
--#include <linux/of_address.h>
--#include <linux/platform_device.h>
--#include <linux/regmap.h>
--#include <linux/reset.h>
--
--#include <linux/phy/phy.h>
--#include <linux/phy/phy-mipi-dphy.h>
--
--#define SUN6I_DPHY_GCTL_REG		0x00
--#define SUN6I_DPHY_GCTL_LANE_NUM(n)		((((n) - 1) & 3) << 4)
--#define SUN6I_DPHY_GCTL_EN			BIT(0)
--
--#define SUN6I_DPHY_TX_CTL_REG		0x04
--#define SUN6I_DPHY_TX_CTL_HS_TX_CLK_CONT	BIT(28)
--
--#define SUN6I_DPHY_TX_TIME0_REG		0x10
--#define SUN6I_DPHY_TX_TIME0_HS_TRAIL(n)		(((n) & 0xff) << 24)
--#define SUN6I_DPHY_TX_TIME0_HS_PREPARE(n)	(((n) & 0xff) << 16)
--#define SUN6I_DPHY_TX_TIME0_LP_CLK_DIV(n)	((n) & 0xff)
--
--#define SUN6I_DPHY_TX_TIME1_REG		0x14
--#define SUN6I_DPHY_TX_TIME1_CLK_POST(n)		(((n) & 0xff) << 24)
--#define SUN6I_DPHY_TX_TIME1_CLK_PRE(n)		(((n) & 0xff) << 16)
--#define SUN6I_DPHY_TX_TIME1_CLK_ZERO(n)		(((n) & 0xff) << 8)
--#define SUN6I_DPHY_TX_TIME1_CLK_PREPARE(n)	((n) & 0xff)
--
--#define SUN6I_DPHY_TX_TIME2_REG		0x18
--#define SUN6I_DPHY_TX_TIME2_CLK_TRAIL(n)	((n) & 0xff)
--
--#define SUN6I_DPHY_TX_TIME3_REG		0x1c
--
--#define SUN6I_DPHY_TX_TIME4_REG		0x20
--#define SUN6I_DPHY_TX_TIME4_HS_TX_ANA1(n)	(((n) & 0xff) << 8)
--#define SUN6I_DPHY_TX_TIME4_HS_TX_ANA0(n)	((n) & 0xff)
--
--#define SUN6I_DPHY_ANA0_REG		0x4c
--#define SUN6I_DPHY_ANA0_REG_PWS			BIT(31)
--#define SUN6I_DPHY_ANA0_REG_DMPC		BIT(28)
--#define SUN6I_DPHY_ANA0_REG_DMPD(n)		(((n) & 0xf) << 24)
--#define SUN6I_DPHY_ANA0_REG_SLV(n)		(((n) & 7) << 12)
--#define SUN6I_DPHY_ANA0_REG_DEN(n)		(((n) & 0xf) << 8)
--
--#define SUN6I_DPHY_ANA1_REG		0x50
--#define SUN6I_DPHY_ANA1_REG_VTTMODE		BIT(31)
--#define SUN6I_DPHY_ANA1_REG_CSMPS(n)		(((n) & 3) << 28)
--#define SUN6I_DPHY_ANA1_REG_SVTT(n)		(((n) & 0xf) << 24)
--
--#define SUN6I_DPHY_ANA2_REG		0x54
--#define SUN6I_DPHY_ANA2_EN_P2S_CPU(n)		(((n) & 0xf) << 24)
--#define SUN6I_DPHY_ANA2_EN_P2S_CPU_MASK		GENMASK(27, 24)
--#define SUN6I_DPHY_ANA2_EN_CK_CPU		BIT(4)
--#define SUN6I_DPHY_ANA2_REG_ENIB		BIT(1)
--
--#define SUN6I_DPHY_ANA3_REG		0x58
--#define SUN6I_DPHY_ANA3_EN_VTTD(n)		(((n) & 0xf) << 28)
--#define SUN6I_DPHY_ANA3_EN_VTTD_MASK		GENMASK(31, 28)
--#define SUN6I_DPHY_ANA3_EN_VTTC			BIT(27)
--#define SUN6I_DPHY_ANA3_EN_DIV			BIT(26)
--#define SUN6I_DPHY_ANA3_EN_LDOC			BIT(25)
--#define SUN6I_DPHY_ANA3_EN_LDOD			BIT(24)
--#define SUN6I_DPHY_ANA3_EN_LDOR			BIT(18)
--
--#define SUN6I_DPHY_ANA4_REG		0x5c
--#define SUN6I_DPHY_ANA4_REG_DMPLVC		BIT(24)
--#define SUN6I_DPHY_ANA4_REG_DMPLVD(n)		(((n) & 0xf) << 20)
--#define SUN6I_DPHY_ANA4_REG_CKDV(n)		(((n) & 0x1f) << 12)
--#define SUN6I_DPHY_ANA4_REG_TMSC(n)		(((n) & 3) << 10)
--#define SUN6I_DPHY_ANA4_REG_TMSD(n)		(((n) & 3) << 8)
--#define SUN6I_DPHY_ANA4_REG_TXDNSC(n)		(((n) & 3) << 6)
--#define SUN6I_DPHY_ANA4_REG_TXDNSD(n)		(((n) & 3) << 4)
--#define SUN6I_DPHY_ANA4_REG_TXPUSC(n)		(((n) & 3) << 2)
--#define SUN6I_DPHY_ANA4_REG_TXPUSD(n)		((n) & 3)
--
--#define SUN6I_DPHY_DBG5_REG		0xf4
--
--struct sun6i_dphy {
--	struct clk				*bus_clk;
--	struct clk				*mod_clk;
--	struct regmap				*regs;
--	struct reset_control			*reset;
--
--	struct phy				*phy;
--	struct phy_configure_opts_mipi_dphy	config;
--};
--
--static int sun6i_dphy_init(struct phy *phy)
--{
--	struct sun6i_dphy *dphy = phy_get_drvdata(phy);
--
--	reset_control_deassert(dphy->reset);
--	clk_prepare_enable(dphy->mod_clk);
--	clk_set_rate_exclusive(dphy->mod_clk, 150000000);
--
--	return 0;
--}
--
--static int sun6i_dphy_configure(struct phy *phy, union phy_configure_opts *opts)
--{
--	struct sun6i_dphy *dphy = phy_get_drvdata(phy);
--	int ret;
--
--	ret = phy_mipi_dphy_config_validate(&opts->mipi_dphy);
--	if (ret)
--		return ret;
--
--	memcpy(&dphy->config, opts, sizeof(dphy->config));
--
--	return 0;
--}
--
--static int sun6i_dphy_power_on(struct phy *phy)
--{
--	struct sun6i_dphy *dphy = phy_get_drvdata(phy);
--	u8 lanes_mask = GENMASK(dphy->config.lanes - 1, 0);
--
--	regmap_write(dphy->regs, SUN6I_DPHY_TX_CTL_REG,
--		     SUN6I_DPHY_TX_CTL_HS_TX_CLK_CONT);
--
--	regmap_write(dphy->regs, SUN6I_DPHY_TX_TIME0_REG,
--		     SUN6I_DPHY_TX_TIME0_LP_CLK_DIV(14) |
--		     SUN6I_DPHY_TX_TIME0_HS_PREPARE(6) |
--		     SUN6I_DPHY_TX_TIME0_HS_TRAIL(10));
--
--	regmap_write(dphy->regs, SUN6I_DPHY_TX_TIME1_REG,
--		     SUN6I_DPHY_TX_TIME1_CLK_PREPARE(7) |
--		     SUN6I_DPHY_TX_TIME1_CLK_ZERO(50) |
--		     SUN6I_DPHY_TX_TIME1_CLK_PRE(3) |
--		     SUN6I_DPHY_TX_TIME1_CLK_POST(10));
--
--	regmap_write(dphy->regs, SUN6I_DPHY_TX_TIME2_REG,
--		     SUN6I_DPHY_TX_TIME2_CLK_TRAIL(30));
--
--	regmap_write(dphy->regs, SUN6I_DPHY_TX_TIME3_REG, 0);
--
--	regmap_write(dphy->regs, SUN6I_DPHY_TX_TIME4_REG,
--		     SUN6I_DPHY_TX_TIME4_HS_TX_ANA0(3) |
--		     SUN6I_DPHY_TX_TIME4_HS_TX_ANA1(3));
--
--	regmap_write(dphy->regs, SUN6I_DPHY_GCTL_REG,
--		     SUN6I_DPHY_GCTL_LANE_NUM(dphy->config.lanes) |
--		     SUN6I_DPHY_GCTL_EN);
--
--	regmap_write(dphy->regs, SUN6I_DPHY_ANA0_REG,
--		     SUN6I_DPHY_ANA0_REG_PWS |
--		     SUN6I_DPHY_ANA0_REG_DMPC |
--		     SUN6I_DPHY_ANA0_REG_SLV(7) |
--		     SUN6I_DPHY_ANA0_REG_DMPD(lanes_mask) |
--		     SUN6I_DPHY_ANA0_REG_DEN(lanes_mask));
--
--	regmap_write(dphy->regs, SUN6I_DPHY_ANA1_REG,
--		     SUN6I_DPHY_ANA1_REG_CSMPS(1) |
--		     SUN6I_DPHY_ANA1_REG_SVTT(7));
--
--	regmap_write(dphy->regs, SUN6I_DPHY_ANA4_REG,
--		     SUN6I_DPHY_ANA4_REG_CKDV(1) |
--		     SUN6I_DPHY_ANA4_REG_TMSC(1) |
--		     SUN6I_DPHY_ANA4_REG_TMSD(1) |
--		     SUN6I_DPHY_ANA4_REG_TXDNSC(1) |
--		     SUN6I_DPHY_ANA4_REG_TXDNSD(1) |
--		     SUN6I_DPHY_ANA4_REG_TXPUSC(1) |
--		     SUN6I_DPHY_ANA4_REG_TXPUSD(1) |
--		     SUN6I_DPHY_ANA4_REG_DMPLVC |
--		     SUN6I_DPHY_ANA4_REG_DMPLVD(lanes_mask));
--
--	regmap_write(dphy->regs, SUN6I_DPHY_ANA2_REG,
--		     SUN6I_DPHY_ANA2_REG_ENIB);
--	udelay(5);
--
--	regmap_write(dphy->regs, SUN6I_DPHY_ANA3_REG,
--		     SUN6I_DPHY_ANA3_EN_LDOR |
--		     SUN6I_DPHY_ANA3_EN_LDOC |
--		     SUN6I_DPHY_ANA3_EN_LDOD);
--	udelay(1);
--
--	regmap_update_bits(dphy->regs, SUN6I_DPHY_ANA3_REG,
--			   SUN6I_DPHY_ANA3_EN_VTTC |
--			   SUN6I_DPHY_ANA3_EN_VTTD_MASK,
--			   SUN6I_DPHY_ANA3_EN_VTTC |
--			   SUN6I_DPHY_ANA3_EN_VTTD(lanes_mask));
--	udelay(1);
--
--	regmap_update_bits(dphy->regs, SUN6I_DPHY_ANA3_REG,
--			   SUN6I_DPHY_ANA3_EN_DIV,
--			   SUN6I_DPHY_ANA3_EN_DIV);
--	udelay(1);
--
--	regmap_update_bits(dphy->regs, SUN6I_DPHY_ANA2_REG,
--			   SUN6I_DPHY_ANA2_EN_CK_CPU,
--			   SUN6I_DPHY_ANA2_EN_CK_CPU);
--	udelay(1);
--
--	regmap_update_bits(dphy->regs, SUN6I_DPHY_ANA1_REG,
--			   SUN6I_DPHY_ANA1_REG_VTTMODE,
--			   SUN6I_DPHY_ANA1_REG_VTTMODE);
--
--	regmap_update_bits(dphy->regs, SUN6I_DPHY_ANA2_REG,
--			   SUN6I_DPHY_ANA2_EN_P2S_CPU_MASK,
--			   SUN6I_DPHY_ANA2_EN_P2S_CPU(lanes_mask));
--
--	return 0;
--}
--
--static int sun6i_dphy_power_off(struct phy *phy)
--{
--	struct sun6i_dphy *dphy = phy_get_drvdata(phy);
--
--	regmap_update_bits(dphy->regs, SUN6I_DPHY_ANA1_REG,
--			   SUN6I_DPHY_ANA1_REG_VTTMODE, 0);
--
--	return 0;
--}
--
--static int sun6i_dphy_exit(struct phy *phy)
--{
--	struct sun6i_dphy *dphy = phy_get_drvdata(phy);
--
--	clk_rate_exclusive_put(dphy->mod_clk);
--	clk_disable_unprepare(dphy->mod_clk);
--	reset_control_assert(dphy->reset);
--
--	return 0;
--}
--
--
--static struct phy_ops sun6i_dphy_ops = {
--	.configure	= sun6i_dphy_configure,
--	.power_on	= sun6i_dphy_power_on,
--	.power_off	= sun6i_dphy_power_off,
--	.init		= sun6i_dphy_init,
--	.exit		= sun6i_dphy_exit,
--};
--
--static struct regmap_config sun6i_dphy_regmap_config = {
--	.reg_bits	= 32,
--	.val_bits	= 32,
--	.reg_stride	= 4,
--	.max_register	= SUN6I_DPHY_DBG5_REG,
--	.name		= "mipi-dphy",
--};
--
--static int sun6i_dphy_probe(struct platform_device *pdev)
--{
--	struct phy_provider *phy_provider;
--	struct sun6i_dphy *dphy;
--	struct resource *res;
--	void __iomem *regs;
--
--	dphy = devm_kzalloc(&pdev->dev, sizeof(*dphy), GFP_KERNEL);
--	if (!dphy)
--		return -ENOMEM;
--
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	regs = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(regs)) {
--		dev_err(&pdev->dev, "Couldn't map the DPHY encoder registers\n");
--		return PTR_ERR(regs);
--	}
--
--	dphy->regs = devm_regmap_init_mmio_clk(&pdev->dev, "bus",
--					       regs, &sun6i_dphy_regmap_config);
--	if (IS_ERR(dphy->regs)) {
--		dev_err(&pdev->dev, "Couldn't create the DPHY encoder regmap\n");
--		return PTR_ERR(dphy->regs);
--	}
--
--	dphy->reset = devm_reset_control_get_shared(&pdev->dev, NULL);
--	if (IS_ERR(dphy->reset)) {
--		dev_err(&pdev->dev, "Couldn't get our reset line\n");
--		return PTR_ERR(dphy->reset);
--	}
--
--	dphy->mod_clk = devm_clk_get(&pdev->dev, "mod");
--	if (IS_ERR(dphy->mod_clk)) {
--		dev_err(&pdev->dev, "Couldn't get the DPHY mod clock\n");
--		return PTR_ERR(dphy->mod_clk);
--	}
--
--	dphy->phy = devm_phy_create(&pdev->dev, NULL, &sun6i_dphy_ops);
--	if (IS_ERR(dphy->phy)) {
--		dev_err(&pdev->dev, "failed to create PHY\n");
--		return PTR_ERR(dphy->phy);
--	}
--
--	phy_set_drvdata(dphy->phy, dphy);
--	phy_provider = devm_of_phy_provider_register(&pdev->dev, of_phy_simple_xlate);
--
--	return PTR_ERR_OR_ZERO(phy_provider);
--}
--
--static const struct of_device_id sun6i_dphy_of_table[] = {
--	{ .compatible = "allwinner,sun6i-a31-mipi-dphy" },
--	{ }
--};
--MODULE_DEVICE_TABLE(of, sun6i_dphy_of_table);
--
--static struct platform_driver sun6i_dphy_platform_driver = {
--	.probe		= sun6i_dphy_probe,
--	.driver		= {
--		.name		= "sun6i-mipi-dphy",
--		.of_match_table	= sun6i_dphy_of_table,
--	},
--};
--module_platform_driver(sun6i_dphy_platform_driver);
--
--MODULE_AUTHOR("Maxime Ripard <maxime.ripard@bootlin>");
--MODULE_DESCRIPTION("Allwinner A31 MIPI D-PHY Driver");
--MODULE_LICENSE("GPL");
-diff --git a/drivers/phy/allwinner/Kconfig b/drivers/phy/allwinner/Kconfig
-index cdc1e745ba47..fb1204bcc454 100644
---- a/drivers/phy/allwinner/Kconfig
-+++ b/drivers/phy/allwinner/Kconfig
-@@ -17,6 +17,18 @@ config PHY_SUN4I_USB
- 	  This driver controls the entire USB PHY block, both the USB OTG
- 	  parts, as well as the 2 regular USB 2 host PHYs.
- 
-+config PHY_SUN6I_MIPI_DPHY
-+	tristate "Allwinner A31 MIPI D-PHY Support"
-+	depends on ARCH_SUNXI && HAS_IOMEM && OF
-+	depends on RESET_CONTROLLER
-+	select GENERIC_PHY
-+	select GENERIC_PHY_MIPI_DPHY
-+	select REGMAP_MMIO
-+	help
-+	  Choose this option if you have an Allwinner SoC with
-+	  MIPI-DSI support. If M is selected, the module will be
-+	  called sun6i_mipi_dphy.
-+
- config PHY_SUN9I_USB
- 	tristate "Allwinner sun9i SoC USB PHY driver"
- 	depends on ARCH_SUNXI && HAS_IOMEM && OF
-diff --git a/drivers/phy/allwinner/Makefile b/drivers/phy/allwinner/Makefile
-index 8605529c01a1..7d0053efbfaa 100644
---- a/drivers/phy/allwinner/Makefile
-+++ b/drivers/phy/allwinner/Makefile
-@@ -1,2 +1,3 @@
- obj-$(CONFIG_PHY_SUN4I_USB)		+= phy-sun4i-usb.o
-+obj-$(CONFIG_PHY_SUN6I_MIPI_DPHY)	+= phy-sun6i-mipi-dphy.o
- obj-$(CONFIG_PHY_SUN9I_USB)		+= phy-sun9i-usb.o
-diff --git a/drivers/phy/allwinner/phy-sun6i-mipi-dphy.c b/drivers/phy/allwinner/phy-sun6i-mipi-dphy.c
-new file mode 100644
-index 000000000000..79c8af5c7c1d
---- /dev/null
-+++ b/drivers/phy/allwinner/phy-sun6i-mipi-dphy.c
-@@ -0,0 +1,318 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Copyright (c) 2016 Allwinnertech Co., Ltd.
-+ * Copyright (C) 2017-2018 Bootlin
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ */
-+
-+#include <linux/bitops.h>
-+#include <linux/clk.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/reset.h>
-+
-+#include <linux/phy/phy.h>
-+#include <linux/phy/phy-mipi-dphy.h>
-+
-+#define SUN6I_DPHY_GCTL_REG		0x00
-+#define SUN6I_DPHY_GCTL_LANE_NUM(n)		((((n) - 1) & 3) << 4)
-+#define SUN6I_DPHY_GCTL_EN			BIT(0)
-+
-+#define SUN6I_DPHY_TX_CTL_REG		0x04
-+#define SUN6I_DPHY_TX_CTL_HS_TX_CLK_CONT	BIT(28)
-+
-+#define SUN6I_DPHY_TX_TIME0_REG		0x10
-+#define SUN6I_DPHY_TX_TIME0_HS_TRAIL(n)		(((n) & 0xff) << 24)
-+#define SUN6I_DPHY_TX_TIME0_HS_PREPARE(n)	(((n) & 0xff) << 16)
-+#define SUN6I_DPHY_TX_TIME0_LP_CLK_DIV(n)	((n) & 0xff)
-+
-+#define SUN6I_DPHY_TX_TIME1_REG		0x14
-+#define SUN6I_DPHY_TX_TIME1_CLK_POST(n)		(((n) & 0xff) << 24)
-+#define SUN6I_DPHY_TX_TIME1_CLK_PRE(n)		(((n) & 0xff) << 16)
-+#define SUN6I_DPHY_TX_TIME1_CLK_ZERO(n)		(((n) & 0xff) << 8)
-+#define SUN6I_DPHY_TX_TIME1_CLK_PREPARE(n)	((n) & 0xff)
-+
-+#define SUN6I_DPHY_TX_TIME2_REG		0x18
-+#define SUN6I_DPHY_TX_TIME2_CLK_TRAIL(n)	((n) & 0xff)
-+
-+#define SUN6I_DPHY_TX_TIME3_REG		0x1c
-+
-+#define SUN6I_DPHY_TX_TIME4_REG		0x20
-+#define SUN6I_DPHY_TX_TIME4_HS_TX_ANA1(n)	(((n) & 0xff) << 8)
-+#define SUN6I_DPHY_TX_TIME4_HS_TX_ANA0(n)	((n) & 0xff)
-+
-+#define SUN6I_DPHY_ANA0_REG		0x4c
-+#define SUN6I_DPHY_ANA0_REG_PWS			BIT(31)
-+#define SUN6I_DPHY_ANA0_REG_DMPC		BIT(28)
-+#define SUN6I_DPHY_ANA0_REG_DMPD(n)		(((n) & 0xf) << 24)
-+#define SUN6I_DPHY_ANA0_REG_SLV(n)		(((n) & 7) << 12)
-+#define SUN6I_DPHY_ANA0_REG_DEN(n)		(((n) & 0xf) << 8)
-+
-+#define SUN6I_DPHY_ANA1_REG		0x50
-+#define SUN6I_DPHY_ANA1_REG_VTTMODE		BIT(31)
-+#define SUN6I_DPHY_ANA1_REG_CSMPS(n)		(((n) & 3) << 28)
-+#define SUN6I_DPHY_ANA1_REG_SVTT(n)		(((n) & 0xf) << 24)
-+
-+#define SUN6I_DPHY_ANA2_REG		0x54
-+#define SUN6I_DPHY_ANA2_EN_P2S_CPU(n)		(((n) & 0xf) << 24)
-+#define SUN6I_DPHY_ANA2_EN_P2S_CPU_MASK		GENMASK(27, 24)
-+#define SUN6I_DPHY_ANA2_EN_CK_CPU		BIT(4)
-+#define SUN6I_DPHY_ANA2_REG_ENIB		BIT(1)
-+
-+#define SUN6I_DPHY_ANA3_REG		0x58
-+#define SUN6I_DPHY_ANA3_EN_VTTD(n)		(((n) & 0xf) << 28)
-+#define SUN6I_DPHY_ANA3_EN_VTTD_MASK		GENMASK(31, 28)
-+#define SUN6I_DPHY_ANA3_EN_VTTC			BIT(27)
-+#define SUN6I_DPHY_ANA3_EN_DIV			BIT(26)
-+#define SUN6I_DPHY_ANA3_EN_LDOC			BIT(25)
-+#define SUN6I_DPHY_ANA3_EN_LDOD			BIT(24)
-+#define SUN6I_DPHY_ANA3_EN_LDOR			BIT(18)
-+
-+#define SUN6I_DPHY_ANA4_REG		0x5c
-+#define SUN6I_DPHY_ANA4_REG_DMPLVC		BIT(24)
-+#define SUN6I_DPHY_ANA4_REG_DMPLVD(n)		(((n) & 0xf) << 20)
-+#define SUN6I_DPHY_ANA4_REG_CKDV(n)		(((n) & 0x1f) << 12)
-+#define SUN6I_DPHY_ANA4_REG_TMSC(n)		(((n) & 3) << 10)
-+#define SUN6I_DPHY_ANA4_REG_TMSD(n)		(((n) & 3) << 8)
-+#define SUN6I_DPHY_ANA4_REG_TXDNSC(n)		(((n) & 3) << 6)
-+#define SUN6I_DPHY_ANA4_REG_TXDNSD(n)		(((n) & 3) << 4)
-+#define SUN6I_DPHY_ANA4_REG_TXPUSC(n)		(((n) & 3) << 2)
-+#define SUN6I_DPHY_ANA4_REG_TXPUSD(n)		((n) & 3)
-+
-+#define SUN6I_DPHY_DBG5_REG		0xf4
-+
-+struct sun6i_dphy {
-+	struct clk				*bus_clk;
-+	struct clk				*mod_clk;
-+	struct regmap				*regs;
-+	struct reset_control			*reset;
-+
-+	struct phy				*phy;
-+	struct phy_configure_opts_mipi_dphy	config;
-+};
-+
-+static int sun6i_dphy_init(struct phy *phy)
-+{
-+	struct sun6i_dphy *dphy = phy_get_drvdata(phy);
-+
-+	reset_control_deassert(dphy->reset);
-+	clk_prepare_enable(dphy->mod_clk);
-+	clk_set_rate_exclusive(dphy->mod_clk, 150000000);
-+
-+	return 0;
-+}
-+
-+static int sun6i_dphy_configure(struct phy *phy, union phy_configure_opts *opts)
-+{
-+	struct sun6i_dphy *dphy = phy_get_drvdata(phy);
-+	int ret;
-+
-+	ret = phy_mipi_dphy_config_validate(&opts->mipi_dphy);
-+	if (ret)
-+		return ret;
-+
-+	memcpy(&dphy->config, opts, sizeof(dphy->config));
-+
-+	return 0;
-+}
-+
-+static int sun6i_dphy_power_on(struct phy *phy)
-+{
-+	struct sun6i_dphy *dphy = phy_get_drvdata(phy);
-+	u8 lanes_mask = GENMASK(dphy->config.lanes - 1, 0);
-+
-+	regmap_write(dphy->regs, SUN6I_DPHY_TX_CTL_REG,
-+		     SUN6I_DPHY_TX_CTL_HS_TX_CLK_CONT);
-+
-+	regmap_write(dphy->regs, SUN6I_DPHY_TX_TIME0_REG,
-+		     SUN6I_DPHY_TX_TIME0_LP_CLK_DIV(14) |
-+		     SUN6I_DPHY_TX_TIME0_HS_PREPARE(6) |
-+		     SUN6I_DPHY_TX_TIME0_HS_TRAIL(10));
-+
-+	regmap_write(dphy->regs, SUN6I_DPHY_TX_TIME1_REG,
-+		     SUN6I_DPHY_TX_TIME1_CLK_PREPARE(7) |
-+		     SUN6I_DPHY_TX_TIME1_CLK_ZERO(50) |
-+		     SUN6I_DPHY_TX_TIME1_CLK_PRE(3) |
-+		     SUN6I_DPHY_TX_TIME1_CLK_POST(10));
-+
-+	regmap_write(dphy->regs, SUN6I_DPHY_TX_TIME2_REG,
-+		     SUN6I_DPHY_TX_TIME2_CLK_TRAIL(30));
-+
-+	regmap_write(dphy->regs, SUN6I_DPHY_TX_TIME3_REG, 0);
-+
-+	regmap_write(dphy->regs, SUN6I_DPHY_TX_TIME4_REG,
-+		     SUN6I_DPHY_TX_TIME4_HS_TX_ANA0(3) |
-+		     SUN6I_DPHY_TX_TIME4_HS_TX_ANA1(3));
-+
-+	regmap_write(dphy->regs, SUN6I_DPHY_GCTL_REG,
-+		     SUN6I_DPHY_GCTL_LANE_NUM(dphy->config.lanes) |
-+		     SUN6I_DPHY_GCTL_EN);
-+
-+	regmap_write(dphy->regs, SUN6I_DPHY_ANA0_REG,
-+		     SUN6I_DPHY_ANA0_REG_PWS |
-+		     SUN6I_DPHY_ANA0_REG_DMPC |
-+		     SUN6I_DPHY_ANA0_REG_SLV(7) |
-+		     SUN6I_DPHY_ANA0_REG_DMPD(lanes_mask) |
-+		     SUN6I_DPHY_ANA0_REG_DEN(lanes_mask));
-+
-+	regmap_write(dphy->regs, SUN6I_DPHY_ANA1_REG,
-+		     SUN6I_DPHY_ANA1_REG_CSMPS(1) |
-+		     SUN6I_DPHY_ANA1_REG_SVTT(7));
-+
-+	regmap_write(dphy->regs, SUN6I_DPHY_ANA4_REG,
-+		     SUN6I_DPHY_ANA4_REG_CKDV(1) |
-+		     SUN6I_DPHY_ANA4_REG_TMSC(1) |
-+		     SUN6I_DPHY_ANA4_REG_TMSD(1) |
-+		     SUN6I_DPHY_ANA4_REG_TXDNSC(1) |
-+		     SUN6I_DPHY_ANA4_REG_TXDNSD(1) |
-+		     SUN6I_DPHY_ANA4_REG_TXPUSC(1) |
-+		     SUN6I_DPHY_ANA4_REG_TXPUSD(1) |
-+		     SUN6I_DPHY_ANA4_REG_DMPLVC |
-+		     SUN6I_DPHY_ANA4_REG_DMPLVD(lanes_mask));
-+
-+	regmap_write(dphy->regs, SUN6I_DPHY_ANA2_REG,
-+		     SUN6I_DPHY_ANA2_REG_ENIB);
-+	udelay(5);
-+
-+	regmap_write(dphy->regs, SUN6I_DPHY_ANA3_REG,
-+		     SUN6I_DPHY_ANA3_EN_LDOR |
-+		     SUN6I_DPHY_ANA3_EN_LDOC |
-+		     SUN6I_DPHY_ANA3_EN_LDOD);
-+	udelay(1);
-+
-+	regmap_update_bits(dphy->regs, SUN6I_DPHY_ANA3_REG,
-+			   SUN6I_DPHY_ANA3_EN_VTTC |
-+			   SUN6I_DPHY_ANA3_EN_VTTD_MASK,
-+			   SUN6I_DPHY_ANA3_EN_VTTC |
-+			   SUN6I_DPHY_ANA3_EN_VTTD(lanes_mask));
-+	udelay(1);
-+
-+	regmap_update_bits(dphy->regs, SUN6I_DPHY_ANA3_REG,
-+			   SUN6I_DPHY_ANA3_EN_DIV,
-+			   SUN6I_DPHY_ANA3_EN_DIV);
-+	udelay(1);
-+
-+	regmap_update_bits(dphy->regs, SUN6I_DPHY_ANA2_REG,
-+			   SUN6I_DPHY_ANA2_EN_CK_CPU,
-+			   SUN6I_DPHY_ANA2_EN_CK_CPU);
-+	udelay(1);
-+
-+	regmap_update_bits(dphy->regs, SUN6I_DPHY_ANA1_REG,
-+			   SUN6I_DPHY_ANA1_REG_VTTMODE,
-+			   SUN6I_DPHY_ANA1_REG_VTTMODE);
-+
-+	regmap_update_bits(dphy->regs, SUN6I_DPHY_ANA2_REG,
-+			   SUN6I_DPHY_ANA2_EN_P2S_CPU_MASK,
-+			   SUN6I_DPHY_ANA2_EN_P2S_CPU(lanes_mask));
-+
-+	return 0;
-+}
-+
-+static int sun6i_dphy_power_off(struct phy *phy)
-+{
-+	struct sun6i_dphy *dphy = phy_get_drvdata(phy);
-+
-+	regmap_update_bits(dphy->regs, SUN6I_DPHY_ANA1_REG,
-+			   SUN6I_DPHY_ANA1_REG_VTTMODE, 0);
-+
-+	return 0;
-+}
-+
-+static int sun6i_dphy_exit(struct phy *phy)
-+{
-+	struct sun6i_dphy *dphy = phy_get_drvdata(phy);
-+
-+	clk_rate_exclusive_put(dphy->mod_clk);
-+	clk_disable_unprepare(dphy->mod_clk);
-+	reset_control_assert(dphy->reset);
-+
-+	return 0;
-+}
-+
-+
-+static struct phy_ops sun6i_dphy_ops = {
-+	.configure	= sun6i_dphy_configure,
-+	.power_on	= sun6i_dphy_power_on,
-+	.power_off	= sun6i_dphy_power_off,
-+	.init		= sun6i_dphy_init,
-+	.exit		= sun6i_dphy_exit,
-+};
-+
-+static struct regmap_config sun6i_dphy_regmap_config = {
-+	.reg_bits	= 32,
-+	.val_bits	= 32,
-+	.reg_stride	= 4,
-+	.max_register	= SUN6I_DPHY_DBG5_REG,
-+	.name		= "mipi-dphy",
-+};
-+
-+static int sun6i_dphy_probe(struct platform_device *pdev)
-+{
-+	struct phy_provider *phy_provider;
-+	struct sun6i_dphy *dphy;
-+	struct resource *res;
-+	void __iomem *regs;
-+
-+	dphy = devm_kzalloc(&pdev->dev, sizeof(*dphy), GFP_KERNEL);
-+	if (!dphy)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	regs = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(regs)) {
-+		dev_err(&pdev->dev, "Couldn't map the DPHY encoder registers\n");
-+		return PTR_ERR(regs);
-+	}
-+
-+	dphy->regs = devm_regmap_init_mmio_clk(&pdev->dev, "bus",
-+					       regs, &sun6i_dphy_regmap_config);
-+	if (IS_ERR(dphy->regs)) {
-+		dev_err(&pdev->dev, "Couldn't create the DPHY encoder regmap\n");
-+		return PTR_ERR(dphy->regs);
-+	}
-+
-+	dphy->reset = devm_reset_control_get_shared(&pdev->dev, NULL);
-+	if (IS_ERR(dphy->reset)) {
-+		dev_err(&pdev->dev, "Couldn't get our reset line\n");
-+		return PTR_ERR(dphy->reset);
-+	}
-+
-+	dphy->mod_clk = devm_clk_get(&pdev->dev, "mod");
-+	if (IS_ERR(dphy->mod_clk)) {
-+		dev_err(&pdev->dev, "Couldn't get the DPHY mod clock\n");
-+		return PTR_ERR(dphy->mod_clk);
-+	}
-+
-+	dphy->phy = devm_phy_create(&pdev->dev, NULL, &sun6i_dphy_ops);
-+	if (IS_ERR(dphy->phy)) {
-+		dev_err(&pdev->dev, "failed to create PHY\n");
-+		return PTR_ERR(dphy->phy);
-+	}
-+
-+	phy_set_drvdata(dphy->phy, dphy);
-+	phy_provider = devm_of_phy_provider_register(&pdev->dev, of_phy_simple_xlate);
-+
-+	return PTR_ERR_OR_ZERO(phy_provider);
-+}
-+
-+static const struct of_device_id sun6i_dphy_of_table[] = {
-+	{ .compatible = "allwinner,sun6i-a31-mipi-dphy" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, sun6i_dphy_of_table);
-+
-+static struct platform_driver sun6i_dphy_platform_driver = {
-+	.probe		= sun6i_dphy_probe,
-+	.driver		= {
-+		.name		= "sun6i-mipi-dphy",
-+		.of_match_table	= sun6i_dphy_of_table,
-+	},
-+};
-+module_platform_driver(sun6i_dphy_platform_driver);
-+
-+MODULE_AUTHOR("Maxime Ripard <maxime.ripard@bootlin>");
-+MODULE_DESCRIPTION("Allwinner A31 MIPI D-PHY Driver");
-+MODULE_LICENSE("GPL");
--- 
-git-series 0.9.1
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gV2VkLCBKYW4gOSwgMjAxOSBhdCAyOjUxIEFNIFRvbnkgTGluZGdyZW4gPHRvbnlAYXRvbWlk
+ZS5jb20+IHdyb3RlOgo+Cj4gKiBWaW5jZW50IEd1aXR0b3QgPHZpbmNlbnQuZ3VpdHRvdEBsaW5h
+cm8ub3JnPiBbMTkwMTA5IDAxOjQyXToKPiA+IExlIFR1ZXNkYXkgMDggSmFuIDIwMTkgw6AgMTM6
+Mzc6NDMgKC0wODAwKSwgVG9ueSBMaW5kZ3JlbiBhIMOpY3JpdCA6Cj4gPiA+IExvd2VyaW5nIHRo
+ZSBhdXRvc3VzcGVuZF9kZWxheV9tcyB0byAyMTAwIG1zIG1ha2VzIHRoaW5ncyB3b3JrIGFnYWlu
+Lgo+ID4gPiBBbnl0aGluZyBoaWdoZXIgdGhhbiAyMjAwIG1zIHNlZW1zIHRvIHNvbWVob3cgdGlt
+ZSBvdXQgaW1tZWRpYXRlbHkKPiA+ID4gbm93IDopCj4gPgo+ID4gVGhpcyBpcyBxdWl0ZSBjbG9z
+ZSB0byB0aGUgbWF4IG5zIG9mIGFuIGludCBvbiBhcm0gMzJiaXRzCj4gPgo+ID4gQ291bGQgeW91
+IHRyeSB0aGUgcGF0Y2ggYmVsb3cgPwo+Cj4gWXVwIGdyZWF0IHRoYW5rcywgdGhhdCdzIGl0Ogo+
+Cj4gVGVzdGVkLWJ5OiBUb255IExpbmRncmVuIDx0b255QGF0b21pZGUuY29tPgoKQ29vbC4gIFRo
+YW5rcyBmb3IgZ2V0dGluZyB0byB0aGUgYm90dG9tIG9mIHRoaXMhCgpfX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcg
+bGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmlu
+ZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
