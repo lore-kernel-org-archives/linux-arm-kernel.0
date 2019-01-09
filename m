@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 92444C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 15:03:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F1275C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 15:04:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 63058206BB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 15:03:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B283E206BB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 15:04:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Jx+aO+on"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 63058206BB
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="j3XqBV32"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B283E206BB
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,34 +25,34 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=iUS6a1R/io8IHi6OAbOMF9nQmRAE9hHMPbMXfvUIfEM=; b=Jx+aO+onJNBR0B
-	z+veCl/kaZdabc07o8CJbq0U6Q8sIvGBsrYf9iAK4k2VWV/bnr1HZNsY7D6l7sXcfU3T2C/nRL7jR
-	wM0cxTzzNqzoqfYsoEp9E8NN8fKbVpImnzX4e09npPbwTKLF26ifa+DMrZHVUknneS8emIzEmTQHq
-	/sNABhfsdeCvYwvAqQ0uVV3xqNRSINOthDXHzzLM2bBs61iz+fo9JwW4IFTv43CiNVDVBGtgXbFP2
-	wqVm0mIQcmTTgUA+aoUW4H0AchIIGwSgYjJzWnb666QgBfLhV9RhyZwUS/dTcEsgOEzyAmgOXAirW
-	9wuscLuKFnvh2Tc0PsJg==;
+	List-Owner; bh=iJiJiswlJy2RGrbWD2ULc8KAAwr1TdqzMnYmWgqCX7o=; b=j3XqBV323a8hFq
+	33M/+q3g8BlP8/ILZq80oXKlj26OO4m8NDms6DEADyIzYGvOcFvbxxu5qVxAf1mBop2ZKNyzrblRC
+	7nkQcwRfrTZsSIT4+DoLusUAxThZ8ZCfh3AJrX9TwwQ3LjofuPQIgFInyM82hm+gtMzAGhvpQ7Ee7
+	80M4To2RXsEO8eFzjtgHLyc2xS0m0XzY757U8ezdoNvJDzcYK9Yu9o+/dd++s9ZQ4/aXxUbwpNwtn
+	8Hs7P7Y9CTmDlUwNowf6U9cSVUOanbeUaQ6cMSDHDECMmakZxlr+dLujDRlO/wWZsGuYmlTePY3ib
+	iWukRW3pm7Yk1blfaZCg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghFOP-00027H-18; Wed, 09 Jan 2019 15:03:41 +0000
+	id 1ghFOi-0002L0-7I; Wed, 09 Jan 2019 15:04:00 +0000
 Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghFNo-0001WX-Qf
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 15:03:07 +0000
+ id 1ghFNp-0001WW-2n
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 15:03:08 +0000
 Received: by wens.csie.org (Postfix, from userid 1000)
- id 523375FCE1; Wed,  9 Jan 2019 23:03:00 +0800 (CST)
+ id 50BF85FCDF; Wed,  9 Jan 2019 23:03:00 +0800 (CST)
 From: Chen-Yu Tsai <wens@csie.org>
 To: Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: [PATCH 3/5] ARM: dts: sun8i: r40: bananapi-m2-ultra: Fix WiFi
- regulator definitions
-Date: Wed,  9 Jan 2019 23:02:55 +0800
-Message-Id: <20190109150257.12602-4-wens@csie.org>
+Subject: [PATCH 2/5] ARM: dts: sun8i: r40: Add pinmux setting for CLK_OUT_A
+Date: Wed,  9 Jan 2019 23:02:54 +0800
+Message-Id: <20190109150257.12602-3-wens@csie.org>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190109150257.12602-1-wens@csie.org>
 References: <20190109150257.12602-1-wens@csie.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_070304_999592_1EAD71E9 
-X-CRM114-Status: GOOD (  13.22  )
+X-CRM114-CacheID: sfid-20190109_070305_244425_ADA30147 
+X-CRM114-Status: UNSURE (   9.69  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,57 +72,33 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The design of the Bananapi M2 Ultra has both DLDO1 and DLDO2 regulators
-provide power to the WiFi+BT module, which is based on the Broadcom
-BCM43438 or BCM43430 chip. Each regulator output from the PMIC can supply
-up to 200 mA. The datasheet of the chip suggests a maximum power draw of
-up to 360 mA when transmitting, thus requiring two outputs from the PMIC
-to handle the load. However the device tree only references one of them,
-leaving the other unused and possibly turned off.
+CLK_OUT_A, an external clock output function driven from the clock
+control unit, on the R40 is sometimes used to provide a low rate low
+power clock to a WiFi or Bluetooth controller.
 
-This patch marks both as always-on, since we don't have a proper binding
-to specify two regulators as "bound together". The name and constraints
-of DLDO2 are also added.
+This patch adds a pinmux setting for it.
 
-Fixes: da7ac948fa93 ("ARM: dts: sun8i: Add board dts file for Banana Pi M2
-		      Ultra")
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/boot/dts/sun8i-r40.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-index 438b7b44dab3..1a6794e63b90 100644
---- a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-+++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-@@ -250,12 +250,27 @@
- 	regulator-name = "vcc-wifi-io";
- };
+diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
+index f1fcfa0bdce0..06b685869f52 100644
+--- a/arch/arm/boot/dts/sun8i-r40.dtsi
++++ b/arch/arm/boot/dts/sun8i-r40.dtsi
+@@ -342,6 +342,11 @@
+ 			#interrupt-cells = <3>;
+ 			#gpio-cells = <3>;
  
-+/*
-+ * Our WiFi chip needs both DLDO2 and DLDO3 to be powered at the same
-+ * time, with the two being in sync, to be able to meet maximum power
-+ * consumption during transmits. Since this is not really supported
-+ * right now, just use the two as always on, and we will fix it later.
-+ */
++			clk_out_a_pin: clk-out-a-pin {
++				pins = "PI12";
++				function = "clk_out_a";
++			};
 +
- &reg_dldo2 {
-+	regulator-always-on;
- 	regulator-min-microvolt = <3300000>;
- 	regulator-max-microvolt = <3300000>;
- 	regulator-name = "vcc-wifi";
- };
- 
-+&reg_dldo3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-wifi-2";
-+};
-+
- &reg_dldo4 {
- 	regulator-min-microvolt = <2500000>;
- 	regulator-max-microvolt = <2500000>;
+ 			gmac_rgmii_pins: gmac-rgmii-pins {
+ 				pins = "PA0", "PA1", "PA2", "PA3",
+ 				       "PA4", "PA5", "PA6", "PA7",
 -- 
 2.20.1
 
