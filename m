@@ -2,57 +2,98 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AA3DAC43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 12:44:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C4FC3C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 12:49:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 701BB206B6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 12:44:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8D270206B6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 12:49:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gqdwN6M5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 701BB206B6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=altlinux.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jhrzqc3Z";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ZTSxkqtI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8D270206B6
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Message-ID:
-	Subject:To:From:Date:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	List-Owner; bh=sBTmuAhtqsQqJD39crcmPEsSI2CuOwuX35Ihx3d4AXs=; b=gqdwN6M5lLxFYe
-	YxlSOFdBt3oe7qbWiEQuC39mHTN+SSRs2BBRdWme+fYt/Hgf2xFSvJNjVdiPjK502733WfBhzFgnX
-	1CvFCp1BBWSMxn2wv8AXHhbCHFqRsJZ4RwxvitMTixbht+pTigYik1Z0hZa/3Kv2993ma9YsFPX1L
-	LlFPOIyd34DZ4C4oIF4ewiIzdxuoUnfCWJX5YM+/hINbX6duqwXmSmeX3R6dVHcfsYvOf4kWxLgV5
-	MzkVVMJ89FZ8oPJ3oHHDjb7p3sLj+G9Ok1nb9uk6qc7sMnNcfFdbfM4iWeBwi0YBFuXly6Sm4Pnca
-	/Nph9TI9mgaIB9Fwn++g==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=wkCL4msqQZS1ys07q3rzDxysXHMMxQTuFVT1ePMpnkc=; b=jhrzqc3ZS4Q0E3
+	xpSOnhVPAuqImpyiLXJHjJuG5HSFfPyPaKrAayWppLWASORKTnhcNb01KJkYzyIpGi/DlRH1+i5EA
+	LeNjyf4kM1BgfB0+uEJ/cnihd82WDI2oc4Wv8wHFJA68JGNvv7utesKRaqwGOsu3Mjlh2V+/VSPJy
+	a0tyVG1T5DpwNcZS7SKnNZex6elUSUHXdiePZhwKMW7pJJ/NiizHcoY+Bd15sAhSRLU1gXd99h522
+	KtVxo0vefyqNvNwfZ73ZQIDPZtQBRqXGs79CpCO2sQEGh2Sz7RQu5OTbtkXyLDn6V/vYbgbhM1AtK
+	FAiDT6tsJhHUu6CODwbQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghDDD-0001ki-LS; Wed, 09 Jan 2019 12:43:59 +0000
-Received: from vmicros1.altlinux.org ([194.107.17.57])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghDD8-0001jV-0A; Wed, 09 Jan 2019 12:43:58 +0000
-Received: from mua.local.altlinux.org (mua.local.altlinux.org [192.168.1.14])
- by vmicros1.altlinux.org (Postfix) with ESMTP id 35F2972CA5E;
- Wed,  9 Jan 2019 15:43:53 +0300 (MSK)
-Received: by mua.local.altlinux.org (Postfix, from userid 508)
- id 2AAA17CCE38; Wed,  9 Jan 2019 15:43:53 +0300 (MSK)
-Date: Wed, 9 Jan 2019 15:43:53 +0300
-From: "Dmitry V. Levin" <ldv@altlinux.org>
-To: Paul Moore <paul@paul-moore.com>
-Subject: [PATCH 14/14] syscall_get_arch: add "struct task_struct *" argument
-Message-ID: <20190109124353.GN11981@altlinux.org>
-References: <20190109124044.GA11935@altlinux.org>
+	id 1ghDIb-0003zM-1j; Wed, 09 Jan 2019 12:49:33 +0000
+Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghDIY-0003yt-1A
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 12:49:31 +0000
+Received: by mail-wm1-x344.google.com with SMTP id g67so8057344wmd.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 09 Jan 2019 04:49:29 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=subject:to:cc:references:from:openpgp:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=wcBNaca/Qk9n+SjvifhK9ulpTQ+WQ8/cjJpk1MT8KgM=;
+ b=ZTSxkqtIJhN6+PVuW2LQYYcHnPNPwwoAi7hbBBnCsGHXDEi02FwiNR8LXeTig/7vzS
+ 5xEpiFBboYHQNWt7jIcbvJeF0ZSaabiVUh9Hr4aluowbp5ozbhjzO3KPuck2kPwmSNUV
+ lSEG2HkLGKiweNfL6DrUU8MRv+aWrR9FZaXj77wNvOlBHogQ8ylxjaHXa2hzqBUdvHlv
+ IsMygolaiGQbuRNltz9OczJclhH6UeUxRsj8NfUFAYv3vOtGYJx78XjAiMDgfHeHGrbz
+ bVX5ycFeFjyx+IQsubuOcm2QBRgkRa7/bqkeOo2Ru9OsRM4uVkp0Kc9KWOihx1BPOOZe
+ gNqg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:openpgp:message-id
+ :date:user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=wcBNaca/Qk9n+SjvifhK9ulpTQ+WQ8/cjJpk1MT8KgM=;
+ b=VFmfErQbBDY9Um2rHmMAlru02DBCw07sH06mscZRLPZiwFE+frzHq7OE0dnZ4cw+RK
+ ZzVYWPzbct//N7taLx1R3HUSHlhhI/tRcOfaKWCclAczkEYm7xwxOCVm6+erPXERSCxR
+ WvEaNNk8auTBLtXx2d1+dbjvPJ9Jue7/V08P932EEzDSTjfM0+bm1p9mGofdEVnQi6Cc
+ zRrBd4mQStBVEm41eE+09xoMNR9LPv31klE+f5ZAr3e6I19dyv9dZDksCFEdGDErm5yH
+ OspBDRlH6MfM8kN65Nu/of1FqEdLWaPDaEZhcYvR0/9/F9EPfzV7ne5gD/q4nykKoPuD
+ q2cQ==
+X-Gm-Message-State: AJcUukdOp9Y2Gqj69Qyj/GAmiamD2w1AbhV2YwsMG36KgttwXtTpUqjJ
+ Hr5crXLP7vlpn5LvFEEY8/7gnDsa
+X-Google-Smtp-Source: ALg8bN53Z4R0vZ855AmaXyWpO6kizzx6sQjIoej6vMUXiHmVSISC1WbO0nOtTjKqpzGv+5SsQXcSLQ==
+X-Received: by 2002:a1c:bd86:: with SMTP id n128mr5469410wmf.22.1547038167785; 
+ Wed, 09 Jan 2019 04:49:27 -0800 (PST)
+Received: from [192.168.1.4] (ip-86-49-110-70.net.upcbroadband.cz.
+ [86.49.110.70])
+ by smtp.gmail.com with ESMTPSA id n82sm13510377wma.42.2019.01.09.04.49.26
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 09 Jan 2019 04:49:27 -0800 (PST)
+Subject: Re: [PATCH V3] arm64: dts: r8a77990: ebisu: Add and enable SDHI
+ device nodes
+To: Simon Horman <horms@verge.net.au>
+References: <20181106204647.18051-1-marek.vasut+renesas@gmail.com>
+ <20190109104922.z6g772vgncdqqbqt@verge.net.au>
+ <20190109105754.vvqx6uvsktvxeq7a@ninjato>
+ <34cd1769-f0c9-0c2b-8947-4fceca9a9fb2@gmail.com>
+ <20190109123259.cpql62omcvypafdu@verge.net.au>
+From: Marek Vasut <marek.vasut@gmail.com>
+Openpgp: preference=signencrypt
+Message-ID: <a77e5b5c-fb77-3180-b382-0654eaf7b2a9@gmail.com>
+Date: Wed, 9 Jan 2019 13:49:26 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-Content-Disposition: inline
+In-Reply-To: <20190109123259.cpql62omcvypafdu@verge.net.au>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_044354_422744_9767678F 
-X-CRM114-Status: GOOD (  13.22  )
+X-CRM114-CacheID: sfid-20190109_044930_098800_D3B930FF 
+X-CRM114-Status: GOOD (  14.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -64,575 +105,55 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-ia64@vger.kernel.org, linux-sh@vger.kernel.org,
- Palmer Dabbelt <palmer@sifive.com>, linux-mips@vger.kernel.org,
- sparclinux@vger.kernel.org, linux-hexagon@vger.kernel.org,
- linux-riscv@lists.infradead.org, linux-arch@vger.kernel.org,
- linux-s390@vger.kernel.org, linux-c6x-dev@linux-c6x.org,
- Michael Ellerman <mpe@ellerman.id.au>, x86@kernel.org,
- Eugene Syromyatnikov <esyr@redhat.com>,
- Elvira Khabirova <lineprinter@altlinux.org>, Mark Salter <msalter@redhat.com>,
- linux-snps-arc@lists.infradead.org, uclinux-h8-devel@lists.sourceforge.jp,
- linux-xtensa@linux-xtensa.org, Kees Cook <keescook@chromium.org>,
- linux-um@lists.infradead.org, linux-m68k@lists.linux-m68k.org,
- openrisc@lists.librecores.org, Andy Lutomirski <luto@kernel.org>,
- linux-arm-kernel@lists.infradead.org, linux-parisc@vger.kernel.org,
- Oleg Nesterov <oleg@redhat.com>, linux-kernel@vger.kernel.org,
- Paul Burton <paul.burton@mips.com>, linux-audit@redhat.com,
- linux-alpha@vger.kernel.org, nios2-dev@lists.rocketboards.org,
- linuxppc-dev@lists.ozlabs.org
+Cc: devicetree@vger.kernel.org, Takeshi Kihara <takeshi.kihara.df@renesas.com>,
+ Geert Uytterhoeven <geert+renesas@glider.be>, Wolfram Sang <wsa@the-dreams.de>,
+ Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>,
+ linux-renesas-soc@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ Marek Vasut <marek.vasut+renesas@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This argument is required to extend the generic ptrace API with
-PTRACE_GET_SYSCALL_INFO request: syscall_get_arch() is going
-to be called from ptrace_request() along with syscall_get_nr(),
-syscall_get_arguments(), syscall_get_error(), and
-syscall_get_return_value() functions with a tracee as their argument.
+On 1/9/19 1:32 PM, Simon Horman wrote:
+> On Wed, Jan 09, 2019 at 01:02:00PM +0100, Marek Vasut wrote:
+>> On 1/9/19 11:57 AM, Wolfram Sang wrote:
+>>>> [    3.373714] renesas_sdhi_internal_dmac ee100000.sd: mmc0 base at 0xee100000 max clock rate 200 MHz
+>>>> [    3.456829] renesas_sdhi_internal_dmac ee120000.sd: mmc1 base at 0xee120000 max clock rate 200 MHz
+>>>
+>>> No mmc2 initialized. That should work regardless of eMMC. Probably
+>>> something wrong in the DT somewhere.
+>>
+>> Weird, it worked in next-20181102 with these patches, I just rechecked:
+>>
+>> 7818a9f06df1 mmc: renesas_sdhi: Whitelist R8A77990 SDHI
+>> a05a906776f8 pinctrl: sh-pfc: r8a77990: Add voltage switch operations
+>> for SDHI
+>> 2cc9d3a293e9 pinctrl: sh-pfc: r8a77990: Add SDHI pins, groups and functions
+>> 6b8d151613b7 pinctrl: sh-pfc: r8a77990: Add Audio SSI pins, groups and
+>> functions
+>> 9167b22938f7 pinctrl: sh-pfc: r8a77990: Add Audio clock pins, groups and
+>> functions
+>> 000cc50fc942 arm64: dts: r8a77990-ebisu: Enable HS200 of SDHI3
+>> d3f59bbbf7ce arm64: dts: r8a77990-ebisu: Enable eMMC of SDHI3
+>> 5928c59bff8d arm64: dts: r8a77990-ebisu: Enable UHS-I of SDHI0 and SDHI1
+>> dae32a3172b8 arm64: dts: r8a77990-ebisu: Enable SD card of SDHI0 and SDHI1
+>> 8feef039c6c6 arm64: dts: r8a77990: Add SDHI device nodes
+>> 25e9471b6a27 (tag: next-20181102) Add linux-next specific files for 20181102
+>>
+>> I'll let you know once I figure it out.
+> 
+> Could it be related to potentially old U-Boot etc.. on the board I am using?
 
-The primary intent is that the triple (audit_arch, syscall_nr, arg1..arg6)
-should describe what system call is being called and what its arguments
-are.
+No, I don't think so (however, you should only use latest greatest of
+course :-) ).
 
-Reverts: 5e937a9ae913 ("syscall_get_arch: remove useless function arguments")
-Reverts: 1002d94d3076 ("syscall.h: fix doc text for syscall_get_arch()")
-Reviewed-by: Andy Lutomirski <luto@kernel.org> # for x86
-Reviewed-by: Palmer Dabbelt <palmer@sifive.com>
-Acked-by: Paul Moore <paul@paul-moore.com>
-Acked-by: Paul Burton <paul.burton@mips.com> # MIPS parts
-Acked-by: Michael Ellerman <mpe@ellerman.id.au> (powerpc)
-Acked-by: Kees Cook <keescook@chromium.org> # seccomp parts
-Acked-by: Mark Salter <msalter@redhat.com> # for the c6x bit
-Cc: Elvira Khabirova <lineprinter@altlinux.org>
-Cc: Eugene Syromyatnikov <esyr@redhat.com>
-Cc: Oleg Nesterov <oleg@redhat.com>
-Cc: x86@kernel.org
-Cc: linux-alpha@vger.kernel.org
-Cc: linux-snps-arc@lists.infradead.org
-Cc: linux-arm-kernel@lists.infradead.org
-Cc: linux-c6x-dev@linux-c6x.org
-Cc: uclinux-h8-devel@lists.sourceforge.jp
-Cc: linux-hexagon@vger.kernel.org
-Cc: linux-ia64@vger.kernel.org
-Cc: linux-m68k@lists.linux-m68k.org
-Cc: linux-mips@vger.kernel.org
-Cc: nios2-dev@lists.rocketboards.org
-Cc: openrisc@lists.librecores.org
-Cc: linux-parisc@vger.kernel.org
-Cc: linuxppc-dev@lists.ozlabs.org
-Cc: linux-riscv@lists.infradead.org
-Cc: linux-s390@vger.kernel.org
-Cc: linux-sh@vger.kernel.org
-Cc: sparclinux@vger.kernel.org
-Cc: linux-um@lists.infradead.org
-Cc: linux-xtensa@linux-xtensa.org
-Cc: linux-arch@vger.kernel.org
-Cc: linux-audit@redhat.com
-Signed-off-by: Dmitry V. Levin <ldv@altlinux.org>
----
- arch/alpha/include/asm/syscall.h      |  2 +-
- arch/arc/include/asm/syscall.h        |  2 +-
- arch/arm/include/asm/syscall.h        |  2 +-
- arch/arm64/include/asm/syscall.h      |  4 ++--
- arch/c6x/include/asm/syscall.h        |  2 +-
- arch/csky/include/asm/syscall.h       |  2 +-
- arch/h8300/include/asm/syscall.h      |  2 +-
- arch/hexagon/include/asm/syscall.h    |  2 +-
- arch/ia64/include/asm/syscall.h       |  2 +-
- arch/m68k/include/asm/syscall.h       |  2 +-
- arch/microblaze/include/asm/syscall.h |  2 +-
- arch/mips/include/asm/syscall.h       |  6 +++---
- arch/mips/kernel/ptrace.c             |  2 +-
- arch/nds32/include/asm/syscall.h      |  2 +-
- arch/nios2/include/asm/syscall.h      |  2 +-
- arch/openrisc/include/asm/syscall.h   |  2 +-
- arch/parisc/include/asm/syscall.h     |  4 ++--
- arch/powerpc/include/asm/syscall.h    | 10 ++++++++--
- arch/riscv/include/asm/syscall.h      |  2 +-
- arch/s390/include/asm/syscall.h       |  4 ++--
- arch/sh/include/asm/syscall_32.h      |  2 +-
- arch/sh/include/asm/syscall_64.h      |  2 +-
- arch/sparc/include/asm/syscall.h      |  5 +++--
- arch/unicore32/include/asm/syscall.h  |  2 +-
- arch/x86/include/asm/syscall.h        |  8 +++++---
- arch/x86/um/asm/syscall.h             |  2 +-
- arch/xtensa/include/asm/syscall.h     |  2 +-
- include/asm-generic/syscall.h         |  5 +++--
- kernel/auditsc.c                      |  4 ++--
- kernel/seccomp.c                      |  4 ++--
- 30 files changed, 52 insertions(+), 42 deletions(-)
+I see this on next/master, but not on next/20181224 right now, so I'm
+bisecting it down.
 
-diff --git a/arch/alpha/include/asm/syscall.h b/arch/alpha/include/asm/syscall.h
-index d73a6fcb519c..11c688c1d7ec 100644
---- a/arch/alpha/include/asm/syscall.h
-+++ b/arch/alpha/include/asm/syscall.h
-@@ -4,7 +4,7 @@
- 
- #include <uapi/linux/audit.h>
- 
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
- 	return AUDIT_ARCH_ALPHA;
- }
-diff --git a/arch/arc/include/asm/syscall.h b/arch/arc/include/asm/syscall.h
-index c7fc4c0c3bcb..caf2697ef5b7 100644
---- a/arch/arc/include/asm/syscall.h
-+++ b/arch/arc/include/asm/syscall.h
-@@ -70,7 +70,7 @@ syscall_get_arguments(struct task_struct *task, struct pt_regs *regs,
- }
- 
- static inline int
--syscall_get_arch(void)
-+syscall_get_arch(struct task_struct *task)
- {
- 	return IS_ENABLED(CONFIG_ISA_ARCOMPACT)
- 		? (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN)
-diff --git a/arch/arm/include/asm/syscall.h b/arch/arm/include/asm/syscall.h
-index 06dea6bce293..3940ceac0bdc 100644
---- a/arch/arm/include/asm/syscall.h
-+++ b/arch/arm/include/asm/syscall.h
-@@ -104,7 +104,7 @@ static inline void syscall_set_arguments(struct task_struct *task,
- 	memcpy(&regs->ARM_r0 + i, args, n * sizeof(args[0]));
- }
- 
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
- 	/* ARM tasks don't change audit architectures on the fly. */
- 	return AUDIT_ARCH_ARM;
-diff --git a/arch/arm64/include/asm/syscall.h b/arch/arm64/include/asm/syscall.h
-index ad8be16a39c9..1870df03f774 100644
---- a/arch/arm64/include/asm/syscall.h
-+++ b/arch/arm64/include/asm/syscall.h
-@@ -117,9 +117,9 @@ static inline void syscall_set_arguments(struct task_struct *task,
-  * We don't care about endianness (__AUDIT_ARCH_LE bit) here because
-  * AArch64 has the same system calls both on little- and big- endian.
-  */
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
--	if (is_compat_task())
-+	if (is_compat_thread(task_thread_info(task)))
- 		return AUDIT_ARCH_ARM;
- 
- 	return AUDIT_ARCH_AARCH64;
-diff --git a/arch/c6x/include/asm/syscall.h b/arch/c6x/include/asm/syscall.h
-index 39dbd1ef994c..595057191c9c 100644
---- a/arch/c6x/include/asm/syscall.h
-+++ b/arch/c6x/include/asm/syscall.h
-@@ -121,7 +121,7 @@ static inline void syscall_set_arguments(struct task_struct *task,
- 	}
- }
- 
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
- 	return IS_ENABLED(CONFIG_CPU_BIG_ENDIAN)
- 		? AUDIT_ARCH_C6XBE : AUDIT_ARCH_C6X;
-diff --git a/arch/csky/include/asm/syscall.h b/arch/csky/include/asm/syscall.h
-index d637445737b7..150ffb894fa2 100644
---- a/arch/csky/include/asm/syscall.h
-+++ b/arch/csky/include/asm/syscall.h
-@@ -70,7 +70,7 @@ syscall_set_arguments(struct task_struct *task, struct pt_regs *regs,
- }
- 
- static inline int
--syscall_get_arch(void)
-+syscall_get_arch(struct task_struct *task)
- {
- 	return AUDIT_ARCH_CSKY;
- }
-diff --git a/arch/h8300/include/asm/syscall.h b/arch/h8300/include/asm/syscall.h
-index 5135910616e2..d316c3d40d4e 100644
---- a/arch/h8300/include/asm/syscall.h
-+++ b/arch/h8300/include/asm/syscall.h
-@@ -49,7 +49,7 @@ syscall_get_arguments(struct task_struct *task, struct pt_regs *regs,
- }
- 
- static inline int
--syscall_get_arch(void)
-+syscall_get_arch(struct task_struct *task)
- {
- 	return AUDIT_ARCH_H8300;
- }
-diff --git a/arch/hexagon/include/asm/syscall.h b/arch/hexagon/include/asm/syscall.h
-index de3917aad3fd..47b0bc3f16be 100644
---- a/arch/hexagon/include/asm/syscall.h
-+++ b/arch/hexagon/include/asm/syscall.h
-@@ -46,7 +46,7 @@ static inline void syscall_get_arguments(struct task_struct *task,
- 	memcpy(args, &(&regs->r00)[i], n * sizeof(args[0]));
- }
- 
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
- 	return AUDIT_ARCH_HEXAGON;
- }
-diff --git a/arch/ia64/include/asm/syscall.h b/arch/ia64/include/asm/syscall.h
-index 1d0b875fec44..47ab33f5448a 100644
---- a/arch/ia64/include/asm/syscall.h
-+++ b/arch/ia64/include/asm/syscall.h
-@@ -81,7 +81,7 @@ static inline void syscall_set_arguments(struct task_struct *task,
- 	ia64_syscall_get_set_arguments(task, regs, i, n, args, 1);
- }
- 
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
- 	return AUDIT_ARCH_IA64;
- }
-diff --git a/arch/m68k/include/asm/syscall.h b/arch/m68k/include/asm/syscall.h
-index d4d7deda8d50..465ac039be09 100644
---- a/arch/m68k/include/asm/syscall.h
-+++ b/arch/m68k/include/asm/syscall.h
-@@ -4,7 +4,7 @@
- 
- #include <uapi/linux/audit.h>
- 
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
- 	return AUDIT_ARCH_M68K;
- }
-diff --git a/arch/microblaze/include/asm/syscall.h b/arch/microblaze/include/asm/syscall.h
-index 220decd605a4..77a86fafa974 100644
---- a/arch/microblaze/include/asm/syscall.h
-+++ b/arch/microblaze/include/asm/syscall.h
-@@ -101,7 +101,7 @@ static inline void syscall_set_arguments(struct task_struct *task,
- asmlinkage unsigned long do_syscall_trace_enter(struct pt_regs *regs);
- asmlinkage void do_syscall_trace_leave(struct pt_regs *regs);
- 
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
- 	return AUDIT_ARCH_MICROBLAZE;
- }
-diff --git a/arch/mips/include/asm/syscall.h b/arch/mips/include/asm/syscall.h
-index 6cf8ffb5367e..6a22c9352ef6 100644
---- a/arch/mips/include/asm/syscall.h
-+++ b/arch/mips/include/asm/syscall.h
-@@ -140,14 +140,14 @@ extern const unsigned long sys_call_table[];
- extern const unsigned long sys32_call_table[];
- extern const unsigned long sysn32_call_table[];
- 
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
- 	int arch = AUDIT_ARCH_MIPS;
- #ifdef CONFIG_64BIT
--	if (!test_thread_flag(TIF_32BIT_REGS)) {
-+	if (!test_tsk_thread_flag(task, TIF_32BIT_REGS)) {
- 		arch |= __AUDIT_ARCH_64BIT;
- 		/* N32 sets only TIF_32BIT_ADDR */
--		if (test_thread_flag(TIF_32BIT_ADDR))
-+		if (test_tsk_thread_flag(task, TIF_32BIT_ADDR))
- 			arch |= __AUDIT_ARCH_CONVENTION_MIPS64_N32;
- 	}
- #endif
-diff --git a/arch/mips/kernel/ptrace.c b/arch/mips/kernel/ptrace.c
-index 0057c910bc2f..2ead6ff919b7 100644
---- a/arch/mips/kernel/ptrace.c
-+++ b/arch/mips/kernel/ptrace.c
-@@ -1418,7 +1418,7 @@ asmlinkage long syscall_trace_enter(struct pt_regs *regs, long syscall)
- 		unsigned long args[6];
- 
- 		sd.nr = syscall;
--		sd.arch = syscall_get_arch();
-+		sd.arch = syscall_get_arch(current);
- 		syscall_get_arguments(current, regs, 0, 6, args);
- 		for (i = 0; i < 6; i++)
- 			sd.args[i] = args[i];
-diff --git a/arch/nds32/include/asm/syscall.h b/arch/nds32/include/asm/syscall.h
-index cc56a3962f8b..7501e376a6b1 100644
---- a/arch/nds32/include/asm/syscall.h
-+++ b/arch/nds32/include/asm/syscall.h
-@@ -188,7 +188,7 @@ void syscall_set_arguments(struct task_struct *task, struct pt_regs *regs,
- }
- 
- static inline int
--syscall_get_arch(void)
-+syscall_get_arch(struct task_struct *task)
- {
- 	return IS_ENABLED(CONFIG_CPU_BIG_ENDIAN)
- 		? AUDIT_ARCH_NDS32BE : AUDIT_ARCH_NDS32;
-diff --git a/arch/nios2/include/asm/syscall.h b/arch/nios2/include/asm/syscall.h
-index cf35e210fc4d..f0f6ae208e78 100644
---- a/arch/nios2/include/asm/syscall.h
-+++ b/arch/nios2/include/asm/syscall.h
-@@ -136,7 +136,7 @@ static inline void syscall_set_arguments(struct task_struct *task,
- 	}
- }
- 
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
- 	return AUDIT_ARCH_NIOS2;
- }
-diff --git a/arch/openrisc/include/asm/syscall.h b/arch/openrisc/include/asm/syscall.h
-index 2db9f1cf0694..46b10c674bd2 100644
---- a/arch/openrisc/include/asm/syscall.h
-+++ b/arch/openrisc/include/asm/syscall.h
-@@ -72,7 +72,7 @@ syscall_set_arguments(struct task_struct *task, struct pt_regs *regs,
- 	memcpy(&regs->gpr[3 + i], args, n * sizeof(args[0]));
- }
- 
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
- 	return AUDIT_ARCH_OPENRISC;
- }
-diff --git a/arch/parisc/include/asm/syscall.h b/arch/parisc/include/asm/syscall.h
-index 8bff1a58c97f..c04ffc6ac928 100644
---- a/arch/parisc/include/asm/syscall.h
-+++ b/arch/parisc/include/asm/syscall.h
-@@ -62,11 +62,11 @@ static inline void syscall_rollback(struct task_struct *task,
- 	/* do nothing */
- }
- 
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
- 	int arch = AUDIT_ARCH_PARISC;
- #ifdef CONFIG_64BIT
--	if (!is_compat_task())
-+	if (!__is_compat_task(task))
- 		arch = AUDIT_ARCH_PARISC64;
- #endif
- 	return arch;
-diff --git a/arch/powerpc/include/asm/syscall.h b/arch/powerpc/include/asm/syscall.h
-index 1a0e7a8b1c81..efb50429c9f4 100644
---- a/arch/powerpc/include/asm/syscall.h
-+++ b/arch/powerpc/include/asm/syscall.h
-@@ -99,9 +99,15 @@ static inline void syscall_set_arguments(struct task_struct *task,
- 		regs->orig_gpr3 = args[0];
- }
- 
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
--	int arch = is_32bit_task() ? AUDIT_ARCH_PPC : AUDIT_ARCH_PPC64;
-+	int arch;
-+
-+	if (IS_ENABLED(CONFIG_PPC64) && !test_tsk_thread_flag(task, TIF_32BIT))
-+		arch = AUDIT_ARCH_PPC64;
-+	else
-+		arch = AUDIT_ARCH_PPC;
-+
- #ifdef __LITTLE_ENDIAN__
- 	arch |= __AUDIT_ARCH_LE;
- #endif
-diff --git a/arch/riscv/include/asm/syscall.h b/arch/riscv/include/asm/syscall.h
-index bba3da6ef157..ca120a36a037 100644
---- a/arch/riscv/include/asm/syscall.h
-+++ b/arch/riscv/include/asm/syscall.h
-@@ -100,7 +100,7 @@ static inline void syscall_set_arguments(struct task_struct *task,
- 	memcpy(&regs->a1 + i * sizeof(regs->a1), args, n * sizeof(regs->a0));
- }
- 
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
- #ifdef CONFIG_64BIT
- 	return AUDIT_ARCH_RISCV64;
-diff --git a/arch/s390/include/asm/syscall.h b/arch/s390/include/asm/syscall.h
-index 96f9a9151fde..5a40ea8b90ea 100644
---- a/arch/s390/include/asm/syscall.h
-+++ b/arch/s390/include/asm/syscall.h
-@@ -92,10 +92,10 @@ static inline void syscall_set_arguments(struct task_struct *task,
- 		regs->orig_gpr2 = args[0];
- }
- 
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
- #ifdef CONFIG_COMPAT
--	if (test_tsk_thread_flag(current, TIF_31BIT))
-+	if (test_tsk_thread_flag(task, TIF_31BIT))
- 		return AUDIT_ARCH_S390;
- #endif
- 	return AUDIT_ARCH_S390X;
-diff --git a/arch/sh/include/asm/syscall_32.h b/arch/sh/include/asm/syscall_32.h
-index 6e118799831c..08de429eccd4 100644
---- a/arch/sh/include/asm/syscall_32.h
-+++ b/arch/sh/include/asm/syscall_32.h
-@@ -95,7 +95,7 @@ static inline void syscall_set_arguments(struct task_struct *task,
- 	}
- }
- 
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
- 	int arch = AUDIT_ARCH_SH;
- 
-diff --git a/arch/sh/include/asm/syscall_64.h b/arch/sh/include/asm/syscall_64.h
-index 43882580c7f9..9b62a2404531 100644
---- a/arch/sh/include/asm/syscall_64.h
-+++ b/arch/sh/include/asm/syscall_64.h
-@@ -63,7 +63,7 @@ static inline void syscall_set_arguments(struct task_struct *task,
- 	memcpy(&regs->regs[2 + i], args, n * sizeof(args[0]));
- }
- 
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
- 	int arch = AUDIT_ARCH_SH;
- 
-diff --git a/arch/sparc/include/asm/syscall.h b/arch/sparc/include/asm/syscall.h
-index 053989e3f6a6..9ffb367c17fd 100644
---- a/arch/sparc/include/asm/syscall.h
-+++ b/arch/sparc/include/asm/syscall.h
-@@ -128,10 +128,11 @@ static inline void syscall_set_arguments(struct task_struct *task,
- 		regs->u_regs[UREG_I0 + i + j] = args[j];
- }
- 
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
- #if defined(CONFIG_SPARC64) && defined(CONFIG_COMPAT)
--	return in_compat_syscall() ? AUDIT_ARCH_SPARC : AUDIT_ARCH_SPARC64;
-+	return test_tsk_thread_flag(task, TIF_32BIT)
-+		? AUDIT_ARCH_SPARC : AUDIT_ARCH_SPARC64;
- #elif defined(CONFIG_SPARC64)
- 	return AUDIT_ARCH_SPARC64;
- #else
-diff --git a/arch/unicore32/include/asm/syscall.h b/arch/unicore32/include/asm/syscall.h
-index 3a6b885476b4..607961797fff 100644
---- a/arch/unicore32/include/asm/syscall.h
-+++ b/arch/unicore32/include/asm/syscall.h
-@@ -4,7 +4,7 @@
- 
- #include <uapi/linux/audit.h>
- 
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
- 	return AUDIT_ARCH_UNICORE;
- }
-diff --git a/arch/x86/include/asm/syscall.h b/arch/x86/include/asm/syscall.h
-index d653139857af..435f3f09279c 100644
---- a/arch/x86/include/asm/syscall.h
-+++ b/arch/x86/include/asm/syscall.h
-@@ -107,7 +107,7 @@ static inline void syscall_set_arguments(struct task_struct *task,
- 	memcpy(&regs->bx + i, args, n * sizeof(args[0]));
- }
- 
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
- 	return AUDIT_ARCH_I386;
- }
-@@ -236,10 +236,12 @@ static inline void syscall_set_arguments(struct task_struct *task,
- 		}
- }
- 
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
- 	/* x32 tasks should be considered AUDIT_ARCH_X86_64. */
--	return in_ia32_syscall() ? AUDIT_ARCH_I386 : AUDIT_ARCH_X86_64;
-+	return (IS_ENABLED(CONFIG_IA32_EMULATION) &&
-+		task->thread_info.status & TS_COMPAT)
-+		? AUDIT_ARCH_I386 : AUDIT_ARCH_X86_64;
- }
- #endif	/* CONFIG_X86_32 */
- 
-diff --git a/arch/x86/um/asm/syscall.h b/arch/x86/um/asm/syscall.h
-index ef898af102d1..56a2f0913e3c 100644
---- a/arch/x86/um/asm/syscall.h
-+++ b/arch/x86/um/asm/syscall.h
-@@ -9,7 +9,7 @@ typedef asmlinkage long (*sys_call_ptr_t)(unsigned long, unsigned long,
- 					  unsigned long, unsigned long,
- 					  unsigned long, unsigned long);
- 
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
- #ifdef CONFIG_X86_32
- 	return AUDIT_ARCH_I386;
-diff --git a/arch/xtensa/include/asm/syscall.h b/arch/xtensa/include/asm/syscall.h
-index a168bf81c7f4..0681ca656809 100644
---- a/arch/xtensa/include/asm/syscall.h
-+++ b/arch/xtensa/include/asm/syscall.h
-@@ -14,7 +14,7 @@
- #include <asm/ptrace.h>
- #include <uapi/linux/audit.h>
- 
--static inline int syscall_get_arch(void)
-+static inline int syscall_get_arch(struct task_struct *task)
- {
- 	return AUDIT_ARCH_XTENSA;
- }
-diff --git a/include/asm-generic/syscall.h b/include/asm-generic/syscall.h
-index 0c938a4354f6..e0d060b43321 100644
---- a/include/asm-generic/syscall.h
-+++ b/include/asm-generic/syscall.h
-@@ -144,14 +144,15 @@ void syscall_set_arguments(struct task_struct *task, struct pt_regs *regs,
- 
- /**
-  * syscall_get_arch - return the AUDIT_ARCH for the current system call
-+ * @task:	task of interest, must be blocked
-  *
-  * Returns the AUDIT_ARCH_* based on the system call convention in use.
-  *
-- * It's only valid to call this when current is stopped on entry to a system
-+ * It's only valid to call this when @task is stopped on entry to a system
-  * call, due to %TIF_SYSCALL_TRACE, %TIF_SYSCALL_AUDIT, or %TIF_SECCOMP.
-  *
-  * Architectures which permit CONFIG_HAVE_ARCH_SECCOMP_FILTER must
-  * provide an implementation of this.
-  */
--int syscall_get_arch(void);
-+int syscall_get_arch(struct task_struct *task);
- #endif	/* _ASM_SYSCALL_H */
-diff --git a/kernel/auditsc.c b/kernel/auditsc.c
-index 6593a5207fb0..919fe4ef4314 100644
---- a/kernel/auditsc.c
-+++ b/kernel/auditsc.c
-@@ -1505,7 +1505,7 @@ void __audit_syscall_entry(int major, unsigned long a1, unsigned long a2,
- 			return;
- 	}
- 
--	context->arch	    = syscall_get_arch();
-+	context->arch	    = syscall_get_arch(current);
- 	context->major      = major;
- 	context->argv[0]    = a1;
- 	context->argv[1]    = a2;
-@@ -2480,7 +2480,7 @@ void audit_seccomp(unsigned long syscall, long signr, int code)
- 		return;
- 	audit_log_task(ab);
- 	audit_log_format(ab, " sig=%ld arch=%x syscall=%ld compat=%d ip=0x%lx code=0x%x",
--			 signr, syscall_get_arch(), syscall,
-+			 signr, syscall_get_arch(current), syscall,
- 			 in_compat_syscall(), KSTK_EIP(current), code);
- 	audit_log_end(ab);
- }
-diff --git a/kernel/seccomp.c b/kernel/seccomp.c
-index d7f538847b84..803a69e6af37 100644
---- a/kernel/seccomp.c
-+++ b/kernel/seccomp.c
-@@ -148,7 +148,7 @@ static void populate_seccomp_data(struct seccomp_data *sd)
- 	unsigned long args[6];
- 
- 	sd->nr = syscall_get_nr(task, regs);
--	sd->arch = syscall_get_arch();
-+	sd->arch = syscall_get_arch(task);
- 	syscall_get_arguments(task, regs, 0, 6, args);
- 	sd->args[0] = args[0];
- 	sd->args[1] = args[1];
-@@ -589,7 +589,7 @@ static void seccomp_init_siginfo(kernel_siginfo_t *info, int syscall, int reason
- 	info->si_code = SYS_SECCOMP;
- 	info->si_call_addr = (void __user *)KSTK_EIP(current);
- 	info->si_errno = reason;
--	info->si_arch = syscall_get_arch();
-+	info->si_arch = syscall_get_arch(current);
- 	info->si_syscall = syscall;
- }
- 
 -- 
-ldv
+Best regards,
+Marek Vasut
 
 _______________________________________________
 linux-arm-kernel mailing list
