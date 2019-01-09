@@ -2,80 +2,70 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 259BDC43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 19:00:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 02C8BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 19:02:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E7C2C20859
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 19:00:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C6F94214C6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 19:02:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Dj6OBU59"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E7C2C20859
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tVLnrmO5";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="x4HtUP4r"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C6F94214C6
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Subject:References:
-	In-Reply-To:Message-ID:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Date:Message-ID:References:From:
+	In-Reply-To:To:Subject:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Br3OlnDvc2GwrFnzw0p7VN466T/uot+Hh1vIGuvkbSI=; b=Dj6OBU59Dv56YK
-	oCUaRJJ6ad7dCcHHuWLk53n1Kbspd1J+28np6QGMPg+XkDhTaln2n5jQknYq8xF3KvFJBueUjuRui
-	L7PCLvx+48z3nXfVhgFYuXZFmIa44hWC8m5McIcHMta2VouTshE6FzfMoEmkohoJOmXjTcYfTJDzY
-	7x9q/Av1C6JIZQtpBdFK5n3sPAjSsSMIqHp7WO7X/D6V/My8a4LxVWxizsrDFR5nK88/iEZ8GJ8TT
-	OaliMy/LdOX5Y4PlyPscKXnDgFQ4unIc7OtLL4H7DJRhs3VgB1+OWltwWBSVelA3qmvnJhUFmSHjp
-	NjQKNOXbMbk2NGdbaU8A==;
+	List-Owner; bh=iCCMSdt5/p8euuk79HZ2ANcx/egF+qSbgZKDmQ3ehpg=; b=tVLnrmO5TDyVE0
+	lJHf78USZM73SyXDCGjcSdVtal9qX/LJ66FDtk749DJaI9K5luIauxMgjMYxjFKFQ5oCQzqqU6JRX
+	t+oL6B99d8b40+8is1SlXBXX+16hivgiULpo4BMSdgGxNavlP28NLkctGno/+5bWv5/+Saf/DdJN1
+	4+pI1W7QwnnnXLM1mBfDrYSJVWEJOaq6BJw8FvNUeannM7vNsNZNSxcwFvKRw37yOQu33Ft6xCkw/
+	0ztCPP+DAEeTv6CjrEVmsMP/hqK0SHNfot72RkCDCtuAUIr07jDH8p7XEwZ4eUPKiekOLi30v8Xb1
+	0s9IvsKs850BNRaqAU8Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghJ5s-0006Rw-7u; Wed, 09 Jan 2019 19:00:48 +0000
-Received: from mout.kundenserver.de ([212.227.126.134])
+	id 1ghJ7K-0006kF-8E; Wed, 09 Jan 2019 19:02:18 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghJ5o-0006RL-Sp; Wed, 09 Jan 2019 19:00:46 +0000
-Received: from oxbsltgw03.schlund.de ([172.19.249.20]) by
- mrelayeu.kundenserver.de (mreue010 [213.165.67.97]) with ESMTPSA (Nemesis) id
- 1MQdpG-1gsnov1vMc-00NmAx; Wed, 09 Jan 2019 20:00:15 +0100
-Date: Wed, 9 Jan 2019 20:00:13 +0100 (CET)
-From: Stefan Wahren <stefan.wahren@i2se.com>
-To: Eric Anholt <eric@anholt.net>, Florian Fainelli <f.fainelli@gmail.com>,
- linux-watchdog@vger.kernel.org, devicetree@vger.kernel.org,
- Guenter Roeck <linux@roeck-us.net>,
- Wim Van Sebroeck <wim@linux-watchdog.org>,
- Lee Jones <lee.jones@linaro.org>, Mark Rutland <mark.rutland@arm.com>,
- Rob Herring <robh+dt@kernel.org>
-Message-ID: <1966518233.54588.1547060413944@email.ionos.de>
-In-Reply-To: <7dde45e2-8e26-5051-dea6-da3566bb5e0e@i2se.com>
-References: <20181212235150.6491-1-eric@anholt.net>
- <7dde45e2-8e26-5051-dea6-da3566bb5e0e@i2se.com>
-Subject: Re: [PATCH v4 0/5] BCM2835 PM driver
+ id 1ghJ7H-0006jw-KT
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 19:02:17 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id F06A520859;
+ Wed,  9 Jan 2019 19:02:14 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1547060535;
+ bh=xEQ+uwwNmBSO6YrILiY5f68pgyJrj4JJtuMkMHixFL8=;
+ h=Subject:Cc:To:In-Reply-To:From:References:Date:From;
+ b=x4HtUP4r7Z7S1AaBRHjJuFXknL1dERwBJBqbT2EiHPNM03S2+VH9WATY3XsXGGp0J
+ hTDwO0PvTGlpsR2Ws4O/Bf6gGCEtsraPnoksvunuYuDgWKH+s1D3xk8KmFyIJPVwUK
+ DFaug8z2azAcZM5nP3iplrlQeZIIRYqn6AEdG/kY=
 MIME-Version: 1.0
-X-Priority: 3
-Importance: Medium
-X-Mailer: Open-Xchange Mailer v7.8.4-Rev47
-X-Originating-Client: open-xchange-appsuite
-X-Provags-ID: V03:K1:xe9R5NiMj5STj4jz1+DejXlRv4idZiMxmQwZyvUdKsCduF8oMsW
- A0Zi21xKcDqhGFwhkeneIdrV/aoL37XFrjVlQPj4BT628jYyEegl/tHTfZBimhqkUPo3EAM
- hg+8JeqTf3IeXL9Nna5s+jFTqFePa0sApA/B8wjJeBXAp3mju3EYSXt3IBK2oqdLZmpTmD4
- K5dSRPWaDgBs9cm0pN/Dg==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:cEN39ddn6aI=:o3oBq9HYGiR1Fwm4iPZXAK
- +9nsslsvaCMFLziOrafwf0jKO8/klF9OJ809tks57L8n6nAQ4SXA7XBee43UqQ1i4Bi3Io8Vv
- i+gj++ILw9pbPSdrUcR1bIUHUxNwCB5aCORiPrPA8EQUpaB07uJHwvGC1vvRIua7kdej2Swyg
- NRGZbkBNdRllUTKNafx16keGEF8sm8AZjNzvwFRVTczgjWaDrShRABgPTM5Q0GiVwdgQ6Lq0R
- WVstAmsNClCUFVEcIreIRTXtyH1LoTvo0Hw6T9VjXll44oOB+3IA+RWhsG5+Ihe6XVOzKNyJV
- Liid4Zmlweii2A0TiLT0aw/EaOQpjtHZWM/K6RtIQCJEiPMkkNUxMDPXtuTDXHHiw96ypnN1S
- tGhF8uEOPTCkNUNlw4UlhtpH3D+J1ktqq/iZMIUlL13WVdjnkHbKIWnzg5EDZHEWNsU2+hN8m
- HX4gV4IZtrTudnZoe2t2wgl5Xqq2E6bHEtb+T3hILUkI6FgxK0lacHgB9nKVcFQ5P3J+l4cK9
- srQ0vjTgH2zsEYEVZ3nTsW4TLwDFtdidLNAk9bm5mBvMcWTOWtXc8kH1uJ7x4byAOMAylUMYE
- 9spRqEJ1uAw/u/JzqqUGGFk3FYrXcHLsoki2xR0RyWAKZPEZX+NEWiLbR37giq2xHrcIjN0ny
- EuTlZGyGmdWTP0USt50kuh+j/wHBq4UPo/XZvPFQflxEdB74d5r1a58lS1TWuQnnfjBHhBdsK
- 0mASgBbugV98sDt8flr6zoXHgTfViLcNh2BFCY+AyJLmOaRauij5ohFEFEc=
+Subject: Re: [PATCH 1/3] clk: imx: Make parent_names const pointer in
+ composite-8m
+To: Abel Vesa <abel.vesa@nxp.com>, Aisheng Dong <aisheng.dong@nxp.com>,
+ Sascha Hauer <kernel@pengutronix.de>, Shawn Guo <shawnguo@kernel.org>
+In-Reply-To: <1544801400-18951-2-git-send-email-abel.vesa@nxp.com>
+From: Stephen Boyd <sboyd@kernel.org>
+User-Agent: alot/0.8
+References: <1544801400-18951-1-git-send-email-abel.vesa@nxp.com>
+ <1544801400-18951-2-git-send-email-abel.vesa@nxp.com>
+Message-ID: <154706053417.15366.4490138181504807265@swboyd.mtv.corp.google.com>
+Date: Wed, 09 Jan 2019 11:02:14 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_110045_234991_A19B18FD 
-X-CRM114-Status: GOOD (  11.40  )
+X-CRM114-CacheID: sfid-20190109_110215_686657_71B81FBF 
+X-CRM114-Status: UNSURE (   5.87  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,33 +77,23 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: bcm-kernel-feedback-list@broadcom.com, linux-rpi-kernel@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
+Cc: dl-linux-imx <linux-imx@nxp.com>, Abel Vesa <abel.vesa@nxp.com>,
+ "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Quoting Abel Vesa (2018-12-14 07:30:09)
+> The parent_names needs to be pointer to const pointer to const char.
+> 
+> Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
+> ---
 
-> Stefan Wahren <stefan.wahren@i2se.com> hat am 3. Januar 2019 um 16:56 geschrieben:
-> 
-> 
-> Hi Eric,
-> 
-> Am 13.12.2018 um 00:51 schrieb Eric Anholt:
-> > v4 adds the system-power-controller node to the binding as requested
-> > by Stefan.  No driver changes are added to make the power controller
-> > behavior optional yet, since it's really unrelated to this series.
-> >
-> apologize for my late reply. This whole series is
-> 
-> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
-> 
+Applied to clk-next
 
-Applied to bcm2835-drivers-next / bcm2835-dt-next
-
-Thanks
-Stefan
 
 _______________________________________________
 linux-arm-kernel mailing list
