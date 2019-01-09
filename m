@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F1275C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 15:04:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E99CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 15:11:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B283E206BB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 15:04:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 60BFA206B6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 15:11:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="j3XqBV32"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B283E206BB
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NnjogeYZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 60BFA206B6
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,34 +25,34 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=iJiJiswlJy2RGrbWD2ULc8KAAwr1TdqzMnYmWgqCX7o=; b=j3XqBV323a8hFq
-	33M/+q3g8BlP8/ILZq80oXKlj26OO4m8NDms6DEADyIzYGvOcFvbxxu5qVxAf1mBop2ZKNyzrblRC
-	7nkQcwRfrTZsSIT4+DoLusUAxThZ8ZCfh3AJrX9TwwQ3LjofuPQIgFInyM82hm+gtMzAGhvpQ7Ee7
-	80M4To2RXsEO8eFzjtgHLyc2xS0m0XzY757U8ezdoNvJDzcYK9Yu9o+/dd++s9ZQ4/aXxUbwpNwtn
-	8Hs7P7Y9CTmDlUwNowf6U9cSVUOanbeUaQ6cMSDHDECMmakZxlr+dLujDRlO/wWZsGuYmlTePY3ib
-	iWukRW3pm7Yk1blfaZCg==;
+	List-Owner; bh=ubfmdvjosT+xMuYomk+W3/J5YMf9HqUNloS1uwd8KZ8=; b=NnjogeYZU5RT1g
+	KOr/b9er+gwbxDzZ3AsiZXA8OEE4c9lVb5RcC1q5NWKHK+EkOzCgh4+m1tS7KyOq/IoueuKWrxXKK
+	gHIgiS+N/xvZM3RhBUZB69gFQAJqzM2C8+ykWjMhDm/VgePEdF4h0VIaBTYHxXLW5/SBPRUkOQ0ID
+	7Ncf42/7yCVWgJaTsMuiJTv/Mss6gil3wqTmsfntZKsTxfmrtI27oTQ0+OBNt/c+U+dtpKlBIMU5e
+	Sl2XUGzhLBjCa2KM4PHUBlmxyV+8gLLvUrX+9CvPu7dEG4s8+0KIM71AurAqFv6BN6gU1NkLv4+lG
+	/o9rPwqQbaZ0SZUTpXRw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghFOi-0002L0-7I; Wed, 09 Jan 2019 15:04:00 +0000
+	id 1ghFW8-0005ov-Pq; Wed, 09 Jan 2019 15:11:40 +0000
 Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghFNp-0001WW-2n
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 15:03:08 +0000
+ id 1ghFNr-0001YC-93
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 15:03:12 +0000
 Received: by wens.csie.org (Postfix, from userid 1000)
- id 50BF85FCDF; Wed,  9 Jan 2019 23:03:00 +0800 (CST)
+ id 615535FD43; Wed,  9 Jan 2019 23:03:00 +0800 (CST)
 From: Chen-Yu Tsai <wens@csie.org>
 To: Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: [PATCH 2/5] ARM: dts: sun8i: r40: Add pinmux setting for CLK_OUT_A
-Date: Wed,  9 Jan 2019 23:02:54 +0800
-Message-Id: <20190109150257.12602-3-wens@csie.org>
+Subject: [PATCH 5/5] ARM: dts: sunxi: bananapi-m2-plus: Add Bluetooth device
+ node
+Date: Wed,  9 Jan 2019 23:02:57 +0800
+Message-Id: <20190109150257.12602-6-wens@csie.org>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190109150257.12602-1-wens@csie.org>
 References: <20190109150257.12602-1-wens@csie.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_070305_244425_ADA30147 
-X-CRM114-Status: UNSURE (   9.69  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190109_070307_638447_C781308D 
+X-CRM114-Status: GOOD (  14.13  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,33 +72,58 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-CLK_OUT_A, an external clock output function driven from the clock
-control unit, on the R40 is sometimes used to provide a low rate low
-power clock to a WiFi or Bluetooth controller.
+The AP6212 is based on the Broadcom BCM43430 or BCM43438. The WiFi side
+identifies as BCM43430, while the Bluetooth side identifies as BCM43438.
 
-This patch adds a pinmux setting for it.
+The Bluetooth side is connected to UART1 in a 4 wire configuration. Same
+as the WiFi side, due to being the same chip and package, the board's
+fixed 3.3V power regulator provides overall power via VBAT and I/O power
+via VDDIO. The RTC clock output from the SoC provides the LPO low power
+clock at 32.768 kHz.
+
+This patch enables Bluetooth on this board, and also adds the missing
+LPO clock on the WiFi side. There is also a PCM connection for
+Bluetooth, but this is not covered here.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-r40.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
-index f1fcfa0bdce0..06b685869f52 100644
---- a/arch/arm/boot/dts/sun8i-r40.dtsi
-+++ b/arch/arm/boot/dts/sun8i-r40.dtsi
-@@ -342,6 +342,11 @@
- 			#interrupt-cells = <3>;
- 			#gpio-cells = <3>;
+diff --git a/arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi b/arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi
+index b3283aeb5b7d..3bed375b9c03 100644
+--- a/arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi
++++ b/arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi
+@@ -103,6 +103,8 @@
+ 		compatible = "mmc-pwrseq-simple";
+ 		pinctrl-names = "default";
+ 		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
++		clocks = <&rtc 1>;
++		clock-names = "ext_clock";
+ 	};
+ };
  
-+			clk_out_a_pin: clk-out-a-pin {
-+				pins = "PI12";
-+				function = "clk_out_a";
-+			};
+@@ -215,7 +217,19 @@
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
+-	status = "okay";
++	uart-has-rtscts;
++	status = "okay";
 +
- 			gmac_rgmii_pins: gmac-rgmii-pins {
- 				pins = "PA0", "PA1", "PA2", "PA3",
- 				       "PA4", "PA5", "PA6", "PA7",
++	bluetooth {
++		compatible = "brcm,bcm43438-bt";
++		clocks = <&rtc 1>;
++		clock-names = "lpo";
++		vbat-supply = <&reg_vcc3v3>;
++		vddio-supply = <&reg_vcc3v3>;
++		device-wakeup-gpios = <&pio 6 13 GPIO_ACTIVE_HIGH>; /* PG13 */
++		host-wakeup-gpios = <&pio 6 11 GPIO_ACTIVE_HIGH>; /* PG11 */
++		shutdown-gpios = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
++	};
+ };
+ 
+ &usb_otg {
 -- 
 2.20.1
 
