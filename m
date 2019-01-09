@@ -2,22 +2,22 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_MUTT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 911A4C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 16:04:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E650DC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 16:07:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5EEE9206B6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 16:04:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B5EDB214C6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 16:07:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Pr3m6Fjm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5EEE9206B6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="haBvw8rf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B5EDB214C6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-mips.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,45 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2Zwn/ZX5NRzjQVV9cyFa7aToGVFc+DeMIPpNIJrwtkg=; b=Pr3m6Fjm0Hr1w+
-	vnSuJzfrVpmV3lv1Q+T44KO21OFfkf+VGk4JVgdAL9NKztbQ+ShLXWHkn/LV2YRpD1kgvodpkSk3s
-	JRAMjr9JnQ+9hvF2xr/KdoG7DfThay6wgff7B2DIPCZsOObJYiAX0B+ToND7yZHasC/MEQm1dxPrB
-	bfAVW9u4pqy6pfJ+FWDveUl2o8KKoSU5SUrSVnQdoa0XnmZiDfRRxzm1WwbuNWYnyRjL6e5hT1C8H
-	XjdGxIPRJWu4ZT5abS2KM+0QA1qzLkaJVkWerIPolE/R41KoI9tl3bFGW+qXTe9IWln2OLMCj12BI
-	E6tTAIBYir0iraiG/kIw==;
+	List-Owner; bh=fw1Nd1Td8OxFtvwoLhQYcQzdnew0s4q+K5XhUo+r9ZM=; b=haBvw8rff2Qn/R
+	2KG0jLkRahescdc8t1ASGaNCNHYvPv+IaqpJsrfdy1KQgAR3dGfXog35bz3WYYXuaC2CL0i+dAqML
+	R47YCYPjYVdjVAu3rrfmkjwd6W0/G/iWlzrYW5EyBSZr+ayQpwQm0vSxrVdPk8I/T6eDB7SYCaLoU
+	DE2LJjDO1DQgN1TMQHxh7nA8hZQaAxNJQKy5kqhepan3dPXgaURCLEqrNXzW898SJlrskWozMHGUz
+	pGHmVm1Fg12hlOks8U19VXmUqm91Hhc689fWxxTIimYwMpycSiOm3CAZkgiQCj6mUCxkjclNZf5vB
+	u/GcCWons8N4UmiFy1Vg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghGKw-00015s-OG; Wed, 09 Jan 2019 16:04:10 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1ghGON-0002lu-62; Wed, 09 Jan 2019 16:07:43 +0000
+Received: from eddie.linux-mips.org ([148.251.95.138] helo=cvs.linux-mips.org)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghGKu-00015X-8M
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 16:04:09 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 605E7A78;
- Wed,  9 Jan 2019 08:04:07 -0800 (PST)
-Received: from localhost (unknown [10.37.6.11])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E76373F5AF;
- Wed,  9 Jan 2019 08:04:06 -0800 (PST)
-Date: Wed, 9 Jan 2019 16:04:05 +0000
-From: Andrew Murray <andrew.murray@arm.com>
-To: Marc Zyngier <marc.zyngier@arm.com>
-Subject: Re: [PATCH 2/3] arm64: KVM: Allow for direct call of HYP functions
- when using VHE
-Message-ID: <20190109160404.GI56789@e119886-lin.cambridge.arm.com>
-References: <20190109135435.178664-1-marc.zyngier@arm.com>
- <20190109135435.178664-3-marc.zyngier@arm.com>
- <20190109142407.GH56789@e119886-lin.cambridge.arm.com>
- <a4f68a4c-5e5c-a60e-2f24-712028689422@arm.com>
- <e09db09d-e781-00d7-5247-525969413e44@arm.com>
- <c64d0652-3a29-4393-86d5-2e453e218d22@arm.com>
+ id 1ghGOK-0002lW-0e
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 16:07:41 +0000
+Received: (from localhost user: 'ladis' uid#1021 fake: STDIN
+ (ladis@eddie.linux-mips.org)) by eddie.linux-mips.org
+ id S23993997AbfAIQHhQ3aSs (ORCPT
+ <rfc822;linux-arm-kernel@lists.infradead.org>);
+ Wed, 9 Jan 2019 17:07:37 +0100
+Date: Wed, 9 Jan 2019 17:07:36 +0100
+From: Ladislav Michl <ladis@linux-mips.org>
+To: Vincent Guittot <vincent.guittot@linaro.org>
+Subject: Re: Regression in v5.0-rc1 with autosuspend hrtimers
+Message-ID: <20190109160736.GA7416@lenoch>
+References: <20190108155354.GL5544@atomide.com>
+ <CAKfTPtCoOK-cYLXJ--sOfpVa9RVmzOAEN1+zB2qHMCzkJN0qaQ@mail.gmail.com>
+ <20190108213743.GN5544@atomide.com>
+ <20190109014218.GA8363@linaro.org> <20190109111703.GA28605@lenoch>
+ <CAKfTPtBvzZvJNxBRMbGbNFBYG0-pAR-P7X2=KrBWH01OMWvJYA@mail.gmail.com>
+ <20190109115824.GA1353@lenoch>
+ <CAKfTPtAAgYYW8A1LDg18bM=5vCAMDbQ05APp9QWSaifW=F0SgQ@mail.gmail.com>
+ <20190109133337.GA13579@lenoch>
+ <CAKfTPtAsENRKh_wTFXCLW2_MdMBug+tV2KtjC7x6RigN7hgPmw@mail.gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <c64d0652-3a29-4393-86d5-2e453e218d22@arm.com>
-User-Agent: Mutt/1.10.1+81 (426a6c1) (2018-08-26)
+In-Reply-To: <CAKfTPtAsENRKh_wTFXCLW2_MdMBug+tV2KtjC7x6RigN7hgPmw@mail.gmail.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_080408_308244_DA8B1617 
-X-CRM114-Status: GOOD (  25.85  )
+X-CRM114-CacheID: sfid-20190109_080740_054261_DEAD1EA1 
+X-CRM114-Status: GOOD (  16.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,105 +75,169 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kvm@vger.kernel.org, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org, Julien Thierry <julien.thierry@arm.com>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>,
+ "open list:THERMAL" <linux-pm@vger.kernel.org>,
+ Tony Lindgren <tony@atomide.com>,
+ "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>, linux-omap@vger.kernel.org,
+ LAK <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 09, 2019 at 04:01:56PM +0000, Marc Zyngier wrote:
-> On 09/01/2019 14:51, Julien Thierry wrote:
-> > 
-> > 
-> > On 09/01/2019 14:45, Marc Zyngier wrote:
-> >> Hi Andrew,
-> >>
-> >> On 09/01/2019 14:24, Andrew Murray wrote:
-> >>> On Wed, Jan 09, 2019 at 01:54:34PM +0000, Marc Zyngier wrote:
-> >>>> When running VHE, there is no need to jump via some stub to perform
-> >>>> a "HYP" function call, as there is a single address space.
-> >>>>
-> >>>> Let's thus change kvm_call_hyp() and co to perform a direct call
-> >>>> in this case. Although this results in a bit of code expansion,
-> >>>> it allows the compiler to check for type compatibility, something
-> >>>> that we are missing so far.
-> >>>>
-> >>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >>>> ---
-> >>>>  arch/arm64/include/asm/kvm_host.h | 32 +++++++++++++++++++++++++++++--
-> >>>>  1 file changed, 30 insertions(+), 2 deletions(-)
-> >>>>
-> >>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> >>>> index e54cb7c88a4e..df32edbadd69 100644
-> >>>> --- a/arch/arm64/include/asm/kvm_host.h
-> >>>> +++ b/arch/arm64/include/asm/kvm_host.h
-> >>>> @@ -370,8 +370,36 @@ void kvm_arm_halt_guest(struct kvm *kvm);
-> >>>>  void kvm_arm_resume_guest(struct kvm *kvm);
-> >>>>  
-> >>>>  u64 __kvm_call_hyp(void *hypfn, ...);
-> >>>> -#define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
-> >>>> -#define kvm_call_hyp_ret(f, ...) kvm_call_hyp(f, ##__VA_ARGS__)
-> >>>> +
-> >>>> +/*
-> >>>> + * The couple of isb() below are there to guarantee the same behaviour
-> >>>> + * on VHE as on !VHE, where the eret to EL1 acts as a context
-> >>>> + * synchronization event.
-> >>>> + */
-> >>>> +#define kvm_call_hyp(f, ...)						\
-> >>>> +	do {								\
-> >>>> +		if (cpus_have_const_cap(ARM64_HAS_VIRT_HOST_EXTN)) {	\
-> >>>> +			f(__VA_ARGS__);					\
-> >>>> +			isb();						\
-> >>>> +		} else {						\
-> >>>> +			__kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__); \
-> >>>> +		}							\
-> >>>> +	} while(0)
-> >>>> +
-> >>>> +#define kvm_call_hyp_ret(f, ...)					\
-> >>>> +	({								\
-> >>>> +		u64 ret;						\
-> >>>> +									\
-> >>>> +		if (cpus_have_const_cap(ARM64_HAS_VIRT_HOST_EXTN)) {	\
-> >>>> +			ret = f(__VA_ARGS__);				\
-> >>>
-> >>> __kvm_get_mdcr_el2 and __kvm_vcpu_run_nvhe don't return u64 type, they
-> >>> return a smaller type. I guess any issues would be picked up when compiling,
-> >>> but should the name of the macro be clearer as to the assumptions it makes?
-> >>> Or perhaps take an argument which is the type of ret?
-> >>
-> >> kvm_call_hyp has always returned a u64, so no semantic has changed here.
+On Wed, Jan 09, 2019 at 03:12:25PM +0100, Vincent Guittot wrote:
+> Please keep all thread list when replying :-)
 
-Ah I missed that!
-
-> >>
-> >> Otherwise, your suggestion of specifying a return type is interesting,
-> >> but it also gives the programmer another chance to shoot itself in the
-> >> foot by not providing the return type corresponding to the function that
-> >> is called.
-> >>
-> >> Unless we can extract the return type by pure magic, I'm not sure we
-> >> gain much.
-> >>
-> > 
-> > Would the following work?
-> > 
-> > 	typeof(f(__VA_ARGS__)) ret;
-> > 
-> > If typeof works anything like sizeof, I'd expect it would evaluate stuff
-> > passed as argument and we'd have the return type of the function.
-> And it actually works! Thanks for the awful tip! ;-)
-
-Awesome.
-
-Thanks,
-
-Andrew Murray
-
+Ahh, sorry for that...
+[snip]
+> On Wed, 9 Jan 2019 at 14:33, Ladislav Michl <ladis@linux-mips.org> wrote:
+> > I agree, but it doea all the magic correctly, so you won't need
+> > to touch that code is ktime_t changes (I know, unlikely..)
 > 
-> 	M.
-> -- 
-> Jazz is not dead. It just smells funny...
+> But the current implementation doesn't care of any changes in ktime_t
+> as it uses raw ns
+
+Fair enough, so let's go back to:
+diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
+index 70624695b6d5..e61ee9b47a26 100644
+--- a/drivers/base/power/runtime.c
++++ b/drivers/base/power/runtime.c
+@@ -121,7 +121,7 @@ static void pm_runtime_cancel_pending(struct device *dev)
+  * Compute the autosuspend-delay expiration time based on the device's
+  * power.last_busy time.  If the delay has already expired or is disabled
+  * (negative) or the power.use_autosuspend flag isn't set, return 0.
+- * Otherwise return the expiration time in jiffies (adjusted to be nonzero).
++ * Otherwise return the expiration time in nanoseconds (adjusted to be nonzero).
+  *
+  * This function may be called either with or without dev->power.lock held.
+  * Either way it can be racy, since power.last_busy may be updated at any time.
+@@ -129,24 +129,21 @@ static void pm_runtime_cancel_pending(struct device *dev)
+ u64 pm_runtime_autosuspend_expiration(struct device *dev)
+ {
+ 	int autosuspend_delay;
+-	u64 last_busy, expires = 0;
+-	u64 now = ktime_to_ns(ktime_get());
++	u64 expires;
+ 
+ 	if (!dev->power.use_autosuspend)
+-		goto out;
++		return 0;
+ 
+ 	autosuspend_delay = READ_ONCE(dev->power.autosuspend_delay);
+ 	if (autosuspend_delay < 0)
+-		goto out;
+-
+-	last_busy = READ_ONCE(dev->power.last_busy);
++		return 0;
+ 
+-	expires = last_busy + autosuspend_delay * NSEC_PER_MSEC;
+-	if (expires <= now)
+-		expires = 0;	/* Already expired. */
++	expires  = READ_ONCE(dev->power.last_busy);
++	expires += NSEC_PER_MSEC * (u64)autosuspend_delay;
++	if (expires > ktime_to_ns(ktime_get()))
++		return expires;	/* Expires in the future */
+ 
+- out:
+-	return expires;
++	return 0;
+ }
+ EXPORT_SYMBOL_GPL(pm_runtime_autosuspend_expiration);
+
+Which gives for arm: 
+00000480 <pm_runtime_autosuspend_expiration>:
+     480:	e92d41f0 	push	{r4, r5, r6, r7, r8, lr}
+     484:	e5d030d1 	ldrb	r3, [r0, #209]	; 0xd1
+     488:	e3130004 	tst	r3, #4
+     48c:	0a00000c 	beq	4c4 <pm_runtime_autosuspend_expiration+0x44>
+     490:	e59030e4 	ldr	r3, [r0, #228]	; 0xe4
+     494:	e3530000 	cmp	r3, #0
+     498:	ba000009 	blt	4c4 <pm_runtime_autosuspend_expiration+0x44>
+     49c:	e28050e8 	add	r5, r0, #232	; 0xe8
+     4a0:	e8950030 	ldm	r5, {r4, r5}
+     4a4:	e59f2030 	ldr	r2, [pc, #48]	; 4dc <pm_runtime_autosuspend_expiration+0x5c>
+     4a8:	e0e54392 	smlal	r4, r5, r2, r3
+     4ac:	ebfffffe 	bl	0 <ktime_get>
+     4b0:	e1550001 	cmp	r5, r1
+     4b4:	01540000 	cmpeq	r4, r0
+     4b8:	e1a06004 	mov	r6, r4
+     4bc:	e1a07005 	mov	r7, r5
+     4c0:	8a000001 	bhi	4cc <pm_runtime_autosuspend_expiration+0x4c>
+     4c4:	e3a06000 	mov	r6, #0
+     4c8:	e3a07000 	mov	r7, #0
+     4cc:	e1a00006 	mov	r0, r6
+     4d0:	e1a01007 	mov	r1, r7
+     4d4:	e8bd41f0 	pop	{r4, r5, r6, r7, r8, lr}
+     4d8:	e12fff1e 	bx	lr
+     4dc:	000f4240 	.word	0x000f4240
+
+And x86:
+0000000000000230 <pm_runtime_autosuspend_expiration.part.0>:
+     230:	8b 87 a4 01 00 00    	mov    0x1a4(%rdi),%eax
+     236:	53                   	push   %rbx
+     237:	85 c0                	test   %eax,%eax
+     239:	78 1e                	js     259 <pm_runtime_autosuspend_expiration.part.0+0x29>
+     23b:	48 63 d8             	movslq %eax,%rbx
+     23e:	48 8b 97 a8 01 00 00 	mov    0x1a8(%rdi),%rdx
+     245:	48 69 db 40 42 0f 00 	imul   $0xf4240,%rbx,%rbx
+     24c:	48 01 d3             	add    %rdx,%rbx
+     24f:	e8 00 00 00 00       	callq  254 <pm_runtime_autosuspend_expiration.part.0+0x24>
+     254:	48 39 c3             	cmp    %rax,%rbx
+     257:	77 02                	ja     25b <pm_runtime_autosuspend_expiration.part.0+0x2b>
+     259:	31 db                	xor    %ebx,%ebx
+     25b:	48 89 d8             	mov    %rbx,%rax
+     25e:	5b                   	pop    %rbx
+     25f:	c3                   	retq   
+
+00000000000002a0 <pm_runtime_autosuspend_expiration>:
+     2a0:	f6 87 91 01 00 00 04 	testb  $0x4,0x191(%rdi)
+     2a7:	74 02                	je     2ab <pm_runtime_autosuspend_expiration+0xb>
+     2a9:	eb 85                	jmp    230 <pm_runtime_autosuspend_expiration.part.0>
+     2ab:	31 c0                	xor    %eax,%eax
+     2ad:	c3                   	retq   
+     2ae:	66 90                	xchg   %ax,%ax
+
+
+[snip]
+> > Well, main concern was not to call ktime_get at the beginning of function
+> > as it is not too cheap.
+> 
+> Doesn't the compiler optimize that to just before the test ?
+
+No (compare with above). And it is also almost certain that someone will run
+script and send "...do not needlesly initialize..." patch :)
+
+gcc version 8.2.1 20181130 (OSELAS.Toolchain-2018.12.0 8-20181130)
+
+00000110 <pm_runtime_autosuspend_expiration>:
+     110:	e92d41f0 	push	{r4, r5, r6, r7, r8, lr}
+     114:	e1a06000 	mov	r6, r0
+     118:	ebfffffe 	bl	0 <ktime_get>
+     11c:	e5d630d1 	ldrb	r3, [r6, #209]	; 0xd1
+     120:	e3130004 	tst	r3, #4
+     124:	0a00000d 	beq	160 <pm_runtime_autosuspend_expiration+0x50>
+     128:	e596c0e4 	ldr	ip, [r6, #228]	; 0xe4
+     12c:	e35c0000 	cmp	ip, #0
+     130:	ba00000a 	blt	160 <pm_runtime_autosuspend_expiration+0x50>
+     134:	e28630e8 	add	r3, r6, #232	; 0xe8
+     138:	e893000c 	ldm	r3, {r2, r3}
+     13c:	e1a05001 	mov	r5, r1
+     140:	e1a04000 	mov	r4, r0
+     144:	e59f002c 	ldr	r0, [pc, #44]	; 178 <pm_runtime_autosuspend_expiration+0x68>
+     148:	e0010c90 	mul	r1, r0, ip
+     14c:	e0926001 	adds	r6, r2, r1
+     150:	e0a37fc1 	adc	r7, r3, r1, asr #31
+     154:	e1550007 	cmp	r5, r7
+     158:	01540006 	cmpeq	r4, r6
+     15c:	3a000001 	bcc	168 <pm_runtime_autosuspend_expiration+0x58>
+     160:	e3a06000 	mov	r6, #0
+     164:	e3a07000 	mov	r7, #0
+     168:	e1a00006 	mov	r0, r6
+     16c:	e1a01007 	mov	r1, r7
+     170:	e8bd41f0 	pop	{r4, r5, r6, r7, r8, lr}
+     174:	e12fff1e 	bx	lr
+     178:	000f4240 	.word	0x000f4240
 
 _______________________________________________
 linux-arm-kernel mailing list
