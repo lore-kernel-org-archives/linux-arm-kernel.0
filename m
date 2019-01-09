@@ -2,65 +2,85 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 90AE3C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 11:17:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 01779C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 11:23:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 62AD221783
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 11:17:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C2F8721738
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 11:23:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F9sdRVWS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 62AD221783
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-mips.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HcNDpYpV";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ERUZ9+BB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C2F8721738
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wO8xRevvQEuOOk8vs38d35FteXMEMWkw05ft2aiU6C0=; b=F9sdRVWSkLlZqR
-	StijcaldmBfULqHGpjbZex4jmj/0lDjRJUYQhn0J3kBuhgeh77eI0aPAX4DSqAs1L5oipp4UTfI9n
-	ja/LJ0vcWY05j+ztU09G0noYopEC/79N1Tdcf9LUttkAqT3KdcsBZh5m7qbjqDDDqt1GKc60HgK8t
-	xVBmdj1eMfad80FKJisK84lXbUzCS4TlxyAVytgEXs4wKvdHG70om+f+83y4qNUbp/TiYDUFQ0o7N
-	rCLNhqYDZpeTEzTLCLLRzQ/KeHnpKPdK9+YbLeD4McA+Iyv3CEAUVnehzZAIjA5PngsaAZ31pnBRo
-	i3vlY84DBh6fxR9sPK1Q==;
+	List-Owner; bh=ZWglzfgi6J7CyAdedOgIBHZSWL9LNrRoWHULxYNTag4=; b=HcNDpYpVEYUbyq
+	1iCP8OWs3w1wAkKQg2hM/xPHmJZTde9hZXLU263VT3j1ZTJjxE71grBRMR2hlLWQBYnjAUBPNOfgN
+	CeZ51aeN/uphaLqLKmUXgF2HYppryzndXPbtRkM8YDuke4SXcAF9NX9vEmgacQnkOnbDqoOU2VmuF
+	LSNzE1geGuakA8NPv5SQ5IOnmQEMILoi3that1ECDVNxci8I0V+qRPhhlT9yaitPfibwoI7y/enyy
+	put1Q4bbzZsH3X7GswlakxFDTg3rTAxzpXeC1gmJbFDiED7XUl9mssPGtUFfHHBguz1/IV4F7Cwuh
+	jrcoHBId2kPfnL9KmLWg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghBrE-0001at-H1; Wed, 09 Jan 2019 11:17:12 +0000
-Received: from eddie.linux-mips.org ([148.251.95.138] helo=cvs.linux-mips.org)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghBrB-0001Zw-7D
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 11:17:11 +0000
-Received: (from localhost user: 'ladis' uid#1021 fake: STDIN
- (ladis@eddie.linux-mips.org)) by eddie.linux-mips.org
- id S23993832AbfAILRFLEeRV (ORCPT
- <rfc822;linux-arm-kernel@lists.infradead.org>);
- Wed, 9 Jan 2019 12:17:05 +0100
-Date: Wed, 9 Jan 2019 12:17:03 +0100
-From: Ladislav Michl <ladis@linux-mips.org>
-To: Vincent Guittot <vincent.guittot@linaro.org>
-Subject: Re: Regression in v5.0-rc1 with autosuspend hrtimers
-Message-ID: <20190109111703.GA28605@lenoch>
-References: <20190107233833.GI5544@atomide.com>
- <CAKfTPtDBEmcsLotp-6K1KU1wM9Ba1EpMp3niXScRxYgzjs0nog@mail.gmail.com>
- <20190108155354.GL5544@atomide.com>
- <CAKfTPtCoOK-cYLXJ--sOfpVa9RVmzOAEN1+zB2qHMCzkJN0qaQ@mail.gmail.com>
- <20190108213743.GN5544@atomide.com>
- <20190109014218.GA8363@linaro.org>
+	id 1ghBxH-0003lg-EV; Wed, 09 Jan 2019 11:23:27 +0000
+Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghBxE-0003lA-BD
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 11:23:25 +0000
+Received: by mail-pl1-x644.google.com with SMTP id gn14so3444878plb.10
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 09 Jan 2019 03:23:24 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=qHzQp0kiXKxLyhNLmld/2I5RlSC4SJfARu4BS/3WG9Q=;
+ b=ERUZ9+BBcdoGzDZjgRpZulY/jkDZef5hPSUjn5MPBnZ75et591KFNgm789NlRFxUHc
+ +NXU/3Bm5pdSuvo8PWXhqoS8rd3lTgmr0xLUSSSpJEG69I/tsSeMIfAsYSK7FReyRsfU
+ S12AylVeXNNQxyjZx6FCV+JbOAAYKgocXS8JYxcMwqdNxiLzCIBlW47SzSGk+ZHmtHIX
+ qcuYekr15FEoc0MFoMG2beI+okdJ2DF0IAU1uARicg6IgEli0vljZR+lXW9f/pkmc9th
+ gxF8yPG7qlQ3DTN7STXCp0RPyC3I4OLCH6XS/4mXW9xp/hg6Zfw5PYkmB50ilbklhFwc
+ UI7g==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=qHzQp0kiXKxLyhNLmld/2I5RlSC4SJfARu4BS/3WG9Q=;
+ b=hcmbLqr9wKNuTuTfdajhHkuVjdegBYae4x0ksgdHZ6P60927AGOe2d3oDDmGZY3U5n
+ /nN3I42wh14bwn1SZYxJw2AUzpIK3enUcc+oswQAyebUZhuUU0WAMKxUbqHiTEriGgHM
+ /HjgRb0VNyywz3wEZKRX6oVD4yrPXy7Nlc/+njHYVdd4PgCjIme5ZU6mfPmpIfSXNiYF
+ ksicrJHMnOrFdSNDS4vTvNiASByYvxAjvGktbzJULGxPeZyXDVqooe2n6tmbLlsxK6Aq
+ hGParefAVQSiLD7t92TqO7TM8lAAeLDuxHqAN+ra6Cv5VIr9VhXbakZ6PtiysVCOKNBQ
+ YUUg==
+X-Gm-Message-State: AJcUukdCfazOf084+ChZvVTnkD1zQzgrUkPkz5y1422guh46JWcPiSvE
+ 6EURpKx/UhfhJ8otM4vFKXUwSKAfXqhQjRmK++Du27LH
+X-Google-Smtp-Source: ALg8bN77kthZIpSSKtB/V7To/2gKvPymR90In5qxOXqM9UcaQ5lsus/M2q3f7W9S9GrLnEwYRDUECm6SOj5nw/LTX8A=
+X-Received: by 2002:a17:902:4081:: with SMTP id
+ c1mr5747105pld.87.1547033003677; 
+ Wed, 09 Jan 2019 03:23:23 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190109014218.GA8363@linaro.org>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+References: <20190108175818.705110-1-lkundrak@v3.sk>
+ <20190108175818.705110-7-lkundrak@v3.sk>
+In-Reply-To: <20190108175818.705110-7-lkundrak@v3.sk>
+From: Andy Shevchenko <andy.shevchenko@gmail.com>
+Date: Wed, 9 Jan 2019 13:23:12 +0200
+Message-ID: <CAHp75Vf7ctTmncjOfMKL7MDAi=4rr2huBmZ7RsAnPKyJv7HTQQ@mail.gmail.com>
+Subject: Re: [PATCH v4 06/15] Platform: OLPC: Move EC-specific functionality
+ out from x86
+To: Lubomir Rintel <lkundrak@v3.sk>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_031709_255227_E8C3091F 
-X-CRM114-Status: GOOD (  22.94  )
+X-CRM114-CacheID: sfid-20190109_032324_383279_52F26B09 
+X-CRM114-Status: GOOD (  16.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,71 +92,98 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>,
- "open list:THERMAL" <linux-pm@vger.kernel.org>,
- Tony Lindgren <tony@atomide.com>,
- "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>,
- linux-kernel <linux-kernel@vger.kernel.org>, linux-omap@vger.kernel.org,
- LAK <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>, James Cameron <quozl@laptop.org>,
+ Linux PM <linux-pm@vger.kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ "maintainer:X86 ARCHITECTURE \(32-BIT AND 64-BIT\)" <x86@kernel.org>,
+ Russell King <linux@armlinux.org.uk>,
+ Platform Driver <platform-driver-x86@vger.kernel.org>,
+ Rob Herring <robh+dt@kernel.org>,
+ linux-arm Mailing List <linux-arm-kernel@lists.infradead.org>,
+ Pavel Machek <pavel@ucw.cz>, Sebastian Reichel <sre@kernel.org>,
+ Darren Hart <dvhart@infradead.org>, Andy Shevchenko <andy@infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gV2VkLCBKYW4gMDksIDIwMTkgYXQgMDI6NDI6MThBTSArMDEwMCwgVmluY2VudCBHdWl0dG90
-IHdyb3RlOgo+IExlIFR1ZXNkYXkgMDggSmFuIDIwMTkgw6AgMTM6Mzc6NDMgKC0wODAwKSwgVG9u
-eSBMaW5kZ3JlbiBhIMOpY3JpdCA6Cj4gPiAqIFZpbmNlbnQgR3VpdHRvdCA8dmluY2VudC5ndWl0
-dG90QGxpbmFyby5vcmc+IFsxOTAxMDggMTY6NDJdOgo+ID4gPiBPbiBUdWUsIDggSmFuIDIwMTkg
-YXQgMTY6NTMsIFRvbnkgTGluZGdyZW4gPHRvbnlAYXRvbWlkZS5jb20+IHdyb3RlOgo+ID4gPiA+
-IEhtbSBzbyBjb3VsZCBpdCBiZSB0aGF0IHdlIG5vdyByZWx5IG9uIHRpbWVycyB0aGF0IHRoYXQg
-bWF5Cj4gPiA+ID4gbm90IGJlIGNhcGFibGUgb2Ygd2FraW5nIHVwIHRoZSBzeXN0ZW0gZnJvbSBp
-ZGxlIHN0YXRlcyB3aXRoCj4gPiA+ID4gaHJ0aW1lcj8KPiA+ID4gCj4gPiA+IFdpdGggbm9oeiBh
-bmQgaHJ0aW1lciBlbmFibGVkLCAgdGltZXIgcmVsaWVzIG9uIGhydGltZXIgdG8gZ2VuZXJhdGUK
-PiA+ID4gdGhlIHRpY2sgc28geW91IHNob3VsZCB1c2UgdGhlIHNhbWUgaW50ZXJydXB0Lgo+ID4g
-Cj4gPiBPSyB5ZWFoIGxvb2tzIGxpa2UgdGhhdCBwYXJ0IGlzIHdvcmtpbmcganVzdCBmaW5lLgo+
-ID4gCj4gPiBBZGRpbmcgc29tZSBwcmludGtzIGFuZCBkZWJ1Z2dpbmcgb3ZlciBzc2gsIGxvb2tz
-IGxpa2UKPiA+IG9tYXA4MjUwX3J1bnRpbWVfcmVzdW1lKCkgZ2V0cyBjYWxsZWQganVzdCBmaW5l
-IGJhc2VkIG9uIGEgd2FrZWlycSwKPiA+IGJ1dCB0aGVuIG9tYXA4MjUwX3J1bnRpbWVfc3VzcGVu
-ZCgpIHJ1bnMgaW1tZWRpYXRlbHkgaW5zdGVhZCBvZgo+ID4gd2FpdGluZyBmb3IgdGhlIHRocmVl
-IHNlY29uZCB0aW1lb3V0Lgo+ID4gCj4gPiBMb3dlcmluZyB0aGUgYXV0b3N1c3BlbmRfZGVsYXlf
-bXMgdG8gMjEwMCBtcyBtYWtlcyB0aGluZ3Mgd29yayBhZ2Fpbi4KPiA+IEFueXRoaW5nIGhpZ2hl
-ciB0aGFuIDIyMDAgbXMgc2VlbXMgdG8gc29tZWhvdyB0aW1lIG91dCBpbW1lZGlhdGVseQo+ID4g
-bm93IDopCj4gCj4gVGhpcyBpcyBxdWl0ZSBjbG9zZSB0byB0aGUgbWF4IG5zIG9mIGFuIGludCBv
-biBhcm0gMzJiaXRzCj4gCj4gQ291bGQgeW91IHRyeSB0aGUgcGF0Y2ggYmVsb3cgPwo+IAo+IC0t
-LQo+ICBkcml2ZXJzL2Jhc2UvcG93ZXIvcnVudGltZS5jIHwgMiArLQo+ICAxIGZpbGUgY2hhbmdl
-ZCwgMSBpbnNlcnRpb24oKyksIDEgZGVsZXRpb24oLSkKPiAKPiBkaWZmIC0tZ2l0IGEvZHJpdmVy
-cy9iYXNlL3Bvd2VyL3J1bnRpbWUuYyBiL2RyaXZlcnMvYmFzZS9wb3dlci9ydW50aW1lLmMKPiBp
-bmRleCA3MDYyNDY5Li40NGM1Yzc2IDEwMDY0NAo+IC0tLSBhL2RyaXZlcnMvYmFzZS9wb3dlci9y
-dW50aW1lLmMKPiArKysgYi9kcml2ZXJzL2Jhc2UvcG93ZXIvcnVudGltZS5jCj4gQEAgLTE0MSw3
-ICsxNDEsNyBAQCB1NjQgcG1fcnVudGltZV9hdXRvc3VzcGVuZF9leHBpcmF0aW9uKHN0cnVjdCBk
-ZXZpY2UgKmRldikKPiAgCj4gIAlsYXN0X2J1c3kgPSBSRUFEX09OQ0UoZGV2LT5wb3dlci5sYXN0
-X2J1c3kpOwo+ICAKPiAtCWV4cGlyZXMgPSBsYXN0X2J1c3kgKyBhdXRvc3VzcGVuZF9kZWxheSAq
-IE5TRUNfUEVSX01TRUM7Cj4gKwlleHBpcmVzID0gbGFzdF9idXN5ICsgKHU2NCkoYXV0b3N1c3Bl
-bmRfZGVsYXkpICogTlNFQ19QRVJfTVNFQzsKPiAgCWlmIChleHBpcmVzIDw9IG5vdykKPiAgCQll
-eHBpcmVzID0gMDsJLyogQWxyZWFkeSBleHBpcmVkLiAqLwoKSG1tLCBjb21tZW50IGFib3ZlIGZ1
-bmN0aW9uIHN0YXRlcyBpdCByZXR1cm5zICJ0aGUgZXhwaXJhdGlvbiB0aW1lIGluIGppZmZpZXMK
-KGFkanVzdGVkIHRvIGJlIG5vbnplcm8pIiwgc28gdGhlcmUncyBwcm9iYWJseSBtb3JlIHRvIGZp
-eC4uLgoKWW91IGNhbiBhbHNvIGNvbnNpZGVyIGNoYW5nZSBsaWtlIHRoaXMgKHN0aWxsIGRvZXMg
-bm90IHJldHVybiBqaWZmaWVzKToKZGlmZiAtLWdpdCBhL2RyaXZlcnMvYmFzZS9wb3dlci9ydW50
-aW1lLmMgYi9kcml2ZXJzL2Jhc2UvcG93ZXIvcnVudGltZS5jCmluZGV4IDcwNjI0Njk1YjZkNS4u
-YzcyZWFmMjFhNjFjIDEwMDY0NAotLS0gYS9kcml2ZXJzL2Jhc2UvcG93ZXIvcnVudGltZS5jCisr
-KyBiL2RyaXZlcnMvYmFzZS9wb3dlci9ydW50aW1lLmMKQEAgLTEyOSwyMyArMTI5LDIwIEBAIHN0
-YXRpYyB2b2lkIHBtX3J1bnRpbWVfY2FuY2VsX3BlbmRpbmcoc3RydWN0IGRldmljZSAqZGV2KQog
-dTY0IHBtX3J1bnRpbWVfYXV0b3N1c3BlbmRfZXhwaXJhdGlvbihzdHJ1Y3QgZGV2aWNlICpkZXYp
-CiB7CiAJaW50IGF1dG9zdXNwZW5kX2RlbGF5OwotCXU2NCBsYXN0X2J1c3ksIGV4cGlyZXMgPSAw
-OwotCXU2NCBub3cgPSBrdGltZV90b19ucyhrdGltZV9nZXQoKSk7CisJa3RpbWVfdCBleHBpcmVz
-OwogCiAJaWYgKCFkZXYtPnBvd2VyLnVzZV9hdXRvc3VzcGVuZCkKLQkJZ290byBvdXQ7CisJCXJl
-dHVybiAwOwogCiAJYXV0b3N1c3BlbmRfZGVsYXkgPSBSRUFEX09OQ0UoZGV2LT5wb3dlci5hdXRv
-c3VzcGVuZF9kZWxheSk7CiAJaWYgKGF1dG9zdXNwZW5kX2RlbGF5IDwgMCkKLQkJZ290byBvdXQ7
-Ci0KLQlsYXN0X2J1c3kgPSBSRUFEX09OQ0UoZGV2LT5wb3dlci5sYXN0X2J1c3kpOworCQlyZXR1
-cm4gMDsKIAotCWV4cGlyZXMgPSBsYXN0X2J1c3kgKyBhdXRvc3VzcGVuZF9kZWxheSAqIE5TRUNf
-UEVSX01TRUM7Ci0JaWYgKGV4cGlyZXMgPD0gbm93KQotCQlleHBpcmVzID0gMDsJLyogQWxyZWFk
-eSBleHBpcmVkLiAqLworCWV4cGlyZXMgPSBrdGltZV9hZGRfbnMobXNfdG9fa3RpbWUoYXV0b3N1
-c3BlbmRfZGVsYXkpLAorCQkJICAgICAgIFJFQURfT05DRShkZXYtPnBvd2VyLmxhc3RfYnVzeSkp
-OworCWlmIChleHBpcmVzIDw9IGt0aW1lX2dldCgpKQorCQlyZXR1cm4gMDsJLyogQWxyZWFkeSBl
-eHBpcmVkLiAqLwogCi0gb3V0OgogCXJldHVybiBleHBpcmVzOwogfQogRVhQT1JUX1NZTUJPTF9H
-UEwocG1fcnVudGltZV9hdXRvc3VzcGVuZF9leHBpcmF0aW9uKTsKClJlZ2FyZHMsCglsYWRpcwoK
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJt
-LWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3Jn
-Cmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtl
-cm5lbAo=
+On Tue, Jan 8, 2019 at 7:59 PM Lubomir Rintel <lkundrak@v3.sk> wrote:
+>
+> Move the olpc-ec driver away from the X86 OLPC platform so that it could be
+> used by the ARM based laptops too. Notably, the driver for the OLPC battery,
+> which is also used on the ARM models, builds on this driver's interface.
+>
+> It is actually plaform independent: the OLPC EC commands with their argument
+> and responses are mostly the same despite the delivery mechanism is
+> different.
+>
+> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+> Acked-by: Pavel Machek <pavel@ucw.cz>
+
+>  #define OLPC_F_PRESENT         0x01
+>  #define OLPC_F_DCON            0x02
+> -#define OLPC_F_EC_WIDE_SCI     0x04
+
+Still same concern, i.e. if the initially added definitions are
+coupled together by some reason, why we split them?
+As I told either move all, or none or put in commit message how
+decoupling would benefit.
+
+> +       /* EC version 0x5f adds support for wide SCI mask */
+> +       if (ec->version >= 0x5f) {
+> +               __be16 ec_word = cpu_to_be16(bits);
+> +
+> +               return olpc_ec_cmd(EC_WRITE_EXT_SCI_MASK, (void *) &ec_word, 2, NULL, 0);
+
+No space is needed in "(void *)&ec_word".
+
+> +       } else {
+
+> +               unsigned char ec_byte = bits & 0xff;
+
+Shouldn't be u8?
+
+> +               return olpc_ec_cmd(EC_WRITE_SCI_MASK, &ec_byte, 1, NULL, 0);
+> +       }
+> +}
+> +EXPORT_SYMBOL_GPL(olpc_ec_mask_write);
+
+> +int olpc_ec_sci_query(u16 *sci_value)
+> +{
+> +       struct olpc_ec_priv *ec = ec_priv;
+> +       int ret;
+> +
+> +       if (WARN_ON(!ec))
+> +               return -ENODEV;
+> +
+> +       /* EC version 0x5f adds support for wide SCI mask */
+> +       if (ec->version >= 0x5f) {
+> +               __be16 ec_word;
+> +
+> +               ret = olpc_ec_cmd(EC_EXT_SCI_QUERY, NULL, 0, (void *)&ec_word, 2);
+> +               if (ret == 0)
+> +                       *sci_value = be16_to_cpu(ec_word);
+> +       } else {
+> +               unsigned char ec_byte;
+
+u8?
+
+> +
+> +               ret = olpc_ec_cmd(EC_SCI_QUERY, NULL, 0, &ec_byte, 1);
+> +               if (ret == 0)
+> +                       *sci_value = ec_byte;
+> +       }
+> +
+> +       return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(olpc_ec_sci_query);
+
+-- 
+With Best Regards,
+Andy Shevchenko
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
