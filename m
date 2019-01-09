@@ -2,67 +2,68 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6B1CEC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 17:47:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ACF89C43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 17:47:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 26DC620656
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 17:47:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7EEEF214C6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 17:47:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RdRbZ5fZ";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="MLC1Ijw3";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="NIaJPO57"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 26DC620656
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EKh6tEEA";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="IaQcv0A1";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="IExxPJ6s"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7EEEF214C6
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=p6goObdiFZ0t98O6YlgAMAck9iV9A/1iRtmy7nC7htw=; b=RdRbZ5fZBQpJjR
-	qvOJ92rfxe17myROLHnzvbGf+52InnIhXT7pGXyhhsABgWxg09CHQSLbd8LH2XENZL2shUr15kB8E
-	2tYc/cWfUI3t8mhTdqWV5QjwtySlELKb0iCBkJVcdxC1oz5KoB9XzIEWWj7Too6SX+uA4N8S5W0ZF
-	JU8f/8rBczIGr2rhomIuo/Imabzv37r6PSHo+M1ip3w4JWdsbKidbYp52G5Sl3XGrNbhQfGLnNolQ
-	lTotFZjS+0DfTFMdaoctX2Lcv1pYFp/jUzvkQ2S7xKEBOOOdzf1BKUbFRadk04hsifA1x67z5466/
-	NMSeXKjVZc2CJH84rcEw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=DI6n5ZrM5CFW2fu7Na0bd7sqEt1bqtDRYU8o9pp/MUM=; b=EKh6tEEAihkKLW
+	PErIg26CcjHWW9R4ltAvoNb9LISpusteKAxqj6oG2PoxvUHcOct6mwp1f+4uN6ITuCa+MTPcnQ7U2
+	gK5KflaQs8mGyY3mRpfErl4j/g5BHPYloKZl2qYMJeuSeoSJTO7OKAy9UEHVMaXpwFn4yA6yqvzC3
+	c4u2vArTCaiN7ChVX/XZmjy8ffZjqXVZDYJK7MiFczat+F/qbKwO5EP/hxhDPYBDnTI845RoD9Yok
+	QOUBrUIDzv4yNlIdYQ/zBaSOxPPBLs1F0inDbopePPVpUerZoXx+GfoVqJJHu6ZQb+4D79dgtZ9XJ
+	mruzGlIBBSj12dy1V7cw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghHx0-0001I7-KQ; Wed, 09 Jan 2019 17:47:34 +0000
+	id 1ghHxK-0001al-A8; Wed, 09 Jan 2019 17:47:54 +0000
 Received: from smtp.codeaurora.org ([198.145.29.96])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghHwx-0001Hf-7w
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 17:47:32 +0000
+ id 1ghHxF-0001Xv-5h
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 17:47:51 +0000
 Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id E6C32608A5; Wed,  9 Jan 2019 17:47:29 +0000 (UTC)
+ id D903660A79; Wed,  9 Jan 2019 17:47:42 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1547056050;
- bh=0gyYLuNtvHYhM3xrhaPPKd29npznhL5tuk39VI27em0=;
- h=From:To:Cc:Subject:Date:From;
- b=MLC1Ijw3LT0hVJUYkGRTD2Z0CAq2nhSfU8KySc5Kbd7DqSW1zOn50qL3P7VkX4zdN
- Us2XWYZcbNY/K8ay6UFnNAOm4v+dkbNUIJujAbeOxVpX6YOzA/MBmc+OoTWAYY4e1M
- LvUhCDLw+sbMrFZ2/C/gt/GjByc6tAOEBZirmif4=
+ s=default; t=1547056068;
+ bh=bfNmy5d3KgIXDAS8tBvCXqhk7FUc4qosVXfwiNYVLGw=;
+ h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+ b=IaQcv0A16nYGV8ZOoDcd8HEIHgdCgstFksVHliGkodjM+zr2mKilkd1e51WE212Tn
+ 3x2kJQAzaVtTBDpG03Ql75OWL8BhgYdK2Z3pNaDZoXCuHjsYEA2217QSL7GTGNywBf
+ Dw98DHmBCIowvHunhbNWQL2U8oGKT6AR/gX1ZWNk=
 Received: from blr-ubuntu-253.qualcomm.com
  (blr-bdr-fw-01_globalnat_allzones-outside.qualcomm.com [103.229.18.19])
  (using TLSv1.2 with cipher ECDHE-RSA-AES128-SHA256 (128/128 bits))
  (No client certificate requested)
  (Authenticated sender: saiprakash.ranjan@codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id 4E09C6050D;
- Wed,  9 Jan 2019 17:47:21 +0000 (UTC)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id E413E608FF;
+ Wed,  9 Jan 2019 17:47:34 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1547056047;
- bh=0gyYLuNtvHYhM3xrhaPPKd29npznhL5tuk39VI27em0=;
- h=From:To:Cc:Subject:Date:From;
- b=NIaJPO57LZljsVWqPPR08VplgWmrs2A0n+aCxaRhZpt6ETr2QvSTK6ymIHZreaJyW
- mYPNBRHGrqJ9Jd5IPuAPPjCUzrr2fnE5pxoKZHKNB+NGsrpXrV3hSr4BDqFD+tTvrR
- m5SunLbhvTRBDvVJVMKfbOSdoUBki8hT6csjHcMA=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 4E09C6050D
+ s=default; t=1547056060;
+ bh=bfNmy5d3KgIXDAS8tBvCXqhk7FUc4qosVXfwiNYVLGw=;
+ h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+ b=IExxPJ6soU2re0wWgdB2aACCkkOaIXJLDBAwqIHNpjhpUyHqguZEk/5GdkJqxODM7
+ MvVjInpWy0sMe5/oW8mt4O/3VVd+YFC0Yd60RMN6cVK2MSvnlUzinUggmDilqTSCka
+ mN1N0vtK058mhPFordJc+7wvZC6RrcCw8CM2jumA=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org E413E608FF
 Authentication-Results: pdx-caf-mail.web.codeaurora.org;
  dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: pdx-caf-mail.web.codeaurora.org; spf=none
@@ -74,14 +75,16 @@ To: Rob Herring <robh+dt@kernel.org>,
  Alexander Shishkin <alexander.shishkin@linux.intel.com>,
  Andy Gross <andy.gross@linaro.org>, David Brown <david.brown@linaro.org>,
  devicetree@vger.kernel.org, Mark Rutland <mark.rutland@arm.com>
-Subject: [PATCH 0/3] Add coresight support for SDM845
-Date: Wed,  9 Jan 2019 23:16:46 +0530
-Message-Id: <cover.1547054308.git.saiprakash.ranjan@codeaurora.org>
+Subject: [PATCH 1/3] arm64: dts: qcom: sdm845: Add Coresight support
+Date: Wed,  9 Jan 2019 23:16:47 +0530
+Message-Id: <a13ad49d3ae8d9a5a972027283b7212ab19f97d0.1547054308.git.saiprakash.ranjan@codeaurora.org>
 X-Mailer: git-send-email 2.19.2
+In-Reply-To: <cover.1547054308.git.saiprakash.ranjan@codeaurora.org>
+References: <cover.1547054308.git.saiprakash.ranjan@codeaurora.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_094731_306002_AE6C7DE6 
-X-CRM114-Status: GOOD (  13.14  )
+X-CRM114-CacheID: sfid-20190109_094749_281143_EBA9DCF8 
+X-CRM114-Status: GOOD (  13.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,35 +106,468 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch series adds support for coresight on SDM845. 
+Add coresight components found on Qualcomm SDM845 SoC.
 
-* Patch 1 adds device tree nodes for SDM845 coresight components.
-
-* Patch 2 enables support for ETMv4.2 and enables SDM845 to make
-  use of same driver(etm4x).
-
-* Patch 3 is a trivial removal of duplicate header file.
-
-Patch 1 and 2 depends on below AOSS QMP patches by Bjorn:
- https://patchwork.kernel.org/patch/10749469/ 
- https://patchwork.kernel.org/patch/10749481/
- https://patchwork.kernel.org/patch/10749479/
- https://patchwork.kernel.org/patch/10749475/ 
-
-This patch series has been tested on SDM845 MTP.
-
-Sai Prakash Ranjan (3):
-  arm64: dts: qcom: sdm845: Add Coresight support
-  coresight: etm4x: Add support to enable ETMv4.2
-  arm64: dts: qcom: sdm845: Remove the duplicate header inclusion
-
+Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+---
  .../arm64/boot/dts/qcom/sdm845-coresight.dtsi | 437 ++++++++++++++++++
- arch/arm64/boot/dts/qcom/sdm845.dtsi          |   3 +-
- drivers/hwtracing/coresight/coresight-etm4x.c |   2 +-
- drivers/hwtracing/coresight/coresight-etm4x.h |   2 +-
- 4 files changed, 441 insertions(+), 3 deletions(-)
+ arch/arm64/boot/dts/qcom/sdm845.dtsi          |   2 +
+ 2 files changed, 439 insertions(+)
  create mode 100644 arch/arm64/boot/dts/qcom/sdm845-coresight.dtsi
 
+diff --git a/arch/arm64/boot/dts/qcom/sdm845-coresight.dtsi b/arch/arm64/boot/dts/qcom/sdm845-coresight.dtsi
+new file mode 100644
+index 000000000000..b6ef250b9186
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/sdm845-coresight.dtsi
+@@ -0,0 +1,437 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * SDM845 Coresight DTS
++ *
++ * Copyright (c) 2019, The Linux Foundation. All rights reserved.
++ */
++
++&soc {
++	stm@6002000 {
++		compatible = "arm,coresight-stm", "arm,primecell";
++		reg = <0x06002000 0x1000>,
++		      <0x16280000 0x180000>;
++		reg-names = "stm-base", "stm-stimulus-base";
++
++		power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
++
++		out-ports {
++			port {
++				stm_out: endpoint {
++					remote-endpoint = <&funnel0_in7>;
++				};
++			};
++		};
++	};
++
++	funnel@6041000 {
++		compatible = "arm,coresight-funnel", "arm,primecell";
++		reg = <0x06041000 0x1000>;
++
++		power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
++
++		out-ports {
++			port {
++				funnel0_out: endpoint {
++					remote-endpoint =
++						<&merge_funnel_in0>;
++				};
++			};
++		};
++
++		in-ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port@7 {
++				reg = <7>;
++				funnel0_in7: endpoint {
++					remote-endpoint = <&stm_out>;
++				};
++			};
++		};
++	};
++
++	funnel@6043000 {
++		compatible = "arm,coresight-funnel", "arm,primecell";
++		reg = <0x06043000 0x1000>;
++
++		power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
++
++		out-ports {
++			port {
++				funnel2_out: endpoint {
++					remote-endpoint =
++					  <&merge_funnel_in2>;
++				};
++			};
++		};
++
++		in-ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port@5 {
++				reg = <5>;
++				funnel2_in5: endpoint {
++					remote-endpoint =
++					  <&apss_merge_funnel_out>;
++				};
++			};
++		};
++	};
++
++	funnel@6045000 {
++		compatible = "arm,coresight-funnel", "arm,primecell";
++		reg = <0x06045000 0x1000>;
++
++		power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
++
++		out-ports {
++			port {
++				merge_funnel_out: endpoint {
++					remote-endpoint = <&etf_in>;
++				};
++			};
++		};
++
++		in-ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port@0 {
++				reg = <0>;
++				merge_funnel_in0: endpoint {
++					remote-endpoint =
++						<&funnel0_out>;
++				};
++			};
++
++			port@2 {
++				reg = <2>;
++				merge_funnel_in2: endpoint {
++					remote-endpoint =
++						<&funnel2_out>;
++				};
++			};
++		};
++	};
++
++	replicator@6046000 {
++		compatible = "arm,coresight-dynamic-replicator", "arm,primecell";
++		reg = <0x06046000 0x1000>;
++
++		power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
++
++		out-ports {
++			port {
++				replicator_out: endpoint {
++					remote-endpoint = <&etr_in>;
++				};
++			};
++		};
++
++		in-ports {
++			port {
++				replicator_in: endpoint {
++					remote-endpoint = <&etf_out>;
++				};
++			};
++		};
++	};
++
++	etf@6047000 {
++		compatible = "arm,coresight-tmc", "arm,primecell";
++		reg = <0x06047000 0x1000>;
++
++		power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
++
++		out-ports {
++			port {
++				etf_out: endpoint {
++					remote-endpoint = <&replicator_in>;
++				};
++			};
++		};
++
++		in-ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port@1 {
++				reg = <1>;
++				etf_in: endpoint {
++					remote-endpoint = <&merge_funnel_out>;
++				};
++			};
++		};
++	};
++
++	etr@6048000 {
++		compatible = "arm,coresight-tmc", "arm,primecell";
++		reg = <0x06048000 0x1000>;
++
++		power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
++
++		in-ports {
++			port {
++				etr_in: endpoint {
++					remote-endpoint = <&replicator_out>;
++				};
++			};
++		};
++	};
++
++	etm@7040000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		arm,primecell-periphid = <0x000bb95d>;
++		reg = <0x07040000 0x1000>;
++
++		cpu = <&CPU0>;
++
++		power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
++
++		out-ports {
++			port {
++				etm0_out: endpoint {
++					remote-endpoint = <&apss_funnel_in0>;
++				};
++			};
++		};
++	};
++
++	etm@7140000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		arm,primecell-periphid = <0x000bb95d>;
++		reg = <0x07140000 0x1000>;
++
++		cpu = <&CPU1>;
++
++		power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
++
++		out-ports {
++			port {
++				etm1_out: endpoint {
++					remote-endpoint = <&apss_funnel_in1>;
++				};
++			};
++		};
++	};
++
++	etm@7240000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		arm,primecell-periphid = <0x000bb95d>;
++		reg = <0x07240000 0x1000>;
++
++		cpu = <&CPU2>;
++
++		power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
++
++		out-ports {
++			port {
++				etm2_out: endpoint {
++					remote-endpoint = <&apss_funnel_in2>;
++				};
++			};
++		};
++	};
++
++	etm@7340000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		arm,primecell-periphid = <0x000bb95d>;
++		reg = <0x07340000 0x1000>;
++
++		cpu = <&CPU3>;
++
++		power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
++
++		out-ports {
++			port {
++				etm3_out: endpoint {
++					remote-endpoint = <&apss_funnel_in3>;
++				};
++			};
++		};
++	};
++
++	etm@7440000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		arm,primecell-periphid = <0x000bb95d>;
++		reg = <0x07440000 0x1000>;
++
++		cpu = <&CPU4>;
++
++		power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
++
++		out-ports {
++			port {
++				etm4_out: endpoint {
++					remote-endpoint = <&apss_funnel_in4>;
++				};
++			};
++		};
++	};
++
++	etm@7540000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		arm,primecell-periphid = <0x000bb95d>;
++		reg = <0x07540000 0x1000>;
++
++		cpu = <&CPU5>;
++
++		power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
++
++		out-ports {
++			port {
++				etm5_out: endpoint {
++					remote-endpoint = <&apss_funnel_in5>;
++				};
++			};
++		};
++	};
++
++	etm@7640000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		arm,primecell-periphid = <0x000bb95d>;
++		reg = <0x07640000 0x1000>;
++
++		cpu = <&CPU6>;
++
++		power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
++
++		out-ports {
++			port {
++				etm6_out: endpoint {
++					remote-endpoint = <&apss_funnel_in6>;
++				};
++			};
++		};
++	};
++
++	etm@7740000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		arm,primecell-periphid = <0x000bb95d>;
++		reg = <0x07740000 0x1000>;
++
++		cpu = <&CPU7>;
++
++		power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
++
++		out-ports {
++			port {
++				etm7_out: endpoint {
++					remote-endpoint = <&apss_funnel_in7>;
++				};
++			};
++		};
++	};
++
++	funnel@7800000 { /* APSS Funnel */
++		compatible = "arm,coresight-funnel", "arm,primecell";
++		reg = <0x07800000 0x1000>;
++
++		power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
++
++		out-ports {
++			port {
++				apss_funnel_out: endpoint {
++					remote-endpoint =
++					    <&apss_merge_funnel_in>;
++				};
++			};
++		};
++
++		in-ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port@0 {
++				reg = <0>;
++				apss_funnel_in0: endpoint {
++					remote-endpoint =
++						<&etm0_out>;
++				};
++			};
++
++			port@1 {
++				reg = <1>;
++				apss_funnel_in1: endpoint {
++					remote-endpoint =
++						<&etm1_out>;
++				};
++			};
++
++			port@2 {
++				reg = <2>;
++				apss_funnel_in2: endpoint {
++					remote-endpoint =
++						<&etm2_out>;
++				};
++			};
++
++			port@3 {
++				reg = <3>;
++				apss_funnel_in3: endpoint {
++					remote-endpoint =
++						<&etm3_out>;
++				};
++			};
++
++			port@4 {
++				reg = <4>;
++				apss_funnel_in4: endpoint {
++					remote-endpoint =
++						<&etm4_out>;
++				};
++			};
++
++			port@5 {
++				reg = <5>;
++				apss_funnel_in5: endpoint {
++					remote-endpoint =
++						<&etm5_out>;
++				};
++			};
++
++			port@6 {
++				reg = <6>;
++				apss_funnel_in6: endpoint {
++					remote-endpoint =
++						<&etm6_out>;
++				};
++			};
++
++			port@7 {
++				reg = <7>;
++				apss_funnel_in7: endpoint {
++					remote-endpoint =
++						<&etm7_out>;
++				};
++			};
++		};
++	};
++
++	funnel@7810000 {
++		compatible = "arm,coresight-funnel", "arm,primecell";
++		reg = <0x07810000 0x1000>;
++
++		power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
++
++		out-ports {
++			port {
++				apss_merge_funnel_out: endpoint {
++					remote-endpoint =
++					    <&funnel2_in5>;
++				};
++			};
++		};
++
++		in-ports {
++			port {
++				apss_merge_funnel_in: endpoint {
++					remote-endpoint =
++					    <&apss_funnel_out>;
++				};
++			};
++		};
++	};
++};
+diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+index c27cbd3bcb0a..03683179b8f7 100644
+--- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
++++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+@@ -1853,3 +1853,5 @@
+ 		};
+ 	};
+ };
++
++#include "sdm845-coresight.dtsi"
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
