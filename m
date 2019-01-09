@@ -2,57 +2,72 @@ Return-Path: <SRS0=Odjb=PR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E99CC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 15:11:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DE295C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 15:26:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 60BFA206B6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 15:11:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AAF6F206BA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  9 Jan 2019 15:26:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NnjogeYZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 60BFA206B6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rTgDnOtR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AAF6F206BA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-m68k.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ubfmdvjosT+xMuYomk+W3/J5YMf9HqUNloS1uwd8KZ8=; b=NnjogeYZU5RT1g
-	KOr/b9er+gwbxDzZ3AsiZXA8OEE4c9lVb5RcC1q5NWKHK+EkOzCgh4+m1tS7KyOq/IoueuKWrxXKK
-	gHIgiS+N/xvZM3RhBUZB69gFQAJqzM2C8+ykWjMhDm/VgePEdF4h0VIaBTYHxXLW5/SBPRUkOQ0ID
-	7Ncf42/7yCVWgJaTsMuiJTv/Mss6gil3wqTmsfntZKsTxfmrtI27oTQ0+OBNt/c+U+dtpKlBIMU5e
-	Sl2XUGzhLBjCa2KM4PHUBlmxyV+8gLLvUrX+9CvPu7dEG4s8+0KIM71AurAqFv6BN6gU1NkLv4+lG
-	/o9rPwqQbaZ0SZUTpXRw==;
+	List-Owner; bh=HVHdMo+sJ+UXD5uMxUnZj2ko09McCTb3oG0d2CA3r6o=; b=rTgDnOtRombI2D
+	2S0untnQ/QLutOqfedOh2TxL7BZ7mq9SmQQZ9R35F8gAVhQpqQ7tasApCbqFOPjr5JgxvQpDMaUjJ
+	bKDqMFZr8h2tLgRSrPzxcaLkKwwL5wD7WF8lXJWNKRbznh3MAyyef95u0i+sCWgheqCyAXaOO7Uw3
+	SPtn35jki8BhAESZcxuwqF5xBhoxtCdS0+abaSPrtNrjXeCWHXpzvVWx5xQcf5DT7Ab4m7jLJtXsS
+	28skybqRqI9aBF2uxzfl+IjeYM4RjuYhDOthy/aEnwny2gfbBSJ/HL32ARAIp+AXPLhJS0nzzvgBw
+	481QfD6IfkqNxEaqQMtg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghFW8-0005ov-Pq; Wed, 09 Jan 2019 15:11:40 +0000
-Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
+	id 1ghFki-0002N2-O3; Wed, 09 Jan 2019 15:26:44 +0000
+Received: from mail-vs1-f68.google.com ([209.85.217.68])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghFNr-0001YC-93
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 15:03:12 +0000
-Received: by wens.csie.org (Postfix, from userid 1000)
- id 615535FD43; Wed,  9 Jan 2019 23:03:00 +0800 (CST)
-From: Chen-Yu Tsai <wens@csie.org>
-To: Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: [PATCH 5/5] ARM: dts: sunxi: bananapi-m2-plus: Add Bluetooth device
- node
-Date: Wed,  9 Jan 2019 23:02:57 +0800
-Message-Id: <20190109150257.12602-6-wens@csie.org>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190109150257.12602-1-wens@csie.org>
-References: <20190109150257.12602-1-wens@csie.org>
+ id 1ghFkf-0002MV-M9
+ for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 15:26:43 +0000
+Received: by mail-vs1-f68.google.com with SMTP id x64so4970354vsa.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 09 Jan 2019 07:26:39 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=2tt3B9acyjfAExY8a/1A++5JZZbSlHZnR9d/w9wgWsQ=;
+ b=DZyOjTNgFnwLRZQ8hkPWHq0TE5lyq/oRGxUcC7c25vKhbU3mr2gxmZ0LtaMDEZFAi9
+ WOGJ6VKgoaKLd/PVNZ8BmTAy0lKR5iq3mvJK7fx1fzmCwcAnhlINt0jEjyIaGFT6lWFi
+ 0lWJn3vtYb364oyh9h3uI0HxRCz7a80lqxqrekW2SbYmwywgY/06kL3MseQnt8qRIiVO
+ xiDcVOdLcWtiBNGqfowEnoIpB6uTmbwOy7g8pBwwYR2Hf1UesSGKyuo66EZ2b/22Eylj
+ icVeEDUU8LoWuRNiKn+EdnPdIG+IICcUnlVui9Bdqh/AZEqsQoFGy9gWo5Ed975EssiV
+ pMSA==
+X-Gm-Message-State: AJcUukfa9UToCb6+idMu+cW6Dtv+fUixWG1OtTBfDzHMWHLJkj13qJ5J
+ jQ3nRXosW0mLEVGK+95dTRSB7wuSjuH7xTQtlIw=
+X-Google-Smtp-Source: ALg8bN4Y8vtCBKzMn+5DqAraiqmkzOqBR04HeYEgHw10qE9fNoWBKCOKCAbfuvuCcdcA9PhZ4OFPYzdQmgsOTiJcgbs=
+X-Received: by 2002:a67:c202:: with SMTP id i2mr2435652vsj.11.1547047598700;
+ Wed, 09 Jan 2019 07:26:38 -0800 (PST)
 MIME-Version: 1.0
+References: <20190109140045.17449-1-marek.vasut@gmail.com>
+In-Reply-To: <20190109140045.17449-1-marek.vasut@gmail.com>
+From: Geert Uytterhoeven <geert@linux-m68k.org>
+Date: Wed, 9 Jan 2019 16:26:25 +0100
+Message-ID: <CAMuHMdX3bP_WCYNRRMmVRPwV52e72NOZMtW8cf29Fo+E9_CvcQ@mail.gmail.com>
+Subject: Re: [PATCH] arm64: dts: renesas: r8a77990: ebisu: Fix backlight
+ regulator numbering
+To: Marek Vasut <marek.vasut@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_070307_638447_C781308D 
-X-CRM114-Status: GOOD (  14.13  )
+X-CRM114-CacheID: sfid-20190109_072641_738654_F7E53EFF 
+X-CRM114-Status: GOOD (  14.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -64,69 +79,61 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Chen-Yu Tsai <wens@csie.org>,
- linux-sunxi@googlegroups.com, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>,
+ Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
+ Wolfram Sang <wsa+renesas@sang-engineering.com>,
+ Simon Horman <horms+renesas@verge.net.au>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Marek Vasut <marek.vasut+renesas@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The AP6212 is based on the Broadcom BCM43430 or BCM43438. The WiFi side
-identifies as BCM43430, while the Bluetooth side identifies as BCM43438.
+On Wed, Jan 9, 2019 at 3:01 PM <marek.vasut@gmail.com> wrote:
+> From: Marek Vasut <marek.vasut+renesas@gmail.com>
+>
+> There are two regulator1 nodes in the Ebisu DTS right now, one 3.3V for
+> the eMMC and one 12V for the backlight. This causes one to be overwritten
+> by the other, ultimatelly resulting in inoperable eMMC, which depends on
+> the former. Fix this by renumbering the backlight regulator to regulator2.
+>
+> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Cc: Simon Horman <horms+renesas@verge.net.au>
+> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> Cc: linux-renesas-soc@vger.kernel.org
+> Reported-by: Simon Horman <horms+renesas@verge.net.au>
+> Fixes: 9d16c4a10e07 ("arm64: dts: renesas: r8a77990: ebisu: Add backlight")
 
-The Bluetooth side is connected to UART1 in a 4 wire configuration. Same
-as the WiFi side, due to being the same chip and package, the board's
-fixed 3.3V power regulator provides overall power via VBAT and I/O power
-via VDDIO. The RTC clock output from the SoC provides the LPO low power
-clock at 32.768 kHz.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-This patch enables Bluetooth on this board, and also adds the missing
-LPO clock on the WiFi side. There is also a PCM connection for
-Bluetooth, but this is not covered here.
+> --- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+> +++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+> @@ -191,7 +191,7 @@
+>                 clock-frequency = <24576000>;
+>         };
+>
+> -       reg_12p0v: regulator1 {
+> +       reg_12p0v: regulator2 {
+>                 compatible = "regulator-fixed";
+>                 regulator-name = "D12.0V";
+>                 regulator-min-microvolt = <12000000>;
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
+Perhaps the node name should get a more descriptive suffix
+(e.g. "regulator-12p0v"), like is already done for some of the other
+regulators?
 
-diff --git a/arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi b/arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi
-index b3283aeb5b7d..3bed375b9c03 100644
---- a/arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi
-+++ b/arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi
-@@ -103,6 +103,8 @@
- 		compatible = "mmc-pwrseq-simple";
- 		pinctrl-names = "default";
- 		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
-+		clocks = <&rtc 1>;
-+		clock-names = "ext_clock";
- 	};
- };
- 
-@@ -215,7 +217,19 @@
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
--	status = "okay";
-+	uart-has-rtscts;
-+	status = "okay";
-+
-+	bluetooth {
-+		compatible = "brcm,bcm43438-bt";
-+		clocks = <&rtc 1>;
-+		clock-names = "lpo";
-+		vbat-supply = <&reg_vcc3v3>;
-+		vddio-supply = <&reg_vcc3v3>;
-+		device-wakeup-gpios = <&pio 6 13 GPIO_ACTIVE_HIGH>; /* PG13 */
-+		host-wakeup-gpios = <&pio 6 11 GPIO_ACTIVE_HIGH>; /* PG11 */
-+		shutdown-gpios = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
-+	};
- };
- 
- &usb_otg {
+Gr{oetje,eeting}s,
+
+                        Geert
+
 -- 
-2.20.1
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert@linux-m68k.org
 
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
 
 _______________________________________________
 linux-arm-kernel mailing list
