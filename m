@@ -2,64 +2,65 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+X-Spam-Status: No, score=-3.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C0152C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 18:21:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 98418C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 18:23:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 891F620675
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 18:21:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6DE68214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 18:23:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XGs0u1YX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 891F620675
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pU8cJA0c"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6DE68214DA
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:References:To:Subject:From:Reply-To:Content-ID:Content-Description
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=dzdy+MqvbUAbqCgwudQPYcyI/Lw3t2dnj47KOPTk5dk=; b=XGs0u1YXAp/WCm
-	kea4krrKreQ8v2TO9pTrXoAPyZs3eBSebYEvHsZMHiIPFolBQGduu6N2+W0T5+YsvBomGvKuhxjGS
-	4V3QfSEqTEmgdE/rmuFzAtI2DczenswX+qw76LPMUHncuZECR0S1CSjT/xaf5Al3ZCVZWTgDDVtla
-	hKsGrAW3hZe2KUSFqLpzS1cKUGhZnuAdDJSR6hfjpqt8GxwCG1yyr5/djepsF8HWvrcjZ/smaOSJD
-	7hOfTs4CoAH2U19bE2XhoW6Xn3Ylv0V9ZoY9tD897i+oyFBuXSGqhbmHf5Is5TbDchDqLeZTyQn0o
-	xrJFOV4uGmdTViUIPOuQ==;
+	List-Owner; bh=IM9eo/6KrkUuU9lPUiUxwV2U9Ey71E+01QPbhWTjMTY=; b=pU8cJA0cii1Z0u
+	XiTY7ct98D6gXpo09Oc00FdEYGYge2ucQfml33g6Hbi2Ez9o69NXcp6mSo0Ff/QkVRvZe/nKKts+e
+	dpJuuHlTiNLAL1h0MzAzCaUl06oPl3bvEJtNTVoDIzRd9xYeZD3JJO1iY6uXz7eLsNtIk661Qe9Fq
+	6hv+2JOiqW1airdn6UajFeTZSDQaR648RgIRMFZgWcmvdtu1kZevflT+gByD4u1LI6GY2tnmLzmAX
+	V0WKaWmPd3U52TX8QUyOQrr7sI/89G4KXzd78VpYE3Je8BbxU3AWqk+/Grh1pyJb/MCZ5lfW1UMBX
+	lLjQlc1HOhKD8Uia5ZPw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghexN-0004N5-Sk; Thu, 10 Jan 2019 18:21:29 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gheyu-0004sZ-Dw; Thu, 10 Jan 2019 18:23:04 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghexJ-0004MW-L4
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 18:21:28 +0000
+ id 1gheyr-0004s4-7h
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 18:23:02 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 67010A78;
- Thu, 10 Jan 2019 10:21:25 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id AC323A78;
+ Thu, 10 Jan 2019 10:23:00 -0800 (PST)
 Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id D43DF3F694;
- Thu, 10 Jan 2019 10:21:22 -0800 (PST)
-From: James Morse <james.morse@arm.com>
-Subject: Re: [PATCH v7 09/25] ACPI / APEI: Generalise the estatus queue's
- notify code
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id EF2763F694;
+ Thu, 10 Jan 2019 10:22:57 -0800 (PST)
+Subject: Re: [PATCH v7 10/25] ACPI / APEI: Tell firmware the estatus queue
+ consumed the records
 To: Borislav Petkov <bp@alien8.de>
 References: <20181203180613.228133-1-james.morse@arm.com>
- <20181203180613.228133-10-james.morse@arm.com>
- <20181211174449.GM27375@zn.tnic>
-Message-ID: <3f0f9005-f383-8a03-c7f9-15b50c099f94@arm.com>
-Date: Thu, 10 Jan 2019 18:21:21 +0000
+ <20181203180613.228133-11-james.morse@arm.com>
+ <20181211183634.GO27375@zn.tnic>
+From: James Morse <james.morse@arm.com>
+Message-ID: <56cfa16b-ece4-76e0-3799-58201f8a4ff1@arm.com>
+Date: Thu, 10 Jan 2019 18:22:56 +0000
 User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
  Thunderbird/60.3.1
 MIME-Version: 1.0
-In-Reply-To: <20181211174449.GM27375@zn.tnic>
+In-Reply-To: <20181211183634.GO27375@zn.tnic>
 Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_102125_696249_433603E1 
-X-CRM114-Status: GOOD (  16.45  )
+X-CRM114-CacheID: sfid-20190110_102301_288785_4DADFC56 
+X-CRM114-Status: GOOD (  21.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,8 +78,9 @@ Cc: Rafael Wysocki <rjw@rjwysocki.net>, Tony Luck <tony.luck@intel.com>,
  Xie XiuQi <xiexiuqi@huawei.com>, Will Deacon <will.deacon@arm.com>,
  Christoffer Dall <christoffer.dall@arm.com>,
  Dongjiu Geng <gengdongjiu@huawei.com>, linux-acpi@vger.kernel.org,
- Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org, Len Brown <lenb@kernel.org>
+ baicar.tyler@gmail.com, Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>,
+ kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org,
+ Len Brown <lenb@kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
@@ -86,60 +88,87 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 Hi Boris,
 
-On 11/12/2018 17:44, Borislav Petkov wrote:
-> On Mon, Dec 03, 2018 at 06:05:57PM +0000, James Morse wrote:
->> Refactor the estatus queue's pool notification routine from
->> NOTIFY_NMI's handlers. This will allow another notification
->> method to use the estatus queue without duplicating this code.
+(CC: +Tyler)
+
+On 11/12/2018 18:36, Borislav Petkov wrote:
+> On Mon, Dec 03, 2018 at 06:05:58PM +0000, James Morse wrote:
+>> ACPI has a GHESv2 which is used on hardware reduced platforms to
+>> explicitly acknowledge that the memory for CPER records has been
+>> consumed. This lets an external agent know it can re-use this
+>> memory for something else.
 >>
->> This patch adds rcu_read_lock()/rcu_read_unlock() around the list
-> 
-> s/This patch adds/Add/
-> 
->> list_for_each_entry_rcu() walker. These aren't strictly necessary as
->> the whole nmi_enter/nmi_exit() window is a spooky RCU read-side
->> critical section.
+>> Previously notify_nmi and the estatus queue didn't do this as
+>> they were never used on hardware reduced platforms. Once we move
+>> notify_sea over to use the estatus queue, it may become necessary.
 >>
->> _in_nmi_notify_one() is separate from the rcu-list walker for a later
->> caller that doesn't need to walk a list.
+>> Add the call. This is safe for use in NMI context as the
+>> read_ack_register is pre-mapped by ghes_new() before the
+>> ghes can be added to an RCU list, and then found by the
+>> notification handler.
 
->> +static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
->> +{
->> +	int ret = NMI_DONE;
->> +
->> +	if (!atomic_add_unless(&ghes_in_nmi, 1, 1))
->> +		return ret;
->> +
->> +	if (!ghes_estatus_queue_notified(&ghes_nmi))
->> +		ret = NMI_HANDLED;
+>> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+>> index 366dbdd41ef3..15d94373ba72 100644
+>> --- a/drivers/acpi/apei/ghes.c
+>> +++ b/drivers/acpi/apei/ghes.c
+>> @@ -926,6 +926,10 @@ static int _in_nmi_notify_one(struct ghes *ghes)
+>>  	__process_error(ghes);
+>>  	ghes_clear_estatus(ghes, buf_paddr);
+>>  
+>> +	if (is_hest_type_generic_v2(ghes) && ghes_ack_error(ghes->generic_v2))
 > 
-> So this reads kinda the other way around, at least to me:
+> Since ghes_ack_error() is always prepended with this check, you could
+> push it down into the function:
 > 
-> 	"if the queue was *not* notified, the NMI was handled."
+> ghes_ack_error(ghes)
+> ...
 > 
-> Maybe rename to this:
+> 	if (!is_hest_type_generic_v2(ghes))
+> 		return 0;
 > 
-> 	err = process_queue(&ghes_nmi);
-> 	if (!err)
-> 		ret = NMI_HANDLED;
-> 
-> to make it clearer...
+> and simplify the two callsites :)
 
-(yup, that's clearer).
+Great idea! ...
 
-But now we've opened pandora's box of naming-things: This thing isn't really
-processing anything, its walking a list of 'maybe it was one of these' and
-copying anything it finds into the estatus-queue to be handled later.
+.. huh. Turns out for ghes_proc() we discard any errors other than ENOENT from
+ghes_read_estatus() if is_hest_type_generic_v2(). This masks EIO.
 
-I've evidently overloaded 'notified' to mean this.
-__process_error() doesn't process anything either, it does the add-to-queue.
+Most of the error sources discard the result, the worst thing I can find is
+ghes_irq_func() will return IRQ_HANDLED, instead of IRQ_NONE when we didn't
+really handle the IRQ. They're registered as SHARED, but I don't have an example
+of what goes wrong next.
 
-'spool' is the word that best conveys what's going on here, I should probably
-use that 'in_nmi' prefix more to make it clear this has to be nmi safe.
+I think this will also stop the spurious handling code kicking in to shut it up
+if its broken and screaming. Unlikely, but not impossible.
 
-Something like:
-ghes_notify_nmi() -> in_nmi_spool_from_list(list) -> in_nmi_queue_one_entry(ghes).
+Fixed in a prior patch, with Boris' suggestion, ghes_proc()s tail ends up look
+like this:
+----------------------%<----------------------
+diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+index 0321d9420b1e..8d1f9930b159 100644
+--- a/drivers/acpi/apei/ghes.c
++++ b/drivers/acpi/apei/ghes.c
+@@ -700,18 +708,11 @@ static int ghes_proc(struct ghes *ghes)
 
+ out:
+        ghes_clear_estatus(ghes, buf_paddr);
++       if (rc != -ENOENT)
++               rc_ack = ghes_ack_error(ghes);
+
+-       if (rc == -ENOENT)
+-               return rc;
+-
+-       /*
+-        * GHESv2 type HEST entries introduce support for error acknowledgment,
+-        * so only acknowledge the error if this support is present.
+-        */
+-       if (is_hest_type_generic_v2(ghes))
+-               return ghes_ack_error(ghes->generic_v2);
+-
+-       return rc;
++       /* If rc and rc_ack failed, return the first one */
++       return rc ? rc : rc_ack;
+ }
+----------------------%<----------------------
 
 
 Thanks,
