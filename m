@@ -2,83 +2,56 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2F084C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 13:26:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E412BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 13:26:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EA56E214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 13:26:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B0EEE214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 13:26:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hjoyXlHo";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="IIW2DCjV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EA56E214DA
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rAkrYST3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B0EEE214DA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HJnk0Une0daTNHhGMKUvy31Br+kj+nvjOFoWr6Jb2U8=; b=hjoyXlHobrMQvN
-	YRxwhmAmnqvrAPkjcclc15boJw9VIUTfpundiyJX+5gNgeQ75U0X/ObL78EnOgDXc2P1b2pXetqrX
-	ok6E7Ee5cvWUiNcGWP+mvfHel+1ap8r/TmU2EpXxHlntg6mwJeeof37voWeCw4HWKvF0mvS5wFxAj
-	k+FcjPL3CGUDIE3+UOlxqgEg5BL9s+gnC9MOi5g4JbmvSWNRR5Xt842ZtW/pb7rpRReq4oclPcCDV
-	QqJydcRqoheQWNT90o/yUZvSYG4ChPr6IkNZmB7EAXhJMPR4yjzJwE/ewxgRZ3AqX+Z//aIfbcE28
-	P0YOFXyL9wy3PJ2L0lFg==;
+	List-Owner; bh=LAQ8AmdAHh/M6a5jrVMP/E2H+E12WZ/rJ6daEie77b0=; b=rAkrYST3OURoYk
+	4Njys0h12vCWtU2H2dAdHfNzfd65MnFrNyy4nKeN37oIWbH66bDhN01ZiSnkJ0iuvv5PKW8t3aSQv
+	Hd3NStz+2KxCNXKNMYxFkquy6W2M/PFUz1lfWlyuoYfn8hg+gkGZbKCjk2Df7VT6xtKnnQxslMbgq
+	y29xmTyyBEtYVYlnYGEn7TQ6yClaUihBKJP1+wAOCPPlXj4d0XSZk9FCduBVchT80yGi0sXKnSojs
+	qHcP9rPkm5IbnFTnsitI8/kZGFboQSb0arkS4gA6QFY//wNOZsLlTP2jmdJJ26azlcLihKKJgV5KW
+	8H9J3mOQPQegwmt/uUqA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghaLY-0002ie-F0; Thu, 10 Jan 2019 13:26:08 +0000
-Received: from mail-oi1-x244.google.com ([2607:f8b0:4864:20::244])
+	id 1ghaLq-00033s-1f; Thu, 10 Jan 2019 13:26:26 +0000
+Received: from gloria.sntech.de ([185.11.138.130])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghaLS-0002hb-Qe
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 13:26:06 +0000
-Received: by mail-oi1-x244.google.com with SMTP id i6so9242512oia.6
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 10 Jan 2019 05:26:02 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=ohYVSf1fMbgvNKdeTvE1yHp/DGUKv0oXC+hX6SOxMkA=;
- b=IIW2DCjVNVZuslGTFaSmM0zrd5AQVQs9KDp2KFRXSbCQoxYyw+94e92qDGBqTyYj9f
- rTjqASpKAt6Xb8tRKhvwmEL28Vqwml66hb0v5SEzBEhnYj39EnFmpVUHCBEttJ7OqDKw
- vCUsXhvqdH5rZYw4Bqk3Z72b/G35JUNQffeNU=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=ohYVSf1fMbgvNKdeTvE1yHp/DGUKv0oXC+hX6SOxMkA=;
- b=RqrgBa7dgDjdCCUOUVAcGgEyVwVBSsGWHtLL60amuzlz3nDtrUEp1vikOJj3ym7nuF
- TpwCLrRC84fpJtzJHhwNpp4CdXJHqx3nPmQqTvZVX6EAx+N687x23MZ8Zw39uo+KhF3a
- jCWBh+UUUVuJ6CUJXG+sShM7492xcBEL0dbySav0zdhGUguEHe5vP05QBP5+RI5liQxL
- NviQvWyTtJLzxKVaPqCPpDla7XVKHRGsY6n3yfExO7ysUQcnR77bNuJXu9hbbXgO0HWa
- tgHUqaPBOK2LIizB5vJMDdUYfoJHii1sod0jAQtPm1JFyxysICRt6lnkws4D1iZgdcKX
- rd8Q==
-X-Gm-Message-State: AJcUukcNdZXCI8VIyvuQhiMYlkm5DWMbp4tlYcCGCLfP5N8CUV0bQND7
- ueMzmYywN4rqBNuCu+nlo1Qm5VRs4Y/Cei7O+I3OrA==
-X-Google-Smtp-Source: ALg8bN49WlrOP/5pP+J9WCkIOY3Be/esAAQ74dx3rIvjYOkGKZN7SQXT3HNWI3fx/CND/XZqQSOlAUbc8eKcpIYbbg4=
-X-Received: by 2002:aca:2dc9:: with SMTP id t192mr6774360oit.325.1547126761553; 
- Thu, 10 Jan 2019 05:26:01 -0800 (PST)
+ id 1ghaLk-0002tM-TX; Thu, 10 Jan 2019 13:26:23 +0000
+Received: from wf0848.dip.tu-dresden.de ([141.76.183.80] helo=phil.localnet)
+ by gloria.sntech.de with esmtpsa (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256)
+ (Exim 4.89) (envelope-from <heiko@sntech.de>)
+ id 1ghaLg-0003Lg-M9; Thu, 10 Jan 2019 14:26:16 +0100
+From: Heiko Stuebner <heiko@sntech.de>
+To: Robin Murphy <robin.murphy@arm.com>
+Subject: Re: [PATCH 5/5] arm64: dts: rockchip: Fix nanopi4 uSD card detect
+Date: Thu, 10 Jan 2019 14:26:15 +0100
+Message-ID: <6110368.KK4K1XCW2x@phil>
+In-Reply-To: <c2c40662-f7aa-75d5-572e-c58b21170b59@arm.com>
+References: <cover.1546981251.git.robin.murphy@arm.com>
+ <6925511.AQqqGbhmY3@phil> <c2c40662-f7aa-75d5-572e-c58b21170b59@arm.com>
 MIME-Version: 1.0
-References: <0184EA26B2509940AA629AE1405DD7F201FFC21E@dggema523-mbx.china.huawei.com>
- <c01e3ed0-f66c-f7df-295a-70b44bad49ff@arm.com>
- <CAFEAcA8No4tti6o9oErdfGKyHqRTfXebO4fuEOhBApFAxw=LOg@mail.gmail.com>
- <1d73ec5a-b58d-1e00-b681-53cd80cba999@arm.com>
- <63a1ad58-b4db-c266-1077-0a3d0a3975d0@huawei.com>
-In-Reply-To: <63a1ad58-b4db-c266-1077-0a3d0a3975d0@huawei.com>
-From: Peter Maydell <peter.maydell@linaro.org>
-Date: Thu, 10 Jan 2019 13:25:50 +0000
-Message-ID: <CAFEAcA9nGHFCuocGv+XLTStOZMONNK1SFYZ=uxhVN+KRU6BG2w@mail.gmail.com>
-Subject: Re: [RFC RESEND PATCH] kvm: arm64: export memory error recovery
- capability to user space
-To: gengdongjiu <gengdongjiu@huawei.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_052602_867722_38AE7D21 
-X-CRM114-Status: GOOD (  21.87  )
+X-CRM114-CacheID: sfid-20190110_052621_268621_076FD9FB 
+X-CRM114-Status: GOOD (  24.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,63 +63,74 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "open list:DOCUMENTATION" <linux-doc@vger.kernel.org>,
- kvm-devel <kvm@vger.kernel.org>, Jonathan Corbet <corbet@lwn.net>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- =?UTF-8?B?UmFkaW0gS3LEjW3DocWZ?= <rkrcmar@redhat.com>,
- Will Deacon <will.deacon@arm.com>, Christoffer Dall <christoffer.dall@arm.com>,
- lkml - Kernel Mailing List <linux-kernel@vger.kernel.org>,
- James Morse <james.morse@arm.com>,
- arm-mail-list <linux-arm-kernel@lists.infradead.org>
+Cc: linux-rockchip@lists.infradead.org, tomeu.vizoso@collabora.com,
+ linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 10 Jan 2019 at 12:09, gengdongjiu <gengdongjiu@huawei.com> wrote:
-> Peter, I summarize James's main idea, James think QEMU does not needs
-> to check *something* if Qemu support firmware-first.
-> What do we do for your comments?
+Am Mittwoch, 9. Januar 2019, 00:22:01 CET schrieb Robin Murphy:
+> On 2019-01-08 10:42 pm, Heiko Stuebner wrote:
+> > Am Dienstag, 8. Januar 2019, 22:57:27 CET schrieb Robin Murphy:
+> >> For whatever reason, the sdmmc_dectn function isn't working properly
+> >> as-is, and microSD insertion and removal goes unnoticed. Flipping the
+> >> pin into GPIO mode, however, does do the job, so let's just handle it
+> >> that way for now until someone feels inclined to figure out what GRF
+> >> voodoo or otherwise is needed for correct 'native' operation.
+> >>
+> >> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> >> ---
+> >>   arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi | 7 ++++++-
+> >>   1 file changed, 6 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi
+> >> index 9c723038d8f8..2a183a6af150 100644
+> >> --- a/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi
+> >> +++ b/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi
+> >> @@ -505,6 +505,10 @@
+> >>   		sdmmc0_pwr_h: sdmmc0-pwr-h {
+> >>   			rockchip,pins = <0 RK_PA1 RK_FUNC_GPIO &pcfg_pull_none>;
+> >>   		};
+> >> +
+> >> +		sdmmc0_det_l: sdmmc0-det-l {
+> > 
+> > alphabetically by node-name please,
+> > aka sdmmc0-det-* should be above sdmmc0-pwr-*
+> 
+> Right you are, not sure how that one slipped through.
+> 
+> > If you're respinning the whole series this should be fixed,
+> > otherwise I can also do that when applying.
+> 
+> I've fixed it up locally, although it might be worth holding off on this 
+> particular patch for the moment now that I've taken another look through 
+> the TRM and noticed those smoking-gun-looking bits in 
+> GRF_SIG_DETECT_CON{0,1} - I'll investigate...
 
-Unless I'm missing something, the code in your most recent patchset
-attempts to update an ACPI table when it gets the SIGBUS from the
-host kernel without doing anything to check whether it has ever
-created the ACPI table (and set up the QEMU global variable that
-tells the code where it is in the guest memory) in the first place.
-I don't see how that can work.
+Personally I'm very much fine with using a cd-gpio instead of trying
+to bring order to the GRF "chaos" ;-) as I'm also not really sure
+if we gain anything with the IP-internal detect mechanism.
 
-> >> I think one question here which it would be good to answer is:
-> >> if we are modelling a guest and we haven't specifically provided
-> >> it an ACPI table to tell it about memory errors, what do we do
-> >> when we get a sigbus from the host? We have basically two choices:
-> >>  (1) send the guest an SError (aka asynchronous external abort)
-> >>      anyway (with no further info about what the memory error is)
-> >
-> > For an AR signal an external abort is valid. Its up to the implementation
-> > whether these are synchronous or asynchronous. Qemu can only take a signal for
-> > something that was synchronous, so you can choose between the two.
-> > Synchronous external abort is marginally better as an unaware OS knows its
-> > affects this thread, and may be able to kill it.
-> > SError with an imp-def ESR is indistinguishable from 'part of the soc fell out',
-> > and should always result in a panic().
-> >
-> >
-> >>  (2) just stop QEMU (as we would for a memory error in QEMU's
-> >>      own memory)
-> >
-> > This is also valid. A machine may take external-abort to EL3 and then
-> > reboot/crash/burn.
+But then do as you like :-D
 
-We should decide which of these we want to do, and have a comment
-explaining what we're doing. If I'm reading your current patchset
-correctly, it does neither -- if it can't record the fault in the
-ACPI table it just ignores it without either stopping QEMU or
-delivering an SError.
+> [ side note - do you reckon there'd be any value in bolting a debugfs 
+> interface onto the GRF driver, or is the realistic answer to just use 
+> /dev/mem like everyone else and stop having silly ideas? ]
 
-I think I favour option (2) here.
+I don't think it would help much ... especially when it really only outputs
+the register contents in the same way as mem or so does.
 
-thanks
--- PMM
+Having to fiddle with GRF bits really should only happen in rare cases,
+so I guess mem should do the trick for that.
+
+And the GRF driver also was a bit controversial anyway, with the title
+of "dumping ground" looming over it ... so I'd like to keep it small
+and simple ;-) .
+
+Heiko
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
