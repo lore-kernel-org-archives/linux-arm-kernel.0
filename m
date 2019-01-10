@@ -2,112 +2,72 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B7DB1C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 10:32:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 23AF8C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 10:34:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 88FA8214C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 10:32:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D39BA214C6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 10:34:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="osDE0s1H";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="LqPmW0Fd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 88FA8214C6
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DZMAdHQC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D39BA214C6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=do1ncCIW/k9GbS9a/QlLM4zUGWFnz80ddU9ZGX9nAFw=; b=osDE0s1HgEOPCa
-	QsS7t9NgVk3cQd0wHZwLFD9Xzobq9Vgc/v0n69W374dBz3eXWpQJeCumQw4EBxngAt+NeEMoid4My
-	asaoMnRVORdzi8jsctKDblOU5n1Z1h0wv0KnIn/ITg93TjO0v6NjvPavKPk7dMNe6m0XcTuuLrTmv
-	S7LjYYHgwUikWM0/rwZmkCBZqWTQddg7+JNC1EymZ66S9iodx/eWUuwiIR3DsyzTRTHDer5Sprxd3
-	QyNV6OgW9hDB+3kK4XdymcH52/YtV8ni+rj1h3qA91fW9tNvdbWlxEt38XcorH+TgAeeW7DQLJ/Gf
-	DsgMzeUGjhH+d5exVRpQ==;
+	List-Owner; bh=Li28f3IYYQYz4AYmJUyz0K4VFTnlWLuTMplWlm4e8es=; b=DZMAdHQCCr76Qb
+	luxNtxYHj+f5B7+LUlqRn/NfK3hBfWEezl8PtlN/m34ZyRtqahj0vsJUg+UBKNyVz17vq15wGYwmk
+	3KIPfcRRZmiWqg3CqGlPIDwD2mRIDge0RCckGugen5VVEx5q2QRgua8G14PepV6I0Ajy+8PmzqmoO
+	9YjqrBIYqNF8fF+m68dIZnw2tunxkX9Xf3lyw/t8GRRhwIXIQmgvaZgFX61+pwPWXEsShrzVY2UFp
+	StYoLjj3qxtk8AZpZ5B+FGti6XkDpD8DqCUHir4YnT+qlVjw4ClCkk/Zuco9ASCVEnipHLEhzZ3Az
+	lU5qNfvDFoEGVnISlFOQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghXd3-0006Nk-5e; Thu, 10 Jan 2019 10:32:01 +0000
-Received: from mail-he1eur02on0603.outbound.protection.outlook.com
- ([2a01:111:f400:fe05::603]
- helo=EUR02-HE1-obe.outbound.protection.outlook.com)
+	id 1ghXfL-0006ke-Fi; Thu, 10 Jan 2019 10:34:23 +0000
+Received: from mailgw01.mediatek.com ([216.200.240.184])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghXcz-0006Mr-Af
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 10:31:59 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=naNLwtoqv7J17+VK+hJEASA7Fi7TKGWC4TLLjp1FWDU=;
- b=LqPmW0FdnLTFAGX5aI0NuRYMBb8OHy4Q7gsb0+B51EuRV/3xyjW58jo69Nr7ExFm9vBPpOHMvmJFCTGvlSLvBSS1Gzp+Y4RPGY3L9khb+rGW2ZqdA+ffj6FJ5On/4fQ5FKiNxu9ayh63svVkkcRrZ5H7Krr2OB1C3qyMzl9B9r8=
-Received: from VI1PR04MB4431.eurprd04.prod.outlook.com (20.177.55.159) by
- VI1PR04MB5920.eurprd04.prod.outlook.com (20.178.205.82) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1516.14; Thu, 10 Jan 2019 10:31:52 +0000
-Received: from VI1PR04MB4431.eurprd04.prod.outlook.com
- ([fe80::39b7:fa32:e307:a294]) by VI1PR04MB4431.eurprd04.prod.outlook.com
- ([fe80::39b7:fa32:e307:a294%2]) with mapi id 15.20.1495.011; Thu, 10 Jan 2019
- 10:31:52 +0000
-From: Peng Ma <peng.ma@nxp.com>
-To: Peng Ma <peng.ma@nxp.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "axboe@kernel.dk" <axboe@kernel.dk>
-Subject: RE: [PATCH 1/2] ahci: qoriq: add lx2160 platforms support
-Thread-Topic: [PATCH 1/2] ahci: qoriq: add lx2160 platforms support
-Thread-Index: AQHUqMzHrHO4D1Z/Q0GdToE49HezEKWoS/7w
-Date: Thu, 10 Jan 2019 10:31:52 +0000
-Message-ID: <VI1PR04MB44311C4FCA7DE543941E84B0ED840@VI1PR04MB4431.eurprd04.prod.outlook.com>
-References: <20190110100533.33333-1-peng.ma@nxp.com>
-In-Reply-To: <20190110100533.33333-1-peng.ma@nxp.com>
-Accept-Language: zh-CN, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=peng.ma@nxp.com; 
-x-originating-ip: [119.31.174.73]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; VI1PR04MB5920;
- 6:V13WEA/i0iqc0gVYigHU5cx1+U18wb16bDs9+42mBkjvfBzS7iZgBUGMI/pxX4CbXFgf5FmvM4MztQd78Mb7VWQhvhyEncjmEYyI2y8G/2sxWWhasrYENg2OU70Brstp6itvQ35Z7q25pUVMqOdqI0jjIAt8NakjPeO1Lzzpa1MN9AJCGn2gsrq8KXfRHtpXbyQdG1h1cNVI+NlfKuUbgypOWKkqtI+pi/T1ymVM/NkVPbcNqtBJGLUfDT+HYpzf84oYiGq08dYukCJLKHmdZQvtrKjI3362K7z7nTyxnADTlUYO80ykLOiLNE+7xHzomC09yl/9QinQsoezhqz48VWFlJcDIlMhgah/IcbErk4LJnl8ofsOg0MaYCLypX+HDAHuQM/lI4RcwR3zg2M9f+FH5Ox5epuzmLn7Bn2JFa7QbnXjtjhAfIonoCid4fnKsDSeQF204ZUHN6uWXJgpLw==;
- 5:4VxUIB1FtzJe/xyeRdFHOeQMpOd9WwVk1cjTiW7QMgKx+ZoA5LnRFWPX942ERyPyk6CuomOuSbzBJ8yH3JKrutGOA4P3YJjhlDcZ4EvBsrCKQ3VioUoB2KVbEdz/UtGRxQebuZqbBx4lGf4rukOts9dZrNdlG1ct/XXV5MJ6cjVT6hN6CQD+AfLIVCKVwmXebiBW6e6NHhTQ966QbTUsuQ==;
- 7:ApPGFVt/a4QM3OM5qB9mygXnhKptJV9RRnegz1X5uBkVMDSI/Ye6nS4p/dFLGNjmRUo2Bt55d6UIFGT1dnWoYghajkuTvM1oYoP16AeSnPx6e8gdyG4u9o+3lVbJC23hO0LUUvvwtrjCSdGZu8DWWg==
-x-ms-exchange-antispam-srfa-diagnostics: SOS;
-x-ms-office365-filtering-correlation-id: 4f713b92-ae48-47e6-c778-08d676e6d5e0
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR04MB5920; 
-x-ms-traffictypediagnostic: VI1PR04MB5920:
-x-microsoft-antispam-prvs: <VI1PR04MB592017922AD537BAAED25216ED840@VI1PR04MB5920.eurprd04.prod.outlook.com>
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(3230021)(908002)(999002)(5005026)(6040522)(8220060)(2401047)(8121501046)(3002001)(10201501046)(3231475)(944501520)(4982022)(52105112)(93006095)(93001095)(6055026)(6041310)(20161123564045)(20161123560045)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(201708071742011)(7699051)(76991095);
- SRVR:VI1PR04MB5920; BCL:0; PCL:0; RULEID:; SRVR:VI1PR04MB5920; 
-x-forefront-prvs: 0913EA1D60
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(346002)(136003)(376002)(39860400002)(396003)(366004)(189003)(199004)(13464003)(14454004)(7736002)(4326008)(5660300001)(86362001)(966005)(2201001)(25786009)(478600001)(68736007)(6306002)(9686003)(81166006)(8936002)(567974002)(305945005)(2906002)(33656002)(66066001)(74316002)(8676002)(81156014)(6246003)(186003)(256004)(26005)(105586002)(3846002)(476003)(446003)(11346002)(53936002)(54906003)(486006)(55016002)(44832011)(316002)(6436002)(2501003)(76176011)(99286004)(6506007)(110136005)(102836004)(6116002)(97736004)(71200400001)(7696005)(106356001)(71190400001)(229853002);
- DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB5920;
- H:VI1PR04MB4431.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: XH9+Oahc6jM6BZo3xghnqhqjiC6uMsMIbsHd94SixekG+HM4sXJmHDAdrvGZMrbzYua6VNYMEFKGpc+bYktUKAbKX4XKOcC1CQLjn/0kgwTEfLyxSUecLG97QriJFZ375ZAnz6DHlkeqycaXEQ9p0AeLGpCrFnU0B2zfyP1nYL2kz+uZH+H1qpbox5H46sLIqS8re6+RxkU0CYqiuf11qqf1H2oR4CLgjsXExgLyPk9LxoCV7e+cJphHLRZ+MLO2IFM+HQ44JC7cAcAOKbrHKYsv7vfrfxiS78ylKzVofkRXBDwWCse2IypAAzRPWi3S
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1ghXfH-0006kE-Js; Thu, 10 Jan 2019 10:34:21 +0000
+X-UUID: b9586fe0a219428d9ffa92fd2aab3dbe-20190110
+X-UUID: b9586fe0a219428d9ffa92fd2aab3dbe-20190110
+Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw01.mediatek.com
+ (envelope-from <long.cheng@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 224303398; Thu, 10 Jan 2019 02:34:03 -0800
+Received: from MTKMBS01N1.mediatek.inc (172.21.101.68) by
+ MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Thu, 10 Jan 2019 02:34:02 -0800
+Received: from MTKCAS32.mediatek.inc (172.27.4.184) by mtkmbs01n1.mediatek.inc
+ (172.21.101.68) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
+ Thu, 10 Jan 2019 18:33:53 +0800
+Received: from [10.17.3.153] (10.17.3.153) by MTKCAS32.mediatek.inc
+ (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Thu, 10 Jan 2019 18:33:51 +0800
+Message-ID: <1547116431.3831.43.camel@mhfsdcap03>
+Subject: Re: [PATCH v9 1/2] dmaengine: 8250_mtk_dma: add MediaTek uart DMA
+ support
+From: Long Cheng <long.cheng@mediatek.com>
+To: Vinod Koul <vkoul@kernel.org>
+Date: Thu, 10 Jan 2019 18:33:51 +0800
+In-Reply-To: <20190104171953.GQ13372@vkoul-mobl.Dlink>
+References: <1546395178-8880-1-git-send-email-long.cheng@mediatek.com>
+ <1546395178-8880-2-git-send-email-long.cheng@mediatek.com>
+ <20190104171953.GQ13372@vkoul-mobl.Dlink>
+X-Mailer: Evolution 3.2.3-0ubuntu6 
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 4f713b92-ae48-47e6-c778-08d676e6d5e0
-X-MS-Exchange-CrossTenant-originalarrivaltime: 10 Jan 2019 10:31:52.1243 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB5920
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_023157_469366_1569C453 
-X-CRM114-Status: GOOD (  17.08  )
+X-CRM114-CacheID: sfid-20190110_023419_661974_6B9E3CC6 
+X-CRM114-Status: GOOD (  23.62  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -119,103 +79,283 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Andy Tang <andy.tang@nxp.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Leo Li <leoyang.li@nxp.com>,
- "linux-ide@vger.kernel.org" <linux-ide@vger.kernel.org>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="gb2312"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Nicolas Boichat <drinkcat@chromium.org>,
+ Zhenbao Liu <zhenbao.liu@mediatek.com>, linux-serial@vger.kernel.org,
+ srv_heupstream@mediatek.com, Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Randy Dunlap <rdunlap@infradead.org>, linux-kernel@vger.kernel.org,
+ Rob Herring <robh+dt@kernel.org>, Sean Wang <sean.wang@kernel.org>, YT
+ Shen <yt.shen@mediatek.com>, dmaengine@vger.kernel.org,
+ Ryder Lee <ryder.lee@mediatek.com>, linux-mediatek@lists.infradead.org,
+ Sean Wang <sean.wang@mediatek.com>, Jiri Slaby <jslaby@suse.com>,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ Yingjoe Chen <yingjoe.chen@mediatek.com>,
+ Dan Williams <dan.j.williams@intel.com>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgSmVuc6OsDQoNCglJIHNlbmQgdGhlIHNhdGEgcGF0Y2hzIHRvIHRoZSB1cHN0cmVhbSBwYXRj
-aHdvcmsgd2l0aCAuL3NjcmlwdHMvZ2V0X21haW50YWluZXIucGwsIGJ1dCBJIGZpbmQgbXkgcGF0
-Y2ggb24gaHR0cDovL3BhdGNod29yay5vemxhYnMub3JnL3Byb2plY3QvbGludXgtaWRlL2xpc3Qv
-ICwgSSBzYXcgdGhlIE1BSU5UQUlORVJTLCB0aGUgZHJpdmVyL2F0YS8qIHNob3VsZCBiZSBvbiBo
-dHRwczovL3BhdGNod29yay5rZXJuZWwub3JnL3Byb2plY3QvbGludXgtYmxvY2svbGlzdC8gLiBj
-b3VsZCB5b3UgcGxlYXNlIGhlbHAgbWUgd2hhdCB0aGUgcGF0Y2h3b3JrIGlzIHJpZ2h0Lg0KCVRo
-YW5rcyBhIGxvdC4NCg0KQmVzdCBSZWdhcmRzLA0KUGVuZw0KDQo+LS0tLS1PcmlnaW5hbCBNZXNz
-YWdlLS0tLS0NCj5Gcm9tOiBQZW5nIE1hIDxwZW5nLm1hQG54cC5jb20+DQo+U2VudDogMjAxOcTq
-MdTCMTDI1SAxODowNg0KPlRvOiBzaGF3bmd1b0BrZXJuZWwub3JnOyBheGJvZUBrZXJuZWwuZGsN
-Cj5DYzogTGVvIExpIDxsZW95YW5nLmxpQG54cC5jb20+OyByb2JoK2R0QGtlcm5lbC5vcmc7DQo+
-bWFyay5ydXRsYW5kQGFybS5jb207IGxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9y
-ZzsNCj5kZXZpY2V0cmVlQHZnZXIua2VybmVsLm9yZzsgbGludXgta2VybmVsQHZnZXIua2VybmVs
-Lm9yZzsNCj5saW51eC1pZGVAdmdlci5rZXJuZWwub3JnOyBQZW5nIE1hIDxwZW5nLm1hQG54cC5j
-b20+DQo+U3ViamVjdDogW1BBVENIIDEvMl0gYWhjaTogcW9yaXE6IGFkZCBseDIxNjAgcGxhdGZv
-cm1zIHN1cHBvcnQNCj4NCj5MeDIxNjBhIGlzIGEgbmV3IGludHJvZHVjZWQgc29jIHdoaWNoIHN1
-cHBvcnRzIEFUQTMuMCBhbmQgQ2xlYW4gdXAgc29tZQ0KPmNvZGUNCj4NCj5TaWduZWQtb2ZmLWJ5
-OiBQZW5nIE1hIDxwZW5nLm1hQG54cC5jb20+DQo+LS0tDQo+IGRyaXZlcnMvYXRhL2FoY2lfcW9y
-aXEuYyB8ICAgNDQgKysrKysrKysrKysrLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0N
-Cj4gMSBmaWxlcyBjaGFuZ2VkLCAxMiBpbnNlcnRpb25zKCspLCAzMiBkZWxldGlvbnMoLSkNCj4N
-Cj5kaWZmIC0tZ2l0IGEvZHJpdmVycy9hdGEvYWhjaV9xb3JpcS5jIGIvZHJpdmVycy9hdGEvYWhj
-aV9xb3JpcS5jIGluZGV4DQo+Y2U1OTI1My4uMTk5NGJmMiAxMDA2NDQNCj4tLS0gYS9kcml2ZXJz
-L2F0YS9haGNpX3FvcmlxLmMNCj4rKysgYi9kcml2ZXJzL2F0YS9haGNpX3FvcmlxLmMNCj5AQCAt
-NTcsNyArNTcsNyBAQCBlbnVtIGFoY2lfcW9yaXFfdHlwZSB7DQo+IAlBSENJX0xTMjA4MEEsDQo+
-IAlBSENJX0xTMTA0NkEsDQo+IAlBSENJX0xTMTA4OEEsDQo+LQlBSENJX0xTMjA4OEEsDQo+KwlB
-SENJX0xYMjE2MEEsDQo+IH07DQo+DQo+IHN0cnVjdCBhaGNpX3FvcmlxX3ByaXYgew0KPkBAIC03
-Myw3ICs3Myw3IEBAIHN0cnVjdCBhaGNpX3FvcmlxX3ByaXYgew0KPiAJeyAuY29tcGF0aWJsZSA9
-ICJmc2wsbHMyMDgwYS1haGNpIiwgLmRhdGEgPSAodm9pZCAqKUFIQ0lfTFMyMDgwQX0sDQo+IAl7
-IC5jb21wYXRpYmxlID0gImZzbCxsczEwNDZhLWFoY2kiLCAuZGF0YSA9ICh2b2lkICopQUhDSV9M
-UzEwNDZBfSwNCj4gCXsgLmNvbXBhdGlibGUgPSAiZnNsLGxzMTA4OGEtYWhjaSIsIC5kYXRhID0g
-KHZvaWQgKilBSENJX0xTMTA4OEF9LA0KPi0JeyAuY29tcGF0aWJsZSA9ICJmc2wsbHMyMDg4YS1h
-aGNpIiwgLmRhdGEgPSAodm9pZCAqKUFIQ0lfTFMyMDg4QX0sDQo+Kwl7IC5jb21wYXRpYmxlID0g
-ImZzbCxseDIxNjBhLWFoY2kiLCAuZGF0YSA9ICh2b2lkICopQUhDSV9MWDIxNjBBfSwNCj4gCXt9
-LA0KPiB9Ow0KPiBNT0RVTEVfREVWSUNFX1RBQkxFKG9mLCBhaGNpX3FvcmlxX29mX21hdGNoKTsg
-QEAgLTE3NCwxMiArMTc0LDEwDQo+QEAgc3RhdGljIGludCBhaGNpX3FvcmlxX3BoeV9pbml0KHN0
-cnVjdCBhaGNpX2hvc3RfcHJpdiAqaHByaXYpDQo+IAkJd3JpdGVsKExTMTAyMUFfUE9SVF9QSFk0
-LCByZWdfYmFzZSArIFBPUlRfUEhZNCk7DQo+IAkJd3JpdGVsKExTMTAyMUFfUE9SVF9QSFk1LCBy
-ZWdfYmFzZSArIFBPUlRfUEhZNSk7DQo+IAkJd3JpdGVsKEFIQ0lfUE9SVF9UUkFOU19DRkcsIHJl
-Z19iYXNlICsgUE9SVF9UUkFOUyk7DQo+LQkJaWYgKHFwcml2LT5pc19kbWFjb2hlcmVudCkNCj4t
-CQkJd3JpdGVsKEFIQ0lfUE9SVF9BWElDQ19DRkcsDQo+LQkJCQkJcmVnX2Jhc2UgKyBMUzEwMjFB
-X0FYSUNDX0FERFIpOw0KPiAJCWJyZWFrOw0KPg0KPiAJY2FzZSBBSENJX0xTMTA0M0E6DQo+Kwlj
-YXNlIEFIQ0lfTFMxMDQ2QToNCj4gCQlpZiAoIXFwcml2LT5lY2NfYWRkcikNCj4gCQkJcmV0dXJu
-IC1FSU5WQUw7DQo+IAkJd3JpdGVsKHJlYWRsKHFwcml2LT5lY2NfYWRkcikgfCBFQ0NfRElTX0FS
-TVY4X0NIMiwgQEAgLTE4OCw4DQo+KzE4Niw2IEBAIHN0YXRpYyBpbnQgYWhjaV9xb3JpcV9waHlf
-aW5pdChzdHJ1Y3QgYWhjaV9ob3N0X3ByaXYgKmhwcml2KQ0KPiAJCXdyaXRlbChBSENJX1BPUlRf
-UEhZMl9DRkcsIHJlZ19iYXNlICsgUE9SVF9QSFkyKTsNCj4gCQl3cml0ZWwoQUhDSV9QT1JUX1BI
-WTNfQ0ZHLCByZWdfYmFzZSArIFBPUlRfUEhZMyk7DQo+IAkJd3JpdGVsKEFIQ0lfUE9SVF9UUkFO
-U19DRkcsIHJlZ19iYXNlICsgUE9SVF9UUkFOUyk7DQo+LQkJaWYgKHFwcml2LT5pc19kbWFjb2hl
-cmVudCkNCj4tCQkJd3JpdGVsKEFIQ0lfUE9SVF9BWElDQ19DRkcsIHJlZ19iYXNlICsgUE9SVF9B
-WElDQyk7DQo+IAkJYnJlYWs7DQo+DQo+IAljYXNlIEFIQ0lfTFMyMDgwQToNCj5AQCAtMTk3LDI0
-ICsxOTMsMTAgQEAgc3RhdGljIGludCBhaGNpX3FvcmlxX3BoeV9pbml0KHN0cnVjdCBhaGNpX2hv
-c3RfcHJpdg0KPipocHJpdikNCj4gCQl3cml0ZWwoQUhDSV9QT1JUX1BIWTJfQ0ZHLCByZWdfYmFz
-ZSArIFBPUlRfUEhZMik7DQo+IAkJd3JpdGVsKEFIQ0lfUE9SVF9QSFkzX0NGRywgcmVnX2Jhc2Ug
-KyBQT1JUX1BIWTMpOw0KPiAJCXdyaXRlbChBSENJX1BPUlRfVFJBTlNfQ0ZHLCByZWdfYmFzZSAr
-IFBPUlRfVFJBTlMpOw0KPi0JCWlmIChxcHJpdi0+aXNfZG1hY29oZXJlbnQpDQo+LQkJCXdyaXRl
-bChBSENJX1BPUlRfQVhJQ0NfQ0ZHLCByZWdfYmFzZSArIFBPUlRfQVhJQ0MpOw0KPi0JCWJyZWFr
-Ow0KPi0NCj4tCWNhc2UgQUhDSV9MUzEwNDZBOg0KPi0JCWlmICghcXByaXYtPmVjY19hZGRyKQ0K
-Pi0JCQlyZXR1cm4gLUVJTlZBTDsNCj4tCQl3cml0ZWwocmVhZGwocXByaXYtPmVjY19hZGRyKSB8
-IEVDQ19ESVNfQVJNVjhfQ0gyLA0KPi0JCQkJcXByaXYtPmVjY19hZGRyKTsNCj4tCQl3cml0ZWwo
-QUhDSV9QT1JUX1BIWV8xX0NGRywgcmVnX2Jhc2UgKyBQT1JUX1BIWTEpOw0KPi0JCXdyaXRlbChB
-SENJX1BPUlRfUEhZMl9DRkcsIHJlZ19iYXNlICsgUE9SVF9QSFkyKTsNCj4tCQl3cml0ZWwoQUhD
-SV9QT1JUX1BIWTNfQ0ZHLCByZWdfYmFzZSArIFBPUlRfUEhZMyk7DQo+LQkJd3JpdGVsKEFIQ0lf
-UE9SVF9UUkFOU19DRkcsIHJlZ19iYXNlICsgUE9SVF9UUkFOUyk7DQo+LQkJaWYgKHFwcml2LT5p
-c19kbWFjb2hlcmVudCkNCj4tCQkJd3JpdGVsKEFIQ0lfUE9SVF9BWElDQ19DRkcsIHJlZ19iYXNl
-ICsgUE9SVF9BWElDQyk7DQo+IAkJYnJlYWs7DQo+DQo+IAljYXNlIEFIQ0lfTFMxMDg4QToNCj4r
-CWNhc2UgQUhDSV9MWDIxNjBBOg0KPiAJCWlmICghcXByaXYtPmVjY19hZGRyKQ0KPiAJCQlyZXR1
-cm4gLUVJTlZBTDsNCj4gCQl3cml0ZWwocmVhZGwocXByaXYtPmVjY19hZGRyKSB8IEVDQ19ESVNf
-TFMxMDg4QSwgQEAgLTIyMywxOA0KPisyMDUsMTYgQEAgc3RhdGljIGludCBhaGNpX3FvcmlxX3Bo
-eV9pbml0KHN0cnVjdCBhaGNpX2hvc3RfcHJpdiAqaHByaXYpDQo+IAkJd3JpdGVsKEFIQ0lfUE9S
-VF9QSFkyX0NGRywgcmVnX2Jhc2UgKyBQT1JUX1BIWTIpOw0KPiAJCXdyaXRlbChBSENJX1BPUlRf
-UEhZM19DRkcsIHJlZ19iYXNlICsgUE9SVF9QSFkzKTsNCj4gCQl3cml0ZWwoQUhDSV9QT1JUX1RS
-QU5TX0NGRywgcmVnX2Jhc2UgKyBQT1JUX1RSQU5TKTsNCj4tCQlpZiAocXByaXYtPmlzX2RtYWNv
-aGVyZW50KQ0KPi0JCQl3cml0ZWwoQUhDSV9QT1JUX0FYSUNDX0NGRywgcmVnX2Jhc2UgKyBQT1JU
-X0FYSUNDKTsNCj4gCQlicmVhazsNCj4rCX0NCj4NCj4tCWNhc2UgQUhDSV9MUzIwODhBOg0KPi0J
-CXdyaXRlbChBSENJX1BPUlRfUEhZXzFfQ0ZHLCByZWdfYmFzZSArIFBPUlRfUEhZMSk7DQo+LQkJ
-d3JpdGVsKEFIQ0lfUE9SVF9QSFkyX0NGRywgcmVnX2Jhc2UgKyBQT1JUX1BIWTIpOw0KPi0JCXdy
-aXRlbChBSENJX1BPUlRfUEhZM19DRkcsIHJlZ19iYXNlICsgUE9SVF9QSFkzKTsNCj4tCQl3cml0
-ZWwoQUhDSV9QT1JUX1RSQU5TX0NGRywgcmVnX2Jhc2UgKyBQT1JUX1RSQU5TKTsNCj4tCQlpZiAo
-cXByaXYtPmlzX2RtYWNvaGVyZW50KQ0KPi0JCQl3cml0ZWwoQUhDSV9QT1JUX0FYSUNDX0NGRywg
-cmVnX2Jhc2UgKyBQT1JUX0FYSUNDKTsNCj4tCQlicmVhazsNCj4rCWlmIChxcHJpdi0+aXNfZG1h
-Y29oZXJlbnQpIHsNCj4rCQlpZiAocXByaXYtPnR5cGUgPT0gQUhDSV9MUzEwMjFBKQ0KPisJCQl3
-cml0ZWwoQUhDSV9QT1JUX0FYSUNDX0NGRywNCj4rCQkJICAgICAgIHJlZ19iYXNlICsgTFMxMDIx
-QV9BWElDQ19BRERSKTsNCj4rCQllbHNlDQo+KwkJCXdyaXRlbChBSENJX1BPUlRfQVhJQ0NfQ0ZH
-LA0KPisJCQkgICAgICAgcmVnX2Jhc2UgKyBQT1JUX0FYSUNDKTsNCj4gCX0NCj4NCj4gCXJldHVy
-biAwOw0KPi0tDQo+MS43LjENCg0KX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5l
-bEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4v
-bGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+On Fri, 2019-01-04 at 22:49 +0530, Vinod Koul wrote:
+> On 02-01-19, 10:12, Long Cheng wrote:
+> > In DMA engine framework, add 8250 uart dma to support MediaTek uart.
+> > If MediaTek uart enabled(SERIAL_8250_MT6577), and want to improve
+> > the performance, can enable the function.
+> 
+> Is the DMA controller UART specific, can it work with other controllers
+> as well, if so you should get rid of uart name in patch
+> 
+
+I don't know that it can work or not on other controller. but it's for
+MediaTek SOC
+
+> > +#define MTK_UART_APDMA_CHANNELS		(CONFIG_SERIAL_8250_NR_UARTS * 2)
+> 
+> Why are the channels not coming from DT?
+> 
+
+i will using dma-requests install of it.
+
+> > +
+> > +#define VFF_EN_B		BIT(0)
+> > +#define VFF_STOP_B		BIT(0)
+> > +#define VFF_FLUSH_B		BIT(0)
+> > +#define VFF_4G_SUPPORT_B	BIT(0)
+> > +#define VFF_RX_INT_EN0_B	BIT(0)	/*rx valid size >=  vff thre*/
+> > +#define VFF_RX_INT_EN1_B	BIT(1)
+> > +#define VFF_TX_INT_EN_B		BIT(0)	/*tx left size >= vff thre*/
+> 
+> space around /* space */ also run checkpatch to check for style errors
+> 
+
+ok.
+
+> > +static void mtk_uart_apdma_start_tx(struct mtk_chan *c)
+> > +{
+> > +	unsigned int len, send, left, wpt, d_wpt, tmp;
+> > +	int ret;
+> > +
+> > +	left = mtk_uart_apdma_read(c, VFF_LEFT_SIZE);
+> > +	if (!left) {
+> > +		mtk_uart_apdma_write(c, VFF_INT_EN, VFF_TX_INT_EN_B);
+> > +		return;
+> > +	}
+> > +
+> > +	/* Wait 1sec for flush,  can't sleep*/
+> > +	ret = readx_poll_timeout(readl, c->base + VFF_FLUSH, tmp,
+> > +			tmp != VFF_FLUSH_B, 0, 1000000);
+> > +	if (ret)
+> > +		dev_warn(c->vc.chan.device->dev, "tx: fail, debug=0x%x\n",
+> > +			mtk_uart_apdma_read(c, VFF_DEBUG_STATUS));
+> > +
+> > +	send = min_t(unsigned int, left, c->desc->avail_len);
+> > +	wpt = mtk_uart_apdma_read(c, VFF_WPT);
+> > +	len = mtk_uart_apdma_read(c, VFF_LEN);
+> > +
+> > +	d_wpt = wpt + send;
+> > +	if ((d_wpt & VFF_RING_SIZE) >= len) {
+> > +		d_wpt = d_wpt - len;
+> > +		d_wpt = d_wpt ^ VFF_RING_WRAP;
+> > +	}
+> > +	mtk_uart_apdma_write(c, VFF_WPT, d_wpt);
+> > +
+> > +	c->desc->avail_len -= send;
+> > +
+> > +	mtk_uart_apdma_write(c, VFF_INT_EN, VFF_TX_INT_EN_B);
+> > +	if (mtk_uart_apdma_read(c, VFF_FLUSH) == 0U)
+> > +		mtk_uart_apdma_write(c, VFF_FLUSH, VFF_FLUSH_B);
+> > +}
+> > +
+> > +static void mtk_uart_apdma_start_rx(struct mtk_chan *c)
+> > +{
+> > +	struct mtk_uart_apdma_desc *d = c->desc;
+> > +	unsigned int len, wg, rg, cnt;
+> > +
+> > +	if ((mtk_uart_apdma_read(c, VFF_VALID_SIZE) == 0U) ||
+> > +		!d || !vchan_next_desc(&c->vc))
+> > +		return;
+> > +
+> > +	len = mtk_uart_apdma_read(c, VFF_LEN);
+> > +	rg = mtk_uart_apdma_read(c, VFF_RPT);
+> > +	wg = mtk_uart_apdma_read(c, VFF_WPT);
+> > +	if ((rg ^ wg) & VFF_RING_WRAP)
+> > +		cnt = (wg & VFF_RING_SIZE) + len - (rg & VFF_RING_SIZE);
+> > +	else
+> > +		cnt = (wg & VFF_RING_SIZE) - (rg & VFF_RING_SIZE);
+> > +
+> > +	c->rx_status = cnt;
+> > +	mtk_uart_apdma_write(c, VFF_RPT, wg);
+> > +
+> > +	list_del(&d->vd.node);
+> > +	vchan_cookie_complete(&d->vd);
+> > +}
+> 
+> this looks odd, why do you have different rx and tx start routines?
+> 
+
+Would you like explain it in more detail? thanks.
+In tx function, will wait the last data flush done. and the count the
+size that send.
+In Rx function, will count the size that receive.
+Any way, in rx / tx, need andle WPT or RPT.
+
+> > +static int mtk_uart_apdma_alloc_chan_resources(struct dma_chan *chan)
+> > +{
+> > +	struct mtk_uart_apdmadev *mtkd = to_mtk_uart_apdma_dev(chan->device);
+> > +	struct mtk_chan *c = to_mtk_uart_apdma_chan(chan);
+> > +	u32 tmp;
+> > +	int ret;
+> > +
+> > +	pm_runtime_get_sync(mtkd->ddev.dev);
+> > +
+> > +	mtk_uart_apdma_write(c, VFF_ADDR, 0);
+> > +	mtk_uart_apdma_write(c, VFF_THRE, 0);
+> > +	mtk_uart_apdma_write(c, VFF_LEN, 0);
+> > +	mtk_uart_apdma_write(c, VFF_RST, VFF_WARM_RST_B);
+> > +
+> > +	ret = readx_poll_timeout(readl, c->base + VFF_EN, tmp,
+> > +			tmp == 0, 10, 100);
+> > +	if (ret) {
+> > +		dev_err(chan->device->dev, "dma reset: fail, timeout\n");
+> > +		return ret;
+> > +	}
+> 
+> register read does reset?
+> 
+
+'mtk_uart_apdma_write(c, VFF_RST, VFF_WARM_RST_B);' is reset. resd just
+poll reset done.
+
+> > +
+> > +	if (!c->requested) {
+> > +		c->requested = true;
+> > +		ret = request_irq(mtkd->dma_irq[chan->chan_id],
+> > +				  mtk_uart_apdma_irq_handler, IRQF_TRIGGER_NONE,
+> > +				  KBUILD_MODNAME, chan);
+> 
+> why is the irq not requested in driver probe?
+> 
+
+I have explained in below,
+http://lists.infradead.org/pipermail/linux-mediatek/2018-December/016418.html
+
+> > +static enum dma_status mtk_uart_apdma_tx_status(struct dma_chan *chan,
+> > +					 dma_cookie_t cookie,
+> > +					 struct dma_tx_state *txstate)
+> > +{
+> > +	struct mtk_chan *c = to_mtk_uart_apdma_chan(chan);
+> > +	enum dma_status ret;
+> > +	unsigned long flags;
+> > +
+> > +	if (!txstate)
+> > +		return DMA_ERROR;
+> > +
+> > +	ret = dma_cookie_status(chan, cookie, txstate);
+> > +	spin_lock_irqsave(&c->vc.lock, flags);
+> > +	if (ret == DMA_IN_PROGRESS) {
+> > +		c->rx_status = mtk_uart_apdma_read(c, VFF_RPT) & VFF_RING_SIZE;
+> > +		dma_set_residue(txstate, c->rx_status);
+> > +	} else if (ret == DMA_COMPLETE && c->cfg.direction == DMA_DEV_TO_MEM) {
+> 
+> why set reside when it is complete? also reside can be null, that should
+> be checked as well
+> 
+In different status, set different reside.
+
+> > +static struct dma_async_tx_descriptor *mtk_uart_apdma_prep_slave_sg
+> > +	(struct dma_chan *chan, struct scatterlist *sgl,
+> > +	unsigned int sglen, enum dma_transfer_direction dir,
+> > +	unsigned long tx_flags, void *context)
+> > +{
+> > +	struct mtk_chan *c = to_mtk_uart_apdma_chan(chan);
+> > +	struct mtk_uart_apdma_desc *d;
+> > +
+> > +	if ((dir != DMA_DEV_TO_MEM) &&
+> > +		(dir != DMA_MEM_TO_DEV)) {
+> > +		dev_err(chan->device->dev, "bad direction\n");
+> > +		return NULL;
+> > +	}
+> 
+> we have a macro for this
+
+Thanks for your suggestion. i will modify it.
+> 
+> > +
+> > +	/* Now allocate and setup the descriptor */
+> > +	d = kzalloc(sizeof(*d), GFP_ATOMIC);
+> > +	if (!d)
+> > +		return NULL;
+> > +
+> > +	/* sglen is 1 */
+> 
+> ?
+> 
+> > +static int mtk_uart_apdma_slave_config(struct dma_chan *chan,
+> > +				struct dma_slave_config *cfg)
+> > +{
+> > +	struct mtk_chan *c = to_mtk_uart_apdma_chan(chan);
+> > +	struct mtk_uart_apdmadev *mtkd =
+> > +				to_mtk_uart_apdma_dev(c->vc.chan.device);
+> > +
+> > +	c->cfg = *cfg;
+> > +
+> > +	if (cfg->direction == DMA_DEV_TO_MEM) {
+> 
+> fg->direction is deprecated, in fact I have removed all users recently,
+> please do not use this
+
+You will remove 'direction' in 'struct dma_slave_config'? if remove, how
+do confirm direction?
+
+> 
+> > +		unsigned int rx_len = cfg->src_addr_width * 1024;
+> > +
+> > +		mtk_uart_apdma_write(c, VFF_ADDR, cfg->src_addr);
+> > +		mtk_uart_apdma_write(c, VFF_LEN, rx_len);
+> > +		mtk_uart_apdma_write(c, VFF_THRE, VFF_RX_THRE(rx_len));
+> > +		mtk_uart_apdma_write(c, VFF_INT_EN,
+> > +				VFF_RX_INT_EN0_B | VFF_RX_INT_EN1_B);
+> > +		mtk_uart_apdma_write(c, VFF_RPT, 0);
+> > +		mtk_uart_apdma_write(c, VFF_INT_FLAG, VFF_RX_INT_FLAG_CLR_B);
+> > +		mtk_uart_apdma_write(c, VFF_EN, VFF_EN_B);
+> 
+> why are we writing this here, we are supposed to do that when txn
+> starts!
+> 
+
+also you can review the link
+http://lists.infradead.org/pipermail/linux-mediatek/2018-December/016418.html
+
+> > +static int mtk_uart_apdma_device_resume(struct dma_chan *chan)
+> > +{
+> > +	/* just for check caps pass */
+> > +	return 0;
+> > +}
+> 
+> if you do not support this please remove this!
+> 
+> > +static void mtk_uart_apdma_free(struct mtk_uart_apdmadev *mtkd)
+> > +{
+> > +	while (list_empty(&mtkd->ddev.channels) == 0) {
+> > +		struct mtk_chan *c = list_first_entry(&mtkd->ddev.channels,
+> > +			struct mtk_chan, vc.chan.device_node);
+> > +
+> > +		list_del(&c->vc.chan.device_node);
+> > +		tasklet_kill(&c->vc.task);
+> > +	}
+> > +}
+> > +
+> > +static const struct of_device_id mtk_uart_apdma_match[] = {
+> > +	{ .compatible = "mediatek,mt6577-uart-dma", },
+> 
+> where is the binding document for ediatek,mt6577-uart-dma ??
+> 
+
+http://lists.infradead.org/pipermail/linux-mediatek/2018-December/016154.html
+
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
