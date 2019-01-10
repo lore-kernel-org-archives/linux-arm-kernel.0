@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 54325C43614
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 16:28:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B1E12C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 16:28:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 09996214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 16:28:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7A0E4214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 16:28:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LJ9bYtlP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 09996214DA
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FxpNcQ4L"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7A0E4214DA
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,52 +25,51 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Ev+5Yri8SoSr0QkELrrX1eTfgdpo+0/5Ja+C++AZwYk=; b=LJ9bYtlPzoforN
-	UfGY1M6QXb5am/+Pn+p2qD/PYkxzpFsqwKNtTTtvQAPW2PvJQfXvcMtZd40XWku/yFkyNmS6s5vlW
-	zA1XbYTPRLmApLiruoaN42Y+2Eho3ELAQVpuhENOk9mPvEMXo3l4k+e+fZKkuPxgh3CDDvQssKNQy
-	h/Q+Gv/z68bL5sgS+R5hYcEPpD3NuwPQ3E52nJMaazdm8aL0S5cc9SJtGKGgIVXBXcTu5yYKz/r3C
-	LyzfqF70mP11b1IRdNAZt0rqIIIzC7EnuDVD7APDYx9CufuxkdevH0o09pDPZEo0gHIvUXWfxha6D
-	AXGm1D7rxqrKdm4NF4gA==;
+	List-Owner; bh=uFvPdMuaX691j9uydPxtV5tPhAq2L6UmPpLNuzLzP94=; b=FxpNcQ4LgbO1jx
+	iNbnxO8NhNg0s+fhA5EScoR+L/uOBxynhNV/na/0PDl6cWC2Y45MKNYZ7lAEz+cfD2N/OvJw6aFkm
+	/ZD2C05bX1MUPHwgEs+nlHX/vqm3x1dPy73x7PbjK4sMSY2BmNuWi4LYVcRXsmW5k+7zmTzhgFYda
+	lnXP+W0kSJJgdMiykRWp4hThLRByBrlATgvQHWTQRNTRZ0Pe4r8WF1ttiQIzfEFZDBQE8qTQGjOd9
+	J4k/xtScLy9EzRnLoc+iuRfcOMLlRMwSMY5f4Dz1Bsk/M0aIvpIWlF0mfEopEpp5kTkW+BZ/xVNnf
+	XWOcXtRAyuEQ5rH//4Ow==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghdBb-00064M-Lm; Thu, 10 Jan 2019 16:28:03 +0000
-Received: from mout.kundenserver.de ([217.72.192.73])
+	id 1ghdBr-0006Iv-CB; Thu, 10 Jan 2019 16:28:19 +0000
+Received: from mout.kundenserver.de ([217.72.192.75])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghd9r-0004IM-88
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 16:26:18 +0000
+ id 1ghd9s-0004Im-05
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 16:26:19 +0000
 Received: from wuerfel.lan ([109.192.41.194]) by mrelayeu.kundenserver.de
  (mreue108 [212.227.15.145]) with ESMTPA (Nemesis) id
- 1Mlf8e-1h7aDx3tBq-00ik97; Thu, 10 Jan 2019 17:25:16 +0100
+ 1M26n9-1gjYwt2XdZ-002VJW; Thu, 10 Jan 2019 17:25:14 +0100
 From: Arnd Bergmann <arnd@arndb.de>
 To: y2038@lists.linaro.org, linux-api@vger.kernel.org,
  linux-kernel@vger.kernel.org
-Subject: [PATCH 08/15] m68k: assign syscall number for seccomp
-Date: Thu, 10 Jan 2019 17:24:28 +0100
-Message-Id: <20190110162435.309262-9-arnd@arndb.de>
+Subject: [PATCH 07/15] ARM: add kexec_file_load system call number
+Date: Thu, 10 Jan 2019 17:24:27 +0100
+Message-Id: <20190110162435.309262-8-arnd@arndb.de>
 X-Mailer: git-send-email 2.20.0
 In-Reply-To: <20190110162435.309262-1-arnd@arndb.de>
 References: <20190110162435.309262-1-arnd@arndb.de>
 MIME-Version: 1.0
-X-Provags-ID: V03:K1:cAxqL4Pr32LfUICErQXLweOdeKXEeQmVpfR3EH9HEknl3Rx7o7E
- 3gUWhnJXo/Ubf1H9GjN7gL/hmeHLUh13G8skhoZVYIlxTGcXEAJWfHMK5fqwDp3C4mE6U0X
- qU5L8eRnhl276oNgVKUTHhKQsmD41xIQYhIiHkfU/+doRmo4DFVRig7b6U0yHHq8by33NdZ
- hcAmBJVorlGuA9B3ZJvMQ==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:bDCus6IHYZs=:59ePj81cYO3U2E3eiWHh1M
- sBYu+VjNywqUwFg/ihKW68e09BYM+B9wyJRztaakMTQXqRhqdEmvZ1ojdiFn0PboHSl1sg6Jz
- lktVPIRNjSHV++3RcDapX5ekI8ig/J0IvxH1f4+g6djzOk81uQeI5fVOD5R8OO0yszdfBId8u
- bb2KyOJqmuC0e+cXrMswmdkk/j+BBIteI5Mmb3mP+1uYhOF+TfOtsnOry98sXfwt5ZUPA9G11
- 6Bq2Pyf8idFvfkqnomphG6qXjz59WU2R1Q9Rx7kZwVitLUrtIW2RRr7yq1n7ODZWZGQ2z8AoO
- z24C7F3FN6OHu0pcfqceGVVVuzVusmsWJwQG+I6qPtgtEzJ98nxKoDWen8bapo4VdUefswZ8o
- 6W9+k1MDORiZpzr2jtSy9Ndat8iO6D+3zwTqbLUBoNqQtCgrmkHlAGhalt1LHHGyNhOW148bV
- PpMR+nZk7cIlmB54DRwSnuFmOUO6LDwN1o+g/il93UIM6NlbxyI/DWUKjWVYBGVdQ3s6Ic1Zf
- 0vSKAXuuihlQy5+pZqwaU8DXbOPv4HafkS3SIDPs2yD4d38mWQptPnqKD/bHDpvp4VJ5b/kNU
- aQ+nkmqzQ/IA01YkCZdy/qpBVvRyBS9YoP7Bz5rdcT7rE/Pq4hpkFgqLOPRpxbuJBNTSr2VaF
- icl78Ty7oQCbEHsFAET4OGF8IzhdbEX4J989KHwG97wdV3IRjqDo/uOxwU7z25q/vFvVzTku/
- IOt8wsJUD0b10sFcR6in2Nc/TFY9E3NMoaCyBQ==
+X-Provags-ID: V03:K1:bbQTa8+RVq8uOU5pbxDK+0/4n2oFwdb20J9rbCJvp69tR6LbpUE
+ BGw9PvuvotSd1z/CxUlN3LgFpu8c2eaVfhJU913d+y+4OuiKFe0x+5pUiPKr+A8JyoqUNYl
+ +HzTAqMZP6muHMdLv1v6FLhgS7jrtc4eJiWfRbo6++zUEUKkS/plrzdPDX4N3ebSRZ82vdU
+ 29ipN8xprnY8eaAdBUF1A==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:KcIkOw8POYU=:PlPoKFpPERWmgM//oISQHu
+ FSulXma/Pg8PEBbrHXiPuKmqgQPSJjkYE+IphJVFUZAY6EDeu6AtFVVptEDSdANsrovpTXcAL
+ b/AS9w9/SN/itOc8+uv+gP7/lQwmYzvDK1BbwMZpnXwYFjfMvbHPoKh9HcCWPXrhFDSGmw+8y
+ 5noFZR9dcb/SHixiXSpF1Uzzrt/1D05eMzRme6bDd6MQ8vzxvH9RxaowXKWyPsrHShPT5Yns3
+ RvFMOs0GUK3O83DVUX7KxpyabIrqW2LWJqx+aQ/5s1+2NDh5iBfmAYGenrjOjg1Dw7D3x2DO6
+ CbwGY7gKDYkp0Xv059QhC7u7F1tqgEzxTdrIb4K+LJQWNhFWZE6dFMlppU8my+3kMD+cIT6a4
+ /lKUb9S1bXaWBFRozDTYAQ/dWsNDdcosUEbHB8AsA5zHlOClTE881gOj7PkZjhSIyEpiIEioD
+ iBQFivwkpvXegsxBX3XNPos5ITLYPP00OJlLDCNuDqXAAMqMGQWMyaOHiSPo+J0RuYfofVFUk
+ +ZA+taJ3UVicsNsNzgjrOb/MA1fkK79L0NYP12Nqoq7c8R8vhby74mvgU8cyLD8zYnzaa6jLH
+ 4nGKiLGdIzNVujVY6D9aWQawS+VNaFBXbqJ55jmmne047urmDt0vQV5Lg53Yze4OpTMtc1ZKL
+ bEcAVanw4q5TBWN6nFcFgDqVzMcE+qwbf76mZR1JQw1kZojx200VU6Wc77Ggq+t14WHPxEt3u
+ fc4ZKBNefarvA8bAMh25iORuVAYJ+Kk4mxSxzQ==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_082615_831057_7A919B55 
-X-CRM114-Status: UNSURE (   9.77  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190110_082616_336652_FDA93122 
+X-CRM114-Status: GOOD (  13.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,27 +99,58 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Most architectures have assigned a numbers for the seccomp syscall
-even when they do not implement it.
+A couple of architectures including arm64 already implement the
+kexec_file_load system call, on many others we have assigned a system
+call number for it, but not implemented it yet.
 
-m68k is an exception here, so for consistency lets add the number.
-Unless CONFIG_SECCOMP is implemented, the system call just
-returns -ENOSYS.
+Adding the number in arch/arm/ lets us use the system call on arm64
+systems in compat mode, and also reduces the number of differences
+between architectures. If we want to implement kexec_file_load on ARM
+in the future, the number assignment means that kexec tools can already
+be built with the now current set of kernel headers.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/m68k/kernel/syscalls/syscall.tbl | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/tools/syscall.tbl        | 1 +
+ arch/arm64/include/asm/unistd.h   | 2 +-
+ arch/arm64/include/asm/unistd32.h | 2 ++
+ 3 files changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/m68k/kernel/syscalls/syscall.tbl b/arch/m68k/kernel/syscalls/syscall.tbl
-index 1a95c4a1bc0d..85779d6ef935 100644
---- a/arch/m68k/kernel/syscalls/syscall.tbl
-+++ b/arch/m68k/kernel/syscalls/syscall.tbl
-@@ -387,3 +387,4 @@
- 377	common	preadv2				sys_preadv2
- 378	common	pwritev2			sys_pwritev2
- 379	common	statx				sys_statx
-+380	common	seccomp				sys_seccomp
+diff --git a/arch/arm/tools/syscall.tbl b/arch/arm/tools/syscall.tbl
+index 86de9eb34296..20ed7e026723 100644
+--- a/arch/arm/tools/syscall.tbl
++++ b/arch/arm/tools/syscall.tbl
+@@ -415,3 +415,4 @@
+ 398	common	rseq			sys_rseq
+ 399	common	io_pgetevents		sys_io_pgetevents
+ 400	common	migrate_pages		sys_migrate_pages
++401	common	kexec_file_load		sys_kexec_file_load
+diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
+index 261216c3336e..2c30e6f145ff 100644
+--- a/arch/arm64/include/asm/unistd.h
++++ b/arch/arm64/include/asm/unistd.h
+@@ -44,7 +44,7 @@
+ #define __ARM_NR_compat_set_tls		(__ARM_NR_COMPAT_BASE + 5)
+ #define __ARM_NR_COMPAT_END		(__ARM_NR_COMPAT_BASE + 0x800)
+ 
+-#define __NR_compat_syscalls		401
++#define __NR_compat_syscalls		402
+ #endif
+ 
+ #define __ARCH_WANT_SYS_CLONE
+diff --git a/arch/arm64/include/asm/unistd32.h b/arch/arm64/include/asm/unistd32.h
+index 355fe2bc035b..19f3f58b6146 100644
+--- a/arch/arm64/include/asm/unistd32.h
++++ b/arch/arm64/include/asm/unistd32.h
+@@ -823,6 +823,8 @@ __SYSCALL(__NR_rseq, sys_rseq)
+ __SYSCALL(__NR_io_pgetevents, compat_sys_io_pgetevents)
+ #define __NR_migrate_pages 400
+ __SYSCALL(__NR_migrate_pages, sys_migrate_pages)
++#define __NR_kexec_file_load 401
++__SYSCALL(__NR_kexec_file_load, sys_kexec_file_load)
+ 
+ /*
+  * Please add new compat syscalls above this comment and update
 -- 
 2.20.0
 
