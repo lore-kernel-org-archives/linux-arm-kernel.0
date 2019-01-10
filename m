@@ -2,70 +2,79 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-17.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_ADSP_ALL,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_NEOMUTT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2838EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 09:16:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D1EF8C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 09:19:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EE414206B6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 09:16:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 97542206B6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 09:19:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="n5Nx+7ZB";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=plaes.org header.i=@plaes.org header.b="cFZhOccM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EE414206B6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=plaes.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LSlUnZoC";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="G3JLlRAb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 97542206B6
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Gsaqoi2S2++2SjWITdBd/kXlNixtR60Lr6rpH19ZoEc=; b=n5Nx+7ZBSjhrgY
-	+FuA0dsOLjK+fT9cKxMO9wYPg24EspJdsNffSR7WbA6grry4lu1aDUn/Ww8+wlNtRCoLOfV8gW7gM
-	HiQYkywnR4WFsyueTvQFxiOtD5YvaDar4qK2ka+cjdJ7C6r1LTrrUm0d6V95xRpD/uGEUF4V9E9bP
-	a5q0zUqr+Qm/3ndHrczpgGonM1eeJzHnCBBk7YMyPtMQ7C/eC96UpffcNUGPUBwckQwLq4y9clBqK
-	BS8N1kmjK7SCOoyJ6eTajUDSOi8quoSOtZ9tWt7DqiCzw2RFW8dJp5avVfIbfv8mED+m3yJQrus/O
-	sD72xWxr/tu8lV5TpzYA==;
+	List-Owner; bh=KsR8CVAHBfWVaA3Xz82IZxbvWDSF3RK9YW5oW0JS4rw=; b=LSlUnZoC+Bbt7G
+	SAvP65Vg0JvBN84CGjt09zyN8Zb1d625qmaWDK9zKcjlTvVnuG5gPZQKPzUhH/A4+8D8XE0EQ3Gdn
+	V8slKJCHESm7kwOPhZ8BC1i2vrIdAIDT+nGk3G+UzEsGj/IEE5+IGYbBkkKyvudbyaGMCX/vv/MA+
+	keH4RhcFzF4ZqCdlxXVPbRLJ8CcwpCeju/iOLFL39gLADoc8iObidXxyGn/pJtYHG3R5C5qYNRcOY
+	xCKPHuzmIby1G64xR8tOplX+KB4zkJDopajdCjU7HuDLkAaXnAfBO+ECnvUDUCZ08uKBNeMa0rygL
+	vkhatNpSOIJnem1LHpmA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghWRy-0006mV-FZ; Thu, 10 Jan 2019 09:16:30 +0000
-Received: from plaes.org ([188.166.43.21])
+	id 1ghWUz-000773-NT; Thu, 10 Jan 2019 09:19:37 +0000
+Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghWRu-0006m3-1d
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 09:16:28 +0000
-Received: from plaes.org (localhost [127.0.0.1])
- by plaes.org (Postfix) with ESMTPSA id 4BCE8402DF;
- Thu, 10 Jan 2019 09:15:49 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=plaes.org; s=mail;
- t=1547111749; bh=PrJ54k8gnhELd1dZtSEok5ub/GlZ7U39ptPcCg/GqZs=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=cFZhOccMoJrYTpjmjCw1rY0Hn1c9pL7mVFTkl2ZtKyxlLcuJaGSaQRWR6FX8gQkn9
- Z6aoAI0m8CAAQTm3h33LYdLQJ6JpIHSWuEI/qp2Gg02u1BM9p33mjOb861XeDS/zH4
- z35A3tpNdBemay0HQVoFnJPmWSgivtOwrrfa6Q+cj23ReMzRBYOxvRcW0S6E7V/0HK
- N256ic72EVUtDTGPuEHofeZnsoAnnLpS8tmsd3vWIaMJdhcvrYYdU3R0eh7wIl2TsN
- oBAJk3z5se9OPuRXqtMQo6oLPoRUNGxm1aDC1hZ+qvyyMB0KoPgMvofBcvaEh87jDT
- cXqV5z1ow4kdQ==
-Date: Thu, 10 Jan 2019 09:15:48 +0000
-From: Priit Laes <plaes@plaes.org>
-To: Jernej Skrabec <jernej.skrabec@siol.net>
-Subject: Re: [linux-sunxi] [PATCH v3 02/28] clk: sunxi-ng: Adjust MP clock
- parent rate when allowed
-Message-ID: <20190110091548.e6btt2qofi7ttt6z@plaes.org>
-References: <20181104182705.18047-1-jernej.skrabec@siol.net>
- <20181104182705.18047-3-jernej.skrabec@siol.net>
+ id 1ghWUw-00076d-Al
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 09:19:35 +0000
+Received: by mail-lf1-x144.google.com with SMTP id v5so7780106lfe.7
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 10 Jan 2019 01:19:33 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=hcL+QuKOb9QCeVhpnrtRyTP1qvEO+ZspXYkvnArXyDE=;
+ b=G3JLlRAbcguWedUSTLS3L4IKi1u8SJAEKeb8XTHKE3jaRVEZ8pyWQtputHtk0r6KHc
+ Uo55SxeYFIU688+mNUpvnLU05nhvKuqi4FzA0ILz8PDKmFJTw+gJP+9mJilBYZgczMEv
+ 2wfk6B03sxdmBh5Gwapj+2tnTGSYDmm9qy1VM=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=hcL+QuKOb9QCeVhpnrtRyTP1qvEO+ZspXYkvnArXyDE=;
+ b=HtaGgcMLRo/A1qk9QrZLS5YeodwQ7DutPsatxzX1f44eRT5VlIC8bgQ1NFOl5JF0BT
+ bCImO6gxcQi9vAH7X1QP/Rx0fgYQXBZVnXQ6puKXlWUO/YbkUkngGRICU7GUVhWwQT2w
+ Jgk4GNnaFkCFF99PUcpmrRCXBBLW6HjCwR03lLctI2nt+LjN6CLflZPbXmyOBTc8Go4J
+ GzhxgLVgooYLCHYPBkipIUe/2JG/CiXACvnuvruFcz9uv3PAHk1LRXJoBFCFlqU59JzD
+ qS77iwqFbxOPHs8wgslHaFL6IYHcTbA+Sn97aD5vE1PjpLGbjOqtxwZrg4oqU9t+qIGX
+ P9yQ==
+X-Gm-Message-State: AJcUukcQNxL4N7huc9+X7pw0M3BD4lmrvXq+GEPG3mggzyKcGUpNfM2+
+ e1MxnNIE8UdQ7TNg4WfuVOmLSmPH/FjeRpmwr/dTOw==
+X-Google-Smtp-Source: ALg8bN5Y/oODHtGuyv/4NfNqKAACQSw/2j/XVTnRsOculiBYn6rauSS0h9f6XTMjVICz2uEElauiIDAjYJITYXKb82o=
+X-Received: by 2002:a19:c801:: with SMTP id y1mr5082003lff.53.1547111971521;
+ Thu, 10 Jan 2019 01:19:31 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181104182705.18047-3-jernej.skrabec@siol.net>
-User-Agent: NeoMutt/20170113 (1.7.2)
+References: <20181228154044.10945-1-linus.walleij@linaro.org>
+ <CAKMK7uFBRnzmvJH6k2Qb9CnPLRiHD3o1ViZNTRbAedJVg11VXg@mail.gmail.com>
+In-Reply-To: <CAKMK7uFBRnzmvJH6k2Qb9CnPLRiHD3o1ViZNTRbAedJVg11VXg@mail.gmail.com>
+From: Linus Walleij <linus.walleij@linaro.org>
+Date: Thu, 10 Jan 2019 10:19:19 +0100
+Message-ID: <CACRpkdb=2NGtC_4L26C2du14uy=nR6VZN54Mb63CbrbJrU7pcA@mail.gmail.com>
+Subject: Re: [PATCH v2] drm/fb-helper: Scale back depth to supported maximum
+To: Daniel Vetter <daniel@ffwll.ch>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_011626_366028_7111AF12 
-X-CRM114-Status: GOOD (  28.07  )
+X-CRM114-CacheID: sfid-20190110_011934_404211_C1A47C67 
+X-CRM114-Status: GOOD (  11.39  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,172 +86,49 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org, airlied@linux.ie,
- architt@codeaurora.org, a.hajda@samsung.com, maxime.ripard@bootlin.com,
- mturquette@baylibre.com, linux-sunxi@googlegroups.com,
- linux-kernel@vger.kernel.org, dri-devel@lists.freedesktop.org,
- sboyd@kernel.org, wens@csie.org, robh+dt@kernel.org,
- Laurent.pinchart@ideasonboard.com, linux-clk@vger.kernel.org,
- devicetree@vger.kernel.org
+Cc: Jani Nikula <jani.nikula@linux.intel.com>, Eric Anholt <eric@anholt.net>,
+ Sean Paul <seanpaul@chromium.org>, dri-devel <dri-devel@lists.freedesktop.org>,
+ Daniel Vetter <daniel.vetter@intel.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sun, Nov 04, 2018 at 07:26:39PM +0100, Jernej Skrabec wrote:
-> Currently MP clocks don't consider adjusting parent rate even if they
-> are allowed to do so. Such behaviour considerably lowers amount of
-> possible rates, which is very inconvenient when such clock is used for
-> pixel clock, for example.
-> 
-> In order to improve the situation, adjusting parent rate is considered
-> when allowed.
-> 
-> This code is inspired by clk_divider_bestdiv() function, which does
-> basically the same thing for different clock type.
+On Fri, Dec 28, 2018 at 5:05 PM Daniel Vetter <daniel@ffwll.ch> wrote:
+> On Fri, Dec 28, 2018 at 4:40 PM Linus Walleij <linus.walleij@linaro.org> wrote:
 
-This patch seems to break the eMMC support on Olinuxino-Lime2-eMMC boards:
+> > - Skip over YUV formats. The framebuffer emulation cannot
+> >   handle these formats.
+(...)
+> > +                       /* Do not consider YUV formats for framebuffers */
+> > +                       if (fmt->is_yuv)
+>
+> I think better to skip all funny formats with fmt->depth == 0. With that:
+>
+> Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 
-EXT4-fs (mmcblk1p4): INFO: recovery required on readonly filesystem
-EXT4-fs (mmcblk1p4): write access will be enabled during recovery
-sunxi-mmc 1c11000.mmc: data error, sending stop command
-sunxi-mmc 1c11000.mmc: send stop command failed
+I can easily make that change but this comment in the drm_fourcc.h
+header makes me insecure:
 
+/**
+ * @depth:
+ *
+ * Color depth (number of bits per pixel excluding padding bits),
+ * valid for a subset of RGB formats only. This is a legacy field, do
+ * not use in new code and set to 0 for new formats.
+ */
+u8 depth;
 
-$ git bisect log
-git bisect start
-# good: [3df407b2a5346db1c48809706ece7a8616c79e0b] mmc: dw_mmc-bluefield: simplify the probe() function
-git bisect good 3df407b2a5346db1c48809706ece7a8616c79e0b
-# bad: [00d59fde8532b2d42e80909d2e58678755e04da9] Merge tag 'mmc-v4.21' of git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/mmc
-git bisect bad 00d59fde8532b2d42e80909d2e58678755e04da9
-# good: [01e421feec0817bb3141eaae4c517410d193d440] Merge branch 'fixes' into next
-git bisect good 01e421feec0817bb3141eaae4c517410d193d440
-# bad: [1eefdec18eded41833401cfd64749643ff72e7da] Merge branch 'locking-core-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip
-git bisect bad 1eefdec18eded41833401cfd64749643ff72e7da
-# good: [eaa76499711535fd64d747cc4ef0d78ab0fd41c6] Merge tag 'mtd/for-4.21' of git://git.infradead.org/linux-mtd
-git bisect good eaa76499711535fd64d747cc4ef0d78ab0fd41c6
-# good: [4e4390ad067a61ce4e7607bd0df31f19a4caa36a] Merge tag 'leds-for-4.21-rc1' of git://git.kernel.org/pub/scm/linux/kernel/git/j.anaszewski/linux-leds
-git bisect good 4e4390ad067a61ce4e7607bd0df31f19a4caa36a
-# bad: [c2f1f3e0e17d94ab0c66d83e669492cb9e9a3698] Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/sparc-next
-git bisect bad c2f1f3e0e17d94ab0c66d83e669492cb9e9a3698
-# bad: [e4b99d415c3908581d4703203e1e805f043a3e71] Merge branch 'irq-core-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip
-git bisect bad e4b99d415c3908581d4703203e1e805f043a3e71
-# bad: [ffe05540d18013db62c43627836a3638e9a2c7aa] Merge branches 'clk-renesas', 'clk-allwinner', 'clk-tegra', 'clk-meson' and 'clk-rockchip' into clk-next
-git bisect bad ffe05540d18013db62c43627836a3638e9a2c7aa
-# good: [1a501c8defe950571316d5ddd917bf44f5ed7bd4] Merge branches 'clk-managed-registration', 'clk-spdx', 'clk-remove-basic' and 'clk-ops-const' into clk-next
-git bisect good 1a501c8defe950571316d5ddd917bf44f5ed7bd4
-# good: [e74581b79ddd9b49b8c61e2791fc4dffc0245afb] Merge tag 'meson-clk-4.21-2' of https://github.com/BayLibre/clk-meson into clk-meson
-git bisect good e74581b79ddd9b49b8c61e2791fc4dffc0245afb
-# good: [60baf75e3f5b76043c25328ac0c5320aaef5ea41] Merge tag 'clk-renesas-for-v4.21-tag2' of git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers into clk-renesas
-git bisect good 60baf75e3f5b76043c25328ac0c5320aaef5ea41
-# bad: [a41f85b6017ee20952a60e4330bcae2527fe2c2a] Merge tag 'sunxi-clk-for-4.21' of https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux into clk-allwinner
-git bisect bad a41f85b6017ee20952a60e4330bcae2527fe2c2a
-# bad: [ee678706e46d0d185c27cc214ad97828e0643159] clk: sunxi-ng: a64: Fix gate bit of DSI DPHY
-git bisect bad ee678706e46d0d185c27cc214ad97828e0643159
-# bad: [65b6657672388b72822e0367f06d41c1e3ffb5bb] clk: sunxi-ng: Use u64 for calculation of NM rate
-git bisect bad 65b6657672388b72822e0367f06d41c1e3ffb5bb
-# good: [db7548934603d9eda12649dff97ea5c29884405d] clk: sunxi-ng: sun50i: h6: Fix MMC clock mux width
-git bisect good db7548934603d9eda12649dff97ea5c29884405d
-# bad: [3f790433c3cb27ecaf2ca0e07ac25964e4fd9f15] clk: sunxi-ng: Adjust MP clock parent rate when allowed
-git bisect bad 3f790433c3cb27ecaf2ca0e07ac25964e4fd9f15
-# first bad commit: [3f790433c3cb27ecaf2ca0e07ac25964e4fd9f15] clk: sunxi-ng: Adjust MP clock parent rate when allowed
+This would mean that we make the framebuffer only support
+"legacy formats". It might be that "legacy formats" include
+all reasonable ones such as any RGB/BGA variants.
 
+I will make the change and put in some comments about this
+so it's clear.
 
-> 
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> ---
->  drivers/clk/sunxi-ng/ccu_mp.c | 64 +++++++++++++++++++++++++++++++++--
->  1 file changed, 62 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/sunxi-ng/ccu_mp.c b/drivers/clk/sunxi-ng/ccu_mp.c
-> index 5d0af4051737..0357349eb767 100644
-> --- a/drivers/clk/sunxi-ng/ccu_mp.c
-> +++ b/drivers/clk/sunxi-ng/ccu_mp.c
-> @@ -40,6 +40,61 @@ static void ccu_mp_find_best(unsigned long parent, unsigned long rate,
->  	*p = best_p;
->  }
->  
-> +static unsigned long ccu_mp_find_best_with_parent_adj(struct clk_hw *hw,
-> +						      unsigned long *parent,
-> +						      unsigned long rate,
-> +						      unsigned int max_m,
-> +						      unsigned int max_p)
-> +{
-> +	unsigned long parent_rate_saved;
-> +	unsigned long parent_rate, now;
-> +	unsigned long best_rate = 0;
-> +	unsigned int _m, _p, div;
-> +	unsigned long maxdiv;
-> +
-> +	parent_rate_saved = *parent;
-> +
-> +	/*
-> +	 * The maximum divider we can use without overflowing
-> +	 * unsigned long in rate * m * p below
-> +	 */
-> +	maxdiv = max_m * max_p;
-> +	maxdiv = min(ULONG_MAX / rate, maxdiv);
-> +
-> +	for (_p = 1; _p <= max_p; _p <<= 1) {
-> +		for (_m = 1; _m <= max_m; _m++) {
-> +			div = _m * _p;
-> +
-> +			if (div > maxdiv)
-> +				break;
-> +
-> +			if (rate * div == parent_rate_saved) {
-> +				/*
-> +				 * It's the most ideal case if the requested
-> +				 * rate can be divided from parent clock without
-> +				 * needing to change parent rate, so return the
-> +				 * divider immediately.
-> +				 */
-> +				*parent = parent_rate_saved;
-> +				return rate;
-> +			}
-> +
-> +			parent_rate = clk_hw_round_rate(hw, rate * div);
-> +			now = parent_rate / div;
-> +
-> +			if (now <= rate && now > best_rate) {
-> +				best_rate = now;
-> +				*parent = parent_rate;
-> +
-> +				if (now == rate)
-> +					return rate;
-> +			}
-> +		}
-> +	}
-> +
-> +	return best_rate;
-> +}
-> +
->  static unsigned long ccu_mp_round_rate(struct ccu_mux_internal *mux,
->  				       struct clk_hw *hw,
->  				       unsigned long *parent_rate,
-> @@ -56,8 +111,13 @@ static unsigned long ccu_mp_round_rate(struct ccu_mux_internal *mux,
->  	max_m = cmp->m.max ?: 1 << cmp->m.width;
->  	max_p = cmp->p.max ?: 1 << ((1 << cmp->p.width) - 1);
->  
-> -	ccu_mp_find_best(*parent_rate, rate, max_m, max_p, &m, &p);
-> -	rate = *parent_rate / p / m;
-> +	if (!(clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT)) {
-> +		ccu_mp_find_best(*parent_rate, rate, max_m, max_p, &m, &p);
-> +		rate = *parent_rate / p / m;
-> +	} else {
-> +		rate = ccu_mp_find_best_with_parent_adj(hw, parent_rate, rate,
-> +							max_m, max_p);
-> +	}
->  
->  	if (cmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
->  		rate /= cmp->fixed_post_div;
-> -- 
-> 2.19.1
-> 
-> -- 
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe@googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+Yours,
+Linus Walleij
 
 _______________________________________________
 linux-arm-kernel mailing list
