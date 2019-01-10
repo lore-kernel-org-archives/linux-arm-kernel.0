@@ -2,83 +2,69 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 72B94C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 07:31:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C84C2C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 07:46:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 430EE214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 07:31:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9A85C20685
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 07:46:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AYAVlrNk";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="YWPV24//"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 430EE214DA
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qoE2V83Y"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9A85C20685
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-mips.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wkizuy8HgB1tCEVvoaFdeZkI69gEH307N/HJknF5yRI=; b=AYAVlrNk2WckHm
-	HUy4v5eIU8TrFzTnUpO1Nt1/109LJqGa8sSjHQanJs/DR5stPsi3+tmrLBHXUpdI6LtTjWlp7ioZ4
-	IVbOAsg2ys37XuZTZO+nr3kVZx45gisu0BXwiDhA/q6II9h35sMgvNm3+8tZbhrJoxG5/NJ63WYmf
-	4p0et70D4RyLzeQ+iBAQ0fBtXm8PQgdyJ3/CEvst108zC0tQBPMtGlLHrGIz+lpZJEKFnOMhfGVwL
-	Wm99uhXH/Wut21uFOsQr14lfN4LUXdtgrwJmvqAHDGXXhODGJ91W1S7HD2tTzE8PPocF+cVZtDnAY
-	tMkGx2mmgpqi9XzsUdhA==;
+	List-Owner; bh=GSkq7WD9CPpk6CHNTGrZKZpKdSjWpYRMF1nJTv4MOF8=; b=qoE2V83Yqe7Z2+
+	VzqHJMSJW7WZK0w64jvCJj2yX5YhPgh/K3T1IcsH5Ap1wMr/2o9R1rtq5TaDXxMVCqjaeM2BBV/Ca
+	m3hCzMrm2t0oC5j/YkDqD4cdgQuD9og5sdogDmqLoE+1d5x+itY1C4Fk3F70l3xEBtNQqkfxZn5iU
+	yjR6wSos5mgEUzta9najY8ig9teGaO3NSDD7cdWg9i+tO6C4arXsefCefuXWGsFIOlkGBR0Ih6jEA
+	iJciqRljGPedZAvM/PLmIyh5LUhdiHDD7PV3sndagGvIqSZTL/wa/gEEA4iOdkivw3XtxST0PccGi
+	RiUzugIZYoGIw8vpz7jA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghUoY-0004Bu-7E; Thu, 10 Jan 2019 07:31:42 +0000
-Received: from fllv0016.ext.ti.com ([198.47.19.142])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghUoA-0003lO-9x
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 07:31:24 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0A7VC0V055751;
- Thu, 10 Jan 2019 01:31:12 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1547105472;
- bh=5++OiNtMlT2WVwSZ8rQJshX+c8F6SPQdlgQ6dUfIuPQ=;
- h=From:To:CC:Subject:Date:In-Reply-To:References;
- b=YWPV24//Is/Sa+JKgD8/l10v8LnqE1KFVJz1i4uhJOyLse+lJNPOR3y802FWoZ8cQ
- wBC+poQK2XfwU8lyoflXGTIDfsGJraDtEzcdVfhrDBN21ixXzeJLcVx9uW+f9VOjXR
- nRNzBYQeu25k02DB/0DpyPrsFMegs+z7U5++b9Ew=
-Received: from DLEE106.ent.ti.com (dlee106.ent.ti.com [157.170.170.36])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0A7VCg7106552
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Thu, 10 Jan 2019 01:31:12 -0600
-Received: from DLEE113.ent.ti.com (157.170.170.24) by DLEE106.ent.ti.com
- (157.170.170.36) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 10
- Jan 2019 01:31:11 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE113.ent.ti.com
- (157.170.170.24) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Thu, 10 Jan 2019 01:31:11 -0600
-Received: from a0230074-OptiPlex-7010.india.ti.com (ileax41-snat.itg.ti.com
- [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0A7V38j020221;
- Thu, 10 Jan 2019 01:31:09 -0600
-From: Faiz Abbas <faiz_abbas@ti.com>
-To: <linux-kernel@vger.kernel.org>, <devicetree@vger.kernel.org>,
- <linux-arm-kernel@lists.infradead.org>
-Subject: [PATCH v2 2/2] arm64: dts: ti: k3-am654-base-board: Add MMC support
-Date: Thu, 10 Jan 2019 13:03:55 +0530
-Message-ID: <20190110073355.3382-3-faiz_abbas@ti.com>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20190110073355.3382-1-faiz_abbas@ti.com>
-References: <20190110073355.3382-1-faiz_abbas@ti.com>
+	id 1ghV2U-0000nB-4o; Thu, 10 Jan 2019 07:46:06 +0000
+Received: from eddie.linux-mips.org ([148.251.95.138] helo=cvs.linux-mips.org)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghV2Q-0000mq-SA
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 07:46:04 +0000
+Received: (from localhost user: 'ladis' uid#1021 fake: STDIN
+ (ladis@eddie.linux-mips.org)) by eddie.linux-mips.org
+ id S23990945AbfAJHqARsGeQ (ORCPT
+ <rfc822;linux-arm-kernel@lists.infradead.org>);
+ Thu, 10 Jan 2019 08:46:00 +0100
+Date: Thu, 10 Jan 2019 08:45:58 +0100
+From: Ladislav Michl <ladis@linux-mips.org>
+To: "Rafael J. Wysocki" <rafael@kernel.org>
+Subject: Re: Regression in v5.0-rc1 with autosuspend hrtimers
+Message-ID: <20190110074558.GA26167@lenoch>
+References: <CAKfTPtBvzZvJNxBRMbGbNFBYG0-pAR-P7X2=KrBWH01OMWvJYA@mail.gmail.com>
+ <20190109115824.GA1353@lenoch>
+ <CAKfTPtAAgYYW8A1LDg18bM=5vCAMDbQ05APp9QWSaifW=F0SgQ@mail.gmail.com>
+ <20190109133337.GA13579@lenoch>
+ <CAKfTPtAsENRKh_wTFXCLW2_MdMBug+tV2KtjC7x6RigN7hgPmw@mail.gmail.com>
+ <20190109160736.GA7416@lenoch>
+ <CAKfTPtBnNA6knrsHsZXeaotBSn5mS12xNWNUKdSwZ1EUvueQkA@mail.gmail.com>
+ <20190109172623.GB1711@lenoch>
+ <CAKfTPtBGh+ShbNCZLiYr4PZJooun7uctuQaomc40czvAk5Yizg@mail.gmail.com>
+ <CAJZ5v0jPJYyszAs4qJhqX+5RGwzJoo=+reTS__buoCrfTeYY8Q@mail.gmail.com>
 MIME-Version: 1.0
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+Content-Disposition: inline
+In-Reply-To: <CAJZ5v0jPJYyszAs4qJhqX+5RGwzJoo=+reTS__buoCrfTeYY8Q@mail.gmail.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_233119_001172_2FAA5785 
-X-CRM114-Status: GOOD (  12.67  )
+X-CRM114-CacheID: sfid-20190109_234602_912864_C81763BA 
+X-CRM114-Status: GOOD (  16.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,64 +76,61 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, nm@ti.com, robh+dt@kernel.org, t-kristo@ti.com,
- faiz_abbas@ti.com
+Cc: Ulf Hansson <ulf.hansson@linaro.org>,
+ Vincent Guittot <vincent.guittot@linaro.org>,
+ "open list:THERMAL" <linux-pm@vger.kernel.org>,
+ Tony Lindgren <tony@atomide.com>,
+ "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>,
+ Linux OMAP Mailing List <linux-omap@vger.kernel.org>,
+ LAK <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On the am654x-evm, the sdhci0 node is connected to an eMMC. Add node and
-pinmux for the same.
+On Wed, Jan 09, 2019 at 11:06:34PM +0100, Rafael J. Wysocki wrote:
+> On Wed, Jan 9, 2019 at 7:05 PM Vincent Guittot
+> <vincent.guittot@linaro.org> wrote:
+> >
+> > On Wed, 9 Jan 2019 at 18:26, Ladislav Michl <ladis@linux-mips.org> wrote:
+> > >
+> > > On Wed, Jan 09, 2019 at 05:32:31PM +0100, Vincent Guittot wrote:
+> > > > On Wed, 9 Jan 2019 at 17:07, Ladislav Michl <ladis@linux-mips.org> wrote:
+> > > > >
+> > > > > On Wed, Jan 09, 2019 at 03:12:25PM +0100, Vincent Guittot wrote:
+> > > > > > Please keep all thread list when replying :-)
+> > > > >
+> > > > > Ahh, sorry for that...
+> > > > > [snip]
+> > > > > > On Wed, 9 Jan 2019 at 14:33, Ladislav Michl <ladis@linux-mips.org> wrote:
+> > > > > > > I agree, but it doea all the magic correctly, so you won't need
+> > > > > > > to touch that code is ktime_t changes (I know, unlikely..)
+> > > > > >
+> > > > > > But the current implementation doesn't care of any changes in ktime_t
+> > > > > > as it uses raw ns
+> > > > >
+> > > > > Fair enough, so let's go back to:
+> > > >
+> > > > This one looks good for me
+> > >
+> > > Lets split is for 'comments fix' patch, which was just send and 'the rest'.
+> > > Now, 'the rest' can either be v2 of your "PM/runtime: Fix autosuspend_delay on
+> > > 32bits arch" or will wait for 5.1. You decide :)
+> >
+> > I don't really mind.
+> >
+> > Rafael,
+> > Do you prefer to only take the fix for u64 casting problem or do you
+> > prefer to also take the optimization below in one single patch ?
+> 
+> The casting problem is a bug and the optimization is next release
+> material in my view.  Please send the optimization separately.
 
-Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
----
- .../arm64/boot/dts/ti/k3-am654-base-board.dts | 25 +++++++++++++++++++
- 1 file changed, 25 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/ti/k3-am654-base-board.dts b/arch/arm64/boot/dts/ti/k3-am654-base-board.dts
-index e41fc3a5987b..11e9a2a43dfc 100644
---- a/arch/arm64/boot/dts/ti/k3-am654-base-board.dts
-+++ b/arch/arm64/boot/dts/ti/k3-am654-base-board.dts
-@@ -69,6 +69,23 @@
- 			AM65X_IOPAD(0x01bc, PIN_OUTPUT, 0) /* (AG13) SPI0_CS0 */
- 		>;
- 	};
-+
-+	main_mmc0_pins_default: main-mmc0-pins-default {
-+		pinctrl-single,pins = <
-+			AM65X_IOPAD(0x01a8, PIN_INPUT_PULLDOWN, 0) /* (B25) MMC0_CLK */
-+			AM65X_IOPAD(0x01ac, PIN_INPUT_PULLUP, 0) /* (B27) MMC0_CMD */
-+			AM65X_IOPAD(0x01a4, PIN_INPUT_PULLUP, 0) /* (A26) MMC0_DAT0 */
-+			AM65X_IOPAD(0x01a0, PIN_INPUT_PULLUP, 0) /* (E25) MMC0_DAT1 */
-+			AM65X_IOPAD(0x019c, PIN_INPUT_PULLUP, 0) /* (C26) MMC0_DAT2 */
-+			AM65X_IOPAD(0x0198, PIN_INPUT_PULLUP, 0) /* (A25) MMC0_DAT3 */
-+			AM65X_IOPAD(0x0194, PIN_INPUT_PULLUP, 0) /* (E24) MMC0_DAT4 */
-+			AM65X_IOPAD(0x0190, PIN_INPUT_PULLUP, 0) /* (A24) MMC0_DAT5 */
-+			AM65X_IOPAD(0x018c, PIN_INPUT_PULLUP, 0) /* (B26) MMC0_DAT6 */
-+			AM65X_IOPAD(0x0188, PIN_INPUT_PULLUP, 0) /* (D25) MMC0_DAT7 */
-+			AM65X_IOPAD(0x01b4, PIN_INPUT_PULLUP, 0) /* (A23) MMC0_SDCD */
-+			AM65X_IOPAD(0x01b0, PIN_INPUT, 0) /* (C25) MMC0_DS */
-+		>;
-+	};
- };
- 
- &main_pmx1 {
-@@ -163,3 +180,11 @@
- 		#size-cells= <1>;
- 	};
- };
-+
-+&sdhci0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&main_mmc0_pins_default>;
-+	bus-width = <8>;
-+	non-removable;
-+	ti,driver-strength-ohm = <50>;
-+};
--- 
-2.19.2
-
+Ok, will send that separately in a few moments...
+Btw, u64 casting problem seems to be still present in rpm_suspend while
+computing slack for autosuspend delay greater than 25% of 2^31 (2^33) ns.
+Not sure if that triggers any real bug.
 
 _______________________________________________
 linux-arm-kernel mailing list
