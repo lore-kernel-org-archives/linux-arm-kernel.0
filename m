@@ -2,22 +2,22 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3418EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 00:11:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2459FC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 00:38:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 037E62075C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 00:11:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E275E214C6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 00:38:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BNZ2W8vj";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="TdG8S+of"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 037E62075C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PXVZbZCs";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="SxD8qkXR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E275E214C6
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,47 +25,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:Date:Message-ID:References:From:
 	In-Reply-To:To:Subject:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=A4/dibCHhv4xeaxocYfqdsK4KFYRNDqNQBtx6/Jw6nU=; b=BNZ2W8vjcAVXmg
-	rc4yXYcqvn0h5+sz8hoHeJijCem66WFR463Mpcieqc/kwf0RU0f1yFXFAPPqmZBhUbI+xLV+InOCc
-	RhGdVkfvuU30l808XkRpQ6CB1gM4yQAK/y9wiwvUka3EU0NWJucHOZqFJpcybGLUkqjGk/E7QqkR/
-	iQQ0kj7DuXcmpuTHrOV2ckHgmjfsRE9ZNwHmOwagLO+MJk/NZ3lqnx7r+6SwE0SIqqwfdRgwG/JgB
-	D5BbVhfNdm32AfzpQVV2kfwJ6lC6DtHav7nibKppXzXBeJhUOFUK2dDRDxwnuHupgiLDdWj3fDDD2
-	pYSnIo9v9/PaNp4uNLSA==;
+	List-Owner; bh=DCXz0FYsllntMAxoAcT9EixLLPtJrP3nUjPVGiob2ss=; b=PXVZbZCsSD1CID
+	LCf3aXSAgLGRX1OmLSU/HSuI9lVDjZxcUCn7hRexl+ksHylx0AL8BqeguGg8u1ImW6vdRKa3rzNlq
+	IuDJW+zKOOHue2dLo3y09ABX9padLbwvdSsctwujN2o3UVisPKCwAaQnoJ1xjyhYVAcbHrBRhdAxS
+	1Qy4pl6/kY6OdJu6nUvIAcdK/dE31W8JpRZmf3DqZ9DHE0NcBRpnrJuw11BCgl10C01kt7aBE763w
+	fOLRgwo0Fq7MLhmI/lafUZmFu479r/lBpVl+fiUEIEYOKl5dILE5DuECveZXDq1AQqRH0QiX5MLE/
+	dR2CSMN0NqqAs0LSprWQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghNwo-0004Er-Dl; Thu, 10 Jan 2019 00:11:46 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1ghOMy-0003NB-A8; Thu, 10 Jan 2019 00:38:48 +0000
+Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghNhf-0006Bn-Cz
- for linux-arm-kernel@lists.infradead.org; Wed, 09 Jan 2019 23:56:10 +0000
-Received: from localhost (unknown [104.132.0.74])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 3AEE920675;
- Wed,  9 Jan 2019 23:56:06 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1547078166;
- bh=BtZKa8ke/W+kc1urj0r2VWXhtZFrHzTiN6ylajabc0Y=;
- h=Subject:Cc:To:In-Reply-To:From:References:Date:From;
- b=TdG8S+ofsSX2xZQFjPfVLgRP27fJB0CQyZCM0NE5woscCBlEsSoQTuZzCbXIV1kn4
- pKHCL24iDqT1qVNSK5J3CigGTvbuEdQC+f3xauo6TqcbIJMinEv/2otyzaUc/rZBLN
- IzTM9maBA6onBbHIxixSd+qWHrWh5zGy/x67FL5g=
+ id 1ghOMu-0003M2-Fz
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 00:38:46 +0000
+Received: by mail-pf1-x444.google.com with SMTP id 64so4444097pfr.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 09 Jan 2019 16:38:43 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=mime-version:content-transfer-encoding:subject:cc:to:in-reply-to
+ :from:user-agent:references:message-id:date;
+ bh=7WJ4rS6UbtbSjPMBzCBVUR0lxQo/vQgH/95PF2OSySM=;
+ b=SxD8qkXRrECUTbPvm/OqXdkswxKkXoA6mHB1JizP17W0jf/FHbjglt5QyF6Ccj/67m
+ DHxOB3rNaUjF/K30wrTMUWtpub1zxn8KUTEr7c/PQpYuKpXl/4/vvlORXINb15cB3KT2
+ w1jHtC9WIDNL3Eh209pc7fUiuKYL/kkM45yrw=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:content-transfer-encoding:subject
+ :cc:to:in-reply-to:from:user-agent:references:message-id:date;
+ bh=7WJ4rS6UbtbSjPMBzCBVUR0lxQo/vQgH/95PF2OSySM=;
+ b=fFKgmFAQkwALcERAc2AyvAkV8T6AihzTYLDEjx/AfCwgWVD3NKBEAXGgmtMNAqPzAz
+ RWNBs50rSmuxLw09b5kjN+JprlGWJj8Hr//VIGF9a43Nl28Tv6HK3gZ6KC5Ea65tsWb3
+ iNtilpkekolw0akhbf2/3cZ8tJARoUhmZbE9LRyc+Vf0Qxghm/4cW3jvhd6Ht0JF+cHF
+ V9LHBaWRQmwYyK546AliKtsYvpSg7Y29zk6MHIRC35Y3nd0uM/NAHgyTSbxPFtNVCLhh
+ WNcXx9461a5hwUnaISJ7pU0scAydo3Iv6JMagaUGD80k3Y9YCmmxN94bbA3n8vpQKulm
+ 2Ghg==
+X-Gm-Message-State: AJcUukckisnrTvY3S3nUtJuL9ybZTysVeZT9j46/CUmHenT46453DXio
+ djPJkP2Mk/UM7aew/84gvzFYKA==
+X-Google-Smtp-Source: ALg8bN6E+p7lSVwmR9A34DRJksj54T3Keq/wC14EILMp8v2LTElWDf6KOFhMf1/ZODuM7PkRNX8HMA==
+X-Received: by 2002:a62:3305:: with SMTP id z5mr8225520pfz.112.1547080723204; 
+ Wed, 09 Jan 2019 16:38:43 -0800 (PST)
+Received: from localhost ([2620:15c:202:1:fa53:7765:582b:82b9])
+ by smtp.gmail.com with ESMTPSA id r80sm123239082pfa.111.2019.01.09.16.38.42
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Wed, 09 Jan 2019 16:38:42 -0800 (PST)
 MIME-Version: 1.0
-Subject: Re: [PATCH 1/1] clk: meson: meson8b: fix naming of the APB clocks
-To: Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- Neil Armstrong <narmstrong@baylibre.com>
-In-Reply-To: <CAFBinCAginPSuBObJE52puvbay-S698OjAj6aLEm5kfn0SdU0A@mail.gmail.com>
-From: Stephen Boyd <sboyd@kernel.org>
+Subject: Re: [RFC RESEND PATCH 6/7] soc: mediatek: add MT8183 dvfsrc support
+To: Henry Chen <henryc.chen@mediatek.com>
+In-Reply-To: <1546859353.6818.132.camel@mtksdaap41>
+From: Stephen Boyd <swboyd@chromium.org>
 User-Agent: alot/0.8
-References: <20181223235836.12466-1-martin.blumenstingl@googlemail.com>
- <20181223235836.12466-2-martin.blumenstingl@googlemail.com>
- <154705938114.15366.1098954164811397084@swboyd.mtv.corp.google.com>
- <CAFBinCAginPSuBObJE52puvbay-S698OjAj6aLEm5kfn0SdU0A@mail.gmail.com>
-Message-ID: <154707816530.15366.6699688522231286811@swboyd.mtv.corp.google.com>
-Date: Wed, 09 Jan 2019 15:56:05 -0800
+References: <1546438198-1677-1-git-send-email-henryc.chen@mediatek.com>
+ <1546438198-1677-7-git-send-email-henryc.chen@mediatek.com>
+ <154655691363.15366.15223653253336032554@swboyd.mtv.corp.google.com>
+ <1546859353.6818.132.camel@mtksdaap41>
+Message-ID: <154708072159.15366.10685577152949535083@swboyd.mtv.corp.google.com>
+Date: Wed, 09 Jan 2019 16:38:41 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_155608_314517_B25C5755 
-X-CRM114-Status: GOOD (  14.33  )
+X-CRM114-CacheID: sfid-20190109_163844_569653_00F0C20B 
+X-CRM114-Status: GOOD (  13.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,45 +94,31 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mturquette@baylibre.com, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, jbrunet@baylibre.com
+Cc: Mark Rutland <mark.rutland@arm.com>, "JamesJJ Liao \(廖建智\)" <jamesjj.liao@mediatek.com>, Ulf Hansson <ulf.hansson@linaro.org>, Kees Cook <keescook@chromium.org>, "Weiyi Lu \(呂威儀\)" <Weiyi.Lu@mediatek.com>, "linux-pm@vger.kernel.org" <linux-pm@vger.kernel.org>, Viresh Kumar <vireshk@kernel.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>, "Fan Chen \(陳凡\)" <fan.chen@mediatek.com>, "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>, "linux-mediatek@lists.infradead.org" <linux-mediatek@lists.infradead.org>, Matthias Brugger <matthias.bgg@gmail.com>, "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Martin Blumenstingl (2019-01-09 14:30:24)
-> Hi Stephen, Hi Neil,
+Quoting Henry Chen (2019-01-07 03:09:13)
+> On Fri, 2019-01-04 at 07:08 +0800, Stephen Boyd wrote:
+> > Quoting Henry Chen (2019-01-02 06:09:57)
+> > > +       val = dvfsrc_read(dvfsrc, DVFSRC_INT);
+> > > +       dvfsrc_write(dvfsrc, DVFSRC_INT_CLR, val);
+> > > +       dvfsrc_write(dvfsrc, DVFSRC_INT_CLR, 0x0);
+> > > +       if (val & DVFSRC_IRQ_TIMEOUT_EN)
+> > > +               dev_warn(dvfsrc->dev, "timeout at spm = %x", val);
+> > > +
+> > 
+> > Do you need to handle the irq at all? It looks like you are cleaning up
+> > something and then complaining if there's a timeout, but otherwise
+> > nothing goes on so perhaps the irq can just be ignored and nobody will
+> > be the wiser?
 > 
-> On Wed, Jan 9, 2019 at 7:43 PM Stephen Boyd <sboyd@kernel.org> wrote:
-> >
-> > Quoting Martin Blumenstingl (2018-12-23 15:58:36)
-> > > Fix a typo in the APB clock names by renaming them from "abp" to "apb".
-> > > No functional changes.
-> > >
-> > > Fixes: 8e1dd17c8b0e3f ("dt-bindings: clock: meson8b: export the CPU post dividers")
-> > > Fixes: a7d19b05ce817d ("clk: meson: meson8b: add the CPU clock post divider clocks")
-> > > Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> > > ---
-> >
-> > Can I apply this directly to fixes? Or it's not critical so we can punt
-> > until next merge window?
-> actually it's not critical:
-> I'm not aware of any IP block that I needs the APB clock as input (I'm
-> pretty sure there is some, but I'm not aware of it so it can wait).
-> 
-> Neil already applied another patch for -next which conflicts with this.
-> we can choose now:
-> 1. Stephen takes this patch, Neil drops the (conflicting) GPU clock
-> patches from -next and I re-send the GPU clock patches
-> 2. Stephen and Neil don't do anything, I re-send this patch on top of
-> the GPU clock patches
-> 
-> I'm fine either way, but #2 is less work for you guys.
-> if I don't hear back from you then I'll go with option #2
+> ok, it only for alarm system a timeout message. 
 
-If it's not critical then I'll let it go via the normal paths through
-Neil's tree.
+Well if it's some timeout do you need to fail some dvfs operation if it
+times out? Or take the whole system down in that scenario?
 
 
 _______________________________________________
