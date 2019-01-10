@@ -2,55 +2,71 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3D8D8C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 08:26:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 152A9C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 08:28:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0CB2F2173B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 08:26:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DB3622173B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 08:28:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fdfbwHyj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0CB2F2173B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IhtvBrrd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DB3622173B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=GV6fymg5h4K4sRQwo8n0i+hxxJN9ROB6XdnZgkiGYUY=; b=fdfbwHyjYc5i2B
-	3emGvOvM4qmdN5fTTcX2pGoKD3iiuoL7h9cRIrcRvyRaUXU+rzgrprt1Vs3Gjct8JOvUuEn8RCWl7
-	kH7IqtBUgqK0kbceCZSpyO4Ml6BxWBt73O8p36DwTvNe2KaeysE4E7+P3dIWhlQiTdc+Ub4ypcx1l
-	U+GgDSarVhrU5iE4XvzAFxtG6YWQOvDZrryR51Ok67DpmC2ZySdZHxq2NJ8OUsYkkcJwUiMiHyM0E
-	jyShxBdvvngRLA8XR8Ht/9rgFRvmtzXOpRIVExOLlxJNdViCpt5lF9RYCvQfVXuBBI7mEaYLOPby4
-	DEVgmFV8NFGo3lUrgTww==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=xdjwO+oftYfOhRh1PLTLxcVCeRiGsdDH3YP4ksbGZ0Q=; b=IhtvBrrdqLqodt
+	cyEwWHBxa/JTF+YotGETJ/GplTZS7qnIVtbGXrif1v+EdggBbgb3aJVWZM/2kc4K7gptP229Rbfpv
+	CN2VS9EALvlQywwoA5HlVtKLEYSJGggJh5RNFZdbGOmR702hh8YmTqzys76fnrEgKZ9HTkX0ENTTV
+	cO9HIZDVDgtLF7Y8eDIT0Uz9FA1y3joO5Wk9gN9Swd/3wYwjgFFlD+DZJVPvSXOnibpss/CQwl0l1
+	Hg7c6DwEjk7lPwyTHENwIIWvRzXSq02UlWReCblDYyl4awH8920ID1GreqOP734AIBAtCd1OKCMOs
+	8C5Gm9ptvKEhJ+AbROMg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghVg0-0004Mo-1B; Thu, 10 Jan 2019 08:26:56 +0000
-Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
+	id 1ghVhT-0004wu-I8; Thu, 10 Jan 2019 08:28:27 +0000
+Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghVfg-00047N-WB
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 08:26:39 +0000
-Received: by wens.csie.org (Postfix, from userid 1000)
- id 160925FC23; Thu, 10 Jan 2019 16:26:34 +0800 (CST)
-From: Chen-Yu Tsai <wens@csie.org>
-To: Maxime Ripard <maxime.ripard@bootlin.com>,
- Linus Walleij <linus.walleij@linaro.org>
-Subject: [PATCH 1/2] pinctrl: sunxi: Increase size of regulator array
-Date: Thu, 10 Jan 2019 16:26:32 +0800
-Message-Id: <20190110082633.6321-1-wens@csie.org>
-X-Mailer: git-send-email 2.20.1
+ id 1ghVhP-0004w7-CB; Thu, 10 Jan 2019 08:28:24 +0000
+X-UUID: 5507ae3d1bc84cf1a340a049fe8f8fab-20190110
+X-UUID: 5507ae3d1bc84cf1a340a049fe8f8fab-20190110
+Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw02.mediatek.com
+ (envelope-from <ck.hu@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 63476148; Thu, 10 Jan 2019 00:28:19 -0800
+Received: from MTKMBS06N2.mediatek.inc (172.21.101.130) by
+ MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Thu, 10 Jan 2019 00:28:17 -0800
+Received: from mtkcas07.mediatek.inc (172.21.101.84) by
+ mtkmbs06n2.mediatek.inc (172.21.101.130) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Thu, 10 Jan 2019 16:28:15 +0800
+Received: from [172.21.77.4] (172.21.77.4) by mtkcas07.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Thu, 10 Jan 2019 16:28:15 +0800
+Message-ID: <1547108895.31582.1.camel@mtksdaap41>
+Subject: Re: [PATCH 2/9] drm/mediatek: move the setting of fixed divider
+From: CK Hu <ck.hu@mediatek.com>
+To: chunhui dai <chunhui.dai@mediatek.com>
+Date: Thu, 10 Jan 2019 16:28:15 +0800
+In-Reply-To: <1546585439-30455-3-git-send-email-chunhui.dai@mediatek.com>
+References: <1546585439-30455-1-git-send-email-chunhui.dai@mediatek.com>
+ <1546585439-30455-3-git-send-email-chunhui.dai@mediatek.com>
+X-Mailer: Evolution 3.10.4-0ubuntu2 
 MIME-Version: 1.0
+X-TM-SNTS-SMTP: 004192433046345DE11453B4D7675205C9A28576C80F431AE3A3EE6BF315C46C2000:8
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_002637_184250_BD6A6096 
-X-CRM114-Status: GOOD (  13.70  )
+X-CRM114-CacheID: sfid-20190110_002823_413903_DC89B773 
+X-CRM114-Status: GOOD (  11.37  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -62,49 +78,84 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-gpio@vger.kernel.org, Chen-Yu Tsai <wens@csie.org>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: jamesjj.liao@mediatek.com, Ryder Lee <ryder.lee@mediatek.com>,
+ jitao.shi@mediatek.com, bibby.hsieh@mediatek.com, srv_heupstream@mediatek.com,
+ Stephen Boyd <sboyd@kernel.org>,
+ --to=Michael Turquette <mturquette@baylibre.com>,
+ Sean Wang <sean.wang@mediatek.com>, linux-kernel@vger.kernel.org,
+ dri-devel@lists.freedesktop.org, David Airlie <airlied@linux.ie>,
+ linux-mediatek@lists.infradead.org, Philipp
+ Zabel <p.zabel@pengutronix.de>, Matthias Brugger <matthias.bgg@gmail.com>,
+ Colin Ian King <colin.king@canonical.com>, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On the A80, the pin banks go up to PN, which translates to the 14th
-entry in the regulator array. The array is only 12 entries long, which
-causes the sunxi_pmx_{request,free} functions to access beyond the
-array on the A80 and the A31 (which has pin bank PM). While the
-accessed data is still valid allocated data within the same driver
-data structure, it is likely not a pointer.
+Hi, Chunhui:
 
-Increase the size of the regulator array from 12 to 14. This is a simple
-fix. While we could have the code take into account the fact that R_PIO
-pin banks start from PL, or maybe even dynamically allocate the array
-based on the last pin of the pin controller, the size reduction probably
-isn't worth the additional code complexity.
+On Fri, 2019-01-04 at 15:03 +0800, chunhui dai wrote:
+> move the setting of fixed divider from enable/disable
+> to the function of setting rate.
 
-Fixes: 9a2a566adb00 ("pinctrl: sunxi: Deal with per-bank regulators")
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
-This fixes a crash due to an invalid pointer on the A80.
----
- drivers/pinctrl/sunxi/pinctrl-sunxi.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Please describe more about _WHY_ of this patch. Does it fix any bug, or
+enhance some thing, or a new feature?
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-index e340d2a24b44..e8161aa17dab 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-@@ -136,7 +136,7 @@ struct sunxi_pinctrl {
- 	struct gpio_chip		*chip;
- 	const struct sunxi_pinctrl_desc	*desc;
- 	struct device			*dev;
--	struct sunxi_pinctrl_regulator	regulators[12];
-+	struct sunxi_pinctrl_regulator	regulators[14];
- 	struct irq_domain		*domain;
- 	struct sunxi_pinctrl_function	*functions;
- 	unsigned			nfunctions;
--- 
-2.20.1
+Regards,
+CK
+
+> 
+> Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c | 5 +----
+>  1 file changed, 1 insertion(+), 4 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c b/drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c
+> index b5ed6b7..68b124f 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c
+> @@ -79,7 +79,6 @@ static int mtk_hdmi_pll_prepare(struct clk_hw *hw)
+>  	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SLDO_MASK);
+>  	usleep_range(80, 100);
+>  	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_MBIAS_LPF_EN);
+> -	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_POSDIV);
+>  	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SER_MASK);
+>  	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_PRED_MASK);
+>  	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_DRV_MASK);
+> @@ -94,7 +93,6 @@ static void mtk_hdmi_pll_unprepare(struct clk_hw *hw)
+>  	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_DRV_MASK);
+>  	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_PRED_MASK);
+>  	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SER_MASK);
+> -	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_POSDIV);
+>  	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_MBIAS_LPF_EN);
+>  	usleep_range(80, 100);
+>  	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SLDO_MASK);
+> @@ -123,6 +121,7 @@ static int mtk_hdmi_pll_set_rate(struct clk_hw *hw, unsigned long rate,
+>  
+>  	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON6, RG_HTPLL_PREDIV_MASK);
+>  	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON6, RG_HTPLL_POSDIV_MASK);
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_POSDIV);
+>  	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON6, (0x1 << RG_HTPLL_IC),
+>  			  RG_HTPLL_IC_MASK);
+>  	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON6, (0x1 << RG_HTPLL_IR),
+> @@ -223,7 +222,6 @@ static void mtk_hdmi_phy_enable_tmds(struct mtk_hdmi_phy *hdmi_phy)
+>  	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SLDO_MASK);
+>  	usleep_range(80, 100);
+>  	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_MBIAS_LPF_EN);
+> -	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_POSDIV);
+>  	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SER_MASK);
+>  	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_PRED_MASK);
+>  	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_DRV_MASK);
+> @@ -235,7 +233,6 @@ static void mtk_hdmi_phy_disable_tmds(struct mtk_hdmi_phy *hdmi_phy)
+>  	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_DRV_MASK);
+>  	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_PRED_MASK);
+>  	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SER_MASK);
+> -	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_POSDIV);
+>  	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_MBIAS_LPF_EN);
+>  	usleep_range(80, 100);
+>  	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SLDO_MASK);
+
 
 
 _______________________________________________
