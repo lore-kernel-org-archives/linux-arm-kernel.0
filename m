@@ -2,86 +2,93 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 67640C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 21:01:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B9CDDC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 21:10:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 36B32208E3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 21:01:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 86537213F2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 21:10:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ppd9vLxu";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="qv4UO6Fp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 36B32208E3
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Tsm8RavD";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="Ibd0cQL6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 86537213F2
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=oracle.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9cBVvm/aoN3gdbXbh7LjQlN1pES4G6bsUaHCaEFuKWk=; b=ppd9vLxub12L6M
-	wb957GmKCHCtXYjb01lASurI3LyTQzwNrDoaol2Imx78xnsHRep8LBUhTokf8ypTQhxKzQzy9RY7O
-	Gf7+LaWXd7uHMcmaJGU6hXoCniQ7I26msPMUmbylC9F+1EW66AL7CECuVanFIcfoMJrRqk08giiAh
-	tcgL6AmfaUqe/us9iSteyuAS1YnDFP9Vt0RRxTyXJ6EYlJL9xSYhR0j0Jfen1roKp5RuFfUn0ShsH
-	CpNPCgnekRe+ZuCKS1SYtYm9erCGYhGZ6eEiC0oH7D6KvSORMSH6JoNvQftIuoHnzCbgolXrRJX2q
-	jbSISCSKluoNWNk7m49A==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=xHicP91o4u+chV3E3mjpnXXOssX+l0AJk2SZp9oq+aI=; b=Tsm8RavDDL+ZvB+HqmlWquZKhp
+	w+f7h6GBFbXcE4ChW0V8cm5+OeFwocKr59GKoI1Yb8jKw9uo8HehOeG+lNWiEt/W02pwNA0yheDqo
+	l5pvQXXu20rppvRFZUeUrgBPph2FvECAbLaS1z7LOVrscKGtbM/mHLohAg0CWfi7J4C5jx4hE23jK
+	eco++LtZEuiCIEEO7DN0VFmpabcWtP4VyHG3U+rm1QVdoqnLKWvpsJv1AogpwNjJnInTHaL2vS0lj
+	XX/+x758t1NAAE+pkzxCzW5sRBo4TrAwz0yN95f3IeXWfuSXz8ukcHyKM/bUN0P6yncO3p5TGwmaG
+	wKggt5zg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghhSS-0006cD-TS; Thu, 10 Jan 2019 21:01:44 +0000
-Received: from mail-vs1-xe43.google.com ([2607:f8b0:4864:20::e43])
+	id 1ghhbJ-0001Kx-Ik; Thu, 10 Jan 2019 21:10:53 +0000
+Received: from userp2130.oracle.com ([156.151.31.86])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghhSP-0006bm-Dn
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 21:01:43 +0000
-Received: by mail-vs1-xe43.google.com with SMTP id n13so7914735vsk.4
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 10 Jan 2019 13:01:40 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=BwQUwoxWE9xddt/5B/7ivk+f8UFrG0jsvJWk4vuuwFQ=;
- b=qv4UO6FpqbcXjESpEyv6dMMa0ZVDKl3AXXY3Z6ghoqkOyRPJSb2wxDdd9jY9/MQqDz
- ZNxeGNGg13e5BuSafswztXuyY+nVAD+KTFUyapwOv6M4lK2tX6RZ2GVZPk4tFBp4X9Kp
- GhFvUnmyfOcEd+ZzfLzkXNw8lZepJZ3YANpPesKc9HztZhEUJvva5RQvpZmygFBctHlb
- iY2vT1hiRBdDIxQ53VEInE9XoL77Yd6Kcx+UTYCnO0vXHkopySwwJqzoxNTmUnWlOr5U
- qNyCfYclsQZLlURpkiOT1QeuJ1/thy9dmNNnV9/15lfHi786u+TmLJGuITP05OsWOKJ5
- nkRg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=BwQUwoxWE9xddt/5B/7ivk+f8UFrG0jsvJWk4vuuwFQ=;
- b=dJIzJJiG7/nDg+FXQ6QudZTpEgLj13DDf4x9YEGA8fu1ttygI9v21+Z9rjin/dU38k
- jrM2MuQbaBGyRueojuROBGMKvXLYBuF0SFiDwUMjkrYYU/Nk5r265e7+FrYiDUvZPglf
- vqlLlsRYmphuA+QLShvCrCc44n1Kig5PJCwqdwN8VxmSgqOSwjpP3ZPN7xmAn2qj4t2m
- RFXXSGufQ0XbFVBfMv2J1moxj/KdmzOzoT2yJfxQQgHhp9wmmGisYd97AagcNW+4fl7I
- dr5Oi+NT1w/xsVwrCsVBLmuxXuyfct/I/vG5EZEtHIV50pWsHEztKTZcpVOwyIDGAWzw
- Cg2w==
-X-Gm-Message-State: AJcUukcYjxRdjE7lkAJlMoP+8liwSE2eo56n9A3VdjUE/Wj3Zt7e0UzN
- 6oVasUc8YqKgtb2uODGXBKmnEzskgd9Rw6d8L3Y=
-X-Google-Smtp-Source: ALg8bN7/euEd7hrNjX8CZxbHBxPuqP9dEQzhslf1LrRY1c4u3M0PvYOPaAqoVJxODXBanGQcn9ihKfe8zsRMn3xd7qk=
-X-Received: by 2002:a67:6b07:: with SMTP id g7mr4545930vsc.150.1547154099333; 
- Thu, 10 Jan 2019 13:01:39 -0800 (PST)
-MIME-Version: 1.0
-References: <20181203180613.228133-1-james.morse@arm.com>
- <20181203180613.228133-11-james.morse@arm.com>
- <20181211183634.GO27375@zn.tnic>
- <56cfa16b-ece4-76e0-3799-58201f8a4ff1@arm.com>
-In-Reply-To: <56cfa16b-ece4-76e0-3799-58201f8a4ff1@arm.com>
-From: Tyler Baicar <baicar.tyler@gmail.com>
-Date: Thu, 10 Jan 2019 16:01:27 -0500
-Message-ID: <CABo9ajArdbYMOBGPRa185yo9MnKRb0pgS-pHqUNdNS9m+kKO-Q@mail.gmail.com>
-Subject: Re: [PATCH v7 10/25] ACPI / APEI: Tell firmware the estatus queue
- consumed the records
-To: James Morse <james.morse@arm.com>
+ id 1ghhbF-0001JH-6l
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 21:10:51 +0000
+Received: from pps.filterd (userp2130.oracle.com [127.0.0.1])
+ by userp2130.oracle.com (8.16.0.22/8.16.0.22) with SMTP id x0AL9URC041621;
+ Thu, 10 Jan 2019 21:10:28 GMT
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com;
+ h=from : to : cc :
+ subject : date : message-id : in-reply-to : references : in-reply-to :
+ references; s=corp-2018-07-02;
+ bh=gX2mJdtpePxKA35+8CzrSsJglZdMj3Uyq1TNFTJ+UG8=;
+ b=Ibd0cQL66/Pb0nDbJsIMNJzyd8kKLoFMvwVPnDYSaUhVHgEfhyU47vuyhyoAQ9k2SP6C
+ StEUBOQgSCvzTnn9h+UDKXfgtPFCWhtlMR0JzkADh9ihDe3FPhKazazVcoo14jbU7XQl
+ K1EjNugwd2s1+zetkMhkcq/FsEe9Yd8W/GJLHPv+EMsOmp07GsbYVXK9615cjbazxiSP
+ XJw0vyBfi7NQZ2wuGAFgjtITMe9DL6AW5g4qS9JAx9bFXnfwm4leU+XamB68ZTlkf+J6
+ e3SXq2H+Jlus4XUj2W07lFbgFkTlaBZXXkGQsWherXkWrPFagTorX6CU6WYs040aVs5A Fg== 
+Received: from userv0021.oracle.com (userv0021.oracle.com [156.151.31.71])
+ by userp2130.oracle.com with ESMTP id 2ptm0uhnuh-1
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+ Thu, 10 Jan 2019 21:10:28 +0000
+Received: from aserv0122.oracle.com (aserv0122.oracle.com [141.146.126.236])
+ by userv0021.oracle.com (8.14.4/8.14.4) with ESMTP id x0ALAMv8008733
+ (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+ Thu, 10 Jan 2019 21:10:23 GMT
+Received: from abhmp0009.oracle.com (abhmp0009.oracle.com [141.146.116.15])
+ by aserv0122.oracle.com (8.14.4/8.14.4) with ESMTP id x0ALAM90022955;
+ Thu, 10 Jan 2019 21:10:22 GMT
+Received: from concerto.internal (/24.9.64.241)
+ by default (Oracle Beehive Gateway v4.0)
+ with ESMTP ; Thu, 10 Jan 2019 13:10:22 -0800
+From: Khalid Aziz <khalid.aziz@oracle.com>
+To: juergh@gmail.com, tycho@tycho.ws, jsteckli@amazon.de, ak@linux.intel.com, 
+ torvalds@linux-foundation.org, liran.alon@oracle.com,
+ keescook@google.com, konrad.wilk@oracle.com
+Subject: [RFC PATCH v7 05/16] arm64/mm: Add support for XPFO
+Date: Thu, 10 Jan 2019 14:09:37 -0700
+Message-Id: <89f03091af87f5ab27bd6cafb032236d5bd81d65.1547153058.git.khalid.aziz@oracle.com>
+X-Mailer: git-send-email 2.17.1
+In-Reply-To: <cover.1547153058.git.khalid.aziz@oracle.com>
+References: <cover.1547153058.git.khalid.aziz@oracle.com>
+In-Reply-To: <cover.1547153058.git.khalid.aziz@oracle.com>
+References: <cover.1547153058.git.khalid.aziz@oracle.com>
+X-Proofpoint-Virus-Version: vendor=nai engine=5900 definitions=9132
+ signatures=668680
+X-Proofpoint-Spam-Details: rule=notspam policy=default score=0 suspectscore=0
+ malwarescore=0
+ phishscore=0 bulkscore=0 spamscore=0 mlxscore=0 mlxlogscore=999
+ adultscore=0 classifier=spam adjust=0 reason=mlx scancount=1
+ engine=8.0.1-1810050000 definitions=main-1901100164
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_130141_495386_4B85B1DF 
-X-CRM114-Status: GOOD (  19.96  )
+X-CRM114-CacheID: sfid-20190110_131049_383956_E6063174 
+X-CRM114-Status: GOOD (  22.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,83 +100,130 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rafael Wysocki <rjw@rjwysocki.net>, Tony Luck <tony.luck@intel.com>,
- Fan Wu <wufan@codeaurora.org>, linux-mm@kvack.org,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Xie XiuQi <xiexiuqi@huawei.com>, Will Deacon <will.deacon@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>,
- Dongjiu Geng <gengdongjiu@huawei.com>, Linux ACPI <linux-acpi@vger.kernel.org>,
- Borislav Petkov <bp@alien8.de>, Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>,
- kvmarm@lists.cs.columbia.edu,
- arm-mail-list <linux-arm-kernel@lists.infradead.org>,
- Len Brown <lenb@kernel.org>
+Cc: Tycho Andersen <tycho@docker.com>, kernel-hardening@lists.openwall.com,
+ linux-mm@kvack.org, Khalid Aziz <khalid.aziz@oracle.com>,
+ deepa.srinivasan@oracle.com, steven.sistare@oracle.com,
+ joao.m.martins@oracle.com, boris.ostrovsky@oracle.com, hch@lst.de,
+ kanth.ghatraju@oracle.com, pradeep.vincent@oracle.com, jcm@redhat.com,
+ tglx@linutronix.de, chris.hyser@oracle.com,
+ linux-arm-kernel@lists.infradead.org, jmattson@google.com,
+ andrew.cooper3@citrix.com, linux-kernel@vger.kernel.org, tyhicks@canonical.com,
+ john.haxby@oracle.com, Juerg Haefliger <juerg.haefliger@canonical.com>,
+ dwmw@amazon.co.uk, kirill.shutemov@linux.intel.com
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 10, 2019 at 1:23 PM James Morse <james.morse@arm.com> wrote:
-> >>
-> >> +    if (is_hest_type_generic_v2(ghes) && ghes_ack_error(ghes->generic_v2))
-> >
-> > Since ghes_ack_error() is always prepended with this check, you could
-> > push it down into the function:
-> >
-> > ghes_ack_error(ghes)
-> > ...
-> >
-> >       if (!is_hest_type_generic_v2(ghes))
-> >               return 0;
-> >
-> > and simplify the two callsites :)
->
-> Great idea! ...
->
-> .. huh. Turns out for ghes_proc() we discard any errors other than ENOENT from
-> ghes_read_estatus() if is_hest_type_generic_v2(). This masks EIO.
->
-> Most of the error sources discard the result, the worst thing I can find is
-> ghes_irq_func() will return IRQ_HANDLED, instead of IRQ_NONE when we didn't
-> really handle the IRQ. They're registered as SHARED, but I don't have an example
-> of what goes wrong next.
->
-> I think this will also stop the spurious handling code kicking in to shut it up
-> if its broken and screaming. Unlikely, but not impossible.
->
-> Fixed in a prior patch, with Boris' suggestion, ghes_proc()s tail ends up look
-> like this:
-> ----------------------%<----------------------
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index 0321d9420b1e..8d1f9930b159 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -700,18 +708,11 @@ static int ghes_proc(struct ghes *ghes)
->
->  out:
->         ghes_clear_estatus(ghes, buf_paddr);
-> +       if (rc != -ENOENT)
-> +               rc_ack = ghes_ack_error(ghes);
->
-> -       if (rc == -ENOENT)
-> -               return rc;
-> -
-> -       /*
-> -        * GHESv2 type HEST entries introduce support for error acknowledgment,
-> -        * so only acknowledge the error if this support is present.
-> -        */
-> -       if (is_hest_type_generic_v2(ghes))
-> -               return ghes_ack_error(ghes->generic_v2);
-> -
-> -       return rc;
-> +       /* If rc and rc_ack failed, return the first one */
-> +       return rc ? rc : rc_ack;
->  }
-> ----------------------%<----------------------
->
+From: Juerg Haefliger <juerg.haefliger@canonical.com>
 
-Looks good to me, I guess there's no harm in acking invalid error status blocks.
+Enable support for eXclusive Page Frame Ownership (XPFO) for arm64 and
+provide a hook for updating a single kernel page table entry (which is
+required by the generic XPFO code).
 
-T
+v6: use flush_tlb_kernel_range() instead of __flush_tlb_one()
+
+CC: linux-arm-kernel@lists.infradead.org
+Signed-off-by: Juerg Haefliger <juerg.haefliger@canonical.com>
+Signed-off-by: Tycho Andersen <tycho@docker.com>
+Signed-off-by: Khalid Aziz <khalid.aziz@oracle.com>
+---
+ arch/arm64/Kconfig     |  1 +
+ arch/arm64/mm/Makefile |  2 ++
+ arch/arm64/mm/xpfo.c   | 58 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 61 insertions(+)
+ create mode 100644 arch/arm64/mm/xpfo.c
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index ea2ab0330e3a..f0a9c0007d23 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -171,6 +171,7 @@ config ARM64
+ 	select SWIOTLB
+ 	select SYSCTL_EXCEPTION_TRACE
+ 	select THREAD_INFO_IN_TASK
++	select ARCH_SUPPORTS_XPFO
+ 	help
+ 	  ARM 64-bit (AArch64) Linux support.
+ 
+diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
+index 849c1df3d214..cca3808d9776 100644
+--- a/arch/arm64/mm/Makefile
++++ b/arch/arm64/mm/Makefile
+@@ -12,3 +12,5 @@ KASAN_SANITIZE_physaddr.o	+= n
+ 
+ obj-$(CONFIG_KASAN)		+= kasan_init.o
+ KASAN_SANITIZE_kasan_init.o	:= n
++
++obj-$(CONFIG_XPFO)		+= xpfo.o
+diff --git a/arch/arm64/mm/xpfo.c b/arch/arm64/mm/xpfo.c
+new file mode 100644
+index 000000000000..678e2be848eb
+--- /dev/null
++++ b/arch/arm64/mm/xpfo.c
+@@ -0,0 +1,58 @@
++/*
++ * Copyright (C) 2017 Hewlett Packard Enterprise Development, L.P.
++ * Copyright (C) 2016 Brown University. All rights reserved.
++ *
++ * Authors:
++ *   Juerg Haefliger <juerg.haefliger@hpe.com>
++ *   Vasileios P. Kemerlis <vpk@cs.brown.edu>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ */
++
++#include <linux/mm.h>
++#include <linux/module.h>
++
++#include <asm/tlbflush.h>
++
++/*
++ * Lookup the page table entry for a virtual address and return a pointer to
++ * the entry. Based on x86 tree.
++ */
++static pte_t *lookup_address(unsigned long addr)
++{
++	pgd_t *pgd;
++	pud_t *pud;
++	pmd_t *pmd;
++
++	pgd = pgd_offset_k(addr);
++	if (pgd_none(*pgd))
++		return NULL;
++
++	pud = pud_offset(pgd, addr);
++	if (pud_none(*pud))
++		return NULL;
++
++	pmd = pmd_offset(pud, addr);
++	if (pmd_none(*pmd))
++		return NULL;
++
++	return pte_offset_kernel(pmd, addr);
++}
++
++/* Update a single kernel page table entry */
++inline void set_kpte(void *kaddr, struct page *page, pgprot_t prot)
++{
++	pte_t *pte = lookup_address((unsigned long)kaddr);
++
++	set_pte(pte, pfn_pte(page_to_pfn(page), prot));
++}
++
++inline void xpfo_flush_kernel_tlb(struct page *page, int order)
++{
++	unsigned long kaddr = (unsigned long)page_address(page);
++	unsigned long size = PAGE_SIZE;
++
++	flush_tlb_kernel_range(kaddr, kaddr + (1 << order) * size);
++}
+-- 
+2.17.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
