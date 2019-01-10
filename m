@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B1E12C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 16:28:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A8C5DC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 16:28:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7A0E4214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 16:28:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7A7C1214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 16:28:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FxpNcQ4L"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7A0E4214DA
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Wf2qwLkt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7A7C1214DA
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,51 +25,52 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=uFvPdMuaX691j9uydPxtV5tPhAq2L6UmPpLNuzLzP94=; b=FxpNcQ4LgbO1jx
-	iNbnxO8NhNg0s+fhA5EScoR+L/uOBxynhNV/na/0PDl6cWC2Y45MKNYZ7lAEz+cfD2N/OvJw6aFkm
-	/ZD2C05bX1MUPHwgEs+nlHX/vqm3x1dPy73x7PbjK4sMSY2BmNuWi4LYVcRXsmW5k+7zmTzhgFYda
-	lnXP+W0kSJJgdMiykRWp4hThLRByBrlATgvQHWTQRNTRZ0Pe4r8WF1ttiQIzfEFZDBQE8qTQGjOd9
-	J4k/xtScLy9EzRnLoc+iuRfcOMLlRMwSMY5f4Dz1Bsk/M0aIvpIWlF0mfEopEpp5kTkW+BZ/xVNnf
-	XWOcXtRAyuEQ5rH//4Ow==;
+	List-Owner; bh=qyLAzzDbirY1B3Y8E5XXXITIzqP+a/ZSAEoiMdTndkA=; b=Wf2qwLktKMEaE9
+	AzQShJRmpojHWVPANWm67iizpfpWoDFIsEja/oy0WIInoo/ckPNjUU8DF3KpWkr+XmJDPTL0paSWK
+	9/E6SH2uNmuT7ig9DFCuYEFlmfZEVhxJBhQSx6w3IHqHPa9fJPxa61+u4o+UQh4sbT1sJ2R9Cf4Qr
+	ZyLQzssGh7Ubv29UInGodbsoc9t7mB3ZZZ6wx2Aoj2pGdNE1XhwArr/zNibIn9cWuvuT5A/kBz+3Y
+	w22SZytdhVK5ONikRiIl0lDEjeu2AeAKm5+llnvNwq1e1MdDFzZBSrG0Qn4bdp1vlN+0lIkAH1aDR
+	B3xQI9sZVWYpo7MSPqAg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghdBr-0006Iv-CB; Thu, 10 Jan 2019 16:28:19 +0000
-Received: from mout.kundenserver.de ([217.72.192.75])
+	id 1ghdC8-0006Yo-5C; Thu, 10 Jan 2019 16:28:36 +0000
+Received: from mout.kundenserver.de ([217.72.192.74])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghd9s-0004Im-05
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 16:26:19 +0000
+ id 1ghd9x-0004Lv-1y
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 16:26:24 +0000
 Received: from wuerfel.lan ([109.192.41.194]) by mrelayeu.kundenserver.de
  (mreue108 [212.227.15.145]) with ESMTPA (Nemesis) id
- 1M26n9-1gjYwt2XdZ-002VJW; Thu, 10 Jan 2019 17:25:14 +0100
+ 1Mate1-1hILjh2T0d-00cOMW; Thu, 10 Jan 2019 17:25:18 +0100
 From: Arnd Bergmann <arnd@arndb.de>
 To: y2038@lists.linaro.org, linux-api@vger.kernel.org,
  linux-kernel@vger.kernel.org
-Subject: [PATCH 07/15] ARM: add kexec_file_load system call number
-Date: Thu, 10 Jan 2019 17:24:27 +0100
-Message-Id: <20190110162435.309262-8-arnd@arndb.de>
+Subject: [PATCH 10/15] sh: add statx system call
+Date: Thu, 10 Jan 2019 17:24:30 +0100
+Message-Id: <20190110162435.309262-11-arnd@arndb.de>
 X-Mailer: git-send-email 2.20.0
 In-Reply-To: <20190110162435.309262-1-arnd@arndb.de>
 References: <20190110162435.309262-1-arnd@arndb.de>
 MIME-Version: 1.0
-X-Provags-ID: V03:K1:bbQTa8+RVq8uOU5pbxDK+0/4n2oFwdb20J9rbCJvp69tR6LbpUE
- BGw9PvuvotSd1z/CxUlN3LgFpu8c2eaVfhJU913d+y+4OuiKFe0x+5pUiPKr+A8JyoqUNYl
- +HzTAqMZP6muHMdLv1v6FLhgS7jrtc4eJiWfRbo6++zUEUKkS/plrzdPDX4N3ebSRZ82vdU
- 29ipN8xprnY8eaAdBUF1A==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:KcIkOw8POYU=:PlPoKFpPERWmgM//oISQHu
- FSulXma/Pg8PEBbrHXiPuKmqgQPSJjkYE+IphJVFUZAY6EDeu6AtFVVptEDSdANsrovpTXcAL
- b/AS9w9/SN/itOc8+uv+gP7/lQwmYzvDK1BbwMZpnXwYFjfMvbHPoKh9HcCWPXrhFDSGmw+8y
- 5noFZR9dcb/SHixiXSpF1Uzzrt/1D05eMzRme6bDd6MQ8vzxvH9RxaowXKWyPsrHShPT5Yns3
- RvFMOs0GUK3O83DVUX7KxpyabIrqW2LWJqx+aQ/5s1+2NDh5iBfmAYGenrjOjg1Dw7D3x2DO6
- CbwGY7gKDYkp0Xv059QhC7u7F1tqgEzxTdrIb4K+LJQWNhFWZE6dFMlppU8my+3kMD+cIT6a4
- /lKUb9S1bXaWBFRozDTYAQ/dWsNDdcosUEbHB8AsA5zHlOClTE881gOj7PkZjhSIyEpiIEioD
- iBQFivwkpvXegsxBX3XNPos5ITLYPP00OJlLDCNuDqXAAMqMGQWMyaOHiSPo+J0RuYfofVFUk
- +ZA+taJ3UVicsNsNzgjrOb/MA1fkK79L0NYP12Nqoq7c8R8vhby74mvgU8cyLD8zYnzaa6jLH
- 4nGKiLGdIzNVujVY6D9aWQawS+VNaFBXbqJ55jmmne047urmDt0vQV5Lg53Yze4OpTMtc1ZKL
- bEcAVanw4q5TBWN6nFcFgDqVzMcE+qwbf76mZR1JQw1kZojx200VU6Wc77Ggq+t14WHPxEt3u
- fc4ZKBNefarvA8bAMh25iORuVAYJ+Kk4mxSxzQ==
+X-Provags-ID: V03:K1:h4QdAifLam4g7JZ0RiA7Sql/9EWtvVpzCJaWohLb5+jRFokClhv
+ 9v/OjTvK3x5DsjX1gTUQ6lOp7C5GYphXGZen1IMAu02YPxTyzAdMYoowsG7kkmc/YQOjJPa
+ jX7UfF8kf4eGDgsrm8Xa/J/plh2QibVg882GQ9cXpVBd0jyXZ9nSdMk2p9qn1fiHurxOKS9
+ El2e2jM1xOn8YE19u03AA==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:QmoIGFVpQPw=:Im57Cbx4QWOknyrADQIk10
+ YM4vWHeQCwjtn0jwZHdKXuu65dc+gaH7qoFXIP9/jTL7Xmkc8qqGah6zY5QwkzYmllqQCQ8nv
+ qxVuB5lOZZ243zGZAD4TCC+mNRwozDE1BG5o+FnPx+k9o4/LQeYDEn//OPYHs41he9YPOzojY
+ 90Wcv9veGVctFFVCWIpGv1I+NXVFM+psFPwrFIie5V8H32GUKuL1A4C99y8LVnGmL/OcVBXaO
+ J3lno/p8+ma5DQVHA/u3syk2vOThkzDuPVlh2V7MpiZHgIDh4u4VNzM4wzJfRN6aXTjqJ+3lW
+ aIRmD099eDt/fDvex11MwxqqjBmatpxug5DVTjgs9DDx0wujr9F7YaBgDckfCKPL/1rLBhPFo
+ I2JOPMYGJL95GLRjM4fnE2uOj3RCAg0T7ueBv6Rt2zMHXYqKiEHB+/f4dO2ipScwwM7MbU8i4
+ bfY7nnwl+iv7QWTJpdnAX0VOH2ysB1uBv3766MdzVV0JrlTUoBY3FPEaRkzZhiNAvuXdsHD4t
+ C9iRTot2FGphsMYModOYHaTrG8HctbzPaCM4OXfA/MfWcZHXsT4VzLKNnK5kvw3ga9rNqwxR0
+ f4j3VHuAPYnaiQy4j5/jP3CPhsxrx3vUojaNCAEL/h9zwVUCYlK6OfXfxEJlFfDoNIMaUPVks
+ IShmqkYzYphYWX5a882YE2ZFKPo02u/v0S7HbljQbFS5Ut5kCiGvEysl8tFvAHLSFdaUpJ7+y
+ CQYKGG6ugXm0Kr9fk5qKrem+LcN4rqj3srtwlg==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_082616_336652_FDA93122 
-X-CRM114-Status: GOOD (  13.53  )
+X-CRM114-CacheID: sfid-20190110_082621_858380_22614FDE 
+X-CRM114-Status: UNSURE (   9.05  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,58 +100,23 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-A couple of architectures including arm64 already implement the
-kexec_file_load system call, on many others we have assigned a system
-call number for it, but not implemented it yet.
-
-Adding the number in arch/arm/ lets us use the system call on arm64
-systems in compat mode, and also reduces the number of differences
-between architectures. If we want to implement kexec_file_load on ARM
-in the future, the number assignment means that kexec tools can already
-be built with the now current set of kernel headers.
+statx is available on almost all other architectures but
+got missed on sh, so add it now.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/tools/syscall.tbl        | 1 +
- arch/arm64/include/asm/unistd.h   | 2 +-
- arch/arm64/include/asm/unistd32.h | 2 ++
- 3 files changed, 4 insertions(+), 1 deletion(-)
+ arch/sh/kernel/syscalls/syscall.tbl | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/tools/syscall.tbl b/arch/arm/tools/syscall.tbl
-index 86de9eb34296..20ed7e026723 100644
---- a/arch/arm/tools/syscall.tbl
-+++ b/arch/arm/tools/syscall.tbl
-@@ -415,3 +415,4 @@
- 398	common	rseq			sys_rseq
- 399	common	io_pgetevents		sys_io_pgetevents
- 400	common	migrate_pages		sys_migrate_pages
-+401	common	kexec_file_load		sys_kexec_file_load
-diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
-index 261216c3336e..2c30e6f145ff 100644
---- a/arch/arm64/include/asm/unistd.h
-+++ b/arch/arm64/include/asm/unistd.h
-@@ -44,7 +44,7 @@
- #define __ARM_NR_compat_set_tls		(__ARM_NR_COMPAT_BASE + 5)
- #define __ARM_NR_COMPAT_END		(__ARM_NR_COMPAT_BASE + 0x800)
- 
--#define __NR_compat_syscalls		401
-+#define __NR_compat_syscalls		402
- #endif
- 
- #define __ARCH_WANT_SYS_CLONE
-diff --git a/arch/arm64/include/asm/unistd32.h b/arch/arm64/include/asm/unistd32.h
-index 355fe2bc035b..19f3f58b6146 100644
---- a/arch/arm64/include/asm/unistd32.h
-+++ b/arch/arm64/include/asm/unistd32.h
-@@ -823,6 +823,8 @@ __SYSCALL(__NR_rseq, sys_rseq)
- __SYSCALL(__NR_io_pgetevents, compat_sys_io_pgetevents)
- #define __NR_migrate_pages 400
- __SYSCALL(__NR_migrate_pages, sys_migrate_pages)
-+#define __NR_kexec_file_load 401
-+__SYSCALL(__NR_kexec_file_load, sys_kexec_file_load)
- 
- /*
-  * Please add new compat syscalls above this comment and update
+diff --git a/arch/sh/kernel/syscalls/syscall.tbl b/arch/sh/kernel/syscalls/syscall.tbl
+index 21ec75288562..a70db013dbc7 100644
+--- a/arch/sh/kernel/syscalls/syscall.tbl
++++ b/arch/sh/kernel/syscalls/syscall.tbl
+@@ -390,3 +390,4 @@
+ 380	common	copy_file_range			sys_copy_file_range
+ 381	common	preadv2				sys_preadv2
+ 382	common	pwritev2			sys_pwritev2
++383	common	statx				sys_statx
 -- 
 2.20.0
 
