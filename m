@@ -2,73 +2,81 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-17.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9A609C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 23:04:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E009BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 23:12:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 63F19208E3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 23:04:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A765D213F2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 23:12:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AVkZ4ih3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 63F19208E3
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="C3zbLY+4";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Gl6kCbyB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A765D213F2
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=COKWT5tCKil4Pe2a2Iig8KWre7/jEWlzLY1iYa9gONM=; b=AVkZ4ih3sf7EFG
-	NipS786X+26ZDnc8aQgWtX1Cj9cA1zdOkn3yn4Ocf18cEG6ATGEersyIX8AORUKBd+XFJXw4CpnAQ
-	IisO54E55+elEhhaYJd+o1T0qRKxpLtFD8/lkauvRzGcGCXkZCfI4W6KlwtkcYbJxOVkcpD3r9YkE
-	muIRHWUyejfv3/AsQ1TqtdVL4U2ZAPmdORuZxej7bXzeL+iDI7A2dDRSY+dt4RCCfalsWIaBrGXY4
-	v9o/uznLXXlZtpDOt4qUk0UWLKGbcyqB1Izl5O6hJSZ8g8Krtp1SzCVoT2V5oa7f6PY4tIyov1tQb
-	nm0FtWeUZ3E6w59ISb+w==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=SqbLKfvS7q7NGhEWPv9Qlq58dLZz9IpOLuRZdukwXho=; b=C3z
+	bLY+4z7+FBYYCsi57AS638qgCBUCxR8HMXlOjHPKW4jKEZCMq41w7p57Y/iCt3oYK69vZxCp5Enib
+	xAjQDwqGWnq8SgolJ3VT6q3lF42E6/HK5klscau/VGR7wV/fQJYdKolpyej6dVh4DjUL99EJ2lhBx
+	bCqe0vnZHZ7alwFc8jgvOUinmlM7DuJqDZBdDAtNujuMhsDdW3FysnKY2oPDmQ9ntr5DdEU/EzhgL
+	Cwo/1hzSB2i9j1OcF4HlQaRneig3veFkIrfWWsnWCm2NVBiY8DL+/cknVamtR+cvKKbBX0MtnAMse
+	lZBo8pAjqFQpjHUWDYi4sPar4yr931A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghjNH-0008UW-Kf; Thu, 10 Jan 2019 23:04:31 +0000
-Received: from mail-qt1-f196.google.com ([209.85.160.196])
+	id 1ghjUi-0003X8-P1; Thu, 10 Jan 2019 23:12:12 +0000
+Received: from mail-ot1-x342.google.com ([2607:f8b0:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghjNE-0008U6-2P
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 23:04:29 +0000
-Received: by mail-qt1-f196.google.com with SMTP id t13so15974189qtn.3
+ id 1ghjUf-0003Wf-SD
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 23:12:11 +0000
+Received: by mail-ot1-x342.google.com with SMTP id i20so11575882otl.0
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 10 Jan 2019 15:04:27 -0800 (PST)
+ Thu, 10 Jan 2019 15:12:07 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id;
+ bh=P7cGoCPe9QMEyafb2GT0Ht8UKP6ezcUJ9AN6Y3AHrIw=;
+ b=Gl6kCbyBWvBrPPXb0d+uuvx33Zpbw/2OI3zXUdIFR5s9jmhf6jwfz4gle90Tc6QyAS
+ M3rbpV6XXwhSHmD8Abh2o71meFcvnZJHafRpIPl/klUhW3BOBny1o36kiy3YZmXYSDny
+ bB96EYKBE9PsddEk3odSDhhwXzAcJ8MOINiMw=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=HtXhbi3vHt8M/OEnatDKUvPiA7NAMQnuGXU1lkYVUOA=;
- b=CbGqq+U2nlJZW5DXOdmQVto8+UQttYx7latfVc8QPqAEoMIH8SM+cxfh1CryyHQkk/
- NWl1RLdjutQR083bvioDZI4d9WQmAsUq0tA5BDct0EjtFZ8ce/VfwXr5o/LjRlnEf6L+
- z/m+eled04sQZY68hxQmEVDW5K+QTnLwsP+cE73sTJ9bH0y5Y09/05/iEnBmn+jumuhU
- EssFhXuLfOLfZdVvPWwc5fZ2SI7XmGgkKtH2MNNnd2n0su5i3eZz92eO/QY7kZVDb9gN
- 9SZuTLPxC526tn2jMyuezYrV6JxtM1l3ad1PQyiQ/9MEuQsSDC/lufuA/G0UqFec2S5R
- TprA==
-X-Gm-Message-State: AJcUukccI/aD2ekVRb16LQgbxILhPfA/+QckhnQErMqAjiZLoVl2Z5BO
- aieJwrn4Rrc13ZB3Mesztx1q9lM2JSjICOh17kQ=
-X-Google-Smtp-Source: ALg8bN4ZeEWRkM9hWnrPPHyShJGIJaQ4v14vU6tq5tVSdcQOtnDoc1B1ZFUD1N8Tb+aXoK9KYlt7H6bjgwfKKkPpLQI=
-X-Received: by 2002:a0c:e202:: with SMTP id q2mr11357943qvl.180.1547161466728; 
- Thu, 10 Jan 2019 15:04:26 -0800 (PST)
-MIME-Version: 1.0
-References: <20190110162435.309262-1-arnd@arndb.de>
- <20190110162435.309262-12-arnd@arndb.de>
- <20190110193949.5wsysvchhhh2gfmu@pburton-laptop>
-In-Reply-To: <20190110193949.5wsysvchhhh2gfmu@pburton-laptop>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 11 Jan 2019 00:04:09 +0100
-Message-ID: <CAK8P3a1-QvHrPOupHx3sc+c6zAS9E-u8hYbt4keWzpiPgNOD-Q@mail.gmail.com>
-Subject: Re: [PATCH 11/15] mips: fix n32 compat_ipc_parse_version
-To: Paul Burton <paul.burton@mips.com>
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=P7cGoCPe9QMEyafb2GT0Ht8UKP6ezcUJ9AN6Y3AHrIw=;
+ b=JboFu50msuHm2gz+1emkF8fGEqSM1KeOMThXt3OhHlNig9n+n/dnie8XGJUpZXL8TS
+ TuPRS3LoRV/RmX2mKR5XoujpZSSdKz42uvKDePbjBJMhJEkrd+vXmAQjiw8b5+JTqXRl
+ SGBqvZXLg4OhjBcrhcET5813Y/QecPOCNJkUjYZbW+Gr5n7p6lLFwKMVbMEVOWvKQj7B
+ A5+oJLFNsADaEqEFlOGJovT8PBgCs19CSBUC4fGzp0Pbk8HSG8xzfu/ISltgP4q9JzL2
+ JLb67JMjiAr9mwzCCV38maptJgrfS2oYN0/xZZDazzUwA4uHaJgClzPEy8/QRCSuwQYt
+ QAgw==
+X-Gm-Message-State: AJcUukd6o/zF2zTaZWoodS1CZtVSP+CQGxLqgD4kmJR3r+osp8IWN0Xr
+ Xz/Ac6MDxSUuYO+nPYQc4nH12w==
+X-Google-Smtp-Source: ALg8bN6yn5Iyu1n92kVgg69lakk3N/at7Jw+F6Kohc04FHsEM/ilGJDrVDlStsqq44rfqVoPCzziEw==
+X-Received: by 2002:a9d:60b:: with SMTP id 11mr7812448otn.200.1547161926558;
+ Thu, 10 Jan 2019 15:12:06 -0800 (PST)
+Received: from localhost (107-207-74-175.lightspeed.austtx.sbcglobal.net.
+ [107.207.74.175])
+ by smtp.gmail.com with ESMTPSA id i7sm31832448oth.57.2019.01.10.15.12.05
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 10 Jan 2019 15:12:05 -0800 (PST)
+From: Andy Gross <andy.gross@linaro.org>
+To: arm@kernel.org
+Subject: [GIT PULL] Qualcomm Driver Fixes for 5.0-rc1
+Date: Thu, 10 Jan 2019 17:12:01 -0600
+Message-Id: <1547161921-32078-1-git-send-email-andy.gross@linaro.org>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_150428_109065_53E90C43 
-X-CRM114-Status: GOOD (  16.72  )
+X-CRM114-CacheID: sfid-20190110_151209_914976_75DBE5D1 
+X-CRM114-Status: GOOD (  10.66  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,91 +88,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "dalias@libc.org" <dalias@libc.org>,
- "linux-ia64@vger.kernel.org" <linux-ia64@vger.kernel.org>,
- "linux-sh@vger.kernel.org" <linux-sh@vger.kernel.org>,
- "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
- "heiko.carstens@de.ibm.com" <heiko.carstens@de.ibm.com>,
- "linux@dominikbrodowski.net" <linux@dominikbrodowski.net>,
- "linux-mips@vger.kernel.org" <linux-mips@vger.kernel.org>,
- "jcmvbkbc@gmail.com" <jcmvbkbc@gmail.com>,
- "deepa.kernel@gmail.com" <deepa.kernel@gmail.com>,
- "hpa@zytor.com" <hpa@zytor.com>,
- "sparclinux@vger.kernel.org" <sparclinux@vger.kernel.org>,
- "linux-s390@vger.kernel.org" <linux-s390@vger.kernel.org>,
- "dave@stgolabs.net" <dave@stgolabs.net>,
- "y2038@lists.linaro.org" <y2038@lists.linaro.org>,
- "mpe@ellerman.id.au" <mpe@ellerman.id.au>, "deller@gmx.de" <deller@gmx.de>,
- "x86@kernel.org" <x86@kernel.org>,
- "linux@armlinux.org.uk" <linux@armlinux.org.uk>,
- "mingo@redhat.com" <mingo@redhat.com>,
- "geert@linux-m68k.org" <geert@linux-m68k.org>,
- "firoz.khan@linaro.org" <firoz.khan@linaro.org>,
- "mattst88@gmail.com" <mattst88@gmail.com>,
- "fenghua.yu@intel.com" <fenghua.yu@intel.com>,
- "will.deacon@arm.com" <will.deacon@arm.com>,
- "linux-m68k@lists.linux-m68k.org" <linux-m68k@lists.linux-m68k.org>,
- "ink@jurassic.park.msu.ru" <ink@jurassic.park.msu.ru>,
- "luto@kernel.org" <luto@kernel.org>, "tglx@linutronix.de" <tglx@linutronix.de>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- "monstr@monstr.eu" <monstr@monstr.eu>,
- "tony.luck@intel.com" <tony.luck@intel.com>,
- "linux-parisc@vger.kernel.org" <linux-parisc@vger.kernel.org>,
- "linux-api@vger.kernel.org" <linux-api@vger.kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "stable@vger.kernel.org" <stable@vger.kernel.org>,
- "ebiederm@xmission.com" <ebiederm@xmission.com>,
- "linux-alpha@vger.kernel.org" <linux-alpha@vger.kernel.org>,
- "schwidefsky@de.ibm.com" <schwidefsky@de.ibm.com>,
- "akpm@linux-foundation.org" <akpm@linux-foundation.org>,
- "linuxppc-dev@lists.ozlabs.org" <linuxppc-dev@lists.ozlabs.org>,
- "davem@davemloft.net" <davem@davemloft.net>
+Cc: Arnd Bergmann <arnd@arndb.de>, linux-arm-msm@vger.kernel.org,
+ Bjorn Andersson <bjorn.andersson@linaro.org>,
+ Kevin Hilman <khilman@baylibre.com>, Olof Johansson <olof@lixom.net>,
+ linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 10, 2019 at 8:40 PM Paul Burton <paul.burton@mips.com> wrote:
-> On Thu, Jan 10, 2019 at 05:24:31PM +0100, Arnd Bergmann wrote:
-> > While reading through the sysvipc implementation, I noticed that the n32
-> > semctl/shmctl/msgctl system calls behave differently based on whether
-> > o32 support is enabled or not: Without o32, the IPC_64 flag passed by
-> > user space is rejected but calls without that flag get IPC_64 behavior.
-> >
-> > As far as I can tell, this was inadvertently changed by a cleanup patch
-> > but never noticed by anyone, possibly nobody has tried using sysvipc
-> > on n32 after linux-3.19.
-> >
-> > Change it back to the old behavior now.
-> >
-> > Fixes: 78aaf956ba3a ("MIPS: Compat: Fix build error if CONFIG_MIPS32_COMPAT but no compat ABI.")
-> > Cc: stable@vger.kernel.org
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> > As stated above, this was only found by inspection, the patch is not
-> > tested. Please review accordingly.
->
-> Nice catch! Would you prefer to merge this yourself, or that I take it
-> through the mips tree?
+The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
 
-Up to you: if you want to merge it for 5.0, I'll just drop it from my tree.
+  Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
 
-> If the former then:
->
->   Acked-by: Paul Burton <paul.burton@mips.com>
+are available in the git repository at:
 
-Thanks!
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-fixes-for-5.0-rc1
 
-> I suspect kernels configured with n32 support but no o32 support are
-> probably not very common - for internal testing we currently always
-> enable both.
+for you to fetch changes up to 2076607a20bd4dfba699185616cbbbce06d3fa59:
 
-Do you know of anyone actually still using n32 in production systems
-with 4.x kernels? I wonder if it just fell out of popularity as the 64-bit
-machines that used it either became large enough to want 64-bit
-user space, or got replaced by arm64 or mips32 hardware.
+  qcom-scm: Include <linux/err.h> header (2019-01-10 17:04:45 -0600)
 
-      Arnd
+----------------------------------------------------------------
+Qualcomm Driver Fixes for 5.0-rc1
+
+* Add required includes into qcom_scm.h
+
+----------------------------------------------------------------
+Fabio Estevam (1):
+      qcom-scm: Include <linux/err.h> header
+
+ include/linux/qcom_scm.h | 1 +
+ 1 file changed, 1 insertion(+)
 
 _______________________________________________
 linux-arm-kernel mailing list
