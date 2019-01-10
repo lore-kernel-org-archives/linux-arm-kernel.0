@@ -2,67 +2,123 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 848B4C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 10:19:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7D5EEC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 10:24:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 55568214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 10:19:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4E053214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 10:24:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UouXDLBz";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="PBJu1RiU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 55568214DA
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WUKZpPv2";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="scjv/rYW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4E053214DA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=vqTDYMt0dkMPVVZqyQe1gY0f1Bh8fAW6diW3Ej8NypY=; b=UouXDLBzlNhvWIv8JOyK1YpDc3
-	HubB/CamM9Gze/xfeUK9WYJ5+we5mQFAX91lg+21Crsn/x93V4BJmAjBMoHZyK8KXg6tBigreh82j
-	nXpwUfmzIcd4KdJ0vZZyt8K8Y3lTjKQ6C7NODbzklf+3XEroW7OkFwnodiJINLTaEy26RpSKm5ROp
-	6e81GaBmTjLMMvmrKPe4vrALnwt4koIYMBDFOucFsaRrEozpI5frSl9TS3RRxgMlH4RZuK6wzym7K
-	dg3HL87thrhcZBz67OmiDmgWU2cDThpPaJ27o+80u9eYW8uL4iB9Dr6mVV2vSMezO/1kLOfEt0BZq
-	1Pt80w5Q==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=pecpPsf77xDr1Q/PP6QU2CsY8hh4AWKuuIdRk6B4EOM=; b=WUKZpPv2M12gfk
+	rtibhfzYWbCyOwmOgpcR1Sum1l9godZjuLWPVopyMvG6Ffnu9SJwnNMFsaRXiHWHmtcTIZFdebnTR
+	bnqsfHNPhzxCgqJ5nB3gSD/vxxxlH+1prFNecP5GGPJKyC1Ju+yRGt/tDiobuftBrutxBKRBDuAUt
+	qFvGtLYflYSI6bRELBSagdfN8UF+UP0Ft3djeys08koG79Te2hXvvE+EraOGusyJjDB81VhKpDH9R
+	ANpcNxg/1M6CSuiFowPIoGVGHbEFLZ/ZMCRTnNnRvCLEdRUZtGp23bAHw2zFgqOd44gFlvJnzgEiq
+	2Y+fM8y2+FIMAzZ4Rzfw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghXQi-0000jL-Ay; Thu, 10 Jan 2019 10:19:16 +0000
-Received: from kirsty.vergenet.net ([202.4.237.240])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghXQF-0000Eh-M4
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 10:18:52 +0000
-Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
- by kirsty.vergenet.net (Postfix) with ESMTPA id 05F9D25BED4;
- Thu, 10 Jan 2019 21:18:41 +1100 (AEDT)
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1547115521; bh=YCDZjYmxk4Z3QPKyyrQSn8Ri32Gtj0IKGnbSmDb49qI=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=PBJu1RiUOSj8FSyBN5Iu9YwiJTo8mu7F0CzNUNu7QgpFZiW+BaQY38vzmq3sZgZHA
- BIOrrMJG4MvZyivLqh/AJj7BCkMFp9kJqDtsjoARc7t/nevRYm1MAYXRbhiJEXJpFX
- cmbBl49pRqzMll0vm6+KP8FMTCQGpCGg5VoE9PYw=
-Received: by reginn.horms.nl (Postfix, from userid 7100)
- id 428A59402F6; Thu, 10 Jan 2019 11:18:39 +0100 (CET)
-From: Simon Horman <horms+renesas@verge.net.au>
-To: linux-renesas-soc@vger.kernel.org
-Subject: [PATCH 2/2] soc: renesas: r8a774c0-sysc: Fix initialization order of
- 3DG-{A, B}
-Date: Thu, 10 Jan 2019 11:18:38 +0100
-Message-Id: <a64597227d0de5610407fcc95dc835745a53f5d0.1547115367.git.horms+renesas@verge.net.au>
-X-Mailer: git-send-email 2.11.0
-In-Reply-To: <cover.1547115367.git.horms+renesas@verge.net.au>
-References: <cover.1547115367.git.horms+renesas@verge.net.au>
+	id 1ghXVf-0002k1-6r; Thu, 10 Jan 2019 10:24:23 +0000
+Received: from esa4.microchip.iphmx.com ([68.232.154.123])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghXVb-0002iv-2x
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 10:24:20 +0000
+X-IronPort-AV: E=Sophos;i="5.56,460,1539673200"; d="scan'208";a="24868887"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa4.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 10 Jan 2019 03:24:17 -0700
+Received: from NAM01-SN1-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.108) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Thu, 10 Jan 2019 03:24:16 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=nN7E2FqfM41P8JYiQq4dYXqD6Co9mpBvNtY/ydVDeXw=;
+ b=scjv/rYW/1wAYtTGW/6Q5keRzqtMih3MErE0Uu4iA5RVV2Gm1ZFPaWqsviY841Fk/fUMvZBjlFOLQHnZwWfDqzmi87styMBUS5kezmbfx6fflGBkRLJWwmQ2TlFYtnD1E3Cz8cf8QVIPmg6GJwVtzpLHcf9AyT1GdO3KPK/boBc=
+Received: from MWHPR11MB1920.namprd11.prod.outlook.com (10.175.54.19) by
+ MWHPR11MB2015.namprd11.prod.outlook.com (10.169.236.7) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1516.15; Thu, 10 Jan 2019 10:24:15 +0000
+Received: from MWHPR11MB1920.namprd11.prod.outlook.com
+ ([fe80::e553:ff9d:8c0b:9627]) by MWHPR11MB1920.namprd11.prod.outlook.com
+ ([fe80::e553:ff9d:8c0b:9627%6]) with mapi id 15.20.1516.015; Thu, 10 Jan 2019
+ 10:24:15 +0000
+From: <Claudiu.Beznea@microchip.com>
+To: <pavel@ucw.cz>
+Subject: Re: [PATCH v2 1/3] PM / Suspend: Add support to check if platform's
+ power is off in suspend
+Thread-Topic: [PATCH v2 1/3] PM / Suspend: Add support to check if platform's
+ power is off in suspend
+Thread-Index: AQHUp0DOM7WMwuf4TU6Qg1UGEhg3kaWm/LSAgAFSAwA=
+Date: Thu, 10 Jan 2019 10:24:14 +0000
+Message-ID: <126e9fd8-1009-47f7-7299-9e5e93ebfd4d@microchip.com>
+References: <1546944944-13911-1-git-send-email-claudiu.beznea@microchip.com>
+ <1546944944-13911-2-git-send-email-claudiu.beznea@microchip.com>
+ <20190109141417.GA8529@amd>
+In-Reply-To: <20190109141417.GA8529@amd>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: LNXP123CA0009.GBRP123.PROD.OUTLOOK.COM
+ (2603:10a6:600:d2::21) To MWHPR11MB1920.namprd11.prod.outlook.com
+ (2603:10b6:300:110::19)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Claudiu.Beznea@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [94.177.32.154]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; MWHPR11MB2015;
+ 6:tuSCj4a+owfMvjElZCYWD+4RuuXOMhA51QeM4GjJ8oIdwl0O0r2tronWgJkwjJxCG6c4TLuQzf0J1coShsxu6WIvzbZY1IXX9L+J++CeNEUn4QcDUdoWRq6p2RKkzkAnVPmrh7JEifED/brv/e69909oW/8zE1Yr4vhBbTNu4LlMiey3FlyUJ6Gmvhg+q8AeB3bfYtVk2ICDRsm/25ZCK6bMMx4ZMpEbn+1QyRIZHxkPRTpQMOLbFkKhtOoOAN4KKLpimeycTQP7IAwbZ0xy/orm1aNjnSsiFl5P0EYqtECWMNUu0uhm08uq8fkFUthDRNy/rGTBRdrQs49IntJwtnyor/5EHhRcWRRROGDbIesrAaJ82IE6mXule8mbzd54E1uGa99vTioNH5hwftBMnL0DjLd4mOIdvrNGtRd30O+cCTXZFea71uLsSM5MIuS11NSAMaa++B21oKoiNMcSXQ==;
+ 5:C3/+LeCmX7/sSe5hbw8GKpOIhFMfJCLfT1CVfXdpZQ3gtBLBFRcEE5mHP8qhg2WGEYcl5aHl6hH/FMImVVMjeJCFstDlVcrgbYCT/61ZkaLUJPInEoifmIQnqLr4gJVqrGkc2aIgx/medRC0u3s5/mOu76fa3lZjWbxzToAvRH7aicsY5sjQrNoNM1lAQzkt35iEebqKeetF0+KYhAhpLA==;
+ 7:lEU7pGckJaHR1Lg31dM3WPJm3GMxyeFDNZ640saWcA54cVxKc2Zw4Ngw6B4fbgYDpjYCEroIuMHOd/hnFZaF21jjgIWyBlatfN0kGilbvqSAIlCrCsg58vYxuzv9MRN12CRA30zJsm31oRWB7F6lBg==
+x-ms-office365-filtering-correlation-id: 2cc22a02-9afe-4a61-6adc-08d676e5c513
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(2017052603328)(7153060)(7193020);
+ SRVR:MWHPR11MB2015; 
+x-ms-traffictypediagnostic: MWHPR11MB2015:
+x-microsoft-antispam-prvs: <MWHPR11MB20152686CA7818B1E4C1119287840@MWHPR11MB2015.namprd11.prod.outlook.com>
+x-forefront-prvs: 0913EA1D60
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(396003)(346002)(136003)(366004)(376002)(39860400002)(189003)(199004)(4326008)(25786009)(6486002)(8676002)(6512007)(99286004)(81156014)(81166006)(97736004)(7736002)(53936002)(305945005)(6436002)(8936002)(71200400001)(71190400001)(2906002)(66066001)(39060400002)(316002)(229853002)(7416002)(36756003)(6246003)(5660300001)(6116002)(3846002)(105586002)(486006)(386003)(256004)(53546011)(6506007)(106356001)(14444005)(102836004)(476003)(446003)(2616005)(11346002)(31686004)(14454004)(478600001)(72206003)(6916009)(31696002)(68736007)(76176011)(54906003)(15650500001)(26005)(52116002)(186003)(86362001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:MWHPR11MB2015;
+ H:MWHPR11MB1920.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: va1Jfe6tjFc/rNs4k2ekAuQ1l5B+Tz8Tgz4sG2/IuuLpYditamKwEf4h3X34Sr72QsL7vQvnlAljUyBhqW0B7iJNeAmnTqvru/nifniwQN/HwzGgMxsec9QjXbthhn1kQu/tedv4qClY0nqjRQN7a6KST2+h2iwuTDCxB6LbThTO4kWrHMGmvQmwDW4NY4Bb+GSSrDrpWAB8Wv9HWGn200CCc7VGjN2DeK8NiRm0uwivjmbN3n8RF/4cEeFgdH748TznmNSLGIVcXJD3bKo9Wit2SX9dtVqXQL7p24RXVGTRI9j8SDqSfh6Gudh66XygzcDkToLDoCc25Q9HXKNYoL0H+vx8tpFir0cR+v4A81ZNZkpI1POPTOuZN6OEuEqHGtCTeMPlj6a/JcTz5sVhvd6tbScP8iJrL2oDL7VyNGpBCOuv6zGWf038X1deBZ0J8XjlFgsxptzlNuCUmUPkDA==
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+Content-ID: <96542B4514FC34429CA977BE733673A8@namprd11.prod.outlook.com>
+MIME-Version: 1.0
+X-MS-Exchange-CrossTenant-Network-Message-Id: 2cc22a02-9afe-4a61-6adc-08d676e5c513
+X-MS-Exchange-CrossTenant-originalarrivaltime: 10 Jan 2019 10:24:14.8949 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR11MB2015
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_021848_160789_9F2DCE45 
-X-CRM114-Status: GOOD (  13.98  )
+X-CRM114-CacheID: sfid-20190110_022419_214264_BB403CF5 
+X-CRM114-Status: GOOD (  16.99  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,80 +130,99 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Simon Horman <horms+renesas@verge.net.au>,
- Magnus Damm <magnus.damm@gmail.com>, linux-arm-kernel@lists.infradead.org,
- Biju Das <biju.das@bp.renesas.com>
-MIME-Version: 1.0
+Cc: len.brown@intel.com, alexandre.belloni@bootlin.com,
+ linux-pm@vger.kernel.org, linux-kernel@vger.kernel.org, rjw@rjwysocki.net,
+ lgirdwood@gmail.com, Ludovic.Desroches@microchip.com, broonie@kernel.org,
+ linux@armlinux.org.uk, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
 
-The workaround for the wrong hierarchy of the 3DG-{A,B} power domains on
-RZ/G2E ES1.0 corrected the parent domains. However, the 3DG-{A,B} power
-domains were still initialized and powered in the wrong order, causing
-3DG operation to fail.
 
-Fix this by changing the order in the table at runtime, when running on
-an affected SoC.
+On 09.01.2019 16:14, Pavel Machek wrote:
+> Hi!
+> 
+>> Add support to check if platform's power will be cut off in suspend.
+>> This will help drivers shared by multiple platforms to take only the
+>> necessary actions while suspending/resuming (some platform may not need
+>> to save/restore all the registers if platforms remains powered while
+>> suspended). In this way suspend/resume time could be improved.
+>>
+>> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+>> ---
+>>  include/linux/suspend.h |  6 ++++++
+>>  kernel/power/suspend.c  | 13 +++++++++++++
+>>  2 files changed, 19 insertions(+)
+>>
+>> diff --git a/include/linux/suspend.h b/include/linux/suspend.h
+>> index 3f529ad9a9d2..21f19b167fe2 100644
+>> --- a/include/linux/suspend.h
+>> +++ b/include/linux/suspend.h
+>> @@ -173,6 +173,9 @@ static inline void dpm_save_failed_step(enum suspend_stat_step step)
+>>   *	Called by the PM core if the suspending of devices fails.
+>>   *	This callback is optional and should only be implemented by platforms
+>>   *	which require special recovery actions in that situation.
+>> + *
+>> + * @off_in_suspend: Returns wether the platform's power will be cut off at
+> 
+> wether -- spelling?
 
-This work is based on the work done by Geert for R-Car E3.
+Yep, I did it again :), sorry
 
-Fixes: f37d211c687588328 ("soc: renesas: rcar-sysc: Add r8a774c0 support")
+> 
+>> @@ -185,6 +188,7 @@ struct platform_suspend_ops {
+>>  	bool (*suspend_again)(void);
+>>  	void (*end)(void);
+>>  	void (*recover)(void);
+>> +	bool (*off_in_suspend)(suspend_state_t state);
+>>  };
+> 
+> Dunno, should it be per-regulator? SoCs commonly have more than one
+> power supply, with some of them off during suspend...
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- drivers/soc/renesas/r8a774c0-sysc.c | 23 ++++-------------------
- 1 file changed, 4 insertions(+), 19 deletions(-)
+Every regulator has a suspend state which could be described via device
+tree. In our case, besides other regulators, we have core regulator, which
+is turned off in suspend at the end of the suspend procedure, when PMIC
+detects a level transition on one of its pins, transition which is
+triggered the moment the CPU is shut down (we are doing this from software
+at the end of suspend procedure).
 
-diff --git a/drivers/soc/renesas/r8a774c0-sysc.c b/drivers/soc/renesas/r8a774c0-sysc.c
-index e1ac4c0f6640..11050e17ea81 100644
---- a/drivers/soc/renesas/r8a774c0-sysc.c
-+++ b/drivers/soc/renesas/r8a774c0-sysc.c
-@@ -28,19 +28,6 @@ static struct rcar_sysc_area r8a774c0_areas[] __initdata = {
- 	{ "3dg-b",	0x100, 1, R8A774C0_PD_3DG_B,	R8A774C0_PD_3DG_A },
- };
- 
--static void __init rcar_sysc_fix_parent(struct rcar_sysc_area *areas,
--					unsigned int num_areas, u8 id,
--					int new_parent)
--{
--	unsigned int i;
--
--	for (i = 0; i < num_areas; i++)
--		if (areas[i].isr_bit == id) {
--			areas[i].parent = new_parent;
--			return;
--		}
--}
--
- /* Fixups for RZ/G2E ES1.0 revision */
- static const struct soc_device_attribute r8a774c0[] __initconst = {
- 	{ .soc_id = "r8a774c0", .revision = "ES1.0" },
-@@ -50,12 +37,10 @@ static const struct soc_device_attribute r8a774c0[] __initconst = {
- static int __init r8a774c0_sysc_init(void)
- {
- 	if (soc_device_match(r8a774c0)) {
--		rcar_sysc_fix_parent(r8a774c0_areas,
--				     ARRAY_SIZE(r8a774c0_areas),
--				     R8A774C0_PD_3DG_A, R8A774C0_PD_3DG_B);
--		rcar_sysc_fix_parent(r8a774c0_areas,
--				     ARRAY_SIZE(r8a774c0_areas),
--				     R8A774C0_PD_3DG_B, R8A774C0_PD_ALWAYS_ON);
-+		/* Fix incorrect 3DG hierarchy */
-+		swap(r8a774c0_areas[6], r8a774c0_areas[7]);
-+		r8a774c0_areas[6].parent = R8A774C0_PD_ALWAYS_ON;
-+		r8a774c0_areas[7].parent = R8A774C0_PD_3DG_B;
- 	}
- 
- 	return 0;
--- 
-2.11.0
+One aspect is that we map our proprietary power saving modes to Linux power
+saving modes (suspend-to-ram and standby) at the system initialization. So,
+we could have our backup mode mapped to any of suspend-to-ram or standby so
+that when:
+echo mem > /sys/power/state or
+echo standby > /sys/power/state
+the final power saving mode could be or not this backup mode (depending on
+the mapping - which is done at system initialization based on kernel
+parameters).
 
+And so, depending on the mapped mode (which we currently know only from
+arch/arm/mach-at91/) the real core's regulator could be on or off. We need
+both these information to know if core's regulator would be off in suspend.
+
+I chose to have it here, in platform_suspend_ops thinking that it is more
+related to suspend procedure and that every platform could take use of it
+to do whatever the platform specific things are done in suspend.
+Also, I had in mind that regulator framework doesn't care (as far as I
+know) what every regulator feeds.
+It looked to me more proper to have it per platform since in our case we
+have the mapping b/w Linux power saving modes (suspend-to-ram, standby) and
+SoC specific power saving modes done only in arch/arm/mach-at91/.
+
+I also though that doing so, and having the platform_off_in_suspend()
+wrapper, in drivers we could only include linux/suspend.h and make use of
+this wrapper and in case we would have had it per regulator we should have
+been taken care in drivers or regulator framework which regulator deals
+with feeding the core.
+
+Thank you,
+Claudiu Beznea
+
+> 									Pavel
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
