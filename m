@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 164BCC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 13:54:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5EDECC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 13:55:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D71DC20879
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 13:54:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2DB7F20879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 13:55:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q1zzYtba"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D71DC20879
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hjCEYhgY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2DB7F20879
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,25 +26,25 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=SI/h2gHIzmlDdE3n89kWPdqdEmkYoHJGFghDn0X6AFY=; b=Q1zzYtbaCPpc8iaZL7Ixn7Fjed
-	3dopfKtVXDar35MXmeuv8gfmD14dxSYz0TtF1Ivb08UYdrd6ZdNfMOndY7UZWlVQ8SmJpFdaopgNq
-	5geATjZKaZrL4j54nPjN1pL4H/GXmd0akDg+F8Wx1FDGuUdSHe/iqLvg30F1oyupNq6rXFlQWtIzM
-	cMhnkbpQaE7kIF9oBPRhg8thPUeEod07N1dXQr4ZeUG1e9pvpnoF2AA+fmBK0xGb0V3N0eiySdUJF
-	QpPB4Z4YYOqo/WANJHvms76Z+GRTDo61KdDzaBpI8S5ziY59MWvk+o96Y1ZR3gvCZ9BX/xrXUWjev
-	4DzRVszg==;
+	bh=RF4SaqZDGi0VAAfKL7N5QzJ4cXmD6JyT7Ua6sVuthmo=; b=hjCEYhgYfZ+C8K3ol6aDThqVau
+	NzYVOcCcanG/JqWgNQWuRsJs4fg1Hk4z1UO4aoNVPyLpjtR7CqYw1rrOpcYBCFngnLFWn3dlBE+JP
+	ePMlIEpr/zBr3FGeQs1PCAP6PrcWBXmQ0p6R6DzUbNpCUD3ExDdNHW+8Ov4ONYJXfmZK8P1MuDw6u
+	ZLKYC22JD8zW2D+NzsuW3NLCTryJHEhHxGNygqwPCwBgTZ+CuElH1uSLj3OEz/YajZG2JxqhuxXDp
+	JtJC1z906vpxFGjJtZHlYzfES9DyJhHuv56c/zvcQGp5FDseXsqJxUVjec7XEV4kevADaDUAKzoc6
+	0NgLK3XA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghanD-0005wb-QP; Thu, 10 Jan 2019 13:54:43 +0000
+	id 1ghanV-0006Bj-7k; Thu, 10 Jan 2019 13:55:01 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghamR-0005Dx-Fi
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 13:54:04 +0000
+ id 1ghamW-0005IZ-7f
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 13:54:15 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 07B4A1596;
- Thu, 10 Jan 2019 05:53:55 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B299015BE;
+ Thu, 10 Jan 2019 05:53:59 -0800 (PST)
 Received: from e119886-lin.cambridge.arm.com (unknown [10.37.6.11])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 985043F5AF;
- Thu, 10 Jan 2019 05:53:50 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 54A7D3F5AF;
+ Thu, 10 Jan 2019 05:53:55 -0800 (PST)
 From: Andrew Murray <andrew.murray@arm.com>
 To: Peter Zijlstra <peterz@infradead.org>, Ingo Molnar <mingo@redhat.com>,
  Arnaldo Carvalho de Melo <acme@kernel.org>,
@@ -58,16 +58,16 @@ To: Peter Zijlstra <peterz@infradead.org>, Ingo Molnar <mingo@redhat.com>,
  Borislav Petkov <bp@alien8.de>, Russell King <linux@armlinux.org.uk>,
  suzuki.poulose@arm.com, robin.murphy@arm.com,
  Michael Ellerman <mpe@ellerman.id.au>
-Subject: [PATCH v5 02/12] perf/core: add function to test for event exclusion
- flags
-Date: Thu, 10 Jan 2019 13:53:24 +0000
-Message-Id: <1547128414-50693-3-git-send-email-andrew.murray@arm.com>
+Subject: [PATCH v5 03/12] perf/core: add PERF_PMU_CAP_NO_EXCLUDE for exclusion
+ incapable PMUs
+Date: Thu, 10 Jan 2019 13:53:25 +0000
+Message-Id: <1547128414-50693-4-git-send-email-andrew.murray@arm.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1547128414-50693-1-git-send-email-andrew.murray@arm.com>
 References: <1547128414-50693-1-git-send-email-andrew.murray@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_055356_350304_7547E50C 
-X-CRM114-Status: GOOD (  11.66  )
+X-CRM114-CacheID: sfid-20190110_055401_382387_ECE9043A 
+X-CRM114-Status: GOOD (  15.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,34 +87,55 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add a function that tests if any of the perf event exclusion flags
-are set on a given event.
+Many PMU drivers do not have the capability to exclude counting events
+that occur in specific contexts such as idle, kernel, guest, etc. These
+drivers indicate this by returning an error in their event_init upon
+testing the events attribute flags. This approach is error prone and
+often inconsistent.
+
+Let's instead allow PMU drivers to advertise their inability to exclude
+based on context via a new capability: PERF_PMU_CAP_NO_EXCLUDE. This
+allows the perf core to reject requests for exclusion events where
+there is no support in the PMU.
 
 Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 ---
- include/linux/perf_event.h | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ include/linux/perf_event.h | 1 +
+ kernel/events/core.c       | 9 +++++++++
+ 2 files changed, 10 insertions(+)
 
 diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-index 1d5c551..54a78d2 100644
+index 54a78d2..cec02dc 100644
 --- a/include/linux/perf_event.h
 +++ b/include/linux/perf_event.h
-@@ -1004,6 +1004,15 @@ perf_event__output_id_sample(struct perf_event *event,
- extern void
- perf_log_lost_samples(struct perf_event *event, u64 lost);
+@@ -244,6 +244,7 @@ struct perf_event;
+ #define PERF_PMU_CAP_EXCLUSIVE			0x10
+ #define PERF_PMU_CAP_ITRACE			0x20
+ #define PERF_PMU_CAP_HETEROGENEOUS_CPUS		0x40
++#define PERF_PMU_CAP_NO_EXCLUDE			0x80
  
-+static inline bool event_has_any_exclude_flag(struct perf_event *event)
-+{
-+	struct perf_event_attr *attr = &event->attr;
+ /**
+  * struct pmu - generic performance monitoring unit
+diff --git a/kernel/events/core.c b/kernel/events/core.c
+index 3cd13a3..fbe59b7 100644
+--- a/kernel/events/core.c
++++ b/kernel/events/core.c
+@@ -9772,6 +9772,15 @@ static int perf_try_init_event(struct pmu *pmu, struct perf_event *event)
+ 	if (ctx)
+ 		perf_event_ctx_unlock(event->group_leader, ctx);
+ 
++	if (!ret) {
++		if (pmu->capabilities & PERF_PMU_CAP_NO_EXCLUDE &&
++				event_has_any_exclude_flag(event)) {
++			if (event->destroy)
++				event->destroy(event);
++			ret = -EINVAL;
++		}
++	}
 +
-+	return attr->exclude_idle || attr->exclude_user ||
-+	       attr->exclude_kernel || attr->exclude_hv ||
-+	       attr->exclude_guest || attr->exclude_host;
-+}
-+
- static inline bool is_sampling_event(struct perf_event *event)
- {
- 	return event->attr.sample_period != 0;
+ 	if (ret)
+ 		module_put(pmu->module);
+ 
 -- 
 2.7.4
 
