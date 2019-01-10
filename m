@@ -2,80 +2,117 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 93C03C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 09:55:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 17AA7C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 09:58:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 65FC0214C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 09:55:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DC7F6206B6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 09:58:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hOHbY8VA";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ffwll.ch header.i=@ffwll.ch header.b="ivE1mPtx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 65FC0214C6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ffwll.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AUb6xYKF";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="UruqTDwt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DC7F6206B6
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:References:In-reply-to:Date:Message-id:
+	From:To:Subject:MIME-version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=qF2/z1HuOjpwKYaWymVFrVrMMzAV1HR4KTPxKOm4n2M=; b=hOHbY8VAbim0cw
-	TmKPnIldW5uB0giefSUcAOsQpCuSQyOEOphCGRxj0GFJo8aa2AObkILcver7joNffthp2xMGSVxvI
-	6hSeZf8lIw2wb9fp8DqwRRmvFf66cUdGF4pBUE0P1osCqw9Sbtffw95EeZwHuOLjwxVFWbhiovhQ7
-	AcWCJXQULuXSb8qhhwPSsW58IboNBkPa7h5N2rm5MIfl7/kK3wtF1IIF7wiRqrF2dZNjWj3a4Rc7Y
-	F9YPwLVQdTP8qJmijQhOR5NWAUrrJ0rjBXjJNLJxaEGlY3hv9Doe/U62SxeZE0+yEivTbRa0ImWUX
-	F8aIXFB10dcyLV/Ys92Q==;
+	List-Owner; bh=zRC83R8IdFKlZPydGhvfLNqupLyB6bF2xRzBoMEf/XY=; b=AUb6xYKF8Dvh3L
+	z0vKuhdkC+1lo74sQvaM9zBa8JqY8QMYTdnB9gFFd+1kAPXGdq+W4qFQzjDtfTY8h10ZHP7oP0L2p
+	D0CIVc3rcruDlLKewcEhi84Wv3t0Ojx56pq8daKySJYQabYDNT4ShK0ErZjrnmkOYNdcLWUKh99Zh
+	+A9DslXhOLh8dB/Tut53qJSUYRMHPFkFHrNoIwnBbDqDLAEHbs9kVtctxIYJmPEae5fvhBpeXFfKi
+	5rAlfSsaQaK4lO6ILta57tLRQc1MX/BYqeBoSXXO7zNXOJZ1HttRxtZSQ7w9T5fk9o4cY3F6HSsak
+	/mJqBwI+g/eZ9MNDvZdQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghX3y-0008CZ-Li; Thu, 10 Jan 2019 09:55:46 +0000
-Received: from mail-io1-xd42.google.com ([2607:f8b0:4864:20::d42])
+	id 1ghX6f-00005p-IR; Thu, 10 Jan 2019 09:58:33 +0000
+Received: from mailout1.samsung.com ([203.254.224.24])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghX3u-0008C8-Pg
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 09:55:44 +0000
-Received: by mail-io1-xd42.google.com with SMTP id x6so8452830ioa.9
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 10 Jan 2019 01:55:41 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ffwll.ch; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=d2aE9rUoCuzj1I0CfVrc2Ws0vGnkeasUchy5nLMoznY=;
- b=ivE1mPtxpXESgzxjoRs1BmJlU+AcJB7XcVVPF/E2Bctzu+YPAW+4D7fIop6Y27AC+l
- SVueMJjNdRYX25SBW02zrkCwtjSsx03X5ds8yMnj49YnEmCZUHEmUYuuonIFW+aIVS/s
- 6L5UGAjKJmtH/61wRj17FNP3/igMy0E2IpOwM=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=d2aE9rUoCuzj1I0CfVrc2Ws0vGnkeasUchy5nLMoznY=;
- b=ZuPN/c2NwHqAZPjJb+Og80HfpWCv7I/taNU+YIAJYOG9OGj1ZkZoMLFgQgOfvtffgw
- 0RvsIo6mfA9DmdBcNyYBg/mOWziAI1CplZl/+L+LVhAxXw9fgnUY19YkwbTtO1UBgAFo
- gbLXu7HMqf2r0fOHc7UpjrG2hLz8z/4EmLUHz2+yZvt0TALRZF5esbkYBbHC4CHoAHB2
- snCs9Tzlct3BEAYCsbXVUXVpxMkEALedoBhXNmmodjF6manlkiTum48LeOlR13IMMrvZ
- 0PCpwKgTno3NcPuwY3L9yv6qPReU5KBCvmLha8syV+Kpu4WvvfKrGQ+ysh0SxRa6hyTv
- PviA==
-X-Gm-Message-State: AJcUukd3K28tyDXiAHiZu4uYEFZmC0CSSA9zOinFofylHL95YuXe2Aw2
- Tkah5WNfUHP98IAEyjfuK503Q5Tpv9VNRt4HRxSb0w==
-X-Google-Smtp-Source: ALg8bN7Q1uxgEHDLHsUUFxHzE3eOaxGsxQazmJYoyxdFttlBG9PMl8P2X73XlFN/OLvPafZO9A1rj3BHTsdgpGRiWZk=
-X-Received: by 2002:a6b:4001:: with SMTP id k1mr6680165ioa.34.1547114141171;
- Thu, 10 Jan 2019 01:55:41 -0800 (PST)
-MIME-Version: 1.0
-References: <20181228154044.10945-1-linus.walleij@linaro.org>
- <CAKMK7uFBRnzmvJH6k2Qb9CnPLRiHD3o1ViZNTRbAedJVg11VXg@mail.gmail.com>
- <CACRpkdb=2NGtC_4L26C2du14uy=nR6VZN54Mb63CbrbJrU7pcA@mail.gmail.com>
-In-Reply-To: <CACRpkdb=2NGtC_4L26C2du14uy=nR6VZN54Mb63CbrbJrU7pcA@mail.gmail.com>
-From: Daniel Vetter <daniel@ffwll.ch>
-Date: Thu, 10 Jan 2019 10:55:30 +0100
-Message-ID: <CAKMK7uGWH3mZ0NV7kNn3Nq_zJvE_E40nqcvH=Mf+mBLa4vQ=9Q@mail.gmail.com>
-Subject: Re: [PATCH v2] drm/fb-helper: Scale back depth to supported maximum
-To: Linus Walleij <linus.walleij@linaro.org>
+ id 1ghX6b-00005L-VX
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 09:58:32 +0000
+Received: from epcas2p4.samsung.com (unknown [182.195.41.56])
+ by mailout1.samsung.com (KnoxPortal) with ESMTP id
+ 20190110095825epoutp01176f68009949863b5e17fb3f0d17ddac~4dEOZlFD83218732187epoutp01T;
+ Thu, 10 Jan 2019 09:58:25 +0000 (GMT)
+DKIM-Filter: OpenDKIM Filter v2.11.0 mailout1.samsung.com
+ 20190110095825epoutp01176f68009949863b5e17fb3f0d17ddac~4dEOZlFD83218732187epoutp01T
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
+ s=mail20170921; t=1547114305;
+ bh=x5QnG5QWV4ikDkyVvItuyikbiv+1Rm7pJ0zkHbIZ7WU=;
+ h=Subject:To:Cc:From:Date:In-reply-to:References:From;
+ b=UruqTDwtQxThsCLBdx0WbAxZyQ8XYQC01dosn8dVKi2UhDrYORs5M6eQrOw/09izL
+ kyEG8T1SuykcSDZvABRWSyFP5nO5S7hLhVNtOrV41dKK1edSBlKHFcGgjn1Zb9Bg3r
+ diCAuLvmN/rUQrtF3ckjjTD99t20rC/rytn1Gqus=
+Received: from epsmges2p4.samsung.com (unknown [182.195.42.72]) by
+ epcas2p4.samsung.com (KnoxPortal) with ESMTP id
+ 20190110095824epcas2p4668cebecc31b71483dad197f278445ad~4dENT7adq0371003710epcas2p4R;
+ Thu, 10 Jan 2019 09:58:24 +0000 (GMT)
+Received: from epcas2p3.samsung.com ( [182.195.41.55]) by
+ epsmges2p4.samsung.com (Symantec Messaging Gateway) with SMTP id
+ FD.A2.04055.047173C5; Thu, 10 Jan 2019 18:58:24 +0900 (KST)
+Received: from epsmgms2p2new.samsung.com (unknown [182.195.42.143]) by
+ epcas2p1.samsung.com (KnoxPortal) with ESMTP id
+ 20190110095823epcas2p1936a8d201409b837f9cbd12497fb0e25~4dEMX922X2503425034epcas2p1a;
+ Thu, 10 Jan 2019 09:58:23 +0000 (GMT)
+X-AuditID: b6c32a48-3c1ff70000000fd7-90-5c3717405503
+Received: from epmmp2 ( [203.254.227.17]) by epsmgms2p2new.samsung.com
+ (Symantec Messaging Gateway) with SMTP id 09.36.03627.F37173C5; Thu, 10 Jan
+ 2019 18:58:23 +0900 (KST)
+MIME-version: 1.0
+Received: from [106.116.147.40] by mmp2.samsung.com (Oracle Communications
+ Messaging Server 7.0.5.31.0 64bit (built May  5 2014)) with ESMTPA id
+ <0PL40086D118YF10@mmp2.samsung.com>; Thu, 10 Jan 2019 18:58:23 +0900 (KST)
+Subject: Re: [PATCH] media: s5p-jpeg: Correct step and max values for
+ V4L2_CID_JPEG_RESTART_INTERVAL
+To: =?UTF-8?Q?Pawe=c5=82_Chmiel?= <pawel.mikolaj.chmiel@gmail.com>
+From: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Message-id: <146706fc-007a-c4f9-7ecf-b1bd893bb79d@samsung.com>
+Date: Thu, 10 Jan 2019 10:58:19 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
+In-reply-to: <20190109180041.31052-1-pawel.mikolaj.chmiel@gmail.com>
+Content-language: en-GB
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFvrLIsWRmVeSWpSXmKPExsWy7bCmua6DuHmMwayvkha3t25gsdj0+Bqr
+ xeVdc9gsejZsZbWYcX4fk8WyTX+YLH4c72N2YPfYOesuu8emVZ1sHpuX1Ht83iQXwBLFZZOS
+ mpNZllqkb5fAlXHhomDBKZaKVZvnszYwvmXuYuTkkBAwkbjcO5+1i5GLQ0hgB6PEz6aNTBDO
+ d0aJNXM3sHQxcoBV7Z+QCdIgJLCBUeJRoziIzSsgKPFj8j0WEJtZQFPixZdJLBA19xklnlxV
+ AbGFBdIkLt2dAbZMRMBJonfrK2aQ+cwCu4Bqvv0Da2ATMJToPdrHCDHUTuLp3u9MIHtZBFQl
+ PnyrAgmLCkRIdNxfzQYS5hRwkbjzthxirbjEsfs3GSFseYmDV56zQPx1hk1i3iFrCNtForfn
+ BBOELSzx6vgWdghbWuLZqo2MEHa1xK7t3WCnSQh0MEq0XNgODSBricPHL7JCLOCT6Dj8lx0S
+ JLwSHW1CECUeEluXLmSHBNt0RomlV0+xTGCUnYUURLOQgmgWkrtnIbl7ASPLKkax1ILi3PTU
+ YqMCE73ixNzi0rx0veT83E2M4ESh5bGD8cA5n0OMAhyMSjy8CsvNYoRYE8uKK3MPMUpwMCuJ
+ 8N4BCfGmJFZWpRblxxeV5qQWH2KU5mBREud9KD03WkggPbEkNTs1tSC1CCbLxMEp1cBooefB
+ zlJTs3BH1667wW/zmucEyakc1nSrNb1X0Dn9pFJ1/RcHRl6+fHVD85yq0gPPTyxuXnTLQjvf
+ WE/ywsuA6/bO/6ae6H4QNI//ZcmlcteuKWvLZtg0Vu7msQ/bt/RH6tyWybE5u6e9MU7c8/Wg
+ Yl360bD7Qsu6M60zv/Lfi7/JohifE6bEUpyRaKjFXFScCADxK3mjEAMAAA==
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFnrILMWRmVeSWpSXmKPExsVy+t9jQV17cfMYg0e9sha3t25gsdj0+Bqr
+ xeVdc9gsejZsZbWYcX4fk8WyTX+YLH4c72N2YPfYOesuu8emVZ1sHpuX1Ht83iQXwBLFZZOS
+ mpNZllqkb5fAlXHhomDBKZaKVZvnszYwvmXuYuTgkBAwkdg/IbOLkYtDSGAdo8Sb6ZdYuxg5
+ OXgFBCV+TL7HAlLDLKAuMWVKLkTNQ0aJGfcns4HUCAukSVy6O4MZxBYRcJLo3fqKGaSIWWAX
+ o8TlM5/BEkICzhKb521jArHZBAwleo/2MUIssJN4uvc7E8gCFgFViQ/fqkDCogIREmdfrmME
+ CXMKuEjceVsOEmYWEJc4dv8mI4QtL3HwynOWCYwCs5BcOgvh0llIOmYh6VjAyLKKUTK1oDg3
+ PbfYqMAoL7Vcrzgxt7g0L10vOT93EyMw4Lcd1urfwfh4SfwhRgEORiUe3oR/pjFCrIllxZW5
+ hxglOJiVRHjvLDeLEeJNSaysSi3Kjy8qzUktPsQozcGiJM7Ln38sUkggPbEkNTs1tSC1CCbL
+ xMEp1cA437vmM4dswOepDKbz+xM29XXuPNn1SrVK6eYEyb5He9P1/prM3vC/+42F+sxVql2O
+ 7TMMnXwcVDNDpec93v1tBZ+5j+Q3S01eiyN7Vl1q73+W8vrA+0vsqed23yoqvdv6R1/6qKWj
+ 8i/bcw8s3QQ/BjqscDY3qnQVv9gYvnaixeGpcWJpptxKLMUZiYZazEXFiQCT4vQudAIAAA==
+X-CMS-MailID: 20190110095823epcas2p1936a8d201409b837f9cbd12497fb0e25
+X-Msg-Generator: CA
+CMS-TYPE: 102P
+X-CMS-RootMailID: 20190110095823epcas2p1936a8d201409b837f9cbd12497fb0e25
+References: <20190109180041.31052-1-pawel.mikolaj.chmiel@gmail.com>
+ <CGME20190110095823epcas2p1936a8d201409b837f9cbd12497fb0e25@epcas2p1.samsung.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_015542_912937_08C8172A 
-X-CRM114-Status: GOOD (  16.39  )
+X-CRM114-CacheID: sfid-20190110_015830_346252_C8CB9DD7 
+X-CRM114-Status: GOOD (  14.61  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,70 +124,25 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jani Nikula <jani.nikula@linux.intel.com>, Eric Anholt <eric@anholt.net>,
- Sean Paul <seanpaul@chromium.org>, dri-devel <dri-devel@lists.freedesktop.org>,
- Daniel Vetter <daniel.vetter@intel.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-samsung-soc@vger.kernel.org, linux-kernel@vger.kernel.org,
+ jacek.anaszewski@gmail.com, mchehab@kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 10, 2019 at 10:19 AM Linus Walleij <linus.walleij@linaro.org> wrote:
->
-> On Fri, Dec 28, 2018 at 5:05 PM Daniel Vetter <daniel@ffwll.ch> wrote:
-> > On Fri, Dec 28, 2018 at 4:40 PM Linus Walleij <linus.walleij@linaro.org> wrote:
->
-> > > - Skip over YUV formats. The framebuffer emulation cannot
-> > >   handle these formats.
-> (...)
-> > > +                       /* Do not consider YUV formats for framebuffers */
-> > > +                       if (fmt->is_yuv)
-> >
-> > I think better to skip all funny formats with fmt->depth == 0. With that:
-> >
-> > Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
->
-> I can easily make that change but this comment in the drm_fourcc.h
-> header makes me insecure:
->
-> /**
->  * @depth:
->  *
->  * Color depth (number of bits per pixel excluding padding bits),
->  * valid for a subset of RGB formats only. This is a legacy field, do
->  * not use in new code and set to 0 for new formats.
->  */
-> u8 depth;
->
-> This would mean that we make the framebuffer only support
-> "legacy formats". It might be that "legacy formats" include
-> all reasonable ones such as any RGB/BGA variants.
-
-Yeah it's not a perfect fit either, but there's a lot non-yuv format
-that are very special, and checking for ->depth excludes them. And yes
-all the usual rgb/bga formats have bpp/depth descriptions. That's also
-all that the fbdev format stuff can describe. Long term we maybe want
-to switch over to directly using the format fourcc (and -EINVAL the
-ones we don't understand), because atm we're shrugging the bgr vs rgb
-difference under the rug.
-
-Cheers, Daniel
-
-> I will make the change and put in some comments about this
-> so it's clear.
->
-> Yours,
-> Linus Walleij
-
-
-
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gMS85LzE5IDE5OjAwLCBQYXdlxYIgQ2htaWVsIHdyb3RlOgo+IFRoaXMgY29tbWl0IGNvcnJl
+Y3RzIG1heCBhbmQgc3RlcCB2YWx1ZXMgZm9yIHY0bDIgY29udHJvbCBmb3IKPiBWNEwyX0NJRF9K
+UEVHX1JFU1RBUlRfSU5URVJWQUwuIE1heCBzaG91bGQgYmUgMHhmZmZmIGFuZCBzdGVwIHNob3Vs
+ZCBiZSAxLgo+IEl0IHdhcyBmb3VuZCBieSB1c2luZyB2NGwyLWNvbXBsaWFuY2UgdG9vbCBhbmQg
+Y2hlY2tpbmcgcmVzdWx0IG9mCj4gVklESU9DX1FVRVJZX0VYVF9DVFJML1FVRVJZTUVOVSB0ZXN0
+Lgo+IFByZXZpb3VzbHkgaXQgd2FzIGNvbXBsYWluaW5nIHRoYXQgc3RlcCB3YXMgYmlnZ2VyIHRo
+YW4gZGlmZmVyZW5jZQo+IGJldHdlZW4gbWF4IGFuZCBtaW4uCj4gCj4gRml4ZXM6IDE1ZjRiYzNi
+MWY0MiAoIlttZWRpYV0gczVwLWpwZWc6IEFkZCBKUEVHIGNvbnRyb2xzIHN1cHBvcnQiKQo+IFNp
+Z25lZC1vZmYtYnk6IFBhd2XFgiBDaG1pZWwgPHBhd2VsLm1pa29sYWouY2htaWVsQGdtYWlsLmNv
+bT4KClJldmlld2VkLWJ5OiBTeWx3ZXN0ZXIgTmF3cm9ja2kgPHMubmF3cm9ja2lAc2Ftc3VuZy5j
+b20+CgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51
+eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVh
+ZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1h
+cm0ta2VybmVsCg==
