@@ -2,64 +2,85 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A69F8C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 19:41:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9969FC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 19:43:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6D49E208E3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 19:41:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6A25E20879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 19:43:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="k/na6MLZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6D49E208E3
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PmkMfXnQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6A25E20879
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:References:To:From:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tmMz5nnwfRkDdwzg9uELcWw8ZcVu49SpdbTuxY3WSXM=; b=k/na6MLZ09rjdR
-	0IwxpqqPImAA09rImCXbRLU5j4OGRf6RH/9NhILTGCEcliecPX13MG167lkgVfBvj5Kd1mNkf424L
-	Ggd8U7Spw2XJl91hD6nSF3ctgrGax7uV6i5WI8mhEs4ee05LhlTxKCn5Jik4ts+S1Pl4J3wduAbvN
-	kzsG2eadvgwXR+1Y1L3lUd6TSCCBOaXNZfEJAf8TBMXgGjJH6X0YGU/A2nRzx3qhvLOXI8mKvCP7q
-	KzcJbwFCQbiRGbQ9Vp/m2/4Vg8U/GVkmomyqvQvNVH1DAystz5w2PlIFJdxhekuKGJgjlJN6e2ihK
-	lyLoYjCxTLhLy+QnQDVw==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=KaGZTMjsx75rCVE2IlQAAfqxUjQ3T4fZSi+WRyONYNM=; b=PmkMfXnQNN2DoV
+	JWtpGP3BIaE3p13ZV4dJCmX19YUBMj9LSVYKH/y/WH2z6qzkanLF6N07n/UH44cr0vC9RoHWyFUI1
+	VE3KIT/7ZaKxxwkxTg1ySf1BoutaUJfk8TV2g94TWjXvRXhgv/RzLDvifmvcz45jVrlWM/WUj95Uj
+	k25CothabTB8ZvV1GJiyYn4280DIUhvCd4elhnC7MxZ5GG6HhS5nEX+mj3M2QK3n6D7VpPfq6p4YW
+	QxwSE8eeipAPZ2QB1MacNtXJFjDafxkuXLZWs8+7dWfWgHz42h72rsNHqC7iLbRXoXBhdntMiXtPi
+	va1uOyR5e/AARnzS3Uzg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghgCh-0000Bj-Nc; Thu, 10 Jan 2019 19:41:23 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghgCc-0000B4-Nw
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 19:41:21 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 732E71596;
- Thu, 10 Jan 2019 11:41:18 -0800 (PST)
-Received: from [10.1.197.21] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 3E3E93F6CF; Thu, 10 Jan 2019 11:41:17 -0800 (PST)
-Subject: Re: [PATCH v2] arm64: add ptrace regsets for ptrauth key management
-From: Kristina Martsenko <kristina.martsenko@arm.com>
-To: Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, Dave P Martin <dave.martin@arm.com>
-References: <20190110193508.31888-1-kristina.martsenko@arm.com>
-Message-ID: <d2bcfb3a-3668-693c-2fd4-3814b473375c@arm.com>
-Date: Thu, 10 Jan 2019 19:41:15 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1ghgEY-0000X6-Qr; Thu, 10 Jan 2019 19:43:18 +0000
+Received: from mail-ot1-f65.google.com ([209.85.210.65])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghgEU-0000We-T8
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 19:43:16 +0000
+Received: by mail-ot1-f65.google.com with SMTP id n8so11022081otl.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 10 Jan 2019 11:43:14 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=sPgfEhYHHNB7vBHfMgCSXcBGQ+fLWI4pdLUmG15pdOo=;
+ b=Nk0BM/OfeSIN29DUphpIh7orpgwrq8i6cCyJoGhPyN5k/kkwbb3AFimJBOoL4KPmKm
+ PkO3BeLE1Gb8FtnlbCg/bygNXxGPDdiJfupfCQeUFDXeeBvjf3ShHbkW5K5sUKhoG1l1
+ USyvMkjBXWxJMayZZlcINDSNBQs9fURrXFvn9LweRzVFqT48PuOeSlGlzul6p74onsOp
+ 6A1g3URDkXNGDsEbGiUovtPuYf1PrrZsXcdP4W7oVZPWDAWP8DfN7C3sh8cYro370MYY
+ 5mRTWd0sBUSSxwE9iXk8O+WVBJ+bM+XE0pUf4RF4/G5d5kCNPMN1xdcQXjvObKOVJThS
+ 04ig==
+X-Gm-Message-State: AJcUukdJoO8YCalceewH40Ok062W4+6KxGD8IdqSbMqMYTJk1ilyTlAN
+ MlkT3Yiz6GNTNbsfbtDFuNUMc9Ux
+X-Google-Smtp-Source: ALg8bN5V16k2VNA2gpaq4xnBQrP/nT+E0VFCT7r74ybes7y8emiIid14wssT+iT8xTsWBoKT4dNuWA==
+X-Received: by 2002:a9d:6552:: with SMTP id q18mr7851263otl.128.1547149393601; 
+ Thu, 10 Jan 2019 11:43:13 -0800 (PST)
+Received: from mail-ot1-f43.google.com (mail-ot1-f43.google.com.
+ [209.85.210.43])
+ by smtp.gmail.com with ESMTPSA id d66sm36152096oia.29.2019.01.10.11.43.12
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 10 Jan 2019 11:43:13 -0800 (PST)
+Received: by mail-ot1-f43.google.com with SMTP id t5so11039709otk.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 10 Jan 2019 11:43:12 -0800 (PST)
+X-Received: by 2002:a9d:2387:: with SMTP id t7mr7303236otb.68.1547149392367;
+ Thu, 10 Jan 2019 11:43:12 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20190110193508.31888-1-kristina.martsenko@arm.com>
-Content-Language: en-US
+References: <1544170963-8386-1-git-send-email-hofrat@osadl.org>
+ <98aba52405a63829ee79c775c8b749f8431f5d2a.camel@buserror.net>
+ <20181222075944.GA26155@osadl.at>
+In-Reply-To: <20181222075944.GA26155@osadl.at>
+From: Li Yang <leoyang.li@nxp.com>
+Date: Thu, 10 Jan 2019 13:43:01 -0600
+X-Gmail-Original-Message-ID: <CADRPPNTeLH1ChyYgP3fwqkHLTYCcV48tY1W+91nufFJu+yFKrA@mail.gmail.com>
+Message-ID: <CADRPPNTeLH1ChyYgP3fwqkHLTYCcV48tY1W+91nufFJu+yFKrA@mail.gmail.com>
+Subject: Re: [PATCH] soc: fsl: guts: us devm_kstrdup_const() for RO data
+To: Nicholas Mc Guire <der.herr@hofr.at>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_114118_791532_43ABA920 
-X-CRM114-Status: GOOD (  31.67  )
+X-CRM114-CacheID: sfid-20190110_114314_940175_729D6F32 
+X-CRM114-Status: GOOD (  15.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,396 +92,41 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Amit Kachhap <amit.kachhap@arm.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: Scott Wood <oss@buserror.net>, linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
+ lkml <linux-kernel@vger.kernel.org>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>, Nicholas Mc Guire <hofrat@osadl.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 10/01/2019 19:35, Kristina Martsenko wrote:
-> Add two new ptrace regsets, which can be used to request and change the
-> pointer authentication keys of a thread. NT_ARM_PACA_KEYS gives access
-> to the instruction/data address keys, and NT_ARM_PACG_KEYS to the
-> generic authentication key. The keys are also part of the core dump file
-> of the process.
-> 
-> The regsets are only exposed if the kernel is compiled with
-> CONFIG_CHECKPOINT_RESTORE=y, as the intended use case is checkpointing
-> and restoring processes that are using pointer authentication. Normally
-> applications or debuggers should not need to know the keys (and exposing
-> the keys is a security risk), so the regsets are not exposed by default.
-> 
-> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
-> ---
-> 
-> The previous version of this patch was:
->   https://lore.kernel.org/lkml/20181207183931.4285-12-kristina.martsenko@arm.com/
-> 
-> Changes in v2:
->  - Convert each field individually between ptrauth_keys and
->    user_pac_address_keys/user_pac_generic_keys
+On Sat, Dec 22, 2018 at 2:02 AM Nicholas Mc Guire <der.herr@hofr.at> wrote:
+>
+> On Fri, Dec 21, 2018 at 08:29:56PM -0600, Scott Wood wrote:
+> > On Fri, 2018-12-07 at 09:22 +0100, Nicholas Mc Guire wrote:
+> > > devm_kstrdup() may return NULL if internal allocation failed, but
+> > > as  machine  is from the device tree, and thus RO, devm_kstrdup_const()
+> > > can be used here, which will only copy the reference.
+> >
+> > Is it really going to only copy the reference?  That would require that
+> > is_kernel_rodata(machine) be true, which it shouldn't be since it's not part
+> > of the kernel image.
+> >
+> I had tried to figure out what is RO and what not but was not
+> able to determine that - from the discussion it seemed that the
+> assumption of RO is correct though I did not ask if it would
+> satisfy is_kernel_rodata() so that explains the incorrect assertion.
+> see https://lkml.org/lkml/2018/12/6/42
+> So then the only option is to check the return and cleanup
+> on allocation failure as the orriginal patch proposed.
 
-For comparison, this is what the patch might look like if we instead
-used struct user_pac_address_keys/user_pac_generic_keys in both ptrace
-and the kernel:
+Thanks for the good discussion. I will drop the previous patch. But
+would it also be good to just have "soc_dev_attr.machine = machine"
+directly?
 
--- >8 --
-Subject: [PATCH] arm64: add ptrace regsets for ptrauth key management
-
-Add two new ptrace regsets, which can be used to request and change the
-pointer authentication keys of a thread. NT_ARM_PACA_KEYS gives access
-to the instruction/data address keys, and NT_ARM_PACG_KEYS to the
-generic authentication key. The keys are also part of the core dump file
-of the process.
-
-The regsets are only exposed if the kernel is compiled with
-CONFIG_CHECKPOINT_RESTORE=y, as the intended use case is checkpointing
-and restoring processes that are using pointer authentication. Normally
-applications or debuggers should not need to know the keys (and exposing
-the keys is a security risk), so the regsets are not exposed by default.
-
-Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
----
- Documentation/arm64/pointer-authentication.txt |  5 ++
- arch/arm64/include/asm/pointer_auth.h          | 47 ++++++----------
- arch/arm64/include/asm/processor.h             |  9 ++-
- arch/arm64/include/uapi/asm/ptrace.h           | 18 ++++++
- arch/arm64/kernel/pointer_auth.c               | 19 +++++--
- arch/arm64/kernel/ptrace.c                     | 76 ++++++++++++++++++++++++++
- include/uapi/linux/elf.h                       |  2 +
- 7 files changed, 136 insertions(+), 40 deletions(-)
-
-diff --git a/Documentation/arm64/pointer-authentication.txt b/Documentation/arm64/pointer-authentication.txt
-index a25cd21290e9..5baca42ba146 100644
---- a/Documentation/arm64/pointer-authentication.txt
-+++ b/Documentation/arm64/pointer-authentication.txt
-@@ -78,6 +78,11 @@ bits can vary between the two. Note that the masks apply to TTBR0
- addresses, and are not valid to apply to TTBR1 addresses (e.g. kernel
- pointers).
- 
-+Additionally, when CONFIG_CHECKPOINT_RESTORE is also set, the kernel
-+will expose the NT_ARM_PACA_KEYS and NT_ARM_PACG_KEYS regsets (struct
-+user_pac_address_keys and struct user_pac_generic_keys). These can be
-+used to get and set the keys for a thread.
-+
- 
- Virtualization
- --------------
-diff --git a/arch/arm64/include/asm/pointer_auth.h b/arch/arm64/include/asm/pointer_auth.h
-index 15d49515efdd..2fde45d0e24f 100644
---- a/arch/arm64/include/asm/pointer_auth.h
-+++ b/arch/arm64/include/asm/pointer_auth.h
-@@ -7,60 +7,45 @@
- 
- #include <asm/cpufeature.h>
- #include <asm/memory.h>
-+#include <asm/ptrace.h>
- #include <asm/sysreg.h>
- 
- #ifdef CONFIG_ARM64_PTR_AUTH
- /*
-- * Each key is a 128-bit quantity which is split across a pair of 64-bit
-- * registers (Lo and Hi).
-- */
--struct ptrauth_key {
--	unsigned long lo, hi;
--};
--
--/*
-  * We give each process its own keys, which are shared by all threads. The keys
-  * are inherited upon fork(), and reinitialised upon exec*().
-  */
- struct ptrauth_keys {
--	struct ptrauth_key apia;
--	struct ptrauth_key apib;
--	struct ptrauth_key apda;
--	struct ptrauth_key apdb;
--	struct ptrauth_key apga;
-+	struct user_pac_address_keys addr_keys;
-+	struct user_pac_generic_keys gen_keys;
- };
- 
- static inline void ptrauth_keys_init(struct ptrauth_keys *keys)
- {
--	if (system_supports_address_auth()) {
--		get_random_bytes(&keys->apia, sizeof(keys->apia));
--		get_random_bytes(&keys->apib, sizeof(keys->apib));
--		get_random_bytes(&keys->apda, sizeof(keys->apda));
--		get_random_bytes(&keys->apdb, sizeof(keys->apdb));
--	}
-+	if (system_supports_address_auth())
-+		get_random_bytes(&keys->addr_keys, sizeof(keys->addr_keys));
- 
- 	if (system_supports_generic_auth())
--		get_random_bytes(&keys->apga, sizeof(keys->apga));
-+		get_random_bytes(&keys->gen_keys, sizeof(keys->gen_keys));
- }
- 
- #define __ptrauth_key_install(k, v)				\
- do {								\
--	struct ptrauth_key __pki_v = (v);			\
--	write_sysreg_s(__pki_v.lo, SYS_ ## k ## KEYLO_EL1);	\
--	write_sysreg_s(__pki_v.hi, SYS_ ## k ## KEYHI_EL1);	\
-+	write_sysreg_s(v ## _lo, SYS_ ## k ## KEYLO_EL1);	\
-+	write_sysreg_s(v ## _hi, SYS_ ## k ## KEYHI_EL1);	\
- } while (0)
- 
- static inline void ptrauth_keys_switch(struct ptrauth_keys *keys)
- {
- 	if (system_supports_address_auth()) {
--		__ptrauth_key_install(APIA, keys->apia);
--		__ptrauth_key_install(APIB, keys->apib);
--		__ptrauth_key_install(APDA, keys->apda);
--		__ptrauth_key_install(APDB, keys->apdb);
-+		__ptrauth_key_install(APIA, keys->addr_keys.apiakey);
-+		__ptrauth_key_install(APIB, keys->addr_keys.apibkey);
-+		__ptrauth_key_install(APDA, keys->addr_keys.apdakey);
-+		__ptrauth_key_install(APDB, keys->addr_keys.apdbkey);
- 	}
- 
- 	if (system_supports_generic_auth())
--		__ptrauth_key_install(APGA, keys->apga);
-+		__ptrauth_key_install(APGA, keys->gen_keys.apgakey);
- }
- 
- extern int ptrauth_prctl_reset_keys(struct task_struct *tsk, unsigned long arg);
-@@ -80,12 +65,12 @@ static inline unsigned long ptrauth_strip_insn_pac(unsigned long ptr)
- #define ptrauth_thread_init_user(tsk)					\
- do {									\
- 	struct task_struct *__ptiu_tsk = (tsk);				\
--	ptrauth_keys_init(&__ptiu_tsk->thread.keys_user);		\
--	ptrauth_keys_switch(&__ptiu_tsk->thread.keys_user);		\
-+	ptrauth_keys_init(&__ptiu_tsk->thread.uw.keys_user);		\
-+	ptrauth_keys_switch(&__ptiu_tsk->thread.uw.keys_user);		\
- } while (0)
- 
- #define ptrauth_thread_switch(tsk)	\
--	ptrauth_keys_switch(&(tsk)->thread.keys_user)
-+	ptrauth_keys_switch(&(tsk)->thread.uw.keys_user)
- 
- #else /* CONFIG_ARM64_PTR_AUTH */
- #define ptrauth_prctl_reset_keys(tsk, arg)	(-EINVAL)
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index f1a7ab18faf3..f1d41bac9a23 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -137,6 +137,9 @@ struct thread_struct {
- 	struct {
- 		unsigned long	tp_value;	/* TLS register */
- 		unsigned long	tp2_value;
-+#ifdef CONFIG_ARM64_PTR_AUTH
-+		struct ptrauth_keys keys_user;
-+#endif
- 		struct user_fpsimd_state fpsimd_state;
- 	} uw;
- 
-@@ -147,9 +150,6 @@ struct thread_struct {
- 	unsigned long		fault_address;	/* fault info */
- 	unsigned long		fault_code;	/* ESR_EL1 value */
- 	struct debug_info	debug;		/* debugging */
--#ifdef CONFIG_ARM64_PTR_AUTH
--	struct ptrauth_keys	keys_user;
--#endif
- };
- 
- static inline void arch_thread_struct_whitelist(unsigned long *offset,
-@@ -159,6 +159,9 @@ static inline void arch_thread_struct_whitelist(unsigned long *offset,
- 	BUILD_BUG_ON(sizeof_field(struct thread_struct, uw) !=
- 		     sizeof_field(struct thread_struct, uw.tp_value) +
- 		     sizeof_field(struct thread_struct, uw.tp2_value) +
-+#ifdef CONFIG_ARM64_PTR_AUTH
-+		     sizeof_field(struct thread_struct, uw.keys_user) +
-+#endif
- 		     sizeof_field(struct thread_struct, uw.fpsimd_state));
- 
- 	*offset = offsetof(struct thread_struct, uw);
-diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
-index 28d77c9ed531..0affa43602a5 100644
---- a/arch/arm64/include/uapi/asm/ptrace.h
-+++ b/arch/arm64/include/uapi/asm/ptrace.h
-@@ -233,6 +233,24 @@ struct user_pac_mask {
- 	__u64		insn_mask;
- };
- 
-+/* pointer authentication keys (NT_ARM_PACA_KEYS, NT_ARM_PACG_KEYS) */
-+
-+struct user_pac_address_keys {
-+	__u64		apiakey_lo;
-+	__u64		apiakey_hi;
-+	__u64		apibkey_lo;
-+	__u64		apibkey_hi;
-+	__u64		apdakey_lo;
-+	__u64		apdakey_hi;
-+	__u64		apdbkey_lo;
-+	__u64		apdbkey_hi;
-+};
-+
-+struct user_pac_generic_keys {
-+	__u64		apgakey_lo;
-+	__u64		apgakey_hi;
-+};
-+
- #endif /* __ASSEMBLY__ */
- 
- #endif /* _UAPI__ASM_PTRACE_H */
-diff --git a/arch/arm64/kernel/pointer_auth.c b/arch/arm64/kernel/pointer_auth.c
-index c507b584259d..3fd90ec5efb2 100644
---- a/arch/arm64/kernel/pointer_auth.c
-+++ b/arch/arm64/kernel/pointer_auth.c
-@@ -7,9 +7,16 @@
- #include <asm/cpufeature.h>
- #include <asm/pointer_auth.h>
- 
-+
-+#define ptrauth_reset_key(key)					\
-+do {								\
-+	get_random_bytes(&key ## _lo, sizeof(key ## _lo));	\
-+	get_random_bytes(&key ## _hi, sizeof(key ## _hi));	\
-+} while (0)
-+
- int ptrauth_prctl_reset_keys(struct task_struct *tsk, unsigned long arg)
- {
--	struct ptrauth_keys *keys = &tsk->thread.keys_user;
-+	struct ptrauth_keys *keys = &tsk->thread.uw.keys_user;
- 	unsigned long addr_key_mask = PR_PAC_APIAKEY | PR_PAC_APIBKEY |
- 				      PR_PAC_APDAKEY | PR_PAC_APDBKEY;
- 	unsigned long key_mask = addr_key_mask | PR_PAC_APGAKEY;
-@@ -31,15 +38,15 @@ int ptrauth_prctl_reset_keys(struct task_struct *tsk, unsigned long arg)
- 		return -EINVAL;
- 
- 	if (arg & PR_PAC_APIAKEY)
--		get_random_bytes(&keys->apia, sizeof(keys->apia));
-+		ptrauth_reset_key(keys->addr_keys.apiakey);
- 	if (arg & PR_PAC_APIBKEY)
--		get_random_bytes(&keys->apib, sizeof(keys->apib));
-+		ptrauth_reset_key(keys->addr_keys.apibkey);
- 	if (arg & PR_PAC_APDAKEY)
--		get_random_bytes(&keys->apda, sizeof(keys->apda));
-+		ptrauth_reset_key(keys->addr_keys.apdakey);
- 	if (arg & PR_PAC_APDBKEY)
--		get_random_bytes(&keys->apdb, sizeof(keys->apdb));
-+		ptrauth_reset_key(keys->addr_keys.apdbkey);
- 	if (arg & PR_PAC_APGAKEY)
--		get_random_bytes(&keys->apga, sizeof(keys->apga));
-+		ptrauth_reset_key(keys->gen_keys.apgakey);
- 
- 	ptrauth_keys_switch(keys);
- 
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 9dce33b0e260..cd537bd669e7 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -979,6 +979,60 @@ static int pac_mask_get(struct task_struct *target,
- 
- 	return user_regset_copyout(&pos, &count, &kbuf, &ubuf, &uregs, 0, -1);
- }
-+
-+#ifdef CONFIG_CHECKPOINT_RESTORE
-+static int pac_address_keys_get(struct task_struct *target,
-+				const struct user_regset *regset,
-+				unsigned int pos, unsigned int count,
-+				void *kbuf, void __user *ubuf)
-+{
-+	if (!system_supports_address_auth())
-+		return -EINVAL;
-+
-+	return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
-+				   &target->thread.uw.keys_user.addr_keys,
-+				   0, -1);
-+}
-+
-+static int pac_address_keys_set(struct task_struct *target,
-+				const struct user_regset *regset,
-+				unsigned int pos, unsigned int count,
-+				const void *kbuf, const void __user *ubuf)
-+{
-+	if (!system_supports_address_auth())
-+		return -EINVAL;
-+
-+	return user_regset_copyin(&pos, &count, &kbuf, &ubuf,
-+				  &target->thread.uw.keys_user.addr_keys,
-+				  0, -1);
-+}
-+
-+static int pac_generic_keys_get(struct task_struct *target,
-+				const struct user_regset *regset,
-+				unsigned int pos, unsigned int count,
-+				void *kbuf, void __user *ubuf)
-+{
-+	if (!system_supports_generic_auth())
-+		return -EINVAL;
-+
-+	return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
-+				   &target->thread.uw.keys_user.gen_keys,
-+				   0, -1);
-+}
-+
-+static int pac_generic_keys_set(struct task_struct *target,
-+				const struct user_regset *regset,
-+				unsigned int pos, unsigned int count,
-+				const void *kbuf, const void __user *ubuf)
-+{
-+	if (!system_supports_generic_auth())
-+		return -EINVAL;
-+
-+	return user_regset_copyin(&pos, &count, &kbuf, &ubuf,
-+				  &target->thread.uw.keys_user.gen_keys,
-+				  0, -1);
-+}
-+#endif /* CONFIG_CHECKPOINT_RESTORE */
- #endif /* CONFIG_ARM64_PTR_AUTH */
- 
- enum aarch64_regset {
-@@ -995,6 +1049,10 @@ enum aarch64_regset {
- #endif
- #ifdef CONFIG_ARM64_PTR_AUTH
- 	REGSET_PAC_MASK,
-+#ifdef CONFIG_CHECKPOINT_RESTORE
-+	REGSET_PACA_KEYS,
-+	REGSET_PACG_KEYS,
-+#endif
- #endif
- };
- 
-@@ -1074,6 +1132,24 @@ static const struct user_regset aarch64_regsets[] = {
- 		.get = pac_mask_get,
- 		/* this cannot be set dynamically */
- 	},
-+#ifdef CONFIG_CHECKPOINT_RESTORE
-+	[REGSET_PACA_KEYS] = {
-+		.core_note_type = NT_ARM_PACA_KEYS,
-+		.n = sizeof(struct user_pac_address_keys) / sizeof(u64),
-+		.size = sizeof(u64),
-+		.align = sizeof(u64),
-+		.get = pac_address_keys_get,
-+		.set = pac_address_keys_set,
-+	},
-+	[REGSET_PACG_KEYS] = {
-+		.core_note_type = NT_ARM_PACG_KEYS,
-+		.n = sizeof(struct user_pac_generic_keys) / sizeof(u64),
-+		.size = sizeof(u64),
-+		.align = sizeof(u64),
-+		.get = pac_generic_keys_get,
-+		.set = pac_generic_keys_set,
-+	},
-+#endif
- #endif
- };
- 
-diff --git a/include/uapi/linux/elf.h b/include/uapi/linux/elf.h
-index e4d6ddd93567..34c02e4290fe 100644
---- a/include/uapi/linux/elf.h
-+++ b/include/uapi/linux/elf.h
-@@ -421,6 +421,8 @@ typedef struct elf64_shdr {
- #define NT_ARM_SYSTEM_CALL	0x404	/* ARM system call number */
- #define NT_ARM_SVE	0x405		/* ARM Scalable Vector Extension registers */
- #define NT_ARM_PAC_MASK		0x406	/* ARM pointer authentication code masks */
-+#define NT_ARM_PACA_KEYS	0x407	/* ARM pointer authentication address keys */
-+#define NT_ARM_PACG_KEYS	0x408	/* ARM pointer authentication generic key */
- #define NT_ARC_V2	0x600		/* ARCv2 accumulator/extra registers */
- #define NT_VMCOREDD	0x700		/* Vmcore Device Dump Note */
- #define NT_MIPS_DSP	0x800		/* MIPS DSP ASE registers */
+Regards,
+Leo
 
 _______________________________________________
 linux-arm-kernel mailing list
