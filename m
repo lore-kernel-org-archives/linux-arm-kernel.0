@@ -2,133 +2,75 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3F52EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 16:39:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BF7A3C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 16:41:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 08E7720874
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 16:39:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 87E78206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 16:41:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="R/GPgLU+";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="heBwZWa9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 08E7720874
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JJSBe/QS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 87E78206B7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=u4kHWOdr9cf7sfZL4PCLrAZpMTfZMbX8U5vF4txVgsw=; b=R/GPgLU+Aa4sEw
-	HRSXCcR9i58+WAnv1mw6hr3oNqV/9YVQ7eTa0v84+HDY01S0ViMcpK2/G0SnLUzHiQuD54u1zFGcJ
-	XkMnQSYxNqj8zWvOfHwbNuDqGVFA5GgnV54973LNd15PC6HmX4sIEh3+jkAiFeYjRm5Z2E4dI7/vT
-	57NKLjj4W1uXTNM44U43sV0KFwkaBuFZIok3XWOY84jdqsDV80eJ1a+ER+Sk0+t2Pf/Zdeps3I5Eh
-	gFpfXBSCyt6aK03q3o+FhLyygFvztfnOe+/B9bNQ81nJP81VORAFe9FgNXaQuakCTKGZ7ICrwT3wf
-	STLAR6duoC4KAqj+KdFQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=x9q8qNvNlOYJphM+ooUAhxdi/lgyaWg4mmNaZXl2xLc=; b=JJSBe/QSzmXk+y
+	c84BL1K100StGDIQHCYi4chmJpGj65VM7U+REwmLyPCHtro3zVCskFn8MWNxOoWh7YIBfG9TNK8dp
+	tZndLeDHRqLodnxY0Izx0nsysajRPZUONQKNfEaVM9aZqlCFzLTmhtiQu6GSMmTlAT/QDhtTppz9D
+	s9VtWtm1RAamk8N3+zuS6DNshKg+uPcWpcRst0G1E6HgPnpSGTpaYSpnBDNLKbSK/pFiv5MTgpcCD
+	g6ohyM2gm97LR37BuwXXuR2kjtL2fiNZKPpGB8CJlhtM9KX/KbaKgqWRSN8wyxYJWN/fGX54EssLU
+	9hCrsibKFCJgzsL6A9uQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghdMl-0004hB-9H; Thu, 10 Jan 2019 16:39:35 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1ghdOv-0006HP-E7; Thu, 10 Jan 2019 16:41:49 +0000
+Received: from mout.kundenserver.de ([212.227.17.24])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghdMc-0004Xe-Uh
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 16:39:32 +0000
-Received: by mail-wr1-x441.google.com with SMTP id v13so12129703wrw.5
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 10 Jan 2019 08:39:26 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=bupfKnBbyBUHDqy81nbwX7BLfXudsM3PunbztJHaT70=;
- b=heBwZWa9ZLyD8jpf2VyzWAyQzgdK/G982heficHMK13A7IPIn9JRiVzVL/qVwanBG+
- +7Q4tiePotI6FSpFfqPN/RrHlrMAddOX3NdcNNdpCos/K3XwLQZk1dbIIFHUcFUXattF
- jE08CC3DG7Z3gTx7cD42DzUreldTE1+wROQ0M=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :message-id:date:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=bupfKnBbyBUHDqy81nbwX7BLfXudsM3PunbztJHaT70=;
- b=qbVGO7sXcq448q0LZ5VoEhTwY/0s4pPgPJ0QR/o1EhbWo+gyoDcnAkTkHZdUgvkizn
- rQn4QifSD4Zr15wT8u68qhPdTbRQZmkAM07uPSJtXmgRVoBAS0NFnZZv3K++mldklm3o
- fOEf7BqgI1g2/dm3Fdq6u+wd9nsfvpyIeRRDjANvdUE73Lh8duU2P1Vna0LXoxqPMdnO
- 98Qw8NwpVmLtl67RCuthjsv3/GwtVqlxIcW1Lt/2w84g24h0GOhELzkug8bAIbwltJSj
- 53N9gO73Zto6H97cluRLUWYLYn6eYG4fEgxC2qMEiKoPG3vrp+tUC/uuSH69ohcrKsaS
- PZWw==
-X-Gm-Message-State: AJcUukdI0MDVxTdbIRzh/WfDKHxH8lTHKPEaoPrkrzkPG3d0VUK7Hyd0
- DvwkyeJs2td9j8xIdui3Go/k2A==
-X-Google-Smtp-Source: ALg8bN6/y1ilyu1f+D48QonbNhh8lCkvQ0yH6dX6GzBOPY4pTCQrdcXO3BPzM3RjWamyMx0Fms20Gg==
-X-Received: by 2002:adf:cc91:: with SMTP id p17mr10174021wrj.118.1547138365016; 
- Thu, 10 Jan 2019 08:39:25 -0800 (PST)
-Received: from [10.44.66.8] ([212.45.67.2])
- by smtp.googlemail.com with ESMTPSA id p10sm6782413wrt.25.2019.01.10.08.39.23
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 10 Jan 2019 08:39:24 -0800 (PST)
-Subject: Re: [PATCH v12 6/7] arm64: dts: sdm845: Add interconnect provider DT
- nodes
-To: Doug Anderson <dianders@chromium.org>
-References: <20181208170216.32555-1-georgi.djakov@linaro.org>
- <20181208170216.32555-7-georgi.djakov@linaro.org>
- <CAD=FV=Xg5Sz029_UjuDg-ms05Ez+riv8qr0FLWkvg6axPYbZ_g@mail.gmail.com>
-From: Georgi Djakov <georgi.djakov@linaro.org>
-Openpgp: preference=signencrypt
-Autocrypt: addr=georgi.djakov@linaro.org; prefer-encrypt=mutual; keydata=
- mQINBFjTuRcBEACyAOVzghvyN19Sa/Nit4LPBWkICi5W20p6bwiZvdjhtuh50H5q4ktyxJtp
- 1+s8dMSa/j58hAWhrc2SNL3fttOCo+MM1bQWwe8uMBQJP4swgXf5ZUYkSssQlXxGKqBSbWLB
- uFHOOBTzaQBaNgsdXo+mQ1h8UCgM0zQOmbs2ort8aHnH2i65oLs5/Xgv/Qivde/FcFtvEFaL
- 0TZ7odM67u+M32VetH5nBVPESmnEDjRBPw/DOPhFBPXtal53ZFiiRr6Bm1qKVu3dOEYXHHDt
- nF13gB+vBZ6x5pjl02NUEucSHQiuCc2Aaavo6xnuBc3lnd4z/xk6GLBqFP3P/eJ56eJv4d0B
- 0LLgQ7c1T3fU4/5NDRRCnyk6HJ5+HSxD4KVuluj0jnXW4CKzFkKaTxOp7jE6ZD/9Sh74DM8v
- etN8uwDjtYsM07I3Szlh/I+iThxe/4zVtUQsvgXjwuoOOBWWc4m4KKg+W4zm8bSCqrd1DUgL
- f67WiEZgvN7tPXEzi84zT1PiUOM98dOnmREIamSpKOKFereIrKX2IcnZn8jyycE12zMkk+Sc
- ASMfXhfywB0tXRNmzsywdxQFcJ6jblPNxscnGMh2VlY2rezmqJdcK4G4Lprkc0jOHotV/6oJ
- mj9h95Ouvbq5TDHx+ERn8uytPygDBR67kNHs18LkvrEex/Z1cQARAQABtChHZW9yZ2kgRGph
- a292IDxnZW9yZ2kuZGpha292QGxpbmFyby5vcmc+iQI+BBMBAgAoBQJY07kXAhsDBQkHhM4A
- BgsJCAcDAgYVCAIJCgsEFgIDAQIeAQIXgAAKCRCyi/eZcnWWUuvsD/4miikUeAO6fU2Xy3fT
- l7RUCeb2Uuh1/nxYoE1vtXcow6SyAvIVTD32kHXucJJfYy2zFzptWpvD6Sa0Sc58qe4iLY4j
- M54ugOYK7XeRKkQHFqqR2T3g/toVG1BOLS2atooXEU+8OFbpLkBXbIdItqJ1M1SEw8YgKmmr
- JlLAaKMq3hMb5bDQx9erq7PqEKOB/Va0nNu17IL58q+Q5Om7S1x54Oj6LiG/9kNOxQTklOQZ
- t61oW1Ewjbl325fW0/Lk0QzmfLCrmGXXiedFEMRLCJbVImXVKdIt/Ubk6SAAUrA5dFVNBzm2
- L8r+HxJcfDeEpdOZJzuwRyFnH96u1Xz+7X2V26zMU6Wl2+lhvr2Tj7spxjppR+nuFiybQq7k
- MIwyEF0mb75RLhW33sdGStCZ/nBsXIGAUS7OBj+a5fm47vQKv6ekg60oRTHWysFSJm1mlRyq
- exhI6GwUo5GM/vE36rIPSJFRRgkt6nynoba/1c4VXxfhok2rkP0x3CApJ5RimbvITTnINY0o
- CU6f1ng1I0A1UTi2YcLjFq/gmCdOHExT4huywfu1DDf0p1xDyPA1FJaii/gJ32bBP3zK53hM
- dj5S7miqN7F6ZpvGSGXgahQzkGyYpBR5pda0m0k8drV2IQn+0W8Qwh4XZ6/YdfI81+xyFlXc
- CJjljqsMCJW6PdgEH7kCDQRY07kXARAAvupGd4Jdd8zRRiF+jMpv6ZGz8L55Di1fl1YRth6m
- lIxYTLwGf0/p0oDLIRldKswena3fbWh5bbTMkJmRiOQ/hffhPSNSyyh+WQeLY2kzl6geiHxD
- zbw37e2hd3rWAEfVFEXOLnmenaUeJFyhA3Wd8OLdRMuoV+RaLhNfeHctiEn1YGy2gLCq4VNb
- 4Wj5hEzABGO7+LZ14hdw3hJIEGKtQC65Jh/vTayGD+qdwedhINnIqslk9tCQ33a+jPrCjXLW
- X29rcgqigzsLHH7iVHWA9R5Aq7pCy5hSFsl4NBn1uV6UHlyOBUuiHBDVwTIAUnZ4S8EQiwgv
- WQxEkXEWLM850V+G6R593yZndTr3yydPgYv0xEDACd6GcNLR/x8mawmHKzNmnRJoOh6Rkfw2
- fSiVGesGo83+iYq0NZASrXHAjWgtZXO1YwjW9gCQ2jYu9RGuQM8zIPY1VDpQ6wJtjO/KaOLm
- NehSR2R6tgBJK7XD9it79LdbPKDKoFSqxaAvXwWgXBj0Oz+Y0BqfClnAbxx3kYlSwfPHDFYc
- R/ppSgnbR5j0Rjz/N6Lua3S42MDhQGoTlVkgAi1btbdV3qpFE6jglJsJUDlqnEnwf03EgjdJ
- 6KEh0z57lyVcy5F/EUKfTAMZweBnkPo+BF2LBYn3Qd+CS6haZAWaG7vzVJu4W/mPQzsAEQEA
- AYkCJQQYAQIADwUCWNO5FwIbDAUJB4TOAAAKCRCyi/eZcnWWUhlHD/0VE/2x6lKh2FGP+QHH
- UTKmiiwtMurYKJsSJlQx0T+j/1f+zYkY3MDX+gXa0d0xb4eFv8WNlEjkcpSPFr+pQ7CiAI33
- 99kAVMQEip/MwoTYvM9NXSMTpyRJ/asnLeqa0WU6l6Z9mQ41lLzPFBAJ21/ddT4xeBDv0dxM
- GqaH2C6bSnJkhSfSja9OxBe+F6LIAZgCFzlogbmSWmUdLBg+sh3K6aiBDAdZPUMvGHzHK3fj
- gHK4GqGCFK76bFrHQYgiBOrcR4GDklj4Gk9osIfdXIAkBvRGw8zg1zzUYwMYk+A6v40gBn00
- OOB13qJe9zyKpReWMAhg7BYPBKIm/qSr82aIQc4+FlDX2Ot6T/4tGUDr9MAHaBKFtVyIqXBO
- xOf0vQEokkUGRKWBE0uA3zFVRfLiT6NUjDQ0vdphTnsdA7h01MliZLQ2lLL2Mt5lsqU+6sup
- Tfql1omgEpjnFsPsyFebzcKGbdEr6vySGa3Cof+miX06hQXKe99a5+eHNhtZJcMAIO89wZmj
- 7ayYJIXFqjl/X0KBcCbiAl4vbdBw1bqFnO4zd1lMXKVoa29UHqby4MPbQhjWNVv9kqp8A39+
- E9xw890l1xdERkjVKX6IEJu2hf7X3MMl9tOjBK6MvdOUxvh1bNNmXh7OlBL1MpJYY/ydIm3B
- KEmKjLDvB0pePJkdTw==
-Message-ID: <40c11483-40c4-5f6a-3127-6a718930582a@linaro.org>
-Date: Thu, 10 Jan 2019 18:39:22 +0200
+ id 1ghd9q-0004HW-IS
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 16:26:16 +0000
+Received: from wuerfel.lan ([109.192.41.194]) by mrelayeu.kundenserver.de
+ (mreue108 [212.227.15.145]) with ESMTPA (Nemesis) id
+ 1MXGzQ-1gmTTU2Mc2-00YlJB; Thu, 10 Jan 2019 17:25:10 +0100
+From: Arnd Bergmann <arnd@arndb.de>
+To: y2038@lists.linaro.org, linux-api@vger.kernel.org,
+ linux-kernel@vger.kernel.org
+Subject: [PATCH 04/15] alpha: wire up io_pgetevents system call
+Date: Thu, 10 Jan 2019 17:24:24 +0100
+Message-Id: <20190110162435.309262-5-arnd@arndb.de>
+X-Mailer: git-send-email 2.20.0
+In-Reply-To: <20190110162435.309262-1-arnd@arndb.de>
+References: <20190110162435.309262-1-arnd@arndb.de>
 MIME-Version: 1.0
-In-Reply-To: <CAD=FV=Xg5Sz029_UjuDg-ms05Ez+riv8qr0FLWkvg6axPYbZ_g@mail.gmail.com>
-Content-Language: en-US
+X-Provags-ID: V03:K1:IuTdScJNFP/vlVpLiekPy1ow4ZHjUHd9bBQuCDC76YNBRibrohQ
+ xe4PTU5B3/2nsf++H4PdApUdmfw+lrf+m4akyCZLHyYTCLErcx0kRCUeA5fx2pSYrXhfboI
+ TGcpRPLubhe7ITv+g8HM3hG2m2F8x+f0mihrQflNCCgZKTCoOQI1SPWgWNjeYt2eQffohnL
+ 2+S4SOm3O/NYGRyHFCqnA==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:xg+0ntML16s=:vQUEgMtLWbgXhUDfOD4tFX
+ XVNGSeubXuS5k5TazDG/RTdD+JSIqKb/pqlh4L0fs8LKwLKGo9Mr7o0bUxYV4FvRtEPZM+GKv
+ UfYdpiNhsKK7dBkmvzm5tkoM7X+/xOL79IaUdjoW/sM48o9/nL0wpTNmfPxRgKXqXbNQIiALo
+ n+08m1jAdAD3r6B+DybJibdim3imldLCouU/K09vqwerADzQiMJc13fKPRn0V60r/kWpeotYH
+ OtY4V38lQzwSmWjU9owIspp0el3VCTwvDZbYu7ojyyAcDHZAYvPrK8caRi3SOaHdwFqesPlpx
+ GUzFCEvd4/c2t6OOcaCMSDOy3AMIWnnOK+CMb6653SXWw3bhDJjZFw3EJL/dSwwWluWv8ILx0
+ 0gajNPyzAPBbJyOhecVf2SSzqeyfzeow/YNVRERPCe+L3c43vvO5D3bIGZExSdI0iLqiyJpXL
+ DSMRbux5mjH5JbIiMck0dOMMoRlUXHbvb9V4XPibE4zBWammySsIbDptCPBfr8Ne895uaLKJ5
+ p+DL/Lg1ijinapAoxBaw8V2s1MIyXB/ov86x7SR2xFfoSb5fyn9VshvOo8iFhkyv+xIPzpyyY
+ vQbuFM1W5zrSVFQlRiSF5Q4hwf/SFkFNVGvJC+s/JC5XiBAffWJcxH0VqilVba1u5pblYuaYz
+ 5eqR6z5hxwaLgpk95sWnUAn0rfYw3vIQCCkKfnvOdk2lPgt/6pLaX3KfQs02ySpY3vvpD5UNK
+ Xq5j6U5WXDRMdBdxYGE53f4ixXF9gjVFB99CiA==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_083927_412405_4718FEC2 
-X-CRM114-Status: GOOD (  20.73  )
+X-CRM114-CacheID: sfid-20190110_082614_904460_A88D3470 
+X-CRM114-Status: UNSURE (   9.87  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -140,87 +82,50 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, sanjayc@nvidia.com,
- maxime.ripard@bootlin.com, Michael Turquette <mturquette@baylibre.com>,
- daidavid1@codeaurora.org, Bjorn Andersson <bjorn.andersson@linaro.org>,
- Saravana Kannan <skannan@codeaurora.org>,
- Alexandre Bailon <abailon@baylibre.com>,
- Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- Vincent Guittot <vincent.guittot@linaro.org>, seansw@qti.qualcomm.com,
- Kevin Hilman <khilman@baylibre.com>, Evan Green <evgreen@chromium.org>,
- ksitaraman@nvidia.com, devicetree@vger.kernel.org,
- Arnd Bergmann <arnd@arndb.de>, linux-pm@vger.kernel.org,
- linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- Andy Gross <andy.gross@linaro.org>, Rob Herring <robh+dt@kernel.org>,
- linux-tegra@vger.kernel.org, Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- "Rafael J. Wysocki" <rjw@rjwysocki.net>, LKML <linux-kernel@vger.kernel.org>,
- Amit Kucheria <amit.kucheria@linaro.org>,
- Thierry Reding <thierry.reding@gmail.com>, Olof Johansson <olof@lixom.net>
+Cc: dalias@libc.org, linux-ia64@vger.kernel.org, linux-sh@vger.kernel.org,
+ catalin.marinas@arm.com, will.deacon@arm.com, linux@dominikbrodowski.net,
+ jcmvbkbc@gmail.com, deepa.kernel@gmail.com, hpa@zytor.com,
+ sparclinux@vger.kernel.org, linux-s390@vger.kernel.org, dave@stgolabs.net,
+ mpe@ellerman.id.au, deller@gmx.de, x86@kernel.org, linux@armlinux.org.uk,
+ mingo@redhat.com, geert@linux-m68k.org, firoz.khan@linaro.org,
+ mattst88@gmail.com, fenghua.yu@intel.com, Arnd Bergmann <arnd@arndb.de>,
+ heiko.carstens@de.ibm.com, linux-m68k@lists.linux-m68k.org,
+ ink@jurassic.park.msu.ru, luto@kernel.org, tglx@linutronix.de,
+ linux-arm-kernel@lists.infradead.org, monstr@monstr.eu, tony.luck@intel.com,
+ linux-parisc@vger.kernel.org, linux-mips@vger.kernel.org,
+ stable@vger.kernel.org, paul.burton@mips.com, ebiederm@xmission.com,
+ linux-alpha@vger.kernel.org, schwidefsky@de.ibm.com, akpm@linux-foundation.org,
+ linuxppc-dev@lists.ozlabs.org, davem@davemloft.net
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Doug,
+The io_pgetevents system call was added in linux-4.18 but has
+no entry for alpha:
 
-On 1/10/19 01:18, Doug Anderson wrote:
-> Hi,
-> 
-> On Sat, Dec 8, 2018 at 9:02 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
->>
->> From: David Dai <daidavid1@codeaurora.org>
->>
->> Add RSC (Resource State Coordinator) provider
->> dictating network-on-chip interconnect bus performance
->> found on SDM845-based platforms.
->>
->> Signed-off-by: David Dai <daidavid1@codeaurora.org>
->> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
->> ---
->>  arch/arm64/boot/dts/qcom/sdm845.dtsi | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
->> index b72bdb0a31a5..b3cd256a154e 100644
->> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
->> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
->> @@ -1324,6 +1324,11 @@
->>                                 compatible = "qcom,sdm845-rpmh-clk";
->>                                 #clock-cells = <1>;
->>                         };
->> +
->> +                       rsc_hlos: interconnect {
->> +                               compatible = "qcom,sdm845-rsc-hlos";
->> +                               #interconnect-cells = <1>;
->> +                       };
-> 
-> It would have been convenient if this patch had also added an include above:
-> 
-> #include <dt-bindings/interconnect/qcom,sdm845.h>
-> 
-> ...while the include isn't technically needed by this patch, all the
-> patches that want to actually _use_ the interconnect will need to add
-> the #include and then you get to some fun fights about who has to add
-> the include in which patch.  For instance these two patches won't
-> compile:
-> 
-> * https://lkml.kernel.org/r/1545373748-1416-1-git-send-email-jshekhar@codeaurora.org
-> * https://lkml.kernel.org/r/20181220173026.3857-4-jcrouse@codeaurora.org
-> 
-> ...because neither of them happened to add the include.  Maybe they
-> were both assuming someone else would do it?
-> 
-> 
-> If nobody else wants to, I'm happy to post a patch to add that include
-> myself and it can be applied atop this one.  ...or if this patch needs
-> to spin for some other reason maybe you could add it into this patch
-> directly?
+warning: #warning syscall io_pgetevents not implemented [-Wcpp]
 
-Ok, i will add it and resend.
+Assign a the next system call number here.
 
-Thanks,
-Georgi
+Cc: stable@vger.kernel.org
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/alpha/kernel/syscalls/syscall.tbl | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/alpha/kernel/syscalls/syscall.tbl b/arch/alpha/kernel/syscalls/syscall.tbl
+index 7b56a53be5e3..e09558edae73 100644
+--- a/arch/alpha/kernel/syscalls/syscall.tbl
++++ b/arch/alpha/kernel/syscalls/syscall.tbl
+@@ -451,3 +451,4 @@
+ 520	common	preadv2				sys_preadv2
+ 521	common	pwritev2			sys_pwritev2
+ 522	common	statx				sys_statx
++523	common	io_pgetevents			sys_io_pgetevents
+-- 
+2.20.0
+
 
 _______________________________________________
 linux-arm-kernel mailing list
