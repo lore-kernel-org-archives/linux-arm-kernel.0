@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 79008C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 18:01:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8C933C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 18:01:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4EBFE208E3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 18:01:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5905B2064C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 18:01:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QlCYHZFO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4EBFE208E3
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="diEzJGXX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5905B2064C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=v3.sk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,50 +25,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cZUUavW6gjX/XNSaM3+g2kq8737LGAynpinZwgc5Bgw=; b=QlCYHZFO9NbSFB
-	/XoQDjv+iuE3+s4wmj351+3k0Qyma5Gm9NxboxtyYdKRh3ahaUsr9IulybOw5QmWfDbkTb/reqKKH
-	17IJAEGBN33DLPd8EfMoyyeTGSP/2Qvu3BhG+UUUKQuIBokaCuC8oXk3mI+HNW2hUWj5EqwOK9DTs
-	4LwnVrBfryhEsPWLnbQ3RJ9IjR3dpZhDgkwAwhwJsnz1B+pNS6+zTJpcJGIAqnPnf0SWHt4kMXo/s
-	ycFY2cjnegM556ZfRay02j7gvFnzTz6Bn0z1I1n4AeF3N0HTPgtKqFViisJ77sEqvCLjS22NdEcgm
-	JsujUjpoe7jBYoe3X3nw==;
+	List-Owner; bh=DEtzLUMjwfFGsUjbBRZFDr0G4APcXegeLmqeI4ux+Dk=; b=diEzJGXX4TFS2U
+	QuZyeANW6jY7CAuPqt058Ee/yOVGJTaKsqT3+bfu6gWJlU2cWuF1UyKP7G3ItghQMYcnXDJJwkFSe
+	IVZJaBno6KMEJ5FhqKRXqND6+IIMH/cDffFzQGXfzZGeypiTYRxKxyL01ETzFL5k17vlK0OraahvU
+	X1We8Lf9JUY62Hxabw6MdDs4QXEfW95IIGS7WIao8MTfIrpDyObP/786HVdXea7q8gEeOsVaaASu6
+	fJcwZ/vYOVO0czD/TRN9KCTmyR1gtU4/LQw7AUXDScVHLgL/y48IiIXxQWgP+okZ74UNDIq0WsklM
+	hvaZZn24JWyaOBs8DhRA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghedc-00040U-5n; Thu, 10 Jan 2019 18:01:04 +0000
+	id 1ghedq-0004FI-Cq; Thu, 10 Jan 2019 18:01:18 +0000
 Received: from shell.v3.sk ([90.176.6.54])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghebu-0000yZ-OJ
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 17:59:27 +0000
+ id 1ghebx-000125-L5
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 17:59:28 +0000
 Received: from localhost (localhost [127.0.0.1])
- by zimbra.v3.sk (Postfix) with ESMTP id 497091002F5;
- Thu, 10 Jan 2019 18:59:17 +0100 (CET)
+ by zimbra.v3.sk (Postfix) with ESMTP id 24C9F10019B;
+ Thu, 10 Jan 2019 18:59:20 +0100 (CET)
 Received: from shell.v3.sk ([127.0.0.1])
  by localhost (zimbra.v3.sk [127.0.0.1]) (amavisd-new, port 10032)
- with ESMTP id wtSn1BSFsvzF; Thu, 10 Jan 2019 18:59:06 +0100 (CET)
+ with ESMTP id jxN_GLfwRKYP; Thu, 10 Jan 2019 18:59:08 +0100 (CET)
 Received: from localhost (localhost [127.0.0.1])
- by zimbra.v3.sk (Postfix) with ESMTP id EF22D100306;
- Thu, 10 Jan 2019 18:59:00 +0100 (CET)
+ by zimbra.v3.sk (Postfix) with ESMTP id 0C069100307;
+ Thu, 10 Jan 2019 18:59:01 +0100 (CET)
 X-Virus-Scanned: amavisd-new at zimbra.v3.sk
 Received: from shell.v3.sk ([127.0.0.1])
  by localhost (zimbra.v3.sk [127.0.0.1]) (amavisd-new, port 10026)
- with ESMTP id yq6oPVIWhROU; Thu, 10 Jan 2019 18:58:56 +0100 (CET)
+ with ESMTP id QikxwaQK9201; Thu, 10 Jan 2019 18:58:58 +0100 (CET)
 Received: from belphegor.brq.redhat.com (nat-pool-brq-t.redhat.com
  [213.175.37.10])
- by zimbra.v3.sk (Postfix) with ESMTPSA id 621BE1002FD;
+ by zimbra.v3.sk (Postfix) with ESMTPSA id 9FA261002FC;
  Thu, 10 Jan 2019 18:58:55 +0100 (CET)
 From: Lubomir Rintel <lkundrak@v3.sk>
 To: Andy Shevchenko <andy@infradead.org>,
 	Darren Hart <dvhart@infradead.org>
-Subject: [PATCH v5 08/10] power: supply: olpc_battery: Allow building the
- driver on non-x86
-Date: Thu, 10 Jan 2019 18:58:43 +0100
-Message-Id: <20190110175845.1203986-9-lkundrak@v3.sk>
+Subject: [PATCH v5 09/10] ARM: export arm_pm_restart
+Date: Thu, 10 Jan 2019 18:58:44 +0100
+Message-Id: <20190110175845.1203986-10-lkundrak@v3.sk>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190110175845.1203986-1-lkundrak@v3.sk>
 References: <20190110175845.1203986-1-lkundrak@v3.sk>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_095919_173394_7A9F7E4C 
-X-CRM114-Status: GOOD (  11.95  )
+X-CRM114-CacheID: sfid-20190110_095922_239376_394A36CD 
+X-CRM114-Status: UNSURE (   8.78  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,27 +90,36 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-With the recent changes to the driver and addition of OLPC XO-1.75 EC
-driver it is possible to use this driver on ARM-based XO laptops as
-well.
+The OLPC XO 1.75 laptop is rebooted with a command to the Embedded
+Controller. The EC driver should be a module, since most people don't need
+it to be compiled in.
+
+The EC driver can't use register_restart_handler() because handlers
+registered with it are executed in atomic context and the XO 1.75 reboot
+dance needs to block: the reboot is initiated by poking a GPIO ofter
+which we need to wait for the EC to initiate a SPI transfer and finish
+it.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
----
- drivers/power/supply/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/power/supply/Kconfig b/drivers/power/supply/Kconfig
-index e901b9879e7e..66e4d1958de3 100644
---- a/drivers/power/supply/Kconfig
-+++ b/drivers/power/supply/Kconfig
-@@ -151,7 +151,7 @@ config BATTERY_PMU
- 
- config BATTERY_OLPC
- 	tristate "One Laptop Per Child battery"
--	depends on X86_32 && OLPC
-+	depends on OLPC_EC
- 	help
- 	  Say Y to enable support for the battery on the OLPC laptop.
+---
+Changes since v4:
+- Clarify why we need this
+
+ arch/arm/kernel/reboot.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/kernel/reboot.c b/arch/arm/kernel/reboot.c
+index 3b2aa9a9fe26..71016cf19b86 100644
+--- a/arch/arm/kernel/reboot.c
++++ b/arch/arm/kernel/reboot.c
+@@ -22,6 +22,7 @@ typedef void (*phys_reset_t)(unsigned long, bool);
+  * Function pointers to optional machine specific functions
+  */
+ void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
++EXPORT_SYMBOL_GPL(arm_pm_restart);
+ void (*pm_power_off)(void);
+ EXPORT_SYMBOL(pm_power_off);
  
 -- 
 2.20.1
