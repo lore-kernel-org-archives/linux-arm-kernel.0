@@ -4,83 +4,113 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B2535C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 14:51:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 24417C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 15:10:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7F06220660
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 14:51:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A46C62183F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 15:10:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="k9eijNLa";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="e1p3/EeO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7F06220660
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BeZq/k/C";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=axentia.se header.i=@axentia.se header.b="K6Td3zqa"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A46C62183F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=axentia.se
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=UqA48kYm1v1jVe6fOdWA6CD0nSvBnabuMKr++IRL10s=; b=k9eijNLaATZLtq
-	ZK64g/umZyi97Z2ohQrRfJBiH5mA+QDpLGNwmc7XG40Yy963vgjq5YVAa63ubTa7nCjxTxFp0aL/Y
-	cUry7EgD96mRrdYP1zSiX6X8Ih8NQ661juRktbjw2hFht3fYHfGrj5pfUQjMWh43Y/IyKaPFa1WqW
-	Utz5Td+jxa0wbJKxOjUl2WAsGZxHy5ziXb8VM9ujhx6cbWPHDXXJGAmcJqBn83hn8sFHzT8POBYE2
-	AXvOysIeJfV5SzAHitwTk0rC1jUtbBb/tLYCRy0TthRo9DeT6kn89pEAgvRVbyCwpiq3eOTz6pjVp
-	0gKssZWcK/ETGXwYuBaA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=sXzvUA7VkbB8UX4lOcyJy0pE1ADKfCDjb0/pQL5t6O4=; b=BeZq/k/C/t/EP7
+	zeYNkR5xwDLwwln6PVRH19xxEgFNlYxwsOpRqzabYgvoXy4ApoIID0X8GwIyJTyty8CCC5mGPUgTw
+	n2jFW/ZZj0CinxgmXMcKzv+yflao5TGsX8Fe4og2fXHkqAT8U/2i40tOI6zn3O7b4KSvKm8Zce15I
+	Qs8M63OVI3Qmg0KRlNMk6kP1sVZtwElZsdI+9tGV9A1PIclssmatD+0fSYy4rlzHUvtuoUjMWUa4C
+	4bQuxiwNaYp4485ZdCK3szeoyaFFGEBmnJ48OHh/vH/9LojBa1CkwWtwi5tGAWCeodXM7Yxo55ec8
+	4BcoNDP9ngwD/nFN+TpA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghbfr-0000Wl-HQ; Thu, 10 Jan 2019 14:51:11 +0000
-Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
+	id 1ghbyt-0000AY-8a; Thu, 10 Jan 2019 15:10:51 +0000
+Received: from mail-vi1eur04on072a.outbound.protection.outlook.com
+ ([2a01:111:f400:fe0e::72a]
+ helo=EUR04-VI1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghbfg-0000IM-85
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 14:51:05 +0000
-Received: by mail-lj1-x242.google.com with SMTP id n18-v6so9959678lji.7
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 10 Jan 2019 06:50:59 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=CcNwEXfi6ZlUWBcW2Bye6DgIumypfVjE/iqyPungPEM=;
- b=e1p3/EeOMacVEz/eSnrPj5h5JE79nhsL407Ef84/I6mEd+wTf1mkTcMBa3yTouepSx
- RaEugdd9HkihedamHuEYSU8z/D8TV1CSNMAsPFmT5+uIES7uInOZ0nwxzU0W50sf0EX1
- VdiNbSMeH3ENC3jCJD1Ym5mybuIi+qizwMyAo=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=CcNwEXfi6ZlUWBcW2Bye6DgIumypfVjE/iqyPungPEM=;
- b=aONYc6KyRbjJNIaAgmx/ur2iZx3VEvfM4MqqdJEDhDSn63LQiFKcY7ozGc0TluHHsq
- +AIYMAC2kIecjldPibH57EukMv4Cay5WhPR7y7W4apt7BFH/2EfWTPf+K5r6HQNC0zrs
- Ap/4QH1AyUjDRFNQzBs676N7wqKW+doMeichUqykrSZ7Q/VKD6Akf0bUFxZnIYnlIi9V
- HzZCHKONbCzJhvZKzuV/AQf7GhgP4eleNdIvFmES2RPLDEDqmGppIVm9NaunSyw95deu
- jsrmSvLRl0lazhz6toD97FCrF/7C60LBNzxU/Kr9BE7pceVmCdTwumUGbycCbTNWrQqU
- Fe7A==
-X-Gm-Message-State: AJcUukdqHGXvl5CD5UI03M+PrShxQRYB601hnG4Xt5jXAIw6wkmh9aur
- es7rEZ8YAr8/t4nmP73waZXSsA==
-X-Google-Smtp-Source: ALg8bN7crAFz1W1gq/oTIJOBLS5Rudt857YLHTdESshHo5upLiakIPuRjKCedUWBA5TlOUkjvwe+6g==
-X-Received: by 2002:a2e:9556:: with SMTP id
- t22-v6mr6727732ljh.36.1547131858075; 
- Thu, 10 Jan 2019 06:50:58 -0800 (PST)
-Received: from genomnajs.ideon.se ([85.235.10.227])
- by smtp.gmail.com with ESMTPSA id 12-v6sm15226157ljf.96.2019.01.10.06.50.56
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 10 Jan 2019 06:50:56 -0800 (PST)
-From: Linus Walleij <linus.walleij@linaro.org>
-To: linux-arm-msm@vger.kernel.org, Andy Gross <andy.gross@linaro.org>,
- David Brown <david.brown@linaro.org>
-Subject: [PATCH 2/2 RESEND] ARM: dts: msm8660: Fix up GIC IRQ flags
-Date: Thu, 10 Jan 2019 15:50:54 +0100
-Message-Id: <20190110145054.11952-1-linus.walleij@linaro.org>
-X-Mailer: git-send-email 2.19.2
+ id 1ghbyg-0008Qn-KR
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 15:10:40 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=axentia.se;
+ s=selector1;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=fubxctBDBF6kkbNS9MWkCLsoSWq6LbrnhCguLwzDgVc=;
+ b=K6Td3zqaVkb5ckYSB7372Ie/eMSWXZRUoD1iuL8eCh/dK13VUyaCs4CPzeVTv+qv4n/typexhJHW+XMCNJq4+Or1f8VDtM8b7W+laiLaj+1wo491+L628CNldKhiTRP87rPyryJvMT8SgKNR9gL8qQaqJYdWUPIhC84cL+djqLA=
+Received: from AM6PR02MB4470.eurprd02.prod.outlook.com (20.177.191.218) by
+ AM6PR02MB4037.eurprd02.prod.outlook.com (20.177.112.150) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1516.14; Thu, 10 Jan 2019 15:10:34 +0000
+Received: from AM6PR02MB4470.eurprd02.prod.outlook.com
+ ([fe80::e5f3:a239:2ec4:4453]) by AM6PR02MB4470.eurprd02.prod.outlook.com
+ ([fe80::e5f3:a239:2ec4:4453%6]) with mapi id 15.20.1516.015; Thu, 10 Jan 2019
+ 15:10:34 +0000
+From: Peter Rosin <peda@axentia.se>
+To: "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
+Subject: [PATCH 1/4] drm/atmel-hlcdc: rotate planes counterclockwise
+Thread-Topic: [PATCH 1/4] drm/atmel-hlcdc: rotate planes counterclockwise
+Thread-Index: AQHUqPaiL7m+2adSdUCQzjfoCW/2Iw==
+Date: Thu, 10 Jan 2019 15:10:34 +0000
+Message-ID: <20190110151020.30468-2-peda@axentia.se>
+References: <20190110151020.30468-1-peda@axentia.se>
+In-Reply-To: <20190110151020.30468-1-peda@axentia.se>
+Accept-Language: en-US, sv-SE
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: git-send-email 2.11.0
+x-originating-ip: [85.226.244.23]
+x-clientproxiedby: HE1PR05CA0257.eurprd05.prod.outlook.com
+ (2603:10a6:3:fb::33) To AM6PR02MB4470.eurprd02.prod.outlook.com
+ (2603:10a6:20b:60::26)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=peda@axentia.se; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; AM6PR02MB4037;
+ 6:2Xh8ocU8hq74UnJQI+/u/oXxTu1L84X2SRxf1AVaUX7Qj/hp6rsmrzxjv4/QnbPkYXf/uon8HXvnr6QqfI2+CkR33PFW42PezcuW7zu/PVDE8AOVc8BHr7iBJCuaagfSxLP6k8TxwFM7KKjtuGzm6rcd7J3mQ50mTdDdV+xs7txCe8biS2BIR4ct9fK0Rn72+W5hWOsT0vmy/GRt8eCgFH9UhmH90UR6g7fP/3WywVvSTVMvrkrhY4haZXtX/RCwjG4yCo+Vq6wETFRWGiustPBG1wPdeeKFHDbDsMqwtjDCcyrnRd62uaEAPPoBNzEuJNhid/LSvqq4oNh8KP1PfhahIl2L+bxlIpLOMrjgp9jaS7yCdMjtGq2NatoDGffd0IY7EvQpwuqbpU+UiIbW5fKNuPYdRNBKNUB1vyjH7yRiLJjjheqeizy8gWeuh/VmziQYWT1chWfAfOprQr0Hhg==;
+ 5:7lUZ57Srx8wPHx7f9iz/nyXEtodaSuoxsKDQhpeEQI55A+wDbWaFxCN/7Fi6RSvzMw5mMWrPxUv4Vz6ll2qyXqMEUWo7tqmbK8sZuY12y/xQ9u7E+sKEeshEeJs/G6zCykB1pTFz6cUIGbWRAdH+t2pT5lD6MSru8TMmpmI7uJWQK2R5ArklrZasPigFUBWRPb5yc6226i4B4P8heWuteQ==;
+ 7:1yWWUaGNYTgUaMVGqR2OIC4f81xmvQXIEhgp+qObBZerGMfdsONCq1qw7inQ0h8LTdRGarfD3BhWLMPH/UOVN4h24J8JP0bzBYCMC1LirkZIs1nYVK1OMBE6KDEpeqL/LMvfC1YFLqWNWbXHSL0Yrw==
+x-ms-office365-filtering-correlation-id: 14efde95-ab2a-4925-919d-08d6770dc4be
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(7021145)(8989299)(5600109)(711020)(4534185)(7022145)(4603075)(4627221)(201702281549075)(8990200)(7048125)(7024125)(7027125)(7023125)(2017052603328)(7153060)(7193020);
+ SRVR:AM6PR02MB4037; 
+x-ms-traffictypediagnostic: AM6PR02MB4037:
+x-microsoft-antispam-prvs: <AM6PR02MB403797CE117F3881FD6AFF41BC840@AM6PR02MB4037.eurprd02.prod.outlook.com>
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(3230021)(908002)(999002)(5005026)(6040522)(8220060)(2401047)(8121501046)(3231475)(944501520)(52105112)(93006095)(93001095)(10201501046)(3002001)(6041310)(20161123558120)(2016111802025)(20161123562045)(20161123560045)(20161123564045)(6043046)(201708071742011)(7699051)(76991095);
+ SRVR:AM6PR02MB4037; BCL:0; PCL:0; RULEID:; SRVR:AM6PR02MB4037; 
+x-forefront-prvs: 0913EA1D60
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10019020)(39830400003)(136003)(366004)(396003)(346002)(376002)(199004)(189003)(53936002)(316002)(36756003)(6512007)(97736004)(50226002)(5660300001)(66066001)(186003)(386003)(4326008)(6506007)(446003)(25786009)(26005)(256004)(11346002)(2501003)(476003)(102836004)(2616005)(6916009)(14454004)(71190400001)(71200400001)(106356001)(105586002)(2906002)(68736007)(7736002)(486006)(5640700003)(1076003)(6436002)(6486002)(508600001)(2351001)(81156014)(99286004)(81166006)(3846002)(8936002)(305945005)(575784001)(6116002)(8676002)(86362001)(54906003)(74482002)(76176011)(52116002);
+ DIR:OUT; SFP:1102; SCL:1; SRVR:AM6PR02MB4037;
+ H:AM6PR02MB4470.eurprd02.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: axentia.se does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: qJ2Q/8/QthtF9E8duURiypdCxu2wV0p/Fb987Ipu4/e/oEjJUalwSgU9NdlfkAch63rK178NC/pp1bgLDzXKThhsGKBDeuE4m5f6k6UU0t0STfHSG5TmD0MigDxqSrx8jUGkotxC6KpoGiqATlkuAzRECsSFzEj7utPnxulMrbkxqIb/RhE+Z9O61h6Wf3c11xdIG4TZZmviqDACSFMZiZxVPBegiTESP+UDs2r/fFYAbzzZC4EIIxp8iPuYbC3ZCw8vShHRbbFXCcuUeKOpmcdYh3IU9zg+VUoMCHhQYHFCKUun5/jXy+cfdZZOHfVz
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
+X-OriginatorOrg: axentia.se
+X-MS-Exchange-CrossTenant-Network-Message-Id: 14efde95-ab2a-4925-919d-08d6770dc4be
+X-MS-Exchange-CrossTenant-originalarrivaltime: 10 Jan 2019 15:10:33.3554 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 4ee68585-03e1-4785-942a-df9c1871a234
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR02MB4037
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_065101_325695_306A0BB2 
-X-CRM114-Status: GOOD (  10.72  )
+X-CRM114-CacheID: sfid-20190110_071038_666817_E04E60AE 
+X-CRM114-Status: GOOD (  10.62  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,100 +122,73 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Linus Walleij <linus.walleij@linaro.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>,
+ David Airlie <airlied@linux.ie>,
+ "dri-devel@lists.freedesktop.org" <dri-devel@lists.freedesktop.org>,
+ Boris Brezillon <boris.brezillon@bootlin.com>, Peter Rosin <peda@axentia.se>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-All the GSBI blocks are marking their GIC IRQ lines as
-"IRQ_TYPE_NONE" but there is no such thing: all GIC IRQ
-lines have a trigger type.
+Ouch, the driver rotates planes clockwise, which is simply not correct.
 
-That yields the following warning from the GIC driver:
-
-WARNING: CPU: 0 PID: 1 at ../drivers/irqchip/irq-gic.c:1016
-	 gic_irq_domain_translate+0xdc/0xe4
-(...)
-
-Mark all of these IRQ_TYPE_LEVEL_HIGH as is common so this
-warning goes away.
-
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Peter Rosin <peda@axentia.se>
 ---
- arch/arm/boot/dts/qcom-msm8660.dtsi | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 30 ++++++++++++-------------
+ 1 file changed, 15 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-index 9b1cf00d8ca3..e5da87036dbb 100644
---- a/arch/arm/boot/dts/qcom-msm8660.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
-@@ -141,7 +141,7 @@
- 				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
- 				reg = <0x16540000 0x1000>,
- 				      <0x16500000 0x1000>;
--				interrupts = <GIC_SPI 156 IRQ_TYPE_NONE>;
-+				interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&gcc GSBI6_UART_CLK>, <&gcc GSBI6_H_CLK>;
- 				clock-names = "core", "iface";
- 				status = "disabled";
-@@ -150,7 +150,7 @@
- 			gsbi6_i2c: i2c@16580000 {
- 				compatible = "qcom,i2c-qup-v1.1.1";
- 				reg = <0x16580000 0x1000>;
--				interrupts = <GIC_SPI 157 IRQ_TYPE_NONE>;
-+				interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&gcc GSBI6_QUP_CLK>, <&gcc GSBI6_H_CLK>;
- 				clock-names = "core", "iface";
- 				#address-cells = <1>;
-@@ -176,7 +176,7 @@
- 				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
- 				reg = <0x16640000 0x1000>,
- 				      <0x16600000 0x1000>;
--				interrupts = <GIC_SPI 158 IRQ_TYPE_NONE>;
-+				interrupts = <GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&gcc GSBI7_UART_CLK>, <&gcc GSBI7_H_CLK>;
- 				clock-names = "core", "iface";
- 				status = "disabled";
-@@ -185,7 +185,7 @@
- 			gsbi7_i2c: i2c@16680000 {
- 				compatible = "qcom,i2c-qup-v1.1.1";
- 				reg = <0x16680000 0x1000>;
--				interrupts = <GIC_SPI 159 IRQ_TYPE_NONE>;
-+				interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&gcc GSBI7_QUP_CLK>, <&gcc GSBI7_H_CLK>;
- 				clock-names = "core", "iface";
- 				#address-cells = <1>;
-@@ -209,7 +209,7 @@
- 			gsbi8_i2c: i2c@19880000 {
- 				compatible = "qcom,i2c-qup-v1.1.1";
- 				reg = <0x19880000 0x1000>;
--				interrupts = <GIC_SPI 161 IRQ_TYPE_NONE>;
-+				interrupts = <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&gcc GSBI8_QUP_CLK>, <&gcc GSBI8_H_CLK>;
- 				clock-names = "core", "iface";
- 				#address-cells = <1>;
-@@ -234,7 +234,7 @@
- 				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
- 				reg = <0x19c40000 0x1000>,
- 				      <0x19c00000 0x1000>;
--				interrupts = <0 195 IRQ_TYPE_NONE>;
-+				interrupts = <0 195 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&gcc GSBI12_UART_CLK>, <&gcc GSBI12_H_CLK>;
- 				clock-names = "core", "iface";
- 				status = "disabled";
-@@ -243,7 +243,7 @@
- 			gsbi12_i2c: i2c@19c80000 {
- 				compatible = "qcom,i2c-qup-v1.1.1";
- 				reg = <0x19c80000 0x1000>;
--				interrupts = <0 196 IRQ_TYPE_NONE>;
-+				interrupts = <0 196 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&gcc GSBI12_QUP_CLK>, <&gcc GSBI12_H_CLK>;
- 				clock-names = "core", "iface";
- 				#address-cells = <1>;
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+index 47e0992f3908..ea8fc0deb814 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+@@ -691,13 +691,14 @@ static int atmel_hlcdc_plane_atomic_check(struct drm_plane *p,
+ 
+ 		switch (state->base.rotation & DRM_MODE_ROTATE_MASK) {
+ 		case DRM_MODE_ROTATE_90:
+-			offset = ((y_offset + state->src_y + patched_src_w - 1) /
+-				  ydiv) * fb->pitches[i];
+-			offset += ((x_offset + state->src_x) / xdiv) *
+-				  state->bpp[i];
+-			state->xstride[i] = ((patched_src_w - 1) / ydiv) *
+-					  fb->pitches[i];
+-			state->pstride[i] = -fb->pitches[i] - state->bpp[i];
++			offset = ((y_offset + state->src_y) / ydiv) *
++				 fb->pitches[i];
++			offset += ((x_offset + state->src_x + patched_src_h - 1) /
++				   xdiv) * state->bpp[i];
++			state->xstride[i] = -(((patched_src_w - 1) / ydiv) *
++					    fb->pitches[i]) -
++					  (2 * state->bpp[i]);
++			state->pstride[i] = fb->pitches[i] - state->bpp[i];
+ 			break;
+ 		case DRM_MODE_ROTATE_180:
+ 			offset = ((y_offset + state->src_y + patched_src_h - 1) /
+@@ -709,14 +710,13 @@ static int atmel_hlcdc_plane_atomic_check(struct drm_plane *p,
+ 			state->pstride[i] = -2 * state->bpp[i];
+ 			break;
+ 		case DRM_MODE_ROTATE_270:
+-			offset = ((y_offset + state->src_y) / ydiv) *
+-				 fb->pitches[i];
+-			offset += ((x_offset + state->src_x + patched_src_h - 1) /
+-				   xdiv) * state->bpp[i];
+-			state->xstride[i] = -(((patched_src_w - 1) / ydiv) *
+-					    fb->pitches[i]) -
+-					  (2 * state->bpp[i]);
+-			state->pstride[i] = fb->pitches[i] - state->bpp[i];
++			offset = ((y_offset + state->src_y + patched_src_w - 1) /
++				  ydiv) * fb->pitches[i];
++			offset += ((x_offset + state->src_x) / xdiv) *
++				  state->bpp[i];
++			state->xstride[i] = ((patched_src_w - 1) / ydiv) *
++					  fb->pitches[i];
++			state->pstride[i] = -fb->pitches[i] - state->bpp[i];
+ 			break;
+ 		case DRM_MODE_ROTATE_0:
+ 		default:
 -- 
-2.19.2
+2.11.0
 
 
 _______________________________________________
