@@ -2,84 +2,83 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 516E6C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 08:53:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 75EC2C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 09:00:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2162D21783
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 08:53:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 46A87214C6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 09:00:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dD8dRDYK";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="UU5BpzlB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2162D21783
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SHL4X+cs";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="StTE4o0X"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 46A87214C6
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=eD5wIgW2JjKWPbhWZpaWQA1eIFVa2XVkumowtWkORMk=; b=dD8dRDYKEfZ/a7
-	FELvur+24uW7p/sc4YPvtrunCBETpWP1SCkJ7LO989qDNjIauppwyfPN80azDjKZnP0NPHregJ1zK
-	yj8tUP+wPtwXhm62AxR5NWHL3Vbw5T2ZkR4Ly45QJcFPillm45XCLLhcgrllu0hB5SuL/xjgLwod+
-	0/04J4L8952kogXdDRK6WOKdPbX6A9SGvyT+pvlVyZ72PDUGG9YHsgnHfuTwkElLXcSIh+FN39x11
-	9q9QqGxYOPkouZSgOYYXAn+m+cWDYHQBAKKTlDwWiTxkbNZuB1dmEcahp+fTAowbypsB7NEccQRRs
-	R5Jg30tnp8P3mVoBZzmA==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=SJEoS2+lsAurDH5i8opYlZAzjFOwIWAm5ESoFxs1lWQ=; b=SHL
+	4X+cs3wXlIDQYyr+jxQW/0tvrJ1QVJcIX2TmKfCwA6BU6TTh1ulp04/gHyNDyPCt31HYKc9xTglq8
+	xq6xsuq0OepQ++FhwT0I8Qtq0cOL+CsZuu9BsKMk7l7oWOP6d5iDgRkNq81X8WmLEEKtvII40fMEn
+	5JGNRddsqS9b3/XdNT25yfVFFSvjfe7iPu12l1i/LbpTe16zZPTrkB5ATa+UyxCTm8+d0cCOh1d7R
+	RzmH7gcyBEj2tvIt7MKEq6lhLQGeE6QrcNoLIhWxTPQ0tk45pbuJT4DG7URBeCnuyy4IJI/1kd7yH
+	Et35kw0Tj6Rea5FH6Qan0NZthufQP5g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghW5y-0006Hs-3T; Thu, 10 Jan 2019 08:53:46 +0000
-Received: from mail-pl1-x62f.google.com ([2607:f8b0:4864:20::62f])
+	id 1ghWCu-0001Jo-4i; Thu, 10 Jan 2019 09:00:56 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghW5u-0006HT-Bs
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 08:53:43 +0000
-Received: by mail-pl1-x62f.google.com with SMTP id y1so4894262plp.9
+ id 1ghWCm-0001Iy-Ih
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 09:00:54 +0000
+Received: by mail-wr1-x441.google.com with SMTP id x10so10383223wrs.8
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 10 Jan 2019 00:53:41 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=XfTn9+ut8GJ0U5x3YVMYmOCYYDA033x5ZT9FTfW1xCk=;
- b=UU5BpzlB+6gBTQQFPa+dH7MWAmmfB8WmTaBxDg27aFdbpWaSi8ur8dgHK2I3zIG0Fr
- BGZXD5HEDVVYKxD2oqFsTYNKUUYInp62IWqo48x2AfeVtuLI86I41zfyt5zqKiIEgOIp
- CnsBId9ENboGJKnc7qpETLxPVwIUOC6U9B7NPHe1nd9RJP7F6agLlIQbNYMFNDcuzTR/
- ZGuFtHTZI4xOq4u6rJeyaU5UFojxEHamQEs+0gRh9T/kfxi5PyrIhCfALLsGktdo7ntE
- 4cLADt5pVg+kgmkH0dYT9CCVRuErd8VOlNuJlcM4hCOr7hpNqJZr/5QgF7DfIh9lsf+h
- QrcQ==
+ Thu, 10 Jan 2019 01:00:48 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id;
+ bh=18XqnmtxO2ZjWnroEVY6EZhQhDEBrpPKdAHEWSzf+WU=;
+ b=StTE4o0XcaXOhXmbEVctoZSfkYDxDJftLBtLSB+aOMwy6xCkH0BcV5DvLurqinEZ5d
+ yotV4lgYIg217pLo1xVL3QfUFxxYzaI2ib4kkbGm7ufUkybttnVtZdjCnJemClaJw0EL
+ 5kheEW6GNU4boUXUB/G+HMnhl3E+Z2XB+REkc=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=XfTn9+ut8GJ0U5x3YVMYmOCYYDA033x5ZT9FTfW1xCk=;
- b=MYKdGJqgvs7KiT3+uX6mZC8ScxZn3S3oqULh88rbCl/ouHAfzehNft/DfunksHfMQy
- GOau1HnW6sHutpTvEi74N28yxQE1CBFiTa/+lPy3RT23nfrWDk3RAKOfu1Qid+Rj7NIU
- 3JF/SaCoQEAyeylDYkP+QDUIlJtwLSzoKiANU4Z8eL7pUvvL8UGH07chswXOHa4Zk3JO
- SAcD+fvFax/q5yLbeEEh4wIog9dIGlo1p1zMzIY+UVpZfLzXp9mmkuVILG6ZurY2JjFf
- FIry0eK2Ecbww4uQkcAkML4wCQNzlNygsooagSyBKrKkzccn5QISixyOPs2W3Mz/zCrg
- 2pVA==
-X-Gm-Message-State: AJcUukdoQwisoS3yQuFY1yQsGg/jXowjth0WK4row2mPDlVvG6N8yG37
- 5iH0QkikYeIA2PDdRDHs7r9a/OWA9OGgSWj6xkQ=
-X-Google-Smtp-Source: ALg8bN5PyrVXQWbb8Qxq07RvXW039VQVlYWUY2qQvgb+Zp3Mw6R5205rsy2mSfwVAl+Xf/ulkNx2VUAdS413eI45Rvo=
-X-Received: by 2002:a17:902:ac1:: with SMTP id 59mr9356024plp.36.1547110420783; 
- Thu, 10 Jan 2019 00:53:40 -0800 (PST)
-MIME-Version: 1.0
-References: <CADUS3om=GzsVaVHvcAChivp1cTFYq-5YC_mQr-Yw3ANxbn4k+Q@mail.gmail.com>
- <a5660bda-c4b1-1907-93e4-d9ce9d6f84d5@arm.com>
-In-Reply-To: <a5660bda-c4b1-1907-93e4-d9ce9d6f84d5@arm.com>
-From: yoma sophian <sophian.yoma@gmail.com>
-Date: Thu, 10 Jan 2019 16:53:29 +0800
-Message-ID: <CADUS3onK0LVpnALtscHY=cLfJ-UA+08dhp9tH7QO93QVGhp1iQ@mail.gmail.com>
-Subject: Re: arm64: some question about default_idle_call flow
-To: Julien Thierry <julien.thierry@arm.com>
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=18XqnmtxO2ZjWnroEVY6EZhQhDEBrpPKdAHEWSzf+WU=;
+ b=ADtfnvwQqTlRufBiMEK9EnEgQwXSxQIh5JFClP6lncQZltv8cOTINiIiTBs/E/tSmm
+ yyJ/t2v/rjpPyeYDh47OjwuLY/MTqDq7VBdV7YlBLSc78GMOqKe25e/zRiR57zBnr6o9
+ NLauzFlg/LEe79jglrTUxS1lCLxqRDei0iJKZYx29gu32zG4q30GHV1Cxx3/IwBcC1E/
+ U+X9rVutfG7HSGg7MMrItSkNjA09YY3E9na94OamgofevER0zPkAWT4TKUeo2AVFysKA
+ BFA4DpeXIeBTq3l5MYmV3t1xYJSTFWsBtkh1K/tORtMgMtXacupCpOHJl7BMbEJYmQvk
+ Ky8Q==
+X-Gm-Message-State: AJcUukfC2vmfSTxyPKYQlx7A2UGiyt7NEnslfeECrCRT/fpvtVQ42aeq
+ k5eIglYBiJvaQ84YKhjtjwLsuw==
+X-Google-Smtp-Source: ALg8bN4p1ZQuNVqDCrqwggX/aTkOENTsVdHD1g8Pgg5zQEoc+2qbWVw1fBTyboKuBWbZMFpNiZDfjw==
+X-Received: by 2002:adf:f101:: with SMTP id r1mr8434701wro.32.1547110846578;
+ Thu, 10 Jan 2019 01:00:46 -0800 (PST)
+Received: from localhost.localdomain ([2a01:e0a:f:6020:e487:f4e5:a382:9ce9])
+ by smtp.gmail.com with ESMTPSA id v1sm78383304wrw.90.2019.01.10.01.00.45
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Thu, 10 Jan 2019 01:00:45 -0800 (PST)
+From: Vincent Guittot <vincent.guittot@linaro.org>
+To: linux-pm@vger.kernel.org, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-omap@vger.kernel.org,
+ rjw@rjwysocki.net, ulf.hansson@linaro.org, tony@atomide.com,
+ ladis@linux-mips.org
+Subject: [PATCH v2] PM/runtime: Fix autosuspend_delay on 32bits arch
+Date: Thu, 10 Jan 2019 10:00:40 +0100
+Message-Id: <1547110840-15396-1-git-send-email-vincent.guittot@linaro.org>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_005342_427515_7F85E270 
-X-CRM114-Status: UNSURE (   7.29  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190110_010048_644858_DF5950C9 
+X-CRM114-Status: GOOD (  14.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,24 +90,55 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org
+Cc: Vincent Guittot <vincent.guittot@linaro.org>
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-hi Julien:
-> A note in the same section adds:
-> "WFI wake-up events are never disabled by EDSCR.INTdis, and are never
-> masked by the PSTATE.{A, I, F} mask bits. If wake-up is invoked by an
-> interrupt that is disabled or masked the interrupt is not taken."
-I have one question:
-a) if not only local_irq_disabled but also turn off GIC, the CPU will
-not be waked up after run WFI, right?
-(The PE will not receive any  SError interrupt, IRQ interrupt, or FIQ interrupt,
-since GIC is turned off. And at this time, only legacy fiq/irq can wake up CPU)
+Cast autosuspend_delay in u64 to make sure that the full computation of
+expires or slack will be done in u64, even on 32bits arch.
+Otherwise, any delay greater than 2^31 nsec can overflow if signed 32bits
+is used when moving delay from msec to nsec
 
-Appreciate ur thoughtful explanation.
+Fixes: 8234f6734c5d ("PM-runtime: Switch autosuspend over to using hrtimers")
+Reported-by: Tony Lindgren <tony@atomide.com>
+Tested-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+---
+
+Change since v1:
+- add u64 cast for slack computation
+
+ drivers/base/power/runtime.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
+index 7062469..76d0676 100644
+--- a/drivers/base/power/runtime.c
++++ b/drivers/base/power/runtime.c
+@@ -141,7 +141,7 @@ u64 pm_runtime_autosuspend_expiration(struct device *dev)
+ 
+ 	last_busy = READ_ONCE(dev->power.last_busy);
+ 
+-	expires = last_busy + autosuspend_delay * NSEC_PER_MSEC;
++	expires = last_busy + (u64)autosuspend_delay * NSEC_PER_MSEC;
+ 	if (expires <= now)
+ 		expires = 0;	/* Already expired. */
+ 
+@@ -525,7 +525,7 @@ static int rpm_suspend(struct device *dev, int rpmflags)
+ 				 * We add a slack of 25% to gather wakeups
+ 				 * without sacrificing the granularity.
+ 				 */
+-				u64 slack = READ_ONCE(dev->power.autosuspend_delay) *
++				u64 slack = (u64)READ_ONCE(dev->power.autosuspend_delay) *
+ 						    (NSEC_PER_MSEC >> 2);
+ 
+ 				dev->power.timer_expires = expires;
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
