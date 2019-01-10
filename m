@@ -2,86 +2,84 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C212DC43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 11:41:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 66DF1C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 11:52:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 937922173B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 11:41:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 37183214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 11:52:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ARouPPk3";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="d+FGocRv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 937922173B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ifodJaP7";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="lJM9rQC/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 37183214DA
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=Ttt0vX54L3D+FEPsIxR+ErLnYxwiFpKQnl5biylkCpA=; b=ARouPPk3hj35Y0
-	P17yOWmq24WfuwgoBgAXYJ2mYnxU3m7B187lRRcNDKbIp9G9JaKmeqkWzjlxOsK0iskIdM7cvjzw+
-	lvHNToyTyTDY4oR+VAroDN2YNxBczdtzSZGwy0zoPx9QVtqjFokQ7p2uPnnPQuGiThON31VJV5rYY
-	O8F9f+DSwAwL5fV5WbotHBHp6V2tBJBsr/oXxx2sDGmq9Rd0Jn1Jhas/IG8VdX5DTrjThBXIdBpfK
-	iHPmFBafzzGZp/2LEWmmUvV5w4y6+BJg5j7hSkCnUy7OIZCQeCwhVyksAI8X/xu3wh7rnCExjjhu2
-	n3Gi9CT92liCHwaTzOYQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=+KsZP3rB63Xl/lJvtOkR23EVVOdafB081ppLeih5Qfo=; b=ifodJaP7tg5RNo
+	fbb+psOD33bCX00CHmwFi+O3th3uIkyPRPsjzIg8xxKy9BlwEkDvLRqJBYBIGABQUak1yU2+xdC4L
+	a9DpnlZ8T6evXk5HUsxWEI1T85irk5LmduH90yPPcL4WXd+XrE8MmbDcAvzpp/xhgqOAEIu14OTp6
+	z5DFzF7Z1Qj3n39C/F1ARVx4BCkGVRLly74HFXvsmy5zi9CBrcZFgv4cWLH4WZTgrtQgu+zEDX7va
+	0vymlpH3Zj4h7hcR3q/0g2KWMK7YlSnf97ozIiGMfmHLFIcafR9a78+1n7FLXPMfEPEgrdce1KQFx
+	iDTVgb2/F+gLhST1pGxw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghYhn-0004cI-BW; Thu, 10 Jan 2019 11:40:59 +0000
-Received: from mail-lf1-x141.google.com ([2a00:1450:4864:20::141])
+	id 1ghYsk-0008Ma-SY; Thu, 10 Jan 2019 11:52:18 +0000
+Received: from lelv0143.ext.ti.com ([198.47.23.248])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghYhj-0004bs-U4
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 11:40:57 +0000
-Received: by mail-lf1-x141.google.com with SMTP id c16so8055308lfj.8
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 10 Jan 2019 03:40:54 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=IlDK8bGb/kRNe1UzuHHE+g8wvOU0YDJW7WMbCLP2uh0=;
- b=d+FGocRvhsD+gmzQW8HEJEv1gnpLdpOeJZQW4JLualBkev6vkye2YieO0ftmo4S1LZ
- 3NaeHEdVLiJ1F64qJQck7pL3MLX+mGPONC/cenzjYeQ4CMWPFL3ttvi0AwA2zPNpKhqn
- mgkPMjQvNAOD/rbvU4fNNritrslBMOTMzyWEM=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=IlDK8bGb/kRNe1UzuHHE+g8wvOU0YDJW7WMbCLP2uh0=;
- b=NtP2d75ffbgTMQT2ey6Wk+yndlamLp/WxI8995cdQ+uhStNNZQnu3jHB3tErX/g7rJ
- Zn5UVI9JIbuEWEEKvDJ4NOQZ9NpEcR0aODPz3bJ61yMLv9Zft6rEWS4RGBmwY8gy+8Gc
- E3nvB3Q4mxasPmwFGqtk1iq/nLXLrnTl3zMS9g5u5rCdbW70OoJ5QxizE0lYzpdVlqZy
- 3tmx0ZfPuOj4e2BnIVdY440Yz/U+hG3pEikMps3LiU0b4LHTpPLTWfphTDZ/zdvlcDOf
- 6f6cp9oGfWn1EoshENTjaqbWCHFs4fg4j50F/ohViGG2bkoBTMAQiPo3HSaW8ptFxMMB
- iIWw==
-X-Gm-Message-State: AJcUukdV073NZHdHjgQuohTsiyw4zw7s+5hdGcpqFL8XodT1ZszkYVtx
- WWuAMuX8ObKpVv3Yv05+zG0MaQ==
-X-Google-Smtp-Source: ALg8bN58DACMjpRLx0nlXmAzkCQGoq7jXWdIzihg1A6aHe/BaExdkcz8HtWDy7/yZltzh50HnH3i3w==
-X-Received: by 2002:a19:5a05:: with SMTP id o5mr5974222lfb.140.1547120453263; 
- Thu, 10 Jan 2019 03:40:53 -0800 (PST)
-Received: from genomnajs.ideon.se ([85.235.10.227])
- by smtp.gmail.com with ESMTPSA id k20sm7573177lfe.3.2019.01.10.03.40.51
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 10 Jan 2019 03:40:52 -0800 (PST)
-From: Linus Walleij <linus.walleij@linaro.org>
-To: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
- Eric Anholt <eric@anholt.net>,
- =?UTF-8?q?Noralf=20Tr=C3=B8nnes?= <noralf@tronnes.org>,
- Dave Airlie <airlied@redhat.com>, David Lechner <david@lechnology.com>
-Subject: [PATCH v4] drm/fb-helper: Scale back depth to supported maximum
-Date: Thu, 10 Jan 2019 12:40:49 +0100
-Message-Id: <20190110114049.10618-1-linus.walleij@linaro.org>
-X-Mailer: git-send-email 2.19.2
+ id 1ghYsg-0008M8-B0
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 11:52:15 +0000
+Received: from fllv0035.itg.ti.com ([10.64.41.0])
+ by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0ABq8XQ051327;
+ Thu, 10 Jan 2019 05:52:08 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1547121128;
+ bh=kK5OGjM6dqECzPd5ZaNdPEnutiwSDTnoOQrWXRwCKf0=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=lJM9rQC/1BcOwt6S+6mR1S0IktI4V6AnHZaTtNRAxSZOWjq8gKDkJfsV8eOkHOWgG
+ d5YNjcCco/t3bEY0DUNz2JNBlmpuszCxFBw7lWjTibankFmX7Xj9VabDiYYfLWfrwj
+ vw4hI7z+442VRXwJaNDRjYgHu3tJRQIE1eSPrjXI=
+Received: from DFLE114.ent.ti.com (dfle114.ent.ti.com [10.64.6.35])
+ by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0ABq8xj099778
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Thu, 10 Jan 2019 05:52:08 -0600
+Received: from DFLE113.ent.ti.com (10.64.6.34) by DFLE114.ent.ti.com
+ (10.64.6.35) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 10
+ Jan 2019 05:52:08 -0600
+Received: from dflp33.itg.ti.com (10.64.6.16) by DFLE113.ent.ti.com
+ (10.64.6.34) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Thu, 10 Jan 2019 05:52:08 -0600
+Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dflp33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0ABq2l1031261;
+ Thu, 10 Jan 2019 05:52:03 -0600
+Subject: Re: Regression in v4.20 with net phy soft reset changes
+To: Tony Lindgren <tony@atomide.com>, Heiner Kallweit <hkallweit1@gmail.com>
+References: <20190109190650.GT5544@atomide.com>
+ <a63ca542-db96-40ed-201d-59c609f565ce@gmail.com>
+ <20190109213611.GU5544@atomide.com>
+From: Sekhar Nori <nsekhar@ti.com>
+Message-ID: <79c57d19-837e-4468-f6b4-b3bfa9dde82a@ti.com>
+Date: Thu, 10 Jan 2019 17:22:02 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
+In-Reply-To: <20190109213611.GU5544@atomide.com>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_034055_973453_EC9DA244 
-X-CRM114-Status: GOOD (  21.60  )
+X-CRM114-CacheID: sfid-20190110_035214_501895_4F80FCBB 
+X-CRM114-Status: GOOD (  26.56  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,98 +91,99 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: =?UTF-8?q?Ville=20Syrj=C3=A4l=C3=A4?= <ville.syrjala@linux.intel.com>,
- linux-fbdev@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- dri-devel@lists.freedesktop.org, Linus Walleij <linus.walleij@linaro.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Andrew Lunn <andrew@lunn.ch>, Clemens Gruber <clemens.gruber@pqgruber.com>,
+ Florian Fainelli <f.fainelli@gmail.com>,
+ Ivan Khoronzhuk <ivan.khoronzhuk@linaro.org>, WingMan Kwok <w-kwok2@ti.com>,
+ Keerthy <j-keerthy@ti.com>, linux-kernel@vger.kernel.org,
+ Tero Kristo <t-kristo@ti.com>, Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ Murali Karicheri <m-karicheri2@ti.com>, linux-arm-kernel@lists.infradead.org,
+ Rex Chang <rchang@ti.com>, netdev@vger.kernel.org, linux-omap@vger.kernel.org,
+ "David S. Miller" <davem@davemloft.net>, Chris Healy <cphealy@gmail.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-VGhlIGZvbGxvd2luZyBoYXBwZW5lZCB3aGVuIG1pZ3JhdGluZyBhbiBvbGQgZmJkZXYgZHJpdmVy
-IHRvIERSTToKClRoZSBJbnRlZ3JhdG9yL0NQIFBMMTExIHN1cHBvcnRzIDE2QlBQIGJ1dCBvbmx5
-IEFSR0IxNTU1L0FCR1IxNTU1Cm9yIFhSR0IxNTU1L1hCR1IxNTU1IGkuZS4gdGhlIG1heGltdW0g
-ZGVwdGggaXMgMTUuCgpUaGlzIG1ha2VzIHRoZSBpbml0aWFsaXphdGlvbiBvZiB0aGUgZnJhbWVi
-dWZmZXIgZmFpbCBzaW5jZQp0aGUgY29kZSBpbiBkcm1fZmJfaGVscGVyX3NpbmdsZV9mYl9wcm9i
-ZSgpIGFzc2lnbnMgdGhlIHNhbWUgdmFsdWUKdG8gc2l6ZXMuc3VyZmFjZV9icHAgYW5kIHNpemVz
-LnN1cmZhY2VfZGVwdGguIEkuZS4gaXQgc2ltcGx5IGFzc3VtZXMKYSAxLXRvLTEgbWFwcGluZyBi
-ZXR3ZWVuIEJQUCBhbmQgZGVwdGgsIHdoaWNoIGlzIHRydWUgaW4gbW9zdCBjYXNlcwpidXQgbm90
-IGZvciB0aGlzIGhhcmR3YXJlIHRoYXQgb25seSBzdXBwb3J0IG9kZCBmb3JtYXRzLgoKVG8gc3Vw
-cG9ydCB0aGUgb2RkIGNhc2Ugb2YgYSBkcml2ZXIgc3VwcG9ydGluZyAxNkJQUCB3aXRoIG9ubHkg
-MTUKYml0cyBvZiBkZXB0aCwgdGhpcyBwYXRjaCB3aWxsIG1ha2UgdGhlIGNvZGUgbG9vcCBvdmVy
-IHRoZSBmb3JtYXRzCnN1cHBvcnRlZCBvbiB0aGUgcHJpbWFyeSBwbGFuZSBvbiBlYWNoIENSVEMg
-bWFuYWdlZCBieSB0aGUgRkIKaGVscGVyIGFuZCBjYXAgdGhlIGRlcHRoIHRvIHRoZSBtYXhpbXVt
-IHN1cHBvcnRlZCBvbiBhbnkgcHJpbWFyeQpwbGFuZS4KCk9uIHRoZSBQTDExMCBJbnRlZ3JhdG9y
-LCB0aGlzIG1ha2VzIGRybV9tb2RlX2xlZ2FjeV9mYl9mb3JtYXQoKQpzZWxlY3QgRFJNX0ZPUk1B
-VF9YUkdCMTU1NSB3aGljaCBpcyBhY2NlcHRhYmxlIGZvciB0aGlzIGRyaXZlciwgYW5kCnRodXMg
-d2UgZ2V0IGZyYW1lYnVmZmVyLCBwZW5ndWluIGFuZCBjb25zb2xlIG9uIHRoZSBJbnRlZ3JhdG9y
-L0NQLgoKQ2M6IE5vcmFsZiBUcsO4bm5lcyA8bm9yYWxmQHRyb25uZXMub3JnPgpDYzogVmlsbGUg
-U3lyasOkbMOkIDx2aWxsZS5zeXJqYWxhQGxpbnV4LmludGVsLmNvbT4KUmV2aWV3ZWQtYnk6IERh
-bmllbCBWZXR0ZXIgPGRhbmllbC52ZXR0ZXJAZmZ3bGwuY2g+ClNpZ25lZC1vZmYtYnk6IExpbnVz
-IFdhbGxlaWogPGxpbnVzLndhbGxlaWpAbGluYXJvLm9yZz4KLS0tCkNoYW5nZUxvZyB2My0+djQ6
-Ci0gQXNzaWduIGJlc3RfZGVwdGggYWxzbyB3aGVuIHdlIGhhdmUgYSBwZXJmZWN0IGZpdCwgZHVo
-LgpDaGFuZ2VMb2cgdjItPnYzOgotIFJlYmFzZWQgYW5kIHRlc3RlZCB3aXRoIHY1LjAtcmMxCi0g
-U2tpcCBhbnkgZm9ybWF0cyB3aXRoIGZtdC0+ZGVwdGggPT0gMAotIENvbGxlY3RlZCBEYW5pZWxz
-IHJldmlldyB0YWcuCkNoYW5nZUxvZyB2MS0+djI6Ci0gTG9vcCBvdmVyIHRoZSBDUlRDcyBtYW5h
-Z2VkIGJ5IHRoZSBoZWxwZXIgYW5kIGNoZWNrIHRoZQogIGNydGMtPnByaW1hcnkgb24gZWFjaCBD
-UlRDIGZvciB0aGUgYXBwbGljYWJsZSBmb3JtYXRzIGFuZAogIHRodXMgZGVwdGhzLgotIFNraXAg
-b3ZlciBZVVYgZm9ybWF0cy4gVGhlIGZyYW1lYnVmZmVyIGVtdWxhdGlvbiBjYW5ub3QKICBoYW5k
-bGUgdGhlc2UgZm9ybWF0cy4KClRoZSB2MSB3YXMgc2VudCBzb21lIHdoaWxlIGJhY2sgaW4gZmVi
-cnVhcnkgYW5kIEkgb25seSByZWNlbnRseQpnb3QgYmFjayB0byBmaXhpbmcgdGhpcyB1cCB0byBz
-dXBwb3J0IHRoZSBsYXN0IENMQ0QgZGlzcGxheXMuCkl0IHdhcyBhZ3JlZWQgdGhhdCBpdCBpcyBw
-cm9iYWJseSBiZXN0IHRvIGF1Z21lbnQgdGhlIGZyYW1lYnVmZmVyCmluaXRpYWxpemVyIHRvIHBh
-c3MgYSBkZXNpcmVkIHBpeGVsIGZvcm1hdCBpbnN0ZWFkIG9mIGp1c3QKQlBQIGFzIHRvZGF5LCBi
-dXQgdGhhdCBpcyBhIGJpdCBkYXVudGluZywgYW5kIERhbmllbCBzYWlkIHRoYXQKd2Ugd291bGQg
-cHJvYmFibHkgYW55d2F5cyBuZWVkIGEgZmFsbGJhY2sgbGlrZSB0aGlzLgotLS0KIGRyaXZlcnMv
-Z3B1L2RybS9kcm1fZmJfaGVscGVyLmMgfCA1NSArKysrKysrKysrKysrKysrKysrKysrKysrKysr
-KysrKy0KIDEgZmlsZSBjaGFuZ2VkLCA1NCBpbnNlcnRpb25zKCspLCAxIGRlbGV0aW9uKC0pCgpk
-aWZmIC0tZ2l0IGEvZHJpdmVycy9ncHUvZHJtL2RybV9mYl9oZWxwZXIuYyBiL2RyaXZlcnMvZ3B1
-L2RybS9kcm1fZmJfaGVscGVyLmMKaW5kZXggZDNhZjA5OGIwOTIyLi5mN2YzMWFkNWQzZWUgMTAw
-NjQ0Ci0tLSBhL2RyaXZlcnMvZ3B1L2RybS9kcm1fZmJfaGVscGVyLmMKKysrIGIvZHJpdmVycy9n
-cHUvZHJtL2RybV9mYl9oZWxwZXIuYwpAQCAtMTc5Nyw2ICsxNzk3LDcgQEAgc3RhdGljIGludCBk
-cm1fZmJfaGVscGVyX3NpbmdsZV9mYl9wcm9iZShzdHJ1Y3QgZHJtX2ZiX2hlbHBlciAqZmJfaGVs
-cGVyLAogCWludCBpOwogCXN0cnVjdCBkcm1fZmJfaGVscGVyX3N1cmZhY2Vfc2l6ZSBzaXplczsK
-IAlpbnQgZ2FtbWFfc2l6ZSA9IDA7CisJaW50IGJlc3RfZGVwdGggPSAwOwogCiAJbWVtc2V0KCZz
-aXplcywgMCwgc2l6ZW9mKHN0cnVjdCBkcm1fZmJfaGVscGVyX3N1cmZhY2Vfc2l6ZSkpOwogCXNp
-emVzLnN1cmZhY2VfZGVwdGggPSAyNDsKQEAgLTE4MDQsNyArMTgwNSwxMCBAQCBzdGF0aWMgaW50
-IGRybV9mYl9oZWxwZXJfc2luZ2xlX2ZiX3Byb2JlKHN0cnVjdCBkcm1fZmJfaGVscGVyICpmYl9o
-ZWxwZXIsCiAJc2l6ZXMuZmJfd2lkdGggPSAodTMyKS0xOwogCXNpemVzLmZiX2hlaWdodCA9ICh1
-MzIpLTE7CiAKLQkvKiBpZiBkcml2ZXIgcGlja3MgOCBvciAxNiBieSBkZWZhdWx0IHVzZSB0aGF0
-IGZvciBib3RoIGRlcHRoL2JwcCAqLworCS8qCisJICogSWYgZHJpdmVyIHBpY2tzIDggb3IgMTYg
-YnkgZGVmYXVsdCB1c2UgdGhhdCBmb3IgYm90aCBkZXB0aC9icHAKKwkgKiB0byBiZWdpbiB3aXRo
-CisJICovCiAJaWYgKHByZWZlcnJlZF9icHAgIT0gc2l6ZXMuc3VyZmFjZV9icHApCiAJCXNpemVz
-LnN1cmZhY2VfZGVwdGggPSBzaXplcy5zdXJmYWNlX2JwcCA9IHByZWZlcnJlZF9icHA7CiAKQEAg
-LTE4MzksNiArMTg0Myw1NSBAQCBzdGF0aWMgaW50IGRybV9mYl9oZWxwZXJfc2luZ2xlX2ZiX3By
-b2JlKHN0cnVjdCBkcm1fZmJfaGVscGVyICpmYl9oZWxwZXIsCiAJCX0KIAl9CiAKKwkvKgorCSAq
-IElmIHdlIHJ1biBpbnRvIGEgc2l0dWF0aW9uIHdoZXJlLCBmb3IgZXhhbXBsZSwgdGhlIHByaW1h
-cnkgcGxhbmUKKwkgKiBzdXBwb3J0cyBSR0JBNTU1MSAoMTYgYnBwLCBkZXB0aCAxNSkgYnV0IG5v
-dCBSR0I1NjUgKDE2IGJwcCwgZGVwdGgKKwkgKiAxNikgd2UgbmVlZCB0byBzY2FsZSBkb3duIHRo
-ZSBkZXB0aCBvZiB0aGUgc2l6ZXMgd2UgcmVxdWVzdC4KKwkgKi8KKwlmb3IgKGkgPSAwOyBpIDwg
-ZmJfaGVscGVyLT5jcnRjX2NvdW50OyBpKyspIHsKKwkJc3RydWN0IGRybV9tb2RlX3NldCAqbW9k
-ZV9zZXQgPSAmZmJfaGVscGVyLT5jcnRjX2luZm9baV0ubW9kZV9zZXQ7CisJCXN0cnVjdCBkcm1f
-Y3J0YyAqY3J0YyA9IG1vZGVfc2V0LT5jcnRjOworCQlzdHJ1Y3QgZHJtX3BsYW5lICpwbGFuZSA9
-IGNydGMtPnByaW1hcnk7CisJCWludCBqOworCisJCURSTV9ERUJVRygidGVzdCBDUlRDICVkIHBy
-aW1hcnkgcGxhbmVcbiIsIGkpOworCisJCWZvciAoaiA9IDA7IGogPCBwbGFuZS0+Zm9ybWF0X2Nv
-dW50OyBqKyspIHsKKwkJCWNvbnN0IHN0cnVjdCBkcm1fZm9ybWF0X2luZm8gKmZtdDsKKworCQkJ
-Zm10ID0gZHJtX2Zvcm1hdF9pbmZvKHBsYW5lLT5mb3JtYXRfdHlwZXNbal0pOworCisJCQkvKgor
-CQkJICogRG8gbm90IGNvbnNpZGVyIFlVViBvciBvdGhlciBjb21wbGljYXRlZCBmb3JtYXRzCisJ
-CQkgKiBmb3IgZnJhbWVidWZmZXJzLiBUaGlzIG1lYW5zIG9ubHkgbGVnYWN5IGZvcm1hdHMKKwkJ
-CSAqIGFyZSBzdXBwb3J0ZWQgKGZtdC0+ZGVwdGggaXMgYSBsZWdhY3kgZmllbGQpIGJ1dAorCQkJ
-ICogdGhlIGZyYW1lYnVmZmVyIGVtdWxhdGlvbiBjYW4gb25seSBkZWFsIHdpdGggc3VjaAorCQkJ
-ICogZm9ybWF0cywgc3BlY2lmaWNhbGx5IFJHQi9CR0EgZm9ybWF0cy4KKwkJCSAqLworCQkJaWYg
-KGZtdC0+ZGVwdGggPT0gMCkKKwkJCQljb250aW51ZTsKKworCQkJLyogV2UgZm91bmQgYSBwZXJm
-ZWN0IGZpdCwgZ3JlYXQgKi8KKwkJCWlmIChmbXQtPmRlcHRoID09IHNpemVzLnN1cmZhY2VfZGVw
-dGgpIHsKKwkJCQliZXN0X2RlcHRoID0gZm10LT5kZXB0aDsKKwkJCQlicmVhazsKKwkJCX0KKwor
-CQkJLyogU2tpcCBkZXB0aHMgYWJvdmUgd2hhdCB3ZSdyZSBsb29raW5nIGZvciAqLworCQkJaWYg
-KGZtdC0+ZGVwdGggPiBzaXplcy5zdXJmYWNlX2RlcHRoKQorCQkJCWNvbnRpbnVlOworCisJCQkv
-KiBCZXN0IGRlcHRoIGZvdW5kIHNvIGZhciAqLworCQkJaWYgKGZtdC0+ZGVwdGggPiBiZXN0X2Rl
-cHRoKQorCQkJCWJlc3RfZGVwdGggPSBmbXQtPmRlcHRoOworCQl9CisJfQorCWlmIChzaXplcy5z
-dXJmYWNlX2RlcHRoICE9IGJlc3RfZGVwdGgpIHsKKwkJRFJNX0lORk8oInJlcXVlc3RlZCBicHAg
-JWQsIHNjYWxlZCBkZXB0aCBkb3duIHRvICVkIiwKKwkJCSAgc2l6ZXMuc3VyZmFjZV9icHAsIGJl
-c3RfZGVwdGgpOworCQlzaXplcy5zdXJmYWNlX2RlcHRoID0gYmVzdF9kZXB0aDsKKwl9CisKIAlj
-cnRjX2NvdW50ID0gMDsKIAlmb3IgKGkgPSAwOyBpIDwgZmJfaGVscGVyLT5jcnRjX2NvdW50OyBp
-KyspIHsKIAkJc3RydWN0IGRybV9kaXNwbGF5X21vZGUgKmRlc2lyZWRfbW9kZTsKLS0gCjIuMTku
-MgoKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4
-LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFk
-Lm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFy
-bS1rZXJuZWwK
+Hi Tony,
+
+On 10/01/19 3:06 AM, Tony Lindgren wrote:
+> Hi,
+> 
+> * Heiner Kallweit <hkallweit1@gmail.com> [190109 19:28]:
+>> On 09.01.2019 20:06, Tony Lindgren wrote:
+>>> Commit 6e2d85ec0559 ("net: phy: Stop with excessive soft reset") caused
+>>> a regression where suspend resume cycle fails to bring up Ethernet on at
+>>> least cpsw on am437x-sk-evm.
+>>>
+>> What kind of PHY and which PHY driver is used with this board?
+>> I found one schematics of am437x where a KSZ9031RN PHY is used.
+>> Is it the same on your board?
+> 
+> Yes that's the phy.
+> 
+>> As described in the commit message of this commit you would have
+>> the option to implement the soft_reset callback in the PHY driver.
+>> Can you try to add .soft_reset = genphy_soft_reset to the
+>> KSZ9031 driver config in drivers/net/phy/micrel.c and check whether
+>> it fixes the issue?
+> 
+> Yes that seems to work based on a quick test of five suspend
+> resume cycles.
+> 
+> I wonder what all hardware this issue affects though?
+> 
+> It's probably best that the network folks check what all
+> hardare needs patching.
+> 
+> For TI hardware, Sekhar and TI network folks, can you guys
+> please check the various TI SoCs for multiple suspend resume
+> cycles with v5.0-rc1 and patch accordingly? See also below
+
+Will do.
+
+> for something else to check, 10 seconds to resume a phy
+> seems very long to me :)
+
+On the AM437x GP EVM which uses the same PHY, the link does not even
+come up for me after a cable plug unplug. Link is up at boot (I use
+NFS). This only happens with v4.20 and v5.0-rc1, not with v4.19.
+
+Adding the genphy_soft_reset hook solves the issue and link comes back
+up almost immediately. I checked this with v5.0-rc1.
+
+I don't see the link problem if I shift to 100Mps prior to the
+plug/unplug experiment using ethtool. So looks like the problem is
+restricted to Gigabit link only. Are you using Gigabit link too?
+
+I think we should patch drivers/net/phy/micrel.c to solve the
+regression. Not sure of the root cause though. In the errata pointed to
+by Heiner, there is "Module 6" which comes close to what we are seeing,
+except it talks of a scenario where auto-negotiation is turned off 100M
+link is used and we see the issue even with auto-neg on and in gigabit
+mode. "Module 5" is also related to link failure, but is already worked
+around in kernel with ksz9031_center_flp_timing().
+
+> 
+>>> Keerthy noticed this may not happen on the first resume, but usually
+>>> happens after few suspend resume cycles. The most working suspend resume
+>>> cycles I've seen with the commit above is three.
+> ...
+>>> Note that unrelated to the commit above, there may be other issues too
+>>> as the cpsw phy LED seems to come on only after about five seconds with
+>>> about total of 10 seconds before the Ethernet is up again.
+
+I don't quite see this problem on the AM437x GP EVM. I have seen gigabit
+link takes quite some time (sometimes more than 10 seconds) on x15 EVM.
+Not sure if the problem you are facing is related to gigabit too. If you
+are using gigabit link, can you downgrade to 100MBps to check? Either
+using a 100M only switch or by using ethtool on the EVM.
+
+$ ethtool -s eth0 speed 100 duplex full
+
+Thanks,
+Sekhar
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
