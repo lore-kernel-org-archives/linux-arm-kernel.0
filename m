@@ -2,57 +2,81 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 879FEC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 06:22:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0F539C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 06:24:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 53A272173B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 06:22:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D284620657
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 06:24:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BZ21mjk6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 53A272173B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FE4ZvVa4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D284620657
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=SNLAz/6+y/5FUGVZSdJGPWWpVPV7ndnq3YSTXnU2N70=; b=BZ21mjk6ylaTJu
-	jN5I70xpjbAb9q04ZH507Eh/P6q9Ivs9klTuTPK+sqfjOjRNZ1JWKkjpFGJaSrGf7KK6TzKNlCNSF
-	6ua/ACkmXIA0UQa8H/p87bQuqmKFVegvA9SCjAKheSkNIRjIyg4gKhdfWzt3OePxrGmePLRIVrJx+
-	sLz9NZLD0T96b/X9hJ+hj7hEVPnl+Vh/v1kWiFCUtMjgCNGLePeldjcMkBw1lBsOrIpeCdloNv/8V
-	zTGx9NFb0lBGRSF4nQnMrst1kPaJgxAmH2XPfejp2VdqRE0erNKeEg0JaoTMm/036R6mWwnWRsE+4
-	Gv8XChIqmglbBYdH6i3A==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Subject:References:
+	In-Reply-To:Message-ID:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=0vmxipzacW+GOGX7nObuBIeJwJLJcjJfxCXsHC2B5Sg=; b=FE4ZvVa4OZJDdq
+	4rIIPUZzN4tnLrCREpzb4fgMGw35b6uZZbb3jzpWa+cd4r6lH3/O+oRg5OSNTxW+I05GXTfzDAZjO
+	BU6FEqXmW2Sif85QVrztR7s5YYk9Twrlnd339mF11J4W/pTTqpK1wd8zb0O9QzOWd8Cm4Y6e3uczn
+	rdbABVVkabXPXzVxNc7w39tdd9UDyh4gpfGqky6uvYlwDD7amgVekQJXDcpvoFW+RBsDvSdzzYObu
+	DWNc1ZfCO1Y67Q+KXWW79O05qI1UP+Q5ZWJWDOtDyuXg4zM1KbQVAJGtjOfx8IpCexaiQSIGsQBEt
+	ODZcQB9XLzYS2XEyz9FQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghTjO-0001N8-1I; Thu, 10 Jan 2019 06:22:18 +0000
-Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
+	id 1ghTlp-0001go-0f; Thu, 10 Jan 2019 06:24:49 +0000
+Received: from mout.kundenserver.de ([212.227.17.24])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghTjK-0001MW-6j
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 06:22:15 +0000
-Received: by wens.csie.org (Postfix, from userid 1000)
- id DBC6E5FC23; Thu, 10 Jan 2019 14:22:08 +0800 (CST)
-From: Chen-Yu Tsai <wens@csie.org>
-To: Daniel Lezcano <daniel.lezcano@linaro.org>,
- Thomas Gleixner <tglx@linutronix.de>,
- Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: [PATCH] clocksource: sun5i: fail gracefully when clock rate is
- unavailable
-Date: Thu, 10 Jan 2019 14:22:07 +0800
-Message-Id: <20190110062207.18787-1-wens@csie.org>
-X-Mailer: git-send-email 2.20.1
+ id 1ghTlm-0001gR-4J; Thu, 10 Jan 2019 06:24:47 +0000
+Received: from oxbsltgw61.schlund.de ([212.227.220.199]) by
+ mrelayeu.kundenserver.de (mreue106 [213.165.67.113]) with ESMTPSA (Nemesis)
+ id 1MFL8J-1gWkG049Pd-00Fntk; Thu, 10 Jan 2019 07:24:34 +0100
+Date: Thu, 10 Jan 2019 07:24:31 +0100 (CET)
+From: Stefan Wahren <stefan.wahren@i2se.com>
+To: Peter Robinson <pbrobinson@gmail.com>
+Message-ID: <2090321804.324042.1547101471247@email.ionos.de>
+In-Reply-To: <CALeDE9PPt8yTF1FLioxz0C1kJZDYn1uYH-MoBii2Ewpo-yC3tg@mail.gmail.com>
+References: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
+ <CALeDE9PX=2nR8=9JjT9wvsb470nrZ_h6JGFsrkYkexGOoOhXuA@mail.gmail.com>
+ <849520506.312349.1546937289972@email.ionos.de>
+ <CALeDE9OYZi+LZCtnm3kZQ2g5oJ1BWXgfoX0MBD4X0Bz2Vj9Tng@mail.gmail.com>
+ <389675377.186771.1546942833612@email.ionos.de>
+ <CALeDE9PPt8yTF1FLioxz0C1kJZDYn1uYH-MoBii2Ewpo-yC3tg@mail.gmail.com>
+Subject: Re: [PATCH RFC 00/11] staging: vc04_services: Improve driver
+ load/unload
 MIME-Version: 1.0
+X-Priority: 3
+Importance: Medium
+X-Mailer: Open-Xchange Mailer v7.8.4-Rev47
+X-Originating-Client: open-xchange-appsuite
+X-Provags-ID: V03:K1:6TqN9ZCsvSVsq7r4eH05cleNJGCrESoqSaGw+T4xKh1HPl8zfVI
+ X3OeaXd/LbuV1jPCq5FD81UZ1IEHgcaPXJrX1AvZTQ0XG+2VQjTEU7ZdKZGDk5/3p8+oFtE
+ ukJ/sEI15MRUCh6LvteERVO0z7XJn7C3TfLrnxTd+GBy+XmpN7Y+RR0/H1TZTnqCu5lVYln
+ Ouv8jxGrWozBIxCJeU+3Q==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:yBYnsDfge+4=:So57UsARunepi65mXkLUgf
+ 8zLvrHBLZzaipFbirZDJlMfal+1Tp3s7rZtaNMlPyJY3gRLPDm+8WYiEnP6axeUr9vMk3IQpR
+ /d4S1R+5gUXlr4Kk9PqwsIGBd3/aIT/Dw36PAnCWaWFvOWGAvZZr5WOSGzPnZOlTzksy40sdM
+ qkIQcAAcjuYSYCtHyvRnK+USP29KW59mtMvFxDyOULVa0XiVZ8asWxcFVWi+DRp4OhgMtMXr0
+ TFP2yNZNqL7OlFu1/i4wLOW2dhjlyGdgn93i7TEkgI/fkxXg1mOLdcPwrsfObyyjgsvVqGtBu
+ 53dIw18Rw3Ntdi1pgF5uy0Az9zIucrOonOEfgCv319/xOW3kFZeDYV5J3XG3ZkyQBy2y9+f95
+ HljbPui2QDekaaGd7MOsb0tHk/ugPE2O3VzsgLYsHX4JtKxhXgIjFHsIx6xnZ6IxxgZhWYF/i
+ UfO5JAUHZexLqw2EN0rHIcy8MSEBZquFTQ3iMpvV/Pjd+tZLdcC29G8UeIH3+/dTwAsp8AW4j
+ znU7VRXGyEh7X72z5X5VO5kJk5jdzdE/xWPqYgxrh7F0TjLxaCCdGoCT/Ciza3uyQf4ZwdFmb
+ V8NQgwtfG6102rB9Tfx7yGv6cQTM78+fdbBixWg/6pGYWWGtCFz6pAkEtMHT3KibGHSBrl55G
+ csHk/JlkSeO3ENhqD7kDDZqwi/R3rJ29y+XzGVD+e8wrikuzhTFE2nQlHhU8TFop1yx39+2ub
+ OH4mJ3fjchY82z5nEVy3Jb/z9zl2HndeFNPDc3nE6p9dGr7lWif2oPnD374=
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_222214_382161_2FB675BD 
-X-CRM114-Status: GOOD (  12.77  )
+X-CRM114-CacheID: sfid-20190109_222446_524326_784DA288 
+X-CRM114-Status: UNSURE (   9.96  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -64,58 +88,34 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Chen-Yu Tsai <wens@csie.org>, linux-kernel@vger.kernel.org,
+Cc: devel@driverdev.osuosl.org, tiwai@suse.de, gregkh@linuxfoundation.org,
+ mikebrady@eircom.net, Eric Anholt <eric@anholt.net>,
+ linux-rpi-kernel@lists.infradead.org,
+ Dave Stevenson <dave.stevenson@raspberrypi.org>, nsaenzjulienne@suse.de,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-If the clock tree is not fully populated when the timer-sun5i init code
-is called, attempts to get the clock rate for the timer would fail and
-return 0.
 
-Make the init code for both clock events and clocksource check the
-returned clock rate and fail gracefully if the result is 0, instead of
-causing a divide by 0 exception later on.
+> Peter Robinson <pbrobinson@gmail.com> hat am 10. Januar 2019 um 06:09 geschrieben:
+> 
+> 
+> Hi Stefan,
+> 
+...
+> 
+> I get difference results with 5.0-rc1 but neither of the above apps
+> work either, will follow up based on the rest of the thread there.
+> 
 
-Fixes: 4a59058f0b09 ("clocksource/drivers/sun5i: Refactor the current code")
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/clocksource/timer-sun5i.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+My first step with Raspbian is to enable the Camera interface which results into an appending of the following lines to config.txt:
 
-diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
-index 3b56ea3f52af..552c5254390c 100644
---- a/drivers/clocksource/timer-sun5i.c
-+++ b/drivers/clocksource/timer-sun5i.c
-@@ -202,6 +202,11 @@ static int __init sun5i_setup_clocksource(struct device_node *node,
- 	}
- 
- 	rate = clk_get_rate(clk);
-+	if (!rate) {
-+		pr_err("Couldn't get parent clock rate\n");
-+		ret = -EINVAL;
-+		goto err_disable_clk;
-+	}
- 
- 	cs->timer.base = base;
- 	cs->timer.clk = clk;
-@@ -275,6 +280,11 @@ static int __init sun5i_setup_clockevent(struct device_node *node, void __iomem
- 	}
- 
- 	rate = clk_get_rate(clk);
-+	if (!rate) {
-+		pr_err("Couldn't get parent clock rate\n");
-+		ret = -EINVAL;
-+		goto err_disable_clk;
-+	}
- 
- 	ce->timer.base = base;
- 	ce->timer.ticks_per_jiffy = DIV_ROUND_UP(rate, HZ);
--- 
-2.20.1
+start_x=1
+gpu_mem=128
 
+AFAIK a smaller value for gpu_mem wont work. Please provide your settings which results in this crash.
 
 _______________________________________________
 linux-arm-kernel mailing list
