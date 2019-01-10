@@ -2,70 +2,86 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AF70FC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 20:56:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 67640C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 21:01:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7B1EF2173B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 20:56:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 36B32208E3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 21:01:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Hn7AcZ9H";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="q21SU3o1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7B1EF2173B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ppd9vLxu";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="qv4UO6Fp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 36B32208E3
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Date:Subject:References:To:From:
-	Message-ID:In-Reply-To:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kzDEeahww1E9Xc3ialcLvh/EQAEFmT1fNK7xt+MMFaA=; b=Hn7AcZ9HMW4Sc9
-	PVrWaaeecoEk7lcpsdhqU3z/8ZxBG7T/ZgKXFIvAXy0PRap/HXhG8mi5k7HflogYpT+G2iAZXF/3f
-	bbWoRwxIR1/Mql6k4qaFDkKCgLDNiSXHi8YBSKQl9qMHVFqx7Pjb08nNLKEO93BkbcmBuCO9LZ9GM
-	rhVp1tIcxFoBgeox/tGF56abO9g8N0J4mX2FhDTbuyQTGbvy5g7hb3CDp3PuEfMCPoPs9ktQ3R6pl
-	erj87a7wgJd1vo++mhYGeOAEUzES9FtvcbPscOiu+sDG6AyJnDpkYxM1Ut2hEdyF+7KGQtE8RikIK
-	1R92vcRnBX5sNBSomINg==;
+	List-Owner; bh=9cBVvm/aoN3gdbXbh7LjQlN1pES4G6bsUaHCaEFuKWk=; b=ppd9vLxub12L6M
+	wb957GmKCHCtXYjb01lASurI3LyTQzwNrDoaol2Imx78xnsHRep8LBUhTokf8ypTQhxKzQzy9RY7O
+	Gf7+LaWXd7uHMcmaJGU6hXoCniQ7I26msPMUmbylC9F+1EW66AL7CECuVanFIcfoMJrRqk08giiAh
+	tcgL6AmfaUqe/us9iSteyuAS1YnDFP9Vt0RRxTyXJ6EYlJL9xSYhR0j0Jfen1roKp5RuFfUn0ShsH
+	CpNPCgnekRe+ZuCKS1SYtYm9erCGYhGZ6eEiC0oH7D6KvSORMSH6JoNvQftIuoHnzCbgolXrRJX2q
+	jbSISCSKluoNWNk7m49A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghhNF-0004sD-Cn; Thu, 10 Jan 2019 20:56:21 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1ghhSS-0006cD-TS; Thu, 10 Jan 2019 21:01:44 +0000
+Received: from mail-vs1-xe43.google.com ([2607:f8b0:4864:20::e43])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghhNB-0004rq-QL
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 20:56:19 +0000
-Received: from localhost (unknown [104.132.0.74])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id D464020685;
- Thu, 10 Jan 2019 20:56:16 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1547153776;
- bh=BZ9pNTo2nlZOpfDEebMsqbdLRiv1TsUD3BVKJX6pDlc=;
- h=In-Reply-To:From:To:References:Subject:Cc:Date:From;
- b=q21SU3o1ihcJmY/cpHmPE49isExPV5DCMLllnPo2sJb9+jY08+eHvdi18EdAlJgoS
- zJfXIFMT4GAfcOYDRzfq1VxoP2GanYHqriVP50iXFzGsnhOzX5vPEv+8dJBHRVCdwr
- cD+Ezohe8A4lR5c8mI29tAmC4W2s1BJBo9FPsOvA=
+ id 1ghhSP-0006bm-Dn
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 21:01:43 +0000
+Received: by mail-vs1-xe43.google.com with SMTP id n13so7914735vsk.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 10 Jan 2019 13:01:40 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=BwQUwoxWE9xddt/5B/7ivk+f8UFrG0jsvJWk4vuuwFQ=;
+ b=qv4UO6FpqbcXjESpEyv6dMMa0ZVDKl3AXXY3Z6ghoqkOyRPJSb2wxDdd9jY9/MQqDz
+ ZNxeGNGg13e5BuSafswztXuyY+nVAD+KTFUyapwOv6M4lK2tX6RZ2GVZPk4tFBp4X9Kp
+ GhFvUnmyfOcEd+ZzfLzkXNw8lZepJZ3YANpPesKc9HztZhEUJvva5RQvpZmygFBctHlb
+ iY2vT1hiRBdDIxQ53VEInE9XoL77Yd6Kcx+UTYCnO0vXHkopySwwJqzoxNTmUnWlOr5U
+ qNyCfYclsQZLlURpkiOT1QeuJ1/thy9dmNNnV9/15lfHi786u+TmLJGuITP05OsWOKJ5
+ nkRg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=BwQUwoxWE9xddt/5B/7ivk+f8UFrG0jsvJWk4vuuwFQ=;
+ b=dJIzJJiG7/nDg+FXQ6QudZTpEgLj13DDf4x9YEGA8fu1ttygI9v21+Z9rjin/dU38k
+ jrM2MuQbaBGyRueojuROBGMKvXLYBuF0SFiDwUMjkrYYU/Nk5r265e7+FrYiDUvZPglf
+ vqlLlsRYmphuA+QLShvCrCc44n1Kig5PJCwqdwN8VxmSgqOSwjpP3ZPN7xmAn2qj4t2m
+ RFXXSGufQ0XbFVBfMv2J1moxj/KdmzOzoT2yJfxQQgHhp9wmmGisYd97AagcNW+4fl7I
+ dr5Oi+NT1w/xsVwrCsVBLmuxXuyfct/I/vG5EZEtHIV50pWsHEztKTZcpVOwyIDGAWzw
+ Cg2w==
+X-Gm-Message-State: AJcUukcYjxRdjE7lkAJlMoP+8liwSE2eo56n9A3VdjUE/Wj3Zt7e0UzN
+ 6oVasUc8YqKgtb2uODGXBKmnEzskgd9Rw6d8L3Y=
+X-Google-Smtp-Source: ALg8bN7/euEd7hrNjX8CZxbHBxPuqP9dEQzhslf1LrRY1c4u3M0PvYOPaAqoVJxODXBanGQcn9ihKfe8zsRMn3xd7qk=
+X-Received: by 2002:a67:6b07:: with SMTP id g7mr4545930vsc.150.1547154099333; 
+ Thu, 10 Jan 2019 13:01:39 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <CACRpkdY_LxF82CbUUnf3B3BVucGvGnnXH-DWcWDmKcU9UgLvpA@mail.gmail.com>
-Message-ID: <154715377593.19284.1463901972122807524@swboyd.mtv.corp.google.com>
-From: Stephen Boyd <sboyd@kernel.org>
-To: Andy Gross <andy.gross@linaro.org>,
- Linus Walleij <linus.walleij@linaro.org>, Marc Zyngier <Marc.Zyngier@arm.com>,
- Mark Rutland <mark.rutland@arm.com>, Russell King <rmk+kernel@armlinux.org.uk>
-References: <20181213175952.GC26090@n2100.armlinux.org.uk>
- <E1gXVHy-00088e-JK@rmk-PC.armlinux.org.uk>
- <CACRpkdY_LxF82CbUUnf3B3BVucGvGnnXH-DWcWDmKcU9UgLvpA@mail.gmail.com>
-Subject: Re: [PATCH 2/9] ARM: qcom: remove unnecessary boot_lock
-User-Agent: alot/0.8
-Date: Thu, 10 Jan 2019 12:56:15 -0800
+References: <20181203180613.228133-1-james.morse@arm.com>
+ <20181203180613.228133-11-james.morse@arm.com>
+ <20181211183634.GO27375@zn.tnic>
+ <56cfa16b-ece4-76e0-3799-58201f8a4ff1@arm.com>
+In-Reply-To: <56cfa16b-ece4-76e0-3799-58201f8a4ff1@arm.com>
+From: Tyler Baicar <baicar.tyler@gmail.com>
+Date: Thu, 10 Jan 2019 16:01:27 -0500
+Message-ID: <CABo9ajArdbYMOBGPRa185yo9MnKRb0pgS-pHqUNdNS9m+kKO-Q@mail.gmail.com>
+Subject: Re: [PATCH v7 10/25] ACPI / APEI: Tell firmware the estatus queue
+ consumed the records
+To: James Morse <james.morse@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_125617_867920_9B4C695B 
-X-CRM114-Status: GOOD (  15.09  )
+X-CRM114-CacheID: sfid-20190110_130141_495386_4B85B1DF 
+X-CRM114-Status: GOOD (  19.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,45 +93,83 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Linux-OMAP <linux-omap@vger.kernel.org>, linux-arm-msm@vger.kernel.org,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- David Brown <david.brown@linaro.org>, linux-oxnas@groups.io,
- "open list:ARM/QUALCOMM SUPPORT" <linux-soc@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Rafael Wysocki <rjw@rjwysocki.net>, Tony Luck <tony.luck@intel.com>,
+ Fan Wu <wufan@codeaurora.org>, linux-mm@kvack.org,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Xie XiuQi <xiexiuqi@huawei.com>, Will Deacon <will.deacon@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>,
+ Dongjiu Geng <gengdongjiu@huawei.com>, Linux ACPI <linux-acpi@vger.kernel.org>,
+ Borislav Petkov <bp@alien8.de>, Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>,
+ kvmarm@lists.cs.columbia.edu,
+ arm-mail-list <linux-arm-kernel@lists.infradead.org>,
+ Len Brown <lenb@kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Linus Walleij (2019-01-10 04:50:56)
-> On Thu, Dec 13, 2018 at 7:00 PM Russell King <rmk+kernel@armlinux.org.uk> wrote:
-> 
-> > The boot_lock is something that was required for ARM development
-> > platforms to ensure that the delay calibration worked properly.  This
-> > is not necessary for modern platforms that have better bus bandwidth
-> > and do not need to calibrate the delay loop for secondary cores.
-> > Remove the boot_lock entirely.
+On Thu, Jan 10, 2019 at 1:23 PM James Morse <james.morse@arm.com> wrote:
+> >>
+> >> +    if (is_hest_type_generic_v2(ghes) && ghes_ack_error(ghes->generic_v2))
 > >
-> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> 
-> Andy have you had a chance to test/apply this patch?
-> 
-> I think the majority of Qcom systems use CLKSRC_QCOM
-> which registers an arch delay timer and swiftly bypasses the
-> calibration anyways so this code is pretty much pointless.
-> 
-> There is a question about MSM8974 though. This appears
-> to not use CLKSRC_QCOM but rather HAVE_ARM_ARCH_TIMER.
-> drivers/clocksource/arm_arch_timer.c seems to
-> not register a delay timer, which is probably something that
-> should be fixed?
-> 
-> Mark/Marc: is there any specific reason to why the ARM arch
-> timer does not register an arch delay timer?
-> 
+> > Since ghes_ack_error() is always prepended with this check, you could
+> > push it down into the function:
+> >
+> > ghes_ack_error(ghes)
+> > ...
+> >
+> >       if (!is_hest_type_generic_v2(ghes))
+> >               return 0;
+> >
+> > and simplify the two callsites :)
+>
+> Great idea! ...
+>
+> .. huh. Turns out for ghes_proc() we discard any errors other than ENOENT from
+> ghes_read_estatus() if is_hest_type_generic_v2(). This masks EIO.
+>
+> Most of the error sources discard the result, the worst thing I can find is
+> ghes_irq_func() will return IRQ_HANDLED, instead of IRQ_NONE when we didn't
+> really handle the IRQ. They're registered as SHARED, but I don't have an example
+> of what goes wrong next.
+>
+> I think this will also stop the spurious handling code kicking in to shut it up
+> if its broken and screaming. Unlikely, but not impossible.
+>
+> Fixed in a prior patch, with Boris' suggestion, ghes_proc()s tail ends up look
+> like this:
+> ----------------------%<----------------------
+> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+> index 0321d9420b1e..8d1f9930b159 100644
+> --- a/drivers/acpi/apei/ghes.c
+> +++ b/drivers/acpi/apei/ghes.c
+> @@ -700,18 +708,11 @@ static int ghes_proc(struct ghes *ghes)
+>
+>  out:
+>         ghes_clear_estatus(ghes, buf_paddr);
+> +       if (rc != -ENOENT)
+> +               rc_ack = ghes_ack_error(ghes);
+>
+> -       if (rc == -ENOENT)
+> -               return rc;
+> -
+> -       /*
+> -        * GHESv2 type HEST entries introduce support for error acknowledgment,
+> -        * so only acknowledge the error if this support is present.
+> -        */
+> -       if (is_hest_type_generic_v2(ghes))
+> -               return ghes_ack_error(ghes->generic_v2);
+> -
+> -       return rc;
+> +       /* If rc and rc_ack failed, return the first one */
+> +       return rc ? rc : rc_ack;
+>  }
+> ----------------------%<----------------------
+>
 
-Doesn't the ARM arch timer get registered in
-arch/arm/kernel/arch_timer.c via arch_timer_delay_timer_register()?
+Looks good to me, I guess there's no harm in acking invalid error status blocks.
+
+T
 
 _______________________________________________
 linux-arm-kernel mailing list
