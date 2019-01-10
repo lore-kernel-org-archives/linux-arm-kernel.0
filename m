@@ -3,59 +3,64 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 16BCAC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 10:51:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 737E3C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 11:01:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DAE072173B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 10:51:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 453A8214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 11:01:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PUGc3R+o"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DAE072173B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="htjHsC4H"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 453A8214DA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=anBy3IxmqQDqG7A1Gywi5m+lQSdZIjXG/A2rc35mSCQ=; b=PUG
-	c3R+ojNkIvMVfwmNUrXo3XblLCEKS9X0U05AzwP65RodRr6o5L+DfmlS0Vy96e5lEqzmaJBucd6HV
-	a0VsdyhRak+olyUNxDF9F3tbNXgbYgVTzMVoZcoE/cX2potgee9HOXgLA2+yJDGguBLiLLaB4sBE4
-	BAYS6g9Fvqr2o0jwkd8TcPJ2nboArFYZN8hsD5PH1nZNA6aZJGGDT7vMVly7I3mTT+sWtx9KWcqo4
-	bBJ8U0WBFk1nBoUkVGWTUyLiGlRlwBlL379e2G0wj2H+ul7kRJVbJOXFWBfWfjGoXKLaQq/3Flr61
-	/KGoHGuCYtIWB98lWRiAEp1ju0k2mAA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:In-Reply-To:
+	Date:References:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=QKJeG/fIioRhRP40nMqwbxALVE5R1yHRujsuYYqff7k=; b=htjHsC4HLkwhZj
+	acLi+Hy2B7XsIYK+i748bl638R3NNNssadT4RdiJnhkaLlmaW1Zg654hnffZ+bjlElyh+S6wlr/OF
+	5idOpyN0RDVTITxXJZ/LBnro5oZVEaamJ/cYod7gv39HV7FjngQJZcBvtOxm9uaGQ9mE6omVhw0+N
+	FEu0d6jjzoUSEc6iiNILaVkAaAxeosceGRoYN5FVCLv0F8MUEY+hr0cZIirYzgGsXVVdu8+WYSFnq
+	tpNea9z8/iKO3rjbkfImaYxbwSt0vt+V1N6Lc4F0O385u0Tgx1lyQmRy/riQknvW+sl5NhKSxBYIt
+	w3KvPW/A6TteNVafe7vQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghXwJ-0007GE-GV; Thu, 10 Jan 2019 10:51:55 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1ghY5f-0002Ya-Hs; Thu, 10 Jan 2019 11:01:35 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghXwG-0007Ff-G9
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 10:51:54 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7383CA78;
- Thu, 10 Jan 2019 02:51:49 -0800 (PST)
-Received: from fuggles.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id AA8263F694;
- Thu, 10 Jan 2019 02:51:48 -0800 (PST)
-From: Will Deacon <will.deacon@arm.com>
-To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v2] arm64: kpti: Avoid rewriting early page tables when KASLR
- is enabled
-Date: Thu, 10 Jan 2019 10:51:43 +0000
-Message-Id: <20190110105143.27008-1-will.deacon@arm.com>
-X-Mailer: git-send-email 2.11.0
+ id 1ghY5a-0002Xv-Iw
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 11:01:34 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 9C0DB209BC; Thu, 10 Jan 2019 12:01:28 +0100 (CET)
+Received: from localhost (alyon-652-1-61-72.w109-213.abo.wanadoo.fr
+ [109.213.84.72])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 24864206DC;
+ Thu, 10 Jan 2019 12:01:28 +0100 (CET)
+From: Gregory CLEMENT <gregory.clement@bootlin.com>
+To: Emmanuel Vadot <manu@bidouilliste.com>
+Subject: Re: [PATCH v2 1/1] arm64: dts: marvell: armada-ap806: reserve PSCI
+ area
+References: <20181221164503.5128-1-xypron.glpk@gmx.de>
+ <87h8f09sbe.fsf@bootlin.com>
+ <dce82ebf-81d4-c5d3-2739-053c81afb31c@gmx.de>
+ <20190110073443.75462677e45657b93b3f06e6@bidouilliste.com>
+Date: Thu, 10 Jan 2019 12:01:28 +0100
+In-Reply-To: <20190110073443.75462677e45657b93b3f06e6@bidouilliste.com>
+ (Emmanuel Vadot's message of "Thu, 10 Jan 2019 07:34:43 +0100")
+Message-ID: <878szspyif.fsf@FE-laptop>
+User-Agent: Gnus/5.13 (Gnus v5.13) Emacs/26.1 (gnu/linux)
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_025152_549886_C05B4F63 
-X-CRM114-Status: GOOD (  21.86  )
+X-CRM114-CacheID: sfid-20190110_030130_898493_A13DE841 
+X-CRM114-Status: GOOD (  18.70  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,173 +72,125 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Will Deacon <will.deacon@arm.com>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
+ Jason Cooper <jason@lakedaemon.net>, devicetree@vger.kernel.org,
+ Heinrich Schuchardt <xypron.glpk@gmx.de>, linux-kernel@vger.kernel.org,
+ Emmanuel Vadot <manu@freebsd.org>, Russell King <rmk+kernel@armlinux.org.uk>,
+ Rob Herring <robh+dt@kernel.org>, linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-A side effect of commit c55191e96caa ("arm64: mm: apply r/o permissions
-of VM areas to its linear alias as well") is that the linear map is
-created with page granularity, which means that transitioning the early
-page table from global to non-global mappings when enabling kpti can
-take a significant amount of time during boot.
-
-Given that most CPU implementations do not require kpti, this mainly
-impacts KASLR builds where kpti is forcefully enabled. However, in these
-situations we know early on that non-global mappings are required and
-can avoid the use of global mappings from the beginning. The only gotcha
-is Cavium erratum #27456, which we must detect based on the MIDR value
-of the boot CPU.
-
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Reported-by: John Garry <john.garry@huawei.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
-
-v2: Fix module builds by exporting kimage_vaddr and avoiding references
-    to cavium_erratum_27456_cpus. Minor comment tweaks.
-
- arch/arm64/include/asm/mmu.h          | 41 +++++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/pgtable-prot.h |  4 ++--
- arch/arm64/kernel/cpu_errata.c        |  2 +-
- arch/arm64/kernel/cpufeature.c        |  9 ++++++--
- arch/arm64/kernel/head.S              |  1 +
- 5 files changed, 52 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index 43596b1a5897..bbb47402cd2b 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -16,6 +16,8 @@
- #ifndef __ASM_MMU_H
- #define __ASM_MMU_H
- 
-+#include <asm/cputype.h>
-+
- #define MMCF_AARCH32	0x1	/* mm context flag for AArch32 executables */
- #define USER_ASID_BIT	48
- #define USER_ASID_FLAG	(UL(1) << USER_ASID_BIT)
-@@ -44,6 +46,45 @@ static inline bool arm64_kernel_unmapped_at_el0(void)
- 	       cpus_have_const_cap(ARM64_UNMAP_KERNEL_AT_EL0);
- }
- 
-+static inline bool arm64_kernel_use_ng_mappings(void)
-+{
-+	bool tx1_bug;
-+
-+	/* What's a kpti? Use global mappings if we don't know. */
-+	if (!IS_ENABLED(CONFIG_UNMAP_KERNEL_AT_EL0))
-+		return false;
-+
-+	/*
-+	 * Note: this function is called before the CPU capabilities have
-+	 * been configured, so our early mappings will be global. If we
-+	 * later determine that kpti is required, then
-+	 * kpti_install_ng_mappings() will make them non-global.
-+	 */
-+	if (!IS_ENABLED(CONFIG_RANDOMIZE_BASE))
-+		return arm64_kernel_unmapped_at_el0();
-+
-+	/*
-+	 * KASLR is enabled so we're going to be enabling kpti on non-broken
-+	 * CPUs regardless of their susceptibility to Meltdown. Rather
-+	 * than force everybody to go through the G -> nG dance later on,
-+	 * just put down non-global mappings from the beginning.
-+	 */
-+	if (!IS_ENABLED(CONFIG_CAVIUM_ERRATUM_27456)) {
-+		tx1_bug = false;
-+#ifndef MODULE
-+	} else if (!static_branch_likely(&arm64_const_caps_ready)) {
-+		extern const struct midr_range cavium_erratum_27456_cpus[];
-+
-+		tx1_bug = is_midr_in_range_list(read_cpuid_id(),
-+						cavium_erratum_27456_cpus);
-+#endif
-+	} else {
-+		tx1_bug = __cpus_have_const_cap(ARM64_WORKAROUND_CAVIUM_27456);
-+	}
-+
-+	return !tx1_bug && kaslr_offset() > 0;
-+}
-+
- typedef void (*bp_hardening_cb_t)(void);
- 
- struct bp_hardening_data {
-diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
-index 78b942c1bea4..986e41c4c32b 100644
---- a/arch/arm64/include/asm/pgtable-prot.h
-+++ b/arch/arm64/include/asm/pgtable-prot.h
-@@ -37,8 +37,8 @@
- #define _PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
- #define _PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
- 
--#define PTE_MAYBE_NG		(arm64_kernel_unmapped_at_el0() ? PTE_NG : 0)
--#define PMD_MAYBE_NG		(arm64_kernel_unmapped_at_el0() ? PMD_SECT_NG : 0)
-+#define PTE_MAYBE_NG		(arm64_kernel_use_ng_mappings() ? PTE_NG : 0)
-+#define PMD_MAYBE_NG		(arm64_kernel_use_ng_mappings() ? PMD_SECT_NG : 0)
- 
- #define PROT_DEFAULT		(_PROT_DEFAULT | PTE_MAYBE_NG)
- #define PROT_SECT_DEFAULT	(_PROT_SECT_DEFAULT | PMD_MAYBE_NG)
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 09ac548c9d44..9950bb0cbd52 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -553,7 +553,7 @@ static const struct midr_range arm64_repeat_tlbi_cpus[] = {
- #endif
- 
- #ifdef CONFIG_CAVIUM_ERRATUM_27456
--static const struct midr_range cavium_erratum_27456_cpus[] = {
-+const struct midr_range cavium_erratum_27456_cpus[] = {
- 	/* Cavium ThunderX, T88 pass 1.x - 2.1 */
- 	MIDR_RANGE(MIDR_THUNDERX, 0, 0, 1, 1),
- 	/* Cavium ThunderX, T81 pass 1.0 */
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 4f272399de89..f6d84e2c92fe 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -983,7 +983,7 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
- 
- 	/* Useful for KASLR robustness */
- 	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
--		return true;
-+		return kaslr_offset() > 0;
- 
- 	/* Don't force KPTI for CPUs that are not vulnerable */
- 	if (is_midr_in_range_list(read_cpuid_id(), kpti_safe_list))
-@@ -1003,7 +1003,12 @@ kpti_install_ng_mappings(const struct arm64_cpu_capabilities *__unused)
- 	static bool kpti_applied = false;
- 	int cpu = smp_processor_id();
- 
--	if (kpti_applied)
-+	/*
-+	 * We don't need to rewrite the page-tables if either we've done
-+	 * it already or we have KASLR enabled and therefore have not
-+	 * created any global mappings at all.
-+	 */
-+	if (kpti_applied || kaslr_offset() > 0)
- 		return;
- 
- 	remap_fn = (void *)__pa_symbol(idmap_kpti_install_ng_mappings);
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index c7213674cb24..15d79a8e5e5e 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -475,6 +475,7 @@ ENDPROC(__primary_switched)
- 
- ENTRY(kimage_vaddr)
- 	.quad		_text - TEXT_OFFSET
-+EXPORT_SYMBOL(kimage_vaddr)
- 
- /*
-  * If we're fortunate enough to boot at EL2, ensure that the world is
--- 
-2.11.0
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgRW1tYW51ZWwsCiAKIE9uIGpldS4sIGphbnYuIDEwIDIwMTksIEVtbWFudWVsIFZhZG90IDxt
+YW51QGJpZG91aWxsaXN0ZS5jb20+IHdyb3RlOgoKPiAgSGVsbG8gYWxsLAo+Cj4gIFNvcnJ5IEkg
+Zm9yZ290IHRvIGFuc3dlciB0aGlzIGVtYWlsLgo+Cj4gT24gV2VkLCAyNiBEZWMgMjAxOCAxODow
+OTowNCArMDEwMAo+IEhlaW5yaWNoIFNjaHVjaGFyZHQgPHh5cHJvbi5nbHBrQGdteC5kZT4gd3Jv
+dGU6Cj4KPj4gT24gMTIvMjYvMTggNToxNiBQTSwgR3JlZ29yeSBDTEVNRU5UIHdyb3RlOgo+PiA+
+IEhpIEhlaW5yaWNoLAo+PiA+ICAKPj4gPiAgT24gdmVuLiwgZMOpYy4gMjEgMjAxOCwgSGVpbnJp
+Y2ggU2NodWNoYXJkdCA8eHlwcm9uLmdscGtAZ214LmRlPiB3cm90ZToKPj4gPiAKPj4gPj4gVGhl
+IG1lbW9yeSBhcmVhIFsweDQwMDAwMDAtMHg0MjAwMDAwWyBpcyBvY2N1cGllZCBieSB0aGUgUFND
+SSBmaXJtd2FyZS4gQW55Cj4+ID4+IGF0dGVtcHQgdG8gYWNjZXNzIGl0IGZyb20gTGludXggbGVh
+ZHMgdG8gYW4gaW1tZWRpYXRlIGNyYXNoLgo+PiA+Pgo+PiA+PiBTbyBsZXQncyBtYWtlIHRoZSBz
+YW1lIG1lbW9yeSByZXNlcnZhdGlvbiBhcyB0aGUgdmVuZG9yIGtlcm5lbC4KPj4gPj4KPj4gPj4g
+U2lnbmVkLW9mZi1ieTogSGVpbnJpY2ggU2NodWNoYXJkdCA8eHlwcm9uLmdscGtAZ214LmRlPgo+
+PiA+IAo+PiA+IFdlIGdvdCBhIHNpbWlsYXIgcGF0Y2ggb25lIG1vbnRoIGFnbyBhbmQgUnVzc2Vs
+bCBLaW5nIHBvaW50ZWQgdGhhdCBpdAo+PiA+IGRpZG4ndCBtYXRjaCB3YWh0IGhlIHNhdyBvbiBo
+aXMgTUFDQ0hJQVRPYmluOgo+PiA+IGh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL3BpcGVybWFp
+bC9saW51eC1hcm0ta2VybmVsLzIwMTgtTm92ZW1iZXIvNjEyMzYwLmh0bWwKPj4gPiAKPj4gPiBv
+biBtaW5lIHVuZGVyIFUtQm9vdCBJIGdvdDoKPj4gPiAKPj4gPiBNYXJ2ZWxsPj4gbWQgMHg0MDAw
+MDAwCj4+ID4gMDQwMDAwMDA6IDAwMDAwMDAwIDAwMDAwMDA3IDAwMDAwMDA1IDAwMDAwMDQwICAg
+IC4uLi4uLi4uLi4uLkAuLi4KPj4gPiAwNDAwMDAxMDogMDAwMDAwMDEgMDAwMDEwMDAgMDAwMDAw
+MDcgMDAwMDAwMDEgICAgLi4uLi4uLi4uLi4uLi4uLgo+PiA+IDA0MDAwMDIwOiAwMDAwMDAwOCAw
+MDAwMDAwMCAwMDAwMDAwOSAwMDAwMDAwMCAgICAuLi4uLi4uLi4uLi4uLi4uCj4+ID4gMDQwMDAw
+MzA6IDAwMDAwMDBhIDAwMDAwMDAwIGZmZmZmZmZmIGZmZmZmZmZmICAgIC4uLi4uLi4uLi4uLi4u
+Li4KPj4gPiAwNDAwMDA0MDogZmZmZmZmZmYgZmZmZmZmZmYgZmZmZmZmZmYgZmZmZmZmZmYgICAg
+Li4uLi4uLi4uLi4uLi4uLgo+PiA+IDA0MDAwMDUwOiBmZmZmZmZmZiBmZmZmZmZmZiBmZmZmZmZm
+ZiBmZmZmZmZmZiAgICAuLi4uLi4uLi4uLi4uLi4uCj4+ID4gMDQwMDAwNjA6IGZmZmZmZmZmIGZm
+ZmZmZmZmIGZmZmZmZmZmIGZmZmZmZmZmICAgIC4uLi4uLi4uLi4uLi4uLi4KPj4gPiAwNDAwMDA3
+MDogZmZmZmZmZmYgZmZmZmZmZmYgZmZmZmZmZmYgZmZmZmZmZmYgICAgLi4uLi4uLi4uLi4uLi4u
+Lgo+PiA+IDA0MDAwMDgwOiBmZmZmZmZmZiBmZmZmZmZmZiBmZmZmZmZmZiBmZmZmZmZmZiAgICAu
+Li4uLi4uLi4uLi4uLi4uCj4+ID4gMDQwMDAwOTA6IGZmZmZmZmZmIGZmZmZmZmZmIGZmZmZmZmZm
+IGZmZmZmZmZmICAgIC4uLi4uLi4uLi4uLi4uLi4KPj4gPiAwNDAwMDBhMDogZmZmZmZmZmYgZmZm
+ZmZmZmYgZmZmZmZmZmYgZmZmZmZmZmYgICAgLi4uLi4uLi4uLi4uLi4uLgo+PiA+IDA0MDAwMGIw
+OiBmZmZmZmZmZiBmZmZmZmZmZiBmZmZmZmZmZiBmZmZmZmZmZiAgICAuLi4uLi4uLi4uLi4uLi4u
+Cj4+ID4gMDQwMDAwYzA6IGZmZmZmZmZmIGZmZmZmZmZmIGZmZmZmZmZmIGZmZmZmZmZmICAgIC4u
+Li4uLi4uLi4uLi4uLi4KPj4gPiAwNDAwMDBkMDogZmZmZmZmZmYgZmZmZmZmZmYgZmZmZmZmZmYg
+ZmZmZmZmZmYgICAgLi4uLi4uLi4uLi4uLi4uLgo+PiA+IDA0MDAwMGUwOiBmZmZmZmZmZiBmZmZm
+ZmZmZiBmZmZmZmZmZiBmZmZmZmZmZiAgICAuLi4uLi4uLi4uLi4uLi4uCj4+ID4gMDQwMDAwZjA6
+IGZmZmZmZmZmIGZmZmZmZmZmIGZmZmZmZmZmIGZmZmZmZmZmICAgIC4uLi4uLi4uLi4uLi4uLi4K
+Pj4gPiAKPj4gPiBJbiBteSBjYXNlIEkgaGF2ZSBhbiBvbGQgQVRGLCBob3dldmVyIHRoaXMga2lu
+ZCBvZiBzZXR0aW5nIHNob3VsZCBiZQo+PiA+IGRvbmUgYnkgdGhlIGJvb3Rsb2FkZXIuCj4+ID4g
+Cj4+ID4gSSBhbSBpbnRlcmVzdGVkIGJ5IHlvdXIgY2xhaW0gYWJvdXQgY2F1c2luZyBhbiBpbW1l
+ZGlhdGUgY3Jhc2ggd2hlbgo+PiA+IGFjY2Vzc2luZyB0aGlzIHJlZ2lvbi4gSG93IGRpZCB5b3Ug
+dHJpZ2dlciBpdD8KPj4gPiAKPj4gPiBHcmVnb3J5Cj4+IAo+PiBIZWxsbyBHcmVnb3J5LAo+PiAK
+Pj4ganVkZ2luZyBmcm9tIHlvdSBVLUJvb3QgcHJvbXB0IHlvdSBhcmUgbm90IHVzaW5nIG1haW5s
+aW5lIFUtQm9vdC4gV2l0aAo+PiB0aGUgbGVnYWN5IE1hcnZlbGwgVS1Cb290IEkgZ2V0IHRoZSBz
+YW1lIG91dHB1dCBhcyB5b3UgcHJvdmlkZSBhYm92ZS4KPj4gQnV0IHlvdSBhcmUgbG9va2luZyBp
+biB0aGUgd3JvbmcgcGxhY2UgdG8gY29uZmlybSB0aGF0IHRoaXMgaXMgQVRGOgo+PiAKPj4gTWFy
+dmVsbD4+IG1kIDA0MDE3MjAwCj4+IDA0MDE3MjAwOiA2MTZkNjkyMCA3NDIwNjU2NyA1MDQzMjA2
+ZiA0NzRkMjAzMSAgICAgaW1hZ2UgdG8gQ1AxIE1HCj4+IDA0MDE3MjEwOiA3NDZmNmUyMCA3MDc1
+NzMyMCA3NDcyNmY3MCAwMDBhNjQ2NSAgICAgbm90IHN1cHBvcnRlZC4uCj4+IDA0MDE3MjIwOiA0
+ZjUyNTI0NSAyMDIwM2E1MiA1MDQzNTMyMCAzMjRjNDI1ZiAgICBFUlJPUjogICBTQ1BfQkwyCj4+
+IDA0MDE3MjMwOiA2ZjcyNzcyMCA2OTIwNjc2ZSA2NjIwNjc2ZCA2MTZkNzI2ZiAgICAgd3Jvbmcg
+aW1nIGZvcm1hCj4+IDA0MDE3MjQwOiA2MzI4MjA3NCA3NDVmMzM2ZCAzZDY1NzA3OSAwYTI5NjQy
+NSAgICB0IChjbTNfdHlwZT0lZCkuCj4+IDA0MDE3MjUwOiA1NDRmNGUwMCAzYTQ1NDM0OSA0MzUz
+MjAyMCA2ZDQ5MjA1MCAgICAuTk9USUNFOiAgU0NQIEltCj4+IDA0MDE3MjYwOiAyMDY1Njc2MSA3
+MzY1NmY2NCAyMDc0Mjc2ZSA3NDZlNmY2MyAgICBhZ2UgZG9lc24ndCBjb250Cj4+IDA0MDE3Mjcw
+OiAyMDZlNjk2MSA2NjIwNGQ1MCA3NzZkNzI2OSAwYTY1NzI2MSAgICBhaW4gUE0gZmlybXdhcmUu
+Cj4+IDA0MDE3MjgwOiAwMDAwMDAwMCAwMDAwMDAwMCAwNDAxNDRkMCAwMDAwMDAwMCAgICAuLi4u
+Li4uLi5ELi4uLi4uCj4+IDA0MDE3MjkwOiAwMDAwMDAwMSAwMDAwMDAxOSA0ZjUyNTI0NSAyMDIw
+M2E1MiAgICAuLi4uLi4uLkVSUk9SOgo+PiAwNDAxNzJhMDogNmU2OTU3MjAgMjA3NzZmNjQgMjAz
+YTY0MjUgNjU3MzYxNjIgICAgIFdpbmRvdyAlZDogYmFzZQo+PiAwNDAxNzJiMDogNjQ2NDYxMjAg
+NzM3MzY1NzIgNjE2ZTc1MjAgNmU2NzY5NmMgICAgIGFkZHJlc3MgdW5hbGlnbgo+PiAwNDAxNzJj
+MDogNzQyMDY0NjUgNzgzMDIwNmYgMDAwYTc4MjUgNjc2OTZjNDEgICAgZWQgdG8gMHgleC4uQWxp
+Zwo+PiAwNDAxNzJkMDogNzA3NTIwNmUgNjU2ODc0MjAgNzM2MTYyMjAgNjQ2MTIwNjUgICAgbiB1
+cCB0aGUgYmFzZSBhZAo+PiAwNDAxNzJlMDogNzM2NTcyNjQgNmY3NDIwNzMgMjU3ODMwMjAgMDAw
+YTc4NmMgICAgZHJlc3MgdG8gMHglbHguLgo+PiAwNDAxNzJmMDogNGY1MjUyNDUgMjAyMDNhNTIg
+NmU2OTU3MjAgMjA3NzZmNjQgICAgRVJST1I6ICAgV2luZG93Cj4KPiAgSSBkbyBjb25maXJtIHdo
+YXQgSGVpbnJpY2ggaXMgc2F5aW5nLCB0aGlzIGlzIG5lZWRlZCAoYW5kIG1hZGUgZm9yKQo+IG1h
+aW5saW5lIFUtQm9vdC4KPgo+PiBQb3NzaWJseSB0aGUgbGVnYWN5IE1hcnZlbGwgVS1Cb290IGlz
+IHJ1bm5pbmcgYXQgZXhjZXB0aW9uIGxldmVsIDMKPj4gKEVMMykuIFRoaXMgd291bGQgZXhwbGFp
+biB3aHkgeW91IGNhbm5vdCByZXByb2R1Y2UgdGhlIGNyYXNoIHdpdGggdGhhdAo+PiBVLUJvb3Qu
+Cj4+IAo+PiBUaGUgbGVnYWN5IE1hcnZlbGwgVS1Cb290IGlzIGluIGJhZCBzaGFwZTogdGhlaXIg
+Ym9vdGkgY29tbWFuZCBjYW5ub3QKPj4gbG9hZCB0aGUgaW5pdHJkLmltZyBjcmVhdGVkIGJ5IERl
+Ymlhbi4gVGhpcyBpcyB3aHkgSSB1c2UgbWFpbmxpbmUKPj4gVS1Cb290LiBIZXJlIHlvdSBjYW4g
+ZmluZCBteSByZWNpcGU6Cj4KPiAgSSBwZXJzb25uYWx5IHVzZXMgbWFpbmxpbmUgVS1Cb290IGJl
+Y2F1c2UgdGhlIGVmaSBwYXJ0IGlzIHRvbyBvbGQgYW5kCj4gYnVnZ3kgb24gTWFydmVsbCBmb3Jr
+Lgo+Cj4+IGh0dHBzOi8vZ2l0aHViLmNvbS94eXByb24vdS1ib290LWJ1aWxkL2Jsb2IvbWFjY2hp
+YXRvYmluL01ha2VmaWxlIChmb3IKPj4gVS1Cb290IHYyMDE4LjExKQo+PiAKPj4gV2hlbiBJIGlz
+c3VlIHRoZSBtZCBjb21tYW5kIGZvciB0aGUgcmVnaW9uIGluIG1haW5saW5lIFUtQm9vdCAgSSBn
+ZXQgYQo+PiBjcmFzaDoKPj4gCj4+ID0+IG1kIDB4NDAwMDAwMAo+PiAKPj4gCj4+IDA0MDAwMDAw
+OiJTeW5jaHJvbm91cyBBYm9ydCIgaGFuZGxlciwgZXNyIDB4OTYwMDAyMTAKPj4gCj4+IAo+PiBl
+bHI6IDAwMDAwMDAwMDAwNmI4NzggbHIgOiAwMDAwMDAwMDAwMDZiN2Y0IChyZWxvYykKPj4gCj4+
+IAo+PiBlbHI6IDAwMDAwMDAwN2ZmOGI4NzggbHIgOiAwMDAwMDAwMDdmZjhiN2Y0Cj4+IAo+PiAK
+Pj4geDAgOiAwMDAwMDAwMDAwMDAwMDA5IHgxIDogMDAwMDAwMDAwMDAwMDAwMAo+PiAKPj4gCj4+
+IHgyIDogMDAwMDAwMDAwMDAwMDAzYSB4MyA6IDAwMDAwMDAwMDQwMDAwMDAKPj4gCj4+IAo+PiB4
+NCA6IDAwMDAwMDAwMDAwMDAwMDAgeDUgOiAwMDAwMDAwMDdmZmFlMzA2Cj4+IAo+PiAKPj4geDYg
+OiAwMDAwMDAwMDAwMDAwMDA0IHg3IDogMDAwMDAwMDA3ZmIwYTFlMAo+PiAKPj4gCj4+IHg4IDog
+MDAwMDAwMDA3ZmIwYTBhMCB4OSA6IDAwMDAwMDAwMDAwMDAwMDgKPj4gCj4+IAo+PiB4MTA6IDAw
+MDAwMDAwZmZmZmZmZDAgeDExOiAwMDAwMDAwMDAwMDAwMDA2Cj4+IAo+PiAKPj4geDEyOiAwMDAw
+MDAwMDAwMDE4NjlmIHgxMzogMDAwMDAwMDAwMDAwNDQwYwo+PiAKPj4gCj4+IHgxNDogMDAwMDAw
+MDA3ZmIwYTQzYyB4MTU6IDAwMDAwMDAwMDAwMDAwMDgKPj4gCj4+IAo+PiB4MTY6IDAwMDAwMDAw
+N2ZmYjQ5ZWEgeDE3OiAwMDAwMDAwMDdmZmI0OWVhCj4+IAo+PiAKPj4geDE4OiAwMDAwMDAwMDdm
+YjBmZGQ4IHgxOTogMDAwMDAwMDAwMDAwMDA0MAo+PiAKPj4gCj4+IHgyMDogMDAwMDAwMDAwNDAw
+MDAwMCB4MjE6IDAwMDAwMDAwMDQwMDAwMDAKPj4gCj4+IAo+PiB4MjI6IDAwMDAwMDAwN2ZmYWNm
+ZjEgeDIzOiAwMDAwMDAwMDAwMDAwMDA4Cj4+IAo+PiAKPj4geDI0OiAwMDAwMDAwMDAwMDAwMDA0
+IHgyNTogMDAwMDAwMDAwMDAwMDAwNAo+PiAKPj4gCj4+IHgyNjogMDAwMDAwMDAwMDAwMDAwNCB4
+Mjc6IDAwMDAwMDAwN2ZiMGEyNjgKPj4gCj4+IAo+PiB4Mjg6IDAwMDAwMDAwMDAwMDAwMDAgeDI5
+OiAwMDAwMDAwMDdmYjBhMWUwCj4+IAo+PiAKPj4gCj4+IFJlc2V0dGluZyBDUFUgLi4uCj4+IAo+
+PiBJbiBMaW51eCA0LjIwIHdpdGhvdXQgbXkgcGF0Y2ggSSByZWd1bGFybHkgZXhwZXJpZW5jZSBj
+cmFzaGVzIGxpa2UgdGhlCj4+IG9uZSBiZWxvdy4gV2l0aCB0aGUgcGF0Y2ggSSBuZXZlciBleHBl
+cmllbmNlIHN1Y2ggYSBjcmFzaC4KPgo+ICBGb3IgbWUgdGhpcyBpcyAxMDAlIHJlcHJvZHVjaWJs
+ZSB3aXRoIHRoZSBGcmVlQlNEIGtlcm5lbCwgbm90IHRoZSBzYW1lCj4ga2luZCBvZiBjcmFzaCBi
+dXQgYSBoYW5nIGFzIHNvb24gYXMgd2UgdHJ5IHRvIGNhbGwgUFNDSS9TTUNDQyBmdW5jdGlvbnMu
+Cj4KPiAgSSBkb24ndCBjYXJlIHBlcnNvbm5hbHkgd2hpY2ggcGF0Y2ggaXMgdGFrZW4gYXMgbG9u
+ZyBhcyBpdCdzIGFwcGxpZWQuCgpUaGFua3MgZm9yIHlvdXIgY29uZmlybWF0aW9uIEkgd2lsbCBh
+cHBseSBpdC4KCkdyZWdvcnkKCj4KPiAgQ2hlZXJzLAo+Cj4gLS0gCj4gRW1tYW51ZWwgVmFkb3Qg
+PG1hbnVAYmlkb3VpbGxpc3RlLmNvbT4gPG1hbnVAZnJlZWJzZC5vcmc+CgotLSAKR3JlZ29yeSBD
+bGVtZW50LCBCb290bGluCkVtYmVkZGVkIExpbnV4IGFuZCBLZXJuZWwgZW5naW5lZXJpbmcKaHR0
+cDovL2Jvb3RsaW4uY29tCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxp
+c3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0
+aW5mby9saW51eC1hcm0ta2VybmVsCg==
