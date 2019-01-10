@@ -2,62 +2,64 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-16.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0FB4DC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 11:05:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 68E1DC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 11:10:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D3A12214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 11:05:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 376BF214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 11:10:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eoKNxt3E"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D3A12214DA
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="C8xkcMWU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 376BF214DA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:In-Reply-To:
-	Date:References:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=EuNk/aDWA8477nat3mT7tMKN1I5Yb6/DaFNtAilAgOY=; b=eoKNxt3EOX81TC
-	b49Z5NP/ZWhg5WzZ1IpZIp12TCk1eaelbXQd0Aj6EwN5MAqOKTVz9II8iGNTcHJwdPZH/OL2XSMZO
-	e2+8L1kx3/s4j0OzuyIG6/j/PDQoec6D5DaQbezW4chSLfAiASDgYihR33rGKiPYDfNt1x9UbZDcS
-	ahWbFfvExACf4EkfnU+egQr/d8hZ1CGE4WlUKuO3wIxh/eUGVg3sN7CrURzZv8r0iGUbtChoUnEHi
-	dgpdXg9DS1A1mFkQ3oNFY95z2kCTl2/Hy6ZkjCAhkU2GyaEIxABHo3DSbhpkIZUiyLogFgXHiBwLQ
-	lL0KrkHiZLyWXj8GiDhA==;
+	List-Owner; bh=h53sSl1+r1OuEp+xdsmi0LwzNE+5PFcFgpNdTuk2u6k=; b=C8xkcMWU7v2lFg
+	KzShVEHFPyWmT+paoiLSp//hK1MWXttlCAgvmBnUV9KJKz0ZQRF50YAuCYaTNZ/UKYcB0VmT2v2I5
+	IMn90FnpeJ+pz7feDjAplchyAkPKxeEVcTPyb4yGwEYmN+moNaKdJ7cZzg2PFLQc6SgJ/UlLLvyzv
+	XoghARIEVNIaTed7g6r7ZUVNHfRH1M5l1N3zibp9Qgj1AQiuK1aLFxqhXI0wXGNz0FWuBJxNoUdgT
+	AxrKoPIHPrql6EHVJyansWV8o66HdWwdF7iL+rDWy8WEcA4ekS7m3CCAs8bO8x80/xQNcr1NuOb/F
+	6y4eL66KZuhrffzeUQdQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghY8z-0003CH-Ke; Thu, 10 Jan 2019 11:05:01 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
+	id 1ghYE9-0006O1-Nf; Thu, 10 Jan 2019 11:10:21 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghY8w-0003Bm-6O
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 11:04:59 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id CDE97209D7; Thu, 10 Jan 2019 12:04:56 +0100 (CET)
-Received: from localhost (alyon-652-1-61-72.w109-213.abo.wanadoo.fr
- [109.213.84.72])
- by mail.bootlin.com (Postfix) with ESMTPSA id 94941206DC;
- Thu, 10 Jan 2019 12:04:46 +0100 (CET)
-From: Gregory CLEMENT <gregory.clement@bootlin.com>
-To: Heinrich Schuchardt <xypron.glpk@gmx.de>
-Subject: Re: [PATCH v2 1/1] arm64: dts: marvell: armada-ap806: reserve PSCI
- area
-References: <20181221164503.5128-1-xypron.glpk@gmx.de>
-Date: Thu, 10 Jan 2019 12:04:46 +0100
-In-Reply-To: <20181221164503.5128-1-xypron.glpk@gmx.de> (Heinrich Schuchardt's
- message of "Fri, 21 Dec 2018 17:45:03 +0100")
-Message-ID: <874lagpycx.fsf@FE-laptop>
-User-Agent: Gnus/5.13 (Gnus v5.13) Emacs/26.1 (gnu/linux)
+ id 1ghYE7-0006NZ-27
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 11:10:20 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5264DA78;
+ Thu, 10 Jan 2019 03:10:18 -0800 (PST)
+Received: from fuggles.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 9F74A3F694;
+ Thu, 10 Jan 2019 03:10:14 -0800 (PST)
+Date: Thu, 10 Jan 2019 11:10:12 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Andrew Murray <andrew.murray@arm.com>
+Subject: Re: [PATCH v4 13/13] drivers/perf: use PERF_PMU_CAP_NO_EXCLUDE for
+ Cavium TX2 PMU
+Message-ID: <20190110111012.GB27065@fuggles.cambridge.arm.com>
+References: <1546878450-20341-1-git-send-email-andrew.murray@arm.com>
+ <1546878450-20341-14-git-send-email-andrew.murray@arm.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <1546878450-20341-14-git-send-email-andrew.murray@arm.com>
+User-Agent: Mutt/1.11.1+86 (6f28e57d73f2) ()
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_030458_374449_7DE1202D 
-X-CRM114-Status: GOOD (  18.67  )
+X-CRM114-CacheID: sfid-20190110_031019_130706_2FE4B7D3 
+X-CRM114-Status: GOOD (  12.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,42 +71,41 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
- Jason Cooper <jason@lakedaemon.net>, devicetree@vger.kernel.org,
- linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
- linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>, Peter Zijlstra <peterz@infradead.org>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ Paul Mackerras <paulus@samba.org>, Shawn Guo <shawnguo@kernel.org>,
+ Michael Ellerman <mpe@ellerman.id.au>, x86@kernel.org,
+ Russell King <linux@armlinux.org.uk>, Ingo Molnar <mingo@redhat.com>,
+ Matt Turner <mattst88@gmail.com>, suzuki.poulose@arm.com,
+ Sascha Hauer <s.hauer@pengutronix.de>,
+ Arnaldo Carvalho de Melo <acme@kernel.org>,
+ Ivan Kokshaysky <ink@jurassic.park.msu.ru>,
+ Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org,
+ Richard Henderson <rth@twiddle.net>, robin.murphy@arm.com,
+ linux-kernel@vger.kernel.org, linux-alpha@vger.kernel.org,
+ Borislav Petkov <bp@alien8.de>, linuxppc-dev@lists.ozlabs.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgSGVpbnJpY2gsCiAKIE9uIHZlbi4sIGTDqWMuIDIxIDIwMTgsIEhlaW5yaWNoIFNjaHVjaGFy
-ZHQgPHh5cHJvbi5nbHBrQGdteC5kZT4gd3JvdGU6Cgo+IFRoZSBtZW1vcnkgYXJlYSBbMHg0MDAw
-MDAwLTB4NDIwMDAwMFsgaXMgb2NjdXBpZWQgYnkgdGhlIFBTQ0kgZmlybXdhcmUuIEFueQo+IGF0
-dGVtcHQgdG8gYWNjZXNzIGl0IGZyb20gTGludXggbGVhZHMgdG8gYW4gaW1tZWRpYXRlIGNyYXNo
-Lgo+Cj4gU28gbGV0J3MgbWFrZSB0aGUgc2FtZSBtZW1vcnkgcmVzZXJ2YXRpb24gYXMgdGhlIHZl
-bmRvciBrZXJuZWwuCj4KPiBTaWduZWQtb2ZmLWJ5OiBIZWlucmljaCBTY2h1Y2hhcmR0IDx4eXBy
-b24uZ2xwa0BnbXguZGU+CgoKQXBwbGllZCBvbiBtdmVidS9maXhlcwoKSSBhZGRlZCBhIGNvbW1l
-bnQgYWJvdXQgdGhlIHVzZSB3aXRoIGEgbWFpbmxpbmUgL1UtQm9vdAoKVGhhbmtzLAoKR3JlZ29y
-eQoKCj4gLS0tCj4gdjIKPiAJTW92ZSB0aGUgY2hhbmdlIGZyb20gYXJtYWRhLTgwNDAtbWNiaW4u
-ZHRzIHRvIGFybWFkYS1hcDgwNi5kdHNpLgo+IAlJIG9ubHkgaGF2ZSBhIE1BQ0NISUFUT2JpbiBm
-b3IgdGVzdGluZyBidXQKPiAJaHR0cHM6Ly9naXRodWIuY29tL01hcnZlbGxFbWJlZGRlZFByb2Nl
-c3NvcnMvbGludXgtbWFydmVsbAo+IAloYXMgdGhlIHJlc2VydmF0aW9uIGluIHRoYXQgZmlsZS4K
-PiAtLS0KPiAgYXJjaC9hcm02NC9ib290L2R0cy9tYXJ2ZWxsL2FybWFkYS1hcDgwNi5kdHNpIHwg
-MTEgKysrKysrKysrKysKPiAgMSBmaWxlIGNoYW5nZWQsIDExIGluc2VydGlvbnMoKykKPgo+IGRp
-ZmYgLS1naXQgYS9hcmNoL2FybTY0L2Jvb3QvZHRzL21hcnZlbGwvYXJtYWRhLWFwODA2LmR0c2kg
-Yi9hcmNoL2FybTY0L2Jvb3QvZHRzL21hcnZlbGwvYXJtYWRhLWFwODA2LmR0c2kKPiBpbmRleCA3
-ZDk0YzFmYTU5MmEuLmY4ZGFmZWY4M2RiMCAxMDA2NDQKPiAtLS0gYS9hcmNoL2FybTY0L2Jvb3Qv
-ZHRzL21hcnZlbGwvYXJtYWRhLWFwODA2LmR0c2kKPiArKysgYi9hcmNoL2FybTY0L2Jvb3QvZHRz
-L21hcnZlbGwvYXJtYWRhLWFwODA2LmR0c2kKPiBAQCAtMjgsNiArMjgsMTcgQEAKPiAgCQltZXRo
-b2QgPSAic21jIjsKPiAgCX07Cj4gIAo+ICsJcmVzZXJ2ZWQtbWVtb3J5IHsKPiArCQkjYWRkcmVz
-cy1jZWxscyA9IDwyPjsKPiArCQkjc2l6ZS1jZWxscyA9IDwyPjsKPiArCQlyYW5nZXM7Cj4gKwo+
-ICsJCXBzY2ktYXJlYUA0MDAwMDAwIHsKPiArCQkJcmVnID0gPDB4MCAweDQwMDAwMDAgMHgwIDB4
-MjAwMDAwPjsKPiArCQkJbm8tbWFwOwo+ICsJCX07Cj4gKwl9Owo+ICsKPiAgCWFwODA2IHsKPiAg
-CQkjYWRkcmVzcy1jZWxscyA9IDwyPjsKPiAgCQkjc2l6ZS1jZWxscyA9IDwyPjsKPiAtLSAKPiAy
-LjE5LjIKPgoKLS0gCkdyZWdvcnkgQ2xlbWVudCwgQm9vdGxpbgpFbWJlZGRlZCBMaW51eCBhbmQg
-S2VybmVsIGVuZ2luZWVyaW5nCmh0dHA6Ly9ib290bGluLmNvbQoKX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxp
-c3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZy
-YWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+On Mon, Jan 07, 2019 at 04:27:30PM +0000, Andrew Murray wrote:
+> The Cavium ThunderX2 UNCORE PMU driver doesn't support any event
+> filtering. Let's advertise the PERF_PMU_CAP_NO_EXCLUDE capability to
+> simplify the code.
+> 
+> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> ---
+>  drivers/perf/thunderx2_pmu.c | 10 +---------
+>  1 file changed, 1 insertion(+), 9 deletions(-)
+
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Thanks for fixing this up.
+
+Will
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
