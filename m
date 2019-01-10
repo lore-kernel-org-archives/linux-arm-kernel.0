@@ -2,73 +2,94 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ECE38C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 17:06:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AE79FC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 17:10:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AFEE020685
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 17:06:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 797F520685
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 17:10:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EqqzlPde"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AFEE020685
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RTFUtU4C";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="HnwKuE7M";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="RKQoQkDI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 797F520685
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2EAbqp52hjPZ+SlPAm3Fx5gjY8AMxyrQUNgZx767wsQ=; b=EqqzlPdeOYBe+i
-	2PnwH9Xmr1fBmnIyaloweJiLWZnLF0565VUeHnYmHGfGU42SNerwQjacWBIW8BMdRTzMOCr1ycTek
-	m+pMVREy58bAjr0vYYmZhFH6Rtma+weMoC/Rqye6qLyvh4ZLuZ702dy5LvT/laDrh7LCnmEYjRIS+
-	hB9NHhOYispHqZdUNWXRG/SFlXt4s1ZfXtiNscspqUdbzTNT8ZA2S3zDAHQsPS0lTmyMq+xX6vvo9
-	42WOO3EfTaWURyMx5xFB0liBpLrhPa/5mDF2NiKYCMjXG+G7d585xL03gy4T3d+3hZrEt78QuLTu/
-	tEvHSIqIMJWK6SuYniGg==;
+	List-Owner; bh=2o/Ndr8DfyevO8gVs/RYj20ffft2OyNO1DGpMknIkT4=; b=RTFUtU4CgV/y5d
+	/vIrZcCi7iDUveiKb/ITduMDxbvuGqedtdAhAaB9Tt+AGkNVNv3kVLCFHbHDSElL3+OAUqdmOb3B/
+	LFdEy8YyZNc0+CIfdBkH+o/Bsas7dqletJDAYZBdjcGMqC6geMJby3MOGqjZw5UCbpVYzPbb989tK
+	ECoLL0bP2/RaQ70L4Na9R6cIIndlmDNu6qoTOXlUJEdisat8bpX9YkYbe4w5ZrX7++LxoEihn5dLv
+	EATOOUNBAiLSZIZVeF3REVfpuQn8YBdNwDgd+FaOCJSuQXTJBA9v8mBU5dZ74YcYlzLavkP4rAt7T
+	Hy0MsOcsQbhXBnwh0Ynw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghdmo-000079-NU; Thu, 10 Jan 2019 17:06:30 +0000
-Received: from mail-qt1-f196.google.com ([209.85.160.196])
+	id 1ghdr6-0002BC-7o; Thu, 10 Jan 2019 17:10:56 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghdml-00006e-Pz
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 17:06:29 +0000
-Received: by mail-qt1-f196.google.com with SMTP id v11so14018605qtc.2
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 10 Jan 2019 09:06:27 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=ppZcVQ/6kEa1+6j6RgrBmmjrAAts0gpmQru81oI2DjY=;
- b=TErwJatucnVAdfKBdkbp5w3Y3Wh7YyguJcG7MwzyAzzlDis5QOVVz6NJ1hSuO9cIaG
- HgLKRwJFiDxhg/VEOUhSTjMPGU97kKlYVnNgVBQqzIzOpjxs2rw5iJ9whmsabgFq2vJ2
- l6lSXEnTiWpmkdnr/dRcnXyoz0lofoy9Z/O9aX4tcCsshYK2cMReDiUv+0lj5pBpx0s/
- jm5XVpGYE56+m7QHGhMS4/JUHU8/04gxCAI0lN4jwEeuFjWRttdzK8o5sWQto/DeiPC2
- zJhYJrjQFMqt0AektZubfjwHgPgBQGEUpJu8x4RdXp0KUnWTyHxeYxs4/qJ5cvEYHFcw
- enCQ==
-X-Gm-Message-State: AJcUukd+Ip0VDDAagTJIc0uX5LYULdKM+lbFYf3XWPhFxLXMLxEp9JE4
- kQbElq15qzke+90D7yjqAJn8o/fZIYJ1J+Mg3pQ=
-X-Google-Smtp-Source: ALg8bN6AYimQvL2fk3CyhFYbTwHueixsV0cppMAFEDILJ7f9F0R4jNkQXt8J3yrK7O3RY2Kukmp6QEA1Mn21OLb0A00=
-X-Received: by 2002:a0c:e202:: with SMTP id q2mr10276671qvl.180.1547139986093; 
- Thu, 10 Jan 2019 09:06:26 -0800 (PST)
+ id 1ghdr3-0002An-BA
+ for linux-arm-kernel@bombadil.infradead.org; Thu, 10 Jan 2019 17:10:53 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
+ References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=v2Utgln8VaDCdBzHPa0SkyAbwFMG8qxLCFNwQhAz+gc=; b=HnwKuE7MV+uQdezAGDAiimpAF
+ GcP8UJCbFynNvufCMTnaM8aizEbIr0tcIu9REiJzATzv0+GEMWygCkx9XbecjvgabsfZbpHkyXwaF
+ b5L3EGBYkO/UV9I1mNRo7hyxYwTOZU452Oo8+IxUjZpTgXgq5cuGJiEwqPeGd/LSvuKgKogVhjJ3y
+ NIWDusgJkkrMkYucC/hIk3j0sIvL1cYGKYAhAk6ppz9c4k/uU4+N8gxZu18hhvnvGraU99mj9Y62K
+ ikDwEvB44lEGORStUZR+g/NlV4xsc/J9wZxs4dfTJAB1c9YmRJWVO29/QH3etWOCXNFwhnwlZgrId
+ MKQcT7fVA==;
+Received: from mail.kernel.org ([198.145.29.99])
+ by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghdCh-0005Mq-OC
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 16:29:13 +0000
+Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id C6B6A206B7;
+ Thu, 10 Jan 2019 16:29:08 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1547137749;
+ bh=0TNDLtP5cTQhN0wkLzWrHUEFAuWPdSuNN1R+VjRe4Rk=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=RKQoQkDIkr7iCduLvMEM+BbU7RcbKqDVkHd49EigLMqa3ClUI311xHt9bz4nr1aNd
+ T6qdY8RonJLVOvNLmwBrWvBjGjLS5+zfB6LOhTRg68++BV7Kia3iGW4QErjfDRmQop
+ 7UxlselKsN3r3ooc+WAWBKn4mtXFw87EYU+/7fN0=
+Date: Thu, 10 Jan 2019 17:29:06 +0100
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+To: Georgi Djakov <georgi.djakov@linaro.org>
+Subject: Re: [PATCH v10 0/8] Introduce on-chip interconnect API
+Message-ID: <20190110162906.GA19693@kroah.com>
+References: <20181127180349.29997-1-georgi.djakov@linaro.org>
+ <CAE=gft4jUjr3oDAZrM=-orLM-YoVAwa+e=crDDC_p9ArGE1dig@mail.gmail.com>
+ <20181206145547.GA7884@kroah.com>
+ <CAJZ5v0gP50tmq4ZzB7LLSaWGWjGjK31y=qFg5PS9B7c2XQ+DyQ@mail.gmail.com>
+ <6923d6ed-e357-b083-1830-8396d788efe5@linaro.org>
+ <CAJZ5v0jZMqFwYgnfRz04ELLRk=0U8Uv=acw0t9Azxk_HYL0gSQ@mail.gmail.com>
+ <9a3aae02-c7e0-97e3-2330-af4fccee6c14@linaro.org>
+ <20181211065808.GB5161@kroah.com>
+ <199be960-032a-d72d-4293-820e23a15b7a@linaro.org>
+ <b21d13df-7c0b-4c6d-e3c7-6ab285579ed5@linaro.org>
 MIME-Version: 1.0
-References: <20190110162435.309262-1-arnd@arndb.de>
- <CAMuHMdXYP3=TRHYqddVRfbRRaj_Ou=wfoX6ohKM7XNAx-c2RXw@mail.gmail.com>
-In-Reply-To: <CAMuHMdXYP3=TRHYqddVRfbRRaj_Ou=wfoX6ohKM7XNAx-c2RXw@mail.gmail.com>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Thu, 10 Jan 2019 18:06:09 +0100
-Message-ID: <CAK8P3a0kmr2ju+sZE+f-+=-2t5Eu+t-DS-+r6OKrPVTAxHwf8w@mail.gmail.com>
-Subject: Re: [PATCH 00/15] arch: synchronize syscall tables in preparation for
- y2038
-To: Geert Uytterhoeven <geert@linux-m68k.org>
+Content-Disposition: inline
+In-Reply-To: <b21d13df-7c0b-4c6d-e3c7-6ab285579ed5@linaro.org>
+User-Agent: Mutt/1.11.2 (2019-01-07)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_090627_843254_A34BE245 
-X-CRM114-Status: GOOD (  18.44  )
+X-CRM114-CacheID: sfid-20190110_112911_995498_79614F00 
+X-CRM114-Status: GOOD (  49.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,69 +101,153 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rich Felker <dalias@libc.org>,
- "linux-ia64@vger.kernel.org" <linux-ia64@vger.kernel.org>,
- Linux-sh list <linux-sh@vger.kernel.org>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Heiko Carstens <heiko.carstens@de.ibm.com>,
- Dominik Brodowski <linux@dominikbrodowski.net>, linux-mips@vger.kernel.org,
- Max Filippov <jcmvbkbc@gmail.com>, Deepa Dinamani <deepa.kernel@gmail.com>,
- "H. Peter Anvin" <hpa@zytor.com>, sparclinux <sparclinux@vger.kernel.org>,
- linux-s390 <linux-s390@vger.kernel.org>, Davidlohr Bueso <dave@stgolabs.net>,
- y2038 Mailman List <y2038@lists.linaro.org>,
- Michael Ellerman <mpe@ellerman.id.au>, Helge Deller <deller@gmx.de>,
- the arch/x86 maintainers <x86@kernel.org>,
- Russell King <linux@armlinux.org.uk>, Ingo Molnar <mingo@redhat.com>,
- Firoz Khan <firoz.khan@linaro.org>, Matt Turner <mattst88@gmail.com>,
- Fenghua Yu <fenghua.yu@intel.com>, Will Deacon <will.deacon@arm.com>,
- linux-m68k <linux-m68k@lists.linux-m68k.org>,
- Ivan Kokshaysky <ink@jurassic.park.msu.ru>, Andy Lutomirski <luto@kernel.org>,
- Thomas Gleixner <tglx@linutronix.de>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Michal Simek <monstr@monstr.eu>, Tony Luck <tony.luck@intel.com>,
- Parisc List <linux-parisc@vger.kernel.org>,
- Linux API <linux-api@vger.kernel.org>,
+Cc: Mark Rutland <mark.rutland@arm.com>, Doug Anderson <dianders@chromium.org>,
+ sanjayc@nvidia.com, "Rafael J. Wysocki" <rafael@kernel.org>,
+ maxime.ripard@bootlin.com, Michael Turquette <mturquette@baylibre.com>,
+ daidavid1@codeaurora.org, bjorn.andersson@linaro.org,
+ Saravana Kannan <skannan@codeaurora.org>, abailon@baylibre.com,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Vincent Guittot <vincent.guittot@linaro.org>, seansw@qti.qualcomm.com,
+ Kevin Hilman <khilman@baylibre.com>, evgreen@chromium.org,
+ ksitaraman@nvidia.com,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Arnd Bergmann <arnd@arndb.de>, Linux PM <linux-pm@vger.kernel.org>,
+ linux-arm-msm <linux-arm-msm@vger.kernel.org>,
+ Andy Gross <andy.gross@linaro.org>, Rob Herring <robh+dt@kernel.org>,
+ linux-tegra@vger.kernel.org, Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ "Rafael J. Wysocki" <rjw@rjwysocki.net>,
  Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Paul Burton <paul.burton@mips.com>,
- "Eric W. Biederman" <ebiederm@xmission.com>,
- alpha <linux-alpha@vger.kernel.org>,
- Martin Schwidefsky <schwidefsky@de.ibm.com>,
- Andrew Morton <akpm@linux-foundation.org>,
- linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
- "David S. Miller" <davem@davemloft.net>
+ Amit Kucheria <amit.kucheria@linaro.org>,
+ Thierry Reding <thierry.reding@gmail.com>, Olof Johansson <olof@lixom.net>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 10, 2019 at 5:59 PM Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->
-> Hi Arnd,
->
-> On Thu, Jan 10, 2019 at 5:26 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> > The system call tables have diverged a bit over the years, and a number
-> > of the recent additions never made it into all architectures, for one
-> > reason or another.
-> >
-> > This is an attempt to clean it up as far as we can without breaking
-> > compatibility, doing a number of steps:
->
-> Thanks a lot!
->
-> > - Add system calls that have not yet been integrated into all
-> >   architectures but that we definitely want there.
->
-> It looks like you missed wiring up io_pgetevents() on m68k.
-> Is that intentional?
+On Thu, Jan 10, 2019 at 04:19:14PM +0200, Georgi Djakov wrote:
+> Hi Greg,
+> 
+> On 12/17/18 13:17, Georgi Djakov wrote:
+> > Hi Greg,
+> > 
+> > On 12/11/18 08:58, Greg Kroah-Hartman wrote:
+> >> On Mon, Dec 10, 2018 at 04:50:00PM +0200, Georgi Djakov wrote:
+> >>> On 12/10/18 13:00, Rafael J. Wysocki wrote:
+> >>>> On Mon, Dec 10, 2018 at 11:18 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
+> >>>>>
+> >>>>> Hi Rafael,
+> >>>>>
+> >>>>> On 12/10/18 11:04, Rafael J. Wysocki wrote:
+> >>>>>> On Thu, Dec 6, 2018 at 3:55 PM Greg KH <gregkh@linuxfoundation.org> wrote:
+> >>>>>>>
+> >>>>>>> On Wed, Dec 05, 2018 at 12:41:35PM -0800, Evan Green wrote:
+> >>>>>>>> On Tue, Nov 27, 2018 at 10:03 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
+> >>>>>>>>>
+> >>>>>>>>> Modern SoCs have multiple processors and various dedicated cores (video, gpu,
+> >>>>>>>>> graphics, modem). These cores are talking to each other and can generate a
+> >>>>>>>>> lot of data flowing through the on-chip interconnects. These interconnect
+> >>>>>>>>> buses could form different topologies such as crossbar, point to point buses,
+> >>>>>>>>> hierarchical buses or use the network-on-chip concept.
+> >>>>>>>>>
+> >>>>>>>>> These buses have been sized usually to handle use cases with high data
+> >>>>>>>>> throughput but it is not necessary all the time and consume a lot of power.
+> >>>>>>>>> Furthermore, the priority between masters can vary depending on the running
+> >>>>>>>>> use case like video playback or CPU intensive tasks.
+> >>>>>>>>>
+> >>>>>>>>> Having an API to control the requirement of the system in terms of bandwidth
+> >>>>>>>>> and QoS, so we can adapt the interconnect configuration to match those by
+> >>>>>>>>> scaling the frequencies, setting link priority and tuning QoS parameters.
+> >>>>>>>>> This configuration can be a static, one-time operation done at boot for some
+> >>>>>>>>> platforms or a dynamic set of operations that happen at run-time.
+> >>>>>>>>>
+> >>>>>>>>> This patchset introduce a new API to get the requirement and configure the
+> >>>>>>>>> interconnect buses across the entire chipset to fit with the current demand.
+> >>>>>>>>> The API is NOT for changing the performance of the endpoint devices, but only
+> >>>>>>>>> the interconnect path in between them.
+> >>>>>>>>
+> >>>>>>>> For what it's worth, we are ready to land this in Chrome OS. I think
+> >>>>>>>> this series has been very well discussed and reviewed, hasn't changed
+> >>>>>>>> much in the last few spins, and is in good enough shape to use as a
+> >>>>>>>> base for future patches. Georgi's also done a great job reaching out
+> >>>>>>>> to other SoC vendors, and there appears to be enough consensus that
+> >>>>>>>> this framework will be usable by more than just Qualcomm. There are
+> >>>>>>>> also several drivers out on the list trying to add patches to use this
+> >>>>>>>> framework, with more to come, so it made sense (to us) to get this
+> >>>>>>>> base framework nailed down. In my experiments this is an important
+> >>>>>>>> piece of the overall power management story, especially on systems
+> >>>>>>>> that are mostly idle.
+> >>>>>>>>
+> >>>>>>>> I'll continue to track changes to this series and we will ultimately
+> >>>>>>>> reconcile with whatever happens upstream, but I thought it was worth
+> >>>>>>>> sending this note to express our "thumbs up" towards this framework.
+> >>>>>>>
+> >>>>>>> Looks like a v11 will be forthcoming, so I'll wait for that one to apply
+> >>>>>>> it to the tree if all looks good.
+> >>>>>>
+> >>>>>> I'm honestly not sure if it is ready yet.
+> >>>>>>
+> >>>>>> New versions are coming on and on, which may make such an impression,
+> >>>>>> but we had some discussion on it at the LPC and some serious questions
+> >>>>>> were asked during it, for instance regarding the DT binding introduced
+> >>>>>> here.  I'm not sure how this particular issue has been addressed here,
+> >>>>>> for example.
+> >>>>>
+> >>>>> There have been no changes in bindings since v4 (other than squashing
+> >>>>> consumer and provider bindings into a single patch and fixing typos).
+> >>>>>
+> >>>>> The last DT comment was on v9 [1] where Rob wanted confirmation from
+> >>>>> other SoC vendors that this works for them too. And now we have that
+> >>>>> confirmation and there are patches posted on the list [2].
+> >>>>
+> >>>> OK
+> >>>>
+> >>>>> The second thing (also discussed at LPC) was about possible cases where
+> >>>>> some consumer drivers can't calculate how much bandwidth they actually
+> >>>>> need and how to address that. The proposal was to extend the OPP
+> >>>>> bindings with one more property, but this is not part of this patchset.
+> >>>>> It is a future step that needs more discussion on the mailing list. If a
+> >>>>> driver really needs some bandwidth data now, it should be put into the
+> >>>>> driver and not in DT. After we have enough consumers, we can discuss
+> >>>>> again if it makes sense to extract something into DT or not.
+> >>>>
+> >>>> That's fine by me.
+> >>>>
+> >>>> Admittedly, I have some reservations regarding the extent to which
+> >>>> this approach will turn out to be useful in practice, but I guess as
+> >>>> long as there is enough traction, the best way to find out it to try
+> >>>> and see. :-)
+> >>>>
+> >>>> From now on I will assume that this series is going to be applied by Greg.
+> >>>
+> >>> That was the initial idea, but the problem is that there is a recent
+> >>> change in the cmd_db API (needed by the sdm845 provider driver), which
+> >>> is going through arm-soc/qcom/drivers. So either Greg pulls also the
+> >>> qcom-drivers-for-4.21 tag from Andy or the whole series goes via Olof
+> >>> and Arnd. Maybe there are other options. I don't have any preference and
+> >>> don't want to put extra burden on any maintainers, so i am ok with what
+> >>> they prefer.
+> >>
+> >> Let me take the time later this week to review the code, which I haven't
+> >> done in a while...
+> >>
+> > 
+> > When you get a chance to review, please keep in mind that the latest
+> > version is v12 (from 08.Dec). The same is also available in linux-next
+> > with no reported issues.
+> 
+> The dependencies for this patchset have been already merged in v5.0-rc1,
+> so i was wondering if this can still go into -rc2? Various patches that
+> use this API are already posted and having it sooner will make dealing
+> with dependencies and merge paths a bit easier during the next merge
+> window. Or i can just rebase and resend everything targeting v5.1.
 
-Yes, I thought I had described that somewhere but maybe I
-forgot: semtimedop() and io_pgetevents() get replaced with
-time64 versions in the follow-up, so I only added them in
-64-bit architectures. If you think we should have both
-io_pgetevents() and io_pgetevents_time32() on all 32-bit
-architectures, I can add that as well.
+We can't add new features after -rc1, sorry.
 
-      Arnd
+Please rebase and resend to target 5.1
+
+thanks,
+
+greg k-h
 
 _______________________________________________
 linux-arm-kernel mailing list
