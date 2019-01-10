@@ -2,65 +2,59 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 98418C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 18:23:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6C178C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 18:42:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6DE68214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 18:23:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 31052206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 18:42:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pU8cJA0c"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6DE68214DA
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bKZWGqmR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 31052206B7
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=IM9eo/6KrkUuU9lPUiUxwV2U9Ey71E+01QPbhWTjMTY=; b=pU8cJA0cii1Z0u
-	XiTY7ct98D6gXpo09Oc00FdEYGYge2ucQfml33g6Hbi2Ez9o69NXcp6mSo0Ff/QkVRvZe/nKKts+e
-	dpJuuHlTiNLAL1h0MzAzCaUl06oPl3bvEJtNTVoDIzRd9xYeZD3JJO1iY6uXz7eLsNtIk661Qe9Fq
-	6hv+2JOiqW1airdn6UajFeTZSDQaR648RgIRMFZgWcmvdtu1kZevflT+gByD4u1LI6GY2tnmLzmAX
-	V0WKaWmPd3U52TX8QUyOQrr7sI/89G4KXzd78VpYE3Je8BbxU3AWqk+/Grh1pyJb/MCZ5lfW1UMBX
-	lLjQlc1HOhKD8Uia5ZPw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=SuWaX4RpSYQMsZ2cgmGvsFqJhelbM4Guv+Yd1hAheLU=; b=bKZWGqmRoZcF41
+	Uzb7ITJXFUHqNqp5cFcRbDveCo8iRBLKJgeoLouH/vpH7qxWN392BGwTqGlPOcfbY85YsSEtmkoih
+	OzLfCyPdPRTgPp+mtMAasmArotDezZgH8CE/D+dHh2hgNSUWdLhhw/cuzjCjjkYNVdOte0aIjq4Er
+	krBEey721Hv7UIWhH9LmB5ItuKC6MkQc2TTjmN+u9Q3HPb86Bm8enOXy9+uKVKnt8BztO9s2vnQC2
+	LOoWLN0K9YUYujkdAI7pLTDy2/aap6RGetS4+Vb7JJM5ZnvlDbN2Ch6o8K1Nl9FIfKTamd3rEyoen
+	nq46jO2qw2Wzkke/SCYA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gheyu-0004sZ-Dw; Thu, 10 Jan 2019 18:23:04 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1ghfHN-0002uw-HS; Thu, 10 Jan 2019 18:42:09 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gheyr-0004s4-7h
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 18:23:02 +0000
+ id 1ghfHK-0002uJ-DA
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 18:42:07 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id AC323A78;
- Thu, 10 Jan 2019 10:23:00 -0800 (PST)
-Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id EF2763F694;
- Thu, 10 Jan 2019 10:22:57 -0800 (PST)
-Subject: Re: [PATCH v7 10/25] ACPI / APEI: Tell firmware the estatus queue
- consumed the records
-To: Borislav Petkov <bp@alien8.de>
-References: <20181203180613.228133-1-james.morse@arm.com>
- <20181203180613.228133-11-james.morse@arm.com>
- <20181211183634.GO27375@zn.tnic>
-From: James Morse <james.morse@arm.com>
-Message-ID: <56cfa16b-ece4-76e0-3799-58201f8a4ff1@arm.com>
-Date: Thu, 10 Jan 2019 18:22:56 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 74C8B1596;
+ Thu, 10 Jan 2019 10:42:02 -0800 (PST)
+Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
+ [10.1.197.40])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 822E43F694;
+ Thu, 10 Jan 2019 10:42:00 -0800 (PST)
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [RESEND PATCH] ACPI/IORT: Fix rc_dma_get_range()
+Date: Thu, 10 Jan 2019 18:41:51 +0000
+Message-Id: <20190110184151.27492-1-lorenzo.pieralisi@arm.com>
+X-Mailer: git-send-email 2.19.2
 MIME-Version: 1.0
-In-Reply-To: <20181211183634.GO27375@zn.tnic>
-Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_102301_288785_4DADFC56 
-X-CRM114-Status: GOOD (  21.95  )
+X-CRM114-CacheID: sfid-20190110_104206_448751_030A611B 
+X-CRM114-Status: GOOD (  11.69  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,108 +66,71 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rafael Wysocki <rjw@rjwysocki.net>, Tony Luck <tony.luck@intel.com>,
- Fan Wu <wufan@codeaurora.org>, linux-mm@kvack.org,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Xie XiuQi <xiexiuqi@huawei.com>, Will Deacon <will.deacon@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>,
- Dongjiu Geng <gengdongjiu@huawei.com>, linux-acpi@vger.kernel.org,
- baicar.tyler@gmail.com, Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>,
- kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org,
- Len Brown <lenb@kernel.org>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Eric Auger <eric.auger@redhat.com>,
+ Jean-Philippe Brucker <jean-philippe.brucker@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ linux-acpi@vger.kernel.org, Hanjun Guo <hanjun.guo@linaro.org>,
+ Sudeep Holla <sudeep.holla@arm.com>, Robin Murphy <robin.murphy@arm.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Boris,
+From: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 
-(CC: +Tyler)
+When executed for a PCI_ROOT_COMPLEX type, iort_match_node_callback()
+expects the opaque pointer argument to be a PCI bus device. At the
+moment rc_dma_get_range() passes the PCI endpoint instead of the bus,
+and we've been lucky to have pci_domain_nr(ptr) return 0 instead of
+crashing. Pass the bus device to iort_scan_node().
 
-On 11/12/2018 18:36, Borislav Petkov wrote:
-> On Mon, Dec 03, 2018 at 06:05:58PM +0000, James Morse wrote:
->> ACPI has a GHESv2 which is used on hardware reduced platforms to
->> explicitly acknowledge that the memory for CPER records has been
->> consumed. This lets an external agent know it can re-use this
->> memory for something else.
->>
->> Previously notify_nmi and the estatus queue didn't do this as
->> they were never used on hardware reduced platforms. Once we move
->> notify_sea over to use the estatus queue, it may become necessary.
->>
->> Add the call. This is safe for use in NMI context as the
->> read_ack_register is pre-mapped by ghes_new() before the
->> ghes can be added to an RCU list, and then found by the
->> notification handler.
+Fixes: 5ac65e8c8941 ("ACPI/IORT: Support address size limit for root complexes")
+Reported-by: Eric Auger <eric.auger@redhat.com>
+Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Acked-by: Robin Murphy <robin.murphy@arm.com>
+Cc: stable@vger.kernel.org
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+---
+Will, Catalin,
 
->> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
->> index 366dbdd41ef3..15d94373ba72 100644
->> --- a/drivers/acpi/apei/ghes.c
->> +++ b/drivers/acpi/apei/ghes.c
->> @@ -926,6 +926,10 @@ static int _in_nmi_notify_one(struct ghes *ghes)
->>  	__process_error(ghes);
->>  	ghes_clear_estatus(ghes, buf_paddr);
->>  
->> +	if (is_hest_type_generic_v2(ghes) && ghes_ack_error(ghes->generic_v2))
-> 
-> Since ghes_ack_error() is always prepended with this check, you could
-> push it down into the function:
-> 
-> ghes_ack_error(ghes)
-> ...
-> 
-> 	if (!is_hest_type_generic_v2(ghes))
-> 		return 0;
-> 
-> and simplify the two callsites :)
-
-Great idea! ...
-
-.. huh. Turns out for ghes_proc() we discard any errors other than ENOENT from
-ghes_read_estatus() if is_hest_type_generic_v2(). This masks EIO.
-
-Most of the error sources discard the result, the worst thing I can find is
-ghes_irq_func() will return IRQ_HANDLED, instead of IRQ_NONE when we didn't
-really handle the IRQ. They're registered as SHARED, but I don't have an example
-of what goes wrong next.
-
-I think this will also stop the spurious handling code kicking in to shut it up
-if its broken and screaming. Unlikely, but not impossible.
-
-Fixed in a prior patch, with Boris' suggestion, ghes_proc()s tail ends up look
-like this:
-----------------------%<----------------------
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 0321d9420b1e..8d1f9930b159 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -700,18 +708,11 @@ static int ghes_proc(struct ghes *ghes)
-
- out:
-        ghes_clear_estatus(ghes, buf_paddr);
-+       if (rc != -ENOENT)
-+               rc_ack = ghes_ack_error(ghes);
-
--       if (rc == -ENOENT)
--               return rc;
--
--       /*
--        * GHESv2 type HEST entries introduce support for error acknowledgment,
--        * so only acknowledge the error if this support is present.
--        */
--       if (is_hest_type_generic_v2(ghes))
--               return ghes_ack_error(ghes->generic_v2);
--
--       return rc;
-+       /* If rc and rc_ack failed, return the first one */
-+       return rc ? rc : rc_ack;
- }
-----------------------%<----------------------
-
+resending a reformatted version of this fix previously posted in [1],
+please merge it for one of the upcoming -rc.
 
 Thanks,
+Lorenzo
 
-James
+[1] https://marc.info/?l=linux-acpi&m=154712742324811&w=2
+
+ drivers/acpi/arm64/iort.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index fdd90ffceb85..c08afe44c488 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -952,9 +952,10 @@ static int rc_dma_get_range(struct device *dev, u64 *size)
+ {
+ 	struct acpi_iort_node *node;
+ 	struct acpi_iort_root_complex *rc;
++	struct pci_bus *pbus = to_pci_dev(dev)->bus;
+ 
+ 	node = iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
+-			      iort_match_node_callback, dev);
++			      iort_match_node_callback, &pbus->dev);
+ 	if (!node || node->revision < 1)
+ 		return -ENODEV;
+ 
+-- 
+2.19.2
+
 
 _______________________________________________
 linux-arm-kernel mailing list
