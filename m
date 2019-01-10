@@ -2,81 +2,87 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F20D1C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 08:08:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7BF14C43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 08:08:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AB5AB2173B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 08:08:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3B13B206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 08:08:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Dq09baqC";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="gO2ad/HU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AB5AB2173B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q3h5JP/m";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="hhxFSz/9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B13B206B7
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=oLC6mTQhePIU7gNo5fbIJfC1YaEkxqmgO5SZ/5wNKtg=; b=Dq0
-	9baqC0+FX4qii28VSOgZB+ncgUZ6soHVGIQsjDbyVWUnYWX3jXKgx/1CMW7FcrFTYn6iKyxhMQcqj
-	xR6aC+b9UAbULf49SwnJXFMcVm0sNwdQdVojc9BQf1B5IVMHDQBv926tjj5eHhxlvSZAjc+vYrDut
-	eISIlvcBDvKqsUYyp6OPh8epDgd92xQhklapVHn2XKlsj6x2m9MTb3pT37VQCGVd8zazvXZe2qnyQ
-	pZ2Sd42nssqfFLRe07tBvELu/OtjaHhfSG/cOCwHnbpC5Psj3O5YaSvIFd23/3gll7jjNRcuIV8wc
-	i3WgHAPQl7X1ehp30N1eNznrQLPy9JQ==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=YC9wi5bJJ8d2TNmosVH7OqKygS0bKMgRwiewZJB9aGA=; b=q3h5JP/muV5Irgv85xtdgyVJjZ
+	nWogFU1PyAM3RE4j8LN7faDzzlWvwbzLuECkOMraZyj573zGOGu2NFjhw/YO7eUPqxNjiJUl8jNs3
+	JghJl2VK8loI4KzZHLIyllia2vC5HSrBuryg11iiTV3LrWcXQXMBlJz7QfqYSIu9v1TOxAmmdo3/+
+	dwjZhntFzSL7xEaIM25JoPpYtnPnw3MN0kAw9w4vuVGPBb//qi0BjJGCXlS8JmYMMVlpetpqa5s6l
+	r15YI62Kax7N9F+n5EQxFMgSVYjejmPt4pnbc6+11N/BXC3xoqXY5oSaBZHlx+FSIaVwpaESTcKAm
+	IUsqsLfw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghVOG-0001Mz-P8; Thu, 10 Jan 2019 08:08:36 +0000
-Received: from mail-pf1-x443.google.com ([2607:f8b0:4864:20::443])
+	id 1ghVOT-0001br-CY; Thu, 10 Jan 2019 08:08:49 +0000
+Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghVOC-0001MY-Vz
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 08:08:34 +0000
-Received: by mail-pf1-x443.google.com with SMTP id b7so4960711pfi.8
+ id 1ghVOJ-0001PJ-K5
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 08:08:45 +0000
+Received: by mail-pg1-x543.google.com with SMTP id z11so4532885pgu.0
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 10 Jan 2019 00:08:32 -0800 (PST)
+ Thu, 10 Jan 2019 00:08:39 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id;
- bh=iSUvtlmz7HRG1KEi4a3SboSz9E/V0kDVcYhcnqIe4qQ=;
- b=gO2ad/HURJwsyHjGuSd53WT0Fe1QjfjRmTcvDyCE32Hz6/VkQLW6Nfg/qe6loWhY66
- lOc9moMCkTXuSRauoqLo55EwGnabcqSNPCfQxUXU+V9ztRMQpUwLKTyWx2IfuR3Szcq8
- aR8uFPeO0Uyr6K9cISPy3pSmmV/AG9aa7nUTw=
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=bR0eeytQfv+glll7aoQHEqu8NdP2ZbsHgif8yrcXd+8=;
+ b=hhxFSz/9yhJlDxwLfGoVRZRbWxzm7XPUcdTCV8qqkR291nrod6TNYNGIeOiLB76kI6
+ 2RcV/+FlwBIf7rPQngKDpNSieP/fe1J51pJGchptJZf5XKwaf6WCbPDdM0B7YF2XMggV
+ Zj3+0j2+6Yp0QMxosahoGiHtpKntr4AfZsFRQ=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=iSUvtlmz7HRG1KEi4a3SboSz9E/V0kDVcYhcnqIe4qQ=;
- b=s7ECeLnbBQhEjs1orbysZSd/Zo/0+6u2FGEhZvlNZqSYWOOhsM/e61Pw1a0E6G7m6c
- KGb0YvYENKO5O2RB/kbykAZNYIjesFLrU7OohQdTYwAJO+ea4GyTI412s+tmJTZfDg2L
- JzUgmRs1MGQezuYWqsK4u55nKR0iJ36zShyjoFbXysoXtOeGE5vVLoLF/QyPDoHbwNHB
- Czl5mXOI0lOmcdyW0pxQORwYwaGZOyuSYGzDkM4aqYoYBZiwIjCkc71rP+TzXgu2cqq/
- P5umADN7GfcRwZ3inmZo6x8OJXaFLZachHcO33i0EcvtDiBAKX9fhwHUaVe7zeAbQZjJ
- XdwA==
-X-Gm-Message-State: AJcUukfasXAyZ7jVJGdm+/nyPum8a5ehSg9GSxwUHJuC41Jj6SMM2A01
- vl2LtuRhondc0S2MqBasOJ3X
-X-Google-Smtp-Source: ALg8bN75uRydOKOeNSyFja7FTS42cWEHqVE9OeylGWb6tLCL+yqKDDLTXu7sAFMbWg2AkUCQdwnPhg==
-X-Received: by 2002:a63:ee0e:: with SMTP id e14mr8333960pgi.8.1547107712096;
- Thu, 10 Jan 2019 00:08:32 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references;
+ bh=bR0eeytQfv+glll7aoQHEqu8NdP2ZbsHgif8yrcXd+8=;
+ b=Qd0z9RztF4DOskfMH0I9L0YuID3oLwu/JEdA1F4pDX+jmOre2u+0eKqwCe+Uw8FOMw
+ W10lYBYDhYVzhGSnAlVvJzgXACP89ns2b5IRKZ8fKMYN36EhHIpOHpqvMjjYmSEMa2M8
+ KkK1wTNwM/sN86sUm694DtBKnabblgMw4JIC+uIjQmo1sT1rGSsMLjOu3Hh5boGrt+5c
+ IXM0O8DjQLUNS10TWjYz21B6R8phDhbWj+wtOTCmefASgtSabix7zEV7LVTFaUYvKbCz
+ iukCxySWVNInKDbGkyqVokRrUqKdVjSQC1QYLF3DE1lY7y0yBx3CTtZgs/VZQ1BcjpX+
+ 9VpQ==
+X-Gm-Message-State: AJcUukfxKtiYZVBiHXERDTRxhmzVO2uUOqaGeid3p3Ac+eJCTlLmFNHi
+ 2JxEMb0GzYABzwkTapXo0C8E
+X-Google-Smtp-Source: ALg8bN7KIPDQvkcInyzp4AML13melQLbzch2o/v+mWcpv1ZL+u/0DQNe3JNt8SiQ2Nkh3mWcH8M9Hg==
+X-Received: by 2002:a63:e615:: with SMTP id g21mr8627413pgh.290.1547107718782; 
+ Thu, 10 Jan 2019 00:08:38 -0800 (PST)
 Received: from localhost.localdomain ([2409:4072:89d:654d:749c:afde:a8a6:224d])
- by smtp.gmail.com with ESMTPSA id w23sm27401007pgc.72.2019.01.10.00.08.26
+ by smtp.gmail.com with ESMTPSA id w23sm27401007pgc.72.2019.01.10.00.08.32
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 10 Jan 2019 00:08:31 -0800 (PST)
+ Thu, 10 Jan 2019 00:08:38 -0800 (PST)
 From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 To: shawnguo@kernel.org,
 	leoyang.li@nxp.com,
 	robh+dt@kernel.org
-Subject: [PATCH 0/3] Add Oxalis board support
-Date: Thu, 10 Jan 2019 13:38:18 +0530
-Message-Id: <20190110080821.30280-1-manivannan.sadhasivam@linaro.org>
+Subject: [PATCH 1/3] dt-bindings: vendor-prefixes: Add EBS-SYSTART GmbH Vendor
+ Prefix
+Date: Thu, 10 Jan 2019 13:38:19 +0530
+Message-Id: <20190110080821.30280-2-manivannan.sadhasivam@linaro.org>
 X-Mailer: git-send-email 2.17.1
+In-Reply-To: <20190110080821.30280-1-manivannan.sadhasivam@linaro.org>
+References: <20190110080821.30280-1-manivannan.sadhasivam@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_000833_039632_C7EC4D7D 
-X-CRM114-Status: GOOD (  10.81  )
+X-CRM114-CacheID: sfid-20190110_000840_542333_BDCFA919 
+X-CRM114-Status: GOOD (  11.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,39 +105,25 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello,
+Add vendor prefix for EBS-SYSTART GmbH.
 
-This patchset adds Oxalis board support. This board is one of the
-96Boards Enterprise Edition platform from EBS-SYSTART GmbH. Below are some
-of the key features of this board:
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-* SoC: NXP Layerscape LS1012A
-* RAM: 1GB DDR3L
-* PMU: NXP VR5100
-* Storage: 64MByte SPI Flash for bootloader and RCW, MicroSD Card, SATA
-* Connectivity: 2x Ethernet
-* USB: 2x USB3.0
-
-More information about this board can be found in 96Boards product
-page: https://www.96boards.org/product/oxalis/
-
-Ethernet and SPI flash are not supported yet!
-
-Thanks,
-Mani
-
-Manivannan Sadhasivam (3):
-  dt-bindings: vendor-prefixes: Add EBS-SYSTART GmbH Vendor Prefix
-  dt-bindings: arm: fsl: Add devicetree binding for Oxalis
-  arm64: dts: freescale: Add devicetree for Oxalis
-
- Documentation/devicetree/bindings/arm/fsl.txt |  4 +
- .../devicetree/bindings/vendor-prefixes.txt   |  1 +
- arch/arm64/boot/dts/freescale/Makefile        |  1 +
- .../boot/dts/freescale/fsl-ls1012a-oxalis.dts | 96 +++++++++++++++++++
- 4 files changed, 102 insertions(+)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1012a-oxalis.dts
-
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 389508584f48..27a3da1e3a54 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -383,6 +383,7 @@ SUNW	Sun Microsystems, Inc
+ swir	Sierra Wireless
+ syna	Synaptics Inc.
+ synology	Synology, Inc.
++ebs-systart EBS-SYSTART GmbH
+ tbs	TBS Technologies
+ tbs-biometrics	Touchless Biometric Systems AG
+ tcg	Trusted Computing Group
 -- 
 2.17.1
 
