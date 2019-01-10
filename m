@@ -2,93 +2,139 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4975CC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 16:34:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8669CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 16:34:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 17658206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 16:34:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4CF9720874
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 16:34:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pOqzvtbe";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=ragnatech-se.20150623.gappssmtp.com header.i=@ragnatech-se.20150623.gappssmtp.com header.b="QXUi9YeW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 17658206B7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ragnatech.se
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Sxp2Bwr8";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="QAhfecLQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4CF9720874
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2IoQae3t2Hb6ntlddIrE6A9bO5IYf1ucmxI2DflCL1o=; b=pOqzvtbe8sK964
-	uxSptMsf70R3/z6/1Nlxrjifz92uLwmL320bUEurtLe+DbC4aPND2Yo9zOBwnTXQwNjxl/y6MMQm1
-	DBHDz2IRhPlOeZ/OnuxMXjYy2rvW4WA6xO8MTAqy7QPqSP9MahZsfxTmYyeulLRqJpEcNxphTwjHf
-	O79aBT5Il6xsANeW+OjtM1m+gDvRMhyOkgWBb+196Hoh1G0+S78oqsCyru6Q+zNoAN5Qm2Cc1Frcz
-	dgeyl5bhKGaVfBXGM9l2LGXyqmV5KiIUwlfSI529F8WB/qWA0KzhWTIqD09ubIIjiMoAF664XglA9
-	Y0G9/ZbS+SiwlaDu/OQA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=laNSt7ODw9kHZEiZ/MpnEKzHi+MSKRAeC/fLTEasedI=; b=Sxp2Bwr8YVzLZ/
+	msdEeoXq/Va7okL9EzwJ4uK1T3QCNCGL45nMopVg7WbXbAlpqXr/HCz7OgtErZ7aHTUT4i7436Hbg
+	sSH4QJRvdp0gKG39ywzg1c7XHGMFxsRD1KgPxDWDKzsvlrBvNOygbEDrLEL4O0dvH7WHJQioHNBLC
+	oMsEWWidPbNbdFeXj48rY3P51UxdHqgKZH8lUt0T2tYsTHrGKJzBW6r7vqfiQ6qglgzJbRN6HeCzr
+	5D5cKHUUXp4P4pI1vYQUN5kChbrDA/DQG9WTPEK8o6Y+bQhBG1Sa/RtMprk/esBUNC93J0k4ovp5a
+	70I432wOKWSQwX7HZObw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghdHR-0001qO-2A; Thu, 10 Jan 2019 16:34:05 +0000
-Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
+	id 1ghdID-00026m-VH; Thu, 10 Jan 2019 16:34:53 +0000
+Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghdHN-0001pw-0a
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 16:34:03 +0000
-Received: by mail-lj1-x244.google.com with SMTP id t9-v6so10280326ljh.6
+ id 1ghdI9-00026F-7J
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 16:34:52 +0000
+Received: by mail-wm1-x341.google.com with SMTP id p6so12655902wmc.1
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 10 Jan 2019 08:33:59 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=ragnatech-se.20150623.gappssmtp.com; s=20150623;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:content-transfer-encoding:in-reply-to
- :user-agent; bh=SILPKsssX93B2bCq9HZjULce0uDqO6Q10m7kNrgqwYI=;
- b=QXUi9YeW3unQmzoXtqNe3IB3+S5MFGteLRCy0Kwe6/pFc9Jmqm16in6HmByVWDIRKl
- 6f3kuaV+Hh3b0K590egVDWxC3EU9IOQI6JuAV9ovtcXzu7hFKe8+1mx9XzOAwEq54iCE
- fML1LgdvPLufVrgPnhe7DXqhDIWyaDX6yBjsACzxiUxxE0i9+V/Q2paoLVGXPtarkqeh
- rCXSxKU1UEDjFrzrL5QbetyBm7NvL96HUXX0FFAuJX9f6M0f7+5SGf+3BNEtYTJLza0/
- XOVfs30FE+SreGAM7btblL82dShuFjdp/nzC+mQ8sRqNaHCSV3hOMtWhNutggiA0VfYz
- rkfw==
+ Thu, 10 Jan 2019 08:34:48 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=w32hLnAw5bLjWDJ9T8+qGhKha4sKnjjXz6R6e6acIX4=;
+ b=QAhfecLQFQMuw408R6wdu7wFUxU09DyOPUJ9LVygjs2aadQbCPUJHyNDHX+KKOniap
+ dMAArhSzvv1eeKNynMDzAPBUZiLs1sYaiRrw50xK0bHlq9avMpnlCme043QMKGix8WZS
+ dz+nn/ms7ee+iuW3ZeKx5rCJBHTMciOjrIAPE=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:content-transfer-encoding
- :in-reply-to:user-agent;
- bh=SILPKsssX93B2bCq9HZjULce0uDqO6Q10m7kNrgqwYI=;
- b=RABZZW7TFQJJNIgMWJTfu094gE/jfTTYotqHbumDWoNM9X206RnLW0AScZZGu61rZr
- A0ZpOoTSXnztmXTDa3Teh0oR4dj1V8k8Ny4HazFBVsnfiX+jRdFJmrGcby/I3se7x0BR
- JUFSheIYxZZ70xj9yuZTMNQbX9dip5ZpAN3+zUwS39i+iXTxMtUe7X3iI50/3ZPBOR6C
- Zaa5rmEKdOkOyMg14zZ8AMQChlQz8a9ARAgAFxIDO3UVa0P7VNzZE94H+xyvVCLu2jZq
- +4iiLjad2Afc/XlYNEWNO2ROXug+iaEpA5iz9SinnVjvbnIDq1YRhLjJvNlbXRZjJB8N
- icPw==
-X-Gm-Message-State: AJcUukddnNDpVkd40q4DV4KW0JolqxmcepUiN7nZ9EYxIEkYvD1pY3Cl
- WiDLX+YVawe27Is0pLRe9vJeUw==
-X-Google-Smtp-Source: ALg8bN40Dwqt2DdMJ2jk1c/vrgkqNq2maRTL2zAtHeSLyqteGi7vJvrtg0u2HTWaoUmJZNNswxQ+VQ==
-X-Received: by 2002:a2e:90ca:: with SMTP id
- o10-v6mr6296756ljg.134.1547138038210; 
- Thu, 10 Jan 2019 08:33:58 -0800 (PST)
-Received: from localhost (89-233-230-99.cust.bredband2.com. [89.233.230.99])
- by smtp.gmail.com with ESMTPSA id p77-v6sm17026542lja.0.2019.01.10.08.33.57
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 10 Jan 2019 08:33:57 -0800 (PST)
-Date: Thu, 10 Jan 2019 17:33:57 +0100
-From: Niklas =?iso-8859-1?Q?S=F6derlund?= <niklas.soderlund@ragnatech.se>
-To: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-Subject: Re: [PATCH/RFT] arm64: dts: renesas: r8a7795: Create thermal zone to
- support IPA
-Message-ID: <20190110163356.GF24252@bigcity.dyn.berto.se>
-References: <1545338982-19466-1-git-send-email-ykaneko0929@gmail.com>
+ h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
+ :message-id:date:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=w32hLnAw5bLjWDJ9T8+qGhKha4sKnjjXz6R6e6acIX4=;
+ b=S4xOieLijBwEMzMOQcV+jc+zVEkZj0ujKL1i8/qRg/h8UG1A5d9Bn+OoDnNK5kUtXb
+ Z7M4B5t0TjHmnaSmGqF6z0e9sbPqpdL24wmDS4A4Gn4jEy11Sr3+Fvx1LiGaoJacAANM
+ oGFk9X5Xzwc5vKVN4kBQiQrk5WWedTLoaBEB6BSeZ9ktUkdzz+zWQvt+v7FDVgD/t+c2
+ I3Qg7+gvLwhgOmt1HUi+IrA1OciHT6Z/InGEdvq/bYof0Qi+GlHTuBXJFtYKG0H91JKK
+ 0UJ0/HILGBfIdbd3so1lLsvtjx5hLszPnckMZ8EEabfGdRK3IYRBimHlGu820vXV3pDP
+ 43Uw==
+X-Gm-Message-State: AJcUukc36qi79m/HGW749Hvg53Zv4skXVgkS8njW1Sl1G9EO5FIHNbPY
+ SS+RfQnXuMF6vbnUyt1K3xRlGA==
+X-Google-Smtp-Source: ALg8bN5aj5as7M96AsGERTcrl249DmAuGIutaCvQjhYPW0GTTPFG1sBE2A4JwnObhzRGytXMT7GSfw==
+X-Received: by 2002:a1c:990c:: with SMTP id b12mr10982437wme.106.1547138087097; 
+ Thu, 10 Jan 2019 08:34:47 -0800 (PST)
+Received: from [10.44.66.8] ([212.45.67.2])
+ by smtp.googlemail.com with ESMTPSA id m4sm5658204wmi.3.2019.01.10.08.34.45
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 10 Jan 2019 08:34:46 -0800 (PST)
+Subject: Re: [PATCH v10 0/8] Introduce on-chip interconnect API
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+References: <20181127180349.29997-1-georgi.djakov@linaro.org>
+ <CAE=gft4jUjr3oDAZrM=-orLM-YoVAwa+e=crDDC_p9ArGE1dig@mail.gmail.com>
+ <20181206145547.GA7884@kroah.com>
+ <CAJZ5v0gP50tmq4ZzB7LLSaWGWjGjK31y=qFg5PS9B7c2XQ+DyQ@mail.gmail.com>
+ <6923d6ed-e357-b083-1830-8396d788efe5@linaro.org>
+ <CAJZ5v0jZMqFwYgnfRz04ELLRk=0U8Uv=acw0t9Azxk_HYL0gSQ@mail.gmail.com>
+ <9a3aae02-c7e0-97e3-2330-af4fccee6c14@linaro.org>
+ <20181211065808.GB5161@kroah.com>
+ <199be960-032a-d72d-4293-820e23a15b7a@linaro.org>
+ <b21d13df-7c0b-4c6d-e3c7-6ab285579ed5@linaro.org>
+ <20190110162906.GA19693@kroah.com>
+From: Georgi Djakov <georgi.djakov@linaro.org>
+Openpgp: preference=signencrypt
+Autocrypt: addr=georgi.djakov@linaro.org; prefer-encrypt=mutual; keydata=
+ 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
+ KEmKjLDvB0pePJkdTw==
+Message-ID: <69f004fa-2705-5cf4-3812-8e7b68a16400@linaro.org>
+Date: Thu, 10 Jan 2019 18:34:41 +0200
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1545338982-19466-1-git-send-email-ykaneko0929@gmail.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <20190110162906.GA19693@kroah.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_083401_108442_D4781D40 
-X-CRM114-Status: GOOD (  23.07  )
+X-CRM114-CacheID: sfid-20190110_083451_173484_CC1EDC57 
+X-CRM114-Status: GOOD (  27.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,228 +146,155 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-renesas-soc@vger.kernel.org, Magnus Damm <magnus.damm@gmail.com>,
- Simon Horman <horms@verge.net.au>, Geert Uytterhoeven <geert@linux-m68k.org>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: Mark Rutland <mark.rutland@arm.com>, Doug Anderson <dianders@chromium.org>,
+ sanjayc@nvidia.com, "Rafael J. Wysocki" <rafael@kernel.org>,
+ maxime.ripard@bootlin.com, Michael Turquette <mturquette@baylibre.com>,
+ daidavid1@codeaurora.org, bjorn.andersson@linaro.org,
+ Saravana Kannan <skannan@codeaurora.org>, abailon@baylibre.com,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Vincent Guittot <vincent.guittot@linaro.org>, seansw@qti.qualcomm.com,
+ Kevin Hilman <khilman@baylibre.com>, evgreen@chromium.org,
+ ksitaraman@nvidia.com,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Arnd Bergmann <arnd@arndb.de>, Linux PM <linux-pm@vger.kernel.org>,
+ linux-arm-msm <linux-arm-msm@vger.kernel.org>,
+ Andy Gross <andy.gross@linaro.org>, Rob Herring <robh+dt@kernel.org>,
+ linux-tegra@vger.kernel.org, Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ "Rafael J. Wysocki" <rjw@rjwysocki.net>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Amit Kucheria <amit.kucheria@linaro.org>,
+ Thierry Reding <thierry.reding@gmail.com>, Olof Johansson <olof@lixom.net>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Keneko-san,
+On 1/10/19 18:29, Greg Kroah-Hartman wrote:
+> On Thu, Jan 10, 2019 at 04:19:14PM +0200, Georgi Djakov wrote:
+>> Hi Greg,
+>>
+>> On 12/17/18 13:17, Georgi Djakov wrote:
+>>> Hi Greg,
+>>>
+>>> On 12/11/18 08:58, Greg Kroah-Hartman wrote:
+>>>> On Mon, Dec 10, 2018 at 04:50:00PM +0200, Georgi Djakov wrote:
+>>>>> On 12/10/18 13:00, Rafael J. Wysocki wrote:
+>>>>>> On Mon, Dec 10, 2018 at 11:18 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
+>>>>>>>
+>>>>>>> Hi Rafael,
+>>>>>>>
+>>>>>>> On 12/10/18 11:04, Rafael J. Wysocki wrote:
+>>>>>>>> On Thu, Dec 6, 2018 at 3:55 PM Greg KH <gregkh@linuxfoundation.org> wrote:
+>>>>>>>>>
+>>>>>>>>> On Wed, Dec 05, 2018 at 12:41:35PM -0800, Evan Green wrote:
+>>>>>>>>>> On Tue, Nov 27, 2018 at 10:03 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
+>>>>>>>>>>>
+>>>>>>>>>>> Modern SoCs have multiple processors and various dedicated cores (video, gpu,
+>>>>>>>>>>> graphics, modem). These cores are talking to each other and can generate a
+>>>>>>>>>>> lot of data flowing through the on-chip interconnects. These interconnect
+>>>>>>>>>>> buses could form different topologies such as crossbar, point to point buses,
+>>>>>>>>>>> hierarchical buses or use the network-on-chip concept.
+>>>>>>>>>>>
+>>>>>>>>>>> These buses have been sized usually to handle use cases with high data
+>>>>>>>>>>> throughput but it is not necessary all the time and consume a lot of power.
+>>>>>>>>>>> Furthermore, the priority between masters can vary depending on the running
+>>>>>>>>>>> use case like video playback or CPU intensive tasks.
+>>>>>>>>>>>
+>>>>>>>>>>> Having an API to control the requirement of the system in terms of bandwidth
+>>>>>>>>>>> and QoS, so we can adapt the interconnect configuration to match those by
+>>>>>>>>>>> scaling the frequencies, setting link priority and tuning QoS parameters.
+>>>>>>>>>>> This configuration can be a static, one-time operation done at boot for some
+>>>>>>>>>>> platforms or a dynamic set of operations that happen at run-time.
+>>>>>>>>>>>
+>>>>>>>>>>> This patchset introduce a new API to get the requirement and configure the
+>>>>>>>>>>> interconnect buses across the entire chipset to fit with the current demand.
+>>>>>>>>>>> The API is NOT for changing the performance of the endpoint devices, but only
+>>>>>>>>>>> the interconnect path in between them.
+>>>>>>>>>>
+>>>>>>>>>> For what it's worth, we are ready to land this in Chrome OS. I think
+>>>>>>>>>> this series has been very well discussed and reviewed, hasn't changed
+>>>>>>>>>> much in the last few spins, and is in good enough shape to use as a
+>>>>>>>>>> base for future patches. Georgi's also done a great job reaching out
+>>>>>>>>>> to other SoC vendors, and there appears to be enough consensus that
+>>>>>>>>>> this framework will be usable by more than just Qualcomm. There are
+>>>>>>>>>> also several drivers out on the list trying to add patches to use this
+>>>>>>>>>> framework, with more to come, so it made sense (to us) to get this
+>>>>>>>>>> base framework nailed down. In my experiments this is an important
+>>>>>>>>>> piece of the overall power management story, especially on systems
+>>>>>>>>>> that are mostly idle.
+>>>>>>>>>>
+>>>>>>>>>> I'll continue to track changes to this series and we will ultimately
+>>>>>>>>>> reconcile with whatever happens upstream, but I thought it was worth
+>>>>>>>>>> sending this note to express our "thumbs up" towards this framework.
+>>>>>>>>>
+>>>>>>>>> Looks like a v11 will be forthcoming, so I'll wait for that one to apply
+>>>>>>>>> it to the tree if all looks good.
+>>>>>>>>
+>>>>>>>> I'm honestly not sure if it is ready yet.
+>>>>>>>>
+>>>>>>>> New versions are coming on and on, which may make such an impression,
+>>>>>>>> but we had some discussion on it at the LPC and some serious questions
+>>>>>>>> were asked during it, for instance regarding the DT binding introduced
+>>>>>>>> here.  I'm not sure how this particular issue has been addressed here,
+>>>>>>>> for example.
+>>>>>>>
+>>>>>>> There have been no changes in bindings since v4 (other than squashing
+>>>>>>> consumer and provider bindings into a single patch and fixing typos).
+>>>>>>>
+>>>>>>> The last DT comment was on v9 [1] where Rob wanted confirmation from
+>>>>>>> other SoC vendors that this works for them too. And now we have that
+>>>>>>> confirmation and there are patches posted on the list [2].
+>>>>>>
+>>>>>> OK
+>>>>>>
+>>>>>>> The second thing (also discussed at LPC) was about possible cases where
+>>>>>>> some consumer drivers can't calculate how much bandwidth they actually
+>>>>>>> need and how to address that. The proposal was to extend the OPP
+>>>>>>> bindings with one more property, but this is not part of this patchset.
+>>>>>>> It is a future step that needs more discussion on the mailing list. If a
+>>>>>>> driver really needs some bandwidth data now, it should be put into the
+>>>>>>> driver and not in DT. After we have enough consumers, we can discuss
+>>>>>>> again if it makes sense to extract something into DT or not.
+>>>>>>
+>>>>>> That's fine by me.
+>>>>>>
+>>>>>> Admittedly, I have some reservations regarding the extent to which
+>>>>>> this approach will turn out to be useful in practice, but I guess as
+>>>>>> long as there is enough traction, the best way to find out it to try
+>>>>>> and see. :-)
+>>>>>>
+>>>>>> From now on I will assume that this series is going to be applied by Greg.
+>>>>>
+>>>>> That was the initial idea, but the problem is that there is a recent
+>>>>> change in the cmd_db API (needed by the sdm845 provider driver), which
+>>>>> is going through arm-soc/qcom/drivers. So either Greg pulls also the
+>>>>> qcom-drivers-for-4.21 tag from Andy or the whole series goes via Olof
+>>>>> and Arnd. Maybe there are other options. I don't have any preference and
+>>>>> don't want to put extra burden on any maintainers, so i am ok with what
+>>>>> they prefer.
+>>>>
+>>>> Let me take the time later this week to review the code, which I haven't
+>>>> done in a while...
+>>>>
+>>>
+>>> When you get a chance to review, please keep in mind that the latest
+>>> version is v12 (from 08.Dec). The same is also available in linux-next
+>>> with no reported issues.
+>>
+>> The dependencies for this patchset have been already merged in v5.0-rc1,
+>> so i was wondering if this can still go into -rc2? Various patches that
+>> use this API are already posted and having it sooner will make dealing
+>> with dependencies and merge paths a bit easier during the next merge
+>> window. Or i can just rebase and resend everything targeting v5.1.
+> 
+> We can't add new features after -rc1, sorry.
+> 
+> Please rebase and resend to target 5.1
 
-Thanks for your work.
+Ok, i was expecting that. Thanks for confirming!
 
-Comments to this patch applies to all patches in this series.
-
-On 2018-12-21 05:49:39 +0900, Yoshihiro Kaneko wrote:
-> From: Dien Pham <dien.pham.ry@renesas.com>
-> =
-
-> [dien.pham.ry: arm64: dts: r8a7795: Add support IPA for CA53 core]
-> =
-
-> Setup a thermal zone driven by SoC temperature sensor.
-> Create passive trip points and bind them to CPUFreq cooling
-> device that supports power extension.
-> =
-
-> In R-Car Gen3, IPA is supportted for only one channel
->  (on H3/M3/M3N board, it is channel THS3). Reason:
->   Currently, IPA controls base on only CPU temperature.
->   And only one thermal channel is assembled closest
->   CPU cores is selected as target of IPA.
->   If other channels are used, IPA controlling is not properly.
-> =
-
-> Signed-off-by: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
-> [gaku.inami.xw: fix the trip temperature for cooling-device]
-> [gaku.inami.xw: fix the power coefficient]
-> Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-> Signed-off-by: Hien Dang <hien.dang.eb@rvc.renesas.com>
-> Signed-off-by: An Huynh <an.huynh.uj@rvc.renesas.com>
-> [takeshi.kihara.df: fix W=3D1 dtc unit_address_vs_reg warnings]
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-> ---
-> =
-
-> This patch is based on the devel branch of Simon Horman's renesas tree.
-> =
-
->  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 64 ++++++++++++++------------=
-------
->  1 file changed, 27 insertions(+), 37 deletions(-)
-> =
-
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/d=
-ts/renesas/r8a7795.dtsi
-> index af9605d..dd52b50 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> @@ -155,6 +155,9 @@
->  			power-domains =3D <&sysc R8A7795_PD_CA57_CPU0>;
->  			next-level-cache =3D <&L2_CA57>;
->  			enable-method =3D "psci";
-> +			dynamic-power-coefficient =3D <854>;
-> +			cooling-min-level =3D <0>;
-> +			cooling-max-level =3D <2>;
-
-I can't find any documentation or code which makes use of the =
-
-cooling-min-level and cooling-max-level properties on v5.0-rc1. What is =
-
-the intended usage for these properties?
-
->  			clocks =3D <&cpg CPG_CORE R8A7795_CLK_Z>;
->  			operating-points-v2 =3D <&cluster0_opp>;
->  			capacity-dmips-mhz =3D <1024>;
-> @@ -207,6 +210,10 @@
->  			power-domains =3D <&sysc R8A7795_PD_CA53_CPU0>;
->  			next-level-cache =3D <&L2_CA53>;
->  			enable-method =3D "psci";
-> +			#cooling-cells =3D <2>;
-> +			dynamic-power-coefficient =3D <277>;
-> +			cooling-min-level =3D <0>;
-> +			cooling-max-level =3D <2>;
->  			clocks =3D <&cpg CPG_CORE R8A7795_CLK_Z2>;
->  			operating-points-v2 =3D <&cluster1_opp>;
->  			capacity-dmips-mhz =3D <535>;
-> @@ -3098,58 +3105,30 @@
->  			polling-delay-passive =3D <250>;
->  			polling-delay =3D <1000>;
->  			thermal-sensors =3D <&tsc 0>;
-> +			sustainable-power =3D <6313>;
->  =
-
->  			trips {
-> -				sensor1_passive: sensor1-passive {
-> -					temperature =3D <95000>;
-> -					hysteresis =3D <1000>;
-> -					type =3D "passive";
-> -				};
->  				sensor1_crit: sensor1-crit {
->  					temperature =3D <120000>;
->  					hysteresis =3D <1000>;
->  					type =3D "critical";
->  				};
->  			};
-> -
-> -			cooling-maps {
-> -				map0 {
-> -					trip =3D <&sensor1_passive>;
-> -					cooling-device =3D <&a57_0 4 4>,
-> -							 <&a57_1 4 4>,
-> -							 <&a57_2 4 4>,
-> -							 <&a57_3 4 4>;
-> -				};
-> -			};
->  		};
->  =
-
->  		sensor_thermal2: sensor-thermal2 {
->  			polling-delay-passive =3D <250>;
->  			polling-delay =3D <1000>;
->  			thermal-sensors =3D <&tsc 1>;
-> +			sustainable-power =3D <6313>;
->  =
-
->  			trips {
-> -				sensor2_passive: sensor2-passive {
-> -					temperature =3D <95000>;
-> -					hysteresis =3D <1000>;
-> -					type =3D "passive";
-> -				};
->  				sensor2_crit: sensor2-crit {
->  					temperature =3D <120000>;
->  					hysteresis =3D <1000>;
->  					type =3D "critical";
->  				};
->  			};
-> -
-> -			cooling-maps {
-> -				map0 {
-> -					trip =3D <&sensor2_passive>;
-> -					cooling-device =3D <&a57_0 4 4>,
-> -							 <&a57_1 4 4>,
-> -							 <&a57_2 4 4>,
-> -							 <&a57_3 4 4>;
-> -				};
-> -			};
->  		};
->  =
-
->  		sensor_thermal3: sensor-thermal3 {
-> @@ -3158,11 +3137,18 @@
->  			thermal-sensors =3D <&tsc 2>;
->  =
-
->  			trips {
-> -				sensor3_passive: sensor3-passive {
-> -					temperature =3D <95000>;
-> +				threshold: trip-point0 {
-> +					temperature =3D <90000>;
-> +					hysteresis =3D <1000>;
-> +					type =3D "passive";
-> +				};
-
-What is the usage of trip-point0? The label threshold is never =
-
-referenced anywhere, or am I missing something?
-
-> +
-> +				target: trip-point1 {
-> +					temperature =3D <100000>;
->  					hysteresis =3D <1000>;
->  					type =3D "passive";
->  				};
-> +
->  				sensor3_crit: sensor3-crit {
->  					temperature =3D <120000>;
->  					hysteresis =3D <1000>;
-> @@ -3172,11 +3158,15 @@
->  =
-
->  			cooling-maps {
->  				map0 {
-> -					trip =3D <&sensor3_passive>;
-> -					cooling-device =3D <&a57_0 4 4>,
-> -							 <&a57_1 4 4>,
-> -							 <&a57_2 4 4>,
-> -							 <&a57_3 4 4>;
-> +					trip =3D <&target>;
-> +					cooling-device =3D <&a57_0 0 2>;
-
-We have 5 (0-4) cooling states for the A57s on this SoC. Out of =
-
-curiosity why allow states 0-2 here and not force it do more cooling or =
-
-keep the to max cooling (4) as before this change as this is set to a =
-
-trip point with a rather large temperature? Not saying this is wrong =
-
-only curious :-)
-
-> +					contribution =3D <1024>;
-> +				};
-> +
-> +				map1 {
-> +					trip =3D <&target>;
-> +					cooling-device =3D <&a53_0 0 2>;
-> +					contribution =3D <1024>;
->  				};
->  			};
->  		};
-> -- =
-
-> 1.9.1
-> =
-
-
--- =
-
-Regards,
-Niklas S=F6derlund
+BR,
+Georgi
 
 _______________________________________________
 linux-arm-kernel mailing list
