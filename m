@@ -2,117 +2,71 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED,URI_HEX,USER_AGENT_NEOMUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 17AA7C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 09:58:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CF7D7C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 10:02:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DC7F6206B6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 09:58:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A1764206B6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 10:02:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AUb6xYKF";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="UruqTDwt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DC7F6206B6
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VL2a/VCZ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="EPwZVIgL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A1764206B6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-reply-to:Date:Message-id:
-	From:To:Subject:MIME-version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zRC83R8IdFKlZPydGhvfLNqupLyB6bF2xRzBoMEf/XY=; b=AUb6xYKF8Dvh3L
-	z0vKuhdkC+1lo74sQvaM9zBa8JqY8QMYTdnB9gFFd+1kAPXGdq+W4qFQzjDtfTY8h10ZHP7oP0L2p
-	D0CIVc3rcruDlLKewcEhi84Wv3t0Ojx56pq8daKySJYQabYDNT4ShK0ErZjrnmkOYNdcLWUKh99Zh
-	+A9DslXhOLh8dB/Tut53qJSUYRMHPFkFHrNoIwnBbDqDLAEHbs9kVtctxIYJmPEae5fvhBpeXFfKi
-	5rAlfSsaQaK4lO6ILta57tLRQc1MX/BYqeBoSXXO7zNXOJZ1HttRxtZSQ7w9T5fk9o4cY3F6HSsak
-	/mJqBwI+g/eZ9MNDvZdQ==;
+	List-Owner; bh=dXGvQWUkPj+xyBFb9aMne5btwsSUwzJcMhSADhybZ6s=; b=VL2a/VCZ/BEAEY
+	6S2bxh0BGZ16odrAllE5o54e4eLlFLPGakbBy4b/6t5LxfffPXq9n4a16Qbl13QpRlkY50IJnuUE5
+	iNg4Tev8Rn+7tH2VX1/bSQcYGfiNvGInknLTZesycDFXvmEA8CxTlh9Jj/uRfGnjikElZ7uVPnw3W
+	2q3GBQSh/wc3BhJnQUSw5RvYKwhgCNw719GxL3pzSp6ME94RKYfmKuXZVEOtcpwOGmi3qLIIXPbgy
+	6r3jUHMuMe4+vRQMx914cyyxh00RAdFoiMHWYpjC58eYU/IKoJMnLCSoB3W1yETHOAUCqwl/5qJCA
+	c4Et0y/vksczk+PpW9OA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghX6f-00005p-IR; Thu, 10 Jan 2019 09:58:33 +0000
-Received: from mailout1.samsung.com ([203.254.224.24])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghX6b-00005L-VX
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 09:58:32 +0000
-Received: from epcas2p4.samsung.com (unknown [182.195.41.56])
- by mailout1.samsung.com (KnoxPortal) with ESMTP id
- 20190110095825epoutp01176f68009949863b5e17fb3f0d17ddac~4dEOZlFD83218732187epoutp01T;
- Thu, 10 Jan 2019 09:58:25 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout1.samsung.com
- 20190110095825epoutp01176f68009949863b5e17fb3f0d17ddac~4dEOZlFD83218732187epoutp01T
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1547114305;
- bh=x5QnG5QWV4ikDkyVvItuyikbiv+1Rm7pJ0zkHbIZ7WU=;
- h=Subject:To:Cc:From:Date:In-reply-to:References:From;
- b=UruqTDwtQxThsCLBdx0WbAxZyQ8XYQC01dosn8dVKi2UhDrYORs5M6eQrOw/09izL
- kyEG8T1SuykcSDZvABRWSyFP5nO5S7hLhVNtOrV41dKK1edSBlKHFcGgjn1Zb9Bg3r
- diCAuLvmN/rUQrtF3ckjjTD99t20rC/rytn1Gqus=
-Received: from epsmges2p4.samsung.com (unknown [182.195.42.72]) by
- epcas2p4.samsung.com (KnoxPortal) with ESMTP id
- 20190110095824epcas2p4668cebecc31b71483dad197f278445ad~4dENT7adq0371003710epcas2p4R;
- Thu, 10 Jan 2019 09:58:24 +0000 (GMT)
-Received: from epcas2p3.samsung.com ( [182.195.41.55]) by
- epsmges2p4.samsung.com (Symantec Messaging Gateway) with SMTP id
- FD.A2.04055.047173C5; Thu, 10 Jan 2019 18:58:24 +0900 (KST)
-Received: from epsmgms2p2new.samsung.com (unknown [182.195.42.143]) by
- epcas2p1.samsung.com (KnoxPortal) with ESMTP id
- 20190110095823epcas2p1936a8d201409b837f9cbd12497fb0e25~4dEMX922X2503425034epcas2p1a;
- Thu, 10 Jan 2019 09:58:23 +0000 (GMT)
-X-AuditID: b6c32a48-3c1ff70000000fd7-90-5c3717405503
-Received: from epmmp2 ( [203.254.227.17]) by epsmgms2p2new.samsung.com
- (Symantec Messaging Gateway) with SMTP id 09.36.03627.F37173C5; Thu, 10 Jan
- 2019 18:58:23 +0900 (KST)
-MIME-version: 1.0
-Received: from [106.116.147.40] by mmp2.samsung.com (Oracle Communications
- Messaging Server 7.0.5.31.0 64bit (built May  5 2014)) with ESMTPA id
- <0PL40086D118YF10@mmp2.samsung.com>; Thu, 10 Jan 2019 18:58:23 +0900 (KST)
-Subject: Re: [PATCH] media: s5p-jpeg: Correct step and max values for
- V4L2_CID_JPEG_RESTART_INTERVAL
-To: =?UTF-8?Q?Pawe=c5=82_Chmiel?= <pawel.mikolaj.chmiel@gmail.com>
-From: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Message-id: <146706fc-007a-c4f9-7ecf-b1bd893bb79d@samsung.com>
-Date: Thu, 10 Jan 2019 10:58:19 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-In-reply-to: <20190109180041.31052-1-pawel.mikolaj.chmiel@gmail.com>
-Content-language: en-GB
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFvrLIsWRmVeSWpSXmKPExsWy7bCmua6DuHmMwayvkha3t25gsdj0+Bqr
- xeVdc9gsejZsZbWYcX4fk8WyTX+YLH4c72N2YPfYOesuu8emVZ1sHpuX1Ht83iQXwBLFZZOS
- mpNZllqkb5fAlXHhomDBKZaKVZvnszYwvmXuYuTkkBAwkbjcO5+1i5GLQ0hgB6PEz6aNTBDO
- d0aJNXM3sHQxcoBV7Z+QCdIgJLCBUeJRoziIzSsgKPFj8j0WEJtZQFPixZdJLBA19xklnlxV
- AbGFBdIkLt2dAbZMRMBJonfrK2aQ+cwCu4Bqvv0Da2ATMJToPdrHCDHUTuLp3u9MIHtZBFQl
- PnyrAgmLCkRIdNxfzQYS5hRwkbjzthxirbjEsfs3GSFseYmDV56zQPx1hk1i3iFrCNtForfn
- BBOELSzx6vgWdghbWuLZqo2MEHa1xK7t3WCnSQh0MEq0XNgODSBricPHL7JCLOCT6Dj8lx0S
- JLwSHW1CECUeEluXLmSHBNt0RomlV0+xTGCUnYUURLOQgmgWkrtnIbl7ASPLKkax1ILi3PTU
- YqMCE73ixNzi0rx0veT83E2M4ESh5bGD8cA5n0OMAhyMSjy8CsvNYoRYE8uKK3MPMUpwMCuJ
- 8N4BCfGmJFZWpRblxxeV5qQWH2KU5mBREud9KD03WkggPbEkNTs1tSC1CCbLxMEp1cBooefB
- zlJTs3BH1667wW/zmucEyakc1nSrNb1X0Dn9pFJ1/RcHRl6+fHVD85yq0gPPTyxuXnTLQjvf
- WE/ywsuA6/bO/6ae6H4QNI//ZcmlcteuKWvLZtg0Vu7msQ/bt/RH6tyWybE5u6e9MU7c8/Wg
- Yl360bD7Qsu6M60zv/Lfi7/JohifE6bEUpyRaKjFXFScCADxK3mjEAMAAA==
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFnrILMWRmVeSWpSXmKPExsVy+t9jQV17cfMYg0e9sha3t25gsdj0+Bqr
- xeVdc9gsejZsZbWYcX4fk8WyTX+YLH4c72N2YPfYOesuu8emVZ1sHpuX1Ht83iQXwBLFZZOS
- mpNZllqkb5fAlXHhomDBKZaKVZvnszYwvmXuYuTgkBAwkdg/IbOLkYtDSGAdo8Sb6ZdYuxg5
- OXgFBCV+TL7HAlLDLKAuMWVKLkTNQ0aJGfcns4HUCAukSVy6O4MZxBYRcJLo3fqKGaSIWWAX
- o8TlM5/BEkICzhKb521jArHZBAwleo/2MUIssJN4uvc7E8gCFgFViQ/fqkDCogIREmdfrmME
- CXMKuEjceVsOEmYWEJc4dv8mI4QtL3HwynOWCYwCs5BcOgvh0llIOmYh6VjAyLKKUTK1oDg3
- PbfYqMAoL7Vcrzgxt7g0L10vOT93EyMw4Lcd1urfwfh4SfwhRgEORiUe3oR/pjFCrIllxZW5
- hxglOJiVRHjvLDeLEeJNSaysSi3Kjy8qzUktPsQozcGiJM7Ln38sUkggPbEkNTs1tSC1CCbL
- xMEp1cA437vmM4dswOepDKbz+xM29XXuPNn1SrVK6eYEyb5He9P1/prM3vC/+42F+sxVql2O
- 7TMMnXwcVDNDpec93v1tBZ+5j+Q3S01eiyN7Vl1q73+W8vrA+0vsqed23yoqvdv6R1/6qKWj
- 8i/bcw8s3QQ/BjqscDY3qnQVv9gYvnaixeGpcWJpptxKLMUZiYZazEXFiQCT4vQudAIAAA==
-X-CMS-MailID: 20190110095823epcas2p1936a8d201409b837f9cbd12497fb0e25
-X-Msg-Generator: CA
-CMS-TYPE: 102P
-X-CMS-RootMailID: 20190110095823epcas2p1936a8d201409b837f9cbd12497fb0e25
-References: <20190109180041.31052-1-pawel.mikolaj.chmiel@gmail.com>
- <CGME20190110095823epcas2p1936a8d201409b837f9cbd12497fb0e25@epcas2p1.samsung.com>
+	id 1ghXA9-0001x0-S2; Thu, 10 Jan 2019 10:02:09 +0000
+Received: from kirsty.vergenet.net ([202.4.237.240])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghXA6-0001wY-CJ
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 10:02:08 +0000
+Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
+ by kirsty.vergenet.net (Postfix) with ESMTPA id BCF5425B78D;
+ Thu, 10 Jan 2019 21:02:04 +1100 (AEDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
+ t=1547114525; bh=Evv6/kUZM2BXEO4ID4kHm9U6pi6UaWggfSKsaCs7c7M=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=EPwZVIgLNQ3mAUE3y4DWNM7bFN+1AUHGqF5+XB7zc8f85SWpA5gMjdAAV/c66Jf2x
+ vItbhyAtUueachhAMG4KI2NnFLCoKkZS4qHdqnPRtW+m4rYvi9S7FU1D614OFOO4bU
+ fI12whi5V/eEX5xrd2KdWy9stsF3fzybJgPjApDU=
+Received: by reginn.horms.nl (Postfix, from userid 7100)
+ id F0FCB940462; Thu, 10 Jan 2019 11:02:02 +0100 (CET)
+Date: Thu, 10 Jan 2019 11:02:02 +0100
+From: Simon Horman <horms@verge.net.au>
+To: Geert Uytterhoeven <geert@linux-m68k.org>
+Subject: Re: [PATCH] arm64: dts: renesas: r8a77990: ebisu: Fix backlight
+ regulator numbering
+Message-ID: <20190110100202.4eqyge7vadlmodsy@verge.net.au>
+References: <20190109140045.17449-1-marek.vasut@gmail.com>
+ <CAMuHMdX3bP_WCYNRRMmVRPwV52e72NOZMtW8cf29Fo+E9_CvcQ@mail.gmail.com>
+ <20190109165822.tmj7qbho46f7clvg@verge.net.au>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20190109165822.tmj7qbho46f7clvg@verge.net.au>
+Organisation: Horms Solutions BV
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_015830_346252_C8CB9DD7 
-X-CRM114-Status: GOOD (  14.61  )
+X-CRM114-CacheID: sfid-20190110_020206_573946_30096A4E 
+X-CRM114-Status: GOOD (  19.81  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -124,25 +78,105 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-samsung-soc@vger.kernel.org, linux-kernel@vger.kernel.org,
- jacek.anaszewski@gmail.com, mchehab@kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>,
+ Wolfram Sang <wsa+renesas@sang-engineering.com>,
+ Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
+ Marek Vasut <marek.vasut@gmail.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Marek Vasut <marek.vasut+renesas@gmail.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMS85LzE5IDE5OjAwLCBQYXdlxYIgQ2htaWVsIHdyb3RlOgo+IFRoaXMgY29tbWl0IGNvcnJl
-Y3RzIG1heCBhbmQgc3RlcCB2YWx1ZXMgZm9yIHY0bDIgY29udHJvbCBmb3IKPiBWNEwyX0NJRF9K
-UEVHX1JFU1RBUlRfSU5URVJWQUwuIE1heCBzaG91bGQgYmUgMHhmZmZmIGFuZCBzdGVwIHNob3Vs
-ZCBiZSAxLgo+IEl0IHdhcyBmb3VuZCBieSB1c2luZyB2NGwyLWNvbXBsaWFuY2UgdG9vbCBhbmQg
-Y2hlY2tpbmcgcmVzdWx0IG9mCj4gVklESU9DX1FVRVJZX0VYVF9DVFJML1FVRVJZTUVOVSB0ZXN0
-Lgo+IFByZXZpb3VzbHkgaXQgd2FzIGNvbXBsYWluaW5nIHRoYXQgc3RlcCB3YXMgYmlnZ2VyIHRo
-YW4gZGlmZmVyZW5jZQo+IGJldHdlZW4gbWF4IGFuZCBtaW4uCj4gCj4gRml4ZXM6IDE1ZjRiYzNi
-MWY0MiAoIlttZWRpYV0gczVwLWpwZWc6IEFkZCBKUEVHIGNvbnRyb2xzIHN1cHBvcnQiKQo+IFNp
-Z25lZC1vZmYtYnk6IFBhd2XFgiBDaG1pZWwgPHBhd2VsLm1pa29sYWouY2htaWVsQGdtYWlsLmNv
-bT4KClJldmlld2VkLWJ5OiBTeWx3ZXN0ZXIgTmF3cm9ja2kgPHMubmF3cm9ja2lAc2Ftc3VuZy5j
-b20+CgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51
-eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVh
-ZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1h
-cm0ta2VybmVsCg==
+On Wed, Jan 09, 2019 at 05:58:23PM +0100, Simon Horman wrote:
+> On Wed, Jan 09, 2019 at 04:26:25PM +0100, Geert Uytterhoeven wrote:
+> > On Wed, Jan 9, 2019 at 3:01 PM <marek.vasut@gmail.com> wrote:
+> > > From: Marek Vasut <marek.vasut+renesas@gmail.com>
+> > >
+> > > There are two regulator1 nodes in the Ebisu DTS right now, one 3.3V for
+> > > the eMMC and one 12V for the backlight. This causes one to be overwritten
+> > > by the other, ultimatelly resulting in inoperable eMMC, which depends on
+> > > the former. Fix this by renumbering the backlight regulator to regulator2.
+> > >
+> > > Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+> > > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > > Cc: Simon Horman <horms+renesas@verge.net.au>
+> > > Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> > > Cc: linux-renesas-soc@vger.kernel.org
+> > > Reported-by: Simon Horman <horms+renesas@verge.net.au>
+> > > Fixes: 9d16c4a10e07 ("arm64: dts: renesas: r8a77990: ebisu: Add backlight")
+> > 
+> > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > 
+> > > --- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+> > > +++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+> > > @@ -191,7 +191,7 @@
+> > >                 clock-frequency = <24576000>;
+> > >         };
+> > >
+> > > -       reg_12p0v: regulator1 {
+> > > +       reg_12p0v: regulator2 {
+> > >                 compatible = "regulator-fixed";
+> > >                 regulator-name = "D12.0V";
+> > >                 regulator-min-microvolt = <12000000>;
+> > 
+> > Perhaps the node name should get a more descriptive suffix
+> > (e.g. "regulator-12p0v"), like is already done for some of the other
+> > regulators?
+> 
+> I think I would prefer that addressed in a follow-up patch.
+
+Thanks for this patch.
+
+I have now tested it and it looks good to me.
+I can now access eMMC as a block device.
+
+Tested-by: Simon Horman <horms+renesas@verge.net.au>
+
+I plan to apply this for v5.1 as the problem appears to
+be introduced in a patch queued-up for v5.1.
+
+
+
+# dmesg | egrep "(ee160000.sd|mmc0|mmcblk0|backlight)"
+[    0.893760] pwm-backlight backlight: Linked as a consumer to regulator.3
+[    2.901953] renesas_sdhi_internal_dmac ee160000.sd: Linked as a consumer to regulator.2
+[    2.910262] renesas_sdhi_internal_dmac ee160000.sd: Linked as a consumer to regulator.1
+[    2.967591] renesas_sdhi_internal_dmac ee160000.sd: mmc0 base at 0xee160000 max clock rate 200 MHz
+[    3.049943] mmc0: new HS200 MMC card at address 0001
+[    3.055843] mmcblk0: mmc0:0001 BGSD3R 29.1 GiB 
+[    3.064414] mmcblk0boot0: mmc0:0001 BGSD3R partition 1 16.0 MiB
+[    3.074888] mmcblk0boot1: mmc0:0001 BGSD3R partition 2 16.0 MiB
+[    3.081522] mmcblk0rpmb: mmc0:0001 BGSD3R partition 3 4.00 MiB, chardev (243:0)
+
+# dd if=/dev/mmcblk0 of=/dev/null bs=1M count=512 iflag=direct
+512+0 records in
+512+0 records out
+536870912 bytes (537 MB) copied, 14.7343 s, 36.4 MB/s
+# dd if=/dev/mmcblk0 of=/dev/null bs=1M count=512 iflag=direct
+512+0 records in
+512+0 records out
+536870912 bytes (537 MB) copied, 8.46809 s, 63.4 MB/s
+# dd if=/dev/mmcblk0 of=/dev/null bs=1M count=512 iflag=direct
+512+0 records in
+512+0 records out
+536870912 bytes (537 MB) copied, 14.6945 s, 36.5 MB/s
+
+# dd of=/dev/mmcblk0 if=/dev/zero bs=1M count=512 oflag=direct
+512+0 records in
+512+0 records out
+536870912 bytes (537 MB) copied, 19.1677 s, 28.0 MB/s
+# dd of=/dev/mmcblk0 if=/dev/zero bs=1M count=512 oflag=direct
+512+0 records in
+512+0 records out
+536870912 bytes (537 MB) copied, 21.3139 s, 25.2 MB/s
+# dd of=/dev/mmcblk0 if=/dev/zero bs=1M count=512 oflag=direct
+512+0 records in
+512+0 records out
+536870912 bytes (537 MB) copied, 19.9205 s, 27.0 MB/s
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
