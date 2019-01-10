@@ -2,64 +2,66 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CAB7DC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 20:16:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 923AEC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 20:19:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9BBB2206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 20:16:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 52EF6208E3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 20:19:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Teuz/gbU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9BBB2206B7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ravnborg.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HZHnW28r"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 52EF6208E3
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=3g9Xw6kC8YuBmy/elw9peplTiyK4f/3ITjaS+Aru1u8=; b=Teuz/gbUIuDWzu
-	rp96l/clGF4PCfy4kUMlvg+anWg2PzdmQ32dBARytdhZz2JTyIY4s8AIsMjFFIKf6zKlD14Y8CcWL
-	R+35LKkW1PFJbsKgLPzM7Kn/3nb8Rwmn22RdXpWjwrz250rS/mJLLOnQ8wmncQL64ajgfSZvRvEAW
-	/qVRryJ95fV+Tu/7wUL6QG9gjrDx3hwx98UG5b2cehrD6wABiP/Tm1rWZErG9d98mDuRMGiRi7/x8
-	ccOs/FDkjOgFOeikb4QsMtsymqLiHgsaUdYIOT75eq2DkVRMQyKlc+OteVuP8VDMYFLOyqVp9F7IN
-	0WjjV334sR3cBR2JVvVA==;
+	List-Owner; bh=nVD0yHVRP+H0BXkUXVgaqjpIZMWWE3VuV6SJJzDnIvM=; b=HZHnW28rHcvGjM
+	mr4m3XGS9egmewVHIW9hp3O7pR64jG3yBU6+0tiP0adVS0JVP5MFQV21Y3jE8KTk965n5r5V9d1yW
+	mhML+SS8Us4g0Y9MAJvJr6qhe9RAVVOdBZzZLVLSpPmHG04aOH2Nf1ZA8q4tHiJT+WTMOAEVM/X9D
+	ZWMEYLL9ittaFeH28h7DnfV3fiHxixR3IqYv2xQiL9bf7XX64im+FQnl2HnyjXVm1BfwqRq+Xm3fw
+	0R9pQeEVczW1k+z7MVKITgnD7q/pGXX85Od9ERpKgWrNK1HPuHxFZZIPwEVBIzNblIt0lCC2USAnG
+	Kqy9TMLqAcWUxQTzTQZA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghgl0-00057z-GD; Thu, 10 Jan 2019 20:16:50 +0000
-Received: from asavdk4.altibox.net ([109.247.116.15])
+	id 1ghgns-0005bO-RL; Thu, 10 Jan 2019 20:19:48 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghgks-0004w8-4w
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 20:16:48 +0000
-Received: from ravnborg.org (unknown [158.248.194.18])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by asavdk4.altibox.net (Postfix) with ESMTPS id 4BC9780538;
- Thu, 10 Jan 2019 21:16:38 +0100 (CET)
-Date: Thu, 10 Jan 2019 21:16:36 +0100
-From: Sam Ravnborg <sam@ravnborg.org>
-To: Boris Brezillon <bbrezillon@kernel.org>, Peter Rosin <peda@axentia.se>
-Subject: Re: [PATCH 0/4] drm/atmel-hlcdc: fix plane clipping/rotation issues
-Message-ID: <20190110201636.GA7074@ravnborg.org>
-References: <20190110151020.30468-1-peda@axentia.se>
- <20190110184446.75b4350a@bbrezillon>
+ id 1ghgnp-0005aP-OF
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 20:19:47 +0000
+Received: from pty.hi.pengutronix.de ([2001:67c:670:100:1d::c5])
+ by metis.ext.pengutronix.de with esmtps
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1ghgnk-00040k-BG; Thu, 10 Jan 2019 21:19:40 +0100
+Received: from ukl by pty.hi.pengutronix.de with local (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1ghgnj-0007zH-QO; Thu, 10 Jan 2019 21:19:39 +0100
+From: =?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?= <u.kleine-koenig@pengutronix.de>
+To: Thierry Reding <thierry.reding@gmail.com>, Shawn Guo <shawnguo@kernel.org>
+Subject: [PATCH 0/2] ARM: adapt defconfigs to pwm driver split
+Date: Thu, 10 Jan 2019 21:19:32 +0100
+Message-Id: <20190110201934.4105-1-u.kleine-koenig@pengutronix.de>
+X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190107195352.3149-5-u.kleine-koenig@pengutronix.de>
+References: <20190107195352.3149-5-u.kleine-koenig@pengutronix.de>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190110184446.75b4350a@bbrezillon>
-User-Agent: Mutt/1.5.21 (2010-09-15)
-X-CMAE-Score: 0
-X-CMAE-Analysis: v=2.3 cv=UpRNyd4B c=1 sm=1 tr=0
- a=UWs3HLbX/2nnQ3s7vZ42gw==:117 a=UWs3HLbX/2nnQ3s7vZ42gw==:17
- a=kj9zAlcOel0A:10 a=cw4OArruGTS2hah8c1kA:9 a=CjuIK1q_8ugA:10
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c5
+X-SA-Exim-Mail-From: ukl@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_121643_223496_24FA6BFE 
-X-CRM114-Status: GOOD (  17.94  )
+X-CRM114-CacheID: sfid-20190110_121945_942227_2F8E3E88 
+X-CRM114-Status: GOOD (  10.82  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,51 +73,24 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>,
- David Airlie <airlied@linux.ie>,
- "dri-devel@lists.freedesktop.org" <dri-devel@lists.freedesktop.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Boris Brezillon <boris.brezillon@bootlin.com>, Peter Rosin <peda@axentia.se>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-pwm@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ kernel@pengutronix.de
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Peter.
-
-(Hijacking this thread as I lost the orginal mails)
-
-> > 
-> > I found an unfortunate issue while recoding plane handling to use
-> > drm_atomic_helper_check_plane_state(). The driver rotates clockwise,
-> > which is not correct. I simply fixed it (patch 1/4), but maybe that
-> > will cause regressions for unsuspecting users who simply assumed
-> > that the clockwise rotation was correct? I don't know what to do
-> > about that? Adding an option to get the old broken behavior seems
-> > useless, wouldn't it be just as easy to just fix whatever app to
-> > rotate the other way instead of adding an option somewhere?
-> 
-> Hm, rotation support has been added before the standard rotation
-> property was created, and at that time I assumed rotation was clockwise
-> (which apparently was an unwise choice). Anyway, I don't have a
-> solution for this problem, so I'll let Nicolas decide if it's
-> acceptable to change the rotation behavior.
-> 
-> > 
-> > I have only tested this series on sama5d3, but I did check the docs
-> > for various other chips (sama5d2, sama5d4, sam9n12, sam9g15, sam9g35
-> > and sam9x35) supported by the driver (relevant to patch 4/4).
-
-I wonder if, when this code path is anyway touched, could benefit
-from drm_rect_rotate().
-
-It is obviously not a simple replacement, but could it be used then
-I hope the resulting code is simpler.
-
-	Sam
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGVsbG8sCgp0byBjb250aW51ZSBjb21waWxpbmcgdGhlIChub3cpIHR3byBwd20taW14IGRyaXZl
+cnMgYXMgcGFydCBvZiB0aGUKaW14IGRlZmNvbmZpZ3Mgd2Ugc2hvdWxkIHVwZGF0ZSB0aGVtIHRv
+IHVzZSB0aGUgbmV3IG5hbWVzLgoKSSB0aGluayB0aGUgZWFzaWVzdCBoYW5kbGluZyB3b3VsZCBi
+ZSB0byBsZXQgdGhlbSBnbyB2aWEgdGhlIHB3bSB0cmVlCndpdGggU2hhd24ncyBBY2sgdG8gZ2V0
+IHRoZSB1cGRhdGUgbmVhciB0byB0aGUgYWN0dWFsIHNwbGl0IGludG8KdGhlIG1haW5saW5lLgoK
+QmVzdCByZWdhcmRzClV3ZQoKVXdlIEtsZWluZS1Lw7ZuaWcgKDIpOgogIEFSTTogaW14X3Y2X3Y3
+X2RlZmNvbmZpZzogY29udGludWUgY29tcGlsaW5nIHRoZSBwd20gZHJpdmVyCiAgQVJNOiBpbXhf
+djRfdjVfZGVmY29uZmlnOiBlbmFibGUgUFdNIGRyaXZlcgoKIGFyY2gvYXJtL2NvbmZpZ3MvaW14
+X3Y0X3Y1X2RlZmNvbmZpZyB8IDMgKysrCiBhcmNoL2FybS9jb25maWdzL2lteF92Nl92N19kZWZj
+b25maWcgfCAyICstCiAyIGZpbGVzIGNoYW5nZWQsIDQgaW5zZXJ0aW9ucygrKSwgMSBkZWxldGlv
+bigtKQoKLS0gCjIuMjAuMQoKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxA
+bGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xp
+c3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
