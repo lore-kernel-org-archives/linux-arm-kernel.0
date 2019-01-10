@@ -4,21 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D1C04C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 14:29:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 63E00C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 14:34:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A22D32177B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 14:29:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 24327214C6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 14:34:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rPKDBXhq";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="ZWdqLwDD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A22D32177B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jj/9jsdr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 24327214C6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,39 +25,35 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
 	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=7Z5yPjmHmtf43AFUIeRWdPbsZSjvjfpmyGjXyzh2JvI=; b=rPK
-	DBXhqW3Wgj6CVLByiRN0k6N/7ckvQ2OMYtbisCWqZ2cjgs2F6b8D727VeYjtJL4l88aKj5SS5QciI
-	9ogKJlSEXNh2CaOoZ52ylFu+Vlt5TUCHNPxc3Xv4kyB6OjwVXd6F2X1iALI2L+9EjzMiasIddaWAt
-	dopD597ez7zdQtrEU5w7O2/rt3zSZdh94oIXm6Sn175VUWna2Kseat3icf83IqGPA2urciIDk0cMq
-	o6U5DdLv3ua+V9G4gx/uQFmOzeyvMzBn7lTslYuACh+wWb/o+83VFRR2+hNsniK+twQgMjM16Ci8l
-	acAFSOquz5ih97SnF5D1Rhm7/QlzyPA==;
+	References:List-Owner; bh=165v5ZQ0s+wMRlf7osiAsv4esWaXQ6xYcQuY1CRcY4Q=; b=jj/
+	9jsdru49+JQAgnu7M6k37wHVo9mg02S3Ycncmx+AoLZBk/KaFrL/vCJcJryiquyT9Swk6nnrUNCx7
+	VSTSpWjP0bBmElEA2LOexcNQS0fFBxpafjo4NyRCaGRlOnVxIEGzjPgq0rw+WZoIKBDe9xEl3LTgo
+	dAm2Y0VMJi/iDaBOS6u6Gmp7+bI9WNGxAbGwMTFNlPhgx8fHrdSzdTivUnIC8c6kXrlG9lAMBoxd3
+	/mK3LCmWrk7AFirTGOh5+gXo2KwUQAencFMUmqCvsma2DY3CoZ4jDn26ofxV9RElokhlyIIx4eNIo
+	0mxwj0nSqRRXsF4E46+txH4v3u9vfrQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghbKM-0000IC-Uk; Thu, 10 Jan 2019 14:28:58 +0000
-Received: from kirsty.vergenet.net ([202.4.237.240])
+	id 1ghbPG-000205-0U; Thu, 10 Jan 2019 14:34:02 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghbKJ-0000Hs-Hs
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 14:28:57 +0000
-Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
- by kirsty.vergenet.net (Postfix) with ESMTPA id 2AD7425B78D;
- Fri, 11 Jan 2019 01:28:52 +1100 (AEDT)
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1547130532; bh=fZThQyC5Koq5AXMYyJb9TBHMB4uX/jHex3OlNiCVT/Q=;
- h=From:To:Cc:Subject:Date:From;
- b=ZWdqLwDD+5kXPE5WGQ1xGmt80pna3ia8qQw+Ha4FZeAvVjIFw0QTt7BzRcKoWwTO4
- 7bFr2PCwuKkw2rKMHQIKfV92rzBug0/Vbx+5eSYk8rlkBxPTyUY3rnPh1m/Tw21jJ0
- VehqCeYIHE3Mc2HZ1RMuqm789XTa0CbHU3yu9jE8=
-Received: by reginn.horms.nl (Postfix, from userid 7100)
- id 2F253940462; Thu, 10 Jan 2019 15:28:50 +0100 (CET)
-From: Simon Horman <horms+renesas@verge.net.au>
-To: linux-renesas-soc@vger.kernel.org
-Subject: [PATCH] arm64: dts: renesas: r8a77990: ebisu: Enable HS400 of SDHI3
-Date: Thu, 10 Jan 2019 15:28:33 +0100
-Message-Id: <20190110142833.31577-1-horms+renesas@verge.net.au>
-X-Mailer: git-send-email 2.11.0
+ id 1ghbPC-0001zB-GZ
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 14:34:00 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 67C4B1596;
+ Thu, 10 Jan 2019 06:33:56 -0800 (PST)
+Received: from localhost (chrdal02-desktop.copenhagen.arm.com [10.32.144.41])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ CD3E33F5AF; Thu, 10 Jan 2019 06:33:55 -0800 (PST)
+From: Christoffer Dall <christoffer.dall@arm.com>
+To: Marc Zyngier <marc.zyngier@arm.com>
+Subject: [PATCH] KVM: arm/arm64: vgic: Always initialize the group of private
+ IRQs
+Date: Thu, 10 Jan 2019 15:33:52 +0100
+Message-Id: <20190110143352.17295-1-christoffer.dall@arm.com>
+X-Mailer: git-send-email 2.18.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_062855_740633_A049742F 
-X-CRM114-Status: GOOD (  11.42  )
+X-CRM114-CacheID: sfid-20190110_063358_563957_D0E2A176 
+X-CRM114-Status: GOOD (  16.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,129 +65,135 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Simon Horman <horms+renesas@verge.net.au>,
- Magnus Damm <magnus.damm@gmail.com>, linux-arm-kernel@lists.infradead.org
+Cc: Christoffer Dall <christoffer.dall@arm.com>, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org, Julien Thierry <julien.thierry@arm.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add SDHI3 UHS pin control and use it when enabling HS200 support
-for SDHI3.
+We currently initialize the group of private IRQs during
+kvm_vgic_vcpu_init, and the value of the group depends on the GIC model
+we are emulating.  However, CPUs created before creating (and
+initializing) the VGIC might end up with the wrong group if the VGIC
+is created as GICv3 later.
 
-Based on work by Takeshi Kihara.
+Since we have no enforced ordering of creating the VGIC and creating
+VCPUs, we can end up with part the VCPUs being properly intialized and
+the remaining incorrectly initialized.  That also means that we have no
+single place to do the per-cpu data structure initialization which
+depends on knowing the emulated GIC model (which is only the group
+field).
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+This patch removes the incorrect comment from kvm_vgic_vcpu_init and
+initializes the group of all previously created VCPUs's private
+interrupts in vgic_init in addition to the existing initialization in
+kvm_vgic_vcpu_init.
+
+Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 ---
-Tested on top of renesas-devel-20190110-v5.0-rc1
+I tested this by modifying kvmtool to create the vgic in the middle of creating
+the VCPUs, and looking in /sys/kernel/debug/kvm/<pid>/vgic-state showed the
+first VCPU with private interrupts with group 0 for gicv3 and the secondary
+VCPU with group 1 prior to this patch, and both VCPUs with group 1 following
+this patch for GICv3 and both with group 0 with GICv2.
 
-[    2.967136] renesas_sdhi_internal_dmac ee160000.sd: mmc0 base at 0xee160000 max clock rate 200 MHz
-[    3.055659] mmc0: new HS400 MMC card at address 0001
-[    3.061726] mmcblk0: mmc0:0001 BGSD3R 29.1 GiB
-[    3.070827] mmcblk0boot0: mmc0:0001 BGSD3R partition 1 16.0 MiB
-[    3.077508] mmcblk0boot1: mmc0:0001 BGSD3R partition 2 16.0 MiB
-[    3.084132] mmcblk0rpmb: mmc0:0001 BGSD3R partition 3 4.00 MiB, chardev (243:0)
-[    2.967136] renesas_sdhi_internal_dmac ee160000.sd: mmc0 base at 0xee160000 max clock rate 200 MHz
-[    3.055659] mmc0: new HS400 MMC card at address 0001
-[    3.061726] mmcblk0: mmc0:0001 BGSD3R 29.1 GiB
-[    3.070827] mmcblk0boot0: mmc0:0001 BGSD3R partition 1 16.0 MiB
-[    3.077508] mmcblk0boot1: mmc0:0001 BGSD3R partition 2 16.0 MiB
-[    3.084132] mmcblk0rpmb: mmc0:0001 BGSD3R partition 3 4.00 MiB, chardev (243:0)
-
-[    2.901527] renesas_sdhi_internal_dmac ee160000.sd: Linked as a consumer to regulator.2
-[    2.909824] renesas_sdhi_internal_dmac ee160000.sd: Linked as a consumer to regulator.1
-[    2.967136] renesas_sdhi_internal_dmac ee160000.sd: mmc0 base at 0xee160000 max clock rate 200 MHz
-[    3.055659] mmc0: new HS400 MMC card at address 0001
-[    3.061726] mmcblk0: mmc0:0001 BGSD3R 29.1 GiB
-[    3.070827] mmcblk0boot0: mmc0:0001 BGSD3R partition 1 16.0 MiB
-[    3.077508] mmcblk0boot1: mmc0:0001 BGSD3R partition 2 16.0 MiB
-[    3.084132] mmcblk0rpmb: mmc0:0001 BGSD3R partition 3 4.00 MiB, chardev (243:0)
-
-128+0 records in
-128+0 records out
-134217728 bytes (134 MB) copied, 0.92438 s, 145 MB/s
-512+0 records in
-512+0 records out
-536870912 bytes (537 MB) copied, 9.02486 s, 59.5 MB/s
-512+0 records in
-512+0 records out
-536870912 bytes (537 MB) copied, 7.36003 s, 72.9 MB/s
-
-512+0 records in
-512+0 records out
-536870912 bytes (537 MB) copied, 11.0156 s, 48.7 MB/s
-512+0 records in
-512+0 records out
-536870912 bytes (537 MB) copied, 7.15907 s, 75.0 MB/s
-512+0 records in
-512+0 records out
-536870912 bytes (537 MB) copied, 8.78869 s, 61.1 MB/s
-512+0 records in
-512+0 records out
-536870912 bytes (537 MB) copied, 10.3861 s, 51.7 MB/s
-
-The above test results seem favourable when compared to
-testing against renesas-devel-20190110-v5.0-rc1 where the eMMC
-device uses HS200 mode.
-
-512+0 records in
-512+0 records out
-536870912 bytes (537 MB) copied, 14.7343 s, 36.4 MB/s
-512+0 records in
-512+0 records out
-536870912 bytes (537 MB) copied, 8.46809 s, 63.4 MB/s
-512+0 records in
-512+0 records out
-536870912 bytes (537 MB) copied, 14.6945 s, 36.5 MB/s
-
-512+0 records in
-512+0 records out
-536870912 bytes (537 MB) copied, 19.1677 s, 28.0 MB/s
-512+0 records in
-512+0 records out
-536870912 bytes (537 MB) copied, 21.3139 s, 25.2 MB/s
-512+0 records in
-512+0 records out
-536870912 bytes (537 MB) copied, 19.9205 s, 27.0 MB/s
----
- arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-index 89383aa35d65..f2846c9eb83f 100644
---- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-@@ -535,6 +535,12 @@
- 		power-source = <1800>;
- 	};
+diff --git a/arm/kvm.c b/arm/kvm.c
+index b824f63..c6c5fbc 100644
+--- a/arm/kvm.c
++++ b/arm/kvm.c
+@@ -82,10 +82,6 @@ void kvm__arch_init(struct kvm *kvm, const char *hugetlbfs_path, u64 ram_size)
  
-+	sdhi3_pins_uhs: sd3_uhs {
-+		groups = "sdhi3_data8", "sdhi3_ctrl", "sdhi3_ds";
-+		function = "sdhi3";
-+		power-source = <1800>;
-+	};
+ 	madvise(kvm->arch.ram_alloc_start, kvm->arch.ram_alloc_size,
+ 		MADV_HUGEPAGE);
+-
+-	/* Create the virtual GIC. */
+-	if (gic__create(kvm, kvm->cfg.arch.irqchip))
+-		die("Failed to create virtual GIC");
+ }
+ 
+ #define FDT_ALIGN	SZ_2M
+diff --git a/kvm-cpu.c b/kvm-cpu.c
+index cc8385f..7a2fde0 100644
+--- a/kvm-cpu.c
++++ b/kvm-cpu.c
+@@ -253,6 +253,7 @@ panic_kvm:
+ int kvm_cpu__init(struct kvm *kvm)
+ {
+ 	int max_cpus, recommended_cpus, i;
++	bool gic_created = false;
+ 
+ 	max_cpus = kvm__max_cpus(kvm);
+ 	recommended_cpus = kvm__recommended_cpus(kvm);
+@@ -281,6 +282,12 @@ int kvm_cpu__init(struct kvm *kvm)
+ 	}
+ 
+ 	for (i = 0; i < kvm->nrcpus; i++) {
++		if (i == 1) {
++			/* Create the virtual GIC. */
++			if (gic__create(kvm, kvm->cfg.arch.irqchip))
++				die("Failed to create virtual GIC");
++			gic_created = true;
++		}
+ 		kvm->cpus[i] = kvm_cpu__arch_init(kvm, i);
+ 		if (!kvm->cpus[i]) {
+ 			pr_warning("unable to initialize KVM VCPU");
+@@ -288,6 +295,10 @@ int kvm_cpu__init(struct kvm *kvm)
+ 		}
+ 	}
+ 
++	/* Create the virtual GIC. */
++	if (!gic_created && gic__create(kvm, kvm->cfg.arch.irqchip))
++		die("Failed to create virtual GIC");
 +
- 	sound_pins: sound {
- 		groups = "ssi01239_ctrl", "ssi0_data", "ssi1_data";
- 		function = "ssi";
-@@ -689,12 +695,13 @@
- &sdhi3 {
- 	/* used for on-board 8bit eMMC */
- 	pinctrl-0 = <&sdhi3_pins>;
--	pinctrl-1 = <&sdhi3_pins>;
-+	pinctrl-1 = <&sdhi3_pins_uhs>;
- 	pinctrl-names = "default", "state_uhs";
+ 	return 0;
  
- 	vmmc-supply = <&reg_3p3v>;
- 	vqmmc-supply = <&reg_1p8v>;
- 	mmc-hs200-1_8v;
-+	mmc-hs400-1_8v;
- 	bus-width = <8>;
- 	non-removable;
- 	status = "okay";
+ fail_alloc:
+
+ virt/kvm/arm/vgic/vgic-init.c | 20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index c0c0b88af1d5..f935adc50626 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -231,13 +231,6 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ 			irq->config = VGIC_CONFIG_LEVEL;
+ 		}
+ 
+-		/*
+-		 * GICv3 can only be created via the KVM_DEVICE_CREATE API and
+-		 * so we always know the emulation type at this point as it's
+-		 * either explicitly configured as GICv3, or explicitly
+-		 * configured as GICv2, or not configured yet which also
+-		 * implies GICv2.
+-		 */
+ 		if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
+ 			irq->group = 1;
+ 		else
+@@ -298,6 +291,19 @@ int vgic_init(struct kvm *kvm)
+ 	if (ret)
+ 		goto out;
+ 
++	/* Initialize groups on CPUs created before the VGIC type was known */
++	kvm_for_each_vcpu(i, vcpu, kvm) {
++		struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
++
++		for (i = 0; i < VGIC_NR_PRIVATE_IRQS; i++) {
++			struct vgic_irq *irq = &vgic_cpu->private_irqs[i];
++			if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
++				irq->group = 1;
++			else
++				irq->group = 0;
++		}
++	}
++
+ 	if (vgic_has_its(kvm)) {
+ 		ret = vgic_v4_init(kvm);
+ 		if (ret)
 -- 
-2.11.0
+2.18.0
 
 
 _______________________________________________
