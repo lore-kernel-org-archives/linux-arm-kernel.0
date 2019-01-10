@@ -2,107 +2,68 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D200FC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 12:56:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 833EDC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 12:58:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 99F69214C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 12:56:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4AD6620879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 12:58:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Kmwi2zE/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 99F69214C6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tk7iergX";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ideasonboard.com header.i=@ideasonboard.com header.b="EFuKjXkt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4AD6620879
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ideasonboard.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1ELLjYAVwcpNhQUvgMQ1nc2VcnRA+3K/wkFYbUEmDJk=; b=Kmwi2zE/u1y+vf
-	JMBblqt6JstM2mJaQcHPY/kkryCnRXkFYqCxtxWvifSw1+/amrZI9qW+y8fKDodloAeQTZes+x8Qe
-	Ge5W+7PBYxVcMDJtx0eAuW15a81mjoWac5MOzevcvVVSSRrK9466dlX1gwHMmx0n5ToJTIu84P/rl
-	OJC8IVeKMnUca52aruRqFe7nPJ5FcyTMWF+y5lzmHN3NBiUuakOjdEVI9WWk48UhNRpid5yQ5Mgej
-	kpqSZmUG/yuR+KcF/n5zLDDyCjAyKCjDO2nzzV/Ra1zuRYUP6jkGolu05UGiGxG5ht3OYhKMyfgBm
-	xXtfuE8q+SVwyPCri22w==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=D4aarbSd3csfbLo0fPlBoL8O0RE+XgX2FnK7EnbeOSU=; b=tk7iergXTrm935
+	Bnr0ICVho6kpJSgfCs9RCKab6Idtwy8spJ57s1fyqbsTNK+VvDokJbzM8DFQdcsIO6Vzh4Kc8/ywC
+	849zu8IQR0xtK3k7PRO3RxOrs4FqBw322dm1eg8GiiG+yXycqW3s1Fm9VrFfnxGU1/5RN3DY04LKx
+	0wXpCd7C1uX+0bioCpAWFL5cW8cPAprOJAS7pp/fuLvbIJrRx4zufYyhG/F/sUxmCgW1hFMbWoVaW
+	9x9AstIWlef4s1jXAP0BrSTi5JkONCDoapoaA9wMbwelkHqvfgyRvIF9ZUPEpyxkDzHyprrj/ob2g
+	WYoV6Qx1GGEYgl8ZXbQQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghZso-00083G-01; Thu, 10 Jan 2019 12:56:26 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghZsc-0007uE-9f
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 12:56:20 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1394380D;
- Thu, 10 Jan 2019 04:56:14 -0800 (PST)
-Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 26EDF3F5AF; Thu, 10 Jan 2019 04:56:13 -0800 (PST)
-Subject: Re: [PATCH] arm: fix a migrating irq bug when hotplug cpu
-To: Dietmar Eggemann <dietmar.eggemann@arm.com>,
- linux-arm-kernel@lists.infradead.org
-References: <20190110100922.20280-1-dietmar.eggemann@arm.com>
-From: Marc Zyngier <marc.zyngier@arm.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
- 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
-Organization: ARM Ltd
-Message-ID: <52e825c6-6704-c6b9-bbba-a87a0f5ec9cb@arm.com>
-Date: Thu, 10 Jan 2019 12:56:11 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
+	id 1ghZuh-0008Mx-Uy; Thu, 10 Jan 2019 12:58:23 +0000
+Received: from perceval.ideasonboard.com
+ ([2001:4b98:dc2:55:216:3eff:fef7:d647])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghZue-0008MZ-6k
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 12:58:22 +0000
+Received: from avalon.localnet (dfj612ybrt5fhg77mgycy-3.rev.dnainternet.fi
+ [IPv6:2001:14ba:21f5:5b00:2e86:4862:ef6a:2804])
+ by perceval.ideasonboard.com (Postfix) with ESMTPSA id 885B14F8;
+ Thu, 10 Jan 2019 13:58:05 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=ideasonboard.com;
+ s=mail; t=1547125085;
+ bh=4puNvOBoknhCNWs2atjqhIpgbrRg/eCecU28pHTvyTQ=;
+ h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+ b=EFuKjXkthiKKJqoS51u3F6wg4ga0DPhcm169JHzCKuydY7s2W+4rDaciAVkU2DvAj
+ olVlqD+fI2/1RBzJpW7TsZYESCyZpAY+xFWuxE7ku4vKW/1mVn/g1KW38u2w3UorZk
+ D6P5YQ6Jv5s7txVUMhTPdN0pPP1K5nwLvFxRdwZA=
+From: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+To: marek.vasut@gmail.com
+Subject: Re: [PATCH] arm64: dts: renesas: r8a77990: ebisu: Fix backlight
+ regulator numbering
+Date: Thu, 10 Jan 2019 14:59:15 +0200
+Message-ID: <1816865.hhpKvpXsC4@avalon>
+Organization: Ideas on Board Oy
+In-Reply-To: <20190109140045.17449-1-marek.vasut@gmail.com>
+References: <20190109140045.17449-1-marek.vasut@gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <20190110100922.20280-1-dietmar.eggemann@arm.com>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_045614_651498_71BE9826 
-X-CRM114-Status: GOOD (  14.44  )
+X-CRM114-CacheID: sfid-20190110_045820_532055_07A84250 
+X-CRM114-Status: GOOD (  14.69  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -114,42 +75,67 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-kernel@vger.kernel.org,
- Russell King - ARM Linux <linux@armlinux.org.uk>,
- Sudeep Holla <sudeep.holla@arm.com>
+Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>,
+ linux-renesas-soc@vger.kernel.org,
+ Wolfram Sang <wsa+renesas@sang-engineering.com>,
+ Simon Horman <horms+renesas@verge.net.au>,
+ linux-arm-kernel@lists.infradead.org,
+ Marek Vasut <marek.vasut+renesas@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 10/01/2019 10:09, Dietmar Eggemann wrote:
-> Arm TC2 fails cpu hotplug stress test.
-> 
-> This issue was tracked down to a missing copy of the new affinity
-> cpumask for the vexpress-spc interrupt into struct
-> irq_common_data.affinity when the interrupt is migrated in
-> migrate_one_irq().
-> 
-> Fix it by replacing the arm specific hotplug cpu migration with the
-> generic irq code.
-> 
-> This is the counterpart implementation to commit 217d453d473c ("arm64:
-> fix a migrating irq bug when hotplug cpu").
-> 
-> Tested with cpu hotplug stress test on Arm TC2 (multi_v7_defconfig plus
-> CONFIG_ARM_BIG_LITTLE_CPUFREQ=y and CONFIG_ARM_VEXPRESS_SPC_CPUFREQ=y).
-> The vexpress-spc interrupt (irq=22) on this board is affine to CPU0.
-> Its affinity cpumask now changes correctly e.g. from 0 to 1-4 when
-> CPU0 is hotplugged out.
-> 
-> Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
+Hi Marek,
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Thank you for the patch.
 
-	M.
+On Wednesday, 9 January 2019 16:00:45 EET marek.vasut@gmail.com wrote:
+> From: Marek Vasut <marek.vasut+renesas@gmail.com>
+> 
+> There are two regulator1 nodes in the Ebisu DTS right now, one 3.3V for
+> the eMMC and one 12V for the backlight. This causes one to be overwritten
+> by the other, ultimatelly resulting in inoperable eMMC, which depends on
+> the former. Fix this by renumbering the backlight regulator to regulator2.
+> 
+> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Cc: Simon Horman <horms+renesas@verge.net.au>
+> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> Cc: linux-renesas-soc@vger.kernel.org
+> Reported-by: Simon Horman <horms+renesas@verge.net.au>
+> Fixes: 9d16c4a10e07 ("arm64: dts: renesas: r8a77990: ebisu: Add backlight")
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+
+Sorry for breaking this in the first place.
+
+> ---
+>  arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+> b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts index
+> e0590c0af4c4..89383aa35d65 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+> +++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+> @@ -191,7 +191,7 @@
+>  		clock-frequency = <24576000>;
+>  	};
+> 
+> -	reg_12p0v: regulator1 {
+> +	reg_12p0v: regulator2 {
+>  		compatible = "regulator-fixed";
+>  		regulator-name = "D12.0V";
+>  		regulator-min-microvolt = <12000000>;
+
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+
+Laurent Pinchart
+
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
