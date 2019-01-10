@@ -6,18 +6,17 @@ X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 66DF1C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 11:52:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8C3EBC43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 12:09:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 37183214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 11:52:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4CF09214C6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 12:09:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ifodJaP7";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="lJM9rQC/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 37183214DA
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="u5/tdqT8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4CF09214C6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,61 +24,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+KsZP3rB63Xl/lJvtOkR23EVVOdafB081ppLeih5Qfo=; b=ifodJaP7tg5RNo
-	fbb+psOD33bCX00CHmwFi+O3th3uIkyPRPsjzIg8xxKy9BlwEkDvLRqJBYBIGABQUak1yU2+xdC4L
-	a9DpnlZ8T6evXk5HUsxWEI1T85irk5LmduH90yPPcL4WXd+XrE8MmbDcAvzpp/xhgqOAEIu14OTp6
-	z5DFzF7Z1Qj3n39C/F1ARVx4BCkGVRLly74HFXvsmy5zi9CBrcZFgv4cWLH4WZTgrtQgu+zEDX7va
-	0vymlpH3Zj4h7hcR3q/0g2KWMK7YlSnf97ozIiGMfmHLFIcafR9a78+1n7FLXPMfEPEgrdce1KQFx
-	iDTVgb2/F+gLhST1pGxw==;
+	List-Owner; bh=mEcSEA4oB/kUPXaQqhnhW0dZnCrcpas+sjN/uuOP3nQ=; b=u5/tdqT8uzQbLL
+	jKRxb5xPEtn/eshDM1CkjDvE4boi9bpsaqxZsBrVeeIZeEFNqerj68u19Opco5tedjxBPopbNM3nw
+	DU8hYppvfZimD3D73MwSVwTWtiOaWuShpPy0qlxQVtkh+wcgZHJpeMakX9BJjl2R6CRzgGbcliHvh
+	LyX1swnr2yvbEnUYVPSjcOQ2/n1Q5qZrrbhO6uV0lmG5RnSEMmZZNrerYCUe4IwFA2d8hcDFy1zKM
+	RFL/81WiW0uRD5UHEeeP5UmO/ybaKuoTGMjjncS8OfuEV8eQRUTep6NB6egh1zeh8IhLLNBPdo7v6
+	822c/jeG0a2CHWNWwjWQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghYsk-0008Ma-SY; Thu, 10 Jan 2019 11:52:18 +0000
-Received: from lelv0143.ext.ti.com ([198.47.23.248])
+	id 1ghZ9j-00058V-FY; Thu, 10 Jan 2019 12:09:51 +0000
+Received: from szxga07-in.huawei.com ([45.249.212.35] helo=huawei.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghYsg-0008M8-B0
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 11:52:15 +0000
-Received: from fllv0035.itg.ti.com ([10.64.41.0])
- by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0ABq8XQ051327;
- Thu, 10 Jan 2019 05:52:08 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1547121128;
- bh=kK5OGjM6dqECzPd5ZaNdPEnutiwSDTnoOQrWXRwCKf0=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=lJM9rQC/1BcOwt6S+6mR1S0IktI4V6AnHZaTtNRAxSZOWjq8gKDkJfsV8eOkHOWgG
- d5YNjcCco/t3bEY0DUNz2JNBlmpuszCxFBw7lWjTibankFmX7Xj9VabDiYYfLWfrwj
- vw4hI7z+442VRXwJaNDRjYgHu3tJRQIE1eSPrjXI=
-Received: from DFLE114.ent.ti.com (dfle114.ent.ti.com [10.64.6.35])
- by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0ABq8xj099778
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Thu, 10 Jan 2019 05:52:08 -0600
-Received: from DFLE113.ent.ti.com (10.64.6.34) by DFLE114.ent.ti.com
- (10.64.6.35) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 10
- Jan 2019 05:52:08 -0600
-Received: from dflp33.itg.ti.com (10.64.6.16) by DFLE113.ent.ti.com
- (10.64.6.34) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Thu, 10 Jan 2019 05:52:08 -0600
-Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0ABq2l1031261;
- Thu, 10 Jan 2019 05:52:03 -0600
-Subject: Re: Regression in v4.20 with net phy soft reset changes
-To: Tony Lindgren <tony@atomide.com>, Heiner Kallweit <hkallweit1@gmail.com>
-References: <20190109190650.GT5544@atomide.com>
- <a63ca542-db96-40ed-201d-59c609f565ce@gmail.com>
- <20190109213611.GU5544@atomide.com>
-From: Sekhar Nori <nsekhar@ti.com>
-Message-ID: <79c57d19-837e-4468-f6b4-b3bfa9dde82a@ti.com>
-Date: Thu, 10 Jan 2019 17:22:02 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1ghZ9e-00057T-Ol
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 12:09:49 +0000
+Received: from DGGEMS401-HUB.china.huawei.com (unknown [172.30.72.59])
+ by Forcepoint Email with ESMTP id 27B96DE8FB657DE1C470;
+ Thu, 10 Jan 2019 20:09:39 +0800 (CST)
+Received: from [127.0.0.1] (10.142.68.147) by DGGEMS401-HUB.china.huawei.com
+ (10.3.19.201) with Microsoft SMTP Server id 14.3.408.0; Thu, 10 Jan 2019
+ 20:09:35 +0800
+Subject: Re: [RFC RESEND PATCH] kvm: arm64: export memory error recovery
+ capability to user space
+To: James Morse <james.morse@arm.com>, Peter Maydell <peter.maydell@linaro.org>
+References: <0184EA26B2509940AA629AE1405DD7F201FFC21E@dggema523-mbx.china.huawei.com>
+ <c01e3ed0-f66c-f7df-295a-70b44bad49ff@arm.com>
+ <CAFEAcA8No4tti6o9oErdfGKyHqRTfXebO4fuEOhBApFAxw=LOg@mail.gmail.com>
+ <1d73ec5a-b58d-1e00-b681-53cd80cba999@arm.com>
+From: gengdongjiu <gengdongjiu@huawei.com>
+Message-ID: <63a1ad58-b4db-c266-1077-0a3d0a3975d0@huawei.com>
+Date: Thu, 10 Jan 2019 20:09:34 +0800
+User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:52.0) Gecko/20100101
+ Thunderbird/52.6.0
 MIME-Version: 1.0
-In-Reply-To: <20190109213611.GU5544@atomide.com>
+In-Reply-To: <1d73ec5a-b58d-1e00-b681-53cd80cba999@arm.com>
 Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+X-Originating-IP: [10.142.68.147]
+X-CFilter-Loop: Reflected
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_035214_501895_4F80FCBB 
-X-CRM114-Status: GOOD (  26.56  )
+X-CRM114-CacheID: sfid-20190110_040947_157184_07B5F289 
+X-CRM114-Status: GOOD (  41.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,97 +74,172 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>, Clemens Gruber <clemens.gruber@pqgruber.com>,
- Florian Fainelli <f.fainelli@gmail.com>,
- Ivan Khoronzhuk <ivan.khoronzhuk@linaro.org>, WingMan Kwok <w-kwok2@ti.com>,
- Keerthy <j-keerthy@ti.com>, linux-kernel@vger.kernel.org,
- Tero Kristo <t-kristo@ti.com>, Bartosz Golaszewski <bgolaszewski@baylibre.com>,
- Murali Karicheri <m-karicheri2@ti.com>, linux-arm-kernel@lists.infradead.org,
- Rex Chang <rchang@ti.com>, netdev@vger.kernel.org, linux-omap@vger.kernel.org,
- "David S. Miller" <davem@davemloft.net>, Chris Healy <cphealy@gmail.com>
+Cc: "open list:DOCUMENTATION" <linux-doc@vger.kernel.org>,
+ kvm-devel <kvm@vger.kernel.org>, Jonathan Corbet <corbet@lwn.net>,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ =?UTF-8?B?UmFkaW0gS3LEjW3DocWZ?= <rkrcmar@redhat.com>, Will
+ Deacon <will.deacon@arm.com>, Christoffer Dall <christoffer.dall@arm.com>,
+ lkml - Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ arm-mail-list <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Tony,
+Hi James/Peter,
+   thanks for this discussion, and sorry for my late response due to vacation.
 
-On 10/01/19 3:06 AM, Tony Lindgren wrote:
-> Hi,
+On 2018/12/22 2:17, James Morse wrote:
+> Hi Peter,
 > 
-> * Heiner Kallweit <hkallweit1@gmail.com> [190109 19:28]:
->> On 09.01.2019 20:06, Tony Lindgren wrote:
->>> Commit 6e2d85ec0559 ("net: phy: Stop with excessive soft reset") caused
->>> a regression where suspend resume cycle fails to bring up Ethernet on at
->>> least cpsw on am437x-sk-evm.
+> On 19/12/2018 19:02, Peter Maydell wrote:
+>> On Mon, 17 Dec 2018 at 15:56, James Morse <james.morse@arm.com> wrote:
+>>> I don't think this really matters. Its only the NMIlike notifications that the
+>>> guest doesn't have to register or poll. The ones we support today extend the
+>>> architectures existing behaviour: you would have taken an external-abort on a
+>>> real system, whether you know about the additional metadata doesn't matter to Qemu.
+>>
+>> Consider the case where we booted the guest using a DTB and no ACPI
+>> table at all -- we certainly can't just call QEMU code that tries to
+>> add entries to a nonexistent table.
+> 
+> Sure, because you know which of the two sets of firmware-table you're providing.
+> 
+> I'm taking the behaviour of physical machines as the template for what we should
+> do here. I can boot a DT-only kernel on Seattle. Firmware has no idea I did
+> this, it will still take DRAM uncorrected-error IRQs in firmware, and generate
+> CPER records in the POLLed areas. But the kernel will never look, because it
+> booted with DT.
+> What happens if the kernel goes on to access the corrupt location? It either
+> gets corrupt values back, or an external abort, depending on the design of the
+> memory-controller.
+> 
+> X-gene uses an IRQ for its firmware-first notification. Booted with DT that
+> interrupt can be asserted, but as the OS has didn't know to register it, its
+> never taken. We eventually get the same corrupt-values/external-abort behaviour.
+> 
+> KVM/Linux is acting as the memory controller using stage2. When an error is
+> detected by the host it unmaps the page from stage2, and refuses to map it again
+> until its fixed up in Qemu's memory map (which can happen automatically). If the
+> kernel can't fix it itself, the AO signal is like the DRAM-IRQ above, and the AR
+> like the external abort.
+> We don't have a parallel to the 'gets corrupt values back' behaviour as Linux
+> will always unmap hwpoison pages from user-space/guests.
+> 
+> If the host-kernel wasn't build with CONFIG_MEMORY_FAILURE, its like the memory
+> controller doesn't support any of the above. I think knowing this is the closest
+> to what you want.
+> 
+> 
+>> My main point is that there
+>> needs to be logic in Dongjiu's QEMU patches that checks more than
+>> just "does this KVM feature exist". I'm not sufficiently familiar
+>> with all this RAS stuff to be certain what those checks should
+>> be and what the right choices are; I just know we need to check
+>> *something*...
+> 
+> I think this is the crux of where we don't see this the same way.
+> The v8.2 RAS stuff is new, RAS support on arm64 is not. Kernel support arrived
+> at roughly the same time, but not CPU support. There are v8.0 systems that
+> support RAS. There are DT systems that can do the same with edac drivers.
+> The physical v8.0 systems that do this, are doing it without any extra CPU support.
+> 
+> I think x86's behaviour here includes some history, which we don't have.
+>>From the order of the HEST entries, it looks like the machine-check stuff came
+> first, then firmware-first using a 'GHES' entry in that table.
+> I think Qemu on x86 only supports the emulated machine check stuff, so it needs
+> to check KVM has the widget to do this.
+> If Qemu on x86 supported firmware-first, I don't think there would be anything
+> to check. (details below)
+
+Peter, I summarize James's main idea, James think QEMU does not needs to check *something* if Qemu support firmware-first.
+What do we do for your comments?
+
+> 
+> 
+>>>> Let us see the X86's QEMU logic:
+>>>> 1. Before the vCPU created, it will set a default env->mcg_cap value with
 >>>
->> What kind of PHY and which PHY driver is used with this board?
->> I found one schematics of am437x where a KSZ9031RN PHY is used.
->> Is it the same on your board?
+>>>> MCE_CAP_DEF flag, MCG_SER_P means it expected the guest CPU model supports
+>>>> RAS error recovery.[1] 2. when the vCPU initialize, it will check whether host
+>>>> kernel support this feature[2]. Only when host kernel and default env->mcg_cap
+>>>> value all expected this feature, then it will setup vCPU support RAS error
+>>>> recovery[3].
+>>>
+>>> This looks like KVM exposing a CPU capability to Qemu, which then configures the
+>>> behaviour KVM gives to the guest. This doesn't tell you anything about what the
+>>> guest supports.
+>>
+>> It tells you what the *guest CPU* supports, which for x86 is a combination
+>> of (a) what did the user/machine model ask for and (b) what can KVM
+>> actually implement. I don't much care whether the guest OS supports
+>> anything or not, that's its business... but it does seem odd to me
+>> that the equivalent Arm code is not similarly saying "what were we
+>> asked for, and what can we do?".
 > 
-> Yes that's the phy.
+> The flow is something like:
+> For AO, generate CPER records, and notify the OS via NOTIFY_POLL (which isn't
+> really a notification) or some flavour of IRQ.
+> To do this, Qemu needs to be able to write to its reserved area of guest memory,
+> and possibly trigger an interrupt.
 > 
->> As described in the commit message of this commit you would have
->> the option to implement the soft_reset callback in the PHY driver.
->> Can you try to add .soft_reset = genphy_soft_reset to the
->> KSZ9031 driver config in drivers/net/phy/micrel.c and check whether
->> it fixes the issue?
+> For AR, generate CPER records and notify the OS via external abort. (the
+> presence of the CPER records makes this NOTIFY_SEA or NOTIFY_SEI).
+> To do this, Qemu again needs to be able to write to guest memory, set guest
+> registers (KVM_SET_ONE_REG()). If it wants to inject an
+> SError-Interrupt/Asynchronous-external-abort while the guest has it masked, it
+> needs KVM_SET_VCPU_EVENTS().
 > 
-> Yes that seems to work based on a quick test of five suspend
-> resume cycles.
+> Nothing here depends on the CPU or kernel configuration. This is all ACPI stuff,
+> so its the same on x86. (The only difference is external-abort becomes NMI,
+> which is probably done through SET_VCPU_EVENTS())
 > 
-> I wonder what all hardware this issue affects though?
+> What were we asked for? Qemu wants to know if it can write to guest memory,
+> guest registers (for synchronous external abort) and trigger interrupts. It has
+> always been able to do these things.
 > 
-> It's probably best that the network folks check what all
-> hardare needs patching.
 > 
-> For TI hardware, Sekhar and TI network folks, can you guys
-> please check the various TI SoCs for multiple suspend resume
-> cycles with v5.0-rc1 and patch accordingly? See also below
-
-Will do.
-
-> for something else to check, 10 seconds to resume a phy
-> seems very long to me :)
-
-On the AM437x GP EVM which uses the same PHY, the link does not even
-come up for me after a cable plug unplug. Link is up at boot (I use
-NFS). This only happens with v4.20 and v5.0-rc1, not with v4.19.
-
-Adding the genphy_soft_reset hook solves the issue and link comes back
-up almost immediately. I checked this with v5.0-rc1.
-
-I don't see the link problem if I shift to 100Mps prior to the
-plug/unplug experiment using ethtool. So looks like the problem is
-restricted to Gigabit link only. Are you using Gigabit link too?
-
-I think we should patch drivers/net/phy/micrel.c to solve the
-regression. Not sure of the root cause though. In the errata pointed to
-by Heiner, there is "Module 6" which comes close to what we are seeing,
-except it talks of a scenario where auto-negotiation is turned off 100M
-link is used and we see the issue even with auto-neg on and in gigabit
-mode. "Module 5" is also related to link failure, but is already worked
-around in kernel with ksz9031_center_flp_timing().
-
+>> I think one question here which it would be good to answer is:
+>> if we are modelling a guest and we haven't specifically provided
+>> it an ACPI table to tell it about memory errors, what do we do
+>> when we get a sigbus from the host? We have basically two choices:
+>>  (1) send the guest an SError (aka asynchronous external abort)
+>>      anyway (with no further info about what the memory error is)
 > 
->>> Keerthy noticed this may not happen on the first resume, but usually
->>> happens after few suspend resume cycles. The most working suspend resume
->>> cycles I've seen with the commit above is three.
-> ...
->>> Note that unrelated to the commit above, there may be other issues too
->>> as the cpsw phy LED seems to come on only after about five seconds with
->>> about total of 10 seconds before the Ethernet is up again.
+> For an AR signal an external abort is valid. Its up to the implementation
+> whether these are synchronous or asynchronous. Qemu can only take a signal for
+> something that was synchronous, so you can choose between the two.
+> Synchronous external abort is marginally better as an unaware OS knows its
+> affects this thread, and may be able to kill it.
+> SError with an imp-def ESR is indistinguishable from 'part of the soc fell out',
+> and should always result in a panic().
+> 
+> 
+>>  (2) just stop QEMU (as we would for a memory error in QEMU's
+>>      own memory)
+> 
+> This is also valid. A machine may take external-abort to EL3 and then
+> reboot/crash/burn.
+> 
+> 
+> Just in case this is the deeper issue: I keep picking on memory-errors, what
+> about CPU errors?
+> Linux can't handle these at all, unless they are also memory errors. If we take
+> an imprecise abort from a guest KVM can't tell Qemu using signals. We don't have
+> any mechanism to tell user-space about imprecise exceptions. In this case KVM
+> throws an imp-def SError back at the affected vcpu, these are allowed to be
+> imprecise, as this is the closest thing we have.
+> 
+> This does mean that any AO/AR signal Qemu gets is a memory error.
+> 
+> 
+> Happy New Year,
+> 
+> James
+> 
+> .
+> 
 
-I don't quite see this problem on the AM437x GP EVM. I have seen gigabit
-link takes quite some time (sometimes more than 10 seconds) on x15 EVM.
-Not sure if the problem you are facing is related to gigabit too. If you
-are using gigabit link, can you downgrade to 100MBps to check? Either
-using a 100M only switch or by using ethtool on the EVM.
-
-$ ethtool -s eth0 speed 100 duplex full
-
-Thanks,
-Sekhar
 
 _______________________________________________
 linux-arm-kernel mailing list
