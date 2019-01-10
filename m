@@ -2,89 +2,84 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ADD0BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 14:12:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 87429C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 14:14:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 68AD4214C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 14:12:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4E773214C6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 14:14:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LVUITy6A";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="eW8EvGum"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 68AD4214C6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OksnyHrt";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="sJdI6kxI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4E773214C6
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=UGcQoDoWpRL3KNIvK3llthEcyFlHgkmD5TS7EI33Y8U=; b=LVUITy6AG7D3ESyRUniQhwHAdu
-	ikHX45rfvvOgH9DSLCiaoIHQCC1wupd3cH97Ap7g5X+I4VSblFqw9nHQ7nDJZHDI72WNxjo75uWqS
-	KuAhVh8Iu8kgFTV/BuNlS2MZT1KDvrmtgFiKjz4x7Sj5zgnwa7OOSH+8jeAWgPZTKiHj1AxOQWEZl
-	0x3gs/W8UoujSTIZLB90dJ+gRbelJo0oFZpyEQjnnUNOaV2rmRCLlo99doxxJCI41K5iCemAi3Bsx
-	dKk79a7TW/6g4RQuwcQ/Z7A93e2b9NsqzSvyTJCpk43JjO9m6TWkPywhBlG5zFtUCIFeN3SvEDsOw
-	U6R2CdwQ==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=e9XtwtaAuRQa0Z2kvkvzcckHnqbTkCmxqlR8xSJ9tnM=; b=OksnyHrtGG50Df
+	8UOcnAD1Gk2OvWf2dOeALcxVyh0RvAwcKppyTkZ96dRVP469L7VP5NBDKYbNlRGVvJW/c+v96Aj8H
+	Lst4GaCL2CUV1S85PWW5gdJtrjfyBW/2M0LvY31DpyVYUvWVWhdMrHznEkLy0Bqvllyyn0QHDEY62
+	LD6gP5DuVpbmWXok3OB1/BsdLgng/QRUj3NO1U5T48M3pd5pG9TgXHdx9h7dtDqkNMFGzymZSsKXT
+	goH49e5mZhd17YgdXCVVcNESha03c+lF50xuhRhsEvdpV3ZItl4ocJ77FP5bnUdOSNYk6FPX4h3XS
+	oV/BvgKQVWwhy/Tof3ng==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghb4W-0008IS-0m; Thu, 10 Jan 2019 14:12:36 +0000
-Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+	id 1ghb5t-0000Rj-Eh; Thu, 10 Jan 2019 14:14:01 +0000
+Received: from fllv0016.ext.ti.com ([198.47.19.142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghb3a-0007Bt-5U
- for linux-arm-kernel@bombadil.infradead.org; Thu, 10 Jan 2019 14:11:38 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=References:In-Reply-To:Message-Id:Date:
- Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=Ik+EAB54T9RQFtkpbycqvLuiqEhoguYJpEw8OUm68RU=; b=eW8EvGumCStUojsRax5jUHOCk
- w3dcb9o8qxjc+OwJ/cEE4f1jIyaRWT/E2C2luMo93OlmYOgTd1IbDnZjHn2dDChbGk3xolk0XSuix
- sTv0d8UI92t32oFsjsKYDvsS+mFgaCAXTGGEh2xkQfC2lKjX14ukEUO25tAJClgyMTEMUKO8rMSGs
- E1KMVs6sUlR+bR+yLJ+vSMUm+4oYue62nNMfAXmr3+2caPLxahk31RAYgwPCwtsE3DfWwnsGz8diT
- rW8qxgR7Mp19ifW+DrhbfmLzWOl+mNDQ7aQ2vdMO9GikQpC+OaAI5aLGzKcjjZxour88OmkfeMWTl
- CZ2AWivgA==;
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by casper.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghamf-0006Jf-QD
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 13:54:13 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2A1B21596;
- Thu, 10 Jan 2019 05:54:09 -0800 (PST)
-Received: from e119886-lin.cambridge.arm.com (unknown [10.37.6.11])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id BEFBA3F5AF;
- Thu, 10 Jan 2019 05:54:04 -0800 (PST)
-From: Andrew Murray <andrew.murray@arm.com>
-To: Peter Zijlstra <peterz@infradead.org>, Ingo Molnar <mingo@redhat.com>,
- Arnaldo Carvalho de Melo <acme@kernel.org>,
- Richard Henderson <rth@twiddle.net>,
- Ivan Kokshaysky <ink@jurassic.park.msu.ru>,
- Matt Turner <mattst88@gmail.com>, Will Deacon <will.deacon@arm.com>,
- Mark Rutland <mark.rutland@arm.com>, Shawn Guo <shawnguo@kernel.org>,
- Sascha Hauer <s.hauer@pengutronix.de>,
- Benjamin Herrenschmidt <benh@kernel.crashing.org>,
- Paul Mackerras <paulus@samba.org>, Thomas Gleixner <tglx@linutronix.de>,
- Borislav Petkov <bp@alien8.de>, Russell King <linux@armlinux.org.uk>,
- suzuki.poulose@arm.com, robin.murphy@arm.com,
- Michael Ellerman <mpe@ellerman.id.au>
-Subject: [PATCH v5 05/12] arm: perf: conditionally use PERF_PMU_CAP_NO_EXCLUDE
-Date: Thu, 10 Jan 2019 13:53:27 +0000
-Message-Id: <1547128414-50693-6-git-send-email-andrew.murray@arm.com>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1547128414-50693-1-git-send-email-andrew.murray@arm.com>
-References: <1547128414-50693-1-git-send-email-andrew.murray@arm.com>
+ id 1ghb5q-0000QD-96
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 14:13:59 +0000
+Received: from fllv0035.itg.ti.com ([10.64.41.0])
+ by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0AEDqCG040226;
+ Thu, 10 Jan 2019 08:13:52 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1547129632;
+ bh=HCtyGIf1iBr5A99mAfEpZkXBqU8fRmJdmkPA4jZIUvY=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=sJdI6kxINiobAiHuxcyBDp6cK/lhMvaHLjZ0C5HZODJ6f5qwaFerO7jpxiu/niIbi
+ vm02w+30s1wHc32U5uVfZ/Ds3vjbvF5IPJ/uzf/aoBvoorPiBT64J8pI4wMQduqYSN
+ Pm0eBQ0RQGhSlmCj0w9GtLuoUww4mb+H1wR8TbiU=
+Received: from DLEE102.ent.ti.com (dlee102.ent.ti.com [157.170.170.32])
+ by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0AEDqP4105708
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Thu, 10 Jan 2019 08:13:52 -0600
+Received: from DLEE110.ent.ti.com (157.170.170.21) by DLEE102.ent.ti.com
+ (157.170.170.32) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 10
+ Jan 2019 08:13:51 -0600
+Received: from dflp33.itg.ti.com (10.64.6.16) by DLEE110.ent.ti.com
+ (157.170.170.21) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Thu, 10 Jan 2019 08:13:52 -0600
+Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dflp33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0AEDmnR012760;
+ Thu, 10 Jan 2019 08:13:48 -0600
+Subject: Re: [RESEND PATCH 00/12] eeprom: at24: remove platform_data
+To: Bartosz Golaszewski <brgl@bgdev.pl>, Kevin Hilman <khilman@kernel.org>,
+ Arnd Bergmann <arnd@arndb.de>, Greg Kroah-Hartman
+ <gregkh@linuxfoundation.org>
+References: <20190108091539.16674-1-brgl@bgdev.pl>
+From: Sekhar Nori <nsekhar@ti.com>
+Message-ID: <8c190cf3-b4f3-90d0-07ce-4bb7927160df@ti.com>
+Date: Thu, 10 Jan 2019 19:43:47 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
+MIME-Version: 1.0
+In-Reply-To: <20190108091539.16674-1-brgl@bgdev.pl>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_135410_037242_9AF0551C 
-X-CRM114-Status: GOOD (  16.78  )
+X-CRM114-CacheID: sfid-20190110_061358_397248_3B56E7E3 
+X-CRM114-Status: GOOD (  19.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,72 +91,76 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: x86@kernel.org, linuxppc-dev@lists.ozlabs.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-alpha@vger.kernel.org
-MIME-Version: 1.0
+Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-i2c@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The ARM PMU driver can be used to represent a variety of ARM based
-PMUs. Some of these PMUs do not provide support for context
-exclusion, where this is the case we advertise the
-PERF_PMU_CAP_NO_EXCLUDE capability to ensure that perf prevents us
-from handling events where any exclusion flags are set.
+Hi Bartosz,
 
-Where an ARM PMU driver has the set_event_filter function implemented,
-we rely on it to perform exclusion checks. At present some of these
-functions do not test for all of the available exclude flags.
+On 08/01/19 2:45 PM, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> Hi Sekhar,
+> 
+> now that all dependencies are in and v5.0-rc1 is tagged, please consider
+> picking up the second batch of davinci-specific changes into your tree.
+> Once that's done, please provide me with an immutable branch for me to
+> apply the last patch to my at24 tree.
 
-Signed-off-by: Andrew Murray <andrew.murray@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
----
- drivers/perf/arm_pmu.c | 15 +++++----------
- 1 file changed, 5 insertions(+), 10 deletions(-)
+You can use branch v5.1/eeprom-for-bartosz in my tree for this (commit
+e430685f4969).
 
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index d0b7dd8..eec75b9 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -357,13 +357,6 @@ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
- }
- 
- static int
--event_requires_mode_exclusion(struct perf_event_attr *attr)
--{
--	return attr->exclude_idle || attr->exclude_user ||
--	       attr->exclude_kernel || attr->exclude_hv;
--}
--
--static int
- __hw_perf_event_init(struct perf_event *event)
- {
- 	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
-@@ -393,9 +386,8 @@ __hw_perf_event_init(struct perf_event *event)
- 	/*
- 	 * Check whether we need to exclude the counter from certain modes.
- 	 */
--	if ((!armpmu->set_event_filter ||
--	     armpmu->set_event_filter(hwc, &event->attr)) &&
--	     event_requires_mode_exclusion(&event->attr)) {
-+	if (armpmu->set_event_filter &&
-+	    armpmu->set_event_filter(hwc, &event->attr)) {
- 		pr_debug("ARM performance counters do not support "
- 			 "mode exclusion\n");
- 		return -EOPNOTSUPP;
-@@ -867,6 +859,9 @@ int armpmu_register(struct arm_pmu *pmu)
- 	if (ret)
- 		return ret;
- 
-+	if (!pmu->set_event_filter)
-+		pmu->pmu.capabilities |= PERF_PMU_CAP_NO_EXCLUDE;
-+
- 	ret = perf_pmu_register(&pmu->pmu, pmu->name, -1);
- 	if (ret)
- 		goto out_destroy;
--- 
-2.7.4
+> 
+> This is the second part of the effort to modernize the at24 driver and
+> remove the legacy platform data structure in favor of device properties.
+> It required getting rid of the at24 setup callback in favor of nvmem
+> lookups.
+> 
+> Re-tested with da850-evm and dm365-evm.
+
+Applied patches 1-11 for v5.1
+
+Thanks,
+Sekhar
+
+> 
+> Bartosz Golaszewski (12):
+>   ARM: davinci: da850-evm: remove dead MTD code
+>   ARM: davinci: mityomapl138: don't read the MAC address from machine
+>     code
+>   ARM: davinci: dm365-evm: use device properties for at24 eeprom
+>   ARM: davinci: da830-evm: use device properties for at24 eeprom
+>   ARM: davinci: dm644x-evm: use device properties for at24 eeprom
+>   ARM: davinci: dm646x-evm: use device properties for at24 eeprom
+>   ARM: davinci: sffsdr: fix the at24 eeprom device name
+>   ARM: davinci: sffsdr: use device properties for at24 eeprom
+>   ARM: davinci: remove dead code related to MAC address reading
+>   ARM: davinci: mityomapl138: use nvmem notifiers
+>   ARM: davinci: mityomapl138: use device properties for at24 eeprom
+>   eeprom: at24: remove at24_platform_data
+> 
+>  MAINTAINERS                                |   1 -
+>  arch/arm/mach-davinci/board-da830-evm.c    |  13 +-
+>  arch/arm/mach-davinci/board-da850-evm.c    |  28 ----
+>  arch/arm/mach-davinci/board-dm365-evm.c    |  13 +-
+>  arch/arm/mach-davinci/board-dm644x-evm.c   |  13 +-
+>  arch/arm/mach-davinci/board-dm646x-evm.c   |  13 +-
+>  arch/arm/mach-davinci/board-mityomapl138.c |  38 ++---
+>  arch/arm/mach-davinci/board-sffsdr.c       |  13 +-
+>  arch/arm/mach-davinci/common.c             |  15 --
+>  drivers/misc/eeprom/at24.c                 | 162 ++++++++++-----------
+>  include/linux/davinci_emac.h               |   1 -
+>  include/linux/platform_data/at24.h         |  60 --------
+>  12 files changed, 122 insertions(+), 248 deletions(-)
+>  delete mode 100644 include/linux/platform_data/at24.h
+> 
+> -- 
+> 2.19.1
+> 
 
 
 _______________________________________________
