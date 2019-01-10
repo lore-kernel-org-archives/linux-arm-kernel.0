@@ -2,100 +2,70 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A9DBFC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 20:55:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AF70FC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 20:56:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 62D48213F2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 20:55:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7B1EF2173B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 20:56:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G5ScK70f"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 62D48213F2
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=de.ibm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Hn7AcZ9H";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="q21SU3o1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7B1EF2173B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Message-Id:In-Reply-To:MIME-Version:
-	References:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Date:Subject:References:To:From:
+	Message-ID:In-Reply-To:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=m77AHDEbCFbMkCyFxjqIGN9h0ft8sGmELomVpt4j3Uw=; b=G5ScK70fpnUpLt
-	kTeN3ZT1PGLwgK/JSZbfhTY+JXy2If2UlvFGLGYaQELZJ5prwsTw6ISFYMTKnucQKp72PDZ9k9IdO
-	INDSYp/3fwntL2sTFbNcEu8EhfoYuOkiyuTJG91rHMkk7+pWnVdKspE/BUL7RczSGFEppbhHbEdgB
-	NTmOOGVo9UK4mYF6JHz+w+xaH01GAMtSirnhTzmzds+mH08PLh7fYWFPvxMFGNm155XwSpYjQmAMr
-	Prn7qClXUv/lvgNDQf9tK1o+fDieRxL3k111r0yfD0bgpQMnVl8E/F0Te5iX3sy6MpxTejr4rF42n
-	gKER/Sz7Ks9+KCnnXWSQ==;
+	List-Owner; bh=kzDEeahww1E9Xc3ialcLvh/EQAEFmT1fNK7xt+MMFaA=; b=Hn7AcZ9HMW4Sc9
+	PVrWaaeecoEk7lcpsdhqU3z/8ZxBG7T/ZgKXFIvAXy0PRap/HXhG8mi5k7HflogYpT+G2iAZXF/3f
+	bbWoRwxIR1/Mql6k4qaFDkKCgLDNiSXHi8YBSKQl9qMHVFqx7Pjb08nNLKEO93BkbcmBuCO9LZ9GM
+	rhVp1tIcxFoBgeox/tGF56abO9g8N0J4mX2FhDTbuyQTGbvy5g7hb3CDp3PuEfMCPoPs9ktQ3R6pl
+	erj87a7wgJd1vo++mhYGeOAEUzES9FtvcbPscOiu+sDG6AyJnDpkYxM1Ut2hEdyF+7KGQtE8RikIK
+	1R92vcRnBX5sNBSomINg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghhMg-0004b0-Vr; Thu, 10 Jan 2019 20:55:46 +0000
-Received: from mx0b-001b2d01.pphosted.com ([148.163.158.5]
- helo=mx0a-001b2d01.pphosted.com)
+	id 1ghhNF-0004sD-Cn; Thu, 10 Jan 2019 20:56:21 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghhMc-0004a4-F9
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 20:55:44 +0000
-Received: from pps.filterd (m0098416.ppops.net [127.0.0.1])
- by mx0b-001b2d01.pphosted.com (8.16.0.22/8.16.0.22) with SMTP id
- x0AKsnG8173047
- for <linux-arm-kernel@lists.infradead.org>; Thu, 10 Jan 2019 15:55:39 -0500
-Received: from e06smtp03.uk.ibm.com (e06smtp03.uk.ibm.com [195.75.94.99])
- by mx0b-001b2d01.pphosted.com with ESMTP id 2pxawjenqc-1
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
- for <linux-arm-kernel@lists.infradead.org>; Thu, 10 Jan 2019 15:55:39 -0500
-Received: from localhost
- by e06smtp03.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
- Violators will be prosecuted
- for <linux-arm-kernel@lists.infradead.org> from <heiko.carstens@de.ibm.com>;
- Thu, 10 Jan 2019 20:55:37 -0000
-Received: from b06cxnps4074.portsmouth.uk.ibm.com (9.149.109.196)
- by e06smtp03.uk.ibm.com (192.168.101.133) with IBM ESMTP SMTP Gateway:
- Authorized Use Only! Violators will be prosecuted; 
- (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
- Thu, 10 Jan 2019 20:55:26 -0000
-Received: from b06wcsmtp001.portsmouth.uk.ibm.com
- (b06wcsmtp001.portsmouth.uk.ibm.com [9.149.105.160])
- by b06cxnps4074.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
- x0AKtPK95439922
- (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
- Thu, 10 Jan 2019 20:55:25 GMT
-Received: from b06wcsmtp001.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id A06FAA4054;
- Thu, 10 Jan 2019 20:55:25 +0000 (GMT)
-Received: from b06wcsmtp001.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 48E49A405C;
- Thu, 10 Jan 2019 20:55:24 +0000 (GMT)
-Received: from osiris (unknown [9.145.24.85])
- by b06wcsmtp001.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
- Thu, 10 Jan 2019 20:55:24 +0000 (GMT)
-Date: Thu, 10 Jan 2019 21:55:22 +0100
-From: Heiko Carstens <heiko.carstens@de.ibm.com>
-To: Arnd Bergmann <arnd@arndb.de>
-Subject: Re: [PATCH 07/11] y2038: syscalls: rename y2038 compat syscalls
-References: <20190110172216.313063-1-arnd@arndb.de>
- <20190110172216.313063-8-arnd@arndb.de>
+ id 1ghhNB-0004rq-QL
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 20:56:19 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id D464020685;
+ Thu, 10 Jan 2019 20:56:16 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1547153776;
+ bh=BZ9pNTo2nlZOpfDEebMsqbdLRiv1TsUD3BVKJX6pDlc=;
+ h=In-Reply-To:From:To:References:Subject:Cc:Date:From;
+ b=q21SU3o1ihcJmY/cpHmPE49isExPV5DCMLllnPo2sJb9+jY08+eHvdi18EdAlJgoS
+ zJfXIFMT4GAfcOYDRzfq1VxoP2GanYHqriVP50iXFzGsnhOzX5vPEv+8dJBHRVCdwr
+ cD+Ezohe8A4lR5c8mI29tAmC4W2s1BJBo9FPsOvA=
 MIME-Version: 1.0
-In-Reply-To: <20190110172216.313063-8-arnd@arndb.de>
-X-TM-AS-GCONF: 00
-x-cbid: 19011020-0012-0000-0000-000002E6217E
-X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
-x-cbparentid: 19011020-0013-0000-0000-0000211D2918
-Message-Id: <20190110205522.GC3676@osiris>
-Content-Disposition: inline
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2019-01-10_08:, , signatures=0
-X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
- priorityscore=1501
- malwarescore=0 suspectscore=1 phishscore=0 bulkscore=0 spamscore=0
- clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
- mlxlogscore=780 adultscore=0 classifier=spam adjust=0 reason=mlx
- scancount=1 engine=8.0.1-1810050000 definitions=main-1901100162
+In-Reply-To: <CACRpkdY_LxF82CbUUnf3B3BVucGvGnnXH-DWcWDmKcU9UgLvpA@mail.gmail.com>
+Message-ID: <154715377593.19284.1463901972122807524@swboyd.mtv.corp.google.com>
+From: Stephen Boyd <sboyd@kernel.org>
+To: Andy Gross <andy.gross@linaro.org>,
+ Linus Walleij <linus.walleij@linaro.org>, Marc Zyngier <Marc.Zyngier@arm.com>,
+ Mark Rutland <mark.rutland@arm.com>, Russell King <rmk+kernel@armlinux.org.uk>
+References: <20181213175952.GC26090@n2100.armlinux.org.uk>
+ <E1gXVHy-00088e-JK@rmk-PC.armlinux.org.uk>
+ <CACRpkdY_LxF82CbUUnf3B3BVucGvGnnXH-DWcWDmKcU9UgLvpA@mail.gmail.com>
+Subject: Re: [PATCH 2/9] ARM: qcom: remove unnecessary boot_lock
+User-Agent: alot/0.8
+Date: Thu, 10 Jan 2019 12:56:15 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_125543_270923_D2D56F8F 
-X-CRM114-Status: GOOD (  18.06  )
+X-CRM114-CacheID: sfid-20190110_125617_867920_9B4C695B 
+X-CRM114-Status: GOOD (  15.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,56 +77,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dalias@libc.org, linux-ia64@vger.kernel.org, linux-sh@vger.kernel.org,
- benh@kernel.crashing.org, will.deacon@arm.com, linux-mips@vger.kernel.org,
- jcmvbkbc@gmail.com, netdev@vger.kernel.org, deepa.kernel@gmail.com,
- hpa@zytor.com, sparclinux@vger.kernel.org, linux-arch@vger.kernel.org,
- linux-s390@vger.kernel.org, y2038@lists.linaro.org, mpe@ellerman.id.au,
- deller@gmx.de, x86@kernel.org, linux@armlinux.org.uk, mingo@redhat.com,
- geert@linux-m68k.org, catalin.marinas@arm.com, firoz.khan@linaro.org,
- mattst88@gmail.com, fenghua.yu@intel.com, linux-fsdevel@vger.kernel.org,
- linux-m68k@lists.linux-m68k.org, luto@kernel.org, tglx@linutronix.de,
- linux-arm-kernel@lists.infradead.org, monstr@monstr.eu, tony.luck@intel.com,
- linux-parisc@vger.kernel.org, linux-api@vger.kernel.org,
- linux-kernel@vger.kernel.org, paul.burton@mips.com, ebiederm@xmission.com,
- linux-alpha@vger.kernel.org, schwidefsky@de.ibm.com, akpm@linux-foundation.org,
- linuxppc-dev@lists.ozlabs.org, davem@davemloft.net
+Cc: Linux-OMAP <linux-omap@vger.kernel.org>, linux-arm-msm@vger.kernel.org,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ David Brown <david.brown@linaro.org>, linux-oxnas@groups.io,
+ "open list:ARM/QUALCOMM SUPPORT" <linux-soc@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 10, 2019 at 06:22:12PM +0100, Arnd Bergmann wrote:
-> diff --git a/arch/s390/kernel/syscalls/syscall.tbl b/arch/s390/kernel/syscalls/syscall.tbl
-> index f84ea364a302..b3199a744731 100644
-> --- a/arch/s390/kernel/syscalls/syscall.tbl
-> +++ b/arch/s390/kernel/syscalls/syscall.tbl
-> @@ -20,7 +20,7 @@
->  10   common	unlink			sys_unlink			compat_sys_unlink
->  11   common	execve			sys_execve			compat_sys_execve
->  12   common	chdir			sys_chdir			compat_sys_chdir
-> -13   32		time			-				compat_sys_time
-> +13   32		time			-				sys_time32
->  14   common	mknod			sys_mknod			compat_sys_mknod
->  15   common	chmod			sys_chmod			compat_sys_chmod
->  16   32		lchown			-				compat_sys_s390_lchown16
-> @@ -30,11 +30,11 @@
->  22   common	umount			sys_oldumount			compat_sys_oldumount
->  23   32		setuid			-				compat_sys_s390_setuid16
->  24   32		getuid			-				compat_sys_s390_getuid16
-> -25   32		stime			-				compat_sys_stime
-> +25   32		stime			-				sys_stime32
->  26   common	ptrace			sys_ptrace			compat_sys_ptrace
->  27   common	alarm			sys_alarm			sys_alarm
->  29   common	pause			sys_pause			sys_pause
-> -30   common	utime			sys_utime			compat_sys_utime
-> +30   common	utime			sys_utime			sys_utime32
-...(and more)...
+Quoting Linus Walleij (2019-01-10 04:50:56)
+> On Thu, Dec 13, 2018 at 7:00 PM Russell King <rmk+kernel@armlinux.org.uk> wrote:
+> 
+> > The boot_lock is something that was required for ARM development
+> > platforms to ensure that the delay calibration worked properly.  This
+> > is not necessary for modern platforms that have better bus bandwidth
+> > and do not need to calibrate the delay loop for secondary cores.
+> > Remove the boot_lock entirely.
+> >
+> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> 
+> Andy have you had a chance to test/apply this patch?
+> 
+> I think the majority of Qcom systems use CLKSRC_QCOM
+> which registers an arch delay timer and swiftly bypasses the
+> calibration anyways so this code is pretty much pointless.
+> 
+> There is a question about MSM8974 though. This appears
+> to not use CLKSRC_QCOM but rather HAVE_ARM_ARCH_TIMER.
+> drivers/clocksource/arm_arch_timer.c seems to
+> not register a delay timer, which is probably something that
+> should be fixed?
+> 
+> Mark/Marc: is there any specific reason to why the ARM arch
+> timer does not register an arch delay timer?
+> 
 
-All of them need compat wrappers to clear the uppermost 33 bits of
-user space pointers. I assume there is no new *32 system call which
-takes u64/s64 arguments; so the pointers should be the only problem.
-
+Doesn't the ARM arch timer get registered in
+arch/arm/kernel/arch_timer.c via arch_timer_delay_timer_register()?
 
 _______________________________________________
 linux-arm-kernel mailing list
