@@ -2,63 +2,60 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 72AADC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 15:57:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A8341C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 16:09:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4420D206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 15:57:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 78B4A206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 16:09:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aL19aHxi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4420D206B7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=tkos.co.il
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t1cIOOuR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 78B4A206B7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:
-	In-reply-to:Subject:To:From:References:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=Mx6FeZPPoYnpwBjzvrn4eLoe8WqGYXUufVK+Qb36pB8=; b=aL19aHxi7aMt+zn64vSqn++92C
-	k+RMcmSVv/VV9HKLgmgseVMgXnGiEgm9fxLEpP9aruSomhADkv/Pf1iueyxnj8saj2QX0tjxm4EFO
-	9AhuaMcSRSnAckIcGF3hGZ1QAwroeG+CUiGby0JHlnyX5jI9qpAVpMPg2SYR1SEkToNCCYh8ByhVK
-	NBhghkWvjMHNcaFl1fvNYPfRTtVGku7Qq1QfrSv+qf8r0Cl3C/Exj0A+hLE+XaowYX0HtiEw+841O
-	MJvAO8pqmgky/qDeh/2JzyLHwjLz+jU8folPiqUyaT0hPUJG6KUADQM8ibNG35qRIWrTxTsTLFjX7
-	JgRz9wJw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=z6YmBooXvZqZQGsX91OzoJAGJ1TDb5CQ7WGSIuLthp0=; b=t1cIOOuRo/+XtU
+	/NCQGdE7+GSkV9we5++GGvXsMpe3z6zpy4AO7FWVK0z3FR5PG/4n9wpqr0kVUz0/OzmsTyhtjMHV2
+	AgCvYOw1GwxRYVrU04p/nAYPbV0pmqmfy8gyL6S3ZgD0P5j1dvTGwelLkhgtUmWpQN6F1qNTWM0+V
+	7tRF2cW430Xa4gGQe/nUudEJPz+MFEeZHMEuyYXttx7EHyiZDSAtIVGXPA8xrewiEolzPgGd52bEO
+	9p/uqFhEruK6jCgcDIcP0NosXzRnBXm5YhI5kZXDFGRVbZA+bufKYab0TCkxM7SQI8qRFbeipPMkV
+	/eM7Cb+FQHjw0FegaG6Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghci6-0001H4-Kg; Thu, 10 Jan 2019 15:57:34 +0000
-Received: from guitar.tcltek.co.il ([192.115.133.116] helo=mx.tkos.co.il)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghci1-0001GL-LT
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 15:57:32 +0000
-Received: from tarshish (unknown [10.0.8.6])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mx.tkos.co.il (Postfix) with ESMTPS id 427FB44087E;
- Thu, 10 Jan 2019 17:57:25 +0200 (IST)
-References: <024cc24efa7b99186750f90c91880b29357d379d.1547123182.git.baruch@tkos.co.il>
- <94cd23a60c647020dd87a923684b59255b89f02c.1547123182.git.baruch@tkos.co.il>
- <20190110125548.GA29612@lunn.ch> <8736q0irwy.fsf@tarshish>
- <20190110131912.GB29612@lunn.ch>
-User-agent: mu4e 1.0; emacs 26.1
-From: Baruch Siach <baruch@tkos.co.il>
-To: Andrew Lunn <andrew@lunn.ch>
-Subject: Re: [PATCH 2/2] PCI: armada8k: don't toggle reset twice
-In-reply-to: <20190110131912.GB29612@lunn.ch>
-Date: Thu, 10 Jan 2019 17:57:24 +0200
-Message-ID: <87zhs8h5ej.fsf@tarshish>
+	id 1ghctd-0005Er-70; Thu, 10 Jan 2019 16:09:29 +0000
+Received: from muru.com ([72.249.23.125])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghctZ-0005E0-Fs
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 16:09:27 +0000
+Received: from atomide.com (localhost [127.0.0.1])
+ by muru.com (Postfix) with ESMTPS id 81B8580E7;
+ Thu, 10 Jan 2019 16:09:26 +0000 (UTC)
+Date: Thu, 10 Jan 2019 08:09:17 -0800
+From: Tony Lindgren <tony@atomide.com>
+To: Sekhar Nori <nsekhar@ti.com>
+Subject: Re: Regression in v4.20 with net phy soft reset changes
+Message-ID: <20190110160917.GY5544@atomide.com>
+References: <20190109190650.GT5544@atomide.com>
+ <a63ca542-db96-40ed-201d-59c609f565ce@gmail.com>
+ <20190109213611.GU5544@atomide.com>
+ <79c57d19-837e-4468-f6b4-b3bfa9dde82a@ti.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <79c57d19-837e-4468-f6b4-b3bfa9dde82a@ti.com>
+User-Agent: Mutt/1.11.1 (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_075729_929369_0FCAE0BC 
-X-CRM114-Status: GOOD (  12.57  )
+X-CRM114-CacheID: sfid-20190110_080925_564353_1EF423FC 
+X-CRM114-Status: GOOD (  18.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,72 +67,66 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-pwm@vger.kernel.org, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- Sven Auhagen <sven.auhagen@voleatech.de>, Jason Cooper <jason@lakedaemon.net>,
- linux-gpio@vger.kernel.org, linux-pci@vger.kernel.org,
- Linus Walleij <linus.walleij@linaro.org>,
- Bartosz Golaszewski <bgolaszewski@baylibre.com>,
- Thierry Reding <thierry.reding@gmail.com>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Bjorn Helgaas <bhelgaas@google.com>,
- Gregory Clement <gregory.clement@bootlin.com>,
- linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Andrew Lunn <andrew@lunn.ch>, Clemens Gruber <clemens.gruber@pqgruber.com>,
+ Florian Fainelli <f.fainelli@gmail.com>,
+ Ivan Khoronzhuk <ivan.khoronzhuk@linaro.org>, WingMan Kwok <w-kwok2@ti.com>,
+ Keerthy <j-keerthy@ti.com>, linux-kernel@vger.kernel.org,
+ Tero Kristo <t-kristo@ti.com>, Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ Murali Karicheri <m-karicheri2@ti.com>, linux-arm-kernel@lists.infradead.org,
+ Rex Chang <rchang@ti.com>, netdev@vger.kernel.org, linux-omap@vger.kernel.org,
+ "David S. Miller" <davem@davemloft.net>, Chris Healy <cphealy@gmail.com>,
+ Heiner Kallweit <hkallweit1@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Andrew,
+* Sekhar Nori <nsekhar@ti.com> [190110 11:52]:
+> On 10/01/19 3:06 AM, Tony Lindgren wrote:
+> > For TI hardware, Sekhar and TI network folks, can you guys
+> > please check the various TI SoCs for multiple suspend resume
+> > cycles with v5.0-rc1 and patch accordingly? See also below
+> 
+> Will do.
 
-On Thu, Jan 10 2019, Andrew Lunn wrote:
->> Sven Auhagen reported the same issue with Intel NIC attached to
->> mini-PCIe slots on a custom Armada 8K design.
+OK thanks!
+
+> I don't see the link problem if I shift to 100Mps prior to the
+> plug/unplug experiment using ethtool. So looks like the problem is
+> restricted to Gigabit link only. Are you using Gigabit link too?
+
+Yes this is a Gigabit link.
+
+> I think we should patch drivers/net/phy/micrel.c to solve the
+> regression. Not sure of the root cause though. In the errata pointed to
+> by Heiner, there is "Module 6" which comes close to what we are seeing,
+> except it talks of a scenario where auto-negotiation is turned off 100M
+> link is used and we see the issue even with auto-neg on and in gigabit
+> mode. "Module 5" is also related to link failure, but is already worked
+> around in kernel with ksz9031_center_flp_timing().
 >
-> O.K. so that suggests the issue is on the Armada side.
->  
->> How would you suggest to investigate this issue?
->
-> I presume reboot works O.K? So it is possible to toggle the reset
-> multiple times, but reboot must do something additional which makes it
-> work? Do you have sources for the bootloader?
+> >>> Keerthy noticed this may not happen on the first resume, but usually
+> >>> happens after few suspend resume cycles. The most working suspend resume
+> >>> cycles I've seen with the commit above is three.
+> > ...
+> >>> Note that unrelated to the commit above, there may be other issues too
+> >>> as the cpsw phy LED seems to come on only after about five seconds with
+> >>> about total of 10 seconds before the Ethernet is up again.
+> 
+> I don't quite see this problem on the AM437x GP EVM. I have seen gigabit
+> link takes quite some time (sometimes more than 10 seconds) on x15 EVM.
+> Not sure if the problem you are facing is related to gigabit too. If you
+> are using gigabit link, can you downgrade to 100MBps to check? Either
+> using a 100M only switch or by using ethtool on the EVM.
+> 
+> $ ethtool -s eth0 speed 100 duplex full
 
-The bootloader is current U-Boot master as BL33 of Marvell provided ATF
-version 18.12, current latest.
+Yes this makes the 10 second resume latency go away on am437x-sk-evm
+here.
 
-> Are there status bits in the comphy about the state of the link? Maybe
-> comphy needs to be kicked to reestablish the link?
+Regards,
 
-Maybe. The U-Boot comphy PCIe initialization routine
-comphy_pcie_power_up() is long and complex.
-
-The ATF code also carries PCIe comphy initialization with this text:
-
-https://github.com/MarvellEmbeddedProcessors/atf-marvell/blob/atf-v1.5-armada-18.12/drivers/marvell/comphy/phy-comphy-cp110.c#L1170
-
-        /* In Armada 8K DB boards, PCIe initialization can be executed
-         * only once (PCIe reset performed during chip power on and
-         * it cannot be executed via GPIO later).
-         * This means that power on can be executed only once, so let's
-         * mark if the caller is bootloader or Linux.
-         * If bootloader -> run power on.
-         * If Linux -> exit.
-         *
-         * TODO: In MacciatoBIN, PCIe reset is connected via GPIO,
-         * so after GPIO reset is added to Linux Kernel, it can be
-         * powered-on by Linux.
-         */
-        if (!called_from_uboot)
-                return ret;
-
-It looks like vendor code is using a similar trick.
-
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch@tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+Tony
 
 _______________________________________________
 linux-arm-kernel mailing list
