@@ -2,76 +2,74 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 47E1CC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 22:16:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1A952C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 22:42:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 11AA1208E3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 22:16:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D747F2063F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 22:42:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SWaoGLrO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 11AA1208E3
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UXnrnzGy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D747F2063F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=XT/GxWsP4YLK5VbVRQNnWaVJUT638UbHlWd1g/UdPhI=; b=SWaoGLrOhfnq1G
-	DYVzFdiCW37nKJbSk2I8eaxt/x5RUuJUFjCq8pUm3YGhHSRbtCJhc+o2cBoLWEC1WCzVLBxRVsvgf
-	2OAp3HbWeGg7q6A0zzFcEZI8NabybCGfO1/S30b3nkwCr9itvMz339mC1jM/Q5r3s6qZ7TGFcsyVN
-	N65D46beCuIFC6YnAkCbABtE4SrOC2cOfFYLZ6KUq9tA14zEurx/32ujopp6zkDxmqmvnzXijJTvC
-	u3MBKdxTOGJAEc5WM2Olf1Zsc9F3CPtI4++OM+nKILJLlGYe5RXhGcqwkEWgaBDQW5ZUkBIwmfxZu
-	4yLKCLlUmGQidFPThKwg==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=5fg2dY2A7ioKCSBEd+45dEPIO6GeZloEBmutWFXVwVk=; b=UXnrnzGyf/xoGc
+	leLO3OLDr8+gqcYwY1UKmhRA7mvTAW8KDqy2ExFME7Mrmk6yW6WDyZsZRaf1rFLCF8bdVlaV7m5aw
+	WHN4BMI2nim5CXlBTwyVXLoV8u10jbyao25OHZFER0WW4SDHROkKznD1raKDyY8M+IgwWmHNbdxXp
+	P6SKmHVESkKOeouomSWjqaLDXT+SSGi0XDaX4iefVXzq3yXACKfJbpwAV/GN5oMidqmzRT7cUo7wt
+	8AjP0wlVcne5r962KCyFKjYLY6F3tCsKFQGRBa96knTX6TV21woeIg1rHyydjWujYeRioKApVt2Hp
+	sYZq1eaXhrv+YEYysuTQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghics-0000Gp-Rw; Thu, 10 Jan 2019 22:16:34 +0000
-Received: from mail-oi1-f196.google.com ([209.85.167.196])
+	id 1ghj2O-0007yR-Ge; Thu, 10 Jan 2019 22:42:56 +0000
+Received: from mail-qt1-f196.google.com ([209.85.160.196])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghicp-0000GP-FH
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 22:16:33 +0000
-Received: by mail-oi1-f196.google.com with SMTP id m6so10601563oig.11
+ id 1ghj2K-0007xW-KB
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 22:42:54 +0000
+Received: by mail-qt1-f196.google.com with SMTP id r14so15913878qtp.1
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 10 Jan 2019 14:16:30 -0800 (PST)
+ Thu, 10 Jan 2019 14:42:50 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=FUzrvJeCP/Uefe73lE9qVhQ6gchhxLspPlMJYTQFUYk=;
- b=JX188Z/V6YlwDIfHsF87ACU7McbFiU1rU01Pk8D3fkkTyYnXbQYPfqAO/vr1wBjEkP
- 7/xrzwlQ8ebr9xYn8JgRjZsjWS5aXOygqY5UF3FEUnjFFW//FNYjvOzs+6arSd5Br7dD
- hjw+aj5TrvIhB24yV4C8XFot5HbUEpZeRJYJeqRpSa8mZsr4dZHSzTFyCfzVgeh/a0hr
- /1j9l31B9+cci8qHfixm2guBntSuyTpqUjrD3Qv0Y7s4GBQYvSaXYGJ+1Pp5B/7PdJ21
- xGEpD8x2eTUoMWrwOsYBFbyxxg+rw6he8X86GClMduXeAl7aFqbbZ8Ny548T77BlKMG9
- hR4w==
-X-Gm-Message-State: AJcUukdLERbObjUMxKV1lITBB+iZ2+SGjnqKg2OqQv84VrdLh+kekVYC
- bI3G1bRhJGbKAflagzgYUg==
-X-Google-Smtp-Source: ALg8bN7Xt7+BBCXLQ2orGqHjFrpjaVVQ7W9X+OKjQzs5ZaQrufVTwKAKhO2gToMUMlM1qoKu06KtxQ==
-X-Received: by 2002:aca:a86:: with SMTP id k6mr7957399oiy.334.1547158589407;
- Thu, 10 Jan 2019 14:16:29 -0800 (PST)
-Received: from xps15.herring.priv (24-155-109-49.dyn.grandenetworks.net.
- [24.155.109.49])
- by smtp.googlemail.com with ESMTPSA id v3sm69035242oib.57.2019.01.10.14.16.28
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 10 Jan 2019 14:16:28 -0800 (PST)
-From: Rob Herring <robh@kernel.org>
-To: Will Deacon <will.deacon@arm.com>
-Subject: [PATCH v3] dt-bindings: arm: Convert PMU binding to json-schema
-Date: Thu, 10 Jan 2019 16:16:28 -0600
-Message-Id: <20190110221628.25021-1-robh@kernel.org>
-X-Mailer: git-send-email 2.19.1
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=yNKid8601Q74qbqdVMhf8FUFM1MYtF3TJK3jK7Mp7Ng=;
+ b=F/Fp+Dy0Z4NaXe7Hr4rLOizznW9zz/EqKYeAyU3+GHb1kpXFlYxruHwmr/HyXUbIPz
+ CDfFYL/0g2eIMir+1tbM0fGEpxm+LY7MOAnBw00IIG2XLQNGmBkKtxp5b/j9DVOIYhkJ
+ 7sNYcdd5LXRuOHXLTZnkq4Y8JkCre5gJGg8Dwv8mBV3BZ/vqGhI4jmzLUNW8NEaLRT6u
+ uf4WC4mfeYtRblGMg6+DTCp5Cc7QBVNecvPOF/qScpNv9mqFOQg61Cw+rfzK1AlOVyb1
+ B56BTpRbhKc0bB9MekRTc5WMJiBE315pFUUVgvIo2roMU2TDGPkxOBTbp+DwmIxywkmk
+ b/LA==
+X-Gm-Message-State: AJcUukfxzAzXlWxh1XaFNueOTcQZuYdsozLrvTq6fd/tpd1sykL3gv3v
+ Zc3OxeAKDDdfEmNNuoo3b4Fg78rBritzotcJHfE=
+X-Google-Smtp-Source: ALg8bN4wMR/sIxtpNUyojzYiti1ruSkqKLKoKXLZmlthH3ilc8ugAlgx3EsdaYVXiGEAkGXDoaecVD7bYSRnjKp5c14=
+X-Received: by 2002:a37:bdc6:: with SMTP id
+ n189mr10790675qkf.330.1547160169972; 
+ Thu, 10 Jan 2019 14:42:49 -0800 (PST)
 MIME-Version: 1.0
+References: <20190110162435.309262-1-arnd@arndb.de>
+ <alpine.DEB.2.21.1901101808220.31458@digraph.polyomino.org.uk>
+In-Reply-To: <alpine.DEB.2.21.1901101808220.31458@digraph.polyomino.org.uk>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Thu, 10 Jan 2019 23:42:32 +0100
+Message-ID: <CAK8P3a2f4SCJXrm6HWO9UKY-akSW+ONNpOvQOtYbia_fRo9ciQ@mail.gmail.com>
+Subject: Re: [PATCH 00/15] arch: synchronize syscall tables in preparation for
+ y2038
+To: Joseph Myers <joseph@codesourcery.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_141631_512310_281C83B8 
-X-CRM114-Status: GOOD (  20.23  )
+X-CRM114-CacheID: sfid-20190110_144252_668904_64BC8729 
+X-CRM114-Status: GOOD (  14.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,219 +81,72 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: Rich Felker <dalias@libc.org>, linux-ia64@vger.kernel.org,
+ Linux-sh list <linux-sh@vger.kernel.org>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>,
+ Dominik Brodowski <linux@dominikbrodowski.net>, linux-mips@vger.kernel.org,
+ Max Filippov <jcmvbkbc@gmail.com>, Deepa Dinamani <deepa.kernel@gmail.com>,
+ "H. Peter Anvin" <hpa@zytor.com>, sparclinux <sparclinux@vger.kernel.org>,
+ linux-s390 <linux-s390@vger.kernel.org>, Davidlohr Bueso <dave@stgolabs.net>,
+ y2038 Mailman List <y2038@lists.linaro.org>,
+ Michael Ellerman <mpe@ellerman.id.au>, Helge Deller <deller@gmx.de>,
+ the arch/x86 maintainers <x86@kernel.org>,
+ Russell King - ARM Linux <linux@armlinux.org.uk>,
+ Ingo Molnar <mingo@redhat.com>, Geert Uytterhoeven <geert@linux-m68k.org>,
+ Firoz Khan <firoz.khan@linaro.org>, Matt Turner <mattst88@gmail.com>,
+ Fenghua Yu <fenghua.yu@intel.com>, Will Deacon <will.deacon@arm.com>,
+ linux-m68k <linux-m68k@lists.linux-m68k.org>,
+ Ivan Kokshaysky <ink@jurassic.park.msu.ru>, Andy Lutomirski <luto@kernel.org>,
+ Thomas Gleixner <tglx@linutronix.de>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Michal Simek <monstr@monstr.eu>, Tony Luck <tony.luck@intel.com>,
+ Parisc List <linux-parisc@vger.kernel.org>,
+ Linux API <linux-api@vger.kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Paul Burton <paul.burton@mips.com>,
+ "Eric W . Biederman" <ebiederm@xmission.com>,
+ alpha <linux-alpha@vger.kernel.org>,
+ Martin Schwidefsky <schwidefsky@de.ibm.com>,
+ Andrew Morton <akpm@linux-foundation.org>,
+ linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
+ David Miller <davem@davemloft.net>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Convert ARM PMU binding to DT schema format using json-schema.
+On Thu, Jan 10, 2019 at 7:10 PM Joseph Myers <joseph@codesourcery.com> wrote:
+>
+> On Thu, 10 Jan 2019, Arnd Bergmann wrote:
+>
+> > - Add system calls that have not yet been integrated into all
+> >   architectures but that we definitely want there.
+>
+> glibc has a note that alpha lacks statfs64, any plans for that?
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: linux-arm-kernel@lists.infradead.org
-Cc: devicetree@vger.kernel.org
-Signed-off-by: Rob Herring <robh@kernel.org>
----
-v3:
-- Don't allow arm,cortex-a15-pmu to be a fallback for arm,cortex-a7-pmu
-- Update MAINTAINERS
+Good catch, I missed that because all other 64-bit architectures
+have a statfs() call with 64-bit fields. I see that it also has an
+osf_statfs64 structure and system call with lots of padding and some
+oddly sized fields: f_type, f_flags and f_namemax are only 16 bits
+wide, the rest is all 64-bit.
 
-Will, you can take this.
+Adding the regular statfs64() should be easy enough, we just need to
+decide which layout to use:
 
- Documentation/devicetree/bindings/arm/pmu.txt | 70 ---------------
- .../devicetree/bindings/arm/pmu.yaml          | 87 +++++++++++++++++++
- MAINTAINERS                                   |  2 +-
- 3 files changed, 88 insertions(+), 71 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/arm/pmu.txt
- create mode 100644 Documentation/devicetree/bindings/arm/pmu.yaml
+a) use the currently unused 'struct statfs64' as provided by the
+    alpha uapi headers, which has a 32-bit __statfs_word but
+    64-bit f_blocks, f_bfree, f_bavail, f_files, and f_ffree.
 
-diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
-deleted file mode 100644
-index 13611a8199bb..000000000000
---- a/Documentation/devicetree/bindings/arm/pmu.txt
-+++ /dev/null
-@@ -1,70 +0,0 @@
--* ARM Performance Monitor Units
--
--ARM cores often have a PMU for counting cpu and cache events like cache misses
--and hits. The interface to the PMU is part of the ARM ARM. The ARM PMU
--representation in the device tree should be done as under:-
--
--Required properties:
--
--- compatible : should be one of
--	"apm,potenza-pmu"
--	"arm,armv8-pmuv3"
--	"arm,cortex-a73-pmu"
--	"arm,cortex-a72-pmu"
--	"arm,cortex-a57-pmu"
--	"arm,cortex-a53-pmu"
--	"arm,cortex-a35-pmu"
--	"arm,cortex-a17-pmu"
--	"arm,cortex-a15-pmu"
--	"arm,cortex-a12-pmu"
--	"arm,cortex-a9-pmu"
--	"arm,cortex-a8-pmu"
--	"arm,cortex-a7-pmu"
--	"arm,cortex-a5-pmu"
--	"arm,arm11mpcore-pmu"
--	"arm,arm1176-pmu"
--	"arm,arm1136-pmu"
--	"brcm,vulcan-pmu"
--	"cavium,thunder-pmu"
--	"qcom,scorpion-pmu"
--	"qcom,scorpion-mp-pmu"
--	"qcom,krait-pmu"
--- interrupts : 1 combined interrupt or 1 per core. If the interrupt is a per-cpu
--               interrupt (PPI) then 1 interrupt should be specified.
--
--Optional properties:
--
--- interrupt-affinity : When using SPIs, specifies a list of phandles to CPU
--                       nodes corresponding directly to the affinity of
--		       the SPIs listed in the interrupts property.
--
--                       When using a PPI, specifies a list of phandles to CPU
--		       nodes corresponding to the set of CPUs which have
--		       a PMU of this type signalling the PPI listed in the
--		       interrupts property, unless this is already specified
--		       by the PPI interrupt specifier itself (in which case
--		       the interrupt-affinity property shouldn't be present).
--
--                       This property should be present when there is more than
--		       a single SPI.
--
--
--- qcom,no-pc-write : Indicates that this PMU doesn't support the 0xc and 0xd
--                     events.
--
--- secure-reg-access : Indicates that the ARMv7 Secure Debug Enable Register
--		      (SDER) is accessible. This will cause the driver to do
--		      any setup required that is only possible in ARMv7 secure
--		      state. If not present the ARMv7 SDER will not be touched,
--		      which means the PMU may fail to operate unless external
--		      code (bootloader or security monitor) has performed the
--		      appropriate initialisation. Note that this property is
--		      not valid for non-ARMv7 CPUs or ARMv7 CPUs booting Linux
--		      in Non-secure state.
--
--Example:
--
--pmu {
--        compatible = "arm,cortex-a9-pmu";
--        interrupts = <100 101>;
--};
-diff --git a/Documentation/devicetree/bindings/arm/pmu.yaml b/Documentation/devicetree/bindings/arm/pmu.yaml
-new file mode 100644
-index 000000000000..52ae094ce330
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/pmu.yaml
-@@ -0,0 +1,87 @@
-+# SPDX-License-Identifier: GPL-2.0
-+%YAML 1.2
-+---
-+$id: http://devicetree.org/schemas/arm/pmu.yaml#
-+$schema: http://devicetree.org/meta-schemas/core.yaml#
-+
-+title: ARM Performance Monitor Units
-+
-+maintainers:
-+  - Mark Rutland <mark.rutland@arm.com>
-+  - Will Deacon <will.deacon@arm.com>
-+
-+description: |+
-+  ARM cores often have a PMU for counting cpu and cache events like cache misses
-+  and hits. The interface to the PMU is part of the ARM ARM. The ARM PMU
-+  representation in the device tree should be done as under:-
-+
-+properties:
-+  compatible:
-+    items:
-+      - enum:
-+          - apm,potenza-pmu
-+          - arm,armv8-pmuv3
-+          - arm,cortex-a73-pmu
-+          - arm,cortex-a72-pmu
-+          - arm,cortex-a57-pmu
-+          - arm,cortex-a53-pmu
-+          - arm,cortex-a35-pmu
-+          - arm,cortex-a17-pmu
-+          - arm,cortex-a15-pmu
-+          - arm,cortex-a12-pmu
-+          - arm,cortex-a9-pmu
-+          - arm,cortex-a8-pmu
-+          - arm,cortex-a7-pmu
-+          - arm,cortex-a5-pmu
-+          - arm,arm11mpcore-pmu
-+          - arm,arm1176-pmu
-+          - arm,arm1136-pmu
-+          - brcm,vulcan-pmu
-+          - cavium,thunder-pmu
-+          - qcom,scorpion-pmu
-+          - qcom,scorpion-mp-pmu
-+          - qcom,krait-pmu
-+
-+  interrupts:
-+    # Don't know how many CPUs, so no constraints to specify
-+    description: 1 per-cpu interrupt (PPI) or 1 interrupt per core.
-+
-+  interrupt-affinity:
-+    $ref: /schemas/types.yaml#/definitions/phandle-array
-+    description:
-+      When using SPIs, specifies a list of phandles to CPU
-+      nodes corresponding directly to the affinity of
-+      the SPIs listed in the interrupts property.
-+
-+      When using a PPI, specifies a list of phandles to CPU
-+      nodes corresponding to the set of CPUs which have
-+      a PMU of this type signalling the PPI listed in the
-+      interrupts property, unless this is already specified
-+      by the PPI interrupt specifier itself (in which case
-+      the interrupt-affinity property shouldn't be present).
-+
-+      This property should be present when there is more than
-+      a single SPI.
-+
-+  qcom,no-pc-write:
-+    type: boolean
-+    description:
-+      Indicates that this PMU doesn't support the 0xc and 0xd events.
-+
-+  secure-reg-access:
-+    type: boolean
-+    description:
-+      Indicates that the ARMv7 Secure Debug Enable Register
-+      (SDER) is accessible. This will cause the driver to do
-+      any setup required that is only possible in ARMv7 secure
-+      state. If not present the ARMv7 SDER will not be touched,
-+      which means the PMU may fail to operate unless external
-+      code (bootloader or security monitor) has performed the
-+      appropriate initialisation. Note that this property is
-+      not valid for non-ARMv7 CPUs or ARMv7 CPUs booting Linux
-+      in Non-secure state.
-+
-+required:
-+  - compatible
-+
-+...
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 39fcdbf38969..3f15010e5883 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1159,7 +1159,7 @@ F:	arch/arm*/include/asm/hw_breakpoint.h
- F:	arch/arm*/include/asm/perf_event.h
- F:	drivers/perf/*
- F:	include/linux/perf/arm_pmu.h
--F:	Documentation/devicetree/bindings/arm/pmu.txt
-+F:	Documentation/devicetree/bindings/arm/pmu.yaml
- F:	Documentation/devicetree/bindings/perf/
- 
- ARM PORT
--- 
-2.19.1
+b) copy asm-generic/statfs.h to the alpha asm/statfs.h and
+    change statfs64 to have the regular layout that we use
+    on all other 64-bit architectures, using all 64-bit fields.
 
+The other open question for alpha (as mentioned in one of the
+patches I sent) would be whether to add get{eg,eu,g,p,pp,u}id()
+with the regular calling conventions.
+
+       Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
