@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7125EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 18:20:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C0152C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 18:21:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 470AB20675
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 18:20:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 891F620675
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 18:21:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SUDp2G6v"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 470AB20675
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XGs0u1YX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 891F620675
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,45 +24,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:References:To:Subject:From:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=JRMf1t6yHE0LDtr+K9u2tDQPmTX5Vr6mgzRQ/+bhU1Q=; b=SUDp2G6vn2y4Lo
-	qbjqj4ncEgTm7LMqOnuMmdGGdhKaAyFG6DEeHp2EXrT+1JJO//H6no7bnhLKsPw5a7cE5YA/rNQbD
-	/wExM009eFhH2Eip4dzSbe2LQWBRPvfFWo16uqaCmevH+TMaehHHCoog4JczSv0RkS/WEMyPLkdFU
-	aNW2gsf5yvgYu42lFHbrVD30mujOXJksXLkpnUJxR6/1W9Q/oYZmJIya7RC4Uq5l+N+INI0mSBh4M
-	6sRed5zD0AiqCuAKlfaucoZmqjFnCkJAOYtpIh2ZkY5ENMohQjDnYf3n+VegtM6yObhQgyug7Z+eY
-	TCL5z8STKl33vd0VG8jA==;
+	List-Owner; bh=dzdy+MqvbUAbqCgwudQPYcyI/Lw3t2dnj47KOPTk5dk=; b=XGs0u1YXAp/WCm
+	kea4krrKreQ8v2TO9pTrXoAPyZs3eBSebYEvHsZMHiIPFolBQGduu6N2+W0T5+YsvBomGvKuhxjGS
+	4V3QfSEqTEmgdE/rmuFzAtI2DczenswX+qw76LPMUHncuZECR0S1CSjT/xaf5Al3ZCVZWTgDDVtla
+	hKsGrAW3hZe2KUSFqLpzS1cKUGhZnuAdDJSR6hfjpqt8GxwCG1yyr5/djepsF8HWvrcjZ/smaOSJD
+	7hOfTs4CoAH2U19bE2XhoW6Xn3Ylv0V9ZoY9tD897i+oyFBuXSGqhbmHf5Is5TbDchDqLeZTyQn0o
+	xrJFOV4uGmdTViUIPOuQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghewg-00043Y-Dh; Thu, 10 Jan 2019 18:20:46 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1ghexN-0004N5-Sk; Thu, 10 Jan 2019 18:21:29 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghewc-00042v-D4
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 18:20:45 +0000
+ id 1ghexJ-0004MW-L4
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 18:21:28 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id BA80AA78;
- Thu, 10 Jan 2019 10:20:39 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 67010A78;
+ Thu, 10 Jan 2019 10:21:25 -0800 (PST)
 Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 2540C3F694;
- Thu, 10 Jan 2019 10:20:37 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id D43DF3F694;
+ Thu, 10 Jan 2019 10:21:22 -0800 (PST)
 From: James Morse <james.morse@arm.com>
-Subject: Re: [PATCH v7 04/25] ACPI / APEI: Make hest.c manage the estatus
- memory pool
+Subject: Re: [PATCH v7 09/25] ACPI / APEI: Generalise the estatus queue's
+ notify code
 To: Borislav Petkov <bp@alien8.de>
 References: <20181203180613.228133-1-james.morse@arm.com>
- <20181203180613.228133-5-james.morse@arm.com>
- <20181211164802.GI27375@zn.tnic>
- <ad48f9a1-404e-7878-3173-f8a4a417a723@arm.com>
- <20181219144234.GA31643@zn.tnic>
-Message-ID: <7f1621ac-09ba-71c0-d47d-e9ad61660307@arm.com>
-Date: Thu, 10 Jan 2019 18:20:35 +0000
+ <20181203180613.228133-10-james.morse@arm.com>
+ <20181211174449.GM27375@zn.tnic>
+Message-ID: <3f0f9005-f383-8a03-c7f9-15b50c099f94@arm.com>
+Date: Thu, 10 Jan 2019 18:21:21 +0000
 User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
  Thunderbird/60.3.1
 MIME-Version: 1.0
-In-Reply-To: <20181219144234.GA31643@zn.tnic>
+In-Reply-To: <20181211174449.GM27375@zn.tnic>
 Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_102042_454582_CE6ADB02 
-X-CRM114-Status: GOOD (  21.14  )
+X-CRM114-CacheID: sfid-20190110_102125_696249_433603E1 
+X-CRM114-Status: GOOD (  16.45  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,93 +86,60 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 Hi Boris,
 
-On 19/12/2018 14:42, Borislav Petkov wrote:
-> On Fri, Dec 14, 2018 at 01:56:16PM +0000, James Morse wrote:
->> /me digs a bit,
+On 11/12/2018 17:44, Borislav Petkov wrote:
+> On Mon, Dec 03, 2018 at 06:05:57PM +0000, James Morse wrote:
+>> Refactor the estatus queue's pool notification routine from
+>> NOTIFY_NMI's handlers. This will allow another notification
+>> method to use the estatus queue without duplicating this code.
 >>
->> ghes_estatus_pool_init() allocates memory from hest_ghes_dev_register().
->> Its caller is behind a 'if (!ghes_disable)' in acpi_hest_init(), and is after
->> another 2 calls to apei_hest_parse().
+>> This patch adds rcu_read_lock()/rcu_read_unlock() around the list
+> 
+> s/This patch adds/Add/
+> 
+>> list_for_each_entry_rcu() walker. These aren't strictly necessary as
+>> the whole nmi_enter/nmi_exit() window is a spooky RCU read-side
+>> critical section.
 >>
->> If ghes_disable is set, we don't call this thing.
->> If hest_disable is set, acpi_hest_init() exits early.
->> If we don't have a HEST table, acpi_hest_init() exits early.
->>
->> ... if the HEST table doesn't have any GHES entries, hest_ghes_dev_register() is
->> called with ghes_count==0, and does nothing useful. (kmalloc_alloc_array(0,...)
->> great!) But we do call ghes_estatus_pool_init().
->>
->> I think a check that ghes_count is non-zero before calling
->> hest_ghes_dev_register() is the cleanest way to avoid this.
-> 
-> Grrr, what an effing mess that code is! There's hest_disable *and*
-> ghes_disable. Do we really need them both?
+>> _in_nmi_notify_one() is separate from the rcu-list walker for a later
+>> caller that doesn't need to walk a list.
 
-ghes_disable lets you ignore the firmware-first notifications, but still 'use'
-the other error sources:
-drivers/pci/pcie/aer.c picks out the three AER types, and uses apei_hest_parse()
-to know if firmware is controlling AER, even if ghes_disable is set.
+>> +static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
+>> +{
+>> +	int ret = NMI_DONE;
+>> +
+>> +	if (!atomic_add_unless(&ghes_in_nmi, 1, 1))
+>> +		return ret;
+>> +
+>> +	if (!ghes_estatus_queue_notified(&ghes_nmi))
+>> +		ret = NMI_HANDLED;
+> 
+> So this reads kinda the other way around, at least to me:
+> 
+> 	"if the queue was *not* notified, the NMI was handled."
+> 
+> Maybe rename to this:
+> 
+> 	err = process_queue(&ghes_nmi);
+> 	if (!err)
+> 		ret = NMI_HANDLED;
+> 
+> to make it clearer...
 
-x86's arch_apei_enable_cmcff() looks like it disables MCE to get firmware to
-handle them. hest_disable would stop this, but instead ghes_disable keeps that,
-and stops the NOTIFY_NMI being registered.
+(yup, that's clearer).
 
+But now we've opened pandora's box of naming-things: This thing isn't really
+processing anything, its walking a list of 'maybe it was one of these' and
+copying anything it finds into the estatus-queue to be handled later.
 
-> With my simplifier hat on I wanna say, we should have a single switch -
-> apei_disable - and kill those other two. What a damn mess that is.
+I've evidently overloaded 'notified' to mean this.
+__process_error() doesn't process anything either, it does the add-to-queue.
 
-(do you consider cmdline arguments as ABI, or hard to justify and hard to remove?)
+'spool' is the word that best conveys what's going on here, I should probably
+use that 'in_nmi' prefix more to make it clear this has to be nmi safe.
 
-I don't think its broken enough to justify ripping them out. A user of
-ghes_disable would be someone with broken firmware-first handling of AER. They
-need to know firmware is changing the register values behind their back (so need
-to parse the HEST), but want to ignore the junk notifications. It doesn't sound
-like an unlikely scenario.
+Something like:
+ghes_notify_nmi() -> in_nmi_spool_from_list(list) -> in_nmi_queue_one_entry(ghes).
 
-
->> I wanted the estatus pool to be initialised before creating the platform devices
->> in case the order of these things is changed in the future and they get probed
->> immediately, before the pool is initialised.
-> 
-> Hmmm.
-> 
-> Actually, I meant flipping those two calls:
-> 
->         rc = ghes_estatus_pool_init(ghes_count);
->         if (rc)
->                 goto out;
-> 
->         rc = apei_hest_parse(hest_parse_ghes, &ghes_arr);
->         if (rc)
->                 goto err;
-> 
-> to
-> 
->         rc = apei_hest_parse(hest_parse_ghes, &ghes_arr);
->         if (rc)
->                 goto err;
-> 
->         rc = ghes_estatus_pool_init(ghes_count);
->         if (rc)
->                 goto out;
-> 
-> so as not to alloc the pool unnecessarily if the parsing fails.
-> 
-> Also, AFAICT, the order you have them in now might be a problem anyway
-> if
-> 
-> 	apei_hest_parse(hest_parse_ghes, &ghes_arr);
-> 
-> fails because then you goto err and and that pool leaks, right?
-
-Right, yes. I've been ignoring errors like this on the probe path as it implies
-you've got busted ACPI tables, or so little memory you're never going to make it
-to user-space. I was more worried about ghes_probe() trying to use the pool
-memory before its been allocated. I doesn't seem right to register the device if
-the driver wouldn't work yet. But one is an subsys_initcall(), the drivers is
-device_initcall(), which is obvious enough.
-
-Fixed.
 
 
 Thanks,
