@@ -2,87 +2,72 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D7221C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 07:05:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A8776C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 07:24:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A597820657
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 07:05:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 736F8206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 07:24:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ii8AZJ1b";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="NWiHu74X"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A597820657
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ud/a5Oza"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 736F8206B7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=yYBY+c9ZdkRl5CWupJP7gBeIomIf7vIV9cW9Y5miajc=; b=Ii8AZJ1bMP/oAY
-	yudb8j6j7hDCdvFXms9kxeuosM1G+CEkR8WjiM3HCm7QzHpcw2CZyU6sU6jh8lTb4MgR8A6JhXjxp
-	UmBjL8jPMlwedIHCGfU74BoZaIQzXxSiw/JBFWcGHOtMfrpSW/5TN1i+DDKGf4yiBojUofCHIeJ7D
-	HtEVxtO6PjHwSQ0kw144aE0NvuReD9OW9LRdxhScDRhBfYj28+cGliOx7IGvJLSzi5vgLsXyiUG3e
-	UZXqeE6vCDsCEyOhS4KMiuCYs2bcCdMa4IPV7I/XMmYQfnlHn+zKEjtTjNfbMxLWEw2+Q1wNjRUcc
-	wlqTij6qBVZYJQRSKrxg==;
+	List-Owner; bh=pOELlPkkshJOYZmDPBZ5DnovNR9eMI5SrYqNF9xfkzk=; b=ud/a5OzayC92RY
+	ZLrRnBhC6blFaz8bmRGaMfloWknaOyAfJMdbp31FAJiunY7CqQ1kl1UguoSNvplrcTzxEmgDnd7XL
+	J9K61qm4PJJzhwhg3mUwoDL6OeNcG6wyhq/n64kbQkC/CoBoIeGURvb1qEJJj6mA+PQZ+dcOInZIr
+	blXfCgePQlnFEL0/ozSpui2F8QiZbksi00i72038OPe4ox2tdZCdq2JU4s09BiMUBsszZWPx5BMuA
+	J5UWbLbj6aBoQITOISnPc/BocZAGe+wUItwlXcgM+q8sksnW28aWSgkkUVlV6OHA5eWn7CP8GO/bV
+	LjnTQWdX3TfKBMJZHItA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghUPN-0001Ub-OJ; Thu, 10 Jan 2019 07:05:41 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1ghUhj-0008B9-VB; Thu, 10 Jan 2019 07:24:39 +0000
+Received: from mailgw01.mediatek.com ([216.200.240.184])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghUPJ-0001U5-GP; Thu, 10 Jan 2019 07:05:39 +0000
-Received: by mail-wr1-x441.google.com with SMTP id t27so10071653wra.6;
- Wed, 09 Jan 2019 23:05:37 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=Mpbsgn3w8p9zXJCd57n/3W1Sd7O4KtTN2ExuRO+aA1c=;
- b=NWiHu74Xhr7jGonsEUS6Q/0xm5tZ+aH8VzIFNe4d83TMfZpfUuE0aDkWbmnLafThj1
- V6tr7fdB0qTa62SWGiD/zHJ59IoU9C25XHL1xVc8jUvsU+G28hi/Wp0gs9SAVy9OSvbw
- w5rH+0siDgHU4yT8bRh2RYXb/hJ5En7WuNDxUVQq9/ykPj/L+IcpvqLtAusakGJqE6b/
- vle4NUrm/2e1qy1hRG5b5Cu8AGDyR7SRglWL5c2A1sFvpjUif3My59cuPwfhtF+/vhDL
- 9C9MwEIHFWkm0lk8pbETg6U9KRwRAFRh86zvcWcLi8EkIN7zXWATizlxAF0rOURHTGA7
- WEJw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=Mpbsgn3w8p9zXJCd57n/3W1Sd7O4KtTN2ExuRO+aA1c=;
- b=ZOoJW7Ow0EyOGDegLHpWHNOqP6Cq0P3FFH79bqrV5dDRw0peQNDHXvekFEzbOpSD1A
- wYAFSXnSM/jFc9wcfQQ1OY08dKEM9FWa1+Tiqws4aCO/jK6vrk34y3M1o28TYpruvN5n
- HUuGADReySbUJZ/2g9RZAAAhNOJ4kwWs5hU73QOro1Otme67gl/xS0ixeiieqrijsD2l
- f/q/bi9Ip81ALeoCeGHl0Yr8hcw7ONO+XzZnCSgCIPbCRUPTJXeTEN2kqu0guvY1GXkF
- lg5wmqy+DYHlrUKRI/vsgM0yao13r36V+5Ug+Oe5saSOJtWy5O5VZYPSkweNkUEMopgs
- 0WCQ==
-X-Gm-Message-State: AJcUukeYjC8McJSmcJ2VJ7EydfkJeWF44zToLMcf0yyHPJ8tSEpIm2NS
- jz8Cb3T+CIZduWtDb7rxUhgA3nNU4VfzqXCpypI=
-X-Google-Smtp-Source: ALg8bN4ojphochaZ37BQILrukvLHP/BFE/c+xKheHBwXBP4TQp+vGZEx7N+VnUaee7o10Vz63nL6QLijNwA5c6YDcjY=
-X-Received: by 2002:adf:c108:: with SMTP id r8mr8136299wre.233.1547103935687; 
- Wed, 09 Jan 2019 23:05:35 -0800 (PST)
+ id 1ghUhe-00089n-Qs; Thu, 10 Jan 2019 07:24:37 +0000
+X-UUID: d6c8c01e3ba740a9b7e071005b1aebe7-20190109
+X-UUID: d6c8c01e3ba740a9b7e071005b1aebe7-20190109
+Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw01.mediatek.com
+ (envelope-from <min.guo@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 1773024293; Wed, 09 Jan 2019 23:24:27 -0800
+Received: from MTKMBS31DR.mediatek.inc (172.27.6.102) by
+ MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Wed, 9 Jan 2019 23:24:25 -0800
+Received: from MTKCAS36.mediatek.inc (172.27.4.186) by MTKMBS31DR.mediatek.inc
+ (172.27.6.102) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
+ Thu, 10 Jan 2019 15:24:23 +0800
+Received: from [10.17.3.153] (10.17.3.153) by MTKCAS36.mediatek.inc
+ (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Thu, 10 Jan 2019 15:24:22 +0800
+Message-ID: <1547105062.4433.144.camel@mhfsdcap03>
+Subject: Re: [PATCH 4/4] usb: musb: Add support for MediaTek musb controller
+From: Min Guo <min.guo@mediatek.com>
+To: Bin Liu <b-liu@ti.com>
+Date: Thu, 10 Jan 2019 15:24:22 +0800
+In-Reply-To: <20190109140144.GI25910@uda0271908>
+References: <1545896066-897-1-git-send-email-min.guo@mediatek.com>
+ <1545896066-897-5-git-send-email-min.guo@mediatek.com>
+ <20190108154441.GG25910@uda0271908> <1547037068.4433.122.camel@mhfsdcap03>
+ <20190109140144.GI25910@uda0271908>
+X-Mailer: Evolution 3.2.3-0ubuntu6 
 MIME-Version: 1.0
-References: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
- <CALeDE9PX=2nR8=9JjT9wvsb470nrZ_h6JGFsrkYkexGOoOhXuA@mail.gmail.com>
- <849520506.312349.1546937289972@email.ionos.de>
- <CALeDE9OYZi+LZCtnm3kZQ2g5oJ1BWXgfoX0MBD4X0Bz2Vj9Tng@mail.gmail.com>
- <389675377.186771.1546942833612@email.ionos.de>
- <CALeDE9PPt8yTF1FLioxz0C1kJZDYn1uYH-MoBii2Ewpo-yC3tg@mail.gmail.com>
- <2090321804.324042.1547101471247@email.ionos.de>
-In-Reply-To: <2090321804.324042.1547101471247@email.ionos.de>
-From: Peter Robinson <pbrobinson@gmail.com>
-Date: Thu, 10 Jan 2019 07:05:23 +0000
-Message-ID: <CALeDE9P89QFB8CsY1xRyT1+bau+Hzkj7tmc81e6-Lq9nEpjJ-w@mail.gmail.com>
-Subject: Re: [PATCH RFC 00/11] staging: vc04_services: Improve driver
- load/unload
-To: Stefan Wahren <stefan.wahren@i2se.com>
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_230537_576372_FEEF2593 
-X-CRM114-Status: GOOD (  11.50  )
+X-CRM114-CacheID: sfid-20190109_232434_898882_6C710DBC 
+X-CRM114-Status: GOOD (  47.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,271 +79,431 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devel@driverdev.osuosl.org, tiwai@suse.de, gregkh@linuxfoundation.org,
- mikebrady@eircom.net, Eric Anholt <eric@anholt.net>,
- linux-rpi-kernel@lists.infradead.org,
- Dave Stevenson <dave.stevenson@raspberrypi.org>, nsaenzjulienne@suse.de,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Yonglong Wu <yonglong.wu@mediatek.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-usb@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Matthias
+ Brugger <matthias.bgg@gmail.com>, Rob Herring <robh+dt@kernel.org>,
+ Alan Stern <stern@rowland.harvard.edu>, chunfeng.yun@mediatek.com,
+ linux-mediatek@lists.infradead.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-> > I get difference results with 5.0-rc1 but neither of the above apps
-> > work either, will follow up based on the rest of the thread there.
-> >
->
-> My first step with Raspbian is to enable the Camera interface which results into an appending of the following lines to config.txt:
->
-> start_x=1
-> gpu_mem=128
->
-> AFAIK a smaller value for gpu_mem wont work. Please provide your settings which results in this crash.
+Hi Bin,
 
-OK with that, plus my 4.20.1 kernel (and the 09/01/19 firmware) I'm
-starting to get somewhere.
+On Wed, 2019-01-09 at 08:01 -0600, Bin Liu wrote:
+> Hi Min,
+> 
+> On Wed, Jan 09, 2019 at 08:31:08PM +0800, Min Guo wrote:
+> > Hi Bin,
+> > On Tue, 2019-01-08 at 09:44 -0600, Bin Liu wrote:
+> > > Hi,
+> > > 
+> > > On Thu, Dec 27, 2018 at 03:34:26PM +0800, min.guo@mediatek.com wrote:
+> > > > From: Min Guo <min.guo@mediatek.com>
+> > > > 
+> > > > This adds support for MediaTek musb controller in
+> > > > host, peripheral and otg mode
+> > > > 
+> > > > Signed-off-by: Min Guo <min.guo@mediatek.com>
+> > > > Signed-off-by: Yonglong Wu <yonglong.wu@mediatek.com>
+> > > > ---
+> > > >  drivers/usb/musb/Kconfig     |   8 +-
+> > > >  drivers/usb/musb/Makefile    |   1 +
+> > > >  drivers/usb/musb/mediatek.c  | 562 +++++++++++++++++++++++++++++++++++++++++++
+> > > >  drivers/usb/musb/musb_core.c |  10 +
+> > > >  drivers/usb/musb/musb_core.h |   1 +
+> > > >  drivers/usb/musb/musb_dma.h  |   1 +
+> > > >  drivers/usb/musb/musb_host.c |  79 ++++--
+> > > >  drivers/usb/musb/musb_regs.h |   6 +
+> > > >  drivers/usb/musb/musbhsdma.c |  34 ++-
+> > > >  9 files changed, 671 insertions(+), 31 deletions(-)
+> > > >  create mode 100644 drivers/usb/musb/mediatek.c
+> > > > 
+> > > > diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
+> > > > index ad08895..540fc9f 100644
+> > > > --- a/drivers/usb/musb/Kconfig
+> > > > +++ b/drivers/usb/musb/Kconfig
+> > > > @@ -115,6 +115,12 @@ config USB_MUSB_JZ4740
+> > > >  	depends on USB_MUSB_GADGET
+> > > >  	depends on USB_OTG_BLACKLIST_HUB
+> > > >  
+> > > > +config USB_MUSB_MEDIATEK
+> > > > +	tristate "MediaTek platforms"
+> > > > +	depends on ARCH_MEDIATEK
+> > > 
+> > > Please also add '|| COMPILE_TEST' to make testing easier.
+> > 
+> > Ok
+> > 
+> > > > +	depends on NOP_USB_XCEIV
+> > > > +	depends on GENERIC_PHY
+> > > > +
+> > > >  config USB_MUSB_AM335X_CHILD
+> > > >  	tristate
+> > > >  
+> > > > @@ -141,7 +147,7 @@ config USB_UX500_DMA
+> > > >  
+> > > >  config USB_INVENTRA_DMA
+> > > >  	bool 'Inventra'
+> > > > -	depends on USB_MUSB_OMAP2PLUS
+> > > > +	depends on USB_MUSB_OMAP2PLUS || USB_MUSB_MEDIATEK
+> > > >  	help
+> > > >  	  Enable DMA transfers using Mentor's engine.
+> > > >  
+> > > > diff --git a/drivers/usb/musb/Makefile b/drivers/usb/musb/Makefile
+> > > > index 3a88c79..63d82d0 100644
+> > > > --- a/drivers/usb/musb/Makefile
+> > > > +++ b/drivers/usb/musb/Makefile
+> > > > @@ -24,6 +24,7 @@ obj-$(CONFIG_USB_MUSB_DA8XX)			+= da8xx.o
+> > > >  obj-$(CONFIG_USB_MUSB_UX500)			+= ux500.o
+> > > >  obj-$(CONFIG_USB_MUSB_JZ4740)			+= jz4740.o
+> > > >  obj-$(CONFIG_USB_MUSB_SUNXI)			+= sunxi.o
+> > > > +obj-$(CONFIG_USB_MUSB_MEDIATEK)      		+= mediatek.o
+> > > >  
+> > > >  
+> > > >  obj-$(CONFIG_USB_MUSB_AM335X_CHILD)		+= musb_am335x.o
+> > > > diff --git a/drivers/usb/musb/mediatek.c b/drivers/usb/musb/mediatek.c
+> > > > new file mode 100644
+> > > > index 0000000..15a6460
+> > > > --- /dev/null
+> > > > +++ b/drivers/usb/musb/mediatek.c
+> > > 
+> > > [snip]
+> > > I will review this section later after we sorted out other things.
+> > > 
+> > > > diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+> > > > index b7d5627..d60f76f 100644
+> > > > --- a/drivers/usb/musb/musb_core.c
+> > > > +++ b/drivers/usb/musb/musb_core.c
+> > > > @@ -1028,6 +1028,16 @@ static void musb_disable_interrupts(struct musb *musb)
+> > > >  	temp = musb_readb(mbase, MUSB_INTRUSB);
+> > > >  	temp = musb_readw(mbase, MUSB_INTRTX);
+> > > >  	temp = musb_readw(mbase, MUSB_INTRRX);
+> > > > +
+> > > > +	/*  MediaTek controller interrupt status is W1C */
+> > > 
+> > > This W1C doesn't match to the MUSB Programming Guide that I have. Those
+> > > registers are read-only.
+> > > Is the difference due to the IP intergration in the mtk platforms? or is
+> > > it a new version of the MUSB controller? If latter, what is the version?
+> > 
+> > This is difference due to the IP intergration in mtk platforms. W1C is
+> > easy for CpdeViser debug.
+> > 
+> > > > +	if (musb->ops->quirks & MUSB_MTK_QUIRKS) {
+> > > 
+> > > Basically we don't want to use this type of platform specific quirks if
+> > > possible, so let's try to not use it.
+> > 
+> > I will try my best to avoid using it.
+> 
+> Thanks.
+> 
+> > 
+> > > > +		musb_writeb(mbase, MUSB_INTRUSB,
+> > > > +			musb_readb(mbase, MUSB_INTRUSB));
+> > > 
+> > > For this clearing register bit operation, please create platform hooks
+> > > musb_clearb() and musb_clearw() in struct musb_platform_ops instead,
+> > > then follow how musb_readb() pointer is assigned in
+> > > musb_init_controller() to use the W1C version for mtk platform.
+> > 
+> > I have tried implementing musb_readb(), musb_readw() interface with
+> > interrupt status W1C function in struct musb_platform_ops. But this
+> > interface will require a global variable to hold MAC basic address for
+> > judgment, and then special handling of the interrupt state. A global
+> > variable will make the driver work with only a single instance, so it
+> > can't work on some MTK platforms which have two instances.
+> 
+> I didn't mean to modify musb_read*(), but
+> 
+> > How about creating musb_clearb/w() as following:
+> > void (*clearb)(void __iomem *addr, unsigned offset, u8 data);
+> > void (*clearw)(void __iomem *addr, unsigned offset, u16 data);
+> 
+> this is what I was asking for, similar to what musb_readb/w() is
+> implemented.
 
-I can get a picture with the qv4l2 app ;-)
+I will prepare a patch for musb_clearb/w().
 
-If I try with cheese I get the following two crashes, I then tried
-with qv4l2 again (no reboot) and got the final crash, basically once
-cheese/gstreamer pokes it tht's it and it doesn't come back. The
-"Comm: v4l2src0:src" are the cheese/gstreamer crash.
+> > 
+> > 
+> > > > +		musb_writew(mbase, MUSB_INTRRX,
+> > > > +			musb_readw(mbase, MUSB_INTRRX));
+> > > > +		musb_writew(mbase, MUSB_INTRTX,
+> > > > +			musb_readw(mbase, MUSB_INTRTX));
+> > > > +	}
+> > > >  }
+> > > >  
+> > > >  static void musb_enable_interrupts(struct musb *musb)
+> > > > diff --git a/drivers/usb/musb/musb_core.h b/drivers/usb/musb/musb_core.h
+> > > > index 04203b7..1bf4e9a 100644
+> > > > --- a/drivers/usb/musb/musb_core.h
+> > > > +++ b/drivers/usb/musb/musb_core.h
+> > > > @@ -138,6 +138,7 @@ enum musb_g_ep0_state {
+> > > >   */
+> > > >  struct musb_platform_ops {
+> > > >  
+> > > > +#define MUSB_MTK_QUIRKS	BIT(10)
+> > > >  #define MUSB_G_NO_SKB_RESERVE	BIT(9)
+> > > >  #define MUSB_DA8XX		BIT(8)
+> > > >  #define MUSB_PRESERVE_SESSION	BIT(7)
+> > > > diff --git a/drivers/usb/musb/musb_dma.h b/drivers/usb/musb/musb_dma.h
+> > > > index 281e75d3..b218210 100644
+> > > > --- a/drivers/usb/musb/musb_dma.h
+> > > > +++ b/drivers/usb/musb/musb_dma.h
+> > > > @@ -197,6 +197,7 @@ static inline void musb_dma_controller_destroy(struct dma_controller *d) { }
+> > > >  extern struct dma_controller *
+> > > >  musbhs_dma_controller_create(struct musb *musb, void __iomem *base);
+> > > >  extern void musbhs_dma_controller_destroy(struct dma_controller *c);
+> > > > +extern irqreturn_t dma_controller_irq(int irq, void *private_data);
+> > > >  
+> > > >  extern struct dma_controller *
+> > > >  tusb_dma_controller_create(struct musb *musb, void __iomem *base);
+> > > > diff --git a/drivers/usb/musb/musb_host.c b/drivers/usb/musb/musb_host.c
+> > > > index b59ce9a..b1b0216 100644
+> > > > --- a/drivers/usb/musb/musb_host.c
+> > > > +++ b/drivers/usb/musb/musb_host.c
+> > > > @@ -292,20 +292,73 @@ static inline void musb_save_toggle(struct musb_qh *qh, int is_in,
+> > > >  {
+> > > >  	void __iomem		*epio = qh->hw_ep->regs;
+> > > >  	u16			csr;
+> > > > +	struct musb *musb = qh->hw_ep->musb;
+> > > >  
+> > > >  	/*
+> > > >  	 * FIXME: the current Mentor DMA code seems to have
+> > > >  	 * problems getting toggle correct.
+> > > >  	 */
+> > > >  
+> > > > -	if (is_in)
+> > > > -		csr = musb_readw(epio, MUSB_RXCSR) & MUSB_RXCSR_H_DATATOGGLE;
+> > > > -	else
+> > > > -		csr = musb_readw(epio, MUSB_TXCSR) & MUSB_TXCSR_H_DATATOGGLE;
+> > > > +	/* MediaTek controller has private toggle register */
+> > > 
+> > > only one toggle register for all endpoints? how does it handle
+> > > difference toggle values for different endpoints?
+> > 
+> > MediaTek controller has separate registers to describe TX/RX toggle.
+> 
+> Is it one register per endpoint?
 
-[   26.013706] vchiq: module is from the staging directory, the
-quality is unknown, you have been warned.
-[   26.040943] vchiq: vchiq_init_state: slot_zero = 415842fa, is_master = 0
-[   26.937936] media: Linux media interface: v0.10
-[   27.052339] videodev: Linux video capture interface: v2.00
-[   27.351732] snd_bcm2835: module is from the staging directory, the
-quality is unknown, you have been warned.
-[   27.385975] bcm2835_audio bcm2835_audio: card created with 8 channels
-[   27.406702] bcm2835_v4l2: module is from the staging directory, the
-quality is unknown, you have been warned.
-[   28.059932] bcm2835-v4l2: scene mode selected 0, was 0
-[   28.061098] bcm2835-v4l2: V4L2 device registered as video0 - stills
-mode > 1280x720
-[   28.074773] bcm2835-v4l2: Broadcom 2835 MMAL video capture ver 0.0.2 loaded.
-[   78.307961] bcm2835_audio bcm2835_audio: vchi message timeout, msg=5
-[  138.790296] bcm2835-v4l2: Failed to enable capture port - error -1.
-Disabling camera port again
-[  138.818456] ------------[ cut here ]------------
-[  138.823246] WARNING: CPU: 2 PID: 1464 at
-drivers/media/common/videobuf2/videobuf2-core.c:1471
-vb2_start_streaming+0xb4/0x12c [videobuf2_common]
-[  138.836377] Modules linked in: fuse ip6t_rpfilter ip6t_REJECT
-nf_reject_ipv6 xt_conntrack ebtable_nat ip6table_nat nf_nat_ipv6
-ip6table_mangle ip6table_raw ip6table_security iptable_nat nf_nat_ipv4
-nf_nat iptable_mangle iptable_raw iptable_security nf_conntrack
-nf_defrag_ipv6 nf_defrag_ipv4 libcrc32c ip_set nfnetlink
-ebtable_filter ebtables ip6table_filter ip6_tables cmac bnep sunrpc
-vfat fat vc4 snd_soc_core bcm2835_v4l2(C) snd_bcm2835(C)
-videobuf2_vmalloc ac97_bus snd_pcm_dmaengine videobuf2_memops
-videobuf2_v4l2 snd_seq videobuf2_common snd_seq_device snd_pcm
-v4l2_common videodev brcmfmac media snd_timer snd brcmutil soundcore
-drm_kms_helper cfg80211 drm hci_uart fb_sys_fops syscopyarea btqca
-sysfillrect btbcm joydev sysimgblt btintel bluetooth raspberrypi_hwmon
-ecdh_generic rfkill vchiq(C) bcm2835_thermal bcm2835_rng bcm2835_wdt
-leds_gpio cpufreq_dt lz4 lz4_compress zram hid_logitech_hidpp
-hid_logitech_dj smsc95xx usbnet mii mmc_block sdhci_iproc dwc2
-crc32_arm_ce sdhci_pltfm
-[  138.836522]  gpio_raspberrypi_exp udc_core sdhci pwm_bcm2835
-i2c_bcm2835 bcm2835 bcm2835_dma phy_generic
-[  138.934289] CPU: 2 PID: 1464 Comm: v4l2src0:src Tainted: G
-C        4.20.1-200.fc29.armv7hl #1
-[  138.943729] Hardware name: BCM2835
-[  138.947196] [<c03127a4>] (unwind_backtrace) from [<c030cbf0>]
-(show_stack+0x18/0x1c)
-[  138.955058] [<c030cbf0>] (show_stack) from [<c0b14f80>]
-(dump_stack+0x80/0xa0)
-[  138.962390] [<c0b14f80>] (dump_stack) from [<c03507b4>] (__warn+0xdc/0xf8)
-[  138.969366] [<c03507b4>] (__warn) from [<c0350b28>]
-(warn_slowpath_null+0x40/0x4c)
-[  138.977070] [<c0350b28>] (warn_slowpath_null) from [<bf70b2d4>]
-(vb2_start_streaming+0xb4/0x12c [videobuf2_common])
-[  138.987713] [<bf70b2d4>] (vb2_start_streaming [videobuf2_common])
-from [<bf70c78c>] (vb2_core_streamon+0x110/0x138 [videobuf2_common])
-[  139.000054] [<bf70c78c>] (vb2_core_streamon [videobuf2_common])
-from [<bf681a34>] (__video_do_ioctl+0x35c/0x494 [videodev])
-[  139.011453] [<bf681a34>] (__video_do_ioctl [videodev]) from
-[<bf68219c>] (video_usercopy+0x508/0x5d4 [videodev])
-[  139.021827] [<bf68219c>] (video_usercopy [videodev]) from
-[<c04ffae8>] (vfs_ioctl+0x28/0x3c)
-[  139.030391] [<c04ffae8>] (vfs_ioctl) from [<c0500308>]
-(do_vfs_ioctl+0x8c/0x838)
-[  139.037896] [<c0500308>] (do_vfs_ioctl) from [<c0500b0c>]
-(ksys_ioctl+0x58/0x74)
-[  139.045398] [<c0500b0c>] (ksys_ioctl) from [<c0301000>]
-(ret_fast_syscall+0x0/0x54)
-[  139.053160] Exception stack(0xd0b2ffa8 to 0xd0b2fff0)
-[  139.058281] ffa0:                   00000000 aa812138 0000001e
-40045612 01658708 b590cd10
-[  139.066577] ffc0: 00000000 aa812138 ab8af99c 00000036 00000020
-b6f388f8 01658700 aa80cc90
-[  139.074869] ffe0: b5b4dcec a69fa974 ab8786f4 b590cd1c
-[  139.080031] ---[ end trace eed7fb71749a2e2c ]---
-[  139.211923] bcm2835-v4l2: vidioc_s_fmt_vid_cap device busy
-[  177.331656] bcm2835-v4l2: Failed to enable capture port - error -1.
-Disabling camera port again
-[  177.362943] ------------[ cut here ]------------
-[  177.367736] WARNING: CPU: 1 PID: 1531 at
-drivers/media/common/videobuf2/videobuf2-core.c:1471
-vb2_start_streaming+0xb4/0x12c [videobuf2_common]
-[  177.380847] Modules linked in: fuse ip6t_rpfilter ip6t_REJECT
-nf_reject_ipv6 xt_conntrack ebtable_nat ip6table_nat nf_nat_ipv6
-ip6table_mangle ip6table_raw ip6table_security iptable_nat nf_nat_ipv4
-nf_nat iptable_mangle iptable_raw iptable_security nf_conntrack
-nf_defrag_ipv6 nf_defrag_ipv4 libcrc32c ip_set nfnetlink
-ebtable_filter ebtables ip6table_filter ip6_tables cmac bnep sunrpc
-vfat fat vc4 snd_soc_core bcm2835_v4l2(C) snd_bcm2835(C)
-videobuf2_vmalloc ac97_bus snd_pcm_dmaengine videobuf2_memops
-videobuf2_v4l2 snd_seq videobuf2_common snd_seq_device snd_pcm
-v4l2_common videodev brcmfmac media snd_timer snd brcmutil soundcore
-drm_kms_helper cfg80211 drm hci_uart fb_sys_fops syscopyarea btqca
-sysfillrect btbcm joydev sysimgblt btintel bluetooth raspberrypi_hwmon
-ecdh_generic rfkill vchiq(C) bcm2835_thermal bcm2835_rng bcm2835_wdt
-leds_gpio cpufreq_dt lz4 lz4_compress zram hid_logitech_hidpp
-hid_logitech_dj smsc95xx usbnet mii mmc_block sdhci_iproc dwc2
-crc32_arm_ce sdhci_pltfm
-[  177.381107]  gpio_raspberrypi_exp udc_core sdhci pwm_bcm2835
-i2c_bcm2835 bcm2835 bcm2835_dma phy_generic
-[  177.479003] CPU: 1 PID: 1531 Comm: v4l2src0:src Tainted: G
-WC        4.20.1-200.fc29.armv7hl #1
-[  177.488452] Hardware name: BCM2835
-[  177.491936] [<c03127a4>] (unwind_backtrace) from [<c030cbf0>]
-(show_stack+0x18/0x1c)
-[  177.499807] [<c030cbf0>] (show_stack) from [<c0b14f80>]
-(dump_stack+0x80/0xa0)
-[  177.507148] [<c0b14f80>] (dump_stack) from [<c03507b4>] (__warn+0xdc/0xf8)
-[  177.514137] [<c03507b4>] (__warn) from [<c0350b28>]
-(warn_slowpath_null+0x40/0x4c)
-[  177.521863] [<c0350b28>] (warn_slowpath_null) from [<bf70b2d4>]
-(vb2_start_streaming+0xb4/0x12c [videobuf2_common])
-[  177.532507] [<bf70b2d4>] (vb2_start_streaming [videobuf2_common])
-from [<bf70c78c>] (vb2_core_streamon+0x110/0x138 [videobuf2_common])
-[  177.544926] [<bf70c78c>] (vb2_core_streamon [videobuf2_common])
-from [<bf681a34>] (__video_do_ioctl+0x35c/0x494 [videodev])
-[  177.556424] [<bf681a34>] (__video_do_ioctl [videodev]) from
-[<bf68219c>] (video_usercopy+0x508/0x5d4 [videodev])
-[  177.566859] [<bf68219c>] (video_usercopy [videodev]) from
-[<c04ffae8>] (vfs_ioctl+0x28/0x3c)
-[  177.575434] [<c04ffae8>] (vfs_ioctl) from [<c0500308>]
-(do_vfs_ioctl+0x8c/0x838)
-[  177.582949] [<c0500308>] (do_vfs_ioctl) from [<c0500b0c>]
-(ksys_ioctl+0x58/0x74)
-[  177.590465] [<c0500b0c>] (ksys_ioctl) from [<c0301000>]
-(ret_fast_syscall+0x0/0x54)
-[  177.598233] Exception stack(0xc9e49fa8 to 0xc9e49ff0)
-[  177.603363] 9fa0:                   00000000 aa9100e8 0000001f
-40045612 011a78a0 b59aed10
-[  177.611666] 9fc0: 00000000 aa9100e8 ab9c899c 00000036 00000020
-b6fda8f8 011a7898 aa907720
-[  177.619967] 9fe0: b5befcec a6afa974 ab9916f4 b59aed1c
-[  177.625167] ---[ end trace eed7fb71749a2e2d ]---
-[  177.761663] bcm2835-v4l2: vidioc_s_fmt_vid_cap device busy
-[  218.865174] Unable to handle kernel NULL pointer dereference at
-virtual address 00000001
-[  218.873455] pgd = 4a1eb2da
-[  218.876252] [00000001] *pgd=00000000
-[  218.879920] Internal error: Oops: 5 [#1] SMP ARM
-[  218.884610] Modules linked in: fuse ip6t_rpfilter ip6t_REJECT
-nf_reject_ipv6 xt_conntrack ebtable_nat ip6table_nat nf_nat_ipv6
-ip6table_mangle ip6table_raw ip6table_security iptable_nat nf_nat_ipv4
-nf_nat iptable_mangle iptable_raw iptable_security nf_conntrack
-nf_defrag_ipv6 nf_defrag_ipv4 libcrc32c ip_set nfnetlink
-ebtable_filter ebtables ip6table_filter ip6_tables cmac bnep sunrpc
-vfat fat vc4 snd_soc_core bcm2835_v4l2(C) snd_bcm2835(C)
-videobuf2_vmalloc ac97_bus snd_pcm_dmaengine videobuf2_memops
-videobuf2_v4l2 snd_seq videobuf2_common snd_seq_device snd_pcm
-v4l2_common videodev brcmfmac media snd_timer snd brcmutil soundcore
-drm_kms_helper cfg80211 drm hci_uart fb_sys_fops syscopyarea btqca
-sysfillrect btbcm joydev sysimgblt btintel bluetooth raspberrypi_hwmon
-ecdh_generic rfkill vchiq(C) bcm2835_thermal bcm2835_rng bcm2835_wdt
-leds_gpio cpufreq_dt lz4 lz4_compress zram hid_logitech_hidpp
-hid_logitech_dj smsc95xx usbnet mii mmc_block sdhci_iproc dwc2
-crc32_arm_ce sdhci_pltfm
-[  218.884870]  gpio_raspberrypi_exp udc_core sdhci pwm_bcm2835
-i2c_bcm2835 bcm2835 bcm2835_dma phy_generic
-[  218.982626] CPU: 3 PID: 1552 Comm: qv4l2 Tainted: G        WC
- 4.20.1-200.fc29.armv7hl #1
-[  218.991458] Hardware name: BCM2835
-[  218.994955] PC is at vchiq_mmal_port_enable+0x90/0x138 [bcm2835_v4l2]
-[  219.001501] LR is at _cond_resched+0x48/0x50
-[  219.005831] pc : [<bf793ec0>]    lr : [<c0b2a8b4>]    psr: 00070013
-[  219.012209] sp : c6727d90  ip : 002dc121  fp : 00000001
-[  219.017518] r10: bf69a200  r9 : df278004  r8 : dffe6380
-[  219.022821] r7 : df278000  r6 : bf79a880  r5 : bf78f600  r4 : df278490
-[  219.029443] r3 : 00000001  r2 : df278518  r1 : 00000001  r0 : 00000000
-[  219.036069] Flags: nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
-[  219.043309] Control: 10c5383d  Table: 1276806a  DAC: 00000051
-[  219.049145] Process qv4l2 (pid: 1552, stack limit = 0x266508dd)
-[  219.055151] Stack: (0xc6727d90 to 0xc6728000)
-[  219.059578] 7d80:                                     df278000
-df278490 bf78f600 dffe6000
-[  219.067885] 7da0: dffe6660 bf79a880 bf67da08 dffe6380 c6727e78
-bf69a200 00000001 bf78fa54
-[  219.076189] 7dc0: c6727dcc 00000004 d090ee78 00000008 dffe6528
-dffe64dc dffe6624 bf70b28c
-[  219.084493] 7de0: dffe6528 00000000 dffe6058 bf67da08 dffe6380
-bf70c78c 40045612 bf681a34
-[  219.092800] 7e00: c6727e2c c04babdc e39a99bc bf7951f4 c328d200
-00000000 d6be1b40 c328d200
-[  219.101103] 7e20: c124f850 00000004 c6727e7c c04c0b90 c6727e78
-c031691c c6727e78 00000000
-[  219.109407] 7e40: c6727e78 00000000 bf6816d8 40045612 00000000
-00000004 00000000 bf68219c
-[  219.117710] 7e60: 0007ffff 00000000 00000000 bedf8368 d6be1b40
-00000001 00000001 00000001
-[  219.126015] 7e80: 00000000 00002003 00000000 00000000 00000000
-00000000 00000000 00000000
-[  219.134318] 7ea0: 00000000 00000000 00000001 05cf1000 01efb000
-00000000 00000000 00000000
-[  219.142623] 7ec0: 00002000 00000000 a1743000 e27e93c0 c3a1d738
-c3a1d730 a1743000 c049bad0
-[  219.150926] 7ee0: 00000001 00000003 01efb000 c0b2a8b4 00000000
-c0b2a8b4 df801c30 bedf8368
-[  219.159230] 7f00: df801c30 d6be1b40 40045612 bedf8368 0000000c
-00000036 00000000 c04ffae8
-[  219.167532] 7f20: bedf8368 c0500308 00000001 00000056 00000012
-c6727f48 00000001 e31dd210
-[  219.175837] 7f40: c3400bb0 c6725612 c6727f0b c6727f3c 2262e000
-00000000 c6727f58 c126ab28
-[  219.184141] 7f60: d6be1b40 40045612 00000000 d6be1b40 d6be1b41
-40045612 bedf8368 0000000c
-[  219.192445] 7f80: 00000036 c0500b0c 47d64200 b5f11000 40045612
-00000036 c0301204 c6726000
-[  219.200750] 7fa0: 00000036 c0301000 47d64200 b5f11000 0000000c
-40045612 bedf8368 00000001
-[  219.209053] 7fc0: 47d64200 b5f11000 40045612 00000036 b5e74e40
-0000000c b6f34508 00000000
-[  219.217357] 7fe0: bedf8368 bedf8358 b5efa804 b5bce1f0 400f0010
-0000000c 00000000 00000000
-[  219.225785] [<bf793ec0>] (vchiq_mmal_port_enable [bcm2835_v4l2])
-from [<bf78fa54>] (start_streaming+0x124/0x1f0 [bcm2835_v4l2])
-[  219.237498] [<bf78fa54>] (start_streaming [bcm2835_v4l2]) from
-[<bf70b28c>] (vb2_start_streaming+0x6c/0x12c [videobuf2_common])
-[  219.249221] [<bf70b28c>] (vb2_start_streaming [videobuf2_common])
-from [<bf70c78c>] (vb2_core_streamon+0x110/0x138 [videobuf2_common])
-[  219.261644] [<bf70c78c>] (vb2_core_streamon [videobuf2_common])
-from [<bf681a34>] (__video_do_ioctl+0x35c/0x494 [videodev])
-[  219.273142] [<bf681a34>] (__video_do_ioctl [videodev]) from
-[<bf68219c>] (video_usercopy+0x508/0x5d4 [videodev])
-[  219.283585] [<bf68219c>] (video_usercopy [videodev]) from
-[<c04ffae8>] (vfs_ioctl+0x28/0x3c)
-[  219.292163] [<c04ffae8>] (vfs_ioctl) from [<c0500308>]
-(do_vfs_ioctl+0x8c/0x838)
-[  219.299678] [<c0500308>] (do_vfs_ioctl) from [<c0500b0c>]
-(ksys_ioctl+0x58/0x74)
-[  219.307193] [<c0500b0c>] (ksys_ioctl) from [<c0301000>]
-(ret_fast_syscall+0x0/0x54)
-[  219.314966] Exception stack(0xc6727fa8 to 0xc6727ff0)
-[  219.320095] 7fa0:                   47d64200 b5f11000 0000000c
-40045612 bedf8368 00000001
-[  219.328400] 7fc0: 47d64200 b5f11000 40045612 00000036 b5e74e40
-0000000c b6f34508 00000000
-[  219.336699] 7fe0: bedf8368 bedf8358 b5efa804 b5bce1f0
-[  219.341831] Code: e1a00007 ebfffbd4 e1a01000 ea000007 (e5911000)
-[  219.348216] ---[ end trace eed7fb71749a2e2e ]---
+MUSB_RXTOG/MUSB_TXTOG is common register, each bit reflects the toggle
+state of an endpoint. bit[0] not used,bit[1~8] corresponds to ep[1~8]
+
+> > 
+> > > > +	if (musb->ops->quirks & MUSB_MTK_QUIRKS) {
+> > > > +		u16 toggle;
+> > > > +		u8 epnum = qh->hw_ep->epnum;
+> > > > +
+> > > > +		if (is_in)
+> > > > +			toggle = musb_readl(musb->mregs, MUSB_RXTOG);
+> 
+> this line seems telling there is just *one* register for all endpoints.
+
+Yes, all endpoint share this register, endpoint and bit are one-to-one
+correspondence.
+
+> > > 
+> > > should use musb_readw() instead? MUSB_RXTOG seems to be 16bit.
+> > 
+> > Ok
+> > 
+> > > > +		else
+> > > > +			toggle = musb_readl(musb->mregs, MUSB_TXTOG);
+> > > > +
+> > > > +		csr = toggle & (1 << epnum);
+> > > > +	} else {
+> > > > +		if (is_in)
+> > > > +			csr = musb_readw(epio, MUSB_RXCSR)
+> > > > +				& MUSB_RXCSR_H_DATATOGGLE;
+> > > > +		else
+> > > > +			csr = musb_readw(epio, MUSB_TXCSR)
+> > > > +				& MUSB_TXCSR_H_DATATOGGLE;
+> > > 
+> > > Does this logic still work for the mtk platform even if it has its own
+> > > private toggle register? If so, we don't need to change here.
+> > 
+> > Sorry, this logic can not work on mtk platform, bit
+> > MUSB_RXCSR_H_DATATOGGLE and MUSB_TXCSR_H_DATATOGGLE are used for other
+> > function.
+> 
+> Is there a different controller RTL version we can use to
+> differentiate?
+
+Sorry, there is no controller RTL version can be used to indicate the
+differences.
+
+> > 
+> > > If not, let's try to not use this quirk flag. Please create a hook
+> > > musb_platform_get_toggle() in struct musb_platform_ops.
+> > 
+> > Does the method of implement musb_platform_get_toggle() is prepare
+> > musb_default_get_toggle with common function, then follow how
+> > musb_readb() pointer is assigned in musb_init_controller()?
+> 
+> Yes, similar to musb_readb() implementation.
+
+OK.
+
+> > How about creating musb_platform_get_toggle() as following:
+> > u16 (*get_toggle)(struct musb* musb, struct musb_qh *qh, int is_in);
+> 
+> yes, it is part of the implementation, then add it in struct musb_io.
+
+I will prepare a patch for (*get_toggle).
+
+> > 
+> > > > +	}
+> > > >  
+> > > >  	usb_settoggle(urb->dev, qh->epnum, !is_in, csr ? 1 : 0);
+> > > >  }
+> > > >  
+> > > > +static inline u16 musb_set_toggle(struct musb_qh *qh, int is_in,
+> > > > +					struct urb *urb)
+> > > > +{
+> > > > +	u16 csr = 0;
+> > > > +	u16 toggle = 0;
+> > > > +	struct musb *musb = qh->hw_ep->musb;
+> > > > +	u8 epnum = qh->hw_ep->epnum;
+> > > > +
+> > > > +	toggle = usb_gettoggle(urb->dev, qh->epnum, !is_in);
+> > > > +
+> > > > +	/* MediaTek controller has private toggle register */
+> > > > +	if (musb->ops->quirks & MUSB_MTK_QUIRKS) {
+> > > > +		if (is_in) {
+> > > > +			musb_writel(musb->mregs, MUSB_RXTOGEN, (1 << epnum));
+> > > > +			musb_writel(musb->mregs, MUSB_RXTOG, (toggle << epnum));
+> > > > +		} else {
+> > > > +			musb_writel(musb->mregs, MUSB_TXTOGEN, (1 << epnum));
+> > > > +			musb_writel(musb->mregs, MUSB_TXTOG, (toggle << epnum));
+> > > > +		}
+> > > > +	} else {
+> > > > +		if (is_in) {
+> > > > +			if (toggle)
+> > > > +				csr = MUSB_RXCSR_H_WR_DATATOGGLE
+> > > > +						| MUSB_RXCSR_H_DATATOGGLE;
+> > > > +			else
+> > > > +				csr = 0;
+> > > > +		} else {
+> > > > +			if (toggle)
+> > > > +				csr |= MUSB_TXCSR_H_WR_DATATOGGLE
+> > > > +						| MUSB_TXCSR_H_DATATOGGLE;
+> > > > +			else
+> > > > +				csr |= MUSB_TXCSR_CLRDATATOG;
+> 
+> '? :' operation probably is better than 'if else' here.
+
+OK.
+
+> > > > +		}
+> > > > +	}
+> > > > +	return csr;
+> > > 
+> > > Please create a seperate patch for this musb_set_toggle() without adding
+> > > the mtk logic. It is a nice cleanup.
+> > 
+> > Does this like get toggle implementation, create a hook
+> > musb_platform_set_toggle() in struct musb_platform_ops?
+> 
+> You did the code cleanup by creating musb_set_toggle(), please make it
+> in a separate patch, like
+> 
+> static u16 musb_set_toggle(struct musb_qh *qh, int is_in, struct urb *urb)
+> {
+> 	toggle = usb_gettoggle(urb->dev, qh->epnum, !is_in);
+> 	if (is_in)
+> 		csr = toggle ? 
+> 			(MUSB_RXCSR_H_WR_DATATOGGLE | MUSB_RXCSR_H_DATATOGGLE) :
+> 			0;
+> 	else
+> 		csr = toggle ?
+> 			MUSB_TXCSR_H_WR_DATATOGGLE | MUSB_TXCSR_H_DATATOGGLE :
+> 			MUSB_TXCSR_CLRDATATOG;
+> 	return csr;
+> }
+> 
+> /* use musb_set_toggle() in the two instances */
+> 
+> then in this patch you add the mtk implementation similar as
+> *get_toggle() discussed above.
+
+OK.
+
+> > 
+> > > > +}
+> > > > +
+> > > >  /*
+> > > >   * Advance this hardware endpoint's queue, completing the specified URB and
+> > > >   * advancing to either the next URB queued to that qh, or else invalidating
+> > > > @@ -772,13 +825,8 @@ static void musb_ep_program(struct musb *musb, u8 epnum,
+> > > >  					);
+> > > >  			csr |= MUSB_TXCSR_MODE;
+> > > >  
+> > > > -			if (!hw_ep->tx_double_buffered) {
+> > > > -				if (usb_gettoggle(urb->dev, qh->epnum, 1))
+> > > > -					csr |= MUSB_TXCSR_H_WR_DATATOGGLE
+> > > > -						| MUSB_TXCSR_H_DATATOGGLE;
+> > > > -				else
+> > > > -					csr |= MUSB_TXCSR_CLRDATATOG;
+> > > > -			}
+> > > > +			if (!hw_ep->tx_double_buffered)
+> > > > +				csr |= musb_set_toggle(qh, !is_out, urb);
+> > > >  
+> > > >  			musb_writew(epio, MUSB_TXCSR, csr);
+> > > >  			/* REVISIT may need to clear FLUSHFIFO ... */
+> > > > @@ -860,17 +908,12 @@ static void musb_ep_program(struct musb *musb, u8 epnum,
+> > > >  
+> > > >  	/* IN/receive */
+> > > >  	} else {
+> > > > -		u16	csr;
+> > > > +		u16	csr = 0;
+> > > >  
+> > > >  		if (hw_ep->rx_reinit) {
+> > > >  			musb_rx_reinit(musb, qh, epnum);
+> > > > +			csr |= musb_set_toggle(qh, !is_out, urb);
+> > > >  
+> > > > -			/* init new state: toggle and NYET, maybe DMA later */
+> > > > -			if (usb_gettoggle(urb->dev, qh->epnum, 0))
+> > > > -				csr = MUSB_RXCSR_H_WR_DATATOGGLE
+> > > > -					| MUSB_RXCSR_H_DATATOGGLE;
+> > > > -			else
+> > > > -				csr = 0;
+> > > >  			if (qh->type == USB_ENDPOINT_XFER_INT)
+> > > >  				csr |= MUSB_RXCSR_DISNYET;
+> > > >  
+> > > > diff --git a/drivers/usb/musb/musb_regs.h b/drivers/usb/musb/musb_regs.h
+> > > > index 5cd7264..ffbe267 100644
+> > > > --- a/drivers/usb/musb/musb_regs.h
+> > > > +++ b/drivers/usb/musb/musb_regs.h
+> > > > @@ -273,6 +273,12 @@
+> > > >  #define MUSB_RXHUBADDR		0x06
+> > > >  #define MUSB_RXHUBPORT		0x07
+> > > >  
+> > > > +/* MediaTek controller toggle enable and status reg */
+> > > > +#define MUSB_RXTOG		0x80
+> > > > +#define MUSB_RXTOGEN		0x82
+> > > > +#define MUSB_TXTOG		0x84
+> > > > +#define MUSB_TXTOGEN		0x86
+> > > 
+> > > Again, these offsets are for different registers in the MUSB version I
+> > > have, please let me know if you have different version of the MUSB IP.
+> > 
+> > Sorry, these are MediaTek controller private registers used for control
+> > toggle.
+> 
+> Okay. Once the platform get/set_toggle() are implemented, those
+> registers can be defined in the mtk glue driver instead of here.
+
+OK.
+
+> Regards,
+> -Bin.
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
