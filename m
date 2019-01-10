@@ -6,63 +6,53 @@ X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8C3EBC43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 12:09:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C5B00C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 12:11:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4CF09214C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 12:09:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 95EE3214C6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 12:11:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="u5/tdqT8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4CF09214C6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WH1Bp5w7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 95EE3214C6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mEcSEA4oB/kUPXaQqhnhW0dZnCrcpas+sjN/uuOP3nQ=; b=u5/tdqT8uzQbLL
-	jKRxb5xPEtn/eshDM1CkjDvE4boi9bpsaqxZsBrVeeIZeEFNqerj68u19Opco5tedjxBPopbNM3nw
-	DU8hYppvfZimD3D73MwSVwTWtiOaWuShpPy0qlxQVtkh+wcgZHJpeMakX9BJjl2R6CRzgGbcliHvh
-	LyX1swnr2yvbEnUYVPSjcOQ2/n1Q5qZrrbhO6uV0lmG5RnSEMmZZNrerYCUe4IwFA2d8hcDFy1zKM
-	RFL/81WiW0uRD5UHEeeP5UmO/ybaKuoTGMjjncS8OfuEV8eQRUTep6NB6egh1zeh8IhLLNBPdo7v6
-	822c/jeG0a2CHWNWwjWQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=leVS7mvv9JyDGsGk3mb2OhlPu8D9AkQ6yVVzOJPe4aA=; b=WH1Bp5w7+bXr6Z
+	dDUSi2e1ylB2qDluXgWqDIjNiclNRlHg5Iko6GLuzjgO9CmKIytFCfW7+QZml+OB7JfZX/lQESJg7
+	tToCsY8JMDkb5pkL/pbp/TbBsffmTSTwjAfKy9cDjJhk+lBr8egosZt2kr/7vbkcATA1DvzcbzD0m
+	MayFEGqhImGjV2UKN+dK479fMcBTEy4CJb9oZD2NLFc+O/3tTJ/dI47PwLatlI6gsg/ofMKhZbNwW
+	HfNb24SR1vxPy63PcyDY370wURhTdJJqHZXuSziHx0G87f6weE5FKuTCsNF4nSIv1AEqSIsdD19JP
+	MHmjJknJ1Wm8lhdWJWlA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghZ9j-00058V-FY; Thu, 10 Jan 2019 12:09:51 +0000
-Received: from szxga07-in.huawei.com ([45.249.212.35] helo=huawei.com)
+	id 1ghZAp-0006oP-KY; Thu, 10 Jan 2019 12:10:59 +0000
+Received: from gloria.sntech.de ([185.11.138.130])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghZ9e-00057T-Ol
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 12:09:49 +0000
-Received: from DGGEMS401-HUB.china.huawei.com (unknown [172.30.72.59])
- by Forcepoint Email with ESMTP id 27B96DE8FB657DE1C470;
- Thu, 10 Jan 2019 20:09:39 +0800 (CST)
-Received: from [127.0.0.1] (10.142.68.147) by DGGEMS401-HUB.china.huawei.com
- (10.3.19.201) with Microsoft SMTP Server id 14.3.408.0; Thu, 10 Jan 2019
- 20:09:35 +0800
-Subject: Re: [RFC RESEND PATCH] kvm: arm64: export memory error recovery
- capability to user space
-To: James Morse <james.morse@arm.com>, Peter Maydell <peter.maydell@linaro.org>
-References: <0184EA26B2509940AA629AE1405DD7F201FFC21E@dggema523-mbx.china.huawei.com>
- <c01e3ed0-f66c-f7df-295a-70b44bad49ff@arm.com>
- <CAFEAcA8No4tti6o9oErdfGKyHqRTfXebO4fuEOhBApFAxw=LOg@mail.gmail.com>
- <1d73ec5a-b58d-1e00-b681-53cd80cba999@arm.com>
-From: gengdongjiu <gengdongjiu@huawei.com>
-Message-ID: <63a1ad58-b4db-c266-1077-0a3d0a3975d0@huawei.com>
-Date: Thu, 10 Jan 2019 20:09:34 +0800
-User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:52.0) Gecko/20100101
- Thunderbird/52.6.0
+ id 1ghZAk-0006n0-F1; Thu, 10 Jan 2019 12:10:57 +0000
+Received: from wf0848.dip.tu-dresden.de ([141.76.183.80] helo=phil.localnet)
+ by gloria.sntech.de with esmtpsa (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256)
+ (Exim 4.89) (envelope-from <heiko@sntech.de>)
+ id 1ghZAW-0002x4-0E; Thu, 10 Jan 2019 13:10:40 +0100
+From: Heiko Stuebner <heiko@sntech.de>
+To: Kishon Vijay Abraham I <kishon@ti.com>,
+ Shawn Lin <shawn.lin@rock-chips.com>
+Subject: Re: [PATCH 00/15] PCI: endpoint: Cleanup EPC features
+Date: Thu, 10 Jan 2019 13:10:39 +0100
+Message-ID: <17209565.32fjuqOkZh@phil>
+In-Reply-To: <ce1e4bab-5c7c-5593-d28f-2187a04baef6@ti.com>
+References: <20190107064148.10152-1-kishon@ti.com> <1936135.agpnLP3rXd@phil>
+ <ce1e4bab-5c7c-5593-d28f-2187a04baef6@ti.com>
 MIME-Version: 1.0
-In-Reply-To: <1d73ec5a-b58d-1e00-b681-53cd80cba999@arm.com>
-Content-Language: en-US
-X-Originating-IP: [10.142.68.147]
-X-CFilter-Loop: Reflected
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_040947_157184_07B5F289 
-X-CRM114-Status: GOOD (  41.76  )
+X-CRM114-CacheID: sfid-20190110_041054_646305_781CDBB0 
+X-CRM114-Status: GOOD (  19.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,171 +64,68 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "open list:DOCUMENTATION" <linux-doc@vger.kernel.org>,
- kvm-devel <kvm@vger.kernel.org>, Jonathan Corbet <corbet@lwn.net>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- =?UTF-8?B?UmFkaW0gS3LEjW3DocWZ?= <rkrcmar@redhat.com>, Will
- Deacon <will.deacon@arm.com>, Christoffer Dall <christoffer.dall@arm.com>,
- lkml - Kernel Mailing List <linux-kernel@vger.kernel.org>,
- arm-mail-list <linux-arm-kernel@lists.infradead.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Gustavo Pimentel <gustavo.pimentel@synopsys.com>, linux-pci@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-rockchip@lists.infradead.org,
+ Alan Douglas <adouglas@cadence.com>, Jia-Ju Bai <baijiaju1990@gmail.com>,
+ Cyrille Pitchen <cyrille.pitchen@free-electrons.com>,
+ Jingoo Han <jingoohan1@gmail.com>, Bjorn Helgaas <bhelgaas@google.com>,
+ linux-omap@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi James/Peter,
-   thanks for this discussion, and sorry for my late response due to vacation.
+Am Donnerstag, 10. Januar 2019, 06:05:00 CET schrieb Kishon Vijay Abraham I:
+> Hi Heiko,
+> 
+> On 07/01/19 8:05 PM, Heiko Stuebner wrote:
+> > Am Montag, 7. Januar 2019, 07:41:33 CET schrieb Kishon Vijay Abraham I:
+> >> Hi Lorenzo,
+> >>
+> >> The Endpoint controller driver uses features member in 'struct pci_epc'
+> >> to advertise the list of supported features to the endpoint function
+> >> driver.
+> >>
+> >> There are a few shortcomings with this approach.
+> >>   *) Certain endpoint controllers support fixed size BAR (e.g. TI's
+> >>      AM654 uses Designware configuration with fixed size BAR). The
+> >>      size of each BARs cannot be passed to the endpoint function
+> >>      driver.
+> >>   *) Too many macros for handling EPC features.
+> >>      (EPC_FEATURE_NO_LINKUP_NOTIFIER, EPC_FEATURE_BAR_MASK,
+> >>       EPC_FEATURE_MSIX_AVAILABLE, EPC_FEATURE_SET_BAR,
+> >>       EPC_FEATURE_GET_BAR)
+> >>   *) Endpoint controllers are directly modifying struct pci_epc
+> >>      members. (I have plans to move struct pci_epc to
+> >>      drivers/pci/endpoint so that pci_epc members are referenced
+> >>      only by endpoint core).
+> >>
+> >> To overcome the above shortcomings, introduced pci_epc_get_features()
+> >> API, pci_epc_features structure and a ->get_features() callback.
+> >>
+> >> Also added a patch to set BAR flags in pci_epf_alloc_space and
+> >> remove it from pci-epf-test function driver.
+> >>
+> >> Tested on TI's DRA7xx platform.
+> > 
+> > While I don't have that much PCI experience and hence cannot judge
+> > this cleanup as a whole, I can at least say, that my Rockchip rk3399
+> > still does find its PCIE-connected wifi card, so this series on rk3399
+> > 
+> > Tested-by: Heiko Stuebner <heiko@sntech.de>
+> 
+> Thank you for testing this series with PCIe controller configured in RC mode.
+> It would be great if it could be tested with EP mode too.
+> 
+> Thanks for the help.
 
-On 2018/12/22 2:17, James Morse wrote:
-> Hi Peter,
-> 
-> On 19/12/2018 19:02, Peter Maydell wrote:
->> On Mon, 17 Dec 2018 at 15:56, James Morse <james.morse@arm.com> wrote:
->>> I don't think this really matters. Its only the NMIlike notifications that the
->>> guest doesn't have to register or poll. The ones we support today extend the
->>> architectures existing behaviour: you would have taken an external-abort on a
->>> real system, whether you know about the additional metadata doesn't matter to Qemu.
->>
->> Consider the case where we booted the guest using a DTB and no ACPI
->> table at all -- we certainly can't just call QEMU code that tries to
->> add entries to a nonexistent table.
-> 
-> Sure, because you know which of the two sets of firmware-table you're providing.
-> 
-> I'm taking the behaviour of physical machines as the template for what we should
-> do here. I can boot a DT-only kernel on Seattle. Firmware has no idea I did
-> this, it will still take DRAM uncorrected-error IRQs in firmware, and generate
-> CPER records in the POLLed areas. But the kernel will never look, because it
-> booted with DT.
-> What happens if the kernel goes on to access the corrupt location? It either
-> gets corrupt values back, or an external abort, depending on the design of the
-> memory-controller.
-> 
-> X-gene uses an IRQ for its firmware-first notification. Booted with DT that
-> interrupt can be asserted, but as the OS has didn't know to register it, its
-> never taken. We eventually get the same corrupt-values/external-abort behaviour.
-> 
-> KVM/Linux is acting as the memory controller using stage2. When an error is
-> detected by the host it unmaps the page from stage2, and refuses to map it again
-> until its fixed up in Qemu's memory map (which can happen automatically). If the
-> kernel can't fix it itself, the AO signal is like the DRAM-IRQ above, and the AR
-> like the external abort.
-> We don't have a parallel to the 'gets corrupt values back' behaviour as Linux
-> will always unmap hwpoison pages from user-space/guests.
-> 
-> If the host-kernel wasn't build with CONFIG_MEMORY_FAILURE, its like the memory
-> controller doesn't support any of the above. I think knowing this is the closest
-> to what you want.
-> 
-> 
->> My main point is that there
->> needs to be logic in Dongjiu's QEMU patches that checks more than
->> just "does this KVM feature exist". I'm not sufficiently familiar
->> with all this RAS stuff to be certain what those checks should
->> be and what the right choices are; I just know we need to check
->> *something*...
-> 
-> I think this is the crux of where we don't see this the same way.
-> The v8.2 RAS stuff is new, RAS support on arm64 is not. Kernel support arrived
-> at roughly the same time, but not CPU support. There are v8.0 systems that
-> support RAS. There are DT systems that can do the same with edac drivers.
-> The physical v8.0 systems that do this, are doing it without any extra CPU support.
-> 
-> I think x86's behaviour here includes some history, which we don't have.
->>From the order of the HEST entries, it looks like the machine-check stuff came
-> first, then firmware-first using a 'GHES' entry in that table.
-> I think Qemu on x86 only supports the emulated machine check stuff, so it needs
-> to check KVM has the widget to do this.
-> If Qemu on x86 supported firmware-first, I don't think there would be anything
-> to check. (details below)
+Sadly I don't have hardware for that, but the support was done by Shawn,
+maybe he can help with testing EP mode and will hopefully see this mail
+and give it a spin.
 
-Peter, I summarize James's main idea, James think QEMU does not needs to check *something* if Qemu support firmware-first.
-What do we do for your comments?
+Heiko
 
-> 
-> 
->>>> Let us see the X86's QEMU logic:
->>>> 1. Before the vCPU created, it will set a default env->mcg_cap value with
->>>
->>>> MCE_CAP_DEF flag, MCG_SER_P means it expected the guest CPU model supports
->>>> RAS error recovery.[1] 2. when the vCPU initialize, it will check whether host
->>>> kernel support this feature[2]. Only when host kernel and default env->mcg_cap
->>>> value all expected this feature, then it will setup vCPU support RAS error
->>>> recovery[3].
->>>
->>> This looks like KVM exposing a CPU capability to Qemu, which then configures the
->>> behaviour KVM gives to the guest. This doesn't tell you anything about what the
->>> guest supports.
->>
->> It tells you what the *guest CPU* supports, which for x86 is a combination
->> of (a) what did the user/machine model ask for and (b) what can KVM
->> actually implement. I don't much care whether the guest OS supports
->> anything or not, that's its business... but it does seem odd to me
->> that the equivalent Arm code is not similarly saying "what were we
->> asked for, and what can we do?".
-> 
-> The flow is something like:
-> For AO, generate CPER records, and notify the OS via NOTIFY_POLL (which isn't
-> really a notification) or some flavour of IRQ.
-> To do this, Qemu needs to be able to write to its reserved area of guest memory,
-> and possibly trigger an interrupt.
-> 
-> For AR, generate CPER records and notify the OS via external abort. (the
-> presence of the CPER records makes this NOTIFY_SEA or NOTIFY_SEI).
-> To do this, Qemu again needs to be able to write to guest memory, set guest
-> registers (KVM_SET_ONE_REG()). If it wants to inject an
-> SError-Interrupt/Asynchronous-external-abort while the guest has it masked, it
-> needs KVM_SET_VCPU_EVENTS().
-> 
-> Nothing here depends on the CPU or kernel configuration. This is all ACPI stuff,
-> so its the same on x86. (The only difference is external-abort becomes NMI,
-> which is probably done through SET_VCPU_EVENTS())
-> 
-> What were we asked for? Qemu wants to know if it can write to guest memory,
-> guest registers (for synchronous external abort) and trigger interrupts. It has
-> always been able to do these things.
-> 
-> 
->> I think one question here which it would be good to answer is:
->> if we are modelling a guest and we haven't specifically provided
->> it an ACPI table to tell it about memory errors, what do we do
->> when we get a sigbus from the host? We have basically two choices:
->>  (1) send the guest an SError (aka asynchronous external abort)
->>      anyway (with no further info about what the memory error is)
-> 
-> For an AR signal an external abort is valid. Its up to the implementation
-> whether these are synchronous or asynchronous. Qemu can only take a signal for
-> something that was synchronous, so you can choose between the two.
-> Synchronous external abort is marginally better as an unaware OS knows its
-> affects this thread, and may be able to kill it.
-> SError with an imp-def ESR is indistinguishable from 'part of the soc fell out',
-> and should always result in a panic().
-> 
-> 
->>  (2) just stop QEMU (as we would for a memory error in QEMU's
->>      own memory)
-> 
-> This is also valid. A machine may take external-abort to EL3 and then
-> reboot/crash/burn.
-> 
-> 
-> Just in case this is the deeper issue: I keep picking on memory-errors, what
-> about CPU errors?
-> Linux can't handle these at all, unless they are also memory errors. If we take
-> an imprecise abort from a guest KVM can't tell Qemu using signals. We don't have
-> any mechanism to tell user-space about imprecise exceptions. In this case KVM
-> throws an imp-def SError back at the affected vcpu, these are allowed to be
-> imprecise, as this is the closest thing we have.
-> 
-> This does mean that any AO/AR signal Qemu gets is a memory error.
-> 
-> 
-> Happy New Year,
-> 
-> James
-> 
-> .
-> 
 
 
 _______________________________________________
