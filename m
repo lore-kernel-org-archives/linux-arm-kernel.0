@@ -2,91 +2,100 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1766AC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 20:54:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A9DBFC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 20:55:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B16B420685
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 20:54:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 62D48213F2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 20:55:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EKABhMMO";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="CjrkIM7B"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B16B420685
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G5ScK70f"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 62D48213F2
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=de.ibm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Message-Id:In-Reply-To:MIME-Version:
+	References:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XsxPJz+9aBI+QD+CsLDG6kGjCAZ3j/zNQB4cctlwR+s=; b=EKABhMMO0xLvAl
-	46wvpGZlfv+vjCWbGMRY5y9Z2WEahPbfo/hUrE+M1Mu36LH9j+Che+U3Wgn9rm556AadGoU0COua/
-	lSIrizs+jMqyMNBXt9MkudcR4YgkX7Yf2LCTZ7nIKgkos0BnVYme+yIbjfZ1AfIQybxkFGf6/2wr1
-	Fjz8KbDAmJR+oEFAAC8aqTr2yOPdE8VeOmkieggiLB6rdNCpibvkPT7LwizCEiflS129ctzidnYCM
-	r/eqHUs2BNCKfZC1k//QEi6LKgsyxcILBlu9NluPeGOypmlAnETm/ENpsWapD8+00fVOuuI2tjVlg
-	4lUsXxnBjpPg8ot0z+eQ==;
+	List-Owner; bh=m77AHDEbCFbMkCyFxjqIGN9h0ft8sGmELomVpt4j3Uw=; b=G5ScK70fpnUpLt
+	kTeN3ZT1PGLwgK/JSZbfhTY+JXy2If2UlvFGLGYaQELZJ5prwsTw6ISFYMTKnucQKp72PDZ9k9IdO
+	INDSYp/3fwntL2sTFbNcEu8EhfoYuOkiyuTJG91rHMkk7+pWnVdKspE/BUL7RczSGFEppbhHbEdgB
+	NTmOOGVo9UK4mYF6JHz+w+xaH01GAMtSirnhTzmzds+mH08PLh7fYWFPvxMFGNm155XwSpYjQmAMr
+	Prn7qClXUv/lvgNDQf9tK1o+fDieRxL3k111r0yfD0bgpQMnVl8E/F0Te5iX3sy6MpxTejr4rF42n
+	gKER/Sz7Ks9+KCnnXWSQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghhLG-0002kh-C2; Thu, 10 Jan 2019 20:54:18 +0000
-Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
+	id 1ghhMg-0004b0-Vr; Thu, 10 Jan 2019 20:55:46 +0000
+Received: from mx0b-001b2d01.pphosted.com ([148.163.158.5]
+ helo=mx0a-001b2d01.pphosted.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghhKK-0001o0-5u
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 20:53:23 +0000
-Received: by mail-lf1-x144.google.com with SMTP id y14so9267131lfg.13
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 10 Jan 2019 12:53:19 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=KjuAmgjHlhPWg7vZv/M0TlOMAshH0WF7o8w6mNSkFXw=;
- b=CjrkIM7BBTZSRBJobpknJiZPTJU+pWStblRgDCGvIVSFYmeF8Dnz0JCLPNXYGFBJ2c
- 5o+YvOuESHL8dY4RS8c0o1kAfJBaNzYdocDRTiLa/ADvs14oRcmd0AGMp2qJpf0bW0ZE
- trmGj2gXokwcGmxiik/0Y20U1LZIkXI0EvzltO+MVeXJSPKRaeptRxqJ21ZlpWH99ZUv
- f+hRpNmVObSMIbaQHg7ehKLsqrndLkWJSTIPk9n3oNLEx41eZj3qBohamSs6bb5Pi4mL
- ulTRXpuIQ/fJBwFMyutuCklpBALlN3FbTiUwRPH92EX0T6WTNAWuYzLtrJoTL/EPYC5M
- xP7w==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=KjuAmgjHlhPWg7vZv/M0TlOMAshH0WF7o8w6mNSkFXw=;
- b=oTbMUQKID8NXvukgu7j/hc91BsXKGimbsgq8DCBpRzAki1W9s9I6SucJhtgsdV5pdk
- vdvScLuyl2OOsaOx2RH/vBUM5+GycFFYrAlqeagwlogIyHacMrNCPtrquLzrTezANXD7
- Eju1MjnL2QU+USqvLAm/h0DgT5Wxq9/PLJtnXKchoFem9kQn5D14GXe9ONJM8PQYDFc9
- Ie8wrpKSbuQCn2A138Exhb65roYY/LhSk1ZePbHTVLY6NforFt7tZUIx5xcDWafxK2Zq
- yX/I44eFXz2TV1aMHzXeWbOj73iEr0JjK3j/LIFR9sWbpJ6xAVWQg0xu4UBWW9XlS4z5
- Rewg==
-X-Gm-Message-State: AJcUukfQHxKCwDafTHHwkN7u7sYaySvYcC/S6o+1KXszHdn+KXW2U7IS
- EMvnmblpDOWCWOGoe93zhac=
-X-Google-Smtp-Source: ALg8bN7adZ008RPmP0J1BWFEJu9/vRj31EhA6mkS1SlBCjLbIJYaMRKGnl7f69G+9tJtXMhStxu3Mw==
-X-Received: by 2002:a19:a9d2:: with SMTP id s201mr6402487lfe.154.1547153598199; 
- Thu, 10 Jan 2019 12:53:18 -0800 (PST)
-Received: from localhost.localdomain
- ([2a02:a315:5445:5300:5dc1:592c:c674:2869])
- by smtp.googlemail.com with ESMTPSA id
- z7-v6sm15389690lji.42.2019.01.10.12.53.16
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 10 Jan 2019 12:53:17 -0800 (PST)
-From: =?UTF-8?q?Pawe=C5=82=20Chmiel?= <pawel.mikolaj.chmiel@gmail.com>
-To: kgene@kernel.org
-Subject: [PATCH v2 4/4] ARM: defconfig: s5pv210: Add cpufreq support
-Date: Thu, 10 Jan 2019 21:52:15 +0100
-Message-Id: <20190110205215.22030-5-pawel.mikolaj.chmiel@gmail.com>
-X-Mailer: git-send-email 2.17.1
-In-Reply-To: <20190110205215.22030-1-pawel.mikolaj.chmiel@gmail.com>
-References: <20190110205215.22030-1-pawel.mikolaj.chmiel@gmail.com>
+ id 1ghhMc-0004a4-F9
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 20:55:44 +0000
+Received: from pps.filterd (m0098416.ppops.net [127.0.0.1])
+ by mx0b-001b2d01.pphosted.com (8.16.0.22/8.16.0.22) with SMTP id
+ x0AKsnG8173047
+ for <linux-arm-kernel@lists.infradead.org>; Thu, 10 Jan 2019 15:55:39 -0500
+Received: from e06smtp03.uk.ibm.com (e06smtp03.uk.ibm.com [195.75.94.99])
+ by mx0b-001b2d01.pphosted.com with ESMTP id 2pxawjenqc-1
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
+ for <linux-arm-kernel@lists.infradead.org>; Thu, 10 Jan 2019 15:55:39 -0500
+Received: from localhost
+ by e06smtp03.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
+ Violators will be prosecuted
+ for <linux-arm-kernel@lists.infradead.org> from <heiko.carstens@de.ibm.com>;
+ Thu, 10 Jan 2019 20:55:37 -0000
+Received: from b06cxnps4074.portsmouth.uk.ibm.com (9.149.109.196)
+ by e06smtp03.uk.ibm.com (192.168.101.133) with IBM ESMTP SMTP Gateway:
+ Authorized Use Only! Violators will be prosecuted; 
+ (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
+ Thu, 10 Jan 2019 20:55:26 -0000
+Received: from b06wcsmtp001.portsmouth.uk.ibm.com
+ (b06wcsmtp001.portsmouth.uk.ibm.com [9.149.105.160])
+ by b06cxnps4074.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
+ x0AKtPK95439922
+ (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Thu, 10 Jan 2019 20:55:25 GMT
+Received: from b06wcsmtp001.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id A06FAA4054;
+ Thu, 10 Jan 2019 20:55:25 +0000 (GMT)
+Received: from b06wcsmtp001.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id 48E49A405C;
+ Thu, 10 Jan 2019 20:55:24 +0000 (GMT)
+Received: from osiris (unknown [9.145.24.85])
+ by b06wcsmtp001.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
+ Thu, 10 Jan 2019 20:55:24 +0000 (GMT)
+Date: Thu, 10 Jan 2019 21:55:22 +0100
+From: Heiko Carstens <heiko.carstens@de.ibm.com>
+To: Arnd Bergmann <arnd@arndb.de>
+Subject: Re: [PATCH 07/11] y2038: syscalls: rename y2038 compat syscalls
+References: <20190110172216.313063-1-arnd@arndb.de>
+ <20190110172216.313063-8-arnd@arndb.de>
 MIME-Version: 1.0
+In-Reply-To: <20190110172216.313063-8-arnd@arndb.de>
+X-TM-AS-GCONF: 00
+x-cbid: 19011020-0012-0000-0000-000002E6217E
+X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
+x-cbparentid: 19011020-0013-0000-0000-0000211D2918
+Message-Id: <20190110205522.GC3676@osiris>
+Content-Disposition: inline
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2019-01-10_08:, , signatures=0
+X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
+ priorityscore=1501
+ malwarescore=0 suspectscore=1 phishscore=0 bulkscore=0 spamscore=0
+ clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
+ mlxlogscore=780 adultscore=0 classifier=spam adjust=0 reason=mlx
+ scancount=1 engine=8.0.1-1810050000 definitions=main-1901100162
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_125320_553588_A18A459C 
-X-CRM114-Status: GOOD (  11.31  )
+X-CRM114-CacheID: sfid-20190110_125543_270923_D2D56F8F 
+X-CRM114-Status: GOOD (  18.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,33 +107,58 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
- linux-samsung-soc@vger.kernel.org, linux-pm@vger.kernel.org,
- viresh.kumar@linaro.org, rjw@rjwysocki.net, linux@armlinux.org.uk,
- krzk@kernel.org, linux-kernel@vger.kernel.org, robh+dt@kernel.org,
- linux-arm-kernel@lists.infradead.org,
- =?UTF-8?q?Pawe=C5=82=20Chmiel?= <pawel.mikolaj.chmiel@gmail.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: dalias@libc.org, linux-ia64@vger.kernel.org, linux-sh@vger.kernel.org,
+ benh@kernel.crashing.org, will.deacon@arm.com, linux-mips@vger.kernel.org,
+ jcmvbkbc@gmail.com, netdev@vger.kernel.org, deepa.kernel@gmail.com,
+ hpa@zytor.com, sparclinux@vger.kernel.org, linux-arch@vger.kernel.org,
+ linux-s390@vger.kernel.org, y2038@lists.linaro.org, mpe@ellerman.id.au,
+ deller@gmx.de, x86@kernel.org, linux@armlinux.org.uk, mingo@redhat.com,
+ geert@linux-m68k.org, catalin.marinas@arm.com, firoz.khan@linaro.org,
+ mattst88@gmail.com, fenghua.yu@intel.com, linux-fsdevel@vger.kernel.org,
+ linux-m68k@lists.linux-m68k.org, luto@kernel.org, tglx@linutronix.de,
+ linux-arm-kernel@lists.infradead.org, monstr@monstr.eu, tony.luck@intel.com,
+ linux-parisc@vger.kernel.org, linux-api@vger.kernel.org,
+ linux-kernel@vger.kernel.org, paul.burton@mips.com, ebiederm@xmission.com,
+ linux-alpha@vger.kernel.org, schwidefsky@de.ibm.com, akpm@linux-foundation.org,
+ linuxppc-dev@lists.ozlabs.org, davem@davemloft.net
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-VGhpcyBjb21taXQgZW5hYmxlcyBjcHVmcmVxIHN1cHBvcnQgZm9yIGFsbCBzNXB2MjEwIGRldmlj
-ZXMuCgpTaWduZWQtb2ZmLWJ5OiBQYXdlxYIgQ2htaWVsIDxwYXdlbC5taWtvbGFqLmNobWllbEBn
-bWFpbC5jb20+Ci0tLQogYXJjaC9hcm0vY29uZmlncy9zNXB2MjEwX2RlZmNvbmZpZyB8IDYgKysr
-KysrCiAxIGZpbGUgY2hhbmdlZCwgNiBpbnNlcnRpb25zKCspCgpkaWZmIC0tZ2l0IGEvYXJjaC9h
-cm0vY29uZmlncy9zNXB2MjEwX2RlZmNvbmZpZyBiL2FyY2gvYXJtL2NvbmZpZ3MvczVwdjIxMF9k
-ZWZjb25maWcKaW5kZXggOTUxMTk2YmRmMDA4Li5mZDRmMjhhYWJkYTYgMTAwNjQ0Ci0tLSBhL2Fy
-Y2gvYXJtL2NvbmZpZ3MvczVwdjIxMF9kZWZjb25maWcKKysrIGIvYXJjaC9hcm0vY29uZmlncy9z
-NXB2MjEwX2RlZmNvbmZpZwpAQCAtMTEsNiArMTEsMTIgQEAgQ09ORklHX0FSQ0hfUzVQVjIxMD15
-CiBDT05GSUdfVk1TUExJVF8yRz15CiBDT05GSUdfQVJNX0FQUEVOREVEX0RUQj15CiBDT05GSUdf
-Q01ETElORT0icm9vdD0vZGV2L3JhbTAgcncgcmFtZGlzaz04MTkyIGluaXRyZD0weDIwODAwMDAw
-LDhNIGNvbnNvbGU9dHR5U0FDMSwxMTUyMDAgaW5pdD0vbGludXhyYyIKK0NPTkZJR19DUFVfRlJF
-UT15CitDT05GSUdfQ1BVX0ZSRVFfU1RBVD15CitDT05GSUdfQ1BVX0ZSRVFfREVGQVVMVF9HT1Zf
-T05ERU1BTkQ9eQorQ09ORklHX0NQVV9GUkVRX0dPVl9QT1dFUlNBVkU9bQorQ09ORklHX0NQVV9G
-UkVRX0dPVl9VU0VSU1BBQ0U9bQorQ09ORklHX0NQVV9GUkVRX0dPVl9DT05TRVJWQVRJVkU9bQog
-Q09ORklHX1ZGUD15CiBDT05GSUdfTkVPTj15CiBDT05GSUdfTU9EVUxFUz15Ci0tIAoyLjE3LjEK
-CgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1h
-cm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5v
-cmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0t
-a2VybmVsCg==
+On Thu, Jan 10, 2019 at 06:22:12PM +0100, Arnd Bergmann wrote:
+> diff --git a/arch/s390/kernel/syscalls/syscall.tbl b/arch/s390/kernel/syscalls/syscall.tbl
+> index f84ea364a302..b3199a744731 100644
+> --- a/arch/s390/kernel/syscalls/syscall.tbl
+> +++ b/arch/s390/kernel/syscalls/syscall.tbl
+> @@ -20,7 +20,7 @@
+>  10   common	unlink			sys_unlink			compat_sys_unlink
+>  11   common	execve			sys_execve			compat_sys_execve
+>  12   common	chdir			sys_chdir			compat_sys_chdir
+> -13   32		time			-				compat_sys_time
+> +13   32		time			-				sys_time32
+>  14   common	mknod			sys_mknod			compat_sys_mknod
+>  15   common	chmod			sys_chmod			compat_sys_chmod
+>  16   32		lchown			-				compat_sys_s390_lchown16
+> @@ -30,11 +30,11 @@
+>  22   common	umount			sys_oldumount			compat_sys_oldumount
+>  23   32		setuid			-				compat_sys_s390_setuid16
+>  24   32		getuid			-				compat_sys_s390_getuid16
+> -25   32		stime			-				compat_sys_stime
+> +25   32		stime			-				sys_stime32
+>  26   common	ptrace			sys_ptrace			compat_sys_ptrace
+>  27   common	alarm			sys_alarm			sys_alarm
+>  29   common	pause			sys_pause			sys_pause
+> -30   common	utime			sys_utime			compat_sys_utime
+> +30   common	utime			sys_utime			sys_utime32
+...(and more)...
+
+All of them need compat wrappers to clear the uppermost 33 bits of
+user space pointers. I assume there is no new *32 system call which
+takes u64/s64 arguments; so the pointers should be the only problem.
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
