@@ -2,68 +2,58 @@ Return-Path: <SRS0=vaNk=PS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E00F4C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 07:04:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E35D2C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 07:04:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AB41D2173B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 07:04:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B201C20657
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 10 Jan 2019 07:04:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WWkjK89W";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="H7QbmsPc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AB41D2173B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SkH4sq2Q"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B201C20657
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=84cISLJU6E49xGHYc+QICxf4vo7LAA8oqaguedLqSAQ=; b=WWkjK89WOAvnLd
-	4qw6+lfGRSuOIeh/aQIq3V8+EnxRObCyrAelgvmHtNJy0dSesOKWwps05Ce6s2JTxPHE2K/OnrZ67
-	nZnVBMoCvhgP1bY4fHZsgsXN+uRKnAt+Hf6QeAPurLIw+GbwhJzIBZhLU/2Oi3+hyIS/yCFgsCiVZ
-	zDPOx1kFsRXSIf48VTe/3EWmnixQXwhvUKr3srW1u0dYhESz7/SZnOW+EhHWEjBbG9INdKlLkqFrS
-	Jk81YtIEkLo043PC/Y4tYNa2bSOZabI8VdowVct/z68HoNkQSwk7UVnUbRwVmgy3pj3Og4L9A1ZGl
-	NJiEwd95mYAgiL4GH+5A==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=4oRwhJgo2MkrFwdigO26ePJbsxyrLUVUXNhkPnJUPZ4=; b=SkH4sq2QiNjZwtF06rBRyxMzN
+	a7ZKvw0aCM74uXrG5EkBKLHogyOlVaq7AzQSfKmmEHETi+cKurw0N+7e/IbisTNpJ+T4IbzFQHUWF
+	A/M8/0K91p0LN+pGRIwL9T/4r1npkClbklg8RpZjFO6GP38wjC6IGZqo8QH6G8yO1VW2KPoCeecDH
+	5YFq8xi8IgKigAxMSaNHVWS8H25XhuRpaSVqILZj9zMUb63ZzkW0LsALGKvfRmaDuTgtDqhk+xbRg
+	mrub2VTlIurTyroq30IUDVXo3jcGE5EPFfb9XR2CzK6Ozsm1FuvoR1yv9iGd2BtzmTxel+fzC08LM
+	VUSCEWaow==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghUNp-00087L-MY; Thu, 10 Jan 2019 07:04:05 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghUNl-00086l-IW
- for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 07:04:02 +0000
-Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
- (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id A975320657;
- Thu, 10 Jan 2019 07:03:57 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1547103841;
- bh=zJA2QWmPWQzBtdWt4XO4f9HuTEqs9pPqgsZnQhYFRSM=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=H7QbmsPceOK6nrXYKIeoJYZ/i4f5RjhMnLcODT2xH0MVTEvfep7CK5yiSnbm7VM9Y
- lRsJ52SJOGSeiHWFEPe+0k8oH06vh7Csr3mrx5Cdjq2KZmtl76VoJ8BIBlDnrWB5Da
- clYiA/EqF/NISjTk99zRDV5es9xFFf5+lvL5gAfE=
-Date: Thu, 10 Jan 2019 15:03:50 +0800
-From: Shawn Guo <shawnguo@kernel.org>
-To: Patrick Havelange <patrick.havelange@essensium.com>
-Subject: Re: [PATCH] ARM: dts: ls1021a: Add memory controller
-Message-ID: <20190110070348.GD25218@dragon>
-References: <20181211154834.4489-1-patrick.havelange@essensium.com>
+	id 1ghUO5-0008Ne-4q; Thu, 10 Jan 2019 07:04:21 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghUNz-0008Jx-SE
+ for linux-arm-kernel@lists.infradead.org; Thu, 10 Jan 2019 07:04:18 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id B697520A16; Thu, 10 Jan 2019 08:04:14 +0100 (CET)
+Received: from localhost (lfbn-1-10718-76.w90-89.abo.wanadoo.fr [90.89.68.76])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 830A720729;
+ Thu, 10 Jan 2019 08:04:04 +0100 (CET)
+Date: Thu, 10 Jan 2019 08:04:04 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Jernej Skrabec <jernej.skrabec@siol.net>
+Subject: Re: [PATCH] arm64: dts: allwinner: a64: Fix USB OTG regulator
+Message-ID: <20190110070404.gmthhqpehllvatp7@flea>
+References: <20190109181604.16988-1-jernej.skrabec@siol.net>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181211154834.4489-1-patrick.havelange@essensium.com>
-User-Agent: Mutt/1.5.21 (2010-09-15)
+In-Reply-To: <20190109181604.16988-1-jernej.skrabec@siol.net>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190109_230401_629140_13DBA812 
-X-CRM114-Status: UNSURE (   9.08  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190109_230416_210661_BBCF0E31 
+X-CRM114-Status: GOOD (  11.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,26 +65,72 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- arnout.vandecappelle@essensium.com, matthew.weber@rockwellcollins.com,
- linux-kernel@vger.kernel.org, Li Yang <leoyang.li@nxp.com>,
- Rob Herring <robh+dt@kernel.org>, Borislav Petkov <bp@alien8.de>,
- Mauro Carvalho Chehab <mchehab@kernel.org>,
- linux-arm-kernel@lists.infradead.org, linux-edac@vger.kernel.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ linux-sunxi@googlegroups.com, linux-kernel@vger.kernel.org,
+ stable@vger.kernel.org, wens@csie.org, robh+dt@kernel.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: multipart/mixed; boundary="===============4823834946956320122=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 11, 2018 at 04:48:34PM +0100, Patrick Havelange wrote:
-> The LS1021A has a memory controller that supports EDAC. This commit
-> adds an entry for it.
-> 
-> Signed-off-by: Patrick Havelange <patrick.havelange@essensium.com>
 
-Applied, thanks.
+--===============4823834946956320122==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="nrx4fsnyeq3jeufe"
+Content-Disposition: inline
+
+
+--nrx4fsnyeq3jeufe
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Wed, Jan 09, 2019 at 07:16:04PM +0100, Jernej Skrabec wrote:
+> Currently, AXP803 driver assumes that reg_drivevbus is input which is
+> wrong. Unfortunate consequence of that is that none of the USB ports
+> work on the board, even USB HOST port, because USB PHY driver probing
+> fails due to missing regulator.
+>=20
+> Fix that by adding "x-powers,drive-vbus-en" property to AXP803 node.
+>=20
+> Fixes: 14ff5d8f9151 ("arm64: dts: allwinner: a64: Orange Pi Win: Enable U=
+SB OTG socket")
+>=20
+> Cc: stable@vger.kernel.org
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+
+Applied, thanks!
+Maxime
+
+--=20
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+
+--nrx4fsnyeq3jeufe
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXDbuZAAKCRDj7w1vZxhR
+xcNNAQCpjQz3/Y9S6ezBZ/Cpt0gKdZJEFq0gBWu+rBA/9Sc3LAD/VauvK1wSERHI
+51ycvmN7+U85damhGd9JfgAZmSgebgI=
+=mixa
+-----END PGP SIGNATURE-----
+
+--nrx4fsnyeq3jeufe--
+
+
+--===============4823834946956320122==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============4823834946956320122==--
+
