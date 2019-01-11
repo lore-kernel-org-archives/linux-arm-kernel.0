@@ -2,73 +2,89 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 205FFC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 01:19:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 721CFC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 01:28:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D710B20872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 01:19:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4372920879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 01:28:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BzJBNOJq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D710B20872
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pqpbuRf8";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="PX0kpIsH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4372920879
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
+	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RzFvzZlq4RlY3UI0MY66uwGOzh+LBmMfB02i1/NabDw=; b=BzJBNOJqCjtkwz
-	iSe6xIE/YFK/62lJBVWJTFaMoqCIMmbV3LtPhq4xXAg3sCyhNfGur1SNd9mchHxUY0zPOLaqsE+Iv
-	zFxgF1lBGkt5kEW6map92Zr39G43N9DKnZryaT4V952MbSFD8gTWCY5gD+WsNZjqKTF1VAmiIe9ho
-	/U5tNjtjCrwyxpNKgDmsMkWmmGSD8nndT1aBFJg8TmoSM5FOyzc9NRyMIwokTQxYOBlRg4LZFJuJA
-	tlJC9+hJXhPGIYFv8KOq7T+yc+N70A1K4G5+ntqVzuu6D2eqSouLRQzbvlo5POMMVCVSyOhWf3/1O
-	QNz+zpK9USe8BmOQnXSg==;
+	List-Owner; bh=vTeeT/prclWX7Chp7b1abOaWbp09N0to5ANVk6UGsGg=; b=pqpbuRf8KOjIZe
+	uXJIm1sG+1M5eSSjvEMl7ZHgKtrfkZ6w3SXozGC+swZ3At8g0G8rnqE/twzZuIDafNcGuorOVlJgj
+	OXjo7Qavgp3xXz+W04GIi/1G8gKiigPKzwrqhfSLG+UNX5Mu3Wm65c+WIa2aXLwxF84WzvbM4+56n
+	TwjgCf3cFkYt/FWfXZmJ4C9rZ+flrjTOeIq8RJkj/zhqXNnzNoKu74ZFaga+uT618N4RBSoUxPDQB
+	2ZmE0zBrLt8HzwAOWqrRUKQWUSFLezxer5/edGQ3sH3umza36y5Ge/MGjXpaxjHHDwRDtW7pLgUkC
+	LW5VtSH7uvWoaRZFmB1A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghlTi-0005gm-Ov; Fri, 11 Jan 2019 01:19:18 +0000
-Received: from mailgw02.mediatek.com ([216.200.240.185])
+	id 1ghlcP-0000N9-AX; Fri, 11 Jan 2019 01:28:17 +0000
+Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghlTW-0005X0-3K; Fri, 11 Jan 2019 01:19:16 +0000
-X-UUID: d9b1fb2c8d434ce38448e143387a3341-20190110
-X-UUID: d9b1fb2c8d434ce38448e143387a3341-20190110
-Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw02.mediatek.com
- (envelope-from <long.cheng@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 2064551275; Thu, 10 Jan 2019 17:18:48 -0800
-Received: from MTKMBS06N1.mediatek.inc (172.21.101.129) by
- MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Thu, 10 Jan 2019 17:18:46 -0800
-Received: from MTKCAS32.mediatek.inc (172.27.4.184) by mtkmbs06n1.mediatek.inc
- (172.21.101.129) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Fri, 11 Jan 2019 09:18:44 +0800
-Received: from [10.17.3.153] (10.17.3.153) by MTKCAS32.mediatek.inc
- (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Fri, 11 Jan 2019 09:18:43 +0800
-Message-ID: <1547169522.3831.47.camel@mhfsdcap03>
-Subject: Re: [PATCH v9 1/2] dmaengine: 8250_mtk_dma: add MediaTek uart DMA
- support
-From: Long Cheng <long.cheng@mediatek.com>
-To: Vinod Koul <vkoul@kernel.org>
-Date: Fri, 11 Jan 2019 09:18:42 +0800
-In-Reply-To: <1547116431.3831.43.camel@mhfsdcap03>
-References: <1546395178-8880-1-git-send-email-long.cheng@mediatek.com>
- <1546395178-8880-2-git-send-email-long.cheng@mediatek.com>
- <20190104171953.GQ13372@vkoul-mobl.Dlink>
- <1547116431.3831.43.camel@mhfsdcap03>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+ id 1ghlcL-0000MK-Pd
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 01:28:15 +0000
+Received: by mail-pg1-x544.google.com with SMTP id w6so5594849pgl.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 10 Jan 2019 17:28:13 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:in-reply-to:references:date:message-id
+ :mime-version; bh=2P+pkq/TAVJfpx+QVUhCn9RikOPq88PivZzjtOGkCms=;
+ b=PX0kpIsHZAopLUpTUOPcmSxdoYqWG3Yy2a/gSt4fMAnFTPMwwUZp9lvNX7iUhe0CEO
+ mr97YQ7w7MATf/6pJT7ZjTp5xduZAHtwnnPdIDJ5cb3ltat7IkZXULfiL7Iz5aMqdKmb
+ M1IPOaheORYcAz6PekI7TF5iRMtxmFJWNu6bHeQM56HEB3a+r/+zhiKS29cOuIjP50Dq
+ +mv6Kn5EWfNVPwXwYrsIhj7tXR4JUNhGgkE3oiTS/CeZoxr5Nn/fVQjE6mC682Hrq1My
+ arIrXEGnTS9VKPbcKRtVdYDn9EYVAKzl1Hk7q6W5/SPh8wZsW9V4vUCpsHs66BuSnPfj
+ VqCQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:in-reply-to:references:date
+ :message-id:mime-version;
+ bh=2P+pkq/TAVJfpx+QVUhCn9RikOPq88PivZzjtOGkCms=;
+ b=qwabXGhm4/GL1gN1dwvkKKHmc2bqMJYNuScqtgdREkAUGgLKAXRBmQn8yeE/80JnGb
+ tGkEVX0I6DD93WCqnUv1U+NtjkTUrKFRPJrhDTv4id6NLKbOZEAKkw8Uup7qL1lu76V5
+ Gv41zQX6rgDvws6Ci98sbe3Vw9i8xMuNDq9ofWp5SmQH5tfHkQYkldjNnTthV1t4wFZR
+ ZsIQdLN98WYSjs+iFDsppdU1RvjdjF+dLBLiBl43fHyegm/Xs4/DU3cxzFIDqCx9xj6T
+ zgB9ZRjyRwwGM3SU8R/8R2Obt468c2Td5SpUM5Zrsp9V5FcdqqvAJf1utxMFzemzGDQG
+ OThg==
+X-Gm-Message-State: AJcUukfIlUucppO3o3h2Udh3IuAbxSx4cZG/tYRfRRv6ohHqgmcn67dY
+ fDwCT5gEYlZ4R5l9CH7ODYTqKw==
+X-Google-Smtp-Source: ALg8bN5IO4BJcANmQlKQXyWnapZsR/3IqoI/v9r4ESHNsrGTcIk1c3DNbMbLWi6X4V8xHzoCBXXJsQ==
+X-Received: by 2002:a63:184a:: with SMTP id 10mr11378583pgy.81.1547170092711; 
+ Thu, 10 Jan 2019 17:28:12 -0800 (PST)
+Received: from localhost (c-71-197-186-152.hsd1.wa.comcast.net.
+ [71.197.186.152]) by smtp.googlemail.com with ESMTPSA id
+ r187sm242710873pfc.63.2019.01.10.17.28.11
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Thu, 10 Jan 2019 17:28:12 -0800 (PST)
+From: Kevin Hilman <khilman@baylibre.com>
+To: Loys Ollivier <lollivier@baylibre.com>, devicetree@vger.kernel.org,
+ linux-amlogic@lists.infradead.org
+Subject: Re: [PATCH v3] arm64: dts: meson: Fix mmc cd-gpios polarity
+In-Reply-To: <1547134822-18498-1-git-send-email-lollivier@baylibre.com>
+References: <1547134822-18498-1-git-send-email-lollivier@baylibre.com>
+Date: Thu, 10 Jan 2019 17:28:11 -0800
+Message-ID: <7hftu0oudw.fsf@baylibre.com>
 MIME-Version: 1.0
-X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_171907_011091_B64B961B 
-X-CRM114-Status: GOOD (  27.73  )
+X-CRM114-CacheID: sfid-20190110_172813_831219_8FCAC748 
+X-CRM114-Status: UNSURE (   9.29  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,290 +96,37 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Sean Wang <sean.wang@kernel.org>,
- Ryder Lee <ryder.lee@mediatek.com>, Zhenbao Liu <zhenbao.liu@mediatek.com>,
- Nicolas Boichat <drinkcat@chromium.org>, Long
- Cheng <long.cheng@mediatek.com>, linux-serial@vger.kernel.org,
- Jiri Slaby <jslaby@suse.com>, YT
- Shen <yt.shen@mediatek.com>, Yingjoe Chen <yingjoe.chen@mediatek.com>,
- devicetree@vger.kernel.org, Sean Wang <sean.wang@mediatek.com>,
- Rob Herring <robh+dt@kernel.org>, linux-mediatek@lists.infradead.org,
- Matthias Brugger <matthias.bgg@gmail.com>,
- Dan Williams <dan.j.williams@intel.com>, linux-arm-kernel@lists.infradead.org,
- srv_heupstream@mediatek.com, Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Randy Dunlap <rdunlap@infradead.org>, linux-kernel@vger.kernel.org,
- dmaengine@vger.kernel.org
+Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ Linus Walleij <linus.walleij@linaro.org>,
+ Loys Ollivier <lollivier@baylibre.com>, linux-mmc@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ Jerome Brunet <jbrunet@baylibre.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 2019-01-10 at 18:33 +0800, Long Cheng wrote:
-fix spell error
+Loys Ollivier <lollivier@baylibre.com> writes:
 
-> On Fri, 2019-01-04 at 22:49 +0530, Vinod Koul wrote:
-> > On 02-01-19, 10:12, Long Cheng wrote:
-> > > In DMA engine framework, add 8250 uart dma to support MediaTek uart.
-> > > If MediaTek uart enabled(SERIAL_8250_MT6577), and want to improve
-> > > the performance, can enable the function.
-> > 
-> > Is the DMA controller UART specific, can it work with other controllers
-> > as well, if so you should get rid of uart name in patch
-> > 
-> 
-> I don't know that it can work or not on other controller. but it's for
-> MediaTek SOC
-> 
-> > > +#define MTK_UART_APDMA_CHANNELS		(CONFIG_SERIAL_8250_NR_UARTS * 2)
-> > 
-> > Why are the channels not coming from DT?
-> > 
-> 
-> i will using dma-requests install of it.
-> 
-i will using 'dma-requests' instead of it.
+> Commit 89a5e15bcba8 ("gpio/mmc/of: Respect polarity in the device tree")
+> changed the behavior of "cd-inverted" to follow the device tree bindings
+> specification.
+> Lines specifying "cd-inverted" are now "active high".
+>
+> Fix the SD card for meson by setting the cd-gpios as "active low" according
+> to the boards specifications.
+>
+> Fixes: 89a5e15bcba8 ("gpio/mmc/of: Respect polarity in the device tree")
+> Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
 
-> > > +
-> > > +#define VFF_EN_B		BIT(0)
-> > > +#define VFF_STOP_B		BIT(0)
-> > > +#define VFF_FLUSH_B		BIT(0)
-> > > +#define VFF_4G_SUPPORT_B	BIT(0)
-> > > +#define VFF_RX_INT_EN0_B	BIT(0)	/*rx valid size >=  vff thre*/
-> > > +#define VFF_RX_INT_EN1_B	BIT(1)
-> > > +#define VFF_TX_INT_EN_B		BIT(0)	/*tx left size >= vff thre*/
-> > 
-> > space around /* space */ also run checkpatch to check for style errors
-> > 
-> 
-> ok.
-> 
-> > > +static void mtk_uart_apdma_start_tx(struct mtk_chan *c)
-> > > +{
-> > > +	unsigned int len, send, left, wpt, d_wpt, tmp;
-> > > +	int ret;
-> > > +
-> > > +	left = mtk_uart_apdma_read(c, VFF_LEFT_SIZE);
-> > > +	if (!left) {
-> > > +		mtk_uart_apdma_write(c, VFF_INT_EN, VFF_TX_INT_EN_B);
-> > > +		return;
-> > > +	}
-> > > +
-> > > +	/* Wait 1sec for flush,  can't sleep*/
-> > > +	ret = readx_poll_timeout(readl, c->base + VFF_FLUSH, tmp,
-> > > +			tmp != VFF_FLUSH_B, 0, 1000000);
-> > > +	if (ret)
-> > > +		dev_warn(c->vc.chan.device->dev, "tx: fail, debug=0x%x\n",
-> > > +			mtk_uart_apdma_read(c, VFF_DEBUG_STATUS));
-> > > +
-> > > +	send = min_t(unsigned int, left, c->desc->avail_len);
-> > > +	wpt = mtk_uart_apdma_read(c, VFF_WPT);
-> > > +	len = mtk_uart_apdma_read(c, VFF_LEN);
-> > > +
-> > > +	d_wpt = wpt + send;
-> > > +	if ((d_wpt & VFF_RING_SIZE) >= len) {
-> > > +		d_wpt = d_wpt - len;
-> > > +		d_wpt = d_wpt ^ VFF_RING_WRAP;
-> > > +	}
-> > > +	mtk_uart_apdma_write(c, VFF_WPT, d_wpt);
-> > > +
-> > > +	c->desc->avail_len -= send;
-> > > +
-> > > +	mtk_uart_apdma_write(c, VFF_INT_EN, VFF_TX_INT_EN_B);
-> > > +	if (mtk_uart_apdma_read(c, VFF_FLUSH) == 0U)
-> > > +		mtk_uart_apdma_write(c, VFF_FLUSH, VFF_FLUSH_B);
-> > > +}
-> > > +
-> > > +static void mtk_uart_apdma_start_rx(struct mtk_chan *c)
-> > > +{
-> > > +	struct mtk_uart_apdma_desc *d = c->desc;
-> > > +	unsigned int len, wg, rg, cnt;
-> > > +
-> > > +	if ((mtk_uart_apdma_read(c, VFF_VALID_SIZE) == 0U) ||
-> > > +		!d || !vchan_next_desc(&c->vc))
-> > > +		return;
-> > > +
-> > > +	len = mtk_uart_apdma_read(c, VFF_LEN);
-> > > +	rg = mtk_uart_apdma_read(c, VFF_RPT);
-> > > +	wg = mtk_uart_apdma_read(c, VFF_WPT);
-> > > +	if ((rg ^ wg) & VFF_RING_WRAP)
-> > > +		cnt = (wg & VFF_RING_SIZE) + len - (rg & VFF_RING_SIZE);
-> > > +	else
-> > > +		cnt = (wg & VFF_RING_SIZE) - (rg & VFF_RING_SIZE);
-> > > +
-> > > +	c->rx_status = cnt;
-> > > +	mtk_uart_apdma_write(c, VFF_RPT, wg);
-> > > +
-> > > +	list_del(&d->vd.node);
-> > > +	vchan_cookie_complete(&d->vd);
-> > > +}
-> > 
-> > this looks odd, why do you have different rx and tx start routines?
-> > 
-> 
-> Would you like explain it in more detail? thanks.
-> In tx function, will wait the last data flush done. and the count the
-> size that send.
-> In Rx function, will count the size that receive.
-> Any way, in rx / tx, need andle WPT or RPT.
-> 
-Any way, in rx / tx, need handle WPT or RPT.
+Thanks for fixing this!
 
-> > > +static int mtk_uart_apdma_alloc_chan_resources(struct dma_chan *chan)
-> > > +{
-> > > +	struct mtk_uart_apdmadev *mtkd = to_mtk_uart_apdma_dev(chan->device);
-> > > +	struct mtk_chan *c = to_mtk_uart_apdma_chan(chan);
-> > > +	u32 tmp;
-> > > +	int ret;
-> > > +
-> > > +	pm_runtime_get_sync(mtkd->ddev.dev);
-> > > +
-> > > +	mtk_uart_apdma_write(c, VFF_ADDR, 0);
-> > > +	mtk_uart_apdma_write(c, VFF_THRE, 0);
-> > > +	mtk_uart_apdma_write(c, VFF_LEN, 0);
-> > > +	mtk_uart_apdma_write(c, VFF_RST, VFF_WARM_RST_B);
-> > > +
-> > > +	ret = readx_poll_timeout(readl, c->base + VFF_EN, tmp,
-> > > +			tmp == 0, 10, 100);
-> > > +	if (ret) {
-> > > +		dev_err(chan->device->dev, "dma reset: fail, timeout\n");
-> > > +		return ret;
-> > > +	}
-> > 
-> > register read does reset?
-> > 
-> 
-> 'mtk_uart_apdma_write(c, VFF_RST, VFF_WARM_RST_B);' is reset. resd just
-> poll reset done.
-> 
-> > > +
-> > > +	if (!c->requested) {
-> > > +		c->requested = true;
-> > > +		ret = request_irq(mtkd->dma_irq[chan->chan_id],
-> > > +				  mtk_uart_apdma_irq_handler, IRQF_TRIGGER_NONE,
-> > > +				  KBUILD_MODNAME, chan);
-> > 
-> > why is the irq not requested in driver probe?
-> > 
-> 
-> I have explained in below,
-> http://lists.infradead.org/pipermail/linux-mediatek/2018-December/016418.html
-> 
-> > > +static enum dma_status mtk_uart_apdma_tx_status(struct dma_chan *chan,
-> > > +					 dma_cookie_t cookie,
-> > > +					 struct dma_tx_state *txstate)
-> > > +{
-> > > +	struct mtk_chan *c = to_mtk_uart_apdma_chan(chan);
-> > > +	enum dma_status ret;
-> > > +	unsigned long flags;
-> > > +
-> > > +	if (!txstate)
-> > > +		return DMA_ERROR;
-> > > +
-> > > +	ret = dma_cookie_status(chan, cookie, txstate);
-> > > +	spin_lock_irqsave(&c->vc.lock, flags);
-> > > +	if (ret == DMA_IN_PROGRESS) {
-> > > +		c->rx_status = mtk_uart_apdma_read(c, VFF_RPT) & VFF_RING_SIZE;
-> > > +		dma_set_residue(txstate, c->rx_status);
-> > > +	} else if (ret == DMA_COMPLETE && c->cfg.direction == DMA_DEV_TO_MEM) {
-> > 
-> > why set reside when it is complete? also reside can be null, that should
-> > be checked as well
-> > 
-> In different status, set different reside.
-> 
-> > > +static struct dma_async_tx_descriptor *mtk_uart_apdma_prep_slave_sg
-> > > +	(struct dma_chan *chan, struct scatterlist *sgl,
-> > > +	unsigned int sglen, enum dma_transfer_direction dir,
-> > > +	unsigned long tx_flags, void *context)
-> > > +{
-> > > +	struct mtk_chan *c = to_mtk_uart_apdma_chan(chan);
-> > > +	struct mtk_uart_apdma_desc *d;
-> > > +
-> > > +	if ((dir != DMA_DEV_TO_MEM) &&
-> > > +		(dir != DMA_MEM_TO_DEV)) {
-> > > +		dev_err(chan->device->dev, "bad direction\n");
-> > > +		return NULL;
-> > > +	}
-> > 
-> > we have a macro for this
-> 
-> Thanks for your suggestion. i will modify it.
-> > 
-> > > +
-> > > +	/* Now allocate and setup the descriptor */
-> > > +	d = kzalloc(sizeof(*d), GFP_ATOMIC);
-> > > +	if (!d)
-> > > +		return NULL;
-> > > +
-> > > +	/* sglen is 1 */
-> > 
-> > ?
-> > 
-> > > +static int mtk_uart_apdma_slave_config(struct dma_chan *chan,
-> > > +				struct dma_slave_config *cfg)
-> > > +{
-> > > +	struct mtk_chan *c = to_mtk_uart_apdma_chan(chan);
-> > > +	struct mtk_uart_apdmadev *mtkd =
-> > > +				to_mtk_uart_apdma_dev(c->vc.chan.device);
-> > > +
-> > > +	c->cfg = *cfg;
-> > > +
-> > > +	if (cfg->direction == DMA_DEV_TO_MEM) {
-> > 
-> > fg->direction is deprecated, in fact I have removed all users recently,
-> > please do not use this
-> 
-> You will remove 'direction' in 'struct dma_slave_config'? if remove, how
-> do confirm direction?
-> 
-> > 
-> > > +		unsigned int rx_len = cfg->src_addr_width * 1024;
-> > > +
-> > > +		mtk_uart_apdma_write(c, VFF_ADDR, cfg->src_addr);
-> > > +		mtk_uart_apdma_write(c, VFF_LEN, rx_len);
-> > > +		mtk_uart_apdma_write(c, VFF_THRE, VFF_RX_THRE(rx_len));
-> > > +		mtk_uart_apdma_write(c, VFF_INT_EN,
-> > > +				VFF_RX_INT_EN0_B | VFF_RX_INT_EN1_B);
-> > > +		mtk_uart_apdma_write(c, VFF_RPT, 0);
-> > > +		mtk_uart_apdma_write(c, VFF_INT_FLAG, VFF_RX_INT_FLAG_CLR_B);
-> > > +		mtk_uart_apdma_write(c, VFF_EN, VFF_EN_B);
-> > 
-> > why are we writing this here, we are supposed to do that when txn
-> > starts!
-> > 
-> 
-> also you can review the link
-> http://lists.infradead.org/pipermail/linux-mediatek/2018-December/016418.html
-> 
-> > > +static int mtk_uart_apdma_device_resume(struct dma_chan *chan)
-> > > +{
-> > > +	/* just for check caps pass */
-> > > +	return 0;
-> > > +}
-> > 
-> > if you do not support this please remove this!
-> > 
-> > > +static void mtk_uart_apdma_free(struct mtk_uart_apdmadev *mtkd)
-> > > +{
-> > > +	while (list_empty(&mtkd->ddev.channels) == 0) {
-> > > +		struct mtk_chan *c = list_first_entry(&mtkd->ddev.channels,
-> > > +			struct mtk_chan, vc.chan.device_node);
-> > > +
-> > > +		list_del(&c->vc.chan.device_node);
-> > > +		tasklet_kill(&c->vc.task);
-> > > +	}
-> > > +}
-> > > +
-> > > +static const struct of_device_id mtk_uart_apdma_match[] = {
-> > > +	{ .compatible = "mediatek,mt6577-uart-dma", },
-> > 
-> > where is the binding document for ediatek,mt6577-uart-dma ??
-> > 
-> 
-> http://lists.infradead.org/pipermail/linux-mediatek/2018-December/016154.html
-> 
+Queued as a fix for v5.1-rc,
 
+I see that this is being fixed in the driver also, but I think fixing
+the DTs is necessary also.
 
+Kevin
 
 _______________________________________________
 linux-arm-kernel mailing list
