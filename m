@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1243DC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 10:53:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 92F1FC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 10:55:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D806A20872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 10:53:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5D7E220872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 10:55:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bm5h2yPW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D806A20872
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l8MW4HHz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5D7E220872
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=rjwysocki.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,37 +25,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=GMRDs2f4XvjBd3sodxh/+y02+ZGktlnrEFaDPExOLPw=; b=bm5h2yPW8zk1KF
-	SqdLMi45wAt5qAGsudULlPBe3H5ILFcSslKnSyJpDPh57kdlgYT0MLFFL1rt1MiUh0JebyUMUQ5Hr
-	C6T15HFhPPVNdQ8Alf2dZs7ciWRAtUecsziwGxEsHgYDShcurp3o+zYZHH0Yhe5U37NLzWQGyOA2s
-	4uJ+wOZKhmUU+w+3nCQ17CFmSHQtVwkds5ZpHn+5kRYLx8Z0YB3RCs8EO0YAnvQvyXF94pA4zNmyt
-	kIGcqIMqQ9eZ6/GWMm0UfRglfxPtMKZyrK1Nf42q8LZ/And+B4z7hUTJXkW7HNzlJlgbqWe6mrlxy
-	xRrXgDfFDR1+If2Q9y5A==;
+	List-Owner; bh=DOK7RPF3tSLFffa6VZkdbcw6KHzunH9kO7AlnMVKnnk=; b=l8MW4HHzUa1Pw0
+	+fHXPx6BNjTszwUt1LeIDFdUvgv+RgLNGk3SZBcAOiyXYzcyFr1xFrrezDJX2mXasT8J53gvm07Hf
+	2D8Huk4lSTZC1nS74UCNy0U/2x/iCllV3xgBOBJHTaUTDdXjdIq3p1KyM87W9bRUBjMieeauJ3mzp
+	7LhUMvQqPBO+CvUeobiDDu5drQhw5N7aczkNxG3whDb7q9P9yq88pPR41dUAwNGZKhJurk1MU3MzP
+	MADiF1khkvIx5FBRWNd/prImLIDmaxGruyhsWkVjNoIeqrGl7rbi+34E34fyxMJW34THn5YOKJhfF
+	IZyo42F1Flt6O9mGTWcA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghuRc-0001d6-9l; Fri, 11 Jan 2019 10:53:44 +0000
+	id 1ghuT4-0003WD-RL; Fri, 11 Jan 2019 10:55:14 +0000
 Received: from cloudserver094114.home.pl ([79.96.170.134])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghuRZ-0001ch-7g
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 10:53:42 +0000
+ id 1ghuT1-0003Ut-7F
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 10:55:12 +0000
 Received: from 79.184.254.168.ipv4.supernova.orange.pl (79.184.254.168) (HELO
  aspire.rjw.lan)
  by serwer1319399.home.pl (79.96.170.134) with SMTP (IdeaSmtpServer 0.83.183)
- id 0b5c9bc25c66d993; Fri, 11 Jan 2019 11:53:39 +0100
+ id ac8736e6ecfb3cd6; Fri, 11 Jan 2019 11:55:08 +0100
 From: "Rafael J. Wysocki" <rjw@rjwysocki.net>
 To: Ulf Hansson <ulf.hansson@linaro.org>
-Subject: Re: [PATCH v10 01/27] PM / Domains: Add generic data pointer to
- genpd_power_state struct
-Date: Fri, 11 Jan 2019 11:52:52 +0100
-Message-ID: <5682777.oKQsr9mDaT@aspire.rjw.lan>
-In-Reply-To: <CAPDyKFp=z0TS5oDD7muRCSuqqJ5sj-vOUyTf9tUJfXgWyE64Mg@mail.gmail.com>
+Subject: Re: [PATCH v10 02/27] PM / Domains: Add support for CPU devices to
+ genpd
+Date: Fri, 11 Jan 2019 11:54:20 +0100
+Message-ID: <1993885.1ZciKZtFgT@aspire.rjw.lan>
+In-Reply-To: <CAPDyKFpPa1u1ouoa2zFzMe2McqEpxu7Vex2zd1nYoQUQtY2s-A@mail.gmail.com>
 References: <20181129174700.16585-1-ulf.hansson@linaro.org>
- <81caa4b6-d0ac-f351-2ecf-47fb0f7dcc74@linaro.org>
- <CAPDyKFp=z0TS5oDD7muRCSuqqJ5sj-vOUyTf9tUJfXgWyE64Mg@mail.gmail.com>
+ <45ff9a4b-6130-7800-28cc-a2f5f736f44b@linaro.org>
+ <CAPDyKFpPa1u1ouoa2zFzMe2McqEpxu7Vex2zd1nYoQUQtY2s-A@mail.gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_025341_434671_5A4807EB 
-X-CRM114-Status: GOOD (  23.87  )
+X-CRM114-CacheID: sfid-20190111_025511_425304_EBA6A453 
+X-CRM114-Status: GOOD (  26.07  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,20 +85,25 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tuesday, December 18, 2018 12:53:28 PM CET Ulf Hansson wrote:
-> On Tue, 18 Dec 2018 at 11:39, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+On Wednesday, December 19, 2018 11:02:05 AM CET Ulf Hansson wrote:
+> On Wed, 19 Dec 2018 at 10:53, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
 > >
 > > On 29/11/2018 18:46, Ulf Hansson wrote:
-> > > Let's add a data pointer to the genpd_power_state struct, to allow a genpd
-> > > backend driver to store per state specific data. In order to introduce the
-> > > pointer, we also need to adopt how genpd frees the allocated data for the
-> > > default genpd_power_state struct, that it may allocate at pm_genpd_init().
+> > > To enable a device belonging to a CPU to be attached to a PM domain managed
+> > > by genpd, let's do a few changes to it, as to make it convenient to manage
+> > > the specifics around CPUs.
 > > >
-> > > More precisely, let's use an internal genpd flag to understand when the
-> > > states needs to be freed by genpd. When freeing the states data in
-> > > genpd_remove(), let's also clear the corresponding genpd->states pointer
-> > > and reset the genpd->state_count. In this way, a genpd backend driver
-> > > becomes aware of when there is state specific data for it to free.
+> > > To be able to quickly find out what CPUs that are attached to a genpd,
+> > > which typically becomes useful from a genpd governor as following changes
+> > > is about to show, let's add a cpumask to the struct generic_pm_domain. At
+> > > the point when a CPU device gets attached to a genpd, let's update its
+> > > cpumask. Moreover, let's also propagate changes to the cpumask upwards in
+> > > the topology to the master PM domains. In this way, the cpumask for a genpd
+> > > hierarchically reflects all CPUs attached to the topology below it.
+> > >
+> > > Finally, let's make this an opt-in feature, to avoid having to manage CPUs
+> > > and the cpumask for a genpd that doesn't need it. For that reason, let's
+> > > add a new genpd configuration bit, GENPD_FLAG_CPU_DOMAIN.
 > > >
 > > > Cc: Lina Iyer <ilina@codeaurora.org>
 > > > Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
@@ -106,57 +111,58 @@ On Tuesday, December 18, 2018 12:53:28 PM CET Ulf Hansson wrote:
 > > > ---
 > > >
 > > > Changes in v10:
-> > >       - Update the patch allow backend drivers to free the states specific
-> > >         data during genpd removal. Due to this added complexity, I decided to
-> > >         keep the patch separate, rather than fold it into the patch that makes
-> > >         use of the new void pointer, which was suggested by Rafael.
-> > >       - Claim authorship of the patch as lots of changes has been done since
-> > >         the original pick up from Lina Iyer.
+> > >       - Don't allocate the cpumask when not used.
+> > >       - Simplify the code that updates the cpumask.
+> > >       - Document the GENPD_FLAG_CPU_DOMAIN.
 > > >
 > > > ---
-> > >  drivers/base/power/domain.c | 8 ++++++--
-> > >  include/linux/pm_domain.h   | 3 ++-
-> > >  2 files changed, 8 insertions(+), 3 deletions(-)
+> > >  drivers/base/power/domain.c | 66 ++++++++++++++++++++++++++++++++++++-
+> > >  include/linux/pm_domain.h   | 13 ++++++++
+> > >  2 files changed, 78 insertions(+), 1 deletion(-)
 > > >
 > > > diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> > > index 7f38a92b444a..e27b91d36a2a 100644
+> > > index e27b91d36a2a..c3ff8e395308 100644
 > > > --- a/drivers/base/power/domain.c
 > > > +++ b/drivers/base/power/domain.c
-> > > @@ -1620,7 +1620,7 @@ static int genpd_set_default_power_state(struct generic_pm_domain *genpd)
+> > > @@ -20,6 +20,7 @@
+> > >  #include <linux/sched.h>
+> > >  #include <linux/suspend.h>
+> > >  #include <linux/export.h>
+> > > +#include <linux/cpu.h>
 > > >
-> > >       genpd->states = state;
-> > >       genpd->state_count = 1;
-> > > -     genpd->free = state;
-> > > +     genpd->free_state = true;
+> > >  #include "power.h"
 > > >
-> > >       return 0;
+> > > @@ -126,6 +127,7 @@ static const struct genpd_lock_ops genpd_spin_ops = {
+> > >  #define genpd_is_irq_safe(genpd)     (genpd->flags & GENPD_FLAG_IRQ_SAFE)
+> > >  #define genpd_is_always_on(genpd)    (genpd->flags & GENPD_FLAG_ALWAYS_ON)
+> > >  #define genpd_is_active_wakeup(genpd)        (genpd->flags & GENPD_FLAG_ACTIVE_WAKEUP)
+> > > +#define genpd_is_cpu_domain(genpd)   (genpd->flags & GENPD_FLAG_CPU_DOMAIN)
+> > >
+> > >  static inline bool irq_safe_dev_in_no_sleep_domain(struct device *dev,
+> > >               const struct generic_pm_domain *genpd)
+> > > @@ -1377,6 +1379,56 @@ static void genpd_free_dev_data(struct device *dev,
+> > >       dev_pm_put_subsys_data(dev);
 > > >  }
-> > > @@ -1736,7 +1736,11 @@ static int genpd_remove(struct generic_pm_domain *genpd)
-> > >       list_del(&genpd->gpd_list_node);
-> > >       genpd_unlock(genpd);
-> > >       cancel_work_sync(&genpd->power_off_work);
-> > > -     kfree(genpd->free);
-> > > +     if (genpd->free_state) {
-> > > +             kfree(genpd->states);
-> > > +             genpd->states = NULL;
-> > > +             genpd->state_count = 0;
+> > >
+> > > +static void __genpd_update_cpumask(struct generic_pm_domain *genpd,
+> > > +                                int cpu, bool set, unsigned int depth)
+> > > +{
+> > > +     struct gpd_link *link;
+> > > +
+> > > +     if (!genpd_is_cpu_domain(genpd))
+> > > +             return;
 > >
-> > Why these two initializations? After genpd_remove, this structure
-> > shouldn't be used anymore, no ?
+> > With this test, we won't continue updating the cpumask for the other
+> > masters. Is it done on purpose ?
 > 
-> Correct.
+> Correct, and yes it's on purpose.
 > 
-> >
-> > > +     }
-> >
-> > Instead of a flag, replacing the 'free' pointer to a 'free' callback
-> > will allow to keep the free path self-encapsulated in domain.c
-> >
-> > genpd->free(genpd->states);
-> 
-> Right, I get your idea and it makes sense. Let me convert to that.
+> We are not even allocating the cpumask for the genpd in question,
+> unless it has the GENPD_FLAG_CPU_DOMAIN set.
 
-OK, so I'm expecting an update here.
+So this patch is generally fine by me.  You can add my ACK to it when
+submitting it again, unless it is changed, so I know I've seen it
+already.
 
 
 _______________________________________________
