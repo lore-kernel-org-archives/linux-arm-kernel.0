@@ -2,65 +2,75 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5FA34C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 11:45:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AFA07C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 11:46:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2D9EB20578
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 11:45:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8062F20578
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 11:46:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jGke/E4X"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2D9EB20578
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LoLDzXFK";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=alien8.de header.i=@alien8.de header.b="O4Dx8nUo"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8062F20578
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=alien8.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=BnBMT6TPZTCLINzIJE1IyqQgCi6+Q/XaTKvHwSyn7sE=; b=jGke/E4XTethmEFtM33tjKCKI
-	FpKvZMKiFMMJpO7ry6oEsikuHkWnVVDHhRoAJ/bqyUrHGySS0wRG3ZV5BU3VXB9zqEExQmVBDKfZk
-	tet4nMc06bRJRLp0uQ/p/jiw6FYUlsih+mLn8eCN0IuIY45dxHooeT7pGY8E7McgN99taIhZ+/0RG
-	MQSHbHxsEV3Xakp5qAo9+3LED/4p06efD7FN6HGjOgc5pLzlMplUS9RG7Wlg7DtJI69L7PLCZBwTJ
-	/MNhgD0amK4Xpw0mzwx1wmgz3b9tVtQFLn4jm9Ge8eB1Cc7dufIF/xXGMKimGT9CYo1utkWAEDGmJ
-	V0O9KMKCQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=M5+YiuwEB4EObWBK7N6OLUEuRNs3t1M7GA9ToaQiLLo=; b=LoLDzXFK9a1OL9
+	aN7+J9jjzY3kYTfOOveGLsBu+UVe8DXc7RpacKP8m756IN/vo/rlkjhPYh6ckOIqh2qNr9zEiaPYJ
+	cVnY9rAwQGn7l4eQOCI7tUbW10yVHfo9NUDJmiLT0nGsCigQ2B+wADA0Nmc7p+Z1zXB5PmA9TRIvr
+	+oSGxtBNoZBUAnjG+H/eZqmMkBZpucr9EKIA7kc9LMsv0ICGLT0oG3g406Q5JQrmkZDl4Lbxj+bE/
+	86OuBCtXUo+Rz820HuoLA6cdo0C80cAFprfVJRJvNnyN4ap3EI3KX4cb+E4WlFEA6CRUvhhaGzPPx
+	0tmIuMvCzoqeSBLmEphg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghvFG-00076y-Ua; Fri, 11 Jan 2019 11:45:02 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghvFD-00074l-F6
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 11:45:00 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 83CAF80D;
- Fri, 11 Jan 2019 03:44:58 -0800 (PST)
-Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 7499F3F70D;
- Fri, 11 Jan 2019 03:44:57 -0800 (PST)
-Subject: Re: [RESEND PATCH v3 2/2] coresight: etmv4: Update ID register table
- to add UCI support
-To: mike.leach@linaro.org, linux@armlinux.org.uk
-References: <20181218215944.2444-1-mike.leach@linaro.org>
- <20181218215944.2444-3-mike.leach@linaro.org>
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
-Message-ID: <05f725dd-24be-65e4-8b5d-a9acc9167ae9@arm.com>
-Date: Fri, 11 Jan 2019 11:44:56 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1ghvGc-0000B6-Kq; Fri, 11 Jan 2019 11:46:26 +0000
+Received: from mail.skyhub.de ([5.9.137.197])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghvGZ-0000Ak-C6
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 11:46:24 +0000
+Received: from zn.tnic (p200300EC2BCAC5006CCD8D4D75E662CE.dip0.t-ipconnect.de
+ [IPv6:2003:ec:2bca:c500:6ccd:8d4d:75e6:62ce])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.skyhub.de (SuperMail on ZX Spectrum 128k) with ESMTPSA id B7E081EC03DB;
+ Fri, 11 Jan 2019 12:46:20 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=alien8.de; s=dkim;
+ t=1547207180;
+ h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+ to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+ content-transfer-encoding:in-reply-to:in-reply-to:  references:references;
+ bh=UfSZOq9GqD65RVv2Kmgwqo4lzVwlJ1e355g+KSPJc+A=;
+ b=O4Dx8nUok8Ves2aXjM3GYVZuzQzDJt2fOdgdOJuMMpi9D+O/dFWHYnyLwz2NWBaK4WnfUx
+ wU+wTJhu8G1+AYA5SgQS18PNqSCzzt7ZdX2t7hiU/csltRXFIx73lRvu7lcXI1aUCr1166
+ rsyTHeeH373YtLq5GJsYo3Uc0v7+l6w=
+Date: Fri, 11 Jan 2019 12:46:12 +0100
+From: Borislav Petkov <bp@alien8.de>
+To: James Morse <james.morse@arm.com>
+Subject: Re: [PATCH v7 09/25] ACPI / APEI: Generalise the estatus queue's
+ notify code
+Message-ID: <20190111114612.GC4729@zn.tnic>
+References: <20181203180613.228133-1-james.morse@arm.com>
+ <20181203180613.228133-10-james.morse@arm.com>
+ <20181211174449.GM27375@zn.tnic>
+ <3f0f9005-f383-8a03-c7f9-15b50c099f94@arm.com>
 MIME-Version: 1.0
-In-Reply-To: <20181218215944.2444-3-mike.leach@linaro.org>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <3f0f9005-f383-8a03-c7f9-15b50c099f94@arm.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_034459_511064_2E7B8505 
-X-CRM114-Status: GOOD (  18.73  )
+X-CRM114-CacheID: sfid-20190111_034623_563179_4B051674 
+X-CRM114-Status: UNSURE (   7.44  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,63 +82,36 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org, coresight@lists.linaro.org,
- linux-kernel@vger.kernel.org, mathieu.poirier@linaro.org
+Cc: Rafael Wysocki <rjw@rjwysocki.net>, Tony Luck <tony.luck@intel.com>,
+ Fan Wu <wufan@codeaurora.org>, linux-mm@kvack.org,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Xie XiuQi <xiexiuqi@huawei.com>, Will Deacon <will.deacon@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>,
+ Dongjiu Geng <gengdongjiu@huawei.com>, linux-acpi@vger.kernel.org,
+ Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org, Len Brown <lenb@kernel.org>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Thu, Jan 10, 2019 at 06:21:21PM +0000, James Morse wrote:
+> Something like:
+> ghes_notify_nmi() -> in_nmi_spool_from_list(list) -> in_nmi_queue_one_entry(ghes).
 
+Yah, but make that
 
-On 18/12/2018 21:59, Mike Leach wrote:
-> Updates the ID register tables to contain a UCI entry for the A35 ETM
-> device to allow correct matching of driver in the amba bus code.
-> 
-> Signed-off-by: Mike Leach <mike.leach@linaro.org>
-> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
->   drivers/hwtracing/coresight/coresight-etm4x.c | 18 +++++++++++++++++-
->   1 file changed, 17 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-> index 53e2fb6e86f6..2fb8054e43ab 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm4x.c
-> +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-> @@ -1073,12 +1073,28 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
->   		.mask	= 0x000fffff,		\
->   	}
->   
-> +static struct amba_cs_uci_id uci_id_etm4[] = {
-> +	{
-> +		/*  ETMv4 UCI data */
-> +		.devarch	= 0x47704a13,
-> +		.devarch_mask	= 0xfff0ffff,
-> +		.devtype	= 0x00000013,
-> +	}
-> +};
-> +
-> +#define ETM4x_AMBA_UCI_ID(pid)			\
-> +	{					\
-> +		.id	= pid,			\
-> +		.mask	= 0x000fffff,		\
-> +		.data	= uci_id_etm4,		\
-> +	}
-> +
->   static const struct amba_id etm4_ids[] = {
->   	ETM4x_AMBA_ID(0x000bb95d),		/* Cortex-A53 */
->   	ETM4x_AMBA_ID(0x000bb95e),		/* Cortex-A57 */
->   	ETM4x_AMBA_ID(0x000bb95a),		/* Cortex-A72 */
->   	ETM4x_AMBA_ID(0x000bb959),		/* Cortex-A73 */
-> -	ETM4x_AMBA_ID(0x000bb9da),		/* Cortex-A35 */
-> +	ETM4x_AMBA_UCI_ID(0x000bb9da),		/* Cortex-A35 */
->   	{},
->   };
->   
-> 
+ghes_notify_nmi() -> ghes_nmi_spool_from_list(list) -> ghes_nmi_queue_one_entry(ghes).
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+to denote it is the GHES NMI path.
 
+Thx.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
 
 _______________________________________________
 linux-arm-kernel mailing list
