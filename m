@@ -2,22 +2,22 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 69291C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 09:39:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D9130C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 09:41:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1B7C32146F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 09:39:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A9A632146F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 09:41:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kGX5s651";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Pc8kxKjr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1B7C32146F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KA4BT8mF";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="GcCgZl30"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A9A632146F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,66 +26,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hIDWoyKxZ7KG5UebN6o7OeOQVnslvuouHrDQGAGM2/A=; b=kGX5s651Vzpp1J
-	gk6lEJ1DXWYezRTd1WK9RqkTNzeHuu/bNKv3DLP9F3WXY9aadg6hPtphZS4boISiVP7rCUyFCCeSH
-	iflDYOk5Rr24LfFbt0buWtpdVI19eOgU+jYDmruD+UbDKiq6+ai2ZSomIPHm/NuAzkCNl0waQ7/qb
-	nrvxlJBSKAIyLBZxW3VjFGBcbCHFw2ZKYXwLyFpGpbl62IlQYsss79KQVJ2IOfNai8hLFL5eiiqdY
-	i7ry4oru/wpsHaNK6tJcWpJ5Y0XOCKeNRqOgRQJorwV+AED3Ywc7FtskoUtrVUcsGxRQ+9i2Hsmeo
-	I6zP8+4FDhDcqarTDiNA==;
+	List-Owner; bh=TTgvZ528BulnHq6hXoCpQdk2xMuCLye0eVEQdRVPqB0=; b=KA4BT8mFh2zrgX
+	ZpCucPRrW0Fxz3NJ0WK9EXWu5grzqUOJ5T7u8a0DFLbyFyjN2NgqIw62GFlHMpYTBhAq+UYEYsBV1
+	a8sTk5G/g98E5ReEW9gHyobarHQ96LEHWhjrBgSq1MBTwD0lkemgIOKoqMRA2lws3rf2Ncmzr26rL
+	m1M36aeEwIeeEzKglMBJd2XaimJbVJmAor4MNkVM3RYEDlYEE5QjAn7cjjkuF5lGrzXDMpV8R6WlQ
+	d/oSV1Ud8dHpimkzJEhYXOujzT+4OrvUec5siyrAc5ZGDGnOXqgbejouQOyoiE7BB1Tbx1O9uaRhN
+	///prfXkVtwP3PmlARNw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghtHi-0001pr-BK; Fri, 11 Jan 2019 09:39:26 +0000
-Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+	id 1ghtJh-0003Y6-6s; Fri, 11 Jan 2019 09:41:29 +0000
+Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghtHP-0001Y1-MR
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 09:39:11 +0000
-Received: by mail-wm1-x341.google.com with SMTP id b11so1704563wmj.1
+ id 1ghtJd-0003Xd-N7
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 09:41:27 +0000
+Received: by mail-pl1-x644.google.com with SMTP id b5so6549167plr.4
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 11 Jan 2019 01:39:07 -0800 (PST)
+ Fri, 11 Jan 2019 01:41:24 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=0zsaqiFcpYXcCFsq+FAdMLlkTpsvPBWVOZxTGMUhgoM=;
- b=Pc8kxKjrXqxpNBROsHpISPINeN6qheusQQhAIklADat1GC2LXVcdnRTq5t9obDZ00V
- y/UZEhWPDF0j1+8vRi54ONhwN6AyabgK8iifakz/qrL7lFaxJwx6f3H5Ja9fVshsvxCh
- nwMlUnzI2NT3R0IR/0aGFnhDr3Hg+kvnVfCTA=
+ :content-disposition:content-transfer-encoding:in-reply-to
+ :user-agent; bh=tbiaA4fJYcgLb1K4vUdUrbau2fblch5OFHfxAA3Jx6Y=;
+ b=GcCgZl30ekMXf9dQ34DPGjltcR8nc2we04mXPbjyfOoyXc2Zl1q1KcEV7bT/GppfwU
+ oCc4ZV+BHU4YBhAy0zRvvT/VxYJL/AL+L96pfD6qrNlhjdXs0JY645s2SMiSobmpUo9W
+ cilKLeB4DmMGU41ItqVFx1uh4Q5NHvHoxKkaE=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=0zsaqiFcpYXcCFsq+FAdMLlkTpsvPBWVOZxTGMUhgoM=;
- b=Ibum5FzfrP2RqL3x9SezWs09NRe9H7sUhPjAi0kRnFrHGj3To60A9G7X+a8if1zwxt
- dYCqpSE7n8jw3w+mAM6GJjAlo0DcqDhLDy8io7sDTIo3KUTHy09PZx06v46Q28N617KE
- V7mBEejtyXyl5UccuiAQy+ILiPNTF/av6NRXs6njmRa5bqfGTCy4mJLOLBfkzD42ehCH
- tZMCtvh4Od7aDxuMKl+/aUYRgmspkhnfCMSKck6kB+WkE8Wy3yoWAeBmKd5ikldRi36i
- AcPyXStlZXkHJyPgXFHf+v97Cst6HL7HlKbyueGg2Rf3iBSm2UCr52b8qTWbpDJIfyUE
- l3Hw==
-X-Gm-Message-State: AJcUukf6fBFjWub8KZfYj+4RW2JQkEXXxKEWMS5fiw2gwDflp8kviWNg
- mzQ2+v5LURU8aDDv+lc7d2EmwIC+n6F5wg==
-X-Google-Smtp-Source: ALg8bN67P7vgoMl0PMJxpWcYivyBDHXNTowY5OD5ejJ409LH5XkyZ5FjRtxfFYUblCZ64cvSnHMsgw==
-X-Received: by 2002:a1c:1a8a:: with SMTP id a132mr1595849wma.109.1547199545827; 
- Fri, 11 Jan 2019 01:39:05 -0800 (PST)
-Received: from holly.lan (cpc141214-aztw34-2-0-cust773.18-1.cable.virginm.net.
- [86.9.19.6])
- by smtp.gmail.com with ESMTPSA id t5sm12963321wmg.43.2019.01.11.01.39.04
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 11 Jan 2019 01:39:04 -0800 (PST)
-Date: Fri, 11 Jan 2019 09:39:02 +0000
-From: Daniel Thompson <daniel.thompson@linaro.org>
-To: Sumit Garg <sumit.garg@linaro.org>
-Subject: Re: [PATCH v2 2/4] tee: optee: add TEE bus device enumeration support
-Message-ID: <20190111093902.hfxb67txjhhlegzu@holly.lan>
-References: <1547123097-16431-1-git-send-email-sumit.garg@linaro.org>
- <1547123097-16431-3-git-send-email-sumit.garg@linaro.org>
- <20190110141856.p3evqyf34py74gkg@holly.lan>
- <CAFA6WYPHmtY4N9ruGLZ70FNeiDCbQE-fs+EP2px-S+GEj2nPTw@mail.gmail.com>
+ :mime-version:content-disposition:content-transfer-encoding
+ :in-reply-to:user-agent;
+ bh=tbiaA4fJYcgLb1K4vUdUrbau2fblch5OFHfxAA3Jx6Y=;
+ b=VTehBMuaIO52YMpFbXBEYM8RwTn0sCqqc6qGQxFEPwWBA7SC7kK/LDLuUiWc08xBFL
+ JGXmkfvnSn8IpPIaniXAv+5uxix0o4G85VRubv717eqO/q0JW/rcBR+CdjgG0dRjcg7b
+ pIoMMH+Yv2t6Lf1mH0MmRXyZs14PZi8XynpVqTzp3Z3DTb7eQJOjDI+Nrbr/RDrwM2s/
+ iC1KbUYDlw4wc4wZicv0S1MLmHx30kMgG4zBIe/9HCx4gBxDucqAckAzQP2Mmo/LOTLB
+ EPRSrboLwDRI8WozJrCEZWtgdcI369M6TKZEw5Xh3lJowypm4qn5Z6Gz/wXPdAkkLSXf
+ tUKQ==
+X-Gm-Message-State: AJcUukew6FpYTIX+rxMrXweBs9ErKQ/0p9r6S7vfboyxiEBP1L/ah2YB
+ HxNWLXx0YQgGcqLaV4Exs6vjlw3W07k=
+X-Google-Smtp-Source: ALg8bN4IjpnAOTmlVspkQtv7ADosTvS3hRuvvcSpujqPY0ZxmJpnVeiMCadtsOt0Fk91YxcVy7jl0g==
+X-Received: by 2002:a17:902:bd0a:: with SMTP id
+ p10mr13524931pls.322.1547199684113; 
+ Fri, 11 Jan 2019 01:41:24 -0800 (PST)
+Received: from localhost ([122.172.34.203])
+ by smtp.gmail.com with ESMTPSA id 125sm139472770pfx.159.2019.01.11.01.41.22
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 11 Jan 2019 01:41:22 -0800 (PST)
+Date: Fri, 11 Jan 2019 15:11:20 +0530
+From: Viresh Kumar <viresh.kumar@linaro.org>
+To: Krzysztof Kozlowski <krzk@kernel.org>
+Subject: Re: [PATCH v2 1/4] ARM: dts: s5pv210: Add dmc nodes
+Message-ID: <20190111094120.6dcnspccp6ufxd4y@vireshk-i7>
+References: <20190110205215.22030-1-pawel.mikolaj.chmiel@gmail.com>
+ <20190110205215.22030-2-pawel.mikolaj.chmiel@gmail.com>
+ <CAJKOXPcWOtTh5nDpZuX=NfrcOcQDPUXoFJLc8JtLs6UEY9LL6w@mail.gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <CAFA6WYPHmtY4N9ruGLZ70FNeiDCbQE-fs+EP2px-S+GEj2nPTw@mail.gmail.com>
-User-Agent: NeoMutt/20180716
+In-Reply-To: <CAJKOXPcWOtTh5nDpZuX=NfrcOcQDPUXoFJLc8JtLs6UEY9LL6w@mail.gmail.com>
+User-Agent: NeoMutt/20180323-120-3dd1ac
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_013908_043669_7D7AE5BD 
-X-CRM114-Status: GOOD (  15.87  )
+X-CRM114-CacheID: sfid-20190111_014125_771349_A6622002 
+X-CRM114-Status: GOOD (  11.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,80 +97,27 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Herbert Xu <herbert@gondor.apana.org.au>, Arnd Bergmann <arnd@arndb.de>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Bhupesh Sharma <bhsharma@redhat.com>, linux-kernel@vger.kernel.org,
- tee-dev@lists.linaro.org, Rob Herring <robh+dt@kernel.org>,
- "open list:HARDWARE RANDOM NUMBER GENERATOR CORE"
- <linux-crypto@vger.kernel.org>, mpm@selenic.com,
- Jens Wiklander <jens.wiklander@linaro.org>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
+ linux-pm@vger.kernel.org, rjw@rjwysocki.net, linux@armlinux.org.uk,
+ robh+dt@kernel.org, linux-kernel@vger.kernel.org, kgene@kernel.org,
+ linux-arm-kernel@lists.infradead.org,
+ =?utf-8?B?UGF3ZcWC?= Chmiel <pawel.mikolaj.chmiel@gmail.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 11, 2019 at 12:52:19PM +0530, Sumit Garg wrote:
-> On Thu, 10 Jan 2019 at 19:49, Daniel Thompson
-> <daniel.thompson@linaro.org> wrote:
-> > > +static int get_devices(struct tee_context *ctx, u32 session,
-> > > +                    struct tee_shm *device_uuid, u32 *shm_size)
-> >
-> > Missing const on device_uuid?
-> >
-> 
-> I don't think we should have a const for device_uuid here as this is
-> shared memory struct pointer which is dynamically allocated and used
-> to fetch device UUIDs.
-
-Agree. Perhaps device_uuid is misnamed though (part of the reason I
-misread this is that it is singular so I though it was a single UUID
-travelling into the TZ).
-
-> > > +     rc = get_devices(ctx, sess_arg.session, device_shm, &shm_size);
-> > > +     if (rc < 0)
-> > > +             goto out_shm;
-> > > +
-> > > +     device_uuid = tee_shm_get_va(device_shm, 0);
-> > > +     if (IS_ERR(device_uuid)) {
-> > > +             pr_err("tee_shm_get_va failed\n");
-> > > +             rc = PTR_ERR(device_uuid);
-> > > +             goto out_shm;
-> > > +     }
-> > > +
-> > > +     while (idx < shm_size / sizeof(uuid_t)) {
-> >
-> > This is a very uncommon way to write a for loop ;-).
-> >
-> 
-> Ok, will add "num_devices" variable.
-
-num_devices might add readability but that is not what I meant.
-
-The most idiomatic way to write somthing that loops for every valid index
-value is:
-
-	for (i=0; i < limit; i++)
-
-You wrote it like this:
-
-	int idx=0;
-
-	/* lots of code between initializer and first use */
-
-	while (idx < limit) {
-		/* more code */
-		idx++;
-	}
-
-Sure, they are equivalent but the idiomatic form is easier to read.
-
-
-Daniel.
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gMTEtMDEtMTksIDA5OjMyLCBLcnp5c3p0b2YgS296bG93c2tpIHdyb3RlOgo+IE9uIFRodSwg
+MTAgSmFuIDIwMTkgYXQgMjE6NTMsIFBhd2XFgiBDaG1pZWwKPiA8cGF3ZWwubWlrb2xhai5jaG1p
+ZWxAZ21haWwuY29tPiB3cm90ZToKPiA+Cj4gPiBUaGlzIGNvbW1pdCBhZGRzIGRtYyBub2Rlcywg
+d2hpY2ggYXJlIG5lZWRlZCBieSBzNXB2MjEwIGNwdWZyZXEgZHJpdmVyCj4gPiB0byB3b3JrLgo+
+ID4KPiA+IFNpZ25lZC1vZmYtYnk6IFBhd2XFgiBDaG1pZWwgPHBhd2VsLm1pa29sYWouY2htaWVs
+QGdtYWlsLmNvbT4KPiA+IC0tLQo+ID4gIGFyY2gvYXJtL2Jvb3QvZHRzL3M1cHYyMTAuZHRzaSB8
+IDEyICsrKysrKysrKysrKwo+ID4gIDEgZmlsZSBjaGFuZ2VkLCAxMiBpbnNlcnRpb25zKCspCj4g
+Pgo+IAo+IFRoYW5rcywgYXBwbGllZCAoYWN0dWFsbHkgSSBhcHBsaWVkIHYxIC0gSSBob3BlIHRo
+ZXJlIHdlcmUgbm8gY2hhbmdlcykuCgpXb3VsZCB5b3UgbGlrZSB0byBBY2sgdGhlIG90aGVyIHBh
+dGNoZXMgc28gdGhhdCBJIGNhbiBhcHBseSB0aGVtID8KCi0tIAp2aXJlc2gKCl9fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFp
+bGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlz
+dHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
