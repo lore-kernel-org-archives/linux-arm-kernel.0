@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EA17CC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 00:15:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AC840C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 00:21:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B7FCA2133F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 00:15:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7B62C2133F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 00:21:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DTBNdkcl";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="f/XbIiUg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B7FCA2133F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ja8Wy/2p";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="GSnRMTVE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7B62C2133F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,67 +25,68 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
 	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=5tyQDUIRIMkkpYBZv+nWy+yUz7N0lFCUmT15e+wda0U=; b=DTBNdkclKM8DKm
-	EYSxXLLGMdBBugcvXHxlMCvW6cMit1sew2Q0SK0/JvPJ7N0jsHS5PLEOpRDIt4OtmsdAdMA4g88wi
-	SzejDhRBgSvVxV3KI11GfDKssZp3C4OGNBlSKGw/F6XbwxxXPaFu9EjIrN0uIgzMpSaj94pED1YXW
-	bz+dro6TaaoDFLSYA269KLnQATxW1P1ioe2KIy6iRxIC+3B55j0BXm43wknl646hS5TzDFa0ecZtk
-	comwzgnF4xQ/RFr2mvx/rpviOS9Aw9Mu+yqSKcojDvW4TF71n7vuPzBeJBtxwsvEnX9IE3SQ4Xp69
-	UGNMJfFgNG+Rip70rWHQ==;
+	List-Owner; bh=nlckedCo6AEo56/Bh3bnpQwogGdK0LxlkrOUIDf5HaA=; b=ja8Wy/2pHlCtE+
+	zUNILUGKKohd052kLHEMBqOYaubsIaU6jz5W7IuuWsKdOQsWU8jrTxdYOs7RA1pbX6xmXzJRCqtNy
+	eq+uf0WPlQP/vlNq+EudKCavk1ofqj+sU1yIzFJfkQ+8KfhFqamvuEKRp72DSgbjECC14wzkM1Eb4
+	HTdHbfVWakKmdjNUIZau6LwuQFhnB0Mnu+qrhTbS9KFa1tj9dlbWKIdPRYcvuqaoFaPJd/PJkJncj
+	u+TN/+VC6KI71vHx8NS8GC+u6r3cJ/NfyG2Nadm0GupyI2WEgvro2kBSvED/VlBNbXQPlD6+cwDNi
+	40l1toysgyfbXa9vI3yA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghkTf-00081l-Fq; Fri, 11 Jan 2019 00:15:11 +0000
-Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
+	id 1ghkZd-0001tQ-N7; Fri, 11 Jan 2019 00:21:21 +0000
+Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghkTc-0007jZ-LB
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 00:15:10 +0000
-Received: by mail-pg1-x542.google.com with SMTP id c25so5522090pgb.4
+ id 1ghkZY-0001sC-KX
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 00:21:18 +0000
+Received: by mail-pl1-x642.google.com with SMTP id y1so5909083plp.9
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 10 Jan 2019 16:15:08 -0800 (PST)
+ Thu, 10 Jan 2019 16:21:16 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=baylibre-com.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:in-reply-to:references:date:message-id
- :mime-version; bh=lrRYkQOX8oabBI7evmXJhlETKhOiCG5tJ57nJBVZseI=;
- b=f/XbIiUg+sKbMwHVCYO1u5rTsudsHeZsgVXAtIuG8QXpvvdyWs1xIDFJIEgnr7cq27
- vPbOApd2jwWdwhMSW6K53xmOkKq85kwxm5VCzRIRRxAKWM+ZvbHx8G9Uv/YvA7HTxuCK
- qRrv6fJCITronI4nz8ipRMrXhCi8E1WXqczyqZHC8B5fggZZphKkiMwt2FAauHQ/jYCE
- n2jrMeljN05Z0/GL3zQfiexo75lPpbvH39zNeAMBDv8bqE2MH0tSAIIKvriy0Rg/lOxN
- UwQkCj61ACmlHSwWoJ2lnkQeDhXaOq2DHlIsIerp5NDpqa+MhQuC4qLWd1J+Jp6L+zVw
- HGSw==
+ :mime-version; bh=U5ied4IpUVo0pHUmsHibr0IXWO/yNrasETY2g43N018=;
+ b=GSnRMTVEQIOAn5/ac55f+bPtbB0vLJc5Q5RLD2gZ1eVov4WuW4XdmZRXjYkL3uBITz
+ MBP5SSQbJO42xGViJbJRRbBH2wlHpRyFsGvVCzVlvMJYys0XgHHHVDi6PNyxX/9iDIzX
+ pJWDvlAJ1GHRwErhfE6PEEPJSFJDzjj99SvoS7wTNgV57GuloN5FzV60L9ztphtjjtQx
+ rv9/SjAw3sQGbB6lnIS0fdGnYJ6coQp0dEf+wUzVxoOFbEwJ5yjhpsUprLTNkp8oh47W
+ DVM8Z8iSC9wu7lJg2AsBg1D4P4yfinK8zM8i/KaX3Z5ckU9xeUD7iwBs++LicSZEAWYp
+ lcEQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:in-reply-to:references:date
  :message-id:mime-version;
- bh=lrRYkQOX8oabBI7evmXJhlETKhOiCG5tJ57nJBVZseI=;
- b=eI++7uSI/ayM6a8wpH6naYA0E3fD6jRwOg8KAMDitDr4y2fEUW09UKoVEhNeukIhls
- 3OGcTbIVxUQC7RBcl77LWX9O5bffUM8WgkPlsLFZdLNx0LgReA4D1rkVWmhP1PFtAik8
- 6nSE5mI2B7K8rkjvngb9v1UURST9SJEaU9TLBqnG6DJD9oryPAdEhKQI1QxUHqT0GrzD
- IsHQwY08Dnh8UKJ1B7pLYCCSepG6Oe6xzHdZ0ZSYr5UVpRLkWnhH5kpCfRkZgged8wKR
- me4+8b1A5mVrHZq4sJms531RIUvG/WYXYDkfyTriMznWfrPWmMX5feb+GgF04XVsrxy/
- Yksw==
-X-Gm-Message-State: AJcUukeJB7eLmgyMxTxMCrnrVBiSUYif+0Ib6AXhtaixNx+pe198t50+
- O/9DkZzL7IA83s0yUbICYIfAKw==
-X-Google-Smtp-Source: ALg8bN53KR6/M8+Mt+5jqUyjitraKHDVbewmPsYnLuVNvTwlPDbyhBscf+tOeAMebs9YqWXTlpBzZg==
-X-Received: by 2002:a63:9809:: with SMTP id q9mr11371259pgd.109.1547165708097; 
- Thu, 10 Jan 2019 16:15:08 -0800 (PST)
+ bh=U5ied4IpUVo0pHUmsHibr0IXWO/yNrasETY2g43N018=;
+ b=ke9kSYK7V67BjyzBABh2njIsGL33ZOFjxhfk5Lf347VLBa80gpZGHrCJQGtEwDSifO
+ m4neVv6PJNvaKPYimrMrlxY7WB3i47QahPfbliBM1nipZG4GsfaJfB2sbtSqSLmeGl8F
+ zkul6wqyOco3npgTLGzbPk16hUgq7fsB0xxF4GLIeD0y+1UDNr9iHv0ZgGt0T3L2nChx
+ 87zZWw7iHeo4ev5TsFcQvN65XcakrrYGEmXk5Ye+I9aUSTBx27akFyQOftONIxyNvR7h
+ hPfMuaowFmvFw5680gWOvqKoctVOVEhFnptar/7oqQN2m2f7PJD7xfcETCFvYuBI+A1Z
+ LC+Q==
+X-Gm-Message-State: AJcUukeynlqzTMR7Tsl2D3Cr+p13t0DaIGs+mhkeoritLVkLyk5a4tUD
+ SLp1HTX8X4OmNPowEVaqigwl4ODKFJA=
+X-Google-Smtp-Source: ALg8bN5uPOktJrpj7ce1wLi9pSB5u80P34ytQ6EYAHFCV2NXGoFCHVzYDGrv5Dvdnbht11jwx/hcHw==
+X-Received: by 2002:a17:902:8ec8:: with SMTP id
+ x8mr12542185plo.210.1547166075478; 
+ Thu, 10 Jan 2019 16:21:15 -0800 (PST)
 Received: from localhost (c-71-197-186-152.hsd1.wa.comcast.net.
- [71.197.186.152])
- by smtp.googlemail.com with ESMTPSA id i5sm19828838pfg.34.2019.01.10.16.15.07
+ [71.197.186.152]) by smtp.googlemail.com with ESMTPSA id
+ b68sm115136686pfg.160.2019.01.10.16.21.14
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 10 Jan 2019 16:15:07 -0800 (PST)
+ Thu, 10 Jan 2019 16:21:14 -0800 (PST)
 From: Kevin Hilman <khilman@baylibre.com>
-To: Jerome Brunet <jbrunet@baylibre.com>
-Subject: Re: [PATCH] arm64: defconfig: enable modules for amlogic s400 sound
- card
-In-Reply-To: <6770759de6ed04ecabaa163eb550769d43dfc901.camel@baylibre.com>
-References: <20180828122735.28919-1-jbrunet@baylibre.com>
- <7hmusmvw6z.fsf@baylibre.com>
- <6770759de6ed04ecabaa163eb550769d43dfc901.camel@baylibre.com>
-Date: Thu, 10 Jan 2019 16:15:06 -0800
-Message-ID: <7htvigqcc5.fsf@baylibre.com>
+To: Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ Carlo Caione <ccaione@baylibre.com>
+Subject: Re: [PATCH v2 2/2] arm: dts: meson: Fix IRQ trigger type for macirq
+In-Reply-To: <CAFBinCAbOdPnsH4TLLBmMnR5tS+jHfHagWudVLjaH6X89vtgDQ@mail.gmail.com>
+References: <20181207105231.25593-1-ccaione@baylibre.com>
+ <20181207105231.25593-3-ccaione@baylibre.com>
+ <CAFBinCAbOdPnsH4TLLBmMnR5tS+jHfHagWudVLjaH6X89vtgDQ@mail.gmail.com>
+Date: Thu, 10 Jan 2019 16:21:14 -0800
+Message-ID: <7hpnt4qc1x.fsf@baylibre.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_161508_702876_93A802B3 
-X-CRM114-Status: GOOD (  14.62  )
+X-CRM114-CacheID: sfid-20190110_162116_669589_697AC70D 
+X-CRM114-Status: GOOD (  15.19  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,39 +98,59 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-amlogic@lists.infradead.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, robh+dt@kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-amlogic@lists.infradead.org,
+ ingrassia@epigenesys.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Jerome Brunet <jbrunet@baylibre.com> writes:
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
-> On Wed, 2018-09-12 at 21:49 -0700, Kevin Hilman wrote:
->> Jerome Brunet <jbrunet@baylibre.com> writes:
->> 
->> > Compile the necessary drivers as modules, including codecs, for the
->> > s400 sound card.
->> > 
->> > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
->> 
->> Applied to v4.20/defconfig.
+> Hi Carlo,
 >
-> Hi Kevin,
+> On Fri, Dec 7, 2018 at 11:52 AM Carlo Caione <ccaione@baylibre.com> wrote:
+>>
+>> A long running stress test on a custom board shipping an AXG SoCs and a
+>> Realtek RTL8211F PHY revealed that after a few hours the connection
+>> speed would drop drastically, from ~1000Mbps to ~3Mbps. At the same time
+>> the 'macirq' (eth0) IRQ would stop being triggered at all and as
+>> consequence the GMAC IRQs never ACKed.
+>>
+>> After a painful investigation the problem seemed to be due to a wrong
+>> defined IRQ type for the GMAC IRQ that should be LEVEL_HIGH instead of
+>> EDGE_RISING.
+>>
+>> The change in the macirq IRQ type also solved another long standing
+>> issue affecting this SoC/PHY where EEE was causing the network
+>> connection to die after stressing it with iperf3 (even though much
+>> sooner). It's now possible to remove the 'eee-broken-1000t' quirk as
+>> well.
+> (disclaimer: I was not able to reproduce this bug without your
+> patches, but I didn't run iperf3 for more than a couple of minutes)
+> I did test your patch with and without my "Meson8b RGMII Ethernet pin
+> cleanup" from [0] which shows that there's another performance related
+> problem:
+> 1) before and after your patch receive speeds were fine (above
+> 700Mbit/s and no transmit errors / retries in iperf3) but the transmit
+> speed was bad (<200Mbit/s and >1500 retries in perf3)
+> 2) transmit errors (when Odroid-C1 is sending) are not occurring
+> anymore after my patch from [0]
 >
-> This patch was supposed to be merged for v4.20 but I'm still not seing it in
-> the 5.0-rc1
+> thus I believe your patch is fine, especially since we already have
+> IRQ_TYPE_LEVEL_HIGH for the dwc2 controllers
 >
-> Could you tell me if there is a problem with it ?
+>> Fixes: 9c15795a4f96 ("ARM: dts: meson8b-odroidc1: ethernet support")
+>> Signed-off-by: Carlo Caione <ccaione@baylibre.com>
+> Reviewed-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> Tested-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>
+> I wonder if Kevin can send this as a fix for v4.20
 
-No problem with the patch, just a problem with the maintainer.  Not sure
-how/why this one slipped through the cracks.
-
-Thanks for the ping, just sent a request to have it merge for v5.0-rc.
+Queued as a fix for v5.0-rc
 
 Kevin
-
 
 _______________________________________________
 linux-arm-kernel mailing list
