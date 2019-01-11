@@ -2,87 +2,90 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-15.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A9CE8C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 00:14:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EA17CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 00:15:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 751B62133F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 00:14:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B7FCA2133F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 00:15:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TGF+07HF";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="Jy9hngyp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 751B62133F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DTBNdkcl";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="f/XbIiUg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B7FCA2133F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=WvVxx4OZm5qfOOeMvIBA+yWMGlzkyG0j5W29Gg1IEYo=; b=TGF+07HFHlVe0w
-	qmEiT9bcsIQCifcX597rBcTbAt5TLyKGFlYp1Jldr8B0mwAg0LAH6e3S0wziqswnU/rk73kMBbapu
-	Suule/lugKX8ORUzWu0pMNs8owyD0d324x3DUcTXAUcYDciJxCJJeBtcZcjBlf7wVSXu7Y+4ihGKG
-	CGsij+weiyZytu8LwnEmEmQBiioieJdQg6p3gsw4sKfszHdIPepn6LxWqy1Z0RPZe0V+PjqEQTrHv
-	Z5P1Y9lVH1djHn+DlvRUIvsaHrNGP1vqBuiXVeqwmI6dELO6jJoRFS8hP771NZ9pkjtSbt4d3x7Tf
-	H4IB5tqyyw3gUcwW/4rQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
+	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=5tyQDUIRIMkkpYBZv+nWy+yUz7N0lFCUmT15e+wda0U=; b=DTBNdkclKM8DKm
+	EYSxXLLGMdBBugcvXHxlMCvW6cMit1sew2Q0SK0/JvPJ7N0jsHS5PLEOpRDIt4OtmsdAdMA4g88wi
+	SzejDhRBgSvVxV3KI11GfDKssZp3C4OGNBlSKGw/F6XbwxxXPaFu9EjIrN0uIgzMpSaj94pED1YXW
+	bz+dro6TaaoDFLSYA269KLnQATxW1P1ioe2KIy6iRxIC+3B55j0BXm43wknl646hS5TzDFa0ecZtk
+	comwzgnF4xQ/RFr2mvx/rpviOS9Aw9Mu+yqSKcojDvW4TF71n7vuPzBeJBtxwsvEnX9IE3SQ4Xp69
+	UGNMJfFgNG+Rip70rWHQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghkSm-0006Eq-O9; Fri, 11 Jan 2019 00:14:16 +0000
-Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
+	id 1ghkTf-00081l-Fq; Fri, 11 Jan 2019 00:15:11 +0000
+Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghkSj-0006EF-EH
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 00:14:15 +0000
-Received: by mail-pl1-x644.google.com with SMTP id e11so5906666plt.11
+ id 1ghkTc-0007jZ-LB
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 00:15:10 +0000
+Received: by mail-pg1-x542.google.com with SMTP id c25so5522090pgb.4
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 10 Jan 2019 16:14:11 -0800 (PST)
+ Thu, 10 Jan 2019 16:15:08 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:mime-version;
- bh=RlyNJmh4No0SkRNKfsYkuijXsVwd4v2lCvL0JlZfoZ4=;
- b=Jy9hngyp29zXDoU66xxMfoHZOLjvAqwABp3sLeUxCFgyokz+eAnNqg0Wt5hrZNH/nO
- tUMSHNIbt50DI3UnexSDAMhotzI6cuGzB4/Qi66Uuc9tKgDAaHqBP9N3GTG0HBuGX82V
- WpA8Sxv6ggp5TA4mUATp8RJZQJXKkMwD19nQnxR+CaKOhvCdE7qEWJiZTmZ7zuQvhz0Z
- ir+Hz6BpbmFmua93gYvK1jw16MIPnQ/qre9xzyM+BWVtotI+rjUred/3niv8mVFbUm2p
- SeNO7xwOd4SAnFkTxXzigdbfjmzLYaBielVAR+HOwBAMJzDcXrlMyLqAN6bzPob89o2U
- EJsA==
+ h=from:to:cc:subject:in-reply-to:references:date:message-id
+ :mime-version; bh=lrRYkQOX8oabBI7evmXJhlETKhOiCG5tJ57nJBVZseI=;
+ b=f/XbIiUg+sKbMwHVCYO1u5rTsudsHeZsgVXAtIuG8QXpvvdyWs1xIDFJIEgnr7cq27
+ vPbOApd2jwWdwhMSW6K53xmOkKq85kwxm5VCzRIRRxAKWM+ZvbHx8G9Uv/YvA7HTxuCK
+ qRrv6fJCITronI4nz8ipRMrXhCi8E1WXqczyqZHC8B5fggZZphKkiMwt2FAauHQ/jYCE
+ n2jrMeljN05Z0/GL3zQfiexo75lPpbvH39zNeAMBDv8bqE2MH0tSAIIKvriy0Rg/lOxN
+ UwQkCj61ACmlHSwWoJ2lnkQeDhXaOq2DHlIsIerp5NDpqa+MhQuC4qLWd1J+Jp6L+zVw
+ HGSw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version;
- bh=RlyNJmh4No0SkRNKfsYkuijXsVwd4v2lCvL0JlZfoZ4=;
- b=SLSyWdF4hT9jn1GcGpdkPeq7rCeUE8lfOQWMXBFxjbyJJK4p85vbceedWOJA1Opoy3
- bE9hu5cZAwNXAWOupuN54xY5wcwPwk5aFkVCOcX9GwGng5+yoa3LWW89faJi9ky0eyiR
- woYi9vRvYDIB+KKwC516+N0QefOocIdS+jfHpzwsS1cnVq5esJY019TS2EHXqYKNTJcz
- HR3kn95qVurfu/O42bMfAJ59+4nnalO/5SzKeMDcafw9DBTguqaqNe7YTg4aGGGaOLBY
- qpvvUpqGeUbgWHKbUw/UYMypYPChQDh4iDAqXOxiNmPaWjkbNccotY0apB8lAcQFAxzt
- VECg==
-X-Gm-Message-State: AJcUukdjfqBJnkg0AugQU+HRoESmszK1lGns39QNxphptCMR16b68X1z
- 7TM3cjkhWORIQb5aD3+3WegDWg2tD54=
-X-Google-Smtp-Source: ALg8bN6p2ZwQHecHkD4DJ9BIAAnhjbSFpT7noF1jxCMkikmbZgU/y25G9OLaAR2KUt4ZewfAVxAAvQ==
-X-Received: by 2002:a17:902:27a8:: with SMTP id
- d37mr12612641plb.182.1547165650942; 
- Thu, 10 Jan 2019 16:14:10 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:in-reply-to:references:date
+ :message-id:mime-version;
+ bh=lrRYkQOX8oabBI7evmXJhlETKhOiCG5tJ57nJBVZseI=;
+ b=eI++7uSI/ayM6a8wpH6naYA0E3fD6jRwOg8KAMDitDr4y2fEUW09UKoVEhNeukIhls
+ 3OGcTbIVxUQC7RBcl77LWX9O5bffUM8WgkPlsLFZdLNx0LgReA4D1rkVWmhP1PFtAik8
+ 6nSE5mI2B7K8rkjvngb9v1UURST9SJEaU9TLBqnG6DJD9oryPAdEhKQI1QxUHqT0GrzD
+ IsHQwY08Dnh8UKJ1B7pLYCCSepG6Oe6xzHdZ0ZSYr5UVpRLkWnhH5kpCfRkZgged8wKR
+ me4+8b1A5mVrHZq4sJms531RIUvG/WYXYDkfyTriMznWfrPWmMX5feb+GgF04XVsrxy/
+ Yksw==
+X-Gm-Message-State: AJcUukeJB7eLmgyMxTxMCrnrVBiSUYif+0Ib6AXhtaixNx+pe198t50+
+ O/9DkZzL7IA83s0yUbICYIfAKw==
+X-Google-Smtp-Source: ALg8bN53KR6/M8+Mt+5jqUyjitraKHDVbewmPsYnLuVNvTwlPDbyhBscf+tOeAMebs9YqWXTlpBzZg==
+X-Received: by 2002:a63:9809:: with SMTP id q9mr11371259pgd.109.1547165708097; 
+ Thu, 10 Jan 2019 16:15:08 -0800 (PST)
 Received: from localhost (c-71-197-186-152.hsd1.wa.comcast.net.
  [71.197.186.152])
- by smtp.googlemail.com with ESMTPSA id h9sm124389823pgd.53.2019.01.10.16.14.10
+ by smtp.googlemail.com with ESMTPSA id i5sm19828838pfg.34.2019.01.10.16.15.07
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 10 Jan 2019 16:14:10 -0800 (PST)
+ Thu, 10 Jan 2019 16:15:07 -0800 (PST)
 From: Kevin Hilman <khilman@baylibre.com>
-To: arm@kernel.org
-Subject: [GIT PULL] Amlogic fixes for v5.0-rc
-Date: Thu, 10 Jan 2019 16:14:09 -0800
-Message-ID: <7hzhs8qcdq.fsf@baylibre.com>
+To: Jerome Brunet <jbrunet@baylibre.com>
+Subject: Re: [PATCH] arm64: defconfig: enable modules for amlogic s400 sound
+ card
+In-Reply-To: <6770759de6ed04ecabaa163eb550769d43dfc901.camel@baylibre.com>
+References: <20180828122735.28919-1-jbrunet@baylibre.com>
+ <7hmusmvw6z.fsf@baylibre.com>
+ <6770759de6ed04ecabaa163eb550769d43dfc901.camel@baylibre.com>
+Date: Thu, 10 Jan 2019 16:15:06 -0800
+Message-ID: <7htvigqcc5.fsf@baylibre.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_161413_532573_2B7A9018 
-X-CRM114-Status: UNSURE (   9.93  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190110_161508_702876_93A802B3 
+X-CRM114-Status: GOOD (  14.62  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,43 +97,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Cc: linux-amlogic@lists.infradead.org, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-A single fix for the early -rc.
+Jerome Brunet <jbrunet@baylibre.com> writes:
 
-This is actually one that I missed including in the defconfig updtes for
-v5.0, and fixes the out-of-the box sound card support for the newly
-added s400 board.
+> On Wed, 2018-09-12 at 21:49 -0700, Kevin Hilman wrote:
+>> Jerome Brunet <jbrunet@baylibre.com> writes:
+>> 
+>> > Compile the necessary drivers as modules, including codecs, for the
+>> > s400 sound card.
+>> > 
+>> > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+>> 
+>> Applied to v4.20/defconfig.
+>
+> Hi Kevin,
+>
+> This patch was supposed to be merged for v4.20 but I'm still not seing it in
+> the 5.0-rc1
+>
+> Could you tell me if there is a problem with it ?
+
+No problem with the patch, just a problem with the maintainer.  Not sure
+how/why this one slipped through the cracks.
+
+Thanks for the ping, just sent a request to have it merge for v5.0-rc.
 
 Kevin
 
-
-The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
-
-  Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
-
-are available in the Git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-fixes
-
-for you to fetch changes up to 19a220dd1e8a1b1d8e5e2f8f4a25313c4b02d527:
-
-  arm64: defconfig: enable modules for amlogic s400 sound card (2019-01-08 15:27:50 -0800)
-
-----------------------------------------------------------------
-Amlogic DT fixes for v5.0-rc
-- arm64: defconfig: enable modules for amlogic s400 sound card
-
-----------------------------------------------------------------
-Jerome Brunet (1):
-      arm64: defconfig: enable modules for amlogic s400 sound card
-
- arch/arm64/configs/defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
 
 _______________________________________________
 linux-arm-kernel mailing list
