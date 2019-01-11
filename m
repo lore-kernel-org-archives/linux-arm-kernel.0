@@ -2,89 +2,118 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DEAE8C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 06:11:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 83862C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 06:22:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AA06020872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 06:11:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4F7B72146F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 06:22:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qOvXIodZ";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="I4qllzli"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AA06020872
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E+pJQV8/";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="CH8j5bjV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4F7B72146F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=TLiKXd1PhCwGzgqNj8UvuaR8a7zQ4bvV5SrhTXaO1Dc=; b=qOvXIodZHUVywk
-	SKI8xswd0bgVppKvUZy0jAE2ow2v7kl5JHv4pOKb4CvIhYRsWH1aa7SbAtNJ3dL+VGB8rb478wmcP
-	Z2DCsn3/QlUvsVe8yNaEdi3enWVd+ZK5gPsmEyjz0CagSfH2LD2qpzozxeIwakGDBhnPaXAMAysrc
-	Xv4TtAJV0RoaikrUT1zcA6K8GpoOsYjsYOCTKKn5Ji+qn5E52kKG2sQD8W4Oebrjc515EXS5rST8W
-	24OD6PgqiDwMqEaJ0iEv+TxD2H8TwswwatCG8Wkds3RG/YiWa0Wsz466jBHzeQwK0tnPVjXqTKKbe
-	B2PT+Gt7zOlvoWAr5e2A==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=uWUcxFET6Qj40Z3E25DGGnnYrCNYfvc8DzDrvINilmc=; b=E+pJQV8/59VCFX
+	hV3GhkYLB2wkuR9/fkklZKpq4iXQgpIaUW1PCBvghnL8xLPETKQ8Or82JBDG7CVdS8qZjibFAuIPh
+	PyaHcBpzLI2I1cei6IoX1YJlhiWdzZccbmrKohtljwOBB/8kLXijYqyFFfjMi2v6hKWP8PZq9HV+K
+	8Hi+o7pLGthg4dVOWjchQ6Xlov7Myv5DuKUvdEB+vfIKreLj8slvxnihvstKa/J5kgmP0++Gbx0PW
+	jhaF/WTSeiTwAQY9Yu19zH0r9kBFD2YiCQdtMsUv0d3mUIu6ChBFIqcfU4NtgsDMmuUD1w4+vbrrz
+	lJSHICVWrJF4xGP0IZ2Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghq23-0004Mq-G6; Fri, 11 Jan 2019 06:11:03 +0000
-Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
+	id 1ghqDO-0008IK-JO; Fri, 11 Jan 2019 06:22:46 +0000
+Received: from mail-eopbgr150071.outbound.protection.outlook.com
+ ([40.107.15.71] helo=EUR01-DB5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghq1z-0004ML-Uh; Fri, 11 Jan 2019 06:11:01 +0000
-Received: by mail-wr1-x442.google.com with SMTP id p4so13869273wrt.7;
- Thu, 10 Jan 2019 22:10:58 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=CIiCoovpaUnBgLP3pt9qYms/wUO6h6OcA+/iCwE7uDI=;
- b=I4qllzli0NzBcI7vPbOJ66qScNosNGrxNRPQxBZCDvHsN+HasK1FWGlInJF1CMCezu
- LaoIaOEw0jVzx6fFrGi3mWYAM6lHDtMAiVzMnGjcUNhSBHtDDrJEjE7I+wYBQflk/Ocw
- E+QdNU12mamtA6QhyVIHZDHrxSfnE+D9vxi5z8Yax12gwLttjzsnWQYUXtew/2DhvQMG
- ZRvQ69z5SILBM22qJ8QExDT7USoIqRaozO7XBqQ7+bVxWNRi3C143XcTzx53n3XRRe7L
- JkIYrMwd6r69nbAlB/t4tMDMk7m/LaCkhpQAY29Fffvq5JjPX7aK07PA+uKnu+RBxI04
- Vb1g==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=CIiCoovpaUnBgLP3pt9qYms/wUO6h6OcA+/iCwE7uDI=;
- b=rIpxnxdvfpHnW3E/eVWoQwS0iZmPZjnN2+RtAzfNMb4M57DJQdhEbLMvNOTRuLQxqi
- byznOHkmjF6rXBQ636g1uhojdYQNzDlPiCZt3OQs5wcKfHvhJeb5vCfACRTWAOwePKal
- VR2zoyHwUBhZQRjhknm240r9PoQO37WZL3IIq7DpokrW+XZeS2ueQfDSFNY7IHoWinlB
- gY/Sp7TLCSgqMnyvEfgF4u/uLCsIy4jdK7aFhlmHubsZsWaNt3rA+FifX0QKgdhMszEe
- 6lSd1dVSWw+ix4ORNpitd2vE1k4d8XqwmqeXGMl7etqW1A1Smion4T5HZlgjjYQkgHtA
- pUhw==
-X-Gm-Message-State: AJcUukeSHSEfDE7JdkXvxdLgVvLVcByBQL2BatTEAKfyGGiRB3Xsics+
- oPkTbeRz+L3bOfcYcgochOznsNOHQzJUAJvWFhs=
-X-Google-Smtp-Source: ALg8bN4pjYEjFtLD3l8Ks6/HhSG4Dj7RvucMjHQuo9JUxJBvsS9JSuqYLZbj7cWaOxP5thiRlrP9Iy5y3ZL2z0tLmmo=
-X-Received: by 2002:adf:c108:: with SMTP id r8mr12508579wre.233.1547187057471; 
- Thu, 10 Jan 2019 22:10:57 -0800 (PST)
+ id 1ghqDL-0008Hr-F7
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 06:22:44 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=va6EszgpMG1pBMAICVzHE2KsRLN2Z9bm0ddaZ186U5Y=;
+ b=CH8j5bjVAOY2tDgRK1d1aPMj3F3dw6n4afqhGK7TMX1Bt9L5dRqumRBKj09odTHFTh3MFbGvl6xPTFS7qt4shqrwYEjfe9ZkaN/S7om1620UKJsm6fG1K2Ro4JHRC8bBdJwKyMmJWpw9bzc8NnYJ8/ywX0/fjqQ1gHkxw22uMY8=
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
+ DB3PR0402MB3788.eurprd04.prod.outlook.com (52.134.72.17) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1516.14; Fri, 11 Jan 2019 06:22:40 +0000
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::59d2:55a0:dbe3:2a97]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::59d2:55a0:dbe3:2a97%6]) with mapi id 15.20.1516.016; Fri, 11 Jan 2019
+ 06:22:40 +0000
+From: Anson Huang <anson.huang@nxp.com>
+To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
+ <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>, "kernel@pengutronix.de"
+ <kernel@pengutronix.de>, Fabio Estevam <fabio.estevam@nxp.com>,
+ "linux@armlinux.org.uk" <linux@armlinux.org.uk>, "devicetree@vger.kernel.org"
+ <devicetree@vger.kernel.org>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>, "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>
+Subject: [PATCH V2 1/3] dt-bindings: fsl: add imx7ulp system integration
+ module binding
+Thread-Topic: [PATCH V2 1/3] dt-bindings: fsl: add imx7ulp system integration
+ module binding
+Thread-Index: AQHUqXYN+J7GKpm380y3RHGstkMQ5g==
+Date: Fri, 11 Jan 2019 06:22:40 +0000
+Message-ID: <1547187469-14046-1-git-send-email-Anson.Huang@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: git-send-email 2.7.4
+x-clientproxiedby: HK2PR04CA0090.apcprd04.prod.outlook.com
+ (2603:1096:202:15::34) To DB3PR0402MB3916.eurprd04.prod.outlook.com
+ (2603:10a6:8:10::18)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=anson.huang@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [119.31.174.66]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; DB3PR0402MB3788;
+ 6:fU7FA9XjZouFS0oz0RbkNV1Cpy2v6K5q9Y6Al4zwSo7wbREGjAYXIFYiymY/2L6T83ILdsupcN5SY5Eg74ahbQro/LuKRML048wtPFtURwOGdLPO/Mnc3ZbAaOI1O1zF77qjeKMU9wvw/gZcVKhjpqEanDZcFs9aEeUV0F3TpRE1D8hd9sLiQlT2ZsqwGfSaPf5BV+u9VWB0sgDrWmqwWrp+lLlHP2DuXyqLUK524fweQn49QC7N0JcIVFzgB0Fk2Si13/l/sTdtldjGoDOOYQNhfsqhWLfc9MQDKYvwBj5sVlkgBkUHIqwJPQqN9+9X/A8IW08fJ7lnYdAsHlP2QAqLdd0FsDHNZL4r0GwoHV8KMNRIL9YUqGQJG7a6Af8IKctnrjdgkInnt9Yc+KIyhwpacI3bjjRUzc/Mouv0GCk5xPU4JD4BvOaEfnHOkERXZAOcI4ONqo/04zbBhnGBUg==;
+ 5:FWF7euROZU5HzwPZrLfGiaHoJRknC3Rx7AvUBiSqNvvUdBqAWtTKpSxwoc1wbKKBjuYdxOEj+A4o/ivsbAvN9NtGlGNbc3oI4MdIG1AYH9pW7x7Ksjv4sxfpZvfWNdiHJoXMbJeAfMaDjJqXqjl1m+ermOAMDmkkrK2//AOqaQsjvnqI3TMRCg2Q01UDiSvt/RkIPPX+gJzpNjOCM9W4Jg==;
+ 7:3aakN36QGcTJ+EP6a/Q8SmSy+tdXpSZdgqNlTx+n2Z88WGR6YEM5BCePduYMQ17V/uYIsEdmNq4SHRj9/8J0PyuyGDqKz5QX51Bir+Joj/FyFG19oWRQzRUhRLffDrtSRcxSST6v4vtTjspCrsWqkA==
+x-ms-office365-filtering-correlation-id: 90c2f8fd-ffdb-4ed1-5a27-08d6778d3019
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:DB3PR0402MB3788; 
+x-ms-traffictypediagnostic: DB3PR0402MB3788:
+x-microsoft-antispam-prvs: <DB3PR0402MB3788820BD47278EC80F081DEF5850@DB3PR0402MB3788.eurprd04.prod.outlook.com>
+x-forefront-prvs: 09144DB0F7
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(366004)(376002)(346002)(136003)(396003)(39860400002)(189003)(199004)(4326008)(486006)(106356001)(105586002)(53936002)(316002)(2616005)(102836004)(2906002)(25786009)(26005)(99286004)(186003)(386003)(6506007)(97736004)(6512007)(6486002)(52116002)(71190400001)(71200400001)(256004)(2501003)(305945005)(478600001)(7736002)(36756003)(14454004)(6436002)(6116002)(66066001)(476003)(3846002)(5660300001)(81156014)(68736007)(81166006)(8936002)(575784001)(86362001)(8676002)(50226002)(110136005)(2201001)(921003)(1121003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3788;
+ H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: GkeVI5JRa7ORV0tfU506li4hOOWf5J6/gtxa3uSr1YOdTVFYGlk7f2tR8MxTHwJ1i8xtlOyqPH3jBH9OrdGrwlwYSU0bJUptQN5O1P51Cf/0LsO+KzYiRLmSFaNeY7Jk9Gaue3dyvI0ccUBtSznDi0TCakiS27XswOT+uIjjWkrPFRJhBvGI5b0HqeWflKAB7pl6iS9d2P5+MUolVQS/1XiFs9twvnFs8mfbFY5wbyhq+qeiw6c1BPin/DZRE8YLhrdLNN5ldmQW3f0vj6pNv8VdXZJKOGxt36YiwtAvIWciKvEgWlKR9VdtTGJ17NQl/Z4trJJzlNNFjh0ROEhpa8CNEXcKfB2+jtBE/QHq1IopToxcqt0XttJf/voGcV10NcilLdrkHBTRFickvo0kf1Mes81X47ybj6x/GE9JXSE=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-References: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
- <CALeDE9PX=2nR8=9JjT9wvsb470nrZ_h6JGFsrkYkexGOoOhXuA@mail.gmail.com>
- <849520506.312349.1546937289972@email.ionos.de>
- <CALeDE9OYZi+LZCtnm3kZQ2g5oJ1BWXgfoX0MBD4X0Bz2Vj9Tng@mail.gmail.com>
- <389675377.186771.1546942833612@email.ionos.de>
- <CALeDE9PPt8yTF1FLioxz0C1kJZDYn1uYH-MoBii2Ewpo-yC3tg@mail.gmail.com>
- <2090321804.324042.1547101471247@email.ionos.de>
- <CALeDE9Nzibm=GUfUDKm=d8Zu1fR7J0t-UXMAysmBHxN0oKd-Zw@mail.gmail.com>
- <528752360.347624.1547146121882@email.ionos.de>
-In-Reply-To: <528752360.347624.1547146121882@email.ionos.de>
-From: Peter Robinson <pbrobinson@gmail.com>
-Date: Fri, 11 Jan 2019 06:10:44 +0000
-Message-ID: <CALeDE9OZpGVD4HGxCqjtWf1qCXxkH1YAAM28na7tBvFyRpHJow@mail.gmail.com>
-Subject: Re: [PATCH RFC 00/11] staging: vc04_services: Improve driver
- load/unload
-To: Stefan Wahren <stefan.wahren@i2se.com>
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 90c2f8fd-ffdb-4ed1-5a27-08d6778d3019
+X-MS-Exchange-CrossTenant-originalarrivaltime: 11 Jan 2019 06:22:34.2925 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3788
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_221059_990771_EF03CF6A 
-X-CRM114-Status: GOOD (  12.35  )
+X-CRM114-CacheID: sfid-20190110_222243_514881_B6D13C87 
+X-CRM114-Status: GOOD (  12.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,53 +125,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devel@driverdev.osuosl.org, tiwai@suse.de, gregkh@linuxfoundation.org,
- mikebrady@eircom.net, Eric Anholt <eric@anholt.net>,
- linux-rpi-kernel@lists.infradead.org,
- Dave Stevenson <dave.stevenson@raspberrypi.org>, nsaenzjulienne@suse.de,
- linux-arm-kernel@lists.infradead.org
+Cc: dl-linux-imx <linux-imx@nxp.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Stefan,
+Add i.MX7ULP system integration module (SIM) binding.
 
-> > > > I get difference results with 5.0-rc1 but neither of the above apps
-> > > > work either, will follow up based on the rest of the thread there.
-> > > >
-> > >
-> > > My first step with Raspbian is to enable the Camera interface which results into an appending of the following lines to config.txt:
-> > >
-> > > start_x=1
-> > > gpu_mem=128
-> > >
-> > > AFAIK a smaller value for gpu_mem wont work. Please provide your settings which results in this crash.
-> >
-> > start_x=1
-> > gpu_mem=64
->
-> even with those settings i'm getting a picture in qv4l2 (v1.12.3) and no crash.
->
-> According to dmesg i also have 64M reserved for CMA. How many do you have?
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ .../bindings/arm/freescale/fsl,imx7ulp-sim.txt           | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-sim.txt
 
-I have 192Mb of CMA with LXDE, the vc4 driver uses CMA rather than the
-gpu_mem via the firmware so that's what we set it to (and to 256Mb for
-GNOME)
+diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-sim.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-sim.txt
+new file mode 100644
+index 0000000..7d0c7f0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-sim.txt
+@@ -0,0 +1,16 @@
++Freescale i.MX7ULP System Integration Module
++----------------------------------------------
++The system integration module (SIM) provides system control and chip configuration
++registers. In this module, chip revision information is located in JTAG ID register,
++and a set of registers have been made available in DGO domain for SW use, with the
++objective to maintain its value between system resets.
++
++Required properties:
++- compatible:	Should be "fsl,imx7ulp-sim".
++- reg:		Specifies base physical address and size of the register sets.
++
++Example:
++sim: sim@410a3000 {
++	compatible = "fsl,imx7ulp-sim", "syscon";
++	reg = <0x410a3000 0x1000>;
++};
+-- 
+2.7.4
 
-> Does your qc4l2 make use of OpenGL (not in my case)?
-
-Yes, mine does. The crash with qv4l2 was only when I tried Cheese
-first, if I reboot and just use qv4l2 it works fine when configured
-with 128Mb without any crash. Which display driver are you using? Are
-you using vc4 or the proprietary closed one? With vc4 using cma rather
-than gpu_mem I wonder if we can reduce the amount needed there, but in
-the interim I've at least now got picture output when using purely
-qv4l2 and a reserve of 128Mb
-
-I'm not sure quite what gstreamer1/cheese is doing to cause that crash.
-
-Peter
 
 _______________________________________________
 linux-arm-kernel mailing list
