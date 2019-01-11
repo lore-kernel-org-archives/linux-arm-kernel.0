@@ -2,85 +2,110 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-12.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UPPERCASE_50_75,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D0D5BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 19:13:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ABFF5C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 19:25:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A038720872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 19:13:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 84862218AE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 19:25:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Kf6jTwC/";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="iLa+zJdk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A038720872
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jfnht9Iw";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=wavesemi.onmicrosoft.com header.i=@wavesemi.onmicrosoft.com header.b="NCjj78+q"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 84862218AE
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mips.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=GeirmyC0mZRFIr6QOZ8sGSnh4gxaJfMywNzZ5EiJq5g=; b=Kf6jTwC/w1aoFE
-	zR5P+Zg1I0t5H9LImbZgufBkbOIH8Y7SnQruBnwEp8UdOdbwYG4329lzHLju8IP4ItK7S67vS1QDY
-	K/epy4pwPgvKH9XObU+GXTlIl0y2KMOPVuAg97L3X4GhFUUs10Qk+n5k//BSLU9NKstttU7ZzA1bd
-	bCkkpHX5N8TQFER/XaPy9vOoDnyl84b6Nqu18oF0GJBYzkVCxfPTdSE0zyn3JmH8rrGTIOA4yQFBn
-	q+elu2xem+Zv3Aaed6qo+PushjS1x6DhnhE/FOj1DkmqDh62YBUWyscjibWgpvqfMit+GgLlSOK+M
-	sSJPqRO/1zVYp4MUWl+w==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=jztjKLdn2ZkVirH7Gwbqa0KbbQAWcNDgjffMGcIvZJg=; b=jfnht9IwMp3lxi
+	G9t7DdfZ1KqwQTtT2JzsOxZxgPINriJOHue48RnC39IvNBJCAWFlgKgQdG5FVQcnGV8HbpRFN+f7a
+	8kmTF00ygXL0RnvBXcsn18M0uE1TJYTvzM5WNK1vaObhY+ktIYnvIjKH+7MRLOAI7ZgM9kqxFPuQO
+	FAPgv52VeO/mHnduZUDtFyDn8wB6/HLAWQ9BskV5Y6PbBQnjhyoTeqP1tsauusxpxWYTFwmqe13kI
+	GNXgOkKZLGnemCeq9TvBgJ4/ii5cTGCHz8XcJZJc00J/yrAcVVaZlBt32oSvmloQdwk9b0ATzc9a2
+	WAIyRB7FPvIj3md86zCg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gi2FW-0006HE-Bq; Fri, 11 Jan 2019 19:13:46 +0000
-Received: from mail-lj1-x241.google.com ([2a00:1450:4864:20::241])
+	id 1gi2Qq-0004gG-CH; Fri, 11 Jan 2019 19:25:28 +0000
+Received: from mail-dm3nam05on0703.outbound.protection.outlook.com
+ ([2a01:111:f400:fe51::703]
+ helo=NAM05-DM3-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gi2FT-0006GR-1Z
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 19:13:44 +0000
-Received: by mail-lj1-x241.google.com with SMTP id t18-v6so13894816ljd.4
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 11 Jan 2019 11:13:42 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=HGWT+fVX/OzAwVYlml6V/JEJZXYhqCX3FF/2fg2ntTg=;
- b=iLa+zJdk/kpExi88qxeeKEcxoktDg+36lkFbuKpKo7XtCWx3Va97gQc7En1gsMLCNO
- 846cr/08zGxI2klBpIrW0/hvYCCuaANqbV3tsT5TvX2Z+1c3sr/wlhOalTcSFKXqhnvE
- UJlKD0e/O4cyjP/B2mnZmv4NRD8M8WeoBibS0=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=HGWT+fVX/OzAwVYlml6V/JEJZXYhqCX3FF/2fg2ntTg=;
- b=TrstPrqW2la3Wt3yG2HFAcryKFfmJ8kthtFIzDcDD3PlRv5JIOeEQsO8OTCPChJJWm
- /XiB8gFrOAXTQRfk6Ti4SGxuOMwfe1ggV0B/Uc5N6cX+ZdxfwtK/ZJnGtyHIbXJMmXp+
- c71K0bQslDeNE/EEB4re3/SLngGxZqoRXZBd5I5yejohZWiw7KyZssuf76ChPACNdTxX
- ZYxmb0EnbacFLuk3Lk4AmU/7IEVcSaur8s3SUJISUdmkqVqhmch+GF6F7i+r8G7LR0Pz
- M4tbQSTHMFKkrTnkOEWO0OXKdFhOj887UmXRW21oaDF00KycC0t0xPa7j+MVe5P5voSD
- 6ZLA==
-X-Gm-Message-State: AJcUukexfeWs+XCxGZtFPpCth8imkKuAJ8rF/szvqd26kCN65AethU+U
- fs4haO2HsGp0wn9XqkxqoQp2Iq3kI2Gtzw==
-X-Google-Smtp-Source: ALg8bN589fLEGKP5feC/qcP4b16Dh7eMwPTBuQxuVwPbmYQEHJR8Gy0fpCktamCyJ8WZdycM/keS4Q==
-X-Received: by 2002:a2e:974a:: with SMTP id
- f10-v6mr10369771ljj.61.1547234020325; 
- Fri, 11 Jan 2019 11:13:40 -0800 (PST)
-Received: from localhost.bredbandsbolaget
- (c-ae7b71d5.014-348-6c756e10.bbcust.telenor.se. [213.113.123.174])
- by smtp.gmail.com with ESMTPSA id p10-v6sm16024366ljg.19.2019.01.11.11.13.38
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 11 Jan 2019 11:13:39 -0800 (PST)
-From: Linus Walleij <linus.walleij@linaro.org>
-To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH] ARM: defconfig: Update NHK8815 defconfig
-Date: Fri, 11 Jan 2019 20:13:36 +0100
-Message-Id: <20190111191336.4391-1-linus.walleij@linaro.org>
-X-Mailer: git-send-email 2.19.2
+ id 1gi2Qm-0004fn-Mn
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 19:25:26 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=wavesemi.onmicrosoft.com; s=selector1-wavecomp-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=VH+nqXecd4XJOdhRgHxpM/1XQtILUU9L91QvDoEgzww=;
+ b=NCjj78+qHrdaWHvF36kvYcifQwiTlShNqitusFWX8FlkfYZYnVZlu0TgAx0Nyp59H7hnbCOMXriPBOXL/YJ/njF7TKOdelFamkHdOCkef6z+AFnvVirKghfw1XhJZOhPk59leKyLIgS+m+4lRG6dn1VIDiD3535x5xk0R+3/pII=
+Received: from MWHPR2201MB1277.namprd22.prod.outlook.com (10.174.162.17) by
+ MWHSPR00MB2400.namprd22.prod.outlook.com (10.171.151.23) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1516.13; Fri, 11 Jan 2019 19:25:18 +0000
+Received: from MWHPR2201MB1277.namprd22.prod.outlook.com
+ ([fe80::595e:ffcc:435b:9110]) by MWHPR2201MB1277.namprd22.prod.outlook.com
+ ([fe80::595e:ffcc:435b:9110%4]) with mapi id 15.20.1516.016; Fri, 11 Jan 2019
+ 19:25:18 +0000
+From: Paul Burton <paul.burton@mips.com>
+To: Arnd Bergmann <arnd@arndb.de>
+Subject: Re: [PATCH 11/15] mips: fix n32 compat_ipc_parse_version
+Thread-Topic: [PATCH 11/15] mips: fix n32 compat_ipc_parse_version
+Thread-Index: AQHUqQEbv9GqBtrBzEy9nMrieVYZQaWqdMAA
+Date: Fri, 11 Jan 2019 19:25:17 +0000
+Message-ID: <MWHPR2201MB12776696BE1B1E8EF4A90DA1C1850@MWHPR2201MB1277.namprd22.prod.outlook.com>
+References: <20190110162435.309262-12-arnd@arndb.de>
+In-Reply-To: <20190110162435.309262-12-arnd@arndb.de>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: BYAPR07CA0005.namprd07.prod.outlook.com
+ (2603:10b6:a02:bc::18) To MWHPR2201MB1277.namprd22.prod.outlook.com
+ (2603:10b6:301:24::17)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=pburton@wavecomp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [67.207.99.198]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; MWHSPR00MB2400;
+ 6:SomTMk/mVKaMESAK/AXinLQxx/KsR+jQ6+cxfWH8/DfmPdFYzDy2DiA6f4gQ1FwZCI/dh9I4muNf/2q8fl8IclVtFDPXv2DMMgNQT5I4IsbqRtnZFuQGEPk0Kv/6RGt23rVnVrJEFemySL/Er1wWL+DKDfrgNcYoloJlqOVoEpYkK2obzaT4+XP4Kj3Vawu2WwvfJo7Grmd1gKFodNktqz5XC7pkq+Sna74Pu6FtQg/8y0B6sE+w/rBOIbmRpSrAT2szZpgZFLGjBdYHOkEkvXeXmHU3Q+HMvGYF9SvOWvEX6xx2m6ZMsc+F2TabJ9/6XeXPLnbUNRPZb3Q9YbnWJFpbN9aB8PHatcHh2wxfAjKFZ/CmVk2Dx0TJ2kHhH4ecXpOP9CUFTJVt7Lyrt9O0jvBJoKavrioaSZQRdECEvqq0i/CPzMcGTixmC3q75ltXKw2j1ceS4vrMRDO7EWNPPQ==;
+ 5:vkBX1ZtpLgkD7z9AqqBKAMMYvw5lqig9JV5hKLvl+zWhOGJ7boU73g7EQMYZ0dm9DUwQRNeffzJ2A7wepWq8MuEgPLo/szTOUNx8gCDBSUhsjYkbsxkZkdU2KVU6yzeDalr0WvzBGWs9du30ECUkTUYXCPLkYDC4NoOYXf73wqDzj3Sd1QcFWMM/Y36TE9PjVFlvNgJJPbRmVbqbVXFqtg==;
+ 7:CdVq2cvIX4pqHNIEaQbWsYCjeHWu9/WRBUQijm+nLmdBKrOr7zwjWjx10H0q4Jm25V41smG8SjfCItF7vRK1ftjDCE6uI8KrlzuuJu3haojImZp+rmSWfl9700ptp6UcHj6LLYx4zlRh78ScfCzmEA==
+x-ms-office365-filtering-correlation-id: 8dfe35c1-c55c-4d6f-ca7d-08d677fa84ec
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(2017052603328)(7153060)(7193020);
+ SRVR:MWHSPR00MB2400; 
+x-ms-traffictypediagnostic: MWHSPR00MB2400:
+x-microsoft-antispam-prvs: <MWHSPR00MB2400D3A06B87CF91EBC600A5C1850@MWHSPR00MB2400.namprd22.prod.outlook.com>
+x-forefront-prvs: 09144DB0F7
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10019020)(376002)(39850400004)(346002)(396003)(366004)(136003)(199004)(189003)(102836004)(229853002)(8676002)(74316002)(7416002)(305945005)(81166006)(5660300001)(81156014)(7736002)(6116002)(68736007)(8936002)(3846002)(6246003)(478600001)(7406005)(55016002)(9686003)(25786009)(2906002)(6916009)(53936002)(66066001)(6436002)(97736004)(4326008)(11346002)(446003)(476003)(39060400002)(4744005)(186003)(256004)(26005)(42882007)(33656002)(71200400001)(71190400001)(44832011)(316002)(486006)(54906003)(14454004)(111086002)(52116002)(6506007)(106356001)(386003)(76176011)(105586002)(7696005)(99286004);
+ DIR:OUT; SFP:1102; SCL:1; SRVR:MWHSPR00MB2400;
+ H:MWHPR2201MB1277.namprd22.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: wavecomp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: aY2u+5Lnnma1NCwo4chyHeUpst2HmyyPHtyLbO13mo/vsrZbHvvSgCPRDP3xa8hlorcUc7R9v6F2g5g1JDCfcfheS/olYUY0kWLBJIQ20bvhVHJDvxUkJ71LaPTHnpeWBQDz7ybmb5xdIJSkM7zov8T28EU7rXBati2rlnlYS0tTsifbnFSoZsPF1OkWLuKS5/nzzLEtTy9WQfP1yPSQLCo6JHizqVnDMc9X1MIhEuJd+gHtiUHV/2CAOh+aPyRypXZtCOBAl+mDvv4DGTd8+J6rfyqpc32Uue+UEkT7AA59RCCkt1UvRwChgsz9U6/mIHh1txZWoKT4Hx+XuqlcdnO7Ez3X54h63bIPcDF6fKfDghqstBD0fFk3kDzGtLB0QkIgmfxA2tOdUSfvj5ixSaos0UBNaeWm/nEPwN7Zctg=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
+X-OriginatorOrg: mips.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 8dfe35c1-c55c-4d6f-ca7d-08d677fa84ec
+X-MS-Exchange-CrossTenant-originalarrivaltime: 11 Jan 2019 19:25:17.8656 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 463607d3-1db3-40a0-8a29-970c56230104
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHSPR00MB2400
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_111343_086803_5EA50F33 
-X-CRM114-Status: GOOD (  10.67  )
+X-CRM114-CacheID: sfid-20190111_112524_748861_A6863383 
+X-CRM114-Status: GOOD (  12.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,141 +117,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Paul Burton <pburton@wavecomp.com>, "dalias@libc.org" <dalias@libc.org>,
+ "linux-ia64@vger.kernel.org" <linux-ia64@vger.kernel.org>,
+ "linux-sh@vger.kernel.org" <linux-sh@vger.kernel.org>,
+ "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
+ "will.deacon@arm.com" <will.deacon@arm.com>,
+ "linux@dominikbrodowski.net" <linux@dominikbrodowski.net>,
+ "linux-mips@vger.kernel.org" <linux-mips@vger.kernel.org>,
+ "jcmvbkbc@gmail.com" <jcmvbkbc@gmail.com>,
+ "deepa.kernel@gmail.com" <deepa.kernel@gmail.com>,
+ "hpa@zytor.com" <hpa@zytor.com>,
+ "sparclinux@vger.kernel.org" <sparclinux@vger.kernel.org>,
+ "linux-s390@vger.kernel.org" <linux-s390@vger.kernel.org>,
+ "dave@stgolabs.net" <dave@stgolabs.net>,
+ "y2038@lists.linaro.org" <y2038@lists.linaro.org>,
+ "mpe@ellerman.id.au" <mpe@ellerman.id.au>, "deller@gmx.de" <deller@gmx.de>,
+ "x86@kernel.org" <x86@kernel.org>,
+ "linux@armlinux.org.uk" <linux@armlinux.org.uk>,
+ "mingo@redhat.com" <mingo@redhat.com>,
+ "geert@linux-m68k.org" <geert@linux-m68k.org>,
+ "firoz.khan@linaro.org" <firoz.khan@linaro.org>,
+ "mattst88@gmail.com" <mattst88@gmail.com>,
+ "fenghua.yu@intel.com" <fenghua.yu@intel.com>, Arnd Bergmann <arnd@arndb.de>,
+ "heiko.carstens@de.ibm.com" <heiko.carstens@de.ibm.com>,
+ "linux-m68k@lists.linux-m68k.org" <linux-m68k@lists.linux-m68k.org>,
+ "ink@jurassic.park.msu.ru" <ink@jurassic.park.msu.ru>,
+ "luto@kernel.org" <luto@kernel.org>, "tglx@linutronix.de" <tglx@linutronix.de>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "monstr@monstr.eu" <monstr@monstr.eu>,
+ "tony.luck@intel.com" <tony.luck@intel.com>,
+ "linux-parisc@vger.kernel.org" <linux-parisc@vger.kernel.org>,
+ "linux-api@vger.kernel.org" <linux-api@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "stable@vger.kernel.org" <stable@vger.kernel.org>,
+ "ebiederm@xmission.com" <ebiederm@xmission.com>,
+ "linux-alpha@vger.kernel.org" <linux-alpha@vger.kernel.org>,
+ "schwidefsky@de.ibm.com" <schwidefsky@de.ibm.com>,
+ "akpm@linux-foundation.org" <akpm@linux-foundation.org>,
+ "linuxppc-dev@lists.ozlabs.org" <linuxppc-dev@lists.ozlabs.org>,
+ "davem@davemloft.net" <davem@davemloft.net>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This updates the Nomadik NHK8815 defconfig:
-- Update the config to the lates Kconfig structure
-- Activate IIO driver
-- Activate DRM framebuffer driver for PL111
-- Activate DRM panel driver for TPO TPG110
-- Activate SPI GPIO driver (talks to the display)
-- Activate STMPE PWM driver (used for display backlight)
-- Activate PWM backlight
-- Activate STw481x driver (PMIC)
+Hello,
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/configs/nhk8815_defconfig | 41 ++++++++++++++++++++----------
- 1 file changed, 27 insertions(+), 14 deletions(-)
+Arnd Bergmann wrote:
+> While reading through the sysvipc implementation, I noticed that the n32
+> semctl/shmctl/msgctl system calls behave differently based on whether
+> o32 support is enabled or not: Without o32, the IPC_64 flag passed by
+> user space is rejected but calls without that flag get IPC_64 behavior.
+> 
+> As far as I can tell, this was inadvertently changed by a cleanup patch
+> but never noticed by anyone, possibly nobody has tried using sysvipc
+> on n32 after linux-3.19.
+> 
+> Change it back to the old behavior now.
+> 
+> Fixes: 78aaf956ba3a ("MIPS: Compat: Fix build error if CONFIG_MIPS32_COMPAT but no compat ABI.")
+> Cc: stable@vger.kernel.org
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-diff --git a/arch/arm/configs/nhk8815_defconfig b/arch/arm/configs/nhk8815_defconfig
-index 0ac44acd5bc4..5f4c6aaa07f6 100644
---- a/arch/arm/configs/nhk8815_defconfig
-+++ b/arch/arm/configs/nhk8815_defconfig
-@@ -3,6 +3,7 @@
- CONFIG_SYSVIPC=y
- CONFIG_NO_HZ_IDLE=y
- CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_PREEMPT=y
- CONFIG_IKCONFIG=y
- CONFIG_IKCONFIG_PROC=y
- CONFIG_LOG_BUF_SHIFT=14
-@@ -10,16 +11,16 @@ CONFIG_BLK_DEV_INITRD=y
- CONFIG_EXPERT=y
- CONFIG_KALLSYMS_ALL=y
- CONFIG_SLAB=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--# CONFIG_BLK_DEV_BSG is not set
- # CONFIG_ARCH_MULTI_V7 is not set
- CONFIG_ARCH_NOMADIK=y
- CONFIG_MACH_NOMADIK_8815NHK=y
--CONFIG_PREEMPT=y
- CONFIG_AEABI=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_BLK_DEV_BSG is not set
-+CONFIG_CMA=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
-@@ -49,12 +50,12 @@ CONFIG_MTD=y
- CONFIG_MTD_TESTS=m
- CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_BLOCK=y
--CONFIG_MTD_NAND_ECC_SMC=y
--CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_FSMC=y
- CONFIG_MTD_ONENAND=y
- CONFIG_MTD_ONENAND_VERIFY_WRITE=y
- CONFIG_MTD_ONENAND_GENERIC=y
-+CONFIG_MTD_NAND_ECC_SMC=y
-+CONFIG_MTD_NAND=y
-+CONFIG_MTD_NAND_FSMC=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_CRYPTOLOOP=y
- CONFIG_BLK_DEV_RAM=y
-@@ -75,7 +76,6 @@ CONFIG_PPP_MPPE=m
- CONFIG_PPPOE=m
- CONFIG_PPP_ASYNC=m
- CONFIG_PPP_SYNC_TTY=m
--# CONFIG_INPUT_MOUSEDEV is not set
- CONFIG_INPUT_EVDEV=y
- # CONFIG_KEYBOARD_ATKBD is not set
- CONFIG_KEYBOARD_GPIO=y
-@@ -88,13 +88,22 @@ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
- CONFIG_HW_RANDOM=y
- CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_GPIO=y
--CONFIG_DEBUG_GPIO=y
-+CONFIG_SPI=y
-+CONFIG_SPI_GPIO=y
- CONFIG_GPIO_STMPE=y
- # CONFIG_HWMON is not set
- CONFIG_MFD_STMPE=y
-+CONFIG_MFD_STW481X=y
- CONFIG_REGULATOR=y
-+CONFIG_DRM=y
-+CONFIG_DRM_PANEL_TPO_TPG110=y
-+CONFIG_DRM_PL111=y
-+CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+CONFIG_BACKLIGHT_CLASS_DEVICE=y
-+CONFIG_BACKLIGHT_PWM=y
-+CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_LOGO=y
- CONFIG_MMC=y
--# CONFIG_MMC_BLOCK_BOUNCE is not set
- CONFIG_MMC_ARMMMCI=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
-@@ -105,6 +114,11 @@ CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_PL031=y
- CONFIG_DMADEVICES=y
- CONFIG_AMBA_PL08X=y
-+CONFIG_IIO=y
-+CONFIG_IIO_BUFFER=y
-+CONFIG_IIO_ST_ACCEL_3AXIS=y
-+CONFIG_PWM=y
-+CONFIG_PWM_STMPE=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- CONFIG_FUSE_FS=y
-@@ -121,13 +135,12 @@ CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ASCII=y
- CONFIG_NLS_ISO8859_1=y
- CONFIG_NLS_ISO8859_15=y
-+CONFIG_CRYPTO_MD5=y
-+CONFIG_CRYPTO_SHA1=y
-+CONFIG_CRYPTO_DES=y
- CONFIG_DEBUG_INFO=y
- # CONFIG_ENABLE_MUST_CHECK is not set
- CONFIG_DEBUG_FS=y
- # CONFIG_SCHED_DEBUG is not set
- # CONFIG_DEBUG_PREEMPT is not set
- # CONFIG_DEBUG_BUGVERBOSE is not set
--CONFIG_CRYPTO_MD5=y
--CONFIG_CRYPTO_SHA1=y
--CONFIG_CRYPTO_DES=y
--# CONFIG_CRYPTO_ANSI_CPRNG is not set
--- 
-2.19.2
+Applied to mips-fixes.
 
+Thanks,
+    Paul
+
+[ This message was auto-generated; if you believe anything is incorrect
+  then please email paul.burton@mips.com to report it. ]
 
 _______________________________________________
 linux-arm-kernel mailing list
