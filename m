@@ -2,86 +2,64 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B9D21C43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 17:34:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 012E5C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 17:42:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 900EB20870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 17:34:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CD8CB20870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 17:42:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="D/bYdhpo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 900EB20870
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jsDuQAsv";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=lunn.ch header.i=@lunn.ch header.b="tjCUvZnD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CD8CB20870
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lunn.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zq11aOz8X+uvXBY2uAwa57EhYfjwFFZXzCMwnCYYE+w=; b=D/bYdhpoSSFVsl
-	UdWoJ4RSwWEbyMSys1hOIUJR7PTeefE2XcZBVKX8WmwmiySGsu/pwUFOTzxc7R8M9B6POidEROp6q
-	hlK0CIF/ATNaSUudd2XbIZlW9E6yVslkSv6wuKicxtyr//hgFeX/mtEY3iQLsdcupd7bG7RLfHWNA
-	izlevCt4T/Y/P6QD4oHqgyixhkNuKXJYoU0xT5E/XlghkS/S3/hYVDcxj1Fg6XP/WOhSq3NWNElUh
-	duVnpeKwrMpJhNQKOIBsJobtxLjGvt9Hj8/EKUj/BHaAQM7g37Qg6Q8I9Lxb5Zw+MGVybKrsHCbAx
-	WzDe86TqzzOXr+yAyVgw==;
+	List-Owner; bh=uuLYA0ZdZBMJLvslnLjPjgbY/5vRQAEPL5Yb6WXgQrM=; b=jsDuQAsvXf110n
+	yIGgJLRM/pHZ/exMQQYy4EVohSeryLBFEy6HUuLJZPdMo+BNAzLkThZ7pxGzW9FdLCFJBHgDLMdFu
+	yRhqwz8z5ZQMG2GTnM03C1VkSXCDvLmrfPNrSkSVwd+WVwwlfrj/L5++/63DYudhotqfK4wJ/BsLJ
+	or60QzxvqxgD5f3sOmLeGR1P3QT+9lQxDcqFql2km+ZuZlNljNLA2F2fzxxRqrl5bi5ejyW7eDmXi
+	2H39XgQc+k1F36I6a68HRaUrWttRgFggcRsLTlAg7VwpmJT20GtLHDWAwZSHs3fxcyCx2q1H0wys/
+	EBuUmHpf5OcF8xNuIbtg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gi0hk-0001D9-QE; Fri, 11 Jan 2019 17:34:48 +0000
-Received: from mx07-00178001.pphosted.com ([62.209.51.94])
+	id 1gi0oh-0004Um-Hx; Fri, 11 Jan 2019 17:41:59 +0000
+Received: from vps0.lunn.ch ([185.16.172.187])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gi0hg-0001Ci-Jj
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 17:34:46 +0000
-Received: from pps.filterd (m0046037.ppops.net [127.0.0.1])
- by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x0BHQDoW010536; Fri, 11 Jan 2019 18:34:34 +0100
-Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx07-00178001.pphosted.com with ESMTP id 2ptybng97d-1
- (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Fri, 11 Jan 2019 18:34:34 +0100
-Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id E119231;
- Fri, 11 Jan 2019 17:34:32 +0000 (GMT)
-Received: from Webmail-eu.st.com (sfhdag3node3.st.com [10.75.127.9])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 9250655A4;
- Fri, 11 Jan 2019 17:34:32 +0000 (GMT)
-Received: from SFHDAG7NODE2.st.com (10.75.127.20) by SFHDAG3NODE3.st.com
- (10.75.127.9) with Microsoft SMTP Server (TLS) id 15.0.1347.2; Fri, 11 Jan
- 2019 18:34:32 +0100
-Received: from SFHDAG7NODE2.st.com ([fe80::d548:6a8f:2ca4:2090]) by
- SFHDAG7NODE2.st.com ([fe80::d548:6a8f:2ca4:2090%20]) with mapi id
- 15.00.1347.000; Fri, 11 Jan 2019 18:34:32 +0100
-From: Loic PALLARDY <loic.pallardy@st.com>
-To: Marc Zyngier <marc.zyngier@arm.com>, "tglx@linutronix.de"
- <tglx@linutronix.de>, "jason@lakedaemon.net" <jason@lakedaemon.net>,
- "mcoquelin.stm32@gmail.com" <mcoquelin.stm32@gmail.com>, Alexandre TORGUE
- <alexandre.torgue@st.com>
-Subject: RE: [PATCH 1/1] irqchip: stm32-exti: add domain translate function
-Thread-Topic: [PATCH 1/1] irqchip: stm32-exti: add domain translate function
-Thread-Index: AQHUqbXR7xrMy0xrkECi13pJpL3NPqWqJw+AgAAkTxA=
-Date: Fri, 11 Jan 2019 17:34:32 +0000
-Message-ID: <fb407c82a8fc44cdb0fd4c8954c4c12d@SFHDAG7NODE2.st.com>
-References: <1547215132-85612-1-git-send-email-loic.pallardy@st.com>
- <7e36a9f2-2b43-5af3-2094-198a61030687@arm.com>
-In-Reply-To: <7e36a9f2-2b43-5af3-2094-198a61030687@arm.com>
-Accept-Language: fr-FR, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-ms-exchange-transport-fromentityheader: Hosted
-x-originating-ip: [10.75.127.49]
+ id 1gi0od-0004UC-Lj
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 17:41:57 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed; d=lunn.ch;
+ s=20171124; 
+ h=In-Reply-To:Content-Type:MIME-Version:References:Message-ID:Subject:Cc:To:From:Date;
+ bh=XUowxWRSd2Y+Sn0A7nY0q29L7H0oWBllzuWs6LBcrZs=; 
+ b=tjCUvZnDgaMQQ3HMiUaRNU9TuGqDaHW0o0ksC2KJb64VGuXO2WIYg2cVuO1rNLcUYtpEdZWCLp1Ss8cxT+LiVgxDdl3m9hsyBA+QPOEN6TNn3lhWWSfuiaZ9wCDo5NdDJknBqfYYz29cgxf0mbyL+8nqKCdVRWK7nE6Bf0lb69Q=;
+Received: from andrew by vps0.lunn.ch with local (Exim 4.84_2)
+ (envelope-from <andrew@lunn.ch>)
+ id 1gi0oV-0002fS-Gn; Fri, 11 Jan 2019 18:41:47 +0100
+Date: Fri, 11 Jan 2019 18:41:47 +0100
+From: Andrew Lunn <andrew@lunn.ch>
+To: Vladimir Vid <vladimir.vid@sartura.hr>
+Subject: Re: [PATCH] arm64: dts: marvell: Add device tree for uDPU board
+Message-ID: <20190111174147.GG20924@lunn.ch>
+References: <20190111172055.30451-1-vladimir.vid@sartura.hr>
 MIME-Version: 1.0
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2019-01-11_09:, , signatures=0
+Content-Disposition: inline
+In-Reply-To: <20190111172055.30451-1-vladimir.vid@sartura.hr>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_093444_948322_89D38D23 
-X-CRM114-Status: GOOD (  18.49  )
+X-CRM114-CacheID: sfid-20190111_094155_859903_648B7FBB 
+X-CRM114-Status: GOOD (  13.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,99 +71,73 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>,
- "linux-stm32@st-md-mailman.stormreply.com"
- <linux-stm32@st-md-mailman.stormreply.com>
+Cc: devicetree@vger.kernel.org, Luka Perkov <luka.perkov@sartura.hr>,
+ Paul Arola <paul.arola@telus.com>, Luis Torres <luis.torres@methode.com>,
+ Scott Roberts <scott.roberts@telus.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Marc,
-Thanks for the review
+> diff --git a/arch/arm64/boot/dts/marvell/armada-3720-uDPU.dts b/arch/arm64/boot/dts/marvell/armada-3720-uDPU.dts
+> new file mode 100644
+> index 000000000000..eae30322a037
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/marvell/armada-3720-uDPU.dts
+> @@ -0,0 +1,178 @@
+> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> +/*
+> + * Device tree for the uDPU board.
+> + * Based on Marvell Armada 3720 development board (DB-88F3720-DDR3)
+> + * Copyright (C) 2016 Marvell
+> + * Copyright (C) 2018 Methode
+> + * Copyright (C) 2018 Telus
+> + *
+> + * Vladimir Vid <vladimir.vid@sartura.hr>
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include "armada-372x.dtsi"
+> +
+> +/ {
+> +	model = "Methode uDPU Board";
+> +	compatible = "marvell,armada-3720-db", "marvell,armada3720",
+> +		     "marvell,armada3710";
+> +
 
-> -----Original Message-----
-> From: Marc Zyngier <marc.zyngier@arm.com>
-> Sent: vendredi 11 janvier 2019 16:52
-> To: Loic PALLARDY <loic.pallardy@st.com>; tglx@linutronix.de;
-> jason@lakedaemon.net; mcoquelin.stm32@gmail.com; Alexandre TORGUE
-> <alexandre.torgue@st.com>
-> Cc: linux-kernel@vger.kernel.org; linux-stm32@st-md-
-> mailman.stormreply.com; linux-arm-kernel@lists.infradead.org
-> Subject: Re: [PATCH 1/1] irqchip: stm32-exti: add domain translate function
-> 
-> On 11/01/2019 13:58, Loic Pallardy wrote:
-> > Domain translate function is needed to recover irq
-> > configuration parameters from DT node
-> >
-> > Signed-off-by: Loic Pallardy <loic.pallardy@st.com>
-> 
-> Surely this fixes something, right? Can you please add a Fixes: tag?
-Yes I will add tag of patch introducing hierarchical domain
+Hi Vladimir
 
-> 
-> > ---
-> >  drivers/irqchip/irq-stm32-exti.c | 18 ++++++++++++++++++
-> >  1 file changed, 18 insertions(+)
-> >
-> > diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-
-> exti.c
-> > index 6edfd4bfa169..717879028cc4 100644
-> > --- a/drivers/irqchip/irq-stm32-exti.c
-> > +++ b/drivers/irqchip/irq-stm32-exti.c
-> > @@ -819,9 +819,27 @@ static int __init stm32_exti_init(const struct
-> stm32_exti_drv_data *drv_data,
-> >  	return ret;
-> >  }
-> >
-> > +static int stm32_exti_h_translate(struct irq_domain *d,
-> > +				  struct irq_fwspec *fwspec,
-> > +				  unsigned long *out_hwirq,
-> > +				  unsigned int *out_type)
-> > +{
-> > +	if (is_of_node(fwspec->fwnode)) {
-> 
-> Is there any case where this wouldn't be true? i.e. an stm32 ACPI system?
+There should be a compatible string here for the board. It looks like
+you will also need to add Methode as a vendor to
+Documentation/devicetree/bindings/vendor-prefixes.txt.
 
-You're right, no ACPI so check useless
+> +	leds {
+> +		pinctrl-names = "default";
+> +		compatible = "gpio-leds";
+> +
+> +		led@487 {
+> +			gpios = <&gpionb 11 GPIO_ACTIVE_LOW>;
+> +			default-state = "off";
 
-> 
-> > +		if (fwspec->param_count != 2)
-> > +			return -EINVAL;
-> > +
-> > +		*out_hwirq = fwspec->param[0];
-> > +		*out_type = fwspec->param[1] & IRQ_TYPE_SENSE_MASK;
-> > +		return 0;
-> > +	}
-> > +
-> > +	return -EINVAL;
-> > +}
-> 
-> Because otherwise, this is exactly what irq_domain_xlate_twocell() does.
+It is normal to have a name here, indicating what the LED is for, its
+colour, etc.
 
-Thanks for pointing me this helper. Indeed no need to duplicate code
-I'll send a v2 
+> +&mdio {
+> +	status = "okay";
+> +	phy0: ethernet-phy@0 {
+> +		reg = <0>;
+> +	};
+> +	phy1: ethernet-phy@1 {
+> +		reg = <1>;
+> +	};
+> +};
 
-Regards,
-Loic
-> 
-> > +
-> >  static const struct irq_domain_ops stm32_exti_h_domain_ops = {
-> >  	.alloc	= stm32_exti_h_domain_alloc,
-> >  	.free	= irq_domain_free_irqs_common,
-> > +	.translate = stm32_exti_h_translate,
-> >  };
-> >
-> >  static int
-> >
-> 
-> Thanks,
-> 
-> 	M.
-> --
-> Jazz is not dead. It just smells funny...
+These don't appear to be used anywhere. 
+
+      Andrew
+
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
