@@ -2,22 +2,23 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-12.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UPPERCASE_50_75,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 140AFC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:58:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D0D5BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 19:13:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E44372183F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:58:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A038720872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 19:13:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nIZ+wt65"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E44372183F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=virtuozzo.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Kf6jTwC/";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="iLa+zJdk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A038720872
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,33 +26,61 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
 	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=LQI7D54fTx2IuZoQdyJUa2hCte7LT0TsJzijdkjL40o=; b=nIZ+wt65UvIyBc
-	+wANJk0S79YTyXzras/YqRdJx5QQzZG4uNS+szJil5JmOyivO5Z4jdYh9k+nDKqYTBFj6ZvOJeHif
-	Ri5Z256O6xqwo+8ELBuKq8f2npVyMLbpQ7UJ98Sdaxp8OUBXuGj5O6v1K2wOcfHzIWOF1JshfLeao
-	SYHNlXTXDzM14speVjyA8UHqr+JhxJ1yCx7hM3fTWGcTSv+ncJZ0Fi1BDYbax1/ZGPJ+bzUL8DTa6
-	SS+qBJgmXKO23MfHGfa1/IvPg+eQCCQSM4c7J98SBgJd3XLz8P/LZyaBUkOkPJNEYNx3Fg6vaoH+w
-	6gmeaI9JbpJ6j8G8wMUw==;
+	List-Owner; bh=GeirmyC0mZRFIr6QOZ8sGSnh4gxaJfMywNzZ5EiJq5g=; b=Kf6jTwC/w1aoFE
+	zR5P+Zg1I0t5H9LImbZgufBkbOIH8Y7SnQruBnwEp8UdOdbwYG4329lzHLju8IP4ItK7S67vS1QDY
+	K/epy4pwPgvKH9XObU+GXTlIl0y2KMOPVuAg97L3X4GhFUUs10Qk+n5k//BSLU9NKstttU7ZzA1bd
+	bCkkpHX5N8TQFER/XaPy9vOoDnyl84b6Nqu18oF0GJBYzkVCxfPTdSE0zyn3JmH8rrGTIOA4yQFBn
+	q+elu2xem+Zv3Aaed6qo+PushjS1x6DhnhE/FOj1DkmqDh62YBUWyscjibWgpvqfMit+GgLlSOK+M
+	sSJPqRO/1zVYp4MUWl+w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gi20y-00015T-SO; Fri, 11 Jan 2019 18:58:44 +0000
-Received: from relay.sw.ru ([185.231.240.75])
+	id 1gi2FW-0006HE-Bq; Fri, 11 Jan 2019 19:13:46 +0000
+Received: from mail-lj1-x241.google.com ([2a00:1450:4864:20::241])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gi20u-00014H-Bb
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 18:58:43 +0000
-Received: from [172.16.25.12] (helo=i7.sw.ru)
- by relay.sw.ru with esmtp (Exim 4.91)
- (envelope-from <aryabinin@virtuozzo.com>)
- id 1gi20f-0006j6-CF; Fri, 11 Jan 2019 21:58:25 +0300
-From: Andrey Ryabinin <aryabinin@virtuozzo.com>
-To: akpm@linux-foundation.org
-Subject: [PATCH] kasan: Remove use after scope bugs detection.
-Date: Fri, 11 Jan 2019 21:58:42 +0300
-Message-Id: <20190111185842.13978-1-aryabinin@virtuozzo.com>
+ id 1gi2FT-0006GR-1Z
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 19:13:44 +0000
+Received: by mail-lj1-x241.google.com with SMTP id t18-v6so13894816ljd.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 11 Jan 2019 11:13:42 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=HGWT+fVX/OzAwVYlml6V/JEJZXYhqCX3FF/2fg2ntTg=;
+ b=iLa+zJdk/kpExi88qxeeKEcxoktDg+36lkFbuKpKo7XtCWx3Va97gQc7En1gsMLCNO
+ 846cr/08zGxI2klBpIrW0/hvYCCuaANqbV3tsT5TvX2Z+1c3sr/wlhOalTcSFKXqhnvE
+ UJlKD0e/O4cyjP/B2mnZmv4NRD8M8WeoBibS0=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=HGWT+fVX/OzAwVYlml6V/JEJZXYhqCX3FF/2fg2ntTg=;
+ b=TrstPrqW2la3Wt3yG2HFAcryKFfmJ8kthtFIzDcDD3PlRv5JIOeEQsO8OTCPChJJWm
+ /XiB8gFrOAXTQRfk6Ti4SGxuOMwfe1ggV0B/Uc5N6cX+ZdxfwtK/ZJnGtyHIbXJMmXp+
+ c71K0bQslDeNE/EEB4re3/SLngGxZqoRXZBd5I5yejohZWiw7KyZssuf76ChPACNdTxX
+ ZYxmb0EnbacFLuk3Lk4AmU/7IEVcSaur8s3SUJISUdmkqVqhmch+GF6F7i+r8G7LR0Pz
+ M4tbQSTHMFKkrTnkOEWO0OXKdFhOj887UmXRW21oaDF00KycC0t0xPa7j+MVe5P5voSD
+ 6ZLA==
+X-Gm-Message-State: AJcUukexfeWs+XCxGZtFPpCth8imkKuAJ8rF/szvqd26kCN65AethU+U
+ fs4haO2HsGp0wn9XqkxqoQp2Iq3kI2Gtzw==
+X-Google-Smtp-Source: ALg8bN589fLEGKP5feC/qcP4b16Dh7eMwPTBuQxuVwPbmYQEHJR8Gy0fpCktamCyJ8WZdycM/keS4Q==
+X-Received: by 2002:a2e:974a:: with SMTP id
+ f10-v6mr10369771ljj.61.1547234020325; 
+ Fri, 11 Jan 2019 11:13:40 -0800 (PST)
+Received: from localhost.bredbandsbolaget
+ (c-ae7b71d5.014-348-6c756e10.bbcust.telenor.se. [213.113.123.174])
+ by smtp.gmail.com with ESMTPSA id p10-v6sm16024366ljg.19.2019.01.11.11.13.38
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 11 Jan 2019 11:13:39 -0800 (PST)
+From: Linus Walleij <linus.walleij@linaro.org>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [PATCH] ARM: defconfig: Update NHK8815 defconfig
+Date: Fri, 11 Jan 2019 20:13:36 +0100
+Message-Id: <20190111191336.4391-1-linus.walleij@linaro.org>
 X-Mailer: git-send-email 2.19.2
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_105840_596205_53A084F4 
-X-CRM114-Status: GOOD (  14.32  )
+X-CRM114-CacheID: sfid-20190111_111343_086803_5EA50F33 
+X-CRM114-Status: GOOD (  10.67  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -63,243 +92,138 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
- kasan-dev@googlegroups.com, linux-mm@kvack.org, Qian Cai <cai@lca.pw>,
- Dmitry Vyukov <dvyukov@google.com>, Andrey Ryabinin <aryabinin@virtuozzo.com>,
- Alexander Potapenko <glider@google.com>, linux-arm-kernel@lists.infradead.org
+Cc: Linus Walleij <linus.walleij@linaro.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Use after scope bugs detector seems to be almost entirely useless
-for the linux kernel. It exists over two years, but I've seen only
-one valid bug so far [1]. And the bug was fixed before it has been
-reported. There were some other use-after-scope reports, but they
-were false-positives due to different reasons like incompatibility
-with structleak plugin.
+This updates the Nomadik NHK8815 defconfig:
+- Update the config to the lates Kconfig structure
+- Activate IIO driver
+- Activate DRM framebuffer driver for PL111
+- Activate DRM panel driver for TPO TPG110
+- Activate SPI GPIO driver (talks to the display)
+- Activate STMPE PWM driver (used for display backlight)
+- Activate PWM backlight
+- Activate STw481x driver (PMIC)
 
-This feature significantly increases stack usage, especially with
-GCC < 9 version, and causes a 32K stack overflow. It probably
-adds performance penalty too.
-
-Given all that, let's remove use-after-scope detector entirely.
-
-While preparing this patch I've noticed that we mistakenly enable
-use-after-scope detection for clang compiler regardless of
-CONFIG_KASAN_EXTRA setting. This is also fixed now.
-
-[1] http://lkml.kernel.org/r/<20171129052106.rhgbjhhis53hkgfn@wfg-t540p.sh.intel.com>
-
-Signed-off-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-Cc: Qian Cai <cai@lca.pw>
-Cc: Alexander Potapenko <glider@google.com>
-Cc: Dmitry Vyukov <dvyukov@google.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm64/include/asm/memory.h |  4 ----
- lib/Kconfig.debug               |  1 -
- lib/Kconfig.kasan               | 10 ----------
- lib/test_kasan.c                | 24 ------------------------
- mm/kasan/generic.c              | 19 -------------------
- mm/kasan/generic_report.c       |  3 ---
- mm/kasan/kasan.h                |  3 ---
- scripts/Makefile.kasan          |  5 -----
- scripts/gcc-plugins/Kconfig     |  4 ----
- 9 files changed, 73 deletions(-)
+ arch/arm/configs/nhk8815_defconfig | 41 ++++++++++++++++++++----------
+ 1 file changed, 27 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index e1ec947e7c0c..0e236a99b3ef 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -80,11 +80,7 @@
-  */
- #ifdef CONFIG_KASAN
- #define KASAN_SHADOW_SIZE	(UL(1) << (VA_BITS - KASAN_SHADOW_SCALE_SHIFT))
--#ifdef CONFIG_KASAN_EXTRA
--#define KASAN_THREAD_SHIFT	2
--#else
- #define KASAN_THREAD_SHIFT	1
--#endif /* CONFIG_KASAN_EXTRA */
- #else
- #define KASAN_SHADOW_SIZE	(0)
- #define KASAN_THREAD_SHIFT	0
-diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
-index d4df5b24d75e..a219f3488ad7 100644
---- a/lib/Kconfig.debug
-+++ b/lib/Kconfig.debug
-@@ -222,7 +222,6 @@ config ENABLE_MUST_CHECK
- config FRAME_WARN
- 	int "Warn for stack frames larger than (needs gcc 4.4)"
- 	range 0 8192
--	default 3072 if KASAN_EXTRA
- 	default 2048 if GCC_PLUGIN_LATENT_ENTROPY
- 	default 1280 if (!64BIT && PARISC)
- 	default 1024 if (!64BIT && !PARISC)
-diff --git a/lib/Kconfig.kasan b/lib/Kconfig.kasan
-index d8c474b6691e..67d7d1309c52 100644
---- a/lib/Kconfig.kasan
-+++ b/lib/Kconfig.kasan
-@@ -78,16 +78,6 @@ config KASAN_SW_TAGS
- 
- endchoice
- 
--config KASAN_EXTRA
--	bool "KASAN: extra checks"
--	depends on KASAN_GENERIC && DEBUG_KERNEL && !COMPILE_TEST
--	help
--	  This enables further checks in generic KASAN, for now it only
--	  includes the address-use-after-scope check that can lead to
--	  excessive kernel stack usage, frame size warnings and longer
--	  compile time.
--	  See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81715
--
- choice
- 	prompt "Instrumentation type"
- 	depends on KASAN
-diff --git a/lib/test_kasan.c b/lib/test_kasan.c
-index 51b78405bf24..7de2702621dc 100644
---- a/lib/test_kasan.c
-+++ b/lib/test_kasan.c
-@@ -480,29 +480,6 @@ static noinline void __init copy_user_test(void)
- 	kfree(kmem);
- }
- 
--static noinline void __init use_after_scope_test(void)
--{
--	volatile char *volatile p;
--
--	pr_info("use-after-scope on int\n");
--	{
--		int local = 0;
--
--		p = (char *)&local;
--	}
--	p[0] = 1;
--	p[3] = 1;
--
--	pr_info("use-after-scope on array\n");
--	{
--		char local[1024] = {0};
--
--		p = local;
--	}
--	p[0] = 1;
--	p[1023] = 1;
--}
--
- static noinline void __init kasan_alloca_oob_left(void)
- {
- 	volatile int i = 10;
-@@ -682,7 +659,6 @@ static int __init kmalloc_tests_init(void)
- 	kasan_alloca_oob_right();
- 	ksize_unpoisons_memory();
- 	copy_user_test();
--	use_after_scope_test();
- 	kmem_cache_double_free();
- 	kmem_cache_invalid_free();
- 	kasan_memchr();
-diff --git a/mm/kasan/generic.c b/mm/kasan/generic.c
-index ccb6207276e3..504c79363a34 100644
---- a/mm/kasan/generic.c
-+++ b/mm/kasan/generic.c
-@@ -275,25 +275,6 @@ EXPORT_SYMBOL(__asan_storeN_noabort);
- void __asan_handle_no_return(void) {}
- EXPORT_SYMBOL(__asan_handle_no_return);
- 
--/* Emitted by compiler to poison large objects when they go out of scope. */
--void __asan_poison_stack_memory(const void *addr, size_t size)
--{
--	/*
--	 * Addr is KASAN_SHADOW_SCALE_SIZE-aligned and the object is surrounded
--	 * by redzones, so we simply round up size to simplify logic.
--	 */
--	kasan_poison_shadow(addr, round_up(size, KASAN_SHADOW_SCALE_SIZE),
--			    KASAN_USE_AFTER_SCOPE);
--}
--EXPORT_SYMBOL(__asan_poison_stack_memory);
--
--/* Emitted by compiler to unpoison large objects when they go into scope. */
--void __asan_unpoison_stack_memory(const void *addr, size_t size)
--{
--	kasan_unpoison_shadow(addr, size);
--}
--EXPORT_SYMBOL(__asan_unpoison_stack_memory);
--
- /* Emitted by compiler to poison alloca()ed objects. */
- void __asan_alloca_poison(unsigned long addr, size_t size)
- {
-diff --git a/mm/kasan/generic_report.c b/mm/kasan/generic_report.c
-index 5e12035888f2..36c645939bc9 100644
---- a/mm/kasan/generic_report.c
-+++ b/mm/kasan/generic_report.c
-@@ -82,9 +82,6 @@ static const char *get_shadow_bug_type(struct kasan_access_info *info)
- 	case KASAN_KMALLOC_FREE:
- 		bug_type = "use-after-free";
- 		break;
--	case KASAN_USE_AFTER_SCOPE:
--		bug_type = "use-after-scope";
--		break;
- 	case KASAN_ALLOCA_LEFT:
- 	case KASAN_ALLOCA_RIGHT:
- 		bug_type = "alloca-out-of-bounds";
-diff --git a/mm/kasan/kasan.h b/mm/kasan/kasan.h
-index ea51b2d898ec..3e0c11f7d7a1 100644
---- a/mm/kasan/kasan.h
-+++ b/mm/kasan/kasan.h
-@@ -34,7 +34,6 @@
- #define KASAN_STACK_MID         0xF2
- #define KASAN_STACK_RIGHT       0xF3
- #define KASAN_STACK_PARTIAL     0xF4
--#define KASAN_USE_AFTER_SCOPE   0xF8
- 
- /*
-  * alloca redzone shadow values
-@@ -187,8 +186,6 @@ void __asan_unregister_globals(struct kasan_global *globals, size_t size);
- void __asan_loadN(unsigned long addr, size_t size);
- void __asan_storeN(unsigned long addr, size_t size);
- void __asan_handle_no_return(void);
--void __asan_poison_stack_memory(const void *addr, size_t size);
--void __asan_unpoison_stack_memory(const void *addr, size_t size);
- void __asan_alloca_poison(unsigned long addr, size_t size);
- void __asan_allocas_unpoison(const void *stack_top, const void *stack_bottom);
- 
-diff --git a/scripts/Makefile.kasan b/scripts/Makefile.kasan
-index 25c259df8ffa..f1fb8e502657 100644
---- a/scripts/Makefile.kasan
-+++ b/scripts/Makefile.kasan
-@@ -27,14 +27,9 @@ else
- 	 $(call cc-param,asan-globals=1) \
- 	 $(call cc-param,asan-instrumentation-with-call-threshold=$(call_threshold)) \
- 	 $(call cc-param,asan-stack=1) \
--	 $(call cc-param,asan-use-after-scope=1) \
- 	 $(call cc-param,asan-instrument-allocas=1)
- endif
- 
--ifdef CONFIG_KASAN_EXTRA
--CFLAGS_KASAN += $(call cc-option, -fsanitize-address-use-after-scope)
--endif
--
- endif # CONFIG_KASAN_GENERIC
- 
- ifdef CONFIG_KASAN_SW_TAGS
-diff --git a/scripts/gcc-plugins/Kconfig b/scripts/gcc-plugins/Kconfig
-index d45f7f36b859..d9fd9988ef27 100644
---- a/scripts/gcc-plugins/Kconfig
-+++ b/scripts/gcc-plugins/Kconfig
-@@ -68,10 +68,6 @@ config GCC_PLUGIN_LATENT_ENTROPY
- 
- config GCC_PLUGIN_STRUCTLEAK
- 	bool "Force initialization of variables containing userspace addresses"
--	# Currently STRUCTLEAK inserts initialization out of live scope of
--	# variables from KASAN point of view. This leads to KASAN false
--	# positive reports. Prohibit this combination for now.
--	depends on !KASAN_EXTRA
- 	help
- 	  This plugin zero-initializes any structures containing a
- 	  __user attribute. This can prevent some classes of information
+diff --git a/arch/arm/configs/nhk8815_defconfig b/arch/arm/configs/nhk8815_defconfig
+index 0ac44acd5bc4..5f4c6aaa07f6 100644
+--- a/arch/arm/configs/nhk8815_defconfig
++++ b/arch/arm/configs/nhk8815_defconfig
+@@ -3,6 +3,7 @@
+ CONFIG_SYSVIPC=y
+ CONFIG_NO_HZ_IDLE=y
+ CONFIG_HIGH_RES_TIMERS=y
++CONFIG_PREEMPT=y
+ CONFIG_IKCONFIG=y
+ CONFIG_IKCONFIG_PROC=y
+ CONFIG_LOG_BUF_SHIFT=14
+@@ -10,16 +11,16 @@ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_EXPERT=y
+ CONFIG_KALLSYMS_ALL=y
+ CONFIG_SLAB=y
+-CONFIG_MODULES=y
+-CONFIG_MODULE_UNLOAD=y
+-# CONFIG_BLK_DEV_BSG is not set
+ # CONFIG_ARCH_MULTI_V7 is not set
+ CONFIG_ARCH_NOMADIK=y
+ CONFIG_MACH_NOMADIK_8815NHK=y
+-CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++# CONFIG_BLK_DEV_BSG is not set
++CONFIG_CMA=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+@@ -49,12 +50,12 @@ CONFIG_MTD=y
+ CONFIG_MTD_TESTS=m
+ CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_BLOCK=y
+-CONFIG_MTD_NAND_ECC_SMC=y
+-CONFIG_MTD_NAND=y
+-CONFIG_MTD_NAND_FSMC=y
+ CONFIG_MTD_ONENAND=y
+ CONFIG_MTD_ONENAND_VERIFY_WRITE=y
+ CONFIG_MTD_ONENAND_GENERIC=y
++CONFIG_MTD_NAND_ECC_SMC=y
++CONFIG_MTD_NAND=y
++CONFIG_MTD_NAND_FSMC=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_CRYPTOLOOP=y
+ CONFIG_BLK_DEV_RAM=y
+@@ -75,7 +76,6 @@ CONFIG_PPP_MPPE=m
+ CONFIG_PPPOE=m
+ CONFIG_PPP_ASYNC=m
+ CONFIG_PPP_SYNC_TTY=m
+-# CONFIG_INPUT_MOUSEDEV is not set
+ CONFIG_INPUT_EVDEV=y
+ # CONFIG_KEYBOARD_ATKBD is not set
+ CONFIG_KEYBOARD_GPIO=y
+@@ -88,13 +88,22 @@ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+ CONFIG_HW_RANDOM=y
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_GPIO=y
+-CONFIG_DEBUG_GPIO=y
++CONFIG_SPI=y
++CONFIG_SPI_GPIO=y
+ CONFIG_GPIO_STMPE=y
+ # CONFIG_HWMON is not set
+ CONFIG_MFD_STMPE=y
++CONFIG_MFD_STW481X=y
+ CONFIG_REGULATOR=y
++CONFIG_DRM=y
++CONFIG_DRM_PANEL_TPO_TPG110=y
++CONFIG_DRM_PL111=y
++CONFIG_BACKLIGHT_LCD_SUPPORT=y
++CONFIG_BACKLIGHT_CLASS_DEVICE=y
++CONFIG_BACKLIGHT_PWM=y
++CONFIG_FRAMEBUFFER_CONSOLE=y
++CONFIG_LOGO=y
+ CONFIG_MMC=y
+-# CONFIG_MMC_BLOCK_BOUNCE is not set
+ CONFIG_MMC_ARMMMCI=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+@@ -105,6 +114,11 @@ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_PL031=y
+ CONFIG_DMADEVICES=y
+ CONFIG_AMBA_PL08X=y
++CONFIG_IIO=y
++CONFIG_IIO_BUFFER=y
++CONFIG_IIO_ST_ACCEL_3AXIS=y
++CONFIG_PWM=y
++CONFIG_PWM_STMPE=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+ CONFIG_FUSE_FS=y
+@@ -121,13 +135,12 @@ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ASCII=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_NLS_ISO8859_15=y
++CONFIG_CRYPTO_MD5=y
++CONFIG_CRYPTO_SHA1=y
++CONFIG_CRYPTO_DES=y
+ CONFIG_DEBUG_INFO=y
+ # CONFIG_ENABLE_MUST_CHECK is not set
+ CONFIG_DEBUG_FS=y
+ # CONFIG_SCHED_DEBUG is not set
+ # CONFIG_DEBUG_PREEMPT is not set
+ # CONFIG_DEBUG_BUGVERBOSE is not set
+-CONFIG_CRYPTO_MD5=y
+-CONFIG_CRYPTO_SHA1=y
+-CONFIG_CRYPTO_DES=y
+-# CONFIG_CRYPTO_ANSI_CPRNG is not set
 -- 
 2.19.2
 
