@@ -2,75 +2,81 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AFA07C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 11:46:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 67D4CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 11:50:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8062F20578
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 11:46:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 334042064C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 11:50:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LoLDzXFK";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=alien8.de header.i=@alien8.de header.b="O4Dx8nUo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8062F20578
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=alien8.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jLNatGaJ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="MMP3kchM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 334042064C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=M5+YiuwEB4EObWBK7N6OLUEuRNs3t1M7GA9ToaQiLLo=; b=LoLDzXFK9a1OL9
-	aN7+J9jjzY3kYTfOOveGLsBu+UVe8DXc7RpacKP8m756IN/vo/rlkjhPYh6ckOIqh2qNr9zEiaPYJ
-	cVnY9rAwQGn7l4eQOCI7tUbW10yVHfo9NUDJmiLT0nGsCigQ2B+wADA0Nmc7p+Z1zXB5PmA9TRIvr
-	+oSGxtBNoZBUAnjG+H/eZqmMkBZpucr9EKIA7kc9LMsv0ICGLT0oG3g406Q5JQrmkZDl4Lbxj+bE/
-	86OuBCtXUo+Rz820HuoLA6cdo0C80cAFprfVJRJvNnyN4ap3EI3KX4cb+E4WlFEA6CRUvhhaGzPPx
-	0tmIuMvCzoqeSBLmEphg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=eiBvEn41OGiQAzivEfVbFPCGwPZbZ7+feM6AndLiR/w=; b=jLN
+	atGaJ8uiPRX+fdA3LKG8D2OCvFqlvQFsJqMqeHtn650X0hLGUNPkDlt0gjxuBoEG2eNVjCBnGP9/x
+	kFcsptOjaIaZDMFpXo8W7QpImzl8hBa4AzhHsWmaMeVuFivkoQup6dxgSYVZfeInhHKu/W6yzCggN
+	Ox2+DOW0nPer18oXkk9th7czPE0N1a2Er2gSKZYCghuMSncu8ESwrwW7Fq1WXrR3apZMCbRQAeGRN
+	hF36ikHB52c9QBVJEOlnEjMOT/gDXF1DHGviIQCi7rbsz3+lt9RGFWOgWIZe+9r8BIXOkY2o9PLwN
+	LuT1eNX4FMuHSjeGzlxj1AFQPaTE9dw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghvGc-0000B6-Kq; Fri, 11 Jan 2019 11:46:26 +0000
-Received: from mail.skyhub.de ([5.9.137.197])
+	id 1ghvK9-00018E-GN; Fri, 11 Jan 2019 11:50:05 +0000
+Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghvGZ-0000Ak-C6
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 11:46:24 +0000
-Received: from zn.tnic (p200300EC2BCAC5006CCD8D4D75E662CE.dip0.t-ipconnect.de
- [IPv6:2003:ec:2bca:c500:6ccd:8d4d:75e6:62ce])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.skyhub.de (SuperMail on ZX Spectrum 128k) with ESMTPSA id B7E081EC03DB;
- Fri, 11 Jan 2019 12:46:20 +0100 (CET)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=alien8.de; s=dkim;
- t=1547207180;
- h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
- to:to:cc:cc:mime-version:mime-version:content-type:content-type:
- content-transfer-encoding:in-reply-to:in-reply-to:  references:references;
- bh=UfSZOq9GqD65RVv2Kmgwqo4lzVwlJ1e355g+KSPJc+A=;
- b=O4Dx8nUok8Ves2aXjM3GYVZuzQzDJt2fOdgdOJuMMpi9D+O/dFWHYnyLwz2NWBaK4WnfUx
- wU+wTJhu8G1+AYA5SgQS18PNqSCzzt7ZdX2t7hiU/csltRXFIx73lRvu7lcXI1aUCr1166
- rsyTHeeH373YtLq5GJsYo3Uc0v7+l6w=
-Date: Fri, 11 Jan 2019 12:46:12 +0100
-From: Borislav Petkov <bp@alien8.de>
-To: James Morse <james.morse@arm.com>
-Subject: Re: [PATCH v7 09/25] ACPI / APEI: Generalise the estatus queue's
- notify code
-Message-ID: <20190111114612.GC4729@zn.tnic>
-References: <20181203180613.228133-1-james.morse@arm.com>
- <20181203180613.228133-10-james.morse@arm.com>
- <20181211174449.GM27375@zn.tnic>
- <3f0f9005-f383-8a03-c7f9-15b50c099f94@arm.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <3f0f9005-f383-8a03-c7f9-15b50c099f94@arm.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+ id 1ghvK4-0000j7-8f
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 11:50:03 +0000
+Received: by mail-pg1-x542.google.com with SMTP id t13so6213414pgr.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 11 Jan 2019 03:49:59 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id;
+ bh=fq7MtF2ScfFMWpdvczijzx7e8y4b1AHJmZlcX4q9K6E=;
+ b=MMP3kchMB/DsEDH6qKdnq4FW7h9C13s8fWAZrNzFO0A7fxdeLbdZNF8uE0IffLs8CA
+ lyvM77ueEBR986Phanff3BbH9CXq5jsskuaPLrjnLUcIVqtPCup+3CfSk2IE5/vXM8lG
+ Vgo5G2OojyHYYHxnG2Cta220tf0tN5US0+Ssg=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=fq7MtF2ScfFMWpdvczijzx7e8y4b1AHJmZlcX4q9K6E=;
+ b=EKb8pk/qPU5bU2BvpNR+sA5SQ2Hn9nocmG1Qp5w0oD25FOQRQ5UYu3wSrvs+jOkN/w
+ 6SyOLyLVxJhy0ifc6xykI+Si8KxlRLB3cXEyjP7s48510Z/F4AptVsEvH/vdCRNu7G6N
+ 0VvVx4XfFYRIpjEgVV2S9bV/WGJ1hYw2BIl5e970+ynUlfPeRox10FxlvXDidGnBbLkD
+ l6UJAtayEYdmlyRf3WkaU/lT/UmY001UQ4PamHd+bwSBF7/NQ5zonXTn57VZKBqOHhnQ
+ GsxUgSNhOKicPrSuK75+AixgXnr8JTqX81QvHcR0lMAyMno1HG3cj2j6VGH/h+w8OQPr
+ lsZw==
+X-Gm-Message-State: AJcUukcEyjnjb+P8XVRAfI095xbLcgnWuuHzlcJjvrkgHi2RsbC6+DL1
+ a+cSZ6aqBeB/6rqLBkqFhVTfI6jPhHM=
+X-Google-Smtp-Source: ALg8bN4L4Q4YuEIyK/IxKjebItlbdc/puOKAnbLfwMhu7SK2SJW3WCIykfjif0Mkxoa4i93mfgFwRQ==
+X-Received: by 2002:a65:4b82:: with SMTP id t2mr13132854pgq.189.1547207398922; 
+ Fri, 11 Jan 2019 03:49:58 -0800 (PST)
+Received: from localhost.localdomain ([117.196.233.251])
+ by smtp.gmail.com with ESMTPSA id b2sm143199988pfm.3.2019.01.11.03.49.52
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Fri, 11 Jan 2019 03:49:58 -0800 (PST)
+From: Sumit Garg <sumit.garg@linaro.org>
+To: linux-arm-kernel@lists.infradead.org,
+	linux-crypto@vger.kernel.org
+Subject: [PATCH v3 0/4] Introduce TEE bus driver framework
+Date: Fri, 11 Jan 2019 17:17:27 +0530
+Message-Id: <1547207251-9372-1-git-send-email-sumit.garg@linaro.org>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_034623_563179_4B051674 
-X-CRM114-Status: UNSURE (   7.44  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190111_035000_310522_45396D25 
+X-CRM114-Status: GOOD (  13.39  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,36 +88,89 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rafael Wysocki <rjw@rjwysocki.net>, Tony Luck <tony.luck@intel.com>,
- Fan Wu <wufan@codeaurora.org>, linux-mm@kvack.org,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Xie XiuQi <xiexiuqi@huawei.com>, Will Deacon <will.deacon@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>,
- Dongjiu Geng <gengdongjiu@huawei.com>, linux-acpi@vger.kernel.org,
- Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org, Len Brown <lenb@kernel.org>
+Cc: mark.rutland@arm.com, Sumit Garg <sumit.garg@linaro.org>,
+ daniel.thompson@linaro.org, herbert@gondor.apana.org.au, arnd@arndb.de,
+ ard.biesheuvel@linaro.org, gregkh@linuxfoundation.org, bhsharma@redhat.com,
+ linux-kernel@vger.kernel.org, tee-dev@lists.linaro.org, robh+dt@kernel.org,
+ mpm@selenic.com, jens.wiklander@linaro.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 10, 2019 at 06:21:21PM +0000, James Morse wrote:
-> Something like:
-> ghes_notify_nmi() -> in_nmi_spool_from_list(list) -> in_nmi_queue_one_entry(ghes).
+This series introduces a generic TEE bus driver concept for TEE based
+kernel drivers which would like to communicate with TEE based devices/
+services.
 
-Yah, but make that
+Patch #1 adds TEE bus concept where devices/services are identified via
+Universally Unique Identifier (UUID) and drivers register a table of
+device UUIDs which they can support. This concept also allows for device
+enumeration to be specific to corresponding TEE implementation like
+OP-TEE etc.
 
-ghes_notify_nmi() -> ghes_nmi_spool_from_list(list) -> ghes_nmi_queue_one_entry(ghes).
+Patch #2 adds supp_nowait flag for non-blocking requests arising via
+TEE internal client interface.
 
-to denote it is the GHES NMI path.
+Patch #3 adds TEE bus device enumeration support for OP-TEE. OP-TEE
+provides a pseudo TA to enumerate TAs which can act as devices/services
+for TEE bus.
 
-Thx.
+Patch #4 adds OP-TEE based hwrng driver which act as TEE bus driver.
+On ARM SoC's with TrustZone enabled, peripherals like entropy sources
+might not be accessible to normal world (linux in this case) and rather
+accessible to secure world (OP-TEE in this case) only. So this driver
+aims to provides a generic interface to OP-TEE based random number
+generator service.
+
+Example case is Developerbox based on Socionext's Synquacer SoC [1]
+which provides 7 thermal sensors accessible from secure world only which
+could be used as entropy sources (thermal/measurement noise).
+
+[1] https://www.96boards.org/product/developerbox/
+
+Changes in v3:
+
+1. Fixed bus error path in Patch #1.
+2. Reversed order of Patch #2 and #3.
+3. Fixed miscellaneous syntax comments and memory leak.
+4. Added comments in Patch #2 for supp_nowait flag.
+
+Changes in v2:
+
+Based on review comments, the scope of this series has increased as
+follows:
+
+1. Added TEE bus driver framework.
+2. Added OP-TEE based device enumeration.
+3. Register optee-rng driver as TEE bus driver.
+4. Removed DT dependency for optee-rng device UUID.
+5. Added supp_nowait flag.
+
+Sumit Garg (4):
+  tee: add bus driver framework for TEE based devices
+  tee: add supp_nowait flag in tee_context struct
+  tee: optee: add TEE bus device enumeration support
+  hwrng: add OP-TEE based rng driver
+
+ MAINTAINERS                        |   5 +
+ drivers/char/hw_random/Kconfig     |  15 ++
+ drivers/char/hw_random/Makefile    |   1 +
+ drivers/char/hw_random/optee-rng.c | 272 +++++++++++++++++++++++++++++++++++++
+ drivers/tee/optee/Makefile         |   1 +
+ drivers/tee/optee/core.c           |   4 +
+ drivers/tee/optee/device.c         | 153 +++++++++++++++++++++
+ drivers/tee/optee/optee_private.h  |   3 +
+ drivers/tee/optee/supp.c           |  10 +-
+ drivers/tee/tee_core.c             |  56 +++++++-
+ include/linux/tee_drv.h            |  42 ++++++
+ 11 files changed, 558 insertions(+), 4 deletions(-)
+ create mode 100644 drivers/char/hw_random/optee-rng.c
+ create mode 100644 drivers/tee/optee/device.c
 
 -- 
-Regards/Gruss,
-    Boris.
+2.7.4
 
-Good mailing practices for 400: avoid top-posting and trim the reply.
 
 _______________________________________________
 linux-arm-kernel mailing list
