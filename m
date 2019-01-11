@@ -7,51 +7,51 @@ X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 83862C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 06:22:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 99DE3C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 06:23:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4F7B72146F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 06:22:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 69C4320870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 06:23:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E+pJQV8/";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="CH8j5bjV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4F7B72146F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m/hnTQYx";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="KFAkfYT8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 69C4320870
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=uWUcxFET6Qj40Z3E25DGGnnYrCNYfvc8DzDrvINilmc=; b=E+pJQV8/59VCFX
-	hV3GhkYLB2wkuR9/fkklZKpq4iXQgpIaUW1PCBvghnL8xLPETKQ8Or82JBDG7CVdS8qZjibFAuIPh
-	PyaHcBpzLI2I1cei6IoX1YJlhiWdzZccbmrKohtljwOBB/8kLXijYqyFFfjMi2v6hKWP8PZq9HV+K
-	8Hi+o7pLGthg4dVOWjchQ6Xlov7Myv5DuKUvdEB+vfIKreLj8slvxnihvstKa/J5kgmP0++Gbx0PW
-	jhaF/WTSeiTwAQY9Yu19zH0r9kBFD2YiCQdtMsUv0d3mUIu6ChBFIqcfU4NtgsDMmuUD1w4+vbrrz
-	lJSHICVWrJF4xGP0IZ2Q==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=et2B4HFWeoiwrt7R9YzxKan0+X42gPAi6+PFBOj4/qs=; b=m/hnTQYxNtfGaW
+	0lhDS9Rf2cAQnUK9PrB01d1CKhmLlt6u4r17K6tkP83l/jj1IbVwaMYxsJxKHmK8k8wq9SwisvEFd
+	MlzFh4OPOy0flamsOK8jex4kuT3tdPX47y6PstwrCDagmVlJCQm98iwHY+FRg/SuNGuiCnaudQFbe
+	6kHTpnWdF21n19WNMa9p2ONnxtCkHPQNdC3AH+gdD5tViSvc2rAYO/TimMGcmSVF8jxao/1ZN9I4X
+	WA2a7RylDojwSxR6wWQzzmMN8eRfsGXc4sHntwvoLZuJU+I+n9KFhIFDX8htJMjfE8jG1pUzTWbrX
+	S1uYD2y4NU4MjklBLf4Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghqDO-0008IK-JO; Fri, 11 Jan 2019 06:22:46 +0000
-Received: from mail-eopbgr150071.outbound.protection.outlook.com
- ([40.107.15.71] helo=EUR01-DB5-obe.outbound.protection.outlook.com)
+	id 1ghqDc-0008Vp-2C; Fri, 11 Jan 2019 06:23:00 +0000
+Received: from mail-eopbgr40079.outbound.protection.outlook.com ([40.107.4.79]
+ helo=EUR03-DB5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghqDL-0008Hr-F7
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 06:22:44 +0000
+ id 1ghqDV-0008NM-2j
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 06:22:56 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=va6EszgpMG1pBMAICVzHE2KsRLN2Z9bm0ddaZ186U5Y=;
- b=CH8j5bjVAOY2tDgRK1d1aPMj3F3dw6n4afqhGK7TMX1Bt9L5dRqumRBKj09odTHFTh3MFbGvl6xPTFS7qt4shqrwYEjfe9ZkaN/S7om1620UKJsm6fG1K2Ro4JHRC8bBdJwKyMmJWpw9bzc8NnYJ8/ywX0/fjqQ1gHkxw22uMY8=
+ bh=+RNl0nk1HJ9YCprLzmpGpqsrszr5zUvcMfHu9qro0t0=;
+ b=KFAkfYT8xJevKYWqfuKgz/4a69VOz85q2Ll3iqfPxxiPnTtQoEZ9c/GgqK41YhYfjzze9UWfqzbV6BArvyJc0YQt3OMxoW/dVRaRYynsViyfl5UGnMy8SnCLZjktZ7rjVe0iXSRzVygLAI0qL8Mu37QIVqubhIytn2IiywVHn10=
 Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
  DB3PR0402MB3788.eurprd04.prod.outlook.com (52.134.72.17) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1516.14; Fri, 11 Jan 2019 06:22:40 +0000
+ 15.20.1516.14; Fri, 11 Jan 2019 06:22:50 +0000
 Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
  ([fe80::59d2:55a0:dbe3:2a97]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
  ([fe80::59d2:55a0:dbe3:2a97%6]) with mapi id 15.20.1516.016; Fri, 11 Jan 2019
- 06:22:40 +0000
+ 06:22:50 +0000
 From: Anson Huang <anson.huang@nxp.com>
 To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
  <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
@@ -61,13 +61,13 @@ To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
  <devicetree@vger.kernel.org>, "linux-kernel@vger.kernel.org"
  <linux-kernel@vger.kernel.org>, "linux-arm-kernel@lists.infradead.org"
  <linux-arm-kernel@lists.infradead.org>
-Subject: [PATCH V2 1/3] dt-bindings: fsl: add imx7ulp system integration
- module binding
-Thread-Topic: [PATCH V2 1/3] dt-bindings: fsl: add imx7ulp system integration
- module binding
-Thread-Index: AQHUqXYN+J7GKpm380y3RHGstkMQ5g==
-Date: Fri, 11 Jan 2019 06:22:40 +0000
-Message-ID: <1547187469-14046-1-git-send-email-Anson.Huang@nxp.com>
+Subject: [PATCH V2 2/3] ARM: imx: add i.MX7ULP SoC revision support
+Thread-Topic: [PATCH V2 2/3] ARM: imx: add i.MX7ULP SoC revision support
+Thread-Index: AQHUqXYTfowyprR/GkaKRunxZlhVwA==
+Date: Fri, 11 Jan 2019 06:22:50 +0000
+Message-ID: <1547187469-14046-2-git-send-email-Anson.Huang@nxp.com>
+References: <1547187469-14046-1-git-send-email-Anson.Huang@nxp.com>
+In-Reply-To: <1547187469-14046-1-git-send-email-Anson.Huang@nxp.com>
 Accept-Language: en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
@@ -82,38 +82,38 @@ x-ms-exchange-messagesentrepresentingtype: 1
 x-originating-ip: [119.31.174.66]
 x-ms-publictraffictype: Email
 x-microsoft-exchange-diagnostics: 1; DB3PR0402MB3788;
- 6:fU7FA9XjZouFS0oz0RbkNV1Cpy2v6K5q9Y6Al4zwSo7wbREGjAYXIFYiymY/2L6T83ILdsupcN5SY5Eg74ahbQro/LuKRML048wtPFtURwOGdLPO/Mnc3ZbAaOI1O1zF77qjeKMU9wvw/gZcVKhjpqEanDZcFs9aEeUV0F3TpRE1D8hd9sLiQlT2ZsqwGfSaPf5BV+u9VWB0sgDrWmqwWrp+lLlHP2DuXyqLUK524fweQn49QC7N0JcIVFzgB0Fk2Si13/l/sTdtldjGoDOOYQNhfsqhWLfc9MQDKYvwBj5sVlkgBkUHIqwJPQqN9+9X/A8IW08fJ7lnYdAsHlP2QAqLdd0FsDHNZL4r0GwoHV8KMNRIL9YUqGQJG7a6Af8IKctnrjdgkInnt9Yc+KIyhwpacI3bjjRUzc/Mouv0GCk5xPU4JD4BvOaEfnHOkERXZAOcI4ONqo/04zbBhnGBUg==;
- 5:FWF7euROZU5HzwPZrLfGiaHoJRknC3Rx7AvUBiSqNvvUdBqAWtTKpSxwoc1wbKKBjuYdxOEj+A4o/ivsbAvN9NtGlGNbc3oI4MdIG1AYH9pW7x7Ksjv4sxfpZvfWNdiHJoXMbJeAfMaDjJqXqjl1m+ermOAMDmkkrK2//AOqaQsjvnqI3TMRCg2Q01UDiSvt/RkIPPX+gJzpNjOCM9W4Jg==;
- 7:3aakN36QGcTJ+EP6a/Q8SmSy+tdXpSZdgqNlTx+n2Z88WGR6YEM5BCePduYMQ17V/uYIsEdmNq4SHRj9/8J0PyuyGDqKz5QX51Bir+Joj/FyFG19oWRQzRUhRLffDrtSRcxSST6v4vtTjspCrsWqkA==
-x-ms-office365-filtering-correlation-id: 90c2f8fd-ffdb-4ed1-5a27-08d6778d3019
+ 6:V7SNeIKvBkWPfp+qo7yNXFnn70TsU2EbrydzuTsd8VsL1hZzMVdPuHh5jKwZyFEWF2WK+qLsG9a1f2GCzFmnSLtFwDvwFe14m1akyTKgkKhFmH5cCPD3HwSrZTnmyzTuY+q1U+3Mjv2XYzJuo1h3gDk+/grvsUdDg8XyTVnO3yexFxSmUF8RA0SvoYnnoxehCNqO3L6Tl6ckYpA3ypbzHQ1IbBO5kTGDIavlxw+wkQh1BlZueXhOwyrQsVwiLW+RczesMeOe7YXZjPisGMffrOpIn6FNdxngpGoGo2rfCB7zpyXxQj+qDjCk6e9gdRn9z6Yl8wdHWrthZ/kBvocVphTq1s8dK7w4Ix8zRPryqhx60DBFp1l2Cqrar84k4DkHt8OdFxK55iyJzZutgbnLq3EZNnznQuKnREt7I/+SYKPbK1LzvzQc3duq6K2SD3PpOXmoyU2EkUGPt+RMeGrQYg==;
+ 5:Ag97wcOxBMVcOSMayVOvUWMjtguhzRgh49ja6H/Y6QBxMey3UUk8NAEskqFMSKLgNLaKcO3WuLzkUEmFM/zyqSdeTK0hU7gpXnf3CjL5heyp3TLOzqMLX/bzY+uv9WRTy8e1vxP2fRWFMHGgTOpGbaZXp+mEraCGtybsNOH6kh75Yx+a0M+uVfPIWOfr1ksTDnw0Qfb+zFmuk9UWqyL8rw==;
+ 7:R46jlEg8jSphXSt2WqkKz1CzP/S9RU5drSvcm4m4919DU2Rj3Z6J/7KrGjRQ+H4q8qADNAzLt+BRfQkf9CEd6mMYPhI4mZdVC/eIwVaEPusqYOcW4avs1RYN7wVS5fqeh0Y3jZuaVEWnbx+PCtU+FQ==
+x-ms-office365-filtering-correlation-id: 507e45b1-b0e1-44c8-9128-08d6778d3602
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
  SRVR:DB3PR0402MB3788; 
 x-ms-traffictypediagnostic: DB3PR0402MB3788:
-x-microsoft-antispam-prvs: <DB3PR0402MB3788820BD47278EC80F081DEF5850@DB3PR0402MB3788.eurprd04.prod.outlook.com>
+x-microsoft-antispam-prvs: <DB3PR0402MB37888684FE1C7ED9EC0D0449F5850@DB3PR0402MB3788.eurprd04.prod.outlook.com>
 x-forefront-prvs: 09144DB0F7
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(366004)(376002)(346002)(136003)(396003)(39860400002)(189003)(199004)(4326008)(486006)(106356001)(105586002)(53936002)(316002)(2616005)(102836004)(2906002)(25786009)(26005)(99286004)(186003)(386003)(6506007)(97736004)(6512007)(6486002)(52116002)(71190400001)(71200400001)(256004)(2501003)(305945005)(478600001)(7736002)(36756003)(14454004)(6436002)(6116002)(66066001)(476003)(3846002)(5660300001)(81156014)(68736007)(81166006)(8936002)(575784001)(86362001)(8676002)(50226002)(110136005)(2201001)(921003)(1121003);
+ SFS:(10009020)(366004)(376002)(346002)(136003)(396003)(39860400002)(189003)(199004)(4326008)(486006)(106356001)(105586002)(53936002)(316002)(2616005)(102836004)(2906002)(25786009)(26005)(99286004)(186003)(386003)(6506007)(97736004)(6512007)(76176011)(6486002)(52116002)(71190400001)(71200400001)(256004)(2501003)(305945005)(478600001)(7736002)(446003)(36756003)(14454004)(11346002)(6436002)(6116002)(66066001)(476003)(3846002)(5660300001)(81156014)(68736007)(81166006)(8936002)(575784001)(86362001)(8676002)(50226002)(110136005)(2201001)(921003)(1121003);
  DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3788;
  H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; MX:1; A:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: GkeVI5JRa7ORV0tfU506li4hOOWf5J6/gtxa3uSr1YOdTVFYGlk7f2tR8MxTHwJ1i8xtlOyqPH3jBH9OrdGrwlwYSU0bJUptQN5O1P51Cf/0LsO+KzYiRLmSFaNeY7Jk9Gaue3dyvI0ccUBtSznDi0TCakiS27XswOT+uIjjWkrPFRJhBvGI5b0HqeWflKAB7pl6iS9d2P5+MUolVQS/1XiFs9twvnFs8mfbFY5wbyhq+qeiw6c1BPin/DZRE8YLhrdLNN5ldmQW3f0vj6pNv8VdXZJKOGxt36YiwtAvIWciKvEgWlKR9VdtTGJ17NQl/Z4trJJzlNNFjh0ROEhpa8CNEXcKfB2+jtBE/QHq1IopToxcqt0XttJf/voGcV10NcilLdrkHBTRFickvo0kf1Mes81X47ybj6x/GE9JXSE=
+x-microsoft-antispam-message-info: k8YRZJoYrggws1a4lSjcz2jbkrmneNTiqE+C9rav6RR1LHzMoT6Gbq4Ie83d/a3IllIlDJNS3NeiOXCxLY+Js8ZdwxpIHiKOF5wxrLruKo/sATsPrkj7flBD1F3RAf6VfVlv2o4Zfyrn3isV/ObwThV5xQVM7ZMTnFWf5wCMqyw4REb7dCUiRg+up/dr9Djh+haMbmsmOLi2oecM+g03UJjZ6+b2FInNzhB86UfaQUsBW3yNjR0b2Yronrzy1YsgEBXTJj+ofuJmYrriaaxfRpgXehB50yxEGcnDeh82OIMXpLRtoXqJAJQvkJMheffX+FL8878q2+NOALrKFfEVya4PU9FYi7Jj4IU4ilU+XKGvd+r0BQlIzcgBbG3wCKYMLRpA++JgfG7qSgbf2+5iRQrmPZ7BIDOqc2XoU25YuzE=
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 90c2f8fd-ffdb-4ed1-5a27-08d6778d3019
-X-MS-Exchange-CrossTenant-originalarrivaltime: 11 Jan 2019 06:22:34.2925 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 507e45b1-b0e1-44c8-9128-08d6778d3602
+X-MS-Exchange-CrossTenant-originalarrivaltime: 11 Jan 2019 06:22:41.1943 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3788
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_222243_514881_B6D13C87 
-X-CRM114-Status: GOOD (  12.00  )
+X-CRM114-CacheID: sfid-20190110_222253_347863_552A4076 
+X-CRM114-Status: GOOD (  13.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -131,36 +131,86 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add i.MX7ULP system integration module (SIM) binding.
+i.MX7ULP SoC's revision info is inside the SIM module,
+bit[31:28] of JTAG_ID register defines revision as below
+from B0:
+
+0001        B0
+0010        B1
+
+This patch adds SoC revision support for i.MX7ULP, test
+result as below:
+
+root@imx7ulp-evk ~$ cat /sys/devices/soc0/revision
+2.1
 
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
- .../bindings/arm/freescale/fsl,imx7ulp-sim.txt           | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-sim.txt
+ arch/arm/mach-imx/mach-imx7ulp.c | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-sim.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-sim.txt
-new file mode 100644
-index 0000000..7d0c7f0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-sim.txt
-@@ -0,0 +1,16 @@
-+Freescale i.MX7ULP System Integration Module
-+----------------------------------------------
-+The system integration module (SIM) provides system control and chip configuration
-+registers. In this module, chip revision information is located in JTAG ID register,
-+and a set of registers have been made available in DGO domain for SW use, with the
-+objective to maintain its value between system resets.
+diff --git a/arch/arm/mach-imx/mach-imx7ulp.c b/arch/arm/mach-imx/mach-imx7ulp.c
+index 19c5b30..11ac71a 100644
+--- a/arch/arm/mach-imx/mach-imx7ulp.c
++++ b/arch/arm/mach-imx/mach-imx7ulp.c
+@@ -6,18 +6,57 @@
+  */
+ 
+ #include <linux/irqchip.h>
++#include <linux/mfd/syscon.h>
+ #include <linux/of_platform.h>
++#include <linux/regmap.h>
+ #include <asm/mach/arch.h>
+ 
+ #include "common.h"
+ #include "cpuidle.h"
+ #include "hardware.h"
+ 
++#define SIM_JTAG_ID_REG		0x8c
 +
-+Required properties:
-+- compatible:	Should be "fsl,imx7ulp-sim".
-+- reg:		Specifies base physical address and size of the register sets.
++static void __init imx7ulp_set_revision(void)
++{
++	struct regmap *sim;
++	u32 revision;
 +
-+Example:
-+sim: sim@410a3000 {
-+	compatible = "fsl,imx7ulp-sim", "syscon";
-+	reg = <0x410a3000 0x1000>;
-+};
++	sim = syscon_regmap_lookup_by_compatible("fsl,imx7ulp-sim");
++	if (IS_ERR(sim)) {
++		pr_warn("failed to find fsl,imx7ulp-sim regmap!\n");
++		return;
++	}
++
++	if (regmap_read(sim, SIM_JTAG_ID_REG, &revision)) {
++		pr_warn("failed to read sim regmap!\n");
++		return;
++	}
++
++	/*
++	 * bit[31:28] of JTAG_ID register defines revision as below from B0:
++	 * 0001        B0
++	 * 0010        B1
++	 */
++	switch (revision >> 28) {
++	case 1:
++		imx_set_soc_revision(IMX_CHIP_REVISION_2_0);
++		break;
++	case 2:
++		imx_set_soc_revision(IMX_CHIP_REVISION_2_1);
++		break;
++	default:
++		imx_set_soc_revision(IMX_CHIP_REVISION_1_0);
++		break;
++	}
++}
++
+ static void __init imx7ulp_init_machine(void)
+ {
+ 	imx7ulp_pm_init();
+ 
+ 	mxc_set_cpu_type(MXC_CPU_IMX7ULP);
++	imx7ulp_set_revision();
+ 	of_platform_default_populate(NULL, NULL, imx_soc_device_init());
+ }
+ 
 -- 
 2.7.4
 
