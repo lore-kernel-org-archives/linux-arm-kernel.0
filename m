@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 16DF7C43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 17:22:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 26691C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 17:23:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D71BB21848
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 17:22:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EB9832133F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 17:23:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Oo5Shfrj";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="uC6pgdPK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D71BB21848
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f77WN/Lz";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="uhGHaxmE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EB9832133F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,68 +26,68 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Eqliu2I2OSspCwQNetCrn+/8CuHVIv1FSbkCLH7+Cp4=; b=Oo5ShfrjCL0j3p
-	O6RT78Kg1WT6J3bCtLvdPjr5TMDYLf165KOlEd16iEFplvDD51o9jb0fOVnpuKDKF7akysKsK2uHV
-	Utq3ru0jPEN5G9AlxBiQlulYIejKeU07ClPDDopNfqUH93eWsTkmreONeUYak5SUlip6T35Co6FzY
-	6mRKMI5otdjrGA7hjLOT9hdWn88M+ZkYbrEb/XCpYGQyneh8PJYLYmt97BkeCZP9QtU4uW0F5d35J
-	IVP3RS+dVoWRjKY3ZRhPdSkKZVIHxhIA2VYSVl3Kq2dSrUJ2fQ60b1k+FBKEFXLSuy8qNQWCR61+8
-	lEsP7JxsJm/UZ4bfBR3Q==;
+	List-Owner; bh=H2JLbEj/zP4OYwJKQuvZhuZ3sD4ZNyZh4hCRTUdEgjw=; b=f77WN/LzAJ1yY2
+	MrPgXS/kKm8YBvPCyNfu5eTqy40jK6tqd4XX/xmaMXn+5j5d8/Uh3w2CJUVfeoDcDRQwgXqixKQgD
+	IxYdGCdlByW098WU+nyW8R98nmXLosjl9tLCqw/6xpopflxv8xZYrJ/JLa697aqiX8GjuZ2MYcXf/
+	sWxFPxtN+yRRH2lpx1PXC6bv5vCGDA9KM66uWw6iyZ+Z11fSfzkBeihVW2fzCm4d4G4AoRYMblE13
+	9NS1CPqadb2ojhdjV/o4z3QnRs10H570cQzpWm/HCL9Pff9Jwoqeaq6i/54tjq7ipYAPlUcX+ORAQ
+	+nMWW0VLFPbQcqYdaZsw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gi0W4-0001CS-L0; Fri, 11 Jan 2019 17:22:44 +0000
-Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+	id 1gi0WJ-0001SA-Di; Fri, 11 Jan 2019 17:22:59 +0000
+Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gi0VG-0000JC-Cn
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 17:21:56 +0000
-Received: by mail-wm1-x341.google.com with SMTP id m1so3132614wml.2
+ id 1gi0VI-0000Jd-Ku
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 17:22:00 +0000
+Received: by mail-wm1-x344.google.com with SMTP id b11so3143683wmj.1
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 11 Jan 2019 09:21:54 -0800 (PST)
+ Fri, 11 Jan 2019 09:21:56 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=QOlmAzT9VkWHBuMKcdHlAtoH6zcSrRq2fAobwtYxMi4=;
- b=uC6pgdPKBS8FYKKHHmyPtBc1aH1jyYY1+Nu+gOtJFIdu503PyiJskdXfAHdAtV+qj9
- +KcNrX4FinszBYRnudC4LXtpOaZuM0TjQ9aqoB5M6Ns5DyECRnsmvEWLt8zhNISS5kah
- E29mzInzWElzgnn862DCEP6c/usmfmlfJ3R/7omuJ1pXwGBtfJUQ+2PiTGDKP+YejIIZ
- BF0ZYOyLlC40zlfRmJ0XS2CHeSoHRrHe+kX8JHzcMqHXIOeKgFvPQr+2RAD24DTc6HpU
- ZDrLYdNeJaymotUgA5m41X6q5vHbSHEM4vz+9ut07WPHSkTipCFxjnWlM7C9qZjtnW19
- mdng==
+ bh=wdNPi9yYX+VeO7yfYl4QzOTwh2emyQNtF85luiFVb28=;
+ b=uhGHaxmEJviZuGQmGmBjpOazE6+kQBgDedrWgSS8iT8szm3RUCgxV07K6lR7YqFae3
+ PykG/z5syFNlaT0+zHQfvyI2gkXAReMEmNrn2vCHXPDqsNo65KJmLCovjM8Z+1bXkfFG
+ z2JMyiKbOao1JqKiKt9p7zki09GkScxag2UHps2pmRFUxSPPInK2G7K3na7jojaC9Vkl
+ AH5eNZjcBrzOey0U0nCYzg2RNB7n+h9oALKQ8t8DVXcaf7T2yckvEf2nG/VeIZbG9Fwa
+ kKk0L9UBPWeL9LneejzIo6byknAzktb8WVukq7YOBFTextXqJGbHPRkuZnx2lpgGS6s8
+ GPTw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=QOlmAzT9VkWHBuMKcdHlAtoH6zcSrRq2fAobwtYxMi4=;
- b=ZdNeh6Nflijdmw0RQFz2v8xbBCDg5PjOa39ylOOTK9M+9aix2CPS8grRVMdRV3hhaC
- LSfezunPV5D9PYNSRPau6qZk8NC7FfwqfaYnKhIQj0rSIxC7LLsmMBIsv1NconcGRQET
- meX9h0a5XTZVJKH7ELbTNVnDtrt96472DehS5d20YXmxSC7Z4+fO9c8sxPNB0Rh1BxUN
- JuFIXVPqEadOYhiG4teo08BF3JN0ASsekpB8Di+VYxmjEc6O9oI4Z0eB18ItVMoOy/BT
- JiQeUeWucbkB62T1UGGr9RSJK/7Y781wZqdwqbZOlcHAQQ+F/CYXp8mHYy/dnRrKSc9r
- MdMw==
-X-Gm-Message-State: AJcUukdoaBBLhMtk91cn1rRtHpu5cRvwmvE8ksLkJFqW4TZxtp+UYUI9
- h47BXPeZKa1nMh79Kiv1wjVIgw==
-X-Google-Smtp-Source: ALg8bN5shK6Q7cii91LOXXsN2kDWDOgE0CtGb7BnC7hPwceiD+ixRs1S9FaPqdxlykx7U8g1lXD1hw==
-X-Received: by 2002:a1c:578e:: with SMTP id l136mr2996733wmb.124.1547227312474; 
- Fri, 11 Jan 2019 09:21:52 -0800 (PST)
+ bh=wdNPi9yYX+VeO7yfYl4QzOTwh2emyQNtF85luiFVb28=;
+ b=TXBwojhX+EkV3VaCzZ60YLjl6QIN0Ig4uPtC1QEixlAjS7azwnRNzjM13ShXDuQyFL
+ VtTrALtuMNbgpD1uMJ1723Vr6ILcGUGTuAmDWR3+7Kf2ISHZOOQh5iPAn0VlD0pIHBUy
+ 7UXWguo6nVwqw0mPGUPcef4AbwfPLWG16J8+FvDPXjxW/m9S3yj91A/lCSQDKMJJNIjR
+ /jAeYfMhGtXRhbrbvnZObx1WmFrFQO+waMtqV+UJbiybreIxBg2intAuX01YDpsrVQUB
+ TFqd59w4P4Jne/Umz4lbKVJhNfLDk5QKE4ywGddgxTGFvLA44lvj3KQfr60xEKsqzw3w
+ oRJA==
+X-Gm-Message-State: AJcUukeLyBKB0VbMtLtpTeD+O1ToNxSbQ7ApNHNy2Wmt8NxFs65fs/4I
+ ZT1K/0zQ3aitOmdIekbB+DvGAQ==
+X-Google-Smtp-Source: ALg8bN51ES/LVNgyvdfRMCzv55KUPPAPMkaAEcAbJT82yMZmq+JTtiU37mTzcH08PmBePII1Rao3XA==
+X-Received: by 2002:a1c:6e01:: with SMTP id j1mr3015616wmc.103.1547227315042; 
+ Fri, 11 Jan 2019 09:21:55 -0800 (PST)
 Received: from debian-brgl.home ([2a01:cb1d:af:5b00:6d6c:8493:1ab5:dad7])
- by smtp.gmail.com with ESMTPSA id o16sm78534408wrn.11.2019.01.11.09.21.51
+ by smtp.gmail.com with ESMTPSA id o16sm78534408wrn.11.2019.01.11.09.21.53
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 11 Jan 2019 09:21:51 -0800 (PST)
+ Fri, 11 Jan 2019 09:21:54 -0800 (PST)
 From: Bartosz Golaszewski <brgl@bgdev.pl>
 To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
  Daniel Lezcano <daniel.lezcano@linaro.org>,
  Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
  Thomas Gleixner <tglx@linutronix.de>
-Subject: [PATCH 02/17] clocksource: davinci-timer: new driver
-Date: Fri, 11 Jan 2019 18:21:19 +0100
-Message-Id: <20190111172134.30147-3-brgl@bgdev.pl>
+Subject: [PATCH 04/17] ARM: davinci: da850: WARN() if clk_get() fails
+Date: Fri, 11 Jan 2019 18:21:21 +0100
+Message-Id: <20190111172134.30147-5-brgl@bgdev.pl>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20190111172134.30147-1-brgl@bgdev.pl>
 References: <20190111172134.30147-1-brgl@bgdev.pl>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_092154_438938_D34A55AD 
-X-CRM114-Status: GOOD (  20.32  )
+X-CRM114-CacheID: sfid-20190111_092156_842442_E9DDB5BA 
+X-CRM114-Status: GOOD (  12.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -109,522 +109,28 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Currently the clocksource and clockevent support for davinci platforms
-lives in mach-davinci. It hard-codes many things, used global variables,
-implements functionalities unused by any platform and has code fragments
-scattered across many (often unrelated) files.
-
-Implement a new, modern and simplified timer driver and put it into
-drivers/clocksource. We still need to support legacy board files so
-export a config structure and a function that allows machine code to
-register the timer.
-
-We don't check the return values of regmap reads and writes since with
-mmio it's only likely to fail due to programmer's errors.
-
-We also don't bother freeing resources on errors in
-davinci_timer_register() as the system won't boot without a timer anyway.
+Currently the timer code checks if the clock pointer passed to it is
+good (!IS_ERR(clk)). The new clocksource driver expects the clock to
+be functional and doesn't perform any checks so emit a warning if
+clk_get() fails.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/clocksource/Kconfig         |   5 +
- drivers/clocksource/Makefile        |   1 +
- drivers/clocksource/timer-davinci.c | 415 ++++++++++++++++++++++++++++
- include/clocksource/timer-davinci.h |  35 +++
- 4 files changed, 456 insertions(+)
- create mode 100644 drivers/clocksource/timer-davinci.c
- create mode 100644 include/clocksource/timer-davinci.h
+ arch/arm/mach-davinci/da850.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index a9e26f6a81a1..36d222c3fa4a 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -42,6 +42,11 @@ config BCM_KONA_TIMER
- 	help
- 	  Enables the support for the BCM Kona mobile timer driver.
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index e7b78df2bfef..9ff377f26c4b 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -774,6 +774,7 @@ void __init da850_init_time(void)
+ 	da850_pll0_init(NULL, pll0, cfgchip);
  
-+config DAVINCI_TIMER
-+	bool "Texas Instruments DaVinci timer driver"
-+	help
-+	  Enables the support for the TI DaVinci timer driver.
-+
- config DIGICOLOR_TIMER
- 	bool "Digicolor timer driver" if COMPILE_TEST
- 	select CLKSRC_MMIO
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index cdd210ff89ea..1be97aa7a699 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -15,6 +15,7 @@ obj-$(CONFIG_SH_TIMER_TMU)	+= sh_tmu.o
- obj-$(CONFIG_EM_TIMER_STI)	+= em_sti.o
- obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
- obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
-+obj-$(CONFIG_DAVINCI_TIMER)	+= timer-davinci.o
- obj-$(CONFIG_DIGICOLOR_TIMER)	+= timer-digicolor.o
- obj-$(CONFIG_OMAP_DM_TIMER)	+= timer-ti-dm.o
- obj-$(CONFIG_DW_APB_TIMER)	+= dw_apb_timer.o
-diff --git a/drivers/clocksource/timer-davinci.c b/drivers/clocksource/timer-davinci.c
-new file mode 100644
-index 000000000000..7282a1fda80f
---- /dev/null
-+++ b/drivers/clocksource/timer-davinci.c
-@@ -0,0 +1,415 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * TI DaVinci clocksource driver
-+ *
-+ * Copyright (C) 2019 Texas Instruments
-+ * Author: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-+ * (with some parts adopted from code by Kevin Hilman <khilman@baylibre.com>)
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/clockchips.h>
-+#include <linux/clocksource.h>
-+#include <linux/err.h>
-+#include <linux/interrupt.h>
-+#include <linux/kernel.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/regmap.h>
-+#include <linux/sched_clock.h>
-+
-+#include <clocksource/timer-davinci.h>
-+
-+#define DAVINCI_TIMER_REG_TIM12			0x10
-+#define DAVINCI_TIMER_REG_TIM34			0x14
-+#define DAVINCI_TIMER_REG_PRD12			0x18
-+#define DAVINCI_TIMER_REG_PRD34			0x1c
-+#define DAVINCI_TIMER_REG_TCR			0x20
-+#define DAVINCI_TIMER_REG_TGCR			0x24
-+
-+#define DAVINCI_TIMER_TIMMODE_MASK		0x0000000c
-+#define DAVINCI_TIMER_RESET_MASK		0x00000003
-+#define DAVINCI_TIMER_TIMMODE_32BIT_UNCHAINED	0x00000004
-+#define DAVINCI_TIMER_UNRESET			0x00000003
-+
-+/* Shift depends on timer. */
-+#define DAVINCI_TIMER_ENAMODE_MASK		0x03
-+#define DAVINCI_TIMER_ENAMODE_DISABLED		0x00
-+#define DAVINCI_TIMER_ENAMODE_ONESHOT		0x01
-+#define DAVINCI_TIMER_ENAMODE_PERIODIC		0x02
-+
-+#define DAVINCI_TIMER_ENAMODE_SHIFT_TIM12	6
-+#define DAVINCI_TIMER_ENAMODE_SHIFT_TIM34	22
-+
-+#define DAVINCI_TIMER_MIN_DELTA			0x01
-+#define DAVINCI_TIMER_MAX_DELTA			0xfffffffe
-+
-+#define DAVINCI_TIMER_CLKSRC_BITS		32
-+
-+enum {
-+	DAVINCI_TIMER_MODE_DISABLED = 0,
-+	DAVINCI_TIMER_MODE_ONESHOT,
-+	DAVINCI_TIMER_MODE_PERIODIC,
-+};
-+
-+struct davinci_timer_data;
-+
-+typedef void (*davinci_timer_set_period_func)(struct davinci_timer_data *,
-+					      unsigned int period);
-+
-+struct davinci_timer_regs {
-+	unsigned int tim_off;
-+	unsigned int prd_off;
-+	unsigned int enamode_shift;
-+};
-+
-+struct davinci_timer_data {
-+	const struct davinci_timer_regs *regs;
-+	unsigned int mode;
-+	struct regmap *map;
-+	davinci_timer_set_period_func set_period;
-+	unsigned int cmp_off;
-+};
-+
-+struct davinci_timer_clockevent {
-+	struct clock_event_device dev;
-+	unsigned int tick_rate;
-+	struct davinci_timer_data timer;
-+};
-+
-+struct davinci_timer_clocksource {
-+	struct clocksource dev;
-+	struct davinci_timer_data timer;
-+};
-+
-+static const struct regmap_config davinci_timer_regmap_config = {
-+	.name			= "timer-davinci",
-+	.reg_bits		= 32,
-+	.reg_stride		= 4,
-+	.val_bits		= 32,
-+	.fast_io		= true,
-+};
-+
-+static const struct davinci_timer_regs davinci_timer_tim12_regs = {
-+	.tim_off		= DAVINCI_TIMER_REG_TIM12,
-+	.prd_off		= DAVINCI_TIMER_REG_PRD12,
-+	.enamode_shift		= DAVINCI_TIMER_ENAMODE_SHIFT_TIM12,
-+};
-+
-+static const struct davinci_timer_regs davinci_timer_tim34_regs = {
-+	.tim_off		= DAVINCI_TIMER_REG_TIM34,
-+	.prd_off		= DAVINCI_TIMER_REG_PRD34,
-+	.enamode_shift		= DAVINCI_TIMER_ENAMODE_SHIFT_TIM34,
-+};
-+
-+/* Must be global for davinci_timer_read_sched_clock(). */
-+static struct davinci_timer_data *davinci_timer_clksrc_timer;
-+
-+static struct davinci_timer_clockevent *
-+to_davinci_timer_clockevent(struct clock_event_device *clockevent)
-+{
-+	return container_of(clockevent, struct davinci_timer_clockevent, dev);
-+}
-+
-+static struct davinci_timer_clocksource *
-+to_davinci_timer_clocksource(struct clocksource *clocksource)
-+{
-+	return container_of(clocksource, struct davinci_timer_clocksource, dev);
-+}
-+
-+static void davinci_timer_set_period(struct davinci_timer_data *timer,
-+				     unsigned int period)
-+{
-+	timer->set_period(timer, period);
-+}
-+
-+static void davinci_timer_set_period_std(struct davinci_timer_data *timer,
-+					 unsigned int period)
-+{
-+	const struct davinci_timer_regs *regs = timer->regs;
-+	unsigned int enamode;
-+
-+	regmap_read(timer->map, DAVINCI_TIMER_REG_TCR, &enamode);
-+
-+	regmap_update_bits(timer->map, DAVINCI_TIMER_REG_TCR,
-+			DAVINCI_TIMER_ENAMODE_MASK << regs->enamode_shift,
-+			DAVINCI_TIMER_ENAMODE_DISABLED << regs->enamode_shift);
-+
-+	regmap_write(timer->map, regs->tim_off, 0x0);
-+	regmap_write(timer->map, regs->prd_off, period);
-+
-+	if (timer->mode == DAVINCI_TIMER_MODE_ONESHOT)
-+		enamode = DAVINCI_TIMER_ENAMODE_ONESHOT;
-+	else if (timer->mode == DAVINCI_TIMER_MODE_PERIODIC)
-+		enamode = DAVINCI_TIMER_ENAMODE_PERIODIC;
-+
-+	regmap_update_bits(timer->map, DAVINCI_TIMER_REG_TCR,
-+			   DAVINCI_TIMER_ENAMODE_MASK << regs->enamode_shift,
-+			   enamode << regs->enamode_shift);
-+}
-+
-+static void davinci_timer_set_period_cmp(struct davinci_timer_data *timer,
-+					 unsigned int period)
-+{
-+	const struct davinci_timer_regs *regs = timer->regs;
-+	unsigned int curr_time;
-+
-+	regmap_read(timer->map, regs->tim_off, &curr_time);
-+	regmap_write(timer->map, timer->cmp_off, curr_time + period);
-+}
-+
-+static irqreturn_t davinci_timer_irq_timer(int irq, void *data)
-+{
-+	struct davinci_timer_clockevent *clockevent = data;
-+
-+	clockevent->dev.event_handler(&clockevent->dev);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static irqreturn_t davinci_timer_irq_freerun(int irq, void *data)
-+{
-+	return IRQ_HANDLED;
-+}
-+
-+static u64 notrace davinci_timer_read_sched_clock(void)
-+{
-+	struct davinci_timer_data *timer;
-+	unsigned int val;
-+
-+	timer = davinci_timer_clksrc_timer;
-+	regmap_read(timer->map, timer->regs->tim_off, &val);
-+
-+	return val;
-+}
-+
-+static u64 davinci_timer_read(struct clocksource *dev)
-+{
-+	struct davinci_timer_clocksource *clocksource;
-+	const struct davinci_timer_regs *regs;
-+	unsigned int val;
-+
-+	clocksource = to_davinci_timer_clocksource(dev);
-+	regs = clocksource->timer.regs;
-+
-+	regmap_read(clocksource->timer.map, regs->tim_off, &val);
-+
-+	return val;
-+}
-+
-+static int davinci_timer_set_next_event(unsigned long cycles,
-+					struct clock_event_device *dev)
-+{
-+	struct davinci_timer_clockevent *clockevent;
-+
-+	clockevent = to_davinci_timer_clockevent(dev);
-+	davinci_timer_set_period(&clockevent->timer, cycles);
-+
-+	return 0;
-+}
-+
-+static int davinci_timer_set_state_shutdown(struct clock_event_device *dev)
-+{
-+	struct davinci_timer_clockevent *clockevent;
-+
-+	clockevent = to_davinci_timer_clockevent(dev);
-+	clockevent->timer.mode = DAVINCI_TIMER_MODE_DISABLED;
-+
-+	return 0;
-+}
-+
-+static int davinci_timer_set_state_periodic(struct clock_event_device *dev)
-+{
-+	struct davinci_timer_clockevent *clockevent;
-+	unsigned int period;
-+
-+	clockevent = to_davinci_timer_clockevent(dev);
-+	period = clockevent->tick_rate / HZ;
-+
-+	clockevent->timer.mode = DAVINCI_TIMER_MODE_PERIODIC;
-+	davinci_timer_set_period(&clockevent->timer, period);
-+
-+	return 0;
-+}
-+
-+static int davinci_timer_set_state_oneshot(struct clock_event_device *dev)
-+{
-+	struct davinci_timer_clockevent *clockevent;
-+
-+	clockevent = to_davinci_timer_clockevent(dev);
-+	clockevent->timer.mode = DAVINCI_TIMER_MODE_ONESHOT;
-+
-+	return 0;
-+}
-+
-+int __init davinci_timer_register(struct clk *clk,
-+				  const struct davinci_timer_cfg *timer_cfg)
-+{
-+	struct davinci_timer_clocksource *clocksource;
-+	struct davinci_timer_clockevent *clockevent;
-+	struct regmap *map;
-+	int rv, clkev_irq;
-+	void *base;
-+
-+	rv = clk_prepare_enable(clk);
-+	if (rv) {
-+		pr_err("%s: Unable to prepare and enable the timer clock\n",
-+		       __func__);
-+		return rv;
-+	}
-+
-+	base = ioremap(timer_cfg->reg.start, resource_size(&timer_cfg->reg));
-+	if (!base) {
-+		pr_err("%s: Unable to map the register range", __func__);
-+		return -ENOMEM;
-+	}
-+
-+	map = regmap_init_mmio(NULL, base, &davinci_timer_regmap_config);
-+	if (IS_ERR(map)) {
-+		pr_err("%s: Error initiating regmap\n", __func__);
-+		return PTR_ERR(map);
-+	}
-+
-+	/* Global timer init. */
-+
-+	/* Set clock to internal mode and disable it. */
-+	regmap_write(map, DAVINCI_TIMER_REG_TCR, 0x0);
-+	/* Reset both 32-bit timers, set no prescaler for timer 34. */
-+	regmap_write(map, DAVINCI_TIMER_REG_TGCR, 0x0);
-+	/* Set the timer to dual 32-bit unchained mode. */
-+	regmap_update_bits(map, DAVINCI_TIMER_REG_TGCR,
-+			   DAVINCI_TIMER_TIMMODE_MASK,
-+			   DAVINCI_TIMER_TIMMODE_32BIT_UNCHAINED);
-+	/* Unreset both 32-bit timers. */
-+	regmap_update_bits(map, DAVINCI_TIMER_REG_TGCR,
-+			   DAVINCI_TIMER_RESET_MASK, DAVINCI_TIMER_UNRESET);
-+	/* Init both counters to zero. */
-+	regmap_write(map, DAVINCI_TIMER_REG_TIM12, 0x0);
-+	regmap_write(map, DAVINCI_TIMER_REG_TIM34, 0x0);
-+
-+	/* Setup clockevent. */
-+
-+	clockevent = kzalloc(sizeof(*clockevent), GFP_KERNEL);
-+	if (!clockevent) {
-+		pr_err("%s: Error allocating memory for clockevent data",
-+		       __func__);
-+		return -ENOMEM;
-+	}
-+
-+	clockevent->dev.name = "timer0_0";
-+	clockevent->dev.features = CLOCK_EVT_FEAT_ONESHOT;
-+	clockevent->dev.set_next_event = davinci_timer_set_next_event;
-+	clockevent->dev.set_state_shutdown = davinci_timer_set_state_shutdown;
-+	clockevent->dev.set_state_periodic = davinci_timer_set_state_periodic;
-+	clockevent->dev.set_state_oneshot = davinci_timer_set_state_oneshot;
-+	clockevent->dev.cpumask = cpumask_of(0);
-+	clockevent->tick_rate = clk_get_rate(clk);
-+	clockevent->timer.mode = DAVINCI_TIMER_MODE_DISABLED;
-+	clockevent->timer.map = map;
-+	clockevent->timer.regs = &davinci_timer_tim12_regs;
-+
-+	if (timer_cfg->cmp.offset) {
-+		clkev_irq = timer_cfg->cmp.irq.start;
-+		clockevent->timer.cmp_off = timer_cfg->cmp.offset;
-+		clockevent->timer.set_period = davinci_timer_set_period_cmp;
-+	} else {
-+		clkev_irq = timer_cfg->irq[DAVINCI_TIMER_TIM12_IRQ].start;
-+		clockevent->dev.features |= CLOCK_EVT_FEAT_PERIODIC;
-+		clockevent->timer.set_period = davinci_timer_set_period_std;
-+	}
-+
-+	rv = request_irq(clkev_irq, davinci_timer_irq_timer,
-+			 IRQF_TIMER, "clockevent", clockevent);
-+	if (rv) {
-+		pr_err("%s: Unable to request the clockevent interrupt\n",
-+		       __func__);
-+		return rv;
-+	}
-+
-+	clockevents_config_and_register(&clockevent->dev,
-+					clockevent->tick_rate,
-+					DAVINCI_TIMER_MIN_DELTA,
-+					DAVINCI_TIMER_MAX_DELTA);
-+
-+	/* Setup clocksource */
-+
-+	clocksource = kzalloc(sizeof(*clocksource), GFP_KERNEL);
-+	if (!clocksource) {
-+		pr_err("%s: Error allocating memory for clocksource data",
-+		       __func__);
-+		return -ENOMEM;
-+	}
-+
-+	clocksource->dev.name = timer_cfg->cmp.offset ? "timer0_0" : "timer0_1";
-+	clocksource->dev.rating = 300;
-+	clocksource->dev.read = davinci_timer_read;
-+	clocksource->dev.mask = CLOCKSOURCE_MASK(DAVINCI_TIMER_CLKSRC_BITS);
-+	clocksource->dev.flags = CLOCK_SOURCE_IS_CONTINUOUS;
-+	clocksource->timer.set_period = davinci_timer_set_period_std;
-+	clocksource->timer.mode = DAVINCI_TIMER_MODE_PERIODIC;
-+	clocksource->timer.map = map;
-+	clocksource->timer.regs = &davinci_timer_tim34_regs;
-+
-+	rv = request_irq(timer_cfg->irq[DAVINCI_TIMER_TIM34_IRQ].start,
-+			 davinci_timer_irq_freerun, IRQF_TIMER,
-+			 "free-run counter", clocksource);
-+	if (rv) {
-+		pr_err("%s: Unable to request the clocksource interrupt\n",
-+		       __func__);
-+		return rv;
-+	}
-+
-+	rv = clocksource_register_hz(&clocksource->dev, clockevent->tick_rate);
-+	if (rv) {
-+		pr_err("%s: Unable to register clocksource\n",
-+		       __func__);
-+		return rv;
-+	}
-+
-+	davinci_timer_clksrc_timer = &clocksource->timer;
-+
-+	sched_clock_register(davinci_timer_read_sched_clock,
-+			     DAVINCI_TIMER_CLKSRC_BITS,
-+			     clockevent->tick_rate);
-+
-+	davinci_timer_set_period(&clockevent->timer,
-+				 clockevent->tick_rate / HZ);
-+	davinci_timer_set_period(&clocksource->timer, UINT_MAX);
-+
-+	return 0;
-+}
-+
-+static int __init of_davinci_timer_register(struct device_node *np)
-+{
-+	struct davinci_timer_cfg timer_cfg = { };
-+	struct clk *clk;
-+	int rv;
-+
-+	rv = of_address_to_resource(np, 0, &timer_cfg.reg);
-+	if (rv) {
-+		pr_err("%s: Unable to get the register range for timer\n",
-+		       __func__);
-+		return rv;
-+	}
-+
-+	rv = of_irq_to_resource_table(np, timer_cfg.irq,
-+				      DAVINCI_TIMER_NUM_IRQS);
-+	if (rv != DAVINCI_TIMER_NUM_IRQS) {
-+		pr_err("%s: Unable to get the interrupts for timer\n",
-+		       __func__);
-+		return rv;
-+	}
-+
-+	clk = of_clk_get(np, 0);
-+	if (IS_ERR(clk)) {
-+		pr_err("%s: Unable to get the timer clock\n", __func__);
-+		return PTR_ERR(clk);
-+	}
-+
-+	rv = davinci_timer_register(clk, &timer_cfg);
-+	if (rv)
-+		clk_put(clk);
-+
-+	return rv;
-+}
-+TIMER_OF_DECLARE(davinci_timer, "ti,da830-timer", of_davinci_timer_register);
-diff --git a/include/clocksource/timer-davinci.h b/include/clocksource/timer-davinci.h
-new file mode 100644
-index 000000000000..77a98cbd040b
---- /dev/null
-+++ b/include/clocksource/timer-davinci.h
-@@ -0,0 +1,35 @@
-+/* SPDX-License-Identifier: GPL-2.0+ */
-+/*
-+ * TI DaVinci clocksource driver
-+ *
-+ * Copyright (C) 2019 Texas Instruments
-+ * Author: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-+ */
-+
-+#ifndef __TIMER_DAVINCI_H__
-+#define __TIMER_DAVINCI_H__
-+
-+#include <linux/clk.h>
-+#include <linux/ioport.h>
-+
-+enum {
-+	DAVINCI_TIMER_TIM12_IRQ = 0,
-+	DAVINCI_TIMER_TIM34_IRQ,
-+	DAVINCI_TIMER_NUM_IRQS,
-+};
-+
-+struct davinci_timer_cmp_cfg {
-+	struct resource irq;
-+	unsigned int offset;
-+};
-+
-+struct davinci_timer_cfg {
-+	struct resource reg;
-+	struct resource irq[DAVINCI_TIMER_NUM_IRQS];
-+	struct davinci_timer_cmp_cfg cmp;
-+};
-+
-+int __init davinci_timer_register(struct clk *clk,
-+				  const struct davinci_timer_cfg *data);
-+
-+#endif /* __TIMER_DAVINCI_H__ */
+ 	clk = clk_get(NULL, "timer0");
++	WARN(IS_ERR(clk), "Unable to get the timer clock\n");
+ 
+ 	davinci_timer_init(clk);
+ }
 -- 
 2.19.1
 
