@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 44DF7C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:18:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E87F7C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:18:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2250B205C9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:18:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B20AF205C9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:18:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZtAwosyz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2250B205C9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hjJpxu4D"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B20AF205C9
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,28 +25,28 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=gi5tHKG9Pqx/hSkBypBiYMIAu/7CHL5BLAlcz4pNNXk=; b=ZtAwosyzbRHYG0
-	1wgYOkr1b9Y8AkPiErtgHSM/eHVwAAf1AuD11o4SOie2kEpqjHwDuokBXJH9uqjMj7wCVuQsUTvYN
-	1tTyIgwTma16I7Qsf7mgNnu4O9c9xMWwvh/QrEDq7l3zK3ySNxGcY/dm+/eZKiUxI2ogZvGXgcG9/
-	YfCR/zRHEP58oNyIjmR7PtYLnKreX9tMEaPOYwq0cv802VxwMXizrnwbehw0uBFP7sWL0xUA7hYnw
-	WORGu6GaH1U4U9t+unfrsfjRBD/9SdCQadzVE4VN5CWYSm0IW84CjSP21Ogt7PIyu1WFlHTWNVhF8
-	abFiU8VdJ7FhcSgxfFMA==;
+	List-Owner; bh=xC/D8SfIDPGf3SWbEqB55SsrWOIC7lMr1nJe65D8tFg=; b=hjJpxu4DyYw4GJ
+	1oc2VRhryWOGD+AIzLB8GyAKNtt0UWsKSoOUTDEDLmB6K2GP5eCb8JrhBtEfFhJclRKev6XH7e3HI
+	loEawgaeMm6Szc9tbHELlJGmtMahvlsCljQbcFt4eZmOK6+d1GrK8Fx/ZuAqHmeIbm6BzNlbcvkp3
+	0fsJ/LbZ7D425rYRpfU3a8T42P3O1RzmRGmXm1dghC5D0BVFS2P3+WuNLk1GJOtRre9RtJOtrkFJE
+	hyiiNZ20Ijtk1jXMzwZk7SW41xLMND0+gHTpXE+WGG2GPFFbjGzB42JGYl2XzK1vVgqt/N1kNUobK
+	n13jgCSIB3rB++hXL0Wg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gi1Nf-0001M4-06; Fri, 11 Jan 2019 18:18:07 +0000
+	id 1gi1Nr-0001Z0-LY; Fri, 11 Jan 2019 18:18:19 +0000
 Received: from 089144213167.atnat0022.highway.a1.net ([89.144.213.167]
  helo=localhost)
  by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gi1NH-0000wU-Ef; Fri, 11 Jan 2019 18:17:44 +0000
+ id 1gi1NK-0000zl-Ke; Fri, 11 Jan 2019 18:17:47 +0000
 From: Christoph Hellwig <hch@lst.de>
 To: Pawel Osciak <pawel@osciak.com>,
  Marek Szyprowski <m.szyprowski@samsung.com>,
  Kyungmin Park <kyungmin.park@samsung.com>,
  =?UTF-8?q?Niklas=20S=C3=B6derlund?= <niklas.soderlund+renesas@ragnatech.se>
-Subject: [PATCH 2/3] dma-mapping: don't BUG when calling dma_map_resource on
- RAM
-Date: Fri, 11 Jan 2019 19:17:30 +0100
-Message-Id: <20190111181731.11782-3-hch@lst.de>
+Subject: [PATCH 3/3] videobuf2: replace a layering violation with
+ dma_map_resource
+Date: Fri, 11 Jan 2019 19:17:31 +0100
+Message-Id: <20190111181731.11782-4-hch@lst.de>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190111181731.11782-1-hch@lst.de>
 References: <20190111181731.11782-1-hch@lst.de>
@@ -71,28 +71,82 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Use WARN_ON_ONCE to print a stack trace and return a proper error
-code instead.
+vb2_dc_get_userptr pokes into arm direct mapping details to get the
+resemblance of a dma address for a a physical address that does is
+not backed by a page struct.  Not only is this not portable to other
+architectures with dma direct mapping offsets, but also not to uses
+of IOMMUs of any kind.  Switch to the proper dma_map_resource /
+dma_unmap_resource interface instead.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- include/linux/dma-mapping.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ .../common/videobuf2/videobuf2-dma-contig.c   | 41 ++++---------------
+ 1 file changed, 9 insertions(+), 32 deletions(-)
 
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index d3087829a6df..91add0751aa5 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -353,7 +353,8 @@ static inline dma_addr_t dma_map_resource(struct device *dev,
- 	BUG_ON(!valid_dma_direction(dir));
+diff --git a/drivers/media/common/videobuf2/videobuf2-dma-contig.c b/drivers/media/common/videobuf2/videobuf2-dma-contig.c
+index aff0ab7bf83d..82389aead6ed 100644
+--- a/drivers/media/common/videobuf2/videobuf2-dma-contig.c
++++ b/drivers/media/common/videobuf2/videobuf2-dma-contig.c
+@@ -439,42 +439,14 @@ static void vb2_dc_put_userptr(void *buf_priv)
+ 				set_page_dirty_lock(pages[i]);
+ 		sg_free_table(sgt);
+ 		kfree(sgt);
++	} else {
++		dma_unmap_resource(buf->dev, buf->dma_addr, buf->size,
++				   buf->dma_dir, 0);
+ 	}
+ 	vb2_destroy_framevec(buf->vec);
+ 	kfree(buf);
+ }
  
- 	/* Don't allow RAM to be mapped */
--	BUG_ON(pfn_valid(PHYS_PFN(phys_addr)));
-+	if (WARN_ON_ONCE(pfn_valid(PHYS_PFN(phys_addr))))
-+		return DMA_MAPPING_ERROR;
+-/*
+- * For some kind of reserved memory there might be no struct page available,
+- * so all that can be done to support such 'pages' is to try to convert
+- * pfn to dma address or at the last resort just assume that
+- * dma address == physical address (like it has been assumed in earlier version
+- * of videobuf2-dma-contig
+- */
+-
+-#ifdef __arch_pfn_to_dma
+-static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
+-{
+-	return (dma_addr_t)__arch_pfn_to_dma(dev, pfn);
+-}
+-#elif defined(__pfn_to_bus)
+-static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
+-{
+-	return (dma_addr_t)__pfn_to_bus(pfn);
+-}
+-#elif defined(__pfn_to_phys)
+-static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
+-{
+-	return (dma_addr_t)__pfn_to_phys(pfn);
+-}
+-#else
+-static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
+-{
+-	/* really, we cannot do anything better at this point */
+-	return (dma_addr_t)(pfn) << PAGE_SHIFT;
+-}
+-#endif
+-
+ static void *vb2_dc_get_userptr(struct device *dev, unsigned long vaddr,
+ 	unsigned long size, enum dma_data_direction dma_dir)
+ {
+@@ -528,7 +500,12 @@ static void *vb2_dc_get_userptr(struct device *dev, unsigned long vaddr,
+ 		for (i = 1; i < n_pages; i++)
+ 			if (nums[i-1] + 1 != nums[i])
+ 				goto fail_pfnvec;
+-		buf->dma_addr = vb2_dc_pfn_to_dma(buf->dev, nums[0]);
++		buf->dma_addr = dma_map_resource(buf->dev,
++				__pfn_to_phys(nums[0]), size, buf->dma_dir, 0);
++		if (dma_mapping_error(buf->dev, buf->dma_addr)) {
++			ret = -ENOMEM;
++			goto fail_pfnvec;
++		}
+ 		goto out;
+ 	}
  
- 	if (dma_is_direct(ops))
- 		addr = dma_direct_map_resource(dev, phys_addr, size, dir, attrs);
 -- 
 2.20.1
 
