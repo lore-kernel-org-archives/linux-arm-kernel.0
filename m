@@ -2,106 +2,87 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 64AD1C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 09:20:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 36723C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 09:23:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3289B2146F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 09:20:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 07B5020872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 09:23:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LRUL1bRo";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ffwll.ch header.i=@ffwll.ch header.b="J3+uACOs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3289B2146F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ffwll.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nAmAqDqr";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="l0sqpMDP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 07B5020872
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=74STRhzVbE4r91rYGpHu+4rh+iHhwd54nof/qqFb0es=; b=LRUL1bRoutPslL
-	3bMZzacynmECsQyq28XwAQkAqh+sON8kaeyMrtoC2f6TloGPh39hPL3S2moOL0UdIUHJ+E6dSEtK4
-	Ck05SJQvPeDZksPjsYsRjZMc35scUHt83NNuKrNDcbMeGlbNEVKQCX2xM8zFZx01LgiHAnNSGwp4J
-	NZEeiiizg/3jkWat4oDwnLDYN/CJ24rHkPoQVgpmv8SRPbS4CRa8CTqIIAMU0Ds9/canPKWsI/7xT
-	SsnPTwrgbqjkX3lGIE505jfPvZUR0UoHgmQpBkk1Gsb/2VCt5P2s25e1ZJnPQ170aJYdLyGlqUx1E
-	MtzCxwzw4KfpsT8/ocgQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=p1Cq3cICpgJvgn+LQRYETclKa7tgy3PagAkEEQb6eFs=; b=nAmAqDqrCTcJmv
+	ZtrN7f9kU/fyFB0Ez96DnOI6ift+bcibA5RTdkfxBI0g/lMN4DOmHtbgMoR3iE57d6ZUO7NE/7CAc
+	nkIpkCVwN8IHAAV0qm5+hAMsLeskAWYzOKKPv4FJLMeK2AG5S0WeM5E2xy/6Y0lPOSA7sGvvH3A0p
+	jsscWvXqJJycFRDDjExNjjE5pzERlvucKvQfmZnDzW6NlQCVTxY/k6ewNjSc7Ks4v0Zw0kGoZldrC
+	QEHpE+gEfs+uGeH6AUs62ivOXUIHSAbtjVP25b48+T+S9palLyBuFF+xhrYkTIpUnG1AwOt3kaeaj
+	eH92Yj2EIFDXSqu6gqdw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghszk-0003il-SC; Fri, 11 Jan 2019 09:20:52 +0000
-Received: from mail-ed1-x543.google.com ([2a00:1450:4864:20::543])
+	id 1ght1l-00043v-V2; Fri, 11 Jan 2019 09:22:57 +0000
+Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghszf-0003hP-Qw
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 09:20:49 +0000
-Received: by mail-ed1-x543.google.com with SMTP id h50so12516267ede.5
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 11 Jan 2019 01:20:47 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ffwll.ch; s=google;
- h=sender:date:from:to:cc:subject:message-id:mail-followup-to
- :references:mime-version:content-disposition:in-reply-to:user-agent;
- bh=GaqnS2LOgt+LFJt9xFrmU2vVR4iRU1kwlidEkb98jHQ=;
- b=J3+uACOsGvjKIwwNZU9v/5e9exunHsPJpRPYDg4OlMHHf/XELl6dYwNsYlGox5YTa8
- yMbxIMStMsUQrN+OyrAaM3vIDZ3TDlpKGlarvZ6Rb6jV8SGsXkCrKe5+9f6rxGOE0zrC
- M4wSFRXHs04vdaIB4+CC7tXD97hu9kx632QVE=
+ id 1ght1i-00043P-VT; Fri, 11 Jan 2019 09:22:56 +0000
+Received: by mail-pl1-x642.google.com with SMTP id w4so6526506plz.1;
+ Fri, 11 Jan 2019 01:22:54 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=JgweMQq5cDlqCc0BvnL1YU2JSCEJOrEfkNsdQxAwwqw=;
+ b=l0sqpMDPIdE/maNw/fLRJKTbWowLfopxspHdAIE25mYhqvzXhOTplF3rZjWiShKsBZ
+ rTG3O50j7Whgb+DV0Bo0rxqLyJvCcNNv8GXktOrvZjfOIN+doq9K2GSTPKoRFu8YgRPl
+ jTnqeCdhTh7ze1gU9PYMlWJ7GeLqoihrmPQLwUG0UzZwIDTtdwt8fMtbY44NlOxCGZsW
+ xLAiCWXwWHFp6SvpfvNl/QKq5s3qirPTZ0+W2zyGq2iNESoEX4MMzThUH/aIWbzCFEBJ
+ iVh5ZunmTB1rMJMPoh2QN5PepjuNaG8MnHraZa2zC9HOxx5vNVwcW5XnfyvWk/dm0hlo
+ mx4A==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:sender:date:from:to:cc:subject:message-id
- :mail-followup-to:references:mime-version:content-disposition
- :in-reply-to:user-agent;
- bh=GaqnS2LOgt+LFJt9xFrmU2vVR4iRU1kwlidEkb98jHQ=;
- b=bLvXOfwnlzhKkhXfAfGQIlsjMQArMhGg4gCQY4jmUbUOyolVCtNUGEu1ac/m9nVhqn
- goe6N+AZPJjSjEycX0THDIkVAQ3moCLaVivnB3ox1rVvWHrfVkcaP4uVBw7hbmaGaQDS
- KTlgseQq9x6dCvPn8IlRZoL2rM2eLfFBZmHFtKxUc5EoewMtACp9FKNW1AMSOnB9FNQz
- XW+in7lonf5mSkHODDajbY0Ln9iX6iuKuuCB731LpD6n8KK0Cm0FjF8dUncjGOK6IUd4
- tY9ut9/EbF6HeGjU4shHcfJ+p3f55GzTizA24pWq2cmSVyNBKh6IGBtAgPHKe/UlE7h7
- xPCA==
-X-Gm-Message-State: AJcUukf/2rHibMzTAbyqHJOKqPI3qo3/2/zrKXwj8SaW7lZWM0OUc+3S
- iVp0DsMt8W5PL6YDuFPeUBZnbQ==
-X-Google-Smtp-Source: ALg8bN4kBtaXnQRgos4KUgmDEnpC7otk8vZ64bn1MqFMnTMg4iIyt3mMD7L0TM3+lcOPEX94Yx+UEg==
-X-Received: by 2002:a17:906:d507:: with SMTP id
- ge7-v6mr11266479ejb.78.1547198445731; 
- Fri, 11 Jan 2019 01:20:45 -0800 (PST)
-Received: from phenom.ffwll.local ([2a02:168:569e:0:3106:d637:d723:e855])
- by smtp.gmail.com with ESMTPSA id m14sm3064811edc.27.2019.01.11.01.20.44
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 11 Jan 2019 01:20:44 -0800 (PST)
-Date: Fri, 11 Jan 2019 10:20:42 +0100
-From: Daniel Vetter <daniel@ffwll.ch>
-To: CK Hu <ck.hu@mediatek.com>,
- Noralf =?iso-8859-1?Q?Tr=F8nnes?= <noralf@tronnes.org>
-Subject: Re: Re: [PATCH] drm/mediatek: Add MTK Framebuffer-Device (mt7623)
-Message-ID: <20190111092042.GP21184@phenom.ffwll.local>
-Mail-Followup-To: CK Hu <ck.hu@mediatek.com>,
- Noralf =?iso-8859-1?Q?Tr=F8nnes?= <noralf@tronnes.org>,
- Frank Wunderlich <frank-w@public-files.de>,
- David Airlie <airlied@linux.ie>,
- Alexander Ryabchenko <d3adme4t@gmail.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- Matthias Brugger <matthias.bgg@gmail.com>,
- "moderated list:ARM/Mediatek SoC support" <linux-mediatek@lists.infradead.org>,
- Philipp Zabel <p.zabel@pengutronix.de>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-References: <20190102084917.4049-1-frank-w@public-files.de>
- <20190107103640.GH21184@phenom.ffwll.local>
- <CAKMK7uEqxz4TAt_iwEC+dMWboVxCeCduyABsSwD0Ns7k=Z_UWA@mail.gmail.com>
- <trinity-0da588a3-1277-4421-ad6b-1f6aeb129dd6-1547146897687@3c-app-gmx-bs35>
- <20190110200225.GN21184@phenom.ffwll.local>
- <1547176809.12054.11.camel@mtksdaap41>
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=JgweMQq5cDlqCc0BvnL1YU2JSCEJOrEfkNsdQxAwwqw=;
+ b=PXQMI/sa+Z9FN4C+5AU4EDnqRXYgf+21EJ3GnF/KW2DH3FU/iiMAcm/wRQ7rJGy3YT
+ h+3nqA3WeUWkRBt4cbw4kRo4K+a4mIjXNmul7F2FkGqA7S//Sko6IuhXWyysP/kh4Izl
+ +vRYputMQjjG9rAtYw9f9hszuet0GtYuXAkrm3nWW8zmabbJ9r2UQe622VWJXw5LDIS8
+ JXVRGG+ylWBzJSo4whzNbj8dr8aY86eVwRC8j7tlUg+F7ccvUQQOQSEpeGj5jOB2awNu
+ mMddWYtOS2MXEfgT1Nt3u11Gp+Ltjw1OYAg4N+RtBqak39x/C54iHBwMsnhIp8k5qXvO
+ N7nA==
+X-Gm-Message-State: AJcUukdXkQvdRSnB1mhIgAnAB5dtNQFhA0oYnRLuhdabLu2cvV+oVzuG
+ 5j6hBfcW05zyQJZOFPAtG1c=
+X-Google-Smtp-Source: ALg8bN6BOFiMpCfsaGfi9V6CMp1OM3KTRFl6uy0J+NU7fPZQUsBcHahhHnXodIXBmrFJ2eZHKg7kKw==
+X-Received: by 2002:a17:902:7296:: with SMTP id
+ d22mr14219890pll.265.1547198574060; 
+ Fri, 11 Jan 2019 01:22:54 -0800 (PST)
+Received: from localhost.localdomain ([103.51.74.128])
+ by smtp.gmail.com with ESMTPSA id u126sm178115558pgb.2.2019.01.11.01.22.50
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 11 Jan 2019 01:22:53 -0800 (PST)
+From: Anand Moon <linux.amoon@gmail.com>
+To: devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-amlogic@lists.infradead.org, linux-kernel@vger.kernel.org
+Subject: [PATCH] ARM64: dts: meson-gxbb-odroidc2: Fix usb phy regulator warning
+Date: Fri, 11 Jan 2019 14:52:35 +0530
+Message-Id: <20190111092235.28161-1-linux.amoon@gmail.com>
+X-Mailer: git-send-email 2.19.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1547176809.12054.11.camel@mtksdaap41>
-X-Operating-System: Linux phenom 4.18.0-2-amd64
-User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_012047_933045_D5D1F838 
-X-CRM114-Status: GOOD (  27.38  )
+X-CRM114-CacheID: sfid-20190111_012255_039038_56B32CF7 
+X-CRM114-Status: GOOD (  12.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -113,125 +94,140 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Philipp Zabel <p.zabel@pengutronix.de>,
- Frank Wunderlich <frank-w@public-files.de>, David Airlie <airlied@linux.ie>,
- Alexander Ryabchenko <d3adme4t@gmail.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- "moderated list:ARM/Mediatek SoC support" <linux-mediatek@lists.infradead.org>,
- Daniel Vetter <daniel@ffwll.ch>, Matthias Brugger <matthias.bgg@gmail.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Neil Armstrong <narmstrong@baylibre.com>,
+ Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ Kevin Hilman <khilman@baylibre.com>, Rob Herring <robh+dt@kernel.org>,
+ Jerome Brunet <jbrunet@baylibre.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 11, 2019 at 11:20:09AM +0800, CK Hu wrote:
-> Hi, Daniel:
-> 
-> On Thu, 2019-01-10 at 21:02 +0100, Daniel Vetter wrote:
-> > On Thu, Jan 10, 2019 at 08:01:37PM +0100, Frank Wunderlich wrote:
-> > > Hi Daniel,
-> > > 
-> > > > > Would be good to use the new generic fbdev emulation code here, for even
-> > > > > less code. Or at least know why this isn't possible to use for mtk (and
-> > > > > maybe address that in the core code). Hand-rolling fbdev code shouldn't be
-> > > > > needed anymore.
-> > > > 
-> > > > Back on the mailing list, no private replies please:
-> > > 
-> > > i don't wanted to spam all people with dumb questions ;)
-> > 
-> > There's no dumb questions, only insufficient documentation :-)
-> > 
-> > > > For examples please grep for drm_fbdev_generic_setup(). There's also a
-> > > > still in-flight series from Gerd Hoffmann to convert over bochs. That,
-> > > > plus all the kerneldoc linked from there should get you started.
-> > > > -Daniel
-> > > 
-> > > this is one of google best founds if i search for drm_fbdev_generic_setup:
-> > > 
-> > > https://lkml.org/lkml/2018/12/19/305
-> > > 
-> > > not very helpful...
-> > > 
-> > > so i tried kernel-doc
-> > > 
-> > > https://www.kernel.org/doc/html/latest/gpu/drm-kms-helpers.html?highlight=drm_fbdev_generic_setup#c.drm_fbdev_generic_setup
-> > > 
-> > > which is nice function-reference but i've found no generic workflow
-> > > 
-> > > as the posted driver is "only" a driver ported from kernel 4.4 by Alexander, i don't know if this new framework can be used and which parts need to be changed. I only try to bring his code Mainline....
-> > > Maybe CK Hu can help here because driver is originally from him and he knows internals. Or maybe you can help here?
-> > > 
-> > > i personally make my first steps as spare-time kernel-developer :)
-> > 
-> > There's a ton of in-kernel users of that function already, I meant you can
-> > use those to serve as examples ... If those + the kerneldoc aren't
-> > good enough, then we need to improve them.
-> > -Daniel
-> 
-> I've tried with drm_fbdev_generic_setup() and it works fine with simple
-> modification. The patch is
-> 
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> @@ -16,6 +16,7 @@
->  #include <drm/drm_atomic.h>
->  #include <drm/drm_atomic_helper.h>
->  #include <drm/drm_crtc_helper.h>
-> +#include <drm/drm_fb_helper.h>
->  #include <drm/drm_gem.h>
->  #include <drm/drm_gem_cma_helper.h>
->  #include <drm/drm_of.h>
-> @@ -379,6 +380,7 @@ static void mtk_drm_kms_deinit(struct drm_device
-> *drm)
->         .gem_prime_get_sg_table = mtk_gem_prime_get_sg_table,
->         .gem_prime_import_sg_table = mtk_gem_prime_import_sg_table,
->         .gem_prime_mmap = mtk_drm_gem_mmap_buf,
-> +       .gem_prime_vmap = mtk_drm_gem_prime_vmap,
->         .ioctls = mtk_ioctls,
->         .num_ioctls = ARRAY_SIZE(mtk_ioctls),
->         .fops = &mtk_drm_fops,
-> @@ -416,6 +418,8 @@ static int mtk_drm_bind(struct device *dev)
->         if (ret < 0)
->                 goto err_deinit;
-> 
-> +       drm_fbdev_generic_setup(drm, 32);
-> +
->         return 0;
-> 
-> 
-> But I implement .gem_prime_vmap with a workaround,
-> 
-> 
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_gem.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_gem.c
-> @@ -280,3 +280,8 @@ int mtk_gem_create_ioctl(struct drm_device *dev,
-> void *data,
->         mtk_drm_gem_free_object(&mtk_gem->base);
->         return ret;
->  }
-> +
-> +void *mtk_drm_gem_prime_vmap(struct drm_gem_object *obj)
-> +{
-> +       return (void *)1;
-> +}
-> 
-> Current drm_fb_helper depends on drm_client to create fbdev. When
-> drm_client create drm_client_buffer, it need to vmap to get kernel
-> vaddr. But I think for fbdev, the vaddr is useless. Do you agree that I
-> temporarily implement .gem_prime_vmap in such way?
+Add missing vin-supply 5V regulator node on usb_phy nodes needed
+to power usb bus ports. Override the dr_mode from "host" to "peripheral"
+for initialization of dwc2 usb0 phy node,changes fix the below
+warning for usb initialization.
 
-The vmap is used by fbcon, without that fbdev won't really work I think.
-So I'm rather confused on what you tested ...
+[    1.203900] phy phy-c0000000.phy.0: USB ID detect failed!
+[    1.208048] phy phy-c0000000.phy.0: phy poweron failed --> -22
+[    1.213877] WARNING: CPU: 1 PID: 44 at drivers/regulator/core.c:2054 _regulator_put.part.11+0xf0/0xf8
+[    1.222953] Modules linked in:
+[    1.225976] CPU: 1 PID: 44 Comm: kworker/1:1 Not tainted 5.0.0-rc1-xc2ml #3
+[    1.232872] Hardware name: Hardkernel ODROID-C2 (DT)
+[    1.237794] Workqueue: events deferred_probe_work_func
+[    1.242878] pstate: 80000005 (Nzcv daif -PAN -UAO)
+[    1.247623] pc : _regulator_put.part.11+0xf0/0xf8
+[    1.252280] lr : regulator_put+0x34/0x48
+[    1.256159] sp : ffff00001176bb00
+[    1.259437] x29: ffff00001176bb00 x28: 0000000000000000
+[    1.264698] x27: ffff80007f31beb8 x26: ffff000010eeb7e0
+[    1.269959] x25: 0000000000000000 x24: 0000000000000009
+[    1.275220] x23: ffff00001176bbc8 x22: ffff80007ed9d500
+[    1.280482] x21: ffff0000111bd6c8 x20: ffff80007ed9d700
+[    1.285743] x19: ffff80007ed9d700 x18: 000000000000006f
+[    1.291004] x17: 0000000000000000 x16: 0000000000000000
+[    1.296265] x15: 0000000000000400 x14: 0000000000000400
+[    1.301527] x13: ff00000000000000 x12: ffffffffffffffff
+[    1.306788] x11: 0000000000000038 x10: 0000000000000040
+[    1.312049] x9 : ffff0000111d58b0 x8 : ffff0000111d58a8
+[    1.317310] x7 : ffff80007ed9db00 x6 : ffff80007ec21b00
+[    1.322571] x5 : ffff80007f400248 x4 : ffff80007fba9b00
+[    1.327833] x3 : ffff0000112d9eb8 x2 : ffff80007ec21b00
+[    1.333094] x1 : 0000000000000000 x0 : 0000000000000001
+[    1.338356] Call trace:
+[    1.340773]  _regulator_put.part.11+0xf0/0xf8
+[    1.345085]  regulator_put+0x34/0x48
+[    1.348621]  regulator_bulk_free+0x30/0x50
+[    1.352675]  devm_regulator_bulk_release+0x18/0x20
+[    1.357421]  release_nodes+0x1b0/0x220
+[    1.361127]  devres_release_all+0x34/0x50
+[    1.365094]  really_probe+0xec/0x290
+[    1.368630]  driver_probe_device+0x54/0xe8
+[    1.372684]  __device_attach_driver+0xb8/0xe8
+[    1.376997]  bus_for_each_drv+0x78/0xc8
+[    1.380792]  __device_attach+0xd4/0x130
+[    1.384587]  device_initial_probe+0x10/0x18
+[    1.388727]  bus_probe_device+0x90/0x98
+[    1.392522]  deferred_probe_work_func+0x6c/0xa0
+[    1.397010]  process_one_work+0x1e0/0x318
+[    1.400975]  worker_thread+0x228/0x428
+[    1.404684]  kthread+0x124/0x128
+[    1.407876]  ret_from_fork+0x10/0x18
+[    1.411410] ---[ end trace de5fd1b262c1f56a ]---
+[    1.416055] WARNING: CPU: 1 PID: 44 at drivers/regulator/core.c:2054 _regulator_put.part.11+0xf0/0xf8
+[    1.425123] Modules linked in:
+[    1.428144] CPU: 1 PID: 44 Comm: kworker/1:1 Tainted: G        W         5.0.0-rc1-xc2ml #3
+[    1.436422] Hardware name: Hardkernel ODROID-C2 (DT)
+[    1.441340] Workqueue: events deferred_probe_work_func
 
-Adding Noralf, he's the expert here.
--Daniel
+Fixes: 5a0803bd5ae (ARM64: dts: meson-gxbb-odroidc2: Enable USB Nodes)
+Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Cc: Jerome Brunet <jbrunet@baylibre.com>
+Cc: Neil Armstrong <narmstrong@baylibre.com>
+Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+---
+Fix the following power issue with usb device
+
+[  795.380156] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+[  798.356073] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+[  801.331999] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+[  804.307919] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+[  807.283844] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+
+[alarm@archl-c2m ~]$ lsusb -t
+/:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=dwc2/1p, 480M
+    |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/4p, 480M
+        |__ Port 1: Dev 4, If 0, Class=Mass Storage, Driver=usb-storage, 480M
+        |__ Port 2: Dev 5, If 3, Class=Audio, Driver=, 480M
+        |__ Port 2: Dev 5, If 1, Class=Video, Driver=uvcvideo, 480M
+        |__ Port 2: Dev 5, If 2, Class=Audio, Driver=, 480M
+        |__ Port 2: Dev 5, If 0, Class=Video, Driver=uvcvideo, 480M
+        |__ Port 3: Dev 3, If 0, Class=Vendor Specific Class, Driver=, 480M
+
+Similar Fix is need for Odroid C1+ to power on the phy nodes
+---
+ arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+index 2e1cd5e3a246..b4e14ff614c4 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+@@ -28,6 +28,13 @@
+ 		reg = <0x0 0x0 0x0 0x80000000>;
+ 	};
+ 
++	p5v0: regulator-p5v0 {
++		compatible = "regulator-fixed";
++		regulator-name = "P5V0";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
++
+ 	usb_otg_pwr: regulator-usb-pwrs {
+ 		compatible = "regulator-fixed";
+ 
+@@ -36,6 +43,8 @@
+ 		regulator-min-microvolt = <5000000>;
+ 		regulator-max-microvolt = <5000000>;
+ 
++		vin-supply = <&p5v0>;
++
+ 		gpio = <&gpio_ao GPIOAO_5 GPIO_ACTIVE_HIGH>;
+ 		enable-active-high;
+ 	};
+@@ -303,6 +312,7 @@
+ 
+ &usb0 {
+ 	status = "okay";
++	dr_mode = "peripheral";
+ };
+ 
+ &usb1 {
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+2.19.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
