@@ -2,85 +2,78 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 47741C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 14:37:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CD5CFC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 14:54:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 16D5F2133F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 14:37:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9EEE420870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 14:54:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ayPgYx7Z";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="WVPuTtR/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 16D5F2133F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iHu2TK90"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9EEE420870
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kn3hXkOGaIx/9buAUgMKAI0jE2BxLx8MRkDZo8RdMjw=; b=ayPgYx7Z8/MGmc
-	yXRlojdCIz9qI0JGCyc4BljDLnSPfXZAR3RPFunEXhzfRzZRHy0He3GGrOkF7sYOveyckmNG67xCR
-	49Xqg2zIVJtj4zUpqExugsb5xiy44keLQoRVqVbtNLCqLEpEblAd3t279Iz8txTR4faaxGKq2iX6f
-	dQkBWUQfpMF5aVUhNjcPt5k7VB3IR7GLELpCCnxQmpCKoj7ZgBsxyDmp5Yz1BNTW5CeXB8gl9q70u
-	lQTNtBUvanOCdjUpvXOrdWvFi/a44SrYVcowfjEb4ZiACj6/3IHBKHOZV37MN6V3ZLSO2nkAInJve
-	/SLYBUdQKeXXTZ/yWOcA==;
+	List-Owner; bh=a0Ew7hQZ2MyOD2ZN/1blbQAODpBUqEfqxut+otKGsTQ=; b=iHu2TK90mAl4EA
+	u8878CxBfNH2uH9rV2QVUP+6rM0htr/yRI+u2CkVywC8cJ3Nnj4/WfX/l1qtBnyTj5CcrdxWcb0E0
+	csuWHgxlBLKGk2PMgK43hhjDN18LeSF02JThNT+JmtIlpTkL+sBnO/zzGpunJOoKur8hprvVflY8Q
+	kxHo2N4KfdNWZnajbOEwgPuAyWJF5W3nZE1nM6qfwc+wI0puo10dF64ghN3Ot65THF4d+Pv0d/Gvt
+	0kYj6TGsAa17dqpqwC20nZI0pNiJKzhJjO6H9mNmTxKauAlci13+uPAzvart7BtO65fHfaDdBOGql
+	LyIAOLpQp40Tm0Mmopsg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghxw4-00036h-JR; Fri, 11 Jan 2019 14:37:24 +0000
-Received: from mail-lj1-x241.google.com ([2a00:1450:4864:20::241])
+	id 1ghyCc-0000h8-IP; Fri, 11 Jan 2019 14:54:30 +0000
+Received: from mail-ot1-f65.google.com ([209.85.210.65])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghxw0-00035x-VJ
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 14:37:22 +0000
-Received: by mail-lj1-x241.google.com with SMTP id g11-v6so13148289ljk.3
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 11 Jan 2019 06:37:20 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=iiz7Wr5zV9F15CaqgmTVT3cwFrrlab1AeDN8mYEG4jo=;
- b=WVPuTtR/ndViS6PFHzXI9F1Drm5p2L4SAy8RtXsWyB+IcFpKeV/f1qWP9JMP82GGw5
- RPW+cQWj5JQxdsJ+3HbaYZUgmZl7C7N4Qt4NLFQX+oriYnlFY5bvDNiu9AQ3wCMeBlGW
- h9n68eEY8zgkvZdiWaHvAaKNV2MWJcZxjXxTQ=
+ id 1ghyCZ-0000gd-GE; Fri, 11 Jan 2019 14:54:29 +0000
+Received: by mail-ot1-f65.google.com with SMTP id k98so13322177otk.3;
+ Fri, 11 Jan 2019 06:54:26 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=iiz7Wr5zV9F15CaqgmTVT3cwFrrlab1AeDN8mYEG4jo=;
- b=dGDx5KNuWWe3bwqhHgH+eWFuW5Z0BrSRWDhyhS5bJDk8FO/cnWlqyTEZ+DkhObyfcx
- b4zM7yj06GbhqTllGBKHw6wk4126YoRgxyHr16/yArxVQDPrDkg8HLbm1/oVNeqMA6v6
- YPc3yFV2pyvCzk9D8qLLHRVlUliNjPAOalGV1gQvu9wzXbmNO5FQo60/PuZO9mKlF5XW
- KTWhjEIYpU85sn3R2ReYUlv6OvASaKR/+tMzhMAVe413f+kxuCvj3tSdbzASskPOoYEv
- CnB4tByCb2IMgWBRBeeaV9NpbV0NkdhBVF7yszwgchknZ1LsUf9OXXzrGNeAltHa7jeC
- bQ8A==
-X-Gm-Message-State: AJcUuketsfEMzMqwxmc8TLHLwdxtbvT2NdJ3fOamlZCw5Az2qmYxclCo
- xik4NAgiw/BuCbf6UGjLa0oG5BPB2YlO4g3E8KCn/Q==
-X-Google-Smtp-Source: ALg8bN7eohjr6xkd+13r3SWcDb/8yGYqS1LG43RZFSuqfWoXCaXwLMfVkvAytlhCZ8ADpSaOyOAkaJZwRmsxv0jMZvY=
-X-Received: by 2002:a2e:7e04:: with SMTP id z4-v6mr8758978ljc.97.1547217438950; 
- Fri, 11 Jan 2019 06:37:18 -0800 (PST)
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=AxBTm/miHcpzTWrZ6oK4vYugnLB4OJ4qPCXeYxBcs9I=;
+ b=Mv2WyFRYXgJz1hkmq4Uv//TofBqnJANyWTVsoZmzWdVJBgiIl6uPtId4mnJZ14mqHZ
+ 2J5V3t9E5vQYWrSneGFFtsTKhGGk5cfY7OFhcjx6lI4qB+oadS/AperYRRLCnW+lvxbj
+ xqHyRF2412Zswpco6mAGY46BLlKAi+4bsptVI9HWEs6pDXaUbG2ooduuMRpj6MGamJQZ
+ 1FPYO8NoQE5F0fjiRGutQnUVThyukZew1jJgWQcKvou+Av/ZeHVGzd+ZEuOBGWnQZn9w
+ G5AVwImOXp/sgv6hZhx0k/oA+r5//fSitrIHWFsu43nSMPA9HoK7shOxWUYFlNZEGJR3
+ OShw==
+X-Gm-Message-State: AJcUukc4sqTyP3lAs7ltGp5ugg3ppQdOI7mC2geJkB2SXWDaaRcxj3h9
+ LNrqelWhQJ2B1vz+Mvu4Lg==
+X-Google-Smtp-Source: ALg8bN7V0LmbKUmrNricS3ji6iXmjFN22dEwo5X+zsrnshlMFJPUSzs6OlleaePLksTmKgNq0jURtg==
+X-Received: by 2002:a9d:4b0f:: with SMTP id q15mr5119413otf.201.1547218465767; 
+ Fri, 11 Jan 2019 06:54:25 -0800 (PST)
+Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.gmail.com with ESMTPSA id d3sm35589465otb.79.2019.01.11.06.54.24
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 11 Jan 2019 06:54:24 -0800 (PST)
+Date: Fri, 11 Jan 2019 08:54:24 -0600
+From: Rob Herring <robh@kernel.org>
+To: Heiko Stuebner <heiko@sntech.de>
+Subject: Re: [PATCH v2 3/7] drm: rockchip: vop: add rk3066 vop definitions
+Message-ID: <20190111145424.GA21604@bogus>
+References: <20181229133318.18128-1-jbx6244@gmail.com>
+ <20181229133318.18128-4-jbx6244@gmail.com>
+ <154632658.xpTMZOjgxT@phil>
 MIME-Version: 1.0
-References: <cover.1502103715.git.michal.simek@xilinx.com>
- <72d3cd83bed792a23ab60cf9b6d51b618f5aa084.1502103715.git.michal.simek@xilinx.com>
- <CACRpkdZE-Edr7fWZY5VQM1_65iw7MYGP-iDa2ExZsPxpM0rurQ@mail.gmail.com>
- <6da5fd79-fbc8-b613-954f-dcbe2ef8d6c5@xilinx.com>
- <20190107164210.3ecf37e8@windsurf>
- <CACRpkdafBpC14TxBNVN2AemkBz-yKkXkKfNpdgkYKQX3qFemag@mail.gmail.com>
- <20190111135413.73dad0b2@windsurf>
-In-Reply-To: <20190111135413.73dad0b2@windsurf>
-From: Linus Walleij <linus.walleij@linaro.org>
-Date: Fri, 11 Jan 2019 15:37:07 +0100
-Message-ID: <CACRpkdZVfH_LYQov5mkMvp6BWjkVsisawWuE1PMp0b8dW5Qc=g@mail.gmail.com>
-Subject: Re: [PATCH 2/8] gpio: zynq: Wakeup gpio controller when it is used as
- IRQ controller
-To: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+Content-Disposition: inline
+In-Reply-To: <154632658.xpTMZOjgxT@phil>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_063721_008872_984E86F8 
-X-CRM114-Status: GOOD (  14.85  )
+X-CRM114-CacheID: sfid-20190111_065427_584301_A2E22A2A 
+X-CRM114-Status: GOOD (  14.72  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,51 +85,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Josh Cartwright <josh.cartwright@ni.com>,
- Peter Crosthwaite <peter.crosthwaite@xilinx.com>,
- Nava kishore Manne <navam@xilinx.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "monstr@monstr.eu" <monstr@monstr.eu>, Borsodi Petr <Petr.Borsodi@i.cz>,
- Michal Simek <michal.simek@xilinx.com>,
- "linux-gpio@vger.kernel.org" <linux-gpio@vger.kernel.org>,
- Rob Herring <robherring2@gmail.com>,
- =?UTF-8?Q?S=C3=B6ren_Brinkmann?= <soren.brinkmann@xilinx.com>,
- Steffen Trumtrar <s.trumtrar@pengutronix.de>,
- Shubhrajyoti Datta <shubhraj@xilinx.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ linux-rockchip@lists.infradead.org, airlied@linux.ie, mturquette@baylibre.com,
+ hjc@rock-chips.com, dri-devel@lists.freedesktop.org,
+ linux-kernel@vger.kernel.org, sboyd@kernel.org,
+ Johan Jonker <jbx6244@gmail.com>, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 11, 2019 at 1:54 PM Thomas Petazzoni
-<thomas.petazzoni@bootlin.com> wrote:
-> On Fri, 11 Jan 2019 10:54:20 +0100, Linus Walleij wrote:
->
-> > My stance is that the driver is responsible of enabling and managing
-> > runtime PM for its hardware block(s).
-> >
-> > Runtime PM in the core should only be added if the core needs to
-> > be aware about it, such as is the case when e.g. a block device
-> > needs to drain its write buffer before going to runtime sleep.
-> >
-> > I fail so see why the GPIO core need to be aware about this.
->
-> In this very same thread at
-> https://www.spinics.net/lists/arm-kernel/msg600515.html, you kind of
-> proposed to handle this in the core in fact :-) Though indeed you said
-> that the core could provide helpers.
+On Sun, Dec 30, 2018 at 06:22:00PM +0100, Heiko Stuebner wrote:
+> Hi Johan,
+> 
+> Am Samstag, 29. Dezember 2018, 14:33:14 CET schrieb Johan Jonker:
+> > From: Mark Yao <mark.yao@rock-chips.com>
+> > 
+> > This patch adds the rk3066 VOP definitions.
+> > 
+> > The VOP or LCD Controller serves as interface between
+> > framebuffer memory and a display device (LCD panel or TV set).
+> > 
+> > This SOC has two symmetrical LCDC's for a dual panel application.
+> > 
+> > A LCDC has 5 display layers.
+> > Only 3 are used here.
+> > 
+> > - Video layer 0 (Win0)
+> > - Video layer 1 (Win1)
+> > - OSD layer     (Win2)
+> 
+> Patch itself looks good, we'll need to wait a bit to give Rob a chance
+> to look at the (simple) dt-binding change and I'll drop the paragraph
+> about the display layers when applying.
 
-Yeah allright, I have never been good with consistency but what I guess
-I would mean to say (today) is that the driver needs to be in the driver
-seat (heh) and opting in to any runtime PM support.
+Don't wait on me for simple oneline compatible additions.
 
-This is in contrast with "midlayer" where all drivers are forced to behave
-"as if" they had runtime PM (i.e. calls are done to the runtime PM helpers
-even if the device doesn't really activate runtime PM).
+Acked-by: Rob Herring <robh@kernel.org>
 
-Yours,
-Linus Walleij
+Rob
 
 _______________________________________________
 linux-arm-kernel mailing list
