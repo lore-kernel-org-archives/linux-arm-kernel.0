@@ -3,22 +3,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A43B6C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 14:55:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C1FCAC43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 14:56:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 74D9420872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 14:55:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7CB9A20870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 14:56:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bG3Gq/uF";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=tycho-ws.20150623.gappssmtp.com header.i=@tycho-ws.20150623.gappssmtp.com header.b="JcGQYfCr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 74D9420872
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=tycho.ws
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CURkEeC+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7CB9A20870
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,68 +24,56 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=aKVX9/qogIowJu3aPi4uBAIwkAxI6dYG9EPhvX2LdAc=; b=bG3Gq/uFiLpjvV
-	+N2reWun2pJ7CoUk94VBjTmQRByUJvMZNwhVMgtZOsJ+SgX1Bh9GMgORIBXMhM9f0oC+yAcb2THQY
-	O3uaTkpTuPtngwWJ/7SWHl97JUh9UMhD2yPzhdePBHJiNJ63005Vx4r7Nj5fv8DstvcM4ivTezcM4
-	c1RgaUaFXoIFak/AnlW8Ga2dVKtbOIqHCNOO3hToYOBsBQnjJ+uWN1FBox35affXPds878fg4H4Xl
-	EM7fQJNuduEniWQly+IZTMG4lW7hdA6ymn7rT6hGnMTuRqraP/WL+EDwpdID/omyIZmU0mhg2X9dD
-	dUPxTjW5ZshisIcFZ/jA==;
+	List-Owner; bh=TL8IjN3dw5mPLF51ffWB8psAE9ln67psGGwV2O8I3R4=; b=CURkEeC+tAYc1I
+	l1/pOSKSoXMdcGXWxi6/8h57LpvyjSm/tl+mVRU6MFRGfNBNesmHffbLlLMSN6nBpU0toYHxortHl
+	XIjkEMXrDK+nJG/GSAhxGa3EH27FP3JiIn52PEpF8Yhy3//4vRFXyBBLcoyXnZngh1QJefWTxRqxh
+	Lmwc6XdvXGUi0Xtm/SGD/xvpgK5/WGtnFjqtx4F1IdToKKrgIjgLoIFjto9E0BwTjiHcyddX5iXo8
+	Mqjlmroic0zBCEg8wlKCpHB27mpXdyNF0g/QMASaxvc5EIXeizFxaZ8wGojUlEmaa5+un7a63G1E+
+	sb3UvoN9pZLyLpNS7l1w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghyD3-00014k-HA; Fri, 11 Jan 2019 14:54:57 +0000
-Received: from mail-it1-x142.google.com ([2607:f8b0:4864:20::142])
+	id 1ghyEr-0002w2-Pm; Fri, 11 Jan 2019 14:56:49 +0000
+Received: from mail-oi1-f195.google.com ([209.85.167.195])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghyCw-00011j-6E
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 14:54:55 +0000
-Received: by mail-it1-x142.google.com with SMTP id w18so2857422ite.1
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 11 Jan 2019 06:54:49 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=tycho-ws.20150623.gappssmtp.com; s=20150623;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=uJh/pMTsGneTKaKggyvXF+Sg9B2wbRdl3/xWASaoeJw=;
- b=JcGQYfCr0JAkjBFuTWcLasw8AQZ+fTJzH8LyaRL8LAp8Zh8uneEWnO1VqaQLOAjB0r
- HMBtrlwZEzKilvHbM3I3jUn6BVPEyAh64wzW9U/YwxMxpUmcjtg1QRIgJHo++a0v2Fwa
- 5cz01rN1NeWfZdn8q+LQgxhtBkyCW7rEauev9VhGi2fimSrQIPyI9sxbIJd3PPxuf1NH
- Uqa59o2TEYkxG4fDOtRajtWdH044la6qzI3LVPnCNFUEUwqNoHYw6/Lh7nlGuEJKSKvy
- mdG4WtIkXb4KuW03qGLNMCDUFjgwEN16yFKRFu38CRWlqqOiQpv1WhIysxhmchpISxMb
- G7AQ==
+ id 1ghyEl-0002s4-UM; Fri, 11 Jan 2019 14:56:46 +0000
+Received: by mail-oi1-f195.google.com with SMTP id y23so12401720oia.4;
+ Fri, 11 Jan 2019 06:56:43 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=uJh/pMTsGneTKaKggyvXF+Sg9B2wbRdl3/xWASaoeJw=;
- b=Mt3kafnLflRqCM5/PfgcUxWVIb2TLZ76tbXszO+wAF/QgTg4UUeGKDk5+XZbXEw8MW
- sSqoKfZNw4qgXjTJfHJQjK1b7iElnUJ60VFCMnt5/xLj7qZolYx6+PCAuEpm5JdKZLqA
- S5oubr3njJoxMN4KtpITejiusajAsooKFQ5Av8yZlqrsmkL1SuPWjT2U6xoCaMR15Wnc
- EfTGYu2zbXssjL3/sTLcO86KcXxQ05c5nHYqJ9lmjnUHgALnnPC4U3MZRn9/rEv/fEcu
- YOuvOB0j4kUi5OHETmJRnCg8cGMpSmuf7E/TfLkWdtSRkXeWYNTzaktN0aFTu1RLaAFz
- fdBA==
-X-Gm-Message-State: AJcUukdKCFc6kMkg5RGZ6zrTl2YD4GY+iLU0zLA/M2xj+3wuDzVLGI2i
- Ow+wOY2nNo9Qxi/cxnEcF/n2Bw==
-X-Google-Smtp-Source: ALg8bN6KCMZX9D782XIM0sEno9u8EK/u/rCjLFpSCEvmMj5+Pt/LjL9iF+g6YFTIunFQgkmw/L9Fjg==
-X-Received: by 2002:a24:fe06:: with SMTP id w6mr1349599ith.108.1547218488492; 
- Fri, 11 Jan 2019 06:54:48 -0800 (PST)
-Received: from cisco ([2601:282:901:dd7b:c69:9cc7:f9cf:ff1b])
- by smtp.gmail.com with ESMTPSA id l21sm15740077ioh.42.2019.01.11.06.54.46
+ bh=dOZ7ydKjrFInmblb4snE5E2ZFfXlu7+y0nbTinIkDn0=;
+ b=RHrXS5DJhUil/G1yHitnXton2T6Mw91Gx96hNe9AEj5Nq0zMe1r2QWQxjfus1St2sb
+ Gl4AcVnKZnmRcgwUs9IbkZ/BcDIgfYeqwtvSfSaUu9/HJfTUME93MnQ/S7chymaymCKi
+ k5kdbY4euIK/n/qjFDSlYB3dfjP4D1e3D9S8WOSSawohlbVpDg/qqmEVlXN/75JhkIM6
+ HxZUUAT2XDhgkvLmhEvz4mfLXOabdoKlBnCMwNpZ9XZjQuQfVAHp6vmRKBGkEY3TwS1M
+ SGSKKx3MTeLTVuEcEmjDhAFkjGlvI20GDS5szm5HkG/FPfuOLTgb4QIx88VF6/oY6jFB
+ p2Eg==
+X-Gm-Message-State: AJcUukeYCisOnhSFrhbmPdACObl4Hq4nzCPIz2Q/wzRMXVZr+WP5r1/Z
+ gb2fgfKMb8bi8gvTYKW/Jg==
+X-Google-Smtp-Source: ALg8bN6MHh/sH867VMmlp3MFoU+z+L15kBA8wRT0Ao/QgxP+nngTy5tg2TecIHSSwviwWTPgrZzHNQ==
+X-Received: by 2002:aca:bc42:: with SMTP id m63mr8971423oif.323.1547218603102; 
+ Fri, 11 Jan 2019 06:56:43 -0800 (PST)
+Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.gmail.com with ESMTPSA id k13sm59192406otj.19.2019.01.11.06.56.42
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 11 Jan 2019 06:54:47 -0800 (PST)
-Date: Fri, 11 Jan 2019 07:54:45 -0700
-From: Tycho Andersen <tycho@tycho.ws>
-To: Khalid Aziz <khalid.aziz@oracle.com>
-Subject: Re: [RFC PATCH v7 07/16] arm64/mm, xpfo: temporarily map dcache
- regions
-Message-ID: <20190111145445.GA4102@cisco>
-References: <cover.1547153058.git.khalid.aziz@oracle.com>
- <eba179acbfdea5a646c5548cb82138c1c3b74aa2.1547153058.git.khalid.aziz@oracle.com>
+ Fri, 11 Jan 2019 06:56:42 -0800 (PST)
+Date: Fri, 11 Jan 2019 08:56:42 -0600
+From: Rob Herring <robh@kernel.org>
+To: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+Subject: Re: [PATCH 2/6] dt-bindings: clock: Add DT bindings for Actions Semi
+ S500 CMU
+Message-ID: <20190111145642.GA25726@bogus>
+References: <20181231185517.18517-1-manivannan.sadhasivam@linaro.org>
+ <20181231185517.18517-3-manivannan.sadhasivam@linaro.org>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <eba179acbfdea5a646c5548cb82138c1c3b74aa2.1547153058.git.khalid.aziz@oracle.com>
+In-Reply-To: <20181231185517.18517-3-manivannan.sadhasivam@linaro.org>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_065450_473245_202D93AF 
-X-CRM114-Status: GOOD (  17.14  )
+X-CRM114-CacheID: sfid-20190111_065644_307506_D49E09A5 
+X-CRM114-Status: GOOD (  14.15  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,76 +85,50 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kernel-hardening@lists.openwall.com, linux-mm@kvack.org,
- deepa.srinivasan@oracle.com, steven.sistare@oracle.com,
- joao.m.martins@oracle.com, boris.ostrovsky@oracle.com, ak@linux.intel.com,
- hch@lst.de, kanth.ghatraju@oracle.com, jsteckli@amazon.de,
- pradeep.vincent@oracle.com, konrad.wilk@oracle.com, jcm@redhat.com,
- liran.alon@oracle.com, tglx@linutronix.de, chris.hyser@oracle.com,
- linux-arm-kernel@lists.infradead.org, jmattson@google.com, juergh@gmail.com,
- andrew.cooper3@citrix.com, linux-kernel@vger.kernel.org, tyhicks@canonical.com,
- john.haxby@oracle.com, Juerg Haefliger <juerg.haefliger@canonical.com>,
- dwmw@amazon.co.uk, keescook@google.com, torvalds@linux-foundation.org,
- kirill.shutemov@linux.intel.com
+Cc: devicetree@vger.kernel.org, sboyd@kernel.org, mturquette@baylibre.com,
+ linux-actions@lists.infradead.org, linux-kernel@vger.kernel.org,
+ linux-clk@vger.kernel.org, Edgar Bernardi Righi <edgar.righi@lsitec.org.br>,
+ afaerber@suse.de, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 10, 2019 at 02:09:39PM -0700, Khalid Aziz wrote:
-> From: Juerg Haefliger <juerg.haefliger@canonical.com>
+On Tue, Jan 01, 2019 at 12:25:13AM +0530, Manivannan Sadhasivam wrote:
+> From: Edgar Bernardi Righi <edgar.righi@lsitec.org.br>
 > 
-> If the page is unmapped by XPFO, a data cache flush results in a fatal
-> page fault, so let's temporarily map the region, flush the cache, and then
-> unmap it.
+> Add devicetree bindings for Actions Semi S500 Clock Management Unit.
 > 
-> v6: actually flush in the face of xpfo, and temporarily map the underlying
->     memory so it can be flushed correctly
-> 
-> CC: linux-arm-kernel@lists.infradead.org
-> Signed-off-by: Juerg Haefliger <juerg.haefliger@canonical.com>
-> Signed-off-by: Tycho Andersen <tycho@docker.com>
-> Signed-off-by: Khalid Aziz <khalid.aziz@oracle.com>
+> Signed-off-by: Edgar Bernardi Righi <edgar.righi@lsitec.org.br>
+> [Mani: Documented S500 CMU compatible]
+> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 > ---
->  arch/arm64/mm/flush.c | 7 +++++++
->  1 file changed, 7 insertions(+)
 > 
-> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-> index 30695a868107..f12f26b60319 100644
-> --- a/arch/arm64/mm/flush.c
-> +++ b/arch/arm64/mm/flush.c
-> @@ -20,6 +20,7 @@
->  #include <linux/export.h>
->  #include <linux/mm.h>
->  #include <linux/pagemap.h>
-> +#include <linux/xpfo.h>
+> Rob, I have removed your Reviewed-by tag for this patch since the
+> earlier revision contained only bindings constants and lacked the
+> compatible documentation, which is added now.
+> 
+>  .../bindings/clock/actions,owl-cmu.txt        |  7 +-
+>  include/dt-bindings/clock/actions,s500-cmu.h  | 78 +++++++++++++++++++
+>  2 files changed, 82 insertions(+), 3 deletions(-)
+>  create mode 100644 include/dt-bindings/clock/actions,s500-cmu.h
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/actions,owl-cmu.txt b/Documentation/devicetree/bindings/clock/actions,owl-cmu.txt
+> index 2ef86ae96df8..86183f559022 100644
+> --- a/Documentation/devicetree/bindings/clock/actions,owl-cmu.txt
+> +++ b/Documentation/devicetree/bindings/clock/actions,owl-cmu.txt
+> @@ -2,13 +2,14 @@
 >  
->  #include <asm/cacheflush.h>
->  #include <asm/cache.h>
-> @@ -28,9 +29,15 @@
->  void sync_icache_aliases(void *kaddr, unsigned long len)
->  {
->  	unsigned long addr = (unsigned long)kaddr;
-> +	unsigned long num_pages = XPFO_NUM_PAGES(addr, len);
-> +	void *mapping[num_pages];
+>  The Actions Semi Owl Clock Management Unit generates and supplies clock
+>  to various controllers within the SoC. The clock binding described here is
+> -applicable to S900 and S700 SoC's.
+> +applicable to S900,S700 and S500 SoC's.
 
-Does this still compile with -Wvla? It was a bad hack on my part, and
-we should probably just drop it and come up with something else :)
+space needed after the ','.
 
-Tycho
+With that,
 
->  	if (icache_is_aliasing()) {
-> +		xpfo_temp_map(kaddr, len, mapping,
-> +			      sizeof(mapping[0]) * num_pages);
->  		__clean_dcache_area_pou(kaddr, len);
-> +		xpfo_temp_unmap(kaddr, len, mapping,
-> +			        sizeof(mapping[0]) * num_pages);
->  		__flush_icache_all();
->  	} else {
->  		flush_icache_range(addr, addr + len);
-> -- 
-> 2.17.1
-> 
+Reviewed-by: Rob Herring <robh@kernel.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
