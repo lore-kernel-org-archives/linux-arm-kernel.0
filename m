@@ -2,62 +2,78 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 787A4C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 12:09:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CD7DBC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 12:16:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 474BE2146F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 12:09:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9E74B206B6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 12:16:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VCNb0rzc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 474BE2146F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=suse.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RFzLnYt1";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="iz1LApfX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9E74B206B6
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=fLPDgkUK+rH7G2QLnMiLDcSXA4vFE7M66Eh+fjmDUoQ=; b=VCNb0rzcpWga2r
-	kbiJh24ZgDhPY37q5VRJSDNhXiHifNGqCTpZz/1CmOBVxQxf5+cdfT+3uClSPlxH46r4B91sJB/be
-	Aw+j3JBK1T0vgF4J8eFJTc1qHyk+mLfrf0mcPmP0z0GtNp+AoTBRjOwSPxYGQxljkZvpoWxwxRerv
-	unvqEDJ4NXj7QzMQSbmVnkZN+Xj2j7hr6yn1CwhJ161g9sWjVyeOOhd1eBIWbZ9fHRDVFPpYWL1FA
-	SuCJn0xLTI/c9a2fxdyx5PRWDjYXBa4dlCs9WG+jPjF+xQQG38tVHhUdJLLbeTcj7VxwtirvQVB4c
-	OAzOo6Wyy80XtlXMXjMg==;
+	List-Owner; bh=FVAZ8UO7Y3aRc8HhutyYfGVpZTfyoMYU9aSUTPrbYTs=; b=RFzLnYt1VJymIX
+	wzfuiR7EmWwQkmlH1iKlysZQtkCuws1tCUuRALstm8JG/wgPqSx0pxI2D1wsFskbY3Ebh9UP/GZGQ
+	BzWX2hekHDzWhC80V6K8VaJAnHTP6Silh+Atci2lm5DtwKi/6wSv8DZRhsLYOAOLZ/9w+/260LVTj
+	IdAXc7EJxjOAxLf65RbTAECiIY4LgvAlwkJ7UK0yaYSqnLgV43iKKED6tsUWg07VFWfjySvPEPSTw
+	in2XmIl0kZHpb/Cr8SmS1YLDypigHchHydRR0xxwV4MXw9QkU0XhsCeZvHAD9yA3pXF6Z4jwHRCcC
+	Xk3B9SI6n78xoZTImtaw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghvcY-0001aI-Bx; Fri, 11 Jan 2019 12:09:06 +0000
-Received: from mx2.suse.de ([195.135.220.15] helo=mx1.suse.de)
+	id 1ghvjR-0005ad-IM; Fri, 11 Jan 2019 12:16:13 +0000
+Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghvcU-0001Zr-2Y
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 12:09:04 +0000
-X-Virus-Scanned: by amavisd-new at test-mx.suse.de
-Received: from relay2.suse.de (unknown [195.135.220.254])
- by mx1.suse.de (Postfix) with ESMTP id 95447ABD4;
- Fri, 11 Jan 2019 12:09:00 +0000 (UTC)
-Date: Fri, 11 Jan 2019 13:08:59 +0100
-From: Joerg Roedel <jroedel@suse.de>
-To: Will Deacon <will.deacon@arm.com>
-Subject: Re: [PATCH] ACPI/IORT: Fix build when CONFIG_IOMMU_API=n
-Message-ID: <20190111120859.iqq7gju2ecrmi66t@suse.de>
-References: <20190107164208.27789-1-lorenzo.pieralisi@arm.com>
- <20190111113308.5lwgl5d7m7zjvidr@suse.de>
- <20190111113652.GA30082@fuggles.cambridge.arm.com>
+ id 1ghvjM-0005Xv-Jb
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 12:16:11 +0000
+Received: by mail-lj1-x243.google.com with SMTP id k15-v6so12719081ljc.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 11 Jan 2019 04:16:07 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=nJvZ9aA7kxJjZFLo1RF/B2VvSXiNkbAu9KeR5An6hXg=;
+ b=iz1LApfXrv4XxZ+SXzgkPFB8g6QClp7K7ozwAW1s1F4nkJlMRyfchOPQGBuOL2aW8F
+ 3u/CLsz+DQlU0nmKCm5ZH2t10gvdNFtDox+2pry5MYpPdp3zmf1/ZDQrPp4mKUWngaKv
+ +Z9q8oRXBz0f7TAM9IKypRJFffAh62uExhjVE=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=nJvZ9aA7kxJjZFLo1RF/B2VvSXiNkbAu9KeR5An6hXg=;
+ b=EUoBEEV6OpVyeUWrvGK6qe92Kr+D6ZiUzxZW4/kJX45xMvM4NYUtcSCHfj5DiEaK0C
+ 1Hrjt4I82BCm04rnTgKUflzB3+bvW0Fdt30rzPPI7i8BQAzi9b10KJcN85ROdc8281tu
+ yGbzMiQmzRRfz1xD9eo5hJULJZMO36vJy9gKOP6U9gMXRElrmS/5Z7q61mENDhy052RM
+ U6FY7gi3RxeoA9vRA8LwvWSDMNEr3shNYl6OJlo+zviUOnukHLft4Nw647GLuS0sL9vr
+ s7fiuUbs7zCXzNtgWzjQCulytVsMDE0CkG3wPCqIGzKkjlhswr8C/OxOT23N3mq1XpXg
+ ruPw==
+X-Gm-Message-State: AJcUukcIeEiWXeGbrQtmH/kTr3naJ4Rbg4EAXVmnL736YXwXu0NAUYI+
+ Nkbwc5DyEon8dMGJ5117L/ophQaxwgHjl+BH5x7Zvg==
+X-Google-Smtp-Source: ALg8bN41O3reEE+JTtBEo9wmOu52QK/F0wo/fZAIr5YSpubH6XUtUqJfyDFNoBgO3RbPfsOkv98W822XrAfXo/jTjCQ=
+X-Received: by 2002:a2e:9107:: with SMTP id m7-v6mr8436654ljg.23.1547208966250; 
+ Fri, 11 Jan 2019 04:16:06 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190111113652.GA30082@fuggles.cambridge.arm.com>
-User-Agent: NeoMutt/20170421 (1.8.2)
+References: <1546486635-16829-1-git-send-email-chuanjia.liu@mediatek.com>
+In-Reply-To: <1546486635-16829-1-git-send-email-chuanjia.liu@mediatek.com>
+From: Linus Walleij <linus.walleij@linaro.org>
+Date: Fri, 11 Jan 2019 13:15:54 +0100
+Message-ID: <CACRpkdaF+PFv-oUkLiWT7M2hYESsAYxaPN5OM2=XraeAx9zP4Q@mail.gmail.com>
+Subject: Re: [PATCH v5] pinctrl: mediatek: add EINT support to virtual GPIOs
+To: chuanjia.liu@mediatek.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_040902_266591_4EAE5913 
-X-CRM114-Status: UNSURE (   8.71  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190111_041608_747898_CA750D07 
+X-CRM114-Status: GOOD (  10.38  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,30 +85,37 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, linux-acpi@vger.kernel.org,
- Qian Cai <cai@lca.pw>, Hanjun Guo <hanjun.guo@linaro.org>,
- Sudeep Holla <sudeep.holla@arm.com>, linux-arm-kernel@lists.infradead.org
+Cc: youlin.pei@mediatek.com, Zhiyong Tao <zhiyong.tao@mediatek.com>,
+ Sean Wang <sean.wang@kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
+ "moderated list:ARM/Mediatek SoC support" <linux-mediatek@lists.infradead.org>,
+ hailong.fan@mediatek.com, Matthias Brugger <matthias.bgg@gmail.com>,
+ huang eddie <eddie.huang@mediatek.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Will,
+On Thu, Jan 3, 2019 at 4:38 AM <chuanjia.liu@mediatek.com> wrote:
 
-On Fri, Jan 11, 2019 at 11:36:52AM +0000, Will Deacon wrote:
-> I've already got this one in arm64 for-next/fixes (should be in linux-next
-> already). Would you prefer me to drop it (which would mean a rebase :()? I
-> was planning to send a pull later today, since I have some other fixes
-> queued as well.
+> From: "chuanjia.liu" <Chuanjia.Liu@mediatek.com>
+>
+> Virtual gpio only used inside SOC and not being exported to outside SOC.
+> Some modules use virtual gpio as eint and doesn't need SMT.
+> So this patch add EINT support to virtual GPIOs.
+>
+> Signed-off-by: chuanjia.liu <Chuanjia.Liu@mediatek.com>
+> ---
+> change note:
+> v5: This patch is the same as v4,re-upload due to
+>       mail permissions issues
 
-Ah okay, didn't check linux-next, just linus/master. Keep it in your
-tree, I'll drop it from my branch. It is not pushed yet anywhere public,
-so it's easy for me to do.
+Patch applied with Sean's ACK.
 
-Thanks,
-
-	Joerg
+Yours,
+Linus Walleij
 
 _______________________________________________
 linux-arm-kernel mailing list
