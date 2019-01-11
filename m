@@ -7,76 +7,105 @@ X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7E3C9C43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 06:35:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EDE35C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 06:35:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4666A20872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 06:35:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BB9D920872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 06:35:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Zuhk+1KY";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="WeE5/3oD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4666A20872
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lBww+wV3";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="b0eRqZzP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BB9D920872
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=P08GEsAZngO925xVO2A/P21xBdEPnoId0ug2XNmo0yE=; b=Zuhk+1KYicqe7F
-	ibf07pLosHYfl209Q5KU1+WjRNUPKV/67WqYKGhGaeueSA7Ehj8+4EXs+3Yy23VGkDryupOyeyuFX
-	AsVOpk6Kqf6/sgffLN8Ct7niZO98ph8nhIzikRRywDkog+9HywGchPzX/3057HGQR5LA3hw5Xw0CG
-	B55X17J8EaABQEfTT7WyJNu6uQ35tXUIVM4k8bK1lzeJxujxTEdzI3irpVZCwq6dwrPy0tZNFZ5JH
-	3xTxNEKquLHLdD0mcMfW6rIJJvM27DndQ1Cnl1I5GHxDp6Dlf4ZhG3SmxTySmJh2KEmmMEbhhmYLE
-	E3H30QlW6AgSZ9YTTSbg==;
+	List-Owner; bh=FtHRPrGjjLzNit8beaOR5Ez8F3tdaegsvJSAy9y+gK0=; b=lBww+wV34MJwRT
+	B9QgZNJn1eqtj6yPtV6y4iCnzXY9mP90A2dNXZoLzAhr+BqvbHh3XBQPQAJI4mhr6WZcyK+zCdNWw
+	Za0RLsiYaav6C0c1sZCKTMrJprUVJIrMWWdaSBqoJcgX9PryG3OhXYgQGzJg9hYo4Dq695ONzortr
+	kGyGw6xSjkJOWKzMhFj2aM54ANr8RIO4Pasqjj0zCgM5ws8O2oXdTCfby86nEe04UxCMHmpHP1k/m
+	x4f8X+ZyEsOT0cLQaMy/ZyGauLtaYUra2ZWJwN+FUZJbQD9t4Kw5oQ+/s8jyOZBMraYRF4iZdbmw3
+	H1Qw/53RTYs7PWdSlggQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghqPN-0005OL-TX; Fri, 11 Jan 2019 06:35:09 +0000
-Received: from mail-vk1-xa43.google.com ([2607:f8b0:4864:20::a43])
+	id 1ghqQ4-0005gw-G9; Fri, 11 Jan 2019 06:35:52 +0000
+Received: from mail-eopbgr70040.outbound.protection.outlook.com ([40.107.7.40]
+ helo=EUR04-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghqPJ-0004Zz-Iy
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 06:35:07 +0000
-Received: by mail-vk1-xa43.google.com with SMTP id 197so3055740vkf.4
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 10 Jan 2019 22:35:04 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=uf5RlXm9R4Tp6j/EM7HwfH2Fw0OWn67h4QYTzr31mZI=;
- b=WeE5/3oDiIyYSLcpcNtPA/IhfXo3ucNL2mEyUrEfpVzQPAy1db0Bsjd4C/WDV8RAFp
- CQ+Pd8+CuVkX00GE7G7BmewFOczyymLc+bWZSvmCU4uqKhnedwezuDu1NTchVCDzXNYU
- eqsUW5IB5vTS28ho/VmvSFDmYCFT0JujmiU7g=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=uf5RlXm9R4Tp6j/EM7HwfH2Fw0OWn67h4QYTzr31mZI=;
- b=WmZ0YiP+SJRpVFb3KQ5D2zANx3HMCiZN8ZujCzHyLsa09ROH+KJxlnpmwHa9n92Ewt
- 5V6vyKBAsxDpXMKUUX3tHsTysvxN+cw+Ll7U1xnvczeYwU9qx2v+MZsa3PpYM4nkAG68
- VdefEc/joo93hsoYjNsYZEGMCVLcecT5YXx1obV6Gu3d+qK6R2qv5evpU+ChnYHCwsiW
- HQ1QzeaKHKxDT+Jd1cwmT4bEh7gbvDP8EFU7aHcXjoKKENHYlj7m++36JK8fIlgic9hh
- huzeF1omA5OFMpr1tD9HOYaGUlsBdFnT0a5oGGbxy+iDHP+OJDnGp55TDhz2N6V60Y9K
- SOmQ==
-X-Gm-Message-State: AJcUukcydSvOVHq+E4pXvvd76KH+XngqlfT6cFiZUbB5cY9IHF+n5qcG
- hSEP4P/7YmVKztxzJJdoXZEi9iM67jGPuZQ6sT/S6Q==
-X-Google-Smtp-Source: ALg8bN7OYFHCYmSr1im68IQmOv/WNjjd8raJuLHEAe3kyzraMM0xNsWIAWSRyoVsKUb2fUL8tzacpQbaIGojeYS7SBw=
-X-Received: by 2002:a1f:aa44:: with SMTP id t65mr5053502vke.66.1547188503857; 
- Thu, 10 Jan 2019 22:35:03 -0800 (PST)
+ id 1ghqQ0-0005g6-LF
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 06:35:50 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=COu2ExQogmrrq8S6yMRG4NdA9oLvF0XV5xNs0zCDbYM=;
+ b=b0eRqZzP/PClddX/maSSlE/SAkQw6CDpXC18Vm9Bz4XMuTtd4XWbb8YjJZoC3LjMwuiqJeNP329/EovMj0mR4pN6gjvQW8CUf9RG7OB9Y+TDDMAFKkDKJ58kqnAHka6AUXhc+cJrFDc8rqIk/SRGtWyqzCuRXvdy7MWtqpaV9bs=
+Received: from VI1PR04MB4431.eurprd04.prod.outlook.com (20.177.55.159) by
+ VI1PR04MB3182.eurprd04.prod.outlook.com (10.170.229.32) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1495.7; Fri, 11 Jan 2019 06:35:44 +0000
+Received: from VI1PR04MB4431.eurprd04.prod.outlook.com
+ ([fe80::39b7:fa32:e307:a294]) by VI1PR04MB4431.eurprd04.prod.outlook.com
+ ([fe80::39b7:fa32:e307:a294%2]) with mapi id 15.20.1495.011; Fri, 11 Jan 2019
+ 06:35:44 +0000
+From: Peng Ma <peng.ma@nxp.com>
+To: Leo Li <leoyang.li@nxp.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>, 
+ "axboe@kernel.dk" <axboe@kernel.dk>
+Subject: RE: [PATCH 1/2] ahci: qoriq: add lx2160 platforms support
+Thread-Topic: [PATCH 1/2] ahci: qoriq: add lx2160 platforms support
+Thread-Index: AQHUqMzHrHO4D1Z/Q0GdToE49HezEKWoS/7wgACo8ICAAKkOkA==
+Date: Fri, 11 Jan 2019 06:35:44 +0000
+Message-ID: <VI1PR04MB44311646001F5E7F9BBFC61BED850@VI1PR04MB4431.eurprd04.prod.outlook.com>
+References: <20190110100533.33333-1-peng.ma@nxp.com>
+ <VI1PR04MB44311C4FCA7DE543941E84B0ED840@VI1PR04MB4431.eurprd04.prod.outlook.com>
+ <AM6PR04MB58636C1666ADCEC1784C7E218F840@AM6PR04MB5863.eurprd04.prod.outlook.com>
+In-Reply-To: <AM6PR04MB58636C1666ADCEC1784C7E218F840@AM6PR04MB5863.eurprd04.prod.outlook.com>
+Accept-Language: zh-CN, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=peng.ma@nxp.com; 
+x-originating-ip: [119.31.174.73]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; VI1PR04MB3182;
+ 6:c2BSPSEg3WvKWdkTBuvp7Hg7aL3D5QCH4R93yyOQwklCD56KfH7imU897YT7sXjtbkrpJ4Mp/Vyqs5c4TmytadvfVcIzUfEO42+6q7yp/71V8S89/EfmclRXjPay8QCFBRSoWPAoDesj4byvfCnWNRA8l3oPnIG6CzF3VCcvY5yk5dkKmD5yzQIYmTN8abtvBpfBqWM6ljZm02N/euytneFe7tTSdYz8xyBAnv+GyYnSADtYNYJQe6MDTeldK7RkhdrqPPm4GIkim84J6P7vnMQ0n2CQDHbQzFNXhy7D7rpxHUX6arl2eYDKbpjt9KUXzJbCeq+Bopn+3BbkoLEWRJdFd1EH2+DiZ/BkyQG5LqQjI2ipK5KDi+WNVy4ZxBHGqPjNJoqzQoPg8Zm1MPYB4Nb+OAJe96yMSY/y+tnfhlI73KjKfPbpY8wUGD9l6Bml9+8f2bxto56HsMybl0xZaQ==;
+ 5:R7+nSALmVcEM4jsOKfY8QWtHt22wPdcLLEGjU3DTxL4zg6b2+8zekQR2LuPOKx6QqgPDuJ339jnEVr88fP6MWDCPKMBCQrEa2Gy9BPvRP8kMnx4dygUXJm04+FZycUlnztIc5XfC70fJ0KbGX0iWX4H4iq/2YCUOvm51sSI8vfqBpqxUcPfH44IocDkfVwZP/BrYx8QtfbtqM+gtkFj35w==;
+ 7:w6riuJugmczuQBzBs9JYOQJxVPRsIPF9FUflenmKeWvMlZNnUzUEfC1PJB1LiOMgQDHyKMPgq8Wlnd+uPl68E0VvoVfdYXZ+pICKvLCC1kyn+5Sx4WBQroHWfJ6ryefzKHP4+psny1epgMFj7dOKgQ==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: 6169ec20-2288-4b34-5848-08d6778f03a3
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR04MB3182; 
+x-ms-traffictypediagnostic: VI1PR04MB3182:
+x-microsoft-antispam-prvs: <VI1PR04MB3182BA6F3978C38BC64FE690ED850@VI1PR04MB3182.eurprd04.prod.outlook.com>
+x-forefront-prvs: 09144DB0F7
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(376002)(346002)(396003)(39860400002)(136003)(366004)(13464003)(199004)(189003)(81156014)(8676002)(476003)(66066001)(6116002)(305945005)(3846002)(478600001)(54906003)(44832011)(486006)(71200400001)(74316002)(2201001)(256004)(71190400001)(97736004)(110136005)(7736002)(86362001)(316002)(14454004)(53546011)(2906002)(11346002)(446003)(26005)(4326008)(186003)(76176011)(2501003)(7696005)(6506007)(33656002)(55016002)(229853002)(68736007)(6306002)(105586002)(6436002)(9686003)(53936002)(81166006)(106356001)(6246003)(8936002)(99286004)(102836004)(25786009)(966005)(5660300001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB3182;
+ H:VI1PR04MB4431.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: MJYxaPhFS9Gy9Vct+Db91MNBFPVAzbLrjAvBzQ/FU8pxNrII3CY+D46QymEybd034qDO7rewC6s+KuUaFkYpIg+zHV10927mlR5WWmo/vyr9lmZRyCnU8YObTe59jJZkbT3X5Rd76R6mcPqguSLsHSXucgwGrxzx0PZkkaMzfA3Ur23LjZSLd91WxxXUQUlDnXW9kE6SnaIgpmEDPlFnICvRqN8NTAbgzTwrF71dqD9SYeIpHQo7HwL8V9O3q7+LfmIqgSfTXpeL9+FzMgGO9uaFORwV8IALUAjZOfEIu12X5BpomOwNCNK/3n0jAIknnytOVZmCkP2wgkGKALBXIBDPBUt0hLHZqnjvWM6SkuvoE+y9XeGZOMuXPwgj5/06FTE5wmLmLgkzZMN5BqqqYM5aLTuMFICg1kJLMigxZ9I=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-References: <1547123097-16431-1-git-send-email-sumit.garg@linaro.org>
- <1547123097-16431-5-git-send-email-sumit.garg@linaro.org>
- <20190110135557.wjnusuwe5vpkho4t@debby>
-In-Reply-To: <20190110135557.wjnusuwe5vpkho4t@debby>
-From: Sumit Garg <sumit.garg@linaro.org>
-Date: Fri, 11 Jan 2019 12:04:52 +0530
-Message-ID: <CAFA6WYO61DdOMxErP4PUBcmgTq3x9AKzeZGR9L+t4B+FvUfrnw@mail.gmail.com>
-Subject: Re: [Tee-dev] [PATCH v2 4/4] hwrng: add OP-TEE based rng driver
-To: Joakim Bech <joakim.bech@linaro.org>
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 6169ec20-2288-4b34-5848-08d6778f03a3
+X-MS-Exchange-CrossTenant-originalarrivaltime: 11 Jan 2019 06:35:44.3631 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB3182
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_223505_659941_98C3A771 
-X-CRM114-Status: GOOD (  31.26  )
+X-CRM114-CacheID: sfid-20190110_223548_698814_153A80C0 
+X-CRM114-Status: GOOD (  17.82  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,422 +117,132 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Daniel Thompson <daniel.thompson@linaro.org>,
- Herbert Xu <herbert@gondor.apana.org.au>, Arnd Bergmann <arnd@arndb.de>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Bhupesh Sharma <bhsharma@redhat.com>, linux-kernel@vger.kernel.org,
- tee-dev@lists.linaro.org, Rob Herring <robh+dt@kernel.org>,
- "open list:HARDWARE RANDOM NUMBER GENERATOR CORE"
- <linux-crypto@vger.kernel.org>, mpm@selenic.com,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Andy Tang <andy.tang@nxp.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "linux-ide@vger.kernel.org" <linux-ide@vger.kernel.org>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="gb2312"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 10 Jan 2019 at 19:26, Joakim Bech <joakim.bech@linaro.org> wrote:
->
-> On Thu, Jan 10, 2019 at 05:54:57PM +0530, Sumit Garg wrote:
-> > On ARM SoC's with TrustZone enabled, peripherals like entropy sources
-> > might not be accessible to normal world (linux in this case) and rather
-> > accessible to secure world (OP-TEE in this case) only. So this driver
-> > aims to provides a generic interface to OP-TEE based random number
-> > generator service.
-> >
-> > This driver registers on TEE bus to interact with OP-TEE based rng
-> >
-> > device/service.
-> >
-> > Signed-off-by: Sumit Garg <sumit.garg@linaro.org>
-> > ---
-> >  MAINTAINERS                        |   5 +
-> >  drivers/char/hw_random/Kconfig     |  15 ++
-> >  drivers/char/hw_random/Makefile    |   1 +
-> >  drivers/char/hw_random/optee-rng.c | 272 +++++++++++++++++++++++++++++++++++++
-> >  4 files changed, 293 insertions(+)
-> >  create mode 100644 drivers/char/hw_random/optee-rng.c
-> >
-> > diff --git a/MAINTAINERS b/MAINTAINERS
-> > index 32d44447..502733c 100644
-> > --- a/MAINTAINERS
-> > +++ b/MAINTAINERS
-> > @@ -11260,6 +11260,11 @@ M:   Jens Wiklander <jens.wiklander@linaro.org>
-> >  S:   Maintained
-> >  F:   drivers/tee/optee/
-> >
-> > +OP-TEE RANDOM NUMBER GENERATOR (RNG) DRIVER
-> > +M:   Sumit Garg <sumit.garg@linaro.org>
-> > +S:   Maintained
-> > +F:   drivers/char/hw_random/optee-rng.c
-> > +
-> >  OPA-VNIC DRIVER
-> >  M:   Dennis Dalessandro <dennis.dalessandro@intel.com>
-> >  M:   Niranjana Vishwanathapura <niranjana.vishwanathapura@intel.com>
-> > diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
-> > index dac895d..25a7d8f 100644
-> > --- a/drivers/char/hw_random/Kconfig
-> > +++ b/drivers/char/hw_random/Kconfig
-> > @@ -424,6 +424,21 @@ config HW_RANDOM_EXYNOS
-> >         will be called exynos-trng.
-> >
-> >         If unsure, say Y.
-> > +
-> > +config HW_RANDOM_OPTEE
-> > +     tristate "OP-TEE based Random Number Generator support"
-> > +     depends on OPTEE
-> > +     default HW_RANDOM
-> > +     help
-> > +       This  driver provides support for OP-TEE based Random Number
-> > +       Generator on ARM SoCs where hardware entropy sources are not
-> > +       accessible to normal world (Linux).
-> > +
-> > +       To compile this driver as a module, choose M here: the module
-> > +       will be called optee-rng.
-> > +
-> > +       If unsure, say Y.
-> > +
-> >  endif # HW_RANDOM
-> >
-> >  config UML_RANDOM
-> > diff --git a/drivers/char/hw_random/Makefile b/drivers/char/hw_random/Makefile
-> > index e35ec3c..7c9ef4a 100644
-> > --- a/drivers/char/hw_random/Makefile
-> > +++ b/drivers/char/hw_random/Makefile
-> > @@ -38,3 +38,4 @@ obj-$(CONFIG_HW_RANDOM_CAVIUM) += cavium-rng.o cavium-rng-vf.o
-> >  obj-$(CONFIG_HW_RANDOM_MTK)  += mtk-rng.o
-> >  obj-$(CONFIG_HW_RANDOM_S390) += s390-trng.o
-> >  obj-$(CONFIG_HW_RANDOM_KEYSTONE) += ks-sa-rng.o
-> > +obj-$(CONFIG_HW_RANDOM_OPTEE) += optee-rng.o
-> > diff --git a/drivers/char/hw_random/optee-rng.c b/drivers/char/hw_random/optee-rng.c
-> > new file mode 100644
-> > index 0000000..ebfe1f2c
-> > --- /dev/null
-> > +++ b/drivers/char/hw_random/optee-rng.c
-> > @@ -0,0 +1,272 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +/*
-> > + * Copyright (C) 2018-2019 Linaro Ltd.
-> > + */
-> > +
-> > +#include <linux/delay.h>
-> > +#include <linux/of.h>
-> > +#include <linux/hw_random.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/module.h>
-> > +#include <linux/slab.h>
-> > +#include <linux/tee_drv.h>
-> > +#include <linux/uuid.h>
-> > +
-> > +#define DRIVER_NAME "optee-rng"
-> > +
-> > +#define TEE_ERROR_HEALTH_TEST_FAIL   0x00000001
-> > +
-> > +/*
-> > + * TA_CMD_GET_ENTROPY - Get Entropy from RNG
-> > + *
-> > + * param[0] (inout memref) - Entropy buffer memory reference
-> > + * param[1] unused
-> > + * param[2] unused
-> > + * param[3] unused
-> > + *
-> > + * Result:
-> > + * TEE_SUCCESS - Invoke command success
-> > + * TEE_ERROR_BAD_PARAMETERS - Incorrect input param
-> > + * TEE_ERROR_NOT_SUPPORTED - Requested entropy size greater than size of pool
-> > + * TEE_ERROR_HEALTH_TEST_FAIL - Continuous health testing failed
-> > + */
-> > +#define TA_CMD_GET_ENTROPY           0x0
-> > +
-> > +/*
-> > + * TA_CMD_GET_RNG_INFO - Get RNG information
-> > + *
-> > + * param[0] (out value) - value.a: RNG data-rate in bytes per second
-> > + *                        value.b: Quality/Entropy per 1024 bit of data
-> > + * param[1] unused
-> > + * param[2] unused
-> > + * param[3] unused
-> > + *
-> > + * Result:
-> > + * TEE_SUCCESS - Invoke command success
-> > + * TEE_ERROR_BAD_PARAMETERS - Incorrect input param
-> > + */
-> > +#define TA_CMD_GET_RNG_INFO          0x1
-> > +
-> > +#define MAX_ENTROPY_REQ_SZ           (4 * 1024)
-> > +
-> > +static struct tee_context *ctx;
-> > +static struct tee_shm *entropy_shm_pool;
-> > +static u32 ta_rng_data_rate;
-> > +static u32 ta_rng_session_id;
-> > +
-> > +static size_t get_optee_rng_data(void *buf, size_t req_size)
-> > +{
-> > +     u32 ret = 0;
-> > +     u8 *rng_data = NULL;
-> > +     size_t rng_size = 0;
-> > +     struct tee_ioctl_invoke_arg inv_arg = {0};
-> > +     struct tee_param param[4] = {0};
-> > +
-> > +     /* Invoke TA_CMD_GET_RNG function of Trusted App */
-> >
-> TA_CMD_GET_ENTROPY?
->
-
-Will correct.
-
-> > +     inv_arg.func = TA_CMD_GET_ENTROPY;
-> > +     inv_arg.session = ta_rng_session_id;
-> > +     inv_arg.num_params = 4;
-> > +
-> > +     /* Fill invoke cmd params */
-> > +     param[0].attr = TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INOUT;
-> >
-> > +     param[0].u.memref.shm = entropy_shm_pool;
-> > +     param[0].u.memref.size = req_size;
-> > +     param[0].u.memref.shm_offs = 0;
-> > +
-> > +     ret = tee_client_invoke_func(ctx, &inv_arg, param);
-> > +     if ((ret < 0) || (inv_arg.ret != 0)) {
-> > +             pr_err("TA_CMD_GET_ENTROPY invoke function error: %x\n",
-> > +                    inv_arg.ret);
-> > +             return 0;
-> > +     }
-> > +
-> > +     rng_data = tee_shm_get_va(entropy_shm_pool, 0);
-> > +     if (IS_ERR(rng_data)) {
-> > +             pr_err("tee_shm_get_va failed\n");
-> > +             return 0;
-> > +     }
-> > +
-> > +     rng_size = param[0].u.memref.size;
-> > +     memcpy(buf, rng_data, rng_size);
-> > +
-> > +     return rng_size;
-> > +}
-> > +
-> > +static int optee_rng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
-> > +{
-> > +     u8 *data = buf;
-> > +     size_t read = 0, rng_size = 0;
-> > +     int timeout = 1;
-> > +
-> > +     if (max > MAX_ENTROPY_REQ_SZ)
-> > +             max = MAX_ENTROPY_REQ_SZ;
-> > +
-> > +     while (read == 0) {
-> > +             rng_size = get_optee_rng_data(data, (max - read));
-> > +
-> > +             data += rng_size;
-> > +             read += rng_size;
-> > +
-> > +             if (wait) {
-> > +                     if (timeout-- == 0)
-> > +                             return read;
-> > +                     msleep((1000 * (max - read)) / ta_rng_data_rate);
-> > +             } else {
-> > +                     return read;
-> > +             }
-> > +     }
-> > +
-> > +     return read;
-> > +}
-> > +
-> > +static int optee_rng_init(struct hwrng *rng)
-> > +{
-> > +     entropy_shm_pool = tee_shm_alloc(ctx, MAX_ENTROPY_REQ_SZ,
-> > +                                      TEE_SHM_MAPPED | TEE_SHM_DMA_BUF);
-> > +     if (IS_ERR(entropy_shm_pool)) {
-> > +             pr_err("tee_shm_alloc failed\n");
-> > +             return PTR_ERR(entropy_shm_pool);
-> > +     }
-> > +
-> > +     return 0;
-> > +}
-> > +
-> > +static void optee_rng_cleanup(struct hwrng *rng)
-> > +{
-> > +     tee_shm_free(entropy_shm_pool);
-> > +}
-> > +
-> > +static struct hwrng optee_rng = {
-> > +     .name           = DRIVER_NAME,
-> > +     .init           = optee_rng_init,
-> > +     .cleanup        = optee_rng_cleanup,
-> > +     .read           = optee_rng_read,
-> > +};
-> > +
-> > +static int get_optee_rng_info(void)
-> > +{
-> > +     u32 ret = 0;
-> > +     struct tee_ioctl_invoke_arg inv_arg = {0};
-> > +     struct tee_param param[4] = {0};
-> > +
-> > +     /* Invoke TA_CMD_GET_RNG function of Trusted App */
-> >
-> TA_CMD_GET_RNG_INFO?
->
-
-Will correct.
-
-> > +     inv_arg.func = TA_CMD_GET_RNG_INFO;
-> > +     inv_arg.session = ta_rng_session_id;
-> > +     inv_arg.num_params = 4;
-> > +
-> > +     /* Fill invoke cmd params */
-> > +     param[0].attr = TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_OUTPUT;
-> > +
-> > +     ret = tee_client_invoke_func(ctx, &inv_arg, param);
-> > +     if ((ret < 0) || (inv_arg.ret != 0)) {
-> > +             pr_err("TA_CMD_GET_RNG_INFO invoke function error: %x\n",
-> > +                    inv_arg.ret);
-> > +             return -EINVAL;
-> > +     }
-> > +
-> > +     ta_rng_data_rate = param[0].u.value.a;
-> > +     optee_rng.quality = param[0].u.value.b;
-> > +
-> > +     return 0;
-> > +}
-> > +
-> > +static int optee_ctx_match(struct tee_ioctl_version_data *ver, const void *data)
-> > +{
-> > +     if (ver->impl_id == TEE_IMPL_ID_OPTEE)
-> > +             return 1;
-> > +     else
-> > +             return 0;
-> > +}
-> > +
-> > +static int optee_rng_probe(struct device *dev)
-> > +{
-> > +     struct tee_client_device *rng_device = to_tee_client_device(dev);
-> > +     int ret = 0, err = -ENODEV;
-> > +     struct tee_ioctl_open_session_arg sess_arg = {0};
-> > +
-> > +     /* Open context with TEE driver */
-> > +     ctx = tee_client_open_context(NULL, optee_ctx_match, NULL, NULL);
-> > +     if (IS_ERR(ctx))
-> > +             return -ENODEV;
-> > +
-> > +     /* Open session with hwrng Trusted App */
-> > +     memcpy(sess_arg.uuid, rng_device->id.uuid.b, TEE_IOCTL_UUID_LEN);
-> > +     sess_arg.clnt_login = TEE_IOCTL_LOGIN_PUBLIC;
-> > +     sess_arg.num_params = 0;
-> > +
-> > +     ret = tee_client_open_session(ctx, &sess_arg, NULL);
-> > +     if ((ret < 0) || (sess_arg.ret != 0)) {
-> > +             pr_err("tee_client_open_session failed, error: %x\n",
-> > +                    sess_arg.ret);
-> > +             err = -EINVAL;
-> > +             goto out_ctx;
-> > +     }
-> > +     ta_rng_session_id = sess_arg.session;
-> > +
-> > +     err = get_optee_rng_info();
-> > +     if (err)
-> > +             goto out_sess;
-> > +
-> > +     err = hwrng_register(&optee_rng);
-> > +     if (err) {
-> > +             pr_err("registering failed (%d)\n", err);
-> > +             goto out_sess;
-> > +     }
-> > +
-> > +     return 0;
-> > +
-> > +out_sess:
-> > +     tee_client_close_session(ctx, ta_rng_session_id);
-> > +out_ctx:
-> > +     tee_client_close_context(ctx);
-> > +
-> > +     return err;
-> > +}
-> > +
-> > +static int optee_rng_remove(struct device *dev)
-> > +{
-> > +     tee_client_close_session(ctx, ta_rng_session_id);
-> > +     tee_client_close_context(ctx);
-> > +     hwrng_unregister(&optee_rng);
-> > +
-> > +     return 0;
-> > +}
-> > +
-> > +const struct tee_client_device_id optee_rng_id_table[] = {
-> > +     {UUID_INIT(0xab7a617c, 0xb8e7, 0x4d8f,
-> > +                0x83, 0x01, 0xd0, 0x9b, 0x61, 0x03, 0x6b, 0x64)},
-> > +     {}
-> > +};
-> >
-> Just so I'm with you here, in the v1 patch set you said, that this could be
-> populated with other platform specific RNG UUID/GUID later. So if I implement
-> another RNG TA for another device in OP-TEE, then I only need to update this
-> array with another corresponding ID? To me it looks like the ta_rng_session_id
-> just stores an id for a single TEE RNG source, correct? I.e., this patch set is
-> not really written to fully support more than a single source in OP-TEE at this
-> point? I.e., my assumption about just adding another UUID to the array is wrong?
->
-
-But do you think multiple OP-TEE RNG devices/TAs for a particular
-platform would be a feasible use-case? I would expect a particular
-platform would expose only a single OP-TEE RNG device even if it has
-multiple hardware entropy sources accessible to secure world only.
-
-So my intention of having this id_table populated with other RNG
-UUID/GUID was that if another platform chooses to implement RNG TA
-with different UUID (not having global RNG TA UUID) rather than this
-driver trying to support multiple devices running concurrently. Having
-said that, this may be true for other TEE based drivers which would
-like to support multiple devices running concurrently.
-
--Sumit
-
-> > +
-> > +static struct tee_client_driver optee_rng_driver = {
-> > +     .id_table       = optee_rng_id_table,
-> > +     .driver         = {
-> > +             .name           = DRIVER_NAME,
-> > +             .bus            = &tee_bus_type,
-> > +             .probe          = optee_rng_probe,
-> > +             .remove         = optee_rng_remove,
-> > +     },
-> > +};
-> > +
-> > +static int __init mod_init(void)
-> > +{
-> > +     int rc;
-> > +
-> > +     rc = driver_register(&optee_rng_driver.driver);
-> > +     if (rc)
-> > +             pr_warn("driver registration failed, err: %d", rc);
-> > +
-> > +     return rc;
-> > +}
-> > +
-> > +static void __exit mod_exit(void)
-> > +{
-> > +     driver_unregister(&optee_rng_driver.driver);
-> > +}
-> > +
-> > +module_init(mod_init);
-> > +module_exit(mod_exit);
-> > +
-> > +MODULE_LICENSE("GPL");
-> > +MODULE_AUTHOR("Sumit Garg <sumit.garg@linaro.org>");
-> > +MODULE_DESCRIPTION("OP-TEE based random number generator driver");
-> > --
-> > 2.7.4
-> >
-> > _______________________________________________
-> > Tee-dev mailing list
-> > Tee-dev@lists.linaro.org
-> > https://lists.linaro.org/mailman/listinfo/tee-dev
->
-> --
-> Regards,
-> Joakim
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+DQoNCj4tLS0tLU9yaWdpbmFsIE1lc3NhZ2UtLS0tLQ0KPkZyb206IExlbyBMaQ0KPlNlbnQ6IDIw
+MTnE6jHUwjExyNUgNDozMA0KPlRvOiBQZW5nIE1hIDxwZW5nLm1hQG54cC5jb20+OyBzaGF3bmd1
+b0BrZXJuZWwub3JnOyBheGJvZUBrZXJuZWwuZGsNCj5DYzogcm9iaCtkdEBrZXJuZWwub3JnOyBt
+YXJrLnJ1dGxhbmRAYXJtLmNvbTsNCj5saW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5v
+cmc7IGRldmljZXRyZWVAdmdlci5rZXJuZWwub3JnOw0KPmxpbnV4LWtlcm5lbEB2Z2VyLmtlcm5l
+bC5vcmc7IGxpbnV4LWlkZUB2Z2VyLmtlcm5lbC5vcmc7IEFuZHkgVGFuZw0KPjxhbmR5LnRhbmdA
+bnhwLmNvbT4NCj5TdWJqZWN0OiBSRTogW1BBVENIIDEvMl0gYWhjaTogcW9yaXE6IGFkZCBseDIx
+NjAgcGxhdGZvcm1zIHN1cHBvcnQNCj4NCj4NCj4NCj4+IC0tLS0tT3JpZ2luYWwgTWVzc2FnZS0t
+LS0tDQo+PiBGcm9tOiBQZW5nIE1hDQo+PiBTZW50OiBUaHVyc2RheSwgSmFudWFyeSAxMCwgMjAx
+OSA0OjMyIEFNDQo+PiBUbzogUGVuZyBNYSA8cGVuZy5tYUBueHAuY29tPjsgc2hhd25ndW9Aa2Vy
+bmVsLm9yZzsgYXhib2VAa2VybmVsLmRrDQo+PiBDYzogTGVvIExpIDxsZW95YW5nLmxpQG54cC5j
+b20+OyByb2JoK2R0QGtlcm5lbC5vcmc7DQo+PiBtYXJrLnJ1dGxhbmRAYXJtLmNvbTsgbGludXgt
+YXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnOw0KPj4gZGV2aWNldHJlZUB2Z2VyLmtlcm5l
+bC5vcmc7IGxpbnV4LWtlcm5lbEB2Z2VyLmtlcm5lbC5vcmc7IGxpbnV4LQ0KPj4gaWRlQHZnZXIu
+a2VybmVsLm9yZzsgQW5keSBUYW5nIDxhbmR5LnRhbmdAbnhwLmNvbT4NCj4+IFN1YmplY3Q6IFJF
+OiBbUEFUQ0ggMS8yXSBhaGNpOiBxb3JpcTogYWRkIGx4MjE2MCBwbGF0Zm9ybXMgc3VwcG9ydA0K
+Pj4NCj4+IEhpIEplbnOjrA0KPj4NCj4+IAlJIHNlbmQgdGhlIHNhdGEgcGF0Y2hzIHRvIHRoZSB1
+cHN0cmVhbSBwYXRjaHdvcmsgd2l0aA0KPj4gLi9zY3JpcHRzL2dldF9tYWludGFpbmVyLnBsLCBi
+dXQgSSBmaW5kIG15IHBhdGNoIG9uDQo+PiBodHRwOi8vcGF0Y2h3b3JrLm96bGFicy5vcmcvcHJv
+amVjdC9saW51eC1pZGUvbGlzdC8gLCBJIHNhdyB0aGUNCj4+IE1BSU5UQUlORVJTLCB0aGUgZHJp
+dmVyL2F0YS8qIHNob3VsZCBiZSBvbg0KPj4gaHR0cHM6Ly9wYXRjaHdvcmsua2VybmVsLm9yZy9w
+cm9qZWN0L2xpbnV4LQ0KPj4gYmxvY2svbGlzdC8gLiBjb3VsZCB5b3UgcGxlYXNlIGhlbHAgbWUg
+d2hhdCB0aGUgcGF0Y2h3b3JrIGlzIHJpZ2h0Lg0KPg0KPlBlbmcsDQo+DQo+VGhlIHBhdGNod29y
+ayB1c2VkIGlzIHJlbGF0ZWQgdG8gdGhlIG1haWxpbmcgbGlzdCB3aGljaCB5b3Ugc2VuZCB0aGUg
+cGF0Y2ggdG8NCj5ub3QgdGhlIG1haW50YWluZXIncyBnaXQgdHJlZSB1c2VkLiAgU2luY2UgdGhl
+IE1BSU5UQUlORVJTIGZpbGUgc2F5cw0KPmRyaXZlcnMvYXRhIHNob3VsZCB1c2UgbGludXgtaWRl
+IG1haWxpbmcgbGlzdCwgcGF0Y2hlcyB3aWxsIGFwcGVhciBpbiBsaW51eC1pZGUNCj5wYXRjaHdv
+cmsuDQo+DQo+UmVnYXJkcywNCj5MZW8NCj4NCltQZW5nIE1hXSBnb3QgaXQsIHRoYW5rcy4NCkJl
+c3QgUmVnYXJkcywNClBlbmcNCj4+IAlUaGFua3MgYSBsb3QuDQo+Pg0KPj4gQmVzdCBSZWdhcmRz
+LA0KPj4gUGVuZw0KPj4NCj4+ID4tLS0tLU9yaWdpbmFsIE1lc3NhZ2UtLS0tLQ0KPj4gPkZyb206
+IFBlbmcgTWEgPHBlbmcubWFAbnhwLmNvbT4NCj4+ID5TZW50OiAyMDE5xOox1MIxMMjVIDE4OjA2
+DQo+PiA+VG86IHNoYXduZ3VvQGtlcm5lbC5vcmc7IGF4Ym9lQGtlcm5lbC5kaw0KPj4gPkNjOiBM
+ZW8gTGkgPGxlb3lhbmcubGlAbnhwLmNvbT47IHJvYmgrZHRAa2VybmVsLm9yZzsNCj4+ID5tYXJr
+LnJ1dGxhbmRAYXJtLmNvbTsgbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnOw0K
+Pj4gPmRldmljZXRyZWVAdmdlci5rZXJuZWwub3JnOyBsaW51eC1rZXJuZWxAdmdlci5rZXJuZWwu
+b3JnOw0KPj4gPmxpbnV4LWlkZUB2Z2VyLmtlcm5lbC5vcmc7IFBlbmcgTWEgPHBlbmcubWFAbnhw
+LmNvbT4NCj4+ID5TdWJqZWN0OiBbUEFUQ0ggMS8yXSBhaGNpOiBxb3JpcTogYWRkIGx4MjE2MCBw
+bGF0Zm9ybXMgc3VwcG9ydA0KPj4gPg0KPj4gPkx4MjE2MGEgaXMgYSBuZXcgaW50cm9kdWNlZCBz
+b2Mgd2hpY2ggc3VwcG9ydHMgQVRBMy4wIGFuZCBDbGVhbiB1cA0KPj4gPnNvbWUgY29kZQ0KPj4g
+Pg0KPj4gPlNpZ25lZC1vZmYtYnk6IFBlbmcgTWEgPHBlbmcubWFAbnhwLmNvbT4NCj4+ID4tLS0N
+Cj4+ID4gZHJpdmVycy9hdGEvYWhjaV9xb3JpcS5jIHwgICA0NCArKysrKysrKysrKystLS0tLS0t
+LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQ0KPj4gPiAxIGZpbGVzIGNoYW5nZWQsIDEyIGluc2Vy
+dGlvbnMoKyksIDMyIGRlbGV0aW9ucygtKQ0KPj4gPg0KPj4gPmRpZmYgLS1naXQgYS9kcml2ZXJz
+L2F0YS9haGNpX3FvcmlxLmMgYi9kcml2ZXJzL2F0YS9haGNpX3FvcmlxLmMNCj4+ID5pbmRleA0K
+Pj4gPmNlNTkyNTMuLjE5OTRiZjIgMTAwNjQ0DQo+PiA+LS0tIGEvZHJpdmVycy9hdGEvYWhjaV9x
+b3JpcS5jDQo+PiA+KysrIGIvZHJpdmVycy9hdGEvYWhjaV9xb3JpcS5jDQo+PiA+QEAgLTU3LDcg
+KzU3LDcgQEAgZW51bSBhaGNpX3FvcmlxX3R5cGUgew0KPj4gPiAJQUhDSV9MUzIwODBBLA0KPj4g
+PiAJQUhDSV9MUzEwNDZBLA0KPj4gPiAJQUhDSV9MUzEwODhBLA0KPj4gPi0JQUhDSV9MUzIwODhB
+LA0KPj4gPisJQUhDSV9MWDIxNjBBLA0KPj4gPiB9Ow0KPj4gPg0KPj4gPiBzdHJ1Y3QgYWhjaV9x
+b3JpcV9wcml2IHsNCj4+ID5AQCAtNzMsNyArNzMsNyBAQCBzdHJ1Y3QgYWhjaV9xb3JpcV9wcml2
+IHsNCj4+ID4gCXsgLmNvbXBhdGlibGUgPSAiZnNsLGxzMjA4MGEtYWhjaSIsIC5kYXRhID0gKHZv
+aWQgKilBSENJX0xTMjA4MEF9LA0KPj4gPiAJeyAuY29tcGF0aWJsZSA9ICJmc2wsbHMxMDQ2YS1h
+aGNpIiwgLmRhdGEgPSAodm9pZCAqKUFIQ0lfTFMxMDQ2QX0sDQo+PiA+IAl7IC5jb21wYXRpYmxl
+ID0gImZzbCxsczEwODhhLWFoY2kiLCAuZGF0YSA9ICh2b2lkICopQUhDSV9MUzEwODhBfSwNCj4+
+ID4tCXsgLmNvbXBhdGlibGUgPSAiZnNsLGxzMjA4OGEtYWhjaSIsIC5kYXRhID0gKHZvaWQgKilB
+SENJX0xTMjA4OEF9LA0KPj4gPisJeyAuY29tcGF0aWJsZSA9ICJmc2wsbHgyMTYwYS1haGNpIiwg
+LmRhdGEgPSAodm9pZCAqKUFIQ0lfTFgyMTYwQX0sDQo+PiA+IAl7fSwNCj4+ID4gfTsNCj4+ID4g
+TU9EVUxFX0RFVklDRV9UQUJMRShvZiwgYWhjaV9xb3JpcV9vZl9tYXRjaCk7IEBAIC0xNzQsMTIg
+KzE3NCwxMA0KPj4gQEANCj4+ID5zdGF0aWMgaW50IGFoY2lfcW9yaXFfcGh5X2luaXQoc3RydWN0
+IGFoY2lfaG9zdF9wcml2ICpocHJpdikNCj4+ID4gCQl3cml0ZWwoTFMxMDIxQV9QT1JUX1BIWTQs
+IHJlZ19iYXNlICsgUE9SVF9QSFk0KTsNCj4+ID4gCQl3cml0ZWwoTFMxMDIxQV9QT1JUX1BIWTUs
+IHJlZ19iYXNlICsgUE9SVF9QSFk1KTsNCj4+ID4gCQl3cml0ZWwoQUhDSV9QT1JUX1RSQU5TX0NG
+RywgcmVnX2Jhc2UgKyBQT1JUX1RSQU5TKTsNCj4+ID4tCQlpZiAocXByaXYtPmlzX2RtYWNvaGVy
+ZW50KQ0KPj4gPi0JCQl3cml0ZWwoQUhDSV9QT1JUX0FYSUNDX0NGRywNCj4+ID4tCQkJCQlyZWdf
+YmFzZSArIExTMTAyMUFfQVhJQ0NfQUREUik7DQo+PiA+IAkJYnJlYWs7DQo+PiA+DQo+PiA+IAlj
+YXNlIEFIQ0lfTFMxMDQzQToNCj4+ID4rCWNhc2UgQUhDSV9MUzEwNDZBOg0KPj4gPiAJCWlmICgh
+cXByaXYtPmVjY19hZGRyKQ0KPj4gPiAJCQlyZXR1cm4gLUVJTlZBTDsNCj4+ID4gCQl3cml0ZWwo
+cmVhZGwocXByaXYtPmVjY19hZGRyKSB8IEVDQ19ESVNfQVJNVjhfQ0gyLCBAQCAtDQo+PiAxODgs
+OA0KPj4gPisxODYsNiBAQCBzdGF0aWMgaW50IGFoY2lfcW9yaXFfcGh5X2luaXQoc3RydWN0IGFo
+Y2lfaG9zdF9wcml2DQo+PiA+KypocHJpdikNCj4+ID4gCQl3cml0ZWwoQUhDSV9QT1JUX1BIWTJf
+Q0ZHLCByZWdfYmFzZSArIFBPUlRfUEhZMik7DQo+PiA+IAkJd3JpdGVsKEFIQ0lfUE9SVF9QSFkz
+X0NGRywgcmVnX2Jhc2UgKyBQT1JUX1BIWTMpOw0KPj4gPiAJCXdyaXRlbChBSENJX1BPUlRfVFJB
+TlNfQ0ZHLCByZWdfYmFzZSArIFBPUlRfVFJBTlMpOw0KPj4gPi0JCWlmIChxcHJpdi0+aXNfZG1h
+Y29oZXJlbnQpDQo+PiA+LQkJCXdyaXRlbChBSENJX1BPUlRfQVhJQ0NfQ0ZHLCByZWdfYmFzZSAr
+DQo+PiBQT1JUX0FYSUNDKTsNCj4+ID4gCQlicmVhazsNCj4+ID4NCj4+ID4gCWNhc2UgQUhDSV9M
+UzIwODBBOg0KPj4gPkBAIC0xOTcsMjQgKzE5MywxMCBAQCBzdGF0aWMgaW50IGFoY2lfcW9yaXFf
+cGh5X2luaXQoc3RydWN0DQo+PiA+YWhjaV9ob3N0X3ByaXYNCj4+ID4qaHByaXYpDQo+PiA+IAkJ
+d3JpdGVsKEFIQ0lfUE9SVF9QSFkyX0NGRywgcmVnX2Jhc2UgKyBQT1JUX1BIWTIpOw0KPj4gPiAJ
+CXdyaXRlbChBSENJX1BPUlRfUEhZM19DRkcsIHJlZ19iYXNlICsgUE9SVF9QSFkzKTsNCj4+ID4g
+CQl3cml0ZWwoQUhDSV9QT1JUX1RSQU5TX0NGRywgcmVnX2Jhc2UgKyBQT1JUX1RSQU5TKTsNCj4+
+ID4tCQlpZiAocXByaXYtPmlzX2RtYWNvaGVyZW50KQ0KPj4gPi0JCQl3cml0ZWwoQUhDSV9QT1JU
+X0FYSUNDX0NGRywgcmVnX2Jhc2UgKw0KPj4gUE9SVF9BWElDQyk7DQo+PiA+LQkJYnJlYWs7DQo+
+PiA+LQ0KPj4gPi0JY2FzZSBBSENJX0xTMTA0NkE6DQo+PiA+LQkJaWYgKCFxcHJpdi0+ZWNjX2Fk
+ZHIpDQo+PiA+LQkJCXJldHVybiAtRUlOVkFMOw0KPj4gPi0JCXdyaXRlbChyZWFkbChxcHJpdi0+
+ZWNjX2FkZHIpIHwgRUNDX0RJU19BUk1WOF9DSDIsDQo+PiA+LQkJCQlxcHJpdi0+ZWNjX2FkZHIp
+Ow0KPj4gPi0JCXdyaXRlbChBSENJX1BPUlRfUEhZXzFfQ0ZHLCByZWdfYmFzZSArIFBPUlRfUEhZ
+MSk7DQo+PiA+LQkJd3JpdGVsKEFIQ0lfUE9SVF9QSFkyX0NGRywgcmVnX2Jhc2UgKyBQT1JUX1BI
+WTIpOw0KPj4gPi0JCXdyaXRlbChBSENJX1BPUlRfUEhZM19DRkcsIHJlZ19iYXNlICsgUE9SVF9Q
+SFkzKTsNCj4+ID4tCQl3cml0ZWwoQUhDSV9QT1JUX1RSQU5TX0NGRywgcmVnX2Jhc2UgKyBQT1JU
+X1RSQU5TKTsNCj4+ID4tCQlpZiAocXByaXYtPmlzX2RtYWNvaGVyZW50KQ0KPj4gPi0JCQl3cml0
+ZWwoQUhDSV9QT1JUX0FYSUNDX0NGRywgcmVnX2Jhc2UgKw0KPj4gUE9SVF9BWElDQyk7DQo+PiA+
+IAkJYnJlYWs7DQo+PiA+DQo+PiA+IAljYXNlIEFIQ0lfTFMxMDg4QToNCj4+ID4rCWNhc2UgQUhD
+SV9MWDIxNjBBOg0KPj4gPiAJCWlmICghcXByaXYtPmVjY19hZGRyKQ0KPj4gPiAJCQlyZXR1cm4g
+LUVJTlZBTDsNCj4+ID4gCQl3cml0ZWwocmVhZGwocXByaXYtPmVjY19hZGRyKSB8IEVDQ19ESVNf
+TFMxMDg4QSwgQEAgLQ0KPj4gMjIzLDE4DQo+PiA+KzIwNSwxNiBAQCBzdGF0aWMgaW50IGFoY2lf
+cW9yaXFfcGh5X2luaXQoc3RydWN0IGFoY2lfaG9zdF9wcml2DQo+PiA+KypocHJpdikNCj4+ID4g
+CQl3cml0ZWwoQUhDSV9QT1JUX1BIWTJfQ0ZHLCByZWdfYmFzZSArIFBPUlRfUEhZMik7DQo+PiA+
+IAkJd3JpdGVsKEFIQ0lfUE9SVF9QSFkzX0NGRywgcmVnX2Jhc2UgKyBQT1JUX1BIWTMpOw0KPj4g
+PiAJCXdyaXRlbChBSENJX1BPUlRfVFJBTlNfQ0ZHLCByZWdfYmFzZSArIFBPUlRfVFJBTlMpOw0K
+Pj4gPi0JCWlmIChxcHJpdi0+aXNfZG1hY29oZXJlbnQpDQo+PiA+LQkJCXdyaXRlbChBSENJX1BP
+UlRfQVhJQ0NfQ0ZHLCByZWdfYmFzZSArDQo+PiBQT1JUX0FYSUNDKTsNCj4+ID4gCQlicmVhazsN
+Cj4+ID4rCX0NCj4+ID4NCj4+ID4tCWNhc2UgQUhDSV9MUzIwODhBOg0KPj4gPi0JCXdyaXRlbChB
+SENJX1BPUlRfUEhZXzFfQ0ZHLCByZWdfYmFzZSArIFBPUlRfUEhZMSk7DQo+PiA+LQkJd3JpdGVs
+KEFIQ0lfUE9SVF9QSFkyX0NGRywgcmVnX2Jhc2UgKyBQT1JUX1BIWTIpOw0KPj4gPi0JCXdyaXRl
+bChBSENJX1BPUlRfUEhZM19DRkcsIHJlZ19iYXNlICsgUE9SVF9QSFkzKTsNCj4+ID4tCQl3cml0
+ZWwoQUhDSV9QT1JUX1RSQU5TX0NGRywgcmVnX2Jhc2UgKyBQT1JUX1RSQU5TKTsNCj4+ID4tCQlp
+ZiAocXByaXYtPmlzX2RtYWNvaGVyZW50KQ0KPj4gPi0JCQl3cml0ZWwoQUhDSV9QT1JUX0FYSUND
+X0NGRywgcmVnX2Jhc2UgKw0KPj4gUE9SVF9BWElDQyk7DQo+PiA+LQkJYnJlYWs7DQo+PiA+Kwlp
+ZiAocXByaXYtPmlzX2RtYWNvaGVyZW50KSB7DQo+PiA+KwkJaWYgKHFwcml2LT50eXBlID09IEFI
+Q0lfTFMxMDIxQSkNCj4+ID4rCQkJd3JpdGVsKEFIQ0lfUE9SVF9BWElDQ19DRkcsDQo+PiA+KwkJ
+CSAgICAgICByZWdfYmFzZSArIExTMTAyMUFfQVhJQ0NfQUREUik7DQo+PiA+KwkJZWxzZQ0KPj4g
+PisJCQl3cml0ZWwoQUhDSV9QT1JUX0FYSUNDX0NGRywNCj4+ID4rCQkJICAgICAgIHJlZ19iYXNl
+ICsgUE9SVF9BWElDQyk7DQo+PiA+IAl9DQo+PiA+DQo+PiA+IAlyZXR1cm4gMDsNCj4+ID4tLQ0K
+Pj4gPjEuNy4xDQoNCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMu
+aW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZv
+L2xpbnV4LWFybS1rZXJuZWwK
