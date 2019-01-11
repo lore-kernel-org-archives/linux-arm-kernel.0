@@ -2,84 +2,67 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 16721C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:21:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 19559C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:22:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E7B8521841
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:21:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EA87E21841
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:22:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QJWF0V2H"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E7B8521841
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=epigenesys.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JMAPRm9V"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EA87E21841
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=EzwMNTMNKZsqZ8RNOvgFyGiFJK+zSrsXmSIderKmc6c=; b=QJWF0V2HoWTnjW
-	I0r7ihDUOCr8EhrcvVGUEGwT+G+e9auEOBrDJFG0EmIK+RI5w4+bkT1EH/KW36ql980sTGpGcDR61
-	Q1eHHUCyAkbwZSpXCSsY0MYkTxrMcITU1ivaldUAb8BAfBYs439RWQMJcIJR8GRFk/TqdTrTswGSm
-	FcZ4DoxG1+0XpCbicxhPFLxwNuO/WtyGpbILu2ummJS2LGqDMKqlRwfVn1s1mNi8GugCLGke3do7j
-	o5jtjwRdxAvRVg/0RD6gbFyHVQXeuVwjBJbsyeX2UiKsNgXy/bXrGiU8c9b/7u5HRD7h0YEfeIYmk
-	ZMFFNG2u/Fns0RzjkZTw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=hTgE6XxfKGC5PQUeR6VN/Mlt2x8OcIMZQTkM/SOuYRI=; b=JMAPRm9VX9h/jE
+	jLAIclviaLWY07g4clTVRK3OXsejRiLgGt3qYrqWa8RkxC8eqcAa+rceChe9uptNGGNXoy2ekGoWh
+	XT1Tkd2+giWWjRLV0O2MIcfntt2+/Fj2Vs5pWgTwcYCn20km9e3Y4fCCHBoHQnDLbHM5PcQ2z3GaK
+	NOJ3LVCVTZB6m90R1R36FhYG+1DhPA3XEiRMUGUx0xe9jS1nk3FyWqiEirbzTqgrzjoU7L/tU2Pyb
+	STDjgZwfhvIuSvQL2jEgU7qDj7++Pf6NijPHBhWukamfxbppo9gkhY8Pel0ka6feFdKv/zoyqOjDL
+	xgjkIwk3cvEW6F2g8MzQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gi1Qz-0003f1-L2; Fri, 11 Jan 2019 18:21:33 +0000
-Received: from mail-wr1-f67.google.com ([209.85.221.67])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gi1Qv-0003dy-Ti; Fri, 11 Jan 2019 18:21:31 +0000
-Received: by mail-wr1-f67.google.com with SMTP id t6so16148940wrr.12;
- Fri, 11 Jan 2019 10:21:29 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=CXQMb3CYoxZvEBGoFLf3XqN+Sy8lNJon5xeR0SKttEQ=;
- b=lqYwXZ0BtcJ61vKFP0PAxqPw26kUwe9IybUOKCSwZ1LeuVFStgw6FWYLZbHgrAGUbd
- rQf9IIIEBdn7iJKDYExGeaHDoEMUVWo56hpGwWkCHVL+a7QL+ljyNtL4i99UsBxNCi3S
- gYM7uN3rDVOT4DuKUXoNLxDYnZMef2De8rQ4hxUEuEm9SNhxrwnWni190l2VEdFpWJdH
- wo92+qvjm3A8uOSQT9a9Mya3gBsAb+iEHkKq+wwMiJqGmr+s03G7OX8I0X8Q5Ip2rp5r
- cUyujOhE8C13x45VkDgKHP4xlpOHzhaH9AghOTZzzStdJaHeM/WLkOXn5tWSswDQjYtF
- phHQ==
-X-Gm-Message-State: AJcUukevPkEK1oeKPpOExl5cYHF1WxrNN9036RHI/A0ZWeZOaJ9ucp4Q
- 22vU8m38jEAgKb4IuElL8sHzCBwG
-X-Google-Smtp-Source: ALg8bN4fYziC++OXve0ga78/Oef9cqm1AGM6vL7wECICvMlTC/n/gbWa8+Fwy7Zx6t1yMvaQ51EWyg==
-X-Received: by 2002:adf:e509:: with SMTP id j9mr15436184wrm.76.1547230887888; 
- Fri, 11 Jan 2019 10:21:27 -0800 (PST)
-Received: from ingrassia.epigenesys.com
- (host194-85-static.3-79-b.business.telecomitalia.it. [79.3.85.194])
- by smtp.gmail.com with ESMTPSA id o5sm32667437wmg.25.2019.01.11.10.21.26
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 11 Jan 2019 10:21:27 -0800 (PST)
-Date: Fri, 11 Jan 2019 19:21:24 +0100
-From: Emiliano Ingrassia <ingrassia@epigenesys.com>
-To: Kevin Hilman <khilman@baylibre.com>,
- Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- linux-amlogic@lists.infradead.org
-Subject: Re: [PATCH v3 1/2] pinctrl: meson: meson8b: add the eth_rxd2 and
- eth_rxd3 pins
-Message-ID: <20190111182124.GA4420@ingrassia.epigenesys.com>
-References: <20181229143556.27339-1-martin.blumenstingl@googlemail.com>
- <20181229143556.27339-2-martin.blumenstingl@googlemail.com>
- <7hzhs8ovag.fsf@baylibre.com>
- <20190111100915.GA1716@ingrassia.epigenesys.com>
- <7hbm4noypt.fsf@baylibre.com>
+	id 1gi1SC-00043s-OI; Fri, 11 Jan 2019 18:22:48 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gi1S8-00043G-QJ
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 18:22:46 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 145BC80D;
+ Fri, 11 Jan 2019 10:22:42 -0800 (PST)
+Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 760CD3F6CF;
+ Fri, 11 Jan 2019 10:22:40 -0800 (PST)
+Subject: Re: [PATCH 1/3] arm64: kprobes: Move extable address check into
+ arch_prepare_kprobe()
+To: Masami Hiramatsu <mhiramat@kernel.org>
+References: <154502881646.30629.9938335052821665530.stgit@devbox>
+ <154502884653.30629.3172839440883293817.stgit@devbox>
+ <aec51c10-d744-df0f-1216-d3372e779cb1@arm.com>
+ <20190108113953.8bc0cc7d196ddba370377217@kernel.org>
+ <b4109104-c438-f4c2-352a-d8b0ec47db37@arm.com>
+ <20190109110500.b4b5049f4c67dfc85b9ced4e@kernel.org>
+From: James Morse <james.morse@arm.com>
+Message-ID: <92c160a8-7627-0c64-ed73-df616e9c057d@arm.com>
+Date: Fri, 11 Jan 2019 18:22:38 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <7hbm4noypt.fsf@baylibre.com>
-User-Agent: Mutt/1.11.1 (2018-12-01)
+In-Reply-To: <20190109110500.b4b5049f4c67dfc85b9ced4e@kernel.org>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_102129_953802_F731FE5E 
-X-CRM114-Status: GOOD (  21.30  )
+X-CRM114-CacheID: sfid-20190111_102244_854584_9D99D246 
+X-CRM114-Status: GOOD (  15.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,95 +74,78 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org, jianxin.pan@amlogic.com,
- linus.luessing@c0d3.blue
+Cc: Pratyush Anand <panand@redhat.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>,
+ "David A . Long" <dave.long@linaro.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Kevin,
+Hi,
 
-On Fri, Jan 11, 2019 at 10:06:54AM -0800, Kevin Hilman wrote:
-> Emiliano Ingrassia <ingrassia@epigenesys.com> writes:
->
-> > Hi Kevin,
-> >
-> > sorry to bother you.
->
-> No need to apologize.
->
-> > On Thu, Jan 10, 2019 at 05:08:39PM -0800, Kevin Hilman wrote:
-> >> Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
-> >>
-> >> > Gigabit Ethernet requires the Ethernet TXD0..3 and RXD0..3 data lines.
-> >> > Add the missing eth_rxd2 and eth_rxd3 definitions so we don't have to
-> >> > rely on the bootloader to set them up correctly.
-> >> >
-> >> > The vendor u-boot sources for Odroid-C1 use the following Ethernet
-> >> > pinmux configuration:
-> >> >   SET_CBUS_REG_MASK(PERIPHS_PIN_MUX_6, 0x3f4f);
-> >> >   SET_CBUS_REG_MASK(PERIPHS_PIN_MUX_7, 0xf00000);
-> >> > This translates to the following pin groups in the mainline kernel:
-> >> > - register 6 bit  0: eth_rxd1 (DIF_0_P)
-> >> > - register 6 bit  1: eth_rxd0 (DIF_0_N)
-> >> > - register 6 bit  2: eth_rx_dv (DIF_1_P)
-> >> > - register 6 bit  3: eth_rx_clk (DIF_1_N)
-> >> > - register 6 bit  6: eth_tx_en (DIF_3_P)
-> >> > - register 6 bit  8: eth_ref_clk (DIF_3_N)
-> >> > - register 6 bit  9: eth_mdc (DIF_4_P)
-> >> > - register 6 bit 10: eth_mdio_en (DIF_4_N)
-> >> > - register 6 bit 11: eth_tx_clk (GPIOH_9)
-> >> > - register 6 bit 12: eth_txd2 (GPIOH_8)
-> >> > - register 6 bit 13: eth_txd3 (GPIOH_7)
-> >> > - register 7 bit 20: eth_txd0_0 (GPIOH_6)
-> >> > - register 7 bit 21: eth_txd1_0 (GPIOH_5)
-> >> > - register 7 bit 22: eth_rxd3 (DIF_2_P)
-> >> > - register 7 bit 23: eth_rxd2 (DIF_2_N)
-> >> >
-> >> > All functions except eth_rxd2 and eth_rxd3 are already supported by the
-> >> > pinctrl-meson8b driver.
-> >> >
-> >> > Suggested-by: Jianxin Pan <jianxin.pan@amlogic.com>
-> >> > Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> >>
-> >> Reviewed-by: Kevin Hilman <khilman@baylibre.com>
-> >
-> > For both patches of this series I gave:
-> > Tested-by: Emiliano Ingrassia <ingrassia@epigenesys.com>
-> > Reviewed-by: Emiliano Ingrassia <ingrassia@epigenesys.com>
-> >
-> > They were in the answer to the cover letter of this series.
-> > I note that they were not included in the commit message of the first patch.
-> >
-> > Did I miss something or did something wrong?
-> > Please, let me know.
->
-> You did everything fine, I just missed them.
->
-> I've started relying a bit more heavily on patchwork to collect
-> review/test tags, and right now it doesn't notice tags to the
-> cover-letter, only to individual patches, so I typically add those by
-> hand, but in this case I missed them.
->
+On 09/01/2019 02:05, Masami Hiramatsu wrote:
+> On Tue, 8 Jan 2019 17:13:36 +0000
+> James Morse <james.morse@arm.com> wrote:
+>> On 08/01/2019 02:39, Masami Hiramatsu wrote:
+>>> On Thu, 3 Jan 2019 17:05:18 +0000
+>>> James Morse <james.morse@arm.com> wrote:
+>>>> On 17/12/2018 06:40, Masami Hiramatsu wrote:
+>>>>> Move extable address check into arch_prepare_kprobe() from
+>>>>> arch_within_kprobe_blacklist().
+>>>>
+>>>> I'm trying to work out the pattern for what should go in the blacklist, and what
+>>>> should be rejected by the arch code.
+>>>>
+>>>> It seems address-ranges should be blacklisted as the contents don't matter.
+>>>> easy-example: the idmap text.
+>>>
+>>> Yes, more precisely, the code smaller than a function (symbol), it must be
+>>> rejected by arch_prepare_kprobe(), since blacklist is poplated based on
+>>> kallsyms.
+>>
+>> Ah, okay, so the pattern is the blacklist should only be for whole symbols,
+>> (which explains why its usually based on sections).
+> 
+> Correct. Actually, the blacklist is generated based on the symbol info
+> from symbol address.
+> 
+>> I see kprobe_add_ksym_blacklist() would go wrong if you give it something like:
+>> platform_drv_probe+0x50/0xb0, as it will log platform_drv_probe+0x50 as the
+>> start_addr and platform_drv_probe+0x50+0xb0 as the end.
+> 
+> Yes, it expects given address is the entry of a symbol.
 
-Good to know, I'll keep it in mind next time.
+>> But how does anything from the arch code's blacklist get into the
+>> kprobe_blacklist list?
+> 
+> It should be done via arch_populate_kprobe_blacklist().
 
-> Sorry about that, and thanks for the reminder.  I'll add them and
-> repush.
->
-> And, while I'm thinking about it, I'll request that feature to patchwork
-> developers.
->
-> Kevin
->
->
+>> We don't have an arch_populate_kprobe_blacklist(), so rely on
+>> within_kprobe_blacklist() calling arch_within_kprobe_blacklist() with the
+>> address, as well as walking kprobe_blacklist.
+>>
+>> Is this cleanup ahead of a series that does away with
+>> arch_within_kprobe_blacklist() so that debugfs list is always complete?
+> 
+> Right, after this cleanup, I will send arch_populate_kprobe_blacklist()
+> patch for arm64 and others. My plan is to move all arch_within_kprobe_blacklist()
+> to arch_populate_kprobe_blacklist() so that user can get more precise blacklist
+> via debugfs.
 
-Thank you for the explanation!
+Thanks, now it all makes sense!
 
-Best regards,
+Reviewed-by: James Morse <james.morse@arm.com>
 
-Emiliano
+
+Could you include a paragraph like that in the cover-letter or commit-message?
+The 'fix' in the cover-letter subject had me looking for the bug!
+
+
+Thanks,
+
+James
 
 _______________________________________________
 linux-arm-kernel mailing list
