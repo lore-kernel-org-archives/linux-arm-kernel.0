@@ -2,21 +2,21 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 88B82C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 09:55:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0B106C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 09:57:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2E90A2177B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 09:55:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BEB4620872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 09:57:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A7bmtWIO";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="WMLcjg+X"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2E90A2177B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="osDl1RHr";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="QgSAZmqy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BEB4620872
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,60 +25,59 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=JLpwSRbT+Js47VuKlJfoUsuvCULW0vgr0R4RZhQTg70=; b=A7bmtWIOQY+t8g
-	mAdAuI96wlkLhEbyBZuvB1JSkptnmRjzOlyH1OLMabpKS6IuWjSn5Sm8MvlkCKpAjcs4v9tMQYn1D
-	fm+cxVEH9viiLOdlXjBNmQwpIRzm3bV9waSNzMuwzPW8Fw1P65+vO8L/rqDSK7C36hpffGT8NxS2A
-	eVSOqYcpVG3DZHMQLuWLGDvu4U7qJC/qwYcBWV4HroCe26PkQZGGrzRl+hzpGloTOlCKb3A1qAKm4
-	V3Ti1t4tNwQnc/72mXzTuMp9tL5AdvjurqQx86y+0/duyzdYYHEnbigj+WYAF5D9H2ReSIKMKVfM9
-	2Z6gIPk+uv43jljLok4A==;
+	List-Owner; bh=xhkYbePuVrLvS3cyeLn3ss8hRofaeK0cwBdWtdhGJ1w=; b=osDl1RHrTamJTC
+	IF3Achz9VY9Qx3cakRfQILNoJG8zYX0hsxINzNzqObn2tzCCiBDQm7wk0GcDSNJCivH8aYxE0Vwvi
+	mvT0aNCZN7JmnRdP99EYJUj+u+WWwY6Os+iBOQFq5WYebje8V++ibAOC0ICCVYyod3yS0h2Otjolx
+	JWTYBtt0k57wF/llyM4g/cRBFu5G32k5xO7vcMLnushtpAnfBTGpcp3ryKrNHLC2xsQl3qbjIktJx
+	5W44w9Xs2MPgPL2kQ4cU1uYSVXiL4q3hMkgasHhJdTJGWBdJiFddYjTdyxK5R3QPE21JqNKSABd42
+	4A2EqQL2BAlMzhtRgHNg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghtWn-0001Vn-Gw; Fri, 11 Jan 2019 09:55:01 +0000
-Received: from mail-lj1-x241.google.com ([2a00:1450:4864:20::241])
+	id 1ghtYz-0003Fz-HS; Fri, 11 Jan 2019 09:57:17 +0000
+Received: from mail-vs1-xe41.google.com ([2607:f8b0:4864:20::e41])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghtWL-0001Bg-9W
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 09:54:44 +0000
-Received: by mail-lj1-x241.google.com with SMTP id q2-v6so12364345lji.10
+ id 1ghtYu-0003FY-My
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 09:57:15 +0000
+Received: by mail-vs1-xe41.google.com with SMTP id v205so8855158vsc.3
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 11 Jan 2019 01:54:33 -0800 (PST)
+ Fri, 11 Jan 2019 01:57:12 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=lDK1FAgxhgi3jXoNAQKdEfAbhO19e8mPHK/hUEQFr7I=;
- b=WMLcjg+XD2sK/PkoIlRemJuRAMSvYdo+TPNeYthUtIN3L3VTbGLv/4nyi3pJgRXPim
- JCH6y179utuToP1Y9VDNa4Puv2WJRNu3Zp5U8is9gH3JL/Fxh2DDXIj4hol6dsO58VMz
- twEZgWSZwE6cD/ndgYA+UxT4XsV9YjZucb95g=
+ :cc; bh=hdxivZjww+kdiSrhuzC1PWn78pP7JY13s0K0FNua8kQ=;
+ b=QgSAZmqy+LoU5cca445Mn/9Qjb4V+2eRA4M90GScviuRacw1X5qVNSdDk12BEX48jj
+ w97mbncn2bJOmB2FO/HI82hxjJ0sNIYDyqGD98Nu5lXttJNP1HO2MxAwAseEIYcePsWZ
+ et/UJL8NdNyjaDaOWruepTft55hi/eDaF38PI=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=lDK1FAgxhgi3jXoNAQKdEfAbhO19e8mPHK/hUEQFr7I=;
- b=pieBYSyi32D+R+yhifgoDC0lmMoy56b/Zumc6o9YMkVKQ2H0+T7IatcBQbSxUgu+VD
- peBNI/RnWgcbVqA4y3CMkCMsJk2dcjXNalSastd15dCekihCSK6g6Q2ZFHm9+X1M0Rd/
- 4ZV7fluV/QGCbG6GlpCwYPX4hmVXRyqMHIv2BmH9OpGrHwAB7x+OY3pnlMJJyN7iIk2A
- RP4sJI9sSooOFyZXsc9BrWaRgdk2WXVEB5Yt/CH9Q7jLQZ9R0QLziSEHk1X+HYjgYNB1
- taRvr7myGP2DJaR6u8zZJJOl3xgCEqbYgAStU+NVRr2fSJZ08yci45xjZbcOUjXcqgvg
- rr4Q==
-X-Gm-Message-State: AJcUukcqM7WHWSiRySlP7VpeS7Jj0n8nzXUseHxTFNFzFXcNCM2kyTZM
- WIEiccU9qJbe9kxLVd93XaDkxRgo1iVkuEV0c1ht5CKR
-X-Google-Smtp-Source: ALg8bN7nRDxyuo1cVbZfGLGHtnNshIBA79qFEezoOXTXDQHk2/Om7qYQ8hbQyi4L7SJW3JvQ42LB9FVV2eGmCJv6Aqw=
-X-Received: by 2002:a2e:9e16:: with SMTP id e22-v6mr8099680ljk.4.1547200471478; 
- Fri, 11 Jan 2019 01:54:31 -0800 (PST)
+ bh=hdxivZjww+kdiSrhuzC1PWn78pP7JY13s0K0FNua8kQ=;
+ b=RLGfRPzW5NCvbutQsehn4RyKT1htqSsn7aElN2r0uDZ4RhauY4rdhbTXUKcEziGbE2
+ UrUBXIU78pQOM4yWcRzuXFVvdvb7hLTn1Gd6Szwthl3AVDOFlQoifSiDF/zHoLMCPCPy
+ kF0wfKUOveLZax3poUrYKslKl4ICrGCPHKiODtzH5bGgc3kLsaJfdh2JV7nxPOBbCljS
+ If/TUxjOUVt1ORyyd7qGHj6qoxv8LzvMEa6QZdFAmw/u/dkJAb2C8c3HdR0WOYXR9fu4
+ DvtPMdyy75iHhNml6bd8UZ4sqfB4afd8aNxvMSBkHHokdI6hTXfWJ2LqkrtpLadsQ4zg
+ sPEg==
+X-Gm-Message-State: AJcUukdoX9hySWJXbaBK22RJJ/3E8vSAn2T3UYyzqv1TQOgVbFMs+JRW
+ Y+DPR6dl/opmGjeWMxMuRvXzND8zo800a6kkhdhs8g==
+X-Google-Smtp-Source: ALg8bN7gBLpnCYKzcoKbQM+Py6BQ9g4M4vk28CNSgFNbS2ONxp7bUleFVwMZ1lWpqEpu1bWOJ0Jw1ZB6656JfxVec8M=
+X-Received: by 2002:a67:8cc2:: with SMTP id o185mr5575802vsd.55.1547200631444; 
+ Fri, 11 Jan 2019 01:57:11 -0800 (PST)
 MIME-Version: 1.0
-References: <cover.1502103715.git.michal.simek@xilinx.com>
- <72d3cd83bed792a23ab60cf9b6d51b618f5aa084.1502103715.git.michal.simek@xilinx.com>
- <CACRpkdZE-Edr7fWZY5VQM1_65iw7MYGP-iDa2ExZsPxpM0rurQ@mail.gmail.com>
- <6da5fd79-fbc8-b613-954f-dcbe2ef8d6c5@xilinx.com>
- <20190107164210.3ecf37e8@windsurf>
-In-Reply-To: <20190107164210.3ecf37e8@windsurf>
-From: Linus Walleij <linus.walleij@linaro.org>
-Date: Fri, 11 Jan 2019 10:54:20 +0100
-Message-ID: <CACRpkdafBpC14TxBNVN2AemkBz-yKkXkKfNpdgkYKQX3qFemag@mail.gmail.com>
-Subject: Re: [PATCH 2/8] gpio: zynq: Wakeup gpio controller when it is used as
- IRQ controller
-To: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+References: <1547123097-16431-1-git-send-email-sumit.garg@linaro.org>
+ <1547123097-16431-4-git-send-email-sumit.garg@linaro.org>
+ <20190110142355.bcgw62w2qk2mlzj6@holly.lan>
+ <CAFA6WYPzA+rKMq58xVPghSe-mLa6fDi4t=1DYxakEaeG+ayQug@mail.gmail.com>
+ <20190111095414.nbnzbocdn32zypdc@holly.lan>
+In-Reply-To: <20190111095414.nbnzbocdn32zypdc@holly.lan>
+From: Sumit Garg <sumit.garg@linaro.org>
+Date: Fri, 11 Jan 2019 15:27:00 +0530
+Message-ID: <CAFA6WYM7JpE+h+6FC-YmqjyLo-xopeMg=d0BhOLx1C+N-tsZvA@mail.gmail.com>
+Subject: Re: [PATCH v2 3/4] tee: add supp_nowait flag in tee_context struct
+To: Daniel Thompson <daniel.thompson@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_015433_601125_39936CAC 
-X-CRM114-Status: GOOD (  14.88  )
+X-CRM114-CacheID: sfid-20190111_015714_573887_BF894329 
+X-CRM114-Status: GOOD (  14.39  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,53 +89,63 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Josh Cartwright <josh.cartwright@ni.com>,
- Peter Crosthwaite <peter.crosthwaite@xilinx.com>,
- Nava kishore Manne <navam@xilinx.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "monstr@monstr.eu" <monstr@monstr.eu>, Borsodi Petr <Petr.Borsodi@i.cz>,
- Michal Simek <michal.simek@xilinx.com>,
- "linux-gpio@vger.kernel.org" <linux-gpio@vger.kernel.org>,
- Rob Herring <robherring2@gmail.com>,
- =?UTF-8?Q?S=C3=B6ren_Brinkmann?= <soren.brinkmann@xilinx.com>,
- Steffen Trumtrar <s.trumtrar@pengutronix.de>,
- Shubhrajyoti Datta <shubhraj@xilinx.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Herbert Xu <herbert@gondor.apana.org.au>, Arnd Bergmann <arnd@arndb.de>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Bhupesh Sharma <bhsharma@redhat.com>, linux-kernel@vger.kernel.org,
+ tee-dev@lists.linaro.org, Rob Herring <robh+dt@kernel.org>,
+ "open list:HARDWARE RANDOM NUMBER GENERATOR CORE"
+ <linux-crypto@vger.kernel.org>, mpm@selenic.com,
+ Jens Wiklander <jens.wiklander@linaro.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 7, 2019 at 4:42 PM Thomas Petazzoni
-<thomas.petazzoni@bootlin.com> wrote:
-
-> This patch almost solves the problem. It doesn't work as-is, because it
-> assumes that runtime PM is used by all GPIO controllers, which is not
-> the case. When runtime PM is not enabled, pm_runtime_get_sync() fails
-> with -EACCES, and the whole gpiochip_irq_reqres() function aborts.
-(...)
-> However, I must say that from a design perspective, I am not a big fan
-> of this solution. Indeed for the normal GPIO ->request() and ->free()
-> hooks, it is currently the GPIO driver itself that is responsible for
-> runtime PM get/put, so it would be weird to have the runtime PM get/put
-> for the IRQ request/free be done by the GPIO core.
+On Fri, 11 Jan 2019 at 15:24, Daniel Thompson
+<daniel.thompson@linaro.org> wrote:
 >
-> I believe that either the GPIO core should be in charge of the entire
-> runtime PM interaction, or it should entirely be the responsibility of
-> each GPIO controller driver. Having a mixed solution seems very
-> confusing.
+> On Fri, Jan 11, 2019 at 01:00:49PM +0530, Sumit Garg wrote:
+> > On Thu, 10 Jan 2019 at 19:53, Daniel Thompson
+> > <daniel.thompson@linaro.org> wrote:
+> > > > diff --git a/drivers/tee/tee_core.c b/drivers/tee/tee_core.c
+> > > > index 9ddb89e..5d6c317 100644
+> > > > --- a/drivers/tee/tee_core.c
+> > > > +++ b/drivers/tee/tee_core.c
+> > > > @@ -105,6 +105,7 @@ static int tee_open(struct inode *inode, struct file *filp)
+> > > >       if (IS_ERR(ctx))
+> > > >               return PTR_ERR(ctx);
+> > > >
+> > > > +     ctx->supp_nowait = false;
+> > > >       filp->private_data = ctx;
+> > > >       return 0;
+> > > >  }
+> > > > @@ -981,6 +982,7 @@ tee_client_open_context(struct tee_context *start,
+> > > >       } while (IS_ERR(ctx) && PTR_ERR(ctx) != -ENOMEM);
+> > > >
+> > > >       put_device(put_dev);
+> > > > +     ctx->supp_nowait = true;
+> > >
+> > > Why automatically set supp_nowait inside open_context() ?
+> > >
+> >
+> > I think this is the default behaviour (non-blocking request) that any
+> > in kernel client would expect. Also this flag could be configured
+> > again before call to open_session() if any in kernel client requires
+> > different behaviour.
+>
+> Makes sense. I think this is a deep enough behaviour to warrant proper
+> commenting though.
+>
 
-My stance is that the driver is responsible of enabling and managing
-runtime PM for its hardware block(s).
+Sure, will add comments.
 
-Runtime PM in the core should only be added if the core needs to
-be aware about it, such as is the case when e.g. a block device
-needs to drain its write buffer before going to runtime sleep.
+-Sumit
 
-I fail so see why the GPIO core need to be aware about this.
-
-Yours,
-Linus Walleij
+>
+> Daniel.
 
 _______________________________________________
 linux-arm-kernel mailing list
