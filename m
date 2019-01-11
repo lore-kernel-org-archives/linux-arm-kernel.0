@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C7AFFC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 13:31:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CB4CAC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 13:32:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9510E20874
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 13:31:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9C0A120874
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 13:32:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UaweuKFM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9510E20874
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Txg1q27i"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9C0A120874
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,24 +25,24 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/STgNYy40sQi+EZ4e9hN5QOdF0rbpJiQ6OZhMAk8T80=; b=UaweuKFM7t2aS/
-	eBtg3prvIRXOJAqBw8+7yjKQFEbbHB9N6J9DGM05D3LfLHrSWPfx6twYw9i73nMcoePMpTHhHLkwC
-	ckItG3fESRxRnk+fXAw61/KOZJdHG9qxA7N5k/MhNz5gBaycp+vXsfYKCLucgW25qNL7jgCEHTu7C
-	1ewA7d36hh0UBUmz4dAhrxIuzpMMV+sw5fD4WYj7MGD9VKEcd1GNzCI9aXIG/vwEpJXEQY5XdynDs
-	vCaUy+SPRBWz2eTrHq0UvmnR7av+PN+PIVG899UrlLSsY1qzH3S5CZShAX2/3gwctrHKj6/6rEX4s
-	sCVlfZY8uirh62XApkzQ==;
+	List-Owner; bh=IEbqZn4c/vDi/5cLRlbHwA49W5qs5i609L6A3/PWZ+o=; b=Txg1q27iiOINGE
+	jH7LW3LKlnB9NneOqIbeVeMjv+Sa4NEYgpltCM7m33ilj7hr07S6RPsL5ULUcr1zOLsx204VBZiQc
+	RPhwCElJ8YDB49xVsyXIhlaghfSzuRs1tsbUOUeFFBHzNK/9p/DB3COFJMFhyE8RRzIM7fySGEldf
+	sl/2QCZarmX958fNdXN8TmgqSUfAA1mj/j2yH0gDwfXTkPPMoaNdcgYItuo2NziSo8rC7UqftrWT5
+	H35uYNLPuPPiVGkGsWfGdobXRhDjaTdWCFcBObVGX4JRnBptYrxpPzIB5ZOpD9p2wiqCNzaDWI4wX
+	8LhcD8nej8QtAhctX/Ow==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghwug-00062o-Pv; Fri, 11 Jan 2019 13:31:54 +0000
+	id 1ghwv2-0006PK-1J; Fri, 11 Jan 2019 13:32:16 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghwuR-0005pN-KB
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 13:31:41 +0000
+ id 1ghwuS-0005pO-9M
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 13:31:42 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id EEDCD20A85; Fri, 11 Jan 2019 14:31:35 +0100 (CET)
+ id 4EB0B20A9B; Fri, 11 Jan 2019 14:31:36 +0100 (CET)
 Received: from localhost.localdomain
  (aaubervilliers-681-1-45-241.w90-88.abo.wanadoo.fr [90.88.163.241])
- by mail.bootlin.com (Postfix) with ESMTPSA id 7CD0420A2D;
+ by mail.bootlin.com (Postfix) with ESMTPSA id DD40320A2F;
  Fri, 11 Jan 2019 14:31:35 +0100 (CET)
 From: Miquel Raynal <miquel.raynal@bootlin.com>
 To: Kishon Vijay Abraham I <kishon@ti.com>,
@@ -53,16 +53,16 @@ To: Kishon Vijay Abraham I <kishon@ti.com>,
  Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
  Mathias Nyman <mathias.nyman@intel.com>,
  Alan Stern <stern@rowland.harvard.edu>
-Subject: [PATCH v2 02/10] usb: host: xhci: mvebu: add reset on resume quirk
-Date: Fri, 11 Jan 2019 14:31:25 +0100
-Message-Id: <20190111133133.24803-3-miquel.raynal@bootlin.com>
+Subject: [PATCH v2 03/10] usb: ehci-orion: avoid double PHY initialization
+Date: Fri, 11 Jan 2019 14:31:26 +0100
+Message-Id: <20190111133133.24803-4-miquel.raynal@bootlin.com>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20190111133133.24803-1-miquel.raynal@bootlin.com>
 References: <20190111133133.24803-1-miquel.raynal@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_053140_328731_2999B6E0 
-X-CRM114-Status: GOOD (  19.34  )
+X-CRM114-CacheID: sfid-20190111_053140_466229_2088C846 
+X-CRM114-Status: GOOD (  14.67  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,124 +78,80 @@ Cc: devicetree@vger.kernel.org, Antoine Tenart <antoine.tenart@bootlin.com>,
  linux-usb@vger.kernel.org, Maxime Chevallier <maxime.chevallier@bootlin.com>,
  Nadav Haklai <nadavh@marvell.com>,
  Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Miquel Raynal <miquel.raynal@bootlin.com>, Ofer Heifetz <oferh@marvell.com>,
+ Miquel Raynal <miquel.raynal@bootlin.com>,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Ofer Heifetz <oferh@marvell.com>
+No need to initialize the PHY from the driver's probe. It is done by
+the core automatically and doing it twice would increment the
+phy->powercount counter to 2 instead of 1. During later suspend
+operation, the counter will be decremented to one, no phy->power_off()
+will occur and worst than that, the following phy->power_on() at
+resume time will be also skipped, failing the whole S2RAM operation.
 
-The mvebu xHCI host driver does not have suspend/resume support. Use of
-the XHCI_RESET_ON_RESUME quirk is mandatory in order to avoid failures
-after resume. This will work only if no USB device is plugged-in.
-
-While at it, mention in the Kconfig file that this IP is also present
-on the A3700 SoC.
-
-Signed-off-by: Ofer Heifetz <oferh@marvell.com>
-[miquel.raynal@bootlin.com: Reword the commit message]
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/usb/host/Kconfig      |  4 ++--
- drivers/usb/host/xhci-mvebu.c | 11 +++++++++++
- drivers/usb/host/xhci-mvebu.h |  6 ++++++
- drivers/usb/host/xhci-plat.c  |  7 +++++++
- 4 files changed, 26 insertions(+), 2 deletions(-)
+ drivers/usb/host/ehci-orion.c | 26 +++-----------------------
+ 1 file changed, 3 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 16758b12a5e9..13d59be6a6aa 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -69,13 +69,13 @@ config USB_XHCI_MTK
- 	  If unsure, say N.
+diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
+index 1ad72647a069..3109f082949e 100644
+--- a/drivers/usb/host/ehci-orion.c
++++ b/drivers/usb/host/ehci-orion.c
+@@ -257,15 +257,7 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
+ 	if (IS_ERR(priv->phy)) {
+ 		err = PTR_ERR(priv->phy);
+ 		if (err != -ENOSYS)
+-			goto err_phy_get;
+-	} else {
+-		err = phy_init(priv->phy);
+-		if (err)
+-			goto err_phy_init;
+-
+-		err = phy_power_on(priv->phy);
+-		if (err)
+-			goto err_phy_power_on;
++			goto err_dis_clk;
+ 	}
  
- config USB_XHCI_MVEBU
--	tristate "xHCI support for Marvell Armada 375/38x"
-+	tristate "xHCI support for Marvell Armada 375/38x/3700"
- 	select USB_XHCI_PLATFORM
- 	depends on HAS_IOMEM
- 	depends on ARCH_MVEBU || COMPILE_TEST
- 	---help---
- 	  Say 'Y' to enable the support for the xHCI host controller
--	  found in Marvell Armada 375/38x ARM SOCs.
-+	  found in Marvell Armada 375/38x/3700 ARM SOCs.
+ 	/*
+@@ -297,19 +289,12 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
  
- config USB_XHCI_RCAR
- 	tristate "xHCI support for Renesas R-Car SoCs"
-diff --git a/drivers/usb/host/xhci-mvebu.c b/drivers/usb/host/xhci-mvebu.c
-index 32e158568788..60651a50770f 100644
---- a/drivers/usb/host/xhci-mvebu.c
-+++ b/drivers/usb/host/xhci-mvebu.c
-@@ -13,6 +13,7 @@
- #include <linux/usb/hcd.h>
+ 	err = usb_add_hcd(hcd, irq, IRQF_SHARED);
+ 	if (err)
+-		goto err_add_hcd;
++		goto err_dis_clk;
  
- #include "xhci-mvebu.h"
-+#include "xhci.h"
- 
- #define USB3_MAX_WINDOWS	4
- #define USB3_WIN_CTRL(w)	(0x0 + ((w) * 8))
-@@ -72,3 +73,13 @@ int xhci_mvebu_mbus_init_quirk(struct usb_hcd *hcd)
- 
+ 	device_wakeup_enable(hcd->self.controller);
  	return 0;
- }
-+
-+int xhci_mvebu_a3700_init_quirk(struct usb_hcd *hcd)
-+{
-+	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
-+
-+	/* Without reset on resume, the HC won't work at all */
-+	xhci->quirks |= XHCI_RESET_ON_RESUME;
-+
-+	return 0;
-+}
-diff --git a/drivers/usb/host/xhci-mvebu.h b/drivers/usb/host/xhci-mvebu.h
-index 09791df2cec0..ca0a3a5721dd 100644
---- a/drivers/usb/host/xhci-mvebu.h
-+++ b/drivers/usb/host/xhci-mvebu.h
-@@ -12,10 +12,16 @@ struct usb_hcd;
  
- #if IS_ENABLED(CONFIG_USB_XHCI_MVEBU)
- int xhci_mvebu_mbus_init_quirk(struct usb_hcd *hcd);
-+int xhci_mvebu_a3700_init_quirk(struct usb_hcd *hcd);
- #else
- static inline int xhci_mvebu_mbus_init_quirk(struct usb_hcd *hcd)
- {
- 	return 0;
- }
-+
-+static inline int xhci_mvebu_a3700_init_quirk(struct usb_hcd *hcd)
-+{
-+	return 0;
-+}
- #endif
- #endif /* __LINUX_XHCI_MVEBU_H */
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index ef09cb06212f..0ac4ec975547 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -98,6 +98,10 @@ static const struct xhci_plat_priv xhci_plat_marvell_armada = {
- 	.init_quirk = xhci_mvebu_mbus_init_quirk,
- };
+-err_add_hcd:
+-	if (!IS_ERR(priv->phy))
+-		phy_power_off(priv->phy);
+-err_phy_power_on:
+-	if (!IS_ERR(priv->phy))
+-		phy_exit(priv->phy);
+-err_phy_init:
+-err_phy_get:
++err_dis_clk:
+ 	if (!IS_ERR(priv->clk))
+ 		clk_disable_unprepare(priv->clk);
+ 	usb_put_hcd(hcd);
+@@ -327,11 +312,6 @@ static int ehci_orion_drv_remove(struct platform_device *pdev)
  
-+static const struct xhci_plat_priv xhci_plat_marvell_armada3700 = {
-+	.init_quirk = xhci_mvebu_a3700_init_quirk,
-+};
-+
- static const struct xhci_plat_priv xhci_plat_renesas_rcar_gen2 = {
- 	.firmware_name = XHCI_RCAR_FIRMWARE_NAME_V1,
- 	.init_quirk = xhci_rcar_init_quirk,
-@@ -123,6 +127,9 @@ static const struct of_device_id usb_xhci_of_match[] = {
- 	}, {
- 		.compatible = "marvell,armada-380-xhci",
- 		.data = &xhci_plat_marvell_armada,
-+	}, {
-+		.compatible = "marvell,armada3700-xhci",
-+		.data = &xhci_plat_marvell_armada3700,
- 	}, {
- 		.compatible = "renesas,xhci-r8a7790",
- 		.data = &xhci_plat_renesas_rcar_gen2,
+ 	usb_remove_hcd(hcd);
+ 
+-	if (!IS_ERR(priv->phy)) {
+-		phy_power_off(priv->phy);
+-		phy_exit(priv->phy);
+-	}
+-
+ 	if (!IS_ERR(priv->clk))
+ 		clk_disable_unprepare(priv->clk);
+ 
 -- 
 2.19.1
 
