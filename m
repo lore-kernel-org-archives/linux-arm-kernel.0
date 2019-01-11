@@ -2,69 +2,90 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 26196C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 19:54:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 913FDC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 19:56:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E91AB20836
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 19:54:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5B9C520836
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 19:56:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o0evO7sk";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="mbohqD2Q"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E91AB20836
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cc81t5Wi";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="lREnOr2A"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5B9C520836
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
+	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ZZb6/sQuJKc4QobFBUfiaEU8HqXLgM575UyyiWfBuqQ=; b=o0evO7sk5tAidF
-	qgMahxqjK5zNYCiy2kaRua0ZvjeGA8ToofOPy89M2dQoqOOBxmXmLh51omxICy434Av3+3HE+wfa7
-	QMnq1h4Ok1c9nw+s6SOEJTq02Zoua6YJ4G/vqxZIlf8s9xj52MQW5cMKWHQS/csPcIVMnRTaHkp+S
-	HUBqC1eJtD7xdCpYCpc2dvs+EF1FBviQt/tfRwAZcwdwoS6OO8CtN5mJNK4BvFLp6GGwm9xO+lNQZ
-	571Miq499xC5398Lkkplttx4apm/sltNGYGBWE8eV/eWYscjiuVn6/oskduTHqsi6/3KyJoTfYiyS
-	aBLZ9Ia7rQf8WRck0hxw==;
+	List-Owner; bh=cVLJ3XCPldgit3g2FQKk5W0kWQXN0EFvAgeFgN+rFVU=; b=cc81t5Wi6iWkUU
+	6k1TaVz2uSOr/O6XF4xByLXmeKJUYgryvsAzZxOrimttBny8V+X0VOGQPY1/odrgO8yoF7Y3v3Ezo
+	xrOcHxWUAwLmFZ451YjNGKKNMVR5J3HGEFfznYEt/jHhIeuyOQ8uyFW74eZDyp9PmHQyLSr8Bmljj
+	tddRvftlKvPK88jciH1dyjV84cu1cj+D471ja5HiPHDt5qUDQaa4eEOzo/0nkfTR9YtE2BQ1HWskd
+	D5fJK87GyAEiz4r8d8jbxMOzvF0Z9+G1mZXBfJqomDiVN37fULozlqk9QALhpXdPTN1B65mNDtfdA
+	J6Q4qeagbOuP6ryyqKkw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gi2sw-0000xY-Rk; Fri, 11 Jan 2019 19:54:30 +0000
-Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+	id 1gi2uR-0002nY-W8; Fri, 11 Jan 2019 19:56:04 +0000
+Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gi2sv-0000xO-7B
- for linux-arm-kernel@bombadil.infradead.org; Fri, 11 Jan 2019 19:54:29 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:Content-Type:
- MIME-Version:References:In-Reply-To:Message-ID:Subject:Cc:To:From:Date:Sender
- :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=fMcNvquDgQQYlKE4Y7lNw6Nx1C1EhjU6J5BGveGlj+4=; b=mbohqD2QpEMefQWwUsKCJJR0wu
- XLxAF7/7GnD3lzQsYsgzRvoy1zuL7Ej70GIMeFRCcP6OoqrQ5zEbi3ymwpEXuE8uU+YWZg1Gp5EQ/
- 4otHAYmsRlUMimv7+sUOhH7xlI537dTWBlz21EilYEsoRClF7Mc76ZM5aJlB5CO9fzeeNiq95PRcv
- tU1bQ5OdGrT9SQgptnDn1p/CqPKxQJW/h9+Bmc6E0J675O13PXHHI8iN7g+v+ZnA5MjEoLdWoyrVa
- oLvXi+/a8wZ3SkoSbTiyARozxYoYa3ppl0LF0X5BNi1DgOEj2LhBA7evi/bgAhBuyyDGHmrPx6s9Q
- MIxVgPSA==;
-Received: from 177.17.174.42.dynamic.adsl.gvt.net.br ([177.17.174.42]
- helo=coco.lan)
- by casper.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gi2sp-0000fE-UV; Fri, 11 Jan 2019 19:54:24 +0000
-Date: Fri, 11 Jan 2019 17:54:16 -0200
-From: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
-To: Christoph Hellwig <hch@lst.de>
-Subject: Re: [PATCH 3/3] videobuf2: replace a layering violation with
- dma_map_resource
-Message-ID: <20190111175416.7d291e25@coco.lan>
-In-Reply-To: <20190111181731.11782-4-hch@lst.de>
-References: <20190111181731.11782-1-hch@lst.de>
- <20190111181731.11782-4-hch@lst.de>
-X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; x86_64-redhat-linux-gnu)
+ id 1gi2uN-0002mI-RX
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 19:56:01 +0000
+Received: by mail-pl1-x641.google.com with SMTP id p8so7214739plo.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 11 Jan 2019 11:55:59 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:in-reply-to:references:date:message-id
+ :mime-version; bh=OEko4Q1k2V9fZxblUwJN/ehB2KPRXcsUj+UxLIJ/99E=;
+ b=lREnOr2Ab7Kk0yTYlqBE4YoNQuckrSl/N1T7ZYdoiFR8nIrOc5ApkvV3G4eTPNrOdw
+ uSj15PfeBjfHhUSAtIAorUyKZuqAO+zw/2CYIE8C1vDGOhR+Q4qSl0RPqc3fm1eAyzN1
+ 6O/s6BKzHyPPuT0PDA1QAbLYOl2/eoY0qN5Fv9pXO0DaRRnd9Ucb5ThU7+M9/cH6ri0s
+ omlTZ6o3vAw37lLxsBheXZbVEc6RTZ/Z2M86lVmk+pmDPYibEEBWvuuHPF8l4z7O48Y/
+ mIvsE0TWTzuZz3UrqUZWJ6uZyeoklRaUswl90hxYN0UHG/Pq2xzXhjEdI0Ra20BzG5c0
+ 0kpA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:in-reply-to:references:date
+ :message-id:mime-version;
+ bh=OEko4Q1k2V9fZxblUwJN/ehB2KPRXcsUj+UxLIJ/99E=;
+ b=NXQ3L5hZ+QuFE+SJexWdBlAiPP73jNEHbimwTNmVI1dWw9LzwCKgDjObrz9KbK+sq5
+ 5U3maeuI/WNGf/qnz/bT9/Az3F5Kbo2HmCdiGPFcSEZTMohRlGL2AAKLLJU03wDJbDNc
+ VUoO+84nBieBbIxJ+Z1R6uRzxFrbmubjP/bo7eLBCeGdlyA0/IwEXK3CWd2CUWdzzSTh
+ Gvge4Fj+1sb2BDEUNHU0hhOtW0OwxJRz+nNg2GY/PY4B3owGDSJxVygRDSMlKlmb36gZ
+ 6rQ6biK+t/JNA8g9NhtsRBW0YSmUMWcX+cDEoL05iE11PAvk6DS6RgXNTeJ8QmyeZiku
+ HUHg==
+X-Gm-Message-State: AJcUukenGfRkcdAxmadievu2GF+1+7rN1oHHLndqNn4XI/01tEe2HTES
+ i5ihA+JDwXkC0Wzsb/bg1/Nu5A==
+X-Google-Smtp-Source: ALg8bN5L/trq5QYIz/32j0sWyti7NW7gpTBlSWdiqFsYW+rU55NoRqzkkchPuRExl5FjqljMxD/VJQ==
+X-Received: by 2002:a17:902:9047:: with SMTP id
+ w7mr16117360plz.270.1547236558983; 
+ Fri, 11 Jan 2019 11:55:58 -0800 (PST)
+Received: from localhost (c-71-197-186-152.hsd1.wa.comcast.net.
+ [71.197.186.152])
+ by smtp.googlemail.com with ESMTPSA id c7sm110659515pfa.24.2019.01.11.11.55.58
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 11 Jan 2019 11:55:58 -0800 (PST)
+From: Kevin Hilman <khilman@baylibre.com>
+To: Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ Loys Ollivier <lollivier@baylibre.com>
+Subject: Re: [PATCH v3] arm64: dts: meson: Fix mmc cd-gpios polarity
+In-Reply-To: <CAFBinCDM4BTx0Ude-M=O6B2bXPE9EdfD=VxZfFzR9Dc=yT+xWQ@mail.gmail.com>
+References: <1547134822-18498-1-git-send-email-lollivier@baylibre.com>
+ <CAFBinCDM4BTx0Ude-M=O6B2bXPE9EdfD=VxZfFzR9Dc=yT+xWQ@mail.gmail.com>
+Date: Fri, 11 Jan 2019 11:55:57 -0800
+Message-ID: <7hy37rm0j6.fsf@baylibre.com>
 MIME-Version: 1.0
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20190111_115559_893464_19A69B9A 
+X-CRM114-Status: GOOD (  13.94  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,108 +97,56 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Niklas =?UTF-8?B?U8O2ZGVybHVuZA==?=
- <niklas.soderlund+renesas@ragnatech.se>, Pawel Osciak <pawel@osciak.com>,
- Russell King <linux@armlinux.org.uk>, iommu@lists.linux-foundation.org,
- linux-kernel@vger.kernel.org, Kyungmin Park <kyungmin.park@samsung.com>,
- linux-media@vger.kernel.org, linuxppc-dev@lists.ozlabs.org,
- linux-arm-kernel@lists.infradead.org,
- Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: devicetree@vger.kernel.org, Linus Walleij <linus.walleij@linaro.org>,
+ linux-mmc@vger.kernel.org, linux-kernel@vger.kernel.org,
+ linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org,
+ Jerome Brunet <jbrunet@baylibre.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Em Fri, 11 Jan 2019 19:17:31 +0100
-Christoph Hellwig <hch@lst.de> escreveu:
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
-> vb2_dc_get_userptr pokes into arm direct mapping details to get the
-> resemblance of a dma address for a a physical address that does is
-> not backed by a page struct.  Not only is this not portable to other
-> architectures with dma direct mapping offsets, but also not to uses
-> of IOMMUs of any kind.  Switch to the proper dma_map_resource /
-> dma_unmap_resource interface instead.
+> Hi,
+>
+> some nit-picks as well as my Tested-by (in case it's not too late) below.
+> thank you for taking care of this!
+>
+> On Thu, Jan 10, 2019 at 4:40 PM Loys Ollivier <lollivier@baylibre.com> wrote:
+>>
+>> Commit 89a5e15bcba8 ("gpio/mmc/of: Respect polarity in the device tree")
+>> changed the behavior of "cd-inverted" to follow the device tree bindings
+>> specification.
+>> Lines specifying "cd-inverted" are now "active high".
+> this depends on the polarity from the cd-gpios property. above commit
+> caused cd-inverted to be applied twice (effectively making it a
+> no-op). thus "cd-inverted" only means "active high" if cd-gpios also
+> sets GPIO_ACTIVE_HIGH. if the polarity in cd-gpios is GPIO_ACTIVE_LOW
+> together with "cd-inverted" then the GPIO will be treated as active
+> low.
+>
+>> Fix the SD card for meson by setting the cd-gpios as "active low" according
+>> to the boards specifications.
+> not only switching to GPIO_ACTIVE_LOW, also dropping "cd-inverted"
+>
+>> Fixes: 89a5e15bcba8 ("gpio/mmc/of: Respect polarity in the device tree")
+> in my patches for the 32-bit boards I used the commit which added SD
+> card support to the board for the Fixes tag. however, I'm fine with
+> this as well (I just wanted to point out that there's a small
+> difference in our commits).
+>
+>> Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
+> on my Khadas VIM(1), using Kevin's v5.0/fixes branch:
+> Tested-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 
-Makes sense to me. I'm assuming that you'll be pushing it together
-with other mm patches, so:
-
-Acked-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
-
-> 
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> ---
->  .../common/videobuf2/videobuf2-dma-contig.c   | 41 ++++---------------
->  1 file changed, 9 insertions(+), 32 deletions(-)
-> 
-> diff --git a/drivers/media/common/videobuf2/videobuf2-dma-contig.c b/drivers/media/common/videobuf2/videobuf2-dma-contig.c
-> index aff0ab7bf83d..82389aead6ed 100644
-> --- a/drivers/media/common/videobuf2/videobuf2-dma-contig.c
-> +++ b/drivers/media/common/videobuf2/videobuf2-dma-contig.c
-> @@ -439,42 +439,14 @@ static void vb2_dc_put_userptr(void *buf_priv)
->  				set_page_dirty_lock(pages[i]);
->  		sg_free_table(sgt);
->  		kfree(sgt);
-> +	} else {
-> +		dma_unmap_resource(buf->dev, buf->dma_addr, buf->size,
-> +				   buf->dma_dir, 0);
->  	}
->  	vb2_destroy_framevec(buf->vec);
->  	kfree(buf);
->  }
->  
-> -/*
-> - * For some kind of reserved memory there might be no struct page available,
-> - * so all that can be done to support such 'pages' is to try to convert
-> - * pfn to dma address or at the last resort just assume that
-> - * dma address == physical address (like it has been assumed in earlier version
-> - * of videobuf2-dma-contig
-> - */
-> -
-> -#ifdef __arch_pfn_to_dma
-> -static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
-> -{
-> -	return (dma_addr_t)__arch_pfn_to_dma(dev, pfn);
-> -}
-> -#elif defined(__pfn_to_bus)
-> -static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
-> -{
-> -	return (dma_addr_t)__pfn_to_bus(pfn);
-> -}
-> -#elif defined(__pfn_to_phys)
-> -static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
-> -{
-> -	return (dma_addr_t)__pfn_to_phys(pfn);
-> -}
-> -#else
-> -static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
-> -{
-> -	/* really, we cannot do anything better at this point */
-> -	return (dma_addr_t)(pfn) << PAGE_SHIFT;
-> -}
-> -#endif
-> -
->  static void *vb2_dc_get_userptr(struct device *dev, unsigned long vaddr,
->  	unsigned long size, enum dma_data_direction dma_dir)
->  {
-> @@ -528,7 +500,12 @@ static void *vb2_dc_get_userptr(struct device *dev, unsigned long vaddr,
->  		for (i = 1; i < n_pages; i++)
->  			if (nums[i-1] + 1 != nums[i])
->  				goto fail_pfnvec;
-> -		buf->dma_addr = vb2_dc_pfn_to_dma(buf->dev, nums[0]);
-> +		buf->dma_addr = dma_map_resource(buf->dev,
-> +				__pfn_to_phys(nums[0]), size, buf->dma_dir, 0);
-> +		if (dma_mapping_error(buf->dev, buf->dma_addr)) {
-> +			ret = -ENOMEM;
-> +			goto fail_pfnvec;
-> +		}
->  		goto out;
->  	}
->  
-
-
+I can add this tested-by tag in my v5.0/fixes branch for now, and can
+replace it with a follow up if Loys can update the changelog with your
+suggestions/clarifications.
 
 Thanks,
-Mauro
+
+Kevin
 
 _______________________________________________
 linux-arm-kernel mailing list
