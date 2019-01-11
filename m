@@ -2,108 +2,80 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F0C2BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 15:52:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BE3C7C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 16:08:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BD82A20700
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 15:52:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8F75A20657
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 16:08:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Vd/NKONA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BD82A20700
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OfTLY7Nu";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=tronnes.org header.i=@tronnes.org header.b="fhigaoJQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8F75A20657
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=tronnes.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RFyg07H7rbScXcN9DvZ4/DdH5fbcNRr433Umwra9zRY=; b=Vd/NKONA+cGDOU
-	idX0U4/D+82JnZ6duhi9KDljJjePfWzjzrTN2yl54VtFcN3/RyLberSDTgt1sClflBS0e8xysJwC4
-	NqgOn4rJu2dqU4NE5DHmvk9p018jgfRgYawTjp7ZFqB2sjHvb2qgj682uiStQqvxOelKDDz+dUErY
-	ixNsiruUvmXSfLO4u1jDCWyGXHs0IsiicAuY+O7iQs+oO9nzv2aJVpxp1Q/FkD8skuvxtQZfrPltt
-	ATi9AGaiAIUf6P/B8a0tgYbFdh6MpGBK1tTYWalaRajnB3QNvHjhSWy/++p7XGJnoGBcAN9y5ZviH
-	G82jhIIXtFF14zPGNQLg==;
+	Message-ID:From:References:To:Subject:Reply-To:Cc:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=TGYnGq4WQVO5U4d2I5B1TPV7CrP39UXMyJER9T42VRM=; b=OfTLY7NuxW6hlWiRd0yixr9glL
+	R2uWE2BYKWpFgJXYa6Zqk22g3bs679PRLWMAinlS3RqKZ3NamyZkt9weq6USXYa1hFXdfCd4GrwtV
+	3kjCljGK6UsYHPV2Wmjp+z8diKknQE6Y1zFnmm+8gnZbuV+IHu2WDrcRLu1KQT6p+LTsHVAGNoEPk
+	i1xQYMzebKIYgTKQ7NsaiJMGhMN0OCe8tRz/XBzmpgyQtjs4gfwbW4DkNMB/kxT22LtJaRyvRhWx0
+	plc5EJXWiYZ+IL6wi/TrrypdU/QyUT4N2q8mvSWXstIodku1kh/brRniKwiXeTvTcNb91dRTGBQEA
+	RPVvaE/A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghz6d-0001F1-TA; Fri, 11 Jan 2019 15:52:23 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghz6a-0001Ea-Jk
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 15:52:21 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6735E1596;
- Fri, 11 Jan 2019 07:52:19 -0800 (PST)
-Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 0FB263F5AF; Fri, 11 Jan 2019 07:52:17 -0800 (PST)
-Subject: Re: [PATCH 1/1] irqchip: stm32-exti: add domain translate function
-To: Loic Pallardy <loic.pallardy@st.com>, tglx@linutronix.de,
- jason@lakedaemon.net, mcoquelin.stm32@gmail.com, alexandre.torgue@st.com
-References: <1547215132-85612-1-git-send-email-loic.pallardy@st.com>
-From: Marc Zyngier <marc.zyngier@arm.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
- 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
-Organization: ARM Ltd
-Message-ID: <7e36a9f2-2b43-5af3-2094-198a61030687@arm.com>
-Date: Fri, 11 Jan 2019 15:52:15 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
+	id 1ghzLr-0006Ok-A1; Fri, 11 Jan 2019 16:08:07 +0000
+Received: from smtp.domeneshop.no ([2a01:5b40:0:3005::1])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghzLm-0006MJ-LO; Fri, 11 Jan 2019 16:08:05 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed; d=tronnes.org;
+ s=ds201810; 
+ h=Content-Transfer-Encoding:Content-Type:In-Reply-To:MIME-Version:Date:Message-ID:From:References:To:Subject;
+ bh=q1Ni4Y9xes35WERiU2eMbmkZJEsUFDS3fkb7wysMQuk=; 
+ b=fhigaoJQrmZ0B+5Ba75XFmLasmGhR4sMrSfdp4hi20JmJV22jzErvqJzuSOfWFjoYE5QxN/5lzDcF5B0HS3lE5FrsVBgL/dvooyQW0D4gKCoKqN4MlbMfEGekM6H0nJUOj8TZWo04LUVqHmdSgXJFeXM6xdYGsBomLFYhbMWbYXq5YgI7tr7ypY53HZfG5y5LkU4mQVOzoV9NGA3FOjEIMY/b0SDRDrejYmi8yH9iF2hbczHDSmblFwOpZx/uxhFz0B9ogDRp1IyiTJvUTlUDAfbyhSNKmf2VhivdMlNfwEIfxs+e2KPeVBU1XdU7fZHVItCXxh7IvkRa3J8IeG6QA==;
+Received: from 211.81-166-168.customer.lyse.net ([81.166.168.211]:50224
+ helo=[192.168.10.176])
+ by smtp.domeneshop.no with esmtpsa (TLS1.2:ECDHE_RSA_AES_128_GCM_SHA256:128)
+ (Exim 4.84_2) (envelope-from <noralf@tronnes.org>)
+ id 1ghzLh-0006o4-1Q; Fri, 11 Jan 2019 17:07:57 +0100
+Subject: Re: [PATCH] drm/mediatek: Add MTK Framebuffer-Device (mt7623)
+To: CK Hu <ck.hu@mediatek.com>, Frank Wunderlich <frank-w@public-files.de>,
+ David Airlie <airlied@linux.ie>, Alexander Ryabchenko <d3adme4t@gmail.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ dri-devel <dri-devel@lists.freedesktop.org>,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ "moderated list:ARM/Mediatek SoC support"
+ <linux-mediatek@lists.infradead.org>, Philipp Zabel
+ <p.zabel@pengutronix.de>, Linux ARM <linux-arm-kernel@lists.infradead.org>
+References: <20190102084917.4049-1-frank-w@public-files.de>
+ <20190107103640.GH21184@phenom.ffwll.local>
+ <CAKMK7uEqxz4TAt_iwEC+dMWboVxCeCduyABsSwD0Ns7k=Z_UWA@mail.gmail.com>
+ <trinity-0da588a3-1277-4421-ad6b-1f6aeb129dd6-1547146897687@3c-app-gmx-bs35>
+ <20190110200225.GN21184@phenom.ffwll.local>
+ <1547176809.12054.11.camel@mtksdaap41>
+ <20190111092042.GP21184@phenom.ffwll.local>
+ <1547200155.4209.4.camel@mtksdaap41>
+ <20190111102503.GU21184@phenom.ffwll.local>
+From: =?UTF-8?Q?Noralf_Tr=c3=b8nnes?= <noralf@tronnes.org>
+Message-ID: <afe6ba3f-77ee-1b7c-072e-64ccb161119e@tronnes.org>
+Date: Fri, 11 Jan 2019 17:07:51 +0100
+User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <1547215132-85612-1-git-send-email-loic.pallardy@st.com>
-Content-Language: en-US
+In-Reply-To: <20190111102503.GU21184@phenom.ffwll.local>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_075220_658521_9A55765F 
-X-CRM114-Status: GOOD (  18.21  )
+X-CRM114-CacheID: sfid-20190111_080802_896970_9A8D0899 
+X-CRM114-Status: GOOD (  20.73  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -115,70 +87,149 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-stm32@st-md-mailman.stormreply.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 11/01/2019 13:58, Loic Pallardy wrote:
-> Domain translate function is needed to recover irq
-> configuration parameters from DT node
+
+
+Den 11.01.2019 11.25, skrev Daniel Vetter:
+> On Fri, Jan 11, 2019 at 05:49:15PM +0800, CK Hu wrote:
+>> Hi, Daniel:
+>>
+>> On Fri, 2019-01-11 at 10:20 +0100, Daniel Vetter wrote:
+>>> On Fri, Jan 11, 2019 at 11:20:09AM +0800, CK Hu wrote:
+>>>> Hi, Daniel:
+>>>>
+>>>> On Thu, 2019-01-10 at 21:02 +0100, Daniel Vetter wrote:
+>>>>> On Thu, Jan 10, 2019 at 08:01:37PM +0100, Frank Wunderlich wrote:
+>>>>>> Hi Daniel,
+>>>>>>
+>>>>>>>> Would be good to use the new generic fbdev emulation code here, for even
+>>>>>>>> less code. Or at least know why this isn't possible to use for mtk (and
+>>>>>>>> maybe address that in the core code). Hand-rolling fbdev code shouldn't be
+>>>>>>>> needed anymore.
+>>>>>>>
+>>>>>>> Back on the mailing list, no private replies please:
+>>>>>>
+>>>>>> i don't wanted to spam all people with dumb questions ;)
+>>>>>
+>>>>> There's no dumb questions, only insufficient documentation :-)
+>>>>>
+>>>>>>> For examples please grep for drm_fbdev_generic_setup(). There's also a
+>>>>>>> still in-flight series from Gerd Hoffmann to convert over bochs. That,
+>>>>>>> plus all the kerneldoc linked from there should get you started.
+>>>>>>> -Daniel
+>>>>>>
+>>>>>> this is one of google best founds if i search for drm_fbdev_generic_setup:
+>>>>>>
+>>>>>> https://lkml.org/lkml/2018/12/19/305
+>>>>>>
+>>>>>> not very helpful...
+>>>>>>
+>>>>>> so i tried kernel-doc
+>>>>>>
+>>>>>> https://www.kernel.org/doc/html/latest/gpu/drm-kms-helpers.html?highlight=drm_fbdev_generic_setup#c.drm_fbdev_generic_setup
+>>>>>>
+>>>>>> which is nice function-reference but i've found no generic workflow
+>>>>>>
+>>>>>> as the posted driver is "only" a driver ported from kernel 4.4 by Alexander, i don't know if this new framework can be used and which parts need to be changed. I only try to bring his code Mainline....
+>>>>>> Maybe CK Hu can help here because driver is originally from him and he knows internals. Or maybe you can help here?
+>>>>>>
+>>>>>> i personally make my first steps as spare-time kernel-developer :)
+>>>>>
+>>>>> There's a ton of in-kernel users of that function already, I meant you can
+>>>>> use those to serve as examples ... If those + the kerneldoc aren't
+>>>>> good enough, then we need to improve them.
+>>>>> -Daniel
+>>>>
+>>>> I've tried with drm_fbdev_generic_setup() and it works fine with simple
+>>>> modification. The patch is
+>>>>
+>>>> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+>>>> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+>>>> @@ -16,6 +16,7 @@
+>>>>  #include <drm/drm_atomic.h>
+>>>>  #include <drm/drm_atomic_helper.h>
+>>>>  #include <drm/drm_crtc_helper.h>
+>>>> +#include <drm/drm_fb_helper.h>
+>>>>  #include <drm/drm_gem.h>
+>>>>  #include <drm/drm_gem_cma_helper.h>
+>>>>  #include <drm/drm_of.h>
+>>>> @@ -379,6 +380,7 @@ static void mtk_drm_kms_deinit(struct drm_device
+>>>> *drm)
+>>>>         .gem_prime_get_sg_table = mtk_gem_prime_get_sg_table,
+>>>>         .gem_prime_import_sg_table = mtk_gem_prime_import_sg_table,
+>>>>         .gem_prime_mmap = mtk_drm_gem_mmap_buf,
+>>>> +       .gem_prime_vmap = mtk_drm_gem_prime_vmap,
+>>>>         .ioctls = mtk_ioctls,
+>>>>         .num_ioctls = ARRAY_SIZE(mtk_ioctls),
+>>>>         .fops = &mtk_drm_fops,
+>>>> @@ -416,6 +418,8 @@ static int mtk_drm_bind(struct device *dev)
+>>>>         if (ret < 0)
+>>>>                 goto err_deinit;
+>>>>
+>>>> +       drm_fbdev_generic_setup(drm, 32);
+>>>> +
+>>>>         return 0;
+>>>>
+>>>>
+>>>> But I implement .gem_prime_vmap with a workaround,
+>>>>
+>>>>
+>>>> --- a/drivers/gpu/drm/mediatek/mtk_drm_gem.c
+>>>> +++ b/drivers/gpu/drm/mediatek/mtk_drm_gem.c
+>>>> @@ -280,3 +280,8 @@ int mtk_gem_create_ioctl(struct drm_device *dev,
+>>>> void *data,
+>>>>         mtk_drm_gem_free_object(&mtk_gem->base);
+>>>>         return ret;
+>>>>  }
+>>>> +
+>>>> +void *mtk_drm_gem_prime_vmap(struct drm_gem_object *obj)
+>>>> +{
+>>>> +       return (void *)1;
+>>>> +}
+>>>>
+>>>> Current drm_fb_helper depends on drm_client to create fbdev. When
+>>>> drm_client create drm_client_buffer, it need to vmap to get kernel
+>>>> vaddr. But I think for fbdev, the vaddr is useless. Do you agree that I
+>>>> temporarily implement .gem_prime_vmap in such way?
+>>>
+>>> The vmap is used by fbcon, without that fbdev won't really work I think.
+>>> So I'm rather confused on what you tested ...
+>>>
+>>> Adding Noralf, he's the expert here.
+>>> -Daniel
+>>
+>> I test with fb_test [1], it is a user space program just open /dev/fb0
+>> and mmap it to user space. I does not turn on fbcon so everything looks
+>> well. If support fbcon is essential, I would implement vmap correctly.
+>> If it's not essential, I think I could return 0 when
+>> CONFIG_FRAMBUFFER_CONSOLE is defined.
 > 
-> Signed-off-by: Loic Pallardy <loic.pallardy@st.com>
+> I think fbdev emulation without working fbcon is fairly useless. And it
+> shouldn't be that much work to make it work, we have quite a few more
+> helers for gem bo nowadays.
 
-Surely this fixes something, right? Can you please add a Fixes: tag?
+If the virtual address is not set, fbcon can't be used and that means it
+has to be disabled using something like this in the driver Kconfig:
+	depends on !FRAMEBUFFER_CONSOLE
 
-> ---
->  drivers/irqchip/irq-stm32-exti.c | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
-> 
-> diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
-> index 6edfd4bfa169..717879028cc4 100644
-> --- a/drivers/irqchip/irq-stm32-exti.c
-> +++ b/drivers/irqchip/irq-stm32-exti.c
-> @@ -819,9 +819,27 @@ static int __init stm32_exti_init(const struct stm32_exti_drv_data *drv_data,
->  	return ret;
->  }
->  
-> +static int stm32_exti_h_translate(struct irq_domain *d,
-> +				  struct irq_fwspec *fwspec,
-> +				  unsigned long *out_hwirq,
-> +				  unsigned int *out_type)
-> +{
-> +	if (is_of_node(fwspec->fwnode)) {
+Otherwise it will crash if someone tries to use it.
 
-Is there any case where this wouldn't be true? i.e. an stm32 ACPI system?
+The problem here is that this driver doesn't map a virtual address for
+its buffers:
+	mtk_gem->dma_attrs |= DMA_ATTR_NO_KERNEL_MAPPING;
 
-> +		if (fwspec->param_count != 2)
-> +			return -EINVAL;
-> +
-> +		*out_hwirq = fwspec->param[0];
-> +		*out_type = fwspec->param[1] & IRQ_TYPE_SENSE_MASK;
-> +		return 0;
-> +	}
-> +
-> +	return -EINVAL;
-> +}
+Probably because of limited virtual address space.
+rockchip is in the same situation.
 
-Because otherwise, this is exactly what irq_domain_xlate_twocell() does.
+I'm aware of this shortcoming of the generic emulation, but I don't see
+how it can be solved without using somekind of flag attached to the dumb
+buffer creation request.
 
-> +
->  static const struct irq_domain_ops stm32_exti_h_domain_ops = {
->  	.alloc	= stm32_exti_h_domain_alloc,
->  	.free	= irq_domain_free_irqs_common,
-> +	.translate = stm32_exti_h_translate,
->  };
->  
->  static int
-> 
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Noralf.
 
 _______________________________________________
 linux-arm-kernel mailing list
