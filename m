@@ -2,20 +2,20 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D12A7C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 19:30:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0F2E1C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 19:32:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AD41C218C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 19:30:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DF286218C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 19:32:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oZ1/Cagc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AD41C218C3
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OT2gS2Qi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DF286218C3
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,56 +24,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ATZjUYf/Xm5d4PSjAIokVm9lH3mNy/i9SFk2QbnP5pY=; b=oZ1/CagcEyjTds
-	/2PChoBdxtEOo+yaHl7TslKXDlQdUzkmjLrLmVtWPIG82WDPl16pNUc2DYTGJ8vYclYGRGQqarsdd
-	tu2BFQz+gJVoNfnLQ7J9yyFmIb6RdXMOjIAqty35Ieyl+GvyWGAQhb7gJ5YvMAxjEaUZRWFSQcQWB
-	4nl6OZIu+wgYVbZfpdVMhndACpUVuJo9FiD7tsVGjA1+174WmZpn0vQOxXQSsge9QV3QEzzxA9dpN
-	halCViVP2Jz0USx70ljkL78ZvHQLiKnvQ/b3ud4opq4lVqqyuNJwHg/5IKMnUVma+7lTgyxcfBTK3
-	vxheDSjzN4qFBDXpnPpQ==;
+	List-Owner; bh=HM/tRHvtoRGeoNHPq6O3m8Ce9rrdX5cl2/ijoo07tFg=; b=OT2gS2Qi8XCU/e
+	mO6hp5Tk79Ptusua6RTZpKGj6d2OS42hD8JbpCXRRr429NhWUsYOwx+YII7BUCkm8dRPKAT9BNpDg
+	VQV3UJPGN/3GqakTihsZwgnjJnJtq5eD1eXQD36kDk5xfsckRcn6J+dofgP/Infb647P8FmJCPe8j
+	+1AkE/PvV+i2JZExmIGZniNokwYJ3csn+0OHAcmj8QyMTj/hh74pt5E27wfkPCNu82wcUV4b9Bv6m
+	0vgzBQFJJjP622N1S6bo08+PTbLiQ68NuRI3WbKZEqz9BM2zM67DnT8XagHEeC1dS0xyVspOxw7wm
+	swwh6vecmUSlg0wZ3NHA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gi2VQ-0006wl-9c; Fri, 11 Jan 2019 19:30:12 +0000
-Received: from mail-oi1-f193.google.com ([209.85.167.193])
+	id 1gi2XJ-0007HS-8X; Fri, 11 Jan 2019 19:32:09 +0000
+Received: from mail-ot1-f66.google.com ([209.85.210.66])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gi2VJ-0005uM-2g; Fri, 11 Jan 2019 19:30:10 +0000
-Received: by mail-oi1-f193.google.com with SMTP id r62so13152413oie.1;
- Fri, 11 Jan 2019 11:30:04 -0800 (PST)
+ id 1gi2XG-0007Gr-BD
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 19:32:07 +0000
+Received: by mail-ot1-f66.google.com with SMTP id v23so14100811otk.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 11 Jan 2019 11:32:04 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=8c0Cd9SOEjMucxUgr1cK7o0spBsIvwNckk4Oy28C5lI=;
- b=Ccf0t418sVDTKpWjizpDaCuehJcpzu92oCl/xPvlZUiFSayXQ7NE/elOrdj0OQU0cA
- nLzM91UrIJ5JV38sZDWA9tZLPaa+xHpQDBNaXnve12p9McG8YYKi6M6hvruIEZSG/VkN
- vkMcCY9xUu50OQ/2HdMcagGfX3zascn79FemBkxtvqtGzKUYyAe59Twdl/s6uYlciM6U
- T9UzoO3XWYyzu3eiH1mxbIarWixq0JYDrWNypUAS9EYE1Vo0RMRtLSIHMgXCY2DQHLr3
- 3MFTe+TNcuyPeYd76j0IbQ7xWZXO3AVS7bnZOkHA9iddzyG/rq6IHXc9zE1Gc46xihZY
- TRHQ==
-X-Gm-Message-State: AJcUuke5ydyLXNo7cOcCSUi/KK23hm9SaXfQ5NbIqUl3sq7NnN8MQ9um
- 26ITOFphAb4G+2noVuWjGQ==
-X-Google-Smtp-Source: ALg8bN4aD2psTbop+nJFCIp6EGeA7Nih3kgQ7KPHL/VjW6kqRp1Sfq9RC0C0xCae3bHA5zHvpYMDVg==
-X-Received: by 2002:aca:f44c:: with SMTP id s73mr10507571oih.102.1547235003963; 
- Fri, 11 Jan 2019 11:30:03 -0800 (PST)
+ bh=V0W2PjXbgYdTSjRjbwVyVPKyXHLoEjG/vLmUxXHD6X4=;
+ b=OcWq1X3m7JJCZmSVNo6d/xj/KETMem8N0hKhYUqR1gMyKDnmx6lnJmMQ3s5OdpZPFQ
+ HkJgCc8KgjtM9hB4TvANHupCTIW0ZM+q5apQBjbBPK+wrjK3Jnjl8bO1LZaWW6QIsdo3
+ 0A4yIpy7DP4jt55opVop5VtghR9xZDeKsIS09FilkUSb1k/M1MsL8SJXMZrNoVUATbIz
+ KwTDByTajjfTkc1a9BnN4ZYc+VbAf5qGUCz1gSSRW/wAJADRBDkLup2JN6OY2ily9OmW
+ JQfwT4s5WPqT1LDlBopRzDMK9aJnUVF57jotk6ftLc5zm7Vw3Bd/mKl7W5G9F/GylxwA
+ qW5Q==
+X-Gm-Message-State: AJcUukcfIcVn78qPdeT+EpgVGx/7t8Qpx+S05aHoUl2YR7ZLhxI2by+F
+ evS/elS0pDnd38EwvUHeJNxyn4Welw==
+X-Google-Smtp-Source: ALg8bN6WQImHQo+GfG9Jdk6TNTqLFZfvBf6+Bd+tZ3jor0crk9hCgNeWppVXg29Xj929wujzz/v9iQ==
+X-Received: by 2002:a9d:2c65:: with SMTP id f92mr10586942otb.18.1547235123480; 
+ Fri, 11 Jan 2019 11:32:03 -0800 (PST)
 Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
  [24.155.109.49])
- by smtp.gmail.com with ESMTPSA id u65sm31698804oib.5.2019.01.11.11.30.03
+ by smtp.gmail.com with ESMTPSA id m131sm34930866oia.6.2019.01.11.11.32.02
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 11 Jan 2019 11:30:03 -0800 (PST)
-Date: Fri, 11 Jan 2019 13:30:02 -0600
+ Fri, 11 Jan 2019 11:32:02 -0800 (PST)
+Date: Fri, 11 Jan 2019 13:32:02 -0600
 From: Rob Herring <robh@kernel.org>
-To: Yunfei Dong <yunfei.dong@mediatek.com>
-Subject: Re: [PATCH v2,1/3] media: dt-bindings: media: add 'assigned-clocks'
- to vcodec examples
-Message-ID: <20190111193002.GA19308@bogus>
-References: <1546571161-11470-1-git-send-email-yunfei.dong@mediatek.com>
+To: Joseph Lo <josephl@nvidia.com>
+Subject: Re: [PATCH V4 01/20] dt-bindings: clock: tegra124-dfll: Update DFLL
+ binding for PWM regulator
+Message-ID: <20190111193202.GA23016@bogus>
+References: <20190104030702.8684-1-josephl@nvidia.com>
+ <20190104030702.8684-2-josephl@nvidia.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1546571161-11470-1-git-send-email-yunfei.dong@mediatek.com>
+In-Reply-To: <20190104030702.8684-2-josephl@nvidia.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_113005_162039_2D8904B6 
-X-CRM114-Status: UNSURE (   9.87  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190111_113206_420775_226ABE38 
+X-CRM114-Status: GOOD (  12.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,32 +87,38 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Andrew-CT Chen <andrew-ct.chen@mediatek.com>,
- Tiffany Lin <tiffany.lin@mediatek.com>, devicetree@vger.kernel.org,
- Yunfei Dong <yunfei.dong@mediatek.com>, linux-kernel@vger.kernel.org,
- linux-mediatek@lists.infradead.org, Qianqian Yan <qianqian.yan@mediatek.com>,
- Matthias Brugger <matthias.bgg@gmail.com>,
- Mauro Carvalho Chehab <mchehab@kernel.org>,
- linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
+Cc: devicetree@vger.kernel.org, Peter De Schrijver <pdeschrijver@nvidia.com>,
+ Jonathan Hunter <jonathanh@nvidia.com>,
+ Thierry Reding <thierry.reding@gmail.com>, Joseph Lo <josephl@nvidia.com>,
+ linux-tegra@vger.kernel.org, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 4 Jan 2019 11:05:59 +0800, Yunfei Dong wrote:
-> Fix MTK binding document for MT8173 dtsi changed in order
-> to use standard CCF interface.
-> MT8173 SoC from Mediatek.
+On Fri, 4 Jan 2019 11:06:43 +0800, Joseph Lo wrote:
+> From: Peter De Schrijver <pdeschrijver@nvidia.com>
 > 
-> Signed-off-by: Yunfei Dong <yunfei.dong@mediatek.com>
-> Signed-off-by: Qianqian Yan <qianqian.yan@mediatek.com>
+> Add new properties to configure the DFLL PWM regulator support.
+> 
+> Cc: devicetree@vger.kernel.org
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> Acked-by: Jon Hunter <jonathanh@nvidia.com>
 > ---
-> change note:
-> v2: modify subject
+> *V4:
+>  - s/nvidia,pwm-period/nvidia,pwm-period-nanoseconds/
+> *V3:
+>  - no change
+> *V2:
+>  - update the binding strings and descriptions for
+>  nvidia,pwm-tristate-microvolts
+>  nvidia,pwm-min-microvolts
+>  nvidia,pwm-voltage-step-microvolts
 > ---
->  .../devicetree/bindings/media/mediatek-vcodec.txt   | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
+>  .../bindings/clock/nvidia,tegra124-dfll.txt   | 79 ++++++++++++++++++-
+>  1 file changed, 77 insertions(+), 2 deletions(-)
 > 
 
 Reviewed-by: Rob Herring <robh@kernel.org>
