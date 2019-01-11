@@ -2,71 +2,117 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 69538C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 05:25:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7D9BEC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 05:57:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 304A620872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 05:25:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 16F4920872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 05:57:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tO8wPwrp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 304A620872
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="I9036OQv";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="uggNfwRe"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 16F4920872
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lesMpYjSIw7Rpmr+WvFM5wY6LR2V+7Cmn299tej2RzM=; b=tO8wPwrp6LVaem
-	+Sp0SgpO1v+x7PBgrhWq86XiIjclGhoxnmNatqqK7e2WFoM+Hs45FRWL74uQfiGodRpxJ+Cofl9er
-	J1D7OjX6PCKHdmmETJCf5i2QJcMAX9Iej4+iImBx09giQY9DV5rRsT8tA4xkMBtYFbWpZzJGKgliQ
-	xe8LyDN6Cd3nktinOGncMC7z625LLKxyh584wyMuWwSBg7tpwmTvaPx6WunpuKBFwZKyw4JQnQ2DV
-	Oh79LlLVJu/d9hfBfbJApf3cmIF6KxCBt3I4DXkQX7ZmLErR2iTV5K1WpwLOlrHhhPLeNW7uugSRT
-	OmN45Vh0JSXhaluyDaHA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=8AK/V4AL4m6RXzfV6XQHYMGiokjMyO300imCDNUBSjA=; b=I9036OQvtbz5bg
+	xyEuL1nk1xaXQGz3SAM3HtVO7GLqunwh7px6gJPrFcI2inN3r/DrQPfkVA842UCNpkAny7b8HNO/N
+	d4W9W5pOPtY4jIyNn+gMzxvJKS0Jf8ODIH3WkkdSPM0LRPINFLfn8qo+E4hhk3TE74bA66DZ5Id8N
+	hCUO1lS1Oacb5zkpo+JTQAJxuycRwrolkPDKrBpcm3Gpxp3VD8hKeVSzPJsQacvgl891KasH0oAnV
+	UWXmEf+pqSHx26MoVeVkkPZlOHZGyXa0iTCmoM2vR/XPz9a+EayiUyb2BUreSCC4qYt2WEQl/mo7B
+	PrVf3IseIruhcTo34OZw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghpJR-0004T5-R1; Fri, 11 Jan 2019 05:24:57 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1ghpp6-0007EK-5Q; Fri, 11 Jan 2019 05:57:40 +0000
+Received: from mail-eopbgr80043.outbound.protection.outlook.com ([40.107.8.43]
+ helo=EUR04-VI1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghpJN-0004SE-DZ; Fri, 11 Jan 2019 05:24:54 +0000
-X-UUID: 5a1d0a38c2ca46c8aa75cff9cc8dd425-20190110
-X-UUID: 5a1d0a38c2ca46c8aa75cff9cc8dd425-20190110
-Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw01.mediatek.com
- (envelope-from <min.guo@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1169424473; Thu, 10 Jan 2019 21:24:43 -0800
-Received: from MTKMBS31N1.mediatek.inc (172.27.4.69) by
- MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Thu, 10 Jan 2019 21:24:42 -0800
-Received: from MTKCAS32.mediatek.inc (172.27.4.184) by MTKMBS31N1.mediatek.inc
- (172.27.4.69) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Fri, 11 Jan 2019 13:24:39 +0800
-Received: from [10.17.3.153] (10.17.3.153) by MTKCAS32.mediatek.inc
- (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Fri, 11 Jan 2019 13:24:37 +0800
-Message-ID: <1547184277.4433.164.camel@mhfsdcap03>
-Subject: Re: [PATCH 4/4] usb: musb: Add support for MediaTek musb controller
-From: Min Guo <min.guo@mediatek.com>
-To: Bin Liu <b-liu@ti.com>
-Date: Fri, 11 Jan 2019 13:24:37 +0800
-In-Reply-To: <20190108154441.GG25910@uda0271908>
-References: <1545896066-897-1-git-send-email-min.guo@mediatek.com>
- <1545896066-897-5-git-send-email-min.guo@mediatek.com>
- <20190108154441.GG25910@uda0271908>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+ id 1ghpp1-0007E0-Hd
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 05:57:37 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=5kYSRxsRGK+FO7ypNattloBcDLkGHIr1KmhNKjiMuPA=;
+ b=uggNfwReZI6BY9Xmz9FYQOXng6boL/6hnXe1lTb9ictW0XYaalHMIFM8d/6dVoVCXLhP23+F3FdQzcsNGDuxYFJg3LcvMchUgK4lWUknPd3zznbQMfmxuNnm7PVsMG2ia1kBssGMdZNd1y6rhSB06TxE7FKeIPhla4Yq47UrAss=
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
+ DB3PR0402MB3852.eurprd04.prod.outlook.com (52.134.71.143) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1516.14; Fri, 11 Jan 2019 05:57:30 +0000
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::59d2:55a0:dbe3:2a97]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::59d2:55a0:dbe3:2a97%6]) with mapi id 15.20.1516.016; Fri, 11 Jan 2019
+ 05:57:30 +0000
+From: Anson Huang <anson.huang@nxp.com>
+To: "shawnguo@kernel.org" <shawnguo@kernel.org>, "s.hauer@pengutronix.de"
+ <s.hauer@pengutronix.de>, "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>, "linux@armlinux.org.uk"
+ <linux@armlinux.org.uk>, "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>
+Subject: [PATCH V2] ARM: imx: add i.MX7ULP cpuidle support
+Thread-Topic: [PATCH V2] ARM: imx: add i.MX7ULP cpuidle support
+Thread-Index: AQHUqXKJSi5DEBdu5UKeaKryAiY5Gg==
+Date: Fri, 11 Jan 2019 05:57:30 +0000
+Message-ID: <1547185955-2395-1-git-send-email-Anson.Huang@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: git-send-email 2.7.4
+x-clientproxiedby: HK0PR03CA0087.apcprd03.prod.outlook.com
+ (2603:1096:203:72::27) To DB3PR0402MB3916.eurprd04.prod.outlook.com
+ (2603:10a6:8:10::18)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=anson.huang@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [119.31.174.66]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; DB3PR0402MB3852;
+ 6:8PUSiBC59KePb3JcEOLkLi9Rs6xfCHOzQN0iw56XRgBBFhy9KeyHYpBghMg4LO5uX6eyxWBBDZuLh94ruZKb8VuOCX3wEpMIkO4T9Z2vAiprAuf011qWSBwxT5xOqns3ieMsYtXgj4hAWZq2dp18XCeyalACQadixRQobFb/k7/AiVP4pLNOmzZV7ZADSKSIAFKwUYfTeoNKIuim192/sfyfEdTn1KumNhy8fRNticQzm57Bcoo/zJdggra344lb+i8e1tu/CFQqQohAVoGTcCnRfV5EfzuFZKsyrvFv6+05+shj71NF3cPWsW+SGN5sQ4dUUh1GADQVtbjVP3bHyHIN31TneYvXnmaabhYS+V3Tl14alvqcrkn69nESoHFvbhNT+wedEQnq2aLPjCuQzLeUdx40pXlE152+qUxvp9xV0rnWpEKLE3EnW91xFRQyVCmhfiEFyKQC4t/hNzDT0g==;
+ 5:BWtE1DASKlCVSO81c588T+WnRMODdVSqxnxQPlCPd1GbE7toMVZUgxhOVd3c8rfjWkPYsS6DOtxXX5pKfS5onZ18IEeCBw0SDSaQcI0UrgeGOf8ZEQ4tUYfX7esyRHdx1aCRAb7BP9eKW7ETgB3UdGM/+TlzS8OkD1V7T8itILWN3uoIvcj125jCBOMR613QecgPNDeiLvbGNkFtmQHf3g==;
+ 7:/4NTILLxO7W5sIJoU3KrWKXfq/LmMHuYaSpK4iP2++NajBca7lllv/8Fjs5+TgS5OnXojet0twJzSlFxeOwwGb+mdu6TOXmQ3lThMM77sUxb+ibf9SsZR6jfYwsMOPWuEP1lFtpYx7VL9m+t/3hSnw==
+x-ms-office365-filtering-correlation-id: 8a95582f-ac02-43de-f809-08d67789ac38
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:DB3PR0402MB3852; 
+x-ms-traffictypediagnostic: DB3PR0402MB3852:
+x-microsoft-antispam-prvs: <DB3PR0402MB3852C3C12F35EB9CD28C19F5F5850@DB3PR0402MB3852.eurprd04.prod.outlook.com>
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(3230021)(908002)(5005026)(6040522)(8220060)(2401047)(8121501046)(3002001)(3231475)(944501520)(52105112)(10201501046)(93006095)(93001095)(6055026)(6041310)(20161123558120)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123562045)(20161123560045)(20161123564045)(201708071742011)(7699051)(76991095);
+ SRVR:DB3PR0402MB3852; BCL:0; PCL:0; RULEID:; SRVR:DB3PR0402MB3852; 
+x-forefront-prvs: 09144DB0F7
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(366004)(39860400002)(376002)(396003)(346002)(136003)(199004)(189003)(54534003)(2501003)(386003)(97736004)(68736007)(5660300001)(36756003)(14444005)(256004)(71190400001)(71200400001)(105586002)(106356001)(486006)(2906002)(66066001)(316002)(2616005)(4326008)(476003)(110136005)(99286004)(25786009)(6436002)(86362001)(575784001)(2201001)(478600001)(6486002)(3846002)(6116002)(14454004)(8676002)(81156014)(8936002)(26005)(6512007)(6506007)(53936002)(81166006)(7736002)(305945005)(50226002)(102836004)(186003)(52116002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3852;
+ H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: Ay8wOj/Y+9RRxL8c27vEBPUWbPxuQifW3bz1EEqWotvh5V0BwhiKCJ4V1JZxGbo+RdX0Kb6ILTKblNGbYB850pm6seYLCM/GicuV6Gpmr4NE2n9BzZyTWxRsqOtzmQHscMH+EA84IVHOz6mjd8hpSM94VD4WG+WtjWob5Xnks0uHzHZtbIwXZFd/pYeAp3old47hf79QM/nGfvHG9jd057Idq4AygbmWAhfOue+4MGm0YCJ5UKSkVfUjKIRRo9y+YrcH4ncLYmuEaiOnEDQkWcG/MU04YZCl4/XeE9T/zWswR/XMgWvlxhyDnZ76ACjt+iwFvnGPkUsqU/hmFolGEyFVfbbK/9OFWmW/l3XmykFTIx2JINqFvF8ugarkGu8nYe2u/Pev+aGkgp442ZXM7e5yk1Va1FG93ca5sYfSGxA=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-X-MTK: N
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 8a95582f-ac02-43de-f809-08d67789ac38
+X-MS-Exchange-CrossTenant-originalarrivaltime: 11 Jan 2019 05:57:24.5242 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3852
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_212453_460705_EA15FA4E 
-X-CRM114-Status: GOOD (  18.69  )
+X-CRM114-CacheID: sfid-20190110_215735_661547_181EB1A6 
+X-CRM114-Status: GOOD (  22.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,119 +124,262 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Yonglong Wu <yonglong.wu@mediatek.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-usb@vger.kernel.org,
- linux-kernel@vger.kernel.org, Matthias
- Brugger <matthias.bgg@gmail.com>, Rob Herring <robh+dt@kernel.org>,
- Alan Stern <stern@rowland.harvard.edu>, chunfeng.yun@mediatek.com,
- linux-mediatek@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Cc: dl-linux-imx <linux-imx@nxp.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Bin,
+This patch adds cpuidle support for i.MX7ULP, 3 cpuidle
+states supported as below:
 
-I have some questions about
-musbhs_dma_controller_destroy/create_noirq().
-1,Because of controller->irq=0 in noirq case, destroy_noirq can reuse
-musbhs_dma_controller_destroy. Is it necessary to write a destroy_noirq
-function?
-2, How about creating a common function for create musb dma controller
-as following:
-static struct musb_dma_controller *dma_controller_alloc(struct musb
-*musb, void __iomem *base)
-then musbhs_dma_controller_create() and
-musbhs_dma_controller_create_noirq() call it to alloc common resource.
+1. WFI, just ARM wfi;
+2. WAIT mode, mapped to SoC's partial stop mode #3;
+3. STOP mode, mapped to SoC's partial stop mode #1.
 
+In WAIT mode, system clock and bus clock will be enabled;
+In STOP mode, system clock and bus clock will be disabled.
 
-On Tue, 2019-01-08 at 09:44 -0600, Bin Liu wrote:
-> Hi,
-> 
-> On Thu, Dec 27, 2018 at 03:34:26PM +0800, min.guo@mediatek.com wrote:
-> > From: Min Guo <min.guo@mediatek.com>
-> > 
-> > This adds support for MediaTek musb controller in
-> > host, peripheral and otg mode
-> > 
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ChangeLog Since V1:
+  - add prefix for power mode name;
+  - use tab instead of spaces, sorry for this stupid mistake.
+---
+ arch/arm/mach-imx/Makefile          |  1 +
+ arch/arm/mach-imx/common.h          | 10 +++++++
+ arch/arm/mach-imx/cpuidle-imx7ulp.c | 60 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/cpuidle.h         |  5 ++++
+ arch/arm/mach-imx/mach-imx7ulp.c    |  7 +++++
+ arch/arm/mach-imx/pm-imx7ulp.c      | 49 ++++++++++++++++++++++++++----
+ 6 files changed, 127 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/mach-imx/cpuidle-imx7ulp.c
 
-> > diff --git a/drivers/usb/musb/musbhsdma.c b/drivers/usb/musb/musbhsdma.c
-> > index 824adcb..c545475 100644
-> > --- a/drivers/usb/musb/musbhsdma.c
-> > +++ b/drivers/usb/musb/musbhsdma.c
-
-> >  
-> >  void musbhs_dma_controller_destroy(struct dma_controller *c)
-> >  {
-> >  	struct musb_dma_controller *controller = container_of(c,
-> >  			struct musb_dma_controller, controller);
-> > +	struct musb *musb = controller->private_data;
-> >  
-> >  	dma_controller_stop(controller);
-> >  
-> > -	if (controller->irq)
-> > +	if (!(musb->ops->quirks & MUSB_MTK_QUIRKS) && controller->irq)
-> >  		free_irq(controller->irq, c);
-> >  
-> >  	kfree(controller);
-> > @@ -398,11 +402,15 @@ struct dma_controller *musbhs_dma_controller_create(struct musb *musb,
-> >  	struct musb_dma_controller *controller;
-> >  	struct device *dev = musb->controller;
-> >  	struct platform_device *pdev = to_platform_device(dev);
-> > -	int irq = platform_get_irq_byname(pdev, "dma");
-> > +	int irq = -1;
-> >  
-> > -	if (irq <= 0) {
-> > -		dev_err(dev, "No DMA interrupt line!\n");
-> > -		return NULL;
-> > +	if (!(musb->ops->quirks & MUSB_MTK_QUIRKS)) {
-> > +		irq = platform_get_irq_byname(pdev, "dma");
-> > +
-> > +		if (irq < 0) {
-> > +			dev_err(dev, "No DMA interrupt line!\n");
-> > +			return NULL;
-> > +		}
-> >  	}
-> 
-> Please create musbhs_dma_controller_destroy_noirq() for your platform to
-> not use the quirk.
-> 
-> >  
-> >  	controller = kzalloc(sizeof(*controller), GFP_KERNEL);
-> > @@ -418,15 +426,17 @@ struct dma_controller *musbhs_dma_controller_create(struct musb *musb,
-> >  	controller->controller.channel_program = dma_channel_program;
-> >  	controller->controller.channel_abort = dma_channel_abort;
-> >  
-> > -	if (request_irq(irq, dma_controller_irq, 0,
-> > +	if (!(musb->ops->quirks & MUSB_MTK_QUIRKS)) {
-> > +		if (request_irq(irq, dma_controller_irq, 0,
-> >  			dev_name(musb->controller), &controller->controller)) {
-> > -		dev_err(dev, "request_irq %d failed!\n", irq);
-> > -		musb_dma_controller_destroy(&controller->controller);
-> > +			dev_err(dev, "request_irq %d failed!\n", irq);
-> > +			musb_dma_controller_destroy(&controller->controller);
-> >  
-> > -		return NULL;
-> > -	}
-> > +			return NULL;
-> > +		}
-> >  
-> > -	controller->irq = irq;
-> > +		controller->irq = irq;
-> > +	}
-> >  
-> >  	return &controller->controller;
-> >  }
-> 
-> Same here, create musbhs_dma_controller_create_noirq(). Then use both
-> new API for the mtk glue driver.
-
-
-
-> Regards,
-> -Bin.
-
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 8af2f7e..12aa44a 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -29,6 +29,7 @@ obj-$(CONFIG_SOC_IMX6SL) += cpuidle-imx6sl.o
+ obj-$(CONFIG_SOC_IMX6SLL) += cpuidle-imx6sx.o
+ obj-$(CONFIG_SOC_IMX6SX) += cpuidle-imx6sx.o
+ obj-$(CONFIG_SOC_IMX6UL) += cpuidle-imx6sx.o
++obj-$(CONFIG_SOC_IMX7ULP) += cpuidle-imx7ulp.o
+ endif
+ 
+ ifdef CONFIG_SND_IMX_SOC
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index bc915e5..c51764a 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -72,6 +72,15 @@ enum mxc_cpu_pwr_mode {
+ 	STOP_POWER_OFF,		/* STOP + SRPG */
+ };
+ 
++enum ulp_cpu_pwr_mode {
++	ULP_PM_HSRUN,    /* High speed run mode */
++	ULP_PM_RUN,      /* Run mode */
++	ULP_PM_WAIT,     /* Wait mode */
++	ULP_PM_STOP,     /* Stop mode */
++	ULP_PM_VLPS,     /* Very low power stop mode */
++	ULP_PM_VLLS,     /* very low leakage stop mode */
++};
++
+ void imx_enable_cpu(int cpu, bool enable);
+ void imx_set_cpu_jump(int cpu, void *jump_addr);
+ u32 imx_get_cpu_arg(int cpu);
+@@ -98,6 +107,7 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode);
+ void imx6_set_int_mem_clk_lpm(bool enable);
+ void imx6sl_set_wait_clk(bool enter);
+ int imx_mmdc_get_ddr_type(void);
++int imx7ulp_set_lpm(enum ulp_cpu_pwr_mode mode);
+ 
+ void imx_cpu_die(unsigned int cpu);
+ int imx_cpu_kill(unsigned int cpu);
+diff --git a/arch/arm/mach-imx/cpuidle-imx7ulp.c b/arch/arm/mach-imx/cpuidle-imx7ulp.c
+new file mode 100644
+index 0000000..ca86c96
+--- /dev/null
++++ b/arch/arm/mach-imx/cpuidle-imx7ulp.c
+@@ -0,0 +1,60 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright (C) 2016 Freescale Semiconductor, Inc.
++ * Copyright 2017-2018 NXP
++ *   Anson Huang <Anson.Huang@nxp.com>
++ */
++
++#include <linux/cpuidle.h>
++#include <linux/module.h>
++#include <asm/cpuidle.h>
++
++#include "common.h"
++#include "cpuidle.h"
++
++static int imx7ulp_enter_wait(struct cpuidle_device *dev,
++			    struct cpuidle_driver *drv, int index)
++{
++	if (index == 1)
++		imx7ulp_set_lpm(ULP_PM_WAIT);
++	else
++		imx7ulp_set_lpm(ULP_PM_STOP);
++
++	cpu_do_idle();
++
++	imx7ulp_set_lpm(ULP_PM_RUN);
++
++	return index;
++}
++
++static struct cpuidle_driver imx7ulp_cpuidle_driver = {
++	.name = "imx7ulp_cpuidle",
++	.owner = THIS_MODULE,
++	.states = {
++		/* WFI */
++		ARM_CPUIDLE_WFI_STATE,
++		/* WAIT */
++		{
++			.exit_latency = 50,
++			.target_residency = 75,
++			.enter = imx7ulp_enter_wait,
++			.name = "WAIT",
++			.desc = "PSTOP2",
++		},
++		/* STOP */
++		{
++			.exit_latency = 100,
++			.target_residency = 150,
++			.enter = imx7ulp_enter_wait,
++			.name = "STOP",
++			.desc = "PSTOP1",
++		},
++	},
++	.state_count = 3,
++	.safe_state_index = 0,
++};
++
++int __init imx7ulp_cpuidle_init(void)
++{
++	return cpuidle_register(&imx7ulp_cpuidle_driver, NULL);
++}
+diff --git a/arch/arm/mach-imx/cpuidle.h b/arch/arm/mach-imx/cpuidle.h
+index f914012..7694c8f 100644
+--- a/arch/arm/mach-imx/cpuidle.h
++++ b/arch/arm/mach-imx/cpuidle.h
+@@ -15,6 +15,7 @@ extern int imx5_cpuidle_init(void);
+ extern int imx6q_cpuidle_init(void);
+ extern int imx6sl_cpuidle_init(void);
+ extern int imx6sx_cpuidle_init(void);
++extern int imx7ulp_cpuidle_init(void);
+ #else
+ static inline int imx5_cpuidle_init(void)
+ {
+@@ -32,4 +33,8 @@ static inline int imx6sx_cpuidle_init(void)
+ {
+ 	return 0;
+ }
++static inline int imx7ulp_cpuidle_init(void)
++{
++	return 0;
++}
+ #endif
+diff --git a/arch/arm/mach-imx/mach-imx7ulp.c b/arch/arm/mach-imx/mach-imx7ulp.c
+index 16b295b..11ac71a 100644
+--- a/arch/arm/mach-imx/mach-imx7ulp.c
++++ b/arch/arm/mach-imx/mach-imx7ulp.c
+@@ -12,6 +12,7 @@
+ #include <asm/mach/arch.h>
+ 
+ #include "common.h"
++#include "cpuidle.h"
+ #include "hardware.h"
+ 
+ #define SIM_JTAG_ID_REG		0x8c
+@@ -64,7 +65,13 @@ static const char *const imx7ulp_dt_compat[] __initconst = {
+ 	NULL,
+ };
+ 
++static void __init imx7ulp_init_late(void)
++{
++	imx7ulp_cpuidle_init();
++}
++
+ DT_MACHINE_START(IMX7ulp, "Freescale i.MX7ULP (Device Tree)")
+ 	.init_machine	= imx7ulp_init_machine,
+ 	.dt_compat	= imx7ulp_dt_compat,
++	.init_late	= imx7ulp_init_late,
+ MACHINE_END
+diff --git a/arch/arm/mach-imx/pm-imx7ulp.c b/arch/arm/mach-imx/pm-imx7ulp.c
+index cf6a380..7b2f738 100644
+--- a/arch/arm/mach-imx/pm-imx7ulp.c
++++ b/arch/arm/mach-imx/pm-imx7ulp.c
+@@ -9,21 +9,60 @@
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ 
++#include "common.h"
++
+ #define SMC_PMCTRL		0x10
+ #define BP_PMCTRL_PSTOPO        16
+ #define PSTOPO_PSTOP3		0x3
++#define PSTOPO_PSTOP2		0x2
++#define PSTOPO_PSTOP1		0x1
++#define BP_PMCTRL_RUNM		8
++#define RUNM_RUN		0
++#define BP_PMCTRL_STOPM		0
++#define STOPM_STOP		0
++
++#define BM_PMCTRL_PSTOPO	(3 << BP_PMCTRL_PSTOPO)
++#define BM_PMCTRL_RUNM		(3 << BP_PMCTRL_RUNM)
++#define BM_PMCTRL_STOPM		(7 << BP_PMCTRL_STOPM)
++
++static void __iomem *smc1_base;
++
++int imx7ulp_set_lpm(enum ulp_cpu_pwr_mode mode)
++{
++	u32 val = readl_relaxed(smc1_base + SMC_PMCTRL);
++
++	/* clear all */
++	val &= ~(BM_PMCTRL_RUNM | BM_PMCTRL_STOPM | BM_PMCTRL_PSTOPO);
++
++	switch (mode) {
++	case ULP_PM_RUN:
++		/* system/bus clock enabled */
++		val |= PSTOPO_PSTOP3 << BP_PMCTRL_PSTOPO;
++		break;
++	case ULP_PM_WAIT:
++		/* system clock disabled, bus clock enabled */
++		val |= PSTOPO_PSTOP2 << BP_PMCTRL_PSTOPO;
++		break;
++	case ULP_PM_STOP:
++		/* system/bus clock disabled */
++		val |= PSTOPO_PSTOP1 << BP_PMCTRL_PSTOPO;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	writel_relaxed(val, smc1_base + SMC_PMCTRL);
++
++	return 0;
++}
+ 
+ void __init imx7ulp_pm_init(void)
+ {
+ 	struct device_node *np;
+-	void __iomem *smc1_base;
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "fsl,imx7ulp-smc1");
+ 	smc1_base = of_iomap(np, 0);
+ 	WARN_ON(!smc1_base);
+ 
+-	/* Partial Stop mode 3 with system/bus clock enabled */
+-	writel_relaxed(PSTOPO_PSTOP3 << BP_PMCTRL_PSTOPO,
+-		       smc1_base + SMC_PMCTRL);
+-	iounmap(smc1_base);
++	imx7ulp_set_lpm(ULP_PM_RUN);
+ }
+-- 
+2.7.4
 
 
 _______________________________________________
