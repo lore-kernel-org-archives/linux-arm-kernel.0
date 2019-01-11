@@ -2,67 +2,62 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9D123C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 13:34:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0C294C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 13:34:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6ED7220874
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 13:34:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CF8DD20874
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 13:34:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eB+/MXTy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6ED7220874
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jJZc9m5f"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CF8DD20874
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=iMQxIRwKRe1wWklEt02VL2s8CR8dL3tpWk7lcAvryiw=; b=eB+/MXTymYiqVw
-	1srBK4neOUU6rJTi3BXR00JTRLGHLU4ueZ5Jum7sEDXjyD91dapky2VFmp7nDaz0UoT2k/x/Q3s33
-	CBv3/x0HW2c17VQxLig6bEK7DP8WPqI29ERfPhtb2kp0lAlyHqqIxB8ZvC1lDPs/jBh4Q6XaBpH1z
-	6ZG3MyfU2S/FjG0hgN+hnkJN4Wp8Et7nKFNTAzNtXiO0Fia1VEFWYxHJtvexjc7/UKs3Vazp8AE4S
-	s1qDVQPMImglfe4/IldbU4fJ+QBYUSMQTRm6TECM3/C2sGphIMJuBHyY+Q6YceuLzhAj3fI2+ebBp
-	vHDqucDu+hJOdM7qsd5w==;
+	List-Owner; bh=w31FEs98qYSLhfEUGXfAU12fCnb8VBnOQUqWtzIK/aU=; b=jJZc9m5fvgf3xn
+	LMnVLRgtRF0fYL987NnAo3lHkvd2t7LX+q2djkXPkijQrX/jmW6tw5afU97rq0BsBhLtPW4nA9nMX
+	Fh22hnOPwnU/UH89O4e0sblIxDl5Diei6S/PTcunUNs1syDdTid6BmhrZykFhSfznSH7VCiQc63b2
+	dJgh7okNuayKFqKlBTzu1DIIltq8Ws+4ssOqA+fzT766OelzgcKGQqKkQicO25gAXUpFc10Dqft8L
+	Q6Qcp3S4FVCx2VyOXIb8c2W6HuH/qf4BtlF0EvNUBKSlir0EJfO8fy5BcPbRUV6Ewq65qvBF0yW7Z
+	eFyotVIitGT/ySuEWrfw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghwx4-0008Lw-Qk; Fri, 11 Jan 2019 13:34:22 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
+	id 1ghwxL-000074-4h; Fri, 11 Jan 2019 13:34:39 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghwuU-0005qk-3s
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 13:31:55 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 2BB0C20AAA; Fri, 11 Jan 2019 14:31:37 +0100 (CET)
-Received: from localhost.localdomain
- (aaubervilliers-681-1-45-241.w90-88.abo.wanadoo.fr [90.88.163.241])
- by mail.bootlin.com (Postfix) with ESMTPSA id A49EA20A2F;
- Fri, 11 Jan 2019 14:31:36 +0100 (CET)
-From: Miquel Raynal <miquel.raynal@bootlin.com>
-To: Kishon Vijay Abraham I <kishon@ti.com>,
- Gregory Clement <gregory.clement@bootlin.com>,
- Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>,
- Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Mathias Nyman <mathias.nyman@intel.com>,
- Alan Stern <stern@rowland.harvard.edu>
-Subject: [PATCH v2 05/10] phy: add A3700 UTMI PHY driver
-Date: Fri, 11 Jan 2019 14:31:28 +0100
-Message-Id: <20190111133133.24803-6-miquel.raynal@bootlin.com>
-X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20190111133133.24803-1-miquel.raynal@bootlin.com>
-References: <20190111133133.24803-1-miquel.raynal@bootlin.com>
+ id 1ghwv6-0006UU-Ql
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 13:32:59 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1CFB5EBD;
+ Fri, 11 Jan 2019 05:32:20 -0800 (PST)
+Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id DD4BA3F6CF;
+ Fri, 11 Jan 2019 05:32:18 -0800 (PST)
+Date: Fri, 11 Jan 2019 13:31:54 +0000
+From: Dave Martin <Dave.Martin@arm.com>
+To: Kristina Martsenko <kristina.martsenko@arm.com>
+Subject: Re: [PATCH v2] arm64: add ptrace regsets for ptrauth key management
+Message-ID: <20190111133146.GA3547@e103592.cambridge.arm.com>
+References: <20190110193508.31888-1-kristina.martsenko@arm.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20190110193508.31888-1-kristina.martsenko@arm.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_053145_961648_FBA4CB4A 
-X-CRM114-Status: GOOD (  21.21  )
+X-CRM114-CacheID: sfid-20190111_053222_020404_F229A3A8 
+X-CRM114-Status: GOOD (  30.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,209 +69,289 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Antoine Tenart <antoine.tenart@bootlin.com>,
- linux-usb@vger.kernel.org, Maxime Chevallier <maxime.chevallier@bootlin.com>,
- Nadav Haklai <nadavh@marvell.com>, Igal Liberman <igall@marvell.com>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Miquel Raynal <miquel.raynal@bootlin.com>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Amit Kachhap <amit.kachhap@arm.com>,
+ Will Deacon <will.deacon@arm.com>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-TWFydmVsbCBBcm1hZGEgMzcwMCBTb0MgaGFzIHR3byBVU0IgY29udHJvbGxlcnMsIGVhY2ggb2Yg
-dGhlbSBiZWluZwp3aXJlZCB0byBhbiBpbnRlcm5hbCBVVE1JIFBIWS4gQWRkIGEgZHJpdmVyIHRv
-IGNvbnRyb2wgdGhlbS4KCklnYWwgTGliZXJtYW4gd29ya2VkIG9uIHN1cHBvcnRpbmcgdGhlIFBI
-WSwgSSB0b29rIHRoZSB3aGlsZSAncmVnaXN0ZXIKY29uZmlndXJhdGlvbicgZnJvbSBoaXMgd29y
-ayBhbmQgcmV3cm90ZSBhbG1vc3QgZW50aXJlbHkgdGhlCmRyaXZlci9iaW5kaW5ncyBhcm91bmQg
-aXQuCgpDby1kZXZlbG9wZWQtYnk6IElnYWwgTGliZXJtYW4gPGlnYWxsQG1hcnZlbGwuY29tPgpT
-aWduZWQtb2ZmLWJ5OiBNaXF1ZWwgUmF5bmFsIDxtaXF1ZWwucmF5bmFsQGJvb3RsaW4uY29tPgpT
-aWduZWQtb2ZmLWJ5OiBJZ2FsIExpYmVybWFuIDxpZ2FsbEBtYXJ2ZWxsLmNvbT4KLS0tCiBkcml2
-ZXJzL3BoeS9tYXJ2ZWxsL0tjb25maWcgICAgICAgICAgICAgICAgfCAgIDkgKwogZHJpdmVycy9w
-aHkvbWFydmVsbC9NYWtlZmlsZSAgICAgICAgICAgICAgIHwgICAxICsKIGRyaXZlcnMvcGh5L21h
-cnZlbGwvcGh5LW12ZWJ1LWEzNzAwLXV0bWkuYyB8IDI5NyArKysrKysrKysrKysrKysrKysrKysK
-IDMgZmlsZXMgY2hhbmdlZCwgMzA3IGluc2VydGlvbnMoKykKIGNyZWF0ZSBtb2RlIDEwMDY0NCBk
-cml2ZXJzL3BoeS9tYXJ2ZWxsL3BoeS1tdmVidS1hMzcwMC11dG1pLmMKCmRpZmYgLS1naXQgYS9k
-cml2ZXJzL3BoeS9tYXJ2ZWxsL0tjb25maWcgYi9kcml2ZXJzL3BoeS9tYXJ2ZWxsL0tjb25maWcK
-aW5kZXggOWM5MGMwNDA4ZWEzLi5iOGU5ZGQzOGFkMGQgMTAwNjQ0Ci0tLSBhL2RyaXZlcnMvcGh5
-L21hcnZlbGwvS2NvbmZpZworKysgYi9kcml2ZXJzL3BoeS9tYXJ2ZWxsL0tjb25maWcKQEAgLTMz
-LDYgKzMzLDE1IEBAIGNvbmZpZyBQSFlfTVZFQlVfQTM3MDBfQ09NUEhZCiAJICBzaGFyZWQgc2Vy
-ZGVzIFBIWXMgb24gTWFydmVsbCBBcm1hZGEgMzcwMC4gSXRzIHNlcmRlcyBsYW5lcyBjYW4gYmUK
-IAkgIHVzZWQgYnkgdmFyaW91cyBjb250cm9sbGVyczogRXRoZXJuZXQsIFNBVEEsIFVTQjMsIFBD
-SWUuCiAKK2NvbmZpZyBQSFlfTVZFQlVfQTM3MDBfVVRNSQorCXRyaXN0YXRlICJNYXJ2ZWxsIEEz
-NzAwIFVUTUkgZHJpdmVyIgorCWRlcGVuZHMgb24gQVJDSF9NVkVCVSB8fCBDT01QSUxFX1RFU1QK
-KwlkZXBlbmRzIG9uIE9GCisJZGVmYXVsdCB5CisJc2VsZWN0IEdFTkVSSUNfUEhZCisJaGVscAor
-CSAgRW5hYmxlIHRoaXMgdG8gc3VwcG9ydCBNYXJ2ZWxsIEEzNzAwIFVUTUkgUEhZIGRyaXZlci4K
-KwogY29uZmlnIFBIWV9NVkVCVV9DUDExMF9DT01QSFkKIAl0cmlzdGF0ZSAiTWFydmVsbCBDUDEx
-MCBjb21waHkgZHJpdmVyIgogCWRlcGVuZHMgb24gQVJDSF9NVkVCVSB8fCBDT01QSUxFX1RFU1QK
-ZGlmZiAtLWdpdCBhL2RyaXZlcnMvcGh5L21hcnZlbGwvTWFrZWZpbGUgYi9kcml2ZXJzL3BoeS9t
-YXJ2ZWxsL01ha2VmaWxlCmluZGV4IGMxM2EwYzhhYjZmMC4uODJmMjkxY2Y1OWVlIDEwMDY0NAot
-LS0gYS9kcml2ZXJzL3BoeS9tYXJ2ZWxsL01ha2VmaWxlCisrKyBiL2RyaXZlcnMvcGh5L21hcnZl
-bGwvTWFrZWZpbGUKQEAgLTMsNiArMyw3IEBAIG9iai0kKENPTkZJR19BUk1BREEzNzVfVVNCQ0xV
-U1RFUl9QSFkpCSs9IHBoeS1hcm1hZGEzNzUtdXNiMi5vCiBvYmotJChDT05GSUdfUEhZX0JFUkxJ
-Tl9TQVRBKQkJKz0gcGh5LWJlcmxpbi1zYXRhLm8KIG9iai0kKENPTkZJR19QSFlfQkVSTElOX1VT
-QikJCSs9IHBoeS1iZXJsaW4tdXNiLm8KIG9iai0kKENPTkZJR19QSFlfTVZFQlVfQTM3MDBfQ09N
-UEhZKQkrPSBwaHktbXZlYnUtYTM3MDAtY29tcGh5Lm8KK29iai0kKENPTkZJR19QSFlfTVZFQlVf
-QTM3MDBfVVRNSSkJKz0gcGh5LW12ZWJ1LWEzNzAwLXV0bWkubwogb2JqLSQoQ09ORklHX1BIWV9N
-VkVCVV9DUDExMF9DT01QSFkpCSs9IHBoeS1tdmVidS1jcDExMC1jb21waHkubwogb2JqLSQoQ09O
-RklHX1BIWV9NVkVCVV9TQVRBKQkJKz0gcGh5LW12ZWJ1LXNhdGEubwogb2JqLSQoQ09ORklHX1BI
-WV9QWEFfMjhOTV9IU0lDKQkJKz0gcGh5LXB4YS0yOG5tLWhzaWMubwpkaWZmIC0tZ2l0IGEvZHJp
-dmVycy9waHkvbWFydmVsbC9waHktbXZlYnUtYTM3MDAtdXRtaS5jIGIvZHJpdmVycy9waHkvbWFy
-dmVsbC9waHktbXZlYnUtYTM3MDAtdXRtaS5jCm5ldyBmaWxlIG1vZGUgMTAwNjQ0CmluZGV4IDAw
-MDAwMDAwMDAwMC4uOTdkODIzNWQ2NjFkCi0tLSAvZGV2L251bGwKKysrIGIvZHJpdmVycy9waHkv
-bWFydmVsbC9waHktbXZlYnUtYTM3MDAtdXRtaS5jCkBAIC0wLDAgKzEsMjk3IEBACisvLyBTUERY
-LUxpY2Vuc2UtSWRlbnRpZmllcjogR1BMLTIuMAorLyoKKyAqIENvcHlyaWdodCAoQykgMjAxOCBN
-YXJ2ZWxsCisgKgorICogQXV0aG9yczoKKyAqICAgRXZhbiBXYW5nIDx4c3dhbmdAbWFydmVsbC5j
-b20+CisgKiAgIE1pcXXDqGwgUmF5bmFsIDxtaXF1ZWwucmF5bmFsQGJvb3RsaW4uY29tPgorICoK
-KyAqIE1hcnZlbGwgQTM3MDAgVVRNSSBQSFkgZHJpdmVyCisgKi8KKworI2luY2x1ZGUgPGxpbnV4
-L2lvLmg+CisjaW5jbHVkZSA8bGludXgvaW9wb2xsLmg+CisjaW5jbHVkZSA8bGludXgvbWZkL3N5
-c2Nvbi5oPgorI2luY2x1ZGUgPGxpbnV4L21vZHVsZS5oPgorI2luY2x1ZGUgPGxpbnV4L29mX2Rl
-dmljZS5oPgorI2luY2x1ZGUgPGxpbnV4L3BoeS9waHkuaD4KKyNpbmNsdWRlIDxsaW51eC9wbGF0
-Zm9ybV9kZXZpY2UuaD4KKyNpbmNsdWRlIDxsaW51eC9yZWdtYXAuaD4KKworLyogQXJtYWRhIDM3
-MDAgVVRNSSBQSFkgcmVnaXN0ZXJzICovCisjZGVmaW5lIFVTQjJfUEhZX1BMTF9DVFJMX1JFRzAJ
-CQkweDAKKyNkZWZpbmUgICBQTExfUkVGX0RJVl9PRkYJCQkwCisjZGVmaW5lICAgUExMX1JFRl9E
-SVZfTUFTSwkJCSgweDdGIDw8IFBMTF9SRUZfRElWX09GRikKKyNkZWZpbmUgICBQTExfUkVGX0RJ
-Vl81CQkJCTB4NQorI2RlZmluZSAgIFBMTF9GQl9ESVZfT0ZGCQkJMTYKKyNkZWZpbmUgICBQTExf
-RkJfRElWX01BU0sJCQkoMHgxRkYgPDwgUExMX0ZCX0RJVl9PRkYpCisjZGVmaW5lICAgUExMX0ZC
-X0RJVl85NgkJCQk5NgorI2RlZmluZSAgIFBMTF9TRUxfTFBGUl9PRkYJCQkyOAorI2RlZmluZSAg
-IFBMTF9TRUxfTFBGUl9NQVNLCQkJKDB4MyA8PCBQTExfU0VMX0xQRlJfT0ZGKQorI2RlZmluZSAg
-IFBMTF9SRUFEWQkJCQlCSVQoMzEpCisjZGVmaW5lIFVTQjJfUEhZX0NBTF9DVFJMCQkJMHg4Cisj
-ZGVmaW5lICAgUEhZX1BMTENBTF9ET05FCQkJQklUKDMxKQorI2RlZmluZSAgIFBIWV9JTVBDQUxf
-RE9ORQkJCUJJVCgyMykKKyNkZWZpbmUgVVNCMl9SWF9DSEFOX0NUUkwxCQkJMHgxOAorI2RlZmlu
-ZSAgIFVTQjJQSFlfU1FDQUxfRE9ORQkJCUJJVCgzMSkKKyNkZWZpbmUgVVNCMl9QSFlfT1RHX0NU
-UkwJCQkweDM0CisjZGVmaW5lICAgUEhZX1BVX09URwkJCQlCSVQoNCkKKyNkZWZpbmUgVVNCMl9Q
-SFlfQ0hSR1JfREVURUNUCQkJMHgzOAorI2RlZmluZSAgIFBIWV9DRFBfRU4JCQkJQklUKDIpCisj
-ZGVmaW5lICAgUEhZX0RDUF9FTgkJCQlCSVQoMykKKyNkZWZpbmUgICBQSFlfUERfRU4JCQkJQklU
-KDQpCisjZGVmaW5lICAgUEhZX1BVX0NIUkdfRFRDCQkJQklUKDUpCisjZGVmaW5lICAgUEhZX0NE
-UF9ETV9BVVRPCQkJQklUKDcpCisjZGVmaW5lICAgUEhZX0VOU1dJVENIX0RQCQkJQklUKDEyKQor
-I2RlZmluZSAgIFBIWV9FTlNXSVRDSF9ETQkJCUJJVCgxMykKKworLyogQXJtYWRhIDM3MDAgVVNC
-IG1pc2NlbGxhbmVvdXMgcmVnaXN0ZXJzICovCisjZGVmaW5lIFVTQjJfUEhZX0NUUkwodXNiMzIp
-CQkJKHVzYjMyID8gMHgyMCA6IDB4NCkKKyNkZWZpbmUgICBSQl9VU0IyUEhZX1BVCQkJCUJJVCgw
-KQorI2RlZmluZSAgIFVTQjJfRFBfUFVMTEROX0RFVl9NT0RFCQlCSVQoNSkKKyNkZWZpbmUgICBV
-U0IyX0RNX1BVTExETl9ERVZfTU9ERQkJQklUKDYpCisjZGVmaW5lICAgUkJfVVNCMlBIWV9TVVNQ
-TSh1c2IzMikJCSh1c2IzMiA/IEJJVCgxNCkgOiBCSVQoNykpCisKKyNkZWZpbmUgUExMX0xPQ0tf
-REVMQVlfVVMJCQkxMDAwMAorI2RlZmluZSBQTExfTE9DS19USU1FT1VUX1VTCQkJMTAwMDAwMAor
-CisvKioKKyAqIHN0cnVjdCBtdmVidV9hMzcwMF91dG1pX2NhcHMgLSBQSFkgY2FwYWJpbGl0aWVz
-CisgKgorICogQHVzYjMyOiBGbGFnIGluZGljYXRpbmcgd2hpY2ggUEhZIGlzIGluIHVzZSAoaW1w
-YWN0cyB0aGUgcmVnaXN0ZXIgbWFwKToKKyAqICAgICAgICAgICAtIFRoZSBVVE1JIFBIWSB3aXJl
-ZCB0byB0aGUgVVNCMy9VU0IyIGNvbnRyb2xsZXIgKG90ZykKKyAqICAgICAgICAgICAtIFRoZSBV
-VE1JIFBIWSB3aXJlZCB0byB0aGUgVVNCMiBjb250cm9sbGVyIChob3N0IG9ubHkpCisgKiBAb3Bz
-OiBQSFkgb3BlcmF0aW9ucworICovCitzdHJ1Y3QgbXZlYnVfYTM3MDBfdXRtaV9jYXBzIHsKKwlp
-bnQgdXNiMzI7CisJY29uc3Qgc3RydWN0IHBoeV9vcHMgKm9wczsKK307CisKKy8qKgorICogc3Ry
-dWN0IG12ZWJ1X2EzNzAwX3V0bWkgLSBQSFkgZHJpdmVyIGRhdGEKKyAqCisgKiBAcmVnczogUEhZ
-IHJlZ2lzdGVycworICogQHVzYl9taXM6IFJlZ21hcCB3aXRoIFVTQiBtaXNjZWxsYW5lb3VzIHJl
-Z2lzdGVycyBpbmNsdWRpbmcgUEhZIG9uZXMKKyAqIEBjYXBzOiBQSFkgY2FwYWJpbGl0aWVzCisg
-KiBAcGh5OiBQSFkgaGFuZGxlCisgKi8KK3N0cnVjdCBtdmVidV9hMzcwMF91dG1pIHsKKwl2b2lk
-IF9faW9tZW0gKnJlZ3M7CisJc3RydWN0IHJlZ21hcCAqdXNiX21pc2M7CisJY29uc3Qgc3RydWN0
-IG12ZWJ1X2EzNzAwX3V0bWlfY2FwcyAqY2FwczsKKwlzdHJ1Y3QgcGh5ICpwaHk7Cit9OworCitz
-dGF0aWMgaW50IG12ZWJ1X2EzNzAwX3V0bWlfcGh5X3Bvd2VyX29uKHN0cnVjdCBwaHkgKnBoeSkK
-K3sKKwlzdHJ1Y3QgbXZlYnVfYTM3MDBfdXRtaSAqdXRtaSA9IHBoeV9nZXRfZHJ2ZGF0YShwaHkp
-OworCXN0cnVjdCBkZXZpY2UgKmRldiA9ICZwaHktPmRldjsKKwlpbnQgdXNiMzIgPSB1dG1pLT5j
-YXBzLT51c2IzMjsKKwlpbnQgcmV0ID0gMDsKKwl1MzIgcmVnOworCisJaWYgKCF1dG1pKQorCQly
-ZXR1cm4gLUVOT0RFVjsKKworCS8qCisJICogU2V0dXAgUExMLiA0ME1IeiBjbG9jayB1c2VkIHRv
-IGJlIHRoZSBkZWZhdWx0LCBiZWluIDI1TUh6IG5vdy4KKwkgKiBTZWUgIlBMTCBTZXR0aW5ncyBm
-b3IgVHlwaWNhbCBSRUZDTEsiIHRhYmxlLgorCSAqLworCXJlZyA9IHJlYWRsKHV0bWktPnJlZ3Mg
-KyBVU0IyX1BIWV9QTExfQ1RSTF9SRUcwKTsKKwlyZWcgJj0gfihQTExfUkVGX0RJVl9NQVNLIHwg
-UExMX0ZCX0RJVl9NQVNLIHwgUExMX1NFTF9MUEZSX01BU0spOworCXJlZyB8PSAoUExMX1JFRl9E
-SVZfNSA8PCBQTExfUkVGX0RJVl9PRkYgfAorCQlQTExfRkJfRElWXzk2IDw8IFBMTF9GQl9ESVZf
-T0ZGKTsKKwl3cml0ZWwocmVnLCB1dG1pLT5yZWdzICsgVVNCMl9QSFlfUExMX0NUUkxfUkVHMCk7
-CisKKwkvKiBFbmFibGUgUEhZIHB1bGwgdXAgYW5kIGRpc2FibGUgVVNCMiBzdXNwZW5kICovCisJ
-cmVnbWFwX3VwZGF0ZV9iaXRzKHV0bWktPnVzYl9taXNjLCBVU0IyX1BIWV9DVFJMKHVzYjMyKSwK
-KwkJCSAgIFJCX1VTQjJQSFlfU1VTUE0odXNiMzIpIHwgUkJfVVNCMlBIWV9QVSwKKwkJCSAgIFJC
-X1VTQjJQSFlfU1VTUE0odXNiMzIpIHwgUkJfVVNCMlBIWV9QVSk7CisKKwlpZiAodXNiMzIpIHsK
-KwkJLyogUG93ZXIgdXAgT1RHIG1vZHVsZSAqLworCQlyZWcgPSByZWFkbCh1dG1pLT5yZWdzICsg
-VVNCMl9QSFlfT1RHX0NUUkwpOworCQlyZWcgfD0gUEhZX1BVX09URzsKKwkJd3JpdGVsKHJlZywg
-dXRtaS0+cmVncyArIFVTQjJfUEhZX09UR19DVFJMKTsKKworCQkvKiBEaXNhYmxlIFBIWSBjaGFy
-Z2VyIGRldGVjdGlvbiAqLworCQlyZWcgPSByZWFkbCh1dG1pLT5yZWdzICsgVVNCMl9QSFlfQ0hS
-R1JfREVURUNUKTsKKwkJcmVnICY9IH4oUEhZX0NEUF9FTiB8IFBIWV9EQ1BfRU4gfCBQSFlfUERf
-RU4gfCBQSFlfUFVfQ0hSR19EVEMgfAorCQkJIFBIWV9DRFBfRE1fQVVUTyB8IFBIWV9FTlNXSVRD
-SF9EUCB8IFBIWV9FTlNXSVRDSF9ETSk7CisJCXdyaXRlbChyZWcsIHV0bWktPnJlZ3MgKyBVU0Iy
-X1BIWV9DSFJHUl9ERVRFQ1QpOworCisJCS8qIERpc2FibGUgUEhZIERQL0RNIHB1bGwtZG93biAo
-dXNlZCBmb3IgZGV2aWNlIG1vZGUpICovCisJCXJlZ21hcF91cGRhdGVfYml0cyh1dG1pLT51c2Jf
-bWlzYywgVVNCMl9QSFlfQ1RSTCh1c2IzMiksCisJCQkJICAgVVNCMl9EUF9QVUxMRE5fREVWX01P
-REUgfAorCQkJCSAgIFVTQjJfRE1fUFVMTEROX0RFVl9NT0RFLCAwKTsKKwl9CisKKwkvKiBXYWl0
-IGZvciBQTEwgY2FsaWJyYXRpb24gKi8KKwlyZXQgPSByZWFkbF9wb2xsX3RpbWVvdXQodXRtaS0+
-cmVncyArIFVTQjJfUEhZX0NBTF9DVFJMLCByZWcsCisJCQkJIHJlZyAmIFBIWV9QTExDQUxfRE9O
-RSwKKwkJCQkgUExMX0xPQ0tfREVMQVlfVVMsIFBMTF9MT0NLX1RJTUVPVVRfVVMpOworCWlmIChy
-ZXQpIHsKKwkJZGV2X2VycihkZXYsICJGYWlsZWQgdG8gZW5kIFVTQjIgUExMIGNhbGlicmF0aW9u
-XG4iKTsKKwkJcmV0dXJuIHJldDsKKwl9CisKKwkvKiBXYWl0IGZvciBpbXBlZGFuY2UgY2FsaWJy
-YXRpb24gKi8KKwlyZXQgPSByZWFkbF9wb2xsX3RpbWVvdXQodXRtaS0+cmVncyArIFVTQjJfUEhZ
-X0NBTF9DVFJMLCByZWcsCisJCQkJIHJlZyAmIFBIWV9JTVBDQUxfRE9ORSwKKwkJCQkgUExMX0xP
-Q0tfREVMQVlfVVMsIFBMTF9MT0NLX1RJTUVPVVRfVVMpOworCWlmIChyZXQpIHsKKwkJZGV2X2Vy
-cihkZXYsICJGYWlsZWQgdG8gZW5kIFVTQjIgaW1wZWRhbmNlIGNhbGlicmF0aW9uXG4iKTsKKwkJ
-cmV0dXJuIHJldDsKKwl9CisKKwkvKiBXYWl0IGZvciBzcXVldGNoIGNhbGlicmF0aW9uICovCisJ
-cmV0ID0gcmVhZGxfcG9sbF90aW1lb3V0KHV0bWktPnJlZ3MgKyBVU0IyX1JYX0NIQU5fQ1RSTDEs
-IHJlZywKKwkJCQkgcmVnICYgVVNCMlBIWV9TUUNBTF9ET05FLAorCQkJCSBQTExfTE9DS19ERUxB
-WV9VUywgUExMX0xPQ0tfVElNRU9VVF9VUyk7CisJaWYgKHJldCkgeworCQlkZXZfZXJyKGRldiwg
-IkZhaWxlZCB0byBlbmQgVVNCMiB1bmtub3duIGNhbGlicmF0aW9uXG4iKTsKKwkJcmV0dXJuIHJl
-dDsKKwl9CisKKwkvKiBXYWl0IGZvciBQTEwgdG8gYmUgbG9ja2VkICovCisJcmV0ID0gcmVhZGxf
-cG9sbF90aW1lb3V0KHV0bWktPnJlZ3MgKyBVU0IyX1BIWV9QTExfQ1RSTF9SRUcwLCByZWcsCisJ
-CQkJIHJlZyAmIFBMTF9SRUFEWSwKKwkJCQkgUExMX0xPQ0tfREVMQVlfVVMsIFBMTF9MT0NLX1RJ
-TUVPVVRfVVMpOworCWlmIChyZXQpCisJCWRldl9lcnIoZGV2LCAiRmFpbGVkIHRvIGxvY2sgVVNC
-MiBQTExcbiIpOworCisJcmV0dXJuIHJldDsKK30KKworc3RhdGljIGludCBtdmVidV9hMzcwMF91
-dG1pX3BoeV9wb3dlcl9vZmYoc3RydWN0IHBoeSAqcGh5KQoreworCXN0cnVjdCBtdmVidV9hMzcw
-MF91dG1pICp1dG1pID0gcGh5X2dldF9kcnZkYXRhKHBoeSk7CisJaW50IHVzYjMyID0gdXRtaS0+
-Y2Fwcy0+dXNiMzI7CisJdTMyIHJlZzsKKworCWlmICghdXRtaSkKKwkJcmV0dXJuIC1FTk9ERVY7
-CisKKwkvKiBEaXNhYmxlIFBIWSBwdWxsLXVwIGFuZCBlbmFibGUgVVNCMiBzdXNwZW5kICovCisJ
-cmVnID0gcmVhZGwodXRtaS0+cmVncyArIFVTQjJfUEhZX0NUUkwodXNiMzIpKTsKKwlyZWcgJj0g
-fihSQl9VU0IyUEhZX1BVIHwgUkJfVVNCMlBIWV9TVVNQTSh1c2IzMikpOworCXdyaXRlbChyZWcs
-IHV0bWktPnJlZ3MgKyBVU0IyX1BIWV9DVFJMKHVzYjMyKSk7CisKKwkvKiBQb3dlciBkb3duIE9U
-RyBtb2R1bGUgKi8KKwlpZiAodXNiMzIpIHsKKwkJcmVnID0gcmVhZGwodXRtaS0+cmVncyArIFVT
-QjJfUEhZX09UR19DVFJMKTsKKwkJcmVnICY9IH5QSFlfUFVfT1RHOworCQl3cml0ZWwocmVnLCB1
-dG1pLT5yZWdzICsgVVNCMl9QSFlfT1RHX0NUUkwpOworCX0KKworCXJldHVybiAwOworfQorCitz
-dGF0aWMgY29uc3Qgc3RydWN0IHBoeV9vcHMgbXZlYnVfYTM3MDBfdXRtaV9waHlfb3BzID0gewor
-CS5wb3dlcl9vbiA9IG12ZWJ1X2EzNzAwX3V0bWlfcGh5X3Bvd2VyX29uLAorCS5wb3dlcl9vZmYg
-PSBtdmVidV9hMzcwMF91dG1pX3BoeV9wb3dlcl9vZmYsCisJLm93bmVyID0gVEhJU19NT0RVTEUs
-Cit9OworCitzdGF0aWMgY29uc3Qgc3RydWN0IG12ZWJ1X2EzNzAwX3V0bWlfY2FwcyBtdmVidV9h
-MzcwMF91dG1pX290Z19waHlfY2FwcyA9IHsKKwkudXNiMzIgPSB0cnVlLAorCS5vcHMgPSAmbXZl
-YnVfYTM3MDBfdXRtaV9waHlfb3BzLAorfTsKKworc3RhdGljIGNvbnN0IHN0cnVjdCBtdmVidV9h
-MzcwMF91dG1pX2NhcHMgbXZlYnVfYTM3MDBfdXRtaV9ob3N0X3BoeV9jYXBzID0geworCS51c2Iz
-MiA9IGZhbHNlLAorCS5vcHMgPSAmbXZlYnVfYTM3MDBfdXRtaV9waHlfb3BzLAorfTsKKworc3Rh
-dGljIGNvbnN0IHN0cnVjdCBvZl9kZXZpY2VfaWQgbXZlYnVfYTM3MDBfdXRtaV9vZl9tYXRjaFtd
-ID0geworCXsKKwkJLmNvbXBhdGlibGUgPSAibWFydmVsbCxhMzcwMC11dG1pLW90Zy1waHkiLAor
-CQkuZGF0YSA9ICZtdmVidV9hMzcwMF91dG1pX290Z19waHlfY2FwcywKKwl9LAorCXsKKwkJLmNv
-bXBhdGlibGUgPSAibWFydmVsbCxhMzcwMC11dG1pLWhvc3QtcGh5IiwKKwkJLmRhdGEgPSAmbXZl
-YnVfYTM3MDBfdXRtaV9ob3N0X3BoeV9jYXBzLAorCX0sCisJe30sCit9OworTU9EVUxFX0RFVklD
-RV9UQUJMRShvZiwgbXZlYnVfYTM3MDBfdXRtaV9vZl9tYXRjaCk7CisKK3N0YXRpYyBpbnQgbXZl
-YnVfYTM3MDBfdXRtaV9waHlfcHJvYmUoc3RydWN0IHBsYXRmb3JtX2RldmljZSAqcGRldikKK3sK
-Kwljb25zdCBzdHJ1Y3Qgb2ZfZGV2aWNlX2lkICpkZXZfaWQ7CisJc3RydWN0IGRldmljZSAqZGV2
-ID0gJnBkZXYtPmRldjsKKwlzdHJ1Y3QgbXZlYnVfYTM3MDBfdXRtaSAqdXRtaTsKKwlzdHJ1Y3Qg
-cGh5X3Byb3ZpZGVyICpwcm92aWRlcjsKKwljb25zdCBzdHJ1Y3QgcGh5X29wcyAqb3BzOworCXN0
-cnVjdCByZXNvdXJjZSAqcmVzOworCisJdXRtaSA9IGRldm1fa3phbGxvYyhkZXYsIHNpemVvZigq
-dXRtaSksIEdGUF9LRVJORUwpOworCWlmICghdXRtaSkKKwkJcmV0dXJuIC1FTk9NRU07CisKKwkv
-KiBHZXQgVVRNSSBtZW1vcnkgcmVnaW9uICovCisJcmVzID0gcGxhdGZvcm1fZ2V0X3Jlc291cmNl
-KHBkZXYsIElPUkVTT1VSQ0VfTUVNLCAwKTsKKwlpZiAoIXJlcykgeworCQlkZXZfZXJyKGRldiwg
-Ik1pc3NpbmcgVVRNSSBQSFkgbWVtb3J5IHJlc291cmNlXG4iKTsKKwkJcmV0dXJuIC1FTk9ERVY7
-CisJfQorCisJdXRtaS0+cmVncyA9IGRldm1faW9yZW1hcF9yZXNvdXJjZShkZXYsIHJlcyk7CisJ
-aWYgKElTX0VSUih1dG1pLT5yZWdzKSkKKwkJcmV0dXJuIFBUUl9FUlIodXRtaS0+cmVncyk7CisK
-KwkvKiBHZXQgbWlzY2VsbGFuZW91cyBIb3N0L1BIWSByZWdpb24gKi8KKwl1dG1pLT51c2JfbWlz
-YyA9IHN5c2Nvbl9yZWdtYXBfbG9va3VwX2J5X3BoYW5kbGUoZGV2LT5vZl9ub2RlLAorCQkJCQkJ
-CSAibWFydmVsbCx1c2ItbWlzYy1yZWciKTsKKwlpZiAoSVNfRVJSKHV0bWktPnVzYl9taXNjKSkg
-eworCQlkZXZfZXJyKGRldiwKKwkJCSJNaXNzaW5nIFVTQiBtaXNjIHB1cnBvc2Ugc3lzdGVtIGNv
-bnRyb2xsZXJcbiIpOworCQlyZXR1cm4gUFRSX0VSUih1dG1pLT51c2JfbWlzYyk7CisJfQorCisJ
-LyogUmV0cmlldmUgUEhZIGNhcGFiaWxpdGllcyAqLworCWRldl9pZCA9IG9mX21hdGNoX2Rldmlj
-ZShtdmVidV9hMzcwMF91dG1pX29mX21hdGNoLCBkZXYpOworCWlmICghZGV2X2lkKQorCQlyZXR1
-cm4gLUVJTlZBTDsKKworCXV0bWktPmNhcHMgPSBkZXZfaWQtPmRhdGE7CisJb3BzID0gdXRtaS0+
-Y2Fwcy0+b3BzOworCisJLyogSW5zdGFudGlhdGUgdGhlIFBIWSAqLworCXV0bWktPnBoeSA9IGRl
-dm1fcGh5X2NyZWF0ZShkZXYsIE5VTEwsIG9wcyk7CisJaWYgKElTX0VSUih1dG1pLT5waHkpKSB7
-CisJCWRldl9lcnIoZGV2LCAiRmFpbGVkIHRvIGNyZWF0ZSB0aGUgVVRNSSBQSFlcbiIpOworCQly
-ZXR1cm4gUFRSX0VSUih1dG1pLT5waHkpOworCX0KKworCXBoeV9zZXRfZHJ2ZGF0YSh1dG1pLT5w
-aHksIHV0bWkpOworCisJLyogRW5zdXJlIHRoZSBQSFkgaXMgcG93ZXJlZCBvZmYgKi8KKwlvcHMt
-PnBvd2VyX29mZih1dG1pLT5waHkpOworCisJcHJvdmlkZXIgPSBkZXZtX29mX3BoeV9wcm92aWRl
-cl9yZWdpc3RlcihkZXYsIG9mX3BoeV9zaW1wbGVfeGxhdGUpOworCisJcmV0dXJuIFBUUl9FUlJf
-T1JfWkVSTyhwcm92aWRlcik7Cit9CisKK3N0YXRpYyBpbnQgbXZlYnVfYTM3MDBfdXRtaV9waHlf
-cmVtb3ZlKHN0cnVjdCBwbGF0Zm9ybV9kZXZpY2UgKnBkZXYpCit7CisJcmV0dXJuIDA7Cit9CisK
-K3N0YXRpYyBzdHJ1Y3QgcGxhdGZvcm1fZHJpdmVyIG12ZWJ1X2EzNzAwX3V0bWlfZHJpdmVyID0g
-eworCS5wcm9iZQk9IG12ZWJ1X2EzNzAwX3V0bWlfcGh5X3Byb2JlLAorCS5yZW1vdmUgPSBtdmVi
-dV9hMzcwMF91dG1pX3BoeV9yZW1vdmUsCisJLmRyaXZlcgk9IHsKKwkJLm5hbWUJCT0gIm12ZWJ1
-LWEzNzAwLXV0bWktcGh5IiwKKwkJLm93bmVyCQk9IFRISVNfTU9EVUxFLAorCQkub2ZfbWF0Y2hf
-dGFibGUJPSBtdmVidV9hMzcwMF91dG1pX29mX21hdGNoLAorCSB9LAorfTsKK21vZHVsZV9wbGF0
-Zm9ybV9kcml2ZXIobXZlYnVfYTM3MDBfdXRtaV9kcml2ZXIpOworCitNT0RVTEVfQVVUSE9SKCJF
-dmFuIFdhbmcgPHhzd2FuZ0BtYXJ2ZWxsLmNvbT4iKTsKK01PRFVMRV9BVVRIT1IoIk1pcXVlbCBS
-YXluYWwgPG1pcXVlbC5yYXluYWxAYm9vdGxpbi5jb20+Iik7CitNT0RVTEVfREVTQ1JJUFRJT04o
-Ik1hcnZlbGwgRUJVIEEzNzAwIFVUTUkgUEhZIGRyaXZlciIpOworTU9EVUxFX0xJQ0VOU0UoIkdQ
-TCIpOwotLSAKMi4xOS4xCgoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBs
-aXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlz
-dGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+On Thu, Jan 10, 2019 at 07:35:08PM +0000, Kristina Martsenko wrote:
+> Add two new ptrace regsets, which can be used to request and change the
+> pointer authentication keys of a thread. NT_ARM_PACA_KEYS gives access
+> to the instruction/data address keys, and NT_ARM_PACG_KEYS to the
+> generic authentication key. The keys are also part of the core dump file
+> of the process.
+> 
+> The regsets are only exposed if the kernel is compiled with
+> CONFIG_CHECKPOINT_RESTORE=y, as the intended use case is checkpointing
+> and restoring processes that are using pointer authentication. Normally
+> applications or debuggers should not need to know the keys (and exposing
+> the keys is a security risk), so the regsets are not exposed by default.
+
+I think the second variant of the patch is the way to go with this, since
+it seems to result in simpler code.
+
+So, I'll comment on the second patch.
+
+Cheers
+---Dave
+
+> 
+> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+> ---
+> 
+> The previous version of this patch was:
+>   https://lore.kernel.org/lkml/20181207183931.4285-12-kristina.martsenko@arm.com/
+> 
+> Changes in v2:
+>  - Convert each field individually between ptrauth_keys and
+>    user_pac_address_keys/user_pac_generic_keys
+> 
+>  Documentation/arm64/pointer-authentication.txt |   5 +
+>  arch/arm64/include/uapi/asm/ptrace.h           |  18 ++++
+>  arch/arm64/kernel/ptrace.c                     | 144 +++++++++++++++++++++++++
+>  include/uapi/linux/elf.h                       |   2 +
+>  4 files changed, 169 insertions(+)
+> 
+> diff --git a/Documentation/arm64/pointer-authentication.txt b/Documentation/arm64/pointer-authentication.txt
+> index a25cd21290e9..5baca42ba146 100644
+> --- a/Documentation/arm64/pointer-authentication.txt
+> +++ b/Documentation/arm64/pointer-authentication.txt
+> @@ -78,6 +78,11 @@ bits can vary between the two. Note that the masks apply to TTBR0
+>  addresses, and are not valid to apply to TTBR1 addresses (e.g. kernel
+>  pointers).
+>  
+> +Additionally, when CONFIG_CHECKPOINT_RESTORE is also set, the kernel
+> +will expose the NT_ARM_PACA_KEYS and NT_ARM_PACG_KEYS regsets (struct
+> +user_pac_address_keys and struct user_pac_generic_keys). These can be
+> +used to get and set the keys for a thread.
+> +
+>  
+>  Virtualization
+>  --------------
+> diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
+> index 28d77c9ed531..0affa43602a5 100644
+> --- a/arch/arm64/include/uapi/asm/ptrace.h
+> +++ b/arch/arm64/include/uapi/asm/ptrace.h
+> @@ -233,6 +233,24 @@ struct user_pac_mask {
+>  	__u64		insn_mask;
+>  };
+>  
+> +/* pointer authentication keys (NT_ARM_PACA_KEYS, NT_ARM_PACG_KEYS) */
+> +
+> +struct user_pac_address_keys {
+> +	__u64		apiakey_lo;
+> +	__u64		apiakey_hi;
+> +	__u64		apibkey_lo;
+> +	__u64		apibkey_hi;
+> +	__u64		apdakey_lo;
+> +	__u64		apdakey_hi;
+> +	__u64		apdbkey_lo;
+> +	__u64		apdbkey_hi;
+> +};
+> +
+> +struct user_pac_generic_keys {
+> +	__u64		apgakey_lo;
+> +	__u64		apgakey_hi;
+> +};
+> +
+>  #endif /* __ASSEMBLY__ */
+>  
+>  #endif /* _UAPI__ASM_PTRACE_H */
+> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> index 9dce33b0e260..a5f9f07e9eac 100644
+> --- a/arch/arm64/kernel/ptrace.c
+> +++ b/arch/arm64/kernel/ptrace.c
+> @@ -979,6 +979,128 @@ static int pac_mask_get(struct task_struct *target,
+>  
+>  	return user_regset_copyout(&pos, &count, &kbuf, &ubuf, &uregs, 0, -1);
+>  }
+> +
+> +#ifdef CONFIG_CHECKPOINT_RESTORE
+> +static void pac_address_keys_to_user(struct user_pac_address_keys *ukeys,
+> +				     struct ptrauth_keys *keys)
+> +{
+> +	ukeys->apiakey_lo = keys->apia.lo;
+> +	ukeys->apiakey_hi = keys->apia.hi;
+> +	ukeys->apibkey_lo = keys->apib.lo;
+> +	ukeys->apibkey_hi = keys->apib.hi;
+> +	ukeys->apdakey_lo = keys->apda.lo;
+> +	ukeys->apdakey_hi = keys->apda.hi;
+> +	ukeys->apdbkey_lo = keys->apdb.lo;
+> +	ukeys->apdbkey_hi = keys->apdb.hi;
+> +}
+> +
+> +static void pac_address_keys_from_user(struct user_pac_address_keys *ukeys,
+> +				       struct ptrauth_keys *keys)
+> +{
+> +	keys->apia.lo = ukeys->apiakey_lo;
+> +	keys->apia.hi = ukeys->apiakey_hi;
+> +	keys->apib.lo = ukeys->apibkey_lo;
+> +	keys->apib.hi = ukeys->apibkey_hi;
+> +	keys->apda.lo = ukeys->apdakey_lo;
+> +	keys->apda.hi = ukeys->apdakey_hi;
+> +	keys->apdb.lo = ukeys->apdbkey_lo;
+> +	keys->apdb.hi = ukeys->apdbkey_hi;
+> +}
+> +
+> +static int pac_address_keys_get(struct task_struct *target,
+> +				const struct user_regset *regset,
+> +				unsigned int pos, unsigned int count,
+> +				void *kbuf, void __user *ubuf)
+> +{
+> +	struct ptrauth_keys *keys = &target->thread.keys_user;
+> +	struct user_pac_address_keys user_keys;
+> +
+> +	if (!system_supports_address_auth())
+> +		return -EINVAL;
+> +
+> +	memset(&user_keys, 0, sizeof(user_keys));
+> +	pac_address_keys_to_user(&user_keys, keys);
+> +
+> +	return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
+> +				   &user_keys, 0, -1);
+> +}
+> +
+> +static int pac_address_keys_set(struct task_struct *target,
+> +				const struct user_regset *regset,
+> +				unsigned int pos, unsigned int count,
+> +				const void *kbuf, const void __user *ubuf)
+> +{
+> +	struct ptrauth_keys *keys = &target->thread.keys_user;
+> +	struct user_pac_address_keys user_keys;
+> +	int ret;
+> +
+> +	if (!system_supports_address_auth())
+> +		return -EINVAL;
+> +
+> +	pac_address_keys_to_user(&user_keys, keys);
+> +	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
+> +				 &user_keys, 0, -1);
+> +	if (ret)
+> +		return ret;
+> +	pac_address_keys_from_user(&user_keys, keys);
+> +
+> +	return 0;
+> +}
+> +
+> +static void pac_generic_keys_to_user(struct user_pac_generic_keys *ukeys,
+> +				     struct ptrauth_keys *keys)
+> +{
+> +	ukeys->apgakey_lo = keys->apga.lo;
+> +	ukeys->apgakey_hi = keys->apga.hi;
+> +}
+> +
+> +static void pac_generic_keys_from_user(struct user_pac_generic_keys *ukeys,
+> +				       struct ptrauth_keys *keys)
+> +{
+> +	keys->apga.lo = ukeys->apgakey_lo;
+> +	keys->apga.hi = ukeys->apgakey_hi;
+> +}
+> +
+> +static int pac_generic_keys_get(struct task_struct *target,
+> +				const struct user_regset *regset,
+> +				unsigned int pos, unsigned int count,
+> +				void *kbuf, void __user *ubuf)
+> +{
+> +	struct ptrauth_keys *keys = &target->thread.keys_user;
+> +	struct user_pac_generic_keys user_keys;
+> +
+> +	if (!system_supports_generic_auth())
+> +		return -EINVAL;
+> +
+> +	memset(&user_keys, 0, sizeof(user_keys));
+> +	pac_generic_keys_to_user(&user_keys, keys);
+> +
+> +	return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
+> +				   &user_keys, 0, -1);
+> +}
+> +
+> +static int pac_generic_keys_set(struct task_struct *target,
+> +				const struct user_regset *regset,
+> +				unsigned int pos, unsigned int count,
+> +				const void *kbuf, const void __user *ubuf)
+> +{
+> +	struct ptrauth_keys *keys = &target->thread.keys_user;
+> +	struct user_pac_generic_keys user_keys;
+> +	int ret;
+> +
+> +	if (!system_supports_generic_auth())
+> +		return -EINVAL;
+> +
+> +	pac_generic_keys_to_user(&user_keys, keys);
+> +	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
+> +				 &user_keys, 0, -1);
+> +	if (ret)
+> +		return ret;
+> +	pac_generic_keys_from_user(&user_keys, keys);
+> +
+> +	return 0;
+> +}
+> +#endif /* CONFIG_CHECKPOINT_RESTORE */
+>  #endif /* CONFIG_ARM64_PTR_AUTH */
+>  
+>  enum aarch64_regset {
+> @@ -995,6 +1117,10 @@ enum aarch64_regset {
+>  #endif
+>  #ifdef CONFIG_ARM64_PTR_AUTH
+>  	REGSET_PAC_MASK,
+> +#ifdef CONFIG_CHECKPOINT_RESTORE
+> +	REGSET_PACA_KEYS,
+> +	REGSET_PACG_KEYS,
+> +#endif
+>  #endif
+>  };
+>  
+> @@ -1074,6 +1200,24 @@ static const struct user_regset aarch64_regsets[] = {
+>  		.get = pac_mask_get,
+>  		/* this cannot be set dynamically */
+>  	},
+> +#ifdef CONFIG_CHECKPOINT_RESTORE
+> +	[REGSET_PACA_KEYS] = {
+> +		.core_note_type = NT_ARM_PACA_KEYS,
+> +		.n = sizeof(struct user_pac_address_keys) / sizeof(u64),
+> +		.size = sizeof(u64),
+> +		.align = sizeof(u64),
+> +		.get = pac_address_keys_get,
+> +		.set = pac_address_keys_set,
+> +	},
+> +	[REGSET_PACG_KEYS] = {
+> +		.core_note_type = NT_ARM_PACG_KEYS,
+> +		.n = sizeof(struct user_pac_generic_keys) / sizeof(u64),
+> +		.size = sizeof(u64),
+> +		.align = sizeof(u64),
+> +		.get = pac_generic_keys_get,
+> +		.set = pac_generic_keys_set,
+> +	},
+> +#endif
+>  #endif
+>  };
+>  
+> diff --git a/include/uapi/linux/elf.h b/include/uapi/linux/elf.h
+> index e4d6ddd93567..34c02e4290fe 100644
+> --- a/include/uapi/linux/elf.h
+> +++ b/include/uapi/linux/elf.h
+> @@ -421,6 +421,8 @@ typedef struct elf64_shdr {
+>  #define NT_ARM_SYSTEM_CALL	0x404	/* ARM system call number */
+>  #define NT_ARM_SVE	0x405		/* ARM Scalable Vector Extension registers */
+>  #define NT_ARM_PAC_MASK		0x406	/* ARM pointer authentication code masks */
+> +#define NT_ARM_PACA_KEYS	0x407	/* ARM pointer authentication address keys */
+> +#define NT_ARM_PACG_KEYS	0x408	/* ARM pointer authentication generic key */
+>  #define NT_ARC_V2	0x600		/* ARCv2 accumulator/extra registers */
+>  #define NT_VMCOREDD	0x700		/* Vmcore Device Dump Note */
+>  #define NT_MIPS_DSP	0x800		/* MIPS DSP ASE registers */
+> -- 
+> 2.11.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel@lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
