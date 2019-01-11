@@ -2,22 +2,23 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D679DC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 09:52:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 19F98C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 09:54:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A807020874
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 09:52:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D77B220874
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 09:54:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EjxnEi7i";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="auggXh3e"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A807020874
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eHgEXLua";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="VYvPcBRc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D77B220874
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,59 +26,62 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=j4Bp3oLbdmHlajoxF8So6YjT7RgoZcWUpTXbnKmxueE=; b=EjxnEi7iygToXy
-	XMy+vWwJhpBCGR5JRYQr573dET+E0EAw9qdc7kVPGXIQpJeKYNJcOz1uyF1/STL9IZ62Ehs7GGcAv
-	/7GoIZNs/V27VOR9jL0kJRua1S8B/dScH9wQ4YkWNOY8Sysbi4VRRUB4/5B3gO7fcM7BJFrrzlL4Q
-	btHXwTzjwRWcOFQE/r+xK8KMGVn+B6gTN+X1avM4DdxBeJTbkVRiNVNEJV2C5zF+q62fjTacKKYDx
-	ahafV5OlyVUpXFaZbX6hpPWq3LdUHnPNLe5c65b0f867PKl0Ecz75dUkJlY+nScKlqTq9tjTrk9tY
-	a4OvptlTaEfoTmRJDANg==;
+	List-Owner; bh=DtJMpi04hYZB5Zg+l5eDhdCQ1H4BlNVx94RETfVKRbs=; b=eHgEXLua+Bpznh
+	eYMSTtz9sQQdDrua/GIW7z299YveP++cWGc36ygRrQRTEdo+uvUBh2Uc+md3w/TS2UEeBx29SH0rY
+	wfSevhk+OCs8qAQ4C8hYEXGOkSzuuhiL7RZ5Z4pnLGS4pw/gDD+C5Pkh1WqxPMDDMYO0z+VLTry0O
+	CzOIWNxxEubg+BZ6ymEtobCXZTeyPJrBZOMcULI5Lfm2TvpeIQ/KcaFaYeLtvjRYnN6Byj1479jIC
+	UdRS0vtuNSzPGUMfOKVZkusQ0sPBCoBd0907uigT6pyZH9Q8gLtNFdvUg3QVQcmOH/9M8BvpPqGnp
+	R0QoKEEHDHuY3EDgZuxw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghtTy-0008Ty-NV; Fri, 11 Jan 2019 09:52:06 +0000
-Received: from mail-vs1-xe41.google.com ([2607:f8b0:4864:20::e41])
+	id 1ghtVo-0000eq-5u; Fri, 11 Jan 2019 09:54:00 +0000
+Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghtTu-0008TQ-RS
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 09:52:04 +0000
-Received: by mail-vs1-xe41.google.com with SMTP id x28so8815240vsh.12
+ id 1ghtVk-0000ay-5q
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 09:53:57 +0000
+Received: by mail-it1-x143.google.com with SMTP id h65so2200074ith.3
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 11 Jan 2019 01:52:02 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ Fri, 11 Jan 2019 01:53:55 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=6TXYG0bRygv37lt/cmIuFfZcnUSM355T9n2ZJXUOXPE=;
- b=auggXh3eSLNCvw2+OMx6WOeqof/9eRBvDRe3sNrVnKSytLC0n6jddw1GRRW8kAJCfQ
- L1Ci0N/vlIQYbtnCKmcNG5j3YLRFH2ImiXEaRx5OfQIM0yezxdHi/J52vsbCNtAuMB9b
- eZVb5nz9KMlhsBXCglVo/6kBsUM2tESEqqyzk=
+ :cc:content-transfer-encoding;
+ bh=X8BlbWN2HjYlOQtiuSrwPdZOJRLE+ItQTDWpVSJ/AoM=;
+ b=VYvPcBRcZVLM7E3GxT8ji68L/CDLZHjqlnGqFP2mWgISzWPJ+0iaEDA5kfN51DbK+t
+ RrGRUmJIB7ccFbJC3XBmJN5k0WiMdsnmHP8ECfSDGsYn484QCQ0Sn1KUAQaqi0LWNVC0
+ wytD3d4Plm4j4OUHSuMsD0nKcPVVag/YyARZS3gALBEpC/kaHkc3TwHAJhBWw0620sH6
+ IbUvtbp61RRrrSAu7tYJeiOprYcJEWEUpFT2erTQWt5WpsgwP75Na0BA77EIYdOkgX60
+ TR1Fo02YwUpcKhPfO6qQQrijprvd8Fsw656bC933wmSP+w+cz9S9+DIh3MFFN9ePc3bI
+ k2Rg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=6TXYG0bRygv37lt/cmIuFfZcnUSM355T9n2ZJXUOXPE=;
- b=abFMep0JO4gft9+Jjv9l6C9qofgZAW8+Gkifq/XzPkJC1L9o/IiJYdXP+sWagzqxBy
- JfD1VBLTUIm6Vppn2mj6VoEu9U95IfYxLgsCokhlsWzgAtNgypkOtsSCtHax7XVtylIl
- izWLi1w8foRJW/Qol3djr3ZDqCC8u6mi5SWRjB/ocv8GW2a9KNrBfGxdp5gCISaR+mqh
- hjh+HZz6KoDglPBLHK1beV9LSjQrNobbTp8Hvv5B4qfk0UAvlErQM8TotoMrvfloDs2Y
- Jcq89hgjQgUu4IxzNx8FE+lwZnRQRn5zdeu4diX5erRfrM+socnK9/tCVMBItr3dfoo/
- AcOQ==
-X-Gm-Message-State: AJcUukcnSK9eWcnuFWKmu3w2vyYyX14LZTePwq9ISfDB4F7r8DpHd+En
- woXC5Um+XHx6UWbyu0maiInxwbm+nbIefg8XPk0RdA==
-X-Google-Smtp-Source: ALg8bN4PF1Axmm3q/vaJb9HeicK/Bp4AvzPVk8dEcLkvR/I3xClXHtXXlYhNB94xF29IhkuBpad6GwZa0XRnf2JuXBQ=
-X-Received: by 2002:a67:2045:: with SMTP id g66mr5711533vsg.180.1547200321471; 
- Fri, 11 Jan 2019 01:52:01 -0800 (PST)
+ :message-id:subject:to:cc:content-transfer-encoding;
+ bh=X8BlbWN2HjYlOQtiuSrwPdZOJRLE+ItQTDWpVSJ/AoM=;
+ b=WieZqg4wDPoilbY3MWRooOnWiIKiys0ILPd5PwAMc3z0QLMvk3nRWCkg44eWOhObhG
+ dCqchAnvqtFCA/6kX45zEvj65ak4aWGjmTxBPVwbDRNd9v0rm5JfMCMTmZACuD0NVVfo
+ 5qxWqzQOn3yzeEznIzDKKOLQN/SCiLDgON0vB3PTA9/gX1EQ6eSdpuYzAka8mKJFZzxt
+ GP8rqpZVhehvN+qXp/O/J9RFguKWF1eZr6KIJCsy+E477sjvCiOxzAL1wh9MWn7Ls6eM
+ 8A2uyUu9fGvq5cmmsiPmy6NCRA/VW3bm95J2N5TshLSFd2H9ncznjW1Clega45VV8g83
+ YVUw==
+X-Gm-Message-State: AJcUukeJZeRI63UXOvtISG5dQkyARLeGAMYADMq1eDZCbYY/vTgim38/
+ da0PSqg4SWoe7qfUuhtpdqtUPc8PveuPkif4ylE=
+X-Google-Smtp-Source: ALg8bN52T1VUQ0452u28Ck2IgbKwCIo7u0arkYUYOB7DIXGsCnKFnh2P+dQ7xTUxKqdviqaM0dGeIG+plosJXqy29Sk=
+X-Received: by 2002:a24:b34f:: with SMTP id z15mr671096iti.61.1547200435077;
+ Fri, 11 Jan 2019 01:53:55 -0800 (PST)
 MIME-Version: 1.0
-References: <1547123097-16431-1-git-send-email-sumit.garg@linaro.org>
- <1547123097-16431-3-git-send-email-sumit.garg@linaro.org>
- <20190110141856.p3evqyf34py74gkg@holly.lan>
- <CAFA6WYPHmtY4N9ruGLZ70FNeiDCbQE-fs+EP2px-S+GEj2nPTw@mail.gmail.com>
- <20190111093902.hfxb67txjhhlegzu@holly.lan>
-In-Reply-To: <20190111093902.hfxb67txjhhlegzu@holly.lan>
-From: Sumit Garg <sumit.garg@linaro.org>
-Date: Fri, 11 Jan 2019 15:21:50 +0530
-Message-ID: <CAFA6WYNp5ve=xZ1bQL+HUGK4Pz7dpzMzWy_fuS0_q8NHaZWL4Q@mail.gmail.com>
-Subject: Re: [PATCH v2 2/4] tee: optee: add TEE bus device enumeration support
-To: Daniel Thompson <daniel.thompson@linaro.org>
+References: <20190110205215.22030-1-pawel.mikolaj.chmiel@gmail.com>
+ <20190110205215.22030-4-pawel.mikolaj.chmiel@gmail.com>
+ <CAJKOXPdz-LfQ1-jPXB5Y7pVVVBDdH0Q=5xZJxvabjhZ-Ush+dg@mail.gmail.com>
+In-Reply-To: <CAJKOXPdz-LfQ1-jPXB5Y7pVVVBDdH0Q=5xZJxvabjhZ-Ush+dg@mail.gmail.com>
+From: =?UTF-8?Q?Pawe=C5=82_Chmiel?= <pawel.mikolaj.chmiel@gmail.com>
+Date: Fri, 11 Jan 2019 10:53:44 +0100
+Message-ID: <CAKpie0S3ce1gYqf2-ncz9jQdxG-e58bzn2GkCOkT468sL_EapA@mail.gmail.com>
+Subject: Re: [PATCH v2 3/4] cpufreq: s5pv210: Defer probe if getting
+ regulators fail
+To: Krzysztof Kozlowski <krzk@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_015202_897862_932EF20C 
-X-CRM114-Status: GOOD (  18.88  )
+X-CRM114-CacheID: sfid-20190111_015356_227387_72B88E1F 
+X-CRM114-Status: GOOD (  19.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,91 +93,63 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Herbert Xu <herbert@gondor.apana.org.au>, Arnd Bergmann <arnd@arndb.de>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Bhupesh Sharma <bhsharma@redhat.com>, linux-kernel@vger.kernel.org,
- tee-dev@lists.linaro.org, Rob Herring <robh+dt@kernel.org>,
- "open list:HARDWARE RANDOM NUMBER GENERATOR CORE"
- <linux-crypto@vger.kernel.org>, mpm@selenic.com,
- Jens Wiklander <jens.wiklander@linaro.org>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>, DTML <devicetree@vger.kernel.org>,
+ "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
+ linux-pm@vger.kernel.org, Viresh Kumar <viresh.kumar@linaro.org>,
+ rjw@rjwysocki.net, linux@armlinux.org.uk, Rob Herring <robh+dt@kernel.org>,
+ linux-kernel <linux-kernel@vger.kernel.org>, Kukjin Kim <kgene@kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 11 Jan 2019 at 15:09, Daniel Thompson
-<daniel.thompson@linaro.org> wrote:
->
-> On Fri, Jan 11, 2019 at 12:52:19PM +0530, Sumit Garg wrote:
-> > On Thu, 10 Jan 2019 at 19:49, Daniel Thompson
-> > <daniel.thompson@linaro.org> wrote:
-> > > > +static int get_devices(struct tee_context *ctx, u32 session,
-> > > > +                    struct tee_shm *device_uuid, u32 *shm_size)
-> > >
-> > > Missing const on device_uuid?
-> > >
-> >
-> > I don't think we should have a const for device_uuid here as this is
-> > shared memory struct pointer which is dynamically allocated and used
-> > to fetch device UUIDs.
->
-> Agree. Perhaps device_uuid is misnamed though (part of the reason I
-> misread this is that it is singular so I though it was a single UUID
-> travelling into the TZ).
->
-
-Will rename it to device_shm instead.
-
-> > > > +     rc = get_devices(ctx, sess_arg.session, device_shm, &shm_size);
-> > > > +     if (rc < 0)
-> > > > +             goto out_shm;
-> > > > +
-> > > > +     device_uuid = tee_shm_get_va(device_shm, 0);
-> > > > +     if (IS_ERR(device_uuid)) {
-> > > > +             pr_err("tee_shm_get_va failed\n");
-> > > > +             rc = PTR_ERR(device_uuid);
-> > > > +             goto out_shm;
-> > > > +     }
-> > > > +
-> > > > +     while (idx < shm_size / sizeof(uuid_t)) {
-> > >
-> > > This is a very uncommon way to write a for loop ;-).
-> > >
-> >
-> > Ok, will add "num_devices" variable.
->
-> num_devices might add readability but that is not what I meant.
->
-> The most idiomatic way to write somthing that loops for every valid index
-> value is:
->
->         for (i=0; i < limit; i++)
->
-> You wrote it like this:
->
->         int idx=0;
->
->         /* lots of code between initializer and first use */
->
->         while (idx < limit) {
->                 /* more code */
->                 idx++;
->         }
->
-> Sure, they are equivalent but the idiomatic form is easier to read.
->
-
-Oh okay, will use "for" loop instead.
-
--Sumit
-
->
-> Daniel.
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+cHQuLCAxMSBzdHkgMjAxOSBvIDEwOjQ2IEtyenlzenRvZiBLb3psb3dza2kgPGtyemtAa2VybmVs
+Lm9yZz4gbmFwaXNhxYIoYSk6Cj4KPiBPbiBUaHUsIDEwIEphbiAyMDE5IGF0IDIxOjUzLCBQYXdl
+xYIgQ2htaWVsCj4gPHBhd2VsLm1pa29sYWouY2htaWVsQGdtYWlsLmNvbT4gd3JvdGU6Cj4gPgo+
+ID4gVGhlcmUgaXMgcG9zc2liaWxpdHksIHRoYXQgd2hlbiBwcm9iaW5nIGRyaXZlciwgcmVndWxh
+dG9ycyBhcmUgbm90IHlldAo+ID4gaW5pdGlhbGl6ZWQuIEluIHRoaXMgY2FzZSB3ZSBzaG91bGQg
+cmV0dXJuIEVQUk9CRV9ERUZFUiBhbmQgd2FpdCB0aWxsCj4gPiB0aGV5J3JlIGluaXRpYWxpemVk
+LCBzaW5jZSB0aGV5J3JlIHJlcXVpcmVkIGN1cnJlbnRseSBmb3IgY3B1ZnJlcSBkcml2ZXIKPiA+
+IHRvIHdvcmsuIEFsc28gbW92ZSByZWd1bGF0b3IgaW5pdGlhbGl6YXRpb24gY29kZSBhdCBiZWdp
+bm5pbmcgb2YgcHJvYmUsCj4gPiBzbyB3ZSBjYW4gZGVmZXIgYXMgZmFzdCBhcyBwb3NpYmJsZS4K
+PiA+Cj4gPiBTaWduZWQtb2ZmLWJ5OiBQYXdlxYIgQ2htaWVsIDxwYXdlbC5taWtvbGFqLmNobWll
+bEBnbWFpbC5jb20+Cj4gPiAtLS0KPiA+IENoYW5nZXMgZnJvbSB2MToKPiA+ICAgLSBGaXggY29t
+cGlsYXRpb24gZXJyb3IKPiA+ICAgLSBSZW9yZ2FuaXplIGNvZGUgc28gaXQncyBzbWFsbGVyCj4g
+PiAtLS0KPiA+ICBkcml2ZXJzL2NwdWZyZXEvczVwdjIxMC1jcHVmcmVxLmMgfCAzMiArKysrKysr
+KysrKysrKysrKystLS0tLS0tLS0tLS0tCj4gPiAgMSBmaWxlIGNoYW5nZWQsIDE5IGluc2VydGlv
+bnMoKyksIDEzIGRlbGV0aW9ucygtKQo+ID4KPiA+IGRpZmYgLS1naXQgYS9kcml2ZXJzL2NwdWZy
+ZXEvczVwdjIxMC1jcHVmcmVxLmMgYi9kcml2ZXJzL2NwdWZyZXEvczVwdjIxMC1jcHVmcmVxLmMK
+PiA+IGluZGV4IGY1MTY5N2YxZTBiMy4uNmRmOTU5NDFiYTk2IDEwMDY0NAo+ID4gLS0tIGEvZHJp
+dmVycy9jcHVmcmVxL3M1cHYyMTAtY3B1ZnJlcS5jCj4gPiArKysgYi9kcml2ZXJzL2NwdWZyZXEv
+czVwdjIxMC1jcHVmcmVxLmMKPiA+IEBAIC01OTQsNiArNTk0LDI1IEBAIHN0YXRpYyBpbnQgczVw
+djIxMF9jcHVmcmVxX3Byb2JlKHN0cnVjdCBwbGF0Zm9ybV9kZXZpY2UgKnBkZXYpCj4gPiAgICAg
+ICAgICAqIHRoaXMgd2hvbGUgZHJpdmVyIGFzIHNvb24gYXMgUzVQVjIxMCBnZXRzIG1pZ3JhdGVk
+IHRvIHVzZQo+ID4gICAgICAgICAgKiBjcHVmcmVxLWR0IGRyaXZlci4KPiA+ICAgICAgICAgICov
+Cj4gPiArICAgICAgIGFybV9yZWd1bGF0b3IgPSByZWd1bGF0b3JfZ2V0KE5VTEwsICJ2ZGRhcm0i
+KTsKPiA+ICsgICAgICAgaWYgKElTX0VSUihhcm1fcmVndWxhdG9yKSkgewo+ID4gKyAgICAgICAg
+ICAgICAgIGlmIChQVFJfRVJSKGFybV9yZWd1bGF0b3IpID09IC1FUFJPQkVfREVGRVIpCj4gPiAr
+ICAgICAgICAgICAgICAgICAgICAgICBwcl9kZWJ1ZygidmRkYXJtIHJlZ3VsYXRvciBub3QgcmVh
+ZHksIGRlZmVyXG4iKTsKPiA+ICsgICAgICAgICAgICAgICBlbHNlCj4gPiArICAgICAgICAgICAg
+ICAgICAgICAgICBwcl9lcnIoImZhaWxlZCB0byBnZXQgcmVndWxhdG9yIHZkZGFybVxuIik7Cj4g
+PiArICAgICAgICAgICAgICAgcmV0dXJuIFBUUl9FUlIoYXJtX3JlZ3VsYXRvcik7Cj4gPiArICAg
+ICAgIH0KPiA+ICsKPiA+ICsgICAgICAgaW50X3JlZ3VsYXRvciA9IHJlZ3VsYXRvcl9nZXQoTlVM
+TCwgInZkZGludCIpOwo+ID4gKyAgICAgICBpZiAoSVNfRVJSKGludF9yZWd1bGF0b3IpKSB7Cj4g
+PiArICAgICAgICAgICAgICAgaWYgKFBUUl9FUlIoaW50X3JlZ3VsYXRvcikgPT0gLUVQUk9CRV9E
+RUZFUikKPiA+ICsgICAgICAgICAgICAgICAgICAgICAgIHByX2RlYnVnKCJ2ZGRpbnQgcmVndWxh
+dG9yIG5vdCByZWFkeSwgZGVmZXJcbiIpOwo+ID4gKyAgICAgICAgICAgICAgIGVsc2UKPiA+ICsg
+ICAgICAgICAgICAgICAgICAgICAgIHByX2VycigiZmFpbGVkIHRvIGdldCByZWd1bGF0b3IgdmRk
+aW50XG4iKTsKPiA+ICsgICAgICAgICAgICAgICByZWd1bGF0b3JfcHV0KGFybV9yZWd1bGF0b3Ip
+Owo+ID4gKyAgICAgICAgICAgICAgIHJldHVybiBQVFJfRVJSKGludF9yZWd1bGF0b3IpOwo+ID4g
+KyAgICAgICB9Cj4gPiArCj4KPiBFcnJvciBwYXRocyBhcmUgbm93IG5vdCBjb3JyZWN0LiBZb3Ug
+c2hvdWxkIHB1dCB0aGUgcmVndWxhdG9ycyB3aGVuCj4gcmV0dXJuaW5nIGxhdGVyLiBUaGUgcHJl
+dmlvdXMgY29kZSBoYWQgdGhlc2UgZXJyb3IgcGF0aHMgd3JvbmcgYXMgd2VsbAo+IC0gbm90IGlv
+dW5tYXBwaW5nIC0gYnV0IGlmIHlvdSBtb3ZlIHRoaW5ncyBhcm91bmQsIG1heWJlIGxldCdzIGZp
+eAo+IHRoaW5ncy4KT2ssIHdpbGwgZml4IHRoaXMgaW4gbmV3IHZlcnNpb24gYW5kIHdpbGwgcmVz
+ZW5kIGl0IChvbmx5IHRoaXMgb25lCnBhdGNoLCBzaW5jZSBhbGwgb3RoZXIgbG9va3Mgb2svYXBw
+bGllZCkuCkFsc28gd2lsbCBhZGQgbWlzc2luZyBpb3VubWFwcGluZy9ldGMgdG8gZml4IGFsbCBv
+dGhlciBlcnJvciBwYXRocy4KClRoYW5rcwo+Cj4gQmVzdCByZWdhcmRzLAo+IEtyenlzenRvZgoK
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJt
+LWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3Jn
+Cmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtl
+cm5lbAo=
