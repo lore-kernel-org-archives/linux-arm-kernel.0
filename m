@@ -2,22 +2,23 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9FC28C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 15:01:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 90339C43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 15:03:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 708A620874
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 15:01:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 628632084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 15:03:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bjycbtY6";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="RpzAMn/t"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 708A620874
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MatSI9p0";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ecFP8Fvc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 628632084C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,50 +27,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
 	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=8iXsofADqBAT87niCZG2cKJireWHxlkKTMffocwwyI4=; b=bjycbtY6qzDLE/
-	9+6kM98hLprlS937t7d/03F6ita2Jd0fr2w/XYLtRjoanCfe90pPrgpqKCkz6mAlKQ6HuxOf2jx8+
-	pq4pKUq2/zoXRnIQGP3EJWpRFbK6CN7M+eAA4Kga5bliSrTiD+xBxrjeQHdggzFbfkZUQCljZnCIK
-	6yp2mSGoDhpreaR451/PrJDgL17DlhXggFWVg5xM3UycWlsegnq5AU5KZbEoHqSdRr3jBTlWbPo0+
-	6b7Z1Vdcxg/fMIyyYnGofoPWaH/PpvdlI1mFz/DdDeB1I3Y+zIcZUAP2/cZZRv8JHbsRIl0QzoTWf
-	lO5p4Va+r0HRfHKkvcsw==;
+	List-Owner; bh=xfggkln8Fe7T2dpJDzLwDbUEk+ufEeb9vt9YEMeRAw0=; b=MatSI9p0DV7tAd
+	+FpFlEzqcvWcWbt2McYueY5CBsgf3wHJm0rgTkn89C0kKsM4plJpcXmH7+3rD7cue/5X4gkKQ2nOA
+	d35bmDDjjTvzBABP5fhus2A/i6g4qYSRJQEgx8MxMkD2PhgDxhSwZQQQvj2fOWkzULOZz3i4MWbjn
+	R3pasfVtMxJErqJpTPNeahyeLo0ALMH2kiJn42cdFOui2DVT5bMmL3BHJpb1xS7ih88KvlibRJEw5
+	Gli7wZViLb0EmnK1EKgS3ixfWm5CaqzpiynNitCURlVmXhvwOgGpvRLUZdy0nSOVEy3GyiIR/SvgB
+	XuWto0/gtFslF2A4Znrg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghyJj-0005j9-Fg; Fri, 11 Jan 2019 15:01:51 +0000
-Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
+	id 1ghyL7-0006Ca-RQ; Fri, 11 Jan 2019 15:03:17 +0000
+Received: from mail-pf1-x442.google.com ([2607:f8b0:4864:20::442])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghyJb-0005hZ-Ah; Fri, 11 Jan 2019 15:01:48 +0000
-Received: by mail-pf1-x441.google.com with SMTP id c73so7053037pfe.13;
- Fri, 11 Jan 2019 07:01:42 -0800 (PST)
+ id 1ghyL3-0006Bo-Gf; Fri, 11 Jan 2019 15:03:15 +0000
+Received: by mail-pf1-x442.google.com with SMTP id h3so7085466pfg.1;
+ Fri, 11 Jan 2019 07:03:13 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=date:from:to:cc:subject:message-id:mime-version:content-disposition
- :user-agent; bh=SrodQzZztcg8txHZaZFxducSgC9DqvYe1eV09xmVfQk=;
- b=RpzAMn/tFZO9w1bOsU0R3bl0Czqgh3vozKcpize0+4T5FcTI3eGHnL7a/siSocGNeS
- YpzDw/x5TPn/ZIK8D8rFRVnfSd+kRunfwlXMPBFnoy0agtIVT3l2o8n93yulfDdqPfpM
- 02pnJKSJtBrMnNoIKfIXvp+dl7xWo/ZINl/06zWYmqtI8R6Rd1tzw33GJStW9BWNcyJd
- UTxrdHPrzQA7Dgo9vXmzvN7LPm0x/n5eENgEHExKf5wRU3L1BPvidyksamluwHiEMfNj
- jLP1Epne1X0o4Fs5YlsShABd8w6xov+ORe//hxIum1KwYBI45AwbqyCzizyY7CZsappy
- j23Q==
+ :user-agent; bh=OKnr+eVdmA4Yca5asvAl3VJvv/8NsBSwy+KQiY0Jcow=;
+ b=ecFP8FvcstIqu0NB/u52GoYNOTcWG2DvcB07IgY8lEs9qJPP4QRrMpFsf79PdPyxVo
+ +95bi0qc4yFsVreg3UGS61GpTOuoYCQnYZyc+5rX9mPEq6iWXgJAAzC0Dic6/1Ac4kdd
+ ToSp1I9tu34JSInsxojwgpUz/v6muGU8hTz3xenp7NxE8zdhMiFKGpknt4LFIcIdPB8A
+ yk0tCLiaSAkmPdaK/WpQa8EEuvjBTrzwO+wwZHg4X6ykM3D78CNfnJIFfuAC4GhqGeJE
+ 2By7VfXiT62OJFnrYXEMYkgKZWvN35vVUGiGIWMLm2+uUIMEr0RRqcicvSTWrx7DGnxD
+ TQHw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:mime-version
  :content-disposition:user-agent;
- bh=SrodQzZztcg8txHZaZFxducSgC9DqvYe1eV09xmVfQk=;
- b=bn5zKO+Iu+grqDtZSfkg+7otGs9R1cq3njekBIVCCf9GHHPGftV5LaeqvZpXUjQQYD
- iuRufP0DU+zmqdZtxYCbnow33w0dDHX61G1MjriNuqq5UCiQhemFJ/Cv0THK8+E5kev6
- f4rVY7P/UNaceSuEARPGqjMAPq0/g0WUm9mwxJhgWhvr01aXAYyNmWFmnMIKEKkbfF1n
- pQrvgvsx+j+jjJgycIU3YvYuEY2pxTqtyzEFHMkk7e61xdwIFsmdnCf8zq1WGU3KFGXh
- hfrJkQLu8Etech6vXtYMxpNiwC2pX/t0lpX31RzKfv9O8sAf32c9tCv//btitrcTgWrz
- hYjw==
-X-Gm-Message-State: AJcUukdRAJGHRigQv8sM0tSU4jvCWVrgDJzM6p+rbib4RSAiAdwA8Fsa
- ir36dOelJfj6bH1M8ksNUBE=
-X-Google-Smtp-Source: ALg8bN63Mqumr33i923Eaojw1CNwJqGO3fUgNxuFX1Idnsn+2UvfCqyMDy2gA5SSe2/mxV+qUcpzvQ==
-X-Received: by 2002:a63:f30d:: with SMTP id l13mr13690215pgh.399.1547218901644; 
- Fri, 11 Jan 2019 07:01:41 -0800 (PST)
+ bh=OKnr+eVdmA4Yca5asvAl3VJvv/8NsBSwy+KQiY0Jcow=;
+ b=fngzHXQJ13nMFw+U9a4zpLjKWa19yvpWuJV5sk2m6gWSIhjKmvt9GKqDpqXUFdO070
+ W99PPs7ZH/6ntPPiqZG1amCaImkUIduvWPijhN82pU4v1ckP/+m82/Di1EjXZCZfC2F3
+ 9PglRy03YJxCJ6dgnUtaNWNCwy0lEIWGQouKmbk7INwRB7e2iw3zPA5W+FiI65JBlE5F
+ R2uiTKAnCChtKEMvzj6APUFIBkjaS9YpApqwIRmaEKOK6CCAVCk1ZZdCpFdeJgxh3c1L
+ mRa8RsiEbBVKuL/2n2QMXkaWUW/1nnEhHVADrDPmaPWU+kZEomd/vdMjxaaaoqy6idX8
+ ID1A==
+X-Gm-Message-State: AJcUukfHO5mz5H5B8/h6PMMz4VDaVvXFAlT5kiv8m52+4cpKNUQC8FMm
+ bviyjITGn8dN9pkpe1iHNBE=
+X-Google-Smtp-Source: ALg8bN4N+0OC/ohlRldBlS6pqDxN4tNRJaVupZC6A5wD5JEK2YvVMDK1VGgLB+11HRGTGie4+RIV4Q==
+X-Received: by 2002:aa7:80d7:: with SMTP id a23mr14629976pfn.86.1547218992868; 
+ Fri, 11 Jan 2019 07:03:12 -0800 (PST)
 Received: from jordon-HP-15-Notebook-PC ([49.207.52.190])
- by smtp.gmail.com with ESMTPSA id l70sm87429186pgd.20.2019.01.11.07.01.39
+ by smtp.gmail.com with ESMTPSA id d129sm119031814pfc.31.2019.01.11.07.03.10
  (version=TLS1 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Fri, 11 Jan 2019 07:01:40 -0800 (PST)
-Date: Fri, 11 Jan 2019 20:35:41 +0530
+ Fri, 11 Jan 2019 07:03:11 -0800 (PST)
+Date: Fri, 11 Jan 2019 20:37:12 +0530
 From: Souptick Joarder <jrdr.linux@gmail.com>
 To: akpm@linux-foundation.org, willy@infradead.org, mhocko@suse.com,
  kirill.shutemov@linux.intel.com, vbabka@suse.cz, riel@surriel.com,
@@ -80,14 +81,15 @@ To: akpm@linux-foundation.org, willy@infradead.org, mhocko@suse.com,
  airlied@linux.ie, oleksandr_andrushchenko@epam.com, joro@8bytes.org,
  pawel@osciak.com, kyungmin.park@samsung.com, mchehab@kernel.org,
  boris.ostrovsky@oracle.com, jgross@suse.com
-Subject: [PATCH 0/9] Use vm_insert_range and vm_insert_range_buggy
-Message-ID: <20190111150541.GA2670@jordon-HP-15-Notebook-PC>
+Subject: [PATCH 1/9] mm: Introduce new vm_insert_range and
+ vm_insert_range_buggy API
+Message-ID: <20190111150712.GA2696@jordon-HP-15-Notebook-PC>
 MIME-Version: 1.0
 Content-Disposition: inline
 User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_070143_413725_BBDF8757 
-X-CRM114-Status: GOOD (  10.40  )
+X-CRM114-CacheID: sfid-20190111_070313_556375_ECA2BCFB 
+X-CRM114-Status: GOOD (  16.65  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -128,35 +130,147 @@ vm_insert_range_buggy() to behave according to the normal vm_pgoff
 offsetting simply by removing the _buggy suffix on the function
 name and if that causes regressions, it gives us an easy way to revert.
 
-There is an existing bug in [7/9], where user passed length is not
-verified against object_count. For any value of length > object_count
-it will end up overrun page array which could lead to a potential bug.
-This is fixed as part of these conversion.
+Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+Suggested-by: Russell King <linux@armlinux.org.uk>
+Suggested-by: Matthew Wilcox <willy@infradead.org>
+---
+ include/linux/mm.h |  4 +++
+ mm/memory.c        | 81 ++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ mm/nommu.c         | 14 ++++++++++
+ 3 files changed, 99 insertions(+)
 
-Souptick Joarder (9):
-  mm: Introduce new vm_insert_range and vm_insert_range_buggy API
-  arch/arm/mm/dma-mapping.c: Convert to use vm_insert_range
-  drivers/firewire/core-iso.c: Convert to use vm_insert_range_buggy
-  drm/rockchip/rockchip_drm_gem.c: Convert to use vm_insert_range
-  drm/xen/xen_drm_front_gem.c: Convert to use vm_insert_range
-  iommu/dma-iommu.c: Convert to use vm_insert_range
-  videobuf2/videobuf2-dma-sg.c: Convert to use vm_insert_range_buggy
-  xen/gntdev.c: Convert to use vm_insert_range
-  xen/privcmd-buf.c: Convert to use vm_insert_range_buggy
-
- arch/arm/mm/dma-mapping.c                         | 22 ++----
- drivers/firewire/core-iso.c                       | 15 +----
- drivers/gpu/drm/rockchip/rockchip_drm_gem.c       | 17 +----
- drivers/gpu/drm/xen/xen_drm_front_gem.c           | 18 ++---
- drivers/iommu/dma-iommu.c                         | 12 +---
- drivers/media/common/videobuf2/videobuf2-dma-sg.c | 22 ++----
- drivers/xen/gntdev.c                              | 16 ++---
- drivers/xen/privcmd-buf.c                         |  8 +--
- include/linux/mm.h                                |  4 ++
- mm/memory.c                                       | 81 +++++++++++++++++++++++
- mm/nommu.c                                        | 14 ++++
- 11 files changed, 129 insertions(+), 100 deletions(-)
-
+diff --git a/include/linux/mm.h b/include/linux/mm.h
+index 5411de9..9d1dff6 100644
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -2514,6 +2514,10 @@ unsigned long change_prot_numa(struct vm_area_struct *vma,
+ int remap_pfn_range(struct vm_area_struct *, unsigned long addr,
+ 			unsigned long pfn, unsigned long size, pgprot_t);
+ int vm_insert_page(struct vm_area_struct *, unsigned long addr, struct page *);
++int vm_insert_range(struct vm_area_struct *vma, struct page **pages,
++				unsigned long num);
++int vm_insert_range_buggy(struct vm_area_struct *vma, struct page **pages,
++				unsigned long num);
+ vm_fault_t vmf_insert_pfn(struct vm_area_struct *vma, unsigned long addr,
+ 			unsigned long pfn);
+ vm_fault_t vmf_insert_pfn_prot(struct vm_area_struct *vma, unsigned long addr,
+diff --git a/mm/memory.c b/mm/memory.c
+index 4ad2d29..00e66df 100644
+--- a/mm/memory.c
++++ b/mm/memory.c
+@@ -1520,6 +1520,87 @@ int vm_insert_page(struct vm_area_struct *vma, unsigned long addr,
+ }
+ EXPORT_SYMBOL(vm_insert_page);
+ 
++/**
++ * __vm_insert_range - insert range of kernel pages into user vma
++ * @vma: user vma to map to
++ * @pages: pointer to array of source kernel pages
++ * @num: number of pages in page array
++ * @offset: user's requested vm_pgoff
++ *
++ * This allows drivers to insert range of kernel pages they've allocated
++ * into a user vma.
++ *
++ * If we fail to insert any page into the vma, the function will return
++ * immediately leaving any previously inserted pages present.  Callers
++ * from the mmap handler may immediately return the error as their caller
++ * will destroy the vma, removing any successfully inserted pages. Other
++ * callers should make their own arrangements for calling unmap_region().
++ *
++ * Context: Process context.
++ * Return: 0 on success and error code otherwise.
++ */
++static int __vm_insert_range(struct vm_area_struct *vma, struct page **pages,
++				unsigned long num, unsigned long offset)
++{
++	unsigned long count = vma_pages(vma);
++	unsigned long uaddr = vma->vm_start;
++	int ret, i;
++
++	/* Fail if the user requested offset is beyond the end of the object */
++	if (offset > num)
++		return -ENXIO;
++
++	/* Fail if the user requested size exceeds available object size */
++	if (count > num - offset)
++		return -ENXIO;
++
++	for (i = 0; i < count; i++) {
++		ret = vm_insert_page(vma, uaddr, pages[offset + i]);
++		if (ret < 0)
++			return ret;
++		uaddr += PAGE_SIZE;
++	}
++
++	return 0;
++}
++
++/**
++ * vm_insert_range - insert range of kernel pages starts with non zero offset
++ * @vma: user vma to map to
++ * @pages: pointer to array of source kernel pages
++ * @num: number of pages in page array
++ *
++ * Maps an object consisting of `num' `pages', catering for the user's
++ * requested vm_pgoff
++ *
++ * Context: Process context. Called by mmap handlers.
++ * Return: 0 on success and error code otherwise.
++ */
++int vm_insert_range(struct vm_area_struct *vma, struct page **pages,
++				unsigned long num)
++{
++	return __vm_insert_range(vma, pages, num, vma->vm_pgoff);
++}
++EXPORT_SYMBOL(vm_insert_range);
++
++/**
++ * vm_insert_range_buggy - insert range of kernel pages starts with zero offset
++ * @vma: user vma to map to
++ * @pages: pointer to array of source kernel pages
++ * @num: number of pages in page array
++ *
++ * Maps a set of pages, always starting at page[0]
++ *
++ * Context: Process context. Called by mmap handlers.
++ * Return: 0 on success and error code otherwise.
++ */
++int vm_insert_range_buggy(struct vm_area_struct *vma, struct page **pages,
++				unsigned long num)
++{
++	return __vm_insert_range(vma, pages, num, 0);
++}
++EXPORT_SYMBOL(vm_insert_range_buggy);
++
+ static vm_fault_t insert_pfn(struct vm_area_struct *vma, unsigned long addr,
+ 			pfn_t pfn, pgprot_t prot, bool mkwrite)
+ {
+diff --git a/mm/nommu.c b/mm/nommu.c
+index 749276b..21d101e 100644
+--- a/mm/nommu.c
++++ b/mm/nommu.c
+@@ -473,6 +473,20 @@ int vm_insert_page(struct vm_area_struct *vma, unsigned long addr,
+ }
+ EXPORT_SYMBOL(vm_insert_page);
+ 
++int vm_insert_range(struct vm_area_struct *vma, struct page **pages,
++			unsigned long num)
++{
++	return -EINVAL;
++}
++EXPORT_SYMBOL(vm_insert_range);
++
++int vm_insert_range_buggy(struct vm_area_struct *vma, struct page **pages,
++				unsigned long num)
++{
++	return -EINVAL;
++}
++EXPORT_SYMBOL(vm_insert_range_buggy);
++
+ /*
+  *  sys_brk() for the most part doesn't need the global kernel
+  *  lock, except when an application is doing something nasty
 -- 
 1.9.1
 
