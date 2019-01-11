@@ -2,89 +2,77 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-15.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B8CC9C43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 15:05:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 92DAEC43613
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 15:07:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 682912084C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 15:05:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 64F4C2084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 15:07:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XW8VtWq0";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="sh2LY1Wi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 682912084C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NeEg0Eri";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="XS3P+qFr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 64F4C2084C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
-	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	MIME-Version:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=gQmFQ+6xaAhKhgVMscv6B2vZ4IX116pWMmgheNWKtkU=; b=XW8VtWq0fuJiVG
-	iUaMdot15jFSqesx7qRaEGziTl4YxH9pQ4HurE87J9dCV9sQLlfSCYAsUZKRnLmb4ZEdXMdJKSG2u
-	6JuoFutpjdUou5mFU9blXQEH5HKKSqu6Ra36IxiQo2SNlsvHtidE1Z89y7SeAN+z+LHjr6N2/PVVL
-	hEIbVBNJIZNXmAAN7pxVWHpvY8bwEHXq41Nax2ogq873IZE2CJqDRW0jRfhJirRMcL8TteCUwVUUU
-	ymWCfbEjJfkIHl/MwsbiaBpTU4S8IUqTwLTU3al0m+OaGXZmcVS84jjO3AMnpGN7P+CqAOPtXQGS3
-	URsyx8NCNoGObPEkQW/A==;
+	List-Owner; bh=ZO22n6eRFjKBv015t1FgMoY6kfw6kgJGhnzUktDhG1Y=; b=NeEg0Eriabya+o
+	11IdvciRzKGRIG6jgHDrNfg7UK2MSZMSsDu342D3+Vm0WXgwDDKVPG0BPnlBqF5KDklR5B4HsWaqE
+	/WMiG6KUV/F9VFD2sm1hGvy/qKVTUpCLbDUi9IIAVZ3dnebeD1woE/gQBs2aoXTVVF3F2VEcBSdbt
+	zIZF53bjmwGgGElejDyHQwPBfWkH/AH6G1J7MegZctA2sR0TsGhKkNmatAekUO5C8NVGVUkQL6yTh
+	hEkzWPsDXq5B9Q1tSMFdQvTDr5EbTtozJPmwJi2JjcBLNmArQrybBav50rJiFbh++eJnQkHIQmpGA
+	QABQPYDeYGQZYphDiOnQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghyNS-0000DL-Lf; Fri, 11 Jan 2019 15:05:42 +0000
-Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
+	id 1ghyPL-0000lc-1u; Fri, 11 Jan 2019 15:07:39 +0000
+Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghyNO-0000Bt-HS; Fri, 11 Jan 2019 15:05:39 +0000
-Received: by mail-pl1-x644.google.com with SMTP id 101so6877081pld.6;
- Fri, 11 Jan 2019 07:05:38 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=date:from:to:cc:subject:message-id:mime-version:content-disposition
- :user-agent; bh=fve/F1/lKXEnfpzre5B+d6239UbIM50sDNUC8vj1UvQ=;
- b=sh2LY1WiZPIeUaF3MW5DJg/QEYmtg7MuKqRcV+ohKVqeLOX2kAj87/ncMa6egebbYo
- k294jPvUpvY8tWh/TVJyCnvyC/T/VHszUoQByu4+B0bLPUEBcCPJg3A6iuRrk0nL/SCc
- lpg3ZBT6tI1It72Jxe2UE98iYfsC88cR1xfpH7vrMx9OJMw9tL2Vr1vv2W8XZ4Xktn9H
- NZtgrvTlD3Ik9YbSkPstnCWGQNPhb3+vQLQJ5oV3oYtnxdhNYQ0n2lHyDmzWabMOBagm
- +fOV5sL4jmozsC4arWO7kSdaVEIRpgV9bHvSvYqaiApnZh3+zyi/XPtspSlyoMBygeU3
- sZeA==
+ id 1ghyPH-0000jy-DT
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 15:07:36 +0000
+Received: by mail-lf1-x143.google.com with SMTP id p6so11047701lfc.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 11 Jan 2019 07:07:34 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:from:date:message-id:subject:to:cc;
+ bh=QpS0qN3cPtVGcoS5jBxT/KIbjxs+ePVHQzVvs7kIRfc=;
+ b=XS3P+qFrsDpby5u2cmyBNybPYVRGm/sxWN/vQjnANQ5qcwC4uBWNrOL/p8/r8uMHUK
+ m1++WKxrMMnkq62ANYZy2iV8rilXdPqPSX7EnRAwtpz0UIoMfD6syT39p8U6eM23CHTb
+ +dNFJ1Zcq9/R1QI35ImRwJuSzVpA+DOlshkoo=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:mime-version
- :content-disposition:user-agent;
- bh=fve/F1/lKXEnfpzre5B+d6239UbIM50sDNUC8vj1UvQ=;
- b=PHcPjVCW7liU5grs+dalOsnkKlYeM873WJgtiQj5EYnTZD5phy6yRvyZNIosbKKe7B
- UsKBdxZsmvyTDjqZ1HJvoVbye+cCh3+MzIZbE5LelJ/kgYUoGINkulNVhz7Frf7u7noq
- VQr5BZbdcnm+s5makdiue6nuwAkNk+NZiLCx4ueMXkvEycKHbK1J/DtQTZ8TqHNlMADR
- rDByeSLijOg+Nt6DzxjDkIInEcKayrnJGqtcPvUmBZLBG3MP2zbWkD8TqgzvZHjUEb/y
- /nNRbSkN1TD1C85it17wGjBLN29Cx/j6om9QWGBiK7EiEvl6JkwCo2lOypcA/mnqbk9T
- R/kQ==
-X-Gm-Message-State: AJcUukfHdyWWBEPKUTNDMUau6Yh5WH1/UES0Z/+gkzWbETK9mB17NGBb
- LCDfB/iQA8LnGJl9iuirWdPFRRvS
-X-Google-Smtp-Source: ALg8bN5Rc2l8bWM7uxkHK8LK4e398s3Iy/tXK9itkSm2yPC22Yk8baS7VKxthK4Bra16e8DuO0AC9w==
-X-Received: by 2002:a17:902:1105:: with SMTP id
- d5mr14463670pla.47.1547219137463; 
- Fri, 11 Jan 2019 07:05:37 -0800 (PST)
-Received: from jordon-HP-15-Notebook-PC ([49.207.52.190])
- by smtp.gmail.com with ESMTPSA id h15sm98053997pgl.43.2019.01.11.07.05.35
- (version=TLS1 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Fri, 11 Jan 2019 07:05:36 -0800 (PST)
-Date: Fri, 11 Jan 2019 20:39:33 +0530
-From: Souptick Joarder <jrdr.linux@gmail.com>
-To: akpm@linux-foundation.org, willy@infradead.org, mhocko@suse.com,
- hjc@rock-chips.com, heiko@sntech.de, airlied@linux.ie,
- linux@armlinux.org.uk, robin.murphy@arm.com
-Subject: [PATCH 4/9] drm/rockchip/rockchip_drm_gem.c: Convert to use
- vm_insert_range
-Message-ID: <20190111150933.GA2760@jordon-HP-15-Notebook-PC>
+ h=x-gm-message-state:mime-version:from:date:message-id:subject:to:cc;
+ bh=QpS0qN3cPtVGcoS5jBxT/KIbjxs+ePVHQzVvs7kIRfc=;
+ b=oDdtn83LxukLbxsxvFH1EmjsdIrNGOyQnwjcj5FQyDbCL6EfBTwaBoIPRms8B0cpq4
+ XLqjaTbTBrSu5gM7R1g98blF7kltlYoRW35Mq4UFg82ac8O1uiavHRbEJGVIXWnHWTGW
+ 0rwvy3+cD94yde4EJYprN8D7eu2UFCe4Z9+F0+e63c0p4zKn2NhLJO5+udCWb+zS2Ujk
+ HHF4+FPKxpnN2lpgzkPrr6o/3EabYB6TBhydt6OOxtzBssoSRhPf+CARnUwNZgy6Z1GG
+ tmKsCuz7gO4D9C9EZDAVrtn+ixZFSi6+HBNmsOq2Il8rdI2hWb5GQjBQrpxiBi+PZ5wv
+ J5Vg==
+X-Gm-Message-State: AJcUukfB/PCHvqG6YbX5rnMMVskioik9i5p0DcBlw+fSjMjqATMdPnjk
+ yO85HnYrdINiIrGSPdKv/0qEMYD2Fp+ojk6KbR1UVA==
+X-Google-Smtp-Source: ALg8bN7CI7rsfObqdbO/7zX07952101DGFQHK4UfjDL15DKAa9YA4YUR14f7r9vhHy7kJYELi1MLYIgFnPLx0NupOB4=
+X-Received: by 2002:a19:5154:: with SMTP id f81mr8750859lfb.96.1547219252929; 
+ Fri, 11 Jan 2019 07:07:32 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-User-Agent: Mutt/1.5.21 (2010-09-15)
+From: Linus Walleij <linus.walleij@linaro.org>
+Date: Fri, 11 Jan 2019 16:07:21 +0100
+Message-ID: <CACRpkdb22-JT3GeJeqcOdXYJa9MyGMhujHxX-RgZOk7kbEkejw@mail.gmail.com>
+Subject: [GIT PULL] Integrator fixes for v5.0+
+To: arm-soc <arm@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_070538_575597_B53F2693 
-X-CRM114-Status: GOOD (  12.15  )
+X-CRM114-CacheID: sfid-20190111_070735_481331_0E559490 
+X-CRM114-Status: UNSURE (   9.93  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,58 +84,55 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-mm@kvack.org, dri-devel@lists.freedesktop.org,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-rockchip@lists.infradead.org
+Cc: Nicholas Mc Guire <hofrat@osadl.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ "Gustavo A. R. Silva" <gustavo@embeddedor.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Convert to use vm_insert_range() to map range of kernel
-memory to user vma.
+Hi ARM SoC maintainers,
 
-Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
----
- drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 17 ++---------------
- 1 file changed, 2 insertions(+), 15 deletions(-)
+these are some overdue fixes for the Integrator.
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-index a8db758..c9e207f 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-@@ -221,26 +221,13 @@ static int rockchip_drm_gem_object_mmap_iommu(struct drm_gem_object *obj,
- 					      struct vm_area_struct *vma)
- {
- 	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
--	unsigned int i, count = obj->size >> PAGE_SHIFT;
-+	unsigned int count = obj->size >> PAGE_SHIFT;
- 	unsigned long user_count = vma_pages(vma);
--	unsigned long uaddr = vma->vm_start;
--	unsigned long offset = vma->vm_pgoff;
--	unsigned long end = user_count + offset;
--	int ret;
- 
- 	if (user_count == 0)
- 		return -ENXIO;
--	if (end > count)
--		return -ENXIO;
- 
--	for (i = offset; i < end; i++) {
--		ret = vm_insert_page(vma, uaddr, rk_obj->pages[i]);
--		if (ret)
--			return ret;
--		uaddr += PAGE_SIZE;
--	}
--
--	return 0;
-+	return vm_insert_range(vma, rk_obj->pages, count);
- }
- 
- static int rockchip_drm_gem_object_mmap_dma(struct drm_gem_object *obj,
--- 
-1.9.1
+It's your choice whether to queue for fixes or defer to v5.1, there are
+not many users out there, at the same time it is nice if the code is
+in shape.
 
+Please pull it in!
+
+Yours,
+Linus Walleij
+
+The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
+
+  Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+tags/integrator-fixes-armsoc
+
+for you to fetch changes up to 21face6f0d4d033d949d5517f307a15f76a9d9f2:
+
+  ARM: integrator: impd1: use struct_size() in devm_kzalloc()
+(2019-01-11 13:33:00 +0100)
+
+----------------------------------------------------------------
+Fixes for the Integrator:
+- Handle failed allocations in the IM/PC bus attachment.
+- Use struct_size() for allocation.
+
+----------------------------------------------------------------
+Gustavo A. R. Silva (1):
+      ARM: integrator: impd1: use struct_size() in devm_kzalloc()
+
+Nicholas Mc Guire (1):
+      gpio: pl061: handle failed allocations
+
+ arch/arm/mach-integrator/impd1.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
