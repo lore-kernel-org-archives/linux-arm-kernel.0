@@ -2,89 +2,72 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 721CFC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 01:28:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 72E5FC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 01:31:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4372920879
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 01:28:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4356120879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 01:31:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pqpbuRf8";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="PX0kpIsH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4372920879
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m1/h9utf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4356120879
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
-	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=vTeeT/prclWX7Chp7b1abOaWbp09N0to5ANVk6UGsGg=; b=pqpbuRf8KOjIZe
-	uXJIm1sG+1M5eSSjvEMl7ZHgKtrfkZ6w3SXozGC+swZ3At8g0G8rnqE/twzZuIDafNcGuorOVlJgj
-	OXjo7Qavgp3xXz+W04GIi/1G8gKiigPKzwrqhfSLG+UNX5Mu3Wm65c+WIa2aXLwxF84WzvbM4+56n
-	TwjgCf3cFkYt/FWfXZmJ4C9rZ+flrjTOeIq8RJkj/zhqXNnzNoKu74ZFaga+uT618N4RBSoUxPDQB
-	2ZmE0zBrLt8HzwAOWqrRUKQWUSFLezxer5/edGQ3sH3umza36y5Ge/MGjXpaxjHHDwRDtW7pLgUkC
-	LW5VtSH7uvWoaRZFmB1A==;
+	List-Owner; bh=VKXmMePc4zHeTO7+SIUoI/LXhmxQNU5mvrYgkZDhSPU=; b=m1/h9utf+9stTA
+	muoiWZthSgY+WUf2VSIfoJ/19vIbsGOfqxkGBEO0y3fHYZgwRa+aVTrIQhjvtwEsvPusOl9jycZJ3
+	KphcfyKRN107PCsUmhSWGbjLIreO0O0hfzRQ/jlIwcT2fmKrZUAoq0XULRqftXjL+nUoJ5Abn6MU5
+	xqjUamRiQ5fGCEdjw+nEMfm7Ib4wi1UrdEkx+ek2zfT5IG6aUyY6Gp9YkkFzN85Y7RoBukPSjziZ0
+	6qPiITNFQYhR9VMB7CGliZS2MZfLkzLrJeIBGbm5Q5AVwt1qgJhM9y0TJgII0Fzf7DC13ZA9jAHyx
+	09JO9u6DBi436XzQex4g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghlcP-0000N9-AX; Fri, 11 Jan 2019 01:28:17 +0000
-Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
+	id 1ghlfm-0002ED-39; Fri, 11 Jan 2019 01:31:46 +0000
+Received: from mailgw01.mediatek.com ([216.200.240.184])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghlcL-0000MK-Pd
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 01:28:15 +0000
-Received: by mail-pg1-x544.google.com with SMTP id w6so5594849pgl.6
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 10 Jan 2019 17:28:13 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:in-reply-to:references:date:message-id
- :mime-version; bh=2P+pkq/TAVJfpx+QVUhCn9RikOPq88PivZzjtOGkCms=;
- b=PX0kpIsHZAopLUpTUOPcmSxdoYqWG3Yy2a/gSt4fMAnFTPMwwUZp9lvNX7iUhe0CEO
- mr97YQ7w7MATf/6pJT7ZjTp5xduZAHtwnnPdIDJ5cb3ltat7IkZXULfiL7Iz5aMqdKmb
- M1IPOaheORYcAz6PekI7TF5iRMtxmFJWNu6bHeQM56HEB3a+r/+zhiKS29cOuIjP50Dq
- +mv6Kn5EWfNVPwXwYrsIhj7tXR4JUNhGgkE3oiTS/CeZoxr5Nn/fVQjE6mC682Hrq1My
- arIrXEGnTS9VKPbcKRtVdYDn9EYVAKzl1Hk7q6W5/SPh8wZsW9V4vUCpsHs66BuSnPfj
- VqCQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:in-reply-to:references:date
- :message-id:mime-version;
- bh=2P+pkq/TAVJfpx+QVUhCn9RikOPq88PivZzjtOGkCms=;
- b=qwabXGhm4/GL1gN1dwvkKKHmc2bqMJYNuScqtgdREkAUGgLKAXRBmQn8yeE/80JnGb
- tGkEVX0I6DD93WCqnUv1U+NtjkTUrKFRPJrhDTv4id6NLKbOZEAKkw8Uup7qL1lu76V5
- Gv41zQX6rgDvws6Ci98sbe3Vw9i8xMuNDq9ofWp5SmQH5tfHkQYkldjNnTthV1t4wFZR
- ZsIQdLN98WYSjs+iFDsppdU1RvjdjF+dLBLiBl43fHyegm/Xs4/DU3cxzFIDqCx9xj6T
- zgB9ZRjyRwwGM3SU8R/8R2Obt468c2Td5SpUM5Zrsp9V5FcdqqvAJf1utxMFzemzGDQG
- OThg==
-X-Gm-Message-State: AJcUukfIlUucppO3o3h2Udh3IuAbxSx4cZG/tYRfRRv6ohHqgmcn67dY
- fDwCT5gEYlZ4R5l9CH7ODYTqKw==
-X-Google-Smtp-Source: ALg8bN5IO4BJcANmQlKQXyWnapZsR/3IqoI/v9r4ESHNsrGTcIk1c3DNbMbLWi6X4V8xHzoCBXXJsQ==
-X-Received: by 2002:a63:184a:: with SMTP id 10mr11378583pgy.81.1547170092711; 
- Thu, 10 Jan 2019 17:28:12 -0800 (PST)
-Received: from localhost (c-71-197-186-152.hsd1.wa.comcast.net.
- [71.197.186.152]) by smtp.googlemail.com with ESMTPSA id
- r187sm242710873pfc.63.2019.01.10.17.28.11
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 10 Jan 2019 17:28:12 -0800 (PST)
-From: Kevin Hilman <khilman@baylibre.com>
-To: Loys Ollivier <lollivier@baylibre.com>, devicetree@vger.kernel.org,
- linux-amlogic@lists.infradead.org
-Subject: Re: [PATCH v3] arm64: dts: meson: Fix mmc cd-gpios polarity
-In-Reply-To: <1547134822-18498-1-git-send-email-lollivier@baylibre.com>
-References: <1547134822-18498-1-git-send-email-lollivier@baylibre.com>
-Date: Thu, 10 Jan 2019 17:28:11 -0800
-Message-ID: <7hftu0oudw.fsf@baylibre.com>
+ id 1ghlfh-0002DC-2n; Fri, 11 Jan 2019 01:31:43 +0000
+X-UUID: fa4ebcc489414ff0bd9e8c68925b343b-20190110
+X-UUID: fa4ebcc489414ff0bd9e8c68925b343b-20190110
+Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw01.mediatek.com
+ (envelope-from <ck.hu@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 357980858; Thu, 10 Jan 2019 17:31:38 -0800
+Received: from MTKMBS02N2.mediatek.inc (172.21.101.101) by
+ MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Thu, 10 Jan 2019 17:31:36 -0800
+Received: from mtkcas09.mediatek.inc (172.21.101.178) by
+ mtkmbs02n2.mediatek.inc (172.21.101.101) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Fri, 11 Jan 2019 09:31:28 +0800
+Received: from [172.21.77.4] (172.21.77.4) by mtkcas09.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Fri, 11 Jan 2019 09:31:28 +0800
+Message-ID: <1547170288.29836.2.camel@mtksdaap41>
+Subject: Re: Aw: Re: [PATCH] drm/mediatek: Add MTK Framebuffer-Device (mt7623)
+From: CK Hu <ck.hu@mediatek.com>
+To: Frank Wunderlich <frank-w@public-files.de>
+Date: Fri, 11 Jan 2019 09:31:28 +0800
+In-Reply-To: <trinity-0da588a3-1277-4421-ad6b-1f6aeb129dd6-1547146897687@3c-app-gmx-bs35>
+References: <20190102084917.4049-1-frank-w@public-files.de>
+ <20190107103640.GH21184@phenom.ffwll.local>
+ <CAKMK7uEqxz4TAt_iwEC+dMWboVxCeCduyABsSwD0Ns7k=Z_UWA@mail.gmail.com>
+ <trinity-0da588a3-1277-4421-ad6b-1f6aeb129dd6-1547146897687@3c-app-gmx-bs35>
+X-Mailer: Evolution 3.10.4-0ubuntu2 
 MIME-Version: 1.0
+X-TM-SNTS-SMTP: 0A9927583E6C4C5F7B56FD85D3FBAA413171D2A9E01E6C960CD787995FFDBB712000:8
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_172813_831219_8FCAC748 
-X-CRM114-Status: UNSURE (   9.29  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190110_173141_128969_BC8E2148 
+X-CRM114-Status: GOOD (  15.93  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,37 +79,69 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- Linus Walleij <linus.walleij@linaro.org>,
- Loys Ollivier <lollivier@baylibre.com>, linux-mmc@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Jerome Brunet <jbrunet@baylibre.com>
+Cc: Philipp Zabel <p.zabel@pengutronix.de>, David Airlie <airlied@linux.ie>,
+ Alexander Ryabchenko <d3adme4t@gmail.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ dri-devel <dri-devel@lists.freedesktop.org>, "moderated list:ARM/Mediatek SoC
+ support" <linux-mediatek@lists.infradead.org>, Daniel Vetter <daniel@ffwll.ch>,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Loys Ollivier <lollivier@baylibre.com> writes:
+Hi, Frank:
 
-> Commit 89a5e15bcba8 ("gpio/mmc/of: Respect polarity in the device tree")
-> changed the behavior of "cd-inverted" to follow the device tree bindings
-> specification.
-> Lines specifying "cd-inverted" are now "active high".
->
-> Fix the SD card for meson by setting the cd-gpios as "active low" according
-> to the boards specifications.
->
-> Fixes: 89a5e15bcba8 ("gpio/mmc/of: Respect polarity in the device tree")
-> Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
+On Thu, 2019-01-10 at 20:01 +0100, Frank Wunderlich wrote:
+> Hi Daniel,
+> 
+> > > Would be good to use the new generic fbdev emulation code here, for even
+> > > less code. Or at least know why this isn't possible to use for mtk (and
+> > > maybe address that in the core code). Hand-rolling fbdev code shouldn't be
+> > > needed anymore.
+> > 
+> > Back on the mailing list, no private replies please:
+> 
+> i don't wanted to spam all people with dumb questions ;)
+> 
+> > For examples please grep for drm_fbdev_generic_setup(). There's also a
+> > still in-flight series from Gerd Hoffmann to convert over bochs. That,
+> > plus all the kerneldoc linked from there should get you started.
+> > -Daniel
+> 
+> this is one of google best founds if i search for drm_fbdev_generic_setup:
+> 
+> https://lkml.org/lkml/2018/12/19/305
+> 
+> not very helpful...
+> 
+> so i tried kernel-doc
+> 
+> https://www.kernel.org/doc/html/latest/gpu/drm-kms-helpers.html?highlight=drm_fbdev_generic_setup#c.drm_fbdev_generic_setup
+> 
+> which is nice function-reference but i've found no generic workflow
+> 
+> as the posted driver is "only" a driver ported from kernel 4.4 by Alexander, i don't know if this new framework can be used and which parts need to be changed. I only try to bring his code Mainline....
+> Maybe CK Hu can help here because driver is originally from him and he knows internals. Or maybe you can help here?
 
-Thanks for fixing this!
+I could help on this but I'm a little busy now, so I'm not sure how long
+this process takes.
 
-Queued as a fix for v5.1-rc,
+Regards,
+CK
 
-I see that this is being fixed in the driver also, but I think fixing
-the DTs is necessary also.
+> 
+> i personally make my first steps as spare-time kernel-developer :)
+> 
+> regards Frank
+> 
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek@lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
 
-Kevin
+
 
 _______________________________________________
 linux-arm-kernel mailing list
