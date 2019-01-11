@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 84EBEC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 17:24:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5DE46C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 17:24:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 394CD20652
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 17:24:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2528920652
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 17:24:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HeFOJyeH";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="TegxTHJJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 394CD20652
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Kst1knbr";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="lqIK8IKE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2528920652
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,69 +26,69 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=UuJQ6k1OV80Eip3rIhcfVnw+IRDgW7XjifVrU3u7kPI=; b=HeFOJyeHYpBX4O
-	+BwngtasrjIxttFLbzj+GY3Ro4cuML3wGm8LaUUjF6KqCvS0Vfpou+aVioInR9tpW+n17CJezzniC
-	Fq6+46NnoNUoorfll3ByujQG3qUWNX8lAD1O3xVceramT9cnbh4s1pSlp+YLsuOMdgRin/cqfZTNR
-	GKVUcJpgIcbhODlm3FqY252cL+ICfDXFr4Q3oYya6KHUKsR/86ItEpotfBOr3NfUbc8P0ZZahIDsF
-	7oXeDUf7LitxexfsdOexF9F8vBEvdJlo5I8mRtGuv5cW09OR3KeKZu3IhYbd8lXl9+cKtAt1O/tAU
-	5Dg3xcpKI3mVfWy4pZsQ==;
+	List-Owner; bh=jm1ojf2Q9/RYTwDufICZe16QSn/WaVwQbmkcA3fnphk=; b=Kst1knbrNzUEcr
+	xP53zLxR7ffy4oPVZX4YRtugSY+Uvf/sQKOlq5Cvx8/AWNEKHfRJpONFvvAlRMRxHJRVTDfKIOU1t
+	5U2xh2T6W5NUctvKTm9V2qW1gmat4rHaRk7LxbDsafwHp6x5N68ilhX1vxScDoJUxg+0lr0tLNoEd
+	G5Ape4ZSyE6Tr+C07VF4PzVABoemv2Rnyfk5qkgJ5Yy5wpZgEv9QpRHnjwh9f/bE2yRkYM37BtiVH
+	Ik1DSFMzfud7DWF3EF0yEl5HMe/KDVQFLXpmx3xp9vkcBluWgYO2G5bviasMGf/MTHbvL9//QFuzV
+	qi4pol0PPzMBjqm8jRtQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gi0Xq-0002ug-Bb; Fri, 11 Jan 2019 17:24:34 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1gi0Y2-00039k-Vz; Fri, 11 Jan 2019 17:24:47 +0000
+Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gi0VT-0000Y0-LO
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 17:22:16 +0000
-Received: by mail-wr1-x441.google.com with SMTP id z5so15982365wrt.11
+ id 1gi0VU-0000Zh-TK
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 17:22:17 +0000
+Received: by mail-wr1-x444.google.com with SMTP id v13so16018947wrw.5
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 11 Jan 2019 09:22:07 -0800 (PST)
+ Fri, 11 Jan 2019 09:22:08 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=hfk3et7otLUxOjDItpbWy429zVa4HyUJDtZ/8CbR6Hc=;
- b=TegxTHJJI1X+1ffw9Ii0XYA3eoFOA4jPpjkQqX8Dx62H8alN7PomzfVaNMj/nZOJb6
- 7yG/Nsco2tNE5UShk+929HPiIJ66AcS54hdYEk3eWFVZC2DtjIZWhkMlIJUTMCi0SDva
- OS1RJWntdvhyn277ihGVezT2c0epLzw6KjQMQMBD4q058CyCn7GhRZZiUT7ZqadYgWfW
- mk+DFDs6a269kM9HIcNa27XExT5hrs3NmPI/CzpiRXlJhnQUHYUmAA5DfeUeJ/k8uhtA
- HHZFGg1SUuh1mIlGiL79F4CbPt99CTWrjSw1r12Ry/LFiJA77pHpOBPW+TmiVDxcVfs9
- LYzQ==
+ bh=8uDRh+zfzHIczZUkwUu8zWkfC3Ym8OxzyS3iE5hQDh0=;
+ b=lqIK8IKEc/qe+wnZ/U5o2f3zXE8BjI42VkuuKyTUkrN0Oq5RwKeqQiErfurC7yp6Id
+ XuW2as02N7M3q34vFDl5FtHkQER1jAkXXcnvkCfTLJkmml412cxmFqwFB/jgLtAjotmY
+ AYjNpANfTwNfNIFgxTdgshbpx8MDkIPyspNnIXc8ZOytHc1Bh8N7rbgAV61/3quR9we6
+ MJA4lkdu6c3OWVSEmFSY20f0IbCiVJyPwaNLqNRBJlSoiEP3EhmuTHzfA6R3+hTJ/Iuq
+ zZfC1qRlULIsI+YPdZ/O+w/OBO4LgtDbPzy6uieNXOzhfEmgCX57So3uK1tQ4n+Ou/We
+ bkdQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=hfk3et7otLUxOjDItpbWy429zVa4HyUJDtZ/8CbR6Hc=;
- b=Ux7f8C5T53ZNyMNDdbuc3YbkOGCeFFQtmSHSZa9Iwbx8c+GGewA1J2BymA9FT/5wgt
- SauLqGQVppuN0+gLitLaYhxWAiFk2vY2vo4MlclucPJOEYMqRGtQUHtM5zZOLnr27uCY
- nEHSzWhAy+N2HIv6qdKmGAWKIePPhiTNvuHzokMfeqskewQHZW3/DVFn5C0yWi5TUgqk
- cRE66Da0qqgXggkkoM3hk8DG08ojndUDbitlr9PSntUTpnnxt20ymFL2SKfSFVN5/T+n
- krXMZHkAm1wu7pwyWmgKosuvKTKN0AnMNd5pkO1gRK4bqCe0rMsyGQO/AdUiB/2/KU97
- WA9g==
-X-Gm-Message-State: AJcUukcq//xDo+8fRI4E01L/QiT+bnxIValGssXLgjDeIhIDMl3YWD+E
- EfKM1Z2tmWxOMP+YsePprejpYQ==
-X-Google-Smtp-Source: ALg8bN7ldJGoTP7K8GnOoSfkJScx5WGi/6liRkczax7q8ZHiAlb1NeBhfS0UyuGP05DMy3DwgmHk5w==
-X-Received: by 2002:a5d:5351:: with SMTP id t17mr14250045wrv.288.1547227326340; 
- Fri, 11 Jan 2019 09:22:06 -0800 (PST)
+ bh=8uDRh+zfzHIczZUkwUu8zWkfC3Ym8OxzyS3iE5hQDh0=;
+ b=YGufyGsOYrl92yTYvcU7pl+U5Rgu9zMgjp0nKLO9kaFAm4B2EbRMSLfg3MzoiOU5l5
+ cDrwtFonC5dfB3XOtKLCxQ+x+Sh2mrO39QkMHMHpRFbJqsqEgXYDysV048ylrIJWO8WX
+ /EpJz545BsnHHqv+jIlFkUXffqRXt7DEz8T7r3TvcKTcHxXsXGusc3yPHl7LI099nIXD
+ Z0NCKd6Qlpx/+pJFlAMNRQg7NrUd6hM23ErubCqod+XHhQkjm6gK5hUQBsAqobHOXT5P
+ //LvaJyI3XgMc7xxritezEtsUrgEsqz6INKOTFM4C1kHHVSVfDYEYbE2Mq0iqftgKI96
+ IKSw==
+X-Gm-Message-State: AJcUukcu4aGMZosoYuIoTfJGRFJC+ExLWzTJzlB2kw1pvWwwIk9rrE/5
+ pjm6W4efvozbVeIYJ0kHVPmYGQ==
+X-Google-Smtp-Source: ALg8bN61524V+BNotDYTCh1j/dBf3aS0mwzUaWax/dfKlCzaQ1M5ahcNhRYrC9JW1oeJhFD7T5E4TA==
+X-Received: by 2002:adf:f3c6:: with SMTP id g6mr14201248wrp.111.1547227327498; 
+ Fri, 11 Jan 2019 09:22:07 -0800 (PST)
 Received: from debian-brgl.home ([2a01:cb1d:af:5b00:6d6c:8493:1ab5:dad7])
- by smtp.gmail.com with ESMTPSA id o16sm78534408wrn.11.2019.01.11.09.22.05
+ by smtp.gmail.com with ESMTPSA id o16sm78534408wrn.11.2019.01.11.09.22.06
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 11 Jan 2019 09:22:05 -0800 (PST)
+ Fri, 11 Jan 2019 09:22:06 -0800 (PST)
 From: Bartosz Golaszewski <brgl@bgdev.pl>
 To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
  Daniel Lezcano <daniel.lezcano@linaro.org>,
  Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
  Thomas Gleixner <tglx@linutronix.de>
-Subject: [PATCH 13/17] ARM: davinci: dm355: switch to using the clocksource
+Subject: [PATCH 14/17] ARM: davinci: dm365: switch to using the clocksource
  driver
-Date: Fri, 11 Jan 2019 18:21:30 +0100
-Message-Id: <20190111172134.30147-14-brgl@bgdev.pl>
+Date: Fri, 11 Jan 2019 18:21:31 +0100
+Message-Id: <20190111172134.30147-15-brgl@bgdev.pl>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20190111172134.30147-1-brgl@bgdev.pl>
 References: <20190111172134.30147-1-brgl@bgdev.pl>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_092208_232911_6B70CDBF 
-X-CRM114-Status: GOOD (  15.14  )
+X-CRM114-CacheID: sfid-20190111_092209_509715_21562A3D 
+X-CRM114-Status: GOOD (  14.62  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -115,14 +115,14 @@ to using it.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/dm355.c | 36 ++++++++++++++++++++++-------------
- 1 file changed, 23 insertions(+), 13 deletions(-)
+ arch/arm/mach-davinci/dm365.c | 30 +++++++++++++++++++++++-------
+ 1 file changed, 23 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
-index 07ad9d6c9cae..2fd1186ceef6 100644
---- a/arch/arm/mach-davinci/dm355.c
-+++ b/arch/arm/mach-davinci/dm355.c
-@@ -29,7 +29,8 @@
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index 842b7e706ba1..ff7754ce2bbe 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -34,7 +34,8 @@
  #include <mach/irqs.h>
  #include <mach/mux.h>
  #include <mach/serial.h>
@@ -132,21 +132,15 @@ index 07ad9d6c9cae..2fd1186ceef6 100644
  
  #include "asp.h"
  #include "davinci.h"
-@@ -617,16 +618,24 @@ static struct davinci_id dm355_ids[] = {
+@@ -658,10 +659,24 @@ static struct davinci_id dm365_ids[] = {
  	},
  };
  
--/*
-- * T0_BOT: Timer 0, bottom:  clockevent source for hrtimers
-- * T0_TOP: Timer 0, top   :  clocksource for generic timekeeping
-- * T1_BOT: Timer 1, bottom:  (used by DSP in TI DSPLink code)
-- * T1_TOP: Timer 1, top   :  <unused>
-- */
--static struct davinci_timer_info dm355_timer_info = {
+-static struct davinci_timer_info dm365_timer_info = {
 -	.timers		= davinci_timer_instance,
 -	.clockevent_id	= T0_BOT,
 -	.clocksource_id	= T0_TOP,
-+static const struct davinci_timer_cfg dm355_timer_cfg = {
++static const struct davinci_timer_cfg dm365_timer_cfg = {
 +	.reg = {
 +		.start		= DAVINCI_TIMER0_BASE,
 +		.end		= DAVINCI_TIMER0_BASE + SZ_4K,
@@ -166,33 +160,33 @@ index 07ad9d6c9cae..2fd1186ceef6 100644
 +	}
  };
  
- static struct plat_serial8250_port dm355_serial0_platform_data[] = {
-@@ -708,7 +717,6 @@ static const struct davinci_soc_info davinci_soc_info_dm355 = {
+ #define DM365_UART1_BASE	(IO_PHYS + 0x106000)
+@@ -725,7 +740,6 @@ static const struct davinci_soc_info davinci_soc_info_dm365 = {
  	.intc_type		= DAVINCI_INTC_TYPE_AINTC,
- 	.intc_irq_prios		= dm355_default_priorities,
+ 	.intc_irq_prios		= dm365_default_priorities,
  	.intc_irq_num		= DAVINCI_N_AINTC_IRQ,
--	.timer_info		= &dm355_timer_info,
+-	.timer_info		= &dm365_timer_info,
+ 	.emac_pdata		= &dm365_emac_pdata,
  	.sram_dma		= 0x00010000,
  	.sram_len		= SZ_32K,
- };
-@@ -735,6 +743,7 @@ void __init dm355_init_time(void)
+@@ -773,6 +787,7 @@ void __init dm365_init_time(void)
  {
- 	void __iomem *pll1, *psc;
+ 	void __iomem *pll1, *pll2, *psc;
  	struct clk *clk;
 +	int rv;
  
- 	clk_register_fixed_rate(NULL, "ref_clk", NULL, 0, DM355_REF_FREQ);
+ 	clk_register_fixed_rate(NULL, "ref_clk", NULL, 0, DM365_REF_FREQ);
  
-@@ -747,7 +756,8 @@ void __init dm355_init_time(void)
+@@ -788,7 +803,8 @@ void __init dm365_init_time(void)
  	clk = clk_get(NULL, "timer0");
  	WARN(IS_ERR(clk), "Unable to get the timer clock\n");
  
 -	davinci_timer_init(clk);
-+	rv = davinci_timer_register(clk, &dm355_timer_cfg);
++	rv = davinci_timer_register(clk, &dm365_timer_cfg);
 +	WARN(rv, "Unable to register the timer: %d\n", rv);
  }
  
- static struct resource dm355_pll2_resources[] = {
+ void __init dm365_register_clocks(void)
 -- 
 2.19.1
 
