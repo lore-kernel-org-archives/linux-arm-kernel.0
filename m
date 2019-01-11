@@ -2,80 +2,69 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BBF2DC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 19:53:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 26196C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 19:54:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 95EC82084C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 19:53:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E91AB20836
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 19:54:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Gk22RU4y"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 95EC82084C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o0evO7sk";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="mbohqD2Q"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E91AB20836
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/JnOe1jex7gM0kf16F+FN3fzVr4yeFiXEJBFvonRXsk=; b=Gk22RU4yoIWNEx
-	rx6PVZ8qT/Be0ntkRww6LVL4qyZwGiVpMtvESUub29ufqWjzYWKo8+NI6NoCCpqRD/GlWBp96bsVd
-	csYKSnN+4F++Qoa3/HVXZO2v9hMunxDiGnh+SUeHd2Ch3XNdZ7HxZHe0XO4DT6CCH7GHI40wTfDFl
-	bujrK5vJ58kwK3JtjrXnYUAXux9TOSd7B8F78XMNfJcyKfvK+Zih6aRc5S2RXYeKkzUQl8Q5kIsh3
-	wGNMr6qSItXEAAn0j7TYy4ho520Axe4ZM81ryLSayIBsy9wBOCuUZAcr9fRh7veSb7icQiH9zAcXG
-	eP359qZ/Xf9DJKKJiurw==;
+	List-Owner; bh=ZZb6/sQuJKc4QobFBUfiaEU8HqXLgM575UyyiWfBuqQ=; b=o0evO7sk5tAidF
+	qgMahxqjK5zNYCiy2kaRua0ZvjeGA8ToofOPy89M2dQoqOOBxmXmLh51omxICy434Av3+3HE+wfa7
+	QMnq1h4Ok1c9nw+s6SOEJTq02Zoua6YJ4G/vqxZIlf8s9xj52MQW5cMKWHQS/csPcIVMnRTaHkp+S
+	HUBqC1eJtD7xdCpYCpc2dvs+EF1FBviQt/tfRwAZcwdwoS6OO8CtN5mJNK4BvFLp6GGwm9xO+lNQZ
+	571Miq499xC5398Lkkplttx4apm/sltNGYGBWE8eV/eWYscjiuVn6/oskduTHqsi6/3KyJoTfYiyS
+	aBLZ9Ia7rQf8WRck0hxw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gi2rd-0000fZ-IJ; Fri, 11 Jan 2019 19:53:09 +0000
-Received: from mail-ot1-f67.google.com ([209.85.210.67])
+	id 1gi2sw-0000xY-Rk; Fri, 11 Jan 2019 19:54:30 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gi2ra-0000et-5r
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 19:53:07 +0000
-Received: by mail-ot1-f67.google.com with SMTP id v23so14154125otk.9
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 11 Jan 2019 11:53:04 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=+2TD2oZRzwkC+aydOSsmZyCcfz+f8jQPAtzrx0HUfqM=;
- b=SMCy2bL+adpQbt9sTk2fvHdlKCCE6uET6xJTLJu3yrHItB3AjfKmozFOOcy3NL3bmX
- mbRc1awpHUyhsDCfZKh9P7pkvjYVCNxaRfU26jletC5wKiu7xdorst7w7PNZ89kisCNi
- mJ5kGgMTPUTbmh62i3bZG2GCcf5SzHvltg/Xwfn6ZLEd36wRVeOfTRe1Ucpao3gO3uKI
- WzXBgVta8je3+sddl05VO+x+ce9P87utjADoIems47ofSFgYNBY7/nEwcqkvOyNbt4DD
- wX+QZJE3uSuwxBnwzPLf4wxj7WHtUOsCAOpQyJlRBorT/JA9Wx13rCqAsGB415PRkI81
- rDeQ==
-X-Gm-Message-State: AJcUukfeBR3RFa9Y15fXTclNlCm6XQeuoA03HDw9+D6KJGlx04IQtcW2
- EqEDFUvnSP5/QqLeFjGcnraNJtxdDw==
-X-Google-Smtp-Source: ALg8bN7EzkRi1yi2nyRqFZbexKquii1ImncHMr18M7iKOeoBY5A61qbjzYXDOgcIZKa7dSRptWs7WQ==
-X-Received: by 2002:a9d:4f0e:: with SMTP id d14mr10995137otl.259.1547236384002; 
- Fri, 11 Jan 2019 11:53:04 -0800 (PST)
-Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
- [24.155.109.49])
- by smtp.gmail.com with ESMTPSA id l108sm35408545otc.23.2019.01.11.11.53.03
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 11 Jan 2019 11:53:03 -0800 (PST)
-Date: Fri, 11 Jan 2019 13:53:02 -0600
-From: Rob Herring <robh@kernel.org>
-To: Andrey Smirnov <andrew.smirnov@gmail.com>
-Subject: Re: [PATCH v4 4/4] PCI: imx6: Add support for i.MX8MQ
-Message-ID: <20190111195302.GA18985@bogus>
-References: <20190104165335.13205-1-andrew.smirnov@gmail.com>
- <20190104165335.13205-5-andrew.smirnov@gmail.com>
+ id 1gi2sv-0000xO-7B
+ for linux-arm-kernel@bombadil.infradead.org; Fri, 11 Jan 2019 19:54:29 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:Content-Type:
+ MIME-Version:References:In-Reply-To:Message-ID:Subject:Cc:To:From:Date:Sender
+ :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=fMcNvquDgQQYlKE4Y7lNw6Nx1C1EhjU6J5BGveGlj+4=; b=mbohqD2QpEMefQWwUsKCJJR0wu
+ XLxAF7/7GnD3lzQsYsgzRvoy1zuL7Ej70GIMeFRCcP6OoqrQ5zEbi3ymwpEXuE8uU+YWZg1Gp5EQ/
+ 4otHAYmsRlUMimv7+sUOhH7xlI537dTWBlz21EilYEsoRClF7Mc76ZM5aJlB5CO9fzeeNiq95PRcv
+ tU1bQ5OdGrT9SQgptnDn1p/CqPKxQJW/h9+Bmc6E0J675O13PXHHI8iN7g+v+ZnA5MjEoLdWoyrVa
+ oLvXi+/a8wZ3SkoSbTiyARozxYoYa3ppl0LF0X5BNi1DgOEj2LhBA7evi/bgAhBuyyDGHmrPx6s9Q
+ MIxVgPSA==;
+Received: from 177.17.174.42.dynamic.adsl.gvt.net.br ([177.17.174.42]
+ helo=coco.lan)
+ by casper.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gi2sp-0000fE-UV; Fri, 11 Jan 2019 19:54:24 +0000
+Date: Fri, 11 Jan 2019 17:54:16 -0200
+From: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+To: Christoph Hellwig <hch@lst.de>
+Subject: Re: [PATCH 3/3] videobuf2: replace a layering violation with
+ dma_map_resource
+Message-ID: <20190111175416.7d291e25@coco.lan>
+In-Reply-To: <20190111181731.11782-4-hch@lst.de>
+References: <20190111181731.11782-1-hch@lst.de>
+ <20190111181731.11782-4-hch@lst.de>
+X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; x86_64-redhat-linux-gnu)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190104165335.13205-5-andrew.smirnov@gmail.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
-X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_115306_212671_6A975B1F 
-X-CRM114-Status: GOOD (  17.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,79 +76,108 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "A.s. Dong" <aisheng.dong@nxp.com>, devicetree@vger.kernel.org,
- Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- Richard Zhu <hongxing.zhu@nxp.com>, linux-arm-kernel@lists.infradead.org,
- linux-pci@vger.kernel.org, linux-kernel@vger.kernel.org,
- Fabio Estevam <fabio.estevam@nxp.com>, linux-imx@nxp.com,
- Bjorn Helgaas <bhelgaas@google.com>, Leonard Crestez <leonard.crestez@nxp.com>,
- Chris Healy <cphealy@gmail.com>, Lucas Stach <l.stach@pengutronix.de>
+Cc: Niklas =?UTF-8?B?U8O2ZGVybHVuZA==?=
+ <niklas.soderlund+renesas@ragnatech.se>, Pawel Osciak <pawel@osciak.com>,
+ Russell King <linux@armlinux.org.uk>, iommu@lists.linux-foundation.org,
+ linux-kernel@vger.kernel.org, Kyungmin Park <kyungmin.park@samsung.com>,
+ linux-media@vger.kernel.org, linuxppc-dev@lists.ozlabs.org,
+ linux-arm-kernel@lists.infradead.org,
+ Marek Szyprowski <m.szyprowski@samsung.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 04, 2019 at 08:53:35AM -0800, Andrey Smirnov wrote:
-> Add code needed to support i.MX8MQ variant.
+Em Fri, 11 Jan 2019 19:17:31 +0100
+Christoph Hellwig <hch@lst.de> escreveu:
+
+> vb2_dc_get_userptr pokes into arm direct mapping details to get the
+> resemblance of a dma address for a a physical address that does is
+> not backed by a page struct.  Not only is this not portable to other
+> architectures with dma direct mapping offsets, but also not to uses
+> of IOMMUs of any kind.  Switch to the proper dma_map_resource /
+> dma_unmap_resource interface instead.
+
+Makes sense to me. I'm assuming that you'll be pushing it together
+with other mm patches, so:
+
+Acked-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+
 > 
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Chris Healy <cphealy@gmail.com>
-> Cc: Lucas Stach <l.stach@pengutronix.de>
-> Cc: Leonard Crestez <leonard.crestez@nxp.com>
-> Cc: "A.s. Dong" <aisheng.dong@nxp.com>
-> Cc: Richard Zhu <hongxing.zhu@nxp.com>
-> Cc: Rob Herring <robh@kernel.org>,
-> Cc: devicetree@vger.kernel.org,
-> Cc: linux-imx@nxp.com
-> Cc: linux-arm-kernel@lists.infradead.org
-> Cc: linux-kernel@vger.kernel.org
-> Cc: linux-pci@vger.kernel.org
-> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
 > ---
->  .../bindings/pci/fsl,imx6q-pcie.txt           |  3 +-
->  drivers/pci/controller/dwc/Kconfig            |  4 +-
->  drivers/pci/controller/dwc/pci-imx6.c         | 77 ++++++++++++++++++-
->  3 files changed, 79 insertions(+), 5 deletions(-)
+>  .../common/videobuf2/videobuf2-dma-contig.c   | 41 ++++---------------
+>  1 file changed, 9 insertions(+), 32 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> index d514c1f2365f..920ca93870a8 100644
-> --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> @@ -9,6 +9,7 @@ Required properties:
->  	- "fsl,imx6sx-pcie",
->  	- "fsl,imx6qp-pcie"
->  	- "fsl,imx7d-pcie"
-> +	- "fsl,imx8mq-pcie"
->  - reg: base address and length of the PCIe controller
->  - interrupts: A list of interrupt outputs of the controller. Must contain an
->    entry for each entry in the interrupt-names property.
-> @@ -45,7 +46,7 @@ Additional required properties for imx6sx-pcie:
->    PCIE_PHY power domains
->  - power-domain-names: Must be "pcie", "pcie_phy"
+> diff --git a/drivers/media/common/videobuf2/videobuf2-dma-contig.c b/drivers/media/common/videobuf2/videobuf2-dma-contig.c
+> index aff0ab7bf83d..82389aead6ed 100644
+> --- a/drivers/media/common/videobuf2/videobuf2-dma-contig.c
+> +++ b/drivers/media/common/videobuf2/videobuf2-dma-contig.c
+> @@ -439,42 +439,14 @@ static void vb2_dc_put_userptr(void *buf_priv)
+>  				set_page_dirty_lock(pages[i]);
+>  		sg_free_table(sgt);
+>  		kfree(sgt);
+> +	} else {
+> +		dma_unmap_resource(buf->dev, buf->dma_addr, buf->size,
+> +				   buf->dma_dir, 0);
+>  	}
+>  	vb2_destroy_framevec(buf->vec);
+>  	kfree(buf);
+>  }
 >  
-> -Additional required properties for imx7d-pcie:
-> +Additional required properties for imx7d-pcie and imx8mq-pcie:
->  - power-domains: Must be set to a phandle pointing to PCIE_PHY power domain
->  - resets: Must contain phandles to PCIe-related reset lines exposed by SRC
->    IP block
-> diff --git a/drivers/pci/controller/dwc/Kconfig b/drivers/pci/controller/dwc/Kconfig
-> index 6aafec3fad00..83ea318ad989 100644
-> --- a/drivers/pci/controller/dwc/Kconfig
-> +++ b/drivers/pci/controller/dwc/Kconfig
-> @@ -89,8 +89,8 @@ config PCI_EXYNOS
->  	select PCIE_DW_HOST
+> -/*
+> - * For some kind of reserved memory there might be no struct page available,
+> - * so all that can be done to support such 'pages' is to try to convert
+> - * pfn to dma address or at the last resort just assume that
+> - * dma address == physical address (like it has been assumed in earlier version
+> - * of videobuf2-dma-contig
+> - */
+> -
+> -#ifdef __arch_pfn_to_dma
+> -static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
+> -{
+> -	return (dma_addr_t)__arch_pfn_to_dma(dev, pfn);
+> -}
+> -#elif defined(__pfn_to_bus)
+> -static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
+> -{
+> -	return (dma_addr_t)__pfn_to_bus(pfn);
+> -}
+> -#elif defined(__pfn_to_phys)
+> -static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
+> -{
+> -	return (dma_addr_t)__pfn_to_phys(pfn);
+> -}
+> -#else
+> -static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
+> -{
+> -	/* really, we cannot do anything better at this point */
+> -	return (dma_addr_t)(pfn) << PAGE_SHIFT;
+> -}
+> -#endif
+> -
+>  static void *vb2_dc_get_userptr(struct device *dev, unsigned long vaddr,
+>  	unsigned long size, enum dma_data_direction dma_dir)
+>  {
+> @@ -528,7 +500,12 @@ static void *vb2_dc_get_userptr(struct device *dev, unsigned long vaddr,
+>  		for (i = 1; i < n_pages; i++)
+>  			if (nums[i-1] + 1 != nums[i])
+>  				goto fail_pfnvec;
+> -		buf->dma_addr = vb2_dc_pfn_to_dma(buf->dev, nums[0]);
+> +		buf->dma_addr = dma_map_resource(buf->dev,
+> +				__pfn_to_phys(nums[0]), size, buf->dma_dir, 0);
+> +		if (dma_mapping_error(buf->dev, buf->dma_addr)) {
+> +			ret = -ENOMEM;
+> +			goto fail_pfnvec;
+> +		}
+>  		goto out;
+>  	}
 >  
->  config PCI_IMX6
-> -	bool "Freescale i.MX6/7 PCIe controller"
-> -	depends on SOC_IMX6Q || SOC_IMX7D || (ARM && COMPILE_TEST)
-> +	bool "Freescale i.MX6/7/8 PCIe controller"
-> +	depends on SOC_IMX6Q || SOC_IMX7D || (ARM64 && ARCH_MXC) || ((ARM || ARM64) && COMPILE_TEST)
 
-Since you added the ifdef around the abort handler, I think you can drop 
-"(ARM || ARM64)" and enable building other arches.
 
-Rob
+
+Thanks,
+Mauro
 
 _______________________________________________
 linux-arm-kernel mailing list
