@@ -2,78 +2,65 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C5E32C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 12:26:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 96101C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 12:30:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 959A320870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 12:26:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 65FAD2133F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 12:30:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iJcpHlC+";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Wg1e9/P0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 959A320870
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pTrWn/n2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 65FAD2133F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=je2OsknKIoiNeG1FK715kQFKR0MfvwqUV5i39/PNdFM=; b=iJcpHlC+op56uZ
-	U5QSXK1fdqdHFRmNf59eTWPb3W8T6g/2+fUMQNgO3lw+wgzAoMCtBi9gC8M1a4nrcte9sRLZuU+gr
-	wqirGzXVqOdJ50weEZiFxFZIgqYIL2mNgaap15OxhK5d6Rk6I/n/XxquUDHAXYRGwh/2CLefxKyZA
-	EnHuDwvyewuWhl/25ITn4clJebGJPgrXu8r/B0voJ0vyeY2FASWiJWH/109Tsrhy2iqOXJSFrdlCD
-	+IxEtKwY10l28e4g9JfrEnbEAr0v/1ljVf1jxJMhDl2L2vcIaDriGpYt3FY5yO/O9UJSJpiLcigqW
-	Xk22HHhStkQbr3cua6EA==;
+	List-Owner; bh=qyncTfzPqQ9W1VPqfc1/EpJpnKO9kRgk3s7TSxTLd6A=; b=pTrWn/n2YcorIu
+	pOxJg2IdBTbI/XRiMLz3QMHAm1y7zODqVosZxn97XONPpuq1RTGeRJ4PKRIlh8rtbF6rTdhpJedw0
+	gOX4d4Ei7QmTeekQkDJdS31tGHxVhyvWpHxbLSO/NE9E8UJYzPClhVvuPPVsEkG6AQpInOQ1CmnJ+
+	601VxlFLjfVTjisO7yCCG6yxXaCyolf6Y3ilR4uLvasx91QiNJIF6i3grOl8fWUiYmpDTW7zQRQBR
+	iFxf3fHN9C7pBdK9JmgxNnBuFbpMiGWl62xh8rF7maF0Y6Q5rKt7V6QwoY25gmt1xsLRRXQMYLfzD
+	VeStp03E2k+IIEuIbeAQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghvs5-00011x-TP; Fri, 11 Jan 2019 12:25:09 +0000
-Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghvs1-0000P8-Av
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 12:25:06 +0000
-Received: by mail-lj1-x243.google.com with SMTP id s5-v6so12738988ljd.12
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 11 Jan 2019 04:25:05 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=TdsESOGbRKiRNxdPcXpg9XNxPPBWWG5+p2LUtuOv3CA=;
- b=Wg1e9/P0IQ7GBlEPv+F3XAL0xi4w8pywuaBIJ1b1D3hIPe9SjjxboDBctrnx50LMK+
- wkOX6UOkWsYx2ZR7IsTdNFZDafkWpBvdSznJnTaw144pQizOAgFpsm1Bn0/b6ysyy5FT
- Ddzg6kMNdFNMTek3ZgH5+Is1Ybi4/FxttLWXo=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=TdsESOGbRKiRNxdPcXpg9XNxPPBWWG5+p2LUtuOv3CA=;
- b=ieASh7M8iut+FXe2jw1C44ooBS+wChihUTne86oCFqUenU5b/rOXePQ0oQ+nPiAzW8
- bsAomM+zETm1nJuWoCfHDBovpPQ55T5zGxGd6mulmuR1Rgdp9Kw1vGRR3iDtwl35FTos
- cAiCT1rkj36nPXiUoU1B58fZOxCOtSkq6Yd3+pWMC2edQxyZiH58FEt34nQZF+3W9pbO
- 1WT++Q2DkaLtfLbMrf/I6kvIJoFOYonTm2Is2RihQsDQxY02VW60xc9kXBM6aTvWoTlk
- OXzpKDlpgq+cskD8HS7vZ4RGybZNURvxyiH/eKahG18j3MGvEPsD+M3y5YMZWqyuFhxQ
- +HCQ==
-X-Gm-Message-State: AJcUukcsH0JP368dGKCf+1MK5z4+zmyNI+O6VrH5ezHOimRjE5efZwIt
- 4qe5LcLBhFKJeB7/friCW6PzD9QE6WQnyMSSyjAdXA==
-X-Google-Smtp-Source: ALg8bN4E6VhqTcppuvh3BjDY7EX/U7s+63hNCiJmT9bByc9mNbf/yofgZnr+qfj5zQNrwgM9D36r+IIiMXw1J4Kbqcs=
-X-Received: by 2002:a2e:7e04:: with SMTP id z4-v6mr8469613ljc.97.1547209503753; 
- Fri, 11 Jan 2019 04:25:03 -0800 (PST)
+	id 1ghvwt-0002eu-62; Fri, 11 Jan 2019 12:30:07 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghvwm-0002W6-B8
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 12:30:02 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9EB4F80D;
+ Fri, 11 Jan 2019 04:29:59 -0800 (PST)
+Received: from fuggles.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 23FC53F70D;
+ Fri, 11 Jan 2019 04:29:58 -0800 (PST)
+Date: Fri, 11 Jan 2019 12:29:55 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Joerg Roedel <jroedel@suse.de>
+Subject: Re: [PATCH] ACPI/IORT: Fix build when CONFIG_IOMMU_API=n
+Message-ID: <20190111122955.GB30082@fuggles.cambridge.arm.com>
+References: <20190107164208.27789-1-lorenzo.pieralisi@arm.com>
+ <20190111113308.5lwgl5d7m7zjvidr@suse.de>
+ <20190111113652.GA30082@fuggles.cambridge.arm.com>
+ <20190111120859.iqq7gju2ecrmi66t@suse.de>
 MIME-Version: 1.0
-References: <20190104213508.GA20333@embeddedor>
-In-Reply-To: <20190104213508.GA20333@embeddedor>
-From: Linus Walleij <linus.walleij@linaro.org>
-Date: Fri, 11 Jan 2019 13:24:52 +0100
-Message-ID: <CACRpkdYoVLARk8oxqFesKZ0FDyqCoaoxLdTXR=0TS5N_PQdyTw@mail.gmail.com>
-Subject: Re: [PATCH] pinctrl: sirf: atlas7: use struct_size() in devm_kzalloc()
-To: "Gustavo A. R. Silva" <gustavo@embeddedor.com>
+Content-Disposition: inline
+In-Reply-To: <20190111120859.iqq7gju2ecrmi66t@suse.de>
+User-Agent: Mutt/1.11.1+86 (6f28e57d73f2) ()
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_042505_382726_1F537844 
-X-CRM114-Status: GOOD (  10.99  )
+X-CRM114-CacheID: sfid-20190111_043000_581076_B05306DF 
+X-CRM114-Status: GOOD (  13.03  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,42 +72,31 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
- Barry Song <baohua@kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, linux-acpi@vger.kernel.org,
+ Qian Cai <cai@lca.pw>, Hanjun Guo <hanjun.guo@linaro.org>,
+ Sudeep Holla <sudeep.holla@arm.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 4, 2019 at 10:35 PM Gustavo A. R. Silva
-<gustavo@embeddedor.com> wrote:
+On Fri, Jan 11, 2019 at 01:08:59PM +0100, Joerg Roedel wrote:
+> Hi Will,
+> 
+> On Fri, Jan 11, 2019 at 11:36:52AM +0000, Will Deacon wrote:
+> > I've already got this one in arm64 for-next/fixes (should be in linux-next
+> > already). Would you prefer me to drop it (which would mean a rebase :()? I
+> > was planning to send a pull later today, since I have some other fixes
+> > queued as well.
+> 
+> Ah okay, didn't check linux-next, just linus/master. Keep it in your
+> tree, I'll drop it from my branch. It is not pushed yet anywhere public,
+> so it's easy for me to do.
 
-> One of the more common cases of allocation size calculations is finding
-> the size of a structure that has a zero-sized array at the end, along
-> with memory for some number of elements for that array. For example:
->
-> struct foo {
->     int stuff;
->     void *entry[];
-> };
->
-> instance = devm_kzalloc(dev, sizeof(struct foo) + sizeof(void *) * count, GFP_KERNEL);
->
-> Instead of leaving these open-coded and prone to type mistakes, we can
-> now use the new struct_size() helper:
->
-> instance = devm_kzalloc(dev, struct_size(instance, entry, count), GFP_KERNEL);
->
-> This code was detected with the help of Coccinelle.
->
-> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
+Thanks Joerg, that keeps things simple! Should land in -rc2.
 
-Patch applied.
-
-Yours,
-Linus Walleij
+Will
 
 _______________________________________________
 linux-arm-kernel mailing list
