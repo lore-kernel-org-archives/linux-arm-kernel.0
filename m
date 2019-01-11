@@ -2,68 +2,89 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ADCC3C43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 15:04:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B8CC9C43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 15:05:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 62E312084C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 15:04:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 682912084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 15:05:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CB/Qiw4I"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 62E312084C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XW8VtWq0";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="sh2LY1Wi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 682912084C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pE1vEFk+8CEqkru/pIkZUpJ7gSOGw8Z3y0EWPB3Wbj8=; b=CB/Qiw4I6pSzSk
-	UVLTXkkSJLdr1J0uXbLOqavOemS1Ms5NklFFddBMuZVD7WtT9FOrJBfK7yZbzeRhD3ZLuaoi8JYNE
-	Zyt1YKya9N4Qz7DWT0rLOEl9GKIoyFfuJ4qXgtgK8imqpJI9DQR3jxGBTla6zRhie+UIY5bY2dCXw
-	+8iUOTns+ynzokH/1WkNLxAkX/Gn7RCAtS2+jsB3XOCZ+d8QfFkfkcIWgmNkXg7GV3Fld1l7bFzGa
-	FTg6sRrMSuGmddXCCGwiB4q7Ti6HfaUoNIxm9AWLMPjwdOEswujVXY26hCbbLWNPKymWypdxCEzPL
-	CKSZb6dXDOLDXmyQmRBg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=gQmFQ+6xaAhKhgVMscv6B2vZ4IX116pWMmgheNWKtkU=; b=XW8VtWq0fuJiVG
+	iUaMdot15jFSqesx7qRaEGziTl4YxH9pQ4HurE87J9dCV9sQLlfSCYAsUZKRnLmb4ZEdXMdJKSG2u
+	6JuoFutpjdUou5mFU9blXQEH5HKKSqu6Ra36IxiQo2SNlsvHtidE1Z89y7SeAN+z+LHjr6N2/PVVL
+	hEIbVBNJIZNXmAAN7pxVWHpvY8bwEHXq41Nax2ogq873IZE2CJqDRW0jRfhJirRMcL8TteCUwVUUU
+	ymWCfbEjJfkIHl/MwsbiaBpTU4S8IUqTwLTU3al0m+OaGXZmcVS84jjO3AMnpGN7P+CqAOPtXQGS3
+	URsyx8NCNoGObPEkQW/A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghyMd-00075U-Pz; Fri, 11 Jan 2019 15:04:51 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+	id 1ghyNS-0000DL-Lf; Fri, 11 Jan 2019 15:05:42 +0000
+Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghyMX-0006yB-VW
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 15:04:49 +0000
-Received: from ptx.hi.pengutronix.de ([2001:67c:670:100:1d::c0])
- by metis.ext.pengutronix.de with esmtps
- (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1ghyMV-0003kL-Sp; Fri, 11 Jan 2019 16:04:43 +0100
-Received: from ukl by ptx.hi.pengutronix.de with local (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1ghyMT-0000uG-RM; Fri, 11 Jan 2019 16:04:41 +0100
-Date: Fri, 11 Jan 2019 16:04:41 +0100
-From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
-To: Linus Walleij <linus.walleij@linaro.org>
-Subject: Re: [PATCH] bus: ts-nbus: remove bus driver without user
-Message-ID: <20190111150441.rsmize5dudrmgu52@pengutronix.de>
-References: <20190107194523.2772-1-u.kleine-koenig@pengutronix.de>
- <CACRpkdbYizVLtQxh8_ZXWC-d6+E-k0T6Zq67qRJ7ascFGWTXig@mail.gmail.com>
+ id 1ghyNO-0000Bt-HS; Fri, 11 Jan 2019 15:05:39 +0000
+Received: by mail-pl1-x644.google.com with SMTP id 101so6877081pld.6;
+ Fri, 11 Jan 2019 07:05:38 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=date:from:to:cc:subject:message-id:mime-version:content-disposition
+ :user-agent; bh=fve/F1/lKXEnfpzre5B+d6239UbIM50sDNUC8vj1UvQ=;
+ b=sh2LY1WiZPIeUaF3MW5DJg/QEYmtg7MuKqRcV+ohKVqeLOX2kAj87/ncMa6egebbYo
+ k294jPvUpvY8tWh/TVJyCnvyC/T/VHszUoQByu4+B0bLPUEBcCPJg3A6iuRrk0nL/SCc
+ lpg3ZBT6tI1It72Jxe2UE98iYfsC88cR1xfpH7vrMx9OJMw9tL2Vr1vv2W8XZ4Xktn9H
+ NZtgrvTlD3Ik9YbSkPstnCWGQNPhb3+vQLQJ5oV3oYtnxdhNYQ0n2lHyDmzWabMOBagm
+ +fOV5sL4jmozsC4arWO7kSdaVEIRpgV9bHvSvYqaiApnZh3+zyi/XPtspSlyoMBygeU3
+ sZeA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:mime-version
+ :content-disposition:user-agent;
+ bh=fve/F1/lKXEnfpzre5B+d6239UbIM50sDNUC8vj1UvQ=;
+ b=PHcPjVCW7liU5grs+dalOsnkKlYeM873WJgtiQj5EYnTZD5phy6yRvyZNIosbKKe7B
+ UsKBdxZsmvyTDjqZ1HJvoVbye+cCh3+MzIZbE5LelJ/kgYUoGINkulNVhz7Frf7u7noq
+ VQr5BZbdcnm+s5makdiue6nuwAkNk+NZiLCx4ueMXkvEycKHbK1J/DtQTZ8TqHNlMADR
+ rDByeSLijOg+Nt6DzxjDkIInEcKayrnJGqtcPvUmBZLBG3MP2zbWkD8TqgzvZHjUEb/y
+ /nNRbSkN1TD1C85it17wGjBLN29Cx/j6om9QWGBiK7EiEvl6JkwCo2lOypcA/mnqbk9T
+ R/kQ==
+X-Gm-Message-State: AJcUukfHdyWWBEPKUTNDMUau6Yh5WH1/UES0Z/+gkzWbETK9mB17NGBb
+ LCDfB/iQA8LnGJl9iuirWdPFRRvS
+X-Google-Smtp-Source: ALg8bN5Rc2l8bWM7uxkHK8LK4e398s3Iy/tXK9itkSm2yPC22Yk8baS7VKxthK4Bra16e8DuO0AC9w==
+X-Received: by 2002:a17:902:1105:: with SMTP id
+ d5mr14463670pla.47.1547219137463; 
+ Fri, 11 Jan 2019 07:05:37 -0800 (PST)
+Received: from jordon-HP-15-Notebook-PC ([49.207.52.190])
+ by smtp.gmail.com with ESMTPSA id h15sm98053997pgl.43.2019.01.11.07.05.35
+ (version=TLS1 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Fri, 11 Jan 2019 07:05:36 -0800 (PST)
+Date: Fri, 11 Jan 2019 20:39:33 +0530
+From: Souptick Joarder <jrdr.linux@gmail.com>
+To: akpm@linux-foundation.org, willy@infradead.org, mhocko@suse.com,
+ hjc@rock-chips.com, heiko@sntech.de, airlied@linux.ie,
+ linux@armlinux.org.uk, robin.murphy@arm.com
+Subject: [PATCH 4/9] drm/rockchip/rockchip_drm_gem.c: Convert to use
+ vm_insert_range
+Message-ID: <20190111150933.GA2760@jordon-HP-15-Notebook-PC>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <CACRpkdbYizVLtQxh8_ZXWC-d6+E-k0T6Zq67qRJ7ascFGWTXig@mail.gmail.com>
-User-Agent: NeoMutt/20170113 (1.7.2)
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c0
-X-SA-Exim-Mail-From: ukl@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_070446_560962_D77E7F17 
-X-CRM114-Status: GOOD (  18.61  )
+X-CRM114-CacheID: sfid-20190111_070538_575597_B53F2693 
+X-CRM114-Status: GOOD (  12.15  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,80 +96,58 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnd Bergmann <arnd@arndb.de>, kernel <kernel@savoirfairelinux.com>,
- Sascha Hauer <kernel@pengutronix.de>,
- =?iso-8859-1?B?Suly9G1l?= OUFELLA <jerome.oufella@savoirfairelinux.com>,
- Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: linux-mm@kvack.org, dri-devel@lists.freedesktop.org,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-rockchip@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello,
+Convert to use vm_insert_range() to map range of kernel
+memory to user vma.
 
-On Fri, Jan 11, 2019 at 01:52:36PM +0100, Linus Walleij wrote:
-> On Mon, Jan 7, 2019 at 8:46 PM Uwe Kleine-K=F6nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> =
+Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 17 ++---------------
+ 1 file changed, 2 insertions(+), 15 deletions(-)
 
-> > Since the ts-nbus driver was introduced in 2017 it only saw some rework=
-ing
-> > changes. There is no user in the tree, neither a machine that has this
-> > bus nor a driver for a device on that bus. Also the email address of the
-> > author doesn't exist any more.
-> >
-> > So remove this bus.
-> >
-> > Signed-off-by: Uwe Kleine-K=F6nig <u.kleine-koenig@pengutronix.de>
-> =
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+index a8db758..c9e207f 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+@@ -221,26 +221,13 @@ static int rockchip_drm_gem_object_mmap_iommu(struct drm_gem_object *obj,
+ 					      struct vm_area_struct *vma)
+ {
+ 	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
+-	unsigned int i, count = obj->size >> PAGE_SHIFT;
++	unsigned int count = obj->size >> PAGE_SHIFT;
+ 	unsigned long user_count = vma_pages(vma);
+-	unsigned long uaddr = vma->vm_start;
+-	unsigned long offset = vma->vm_pgoff;
+-	unsigned long end = user_count + offset;
+-	int ret;
+ 
+ 	if (user_count == 0)
+ 		return -ENXIO;
+-	if (end > count)
+-		return -ENXIO;
+ 
+-	for (i = offset; i < end; i++) {
+-		ret = vm_insert_page(vma, uaddr, rk_obj->pages[i]);
+-		if (ret)
+-			return ret;
+-		uaddr += PAGE_SIZE;
+-	}
+-
+-	return 0;
++	return vm_insert_range(vma, rk_obj->pages, count);
+ }
+ 
+ static int rockchip_drm_gem_object_mmap_dma(struct drm_gem_object *obj,
+-- 
+1.9.1
 
-> Sebastien added this bus and I was under the impression that he was
-> using it, even if no config or DTS in the kernel seems to be using it.
-> =
-
-> IIRC it should land in this one:
-> arch/arm/boot/dts/imx28-ts4600.dts
-> =
-
-> This was added over a year ago and not much happened since.
-> =
-
-> Sebastien what happened with this?
-> (I hope his mail is not bouncing...)
-> =
-
-> This interestingly brings up the following question: we used to just
-> grep the kernel for users of a certain driver, which will find e.g. board
-> files even if there is currently no defconfig for the system.
-> With device tree drivers these DTS files defining the use of the
-> driver can be out-of-tree, sometimes (SunOS?) in the ROM of a
-> machine, and not possible to check using grep.
-> =
-
-> We need some policy there, like preferably merge device trees
-> upstream and add defconfigs so we have some indication that
-> the driver is used and also get compiled in tests.
-
-Ack. For now I'd say a statement from someone who uses this stuff about
-this fact would be good enough. Given that some time ago I sent patches
-for this driver and didn't get any feedback from an interested party[1]
-I tried with that patch adding some more people from
-savoirfairelinux.com ...
-
-I suggest to give them some more time, and then drop this for 5.2 or so
-if we don't hear anything.
-
-Best regards
-Uwe
-
-
-[1] https://patchwork.kernel.org/patch/10657725/
-
--- =
-
-Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 
 _______________________________________________
 linux-arm-kernel mailing list
