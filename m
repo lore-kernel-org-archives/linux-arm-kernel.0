@@ -2,55 +2,60 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-17.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E87F7C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:18:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 99DE9C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:21:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B20AF205C9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:18:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 737A3205C9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:21:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hjJpxu4D"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B20AF205C9
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="imMuqNki"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 737A3205C9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=xC/D8SfIDPGf3SWbEqB55SsrWOIC7lMr1nJe65D8tFg=; b=hjJpxu4DyYw4GJ
-	1oc2VRhryWOGD+AIzLB8GyAKNtt0UWsKSoOUTDEDLmB6K2GP5eCb8JrhBtEfFhJclRKev6XH7e3HI
-	loEawgaeMm6Szc9tbHELlJGmtMahvlsCljQbcFt4eZmOK6+d1GrK8Fx/ZuAqHmeIbm6BzNlbcvkp3
-	0fsJ/LbZ7D425rYRpfU3a8T42P3O1RzmRGmXm1dghC5D0BVFS2P3+WuNLk1GJOtRre9RtJOtrkFJE
-	hyiiNZ20Ijtk1jXMzwZk7SW41xLMND0+gHTpXE+WGG2GPFFbjGzB42JGYl2XzK1vVgqt/N1kNUobK
-	n13jgCSIB3rB++hXL0Wg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=8GuKm59AlUVRT91K405c2QEin4Pv993VTr7ZY0dAheQ=; b=imMuqNkixxxcC7
+	cTLE7+GlQOMhb2HG9asNsmhPLMYu1r5KYShT5tQ9tkJb037v6itFh2iquOedO6SR3g19bJZBeY0lg
+	3rh6hDE0/y2RTVRAxqc2rxeDd7UKNhvDpLkfh+KHeXfY/NhDyfmhomt4X2n2hd9ojAhPDf9gQIzud
+	O0Cg2eSLkPmABA+JDFD8txewHu6ud0PSMo86lB8XsEyCkq8mivDwUPbOhkpNxodU51xCWD6turodr
+	XS/vTan7XKSul4tbxA8JhUpVM6Y2InCy0zgL8J0ID4GK7YeRcF3nG7ZEURcyYP+Isrz2DvxaEgEpE
+	lgR9vSwWA7EaS7S5yoxw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gi1Nr-0001Z0-LY; Fri, 11 Jan 2019 18:18:19 +0000
-Received: from 089144213167.atnat0022.highway.a1.net ([89.144.213.167]
- helo=localhost)
- by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gi1NK-0000zl-Ke; Fri, 11 Jan 2019 18:17:47 +0000
-From: Christoph Hellwig <hch@lst.de>
-To: Pawel Osciak <pawel@osciak.com>,
- Marek Szyprowski <m.szyprowski@samsung.com>,
- Kyungmin Park <kyungmin.park@samsung.com>,
- =?UTF-8?q?Niklas=20S=C3=B6derlund?= <niklas.soderlund+renesas@ragnatech.se>
-Subject: [PATCH 3/3] videobuf2: replace a layering violation with
- dma_map_resource
-Date: Fri, 11 Jan 2019 19:17:31 +0100
-Message-Id: <20190111181731.11782-4-hch@lst.de>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190111181731.11782-1-hch@lst.de>
-References: <20190111181731.11782-1-hch@lst.de>
+	id 1gi1QX-0003O6-2y; Fri, 11 Jan 2019 18:21:05 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gi1QT-0003Nd-I8
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 18:21:03 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 30FEF80D;
+ Fri, 11 Jan 2019 10:21:01 -0800 (PST)
+Received: from fuggles.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 217443F6CF;
+ Fri, 11 Jan 2019 10:20:59 -0800 (PST)
+Date: Fri, 11 Jan 2019 18:20:57 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: torvalds@linux-foundation.org
+Subject: [GIT PULL] arm64: fixes for -rc2
+Message-ID: <20190111182057.GB32645@fuggles.cambridge.arm.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+User-Agent: Mutt/1.11.1+86 (6f28e57d73f2) ()
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20190111_102101_602378_C6A5B7EA 
+X-CRM114-Status: GOOD (  13.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -62,94 +67,76 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Russell King <linux@armlinux.org.uk>, linux-kernel@vger.kernel.org,
- iommu@lists.linux-foundation.org, Mauro Carvalho Chehab <mchehab@kernel.org>,
- linuxppc-dev@lists.ozlabs.org, linux-arm-kernel@lists.infradead.org,
- linux-media@vger.kernel.org
+Cc: catalin.marinas@arm.com, lorenzo.pieralisi@arm.com,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-vb2_dc_get_userptr pokes into arm direct mapping details to get the
-resemblance of a dma address for a a physical address that does is
-not backed by a page struct.  Not only is this not portable to other
-architectures with dma direct mapping offsets, but also not to uses
-of IOMMUs of any kind.  Switch to the proper dma_map_resource /
-dma_unmap_resource interface instead.
+Hi Linus,
 
-Signed-off-by: Christoph Hellwig <hch@lst.de>
----
- .../common/videobuf2/videobuf2-dma-contig.c   | 41 ++++---------------
- 1 file changed, 9 insertions(+), 32 deletions(-)
+Another handful of arm64 fixes here. Most of the complication comes from
+improving our kpti code to avoid lengthy pauses (30+ seconds) during boot
+when we rewrite the page tables. There are also a couple of IORT fixes
+that came in via Lorenzo. Usual summary in the tag.
 
-diff --git a/drivers/media/common/videobuf2/videobuf2-dma-contig.c b/drivers/media/common/videobuf2/videobuf2-dma-contig.c
-index aff0ab7bf83d..82389aead6ed 100644
---- a/drivers/media/common/videobuf2/videobuf2-dma-contig.c
-+++ b/drivers/media/common/videobuf2/videobuf2-dma-contig.c
-@@ -439,42 +439,14 @@ static void vb2_dc_put_userptr(void *buf_priv)
- 				set_page_dirty_lock(pages[i]);
- 		sg_free_table(sgt);
- 		kfree(sgt);
-+	} else {
-+		dma_unmap_resource(buf->dev, buf->dma_addr, buf->size,
-+				   buf->dma_dir, 0);
- 	}
- 	vb2_destroy_framevec(buf->vec);
- 	kfree(buf);
- }
- 
--/*
-- * For some kind of reserved memory there might be no struct page available,
-- * so all that can be done to support such 'pages' is to try to convert
-- * pfn to dma address or at the last resort just assume that
-- * dma address == physical address (like it has been assumed in earlier version
-- * of videobuf2-dma-contig
-- */
--
--#ifdef __arch_pfn_to_dma
--static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
--{
--	return (dma_addr_t)__arch_pfn_to_dma(dev, pfn);
--}
--#elif defined(__pfn_to_bus)
--static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
--{
--	return (dma_addr_t)__pfn_to_bus(pfn);
--}
--#elif defined(__pfn_to_phys)
--static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
--{
--	return (dma_addr_t)__pfn_to_phys(pfn);
--}
--#else
--static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
--{
--	/* really, we cannot do anything better at this point */
--	return (dma_addr_t)(pfn) << PAGE_SHIFT;
--}
--#endif
--
- static void *vb2_dc_get_userptr(struct device *dev, unsigned long vaddr,
- 	unsigned long size, enum dma_data_direction dma_dir)
- {
-@@ -528,7 +500,12 @@ static void *vb2_dc_get_userptr(struct device *dev, unsigned long vaddr,
- 		for (i = 1; i < n_pages; i++)
- 			if (nums[i-1] + 1 != nums[i])
- 				goto fail_pfnvec;
--		buf->dma_addr = vb2_dc_pfn_to_dma(buf->dev, nums[0]);
-+		buf->dma_addr = dma_map_resource(buf->dev,
-+				__pfn_to_phys(nums[0]), size, buf->dma_dir, 0);
-+		if (dma_mapping_error(buf->dev, buf->dma_addr)) {
-+			ret = -ENOMEM;
-+			goto fail_pfnvec;
-+		}
- 		goto out;
- 	}
- 
--- 
-2.20.1
+Please pull,
 
+Thanks,
+
+Will
+
+--->8
+
+The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
+
+  Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
+
+for you to fetch changes up to 279667212ab2a4f36c3b0347657ddcc11f9cfa25:
+
+  arm64: kexec_file: return successfully even if kaslr-seed doesn't exist (2019-01-11 10:10:51 +0000)
+
+----------------------------------------------------------------
+arm64 fixes for -rc2
+
+- Don't error in kexec_file_load if kaslr-seed is missing in device-tree
+
+- Fix incorrect argument type passed to iort_match_node_callback()
+
+- Fix IORT build failure when CONFIG_IOMMU_API=n
+
+- Fix kpti performance regression with new rodata default option
+
+- Typo fix
+
+----------------------------------------------------------------
+AKASHI Takahiro (1):
+      arm64: kexec_file: return successfully even if kaslr-seed doesn't exist
+
+Jean-Philippe Brucker (1):
+      ACPI/IORT: Fix rc_dma_get_range()
+
+Qian Cai (1):
+      ACPI/IORT: Fix build when CONFIG_IOMMU_API=n
+
+Will Deacon (2):
+      arm64: asm-prototypes: Fix fat-fingered typo in comment
+      arm64: kpti: Avoid rewriting early page tables when KASLR is enabled
+
+ arch/arm64/include/asm/asm-prototypes.h |  2 +-
+ arch/arm64/include/asm/mmu.h            | 41 +++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/pgtable-prot.h   |  4 ++--
+ arch/arm64/kernel/cpu_errata.c          |  2 +-
+ arch/arm64/kernel/cpufeature.c          |  9 ++++++--
+ arch/arm64/kernel/head.S                |  1 +
+ arch/arm64/kernel/machine_kexec_file.c  |  4 +++-
+ drivers/acpi/arm64/iort.c               |  5 ++--
+ 8 files changed, 59 insertions(+), 9 deletions(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
