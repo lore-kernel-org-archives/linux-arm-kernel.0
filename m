@@ -2,20 +2,20 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 557A7C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:09:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 02B54C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:11:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 327A020652
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:09:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CE17120878
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:11:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CA/Dwh5+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 327A020652
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RQEVj0+L"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CE17120878
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,46 +24,43 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9+to/3gyFNHiG1f8tUKRhrve8VtoctSOz8/kcRnpaP0=; b=CA/Dwh5+TQa5gA
-	wx6Gwfy8PWZnaHjJ90xHW/iVuynx0eSLI13KiHXvc0VH1S7ozau7WayOCyZZZvZbFyzyB2wCqdX0b
-	RmbyI+6kNKt3lczfTaWeAm+JJaoAX0daCDJnDvpEDXj3eXNMlNpyCGeUOMhJgVNTbGI+wvC2kpv9i
-	tfTHCHedFCgMBOyWeHoOfEaKC/mOUAI9dwLW0VsiK/WfGjTtL135i7D+1M3JTXlaI8hhxzbI7iLiS
-	enJuO1nGB0xe4u4JkBft/ssHGCn9k1tQSRkvj+wfeKy0rGfjiiz6m6EJv0Z7zhZd/eNvLfJITRFqg
-	n+w+bPKGeK69smZz+fjg==;
+	List-Owner; bh=yhLqfCpjuERmBeCgp/0bNc8nM107jWT9q1volPki4sg=; b=RQEVj0+Ldrp43/
+	3ZE/aBA0v/5J48RoD4PO7+PwOlqa1Wl6uNHqPEtnChooq9ASc90B6W3SvL5acC8WkfxY195ayMhOb
+	MRQ7c9bZpIkDa9enNHKJa460DaqUubZBWpWmjEEZT7eshken2r1PkNoiKPt8Na/UX/+MnWqCcJA3R
+	B7TqknlNG4JGCpLvF0hu61lEoelAIl72pwdqzUJix4j0e+nu1uEAAnkrDw0ls3CcvwPF2hmJSNsiZ
+	aXtujv5gyx+ZxJHmEVnOQda1ygVunmI1Z+JaaFU+v0s+HTQ9/+d+20JkRsM0wnSM/qBSUV+1iHqG7
+	H5hajw9kmba9lDfmK1uA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gi1FV-0005tL-Gv; Fri, 11 Jan 2019 18:09:41 +0000
+	id 1gi1Gy-0007Z9-QE; Fri, 11 Jan 2019 18:11:12 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gi1FR-0005si-Vu
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 18:09:39 +0000
+ id 1gi1Gv-0007Yj-Md
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 18:11:11 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9D1421596;
- Fri, 11 Jan 2019 10:09:33 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2B44E80D;
+ Fri, 11 Jan 2019 10:11:09 -0800 (PST)
 Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 487213F6CF;
- Fri, 11 Jan 2019 10:09:30 -0800 (PST)
-Subject: Re: [PATCH v7 10/25] ACPI / APEI: Tell firmware the estatus queue
- consumed the records
-To: Tyler Baicar <baicar.tyler@gmail.com>, Borislav Petkov <bp@alien8.de>
-References: <20181203180613.228133-1-james.morse@arm.com>
- <20181203180613.228133-11-james.morse@arm.com>
- <20181211183634.GO27375@zn.tnic>
- <56cfa16b-ece4-76e0-3799-58201f8a4ff1@arm.com>
- <CABo9ajArdbYMOBGPRa185yo9MnKRb0pgS-pHqUNdNS9m+kKO-Q@mail.gmail.com>
- <20190111120322.GD4729@zn.tnic>
- <CABo9ajAk5XNBmNHRRfUb-dQzW7-UOs5826jPkrVz-8zrtMUYkg@mail.gmail.com>
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A0A693F6CF;
+ Fri, 11 Jan 2019 10:11:06 -0800 (PST)
+Subject: Re: [PATCH 2/2] EDAC: add ARM Cortex A15 L2 internal asynchronous
+ error detection driver
+To: "Wiebe, Wladislav (Nokia - DE/Ulm)" <wladislav.wiebe@nokia.com>
+References: <AM6PR0702MB379953E130CC1E1DEE18B79BFA8A0@AM6PR0702MB3799.eurprd07.prod.outlook.com>
+ <20190108104204.GA14243@zn.tnic>
+ <e1458b95-6d17-21be-5dd8-ee7ff8d8b3fb@arm.com>
+ <AM6PR0702MB37997C0FA1670DD1AF4C25C7FA8B0@AM6PR0702MB3799.eurprd07.prod.outlook.com>
 From: James Morse <james.morse@arm.com>
-Message-ID: <0939c14d-de58-f21d-57a6-89bdce3bcb44@arm.com>
-Date: Fri, 11 Jan 2019 18:09:28 +0000
+Message-ID: <bba99e8c-5e3e-98a4-d0c9-9734216e66d2@arm.com>
+Date: Fri, 11 Jan 2019 18:11:04 +0000
 User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
  Thunderbird/60.3.1
 MIME-Version: 1.0
-In-Reply-To: <CABo9ajAk5XNBmNHRRfUb-dQzW7-UOs5826jPkrVz-8zrtMUYkg@mail.gmail.com>
+In-Reply-To: <AM6PR0702MB37997C0FA1670DD1AF4C25C7FA8B0@AM6PR0702MB3799.eurprd07.prod.outlook.com>
 Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_100938_178324_04FBF8A2 
-X-CRM114-Status: GOOD (  24.76  )
+X-CRM114-CacheID: sfid-20190111_101109_778172_9A61436F 
+X-CRM114-Status: GOOD (  25.13  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,142 +72,109 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rafael Wysocki <rjw@rjwysocki.net>, Tony Luck <tony.luck@intel.com>,
- Fan Wu <wufan@codeaurora.org>, linux-mm@kvack.org,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Xie XiuQi <xiexiuqi@huawei.com>, Will Deacon <will.deacon@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>,
- Dongjiu Geng <gengdongjiu@huawei.com>, Linux ACPI <linux-acpi@vger.kernel.org>,
- Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>, kvmarm@lists.cs.columbia.edu,
- arm-mail-list <linux-arm-kernel@lists.infradead.org>,
- Len Brown <lenb@kernel.org>
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "arnd@arndb.de" <arnd@arndb.de>,
+ "gregkh@linuxfoundation.org" <gregkh@linuxfoundation.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, Borislav Petkov <bp@alien8.de>,
+ "mchehab+samsung@kernel.org" <mchehab+samsung@kernel.org>, "Sverdlin,
+ Alexander \(Nokia - DE/Ulm\)" <alexander.sverdlin@nokia.com>,
+ "akpm@linux-foundation.org" <akpm@linux-foundation.org>,
+ "mchehab@kernel.org" <mchehab@kernel.org>,
+ "davem@davemloft.net" <davem@davemloft.net>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "linux-edac@vger.kernel.org" <linux-edac@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi guys,
+Hi Wladislav,
 
-On 11/01/2019 15:32, Tyler Baicar wrote:
-> On Fri, Jan 11, 2019 at 7:03 AM Borislav Petkov <bp@alien8.de> wrote:
->> On Thu, Jan 10, 2019 at 04:01:27PM -0500, Tyler Baicar wrote:
->>> On Thu, Jan 10, 2019 at 1:23 PM James Morse <james.morse@arm.com> wrote:
->>>>>>
->>>>>> +    if (is_hest_type_generic_v2(ghes) && ghes_ack_error(ghes->generic_v2))
->>>>>
->>>>> Since ghes_ack_error() is always prepended with this check, you could
->>>>> push it down into the function:
->>>>>
->>>>> ghes_ack_error(ghes)
->>>>> ...
->>>>>
->>>>>       if (!is_hest_type_generic_v2(ghes))
->>>>>               return 0;
->>>>>
->>>>> and simplify the two callsites :)
->>>>
->>>> Great idea! ...
->>>>
->>>> .. huh. Turns out for ghes_proc() we discard any errors other than ENOENT from
->>>> ghes_read_estatus() if is_hest_type_generic_v2(). This masks EIO.
->>>>
->>>> Most of the error sources discard the result, the worst thing I can find is
->>>> ghes_irq_func() will return IRQ_HANDLED, instead of IRQ_NONE when we didn't
->>>> really handle the IRQ. They're registered as SHARED, but I don't have an example
->>>> of what goes wrong next.
->>>>
->>>> I think this will also stop the spurious handling code kicking in to shut it up
->>>> if its broken and screaming. Unlikely, but not impossible.
+On 09/01/2019 14:44, Wiebe, Wladislav (Nokia - DE/Ulm) wrote:
+>> From: James Morse <james.morse@arm.com>
+>> Sent: Tuesday, January 08, 2019 6:57 PM
 
-[....]
+>> On 08/01/2019 10:42, Borislav Petkov wrote:
+>>> So the first thing to figure out here is how generic is this and if
+>>> so, to make it a cortex_a15_edac.c driver which contains all the RAS
+>>> functionality for A15. Definitely not an EDAC driver per functional
+>>> unit but rather per vendor or even ARM core.
+>>
+>> This is implementation-defined/specific-to-A15 and is documented in the
+>> TRM [0].
+>> (On the 'all the RAS functionality for A15' front: there are two more registers:
+>> L2MERRSR and CPUMERRSR. These are both accessible from the normal-
+>> world, and don't appear to need enabling.)
 
->>> Looks good to me, I guess there's no harm in acking invalid error status blocks.
-
-Great, I didn't miss something nasty...
+After I sent this it occurred to me the core can't know about errors in the L3
+cache (if there is one) or the memory-controller. These may have edac/ras
+abilities, but they are selected by the soc integrator, so could be per soc.
+This goes against Boris's no-per-functional-unit edac drivers. If we had to pick
+one out of that set, I think the memory-controller is most useful as DRAM is the
+most likely to be affected by errors.
 
 
->> Err, why?
+>> But we have the usual pre-v8.2 problems, and in addition cluster-interrupts,
+>> as this signal might be per-cluster, or it might be combined.
+>>
+>> Wladislav, I'm afraid we've had a few attempts at pre-8.2 EDAC drivers, the
+>> below list of problems is what we've learnt along the way. The upshot is that
+>> before the architected RAS extensions, the expectation is firmware will
+>> handle all this, as its difficult for the OS to deal with.
+>>
+>>
+>> My first question is how useful is a 'something bad happened' edac event?
 > 
-> If ghes_read_estatus() fails, then either there was no error populated or the
-> error status block was invalid.
-> If the error status block is invalid, then the kernel doesn't know what happened
-> in hardware.
+> We experienced sometimes random user-space crashes where we didn't 
+> expect a bug in the application code. If there would be a notification 
+> by such edac event,
 
-What do we mean by 'hardware' here? We're receiving a corrupt report of
-something via memory.
-The GHESv2 ack just means we're done with the memory. I think it exists because
-the external-agent can't peek into the CPU to see if its returned from the
-notification.
+Sure, but we always have to assume its the worst case: an uncontained error (to
+use the v8.2 terms). A write has gone somewhere it shouldn't, we can't trust
+memory anymore.
 
+> we would at least know that something bad happened before.
 
-> I originally thought this was changing what's acked, but it's just changing the
-> return value of ghes_proc() when ghes_read_estatus() returns -EIO.
-
-Sorry, that will be due to my bad description.
-
-
->> I don't know what the firmware glue does on ARM but if I'd have to
->> remain logical - which is hard to do with firmware - the proper thing to
->> do would be this:
+>>> On Tue, Jan 08, 2019 at 08:10:45AM +0000, Wiebe, Wladislav (Nokia -
+>> DE/Ulm) wrote:
+>>>> This driver adds support for L2 internal asynchronous error detection
+>>>> caused by L2 RAM double-bit ECC error or illegal writes to the
+>>>> Interrupt Controller memory-map region on the Cortex A15.
 >>
->>         rc = ghes_read_estatus(ghes, &buf_paddr);
->>         if (rc) {
->>                 ghes_reset_hardware();
+>>>> diff --git a/drivers/edac/cortex_a15_l2_async_edac.c
+>>>> b/drivers/edac/cortex_a15_l2_async_edac.c
+>>>> new file mode 100644
+>>>> index 000000000000..26252568e961
+>>>> --- /dev/null
+>>>> +++ b/drivers/edac/cortex_a15_l2_async_edac.c
+>>>> @@ -0,0 +1,134 @@
+
+>>>> +static int cortex_a15_l2_async_edac_probe(struct platform_device
+>>>> +*pdev) {
+>>>> +	struct edac_device_ctl_info *dci;
+>>>> +	struct device_node *np = pdev->dev.of_node;
+>>>> +	char *ctl_name = (char *)np->name;
+>>>> +	int i = 0, ret = 0, err_irq = 0, irq_count = 0;
+>>>> +
+>>>> +	/* We can have multiple CPU clusters with one INTERRIRQ per cluster
+>>>> +*/
+>>
+>> Surely this an integration choice?
+>>
+>> You're accessing the cluster through a cpu register in the handler, what
+>> happens if the interrupt is delivered to the wrong cluster?
+>> How do we know which interrupt maps to which cluster?
+>> How do we stop user-space 'balancing' the interrupts?
 > 
-> The kernel would have no way of knowing what to do here.
+> You are right, based on all your inputs I think we can stop using this driver
+> as generic A15 solution
 
-Is there anything wrong with what we do today? We stamp on the records so that
-we don't processes them again. (especially if is polled), and we tell firmware
-it can re-use this memory.
-
-(I think we should return an error, or print a ratelimited warning for corrupt
-records)
-
-
->>         }
->>
->>         /* clear estatus and bla bla */
->>
->>         /* Now, I'm in the success case: */
->>          ghes_ack_error();
->>
->>
->> This way, you have the error path clear of something unexpected happened
->> when reading the hardware, obvious and separated. ghes_reset_hardware()
->> clears the registers and does the necessary steps to put the hardware in
->> good state again so that it can report the next error.
->>
->> And the success path simply acks the error and does possibly the same
->> thing. The naming of the functions is important though, to denote what
->> gets called when.
-
-I think this duplicates the record-stamping/acking. If there is anything in that
-memory region, the action for processed/copied/ignored-because-its-corrupt is
-the same.
-
-We can return on ENOENT out earlier, as nothing needs doing in that case. Its
-what the GHES_TO_CLEAR spaghetti is for, we can probably move the ack thing into
-ghes_clear_estatus(), that way that thing means 'I'm done with this memory'.
-
-Something like:
--------------------------
-rc = ghes_read_estatus();
-if (rc == -ENOENT)
-	return 0;
-
-if (!rc) {
-	ghes_do_proc() and friends;
-}
-
-ghes_clear_estatus();
-
-return rc;
--------------------------
-
-We would no longer return errors from the ack code, I suspect that can only
-happen for a corrupt gas, which we would have caught earlier as we rely on the
-mapping being cached.
-
+Handling this interrupt in firmware is probably the best for your soc. For a
+generic a15 driver in the kernel, we would have to consider 'no interrupt',
+(e.g. the interrupt is wired to some other SCP/BMC thing). Once we've got
+polling code for these registers, we may as well always use it.
 
 
 Thanks,
