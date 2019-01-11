@@ -2,20 +2,20 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EE334C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 17:31:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 12792C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 17:33:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C5A1320836
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 17:31:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DEC9120878
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 17:33:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sKSMjuTy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C5A1320836
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LFvu/a8N"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DEC9120878
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,51 +24,51 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=U8aHuVfGMu2/keorFEI/NHD/QW1qg6HIsxJxWXRF0Co=; b=sKSMjuTy4hZ6Ch
-	iEPhvYP+YbtjwSxh6ozmEqMhIlxcjNJeZWiEunArgSqUiYeIFhbb5o9YYu/dslH9sSq+Cm2DHvvy7
-	PqlRMfb8Ev6WgnN7amrHhWdndUm0ZbCTy1W7S3z5MI+yGSTPzcCdy5L7iz7vP+U8kGnSaqEPa2W0M
-	J11DyI0YjydDOLmqx8yzVMDjYkvj6OtyKyvqnkmV4FkFEcZBLfQFB+hZq+XR6ZifB3Y5r9A293H8/
-	1sXNFN4Xt+CgD6hkdbzHYkYA6tRoAymccmI8YqR3ARgHdRohq5+aQ1Sga+IyzHbFYxc3lB/yXUHdt
-	CXNVZnxxlgZ0AGOoN52A==;
+	List-Owner; bh=oiJMHwqRORJRfpTi9n4fo9O8aY1l0QXnTEJNjHkM6LM=; b=LFvu/a8N0mACFF
+	w2TPqlrmcCTulR9jqW3IlNFM7RDRlaezjUUbfYXnthyrPD+SGDm1fwM0ftSeyj2K7RWe1oQiPL8Gq
+	nEZvb5ghvYOvT50/W8BfbGSimhlU6OgbRRSFGyLB64w3ADPb76dqZqfUtDzxtqK4BFYn9i027kqWf
+	xtlwwycbsu/iPPh9MCgjkgMtmAynLkHZmyJQAbaXH6y6TUuKwMBllGTrqXuqfsZCbHJwTOjEQTQMA
+	QMSGkjMdyW5Ikqq7bCVrzgZQHbUduSpu0R4bdYKcYP0Wv/umpJUgws0sXDFT4FDUa6IkAjSD4VJEE
+	k7ytPQlqkkCSPUATLH6g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gi0el-0000Wo-Jh; Fri, 11 Jan 2019 17:31:43 +0000
-Received: from mail-qt1-f194.google.com ([209.85.160.194])
+	id 1gi0gQ-0000uu-Op; Fri, 11 Jan 2019 17:33:26 +0000
+Received: from mail-qt1-f195.google.com ([209.85.160.195])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gi0e6-0008Ii-3d
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 17:31:10 +0000
-Received: by mail-qt1-f194.google.com with SMTP id d19so19650674qtq.9
+ id 1gi0gN-0000uV-7C
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 17:33:24 +0000
+Received: by mail-qt1-f195.google.com with SMTP id l11so19708575qtp.0
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 11 Jan 2019 09:31:01 -0800 (PST)
+ Fri, 11 Jan 2019 09:33:22 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=SGHCnfowgHn30T+nuPC0hqbUSrYY8+wFH1Oi3pXaRzM=;
- b=Qc0kjL6t7exRRCFRiUtk+uDHeUnZaKKKiB+tLrYfXcMP7el4cJkzHeTMLd8Y+WcFOu
- KHfnudRgy5EAEOTrjh/CziUw4HGYVRFTekuytKVCGBx35Msmw3V4our+W589osQq/ajz
- JZLQpjjzHWkG5TrShY13iaOE+i0PRavkYSpBDnPhgEWsd3JtGTUhkjP1EG0KuBogmnxB
- k0Z/sXFpj3aIYCpjcrffVufRGOrBOt8r3fjEVFGjF7KtlM08s3jS6kls2eLwRvcp3f0w
- 8ZXjrbcpOO2nffGKXj/jkg+RyDDfQuOhC5r4DhhmCpuLU6Zq86Dr4Pyx0mGxsdo/61hE
- ZauA==
-X-Gm-Message-State: AJcUukdUZdD1BikLvG5zw+dydE+Pc7YzuKNNxGgRMf98G8dnDC5bmY2Z
- A/TOrvu4hftVfM17Ls1GiyxDLUTZSDXJRjhq7ks=
-X-Google-Smtp-Source: ALg8bN775BnYYqpcTaMAandAOOVFGcb1fag8zY9M3WMS/TPmNFpmSdRaCOyAJ14+1Aq8ng+YTuIZvIzlZbwDHzn2U4I=
-X-Received: by 2002:ac8:2c34:: with SMTP id d49mr14875090qta.152.1547227860501; 
- Fri, 11 Jan 2019 09:31:00 -0800 (PST)
+ bh=PlXu3O61pUFPLleZ5AMTVxcoWeFNM1mKAK5t7dNAM0o=;
+ b=sd91tPYyw7WkqKTRfu7qqHtSnjXK8WJtaJ5vYxXMk/XKHmMvKXLvOTjc4vL4R30Uqo
+ 55z/1FcBBicglvI3WpKDVm0VNeVxI0WQ/Qq7k6YxLgUmsuevdf9bk6NDRPeMb1npeCmK
+ Ngd3od23DGeM4nNz7L2PNPICVzjNBqQjsQKqM/NihRaQ1qrZ+StCDYWukm0Pz1uy8sDq
+ EOuBFrDZ0EGHp2J6RwOlTFX/i958GlHTo1ox6Y2RWyAokr1jxp6Mef6PH3b/yLUzJYGY
+ pHsUOEGhPuBhkcZHbJ3R1q7iKOaVaMWN7n6v/kSN5QqSM+8j304hDJyZCj7d35b3p7yc
+ l5Ew==
+X-Gm-Message-State: AJcUukcCAMUxIKzpJHv1Jb3OMHepY22lpcy0s0PyHRsCtp88WGh0WFg4
+ 28fv472JsmF15z0KJSYQUfTykA+m1PP7IgAYyS8=
+X-Google-Smtp-Source: ALg8bN69vX9vcq63IXhYC33aOwWxtfAvEwzhoWorTBpfa9Zlf+nERekjdxP7iJFo0Zjh4Gu5ospxdXcZfV6z9FLdQY4=
+X-Received: by 2002:ac8:1d12:: with SMTP id d18mr14381544qtl.343.1547228002113; 
+ Fri, 11 Jan 2019 09:33:22 -0800 (PST)
 MIME-Version: 1.0
 References: <20190110162435.309262-1-arnd@arndb.de>
- <20190110162435.309262-16-arnd@arndb.de>
- <20190110203638.GB3676@osiris>
-In-Reply-To: <20190110203638.GB3676@osiris>
+ <20190110162435.309262-15-arnd@arndb.de>
+ <20190110203253.GA3676@osiris>
+In-Reply-To: <20190110203253.GA3676@osiris>
 From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 11 Jan 2019 18:30:43 +0100
-Message-ID: <CAK8P3a0M6qSJQAtFNKVS5muissKvyzeE9MSYT_uwKnM4BKCAug@mail.gmail.com>
-Subject: Re: [PATCH 15/15] arch: add pkey and rseq syscall numbers everywhere
+Date: Fri, 11 Jan 2019 18:33:05 +0100
+Message-ID: <CAK8P3a0PahP8Bbc7OfiqrRcoxMReDuoyn8Hw=aSFtPjNeyrjcA@mail.gmail.com>
+Subject: Re: [PATCH 14/15] arch: add split IPC system calls where needed
 To: Heiko Carstens <heiko.carstens@de.ibm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_093102_557490_4A871C45 
-X-CRM114-Status: GOOD (  12.98  )
+X-CRM114-CacheID: sfid-20190111_093323_263134_62AB6630 
+X-CRM114-Status: GOOD (  17.97  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -114,30 +114,48 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 10, 2019 at 9:36 PM Heiko Carstens
+On Thu, Jan 10, 2019 at 9:33 PM Heiko Carstens
 <heiko.carstens@de.ibm.com> wrote:
-> On Thu, Jan 10, 2019 at 05:24:35PM +0100, Arnd Bergmann wrote:
+> On Thu, Jan 10, 2019 at 05:24:34PM +0100, Arnd Bergmann wrote:
 
-> Since you only need/want the system call numbers, could you please
-> change these lines to:
+> > diff --git a/arch/s390/kernel/syscalls/syscall.tbl b/arch/s390/kernel/syscalls/syscall.tbl
+> > index 022fc099b628..428cf512a757 100644
+> > --- a/arch/s390/kernel/syscalls/syscall.tbl
+> > +++ b/arch/s390/kernel/syscalls/syscall.tbl
+> > @@ -391,3 +391,15 @@
+> >  381  common  kexec_file_load         sys_kexec_file_load             compat_sys_kexec_file_load
+> >  382  common  io_pgetevents           sys_io_pgetevents               compat_sys_io_pgetevents
+> >  383  common  rseq                    sys_rseq                        compat_sys_rseq
+> > +# room for arch specific syscalls
+> > +392  64      semtimedop              sys_semtimedop                  -
+> > +393  common  semget                  sys_semget                      sys_semget
+> ...
+> > +395  common  shmget                  sys_shmget                      sys_shmget
+> ...
+> > +398  common  shmdt                   sys_shmdt                       sys_shmdt
+> > +399  common  msgget                  sys_msgget                      sys_msgget
 >
-> > +384  common  pkey_alloc              -                               -
-> > +385  common  pkey_free               -                               -
-> > +386  common  pkey_mprotect           -                               -
+> These four need compat system call wrappers, unfortunately... (well,
+> actually only shmget and shmdt require them, but let's add them for
+> all four). See arch/s390/kernel/compat_wrapper.c
 >
-> Otherwise it _looks_ like we would need compat wrappers here as well,
-> even though all of them would just jump to sys_ni_syscall() in this
-> case. Making this explicit seems to better.
+> I'm afraid this compat special handling will be even more annoying in
+> the future, since s390 will be the only architecture which requires
+> this special handling.
+>
+> _Maybe_ it would make sense to automatically generate a weak compat
+> system call wrapper for s390 with the SYSCALL_DEFINE macros, but that
+> probably won't work in all cases.
 
-Ok, fair enough. I considered doing this originally and then
-decided against it for consistency with the asm-generic file,
-but I don't care much either way.
+For some reason I was under the impression that s390 already did that.
+However, it seems that x86 does, so I'll try to convert the x86 version
+for s390, and see if I can get rid of all the wrappers that way.
 
-Is this something you may want to add later? I'm not sure exactly
-how pkey compares to s390 storage keys, or if this is something
-completely unrelated.
+It would certainly be safer to have the wrappers always present,
+especially if we expect future system calls to be added to the
+s390 table by whoever implements the syscall itself.
 
-     Arnd
+      Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
