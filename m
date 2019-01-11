@@ -2,60 +2,84 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-17.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_MUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 99DE9C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:21:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 16721C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:21:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 737A3205C9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:21:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E7B8521841
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:21:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="imMuqNki"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 737A3205C9
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QJWF0V2H"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E7B8521841
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=epigenesys.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
-	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=8GuKm59AlUVRT91K405c2QEin4Pv993VTr7ZY0dAheQ=; b=imMuqNkixxxcC7
-	cTLE7+GlQOMhb2HG9asNsmhPLMYu1r5KYShT5tQ9tkJb037v6itFh2iquOedO6SR3g19bJZBeY0lg
-	3rh6hDE0/y2RTVRAxqc2rxeDd7UKNhvDpLkfh+KHeXfY/NhDyfmhomt4X2n2hd9ojAhPDf9gQIzud
-	O0Cg2eSLkPmABA+JDFD8txewHu6ud0PSMo86lB8XsEyCkq8mivDwUPbOhkpNxodU51xCWD6turodr
-	XS/vTan7XKSul4tbxA8JhUpVM6Y2InCy0zgL8J0ID4GK7YeRcF3nG7ZEURcyYP+Isrz2DvxaEgEpE
-	lgR9vSwWA7EaS7S5yoxw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=EzwMNTMNKZsqZ8RNOvgFyGiFJK+zSrsXmSIderKmc6c=; b=QJWF0V2HoWTnjW
+	I0r7ihDUOCr8EhrcvVGUEGwT+G+e9auEOBrDJFG0EmIK+RI5w4+bkT1EH/KW36ql980sTGpGcDR61
+	Q1eHHUCyAkbwZSpXCSsY0MYkTxrMcITU1ivaldUAb8BAfBYs439RWQMJcIJR8GRFk/TqdTrTswGSm
+	FcZ4DoxG1+0XpCbicxhPFLxwNuO/WtyGpbILu2ummJS2LGqDMKqlRwfVn1s1mNi8GugCLGke3do7j
+	o5jtjwRdxAvRVg/0RD6gbFyHVQXeuVwjBJbsyeX2UiKsNgXy/bXrGiU8c9b/7u5HRD7h0YEfeIYmk
+	ZMFFNG2u/Fns0RzjkZTw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gi1QX-0003O6-2y; Fri, 11 Jan 2019 18:21:05 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gi1QT-0003Nd-I8
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 18:21:03 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 30FEF80D;
- Fri, 11 Jan 2019 10:21:01 -0800 (PST)
-Received: from fuggles.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 217443F6CF;
- Fri, 11 Jan 2019 10:20:59 -0800 (PST)
-Date: Fri, 11 Jan 2019 18:20:57 +0000
-From: Will Deacon <will.deacon@arm.com>
-To: torvalds@linux-foundation.org
-Subject: [GIT PULL] arm64: fixes for -rc2
-Message-ID: <20190111182057.GB32645@fuggles.cambridge.arm.com>
+	id 1gi1Qz-0003f1-L2; Fri, 11 Jan 2019 18:21:33 +0000
+Received: from mail-wr1-f67.google.com ([209.85.221.67])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gi1Qv-0003dy-Ti; Fri, 11 Jan 2019 18:21:31 +0000
+Received: by mail-wr1-f67.google.com with SMTP id t6so16148940wrr.12;
+ Fri, 11 Jan 2019 10:21:29 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=CXQMb3CYoxZvEBGoFLf3XqN+Sy8lNJon5xeR0SKttEQ=;
+ b=lqYwXZ0BtcJ61vKFP0PAxqPw26kUwe9IybUOKCSwZ1LeuVFStgw6FWYLZbHgrAGUbd
+ rQf9IIIEBdn7iJKDYExGeaHDoEMUVWo56hpGwWkCHVL+a7QL+ljyNtL4i99UsBxNCi3S
+ gYM7uN3rDVOT4DuKUXoNLxDYnZMef2De8rQ4hxUEuEm9SNhxrwnWni190l2VEdFpWJdH
+ wo92+qvjm3A8uOSQT9a9Mya3gBsAb+iEHkKq+wwMiJqGmr+s03G7OX8I0X8Q5Ip2rp5r
+ cUyujOhE8C13x45VkDgKHP4xlpOHzhaH9AghOTZzzStdJaHeM/WLkOXn5tWSswDQjYtF
+ phHQ==
+X-Gm-Message-State: AJcUukevPkEK1oeKPpOExl5cYHF1WxrNN9036RHI/A0ZWeZOaJ9ucp4Q
+ 22vU8m38jEAgKb4IuElL8sHzCBwG
+X-Google-Smtp-Source: ALg8bN4fYziC++OXve0ga78/Oef9cqm1AGM6vL7wECICvMlTC/n/gbWa8+Fwy7Zx6t1yMvaQ51EWyg==
+X-Received: by 2002:adf:e509:: with SMTP id j9mr15436184wrm.76.1547230887888; 
+ Fri, 11 Jan 2019 10:21:27 -0800 (PST)
+Received: from ingrassia.epigenesys.com
+ (host194-85-static.3-79-b.business.telecomitalia.it. [79.3.85.194])
+ by smtp.gmail.com with ESMTPSA id o5sm32667437wmg.25.2019.01.11.10.21.26
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 11 Jan 2019 10:21:27 -0800 (PST)
+Date: Fri, 11 Jan 2019 19:21:24 +0100
+From: Emiliano Ingrassia <ingrassia@epigenesys.com>
+To: Kevin Hilman <khilman@baylibre.com>,
+ Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ linux-amlogic@lists.infradead.org
+Subject: Re: [PATCH v3 1/2] pinctrl: meson: meson8b: add the eth_rxd2 and
+ eth_rxd3 pins
+Message-ID: <20190111182124.GA4420@ingrassia.epigenesys.com>
+References: <20181229143556.27339-1-martin.blumenstingl@googlemail.com>
+ <20181229143556.27339-2-martin.blumenstingl@googlemail.com>
+ <7hzhs8ovag.fsf@baylibre.com>
+ <20190111100915.GA1716@ingrassia.epigenesys.com>
+ <7hbm4noypt.fsf@baylibre.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-User-Agent: Mutt/1.11.1+86 (6f28e57d73f2) ()
+In-Reply-To: <7hbm4noypt.fsf@baylibre.com>
+User-Agent: Mutt/1.11.1 (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_102101_602378_C6A5B7EA 
-X-CRM114-Status: GOOD (  13.68  )
+X-CRM114-CacheID: sfid-20190111_102129_953802_F731FE5E 
+X-CRM114-Status: GOOD (  21.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,76 +91,95 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: catalin.marinas@arm.com, lorenzo.pieralisi@arm.com,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: linux-arm-kernel@lists.infradead.org, jianxin.pan@amlogic.com,
+ linus.luessing@c0d3.blue
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Linus,
+Hi Kevin,
 
-Another handful of arm64 fixes here. Most of the complication comes from
-improving our kpti code to avoid lengthy pauses (30+ seconds) during boot
-when we rewrite the page tables. There are also a couple of IORT fixes
-that came in via Lorenzo. Usual summary in the tag.
+On Fri, Jan 11, 2019 at 10:06:54AM -0800, Kevin Hilman wrote:
+> Emiliano Ingrassia <ingrassia@epigenesys.com> writes:
+>
+> > Hi Kevin,
+> >
+> > sorry to bother you.
+>
+> No need to apologize.
+>
+> > On Thu, Jan 10, 2019 at 05:08:39PM -0800, Kevin Hilman wrote:
+> >> Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
+> >>
+> >> > Gigabit Ethernet requires the Ethernet TXD0..3 and RXD0..3 data lines.
+> >> > Add the missing eth_rxd2 and eth_rxd3 definitions so we don't have to
+> >> > rely on the bootloader to set them up correctly.
+> >> >
+> >> > The vendor u-boot sources for Odroid-C1 use the following Ethernet
+> >> > pinmux configuration:
+> >> >   SET_CBUS_REG_MASK(PERIPHS_PIN_MUX_6, 0x3f4f);
+> >> >   SET_CBUS_REG_MASK(PERIPHS_PIN_MUX_7, 0xf00000);
+> >> > This translates to the following pin groups in the mainline kernel:
+> >> > - register 6 bit  0: eth_rxd1 (DIF_0_P)
+> >> > - register 6 bit  1: eth_rxd0 (DIF_0_N)
+> >> > - register 6 bit  2: eth_rx_dv (DIF_1_P)
+> >> > - register 6 bit  3: eth_rx_clk (DIF_1_N)
+> >> > - register 6 bit  6: eth_tx_en (DIF_3_P)
+> >> > - register 6 bit  8: eth_ref_clk (DIF_3_N)
+> >> > - register 6 bit  9: eth_mdc (DIF_4_P)
+> >> > - register 6 bit 10: eth_mdio_en (DIF_4_N)
+> >> > - register 6 bit 11: eth_tx_clk (GPIOH_9)
+> >> > - register 6 bit 12: eth_txd2 (GPIOH_8)
+> >> > - register 6 bit 13: eth_txd3 (GPIOH_7)
+> >> > - register 7 bit 20: eth_txd0_0 (GPIOH_6)
+> >> > - register 7 bit 21: eth_txd1_0 (GPIOH_5)
+> >> > - register 7 bit 22: eth_rxd3 (DIF_2_P)
+> >> > - register 7 bit 23: eth_rxd2 (DIF_2_N)
+> >> >
+> >> > All functions except eth_rxd2 and eth_rxd3 are already supported by the
+> >> > pinctrl-meson8b driver.
+> >> >
+> >> > Suggested-by: Jianxin Pan <jianxin.pan@amlogic.com>
+> >> > Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> >>
+> >> Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+> >
+> > For both patches of this series I gave:
+> > Tested-by: Emiliano Ingrassia <ingrassia@epigenesys.com>
+> > Reviewed-by: Emiliano Ingrassia <ingrassia@epigenesys.com>
+> >
+> > They were in the answer to the cover letter of this series.
+> > I note that they were not included in the commit message of the first patch.
+> >
+> > Did I miss something or did something wrong?
+> > Please, let me know.
+>
+> You did everything fine, I just missed them.
+>
+> I've started relying a bit more heavily on patchwork to collect
+> review/test tags, and right now it doesn't notice tags to the
+> cover-letter, only to individual patches, so I typically add those by
+> hand, but in this case I missed them.
+>
 
-Please pull,
+Good to know, I'll keep it in mind next time.
 
-Thanks,
+> Sorry about that, and thanks for the reminder.  I'll add them and
+> repush.
+>
+> And, while I'm thinking about it, I'll request that feature to patchwork
+> developers.
+>
+> Kevin
+>
+>
 
-Will
+Thank you for the explanation!
 
---->8
+Best regards,
 
-The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
-
-  Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to 279667212ab2a4f36c3b0347657ddcc11f9cfa25:
-
-  arm64: kexec_file: return successfully even if kaslr-seed doesn't exist (2019-01-11 10:10:51 +0000)
-
-----------------------------------------------------------------
-arm64 fixes for -rc2
-
-- Don't error in kexec_file_load if kaslr-seed is missing in device-tree
-
-- Fix incorrect argument type passed to iort_match_node_callback()
-
-- Fix IORT build failure when CONFIG_IOMMU_API=n
-
-- Fix kpti performance regression with new rodata default option
-
-- Typo fix
-
-----------------------------------------------------------------
-AKASHI Takahiro (1):
-      arm64: kexec_file: return successfully even if kaslr-seed doesn't exist
-
-Jean-Philippe Brucker (1):
-      ACPI/IORT: Fix rc_dma_get_range()
-
-Qian Cai (1):
-      ACPI/IORT: Fix build when CONFIG_IOMMU_API=n
-
-Will Deacon (2):
-      arm64: asm-prototypes: Fix fat-fingered typo in comment
-      arm64: kpti: Avoid rewriting early page tables when KASLR is enabled
-
- arch/arm64/include/asm/asm-prototypes.h |  2 +-
- arch/arm64/include/asm/mmu.h            | 41 +++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/pgtable-prot.h   |  4 ++--
- arch/arm64/kernel/cpu_errata.c          |  2 +-
- arch/arm64/kernel/cpufeature.c          |  9 ++++++--
- arch/arm64/kernel/head.S                |  1 +
- arch/arm64/kernel/machine_kexec_file.c  |  4 +++-
- drivers/acpi/arm64/iort.c               |  5 ++--
- 8 files changed, 59 insertions(+), 9 deletions(-)
+Emiliano
 
 _______________________________________________
 linux-arm-kernel mailing list
