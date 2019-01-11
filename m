@@ -2,80 +2,92 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4AC7FC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 15:01:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9FC28C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 15:01:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 09D2420874
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 15:01:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 708A620874
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 15:01:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Fy5J7fU2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 09D2420874
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bjycbtY6";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="RpzAMn/t"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 708A620874
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Pq20GG6eLCq9H5u36kTxQ///NqRU9KlvXikttFOuI5M=; b=Fy5J7fU23Av8oO
-	B8swhHVjfAG6lXm0Ne0Mn9840TN4jnnMH3qiYCgtuR2O3qU69qzdtOyntV1iXgfoEr7MON8g0zayD
-	Y8zTNQKANpo9pjzW26zev+6MDIUM5oE2dBB1nH5mKGJ19qxuau1xgcmPCzgRDEE/eqmBiwygf6/pa
-	SXvLbOuuWLXpw6XgwT/4F7KrM+9b0ZQOzTD3WlkTuk0uryICszP0KefFXXpMszb8s+zn+YO2pPiVi
-	I7dA4JONZY7657UCyOttWHu1ANtPhw+18CElhM6Clq+e7HRn/BJ5pN/injEphyamelyUR7ROoUUEw
-	Mo3JQgTjUQvwtWnTJNgQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=8iXsofADqBAT87niCZG2cKJireWHxlkKTMffocwwyI4=; b=bjycbtY6qzDLE/
+	9+6kM98hLprlS937t7d/03F6ita2Jd0fr2w/XYLtRjoanCfe90pPrgpqKCkz6mAlKQ6HuxOf2jx8+
+	pq4pKUq2/zoXRnIQGP3EJWpRFbK6CN7M+eAA4Kga5bliSrTiD+xBxrjeQHdggzFbfkZUQCljZnCIK
+	6yp2mSGoDhpreaR451/PrJDgL17DlhXggFWVg5xM3UycWlsegnq5AU5KZbEoHqSdRr3jBTlWbPo0+
+	6b7Z1Vdcxg/fMIyyYnGofoPWaH/PpvdlI1mFz/DdDeB1I3Y+zIcZUAP2/cZZRv8JHbsRIl0QzoTWf
+	lO5p4Va+r0HRfHKkvcsw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghyJ8-0005PF-BH; Fri, 11 Jan 2019 15:01:14 +0000
-Received: from mail-ot1-f67.google.com ([209.85.210.67])
+	id 1ghyJj-0005j9-Fg; Fri, 11 Jan 2019 15:01:51 +0000
+Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghyJ0-0005No-Ig
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 15:01:12 +0000
-Received: by mail-ot1-f67.google.com with SMTP id s13so4836250otq.4
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 11 Jan 2019 07:01:06 -0800 (PST)
+ id 1ghyJb-0005hZ-Ah; Fri, 11 Jan 2019 15:01:48 +0000
+Received: by mail-pf1-x441.google.com with SMTP id c73so7053037pfe.13;
+ Fri, 11 Jan 2019 07:01:42 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=date:from:to:cc:subject:message-id:mime-version:content-disposition
+ :user-agent; bh=SrodQzZztcg8txHZaZFxducSgC9DqvYe1eV09xmVfQk=;
+ b=RpzAMn/tFZO9w1bOsU0R3bl0Czqgh3vozKcpize0+4T5FcTI3eGHnL7a/siSocGNeS
+ YpzDw/x5TPn/ZIK8D8rFRVnfSd+kRunfwlXMPBFnoy0agtIVT3l2o8n93yulfDdqPfpM
+ 02pnJKSJtBrMnNoIKfIXvp+dl7xWo/ZINl/06zWYmqtI8R6Rd1tzw33GJStW9BWNcyJd
+ UTxrdHPrzQA7Dgo9vXmzvN7LPm0x/n5eENgEHExKf5wRU3L1BPvidyksamluwHiEMfNj
+ jLP1Epne1X0o4Fs5YlsShABd8w6xov+ORe//hxIum1KwYBI45AwbqyCzizyY7CZsappy
+ j23Q==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=tvjsmNv2ozKilJqW/hbPznvH/zBjxGIJWFcCGyvEiTI=;
- b=royz4Od/NQos9NOEsfHNfqwz+VRBWqbYKSIUQBes3w9FBkCxQS5eNThnPAmjD+ijAz
- wenURBrwSdvnO2o3WeV/uUWIj3WYT3hYs5GEvIGYZ5slLTEiWfSaIeTa+/AqxvYZZXZy
- pNgFg6345drzDmTB70nIB+hMTp+Bp/JS0psp+YOk7/qRAASGmfEfowaY/37YuT5jzYQE
- H5rYsLHNBoJCDYN19eR76k7x4dqwviu14rJ1h3KhaJ2v2qqez8LtZtEkJpOhLAGtwNNB
- oR4VBCW5GvvuAyvqjORhZmVeQI5vKAtFDRd5/8FvEYL9SQWJzTvT9tM+VT4z6LbY9vpV
- utBQ==
-X-Gm-Message-State: AJcUukclXYU3QWNOq383LOGG4ZQD4PEVAokUu0So0H/59IJk/F/P7KSv
- oy3C7dvdmSBpiymL8MrlZA==
-X-Google-Smtp-Source: ALg8bN5VtP2ktnfaO6Bmh7ETkGMkiZGqpIfxtejBAyPXs/10dOlhE0BNN/lr+MQp4wPZ+NiR+N4jBg==
-X-Received: by 2002:a9d:3e4a:: with SMTP id h10mr10439136otg.74.1547218865738; 
- Fri, 11 Jan 2019 07:01:05 -0800 (PST)
-Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
- [24.155.109.49])
- by smtp.gmail.com with ESMTPSA id u65sm31382796oib.5.2019.01.11.07.01.04
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 11 Jan 2019 07:01:04 -0800 (PST)
-Date: Fri, 11 Jan 2019 09:01:04 -0600
-From: Rob Herring <robh@kernel.org>
-To: Vinod Koul <vkoul@kernel.org>
-Subject: Re: [PATCH 3/7] dt-bindings: net: stmmac: Add the bindings
- documentation for delays
-Message-ID: <20190111150104.GA1465@bogus>
-References: <20190102091729.18582-1-vkoul@kernel.org>
- <20190102091729.18582-4-vkoul@kernel.org>
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:mime-version
+ :content-disposition:user-agent;
+ bh=SrodQzZztcg8txHZaZFxducSgC9DqvYe1eV09xmVfQk=;
+ b=bn5zKO+Iu+grqDtZSfkg+7otGs9R1cq3njekBIVCCf9GHHPGftV5LaeqvZpXUjQQYD
+ iuRufP0DU+zmqdZtxYCbnow33w0dDHX61G1MjriNuqq5UCiQhemFJ/Cv0THK8+E5kev6
+ f4rVY7P/UNaceSuEARPGqjMAPq0/g0WUm9mwxJhgWhvr01aXAYyNmWFmnMIKEKkbfF1n
+ pQrvgvsx+j+jjJgycIU3YvYuEY2pxTqtyzEFHMkk7e61xdwIFsmdnCf8zq1WGU3KFGXh
+ hfrJkQLu8Etech6vXtYMxpNiwC2pX/t0lpX31RzKfv9O8sAf32c9tCv//btitrcTgWrz
+ hYjw==
+X-Gm-Message-State: AJcUukdRAJGHRigQv8sM0tSU4jvCWVrgDJzM6p+rbib4RSAiAdwA8Fsa
+ ir36dOelJfj6bH1M8ksNUBE=
+X-Google-Smtp-Source: ALg8bN63Mqumr33i923Eaojw1CNwJqGO3fUgNxuFX1Idnsn+2UvfCqyMDy2gA5SSe2/mxV+qUcpzvQ==
+X-Received: by 2002:a63:f30d:: with SMTP id l13mr13690215pgh.399.1547218901644; 
+ Fri, 11 Jan 2019 07:01:41 -0800 (PST)
+Received: from jordon-HP-15-Notebook-PC ([49.207.52.190])
+ by smtp.gmail.com with ESMTPSA id l70sm87429186pgd.20.2019.01.11.07.01.39
+ (version=TLS1 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Fri, 11 Jan 2019 07:01:40 -0800 (PST)
+Date: Fri, 11 Jan 2019 20:35:41 +0530
+From: Souptick Joarder <jrdr.linux@gmail.com>
+To: akpm@linux-foundation.org, willy@infradead.org, mhocko@suse.com,
+ kirill.shutemov@linux.intel.com, vbabka@suse.cz, riel@surriel.com,
+ sfr@canb.auug.org.au, rppt@linux.vnet.ibm.com, peterz@infradead.org,
+ linux@armlinux.org.uk, robin.murphy@arm.com, iamjoonsoo.kim@lge.com,
+ treding@nvidia.com, keescook@chromium.org, m.szyprowski@samsung.com,
+ stefanr@s5r6.in-berlin.de, hjc@rock-chips.com, heiko@sntech.de,
+ airlied@linux.ie, oleksandr_andrushchenko@epam.com, joro@8bytes.org,
+ pawel@osciak.com, kyungmin.park@samsung.com, mchehab@kernel.org,
+ boris.ostrovsky@oracle.com, jgross@suse.com
+Subject: [PATCH 0/9] Use vm_insert_range and vm_insert_range_buggy
+Message-ID: <20190111150541.GA2670@jordon-HP-15-Notebook-PC>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190102091729.18582-4-vkoul@kernel.org>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_070106_615518_D4279C0F 
-X-CRM114-Status: GOOD (  16.18  )
+X-CRM114-CacheID: sfid-20190111_070143_413725_BBDF8757 
+X-CRM114-Status: GOOD (  10.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,47 +99,67 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- netdev@vger.kernel.org, Bjorn Andersson <bjorn.andersson@linaro.org>,
- Niklas Cassel <niklas.cassel@linaro.org>,
- "David S . Miller" <davem@davemloft.net>, linux-arm-kernel@lists.infradead.org
+Cc: linux-rockchip@lists.infradead.org, linux-kernel@vger.kernel.org,
+ dri-devel@lists.freedesktop.org, xen-devel@lists.xen.org, linux-mm@kvack.org,
+ iommu@lists.linux-foundation.org, linux1394-devel@lists.sourceforge.net,
+ linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 02, 2019 at 02:47:25PM +0530, Vinod Koul wrote:
-> Some controllers require that phy delay should be disabled. So add
+Previouly drivers have their own way of mapping range of
+kernel pages/memory into user vma and this was done by
+invoking vm_insert_page() within a loop.
 
-If the MAC requires it, then the compatible string should imply this. If 
-it depends on the PHY, then okay.
+As this pattern is common across different drivers, it can
+be generalized by creating new functions and use it across
+the drivers.
 
-> optional properties rx-disable-delay and tx-disable-delay for it.
-> 
-> Signed-off-by: Vinod Koul <vkoul@kernel.org>
-> ---
->  Documentation/devicetree/bindings/net/stmmac.txt | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/net/stmmac.txt b/Documentation/devicetree/bindings/net/stmmac.txt
-> index cb694062afff..ec18897e22c8 100644
-> --- a/Documentation/devicetree/bindings/net/stmmac.txt
-> +++ b/Documentation/devicetree/bindings/net/stmmac.txt
-> @@ -74,6 +74,8 @@ Optional properties:
->  	- snps,mb: mixed-burst
->  	- snps,rb: rebuild INCRx Burst
->  - mdio: with compatible = "snps,dwmac-mdio", create and register mdio bus.
-> +- rx-delay-disable: bool, when present disable the rx delay
-> +- tx-delay-disable: bool, when present disable the tx delay
+vm_insert_range() is the API which could be used to mapped
+kernel memory/pages in drivers which has considered vm_pgoff
 
-Needs a vendor prefix.
+vm_insert_range_buggy() is the API which could be used to map
+range of kernel memory/pages in drivers which has not considered
+vm_pgoff. vm_pgoff is passed default as 0 for those drivers.
 
->  - Multiple RX Queues parameters: below the list of all the parameters to
->  				 configure the multiple RX queues:
->  	- snps,rx-queues-to-use: number of RX queues to be used in the driver
-> -- 
-> 2.20.1
-> 
+We _could_ then at a later "fix" these drivers which are using
+vm_insert_range_buggy() to behave according to the normal vm_pgoff
+offsetting simply by removing the _buggy suffix on the function
+name and if that causes regressions, it gives us an easy way to revert.
+
+There is an existing bug in [7/9], where user passed length is not
+verified against object_count. For any value of length > object_count
+it will end up overrun page array which could lead to a potential bug.
+This is fixed as part of these conversion.
+
+Souptick Joarder (9):
+  mm: Introduce new vm_insert_range and vm_insert_range_buggy API
+  arch/arm/mm/dma-mapping.c: Convert to use vm_insert_range
+  drivers/firewire/core-iso.c: Convert to use vm_insert_range_buggy
+  drm/rockchip/rockchip_drm_gem.c: Convert to use vm_insert_range
+  drm/xen/xen_drm_front_gem.c: Convert to use vm_insert_range
+  iommu/dma-iommu.c: Convert to use vm_insert_range
+  videobuf2/videobuf2-dma-sg.c: Convert to use vm_insert_range_buggy
+  xen/gntdev.c: Convert to use vm_insert_range
+  xen/privcmd-buf.c: Convert to use vm_insert_range_buggy
+
+ arch/arm/mm/dma-mapping.c                         | 22 ++----
+ drivers/firewire/core-iso.c                       | 15 +----
+ drivers/gpu/drm/rockchip/rockchip_drm_gem.c       | 17 +----
+ drivers/gpu/drm/xen/xen_drm_front_gem.c           | 18 ++---
+ drivers/iommu/dma-iommu.c                         | 12 +---
+ drivers/media/common/videobuf2/videobuf2-dma-sg.c | 22 ++----
+ drivers/xen/gntdev.c                              | 16 ++---
+ drivers/xen/privcmd-buf.c                         |  8 +--
+ include/linux/mm.h                                |  4 ++
+ mm/memory.c                                       | 81 +++++++++++++++++++++++
+ mm/nommu.c                                        | 14 ++++
+ 11 files changed, 129 insertions(+), 100 deletions(-)
+
+-- 
+1.9.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
