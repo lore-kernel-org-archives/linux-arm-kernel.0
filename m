@@ -2,88 +2,81 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5FDCCC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 05:08:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6DBB5C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 05:21:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2BA1D214C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 05:08:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3C56E20872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 05:21:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VoAN/twt";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=broadcom.com header.i=@broadcom.com header.b="YbI3wrvL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2BA1D214C6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fWKqgU6T";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=broadcom.com header.i=@broadcom.com header.b="FWMVqFgg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3C56E20872
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=broadcom.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=GQVecg5EFoikJUdIwlZdx97uyOsp+3eLK8AFbwY/xN4=; b=VoAN/twtPkhHI5//8LqiC32wmn
-	uMzLtXzQtJYXfsPs/i8Z7aQJgUDStaGBtO+zC0rgSBxKEbghl4C7SchvqEp9mAyTGNPAJeRCq6xrT
-	vjaM/62xDuQiZuO2G8fr1ViW6esIajy7ggnj8nYg8gbM+TTBZu/uBUmMSrKgnJzQKpLPGAgMlyV+W
-	AfXSI0fI7GfiODqR3wBlnu7PMW4KSc5GVd4r100L98Hxej4jZvfmmzYFoPECF5Q7BWRlo3lni6M+o
-	kjzWRo/MQr0w5+i3t95u0BIm87MQ7AotzIE9UcWBub6evrOZnFBQ9deyCMw0by/abMKejuvZ457s7
-	aMrd8Guw==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=wSAdg5k6CcNxHKtFEEW1o3cpl41qQJc9A3Ir6r9E6EE=; b=fWK
+	qgU6TWkfhwLTwB2GOVummzPfkJfr3nh6QYBBh+lvBnGdoAHVLLAPtVS6VeKB8lr4GRy9OnP9ZDKNl
+	faF321MXWQEThCFE5iQgLDgLOg930GDINbhb2aNhN/m8gT1ApHbz+M/arK/My5QJSDcANR7rmXdC7
+	OM7QDJGM0PXjxj6kFlsSd9HXsGL6eIQWNrsvj24pqWh0xOcDT9iBPACY27ZnL8F811rzJV/dbwL1s
+	+jpabQExiRQ9GS+1ra2HOX70b7qtVv2nZiuBup1xx68ITEFmFGXBK3efKZqcfF2yYrkDLspKt4ZKW
+	GF4857E75SvPZ9FdpLi7I8hICK6Lgfw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghp3h-0006tf-UD; Fri, 11 Jan 2019 05:08:41 +0000
-Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
+	id 1ghpFl-0003Es-5W; Fri, 11 Jan 2019 05:21:09 +0000
+Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghp2x-00067T-Gi
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 05:07:59 +0000
-Received: by mail-pf1-x444.google.com with SMTP id q1so6391957pfi.5
+ id 1ghpFh-0003EP-7M
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 05:21:06 +0000
+Received: by mail-pg1-x543.google.com with SMTP id z11so5840113pgu.0
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 10 Jan 2019 21:07:55 -0800 (PST)
+ Thu, 10 Jan 2019 21:21:04 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=broadcom.com; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=OwRCj7PjZaXnprtMq6QV2wVOFtmvXlT2/KrfJ+jAcLc=;
- b=YbI3wrvLQlSuWKzGwcmrPMq10BLR53H4wxvnakPX7SQwU5HynxVsjGZLrCXMFIFj2x
- 58k7ckLKu03eDgblFwVjoFDjwOPilyx/eCtUbQtCihPvHo6vn6DKbmZ4t8Aouyns1RmJ
- t7aPVpar4xkh27FabgEw607ccngXv9ub2bFQk=
+ h=from:to:cc:subject:date:message-id;
+ bh=d+QCZEbb8I1PHoVx1anwFEcq7OTA/n96FjbWbIsWIQs=;
+ b=FWMVqFggvtn9HchiFeiBPrzA6xmoVxb2I6zBZlwqpQ0FsXFc/yZvoUe5wzN3ylxK/b
+ 7vUmkqo0ZoH1XxcW/pc4OJy/ifYYZq1WLOB+peMpyCRJRJZm8rO5pCQTAjrRJ8/gZR8u
+ QkFfMMruabjxsFAyUCwhA/JUrdrNnx37wF5VE=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=OwRCj7PjZaXnprtMq6QV2wVOFtmvXlT2/KrfJ+jAcLc=;
- b=hkLXgRhekKyOvT/c29ePK38xfehIhEwSZbc106KNhocD3JHBqcytSjL310CTQSSdIz
- VqkZtZ/CJYb/DLssgnCuiBsR4bTkcsHl6iHNqZQfs+EiNT3UNyvooayO6vTJMGITUWOH
- EvTaPTy5hDTIQADGUilvDhdMpPfOPTwX9gD5gYpm2zvDFkABIspgn2L7sAmWPmxwkeIX
- e0nnYPUyNdvcqF+qj7DcZFuQw3CrfSjkcHuU9ogaG4FOZS8EE54AV91pOXtTbwTiE7MN
- DpY9vQI+YUw6mTfZwUShQ8rtL/1lvi7azZI1AWcUVhePxhp7skWwOnzAojiGqB52kXOg
- oX+Q==
-X-Gm-Message-State: AJcUukdzlb91y/KyDUVC1jQ+nAeYsUUqEhq+fWGFYwQUT1Sg77RtNOaH
- T56J3kBVuB7KDnVfS7u7gqD76A==
-X-Google-Smtp-Source: ALg8bN4TUjGB9NckJx6746/Yf8+tklNsDUzA144cpS08G0WVS6MwRqSqItBq9OTXaCLoCaOdAmfzhQ==
-X-Received: by 2002:a63:6ac5:: with SMTP id
- f188mr12155983pgc.165.1547183274445; 
- Thu, 10 Jan 2019 21:07:54 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=d+QCZEbb8I1PHoVx1anwFEcq7OTA/n96FjbWbIsWIQs=;
+ b=Xmmu+4cZtuhpri4K6gpz1ZrqbTYvD0YmHl16b3GTug4S/hDqPH0zPa/Q9KsyQ+seo0
+ H1WP8ONIfpOJvnQLs/eB84eAvnDAmj9oeDwXXiUzBh0xM0LMmdyZMGFVPham/HtpHHQM
+ ML99r7Pzv32i/lSJdkhrwFooEwczmeDvoQ2j38Yy1mJV7FEML/XibOduVjdpcTTPsmQG
+ GtpH48J+dSECZ//HKL3yyhPQi/4nWHFGBIq/hv3LQeZ+VGrTx3zh/wyTGGkPufipHva1
+ OFVLlTVm7xXRRkgl8zYjDfN0TUA1cInHxvm4wUIfjqPXIfv8N3WLSvna5u+4vjZ88BUB
+ oIFg==
+X-Gm-Message-State: AJcUukdj3DTz+HWbmfdIM/zpGND9PP8itaCBgrZtuJDbdO8Fa/BrYfqj
+ bLUlnYWH3xdfvfqBejLGSU1NGg==
+X-Google-Smtp-Source: ALg8bN5n6sF59rtRzq1JIaYiy5l1r/j61rUcweghWiW0MvMZNxS3OJoahxg0nBCBRFMIhGPFtEE/0w==
+X-Received: by 2002:a63:8d44:: with SMTP id z65mr2026212pgd.57.1547184064235; 
+ Thu, 10 Jan 2019 21:21:04 -0800 (PST)
 Received: from shitalt.dhcp.broadcom.net ([192.19.234.250])
- by smtp.gmail.com with ESMTPSA id d6sm107520893pgc.89.2019.01.10.21.07.51
+ by smtp.gmail.com with ESMTPSA id 186sm148425418pga.36.2019.01.10.21.21.00
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Thu, 10 Jan 2019 21:07:53 -0800 (PST)
+ Thu, 10 Jan 2019 21:21:03 -0800 (PST)
 From: Sheetal Tigadoli <sheetal.tigadoli@broadcom.com>
 To: Thierry Reding <thierry.reding@gmail.com>,
  Rob Herring <robh+dt@kernel.org>, Florian Fainelli <f.fainelli@gmail.com>,
  Ray Jui <rjui@broadcom.com>, Scott Branden <sbranden@broadcom.com>
-Subject: [PATCH INTERNAL V3 3/3] ARM: dts: cygnus: Change pwm compatible to
- new version
-Date: Fri, 11 Jan 2019 10:38:04 +0530
-Message-Id: <1547183284-19956-4-git-send-email-sheetal.tigadoli@broadcom.com>
+Subject: [PATCH 0/3] Add support for PWM Configure and stablize for PWM kona
+Date: Fri, 11 Jan 2019 10:51:13 +0530
+Message-Id: <1547184076-20521-1-git-send-email-sheetal.tigadoli@broadcom.com>
 X-Mailer: git-send-email 1.9.1
-In-Reply-To: <1547183284-19956-1-git-send-email-sheetal.tigadoli@broadcom.com>
-References: <1547183284-19956-1-git-send-email-sheetal.tigadoli@broadcom.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190110_210756_493479_24F65078 
-X-CRM114-Status: GOOD (  15.13  )
+X-CRM114-CacheID: sfid-20190110_212105_276030_37C3F015 
+X-CRM114-Status: GOOD (  10.74  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,41 +89,31 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: linux-pwm@vger.kernel.org, Sheetal Tigadoli <sheetal.tigadoli@broadcom.com>,
- Praveen Kumar B <praveen.b@broadcom.com>, devicetree@vger.kernel.org,
- linux-kernel@vger.kernel.org, bcm-kernel-feedback-list@broadcom.com,
- linux-arm-kernel@lists.infradead.org
+ devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
+ bcm-kernel-feedback-list@broadcom.com, linux-arm-kernel@lists.infradead.org
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Praveen Kumar B <praveen.b@broadcom.com>
+Hi,
+	This patchset contain support to make PWM changes configure
+	and stablize
+	Following are brief changes done
+	a. Add support for version2 compatible string
+	b. Change PWM config and stablize delay in PWM Kona
 
-Change pwm compatible to new version of pwm-kona
-Add new compatible to check pwm configure status
+Praveen Kumar B (3):
+  dt-bindings: pwm: kona: Add new compatible for new version pwm-kona
+  drivers: pwm: pwm-bcm-kona: Add pwm-kona-v2 support
+  ARM: dts: cygnus: Change pwm compatible to new version
 
-Signed-off-by: Praveen Kumar B <praveen.b@broadcom.com>
-Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-Signed-off-by: Sheetal Tigadoli <sheetal.tigadoli@broadcom.com>
----
- arch/arm/boot/dts/bcm-cygnus.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ .../devicetree/bindings/pwm/brcm,kona-pwm.txt      |   2 +-
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |   2 +-
+ drivers/pwm/pwm-bcm-kona.c                         | 128 ++++++++++++++++-----
+ 3 files changed, 100 insertions(+), 32 deletions(-)
 
-diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
-index 253df71..2a433e7 100644
---- a/arch/arm/boot/dts/bcm-cygnus.dtsi
-+++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
-@@ -595,7 +595,7 @@
- 		};
- 
- 		pwm: pwm@180aa500 {
--			compatible = "brcm,kona-pwm";
-+			compatible = "brcm,kona-pwm-v2";
- 			reg = <0x180aa500 0xc4>;
- 			#pwm-cells = <3>;
- 			clocks = <&asiu_clks BCM_CYGNUS_ASIU_PWM_CLK>;
 -- 
 1.9.1
 
