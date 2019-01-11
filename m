@@ -2,91 +2,110 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 16EA2C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 21:28:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1A152C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 21:33:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DB9BB2084C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 21:28:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DFDF02084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 21:33:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CWcg0/jY";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=broadcom.com header.i=@broadcom.com header.b="TJfjIkH8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DB9BB2084C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=broadcom.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="g2Rfq6Mh";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="K/+1KKNm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DFDF02084C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=Pj8A29mQ6Ocz08hSqJ1wyNTJS+anPTpGbI7agA708uo=; b=CWcg0/jYTsNDsmcH3XFJsZrN1
-	u8npTTI8R4rqH9O4gnk/HOpGOEhbLPrg4u2bcRKM89q7dUpWFHuBNureSrnM76+zOxn1MDRv5UKFj
-	C9m5bDz7GjzK7wO7qxd5MhPqQUOnQsvrocmxB+0CDum/2l1Ywzd/oL2uqTtwBzLTh9TL1qSXLBpYv
-	bOReCkSOxCnD0z7tG9hb1fdXU1N7b1/K0YUnA3MQsOjrFE3WGvU2iXWHWRG+mpI01oGU95aAOk6z4
-	CTQ/PtACVbCU8+J1AAn+mTZqwNU9bf6F1aLmA2gsdpEV2vqxj+zuykqwQi/yhSrZWEPrl4bI7gJ5V
-	wPekC5aUA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ew6dBrOsNfskYJWLs30sTt5DZaLzyCk9DRjTc8zJZ1A=; b=g2Rfq6MhcB/XnE
+	pZTPcaNwAvBIwdXp7xNiUheJpNZx1IorMslbvJki/UYR1Uu0if1jfVIkFJ6vQhtk6JsgVHl0Ef8W4
+	bLncuECEW8H0GMBTV/yZBAEpRZ32xMMg0Rlws4y7yTIbIzbKIKNUNGc0b7JwSc9Z1+CQjolk3ATrs
+	fOIo9bj/sa7+QRvrgguAAYAZ8h1IcuOLzKNCXHK9usXDRW/IGw6f3pZSyYjWT1psIT4ilzexw9z3W
+	1+TyYxdDNBeGy63/jCEs1OVqZLP+YbfBkioBzLH9A3+0iCykt7NwElMQg+0HddqUl0eXAxSZDp6jR
+	9HVRerhOS5FFZmnTuANQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gi4ML-0003ym-5w; Fri, 11 Jan 2019 21:28:57 +0000
-Received: from mail-yb1-xb43.google.com ([2607:f8b0:4864:20::b43])
+	id 1gi4QJ-0005hW-SQ; Fri, 11 Jan 2019 21:33:03 +0000
+Received: from mail-eopbgr70053.outbound.protection.outlook.com ([40.107.7.53]
+ helo=EUR04-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gi4MH-0003xs-Hd
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 21:28:55 +0000
-Received: by mail-yb1-xb43.google.com with SMTP id s17so163194ybp.6
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 11 Jan 2019 13:28:51 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=broadcom.com; s=google;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-transfer-encoding:content-language;
- bh=PW+iFYKiZXJTOX93yIrYnuspfcNtG9ovkhcDVYkM07w=;
- b=TJfjIkH8TO3Qk/oz9gnIatmU8kPP/dYNSE8g6nonTzrgxX8fkbQ+jPI+niDmjYDrXe
- dmGr9VE0FzgOkHkEKbM5G3srY/JC1PuUQ1GNLlW6NvWZNCGiJ+BD3vtSfO1JwYC1cS+4
- V/x7zmxDGJH7im4xAM8VSxIzabErqi9+yvUMg=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-transfer-encoding
- :content-language;
- bh=PW+iFYKiZXJTOX93yIrYnuspfcNtG9ovkhcDVYkM07w=;
- b=brjzwdlP8sx28pmJlfKMdmeinVQeIzpbrYIZjYj4Fq0F6AuC3HnME9AIkpLL4vfNQY
- uyWO/J62vzFuYcmXjNnfdTR2D37y9Yb2BJYSiPJtCqi8u4jq0PaLPooB3kEfhfB/3IQx
- GZ1CDVOPAkzIT4jWCL8ZdZQeAxAdtYozTd+3hg7Sh3evNxLM7PcrUtKP/mpNEneg1otS
- Z80+wbz8096P76s3Tb5DXsV3XYh9TtATxQQXL2Wn8gIeOv7zqB/fFckpDsYP3WKQMANx
- 7o7lxdX1jeOErqk2E4QqJXyyJ73byXprXCzeX81It2rwjV0YzX/WvGEPVP8PjFb7ppWk
- ZrKg==
-X-Gm-Message-State: AJcUukcgQYaDqjSxNYoQSfBaBgtYUe55+ExmVuO8A2K76BYhcqtX6eBC
- 0MVs8rCofDLBKV2jp8WpnVlunw==
-X-Google-Smtp-Source: ALg8bN6iQIhBjir5hLQlVAfbqJ7QYklFND9ZiZB4pJlTYGzS5alwjTXx+lmKirBAk8vFXD4vvT5wFA==
-X-Received: by 2002:a25:ad28:: with SMTP id y40mr8794374ybi.338.1547242130687; 
- Fri, 11 Jan 2019 13:28:50 -0800 (PST)
-Received: from [10.136.13.65] ([192.19.228.250])
- by smtp.gmail.com with ESMTPSA id m126sm28904083ywd.39.2019.01.11.13.28.47
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 11 Jan 2019 13:28:49 -0800 (PST)
-Subject: Re: [PATCH 1/3] dt-bindings: pwm: kona: Add new compatible for new
- version pwm-kona
-To: =?UTF-8?Q?Uwe_Kleine-K=c3=b6nig?= <u.kleine-koenig@pengutronix.de>,
- Sheetal Tigadoli <sheetal.tigadoli@broadcom.com>
-References: <1547184076-20521-1-git-send-email-sheetal.tigadoli@broadcom.com>
- <1547184076-20521-2-git-send-email-sheetal.tigadoli@broadcom.com>
- <20190111204801.2ytdeblcai7lg3on@pengutronix.de>
-From: Scott Branden <scott.branden@broadcom.com>
-Message-ID: <f1ec3121-a8e7-a1c0-008a-ea4ae6028157@broadcom.com>
-Date: Fri, 11 Jan 2019 13:28:45 -0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <20190111204801.2ytdeblcai7lg3on@pengutronix.de>
+ id 1gi4QE-0005gX-V3
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 21:33:01 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=eSbj7h4nkJbVGydsaUAJL8p9rD32TqGoPj0E/sidZ18=;
+ b=K/+1KKNmTvP+SxCdp9JtWp8P33LwbnQ/pxxjWoe70i7TqZ0MlVL0MEvClhrUCThNiBJlP/T3Y5fVlFvxke8E4CuN/6SeVHc0QFuvqbdiorZT4UrCYjKtMvSq992SPICaK6Vwc/EvTPntzX//UeYlI8zoY1mXR9Mql13t1abECM4=
+Received: from AM6PR04MB5863.eurprd04.prod.outlook.com (20.179.1.11) by
+ AM6PR04MB4968.eurprd04.prod.outlook.com (20.177.33.211) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1495.9; Fri, 11 Jan 2019 21:32:54 +0000
+Received: from AM6PR04MB5863.eurprd04.prod.outlook.com
+ ([fe80::b800:e18:108b:416d]) by AM6PR04MB5863.eurprd04.prod.outlook.com
+ ([fe80::b800:e18:108b:416d%4]) with mapi id 15.20.1516.016; Fri, 11 Jan 2019
+ 21:32:54 +0000
+From: Leo Li <leoyang.li@nxp.com>
+To: Nicholas Mc Guire <der.herr@hofr.at>
+Subject: RE: [PATCH] soc: fsl: guts: us devm_kstrdup_const() for RO data
+Thread-Topic: [PATCH] soc: fsl: guts: us devm_kstrdup_const() for RO data
+Thread-Index: AQHUjgbZUE8xlzjs0UWEhi0bkgMBrqWKIGYAgABcJQCAHxZfi4ABOyQw
+Date: Fri, 11 Jan 2019 21:32:53 +0000
+Message-ID: <AM6PR04MB5863821216050C13EBED68AA8F850@AM6PR04MB5863.eurprd04.prod.outlook.com>
+References: <1544170963-8386-1-git-send-email-hofrat@osadl.org>
+ <98aba52405a63829ee79c775c8b749f8431f5d2a.camel@buserror.net>
+ <20181222075944.GA26155@osadl.at>
+ <CADRPPNTeLH1ChyYgP3fwqkHLTYCcV48tY1W+91nufFJu+yFKrA@mail.gmail.com>
+ <20190111024334.GA12140@osadl.at>
+In-Reply-To: <20190111024334.GA12140@osadl.at>
+Accept-Language: en-US
 Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=leoyang.li@nxp.com; 
+x-originating-ip: [64.157.242.222]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; AM6PR04MB4968;
+ 6:dxTleWQqCJEDQycJ/CmOqbYq5a08FuJgaCyloMHe1OJzfF9iZb6CkvMDU/gd/OgCWB6ov2YNq2Y9uJgQojoFYRa2dc/1Sa1tl/+enKVe45AuXeZ64U2QsA1LB4H9Y9MmVH8ZeAPHeqv4KQYmFKEHoyoV9pe42QDs1AhdR75fZyRdYeN9XNM1tpVbG1i0GSomrx5Lnv32FWBWSyGB5dMLQhVpt0SNqUrA/VIBZhePTka82DikrEe6/3ZgRZ/AVdmVQnjSOquLbKnp34Z9VQsAu43qNHSrBq2yIKbQb0fwLBMYjXmkGceCUi/9824Th4BehIyfw9rOwRgCoEElxnHx1z32L8Auo1JDRTx53eHOdsxZhU2+xFSe+j4cNsCCATWgTyfX2bGsi/lnAgZd7CE2MBUj8eQzcc9EyLr+zRz1rme81K9nI6WoskNQSENzb3ckodQwtcroOs64dzCZH7cgUA==;
+ 5:fYh2aBHJtPJs702gyO1RRNulPvOiPd/yo6zJPSf7Te2Kk1ZQRWN3rG9An8v12R4IS4ZsvDgMQ0iUJgtHp8YdUGKp3lmdqt9NaAbrCA8exCiPJ+vMUIaCzR6DYwwTPCeCGhDsEldsdZOVBnywyjvIHyzEPMM33642qZy1ycRL29k1GV9TrkQZXOxXzIKIAhcIcDc7KEyLLB1K5OM3CGuajA==;
+ 7:IUa7zTWLdNvQ0bgmzJzqSxJzYjcnHQcRUJWLmSlGyd41FlXoFalGKUcyTfd7F9oz8b06ODcMiRkm56rIaKc5D++eFjZLYhcz/BpGrRX4Hz/35NHsnW+oNdEBGX8uUTjMp3lFaSrOtmantIpXv+zZNQ==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: 9518c160-c1c0-4c79-3380-08d6780c588d
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:AM6PR04MB4968; 
+x-ms-traffictypediagnostic: AM6PR04MB4968:
+x-microsoft-antispam-prvs: <AM6PR04MB4968AA4BA850233A49BA8AC88F850@AM6PR04MB4968.eurprd04.prod.outlook.com>
+x-forefront-prvs: 09144DB0F7
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(396003)(136003)(346002)(376002)(39860400002)(366004)(13464003)(189003)(199004)(51444003)(51914003)(26005)(476003)(186003)(11346002)(14454004)(102836004)(6916009)(575784001)(446003)(8936002)(86362001)(5660300001)(74316002)(93886005)(256004)(6116002)(6506007)(53546011)(14444005)(76176011)(66066001)(3846002)(316002)(478600001)(966005)(45080400002)(71190400001)(71200400001)(54906003)(7696005)(486006)(97736004)(99286004)(2906002)(33656002)(6436002)(229853002)(25786009)(81156014)(6246003)(9686003)(55016002)(305945005)(6306002)(81166006)(7736002)(53936002)(8676002)(105586002)(106356001)(68736007)(4326008);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM6PR04MB4968;
+ H:AM6PR04MB5863.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: VrU3keiidlUC4fXmuE9JvN7bP/GeF03Wprrw6ARyOPwUoGPhTjNyIcpqB+X80A5/Qg3azq8FTCHoURZHgPbn2X/pCaLd4foZzePZRoNYnWdtNLArh3XH5rbDYW6D0m5/H6N7/JbMh6shbUuLJmEwC4Au1PdaZgZEX8MQJB7+9LUOUIfeEaRwZGOtBIjBtm2mvEuDvKh6RohIfGXqf6UpV1dktnQl29M5/LT8qjulFlQ/DDi6lfAgeb6cavPwZP90U/K9Au8MzOzu0pHKdV5cXFp3V6b+FFAqJouYxwrZDNj0o9VqqW4Z5x9bcSXZlYydl4atseOpnikn4ojGQFpIYiXKo6/McBFsgogjH4THAvBU+b6MSdZAixuf4XkIywu1CLY0IE1VEHddLNIMFo3B77+YBGo+gBO5dx8d81NZIu0=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+MIME-Version: 1.0
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 9518c160-c1c0-4c79-3380-08d6780c588d
+X-MS-Exchange-CrossTenant-originalarrivaltime: 11 Jan 2019 21:32:53.9622 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR04MB4968
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_132853_595835_01A129F3 
-X-CRM114-Status: GOOD (  17.61  )
+X-CRM114-CacheID: sfid-20190111_133259_700019_9CBD3A38 
+X-CRM114-Status: GOOD (  23.02  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,44 +117,87 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-pwm@vger.kernel.org, Florian Fainelli <f.fainelli@gmail.com>,
- Scott Branden <sbranden@broadcom.com>, devicetree@vger.kernel.org,
- Ray Jui <rjui@broadcom.com>, linux-kernel@vger.kernel.org,
- Rob Herring <robh+dt@kernel.org>, Thierry Reding <thierry.reding@gmail.com>,
- bcm-kernel-feedback-list@broadcom.com,
- Praveen Kumar B <praveen.b@broadcom.com>, linux-arm-kernel@lists.infradead.org
-Content-Transfer-Encoding: base64
-Content-Type: text/plain; charset="utf-8"; Format="flowed"
+Cc: Scott Wood <oss@buserror.net>, linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
+ lkml <linux-kernel@vger.kernel.org>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>, Nicholas Mc Guire <hofrat@osadl.org>
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgVXdlCgpPbiAyMDE5LTAxLTExIDEyOjQ4IHAubS4sIFV3ZSBLbGVpbmUtS8O2bmlnIHdyb3Rl
-Ogo+IE9uIEZyaSwgSmFuIDExLCAyMDE5IGF0IDEwOjUxOjE0QU0gKzA1MzAsIFNoZWV0YWwgVGln
-YWRvbGkgd3JvdGU6Cj4+IEZyb206IFByYXZlZW4gS3VtYXIgQiA8cHJhdmVlbi5iQGJyb2FkY29t
-LmNvbT4KPj4KPj4gQWRkIG5ldyBjb21wYXRpYmxlIHN0cmluZyBmb3IgbmV3IHZlcnNpb24gb2Yg
-cHdtLWtvbmEKPj4KPj4gU2lnbmVkLW9mZi1ieTogUHJhdmVlbiBLdW1hciBCIDxwcmF2ZWVuLmJA
-YnJvYWRjb20uY29tPgo+PiBSZXZpZXdlZC1ieTogUmF5IEp1aSA8cmF5Lmp1aUBicm9hZGNvbS5j
-b20+Cj4+IFJldmlld2VkLWJ5OiBTY290dCBCcmFuZGVuIDxzY290dC5icmFuZGVuQGJyb2FkY29t
-LmNvbT4KPj4gU2lnbmVkLW9mZi1ieTogU2hlZXRhbCBUaWdhZG9saSA8c2hlZXRhbC50aWdhZG9s
-aUBicm9hZGNvbS5jb20+Cj4+IC0tLQo+PiAgIERvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5k
-aW5ncy9wd20vYnJjbSxrb25hLXB3bS50eHQgfCAyICstCj4+ICAgMSBmaWxlIGNoYW5nZWQsIDEg
-aW5zZXJ0aW9uKCspLCAxIGRlbGV0aW9uKC0pCj4+Cj4+IGRpZmYgLS1naXQgYS9Eb2N1bWVudGF0
-aW9uL2RldmljZXRyZWUvYmluZGluZ3MvcHdtL2JyY20sa29uYS1wd20udHh0IGIvRG9jdW1lbnRh
-dGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL3B3bS9icmNtLGtvbmEtcHdtLnR4dAo+PiBpbmRleCA4
-ZWFlOWZlLi5kMzdmNjk3IDEwMDY0NAo+PiAtLS0gYS9Eb2N1bWVudGF0aW9uL2RldmljZXRyZWUv
-YmluZGluZ3MvcHdtL2JyY20sa29uYS1wd20udHh0Cj4+ICsrKyBiL0RvY3VtZW50YXRpb24vZGV2
-aWNldHJlZS9iaW5kaW5ncy9wd20vYnJjbSxrb25hLXB3bS50eHQKPj4gQEAgLTMsNyArMyw3IEBA
-IEJyb2FkY29tIEtvbmEgUFdNIGNvbnRyb2xsZXIgZGV2aWNlIHRyZWUgYmluZGluZ3MKPj4gICBU
-aGlzIGNvbnRyb2xsZXIgaGFzIDYgY2hhbm5lbHMuCj4+ICAgCj4+ICAgUmVxdWlyZWQgUHJvcGVy
-dGllcyA6Cj4+IC0tIGNvbXBhdGlibGU6IHNob3VsZCBjb250YWluICJicmNtLGtvbmEtcHdtIgo+
-PiArLSBjb21wYXRpYmxlOiBzaG91bGQgY29udGFpbiAiYnJjbSxrb25hLXB3bSIgb3IgImJyY20s
-a29uYS1wd20tdjIiCj4gSXMgdjIgdXNlZCBvbiBhIG5ld2VyIGdlbmVyYXRpb24gb2Yga29uYSBT
-b0NzPyBPbiBpLk1YIHRoZXNlIHZhcmlhbnRzCj4gYXJlIHVzdWFsbHkgbmFtZWQgYWZ0ZXIgdGhl
-IGZpcnN0IFNvQyB0aGF0IGNhbWUgd2l0aCB0aGUgbmV3IHZhcmlhbnQuIElzCj4gdGhpcyBzZW5z
-aWJsZSBoZXJlLCB0b28/CgpJdCBkb2Vzbid0IG1ha2UgYXMgbXVjaCBzZW5zZSBoZXJlIGFzIGRp
-ZmZlcmVudCByZXZzIG9mIHRoZSBJUCBibG9jayBhcmUgCnBpY2tlZCB1cCBiYXNlZCBvbiB2YXJp
-b3VzIGRlY2lzaW9ucy4KCkEgbmV3IFNvQyBjb3VsZCBkZWNpZGUgdG8gdXNlIGFuIG9sZCB2ZXJz
-aW9uLgoKPgo+IEJlc3QgcmVnYXJkcwo+IFV3ZQo+CgpfX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51
-eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5v
-cmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+
+
+> -----Original Message-----
+> From: Nicholas Mc Guire <der.herr@hofr.at>
+> Sent: Thursday, January 10, 2019 8:44 PM
+> To: Leo Li <leoyang.li@nxp.com>
+> Cc: Scott Wood <oss@buserror.net>; linuxppc-dev <linuxppc-
+> dev@lists.ozlabs.org>; lkml <linux-kernel@vger.kernel.org>; moderated
+> list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE <linux-arm-
+> kernel@lists.infradead.org>; Nicholas Mc Guire <hofrat@osadl.org>
+> Subject: Re: [PATCH] soc: fsl: guts: us devm_kstrdup_const() for RO data
+> =
+
+> On Thu, Jan 10, 2019 at 01:43:01PM -0600, Li Yang wrote:
+> > On Sat, Dec 22, 2018 at 2:02 AM Nicholas Mc Guire <der.herr@hofr.at>
+> wrote:
+> > >
+> > > On Fri, Dec 21, 2018 at 08:29:56PM -0600, Scott Wood wrote:
+> > > > On Fri, 2018-12-07 at 09:22 +0100, Nicholas Mc Guire wrote:
+> > > > > devm_kstrdup() may return NULL if internal allocation failed,
+> > > > > but as  machine  is from the device tree, and thus RO,
+> > > > > devm_kstrdup_const() can be used here, which will only copy the
+> reference.
+> > > >
+> > > > Is it really going to only copy the reference?  That would require
+> > > > that
+> > > > is_kernel_rodata(machine) be true, which it shouldn't be since
+> > > > it's not part of the kernel image.
+> > > >
+> > > I had tried to figure out what is RO and what not but was not able
+> > > to determine that - from the discussion it seemed that the
+> > > assumption of RO is correct though I did not ask if it would satisfy
+> > > is_kernel_rodata() so that explains the incorrect assertion.
+> > > see
+> > >
+> https://emea01.safelinks.protection.outlook.com/?url=3Dhttps%3A%2F%2Fl
+> > >
+> kml.org%2Flkml%2F2018%2F12%2F6%2F42&amp;data=3D02%7C01%7Cleoyang.l
+> i%40
+> > >
+> nxp.com%7Cf72d70a65d1b47f6883808d6776e9d58%7C686ea1d3bc2b4c6fa92c
+> d99
+> > >
+> c5c301635%7C0%7C1%7C636827714307963102&amp;sdata=3DxnaO0Y7q%2Byad
+> Yv8sF
+> > > VPFtkfllgnwpEIkkTIgw0K%2Fovg%3D&amp;reserved=3D0
+> > > So then the only option is to check the return and cleanup on
+> > > allocation failure as the orriginal patch proposed.
+> >
+> > Thanks for the good discussion. I will drop the previous patch. But
+> > would it also be good to just have "soc_dev_attr.machine =3D machine"
+> > directly?
+> >
+> I think that the intent is to switch to managed devm API so that the clea=
+nup is
+> handled properly currently you would get "machine" from
+> of_property_read_string_index
+>   -> of_property_read_string_helper
+>    -> of_find_property
+> which does not do any allocation - so there would actually not be anythin=
+g to
+> cleanup here - don=B4t see why your solution would not be suitable given =
+the
+> current API. the only advantage of the devm_kstrdup() is that underlying
+> APIs internal changes would have no effect.
+
+Thanks.  I will sent out a new version.
+
+Regards,
+Leo
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
