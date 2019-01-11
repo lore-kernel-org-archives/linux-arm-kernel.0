@@ -2,22 +2,22 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B9DDFC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 20:01:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 683A5C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 20:08:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 929412133F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 20:01:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3F7212133F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 20:08:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tzhi9Az4";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=alien8.de header.i=@alien8.de header.b="LTpKCPnu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 929412133F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=alien8.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dtbarTc1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3F7212133F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,56 +25,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1wi8oAeD6wfQl7udm/iIjPbowGnEy8x+CtieYpi+WCo=; b=tzhi9Az4HcmWb5
-	AJzhhtnLmySA+JvwqyZiztLDweiInhrrazaTEv2x9WbX43YuPNrVLWBrTfvCiKbQEnHxdXuk4pp2/
-	Ln91kHf8sD/m0oSjnYCVjnBJXtVUe/VlNG/ciJoTW31hXYqLLiXq3d76EVeqtoJB1R7KMqJ3YNfH+
-	y2yDvIxjCzC1EKpCIweLgiYMLzJ5OcJohwnXYe6kRETV4q8rcwcEVHsuNJrPdnXmMP+dQKj6N1Kk+
-	JV2zELMuIU2LxpjASdfyiPXUmj40iOJLCfom0EzyRLxUnO7feq/4kncMCmPDyGHm/V5zw0dpMk5rg
-	1TKIG7zlXnfjHQLl1Qkg==;
+	List-Owner; bh=FiqwRKVK/BGgxLqJge3dYdtddlo/Z86nZ8O8H5e9D/0=; b=dtbarTc1K97D5v
+	N4NQdJPwHK81IpEwd4fqMb9NlHEAgpa0ObAxeLPLAxQOhlApPgAbVn4y2lyJno0e0AQXufzzyYb5d
+	NUVYWkhq3r6LHUj3SR995LMotuMD+KKMH+aGKZMJqGBqH++xzwDDXDyenUZt64cpqpQaEbE2qdyWr
+	Q76yq+XZi1pgdwL8eCPj3romSWYd7DqJpoiOts0RukxC4kemo0ZzkHdOcZrSimyDITAkoHU+idG53
+	vZk3gOM2BrLJpYp7Lux1IZAXjDZvA2lyXPfLnu0wzTNUfTjY45em99usskd0Ok1DHcMj7VdYspjPi
+	dUJfl1IgzlGWfJoye7aQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gi2zV-0005UQ-1R; Fri, 11 Jan 2019 20:01:17 +0000
-Received: from mail.skyhub.de ([2a01:4f8:190:11c2::b:1457])
+	id 1gi36q-0007MQ-4J; Fri, 11 Jan 2019 20:08:52 +0000
+Received: from mail-oi1-f194.google.com ([209.85.167.194])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gi2zR-0005U4-0N
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 20:01:14 +0000
-Received: from zn.tnic (p200300EC2BCAC500F59AF9850531CFF6.dip0.t-ipconnect.de
- [IPv6:2003:ec:2bca:c500:f59a:f985:531:cff6])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.skyhub.de (SuperMail on ZX Spectrum 128k) with ESMTPSA id 739591EC0B1A;
- Fri, 11 Jan 2019 21:01:11 +0100 (CET)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=alien8.de; s=dkim;
- t=1547236871;
- h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
- to:to:cc:cc:mime-version:mime-version:content-type:content-type:
- content-transfer-encoding:in-reply-to:in-reply-to:  references:references;
- bh=tYCUebBSqDWIxvvs8nDDh9gQGbVZPgRT5lQ9BcgCVmI=;
- b=LTpKCPnua2EPkuczDLj8KUt1a9D9MrUjNFhBUx3Q/+wZ95PnewmWxvga2tusFfAG9UBnx/
- duQcUfCvBGjORode+us3+Q4/1NQS4L67GbeLeIXWQ83b/XigC8HaYwz6nzg+hX7QekCte2
- UtS18dOlIoeS1Y6Bx5Zm0albKzw4yuE=
-Date: Fri, 11 Jan 2019 21:01:08 +0100
-From: Borislav Petkov <bp@alien8.de>
-To: James Morse <james.morse@arm.com>
-Subject: Re: [PATCH v7 10/25] ACPI / APEI: Tell firmware the estatus queue
- consumed the records
-Message-ID: <20190111200108.GB11723@zn.tnic>
-References: <20181203180613.228133-1-james.morse@arm.com>
- <20181203180613.228133-11-james.morse@arm.com>
- <20181211183634.GO27375@zn.tnic>
- <56cfa16b-ece4-76e0-3799-58201f8a4ff1@arm.com>
- <CABo9ajArdbYMOBGPRa185yo9MnKRb0pgS-pHqUNdNS9m+kKO-Q@mail.gmail.com>
- <20190111120322.GD4729@zn.tnic>
- <CABo9ajAk5XNBmNHRRfUb-dQzW7-UOs5826jPkrVz-8zrtMUYkg@mail.gmail.com>
- <0939c14d-de58-f21d-57a6-89bdce3bcb44@arm.com>
+ id 1gi36m-0007Lr-3w
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 20:08:50 +0000
+Received: by mail-oi1-f194.google.com with SMTP id r62so13243063oie.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 11 Jan 2019 12:08:47 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=bHbhX/gb8e+qwY763NTphn/ry459cEIqwV9t6XEdBC4=;
+ b=B3LCzcYZjmlsA85actNHyaVG4iWxqGb+h7ubcJibek2VcEMH2TE/6BTtMe/IEOLU3P
+ 9Pis0ylCeST5C/bi1hIUwcYMXkTwjC538zFQFc7zCYpEluVtXuEvrHfpPdMaMmtyHkEH
+ RfbLDoPLTRwdxMEGD0BwQurv+ZAWzBz1YFNBEkTztO0BUGlOZ8Gb+jTqmgPg3Jm8qnSj
+ fkMrsj7j3SyTwVc2l11aeZfeWYlgFv/83QKPOWYOJQMX0MjvfDqXeY/DWkUbXo1qQqz3
+ ueLxDfiP4KeoLQ7IPYO0IxBEhDVt4g0obGsbIEHJvkdc0kWH8i1YkqCckjQdln1wYV7A
+ 5HOQ==
+X-Gm-Message-State: AJcUukdJF54aT6S3F0JalWEIW9LCQw8/qnR3gyV1gyPgEvSkpU3s9nWL
+ qgVz+RZCYW5mddDLvZoT2Q==
+X-Google-Smtp-Source: ALg8bN66GqGPlf6VpBvlTVYBSH5fOSs16NW52Elq94oaHD5l8QucB5wvv+3mlPSum5As9TplaX4T4w==
+X-Received: by 2002:aca:4a56:: with SMTP id x83mr9469406oia.11.1547237326714; 
+ Fri, 11 Jan 2019 12:08:46 -0800 (PST)
+Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.gmail.com with ESMTPSA id 75sm75689393otc.67.2019.01.11.12.08.45
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 11 Jan 2019 12:08:46 -0800 (PST)
+Date: Fri, 11 Jan 2019 14:08:45 -0600
+From: Rob Herring <robh@kernel.org>
+To: Jolly Shah <jolly.shah@xilinx.com>
+Subject: Re: [PATCH v2 4/4] dt-bindings: pinctrl: Add ZynqMP pin controller
+ bindings
+Message-ID: <20190111200845.GA20325@bogus>
+References: <1546638982-12954-1-git-send-email-jollys@xilinx.com>
+ <1546638982-12954-5-git-send-email-jollys@xilinx.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <0939c14d-de58-f21d-57a6-89bdce3bcb44@arm.com>
+In-Reply-To: <1546638982-12954-5-git-send-email-jollys@xilinx.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_120113_201129_1BB13461 
-X-CRM114-Status: UNSURE (   9.27  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190111_120848_170074_9AB0BE98 
+X-CRM114-Status: GOOD (  21.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,39 +88,320 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rafael Wysocki <rjw@rjwysocki.net>, Tony Luck <tony.luck@intel.com>,
- Fan Wu <wufan@codeaurora.org>, Xie XiuQi <xiexiuqi@huawei.com>,
- Linux ACPI <linux-acpi@vger.kernel.org>, Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Tyler Baicar <baicar.tyler@gmail.com>, Will Deacon <will.deacon@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>,
- Dongjiu Geng <gengdongjiu@huawei.com>, linux-mm@kvack.org,
- Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>, kvmarm@lists.cs.columbia.edu,
- arm-mail-list <linux-arm-kernel@lists.infradead.org>,
- Len Brown <lenb@kernel.org>
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ Rajan Vaja <rajan.vaja@xilinx.com>, nava.manne@xilinx.com,
+ michal.simek@xilinx.com, linux-kernel@vger.kernel.org,
+ Jolly Shah <jollys@xilinx.com>, rajanv@xilinx.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 11, 2019 at 06:09:28PM +0000, James Morse wrote:
-> We can return on ENOENT out earlier, as nothing needs doing in that case. Its
-> what the GHES_TO_CLEAR spaghetti is for, we can probably move the ack thing into
-> ghes_clear_estatus(), that way that thing means 'I'm done with this memory'.
+On Fri, Jan 04, 2019 at 01:56:22PM -0800, Jolly Shah wrote:
+> From: Rajan Vaja <rajan.vaja@xilinx.com>
+> 
+> Add documentation to describe Xilinx ZynqMP pin controller
+> bindings.
+> 
+> Signed-off-by: Rajan Vaja <rajan.vaja@xilinx.com>
+> Signed-off-by: Jolly Shah <jollys@xilinx.com>
+> ---
+>  .../bindings/pinctrl/xlnx,zynqmp-pinctrl.txt       | 275 +++++++++++++++++++++
+>  1 file changed, 275 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/xlnx,zynqmp-pinctrl.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pinctrl/xlnx,zynqmp-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/xlnx,zynqmp-pinctrl.txt
+> new file mode 100644
+> index 0000000..acf44a5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/xlnx,zynqmp-pinctrl.txt
+> @@ -0,0 +1,275 @@
+> +	Binding for Xilinx ZynqMP Pinctrl
+> +
+> +Required properties:
+> +- compatible: "xlnx,zynqmp-pinctrl"
+> +
+> +Please refer to pinctrl-bindings.txt in this directory for details of the
+> +common pinctrl bindings used by client devices, including the meaning of the
+> +phrase "pin configuration node".
+> +
+> +ZynqMP's pin configuration nodes act as a container for an arbitrary number of
+> +subnodes. Each of these subnodes represents some desired configuration for a
+> +pin, a group, or a list of pins or groups. This configuration can include the
+> +mux function to select on those pin(s)/group(s), and various pin configuration
+> +parameters, such as pull-up, slew rate, etc.
+> +
+> +Each configuration node can consist of multiple nodes describing the pinmux and
+> +pinconf options. Those nodes can be pinmux nodes or pinconf nodes.
+> +
+> +The name of each subnode is not important; all subnodes should be enumerated
+> +and processed purely based on their content.
+> +
+> +Required properties for pinmux nodes are:
+> + - groups: A list of pinmux groups.
+> + - function: The name of a pinmux function to activate for the specified set
+> +   of groups.
+> +
+> +Required properties for configuration nodes:
+> +One of:
+> + - pins: A list of pin names
+> + - groups: A list of pinmux groups.
+> +
+> +The following generic properties as defined in pinctrl-bindings.txt are valid
+> +to specify in a pinmux subnode:
+> + groups, function
+> +
+> +The following generic properties as defined in pinctrl-bindings.txt are valid
+> +to specify in a pinconf subnode:
+> + groups, pins, bias-disable, bias-pull-up, bias-pull-down, slew-rate
+> +
+> + Valid arguments for 'slew-rate' are 'SLEW_RATE_SLOW' and 'SLEW_RATE_FAST' to
+> + select between slow and fast respectively.
+> +
+> + Valid values for groups are:
+> + ethernet0_0_grp, ethernet1_0_grp, ethernet2_0_grp,
+> + ethernet3_0_grp, gemtsu0_0_grp, gemtsu0_1_grp,
+> + gemtsu0_2_grp, mdio0_0_grp, mdio1_0_grp,
+> + mdio1_1_grp, mdio2_0_grp, mdio3_0_grp,
+> + qspi0_0_grp, qspi_ss_0_grp, qspi_fbclk_0_grp,
+> + spi0_0_grp, spi0_ss_0_grp, spi0_ss_1_grp,
+> + spi0_ss_2_grp, spi0_1_grp, spi0_ss_3_grp,
+> + spi0_ss_4_grp, spi0_ss_5_grp, spi0_2_grp,
+> + spi0_ss_6_grp, spi0_ss_7_grp, spi0_ss_8_grp,
+> + spi0_3_grp, spi0_ss_9_grp, spi0_ss_10_grp,
+> + spi0_ss_11_grp, spi0_4_grp, spi0_ss_12_grp,
+> + spi0_ss_13_grp, spi0_ss_14_grp, spi0_5_grp,
+> + spi0_ss_15_grp, spi0_ss_16_grp, spi0_ss_17_grp,
+> + spi1_0_grp, spi1_ss_0_grp, spi1_ss_1_grp,
+> + spi1_ss_2_grp, spi1_1_grp, spi1_ss_3_grp,
+> + spi1_ss_4_grp, spi1_ss_5_grp, spi1_2_grp,
+> + spi1_ss_6_grp, spi1_ss_7_grp, spi1_ss_8_grp,
+> + spi1_3_grp, spi1_ss_9_grp, spi1_ss_10_grp,
+> + spi1_ss_11_grp, spi1_4_grp, spi1_ss_12_grp,
+> + spi1_ss_13_grp, spi1_ss_14_grp, spi1_5_grp,
+> + spi1_ss_15_grp, spi1_ss_16_grp, spi1_ss_17_grp,
+> + sdio0_0_grp, sdio0_1_grp, sdio0_2_grp,
+> + sdio0_3_grp, sdio0_4_grp, sdio0_5_grp,
+> + sdio0_6_grp, sdio0_7_grp, sdio0_8_grp,
+> + sdio0_9_grp, sdio0_10_grp, sdio0_11_grp,
+> + sdio0_12_grp, sdio0_13_grp, sdio0_14_grp,
+> + sdio0_15_grp, sdio0_16_grp, sdio0_17_grp,
+> + sdio0_18_grp, sdio0_19_grp, sdio0_20_grp,
+> + sdio0_21_grp, sdio0_22_grp, sdio0_23_grp,
+> + sdio0_24_grp, sdio0_25_grp, sdio0_26_grp,
+> + sdio0_27_grp, sdio0_28_grp, sdio0_29_grp,
+> + sdio0_30_grp, sdio0_31_grp, sdio0_32_grp,
+> + sdio0_pc_0_grp, sdio0_cd_0_grp, sdio0_wp_0_grp,
+> + sdio0_pc_1_grp, sdio0_cd_1_grp, sdio0_wp_1_grp,
+> + sdio0_pc_2_grp, sdio0_cd_2_grp, sdio0_wp_2_grp,
+> + sdio1_0_grp, sdio1_1_grp, sdio1_2_grp,
+> + sdio1_3_grp, sdio1_4_grp, sdio1_5_grp,
+> + sdio1_6_grp, sdio1_7_grp, sdio1_8_grp,
+> + sdio1_9_grp, sdio1_10_grp, sdio1_11_grp,
+> + sdio1_12_grp, sdio1_13_grp, sdio1_14_grp,
+> + sdio1_15_grp, sdio1_pc_0_grp, sdio1_cd_0_grp,
+> + sdio1_wp_0_grp, sdio1_pc_1_grp, sdio1_cd_1_grp,
+> + sdio1_wp_1_grp, nand0_0_grp, nand0_ce_0_grp,
+> + nand0_rb_0_grp, nand0_dqs_0_grp, nand0_ce_1_grp,
+> + nand0_rb_1_grp, nand0_dqs_1_grp, can0_0_grp,
+> + can0_1_grp, can0_2_grp, can0_3_grp,
+> + can0_4_grp, can0_5_grp, can0_6_grp,
+> + can0_7_grp, can0_8_grp, can0_9_grp,
+> + can0_10_grp, can0_11_grp, can0_12_grp,
+> + can0_13_grp, can0_14_grp, can0_15_grp,
+> + can0_16_grp, can0_17_grp, can0_18_grp,
+> + can1_0_grp, can1_1_grp, can1_2_grp,
+> + can1_3_grp, can1_4_grp, can1_5_grp,
+> + can1_6_grp, can1_7_grp, can1_8_grp,
+> + can1_9_grp, can1_10_grp, can1_11_grp,
+> + can1_12_grp, can1_13_grp, can1_14_grp,
+> + can1_15_grp, can1_16_grp, can1_17_grp,
+> + can1_18_grp, can1_19_grp, uart0_0_grp,
+> + uart0_1_grp, uart0_2_grp, uart0_3_grp,
+> + uart0_4_grp, uart0_5_grp, uart0_6_grp,
+> + uart0_7_grp, uart0_8_grp, uart0_9_grp,
+> + uart0_10_grp, uart0_11_grp, uart0_12_grp,
+> + uart0_13_grp, uart0_14_grp, uart0_15_grp,
+> + uart0_16_grp, uart0_17_grp, uart0_18_grp,
+> + uart1_0_grp, uart1_1_grp, uart1_2_grp,
+> + uart1_3_grp, uart1_4_grp, uart1_5_grp,
+> + uart1_6_grp, uart1_7_grp, uart1_8_grp,
+> + uart1_9_grp, uart1_10_grp, uart1_11_grp,
+> + uart1_12_grp, uart1_13_grp, uart1_14_grp,
+> + uart1_15_grp, uart1_16_grp, uart1_17_grp,
+> + uart1_18_grp, i2c0_0_grp, i2c0_1_grp,
+> + i2c0_2_grp, i2c0_3_grp, i2c0_4_grp,
+> + i2c0_5_grp, i2c0_6_grp, i2c0_7_grp,
+> + i2c0_8_grp, i2c0_9_grp, i2c0_10_grp,
+> + i2c0_11_grp, i2c0_12_grp, i2c0_13_grp,
+> + i2c0_14_grp, i2c0_15_grp, i2c0_16_grp,
+> + i2c0_17_grp, i2c0_18_grp, i2c1_0_grp,
+> + i2c1_1_grp, i2c1_2_grp, i2c1_3_grp,
+> + i2c1_4_grp, i2c1_5_grp, i2c1_6_grp,
+> + i2c1_7_grp, i2c1_8_grp, i2c1_9_grp,
+> + i2c1_10_grp, i2c1_11_grp, i2c1_12_grp,
+> + i2c1_13_grp, i2c1_14_grp, i2c1_15_grp,
+> + i2c1_16_grp, i2c1_17_grp, i2c1_18_grp,
+> + i2c1_19_grp, ttc0_clk_0_grp, ttc0_wav_0_grp,
+> + ttc0_clk_1_grp, ttc0_wav_1_grp, ttc0_clk_2_grp,
+> + ttc0_wav_2_grp, ttc0_clk_3_grp, ttc0_wav_3_grp,
+> + ttc0_clk_4_grp, ttc0_wav_4_grp, ttc0_clk_5_grp,
+> + ttc0_wav_5_grp, ttc0_clk_6_grp, ttc0_wav_6_grp,
+> + ttc0_clk_7_grp, ttc0_wav_7_grp, ttc0_clk_8_grp,
+> + ttc0_wav_8_grp, ttc1_clk_0_grp, ttc1_wav_0_grp,
+> + ttc1_clk_1_grp, ttc1_wav_1_grp, ttc1_clk_2_grp,
+> + ttc1_wav_2_grp, ttc1_clk_3_grp, ttc1_wav_3_grp,
+> + ttc1_clk_4_grp, ttc1_wav_4_grp, ttc1_clk_5_grp,
+> + ttc1_wav_5_grp, ttc1_clk_6_grp, ttc1_wav_6_grp,
+> + ttc1_clk_7_grp, ttc1_wav_7_grp, ttc1_clk_8_grp,
+> + ttc1_wav_8_grp, ttc2_clk_0_grp, ttc2_wav_0_grp,
+> + ttc2_clk_1_grp, ttc2_wav_1_grp, ttc2_clk_2_grp,
+> + ttc2_wav_2_grp, ttc2_clk_3_grp, ttc2_wav_3_grp,
+> + ttc2_clk_4_grp, ttc2_wav_4_grp, ttc2_clk_5_grp,
+> + ttc2_wav_5_grp, ttc2_clk_6_grp, ttc2_wav_6_grp,
+> + ttc2_clk_7_grp, ttc2_wav_7_grp, ttc2_clk_8_grp,
+> + ttc2_wav_8_grp, ttc3_clk_0_grp, ttc3_wav_0_grp,
+> + ttc3_clk_1_grp, ttc3_wav_1_grp, ttc3_clk_2_grp,
+> + ttc3_wav_2_grp, ttc3_clk_3_grp, ttc3_wav_3_grp,
+> + ttc3_clk_4_grp, ttc3_wav_4_grp, ttc3_clk_5_grp,
+> + ttc3_wav_5_grp, ttc3_clk_6_grp, ttc3_wav_6_grp,
+> + ttc3_clk_7_grp, ttc3_wav_7_grp, ttc3_clk_8_grp,
+> + ttc3_wav_8_grp, swdt0_clk_0_grp, swdt0_rst_0_grp,
+> + swdt0_clk_1_grp, swdt0_rst_1_grp, swdt0_clk_2_grp,
+> + swdt0_rst_2_grp, swdt0_clk_3_grp, swdt0_rst_3_grp,
+> + swdt0_clk_4_grp, swdt0_rst_4_grp, swdt0_clk_5_grp,
+> + swdt0_rst_5_grp, swdt0_clk_6_grp, swdt0_rst_6_grp,
+> + swdt0_clk_7_grp, swdt0_rst_7_grp, swdt0_clk_8_grp,
+> + swdt0_rst_8_grp, swdt0_clk_9_grp, swdt0_rst_9_grp,
+> + swdt0_clk_10_grp, swdt0_rst_10_grp, swdt0_clk_11_grp,
+> + swdt0_rst_11_grp, swdt0_clk_12_grp, swdt0_rst_12_grp,
+> + swdt1_clk_0_grp, swdt1_rst_0_grp, swdt1_clk_1_grp,
+> + swdt1_rst_1_grp, swdt1_clk_2_grp, swdt1_rst_2_grp,
+> + swdt1_clk_3_grp, swdt1_rst_3_grp, swdt1_clk_4_grp,
+> + swdt1_rst_4_grp, swdt1_clk_5_grp, swdt1_rst_5_grp,
+> + swdt1_clk_6_grp, swdt1_rst_6_grp, swdt1_clk_7_grp,
+> + swdt1_rst_7_grp, swdt1_clk_8_grp, swdt1_rst_8_grp,
+> + swdt1_clk_9_grp, swdt1_rst_9_grp, swdt1_clk_10_grp,
+> + swdt1_rst_10_grp, swdt1_clk_11_grp, swdt1_rst_11_grp,
+> + swdt1_clk_12_grp, swdt1_rst_12_grp, gpio0_0_grp,
+> + gpio0_1_grp, gpio0_2_grp, gpio0_3_grp,
+> + gpio0_4_grp, gpio0_5_grp, gpio0_6_grp,
+> + gpio0_7_grp, gpio0_8_grp, gpio0_9_grp,
+> + gpio0_10_grp, gpio0_11_grp, gpio0_12_grp,
+> + gpio0_13_grp, gpio0_14_grp, gpio0_15_grp,
+> + gpio0_16_grp, gpio0_17_grp, gpio0_18_grp,
+> + gpio0_19_grp, gpio0_20_grp, gpio0_21_grp,
+> + gpio0_22_grp, gpio0_23_grp, gpio0_24_grp,
+> + gpio0_25_grp, gpio0_26_grp, gpio0_27_grp,
+> + gpio0_28_grp, gpio0_29_grp, gpio0_30_grp,
+> + gpio0_31_grp, gpio0_32_grp, gpio0_33_grp,
+> + gpio0_34_grp, gpio0_35_grp, gpio0_36_grp,
+> + gpio0_37_grp, gpio0_38_grp, gpio0_39_grp,
+> + gpio0_40_grp, gpio0_41_grp, gpio0_42_grp,
+> + gpio0_43_grp, gpio0_44_grp, gpio0_45_grp,
+> + gpio0_46_grp, gpio0_47_grp, gpio0_48_grp,
+> + gpio0_49_grp, gpio0_50_grp, gpio0_51_grp,
+> + gpio0_52_grp, gpio0_53_grp, gpio0_54_grp,
+> + gpio0_55_grp, gpio0_56_grp, gpio0_57_grp,
+> + gpio0_58_grp, gpio0_59_grp, gpio0_60_grp,
+> + gpio0_61_grp, gpio0_62_grp, gpio0_63_grp,
+> + gpio0_64_grp, gpio0_65_grp, gpio0_66_grp,
+> + gpio0_67_grp, gpio0_68_grp, gpio0_69_grp,
+> + gpio0_70_grp, gpio0_71_grp, gpio0_72_grp,
+> + gpio0_73_grp, gpio0_74_grp, gpio0_75_grp,
+> + gpio0_76_grp, gpio0_77_grp, usb0_0_grp,
+> + usb1_0_grp, pmu0_0_grp, pmu0_1_grp,
+> + pmu0_2_grp, pmu0_3_grp, pmu0_4_grp,
+> + pmu0_5_grp, pmu0_6_grp, pmu0_7_grp,
+> + pmu0_8_grp, pmu0_9_grp, pmu0_10_grp,
+> + pmu0_11_grp, pcie0_0_grp, pcie0_1_grp,
+> + pcie0_2_grp, pcie0_3_grp, pcie0_4_grp,
+> + pcie0_5_grp, pcie0_6_grp, pcie0_7_grp,
+> + csu0_0_grp, csu0_1_grp, csu0_2_grp,
+> + csu0_3_grp, csu0_4_grp, csu0_5_grp,
+> + csu0_6_grp, csu0_7_grp, csu0_8_grp,
+> + csu0_9_grp, csu0_10_grp, csu0_11_grp,
+> + dpaux0_0_grp, dpaux0_1_grp, dpaux0_2_grp,
+> + dpaux0_3_grp, pjtag0_0_grp, pjtag0_1_grp,
+> + pjtag0_2_grp, pjtag0_3_grp, pjtag0_4_grp,
+> + pjtag0_5_grp, trace0_0_grp, trace0_clk_0_grp,
+> + trace0_1_grp, trace0_clk_1_grp, trace0_2_grp,
+> + trace0_clk_2_grp, testscan0_0_grp
+> +
+> + Valid values for pins are:
+> +   MIO0 - MIO77
+> +
+> + Valid values for function are:
+> +   ethernet0, ethernet1, ethernet2, ethernet3, gemtsu0, usb0, usb1, mdio0,
+> +   mdio1, mdio2, mdio3, qspi0, qspi_fbclk, qspi_ss, spi0, spi1, spi0_ss,
+> +   spi1_ss, sdio0, sdio0_pc, sdio0_wp, sdio0_cd, sdio1, sdio1_pc, sdio1_wp,
+> +   sdio1_cd, nand0, nand0_ce, nand0_rb, nand0_dqs, can0, can1, uart0, uart1,
+> +   i2c0, i2c1, ttc0_clk, ttc0_wav, ttc1_clk, ttc1_wav, ttc2_clk, ttc2_wav,
+> +   ttc3_clk, ttc3_wav, swdt0_clk, swdt0_rst, swdt1_clk, swdt1_rst, gpio0, pmu0,
+> +   pcie0, csu0, dpaux0, pjtag0, trace0, trace0_clk, testscan0
+> +
+> +The following driver-specific properties as defined here are valid to specify in
+> +a pin configuration subnode:
+> + - io-standard: Configure the pin to use the selected IO standard. Valid
+> +   arguments are 'IO_STANDARD_LVCMOS33' and 'IO_STANDARD_LVCMOS18'.
+> + - schmitt-cmos: Selects either Schmitt or CMOS input for MIO pins. Valid
+> +   arguments are 'PIN_INPUT_TYPE_SCHMITT' and 'PIN_INPUT_TYPE_CMOS'.
+> +
+> +Example:
+> +
+> +firmware {
+> +	zynqmp_firmware: zynqmp-firmware {
+> +		compatible = "xlnx,zynqmp-firmware";
+> +		method = "smc";
+> +
+> +		pinctrl0: pinctrl@ff180000 {
 
-That actually sounds nice and other code in the kernel already does
-that: when a failure has been encountered during reading status, you
-free up resources right then and there. No need for passing retvals back
-and forth. And this would simplify the spaghetti. Which is something
-good(tm) on its own!
+The address here should be dropped.
 
-Thx.
+Otherwise, looks fine.
 
--- 
-Regards/Gruss,
-    Boris.
+Reviewed-by: Rob Herring <robh@kernel.org>
 
-Good mailing practices for 400: avoid top-posting and trim the reply.
+> +			compatible = "xlnx,zynqmp-pinctrl";
+> +
+> +			pinctrl_uart1_default: uart1-default {
+> +				mux {
+> +					groups = "uart0_4_grp";
+> +					function = "uart0";
+> +				};
+> +
+> +				conf {
+> +					groups = "uart0_4_grp";
+> +					slew-rate = <SLEW_RATE_SLOW>;
+> +					io-standard = <IO_STANDARD_LVCMOS18>;
+> +				};
+> +
+> +				conf-rx {
+> +					pins = "MIO18";
+> +					bias-high-impedance;
+> +				};
+> +
+> +				conf-tx {
+> +					pins = "MIO19";
+> +					bias-disable;
+> +					schmitt-cmos = <PIN_INPUT_TYPE_CMOS>;
+> +				};
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +uart1 {
+> +	...
+> +        pinctrl-names = "default";
+> +        pinctrl-0 = <&pinctrl_uart1_default>;
+> +	...
+> +
+> +};
+> -- 
+> 2.7.4
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
