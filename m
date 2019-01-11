@@ -2,80 +2,108 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-16.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 20E9BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 08:40:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 160B3C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 08:45:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DE59A20872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 08:40:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DC2022084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 08:45:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Z2VslXmQ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="P+G2GkQv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DE59A20872
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FtVFnvUQ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="UcqrgStj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DC2022084C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+i6t/P0m5HvzlRwerR5b3p+/XxPr4UR9PN2B8Xf9npI=; b=Z2VslXmQ/s/EOv
-	K1h0/t5WZZ7DBfkWzI1vVOaifJg8kD37iKu4Qggs8jvcIXH8+ZzfgpPYmlFMtOM9LKzOX3Q71+0j9
-	2tEEm/XqSfsUzGWE98QCDXKY7RqLlzxcDJW/6erLR3l8IeVRr4eRf8ZZnpzpuHV/w0G+DNuUgUqWk
-	ZLdjMQQc4vsHSfz35Y/HHN6Uyg8UPi6ZTkuzXSUT19TN54G2rAwNf6OPk/VKN76/Ay39F1yQISW20
-	oIWtAGURzxlOySu6WgpANUHQ4V1DVzKAG5LR1Ii4gVyBZi5FZ0TS4tpNbcYS8Xdl7s8OYTHd4HEbh
-	uV5ncsgxhsfTJoDBkUCA==;
+	List-Owner; bh=QnU/N5Wt/aTsSC4syq+Ki+tcFv2MmCXdt0xuqO8Rlws=; b=FtVFnvUQJM/3QF
+	bDrIY5NHbgHobt9LE0kNfZoYxQm6IpX7srmaIGTCC9/fOK4Tw/DbrR79EnX8HzMOFcgh54tP04rLf
+	ZfVO7L12MqBqL4b/O2wimni0UcVY5Ia9T0eJN6kc8Qi7v1ntwNybVULGJisO2zlMid5S/F7+sNJ6t
+	QqtMnf1wiKWhjiWHVhNcMNExRqOB+rAn6evmPmBfRFTfZ/CHrJMtiq5e3PLi/0JiSSEuS736pjd+T
+	tZIR5MBTvrOLvGIifF/odsyqYf2WmwcLCsENqSyo5VK0TKGZMuQrv7QJFp84HKf19lpmrROtK5GOd
+	xjz59JfJ4EmIE8q0Amgg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghsMq-0004XU-V3; Fri, 11 Jan 2019 08:40:40 +0000
-Received: from mail-ua1-x944.google.com ([2607:f8b0:4864:20::944])
+	id 1ghsRe-0006D9-Ql; Fri, 11 Jan 2019 08:45:38 +0000
+Received: from mail-eopbgr80041.outbound.protection.outlook.com ([40.107.8.41]
+ helo=EUR04-VI1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghsMm-0004Wr-9V
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 08:40:38 +0000
-Received: by mail-ua1-x944.google.com with SMTP id j3so4517654uap.3
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 11 Jan 2019 00:40:35 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=5kUGOXrZd58C8t0iCxDeQ46hWbThSZ9rsDyo51aaZI8=;
- b=P+G2GkQvt/vYXn+itlchJs/46Nkd9YrxCpe8za5sVeJO9L94nZ3gSRSjDpA1LFDb0x
- n3jSGMV68RJbffCF4zktr8MHf4Q4Qb4+ycsSwhs58M4XjLkdCk1R8BT6WrcthCXKlexP
- wrUWFGGFra7IJKZFhOTgS3Desk6xluHSNtM0w=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=5kUGOXrZd58C8t0iCxDeQ46hWbThSZ9rsDyo51aaZI8=;
- b=iRP7IjYpsART3kwg7uX/2adU4VckaZYihbA+YRTyoc0u+oDgrzBOVGZzNiG5QkA/pm
- TOQzmk+Lsck75Gb/igzi4GfxcIemBfZOvZt4r5hiGKzGuWfChRijfJIsAYtvt4434TpN
- T1CHlLHjyNkgF1uOCjI9jqTKCU22c+CzvDWrg/2VtUmCHLR4paNGSZGXlBtl+hQR0pBM
- NGDjrbLzC7Rh68SNAgsW35ideLo/VpHFydlrHy4dAvaU8UX1TUoyahaJst4Sa5kZ4Kxm
- pTqWSZKUJvHBhk24nveFlVuiBqYOISqxfQcuDcFt07wN9uShDhs4CHiqr18+yaQsa2qU
- C+qw==
-X-Gm-Message-State: AJcUukeBLWwqUDcjeMXn9x7jHEQHEJxQ08gOVQ2KP0ZSSTa3yv8yJJuO
- le4gEeo5Y9Y+izFJlbHD+FneOTa6JUbUGhTsePx+Iw==
-X-Google-Smtp-Source: ALg8bN5ubs64o7jwXpq2Yc8IETTgo6g0wx+fpPVzhDVLaA7GIa5njmIcUpgB2fK5VNbS8BgR1MKi3/ybTYE7q0MOITw=
-X-Received: by 2002:ab0:148e:: with SMTP id d14mr4970350uae.23.1547196034925; 
- Fri, 11 Jan 2019 00:40:34 -0800 (PST)
+ id 1ghsRZ-0006CQ-Jv
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 08:45:35 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=r0cC8yw6ECqoTxs1zwosT+/Nj2O08P0pYIqidQZP+bA=;
+ b=UcqrgStjpurLw1UoVWtFHTbCpV4X/e6nDNRAvBMi6TFSWCjcjshWqdoFfep0gB0TwQ543KYCsmfbn4Gz9mZi62gMobqcNT0WjTZE0/Lt/r+OgGgo37sa6/Rh7Umt8JfiEppzeJoxAeMymD7unnxkKuap2rVC4UithdVDVTRe3IA=
+Received: from VI1PR04MB4480.eurprd04.prod.outlook.com (20.177.53.224) by
+ VI1PR04MB5312.eurprd04.prod.outlook.com (20.177.52.13) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1516.13; Fri, 11 Jan 2019 08:45:27 +0000
+Received: from VI1PR04MB4480.eurprd04.prod.outlook.com
+ ([fe80::4d4c:bb1d:2598:39ea]) by VI1PR04MB4480.eurprd04.prod.outlook.com
+ ([fe80::4d4c:bb1d:2598:39ea%3]) with mapi id 15.20.1516.016; Fri, 11 Jan 2019
+ 08:45:27 +0000
+From: Nipun Gupta <nipun.gupta@nxp.com>
+To: Shawn Guo <shawnguo@kernel.org>
+Subject: RE: [PATCH 1/2] arm64: dts: ls1088: add smmu device node
+Thread-Topic: [PATCH 1/2] arm64: dts: ls1088: add smmu device node
+Thread-Index: AQHUlo1oSPDChwILUE2cs2d7WwpBEaWp5VwAgAABYYA=
+Date: Fri, 11 Jan 2019 08:45:26 +0000
+Message-ID: <VI1PR04MB44805B25ED8EB8B74E6E8EBBE6850@VI1PR04MB4480.eurprd04.prod.outlook.com>
+References: <1545109016-1779-1-git-send-email-nipun.gupta@nxp.com>
+ <20190111083956.GF32649@dragon>
+In-Reply-To: <20190111083956.GF32649@dragon>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=nipun.gupta@nxp.com; 
+x-originating-ip: [14.143.254.130]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; VI1PR04MB5312;
+ 6:NgQ1R3iOl0HVrrEN5HF9v4topJ7wzakpbDv/R3y50ybOrqZiCcaQDvzTVljySVNv6g7yzNnR4bs+JSwFNNQcrbbLlkbx2Ppz/Fzr2punsV/83W29cy1D5p0FAYsE+sTle6RwCrPbX7gUCHDJgUUxryX9l7PrH7Aj2P4wNSisp+taDLFSrfJ3qnbDcLKqpP8UAr162LF/XOauxe6cfEuavoNsSU5oSiP67HyeOItdnlRy/7dt7Wacwtta/gVY1EO5g/cfW2eorJ55wJcL5frssyxPJq3CHDcfIe3XSfbxHDpxUY2bn12yPI6AhRmyBDoz6MxTApx06eYY7mVRYE+ex6E+ImyAdEojWLs1m1OQARKD8pJ0w2EFV63kY8QhSTJV2ZcOkZK1pSUY6WS6qyDTf7rimfYxdfNyn/d7U3M8ELM/FXP6j95sEGNmc4r+vPHl5lMDLlvs8sJdWTIV/YzNEQ==;
+ 5:OyZ4gTgVEOA/7RWn0nrCchWwdEHNsu3+rgoDKGBiXiOclS51SyjMa2D6S23XFaktzDzu7oOX8PKNxO6QsHI852hUkFpMn/I33C2HCSaZxGFsqkvlNaWON3kQ7rxICmP5/GSSuOhP3t9Io1Nm5o1niffRWeo/s4JkbV6hZoOrrSyUKGO95j3hmEngd60QNCTGHZ6D1ncFxNFKQdy2ASo1Qw==;
+ 7:CwG+tuirPfQiSvdUALR2er+gJwh+N+2mBrEbGLCMVEcif2U5dtYb/BO9qzjluyS4YhUSNcSVZNUwRzCDEouFCaCdynMkuZ3rWwIBm4P48tKtmubQTU2brWa2nS5T1Pbn4px9oRn/QHUknLq/vblpgw==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: 28f3295b-854d-411c-2029-08d677a12270
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(7168020)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR04MB5312; 
+x-ms-traffictypediagnostic: VI1PR04MB5312:
+x-microsoft-antispam-prvs: <VI1PR04MB5312B43EEFBA254ECE70663FE6850@VI1PR04MB5312.eurprd04.prod.outlook.com>
+x-forefront-prvs: 09144DB0F7
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(39860400002)(136003)(366004)(376002)(346002)(396003)(189003)(199004)(13464003)(68736007)(33656002)(45080400002)(105586002)(106356001)(966005)(14454004)(97736004)(478600001)(14444005)(256004)(316002)(54906003)(55236004)(6506007)(102836004)(486006)(186003)(446003)(476003)(99286004)(53546011)(7696005)(11346002)(26005)(55016002)(78486014)(71200400001)(71190400001)(8936002)(76176011)(81166006)(305945005)(8676002)(81156014)(7736002)(6246003)(86362001)(575784001)(5660300001)(6116002)(3846002)(66066001)(44832011)(6436002)(25786009)(74316002)(4326008)(53936002)(9686003)(229853002)(6306002)(2906002)(6916009);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB5312;
+ H:VI1PR04MB4480.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: z+wQJdg3PzEmrbgWKrvWLwyQz7kLXO0o54lB3/oq8HEKGTnImW8WhwdPJlYAxCEujjq5Kehg9ZIMIkYrwihzLj0PeqA+qa35+NekqDSfr3uSXDPuv4/P8WM/WdfEetEc7/nLFbxvWde1YjEXvKyi1Mn0DKRH/yqUfSOpsmGSYia/hg9w2W935m6bicYegGoimMr/lYg8e7Dh9JJ/ltyB0ddb5ag0PltSSalChjpbSHTe0oT6WvBRATnFVWUNW7hN1N2BW9IYJveXH8f62SgvG2z7qd06mK77YzFmb3mN0Qj5B6K8wZqWUdb9IrEwxCe6YGNdPpP9PC8TJH3lXNmahfPbnPO9cXvYxaq/a5PykRJbyG+ZXbG7RV75dHHsrL+h0sK+oJT5DsN3ZN/upB5Qgmy04PPmLuLzsvh8L0Ub19I=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-References: <1547123097-16431-1-git-send-email-sumit.garg@linaro.org>
- <1547123097-16431-5-git-send-email-sumit.garg@linaro.org>
- <20190110142717.ecktwvxp6qbr55be@holly.lan>
-In-Reply-To: <20190110142717.ecktwvxp6qbr55be@holly.lan>
-From: Sumit Garg <sumit.garg@linaro.org>
-Date: Fri, 11 Jan 2019 14:10:23 +0530
-Message-ID: <CAFA6WYNQsVb310NN4AVMVU49Jqi9JE5dyiecfQgRMp_YY87S1w@mail.gmail.com>
-Subject: Re: [PATCH v2 4/4] hwrng: add OP-TEE based rng driver
-To: Daniel Thompson <daniel.thompson@linaro.org>
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 28f3295b-854d-411c-2029-08d677a12270
+X-MS-Exchange-CrossTenant-originalarrivaltime: 11 Jan 2019 08:45:26.9623 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB5312
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_004036_340176_6213E43E 
-X-CRM114-Status: GOOD (  27.58  )
+X-CRM114-CacheID: sfid-20190111_004533_742016_78E46810 
+X-CRM114-Status: GOOD (  20.61  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,394 +115,79 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Herbert Xu <herbert@gondor.apana.org.au>, Arnd Bergmann <arnd@arndb.de>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Bhupesh Sharma <bhsharma@redhat.com>, linux-kernel@vger.kernel.org,
- tee-dev@lists.linaro.org, Rob Herring <robh+dt@kernel.org>,
- "open list:HARDWARE RANDOM NUMBER GENERATOR CORE"
- <linux-crypto@vger.kernel.org>, mpm@selenic.com,
- Jens Wiklander <jens.wiklander@linaro.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "will.deacon@arm.com" <will.deacon@arm.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Leo Li <leoyang.li@nxp.com>, "robh+dt@kernel.org" <robh+dt@kernel.org>,
+ "robin.murphy@arm.com" <robin.murphy@arm.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 10 Jan 2019 at 19:57, Daniel Thompson
-<daniel.thompson@linaro.org> wrote:
->
-> On Thu, Jan 10, 2019 at 05:54:57PM +0530, Sumit Garg wrote:
-> > On ARM SoC's with TrustZone enabled, peripherals like entropy sources
-> > might not be accessible to normal world (linux in this case) and rather
-> > accessible to secure world (OP-TEE in this case) only. So this driver
-> > aims to provides a generic interface to OP-TEE based random number
-> > generator service.
+
+
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo@kernel.org]
+> Sent: Friday, January 11, 2019 2:10 PM
+> To: Nipun Gupta <nipun.gupta@nxp.com>
+> Cc: Leo Li <leoyang.li@nxp.com>; robh+dt@kernel.org;
+> mark.rutland@arm.com; robin.murphy@arm.com; will.deacon@arm.com;
+> linux-arm-kernel@lists.infradead.org; devicetree@vger.kernel.org; linux-
+> kernel@vger.kernel.org
+> Subject: Re: [PATCH 1/2] arm64: dts: ls1088: add smmu device node
+> 
+> On Tue, Dec 18, 2018 at 04:51:58AM +0000, Nipun Gupta wrote:
+> > This patch also adds the iommu-map property in fsl-mc node, so
+> > that fsl-mc can use iommu.
 > >
-> > This driver registers on TEE bus to interact with OP-TEE based rng
-> > device/service.
-> >
-> > Signed-off-by: Sumit Garg <sumit.garg@linaro.org>
+> > Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
 > > ---
-> >  MAINTAINERS                        |   5 +
-> >  drivers/char/hw_random/Kconfig     |  15 ++
-> >  drivers/char/hw_random/Makefile    |   1 +
-> >  drivers/char/hw_random/optee-rng.c | 272 +++++++++++++++++++++++++++++++++++++
-> >  4 files changed, 293 insertions(+)
-> >  create mode 100644 drivers/char/hw_random/optee-rng.c
+> > These patches are based over:
+> > git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git,
+> > as there are couple of changes related to fsl-mc bus in this tree:
 > >
-> > diff --git a/MAINTAINERS b/MAINTAINERS
-> > index 32d44447..502733c 100644
-> > --- a/MAINTAINERS
-> > +++ b/MAINTAINERS
-> > @@ -11260,6 +11260,11 @@ M:   Jens Wiklander <jens.wiklander@linaro.org>
-> >  S:   Maintained
-> >  F:   drivers/tee/optee/
+> https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Flor
+> e.kernel.org%2Fpatchwork%2Fpatch%2F1021020%2F&amp;data=02%7C01%
+> 7Cnipun.gupta%40nxp.com%7C32db0a82c058487b3b9b08d677a0686c%7C686
+> ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0%7C636827928177177279&amp;s
+> data=owEtCHfG%2Bc4pjO5lkb0TODYs6xORn2jXgLv4qJ95u8o%3D&amp;reser
+> ved=0
 > >
-> > +OP-TEE RANDOM NUMBER GENERATOR (RNG) DRIVER
-> > +M:   Sumit Garg <sumit.garg@linaro.org>
-> > +S:   Maintained
-> > +F:   drivers/char/hw_random/optee-rng.c
-> > +
-> >  OPA-VNIC DRIVER
-> >  M:   Dennis Dalessandro <dennis.dalessandro@intel.com>
-> >  M:   Niranjana Vishwanathapura <niranjana.vishwanathapura@intel.com>
-> > diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
-> > index dac895d..25a7d8f 100644
-> > --- a/drivers/char/hw_random/Kconfig
-> > +++ b/drivers/char/hw_random/Kconfig
-> > @@ -424,6 +424,21 @@ config HW_RANDOM_EXYNOS
-> >         will be called exynos-trng.
+> >  arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 92
+> +++++++++++++++++++++++++-
+> >  1 file changed, 91 insertions(+), 1 deletion(-)
 > >
-> >         If unsure, say Y.
-> > +
-> > +config HW_RANDOM_OPTEE
-> > +     tristate "OP-TEE based Random Number Generator support"
-> > +     depends on OPTEE
-> > +     default HW_RANDOM
-> > +     help
-> > +       This  driver provides support for OP-TEE based Random Number
-> > +       Generator on ARM SoCs where hardware entropy sources are not
-> > +       accessible to normal world (Linux).
-> > +
-> > +       To compile this driver as a module, choose M here: the module
-> > +       will be called optee-rng.
-> > +
-> > +       If unsure, say Y.
-> > +
-> >  endif # HW_RANDOM
+> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> > index de93b42..dec0c2d 100644
+> > --- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> > @@ -576,6 +576,7 @@
+> >  			reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal
+> base */
+> >  			      <0x00000000 0x08340000 0 0x40000>; /* MC
+> control reg */
+> >  			msi-parent = <&its>;
+> > +			iommu-map = <0 &smmu 0 0>;	/* This is fixed-up by
+> u-boot */
+> >  			#address-cells = <3>;
+> >  			#size-cells = <1>;
 > >
-> >  config UML_RANDOM
-> > diff --git a/drivers/char/hw_random/Makefile b/drivers/char/hw_random/Makefile
-> > index e35ec3c..7c9ef4a 100644
-> > --- a/drivers/char/hw_random/Makefile
-> > +++ b/drivers/char/hw_random/Makefile
-> > @@ -38,3 +38,4 @@ obj-$(CONFIG_HW_RANDOM_CAVIUM) += cavium-rng.o cavium-rng-vf.o
-> >  obj-$(CONFIG_HW_RANDOM_MTK)  += mtk-rng.o
-> >  obj-$(CONFIG_HW_RANDOM_S390) += s390-trng.o
-> >  obj-$(CONFIG_HW_RANDOM_KEYSTONE) += ks-sa-rng.o
-> > +obj-$(CONFIG_HW_RANDOM_OPTEE) += optee-rng.o
-> > diff --git a/drivers/char/hw_random/optee-rng.c b/drivers/char/hw_random/optee-rng.c
-> > new file mode 100644
-> > index 0000000..ebfe1f2c
-> > --- /dev/null
-> > +++ b/drivers/char/hw_random/optee-rng.c
-> > @@ -0,0 +1,272 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +/*
-> > + * Copyright (C) 2018-2019 Linaro Ltd.
-> > + */
+> > @@ -641,6 +642,96 @@
+> >  				};
+> >  			};
+> >  		};
 > > +
-> > +#include <linux/delay.h>
-> > +#include <linux/of.h>
-> > +#include <linux/hw_random.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/module.h>
-> > +#include <linux/slab.h>
-> > +#include <linux/tee_drv.h>
-> > +#include <linux/uuid.h>
-> > +
-> > +#define DRIVER_NAME "optee-rng"
-> > +
-> > +#define TEE_ERROR_HEALTH_TEST_FAIL   0x00000001
-> > +
-> > +/*
-> > + * TA_CMD_GET_ENTROPY - Get Entropy from RNG
-> > + *
-> > + * param[0] (inout memref) - Entropy buffer memory reference
-> > + * param[1] unused
-> > + * param[2] unused
-> > + * param[3] unused
-> > + *
-> > + * Result:
-> > + * TEE_SUCCESS - Invoke command success
-> > + * TEE_ERROR_BAD_PARAMETERS - Incorrect input param
-> > + * TEE_ERROR_NOT_SUPPORTED - Requested entropy size greater than size of pool
-> > + * TEE_ERROR_HEALTH_TEST_FAIL - Continuous health testing failed
-> > + */
-> > +#define TA_CMD_GET_ENTROPY           0x0
-> > +
-> > +/*
-> > + * TA_CMD_GET_RNG_INFO - Get RNG information
-> > + *
-> > + * param[0] (out value) - value.a: RNG data-rate in bytes per second
-> > + *                        value.b: Quality/Entropy per 1024 bit of data
-> > + * param[1] unused
-> > + * param[2] unused
-> > + * param[3] unused
-> > + *
-> > + * Result:
-> > + * TEE_SUCCESS - Invoke command success
-> > + * TEE_ERROR_BAD_PARAMETERS - Incorrect input param
-> > + */
-> > +#define TA_CMD_GET_RNG_INFO          0x1
-> > +
-> > +#define MAX_ENTROPY_REQ_SZ           (4 * 1024)
-> > +
-> > +static struct tee_context *ctx;
-> > +static struct tee_shm *entropy_shm_pool;
-> > +static u32 ta_rng_data_rate;
-> > +static u32 ta_rng_session_id;
-> > +
-> > +static size_t get_optee_rng_data(void *buf, size_t req_size)
-> > +{
-> > +     u32 ret = 0;
-> > +     u8 *rng_data = NULL;
-> > +     size_t rng_size = 0;
-> > +     struct tee_ioctl_invoke_arg inv_arg = {0};
-> > +     struct tee_param param[4] = {0};
-> > +
-> > +     /* Invoke TA_CMD_GET_RNG function of Trusted App */
-> > +     inv_arg.func = TA_CMD_GET_ENTROPY;
-> > +     inv_arg.session = ta_rng_session_id;
-> > +     inv_arg.num_params = 4;
-> > +
-> > +     /* Fill invoke cmd params */
-> > +     param[0].attr = TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INOUT;
-> > +     param[0].u.memref.shm = entropy_shm_pool;
-> > +     param[0].u.memref.size = req_size;
-> > +     param[0].u.memref.shm_offs = 0;
-> > +
-> > +     ret = tee_client_invoke_func(ctx, &inv_arg, param);
-> > +     if ((ret < 0) || (inv_arg.ret != 0)) {
-> > +             pr_err("TA_CMD_GET_ENTROPY invoke function error: %x\n",
-> > +                    inv_arg.ret);
->
-> You have a real device now! Almost all of the pr_xxx functions can become
-> dev_xxx instead.
->
+> > +		smmu: iommu@5000000 {
+> 
+> We are trying to keep the nodes with unit-address sorted in the address.
+> I move the node to where it should be, and applied both patches.
 
-Ok will change to dev_xxx function calls.
+Thank you.
 
->
-> > +             return 0;
-> > +     }
-> > +
-> > +     rng_data = tee_shm_get_va(entropy_shm_pool, 0);
-> > +     if (IS_ERR(rng_data)) {
-> > +             pr_err("tee_shm_get_va failed\n");
-> > +             return 0;
-> > +     }
-> > +
-> > +     rng_size = param[0].u.memref.size;
-> > +     memcpy(buf, rng_data, rng_size);
-> > +
-> > +     return rng_size;
-> > +}
-> > +
-> > +static int optee_rng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
-> > +{
-> > +     u8 *data = buf;
-> > +     size_t read = 0, rng_size = 0;
-> > +     int timeout = 1;
-> > +
-> > +     if (max > MAX_ENTROPY_REQ_SZ)
-> > +             max = MAX_ENTROPY_REQ_SZ;
-> > +
-> > +     while (read == 0) {
-> > +             rng_size = get_optee_rng_data(data, (max - read));
-> > +
-> > +             data += rng_size;
-> > +             read += rng_size;
-> > +
-> > +             if (wait) {
-> > +                     if (timeout-- == 0)
-> > +                             return read;
-> > +                     msleep((1000 * (max - read)) / ta_rng_data_rate);
-> > +             } else {
-> > +                     return read;
-> > +             }
-> > +     }
-> > +
-> > +     return read;
-> > +}
-> > +
-> > +static int optee_rng_init(struct hwrng *rng)
-> > +{
-> > +     entropy_shm_pool = tee_shm_alloc(ctx, MAX_ENTROPY_REQ_SZ,
-> > +                                      TEE_SHM_MAPPED | TEE_SHM_DMA_BUF);
-> > +     if (IS_ERR(entropy_shm_pool)) {
-> > +             pr_err("tee_shm_alloc failed\n");
-> > +             return PTR_ERR(entropy_shm_pool);
-> > +     }
-> > +
-> > +     return 0;
-> > +}
-> > +
-> > +static void optee_rng_cleanup(struct hwrng *rng)
-> > +{
-> > +     tee_shm_free(entropy_shm_pool);
-> > +}
-> > +
-> > +static struct hwrng optee_rng = {
-> > +     .name           = DRIVER_NAME,
-> > +     .init           = optee_rng_init,
-> > +     .cleanup        = optee_rng_cleanup,
-> > +     .read           = optee_rng_read,
-> > +};
-> > +
-> > +static int get_optee_rng_info(void)
-> > +{
-> > +     u32 ret = 0;
-> > +     struct tee_ioctl_invoke_arg inv_arg = {0};
-> > +     struct tee_param param[4] = {0};
-> > +
-> > +     /* Invoke TA_CMD_GET_RNG function of Trusted App */
-> > +     inv_arg.func = TA_CMD_GET_RNG_INFO;
-> > +     inv_arg.session = ta_rng_session_id;
-> > +     inv_arg.num_params = 4;
-> > +
-> > +     /* Fill invoke cmd params */
-> > +     param[0].attr = TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_OUTPUT;
-> > +
-> > +     ret = tee_client_invoke_func(ctx, &inv_arg, param);
-> > +     if ((ret < 0) || (inv_arg.ret != 0)) {
-> > +             pr_err("TA_CMD_GET_RNG_INFO invoke function error: %x\n",
-> > +                    inv_arg.ret);
-> > +             return -EINVAL;
-> > +     }
-> > +
-> > +     ta_rng_data_rate = param[0].u.value.a;
-> > +     optee_rng.quality = param[0].u.value.b;
-> > +
-> > +     return 0;
-> > +}
-> > +
-> > +static int optee_ctx_match(struct tee_ioctl_version_data *ver, const void *data)
-> > +{
-> > +     if (ver->impl_id == TEE_IMPL_ID_OPTEE)
-> > +             return 1;
-> > +     else
-> > +             return 0;
-> > +}
-> > +
-> > +static int optee_rng_probe(struct device *dev)
-> > +{
-> > +     struct tee_client_device *rng_device = to_tee_client_device(dev);
-> > +     int ret = 0, err = -ENODEV;
-> > +     struct tee_ioctl_open_session_arg sess_arg = {0};
-> > +
-> > +     /* Open context with TEE driver */
-> > +     ctx = tee_client_open_context(NULL, optee_ctx_match, NULL, NULL);
-> > +     if (IS_ERR(ctx))
-> > +             return -ENODEV;
-> > +
-> > +     /* Open session with hwrng Trusted App */
-> > +     memcpy(sess_arg.uuid, rng_device->id.uuid.b, TEE_IOCTL_UUID_LEN);
-> > +     sess_arg.clnt_login = TEE_IOCTL_LOGIN_PUBLIC;
-> > +     sess_arg.num_params = 0;
-> > +
-> > +     ret = tee_client_open_session(ctx, &sess_arg, NULL);
-> > +     if ((ret < 0) || (sess_arg.ret != 0)) {
-> > +             pr_err("tee_client_open_session failed, error: %x\n",
-> > +                    sess_arg.ret);
-> > +             err = -EINVAL;
-> > +             goto out_ctx;
-> > +     }
-> > +     ta_rng_session_id = sess_arg.session;
-> > +
-> > +     err = get_optee_rng_info();
-> > +     if (err)
-> > +             goto out_sess;
-> > +
-> > +     err = hwrng_register(&optee_rng);
-> > +     if (err) {
-> > +             pr_err("registering failed (%d)\n", err);
-> > +             goto out_sess;
-> > +     }
-> > +
-> > +     return 0;
-> > +
-> > +out_sess:
-> > +     tee_client_close_session(ctx, ta_rng_session_id);
-> > +out_ctx:
-> > +     tee_client_close_context(ctx);
-> > +
-> > +     return err;
-> > +}
-> > +
-> > +static int optee_rng_remove(struct device *dev)
-> > +{
-> > +     tee_client_close_session(ctx, ta_rng_session_id);
-> > +     tee_client_close_context(ctx);
-> > +     hwrng_unregister(&optee_rng);
-> > +
-> > +     return 0;
-> > +}
-> > +
-> > +const struct tee_client_device_id optee_rng_id_table[] = {
-> > +     {UUID_INIT(0xab7a617c, 0xb8e7, 0x4d8f,
-> > +                0x83, 0x01, 0xd0, 0x9b, 0x61, 0x03, 0x6b, 0x64)},
-> > +     {}
-> > +};
-> > +
-> > +static struct tee_client_driver optee_rng_driver = {
-> > +     .id_table       = optee_rng_id_table,
-> > +     .driver         = {
-> > +             .name           = DRIVER_NAME,
-> > +             .bus            = &tee_bus_type,
-> > +             .probe          = optee_rng_probe,
-> > +             .remove         = optee_rng_remove,
-> > +     },
-> > +};
-> > +
-> > +static int __init mod_init(void)
->
-> Not required for correctness but for grepability I'd prefer optee_rng_init .
->
-
-Ok, will rename mod_init -> optee_rng_init and mod_exit -> optee_rng_exit.
-
--Sumit
-
->
-> Daniel.
->
-> > +{
-> > +     int rc;
-> > +
-> > +     rc = driver_register(&optee_rng_driver.driver);
-> > +     if (rc)
-> > +             pr_warn("driver registration failed, err: %d", rc);
-> > +
-> > +     return rc;
-> > +}
-> > +
-> > +static void __exit mod_exit(void)
-> > +{
-> > +     driver_unregister(&optee_rng_driver.driver);
-> > +}
-> > +
-> > +module_init(mod_init);
-> > +module_exit(mod_exit);
-> > +
-> > +MODULE_LICENSE("GPL");
-> > +MODULE_AUTHOR("Sumit Garg <sumit.garg@linaro.org>");
-> > +MODULE_DESCRIPTION("OP-TEE based random number generator driver");
-> > --
-> > 2.7.4
-> >
 
 _______________________________________________
 linux-arm-kernel mailing list
