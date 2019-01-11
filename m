@@ -2,68 +2,93 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6C1F3C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 23:57:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 36CEFC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 23:59:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 31FCB20700
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 23:57:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0629220700
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 23:59:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uTfdUuPd";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="Obym/N+x"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 31FCB20700
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UkNjetax";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=broadcom.com header.i=@broadcom.com header.b="h/frq+od"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0629220700
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=broadcom.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Date:From:Message-ID:To:References:
-	In-Reply-To:Subject:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=UGmeAbIiphzXf2vGsJM3KnSH4ag1nDVTYf47F1oP8Ik=; b=uTfdUuPdD+WCoh
-	GgV3KWEBNsXGXHELIxTbi33n0o4IKCbr+OsukepsBqW8z4/J9+l/bWje9VIAdVl8v3ycP16kL2nwr
-	SOG3GctadAZa8asn6Y0zdqXeFtamxommd3JJIA1zFV3OT9BGMpPripzbN5mCZ9Q8/tB6vQ1OF6RzE
-	1QggMozoF3wWYRSRDW59WmlV7XHdklJyYQY0vPTXbt3f4dZf5uz2eolSKM/rLWEQsSUTnRM8Y0qff
-	CxST37b3M4OOX60Nit4F/VrPlqjo/Go+pHM7lT3gSrskAneVeQ1xy8O4fBluA4eVs30W/gcVBPShc
-	6+ZQxZVWRP+1QjRJ4MNw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=hKmaKLtKGt4txawzt6imGSCfiNDpUAGIRqQMxJyc5QY=; b=UkNjetaxkJ49Px
+	Sa2kXwXn6C7rz/gpGZiDz35qqA811wsnJeBpaHxzd8IBMiJ2QlpE8KcK8PpkzOYeu6GHKKYjcG66D
+	ghr7epAnQiEbqRxaPuA60ypk7or6RgyRVEYKj4ltXiWHxkaIOqSVNu7DJhm8p4TAMFk+NCPY7oyK9
+	1TJWFWvd98NfMa7s1lJFqKaw6NNBFp5jw76ymCekBrg5PXKGzia6N1xOK72XQ/7tRQsSMBy2iDrjL
+	zwqa6sbCJux3OjEPcXl9Fygq3IwxGRoAYoEIZg0o8MNEhw41X3wsA6XpOT7/uMPCclETHZlJLG8a3
+	Pjwj+R9C003ItGLw1BfQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gi6fn-0006pr-Hj; Fri, 11 Jan 2019 23:57:11 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gi6hg-0007Eh-QH; Fri, 11 Jan 2019 23:59:08 +0000
+Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gi6fj-0006pV-QH; Fri, 11 Jan 2019 23:57:09 +0000
-Received: from localhost (unknown [104.132.0.74])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 4B8E520835;
- Fri, 11 Jan 2019 23:57:07 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1547251027;
- bh=ZCmm1wOKskabQ07CJBIP/K03GW5e9UTCwOj61KfmdTo=;
- h=Subject:In-Reply-To:References:Cc:To:From:Date:From;
- b=Obym/N+xNsvpN9Mxn8SD0the1pElFu6moBJZxngJPiuCgS3rcHeVjAcT0D8y6xLIA
- RUeSdq3ivBZXlnijmAJZioTNdL/yCZEI0iFT4TX9pqbhdtLy00dq2f6Cx8lXoaxdCv
- hslBGGmpW6ULltfmlHH2qb4ryhViHAdEu5k3R/KU=
+ id 1gi6hd-0007EI-DR
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 23:59:06 +0000
+Received: by mail-pg1-x543.google.com with SMTP id v28so6950109pgk.10
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 11 Jan 2019 15:59:04 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=broadcom.com; s=google;
+ h=subject:to:cc:references:from:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=YXS609+Rr6Firj7E3CvyBmMR2oehV0/tgvrPgdkRRUM=;
+ b=h/frq+odSvkPp71ZOX+utraN21aXiQKtMAVRIkkriqkC6MI/yvvAP+WNxhCgg2Fqhs
+ I3TMY7PGPh9+btnsz+G3jJ09+gWrvanFn53IoveMNYyh6Ao/zqSu527gKQRDiOzf8FZP
+ r5+KZk0eAbA5Iu2hCAsn1avLCpm+rPQ2TR/C4=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=YXS609+Rr6Firj7E3CvyBmMR2oehV0/tgvrPgdkRRUM=;
+ b=uFkOQIfAA2gLMF9m9+B3YvIEK2rAtqqXaXB7IGdtuqFhGUhfNkLr2DRAyoERiXtsxk
+ cxb6d/YZNNQ65KY0HP/ehlBoJdwpMZi941E19cjugSn33G9Tzzx/UbinC46fz7D4UVlh
+ mTx2trtOePqOQ5HGSTKL/zVS13jTx5rE7Yuz1wtyfCOljKuyYtR7RAljCbiomlZAe/rD
+ Em0K9xx3tTaM26i5RPdE/RlkEijJ1WsMn4dR5FmqWI2HHtVbdIQnSy4WSDaJtzshePYD
+ Jk/HEJtWrkDl0xB+7/V6cldKIE4gYeyiHVTQwNlhzbCfIYtHUwTprlTe/FLSjpHOVw4/
+ ur2g==
+X-Gm-Message-State: AJcUukekqzkY1UmX3h6RGHlgYbNYkNFttXbZB2oIXXlxNDED8wpKM7/m
+ 8qzjZyus5W993SNS68b+mIQcIjuXyxJQGBuHDEhCP0FMV3+4c9JMNiRMq3+pJ/4IZeY10KwQfj4
+ E1u8RUhgKgTzTQS6U7DQ4qxwI42GRh4/SWT37sThvYlnXrSHrriHp7ulXvicwP52+CiibUb/luG
+ bG+7ZKm7iT0/U=
+X-Google-Smtp-Source: ALg8bN7xRpKks2BDpy3PoPgjGMzpdg3A/VIgRcgiaNK5w0N2PooKIbWCfCDwIS+o6+bsN9curvA9LQ==
+X-Received: by 2002:a63:295:: with SMTP id 143mr14746138pgc.362.1547251143332; 
+ Fri, 11 Jan 2019 15:59:03 -0800 (PST)
+Received: from [10.136.8.252] ([192.19.228.250])
+ by smtp.gmail.com with ESMTPSA id y29sm102477011pga.59.2019.01.11.15.59.00
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 11 Jan 2019 15:59:02 -0800 (PST)
+Subject: Re: [PATCH INTERNAL V3 0/3] Add support for PWM Configure and
+ stablize for PWM kona
+To: Sheetal Tigadoli <sheetal.tigadoli@broadcom.com>,
+ Thierry Reding <thierry.reding@gmail.com>, Rob Herring <robh+dt@kernel.org>,
+ Florian Fainelli <f.fainelli@gmail.com>, Ray Jui <rjui@broadcom.com>,
+ Scott Branden <sbranden@broadcom.com>
+References: <1547183284-19956-1-git-send-email-sheetal.tigadoli@broadcom.com>
+From: Ray Jui <ray.jui@broadcom.com>
+Message-ID: <4678b237-d0df-ef85-182f-759125a5c085@broadcom.com>
+Date: Fri, 11 Jan 2019 15:58:59 -0800
+User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-Subject: Re: [PATCH 1/6] clk: actions: Add configurable PLL delay
-User-Agent: alot/0.8
-In-Reply-To: <20181231185517.18517-2-manivannan.sadhasivam@linaro.org>
-References: <20181231185517.18517-1-manivannan.sadhasivam@linaro.org>
- <20181231185517.18517-2-manivannan.sadhasivam@linaro.org>
-To: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>, afaerber@suse.de,
- mturquette@baylibre.com, robh+dt@kernel.org
-Message-ID: <154725102657.169631.13321616473847605014@swboyd.mtv.corp.google.com>
-From: Stephen Boyd <sboyd@kernel.org>
-Date: Fri, 11 Jan 2019 15:57:06 -0800
+In-Reply-To: <1547183284-19956-1-git-send-email-sheetal.tigadoli@broadcom.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_155707_871500_505AD905 
-X-CRM114-Status: UNSURE (   5.99  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190111_155905_456461_A6393E7F 
+X-CRM114-Status: GOOD (  12.97  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,26 +100,34 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-actions@lists.infradead.org,
- linux-kernel@vger.kernel.org,
- Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: linux-pwm@vger.kernel.org, bcm-kernel-feedback-list@broadcom.com,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ devicetree@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Manivannan Sadhasivam (2018-12-31 10:55:12)
-> S500 SoC requires configurable delay for different PLLs. Hence, add
-> a separate macro for declaring a PLL with configurable delay and also
-> modify the existing OWL_PLL_NO_PARENT macro to use default delay so
-> that no need to modify the existing S700/S900 drivers.
+Please remove 'INTERNAL' in all of your patches and cover letter.
+
+On 1/10/2019 9:08 PM, Sheetal Tigadoli wrote:
+> Hi,
+> 	This patchset contain support to make PWM changes configure
+> 	and stablize
+> 	Following are brief changes done
+> 	a. Add support for version2 compatible string
+> 	b. Change PWM config and stablize delay in PWM Kona
 > 
-> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> ---
-
-This one looks good to me.
-
+> Praveen Kumar B (3):
+>   dt-bindings: pwm: kona: Add new compatible for new version pwm-kona
+>   drivers: pwm: pwm-bcm-kona: Add pwm-kona-v2 support
+>   ARM: dts: cygnus: Change pwm compatible to new version
+> 
+>  .../devicetree/bindings/pwm/brcm,kona-pwm.txt      |   2 +-
+>  arch/arm/boot/dts/bcm-cygnus.dtsi                  |   2 +-
+>  drivers/pwm/pwm-bcm-kona.c                         | 128 ++++++++++++++++-----
+>  3 files changed, 100 insertions(+), 32 deletions(-)
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
