@@ -2,66 +2,54 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8D31FC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 12:54:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EC346C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 13:01:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5CB6720874
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 12:54:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B336820836
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 13:01:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="O0g5H9+U"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5CB6720874
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i+bASd5x"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B336820836
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hlMOAdixXv3JmmZ/DmLTe9Fmfkfet/3VtkrRF/4PTRQ=; b=O0g5H9+UJY/iab
-	yzjtDK9RGQa9PQ3aH0f5Szhz1ONFYCdo8tkvrh9uo3ZLT6fxYSEHojnALtk8xUaNMkmH7vPPtq/AS
-	pXZCBkVPCkNiUUcuJxYuVCVvAfPu3uZs3RM+w1qeSfQpdCTIva5FUaWBlqgajXHXXIldnZyDclvrA
-	gJBs4M32d+dHzgW3PtEcWHIWtwFsg6RaHf7xFaAN1+KlN+Z/lbOf2ePH4Fq6A8V2y3Vi3xvHhwd+I
-	mev/3R02zJCciDtOyRyelGbYSygY5hzxIeIRTm+Let/xfrRz94PceDvBIKkisXyqj+XhrKt7+jNQC
-	A7Hd2QnXZ6tIekUSBMiQ==;
+	List-Owner; bh=pNex1VkOZpMyN1vqyenmWDIKOc86hW9nzpwtPowgnKE=; b=i+bASd5xBjlh7I
+	ISy7Kkv8c+PPiDBl7PN3V8U+1b2BfZXKCTRVSG96EFM2sgupWLV+y8mXsl+TRfnHtocLeL5ofE87o
+	RhzXeOw6vCJBqWvUA8wc0saw+OQM2spXDPjzASb2VGNcvq6tWfoQGPRE+m0bYbhejZ2iUhqsB3bby
+	PlAP/mHN2c/rwXViu7LCTcjJbDn/VAIvw3Gqv764tFJLHwuUp0YOdtseatGXIWeQtpBoXy02rHBx5
+	9jTZcN+zCvTi72ibbICMSvp7eJENk3QAx5u09Lzc7++VvcpR6SjwD8f9vywMoci2o7nN77KJWn3p9
+	qTxHk9lUCUSuOrtY/blg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1ghwKM-0006H5-H7; Fri, 11 Jan 2019 12:54:22 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1ghwKI-0006FO-4m
- for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 12:54:20 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 70367209BD; Fri, 11 Jan 2019 13:54:13 +0100 (CET)
-Received: from windsurf (aaubervilliers-681-1-45-241.w90-88.abo.wanadoo.fr
- [90.88.163.241])
- by mail.bootlin.com (Postfix) with ESMTPSA id 1B084206A7;
- Fri, 11 Jan 2019 13:54:13 +0100 (CET)
-Date: Fri, 11 Jan 2019 13:54:13 +0100
-From: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
-To: Linus Walleij <linus.walleij@linaro.org>
-Subject: Re: [PATCH 2/8] gpio: zynq: Wakeup gpio controller when it is used
- as IRQ controller
-Message-ID: <20190111135413.73dad0b2@windsurf>
-In-Reply-To: <CACRpkdafBpC14TxBNVN2AemkBz-yKkXkKfNpdgkYKQX3qFemag@mail.gmail.com>
-References: <cover.1502103715.git.michal.simek@xilinx.com>
- <72d3cd83bed792a23ab60cf9b6d51b618f5aa084.1502103715.git.michal.simek@xilinx.com>
- <CACRpkdZE-Edr7fWZY5VQM1_65iw7MYGP-iDa2ExZsPxpM0rurQ@mail.gmail.com>
- <6da5fd79-fbc8-b613-954f-dcbe2ef8d6c5@xilinx.com>
- <20190107164210.3ecf37e8@windsurf>
- <CACRpkdafBpC14TxBNVN2AemkBz-yKkXkKfNpdgkYKQX3qFemag@mail.gmail.com>
-Organization: Bootlin
-X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; x86_64-redhat-linux-gnu)
+	id 1ghwRL-0001g3-Kx; Fri, 11 Jan 2019 13:01:35 +0000
+Received: from j217100.upc-j.chello.nl ([24.132.217.100]
+ helo=hirez.programming.kicks-ass.net)
+ by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1ghwRJ-0001fN-8m; Fri, 11 Jan 2019 13:01:33 +0000
+Received: by hirez.programming.kicks-ass.net (Postfix, from userid 1000)
+ id CF3F8202A6058; Fri, 11 Jan 2019 14:01:30 +0100 (CET)
+Date: Fri, 11 Jan 2019 14:01:30 +0100
+From: Peter Zijlstra <peterz@infradead.org>
+To: Valentin Schneider <valentin.schneider@arm.com>
+Subject: Re: [PATCH 0/2] System-wide mute of hotplug lockdep during init
+Message-ID: <20190111130130.GA12917@hirez.programming.kicks-ass.net>
+References: <1545243796-23224-1-git-send-email-valentin.schneider@arm.com>
+ <0f2b6cc8-ad2f-bd0b-fe51-c333a8033452@arm.com>
 MIME-Version: 1.0
-X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_045418_318587_486EEC81 
-X-CRM114-Status: GOOD (  11.54  )
+Content-Disposition: inline
+In-Reply-To: <0f2b6cc8-ad2f-bd0b-fe51-c333a8033452@arm.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,46 +61,32 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Josh Cartwright <josh.cartwright@ni.com>,
- Peter Crosthwaite <peter.crosthwaite@xilinx.com>,
- Nava kishore Manne <navam@xilinx.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "monstr@monstr.eu" <monstr@monstr.eu>, Borsodi Petr <Petr.Borsodi@i.cz>,
- Michal Simek <michal.simek@xilinx.com>,
- "linux-gpio@vger.kernel.org" <linux-gpio@vger.kernel.org>,
- Rob Herring <robherring2@gmail.com>,
- =?UTF-8?B?U8O2cmVu?= Brinkmann <soren.brinkmann@xilinx.com>,
- Steffen Trumtrar <s.trumtrar@pengutronix.de>,
- Shubhrajyoti Datta <shubhraj@xilinx.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: mark.rutland@arm.com, cai@gmx.us, marc.zyngier@arm.com,
+ daniel.lezcano@linaro.org, linux-kernel@vger.kernel.org,
+ dietmar.eggemann@arm.com, longman@redhat.com, tglx@linutronix.de,
+ mingo@kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello Linus,
-
-On Fri, 11 Jan 2019 10:54:20 +0100, Linus Walleij wrote:
-
-> My stance is that the driver is responsible of enabling and managing
-> runtime PM for its hardware block(s).
+On Fri, Jan 11, 2019 at 09:53:58AM +0000, Valentin Schneider wrote:
+> Hi,
 > 
-> Runtime PM in the core should only be added if the core needs to
-> be aware about it, such as is the case when e.g. a block device
-> needs to drain its write buffer before going to runtime sleep.
+> On 19/12/2018 18:23, Valentin Schneider wrote:
+> > In [1] Peter had a suggestion to broadly mute hotplug lockdep warnings during
+> > init instead of going after every single warning and wrapping them with
+> > cpus_read_{lock, unlock}(). This is implemented in [PATCH 1/2].
+> > 
+> > [PATCH 2/2] is a logical follow-up as [PATCH 1/2] is the generalized version
+> > of the reverted patch.
+> > 
+> > [1]: https://lore.kernel.org/lkml/1543877121-4098-1-git-send-email-cai@gmx.us/#t
+> > 
 > 
-> I fail so see why the GPIO core need to be aware about this.
+> Gentle ping - I suppose this flew under the holidays radar.
 
-In this very same thread at
-https://www.spinics.net/lists/arm-kernel/msg600515.html, you kind of
-proposed to handle this in the core in fact :-) Though indeed you said
-that the core could provide helpers.
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Indeed so... got them now. Thanks!
 
 _______________________________________________
 linux-arm-kernel mailing list
