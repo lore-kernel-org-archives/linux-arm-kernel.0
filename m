@@ -2,82 +2,70 @@ Return-Path: <SRS0=KsRD=PT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 39354C43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:24:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 712FBC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:25:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0C1C021841
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:24:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3847D2184A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 11 Jan 2019 18:25:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rUg5UPoc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0C1C021841
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=public-files.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RYRYWm8f"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3847D2184A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:Date:Subject:To:
-	From:Message-ID:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=3V5mHbUTtQ0oBUUg6/YTl7XhGXzgWjZ/ZEMDcZueyhQ=; b=rUg5UPocv/aYEB
-	rVN1rr8nxjnWyQTkjfMC7bEgEFLQpcwYQe+97SN7x/LQ9yo3IYZ9BhlKqH/hO3V4A3l0/DWeyVIkA
-	gnIX52xfPR2rqK7R2+7FERrM2YrIZWaUbYrp7UlHuE5SsqeFDuV0YKTYjW5PAl8k7gMX/YnPwl9/J
-	ASaqQM5s0S5y6XJ19GLyVovG6vzyZEqzVTpegMiG3sXW0I2wWQtpbrK2piIMfaw1Xqs/iiW0Y9q8X
-	7TOGgwUPZJ+LCcrQXeB+zn19D+3jNqfQgwogBOoC+uuWFuNvEFUAF9y7BNF5xx0FEImLddM3KTd5E
-	Yj6AYn+6+4wAynLeFF2A==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=dciJ7Y70zyFJf3i+gS8tgA14ClqJfycmR8dYnD/NCxE=; b=RYRYWm8fHzPlAu
+	tq9WVpj7zNp9y2xAkkPKCGL7FNVjwIxLnK/DRBMfo9QwMZo1J9MIyNRxcuxB9mGtN9jN/5TX51BS/
+	86sY78sX8wQBsD8jy5TqdM/gTAqhP0lji/TAh9yrSP0VE6CmTqEcegJDc6B1OWGu4kHLNKmS8g2p3
+	rM5lF05hkwxLlnLuKQd4qY8I7G59xLVQc6cX78QhOAFrqwTldKnbuG9ljeGtj7RIlVObYvFpqJMdO
+	9e7JDZxoaeKgThgh71uqSR2pqgA2PGmxlh4YztyfWk5lkttAwHBMlxyL5iRLGrWz1GBvMsxAy22Jf
+	Pmlg6adlwvDlYYzixRZQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gi1TO-0004PK-J6; Fri, 11 Jan 2019 18:24:02 +0000
-Received: from mout.gmx.net ([212.227.15.15])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gi1TL-0004Oo-7R; Fri, 11 Jan 2019 18:24:01 +0000
-Received: from [91.14.68.96] ([91.14.68.96]) by web-mail.gmx.net
- (3c-app-gmx-bs19.server.lan [172.19.170.71]) (via HTTP); Fri, 11 Jan 2019
- 19:23:42 +0100
+	id 1gi1Un-0005yR-4v; Fri, 11 Jan 2019 18:25:29 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gi1Uk-0005y2-Lh
+ for linux-arm-kernel@lists.infradead.org; Fri, 11 Jan 2019 18:25:28 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E677B80D;
+ Fri, 11 Jan 2019 10:25:25 -0800 (PST)
+Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 300103F6CF;
+ Fri, 11 Jan 2019 10:25:23 -0800 (PST)
+Subject: Re: [PATCH v7 10/25] ACPI / APEI: Tell firmware the estatus queue
+ consumed the records
+To: Borislav Petkov <bp@alien8.de>, Tyler Baicar <baicar.tyler@gmail.com>
+References: <20181203180613.228133-1-james.morse@arm.com>
+ <20181203180613.228133-11-james.morse@arm.com>
+ <20181211183634.GO27375@zn.tnic>
+ <56cfa16b-ece4-76e0-3799-58201f8a4ff1@arm.com>
+ <CABo9ajArdbYMOBGPRa185yo9MnKRb0pgS-pHqUNdNS9m+kKO-Q@mail.gmail.com>
+ <20190111120322.GD4729@zn.tnic>
+ <CABo9ajAk5XNBmNHRRfUb-dQzW7-UOs5826jPkrVz-8zrtMUYkg@mail.gmail.com>
+ <20190111174532.GI4729@zn.tnic>
+From: James Morse <james.morse@arm.com>
+Message-ID: <32025682-f85a-58ef-7386-7ee23296b944@arm.com>
+Date: Fri, 11 Jan 2019 18:25:21 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-Message-ID: <trinity-c852a1ec-38d2-41d2-aefd-9cd385e8f772-1547231022924@3c-app-gmx-bs19>
-From: "Frank Wunderlich" <frank-w@public-files.de>
-To: "CK Hu" <ck.hu@mediatek.com>
-Subject: Aw: Re: Re: [PATCH] drm/mediatek: Add MTK Framebuffer-Device (mt7623)
-Date: Fri, 11 Jan 2019 19:23:42 +0100
-Importance: normal
-Sensitivity: Normal
-In-Reply-To: <1547200155.4209.4.camel@mtksdaap41>
-References: <20190102084917.4049-1-frank-w@public-files.de>
- <20190107103640.GH21184@phenom.ffwll.local>
- <CAKMK7uEqxz4TAt_iwEC+dMWboVxCeCduyABsSwD0Ns7k=Z_UWA@mail.gmail.com>
- <trinity-0da588a3-1277-4421-ad6b-1f6aeb129dd6-1547146897687@3c-app-gmx-bs35>
- <20190110200225.GN21184@phenom.ffwll.local>
- <1547176809.12054.11.camel@mtksdaap41>
- <20190111092042.GP21184@phenom.ffwll.local>
- <1547200155.4209.4.camel@mtksdaap41>
-X-UI-Message-Type: mail
-X-Priority: 3
-X-Provags-ID: V03:K1:NGINZ32in0gJOYgqnehPufFl27JbseS0W1WDvSwCXAWeVB7ovN1HP9XbE2/KbPzEH4s7y
- Au2fZJ+qSNpYP4hJ8/Z+1Ffch9I3l6fVMtuepjTGZTM8owWMSYSX23jLqqIKFyViD4J4Sft052Q8
- GPGnmvK+z6DT34gaEkk5dSk+wexCV9xRp0p2R8f/icf2sPrXc//FIgZ5dm1jRVbSrCpkqwIxrWBz
- prVRFC9lIE3jzJqk6oh44rqUyTX4Lf9GWS6OtizTXA3VPVJ8eprT5OB1eDVF+s1qVnI+BGYhi5Ab
- /s=
-X-UI-Out-Filterresults: notjunk:1;V03:K0:6l6+usElRyM=:rXBiu8jUm+iNKc6hAZyGQr
- 6yeOHxrZr7W+1WgPTtmqWgLCG6gF1G40PZ5xxSJ0rQzY6PaQ8lboaQju2GM6aAAXQxWfkEML7
- awv8mRDAeYHoZrxrJTDMa3SqLXDRnlPCgabpaD8DTLiCTz3t1qSIcH45xDIUfsZGapOa2HRDC
- iSk2OSCxcRe7+sjP1rLy8vVUVFZzAjF1VadqWylkm4jPnwvuMrMykWjjalzQsvO4/Z8pZZ6hN
- fxFDu1Z+I+57fJ2Df/ynTw3W2KcsAGAqPmz+FJebYEs226sSapi1bmXN3BVsF6sF7eXx8/WVJ
- 7HztmrzMTuHwqM2YzDgcR5y3XzUw5oZsEVleVZXsoGFmjKWVckdx77qzFbW901QytdIhrDOdX
- BDeoxdW3VrM0kaza83lOTTfSPA6MU9hRHVK5w8lmrXnfoafBZEB8Gk5a6UaAHMb8yG8j9oM9f
- BT7S7W9PwUy7XDaiEoi4XCS40PYr9usQGfmDK2/zFDo2mPT4L1Kny3yTyRxLh7tddgZELALZ6
- 7UgryerD+JzUQMs8kCQPUIrjQES+G9GJushGf7T4madV6eSwxbFlb0lGG/4TQMtCWipEt23Rk
- 7bveZzVqp0hW8=
+In-Reply-To: <20190111174532.GI4729@zn.tnic>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_102359_575831_9F96580D 
-X-CRM114-Status: UNSURE (   5.80  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190111_102526_720566_4ABE9122 
+X-CRM114-Status: GOOD (  17.89  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,34 +77,63 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Philipp Zabel <p.zabel@pengutronix.de>, David Airlie <airlied@linux.ie>,
- Alexander Ryabchenko <d3adme4t@gmail.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- =?UTF-8?Q?=22Noralf_Tr=C3=B8nnes=22?= <noralf@tronnes.org>,
- "moderated list:ARM/Mediatek SoC support" <linux-mediatek@lists.infradead.org>,
- Daniel Vetter <daniel@ffwll.ch>, Matthias Brugger <matthias.bgg@gmail.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Rafael Wysocki <rjw@rjwysocki.net>, Tony Luck <tony.luck@intel.com>,
+ Fan Wu <wufan@codeaurora.org>, linux-mm@kvack.org,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Xie XiuQi <xiexiuqi@huawei.com>, Will Deacon <will.deacon@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>,
+ Dongjiu Geng <gengdongjiu@huawei.com>, Linux ACPI <linux-acpi@vger.kernel.org>,
+ Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>, kvmarm@lists.cs.columbia.edu,
+ arm-mail-list <linux-arm-kernel@lists.infradead.org>,
+ Len Brown <lenb@kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-like Daniel guessed, fb-console does not work with this Patch.
+Hi Boris,
 
-i tried your Patch (additional patch for headerfile): https://github.com/frank-w/BPI-R2-4.14/commits/4.20-fbdev
+On 11/01/2019 17:45, Borislav Petkov wrote:
+> On Fri, Jan 11, 2019 at 10:32:23AM -0500, Tyler Baicar wrote:
+>> The kernel would have no way of knowing what to do here.
+> 
+> What do you mean, there's no way of knowing what to do? It needs to
+> clear registers so that the next error can get reported properly.
+> 
+> Or of the status read failed and it doesn't need to do anything, then it
+> shouldn't.
 
-and R2 hangs  (no crash and no further boot)
+I think we're speaking at cross-purposes. If the error-detecting-hardware has
+some state, that's firmware's problem to deal with.
+What we're dealing with here is the memory we read the error records from.
 
-[    5.435075] mediatek-drm 14000000.dispsys: bound 14012000.rdma (ops mtk_disp)
-[    5.435134] mediatek-drm 14000000.dispsys: bound 14014000.dpi (ops mtk_dpi_c)
-[    5.459277] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).      
-[    5.465863] [drm] No driver support for vblank timestamp query.              
-[    5.472331] [drm] Initialized mediatek 1.0.0 20150513 for 14000000.dispsys o0
 
-my monitor is switched on, but no output....we had added fbdev-driver to get FB-console over hdmi, so it's currently useless
+> Whatever it is, the kernel either needs to do something in the error
+> case to clean up, or nothing if the firmware doesn't need anything done
+> in the error case; *or* ack the error in the success case.
 
-regards Frank
+We ack it in the corrupt-record case too, because we are done with the memory.
+
+
+> This should all be written down somewhere in that GHES v2
+> spec/doc/writeup whatever, explaining what the OS is supposed to do to
+> signal the error has been read by the OS.
+
+I think it is. 18.3.2.8 of ACPI v6.2 (search for Generic Hardware Error Source
+version 2", then below the table):
+* OSPM detects error (via interrupt/exception or polling the block status)
+* OSPM copies the error status block
+* OSPM clears the block status field of the error status block
+* OSPM acknowledges the error via Read Ack register
+
+The ENOENT case is excluded by 'polling the block status'.
+Unsurprisingly the spec doesn't consider the case that firmware generates
+corrupt records!
+
+
+Thanks,
+
+James
 
 _______________________________________________
 linux-arm-kernel mailing list
