@@ -2,70 +2,75 @@ Return-Path: <SRS0=Pwbl=PU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7B17BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:45:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3A5E5C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:45:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 489CF2086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:45:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 03CBF2086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:45:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WC8cupuF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 489CF2086C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VaiRyY8w"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 03CBF2086C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=aa8BjM24PkogpnRxeCb0kYozKP1CX+kVZILgH9+VjmQ=; b=WC8
-	cupuFCHitE0LtuIZhGoJ373cWVYMRZh52+kx3REg2/0s0/G8TrkbJXChKmdUr6B5ivfvR4D0VDEDz
-	NyC701SdGyvx4hUvDhHmXTsXQiXxX3bvWe7ZtQteZ+07AuwI4uDFz7vJUwsoywp/NccJFULqDNCwU
-	1POiNnUDt3ZyL+lAPdvkqErA+yTbN3g57P3LvCsGtLK46hDo5RoFJUMbNYjm3NL3S8Sn17fPoP0/N
-	AEJudOGi6hzun2n5XWiuf3V/X/UBgDKZ6pzA3rNx+RLPS59EQDJXWApGEZ1bYIZ+928usm2lv2NRD
-	LsqrXncA9WVAKBFEjm4RYog1++yLvVw==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=pMqfB8+/Dg31NExFEdQseot0ioVPhWB+K2E0V2zr3ek=; b=VaiRyY8wYPYSGRt+KZ6P11hxR0
+	PIc0bS/Gqdy5bm7gsH1DOpj6NB9xyNphlPtRaUiyRsGGMfV/42Z8cAH9aCSpxfyGXXrZaMq7eoF95
+	ORbwNA+SnWXnDURPKTJ6i445cMLs2XuDR7YSUv6qeH9xYHBvbVhyYzcJSC8DqZSwELZ8P6AWApRG/
+	y+IL1ZRf8gp/c82TWX+h1rRwgbiTvpv8dOs3cmO2uyuKzKqh+13YcKG913KoHOj3VF5DxCpkrLNgc
+	xVbcFldW5+oVGXY7CLjUeGGEOIexvWDD4rnI0oiFlhdgoXdVorEogCNoMkkLV/keEuDrqb/q6Gq88
+	n1WR7aWA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1giIfE-00081F-Uy; Sat, 12 Jan 2019 12:45:24 +0000
-Received: from mout.kundenserver.de ([217.72.192.74])
+	id 1giIfQ-0008Jf-8S; Sat, 12 Jan 2019 12:45:36 +0000
+Received: from mout.kundenserver.de ([217.72.192.75])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1giIe3-0005sl-Jz; Sat, 12 Jan 2019 12:44:14 +0000
+ id 1giIe3-0005sq-LX; Sat, 12 Jan 2019 12:44:14 +0000
 Received: from localhost.localdomain ([37.4.249.153]) by
  mrelayeu.kundenserver.de (mreue107 [212.227.15.183]) with ESMTPSA (Nemesis)
- id 1MiZkX-1hEMH33v7P-00fmze; Sat, 12 Jan 2019 13:43:59 +0100
+ id 1N94qX-1hN3Sw2Ced-0165Go; Sat, 12 Jan 2019 13:44:01 +0100
 From: Stefan Wahren <stefan.wahren@i2se.com>
 To: Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
  Florian Fainelli <f.fainelli@gmail.com>, Ray Jui <rjui@broadcom.com>,
  Scott Branden <sbranden@broadcom.com>, Eric Anholt <eric@anholt.net>
-Subject: [PATCH 0/6] ARM: dts: bcm283x: Several DTS improvements
-Date: Sat, 12 Jan 2019 13:43:22 +0100
-Message-Id: <1547297008-2740-1-git-send-email-stefan.wahren@i2se.com>
+Subject: [PATCH 4/6] ARM: dts: bcm2837-rpi-3-b: Use consistent label for HDMI
+ hotplug
+Date: Sat, 12 Jan 2019 13:43:26 +0100
+Message-Id: <1547297008-2740-5-git-send-email-stefan.wahren@i2se.com>
 X-Mailer: git-send-email 2.7.4
-X-Provags-ID: V03:K1:5nBwLKvBLo4V6ZZAlP40gz/kl9uAEpvD2bUUl0a+xn69hC9kTGL
- U7zHHwwrhTMkh6zw10on3tsi6Rz+JxMtGoV2Fq5O1S5EsTbuMPX984AU1PVYB5gKJlD5vjt
- ZRDaLGBVZ6l8Lqp06OzAfQjKY/8Q/WNFp9aynfXx65u5CeS2hcZ3yTjvOIJounL7RbFkzvV
- dMGa7AD44TD2HUOt/qyGQ==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:ByqaPpxtF/c=:Voql/mXtbkcSiTl1KCLMCH
- bYahIh/3Sc+ppJN2VtFCw+fxGvIY47vFvkJJRVTJC57j6aJDzPVJAquVd6V4FM8lksN23/bc0
- 0TBMNUYzX1wZ+aChOcZbIMfaG5YCvKJlaleHRkR2eecc2yvM/Op9lqPRmlCcWmmF2xaqu5n4H
- YGRHYgJscopIB+IrG8iBQLLuo/5/rzsnJ6xVKddgiN+CPv1B+NMHZOZneFYZYajz3vqUpYZUJ
- v8T1ETPLpOtbyFk4Aqja7PRLZ3+GsY8RFSw4dN/ACqwoptRkaCoOY/P8kXyVuEz1A5DSZsJue
- Zsf+XNYGCWdJ34IqTIC1ikv5lAGjDHXx5cxx34HAxa/kIT6+mOTt1JrJ/suZcKX4fO1dybrqm
- AFmyOgK6vqU9yCVXZPDwshkst8rzSJV6LuOurgY8hmzRxkX/24TszFsAo7tMracVg7/cPVOyF
- Jeh1nDEP8wzB4DOhNvcAL11GqZkZy8Qv7gHTJzm4M2qMjbrTa28nAjtSuY5jRYmnbTQB/y1VY
- zBUxHJBfzQMZ5uhSv5qDEhjUBWdivyXK0WDKGcONdlebn9PK580jRQAhZBgeZkAm6utMQZizx
- c9aKl6qbQ52a6eBc9Na8FDIW4tMyUv0e7yn+atTrW3fK4IY7gf3wCMXu2UBQjlNNMFxQc7AOM
- pzYLN6bMd9LlfJZAzUi2/rjmiG/J9+NC65mC3/1WrLWUnlpb7dPINfOJkToVgAPKM7r8L3l3b
- tWOb05LvsxLRWFL7R1Yo3G+fUWWOyghrIjfHSwGhf9wyJ+NaIvKpMWQP084=
+In-Reply-To: <1547297008-2740-1-git-send-email-stefan.wahren@i2se.com>
+References: <1547297008-2740-1-git-send-email-stefan.wahren@i2se.com>
+X-Provags-ID: V03:K1:FR5dWh7Bc7ez/2t7UujYBV6wbjP24rJ3IIBr6DeJzE4EixhKGqS
+ 3ilshHe46R9iW17IU856fqbAJ+QTgMPdUZbyQvN4uc2gJQ3aaQCzy22HSKBWWrtMxX4CZn0
+ 4Nglfks85Fyde7xl7tx/zQUEFscUygaRRPK+rycSa2j0GcP+TdQV18NhCzao8PhxFDq8KQ3
+ jYwfBwpAwChPLMTBnjDtQ==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:W33OjkYlMVQ=:a9YtAGBv47gUQfX/RzJzAb
+ 18/pyrAjqIhGDroLfNmx5nzlwPNXIjmIJNNSYWOJvh1Jts7HAWWXO0sHfla8wsyuEnAt7LXXb
+ kCE5eGyAcAfD25PimxmlPdpafsCHU6+dbnnSHwY73PCQCvLnX8hDkJ1hmZthy33ZLAZvri+wd
+ UX3w/ajzz11VzFr8B7z3JgqVFmR9z/HPsMZ1jY+zELeRCBQIKgB2x1pHCQsZizz7iAIX4OynB
+ xcRtFG+tl9fidGvMev8KMfdOjPii5RWIwjEhtKqBGmjCOtjQh99JeL8AGQHnuexsDtvrGrsgx
+ rgUNfR6QrVgdZsBGJxT41rH+VPxW0SocMxrwXl3r1b+V9EBp1poHFooK2BiGqV/T3pz+7g8v4
+ Xb+joSpoOsJOT/6/4e1veQhotEF+b/CRGAYVyIpKbJ0nDdno1Dl89qFQwOFvLWdYaaY5bcbTg
+ 7vxZmKXI8bwY+tmVDhpGf9r5MemDQWZLS6M9bECCw530bvHH66n5a+ioMJxpIbQOwR5DZgEO1
+ b3YhR9k0u9n2Xgl+2eMDwEFRHEi18H92P1d+dL2euVkES5tWOWN8dqinuQ9+gxc1vf7fP2jgc
+ k/709lQMcU3/VBGAqrij1OpSjN1RPOrkh74g8IZW3+CCrnOF7GgMFU15KYDSCGHGGFXjmMeqN
+ +V6cgbrfthOE6UbkmTohuzsyDRYzUmDdJspzO/QBNIWlG3ubwHimSoDBRVPM1XH/mgTyy6NtW
+ 6MtW2hyGiz4TVUZytx5wDVqnevttmYirjAheH2lUeSFzi88rrV0tWl6k0HE=
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190112_044412_165198_67C0EB59 
-X-CRM114-Status: GOOD (  12.18  )
+X-CRM114-CacheID: sfid-20190112_044412_168490_F7C94FF0 
+X-CRM114-Status: GOOD (  15.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,30 +92,27 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This series consists of fixes for DTC warnings and improvements of
-the GPIO labels. So this is nothing critical, but helpful
-in case CONFIG_GPIO_SYSFS is disabled.
+This make the GPIO label for HDMI hotplug more consistent to the other
+boards.
 
-Stefan Wahren (6):
-  ARM: dts: bcm283x: Fix DTC warning for memory node
-  ARM: dts: bcm2835-rpi: Drop unnecessary #address-cells/#size-cells
-  ARM: dts: bcm2835: Fix labels for GPIO 0,1
-  ARM: dts: bcm2837-rpi-3-b: Use consistent label for HDMI hotplug
-  ARM: dts: bcm2837-rpi-3-b-plus: Clarify label for STATUS_LED
-  ARM: dts: bcm283x: Add missing GPIO line names
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm/boot/dts/bcm2835-rpi-a-plus.dts   |  4 +-
- arch/arm/boot/dts/bcm2835-rpi-b-plus.dts   |  4 +-
- arch/arm/boot/dts/bcm2835-rpi-zero-w.dts   |  4 +-
- arch/arm/boot/dts/bcm2835-rpi-zero.dts     |  4 +-
- arch/arm/boot/dts/bcm2835-rpi.dtsi         |  4 +-
- arch/arm/boot/dts/bcm2836-rpi-2-b.dts      | 68 ++++++++++++++++++++++++++-
- arch/arm/boot/dts/bcm2837-rpi-3-a-plus.dts |  2 +-
- arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts | 74 +++++++++++++++++++++++++++++-
- arch/arm/boot/dts/bcm2837-rpi-3-b.dts      | 74 +++++++++++++++++++++++++++++-
- arch/arm/boot/dts/bcm2837-rpi-cm3.dtsi     |  2 +-
- 10 files changed, 222 insertions(+), 18 deletions(-)
-
+diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+index 9abb9c5..31b1c03 100644
+--- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
++++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+@@ -39,7 +39,7 @@
+ 				  "WL_ON",
+ 				  "STATUS_LED",
+ 				  "LAN_RUN",
+-				  "HPD_N",
++				  "HDMI_HPD_N",
+ 				  "CAM_GPIO0",
+ 				  "CAM_GPIO1",
+ 				  "PWR_LOW_N";
 -- 
 2.7.4
 
