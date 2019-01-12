@@ -2,74 +2,78 @@ Return-Path: <SRS0=Pwbl=PU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 38949C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:45:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DDC80C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:51:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E8F692086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:45:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ABF202086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:51:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ERCcXLwS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E8F692086C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G1rrW138";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="efBTxDQr";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="Ti5QamKz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ABF202086C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=FGAnBmb3C+XD38TkscBbWtKoHxSLGP5xWqQ6ieBTwN4=; b=ERCcXLwSEEYf/jvnRCw9D5WSgM
-	gSBbwrbWIqU74vqxrvigHSadclvJOnHRG3uSNoJfHQHQRRs29StZhCaQlrDRloCkrvAmqoGSXjvnY
-	bJYYwoTxG0/J6+2WzX5n3HLyDMnjUQkFf7n0krRBWUM7aDZHn+lwI4HBwmJsolb1AXMUHOMRAcjDT
-	Vp2z/TnooV1dbFteuZi80a+fvUl+7nfalHT1tkVOhQtdLkLV+mnWQKp5ovEZt+TS3MHNdmI/woKBM
-	XDLADnMyWUYNUu9Vjj945Uqx/wAAX+hCInCBKB8+9pa3iTFKCfV24Tshm/PsmxkcP1ukN+ZbWOvh/
-	NP6AlovA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:Message-ID:References:In-Reply-To:Subject:To:From:
+	Date:MIME-Version:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=z3Winsq2zj4OT17DsO1BPieSOsu67CVqIApjQALoLyU=; b=G1rrW138iZyIQck4myQn8m4FC
+	J8E45sDWJ2+emOr6dAOZRtAtLM3f1YTdy6crk2k0Fg+KA2hjjj14TpEdiJg0F9+lJIpd1aFb3TVKP
+	iQVVPYzfJwz3ynWWcwYoNbu2aNDtJrzufHEgtjWQ3zOygWuVvYCYFcXosZiLy4npQ3N9czy2XukjN
+	0b1FOxLRZ8YLd0B+enjTQgMho9hdMwsmQjKgmbr94L8fgEY/roFPSN/74E/5aHWtvZGkJw9faGEF9
+	JJ77qfJ5ihg8pqiHe8KY0RAtpEWPgcSYMJPL4B1+76mgBdu/nzQIiikBT9j2cDexyWzjSHcK9CWvr
+	Le9fKmQLA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1giIfe-00007X-2A; Sat, 12 Jan 2019 12:45:50 +0000
-Received: from mout.kundenserver.de ([217.72.192.74])
+	id 1giIkk-0001p9-67; Sat, 12 Jan 2019 12:51:06 +0000
+Received: from smtp.codeaurora.org ([198.145.29.96])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1giIe3-0005sj-K0; Sat, 12 Jan 2019 12:44:15 +0000
-Received: from localhost.localdomain ([37.4.249.153]) by
- mrelayeu.kundenserver.de (mreue107 [212.227.15.183]) with ESMTPSA (Nemesis)
- id 1N49Qd-1hPmUb47ST-0101Wy; Sat, 12 Jan 2019 13:44:01 +0100
-From: Stefan Wahren <stefan.wahren@i2se.com>
-To: Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- Florian Fainelli <f.fainelli@gmail.com>, Ray Jui <rjui@broadcom.com>,
- Scott Branden <sbranden@broadcom.com>, Eric Anholt <eric@anholt.net>
-Subject: [PATCH 3/6] ARM: dts: bcm2835: Fix labels for GPIO 0,1
-Date: Sat, 12 Jan 2019 13:43:25 +0100
-Message-Id: <1547297008-2740-4-git-send-email-stefan.wahren@i2se.com>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1547297008-2740-1-git-send-email-stefan.wahren@i2se.com>
-References: <1547297008-2740-1-git-send-email-stefan.wahren@i2se.com>
-X-Provags-ID: V03:K1:QJCZ1BJqaup6vHEhzK3pWfsZUAG8j96znb+fC6R3hbojjx4PWx5
- Z6jL6mXzJTtOs3gaL2F5sTuT1mouRrms1+q/sy4YvDuI+b3rTMlTTrDNY0lusedCTF/WB5X
- wxUsCoCchR+9YKiIVE7LibdIa149w6WTQBIz1ok1OnamK4CzAnj4u3TGeGjlJVAUy3xSLwf
- V5O1qaxp4Db2F7NXXjqxw==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:zL4cEz61ssA=:De3HcWXpJsDH3ZFrbhrFaI
- bVIr/ZJy/dQt+7w/A+/+oSJ842N+lmEggXIpODEdEpn0TOhYEEicrCME4OczQ78IH+RLIwTpb
- jfeAG7sH6kU/XSCtULAH3XVVWZ/6c4B8cFcjTVf9qq0Qa9C1/9Z7ZdFQAp/IDAeWnf+TQ1DX3
- 5GimZwbwKFAghckAyiUHYQw5FI+3R5PuhZxLdgTHb3BQoY/3C+CZLwr6SedMChZTZ/oAQ6yB1
- 6dH8DfYL1KyP3a9MgHaIQg9k14JgvMLKGQGAezJwy6izQTpUtVOStNSeuYtAQD1Y9iQXRmTqW
- sT/z+FANDi8l2GANh055aoj+WFkrR4lM5pXOoa+2+AdDRaMOJbEf+zY8Xmzh6AOQX2mI6lpuX
- BgAV6inaiUdxPHGcdJEW0251Q84o7JLhST1wxF2DouHIkNZBJnpePgXnIo/9er2UyOeedDHq9
- juffppkif/MCGaW35SeUUO9Bk+S+L7euq5xytDJ7BP7EZC9MldSrbl4kj/e+9nhLjIzahBEw1
- 1Vue9o55EQ9yEBYF5lIp3yqVAxlX4jz8Ma2wvWximaws5ZtwfEMYMcsvHIcKAMyPCY8XjFCHo
- 87ELVJ/NeUId5aAsHrS3PFjMNk7pmbDBUcKaek/G9mG5hnU6M00tFuloRNEn+AdSyDEUWT8qx
- 5a4hFcYA/3l9PAv5H/AMlvf0jfBg2URQkdSSTYdwo78Uou8NdzpaXmPCUafhhihGQjGVv8G9o
- JZRk736AaIB6AtHXON0PxjAZRPf9k9ln/+x9MQ5RUqs0sAWcPSrIVUVV9GQ=
+ id 1giIkf-0001om-Tf
+ for linux-arm-kernel@lists.infradead.org; Sat, 12 Jan 2019 12:51:03 +0000
+Received: by smtp.codeaurora.org (Postfix, from userid 1000)
+ id 86BA76087F; Sat, 12 Jan 2019 12:51:01 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1547297461;
+ bh=vc95Z/tMlWNdjowrwCwRgmlvYWxkp4Ha9JVSJUZtmRw=;
+ h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
+ b=efBTxDQrAUC6i3csoz7boD3nLvf3rJvOQk+L9BmwSRurQcswXvLaCU9ABEojoc6cu
+ /TTk3HzC4nZmNHTTaEZ0YZC2vW2HpgWDiJqO/xedrNi9UxRoxCsfA8cAliU80/1syv
+ kzcuBdngmV6a+1Nfn/8NQfK410f7zr/A7uOMgoCk=
+Received: from mail.codeaurora.org (localhost.localdomain [127.0.0.1])
+ by smtp.codeaurora.org (Postfix) with ESMTP id CF28B6087F;
+ Sat, 12 Jan 2019 12:51:00 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1547297460;
+ bh=vc95Z/tMlWNdjowrwCwRgmlvYWxkp4Ha9JVSJUZtmRw=;
+ h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
+ b=Ti5QamKzeZ1n7mzWuR9OIUfBx8DLh82A/ne0E++ehrYuFCH79PMffGcpZ3jWdkNVP
+ RZ5V/Gy4WInJZVuHnYZfC7K2PbR+Z0Rb4SBdWbS8LaU3wNViMzbhO+d5OUW0cuCDId
+ 7ZPAn+2WOJ5j/vUdQLrt9UEsH9BCa8QHk474Sk4A=
+MIME-Version: 1.0
+Date: Sat, 12 Jan 2019 18:21:00 +0530
+From: saiprakash.ranjan@codeaurora.org
+To: Mathieu Poirier <mathieu.poirier@linaro.org>
+Subject: Re: [PATCH 1/3] arm64: dts: qcom: sdm845: Add Coresight support
+In-Reply-To: <20190111184643.GA22691@xps15>
+References: <cover.1547054308.git.saiprakash.ranjan@codeaurora.org>
+ <a13ad49d3ae8d9a5a972027283b7212ab19f97d0.1547054308.git.saiprakash.ranjan@codeaurora.org>
+ <20190111184643.GA22691@xps15>
+Message-ID: <81172d85ed7782e0db561fcf96a82d46@codeaurora.org>
+X-Sender: saiprakash.ranjan@codeaurora.org
+User-Agent: Roundcube Webmail/1.2.5
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190112_044412_170278_2B8BAEEE 
-X-CRM114-Status: GOOD (  14.47  )
+X-CRM114-CacheID: sfid-20190112_045102_007432_708C0D8C 
+X-CRM114-Status: UNSURE (   8.57  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,91 +85,44 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Gottfried Haider <gottfried.haider@gmail.com>, devicetree@vger.kernel.org,
- Stefan Wahren <stefan.wahren@i2se.com>, Phil Elwell <phil@raspberrypi.org>,
- bcm-kernel-feedback-list@broadcom.com, Peter Robinson <pbrobinson@gmail.com>,
- linux-arm-kernel@lists.infradead.org, linux-rpi-kernel@lists.infradead.org
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Rajendra Nayak <rnayak@codeaurora.org>,
+ Suzuki K Poulose <suzuki.poulose@arm.com>,
+ Alexander Shishkin <alexander.shishkin@linux.intel.com>,
+ linux-arm-msm@vger.kernel.org, linux-kernel@vger.kernel.org,
+ David Brown <david.brown@linaro.org>, Rob Herring <robh+dt@kernel.org>,
+ Sibi Sankar <sibis@codeaurora.org>, Vivek Gautam <vivek.gautam@codeaurora.org>,
+ Leo Yan <leo.yan@linaro.org>, Andy Gross <andy.gross@linaro.org>,
+ linux-arm-msm-owner@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-According to the schematics for all RPis with a 40 pin header,
-the GPIOs 0 and 1 are labeled as ID_SD and ID_SC. In order to
-clarify that is a I2C bus, append the third letter.
+Hi Mathieu,
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- arch/arm/boot/dts/bcm2835-rpi-a-plus.dts | 4 ++--
- arch/arm/boot/dts/bcm2835-rpi-b-plus.dts | 4 ++--
- arch/arm/boot/dts/bcm2835-rpi-zero-w.dts | 4 ++--
- arch/arm/boot/dts/bcm2835-rpi-zero.dts   | 4 ++--
- 4 files changed, 8 insertions(+), 8 deletions(-)
+>> +
+>> +	etm@7040000 {
+>> +		compatible = "arm,coresight-etm4x", "arm,primecell";
+>> +		arm,primecell-periphid = <0x000bb95d>;
+> 
+> I'm a little curious as to why you need to bypass the normal AMBA bus 
+> discovery
+> method by forcing the peripheral ID.  Tracers don't show up the way 
+> other
+> coresight devices do at boot time?
+> 
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-index 2cd9c5e..db8a601 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-@@ -31,8 +31,8 @@
- 	 * "FOO" = GPIO line named "FOO" on the schematic
- 	 * "FOO_N" = GPIO line named "FOO" on schematic, active low
- 	 */
--	gpio-line-names = "SDA0",
--			  "SCL0",
-+	gpio-line-names = "ID_SDA",
-+			  "ID_SCL",
- 			  "SDA1",
- 			  "SCL1",
- 			  "GPIO_GCLK",
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-index cfbdaac..1e40d67 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-@@ -33,8 +33,8 @@
- 	 * "FOO" = GPIO line named "FOO" on the schematic
- 	 * "FOO_N" = GPIO line named "FOO" on schematic, active low
- 	 */
--	gpio-line-names = "SDA0",
--			  "SCL0",
-+	gpio-line-names = "ID_SDA",
-+			  "ID_SCL",
- 			  "SDA1",
- 			  "SCL1",
- 			  "GPIO_GCLK",
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts b/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
-index 644d907..5765d34 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
-@@ -40,8 +40,8 @@
- 	 * "FOO" = GPIO line named "FOO" on the schematic
- 	 * "FOO_N" = GPIO line named "FOO" on schematic, active low
- 	 */
--	gpio-line-names = "GPIO0",
--			  "GPIO1",
-+	gpio-line-names = "ID_SDA",
-+			  "ID_SCL",
- 			  "SDA1",
- 			  "SCL1",
- 			  "GPIO_GCLK",
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-zero.dts b/arch/arm/boot/dts/bcm2835-rpi-zero.dts
-index 00323ba..3b35a8a 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-zero.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-zero.dts
-@@ -28,8 +28,8 @@
- 	 * "FOO" = GPIO line named "FOO" on the schematic
- 	 * "FOO_N" = GPIO line named "FOO" on schematic, active low
- 	 */
--	gpio-line-names = "SDA0",
--			  "SCL0",
-+	gpio-line-names = "ID_SDA",
-+			  "ID_SCL",
- 			  "SDA1",
- 			  "SCL1",
- 			  "GPIO_GCLK",
--- 
-2.7.4
+Yes on some Qcom SoC's like SDM845 and also on some previous ones, for 
+ETM(only) amba bus discovery method fails because of wrong pid read from 
+the registers. So we have to force this primecell peripheral ids to 
+probe etm.
 
+- Sai
+
+--
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a 
+member of Code Aurora Forum, hosted by The Linux Foundation
 
 _______________________________________________
 linux-arm-kernel mailing list
