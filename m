@@ -2,70 +2,77 @@ Return-Path: <SRS0=Pwbl=PU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,FROM_EXCESS_BASE64,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 779E6C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 08:08:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1FF2EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 08:36:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 415E22133F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 08:08:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DCB712133F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 08:36:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rH8RpMOc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 415E22133F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=siol.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gXOJ1P/4";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Sgt4mnTZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DCB712133F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9UwFHGmwuK6NjUzKLC0NpGQc+xV//PtPWD4Qz1QqmzM=; b=rH8RpMOc7beMtS
-	kqG0iMOx/hxhlB6JaKnqUNnpR1XgAoqwyc67oqgbPbOOQWE7YCnWHNuPlmPzgd1LdReTXtL4R+m/z
-	v/livQBXnhQQI43+7nRkGNwRzDUHweIpiIeXtgCldQXGybxzBMGlyHqwL2YMSMADft6qzitn5P8st
-	KsqeE0t0Xoc8XjBfC2pAIpW9/U1NUZIrZdSGx9jGFWWAQzxhTP2TYyE7cxA+awdaVCvrNmUvAsM4h
-	530uLMGELqm2/l4Q9Zt8Q9vnBT4QH3Wfv2Le9mAd3Z0aEKhjj8dbZszW+8a+NBLqJq3I6UCe5ezC7
-	0taD3r0BzIbCUbu2KLUg==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	MIME-Version:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=YwL+vCTif0VJi8tJklyT9oFi2GwY1MIpiOM0J86soHg=; b=gXOJ1P/4vdl2fN
+	yMXEnY4WpVogjJ3VELaBFz6KIZRDe7fh9fdMFpMufRQX/MfCOzGHGYDdno7rgIYCNnpZHewTTR6Yx
+	hUVrtN5cT0fxxKT1b7Fhb2UilHjQfXhw3zDmWt1eWxoNEPrLDLNWQkj5ZwvwAImD0VfYa2rGkA5it
+	2jSnu4jQERdaPD6GJ2Q3v7kNLT7OjRj1WbXOPGabL89NYyMlYjeQfb6VJ9lKuv3EjXZLcI955RdYR
+	xPc3+EipGqADAj5ApvBsigGcRPaeyO3++hV+CA/DDdeoKUl8WSDm1hqf+otfGO64XXyyB/wO6Tq5A
+	fDKJnL/8f9ujQYxpW8bg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1giEL5-0004Vo-7k; Sat, 12 Jan 2019 08:08:19 +0000
-Received: from mailoutvs42.siol.net ([185.57.226.233] helo=mail.siol.net)
+	id 1giElv-0005oL-Ci; Sat, 12 Jan 2019 08:36:03 +0000
+Received: from mail-lf1-x12a.google.com ([2a00:1450:4864:20::12a])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1giEL0-0004V3-TF
- for linux-arm-kernel@lists.infradead.org; Sat, 12 Jan 2019 08:08:17 +0000
-Received: from localhost (localhost [127.0.0.1])
- by mail.siol.net (Postfix) with ESMTP id 0B13A520991;
- Sat, 12 Jan 2019 09:08:10 +0100 (CET)
-X-Virus-Scanned: amavisd-new at psrvmta11.zcs-production.pri
-Received: from mail.siol.net ([127.0.0.1])
- by localhost (psrvmta11.zcs-production.pri [127.0.0.1]) (amavisd-new,
- port 10032)
- with ESMTP id wtYuQKiFF0G7; Sat, 12 Jan 2019 09:08:09 +0100 (CET)
-Received: from mail.siol.net (localhost [127.0.0.1])
- by mail.siol.net (Postfix) with ESMTPS id 94B43520AF5;
- Sat, 12 Jan 2019 09:08:09 +0100 (CET)
-Received: from jernej-laptop.localnet (cpe1-8-82.cable.triera.net
- [213.161.8.82]) (Authenticated sender: 031275009)
- by mail.siol.net (Postfix) with ESMTPA id 05832520991;
- Sat, 12 Jan 2019 09:08:08 +0100 (CET)
-From: Jernej =?utf-8?B?xaBrcmFiZWM=?= <jernej.skrabec@siol.net>
-To: Chen-Yu Tsai <wens@csie.org>
-Subject: Re: [PATCH 1/3] media: dt: bindings: sunxi-ir: Add A64 compatible
-Date: Sat, 12 Jan 2019 09:08:08 +0100
-Message-ID: <4866484.1b519qCrCi@jernej-laptop>
-In-Reply-To: <CAGb2v66DiqK9sL-hQev4Wy08d9T7f1Yc2DFWJ0gYOnqChJyBRw@mail.gmail.com>
-References: <20190111173015.12119-1-jernej.skrabec@siol.net>
- <20190111173015.12119-2-jernej.skrabec@siol.net>
- <CAGb2v66DiqK9sL-hQev4Wy08d9T7f1Yc2DFWJ0gYOnqChJyBRw@mail.gmail.com>
+ id 1giEls-0005nM-Gh
+ for linux-arm-kernel@lists.infradead.org; Sat, 12 Jan 2019 08:36:01 +0000
+Received: by mail-lf1-x12a.google.com with SMTP id n18so12468994lfh.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sat, 12 Jan 2019 00:36:00 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:from:date:message-id:subject:to:cc;
+ bh=3q7lzdIPWxxxW/s8m7SmbDe4eKvvGBeobQNyq+dkjI4=;
+ b=Sgt4mnTZ6p7MnjbRssML7ifoxUYjM5i+ZJ13JlgknPaUHjcoGT22+e2jwVKm08kLMj
+ hqUZJ0jZB29FRnmwB6b1SHDIXcyW2eTX2d0W4VyzBGBgO4d6pWm+pGEEt733sXOcJ1ep
+ D4JN2FatNMNS1hZxCd4ZGrc+/CIpuM5h8PX5s=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:from:date:message-id:subject:to:cc;
+ bh=3q7lzdIPWxxxW/s8m7SmbDe4eKvvGBeobQNyq+dkjI4=;
+ b=bxy0v9ag56HcRMZBpETvJcoKEohEkuNizl4/j5mnMjs15YRDfZBzWPEn00uIiKmH90
+ QTNEHKJVZ3VRAFqT1zNORH6+ZjzdMbImyOToQ6BPhCbCjTc7nftDvQvvJmcpIEDj8lre
+ mWfHteye3TCwBrY3Zcq3h+vEBE1oIsMmiP0mI+2zV+d6OPTEJ+DrcZSH3nczfd8eJ487
+ LxUrRjWkgJF0QANq4tew+uOEl6+zYpHAdAI5XFUS6vcG6vP9o1gVy0IrUPD71T/Cxfl5
+ oGMeADt+/oQufdGDhsqis7Ap0jmjoYZcdj1hfTQAoZ0q5nTB5X13AxW/iMba3NwiT++1
+ jRwg==
+X-Gm-Message-State: AJcUukdHw3rZtUOr1m54cgvwJ9c5kuY5XStTUbJv5EooLJZV/4VrrsFl
+ gisFCoNg3Zd9MR/8NunQC/V7O35PJwJuMb0lGiKtyA==
+X-Google-Smtp-Source: ALg8bN4/7Lg/P6ylvdAhQ0R7XBdlQrCYrqCaiuEozR5w/rzpKMByNsSjN6udJts0AEZtKQnCnxwz4dFMjGEOeyB0SYA=
+X-Received: by 2002:a19:c801:: with SMTP id y1mr9301458lff.53.1547282158437;
+ Sat, 12 Jan 2019 00:35:58 -0800 (PST)
 MIME-Version: 1.0
+From: Linus Walleij <linus.walleij@linaro.org>
+Date: Sat, 12 Jan 2019 09:35:46 +0100
+Message-ID: <CACRpkdb-zphMyZbGh5XYy2A6B1224BGFmTwr0Bm98G3oM0MeoQ@mail.gmail.com>
+Subject: Hilscher NetX mach-netx refactorings
+To: Robert Schwebel <r.schwebel@pengutronix.de>, 
+ Pengutronix Kernel Team <kernel@pengutronix.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190112_000815_261185_194B84DF 
-X-CRM114-Status: GOOD (  21.01  )
+X-CRM114-CacheID: sfid-20190112_003600_563733_A5B03C87 
+X-CRM114-Status: UNSURE (   7.20  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,100 +84,32 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- linux-kernel <linux-kernel@vger.kernel.org>,
- linux-sunxi <linux-sunxi@googlegroups.com>, Rob Herring <robh+dt@kernel.org>,
- Mauro Carvalho Chehab <mchehab@kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Linux Media Mailing List <linux-media@vger.kernel.org>
+Cc: Olof Johansson <olof@lixom.net>, Arnd Bergmann <arnd@arndb.de>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Dne sobota, 12. januar 2019 ob 02:56:11 CET je Chen-Yu Tsai napisal(a):
-> On Sat, Jan 12, 2019 at 1:30 AM Jernej Skrabec <jernej.skrabec@siol.net> 
-wrote:
-> > A64 IR is compatible with A13, so add A64 compatible with A13 as a
-> > fallback.
-> 
-> We ask people to add the SoC-specific compatible as a contigency,
-> in case things turn out to be not so "compatible".
-> 
-> To be consistent with all the other SoCs and other peripherals,
-> unless you already spotted a "compatible" difference in the
-> hardware, i.e. the hardware isn't completely the same, this
-> patch isn't needed. On the other hand, if you did, please mention
-> the differences in the commit log.
+Hi Sascha, Robert,
 
-When comparing registers descriptions between A13 and A64, I noticed few minor 
-differences:
+I am looking at refactoring mach-netx to use the new PL11x
+DRM driver for the graphics.
 
-A13: RXINT: 11:6 RAL
-A64: RXINT: 13:8 RAL
+I need to make sure that patches get tested on the hardware
+and just want to ascertain that there is an active maintainer that
+will be able to test patches I make for this and work on getting
+it migrated to DRM before I start spending time on it.
 
-A13: IR_RXSTA: 12:6 RAC
-A64: IR_RXSTA: 14:8 RAC, 7 STAT (missing on A13)
+Are you/pengutronix still actively maintaining this machine and
+testing new kernels on netx?
 
-What is strange that  RAL and RAC field have offset defined as 8 in driver. I'm 
-not sure if that is a typo in A13 manual or driver issue. I assume the former, 
-otherwise it wouldn't work. I couldn't found original BSP driver source to 
-confirm, though.
+I guess the second question is whether you have plans to migrate
+it to device tree and multiplatform, but I'm mainly thinking about
+my own little patches now.
 
-STAT bit is really not that important. It just tells if IR unit is busy or 
-not.
-
-The biggest difference is in 0x34 register. A64 has one more clock option 
-(without postdivider), although register values are backward compatible. A64 
-also has Active threshold setting (duration of CIR going from idle to active 
-state).
-
-If we dismiss RAC and RAL differences as manual error and don't care for new 
-clock option and active threshold, then having new compatible maybe really 
-doesn't make sense.
-
-Best regards,
-Jernej
-
-> 
-> ChenYu
-> 
-> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> > ---
-> > 
-> >  Documentation/devicetree/bindings/media/sunxi-ir.txt | 5 ++++-
-> >  1 file changed, 4 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/media/sunxi-ir.txt
-> > b/Documentation/devicetree/bindings/media/sunxi-ir.txt index
-> > 278098987edb..ecac6964b69b 100644
-> > --- a/Documentation/devicetree/bindings/media/sunxi-ir.txt
-> > +++ b/Documentation/devicetree/bindings/media/sunxi-ir.txt
-> > @@ -1,7 +1,10 @@
-> > 
-> >  Device-Tree bindings for SUNXI IR controller found in sunXi SoC family
-> > 
-> >  Required properties:
-> > -- compatible       : "allwinner,sun4i-a10-ir" or "allwinner,sun5i-a13-ir"
-> > +- compatible       : value must be one of:
-> > +  * "allwinner,sun4i-a10-ir"
-> > +  * "allwinner,sun5i-a13-ir"
-> > +  * "allwinner,sun50i-a64-ir", "allwinner,sun5i-a13-ir"
-> > 
-> >  - clocks           : list of clock specifiers, corresponding to
-> >  
-> >                       entries in clock-names property;
-> >  
-> >  - clock-names      : should contain "apb" and "ir" entries;
-> > 
-> > --
-> > 2.20.1
-
-
-
-
+Yours,
+Linus Walleij
 
 _______________________________________________
 linux-arm-kernel mailing list
