@@ -2,88 +2,92 @@ Return-Path: <SRS0=Pwbl=PU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ABD59C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:59:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0ABEDC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:59:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6AEA820854
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:59:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CF1D420854
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:59:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LM8mz9eF";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="Y3klEJ3U"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6AEA820854
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WEd9hqA/";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="mQIZtJcm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CF1D420854
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=XeQIrTIHMv39lbAi3+PkZ7ObHawt8s0K2Bh+bsxQHXg=; b=LM8mz9eFiIK6Qr
-	gh+m/ogLpvBsKLXl1axy0G9SDY+Ax0gPo/Pj8npO4g1bJuJWwpidz9MI8vVYuAVulENuH6uvA6pAI
-	P5kqZEPYeuJiBxbiP74jAPHlNfdrFu9fa8T+ipGYd23u0GY0EE+CEeZwfWD0wnTLXUIxTQ1gU8d7k
-	ooqEU8LSF4+GPwEP4pQtCK2slnKfb6yryN3yaMv1EGWYBTle3eKC4QZgvOlKP4hjHJc6qUya64YtB
-	TqXxL8tFEaSF9zTaIp4HeXcRTr5iGJh48A/6GT+b4z6CVxGjWOFCEAxXfOvym3SARiylqd73vZjte
-	waAFxbXTudUshezbCnlw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=9feJWb21NLwAZWs2wyl4yWO06WweGn4jKpc+de/ChrY=; b=WEd9hqA/1mi4BT
+	6M798XKo4OfWFXtF4YGsul/Ap6mgFrotnjPgn+NB1WvxFMHnQsePf7CVuzTPHB0h/945DjeCbgSQZ
+	2/AyyJ4O0/QIu2G0+WrkW/ZMuwxZta7jKZLySkPc9Yqy2gyJComJKDP37zZD36S7s0xuaa3CjKRTl
+	BSBXuHl5heko+3ZsopmhxNmZvfkfYacDLB4iaXhWziecMD1r9FE2FNnV+dxEom7z6XZQBJT0jGpBr
+	rVN0L0H8H9Lw9gDbfQpSFEzVV9N7rrjsBg6ylshwFPi73HssPc9uQLv4Fja/1qDE59w5SqY1vYXxI
+	HPHm9kN/G+tN/xynG0mw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1giIt1-0004RG-3x; Sat, 12 Jan 2019 12:59:39 +0000
-Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+	id 1giItH-0004jj-Li; Sat, 12 Jan 2019 12:59:55 +0000
+Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1giIsx-0004Q0-2g; Sat, 12 Jan 2019 12:59:36 +0000
-Received: by mail-wm1-x341.google.com with SMTP id y139so4760795wmc.5;
- Sat, 12 Jan 2019 04:59:34 -0800 (PST)
+ id 1giIsy-0004Q3-3q; Sat, 12 Jan 2019 12:59:37 +0000
+Received: by mail-wr1-x444.google.com with SMTP id z5so17987452wrt.11;
+ Sat, 12 Jan 2019 04:59:35 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=googlemail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=eTpP1WjuCUG+0L8LD9GMYRrNbo3+PL/+r7PzDANtlnQ=;
- b=Y3klEJ3UdKzJf+eRpC+l0RjmvR85WZG3ckZ9KGcZCC3CZ78ye4aLXeZ7s9XY3gX80G
- uuv04pVOSzOCe4NCgb9G3RTkZBpM12rRy/HMT0a8GXyqBBu3t15JbYdTm657545TIeDH
- Uexf1F2TntB9iohM5fR75WYeaSWXaqoRI7KtrVBMXt0vBykoJkItl2xz/xqXR6bftqW9
- WB3dU2CCMWKzuRJ/klY19R4fjLcXe7McB7AciziYbEZc3OdK8HhpgESrI9J8GQuP9HWG
- L8IRE0ds8npiJaTBwshl0XU+tqxXNQQoAl/gFzDCuaPO+EJtcvRmRwjKx74pymVRY60T
- XpHw==
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=m38PpyT+0TrkN/Qg1dulRkwdOZ2VzWk99FJ00B4tZEw=;
+ b=mQIZtJcmI+p9O5b+ExXp0/oTSCjgaM5nfZ5lnO+oZJdk5baRg26Hhz90YMf3/4svI8
+ d/XszCO6cuX+yv4VVb8NIXjm5Mr5UGUHMqteBnpUgZsfJSIFa6BQrN/S8Cr3a/7qEa+9
+ v0sPqY3ZPWRvUNd+AP3PikaEYX4/h1zn87w6tN5otcXuj8jaj2k5SwVmcvO5m5dCWlIU
+ /oiwktTtZwlrDoisMthUb9uWTHrfJfrMn/gamrLlx2uumc5U34IriZiVVsWlDVO+2avS
+ lr2efBWsiI7XJiOgMPT+f7VA7D0Ksy/zNMKJ979fTuVdmwNGnvOF/Y9jFK2+hMARiouQ
+ tH1Q==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=eTpP1WjuCUG+0L8LD9GMYRrNbo3+PL/+r7PzDANtlnQ=;
- b=CRbze8KLfNLoZ9RveqL2ooJJTXR6um/fmbyn5L4pudb4pBdpJM3LRMnjPnLmVXviwL
- ujm+mV2iahE9+tD4MCfI0SEL59mLyLz2dPH8BZGo5LMUKCVGI6fkG2WwnXt3Bh+m+B5I
- HzivohPy9pGRKJg07qHiSDEjyO18dIMILwUlqAWLRNogKqiMHj62kcwJ2a0QOFpc/UA7
- rXfkxXTHJcdD/L2YFoLNTmTNEz/kT5fyVnQOAA4f6Wy6LXHWu8W2jxBOfuDNT2gAUEOs
- dM8GAMXD6eVlVpzgfUnTbOrNToUZstjw0qwczb2RRy6u52/a40rAKXFWSr0k0FKSWkO4
- TcEw==
-X-Gm-Message-State: AJcUukdq06Ah/YpDHbKnrJxnBTI7U7ggDEqqYXeAOIZ9MykAueLOLaXU
- G+8zepzcUWoxfqOh4RW5HMN3FDCg
-X-Google-Smtp-Source: ALg8bN7NbmwzeRYFuipzJXxW8+HEgYsF4LBXvU7a1Mfj6OqtR2+GpuKrrmef0y+r8k057RYxGFb1aQ==
-X-Received: by 2002:a1c:990c:: with SMTP id b12mr5952834wme.106.1547297972773; 
- Sat, 12 Jan 2019 04:59:32 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=m38PpyT+0TrkN/Qg1dulRkwdOZ2VzWk99FJ00B4tZEw=;
+ b=EK4FdCKHUwh1rWg/4EieaE+WsMhn5Itl6Z5DypeVrFfqRbvzOn2mIh9XH/H4LyELyq
+ v164yLWCefqp+F/0EvQaBlonl5Bbceinhm996+llNWS/H1griUlRKXPa0EmeTNx2P9Zo
+ l2/dpd5KXQvSwpRFQHn2uenhUJBVMwWAxTcPgHAFNJJe1s3hlFN74n8lpC//+my9aN/0
+ Pvjk2KkU6c15sbTPSCjevewLd8O4/xmzPSUBowbd+DBjdG93RIEfW8nFFCqr+fIto1jJ
+ MQXee8CchleKkBNjemQNtIIJLou7Xdk2kQ0a0QAj3lCKGMJ/ezsMCaKibMkTft7FMdvT
+ 1eJw==
+X-Gm-Message-State: AJcUukfokqnlvS+PZNDg5wjVDMBD2JTV3h526X2XVp97DDgCwAE5AGAp
+ nmt2+l38WMWa+Qy00CvfB1KrzVP1
+X-Google-Smtp-Source: ALg8bN4yHHT3M44qQd5zExDCqFweFLH9W8n1N5VZXjp8t1D/hAe5EYrLDXXwoFkYz2lzhj5E1hSOaA==
+X-Received: by 2002:adf:f785:: with SMTP id q5mr18330829wrp.9.1547297973987;
+ Sat, 12 Jan 2019 04:59:33 -0800 (PST)
 Received: from blackbox.darklights.net
  (p200300DCD7329F008D685E3E728ED25E.dip0.t-ipconnect.de.
  [2003:dc:d732:9f00:8d68:5e3e:728e:d25e])
- by smtp.googlemail.com with ESMTPSA id m4sm15034676wmi.3.2019.01.12.04.59.31
+ by smtp.googlemail.com with ESMTPSA id m4sm15034676wmi.3.2019.01.12.04.59.32
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sat, 12 Jan 2019 04:59:32 -0800 (PST)
+ Sat, 12 Jan 2019 04:59:33 -0800 (PST)
 From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 To: linux-amlogic@lists.infradead.org, linux-gpio@vger.kernel.org,
  linus.walleij@linaro.org
-Subject: [PATCH v4 0/1] Meson8b RGMII Ethernet pin fixes
-Date: Sat, 12 Jan 2019 13:59:12 +0100
-Message-Id: <20190112125913.22085-1-martin.blumenstingl@googlemail.com>
+Subject: [PATCH v4 1/1] pinctrl: meson: meson8b: add the eth_rxd2 and eth_rxd3
+ pins
+Date: Sat, 12 Jan 2019 13:59:13 +0100
+Message-Id: <20190112125913.22085-2-martin.blumenstingl@googlemail.com>
 X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190112125913.22085-1-martin.blumenstingl@googlemail.com>
+References: <20190112125913.22085-1-martin.blumenstingl@googlemail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190112_045935_116867_1C4C4EFF 
-X-CRM114-Status: GOOD (  12.58  )
+X-CRM114-CacheID: sfid-20190112_045936_152746_81D09B2A 
+X-CRM114-Status: GOOD (  12.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,54 +101,80 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
  khilman@baylibre.com, ingrassia@epigenesys.com,
- linux-arm-kernel@lists.infradead.org
+ linux-arm-kernel@lists.infradead.org, Jianxin Pan <jianxin.pan@amlogic.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This series fixes Ethernet RX performance on boards using a Gigabit PHY
-and a Meson8b SoC.
-We now reach near Gigabit speeds in RX and TX direction (when data is
-flowing in only one direction, full-duplex seems be have another issue
-which is probably not related to pinctrl).
+Gigabit Ethernet requires the Ethernet TXD0..3 and RXD0..3 data lines.
+Add the missing eth_rxd2 and eth_rxd3 definitions so we don't have to
+rely on the bootloader to set them up correctly.
 
+The vendor u-boot sources for Odroid-C1 use the following Ethernet
+pinmux configuration:
+  SET_CBUS_REG_MASK(PERIPHS_PIN_MUX_6, 0x3f4f);
+  SET_CBUS_REG_MASK(PERIPHS_PIN_MUX_7, 0xf00000);
+This translates to the following pin groups in the mainline kernel:
+- register 6 bit  0: eth_rxd1 (DIF_0_P)
+- register 6 bit  1: eth_rxd0 (DIF_0_N)
+- register 6 bit  2: eth_rx_dv (DIF_1_P)
+- register 6 bit  3: eth_rx_clk (DIF_1_N)
+- register 6 bit  6: eth_tx_en (DIF_3_P)
+- register 6 bit  8: eth_ref_clk (DIF_3_N)
+- register 6 bit  9: eth_mdc (DIF_4_P)
+- register 6 bit 10: eth_mdio_en (DIF_4_N)
+- register 6 bit 11: eth_tx_clk (GPIOH_9)
+- register 6 bit 12: eth_txd2 (GPIOH_8)
+- register 6 bit 13: eth_txd3 (GPIOH_7)
+- register 7 bit 20: eth_txd0_0 (GPIOH_6)
+- register 7 bit 21: eth_txd1_0 (GPIOH_5)
+- register 7 bit 22: eth_rxd3 (DIF_2_P)
+- register 7 bit 23: eth_rxd2 (DIF_2_N)
 
-Changes since v3 at [2]:
-- Collected Emiliano's and Kevin's Reviewed-by/Tested-by
-- dropped patch #2 (.dts patch) as it has been applied by Kevin already
-- include the linux-gpio mailing list this time
+All functions except eth_rxd2 and eth_rxd3 are already supported by the
+pinctrl-meson8b driver.
 
-
-Changes since v2 at [1]:
-- Thanks to Jianxin for providing the documentation for the two missing
-  bits in pin mux register 7
-- added a patch to add the missing eth_rxd2 and eth_rxd3 pin groups to
-  the pinctrl-meson8b driver
-- update the meson8.dtsi patch to include the eth_rxd2 and eth_rxd3 pin
-  groups on top of the previous change which only removed eth_txd0_1
-  and eth_txd1_1 (including the patch description)
-- update subject of the cover-letter and the meson8b.dtsi patch
-
-
-Changes since v1 at [0]:
-- rebased so it applies on top of "ARM: dts: meson: meson8b: add the CPU
-  OPP tables" which will be part of v4.20-rc1 once the arm-soc tree is
-  merged into mainline
-- updated patch description with more details
-
-
-[0] http://lists.infradead.org/pipermail/linux-amlogic/2018-May/007274.html
-[1] https://patchwork.kernel.org/cover/10744709/
-[2] https://patchwork.kernel.org/cover/10744905/
-
-
-Martin Blumenstingl (1):
-  pinctrl: meson: meson8b: add the eth_rxd2 and eth_rxd3 pins
-
+Suggested-by: Jianxin Pan <jianxin.pan@amlogic.com>
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+Tested-by: Emiliano Ingrassia <ingrassia@epigenesys.com>
+Reviewed-by: Emiliano Ingrassia <ingrassia@epigenesys.com>
+---
  drivers/pinctrl/meson/pinctrl-meson8b.c | 6 +++++-
  1 file changed, 5 insertions(+), 1 deletion(-)
 
+diff --git a/drivers/pinctrl/meson/pinctrl-meson8b.c b/drivers/pinctrl/meson/pinctrl-meson8b.c
+index c69ca95b1ad5..84938bd73ac2 100644
+--- a/drivers/pinctrl/meson/pinctrl-meson8b.c
++++ b/drivers/pinctrl/meson/pinctrl-meson8b.c
+@@ -346,6 +346,8 @@ static const unsigned int eth_rx_dv_pins[]	= { DIF_1_P };
+ static const unsigned int eth_rx_clk_pins[]	= { DIF_1_N };
+ static const unsigned int eth_txd0_1_pins[]	= { DIF_2_P };
+ static const unsigned int eth_txd1_1_pins[]	= { DIF_2_N };
++static const unsigned int eth_rxd3_pins[]	= { DIF_2_P };
++static const unsigned int eth_rxd2_pins[]	= { DIF_2_N };
+ static const unsigned int eth_tx_en_pins[]	= { DIF_3_P };
+ static const unsigned int eth_ref_clk_pins[]	= { DIF_3_N };
+ static const unsigned int eth_mdc_pins[]	= { DIF_4_P };
+@@ -599,6 +601,8 @@ static struct meson_pmx_group meson8b_cbus_groups[] = {
+ 	GROUP(eth_ref_clk,	6,	8),
+ 	GROUP(eth_mdc,		6,	9),
+ 	GROUP(eth_mdio_en,	6,	10),
++	GROUP(eth_rxd3,		7,	22),
++	GROUP(eth_rxd2,		7,	23),
+ };
+ 
+ static struct meson_pmx_group meson8b_aobus_groups[] = {
+@@ -748,7 +752,7 @@ static const char * const ethernet_groups[] = {
+ 	"eth_tx_clk", "eth_tx_en", "eth_txd1_0", "eth_txd1_1",
+ 	"eth_txd0_0", "eth_txd0_1", "eth_rx_clk", "eth_rx_dv",
+ 	"eth_rxd1", "eth_rxd0", "eth_mdio_en", "eth_mdc", "eth_ref_clk",
+-	"eth_txd2", "eth_txd3"
++	"eth_txd2", "eth_txd3", "eth_rxd3", "eth_rxd2"
+ };
+ 
+ static const char * const i2c_a_groups[] = {
 -- 
 2.20.1
 
