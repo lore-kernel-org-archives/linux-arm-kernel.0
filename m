@@ -2,86 +2,62 @@ Return-Path: <SRS0=Pwbl=PU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 61A2AC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:52:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 77BF2C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:56:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 311A82086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:52:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 470002086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:56:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lxVqmt8K";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="q1pgoOHo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 311A82086C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="u+lSJZr+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 470002086C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HZHb3yjJTguahvpj/QHQLVenC1rXspP3mXdCHsO0X5U=; b=lxVqmt8KeozFH9
-	RQJLSKfVqtq4DExUK74N0qWuiMa+VBvbs9tqvFhJGAvt4MBcdoxVrpghoENC6U5+i2YJMX5h2voWP
-	mWHyxQZmHDRmhCpdr13XbHdXj0N0FxI1sINRSbY4BFcNJBj/w0xjaC/DQkYEwURQVD6bd4Z5hp1zn
-	KdxYdEW7GGBipxJJsLi41pRzr8rzXvR6p8Ag6gYhw1SfXqaOjTFUmWoYS6i5odW1KxylhtBNdh2JH
-	CCBM4ZTKYzyz3V4WxwEWdPZCK5N1yhVkbBqloQaZJ6pjVWxsEuLvCvtzCQ3DCttsQXRmZR6S77V6E
-	+kUJU6KICpcMR6ZVA9Uw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=B9kymrFGCT1kXAIUUW5md3Tr9X8siJh/qC3frUedYRg=; b=u+lSJZr+qiW4mm
+	h9MYuOXcB6KfzQRbgBZ7HeH+MXabhL4bMF7TXT15fVzmGIZlwQ35NvgTBZ5NsXV3YeYibOBg0jFqE
+	oSKb4nH33bet37m1+tmvUe6ZW8v4beVDYHqrDifhjWKGlh6l0Idp5dDm+WbxpzEgWq3mWptMGXyw4
+	PPu5fiodU8t0Hpscw1d+szh+R6rIvM2ldIE0Npnl+KTEI4noseklqjYwsP82qdHQUvYfmFiCrsKAU
+	mNgjsA3ZDJldGIlOuEbUMuXDOsOBcUy4uWRCqi5B6aGPuKKksfoUUE6VhWIiDPFbFT+g4v8zrFaQd
+	RlMYCVBVr362l9ELYbCg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1giIls-00027Y-6G; Sat, 12 Jan 2019 12:52:16 +0000
-Received: from mail-oi1-x242.google.com ([2607:f8b0:4864:20::242])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1giIln-000266-Qm; Sat, 12 Jan 2019 12:52:13 +0000
-Received: by mail-oi1-x242.google.com with SMTP id r62so14484484oie.1;
- Sat, 12 Jan 2019 04:52:11 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=googlemail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=rc8PgVwzxQsHlZQUrvGoUgiJPD5Df1DMbVLjyQh0zEo=;
- b=q1pgoOHotLgRiITJMwR3Nr21zMoGSFOGtz6P5PnhJRSfFw8BXzxKwQpM2T1Qc1ZMlr
- SixSB9PBF882HCXbda+ZBauuRJ5F829xkYrydd192rBQpzSjrvIRkR3y0ptL17E+y9i7
- nAefVELdfy25SJ9Dc16gwjRS/SuTXGMtIs9vf+z9t50lEMByk6Ro2a8pLUyJXGweN5P/
- vpCj3oyB37wwXAf+TSEePtAo5o9FTBcAn2jhCcfB8frDfwBrLw8vZ3ipYcCq7DrXluyE
- HloibFgd30nkhG2XuOLMNtt1WrGvBfe/R8J/ObRRi4naLp8OIf3A9Zx4qu9IV/JPRyEk
- UNkw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=rc8PgVwzxQsHlZQUrvGoUgiJPD5Df1DMbVLjyQh0zEo=;
- b=ijJTPDmlyZllBr0Vb60B+d5Q5u0ykbgbopSCZVv9dEH2LJfsQrvjiTLKoAOJjJqUO4
- k67oUqbz8WIkg1vbVbNMf4R2Y0dRJBZXJKeebi8QZSx2t7mN4A2U7lKnOXZK5TxzLfq3
- cXkAf9dCzUFLgw9NvWGQeupSr83zmvj/kP6jnyI0XoaGYXHfljP2EYi5WSyJK/PhEnG9
- eshzzZ2A1xJx6xSEqUEOdHhP0RL7oglgA0fB/ooeh6u3E/4E5ECV7/mwyNqSrhd2+lqz
- BR6FjgIx33Mh85CrQGl1efXePMQMM43r7TicKmGgqs/O9W0oCna7YVg2GogEEF58uF9t
- lrxA==
-X-Gm-Message-State: AJcUukezJZswbf9GIHgZoDgXk1RlF963wuer7iC1b/JIwD88REIf94tx
- WOKXYDhhEitbf7I4tmqm0Ov2q5khGCSySusaKO8=
-X-Google-Smtp-Source: ALg8bN4s/+TIOtaCGkyhh7CyvpozXsXOtaZQJBwt7+upDR/L+/pzeM+4SuHESOQYRYmAIP/g3kFWjvWzYSNapsi+MGg=
-X-Received: by 2002:aca:4ace:: with SMTP id
- x197mr12016181oia.129.1547297530740; 
- Sat, 12 Jan 2019 04:52:10 -0800 (PST)
+	id 1giIpZ-0003uq-PI; Sat, 12 Jan 2019 12:56:05 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1giIpV-0003uP-U0
+ for linux-arm-kernel@lists.infradead.org; Sat, 12 Jan 2019 12:56:03 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 08DDE80D;
+ Sat, 12 Jan 2019 04:56:00 -0800 (PST)
+Received: from [10.162.40.80] (p8cg001049571a15.blr.arm.com [10.162.40.80])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 21A493F70D;
+ Sat, 12 Jan 2019 04:55:49 -0800 (PST)
+Subject: Re: [PATCH] mm: Introduce GFP_PGTABLE
+To: Matthew Wilcox <willy@infradead.org>
+References: <1547288798-10243-1-git-send-email-anshuman.khandual@arm.com>
+ <20190112121230.GQ6310@bombadil.infradead.org>
+From: Anshuman Khandual <anshuman.khandual@arm.com>
+Message-ID: <9dd9a8ef-8db8-891c-79a9-270ab033037c@arm.com>
+Date: Sat, 12 Jan 2019 18:25:48 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.9.1
 MIME-Version: 1.0
-References: <20181202220847.24364-1-martin.blumenstingl@googlemail.com>
- <20181202220847.24364-3-martin.blumenstingl@googlemail.com>
- <85aa8e12-0bca-6432-e1a8-0faceff1dd5e@codethink.co.uk>
- <CAFBinCBDUxTc+ofCYm-zEeiFdU90U6DQOkX4B659q=MvRK64fg@mail.gmail.com>
- <CAFBinCAY7+-zA5-hY6oXmFz2i8aj9wFJsb-HBbKt_Swn9BtMMg@mail.gmail.com>
-In-Reply-To: <CAFBinCAY7+-zA5-hY6oXmFz2i8aj9wFJsb-HBbKt_Swn9BtMMg@mail.gmail.com>
-From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Date: Sat, 12 Jan 2019 13:52:00 +0100
-Message-ID: <CAFBinCCKeb+wGJ4h_PfsT-Ms8AtLmNSwStTpeMqA3shkySjGkg@mail.gmail.com>
-Subject: Re: [PATCH v5 2/2] rtc: support for the Amlogic Meson RTC
-To: ben.dooks@codethink.co.uk
+In-Reply-To: <20190112121230.GQ6310@bombadil.infradead.org>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190112_045211_871313_8EF8DE78 
-X-CRM114-Status: GOOD (  14.59  )
+X-CRM114-CacheID: sfid-20190112_045601_984581_C0C16D46 
+X-CRM114-Status: GOOD (  13.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,49 +69,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-rtc@vger.kernel.org, a.zummo@towertech.it,
- alexandre.belloni@bootlin.com, ccaione@baylibre.com,
- linux-kernel@vger.kernel.org, linux-amlogic@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, mhocko@suse.com, linux-sh@vger.kernel.org,
+ peterz@infradead.org, catalin.marinas@arm.com, dave.hansen@linux.intel.com,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org, linux-mm@kvack.org,
+ kvmarm@lists.cs.columbia.edu, mpe@ellerman.id.au, linux@armlinux.org.uk,
+ mingo@redhat.com, vbabka@suse.cz, rientjes@google.com, marc.zyngier@arm.com,
+ rppt@linux.vnet.ibm.com, shakeelb@google.com, kirill@shutemov.name,
+ tglx@linutronix.de, linux-arm-kernel@lists.infradead.org,
+ ard.biesheuvel@linaro.org, robin.murphy@arm.com, steve.capper@arm.com,
+ christoffer.dall@arm.com, james.morse@arm.com, aneesh.kumar@linux.ibm.com,
+ akpm@linux-foundation.org, linuxppc-dev@lists.ozlabs.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Ben,
-
-On Tue, Dec 18, 2018 at 12:48 AM Martin Blumenstingl
-<martin.blumenstingl@googlemail.com> wrote:
->
-> Hi Ben,
->
-> On Wed, Dec 5, 2018 at 11:15 PM Martin Blumenstingl
-> <martin.blumenstingl@googlemail.com> wrote:
-> [...]
-> > > > Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> > > > [resurrected Ben's patches after 2 years]
-> > > > Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> > >
-> > > Just checking if the change of author is deliberate?
-> > > not sure how to do >1 author on patches like this.
-> > I changed the author on purpose after seeing how much I changed
-> > (compared to your v4). this is also why I added you to the CC list
-> > however, I left in your copyright (just like you kept Carlo's
-> > copyright note) and MODULE_AUTHOR
-> please let me know:
-> 1. whether you want to be the author of the patch or if you're fine
-> with my name in there
-> 2. if you are fine with both of us being listed as Signed-off-by or if
-> you want me to switch to Co-authored-by
-> 3. about any other concerns you have
->
-> I would like to update this patch next weekend so it can be reviewed
-> (and merged once all is fine) for v4.22
-gentle ping on this one now that the holiday season is over.
 
 
-Regards
-Martin
+On 01/12/2019 05:42 PM, Matthew Wilcox wrote:
+> On Sat, Jan 12, 2019 at 03:56:38PM +0530, Anshuman Khandual wrote:
+>> All architectures have been defining their own PGALLOC_GFP as (GFP_KERNEL |
+>> __GFP_ZERO) and using it for allocating page table pages.
+> 
+> Except that's not true.
+> 
+>> +++ b/arch/x86/mm/pgtable.c
+>> @@ -13,19 +13,17 @@ phys_addr_t physical_mask __ro_after_init = (1ULL << __PHYSICAL_MASK_SHIFT) - 1;
+>>  EXPORT_SYMBOL(physical_mask);
+>>  #endif
+>>  
+>> -#define PGALLOC_GFP (GFP_KERNEL_ACCOUNT | __GFP_ZERO)
+>> -
+>>  #ifdef CONFIG_HIGHPTE
+> 
+> ...
+> 
+>>  pte_t *pte_alloc_one_kernel(struct mm_struct *mm)
+>>  {
+>> -	return (pte_t *)__get_free_page(PGALLOC_GFP & ~__GFP_ACCOUNT);
+>> +	return (pte_t *)__get_free_page(GFP_PGTABLE & ~__GFP_ACCOUNT);
+>>  }
+> 
+> I think x86 was the only odd one out here, but you'll need to try again ...
+
+IIUC the user page table pages need __GFP_ACCOUNT not the kernel ones. Hence
+in the above function it clears out __GFP_ACCOUNT for kernel page table page
+allocations but where as by default it has got __GFP_ACCOUNT which would be
+used for user page tables. Instead we can make X86 user allocations add
+__GFP_ACCOUNT (like other archs) to generic GFP_PGTABLE when ever required.
 
 _______________________________________________
 linux-arm-kernel mailing list
