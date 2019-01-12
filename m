@@ -2,86 +2,67 @@ Return-Path: <SRS0=Pwbl=PU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BC268C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 01:56:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 85C30C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 02:29:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8BB8120870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 01:56:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 518E420870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 02:29:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ao+CQ8sf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8BB8120870
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Sr+5yd5m";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="lOmH5y9Q"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 518E420870
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=YND+cjkw9Kto0WypZEd46gxG5v6wQ8J2qN7KZ5phuDs=; b=ao+CQ8sfju6lWe
-	JEjeQoFIwid/MHJu3jHWXGo4mbUgKdr+9XoZNytABlom0kI3tAaipyyj0Zy4XtA1dIw/lWvGROB9R
-	cNxEhPVm+7/eNqf/kkA2tGM9eWrEKo15GzM6IgSDzBYad+hf0VO44h3DTouSxnn+hZL40+o4CIxCl
-	V4rQiANo0OZ2/YKZ7meKSJjtZoz7UJcm7D87Ta2LCr9AtQVLSgymk8j8WvztkfsqvNWJs8Ehh7VFx
-	vjEWaRcQ/ap5IuIml23kDMCtu88B1r3gZX8uCArA2qsTbRQ9bLsLhradoZVltp1322DYjaJ+qRykQ
-	u9cRg7smrNv5WgbR7QMA==;
+	List-Owner; bh=pnViJ4GcG0QKdavMr88c/CdeiuzUkZreIJUmO976yYw=; b=Sr+5yd5movYc5X
+	O3l4rv50nc8rRVGvWSWQL2D4JLDf8bzfYAB9PeqU/OUyL1SshhqhmQWriT3rkLRWekiwMfwH6BNID
+	wm9qg+UT2CQlDf/O1GkUKJdVl3gRmKQ106SdQOlzRCNWtwyyRHrntpsMNIytL4sMw4C/6afjDQSQe
+	Knei5pe8HrdXjqE9cACKVEpB8fnHYaqBppu9PDknI3dEsISzhHmeVAKrTA05z2c2l68uwT/rcmex/
+	ZEuiSXSXI5girkCoQdISHHHotr4s6V7GQRlxWVVGO5OOfwDXQMjXM15onw7DlldgGmLReKDuCS2Ou
+	DgnSUNdHcBq7cU+1QkHg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gi8XJ-0005iy-0I; Sat, 12 Jan 2019 01:56:33 +0000
-Received: from mail-ed1-f67.google.com ([209.85.208.67])
+	id 1gi92u-0006p3-V1; Sat, 12 Jan 2019 02:29:12 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gi8XF-0005iK-0h
- for linux-arm-kernel@lists.infradead.org; Sat, 12 Jan 2019 01:56:30 +0000
-Received: by mail-ed1-f67.google.com with SMTP id y20so14502227edw.9
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 11 Jan 2019 17:56:25 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=9WCLRL4nc+FIeUAVSUDQFW8YoU/sIv0w+O0XhmejYKw=;
- b=PLOK2RRmOM+d856lvDxLbJ6S+TIJcj42WwD+OMtrF/YLWW/TIltCDywn5/j+wZjt5T
- jhwE+EEXSeNwfKA89RN6iSiTFNiv3yzEhnlttV8axz7gNYiwyVXwd1fRq6rDpGwEG3qD
- k7F/gkqy2myVE/aAJiRRPxIRiB67WAW+0yMG9HfNq8sTXmErVgdRx2vkEl4u9kAyEGWA
- OJTPMQiaM9e6BsVKwIgQQ3apsSjfSf1VWbuFkiPRCEp+9oMcaokrw57xjOPJuW3XuBgg
- OGIiEYayugCO2WGT1ot0b6YfJtuJQvG3MNeEhh4+UzSL/REu6I6MKa3OB6/6gjVFbPcL
- +fIA==
-X-Gm-Message-State: AJcUukeQn3qd4Qnhmd3bppfFnLFdcO4bWF1n3eY80hFXnFKQIk8RI0v8
- t2LTZN5WXado02L+F7TCA35ZXiqGU2k=
-X-Google-Smtp-Source: ALg8bN4Q4fObNARiNPJ8J4/v90CY96DtmI9DadGy+6H27erhaQbVjfYjT1i0O81BA5ced+cIOg+p2Q==
-X-Received: by 2002:a17:906:228d:: with SMTP id
- p13-v6mr13398096eja.159.1547258184292; 
- Fri, 11 Jan 2019 17:56:24 -0800 (PST)
-Received: from mail-wr1-f51.google.com (mail-wr1-f51.google.com.
- [209.85.221.51])
- by smtp.gmail.com with ESMTPSA id b46sm3014182edc.57.2019.01.11.17.56.23
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 11 Jan 2019 17:56:24 -0800 (PST)
-Received: by mail-wr1-f51.google.com with SMTP id p4so17099174wrt.7
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 11 Jan 2019 17:56:23 -0800 (PST)
-X-Received: by 2002:adf:a1d2:: with SMTP id v18mr14898494wrv.87.1547258183588; 
- Fri, 11 Jan 2019 17:56:23 -0800 (PST)
+ id 1gi92s-0006oi-35
+ for linux-arm-kernel@lists.infradead.org; Sat, 12 Jan 2019 02:29:11 +0000
+Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
+ (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id C836320870;
+ Sat, 12 Jan 2019 02:29:08 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1547260149;
+ bh=rEDCBZjo/ENkRtN96vNDuYB78NtoZgMQINLim7UVwpA=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=lOmH5y9QEo7Fbm3bGTAaiDrWEkCqjNIcljzd0zmScGR+Ogym8OQxGuAmvaWZmt+Qb
+ eIfXVwaPDmV7Ft6xLfS2LXaN5e2n7UUVH8oBAVKoNMRxIrzclV79bvaCDaim/ZZVyo
+ OZYNXXIhxM/ysNSsjwc4xym12v0tYUCsxWjBQvRU=
+Date: Sat, 12 Jan 2019 10:28:58 +0800
+From: Shawn Guo <shawnguo@kernel.org>
+To: Alexander Shiyan <shc_work@mail.ru>
+Subject: Re: [PATCH] ARM: dts: imx51: Add default bus-width property for esdhc1
+Message-ID: <20190112022856.GM32649@dragon>
+References: <20181219190734.23331-1-shc_work@mail.ru>
 MIME-Version: 1.0
-References: <20190111173015.12119-1-jernej.skrabec@siol.net>
- <20190111173015.12119-2-jernej.skrabec@siol.net>
-In-Reply-To: <20190111173015.12119-2-jernej.skrabec@siol.net>
-From: Chen-Yu Tsai <wens@csie.org>
-Date: Sat, 12 Jan 2019 09:56:11 +0800
-X-Gmail-Original-Message-ID: <CAGb2v66DiqK9sL-hQev4Wy08d9T7f1Yc2DFWJ0gYOnqChJyBRw@mail.gmail.com>
-Message-ID: <CAGb2v66DiqK9sL-hQev4Wy08d9T7f1Yc2DFWJ0gYOnqChJyBRw@mail.gmail.com>
-Subject: Re: [PATCH 1/3] media: dt: bindings: sunxi-ir: Add A64 compatible
-To: Jernej Skrabec <jernej.skrabec@siol.net>
+Content-Disposition: inline
+In-Reply-To: <20181219190734.23331-1-shc_work@mail.ru>
+User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190111_175629_062999_158264A4 
-X-CRM114-Status: GOOD (  18.90  )
+X-CRM114-CacheID: sfid-20190111_182910_169037_B3F2A4C9 
+X-CRM114-Status: GOOD (  17.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,59 +74,111 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- linux-kernel <linux-kernel@vger.kernel.org>,
- linux-sunxi <linux-sunxi@googlegroups.com>, Rob Herring <robh+dt@kernel.org>,
- Mauro Carvalho Chehab <mchehab@kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Linux Media Mailing List <linux-media@vger.kernel.org>
+Cc: kernel@pengutronix.de, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, Jan 12, 2019 at 1:30 AM Jernej Skrabec <jernej.skrabec@siol.net> wrote:
->
-> A64 IR is compatible with A13, so add A64 compatible with A13 as a
-> fallback.
+On Wed, Dec 19, 2018 at 10:07:34PM +0300, Alexander Shiyan wrote:
+> This patch adds bus-width property for esdhc1 to avoid mmc
+> core warning: "bus-width" property is missing, assuming 1 bit.
+> Additionally, the patch removes this property for boards where
+> 4-bit width is already specified, and adds 1-bit width for
+> boards where this property is omitted.
 
-We ask people to add the SoC-specific compatible as a contigency,
-in case things turn out to be not so "compatible".
+I suspect that even boards omitting the property support more than just
+1-bit.  The warning is a good reminder for board maintainers/users  to
+check the bus-width.
 
-To be consistent with all the other SoCs and other peripherals,
-unless you already spotted a "compatible" difference in the
-hardware, i.e. the hardware isn't completely the same, this
-patch isn't needed. On the other hand, if you did, please mention
-the differences in the commit log.
+Shawn
 
-ChenYu
-
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 > ---
->  Documentation/devicetree/bindings/media/sunxi-ir.txt | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/media/sunxi-ir.txt b/Documentation/devicetree/bindings/media/sunxi-ir.txt
-> index 278098987edb..ecac6964b69b 100644
-> --- a/Documentation/devicetree/bindings/media/sunxi-ir.txt
-> +++ b/Documentation/devicetree/bindings/media/sunxi-ir.txt
-> @@ -1,7 +1,10 @@
->  Device-Tree bindings for SUNXI IR controller found in sunXi SoC family
->
->  Required properties:
-> -- compatible       : "allwinner,sun4i-a10-ir" or "allwinner,sun5i-a13-ir"
-> +- compatible       : value must be one of:
-> +  * "allwinner,sun4i-a10-ir"
-> +  * "allwinner,sun5i-a13-ir"
-> +  * "allwinner,sun50i-a64-ir", "allwinner,sun5i-a13-ir"
->  - clocks           : list of clock specifiers, corresponding to
->                       entries in clock-names property;
->  - clock-names      : should contain "apb" and "ir" entries;
-> --
-> 2.20.1
->
+>  arch/arm/boot/dts/imx51-apf51dev.dts                   | 1 -
+>  arch/arm/boot/dts/imx51-babbage.dts                    | 1 +
+>  arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts | 1 +
+>  arch/arm/boot/dts/imx51-ts4800.dts                     | 1 +
+>  arch/arm/boot/dts/imx51-zii-rdu1.dts                   | 1 -
+>  arch/arm/boot/dts/imx51.dtsi                           | 1 +
+>  6 files changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
+> index 3e1846a..b26d92f 100644
+> --- a/arch/arm/boot/dts/imx51-apf51dev.dts
+> +++ b/arch/arm/boot/dts/imx51-apf51dev.dts
+> @@ -97,7 +97,6 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_esdhc1>;
+>  	cd-gpios = <&gpio2 29 GPIO_ACTIVE_LOW>;
+> -	bus-width = <4>;
+>  	status = "okay";
+>  };
+>  
+> diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+> index 35ee1b4..8e86116 100644
+> --- a/arch/arm/boot/dts/imx51-babbage.dts
+> +++ b/arch/arm/boot/dts/imx51-babbage.dts
+> @@ -322,6 +322,7 @@
+>  &esdhc1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_esdhc1>;
+> +	bus-width = <1>;
+>  	cd-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
+>  	wp-gpios = <&gpio1 1 GPIO_ACTIVE_HIGH>;
+>  	status = "okay";
+> diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+> index e9e819f..f2c3c87 100644
+> --- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+> +++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+> @@ -101,6 +101,7 @@
+>  &esdhc1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_esdhc1 &pinctrl_esdhc1_cd>;
+> +	bus-width = <1>;
+>  	cd-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/imx51-ts4800.dts b/arch/arm/boot/dts/imx51-ts4800.dts
+> index 39eb067..e6d25a5 100644
+> --- a/arch/arm/boot/dts/imx51-ts4800.dts
+> +++ b/arch/arm/boot/dts/imx51-ts4800.dts
+> @@ -82,6 +82,7 @@
+>  &esdhc1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_esdhc1>;
+> +	bus-width = <1>;
+>  	cd-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
+>  	wp-gpios = <&gpio1 1 GPIO_ACTIVE_HIGH>;
+>  	status = "okay";
+> diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+> index 69d753c..1287b57 100644
+> --- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
+> +++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+> @@ -459,7 +459,6 @@
+>  &esdhc1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_esdhc1>;
+> -	bus-width = <4>;
+>  	no-1-8-v;
+>  	non-removable;
+>  	no-sdio;
+> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+> index 67d4627..eac432a 100644
+> --- a/arch/arm/boot/dts/imx51.dtsi
+> +++ b/arch/arm/boot/dts/imx51.dtsi
+> @@ -172,6 +172,7 @@
+>  						 <&clks IMX5_CLK_DUMMY>,
+>  						 <&clks IMX5_CLK_ESDHC1_PER_GATE>;
+>  					clock-names = "ipg", "ahb", "per";
+> +					bus-width = <4>;
+>  					status = "disabled";
+>  				};
+>  
+> -- 
+> 2.10.2
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
