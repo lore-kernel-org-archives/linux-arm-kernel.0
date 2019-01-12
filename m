@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3A5E5C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:45:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 38949C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:45:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 03CBF2086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:45:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E8F692086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:45:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VaiRyY8w"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 03CBF2086C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ERCcXLwS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E8F692086C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,51 +26,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=pMqfB8+/Dg31NExFEdQseot0ioVPhWB+K2E0V2zr3ek=; b=VaiRyY8wYPYSGRt+KZ6P11hxR0
-	PIc0bS/Gqdy5bm7gsH1DOpj6NB9xyNphlPtRaUiyRsGGMfV/42Z8cAH9aCSpxfyGXXrZaMq7eoF95
-	ORbwNA+SnWXnDURPKTJ6i445cMLs2XuDR7YSUv6qeH9xYHBvbVhyYzcJSC8DqZSwELZ8P6AWApRG/
-	y+IL1ZRf8gp/c82TWX+h1rRwgbiTvpv8dOs3cmO2uyuKzKqh+13YcKG913KoHOj3VF5DxCpkrLNgc
-	xVbcFldW5+oVGXY7CLjUeGGEOIexvWDD4rnI0oiFlhdgoXdVorEogCNoMkkLV/keEuDrqb/q6Gq88
-	n1WR7aWA==;
+	bh=FGAnBmb3C+XD38TkscBbWtKoHxSLGP5xWqQ6ieBTwN4=; b=ERCcXLwSEEYf/jvnRCw9D5WSgM
+	gSBbwrbWIqU74vqxrvigHSadclvJOnHRG3uSNoJfHQHQRRs29StZhCaQlrDRloCkrvAmqoGSXjvnY
+	bJYYwoTxG0/J6+2WzX5n3HLyDMnjUQkFf7n0krRBWUM7aDZHn+lwI4HBwmJsolb1AXMUHOMRAcjDT
+	Vp2z/TnooV1dbFteuZi80a+fvUl+7nfalHT1tkVOhQtdLkLV+mnWQKp5ovEZt+TS3MHNdmI/woKBM
+	XDLADnMyWUYNUu9Vjj945Uqx/wAAX+hCInCBKB8+9pa3iTFKCfV24Tshm/PsmxkcP1ukN+ZbWOvh/
+	NP6AlovA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1giIfQ-0008Jf-8S; Sat, 12 Jan 2019 12:45:36 +0000
-Received: from mout.kundenserver.de ([217.72.192.75])
+	id 1giIfe-00007X-2A; Sat, 12 Jan 2019 12:45:50 +0000
+Received: from mout.kundenserver.de ([217.72.192.74])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1giIe3-0005sq-LX; Sat, 12 Jan 2019 12:44:14 +0000
+ id 1giIe3-0005sj-K0; Sat, 12 Jan 2019 12:44:15 +0000
 Received: from localhost.localdomain ([37.4.249.153]) by
  mrelayeu.kundenserver.de (mreue107 [212.227.15.183]) with ESMTPSA (Nemesis)
- id 1N94qX-1hN3Sw2Ced-0165Go; Sat, 12 Jan 2019 13:44:01 +0100
+ id 1N49Qd-1hPmUb47ST-0101Wy; Sat, 12 Jan 2019 13:44:01 +0100
 From: Stefan Wahren <stefan.wahren@i2se.com>
 To: Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
  Florian Fainelli <f.fainelli@gmail.com>, Ray Jui <rjui@broadcom.com>,
  Scott Branden <sbranden@broadcom.com>, Eric Anholt <eric@anholt.net>
-Subject: [PATCH 4/6] ARM: dts: bcm2837-rpi-3-b: Use consistent label for HDMI
- hotplug
-Date: Sat, 12 Jan 2019 13:43:26 +0100
-Message-Id: <1547297008-2740-5-git-send-email-stefan.wahren@i2se.com>
+Subject: [PATCH 3/6] ARM: dts: bcm2835: Fix labels for GPIO 0,1
+Date: Sat, 12 Jan 2019 13:43:25 +0100
+Message-Id: <1547297008-2740-4-git-send-email-stefan.wahren@i2se.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1547297008-2740-1-git-send-email-stefan.wahren@i2se.com>
 References: <1547297008-2740-1-git-send-email-stefan.wahren@i2se.com>
-X-Provags-ID: V03:K1:FR5dWh7Bc7ez/2t7UujYBV6wbjP24rJ3IIBr6DeJzE4EixhKGqS
- 3ilshHe46R9iW17IU856fqbAJ+QTgMPdUZbyQvN4uc2gJQ3aaQCzy22HSKBWWrtMxX4CZn0
- 4Nglfks85Fyde7xl7tx/zQUEFscUygaRRPK+rycSa2j0GcP+TdQV18NhCzao8PhxFDq8KQ3
- jYwfBwpAwChPLMTBnjDtQ==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:W33OjkYlMVQ=:a9YtAGBv47gUQfX/RzJzAb
- 18/pyrAjqIhGDroLfNmx5nzlwPNXIjmIJNNSYWOJvh1Jts7HAWWXO0sHfla8wsyuEnAt7LXXb
- kCE5eGyAcAfD25PimxmlPdpafsCHU6+dbnnSHwY73PCQCvLnX8hDkJ1hmZthy33ZLAZvri+wd
- UX3w/ajzz11VzFr8B7z3JgqVFmR9z/HPsMZ1jY+zELeRCBQIKgB2x1pHCQsZizz7iAIX4OynB
- xcRtFG+tl9fidGvMev8KMfdOjPii5RWIwjEhtKqBGmjCOtjQh99JeL8AGQHnuexsDtvrGrsgx
- rgUNfR6QrVgdZsBGJxT41rH+VPxW0SocMxrwXl3r1b+V9EBp1poHFooK2BiGqV/T3pz+7g8v4
- Xb+joSpoOsJOT/6/4e1veQhotEF+b/CRGAYVyIpKbJ0nDdno1Dl89qFQwOFvLWdYaaY5bcbTg
- 7vxZmKXI8bwY+tmVDhpGf9r5MemDQWZLS6M9bECCw530bvHH66n5a+ioMJxpIbQOwR5DZgEO1
- b3YhR9k0u9n2Xgl+2eMDwEFRHEi18H92P1d+dL2euVkES5tWOWN8dqinuQ9+gxc1vf7fP2jgc
- k/709lQMcU3/VBGAqrij1OpSjN1RPOrkh74g8IZW3+CCrnOF7GgMFU15KYDSCGHGGFXjmMeqN
- +V6cgbrfthOE6UbkmTohuzsyDRYzUmDdJspzO/QBNIWlG3ubwHimSoDBRVPM1XH/mgTyy6NtW
- 6MtW2hyGiz4TVUZytx5wDVqnevttmYirjAheH2lUeSFzi88rrV0tWl6k0HE=
+X-Provags-ID: V03:K1:QJCZ1BJqaup6vHEhzK3pWfsZUAG8j96znb+fC6R3hbojjx4PWx5
+ Z6jL6mXzJTtOs3gaL2F5sTuT1mouRrms1+q/sy4YvDuI+b3rTMlTTrDNY0lusedCTF/WB5X
+ wxUsCoCchR+9YKiIVE7LibdIa149w6WTQBIz1ok1OnamK4CzAnj4u3TGeGjlJVAUy3xSLwf
+ V5O1qaxp4Db2F7NXXjqxw==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:zL4cEz61ssA=:De3HcWXpJsDH3ZFrbhrFaI
+ bVIr/ZJy/dQt+7w/A+/+oSJ842N+lmEggXIpODEdEpn0TOhYEEicrCME4OczQ78IH+RLIwTpb
+ jfeAG7sH6kU/XSCtULAH3XVVWZ/6c4B8cFcjTVf9qq0Qa9C1/9Z7ZdFQAp/IDAeWnf+TQ1DX3
+ 5GimZwbwKFAghckAyiUHYQw5FI+3R5PuhZxLdgTHb3BQoY/3C+CZLwr6SedMChZTZ/oAQ6yB1
+ 6dH8DfYL1KyP3a9MgHaIQg9k14JgvMLKGQGAezJwy6izQTpUtVOStNSeuYtAQD1Y9iQXRmTqW
+ sT/z+FANDi8l2GANh055aoj+WFkrR4lM5pXOoa+2+AdDRaMOJbEf+zY8Xmzh6AOQX2mI6lpuX
+ BgAV6inaiUdxPHGcdJEW0251Q84o7JLhST1wxF2DouHIkNZBJnpePgXnIo/9er2UyOeedDHq9
+ juffppkif/MCGaW35SeUUO9Bk+S+L7euq5xytDJ7BP7EZC9MldSrbl4kj/e+9nhLjIzahBEw1
+ 1Vue9o55EQ9yEBYF5lIp3yqVAxlX4jz8Ma2wvWximaws5ZtwfEMYMcsvHIcKAMyPCY8XjFCHo
+ 87ELVJ/NeUId5aAsHrS3PFjMNk7pmbDBUcKaek/G9mG5hnU6M00tFuloRNEn+AdSyDEUWT8qx
+ 5a4hFcYA/3l9PAv5H/AMlvf0jfBg2URQkdSSTYdwo78Uou8NdzpaXmPCUafhhihGQjGVv8G9o
+ JZRk736AaIB6AtHXON0PxjAZRPf9k9ln/+x9MQ5RUqs0sAWcPSrIVUVV9GQ=
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190112_044412_168490_F7C94FF0 
-X-CRM114-Status: GOOD (  15.90  )
+X-CRM114-CacheID: sfid-20190112_044412_170278_2B8BAEEE 
+X-CRM114-Status: GOOD (  14.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,27 +91,78 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This make the GPIO label for HDMI hotplug more consistent to the other
-boards.
+According to the schematics for all RPis with a 40 pin header,
+the GPIOs 0 and 1 are labeled as ID_SD and ID_SC. In order to
+clarify that is a I2C bus, append the third letter.
 
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/bcm2835-rpi-a-plus.dts | 4 ++--
+ arch/arm/boot/dts/bcm2835-rpi-b-plus.dts | 4 ++--
+ arch/arm/boot/dts/bcm2835-rpi-zero-w.dts | 4 ++--
+ arch/arm/boot/dts/bcm2835-rpi-zero.dts   | 4 ++--
+ 4 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-index 9abb9c5..31b1c03 100644
---- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-+++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-@@ -39,7 +39,7 @@
- 				  "WL_ON",
- 				  "STATUS_LED",
- 				  "LAN_RUN",
--				  "HPD_N",
-+				  "HDMI_HPD_N",
- 				  "CAM_GPIO0",
- 				  "CAM_GPIO1",
- 				  "PWR_LOW_N";
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
+index 2cd9c5e..db8a601 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
+@@ -31,8 +31,8 @@
+ 	 * "FOO" = GPIO line named "FOO" on the schematic
+ 	 * "FOO_N" = GPIO line named "FOO" on schematic, active low
+ 	 */
+-	gpio-line-names = "SDA0",
+-			  "SCL0",
++	gpio-line-names = "ID_SDA",
++			  "ID_SCL",
+ 			  "SDA1",
+ 			  "SCL1",
+ 			  "GPIO_GCLK",
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
+index cfbdaac..1e40d67 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
+@@ -33,8 +33,8 @@
+ 	 * "FOO" = GPIO line named "FOO" on the schematic
+ 	 * "FOO_N" = GPIO line named "FOO" on schematic, active low
+ 	 */
+-	gpio-line-names = "SDA0",
+-			  "SCL0",
++	gpio-line-names = "ID_SDA",
++			  "ID_SCL",
+ 			  "SDA1",
+ 			  "SCL1",
+ 			  "GPIO_GCLK",
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts b/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
+index 644d907..5765d34 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
+@@ -40,8 +40,8 @@
+ 	 * "FOO" = GPIO line named "FOO" on the schematic
+ 	 * "FOO_N" = GPIO line named "FOO" on schematic, active low
+ 	 */
+-	gpio-line-names = "GPIO0",
+-			  "GPIO1",
++	gpio-line-names = "ID_SDA",
++			  "ID_SCL",
+ 			  "SDA1",
+ 			  "SCL1",
+ 			  "GPIO_GCLK",
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-zero.dts b/arch/arm/boot/dts/bcm2835-rpi-zero.dts
+index 00323ba..3b35a8a 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-zero.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-zero.dts
+@@ -28,8 +28,8 @@
+ 	 * "FOO" = GPIO line named "FOO" on the schematic
+ 	 * "FOO_N" = GPIO line named "FOO" on schematic, active low
+ 	 */
+-	gpio-line-names = "SDA0",
+-			  "SCL0",
++	gpio-line-names = "ID_SDA",
++			  "ID_SCL",
+ 			  "SDA1",
+ 			  "SCL1",
+ 			  "GPIO_GCLK",
 -- 
 2.7.4
 
