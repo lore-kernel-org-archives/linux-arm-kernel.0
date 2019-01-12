@@ -2,91 +2,119 @@ Return-Path: <SRS0=Pwbl=PU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_NEOMUTT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-11.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EE66EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 14:21:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A2BDBC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 15:01:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B1A362084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 14:21:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6F4672084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 15:01:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P4RXZV4Z";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="GimcIYZK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B1A362084E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sfvvAdIT";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=davidjohnsummers.uk header.i=@davidjohnsummers.uk header.b="D08lw16d"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6F4672084E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=davidjohnsummers.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Mb+7l2wKtJT55rBhdrhLWc7jQWZoc0AZbasSzGJaRI4=; b=P4RXZV4ZA86F2R
-	GRYJETGOmaM2eIxhoxnpkHegyL2iXFIolAOINdNIfMBjV8PVVh+U691TkV049e3nbbT5PxxEZ66J0
-	KF4LRKQABwhTWg8Kw31IjWc6JioPrltiefBu7DxWF3xkRYlGXr8A1GLKi1R4ZtmRcKMs1fDnnJaTK
-	Ls0H/zWxsoFx6wEEv8KFCyIhTWbFUax3gud8niOWcta3zRdhqHlJHxaY56uOpnVis40T3rYSlgCGn
-	Kf0UQNnDvuptyUAJgMe967bVJE9oMxbbJ5GpUp5xIam121I7y7OBFfW3LYpzIFOEt83mYHgLEuk4t
-	fajFLSSuQRrpiqvKj1ow==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=wMbPVylfvHSHO90+/Uh9Efctcj20EXYMF4A/L7XdLSo=; b=sfvvAdITy7NhJaBcgWr2evIE3
+	S5UmCYzOu87F/RJW+REscP5phaGxM+s3XF2BdbHiijEJGkN2qd7LqJ+NpfC9dJbTFZ4Etu/v1j0M5
+	OriWhjKxrEdYSPwxQplGvepFP3A4vPxNHn5B/r3FOh9vzdfB/6RGUEby8t0cfxNvadFLXPO0ie0TQ
+	/5KnLBSaSoqaFpveo0Nde5AqY2YByI+wco4yB5tWowbFrnnhH/+b/sFTTmMuWyZ2jD9Kj+VbvxVoS
+	IUUS2ghVIU3ihn5/Ca8zzyYUJWsJTlulDsZ5S2sfZhttNqCSf7aYioJtXJthjFg65LqoLsPeyXYSX
+	6YE1Kez3A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1giKA3-00085s-Kc; Sat, 12 Jan 2019 14:21:19 +0000
-Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
+	id 1giKme-000405-TT; Sat, 12 Jan 2019 15:01:12 +0000
+Received: from mail-gw.unlimitedwebhosting.co.uk ([149.255.60.82])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1giK9y-000856-4p
- for linux-arm-kernel@lists.infradead.org; Sat, 12 Jan 2019 14:21:15 +0000
-Received: by mail-pl1-x642.google.com with SMTP id 101so8088804pld.6
+ id 1giKma-0003yO-Nf
+ for linux-arm-kernel@lists.infradead.org; Sat, 12 Jan 2019 15:01:11 +0000
+Received: from uwhbsf01.unlimitedwebhosting.co.uk
+ (mail-gw.unlimitedwebhosting.co.uk [149.255.60.72])
+ by mail-gw.unlimitedwebhosting.co.uk (Postfix) with ESMTPS id C48C36060EC1
  for <linux-arm-kernel@lists.infradead.org>;
- Sat, 12 Jan 2019 06:21:11 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=AgztArJgeyI5akkyciYTqOnUwbkH9r4FP5+/k10NYlQ=;
- b=GimcIYZKXTRu9g1J9k8L0qcyKVYBysJpjcAGwKF1FQ5PS+5A213ABMU3N4S60RJGjq
- AYWlgFQpTN6dWDaz9zTgd15Hkin1sfazkfJIgaVQPA06xP02f6M7XJLDMcrstcXiCxhH
- x5qdu8A9LyKyDxeTg0QzBbh/1eAuRnjgapXIrKV8FH5ifgS0tX4mDCI+qZKSAACtxsWm
- UREh7KwBEpVh8jDG6bTAjt+v0CVyLr07jaDcV5wUtVrZDhN14AHu+Wkh4rpe798n+pLv
- 2gNLoXBbKmC/fxElnVHgD716ayuAjpv688SdllVuIma9V01oOVXu9VQrkT/yGC1uwzo/
- DBSA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=AgztArJgeyI5akkyciYTqOnUwbkH9r4FP5+/k10NYlQ=;
- b=H3Oo8wOOd8lCS82IFsEtZOgdzBybzDov43I5IPXE5LWweGhQjX89v8XAxaLcx0PiK/
- VbzgaEiAw+mYAMVuIQiSUlWmX9bROXBmvXDPYymJjIPlCnEwF4ILntKiMS7zlt0n3tYQ
- RCPvA2GUzDJ3vUEvQ+h804PLKyGcWi750HaNh8Fma1gLNriCzawiEWVEj08Umwh8uK80
- gy2l14c9vle9S70D4hOcRspgVQhbGpdwM44jlztLNRODizfpuvGGcLTe+L++TBUsvpGu
- dvb7Ix8UBTrfY3ZS/fL++IC+3yG5XBitkRDO4mbaP2kUxHtzRMjR2xsqktUDzQzHfamh
- cNiQ==
-X-Gm-Message-State: AJcUukfMuxD7CxbABQsxG7Ogzsp5UTtlCtBMZXkxO/XrubUbNp6whjhh
- V7SnVVjJamsUwJ97n6RZKhCGWKh3z9s=
-X-Google-Smtp-Source: ALg8bN4u0a09j0SanHRTuHYZDh38d4cZ9d5mkCKGk53kYwNpFybtGRJj6Z3KYuyRp2SrYrrFmRErIw==
-X-Received: by 2002:a17:902:d01:: with SMTP id
- 1mr19042800plu.127.1547302870972; 
- Sat, 12 Jan 2019 06:21:10 -0800 (PST)
-Received: from mail.google.com ([207.246.99.41])
- by smtp.gmail.com with ESMTPSA id w184sm92667189pgd.34.2019.01.12.06.21.04
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Sat, 12 Jan 2019 06:21:10 -0800 (PST)
-Date: Sat, 12 Jan 2019 22:20:58 +0800
-From: Changbin Du <changbin.du@gmail.com>
-To: Matthew Wilcox <willy@infradead.org>
-Subject: Re: [PATCH] fgraph: record function return value
-Message-ID: <20190112142056.6imezyzfw64qzg2x@mail.google.com>
-References: <20190112065701.30841-1-changbin.du@gmail.com>
- <20190112122113.GR6310@bombadil.infradead.org>
+ Sat, 12 Jan 2019 15:00:20 +0000 (GMT)
+X-ASG-Debug-ID: 1547305219-055413120c6e18e90001-tbGyMd
+Received: from cloud706.unlimitedwebhosting.co.uk (no-dns-yet.unlimited.uk.net
+ [149.255.62.7]) by uwhbsf01.unlimitedwebhosting.co.uk with ESMTP id
+ 3JMuqJuZIzL5EQPD (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256
+ verify=NO) for <linux-arm-kernel@lists.infradead.org>;
+ Sat, 12 Jan 2019 15:00:19 +0000 (GMT)
+X-Barracuda-Envelope-From: beagleboard@davidjohnsummers.uk
+X-Barracuda-Effective-Source-IP: no-dns-yet.unlimited.uk.net[149.255.62.7]
+X-Barracuda-Apparent-Source-IP: 149.255.62.7
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=davidjohnsummers.uk; s=default; h=Content-Transfer-Encoding:Content-Type:
+ In-Reply-To:MIME-Version:Date:Message-ID:From:References:Cc:To:Subject:Sender
+ :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=1x9jj1+9r+Zx7FMCJbxgCN6yyhxwioQL7qECsRH30lQ=; b=D08lw16dDjq45WvT3lhq4FvjWP
+ hTvXP8E2CwG7WBImsLgvBsxRsMxwb2SljZpEaqfvm6vdDD5aUUBFEcRzKD+Ruq/itGYpL0ZOWDF6D
+ JoSLUloZVbHwgjeK3lAfLvWKeRdqjCH89wps0IOKqVnxe+rAtB/wX1stF7wOiXDb7bsxhfPlcxLDj
+ mUGCCUJIL0orUdL3IwOzFzXaru1cXjxXX1hTV2bHYl4RqdMQhHncIalVxCn3t8PBsdGAi1Ufi81FX
+ D4h1eO5R2eta3QN0saEhvG8mhheWil80hn4I/IB+AoEzn52jiV9fEQTHqIoNlxtyRGDrxtG69cBgL
+ QjEDCd1w==;
+Received: from [87.112.42.200] (port=41384 helo=[192.168.2.187])
+ by cloud706.unlimitedwebhosting.co.uk with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.91)
+ (envelope-from <beagleboard@davidjohnsummers.uk>)
+ id 1giKln-002ddh-0M; Sat, 12 Jan 2019 15:00:19 +0000
+Subject: Re: [PATCHv2] Description of the realtek bluetooth device tree hooks
+To: Rob Herring <robh@kernel.org>
+X-ASG-Orig-Subj: Re: [PATCHv2] Description of the realtek bluetooth device
+ tree hooks
+References: <20181229115513.31153-1-beagleboard@davidjohnsummers.uk>
+ <20190103163538.6575-1-beagleboard@davidjohnsummers.uk>
+ <20190111163420.GA20311@bogus>
+From: David Summers <beagleboard@davidjohnsummers.uk>
+Message-ID: <1308b7df-9f09-c46e-e740-131bd1c42fef@davidjohnsummers.uk>
+Date: Sat, 12 Jan 2019 15:00:17 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.3
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190112122113.GR6310@bombadil.infradead.org>
-User-Agent: NeoMutt/20171215
+In-Reply-To: <20190111163420.GA20311@bogus>
+Content-Language: en-US
+X-AntiAbuse: This header was added to track abuse,
+ please include it with any abuse report
+X-AntiAbuse: Primary Hostname - cloud706.unlimitedwebhosting.co.uk
+X-AntiAbuse: Original Domain - lists.infradead.org
+X-AntiAbuse: Originator/Caller UID/GID - [47 12] / [47 12]
+X-AntiAbuse: Sender Address Domain - davidjohnsummers.uk
+X-Get-Message-Sender-Via: cloud706.unlimitedwebhosting.co.uk: authenticated_id:
+ davidjoh/from_h
+X-Authenticated-Sender: cloud706.unlimitedwebhosting.co.uk: beagleboard@davidjohnsummers.uk
+X-Source: 
+X-Source-Args: 
+X-Source-Dir: 
+X-Barracuda-Connect: no-dns-yet.unlimited.uk.net[149.255.62.7]
+X-Barracuda-Start-Time: 1547305219
+X-Barracuda-Encrypted: ECDHE-RSA-AES256-GCM-SHA384
+X-Barracuda-URL: https://149.255.60.72:443/cgi-mod/mark.cgi
+X-Virus-Scanned: by bsmtpd at unlimitedwebhosting.co.uk
+X-Barracuda-Scan-Msg-Size: 4490
+X-Barracuda-BRTS-Status: 1
+X-Barracuda-Spam-Score: 0.00
+X-Barracuda-Spam-Status: No, SCORE=0.00 using global scores of TAG_LEVEL=1000.0
+ QUARANTINE_LEVEL=1000.0 KILL_LEVEL=2.0 tests=BSF_SC0_MISMATCH_TO
+X-Barracuda-Spam-Report: Code version 3.2, rules version 3.2.3.65539
+ Rule breakdown below
+ pts rule name              description
+ ---- ---------------------- --------------------------------------------------
+ 0.00 BSF_SC0_MISMATCH_TO    Envelope rcpt doesn't match header
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190112_062114_381965_3E49CAC6 
-X-CRM114-Status: GOOD (  19.93  )
+X-CRM114-CacheID: sfid-20190112_070109_054478_B6C9196C 
+X-CRM114-Status: GOOD (  26.02  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,68 +126,122 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-doc@vger.kernel.org, x86@kernel.org, linux-kernel@vger.kernel.org,
- rostedt@goodmis.org, linux@armlinux.org.uk,
- linux-arm-kernel@lists.infradead.org, Changbin Du <changbin.du@gmail.com>
-Content-Type: text/plain; charset="us-ascii"
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, johan.hedberg@gmail.com,
+ marcel@holtmann.org, linux-bluetooth@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Thanks Rob,
 
-Hi Matthew,
-On Sat, Jan 12, 2019 at 04:21:13AM -0800, Matthew Wilcox wrote:
-> On Sat, Jan 12, 2019 at 02:57:01PM +0800, Changbin Du wrote:
-> > This patch adds a new trace option 'funcgraph-retval' and is disabled by
-> > default. When this option is enabled, fgraph tracer will show the return
-> > value of each function. This is useful to find/analyze a original error
-> > source in a call graph.
-> > 
-> > One limitation is that kernel doesn't know the prototype of functions. So
-> > fgraph assumes all functions have a retvalue of type int. You must ignore
-> > the value of *void* function. And if the retvalue looks like an error code
-> > then both hexadecimal and decimal number are displayed.
-> 
-> I don't think we can do this.  You're leaking a _lot_ of kernel addresses
-> this way, and we've been trying very hard to avoid doing that because
-> it gives a lot of information to attackers.
-> 
-> Something more clever that prints out only errors (ie IS_ERR_VALUE())
-> might be acceptable.  I would think printing return values that are
-> between 0 and 4095 should also be OK since they can't be real pointers.
-> We'd leak whether a function called kmalloc(0, x) since that returns
-> 16, but that seems like a not-very-useful information leak.
-> 
-Regarding to security concern, I don't think this is a problem. Because using
-ftrace requires *root* permission. And if the attack has got root previlege,
-he/her can obtain nearly all kernel inner information through variant tools.
-For example, we can write an eBPF program to probe kernel functions and we
-just need root previlege to load our program. We also can use the *crash*
-tool to retreive kernel data.
+I'll hopefully make those changes this weekend, and resubmit - just so 
+next weekend can move onto the device tree.
 
-> >  3)   0.247 us    |    mutex_unlock(); /* ret=0xffff8880738ed040 */
-> >  3)               |    kvm_arch_vcpu_create() {
-> >  3)               |      vmx_create_vcpu() {
-> >  3) + 17.969 us   |        kmem_cache_alloc(); /* ret=0xffff88813a980040 */
-> >  3) + 15.948 us   |        kmem_cache_alloc(); /* ret=0xffff88813aa99200 */
-> >  3)   0.653 us    |        allocate_vpid.part.88(); /* ret=0x1 */
-> >  3)   6.964 us    |        kvm_vcpu_init(); /* ret=0xfffffffb */
-> >  3)   0.323 us    |        free_vpid.part.89(); /* ret=0x1 */
-> >  3)   9.985 us    |        kmem_cache_free(); /* ret=0x80000000 */
-> >  3)   9.491 us    |        kmem_cache_free(); /* ret=0x80000000 */
-> >  3) + 69.858 us   |      } /* ret=0xfffffffffffffffb/-5 */
-> >  3) + 70.631 us   |    } /* ret=0xfffffffffffffffb/-5 */
-> >  3)               |    mutex_lock() {
-> >  3)               |      _cond_resched() {
-> >  3)   0.199 us    |        rcu_all_qs(); /* ret=0x80000000 */
-> >  3)   0.594 us    |      } /* ret=0x0 */
-> >  3)   1.067 us    |    } /* ret=0x0 */
-> >  3)   0.337 us    |    mutex_unlock(); /* ret=0xffff8880738ed040 */
-> >  3) + 92.730 us   |  } /* ret=0xfffffffffffffffb/-5 */
+Oh yes, on the "-bluetooth" or "-bt"; as these devices have both and 
+sdio input for wifi, and uart for bluetooth; I guess they will need to 
+be listed twice in a device tree, both under uart and sdio. Now as both 
+these parts of the device tree will want to specify the driver used, and 
+the driver is different for bluetooth and for wifi - doesn't that mean 
+we should specify compatible differently? Otherwise how will the kernel 
+know which driver to load for wifi and which for bluetooth?
 
--- 
-Cheers,
-Changbin Du
+So question is am I missing something here, and this could be simplified?
+
+On the interrupts, GPIO control lines, power supplies, etc, on the ASUS 
+code that I'm basing the patches on (for Tinker Board S) - these bits 
+are freestanding in the device tree, and mainly go in with the wifi 
+patch (and not bluetooth). I'll put some though into how this is best 
+arranged when going mainline. I think if I'm honest, if I wait to get 
+all these extras in the documentation, this will only get settled when I 
+get the wifi into the device tree - as problem is more natural there. 
+This though would delay the bluetooth patch probably a month. I'd prefer 
+to get something out there - even if I have to return later to tidy the 
+documentation.
+
+Regards, and thanks for the helpful comments.
+
+David.
+
+
+On 11/01/2019 16:34, Rob Herring wrote:
+> On Thu, Jan 03, 2019 at 04:35:37PM +0000, David Summers wrote:
+>> This adds the desrciption file that describes the hooks for the
+>> realtek bluetooth serial devices, as needed to refer to the interface
+>> in the device tree.
+> Please follow conventions for patch subjects. 'git log --oneline
+> --no-merges -- path/to/file' usually gives a good clue. In this case,
+> something like:
+>
+> dt-bindings: net: Add Realtek serial bluetooth binding
+>
+>> Signed-off-by: David Summers <beagleboard@davidjohnsummers.uk>
+>> ---
+>>   .../bindings/net/realtek-bluetooth-serial.txt | 28 +++++++++++++++++++
+>>   1 file changed, 28 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/net/realtek-bluetooth-serial.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/net/realtek-bluetooth-serial.txt b/Documentation/devicetree/bindings/net/realtek-bluetooth-serial.txt
+>> new file mode 100644
+>> index 000000000000..0aabca1fc002
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/net/realtek-bluetooth-serial.txt
+>> @@ -0,0 +1,28 @@
+>> +Realtek bluetooth devices connected via a UART
+>> +
+>> +- compatible: should be "realtek,<name>-bluetooth"
+>> +  except for "realtek,trl8761atv" - which only has a serial bluetooth connection
+>> +       "realtek,rtl8723as-bluetooth"
+>> +       "realtek,rtl8723bs-bluetooth"
+>> +       "realtek,rtl8723ds-bluetooth"
+>> +       "realtek,rtl8761atv"
+>> +       "realtek,rtl8821as-bluetooth"
+>> +       "realtek,rtl8821cs-bluetooth"
+>> +       "realtek,rtl8822bs-bluetooth"
+> Arguably, '-bluetooth' is not necessary as nothing else is attached to
+> the serial port. At least shorten it to '-bt'.
+>
+>> +- These device are bluetooth devices, that connect via a uart
+> s/device/devices/
+>
+>> +- all devices (except for rtl8761atv) are also wifi devices, this is connected
+>> +  seperatly via sdio - and is not covered by this compatible node
+> Really, this should be up above the property list in a description of
+> the device(s).
+>
+>> +- ideally these will be referenced in a device tree serial node via serdev
+> Not ideally, but it is only valid for this to be a child of a UART.
+>
+> serdev is a kernel thing, and shouldn't be part of the binding doc.
+>
+>> + http://events17.linuxfoundation.org/sites/events/files/slides/serdev-elce-2017-2.pdf
+> Useful, but again, not part of this binding.
+>
+> There's no interrupts, GPIO control lines, power supplies, etc. for
+> these chips? The binding should be complete even if your platform
+> doesn't need these.
+>
+>> +
+>> +Example:
+>> +
+>> +&uart0 {
+>> +	status = "okay";
+> Don't show status in examples.
+>
+>> +       	pinctrl-0 = <&uart0_xfer>, <&uart0_cts>;
+>> +       	bluetooth {
+>> +               	  compatible = "realtek,rtl8723bs-bluetooth";
+>> +       	};
+> Mixed tabs and spaces. Use tabs.
+>
+>> +};
+>> +
+>> +this ensures that the bluetooth device is tied to the correct uart
+>> -- 
+>> beagleboard@davidjohnsummers.uk
+>>
+
 
 _______________________________________________
 linux-arm-kernel mailing list
