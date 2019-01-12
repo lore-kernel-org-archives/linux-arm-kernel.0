@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-13.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 10191C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:44:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0195EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:45:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CFD0A2086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:44:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BB8FE2086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 12 Jan 2019 12:45:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nffTlcJC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CFD0A2086C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hlaXF/im"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BB8FE2086C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,50 +26,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=EmbYgTmQfiZZhkO7mYWDbYaqvNGlUz3wj91Matd8dpA=; b=nffTlcJCwsur+Fai1sgVqALGII
-	kD7qTYD+U+dXJomixK3RGzvmUkend8iIpN8lsPHFUn8oSTErIq4IvVHLN6MVxkikD1ZoJtkE0kaOT
-	x+7sxHuN2DKl5mgWtpNPHED8Kt63c6J5n8mfxvlayaxAlPEKQBeQa4QGBHuCoL9giKAFzjEUsBwFp
-	Xlf9YRXSuMKW89VTs0nZB2eEmdyC/El9Yw6VkczzewK059cNBo3qvdaoxsRPBoSFikwJfYd6K+l5r
-	z1RqVYlMgxr0IOsX6S/q1JWpt7WYzrjL3NmfJPrKJ2QPMQge7duaHR710ue/3HiqCjGVocIL5kVkH
-	Tqr7rFPA==;
+	bh=82eyVmb/teUkiyYOgrWbVJQLYtsQCWdr3DQ80Lmv67M=; b=hlaXF/imjWGlkQaYvfkXxNWuWq
+	ykX2bMX+AkU9gjMGkXPIggo7p7YbQrL3l+WpsoatS16743+4NsCW+2hE6//jt12gqZwSSKFBOsB4H
+	iC+ZyU25g9WyLf2JJ/ZWd4rMwqYoMSueq/tGam5sdrPqu3BWwhf7ne8n3lz5fOwldQ10ZH82Ml0N6
+	Y0u1ZzTDHLLN/PPmx3fJgMhe4ONOoFa3lLte8hD7rnbJhJ9aLNgwrEBNUNKDjtNhuKMg+GhKHhRD7
+	0TuNnC6AFhsMTfDyDjsKNNBizb1CYxnfpU4zb6ZXwyhGgjZ1MrIi+W218nbA8qNGvW64wR+zSg6N5
+	wTNxqhjQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1giIee-0006QM-GC; Sat, 12 Jan 2019 12:44:48 +0000
+	id 1giIes-0006aX-9H; Sat, 12 Jan 2019 12:45:02 +0000
 Received: from mout.kundenserver.de ([212.227.17.24])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1giIe3-0005sk-Jd; Sat, 12 Jan 2019 12:44:15 +0000
+ id 1giIe3-0005so-Jc; Sat, 12 Jan 2019 12:44:14 +0000
 Received: from localhost.localdomain ([37.4.249.153]) by
  mrelayeu.kundenserver.de (mreue107 [212.227.15.183]) with ESMTPSA (Nemesis)
- id 1MsIfc-1hXFfJ1zr8-00tiod; Sat, 12 Jan 2019 13:43:59 +0100
+ id 1MdNLi-1hHMPa2aSu-00ZS8f; Sat, 12 Jan 2019 13:44:02 +0100
 From: Stefan Wahren <stefan.wahren@i2se.com>
 To: Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
  Florian Fainelli <f.fainelli@gmail.com>, Ray Jui <rjui@broadcom.com>,
  Scott Branden <sbranden@broadcom.com>, Eric Anholt <eric@anholt.net>
-Subject: [PATCH 1/6] ARM: dts: bcm283x: Fix DTC warning for memory node
-Date: Sat, 12 Jan 2019 13:43:23 +0100
-Message-Id: <1547297008-2740-2-git-send-email-stefan.wahren@i2se.com>
+Subject: [PATCH 6/6] ARM: dts: bcm283x: Add missing GPIO line names
+Date: Sat, 12 Jan 2019 13:43:28 +0100
+Message-Id: <1547297008-2740-7-git-send-email-stefan.wahren@i2se.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1547297008-2740-1-git-send-email-stefan.wahren@i2se.com>
 References: <1547297008-2740-1-git-send-email-stefan.wahren@i2se.com>
-X-Provags-ID: V03:K1:m5PXnYOzUn8RRTmCqRKOFExPJaNp0DdLxyKAIZf66qbtTC2Kwdn
- VyZLfI2pGBbHMFNiJDHBqHthbnu1WgPUMjcVRzZiWor4kcK3fjheT0306uv9RWpnHlgz2Wu
- 8NkKHkDU26kZrrmYbtfKIYc4gJ8uEuvpDmA0nm9m9eiGINW9BBGmH34OB2LzxKRdz3RYQjk
- 0Bp99FTc1Evx1XZZmr1vA==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:AZVoUr0OV8c=:l2whGjTRwQ0ijNyYEBfhbh
- jy0bH5tS2EGw9TNEqSEoHoyX0CjVGU7EVi8L4PKR43vq/Yuz0yn2ouIzgoFxOVRQVl2uBasX0
- SlTVk79ECLSyvk/T2hzzdMngzWmYBtPbVzF+tQO4cZgnEHFA7OYQLG714VMuyd6ZPRWwJwQlM
- fCMJjvl0Aw2b57E1+fkUSb9nFNB9R+Z6qxmHSoZifzykeTh6/xtoM5RE5F9ewlR5W/qFcS7ej
- wPca65DjBXdYUv8ghIcuM6SVUF3qStTxY8TFgOCtlTPqTbsWQSkw7B7z3KK4N7MaB9hgo+5rW
- H/VjaHdmoMmswUGgT0VtuD3Tu1hZU4UmoFjaDjsVky6juSgIfZPDoiVyfGLKNgtQq7Dhsk8Us
- ZXc3iviiuQH4GY2PmEFqHAKpjmZNxJyAPqQlETOt7EorAhQLOWVZGZJU4Sokzwz17Jz+J6KC7
- eN++aLE3MBm241/k8YYCoJOEBJIbkesfm3SgdjSGfcjbUS20iqf3moNHMoSRAZdfaYZeIzjbP
- EPhQRsaXunMYLlsipP4/KKupfUdZxBJNljMLofkGn1oJLYjlB1C2aLvXZyYCc6y5h+rHwwH9v
- a38rl9wVLNgyNHuwZAHX+z+V9Kn/UY23/fZj9zHGHn7Mwmn4Ohirr4KAiT2fEmPbyvOMpjXhu
- LvvoCCmISIjlJykgW/jWqeEnUDzgIls+mBe3Vv0F8AvltMyqDbZkzoH/0HXynQy1iJ03tgigu
- 5jyRqRJ6efIA3d4hp4dXHw+gd1xkJ49KPkg7US2FA4bRdAc2cOV77VU0sUU=
+X-Provags-ID: V03:K1:/sSYu93iPiHSiQiCSqyyEbNwieia6j63s13TxvEtjTitqqKhXZY
+ Ndi57wMqrE5bTZ8lYFXctODn+3Waj7YdUxRqgtgOyriZsRo+dZTH75NfP6Sk3hJ6S2x5aaK
+ eyuiMQSayQ9tx7JhPdOO6tz1iI3FIciYxVPKX2tlTlYma/gLie0yQZihf6fXXaTYlsqVG7B
+ nBa3cKKDG58JlTCUxIRug==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:pc6olJVBpeU=:bSjBpD1/Zl36Ndgv3Lwgod
+ 4iRxQ7dg3/EQQjEM/FD1X4YIDT8D9gEynLUDO72+Dq6J4ErpP3nQxciEXHpEkXy6Q95+lPPWS
+ JpJSicn8M4hUV45oYPxHItC4dfs1fSPyjKL5IcBYnAnv6KBryrAoINloUB+u/6tb4m/HJdETE
+ 38J4LKOsaml5xJIX8PGRNrUaRbkasqzCgavggKlhqCYA4xeIebX1VHDlTUsTAzj5IvxDPzBGn
+ BlPFBGTaFmTKTAIUsvIwuk+EeDu8HqE4h7CpIhoP9LwTXaDSzsW/fDBI+FNFeCoN3IG90Y0XZ
+ r38YdbUR16ZCIQ/3jW0YTGUE5ZknqtU/TMdMHvEBZQumO0FH5D2DuApq073PCM8xvddUa2h3W
+ eN4eNWs+SplSMUaNH+AIHo4CsuSMCU/0Xn3cHToYdNv3K6iGaAQFklUU6OfWTkhkXGgclj/mq
+ OQTa4N/FtEjROBJiWVKpmfzGZ4a8ZAHGkhYjtIaEfOtXxJtErSJ7lnlFKopSb6KFKCIMXwNuK
+ niWNkruTCikAopZSsY0+fINBM/GXpti4QrmBt9n9b2gM5BKXDgbWm32O/E3W8OcYicvKh6bo6
+ YBkz5NVDHDbgzdD34VbCoiY9j+ZRZbJdpqjjS30Mb8eM6deMJLfMKTmXqUOQXSjHde9v735ij
+ d0pZymyAENGC0/CbfavX9Zz30PmvM7H4xl91vSQN2S84+cJUoWkE8Yu1nHdHiNrvSvCmN/Pxe
+ T9+48w0iw/AHd02Hg3inGhcdzrmGuAsxkOVzWpQQlCVUQiAN/dnOy8bK29Y=
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190112_044412_170065_6199F88A 
-X-CRM114-Status: GOOD (  15.59  )
+X-CRM114-CacheID: sfid-20190112_044412_167985_7F7DC01D 
+X-CRM114-Status: GOOD (  17.65  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,101 +91,257 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Compiling the bcm283x DTS with W=1 leads to the following warning:
-
-Warning (unit_address_vs_reg): /memory: node has a reg or ranges property,
-but no unit name
-
-Fix this by adding the unit address.
+The GPIO sysfs is deprecated and disabled in the defconfig files.
+So in order to motivate the usage of the new GPIO character device API
+add the missing GPIO line names for Raspberry Pi 2 and 3. In the lack
+of full schematics i would leave all undocumented pins as unnamed.
 
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- arch/arm/boot/dts/bcm2835-rpi.dtsi         | 2 +-
- arch/arm/boot/dts/bcm2836-rpi-2-b.dts      | 2 +-
- arch/arm/boot/dts/bcm2837-rpi-3-a-plus.dts | 2 +-
- arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts | 2 +-
- arch/arm/boot/dts/bcm2837-rpi-3-b.dts      | 2 +-
- arch/arm/boot/dts/bcm2837-rpi-cm3.dtsi     | 2 +-
- 6 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/bcm2836-rpi-2-b.dts      | 66 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts | 70 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/bcm2837-rpi-3-b.dts      | 70 ++++++++++++++++++++++++++++++
+ 3 files changed, 206 insertions(+)
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-index c6e2b23..e490f2a 100644
---- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-+++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-@@ -1,7 +1,7 @@
- #include <dt-bindings/power/raspberrypi-power.h>
- 
- / {
--	memory {
-+	memory@0 {
- 		device_type = "memory";
- 		reg = <0 0x10000000>;
- 	};
 diff --git a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-index ac4408b..871fc4a 100644
+index 871fc4a..7b4e651 100644
 --- a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
 +++ b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-@@ -9,7 +9,7 @@
- 	compatible = "raspberrypi,2-model-b", "brcm,bcm2836";
- 	model = "Raspberry Pi 2 Model B";
+@@ -28,6 +28,72 @@
+ };
  
--	memory {
-+	memory@0 {
- 		reg = <0 0x40000000>;
- 	};
+ &gpio {
++	/*
++	 * Taken from rpi_SCH_2b_1p2_reduced.pdf and
++	 * the official GPU firmware DT blob.
++	 *
++	 * Legend:
++	 * "NC" = not connected (no rail from the SoC)
++	 * "FOO" = GPIO line named "FOO" on the schematic
++	 * "FOO_N" = GPIO line named "FOO" on schematic, active low
++	 */
++	gpio-line-names = "ID_SDA",
++			  "ID_SCL",
++			  "SDA1",
++			  "SCL1",
++			  "GPIO_GCLK",
++			  "GPIO5",
++			  "GPIO6",
++			  "SPI_CE1_N",
++			  "SPI_CE0_N",
++			  "SPI_MISO",
++			  "SPI_MOSI",
++			  "SPI_SCLK",
++			  "GPIO12",
++			  "GPIO13",
++			  /* Serial port */
++			  "TXD0",
++			  "RXD0",
++			  "GPIO16",
++			  "GPIO17",
++			  "GPIO18",
++			  "GPIO19",
++			  "GPIO20",
++			  "GPIO21",
++			  "GPIO22",
++			  "GPIO23",
++			  "GPIO24",
++			  "GPIO25",
++			  "GPIO26",
++			  "GPIO27",
++			  "SDA0",
++			  "SCL0",
++			  "", /* GPIO30 */
++			  "LAN_RUN",
++			  "CAM_GPIO1",
++			  "", /* GPIO33 */
++			  "", /* GPIO34 */
++			  "PWR_LOW_N",
++			  "", /* GPIO36 */
++			  "", /* GPIO37 */
++			  "USB_LIMIT",
++			  "", /* GPIO39 */
++			  "PWM0_OUT",
++			  "CAM_GPIO0",
++			  "SMPS_SCL",
++			  "SMPS_SDA",
++			  "ETHCLK",
++			  "PWM1_OUT",
++			  "HDMI_HPD_N",
++			  "STATUS_LED",
++			  /* Used by SD Card */
++			  "SD_CLK_R",
++			  "SD_CMD_R",
++			  "SD_DATA0_R",
++			  "SD_DATA1_R",
++			  "SD_DATA2_R",
++			  "SD_DATA3_R";
++
+ 	pinctrl-0 = <&gpioout &alt0 &i2s_alt0>;
  
-diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-a-plus.dts b/arch/arm/boot/dts/bcm2837-rpi-3-a-plus.dts
-index e9fadd3..7f4437a 100644
---- a/arch/arm/boot/dts/bcm2837-rpi-3-a-plus.dts
-+++ b/arch/arm/boot/dts/bcm2837-rpi-3-a-plus.dts
-@@ -13,7 +13,7 @@
- 		stdout-path = "serial1:115200n8";
- 	};
- 
--	memory {
-+	memory@0 {
- 		reg = <0 0x20000000>;
- 	};
- 
+ 	/* I2S interface */
 diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
-index 42bb090..7d65013 100644
+index d3ec6cd..c6fa34c 100644
 --- a/arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
 +++ b/arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
-@@ -14,7 +14,7 @@
- 		stdout-path = "serial1:115200n8";
+@@ -52,6 +52,76 @@
  	};
+ };
  
--	memory {
-+	memory@0 {
- 		reg = <0 0x40000000>;
- 	};
- 
++&gpio {
++	/*
++	 * Taken from rpi_SCH_3bplus_1p0_reduced.pdf and
++	 * the official GPU firmware DT blob.
++	 *
++	 * Legend:
++	 * "NC" = not connected (no rail from the SoC)
++	 * "FOO" = GPIO line named "FOO" on the schematic
++	 * "FOO_N" = GPIO line named "FOO" on schematic, active low
++	 */
++	gpio-line-names = "ID_SDA",
++			  "ID_SCL",
++			  "SDA1",
++			  "SCL1",
++			  "GPIO_GCLK",
++			  "GPIO5",
++			  "GPIO6",
++			  "SPI_CE1_N",
++			  "SPI_CE0_N",
++			  "SPI_MISO",
++			  "SPI_MOSI",
++			  "SPI_SCLK",
++			  "GPIO12",
++			  "GPIO13",
++			  /* Serial port */
++			  "TXD1",
++			  "RXD1",
++			  "GPIO16",
++			  "GPIO17",
++			  "GPIO18",
++			  "GPIO19",
++			  "GPIO20",
++			  "GPIO21",
++			  "GPIO22",
++			  "GPIO23",
++			  "GPIO24",
++			  "GPIO25",
++			  "GPIO26",
++			  "GPIO27",
++			  "HDMI_HPD_N",
++			  "STATUS_LED_G",
++			  /* Used by BT module */
++			  "CTS0",
++			  "RTS0",
++			  "TXD0",
++			  "RXD0",
++			  /* Used by Wifi */
++			  "SD1_CLK",
++			  "SD1_CMD",
++			  "SD1_DATA0",
++			  "SD1_DATA1",
++			  "SD1_DATA2",
++			  "SD1_DATA3",
++			  "PWM0_OUT",
++			  "PWM1_OUT",
++			  "ETHCLK",
++			  "WIFI_CLK",
++			  "SDA0",
++			  "SCL0",
++			  "SMPS_SCL",
++			  "SMPS_SDA",
++			  /* Used by SD Card */
++			  "SD_CLK_R",
++			  "SD_CMD_R",
++			  "SD_DATA0_R",
++			  "SD_DATA1_R",
++			  "SD_DATA2_R",
++			  "SD_DATA3_R";
++};
++
+ &hdmi {
+ 	hpd-gpios = <&gpio 28 GPIO_ACTIVE_LOW>;
+ };
 diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-index 0c155dd..9abb9c5 100644
+index 31b1c03..ce71f57 100644
 --- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
 +++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-@@ -14,7 +14,7 @@
- 		stdout-path = "serial1:115200n8";
+@@ -47,6 +47,76 @@
  	};
+ };
  
--	memory {
-+	memory@0 {
- 		reg = <0 0x40000000>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/bcm2837-rpi-cm3.dtsi b/arch/arm/boot/dts/bcm2837-rpi-cm3.dtsi
-index 4a89a18..81399b2 100644
---- a/arch/arm/boot/dts/bcm2837-rpi-cm3.dtsi
-+++ b/arch/arm/boot/dts/bcm2837-rpi-cm3.dtsi
-@@ -4,7 +4,7 @@
- #include "bcm2836-rpi.dtsi"
- 
- / {
--	memory {
-+	memory@0 {
- 		reg = <0 0x40000000>;
- 	};
- 
++&gpio {
++	/*
++	 * Taken from rpi_SCH_3b_1p2_reduced.pdf and
++	 * the official GPU firmware DT blob.
++	 *
++	 * Legend:
++	 * "NC" = not connected (no rail from the SoC)
++	 * "FOO" = GPIO line named "FOO" on the schematic
++	 * "FOO_N" = GPIO line named "FOO" on schematic, active low
++	 */
++	gpio-line-names = "ID_SDA",
++			  "ID_SCL",
++			  "SDA1",
++			  "SCL1",
++			  "GPIO_GCLK",
++			  "GPIO5",
++			  "GPIO6",
++			  "SPI_CE1_N",
++			  "SPI_CE0_N",
++			  "SPI_MISO",
++			  "SPI_MOSI",
++			  "SPI_SCLK",
++			  "GPIO12",
++			  "GPIO13",
++			  /* Serial port */
++			  "TXD1",
++			  "RXD1",
++			  "GPIO16",
++			  "GPIO17",
++			  "GPIO18",
++			  "GPIO19",
++			  "GPIO20",
++			  "GPIO21",
++			  "GPIO22",
++			  "GPIO23",
++			  "GPIO24",
++			  "GPIO25",
++			  "GPIO26",
++			  "GPIO27",
++			  "", /* GPIO 28 */
++			  "LAN_RUN_BOOT",
++			  /* Used by BT module */
++			  "CTS0",
++			  "RTS0",
++			  "TXD0",
++			  "RXD0",
++			  /* Used by Wifi */
++			  "SD1_CLK",
++			  "SD1_CMD",
++			  "SD1_DATA0",
++			  "SD1_DATA1",
++			  "SD1_DATA2",
++			  "SD1_DATA3",
++			  "PWM0_OUT",
++			  "PWM1_OUT",
++			  "ETHCLK",
++			  "WIFI_CLK",
++			  "SDA0",
++			  "SCL0",
++			  "SMPS_SCL",
++			  "SMPS_SDA",
++			  /* Used by SD Card */
++			  "SD_CLK_R",
++			  "SD_CMD_R",
++			  "SD_DATA0_R",
++			  "SD_DATA1_R",
++			  "SD_DATA2_R",
++			  "SD_DATA3_R";
++};
++
+ &pwm {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio41>;
 -- 
 2.7.4
 
