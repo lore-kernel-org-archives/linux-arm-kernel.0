@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-17.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,
 	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A3A0FC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 13 Jan 2019 06:11:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C08D5C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 13 Jan 2019 06:12:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 72E482086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 13 Jan 2019 06:11:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8FA6F2086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 13 Jan 2019 06:12:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Dwto5Zut";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="tt6cOCPj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 72E482086C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HKbdqiZp";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="rEEWH00L"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8FA6F2086C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,66 +26,67 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ArDsv5xJ8XXgF1UOQB20ZFCs+gNz08wlc+ekWP4bkDM=; b=Dwto5ZutBdppx8
-	HAkuMTgS6hZ9Hbx6dvmp80xhFJoDssHWgEPFbQEODWI557giCnuBUgoMCnYgWlK5+yT0dYzOQfOJX
-	tacuMLBoFDWxT+OKUfZ1FS1R7PWiaFpbF9Vx+tbYWk1Q1uunClAz2IExfkVIQbl4WbvbxlaQvWIYy
-	c1/pXI1rEXVlUxd6TtPza10pqKeMk3a1qh/9yi57UBL5kq6DLpbLe742bkwNQwPGvt3CdkASpHEqp
-	SMlM4jvvIuUvO4VPg9mypyNE9hi6IJ1BYB6yuFBUGQnSd69YFdg3SLTFAynZYvx4Cm4mORWSSy3oE
-	SliXQxYYVM/OV9Q0mn7g==;
+	List-Owner; bh=8VxfD2LpTCVJq1PZjVshOGXuIa+uUMPh3BKC7TOmZKM=; b=HKbdqiZpKlnIyp
+	BLClb5BXkRMg+EfH7q/aZBOCS3oVX3O1NOQ8nVfRx+puZS/7SBGRR+eeOx2hdSC9SeieOtDXKf5hn
+	QfZVJ8CLsUVtGF4P9fpwuUgCt4ilmW+cun536FvU0Ame1CwLIopDeZSXHVtw4xwdbwjxPgthdmEGC
+	OuXTB6VRq9B4l2RPI6xDQvXK4xw/T6JMArR3JJ6tUZ5T9CjRK6WYek9XByhxCzR8TTGGmFHypFVXu
+	Kb6pTCTbtWOI2B1XTRP8lDkpZvkZG2uR4wVq0OJUd7L0QEu7DM84J9mTuxfY82z1zssijuT9v2VD8
+	0Tgw09LP2VLhq9+2oGZw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1giYzm-0004Kz-DV; Sun, 13 Jan 2019 06:11:42 +0000
-Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
+	id 1giZ04-0004a6-Fp; Sun, 13 Jan 2019 06:12:00 +0000
+Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1giYyy-0003Zq-Qk
+ id 1giYz1-0003c7-8w
  for linux-arm-kernel@lists.infradead.org; Sun, 13 Jan 2019 06:10:59 +0000
-Received: by mail-lf1-x143.google.com with SMTP id i26so13529356lfc.0
+Received: by mail-lj1-x244.google.com with SMTP id v1-v6so16288462ljd.0
  for <linux-arm-kernel@lists.infradead.org>;
- Sat, 12 Jan 2019 22:10:52 -0800 (PST)
+ Sat, 12 Jan 2019 22:10:54 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=tpGZBMv+2Blxh4V/XE5i9mZ2QtJ6+hBIEg7uehgXemA=;
- b=tt6cOCPjqgPNi0TRL7/t78hIWoMG4wPa3FgWWgmI4zRxFkl/2d1409e4Lxf31bdDnV
- iHmXEkk8ZPWhb8TY0tJbUz4TB93MAyQgnt+02GfpuQ3g+/wbfveJX9Q7rJXf7AFe+5ZR
- fy7BWat0MCJIz3E8byrnH3YbIbeZjsXl1hP1Vm8eP1VnMsSZ8yN2ZtvP0MsAv8mYgOMR
- xn2s61fn5LHbpWNfvvAgccEkHcK8+G4FxKS6U1HbkyvOvykCRCo+hxlsKW+ab5W8yNHd
- vV6pwD+HTDQhmSifeYm0ymyuk3TCgJ1OUF9X84flqby4zlSFT6Fzzo34XotgMGsSBIBM
- muxA==
+ bh=Bz5dcitNEPakAxDAumc42S6KsLZ0vzGAdJHHtTKEJQk=;
+ b=rEEWH00LfNQSDpI1U0QpDNNGCC0ZQOZhYVtOOk8ozsNnkjhLoYb1CBn6B+YyFkg1di
+ 6f83EUgMd0CgStBk2IJhmsMjeRxZnCqtZUA5aqBXWdVBnOb0Ro3id9cy8H9VjlkVcmOo
+ UYy0oXtPQuptixf3Vy2U/eTTIY3tNqTWbHq1cIv/CWRYWbhWnBt9OSCVQ+/oc2frpGZD
+ uGvHZHjK0lqStLlz7AmNzXVe/CHiYboqviAfHarmSe0mzni1+R7CIoV4T1nJh7kJsVm1
+ 2Z/qSBZcHNntfgMPwSvYtSxLEVMeorQeQAQ88bG54fJGPnp3JXrDVM5xrRW0WsDvGE7c
+ RE1w==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=tpGZBMv+2Blxh4V/XE5i9mZ2QtJ6+hBIEg7uehgXemA=;
- b=o2656I2asFvf9Id4/vhCkRUa8z09PJrnX2epRrtcT6q4A9gX2dqpCTuuHtC0rxEI/a
- O41LJD2XmnAWguRqXiXkIFRsIpvIVlS2bIyf2bjD65RULHTsus2SquybcGFpQwMzBPaU
- C6i+TUjkzJpldIgvonEA9HXzAJpC5Qh4fqjvgVPjQuixdck8WeQ9H1xCaEh7yIqgsWFg
- l/YlM+10iIf1ryntPvXgPW4ZMQoZI37pq1Y6ZhqmXfSRYxfdLCf7oJ3mgOQvkaQpNZ1G
- U16aiN8W55kpX1Hm9dmjRxs4Xh7+f44BNYlDsawuQb2ocIV0MOn9edfPb9k97zeJ+jNm
- CzZw==
-X-Gm-Message-State: AJcUukc++jCNrMv7MIHe5rUXhvIXnb+M5j33w18tTBzB1tpjaMyAL5sm
- MLCRi6Gb+lHCtpualqXHdM2/Zw==
-X-Google-Smtp-Source: ALg8bN7dv05vPQ+vUdZf63wl3plyxr1wQtmlk3ENEONCntNMwoETtfHIZhXP3viDeTLhBst0SMFZqQ==
-X-Received: by 2002:a19:2106:: with SMTP id h6mr10804651lfh.29.1547359850830; 
- Sat, 12 Jan 2019 22:10:50 -0800 (PST)
+ bh=Bz5dcitNEPakAxDAumc42S6KsLZ0vzGAdJHHtTKEJQk=;
+ b=DyG5h+ECUo8MXiHdKdYTHploGrJUSdhw2kHjvezprH5GyeR1ECUKAWt9KV8Z6KfTbV
+ LKllzC9vmpRGNGIuHhrqqAzoaYY1XVylrI33gR/sac/6ZaHhi9+tLsKh+g6RGav1MIj8
+ dNVsFdmULV7mRIJTrp9ii5YAvkBA7mnTEWNehxdEu8h+3b+8i+dr99I/rEpX6FqvUhXJ
+ FzOt/LnIjLb+bS5EqHTH0z0xppljKMCGYrVChi+XLi47DocDiBwo8xokq0PK8oVr+sbc
+ XA7ibc3tadUCTEtOj3t2mFiLW7LOoGdD+bR8oEn0K7lUyVlq8WvdfPmWkHffDJk2DFTc
+ E0tA==
+X-Gm-Message-State: AJcUukcRS+BpATyQN9KU90DdgVCmqsbgeHZLwwy1eTJgKemPiP8RPmGm
+ VCizN4EHKwkHy9Dr/MZuytt1+/0AuoA=
+X-Google-Smtp-Source: ALg8bN7c34qYIaQpL4aZUZ1dX2WbS+8QMFk8ur0smu84iwx47/beE8E5UN5xpWSncmuJgSysvWr/wA==
+X-Received: by 2002:a2e:4784:: with SMTP id
+ u126-v6mr11690647lja.124.1547359852983; 
+ Sat, 12 Jan 2019 22:10:52 -0800 (PST)
 Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id m4-v6sm16414543ljb.58.2019.01.12.22.10.49
+ by smtp.gmail.com with ESMTPSA id u65sm16434012lff.54.2019.01.12.22.10.51
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Sat, 12 Jan 2019 22:10:49 -0800 (PST)
-Date: Sat, 12 Jan 2019 22:03:38 -0800
+ Sat, 12 Jan 2019 22:10:51 -0800 (PST)
+Date: Sat, 12 Jan 2019 22:04:17 -0800
 From: Olof Johansson <olof@lixom.net>
-To: Linus Walleij <linus.walleij@linaro.org>
-Subject: Re: [GIT PULL] Integrator fixes for v5.0+
-Message-ID: <20190113060338.serdqlsfb3hih5jn@localhost>
-References: <CACRpkdb22-JT3GeJeqcOdXYJa9MyGMhujHxX-RgZOk7kbEkejw@mail.gmail.com>
+To: Gregory CLEMENT <gregory.clement@bootlin.com>
+Subject: Re: [GIT PULL] ARM: mvebu: fixes for v5.0 (#1)
+Message-ID: <20190113060417.veqxbl2fq2rvpfcl@localhost>
+References: <87zhs7qgfr.fsf@FE-laptop>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <CACRpkdb22-JT3GeJeqcOdXYJa9MyGMhujHxX-RgZOk7kbEkejw@mail.gmail.com>
+In-Reply-To: <87zhs7qgfr.fsf@FE-laptop>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190112_221053_243399_EBEFBC49 
-X-CRM114-Status: GOOD (  15.90  )
+X-CRM114-CacheID: sfid-20190112_221055_727255_9881715E 
+X-CRM114-Status: GOOD (  15.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,27 +98,21 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: arm-soc <arm@kernel.org>, Nicholas Mc Guire <hofrat@osadl.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- "Gustavo A. R. Silva" <gustavo@embeddedor.com>
+Cc: Andrew Lunn <andrew@lunn.ch>, Jason Cooper <jason@lakedaemon.net>,
+ Arnd Bergmann <arnd@arndb.de>, arm@kernel.org,
+ linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 11, 2019 at 04:07:21PM +0100, Linus Walleij wrote:
-> Hi ARM SoC maintainers,
+On Fri, Jan 11, 2019 at 05:58:48PM +0100, Gregory CLEMENT wrote:
+> Hi,
 > 
-> these are some overdue fixes for the Integrator.
+> Here is the first pull request for fixes for mvebu for v5.0.
 > 
-> It's your choice whether to queue for fixes or defer to v5.1, there are
-> not many users out there, at the same time it is nice if the code is
-> in shape.
-> 
-> Please pull it in!
-> 
-> Yours,
-> Linus Walleij
+> Gregory
 > 
 > The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
 > 
@@ -125,18 +120,23 @@ On Fri, Jan 11, 2019 at 04:07:21PM +0100, Linus Walleij wrote:
 > 
 > are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-> tags/integrator-fixes-armsoc
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-5.0-1
 > 
-> for you to fetch changes up to 21face6f0d4d033d949d5517f307a15f76a9d9f2:
+> for you to fetch changes up to b5f034845e70916fd33e172fad5ad530a29c10ab:
 > 
->   ARM: integrator: impd1: use struct_size() in devm_kzalloc()
-> (2019-01-11 13:33:00 +0100)
+>   ARM: dts: kirkwood: Fix polarity of GPIO fan lines (2019-01-10 12:23:47 +0100)
 > 
 > ----------------------------------------------------------------
-> Fixes for the Integrator:
-> - Handle failed allocations in the IM/PC bus attachment.
-> - Use struct_size() for allocation.
+> mvebu fixes for 5.0
+> 
+> They are all device tree fixes which also worth being in stable:
+> 
+>  - Reserve PSCI area on Armada 7K/8K preventing the kernel accessing
+>    this area and crashing while doing it.
+> 
+>  - Use correct PCIe reset signal on MACCHIATOBin  (Armada 8040 based)
+> 
+>  - Fix polarity of GPIO fan line D-Link DNS NASes(kikwood based)
 
 Merged, thanks!
 
