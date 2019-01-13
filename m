@@ -2,81 +2,57 @@ Return-Path: <SRS0=Fp1N=PV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4A36BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 13 Jan 2019 09:34:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 411DAC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 13 Jan 2019 09:34:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1A9802084C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 13 Jan 2019 09:34:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1276721721
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 13 Jan 2019 09:34:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cWqvVgr2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1A9802084C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NV9Dj2YN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1276721721
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lip6.fr
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=m/ivGfyW/2O8VMP2CcTsjFa1Al6RJ2VZUPpM+lm17OM=; b=cWqvVgr2x516TM
-	QNzziAqvTDVGlt/m6+BxhUL/C+U79eSDzZ0StiOGiTXnraML4vkrkzXL1M7b4yXWbg/BwlkYSw1W5
-	Xg2Zc8VWTIO5cmmH8k3XwrS6Bd90VSSqEj+DMoRauTcjHUrr5Lo+0pkeggLM71i7TjmL9NnS+zQ8s
-	A++NpkJPIeGJn/0hMxL0jpJ90LoMR2+fGP9iHfUk31k3SInqVFB1/I8L+iibqmVC8rr2W1X+hdPVB
-	leKHMn6HYOQCT++jr85iSgbxijwMLDONI1OQ7J2asha0GA/ImAHbK1/p9ou2fKSdEcr50Z+fuPCls
-	7JaP6pLZZSOI0V21+CSQ==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=Tx3a7GfTwDft8SS9kx5BbkFO/fPKxOzGNoKTbAHWs6U=; b=NV9Dj2YNKejtGFZ4kDRYxLpYWZ
+	83tEseU6lq04p6ruAYmrwqBDzrqgUufhJAiEyoeglL9USXSqbhT7mJiyBjzgM4BEkfQglFNPfBMy0
+	Y4TcVKSjbtwtFjk59QpRfCQUvVpGyT6bi7N109naC4ksAxYeYCWb998n1HWCLBZFUvqUFMSBFV2z9
+	LwlbyQ1nthzDXsXFs0KPD7Dt5Twe0usNNNAj9JfX0HGWETeTFppMNR4BsN7V4xAXc5ME4zbEOQsoK
+	g6kwF6vYShC4XuxaHO8MABENo3RDiGGKaAIm4NCMXGyo0LN6fGmOu88L5MhZ0SA9YqwwkabbT1gOh
+	zGr+vRBQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gic9y-00060H-MF; Sun, 13 Jan 2019 09:34:26 +0000
-Received: from mail-ed1-f68.google.com ([209.85.208.68])
+	id 1gicAG-0006GA-Tq; Sun, 13 Jan 2019 09:34:44 +0000
+Received: from mail3-relais-sop.national.inria.fr ([192.134.164.104])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gic9v-0005zw-F4
- for linux-arm-kernel@lists.infradead.org; Sun, 13 Jan 2019 09:34:24 +0000
-Received: by mail-ed1-f68.google.com with SMTP id o10so16332484edt.13
- for <linux-arm-kernel@lists.infradead.org>;
- Sun, 13 Jan 2019 01:34:22 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:content-transfer-encoding
- :in-reply-to:user-agent;
- bh=bqtD+IZ9XT8e+fGQkEeRwvV8GURM2V1wPqLQ2hCv1EU=;
- b=VPPQXpCjmW/x/Kj8nT40R2OZS9ia2LejalExyrtxhXToVxVg8nEtpWRzw9ld3aCPfL
- btw8s41cog1Yy6UwOATKE7LGd+txEEQ4O59phaxxrhg/o+l5aAgCW3Gt11vSAT1XGYYS
- d0E+CSl0svqOGf2zh5gIlGMoqngk01GRXv/YklBm4/OaNZQdn+lzoddU7jQ+KFmppy7Q
- FVvLxGYN2gJ78qbLvCvuDiFXesZ1nUkFfbdQDvkoeelOOZX6wOo16x/FNPINk/yGKm2Z
- e43hgam+YqNclf9d4LgOAahPSHrbrdfaMVEXKN9WCudkfIHAHjTWhkxJnNGlrB40N7Ys
- UZgw==
-X-Gm-Message-State: AJcUukcHRpXi87RC/EQw+Bl/4Isi3yDiJvP7C2kwngewDORK3YFOOGbd
- B7ihLUIiG68UYey2p417ufM=
-X-Google-Smtp-Source: ALg8bN5AE0So5HzFbet1Co/Lm594Nx/S201oca+dq0qIQG9W2aj62PRAxT06LnMYNrIrq1qd0zXwkw==
-X-Received: by 2002:a17:906:948d:: with SMTP id
- t13-v6mr16591106ejx.119.1547372060972; 
- Sun, 13 Jan 2019 01:34:20 -0800 (PST)
-Received: from kozik-lap ([194.230.155.148])
- by smtp.googlemail.com with ESMTPSA id c29sm3490630eda.75.2019.01.13.01.34.18
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Sun, 13 Jan 2019 01:34:19 -0800 (PST)
-Date: Sun, 13 Jan 2019 10:34:16 +0100
-From: Krzysztof Kozlowski <krzk@kernel.org>
-To: =?utf-8?B?UGF3ZcWC?= Chmiel <pawel.mikolaj.chmiel@gmail.com>
-Subject: Re: [PATCH v2 4/4] ARM: defconfig: s5pv210: Add cpufreq support
-Message-ID: <20190113093416.GA27934@kozik-lap>
-References: <20190110205215.22030-1-pawel.mikolaj.chmiel@gmail.com>
- <20190110205215.22030-5-pawel.mikolaj.chmiel@gmail.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190110205215.22030-5-pawel.mikolaj.chmiel@gmail.com>
-User-Agent: Mutt/1.9.4 (2018-02-28)
+ id 1gicAC-0006DQ-6h; Sun, 13 Jan 2019 09:34:42 +0000
+X-IronPort-AV: E=Sophos;i="5.56,473,1539640800"; d="scan'208";a="291725799"
+Received: from palace.lip6.fr ([132.227.105.202])
+ by mail3-relais-sop.national.inria.fr with ESMTP/TLS/AES128-SHA256;
+ 13 Jan 2019 10:24:46 +0100
+From: Julia Lawall <Julia.Lawall@lip6.fr>
+To: CK Hu <ck.hu@mediatek.com>
+Subject: [PATCH 1/4] drm/mediatek: add missing of_node_puts
+Date: Sun, 13 Jan 2019 09:47:41 +0100
+Message-Id: <1547369264-24831-2-git-send-email-Julia.Lawall@lip6.fr>
+X-Mailer: git-send-email 1.9.1
+In-Reply-To: <1547369264-24831-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1547369264-24831-1-git-send-email-Julia.Lawall@lip6.fr>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190113_013423_501367_CDF5EA3B 
-X-CRM114-Status: UNSURE (   9.04  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190113_013440_623535_87804AF6 
+X-CRM114-Status: GOOD (  11.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,22 +64,76 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
- linux-samsung-soc@vger.kernel.org, linux-pm@vger.kernel.org,
- viresh.kumar@linaro.org, rjw@rjwysocki.net, linux@armlinux.org.uk,
- robh+dt@kernel.org, linux-kernel@vger.kernel.org, kgene@kernel.org,
+Cc: Philipp Zabel <p.zabel@pengutronix.de>, David Airlie <airlied@linux.ie>,
+ kernel-janitors@vger.kernel.org, linux-kernel@vger.kernel.org,
+ dri-devel@lists.freedesktop.org, linux-mediatek@lists.infradead.org,
+ Daniel Vetter <daniel@ffwll.ch>, Matthias Brugger <matthias.bgg@gmail.com>,
  linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gVGh1LCBKYW4gMTAsIDIwMTkgYXQgMDk6NTI6MTVQTSArMDEwMCwgUGF3ZcWCIENobWllbCB3
-cm90ZToKPiBUaGlzIGNvbW1pdCBlbmFibGVzIGNwdWZyZXEgc3VwcG9ydCBmb3IgYWxsIHM1cHYy
-MTAgZGV2aWNlcy4KPiAKPiBTaWduZWQtb2ZmLWJ5OiBQYXdlxYIgQ2htaWVsIDxwYXdlbC5taWtv
-bGFqLmNobWllbEBnbWFpbC5jb20+Cj4gLS0tCj4gIGFyY2gvYXJtL2NvbmZpZ3MvczVwdjIxMF9k
-ZWZjb25maWcgfCA2ICsrKysrKwoKVGhhbmtzLCBhcHBsaWVkLgoKQmVzdCByZWdhcmRzLApLcnp5
-c3p0b2YKCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwps
-aW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJh
-ZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51
-eC1hcm0ta2VybmVsCg==
+The device node iterators perform an of_node_get on each iteration, so a
+jump out of the loop requires an of_node_put.
+
+The semantic patch that fixes this problem is as follows
+(http://coccinelle.lip6.fr):
+
+// <smpl>
+@@
+local idexpression n;
+expression e,e1;
+identifier l;
+@@
+
+ for_each_child_of_node(e1,n) {
+   ...
+(
+   of_node_put(n);
+|
+   e = n
+|
++  of_node_put(n);
+?  goto l;
+)
+   ...
+ }
+...
+l: ... when != n
+// </smpl>
+
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+
+---
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+index 6422e99..b9205bf 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+@@ -522,12 +522,15 @@ static int mtk_drm_probe(struct platform_device *pdev)
+ 			comp = devm_kzalloc(dev, sizeof(*comp), GFP_KERNEL);
+ 			if (!comp) {
+ 				ret = -ENOMEM;
++				of_node_put(node);
+ 				goto err_node;
+ 			}
+ 
+ 			ret = mtk_ddp_comp_init(dev, node, comp, comp_id, NULL);
+-			if (ret)
++			if (ret) {
++				of_node_put(node);
+ 				goto err_node;
++			}
+ 
+ 			private->ddp_comp[comp_id] = comp;
+ 		}
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
