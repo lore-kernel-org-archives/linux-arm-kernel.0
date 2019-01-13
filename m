@@ -2,57 +2,81 @@ Return-Path: <SRS0=Fp1N=PV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-10.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 29F49C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 13 Jan 2019 10:22:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 153E0C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 13 Jan 2019 12:14:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EF3B32064C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 13 Jan 2019 10:22:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CAC0320836
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 13 Jan 2019 12:14:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tgsYiq93"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EF3B32064C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lip6.fr
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="O8+cP0m/";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="UCuYxNAR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CAC0320836
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=CgrL3AIkaRYZEPMNF6oFx4hOu1sHRxWIpYrNqGX83QM=; b=tgsYiq93hHissAGrd5ym0hVJtM
-	1XT+CuuEZi88bcxjSTxssyJ6Lt1MwtH19RfI3Pj7+K436eRIT5rPorSEenQ21fGnrDC/SJmaqVL/0
-	GXMNenMp+qhkNh7ws8eoqu8hYXipWsF/xcgpWa7ElhvXgGxjWHxZ/TQ45hL1CRPtmlN+2fSQg5YX/
-	mldLryQWYF8Q4YwCgKM4wGXG9I+T6bd0HZSpgZXbnerYb0w5g6zFHEZ/+aKokvhvrnyxo8Le4jIxF
-	BMu5wEGE8PLR2/vLuVpEYoKOZAM0p4ZQiOUT+JQle7ESwbXr0dbGEBrftEfYx66EOz6PYCADRutcp
-	eaXXkopg==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=JqKMDYuofiM6ymjXDxNkcymgBy7/JhrEanKb4H0Oi0E=; b=O8+cP0m/q99jg3
+	SBdP53mrdhLJQnY4aZ0va6g362b/JCAmsog0ksrVYmyCekJs0ozXhmieALFhddQP6MjvsyAXd6gU3
+	3spOGEljW8bF9HUNcv2fqtkVE5F4nKltQh8USmtypFPjujOhvJd2Hk1/XkUQekX8pWGq+RLxnl4IM
+	A8MgHYPxuVPPudyW3AugWIcAkmC8+aUGzvYCR1mLVLUYWhV7O2JASvZzhUS9KAkbuh7zKPSSALWK2
+	siym3RkFBFCNGQPIqos1QZW0+eBMAQkkx5UWd95XrbwS8c7iRP9y1ieyQf5ZLzlBofAJ6vZmL21cT
+	9Df3aubz1Q8XL9zywJJw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gicuI-0006QY-AW; Sun, 13 Jan 2019 10:22:18 +0000
-Received: from mail3-relais-sop.national.inria.fr ([192.134.164.104])
+	id 1giefJ-0001b8-QC; Sun, 13 Jan 2019 12:14:57 +0000
+Received: from mail-lf1-x12f.google.com ([2a00:1450:4864:20::12f])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gicty-00065Q-VF; Sun, 13 Jan 2019 10:22:02 +0000
-X-IronPort-AV: E=Sophos;i="5.56,473,1539640800"; d="scan'208";a="291728765"
-Received: from palace.lip6.fr ([132.227.105.202])
- by mail3-relais-sop.national.inria.fr with ESMTP/TLS/AES128-SHA256;
- 13 Jan 2019 11:21:54 +0100
-From: Julia Lawall <Julia.Lawall@lip6.fr>
-To: Neil Armstrong <narmstrong@baylibre.com>
-Subject: [PATCH 3/3] drm/meson: add missing of_node_put
-Date: Sun, 13 Jan 2019 10:44:51 +0100
-Message-Id: <1547372691-28324-4-git-send-email-Julia.Lawall@lip6.fr>
-X-Mailer: git-send-email 1.9.1
-In-Reply-To: <1547372691-28324-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1547372691-28324-1-git-send-email-Julia.Lawall@lip6.fr>
+ id 1giefG-0001aI-A0
+ for linux-arm-kernel@lists.infradead.org; Sun, 13 Jan 2019 12:14:56 +0000
+Received: by mail-lf1-x12f.google.com with SMTP id a8so13754512lfk.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sun, 13 Jan 2019 04:14:49 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=MquxggZERArLSwcbYfp+/d7MLmRd+ChJbqyHgXD3DKs=;
+ b=UCuYxNAR7gssRmQyGDZFRp/4GXqMgJ0MgiVIqCBF7UD92ooD58BzAKuAWe7oChZXrQ
+ 7XBnqkKhxwM5FxTQ3kd7bThOAC+71olgHmPswOdC3jxfq+dS/oJQv0vhvbHbFRc2Zqqt
+ aisHmzvpuKSnVAPd3IXpsj9qYL7SNwKVcTeic=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=MquxggZERArLSwcbYfp+/d7MLmRd+ChJbqyHgXD3DKs=;
+ b=ciaBiOnkRLB9tn7W+PD/fMkUHLQJYI2R3L3T7UcWn1aHDi/EeWtF3RKxL6nlEDJ77/
+ zbdvpfnXgCjIGkisR5L63kWc3YrzduzWmeqFimRRBv2w/lTHuO+wW0j74bf9kBml3KzS
+ dqgwysZeqA8/rIQNQECmmxCrC0tu95j162LCcZVABccnt163Sn+qBpQ8fcM6jsiEisJV
+ gXrbanVgbKGrudz1RdJMbqBAxxko+e7QWc11aWcVP7iSzSvsQolVOWWuqjKqUTZYwlWL
+ Ow+0m6bYWZka7pcg0LDtxB1Izb6x4jj/KTUdpNy6yKXY6maSRQZYDEGYvS5r14WyO+WS
+ hYJQ==
+X-Gm-Message-State: AJcUukenb26B3aYb8ef1kKgvN3v+T75SluLPALC3Luc9QbGTSjSvP5jP
+ IwH54QSj7FfrSBzPKTq5dVMb7OK97BsCmLTFW9V6xw==
+X-Google-Smtp-Source: ALg8bN49Y3tUQKx8d/P5foBkL8G7ghYtF5A2c7sFFzpKkcUdQUpMeHNTid2hbZp7RaIUjBOynFi6k+YyaBiljh06uqc=
+X-Received: by 2002:a19:c801:: with SMTP id y1mr10930365lff.53.1547381688007; 
+ Sun, 13 Jan 2019 04:14:48 -0800 (PST)
+MIME-Version: 1.0
+References: <CACRpkdb-zphMyZbGh5XYy2A6B1224BGFmTwr0Bm98G3oM0MeoQ@mail.gmail.com>
+ <CAK8P3a08TV+sQhsCPjkXh6wOKEpLfGLqVo9+FHoXzDVXs_bY7A@mail.gmail.com>
+In-Reply-To: <CAK8P3a08TV+sQhsCPjkXh6wOKEpLfGLqVo9+FHoXzDVXs_bY7A@mail.gmail.com>
+From: Linus Walleij <linus.walleij@linaro.org>
+Date: Sun, 13 Jan 2019 13:14:36 +0100
+Message-ID: <CACRpkdZ7KSmgTYP8a_RUJAWKzuc652OZ420Lq4ZnzkCuESLZ2Q@mail.gmail.com>
+Subject: Re: Hilscher NetX mach-netx refactorings
+To: Arnd Bergmann <arnd@arndb.de>, Ladislav Michl <ladis@linux-mips.org>,
+ github@hilscher.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190113_022159_424380_CE8D0F00 
-X-CRM114-Status: GOOD (  10.89  )
+X-CRM114-CacheID: sfid-20190113_041454_351623_FD715C8C 
+X-CRM114-Status: GOOD (  17.84  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -64,80 +88,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: David Airlie <airlied@linux.ie>, Kevin Hilman <khilman@baylibre.com>,
- kernel-janitors@vger.kernel.org, linux-kernel@vger.kernel.org,
- dri-devel@lists.freedesktop.org, Daniel Vetter <daniel@ffwll.ch>,
- linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: Olof Johansson <olof@lixom.net>,
+ Robert Schwebel <r.schwebel@pengutronix.de>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Pengutronix Kernel Team <kernel@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add an of_node_put when the result of of_graph_get_remote_port_parent is
-not available.
+On Sat, Jan 12, 2019 at 1:03 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> On Sat, Jan 12, 2019 at 9:35 AM Linus Walleij <linus.walleij@linaro.org> wrote:
+> >
+> > Hi Sascha, Robert,
+> >
+> > I am looking at refactoring mach-netx to use the new PL11x
+> > DRM driver for the graphics.
+> >
+> > I need to make sure that patches get tested on the hardware
+> > and just want to ascertain that there is an active maintainer that
+> > will be able to test patches I make for this and work on getting
+> > it migrated to DRM before I start spending time on it.
+> >
+> > Are you/pengutronix still actively maintaining this machine and
+> > testing new kernels on netx?
+> >
+> > I guess the second question is whether you have plans to migrate
+> > it to device tree and multiplatform, but I'm mainly thinking about
+> > my own little patches now.
+>
+>
+> On a related note, there does appear to be active work on
+> newer netx machines that were never upstreamed, see
+> https://github.com/Hilscher/netx4000-linux/commits/v4.9-netx4000-stable
 
-An of_node_put is also needed when meson_probe_remote completes.  This was
-present at the recursive call, but not in the call from meson_drv_probe.
+That RS485 addition to PL011 using GPIOs is a bit hacky but
+looks like very useful for industrial applications.
+Ladislav, have you been in contact with Hilscher?
 
-The semantic match that finds this problem is as follows
-(http://coccinelle.lip6.fr):
+> I wonder if anyone has contacts into the company so we can
+> work together with them to include them into mainline Linux.
 
-// <smpl>
-@r exists@
-local idexpression e;
-expression x;
-@@
-e = of_graph_get_remote_port_parent(...);
-... when != x = e
-    when != true e == NULL
-    when != of_node_put(e)
-    when != of_fwnode_handle(e)
-(
-return e;
-|
-*return ...;
-)
-// </smpl>
+They have a mail address github@hilscher.com, let's knock
+on the door and see if somebody answers it :D
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+I'd personally be able to take a stab at converting this machine
+to device tree and multiplatform if I only had access to the
+hardware, as it seems to be in the same class as EP93xx
+and MOXA ART: deployed in industrial systems as we speak.
 
----
- drivers/gpu/drm/meson/meson_drv.c |    9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
-index 3ee4d4a4e..b59c757 100644
---- a/drivers/gpu/drm/meson/meson_drv.c
-+++ b/drivers/gpu/drm/meson/meson_drv.c
-@@ -388,8 +388,10 @@ static int meson_probe_remote(struct platform_device *pdev,
- 		remote_node = of_graph_get_remote_port_parent(ep);
- 		if (!remote_node ||
- 		    remote_node == parent || /* Ignore parent endpoint */
--		    !of_device_is_available(remote_node))
-+		    !of_device_is_available(remote_node)) {
-+			of_node_put(remote_node);
- 			continue;
-+		}
- 
- 		count += meson_probe_remote(pdev, match, remote, remote_node);
- 
-@@ -408,10 +410,13 @@ static int meson_drv_probe(struct platform_device *pdev)
- 
- 	for_each_endpoint_of_node(np, ep) {
- 		remote = of_graph_get_remote_port_parent(ep);
--		if (!remote || !of_device_is_available(remote))
-+		if (!remote || !of_device_is_available(remote)) {
-+			of_node_put(remote);
- 			continue;
-+		}
- 
- 		count += meson_probe_remote(pdev, &match, np, remote);
-+		of_node_put(remote);
- 	}
- 
- 	if (count && !match)
-
+Yours,
+Linus Walleij
 
 _______________________________________________
 linux-arm-kernel mailing list
