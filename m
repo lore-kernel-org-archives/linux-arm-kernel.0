@@ -7,80 +7,82 @@ X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3872AC43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 15:33:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 148D8C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 15:34:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EEDC420873
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 15:33:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D84D520873
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 15:34:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QVxP+sUa";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="13fgKkMU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EEDC420873
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jYGXbzjb";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="nxhGnXIC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D84D520873
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	Message-ID:References:To:From:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RTmDjnlhk9/ik4hSo+dJ+CzEpRgrVuy7cdO3n6xa5Yo=; b=QVxP+sUaJYPlCg
-	8siYItowhRxGa5+Pig4oBQ+vbX1Qtlvn+syPlddrdgxOEpWYwG+4ll5XXBMWss1BOLFSRctAHGW8P
-	doeZzZDRZBLHN5Wxs9qhRQ1ejWKuZQpnLi3wrabqr212X236Ot9Lv7VSSXzw66oJVcg9II0PhdzLX
-	bbgdocl/2bbqKJrqedqsjbkyY1HO4ClOapml4jhAZ9z+m9nn8qphIt5qLmJyJCUGFunMSyb5Len+z
-	+x2aW8xRSdFqpr22HvsnAPLA+djred1R2bPcLd41rIPz7onqRQkXrt5uV8m4BnCFEeDLgdTa0H079
-	vkzTFFaOfl+PxY+yDqdA==;
+	List-Owner; bh=cHLAQF5fio42UWYr5ySNlJofuMRvfM3YGyZ98rZ5PBw=; b=jYGXbzjbajkYiO
+	3t798olkP2R7vGk29AbClbKGyRynxfalgGr2UVVhKu9XeflVCqSP8AAfAlHVVkQWfN9dCUDEoImF6
+	WwduMrUIEK+b0zn7Rgk8XqrzXJdx0fULhuNHJVLVzS6uiNNRc7NxbXCwHog/kCMaeCuOnETMjjN22
+	ekXNfybzkLlBw7G1R4xY1q4H6WO+K1qXhUcdK5P/AEGXeoYEnDkcF17jZ43Nwwc3AvRYWkTNLNh2M
+	20JD77CduJHWYZ3KGR2R1gqMDC8MzU/iF4RQ659s2fFcQzTc3M2hxrSMEmxn56h1/fd1sghOSco3Z
+	jPILAhUOrqW8Ma1I3xYw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj4Eb-0005KO-5z; Mon, 14 Jan 2019 15:33:05 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+	id 1gj4Fu-00061I-DC; Mon, 14 Jan 2019 15:34:26 +0000
+Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj4EX-0005Ix-Ce
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 15:33:04 +0000
-Received: by mail-wm1-x342.google.com with SMTP id n190so9385698wmd.0
+ id 1gj4Fn-00060E-Uz
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 15:34:25 +0000
+Received: by mail-wm1-x344.google.com with SMTP id y8so9262176wmi.4
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 14 Jan 2019 07:33:00 -0800 (PST)
+ Mon, 14 Jan 2019 07:34:19 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=subject:to:cc:references:from:openpgp:autocrypt:organization
+ h=subject:from:to:cc:references:openpgp:autocrypt:organization
  :message-id:date:user-agent:mime-version:in-reply-to
  :content-language:content-transfer-encoding;
- bh=+O05ljDB432NQtxALGl6ShYbAmOX/If9lvRTBq+ufOg=;
- b=13fgKkMUWKwnVVM3rT5uMzNRJNjRTp39N3lf7CQhFYc3jschziMZQBuwDRz4+x2PFo
- 6R2671mdo9MAMl1SpdCJ6q+/YPvifK9kL40OE56ud7s23M11xMm5g4yGWC4G0NJtcQeI
- PyUqC2D4k9xUIyi2DO5ShdqNLv1rwRKnKvmCq6ZXk9baCT/HYBkN0zfiUAPzQFdHFO3J
- qacArYjn6I7Cx9h7sipTQk1CmzUunvFqCbWmCVSb5qqG+qdFjwdOxPocxTPFju0pw2Ej
- sSDpwJdI7GfzGZ1Vah4qGqLNyvT8+0GBZdfL/8a2tyRGxNB5WI0CsyejQgI2ZkLeHSqc
- LaMQ==
+ bh=7CpENgUYFuaKkwmwSVJ/+AjrvPwUExByKZFzFxjT7kI=;
+ b=nxhGnXICfpq9zz6mE65kV48XNAq8yJYi1WQ53qLZmbYXfHVeMROBuYcoN1PiErCvEK
+ zZJ7igpCtcAlqlyT845dHrZFWGKKub5mh3a7WkjcPAhHLwabIjnNWSDim2IS+XZ6xTih
+ qMIVR5ecf9sbFD/SWe3thf4r/lV9KUKZ6Xhk4zduX0ecBVWAtzEdQwYZFTQOpn4vD2aM
+ pQTEx1izH11+yo5sW4HV4QtArpI43XZOo5Vlg/rDeZzELmdkTQE6k/00IfooEK/wcnez
+ F4CISryCl3FVh5y1/EXUAKKsln9gcCiNBwceXQXw0ga1uNmKajb0XOt6008ZSlu/j6SA
+ qd9g==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
+ h=x-gm-message-state:subject:from:to:cc:references:openpgp:autocrypt
  :organization:message-id:date:user-agent:mime-version:in-reply-to
  :content-language:content-transfer-encoding;
- bh=+O05ljDB432NQtxALGl6ShYbAmOX/If9lvRTBq+ufOg=;
- b=d5Ckukje+/OM/T4HRdMlIWv7SjCZ4+PwRb0V/XBg+HpYBhYZrcCf9NCGVMUZGPL37o
- cNnrmhE+nnsvfhKT4XTpe900lHftkkmkgScSLnhoco+E8iYzMPectyOUttfGtl8ozWci
- hHYCpWIMrFvHYXdMrRDK71pudc4qlRbZ+M/BvJfpNynFykk1IJeM91kam7R14L14cu/r
- B88esGcbZp6ap2X7g/lLWY9goz9UEuIj359i7kJVklTTIzkr1quVlSsMNGVnV8xURAeU
- 9va4OphVLbUrz1I7IMore9Eo59jN3DCaGFTHcBFUuMAvLP9W/GKcin8r+sLjmfAiaENQ
- 9b1Q==
-X-Gm-Message-State: AJcUukcnRB+wtkGQo9KoanlZuJNfhUl2PuEIZlZFLuoYkX6+ee/3SLDn
- rlWLtiuJR/4TuFg/L9+Grt7Ldw==
-X-Google-Smtp-Source: ALg8bN5jv9lD+Ssv/lQ/GwCHV/kiUsXTozY0EMSSQupT76uVe2KsX7sY6xXp7EfeThR9WEhZExd2Ww==
-X-Received: by 2002:a1c:87cc:: with SMTP id j195mr12046394wmd.2.1547479979455; 
- Mon, 14 Jan 2019 07:32:59 -0800 (PST)
+ bh=7CpENgUYFuaKkwmwSVJ/+AjrvPwUExByKZFzFxjT7kI=;
+ b=BOOhmpNfZjMhcI3XIqaArA3WJTnTSoOSCmUmqguW4ozxQ07aYB3v5ae2orUvic2/Gn
+ b3neyvNT6JjyNjTABup5nXOv5VCR3T+vG9RSYwgl1LwkjgtA0cmhFAd9DIVpaipwb08k
+ q3EnWAEuMo5YFYfUJSlbh6QPTL0bPQ3Qu52mrmBrlEy7XIvI5RpZDIl9c3zTbBPE1wII
+ zwnejISnP60XCt0xkzD6d+urWumqcVbefuwoSLRcRYXcVxS1A3HJjKKnvJqRnHiJA/iN
+ Aon7/hOk6H5/40KLmVw7fyWcW0gpMIp2TTTMd2Xexw/K/8GIdFlYfNpC9SGOmeCQY+tn
+ th/w==
+X-Gm-Message-State: AJcUukdN9WfowkwdystB02grIWYD64WwxdcMYCOHvqA+ojPepLoY60LA
+ sLt8978VARfDWQIcnprd9gjimQ==
+X-Google-Smtp-Source: ALg8bN4pPQqyKVszuoPcZDhe9Kfxso9uzbz6Ls2znnZniKErRx0tlvkDqxvSuBFaVfWsyNrAz5TYpQ==
+X-Received: by 2002:a1c:bb04:: with SMTP id l4mr12408307wmf.142.1547480058333; 
+ Mon, 14 Jan 2019 07:34:18 -0800 (PST)
 Received: from [10.1.2.12] (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr.
  [90.63.244.31])
- by smtp.gmail.com with ESMTPSA id p4sm59237075wrs.74.2019.01.14.07.32.58
+ by smtp.gmail.com with ESMTPSA id 124sm31308374wmh.22.2019.01.14.07.34.17
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 14 Jan 2019 07:32:58 -0800 (PST)
-Subject: Re: [PATCH 3/3] drm/meson: add missing of_node_put
-To: Julia Lawall <Julia.Lawall@lip6.fr>
-References: <1547372691-28324-1-git-send-email-Julia.Lawall@lip6.fr>
- <1547372691-28324-4-git-send-email-Julia.Lawall@lip6.fr>
+ Mon, 14 Jan 2019 07:34:17 -0800 (PST)
+Subject: Re: [PATCH RESEND] drm/meson: remove firmware framebuffers
 From: Neil Armstrong <narmstrong@baylibre.com>
+To: Maxime Jourdan <mjourdan@baylibre.com>
+References: <20181210092853.13050-1-mjourdan@baylibre.com>
+ <c5138091-d801-8b2a-85ab-d815f0508933@baylibre.com>
+ <CAMO6nay4+8Y_O2iTWJ041Bt0+3VUuOQj0WEN3Pyf6L80vuxHTA@mail.gmail.com>
+ <19df7254-3fec-fb60-7581-54cf22e10509@baylibre.com>
 Openpgp: preference=signencrypt
 Autocrypt: addr=narmstrong@baylibre.com; prefer-encrypt=mutual; keydata=
  mQENBE1ZBs8BCAD78xVLsXPwV/2qQx2FaO/7mhWL0Qodw8UcQJnkrWmgTFRobtTWxuRx8WWP
@@ -132,16 +134,16 @@ Autocrypt: addr=narmstrong@baylibre.com; prefer-encrypt=mutual; keydata=
  VsbXrP9BZ6snXyHfebPnno/te5XRqZTL9aJOytB/1iUna+1MAwBxGFPvqeEUUyT+gx1l3Acl
  ZaTUOEkgIor5losDrePdPgE=
 Organization: Baylibre
-Message-ID: <30e505cf-fdfa-b546-c75d-5eb23366f7bb@baylibre.com>
-Date: Mon, 14 Jan 2019 16:32:58 +0100
+Message-ID: <f510a201-ef9b-9107-3f2b-038e6a69f001@baylibre.com>
+Date: Mon, 14 Jan 2019 16:34:17 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <1547372691-28324-4-git-send-email-Julia.Lawall@lip6.fr>
+In-Reply-To: <19df7254-3fec-fb60-7581-54cf22e10509@baylibre.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_073301_440137_F071D1FF 
-X-CRM114-Status: GOOD (  18.98  )
+X-CRM114-CacheID: sfid-20190114_073423_867287_E343DEAA 
+X-CRM114-Status: GOOD (  17.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -153,90 +155,83 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: David Airlie <airlied@linux.ie>, Kevin Hilman <khilman@baylibre.com>,
- kernel-janitors@vger.kernel.org, linux-kernel@vger.kernel.org,
- dri-devel@lists.freedesktop.org, Daniel Vetter <daniel@ffwll.ch>,
- linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Cc: linux-amlogic@lists.infradead.org, dri-devel@lists.freedesktop.org,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Julia,
-
-On 13/01/2019 10:44, Julia Lawall wrote:
-> Add an of_node_put when the result of of_graph_get_remote_port_parent is
-> not available.
+On 12/12/2018 13:39, Neil Armstrong wrote:
+> On 12/12/2018 13:22, Maxime Jourdan wrote:
+>> Hi Neil,
+>> On Wed, Dec 12, 2018 at 10:55 AM Neil Armstrong <narmstrong@baylibre.com> wrote:
+>>>
+>>> Hi Maxime,
+>>>
+>>> On 10/12/2018 10:28, Maxime Jourdan wrote:
+>>>> In case we are using simplefb or another conflicting framebuffer, make
+>>>> the call to drm_fb_helper_remove_conflicting_framebuffers()
+>>>>
+>>>> Signed-off-by: Maxime Jourdan <mjourdan@baylibre.com>
+>>>> ---
+>>>>  drivers/gpu/drm/meson/meson_drv.c | 20 ++++++++++++++++++++
+>>>>  1 file changed, 20 insertions(+)
+>>>>
+>>>> diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
+>>>> index d3443125e661..afbb3d707d15 100644
+>>>> --- a/drivers/gpu/drm/meson/meson_drv.c
+>>>> +++ b/drivers/gpu/drm/meson/meson_drv.c
+>>>> @@ -159,6 +159,23 @@ static void meson_vpu_init(struct meson_drm *priv)
+>>>>       writel_relaxed(0x20000, priv->io_base + _REG(VPU_WRARB_MODE_L2C1));
+>>>>  }
+>>>>
+>>>> +static void meson_remove_framebuffers(void)
+>>>> +{
+>>>> +     struct apertures_struct *ap;
+>>>> +
+>>>> +     ap = alloc_apertures(1);
+>>>> +     if (!ap)
+>>>> +             return;
+>>>> +
+>>>> +     /* The framebuffer can be located anywhere in RAM */
+>>>> +     ap->ranges[0].base = 0;
+>>>> +     ap->ranges[0].size = ~0;
+>>>> +
+>>>> +     drm_fb_helper_remove_conflicting_framebuffers(ap, "meson-drm-fb",
+>>>> +                                                   false);
+>>>
+>>> I always wondered, where does the "meson-drm-fb" comes from ???
+>>>
+>>> Neil
+>>>
+>>
+>> This name ultimately ends up in a printk and has no functional impact.
+>> See drivers/video/fbdev/core/fbmem.c:1613 :
+>>
+>> printk(KERN_INFO "fb%d: switching to %s from %s\n", i, name,
+>> registered_fb[i]->fix.id);
+>>
+>> I just picked one that was similar to the names of other drm drivers
+>> calling drm_fb_helper_remove_conflicting_framebuffers().
 > 
-> An of_node_put is also needed when meson_probe_remote completes.  This was
-> present at the recursive call, but not in the call from meson_drv_probe.
+> Ok Cool !
 > 
-> The semantic match that finds this problem is as follows
-> (http://coccinelle.lip6.fr):
+>>
+>> Maxime
+>>
 > 
-> // <smpl>
-> @r exists@
-> local idexpression e;
-> expression x;
-> @@
-> e = of_graph_get_remote_port_parent(...);
-> ... when != x = e
->     when != true e == NULL
->     when != of_node_put(e)
->     when != of_fwnode_handle(e)
-> (
-> return e;
-> |
-> *return ...;
-> )
-> // </smpl>
+> Acked-by: Neil Armstrong <narmstrong@baylibre.com>
 > 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+> I'll push it when the bindings are acked and when v4.21-rc1 is tagged !
+> 
+> Neil
+> 
 
-Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+Applied to drm-misc-next.
 
-And applied to drm-misc-fixes.
-
+Thanks,
 Neil
-
-> 
-> ---
->  drivers/gpu/drm/meson/meson_drv.c |    9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
-> index 3ee4d4a4e..b59c757 100644
-> --- a/drivers/gpu/drm/meson/meson_drv.c
-> +++ b/drivers/gpu/drm/meson/meson_drv.c
-> @@ -388,8 +388,10 @@ static int meson_probe_remote(struct platform_device *pdev,
->  		remote_node = of_graph_get_remote_port_parent(ep);
->  		if (!remote_node ||
->  		    remote_node == parent || /* Ignore parent endpoint */
-> -		    !of_device_is_available(remote_node))
-> +		    !of_device_is_available(remote_node)) {
-> +			of_node_put(remote_node);
->  			continue;
-> +		}
->  
->  		count += meson_probe_remote(pdev, match, remote, remote_node);
->  
-> @@ -408,10 +410,13 @@ static int meson_drv_probe(struct platform_device *pdev)
->  
->  	for_each_endpoint_of_node(np, ep) {
->  		remote = of_graph_get_remote_port_parent(ep);
-> -		if (!remote || !of_device_is_available(remote))
-> +		if (!remote || !of_device_is_available(remote)) {
-> +			of_node_put(remote);
->  			continue;
-> +		}
->  
->  		count += meson_probe_remote(pdev, &match, np, remote);
-> +		of_node_put(remote);
->  	}
->  
->  	if (count && !match)
-> 
-
 
 _______________________________________________
 linux-arm-kernel mailing list
