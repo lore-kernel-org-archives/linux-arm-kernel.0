@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8F80FC43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 10:01:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E31DC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 10:01:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6035220873
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 10:01:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4EB8D2087E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 10:01:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DBu2GAML"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6035220873
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jSUl3PjT"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4EB8D2087E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,24 +25,24 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=COg4RXIOAhCBkWe967/d0j7phyZwkh60czW8GFI8aZg=; b=DBu2GAMLnL92xa
-	CL8JFI6EpRbIX7rDPGwUWdVde0CfrcYlJlvXdcTiPR7ubeTWSS6p8Xqqupx7PGcUN1WtFTG9tgDl0
-	Ogzl8AwkfXqSUIfb/CA/3Og0sbBzFsV+zQU827P1t+y7e7kukpGHxKdR3uJiuUFxBGqeBfdyZ570H
-	PKGpnhwBSgAR5Vz8zo0g0ZGhUMv90DLFY9So0cYCYWNoB0PLSE0QFjyzB6ttxslv7xWQObHNv3JIz
-	bkiYNnQVTBonaZtpApJsVNyvmnIRES5y0xQZBnbX6CP8jizA/rruuaf8TcuBiEmK9lbQrf5vnwhhu
-	9/VLpn0QWOly7NCiZo6w==;
+	List-Owner; bh=BD1z21Or/CNmElPUx/3TZ6D3wqUjAZnxl9gmY/aTLpU=; b=jSUl3PjTNFS7F/
+	x0IyYLSZ2tk4/IUiNworZZFCzYf90riLJahVw5PgEDrJbDpSaNxDLg1y+UKsmnJf8Fj56j5v+sAvJ
+	7W1waTkvNtNyXGAL4VRTv5XJ7UiZeGc21xwdiHbvRd3SZSFMIPiklRoX0P+0QMgl9TTXqSLuKftZH
+	X6sB/u+OQryHcCGxvKqvZI1Tc3yQXnFC0RmWL1E99tVNpdCDnXakxqJR12VB89FwHKHULlC1U2+9P
+	7NglJtX/lQLfBDuRXqpqKnRGPIXxr+EYndDfiBKkqW+LX8+eeP5Tk9L4ZNLWhHTigt5KUqJ+qPpgA
+	MznO1T9vEghjxGP01KOQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1giz3G-0006BA-TN; Mon, 14 Jan 2019 10:01:02 +0000
+	id 1giz3W-0006Qu-VG; Mon, 14 Jan 2019 10:01:18 +0000
 Received: from 089144213167.atnat0022.highway.a1.net ([89.144.213.167]
  helo=localhost)
  by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1giz0v-0002Is-AA; Mon, 14 Jan 2019 09:58:38 +0000
+ id 1giz0y-0002PT-RF; Mon, 14 Jan 2019 09:58:41 +0000
 From: Christoph Hellwig <hch@lst.de>
 To: Ulf Hansson <ulf.hansson@linaro.org>
-Subject: [PATCH 09/11] mmc: sh_mmcif: handle chained sglists
-Date: Mon, 14 Jan 2019 10:58:02 +0100
-Message-Id: <20190114095804.27978-10-hch@lst.de>
+Subject: [PATCH 10/11] mmc: core: don't use block layer bounce buffers
+Date: Mon, 14 Jan 2019 10:58:03 +0100
+Message-Id: <20190114095804.27978-11-hch@lst.de>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190114095804.27978-1-hch@lst.de>
 References: <20190114095804.27978-1-hch@lst.de>
@@ -68,61 +68,36 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Use the proper sg_next() helper to move to the next scatterlist element
-to support chained scatterlists.
+All MMC and SD host drivers are highmem safe now, and bounce buffering
+for addressing limitations is handled in the DMA layer now.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- drivers/mmc/host/sh_mmcif.c | 13 +++++--------
- 1 file changed, 5 insertions(+), 8 deletions(-)
+ drivers/mmc/core/queue.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/drivers/mmc/host/sh_mmcif.c b/drivers/mmc/host/sh_mmcif.c
-index 0d2bbb8943f5..a4116be5ebc7 100644
---- a/drivers/mmc/host/sh_mmcif.c
-+++ b/drivers/mmc/host/sh_mmcif.c
-@@ -234,7 +234,6 @@ struct sh_mmcif_host {
- 	enum sh_mmcif_wait_for wait_for;
- 	struct delayed_work timeout_work;
- 	size_t blocksize;
--	int sg_idx;
- 	int sg_blkidx;
- 	bool power;
- 	bool ccs_enable;		/* Command Completion Signal support */
-@@ -606,13 +605,13 @@ static bool sh_mmcif_next_block(struct sh_mmcif_host *host)
+diff --git a/drivers/mmc/core/queue.c b/drivers/mmc/core/queue.c
+index 35cc138b096d..26a18b851397 100644
+--- a/drivers/mmc/core/queue.c
++++ b/drivers/mmc/core/queue.c
+@@ -354,17 +354,12 @@ static const struct blk_mq_ops mmc_mq_ops = {
+ static void mmc_setup_queue(struct mmc_queue *mq, struct mmc_card *card)
+ {
+ 	struct mmc_host *host = card->host;
+-	u64 limit = BLK_BOUNCE_HIGH;
+-
+-	if (mmc_dev(host)->dma_mask && *mmc_dev(host)->dma_mask)
+-		limit = (u64)dma_max_pfn(mmc_dev(host)) << PAGE_SHIFT;
  
- 	if (host->sg_blkidx == data->sg->length) {
- 		host->sg_blkidx = 0;
--		if (++host->sg_idx < data->sg_len) {
--			data->sg++;
--			host->pio_offset = data->sg->offset / 4;
--		}
-+		data->sg = sg_next(data->sg);
-+		if (!data->sg)
-+			return false;
-+		host->pio_offset = data->sg->offset / 4;
- 	}
+ 	blk_queue_flag_set(QUEUE_FLAG_NONROT, mq->queue);
+ 	blk_queue_flag_clear(QUEUE_FLAG_ADD_RANDOM, mq->queue);
+ 	if (mmc_can_erase(card))
+ 		mmc_queue_setup_discard(mq->queue, card);
  
--	return host->sg_idx != data->sg_len;
-+	return true;
- }
- 
- static void sh_mmcif_single_read(struct sh_mmcif_host *host,
-@@ -665,7 +664,6 @@ static void sh_mmcif_multi_read(struct sh_mmcif_host *host,
- 		BLOCK_SIZE_MASK;
- 
- 	host->wait_for = MMCIF_WAIT_FOR_MREAD;
--	host->sg_idx = 0;
- 	host->sg_blkidx = 0;
- 	host->pio_offset = data->sg->offset / 4;
- 
-@@ -752,7 +750,6 @@ static void sh_mmcif_multi_write(struct sh_mmcif_host *host,
- 		BLOCK_SIZE_MASK;
- 
- 	host->wait_for = MMCIF_WAIT_FOR_MWRITE;
--	host->sg_idx = 0;
- 	host->sg_blkidx = 0;
- 	host->pio_offset = data->sg->offset / 4;
- 
+-	blk_queue_bounce_limit(mq->queue, limit);
+ 	blk_queue_max_hw_sectors(mq->queue,
+ 		min(host->max_blk_count, host->max_req_size / 512));
+ 	blk_queue_max_segments(mq->queue, host->max_segs);
 -- 
 2.20.1
 
