@@ -2,21 +2,22 @@ Return-Path: <SRS0=baBj=PW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 44C1AC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 10:31:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B81E5C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 10:35:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 167C220656
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 10:31:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8628F20656
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 10:35:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aSq21gNR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 167C220656
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tLbKY0cL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8628F20656
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,36 +25,52 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=BymwqkZZKTbjPNpFeCtxW7r0oaC7s/EnvaQYSd1bpEA=; b=aSq21gNR3NowKQ
-	k88NmVLnvipL244NfiA5xZ06qUhqKjZzFwqDGvq4i1ROlzbJcCOSGVsomAsXVl4wG7kPPylV2QMZH
-	xHOBDzfvsr7IpM3R+zV1zOzqzQFb+DkC5oEtNPa71ept78dOjYANpEH8i1oQPKCDZXpaFfDR/XGkP
-	p1TZ844PRCxFOvnOck6eILVz/usRAMVeSoWOWiyND/P1ezIfLK94O4SOZXPOuP25citGzxHO/C88N
-	7xn7MvrXty3x1tKXNv0d5fIsMP789YDpLelrMIm49KOCv8/tIAWu/jsPTRlBs7VQliIVeQ8uRhXus
-	+R+IN5FKoC2jfv7SR6dg==;
+	List-Owner; bh=xzaCKnHX+41L8i1Pk/bvQwJUn/VQ/syMV0+V7Mcl2cg=; b=tLbKY0cLrI9aV2
+	KEs8lyLtO//UEVTX2I0zch2Kd5/1R5p4I/6B7hUZMbPjRTlgZwexoo0fs0wbCX29zprRIZHrdIaPM
+	/TjtXX5vXtRS4xUzwfZW/L52idKTarHNPZPMi6uEWXxnqKWBlqA5zqPa4GdjPvtDe517rvBWfZaO8
+	/uYQ2RneDILzpxq88zn5y6mX4pW1PRJE4Lwbk2EggtigFlsU91SLQOlDvjAYH3bEYpfBVzaPUjZK3
+	6Wre7hdLyoZCRwJqZrIm48cFt7VUlX3lPBzIAWTVru243jB1yeSg9a923p14ahkYsjbTNXvP2wMC/
+	aJLrYouExIU3iCagfS7A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gizX2-0006ri-IA; Mon, 14 Jan 2019 10:31:48 +0000
-Received: from verein.lst.de ([213.95.11.211] helo=newverein.lst.de)
+	id 1gizac-0000p6-72; Mon, 14 Jan 2019 10:35:30 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gizWy-0006qu-1S
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 10:31:45 +0000
-Received: by newverein.lst.de (Postfix, from userid 2407)
- id 8F14867358; Mon, 14 Jan 2019 11:31:39 +0100 (CET)
-Date: Mon, 14 Jan 2019 11:31:39 +0100
-From: Christoph Hellwig <hch@lst.de>
-To: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
-Subject: Re: [PATCH 3/3] videobuf2: replace a layering violation with
- dma_map_resource
-Message-ID: <20190114103139.GA31005@lst.de>
-References: <20190111181731.11782-1-hch@lst.de>
- <20190111181731.11782-4-hch@lst.de> <20190111175416.7d291e25@coco.lan>
+ id 1gizaY-0000og-Sn
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 10:35:28 +0000
+Received: from ptx.hi.pengutronix.de ([2001:67c:670:100:1d::c0])
+ by metis.ext.pengutronix.de with esmtps
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
+ (envelope-from <sha@pengutronix.de>)
+ id 1gizaW-0003EZ-4i; Mon, 14 Jan 2019 11:35:24 +0100
+Received: from sha by ptx.hi.pengutronix.de with local (Exim 4.89)
+ (envelope-from <sha@pengutronix.de>)
+ id 1gizaV-0005rv-EK; Mon, 14 Jan 2019 11:35:23 +0100
+Date: Mon, 14 Jan 2019 11:35:23 +0100
+From: Sascha Hauer <s.hauer@pengutronix.de>
+To: Linus Walleij <linus.walleij@linaro.org>
+Subject: Re: Hilscher NetX mach-netx refactorings
+Message-ID: <20190114103523.rlx4pkpjn4md37fm@pengutronix.de>
+References: <CACRpkdb-zphMyZbGh5XYy2A6B1224BGFmTwr0Bm98G3oM0MeoQ@mail.gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190111175416.7d291e25@coco.lan>
-User-Agent: Mutt/1.5.17 (2007-11-01)
+In-Reply-To: <CACRpkdb-zphMyZbGh5XYy2A6B1224BGFmTwr0Bm98G3oM0MeoQ@mail.gmail.com>
+X-Sent-From: Pengutronix Hildesheim
+X-URL: http://www.pengutronix.de/
+X-IRC: #ptxdist @freenode
+X-Accept-Language: de,en
+X-Accept-Content-Type: text/plain
+X-Uptime: 11:32:09 up 215 days, 19:41, 164 users,  load average: 0.70, 0.42,
+ 0.33
+User-Agent: NeoMutt/20170113 (1.7.2)
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c0
+X-SA-Exim-Mail-From: sha@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_023144_223031_5AA261FA 
-X-CRM114-Status: GOOD (  11.47  )
+X-CRM114-CacheID: sfid-20190114_023527_096425_A45C9B88 
+X-CRM114-Status: GOOD (  14.02  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -65,36 +82,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Niklas =?iso-8859-1?Q?S=F6derlund?=
- <niklas.soderlund+renesas@ragnatech.se>, Pawel Osciak <pawel@osciak.com>,
- Russell King <linux@armlinux.org.uk>, iommu@lists.linux-foundation.org,
- linux-kernel@vger.kernel.org, Kyungmin Park <kyungmin.park@samsung.com>,
- linux-media@vger.kernel.org, linuxppc-dev@lists.ozlabs.org,
- Christoph Hellwig <hch@lst.de>, linux-arm-kernel@lists.infradead.org,
- Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Olof Johansson <olof@lixom.net>,
+ Robert Schwebel <r.schwebel@pengutronix.de>, Arnd Bergmann <arnd@arndb.de>,
+ Pengutronix Kernel Team <kernel@pengutronix.de>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 11, 2019 at 05:54:16PM -0200, Mauro Carvalho Chehab wrote:
-> Em Fri, 11 Jan 2019 19:17:31 +0100
-> Christoph Hellwig <hch@lst.de> escreveu:
-> 
-> > vb2_dc_get_userptr pokes into arm direct mapping details to get the
-> > resemblance of a dma address for a a physical address that does is
-> > not backed by a page struct.  Not only is this not portable to other
-> > architectures with dma direct mapping offsets, but also not to uses
-> > of IOMMUs of any kind.  Switch to the proper dma_map_resource /
-> > dma_unmap_resource interface instead.
-> 
-> Makes sense to me. I'm assuming that you'll be pushing it together
-> with other mm patches, so:
+Hi Linus,
 
-Not really mm, but rather DMA mapping, but yes, I'd love to take it
-all together.
+On Sat, Jan 12, 2019 at 09:35:46AM +0100, Linus Walleij wrote:
+> Hi Sascha, Robert,
+> 
+> I am looking at refactoring mach-netx to use the new PL11x
+> DRM driver for the graphics.
+> 
+> I need to make sure that patches get tested on the hardware
+> and just want to ascertain that there is an active maintainer that
+> will be able to test patches I make for this and work on getting
+> it migrated to DRM before I start spending time on it.
+> 
+> Are you/pengutronix still actively maintaining this machine and
+> testing new kernels on netx?
 
-Thanks!
+We do not have any hardware available anymore, so no, we do not test it.
+
+Also we currently do not have any resources for maintaining netx.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
 
 _______________________________________________
 linux-arm-kernel mailing list
