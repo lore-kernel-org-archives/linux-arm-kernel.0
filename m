@@ -2,59 +2,83 @@ Return-Path: <SRS0=baBj=PW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 28413C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 17:09:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 12CFEC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 17:20:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EBBA520873
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 17:09:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D88722070B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 17:20:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bUXR41v/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EBBA520873
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="flVovC4u";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="QQbXxP/c"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D88722070B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=o4eRx9S9ATak4TgS/gJCTffLDRvyRp+mSmgB3YzutmM=; b=bUXR41v/uqr1JN
-	zRPyYhCywDrPWmZWJVDgYskq49A59pPaH9a0tvH90jxPGgvf0VI0JX6uNCqJazYmtB91nS31iZTRW
-	DzgQ6bgPJwk0mV/qrgySiVur1GBz1V+577I7loovhEVk2SXCUXdBwUCHvB5WYhICqE1HSC9Oxh68M
-	ZQ920WJWE2+5faCj6NLuAwzHboAy9yJ0hQt7l+OAzXxav7fAVAC0kryJn6dsBDzkuU0dx6g7ifDEd
-	IxlRkz8o57ARvQNASTzt19TKtrDu+qE5VeEdtyU+QpIfU0zz2r1TWpATs4JPVIQcTP348rvHJmRmt
-	R0+D4SzrrECGa7b6opNA==;
+	List-Owner; bh=pb3ztBlwR0d0jkPw8ec571QakFwUCPSaQ701XTUHFH8=; b=flVovC4utrE7IC
+	wPBdcyJQyJWTR07HFefD4Qc2O90GjjI1A9DsMSTi+K3gavBKrLbm4IyADqC0ZoXdtXYwFl8iJZidD
+	B1aC4Eks9cXfVcRBHaFh39ZbTp2EgIwDyOxZg/zqBkomdvD+Mv/WoAz0BGcgO85ivCMEf4RPNyMtH
+	mxmhhd4gG+Xhr7S8qbYvikGoiki8CRDqx8XpVlVdFhywcGHnYUuQITb9dkAUWbdGa3Qp72c8b4cJ9
+	BHU0WQMv5aAfbGL2L3cX8F1zjCnOSUwb34lTMyAKc8OSoFYfPwW0GTaQtt/wkNirngw2X9dy+7DWU
+	cY3QZJmMR9xppKEF6AfA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj5jR-0001pp-Pi; Mon, 14 Jan 2019 17:09:01 +0000
-Received: from verein.lst.de ([213.95.11.211] helo=newverein.lst.de)
+	id 1gj5uI-0006VT-72; Mon, 14 Jan 2019 17:20:14 +0000
+Received: from mail-ot1-x341.google.com ([2607:f8b0:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj5jO-0001pG-5f
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 17:08:59 +0000
-Received: by newverein.lst.de (Postfix, from userid 2407)
- id 0861268D93; Mon, 14 Jan 2019 18:08:56 +0100 (CET)
-Date: Mon, 14 Jan 2019 18:08:55 +0100
-From: Christoph Hellwig <hch@lst.de>
-To: Robin Murphy <robin.murphy@arm.com>
-Subject: Re: [PATCH 1/3] dma-mapping: remove the default map_resource
- implementation
-Message-ID: <20190114170855.GA7485@lst.de>
-References: <20190111181731.11782-1-hch@lst.de>
- <20190111181731.11782-2-hch@lst.de>
- <c882430e-1dbd-df86-d686-0381dcaa668e@arm.com>
+ id 1gj5uD-0005uJ-6c; Mon, 14 Jan 2019 17:20:12 +0000
+Received: by mail-ot1-x341.google.com with SMTP id n8so19997146otl.6;
+ Mon, 14 Jan 2019 09:20:07 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=qK64DEpMDtPL6DsRftl0nkP0RuweFemsjoRp4cOo2/c=;
+ b=QQbXxP/cR5m6Woo2XRdrlrzYxgV1I1QcnneJYERs7HuE0uO51Qrgz+pqVnMj1bJ6zY
+ +4KDjWFjOzhDBXx9254MlDDRgCZg5cCqcA09wPkdqa3zXiNVw/8hcSFhpJaxka7ayQQp
+ /E91TykuUTkFycBS8Mc0ZVENECk6JQxCiA2exphOUJeEQzC8/tZNyCJEZBc2ibF1x00k
+ 7V9QJQS18iAG/cGY/6ybgrgj7CQD/UCzWS6Pu/c9Jyvrms2EJJckwlErShvku8hGnY9P
+ /R3XnWP3srCd2y3uqI8VBqCAKVJbxnIsRdyuV6hoxhUKBRDxHHre9sAvPYrwkmz/B+AO
+ LZcA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=qK64DEpMDtPL6DsRftl0nkP0RuweFemsjoRp4cOo2/c=;
+ b=Xc9mAylUJKHI4rGOokMR+PupZlnxmRmXbbWVmD5LGNCdZ7QsODBN4uBagxQ8zs5gW0
+ gFtIxccBZlrNUjB8Y874NfeXijnuDyNZWVOvRfDg3gXFcwlRXQaN94CqshvQCXePnWKM
+ kRVngA0G0bNNKDhs0EoPi7ZuIWq2rY6818PXlCDk1gEI0SwrVsPLcphBhg1pwQlXFCZV
+ QFfAwP1333YM5w8C8JpTSAIt3xmLRoDgqYZwchknMWVkVnTZSIgYieCGCsQIsuTryrV9
+ iQ6+T55+zHbNhy9eXm6kuq94p91vLmmQ86K6GnwNZ/0RQuoI5GSmstNO05Rfk+INuXR1
+ HHSQ==
+X-Gm-Message-State: AJcUukeobcDMIZVSN4G1nqo0uDHQ8k8oh9WGuzmuk1z37j5YqdbXM7Hh
+ WjVJI7ZMe1QOpdHkbezu00RYvJPexleqniVfulo=
+X-Google-Smtp-Source: ALg8bN59ta+yDTeU5iEvt253YnBqjgkeS9x4IGTKB1CGifNHyHb0yIHt/nx0O6RM4nnwbXtZ9a5RPVW4FYfMkYpn2V4=
+X-Received: by 2002:a9d:6297:: with SMTP id x23mr16290616otk.63.1547486406357; 
+ Mon, 14 Jan 2019 09:20:06 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <c882430e-1dbd-df86-d686-0381dcaa668e@arm.com>
-User-Agent: Mutt/1.5.17 (2007-11-01)
+References: <20190113153022.5040-1-linux.amoon@gmail.com>
+ <20190113153022.5040-2-linux.amoon@gmail.com>
+ <7hy37nky4v.fsf@baylibre.com>
+In-Reply-To: <7hy37nky4v.fsf@baylibre.com>
+From: Anand Moon <linux.amoon@gmail.com>
+Date: Mon, 14 Jan 2019 22:49:54 +0530
+Message-ID: <CANAwSgQS0B4Gbbvgu2N4cawmXMGWG1Sm0TOg0hTBr2nLteKQxQ@mail.gmail.com>
+Subject: Re: [PatchV2 2/2] ARM64: dts: meson-gxbb-odroidc2: Fix usb phy reset
+ warning
+To: Kevin Hilman <khilman@baylibre.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_090858_358959_D23DD7FD 
-X-CRM114-Status: GOOD (  20.32  )
+X-CRM114-CacheID: sfid-20190114_092009_330204_D7573B10 
+X-CRM114-Status: GOOD (  11.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -66,68 +90,61 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Niklas =?iso-8859-1?Q?S=F6derlund?=
- <niklas.soderlund+renesas@ragnatech.se>, linux-media@vger.kernel.org,
- Pawel Osciak <pawel@osciak.com>, Russell King <linux@armlinux.org.uk>,
- iommu@lists.linux-foundation.org, linux-kernel@vger.kernel.org,
- Kyungmin Park <kyungmin.park@samsung.com>,
- Mauro Carvalho Chehab <mchehab@kernel.org>, linuxppc-dev@lists.ozlabs.org,
- Christoph Hellwig <hch@lst.de>, linux-arm-kernel@lists.infradead.org,
- Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: devicetree <devicetree@vger.kernel.org>,
+ Neil Armstrong <narmstrong@baylibre.com>,
+ Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ Linux Kernel <linux-kernel@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
+ linux-amlogic@lists.infradead.org,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ Jerome Brunet <jbrunet@baylibre.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 14, 2019 at 01:12:33PM +0000, Robin Murphy wrote:
-> Ignoring the offset was kind of intentional there, because at the time I 
-> was primarily thinking about it in terms of the Keystone 2 platform where 
-> the peripherals are all in the same place (0-2GB) in both the bus and CPU 
-> physical address maps, and only the view of RAM differs between the two 
-> (2-4GB vs. 32-34GB). However, on something like BCM283x, the peripherals 
-> region is also offset from its bus address in the CPU view, but at a 
-> *different* offset relative to that of RAM.
+Hi Kevin / Neil
 
-I was more thinking of the PCIe P2P case, where we need to apply a
-consistent offset to translate between the CPU and the bus view.
-
-But this isn't really used for PCIe P2P, so I guess keeping the original
-sematics might be a better idea.  That being said the videobuf code seems
-to rely on these offsets, so we might be between a rock and a hard place.
-
-> Fortunately, I'm not aware of any platform which has a DMA engine behind an 
-> IOMMU (and thus *needs* to use dma_map_resource() to avoid said IOMMU 
-> blocking the slave device register reads/writes) and also has any nonzero 
-> offsets, and AFAIK the IOMMU-less platforms above aren't using 
-> dma_map_resource() at all, so this change shouldn't actually break 
-> anything, but I guess we have a bit of a problem making it truly generic 
-> and robust :(
-
-Note that we don't actually use the code in this patch for ARM/ARM64
-platforms with IOMMUs, as both the ARM and the ARM64 iommu code have
-their own implementations of ->map_resource that actually program
-the iommu (which at least for the PCIe P2P case would be wrong).
-
-> Is this perhaps another shove in the direction of overhauling 
-> dma_pfn_offset into an arbitrary "DMA ranges" lookup table?
-
-It is long overdue anyway.
-
->>   		addr = ops->map_resource(dev, phys_addr, size, dir, attrs);
+On Mon, 14 Jan 2019 at 21:52, Kevin Hilman <khilman@baylibre.com> wrote:
 >
-> Might it be reasonable to do:
+> Hi Anand,
 >
-> 	if (!dma_is_direct(ops) && ops->map_resource)
-> 		addr = ops->map_resource(...);
-> 	else
-> 		addr = dma_direct_map_resource(...);
+> Anand Moon <linux.amoon@gmail.com> writes:
 >
-> and avoid having to explicitly wire up the dma_direct callback elsewhere?
+> > Add missing vin-supply node 5.0V regulator setting to power
+> > to usb ports, changes help fix the usb reset warning.
+> >
+> > [  795.380156] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+> > [  798.356073] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+> > [  801.331999] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+> > [  804.307919] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+> > [  807.283844] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+> >
+> > Fixes: 5a0803bd5ae (ARM64: dts: meson-gxbb-odroidc2: Enable USB Nodes)
+> > Tested-by: Kevin Hilman <khilman@baylibre.com>
+> > Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> > Cc: Jerome Brunet <jbrunet@baylibre.com>
+> > Cc: Neil Armstrong <narmstrong@baylibre.com>
+> > Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> > ---
+> > Rebased on Kevin's amlogic/v5.0/fixes branch
+> > Changes from patch v1 [0] https://lore.kernel.org/patchwork/patch/1031243/
+> > - Split the patch into two part: new patch
+> > - Fix the commit message
+> > - Added Tested by Kevin Hilman
+>
+> Queued as fixes for v5.0-rc (branch: v5.0/fixes) with Neil's reviewed-by tags.
+>
+> Thanks for breaking up into two patches, and as Neil said, please add a
+> cover letter to multi-patch series in the future.
+>
+> Thanks,
+>
+> Kevin
 
-No, I absolutely _want_ the callback explicitly wired up.  That is the
-only way to ensure we actually intentionally support it and don't just
-get a default that often won't work.  Same issue for ->mmap and
-->get_sgtable.
+Ok will follow the protocol next time I send some patches.
+
+Best Regards
+-Anand
 
 _______________________________________________
 linux-arm-kernel mailing list
