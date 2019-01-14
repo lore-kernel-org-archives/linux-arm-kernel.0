@@ -2,67 +2,59 @@ Return-Path: <SRS0=baBj=PW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 697C0C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 14:16:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 015C0C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 14:22:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 39FB920651
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 14:16:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C592520896
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 14:22:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GpyGQzSO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 39FB920651
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NM1ke219"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C592520896
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=0rU5BpjrdvlDGTso9KHQeymYhqq8EjfWciRn0ERrl5c=; b=GpyGQzSObP4t4sN1SuOtE04yj
-	Ya63dymmcdlZdhm/5XwRnjJLKUVNUQt479cSnyBN5ni8KPVko4mAaz7cdDck7L7psjGmqJUixkki6
-	z9rKX8qaM9F024L3VunUvH0ubR06dGDGibEnop9m4RcxwEEmb7JemWjVDGhSMW64pByUxslJJuIle
-	rYA34XSH8lwOmnYDe2f/l3O+6yEGMh7gSZVQ0KW16FpflUbfpxBK2HoMA25esgu3kdvbUIymjYwLZ
-	lY8BNT7tgR4+zNnc1tGrkKgZ1JAheWGBEbYlNJwMeLu0F1h/kFwJ6j5oBsQd5Jr3od047hzPo43DP
-	ODpKH2dpw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=w4qnQLYPtRJQQxiIaRftyhuT4/TYqkGmodEpC43lDaM=; b=NM1
+	ke219O9ZAMSM/WHl78CZQauXun1tyH61OEVkc4fDhNVhv/F7S5oP3eFGseeCQIYdRhT9Y6ZAeKb73
+	XjHWpOMup4FOUa8Mz/Fk9MMVIc/4X1/NOm0mzbZTTexXCJthfBGZM8Zcj39X5c61466rYnIwSwtea
+	vjv1YJ2+dtdW1Ok2kOuCjuaaDZ+rbqnZ/8d4zGypqqJk//OIonicAETwILWQqZR9mQXRAjLy5voWn
+	HCenPMGM4sTH5NPO45xx7T24BIEACLki419yBWqiMwLA7PrEANHRs+aB3e6B6S0DBTQuOuq6vKOaO
+	tAtvobXmwgGlx19SjHXx8zFwnhw7qyg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj32t-0003ID-9V; Mon, 14 Jan 2019 14:16:55 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gj38Q-00054Q-B8; Mon, 14 Jan 2019 14:22:38 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj32q-0003Ho-HC
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 14:16:53 +0000
+ id 1gj38M-00053t-Qp
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 14:22:36 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id CEA66A78;
- Mon, 14 Jan 2019 06:16:49 -0800 (PST)
-Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id DC3DB3F5AF;
- Mon, 14 Jan 2019 06:16:47 -0800 (PST)
-Subject: Re: [PATCH 2/3] dma-mapping: don't BUG when calling dma_map_resource
- on RAM
-To: Christoph Hellwig <hch@lst.de>, Pawel Osciak <pawel@osciak.com>,
- Marek Szyprowski <m.szyprowski@samsung.com>,
- Kyungmin Park <kyungmin.park@samsung.com>,
- =?UTF-8?Q?Niklas_S=c3=b6derlund?= <niklas.soderlund+renesas@ragnatech.se>
-References: <20190111181731.11782-1-hch@lst.de>
- <20190111181731.11782-3-hch@lst.de>
-From: Robin Murphy <robin.murphy@arm.com>
-Message-ID: <f8f9e4f0-87fc-9f4f-37ea-39297acc8d31@arm.com>
-Date: Mon, 14 Jan 2019 14:16:46 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <20190111181731.11782-3-hch@lst.de>
-Content-Language: en-GB
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7485AA78;
+ Mon, 14 Jan 2019 06:22:34 -0800 (PST)
+Received: from fuggles.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id AB2453F5AF;
+ Mon, 14 Jan 2019 06:22:33 -0800 (PST)
+From: Will Deacon <will.deacon@arm.com>
+To: catalin.marinas@arm.com
+Subject: [PATCH] arm64: Remove asm/memblock.h
+Date: Mon, 14 Jan 2019 14:22:24 +0000
+Message-Id: <20190114142224.19200-1-will.deacon@arm.com>
+X-Mailer: git-send-email 2.11.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_061652_575344_C363E4A5 
-X-CRM114-Status: GOOD (  20.86  )
+X-CRM114-CacheID: sfid-20190114_062234_877041_7E2B6C43 
+X-CRM114-Status: GOOD (  15.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,55 +66,96 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Russell King <linux@armlinux.org.uk>, linux-kernel@vger.kernel.org,
- iommu@lists.linux-foundation.org, Mauro Carvalho Chehab <mchehab@kernel.org>,
- linuxppc-dev@lists.ozlabs.org, linux-arm-kernel@lists.infradead.org,
- linux-media@vger.kernel.org
+Cc: Will Deacon <will.deacon@arm.com>, linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 11/01/2019 18:17, Christoph Hellwig wrote:
-> Use WARN_ON_ONCE to print a stack trace and return a proper error
-> code instead.
+The arm64 asm/memblock.h header exists only to provide a function
+prototype for arm64_memblock_init(), which is called only from
+setup_arch().
 
-I was racking my brain to remember the reasoning behind BUG_ON() being 
-the only viable way to prevent errors getting through unhandled, but of 
-course that was before we had a standardised DMA_MAPPING_ERROR that 
-would work across all implementations.
+Move the declaration into mmu.h, where it can live alongside other
+init functions such as paging_init() and bootmem_init() without the
+need for its own special header file.
 
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> ---
->   include/linux/dma-mapping.h | 3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-> index d3087829a6df..91add0751aa5 100644
-> --- a/include/linux/dma-mapping.h
-> +++ b/include/linux/dma-mapping.h
-> @@ -353,7 +353,8 @@ static inline dma_addr_t dma_map_resource(struct device *dev,
->   	BUG_ON(!valid_dma_direction(dir));
->   
->   	/* Don't allow RAM to be mapped */
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/memblock.h | 21 ---------------------
+ arch/arm64/include/asm/mmu.h      |  1 +
+ arch/arm64/kernel/setup.c         |  1 -
+ arch/arm64/mm/mmu.c               |  1 -
+ 4 files changed, 1 insertion(+), 23 deletions(-)
+ delete mode 100644 arch/arm64/include/asm/memblock.h
 
-Ugh, I'm pretty sure that that "pfn_valid means RAM" misunderstanding 
-originally came from me - it might be nice to have a less-misleading 
-comment here, but off-hand I can't think of a succinct way to say "only 
-for 'DMA' access to MMIO registers/SRAMs/etc. and not for anything the 
-kernel knows as actual system/device memory" to better explain the WARN...
+diff --git a/arch/arm64/include/asm/memblock.h b/arch/arm64/include/asm/memblock.h
+deleted file mode 100644
+index 6afeed2467f1..000000000000
+--- a/arch/arm64/include/asm/memblock.h
++++ /dev/null
+@@ -1,21 +0,0 @@
+-/*
+- * Copyright (C) 2012 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-#ifndef __ASM_MEMBLOCK_H
+-#define __ASM_MEMBLOCK_H
+-
+-extern void arm64_memblock_init(void);
+-
+-#endif
+diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+index 7689c7aa1d77..43596b1a5897 100644
+--- a/arch/arm64/include/asm/mmu.h
++++ b/arch/arm64/include/asm/mmu.h
+@@ -85,6 +85,7 @@ static inline struct bp_hardening_data *arm64_get_bp_hardening_data(void)
+ static inline void arm64_apply_bp_hardening(void)	{ }
+ #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
+ 
++extern void arm64_memblock_init(void);
+ extern void paging_init(void);
+ extern void bootmem_init(void);
+ extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 4b0e1231625c..71f5fbb12608 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -58,7 +58,6 @@
+ #include <asm/cacheflush.h>
+ #include <asm/tlbflush.h>
+ #include <asm/traps.h>
+-#include <asm/memblock.h>
+ #include <asm/efi.h>
+ #include <asm/xen/hypervisor.h>
+ #include <asm/mmu_context.h>
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index b6f5aa52ac67..d6b6f1b169bb 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -42,7 +42,6 @@
+ #include <asm/setup.h>
+ #include <asm/sizes.h>
+ #include <asm/tlb.h>
+-#include <asm/memblock.h>
+ #include <asm/mmu_context.h>
+ #include <asm/ptdump.h>
+ #include <asm/tlbflush.h>
+-- 
+2.11.0
 
-Either way, though,
-
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-
-> -	BUG_ON(pfn_valid(PHYS_PFN(phys_addr)));
-> +	if (WARN_ON_ONCE(pfn_valid(PHYS_PFN(phys_addr))))
-> +		return DMA_MAPPING_ERROR;
->   
->   	if (dma_is_direct(ops))
->   		addr = dma_direct_map_resource(dev, phys_addr, size, dir, attrs);
-> 
 
 _______________________________________________
 linux-arm-kernel mailing list
