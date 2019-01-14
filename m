@@ -4,111 +4,69 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 89551C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 05:12:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 169FAC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 05:12:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 574B820873
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 05:12:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CCBEA206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 05:12:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B4UAe7yb";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="O2C92bNB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 574B820873
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CleCr38B"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CCBEA206B7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=PAFluBYEvozL+sVaCqMjjCfGE3w0WViCPAIrUuk7ywE=; b=B4UAe7ybItRU8F
-	+F6JHqFOTQfxKdRobA2BUHJwL5OHQ/8xNm20UoHz72aaR7QPRseY0wnaTtdS6eRgtNrf3WPlz+KVv
-	tcLrHzUzTlzA+7NDiI4VX++yoz/N3aogu18FTwOL4dVeJHYkPGik7OLJz8H7p+4lObNC4Hq9aWgDY
-	2thAR4NUS428GqKt/0crSpycOakCU7C4ytc+mwf9qd+YAitGEDAGgedfLyLQ5M4TgUd0yY8v/RS8Z
-	/MgxLh+9OxgQ/FXmPJSjP5YBM0WZMuhAgvVEycx5Vfl7HbeasckOyQcpoHSrGdAeo1nZJrGGOFvqV
-	nUJ6xJaHDh2WX+h2I25w==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Va8Md2DeR1gUveJjaJ5NkxBdpFHszwX3+Q5LICM9rPU=; b=CleCr38BNRMdUy
+	2LdmyZ4QhvyaJ70pLbtsp+bjgDn3GKtz5R2svPz1oNNK7BF8+A4Bdr01grfeE9+/Grl/8iMxtsjr/
+	uAkqisZDIvYbfJYjOFJFuvHKfWhnd9CjiuDTJOCURSveYByCUv6ZhCbEXmzpDL9AWg+heeVitw5K0
+	pFc76HUm6GE5KWV3/65m0v/mZMY7fQ9eGJD3kb0ReDcCio82qdxZiow+MI7Fx9yHP75gZlO5aEQBV
+	MUsNku+Gym4Ggj7foap/FEgnasmG+hqwT84CfbACKhRZrE4mZD917xvtXwaM/2Ke8JIc9d/4pnt7L
+	1sfPSjQEU8Ex3678X5Bg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1giuXr-00028c-NC; Mon, 14 Jan 2019 05:12:19 +0000
-Received: from mail-ve1eur02on0601.outbound.protection.outlook.com
- ([2a01:111:f400:fe06::601]
- helo=EUR02-VE1-obe.outbound.protection.outlook.com)
+	id 1giuYR-0002aL-W1; Mon, 14 Jan 2019 05:12:56 +0000
+Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1giuXo-000284-EB
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 05:12:18 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=Kfp5DM7bQiq35wf+mlByfZd52IzYVeJWWPblxgYPipY=;
- b=O2C92bNBpJqVps4exj3fPrp4ctDfhLJNESOGNdy+qsn38ZGtqIc3mb1OYqRFHUZNIYPz3KbSHx/X9IeBgOV/hPhLEmB+27eLBCJL69msK9scAIGFBTpfOna5L0Uo1YZP5CYVFlFSLKrIgzGfGIx+jokYMgBNRyrlj7cXxkH/4Ts=
-Received: from VI1PR04MB4845.eurprd04.prod.outlook.com (20.177.49.14) by
- VI1PR04MB5038.eurprd04.prod.outlook.com (20.177.50.95) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1516.14; Mon, 14 Jan 2019 05:12:08 +0000
-Received: from VI1PR04MB4845.eurprd04.prod.outlook.com
- ([fe80::a13c:ebf5:6fb5:8c7]) by VI1PR04MB4845.eurprd04.prod.outlook.com
- ([fe80::a13c:ebf5:6fb5:8c7%2]) with mapi id 15.20.1516.019; Mon, 14 Jan 2019
- 05:12:08 +0000
-From: Bharat Bhushan <bharat.bhushan@nxp.com>
-To: Roy Pledge <roy.pledge@nxp.com>, Leo Li <leoyang.li@nxp.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "linuxppc-dev@lists.ozlabs.org" <linuxppc-dev@lists.ozlabs.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Subject: [PATCH] soc: fsl: dpio: fix cpu range check
-Thread-Topic: [PATCH] soc: fsl: dpio: fix cpu range check
-Thread-Index: AQHUq8eyjXksS82nRkmGUg0ZzKV3Dg==
-Date: Mon, 14 Jan 2019 05:12:08 +0000
-Message-ID: <20190114050237.32140-1-Bharat.Bhushan@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-mailer: git-send-email 2.20.1
-x-clientproxiedby: BM1PR01CA0113.INDPRD01.PROD.OUTLOOK.COM (2603:1096:b00::29)
- To VI1PR04MB4845.eurprd04.prod.outlook.com
- (2603:10a6:803:54::14)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=bharat.bhushan@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [14.143.254.130]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; VI1PR04MB5038;
- 6:P5k3tMpxjjKRh2dMyMWtcXYTbE4kwPt6dyx20s7V6VKOapOx3nIuF+uMUAme6D6rU05UDIBQFj5GTPNUKsf3O7c1QRPmPjca70nU4HEmuFzUv2iDs1H6Tw2/K4aipKaHtY9ksgSFZoQntN4C+Nn5FnD3/V8AR1lEKneiix6JjFkrW61WOl8qrtK5iacDXI7p8td0zfZPWjrKkCkVPRdh5WC7I7Z5/eo+KFeNl9n7OBg7tahYP+QgeH8cZQNb4hOUeXveAyrk9bTIfXdVjGfqoBfmQKDDtpsjebnjxvaR5LC808uAiNXy/j7ohPRErAVuJkaJ54i55szu4/Dl4OSMtq163I7xnZ9dxhWa+EOStFCi2LNmYE/6Wx2WFWx54eilgDWAq+WfP8ZMaQgsXKF4BzYJNdDXi+6OM0EtDRGwZLjIjjo+Pb/1WMZOmQbmHXRNRo5noTBCYWPsF4ONGUkLqA==;
- 5:XccgK3V1u04zieokYIPCDKi6dkeYV8QIVU9KOOmgKG65wA7D9W4lrlwS7XOGLGe654nv7KavHOQnljIJEsB2vxC47CPbLHmcf419paXE0t2zN7qmwqI8C3W6i1bBrv+M/NrhAMTTuQT5E9Z0g6/zB8jRne8O+aQHW57uP9EPKDJEwgKqHOzPhPxJMcjrSIjANycwz/BYScJgezmZLVxiaQ==;
- 7:vMQf+XMF8Ge5RQXUwkHl054qMCOIU7zfSr6vyntatNq7HIQwS3FwLzflOA0yp2IvTIc2qy72eLCrBqmG+pOvIfsHvsjB/bgoxfpUtROatjhXr/rQH2SNyxcIU1C8D1EumUCALeJ2OMR5PqF55AFUiA==
-x-ms-office365-filtering-correlation-id: 61a4e7e0-58fa-420e-b5f2-08d679ded4b0
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(7168020)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR04MB5038; 
-x-ms-traffictypediagnostic: VI1PR04MB5038:
-x-microsoft-antispam-prvs: <VI1PR04MB50386E95ED5CE89607AA35DB9A800@VI1PR04MB5038.eurprd04.prod.outlook.com>
-x-forefront-prvs: 0917DFAC67
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(366004)(346002)(39860400002)(136003)(376002)(396003)(189003)(199004)(71200400001)(53936002)(14444005)(305945005)(6486002)(6436002)(4326008)(71190400001)(256004)(99286004)(4744005)(97736004)(7736002)(476003)(2616005)(486006)(50226002)(1076003)(78486014)(478600001)(8936002)(6512007)(81156014)(81166006)(8676002)(110136005)(6506007)(386003)(316002)(52116002)(2201001)(575784001)(86362001)(54906003)(3846002)(6116002)(2501003)(105586002)(2906002)(36756003)(14454004)(66066001)(39060400002)(26005)(55236004)(5660300001)(68736007)(102836004)(106356001)(186003)(25786009);
- DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB5038;
- H:VI1PR04MB4845.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: t1R0p6LJwFAXtLr2boopCsYeEfvifzRlIviTfmCxpv2a4U8ciObV9kPJHbXKJ0aAbBM/YaJD1N7BF6oC1JCKqqXrNlTtwsYhuu+AbXehoTJSTBf+ZYuQnMN6+87CluCLIM/SL43k50WsCqwfSADNcbeprhdNCXf6X2g1yLykoGOcvOZdK6hmeMDB5MjNPwjCVXeE4/9mJ/fi0Be9wXrC8M/MvNzJDEMZaCBhKmjC0ZeJDK6LE4eBNQjm8V4PTGLiYZUAfl/HmfvM4tPFuwqvxbx4sKCUMx7SZYtBbZ0etM+MHj9gN1GGESiNp7jlpE6uTRf94UjzY2NwD8EwiUEzjW8O769uZjPuh9B2v2kHopNrQs9Ybw7F+uE97rydJv0fYSL2KFHdFrld1Bwcr7u6fyW5TmsHEC9hXKZvkHSugao=
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1giuY8-0002MB-Le; Mon, 14 Jan 2019 05:12:38 +0000
+X-UUID: 881f4cea774b4eea83a2accb1045207b-20190113
+X-UUID: 881f4cea774b4eea83a2accb1045207b-20190113
+Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw02.mediatek.com
+ (envelope-from <ryder.lee@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 1544526370; Sun, 13 Jan 2019 21:12:26 -0800
+Received: from MTKMBS31N1.mediatek.inc (172.27.4.69) by
+ MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Sun, 13 Jan 2019 21:12:25 -0800
+Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
+ MTKMBS31N1.mediatek.inc (172.27.4.69) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Mon, 14 Jan 2019 13:12:22 +0800
+Received: from mtkslt306.mediatek.inc (10.21.14.136) by MTKCAS06.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
+ Frontend Transport; Mon, 14 Jan 2019 13:12:22 +0800
+From: Ryder Lee <ryder.lee@mediatek.com>
+To: Marek Vasut <marek.vasut@gmail.com>, Brian Norris
+ <computersforpeace@gmail.com>, Boris Brezillon <boris.brezillon@bootlin.com>
+Subject: [PATCH v1 2/3] mtd: spi-nor: mtk-quadspi: add SNOR_HWCAPS_READ for
+ capcity setting
+Date: Mon, 14 Jan 2019 13:12:19 +0800
+Message-ID: <54bb8a9d517e2ee35018d78457c6aa6a4970e644.1547442452.git.ryder.lee@mediatek.com>
+X-Mailer: git-send-email 1.9.1
+In-Reply-To: <67e650ca4fcaaddbbc98bf4e1cbe04647c990dc3.1547442452.git.ryder.lee@mediatek.com>
+References: <67e650ca4fcaaddbbc98bf4e1cbe04647c990dc3.1547442452.git.ryder.lee@mediatek.com>
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 61a4e7e0-58fa-420e-b5f2-08d679ded4b0
-X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Jan 2019 05:12:06.3023 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB5038
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190113_211216_553152_CDA93390 
-X-CRM114-Status: GOOD (  11.86  )
+X-CRM114-CacheID: sfid-20190113_211236_892104_89DB2FCE 
+X-CRM114-Status: GOOD (  11.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -120,37 +78,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Bharat Bhushan <bharat.bhushan@nxp.com>,
- "bharatb.yadav@gmail.com" <bharatb.yadav@gmail.com>
+Cc: devicetree@vger.kernel.org, Guochun Mao <guochun.mao@mediatek.com>,
+ Weijie Gao <weijie.gao@mediatek.com>, linux-kernel@vger.kernel.org,
+ Rob Herring <robh+dt@kernel.org>, linux-mtd@lists.infradead.org,
+ linux-mediatek@lists.infradead.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-cpu_possible(cpu) will always return true when cpu parameter
-is from cpumask_next().
-Check for nr_cpu_ids rather than !cpu_possible(cpu).
+From: Guochun Mao <guochun.mao@mediatek.com>
 
-Signed-off-by: Bharat Bhushan <Bharat.Bhushan@nxp.com>
+SNOR_HWCAPS_READ is a basic read mode for both flash and controller,
+it should be supported, so add the capcity for mtk-quadspi.
+
+Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
 ---
- drivers/soc/fsl/dpio/dpio-driver.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Changes since v1: none. 
+---
+ drivers/mtd/spi-nor/mtk-quadspi.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/soc/fsl/dpio/dpio-driver.c b/drivers/soc/fsl/dpio/dpio-driver.c
-index e58fcc9096e8..eb369dd9e0a7 100644
---- a/drivers/soc/fsl/dpio/dpio-driver.c
-+++ b/drivers/soc/fsl/dpio/dpio-driver.c
-@@ -133,7 +133,7 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
- 	else
- 		next_cpu = cpumask_next(next_cpu, cpu_online_mask);
- 
--	if (!cpu_possible(next_cpu)) {
-+	if (next_cpu >= nr_cpu_ids) {
- 		dev_err(dev, "probe failed. Number of DPIOs exceeds NR_CPUS.\n");
- 		err = -ERANGE;
- 		goto err_allocate_irqs;
+diff --git a/drivers/mtd/spi-nor/mtk-quadspi.c b/drivers/mtd/spi-nor/mtk-quadspi.c
+index 5442993..d9eed68 100644
+--- a/drivers/mtd/spi-nor/mtk-quadspi.c
++++ b/drivers/mtd/spi-nor/mtk-quadspi.c
+@@ -431,7 +431,8 @@ static int mtk_nor_init(struct mtk_nor *mtk_nor,
+ 			struct device_node *flash_node)
+ {
+ 	const struct spi_nor_hwcaps hwcaps = {
+-		.mask = SNOR_HWCAPS_READ_FAST |
++		.mask = SNOR_HWCAPS_READ |
++			SNOR_HWCAPS_READ_FAST |
+ 			SNOR_HWCAPS_READ_1_1_2 |
+ 			SNOR_HWCAPS_PP,
+ 	};
 -- 
-2.20.1
+1.9.1
 
 
 _______________________________________________
