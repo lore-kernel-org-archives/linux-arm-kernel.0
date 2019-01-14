@@ -2,84 +2,91 @@ Return-Path: <SRS0=baBj=PW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EA1DFC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 13:29:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DFA7AC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 13:30:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B96B620651
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 13:29:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A267620651
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 13:30:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lFj34LYx";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="tk77drck"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B96B620651
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EdF7paP4";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="L6aZMDkn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A267620651
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=dswZFeOKumaqdQ0ch4ASf1yASIRCtCEaSFjS3Us5lOw=; b=lFj34LYxLvHErM
-	fbeerr6WgB+KKW86yKWbzJ7l36Jrl2k4Yp37uYB8eBG98UanADpC/JYt9U+jFsbOI+9r8BMrpwK5Q
-	KJytJWzKHO1PKYM6hvA6EFDdP9XvvSOd4ys5PKu6OqzqMvbuw7cVQ1ve7ZTvOPrEl80eY+iIqpXVC
-	ALW1PNfqiEixd6QdXI5kumSHHF+APVrk0D/6+HsGOqDEEfVmgrEcT+nLF3gsopqqlxljn0ADGko5N
-	RyQFGopSniT0A5e1BzsARIRjy6YHAYMcyhMl08SVgAx83tva6QhakOKGdcrsywzIPSyo+YG5gJGyg
-	6+gBuzAbZJZkun/+2YRw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:In-reply-to:Subject:To:
+	From:References:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=co9lpSzsIdBE5m0j9txcEN5O28Z6+4T3VthDZN+RhfE=; b=EdF7paP49sSI2A+iPntZCy3kY
+	/QvDo13B05lVPJ4u0g/ivtJX1VuJo7kR/CXb5WHoRvVruMYyVrak0dRxrjNV1TLs5lACO8TAFtHQ0
+	GjaorNWYccKhUQij2gx832mLhvRl1WtmBuw5oRS68JtlqVNQWHJ5zFYkS1rbtlsuVS0Med01nGbV7
+	8o+wEwyO4U5eSfUyKjJGbLHRImhoMiw65r9/wukWeJAkKWbuHdWoRKbVfs4Sse3tMfzGRPFLV5akE
+	e5AKeANwdi8OflzpObpP2ysnp2/gjyIItiatB6hjHa3EZymm/Wld6zDnFZh8P5k/huaEt7gRmtpti
+	02sNqchrw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj2Ie-00076B-Mi; Mon, 14 Jan 2019 13:29:08 +0000
-Received: from lelv0142.ext.ti.com ([198.47.23.249])
+	id 1gj2Jy-0000UG-RC; Mon, 14 Jan 2019 13:30:30 +0000
+Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj2GS-0004qd-Mx
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 13:27:32 +0000
-Received: from fllv0035.itg.ti.com ([10.64.41.0])
- by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0EDQh1v041581;
- Mon, 14 Jan 2019 07:26:43 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1547472403;
- bh=CF5ivThAeVhsXGcV5WpV6w68ilrQQqK8YE1SR4Z9I10=;
- h=From:To:CC:Subject:Date:In-Reply-To:References;
- b=tk77drck6OKnLY9dkDBCKf0sySURytF9x0xxMOPFRCwcQZacNAStG107CmJDsQSmR
- r9+a5K2+EQ8KCsvpdbW4C/MY0hSXsdSyzqEbAPOAFj0g958OSBIGxdAPUCIUsSc3kt
- WtPG9Dy6s5YO1Q06AsX4zxT97WE4I625be1FHFCQ=
-Received: from DFLE100.ent.ti.com (dfle100.ent.ti.com [10.64.6.21])
- by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0EDQhtG089758
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Mon, 14 Jan 2019 07:26:43 -0600
-Received: from DFLE113.ent.ti.com (10.64.6.34) by DFLE100.ent.ti.com
- (10.64.6.21) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Mon, 14
- Jan 2019 07:26:42 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE113.ent.ti.com
- (10.64.6.34) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Mon, 14 Jan 2019 07:26:42 -0600
-Received: from a0393678ub.india.ti.com (ileax41-snat.itg.ti.com
- [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0EDOoWi028516;
- Mon, 14 Jan 2019 07:26:38 -0600
-From: Kishon Vijay Abraham I <kishon@ti.com>
-To: Gustavo Pimentel <gustavo.pimentel@synopsys.com>, Rob Herring
- <robh+dt@kernel.org>, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Subject: [PATCH 22/24] PCI: designware-ep: Use aligned ATU window for raising
- MSI interrupts
-Date: Mon, 14 Jan 2019 18:54:22 +0530
-Message-ID: <20190114132424.6445-23-kishon@ti.com>
-X-Mailer: git-send-email 2.17.1
-In-Reply-To: <20190114132424.6445-1-kishon@ti.com>
-References: <20190114132424.6445-1-kishon@ti.com>
+ id 1gj2Ju-0000Sw-1S
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 13:30:28 +0000
+Received: by mail-wm1-x342.google.com with SMTP id g67so8830125wmd.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 14 Jan 2019 05:30:25 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=references:user-agent:from:to:cc:subject:in-reply-to:date
+ :message-id:mime-version;
+ bh=m+dqoUTZ553nDWQVkK+5miIXYXnjGts+7dZ1viX+uA0=;
+ b=L6aZMDkn0eXQpSur/59udmyHKkaaqYwVzoCYf8j2+nP6g+CvW/03enBcLIM3yUGvP6
+ azqss3Nh/1NvgSnfTRVq+l/zdWPpi4pimmTjWfZ26dVPWyHviJrLsma20gQoBhaF7eBl
+ bs+yyQ5vTi8wGO89Rdpw4T7wNmAmCQez12XjPP0rgy6aAmqwpHMBAXYyj1GARHOHcIO/
+ 4+woaaNHLLMcGeB8rVn+QT59stAKLeqPPv2KVsUHelSKJPm8AeB6IDgBgd37D1LGKROf
+ zjJBUBAcAurH6t4pccnNOYz0wnFBy8TsXDKFAx6SblfKjndg3cpqXpAd3pYvXBB3ndh/
+ Tfjg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:references:user-agent:from:to:cc:subject
+ :in-reply-to:date:message-id:mime-version;
+ bh=m+dqoUTZ553nDWQVkK+5miIXYXnjGts+7dZ1viX+uA0=;
+ b=c6TaUdTDab3ixxq+pv09EtvzcYvjjSW8QG6wKhP41EYpWRcfYGvHbNxTqzBmHfJSKM
+ IbOT9GVEZg4CHuPpUeFTTV8/t5yIFQfQpH34TnW6qDsBFsBRfpS6L0vCDp9SvGLrrQmJ
+ +LKg5Yr4iO07MmIcGOUi4si+qxjGWQWb+7AbfEJXt2+9OCStacYxy4u6MKgSIWmLsOoU
+ ajt8zcjH/KitOaxKnIhZa8DoPRkrfp0YVM4xHg3aTQdhTK/v8uy070oQTDE9Yyy2PjzA
+ uy6nx7CMhp9sA05iW+eMw+9v9tbwbEZfZtEjKKA/GZwy5A2EiCj5Rdd8uDheDLJG/Rfe
+ JdUQ==
+X-Gm-Message-State: AJcUukd5dXCLNJXGSyiLfDR7nl4Set9zvYqKPqTA6clEoIK4N7wY/nVk
+ JV6sjUn9SHqBFo/D2nuCk93NhQ==
+X-Google-Smtp-Source: ALg8bN4g7XhzTK3a7x2ZyBppxsQ2dbnyUnSPT2LvpdX3jVsV/BVKMSu4gDm2frVgSD2pvww/Boqx8g==
+X-Received: by 2002:a1c:8b44:: with SMTP id n65mr12332007wmd.104.1547472623560; 
+ Mon, 14 Jan 2019 05:30:23 -0800 (PST)
+Received: from localhost (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr.
+ [90.63.244.31])
+ by smtp.gmail.com with ESMTPSA id a1sm64329218wrw.76.2019.01.14.05.30.22
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 14 Jan 2019 05:30:22 -0800 (PST)
+References: <1547134822-18498-1-git-send-email-lollivier@baylibre.com>
+ <CAFBinCDM4BTx0Ude-M=O6B2bXPE9EdfD=VxZfFzR9Dc=yT+xWQ@mail.gmail.com>
+ <7hy37rm0j6.fsf@baylibre.com>
+User-agent: mu4e 1.0; emacs 25.3.2
+From: Loys Ollivier <lollivier@baylibre.com>
+To: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Subject: Re: [PATCH v3] arm64: dts: meson: Fix mmc cd-gpios polarity
+In-reply-to: <7hy37rm0j6.fsf@baylibre.com>
+Date: Mon, 14 Jan 2019 14:30:20 +0100
+Message-ID: <861s5fmknn.fsf@baylibre.com>
 MIME-Version: 1.0
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_052653_410841_6EA2F3CF 
-X-CRM114-Status: GOOD (  18.06  )
+X-CRM114-CacheID: sfid-20190114_053026_080052_5756A693 
+X-CRM114-Status: GOOD (  14.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,64 +98,78 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Jesper Nilsson <jesper.nilsson@axis.com>, Arnd Bergmann <arnd@arndb.de>,
- Jingoo Han <jingoohan1@gmail.com>, linux-pci@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-arm-kernel@axis.com,
- Kishon Vijay Abraham I <kishon@ti.com>, Murali Karicheri <m-karicheri2@ti.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Bjorn Helgaas <bhelgaas@google.com>, linux-omap@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: devicetree@vger.kernel.org, Kevin Hilman <khilman@baylibre.com>,
+ Linus Walleij <linus.walleij@linaro.org>,
+ Loys Ollivier <lollivier@baylibre.com>, linux-mmc@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-amlogic@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org, Jerome Brunet <jbrunet@baylibre.com>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Certain platforms like K2G reguires the outbound ATU window to be
-aligned. The alignment size is already present in mem->page_size.
-Use the alignment size present in mem->page_size to configre a
-aligned ATU window. In order to raise an interrupt, CPU has to write
-to address offset from the start of the window unlike before where
-writes were always to the beginning of the ATU window.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- drivers/pci/controller/dwc/pcie-designware-ep.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+Hello,
 
-diff --git a/drivers/pci/controller/dwc/pcie-designware-ep.c b/drivers/pci/controller/dwc/pcie-designware-ep.c
-index 47cc06bac91f..f557e83bc34c 100644
---- a/drivers/pci/controller/dwc/pcie-designware-ep.c
-+++ b/drivers/pci/controller/dwc/pcie-designware-ep.c
-@@ -397,6 +397,7 @@ int dw_pcie_ep_raise_msi_irq(struct dw_pcie_ep *ep, u8 func_no,
- {
- 	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
- 	struct pci_epc *epc = ep->epc;
-+	unsigned int aligned_offset;
- 	u16 msg_ctrl, msg_data;
- 	u32 msg_addr_lower, msg_addr_upper, reg;
- 	u64 msg_addr;
-@@ -422,13 +423,15 @@ int dw_pcie_ep_raise_msi_irq(struct dw_pcie_ep *ep, u8 func_no,
- 		reg = ep->msi_cap + PCI_MSI_DATA_32;
- 		msg_data = dw_pcie_readw_dbi(pci, reg);
- 	}
--	msg_addr = ((u64) msg_addr_upper) << 32 | msg_addr_lower;
-+	aligned_offset = msg_addr_lower & (epc->mem->page_size - 1);
-+	msg_addr = ((u64)msg_addr_upper) << 32 |
-+			(msg_addr_lower & ~aligned_offset);
- 	ret = dw_pcie_ep_map_addr(epc, func_no, ep->msi_mem_phys, msg_addr,
- 				  epc->mem->page_size);
- 	if (ret)
- 		return ret;
- 
--	writel(msg_data | (interrupt_num - 1), ep->msi_mem);
-+	writel(msg_data | (interrupt_num - 1), ep->msi_mem + aligned_offset);
- 
- 	dw_pcie_ep_unmap_addr(epc, func_no, ep->msi_mem_phys);
- 
+On Fri 11 Jan 2019 at 19:55, Kevin Hilman wrote:
+
+> Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
+>
+>> Hi,
+>>
+>> some nit-picks as well as my Tested-by (in case it's not too late) below.
+>> thank you for taking care of this!
+>>
+You're welcome !
+>> On Thu, Jan 10, 2019 at 4:40 PM Loys Ollivier <lollivier@baylibre.com> 
+>> wrote:
+>>>
+>>> Commit 89a5e15bcba8 ("gpio/mmc/of: Respect polarity in the device tree")
+>>> changed the behavior of "cd-inverted" to follow the device tree bindings
+>>> specification.
+>>> Lines specifying "cd-inverted" are now "active high".
+>> this depends on the polarity from the cd-gpios property. above commit
+>> caused cd-inverted to be applied twice (effectively making it a
+>> no-op). thus "cd-inverted" only means "active high" if cd-gpios also
+>> sets GPIO_ACTIVE_HIGH. if the polarity in cd-gpios is GPIO_ACTIVE_LOW
+>> together with "cd-inverted" then the GPIO will be treated as active
+>> low.
+>>
+Hum ok so there's more to it than the commit message. I'll come by with
+something clearer for a v4. Thank you for the clarification.
+>>> Fix the SD card for meson by setting the cd-gpios as "active low" 
+>>> according
+>>> to the boards specifications.
+>> not only switching to GPIO_ACTIVE_LOW, also dropping "cd-inverted"
+>>
+Indeed.
+>>> Fixes: 89a5e15bcba8 ("gpio/mmc/of: Respect polarity in the device tree")
+>> in my patches for the 32-bit boards I used the commit which added SD
+>> card support to the board for the Fixes tag. however, I'm fine with
+>> this as well (I just wanted to point out that there's a small
+>> difference in our commits).
+>>
+OK, I treat fixes tags as:
+from the introduction (or discovery) of a regression (or bug), the
+"Fixes" commit will patch the commit that introduced the regression.
+Hence why I tagged the commit from which the platform was not acting
+correctly anymore. If that's fine for you it's fine for me as well :) 
+>>> Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
+>> on my Khadas VIM(1), using Kevin's v5.0/fixes branch:
+>> Tested-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>
+> I can add this tested-by tag in my v5.0/fixes branch for now, and can
+> replace it with a follow up if Loys can update the changelog with your
+> suggestions/clarifications.
+>
+Will do.
+> Thanks,
+>
+> Kevin
+
+
 -- 
-2.17.1
-
+-L
 
 _______________________________________________
 linux-arm-kernel mailing list
