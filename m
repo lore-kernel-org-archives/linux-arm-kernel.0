@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 775F3C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 09:48:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E944AC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 09:48:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3FEA520656
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 09:48:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B7B9E20656
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 09:48:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RMdRp/6H";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="DFW68Ijq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3FEA520656
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qlyMrNGd";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="DfCazsfu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B7B9E20656
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,53 +26,53 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=piTG8wi0kaJzpzmQmGLqwQ9puRi6C1LZvm1zytcthAM=; b=RMdRp/6HLFy4yu
-	hlA6EJzCHPH+/R1/6lRR0ndrclYVwnH8U0pjfauvpigaI9CDut0f5Et560LTqtGAxB0y0KnhssyEb
-	0CNpoxg5sNbCXgAEuzbrQBS8bruQtkRR1qKKik/wO/lNsyHa6p9OZwJJJ2TPBsZPPgVb91XlF8Gzn
-	GokMTd5SZZidyE5hZFRfobabVbZDBKaX5XTG8cBXb+BVp0W+Gn/POJ3qCCaMgo543Huna44fpHat2
-	3fovDPaoDPmFJOZ7We2U1MXb6T8DWiYaBdZaiVrPRBMydPMUewVRTRqQJQ1ZRxl9z5BEh8Y3zdV+5
-	FH55qwMbQ+ESKcaJrYDg==;
+	List-Owner; bh=o3Ih0RElEguNZ9BD/vSfbFEvZQDuiApuP1GLJOH6ekw=; b=qlyMrNGdrS9PR8
+	zrF0d1zQFEKvrjsvqpyw145H+ONWCmeR12OanEzPq+HKd3WId+9UlL2Bxbrwguoye2LyvClBVphWA
+	vzkM9xy61BjulT2WTAULPmPZ2GofKMOLanJ5SR9UtUmhCnAlttIOIPOZcC255dHjo8iY+afY2ypko
+	6BMT9HALXjdRHSOUZhSICN9ZjPfv73X9KeGF2ZjigaoaXVR78wMESgf3/J0anZVtxcJx80sRNqMFC
+	4MOlKKMD7lmf3E/nrANIOZSxoZjEA+Wn1CyxtEk7Bzy1MrfRwvH3rRd9+i6CtQe4rwP7YJpgQ5EHP
+	DK3Opfk7rH5OyUYrmGJQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1giyrB-0004ic-JW; Mon, 14 Jan 2019 09:48:33 +0000
-Received: from esa6.microchip.iphmx.com ([216.71.154.253])
+	id 1giyrV-0004z3-M6; Mon, 14 Jan 2019 09:48:53 +0000
+Received: from esa1.microchip.iphmx.com ([68.232.147.91])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1giymK-0007Ux-GM
+ id 1giymI-0007SW-6I
  for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 09:43:38 +0000
-X-IronPort-AV: E=Sophos;i="5.56,477,1539673200"; d="scan'208";a="22561371"
+X-IronPort-AV: E=Sophos;i="5.56,477,1539673200"; d="scan'208";a="26378825"
 Received: from smtpout.microchip.com (HELO email.microchip.com)
  ([198.175.253.82])
- by esa6.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 14 Jan 2019 02:43:31 -0700
+ by esa1.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 14 Jan 2019 02:43:28 -0700
 Received: from NAM01-SN1-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.38) with Microsoft SMTP Server (TLS) id
- 14.3.352.0; Mon, 14 Jan 2019 02:43:30 -0700
+ email.microchip.com (10.10.76.105) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Mon, 14 Jan 2019 02:43:27 -0700
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=microchiptechnology.onmicrosoft.com;
  s=selector1-microchiptechnology-onmicrosoft-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=zcMLGvj0rR/QJUHh4lbyHGY6+nlKkwsUgdh8tXoLhWY=;
- b=DFW68IjqPx/vhqU0tL2mdoLPDf/Wmxnz8g7nwusIchNRVQWoDb59VLCazwJOM7M1vZh/HQAVTimNAcMbmChLq9YTXJhTywqrFWbZZ4eb2dycwKJx0m3e2szvgkPc1QGkjB5wNuNxnqUjyEq8AoNprz8IVhDiiWNC/Rr+jQnaipc=
+ bh=H6+TKiH8ZpsHrIuc9XKmb2BDKqQvxMFTm1ef39IhQ8U=;
+ b=DfCazsfuJImbygpPvrTPKLeBIqGaA15r9Oe7AdCt4jxbUcZVzU1riBRc/FIRPdQPrkyDKHEhdCUZXLoGbZ3jaGQ284k/sZznNFPGMBZYif7/yLQsUWRFBs/uV11DDqLkwewnwVJwrcH3/d/Kskfvcrz6oU4oCD43N38Utd2cD04=
 Received: from DM5PR11MB1242.namprd11.prod.outlook.com (10.168.108.8) by
  DM5PR11MB1675.namprd11.prod.outlook.com (10.172.38.136) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1516.14; Mon, 14 Jan 2019 09:43:29 +0000
+ 15.20.1516.14; Mon, 14 Jan 2019 09:43:26 +0000
 Received: from DM5PR11MB1242.namprd11.prod.outlook.com
  ([fe80::4c19:f788:c2be:5e8f]) by DM5PR11MB1242.namprd11.prod.outlook.com
  ([fe80::4c19:f788:c2be:5e8f%4]) with mapi id 15.20.1516.019; Mon, 14 Jan 2019
- 09:43:29 +0000
+ 09:43:26 +0000
 From: <Eugen.Hristev@microchip.com>
 To: <robh+dt@kernel.org>, <mark.rutland@arm.com>,
  <devicetree@vger.kernel.org>, <thierry.reding@gmail.com>, <airlied@linux.ie>, 
  <dri-devel@lists.freedesktop.org>, <linux-kernel@vger.kernel.org>,
  <linux-arm-kernel@lists.infradead.org>, <Nicolas.Ferre@microchip.com>
-Subject: [PATCH v2 2/3] dt-bindings: drm/panel: simple: add support for PDA
- 91-00156-A0
-Thread-Topic: [PATCH v2 2/3] dt-bindings: drm/panel: simple: add support for
- PDA 91-00156-A0
-Thread-Index: AQHUq+2a2UkmhGmZaEW5NwjqBZObcQ==
-Date: Mon, 14 Jan 2019 09:43:28 +0000
-Message-ID: <1547458584-29548-3-git-send-email-eugen.hristev@microchip.com>
+Subject: [PATCH v2 1/3] dt-bindings: add vendor prefix for PDA Precision
+ Design Associates, Inc.
+Thread-Topic: [PATCH v2 1/3] dt-bindings: add vendor prefix for PDA Precision
+ Design Associates, Inc.
+Thread-Index: AQHUq+2ZtC/782pWvUOTJg0HA2cTRQ==
+Date: Mon, 14 Jan 2019 09:43:26 +0000
+Message-ID: <1547458584-29548-2-git-send-email-eugen.hristev@microchip.com>
 References: <1547458584-29548-1-git-send-email-eugen.hristev@microchip.com>
 In-Reply-To: <1547458584-29548-1-git-send-email-eugen.hristev@microchip.com>
 Accept-Language: ro-RO, en-US
@@ -88,37 +88,37 @@ x-ms-exchange-messagesentrepresentingtype: 1
 x-originating-ip: [94.177.32.154]
 x-ms-publictraffictype: Email
 x-microsoft-exchange-diagnostics: 1; DM5PR11MB1675;
- 6:psh9WGrhO/Rp74E55HZTnUbIx0F4m8InsuzhnXTaa4JtiwGW4Ni1d5RY9edHyH0YMLGgv5AZbGRTfE/X/zaY9ynk4dep/ty4i6/u1kWbVdhHVOUJrYHD3nPvcjhd1FiSsSJRDdD7c/5SG44M6n6bqNFErZuIJc9OSSkMAkElSYoOwzkLLBW48HO7sJV6pCGdN3F0rnVosHuJFlZYoKOfjtN/5yDS+JLS7yLGbvK3ZnbuNLvLDDWxP0Nb8A0xHSvgMTe33dSikSmTLWGuMz3oHyI72XIfyxOl0w3Od22zKt6WqjhElD6NmESA5iqnN6V+Y2zIu0bc2eoAtpa2amfBds4EK/fDq2X96odAHmse/QzaDAQYjdzQkvJrmuhk37XNiXPc0IrdZSTxUX2tD9WPdMrt1GJq+JwNI3ojTu4hha5Zpdk9A+jDTWzq+tjpfOPOQugcMVyLh5gLJzaQCqL6wg==;
- 5:e8X7dMipW+klcoU/t505kVNsVYy5gY23x1BgCrAyP7P2byRWkIyamIF2iudGnJt+WfKPfZA4IUUw9/9vdpoJcrD1bQLHklafe3OGfuC92UQuF3YyEJ2SQQ6ns0h8q3xaZPHCM7wEJ7Cnez0YMghKtsrznuTjaMj+R40ogQRg98vyz6+7nehRlBUyielIS1AKlSOj8ljsXwScgsz+hp7MzQ==;
- 7:OsSPK5M/mGai9lpisv6Hx6ZWytpw9WVZjbnPEJrMOdvJ1CA9qI1EWwYBvbHI79hXh1GVHE2bFGW/VD8X5yk4NRowXf0d/BksDMTj0BuC5n1QHiQqpVXUgs0Dc7nsYK/FyaYtCMb/b0SiCk1MhCMLvg==
-x-ms-office365-filtering-correlation-id: dc968365-8f48-41d0-99a4-08d67a04bcef
+ 6:Sa+Pn80zlkP/DvxXcCOdbzAjEClIginhuWH7aAel/IhzPAia7Cy+M1oXdBMo5nwnciSAuNC59QAioav6j8Ha5uYS3vY7qvKs3vacqtDG0O/EH3aTQX3tQjAt4WHurHVq6oYQJNp0ptg0nKqvtIMys849MLlENYJBYNsaQTOyR0NUJ3f5PvtbpSRrP3JJAl2tWAhotQ5eSCkCMnOBqCn+cKDJgmGocoqHpSZltjKrbpWDvb75E6VToYiGCYW2Cl2vA25QwgCxEZ3pIGT/oKKVvotcW8Pe64vjZU3ah4s74V3om8JTHCGKXC+Xn0+tOfyTISRwkt26lS/zWrcAItRUv6N911c5d37ouwdWnF/vIuiPnWprnPzLzPk1b8llvMRfPJKM+EJiCEJ2VzjuBOsuu9yBOQ8ycsMbcoIv16Xcxv9Nq4A5ilU1fpG8+oerRWa9alKOyYFAYphWTUfvR6n5Xg==;
+ 5:JtF8LsZpxc80iw7kaoksH45/07I4JG62D6jeO3k2Y8seNPfNrhhawkHOcGbMxllCfwDnA8ECEhmfWyDJrfkxERqBfZhyMWxvaakPcFB0VRf01ecJc5jkijhJGJZ6JDh5IT046wBm7z4ULw0NUyoLqiagPNvwGUrhFRqkLvW3q7EpqNp4WsWXWO0WzUHSEfEt1+M1FoAZWtvfqprnmJbtmw==;
+ 7:591WaWE0qJXVuEHoF+39fO8uoJbic1WpZpDrExm2YnHLylFoO8CMh2x1OTBIjkSmBfbwVGRtro9JURP5g45Nv1/igiVaP6PdF7N0tDER1uhfAFD2jotZ5Fy3I/CuLwVxDr/RdZ0mSXHWimqFju9M1w==
+x-ms-office365-filtering-correlation-id: c6d83adc-eac7-4273-716d-08d67a04bb61
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(2017052603328)(7153060)(7193020);
  SRVR:DM5PR11MB1675; 
 x-ms-traffictypediagnostic: DM5PR11MB1675:
-x-microsoft-antispam-prvs: <DM5PR11MB1675CBF3B986506E28A51907E8800@DM5PR11MB1675.namprd11.prod.outlook.com>
+x-microsoft-antispam-prvs: <DM5PR11MB16755CB3610844C0905D57E8E8800@DM5PR11MB1675.namprd11.prod.outlook.com>
 x-forefront-prvs: 0917DFAC67
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(366004)(396003)(346002)(376002)(39860400002)(136003)(189003)(199004)(6436002)(316002)(2616005)(186003)(54906003)(6512007)(476003)(6486002)(110136005)(76176011)(2501003)(99286004)(71200400001)(71190400001)(6636002)(6506007)(386003)(102836004)(107886003)(26005)(68736007)(478600001)(446003)(72206003)(86362001)(66066001)(8676002)(39060400002)(106356001)(36756003)(25786009)(486006)(105586002)(3846002)(2906002)(14454004)(4326008)(53936002)(52116002)(81166006)(2201001)(8936002)(5660300001)(6116002)(7736002)(11346002)(97736004)(81156014)(256004)(305945005);
+ SFS:(10009020)(366004)(396003)(346002)(376002)(39860400002)(136003)(189003)(199004)(6436002)(316002)(2616005)(4744005)(186003)(6306002)(54906003)(6512007)(476003)(6486002)(110136005)(76176011)(2501003)(99286004)(71200400001)(71190400001)(6636002)(6506007)(386003)(102836004)(107886003)(26005)(68736007)(478600001)(446003)(72206003)(966005)(86362001)(66066001)(8676002)(39060400002)(106356001)(36756003)(25786009)(486006)(105586002)(3846002)(2906002)(14454004)(4326008)(53936002)(52116002)(81166006)(2201001)(8936002)(5660300001)(6116002)(7736002)(11346002)(97736004)(81156014)(256004)(305945005);
  DIR:OUT; SFP:1101; SCL:1; SRVR:DM5PR11MB1675;
  H:DM5PR11MB1242.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; MX:1; A:1; 
 received-spf: None (protection.outlook.com: microchip.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: 3Pafc/Rrp+kgY6jay2GrgOggSUHmDUnnPOU1mvvAgsnTPI+7g9ztC8W/QGa4WiIyCWKkObgPTg4yzKKbLqoq4bhFFLKhWKbeDCSPkxoJ+hH9VGSitvu5J1gMova+t5hGXk0swmptT33A8rkdggMJQ2Qe1Ci9f9T2I6Q5ddMD+60wjg/xMYZrbqA8kknO0kszry61N3HmV0G4cJ/G6ew+qSLzHE1Eb5j9uyTiwDzmKWXkySqOHoOB40+NVXEUAyE6jGSOnGlSg+GtVYJfwxayPrqVd2Ryy7jybUsGpVAzRJfcS52ZAfsHfc/LKZyZfXWl4z75mY4944/Gc7n2hlQE7iYK/cmrsLXTvEA021c35gYIBN/PlVSemtuRGXAtZIL9zQlY913V9P8Uj18QVYdCazgYoE8jovx/cax/inkrmEA=
+x-microsoft-antispam-message-info: yIV60gJ2tCPwgn0yqsxNPErctB7IsTdGc/fSiH+wMXlT5kNQbn82UVGff0LvK56Rb16d93tHJG6EZLe6mc0TqYVprV++J5P52Zhs7tOpIy9iBefcLikl9oHWKF4zV52wQengA50dw5YdGcRem/DtsK7UmpswXPJjpmfSTfWRvUX5v34m3gs7GJcR1lIWfdSoHajshlpmT25hEapo3MSmkf6NdMVirN5qFY/NWzXX8yvgZ7MZWe7Y6Q/IF8PGTM+FCidLEMdwzX/rXfB1n5MnUf3O/JLqPa/sH1c9dX46USVsxYmClJqCJlZvWqMcXWMRCGpiphrJnMuqbgufYxSIUSyAms5kQhs4Vk2jkHFXHMpxnL5q0j2gWhiybQyfrqQDWoCmu0fRp8HVaQKw+MB39RuC4gv513a2BqmCELSbe90=
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: dc968365-8f48-41d0-99a4-08d67a04bcef
-X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Jan 2019 09:43:28.9812 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: c6d83adc-eac7-4273-716d-08d67a04bb61
+X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Jan 2019 09:43:26.4812 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: DM5PR11MB1675
 X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_014333_116089_40B5AB36 
-X-CRM114-Status: UNSURE (   9.99  )
+X-CRM114-CacheID: sfid-20190114_014330_957226_D6A122FD 
+X-CRM114-Status: UNSURE (   8.47  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -137,45 +137,31 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Cristian Birsan <cristian.birsan@microchip.com>
+From: Eugen Hristev <eugen.hristev@microchip.com>
 
-PDA 91-00156-A0 5.0 is a 5.0" WVGA TFT LCD panel.
-This panel with backlight is found in PDA 5" LCD screen (TM5000 series or
-AC320005-5).
-Adding Device Tree bindings for this panel.
+Precision Design Associates, Inc. (PDA) manufactures standard and custom
+capacitive touch screens, LCD's embedded controllers and custom embedded
+software. They specialize in industrial, rugged and outdoor applications.
+Website: http://www.pdaatl.com/
 
-Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
-[eugen.hristev@microchip.com]: specified backlight and supply bindings
 Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
-Changes in v2:
-- added binding explanations for required properties from simple-panel:
-backlight and power supply which are mandatory
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
- .../devicetree/bindings/display/panel/pda,91-00156-a0.txt  | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/panel/pda,91-00156-a0.txt
-
-diff --git a/Documentation/devicetree/bindings/display/panel/pda,91-00156-a0.txt b/Documentation/devicetree/bindings/display/panel/pda,91-00156-a0.txt
-new file mode 100644
-index 0000000..1639fb1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/panel/pda,91-00156-a0.txt
-@@ -0,0 +1,14 @@
-+PDA 91-00156-A0 5.0" WVGA TFT LCD panel
-+
-+Required properties:
-+- compatible: should be "pda,91-00156-a0"
-+- power-supply: this panel requires a single power supply. A phandle to a
-+regulator needs to be specified here. Compatible with panel-common binding which
-+is specified in the panel-common.txt in this directory.
-+- backlight: this panel's backlight is controlled by an external backlight
-+controller. A phandle to this controller needs to be specified here.
-+Compatible with panel-common binding which is specified in the panel-common.txt
-+in this directory.
-+
-+This binding is compatible with the simple-panel binding, which is specified
-+in simple-panel.txt in this directory.
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 3895085..967a670 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -297,6 +297,7 @@ ovti	OmniVision Technologies
+ oxsemi	Oxford Semiconductor, Ltd.
+ panasonic	Panasonic Corporation
+ parade	Parade Technologies Inc.
++pda	Precision Design Associates, Inc.
+ pericom	Pericom Technology Inc.
+ pervasive	Pervasive Displays, Inc.
+ phicomm PHICOMM Co., Ltd.
 -- 
 2.7.4
 
