@@ -2,60 +2,63 @@ Return-Path: <SRS0=baBj=PW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A56D4C43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 03:59:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 30E92C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 04:01:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 727672086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 03:59:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0134E2086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 04:01:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uWMrVgot"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 727672086D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ellerman.id.au
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jIHrlcsV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0134E2086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
-	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wUtoTnQinTuHrEAEF5CCh4cQZtKQ/qb/mmUVkmRy9/4=; b=uWMrVgot6bFFFm
-	QBcM3d+8eSPrHys3iKE7ebG/tuXczWUdK4L7S51GYf6tgsDyFm2L+Na4TrOef0Tk4ixivVdHWV589
-	PisoeNAz3vbmQvk9O+TcMorQ+heYiiPmfR4yHIyf1qXrgV0xLts8HzWYrApGibo1Ip202v2v0PMjJ
-	L+V7TDGXFiAEAeXvCpZaW4kFvgU9pNSfouCj/CnXbqBPIIvOzAZkZxJ2amTzQYg8iywde3GzOm5Mh
-	0gW6ao1uUz5OMU5rruLbgQv1YL3fqQehjZxIvWSaNNjQX4hfD5Qn0BLHResMTA1kKMiX50+BUXg/6
-	KMjg6MsMj9v033BhGJug==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=IcMILS1hZd4sobsRduiRYF6HDHOx6urpSfZWrbkR3xY=; b=jIHrlcsVv440xA
+	0rrly5qNkvBPCw0lYENAU2r7rCC99P7XiLJ2by64s8D9ijFA2tJfE0VE8NqMxtmXWsNEg76LUoMz4
+	j+WydI4TpcsG911sCg/EHWGDzjf8/5xbqChgfzAkqYy6DXaTBmB+vPQhpKEvFF8SRkrHRRZJaRM/g
+	RnCkFqWyyPRfOcG8ZDYD9HAwu/SkoyeSuSG+blamXTj/kX8mImMD8rhCQfcO/a7SjhQhwKjn5SObi
+	vOrxZQbbM/PB9fGMIZ+QvIW2NTEDNd2c+fZhRv5Nu+stjG8gGHFdTzM01R0veQ/mJxslfQs4/XX85
+	Tmc30ZzYFGcNtYr3pOAg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gitPl-0002lV-G3; Mon, 14 Jan 2019 03:59:53 +0000
-Received: from ozlabs.org ([2401:3900:2:1::2])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gitPh-0002ir-1Q
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 03:59:51 +0000
-Received: from authenticated.ozlabs.org (localhost [127.0.0.1])
- (using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
- key-exchange ECDHE (P-256) server-signature RSA-PSS (2048 bits) server-digest
- SHA256) (No client certificate requested)
- by ozlabs.org (Postfix) with ESMTPSA id 43dKVQ4Bklz9s9G;
- Mon, 14 Jan 2019 14:59:42 +1100 (AEDT)
-From: Michael Ellerman <mpe@ellerman.id.au>
-To: Arnd Bergmann <arnd@arndb.de>, y2038@lists.linaro.org,
- linux-api@vger.kernel.org, linux-kernel@vger.kernel.org
-Subject: Re: [PATCH 14/15] arch: add split IPC system calls where needed
-In-Reply-To: <20190110162435.309262-15-arnd@arndb.de>
-References: <20190110162435.309262-1-arnd@arndb.de>
- <20190110162435.309262-15-arnd@arndb.de>
-Date: Mon, 14 Jan 2019 14:59:41 +1100
-Message-ID: <87pnsz28k2.fsf@concordia.ellerman.id.au>
+	id 1gitR0-0004u6-Uj; Mon, 14 Jan 2019 04:01:10 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gitQx-0004t8-7u
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 04:01:08 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7078780D;
+ Sun, 13 Jan 2019 20:01:04 -0800 (PST)
+Received: from [10.162.42.129] (p8cg001049571a15.blr.arm.com [10.162.42.129])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ 2C24C3F5BD; Sun, 13 Jan 2019 20:00:54 -0800 (PST)
+Subject: Re: [PATCH] mm: Introduce GFP_PGTABLE
+To: Michal Hocko <mhocko@kernel.org>
+References: <1547288798-10243-1-git-send-email-anshuman.khandual@arm.com>
+ <20190113173555.GC1578@dhcp22.suse.cz>
+From: Anshuman Khandual <anshuman.khandual@arm.com>
+Message-ID: <f9f333a5-5533-996a-dc8e-1ff1096c1d19@arm.com>
+Date: Mon, 14 Jan 2019 09:30:55 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.9.1
 MIME-Version: 1.0
+In-Reply-To: <20190113173555.GC1578@dhcp22.suse.cz>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190113_195949_559720_0B142B02 
-X-CRM114-Status: GOOD (  16.99  )
+X-CRM114-CacheID: sfid-20190113_200107_285284_AF8106D4 
+X-CRM114-Status: GOOD (  15.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,98 +70,50 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dalias@libc.org, linux-ia64@vger.kernel.org, linux-sh@vger.kernel.org,
- catalin.marinas@arm.com, will.deacon@arm.com, linux@dominikbrodowski.net,
- jcmvbkbc@gmail.com, deepa.kernel@gmail.com, hpa@zytor.com,
- sparclinux@vger.kernel.org, linux-s390@vger.kernel.org, dave@stgolabs.net,
- deller@gmx.de, x86@kernel.org, linux@armlinux.org.uk, mingo@redhat.com,
- geert@linux-m68k.org, firoz.khan@linaro.org, mattst88@gmail.com,
- fenghua.yu@intel.com, Arnd Bergmann <arnd@arndb.de>, heiko.carstens@de.ibm.com,
- linux-m68k@lists.linux-m68k.org, ink@jurassic.park.msu.ru, luto@kernel.org,
- tglx@linutronix.de, linux-arm-kernel@lists.infradead.org, monstr@monstr.eu,
- tony.luck@intel.com, linux-parisc@vger.kernel.org, linux-mips@vger.kernel.org,
- paul.burton@mips.com, ebiederm@xmission.com, linux-alpha@vger.kernel.org,
- schwidefsky@de.ibm.com, akpm@linux-foundation.org,
- linuxppc-dev@lists.ozlabs.org, davem@davemloft.net
+Cc: mark.rutland@arm.com, linux-sh@vger.kernel.org, peterz@infradead.org,
+ catalin.marinas@arm.com, dave.hansen@linux.intel.com, will.deacon@arm.com,
+ linux-kernel@vger.kernel.org, linux-mm@kvack.org, kvmarm@lists.cs.columbia.edu,
+ mpe@ellerman.id.au, linux@armlinux.org.uk, mingo@redhat.com, vbabka@suse.cz,
+ rientjes@google.com, marc.zyngier@arm.com, rppt@linux.vnet.ibm.com,
+ shakeelb@google.com, kirill@shutemov.name, tglx@linutronix.de,
+ linux-arm-kernel@lists.infradead.org, ard.biesheuvel@linaro.org,
+ robin.murphy@arm.com, steve.capper@arm.com, christoffer.dall@arm.com,
+ james.morse@arm.com, aneesh.kumar@linux.ibm.com, akpm@linux-foundation.org,
+ linuxppc-dev@lists.ozlabs.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Arnd,
 
-Arnd Bergmann <arnd@arndb.de> writes:
-> The IPC system call handling is highly inconsistent across architectures,
-> some use sys_ipc, some use separate calls, and some use both.  We also
-> have some architectures that require passing IPC_64 in the flags, and
-> others that set it implicitly.
->
-> For the additon of a y2083 safe semtimedop() system call, I chose to only
-> support the separate entry points, but that requires first supporting
-> the regular ones with their own syscall numbers.
->
-> The IPC_64 is now implied by the new semctl/shmctl/msgctl system
-> calls even on the architectures that require passing it with the ipc()
-> multiplexer.
->
-> I'm not adding the new semtimedop() or semop() on 32-bit architectures,
-> those will get implemented using the new semtimedop_time64() version
-> that gets added along with the other time64 calls.
-> Three 64-bit architectures (powerpc, s390 and sparc) get semtimedop().
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> One aspect here that might be a bit controversial is the use of
-> the same system call numbers across all architectures, synchronizing
-> all of them with the x86-32 numbers. With the new syscall.tbl
-> files, I hope we can just keep doing that in the future, and no
-> longer require the architecture maintainers to assign a number.
->
-> This is mainly useful for implementers of the C libraries: if
-> we can add future system calls everywhere at the same time, using
-> a particular version of the kernel headers also guarantees that
-> the system call number macro is visible.
-> ---
->  arch/m68k/kernel/syscalls/syscall.tbl     | 11 +++++++++++
->  arch/mips/kernel/syscalls/syscall_o32.tbl | 11 +++++++++++
->  arch/powerpc/kernel/syscalls/syscall.tbl  | 12 ++++++++++++
 
-I have some changes I'd like to make to our syscall table that will
-clash with this.
+On 01/13/2019 11:05 PM, Michal Hocko wrote:
+> On Sat 12-01-19 15:56:38, Anshuman Khandual wrote:
+>> All architectures have been defining their own PGALLOC_GFP as (GFP_KERNEL |
+>> __GFP_ZERO) and using it for allocating page table pages. This causes some
+>> code duplication which can be easily avoided. GFP_KERNEL allocated and
+>> cleared out pages (__GFP_ZERO) are required for page tables on any given
+>> architecture. This creates a new generic GFP flag flag which can be used
+>> for any page table page allocation. Does not cause any functional change.
+> 
+> I agree that some unification is due but GFP_PGTABLE is not something to
+> expose in generic gfp.h IMHO. It just risks an abuse. I would be looking
 
-I'll try and send them today.
+Why would you think that it risks an abuse ? It does not create new semantics
+of allocation in the buddy. Its just uses existing GFP_KERNEL allocation which
+is then getting zeroed out. The risks (if any) is exactly same as GFP_KERNEL.
 
-> diff --git a/arch/powerpc/kernel/syscalls/syscall.tbl b/arch/powerpc/kernel/syscalls/syscall.tbl
-> index db3bbb8744af..1bffab54ff35 100644
-> --- a/arch/powerpc/kernel/syscalls/syscall.tbl
-> +++ b/arch/powerpc/kernel/syscalls/syscall.tbl
-> @@ -425,3 +425,15 @@
->  386	nospu	pkey_mprotect			sys_pkey_mprotect
->  387	nospu	rseq				sys_rseq
->  388	nospu	io_pgetevents			sys_io_pgetevents		compat_sys_io_pgetevents
-> +# room for arch specific syscalls
-> +392	64	semtimedop			sys_semtimedop
-> +393	common	semget				sys_semget
-> +394	common	semctl				sys_semctl			compat_sys_semctl
-> +395	common	shmget				sys_shmget
-> +396	common	shmctl				sys_shmctl			compat_sys_shmctl
-> +397	common	shmat				sys_shmat			compat_sys_shmat
-> +398	common	shmdt				sys_shmdt
-> +399	common	msgget				sys_msgget
-> +400	common	msgsnd				sys_msgsnd			compat_sys_msgsnd
-> +401	common	msgrcv				sys_msgrcv			compat_sys_msgrcv
-> +402	common	msgctl				sys_msgctl			compat_sys_msgctl
+> at providing asm-generic implementation and reuse it to remove the code
 
-We already have a gap at 366-377 from when we tried to add the split IPC
-calls a few years back.
+Does that mean GFP_PGTABLE can be created but not in gfp.h but in some other
+memory related header file ?
 
-I guess I don't mind leaving that gap and using the common numbers as
-you've done here.
+> duplication. But I haven't tried that to know that it will work out due
+> to small/subtle differences between arches.
 
-But it would be good to add a comment pointing out that we have room
-at 366 for more arch specific syscalls as well.
-
-cheers
+IIUC from the allocation perspective GFP_ACCOUNT is the only thing which gets
+added with GFP_PGTABLE for user page table for memcg accounting purpose. There
+does not seem to be any other differences unless I am missing something.
 
 _______________________________________________
 linux-arm-kernel mailing list
