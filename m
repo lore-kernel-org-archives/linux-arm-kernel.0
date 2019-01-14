@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BDA5BC43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 20:54:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6EC2EC43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 20:55:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8434D20656
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 20:54:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 265F92086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 20:55:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A3bJ2Hvb";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=kernelci-org.20150623.gappssmtp.com header.i=@kernelci-org.20150623.gappssmtp.com header.b="yRV50L0u"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8434D20656
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MnEDj2al";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=kernelci-org.20150623.gappssmtp.com header.i=@kernelci-org.20150623.gappssmtp.com header.b="eRZvm7JE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 265F92086D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=kernelci.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,54 +26,54 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:From:To:Subject:MIME-Version:Date:
 	Message-ID:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=SsNgYbDsSypijc+8g+7Ux/02MXO5QzsPHB1t79Q0PZs=; b=A3bJ2Hvbk7H37e
-	hgosHI9hWnuVnxnGACn4hZANOzoXSRTata4vjpjJtaioLyxQEFt76bKaV8TEdN0L3m7vXsXwlgxuE
-	cKLkDd1l1CopXh1EC+xkkZJIY1m92OylFHH6SVN0CsPlNlREjCJ0yz8ekP/Z2vPepQFI1KrK49IlK
-	tAXDFGEGEXJpmUsIEbp4PV28seAZ6RpDoZxMyzjsPOubhwUKEH48+WIMeDVmrtZxUFYtIa9aBmLT3
-	d9Xnc4PsSRvmBM8VqbcJwgQWIJve0NWLj+WuvO5moNB5e279WXayF/wgM25k2E+q+vjflvSihpanI
-	hX9klZGPKdQgQjpudIQQ==;
+	List-Owner; bh=DEKdOhPlG+hK7GrNeIWs8dgGbCYqydhxdeApawNZMxM=; b=MnEDj2alICzCjT
+	61kIadwg6b4pn2ri16plcW4sZZp7nbXieHEDuST4RtK1IufScWnVZiXHOY+vYyxGozAvw6P9+HKd2
+	PoUJKg83HOhCK0QM1RyuaJvQUEzR9lEc0Hhtt9k1uswlBc7Y2d1yPAQOSp0asJ+GPfp7hCbSjCUVe
+	8BpSOZLFOtZu7boCwyh5RABvtoueDy9s+04mDQ2zZ5SICskVBqWV0lTYKVo+6OEY5f35PqjdSd5ny
+	ia/yNrwp71u/diGYmJX96fMGM7NyHArRcLufVXBNSU3dhi6ibWT0OsRvlY/IlRSd8Q9r2nKZR+GwB
+	n/bimiTF2vBePM6NwbAg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj9F9-00061a-Lx; Mon, 14 Jan 2019 20:53:59 +0000
-Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+	id 1gj9GQ-0007jK-Rk; Mon, 14 Jan 2019 20:55:18 +0000
+Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj9F4-000611-Km
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 20:53:57 +0000
-Received: by mail-wm1-x344.google.com with SMTP id g67so1044224wmd.2
+ id 1gj9GM-0007ip-Nd
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 20:55:17 +0000
+Received: by mail-wm1-x341.google.com with SMTP id f188so1024933wmf.5
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 14 Jan 2019 12:53:53 -0800 (PST)
+ Mon, 14 Jan 2019 12:55:14 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=kernelci-org.20150623.gappssmtp.com; s=20150623;
  h=message-id:date:mime-version:content-transfer-encoding:subject:to
- :from:cc; bh=bpHZtiybhef4LZXEWmBHsrKk6PMAlSa7wsd7XEjONWo=;
- b=yRV50L0ue5v1uVFnpxSz2AdRsIrGj+EWuo4mrcVgbSkwPl4M+J1cAZPqsjpyHJgmpd
- n8i9SW/VanEQFR6Gsb6OG2a6B4fqlDq52Ilbalp8ADFS1PqtgnBdxq881RJyZFfqZ1DN
- 6R1RM9IX9dGUpJJTw1GDA3EQ6qPlM9NZn2R1+3rFYhbb5gUeRhqEqMRHR/KJgME2j8wU
- vqfrCDdAqndjdaO7y/9Uefa3/4bsWw5rmlWa8IepGb/AtLZHKcm/BAxpWnnlE+HtMeIP
- YD/vluWo9uxwiF0iaAYU5PxmzsGC8/Se0viSfxCQwDdgeDRjtbo5p08XyCnBrRf5gcvg
- Fiwg==
+ :from:cc; bh=KOrUNExqYak3Nkrw0Ve4Pi5eCkwWw9kzetbC8b8QLHQ=;
+ b=eRZvm7JEcEJ5z7svS6tq+BAinpD/t9A0kQhE09kL9AvvdnIeStKdj87ZuofQrmBNvc
+ wM9k6dG2JGIW3tBjXcbhfD4rU823vHoV4pRlIBW8ifZeBRwT5j9HHL67a3qOnOo3fsti
+ WAjFXdYAdUupEHkpfPtuFjmYPOCT9zlNCf5dOsxsNnA961EIoeqZzb9/J2pblbG1Lznw
+ DAFjZynY2b6M3Fmy6sv4spz22uI54V/6tMXbM1x9Scfz4pHzKdIWxBGoAqEJ8GbhJ8/7
+ RtijE54+pfIcc1CX/R2DTik7N3MBQq8rWlAmIlFTmfJgxlgdkkvNAlARm4upaEzq0si3
+ B3Dw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:message-id:date:mime-version
  :content-transfer-encoding:subject:to:from:cc;
- bh=bpHZtiybhef4LZXEWmBHsrKk6PMAlSa7wsd7XEjONWo=;
- b=n4mJTFBPpT5pt3H8Im9+I7VWZyRXlq5IIf2rZo3pMzPWpCPuvmRMYxkYnyuysdTOW1
- NEMU7lPMy7OgFJgAJzyIMX3+J+4pY4oRUSZ96XxB1uq07XclVNDiVg+MwYobnCc94EJe
- 4UDNFk6J1K4SlK2vSuS2IB5a5++kIsPcD4BfvnCh9B+7J9WHVQ+cMySzkUT6GjPEt1G3
- miV1F+tDge46JsyZOMxvdNaj98YHybGToaSN/chQF02v+kswoQp2UbR3K+rpO4ECh5Li
- 62bcEMy9Lml22vZjcPueZg6kBM8YHv8hHcYGZ9V88X3w/Cs1mjiKAVAZoaGamPSv1d38
- y2Ag==
-X-Gm-Message-State: AJcUukdSDCRpgoJMAeyN+QvDKLAyN4XPIifhL7MxST680toof4mg1Pju
- 1zR23TqS0JOi9UGhegHqvsOEKA==
-X-Google-Smtp-Source: ALg8bN5SuL1kWDOQPhlAQYQz4BV+//RzerE4lS0/kitc1u5D5ByFgfgfdCCXGpPQmFLYlqzZEnZe1g==
-X-Received: by 2002:a1c:16c5:: with SMTP id 188mr714778wmw.69.1547499232499;
- Mon, 14 Jan 2019 12:53:52 -0800 (PST)
+ bh=KOrUNExqYak3Nkrw0Ve4Pi5eCkwWw9kzetbC8b8QLHQ=;
+ b=RkXVYCXZKv7zIGTamvcNOv3IFOXiKWt177A9bTKr2a8SFVl/5nebV77sD/sHU4PVIq
+ DQKRhUFWq1EZEBfg1iToG0HONw4CpoSpdcPoWHhna0CyTYqnchJZOq1jKFC2MakWb1tP
+ VgsN0jPVoipyvCDUp8A3fbGL+SPMB4gxgv9BmJJJJUYnRTn3rwhAo2lwh3J5yTERCfXz
+ xbwTXTxEdWIA7yaWQdp32uwbMf/Wsr2Ok+wdlUMO1sghcA6Irs+cfl0wzG+b25pe+PCO
+ aNTWR8J2WRbyWyMrDvlZm6B4onLJJu2YPX8QjAJtVCVXDq1RqM+jRlMTqV79cU1+hXGZ
+ naQQ==
+X-Gm-Message-State: AJcUukfdwOfK1Up99LLHNdc4QhmK0ilyAVX4qaLzCFfEWDfofUWuDhnN
+ uAFSV8GMoAT+M8LoQmtybVjyzA==
+X-Google-Smtp-Source: ALg8bN4mL84kmoCHVAYuYA06XXth/Uc/GvIRDAOgWIz+VKjPwqwB8ysg1aNdpvNkrH0q7DVT67rv5Q==
+X-Received: by 2002:a1c:8d53:: with SMTP id p80mr770782wmd.68.1547499312847;
+ Mon, 14 Jan 2019 12:55:12 -0800 (PST)
 Received: from [148.251.42.114] ([2a01:4f8:201:9271::2])
- by smtp.gmail.com with ESMTPSA id 198sm45715233wmt.36.2019.01.14.12.53.51
+ by smtp.gmail.com with ESMTPSA id d16sm57986300wru.52.2019.01.14.12.55.10
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 14 Jan 2019 12:53:51 -0800 (PST)
-Message-ID: <5c3cf6df.1c69fb81.2b9ce.99d4@mx.google.com>
-Date: Mon, 14 Jan 2019 12:53:51 -0800 (PST)
+ Mon, 14 Jan 2019 12:55:10 -0800 (PST)
+Message-ID: <5c3cf72e.1c69fb81.a8b5e.f509@mx.google.com>
+Date: Mon, 14 Jan 2019 12:55:10 -0800 (PST)
 MIME-Version: 1.0
 X-Kernelci-Report-Type: bisect
 X-Kernelci-Lab-Name: lab-baylibre
@@ -81,15 +81,15 @@ X-Kernelci-Tree: broonie-regulator
 X-Kernelci-Branch: for-next
 X-Kernelci-Kernel: v5.0-rc2-20-g61b67608c6b9
 Subject: broonie-regulator/for-next boot bisection: v5.0-rc2-20-g61b67608c6b9
- on r8a7796-m3ulcb
+ on meson-gxbb-nanopi-k2
 To: Mark Brown <broonie@kernel.org>, tomeu.vizoso@collabora.com,
  guillaume.tucker@collabora.com, Linus Walleij <linus.walleij@linaro.org>,
  broonie@kernel.org, matthew.hart@linaro.org, khilman@baylibre.com,
  enric.balletbo@collabora.com
 From: "kernelci.org bot" <bot@kernelci.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_125354_691503_77193BE6 
-X-CRM114-Status: GOOD (  23.35  )
+X-CRM114-CacheID: sfid-20190114_125514_785596_553E3CBE 
+X-CRM114-Status: GOOD (  23.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -119,13 +119,13 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 * Hope this helps!                                              *
 * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
-broonie-regulator/for-next boot bisection: v5.0-rc2-20-g61b67608c6b9 on r8a7796-m3ulcb
+broonie-regulator/for-next boot bisection: v5.0-rc2-20-g61b67608c6b9 on meson-gxbb-nanopi-k2
 
 Summary:
   Start:      61b67608c6b9 Merge branch 'regulator-5.1' into regulator-next
-  Details:    https://kernelci.org/boot/id/5c3caf0159b514eca66eddf0
-  Plain log:  https://storage.kernelci.org//broonie-regulator/for-next/v5.0-rc2-20-g61b67608c6b9/arm64/defconfig/lab-baylibre/boot-r8a7796-m3ulcb.txt
-  HTML log:   https://storage.kernelci.org//broonie-regulator/for-next/v5.0-rc2-20-g61b67608c6b9/arm64/defconfig/lab-baylibre/boot-r8a7796-m3ulcb.html
+  Details:    https://kernelci.org/boot/id/5c3cb05459b514f1b56edd3b
+  Plain log:  https://storage.kernelci.org//broonie-regulator/for-next/v5.0-rc2-20-g61b67608c6b9/arm64/defconfig+CONFIG_RANDOMIZE_BASE=y/lab-baylibre/boot-meson-gxbb-nanopi-k2.txt
+  HTML log:   https://storage.kernelci.org//broonie-regulator/for-next/v5.0-rc2-20-g61b67608c6b9/arm64/defconfig+CONFIG_RANDOMIZE_BASE=y/lab-baylibre/boot-meson-gxbb-nanopi-k2.html
   Result:     fe665efe6554 regulator: gpio: Convert to use descriptors
 
 Checks:
@@ -136,10 +136,10 @@ Parameters:
   Tree:       broonie-regulator
   URL:        http://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git
   Branch:     for-next
-  Target:     r8a7796-m3ulcb
+  Target:     meson-gxbb-nanopi-k2
   CPU arch:   arm64
   Lab:        lab-baylibre
-  Config:     defconfig
+  Config:     defconfig+CONFIG_RANDOMIZE_BASE=y
   Test suite: boot
 
 Breaking commit found:
