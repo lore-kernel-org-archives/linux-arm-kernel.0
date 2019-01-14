@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 458AEC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 11:18:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E08ABC43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 11:19:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 14DA120656
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 11:18:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A2ADC20656
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 11:19:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lWw150+L";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="gcveBGTe"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 14DA120656
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sbpMRzEH";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="EMhX8BCe"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A2ADC20656
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,61 +26,61 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DFElov78skYNYNCBX/WIEniOH6PHJUNTSSHkGryihQ4=; b=lWw150+LBaJf8o
-	joD/W7SPz547ony08t+fSxQlBBi2pYpOsK63BtDLID0iR0/Giy7TF5F7KPR+CUh2VmhfUOxjIUWXe
-	9mG+RzHjyHPtjXw5sf2kEV96jZD46uix3O5S0loRS1w9gqOl7+VnITGMTwOkbq89v4Iv4MFayE0Ja
-	19Owi8o5lFrjQ7LJiDRCPqSuK2q1rl8NPry+CmmExGtA6knUPZf28JBGOgXN8PkRelTja/6p/Nfyy
-	V24XFIMXA0icXl6SdQpjEDhaMSpYDOnk6JKCZMa/mM3O9h60B9vSTkz/PyFRo+0E3BkwVTtGO2/hx
-	1AzxH2WpdnDA8oMHOQIg==;
+	List-Owner; bh=c4/LPGoiK04B3JC7GlNWMo+9kll7PBYaQa8lawHBsrU=; b=sbpMRzEH54IURz
+	tBhB0PuPFWC3Q2IwbI0urbQ9imAoy+r//1mH1LVSdJLA4s30GYo0NvcpkfLRWkRCiLZMa+4+h1pps
+	8gtJ/1rGjVhSmZ3ybU9z4syiCtu1v9elx8UuH1fBRiHFF9ExNrCd2JBdscB4RsGyS7AzZvIOlowB6
+	sNhjvZZtJqJRrdMV5hDohgfMAC8WhMTqM50b+QbM6ILlDodT4p8gIBkmGYZJONquekbdbqSsdDYPW
+	AxYO0iVJwot/OVPBbjZwVYwscDhJhzjYC2Nf3hZX4ozVE7LJSwidDpyYOb9TX9q1qqtXY4hm+msnM
+	JSWLxDFJbcg4hH9Y/uJg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj0Gd-0002jK-3c; Mon, 14 Jan 2019 11:18:55 +0000
-Received: from fllv0016.ext.ti.com ([198.47.19.142])
+	id 1gj0H0-00035w-Oc; Mon, 14 Jan 2019 11:19:18 +0000
+Received: from lelv0143.ext.ti.com ([198.47.23.248])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj0EY-0000c2-DO; Mon, 14 Jan 2019 11:17:19 +0000
-Received: from fllv0034.itg.ti.com ([10.64.40.246])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0EBGfgq065583;
- Mon, 14 Jan 2019 05:16:41 -0600
+ id 1gj0EB-0000Eb-HP; Mon, 14 Jan 2019 11:16:44 +0000
+Received: from lelv0266.itg.ti.com ([10.180.67.225])
+ by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0EBGIQi112750;
+ Mon, 14 Jan 2019 05:16:18 -0600
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1547464601;
- bh=4YRXaHedTxJwSOCNaAmkVolcFGYRNrTlux25tJuWNNM=;
+ s=ti-com-17Q1; t=1547464578;
+ bh=DS7GtGkD91osbAa6RekCVW+2i6NQKOGWzWvT8VJgdzc=;
  h=From:To:CC:Subject:Date:In-Reply-To:References;
- b=gcveBGTey529UvNcaC9o3tW3u84kkBK4wU+/DXm2dF9gdk3xF06eCWxhlGKJ1FcEG
- dwFPRC2IO9lnYOIeXeEps8RFrbNKJJIFjgm0OXvcA0HalC2TgGyQmaklEj8VoX8JZT
- Q1iENKeugJ4Wz+NbfxFxV2B3JUen4U23hQP27fwM=
-Received: from DLEE101.ent.ti.com (dlee101.ent.ti.com [157.170.170.31])
- by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0EBGfiD068063
+ b=EMhX8BCerUESkfaCvKZY5pB58iOub+MoqmPkn9jLeIHBgBJzBsT4i5w534+SQqSMG
+ MMOBv5tuuwVL/HS/oZX5JbdsKcVYGk+Syd7ygKCqMGZx8lmRrkrp439QZQ7CfZ+UX9
+ Jv39IRtGP3HIvhwQ/kmstYXtatsREnFZca2qh0XM=
+Received: from DFLE104.ent.ti.com (dfle104.ent.ti.com [10.64.6.25])
+ by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0EBGIA7024008
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Mon, 14 Jan 2019 05:16:41 -0600
-Received: from DLEE106.ent.ti.com (157.170.170.36) by DLEE101.ent.ti.com
- (157.170.170.31) with Microsoft SMTP Server (version=TLS1_2,
+ Mon, 14 Jan 2019 05:16:18 -0600
+Received: from DFLE105.ent.ti.com (10.64.6.26) by DFLE104.ent.ti.com
+ (10.64.6.25) with Microsoft SMTP Server (version=TLS1_2,
  cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Mon, 14
- Jan 2019 05:16:41 -0600
-Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE106.ent.ti.com
- (157.170.170.36) with Microsoft SMTP Server (version=TLS1_0,
+ Jan 2019 05:16:17 -0600
+Received: from dflp32.itg.ti.com (10.64.6.15) by DFLE105.ent.ti.com
+ (10.64.6.26) with Microsoft SMTP Server (version=TLS1_0,
  cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Mon, 14 Jan 2019 05:16:40 -0600
+ Mon, 14 Jan 2019 05:16:18 -0600
 Received: from a0393678ub.india.ti.com (ileax41-snat.itg.ti.com
  [10.172.224.153])
- by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0EBFd1h011560;
- Mon, 14 Jan 2019 05:16:37 -0600
+ by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0EBFd1b011560;
+ Mon, 14 Jan 2019 05:16:14 -0600
 From: Kishon Vijay Abraham I <kishon@ti.com>
 To: Kishon Vijay Abraham I <kishon@ti.com>, Lorenzo Pieralisi
  <lorenzo.pieralisi@arm.com>, Gustavo Pimentel
  <gustavo.pimentel@synopsys.com>, Alan Douglas <adouglas@cadence.com>, Shawn
  Lin <shawn.lin@rock-chips.com>, Heiko Stuebner <heiko@sntech.de>
-Subject: [PATCH v2 15/15] PCI: endpoint: Remove features member in struct
- pci_epc
-Date: Mon, 14 Jan 2019 16:45:13 +0530
-Message-ID: <20190114111513.21618-16-kishon@ti.com>
+Subject: [PATCH v2 09/15] PCI: pci-epf-test: Remove setting epf_bar flags in
+ function driver
+Date: Mon, 14 Jan 2019 16:45:07 +0530
+Message-ID: <20190114111513.21618-10-kishon@ti.com>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20190114111513.21618-1-kishon@ti.com>
 References: <20190114111513.21618-1-kishon@ti.com>
 MIME-Version: 1.0
 X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_031647_165180_459ECD18 
-X-CRM114-Status: GOOD (  15.61  )
+X-CRM114-CacheID: sfid-20190114_031624_375982_8F891F28 
+X-CRM114-Status: GOOD (  14.38  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,43 +101,29 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Since EPC features are now implemented using pci_epc_features and
-all the EPC drivers are moved to using pci_epc_features, remove
-features member in struct pci_epc and all the helper macros for
-configuring the features.
+Now that pci_epf_alloc_space() sets BAR MEM TYPE flags as 64Bit or
+32Bit based on size, remove setting it in function driver.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- include/linux/pci-epc.h | 9 ---------
- 1 file changed, 9 deletions(-)
+ drivers/pci/endpoint/functions/pci-epf-test.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/include/linux/pci-epc.h b/include/linux/pci-epc.h
-index 94e1ecff98ce..c3ffa3917f88 100644
---- a/include/linux/pci-epc.h
-+++ b/include/linux/pci-epc.h
-@@ -99,7 +99,6 @@ struct pci_epc {
- 	struct config_group		*group;
- 	/* spinlock to protect against concurrent access of EP controller */
- 	spinlock_t			lock;
--	unsigned int			features;
- };
+diff --git a/drivers/pci/endpoint/functions/pci-epf-test.c b/drivers/pci/endpoint/functions/pci-epf-test.c
+index 3e86fa3c7da3..44cc31343a80 100644
+--- a/drivers/pci/endpoint/functions/pci-epf-test.c
++++ b/drivers/pci/endpoint/functions/pci-epf-test.c
+@@ -406,10 +406,6 @@ static int pci_epf_test_set_bar(struct pci_epf *epf)
+ 	for (bar = BAR_0; bar <= BAR_5; bar++) {
+ 		epf_bar = &epf->bar[bar];
  
- /**
-@@ -120,14 +119,6 @@ struct pci_epc_features {
- 	u64	bar_fixed_size[BAR_5 + 1];
- };
- 
--#define EPC_FEATURE_NO_LINKUP_NOTIFIER		BIT(0)
--#define EPC_FEATURE_BAR_MASK			(BIT(1) | BIT(2) | BIT(3))
--#define EPC_FEATURE_MSIX_AVAILABLE		BIT(4)
--#define EPC_FEATURE_SET_BAR(features, bar)	\
--		(features |= (EPC_FEATURE_BAR_MASK & (bar << 1)))
--#define EPC_FEATURE_GET_BAR(features)		\
--		((features & EPC_FEATURE_BAR_MASK) >> 1)
+-		epf_bar->flags |= upper_32_bits(epf_bar->size) ?
+-			PCI_BASE_ADDRESS_MEM_TYPE_64 :
+-			PCI_BASE_ADDRESS_MEM_TYPE_32;
 -
- #define to_pci_epc(device) container_of((device), struct pci_epc, dev)
- 
- #define pci_epc_create(dev, ops)    \
+ 		ret = pci_epc_set_bar(epc, epf->func_no, epf_bar);
+ 		if (ret) {
+ 			pci_epf_free_space(epf, epf_test->reg[bar], bar);
 -- 
 2.17.1
 
