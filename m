@@ -2,170 +2,140 @@ Return-Path: <SRS0=baBj=PW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.0 required=3.0 tests=BAD_ENC_HEADER,
-	DKIMWL_WL_HIGH,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B157CC43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 19:24:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C5448C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 19:29:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 80F4A20651
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 19:24:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8ACC92064C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 19:29:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fQDRJocQ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="5U3BVuAM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 80F4A20651
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Bha5Hnll";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.com header.i=@fb.com header.b="H3puoZq9";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.onmicrosoft.com header.i=@fb.onmicrosoft.com header.b="Iq46gVBq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8ACC92064C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=fb.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2VY/N04Fw6qxfKdtyqEkOrwxxL8z49P9DGs1ww+FMb0=; b=fQDRJocQoGYpZ6
-	SM3Qdz7Bo0Q7d7algzU3GWa6mwosL0lm4mg7/LOnId/ip7YizyyMceI+pYfRIi5FqfCbXGZL3wzTT
-	NZlzikMs2G1LsIHMghvVASjyVg3UlUPOQvY92JAily0UHU6x3wuN5NDFx8pdCJPKAYVxSltRAxHvy
-	qbyU2ddqd9AZ8+suu4uynn266Qw88mleVy1uBoo5b5BEETfJaNig0S4gf3UKW6wUeExYQctbLDyqU
-	SNTIb9prLEdDg7WYA2FijuFaROG3L+dQBV5VM1Mz2P/xgfLw6AdSP4ibpERgU99p5AtjaQ6ukKBdb
-	WpCjgtCj8BGF6rWN0Ffw==;
+	List-Owner; bh=en5fpcErpi+D6wv/zosKhXOZ/6eLee4SIFVXOvMYnDc=; b=Bha5Hnll5Xcb0g
+	PhxxH9KxknjCXKkvwJZpQxFUENcwdGQudweE7B/ZRHnQBPO1wLJRlETGBok5cToyFB6LnvpkHFart
+	aTyIKG5SfN80tdKHuiDeb42aUgL8s92JGij+fwMP/3JwwN2QuE557O7/fpghJ7jdZNCtFF+NlMbWe
+	vmhXwLp2YxkE4iLp5gzkFCL10q2lWQ27DUxIUtAY+Afp7W0XVVjyDwe/fCGaGpUiejoZ7YCjMX0wK
+	VCzJyeZYy6hdYqHdopyNTAcNhf960mZ9jnMvEy09DJSWwv+AKAaEQ6Daa8mkPjCMl+N5LWQRNyibN
+	6MPvAN3HXUbpyOZuXsvA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj7qR-0003GO-PJ; Mon, 14 Jan 2019 19:24:23 +0000
-Received: from mail-eopbgr700060.outbound.protection.outlook.com
- ([40.107.70.60] helo=NAM04-SN1-obe.outbound.protection.outlook.com)
+	id 1gj7uv-0005Ge-Tn; Mon, 14 Jan 2019 19:29:01 +0000
+Received: from mx0a-00082601.pphosted.com ([67.231.145.42])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj7pZ-0002Hr-Ia
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 19:23:31 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
+ id 1gj7us-0005Fw-U5
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 19:29:00 +0000
+Received: from pps.filterd (m0044012.ppops.net [127.0.0.1])
+ by mx0a-00082601.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x0EJLbCq026478; Mon, 14 Jan 2019 11:28:45 -0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fb.com;
+ h=from : to : cc : subject
+ : date : message-id : references : in-reply-to : content-type : content-id
+ : content-transfer-encoding : mime-version; s=facebook;
+ bh=nMWjnX8Li/rqjrKtr49iOm5cvEGMcBNILHXXJut3e+g=;
+ b=H3puoZq91UdZe0a5wm+3JnxP+HuhxDyhLK+R2LCQNvnhcRDPKz2uHDGKLpBI4OV7vE6A
+ GmLGot9VlCdUT2mZ2Kerko/rnbyUbXIWT0Un2n5v+4dHcHeQZITP8V2MUlb49Buj9uu5
+ ieOfKf0csRQjbdNHawSMcEBEMbg76cR7iYs= 
+Received: from mail.thefacebook.com ([199.201.64.23])
+ by mx0a-00082601.pphosted.com with ESMTP id 2q0x5rggs7-10
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-SHA384 bits=256 verify=NOT);
+ Mon, 14 Jan 2019 11:28:45 -0800
+Received: from prn-hub06.TheFacebook.com (2620:10d:c081:35::130) by
+ prn-hub01.TheFacebook.com (2620:10d:c081:35::125) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id
+ 15.1.1531.3; Mon, 14 Jan 2019 11:28:43 -0800
+Received: from NAM02-SN1-obe.outbound.protection.outlook.com (192.168.54.28)
+ by o365-in.thefacebook.com (192.168.16.30) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.1.1531.3
+ via Frontend Transport; Mon, 14 Jan 2019 11:28:43 -0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fb.onmicrosoft.com;
+ s=selector1-fb-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=JrJg8WuU4Q5FHv+Mu37FlEw6dlRWX2QSWzPFzlLmDbs=;
- b=5U3BVuAMZPpFyFSr/4cpovZrbZ5Ev0p6HaXvQfOVIe6WlYomnyhPr1i07xFhDGCAbNhglPsRiLBaeX+ww4tTsyf7lOTw/TyiMgXNWl5fi//kirUF7ZKV6ci+CDbggLexwgjk63ucM+OVoD1K4OnseNpeuQlKJXvMGjM7fkHuSx8=
-Received: from MWHPR02CA0046.namprd02.prod.outlook.com (2603:10b6:301:60::35)
- by DM5PR0201MB3509.namprd02.prod.outlook.com (2603:10b6:4:76::39)
- with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1516.18; Mon, 14 Jan
- 2019 19:23:25 +0000
-Received: from CY1NAM02FT019.eop-nam02.prod.protection.outlook.com
- (2a01:111:f400:7e45::203) by MWHPR02CA0046.outlook.office365.com
- (2603:10b6:301:60::35) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.20.1516.18 via Frontend
- Transport; Mon, 14 Jan 2019 19:23:25 +0000
-Authentication-Results: spf=pass (sender IP is 149.199.60.83)
- smtp.mailfrom=xilinx.com; vger.kernel.org; dkim=none (message not signed)
- header.d=none;vger.kernel.org; dmarc=bestguesspass action=none
- header.from=xilinx.com;
-Received-SPF: Pass (protection.outlook.com: domain of xilinx.com designates
- 149.199.60.83 as permitted sender) receiver=protection.outlook.com;
- client-ip=149.199.60.83; helo=xsj-pvapsmtpgw01;
-Received: from xsj-pvapsmtpgw01 (149.199.60.83) by
- CY1NAM02FT019.mail.protection.outlook.com (10.152.75.177) with Microsoft SMTP
- Server (version=TLS1_0, cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.20.1471.13
- via Frontend Transport; Mon, 14 Jan 2019 19:23:20 +0000
-Received: from unknown-38-66.xilinx.com ([149.199.38.66] helo=xsj-pvapsmtp01)
- by xsj-pvapsmtpgw01 with esmtp (Exim 4.63)
- (envelope-from <jolly.shah@xilinx.com>)
- id 1gj7pP-0001l3-Tp; Mon, 14 Jan 2019 11:23:19 -0800
-Received: from [127.0.0.1] (helo=localhost)
- by xsj-pvapsmtp01 with smtp (Exim 4.63)
- (envelope-from <jolly.shah@xilinx.com>)
- id 1gj7pK-0006Hg-QT; Mon, 14 Jan 2019 11:23:14 -0800
-Received: from xsj-pvapsmtp01 (smtp.xilinx.com [149.199.38.66])
- by xsj-smtp-dlp2.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id x0EJN6Z4023263; 
- Mon, 14 Jan 2019 11:23:06 -0800
-Received: from [172.19.2.91] (helo=xsjjollys50.xilinx.com)
- by xsj-pvapsmtp01 with esmtp (Exim 4.63)
- (envelope-from <jollys@xilinx.com>)
- id 1gj7pC-0006DT-1b; Mon, 14 Jan 2019 11:23:06 -0800
-From: Jolly Shah <jolly.shah@xilinx.com>
-To: <matthias.bgg@gmail.com>, <andy.gross@linaro.org>, <shawnguo@kernel.org>, 
- <geert+renesas@glider.be>, <bjorn.andersson@linaro.org>,
- <sean.wang@mediatek.com>, <m.szyprowski@samsung.com>,
- <michal.simek@xilinx.com>, <robh+dt@kernel.org>, <mark.rutland@arm.com>
-Subject: [PATCH v5 2/3] firmware: xilinx: Implement ZynqMP power management
- APIs
-Date: Mon, 14 Jan 2019 11:22:57 -0800
-Message-ID: <1547493778-22720-3-git-send-email-jollys@xilinx.com>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1547493778-22720-1-git-send-email-jollys@xilinx.com>
-References: <1547493778-22720-1-git-send-email-jollys@xilinx.com>
-X-RCIS-Action: ALLOW
-X-TM-AS-Product-Ver: IMSS-7.1.0.1224-8.2.0.1013-23620.005
-X-TM-AS-User-Approved-Sender: Yes;Yes
-X-EOPAttributedMessage: 0
-X-MS-Office365-Filtering-HT: Tenant
-X-Forefront-Antispam-Report: CIP:149.199.60.83; IPV:NLI; CTRY:US; EFV:NLI;
- SFV:NSPM;
- SFS:(10009020)(376002)(39860400002)(136003)(396003)(346002)(2980300002)(199004)(189003)(478600001)(126002)(7696005)(486006)(36756003)(72206003)(305945005)(9786002)(11346002)(426003)(446003)(48376002)(8676002)(26005)(77096007)(356004)(2201001)(6666004)(186003)(476003)(2616005)(54906003)(51416003)(16586007)(110136005)(316002)(76176011)(44832011)(106002)(50466002)(5660300001)(47776003)(50226002)(14444005)(7416002)(106466001)(81156014)(2906002)(81166006)(4326008)(336012)(107886003)(63266004)(36386004)(39060400002)(8936002)(921003)(107986001)(1121003)(2101003)(83996005);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DM5PR0201MB3509; H:xsj-pvapsmtpgw01; FPR:;
- SPF:Pass; LANG:en; PTR:unknown-60-83.xilinx.com; A:1; MX:1; 
-X-Microsoft-Exchange-Diagnostics: 1; CY1NAM02FT019;
- 1:zkkRvIH0v7L6NjIrcR5bfJ/NCaWxc1pnsd3m1HzHypPcfNRaYQem4Ui6I8nA3MsEFwkkAnz46Bs9jyI7frDG3VPghx3BwHOiyrMOo8CdZOTQTxf2z3KsOxaTFnW82LHw
+ bh=nMWjnX8Li/rqjrKtr49iOm5cvEGMcBNILHXXJut3e+g=;
+ b=Iq46gVBqZJOps2lMDZmQFNz69T2qQ9cwkciDZ3eTnW0F41ZgsaUeMmkAnss3VO0QdlFbTnZ1m8S63RXnDhqeMlBD4Yzo8o2Qd8KQKvZNJYUSiZes82pmztZvOKiVvw54hg361FMJ1wzGxrNhQI6U0Dq/vMbMicWCcKn2x9adj/o=
+Received: from CY4PR15MB1269.namprd15.prod.outlook.com (10.172.180.139) by
+ CY4PR15MB1687.namprd15.prod.outlook.com (10.175.121.16) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1516.20; Mon, 14 Jan 2019 19:28:41 +0000
+Received: from CY4PR15MB1269.namprd15.prod.outlook.com
+ ([fe80::f9c6:952c:8b66:cc9d]) by CY4PR15MB1269.namprd15.prod.outlook.com
+ ([fe80::f9c6:952c:8b66:cc9d%10]) with mapi id 15.20.1516.019; Mon, 14 Jan
+ 2019 19:28:41 +0000
+From: Vijay Khemka <vijaykhemka@fb.com>
+To: Andrew Jeffery <andrew@aj.id.au>, Rob Herring <robh+dt@kernel.org>, "Mark
+ Rutland" <mark.rutland@arm.com>, Joel Stanley <joel@jms.id.au>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "linux-aspeed@lists.ozlabs.org"
+ <linux-aspeed@lists.ozlabs.org>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>
+Subject: Re: [Potential Spoof] Re: [Potential Spoof] Re: [PATCH v2 4/4] ARM:
+ dts: aspeed: Add lpc ctrl for Facebook
+Thread-Topic: [Potential Spoof] Re: [Potential Spoof] Re: [PATCH v2 4/4] ARM:
+ dts: aspeed: Add lpc ctrl for Facebook
+Thread-Index: AQHUqg5kq5zkppfjDEupYTurooq9yKWtzaAAgADW2wA=
+Date: Mon, 14 Jan 2019 19:28:41 +0000
+Message-ID: <B36B9550-0E17-442C-974A-908736EB2980@fb.com>
+References: <5972B57A-23D5-43F4-9476-229379B96C7C@fb.com>
+ <1547419180.2315773.1633559160.3F7D29CF@webmail.messagingengine.com>
+In-Reply-To: <1547419180.2315773.1633559160.3F7D29CF@webmail.messagingengine.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-originating-ip: [2620:10d:c090:200::5:6dbd]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; CY4PR15MB1687;
+ 20:23YTfYa1mlMSCbFxlSnuYn8hbKfw20BNGuhW7TkobcLCVR5v3R+2j7kPK/jLP/tHvOz13eRhMH05xkYHJvCJQA7vB2uCh+BAkCnbeVNl3/0RbkS/LdcKb3r6Iu0CVK8GFW7zvojYw5gAsmB7rhDjfSMXDYUnyYkoTERSkux1rPg=
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: 2586ad57-fa12-4af3-6ef8-08d67a567db3
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(2017052603328)(7153060)(7193020);
+ SRVR:CY4PR15MB1687; 
+x-ms-traffictypediagnostic: CY4PR15MB1687:
+x-microsoft-antispam-prvs: <CY4PR15MB1687A48D006037278CDBA000DD800@CY4PR15MB1687.namprd15.prod.outlook.com>
+x-forefront-prvs: 0917DFAC67
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10019020)(39860400002)(376002)(396003)(346002)(366004)(136003)(47680400002)(43544003)(189003)(199004)(6486002)(2201001)(2616005)(11346002)(446003)(110136005)(4326008)(6436002)(486006)(97736004)(86362001)(316002)(476003)(2906002)(8936002)(81156014)(36756003)(81166006)(8676002)(256004)(14444005)(478600001)(14454004)(6116002)(106356001)(186003)(105586002)(82746002)(99286004)(6506007)(53546011)(7736002)(305945005)(46003)(33656002)(5660300001)(102836004)(68736007)(25786009)(6512007)(6246003)(53936002)(76176011)(71200400001)(229853002)(83716004)(2501003)(71190400001);
+ DIR:OUT; SFP:1102; SCL:1; SRVR:CY4PR15MB1687;
+ H:CY4PR15MB1269.namprd15.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: fb.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: Qs8fNVkdNbK+K5rOWK0WN3s5vjgDCWP/nncKc1z1/ME+rYa+0t6jKADNLTaRQwp0pBjWWswljOZD4+JymvMW8qs/CtUgVpx+LJcVLzA+hy5R/Xslfircdqzo8UaivisCii7e2HZm0Sa+Jsi5VFdfHZ2p63v4w5/kS932bqbZE5NDPjAZY8JJdUNkC7LSqEaC8LlMONtVlsxTMwAU+nTBiWpOO7mtGGD5Bse1YTSwsV+E1ZRVi6YWrHkOAh4uRle8hFAJ7d2bYU9dvo6fHa4uqF69xPxtcmWeNV6QMj+p8gbULUAfUAwLwGuNoJaiZd2CuPSB2oX3sxYGH88D0ylPgC5hvRvrO2jXiol9PakIPdNSyS99lfAks2fz7rEF7JK9g4pspbArx5NnIDGc4QvWxDthsFDf+LzIq1HsKka1njo=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+Content-ID: <2F0D47D5C7865C44ADAACD1CBC68E370@namprd15.prod.outlook.com>
 MIME-Version: 1.0
-X-MS-PublicTrafficType: Email
-X-MS-Office365-Filtering-Correlation-Id: f1888bd5-43e3-4157-dc64-08d67a55c127
-X-Microsoft-Antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4608076)(4709027)(2017052603328)(7153060);
- SRVR:DM5PR0201MB3509; 
-X-Microsoft-Exchange-Diagnostics: 1; DM5PR0201MB3509;
- 3:76oyFUONiBgF3e+hlXeiYwkJYQGxsGvmJatm7RdlWxS7QNDybr2C1UjVLdTF1LO+phKJfr0u4SWo2rgELj1H/6hC3HEJ2ZejmCkDZ7GO+JfLazXrmXJSi5PEjeyvQeyMVDba2sEGd/NdD0BLfw6xtwE8guPUH+WAXXtbJ4Ibdin2aO97rTRuRnq+R9EOaK/dQoe6JwCguywIiMsKTZblV0cCUBKyNVu8YAonEK2FF7kaLMbs5X8MBBh0AgAAVUsT31ivHwZhK10dwHseCdQbNekNbfxZgkKOnLeiv73iEe/uXUFOAuRQ5Rc//Nmu1M7hjv5Y/JJaiQMIuW/cekmgVNwVw1tvkzK3EQoqeyaCaZY3za9NkRJE63Rv5y1Uy9FZ;
- 25:hD0Oj2RkJA4DKahBIPg2TecGXM9QnseUrKIBSbT1poowKPiEft46X6lYMWZzl8ra1dp6+iHtdUeBqdBusGejdBawR8mLHVy5voeOGaMH5Mwo5LZE2udNIzki6Ti/hEWM1aC4QjYIbgExEOQfxyD5kGAXVq0tNdinCfwxtgzNL5xZ4N/ZCYARZ5/w+jXEOwpZq1AZSywH32nZT37VLBYGwNeAWhb4lLBoVL4j7RGyXXslfnvow8Ri+JR7X8JQIuWS9YPYtoD0anvSOLVwV+n/8rfgtQ4J313Fc9J866oDaloOq3sds48SiXQiAzBii/g3AS7C8vT91+IA7xxYZ2XHJg==
-X-MS-TrafficTypeDiagnostic: DM5PR0201MB3509:
-X-Microsoft-Exchange-Diagnostics: 1; DM5PR0201MB3509;
- 31:VU9NvErFOGagtw2ME5rvpcP3ahLLUUAmVXSO3R+k0R4CTX61hhNSQ8JtgAQHVlzdbsuiznrlheP+7wtcJB0FzsEiBpLeYpYIoq06uCdALEcRIN/30/uUKVvHgWaoaiZd6oZeQM50bL4j6CvTu+cE4IDyxx61QJuDT8wzVrb2yH+r1d89PVoGddIHuBt5LKSk7p4/xEZ0Tr4qBQvGGpHme+6i/7uTXj1K0EeYi6dW46I=;
- 20:8P0JFFvWEqBW1iXEIu6R8wLb7zABrKFHSTvzZiltG3XXIBhCtx+rOgdn5mCsF7eoBKBuhRlf6D0kXuiWSK1mniT5bvC8UC3DMUz/uLp0RoIMrYBiP9dvnC2u45l1OY0InEyq1xufLYPfDml1r2WGTxmjnxdb/aAx2PE5+alZYWlqa9JZl/XFUxZLXdg57tTzEeJazNZeNIwQO0scE8gItyFfgMKBqiaV8S/+D7T0TV7YgbZYWRw2T97J37lEjY2AiIwqt7foSiyp+5MpK/5kRb5SMluDucNYBxlz827954FWdstD/9VAnIWT2yj3m1qWMDHCtDG1FBdXtaaZIu+zGf//pNPD4jUHlXnDn1Z/mXJVZ0ErlvZzNdexmQZtLYq/yCiqm1s7xt5u+cGEbMkpNkzIUPlwSIukLOSm4JYYF1S2CkScLUfwHTDDFj9ee3Z8jadTTu6V5yK8OT3Q0ndw2FeObVBZkn5mnB84jUtGsej/M6UyUDB4i2h1JXVRETun
-X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
-X-Microsoft-Antispam-PRVS: <DM5PR0201MB3509D19BD9A684B59B54FB19B8800@DM5PR0201MB3509.namprd02.prod.outlook.com>
-X-Microsoft-Exchange-Diagnostics: 1; DM5PR0201MB3509;
- 4:CdlABoTq92ZdBEDlcOitoE9qqsB5PXDgPggL9MdDjrCdoaCfl1gPLqW+aAbxxSC5xDLYr/i8ophjM06D3fnnWat2YSaArAETHkfoA1Humx56c4WUFtO/scm1C7y54uPJRyPHopl06PryaZrwvNV9C8XXdOyegD93gyIHzxtKX8auB6lkPekFXNRM4aNxzfjclkUvj5OJZjU9owiw8iq1gX2Iv3N8QhN+BI9XI8vEWkI+OBpJVp58e5etNBJEaw2ysJhzc4dROpHypL+59ih7d0eA6/oh7e56pwZyuxJo7qHZTPt7bIhUxxFOJfi9+L3a
-X-Forefront-PRVS: 0917DFAC67
-X-Microsoft-Exchange-Diagnostics: =?us-ascii?Q?1; DM5PR0201MB3509;
- 23:QUQG16IJBdsiLCR20hbxOpc/+EwaFtGSCEQQ880?=
- =?us-ascii?Q?IsS+91ubpR9NtuYfn8ib2ZEa4cG93rlPZDtukZiwqxQo9z/kiFqUx5L5GrS8?=
- =?us-ascii?Q?qFZOBttAa0EmJ3FQIAZDmM8KaGgABhcSeLu2Z30WLVQKltoN73dGSduf0mCb?=
- =?us-ascii?Q?85SbVJGOAaynICEzbo0YhP9qbrNjOoVHnqbRKtpBCuX+zBh/suQJcQ1ZqXy/?=
- =?us-ascii?Q?kDOweBwRtYJlyOltZhAlplF6wUbfkxDijiD1uaGk0+tFUDyPiNeQbkTi/DYF?=
- =?us-ascii?Q?kI4EjhBJdoa1WWFDk/GO8f71lf4k3YsNEYKgLOVMk+KP7+EN5+VP2fXn+S5r?=
- =?us-ascii?Q?eRWwpgm26mIAdYTmRPaWrQTFjoskRFkKPxstDRArG3gqOBte51F4hNgSPjrA?=
- =?us-ascii?Q?mjdycFGyNnCZWBukcJCW3DL0NYwWT5AseBafvGqP6AcGCrRTyNNz+jdgMhlt?=
- =?us-ascii?Q?2M+Iv/BEX6z41qsRjqS9VImGURTzYsWhayuurdRjWPC1Tml/zhchTYjwc7Ek?=
- =?us-ascii?Q?sYghHKMsOKbHN8fPlERoSbYyB3YwgHOuyOTy48Yn9UhNZu/9xlvoFiYsFlf+?=
- =?us-ascii?Q?TYaMuxqhZHIFujNVzHPpUpRVJDHkpwIXl/Yw9DiTR+2XVr2A1Vz9COGmXIRq?=
- =?us-ascii?Q?BN3lZmgQYwQaGQbZ14Xoy6Rmm72SKLI2ySBjNCuiy1NMCDYF9U190a/ALqOW?=
- =?us-ascii?Q?50p/mjePpxmiVB1QTQS7WfKX0337qFWD5W5t3/ePVk280x5KOwQ6J9c562aD?=
- =?us-ascii?Q?jL+agmpqM2yV31cqUwZqGuZTORLeyxm5czIivFwyy49GbJAwIve3XRo7qOaN?=
- =?us-ascii?Q?FNp98L/AyGueZ1WueM2C4pjjGlewbQfG9pLTDX1w1FFDLBCK6Pq67BCogOQV?=
- =?us-ascii?Q?73nTtS2PJfFW0+lb2E87FAn4WFAhLNXKCA8H29HfGylrot6D1jemERDxNth7?=
- =?us-ascii?Q?HidoOTRTVP60DItw38OraSwAtFTHVGTXiFHZCTUwQk/LOQTrsUb5x5Ko16Ni?=
- =?us-ascii?Q?VBW+7UTFsXPuXnxU1WLto+DX5X12rnEnXx2G8/Zqj5hRnFqlwkgvxMBR0VUH?=
- =?us-ascii?Q?7KsZ793e/QsAOtwLUs7puqcSJ0uFceAY1k+tYKMwFndBitSrUmb68gaWph5E?=
- =?us-ascii?Q?xOYolEQ3QcTPXdMoP0cvzQrCpwufUbevK15fVAx6LRJQgsP0zHq8O5DCGGIL?=
- =?us-ascii?Q?IKcbfxvh44kCMpd7gQZVQi9IvgAQr4NL8sdN7+x0+0RiD9uEw/8h5zQ/IS9s?=
- =?us-ascii?Q?SANOb1RWARScmWo4C9OxbkfcZyuG296gegd7vKoKS+hQNt4koKzNd2HPC7/z?=
- =?us-ascii?Q?Jyg=3D=3D?=
-X-MS-Exchange-SenderADCheck: 1
-X-Microsoft-Antispam-Message-Info: wwp9tCeb2GQxKuLMR6xx9tI0DnzvyZxdWirC71DcqLfcHmf8Lvw/I6CAUJNuKHoJavsyqM/AAmq10nbHRjpkXe7QDbQbi/+6Amlo7sAqq+kBKl2Ofm18sqVYt8Us4Mp54f70wYXrhqIpmaWmJxtFt8FfCRQaNf7hoKwMCxNOQyqZ8lBZCYpjBw8ZwggHMbDLBuGmhiOpgnua0AS5IvHr1Rb8m59RO9FIU5HOPSl7FuBE1rLPSswJ5O85l/8xcxj9hAzwa9DfHx5cAfzxure+YdNm5IE2q7D3umzwQNQtq8Z5wB20oJ7VUkegibM7Q9spK5ueUKy6E3em+CNolkV7PgYhFKUV9mf6vTvFNgRHNbNCLb+hHX+Z5aLNMEZ4mWkAB6xJQi2NfvMHDyUYLhsZqkQYewmddk/d+B06B5gU8Lg=
-X-Microsoft-Exchange-Diagnostics: 1; DM5PR0201MB3509;
- 6:WX/3fZEpXzaurS0BL0b9UKixugL6VcOzqI/vhk4WCi6UcM2zDubMBWkfAWHjtzj31PX8XjUtoGyMN7+VSpBbgn8REZNXSd/jT25o1Hxyz/4L0o2RtUYsZLzCSQeex9Dgu9byWoFchbfOzPA16oQRf98j4AsvuZW+uSZ5sV+r4CJP8mX7UHxoKK8CEseQq9sU8WvaFw1HnIqWvDgAlNaPkMdI68+DgnadQr05F89O0WtAvjn2UpvUL4w48v1pSapqknnfIT0Hb4Iqf5Q/hCHQpoHBKmV1P9aSaSPtOYBwWbp+atzGjGmoqBPXzxzt3GGcqhwygpXK9LVSCBFTZrdyxG0mu0DSw5UrjzWJAZUwd6C/WekqHV/XA08K/w2yKwn01T/H5AtsVuoeypobfRQsj5D78fiVVQW/N8Uz1wR9q5OTdv8zNapPgXN3sz95yP90hmnH8jGU1oB/aiJrLLC/3A==;
- 5:1NUimQAzdjSdr2bXOkFXT0YHfW2O2jvcPdPb5AdvHPWhgjkG1WB1ApIvc1rkQISv0dkHkVhUhH3u/hSQ90sKtqNJK4mFcrgMt1EL5cP4CjvjTtWeU1Vrew/pGuBfST4rHUOz9S9A5OeG7GK6Pc6cTB1HLppLZPIj8+CplE6YYaMSTVMctIv0JU5a7gEJ9Rhsuskx5l54XMcywO9RBME4XQ==;
- 7:AJpB1CXpHv3N1iC0vmlOSyuZgcsNQDXmaAXAcXJdPGxd4nYqWqi5id0Oxvf7XaZ+H3Tidx+tW7dNjPIE+Vu42prDp8N1Zqk0MBwXLjBnfQLFmCDMXVmAaKzB2DGXsz7tl+ne7ZwTjiy2XvaLQjgKAQ==
-SpamDiagnosticOutput: 1:99
-SpamDiagnosticMetadata: NSPM
-X-OriginatorOrg: xilinx.com
-X-MS-Exchange-CrossTenant-OriginalArrivalTime: 14 Jan 2019 19:23:20.6395 (UTC)
-X-MS-Exchange-CrossTenant-Network-Message-Id: f1888bd5-43e3-4157-dc64-08d67a55c127
-X-MS-Exchange-CrossTenant-Id: 657af505-d5df-48d0-8300-c31994686c5c
-X-MS-Exchange-CrossTenant-OriginalAttributedTenantConnectingIp: TenantId=657af505-d5df-48d0-8300-c31994686c5c; Ip=[149.199.60.83];
- Helo=[xsj-pvapsmtpgw01]
-X-MS-Exchange-CrossTenant-FromEntityHeader: HybridOnPrem
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DM5PR0201MB3509
+X-MS-Exchange-CrossTenant-Network-Message-Id: 2586ad57-fa12-4af3-6ef8-08d67a567db3
+X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Jan 2019 19:28:41.3270 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 8ae927fe-1255-47a7-a2af-5f3a069daaa2
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: CY4PR15MB1687
+X-OriginatorOrg: fb.com
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2019-01-14_10:, , signatures=0
+X-Proofpoint-Spam-Reason: safe
+X-FB-Internal: Safe
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_112329_611898_8EC55ED0 
-X-CRM114-Status: GOOD (  11.25  )
+X-CRM114-CacheID: sfid-20190114_112859_138634_F5EEFA62 
+X-CRM114-Status: GOOD (  25.29  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -177,132 +147,73 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Rajan Vaja <rajan.vaja@xilinx.com>,
- linux-kernel@vger.kernel.org, Jolly Shah <jollys@xilinx.com>,
- rajanv@xilinx.com, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: "openbmc @ lists . ozlabs . org" <openbmc@lists.ozlabs.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Rajan Vaja <rajan.vaja@xilinx.com>
-
-Add Xilinx ZynqMP firmware APIs to set suspend mode
-and inform firmware that master has initialized its
-own power management.
-
-Signed-off-by: Rajan Vaja <rajan.vaja@xilinx.com>
-Signed-off-by: Jolly Shah <jollys@xilinx.com>
----
- drivers/firmware/xilinx/zynqmp.c     | 29 +++++++++++++++++++++++++++++
- include/linux/firmware/xlnx-zynqmp.h | 20 ++++++++++++++++++++
- 2 files changed, 49 insertions(+)
-
-diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
-index 84b3fd2..c7a3b6c 100644
---- a/drivers/firmware/xilinx/zynqmp.c
-+++ b/drivers/firmware/xilinx/zynqmp.c
-@@ -428,6 +428,33 @@ static int zynqmp_pm_clock_getparent(u32 clock_id, u32 *parent_id)
- 	return ret;
- }
- 
-+/**
-+ * zynqmp_pm_init_finalize() - PM call to inform firmware that the caller
-+ *			       master has initialized its own power management
-+ *
-+ * This API function is to be used for notify the power management controller
-+ * about the completed power management initialization.
-+ *
-+ * Return: Returns status, either success or error+reason
-+ */
-+static int zynqmp_pm_init_finalize(void)
-+{
-+	return zynqmp_pm_invoke_fn(PM_PM_INIT_FINALIZE, 0, 0, 0, 0, NULL);
-+}
-+
-+/**
-+ * zynqmp_pm_set_suspend_mode()	- Set system suspend mode
-+ * @mode:	Mode to set for system suspend
-+ *
-+ * This API function is used to set mode of system suspend.
-+ *
-+ * Return: Returns status, either success or error+reason
-+ */
-+static int zynqmp_pm_set_suspend_mode(u32 mode)
-+{
-+	return zynqmp_pm_invoke_fn(PM_SET_SUSPEND_MODE, mode, 0, 0, 0, NULL);
-+}
-+
- static const struct zynqmp_eemi_ops eemi_ops = {
- 	.get_api_version = zynqmp_pm_get_api_version,
- 	.query_data = zynqmp_pm_query_data,
-@@ -440,6 +467,8 @@ static const struct zynqmp_eemi_ops eemi_ops = {
- 	.clock_getrate = zynqmp_pm_clock_getrate,
- 	.clock_setparent = zynqmp_pm_clock_setparent,
- 	.clock_getparent = zynqmp_pm_clock_getparent,
-+	.init_finalize = zynqmp_pm_init_finalize,
-+	.set_suspend_mode = zynqmp_pm_set_suspend_mode,
- };
- 
- /**
-diff --git a/include/linux/firmware/xlnx-zynqmp.h b/include/linux/firmware/xlnx-zynqmp.h
-index 015e130..1424170 100644
---- a/include/linux/firmware/xlnx-zynqmp.h
-+++ b/include/linux/firmware/xlnx-zynqmp.h
-@@ -28,12 +28,21 @@
- /* SMC SIP service Call Function Identifier Prefix */
- #define PM_SIP_SVC			0xC2000000
- #define PM_GET_TRUSTZONE_VERSION	0xa03
-+#define PM_SET_SUSPEND_MODE		0xa02
-+#define GET_CALLBACK_DATA		0xa01
- 
- /* Number of 32bits values in payload */
- #define PAYLOAD_ARG_CNT	4U
- 
-+/* Number of arguments for a callback */
-+#define CB_ARG_CNT	4
-+
-+/* Payload size (consists of callback API ID + arguments) */
-+#define CB_PAYLOAD_SIZE (CB_ARG_CNT + 1)
-+
- enum pm_api_id {
- 	PM_GET_API_VERSION = 1,
-+	PM_PM_INIT_FINALIZE = 21,
- 	PM_QUERY_DATA = 35,
- 	PM_CLOCK_ENABLE,
- 	PM_CLOCK_DISABLE,
-@@ -73,6 +82,12 @@ enum pm_query_id {
- 	PM_QID_CLOCK_GET_ATTRIBUTES,
- };
- 
-+enum zynqmp_pm_suspend_reason {
-+	SUSPEND_POWER_REQUEST = 201,
-+	SUSPEND_ALERT,
-+	SUSPEND_SYSTEM_SHUTDOWN,
-+};
-+
- /**
-  * struct zynqmp_pm_query_data - PM query data
-  * @qid:	query ID
-@@ -99,8 +114,13 @@ struct zynqmp_eemi_ops {
- 	int (*clock_getrate)(u32 clock_id, u64 *rate);
- 	int (*clock_setparent)(u32 clock_id, u32 parent_id);
- 	int (*clock_getparent)(u32 clock_id, u32 *parent_id);
-+	int (*init_finalize)(void);
-+	int (*set_suspend_mode)(u32 mode);
- };
- 
-+int zynqmp_pm_invoke_fn(u32 pm_api_id, u32 arg0, u32 arg1,
-+			u32 arg2, u32 arg3, u32 *ret_payload);
-+
- #if IS_REACHABLE(CONFIG_ARCH_ZYNQMP)
- const struct zynqmp_eemi_ops *zynqmp_pm_get_eemi_ops(void);
- #else
--- 
-2.7.4
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+DQoNCu+7v09uIDEvMTMvMTksIDI6MzkgUE0sICJBbmRyZXcgSmVmZmVyeSIgPGFuZHJld0Bhai5p
+ZC5hdT4gd3JvdGU6DQoNCiAgICBIaSBWaWpheSwNCiAgICANCiAgICBTb3JyeSBmb3IgcHJvdmlk
+aW5nIGFuIG9waW5pb24gc28gbGF0ZSwgaG93ZXZlcjoNCiAgICANCiAgICBPbiBTYXQsIDEyIEph
+biAyMDE5LCBhdCAxMTowMywgVmlqYXkgS2hlbWthIHdyb3RlOg0KICAgID4gSm9lbCwNCiAgICA+
+IFBsZWFzZSBtZXJnZSB0aGVzZSBwYXRjaGVzIGFzIGl0IGlzIHJlcXVpcmVkIGJ5IGZhY2Vib29r
+IHBsYXRmb3JtLg0KICAgID4gDQogICAgPiBSZWdhcmRzDQogICAgPiAtVmlqYXkNCiAgICA+IA0K
+ICAgID4gT24gMS83LzE5LCAxMToyNSBBTSwgIkxpbnV4LWFzcGVlZCBvbiBiZWhhbGYgb2YgVmlq
+YXkgS2hlbWthIiA8bGludXgtDQogICAgPiBhc3BlZWQtYm91bmNlcyt2aWpheWtoZW1rYT1mYi5j
+b21AbGlzdHMub3psYWJzLm9yZyBvbiBiZWhhbGYgb2YgDQogICAgPiB2aWpheWtoZW1rYUBmYi5j
+b20+IHdyb3RlOg0KICAgID4gDQogICAgPiAgICAgUGxlYXNlIG1lcmdlIHRoZXNlIHBhdGNoZXMg
+aW4gdXBzdHJlYW0ga2VybmVsLg0KICAgID4gICAgIA0KICAgID4gICAgIFJlZ2FyZHMNCiAgICA+
+ICAgICAtVmlqYXkNCiAgICA+ICAgICANCiAgICA+ICAgICBPbiAxMi8yMC8xOCwgMTA6MDYgQU0s
+ICJMaW51eC1hc3BlZWQgb24gYmVoYWxmIG9mIFZpamF5IEtoZW1rYSIgDQogICAgPiA8bGludXgt
+YXNwZWVkLWJvdW5jZXMrdmlqYXlraGVta2E9ZmIuY29tQGxpc3RzLm96bGFicy5vcmcgb24gYmVo
+YWxmIG9mIA0KICAgID4gdmlqYXlraGVta2FAZmIuY29tPiB3cm90ZToNCiAgICA+ICAgICANCiAg
+ICA+ICAgICAgICAgSm9lbCwgQ2FuIHlvdSBwbGVhc2UgdGFrZSBjYXJlIG9mIHRoZXNlIHBhdGNo
+ZXMgbWVyZ2UuDQogICAgPiAgICAgICAgIA0KICAgID4gICAgICAgICBPbiAxMi8xNy8xOCwgMTI6
+MDQgUE0sICJWaWpheSBLaGVta2EiIDx2aWpheWtoZW1rYUBmYi5jb20+IHdyb3RlOg0KICAgID4g
+ICAgICAgICANCiAgICA+ICAgICAgICAgICAgIEFkZGVkIGxwYyBjdHJsIGRldmljZSB0byBlbmFi
+bGUgTFBDIGNsb2NrIGluIEZhY2Vib29rDQogICAgPiAgICAgICAgICAgICBUaW9nYXBhc3MgZGV2
+aWNlIHRyZWUuDQogICAgPiAgICAgICAgICAgICANCiAgICA+ICAgICAgICAgICAgIFNpZ25lZC1v
+ZmYtYnk6IFZpamF5IEtoZW1rYSA8dmlqYXlraGVta2FAZmIuY29tPg0KICAgID4gICAgICAgICAg
+ICAgLS0tDQogICAgPiAgICAgICAgICAgICAgLi4uL2Jvb3QvZHRzL2FzcGVlZC1ibWMtZmFjZWJv
+b2stdGlvZ2FwYXNzLmR0cyAgfCAxNyArKysrKysNCiAgICA+ICsrKysrKysrKysrDQogICAgPiAg
+ICAgICAgICAgICAgMSBmaWxlIGNoYW5nZWQsIDE3IGluc2VydGlvbnMoKykNCiAgICA+ICAgICAg
+ICAgICAgIA0KICAgID4gICAgICAgICAgICAgZGlmZiAtLWdpdCBhL2FyY2gvYXJtL2Jvb3QvZHRz
+L2FzcGVlZC1ibWMtZmFjZWJvb2stDQogICAgPiB0aW9nYXBhc3MuZHRzIGIvYXJjaC9hcm0vYm9v
+dC9kdHMvYXNwZWVkLWJtYy1mYWNlYm9vay10aW9nYXBhc3MuZHRzDQogICAgPiAgICAgICAgICAg
+ICBpbmRleCA3M2U1OGE4MjE2MTMuLmVmNzg3NWI1NDU2MiAxMDA2NDQNCiAgICA+ICAgICAgICAg
+ICAgIC0tLSBhL2FyY2gvYXJtL2Jvb3QvZHRzL2FzcGVlZC1ibWMtZmFjZWJvb2stdGlvZ2FwYXNz
+LmR0cw0KICAgID4gICAgICAgICAgICAgKysrIGIvYXJjaC9hcm0vYm9vdC9kdHMvYXNwZWVkLWJt
+Yy1mYWNlYm9vay10aW9nYXBhc3MuZHRzDQogICAgPiAgICAgICAgICAgICBAQCAtMjIsNiArMjIs
+MTcgQEANCiAgICA+ICAgICAgICAgICAgICAJCXJlZyA9IDwweDgwMDAwMDAwIDB4MjAwMDAwMDA+
+Ow0KICAgID4gICAgICAgICAgICAgIAl9Ow0KICAgID4gICAgICAgICAgICAgIA0KICAgID4gICAg
+ICAgICAgICAgKwlyZXNlcnZlZC1tZW1vcnkgew0KICAgID4gICAgICAgICAgICAgKwkJI2FkZHJl
+c3MtY2VsbHMgPSA8MT47DQogICAgPiAgICAgICAgICAgICArCQkjc2l6ZS1jZWxscyA9IDwxPjsN
+CiAgICA+ICAgICAgICAgICAgICsJCXJhbmdlczsNCiAgICA+ICAgICAgICAgICAgICsNCiAgICA+
+ICAgICAgICAgICAgICsJCWZsYXNoX21lbW9yeTogcmVnaW9uQDk4MDAwMDAwIHsNCiAgICA+ICAg
+ICAgICAgICAgICsJCQluby1tYXA7DQogICAgPiAgICAgICAgICAgICArCQkJcmVnID0gPDB4OTgw
+MDAwMDAgMHgwMDAwMTAwMD47IC8qIDRLICovDQogICAgPiAgICAgICAgICAgICArCQl9Ow0KICAg
+ID4gICAgICAgICAgICAgKwl9Ow0KICAgID4gICAgICAgICAgICAgKw0KICAgID4gICAgICAgICAg
+ICAgIAlpaW8taHdtb24gew0KICAgID4gICAgICAgICAgICAgIAkJY29tcGF0aWJsZSA9ICJpaW8t
+aHdtb24iOw0KICAgID4gICAgICAgICAgICAgIAkJaW8tY2hhbm5lbHMgPSA8JmFkYyAwPiwgPCZh
+ZGMgMT4sIDwmYWRjIDI+LCA8JmFkYyAzPiwNCiAgICA+ICAgICAgICAgICAgIEBAIC01NCw2ICs2
+NSwxMiBAQA0KICAgID4gICAgICAgICAgICAgIAl9Ow0KICAgID4gICAgICAgICAgICAgIH07DQog
+ICAgPiAgICAgICAgICAgICAgDQogICAgPiAgICAgICAgICAgICArJmxwY19jdHJsIHsNCiAgICA+
+ICAgICAgICAgICAgICsJc3RhdHVzID0gIm9rYXkiOw0KICAgID4gICAgICAgICAgICAgKwltZW1v
+cnktcmVnaW9uID0gPCZmbGFzaF9tZW1vcnk+Ow0KICAgID4gICAgICAgICAgICAgKwlmbGFzaCA9
+IDwmc3BpMT47DQogICAgPiAgICAgICAgICAgICArfTsNCiAgICA+ICAgICAgICAgICAgICsNCiAg
+ICA+ICAgICAgICAgICAgICAmdWFydDEgew0KICAgID4gICAgICAgICAgICAgIAkvLyBIb3N0IENv
+bnNvbGUNCiAgICA+ICAgICAgICAgICAgICAJc3RhdHVzID0gIm9rYXkiOw0KICAgID4gICAgICAg
+ICAgICAgLS0gDQogICAgPiAgICAgICAgICAgICAyLjE3LjENCiAgICANCiAgICBJIHVuZGVyc3Rh
+bmQgeW91IGp1c3Qgd2FudCB0byBtYWtlIHlvdXIgc3lzdGVtIHdvcmssIGJ1dCB0aGlzIGlzIGEN
+CiAgICBicm9rZW4gd2F5IHRvIGRvIGl0LiBBbmQgdGhhdCdzIG5vdCB5b3VyIGZhdWx0IC0gd2Ug
+c2hvdWxkIHJlYWxseSBmaXgNCiAgICB0aGUgZHJpdmVyLiBJIHRoaW5rIHRoZSBtZW1vcnktcmVn
+aW9uIHBoYW5kbGUgc2hvdWxkIGJlIG9wdGlvbmFsDQogICAgYW5kIHRoZSBkcml2ZXIgc2hvdWxk
+IHNpbXBseSBsaW1pdCB0aGUgb3B0aW9ucyBhdmFpbGFibGUgdG8gdGhlIGlvY3RsDQogICAgdG8g
+anVzdCB0aGUgZmxhc2ggcmVnaW9uIGlmIHRoZSBtZW1vcnkgbm9kZSBpcyBub3QgcHJlc2VudCAo
+aS5lLiByZXR1cm4NCiAgICBhbiBlcnJvciBpZiB0aGUgbWVtb3J5IHJlZ2lvbiBpcyByZXF1ZXN0
+ZWQgYnV0IG5vdCBkZXNjcmliZWQgaW4gdGhlDQogICAgZGV2aWNldHJlZSkuDQpMZXQgbWUgZml4
+IGRyaXZlciBpdHNlbGYgZmlyc3QuDQogICAgDQogICAgQW5kcmV3DQogICAgDQoNCl9fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwg
+bWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8v
+bGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
