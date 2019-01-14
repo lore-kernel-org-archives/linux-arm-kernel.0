@@ -2,108 +2,94 @@ Return-Path: <SRS0=baBj=PW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7B07DC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 20:28:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CBDA6C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 20:40:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 48E2C20659
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 20:28:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9638920659
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 20:40:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FmqsLJ5N"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 48E2C20659
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=math.uni-bielefeld.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="c1j6+Qd8";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=kernelci-org.20150623.gappssmtp.com header.i=@kernelci-org.20150623.gappssmtp.com header.b="pX3IkCAa"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9638920659
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=kernelci.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=y8DA3Chq+WQq1LqckT1459/k/dUTqafkpcAOKC1zo9g=; b=FmqsLJ5NX26zb2
-	MVLY1LfJpl2znvix4010/Vo1vLKAYTK4aLGICk7wDOVZU/HlQtdXqRK5Y8aiAdoRCc0A6vk2gAyGt
-	ik1sezgsZ2WioPa9nHdo3eThpRHmuC3v7azqa7VTlsCIXFP6dcVEJxSxX89x3pFhOjpihGsDiNQ3V
-	7+vJsSaMn0prEEQOKYpNFg8zItQ8MLwmj5w+yYcFEgjmF4Tmam/7yi9QSdIjneBaJ/F00ZylJqQd6
-	UNwU9AooaNvaj0VOgpNFw7JSL7+ywZHS+N7EDkBWKw8ELdfGHOW05BOk24Bs0QPuJeu0/6IVq53Aj
-	M80bBrRcokGA/D2woQGg==;
+	List-Archive:List-Unsubscribe:List-Id:From:To:Subject:MIME-Version:Date:
+	Message-ID:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=1XR5XWRyQcolwXxwzKN7oKvKzkeuPesRJcQOue5OCnU=; b=c1j6+Qd8XqIWBZ
+	4bnOoWLhmRW2+8+ysiWf/ovktLO/FOzoOhpDqTqIl0nIYIAmyiR/6413/a+TmM+pjzo/QeHxX7S47
+	dyXcIFPXDTqqTfuRvN8+ddr6dx9YBtiHaPnKzOBIYQoV3Q5Yn8gKAOk6HvpAoTSvqbFSKcOmKON07
+	Jj/rbNLqFlj7f9E0khPq1zxpivlE7W6Mo4vuiyHAYuZz1lhIFik2ofzX0VSvULQv9jx7SoIGEpNbX
+	xJ4j0xvVUswVXBQr5NY+q/RAHVAsa4HEw/rvOVTojZeEgWtJZKJwsYK6d+UzuiwyVAoUnd+OZMa90
+	j0RqfqSKJebNg3alYeOg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj8qc-0005oK-Na; Mon, 14 Jan 2019 20:28:38 +0000
-Received: from smtp.math.uni-bielefeld.de ([129.70.45.10])
+	id 1gj91o-0002LO-LN; Mon, 14 Jan 2019 20:40:12 +0000
+Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj8qZ-0005nX-6I
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 20:28:37 +0000
-Received: from [192.168.0.100] (pC19F5E95.dip0.t-ipconnect.de [193.159.94.149])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (Client did not present a certificate)
- by smtp.math.uni-bielefeld.de (Postfix) with ESMTPSA id 727AE60004;
- Mon, 14 Jan 2019 21:20:05 +0100 (CET)
-Subject: Re: [PATCH] Revert "ARM: dma-mapping: Set proper DMA ops in
- arm_iommu_detach_device()"
-To: Robin Murphy <robin.murphy@arm.com>, Thierry Reding <treding@nvidia.com>, 
- Marek Szyprowski <m.szyprowski@samsung.com>
-References: <CGME20190114132250eucas1p2abdf2f36bad3554e37dfbf40e539f594@eucas1p2.samsung.com>
- <20190114132240.12125-1-m.szyprowski@samsung.com>
- <20190114160902.GB9218@ulmo> <4f7fd8db-33e4-9c8d-2fee-1ca9c98a9276@arm.com>
-From: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
-Openpgp: preference=signencrypt
-Autocrypt: addr=tjakobi@math.uni-bielefeld.de; prefer-encrypt=mutual; keydata=
- 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
- 24xKzP1yWf7TCvc+DT6gUl4T65RXUQyTeJ0=
-Message-ID: <ffad41c0-f314-e404-5bb0-a39d01b69478@math.uni-bielefeld.de>
-Date: Mon, 14 Jan 2019 21:20:04 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Firefox/52.0 SeaMonkey/2.49.9.1
+ id 1gj91j-0001Ww-SW
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 20:40:10 +0000
+Received: by mail-wm1-x343.google.com with SMTP id y185so8260759wmd.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 14 Jan 2019 12:40:06 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=kernelci-org.20150623.gappssmtp.com; s=20150623;
+ h=message-id:date:mime-version:content-transfer-encoding:subject:to
+ :from:cc; bh=DrmjGZb0lFc8LPUpmbJmzSPWeZlQKhc5D2dUcCK+WnU=;
+ b=pX3IkCAacdKlu70HaGCxeMMC72v5NRrB0EQDWMJ/INNcVzbN0eWHugjsSiWDnPNWOR
+ pXYI4bVxURapuEtUpae+tOkqLkSH2zGAtjJssiON47jZNGHGZyoAB1u+ObjU4vTtTZCV
+ aVnxZ6Ww1If5LBXP33MsPlgOoOvwrocIa8RegYOwTeXKa+wjrgMZ1U77C+OKJKstxWCd
+ MJRUlqL4u7o8g6GaIhhwcKb4o+TqsA17SzZSx1epumJOa8YLg+njdpVcKS2jCYwuKi/I
+ U9yaaToUlnbwPHODvQQ+RG9Z+0PuspJXbFgvwQwI64bsA9QA7erZaIIp7xquSDaM0+d/
+ jP7g==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:message-id:date:mime-version
+ :content-transfer-encoding:subject:to:from:cc;
+ bh=DrmjGZb0lFc8LPUpmbJmzSPWeZlQKhc5D2dUcCK+WnU=;
+ b=MGwtGE76NZki7uN05MlzeShbxNYGEvNe5dkJgvW93IwHwLiuxjH2Rk3YjG2zwHg0Wi
+ Nq832T0ST5bYoy1iMAYofAQf6twKw8itclfHimWQebsgxZ/n9Pq642E6J3pgcoqL+4ab
+ XWNYXpgwtc4nmc0QIKOSS6hpBSDq86hJO2VzVRNN5vbn6JLtEmZK3eXHSe6rtNI02EBi
+ ziTMYpTUSj041UKseAw5jbK8q0a1qRlTDYqyFAl52eSlMOIxNfWD/u+j5PW8yxb7Z0v+
+ TStBgTZaHNd3beedG9rZKPmEm6t14ZLTAjBCNup9UuFyHMU5hhBQdHJvYN9yi1J2YJFH
+ ENjA==
+X-Gm-Message-State: AJcUuke10mFebXmCJL5XUeRfdy9822NAhuzrxAfb2hMww6MWKG728TDI
+ il+gMW8vlf1uCF06luuFrmmt7g==
+X-Google-Smtp-Source: ALg8bN4k6F4XswhgHu4sBLfZW+XysW21TZaRHW9rcMFrsLxTP4XvTnpyRIXgbKDhxBdU7Sb2tbuxeQ==
+X-Received: by 2002:a1c:6607:: with SMTP id a7mr633334wmc.129.1547498405376;
+ Mon, 14 Jan 2019 12:40:05 -0800 (PST)
+Received: from [148.251.42.114] ([2a01:4f8:201:9271::2])
+ by smtp.gmail.com with ESMTPSA id x81sm29428653wmg.17.2019.01.14.12.40.04
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 14 Jan 2019 12:40:04 -0800 (PST)
+Message-ID: <5c3cf3a4.1c69fb81.e81c0.fb80@mx.google.com>
+Date: Mon, 14 Jan 2019 12:40:04 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <4f7fd8db-33e4-9c8d-2fee-1ca9c98a9276@arm.com>
+X-Kernelci-Report-Type: bisect
+X-Kernelci-Lab-Name: lab-baylibre
+X-Kernelci-Tree: broonie-regulator
+X-Kernelci-Branch: for-next
+X-Kernelci-Kernel: v5.0-rc2-20-g61b67608c6b9
+Subject: broonie-regulator/for-next boot bisection: v5.0-rc2-20-g61b67608c6b9
+ on meson8b-odroidc1
+To: Mark Brown <broonie@kernel.org>, tomeu.vizoso@collabora.com,
+ guillaume.tucker@collabora.com, Linus Walleij <linus.walleij@linaro.org>,
+ broonie@kernel.org, matthew.hart@linaro.org, khilman@baylibre.com,
+ enric.balletbo@collabora.com
+From: "kernelci.org bot" <bot@kernelci.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_122835_539019_8E54170D 
-X-CRM114-Status: GOOD (  16.72  )
+X-CRM114-CacheID: sfid-20190114_124008_089127_9016B6E1 
+X-CRM114-Status: GOOD (  23.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -115,72 +101,513 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
- Russell King <rmk+kernel@armlinux.org.uk>, linux-kernel@vger.kernel.org,
- iommu@lists.linux-foundation.org, Ben Skeggs <bskeggs@redhat.com>,
- Christoph Hellwig <hch@lst.de>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="windows-1252"
-Content-Transfer-Encoding: quoted-printable
+Cc: Liam Girdwood <lgirdwood@gmail.com>,
+ Haojian Zhuang <haojian.zhuang@gmail.com>, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, Philipp Zabel <philipp.zabel@gmail.com>,
+ Paul Parsons <lost.distance@yahoo.com>, Russell King <linux@armlinux.org.uk>,
+ Robert Jarzmik <robert.jarzmik@free.fr>, Daniel Mack <daniel@zonque.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello everyone,
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+* This automated bisection report was sent to you on the basis  *
+* that you may be involved with the breaking commit it has      *
+* found.  No manual investigation has been done to verify it,   *
+* and the root cause of the problem may be somewhere else.      *
+* Hope this helps!                                              *
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
-first of all thanks to Marek for looking into this.
+broonie-regulator/for-next boot bisection: v5.0-rc2-20-g61b67608c6b9 on meson8b-odroidc1
 
-@Robin: This works for me. The drivers now probe and bind correctly again.
+Summary:
+  Start:      61b67608c6b9 Merge branch 'regulator-5.1' into regulator-next
+  Details:    https://kernelci.org/boot/id/5c3caf0c59b514ece86edd73
+  Plain log:  https://storage.kernelci.org//broonie-regulator/for-next/v5.0-rc2-20-g61b67608c6b9/arm/multi_v7_defconfig+CONFIG_SMP=n/lab-baylibre/boot-meson8b-odroidc1.txt
+  HTML log:   https://storage.kernelci.org//broonie-regulator/for-next/v5.0-rc2-20-g61b67608c6b9/arm/multi_v7_defconfig+CONFIG_SMP=n/lab-baylibre/boot-meson8b-odroidc1.html
+  Result:     fe665efe6554 regulator: gpio: Convert to use descriptors
 
-With best wishes,
-Tobias
+Checks:
+  revert:     PASS
+  verify:     PASS
 
-Robin Murphy wrote:
-> On 14/01/2019 16:09, Thierry Reding wrote:
->> On Mon, Jan 14, 2019 at 02:22:40PM +0100, Marek Szyprowski wrote:
->>> This reverts commit 1874619a7df4b14b23b14877e705ae15325773e3.
->>>
->>> That patch broke IOMMU support for devices, which fails to probe for the
->>> first time and use deferred probe approach. When non-NULL dma_ops is set
->>> in arm_iommu_detach_device(), the given device later ignored by
->>> arch_setup_dma_ops() and stays with non-IOMMU dma_ops.
->>>
->>> Reported-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
->>> Fixes: 1874619a7df4 "ARM: dma-mapping: Set proper DMA ops in
->>> arm_iommu_detach_device()"
->>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>> ---
->>> =A0 arch/arm/mm/dma-mapping.c | 12 ++++++------
->>> =A0 1 file changed, 6 insertions(+), 6 deletions(-)
->>
->> Can you point out exactly what drivers break because of this change? We
->> need to find a solution that works for everyone. Reverting is only
->> marginally useful because somebody will just end up wanting to revert
->> the revert because a different driver is now broken.
-> =
+Parameters:
+  Tree:       broonie-regulator
+  URL:        http://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git
+  Branch:     for-next
+  Target:     meson8b-odroidc1
+  CPU arch:   arm
+  Lab:        lab-baylibre
+  Config:     multi_v7_defconfig+CONFIG_SMP=n
+  Test suite: boot
 
-> At first glance, it sounds like what we really want is for
-> arch_teardown_iommu_ops() to completely clear any ops that arch_setup_dma=
-_ops()
-> installed - does the below suffice?
-> =
+Breaking commit found:
 
-> Robin.
-> =
+-------------------------------------------------------------------------------
+commit fe665efe6554eb80ff301ba9765d497f5f24abb6
+Author: Linus Walleij <linus.walleij@linaro.org>
+Date:   Mon Jan 7 17:27:42 2019 +0100
 
-> ----->8-----
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index f1e2922e447c..1e3e08a1c456 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -2390,4 +2390,6 @@ void arch_teardown_dma_ops(struct device *dev)
-> =A0=A0=A0=A0=A0=A0=A0=A0 return;
-> =
+    regulator: gpio: Convert to use descriptors
+    
+    This converts the GPIO regulator driver to use decriptors only.
+    
+    We have to let go of the array gpio handling: the fetched descriptors
+    are handled individually anyway, and the array retrieveal function
+    does not make it possible to retrieve each GPIO descriptor with
+    unique flags. Instead get them one by one.
+    
+    We request the "enable" GPIO separately as before, and make sure
+    that this line is requested as nonexclusive since enable lines can
+    be shared and the regulator core expects this.
+    
+    Most users of the GPIO regulator are using device tree.
+    
+    There are two boards in the kernel using the gpio regulator from a
+    non-devicetree path: PXA hx4700 and magician. Make sure to switch
+    these over to use descriptors as well.
+    
+    Cc: Philipp Zabel <p.zabel@pengutronix.de> # Magician
+    Cc: Petr Cvek <petr.cvek@tul.cz> # Magician
+    Cc: Robert Jarzmik <robert.jarzmik@free.fr> # PXA
+    Cc: Paul Parsons <lost.distance@yahoo.com> # hx4700
+    Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+    Signed-off-by: Mark Brown <broonie@kernel.org>
 
-> =A0=A0=A0=A0 arm_teardown_iommu_dma_ops(dev);
-> +=A0=A0=A0 /* Let arch_setup_dma_ops() start again from scratch upon re-p=
-robe */
-> +=A0=A0=A0 set_dma_ops(dev, NULL);
-> =A0}
+diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+index b79b757fdd41..51d38d5e776a 100644
+--- a/arch/arm/mach-pxa/hx4700.c
++++ b/arch/arm/mach-pxa/hx4700.c
+@@ -19,6 +19,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/delay.h>
+ #include <linux/fb.h>
++#include <linux/gpio/machine.h>
+ #include <linux/gpio.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/input.h>
+@@ -702,9 +703,7 @@ static struct regulator_init_data bq24022_init_data = {
+ 	.consumer_supplies      = bq24022_consumers,
+ };
+ 
+-static struct gpio bq24022_gpios[] = {
+-	{ GPIO96_HX4700_BQ24022_ISET2, GPIOF_OUT_INIT_LOW, "bq24022_iset2" },
+-};
++static enum gpiod_flags bq24022_gpiod_gflags[] = { GPIOD_OUT_LOW };
+ 
+ static struct gpio_regulator_state bq24022_states[] = {
+ 	{ .value = 100000, .gpios = (0 << 0) },
+@@ -714,12 +713,10 @@ static struct gpio_regulator_state bq24022_states[] = {
+ static struct gpio_regulator_config bq24022_info = {
+ 	.supply_name = "bq24022",
+ 
+-	.enable_gpio = GPIO72_HX4700_BQ24022_nCHARGE_EN,
+-	.enable_high = 0,
+ 	.enabled_at_boot = 0,
+ 
+-	.gpios = bq24022_gpios,
+-	.nr_gpios = ARRAY_SIZE(bq24022_gpios),
++	.gflags = bq24022_gpiod_gflags,
++	.ngpios = ARRAY_SIZE(bq24022_gpiod_gflags),
+ 
+ 	.states = bq24022_states,
+ 	.nr_states = ARRAY_SIZE(bq24022_states),
+@@ -736,6 +733,17 @@ static struct platform_device bq24022 = {
+ 	},
+ };
+ 
++static struct gpiod_lookup_table bq24022_gpiod_table = {
++	.dev_id = "gpio-regulator",
++	.table = {
++		GPIO_LOOKUP("gpio-pxa", GPIO96_HX4700_BQ24022_ISET2,
++			    NULL, GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("gpio-pxa", GPIO72_HX4700_BQ24022_nCHARGE_EN,
++			    "enable", GPIO_ACTIVE_LOW),
++		{ },
++	},
++};
++
+ /*
+  * StrataFlash
+  */
+@@ -878,6 +886,7 @@ static void __init hx4700_init(void)
+ 	pxa_set_btuart_info(NULL);
+ 	pxa_set_stuart_info(NULL);
+ 
++	gpiod_add_lookup_table(&bq24022_gpiod_table);
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
+ 	pwm_add_table(hx4700_pwm_lookup, ARRAY_SIZE(hx4700_pwm_lookup));
+ 
+diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
+index 08b079653c3f..6538a7c0e504 100644
+--- a/arch/arm/mach-pxa/magician.c
++++ b/arch/arm/mach-pxa/magician.c
+@@ -645,9 +645,8 @@ static struct regulator_init_data bq24022_init_data = {
+ 	.consumer_supplies	= bq24022_consumers,
+ };
+ 
+-static struct gpio bq24022_gpios[] = {
+-	{ EGPIO_MAGICIAN_BQ24022_ISET2, GPIOF_OUT_INIT_LOW, "bq24022_iset2" },
+-};
++
++static enum gpiod_flags bq24022_gpiod_gflags[] = { GPIOD_OUT_LOW };
+ 
+ static struct gpio_regulator_state bq24022_states[] = {
+ 	{ .value = 100000, .gpios = (0 << 0) },
+@@ -657,12 +656,10 @@ static struct gpio_regulator_state bq24022_states[] = {
+ static struct gpio_regulator_config bq24022_info = {
+ 	.supply_name		= "bq24022",
+ 
+-	.enable_gpio		= GPIO30_MAGICIAN_BQ24022_nCHARGE_EN,
+-	.enable_high		= 0,
+ 	.enabled_at_boot	= 1,
+ 
+-	.gpios			= bq24022_gpios,
+-	.nr_gpios		= ARRAY_SIZE(bq24022_gpios),
++	.gflags = bq24022_gpiod_gflags,
++	.ngpios = ARRAY_SIZE(bq24022_gpiod_gflags),
+ 
+ 	.states			= bq24022_states,
+ 	.nr_states		= ARRAY_SIZE(bq24022_states),
+@@ -679,6 +676,17 @@ static struct platform_device bq24022 = {
+ 	},
+ };
+ 
++static struct gpiod_lookup_table bq24022_gpiod_table = {
++	.dev_id = "gpio-regulator",
++	.table = {
++		GPIO_LOOKUP("gpio-pxa", EGPIO_MAGICIAN_BQ24022_ISET2,
++			    NULL, GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("gpio-pxa", GPIO30_MAGICIAN_BQ24022_nCHARGE_EN,
++			    "enable", GPIO_ACTIVE_LOW),
++		{ },
++	},
++};
++
+ /*
+  * fixed regulator for ads7846
+  */
+@@ -1027,6 +1035,7 @@ static void __init magician_init(void)
+ 	regulator_register_always_on(0, "power", pwm_backlight_supply,
+ 		ARRAY_SIZE(pwm_backlight_supply), 5000000);
+ 
++	gpiod_add_lookup_table(&bq24022_gpiod_table);
+ 	platform_add_devices(ARRAY_AND_SIZE(devices));
+ }
+ 
+diff --git a/drivers/regulator/gpio-regulator.c b/drivers/regulator/gpio-regulator.c
+index b2f5ec4f658a..0cec163200c8 100644
+--- a/drivers/regulator/gpio-regulator.c
++++ b/drivers/regulator/gpio-regulator.c
+@@ -30,16 +30,15 @@
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/of_regulator.h>
+ #include <linux/regulator/gpio-regulator.h>
+-#include <linux/gpio.h>
++#include <linux/gpio/consumer.h>
+ #include <linux/slab.h>
+ #include <linux/of.h>
+-#include <linux/of_gpio.h>
+ 
+ struct gpio_regulator_data {
+ 	struct regulator_desc desc;
+ 	struct regulator_dev *dev;
+ 
+-	struct gpio *gpios;
++	struct gpio_desc **gpiods;
+ 	int nr_gpios;
+ 
+ 	struct gpio_regulator_state *states;
+@@ -82,7 +81,7 @@ static int gpio_regulator_set_voltage(struct regulator_dev *dev,
+ 
+ 	for (ptr = 0; ptr < data->nr_gpios; ptr++) {
+ 		state = (target & (1 << ptr)) >> ptr;
+-		gpio_set_value_cansleep(data->gpios[ptr].gpio, state);
++		gpiod_set_value_cansleep(data->gpiods[ptr], state);
+ 	}
+ 	data->state = target;
+ 
+@@ -119,7 +118,7 @@ static int gpio_regulator_set_current_limit(struct regulator_dev *dev,
+ 
+ 	for (ptr = 0; ptr < data->nr_gpios; ptr++) {
+ 		state = (target & (1 << ptr)) >> ptr;
+-		gpio_set_value_cansleep(data->gpios[ptr].gpio, state);
++		gpiod_set_value_cansleep(data->gpiods[ptr], state);
+ 	}
+ 	data->state = target;
+ 
+@@ -138,7 +137,8 @@ of_get_gpio_regulator_config(struct device *dev, struct device_node *np,
+ {
+ 	struct gpio_regulator_config *config;
+ 	const char *regtype;
+-	int proplen, gpio, i;
++	int proplen, i;
++	int ngpios;
+ 	int ret;
+ 
+ 	config = devm_kzalloc(dev,
+@@ -153,59 +153,36 @@ of_get_gpio_regulator_config(struct device *dev, struct device_node *np,
+ 
+ 	config->supply_name = config->init_data->constraints.name;
+ 
+-	if (of_property_read_bool(np, "enable-active-high"))
+-		config->enable_high = true;
+-
+ 	if (of_property_read_bool(np, "enable-at-boot"))
+ 		config->enabled_at_boot = true;
+ 
+ 	of_property_read_u32(np, "startup-delay-us", &config->startup_delay);
+ 
+-	config->enable_gpio = of_get_named_gpio(np, "enable-gpio", 0);
+-	if (config->enable_gpio < 0 && config->enable_gpio != -ENOENT)
+-		return ERR_PTR(config->enable_gpio);
+-
+-	/* Fetch GPIOs. - optional property*/
+-	ret = of_gpio_count(np);
+-	if ((ret < 0) && (ret != -ENOENT))
+-		return ERR_PTR(ret);
+-
+-	if (ret > 0) {
+-		config->nr_gpios = ret;
+-		config->gpios = devm_kcalloc(dev,
+-					config->nr_gpios, sizeof(struct gpio),
+-					GFP_KERNEL);
+-		if (!config->gpios)
++	/* Fetch GPIO init levels */
++	ngpios = gpiod_count(dev, NULL);
++	if (ngpios > 0) {
++		config->gflags = devm_kzalloc(dev,
++					      sizeof(enum gpiod_flags)
++					      * ngpios,
++					      GFP_KERNEL);
++		if (!config->gflags)
+ 			return ERR_PTR(-ENOMEM);
+ 
+-		proplen = of_property_count_u32_elems(np, "gpios-states");
+-		/* optional property */
+-		if (proplen < 0)
+-			proplen = 0;
++		for (i = 0; i < ngpios; i++) {
++			u32 val;
+ 
+-		if (proplen > 0 && proplen != config->nr_gpios) {
+-			dev_warn(dev, "gpios <-> gpios-states mismatch\n");
+-			proplen = 0;
+-		}
++			ret = of_property_read_u32_index(np, "gpios-states", i,
++							 &val);
+ 
+-		for (i = 0; i < config->nr_gpios; i++) {
+-			gpio = of_get_named_gpio(np, "gpios", i);
+-			if (gpio < 0) {
+-				if (gpio != -ENOENT)
+-					return ERR_PTR(gpio);
+-				break;
+-			}
+-			config->gpios[i].gpio = gpio;
+-			config->gpios[i].label = config->supply_name;
+-			if (proplen > 0) {
+-				of_property_read_u32_index(np, "gpios-states",
+-							   i, &ret);
+-				if (ret)
+-					config->gpios[i].flags =
+-							   GPIOF_OUT_INIT_HIGH;
+-			}
++			/* Default to high per specification */
++			if (ret)
++				config->gflags[i] = GPIOD_OUT_HIGH;
++			else
++				config->gflags[i] =
++					val ? GPIOD_OUT_HIGH : GPIOD_OUT_LOW;
+ 		}
+ 	}
++	config->ngpios = ngpios;
+ 
+ 	/* Fetch states. */
+ 	proplen = of_property_count_u32_elems(np, "states");
+@@ -255,7 +232,8 @@ static int gpio_regulator_probe(struct platform_device *pdev)
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct gpio_regulator_data *drvdata;
+ 	struct regulator_config cfg = { };
+-	int ptr, ret, state;
++	enum gpiod_flags gflags;
++	int ptr, ret, state, i;
+ 
+ 	drvdata = devm_kzalloc(&pdev->dev, sizeof(struct gpio_regulator_data),
+ 			       GFP_KERNEL);
+@@ -275,26 +253,17 @@ static int gpio_regulator_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
+-	if (config->nr_gpios != 0) {
+-		drvdata->gpios = kmemdup(config->gpios,
+-					 config->nr_gpios * sizeof(struct gpio),
+-					 GFP_KERNEL);
+-		if (drvdata->gpios == NULL) {
+-			dev_err(&pdev->dev, "Failed to allocate gpio data\n");
+-			ret = -ENOMEM;
+-			goto err_name;
+-		}
+-
+-		drvdata->nr_gpios = config->nr_gpios;
+-		ret = gpio_request_array(drvdata->gpios, drvdata->nr_gpios);
+-		if (ret) {
+-			if (ret != -EPROBE_DEFER)
+-				dev_err(&pdev->dev,
+-					"Could not obtain regulator setting GPIOs: %d\n",
+-					ret);
+-			goto err_memgpio;
+-		}
++	for (i = 0; i < config->ngpios; i++) {
++		drvdata->gpiods[i] = devm_gpiod_get_index(&pdev->dev,
++							  NULL,
++							  i,
++							  config->gflags[i]);
++		if (IS_ERR(drvdata->gpiods[i]))
++			return PTR_ERR(drvdata->gpiods[i]);
++		/* This is good to know */
++		gpiod_set_consumer_name(drvdata->gpiods[i], drvdata->desc.name);
+ 	}
++	drvdata->nr_gpios = config->ngpios;
+ 
+ 	drvdata->states = kmemdup(config->states,
+ 				  config->nr_states *
+@@ -303,7 +272,7 @@ static int gpio_regulator_probe(struct platform_device *pdev)
+ 	if (drvdata->states == NULL) {
+ 		dev_err(&pdev->dev, "Failed to allocate state data\n");
+ 		ret = -ENOMEM;
+-		goto err_stategpio;
++		goto err_name;
+ 	}
+ 	drvdata->nr_states = config->nr_states;
+ 
+@@ -330,7 +299,7 @@ static int gpio_regulator_probe(struct platform_device *pdev)
+ 	/* build initial state from gpio init data. */
+ 	state = 0;
+ 	for (ptr = 0; ptr < drvdata->nr_gpios; ptr++) {
+-		if (config->gpios[ptr].flags & GPIOF_OUT_INIT_HIGH)
++		if (config->gflags[ptr] == GPIOD_OUT_HIGH)
+ 			state |= (1 << ptr);
+ 	}
+ 	drvdata->state = state;
+@@ -340,21 +309,19 @@ static int gpio_regulator_probe(struct platform_device *pdev)
+ 	cfg.driver_data = drvdata;
+ 	cfg.of_node = np;
+ 
+-	if (gpio_is_valid(config->enable_gpio)) {
+-		cfg.ena_gpio = config->enable_gpio;
+-		cfg.ena_gpio_initialized = true;
+-	}
+-	cfg.ena_gpio_invert = !config->enable_high;
+-	if (config->enabled_at_boot) {
+-		if (config->enable_high)
+-			cfg.ena_gpio_flags |= GPIOF_OUT_INIT_HIGH;
+-		else
+-			cfg.ena_gpio_flags |= GPIOF_OUT_INIT_LOW;
+-	} else {
+-		if (config->enable_high)
+-			cfg.ena_gpio_flags |= GPIOF_OUT_INIT_LOW;
+-		else
+-			cfg.ena_gpio_flags |= GPIOF_OUT_INIT_HIGH;
++	/*
++	 * The signal will be inverted by the GPIO core if flagged so in the
++	 * decriptor.
++	 */
++	if (config->enabled_at_boot)
++		gflags = GPIOD_OUT_HIGH | GPIOD_FLAGS_BIT_NONEXCLUSIVE;
++	else
++		gflags = GPIOD_OUT_LOW | GPIOD_FLAGS_BIT_NONEXCLUSIVE;
++
++	cfg.ena_gpiod = gpiod_get_optional(&pdev->dev, "enable", gflags);
++	if (IS_ERR(cfg.ena_gpiod)) {
++		ret = PTR_ERR(cfg.ena_gpiod);
++		goto err_memstate;
+ 	}
+ 
+ 	drvdata->dev = regulator_register(&drvdata->desc, &cfg);
+@@ -370,10 +337,6 @@ static int gpio_regulator_probe(struct platform_device *pdev)
+ 
+ err_memstate:
+ 	kfree(drvdata->states);
+-err_stategpio:
+-	gpio_free_array(drvdata->gpios, drvdata->nr_gpios);
+-err_memgpio:
+-	kfree(drvdata->gpios);
+ err_name:
+ 	kfree(drvdata->desc.name);
+ 	return ret;
+@@ -384,12 +347,7 @@ static int gpio_regulator_remove(struct platform_device *pdev)
+ 	struct gpio_regulator_data *drvdata = platform_get_drvdata(pdev);
+ 
+ 	regulator_unregister(drvdata->dev);
+-
+-	gpio_free_array(drvdata->gpios, drvdata->nr_gpios);
+-
+ 	kfree(drvdata->states);
+-	kfree(drvdata->gpios);
+-
+ 	kfree(drvdata->desc.name);
+ 
+ 	return 0;
+diff --git a/include/linux/regulator/gpio-regulator.h b/include/linux/regulator/gpio-regulator.h
+index 19fbd267406d..49c407afb944 100644
+--- a/include/linux/regulator/gpio-regulator.h
++++ b/include/linux/regulator/gpio-regulator.h
+@@ -21,6 +21,8 @@
+ #ifndef __REGULATOR_GPIO_H
+ #define __REGULATOR_GPIO_H
+ 
++#include <linux/gpio/consumer.h>
++
+ struct regulator_init_data;
+ 
+ enum regulator_type;
+@@ -53,9 +55,9 @@ struct gpio_regulator_state {
+  *			This is used to keep the regulator at
+  *			the default state
+  * @startup_delay:	Start-up time in microseconds
+- * @gpios:		Array containing the gpios needed to control
+- *			the setting of the regulator
+- * @nr_gpios:		Number of gpios
++ * @gflags:		Array of GPIO configuration flags for initial
++ *			states
++ * @ngpios:		Number of GPIOs and configurations available
+  * @states:		Array of gpio_regulator_state entries describing
+  *			the gpio state for specific voltages
+  * @nr_states:		Number of states available
+@@ -74,8 +76,8 @@ struct gpio_regulator_config {
+ 	unsigned enabled_at_boot:1;
+ 	unsigned startup_delay;
+ 
+-	struct gpio *gpios;
+-	int nr_gpios;
++	enum gpiod_flags *gflags;
++	int ngpios;
+ 
+ 	struct gpio_regulator_state *states;
+ 	int nr_states;
+-------------------------------------------------------------------------------
 
+
+Git bisection log:
+
+-------------------------------------------------------------------------------
+git bisect start
+# good: [1c7fc5cbc33980acd13d668f1c8f0313d6ae9fd8] Linux 5.0-rc2
+git bisect good 1c7fc5cbc33980acd13d668f1c8f0313d6ae9fd8
+# bad: [61b67608c6b90e8a2abde5be31bb181f56849927] Merge branch 'regulator-5.1' into regulator-next
+git bisect bad 61b67608c6b90e8a2abde5be31bb181f56849927
+# bad: [fe665efe6554eb80ff301ba9765d497f5f24abb6] regulator: gpio: Convert to use descriptors
+git bisect bad fe665efe6554eb80ff301ba9765d497f5f24abb6
+# good: [08f0b14adc7c4fd5ef7ab2f4b7a62ed1b8216bbb] regulator: hi655x: Removed unused ctrl_regs field from struct hi655x_regulator
+git bisect good 08f0b14adc7c4fd5ef7ab2f4b7a62ed1b8216bbb
+# good: [67cc7ca316c4167cc5aca54b7f63a55de356d976] regulator: max14577: Remove redundant MODULE_ALIAS
+git bisect good 67cc7ca316c4167cc5aca54b7f63a55de356d976
+# good: [f01a7beb6791f1c419424c1a6958b7d0a289c974] regulator: act8865: Fix act8600_sudcdc_voltage_ranges setting
+git bisect good f01a7beb6791f1c419424c1a6958b7d0a289c974
+# first bad commit: [fe665efe6554eb80ff301ba9765d497f5f24abb6] regulator: gpio: Convert to use descriptors
+-------------------------------------------------------------------------------
 
 _______________________________________________
 linux-arm-kernel mailing list
