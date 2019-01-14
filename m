@@ -4,21 +4,21 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 39667C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 13:43:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 16741C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 13:43:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0670F20657
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 13:43:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CB77A206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 13:43:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BodKyYNa";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="qQP2gQhK";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="az+c5PAy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0670F20657
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TkbAL11q";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="mx/B6vsF";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="oQwcW9+v"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CB77A206B7
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,76 +27,76 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SxUpuhyQM4Dx/79rKXgYB6lD1jX9qRVGykudLcXtJW4=; b=BodKyYNatr4fVI
-	xSXPNk8MJwajoToGLKMsH9uqMuEoA9MSkGAqudZZETfdxxClZb8bc4iBkOmVIurVePwNsK/xNQtpd
-	IxomBaVaFbVp48ZnkO2xrl/k8duzJNOJhL6wEokEap/5D9j6iqLOxPgqRMWy9FJnwyOMLFw0dNruF
-	5Cr3xHROp4vgBfHW2JkNJV2aGgmy8c5hQQaRHi6zwCDxGPaCtNClQlOvPMiOlWLRcsOn0L7q6fHx9
-	sP8P9mKzHcOhLo2zTjezRW0C7UxCGCYWqpU5aJfCWwRg23hE/pz4HwWx88hhUBYE8QD/giWAdIzxi
-	UBt64es262CfIfOLGqFQ==;
+	List-Owner; bh=8E/3SiGpFWbQfS7gG+VYGm8KyVBKClU+nHjLt71iXOQ=; b=TkbAL11qmt0s4x
+	t3ARBO9fM9DPA+G2G489zwfkjIBdbiWPxNQdk9wUGsvPwONBfHFHnOtfOkPb7C+aDge0echra5ZrB
+	akbRJM4yM0npuaYrXx85Us8dBWWEeUi4GxllfEHYAyPP1CR0rS0mNmVXck1H6xHrZOqpn2tNdF464
+	/Db0htbexOg7HzSPqVH9rhEiJYBy1KDlB1BwdbUPUM+3NqAu2INlSuU86MD1yZY2A3X+eUD5ZLJ14
+	5+s4wAvEqSphLzapO3IVo8hjkKyeSZJC+zQIOT00j2s1etaow50ils1wUuBi0eEzzL/CgicnqRjCA
+	SQXumDILkluBrQo89PEw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj2WP-0006Pz-3m; Mon, 14 Jan 2019 13:43:21 +0000
+	id 1gj2We-0006fw-5P; Mon, 14 Jan 2019 13:43:36 +0000
 Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj2WC-0005wQ-Og
- for linux-arm-kernel@bombadil.infradead.org; Mon, 14 Jan 2019 13:43:08 +0000
+ id 1gj2WE-00065o-Ew
+ for linux-arm-kernel@bombadil.infradead.org; Mon, 14 Jan 2019 13:43:10 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=infradead.org; s=casper.20170209; h=Content-Type:MIME-Version:References:
  In-Reply-To:Message-ID:Date:Subject:CC:To:From:Sender:Reply-To:
  Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
  Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
  List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=JBZ+KApRI2tD19Gjs/0efSSSLgbMPMBQuRhTfDhOm2w=; b=qQP2gQhKOrORVUyE78j8xVZsy
- dBnO+2TSWBo917LHysaT0oVSKaOldoKXIW0J0rZyoTfwY4nSherSxQuZ5j3Jf7lZ+lA3f0ItdRNVb
- DowhEGpZbCaASEd9SO+2AQ3EOy07egU58ZNwRreuiC3E8MZM6tWcc81BvijHSDrqlCgHbngOGdXDD
- hr6Gx+g+bailjfdhaDlAtORjS9pjGWKwzjQbxsaAj1MDbQkDB96rfhoGAMj96VPIRIvxVh0wyn7Ln
- kAUodsREcrpFsWTgDYUYApNike03jIO4koNPgtngajizmgUqBO0eVwfSMAnFntCUJpgCcJE374zaz
- ijTeIe9zA==;
+ bh=GogJmhPjCHQln5mVKUVQZbQ+wSVFSwsYqqaCZro7fL4=; b=mx/B6vsFP0CVMH4WcMh2Ixky3
+ e0ZS348h0mwRs3bz7TubcAeZIyoGRYLOLJIT0/l+56TK48n/kVRMwJEFTgjs/3tc/eJsTPTzre3Uv
+ S80/OkM+Mk6RJgA9+TCfBm/MuQfWe1omP8tSJKHY1YJPuUrZDC5nWY85l1Hj3ffusMd7vAmWIaN3C
+ 5HhdJ2Q2DMR+Mk6IjM56IxnKiGnA7mw3mvPi2X7uGUXUgeL+4jzaZPZxJ8+jdYNF4Gsw6NUhwxVM9
+ tTbADLj/JWnBaemf8Wn+YZqBWL0ArZ1nKDyRxfOQ7Iu9GkAE3v3G+laQgIJFb6n1E0LYqaEhQfrnH
+ R6+X89EJg==;
 Received: from fllv0016.ext.ti.com ([198.47.19.142])
  by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj2Fz-0000oO-7I
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 13:26:25 +0000
-Received: from fllv0034.itg.ti.com ([10.64.40.246])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0EDQEa8098245;
- Mon, 14 Jan 2019 07:26:14 -0600
+ id 1gj2Fk-0000mk-53
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 13:26:10 +0000
+Received: from fllv0035.itg.ti.com ([10.64.41.0])
+ by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0EDPs7b098170;
+ Mon, 14 Jan 2019 07:25:54 -0600
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1547472374;
- bh=JBZ+KApRI2tD19Gjs/0efSSSLgbMPMBQuRhTfDhOm2w=;
+ s=ti-com-17Q1; t=1547472354;
+ bh=GogJmhPjCHQln5mVKUVQZbQ+wSVFSwsYqqaCZro7fL4=;
  h=From:To:CC:Subject:Date:In-Reply-To:References;
- b=az+c5PAyuQYI/R4OJ6Yb4NImGUbk5jupD15MptWEu+9jq8Vjepl8fvI5GhZ1VDFtN
- 0JBWxlxcCdNaFAo0lsw1aXpSFqGOMvp4NY2uqZGX2+fQHS3qFXPyDTuI4BO1JRlt9B
- ieAwuUla1SUZN6P/xy1KzbzAtIDHBP37WeZD57bc=
-Received: from DFLE115.ent.ti.com (dfle115.ent.ti.com [10.64.6.36])
- by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0EDQExh057326
+ b=oQwcW9+vGGXoQFzkFFMkyS+/zrvRPAh6e8C6iKuoM321++ugdV9tsIdhwMx4bUefT
+ q2c6YRMMK5tmUormImD1GnWa5OSED4Q1P9ROShpg0uhaRBPXB2zI1b+ETJyqCPIlw0
+ eOOzcDA/5QjxHbYmskQxV04UEJWa8F7ohOM13sac=
+Received: from DLEE109.ent.ti.com (dlee109.ent.ti.com [157.170.170.41])
+ by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0EDPsSB088982
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Mon, 14 Jan 2019 07:26:14 -0600
-Received: from DFLE104.ent.ti.com (10.64.6.25) by DFLE115.ent.ti.com
- (10.64.6.36) with Microsoft SMTP Server (version=TLS1_2,
+ Mon, 14 Jan 2019 07:25:54 -0600
+Received: from DLEE100.ent.ti.com (157.170.170.30) by DLEE109.ent.ti.com
+ (157.170.170.41) with Microsoft SMTP Server (version=TLS1_2,
  cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Mon, 14
- Jan 2019 07:26:13 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE104.ent.ti.com
- (10.64.6.25) with Microsoft SMTP Server (version=TLS1_0,
+ Jan 2019 07:25:54 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE100.ent.ti.com
+ (157.170.170.30) with Microsoft SMTP Server (version=TLS1_0,
  cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Mon, 14 Jan 2019 07:26:12 -0600
+ Mon, 14 Jan 2019 07:25:54 -0600
 Received: from a0393678ub.india.ti.com (ileax41-snat.itg.ti.com
  [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0EDOoWc028516;
- Mon, 14 Jan 2019 07:26:09 -0600
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0EDOoWY028516;
+ Mon, 14 Jan 2019 07:25:49 -0600
 From: Kishon Vijay Abraham I <kishon@ti.com>
 To: Gustavo Pimentel <gustavo.pimentel@synopsys.com>, Rob Herring
  <robh+dt@kernel.org>, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Subject: [PATCH 16/24] PCI: endpoint: Add support to allocate aligned buffers
- to be mapped in BARs
-Date: Mon, 14 Jan 2019 18:54:16 +0530
-Message-ID: <20190114132424.6445-17-kishon@ti.com>
+Subject: [PATCH 12/24] PCI: keystone: Prevent ARM32 specific code to be
+ compiled for ARM64
+Date: Mon, 14 Jan 2019 18:54:12 +0530
+Message-ID: <20190114132424.6445-13-kishon@ti.com>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20190114132424.6445-1-kishon@ti.com>
 References: <20190114132424.6445-1-kishon@ti.com>
 MIME-Version: 1.0
 X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_132623_505517_6897F21B 
-X-CRM114-Status: GOOD (  18.33  )
+X-CRM114-CacheID: sfid-20190114_132608_417338_6C3100FB 
+X-CRM114-Status: GOOD (  10.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -121,115 +121,50 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Modify pci_epf_alloc_space API to take alignment size as argument in
-order to argument in order to allocate aligned buffers to be mapped to
-BARs.
-
-Add 'align' parameter to epc_features which can be used by platform
-drivers to specifiy the BAR allocation alignment requirements and use
-this while invoking pci_epf_alloc_space.
-
-This is mainly required for Synopsys Designware PCIe core which masks
-the lower bits based on the BAR size (See "I/O and MEM Match Modes"
-section in DesignWare Cores PCI Express Controller Databook version
-4.90a).
+hook_fault_code is an ARM32 specific API for hooking into data abort.
+Since pci-keystone.c will be used for AM65X platforms which is an
+ARM64 platform, allow hook_fault_code to be compiled only for ARM32.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/pci/endpoint/functions/pci-epf-test.c |  5 +++--
- drivers/pci/endpoint/pci-epf-core.c           | 10 ++++++++--
- include/linux/pci-epc.h                       |  2 ++
- include/linux/pci-epf.h                       |  3 ++-
- 4 files changed, 15 insertions(+), 5 deletions(-)
+ drivers/pci/controller/dwc/pci-keystone.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/pci/endpoint/functions/pci-epf-test.c b/drivers/pci/endpoint/functions/pci-epf-test.c
-index 2e0fb231ce0c..faffae2551ed 100644
---- a/drivers/pci/endpoint/functions/pci-epf-test.c
-+++ b/drivers/pci/endpoint/functions/pci-epf-test.c
-@@ -438,7 +438,7 @@ static int pci_epf_test_alloc_space(struct pci_epf *epf)
- 	epc_features = epf_test->epc_features;
+diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
+index d1ecf826dfe8..9d7cedd96505 100644
+--- a/drivers/pci/controller/dwc/pci-keystone.c
++++ b/drivers/pci/controller/dwc/pci-keystone.c
+@@ -693,6 +693,7 @@ static int ks_pcie_config_legacy_irq(struct keystone_pcie *ks_pcie)
+ 	return ret;
+ }
  
- 	base = pci_epf_alloc_space(epf, sizeof(struct pci_epf_test_reg),
--				   test_reg_bar);
-+				   test_reg_bar, epc_features->align);
- 	if (!base) {
- 		dev_err(dev, "Failed to allocated register space\n");
- 		return -ENOMEM;
-@@ -453,7 +453,8 @@ static int pci_epf_test_alloc_space(struct pci_epf *epf)
- 		if (!!(epc_features->reserved_bar & (1 << bar)))
- 			continue;
++#ifdef CONFIG_ARM
+ /*
+  * When a PCI device does not exist during config cycles, keystone host gets a
+  * bus error instead of returning 0xffffffff. This handler always returns 0
+@@ -712,6 +713,7 @@ static int ks_pcie_fault(unsigned long addr, unsigned int fsr,
  
--		base = pci_epf_alloc_space(epf, bar_size[bar], bar);
-+		base = pci_epf_alloc_space(epf, bar_size[bar], bar,
-+					   epc_features->align);
- 		if (!base)
- 			dev_err(dev, "Failed to allocate space for BAR%d\n",
- 				bar);
-diff --git a/drivers/pci/endpoint/pci-epf-core.c b/drivers/pci/endpoint/pci-epf-core.c
-index 8bfdcd291196..fb1306de8f40 100644
---- a/drivers/pci/endpoint/pci-epf-core.c
-+++ b/drivers/pci/endpoint/pci-epf-core.c
-@@ -109,10 +109,12 @@ EXPORT_SYMBOL_GPL(pci_epf_free_space);
-  * pci_epf_alloc_space() - allocate memory for the PCI EPF register space
-  * @size: the size of the memory that has to be allocated
-  * @bar: the BAR number corresponding to the allocated register space
-+ * @align: alignment size for the allocation region
-  *
-  * Invoke to allocate memory for the PCI EPF register space.
-  */
--void *pci_epf_alloc_space(struct pci_epf *epf, size_t size, enum pci_barno bar)
-+void *pci_epf_alloc_space(struct pci_epf *epf, size_t size, enum pci_barno bar,
-+			  size_t align)
+ 	return 0;
+ }
++#endif
+ 
+ static int __init ks_pcie_init_id(struct keystone_pcie *ks_pcie)
  {
- 	void *space;
- 	struct device *dev = epf->epc->dev.parent;
-@@ -120,7 +122,11 @@ void *pci_epf_alloc_space(struct pci_epf *epf, size_t size, enum pci_barno bar)
+@@ -761,12 +763,14 @@ static int __init ks_pcie_host_init(struct pcie_port *pp)
+ 	if (ret < 0)
+ 		return ret;
  
- 	if (size < 128)
- 		size = 128;
--	size = roundup_pow_of_two(size);
-+
-+	if (align)
-+		size = ALIGN(size, align);
-+	else
-+		size = roundup_pow_of_two(size);
++#ifdef CONFIG_ARM
+ 	/*
+ 	 * PCIe access errors that result into OCP errors are caught by ARM as
+ 	 * "External aborts"
+ 	 */
+ 	hook_fault_code(17, ks_pcie_fault, SIGBUS, 0,
+ 			"Asynchronous external abort");
++#endif
  
- 	space = dma_alloc_coherent(dev, size, &phys_addr, GFP_KERNEL);
- 	if (!space) {
-diff --git a/include/linux/pci-epc.h b/include/linux/pci-epc.h
-index c3ffa3917f88..f641badc2c61 100644
---- a/include/linux/pci-epc.h
-+++ b/include/linux/pci-epc.h
-@@ -109,6 +109,7 @@ struct pci_epc {
-  * @reserved_bar: bitmap to indicate reserved BAR unavailable to function driver
-  * @bar_fixed_64bit: bitmap to indicate fixed 64bit BARs
-  * @bar_fixed_size: Array specifying the size supported by each BAR
-+ * @align: alignment size required for BAR buffer allocation
-  */
- struct pci_epc_features {
- 	unsigned int	linkup_notifier : 1;
-@@ -117,6 +118,7 @@ struct pci_epc_features {
- 	u8	reserved_bar;
- 	u8	bar_fixed_64bit;
- 	u64	bar_fixed_size[BAR_5 + 1];
-+	size_t	align;
- };
- 
- #define to_pci_epc(device) container_of((device), struct pci_epc, dev)
-diff --git a/include/linux/pci-epf.h b/include/linux/pci-epf.h
-index ec02f58758c8..2d6f07556682 100644
---- a/include/linux/pci-epf.h
-+++ b/include/linux/pci-epf.h
-@@ -149,7 +149,8 @@ void pci_epf_destroy(struct pci_epf *epf);
- int __pci_epf_register_driver(struct pci_epf_driver *driver,
- 			      struct module *owner);
- void pci_epf_unregister_driver(struct pci_epf_driver *driver);
--void *pci_epf_alloc_space(struct pci_epf *epf, size_t size, enum pci_barno bar);
-+void *pci_epf_alloc_space(struct pci_epf *epf, size_t size, enum pci_barno bar,
-+			  size_t align);
- void pci_epf_free_space(struct pci_epf *epf, void *addr, enum pci_barno bar);
- int pci_epf_bind(struct pci_epf *epf);
- void pci_epf_unbind(struct pci_epf *epf);
+ 	ks_pcie_start_link(pci);
+ 	dw_pcie_wait_for_link(pci);
 -- 
 2.17.1
 
