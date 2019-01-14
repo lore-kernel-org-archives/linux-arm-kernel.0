@@ -2,21 +2,23 @@ Return-Path: <SRS0=baBj=PW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F0082C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 16:14:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0D425C43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 16:17:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B044520873
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 16:14:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D286E20989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 16:17:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eLv4R/dO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B044520873
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JmuegKgJ";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="vdRyWEq7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D286E20989
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,41 +26,125 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+kwqwDqQ+f1KA1gHTknxrglXS/Mbyq2DyclRTGo0pGk=; b=eLv4R/dO7tjFHw
-	ROIApdR0cqbWQ8k/cx0mV+IwqkAh0uQ/0+GMgZE/HEElrAogdSkR7VnvtyRwUk2wZgX24zy7k78gH
-	Pc31y+mMI3oRYJMKf/Byl2vwnSUfSoQDauqnVrJ9k7IfGFasPGoPmtJKh9Hf90XIgvXeG3Bd/ntvf
-	P6Bo1d1JeLrMG5xCJvdc4QQSVx1TGK7TnNXYTYro/15EsPYRt/KNJguT3njcu9hAD76dwe82CltpO
-	3HSG3f5wA9JcVEV7XrJE+DcjuRRH4LohFQBi1x/h5tgDfZWZvt7LXEm5qGK2iKknyiSn7+DctXXg0
-	Oo/Hw9Ivoc8eWzyXLdyA==;
+	List-Owner; bh=OeUJw6q/gw17K6jL/ei0zpew1UZ42sfKV7d1bHJIgrg=; b=JmuegKgJc0oR4p
+	N/Ob2aa+uEorZ2vIUMBy+DlYRpPJszwyyVf9xCv3K1ea49iFVFSZX4Kvh9bMGIcWezNaKYoCiU6Ub
+	gdSRu0durMjqLIpYJepTP5KIOpJaKu2H92FI5xhK1sGU9gQ8l0nANhFV8dSy/DIFGGrFY8W+YYUc4
+	9/XuDUPJTGrSBfauKtz4Q7apqDE1A419xlBnq3ggz2JV6MWtVHqCcqYdQCmNKUYvqJoRK4mmLGYy1
+	3OdUJLm1aTft0GVX7Tbrxtfrx9EPc/VFU7l5bJ5AeDvDR8NKrTF+20HkfctSGB2WlKfPOSzDLHBje
+	2bD56pOOAPiWuRAoP1dg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj4sC-00005V-G5; Mon, 14 Jan 2019 16:14:00 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj4qz-0007Rc-16
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 16:13:23 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1F84C15AB;
- Mon, 14 Jan 2019 08:12:43 -0800 (PST)
-Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 089CA3F5BD;
- Mon, 14 Jan 2019 08:12:40 -0800 (PST)
-Subject: Re: [PATCH v8 01/26] arm64: Fix HCR.TGE status for NMI contexts
-To: Catalin Marinas <catalin.marinas@arm.com>
-References: <1546956464-48825-1-git-send-email-julien.thierry@arm.com>
- <1546956464-48825-2-git-send-email-julien.thierry@arm.com>
- <20190114155634.GB84430@arrakis.emea.arm.com>
-From: Julien Thierry <julien.thierry@arm.com>
-Message-ID: <229aade3-5bb3-aad4-bd9a-d6220db836c0@arm.com>
-Date: Mon, 14 Jan 2019 16:12:39 +0000
+	id 1gj4vk-0001qY-Uh; Mon, 14 Jan 2019 16:17:40 +0000
+Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gj4vf-0001og-3L
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 16:17:36 +0000
+Received: by mail-wm1-x342.google.com with SMTP id a62so131579wmh.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 14 Jan 2019 08:17:34 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=subject:to:cc:references:from:openpgp:autocrypt:organization
+ :message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=hDPJLjGBthVQ4DdFYqh9h+HDOS6KLaQYF9loO/RXddg=;
+ b=vdRyWEq7pMlPm4eYTffAf5hdsKCHGtBQMaGcwd/VrZHsE2jQ3Vnuh3TYqLTlAeISfL
+ veNuvDpPAGXYScn0LD7/17XjPh3Xk6SW8B7l+586kHQp9MmYYMTGPI2MJZn+ta+wmR87
+ G2J2+MJfokf91+6wpT/StHojN73XZK3eatrQ1mf2L+HiEZhD4mGuQ0T4xp2vNvAHvvqh
+ VSM36Kv/OG7e33gXxvnoRIEcL5q/n785yhZHPYZCGzyJfnsWRbBiB+Doi8bX0iTdaa9A
+ bM/CxFS32euzf4d/jEL47H1+gEEbNMaSyf/ZriDLgygTiR4dsUZBRe6H8jp4mFz7nGmo
+ FP4w==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
+ :organization:message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=hDPJLjGBthVQ4DdFYqh9h+HDOS6KLaQYF9loO/RXddg=;
+ b=tg12xiMOlyMFzuoNOWVqc55mFNC+P+u48iVlfj2CjN+9njc44GLzVvF5WLkvt5NVnY
+ e4HTrXNvlbsXYOImBj9SHUc/62UIPlAZFDAXc2jAUp8VEWBYxSK8QB5ZZTd4mSqFcXBZ
+ vcHkvfjrtuxBn9QVsoLYU68CkMZL1n5o2MskRUKax39OghklpB3yAquySMMyejVBGFF0
+ nLX/SzSTGHsao1gWAB8YMeyhik1koWUdRgCa9TfgMflIbbgo8g9zvnRtdc7gHMww9wEk
+ h/WCAthXH5XWZY3J5p4kmOeBFqZpDRI/gimRQ/Qp3zBOmGUFjConWEt0wxiZEEBt8yU9
+ iHHQ==
+X-Gm-Message-State: AJcUukfOj9yrBJporuQSiDJ7kBjmzSCrZwysqR+oPUExtJZ91Viisj64
+ t1snjS3xpeVw+B2dZ5VHpssqOg==
+X-Google-Smtp-Source: ALg8bN7vdLgEhi0uUIILFFPt70H1fD1WsvCfjObWF/lapGF7nmPGQj9dJgyMEKN+ZM/rw6yU9+cMRQ==
+X-Received: by 2002:a1c:4c10:: with SMTP id z16mr12901155wmf.117.1547482653120; 
+ Mon, 14 Jan 2019 08:17:33 -0800 (PST)
+Received: from [10.1.2.12] (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr.
+ [90.63.244.31])
+ by smtp.gmail.com with ESMTPSA id v16sm58420893wrs.75.2019.01.14.08.17.31
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 14 Jan 2019 08:17:32 -0800 (PST)
+Subject: Re: [PatchV2 2/2] ARM64: dts: meson-gxbb-odroidc2: Fix usb phy reset
+ warning
+To: Anand Moon <linux.amoon@gmail.com>, devicetree@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-amlogic@lists.infradead.org,
+ linux-kernel@vger.kernel.org
+References: <20190113153022.5040-1-linux.amoon@gmail.com>
+ <20190113153022.5040-2-linux.amoon@gmail.com>
+From: Neil Armstrong <narmstrong@baylibre.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=narmstrong@baylibre.com; prefer-encrypt=mutual; keydata=
+ mQENBE1ZBs8BCAD78xVLsXPwV/2qQx2FaO/7mhWL0Qodw8UcQJnkrWmgTFRobtTWxuRx8WWP
+ GTjuhvbleoQ5Cxjr+v+1ARGCH46MxFP5DwauzPekwJUD5QKZlaw/bURTLmS2id5wWi3lqVH4
+ BVF2WzvGyyeV1o4RTCYDnZ9VLLylJ9bneEaIs/7cjCEbipGGFlfIML3sfqnIvMAxIMZrvcl9
+ qPV2k+KQ7q+aXavU5W+yLNn7QtXUB530Zlk/d2ETgzQ5FLYYnUDAaRl+8JUTjc0CNOTpCeik
+ 80TZcE6f8M76Xa6yU8VcNko94Ck7iB4vj70q76P/J7kt98hklrr85/3NU3oti3nrIHmHABEB
+ AAG0KE5laWwgQXJtc3Ryb25nIDxuYXJtc3Ryb25nQGJheWxpYnJlLmNvbT6JATsEEwEKACUC
+ GyMGCwkIBwMCBhUIAgkKCwQWAgMBAh4BAheABQJXDO2CAhkBAAoJEBaat7Gkz/iubGIH/iyk
+ RqvgB62oKOFlgOTYCMkYpm2aAOZZLf6VKHKc7DoVwuUkjHfIRXdslbrxi4pk5VKU6ZP9AKsN
+ NtMZntB8WrBTtkAZfZbTF7850uwd3eU5cN/7N1Q6g0JQihE7w4GlIkEpQ8vwSg5W7hkx3yQ6
+ 2YzrUZh/b7QThXbNZ7xOeSEms014QXazx8+txR7jrGF3dYxBsCkotO/8DNtZ1R+aUvRfpKg5
+ ZgABTC0LmAQnuUUf2PHcKFAHZo5KrdO+tyfL+LgTUXIXkK+tenkLsAJ0cagz1EZ5gntuheLD
+ YJuzS4zN+1Asmb9kVKxhjSQOcIh6g2tw7vaYJgL/OzJtZi6JlIW5AQ0ETVkGzwEIALyKDN/O
+ GURaHBVzwjgYq+ZtifvekdrSNl8TIDH8g1xicBYpQTbPn6bbSZbdvfeQPNCcD4/EhXZuhQXM
+ coJsQQQnO4vwVULmPGgtGf8PVc7dxKOeta+qUh6+SRh3vIcAUFHDT3f/Zdspz+e2E0hPV2hi
+ SvICLk11qO6cyJE13zeNFoeY3ggrKY+IzbFomIZY4yG6xI99NIPEVE9lNBXBKIlewIyVlkOa
+ YvJWSV+p5gdJXOvScNN1epm5YHmf9aE2ZjnqZGoMMtsyw18YoX9BqMFInxqYQQ3j/HpVgTSv
+ mo5ea5qQDDUaCsaTf8UeDcwYOtgI8iL4oHcsGtUXoUk33HEAEQEAAYkBHwQYAQIACQUCTVkG
+ zwIbDAAKCRAWmrexpM/4rrXiB/sGbkQ6itMrAIfnM7IbRuiSZS1unlySUVYu3SD6YBYnNi3G
+ 5EpbwfBNuT3H8//rVvtOFK4OD8cRYkxXRQmTvqa33eDIHu/zr1HMKErm+2SD6PO9umRef8V8
+ 2o2oaCLvf4WeIssFjwB0b6a12opuRP7yo3E3gTCSKmbUuLv1CtxKQF+fUV1cVaTPMyT25Od+
+ RC1K+iOR0F54oUJvJeq7fUzbn/KdlhA8XPGzwGRy4zcsPWvwnXgfe5tk680fEKZVwOZKIEuJ
+ C3v+/yZpQzDvGYJvbyix0lHnrCzq43WefRHI5XTTQbM0WUIBIcGmq38+OgUsMYu4NzLu7uZF
+ Acmp6h8guQINBFYnf6QBEADQ+wBYa+X2n/xIQz/RUoGHf84Jm+yTqRT43t7sO48/cBW9vAn9
+ GNwnJ3HRJWKATW0ZXrCr40ES/JqM1fUTfiFDB3VMdWpEfwOAT1zXS+0rX8yljgsWR1UvqyEP
+ 3xN0M/40Zk+rdmZKaZS8VQaXbveaiWMEmY7sBV3QvgOzB7UF2It1HwoCon5Y+PvyE3CguhBd
+ 9iq5iEampkMIkbA3FFCpQFI5Ai3BywkLzbA3ZtnMXR8Qt9gFZtyXvFQrB+/6hDzEPnBGZOOx
+ zkd/iIX59SxBuS38LMlhPPycbFNmtauOC0DNpXCv9ACgC9tFw3exER/xQgSpDVc4vrL2Cacr
+ wmQp1k9E0W+9pk/l8S1jcHx03hgCxPtQLOIyEu9iIJb27TjcXNjiInd7Uea195NldIrndD+x
+ 58/yU3X70qVY+eWbqzpdlwF1KRm6uV0ZOQhEhbi0FfKKgsYFgBIBchGqSOBsCbL35f9hK/JC
+ 6LnGDtSHeJs+jd9/qJj4WqF3x8i0sncQ/gszSajdhnWrxraG3b7/9ldMLpKo/OoihfLaCxtv
+ xYmtw8TGhlMaiOxjDrohmY1z7f3rf6njskoIXUO0nabun1nPAiV1dpjleg60s3OmVQeEpr3a
+ K7gR1ljkemJzM9NUoRROPaT7nMlNYQL+IwuthJd6XQqwzp1jRTGG26J97wARAQABiQM+BBgB
+ AgAJBQJWJ3+kAhsCAikJEBaat7Gkz/iuwV0gBBkBAgAGBQJWJ3+kAAoJEHfc29rIyEnRk6MQ
+ AJDo0nxsadLpYB26FALZsWlN74rnFXth5dQVQ7SkipmyFWZhFL8fQ9OiIoxWhM6rSg9+C1w+
+ n45eByMg2b8H3mmQmyWztdI95OxSREKwbaXVapCcZnv52JRjlc3DoiiHqTZML5x1Z7lQ1T3F
+ 8o9sKrbFO1WQw1+Nc91+MU0MGN0jtfZ0Tvn/ouEZrSXCE4K3oDGtj3AdC764yZVq6CPigCgs
+ 6Ex80k6QlzCdVP3RKsnPO2xQXXPgyJPJlpD8bHHHW7OLfoR9DaBNympfcbQJeekQrTvyoASw
+ EOTPKE6CVWrcQIztUp0WFTdRGgMK0cZB3Xfe6sOp24PQTHAKGtjTHNP/THomkH24Fum9K3iM
+ /4Wh4V2eqGEgpdeSp5K+LdaNyNgaqzMOtt4HYk86LYLSHfFXywdlbGrY9+TqiJ+ZVW4trmui
+ NIJCOku8SYansq34QzYM0x3UFRwff+45zNBEVzctSnremg1mVgrzOfXU8rt+4N1b2MxorPF8
+ 619aCwVP7U16qNSBaqiAJr4e5SNEnoAq18+1Gp8QsFG0ARY8xp+qaKBByWES7lRi3QbqAKZf
+ yOHS6gmYo9gBmuAhc65/VtHMJtxwjpUeN4Bcs9HUpDMDVHdfeRa73wM+wY5potfQ5zkSp0Jp
+ bxnv/cRBH6+c43stTffprd//4Hgz+nJcCgZKtCYIAPkUxABC85ID2CidzbraErVACmRoizhT
+ KR2OiqSLW2x4xdmSiFNcIWkWJB6Qdri0Fzs2dHe8etD1HYaht1ZhZ810s7QOL7JwypO8dscN
+ KTEkyoTGn6cWj0CX+PeP4xp8AR8ot4d0BhtUY34UPzjE1/xyrQFAdnLd0PP4wXxdIUuRs0+n
+ WLY9Aou/vC1LAdlaGsoTVzJ2gX4fkKQIWhX0WVk41BSFeDKQ3RQ2pnuzwedLO94Bf6X0G48O
+ VsbXrP9BZ6snXyHfebPnno/te5XRqZTL9aJOytB/1iUna+1MAwBxGFPvqeEUUyT+gx1l3Acl
+ ZaTUOEkgIor5losDrePdPgE=
+Organization: Baylibre
+Message-ID: <6223f912-156a-342c-07c3-a0b2a6229b08@baylibre.com>
+Date: Mon, 14 Jan 2019 17:17:31 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20190114155634.GB84430@arrakis.emea.arm.com>
+In-Reply-To: <20190113153022.5040-2-linux.amoon@gmail.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_081245_334276_FFA355B1 
-X-CRM114-Status: GOOD (  12.53  )
+X-CRM114-CacheID: sfid-20190114_081735_144516_7EC7885E 
+X-CRM114-Status: GOOD (  17.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,45 +156,77 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, linux-arch@vger.kernel.org,
- daniel.thompson@linaro.org, Arnd Bergmann <arnd@arndb.de>,
- marc.zyngier@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
- stable@vger.kernel.org, christoffer.dall@arm.com, james.morse@arm.com,
- joel@joelfernandes.org, linux-arm-kernel@lists.infradead.org
+Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ Kevin Hilman <khilman@baylibre.com>, Rob Herring <robh+dt@kernel.org>,
+ Jerome Brunet <jbrunet@baylibre.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi Anand,
 
-
-On 14/01/2019 15:56, Catalin Marinas wrote:
-> On Tue, Jan 08, 2019 at 02:07:19PM +0000, Julien Thierry wrote:
->> When using VHE, the host needs to clear HCR_EL2.TGE bit in order
->> to interract with guest TLBs, switching from EL2&0 translation regime
->> to EL1&0.
->>
->> However, some non-maskable asynchronous event could happen while TGE is
->> cleared like SDEI. Because of this address translation operations
->> relying on EL2&0 translation regime could fail (tlb invalidation,
->> userspace access, ...).
+On 13/01/2019 16:30, Anand Moon wrote:
+> Add missing vin-supply node 5.0V regulator setting to power
+> to usb ports, changes help fix the usb reset warning.
 > 
-> Why would an NMI context need to access user space? (just curious what
-> breaks exactly without this patch; otherwise it looks fine)
+> [  795.380156] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+> [  798.356073] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+> [  801.331999] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+> [  804.307919] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+> [  807.283844] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+> 
+> Fixes: 5a0803bd5ae (ARM64: dts: meson-gxbb-odroidc2: Enable USB Nodes)
+> Tested-by: Kevin Hilman <khilman@baylibre.com>
+> Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> Cc: Jerome Brunet <jbrunet@baylibre.com>
+> Cc: Neil Armstrong <narmstrong@baylibre.com>
+> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> ---
+> Rebased on Kevin's amlogic/v5.0/fixes branch
+> Changes from patch v1 [0] https://lore.kernel.org/patchwork/patch/1031243/
+> - Split the patch into two part: new patch
+> - Fix the commit message
+> - Added Tested by Kevin Hilman
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> index 25a36d117183..a947b46bfaa8 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> @@ -28,6 +28,13 @@
+>  		reg = <0x0 0x0 0x0 0x80000000>;
+>  	};
+>  
+> +	p5v0: regulator-p5v0 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "P5V0";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +	};
+> +
+>  	usb_otg_pwr: regulator-usb-pwrs {
+>  		compatible = "regulator-fixed";
+>  
+> @@ -36,6 +43,8 @@
+>  		regulator-min-microvolt = <5000000>;
+>  		regulator-max-microvolt = <5000000>;
+>  
+> +		vin-supply = <&p5v0>;
+> +
+>  		gpio = <&gpio_ao GPIOAO_5 GPIO_ACTIVE_HIGH>;
+>  		enable-active-high;
+>  	};
+> 
 
-If I remember correctly, the SDEI interrupt might perform cache
-maintenance with EL2&0 translation regime, but James can probably give
-more detail (or correct me if I'm wrong).
+Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Otherwise, if we decide to use the pseudo NMI for profiling with perf, I
-believe the perf interrupt can access user space (although I'm not
-completely sure whether that might be to record profiling data in
-buffers shared with user space or something else).
+PS: Please add a cover-letter next time !
 
-Thanks,
+Neil
 
--- 
-Julien Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
