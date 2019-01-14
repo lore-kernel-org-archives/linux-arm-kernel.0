@@ -2,133 +2,92 @@ Return-Path: <SRS0=baBj=PW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 88A12C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 12:42:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CF9FAC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 12:57:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 582A120656
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 12:42:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A1E9E20657
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 12:57:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TFwNSTPc";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="WxB/wrsj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 582A120656
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XDhR6VPb";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="g8Uogyfy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A1E9E20657
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
-	Date:Message-ID:From:To:Subject:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tf7iQTEKFTAXq/HpndeqLpL49k+F40ArtSx8eP0MEHY=; b=TFwNSTPc0nzV7f
-	0XmRLd1wiYzEgMrY4uEd3UrpKVkdnuB42to6HVJ8NyAJuNNQ20qd1PhKnK1pamWufpvQfgXV0uuQq
-	fNipOeO5DwGrKJsWjjEwehqoyvj0ud+xCu0o9cUhItmdZRf0TyFAZHySlJ0Zgs3RPI9MGRj3Rv6Tm
-	eXxBNmY68V/3WryIaaz+xZMXYnvRTiBcnn4U8BEy67kVYKlN0qTZD8AqLcVT0sPxamUeUsOFj/efl
-	WN9uBux0jLgvvToObqaxT2AVj1kS3R9eZRV59v5ceVNDjehUePcrZD/R90HeY40pRjzBBj6LrEtv1
-	LVyTNH62D2O7EMjYcGhg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=BWQsUdSHUZfd/N9FZpfeDuCEzdrL3HGgmtBHUco0LiE=; b=XDhR6VPbsEFAeT
+	UhEFBI7KXC9ZumvEwXHEwHNv7iEBcqp9ZmpDzp+wCRel5cAIY6PMO+S2rsviMzy4d9jnzUKeCkVgq
+	RzhNe8n0OvnhCxsgMcLG5PnehXaIDn5J0djuTxh3pN5hM/LWpA7oYO8y+3iczK/LN+iO/x427x43/
+	fvY6dg8FBJRL1j8jCDxPRogAhmc2+78eD166E5PgV9fuEIKrd+YErqkfEbeSimDyn+FQpQePLZh4L
+	wDmaZ0GvD+RlDYeQvcjWecJZeYJUQxqwbxiZ0y/O42JxdA9JtojjZmrl0V8Xy74ZEfLJjpAn14CS+
+	5s96K7dsflNUWEp8PQ4g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj1Zd-00086o-9A; Mon, 14 Jan 2019 12:42:37 +0000
-Received: from mailout1.w1.samsung.com ([210.118.77.11])
+	id 1gj1nc-0005Wf-B2; Mon, 14 Jan 2019 12:57:04 +0000
+Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj1ZV-00086K-UQ
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 12:42:32 +0000
-Received: from eucas1p1.samsung.com (unknown [182.198.249.206])
- by mailout1.w1.samsung.com (KnoxPortal) with ESMTP id
- 20190114124227euoutp01eb168bb6b03bb1fb7adcc967f2be8719~5t4lPdFiH0984509845euoutp01Q
+ id 1gj1nY-0005VY-RU
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 12:57:02 +0000
+Received: by mail-wm1-x343.google.com with SMTP id m1so8807319wml.2
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 14 Jan 2019 12:42:27 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout1.w1.samsung.com
- 20190114124227euoutp01eb168bb6b03bb1fb7adcc967f2be8719~5t4lPdFiH0984509845euoutp01Q
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1547469747;
- bh=JkEUB/1etH5HwCAXK5XQVE51QY576xSQ+oOLRoEdTo4=;
- h=Subject:To:Cc:From:Date:In-Reply-To:References:From;
- b=WxB/wrsjzNm/oPYCYyWojDl04dJdH/qcSBe0q5NXZ+fhCzZkQAjhODUe0E2+5EKEU
- 5ecllJTmSrTr6I8faFf2kUn6aPVEREmFbf3Y57KCpE1m9Vpyy8kDRpH7dZzoop83Tn
- PGDyvDmz0X4LR5Ma/jqkemIISb1dfvcB3kfeXmhw=
-Received: from eusmges3new.samsung.com (unknown [203.254.199.245]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTP id
- 20190114124226eucas1p18c02e40c1d8f2e16dc9b8301b473a9bb~5t4k4zJlz2526725267eucas1p10;
- Mon, 14 Jan 2019 12:42:26 +0000 (GMT)
-Received: from eucas1p2.samsung.com ( [182.198.249.207]) by
- eusmges3new.samsung.com (EUCPMTA) with SMTP id E3.96.04806.2B38C3C5; Mon, 14
- Jan 2019 12:42:26 +0000 (GMT)
-Received: from eusmtrp2.samsung.com (unknown [182.198.249.139]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTPA id
- 20190114124225eucas1p1b6a3be0a59408c78ce17ff2e27665f99~5t4jrTm-12526825268eucas1p1z;
- Mon, 14 Jan 2019 12:42:25 +0000 (GMT)
-Received: from eusmgms2.samsung.com (unknown [182.198.249.180]) by
- eusmtrp2.samsung.com (KnoxPortal) with ESMTP id
- 20190114124225eusmtrp2d17053cb57772f09b8c7dcd061959277~5t4jcf_cZ0469204692eusmtrp2O;
- Mon, 14 Jan 2019 12:42:25 +0000 (GMT)
-X-AuditID: cbfec7f5-367ff700000012c6-f1-5c3c83b28e63
-Received: from eusmtip2.samsung.com ( [203.254.199.222]) by
- eusmgms2.samsung.com (EUCPMTA) with SMTP id C8.0D.04128.1B38C3C5; Mon, 14
- Jan 2019 12:42:25 +0000 (GMT)
-Received: from [106.116.147.30] (unknown [106.116.147.30]) by
- eusmtip2.samsung.com (KnoxPortal) with ESMTPA id
- 20190114124224eusmtip2baec9451d28ae77dfcf4ef3317c0caf8~5t4i0jU620772007720eusmtip2J;
- Mon, 14 Jan 2019 12:42:24 +0000 (GMT)
-Subject: Re: [PATCH 3/3] videobuf2: replace a layering violation with
- dma_map_resource
-To: Christoph Hellwig <hch@lst.de>, Pawel Osciak <pawel@osciak.com>,
- Kyungmin Park <kyungmin.park@samsung.com>, =?UTF-8?Q?Niklas_S=c3=b6derlund?=
- <niklas.soderlund+renesas@ragnatech.se>
-From: Marek Szyprowski <m.szyprowski@samsung.com>
-Message-ID: <6f8892ac-c2aa-10df-c74f-ba032bf75160@samsung.com>
-Date: Mon, 14 Jan 2019 13:42:26 +0100
-User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ Mon, 14 Jan 2019 04:56:58 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=subject:to:cc:references:from:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=eE6TJ5VZ3Nk1FjdARea1smiBFbzx1XYTfg4oJ2JGHJs=;
+ b=g8UogyfyF0r7CuNlezSUf9iYT+RPRjoDO3uSz6mkbnuX//PjptXFIYAVK7rVeOrQ24
+ 5nMTLDJRVxI34R3QTHgPQHZe/r5rYJ1EVouM7l+ZQGaIU2hq9N1IG2uiUdOTLV/EQ0yI
+ RKztBsreD1gDWBPCG0c+aPZIToZ0LEDFqzkGc=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=eE6TJ5VZ3Nk1FjdARea1smiBFbzx1XYTfg4oJ2JGHJs=;
+ b=o7sYqNuD7Qg/oM9oh8H1NeaphrBq3mRuDWxA9CdaVEvZ/qA5og+IlhERX6TNhqIpXt
+ 9CP0lzr++m83OTTnrSZ9/ILc94nm0zYISX1p+IP/TKExgJseQP6pJqMszFEmP/T35SAL
+ lbY05UIQEpMmLzqJYxUiSxK0T62+drG0SRgKvMiEXxlFIKoXq9NRmsXtFWtSoUx7fbwh
+ QKUGWuC27AXNwn3OrZIi+saoIY8PDOSapUzUhAvH263sbaWHaypr/cEndXtdKeilP0Ny
+ RTLL7gwKVyH4q7T86sziK4A5Ir9uiXTO6VM8IqGBfeWTv+0WmSbY/ICZ/Rvx56v69m8W
+ twdw==
+X-Gm-Message-State: AJcUukegUpnHmku+TQH8ofR5VkK2gumCqJ0s33M2CL+B46dAma+MxhDc
+ InIjW5ieeMp0jxsiIzPiOPRn4A==
+X-Google-Smtp-Source: ALg8bN5NhSGY+TVdXYyzaakXfLtjuIvc/XiBQFmC7Emp99x4wNII47joUaHwiYlnjHKyGw4Iw3Eozg==
+X-Received: by 2002:a1c:834c:: with SMTP id f73mr11802641wmd.126.1547470617138; 
+ Mon, 14 Jan 2019 04:56:57 -0800 (PST)
+Received: from [192.168.0.41] (45.70.136.77.rev.sfr.net. [77.136.70.45])
+ by smtp.googlemail.com with ESMTPSA id 129sm45849167wmd.18.2019.01.14.04.56.55
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 14 Jan 2019 04:56:56 -0800 (PST)
+Subject: Re: [PATCH v3 0/2] Allwinner A64 timer workaround
+To: Samuel Holland <samuel@sholland.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon
+ <will.deacon@arm.com>, Maxime Ripard <maxime.ripard@bootlin.com>,
+ Chen-Yu Tsai <wens@csie.org>, Rob Herring <robh+dt@kernel.org>,
+ Mark Rutland <Mark.Rutland@arm.com>, Thomas Gleixner <tglx@linutronix.de>,
+ Marc Zyngier <marc.zyngier@arm.com>
+References: <20190113021719.46457-1-samuel@sholland.org>
+From: Daniel Lezcano <daniel.lezcano@linaro.org>
+Message-ID: <9738319a-4154-62be-2325-2873dfb326dc@linaro.org>
+Date: Mon, 14 Jan 2019 13:56:55 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20190111181731.11782-4-hch@lst.de>
+In-Reply-To: <20190113021719.46457-1-samuel@sholland.org>
 Content-Language: en-US
-X-Brightmail-Tracker: H4sIAAAAAAAAA01Sa0hTYRju29nOjkdnX1PzRaVkXcBuGvrjhCJ2o4MQBCFYrXLl8VI6ZZsu
- NcwLqYlYdKFaywwyy+i2vMecTnKIt8qalkQXTSszS7M0l+U8Wv57nud7n/d5XvgoQmoVeVCx
- Sg2nUiriZCQtrGya6FhryA6S+zVU+zA3bz0SMMWmQKYt67OYMfRaRUxnrZ5kCu5ViBjzOSNi
- Jn9OiZjrBpuAedW8hjk7NCEOcWQ7rU8I1lB2gmQfXDvGnukuRWzHhauIffgig2R7f30k2YHO
- nyRbWF6G2FHDkh30bjookouLTeZUvsERdExe+TkiMcvzyP2SfkEGGnHLRw4U4ADoudwiykc0
- JcU3ENRNtiOefEcw3jop5MkogvrWL2jOkm38PWspRfCm0kTyZBhBWa5+2kJRLjgcxvq32XVX
- bETQnnNyxkFgGwJLUdvMKhKvh/yhfNKOJTgYupvqZ3QhXgFVL20zi9ywHI530vzIImi+2Ce0
- YwfsB8b3zwV2TOClUDWkJ3jsDi/7rgjsWYDHxGC1nZ+tvWW66aCQxy7wyVIu5rEX/KmZM2Qj
- yL2gE/OkAEGFvprkpwKh0fJEZG9EYB+4W+vLyxvhQ2EpYZcBO0P30CK+hDOcrjw/K0sgL0fK
- T68EneXOv9iGx0+JU0imm3eabt45unnn6P7nFiNhGXLnktTx0ZzaX8lp16kV8eokZfS6gwnx
- BjT921qmLGPVqM52wIwwhWROErgUKJeKFMnqlHgzAoqQuUqSNwXJpZJIRUoqp0rYr0qK49Rm
- 5EkJZe6StAVv9khxtELDHea4RE419yqgHDwy0Ab3XSMLnF9rvMMoL9fxfaOtobethyA0Ki5s
- kNDS2H/5ri4iJtySec/W80A+bEqLGq5olNZouj3Ss5Rfn30L6TIlKMXlRzM35/gHLI5VlqaK
- 8oZXE7FZb53afPv1EXuB3lqiCQLTzgQn74Uj2vSigRvL9m3Rbm//4Ug3vZPXyITqGMX6VYRK
- rfgLloMPVWkDAAA=
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFnrJIsWRmVeSWpSXmKPExsVy+t/xe7obm21iDB7eEbNYufook8WC/dYW
- Z5vesFtsenyN1eLyrjlsFj0btrJaHJq6l9Hi9/d/rBbLNv1hsrh7Usdiytuf7A7cHpevXWT2
- 2LSqk81j85J6j8k3ljN6nJ+xkNFj980GNo/Hv16yeTy//J3No2/LKkaPz5vkArii9GyK8ktL
- UhUy8otLbJWiDS2M9AwtLfSMTCz1DI3NY62MTJX07WxSUnMyy1KL9O0S9DI6tkxlLmiSrti4
- 9BlTA+Mn0S5GTg4JAROJ5r1/WbsYuTiEBJYySix9upEVIiEjcXJaA5QtLPHnWhcbRNFbRok9
- 234ydzFycAgLREh8feYOEhcR2Msocf/0XbAiZoF/jBLze3cwQnSsZJR48r8JbBSbgKFE11uQ
- UZwcvAJ2EjeOHWAEsVkEVCW23/rDAmKLCsRIzHrSxw5RIyhxcuYTsDingIHE3qdXmUBsZgF1
- iT/zLjFD2PIS29/OgbLFJW49mc80gVFoFpL2WUhaZiFpmYWkZQEjyypGkdTS4tz03GIjveLE
- 3OLSvHS95PzcTYzAaN527OcWoIfeBR9iFOBgVOLhlZhtHSPEmlhWXJl7iFGCg1lJhLfMySZG
- iDclsbIqtSg/vqg0J7X4EKMp0HMTmaVEk/OBiSavJN7Q1NDcwtLQ3Njc2MxCSZz3vEFllJBA
- emJJanZqakFqEUwfEwenVAOjzW6udM6jHy4tWq/LuP22+OQF8zKdmJyCnpdcOPCsZK3U3JLy
- /l9Viqff6RQqrchZ/bD7kQHrtlwb8X9r1I879nPWvj57yiFt0c6961ZGzf756wfHDC1ujx9q
- ku/X1uzbYLzNNGyP2ZdP8zoyz67cMeOT6vfIyyKLmHIOCv++v8nVkWEJ7+ciSSWW4oxEQy3m
- ouJEACyoswL8AgAA
-X-CMS-MailID: 20190114124225eucas1p1b6a3be0a59408c78ce17ff2e27665f99
-X-Msg-Generator: CA
-X-RootMTR: 20190111181812epcas2p1eeb68a16701631513eaf297073f7299f
-X-EPHeader: CA
-CMS-TYPE: 201P
-X-CMS-RootMailID: 20190111181812epcas2p1eeb68a16701631513eaf297073f7299f
-References: <20190111181731.11782-1-hch@lst.de>
- <CGME20190111181812epcas2p1eeb68a16701631513eaf297073f7299f@epcas2p1.samsung.com>
- <20190111181731.11782-4-hch@lst.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_044230_275537_CAE3DC3E 
-X-CRM114-Status: GOOD (  21.61  )
+X-CRM114-CacheID: sfid-20190114_045700_907072_3EC942D7 
+X-CRM114-Status: GOOD (  20.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -140,112 +99,48 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Russell King <linux@armlinux.org.uk>, linux-kernel@vger.kernel.org,
- iommu@lists.linux-foundation.org, Mauro Carvalho Chehab <mchehab@kernel.org>,
- linuxppc-dev@lists.ozlabs.org, linux-arm-kernel@lists.infradead.org,
- linux-media@vger.kernel.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: devicetree@vger.kernel.org, linux-sunxi@googlegroups.com,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Christoph,
-
-On 2019-01-11 19:17, Christoph Hellwig wrote:
-> vb2_dc_get_userptr pokes into arm direct mapping details to get the
-> resemblance of a dma address for a a physical address that does is
-> not backed by a page struct.  Not only is this not portable to other
-> architectures with dma direct mapping offsets, but also not to uses
-> of IOMMUs of any kind.  Switch to the proper dma_map_resource /
-> dma_unmap_resource interface instead.
->
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-
-There are checks for IOMMU presence in other places in vb2-dma-contig,
-so it was used only when no IOMMU is available, but I agree that the
-hacky code should be replaced by a generic code if possible.
-
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-
-V4L2 pipeline works fine on older Exynos-based boards with CMA and IOMMU
-disabled.
-
-> ---
->  .../common/videobuf2/videobuf2-dma-contig.c   | 41 ++++---------------
->  1 file changed, 9 insertions(+), 32 deletions(-)
->
-> diff --git a/drivers/media/common/videobuf2/videobuf2-dma-contig.c b/drivers/media/common/videobuf2/videobuf2-dma-contig.c
-> index aff0ab7bf83d..82389aead6ed 100644
-> --- a/drivers/media/common/videobuf2/videobuf2-dma-contig.c
-> +++ b/drivers/media/common/videobuf2/videobuf2-dma-contig.c
-> @@ -439,42 +439,14 @@ static void vb2_dc_put_userptr(void *buf_priv)
->  				set_page_dirty_lock(pages[i]);
->  		sg_free_table(sgt);
->  		kfree(sgt);
-> +	} else {
-> +		dma_unmap_resource(buf->dev, buf->dma_addr, buf->size,
-> +				   buf->dma_dir, 0);
->  	}
->  	vb2_destroy_framevec(buf->vec);
->  	kfree(buf);
->  }
->  
-> -/*
-> - * For some kind of reserved memory there might be no struct page available,
-> - * so all that can be done to support such 'pages' is to try to convert
-> - * pfn to dma address or at the last resort just assume that
-> - * dma address == physical address (like it has been assumed in earlier version
-> - * of videobuf2-dma-contig
-> - */
-> -
-> -#ifdef __arch_pfn_to_dma
-> -static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
-> -{
-> -	return (dma_addr_t)__arch_pfn_to_dma(dev, pfn);
-> -}
-> -#elif defined(__pfn_to_bus)
-> -static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
-> -{
-> -	return (dma_addr_t)__pfn_to_bus(pfn);
-> -}
-> -#elif defined(__pfn_to_phys)
-> -static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
-> -{
-> -	return (dma_addr_t)__pfn_to_phys(pfn);
-> -}
-> -#else
-> -static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
-> -{
-> -	/* really, we cannot do anything better at this point */
-> -	return (dma_addr_t)(pfn) << PAGE_SHIFT;
-> -}
-> -#endif
-> -
->  static void *vb2_dc_get_userptr(struct device *dev, unsigned long vaddr,
->  	unsigned long size, enum dma_data_direction dma_dir)
->  {
-> @@ -528,7 +500,12 @@ static void *vb2_dc_get_userptr(struct device *dev, unsigned long vaddr,
->  		for (i = 1; i < n_pages; i++)
->  			if (nums[i-1] + 1 != nums[i])
->  				goto fail_pfnvec;
-> -		buf->dma_addr = vb2_dc_pfn_to_dma(buf->dev, nums[0]);
-> +		buf->dma_addr = dma_map_resource(buf->dev,
-> +				__pfn_to_phys(nums[0]), size, buf->dma_dir, 0);
-> +		if (dma_mapping_error(buf->dev, buf->dma_addr)) {
-> +			ret = -ENOMEM;
-> +			goto fail_pfnvec;
-> +		}
->  		goto out;
->  	}
->  
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gMTMvMDEvMjAxOSAwMzoxNywgU2FtdWVsIEhvbGxhbmQgd3JvdGU6Cj4gVGhpcyBpcyB0aGUg
+dGhpcmQgdmVyc2lvbiBvZiBhIHBhdGNoIHNlcmllcyB0byBmaXggc3lzdGVtIGNsb2NrIGp1bXBz
+Cj4gYW5kIG90aGVyIHRpbWVyIGluc3RhYmlsaXR5IG9uIHRoZSBBbGx3aW5uZXIgQTY0IFNvQy4g
+SXQgaGFzIG5vdyBiZWVuCj4gdGVzdGVkIGZvciBhIHdlZWssIGFuZCBJJ3ZlIHJlY2VpdmVkIG5v
+IHJlcG9ydHMgb2YgZGF0ZSBqdW1wcyB3aXRoIHRoaXMKPiB2ZXJzaW9uLiBTbyB0aGlzIGlzLCBh
+cyBmYXIgYXMgSSBjYW4gdGVsbCwgYSBjb21wbGV0ZSB3b3JrYXJvdW5kLgo+IAo+IFNlZSB0aGUg
+Y29tbWl0IG1lc3NhZ2VzIGZvciBhIGRldGFpbGVkIGRlc2NyaXB0aW9uIG9mIHRoZSBpc3N1ZSwg
+YnV0IHRoZQo+IHN1bW1hcnkgaXMgdGhhdCwgd2hlbiBhIGhpZ2ggY291bnRlciBiaXQgcm9sbHMg
+b3ZlciwgaW5kZXRlcm1pbmFuY2UgaW4KPiB0aGUgbG93IGJpdHMgY2F1c2VzIENOVFBDVC9DTlRW
+Q1QgYW5kIHRoZWlyIHJlc3BlY3RpdmUgVFZBTCByZWdpc3RlcnMgdG8KPiBqdW1wIGZvcndhcmQg
+b3IgYmFja3dhcmQuIEJhY2t3YXJkIGp1bXBzIChvciB0aGUgbmV4dCByZWFkIGFmdGVyIGZvcndh
+cmQKPiBqdW1wcykgYXJlIHNvbWV0aW1lcyBzZWVuIGJ5IHRoZSBrZXJuZWwgYW5kIGludGVycHJl
+dGVkIGFzIHRoZSB0aW1lcgo+IHdyYXBwaW5nIGFyb3VuZCBhZnRlciAyXjU2IGN5Y2xlcy4gVGhp
+cyBjYXVzZXMgdGhlIHN5c3RlbSBjbG9jayB0byBqdW1wCj4gZm9yd2FyZCBhcHByb3hpbWF0ZWx5
+IDkxIHllYXJzLgo+IAo+IGNoYW5nZXMgc2luY2UgdjI7Cj4gLSBSZWR1Y2VkIHdvcmthcm91bmQg
+dGhyZXNob2xkIGZyb20gMTEgdG8gMTAgYml0cyBiYXNlZCBvbiByZXBvcnRzIGZyb20KPiAgIG90
+aGVyIGhhcmRhcmUgYW5kIHRoZSBVLUJvb3QgdmVyc2lvbiBvZiB0aGlzIHdvcmthcm91bmQKPiAt
+IEFkZGVkIFRWQUwgaGFuZGxpbmcgYmFzZWQgb24gTWFyYydzIHN1Z2dlc3Rpb24KPiAtIEFkZGVk
+IGVycmF0dW0gZG9jdW1lbnRhdGlvbiBhbmQgcmVuYW1lZCBzeW1ib2xzIHRvIG1hdGNoCj4gLSBB
+ZGRlZCBNYXhpbWUncyBBY2tlZC1ieQo+IAo+IGNoYW5nZXMgc2luY2UgdjE6Cj4gLSBBZGQgYW4g
+aXRlcmF0aW9uIGxpbWl0IGxpa2UgbW9zdCBvdGhlciBhcmNoIHRpbWVyIHdvcmthcm91bmRzCj4g
+LSBBZGRlZCBBbmRyZSdzIFRlc3RlZC1ieQo+IAo+IFNhbXVlbCBIb2xsYW5kICgyKToKPiAgIGFy
+bTY0OiBhcmNoX3RpbWVyOiBXb3JrYXJvdW5kIGZvciBBbGx3aW5uZXIgQTY0IHRpbWVyIGluc3Rh
+YmlsaXR5Cj4gICBhcm02NDogZHRzOiBhbGx3aW5uZXI6IGE2NDogRW5hYmxlIEE2NCB0aW1lciB3
+b3JrYXJvdW5kCj4gCj4gIERvY3VtZW50YXRpb24vYXJtNjQvc2lsaWNvbi1lcnJhdGEudHh0ICAg
+ICAgICB8ICAyICsKPiAgYXJjaC9hcm02NC9ib290L2R0cy9hbGx3aW5uZXIvc3VuNTBpLWE2NC5k
+dHNpIHwgIDEgKwo+ICBkcml2ZXJzL2Nsb2Nrc291cmNlL0tjb25maWcgICAgICAgICAgICAgICAg
+ICAgfCAxMCArKysrCj4gIGRyaXZlcnMvY2xvY2tzb3VyY2UvYXJtX2FyY2hfdGltZXIuYyAgICAg
+ICAgICB8IDU1ICsrKysrKysrKysrKysrKysrKysKPiAgNCBmaWxlcyBjaGFuZ2VkLCA2OCBpbnNl
+cnRpb25zKCspCj4gCgpBcHBsaWVkLiBUb29rIHRoZSBvcHBvcnR1bml0eSB0byBhZGQgdGhlIHN0
+YWJsZUAgdGFnLgoKVGhhbmtzCgogIC0tIERhbmllbAoKCi0tIAogPGh0dHA6Ly93d3cubGluYXJv
+Lm9yZy8+IExpbmFyby5vcmcg4pSCIE9wZW4gc291cmNlIHNvZnR3YXJlIGZvciBBUk0gU29DcwoK
+Rm9sbG93IExpbmFybzogIDxodHRwOi8vd3d3LmZhY2Vib29rLmNvbS9wYWdlcy9MaW5hcm8+IEZh
+Y2Vib29rIHwKPGh0dHA6Ly90d2l0dGVyLmNvbS8jIS9saW5hcm9vcmc+IFR3aXR0ZXIgfAo8aHR0
+cDovL3d3dy5saW5hcm8ub3JnL2xpbmFyby1ibG9nLz4gQmxvZwoKCl9fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBs
+aXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5m
+cmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
