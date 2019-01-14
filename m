@@ -2,79 +2,61 @@ Return-Path: <SRS0=baBj=PW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0BC39C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 15:11:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3E44EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 15:14:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D083E20657
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 15:11:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0E1562086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 15:14:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="c6GxTRXD";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="G8foX2LZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D083E20657
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hbnSjPrL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0E1562086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=oYjj4AGzk/7y4Lr61V/VNN31y4FVKVc3WzWZdsLbH8I=; b=c6GxTRXDSuDRhh
-	Dxq3oPnd5+PqFlyfO1D8wu0syC0gjug/nIrPVXbVBPnJQ7SkEz8mwCsvCU4UMtAdABUDQn8s3Oi/l
-	G2Qqax/cSwhS6q20vkt6VQN54mnsoNRDgg+gevfF9ADIC4N+BR2FIoWt2bumoQ+K+1aVCWaJnGneZ
-	rKf66+UispvjD0mZaWjwfXQM1qB3pNCANbQiOgTA3a3qQSme9vm5RIbxTCPA0o55yAkG7zbLZOIbn
-	sxdRy3LacrxB1T7Jn6CCQaWT8pjlpnSqI4E5vnAP02SgVT5KBtHsNWpeH92sVadOIZhhhE28gX3CQ
-	Iy9I0ZnbUpc8umOqfftA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=EZOXrgvyvXMe50e4Zirb5FBlTouE8ZQ8o6Zyq3HFavA=; b=hbnSjPrLfCrVKv
+	KIm6B+OKiGmL5ZjyD4/bY+h/O0emNGq5nSbF6fLch9w1Vfd9NpYNi9CRXHN797gt150EU4SBcAGBb
+	XrvQF19rTuA1tS8h9z/vC98AwiWAu9qyvvz5Kr0tXpuNSa3/vS9RxIcrjdDNwKymw9EckH+8W3YnA
+	bE99D/BNYWQA1h+aYfdL/acG9XWszXTyu+trBhWdxWQUhs3+jWY//iTkhh4yBoDR4tPb0lFnqc2jA
+	rG49CdOGEzfLUrROW1zcJwkHQ+gDI+qQ28QTxf64kD0xUNGqw3neySffeSv3M1xV4eJczv2eQhhLn
+	H/7R2UKux+oQgnvQm/AA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj3u2-0005gs-BW; Mon, 14 Jan 2019 15:11:50 +0000
-Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj3ty-0005gA-QN
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 15:11:48 +0000
-Received: by mail-lj1-x242.google.com with SMTP id u89-v6so19358051lje.1
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 14 Jan 2019 07:11:44 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=8xeU39kKvuzpWV2g4S+6k90ETR4scHi5Z/69jfWwpeE=;
- b=G8foX2LZWDk8oTxIcKPEYUNPqQ4tsqu+jeAp+bTMYfE7ltJitKh6Pd5ftTMVMR7pIj
- 49AmKwLYvsgMplLTV2ro83pnu2xS7/LED1J9yJ7g+aBEyRvI4LRgwIfKzsa51ZjGw7KZ
- R5FUmBxs9PUOllsLlYJGiPMvXOcR+D1UPbMT4=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=8xeU39kKvuzpWV2g4S+6k90ETR4scHi5Z/69jfWwpeE=;
- b=J5oF/YtRlnV69hqQ3IMTb5wg9WHwztnYSRfqudbtFBmAMkptVNQlWOdbDnCiq92AUX
- ijjmpo43uaGddVMNDK//Kh4i7syQTChms/lMKPPaAuOMASCF2LlhIWrsWz13HGDTl+t9
- TrtphDTspTzcBk3/1Gz4u35jfgt/8gPlcFb4Lr+XHN3j7bmF04EsagdqzWtiwy60+UQ0
- YDIcPPal1Wt79HhzdzGnEtVSmLxFj8V4AHDVgLms4MzKR6SkXt+yv37tVUYaptMvA/fc
- m+S/1XW3VR9anBq1lrSiTx8VWWt8i5BW0ws7jlivJoeF4eSkfUVt7jfUz0+CdcBrbHzY
- fR8A==
-X-Gm-Message-State: AJcUukcj8tTBQvDjo7G2Xs1IMemllfRKYiucZ9zFgydAIJZFNaRmCTpd
- eDf0YDkTYTi3lGneHyVS8tD/nzo721in4AjXBHMFoA==
-X-Google-Smtp-Source: ALg8bN6cHJ+fz1QqOQkuNNQFfwNpp0MF1iXurr6kxiULSYvBo5YUuZwSPe28oyTQRNOjSIm8o4z21nHC4jePJ1X5ZXw=
-X-Received: by 2002:a2e:9849:: with SMTP id e9-v6mr14822840ljj.9.1547478703360; 
- Mon, 14 Jan 2019 07:11:43 -0800 (PST)
+	id 1gj3wZ-00063B-KK; Mon, 14 Jan 2019 15:14:27 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gj3wW-00062q-9z
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 15:14:25 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9599E80D;
+ Mon, 14 Jan 2019 07:14:22 -0800 (PST)
+Received: from e110467-lin.cambridge.arm.com (e110467-lin.cambridge.arm.com
+ [10.1.196.75])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 3F0013F70D;
+ Mon, 14 Jan 2019 07:14:21 -0800 (PST)
+From: Robin Murphy <robin.murphy@arm.com>
+To: robh+dt@kernel.org,
+	frowand.list@gmail.com
+Subject: [PATCH RESEND] media: s5p-mfc: Fix memdev DMA configuration
+Date: Mon, 14 Jan 2019 15:14:14 +0000
+Message-Id: <4235afdd39766f11a3bf4c8daa0d1f4e6a1cd6dc.1547476835.git.robin.murphy@arm.com>
+X-Mailer: git-send-email 2.20.1.dirty
 MIME-Version: 1.0
-References: <20190113095723.25295-1-wens@csie.org>
-In-Reply-To: <20190113095723.25295-1-wens@csie.org>
-From: Linus Walleij <linus.walleij@linaro.org>
-Date: Mon, 14 Jan 2019 16:11:30 +0100
-Message-ID: <CACRpkdazBiRB7ocTkT2hgEnv+-MyyMfdKFFZ_cfnOn202vq0jg@mail.gmail.com>
-Subject: Re: [PATCH v2 1/2] pinctrl: sunxi: Fix and simplify pin bank
- regulator handling
-To: Chen-Yu Tsai <wens@csie.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_071146_855613_CDAC15F5 
-X-CRM114-Status: GOOD (  11.34  )
+X-CRM114-CacheID: sfid-20190114_071424_353751_B18823A6 
+X-CRM114-Status: GOOD (  17.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,40 +68,81 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Maxime Ripard <maxime.ripard@bootlin.com>,
- "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>,
+ devicetree@vger.kernel.org, Marek Szyprowski <m.szyprowski@samsung.com>,
+ linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sun, Jan 13, 2019 at 10:57 AM Chen-Yu Tsai <wens@csie.org> wrote:
+Having of_reserved_mem_device_init() forcibly reconfigure DMA for all
+callers, potentially overriding the work done by a bus-specific
+.dma_configure method earlier, is at best a bad idea and at worst
+actively harmful. If drivers really need virtual devices to own
+dma-coherent memory, they should explicitly configure those devices
+based on the appropriate firmware node as they create them.
 
-> The new per-pin-bank regulator handling code in the sunxi pinctrl driver
-> has mismatched conditions for enabling and disabling the regulator: it
-> is enabled each time a pin is requested, but only disabled when the
-> pin-bank's reference count reaches zero.
->
-> Since we are doing reference counting already, there's no need to enable
-> the regulator each time a pin is requested. Instead we can just do it
-> for the first requested pin of each pin-bank. Thus we can reverse the
-> test and bail out early if it's not the first occurrence.
->
-> Fixes: 9a2a566adb00 ("pinctrl: sunxi: Deal with per-bank regulators")
-> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> Changes since v1:
->
->   - Moved before the other fix. Both fixes are needed, but having this
->     one first made reworking the other one easier.
+It looks like the only driver not passing in a proper OF platform device
+is s5p-mfc, so move the rogue of_dma_configure() call into that driver
+where it logically belongs.
 
-Patch applied for fixes.
+Reviewed-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Acked-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-Yours,
-Linus Walleij
+Hi Rob, Frank,
+
+Bit of an old one bit it's rebased cleanly - Mauro reckoned[1] this
+would suit the OF tree better than media, are you happy to pick it up?
+
+Thanks,
+Robin.
+
+[1] https://patchwork.kernel.org/patch/10598085/
+
+
+ drivers/media/platform/s5p-mfc/s5p_mfc.c | 7 +++++++
+ drivers/of/of_reserved_mem.c             | 4 ----
+ 2 files changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+index 8a5ba3bec3af..6db33704b1a8 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+@@ -1094,6 +1094,13 @@ static struct device *s5p_mfc_alloc_memdev(struct device *dev,
+ 	child->dma_mask = dev->dma_mask;
+ 	child->release = s5p_mfc_memdev_release;
+ 
++	/*
++	 * The memdevs are not proper OF platform devices, so in order for them
++	 * to be treated as valid DMA masters we need a bit of a hack to force
++	 * them to inherit the MFC node's DMA configuration.
++	 */
++	of_dma_configure(child, dev->of_node, true);
++
+ 	if (device_add(child) == 0) {
+ 		ret = of_reserved_mem_device_init_by_idx(child, dev->of_node,
+ 							 idx);
+diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
+index 1977ee0adcb1..9e02a5d80225 100644
+--- a/drivers/of/of_reserved_mem.c
++++ b/drivers/of/of_reserved_mem.c
+@@ -340,10 +340,6 @@ int of_reserved_mem_device_init_by_idx(struct device *dev,
+ 		mutex_lock(&of_rmem_assigned_device_mutex);
+ 		list_add(&rd->list, &of_rmem_assigned_device_list);
+ 		mutex_unlock(&of_rmem_assigned_device_mutex);
+-		/* ensure that dma_ops is set for virtual devices
+-		 * using reserved memory
+-		 */
+-		of_dma_configure(dev, np, true);
+ 
+ 		dev_info(dev, "assigned reserved memory node %s\n", rmem->name);
+ 	} else {
+-- 
+2.20.1.dirty
+
 
 _______________________________________________
 linux-arm-kernel mailing list
