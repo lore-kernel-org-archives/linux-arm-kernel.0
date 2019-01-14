@@ -2,61 +2,86 @@ Return-Path: <SRS0=baBj=PW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CB4F2C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 16:52:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A4F80C43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 16:54:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8B5AB206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 16:52:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 76B4B2086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 16:54:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ez/z8Jj7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8B5AB206B7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="W2ZnR8k4";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="Jb0DCkdW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 76B4B2086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=jFDNBMf9FJakJlOTRri8kucDSFR9Rq4odkbWfhOxbCI=; b=Ez/z8Jj77f6GkYjUhY8HSR/Sm
-	vTPz79bJviIW+5ZjtN93Iw+o0KdlE16TSNQRDbmg9Fszq71DUUBfnaqts99SssidEsZbrd4rq4jeJ
-	GoDM83HbPrp+SZI2Ky8YJVWUwcm3kpHyYruNV5qZdDONHGnKsxSGLn9CmCg4+bbVq87BL9/2IODkB
-	GkKzE5s6jLNyvsbr9aBKBgCLfmoDBX83P4lFJQ78O9313GWS+wCUhlV6MMoZIaSlMQTBUIa46dtZi
-	FZC31IzCad3PwcwIs0Pn0ddTmSZNPcuD5HVG+BgN4rX0OF8uOoYZq3bkDoMuMvwZOJxssIZ87vJFm
-	PTnJ2hqug==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=siFyKGilVoWO1Vd3kmTMaIhOSXoXyWnY9SWYyVXuGMc=; b=W2Z
+	nR8k4ZIIctXPiox9R8WFb5hJ7lcRzaHZBzbnMxvzeEbjS6ap8WoUdsqm7f7OHe3TShxKoRwZd/1LS
+	BHSMpDtPiRPZckq3gkXY/yRcs3uNobMJbEklWkA63idbyjKJ7kYTkFxCVQz2xKJXYRwBFqxZds0S7
+	tnQZfbkv92tVl694ESH5RmYnCejwDQIrDHHKI5aNQCmBLyRroJ2J3uoM7R8/hLA12c3rcWCSPOs60
+	e2UZrzVrz6BKpzHb9gpcT19taErQEpdoHXWdx99/gjH202bKUJ2sEu5/WZe7lFVmbKUjvbpiBnhwW
+	J8kDIEP9xBS3/cviJslQ/sQudPGdxNA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj5Tj-0003Yc-Hp; Mon, 14 Jan 2019 16:52:47 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj5Th-0003YF-2y
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 16:52:46 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 32C8EA78;
- Mon, 14 Jan 2019 08:52:44 -0800 (PST)
-Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5C21A3F5BD;
- Mon, 14 Jan 2019 08:52:42 -0800 (PST)
-Subject: Re: remove block layer bounce buffering for MMC
-To: Christoph Hellwig <hch@lst.de>, Ulf Hansson <ulf.hansson@linaro.org>
-References: <20190114095804.27978-1-hch@lst.de>
-From: Robin Murphy <robin.murphy@arm.com>
-Message-ID: <5d09d233-8631-2a35-cbcf-ba87b0314b3a@arm.com>
-Date: Mon, 14 Jan 2019 16:52:40 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <20190114095804.27978-1-hch@lst.de>
-Content-Language: en-GB
+	id 1gj5VW-0003xp-4p; Mon, 14 Jan 2019 16:54:38 +0000
+Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gj5VR-0003vj-4V
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 16:54:35 +0000
+Received: by mail-wm1-x344.google.com with SMTP id t200so285630wmt.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 14 Jan 2019 08:54:32 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:date:message-id;
+ bh=YDlLAbjE1Bp+CpbdaiFh8za0XJ4VNrbI5R9WvhyxgIc=;
+ b=Jb0DCkdWMu/er0vZsOggLA4HFLbM5pLR7C/JpUHBMaAHDnp8+TWTR/1n1/LMIaoCAK
+ H+ale06NO9L6hXvsm1RNGK15egin4S6VCrgq4d8ExkZ0X/8SYJeqf4tiqihd6b5bGvzi
+ oI/VVDIc5UYae5tGSxjpaeU6b6rUoYSWbdOqvedXbaHfnlELFOTEgfKq90zqV+5JhNoH
+ lCUBS2b1nxjogAQl3uITl311zKHFFyLUq7Njwr/46b3OfYJYGDZgM6dwOL8LLbFDSJhR
+ JTDM+wsehpsFprsu8oN+yoGltYjS5VrkY8JF5DJ17sfARoUIl9bB/BXpX0kXXwxtL5CH
+ UQ7w==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=YDlLAbjE1Bp+CpbdaiFh8za0XJ4VNrbI5R9WvhyxgIc=;
+ b=KrOSTVMijPN5pEAyf1Z2mGTisR3ow3wdaR0GXFnHSKCaKKh+9IqQeSfR4bEoIoNLGO
+ 2iu0LnpNVeyT8V9Xcp4iN0H7OBPc6L/MhxfoBUNx+PSqBDAzeUwNtW9sTuwPqYR2A9L6
+ U/gcznb+tBEknpBeh4+HRwc0o+OeQRke9AAa9n4O4igGxKVsnnKXXzYFqbUzHfc0L7te
+ Mgy4Oj8XTFAO8ACq7AREhSszttfqmtkD5p/rY288bPBpLqjGR3jGlobwUzo/SPJEwtYY
+ t5m3xu9yrEoEHDCY+/OS5qJFQXS6N/f1f4LLFzoWRNRMgGp195pL6O4BFeCEoTh0JpRY
+ AKBg==
+X-Gm-Message-State: AJcUukct6legClqZM2zu9MkcnfUNq6ybjpX0nmC3Uf6xGN1E+JiROXEu
+ GthfW4zMmYHBNVnmgVbTwiaWIA==
+X-Google-Smtp-Source: ALg8bN5WKaMg8ZtcDbbOc8T92Few5xuQokHuFX92gPx15BV3tslpwz15VAQZEBvZV00HsiYBUfh9jA==
+X-Received: by 2002:a1c:ba89:: with SMTP id k131mr27141wmf.85.1547484871518;
+ Mon, 14 Jan 2019 08:54:31 -0800 (PST)
+Received: from loys-ubuntu-BY1835A49200471.thefacebook.com
+ (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr. [90.63.244.31])
+ by smtp.googlemail.com with ESMTPSA id b18sm70411000wrw.83.2019.01.14.08.54.30
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Mon, 14 Jan 2019 08:54:30 -0800 (PST)
+From: Loys Ollivier <lollivier@baylibre.com>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Jiri Slaby <jslaby@suse.com>, Kevin Hilman <khilman@baylibre.com>
+Subject: [PATCH] tty: serial: meson: if no alias specified use an available id
+Date: Mon, 14 Jan 2019 17:54:26 +0100
+Message-Id: <1547484866-3600-1-git-send-email-lollivier@baylibre.com>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_085245_134245_AA9D039D 
-X-CRM114-Status: GOOD (  16.62  )
+X-CRM114-CacheID: sfid-20190114_085433_179145_6DF8970C 
+X-CRM114-Status: GOOD (  15.21  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,38 +93,66 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nicolas Pitre <nico@fluxnic.net>, Aaro Koskinen <aaro.koskinen@iki.fi>,
- linux-mmc@vger.kernel.org, linux-kernel@vger.kernel.org,
- Russell King <linux@armlinux.org.uk>, iommu@lists.linux-foundation.org,
- Ben Dooks <ben-linux@fluff.org>, linux-omap@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: linux-amlogic@lists.infradead.org, Loys Ollivier <lollivier@baylibre.com>,
+ linux-arm-kernel@lists.infradead.org, linux-serial@vger.kernel.org,
+ linux-kernel@vger.kernel.org
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 14/01/2019 09:57, Christoph Hellwig wrote:
-> Hi everyone,
-> 
-> this series converts the remaining MMC host drivers to properly kmap the
-> scatterlist entries it does PIO operations on, and then goes on to
-> remove the usage of block layer bounce buffering (which I plan to remove
-> eventually) from the MMC layer.
-> 
-> As a bonus I've converted various drivers to the proper scatterlist
-> helpers so that at least in theory they are ready for chained
-> scatterlists.
-> 
-> All the changes are compile tested only as I don't have any of the
-> hardware, so a careful review would be appreciated.
+At probe, the uart driver tries to get an id from a device tree alias.
+When no alias was specified, the driver would return an error and probing
+would fail.
 
-One general point for the kmap() conversions - it's not obvious (to me 
-at least) whether or how that would work for a segment where sg->length 
- > PAGE_SIZE. Or is there some cast-iron guarantee from the MMC 
-mid-layer that it will never let the block layer generate such things in 
-the first place?
+Providing an alias for registering a serial device should not be mandatory.
+If the device tree does not specify an alias, provide an id from a reserved
+range so that the probing can continue.
 
-Robin.
+Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
+---
+ drivers/tty/serial/meson_uart.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
+index 8a842591b37c..fbc5bc022a39 100644
+--- a/drivers/tty/serial/meson_uart.c
++++ b/drivers/tty/serial/meson_uart.c
+@@ -72,7 +72,8 @@
+ #define AML_UART_BAUD_USE		BIT(23)
+ #define AML_UART_BAUD_XTAL		BIT(24)
+ 
+-#define AML_UART_PORT_NUM		6
++#define AML_UART_PORT_NUM		12
++#define AML_UART_PORT_OFFSET		6
+ #define AML_UART_DEV_NAME		"ttyAML"
+ 
+ 
+@@ -654,10 +655,20 @@ static int meson_uart_probe(struct platform_device *pdev)
+ 	struct resource *res_mem, *res_irq;
+ 	struct uart_port *port;
+ 	int ret = 0;
++	int id = -1;
+ 
+ 	if (pdev->dev.of_node)
+ 		pdev->id = of_alias_get_id(pdev->dev.of_node, "serial");
+ 
++	if (pdev->id < 0) {
++		for (id = AML_UART_PORT_OFFSET; id < AML_UART_PORT_NUM; id++) {
++			if (!meson_ports[id]) {
++				pdev->id = id;
++				break;
++			}
++		}
++	}
++
+ 	if (pdev->id < 0 || pdev->id >= AML_UART_PORT_NUM)
+ 		return -EINVAL;
+ 
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
