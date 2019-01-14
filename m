@@ -2,140 +2,70 @@ Return-Path: <SRS0=baBj=PW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-3.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C5448C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 19:29:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F3AD2C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 19:35:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8ACC92064C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 19:29:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BF3A32064C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 19:35:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Bha5Hnll";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.com header.i=@fb.com header.b="H3puoZq9";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.onmicrosoft.com header.i=@fb.onmicrosoft.com header.b="Iq46gVBq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8ACC92064C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=fb.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GjT9XpT+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BF3A32064C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=en5fpcErpi+D6wv/zosKhXOZ/6eLee4SIFVXOvMYnDc=; b=Bha5Hnll5Xcb0g
-	PhxxH9KxknjCXKkvwJZpQxFUENcwdGQudweE7B/ZRHnQBPO1wLJRlETGBok5cToyFB6LnvpkHFart
-	aTyIKG5SfN80tdKHuiDeb42aUgL8s92JGij+fwMP/3JwwN2QuE557O7/fpghJ7jdZNCtFF+NlMbWe
-	vmhXwLp2YxkE4iLp5gzkFCL10q2lWQ27DUxIUtAY+Afp7W0XVVjyDwe/fCGaGpUiejoZ7YCjMX0wK
-	VCzJyeZYy6hdYqHdopyNTAcNhf960mZ9jnMvEy09DJSWwv+AKAaEQ6Daa8mkPjCMl+N5LWQRNyibN
-	6MPvAN3HXUbpyOZuXsvA==;
+	List-Owner; bh=+Nw+GoOwEocRt/Mpbei4D2L0N27uIAuEeUDmUZAhGHg=; b=GjT9XpT+KYE/dw
+	4bhGzQa8ACe3S/GS49xsot3b7xwQLc0SqrlHnrQULw1zXv4zwyATTjxcSv5MgDB00kSVbW0WCAl/n
+	V7aUnqkC7DEZZ0jVr0R3uaOsqPbbL1X/F+pbRDf/T51LlCUOqDPoRweQE4GChC64BrpxnDFhPL3pg
+	/UbUxWuFwTAXkh+z2oS/CUnC/B5DqNaus4FV4LpM+9mDOTmZ8MXfvxfrM3aOhTRcSgVtC2AZ/w2Lb
+	z2DJlfPStuek/G9Vynd5EQufZCKgxDkd/KTRkeQApt2BHNMzuEGM7Ul2xOiuyPWTkjXCJc84X1Hwm
+	cK65YN6tnVHJcPWZ/Bhw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj7uv-0005Ge-Tn; Mon, 14 Jan 2019 19:29:01 +0000
-Received: from mx0a-00082601.pphosted.com ([67.231.145.42])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj7us-0005Fw-U5
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 19:29:00 +0000
-Received: from pps.filterd (m0044012.ppops.net [127.0.0.1])
- by mx0a-00082601.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x0EJLbCq026478; Mon, 14 Jan 2019 11:28:45 -0800
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fb.com;
- h=from : to : cc : subject
- : date : message-id : references : in-reply-to : content-type : content-id
- : content-transfer-encoding : mime-version; s=facebook;
- bh=nMWjnX8Li/rqjrKtr49iOm5cvEGMcBNILHXXJut3e+g=;
- b=H3puoZq91UdZe0a5wm+3JnxP+HuhxDyhLK+R2LCQNvnhcRDPKz2uHDGKLpBI4OV7vE6A
- GmLGot9VlCdUT2mZ2Kerko/rnbyUbXIWT0Un2n5v+4dHcHeQZITP8V2MUlb49Buj9uu5
- ieOfKf0csRQjbdNHawSMcEBEMbg76cR7iYs= 
-Received: from mail.thefacebook.com ([199.201.64.23])
- by mx0a-00082601.pphosted.com with ESMTP id 2q0x5rggs7-10
- (version=TLSv1.2 cipher=ECDHE-RSA-AES256-SHA384 bits=256 verify=NOT);
- Mon, 14 Jan 2019 11:28:45 -0800
-Received: from prn-hub06.TheFacebook.com (2620:10d:c081:35::130) by
- prn-hub01.TheFacebook.com (2620:10d:c081:35::125) with Microsoft SMTP Server
- (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id
- 15.1.1531.3; Mon, 14 Jan 2019 11:28:43 -0800
-Received: from NAM02-SN1-obe.outbound.protection.outlook.com (192.168.54.28)
- by o365-in.thefacebook.com (192.168.16.30) with Microsoft SMTP Server
- (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.1.1531.3
- via Frontend Transport; Mon, 14 Jan 2019 11:28:43 -0800
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fb.onmicrosoft.com;
- s=selector1-fb-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=nMWjnX8Li/rqjrKtr49iOm5cvEGMcBNILHXXJut3e+g=;
- b=Iq46gVBqZJOps2lMDZmQFNz69T2qQ9cwkciDZ3eTnW0F41ZgsaUeMmkAnss3VO0QdlFbTnZ1m8S63RXnDhqeMlBD4Yzo8o2Qd8KQKvZNJYUSiZes82pmztZvOKiVvw54hg361FMJ1wzGxrNhQI6U0Dq/vMbMicWCcKn2x9adj/o=
-Received: from CY4PR15MB1269.namprd15.prod.outlook.com (10.172.180.139) by
- CY4PR15MB1687.namprd15.prod.outlook.com (10.175.121.16) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1516.20; Mon, 14 Jan 2019 19:28:41 +0000
-Received: from CY4PR15MB1269.namprd15.prod.outlook.com
- ([fe80::f9c6:952c:8b66:cc9d]) by CY4PR15MB1269.namprd15.prod.outlook.com
- ([fe80::f9c6:952c:8b66:cc9d%10]) with mapi id 15.20.1516.019; Mon, 14 Jan
- 2019 19:28:41 +0000
-From: Vijay Khemka <vijaykhemka@fb.com>
-To: Andrew Jeffery <andrew@aj.id.au>, Rob Herring <robh+dt@kernel.org>, "Mark
- Rutland" <mark.rutland@arm.com>, Joel Stanley <joel@jms.id.au>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "linux-aspeed@lists.ozlabs.org"
- <linux-aspeed@lists.ozlabs.org>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>
-Subject: Re: [Potential Spoof] Re: [Potential Spoof] Re: [PATCH v2 4/4] ARM:
- dts: aspeed: Add lpc ctrl for Facebook
-Thread-Topic: [Potential Spoof] Re: [Potential Spoof] Re: [PATCH v2 4/4] ARM:
- dts: aspeed: Add lpc ctrl for Facebook
-Thread-Index: AQHUqg5kq5zkppfjDEupYTurooq9yKWtzaAAgADW2wA=
-Date: Mon, 14 Jan 2019 19:28:41 +0000
-Message-ID: <B36B9550-0E17-442C-974A-908736EB2980@fb.com>
-References: <5972B57A-23D5-43F4-9476-229379B96C7C@fb.com>
- <1547419180.2315773.1633559160.3F7D29CF@webmail.messagingengine.com>
-In-Reply-To: <1547419180.2315773.1633559160.3F7D29CF@webmail.messagingengine.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-originating-ip: [2620:10d:c090:200::5:6dbd]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; CY4PR15MB1687;
- 20:23YTfYa1mlMSCbFxlSnuYn8hbKfw20BNGuhW7TkobcLCVR5v3R+2j7kPK/jLP/tHvOz13eRhMH05xkYHJvCJQA7vB2uCh+BAkCnbeVNl3/0RbkS/LdcKb3r6Iu0CVK8GFW7zvojYw5gAsmB7rhDjfSMXDYUnyYkoTERSkux1rPg=
-x-ms-exchange-antispam-srfa-diagnostics: SOS;
-x-ms-office365-filtering-correlation-id: 2586ad57-fa12-4af3-6ef8-08d67a567db3
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(2017052603328)(7153060)(7193020);
- SRVR:CY4PR15MB1687; 
-x-ms-traffictypediagnostic: CY4PR15MB1687:
-x-microsoft-antispam-prvs: <CY4PR15MB1687A48D006037278CDBA000DD800@CY4PR15MB1687.namprd15.prod.outlook.com>
-x-forefront-prvs: 0917DFAC67
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10019020)(39860400002)(376002)(396003)(346002)(366004)(136003)(47680400002)(43544003)(189003)(199004)(6486002)(2201001)(2616005)(11346002)(446003)(110136005)(4326008)(6436002)(486006)(97736004)(86362001)(316002)(476003)(2906002)(8936002)(81156014)(36756003)(81166006)(8676002)(256004)(14444005)(478600001)(14454004)(6116002)(106356001)(186003)(105586002)(82746002)(99286004)(6506007)(53546011)(7736002)(305945005)(46003)(33656002)(5660300001)(102836004)(68736007)(25786009)(6512007)(6246003)(53936002)(76176011)(71200400001)(229853002)(83716004)(2501003)(71190400001);
- DIR:OUT; SFP:1102; SCL:1; SRVR:CY4PR15MB1687;
- H:CY4PR15MB1269.namprd15.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: fb.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: Qs8fNVkdNbK+K5rOWK0WN3s5vjgDCWP/nncKc1z1/ME+rYa+0t6jKADNLTaRQwp0pBjWWswljOZD4+JymvMW8qs/CtUgVpx+LJcVLzA+hy5R/Xslfircdqzo8UaivisCii7e2HZm0Sa+Jsi5VFdfHZ2p63v4w5/kS932bqbZE5NDPjAZY8JJdUNkC7LSqEaC8LlMONtVlsxTMwAU+nTBiWpOO7mtGGD5Bse1YTSwsV+E1ZRVi6YWrHkOAh4uRle8hFAJ7d2bYU9dvo6fHa4uqF69xPxtcmWeNV6QMj+p8gbULUAfUAwLwGuNoJaiZd2CuPSB2oX3sxYGH88D0ylPgC5hvRvrO2jXiol9PakIPdNSyS99lfAks2fz7rEF7JK9g4pspbArx5NnIDGc4QvWxDthsFDf+LzIq1HsKka1njo=
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
-Content-ID: <2F0D47D5C7865C44ADAACD1CBC68E370@namprd15.prod.outlook.com>
+	id 1gj81e-0002hS-S3; Mon, 14 Jan 2019 19:35:58 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gj81a-0002gz-KL
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 19:35:56 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 89390A78;
+ Mon, 14 Jan 2019 11:35:53 -0800 (PST)
+Received: from fuggles.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 517133F5BD;
+ Mon, 14 Jan 2019 11:35:51 -0800 (PST)
+Date: Mon, 14 Jan 2019 19:35:48 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: "Koenig, Christian" <Christian.Koenig@amd.com>
+Subject: Re: [RFC PATCH] drm/ttm: force cached mappings for system RAM on ARM
+Message-ID: <20190114193548.GB29600@fuggles.cambridge.arm.com>
+References: <20190110072841.3283-1-ard.biesheuvel@linaro.org>
+ <5d8135de-80fe-9c0e-2206-ecb809f64cdb@daenzer.net>
+ <CAKv+Gu_X-DH6GZ0k8RYuL18rxTwBpb5=Qp9VCZfn_kh+9b3Zkg@mail.gmail.com>
+ <55facfb9-92af-86b8-40e9-d63b887b5592@amd.com>
+ <CAKv+Gu_JyO2KNtdN1-_TcoL_kqs0yswdwBrpAXA6-jyWuDrj+g@mail.gmail.com>
+ <9f956898-7973-98ee-6bf1-e1d445e9d365@amd.com>
+ <20190114191350.GA29600@fuggles.cambridge.arm.com>
+ <a6d9d0ad-d1c0-9e60-17c6-a42f7bde258c@amd.com>
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: 2586ad57-fa12-4af3-6ef8-08d67a567db3
-X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Jan 2019 19:28:41.3270 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 8ae927fe-1255-47a7-a2af-5f3a069daaa2
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: CY4PR15MB1687
-X-OriginatorOrg: fb.com
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2019-01-14_10:, , signatures=0
-X-Proofpoint-Spam-Reason: safe
-X-FB-Internal: Safe
+Content-Disposition: inline
+In-Reply-To: <a6d9d0ad-d1c0-9e60-17c6-a42f7bde258c@amd.com>
+User-Agent: Mutt/1.11.1+86 (6f28e57d73f2) ()
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_112859_138634_F5EEFA62 
-X-CRM114-Status: GOOD (  25.29  )
+X-CRM114-CacheID: sfid-20190114_113554_678205_598A5FD2 
+X-CRM114-Status: GOOD (  31.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -147,73 +77,108 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "openbmc @ lists . ozlabs . org" <openbmc@lists.ozlabs.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Carsten Haitzler <Carsten.Haitzler@arm.com>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>, David Airlie <airlied@linux.ie>,
+ mpe@ellerman.id.au, Michel =?iso-8859-1?Q?D=E4nzer?= <michel@daenzer.net>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ dri-devel <dri-devel@lists.freedesktop.org>, "Huang, Ray" <Ray.Huang@amd.com>,
+ benh@kernel.crashing.org, "Zhang, Jerry" <Jerry.Zhang@amd.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ Bernhard =?iso-8859-1?Q?Rosenkr=E4nzer?= <Bernhard.Rosenkranzer@linaro.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-DQoNCu+7v09uIDEvMTMvMTksIDI6MzkgUE0sICJBbmRyZXcgSmVmZmVyeSIgPGFuZHJld0Bhai5p
-ZC5hdT4gd3JvdGU6DQoNCiAgICBIaSBWaWpheSwNCiAgICANCiAgICBTb3JyeSBmb3IgcHJvdmlk
-aW5nIGFuIG9waW5pb24gc28gbGF0ZSwgaG93ZXZlcjoNCiAgICANCiAgICBPbiBTYXQsIDEyIEph
-biAyMDE5LCBhdCAxMTowMywgVmlqYXkgS2hlbWthIHdyb3RlOg0KICAgID4gSm9lbCwNCiAgICA+
-IFBsZWFzZSBtZXJnZSB0aGVzZSBwYXRjaGVzIGFzIGl0IGlzIHJlcXVpcmVkIGJ5IGZhY2Vib29r
-IHBsYXRmb3JtLg0KICAgID4gDQogICAgPiBSZWdhcmRzDQogICAgPiAtVmlqYXkNCiAgICA+IA0K
-ICAgID4gT24gMS83LzE5LCAxMToyNSBBTSwgIkxpbnV4LWFzcGVlZCBvbiBiZWhhbGYgb2YgVmlq
-YXkgS2hlbWthIiA8bGludXgtDQogICAgPiBhc3BlZWQtYm91bmNlcyt2aWpheWtoZW1rYT1mYi5j
-b21AbGlzdHMub3psYWJzLm9yZyBvbiBiZWhhbGYgb2YgDQogICAgPiB2aWpheWtoZW1rYUBmYi5j
-b20+IHdyb3RlOg0KICAgID4gDQogICAgPiAgICAgUGxlYXNlIG1lcmdlIHRoZXNlIHBhdGNoZXMg
-aW4gdXBzdHJlYW0ga2VybmVsLg0KICAgID4gICAgIA0KICAgID4gICAgIFJlZ2FyZHMNCiAgICA+
-ICAgICAtVmlqYXkNCiAgICA+ICAgICANCiAgICA+ICAgICBPbiAxMi8yMC8xOCwgMTA6MDYgQU0s
-ICJMaW51eC1hc3BlZWQgb24gYmVoYWxmIG9mIFZpamF5IEtoZW1rYSIgDQogICAgPiA8bGludXgt
-YXNwZWVkLWJvdW5jZXMrdmlqYXlraGVta2E9ZmIuY29tQGxpc3RzLm96bGFicy5vcmcgb24gYmVo
-YWxmIG9mIA0KICAgID4gdmlqYXlraGVta2FAZmIuY29tPiB3cm90ZToNCiAgICA+ICAgICANCiAg
-ICA+ICAgICAgICAgSm9lbCwgQ2FuIHlvdSBwbGVhc2UgdGFrZSBjYXJlIG9mIHRoZXNlIHBhdGNo
-ZXMgbWVyZ2UuDQogICAgPiAgICAgICAgIA0KICAgID4gICAgICAgICBPbiAxMi8xNy8xOCwgMTI6
-MDQgUE0sICJWaWpheSBLaGVta2EiIDx2aWpheWtoZW1rYUBmYi5jb20+IHdyb3RlOg0KICAgID4g
-ICAgICAgICANCiAgICA+ICAgICAgICAgICAgIEFkZGVkIGxwYyBjdHJsIGRldmljZSB0byBlbmFi
-bGUgTFBDIGNsb2NrIGluIEZhY2Vib29rDQogICAgPiAgICAgICAgICAgICBUaW9nYXBhc3MgZGV2
-aWNlIHRyZWUuDQogICAgPiAgICAgICAgICAgICANCiAgICA+ICAgICAgICAgICAgIFNpZ25lZC1v
-ZmYtYnk6IFZpamF5IEtoZW1rYSA8dmlqYXlraGVta2FAZmIuY29tPg0KICAgID4gICAgICAgICAg
-ICAgLS0tDQogICAgPiAgICAgICAgICAgICAgLi4uL2Jvb3QvZHRzL2FzcGVlZC1ibWMtZmFjZWJv
-b2stdGlvZ2FwYXNzLmR0cyAgfCAxNyArKysrKysNCiAgICA+ICsrKysrKysrKysrDQogICAgPiAg
-ICAgICAgICAgICAgMSBmaWxlIGNoYW5nZWQsIDE3IGluc2VydGlvbnMoKykNCiAgICA+ICAgICAg
-ICAgICAgIA0KICAgID4gICAgICAgICAgICAgZGlmZiAtLWdpdCBhL2FyY2gvYXJtL2Jvb3QvZHRz
-L2FzcGVlZC1ibWMtZmFjZWJvb2stDQogICAgPiB0aW9nYXBhc3MuZHRzIGIvYXJjaC9hcm0vYm9v
-dC9kdHMvYXNwZWVkLWJtYy1mYWNlYm9vay10aW9nYXBhc3MuZHRzDQogICAgPiAgICAgICAgICAg
-ICBpbmRleCA3M2U1OGE4MjE2MTMuLmVmNzg3NWI1NDU2MiAxMDA2NDQNCiAgICA+ICAgICAgICAg
-ICAgIC0tLSBhL2FyY2gvYXJtL2Jvb3QvZHRzL2FzcGVlZC1ibWMtZmFjZWJvb2stdGlvZ2FwYXNz
-LmR0cw0KICAgID4gICAgICAgICAgICAgKysrIGIvYXJjaC9hcm0vYm9vdC9kdHMvYXNwZWVkLWJt
-Yy1mYWNlYm9vay10aW9nYXBhc3MuZHRzDQogICAgPiAgICAgICAgICAgICBAQCAtMjIsNiArMjIs
-MTcgQEANCiAgICA+ICAgICAgICAgICAgICAJCXJlZyA9IDwweDgwMDAwMDAwIDB4MjAwMDAwMDA+
-Ow0KICAgID4gICAgICAgICAgICAgIAl9Ow0KICAgID4gICAgICAgICAgICAgIA0KICAgID4gICAg
-ICAgICAgICAgKwlyZXNlcnZlZC1tZW1vcnkgew0KICAgID4gICAgICAgICAgICAgKwkJI2FkZHJl
-c3MtY2VsbHMgPSA8MT47DQogICAgPiAgICAgICAgICAgICArCQkjc2l6ZS1jZWxscyA9IDwxPjsN
-CiAgICA+ICAgICAgICAgICAgICsJCXJhbmdlczsNCiAgICA+ICAgICAgICAgICAgICsNCiAgICA+
-ICAgICAgICAgICAgICsJCWZsYXNoX21lbW9yeTogcmVnaW9uQDk4MDAwMDAwIHsNCiAgICA+ICAg
-ICAgICAgICAgICsJCQluby1tYXA7DQogICAgPiAgICAgICAgICAgICArCQkJcmVnID0gPDB4OTgw
-MDAwMDAgMHgwMDAwMTAwMD47IC8qIDRLICovDQogICAgPiAgICAgICAgICAgICArCQl9Ow0KICAg
-ID4gICAgICAgICAgICAgKwl9Ow0KICAgID4gICAgICAgICAgICAgKw0KICAgID4gICAgICAgICAg
-ICAgIAlpaW8taHdtb24gew0KICAgID4gICAgICAgICAgICAgIAkJY29tcGF0aWJsZSA9ICJpaW8t
-aHdtb24iOw0KICAgID4gICAgICAgICAgICAgIAkJaW8tY2hhbm5lbHMgPSA8JmFkYyAwPiwgPCZh
-ZGMgMT4sIDwmYWRjIDI+LCA8JmFkYyAzPiwNCiAgICA+ICAgICAgICAgICAgIEBAIC01NCw2ICs2
-NSwxMiBAQA0KICAgID4gICAgICAgICAgICAgIAl9Ow0KICAgID4gICAgICAgICAgICAgIH07DQog
-ICAgPiAgICAgICAgICAgICAgDQogICAgPiAgICAgICAgICAgICArJmxwY19jdHJsIHsNCiAgICA+
-ICAgICAgICAgICAgICsJc3RhdHVzID0gIm9rYXkiOw0KICAgID4gICAgICAgICAgICAgKwltZW1v
-cnktcmVnaW9uID0gPCZmbGFzaF9tZW1vcnk+Ow0KICAgID4gICAgICAgICAgICAgKwlmbGFzaCA9
-IDwmc3BpMT47DQogICAgPiAgICAgICAgICAgICArfTsNCiAgICA+ICAgICAgICAgICAgICsNCiAg
-ICA+ICAgICAgICAgICAgICAmdWFydDEgew0KICAgID4gICAgICAgICAgICAgIAkvLyBIb3N0IENv
-bnNvbGUNCiAgICA+ICAgICAgICAgICAgICAJc3RhdHVzID0gIm9rYXkiOw0KICAgID4gICAgICAg
-ICAgICAgLS0gDQogICAgPiAgICAgICAgICAgICAyLjE3LjENCiAgICANCiAgICBJIHVuZGVyc3Rh
-bmQgeW91IGp1c3Qgd2FudCB0byBtYWtlIHlvdXIgc3lzdGVtIHdvcmssIGJ1dCB0aGlzIGlzIGEN
-CiAgICBicm9rZW4gd2F5IHRvIGRvIGl0LiBBbmQgdGhhdCdzIG5vdCB5b3VyIGZhdWx0IC0gd2Ug
-c2hvdWxkIHJlYWxseSBmaXgNCiAgICB0aGUgZHJpdmVyLiBJIHRoaW5rIHRoZSBtZW1vcnktcmVn
-aW9uIHBoYW5kbGUgc2hvdWxkIGJlIG9wdGlvbmFsDQogICAgYW5kIHRoZSBkcml2ZXIgc2hvdWxk
-IHNpbXBseSBsaW1pdCB0aGUgb3B0aW9ucyBhdmFpbGFibGUgdG8gdGhlIGlvY3RsDQogICAgdG8g
-anVzdCB0aGUgZmxhc2ggcmVnaW9uIGlmIHRoZSBtZW1vcnkgbm9kZSBpcyBub3QgcHJlc2VudCAo
-aS5lLiByZXR1cm4NCiAgICBhbiBlcnJvciBpZiB0aGUgbWVtb3J5IHJlZ2lvbiBpcyByZXF1ZXN0
-ZWQgYnV0IG5vdCBkZXNjcmliZWQgaW4gdGhlDQogICAgZGV2aWNldHJlZSkuDQpMZXQgbWUgZml4
-IGRyaXZlciBpdHNlbGYgZmlyc3QuDQogICAgDQogICAgQW5kcmV3DQogICAgDQoNCl9fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwg
-bWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8v
-bGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+[+ BenH and MPE]
+
+On Mon, Jan 14, 2019 at 07:21:08PM +0000, Koenig, Christian wrote:
+> Am 14.01.19 um 20:13 schrieb Will Deacon:
+> > On Mon, Jan 14, 2019 at 07:07:54PM +0000, Koenig, Christian wrote:
+> >> Am 14.01.19 um 18:32 schrieb Ard Biesheuvel:
+> >>              - The reason remapping the CPU side as cacheable does work (which I
+> >>              did test) is because the GPU's uncacheable accesses (which I assume
+> >>              are made using the NoSnoop PCIe transaction attribute) are actually
+> >>              emitted as cacheable in some cases.
+> >>                 . On my AMD Seattle, with or without SMMU (which is stage 2 only), I
+> >>              must use cacheable accesses from the CPU side or things are broken.
+> >>              This might be a h/w flaw, though.
+> >>                 . On systems with stage 1+2 SMMUs, the driver uses stage 1
+> >>              translations which always override the memory attributes to cacheable
+> >>              for DMA coherent devices. This is what is affecting the Cavium
+> >>              ThunderX2 (although it appears the attributes emitted by the RC may be
+> >>              incorrect as well.)
+> >>
+> >>              The latter issue is a shortcoming in the SMMU driver that we have to
+> >>              fix, i.e., it should take care not to modify the incoming attributes
+> >>              of DMA coherent PCIe devices for NoSnoop to be able to work.
+> >>
+> >>              So in summary, the mismatch appears to be between the CPU accessing
+> >>              the vmap region with non-cacheable attributes and the GPU accessing
+> >>              the same memory with cacheable attributes, resulting in a loss of
+> >>              coherency and lots of visible corruption.
+> >>
+> >>          Actually it is the other way around. The CPU thinks some data is in the
+> >>          cache and the GPU only updates the system memory version because the
+> >>          snoop flag is not set.
+> >>
+> >>
+> >>      That doesn't seem to be what is happening. As far as we can tell from
+> >>      our experiments, all inbound transactions are always cacheable, and so
+> >>      the only way to make things work is to ensure that the CPU uses the
+> >>      same attributes.
+> >>
+> >>
+> >> Ok that doesn't make any sense. If inbound transactions are cacheable or not is
+> >> irrelevant when the CPU always uses uncached accesses.
+> >>
+> >> See on the PCIe side you have the snoop bit in the read/write transactions
+> >> which tells the root hub if the device wants to snoop caches or not.
+> >>
+> >> When the CPU accesses some memory as cached then devices need to snoop the
+> >> cache for coherent accesses.
+> >>
+> >> When the CPU accesses some memory as uncached then devices can disable snooping
+> >> to improve performance, but when they don't do this it is mandated by the spec
+> >> that this still works.
+> > Which spec?
+> 
+> The PCIe spec. The snoop bit (or rather the NoSnoop) in the transaction 
+> is perfectly optional IIRC.
+
+Thanks for the clarification. I suspect the devil is in the details, so I'll
+try to dig up the spec.
+
+> > The Arm architecture (and others including Power afaiu) doesn't
+> > guarantee coherency when memory is accessed using mismatched cacheability
+> > attributes.
+> 
+> Well what exactly goes wrong on ARM?
+
+Coherency (and any ordering guarantees) can be lost, so the device may see a
+stale copy of the memory it is accessing. The architecture requires cache
+maintenance to restore coherency between the mismatched aliases.
+
+> As far as I know Power doesn't really supports un-cached memory at all, 
+> except for a very very old and odd configuration with AGP.
+
+Hopefully Michael/Ben can elaborate here, but I was under the (possibly
+mistaken) impression that mismatched attributes could cause a machine-check
+on Power.
+
+> I mean in theory I agree that devices should use matching cacheability 
+> attributes, but in practice I know of quite a bunch of devices/engines 
+> which fails to do this correctly.
+
+Given that the experiences of Ard and I so far has been that the system
+ends up making everything cacheable after the RC, perhaps that's an attempt
+by system designers to correct for these devices. Unfortunately, it doesn't
+help if the CPU carefully goes ahead and establishes a non-cacheable mapping
+for itself!
+
+Will
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
