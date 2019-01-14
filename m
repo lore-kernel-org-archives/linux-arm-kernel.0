@@ -2,22 +2,23 @@ Return-Path: <SRS0=baBj=PW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-11.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E0253C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 18:26:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8866BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 18:36:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A865720659
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 18:26:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 56D6020651
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 18:36:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TciiPLxO";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="dmBVDzm/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A865720659
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PZq6V5eE";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Nf1qJ9Y8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 56D6020651
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,60 +27,59 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mXbs1d8k02UeWPMdrrya+9kffRYZdAZyir+LqEUzet4=; b=TciiPLxOFrkk2v
-	9WeT54kF4xyRbp+lLzo+rwO9u8WxdHNQ7CTaUxhWJH13umDpO+lerxcje8ynZPExt+PCJBwRnhPN+
-	fgzR4oaVP+c+NMS0HEW8xpG7EBoHWw1A893Htx+bl3Ph9JKlFiH/QwM0jPFLD0oSwEkFFq4/FJWM4
-	W98D7v3jFN+ysz+KSEWNs3aniRfEuH16XAV+8Ffis60mvposdDIaFrOsaRBG07xOOKIOQxLMdBZdq
-	vHWDcqgN78sddyhCkdPmWFJtNC0P1RBQm745GOmNIkPRpqd1oL93tEf2HSpMU+gvRfmaONhvLPnTO
-	vs2gRDp90RKcF7Z5ArBA==;
+	List-Owner; bh=aDk8q1BUV+UpYLuHF5aB86Pg9wkwHGqm0j0aHf60SIY=; b=PZq6V5eEo5eSjZ
+	xrfLkEuzXduQD45H7sp2SmEqWS+40xLS8dHpFlINdQzvQfDEe9/VvyGIMmS10TxPHH35UcrBysTE7
+	IbEER9S2wbaJgJYCgJNejaHDF8cO1nezjr7ncAjeVJu7X86S3lK4hgRrJscG4NFEGivztwbaPRrCS
+	t9HxJl2fAMKaz4MDVDjS2pT41BwiArklYwI6Dhrh5CykB6mjqYrTNzZibNOm2oXnAjOqHZLYd3cBx
+	VBy5jviMeoXAQfwZE8pYZTefDLeEe63ijWcwFkLsCWqWgi1Bafr3p7yjbW2fIHohmPqFjyTCOr15j
+	kzMtSyBReJIeVeQ6BgWA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj6wo-0007BG-Po; Mon, 14 Jan 2019 18:26:54 +0000
-Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
+	id 1gj767-0001v3-Vc; Mon, 14 Jan 2019 18:36:31 +0000
+Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj6wm-0007Au-8T
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 18:26:53 +0000
-Received: by mail-pf1-x441.google.com with SMTP id c123so10558pfb.0
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 14 Jan 2019 10:26:51 -0800 (PST)
+ id 1gj764-0001ud-Fe; Mon, 14 Jan 2019 18:36:29 +0000
+Received: by mail-pl1-x644.google.com with SMTP id g9so14938plo.3;
+ Mon, 14 Jan 2019 10:36:26 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
  :user-agent:mime-version:in-reply-to:content-language
  :content-transfer-encoding;
- bh=qg2xpNBtDpubbIcqexbyMVs5CziNiFpypv07kt2X48I=;
- b=dmBVDzm/3fEL5ODbPR0wXOII140tDV93o47pKBrjytKlB39B7nKalNOgQmcxe3/fX6
- H/WelqvBgp6ODZVs6vEVyFnIYK7O10eIMmKd3MlZTpsvK+CtVYmcQiMiQM/RAlDItuKm
- Er7tSNWVTxQrZtye5K3D9HqA85Bkxri9S3zTKordvfouiuYSuBOoro9RXe23BaYVZPTZ
- ukXOYFJngv2qA22doY8njxQ2GVR5jCNL2E+lkAOeKW/seVNQKpX3KSqgMVQuXb2OWoDE
- +j70I9yQ+GQa6GI+ioBRq4yNdbvkSIE2V/Mauq6gU59vZRbHvpXozU/53dRwsDZ4Cvif
- 6aPQ==
+ bh=4PVGsIaG0j4vALC1QOjFPnyY7phcv6TK6Cm5VP11Suw=;
+ b=Nf1qJ9Y8bgxcncC1PhaePAxOf3c9nm9RRtJ8PJEZf+9moHqKcBsE2akhwo5vHHxPKK
+ dRS02hvLW9fdM4TxuoXsyPm6uBUCTv3VSCi/af9jyq3UOtsP83EiY9RbVg2fALPJkNeQ
+ LSXKBAU6hlw6Lab3fNTedijGP+dsWkHvNdkPhLRAFsKnQ1YHJuygwkZgN3TTuvCFWQ83
+ WZGJ/15lNZyofm4eEvvah93pWCTC3IiVUi5H+MdMr1UZ+v7Zn5jPQrwygyKWNmyJG1ZV
+ 7cRIADcVELQR+iQYV2TNh1RXtppi2IzH3o669ORjW+9mSCzeBhwGLQN9zB11OfLkNexh
+ 96TA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
  :message-id:date:user-agent:mime-version:in-reply-to
  :content-language:content-transfer-encoding;
- bh=qg2xpNBtDpubbIcqexbyMVs5CziNiFpypv07kt2X48I=;
- b=QHJOPGquu+VsuLTIGwSNVgROQeQTOJYXaNlnyWw+0HiLXbmaQQMm6wAKSfsDwXWswS
- 81bP03ZkE6ib6rvQ5QGY81iiQHfPDLD2bJbNviI0+rm+tV7YuzCDgqDywrwbtD2wM/VS
- k1Q8yVEVTdOkzJnqjAwCBTtlmubAWCWrKPElM9ltLnux2MOFht3bGib5pYH1HAGf6jxv
- jhCZMajwdPCrpy98Wyx9KC7Ds8S+AhMCfNsK9T3mIyfPc0Kh9vA5Z4xLwbD2EWy8vy2X
- c64WxHgTZhe1z7YIaOaYE+e1nUheiNIImHNt/cU9CThYN5JOnkbi4M+o4gzbZwddoDF5
- KEQA==
-X-Gm-Message-State: AJcUukcHk+Q67BFhl/ktQVaTwKpoL20plBaB5l2j4ZrYfTShMxD9Wln4
- G4LC1GnOY/VrjAGloYSPo+Bb148q
-X-Google-Smtp-Source: ALg8bN4ruV8HAdlIE8t/tLSbROTSSFENvZC8ko7gz05ZAYzlT9ooF3cAKw6P3UG8bJTe4eZxfyLIJQ==
-X-Received: by 2002:a63:d34a:: with SMTP id u10mr24374259pgi.301.1547490410289; 
- Mon, 14 Jan 2019 10:26:50 -0800 (PST)
+ bh=4PVGsIaG0j4vALC1QOjFPnyY7phcv6TK6Cm5VP11Suw=;
+ b=LpA4LCqEoqiCtmxVYeky2yrKCC0Kbd9fOjEodpK8fXEi0o+RXUi3Z1pycuQKNSluyI
+ MQQNp5Vhr7l4fwsd3LpBnR7wSfxENwDRVwr30JR/9GxIskDmZo/I4UElSlA81mB2S2tb
+ /EO2iUDxRAUynTaxZdbs4gJ38xuL+xPB8KFz3lnI4eiv6QSFSfRc5+lXeECYaFGAObZ+
+ Jqa80zRp3JU//cv/Z43e1QMBzZgA+b7In0CTO9ZHyc8Wi+Xyhw71VgYt4mRxBiADBuy/
+ AP/CwY915Kai0xDB1y4+wSmPAvKJg2OMIqaUpiXb1k7PhEcNkyXJPMVdSjCJDawJfdUS
+ D7Ng==
+X-Gm-Message-State: AJcUuke05iIMHbPTSWPZNztxgHGaAy1csSXk0wGN6tqybXVqWW0hNj+9
+ xJqx1m1eFD0aLIo4qUGI1LQ=
+X-Google-Smtp-Source: ALg8bN6AP3iO+4TliKc4aoBONgZ9d8K/BV8SK2rSufNhsB8QXo6xIpmbizZNDBNK5hD0z0sYciTP+A==
+X-Received: by 2002:a17:902:2f03:: with SMTP id
+ s3mr26187638plb.277.1547490985913; 
+ Mon, 14 Jan 2019 10:36:25 -0800 (PST)
 Received: from [10.67.49.9] ([192.19.223.250])
- by smtp.googlemail.com with ESMTPSA id 85sm1482946pfw.17.2019.01.14.10.26.48
+ by smtp.googlemail.com with ESMTPSA id v5sm1386261pgn.5.2019.01.14.10.36.22
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 14 Jan 2019 10:26:49 -0800 (PST)
-Subject: Re: [PATCH] ARM: dts: BCM53573: Relicense Luxul files to the GPL 2.0+
- / MIT
-To: =?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?= <rafal@milecki.pl>,
- Dan Haab <riproute@gmail.com>
-References: <1543795215-31863-1-git-send-email-dan.haab@luxul.com>
- <1abbf738f6ac9808310e27a43f430cc9@milecki.pl>
+ Mon, 14 Jan 2019 10:36:24 -0800 (PST)
+Subject: Re: [GIT PULL 1/4] bcm2835-defconfig-next-2018-11-27
+To: Stefan Wahren <stefan.wahren@i2se.com>,
+ Florian Fainelli <f.fainelli@gmail.com>
+References: <20181127211301.30296-1-eric@anholt.net>
+ <da219894-4bba-21a3-94dc-da7ff7e63896@gmail.com>
+ <1330816632.286127.1547059111664@email.ionos.de>
 From: Florian Fainelli <f.fainelli@gmail.com>
 Openpgp: preference=signencrypt
 Autocrypt: addr=f.fainelli@gmail.com; prefer-encrypt=mutual; keydata=
@@ -136,16 +136,16 @@ Autocrypt: addr=f.fainelli@gmail.com; prefer-encrypt=mutual; keydata=
  caxTGgc5zzQHeX67eMzrGomG3ZnIxmd1sAbgvJUDaD2GrYlulfwGWwWyTNbWRvMighVdPkSF
  6XFgQaosWxkV0OELLy2N485YrTr2Uq64VKyxpncLh50e2RnyAJ9Za0Dx0yyp44iD1OvHtkEI
  M5kY0ACeNhCZJvZ5g4C2Lc9fcTHu8jxmEkI=
-Message-ID: <158e0161-0d94-54a9-3851-9a3e65e85b77@gmail.com>
-Date: Mon, 14 Jan 2019 10:26:42 -0800
+Message-ID: <971c110c-862e-8a14-c7e7-56b8fd7072b9@gmail.com>
+Date: Mon, 14 Jan 2019 10:36:11 -0800
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <1abbf738f6ac9808310e27a43f430cc9@milecki.pl>
+In-Reply-To: <1330816632.286127.1547059111664@email.ionos.de>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_102652_328427_80FB539C 
-X-CRM114-Status: GOOD (  11.79  )
+X-CRM114-CacheID: sfid-20190114_103628_526876_2BC11B77 
+X-CRM114-Status: GOOD (  15.41  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -157,26 +157,65 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Dan Haab <dan.haab@luxul.com>, Rob Herring <robh+dt@kernel.org>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Eric Anholt <eric@anholt.net>, bcm-kernel-feedback-list@broadcom.com,
+ linux-rpi-kernel@lists.infradead.org, linux-arm-kernel@lists.infradead.org,
+ linux-kernel@vger.kernel.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMS8xMy8xOSAxMToxNSBQTSwgUmFmYcWCIE1pxYJlY2tpIHdyb3RlOgo+IE9uIDIwMTgtMTIt
-MDMgMDE6MDAsIERhbiBIYWFiIHdyb3RlOgo+PiBUaGlzIG1hdGNoZXMgbGljZW5zaW5nIHVzZWQg
-Ynkgb3RoZXIgQkNNNTM1NzMgZmlsZXMgYW5kIEJDTTUzMDFYLgo+Pgo+PiBTaWduZWQtb2ZmLWJ5
-OiBEYW4gSGFhYiA8ZGFuLmhhYWJAbHV4dWwuY29tPgo+IAo+IEFja2VkLWJ5OiBSYWZhxYIgTWnF
-gmVja2kgPHJhZmFsQG1pbGVja2kucGw+Cj4gCj4gRmxvcmlhbjogcGluZyA6KQoKSWYgYmNtLWtl
-cm5lbC1mZWVkYmFjay1saXN0QGJyb2FkY29tLmNvbSBpcyBub3QgY29waWVkLCB0aGVuIG91cgpw
-YXRjaHdvcmsgaW5zdGFuY2UgZG9lcyBub3QgcGljayB1cCB0aGF0IHBhdGNoLCBhbmQgdGhlcmUg
-aXMgYSByZW1vdGUKY2hhbmNlIHRoaW5ncyBjYW4gZ2V0IGxvc3QuLi4gTm90IHRyeWluZyB0byB1
-c2UgdGhhdCBhcyBhbiBleGN1c2UgZm9yCm5vdCBoYXZpbmcgc2VlbiB0aGlzLCBidXQgcGxlYXNl
-IG1ha2Ugc3VyZSB5b3UgY29weSB0aGF0IGxpc3QgdG8KbWF4aW1pemUgdGhlIGxpa2VsaWhvb2Qg
-b2YgZ2V0dGluZyBwYXRjaGVzIGFjY2VwdGVkLgoKTm93IGFwcGxpZWQsIHRoYW5rcyEKLS0gCkZs
-b3JpYW4KCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxp
-bnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFk
-ZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4
-LWFybS1rZXJuZWwK
+On 1/9/19 10:38 AM, Stefan Wahren wrote:
+> Hi Florian,
+> 
+>> Florian Fainelli <f.fainelli@gmail.com> hat am 28. November 2018 um 22:48 geschrieben:
+>>
+>>
+>>
+>>
+>> On 11/27/18 1:12 PM, Eric Anholt wrote:
+>>> Hi Florian,
+>>>
+>>> Hopefully I'm not too late this time around.  Stefan's been doing a
+>>> great job maintaining the bcm2835 branches, and was waiting for me to
+>>> send the PRs.
+>>>
+>>> The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
+>>>
+>>>   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+>>>
+>>> are available in the Git repository at:
+>>>
+>>>   git://github.com/anholt/linux tags/bcm2835-defconfig-next-2018-11-27
+>>>
+>>> for you to fetch changes up to 24632d6b78a1929b14f32cab762a0859db7086f2:
+>>>
+>>>   ARM: bcm2835_defconfig: Enable BCM2835 MMAL-based V4L2 camera driver (2018-11-15 19:07:36 +0100)
+>>>
+>>> ----------------------------------------------------------------
+>>> This pull request enables the V4L2 camera driver on the Pi1 defconfig.
+>>>
+>>> ----------------------------------------------------------------
+>>
+>> Merged into defconfig/next, thanks Eric.
+> 
+> looks like this patch didn't reached Olof for 4.21/5.0.
+
+Indeed, sorry about that, I must have somehow missed pushing the branch
+and it was not picked up by my script which I likely ran on a different
+machine than where the branch was merged locally.
+
+> 
+> Should i resend for the next version?
+
+No need to, this is now applied and pushed out to
+broadcom-github/stblinux/defconfig/next.
+
+Thanks!
+-- 
+Florian
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
