@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 43572C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 13:39:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 58170C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 13:40:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 04EDC206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 13:39:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 24D3320651
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 13:40:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BzLGsBQs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 04EDC206B7
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="p7CWhPFO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 24D3320651
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=xJUqO1uqF5U42UeEr1+2EPvKBWTL/7IOyoVa6MpL+D8=; b=BzLGsBQsakS9z9
-	71krW8xj9bIQvvaBtPIpuw6lj/oubuUO2PXO99yBaKRQ/0l6ZLNYWEeqHVM0K6QHia1ekTHxkLvno
-	B/dAr8FjfFhD8vXjUHGSJ+hiJqI1mlO3cfLVThxJjsCzpUKo8p2JZUf9oIhvu6DATPQP/VeoY3H+H
-	5CinuHak6KTmcAorEXMICaaaWhPzIxVwG+qTDQV9HpOl3IbqBYS24jUXlZSiec6QTU3KD3tCPS7v0
-	Sim3c047y86jMlSQ1X1lAVlqKVp1eJYtg+zxf6crQm7Q0P53l5xhbI4/4MQtAjV+6euVd/LGKonLm
-	opGjoEnEx3N0uO8IVPIw==;
+	List-Owner; bh=HGbw6G8zme880r63SGdLLIxheXoWvpOdOCLtjLxV7o4=; b=p7CWhPFO8T1DqY
+	LjNkuHN1ytGPw5+0f7IVZDdzfSdRFeoBkznyTP6NAtJ5GkReXqXwFNmAnEXIiKpu/hImV4Gi6EEpK
+	gVkXZclxReYLpbZaBvgMgtUyr6S81oum0au8HHSnewWaNovibOgcY5rdUVvht7JFVh4o2qzS0+nnX
+	zWI+dsxcZT5bXCvE0odIk2f64UJ8BKWR/3+D5AZ2v/8h4v9XwXNbC63EoWvWjYwn2iV+4t1shbIQG
+	ejfVaxFjh4o8A+12nwsyKCHt3/LoqT6F18qwnidM0OB99DTsfLM9H+RtymFslwgRyWrmr+qV1mqHl
+	FU9IXUYBy3KU0eTP1sbw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj2Su-0003fC-JY; Mon, 14 Jan 2019 13:39:44 +0000
+	id 1gj2T7-0003s6-8V; Mon, 14 Jan 2019 13:39:57 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj2SI-000369-FJ
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 13:39:09 +0000
+ id 1gj2SI-000368-FH
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 13:39:10 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id E27AA20955; Mon, 14 Jan 2019 14:39:00 +0100 (CET)
+ id 4C011209D7; Mon, 14 Jan 2019 14:39:01 +0100 (CET)
 Received: from localhost.localdomain
  (aaubervilliers-681-1-45-241.w90-88.abo.wanadoo.fr [90.88.163.241])
- by mail.bootlin.com (Postfix) with ESMTPSA id 6D91620728;
+ by mail.bootlin.com (Postfix) with ESMTPSA id CFB9F206F9;
  Mon, 14 Jan 2019 14:39:00 +0100 (CET)
 From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 To: linux-media@vger.kernel.org, linux-kernel@vger.kernel.org,
  devel@driverdev.osuosl.org, linux-arm-kernel@lists.infradead.org,
  linux-sunxi@googlegroups.com
-Subject: [PATCH RFC 1/4] media: vb2: Add helpers to access unselected buffers
-Date: Mon, 14 Jan 2019 14:38:36 +0100
-Message-Id: <20190114133839.29967-2-paul.kocialkowski@bootlin.com>
+Subject: [PATCH RFC 2/4] media: v4l2-mem2mem: Add an optional job_done
+ operation
+Date: Mon, 14 Jan 2019 14:38:37 +0100
+Message-Id: <20190114133839.29967-3-paul.kocialkowski@bootlin.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190114133839.29967-1-paul.kocialkowski@bootlin.com>
 References: <20190114133839.29967-1-paul.kocialkowski@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_053906_817052_819F5CF5 
-X-CRM114-Status: GOOD (  12.74  )
+X-CRM114-CacheID: sfid-20190114_053906_827249_08FB463E 
+X-CRM114-Status: GOOD (  16.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,100 +88,72 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Introduce helpers to request and release access to buffers that are
-not currently selected as current output or capture buffers.
+Introduce a new optional job_done operation, which allows calling back
+to the driver when a job is done. Since the job might be completed
+from interrupt context where some operations are not available, having
+a callback from non-atomic context allows performing these operations
+upon completion of a job. This is particularly useful for releasing
+access to a reference buffer, which cannot be done in atomic context.
 
-This is useful to ensure proper access to buffers imported via dma-buf
-that are used as reference and thus require associated map/unmap calls
-before access.
+Use the already existing v4l2_m2m_device_run_work work queue for that
+and clear the M2M device current context after calling job_done in the
+worker thread, so that the private data can be passed to the operation.
+
+Delaying the current context clearing should not be a problem since the
+next call to v4l2_m2m_try_run happens right after that.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- .../media/common/videobuf2/videobuf2-core.c   | 46 +++++++++++++++++++
- include/media/videobuf2-core.h                | 15 ++++++
- 2 files changed, 61 insertions(+)
+ drivers/media/v4l2-core/v4l2-mem2mem.c | 8 ++++++--
+ include/media/v4l2-mem2mem.h           | 4 ++++
+ 2 files changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/media/common/videobuf2/videobuf2-core.c b/drivers/media/common/videobuf2/videobuf2-core.c
-index 70e8c3366f9c..2a0c5de4d683 100644
---- a/drivers/media/common/videobuf2/videobuf2-core.c
-+++ b/drivers/media/common/videobuf2/videobuf2-core.c
-@@ -986,6 +986,52 @@ void vb2_discard_done(struct vb2_queue *q)
+diff --git a/drivers/media/v4l2-core/v4l2-mem2mem.c b/drivers/media/v4l2-core/v4l2-mem2mem.c
+index 631f4e2aa942..d5bccb0192f9 100644
+--- a/drivers/media/v4l2-core/v4l2-mem2mem.c
++++ b/drivers/media/v4l2-core/v4l2-mem2mem.c
+@@ -376,6 +376,11 @@ static void v4l2_m2m_device_run_work(struct work_struct *work)
+ 	struct v4l2_m2m_dev *m2m_dev =
+ 		container_of(work, struct v4l2_m2m_dev, job_work);
+ 
++	if (m2m_dev->m2m_ops->job_done && m2m_dev->curr_ctx)
++		m2m_dev->m2m_ops->job_done(m2m_dev->curr_ctx->priv);
++
++	m2m_dev->curr_ctx = NULL;
++
+ 	v4l2_m2m_try_run(m2m_dev);
  }
- EXPORT_SYMBOL_GPL(vb2_discard_done);
  
-+int vb2_buffer_access_request(struct vb2_buffer *vb)
-+{
-+	struct vb2_queue *q = vb->vb2_queue;
-+	unsigned int plane;
-+	int ret;
-+
-+	/* Only dmabuf-imported buffers need to be mapped before access. */
-+	if (q->memory != VB2_MEMORY_DMABUF)
-+		return -EINVAL;
-+
-+	for (plane = 0; plane < vb->num_planes; ++plane) {
-+		if (vb->planes[plane].dbuf_mapped)
-+			continue;
-+
-+		ret = call_memop(vb, map_dmabuf, vb->planes[plane].mem_priv);
-+		if (ret) {
-+			dprintk(1, "failed to map dmabuf for plane %d\n",
-+				plane);
-+			return ret;
-+		}
-+		vb->planes[plane].dbuf_mapped = 1;
-+	}
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(vb2_buffer_access_request);
-+
-+void vb2_buffer_access_release(struct vb2_buffer *vb)
-+{
-+	struct vb2_queue *q = vb->vb2_queue;
-+	unsigned int plane;
-+
-+	/* Only dmabuf-imported buffers need to be unmapped after access. */
-+	if (q->memory != VB2_MEMORY_DMABUF)
-+		return;
-+
-+	for (plane = 0; plane < vb->num_planes; ++plane) {
-+		if (!vb->planes[plane].dbuf_mapped)
-+			continue;
-+
-+		call_void_memop(vb, unmap_dmabuf, vb->planes[plane].mem_priv);
-+		vb->planes[plane].dbuf_mapped = 0;
-+	}
-+}
-+EXPORT_SYMBOL_GPL(vb2_buffer_access_release);
-+
- /*
-  * __prepare_mmap() - prepare an MMAP buffer
-  */
-diff --git a/include/media/videobuf2-core.h b/include/media/videobuf2-core.h
-index 4a737b2c610b..bf378c1e718b 100644
---- a/include/media/videobuf2-core.h
-+++ b/include/media/videobuf2-core.h
-@@ -1199,4 +1199,19 @@ bool vb2_request_object_is_buffer(struct media_request_object *obj);
-  */
- unsigned int vb2_request_buffer_cnt(struct media_request *req);
+@@ -431,8 +436,7 @@ void v4l2_m2m_job_finish(struct v4l2_m2m_dev *m2m_dev,
+ 	list_del(&m2m_dev->curr_ctx->queue);
+ 	m2m_dev->curr_ctx->job_flags &= ~(TRANS_QUEUED | TRANS_RUNNING);
+ 	wake_up(&m2m_dev->curr_ctx->finished);
+-	m2m_dev->curr_ctx = NULL;
+-
++	/* The current context pointer is cleared after the job_done step. */
+ 	spin_unlock_irqrestore(&m2m_dev->job_spinlock, flags);
  
-+/**
-+ * vb2_buffer_access_request() - request out-of-band data access to a buffer
-+ *
-+ * @vb:		buffer to request data access for
-+ */
-+int vb2_buffer_access_request(struct vb2_buffer *vb);
-+
-+
-+/**
-+ * vb2_buffer_access_release() - release out-of-band data access to a buffer
-+ *
-+ * @vb:		buffer to release data access for
-+ */
-+void vb2_buffer_access_release(struct vb2_buffer *vb);
-+
- #endif /* _MEDIA_VIDEOBUF2_CORE_H */
+ 	/* This instance might have more buffers ready, but since we do not
+diff --git a/include/media/v4l2-mem2mem.h b/include/media/v4l2-mem2mem.h
+index 43e447dcf69d..261bcd661b2d 100644
+--- a/include/media/v4l2-mem2mem.h
++++ b/include/media/v4l2-mem2mem.h
+@@ -40,11 +40,15 @@
+  *		v4l2_m2m_job_finish() (as if the transaction ended normally).
+  *		This function does not have to (and will usually not) wait
+  *		until the device enters a state when it can be stopped.
++ * @job_done:	optional. Informs the driver that the current job was completed.
++ *		This can be useful to release access to extra buffers that were
++ *		required for the job, such as reference buffers for decoding.
+  */
+ struct v4l2_m2m_ops {
+ 	void (*device_run)(void *priv);
+ 	int (*job_ready)(void *priv);
+ 	void (*job_abort)(void *priv);
++	void (*job_done)(void *priv);
+ };
+ 
+ struct video_device;
 -- 
 2.20.1
 
