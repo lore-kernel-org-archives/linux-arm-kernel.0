@@ -4,21 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AAC23C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 14:44:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DC322C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 14:53:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 77C2E20657
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 14:44:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ABCA02133D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 14:53:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A43ExlUl";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="YuGVxqVP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 77C2E20657
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cvnZCmSj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ABCA02133D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,62 +25,36 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
 	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=N7qHFMCjoP3fXM5P46bNC78f5bVqtjwA+mGpcty+4Io=; b=A43
-	ExlUlEnUFGR+Y+asK5FmIXVPWhTXPvvVRBvkNP67DISUYek72DPeuYpHTWcR1okSoxdzZe7eNLBol
-	RUoqhzHVIM//eHsDPQ1U0Cu+ikiHTA9zdA64sG0x4QlvFZrGOYlxMM+mPB4eSoR/T7JKdL5rwKXXo
-	BIVJrg3m3kEUuin15RtnKB2fy6zUIhJeS+tGekfjwxtGoeNpaXAESWPp8NqDYibaCsVN+NYwZQD/C
-	K5Q9C+oN9a4WvpaOHNf0lEJoytApjuS3JO/yv/jvl/iI4zZkmOBOvwzAZcK0ydn9w0kuvlElD7TzR
-	xBNxyDDfirMKtlf4brC+bUXFdF6S1sw==;
+	References:List-Owner; bh=bAKnUe+9smhQclpSErIPpWtO9ihv8Sb+9aTPvP6NqY4=; b=cvn
+	ZCmSjyJ4uYGCYVVIRd4YQbD3QvjMoMT6Fu4ZJ6qo/LoM0VH/uXWkUYqLTlJkQgphNK200S8JnV3/2
+	stHoom6z1VLf0Fq4PQ9eI1C2f7+H1rtA87NVSvyl/WRaVyITnZ0TFvxy7KumF4AEEdWiVE4Z0GibV
+	mMg+hLbN7CmJ7Chw7lb9D1qTmn27E19sZ2jesDA9tAfQVb7EEkJe41ru1U12OD57wIoWrf21Cee2Q
+	ZCg8gIk3w2a/QwmbUOgZpYMUhrcnuZmJQx+r2UYcSQoHvb6rr+FxnFLmrhmFsACT4HzKZDfdVa1/e
+	1bYcLLrHggfjzYUmJa9ynI3TuuPWuEQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj3Th-00043Z-Ey; Mon, 14 Jan 2019 14:44:37 +0000
-Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj3TZ-00041D-8b
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 14:44:35 +0000
-Received: by mail-wr1-x444.google.com with SMTP id l9so23098442wrt.13
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 14 Jan 2019 06:44:27 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id;
- bh=xe96/CDqWQQvShXiMB+V1zI3NOQy5KGMXXH6OKg7/Kk=;
- b=YuGVxqVPwPohXE8aPjXcSTo+3ydeyko0UPqK6Y1d+82EC/OF1cYsZeAydSDjU/ttk6
- /2OkrhcRdK8rUqphWCl2SH9mqR64RuX9y4kiu2EmVNEH7ffUvO7T1wzbkBMN2akM+F1+
- D7QDxVtt4GrD2R+KBOpapV7Tf19OBD5hutPUjkG5j0KczoG1fI8OaLEa1EYjrjhrXNRM
- ZhnERDExnu8E4qNF7LL4FchGoxfeqGfHjypCkw0uiOSHRZPyZqY4wFRExdkNv4ufXL70
- HTea+2gPUvvrKTKmqvp2+vdf9xuKQfDTL1N+DYoPXzVGOy1dUSlIlHtyIbCsWF+vXzdl
- FdAw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=xe96/CDqWQQvShXiMB+V1zI3NOQy5KGMXXH6OKg7/Kk=;
- b=kyY9v7SGLqAeqcWT6d+tYYuIdiAB4ctYYhvPFmp1F+piLXKPZohM/d1K8dPB6CPfic
- CPlln3+YbLtfRKz7ksHny7AZBbMB0Q/VIiid4j1F6aqW1dET2NqJa3e7BqmXxo7GXVFl
- 7N9qxHZhll8WVCWlgT5OORDUQER3XCrIsIBhl5jO170UkGbwloCV5BoTIT4/jFPox8dU
- pDLf4zOt0YHoXOWQ0K/SGbUuCp4xfF2HVZQBXOoDhLW5oQwHLqd+PSkZ8SuxJ/blKQg+
- 0qjfBhP3ZXPj6DfPVoWzFdR5uTT42TGsxnkKCVHkYDfRnEoQcOc6iqxOTppAfk2ZkjrL
- Aavg==
-X-Gm-Message-State: AJcUukeRZoLzPSLsgEltKMSW+YsnS8PNqYQj6mnnu4cAdiZlKUZ9XFgt
- tkTwdsOJYl5BP5yHC0rpdqd2/w==
-X-Google-Smtp-Source: ALg8bN75eCUbpHM5e3dpfQAqh5qJdYx9egLZgCTSbQz01udST+kSdhvqX3FB/+NGUgKAL5/mw4u/GA==
-X-Received: by 2002:a5d:6487:: with SMTP id r7mr25326660wru.263.1547477065807; 
- Mon, 14 Jan 2019 06:44:25 -0800 (PST)
-Received: from loys-ubuntu-BY1835A49200471.thefacebook.com
- (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr. [90.63.244.31])
- by smtp.googlemail.com with ESMTPSA id e27sm76692285wra.67.2019.01.14.06.44.24
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Mon, 14 Jan 2019 06:44:25 -0800 (PST)
-From: Loys Ollivier <lollivier@baylibre.com>
-To: devicetree@vger.kernel.org, Kevin Hilman <khilman@baylibre.com>,
- linux-amlogic@lists.infradead.org
-Subject: [PATCH v4] arm64: dts: meson: Fix mmc cd-gpios polarity
-Date: Mon, 14 Jan 2019 15:44:21 +0100
-Message-Id: <1547477061-31543-1-git-send-email-lollivier@baylibre.com>
-X-Mailer: git-send-email 2.7.4
+	id 1gj3c3-0007Cu-7c; Mon, 14 Jan 2019 14:53:15 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gj3by-0007CR-T1
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 14:53:13 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2B7F480D;
+ Mon, 14 Jan 2019 06:53:08 -0800 (PST)
+Received: from login2.euhpc.arm.com (login2.euhpc.arm.com [10.6.27.34])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 3F2323F70D;
+ Mon, 14 Jan 2019 06:53:07 -0800 (PST)
+From: Vladimir Murzin <vladimir.murzin@arm.com>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [RESEND PATCH] ARM: NOMMU: Toggle only bits in EXC_RETURN we are
+ really care of
+Date: Mon, 14 Jan 2019 14:52:45 +0000
+Message-Id: <1547477565-3327-1-git-send-email-vladimir.murzin@arm.com>
+X-Mailer: git-send-email 2.0.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_064429_453376_A50002B2 
-X-CRM114-Status: GOOD (  11.04  )
+X-CRM114-CacheID: sfid-20190114_065310_942720_6564422D 
+X-CRM114-Status: GOOD (  12.24  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,249 +66,101 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- Linus Walleij <linus.walleij@linaro.org>,
- Loys Ollivier <lollivier@baylibre.com>, linux-mmc@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Jerome Brunet <jbrunet@baylibre.com>
+Cc: kbuild-all@01.org, alexandre.torgue@st.com, sza@esh.hu
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Commit 89a5e15bcba8 ("gpio/mmc/of: Respect polarity in the device tree")
-changed the behavior of "cd-inverted" to follow the device tree bindings
-specification:
-According to SDHCI standard, CD lines are specified as "active low".
-Using the "cd-inverted" property means that the CD line is "active high".
+ARMv8M introduces support for Security extension to M class, among
+other things it affects exception handling, especially, encoding of
+EXC_RETURN.
 
-Fix the SD card description for meson by setting the cd-gpios as
-"active low", according to the boards specifications, and dropping the
-"cd-inverted" property.
+The new bits have been added:
 
-Fixes: 89a5e15bcba8 ("gpio/mmc/of: Respect polarity in the device tree")
-Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
+Bit [6]	Secure or Non-secure stack
+Bit [5]	Default callee register stacking
+Bit [0]	Exception Secure
+
+which conflicts with hard-coded value of EXC_RETURN:
+
+In fact, we only care of few bits:
+
+Bit [3]	 Mode (0 - Handler, 1 - Thread)
+Bit [2]	 Stack pointer selection (0 - Main, 1 - Process)
+
+We can toggle only those bits and left other bits as they were on
+exception entry.
+
+It is basically, what patch does - saves EXC_RETURN when we do
+transition form Thread to Handler mode (it is first svc), so later
+saved value is used instead of EXC_RET_THREADMODE_PROCESSSTACK.
+
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
 
-v4: commit message clarification on the "cd-inverted" property and usage.
+Kernel Version: v5.0-rc2
 
-v3: fix typos in the commit message.
+ arch/arm/include/asm/v7m.h     | 2 +-
+ arch/arm/kernel/entry-header.S | 3 ++-
+ arch/arm/kernel/entry-v7m.S    | 4 ++++
+ arch/arm/mm/proc-v7m.S         | 3 +++
+ 4 files changed, 10 insertions(+), 2 deletions(-)
 
-v2: fix more occurences, also in other meson boards.
-
- arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi            | 3 +--
- arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts           | 3 +--
- arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts         | 3 +--
- arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts            | 3 +--
- arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi               | 3 +--
- arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi           | 3 +--
- arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi              | 3 +--
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts | 3 +--
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts   | 3 +--
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts    | 3 +--
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi          | 3 +--
- arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts          | 3 +--
- arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts            | 3 +--
- arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts             | 3 +--
- 14 files changed, 14 insertions(+), 28 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-index e14e0ce7e89f..016641a41694 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-@@ -187,8 +187,7 @@
- 	max-frequency = <100000000>;
- 	disable-wp;
+diff --git a/arch/arm/include/asm/v7m.h b/arch/arm/include/asm/v7m.h
+index 187ccf6..2cb00d1 100644
+--- a/arch/arm/include/asm/v7m.h
++++ b/arch/arm/include/asm/v7m.h
+@@ -49,7 +49,7 @@
+  * (0 -> msp; 1 -> psp). Bits [1:0] are fixed to 0b01.
+  */
+ #define EXC_RET_STACK_MASK			0x00000004
+-#define EXC_RET_THREADMODE_PROCESSSTACK		0xfffffffd
++#define EXC_RET_THREADMODE_PROCESSSTACK		(3 << 2)
  
--	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
--	cd-inverted;
-+	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
+ /* Cache related definitions */
  
- 	vmmc-supply = <&vddao_3v3>;
- 	vqmmc-supply = <&vddio_boot>;
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
-index 8cd50b75171d..ade2ee09ae96 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
-@@ -305,8 +305,7 @@
- 	max-frequency = <200000000>;
- 	disable-wp;
+diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+index 7734248..62db1c9 100644
+--- a/arch/arm/kernel/entry-header.S
++++ b/arch/arm/kernel/entry-header.S
+@@ -127,7 +127,8 @@
+          */
+ 	.macro	v7m_exception_slow_exit ret_r0
+ 	cpsid	i
+-	ldr	lr, =EXC_RET_THREADMODE_PROCESSSTACK
++	ldr	lr, =exc_ret
++	ldr	lr, [lr]
  
--	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
--	cd-inverted;
-+	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
- 
- 	vmmc-supply = <&vddio_ao3v3>;
- 	vqmmc-supply = <&vddio_tf>;
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-index 4cf7f6e80c6a..25105ac96d55 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-@@ -238,8 +238,7 @@
- 	max-frequency = <100000000>;
- 	disable-wp;
- 
--	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
--	cd-inverted;
-+	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
- 
- 	vmmc-supply = <&vddao_3v3>;
- 	vqmmc-supply = <&vddio_card>;
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-index 2e1cd5e3a246..1cc9dc68ef00 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-@@ -258,8 +258,7 @@
- 	max-frequency = <100000000>;
- 	disable-wp;
- 
--	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
--	cd-inverted;
-+	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
- 
- 	vmmc-supply = <&tflash_vdd>;
- 	vqmmc-supply = <&tf_io>;
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-index ce862266b9aa..0be0f2a5d2fe 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-@@ -196,8 +196,7 @@
- 	max-frequency = <100000000>;
- 	disable-wp;
- 
--	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
--	cd-inverted;
-+	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
- 
- 	vmmc-supply = <&vddao_3v3>;
- 	vqmmc-supply = <&vddio_card>;
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-index 93a4acf2c46c..ad4d50bd9d77 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-@@ -154,8 +154,7 @@
- 	max-frequency = <100000000>;
- 	disable-wp;
- 
--	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
--	cd-inverted;
-+	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
- 
- 	vmmc-supply = <&vcc_3v3>;
- };
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi
-index ec09bb5792b7..2d2db783c44c 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi
-@@ -211,8 +211,7 @@
- 	max-frequency = <100000000>;
- 	disable-wp;
- 
--	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
--	cd-inverted;
-+	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
- 
- 	vmmc-supply = <&vddao_3v3>;
- 	vqmmc-supply = <&vcc_3v3>;
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts
-index f1c410e2da2b..796baea7a0bf 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts
-@@ -131,8 +131,7 @@
- 	max-frequency = <100000000>;
- 	disable-wp;
- 
--	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
--	cd-inverted;
-+	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
- 
- 	vmmc-supply = <&vddao_3v3>;
- 	vqmmc-supply = <&vddio_card>;
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
-index db293440e4ca..255cede7b447 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
-@@ -238,8 +238,7 @@
- 	max-frequency = <100000000>;
- 	disable-wp;
- 
--	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
--	cd-inverted;
-+	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
- 
- 	vmmc-supply = <&vcc_3v3>;
- 	vqmmc-supply = <&vcc_card>;
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
-index 6739697be1de..9cbdb85fb591 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
-@@ -183,8 +183,7 @@
- 	max-frequency = <100000000>;
- 	disable-wp;
- 
--	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
--	cd-inverted;
-+	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
- 
- 	vmmc-supply = <&vddao_3v3>;
- 	vqmmc-supply = <&vddio_card>;
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
-index a1b31013ab6e..bc811a2faf42 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
-@@ -137,8 +137,7 @@
- 	max-frequency = <100000000>;
- 	disable-wp;
- 
--	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
--	cd-inverted;
-+	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
- 
- 	vmmc-supply = <&vddao_3v3>;
- 	vqmmc-supply = <&vddio_boot>;
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
-index 3c3a667a8df8..3f086ed7de05 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
-@@ -356,8 +356,7 @@
- 	max-frequency = <100000000>;
- 	disable-wp;
- 
--	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
--	cd-inverted;
-+	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
- 
- 	vmmc-supply = <&vddao_3v3>;
- 	vqmmc-supply = <&vddio_boot>;
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
-index f7a1cffab4a8..8acfd40090d2 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
-@@ -147,8 +147,7 @@
- 	max-frequency = <100000000>;
- 	disable-wp;
- 
--	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
--	cd-inverted;
-+	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
- 
- 	vmmc-supply = <&vddao_3v3>;
- 	vqmmc-supply = <&vddio_boot>;
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts
-index 7212dc4531e4..7fa20a8ede17 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts
-@@ -170,8 +170,7 @@
- 	max-frequency = <100000000>;
- 	disable-wp;
- 
--	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
--	cd-inverted;
-+	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
- 
- 	vmmc-supply = <&vddao_3v3>;
- 	vqmmc-supply = <&vddio_boot>;
+ 	@ read original r12, sp, lr, pc and xPSR
+ 	add	r12, sp, #S_IP
+diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
+index abcf478..19d2dcd 100644
+--- a/arch/arm/kernel/entry-v7m.S
++++ b/arch/arm/kernel/entry-v7m.S
+@@ -146,3 +146,7 @@ ENTRY(vector_table)
+ 	.rept	CONFIG_CPU_V7M_NUM_IRQ
+ 	.long	__irq_entry		@ External Interrupts
+ 	.endr
++	.align	2
++	.globl	exc_ret
++exc_ret:
++	.space	4
+diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
+index 47a5acc..92e8418 100644
+--- a/arch/arm/mm/proc-v7m.S
++++ b/arch/arm/mm/proc-v7m.S
+@@ -139,6 +139,9 @@ __v7m_setup_cont:
+ 	cpsie	i
+ 	svc	#0
+ 1:	cpsid	i
++	ldr	r0, =exc_ret
++	orr	lr, lr, #EXC_RET_THREADMODE_PROCESSSTACK
++	str	lr, [r0]
+ 	ldmia	sp, {r0-r3, r12}
+ 	str	r5, [r12, #11 * 4]	@ restore the original SVC vector entry
+ 	mov	lr, r6			@ restore LR
 -- 
 2.7.4
 
