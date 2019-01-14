@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 25944C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 12:06:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8CBF7C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 12:06:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E97F220656
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 12:06:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 601EF20656
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 12:06:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="T+pynvt4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E97F220656
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K4oDqU6k"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 601EF20656
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,37 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=uQA/za8fHnyu4gnAwn5UdkqKkT69WWxwVnQTF+p24xE=; b=T+pynvt4IB8Jtm
-	tQ9J7544bLU37/1fup4qpmJNnL+UBp2+KJdTtckLA5BA57u1qVXR5s2LXfI11zx2nr8nfGK/4iRup
-	LrlMU6rjwH0n4U7ZeBHWTV5H0kFao9uKA1aZCsv4G2gU1tl2BBQX+7RBzz67jMvDNhxkKU3jfhco4
-	Yb3tOJxW6B6fZh8xA+LaQIRUFx5+/ZAYYUOH01l20Q2DJlO134ueKiqOBXGQbnaRQ2uQuWtduXiYn
-	GQqACHEQepTsGjFeSejuwdSWEnd1TuozMH5kZKCYEHiTk8QpVIBx56ppHXSQQuizFcgBm3x+KZ7NV
-	/jRHkzyrfJFJikvMWA+w==;
+	List-Owner; bh=zN5ua3ZH1HrZnbzuF+sCYdPdNYsH4o/yKQ9iX6sjb6E=; b=K4oDqU6kVpIhfY
+	zpscIgsuloMbASQbkcvyE6/vLd6RBVM7EdqprO83Pn7vQSRwUycTStDP3TYyYO0kvwb1rxIMlRLwU
+	T+JaSi0P8kbG/VvAOosIVXHIfetTjEOclBYE83P0NqYKQjIEooYl+oEqmwLlzatKsTFYEJNa5pu1l
+	R9gjmxVTQ1lEZNQRhGwkEF6NZq8K+MYEC1fIzgA3Z1MdgHqKIvrd9POXF6bH/Otcm7P82nwHqPY4A
+	lJfMjtfi2cAbuT7hTqDyYMV+mlBVwVioUr6t+Gnt6dq+2Ei9LUpWRW9bJt+Q55kqPjzXwCqx5NM/y
+	er6H3xU3eqVsWOtfBhOQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj10F-0006xJ-Pu; Mon, 14 Jan 2019 12:06:03 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gj10V-0007AO-M8; Mon, 14 Jan 2019 12:06:19 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj100-0006h4-4A; Mon, 14 Jan 2019 12:05:51 +0000
+ id 1gj102-0006jj-GR; Mon, 14 Jan 2019 12:05:54 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id ECC0880D;
- Mon, 14 Jan 2019 04:05:47 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 541FD15AB;
+ Mon, 14 Jan 2019 04:05:50 -0800 (PST)
 Received: from e110467-lin.cambridge.arm.com (e110467-lin.cambridge.arm.com
  [10.1.196.75])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id BA1A13F5BD;
- Mon, 14 Jan 2019 04:05:46 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 5F1513F5BD;
+ Mon, 14 Jan 2019 04:05:49 -0800 (PST)
 From: Robin Murphy <robin.murphy@arm.com>
 To: heiko@sntech.de
-Subject: [PATCH v2 1/4] arm64: dts: rockchip: Add DT for NanoPi M4
-Date: Mon, 14 Jan 2019 12:05:31 +0000
-Message-Id: <a96995cfa599792b24e740ce46d53bd68ef1d462.1547466003.git.robin.murphy@arm.com>
+Subject: [PATCH v2 3/4] arm64: dts: rockchip: Add NanoPC-T4 IR receiver
+Date: Mon, 14 Jan 2019 12:05:33 +0000
+Message-Id: <7356fc6d1e3eebfec0408d0ca61b32c11e4994e9.1547466003.git.robin.murphy@arm.com>
 X-Mailer: git-send-email 2.20.1.dirty
 In-Reply-To: <cover.1547466003.git.robin.murphy@arm.com>
 References: <cover.1547466003.git.robin.murphy@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_040548_574912_28686667 
-X-CRM114-Status: GOOD (  20.00  )
+X-CRM114-CacheID: sfid-20190114_040550_718824_D2A313F9 
+X-CRM114-Status: GOOD (  15.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,90 +68,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, linux-rockchip@lists.infradead.org,
- Rob Herring <robh+dt@kernel.org>, linux-arm-kernel@lists.infradead.org,
+Cc: linux-rockchip@lists.infradead.org, linux-arm-kernel@lists.infradead.org,
  devicetree@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-There are a number of subtle differences between the nanopi4 variants,
-and where they disagree, the common DTSI currently follows the details
-of NanoPi M4. In order to improve matters even more, let's add a
-separate DTS for the M4 to which we can start splitting things out
-appropriately. The third variant, NanoPi NEO4, is a lot closer to the M4
-than either is to the larger T4, so arguably could get away with just
-sharing the M4 DT for now (plus I have neither of the smaller boards to
-actually test with).
+In common with most Rockchip reference designs, NanoPC-T4 has a passive
+IR receiver connected to PWM3. In lieu of a specialised driver for
+PWM-based IR pulse measurement, running the pin as a GPIO with the basic
+driver works perfectly well.
 
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
 
-v2: Fix the copy-paste binding thinko
+v2: No change
 
- .../devicetree/bindings/arm/rockchip.yaml      |  6 ++++--
- arch/arm64/boot/dts/rockchip/Makefile          |  1 +
- .../boot/dts/rockchip/rk3399-nanopi-m4.dts     | 18 ++++++++++++++++++
- 3 files changed, 23 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-nanopi-m4.dts
+ .../arm64/boot/dts/rockchip/rk3399-nanopc-t4.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/rockchip.yaml b/Documentation/devicetree/bindings/arm/rockchip.yaml
-index bcc60c492a12..fb46fecab542 100644
---- a/Documentation/devicetree/bindings/arm/rockchip.yaml
-+++ b/Documentation/devicetree/bindings/arm/rockchip.yaml
-@@ -87,9 +87,11 @@ properties:
-           - const: firefly,roc-rk3399-pc
-           - const: rockchip,rk3399
- 
--      - description: FriendlyElec NanoPC-T4
-+      - description: FriendlyElec NanoPi4 series boards
-         items:
--          - const: friendlyarm,nanopc-t4
-+          - enum:
-+              - friendlyarm,nanopc-t4
-+              - friendlyarm,nanopi-m4
-           - const: rockchip,rk3399
- 
-       - description: GeekBuying GeekBox
-diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
-index 1c7406111dfd..91a669378605 100644
---- a/arch/arm64/boot/dts/rockchip/Makefile
-+++ b/arch/arm64/boot/dts/rockchip/Makefile
-@@ -17,6 +17,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-gru-kevin.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-gru-scarlet-inx.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-gru-scarlet-kd.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-nanopc-t4.dtb
-+dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-nanopi-m4.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-puma-haikou.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-roc-pc.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-rock960.dtb
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-nanopi-m4.dts b/arch/arm64/boot/dts/rockchip/rk3399-nanopi-m4.dts
-new file mode 100644
-index 000000000000..8d3f0ba29c72
---- /dev/null
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-nanopi-m4.dts
-@@ -0,0 +1,18 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * FriendlyElec NanoPi M4 board device tree source
-+ *
-+ * Copyright (c) 2018 FriendlyElec Computer Tech. Co., Ltd.
-+ * (http://www.friendlyarm.com)
-+ *
-+ * Copyright (c) 2018 Collabora Ltd.
-+ * Copyright (c) 2019 Arm Ltd.
-+ */
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-nanopc-t4.dts b/arch/arm64/boot/dts/rockchip/rk3399-nanopc-t4.dts
+index 623a03f2548a..84433cf02be9 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-nanopc-t4.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-nanopc-t4.dts
+@@ -45,6 +45,22 @@
+ 			press-threshold-microvolt = <18000>;
+ 		};
+ 	};
 +
-+/dts-v1/;
-+#include "rk3399-nanopi4.dtsi"
-+
-+/ {
-+	model = "FriendlyElec NanoPi M4";
-+	compatible = "friendlyarm,nanopi-m4", "rockchip,rk3399";
++	ir-receiver {
++		compatible = "gpio-ir-receiver";
++		gpios = <&gpio0 RK_PA6 GPIO_ACTIVE_LOW>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&ir_rx>;
++	};
 +};
++
++&pinctrl {
++	ir {
++		ir_rx: ir-rx {
++			/* external pullup to VCC3V3_SYS, despite being 1.8V :/ */
++			rockchip,pins = <0 RK_PA6 RK_FUNC_1 &pcfg_pull_none>;
++		};
++	};
+ };
+ 
+ &sdhci {
 -- 
 2.20.1.dirty
 
