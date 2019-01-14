@@ -2,66 +2,81 @@ Return-Path: <SRS0=baBj=PW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 51BF6C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 13:12:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 22CC3C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 13:20:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 213BE20659
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 13:12:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E67BF20659
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 13:20:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CC2Rz/ey"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 213BE20659
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pKhWhX45";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="VbPJHVc4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E67BF20659
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=jphaXcgZ6GcUNMJH8+jJTQj0aMrbz+SAo14Vds7fIIQ=; b=CC2Rz/eyNuGDFOGfL2ufO32cC
-	fNWuR9JAOCX5qauN4tJbYz0r6/YO4QKlzuz4V0V56s9JrtjcETfZsvPgZRZVzXXqecaFx65fuhtsW
-	OB9psTBaRAprewRc9+e9plLI0g746DV3a875rQ+ljRInRxH3qsfdR81TVhc+7zIWC7N9XZKW9R49T
-	H959YmyE9ZUFp9bn7EVuruSNMXKAXOjkS/7lExq70QhI81Eg4quI78fWElvTijQYvM/z6w/zNFItp
-	Q+ykal7CIvlzRzShd4ZzLVbCXdDSS6hrj/d1J5A0DL+HRzAYRw/c/tBVFd+wvn5d5/WxDdhu9W3lo
-	LnwCAWn5w==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=DVaVp78I3veqLrGXaXWhUVUyuNGmmyF0C1QHu72C06o=; b=pKhWhX45N5kGi+
+	cupPCaS9ck8zJh+w5+D+Y4A7WAAIgTMcekzhmAX8Yiy7PbcQPR9tT5oJqKRr7VKi2cIO3ziSt/WM0
+	oNrZfP1HRh7gF7lPtfR09Y821wxcddZPJk8kPXGhVML6+u3A57yFX/j3B+dT5RXkcY24n1XcFiJuD
+	JntSfyLOVHc4nh2hWPvLCtdAh9aQ8ANUWB1B4iWW/jH6Ip1k09nMsWF1VV2dMEB3IL0Hw2Fz6sEXK
+	Kh55F57Hqpl9huAMLJwXn81nNwx3FrujDgQRauDgiqJCzQV+gR2wZ+jwEx3PuDGVO5gXzwzETtZbg
+	CYdppivwvDDhi4U/rZIg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj22l-0005Kq-Ss; Mon, 14 Jan 2019 13:12:43 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj22h-0005KL-Cj
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 13:12:41 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 523E8A78;
- Mon, 14 Jan 2019 05:12:37 -0800 (PST)
-Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5F4F73F5AF;
- Mon, 14 Jan 2019 05:12:35 -0800 (PST)
-Subject: Re: [PATCH 1/3] dma-mapping: remove the default map_resource
- implementation
-To: Christoph Hellwig <hch@lst.de>, Pawel Osciak <pawel@osciak.com>,
- Marek Szyprowski <m.szyprowski@samsung.com>,
- Kyungmin Park <kyungmin.park@samsung.com>,
- =?UTF-8?Q?Niklas_S=c3=b6derlund?= <niklas.soderlund+renesas@ragnatech.se>
-References: <20190111181731.11782-1-hch@lst.de>
- <20190111181731.11782-2-hch@lst.de>
-From: Robin Murphy <robin.murphy@arm.com>
-Message-ID: <c882430e-1dbd-df86-d686-0381dcaa668e@arm.com>
-Date: Mon, 14 Jan 2019 13:12:33 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gj2A8-00010z-D0; Mon, 14 Jan 2019 13:20:20 +0000
+Received: from mail-vs1-xe44.google.com ([2607:f8b0:4864:20::e44])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gj2A4-00010R-U1
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 13:20:18 +0000
+Received: by mail-vs1-xe44.google.com with SMTP id n10so13556611vso.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 14 Jan 2019 05:20:16 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=BPyljIgp2wEitX709Kaplkdsc+3QnHtjc7OXNLr97mY=;
+ b=VbPJHVc46QXcFBKFE3I2nW4/kRQrqfB08PxGSuaaIrhrC6UYG1BJDZq7bu1hGXPn1Y
+ PpadgyAB7lxGLRYe00psCeAzPZ5B9QaW54JJ+wthLjKNI2/CTpNKH8fRbSvJyZmpZ1U4
+ vNJaWxsd3DQvZiYhRQ6f0HdQ1g1RMQdpxMLJc=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=BPyljIgp2wEitX709Kaplkdsc+3QnHtjc7OXNLr97mY=;
+ b=I2o0eUBtt08fLJ0t8gJYMZkX7VUB3ciZhFGheCFEMDv3abkr3c5GhutpOnO8AjSSDz
+ huf4rkBTqz+9/KbCjWhtUzWbXGNPf8LtnwW1RlPxXESwz5bG4Nj6fLncHDcDhP5S/POq
+ 5/R86BUA+HxrZYWlQwcmpjX++Nb+t0tA+5DSj0ZJbzh3k4NwDBZ2yJ8U57QhAktOEiqM
+ BKqCBlbs+KDCQfS6EGJ8pGpFvd8d98gxRuHT+mk0XiXZt1GhHUIo+bfskZN/75ft8t8p
+ muR72HJZwrMNsuk/2ueUEMi1Attrz5jWlhyaiPfgL+EWXAiCAaH6MD/yz7KvRQW1USPr
+ hoNQ==
+X-Gm-Message-State: AJcUukd4BSRvaZfxwkQ1UmNP3UA9NiAiY/Ezh8fIdXfPL8yeZhN5+dqJ
+ /exGLFoe+axzke/3m67Fp4DfHtfukeEHLZSpst82xA==
+X-Google-Smtp-Source: ALg8bN4iQ+FKWGs0V8+Zfasd85Mka6IBshlzF/S6RTztWRmgXRPrclByZfy62qQD/mNO0aEYsQCE2HrmYxPIE4GOWWk=
+X-Received: by 2002:a67:7685:: with SMTP id r127mr10202029vsc.35.1547472015449; 
+ Mon, 14 Jan 2019 05:20:15 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20190111181731.11782-2-hch@lst.de>
-Content-Language: en-GB
+References: <1545598758-4502-1-git-send-email-stefan.wahren@i2se.com>
+ <CAPDyKFpTW07CsemS1=0kTEc88-ZXb6+HUVaviGb+8eWBOyRjvA@mail.gmail.com>
+ <675cab05-164f-fd72-9d87-1506dc5a6b7a@i2se.com>
+In-Reply-To: <675cab05-164f-fd72-9d87-1506dc5a6b7a@i2se.com>
+From: Ulf Hansson <ulf.hansson@linaro.org>
+Date: Mon, 14 Jan 2019 14:19:39 +0100
+Message-ID: <CAPDyKFoOz4MB0QkM=JAera4-wF7LBsv23wW+YfQwkbStmRL0Bw@mail.gmail.com>
+Subject: Re: [PATCH 1/2] mmc: sdhci-iproc: handle mmc_of_parse() errors during
+ probe
+To: Stefan Wahren <stefan.wahren@i2se.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_051239_444641_3597E965 
-X-CRM114-Status: GOOD (  28.89  )
+X-CRM114-CacheID: sfid-20190114_052016_993974_6090B4E0 
+X-CRM114-Status: GOOD (  14.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,178 +88,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Russell King <linux@armlinux.org.uk>, linux-kernel@vger.kernel.org,
- iommu@lists.linux-foundation.org, Mauro Carvalho Chehab <mchehab@kernel.org>,
- linuxppc-dev@lists.ozlabs.org, linux-arm-kernel@lists.infradead.org,
- linux-media@vger.kernel.org
+Cc: Florian Fainelli <f.fainelli@gmail.com>,
+ Scott Branden <sbranden@broadcom.com>, Ray Jui <rjui@broadcom.com>,
+ Al Cooper <alcooperx@gmail.com>,
+ "linux-mmc@vger.kernel.org" <linux-mmc@vger.kernel.org>,
+ Adrian Hunter <adrian.hunter@intel.com>, "# 4.0+" <stable@vger.kernel.org>,
+ Eric Anholt <eric@anholt.net>,
+ BCM Kernel Feedback <bcm-kernel-feedback-list@broadcom.com>,
+ Gregory Fong <gregory.0xf0@gmail.com>,
+ Brian Norris <computersforpeace@gmail.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 11/01/2019 18:17, Christoph Hellwig wrote:
-> Just returning the physical address when not map_resource method is
-> present is highly dangerous as it doesn't take any offset in the
-> direct mapping into account and does the completely wrong thing for
-> IOMMUs.  Instead provide a proper implementation in the direct mapping
-> code, and also wire it up for arm and powerpc.
+On Mon, 14 Jan 2019 at 13:01, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+>
+> Hi Ulf,
+>
+> Am 14.01.2019 um 12:44 schrieb Ulf Hansson:
+> > On Sun, 23 Dec 2018 at 22:00, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> >> We need to handle mmc_of_parse() errors during probe.
+> >>
+> >> This finally fixes the wifi regression on Raspberry Pi 3 series.
+> >> In error case the wifi chip was permanently in reset because of
+> >> the power sequence depending on the deferred probe of the GPIO expander.
+> >>
+> >> Fixes: b580c52d58d9 ("mmc: sdhci-iproc: add IPROC SDHCI driver")
+> >> Cc: stable@vger.kernel.org
+> >> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> > Applied for next, thanks!
+>
+> since this fixes a regression can this applied to fixes, please?
 
-Ignoring the offset was kind of intentional there, because at the time I 
-was primarily thinking about it in terms of the Keystone 2 platform 
-where the peripherals are all in the same place (0-2GB) in both the bus 
-and CPU physical address maps, and only the view of RAM differs between 
-the two (2-4GB vs. 32-34GB). However, on something like BCM283x, the 
-peripherals region is also offset from its bus address in the CPU view, 
-but at a *different* offset relative to that of RAM.
+Of course, my apologies! I don't know why I didn't notice earlier,
+especially due to your descriptive changelog.
 
-Fortunately, I'm not aware of any platform which has a DMA engine behind 
-an IOMMU (and thus *needs* to use dma_map_resource() to avoid said IOMMU 
-blocking the slave device register reads/writes) and also has any 
-nonzero offsets, and AFAIK the IOMMU-less platforms above aren't using 
-dma_map_resource() at all, so this change shouldn't actually break 
-anything, but I guess we have a bit of a problem making it truly generic 
-and robust :(
+I moved patch to fixes, thanks!
 
-Is this perhaps another shove in the direction of overhauling 
-dma_pfn_offset into an arbitrary "DMA ranges" lookup table?
-
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> ---
->   arch/arm/mm/dma-mapping.c         |  2 ++
->   arch/powerpc/kernel/dma-swiotlb.c |  1 +
->   arch/powerpc/kernel/dma.c         |  1 +
->   include/linux/dma-mapping.h       | 12 +++++++-----
->   kernel/dma/direct.c               | 14 ++++++++++++++
->   5 files changed, 25 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index f1e2922e447c..3c8534904209 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -188,6 +188,7 @@ const struct dma_map_ops arm_dma_ops = {
->   	.unmap_page		= arm_dma_unmap_page,
->   	.map_sg			= arm_dma_map_sg,
->   	.unmap_sg		= arm_dma_unmap_sg,
-> +	.map_resource		= dma_direct_map_resource,
->   	.sync_single_for_cpu	= arm_dma_sync_single_for_cpu,
->   	.sync_single_for_device	= arm_dma_sync_single_for_device,
->   	.sync_sg_for_cpu	= arm_dma_sync_sg_for_cpu,
-> @@ -211,6 +212,7 @@ const struct dma_map_ops arm_coherent_dma_ops = {
->   	.get_sgtable		= arm_dma_get_sgtable,
->   	.map_page		= arm_coherent_dma_map_page,
->   	.map_sg			= arm_dma_map_sg,
-> +	.map_resource		= dma_direct_map_resource,
->   	.dma_supported		= arm_dma_supported,
->   };
->   EXPORT_SYMBOL(arm_coherent_dma_ops);
-> diff --git a/arch/powerpc/kernel/dma-swiotlb.c b/arch/powerpc/kernel/dma-swiotlb.c
-> index 7d5fc9751622..fbb2506a414e 100644
-> --- a/arch/powerpc/kernel/dma-swiotlb.c
-> +++ b/arch/powerpc/kernel/dma-swiotlb.c
-> @@ -55,6 +55,7 @@ const struct dma_map_ops powerpc_swiotlb_dma_ops = {
->   	.dma_supported = swiotlb_dma_supported,
->   	.map_page = dma_direct_map_page,
->   	.unmap_page = dma_direct_unmap_page,
-> +	.map_resource = dma_direct_map_resource,
->   	.sync_single_for_cpu = dma_direct_sync_single_for_cpu,
->   	.sync_single_for_device = dma_direct_sync_single_for_device,
->   	.sync_sg_for_cpu = dma_direct_sync_sg_for_cpu,
-> diff --git a/arch/powerpc/kernel/dma.c b/arch/powerpc/kernel/dma.c
-> index b1903ebb2e9c..258b9e8ebb99 100644
-> --- a/arch/powerpc/kernel/dma.c
-> +++ b/arch/powerpc/kernel/dma.c
-> @@ -273,6 +273,7 @@ const struct dma_map_ops dma_nommu_ops = {
->   	.dma_supported			= dma_nommu_dma_supported,
->   	.map_page			= dma_nommu_map_page,
->   	.unmap_page			= dma_nommu_unmap_page,
-> +	.map_resource			= dma_direct_map_resource,
->   	.get_required_mask		= dma_nommu_get_required_mask,
->   #ifdef CONFIG_NOT_COHERENT_CACHE
->   	.sync_single_for_cpu 		= dma_nommu_sync_single,
-> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-> index cef2127e1d70..d3087829a6df 100644
-> --- a/include/linux/dma-mapping.h
-> +++ b/include/linux/dma-mapping.h
-> @@ -208,6 +208,8 @@ dma_addr_t dma_direct_map_page(struct device *dev, struct page *page,
->   		unsigned long attrs);
->   int dma_direct_map_sg(struct device *dev, struct scatterlist *sgl, int nents,
->   		enum dma_data_direction dir, unsigned long attrs);
-> +dma_addr_t dma_direct_map_resource(struct device *dev, phys_addr_t paddr,
-> +		size_t size, enum dma_data_direction dir, unsigned long attrs);
->   
->   #if defined(CONFIG_ARCH_HAS_SYNC_DMA_FOR_DEVICE) || \
->       defined(CONFIG_SWIOTLB)
-> @@ -346,19 +348,19 @@ static inline dma_addr_t dma_map_resource(struct device *dev,
->   					  unsigned long attrs)
->   {
->   	const struct dma_map_ops *ops = get_dma_ops(dev);
-> -	dma_addr_t addr;
-> +	dma_addr_t addr = DMA_MAPPING_ERROR;
->   
->   	BUG_ON(!valid_dma_direction(dir));
->   
->   	/* Don't allow RAM to be mapped */
->   	BUG_ON(pfn_valid(PHYS_PFN(phys_addr)));
->   
-> -	addr = phys_addr;
-> -	if (ops && ops->map_resource)
-> +	if (dma_is_direct(ops))
-> +		addr = dma_direct_map_resource(dev, phys_addr, size, dir, attrs);
-> +	else if (ops->map_resource)
->   		addr = ops->map_resource(dev, phys_addr, size, dir, attrs);
-
-Might it be reasonable to do:
-
-	if (!dma_is_direct(ops) && ops->map_resource)
-		addr = ops->map_resource(...);
-	else
-		addr = dma_direct_map_resource(...);
-
-and avoid having to explicitly wire up the dma_direct callback elsewhere?
-
-Robin.
-
->   
->   	debug_dma_map_resource(dev, phys_addr, size, dir, addr);
-> -
->   	return addr;
->   }
->   
-> @@ -369,7 +371,7 @@ static inline void dma_unmap_resource(struct device *dev, dma_addr_t addr,
->   	const struct dma_map_ops *ops = get_dma_ops(dev);
->   
->   	BUG_ON(!valid_dma_direction(dir));
-> -	if (ops && ops->unmap_resource)
-> +	if (!dma_is_direct(ops) && ops->unmap_resource)
->   		ops->unmap_resource(dev, addr, size, dir, attrs);
->   	debug_dma_unmap_resource(dev, addr, size, dir);
->   }
-> diff --git a/kernel/dma/direct.c b/kernel/dma/direct.c
-> index 355d16acee6d..8e0359b04957 100644
-> --- a/kernel/dma/direct.c
-> +++ b/kernel/dma/direct.c
-> @@ -356,6 +356,20 @@ int dma_direct_map_sg(struct device *dev, struct scatterlist *sgl, int nents,
->   }
->   EXPORT_SYMBOL(dma_direct_map_sg);
->   
-> +dma_addr_t dma_direct_map_resource(struct device *dev, phys_addr_t paddr,
-> +		size_t size, enum dma_data_direction dir, unsigned long attrs)
-> +{
-> +	dma_addr_t dma_addr = phys_to_dma(dev, paddr);
-> +
-> +	if (unlikely(!dma_direct_possible(dev, dma_addr, size))) {
-> +		report_addr(dev, dma_addr, size);
-> +		return DMA_MAPPING_ERROR;
-> +	}
-> +
-> +	return dma_addr;
-> +}
-> +EXPORT_SYMBOL(dma_direct_map_resource);
-> +
->   /*
->    * Because 32-bit DMA masks are so common we expect every architecture to be
->    * able to satisfy them - either by not supporting more physical memory, or by
-> 
+Kind regards
+Uffe
 
 _______________________________________________
 linux-arm-kernel mailing list
