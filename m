@@ -2,65 +2,97 @@ Return-Path: <SRS0=baBj=PW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+X-Spam-Status: No, score=-6.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 652E9C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 10:03:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C01B6C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 10:06:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 343612086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 10:03:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 90B442086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 10:06:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DqYl9cyZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 343612086D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PALV64YZ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ffwll.ch header.i=@ffwll.ch header.b="GzMIrTld"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 90B442086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ffwll.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=E3dc9xxsR3BO1cq+OTOKme9an83uF4puZTwVRm6fPkc=; b=DqYl9cyZu+/qwGuUzMn4GEXeO
-	XtZ8tpE0B1S+3dl9eklEkfxsv4htkjcJtq/l/7nN2Iia1nYaLCdQo8rXWBLz07vCHAMORNHv/tuVT
-	jQxHn1086AVNpRY4kjNxtDfvc/ffgt1kSENkADvgloTH2INhTou3zRKwZK6doR45hyvPqiYn78HTk
-	n8yM1C7Is/fUV96NWF33OSkqx6H3RLkCdLZybcIFoA4jVxr7cIr20UQRRcLmdt1ujp1l027NCxn88
-	PcPrvLjfOBmq7da8OkWwRmKXyIyYsXcaXEDR8BHfjFn6iIAB1lkU9GbWT3/ZSb/dMmmJSE9O8YjHt
-	zmQjhy4SA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=2xc9IwhYUh92b6sT+k3bpuY0FcbYet0PtNkPQoUf3Sc=; b=PALV64YZIiHrHi
+	XnYfLrVkq0IQd+4EDQO1gRuctk8U5zXsL4aHiclx8jamoYtMZqTzhxV87JWY0gD/tme3abbOJgKfX
+	1+CMCi9uUo9VUNuccPH6A+ssw3WZawCt5tzMubtRa/zlMnE/hz2oCd+ewtUkZtqnTTmY+ZcjKB63S
+	Bj9nT3jp9q8X7dG/3iZQ8jJJQ1nnerECOHQMgPJtW9a4QRE7c8Ht8Ai1lNqB4cxMqkzdikAmRht+m
+	8823yb+GyqZ4zqspvdAaiKwUUgf9f7ECUZA6XIOjGKvhWRw/kp0BzAFSEQ9fmmO8Q2/pODsa/FzdT
+	q4O6bmCeOA+SIanyNVzQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1giz57-0007uW-MG; Mon, 14 Jan 2019 10:02:57 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1giz4e-0007YQ-N9
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 10:02:55 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 64C6CA78;
- Mon, 14 Jan 2019 02:02:26 -0800 (PST)
-Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id EACA23F5AF;
- Mon, 14 Jan 2019 02:02:22 -0800 (PST)
-Subject: Re: [PATCH v3 1/7] sysfs/cpu: Allow individual architectures to
- select vulnerabilities
-To: jeremy.linton@arm.com, linux-arm-kernel@lists.infradead.org
-References: <20190109235544.2992426-1-jeremy.linton@arm.com>
- <20190109235544.2992426-2-jeremy.linton@arm.com>
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
-Message-ID: <901f2f29-aa06-13ad-1995-f9f22184e39d@arm.com>
-Date: Mon, 14 Jan 2019 10:02:21 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1giz89-0002AW-Go; Mon, 14 Jan 2019 10:06:05 +0000
+Received: from mail-ed1-x541.google.com ([2a00:1450:4864:20::541])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1giz84-00023H-Tv
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 10:06:02 +0000
+Received: by mail-ed1-x541.google.com with SMTP id x30so18189343edx.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 14 Jan 2019 02:06:00 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ffwll.ch; s=google;
+ h=sender:date:from:to:cc:subject:message-id:mail-followup-to
+ :references:mime-version:content-disposition:in-reply-to:user-agent;
+ bh=31n6q9gHjvwQ8HUcLFEyEeRyWzXo+P9WHYJIC1waV1I=;
+ b=GzMIrTldTY5X354pq6qiV+EXzAMdM86Sg6lGpmfcDNZVI4880Yj6bX+93vsfPuoIPI
+ S4VPGjtU5zju+vsYOsJVm9OBVymSF33Sq0qyid79WYqnsmzG6DxOyjYk38kSRNB4mXo2
+ /uFDcvkMbpc8m0gojkYCN0tDMPJSJNmoZM5Rg=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:sender:date:from:to:cc:subject:message-id
+ :mail-followup-to:references:mime-version:content-disposition
+ :in-reply-to:user-agent;
+ bh=31n6q9gHjvwQ8HUcLFEyEeRyWzXo+P9WHYJIC1waV1I=;
+ b=s8rjmdTtn1m18LQHtHjK4CnNdiSZoxp8HXik2V8N48qf9QU8wHdaIysatTn7iMQEzj
+ qH0SWkZAzbrGfRlTv9g5J/lnqluTu/J5v4D8kHzDZVQwOgeGvz5g1fdFBlgGURRgZR8m
+ NOkuc/y8UeIyEe6nykVZybu+KbIffSi2T0pcEj/kcG7Oa/1qrc5SXK31CXe0HS2E5BiR
+ lMESdyhhxAPZe2VW3fDnCj+9/R11N3S1appKRJUQzWeo0dPzuOit4dWRnZ/syjZYUvTx
+ /lREffJbvTwNVhEhulemCWTK8MbfNtE1bcjrAqUdvbrSvSjA/EYlgniW8elFmgW4qAzG
+ fH5g==
+X-Gm-Message-State: AJcUukdkhiMh3GC9rFRXAyX3C3SuykpC22knNDO/cEwsxQ/vvKmb9vuz
+ uA8wirsxbSc6pGl/1MQoQkCI3g==
+X-Google-Smtp-Source: ALg8bN4nZrWkCsQEb2QLSbmu7yWl951UtmaS41OrKfjpqVinoMnVAMbr5lU2HQbwuQRUJhm4APVzHA==
+X-Received: by 2002:a17:906:340a:: with SMTP id
+ c10-v6mr19939655ejb.130.1547460358897; 
+ Mon, 14 Jan 2019 02:05:58 -0800 (PST)
+Received: from phenom.ffwll.local ([2a02:168:569e:0:3106:d637:d723:e855])
+ by smtp.gmail.com with ESMTPSA id s5-v6sm2265009eji.25.2019.01.14.02.05.57
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 14 Jan 2019 02:05:58 -0800 (PST)
+Date: Mon, 14 Jan 2019 11:05:56 +0100
+From: Daniel Vetter <daniel@ffwll.ch>
+To: Heiko Stuebner <heiko@sntech.de>
+Subject: Re: [PATCH 3/4] drm/rockchip: add missing of_node_put
+Message-ID: <20190114100556.GC10517@phenom.ffwll.local>
+Mail-Followup-To: Heiko Stuebner <heiko@sntech.de>,
+ Julia Lawall <Julia.Lawall@lip6.fr>,
+ Sandy Huang <hjc@rock-chips.com>, kernel-janitors@vger.kernel.org,
+ David Airlie <airlied@linux.ie>, dri-devel@lists.freedesktop.org,
+ linux-arm-kernel@lists.infradead.org,
+ linux-rockchip@lists.infradead.org, linux-kernel@vger.kernel.org
+References: <1547369264-24831-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1547369264-24831-4-git-send-email-Julia.Lawall@lip6.fr>
+ <3397932.PmTvevuZIG@phil>
 MIME-Version: 1.0
-In-Reply-To: <20190109235544.2992426-2-jeremy.linton@arm.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <3397932.PmTvevuZIG@phil>
+X-Operating-System: Linux phenom 4.19.0-1-amd64 
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_020229_265205_32FA2D3B 
-X-CRM114-Status: GOOD (  24.91  )
+X-CRM114-CacheID: sfid-20190114_020601_018031_5121E566 
+X-CRM114-Status: GOOD (  14.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,102 +104,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: stefan.wahren@i2se.com, mlangsdo@redhat.com, jkosina@suse.cz,
- ak@linux.intel.com, jpoimboe@redhat.com, julien.thierry@arm.com,
- marc.zyngier@arm.com, catalin.marinas@arm.com, rafael@kernel.org,
- will.deacon@arm.com, linux-kernel@vger.kernel.org, Steven.Price@arm.com,
- konrad.wilk@oracle.com, mingo@kernel.org, gregkh@linuxfoundation.org,
- ykaukab@suse.de, longman@redhat.com, tglx@linutronix.de, dave.martin@arm.com,
- shankerd@codeaurora.org
+Cc: linux-rockchip@lists.infradead.org, David Airlie <airlied@linux.ie>,
+ kernel-janitors@vger.kernel.org, Sandy Huang <hjc@rock-chips.com>,
+ dri-devel@lists.freedesktop.org, linux-kernel@vger.kernel.org,
+ Julia Lawall <Julia.Lawall@lip6.fr>, Daniel Vetter <daniel@ffwll.ch>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-
-On 09/01/2019 23:55, Jeremy Linton wrote:
-> As suggested on the list, https://lkml.org/lkml/2019/1/4/282, there are
-> a number of cases where its useful for a system to avoid exporting a
-> sysfs entry for a given vulnerability. This set adds an architecture
-> specific callback which returns the bitmap of vulnerabilities the
-> architecture would like to advertise.
+On Sun, Jan 13, 2019 at 07:48:49PM +0100, Heiko Stuebner wrote:
+> Am Sonntag, 13. Januar 2019, 09:47:43 CET schrieb Julia Lawall:
+> > The device node iterators perform an of_node_get on each iteration, so a
+> > jump out of the loop requires an of_node_put.
+> > 
+> > The semantic patch that fixes this problem is as follows
+> > (http://coccinelle.lip6.fr):
+> > 
+> > // <smpl>
+> > @@
+> > expression root,e;
+> > local idexpression child;
+> > iterator name for_each_child_of_node;
+> > @@
+> > 
+> >  for_each_child_of_node(root, child) {
+> >    ... when != of_node_put(child)
+> >        when != e = child
+> > +  of_node_put(child);
+> > ?  break;
+> >    ...
+> > }
+> > ... when != child
+> > // </smpl>
+> > 
+> > Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 > 
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Rafael J. Wysocki <rafael@kernel.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Josh Poimboeuf <jpoimboe@redhat.com>
-> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> Cc: Ingo Molnar <mingo@kernel.org>
-> Cc: Waiman Long <longman@redhat.com>
-> Cc: Andi Kleen <ak@linux.intel.com>
-> Cc: Jiri Kosina <jkosina@suse.cz>
-> ---
->   drivers/base/cpu.c  | 19 +++++++++++++++++++
->   include/linux/cpu.h |  7 +++++++
->   2 files changed, 26 insertions(+)
+> I've added a fixes+stable tag and applied it to drm-misc-fixes
+
+All of them or just this one here? These cleanup patches have a high
+chance of falling through cracks, so taking them all usually works out
+better ...
+-Daniel
+
 > 
-> diff --git a/drivers/base/cpu.c b/drivers/base/cpu.c
-> index eb9443d5bae1..35f6dfb24cd6 100644
-> --- a/drivers/base/cpu.c
-> +++ b/drivers/base/cpu.c
-> @@ -561,6 +561,11 @@ static struct attribute *cpu_root_vulnerabilities_attrs[] = {
->   	NULL
->   };
->   
-> +uint __weak arch_supported_vuln_attr_fields(void)
-> +{
-> +	return VULN_MELTDOWN|VULN_SPECTREV1|VULN_SPECTREV2|VULN_SSB|VULN_L1TF;
-> +}
-> +
->   static const struct attribute_group cpu_root_vulnerabilities_group = {
->   	.name  = "vulnerabilities",
->   	.attrs = cpu_root_vulnerabilities_attrs,
-> @@ -568,6 +573,20 @@ static const struct attribute_group cpu_root_vulnerabilities_group = {
->   
->   static void __init cpu_register_vulnerabilities(void)
->   {
-> +	int fld;
-> +	int max_fields = ARRAY_SIZE(cpu_root_vulnerabilities_attrs) - 1;
-> +	struct attribute **hd = cpu_root_vulnerabilities_attrs;
-> +	uint enabled_fields = arch_supported_vuln_attr_fields();
-> +
-> +	/* only enable entries requested by the arch code */
-> +	for (fld = 0; fld < max_fields; fld++) {
-> +		if (enabled_fields & 1 << fld) {
-> +			*hd = cpu_root_vulnerabilities_attrs[fld];
-> +			hd++;
-> +		}
-> +	}
-> +	*hd = NULL;
-> +
+> Thanks for catching that
+> Heiko
+> 
+> 
 
-nit: Could we use "is_visible" callback in the attribute group to check this
-dynamically ?
-
->   	if (sysfs_create_group(&cpu_subsys.dev_root->kobj,
->   			       &cpu_root_vulnerabilities_group))
->   		pr_err("Unable to register CPU vulnerabilities\n");
-> diff --git a/include/linux/cpu.h b/include/linux/cpu.h
-> index 218df7f4d3e1..5e45814bcc24 100644
-> --- a/include/linux/cpu.h
-> +++ b/include/linux/cpu.h
-> @@ -189,4 +189,11 @@ static inline void cpu_smt_check_topology_early(void) { }
->   static inline void cpu_smt_check_topology(void) { }
->   #endif
->   
-> +/* generic cpu vulnerability attributes */
-> +#define VULN_MELTDOWN  0x01
-> +#define VULN_SPECTREV1 0x02
-> +#define VULN_SPECTREV2 0x04
-> +#define VULN_SSB       0x08
-> +#define VULN_L1TF      0x10
-
-nit: May use BIT() ?
-
-Cheers
-Suzuki
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
 
 _______________________________________________
 linux-arm-kernel mailing list
