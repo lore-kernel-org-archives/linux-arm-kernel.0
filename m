@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 48001C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 09:59:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 475AAC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 09:59:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0C84720660
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 09:59:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0926120660
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 09:59:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oKsFoiaW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0C84720660
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pWAIUyWM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0926120660
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,24 +25,24 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=bTXGLEW83SF/6Q5NjHeYmLVkcj7QmpiADLe0QU3vwmM=; b=oKsFoiaWMcKwy6
-	rt0pB8AS6oX2+CD4IOHLEPGsrDQB442KLLeWz2rBt05+UeZsoCRw9vW/wbZ8xW039XoOUGyUqeCut
-	WIOrubD4PMROb6aMMOOWdlix5XUklC3d79uu+xHqGjxDBQFL1P1QYjHMwU4mpq71ohE6qmSOZKT7g
-	4MWfrc7l5w4QaedolCF7OyZNvAbZTO65tIyCPaaUzNNIVRa5tHI+X4TQif8GZ3mTIyv54kN6zxAZh
-	S9sgC815ZyFjndLLW4SjX4zq+/2SpWOuKD38XfVL1Wm61m0aE9z0FGHMxdbSfsQfmvO2PCsTtWgtM
-	nJdo5KQ/UTPgJ05atrdA==;
+	List-Owner; bh=q8g5IkcCH6ltC8ni3Qccg6O/8qENGzqWrsh7O3QE4Gg=; b=pWAIUyWMjTsACY
+	IBu4f45kPD/BM2NGUbF56XR41d1jdJ2Yze2UUlWaH8/TgBkRRHdbktcLGwJaTdv/ZQjLIiVnQawrf
+	dbWXrcLCs3v8qjzozr4yUAzQF+H6szz4Z5aqw8yNLZywB+H4emsQ3elfKKI8mdP11XEVuXCeB9ndD
+	uiPCe+Dg1kcfHJJonv3pymyQWIAzXy0enzmizlNqoFeMQRx7jd64pDLYzuwJScpV0iEHalvUctB7P
+	eouNzNtnDUZK4lV32Yx7vWOnyPVYRTCovWV8IoPBko40Q2V8/PG2BbBGk5+3PX7JhkiDKPutBmUS9
+	0tJ0A83p854kVVKdaZxw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1giz1k-0003Ts-Sn; Mon, 14 Jan 2019 09:59:29 +0000
+	id 1giz23-0003il-Nr; Mon, 14 Jan 2019 09:59:47 +0000
 Received: from 089144213167.atnat0022.highway.a1.net ([89.144.213.167]
  helo=localhost)
  by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1giz0d-0001xy-DN; Mon, 14 Jan 2019 09:58:20 +0000
+ id 1giz0g-00021E-SG; Mon, 14 Jan 2019 09:58:23 +0000
 From: Christoph Hellwig <hch@lst.de>
 To: Ulf Hansson <ulf.hansson@linaro.org>
-Subject: [PATCH 04/11] mmc: omap: handle chained sglists
-Date: Mon, 14 Jan 2019 10:57:57 +0100
-Message-Id: <20190114095804.27978-5-hch@lst.de>
+Subject: [PATCH 05/11] mmc: s3cmci: handle highmem pages
+Date: Mon, 14 Jan 2019 10:57:58 +0100
+Message-Id: <20190114095804.27978-6-hch@lst.de>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190114095804.27978-1-hch@lst.de>
 References: <20190114095804.27978-1-hch@lst.de>
@@ -68,66 +68,242 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Use the proper sg_next() helper to move to the next scatterlist element
-to support chained scatterlists.
+Instead of setting up a kernel pointer to track the current PIO address,
+track the offset in the current page, and do an atomic kmap for the page
+while doing the actual PIO operations.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- drivers/mmc/host/omap.c | 16 ++++++----------
- 1 file changed, 6 insertions(+), 10 deletions(-)
+ drivers/mmc/host/s3cmci.c | 107 +++++++++++++++++++-------------------
+ drivers/mmc/host/s3cmci.h |   3 +-
+ 2 files changed, 55 insertions(+), 55 deletions(-)
 
-diff --git a/drivers/mmc/host/omap.c b/drivers/mmc/host/omap.c
-index 0377ac6194a0..248707aba2df 100644
---- a/drivers/mmc/host/omap.c
-+++ b/drivers/mmc/host/omap.c
-@@ -148,7 +148,7 @@ struct mmc_omap_host {
- 	struct mmc_data		*stop_data;
+diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
+index 10f5219b3b40..1be84426c817 100644
+--- a/drivers/mmc/host/s3cmci.c
++++ b/drivers/mmc/host/s3cmci.c
+@@ -15,6 +15,7 @@
+ #include <linux/dmaengine.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/clk.h>
++#include <linux/highmem.h>
+ #include <linux/mmc/host.h>
+ #include <linux/platform_device.h>
+ #include <linux/cpufreq.h>
+@@ -317,26 +318,17 @@ static void s3cmci_check_sdio_irq(struct s3cmci_host *host)
+ 	}
+ }
  
- 	unsigned int		sg_len;
--	int			sg_idx;
-+	struct scatterlist	*cur_sg;
- 	u32			buffer_offset;
- 	u32			buffer_bytes_left;
- 	u32			total_bytes_left;
-@@ -646,11 +646,8 @@ mmc_omap_cmd_timer(struct timer_list *t)
- static void
- mmc_omap_sg_to_buf(struct mmc_omap_host *host)
+-static inline int get_data_buffer(struct s3cmci_host *host,
+-				  u32 *bytes, u32 **pointer)
++static inline int get_data_buffer(struct s3cmci_host *host)
  {
 -	struct scatterlist *sg;
 -
--	sg = host->data->sg + host->sg_idx;
--	host->buffer_bytes_left = sg->length;
--	host->buffer_offset = sg->offset;
-+	host->buffer_bytes_left = host->cur_sg->length;
-+	host->buffer_offset = host->cur_sg->offset;
- 	if (host->buffer_bytes_left > host->total_bytes_left)
- 		host->buffer_bytes_left = host->total_bytes_left;
- }
-@@ -667,13 +664,12 @@ mmc_omap_clk_timer(struct timer_list *t)
- static void
- mmc_omap_xfer_data(struct mmc_omap_host *host, int write)
+-	if (host->pio_active == XFER_NONE)
+-		return -EINVAL;
+-
+-	if ((!host->mrq) || (!host->mrq->data))
+-		return -EINVAL;
+-
+ 	if (host->pio_sgptr >= host->mrq->data->sg_len) {
+ 		dbg(host, dbg_debug, "no more buffers (%i/%i)\n",
+ 		      host->pio_sgptr, host->mrq->data->sg_len);
+ 		return -EBUSY;
+ 	}
+-	sg = &host->mrq->data->sg[host->pio_sgptr];
++	host->cur_sg = &host->mrq->data->sg[host->pio_sgptr];
+ 
+-	*bytes = sg->length;
+-	*pointer = sg_virt(sg);
++	host->pio_bytes = host->cur_sg->length;
++	host->pio_offset = host->cur_sg->offset;
+ 
+ 	host->pio_sgptr++;
+ 
+@@ -422,11 +414,16 @@ static void s3cmci_disable_irq(struct s3cmci_host *host, bool transfer)
+ 
+ static void do_pio_read(struct s3cmci_host *host)
  {
--	struct scatterlist *sg = host->data->sg + host->sg_idx;
-+	struct scatterlist *sg = host->cur_sg;
- 	int n, nwords;
- 	void *p;
+-	int res;
+ 	u32 fifo;
+ 	u32 *ptr;
+ 	u32 fifo_words;
+ 	void __iomem *from_ptr;
++	void *buf;
++
++	if (host->pio_active == XFER_NONE)
++		goto done;
++	if (!host->mrq || !host->mrq->data)
++		goto done;
  
- 	if (host->buffer_bytes_left == 0) {
--		host->sg_idx++;
--		BUG_ON(host->sg_idx == host->sg_len);
-+		host->cur_sg = sg_next(host->cur_sg);
- 		mmc_omap_sg_to_buf(host);
- 	}
- 	n = 64;
-@@ -985,7 +981,7 @@ mmc_omap_prepare_data(struct mmc_omap_host *host, struct mmc_request *req)
+ 	/* write real prescaler to host, it might be set slow to fix */
+ 	writel(host->prescaler, host->base + S3C2410_SDIPRE);
+@@ -435,20 +432,12 @@ static void do_pio_read(struct s3cmci_host *host)
+ 
+ 	while ((fifo = fifo_count(host))) {
+ 		if (!host->pio_bytes) {
+-			res = get_data_buffer(host, &host->pio_bytes,
+-					      &host->pio_ptr);
+-			if (res) {
+-				host->pio_active = XFER_NONE;
+-				host->complete_what = COMPLETION_FINALIZE;
+-
+-				dbg(host, dbg_pio, "pio_read(): "
+-				    "complete (no more data).\n");
+-				return;
+-			}
++			if (get_data_buffer(host) < 0)
++				goto done;
+ 
+ 			dbg(host, dbg_pio,
+-			    "pio_read(): new target: [%i]@[%p]\n",
+-			    host->pio_bytes, host->pio_ptr);
++			    "pio_read(): new target: [%i]@[%zu]\n",
++			    host->pio_bytes, host->pio_offset);
  		}
+ 
+ 		dbg(host, dbg_pio,
+@@ -470,63 +459,65 @@ static void do_pio_read(struct s3cmci_host *host)
+ 		host->pio_count += fifo;
+ 
+ 		fifo_words = fifo >> 2;
+-		ptr = host->pio_ptr;
+-		while (fifo_words--)
++	
++		buf = (kmap_atomic(sg_page(host->cur_sg)) + host->pio_offset);
++		ptr = buf;
++		while (fifo_words--) {
+ 			*ptr++ = readl(from_ptr);
+-		host->pio_ptr = ptr;
++			host->pio_offset += 4;
++		}
+ 
+ 		if (fifo & 3) {
+ 			u32 n = fifo & 3;
+ 			u32 data = readl(from_ptr);
+-			u8 *p = (u8 *)host->pio_ptr;
++			u8 *p = (u8 *)ptr;
+ 
+ 			while (n--) {
+ 				*p++ = data;
+ 				data >>= 8;
++				host->pio_offset++;
+ 			}
+ 		}
++		kunmap_atomic(buf);
  	}
  
--	host->sg_idx = 0;
-+	host->cur_sg = host->data->sg;
- 	if (use_dma) {
- 		enum dma_data_direction dma_data_dir;
- 		struct dma_async_tx_descriptor *tx;
+ 	if (!host->pio_bytes) {
+-		res = get_data_buffer(host, &host->pio_bytes, &host->pio_ptr);
+-		if (res) {
+-			dbg(host, dbg_pio,
+-			    "pio_read(): complete (no more buffers).\n");
+-			host->pio_active = XFER_NONE;
+-			host->complete_what = COMPLETION_FINALIZE;
+-
+-			return;
+-		}
++		if (get_data_buffer(host) < 0)
++			goto done;
+ 	}
+ 
+ 	enable_imask(host,
+ 		     S3C2410_SDIIMSK_RXFIFOHALF | S3C2410_SDIIMSK_RXFIFOLAST);
++	return;
++
++done:
++	host->pio_active = XFER_NONE;
++	host->complete_what = COMPLETION_FINALIZE;
++	dbg(host, dbg_pio, "pio_read(): complete (no more data).\n");
+ }
+ 
+ static void do_pio_write(struct s3cmci_host *host)
+ {
+ 	void __iomem *to_ptr;
+-	int res;
++	void *buf;
+ 	u32 fifo;
+ 	u32 *ptr;
+ 
++	if (host->pio_active == XFER_NONE)
++		goto done;
++	if (!host->mrq || !host->mrq->data)
++		goto done;
++
+ 	to_ptr = host->base + host->sdidata;
+ 
+ 	while ((fifo = fifo_free(host)) > 3) {
+ 		if (!host->pio_bytes) {
+-			res = get_data_buffer(host, &host->pio_bytes,
+-							&host->pio_ptr);
+-			if (res) {
+-				dbg(host, dbg_pio,
+-				    "pio_write(): complete (no more data).\n");
+-				host->pio_active = XFER_NONE;
+-
+-				return;
+-			}
++			if (get_data_buffer(host) < 0)
++				goto done;
+ 
+ 			dbg(host, dbg_pio,
+-			    "pio_write(): new source: [%i]@[%p]\n",
+-			    host->pio_bytes, host->pio_ptr);
++			    "pio_write(): new source: [%i]@[%zd]\n",
++			    host->pio_bytes, host->pio_offset);
+ 
+ 		}
+ 
+@@ -543,13 +534,20 @@ static void do_pio_write(struct s3cmci_host *host)
+ 		host->pio_count += fifo;
+ 
+ 		fifo = (fifo + 3) >> 2;
+-		ptr = host->pio_ptr;
+-		while (fifo--)
++		buf = (kmap_atomic(sg_page(host->cur_sg)) + host->pio_offset);
++		ptr = buf;
++		while (fifo--) {
+ 			writel(*ptr++, to_ptr);
+-		host->pio_ptr = ptr;
++			host->pio_offset += 4;
++		}
++		kunmap_atomic(buf);
+ 	}
+ 
+ 	enable_imask(host, S3C2410_SDIIMSK_TXFIFOHALF);
++	return;
++done:
++	dbg(host, dbg_pio, "pio_write(): complete (no more data).\n");
++	host->pio_active = XFER_NONE;
+ }
+ 
+ static void pio_tasklet(unsigned long data)
+@@ -1055,6 +1053,7 @@ static int s3cmci_prepare_pio(struct s3cmci_host *host, struct mmc_data *data)
+ 	BUG_ON((data->flags & BOTH_DIR) == BOTH_DIR);
+ 
+ 	host->pio_sgptr = 0;
++	host->cur_sg = &host->mrq->data->sg[host->pio_sgptr];
+ 	host->pio_bytes = 0;
+ 	host->pio_count = 0;
+ 	host->pio_active = rw ? XFER_WRITE : XFER_READ;
+diff --git a/drivers/mmc/host/s3cmci.h b/drivers/mmc/host/s3cmci.h
+index 30c2c0dd1bc8..4320f7d832dc 100644
+--- a/drivers/mmc/host/s3cmci.h
++++ b/drivers/mmc/host/s3cmci.h
+@@ -50,10 +50,11 @@ struct s3cmci_host {
+ 
+ 	int			dma_complete;
+ 
++	struct scatterlist	*cur_sg;
+ 	u32			pio_sgptr;
+ 	u32			pio_bytes;
+ 	u32			pio_count;
+-	u32			*pio_ptr;
++	u32			pio_offset;
+ #define XFER_NONE 0
+ #define XFER_READ 1
+ #define XFER_WRITE 2
 -- 
 2.20.1
 
