@@ -2,150 +2,82 @@ Return-Path: <SRS0=baBj=PW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8866BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 18:36:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 34A2FC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 19:01:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 56D6020651
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 18:36:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 06577206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 19:01:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PZq6V5eE";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Nf1qJ9Y8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 56D6020651
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AxBKR/jl";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="i9me2M/M"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 06577206B7
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=aDk8q1BUV+UpYLuHF5aB86Pg9wkwHGqm0j0aHf60SIY=; b=PZq6V5eEo5eSjZ
-	xrfLkEuzXduQD45H7sp2SmEqWS+40xLS8dHpFlINdQzvQfDEe9/VvyGIMmS10TxPHH35UcrBysTE7
-	IbEER9S2wbaJgJYCgJNejaHDF8cO1nezjr7ncAjeVJu7X86S3lK4hgRrJscG4NFEGivztwbaPRrCS
-	t9HxJl2fAMKaz4MDVDjS2pT41BwiArklYwI6Dhrh5CykB6mjqYrTNzZibNOm2oXnAjOqHZLYd3cBx
-	VBy5jviMeoXAQfwZE8pYZTefDLeEe63ijWcwFkLsCWqWgi1Bafr3p7yjbW2fIHohmPqFjyTCOr15j
-	kzMtSyBReJIeVeQ6BgWA==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=bWATChs/xG+dFK++paopiYkC9J2F0DazrDZUQPYVe9w=; b=AxB
+	KR/jlgFbdAAoDUfJJCVQkd980vGWSl9yfewoEd02pthNTu0c1cPHQPzgjJ1wnhBI23vZFtyt0iIqt
+	rUfWHiyIVeSCaCQntpysMhJoo+xqAzFG2fi6yXmn8dO/ffWvtSP2x3N0Irjlj4fTqDwnRwAYjvnB2
+	xkSgeYoJlPxqGY1I//Y3F1a8cVj8p1HrBpN88Q9dJKBWl26jss3iZGa5A1Q40CY23+VFRl4bmiMS5
+	lkev8LSOUsnMDyJbEosE4GlpX4Rc5KlGmgb91qYXJx6VH2lZ0C/Wc0I1vLqg0sdngLKGpnDxBidLn
+	zTiHKb7Wfc+BKpCCvtOFctjWHnQMcbw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj767-0001v3-Vc; Mon, 14 Jan 2019 18:36:31 +0000
-Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
+	id 1gj7UQ-0002vb-6p; Mon, 14 Jan 2019 19:01:38 +0000
+Received: from mail-pg1-x541.google.com ([2607:f8b0:4864:20::541])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj764-0001ud-Fe; Mon, 14 Jan 2019 18:36:29 +0000
-Received: by mail-pl1-x644.google.com with SMTP id g9so14938plo.3;
- Mon, 14 Jan 2019 10:36:26 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=4PVGsIaG0j4vALC1QOjFPnyY7phcv6TK6Cm5VP11Suw=;
- b=Nf1qJ9Y8bgxcncC1PhaePAxOf3c9nm9RRtJ8PJEZf+9moHqKcBsE2akhwo5vHHxPKK
- dRS02hvLW9fdM4TxuoXsyPm6uBUCTv3VSCi/af9jyq3UOtsP83EiY9RbVg2fALPJkNeQ
- LSXKBAU6hlw6Lab3fNTedijGP+dsWkHvNdkPhLRAFsKnQ1YHJuygwkZgN3TTuvCFWQ83
- WZGJ/15lNZyofm4eEvvah93pWCTC3IiVUi5H+MdMr1UZ+v7Zn5jPQrwygyKWNmyJG1ZV
- 7cRIADcVELQR+iQYV2TNh1RXtppi2IzH3o669ORjW+9mSCzeBhwGLQN9zB11OfLkNexh
- 96TA==
+ id 1gj7UN-0002vD-OU
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 19:01:37 +0000
+Received: by mail-pg1-x541.google.com with SMTP id j10so49225pga.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 14 Jan 2019 11:01:35 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=from:to:cc:subject:date:message-id;
+ bh=jfEV92oU/BXZCP8yvuSufQIujV0ayfJ9QmhGwQnDaWs=;
+ b=i9me2M/M9GPc2ytcKjp5DGAMrLOrYSOEqdZ3LWVj1UX6rGhT5oYyEmNJ1m/T5A6miV
+ i76A0AnT71KMSSDPmhcfQWIDEb6s7Cp1AaApto+zfrksMSzA03K6eYdMgYR7Dt5DWmad
+ gQiSR84r1X1ft0zjkfczl7vk4siLT4eCrHWVc=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=4PVGsIaG0j4vALC1QOjFPnyY7phcv6TK6Cm5VP11Suw=;
- b=LpA4LCqEoqiCtmxVYeky2yrKCC0Kbd9fOjEodpK8fXEi0o+RXUi3Z1pycuQKNSluyI
- MQQNp5Vhr7l4fwsd3LpBnR7wSfxENwDRVwr30JR/9GxIskDmZo/I4UElSlA81mB2S2tb
- /EO2iUDxRAUynTaxZdbs4gJ38xuL+xPB8KFz3lnI4eiv6QSFSfRc5+lXeECYaFGAObZ+
- Jqa80zRp3JU//cv/Z43e1QMBzZgA+b7In0CTO9ZHyc8Wi+Xyhw71VgYt4mRxBiADBuy/
- AP/CwY915Kai0xDB1y4+wSmPAvKJg2OMIqaUpiXb1k7PhEcNkyXJPMVdSjCJDawJfdUS
- D7Ng==
-X-Gm-Message-State: AJcUuke05iIMHbPTSWPZNztxgHGaAy1csSXk0wGN6tqybXVqWW0hNj+9
- xJqx1m1eFD0aLIo4qUGI1LQ=
-X-Google-Smtp-Source: ALg8bN6AP3iO+4TliKc4aoBONgZ9d8K/BV8SK2rSufNhsB8QXo6xIpmbizZNDBNK5hD0z0sYciTP+A==
-X-Received: by 2002:a17:902:2f03:: with SMTP id
- s3mr26187638plb.277.1547490985913; 
- Mon, 14 Jan 2019 10:36:25 -0800 (PST)
-Received: from [10.67.49.9] ([192.19.223.250])
- by smtp.googlemail.com with ESMTPSA id v5sm1386261pgn.5.2019.01.14.10.36.22
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 14 Jan 2019 10:36:24 -0800 (PST)
-Subject: Re: [GIT PULL 1/4] bcm2835-defconfig-next-2018-11-27
-To: Stefan Wahren <stefan.wahren@i2se.com>,
- Florian Fainelli <f.fainelli@gmail.com>
-References: <20181127211301.30296-1-eric@anholt.net>
- <da219894-4bba-21a3-94dc-da7ff7e63896@gmail.com>
- <1330816632.286127.1547059111664@email.ionos.de>
-From: Florian Fainelli <f.fainelli@gmail.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=f.fainelli@gmail.com; prefer-encrypt=mutual; keydata=
- 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
- M5kY0ACeNhCZJvZ5g4C2Lc9fcTHu8jxmEkI=
-Message-ID: <971c110c-862e-8a14-c7e7-56b8fd7072b9@gmail.com>
-Date: Mon, 14 Jan 2019 10:36:11 -0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <1330816632.286127.1547059111664@email.ionos.de>
-Content-Language: en-US
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=jfEV92oU/BXZCP8yvuSufQIujV0ayfJ9QmhGwQnDaWs=;
+ b=gj1HQSUiit+CmmCgULxb0axWLe4rorntVlf34EH2LLysw6QQwxYTFuLXTkj8IwGuoq
+ 4m+Irfio69ArgmJkg4fdgake8Z760uIYS7nKDF1Ddj3CsscmKkdGmAfTmp+p+jNNyHYu
+ 4SsmIdEQA/IOm5M9vQVI9ro+dsbAPnbKDxo5cf8pxu38+sg8XOFbbs64vOI1vmnKWTmm
+ dzw5vw7DqbIX3xWrY9qiE4ahu2UrZwpfIcBhaHZ0X+MPHDpv3hlw/0Pcw8TahUL54c55
+ cmbKCSlsL5tjRGEOqgXAafYR9DLBQ01yN8PN/0vvM97gGYryTrD7i5KxGw6tCuVOehQu
+ L/9Q==
+X-Gm-Message-State: AJcUukdWa5N8CsM2ImvKb3GFwqJpqM+K2FQhBPKcpYIxuPsV+q1HOkxw
+ xjDwT+Y6wXriiOvNrpbluHmM0w==
+X-Google-Smtp-Source: ALg8bN4syLCkq+ZRmkNooexV1p8UgALkw9hQry+SfUJeTX/GhzR6R1mEO6qEX3VLlP+mW1XpUwwxxg==
+X-Received: by 2002:a62:c613:: with SMTP id m19mr27038791pfg.207.1547492494475; 
+ Mon, 14 Jan 2019 11:01:34 -0800 (PST)
+Received: from evgreen2.mtv.corp.google.com
+ ([2620:15c:202:201:ffda:7716:9afc:1301])
+ by smtp.gmail.com with ESMTPSA id l85sm1958120pfg.161.2019.01.14.11.01.33
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Mon, 14 Jan 2019 11:01:33 -0800 (PST)
+From: Evan Green <evgreen@chromium.org>
+To: "Martin K . Petersen" <martin.petersen@oracle.com>,
+ Will Deacon <will.deacon@arm.com>
+Subject: [PATCH] arm64: defconfig: Add Qualcomm UFS PHY
+Date: Mon, 14 Jan 2019 11:01:12 -0800
+Message-Id: <20190114190112.167922-1-evgreen@chromium.org>
+X-Mailer: git-send-email 2.18.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_103628_526876_2BC11B77 
-X-CRM114-Status: GOOD (  15.41  )
+X-CRM114-CacheID: sfid-20190114_110135_825039_91EBFBAA 
+X-CRM114-Status: GOOD (  12.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -157,63 +89,58 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Eric Anholt <eric@anholt.net>, bcm-kernel-feedback-list@broadcom.com,
- linux-rpi-kernel@lists.infradead.org, linux-arm-kernel@lists.infradead.org,
- linux-kernel@vger.kernel.org
+Cc: linux-scsi@vger.kernel.org, Arnd Bergmann <arnd@arndb.de>,
+ Marc Gonzalez <marc.w.gonzalez@free.fr>, linux-kernel@vger.kernel.org,
+ Olof Johansson <olof@lixom.net>, Douglas Anderson <dianders@chromium.org>,
+ Evan Green <evgreen@chromium.org>,
+ Bjorn Andersson <bjorn.andersson@linaro.org>,
+ Andy Gross <andy.gross@linaro.org>, Jagan Teki <jagan@amarulasolutions.com>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Enric Balletbo i Serra <enric.balletbo@collabora.com>,
+ Simon Horman <horms+renesas@verge.net.au>,
+ linux-arm-kernel@lists.infradead.org, Heiko Stuebner <heiko@sntech.de>
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 1/9/19 10:38 AM, Stefan Wahren wrote:
-> Hi Florian,
-> 
->> Florian Fainelli <f.fainelli@gmail.com> hat am 28. November 2018 um 22:48 geschrieben:
->>
->>
->>
->>
->> On 11/27/18 1:12 PM, Eric Anholt wrote:
->>> Hi Florian,
->>>
->>> Hopefully I'm not too late this time around.  Stefan's been doing a
->>> great job maintaining the bcm2835 branches, and was waiting for me to
->>> send the PRs.
->>>
->>> The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
->>>
->>>   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
->>>
->>> are available in the Git repository at:
->>>
->>>   git://github.com/anholt/linux tags/bcm2835-defconfig-next-2018-11-27
->>>
->>> for you to fetch changes up to 24632d6b78a1929b14f32cab762a0859db7086f2:
->>>
->>>   ARM: bcm2835_defconfig: Enable BCM2835 MMAL-based V4L2 camera driver (2018-11-15 19:07:36 +0100)
->>>
->>> ----------------------------------------------------------------
->>> This pull request enables the V4L2 camera driver on the Pi1 defconfig.
->>>
->>> ----------------------------------------------------------------
->>
->> Merged into defconfig/next, thanks Eric.
-> 
-> looks like this patch didn't reached Olof for 4.21/5.0.
+With commit 326a859b2814 ("scsi: ufs: Remove select of phy-qcom-ufs from
+ufs-qcom"), the Qualcomm UFS controller no longer selects the Qualcomm
+UFS phy (since it's not a given that PHY will be the one present).
 
-Indeed, sorry about that, I must have somehow missed pushing the branch
-and it was not picked up by my script which I likely ran on a different
-machine than where the branch was merged locally.
+Add that PHY into the defconfig since it's no longer being selected, and
+Qualcomm platforms except for SDM845 need it.
 
-> 
-> Should i resend for the next version?
+Fixes: 326a859b2814 ("scsi: ufs: Remove select of phy-qcom-ufs from ufs-qcom")
+Signed-off-by: Evan Green <evgreen@chromium.org>
+---
+I unfortunately don't have a non-SDM845 device to test this on. I'm hoping
+it Just Works, or someone might be willing to give it a try.
 
-No need to, this is now applied and pushed out to
-broadcom-github/stblinux/defconfig/next.
+Also, Martin, I'm not sure if your git commit IDs are stable, or whether or
+not I should put the Fixes: in there. If they're not, this could be reordered
+with the other commit and then there wouldn't need to be a Fixes. Let me know.
 
-Thanks!
+ arch/arm64/configs/defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 0478ef9e4b78e..d43644ca75997 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -694,6 +694,8 @@ CONFIG_PHY_HISTB_COMBPHY=y
+ CONFIG_PHY_HISI_INNO_USB2=y
+ CONFIG_PHY_MVEBU_CP110_COMPHY=y
+ CONFIG_PHY_QCOM_QMP=m
++CONFIG_PHY_QCOM_UFS=m
++CONFIG_PHY_QCOM_UFS_14NM=m
+ CONFIG_PHY_QCOM_USB_HS=y
+ CONFIG_PHY_RCAR_GEN3_PCIE=y
+ CONFIG_PHY_RCAR_GEN3_USB2=y
 -- 
-Florian
+2.18.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
