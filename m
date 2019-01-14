@@ -2,84 +2,86 @@ Return-Path: <SRS0=baBj=PW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E927CC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 14:22:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AAC23C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 14:44:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AD8B020873
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 14:22:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 77C2E20657
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 14:44:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RdGmdgMU";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="hbrgdkZv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AD8B020873
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A43ExlUl";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="YuGVxqVP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 77C2E20657
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=sLRos4YSiRWMn06yw1ZAb+u+TFi0pSg/hP3l5/kx9pA=; b=RdGmdgMUSw6ZCk
-	qnOqWJUUSCRG/QhNuhX/TFUGFeqKo1hHbsp7qd1taxLl5rY6oMI/MnODBm3iggUZSEMAVDkVjzEAB
-	cc5TGJ4zIBiJaRhj0cTjmsj16JHw6LDZV6+KbYOyL6E6oEXzLbqPhj0hteCQK/t0weWy4OdTGB5sC
-	6EV+AJYrD7VamnPGi6kIMFMhqpQM4PToOLjH1m8mt8sPtiIhHS82lvZrQcnREoZMrcjdndJFcZznf
-	KFwxlP/6peFu537Lsn2UMUZu937WkScarNgrWNtlkkrPvk1pNAhet5TqZg8el8hJoREpQxZmc331X
-	ZYoOUpX0lOtm87FQGHeA==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=N7qHFMCjoP3fXM5P46bNC78f5bVqtjwA+mGpcty+4Io=; b=A43
+	ExlUlEnUFGR+Y+asK5FmIXVPWhTXPvvVRBvkNP67DISUYek72DPeuYpHTWcR1okSoxdzZe7eNLBol
+	RUoqhzHVIM//eHsDPQ1U0Cu+ikiHTA9zdA64sG0x4QlvFZrGOYlxMM+mPB4eSoR/T7JKdL5rwKXXo
+	BIVJrg3m3kEUuin15RtnKB2fy6zUIhJeS+tGekfjwxtGoeNpaXAESWPp8NqDYibaCsVN+NYwZQD/C
+	K5Q9C+oN9a4WvpaOHNf0lEJoytApjuS3JO/yv/jvl/iI4zZkmOBOvwzAZcK0ydn9w0kuvlElD7TzR
+	xBNxyDDfirMKtlf4brC+bUXFdF6S1sw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj38g-0005Jc-MQ; Mon, 14 Jan 2019 14:22:54 +0000
-Received: from mail-lj1-x241.google.com ([2a00:1450:4864:20::241])
+	id 1gj3Th-00043Z-Ey; Mon, 14 Jan 2019 14:44:37 +0000
+Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj38Z-0005Cj-FS
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 14:22:51 +0000
-Received: by mail-lj1-x241.google.com with SMTP id t18-v6so19183060ljd.4
+ id 1gj3TZ-00041D-8b
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 14:44:35 +0000
+Received: by mail-wr1-x444.google.com with SMTP id l9so23098442wrt.13
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 14 Jan 2019 06:22:46 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc:content-transfer-encoding;
- bh=VA8qvM+C8bhjBy4oKNHd2IPgi3gU4Q+EvayrkJ9umdE=;
- b=hbrgdkZvbPXFCTFow/yvfYuAV8nLdSFxHl0gEJJ+pGzKxHEhGlvy+Rfmv+QJq3UC/l
- BxQheix4yc/FCbKppnzF6g+7ZlFyNjgW0eglXHEGeiFgNiw0hNB1I8JFmxV0iK7DDUjV
- Wsa++XLAa9vSBjcu5RWoJ1YfXqpKk7j1w/Zys=
+ Mon, 14 Jan 2019 06:44:27 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:date:message-id;
+ bh=xe96/CDqWQQvShXiMB+V1zI3NOQy5KGMXXH6OKg7/Kk=;
+ b=YuGVxqVPwPohXE8aPjXcSTo+3ydeyko0UPqK6Y1d+82EC/OF1cYsZeAydSDjU/ttk6
+ /2OkrhcRdK8rUqphWCl2SH9mqR64RuX9y4kiu2EmVNEH7ffUvO7T1wzbkBMN2akM+F1+
+ D7QDxVtt4GrD2R+KBOpapV7Tf19OBD5hutPUjkG5j0KczoG1fI8OaLEa1EYjrjhrXNRM
+ ZhnERDExnu8E4qNF7LL4FchGoxfeqGfHjypCkw0uiOSHRZPyZqY4wFRExdkNv4ufXL70
+ HTea+2gPUvvrKTKmqvp2+vdf9xuKQfDTL1N+DYoPXzVGOy1dUSlIlHtyIbCsWF+vXzdl
+ FdAw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc:content-transfer-encoding;
- bh=VA8qvM+C8bhjBy4oKNHd2IPgi3gU4Q+EvayrkJ9umdE=;
- b=k1To4yqFJ/GFizOOk8m+H40q6XdBXzwwlfwIuQOSAJ5opSuuU/hlQk3cQJw7Wvh/cz
- 2j3MNtjqoY+kj5uAh0kSABDbyAASh8hGaWVwLSS4zw+8fWz7B1i29zS4zUUmkpUpG0qN
- O7SqC1ys/9VIcw4BhdTbHjCkE/X0YYuJLrYTsisPHVBIISbPPrL02oxuOvb9x8bFyHf+
- 1dADRfMnCixzHmC2s7jYVOyeRnwBSaWyRLhLN+Jz4zlOsyINDG1JiGi1snKeSJE5j0kx
- oa0Gxr9vOO7qrHzP9AE4UTNAzDj+ASlfKIM/H0Dg5oSN3J6WOIbuULzSAYR522ClfHlI
- l6Xg==
-X-Gm-Message-State: AJcUukckDK/Q44bZ7eYCDOyiIWGRNaq45Mic5SbJaR+3KhflsyciFeZH
- 15cCc6NlRjeVyddS1GOEXvxXd8s+0h636/KvlJfgnQ==
-X-Google-Smtp-Source: ALg8bN5G+VToiq07Afxm/fAbErgD0uFCKvGIb8FRsg+NlTidwd0vXyqSu/WbChqKHqpdVsZ0EFk0ROVNWyw7zoAFepQ=
-X-Received: by 2002:a2e:9c7:: with SMTP id
- 190-v6mr12962995ljj.120.1547475764584; 
- Mon, 14 Jan 2019 06:22:44 -0800 (PST)
-MIME-Version: 1.0
-References: <CACRpkdb-zphMyZbGh5XYy2A6B1224BGFmTwr0Bm98G3oM0MeoQ@mail.gmail.com>
- <CAK8P3a08TV+sQhsCPjkXh6wOKEpLfGLqVo9+FHoXzDVXs_bY7A@mail.gmail.com>
- <CACRpkdZ7KSmgTYP8a_RUJAWKzuc652OZ420Lq4ZnzkCuESLZ2Q@mail.gmail.com>
- <b5e70ac4-4cf8-9abe-ec30-7d225089caf0@hilscher.com>
-In-Reply-To: <b5e70ac4-4cf8-9abe-ec30-7d225089caf0@hilscher.com>
-From: Linus Walleij <linus.walleij@linaro.org>
-Date: Mon, 14 Jan 2019 15:22:32 +0100
-Message-ID: <CACRpkdYnbCmfTVB_aFX-vhkbWma=60U0D6pKZ8bcKdxCdSXdyA@mail.gmail.com>
-Subject: Re: Re: Hilscher NetX mach-netx refactorings
-To: Michael Trensch <MTrensch@hilscher.com>
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=xe96/CDqWQQvShXiMB+V1zI3NOQy5KGMXXH6OKg7/Kk=;
+ b=kyY9v7SGLqAeqcWT6d+tYYuIdiAB4ctYYhvPFmp1F+piLXKPZohM/d1K8dPB6CPfic
+ CPlln3+YbLtfRKz7ksHny7AZBbMB0Q/VIiid4j1F6aqW1dET2NqJa3e7BqmXxo7GXVFl
+ 7N9qxHZhll8WVCWlgT5OORDUQER3XCrIsIBhl5jO170UkGbwloCV5BoTIT4/jFPox8dU
+ pDLf4zOt0YHoXOWQ0K/SGbUuCp4xfF2HVZQBXOoDhLW5oQwHLqd+PSkZ8SuxJ/blKQg+
+ 0qjfBhP3ZXPj6DfPVoWzFdR5uTT42TGsxnkKCVHkYDfRnEoQcOc6iqxOTppAfk2ZkjrL
+ Aavg==
+X-Gm-Message-State: AJcUukeRZoLzPSLsgEltKMSW+YsnS8PNqYQj6mnnu4cAdiZlKUZ9XFgt
+ tkTwdsOJYl5BP5yHC0rpdqd2/w==
+X-Google-Smtp-Source: ALg8bN75eCUbpHM5e3dpfQAqh5qJdYx9egLZgCTSbQz01udST+kSdhvqX3FB/+NGUgKAL5/mw4u/GA==
+X-Received: by 2002:a5d:6487:: with SMTP id r7mr25326660wru.263.1547477065807; 
+ Mon, 14 Jan 2019 06:44:25 -0800 (PST)
+Received: from loys-ubuntu-BY1835A49200471.thefacebook.com
+ (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr. [90.63.244.31])
+ by smtp.googlemail.com with ESMTPSA id e27sm76692285wra.67.2019.01.14.06.44.24
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Mon, 14 Jan 2019 06:44:25 -0800 (PST)
+From: Loys Ollivier <lollivier@baylibre.com>
+To: devicetree@vger.kernel.org, Kevin Hilman <khilman@baylibre.com>,
+ linux-amlogic@lists.infradead.org
+Subject: [PATCH v4] arm64: dts: meson: Fix mmc cd-gpios polarity
+Date: Mon, 14 Jan 2019 15:44:21 +0100
+Message-Id: <1547477061-31543-1-git-send-email-lollivier@baylibre.com>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_062247_526243_86509800 
-X-CRM114-Status: GOOD (  32.43  )
+X-CRM114-CacheID: sfid-20190114_064429_453376_A50002B2 
+X-CRM114-Status: GOOD (  11.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,128 +93,254 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ladislav Michl <ladis@linux-mips.org>, Arnd Bergmann <arnd@arndb.de>,
- Robert Schwebel <r.schwebel@pengutronix.de>, nagasureshkumarrelli@gmail.com,
- Pengutronix Kernel Team <kernel@pengutronix.de>,
- Olof Johansson <olof@lixom.net>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ Linus Walleij <linus.walleij@linaro.org>,
+ Loys Ollivier <lollivier@baylibre.com>, linux-mmc@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ Jerome Brunet <jbrunet@baylibre.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgTWljaGFlbCEKClRoYW5rcyBmb3IgaW50ZXJhY3Rpbmcgd2l0aCB0aGUgY29tbXVuaXR5IGFu
-ZCBoZWxwaW5nIHVzIG91dCEKCk9uIE1vbiwgSmFuIDE0LCAyMDE5IGF0IDEyOjI2IFBNIE1pY2hh
-ZWwgVHJlbnNjaCA8TVRyZW5zY2hAaGlsc2NoZXIuY29tPiB3cm90ZToKCj4gSSBhbSB3b3JraW5n
-IGZvciBIaWxzY2hlciBhbmQgcmVzcG9uc2libGUgd2l0aCBteSBncm91cCBmb3IgbGludXgKPiBy
-dW5uaW5nIG9uIG91ciBuZXcgU29DcyAobmV0WDQwMDAgY3VycmVudGx5KSwgZHVlIHRvIGEgY29y
-cG9yYXRlCj4gZ3VpZGVsaW5lIGFsbCBwdWJsaWMgbWFpbCBhZGRyZXNzZXMgZm9yIGdpdGh1YiBw
-cm9qZWN0cyBpcyBzZXQgdG8KPiBnaXRodWJAaGlsc2NoZXIuY29tIHRvIGRpc3RyaWJ1dGUgdGhl
-bSB0byB0aGUgcHJvcGVyIGRlcGFydG1lbnQuCgpGYWlyIGVub3VnaCwgdGhpcyBjbGVhcmx5IHdv
-cmtzLgoKPiA+PiBPbiBhIHJlbGF0ZWQgbm90ZSwgdGhlcmUgZG9lcyBhcHBlYXIgdG8gYmUgYWN0
-aXZlIHdvcmsgb24KPiA+PiBuZXdlciBuZXR4IG1hY2hpbmVzIHRoYXQgd2VyZSBuZXZlciB1cHN0
-cmVhbWVkLCBzZWUKPiA+PiBodHRwczovL2dpdGh1Yi5jb20vSGlsc2NoZXIvbmV0eDQwMDAtbGlu
-dXgvY29tbWl0cy92NC45LW5ldHg0MDAwLXN0YWJsZQo+Cj4gVGhpcyB3b3JrIGlzIG5vdCBjb21i
-YXRpYmxlIHdpdGggdGhlIG1haW5saW5lZCBuZXR4IHBsYXRmb3JtLCB3aGljaCBpcwo+IG5ldFgx
-MDAvNTAwLCBidXQgZm9yIGEgbmV3IG5ldFggU29DLCBjYWxsZWQgbmV0WCA0MDAwLgoKU28gYSBw
-cmVzc2luZyBxdWVzdGlvbiBpcyB3aGV0aGVyIGl0IGlzIE9LIHdpdGggSGlsc2NoZXIgdGhhdCB3
-ZQpkZWNvbWlzc2lvbi9kZWxldGUgdGhlIGN1cnJlbnQgc3VwcG9ydCBjb2RlIGZvciBOZXRYCm54
-ZGtuLCBueGRiNTAwIGFuZCBueGViNTAwaG1pPyBPciBhcmUgdGhlc2UgcHJvZHVjdHMgdGhhdApz
-dGlsbCBzZWUgYWN0aXZlIGRlcGxveW1lbnQgKG5ldyBkZXNpZ25zKSBhbmQgbWFpbnRlbmFuY2UK
-aW4gdGhlIGxvbmcgdGVybSAoNS0xMCB5ZWFycyBmcm9tIG5vdyk/Cgo+IEN1cnJlbnRseSB3ZSBo
-YXZlCj4gbm90IGhhZCBhbnkgcGxhbnMgb3Igc2NoZWR1bGUgdG8gZ2V0IGl0IG1haW5saW5lIHll
-dCwgYXMgd2UgbmVlZGVkIHRvCj4gZ2V0IGl0IGZpbmlzaGVkIGZpcnN0LiBUaGF0IGRvZXMgbm90
-IG1lYW4gd2UgZG9uJ3Qgd2FudCBpdCB0byBiZWNvbWUKPiBtYWlubGluZS4gVGhpcyBzdXJlbHkg
-ZGVwZW5kcyBvbiB0aGUgbnVtYmVyIG9mIHJlcXVlc3RzIHRoYXQgYXJpc2UgZm9yCj4gdGhpcyBz
-cGVjaWZpYyBTb0MuCgpPSyEgQnV0IHdoZW4geW91IGhhdmUgdGltZSBhbmQgcmVzb3VyY2VzLCBw
-bGVhc2UgY29uc2lkZXIgdG8Kd29yayB3aXRoIHRoZSBrZXJuZWwgY29tbXVuaXR5IHRvIGdldCB0
-aGUgYm9hcmQgc3VwcG9ydCB1cHN0cmVhbS4KCj4gTW9yZSBpbmZvcm1hdGlvbiBvbiB0aGUgbmV0
-WCA0MDAwIFNvQyBpdHNlbGYgY2FuIGJlIGZvdW5kIGhlcmU6Cj4gaHR0cHM6Ly93d3cuaGlsc2No
-ZXIuY29tL3Byb2R1Y3RzL3Byb2R1Y3QtZ3JvdXBzL25ldHdvcmstY29udHJvbGxlci9hc2ljcy9u
-ZXR4LTQwMDAvCgpUaGlzIGlzIGFuIGludGVyZXN0aW5nIFNvQywgcHJpbWFyaWx5IGZvciB0aGUg
-dXNlIG9mIGFuIEE3IGNvcHJvY2Vzc29yCmZvciBhbiBSVE9TLiBXZSBoYXZlIHNlZW4gYSBudW1i
-ZXIgb2YgZGV2aWNlcyBvZiB0aGlzIHR5cGUuCllvdSBtaWdodCBiZSBpbnRlcmVzdGVkIGluIGxv
-b2tpbmcgaW50byBPcGVuQU1QIGZvciB0aGUgY29tbXVuY2F0aW9uCndpdGggdGhlIFJUT1MgY29y
-ZS4gVGhlIGluZHVzdHJ5IGhhcyBpZGVudGlmaWVkIGZyYWdtZW50YXRpb24gaW4gdGhlCnNoYXJl
-ZC1tZW1vcnkgKGFuZCBvdGhlcikgQU1QIHNvbHV0aW9ucyBhbmQgdHJ5IHRvIHN0YW5kYXJkaXpl
-IHRoYXQKY29tbXVuaWNhdGlvbiBhcm91bmQgUlBNU0cuIFRoaXMgaXMgZ29vZCBiZWNhdXNlIHRo
-ZSBMaW51eCBzaWRlCm9mIHRoaW5ncyBpcyB2ZXJ5IHdlbGwgdGVzdGVkIGFuZCBzdGFibGUsIGFu
-ZCB3ZSBkb24ndCBnZXQgdG9vIG1hbnkKZGV2aWFudCBBTVAgbWVjaGFuaXNtcyB0byBkZWFsIHdp
-dGggaW4gdGhlIGtlcm5lbC4KaHR0cHM6Ly93d3cubXVsdGljb3JlLWFzc29jaWF0aW9uLm9yZy93
-b3JrZ3JvdXAvb2FtcC5waHAKCj4gV2hlbiB0cnlpbmcgdG8gYnJpbmcgaXQgbWFpbmxpbmUsIEkg
-c2VlLCBhdCB0aGUgY3VycmVudCBwb2ludCwgc29tZSBtb3JlCj4gd29yayBhcmlzaW5nLCBhcyB3
-ZSBuZWVkZWQgdG8gcGF0Y2ggc29tZSBtYWlubGluZSBzb3VyY2VzIGR1ZSB0byBzb21lCj4gY2hp
-cCBzcGVjaWFsdGllcyBsaWtlOgoKVHJ5aW5nIHRvIGFkZCBteSDigqwwLjA1IGhlcmUuLi4KCj4g
-ICAqIG5icGZheGk6IHN0YXRpYy13aXJlZC1kbWEtY2hhbm5lbHMgLT4KPiBodHRwczovL2dpdGh1
-Yi5jb20vSGlsc2NoZXIvbmV0eDQwMDAtbGludXgvY29tbWl0L2EzZmI1OGM1MzFjYWYwZGExZDhl
-YmE5MDE3MWJjNGE4Y2UyZDFkYTMuCj4gSSBkb24ndCBrbm93IGlmIHN1Y2ggYSBwYXRjaCBpcyBs
-ZWdpdCBvciBpZiBpdCBzaG91bGQgYmUgbW9yZSB1bml2ZXJzYWwKCiNpZmRlZiBpcyBnZW5lcmFs
-bHkgZnJvd25lZCB1cG9uIGFuZCBkb2VzIG5vdCB3b3JrIHdpdGggdGhlIG11bHRpcGxhdGZvcm0K
-cGFyYWRpZ20gKG9uZSBrZXJuZWwgaW1hZ2UgZm9yIGFsbCwgbWFueSBkZXZpY2UgdHJlZXMpLgpC
-dXQgY2VydGFpbmx5IHRoZSBETUEgc3Vic3lzdGVtIG1haW50YWluZXJzIHdpbGwgaGVscCBvdXQg
-ZmluZGluZwp0aGUgcmlnaHQgc29sdXRpb24gaWYgeW91IHRhbGsgdG8gdGhlbSAodGhleSBoYXZl
-IGEgc2VwYXJhdGUgbWFpbGluZwpsaXN0IGFuZCBldmVyeXRoaW5nKS4KCj4gICAqIG5hbmQgc3Bl
-Y2lhbGl0aWVzIGZyb20gYSBwbDM1MyBkcml2ZXIgc3RhcnRpbmcgYXQgLT4KPiBodHRwczovL2dp
-dGh1Yi5jb20vSGlsc2NoZXIvbmV0eDQwMDAtbGludXgvY29tbWl0L2Y3ZGEyYjI1OWI3MTQzOWEw
-YzY2NjJhZjg2OTcyOTJmZTJjM2FmZGEKCkkgd2FzIGludm9sdmVkIGluIHJldmlld2luZyBhIFBM
-MzUzIGRyaXZlciB0aGF0IHdhcyBzZW50CmJ5IE5hZ2EgU3VyZXNoa3VtYXIgUmVsbGkgZnJvbSBY
-bGlsaW54IHNvIEkgZ3Vlc3MgdGhhdCBpcwp3aGF0IHlvdSBhcmUgdXNpbmc/IEkgaGF2ZSBubyBp
-ZGVhIG9uIHdoZXRoZXIgdGhpcyBpcyB0aGUKcmlnaHQgYXBwcm9hY2ggZm9yIGlvcmVtYXAoKSBv
-ciBpZiB0aGF0IGlzIGV2ZW4gd2hhdCB5b3Ugd2FudAp0byBkbyBmb3IgYSBOQU5EIGRyaXZlci4g
-SSB0aGluayBOYWdhIGlzIHN0aWxsIHdvcmtpbmcgb24gdGhpcwpyYXduYW5kIGRyaXZlciwgY2Vy
-dGFpbmx5IHlvdSBjYW4gYmUgYWRkZWQgdG8gdGhlIHJldmlld2VycwpvZiB0aGUgZHJpdmVyIGFz
-IHdlIHdvcmsgd2l0aCBpdCBpbiB0aGUgY29tbXVuaXR5LgoKPiAgICogIERldmljZS10cmVlIGZp
-bGVzIGFyZSBjdXJyZW50bHkgaG9zdGVkIGluIHlvY3RvIHJlY2lwZXMKPiAoaHR0cHM6Ly9naXRo
-dWIuY29tL0hpbHNjaGVyL21ldGEtaGlsc2NoZXItbmV0eDQwMDAvdHJlZS9tYXN0ZXIvZmlsZXMv
-ZHRzKQo+IHRvIHByZXZlbnQgbWFpbnRlbmFuY2UgLyBzeW5jaW5nIGlzc3VlcyBvbiBvdXIgc2lk
-ZQoKVGhlc2UgY2FuIGFsbCBiZSBtZXJnZWQgaW50byB0aGUga2VybmVsIHByb3BlciB3aGVuIHRo
-ZQpwbGF0Zm9ybSBsYW5kcyB1cHN0cmVhbS4gSSBjYW4gc2VlIHRoYXQgeW91ciBjbG9jayBpbXBs
-ZW1lbnRhdGlvbgp3aWxsIHByb2JhYmx5IG5lZWQgc29tZSBjaGFuZ2VzIHVzaW5nIGNlbGxzIGZv
-ciBjbG9jayB0eXBlCnJhdGhlciB0aGFuIGNvbXBhdGlibGUsIG90aGVyd2lzZSBpdCBsb29rcyBw
-cmV0dHkgc3RhbmRhcmQuCgo+ICAgKiBDQU4gZHJpdmVyIHdoaWNoIGlzIHRha2VuIC8gcG9ydGVk
-IGZyb20gcnphMV9jYW4gLT4KPiBodHRwczovL2dpdGh1Yi5jb20vSGlsc2NoZXIvbmV0eDQwMDAt
-bGludXgvY29tbWl0LzQ2Y2E4NzM2ZjQ0YmY4MDAwYWM0MTcxN2VmYjc3ZjE4OGRiMWY2OGUKPiBo
-dHRwczovL2dpdGh1Yi5jb20vSGlsc2NoZXIvbmV0eDQwMDAtbGludXgvY29tbWl0L2YwOGU2MmUw
-YzExNGI1ZTgwMzdlNDQ5NzkzMTdmNmU3Nzc2NzExNDAKCkkgc3VwcG9zZSBpdCBpcyBzbyBzaW1p
-bGFyIHRoYXQgd2UgY2FuIHNpbXBseSBhdWdtZW50IHdoYXQgd2UgaGF2ZQppbiB0aGUgdXBzdHJl
-YW0ga2VybmVsIHRvIGFsc28gc3VwcG9ydCB5b3VyIHZhcmlhbnQuCgo+ICAgKiBGcmFtZWJ1ZmZl
-ciBkaXNwbGF5IGRyaXZlciAtPgo+IGh0dHBzOi8vZ2l0aHViLmNvbS9IaWxzY2hlci9uZXR4NDAw
-MC1saW51eC9jb21taXQvY2VlZTczMzQ1MjE0NTA0YmY4ZTdjMmE5MTI0NTE5ZTU1ZTJiMmI3OQoK
-SSB3b3VsZCByZWltcGxlbWVudCB0aGlzIHVzaW5nIERSTS4gU2ltcGxlIGZyYW1lYnVmZmVycyBh
-cmUKcXVpdGUgZWFzeSB0byBzdXBwb3J0IHdpdGggRFJNIG5vd2FkYXlzLCBzZWUgZm9yIGV4YW1w
-bGU6Cmh0dHBzOi8vZ2l0Lmtlcm5lbC5vcmcvcHViL3NjbS9saW51eC9rZXJuZWwvZ2l0L3RvcnZh
-bGRzL2xpbnV4LmdpdC90cmVlL2RyaXZlcnMvZ3B1L2RybS90dmUyMDAKCj4gQXMgYWxyZWFkeSBz
-dGF0ZWQgc29tZXdoZXJlLCB0aGUgcHJvYmxlbSBpbmRlZWQgaXMgdGhlIG1pc3NpbmcgbW9kZW0K
-PiBjb250cm9sIHNpZ25hbHMsIGR1ZSB0byBwaW4gY291bnQgbGltaXRhdGlvbnMgYW5kIGxhY2sg
-b2YgbW9yZSBwaW4KPiBmdW5jdGlvbiBtdWx0aXBsZXhlcnMsIG9uIHNvbWUgdWFydHMgb24gdGhp
-cyBjaGlwLiBUaGF0J3Mgd2h5IHRoZXkgbmVlZAo+IHRvIGJlIGVtdWxhdGVkIHZpYSBHUElPcy4g
-TW9yZSBvciBsZXNzLCB3aGVuIGl0IGNvbWVzIHRvIGRlbGF5cyB0aGUKPiBQTDAxMXMgbW9kZW0g
-Y29udHJvbCBsaW5lIHdvdWxkIG5lZWQgdG8gYmUgc2V0IG1hbnVhbGx5IGFzIHdlbGwuCgpXZSBj
-YW4gY2VydGFpbmx5IHdvcmsgb3V0IGFuICJhcHByb3ZlZCBxdWlyayIgaW4gdGhlIHVwc3RyZWFt
-IGtlcm5lbAp0byBoYW5kbGUgdGhpcyBnaXZlbiB0aGUgdmVyeSBzdHJhaWdodC1mb3J3YXJkIHVz
-ZWNhc2UuCkl0IHJlcXVpcmVzIHNvbWUgdGltZSBhbmQgdGlua2VyaW5nIGxpa2UgZXZlcnl0aGlu
-ZyBlbHNlLgoKPiBUaGUgbmV0WDQwMDAgcGxhdGZvcm0gaXMgb25seSBidWlsdCB1c2luZyBhIGRl
-dmljZSB0cmVlLiBUaGUgZGV2aWNlIHRyZWUKPiBmaWxlcyB3ZXJlIHNvbWV0aW1lIGFnbyBtb3Zl
-ZCBvdXQgb2YgdGhlIGtlcm5lbCBpbnRvIG91ciB5b2N0byBsYXllciB0bwo+IHJlZHVjZSBtYWlu
-dGVuYW5jZSBhbmQgaGF2ZSBhIHNpbmdsZSBsb2NhdGlvbi4gSSBrbm93IHRoaXMgY29uZmxpY3Rz
-Cj4gd2l0aCBtYWlubGluaW5nLgoKTm8gYmlnIGRlYWwgd2hlcmUgeW91IGtlZXAgdGhlIGZpbGVz
-IGFzIGxvbmcgYXMgdGhleSBhcmUgbWVyZ2VkCndoZW4gd2UgaW1wbGVtZW50IHRoZSBwbGF0Zm9y
-bSBpbiB0aGUgdXBzdHJlYW0ga2VybmVsLgoKPiBJIGRvbid0IGtub3cgd2hhdCBuZWVkcyBhZGRp
-dGlvbmFsbHkgdG8gYmUgZG9uZSBmb3Igd29ya2luZwo+IG11bHRpcGxhdGZvcm0gc3VwcG9ydC4K
-Ckkgd291bGQgc2ltcGx5IGxvb2sgYXQgb25lIG9mIHRoZSBzaW1pbGFyIHBsYXRmb3JtIGluIHRo
-ZSB1cHN0cmVhbQprZXJuZWwsIHN0YXJ0aW5nIHdpdGggdjUuMC1yYzEgYW5kIGZvbGxvd2luZyB0
-aGUgcGF0dGVybiBzZXQgaW4KcHJlc2VudGF0aW9ucyBsaWtlIHRoZXNlOgpodHRwczovL2VsaW51
-eC5vcmcvaW1hZ2VzLzIvMmEvU2NodWx6LWhvdy10by1zdXBwb3J0LW5ldy1ib2FyZC11LWJvb3Qt
-bGludXgucGRmCmh0dHBzOi8vZWxpbnV4Lm9yZy9pbWFnZXMvMS8xOC9BUk02NF9Tb0NfTGludXhf
-U3VwcG9ydF9DaGVjay1MaXN0LnBkZgpodHRwczovL2VsaW51eC5vcmcvaW1hZ2VzLzIvMjYvR2V0
-dGluZy1Zb3VyLVBhdGNoZXMtaW4tTWFpbmxpbmUtTGludXgtV2hhdC1Ob3QtVG8tRG8tYW5kLWEt
-RmV3LVRoaW5ncy1Zb3UtQ291bGQtVHJ5LUluc3RlYWQtTWFyYy1aeW5naWVyLUFSTS5wZGYKCkdy
-ZWdvcnkncyBwcmVzZW50YXRpb24gKHNlY29uZCkgaXMgZXNwZWNpYWxseSBoZWxwZnVsIGZvciBh
-IG5ldyBMaW51eApzdWJhcmNoaXRlY3R1cmUgc3BlY2lmaWNhbGx5LgoKTXVsdGlwbGF0Zm9ybSBp
-cyBnZW5lcmFsbHkganVzdCBtYWtpbmcgc3VyZSB0aGF0IGFsbCBzeXN0ZW0tc3BlY2lmaWMKY29k
-ZSB3aWxsIG9ubHkgcnVuIGZvciB0aGF0IHNwZWNpZmljIGRldmljZSB0cmVlIHRoYXQgcmVwcmVz
-ZW50cwp5b3VyIHNwZWNpZmljIHN5c3RlbS4gVGhlIG11bHRpcGxhdGZvcm0gaW4gdGhpcyBjYXNl
-IGlzCkFSQ0hfTVVMVElfVjcuCgpZb3VycywKTGludXMgV2FsbGVpagoKX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5n
-IGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5p
-bmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+Commit 89a5e15bcba8 ("gpio/mmc/of: Respect polarity in the device tree")
+changed the behavior of "cd-inverted" to follow the device tree bindings
+specification:
+According to SDHCI standard, CD lines are specified as "active low".
+Using the "cd-inverted" property means that the CD line is "active high".
+
+Fix the SD card description for meson by setting the cd-gpios as
+"active low", according to the boards specifications, and dropping the
+"cd-inverted" property.
+
+Fixes: 89a5e15bcba8 ("gpio/mmc/of: Respect polarity in the device tree")
+Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
+---
+
+v4: commit message clarification on the "cd-inverted" property and usage.
+
+v3: fix typos in the commit message.
+
+v2: fix more occurences, also in other meson boards.
+
+ arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi            | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts           | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts         | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts            | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi               | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi           | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi              | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts   | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts    | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi          | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts          | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts            | 3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts             | 3 +--
+ 14 files changed, 14 insertions(+), 28 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
+index e14e0ce7e89f..016641a41694 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
+@@ -187,8 +187,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
+ 
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
+ 
+ 	vmmc-supply = <&vddao_3v3>;
+ 	vqmmc-supply = <&vddio_boot>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
+index 8cd50b75171d..ade2ee09ae96 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
+@@ -305,8 +305,7 @@
+ 	max-frequency = <200000000>;
+ 	disable-wp;
+ 
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
+ 
+ 	vmmc-supply = <&vddio_ao3v3>;
+ 	vqmmc-supply = <&vddio_tf>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+index 4cf7f6e80c6a..25105ac96d55 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+@@ -238,8 +238,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
+ 
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
+ 
+ 	vmmc-supply = <&vddao_3v3>;
+ 	vqmmc-supply = <&vddio_card>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+index 2e1cd5e3a246..1cc9dc68ef00 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+@@ -258,8 +258,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
+ 
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
+ 
+ 	vmmc-supply = <&tflash_vdd>;
+ 	vqmmc-supply = <&tf_io>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+index ce862266b9aa..0be0f2a5d2fe 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+@@ -196,8 +196,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
+ 
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
+ 
+ 	vmmc-supply = <&vddao_3v3>;
+ 	vqmmc-supply = <&vddio_card>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
+index 93a4acf2c46c..ad4d50bd9d77 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
+@@ -154,8 +154,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
+ 
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
+ 
+ 	vmmc-supply = <&vcc_3v3>;
+ };
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi
+index ec09bb5792b7..2d2db783c44c 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi
+@@ -211,8 +211,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
+ 
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
+ 
+ 	vmmc-supply = <&vddao_3v3>;
+ 	vqmmc-supply = <&vcc_3v3>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts
+index f1c410e2da2b..796baea7a0bf 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts
+@@ -131,8 +131,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
+ 
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
+ 
+ 	vmmc-supply = <&vddao_3v3>;
+ 	vqmmc-supply = <&vddio_card>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
+index db293440e4ca..255cede7b447 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
+@@ -238,8 +238,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
+ 
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
+ 
+ 	vmmc-supply = <&vcc_3v3>;
+ 	vqmmc-supply = <&vcc_card>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
+index 6739697be1de..9cbdb85fb591 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
+@@ -183,8 +183,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
+ 
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
+ 
+ 	vmmc-supply = <&vddao_3v3>;
+ 	vqmmc-supply = <&vddio_card>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
+index a1b31013ab6e..bc811a2faf42 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
+@@ -137,8 +137,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
+ 
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
+ 
+ 	vmmc-supply = <&vddao_3v3>;
+ 	vqmmc-supply = <&vddio_boot>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
+index 3c3a667a8df8..3f086ed7de05 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
+@@ -356,8 +356,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
+ 
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
+ 
+ 	vmmc-supply = <&vddao_3v3>;
+ 	vqmmc-supply = <&vddio_boot>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
+index f7a1cffab4a8..8acfd40090d2 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
+@@ -147,8 +147,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
+ 
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
+ 
+ 	vmmc-supply = <&vddao_3v3>;
+ 	vqmmc-supply = <&vddio_boot>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts
+index 7212dc4531e4..7fa20a8ede17 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts
+@@ -170,8 +170,7 @@
+ 	max-frequency = <100000000>;
+ 	disable-wp;
+ 
+-	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_LOW>;
+ 
+ 	vmmc-supply = <&vddao_3v3>;
+ 	vqmmc-supply = <&vddio_boot>;
+-- 
+2.7.4
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
