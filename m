@@ -2,86 +2,63 @@ Return-Path: <SRS0=baBj=PW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4DD76C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 12:22:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E4DF8C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 12:26:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 18B8520657
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 12:22:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B4D8720657
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 12:26:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tMpd1i8l";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="vWToak2U"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 18B8520657
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mdvIihjA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B4D8720657
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=I37kz83BkqnAeloRK4ZQc7sxDF2THXpc0UUiDgRllzc=; b=tMpd1i8l8nVjht
-	m/VtRqZcOZcNGsR0JTQT+LlBc6iuYpv0WIPE4bC16Gh7T4GJZQTTISP9TJv4/EZ4vfpqH4q+4a0sT
-	E2w5py6BcHOXt+2wpQ3jY1ggFLcRkOAUxnaHNO/rTc9AQUocDx6K54udnLTO/Cq3A04RqcbP054tK
-	SkzB/zy1vlnm1g6uUyo0m9wsC6qpzB+Ob2VJP53F423T/WTYuePnNQns+EfriV2VU9ShZvrWVP2D7
-	SMidUAvo4am6WfpSX/vUBkxPbNb+ewyk5UL0Zxy1N+SNLNbf3OCb8Yvv70N2CLbHyqeAPgFd1WymJ
-	Icse2UE6rgq9V4Ctqegg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=dc8cVzj1j3SBLQtFDEC2E9Umx6KcdNyb5mfqI2+U30A=; b=mdvIihjACCh+YP
+	bPlPOZFjmnUVU1abRaDxZt3CLcJxGZX0+ZjbqM3padDCCmnUi6v+WB9ydGGibXGwxzviKETZVQN+Y
+	0edbwWWvKTKkN+b1A5dkx6xg7CVBRyGaG+Ic8dFVw/TN+SeCgp2y+lA2FoImVu2ak7eFul2tFEOZ9
+	9UD1w6rYaVobguNO7Achn5bla2mlGiB7anUNGHz2/iPyJ9PH79015X6a+J2iH5MoH+wtOmrQYJ0Wj
+	HzffjGWvjPtpfFKRrGZBjshrggV94L9mfSjdik+CRD6gCNFxq7dmtDWUnHh7oJX2byXVjAjB+6xLf
+	HU7bDSL/s7dQDHj2I2WQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj1G4-0008GZ-1O; Mon, 14 Jan 2019 12:22:24 +0000
-Received: from lelv0142.ext.ti.com ([198.47.23.249])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj1G0-0008GB-Qn
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 12:22:22 +0000
-Received: from fllv0035.itg.ti.com ([10.64.41.0])
- by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0ECM5hu022736;
- Mon, 14 Jan 2019 06:22:05 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1547468525;
- bh=pomoWjXu4RCf3I1O8QUVAUkXL2nJYqEeNElihQ5YGko=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=vWToak2UyxfbpQ0zZ3dgwsL5ey5gy9OiN0eko5gxKjfdfiHSAd9N0jp9EcYvXY4ol
- AJg6MF/7n7tw0XT04sawyiTbAwohMR7inNzkVf9+xoG9pUIkLsQRdbZ1ZdvoJg4cSE
- DfUW+buB/uaWRkkFumYydUZBKn7IFFINLrS2BQ6w=
-Received: from DLEE105.ent.ti.com (dlee105.ent.ti.com [157.170.170.35])
- by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0ECM5So030284
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Mon, 14 Jan 2019 06:22:05 -0600
-Received: from DLEE108.ent.ti.com (157.170.170.38) by DLEE105.ent.ti.com
- (157.170.170.35) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Mon, 14
- Jan 2019 06:22:04 -0600
-Received: from dlep33.itg.ti.com (157.170.170.75) by DLEE108.ent.ti.com
- (157.170.170.38) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Mon, 14 Jan 2019 06:22:04 -0600
-Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0ECM1kO010732;
- Mon, 14 Jan 2019 06:22:02 -0600
-Subject: Re: [PATCH 04/17] ARM: davinci: da850: WARN() if clk_get() fails
-To: Bartosz Golaszewski <brgl@bgdev.pl>, Kevin Hilman <khilman@kernel.org>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- Thomas Gleixner <tglx@linutronix.de>
-References: <20190111172134.30147-1-brgl@bgdev.pl>
- <20190111172134.30147-5-brgl@bgdev.pl>
-From: Sekhar Nori <nsekhar@ti.com>
-Message-ID: <fcee383c-f2cb-1faf-d2a3-a35a17d57b8b@ti.com>
-Date: Mon, 14 Jan 2019 17:52:00 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gj1K0-0002MG-PL; Mon, 14 Jan 2019 12:26:28 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gj1Ju-0002LW-IP
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 12:26:26 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C929680D;
+ Mon, 14 Jan 2019 04:26:21 -0800 (PST)
+Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 4AAE53F5BD;
+ Mon, 14 Jan 2019 04:26:19 -0800 (PST)
+Date: Mon, 14 Jan 2019 12:26:16 +0000
+From: Mark Rutland <mark.rutland@arm.com>
+To: Balbir Singh <bsingharora@gmail.com>
+Subject: Re: [PATCH v6] arm64: implement ftrace with regs
+Message-ID: <20190114122616.GD10258@lakrids.cambridge.arm.com>
+References: <20190104141053.360F768D93@newverein.lst.de>
+ <20190104175017.GA7157@lakrids.cambridge.arm.com>
+ <20190114121359.GB26056@350D>
 MIME-Version: 1.0
-In-Reply-To: <20190111172134.30147-5-brgl@bgdev.pl>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+Content-Disposition: inline
+In-Reply-To: <20190114121359.GB26056@350D>
+User-Agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_042220_916514_19B2BB3B 
-X-CRM114-Status: GOOD (  13.74  )
+X-CRM114-CacheID: sfid-20190114_042622_612507_45F72200 
+X-CRM114-Status: GOOD (  15.70  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,29 +70,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org,
- Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Cc: Arnd Bergmann <arnd@arndb.de>, Julien Thierry <julien.thierry@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, Steven Rostedt <rostedt@goodmis.org>,
+ AKASHI Takahiro <takahiro.akashi@linaro.org>, Ingo Molnar <mingo@redhat.com>,
+ Torsten Duwe <duwe@lst.de>, Josh Poimboeuf <jpoimboe@redhat.com>,
+ Amit Daniel Kachhap <amit.kachhap@arm.com>, live-patching@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 11/01/19 10:51 PM, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Mon, Jan 14, 2019 at 11:13:59PM +1100, Balbir Singh wrote:
+> On Fri, Jan 04, 2019 at 05:50:18PM +0000, Mark Rutland wrote:
+> > Hi Torsten,
+> > 
+> > On Fri, Jan 04, 2019 at 03:10:53PM +0100, Torsten Duwe wrote:
+> > > Use -fpatchable-function-entry (gcc8) to add 2 NOPs at the beginning
+> > > of each function. Replace the first NOP thus generated with a quick LR
+> > > saver (move it to scratch reg x9), so the 2nd replacement insn, the call
+> > > to ftrace, does not clobber the value. Ftrace will then generate the
+> > > standard stack frames.
 > 
-> Currently the timer code checks if the clock pointer passed to it is
-> good (!IS_ERR(clk)). The new clocksource driver expects the clock to
-> be functional and doesn't perform any checks so emit a warning if
-> clk_get() fails.
-> 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> Do we know what the overhead would be, if this was a link time change
+> for the first instruction?
 
-I think 4-9 can be a single patch. They are doing something very similar
-and its unlikely we will have to patch/revert just one of them.
+No, but it should be possible to benchamrk that for a given workload,
+which is what I'd like to see.
+
+> Also, I was under the impression that some arch's do ftrace_call_replace
+> under stop_machine(), is that a possibility here?
+
+Something like that is a possibility.
+
+I think we need numbers either way.
 
 Thanks,
-Sekhar
+Mark.
 
 _______________________________________________
 linux-arm-kernel mailing list
