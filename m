@@ -2,57 +2,108 @@ Return-Path: <SRS0=baBj=PW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E911C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 10:09:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 334F2C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 10:15:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 70D722086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 10:09:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0235D20659
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 10:15:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Lkb7Dus3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 70D722086D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eh2Gg9Cw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0235D20659
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XX3QmfFuZWjm11ZQja914sUTX+zhQOZAUZu0RZ8vfEc=; b=Lkb7Dus3CVYv6S
-	LufUKMk54EnjW+kRE1XCKRwIGOlHv0FIAVNthy+0q9Gdwzqnx4JEwoD5lY9FZBxqpNauULpVIAUKd
-	Nx7WPm67FE5YVSQbm4zl8tMssR4YRsmNTgGyDF2G7R0N2R+sMye4jDCtxEML8Ov38+lHYPz5JxBhx
-	U22SnXbC7kS7mQpl+RdNgHG+TT3Zlh2fqRlGGe0T7DOiRpDXxbcJucNVnNVtpASX74OwqD8Xf5N84
-	kz7zU+gwff/X0Lom37uulNDCMxoW3BnVv6TmlqAuFDp8M3fvvv9VCuf1IgxCqUJEmZ0GEgn+3J7Jk
-	yjOlCEt441Vy7kQXdIdA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=i5VZOuST8BAcc/bsIMGvZfB1UA2W6lbYzhBGwMh2T84=; b=eh2Gg9Cw/vSaXo
+	0zss50jaSzSImeXdXd0HPM7bELD7qb4v8TZWtk+ckwTWtZeQDWcCQd7oZ8kDFDzGYde6iKABCFNeA
+	p9cQ1RzezLlZF0ckOyd0yuze8mWXEO7JEiXAoBYIr8Cpz5eQF6FbQCNNqP2uw4qfIipt/m8lQnATK
+	ykKBlwWQF6tKLABP/TRTdvUPuNtUFtFZdZBVDJCqi3e079xyxxtawp6FR+8uJ7JHJrxgf6MtUo6xQ
+	ExZRFDDb38nCLImwUw8DTn3VgIZik2KN3RT07IjjXXT7Wl8b1pIO6DaigmHqFRPjWKxQqj7ULR+Uy
+	EIZtY6lQu3ewMhDnesSg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gizBH-0002mI-71; Mon, 14 Jan 2019 10:09:19 +0000
-Received: from gloria.sntech.de ([185.11.138.130])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gizBC-0002lE-Ju; Mon, 14 Jan 2019 10:09:16 +0000
-Received: from p5b1272c6.dip0.t-ipconnect.de ([91.18.114.198]
- helo=phil.localnet)
- by gloria.sntech.de with esmtpsa (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256)
- (Exim 4.89) (envelope-from <heiko@sntech.de>)
- id 1gizB4-0004xw-Hk; Mon, 14 Jan 2019 11:09:06 +0100
-From: Heiko Stuebner <heiko@sntech.de>
-To: Daniel Vetter <daniel@ffwll.ch>
-Subject: Re: [PATCH 3/4] drm/rockchip: add missing of_node_put
-Date: Mon, 14 Jan 2019 11:09:05 +0100
-Message-ID: <10335721.Px6jQUZGiA@phil>
-In-Reply-To: <20190114100556.GC10517@phenom.ffwll.local>
-References: <1547369264-24831-1-git-send-email-Julia.Lawall@lip6.fr>
- <3397932.PmTvevuZIG@phil> <20190114100556.GC10517@phenom.ffwll.local>
+	id 1gizHQ-0005y3-Q6; Mon, 14 Jan 2019 10:15:40 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gizHM-0005xW-8l
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 10:15:38 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 91409A78;
+ Mon, 14 Jan 2019 02:15:35 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ 62EEB3F5BD; Mon, 14 Jan 2019 02:15:33 -0800 (PST)
+Subject: Re: [PATCH v3 6/7] arm64: add sysfs vulnerability show for
+ speculative store bypass
+To: Jeremy Linton <jeremy.linton@arm.com>, linux-arm-kernel@lists.infradead.org
+References: <20190109235544.2992426-1-jeremy.linton@arm.com>
+ <20190109235544.2992426-7-jeremy.linton@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ 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
+Organization: ARM Ltd
+Message-ID: <ac625845-fd40-ad87-4efd-ea0ed53274ec@arm.com>
+Date: Mon, 14 Jan 2019 10:15:31 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
+In-Reply-To: <20190109235544.2992426-7-jeremy.linton@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_020914_802962_F3EA4F55 
-X-CRM114-Status: GOOD (  15.50  )
+X-CRM114-CacheID: sfid-20190114_021536_323728_D82B7854 
+X-CRM114-Status: GOOD (  20.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -64,55 +115,133 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-rockchip@lists.infradead.org, David Airlie <airlied@linux.ie>,
- kernel-janitors@vger.kernel.org, Sandy Huang <hjc@rock-chips.com>,
- dri-devel@lists.freedesktop.org, linux-kernel@vger.kernel.org,
- Julia Lawall <Julia.Lawall@lip6.fr>, linux-arm-kernel@lists.infradead.org
+Cc: stefan.wahren@i2se.com, mlangsdo@redhat.com, suzuki.poulose@arm.com,
+ catalin.marinas@arm.com, julien.thierry@arm.com, will.deacon@arm.com,
+ linux-kernel@vger.kernel.org, steven.price@arm.com, ykaukab@suse.de,
+ dave.martin@arm.com, shankerd@codeaurora.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Am Montag, 14. Januar 2019, 11:05:56 CET schrieb Daniel Vetter:
-> On Sun, Jan 13, 2019 at 07:48:49PM +0100, Heiko Stuebner wrote:
-> > Am Sonntag, 13. Januar 2019, 09:47:43 CET schrieb Julia Lawall:
-> > > The device node iterators perform an of_node_get on each iteration, so a
-> > > jump out of the loop requires an of_node_put.
-> > > 
-> > > The semantic patch that fixes this problem is as follows
-> > > (http://coccinelle.lip6.fr):
-> > > 
-> > > // <smpl>
-> > > @@
-> > > expression root,e;
-> > > local idexpression child;
-> > > iterator name for_each_child_of_node;
-> > > @@
-> > > 
-> > >  for_each_child_of_node(root, child) {
-> > >    ... when != of_node_put(child)
-> > >        when != e = child
-> > > +  of_node_put(child);
-> > > ?  break;
-> > >    ...
-> > > }
-> > > ... when != child
-> > > // </smpl>
-> > > 
-> > > Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-> > 
-> > I've added a fixes+stable tag and applied it to drm-misc-fixes
+On 09/01/2019 23:55, Jeremy Linton wrote:
+> Return status based on ssbd_state and the arm64 SSBS feature. If
+> the mitigation is disabled, or the firmware isn't responding then
+> return the expected machine state based on a new blacklist of known
+> vulnerable cores.
 > 
-> All of them or just this one here? These cleanup patches have a high
-> chance of falling through cracks, so taking them all usually works out
-> better ...
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  arch/arm64/kernel/cpu_errata.c | 48 ++++++++++++++++++++++++++++++++++
+>  1 file changed, 48 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index ee286d606d9b..c8ff96158b94 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -288,6 +288,7 @@ enable_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
+>  DEFINE_PER_CPU_READ_MOSTLY(u64, arm64_ssbd_callback_required);
+>  
+>  int ssbd_state __read_mostly = ARM64_SSBD_KERNEL;
+> +static bool __ssb_safe = true;
+>  
+>  static const struct ssbd_options {
+>  	const char	*str;
+> @@ -385,10 +386,18 @@ static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
+>  {
+>  	struct arm_smccc_res res;
+>  	bool required = true;
+> +	bool is_vul;
+>  	s32 val;
+>  
+>  	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
+>  
+> +	is_vul = is_midr_in_range_list(read_cpuid_id(), entry->midr_range_list);
+> +
+> +	if (is_vul)
+> +		__ssb_safe = false;
+> +
+> +	arm64_requested_vuln_attrs |= VULN_SSB;
+> +
+>  	if (this_cpu_has_cap(ARM64_SSBS)) {
+>  		required = false;
+>  		goto out_printmsg;
+> @@ -422,6 +431,7 @@ static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
+>  		ssbd_state = ARM64_SSBD_UNKNOWN;
+>  		return false;
+>  
+> +	/* machines with mixed mitigation requirements must not return this */
+>  	case SMCCC_RET_NOT_REQUIRED:
+>  		pr_info_once("%s mitigation not required\n", entry->desc);
+>  		ssbd_state = ARM64_SSBD_MITIGATED;
+> @@ -476,6 +486,17 @@ static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
+>  
+>  	return required;
+>  }
+> +
+> +/* known vulnerable cores */
+> +static const struct midr_range arm64_ssb_cpus[] = {
+> +	MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
+> +	MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
+> +	MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
+> +	MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
+> +	MIDR_ALL_VERSIONS(MIDR_CORTEX_A76),
+> +	{},
+> +};
+> +
+>  #endif	/* CONFIG_ARM64_SSBD */
+>  
+>  static void __maybe_unused
+> @@ -762,6 +783,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+>  		.capability = ARM64_SSBD,
+>  		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
+>  		.matches = has_ssbd_mitigation,
+> +		.midr_range_list = arm64_ssb_cpus,
+>  	},
+>  #endif
+>  #ifdef CONFIG_ARM64_ERRATUM_1188873
+> @@ -809,4 +831,30 @@ ssize_t cpu_show_spectre_v2(struct device *dev, struct device_attribute *attr,
+>  	return sprintf(buf, "Vulnerable\n");
+>  }
+>  
+> +ssize_t cpu_show_spec_store_bypass(struct device *dev,
+> +		struct device_attribute *attr, char *buf)
+> +{
+> +	/*
+> +	 *  Two assumptions: First, get_ssbd_state() reflects the worse case
+> +	 *  for hetrogenous machines, and that if SSBS is supported its
+> +	 *  supported by all cores.
+> +	 */
+> +	switch (arm64_get_ssbd_state()) {
+> +	case ARM64_SSBD_MITIGATED:
+> +		return sprintf(buf, "Not affected\n");
+> +
+> +	case ARM64_SSBD_KERNEL:
+> +	case ARM64_SSBD_FORCE_ENABLE:
+> +		if (cpus_have_cap(ARM64_SSBS))
+> +			return sprintf(buf, "Not affected\n");
+> +		return sprintf(buf,
+> +			"Mitigation: Speculative Store Bypass disabled\n");
+> +	}
+> +
+> +	if (__ssb_safe)
+> +		return sprintf(buf, "Not affected\n");
 
-That is the only one I got, so right now I only applied this one in my inbox.
-Weekend and such resulted in me not going looking for other ones.
+The kbuild robot reports that this fails if CONFIG_ARM64_SSBD is not
+selected. What should we print in this case? "Vulnerable"? Or "Unknown"?
 
-Heiko
+> +
+> +	return sprintf(buf, "Vulnerable\n");
+> +}
+> +
+>  #endif
+> 
 
+Thanks,
 
+	M.
+-- 
+Jazz is not dead. It just smells funny...
 
 _______________________________________________
 linux-arm-kernel mailing list
