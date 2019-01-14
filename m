@@ -2,61 +2,80 @@ Return-Path: <SRS0=baBj=PW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3E44EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 15:14:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9B963C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 15:17:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0E1562086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 15:14:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 68DFE2086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 14 Jan 2019 15:17:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hbnSjPrL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0E1562086D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N8Em+lnZ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="LD7BUv/w"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 68DFE2086D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=EZOXrgvyvXMe50e4Zirb5FBlTouE8ZQ8o6Zyq3HFavA=; b=hbnSjPrLfCrVKv
-	KIm6B+OKiGmL5ZjyD4/bY+h/O0emNGq5nSbF6fLch9w1Vfd9NpYNi9CRXHN797gt150EU4SBcAGBb
-	XrvQF19rTuA1tS8h9z/vC98AwiWAu9qyvvz5Kr0tXpuNSa3/vS9RxIcrjdDNwKymw9EckH+8W3YnA
-	bE99D/BNYWQA1h+aYfdL/acG9XWszXTyu+trBhWdxWQUhs3+jWY//iTkhh4yBoDR4tPb0lFnqc2jA
-	rG49CdOGEzfLUrROW1zcJwkHQ+gDI+qQ28QTxf64kD0xUNGqw3neySffeSv3M1xV4eJczv2eQhhLn
-	H/7R2UKux+oQgnvQm/AA==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=8aiU0GAUQZDikPizNsBdJ/Gthk//8srGanQkYkxdwms=; b=N8Em+lnZZnna7w
+	ailmZCnu4BG8iUwyHl63q8Lrb+F68OVeRNeEIMstXhIstFnMX63I2kctIDzDVP6JZNUTN7pbdb3FU
+	g3Tb3iFKqLw5uUYnnd3sVYFglghV+JCMrf8Tq/5uhztZOo0U9uzLEs6AqvcDkXrRKVidC/I/HRb3R
+	FDyCr8/8I+cWVkx9Ks68AFQBFWX7rNO4PVoLxhsbL11C7j+3/tqCxMQve21q62CaS0+/AW6LRRC6X
+	f9xqPU79G7zfZVyFW0jUdDIIMPMsSIYMGRnqeO3ONkXnFTIizMzpvnA51LiGM972T2Dh9hblt9Qsm
+	PMgkUqCou7x5MKYV7KEg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gj3wZ-00063B-KK; Mon, 14 Jan 2019 15:14:27 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gj3wW-00062q-9z
- for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 15:14:25 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9599E80D;
- Mon, 14 Jan 2019 07:14:22 -0800 (PST)
-Received: from e110467-lin.cambridge.arm.com (e110467-lin.cambridge.arm.com
- [10.1.196.75])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 3F0013F70D;
- Mon, 14 Jan 2019 07:14:21 -0800 (PST)
-From: Robin Murphy <robin.murphy@arm.com>
-To: robh+dt@kernel.org,
-	frowand.list@gmail.com
-Subject: [PATCH RESEND] media: s5p-mfc: Fix memdev DMA configuration
-Date: Mon, 14 Jan 2019 15:14:14 +0000
-Message-Id: <4235afdd39766f11a3bf4c8daa0d1f4e6a1cd6dc.1547476835.git.robin.murphy@arm.com>
-X-Mailer: git-send-email 2.20.1.dirty
+	id 1gj3zA-0007kl-DL; Mon, 14 Jan 2019 15:17:08 +0000
+Received: from mail-lf1-x141.google.com ([2a00:1450:4864:20::141])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gj3z6-0007kE-91
+ for linux-arm-kernel@lists.infradead.org; Mon, 14 Jan 2019 15:17:06 +0000
+Received: by mail-lf1-x141.google.com with SMTP id p6so15893184lfc.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 14 Jan 2019 07:17:03 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=+Ead8LSWG66DphT0GLyzfFRHfp2cmEwD0BAU+nVi378=;
+ b=LD7BUv/wG7xDyC47T+6D8/d/xO5Mzy2eH7bmx5svjDtl0ZPuSjt7Rc82NM6Ts46tq4
+ xM1AJlk8hqFyL1sN8+J21mFqRLNkNySMjvgszHcTnXL5TWYMjKhaaPQrErz600xYHl/r
+ rIGiYmvU6+6nNwwmhPuUIOJ9vWvCopomZCOT8=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=+Ead8LSWG66DphT0GLyzfFRHfp2cmEwD0BAU+nVi378=;
+ b=pIFxq7Ix93yUv+EU9/GsxMJt/qpr+fxeFQ8fZah0ckentK6ra7V3ZWcuN6YGRR6aR1
+ PieKsSQmfE2klIM/yQI9RwxHUNBr3N0k/4rdFpx5x7qf6vz1XT6ZHSYjEyxmrpYzJpeS
+ qeubUD68Ga4znF0Txw+BmrOai16owxMX1oYxJ8OFC7mXOxKfeozd9Gz9hI3MdK+KMP0H
+ DUB7Aojx3jauKlxz2vLqbscUrLo2Y2zbXD2Ev5LUMOnkpAIg9hFuW3cIxW6IucyTUEwt
+ 4iXPK65/hGCnZKk88qAld9TsiCtWUnj7gC0HNe6RFepIaL0cfgngW/bfxQBeBZe3fFqP
+ DRjw==
+X-Gm-Message-State: AJcUukdsa/ufyrGl1WZOys3q2v252MhcO8tWANMGmm2lPdK9mpmTUGrs
+ tPDMRHFHoWPb3KebpdZ2/i6vn/DajFlJRZdyCCl46DeHoKc=
+X-Google-Smtp-Source: ALg8bN6baeAcO2Y4iwM/cwg8J9P8BijOQY3CwAVhwt+ksxWZpz8UiiolIKzvyrOTOE/7W9qAXajM6tBeRvM5j8rK8JE=
+X-Received: by 2002:a19:41c4:: with SMTP id o187mr14614209lfa.32.1547479021918; 
+ Mon, 14 Jan 2019 07:17:01 -0800 (PST)
 MIME-Version: 1.0
+References: <20190113095723.25295-1-wens@csie.org>
+ <20190113095723.25295-2-wens@csie.org>
+In-Reply-To: <20190113095723.25295-2-wens@csie.org>
+From: Linus Walleij <linus.walleij@linaro.org>
+Date: Mon, 14 Jan 2019 16:16:50 +0100
+Message-ID: <CACRpkdbJRV2hL2gZ84izY_30XCdWvXZ7T5pzxNHJTqLPk2BWzw@mail.gmail.com>
+Subject: Re: [PATCH v2 2/2] pinctrl: sunxi: Consider pin_base when calculating
+ regulator array index
+To: Chen-Yu Tsai <wens@csie.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_071424_353751_B18823A6 
-X-CRM114-Status: GOOD (  17.32  )
+X-CRM114-CacheID: sfid-20190114_071704_318397_E78F2EEF 
+X-CRM114-Status: GOOD (  13.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,81 +87,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>,
- devicetree@vger.kernel.org, Marek Szyprowski <m.szyprowski@samsung.com>,
- linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
+Cc: Maxime Ripard <maxime.ripard@bootlin.com>,
+ "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Having of_reserved_mem_device_init() forcibly reconfigure DMA for all
-callers, potentially overriding the work done by a bus-specific
-.dma_configure method earlier, is at best a bad idea and at worst
-actively harmful. If drivers really need virtual devices to own
-dma-coherent memory, they should explicitly configure those devices
-based on the appropriate firmware node as they create them.
+On Sun, Jan 13, 2019 at 10:57 AM Chen-Yu Tsai <wens@csie.org> wrote:
 
-It looks like the only driver not passing in a proper OF platform device
-is s5p-mfc, so move the rogue of_dma_configure() call into that driver
-where it logically belongs.
+> On most newer Allwinner SoCs, there are two pinctrl devices, the PIO and
+> R_PIO. PIO covers pin-banks PA to PI (PJ and PK have not been seen),
+> while R_PIO covers PL to PN. The regulator array only has space for 12
+> entries, which was designed to cover PA to PL. On the A80, the pin banks
+> go up to PN, which would be the 14th entry in the regulator array.
+> However since the driver only needs to track regulators for its own pin
+> banks, the array only needs to have 9 entries, and also take in to
+> account the value of pin_base, such that the regulator for the first
+> pin-bank of the pinctrl device, be it "PA" or "PL" uses the first entry
+> of the array.
+>
+> Base the regulator array index on pin_base, such that "PA" for PIO and
+> "PL" for R_PIO both take the first element within their respective
+> device's regulator array.
+>
+> Also decrease the size of the regulator array to 9, just enough to cover
+> "PA" to "PI".
+>
+> Fixes: 9a2a566adb00 ("pinctrl: sunxi: Deal with per-bank regulators")
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> Changes since v1:
+>
+>   - Take in to account pin_base when handling regulator array index
+>     instead of enlarging the array to encompass PA - PN.
 
-Reviewed-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Acked-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+Patch applied.
 
-Hi Rob, Frank,
-
-Bit of an old one bit it's rebased cleanly - Mauro reckoned[1] this
-would suit the OF tree better than media, are you happy to pick it up?
-
-Thanks,
-Robin.
-
-[1] https://patchwork.kernel.org/patch/10598085/
-
-
- drivers/media/platform/s5p-mfc/s5p_mfc.c | 7 +++++++
- drivers/of/of_reserved_mem.c             | 4 ----
- 2 files changed, 7 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-index 8a5ba3bec3af..6db33704b1a8 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-@@ -1094,6 +1094,13 @@ static struct device *s5p_mfc_alloc_memdev(struct device *dev,
- 	child->dma_mask = dev->dma_mask;
- 	child->release = s5p_mfc_memdev_release;
- 
-+	/*
-+	 * The memdevs are not proper OF platform devices, so in order for them
-+	 * to be treated as valid DMA masters we need a bit of a hack to force
-+	 * them to inherit the MFC node's DMA configuration.
-+	 */
-+	of_dma_configure(child, dev->of_node, true);
-+
- 	if (device_add(child) == 0) {
- 		ret = of_reserved_mem_device_init_by_idx(child, dev->of_node,
- 							 idx);
-diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
-index 1977ee0adcb1..9e02a5d80225 100644
---- a/drivers/of/of_reserved_mem.c
-+++ b/drivers/of/of_reserved_mem.c
-@@ -340,10 +340,6 @@ int of_reserved_mem_device_init_by_idx(struct device *dev,
- 		mutex_lock(&of_rmem_assigned_device_mutex);
- 		list_add(&rd->list, &of_rmem_assigned_device_list);
- 		mutex_unlock(&of_rmem_assigned_device_mutex);
--		/* ensure that dma_ops is set for virtual devices
--		 * using reserved memory
--		 */
--		of_dma_configure(dev, np, true);
- 
- 		dev_info(dev, "assigned reserved memory node %s\n", rmem->name);
- 	} else {
--- 
-2.20.1.dirty
-
+Yours,
+Linus Walleij
 
 _______________________________________________
 linux-arm-kernel mailing list
