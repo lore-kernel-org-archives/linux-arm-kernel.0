@@ -2,70 +2,59 @@ Return-Path: <SRS0=3lKL=PX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8CA68C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 22:38:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3F88BC43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 22:43:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5646820656
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 22:38:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 11A22208E4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 22:43:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ggvrvr13";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=agner.ch header.i=@agner.ch header.b="fPgYUVao"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5646820656
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=agner.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UpUB+T8p"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 11A22208E4
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=the-dreams.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Message-ID:References:In-Reply-To:
-	Subject:To:From:Date:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=IWiNruwoFHlLkMJi7eW0OoQ0BdA6LLJtg/S4e0zkIiI=; b=ggvrvr13/zNCv8
-	ZQmY6bOGrS/xhZOwtOQ95Gf7FCHVxujSwLhBvLSzUgC5wRhkcLyEfrCxwUeKxoG89wWWl13TTE8FY
-	bVYVE4efcIlalZwn4Ko/R3hZZVdJWMbsV0aMMF/GwnGfRQg7Ag7w/jo51apAMDgznJrMqa3KmlkDN
-	AWDZK2zKo5gABJZZcXasLmnPbtn1BjvYWl1vOsgXwX7QOH6CryWF4+cRp6k47UFdPhLFkVb/npm1k
-	DNpKBWtu4cN+qyh24tCSQdkdjYdcu4q5Q/8/ENOHuUglPCTqLdiy35uY5vp0UVXBt0pwPQXIPissV
-	CaeSjipdejeK07fcqy4Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=L28KX3qxF71eCAa7W0fxbaluPJ4hZA/qew0M5/atcRU=; b=UpUB+T8plhYgCyMreGPHhjq3X
+	jVBhD2WahD52pfc5UpBe0yhLVwsmKn99x+2YzNpW6i9pT7qu9jTAFgS49zlnujUFTYyr2QpVpMKLF
+	Qhx47wKnEjkh4S+q8IfAnnof1l5pw7MiENNSyGlDha/r0MDtnOCKnz1fzwanYiaS7jtYAlHeibSBv
+	HcjJu7JelKC4b7nILwkAHOsd0T4CXW4ztwTXAVz3R2ZQx2FzZnqalLr/JBP8D92IZA5S6eRpyr3GT
+	CEdzUJDVc3YM2usA0afxDj+dSbFqsyL3woZwdGCRfDWXWAsq95xupCsmzloiH1HhW99rhAobBhYVu
+	y8ERTWJNg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjXLV-0002fV-6o; Tue, 15 Jan 2019 22:38:09 +0000
-Received: from mail.kmu-office.ch ([2a02:418:6a02::a2])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjXLR-0002es-GK
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 22:38:07 +0000
-Received: from webmail.kmu-office.ch (unknown [IPv6:2a02:418:6a02::a3])
- by mail.kmu-office.ch (Postfix) with ESMTPSA id 522515C0DDF;
- Tue, 15 Jan 2019 23:37:57 +0100 (CET)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=agner.ch; s=dkim;
- t=1547591877;
- h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
- to:to:cc:cc:mime-version:mime-version:content-type:content-type:
- content-transfer-encoding:content-transfer-encoding:
- in-reply-to:in-reply-to:references:references;
- bh=ueRAERzUH65+Drr7doYhBdpCMWXmWkgznpq2aomP0nY=;
- b=fPgYUVaoTfrth3LHyPvCnx8D0jXJoNbgx9xREzlTJFk2uVYe4Vj64WDtcVxVFA3CdzFToH
- +gUl3laEVurFmtrE5YLe/jdyCgo7MRPvF+XEB+0zCCsdVOW6CcTtw7/ZAJ3J6W/mFs7bQB
- dj9SIvP3FRkEOM+FbFw9K/GgulPWK5Q=
+	id 1gjXR6-0004Na-3B; Tue, 15 Jan 2019 22:43:56 +0000
+Received: from sauhun.de ([88.99.104.3] helo=pokefinder.org)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gjXR3-0004NH-7a
+ for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 22:43:54 +0000
+Received: from localhost (p54B332B9.dip0.t-ipconnect.de [84.179.50.185])
+ by pokefinder.org (Postfix) with ESMTPSA id 2384B2C9D2D;
+ Tue, 15 Jan 2019 23:43:52 +0100 (CET)
+Date: Tue, 15 Jan 2019 23:43:51 +0100
+From: Wolfram Sang <wsa@the-dreams.de>
+To: kbuild test robot <lkp@intel.com>
+Subject: Re: [PATCH v4 3/3] i2c: at91: added slave mode support
+Message-ID: <20190115224351.rtbqaqro5pl3dvov@ninjato>
+References: <20181227151311.20107-4-ludovic.desroches@microchip.com>
+ <201901050345.JaEWLmjh%fengguang.wu@intel.com>
 MIME-Version: 1.0
-Date: Tue, 15 Jan 2019 23:37:57 +0100
-From: Stefan Agner <stefan@agner.ch>
-To: Stefan Agner <stefan@agner.ch>
-Subject: Re: ARM: config issue with ftrace function graph tracer
-In-Reply-To: <20190113161420.GE2392@n2100.armlinux.org.uk>
-References: <20190112010139.GA5288@r2700x.localdomain>
- <d9bc5937c5fc7a45f3aca14fdf68803d@agner.ch>
- <20190113161420.GE2392@n2100.armlinux.org.uk>
-Message-ID: <78d9aedb4b23dcc929ca9330cc5f0090@agner.ch>
-X-Sender: stefan@agner.ch
-User-Agent: Roundcube Webmail/1.3.7
+In-Reply-To: <201901050345.JaEWLmjh%fengguang.wu@intel.com>
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_143805_834531_91B6F250 
-X-CRM114-Status: GOOD (  26.98  )
+X-CRM114-CacheID: sfid-20190115_144353_426922_784F6234 
+X-CRM114-Status: UNSURE (   6.23  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,117 +66,70 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnd Bergmann <arnd@arndb.de>, Jeremy Fertic <jeremyfertic@gmail.com>,
- Russell King - ARM Linux <linux@armlinux.org.uk>, rostedt@goodmis.org,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: alexandre.belloni@bootlin.com, me@jue.yt, linux-kernel@vger.kernel.org,
+ Ludovic Desroches <ludovic.desroches@microchip.com>, kbuild-all@01.org,
+ andriy.shevchenko@linux.intel.com, Juergen Fitschen <jfi@ssv-embedded.de>,
+ linux-arm-kernel@lists.infradead.org, linux-i2c@vger.kernel.org
+Content-Type: multipart/mixed; boundary="===============4930554671321490587=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 13.01.2019 17:14, Russell King - ARM Linux wrote:
-> On Sun, Jan 13, 2019 at 04:41:52PM +0100, Stefan Agner wrote:
->> Hi,
->>
->> On 12.01.2019 02:01, Jeremy Fertic wrote:
->> > I'm having a problem with the ftrace function graph tracer on a 32 bit arm
->> > board (orangepi pc). A bisect points to the following commit:
->> >
->> > f9b58e8c7d03 ("ARM: 8800/1: use choice for kernel unwinders")
->> >
->> > Before this commit, if I use sunxi_defconfig and then menuconfig to enable
->> > FTRACE and FUNCTION_TRACER then the function graph tracer works. With this
->> > commit, and as of v5.0-rc1, doing the same as above results in a broken
->> > function graph tracer and often an oops as well. The commit introduces a
->> > choice group and it looks like it should default to UNWINDER_FRAME_POINTER
->> > if FUNCTION_GRAPH_TRACER is enabled. FUNCTION_GRAPH_TRACER is enabled by
->> > default when I enable FUNCTION_TRACER but this has no effect on the choice.
->> > The choice always defaults to the other option which is UNWINDER_ARM. If I
->> > manually choose UNWINDER_FRAME_POINTER then the function graph tracer works
->> > fine.
->>
->> The default selection is there, but this is made at "make
->> sunxi_defconfig" time. At this point FUNCTION_GRAPH_TRACER is not
->> enabled, hence Kconfig uses UNWIDER_ARM. However, when enabling the
->> FUNCTION_GRAPH_TRACER Kconfig will _not_ reconsider and switch enable
->> UNWINDER_FRAME_POINTER.
->>
->> Before that commit, when enabling FUNCTION_GRAPH_TRACER, we simply also
->> enabled FRAME_POINTER...
->>
->> I guess we need to make sure that FUNCTION_GRAPH_TRACER depends on the
->> UNWINDER_FRAME_POINTER choice. There is already a similar dependency
->> with THUMB2_KERNEL. We can cleanup that dependency since
->> UNWINDER_FRAME_POINTER already depends on !THUMB2_KERNEL.
->>
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index 664e918e2624..a2ac65a8b2cc 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -69,7 +69,7 @@ config ARM
->>         select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K ||
->> CPU_V7) && MMU
->>         select HAVE_EXIT_THREAD
->>         select HAVE_FTRACE_MCOUNT_RECORD if !XIP_KERNEL
->> -       select HAVE_FUNCTION_GRAPH_TRACER if !THUMB2_KERNEL
->> +       select HAVE_FUNCTION_GRAPH_TRACER if UNWINDER_FRAME_POINTER
->>         select HAVE_FUNCTION_TRACER if !XIP_KERNEL
->>         select HAVE_GCC_PLUGINS
->>         select HAVE_GENERIC_DMA_COHERENT
->> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
->> index 6d6e0330930b..8341649fa71d 100644
->> --- a/arch/arm/Kconfig.debug
->> +++ b/arch/arm/Kconfig.debug
->> @@ -47,8 +47,8 @@ config DEBUG_WX
->>
->>  choice
->>         prompt "Choose kernel unwinder"
->> -       default UNWINDER_ARM if AEABI && !FUNCTION_GRAPH_TRACER
->> -       default UNWINDER_FRAME_POINTER if !AEABI ||
->> FUNCTION_GRAPH_TRACER
->> +       default UNWINDER_ARM if AEABI
->> +       default UNWINDER_FRAME_POINTER if !AEABI
->>         help
->>           This determines which method will be used for unwinding kernel
->> stack
->>           traces for panics, oopses, bugs, warnings, perf,
->> /proc/<pid>/stack,
-> 
-> This looks rather horrid - the upshot of this means that the function
-> tracer becomes unavailable on EABI unless you know that you must change
-> the unwinder from its default.
-> 
-> Before the change to the choice statement, people could select the
-> function graph tracer, and the correct unwinder would be selected
-> for them.  That's knowledge that people never required before, and
-> I think it's really quite unfair to require them to know this to use
-> the function graph tracer.
 
-It is not ideal I agree.
-
-Searching for the symbol FUNCTION_GRAPH_TRACER in menuconfig immediately
-shows what dependency are missing.
-
-Also, we used to have the same situation with THUMB2_KERNEL already: You
-had to know that you need to disable Thumb2 Kernel in order to see
-FUNCTION_GRAPH_TRACER.
+--===============4930554671321490587==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="k747szf62j7ndfj6"
+Content-Disposition: inline
 
 
-> 
-> Maybe someone can put some effort into getting the function graph
-> tracer working with non-framepointer kernels... but as the above
-> currently stands, I really don't like the patch and I'd much rather
-> revert the original change to fix this regression.
+--k747szf62j7ndfj6
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-I am all for that effort. Using Thumb2 on Arm32 is also getting more
-popular.
 
-Is known what is exactly missing/what effort would be required?
+> All errors (new ones prefixed by >>):
+>=20
+> >> ERROR: "at91_init_twi_bus_slave" [drivers/i2c/busses/i2c-at91.ko] unde=
+fined!
+> >> ERROR: "at91_twi_probe_slave" [drivers/i2c/busses/i2c-at91.ko] undefin=
+ed!
 
---
-Stefan
+That needs to be fixed. Rest looks good to me!
+
+
+--k747szf62j7ndfj6
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAABCAAdFiEEOZGx6rniZ1Gk92RdFA3kzBSgKbYFAlw+YicACgkQFA3kzBSg
+KbbCRw/9GyKnSdo2hH8DwxrBSUXFUdteS1XqDLnIl1XxXov0X/hBo7cy8ahSyaH1
+ZtoYoB8kaRpi2DzgJzXslSWvy4YOan5wFyYErgxEh03EXFDWns0JoBee8HVU8Bax
+vMln99pOTSa1wujN1zKcrdp6S4m4dPxfe4Xedr0XC5W7waQlL1QOdak+q/ap7i1x
+DkklfHKCwHN+Z4erOe6IxpDHrhUOKDladtdASn/Te1zZPLKQrGfYtwyHx+7+IXBj
+qNzqo0u+q5depphDBMLJmWLMufkQMRTk+MUeULSE53rUOUFR5YsFIDlbywa0zdUb
+OG5tLyDQjgU7YOMxpqD1/I3phTZyPdRegnDrfAI0uC/8a1oY89GAvvf+VHgZ5CEC
+bIkZy9fymqfckw3v0CxPaMsObNyM1ac/DdYOKRcsC0HIpcI4vJnN48d4Cqp6+PCx
+ujwQwgBU1FmlBakGxZoJVxSb327Qo7F7twqECvgYHOrTMkzeM3atgownEQxJuUrx
+KGYUi1XyN8StZtzY7ywiU9qbQpEb2mbGcjhy3qo8OfbxdAR6sRmyLL1vVknCYN3P
+NaOVK+OyPidbSJr5EEsYY1PoJxrU3tjl0xtDbb+GUEzUecjoAZlWkhil5LkRGylC
+yThBrkrbqblwHD67UtiB6cDoOCtaoyTVHU5KytR04CQyJP5Qs7M=
+=2yQK
+-----END PGP SIGNATURE-----
+
+--k747szf62j7ndfj6--
+
+
+--===============4930554671321490587==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============4930554671321490587==--
+
