@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D0E1BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 14:01:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D87D0C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 14:02:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A2F7320657
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 14:01:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A97CC20866
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 14:02:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FEUm6+D3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A2F7320657
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="V1vb8gUr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A97CC20866
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=PZfNiDWzhJjVjSocxCmlVnmXNY2BLrtbJFKFHr08TS8=; b=FEUm6+D3vZWnrb
-	gZIjvNsm0fecW6d6CA1PZgH3Y+Ya0ZvZHIpXEI7y8TzX8RZbG6AueaRL/VeFfZY9QSQBf1X2Mwuld
-	tPnkYVYOwwpc/PRiHFwlcVgUU54rNuC/pISDhM0XyZc4HvMU4hLAIbmwdoY5J7Bds0AKk5s4u5nAV
-	KC3oEYebR32+YLYYPcUAva4Wrz9Fy+RebimY+WAoeCLKg5p9gO/wLAhfTLz19eD4sHLUYJG7dmqAd
-	S96MCQYPDDugXBUmXTM2lGssyUDQVNDrQ92UY9pJr0lsE5eaSYfRV3F5IAxIC4GKCXwsUh4CVAsGY
-	BQkIrIG2YgWa/Z4DImuA==;
+	List-Owner; bh=PfjSPR9EZwA3cSZS4V9n1dCAcn0UmTmhlBesC/T+N9E=; b=V1vb8gUraAf4ht
+	mDD8r5NT+OTTpfhZD1MvHP//S3bta667bDaI8EjXnBi2kBRJRBpYCsUTG/Eug8bThh0d+qLxttl3v
+	9yCECcL17dpPf2zee1X8DnNXIjEWjwicbRL/RAexa4HAamxAnou2tvbHBTrZLDCnbLqnsggsqLxxv
+	jrIPT12mc18I4oLFJDhMH5u1G7NJqbnkbhR2qB9VrqWvfwRYLx59rbG+XR1emy08QsL/fa75obhsS
+	X8aHpEi1bv1QfYTQjcR+MVE40QSmWv7NMq4FfnMWe9GGhKqdXmuzL3eQNV1P8s5x7t8ZwGRvWiEaL
+	QCri9Ke08O4e81Vq1UCQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjPHf-0001Hu-P6; Tue, 15 Jan 2019 14:01:39 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gjPHu-0001VY-Ir; Tue, 15 Jan 2019 14:01:54 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjPDB-0003wR-M1
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 13:57:28 +0000
+ id 1gjPDG-0004Qy-7V
+ for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 13:57:43 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6A73BA78;
- Tue, 15 Jan 2019 05:57:01 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 193C9165C;
+ Tue, 15 Jan 2019 05:57:06 -0800 (PST)
 Received: from e119884-lin.cambridge.arm.com (e119884-lin.cambridge.arm.com
  [10.1.196.72])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 56EEF3F70D;
- Tue, 15 Jan 2019 05:56:59 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 066733F70D;
+ Tue, 15 Jan 2019 05:57:03 -0800 (PST)
 From: Vincenzo Frascino <vincenzo.frascino@arm.com>
 To: linux-arch@vger.kernel.org,
 	linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v4 16/24] arm64: elf: vDSO code page discovery
-Date: Tue, 15 Jan 2019 13:55:31 +0000
-Message-Id: <20190115135539.24762-17-vincenzo.frascino@arm.com>
+Subject: [PATCH v4 18/24] arm64: Add vDSO compat support
+Date: Tue, 15 Jan 2019 13:55:33 +0000
+Message-Id: <20190115135539.24762-19-vincenzo.frascino@arm.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190115135539.24762-1-vincenzo.frascino@arm.com>
 References: <20190115135539.24762-1-vincenzo.frascino@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_055702_078889_1C83A722 
-X-CRM114-Status: GOOD (  12.38  )
+X-CRM114-CacheID: sfid-20190115_055706_729343_A4DA7EC9 
+X-CRM114-Status: GOOD (  14.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,46 +80,95 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Like in normal vDSOs, when compat vDSOs are enabled the auxiliary
-vector symbol AT_SYSINFO_EHDR needs to point at the address of the
-vDSO code, to allow the dynamic linker to find it.
-
-This patch adds the necessary code to the elf arm64 module to make this
-possible.
+This patch adds vDSO compat support to the arm64 building system.
 
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
 ---
- arch/arm64/include/asm/elf.h | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm64/Kconfig         |  1 +
+ arch/arm64/Makefile        | 23 +++++++++++++++++++++--
+ arch/arm64/kernel/Makefile |  6 +++++-
+ 3 files changed, 27 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index 355d120b78cb..34cabaf78011 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -213,7 +213,21 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
- ({									\
- 	set_thread_flag(TIF_32BIT);					\
-  })
-+#ifdef CONFIG_GENERIC_COMPAT_VDSO
-+#define COMPAT_ARCH_DLINFO						\
-+do {									\
-+	/*								\
-+	 * Note that we use Elf64_Off instead of elf_addr_t because	\
-+	 * elf_addr_t in compat is defined as Elf32_Addr and casting	\
-+	 * current->mm->context.vdso to it triggers a cast warning of	\
-+	 * cast from pointer to integer of different size.		\
-+	 */								\
-+	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
-+			(Elf64_Off)current->mm->context.vdso);		\
-+} while (0)
-+#else
- #define COMPAT_ARCH_DLINFO
-+#endif
- extern int aarch32_setup_additional_pages(struct linux_binprm *bprm,
- 					  int uses_interp);
- #define compat_arch_setup_additional_pages \
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 77803c10b3ef..157df32c03ea 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -102,6 +102,7 @@ config ARM64
+ 	select GENERIC_STRNLEN_USER
+ 	select GENERIC_TIME_VSYSCALL
+ 	select GENERIC_GETTIMEOFDAY
++	select GENERIC_COMPAT_VDSO
+ 	select HANDLE_DOMAIN_IRQ
+ 	select HARDIRQS_SW_RESEND
+ 	select HAVE_PCI
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index b025304bde46..111cb0f7b73b 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -49,9 +49,25 @@ $(warning Detected assembler with broken .inst; disassembly will be unreliable)
+   endif
+ endif
+ 
+-KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr) $(brokengasinst)
++ifeq ($(CONFIG_GENERIC_COMPAT_VDSO), y)
++  CROSS_COMPILE_ARM32 ?= $(CONFIG_CROSS_COMPILE_COMPAT_VDSO:"%"=%)
++
++  ifeq ($(CONFIG_CC_IS_CLANG), y)
++    $(warning CROSS_COMPILE_ARM32 is clang, the compat vDSO will not be built)
++  else ifeq ($(CROSS_COMPILE_ARM32),)
++    $(warning CROSS_COMPILE_ARM32 not defined or empty, the compat vDSO will not be built)
++  else ifeq ($(shell which $(CROSS_COMPILE_ARM32)gcc 2> /dev/null),)
++    $(error $(CROSS_COMPILE_ARM32)gcc not found, check CROSS_COMPILE_ARM32)
++  else
++    export CROSS_COMPILE_ARM32
++    export CONFIG_COMPAT_VDSO := y
++    compat_vdso := -DCONFIG_COMPAT_VDSO=1
++  endif
++endif
++
++KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr) $(brokengasinst) $(compat_vdso)
+ KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
+-KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
++KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst) $(compat_vdso)
+ 
+ KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
+ KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
+@@ -163,6 +179,9 @@ ifeq ($(KBUILD_EXTMOD),)
+ prepare: vdso_prepare
+ vdso_prepare: prepare0
+ 	$(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso include/generated/vdso-offsets.h
++	$(if $(CONFIG_COMPAT_VDSO),$(Q)$(MAKE) \
++		$(build)=arch/arm64/kernel/vdso32  \
++		include/generated/vdso32-offsets.h)
+ endif
+ 
+ define archhelp
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index c7bd0794855a..78a55fc8e0c7 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -28,7 +28,10 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
+ 	$(call if_changed,objcopy)
+ 
+ obj-$(CONFIG_COMPAT)			+= sys32.o signal32.o			\
+-					   sigreturn32.o sys_compat.o
++					   sys_compat.o
++ifneq ($(CONFIG_COMPAT_VDSO), y)
++obj-$(CONFIG_COMPAT)			+= sigreturn32.o
++endif
+ obj-$(CONFIG_KUSER_HELPERS)		+= kuser32.o
+ obj-$(CONFIG_FUNCTION_TRACER)		+= ftrace.o entry-ftrace.o
+ obj-$(CONFIG_MODULES)			+= module.o
+@@ -62,6 +65,7 @@ obj-$(CONFIG_ARM64_SSBD)		+= ssbd.o
+ obj-$(CONFIG_ARM64_PTR_AUTH)		+= pointer_auth.o
+ 
+ obj-y					+= vdso/ probes/
++obj-$(CONFIG_COMPAT_VDSO)		+= vdso32/
+ head-y					:= head.o
+ extra-y					+= $(head-y) vmlinux.lds
+ 
 -- 
 2.20.1
 
