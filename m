@@ -2,89 +2,79 @@ Return-Path: <SRS0=3lKL=PX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-14.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 767B6C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 17:36:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 67F50C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 17:59:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 43F5120656
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 17:36:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3233C20866
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 17:59:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TY+WkvKd";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=sartura-hr.20150623.gappssmtp.com header.i=@sartura-hr.20150623.gappssmtp.com header.b="li4Q9tok"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 43F5120656
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sartura.hr
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sLK52LVs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3233C20866
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=gmx.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=N0EetJ8D6WMG4pdVFJ71xcNoqnifJ+DS94yF22qDV80=; b=TY+WkvKdEyc4k3
-	U01UfRLZwEZ4Ad3Sn0uk6TSkH7ICx08GL9RMSJTecIFu6lcfIvr6OGHKDBUthGG3O1HGeO//tAQ1F
-	8U4fyyiWbGVqiyQoUbngl7txPoNGI4C4CbeRvJ+XL/9b6kEfSnWnsBqtPoCH7EgN7zaipEmWrSiNr
-	2Lg3aSkp1jVedJ2jLdQiITWZtMLfGsqQ0X2vNczpoOnMqwnpDYHGOW38KAwswRJM8iIYHdEZuuhBw
-	rPBOmH4jDAIv7/dIARZ4/WL4cxjqyPKtDtYLX3jfGGSZ10AFNDcmm87bDQ04NH3SJ6M91j5QL6RSH
-	zjUFE1+P96Q/aVf3HS2w==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:Reply-To:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Date
+	:Message-Id:References:Subject:In-reply-to:To:From:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=VXXE1jfn18qxrS6unQl+bV8HBbsnQb1/tPcacSrRJ7s=; b=sLK52LVsalJAzBSqhxsWGSuZHP
+	hsIlOr+CFz7Ot3aCYR8nyTjXJZQsRvntN0Nuk8LuxcfCN8IYncJuAknFgC6JnxB+dUkmcDvOREI/r
+	GFSLLYud8vo4xV+V814+LHEYu5FjMg/E936FEH4QngOCaVs3ohR84UlZxKHPWw2bUZAyCNuziT+VG
+	3LwZDFOo3TvhnSAwHlQ5CQ4E3A8ZUXCbH0/DH1PTTKkeLIN/W+3qWu2fK4D8wFOVwEfvuFo752iP9
+	cOx0JzgKPjsiyuuZGJYqqNT+Zb4WibrrptALgy34DbbUeqOTnMLuExX/yaUuCFnNPl4cHjfEToIYA
+	qPyJC3Hw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjSd1-0005km-Bt; Tue, 15 Jan 2019 17:35:55 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1gjT06-0005Eh-Ky; Tue, 15 Jan 2019 17:59:46 +0000
+Received: from mout.gmx.net ([212.227.15.18])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjScw-0005k1-SQ
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 17:35:53 +0000
-Received: by mail-wr1-x443.google.com with SMTP id v13so3939604wrw.5
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 15 Jan 2019 09:35:50 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=sartura-hr.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=FMTSJB7FtreiHPNGfPfvtJyyJAxH/sYH//NFhM95t1Y=;
- b=li4Q9tokmvDrHT0l9qyGEpuiPLjepM5H4X7S/cYHGo4H7JBELg0q2jS9y/AaRX9NKV
- bIkBNV+7Ku9io/UPWcXQfQV4ZJ7li9bTj5Eo5kuN4auocnfI+5qsUWa6+4zW42WfQ4a7
- AAMeIIBeHTpqjrMa8djMeTFYzF2zqLAgwQBZ7JwaDY660DWX1J4ufACi2G4UwdqW2ByX
- V7zF/ujBciKc9BB7ijbkGS86y+WyFQVttCPQQUHepk/ij/Nsz1kHP6Zbci92Eaivi0t9
- zZ42adw/eWqIyY3ZK4oCeBhiwGIbA33ZUYeH9JNx0Rk6+dkLKh0FYPi6dz8PNaUQRcHU
- hY/w==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=FMTSJB7FtreiHPNGfPfvtJyyJAxH/sYH//NFhM95t1Y=;
- b=E3q8tbl84qU4s6dnytuy6EdieY8YitHXUjDwxp7OINz2GXTM3Y7rp2Xqu0jZ3cYub9
- fdxN8xLHLRDeO4FvEGTshZwcPx2msQWsEI0e734Zgbo99jrplhlK8em79OZvgHSfvHid
- 4HVP6oJZbKtOu+hIustVdAlxfYfxwfBGmRkplue7wl8wQypALfoC8Vm8mK2rMlB3L74r
- hS6Zc5HEdpPupPId2mFw/fbO30o4glrPDHgDw+YCuuKWdrZJ04fCU7Y24Cw7ksHEE2ya
- EyCXaOEoVPb4Dphou96+gR5cwmb7/gYmV3pfaoM9o9hW13JArWYU0swlcQKU1Onhgq9H
- VaZw==
-X-Gm-Message-State: AJcUukdjQFsVng5WEeLR+FJYNW20iuFuUJzUCptSzX/lqaqfh70PAkhL
- TjnaFBogJjfd0gytcQCiO/mc
-X-Google-Smtp-Source: ALg8bN62mi9JXmDUNV49M4SomeHYYHYc39lWYE6uROB1yBqKRWo6mawogmNgCt7hDVN5yDAk9nQeoA==
-X-Received: by 2002:adf:9bda:: with SMTP id e26mr3867563wrc.295.1547573748921; 
- Tue, 15 Jan 2019 09:35:48 -0800 (PST)
-Received: from b50.local (cpe-109-60-36-251.st4.cable.xnet.hr. [109.60.36.251])
- by smtp.gmail.com with ESMTPSA id v8sm99960459wrq.53.2019.01.15.09.35.47
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 15 Jan 2019 09:35:48 -0800 (PST)
-From: Vladimir Vid <vladimir.vid@sartura.hr>
-To: devicetree@vger.kernel.org
-Subject: [PATCH v4] arm64: dts: marvell: Add device tree for uDPU board
-Date: Tue, 15 Jan 2019 18:38:43 +0100
-Message-Id: <20190115173842.30367-1-vladimir.vid@sartura.hr>
-X-Mailer: git-send-email 2.19.0
-In-Reply-To: <20190111172055.30451-1-vladimir.vid@sartura.hr>
-References: <20190111172055.30451-1-vladimir.vid@sartura.hr>
-MIME-Version: 1.0
+ id 1gjT03-0005Dh-2j
+ for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 17:59:45 +0000
+Received: from corona.crabdance.com ([173.228.106.209]) by mail.gmx.com
+ (mrgmx003 [212.227.17.190]) with ESMTPSA (Nemesis) id
+ 0MGBB1-1gUtzO3VeZ-00F8Wp; Tue, 15 Jan 2019 18:59:26 +0100
+Received: by corona.crabdance.com (Postfix, from userid 1001)
+ id 01E3C6E85603; Tue, 15 Jan 2019 09:57:48 -0800 (PST)
+From: Stefan Schaeckeler <schaecsn@gmx.net>
+To: bp@alien8.de
+In-reply-to: <20190110095049.GB17621@zn.tnic> (message from Borislav Petkov on
+ Thu, 10 Jan 2019 10:50:49 +0100)
+Subject: Re: [PATCH 1/2] EDAC: Add Aspeed AST2500 EDAC driver
+References: <1545026517-64069-1-git-send-email-schaecsn@gmx.net>
+ <1545026517-64069-2-git-send-email-schaecsn@gmx.net>
+ <20190110095049.GB17621@zn.tnic>
+Message-Id: <20190115175749.01E3C6E85603@corona.crabdance.com>
+Date: Tue, 15 Jan 2019 09:57:48 -0800 (PST)
+X-Provags-ID: V03:K1:EzR5CvvaIGLH0zWOSwVGWmSucprjb3tra4g1OF2Een2KafAqRjg
+ yFqZ849BZBASOjINZxOP/fle2JvDB4Pw96wU0zquP6SYgQxg9B95NfXmxtzomQ3myKJSeEu
+ Tn6RXzTte0iOff+hz4q/U1qGwYQLUSEQx/V6g0SM1yQQWvjv98IJ/weYbWsICTgqwI+pBy/
+ WbtTSnBLYI30SSq0NoytQ==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:XBytXecmnfY=:kiKrTDa3DWashyjYe5WhLX
+ Rpzw/HP/kLoc52zb/FNyUv2ZjNF1BTD5GaJXibn/osDAxbBSHU+Mp1RuvYNtnnCnNawyD4+zt
+ U4ehmsQJ7P4w5IPK6TIDEQmXFti9freSPMY4DqZ+LlVCaJkSE6SlyocPZ5uoEpfvuKz9Tk2bB
+ xGnXw+/g/oTgJhVdpePgRyVakggcUw4xQG5JWonq9LouJtUStFp/ghrQ4FVgFEjAI+lsS6thd
+ SZe00rqVOceztKVgbMNTF/aEqNTcUbtPRfL7HyCgu4k7BrXM+KsfXQgF2VuggyJWOl5OAFdIC
+ NhiPzcHhIaypXR5Jq7/D+NdNCJMsairve+J1fKMGVcXiHD0CA4zDJoRyWPvRpFga7/hyC3Q34
+ f1RX9Y+Hqu+UqV74uZPDzA9yQTXRVtkOvnV/dGhcqxmZ6iuw48sDpTtZCzj2UAcLfdtLhyejr
+ J7+MPC9etjsuA4BqZdrQAE9TriUnXk8q3+o2gK06/IDRM9W1ljGXucTlZguCw9HfY9EEVMBHN
+ /PxQpuDA837gfm6amPJI/MjLKV9Vc+nmotZbbir36RN3hPICJK7T83xugdP/rKFSQeITyAAH1
+ pcb95zWxivil3PbHVwgX6MmOSRT50vdN9GSGxrz1Htk83x7IFLno+N97FXy6CL5inv2XPzoFS
+ hGFX2xizwjwzs2uZznOIKDea/7Uus0naK9AJ6I9JLm4WGhIi4uZ1hzPHqHyji5imTg1g100wY
+ Til24Bpo8murnGgl5RBfzsgl6wlbAp0QoKPMTajtf/2Q6MrC4uSo8pFe0Eurh0dbG5H2r26f9
+ gO0dVOinRpPUPLMpK4Xa2FRzEVOwvx3ZvrVDSu4SMnlIuRHWlIgWxrrRLpmXNU2PR2k86xzgc
+ QJhUFQRcyHUpxtYyX5eV7Sjtwgi7loI4kJ11qV7mj17rEhnWHLd88kzR80m+lS
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_093550_984726_675A4ABB 
-X-CRM114-Status: GOOD (  20.01  )
+X-CRM114-CacheID: sfid-20190115_095943_497452_94F13AA5 
+X-CRM114-Status: GOOD (  16.56  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,268 +86,84 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>, Luis Torres <luis.torres@methode.com>,
- Jason Cooper <jason@lakedaemon.net>, Paul Arola <paul.arola@telus.com>,
- Gregory Clement <gregory.clement@bootlin.com>,
- Vladimir Vid <vladimir.vid@sartura.hr>,
- Scott Roberts <scott.roberts@telus.com>, Luka Perkov <luka.perkov@sartura.hr>,
- linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Reply-To: schaecsn@gmx.net
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ linux-aspeed@lists.ozlabs.org, andrew@aj.id.au, linux-kernel@vger.kernel.org,
+ robh+dt@kernel.org, joel@jms.id.au, sschaeck@cisco.com, mchehab@kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-edac@vger.kernel.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This adds initial support for micro-DPU (uDPU) board which is based on
-Armada-3720 SoC.  micro-DPU is the single-port FTTdp distribution point
-unit made by Methode Electronics which offers complete modularity with
-replaceable SFP modules both for uplink and downlink (G.hn over
-twisted-pair, G.hn over coax, 1G and 2.5G Ethernet over Cat-5e cable).
+Hello Boris,
 
-On-board features:
-- 512 MiB DDR3
-- 2 x 2.5G SFP via HSGMII SERDES interface to the A3720 SoC
-- USB 2.0 Type-C connector
-- 4GB eMMC
-- ETSI TS 101548 reverse powering via twisted pair (RJ45) or coax (F Type)
+Thank you for your feedback.
 
-Cc: Luka Perkov <luka.perkov@sartura.hr>
-Cc: Luis Torres <luis.torres@methode.com>
-Cc: Scott Roberts <scott.roberts@telus.com>
-Cc: Paul Arola <paul.arola@telus.com>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Gregory Clement <gregory.clement@bootlin.com>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: linux-arm-kernel@lists.infradead.org
-Signed-off-by: Vladimir Vid <vladimir.vid@sartura.hr>
----
+> From: Borislav Petkov <bp@alien8.de>
+> 
+> On Sun, Dec 16, 2018 at 10:01:56PM -0800, Stefan Schaeckeler wrote:
+> > From: Stefan M Schaeckeler <sschaeck@cisco.com>
+> > 
+> > Add support for the Aspeed AST2500 SoC EDAC driver.
+> > 
+> > Signed-off-by: Stefan M Schaeckeler <sschaeck@cisco.com>
+> > ---
+> >  MAINTAINERS                      |   6 +
+> >  arch/arm/boot/dts/aspeed-g5.dtsi |   7 +
+> >  drivers/edac/Kconfig             |   7 +
+> >  drivers/edac/Makefile            |   1 +
+> >  drivers/edac/aspeed_edac.c       | 457 +++++++++++++++++++++++++++++++
+> >  5 files changed, 478 insertions(+)
+> >  create mode 100644 drivers/edac/aspeed_edac.c
+> 
+> I couldn't see anything out of the ordinary - only nitpicks below.
 
-v2:
-- add compatible string for the uDPU board
-- add names and labels for the LEDs
-- remove unused mdio node
-- remove eeprom nodes
+[...]
 
-v3:
-- update copyright year for Methode and Telus
-- fix Methode copyright (use Methode Electornics instead of Methode)
-- sort compatible string by relevance, remove armada-3720-db and
-armada3710 to keep it generic
 
-v4:
-- add generic names for LEDs since they don't use regs
-- add 'partitions' section to standarize with other A37xx/A7K/A8K dts's
-- remove usb3 phandle because of the broken usb_phy (previously used on
-Marvell linux repo) and since usb support is still work in progress
+> > diff --git a/drivers/edac/aspeed_edac.c b/drivers/edac/aspeed_edac.c
+> > new file mode 100644
+> > index 000000000000..d6ed119909eb
+> > --- /dev/null
+> > +++ b/drivers/edac/aspeed_edac.c
+> > @@ -0,0 +1,457 @@
+> > +// SPDX-License-Identifier: GPL-2.0+
+> > +/*
+> > + * Copyright 2018 Cisco Systems
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License
+> > + * as published by the Free Software Foundation; either version
+> > + * 2 of the License, or (at your option) any later version.
+> 
+> You have the SPDX license identifier - no need for that text.
 
----
- MAINTAINERS                                   |   5 +
- arch/arm64/boot/dts/marvell/Makefile          |   1 +
- .../boot/dts/marvell/armada-3720-uDPU.dts     | 163 ++++++++++++++++++
- 3 files changed, 169 insertions(+)
- create mode 100644 arch/arm64/boot/dts/marvell/armada-3720-uDPU.dts
+That's interesting. I did a grep over all 16944 GPL licensed files with an SPDX
+identifier.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 4d04cebb4a71..4ba06bfc1a1e 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -9852,6 +9852,11 @@ F:	drivers/media/platform/meson/ao-cec.c
- F:	Documentation/devicetree/bindings/media/meson-ao-cec.txt
- T:	git git://linuxtv.org/media_tree.git
- 
-+METHODE UDPU SUPPORT
-+M:	Vladimir Vid <vladimir.vid@sartura.hr>
-+S:	Maintained
-+F:	arch/arm64/boot/dts/marvell/armada-3720-uDPU.dts
-+
- MICROBLAZE ARCHITECTURE
- M:	Michal Simek <monstr@monstr.eu>
- W:	http://www.monstr.eu/fdt/
-diff --git a/arch/arm64/boot/dts/marvell/Makefile b/arch/arm64/boot/dts/marvell/Makefile
-index 2eff1f927471..caed4334f27d 100644
---- a/arch/arm64/boot/dts/marvell/Makefile
-+++ b/arch/arm64/boot/dts/marvell/Makefile
-@@ -2,6 +2,7 @@
- # Mvebu SoC Family
- dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-db.dtb
- dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-espressobin.dtb
-+dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-uDPU.dtb
- dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-db.dtb
- dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-clearfog-gt-8k.dtb
- dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-db.dtb
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-uDPU.dts b/arch/arm64/boot/dts/marvell/armada-3720-uDPU.dts
-new file mode 100644
-index 000000000000..1d7e6c82d3ec
---- /dev/null
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-uDPU.dts
-@@ -0,0 +1,163 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Device tree for the uDPU board.
-+ * Based on Marvell Armada 3720 development board (DB-88F3720-DDR3)
-+ * Copyright (C) 2016 Marvell
-+ * Copyright (C) 2019 Methode Electronics
-+ * Copyright (C) 2019 Telus
-+ *
-+ * Vladimir Vid <vladimir.vid@sartura.hr>
-+ */
-+
-+/dts-v1/;
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include "armada-372x.dtsi"
-+
-+/ {
-+	model = "Methode uDPU Board";
-+	compatible = "methode,udpu", "marvell,armada3720";
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory@0 {
-+		device_type = "memory";
-+		reg = <0x00000000 0x00000000 0x00000000 0x20000000>;
-+	};
-+
-+	leds {
-+		pinctrl-names = "default";
-+		compatible = "gpio-leds";
-+
-+		power1 {
-+			label = "power:green:led1";
-+			gpios = <&gpionb 11 GPIO_ACTIVE_LOW>;
-+			default-state = "off";
-+		};
-+
-+		power2 {
-+			label = "power:red:led1";
-+			gpios = <&gpionb 12 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+
-+		network1 {
-+			label = "network:green:led2";
-+			gpios = <&gpionb 13 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+
-+		network2 {
-+			label = "network:red:led2";
-+			gpios = <&gpionb 14 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+
-+		alarm1 {
-+			label = "alarm:green:led3";
-+			gpios = <&gpionb 15 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+
-+		alarm2 {
-+			label = "alarm:red:led3";
-+			gpios = <&gpionb 16 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+	};
-+
-+	sfp_eth0: sfp-eth0 {
-+		compatible = "sff,sfp";
-+		i2c-bus = <&i2c0>;
-+		los-gpio = <&gpiosb 2 GPIO_ACTIVE_HIGH>;
-+		mod-def0-gpio = <&gpiosb 3 GPIO_ACTIVE_LOW>;
-+		tx-disable-gpio = <&gpiosb 4 GPIO_ACTIVE_HIGH>;
-+		tx-fault-gpio = <&gpiosb 5 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	sfp_eth1: sfp-eth1 {
-+		compatible = "sff,sfp";
-+		i2c-bus = <&i2c1>;
-+		los-gpio = <&gpiosb 7 GPIO_ACTIVE_HIGH>;
-+		mod-def0-gpio = <&gpiosb 8 GPIO_ACTIVE_LOW>;
-+		tx-disable-gpio = <&gpiosb 9 GPIO_ACTIVE_HIGH>;
-+		tx-fault-gpio = <&gpiosb 10 GPIO_ACTIVE_HIGH>;
-+	};
-+};
-+
-+&sdhci0 {
-+	non-removable;
-+	bus-width = <8>;
-+	mmc-ddr-1_8v;
-+	mmc-hs400-1_8v;
-+	marvell,pad-type = "fixed-1-8v";
-+	status = "okay";
-+};
-+
-+&sdhci1 {
-+	marvell,xenon-phy-type = "emmc 5.0 phy";
-+	cd-gpios = <&gpiosb 2 GPIO_ACTIVE_LOW>;
-+	bus-width = <4>;
-+	marvell,pad-type = "fixed-1-8v";
-+	status = "okay";
-+	non-removable;
-+	no-sd;
-+	no-sdio;
-+};
-+
-+&spi0 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi_quad_pins>;
-+
-+	m25p80@0 {
-+		compatible = "jedec,spi-nor";
-+		reg = <0>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		spi-max-frequency = <54000000>;
-+
-+		partitions {
-+			compatible = "fixed-partitions";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			/* only bootloader is located on the SPI */
-+			partition@0 {
-+				label = "uboot";
-+				reg = <0 0x400000>;
-+			};
-+		};
-+	};
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins>;
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins>;
-+};
-+
-+&eth0 {
-+	phy-mode = "sgmii";
-+	status = "okay";
-+	managed = "in-band-status";
-+	sfp = <&sfp_eth0>;
-+};
-+
-+&eth1 {
-+	phy-mode = "sgmii";
-+	status = "okay";
-+	managed = "in-band-status";
-+	sfp = <&sfp_eth1>;
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
--- 
-2.19.0
+785 of them have a license text while 16159 don't. I will remove mine.
 
+
+> > +static int aspeed_edac_regmap_reg_write(void *context, unsigned int reg,
+> > +					unsigned int val)
+> 
+> All the static functions don't need the "aspeed_edac" prefix.
+
+When stripping off aspeed_edac_, some static function names will become quite
+"bare-bone":
+
+aspeed_edac_init(), aspeed_edac_exit(), aspeed_edac_probe(),
+aspeed_edac_remove(), aspeed_edac_of_match(), aspeed_edac_isr(),
+aspeed_edac_config_irq().
+
+
+Does your suggestion also apply to static variables? E.g. aspeed_edac_regmap,
+aspeed_edac_regmap_config, aspeed_edac_driver? Also, here some variable names
+would become quite "bare-bone".
+
+ Stefan
 
 _______________________________________________
 linux-arm-kernel mailing list
