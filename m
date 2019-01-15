@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9AAB0C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 12:02:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 32258C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 12:02:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6C4E420657
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 12:02:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EB1F920657
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 12:02:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Uio2+a/g";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="qH9nA06U"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6C4E420657
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iXP/YCbx";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="rtf3lqG9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EB1F920657
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,44 +26,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2e5YuLQU99RL6+cktnBvKj8pHVcEjCoxEyEE9dGR8TQ=; b=Uio2+a/ggHKBzR
-	19QAd0phEzdnU73IdS/gxWazPExvYH68tKBJKDvZNTWD/o5tjkygf1wyarEayiqVFxLFEh7GLmyJN
-	dKjTe3TtTuw5u+ZvL9pPlPLIShMg1SIM6/y7sbYFTqvYamtu/RJMbK/zkHj19Ko7g/pjXfKbFIO4H
-	K08KV8A332ja6x0fAsgdEq+XJ/EjqRLf6ozMMzdx3TzdB05+0mx8lV1O+2wXHxqpFXfZyVJVvpTmc
-	l6v2Z6N6eQm43HGXO7YDMwyUBHqVdLHBy2ZVk51WltT8rWpDeMMoPyjommzBhZZy90OUAtDfo3MpN
-	GV0Dn/xKt6/+dGssHmjg==;
+	List-Owner; bh=mIa2Yi+mXH7shFxJN/2+ZdUk8R50OzQFeKd+D+quNvs=; b=iXP/YCbxrDNXi9
+	66a8ikYNUjQKznwUqZOd7CN9Ibrf8Ryoe5ds+8sge6sD0rY/G3zRApGY5XX3XdPJbTtolNtIf8rQN
+	k0XoE/yMWovqaNBvzM77nejcHopTYiOWvVVFxYRwMgUM758kL/m/JdA5Zix9egOD+5T2OJz2ic/WR
+	jJqR+B6asrpA6CKl8Mzodmst3mZjO41u0ssN7CrE6BfhfWAp2aAjLw/3mq2BwrbJ0U/PzcxVZbQJP
+	t94bIfQbUDIMe5ITMUQZDp101Te35mnVO7gD0rmcH3mZ2ht6p9wN2YZWSzwPpz30qrkKTU5wZfJPn
+	lAK1lHFDGoSKpzrzYWWA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjNPn-0002lU-JM; Tue, 15 Jan 2019 12:01:55 +0000
+	id 1gjNQN-0003H1-5p; Tue, 15 Jan 2019 12:02:31 +0000
 Received: from mail-eopbgr10056.outbound.protection.outlook.com ([40.107.1.56]
  helo=EUR02-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjNOX-0001E8-Qu; Tue, 15 Jan 2019 12:00:46 +0000
+ id 1gjNPA-0001E8-Dq; Tue, 15 Jan 2019 12:02:06 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=mn3iE/JFNlb4lzpaPXAGNBOdGR7Idnue3apFmeOOZ1Q=;
- b=qH9nA06UIbetRvs4B38phZdMwNNlmDuKwe5MS006tUcKtLEP0/eKk5X/4KnqQMcB3RVKf69mpI1L98InqN+u9VMFgaXpLEn/ZXw8pOPR9IKVZYY5Epzp9VZEs/y+wzsDU4aY4F67u/RKGyR1yJKK+B6Qm93JcWoB0U/Hum52p5Y=
+ bh=ihD8KSHSvT0u6Vqe7PeBlDuFJ/wDC820LUWhrUm4F3k=;
+ b=rtf3lqG9isfT7ViPdyXi4kfkOizzZOjoUZ2aAkH2A/GCpzy9uP49AZX+TzwdZKtxqafva4cKSAJdyYvkIDcUtNBVsLxfx1eIFcXzv9NHKmYRdhq/39Zy3IerPCJSKMiMBHdOIHw5TMZGwEpi83cXu2hWhAlrG5gSxofXMrDBLmQ=
 Received: from VI1PR04MB5726.eurprd04.prod.outlook.com (20.178.127.24) by
  VI1PR04MB4301.eurprd04.prod.outlook.com (52.134.31.156) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1537.24; Tue, 15 Jan 2019 12:00:20 +0000
+ 15.20.1537.24; Tue, 15 Jan 2019 12:00:32 +0000
 Received: from VI1PR04MB5726.eurprd04.prod.outlook.com
  ([fe80::a1c2:cc79:80f3:3bcb]) by VI1PR04MB5726.eurprd04.prod.outlook.com
  ([fe80::a1c2:cc79:80f3:3bcb%4]) with mapi id 15.20.1516.019; Tue, 15 Jan 2019
- 12:00:20 +0000
+ 12:00:32 +0000
 From: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
 To: "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
  "bbrezillon@kernel.org" <bbrezillon@kernel.org>, "marek.vasut@gmail.com"
  <marek.vasut@gmail.com>, "broonie@kernel.org" <broonie@kernel.org>,
  "linux-spi@vger.kernel.org" <linux-spi@vger.kernel.org>,
  "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>
-Subject: [PATCH v8 2/5] dt-bindings: spi: add binding file for NXP FlexSPI
- controller
-Thread-Topic: [PATCH v8 2/5] dt-bindings: spi: add binding file for NXP
- FlexSPI controller
-Thread-Index: AQHUrMnj2HaRDCPgY0i5ihL9RBjnkQ==
-Date: Tue, 15 Jan 2019 12:00:20 +0000
-Message-ID: <1547553487-9936-3-git-send-email-yogeshnarayan.gaur@nxp.com>
+Subject: [PATCH v8 4/5] arm64: defconfig: enable NXP FlexSPI driver
+Thread-Topic: [PATCH v8 4/5] arm64: defconfig: enable NXP FlexSPI driver
+Thread-Index: AQHUrMnqDVoJNM2Ci0i+mFO5hrJI1Q==
+Date: Tue, 15 Jan 2019 12:00:31 +0000
+Message-ID: <1547553487-9936-5-git-send-email-yogeshnarayan.gaur@nxp.com>
 References: <1547553487-9936-1-git-send-email-yogeshnarayan.gaur@nxp.com>
 In-Reply-To: <1547553487-9936-1-git-send-email-yogeshnarayan.gaur@nxp.com>
 Accept-Language: en-US
@@ -80,38 +78,38 @@ x-mailer: git-send-email 1.9.1
 x-originating-ip: [14.143.30.134]
 x-ms-publictraffictype: Email
 x-microsoft-exchange-diagnostics: 1; VI1PR04MB4301;
- 6:d5+RYoOiMNP0voHlDF52folhtC2Lfj0OjbhbLXj1+GRFEWOZRTqHa7yHuD6vvCw/MKGNYiPKJ5pciucQ5iZPQ46H09GKf4Qlv12VV0WmtZ7oxPQMva5efIgY/MfTGrnHEZ53QFC40yGsbCIf8rVAYgPo5B4qfydWrsHybCIE6WCmZ1XWXuAMTxev5SYgpZVK8rmUVKrGewxQSOUK4fU2gZo4E9kjf5aOvLazl/8I7rQSNF0EQqRtY9cK8foAmRRdA278QGYptVhmP2TEDTQPEJJ95voTF4ggjmg8ZjGSKeLTlW77AYDlzFQBx8AeydulY0vWjex5dMCcqvEhOSjxB+oM1/RPCRaK4lfZzgBwm3NbAXys7gMgZRY/Uylh1dap0Za5yIvAm/xUef6cefQR6/M9Ze3xMULTsJf+DB0Yum39Kf84FsxJImh5wWQA4TBwOT9Je/rXqaaWHxAKndUPKw==;
- 5:o4mDcrYooGCpM6lNH83uzO7cmMyxdSD0WIo8S9QbTMA7Zy/6SyMJyvyhNREPX9zDnVBLuoYwENuPWUN9gjjzBavxpbpl2Zftui8RtMxK7WNuPDX6CE1x4qh+nktWRN3pXqqoOsAGCvTP4wyqxyssnG2io2jPBTbjLorleue3RmPtlQhbRcqeOzTOzrRe7dl/FIAA8EprGcsIdaDstS9eyQ==;
- 7:R0iq48GSA5T8G/G1eTFsjyrXYEawiQSZzXr9zjX6pXJZQaqvi9OElqDG5J1UnGwaa0gNHTNBzIj5Hfp8VdpeuZFH5IcDjXrmqC5d7YUri133ANE8z9XpiHvg9B0eDiFnYVCVBo+9iuP568gm41dQag==
-x-ms-office365-filtering-correlation-id: 0d1d1a54-a5fc-4fb4-6c45-08d67ae105d2
+ 6:/akDTYaBr7nYCeuj7hdg40L/r5PI0jWmDO3/xcRn6G8e13n/a8pB3NXZWLOsctU4kG9sOzJIzLuDbWKp4jIPq7WcBNUNyNGLat4QU6HA7kII2qTcte0QyZbqAR4wAGGW4DOaVQ/v29k9oz3MWTRoBHZDQxeXIOmX5lif8/dPUT75+2aIkQ7CpRhUtthbVXSGeoqa1RmhH+RnXtCm91drB6/aaA7KyFJTdu9vhAl61aEOfpXLC8ZeEPL2nGzZ76kHXkxvKgCQSqk8s+KMABprT8NKmfUcZQ0q4KwPZcuETo/DUY+s+E9HlkCZLDYnCaTgciroX4h5rz/QdmHsfrBH4YFoAz68JSWI/JdAKhCXb7tyVRt2GcdoYQKbZp1UDY6lPmMdqQDy2XEFPwZpzhByhC/jy+Qr9iMlUWKRg7+Vu1Lw3saLI5jGUs9SCM3XB/QMfV2iOKCrnzwGl2/K6ATI1g==;
+ 5:ln0wTdvurcqiMaZxR76zU+SQ6eec5i0CQlGO0+iSRL/foyNlqYiAp8nOtWg2fWaE7dJGvAEF/trcvJpZt+pYRByrCp1S2uua2cF6lmOETdTMv9mEe/a0o6gJ7K+KigyajrY6+oChfVrp2aTC6csdVvvsU2v1Je91a3OELY3gZHrL98lFzyTM/23mbKurGpCNiDOwMfp4BlpOI5lErzkDsQ==;
+ 7:F9ooF9+WhFgPbQXeBaX5D0TuhFT960zBt1pacFEHmo+GefqlBRazdBDdGHB3p9hr27WQJWOLLW8ZqJQ/pGVIlGCuEKOoXixXAkIiA0Y0WCUsYy5jb9JPwIjVRlhYD/no0muEkPIq9g2eMxmrQWzKqQ==
+x-ms-office365-filtering-correlation-id: 026aa9fa-ff27-40b5-616a-08d67ae10c76
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(7168020)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
  SRVR:VI1PR04MB4301; 
 x-ms-traffictypediagnostic: VI1PR04MB4301:
-x-microsoft-antispam-prvs: <VI1PR04MB430130B5288DDAD3A5716D8799810@VI1PR04MB4301.eurprd04.prod.outlook.com>
+x-microsoft-antispam-prvs: <VI1PR04MB4301AB1E1BDD76BDF89898FF99810@VI1PR04MB4301.eurprd04.prod.outlook.com>
 x-forefront-prvs: 0918748D70
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(376002)(346002)(136003)(396003)(366004)(39860400002)(189003)(199004)(26005)(102836004)(6512007)(25786009)(4326008)(105586002)(2201001)(86362001)(478600001)(186003)(52116002)(6436002)(53936002)(476003)(14454004)(106356001)(50226002)(8676002)(81156014)(81166006)(8936002)(7736002)(305945005)(486006)(316002)(68736007)(36756003)(7416002)(110136005)(54906003)(3846002)(6116002)(97736004)(78486014)(2906002)(6486002)(256004)(446003)(6506007)(386003)(11346002)(39060400002)(2616005)(2501003)(5660300001)(55236004)(76176011)(66066001)(71200400001)(71190400001)(99286004);
+ SFS:(10009020)(979002)(376002)(346002)(136003)(396003)(366004)(39860400002)(189003)(199004)(26005)(102836004)(6512007)(25786009)(4326008)(105586002)(2201001)(86362001)(478600001)(186003)(52116002)(6436002)(53936002)(476003)(14454004)(4744005)(106356001)(50226002)(8676002)(81156014)(81166006)(8936002)(7736002)(305945005)(486006)(316002)(68736007)(36756003)(7416002)(110136005)(54906003)(3846002)(6116002)(97736004)(78486014)(2906002)(6486002)(256004)(446003)(6506007)(386003)(11346002)(39060400002)(2616005)(2501003)(5660300001)(55236004)(76176011)(66066001)(71200400001)(71190400001)(99286004)(969003)(989001)(999001)(1009001)(1019001);
  DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB4301;
  H:VI1PR04MB5726.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; MX:1; A:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: cNhDKgm5pwIMA/nx8CUNrVrPQurfuicAc/v1/bSs1kYWRno1NcQjB4me1Ti34LhMZoHnXuhvhwS6EEJ3gW+jR/+9J3wECdB/ohRAYjY+8sDgsMgWq/GBsJl2sBg5DB/KnoRyJ2e2jrtDML4dBfYT+RjLy+i8+KhKevHmuXImk77+hKTi/+Jlx2CKgecljF1yXQkdIC9/ZBWDlHZ5vFDKtgkAorN9Of84v/gAPbmIg6/6sqDKmutRcss6x/0SSIej+IDPOKt8C6O3CPAiFr6IBAhqhsJctf5g1LER6HFvHPesw1Y+lNapbvp3eYqx9yR00D5RJllmILKgHTxROtLYAImuI+FQkikc6fh0hF6XcThLXzRAYK1JX+6GYYPSOyRZYm/lbdiQndXGYPrRwfxVKns9Za+XDneivZkli/Y2IYU=
+x-microsoft-antispam-message-info: 90Vilt8ZdlvTMNJrG8gB//XvUJScHiUkArdup3h0rCiqbx/c1cKnhUZUI7GmTUnY7hOqenlMox1NRNqt2ke7+R4gGcrsOn/rqfMtEP4ze8aKJiB3e62NhEZDW4gvcgz/398ErYXS2tFSgpj4JLFLJPGWzU9arcOLJgYOlkjNK5VN0nJKrBTlPa97F8Con4Dy6945Q+r0e171RkgcpE47VLLFGXWp3arpl4pZMn/vSjgRvez623chL5Dg0omCq4r8DGmFr32VKy+HD/QOLU8gC2FEfUqrIO/Wp5FP6SL8IdYgOZxieBIXWyDMMgpyLvf/N6IUErDz0B7e2JxToMcxM8vJWHjbOPGy3SDwqvktTzL2rWHop6BafKGLdj5SvB1Xb0zDO0XynGAJjj67ht6/4w4wsPg+4td1wf5C8vjdmGY=
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 0d1d1a54-a5fc-4fb4-6c45-08d67ae105d2
-X-MS-Exchange-CrossTenant-originalarrivaltime: 15 Jan 2019 12:00:15.4815 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 026aa9fa-ff27-40b5-616a-08d67ae10c76
+X-MS-Exchange-CrossTenant-originalarrivaltime: 15 Jan 2019 12:00:26.6536 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB4301
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_040038_439622_375A98E3 
-X-CRM114-Status: GOOD (  15.21  )
+X-CRM114-CacheID: sfid-20190115_040117_309479_C9D1E648 
+X-CRM114-Status: GOOD (  11.61  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -136,10 +134,9 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add binding file for NXP FlexSPI controller
+Enable driver support of NXP FlexSPI controller.
 
 Signed-off-by: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
 Changes for v8:
 - None
@@ -150,61 +147,27 @@ Changes for v6:
 Changes for v5:
 - None
 Changes for v4:
-- Incorporated Rob review comments.
+- None
 Changes for v3:
-- Removed node property 'big-endian'.
+- None
 Changes for v2:
-- Incorporated Rob review comments.
+- None
 
- .../devicetree/bindings/spi/spi-nxp-fspi.txt  | 39 +++++++++++++++++++
- 1 file changed, 39 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt b/Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
-new file mode 100644
-index 000000000000..2cd67eb727d4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
-@@ -0,0 +1,39 @@
-+* NXP Flex Serial Peripheral Interface (FSPI)
-+
-+Required properties:
-+  - compatible : Should be "nxp,lx2160a-fspi"
-+  - reg :        First contains the register location and length,
-+                 Second contains the memory mapping address and length
-+  - reg-names :  Should contain the resource reg names:
-+	         - fspi_base: configuration register address space
-+                 - fspi_mmap: memory mapped address space
-+  - interrupts : Should contain the interrupt for the device
-+
-+Required SPI slave node properties:
-+  - reg :        There are two buses (A and B) with two chip selects each.
-+                 This encodes to which bus and CS the flash is connected:
-+                 - <0>: Bus A, CS 0
-+                 - <1>: Bus A, CS 1
-+                 - <2>: Bus B, CS 0
-+                 - <3>: Bus B, CS 1
-+
-+Example showing the usage of two SPI NOR slave devices on bus A:
-+
-+fspi0: spi@20c0000 {
-+	compatible = "nxp,lx2160a-fspi";
-+	reg = <0x0 0x20c0000 0x0 0x10000>, <0x0 0x20000000 0x0 0x10000000>;
-+	reg-names = "fspi_base", "fspi_mmap";
-+	interrupts = <0 25 0x4>; /* Level high type */
-+	clocks = <&clockgen 4 3>, <&clockgen 4 3>;
-+	clock-names = "fspi_en", "fspi";
-+
-+	mt35xu512aba0: flash@0 {
-+		reg = <0>;
-+		....
-+	};
-+
-+	mt35xu512aba1: flash@1 {
-+		reg = <1>;
-+		....
-+	};
-+};
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 3ef443cfbab6..fe7f35824a79 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -362,6 +362,7 @@ CONFIG_SPI_ROCKCHIP=y
+ CONFIG_SPI_QUP=y
+ CONFIG_SPI_S3C64XX=y
+ CONFIG_SPI_SPIDEV=m
++CONFIG_SPI_NXP_FLEXSPI=y
+ CONFIG_SPMI=y
+ CONFIG_PINCTRL_SINGLE=y
+ CONFIG_PINCTRL_MAX77620=y
 -- 
 2.17.1
 
