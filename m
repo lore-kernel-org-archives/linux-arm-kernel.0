@@ -2,66 +2,86 @@ Return-Path: <SRS0=3lKL=PX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 76F8EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 16:16:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C7E64C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 16:27:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 44E0320657
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 16:16:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 92E3B2086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 16:27:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NpXZZQvX";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=lunn.ch header.i=@lunn.ch header.b="1ughh9OB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 44E0320657
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lunn.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i0PNCWeG";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="XZyRw0Hw";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="icKgFDVk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 92E3B2086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=rsSUApLdN/b+zCMofJISiVuhvpmCGrBvoGzQ7/anvig=; b=NpXZZQvXvYtgLz
-	eOOMwpbTI3sXaXByGBr/K2sKHQNkDe12DaQeHikB91fbdNsg3NTv6oN+fl7C/a3JAXqwpz2zOU8Jd
-	mwNWBprNMVgxkp1iY55kP25EbKvBpN53Xwoztk2F+RVjA8GK1egzAanTE/2UypynaA+T0Su2PAGOy
-	Id2+mVKcLr3vk9CQ5U5lgFOceGe/gbmE+SQIdRNoGAvVu9lk6yb/nOBRYFakjoNJ0kpJgDrKzJ/8T
-	vZBHSdg4r1TumgfLw2gCJaqIWdnCSWnW1ID65cGJty/WHlarxO17pOCpXXmuZLZSH41JRm4i+iKYE
-	mxe/LEAuw+QdKemwVNxA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=6wHbEW071jISCPm72v4i9+Ng6stGaDIVcrvZyMXDjQ8=; b=i0PNCWeGWweBa0TWN1Y1x7La2
+	3hVMtLRHzK/xpcdV5IN8e/ehagxRAYMQvgGBCW+L3N2i78JZF+HL+3mIUkCWCjMWYUjoDnXtQARmG
+	q8ffWLJhxRyUAbWAczfNn7fk/m98TjAxym005k+M7RHHTp5cR8LdYk44mn1b7oMgnTFEdShwbY+yr
+	Z06viKLo6CCWpgLRo+z+WX7Jy2Bm3BfINemdF2OGQTptBYtLBql1cVeUIUBQUAlIclbXVQsQrkQSN
+	qoO2c2z6TvdsQeAQZ68aiyrDWhJu2rm/I+UYnwTzMu4m1kOZiHH8Jk0gda4y1vTaakFWbVqmYxzXm
+	NpDseZpLg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjRO2-0006iQ-10; Tue, 15 Jan 2019 16:16:22 +0000
-Received: from vps0.lunn.ch ([185.16.172.187])
+	id 1gjRYd-0002Ad-T6; Tue, 15 Jan 2019 16:27:19 +0000
+Received: from smtp.codeaurora.org ([198.145.29.96])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjRNy-0006hz-92
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 16:16:19 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed; d=lunn.ch;
- s=20171124; 
- h=In-Reply-To:Content-Type:MIME-Version:References:Message-ID:Subject:Cc:To:From:Date;
- bh=lEm3U+NlNVJbms/y3cTGT0Q3sLzO7Ayki6/oi3eCSFQ=; 
- b=1ughh9OBu42lOmLzsT5CIJrbVzl3wWFrc6QUH7uJvSPoaS2hEe0dcggMMASFwg7CNM9QmahfGS8HmO4nZYupi+MbabmdM5QMLM7UtAihhTzs0/w+Ws6LyBcg3W6fOC/a/UBRPjpUNuGdOHblEiiF58MpRgSs9UKC/LsuG8OwXtU=;
-Received: from andrew by vps0.lunn.ch with local (Exim 4.84_2)
- (envelope-from <andrew@lunn.ch>)
- id 1gjRNo-0006rg-K0; Tue, 15 Jan 2019 17:16:08 +0100
-Date: Tue, 15 Jan 2019 17:16:08 +0100
-From: Andrew Lunn <andrew@lunn.ch>
-To: Vladimir Vid <vladimir.vid@sartura.hr>,
- Gregory Clement <gregory.clement@bootlin.com>
-Subject: Re: [PATCH v3] arm64: dts: marvell: Add device tree for uDPU board
-Message-ID: <20190115161608.GA25888@lunn.ch>
-References: <20190111172055.30451-1-vladimir.vid@sartura.hr>
- <20190115144421.29968-1-vladimir.vid@sartura.hr>
+ id 1gjRYb-0002AB-31
+ for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 16:27:18 +0000
+Received: by smtp.codeaurora.org (Postfix, from userid 1000)
+ id 16FFC60866; Tue, 15 Jan 2019 16:27:16 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1547569636;
+ bh=HibyisDaHH+itZajGqpTFCELahWNFmaTiYbQu9hM7FY=;
+ h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
+ b=XZyRw0HwGlkGX+NKCQPDFWwjiZIn6Yu4Ty1dt3egrSEX3vnQ1QMV9Vkrbtu+oElFZ
+ 58lSX5WVNhKe/PJp79IvKvmjm8kOemmIaoa8CbZaCxOBko1Rbxaj3OefTYShyQqIAq
+ bBlV33PPd+SvC99eRTyoYZOfDS73eTLZODJf15ig=
+Received: from [192.168.43.47] (unknown [223.237.252.96])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ (Authenticated sender: saiprakash.ranjan@smtp.codeaurora.org)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id 2037D605A0;
+ Tue, 15 Jan 2019 16:27:08 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1547569635;
+ bh=HibyisDaHH+itZajGqpTFCELahWNFmaTiYbQu9hM7FY=;
+ h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
+ b=icKgFDVkm2h7YYOaslP8B2s4fVCTrNTKphOfbokzvWdy34SiB4+w8P20RsvJ79vTF
+ V6B8mbzAfad4WEn6S3mcLt7htAN816oLVXOFn8DMjnjrDNrBHd7svVCtNk/1wkFEog
+ jJ+4jNmMtKc/6VuMaR7dlBf3OwbPyN2MsK3MA8/g=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 2037D605A0
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ dmarc=none (p=none dis=none) header.from=codeaurora.org
+Authentication-Results: pdx-caf-mail.web.codeaurora.org; spf=none
+ smtp.mailfrom=saiprakash.ranjan@codeaurora.org
+Subject: Re: [PATCH 1/3] arm64: dts: qcom: sdm845: Add Coresight support
+To: Bjorn Andersson <bjorn.andersson@linaro.org>
+References: <cover.1547054308.git.saiprakash.ranjan@codeaurora.org>
+ <a13ad49d3ae8d9a5a972027283b7212ab19f97d0.1547054308.git.saiprakash.ranjan@codeaurora.org>
+ <20190113072319.GB28907@builder>
+From: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+Message-ID: <5724d2d4-39df-a923-5f94-b53c40a84fd3@codeaurora.org>
+Date: Tue, 15 Jan 2019 21:57:04 +0530
+User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190115144421.29968-1-vladimir.vid@sartura.hr>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+In-Reply-To: <20190113072319.GB28907@builder>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_081618_483607_B9391A3B 
-X-CRM114-Status: UNSURE (   8.37  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190115_082717_186160_2A0DA428 
+X-CRM114-Status: GOOD (  17.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,37 +93,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Luis Torres <luis.torres@methode.com>,
- Paul Arola <paul.arola@telus.com>, Scott Roberts <scott.roberts@telus.com>,
- Luka Perkov <luka.perkov@sartura.hr>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Rajendra Nayak <rnayak@codeaurora.org>,
+ Mathieu Poirier <mathieu.poirier@linaro.org>,
+ Suzuki K Poulose <suzuki.poulose@arm.com>,
+ Alexander Shishkin <alexander.shishkin@linux.intel.com>,
+ linux-arm-msm@vger.kernel.org, linux-kernel@vger.kernel.org,
+ David Brown <david.brown@linaro.org>, Rob Herring <robh+dt@kernel.org>,
+ Sibi Sankar <sibis@codeaurora.org>, Vivek Gautam <vivek.gautam@codeaurora.org>,
+ Leo Yan <leo.yan@linaro.org>, Andy Gross <andy.gross@linaro.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Vladimir
+Hi Bjorn,
 
-Ah, i did not notice early. You need to Cc: the Marvell mvebu
-maintainers. They are the ones who will accept this patch.
+Thanks for the review. Please find my comments inline.
 
+On 1/13/2019 12:53 PM, Bjorn Andersson wrote:
+> On Wed 09 Jan 09:46 PST 2019, Sai Prakash Ranjan wrote:
+> 
+>> Add coresight components found on Qualcomm SDM845 SoC.
+>>
+>> Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+> 
+> Hi Sai,
+> 
+> The content of this patch looks good, but please fold it into
+> sdm845.dtsi (keep the nodes sorted by address).
+> 
 
-> +	leds {
-> +		pinctrl-names = "default";
-> +		compatible = "gpio-leds";
-> +
-> +		power@487 {
-> +			label = "power:green:led1";
-> +			gpios = <&gpionb 11 GPIO_ACTIVE_LOW>;
-> +			default-state = "off";
-> +		};
+I had looked at the sample from hi6220 for coresight and
+decided to keep sdm845 coresight dtsi in separate file as it
+would look much cleaner than mixing it with main dtsi file.
+Also I guess it would make coresight topology more understandable
+if we keep it separately (plus there are about 400+ lines of coresight
+dt entries). Is there any reason for wanting coresight entries merged
+into sdm845.dtsi file? If you still prefer it, I can make the
+change in the next version.
 
-I'm a bit out of date with dtc warnings. I think the @487 will
-generate a warning because there is no reg property?
+> And mention below the --- that this depends on my AMBA bus pclk change
+> and include the URL:
+> 
+> https://lore.kernel.org/lkml/20190106080915.4493-7-bjorn.andersson@linaro.org/
+> 
 
-Gregory, do you know?
+I had mentioned this dependency in the cover letter. But I suppose
+I can mention it here as well.
 
-Thanks
-	Andrew
+Thanks,
+Sai
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
 
 _______________________________________________
 linux-arm-kernel mailing list
