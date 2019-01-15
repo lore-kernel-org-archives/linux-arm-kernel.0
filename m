@@ -2,72 +2,65 @@ Return-Path: <SRS0=3lKL=PX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D6A3BC43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 21:09:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 05C3AC43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 21:22:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A4CC0205C9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 21:09:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C935B20656
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 21:21:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MGkUkz1q";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="mh/agSM4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A4CC0205C9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qxGGN79C"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C935B20656
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=69BxII2XDTPh/RJPa+HLEHt9vwgSHIvzsA2CD5M2ahA=; b=MGkUkz1q+RKZBngxiaVsM2wNh
-	2W6XjwgByhrzaz9gLpYvlrRCU/B20COiUP9EyGEt2AQoJqpcF63ltKYq99NiHuFOMgYDX8ARB+Vao
-	eaZNZoEjfF98mW/OBhO0IdLbl/QfeBsuJoO5dwfHwnEoeggC40wQYthMKsc0G9jzUt4oPbbni0Q6z
-	i63cTBv8Jz1sspvmflxDO2Yiosb7jFm4ip4IGn087SK6N8S3mur5wtqnbJLRFuiLPpKfviTr1Lk1a
-	Gnk+eouV1S9u0dliI3bApokvoH+g/PG34FwF4Jxm3hqCl3C8IgIIzOW/LsWXX0tiZOkcucXjLcHPR
-	Ii9/uJNqQ==;
+	 bh=WfJlmI4S0MbwWjMmS050eLxR6S2zUT57OiNlQkjp6+c=; b=qxGGN79Clb4pCvDldNqRVXDIQ
+	Qt7PCZWv0Gsf0AWXu/uTGMJii+l/SMOJSBcUzuqg8aRssRTOdmWfcvuJ+K9C7TqNyvrIKjKEjROo1
+	AXSBoBoShVhJ/ZewtinI5EgUmIVlePGefdXeOsCphlscxFPs9W6j1UT2k1rgD3VWbWqezmVx0BMIe
+	ubFXUaEqRgA1QJD0SS0QEN/tnB2NBt1GcDUFNcDgovObpEDBTA9n9m8TsBXHzTZruaKvfPB700W6j
+	QdXpGlzCXoYEgh2KJlOia3vGstOOFOwxoxpUgZju0Z9vNIzjQXJoM9m9yI7IyqtErLNUPJCD5ggoh
+	vhh0+LwhQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjVxk-00035f-Q0; Tue, 15 Jan 2019 21:09:32 +0000
-Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjVxh-00035L-S7
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 21:09:31 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=sirena.org.uk; s=20170815-heliosphere; h=In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=s2X22d1LlqDVePqLYmP1rwf2MpuOBw+myHHoyI9YyHk=; b=mh/agSM4jSnUq0H3YM1nkDfP6
- Sxi82ChGz/VUzNWbZLbq0BDYjphGbgdd/uepAF9i2hamiYBVwQ/LDVEH1onD/txd9bpsoJCPbQnWt
- XrCkSJkaeKvNn97ufjo5VDgHK24QdeK2HoTOYKLHZ0XtCcmI/WHbgaMf86mCqGZk2Q0rY=;
-Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
- ([82.37.168.47] helo=debutante.sirena.org.uk)
- by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
- (envelope-from <broonie@sirena.org.uk>)
- id 1gjVxZ-000327-Hh; Tue, 15 Jan 2019 21:09:21 +0000
-Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id 1C9151127848; Tue, 15 Jan 2019 21:09:21 +0000 (GMT)
-Date: Tue, 15 Jan 2019 21:09:21 +0000
-From: Mark Brown <broonie@kernel.org>
-To: Tony Lindgren <tony@atomide.com>
-Subject: Re: Regression in v5.0-rc with regmap-irq level-irq changes
-Message-ID: <20190115210920.GJ5522@sirena.org.uk>
-References: <20190115192840.GK5544@atomide.com>
+	id 1gjW9j-0007sf-ED; Tue, 15 Jan 2019 21:21:55 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gjW9g-0007sH-7m
+ for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 21:21:53 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 23CF780D;
+ Tue, 15 Jan 2019 13:21:48 -0800 (PST)
+Received: from [192.168.100.241] (usa-sjc-mx-foss1.foss.arm.com
+ [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 9F6683F917;
+ Tue, 15 Jan 2019 13:21:46 -0800 (PST)
+Subject: Re: [PATCH v3 0/7] arm64: add system vulnerability sysfs entries
+To: Stefan Wahren <stefan.wahren@i2se.com>,
+ linux-arm-kernel@lists.infradead.org
+References: <20190109235544.2992426-1-jeremy.linton@arm.com>
+ <884332236.499392.1547581848222@email.ionos.de>
+From: Jeremy Linton <jeremy.linton@arm.com>
+Message-ID: <c99f5da9-259c-3fc5-6150-7327ba0ff429@arm.com>
+Date: Tue, 15 Jan 2019 15:21:44 -0600
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.7.0
 MIME-Version: 1.0
-In-Reply-To: <20190115192840.GK5544@atomide.com>
-X-Cookie: Violence is molding.
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <884332236.499392.1547581848222@email.ionos.de>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_130930_053034_075708F0 
-X-CRM114-Status: UNSURE (   7.35  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190115_132152_285930_70FA64B1 
+X-CRM114-Status: GOOD (  17.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,65 +72,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>, linux-omap@vger.kernel.org,
- Belisko Marek <marek.belisko@gmail.com>,
- Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>,
- Tero Kristo <t-kristo@ti.com>, Jon Hunter <jonathanh@nvidia.com>,
- "Dr. H. Nikolaus Schaller" <hns@goldelico.com>,
- Laxman Dewangan <ldewangan@nvidia.com>, linux-arm-kernel@lists.infradead.org,
- Keerthy <j-keerthy@ti.com>, Thierry Reding <treding@nvidia.com>,
- linux-kernel@vger.kernel.org
-Content-Type: multipart/mixed; boundary="===============0656911764090374167=="
+Cc: mlangsdo@redhat.com, julien.thierry@arm.com, marc.zyngier@arm.com,
+ catalin.marinas@arm.com, suzuki.poulose@arm.com, will.deacon@arm.com,
+ linux-kernel@vger.kernel.org, steven.price@arm.com, ykaukab@suse.de,
+ dave.martin@arm.com, shankerd@codeaurora.org
+Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi,
 
---===============0656911764090374167==
-Content-Type: multipart/signed; micalg=pgp-sha512;
-	protocol="application/pgp-signature"; boundary="ONvqYzh+7ST5RsLk"
-Content-Disposition: inline
+On 01/15/2019 01:50 PM, Stefan Wahren wrote:
+> Hi Jeremy,
+> 
+>> Jeremy Linton <jeremy.linton@arm.com> hat am 10. Januar 2019 um 00:55 geschrieben:
+>>
+>>
+>> Arm64 machines should be displaying a human readable
+>> vulnerability status to speculative execution attacks in
+>> /sys/devices/system/cpu/vulnerabilities
+>>
+>> This series enables that behavior by providing the expected
+>> functions. Those functions expose the cpu errata and feature
+>> states, as well as whether firmware is responding appropriately
+>> to display the overall machine status. This means that in a
+>> heterogeneous machine we will only claim the machine is mitigated
+>> or safe if we are confident all booted cores are safe or
+>> mitigated.
+>>
+> 
+> i applied this v3 series and Marc's v2 series.
+> 
+> Now i'm getting the following on a Raspberry Pi 3 B+ :
+> 
+> meltdown:Not affected
+> spec_store_bypass:Not affected
+> spectre_v1:Mitigation: __user pointer sanitization
+> 
+> So the entries l1tf and spectre_v2 disappeared.
+
+Yes, the l1tf entry should be gone.
+
+I believe there is a problem with the "1/2 advertise.." patch in that 
+the 'arm64_requested_vuln_attrs |=' line needs to be hoisted  to the top 
+of check_branch_predictor() and the '__spectrev2_safe = false' line 
+needs to be hoisted 6 lines immediately above "/* Fallback to firmware 
+detection*/"
+
+That should re-enable the spectre_v2 entry.
 
 
---ONvqYzh+7ST5RsLk
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
 
-On Tue, Jan 15, 2019 at 11:28:40AM -0800, Tony Lindgren wrote:
-
-> Any ideas what's needed? Some triggering mapping data to palmas.c
-> driver?
-
-There should be a fix in -next already waiting for me to send it to
-Linus, can you check there (a couple actually, in my for-linus branch)?
-
---ONvqYzh+7ST5RsLk
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAABCgAdFiEEreZoqmdXGLWf4p/qJNaLcl1Uh9AFAlw+TAAACgkQJNaLcl1U
-h9AwIwf8C1ynMQh1N1yNP3/lscQNBS3K8lg9krjtYsdc+zKtloGVvHZLf8rafYsE
-gnWZ8hF5cwMEAkCULG7/iW565WQ5p023DMPmNtk6u9jn3mrbsfk7eYJjapwXrDnL
-vXwdJwQra2PVqQzlwjye7R2cg8sVHpt93e2tv1wCETqTqTZNLIrt+CV8qn9JniCG
-auqMlP/rGMEjNENMh/rslWbpOrVbWnvWOND8h81q4uqFicr67LTSlwBOOkFom1n5
-mlkXLgeFQgsqIaf3T8YVg3vyFmcp1ynTvCKLepDAIDdJyyY6AXbSCL6UoMPkyLQc
-L6ks69fcLXODh7IT0NQaCZaYamiI2w==
-=0Hrj
------END PGP SIGNATURE-----
-
---ONvqYzh+7ST5RsLk--
-
-
---===============0656911764090374167==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============0656911764090374167==--
-
