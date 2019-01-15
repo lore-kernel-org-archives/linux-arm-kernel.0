@@ -2,88 +2,67 @@ Return-Path: <SRS0=3lKL=PX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5D8EBC43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 23:10:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 266F3C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 23:32:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2631220866
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 23:10:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DC4D420883
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 23:32:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="M2I22kFw";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="RrU+4xJY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2631220866
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m3NHw8v/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DC4D420883
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.intel.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=7PTKTztt8nRYhyJwBen6nDzqR9Pw76W9yMwkO0tkskQ=; b=M2I22kFwd5MwyDuKzD2xUc2ZgF
-	1jY6LkxHCgijQpFsA8nvgtqpyv8cb5w1QoBb+JvNVWzcG7ydnijX6GBbFaOy+r6IXuwyU7c4l37Lr
-	qHWV3sEnSg6hied1VnBw45MfqWUrIV2qFfTVVFOm3Y2yWkrbNVjGqZjea/vjhjLqwvlJU3fkG2KOo
-	YtyTjWyqHwxV3yW2L+IHI3Oqd02S2HR3xohAeAgQfBfeh4N8pupFcSrrZP5ipaNNF/A7AtvjGOqpt
-	TNpB6EUVG7ypXa54WqFOpnmy2MYefB4Z9SsG9DAIKDJtxdwIc8UMOpMzLusric6mc11eg2hyRphLB
-	lZWwNkCA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=MfKMNg8SZ7oaL/yd4U7e3ct3DG4wzeU3mXmAOhsKemE=; b=m3NHw8v/s98BJpyKS/XsPojbR
+	vxI1nE4qd+Zkebm5xpcvUfxCBEozZLwRQ6FCPOV++xtnJIticC8rdn3oljFw1RvtbyPbhRMsLXPqT
+	Tbr4fGhgb3pdffyPzTeHrMgxWbzgPSQBePvmswrMi66CCxfZLI7gwfl//HR4gTzL6aAtIhgdc96ET
+	84PjOhwZ0fO+obVateTipFnovS3d9BDX1LUJRXIDhab8mLVGL/Xg7UpjQ7AOCuurzxoym7bmvtLNF
+	6x+MCZKx5Ks7VrRtaMVnGPXf05QSwoM0kaV9eAuf8bbSuAkn1ju/OL1b4cTmJMKnNbW0VV4ua0bqM
+	VW1j4ST/A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjXqc-0007dJ-N7; Tue, 15 Jan 2019 23:10:18 +0000
-Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
+	id 1gjYCE-0006QP-1D; Tue, 15 Jan 2019 23:32:38 +0000
+Received: from mga03.intel.com ([134.134.136.65])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjXoO-00055Y-4w
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 23:08:30 +0000
-Received: by mail-pl1-x642.google.com with SMTP id gn14so1989354plb.10
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 15 Jan 2019 15:08:00 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=W6/A2tfSYGw9pTsmVq4n41iTRg138j1rlpbipIKTLNs=;
- b=RrU+4xJYf4H5FDrj4GZKoITDCPTj4WYhd2IGo8DLql/zAa6ZOFiAo7XKTBOEkNHP6h
- CKuH4cJklJdukiMjaU/Szygr5aSATpa760ylb6fCCVB2JV1WmCdGnOhvhWgctC+OQSr1
- 5F6TXUVe0QFZ5sdKUuRPNnIiukrSxVRvu9LKQ=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=W6/A2tfSYGw9pTsmVq4n41iTRg138j1rlpbipIKTLNs=;
- b=TpsaR8pA8rus9nowCSnhG73/mFzZjhRsnMvS6hda5FuhAWLwqwW+C0BOBFVOg7Zu+X
- mIrj8CUq5awO3tTLMHvwuKYb/E48H3e82WvK6032OgsHXECeSQUjFo6fKpV1G6/x0PbK
- OHIm23kh9Uf5jsoaWvwNAM4NI//MrK9S+pHVJTKuHmUTB5YgbBONwrl+WiGHsiQxBIfy
- UgJa28qXd0VUzxFDlPbOrAxDYcOhJomoCeP9G9VXoNhRvRPtWy8rxF8GEcyJmRi+ju3S
- jwnu2qF16svEkLHo7wQboStqEyHeEFbTF5PVESqgDaRZSrN0oqV6rR33dFY3iOGjuHG0
- CX1w==
-X-Gm-Message-State: AJcUukf9v+c1v7kuBofTZwDSYDm3Fd27m7k0hN6GuHokrLQu3DlXLcRt
- uLKgJcIhfJnOoRt9IH6p8Sz2Zw==
-X-Google-Smtp-Source: ALg8bN4InAWr0zcB0+DKgMk1oVrIcI4CkfTFQs8rYqS0TAjjTRDcHxLPwl4zPRW5Ry+jAsN2Zwi9Qw==
-X-Received: by 2002:a17:902:50e:: with SMTP id
- 14mr6510134plf.141.1547593679318; 
- Tue, 15 Jan 2019 15:07:59 -0800 (PST)
-Received: from xps15.cg.shawcable.net (S0106002369de4dac.cg.shawcable.net.
- [68.147.8.254])
- by smtp.gmail.com with ESMTPSA id h19sm4985928pfn.114.2019.01.15.15.07.57
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 15 Jan 2019 15:07:58 -0800 (PST)
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
-To: acme@kernel.org,
-	peterz@infradead.org,
-	gregkh@linuxfoundation.org
-Subject: [PATCH 7/7] perf tools: Remove PMU::set_drv_config API
-Date: Tue, 15 Jan 2019 16:07:42 -0700
-Message-Id: <20190115230742.13730-8-mathieu.poirier@linaro.org>
-X-Mailer: git-send-email 2.17.1
-In-Reply-To: <20190115230742.13730-1-mathieu.poirier@linaro.org>
-References: <20190115230742.13730-1-mathieu.poirier@linaro.org>
+ id 1gjYCB-0006Q4-GC
+ for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 23:32:36 +0000
+X-Amp-Result: SKIPPED(no attachment in message)
+X-Amp-File-Uploaded: False
+Received: from orsmga004.jf.intel.com ([10.7.209.38])
+ by orsmga103.jf.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
+ 15 Jan 2019 15:32:34 -0800
+X-ExtLoop1: 1
+X-IronPort-AV: E=Sophos;i="5.56,483,1539673200"; d="scan'208";a="267421640"
+Received: from yoojae-mobl1.amr.corp.intel.com (HELO [10.7.153.143])
+ ([10.7.153.143])
+ by orsmga004.jf.intel.com with ESMTP; 15 Jan 2019 15:32:34 -0800
+Subject: Re: [PATCH i2c-next v9 0/5] i2c: aspeed: Add bus idle waiting logic
+ for multi-master use cases
+To: Wolfram Sang <wsa@the-dreams.de>
+References: <20181030210917.32711-1-jae.hyun.yoo@linux.intel.com>
+ <20190115224713.duoha332mjlrmwji@ninjato>
+From: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+Message-ID: <ae348673-f6d5-36ac-a1f2-872d0bab06b1@linux.intel.com>
+Date: Tue, 15 Jan 2019 15:32:33 -0800
+User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.3
+MIME-Version: 1.0
+In-Reply-To: <20190115224713.duoha332mjlrmwji@ninjato>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_150801_165533_CFFF839E 
-X-CRM114-Status: GOOD (  21.84  )
+X-CRM114-CacheID: sfid-20190115_153235_593155_12DDC7B1 
+X-CRM114-Status: GOOD (  17.12  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,284 +74,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, linux-s390@vger.kernel.org, suzuki.poulose@arm.com,
- alexander.shishkin@linux.intel.com, will.deacon@arm.com,
- heiko.carstens@de.ibm.com, adrian.hunter@intel.com, ast@kernel.org,
- mingo@redhat.com, linux-arm-kernel@lists.infradead.org, hpa@zytor.com,
- schwidefsky@de.ibm.com, namhyung@kernel.org, tglx@linutronix.de,
- jolsa@redhat.com, linux-kernel@vger.kernel.org
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ linux-aspeed@lists.ozlabs.org, James Feist <james.feist@linux.intel.com>,
+ Andrew Jeffery <andrew@aj.id.au>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>, openbmc@lists.ozlabs.org,
+ Brendan Higgins <brendanhiggins@google.com>, linux-kernel@vger.kernel.org,
+ Rob Herring <robh+dt@kernel.org>,
+ Jarkko Nikula <jarkko.nikula@linux.intel.com>, Joel Stanley <joel@jms.id.au>,
+ Vernon Mauery <vernon.mauery@linux.intel.com>,
+ linux-arm-kernel@lists.infradead.org, linux-i2c@vger.kernel.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-CoreSight was the only client of the PMU's set_drv_config() API.  Now
-that it is no longer needed by CoreSight remove it from the code base.
+On 1/15/2019 2:47 PM, Wolfram Sang wrote:
+> On Tue, Oct 30, 2018 at 02:09:11PM -0700, Jae Hyun Yoo wrote:
+>> In multi-master environment, this driver's master cannot know
+>> exactly when a peer master sends data to this driver's slave so a
+>> case can be happened that this master tries to send data through
+>> the master_xfer function but slave data from peer master is still
+>> being processed by this driver. To prevent state corruption in the
+>> case, this patch adds checking code if any slave operation is
+>> ongoing and it waits up to the bus timeout duration before starting
+>> a master_xfer operation.
+>>
+>> To support this change, it introduces changes on i2c-core-base to
+>> make that able to read the bus timeout and master transfer retries
+>> count values from device tree properties.
+>>
+>> Please review this patch set.
+> 
+> Marking this as "Changes requested". I think if the mutex approach
+> works, these patches become obsolete then.
+> 
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- tools/perf/builtin-record.c   | 10 -----
- tools/perf/builtin-stat.c     |  9 ----
- tools/perf/builtin-top.c      | 13 ------
- tools/perf/util/Build         |  1 -
- tools/perf/util/drv_configs.c | 78 -----------------------------------
- tools/perf/util/drv_configs.h | 26 ------------
- tools/perf/util/pmu.h         |  1 -
- 7 files changed, 138 deletions(-)
- delete mode 100644 tools/perf/util/drv_configs.c
- delete mode 100644 tools/perf/util/drv_configs.h
+Hi Wolfram,
 
-diff --git a/tools/perf/builtin-record.c b/tools/perf/builtin-record.c
-index 882285fb9f64..b637c37b8479 100644
---- a/tools/perf/builtin-record.c
-+++ b/tools/perf/builtin-record.c
-@@ -23,7 +23,6 @@
- #include "util/evlist.h"
- #include "util/evsel.h"
- #include "util/debug.h"
--#include "util/drv_configs.h"
- #include "util/session.h"
- #include "util/tool.h"
- #include "util/symbol.h"
-@@ -566,7 +565,6 @@ static int record__open(struct record *rec)
- 	struct perf_evlist *evlist = rec->evlist;
- 	struct perf_session *session = rec->session;
- 	struct record_opts *opts = &rec->opts;
--	struct perf_evsel_config_term *err_term;
- 	int rc = 0;
- 
- 	/*
-@@ -619,14 +617,6 @@ static int record__open(struct record *rec)
- 		goto out;
- 	}
- 
--	if (perf_evlist__apply_drv_configs(evlist, &pos, &err_term)) {
--		pr_err("failed to set config \"%s\" on event %s with %d (%s)\n",
--		      err_term->val.drv_cfg, perf_evsel__name(pos), errno,
--		      str_error_r(errno, msg, sizeof(msg)));
--		rc = -1;
--		goto out;
--	}
--
- 	rc = record__mmap(rec);
- 	if (rc)
- 		goto out;
-diff --git a/tools/perf/builtin-stat.c b/tools/perf/builtin-stat.c
-index 63a3afc7f32b..9c5b3b94bb38 100644
---- a/tools/perf/builtin-stat.c
-+++ b/tools/perf/builtin-stat.c
-@@ -52,7 +52,6 @@
- #include "util/evlist.h"
- #include "util/evsel.h"
- #include "util/debug.h"
--#include "util/drv_configs.h"
- #include "util/color.h"
- #include "util/stat.h"
- #include "util/header.h"
-@@ -418,7 +417,6 @@ static int __run_perf_stat(int argc, const char **argv, int run_idx)
- 	int status = 0;
- 	const bool forks = (argc > 0);
- 	bool is_pipe = STAT_RECORD ? perf_stat.data.is_pipe : false;
--	struct perf_evsel_config_term *err_term;
- 
- 	if (interval) {
- 		ts.tv_sec  = interval / USEC_PER_MSEC;
-@@ -515,13 +513,6 @@ static int __run_perf_stat(int argc, const char **argv, int run_idx)
- 		return -1;
- 	}
- 
--	if (perf_evlist__apply_drv_configs(evsel_list, &counter, &err_term)) {
--		pr_err("failed to set config \"%s\" on event %s with %d (%s)\n",
--		      err_term->val.drv_cfg, perf_evsel__name(counter), errno,
--		      str_error_r(errno, msg, sizeof(msg)));
--		return -1;
--	}
--
- 	if (STAT_RECORD) {
- 		int err, fd = perf_data__fd(&perf_stat.data);
- 
-diff --git a/tools/perf/builtin-top.c b/tools/perf/builtin-top.c
-index f64e312db787..33e448f702b6 100644
---- a/tools/perf/builtin-top.c
-+++ b/tools/perf/builtin-top.c
-@@ -24,7 +24,6 @@
- #include "util/annotate.h"
- #include "util/config.h"
- #include "util/color.h"
--#include "util/drv_configs.h"
- #include "util/evlist.h"
- #include "util/evsel.h"
- #include "util/event.h"
-@@ -1184,10 +1183,6 @@ static void init_process_thread(struct perf_top *top)
- 
- static int __cmd_top(struct perf_top *top)
- {
--	char msg[512];
--	struct perf_evsel *pos;
--	struct perf_evsel_config_term *err_term;
--	struct perf_evlist *evlist = top->evlist;
- 	struct record_opts *opts = &top->record_opts;
- 	pthread_t thread, thread_process;
- 	int ret;
-@@ -1232,14 +1227,6 @@ static int __cmd_top(struct perf_top *top)
- 	if (ret)
- 		goto out_delete;
- 
--	ret = perf_evlist__apply_drv_configs(evlist, &pos, &err_term);
--	if (ret) {
--		pr_err("failed to set config \"%s\" on event %s with %d (%s)\n",
--			err_term->val.drv_cfg, perf_evsel__name(pos), errno,
--			str_error_r(errno, msg, sizeof(msg)));
--		goto out_delete;
--	}
--
- 	top->session->evlist = top->evlist;
- 	perf_session__set_id_hdr_size(top->session);
- 
-diff --git a/tools/perf/util/Build b/tools/perf/util/Build
-index af72be7f5b3b..71e697e7df2d 100644
---- a/tools/perf/util/Build
-+++ b/tools/perf/util/Build
-@@ -104,7 +104,6 @@ libperf-y += term.o
- libperf-y += help-unknown-cmd.o
- libperf-y += mem-events.o
- libperf-y += vsprintf.o
--libperf-y += drv_configs.o
- libperf-y += units.o
- libperf-y += time-utils.o
- libperf-y += expr-bison.o
-diff --git a/tools/perf/util/drv_configs.c b/tools/perf/util/drv_configs.c
-deleted file mode 100644
-index eec754243f4d..000000000000
---- a/tools/perf/util/drv_configs.c
-+++ /dev/null
-@@ -1,78 +0,0 @@
--/*
-- * drv_configs.h: Interface to apply PMU specific configuration
-- * Copyright (c) 2016-2018, Linaro Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms and conditions of the GNU General Public License,
-- * version 2, as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- */
--
--#include "drv_configs.h"
--#include "evlist.h"
--#include "evsel.h"
--#include "pmu.h"
--#include <errno.h>
--
--static int
--perf_evsel__apply_drv_configs(struct perf_evsel *evsel,
--			      struct perf_evsel_config_term **err_term)
--{
--	bool found = false;
--	int err = 0;
--	struct perf_evsel_config_term *term;
--	struct perf_pmu *pmu = NULL;
--
--	while ((pmu = perf_pmu__scan(pmu)) != NULL)
--		if (pmu->type == evsel->attr.type) {
--			found = true;
--			break;
--		}
--
--	list_for_each_entry(term, &evsel->config_terms, list) {
--		if (term->type != PERF_EVSEL__CONFIG_TERM_DRV_CFG)
--			continue;
--
--		/*
--		 * We have a configuration term, report an error if we
--		 * can't find the PMU or if the PMU driver doesn't support
--		 * cmd line driver configuration.
--		 */
--		if (!found || !pmu->set_drv_config) {
--			err = -EINVAL;
--			*err_term = term;
--			break;
--		}
--
--		err = pmu->set_drv_config(term);
--		if (err) {
--			*err_term = term;
--			break;
--		}
--	}
--
--	return err;
--}
--
--int perf_evlist__apply_drv_configs(struct perf_evlist *evlist,
--				   struct perf_evsel **err_evsel,
--				   struct perf_evsel_config_term **err_term)
--{
--	struct perf_evsel *evsel;
--	int err = 0;
--
--	evlist__for_each_entry(evlist, evsel) {
--		err = perf_evsel__apply_drv_configs(evsel, err_term);
--		if (err) {
--			*err_evsel = evsel;
--			break;
--		}
--	}
--
--	return err;
--}
-diff --git a/tools/perf/util/drv_configs.h b/tools/perf/util/drv_configs.h
-deleted file mode 100644
-index 32bc9babc2e0..000000000000
---- a/tools/perf/util/drv_configs.h
-+++ /dev/null
-@@ -1,26 +0,0 @@
--/*
-- * drv_configs.h: Interface to apply PMU specific configuration
-- * Copyright (c) 2016-2018, Linaro Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms and conditions of the GNU General Public License,
-- * version 2, as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- */
--
--#ifndef __PERF_DRV_CONFIGS_H
--#define __PERF_DRV_CONFIGS_H
--
--#include "drv_configs.h"
--#include "evlist.h"
--#include "evsel.h"
--
--int perf_evlist__apply_drv_configs(struct perf_evlist *evlist,
--				   struct perf_evsel **err_evsel,
--				   struct perf_evsel_config_term **term);
--#endif
-diff --git a/tools/perf/util/pmu.h b/tools/perf/util/pmu.h
-index 350c54e0bd3d..569a6cbffd5a 100644
---- a/tools/perf/util/pmu.h
-+++ b/tools/perf/util/pmu.h
-@@ -30,7 +30,6 @@ struct perf_pmu {
- 	struct list_head format;  /* HEAD struct perf_pmu_format -> list */
- 	struct list_head aliases; /* HEAD struct perf_pmu_alias -> list */
- 	struct list_head list;    /* ELEM */
--	int (*set_drv_config)	(struct perf_evsel_config_term *term);
- };
- 
- struct perf_pmu_info {
--- 
-2.17.1
+Thanks for your touching base. I made and tested a new patch in my
+local. Actually, I couldn't use a mutex because it should provide
+locking between driver context and interrupt context. Instead, after
+taking lots of experiments, I checked that idle waiting can be supported
+by this H/W so I didn't need to use any locking method in the driver
+code for multi-master handling. I'll submit a new patch tomorrow using a
+different thread. Please drop this patch set.
 
+Thanks,
+Jae
 
 _______________________________________________
 linux-arm-kernel mailing list
