@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D2CD2C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 20:01:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 70019C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 20:02:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9B4A920656
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 20:01:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3E31D20656
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 20:02:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FTFvfm2y"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9B4A920656
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uCBcA/A3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3E31D20656
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,36 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6W1uN5gfIHP0Tah+vHimGqr9j656xSnM4IMzrOZrJTw=; b=FTFvfm2y4DNSDQ
-	Bd/RuuHcyr/N1lCjr7/1TpqQgzuT54lZUpXOYZI+86c3OeztzdBHn9noHmkjAvmzOAN/WRMLLFf/A
-	bSniIy9zcOgm7OSUArFbeIUBa31GYSSxsYBrs4bGHtuS0fIp02J7KtwRWQFnyJ0WmJ8PmPVgYh1EV
-	YGOnuYmAphLQGVckevqQGWJkgCEVWQdydee2tkuhXhGe+UhGnh0R4TlMw3H0WefeqgdOBUK+epOal
-	lL6L3Ocj87l3wHlUqtTPfMbnfNnU405CXbXzKTUHZ74bDYu59mJTs9QiSBd/nwXQAOKGzuHqTFKiM
-	odoDcLvPkDVfnUl67i7g==;
+	List-Owner; bh=c/soXTs0zAzt5tvScsGzXWJFtHMMO6koolW3NAZj1ms=; b=uCBcA/A381wWKe
+	CP5OrD54ITF+qgdwLDoWFq5Nh9/A2qvaYj16kgNKDGg9jHk05F9krAhtbO2RKViiURDVWpsNu6ygQ
+	CLDUmhXSRntiXKfIoZWwn4tiTAWAG46uPBdEmAYztiRJMYi4qfKybE9qmSNZM/sVyBOGvXpIrz9MQ
+	RCL3P89/fExc4R5zOaYGhfqQh4PMhGiGGwCe0wXgpHZ8LGfKkLgtC94pwKxX/u1ojV2Ynu2RVtDD0
+	47NV8h7vC23Y1JI8uK8SGPiEsCQeXHk/m+zdW8Ze8xJghSebpo8s6NCzTF8WUeY1wqlCoRvhWSEDQ
+	V02ynxzUVaim9AhsrIyQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjUtO-0003uj-JP; Tue, 15 Jan 2019 20:00:58 +0000
+	id 1gjUv4-0004HB-VS; Tue, 15 Jan 2019 20:02:42 +0000
 Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjUtC-0003oc-GR
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 20:00:56 +0000
+ id 1gjUv2-0004GU-Bh
+ for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 20:02:42 +0000
 Received: from ptx.hi.pengutronix.de ([2001:67c:670:100:1d::c0])
  by metis.ext.pengutronix.de with esmtps
  (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
  (envelope-from <ukl@pengutronix.de>)
- id 1gjUsy-0003um-L9; Tue, 15 Jan 2019 21:00:32 +0100
+ id 1gjUut-0004Dt-Hg; Tue, 15 Jan 2019 21:02:31 +0100
 Received: from ukl by ptx.hi.pengutronix.de with local (Exim 4.89)
  (envelope-from <ukl@pengutronix.de>)
- id 1gjUsx-0002ty-DQ; Tue, 15 Jan 2019 21:00:31 +0100
-Date: Tue, 15 Jan 2019 21:00:31 +0100
+ id 1gjUut-00049p-7x; Tue, 15 Jan 2019 21:02:31 +0100
+Date: Tue, 15 Jan 2019 21:02:31 +0100
 From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
 To: Ryder Lee <ryder.lee@mediatek.com>
-Subject: Re: [PATCH 1/5] pwm: mediatek: add a property "mediatek,num-pwms"
-Message-ID: <20190115200031.7vranuo6fpcaqvce@pengutronix.de>
+Subject: Re: [PATCH 3/5] arm64: dts: mt7622: add a property
+ "mediatek,num-pwms" for PWM
+Message-ID: <20190115200231.drn2rbxu4jxr22yz@pengutronix.de>
 References: <0c400cb1899c1afb4c9f021350cdc0c6ca3f6239.1547453586.git.ryder.lee@mediatek.com>
+ <b5ed4626a553acb5e3107c6c96e82b674439128f.1547453586.git.ryder.lee@mediatek.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <0c400cb1899c1afb4c9f021350cdc0c6ca3f6239.1547453586.git.ryder.lee@mediatek.com>
+In-Reply-To: <b5ed4626a553acb5e3107c6c96e82b674439128f.1547453586.git.ryder.lee@mediatek.com>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c0
 X-SA-Exim-Mail-From: ukl@pengutronix.de
@@ -62,8 +64,8 @@ X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
  SAEximRunCond expanded to false
 X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_120046_825543_5B2E4B98 
-X-CRM114-Status: GOOD (  21.32  )
+X-CRM114-CacheID: sfid-20190115_120240_559803_0C0CCAE6 
+X-CRM114-Status: GOOD (  14.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,101 +87,33 @@ Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 14, 2019 at 04:21:20PM +0800, Ryder Lee wrote:
-> This adds a property "mediatek,num-pwms" to avoid having an endless
-> list of compatibles with no other differences for the same driver.
+Hello,
 
-I seem to recall having said something similar before, but maybe this
-was a different series (there is no v2 or higher in the Subject ...)
-
-I think it would be sensible to drop the vendor prefix and go with plain
-"num-pwms" (or "npwms" to align to "ngpios" in the gpio bindings).
+On Mon, Jan 14, 2019 at 04:21:22PM +0800, Ryder Lee wrote:
+> This adds a property "mediatek,num-pwms" for PWM controller.
+> =
 
 > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 > ---
->  drivers/pwm/pwm-mediatek.c | 25 +++++++++++--------------
->  1 file changed, 11 insertions(+), 14 deletions(-)
+>  arch/arm64/boot/dts/mediatek/mt7622.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
 > =
 
-> diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
-> index eb6674c..37daa84 100644
-> --- a/drivers/pwm/pwm-mediatek.c
-> +++ b/drivers/pwm/pwm-mediatek.c
-> @@ -55,7 +55,6 @@ enum {
->  };
->  =
+> diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/d=
+ts/mediatek/mt7622.dtsi
+> index 8fc4aa7..ab016cf 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> @@ -436,6 +436,7 @@
+>  			 <&pericfg CLK_PERI_PWM6_PD>;
+>  		clock-names =3D "top", "main", "pwm1", "pwm2", "pwm3", "pwm4",
+>  			      "pwm5", "pwm6";
+> +		mediatek,num-pwms =3D <6>;
+>  		status =3D "disabled";
 
->  struct mtk_pwm_platform_data {
-> -	unsigned int num_pwms;
->  	bool pwm45_fixup;
->  	bool has_clks;
->  };
-> @@ -226,10 +225,11 @@ static void mtk_pwm_disable(struct pwm_chip *chip, =
-struct pwm_device *pwm)
->  =
-
->  static int mtk_pwm_probe(struct platform_device *pdev)
->  {
-> +	struct device_node *np =3D pdev->dev.of_node;
->  	const struct mtk_pwm_platform_data *data;
->  	struct mtk_pwm_chip *pc;
->  	struct resource *res;
-> -	unsigned int i;
-> +	unsigned int i, num_pwms;
->  	int ret;
->  =
-
->  	pc =3D devm_kzalloc(&pdev->dev, sizeof(*pc), GFP_KERNEL);
-> @@ -246,7 +246,13 @@ static int mtk_pwm_probe(struct platform_device *pde=
-v)
->  	if (IS_ERR(pc->regs))
->  		return PTR_ERR(pc->regs);
->  =
-
-> -	for (i =3D 0; i < data->num_pwms + 2 && pc->soc->has_clks; i++) {
-> +	ret =3D of_property_read_u32(np, "mediatek,num-pwms", &num_pwms);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "failed to get pwm number: %d\n", ret);
-
-This sounds wrong. "Failed to get number of pwms" sounds better to my
-(non-native) ear.
-
-> +		return ret;
-> +	}
-> +
-> +	for (i =3D 0; i < num_pwms + 2 && pc->soc->has_clks; i++) {
->  		pc->clks[i] =3D devm_clk_get(&pdev->dev, mtk_pwm_clk_name[i]);
->  		if (IS_ERR(pc->clks[i])) {
->  			dev_err(&pdev->dev, "clock: %s fail: %ld\n",
-> @@ -260,7 +266,7 @@ static int mtk_pwm_probe(struct platform_device *pdev)
->  	pc->chip.dev =3D &pdev->dev;
->  	pc->chip.ops =3D &mtk_pwm_ops;
->  	pc->chip.base =3D -1;
-> -	pc->chip.npwm =3D data->num_pwms;
-> +	pc->chip.npwm =3D num_pwms;
->  =
-
->  	ret =3D pwmchip_add(&pc->chip);
->  	if (ret < 0) {
-> @@ -279,32 +285,23 @@ static int mtk_pwm_remove(struct platform_device *p=
-dev)
->  }
->  =
-
->  static const struct mtk_pwm_platform_data mt2712_pwm_data =3D {
-> -	.num_pwms =3D 8,
-> -	.pwm45_fixup =3D false,
-> -	.has_clks =3D true,
-> -};
-> -
-> -static const struct mtk_pwm_platform_data mt7622_pwm_data =3D {
-> -	.num_pwms =3D 6,
->  	.pwm45_fixup =3D false,
->  	.has_clks =3D true,
-
-I agree with Matthias Brugger that at least for some time you should be
-able to fall back to the right number of pwms if the device tree doesn't
-have a num-pwms property.
+Conceptually this patch must go in before the change to the driver.
+Otherwise the pwms are not usable with only patch 1 applied which breaks
+bisectability.
 
 Best regards
 Uwe
