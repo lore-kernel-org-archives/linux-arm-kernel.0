@@ -2,67 +2,70 @@ Return-Path: <SRS0=3lKL=PX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-4.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8E53EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 22:12:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8CA68C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 22:38:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5FA1120883
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 22:12:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5646820656
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 22:38:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="h/y88Wpp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5FA1120883
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ravnborg.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ggvrvr13";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=agner.ch header.i=@agner.ch header.b="fPgYUVao"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5646820656
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=agner.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Message-ID:References:In-Reply-To:
+	Subject:To:From:Date:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ngqs4RgfaFjmWaGuHpFcgJZrlvByq0zHUdFNWmOQo94=; b=h/y88WpplkrsPJ
-	zTdzV7QQd2W/EX/2Z8+bFM1bzFDf4vSa/JfNiZ4HhFVFrjNPmPDoK6widnHGiNhGDVWuO+evhnnP1
-	HcxVBPrp/quRqWVgjTd/IkCYlRhqskyJOm+fnV6RVkS3N4kJ4pTB9lsm6AeH/ryT6/NpHeDP2enin
-	3AKQ9e79GmfIolAujZXYiZkrBRZ4FkNR7F7ENygm1InHL4CF8K7NsfqG75u+n2sMCWF976w+NuGPX
-	aQPL0a02Wbxihe7zCa9lpIaW8L+Shws65E+j6amG9IO3XjiH7JK+j0/y4oFZFWW8VzuPtybSY/rtR
-	b7xFI7qNGXDDczwvtB2w==;
+	List-Owner; bh=IWiNruwoFHlLkMJi7eW0OoQ0BdA6LLJtg/S4e0zkIiI=; b=ggvrvr13/zNCv8
+	ZQmY6bOGrS/xhZOwtOQ95Gf7FCHVxujSwLhBvLSzUgC5wRhkcLyEfrCxwUeKxoG89wWWl13TTE8FY
+	bVYVE4efcIlalZwn4Ko/R3hZZVdJWMbsV0aMMF/GwnGfRQg7Ag7w/jo51apAMDgznJrMqa3KmlkDN
+	AWDZK2zKo5gABJZZcXasLmnPbtn1BjvYWl1vOsgXwX7QOH6CryWF4+cRp6k47UFdPhLFkVb/npm1k
+	DNpKBWtu4cN+qyh24tCSQdkdjYdcu4q5Q/8/ENOHuUglPCTqLdiy35uY5vp0UVXBt0pwPQXIPissV
+	CaeSjipdejeK07fcqy4Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjWwt-0001w6-7s; Tue, 15 Jan 2019 22:12:43 +0000
-Received: from asavdk4.altibox.net ([109.247.116.15])
+	id 1gjXLV-0002fV-6o; Tue, 15 Jan 2019 22:38:09 +0000
+Received: from mail.kmu-office.ch ([2a02:418:6a02::a2])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjWwo-0001ur-0o
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 22:12:40 +0000
-Received: from ravnborg.org (unknown [158.248.194.18])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by asavdk4.altibox.net (Postfix) with ESMTPS id 504AC80478;
- Tue, 15 Jan 2019 23:12:34 +0100 (CET)
-Date: Tue, 15 Jan 2019 23:12:32 +0100
-From: Sam Ravnborg <sam@ravnborg.org>
-To: Eugen.Hristev@microchip.com
-Subject: Re: [PATCH v2 3/3] drm/panel: simple: add support for PDA
- 91-00156-A0 panel
-Message-ID: <20190115221232.GA11283@ravnborg.org>
-References: <1547458584-29548-1-git-send-email-eugen.hristev@microchip.com>
- <1547458584-29548-4-git-send-email-eugen.hristev@microchip.com>
+ id 1gjXLR-0002es-GK
+ for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 22:38:07 +0000
+Received: from webmail.kmu-office.ch (unknown [IPv6:2a02:418:6a02::a3])
+ by mail.kmu-office.ch (Postfix) with ESMTPSA id 522515C0DDF;
+ Tue, 15 Jan 2019 23:37:57 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=agner.ch; s=dkim;
+ t=1547591877;
+ h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+ to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+ content-transfer-encoding:content-transfer-encoding:
+ in-reply-to:in-reply-to:references:references;
+ bh=ueRAERzUH65+Drr7doYhBdpCMWXmWkgznpq2aomP0nY=;
+ b=fPgYUVaoTfrth3LHyPvCnx8D0jXJoNbgx9xREzlTJFk2uVYe4Vj64WDtcVxVFA3CdzFToH
+ +gUl3laEVurFmtrE5YLe/jdyCgo7MRPvF+XEB+0zCCsdVOW6CcTtw7/ZAJ3J6W/mFs7bQB
+ dj9SIvP3FRkEOM+FbFw9K/GgulPWK5Q=
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1547458584-29548-4-git-send-email-eugen.hristev@microchip.com>
-User-Agent: Mutt/1.5.21 (2010-09-15)
-X-CMAE-Score: 0
-X-CMAE-Analysis: v=2.3 cv=UpRNyd4B c=1 sm=1 tr=0
- a=UWs3HLbX/2nnQ3s7vZ42gw==:117 a=UWs3HLbX/2nnQ3s7vZ42gw==:17
- a=kj9zAlcOel0A:10 a=XYAwZIGsAAAA:8 a=AlPfrvoXxqGtgr3-n_gA:9
- a=CjuIK1q_8ugA:10 a=E8ToXWR_bxluHZ7gmE-Z:22
+Date: Tue, 15 Jan 2019 23:37:57 +0100
+From: Stefan Agner <stefan@agner.ch>
+To: Stefan Agner <stefan@agner.ch>
+Subject: Re: ARM: config issue with ftrace function graph tracer
+In-Reply-To: <20190113161420.GE2392@n2100.armlinux.org.uk>
+References: <20190112010139.GA5288@r2700x.localdomain>
+ <d9bc5937c5fc7a45f3aca14fdf68803d@agner.ch>
+ <20190113161420.GE2392@n2100.armlinux.org.uk>
+Message-ID: <78d9aedb4b23dcc929ca9330cc5f0090@agner.ch>
+X-Sender: stefan@agner.ch
+User-Agent: Roundcube Webmail/1.3.7
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_141238_238810_B6F7FD2A 
-X-CRM114-Status: GOOD (  19.10  )
+X-CRM114-CacheID: sfid-20190115_143805_834531_91B6F250 
+X-CRM114-Status: GOOD (  26.98  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,85 +77,115 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, airlied@linux.ie,
- linux-kernel@vger.kernel.org, dri-devel@lists.freedesktop.org,
- robh+dt@kernel.org, thierry.reding@gmail.com, Cristian.Birsan@microchip.com,
- linux-arm-kernel@lists.infradead.org
+Cc: Arnd Bergmann <arnd@arndb.de>, Jeremy Fertic <jeremyfertic@gmail.com>,
+ Russell King - ARM Linux <linux@armlinux.org.uk>, rostedt@goodmis.org,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Eugen.
-
-Patch looks good, but a small improvement proposal.
-
-On Mon, Jan 14, 2019 at 09:43:31AM +0000, Eugen.Hristev@microchip.com wrote:
-> From: Eugen Hristev <eugen.hristev@microchip.com>
+On 13.01.2019 17:14, Russell King - ARM Linux wrote:
+> On Sun, Jan 13, 2019 at 04:41:52PM +0100, Stefan Agner wrote:
+>> Hi,
+>>
+>> On 12.01.2019 02:01, Jeremy Fertic wrote:
+>> > I'm having a problem with the ftrace function graph tracer on a 32 bit arm
+>> > board (orangepi pc). A bisect points to the following commit:
+>> >
+>> > f9b58e8c7d03 ("ARM: 8800/1: use choice for kernel unwinders")
+>> >
+>> > Before this commit, if I use sunxi_defconfig and then menuconfig to enable
+>> > FTRACE and FUNCTION_TRACER then the function graph tracer works. With this
+>> > commit, and as of v5.0-rc1, doing the same as above results in a broken
+>> > function graph tracer and often an oops as well. The commit introduces a
+>> > choice group and it looks like it should default to UNWINDER_FRAME_POINTER
+>> > if FUNCTION_GRAPH_TRACER is enabled. FUNCTION_GRAPH_TRACER is enabled by
+>> > default when I enable FUNCTION_TRACER but this has no effect on the choice.
+>> > The choice always defaults to the other option which is UNWINDER_ARM. If I
+>> > manually choose UNWINDER_FRAME_POINTER then the function graph tracer works
+>> > fine.
+>>
+>> The default selection is there, but this is made at "make
+>> sunxi_defconfig" time. At this point FUNCTION_GRAPH_TRACER is not
+>> enabled, hence Kconfig uses UNWIDER_ARM. However, when enabling the
+>> FUNCTION_GRAPH_TRACER Kconfig will _not_ reconsider and switch enable
+>> UNWINDER_FRAME_POINTER.
+>>
+>> Before that commit, when enabling FUNCTION_GRAPH_TRACER, we simply also
+>> enabled FRAME_POINTER...
+>>
+>> I guess we need to make sure that FUNCTION_GRAPH_TRACER depends on the
+>> UNWINDER_FRAME_POINTER choice. There is already a similar dependency
+>> with THUMB2_KERNEL. We can cleanup that dependency since
+>> UNWINDER_FRAME_POINTER already depends on !THUMB2_KERNEL.
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 664e918e2624..a2ac65a8b2cc 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -69,7 +69,7 @@ config ARM
+>>         select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K ||
+>> CPU_V7) && MMU
+>>         select HAVE_EXIT_THREAD
+>>         select HAVE_FTRACE_MCOUNT_RECORD if !XIP_KERNEL
+>> -       select HAVE_FUNCTION_GRAPH_TRACER if !THUMB2_KERNEL
+>> +       select HAVE_FUNCTION_GRAPH_TRACER if UNWINDER_FRAME_POINTER
+>>         select HAVE_FUNCTION_TRACER if !XIP_KERNEL
+>>         select HAVE_GCC_PLUGINS
+>>         select HAVE_GENERIC_DMA_COHERENT
+>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+>> index 6d6e0330930b..8341649fa71d 100644
+>> --- a/arch/arm/Kconfig.debug
+>> +++ b/arch/arm/Kconfig.debug
+>> @@ -47,8 +47,8 @@ config DEBUG_WX
+>>
+>>  choice
+>>         prompt "Choose kernel unwinder"
+>> -       default UNWINDER_ARM if AEABI && !FUNCTION_GRAPH_TRACER
+>> -       default UNWINDER_FRAME_POINTER if !AEABI ||
+>> FUNCTION_GRAPH_TRACER
+>> +       default UNWINDER_ARM if AEABI
+>> +       default UNWINDER_FRAME_POINTER if !AEABI
+>>         help
+>>           This determines which method will be used for unwinding kernel
+>> stack
+>>           traces for panics, oopses, bugs, warnings, perf,
+>> /proc/<pid>/stack,
 > 
-> PDA 91-00156-A0 5.0 is a 5.0" WVGA TFT LCD panel.
-> This panel with backlight is found in PDA 5" LCD screen (TM5000 series or
-> AC320005-5).
+> This looks rather horrid - the upshot of this means that the function
+> tracer becomes unavailable on EABI unless you know that you must change
+> the unwinder from its default.
 > 
-> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-> ---
->  drivers/gpu/drm/panel/panel-simple.c | 27 +++++++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
+> Before the change to the choice statement, people could select the
+> function graph tracer, and the correct unwinder would be selected
+> for them.  That's knowledge that people never required before, and
+> I think it's really quite unfair to require them to know this to use
+> the function graph tracer.
+
+It is not ideal I agree.
+
+Searching for the symbol FUNCTION_GRAPH_TRACER in menuconfig immediately
+shows what dependency are missing.
+
+Also, we used to have the same situation with THUMB2_KERNEL already: You
+had to know that you need to disable Thumb2 Kernel in order to see
+FUNCTION_GRAPH_TRACER.
+
+
 > 
-> diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-> index 9c69e73..61361ba 100644
-> --- a/drivers/gpu/drm/panel/panel-simple.c
-> +++ b/drivers/gpu/drm/panel/panel-simple.c
-> @@ -2008,6 +2008,30 @@ static const struct panel_desc ortustech_com43h4m85ulc = {
->  	.bus_flags = DRM_BUS_FLAG_DE_HIGH | DRM_BUS_FLAG_PIXDATA_POSEDGE,
->  };
->  
-> +static const struct drm_display_mode pda_91_00156_a0_mode = {
-> +	.clock = 33300,
-> +	.hdisplay = 800,
-> +	.hsync_start = 800 + 1,
-> +	.hsync_end = 800 + 1 + 64,
-> +	.htotal = 800 + 1 + 64 + 64,
-> +	.vdisplay = 480,
-> +	.vsync_start = 480 + 1,
-> +	.vsync_end = 480 + 1 + 23,
-> +	.vtotal = 480 + 1 + 23 + 22,
-> +	.vrefresh = 60,
-> +};
-.flags are omitted, as it is for many panels in simple-panel.
-drm_modes.h do not document any default, so we must assume default equals no flags.
+> Maybe someone can put some effort into getting the function graph
+> tracer working with non-framepointer kernels... but as the above
+> currently stands, I really don't like the patch and I'd much rather
+> revert the original change to fix this regression.
 
-I would expect two of these as a minimum:
-DRM_MODE_FLAG_PHSYNC: horizontal sync is active high.
-DRM_MODE_FLAG_NHSYNC: horizontal sync is active low.
-DRM_MODE_FLAG_PVSYNC: vertical sync is active high.
-DRM_MODE_FLAG_NVSYNC: vertical sync is active low.
+I am all for that effort. Using Thumb2 on Arm32 is also getting more
+popular.
 
-But it obviously works for a lot of panel, so one
-may say why bother with it.
+Is known what is exactly missing/what effort would be required?
 
-> +
-> +static const struct panel_desc pda_91_00156_a0  = {
-> +	.modes = &pda_91_00156_a0_mode,
-> +	.num_modes = 1,
-> +	.size = {
-> +		.width = 152,
-> +		.height = 91,
-> +	},
-> +	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
-> +};
-.bus_format is specified - good!
-
-Consider if .bus_flags needs to be specified.
-(More or less same argumentation like for .flags above).
-
-I could not find any data-sheet on the panel,
-so I could not check if it is OK that all delays are 0.
-
-So to recap - things looks fine, but consider to be more explicit
-in .flags, bus_flags, and check if it is OK that all timing parameters are 0.
-
-	Sam
+--
+Stefan
 
 _______________________________________________
 linux-arm-kernel mailing list
