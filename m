@@ -2,22 +2,22 @@ Return-Path: <SRS0=3lKL=PX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 18B69C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 14:29:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F0775C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 14:30:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DAFA020868
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 14:29:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A1F592063F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 14:30:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dwtQps2N";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="A2b8CkTg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DAFA020868
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EZ4MDFsM";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="hnjvYWC4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A1F592063F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,60 +26,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=3/sMV/GusCq1jtHn1UnegRm7tKWtmF6kplo4SWB4HUw=; b=dwtQps2NeKu4sU
-	Zpl4oMo5fpX/MTTlEB8KU7CSQ4VNBy7E7AhEVtj9Cfn6pGvSkSC1AG1gs8Z83sE15wg4tS9E9qg7p
-	rB6vcONllOf2tDt0FebiVOUKjYWBY1E615l+m/b6WwRkP9/MroHFy34qlt/vOyDKZ321WYwMiKhoT
-	8O07MHqhRMJ/KPWR4yCMHS7daDxvrjxUbyDm71ctLDGLYiQLahceRHYf6Hi9WPc2D0x7MWewopgZf
-	UwObbemxCuNTtpUetBqtGwK3ftG7gOuEQQsOX5719pcysUoFJp2qhsJIFk+jF8x+1TSv3b1yY6xmT
-	m6PayDe3F8c2Nb3OIOQQ==;
+	List-Owner; bh=W/RAApu0GXLRdENFRzeKZdS6LJhaHmYpft1lDdN09wE=; b=EZ4MDFsMS80OAE
+	zfIomLRW+khD34+/AA+nquYjh09vq5GQol0aSqMpzT2X1wwAhOVcDY/RJg4m/Dh8h7X3epnFKojUQ
+	/CGKxqVfuf3CDAOd/v3VpQ3mfjizH63kH4nWkmE4xW+6zOtpLa0PagGFXdBPyvJuNK0bxVkoowWIA
+	2ecLv043kzI7iHtmkVQqQ9lBFb65rkQ6usGFgkUKQ2WeDash/Fuslq6wpEJr0cQ9Whp7javgrUCxz
+	4FLvIFTpSVb3DBbmC0K8+5LDj21vgpVqlGtQ9ESipxeJU+OsdwuO/c9NjcsaQvmjwzf32XNz0TjLf
+	xtFYEtEQhf5puLlCKH8g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjPiz-0007YH-IC; Tue, 15 Jan 2019 14:29:53 +0000
-Received: from lelv0143.ext.ti.com ([198.47.23.248])
+	id 1gjPjY-0000fE-4R; Tue, 15 Jan 2019 14:30:28 +0000
+Received: from lelv0142.ext.ti.com ([198.47.23.249])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjPif-00079x-R4
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 14:29:36 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0FETR1p084512;
- Tue, 15 Jan 2019 08:29:27 -0600
+ id 1gjPjU-0000el-GG
+ for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 14:30:25 +0000
+Received: from lelv0266.itg.ti.com ([10.180.67.225])
+ by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0FEULhW107461;
+ Tue, 15 Jan 2019 08:30:21 -0600
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1547562567;
- bh=RqrHh6DrBDW9ZgxObAnYihtfnmdCabbyJU45XXWFvJc=;
+ s=ti-com-17Q1; t=1547562621;
+ bh=u+0A9ra6HbEV0+gtRGluL/UpmwxpXHi6otB4YmdSGGc=;
  h=Date:From:To:CC:Subject:References:In-Reply-To;
- b=A2b8CkTg3ZxYuAAJPdVvKD7S0m8W2HDY3ExGHhqcYoWyh0Z/9WMaWPKmNjWaWioqc
- nH/Dhw+AVAjaIaeAVZFyiMBGBgqYhQ/nL6Y8iRNsl97YpKrLSLuTNGpdgmqf8tNrR/
- dNtt402Mc2JXmNPfgMhSSpFfUCpk8fP0FpUlSawM=
-Received: from DLEE102.ent.ti.com (dlee102.ent.ti.com [157.170.170.32])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0FETRq0063795
+ b=hnjvYWC4fvAGSuWvX21msCTRFH9MrWGQ0az/sxZCaZej7dyMiwsbZaOlPljSN3flj
+ frEEN7QIRYHdufMRajQ+5aFmggMrVXjOWgEPCNidVSUaC6OukcxI8X2Z7TdUUhfbKK
+ Qf4AoH7FU6ExO66yC7LhMoOWb2Ae0BZkz6vdmmnY=
+Received: from DLEE115.ent.ti.com (dlee115.ent.ti.com [157.170.170.26])
+ by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0FEULer113773
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Tue, 15 Jan 2019 08:29:27 -0600
-Received: from DLEE115.ent.ti.com (157.170.170.26) by DLEE102.ent.ti.com
- (157.170.170.32) with Microsoft SMTP Server (version=TLS1_2,
+ Tue, 15 Jan 2019 08:30:21 -0600
+Received: from DLEE105.ent.ti.com (157.170.170.35) by DLEE115.ent.ti.com
+ (157.170.170.26) with Microsoft SMTP Server (version=TLS1_2,
  cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 15
- Jan 2019 08:29:27 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE115.ent.ti.com
- (157.170.170.26) with Microsoft SMTP Server (version=TLS1_0,
+ Jan 2019 08:30:21 -0600
+Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE105.ent.ti.com
+ (157.170.170.35) with Microsoft SMTP Server (version=TLS1_0,
  cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Tue, 15 Jan 2019 08:29:27 -0600
+ Tue, 15 Jan 2019 08:30:20 -0600
 Received: from localhost (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0FETR7h017394;
- Tue, 15 Jan 2019 08:29:27 -0600
-Date: Tue, 15 Jan 2019 08:28:54 -0600
+ by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0FEUKGI029469;
+ Tue, 15 Jan 2019 08:30:20 -0600
+Date: Tue, 15 Jan 2019 08:29:48 -0600
 From: Nishanth Menon <nm@ti.com>
 To: Faiz Abbas <faiz_abbas@ti.com>
-Subject: Re: [PATCH v2 2/2] arm64: dts: ti: k3-am654-base-board: Add MMC
- support
-Message-ID: <20190115142854.xbfep5by73oi3sxd@kahuna>
+Subject: Re: [PATCH v2 0/2] Support for eMMC in AM65x-evm
+Message-ID: <20190115142948.3fq2i6vav7jn4ulq@kahuna>
 References: <20190110073355.3382-1-faiz_abbas@ti.com>
- <20190110073355.3382-3-faiz_abbas@ti.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190110073355.3382-3-faiz_abbas@ti.com>
+In-Reply-To: <20190110073355.3382-1-faiz_abbas@ti.com>
 User-Agent: NeoMutt/20171215
 X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_062934_187316_66604715 
-X-CRM114-Status: GOOD (  17.13  )
+X-CRM114-CacheID: sfid-20190115_063024_589642_CDD74471 
+X-CRM114-Status: GOOD (  15.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,58 +97,30 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Similar problem here as well.. $subject probably needs to be explicit
-about eMMC?
-
 On 13:03-20190110, Faiz Abbas wrote:
-> On the am654x-evm, the sdhci0 node is connected to an eMMC. Add node and
-> pinmux for the same.
+> The following patches add eMMC support on TI's AM65x-evm.
 > 
-> Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
-> ---
+> v2:
+>  1. The SD card node is under debug for some usecases.
+>     Only upstreaming eMMC support for now.
+>  2. Rebased to latest mainline.
+>  3. Removed status = "disabled" from dtsi patch
+>  4. Fixed node name to not include '_'s
+> 
+> Faiz Abbas (2):
+>   arm64: dts: ti: k3-am654: Add Support for MMC/SD
+>   arm64: dts: ti: k3-am654-base-board: Add MMC/SD support
+
+Once the $subject changes in the above two patches (should be emmc
+instead of MMC/SD):
+
+Acked-by: Nishanth Menon <nm@ti.com>
+
+> 
+>  arch/arm64/boot/dts/ti/k3-am65-main.dtsi      | 13 ++++++++++
 >  .../arm64/boot/dts/ti/k3-am654-base-board.dts | 25 +++++++++++++++++++
->  1 file changed, 25 insertions(+)
+>  2 files changed, 38 insertions(+)
 > 
-> diff --git a/arch/arm64/boot/dts/ti/k3-am654-base-board.dts b/arch/arm64/boot/dts/ti/k3-am654-base-board.dts
-> index e41fc3a5987b..11e9a2a43dfc 100644
-> --- a/arch/arm64/boot/dts/ti/k3-am654-base-board.dts
-> +++ b/arch/arm64/boot/dts/ti/k3-am654-base-board.dts
-> @@ -69,6 +69,23 @@
->  			AM65X_IOPAD(0x01bc, PIN_OUTPUT, 0) /* (AG13) SPI0_CS0 */
->  		>;
->  	};
-> +
-> +	main_mmc0_pins_default: main-mmc0-pins-default {
-> +		pinctrl-single,pins = <
-> +			AM65X_IOPAD(0x01a8, PIN_INPUT_PULLDOWN, 0) /* (B25) MMC0_CLK */
-> +			AM65X_IOPAD(0x01ac, PIN_INPUT_PULLUP, 0) /* (B27) MMC0_CMD */
-> +			AM65X_IOPAD(0x01a4, PIN_INPUT_PULLUP, 0) /* (A26) MMC0_DAT0 */
-> +			AM65X_IOPAD(0x01a0, PIN_INPUT_PULLUP, 0) /* (E25) MMC0_DAT1 */
-> +			AM65X_IOPAD(0x019c, PIN_INPUT_PULLUP, 0) /* (C26) MMC0_DAT2 */
-> +			AM65X_IOPAD(0x0198, PIN_INPUT_PULLUP, 0) /* (A25) MMC0_DAT3 */
-> +			AM65X_IOPAD(0x0194, PIN_INPUT_PULLUP, 0) /* (E24) MMC0_DAT4 */
-> +			AM65X_IOPAD(0x0190, PIN_INPUT_PULLUP, 0) /* (A24) MMC0_DAT5 */
-> +			AM65X_IOPAD(0x018c, PIN_INPUT_PULLUP, 0) /* (B26) MMC0_DAT6 */
-> +			AM65X_IOPAD(0x0188, PIN_INPUT_PULLUP, 0) /* (D25) MMC0_DAT7 */
-> +			AM65X_IOPAD(0x01b4, PIN_INPUT_PULLUP, 0) /* (A23) MMC0_SDCD */
-> +			AM65X_IOPAD(0x01b0, PIN_INPUT, 0) /* (C25) MMC0_DS */
-> +		>;
-> +	};
->  };
->  
->  &main_pmx1 {
-> @@ -163,3 +180,11 @@
->  		#size-cells= <1>;
->  	};
->  };
-> +
-> +&sdhci0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&main_mmc0_pins_default>;
-> +	bus-width = <8>;
-> +	non-removable;
-> +	ti,driver-strength-ohm = <50>;
-> +};
 > -- 
 > 2.19.2
 > 
