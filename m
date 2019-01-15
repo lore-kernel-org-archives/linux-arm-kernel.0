@@ -6,61 +6,72 @@ X-Spam-Status: No, score=-1.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 05C3AC43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 21:22:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A7B1EC43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 21:25:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C935B20656
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 21:21:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 73F3B20866
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 21:25:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qxGGN79C"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C935B20656
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sN8HmJ4Y"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 73F3B20866
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=WfJlmI4S0MbwWjMmS050eLxR6S2zUT57OiNlQkjp6+c=; b=qxGGN79Clb4pCvDldNqRVXDIQ
-	Qt7PCZWv0Gsf0AWXu/uTGMJii+l/SMOJSBcUzuqg8aRssRTOdmWfcvuJ+K9C7TqNyvrIKjKEjROo1
-	AXSBoBoShVhJ/ZewtinI5EgUmIVlePGefdXeOsCphlscxFPs9W6j1UT2k1rgD3VWbWqezmVx0BMIe
-	ubFXUaEqRgA1QJD0SS0QEN/tnB2NBt1GcDUFNcDgovObpEDBTA9n9m8TsBXHzTZruaKvfPB700W6j
-	QdXpGlzCXoYEgh2KJlOia3vGstOOFOwxoxpUgZju0Z9vNIzjQXJoM9m9yI7IyqtErLNUPJCD5ggoh
-	vhh0+LwhQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=fQNdY9vcqkQX+cr0/dbttbAhbhAGyO3+FEXBXn5S8RM=; b=sN8HmJ4YlN5E/+
+	l7WPv72hYMQ/aH01p1RKIxmjt/04vTiu+OH1mHcEZqHupng0rlIRSp+xCfDbWWfBxDBX5OHHsQVRb
+	Elcpp2qO9IHltiBLuRMZdOAqX4VT+ETWJpPbIEzgV4ZQ8snbmNWBsKY/EPbGLibdhsjsqh/GbNjMr
+	RWCOy1Bc4e3NnZGxOVf6UfHJ8EfICVCqXSXNMfCfIUJlHZJ75ekh2K87lYbuwHYXP7sgxXbx11l8e
+	TCQZzW/Kh+/WvxtxxVdiKa40JaQtUkHDQtPsZhCb5i64gPemPpxJnJQxcLjpxVVYCcBDY7aAC+JkP
+	xHtyle/AW+YqoK2SRQ7Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjW9j-0007sf-ED; Tue, 15 Jan 2019 21:21:55 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjW9g-0007sH-7m
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 21:21:53 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 23CF780D;
- Tue, 15 Jan 2019 13:21:48 -0800 (PST)
-Received: from [192.168.100.241] (usa-sjc-mx-foss1.foss.arm.com
- [217.140.101.70])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 9F6683F917;
- Tue, 15 Jan 2019 13:21:46 -0800 (PST)
-Subject: Re: [PATCH v3 0/7] arm64: add system vulnerability sysfs entries
-To: Stefan Wahren <stefan.wahren@i2se.com>,
- linux-arm-kernel@lists.infradead.org
-References: <20190109235544.2992426-1-jeremy.linton@arm.com>
- <884332236.499392.1547581848222@email.ionos.de>
-From: Jeremy Linton <jeremy.linton@arm.com>
-Message-ID: <c99f5da9-259c-3fc5-6150-7327ba0ff429@arm.com>
-Date: Tue, 15 Jan 2019 15:21:44 -0600
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.7.0
+	id 1gjWCz-000166-Fp; Tue, 15 Jan 2019 21:25:17 +0000
+Received: from mail-qt1-f196.google.com ([209.85.160.196])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gjWCu-000157-OR
+ for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 21:25:15 +0000
+Received: by mail-qt1-f196.google.com with SMTP id n32so4703007qte.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 15 Jan 2019 13:25:12 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=cwu79+tfKKxucE10UGrYialP7p/A9uZCoC3+9sRpJQU=;
+ b=R2UAX71M9fmK7nWDP8NIPHsYRHBEcgRywElUtfYNN/SH6S8scf3Kz7320e77r/pbQR
+ m9gmyY/1tCiOdVXtnKF1GurXLnn1wmtgTmCRFdgZB//3FeAHWdMtrxNi4yOCfLErmVPd
+ quUG4YDCPM4uz1ShGOWIgHZJbDcjFHz0cpj1JeUnSayg+WM+ZRCYs71u74bhpYjKd2ME
+ b+qMU43O8juX1VaSk5abCbW7muZ/6bRRy4PRLqMrfPBTHtVXxmlQREZkF8UEYxQjTEah
+ 7qz4BqkWso0COTRQjI8xQdKYmyhF3pR9Cy9KwrPoCuprfvsJ+1RugvzVOfkyCgp71HQz
+ aaPA==
+X-Gm-Message-State: AJcUukcn+Pkq2wxu0iFVMVETn34J/zqV7qedln1nRYFjFkB+T9IKa8QG
+ mAhrWGnaznT1SwBDW4UG8JnRNkSxTm7naKxJqQ8=
+X-Google-Smtp-Source: ALg8bN7+BefPEIu+AO6YlC+TgIbBCbLAnXf3ffsM10PKrmgDgKU/DC/NPFEymZ0CWR7axa9SwHqauAHOlcWzwMsGG5Q=
+X-Received: by 2002:ac8:7451:: with SMTP id h17mr4458420qtr.319.1547587511092; 
+ Tue, 15 Jan 2019 13:25:11 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <884332236.499392.1547581848222@email.ionos.de>
-Content-Language: en-US
+References: <20190110162435.309262-1-arnd@arndb.de>
+ <20190110162435.309262-15-arnd@arndb.de>
+ <87pnsz28k2.fsf@concordia.ellerman.id.au>
+ <CAK8P3a0uas76i2W1yjFvxHT-2=A8_egUZeAUM-Vya6386+87Xg@mail.gmail.com>
+ <CAK8P3a3eUzGDrJtV2ySpgHwjKHwZYr+1xHp6tChCt1gWi=mJ+g@mail.gmail.com>
+ <CAMuHMdVw1mBLGdn4hkiNVyoJ_oxMwi3d=_e7WL5ru+ALA4MKbw@mail.gmail.com>
+In-Reply-To: <CAMuHMdVw1mBLGdn4hkiNVyoJ_oxMwi3d=_e7WL5ru+ALA4MKbw@mail.gmail.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Tue, 15 Jan 2019 22:24:54 +0100
+Message-ID: <CAK8P3a3KE7bhK34T-G9Lj3v0ERhEj3LB5emEEwy8h6w8pVeQZg@mail.gmail.com>
+Subject: Re: [PATCH 14/15] arch: add split IPC system calls where needed
+To: Geert Uytterhoeven <geert@linux-m68k.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_132152_285930_70FA64B1 
-X-CRM114-Status: GOOD (  17.83  )
+X-CRM114-CacheID: sfid-20190115_132512_800200_01532704 
+X-CRM114-Status: GOOD (  22.13  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,58 +83,88 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mlangsdo@redhat.com, julien.thierry@arm.com, marc.zyngier@arm.com,
- catalin.marinas@arm.com, suzuki.poulose@arm.com, will.deacon@arm.com,
- linux-kernel@vger.kernel.org, steven.price@arm.com, ykaukab@suse.de,
- dave.martin@arm.com, shankerd@codeaurora.org
+Cc: Rich Felker <dalias@libc.org>,
+ "linux-ia64@vger.kernel.org" <linux-ia64@vger.kernel.org>,
+ Linux-sh list <linux-sh@vger.kernel.org>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>,
+ Dominik Brodowski <linux@dominikbrodowski.net>, linux-mips@vger.kernel.org,
+ Max Filippov <jcmvbkbc@gmail.com>, Deepa Dinamani <deepa.kernel@gmail.com>,
+ "H. Peter Anvin" <hpa@zytor.com>, sparclinux <sparclinux@vger.kernel.org>,
+ linux-s390 <linux-s390@vger.kernel.org>, Davidlohr Bueso <dave@stgolabs.net>,
+ y2038 Mailman List <y2038@lists.linaro.org>,
+ Michael Ellerman <mpe@ellerman.id.au>, Helge Deller <deller@gmx.de>,
+ the arch/x86 maintainers <x86@kernel.org>,
+ Russell King - ARM Linux <linux@armlinux.org.uk>,
+ Ingo Molnar <mingo@redhat.com>, Firoz Khan <firoz.khan@linaro.org>,
+ Matt Turner <mattst88@gmail.com>, Fenghua Yu <fenghua.yu@intel.com>,
+ Will Deacon <will.deacon@arm.com>,
+ linux-m68k <linux-m68k@lists.linux-m68k.org>,
+ Ivan Kokshaysky <ink@jurassic.park.msu.ru>, Andy Lutomirski <luto@kernel.org>,
+ Thomas Gleixner <tglx@linutronix.de>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Michal Simek <monstr@monstr.eu>, Tony Luck <tony.luck@intel.com>,
+ Parisc List <linux-parisc@vger.kernel.org>,
+ Linux API <linux-api@vger.kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Paul Burton <paul.burton@mips.com>,
+ "Eric W . Biederman" <ebiederm@xmission.com>,
+ alpha <linux-alpha@vger.kernel.org>,
+ Martin Schwidefsky <schwidefsky@de.ibm.com>,
+ Andrew Morton <akpm@linux-foundation.org>,
+ linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
+ David Miller <davem@davemloft.net>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+On Tue, Jan 15, 2019 at 5:36 PM Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> On Tue, Jan 15, 2019 at 4:19 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tue, Jan 15, 2019 at 4:01 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> > > On Mon, Jan 14, 2019 at 4:59 AM Michael Ellerman <mpe@ellerman.id.au> wrote:
+> > > > Arnd Bergmann <arnd@arndb.de> writes:
+> > > > >  arch/m68k/kernel/syscalls/syscall.tbl     | 11 +++++++++++
+> > > > >  arch/mips/kernel/syscalls/syscall_o32.tbl | 11 +++++++++++
+> > > > >  arch/powerpc/kernel/syscalls/syscall.tbl  | 12 ++++++++++++
+> > > >
+> > > > I have some changes I'd like to make to our syscall table that will
+> > > > clash with this.
+> > > >
+> > > > I'll try and send them today.
+> > >
+> > > Ok. Are those for 5.0 or 5.1? If they are intended for 5.0, it would be
+> > > nice for me to have a branch based on 5.0-rc1 that I can put
+> > > the other patches on top of.
+> >
+> > There is also another change that I considered:
+> >
+> > At the end of my series, we have a lot of entries like
+> >
+> > 245     32      clock_settime                   sys_clock_settime32
+> > 245     64      clock_settime                   sys_clock_settime
+> > 245     spu     clock_settime                   sys_clock_settime
+> >
+> > which could be folded into
+> >
+> > 245     32      clock_settime                   sys_clock_settime32
+> > 245     spu64 clock_settime                   sys_clock_settime
+> >
+> > if we just add another option to the ABI field. Any thoughts on
+> > that?
+>
+> So "spu64" would mean "spu + 64"?
+> That makes it more difficult to read, and to grep.
+> What about allowing multiple ABIs, separated by commas?
+> So that line would become:
+>
+>     245     spu,64 clock_settime                   sys_clock_settime
 
-On 01/15/2019 01:50 PM, Stefan Wahren wrote:
-> Hi Jeremy,
-> 
->> Jeremy Linton <jeremy.linton@arm.com> hat am 10. Januar 2019 um 00:55 geschrieben:
->>
->>
->> Arm64 machines should be displaying a human readable
->> vulnerability status to speculative execution attacks in
->> /sys/devices/system/cpu/vulnerabilities
->>
->> This series enables that behavior by providing the expected
->> functions. Those functions expose the cpu errata and feature
->> states, as well as whether firmware is responding appropriately
->> to display the overall machine status. This means that in a
->> heterogeneous machine we will only claim the machine is mitigated
->> or safe if we are confident all booted cores are safe or
->> mitigated.
->>
-> 
-> i applied this v3 series and Marc's v2 series.
-> 
-> Now i'm getting the following on a Raspberry Pi 3 B+ :
-> 
-> meltdown:Not affected
-> spec_store_bypass:Not affected
-> spectre_v1:Mitigation: __user pointer sanitization
-> 
-> So the entries l1tf and spectre_v2 disappeared.
+I agree that would be a nice representation, but doing this would
+again require changing the script, which then in turn clashes with
+Firoz' patches to unify it under the scripts/ directory.
 
-Yes, the l1tf entry should be gone.
-
-I believe there is a problem with the "1/2 advertise.." patch in that 
-the 'arm64_requested_vuln_attrs |=' line needs to be hoisted  to the top 
-of check_branch_predictor() and the '__spectrev2_safe = false' line 
-needs to be hoisted 6 lines immediately above "/* Fallback to firmware 
-detection*/"
-
-That should re-enable the spectre_v2 entry.
-
-
-
+       Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
