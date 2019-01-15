@@ -2,56 +2,85 @@ Return-Path: <SRS0=3lKL=PX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8A625C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 02:45:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2CB14C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 02:52:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 593CE20651
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 02:45:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EFC4520656
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 02:52:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aeSJsENu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 593CE20651
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U4dBbhr5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EFC4520656
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=m1/RjY9TPJrSCRbIRngHxrH8tbVdiTxjSQOeTRfD488=; b=aeSJsENuGGskfN
-	ohxfHBT93/lJ0q5aiKV1TYGLsicOLAfwUjhMzDcR8GN2cIzTyAQLHdaZwyntITVYo3zhafbQ2FONE
-	pjzKkn4Qy/VQjHk3unXISPK3N8udtje5MN2dO8Aszma4NHQhTLO8aRCFctsXS9wvqD9AutNw4PTFP
-	rbeEPsJjwUS/Po7aqdcXzOB3VxuHUqC7tG6nd5LoVAVLH3OarqL2Oct+2lKZ1XQj+EMKNe3k3KtKh
-	yVrhCQJc0plqg6+tfNF2P4gMv4nLH1JX6XEM35eaq8GTBWfD/AwCPpUhzGaNtrzrMi8hpFPut22zE
-	kMGtjEujiSHSY1UcwCfw==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=g2tQkW40kV1PQsxU1bE7wI9ZzDlHO8XRu2g37+wl0Js=; b=U4dBbhr5ycTgmr
+	R+JdaW+uKGCzzNNbV4ZNfKKrjWIXQg1VS8fbuezfwveJSBe21HUZxWvxUWQa8LGQa7OR5epRqb98M
+	MxA/O41VTKIopjb+dniP/2o1n0Jw5sDNHNkt37pL3qiV3o1MFdulI3qcKae0sxIE2jVmpv0+U6xU4
+	Si2OLx2d/lvOnK1qQkG+Ue/ZdOpS9RuHZKSjzheFWFek1wGFf7v28hUUiDYsTWJEw8wYL6J6JuRIk
+	fK5MTwzPTh3LLgg8SBN1PVYP+c2SXlSSVgOa8AmAqd/lMtzW0P6DImL0cZY96XqXuXLRlRLhfUjSr
+	xsnKjzLa9x3HkLPOYAJg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjEji-00021l-Qi; Tue, 15 Jan 2019 02:45:54 +0000
-Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
+	id 1gjEq5-0003lZ-S4; Tue, 15 Jan 2019 02:52:29 +0000
+Received: from mail-ed1-f68.google.com ([209.85.208.68])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjEje-0001zc-Um
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 02:45:52 +0000
-Received: by wens.csie.org (Postfix, from userid 1000)
- id F0B965FCA8; Tue, 15 Jan 2019 10:45:44 +0800 (CST)
-From: Chen-Yu Tsai <wens@csie.org>
-To: Maxime Ripard <maxime.ripard@bootlin.com>,
- Linus Walleij <linus.walleij@linaro.org>
-Subject: [PATCH] pinctrl: sunxi: Correct number of IRQ banks on H6 main pin
- controller
-Date: Tue, 15 Jan 2019 10:45:43 +0800
-Message-Id: <20190115024543.12928-1-wens@csie.org>
-X-Mailer: git-send-email 2.20.1
+ id 1gjEq2-0003l4-0T
+ for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 02:52:27 +0000
+Received: by mail-ed1-f68.google.com with SMTP id a20so1348969edc.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 14 Jan 2019 18:52:25 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=8QYlvmXDylvUtOb39tKDxn82P1fbLoRwSF1u234njv4=;
+ b=MhNHmSLocUQ2jiw1Z4aYDv0Djm+KCEZZFNuSWtyMD9b+WCexpXQlZsUf2307pE/RNx
+ WPCX6QVCSsEPChi7WInE7flNsvjWOkrf5oGLPoAT6dVD3CYD9XiNcgvGG+54pBA4ugKq
+ MgFgfOI83TQky9fSZ1zZjQddRmUMoR7wRTq0vyhqlYgDTG8ZQ0pT/MQUa4ga2lZwiTR9
+ ggw3JpbQ5RQ+xDqpQEImSn/PtbQ/NHgaMAYvJrSvDOF3HVyNglrpT3p7nNEZPXn2R60h
+ eTe7r5rAhsGva4j6PwakNk2Z4+Jda0wvk7qoCFJH0AFpV42Ra5Vnz26tFyQD6n+Q/iwd
+ KT7w==
+X-Gm-Message-State: AJcUukcArL6aXeyYrJncr8tb7udOEXdXBnRZpQf1OmJa/mnO8/Ix0bP+
+ j3t3cXqLdh6EDWi7vFrYFEFM6OfxAIY=
+X-Google-Smtp-Source: ALg8bN4gChkK8o/anI+rQ4u00Gi1DzM2XDo/tI6jnFvPM67yIM+AtA5a0zS9nmNh3Pddv3StMdqtYA==
+X-Received: by 2002:a17:906:2313:: with SMTP id
+ l19-v6mr1442713eja.204.1547520743579; 
+ Mon, 14 Jan 2019 18:52:23 -0800 (PST)
+Received: from mail-wr1-f46.google.com (mail-wr1-f46.google.com.
+ [209.85.221.46])
+ by smtp.gmail.com with ESMTPSA id q10-v6sm3023433eju.47.2019.01.14.18.52.21
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 14 Jan 2019 18:52:22 -0800 (PST)
+Received: by mail-wr1-f46.google.com with SMTP id l9so1189173wrt.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 14 Jan 2019 18:52:21 -0800 (PST)
+X-Received: by 2002:adf:a1d2:: with SMTP id v18mr1028067wrv.87.1547520741332; 
+ Mon, 14 Jan 2019 18:52:21 -0800 (PST)
 MIME-Version: 1.0
+References: <20190113021719.46457-1-samuel@sholland.org>
+ <9738319a-4154-62be-2325-2873dfb326dc@linaro.org>
+In-Reply-To: <9738319a-4154-62be-2325-2873dfb326dc@linaro.org>
+From: Chen-Yu Tsai <wens@csie.org>
+Date: Tue, 15 Jan 2019 10:52:08 +0800
+X-Gmail-Original-Message-ID: <CAGb2v66Hmn2QBN++X8h94E_Vwe1uZ67zz5TTGiwUJJe4nCWgXQ@mail.gmail.com>
+Message-ID: <CAGb2v66Hmn2QBN++X8h94E_Vwe1uZ67zz5TTGiwUJJe4nCWgXQ@mail.gmail.com>
+Subject: Re: [PATCH v3 0/2] Allwinner A64 timer workaround
+To: Daniel Lezcano <daniel.lezcano@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_184551_256494_3032CDCC 
-X-CRM114-Status: GOOD (  13.91  )
+X-CRM114-CacheID: sfid-20190114_185226_051578_D964EDB1 
+X-CRM114-Status: GOOD (  21.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -63,125 +92,66 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-gpio@vger.kernel.org, Chen-Yu Tsai <wens@csie.org>,
- stable@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <Mark.Rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>, Samuel Holland <samuel@sholland.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>,
+ Marc Zyngier <marc.zyngier@arm.com>,
+ linux-sunxi <linux-sunxi@googlegroups.com>, Rob Herring <robh+dt@kernel.org>,
+ Thomas Gleixner <tglx@linutronix.de>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The H6 main pin controller has four banks of interrupt-triggering pins.
-The driver as originally submitted only specified three, but had pin
-descriptions referencing a fourth bank. This results in a out-of-bounds
-access into .irq_array of struct sunxi_pinctrl. This however did not
-result in a crash until v4.20, with commit a66d972465d1 ("devres: Align
-data[] to ARCH_KMALLOC_MINALIGN"), which changed the alignment of memory
-region returned by devm_kcalloc(). The increase likely moved the
-out-of-bounds access into the next, unmapped page.
+On Mon, Jan 14, 2019 at 8:57 PM Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+>
+> On 13/01/2019 03:17, Samuel Holland wrote:
+> > This is the third version of a patch series to fix system clock jumps
+> > and other timer instability on the Allwinner A64 SoC. It has now been
+> > tested for a week, and I've received no reports of date jumps with this
+> > version. So this is, as far as I can tell, a complete workaround.
+> >
+> > See the commit messages for a detailed description of the issue, but the
+> > summary is that, when a high counter bit rolls over, indeterminance in
+> > the low bits causes CNTPCT/CNTVCT and their respective TVAL registers to
+> > jump forward or backward. Backward jumps (or the next read after forward
+> > jumps) are sometimes seen by the kernel and interpreted as the timer
+> > wrapping around after 2^56 cycles. This causes the system clock to jump
+> > forward approximately 91 years.
+> >
+> > changes since v2;
+> > - Reduced workaround threshold from 11 to 10 bits based on reports from
+> >   other hardare and the U-Boot version of this workaround
+> > - Added TVAL handling based on Marc's suggestion
+> > - Added erratum documentation and renamed symbols to match
+> > - Added Maxime's Acked-by
+> >
+> > changes since v1:
+> > - Add an iteration limit like most other arch timer workarounds
+> > - Added Andre's Tested-by
+> >
+> > Samuel Holland (2):
+> >   arm64: arch_timer: Workaround for Allwinner A64 timer instability
+> >   arm64: dts: allwinner: a64: Enable A64 timer workaround
+> >
+> >  Documentation/arm64/silicon-errata.txt        |  2 +
+> >  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi |  1 +
+> >  drivers/clocksource/Kconfig                   | 10 ++++
+> >  drivers/clocksource/arm_arch_timer.c          | 55 +++++++++++++++++++
+> >  4 files changed, 68 insertions(+)
+> >
+>
+> Applied. Took the opportunity to add the stable@ tag.
 
-With KASAN on, the bug is quite clear:
+Not seeing it in tip just yet. Was it applied for -rc or -next?
+Need to know which branch to apply the device tree patch to.
 
-    BUG: KASAN: slab-out-of-bounds in sunxi_pinctrl_init_with_variant+0x49c/0x12b8
-    Write of size 4 at addr ffff80002c680280 by task swapper/0/1
-
-    CPU: 2 PID: 1 Comm: swapper/0 Not tainted 5.0.0-rc1-00016-gc480a5e6a077 #3
-    Hardware name: OrangePi Lite2 (DT)
-    Call trace:
-     dump_backtrace+0x0/0x220
-     show_stack+0x14/0x20
-     dump_stack+0xac/0xd4
-     print_address_description+0x60/0x25c
-     kasan_report+0x14c/0x1ac
-     __asan_store4+0x80/0xa0
-     sunxi_pinctrl_init_with_variant+0x49c/0x12b8
-     h6_pinctrl_probe+0x18/0x20
-     platform_drv_probe+0x6c/0xc8
-     really_probe+0x244/0x4b0
-     driver_probe_device.part.4+0x11c/0x164
-     __driver_attach+0x120/0x190
-     bus_for_each_dev+0xe8/0x158
-     driver_attach+0x30/0x40
-     bus_add_driver+0x308/0x318
-     driver_register+0xbc/0x1d0
-     __platform_driver_register+0x7c/0x88
-     h6_pinctrl_driver_init+0x18/0x20
-     do_one_initcall+0xd4/0x208
-     kernel_init_freeable+0x230/0x2c8
-     kernel_init+0x10/0x108
-     ret_from_fork+0x10/0x1c
-
-    Allocated by task 1:
-     kasan_kmalloc.part.0+0x4c/0x100
-     kasan_kmalloc+0xc4/0xe8
-     kasan_slab_alloc+0x14/0x20
-     __kmalloc_track_caller+0x130/0x238
-     devm_kmalloc+0x34/0xd0
-     sunxi_pinctrl_init_with_variant+0x1d8/0x12b8
-     h6_pinctrl_probe+0x18/0x20
-     platform_drv_probe+0x6c/0xc8
-     really_probe+0x244/0x4b0
-     driver_probe_device.part.4+0x11c/0x164
-     __driver_attach+0x120/0x190
-     bus_for_each_dev+0xe8/0x158
-     driver_attach+0x30/0x40
-     bus_add_driver+0x308/0x318
-     driver_register+0xbc/0x1d0
-     __platform_driver_register+0x7c/0x88
-     h6_pinctrl_driver_init+0x18/0x20
-     do_one_initcall+0xd4/0x208
-     kernel_init_freeable+0x230/0x2c8
-     kernel_init+0x10/0x108
-     ret_from_fork+0x10/0x1c
-
-    Freed by task 0:
-    (stack is not available)
-
-    The buggy address belongs to the object at ffff80002c680080
-     which belongs to the cache kmalloc-512 of size 512
-    The buggy address is located 0 bytes to the right of
-     512-byte region [ffff80002c680080, ffff80002c680280)
-    The buggy address belongs to the page:
-    page:ffff7e0000b1a000 count:1 mapcount:0 mapping:ffff80002e00c780 index:0xffff80002c683c80 compound_mapcount: 0
-    flags: 0x10200(slab|head)
-    raw: 0000000000010200 ffff80002e003a10 ffff80002e003a10 ffff80002e00c780
-    raw: ffff80002c683c80 0000000000100001 00000001ffffffff 0000000000000000
-    page dumped because: kasan: bad access detected
-
-    Memory state around the buggy address:
-     ffff80002c680180: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-     ffff80002c680200: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-    >ffff80002c680280: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
-		       ^
-     ffff80002c680300: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
-     ffff80002c680380: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
-
-Correct the number of IRQ banks so there are no more mismatches.
-
-Fixes: c8a830904991 ("pinctrl: sunxi: add support for the Allwinner H6
-		      main pin controller")
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c b/drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c
-index aa8b58125568..ef4268cc6227 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c
-@@ -588,7 +588,7 @@ static const unsigned int h6_irq_bank_map[] = { 1, 5, 6, 7 };
- static const struct sunxi_pinctrl_desc h6_pinctrl_data = {
- 	.pins = h6_pins,
- 	.npins = ARRAY_SIZE(h6_pins),
--	.irq_banks = 3,
-+	.irq_banks = 4,
- 	.irq_bank_map = h6_irq_bank_map,
- 	.irq_read_needs_mux = true,
- };
--- 
-2.20.1
-
+Thanks
+ChenYu
 
 _______________________________________________
 linux-arm-kernel mailing list
