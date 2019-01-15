@@ -6,71 +6,58 @@ X-Spam-Status: No, score=-1.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 281BEC43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 16:36:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AD64AC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 16:37:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EAF4320657
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 16:36:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7E4D22087E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 16:37:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pQ5/C06a"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EAF4320657
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-m68k.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q4NNh83z"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7E4D22087E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:In-Reply-To:
+	Date:References:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=S9cKGyYiSVjuAn29Q9OyAKpr8F3vJyfcqAacuJUj4Hw=; b=pQ5/C06ahee+DX
-	7EeYJYyahRAIchmsZEbFggKFUdGZJuZPyl0bPIr9/XEliHPyXKggR0yQxTy6IimQhAc1R2AytSfnC
-	Zqd27ud6MYFK5M0cZk3bNtidYBToSK/kUyE5qyopnIOab+S6LvmWFpJ4TBVT3iiLp+poIs1pfKl06
-	qU8+b7dyveL53I3UkjvWN07YhisxxxYpJ3tCidAmAjR8w9fCw0jCyzHd+sOB7Y7899UsFOLoqvqHC
-	XuXkcbpkcUscKjr7a4vActma6BYpapBvtKvEpZCvRgYxlkB+FbqeLKBIOdlhNlcVLqQ0vDQ6L+L3N
-	ab2NZqipx2KFfNFkjQmQ==;
+	List-Owner; bh=yHinIklBUTpnHdp07p31CBlAeezgRv7UqCbM9rjiITc=; b=Q4NNh83zL7CWfe
+	7edqxOEvFjhwWzRGzhFpQx5KKCDZ3b1IpF20kozOSL0Xuz3VHD6e1DlhJWAst9Lekw4SqPR9Z9VBE
+	iM4QOnNAPSgcXdE7EzcbcD/mGBVJoIUQlt5iReJfAcBjgrSELkcobXBhvw/w7r5rbGkvoQZgSToy8
+	92ZRl2JsDRxZDvx/yOM1u8f01QUrof+m9TUKNxoRppgzns1oSztzfCjlNa7QqDHt1oJ/sPk3RxrLL
+	gFlnsphsyzLwouUl5EOCR32eYoLczpqBoTBs3VoyLhFMOjfnv67dLLyOspcx04/kzrEXcz75n5RbP
+	cYkLK7iJ05y74uxC/KIg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjRhF-00060F-Ri; Tue, 15 Jan 2019 16:36:13 +0000
-Received: from mail-ua1-f66.google.com ([209.85.222.66])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjRhC-0005zX-Hh
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 16:36:12 +0000
-Received: by mail-ua1-f66.google.com with SMTP id v24so1121887uap.13
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 15 Jan 2019 08:36:09 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=adm1Mw3mLDDQkb5Mftiy3lAZ198qNeHBJOL4SrY1tf8=;
- b=JAXghG66tDWFTqVoz1YQteBvy1JIT8Qgfc3OQhnryNB97xRDr+0pIyKEX8KR8qwwb4
- j2/WBWkMteRg/drglDKoFuzYkdxml7pW46oxk6xXzHQqhsmfdHVvg4CNHSyYRiV7dMbm
- NSlWU7YNOuleCXz4c+SJrYwatnkxtpmyXFHlCu1xWVX3CVv+YhDXmy4PFW2X3rmXsuil
- OA4haNJcYdpODkOeeT5epUhDICsj6PYDZrFXWx6/U3wMB8oKiOBrkaIaMWEtnxLmvv0u
- 2mdmsEMOGcc21QWYRMs9OZbJIf51+yRVwSkD/JLyQLflELXHwDfC0ssORBg0WDPqwyU1
- UOHg==
-X-Gm-Message-State: AJcUukeuuFCR6thtwZAHe0RI2aROdYVfsXyQJyH4dCiiAVkjAX+dY9p6
- EqPXDWG+xkapqZpv7itPf+JFe3pQuOVBsasHc0w=
-X-Google-Smtp-Source: ALg8bN5nyuahVho846ktl4afIc2BkzN7/rQ1M7vxhSJ6rgU6eyfffsa43/9sALd1FvtSGdvtLkpiFjHkbityoUbDtSg=
-X-Received: by 2002:ab0:210e:: with SMTP id d14mr1882691ual.20.1547570168071; 
- Tue, 15 Jan 2019 08:36:08 -0800 (PST)
+	id 1gjRir-0006Of-Em; Tue, 15 Jan 2019 16:37:53 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gjRio-0006Nh-0i
+ for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 16:37:51 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 46A4F207A3; Tue, 15 Jan 2019 17:37:46 +0100 (CET)
+Received: from localhost (alyon-652-1-22-18.w109-213.abo.wanadoo.fr
+ [109.213.145.18])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 09CCD20729;
+ Tue, 15 Jan 2019 17:37:36 +0100 (CET)
+From: Gregory CLEMENT <gregory.clement@bootlin.com>
+To: Andrew Lunn <andrew@lunn.ch>
+Subject: Re: [PATCH v3] arm64: dts: marvell: Add device tree for uDPU board
+References: <20190111172055.30451-1-vladimir.vid@sartura.hr>
+ <20190115144421.29968-1-vladimir.vid@sartura.hr>
+ <20190115161608.GA25888@lunn.ch>
+Date: Tue, 15 Jan 2019 17:37:36 +0100
+In-Reply-To: <20190115161608.GA25888@lunn.ch> (Andrew Lunn's message of "Tue, 
+ 15 Jan 2019 17:16:08 +0100")
+Message-ID: <8736ptri5r.fsf@FE-laptop>
+User-Agent: Gnus/5.13 (Gnus v5.13) Emacs/26.1 (gnu/linux)
 MIME-Version: 1.0
-References: <20190110162435.309262-1-arnd@arndb.de>
- <20190110162435.309262-15-arnd@arndb.de>
- <87pnsz28k2.fsf@concordia.ellerman.id.au>
- <CAK8P3a0uas76i2W1yjFvxHT-2=A8_egUZeAUM-Vya6386+87Xg@mail.gmail.com>
- <CAK8P3a3eUzGDrJtV2ySpgHwjKHwZYr+1xHp6tChCt1gWi=mJ+g@mail.gmail.com>
-In-Reply-To: <CAK8P3a3eUzGDrJtV2ySpgHwjKHwZYr+1xHp6tChCt1gWi=mJ+g@mail.gmail.com>
-From: Geert Uytterhoeven <geert@linux-m68k.org>
-Date: Tue, 15 Jan 2019 17:35:55 +0100
-Message-ID: <CAMuHMdVw1mBLGdn4hkiNVyoJ_oxMwi3d=_e7WL5ru+ALA4MKbw@mail.gmail.com>
-Subject: Re: [PATCH 14/15] arch: add split IPC system calls where needed
-To: Arnd Bergmann <arnd@arndb.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_083610_585597_7BB81226 
-X-CRM114-Status: GOOD (  20.55  )
+X-CRM114-CacheID: sfid-20190115_083750_196243_473960BB 
+X-CRM114-Status: GOOD (  13.50  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,94 +69,58 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rich Felker <dalias@libc.org>,
- "linux-ia64@vger.kernel.org" <linux-ia64@vger.kernel.org>,
- Linux-sh list <linux-sh@vger.kernel.org>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Heiko Carstens <heiko.carstens@de.ibm.com>,
- Dominik Brodowski <linux@dominikbrodowski.net>, linux-mips@vger.kernel.org,
- Max Filippov <jcmvbkbc@gmail.com>, Deepa Dinamani <deepa.kernel@gmail.com>,
- "H. Peter Anvin" <hpa@zytor.com>, sparclinux <sparclinux@vger.kernel.org>,
- linux-s390 <linux-s390@vger.kernel.org>, Davidlohr Bueso <dave@stgolabs.net>,
- y2038 Mailman List <y2038@lists.linaro.org>,
- Michael Ellerman <mpe@ellerman.id.au>, Helge Deller <deller@gmx.de>,
- the arch/x86 maintainers <x86@kernel.org>,
- Russell King - ARM Linux <linux@armlinux.org.uk>,
- Ingo Molnar <mingo@redhat.com>, Firoz Khan <firoz.khan@linaro.org>,
- Matt Turner <mattst88@gmail.com>, Fenghua Yu <fenghua.yu@intel.com>,
- Will Deacon <will.deacon@arm.com>,
- linux-m68k <linux-m68k@lists.linux-m68k.org>,
- Ivan Kokshaysky <ink@jurassic.park.msu.ru>, Andy Lutomirski <luto@kernel.org>,
- Thomas Gleixner <tglx@linutronix.de>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Michal Simek <monstr@monstr.eu>, Tony Luck <tony.luck@intel.com>,
- Parisc List <linux-parisc@vger.kernel.org>,
- Linux API <linux-api@vger.kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Paul Burton <paul.burton@mips.com>,
- "Eric W . Biederman" <ebiederm@xmission.com>,
- alpha <linux-alpha@vger.kernel.org>,
- Martin Schwidefsky <schwidefsky@de.ibm.com>,
- Andrew Morton <akpm@linux-foundation.org>,
- linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
- David Miller <davem@davemloft.net>
+Cc: devicetree@vger.kernel.org, Luis Torres <luis.torres@methode.com>,
+ Paul Arola <paul.arola@telus.com>, Luka Perkov <luka.perkov@sartura.hr>,
+ Vladimir Vid <vladimir.vid@sartura.hr>,
+ Scott Roberts <scott.roberts@telus.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Arnd,
+Hi Andrew,
+ 
+ On mar., janv. 15 2019, Andrew Lunn <andrew@lunn.ch> wrote:
 
-On Tue, Jan 15, 2019 at 4:19 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tue, Jan 15, 2019 at 4:01 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Mon, Jan 14, 2019 at 4:59 AM Michael Ellerman <mpe@ellerman.id.au> wrote:
-> > > Arnd Bergmann <arnd@arndb.de> writes:
-> > > >  arch/m68k/kernel/syscalls/syscall.tbl     | 11 +++++++++++
-> > > >  arch/mips/kernel/syscalls/syscall_o32.tbl | 11 +++++++++++
-> > > >  arch/powerpc/kernel/syscalls/syscall.tbl  | 12 ++++++++++++
-> > >
-> > > I have some changes I'd like to make to our syscall table that will
-> > > clash with this.
-> > >
-> > > I'll try and send them today.
-> >
-> > Ok. Are those for 5.0 or 5.1? If they are intended for 5.0, it would be
-> > nice for me to have a branch based on 5.0-rc1 that I can put
-> > the other patches on top of.
+> Hi Vladimir
 >
-> There is also another change that I considered:
+> Ah, i did not notice early. You need to Cc: the Marvell mvebu
+> maintainers. They are the ones who will accept this patch.
 >
-> At the end of my series, we have a lot of entries like
 >
-> 245     32      clock_settime                   sys_clock_settime32
-> 245     64      clock_settime                   sys_clock_settime
-> 245     spu     clock_settime                   sys_clock_settime
+>> +	leds {
+>> +		pinctrl-names = "default";
+>> +		compatible = "gpio-leds";
+>> +
+>> +		power@487 {
+>> +			label = "power:green:led1";
+>> +			gpios = <&gpionb 11 GPIO_ACTIVE_LOW>;
+>> +			default-state = "off";
+>> +		};
 >
-> which could be folded into
+> I'm a bit out of date with dtc warnings. I think the @487 will
+> generate a warning because there is no reg property?
 >
-> 245     32      clock_settime                   sys_clock_settime32
-> 245     spu64 clock_settime                   sys_clock_settime
->
-> if we just add another option to the ABI field. Any thoughts on
-> that?
+> Gregory, do you know?
 
-So "spu64" would mean "spu + 64"?
-That makes it more difficult to read, and to grep.
-What about allowing multiple ABIs, separated by commas?
-So that line would become:
+I confirm that if there is no reg then there should not have a @XXX.
 
-    245     spu,64 clock_settime                   sys_clock_settime
+Gregory
 
-Gr{oetje,eeting}s,
 
-                        Geert
+>
+> Thanks
+> 	Andrew
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel@lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert@linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Gregory Clement, Bootlin
+Embedded Linux and Kernel engineering
+http://bootlin.com
 
 _______________________________________________
 linux-arm-kernel mailing list
