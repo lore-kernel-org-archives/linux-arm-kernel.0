@@ -2,73 +2,72 @@ Return-Path: <SRS0=3lKL=PX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 24355C43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 05:50:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8BDD7C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 06:11:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E153420656
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 05:50:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5405520859
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 06:11:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NcxonpO3";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="YD/aV1bY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E153420656
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eKnQCEQ1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5405520859
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=milecki.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Message-Id:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=PPIBa7UP1nkQFs10osMNAXu/Rs59GVL704aubta0U7A=; b=NcxonpO3gAojFn
-	wrYsboJwd5xmPis2A7CguUgeizo2LmJjwlsLivFssWSTeX7lHnZY/p4VNWd9xRVb85M1/H8yeo0b9
-	qzpqIeHt0feeiS8172/eD6d/3RL3jNTcEoNUip9ltPqhMBYd0z8buI5iHEHUBzdMSxHg+cPVFazKy
-	Fw8bxO7Gbu1br2mb86XxolGyD6jqkaL/+VYW2OeinYmMnKGp+LIttjNGnaCewisDc1jeZQL5h2HwY
-	f1Fqf2TtDpncpfq7n8hl3Z8CARWFvoSpo2UcHbfaGv4dEAC+XH18FE7kjNkKnBzbx1LgQzxeleLoT
-	dnqZTYzWLD/2Z00YxmMg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:Message-ID:References:In-Reply-To:Subject:To:From:
+	Date:MIME-Version:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=kXk4MVjwWKeb157SF1EKpe85NkJTfapIpdVwIpEyEmQ=; b=eKnQCEQ1ae2jB2YDRjFa2GRvn
+	BakP1GoahBs4t0iFOF3Q+4/9SURsRG8H5+q4C1R6UUws1LgYtXEnpvDcnj6RmAm89vEY3250JmH+2
+	hLNbEsUC43ldYYpFJcw8kIT1btH8Mf59LhUdF7+UMIQs68dYMvXydXYpsSyBsFu96A37il0c8mBM9
+	F66QMP4LxwGk455m6CQuhy8r8zI+hUwCD9aWEOsF1EdvfheL8+xxr2GDK8CbgJ9y+ROczRlMCKhEf
+	f89FctH+YcZPisrk4qG8xWzLjUHTBoTX1n7OrJbDs1NWIsx/HuOC5M7i5jGp8+h6x8sORZ6JmTdXw
+	V3/VPIP2w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjHbu-0001DT-PC; Tue, 15 Jan 2019 05:50:02 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gjHwI-0000dm-BU; Tue, 15 Jan 2019 06:11:06 +0000
+Received: from 2.mo2.mail-out.ovh.net ([188.165.53.149])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjHbr-0001Cz-DG
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 05:50:00 +0000
-Received: from devnote (NE2965lan1.rev.em-net.ne.jp [210.141.244.193])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 9678B20656;
- Tue, 15 Jan 2019 05:49:57 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1547531398;
- bh=OsNbKiOw4wC2BGgc0y+q1WmevhGN5MS5HBVUsKEr3Ao=;
- h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
- b=YD/aV1bYlT9JBqyuX7FQozAs4TTkv/t4gLaNQr6DdeJLSC/50wtmS2upU9/fBZCaL
- gPyViv5g/QDVmYvtA9NvI0QNxfAnOEvk85lRPaMEZ4ewCCA03LMADru3uT7/OjNX/m
- 26UlNHYNoeafYBNg5lDIPwEQtDg5hXKQ1u6Bc8jE=
-Date: Tue, 15 Jan 2019 14:49:55 +0900
-From: Masami Hiramatsu <mhiramat@kernel.org>
-To: James Morse <james.morse@arm.com>
-Subject: Re: [PATCH 1/3] arm64: kprobes: Move extable address check into
- arch_prepare_kprobe()
-Message-Id: <20190115144955.b3a6cfae18035ae46ffdcfc2@kernel.org>
-In-Reply-To: <92c160a8-7627-0c64-ed73-df616e9c057d@arm.com>
-References: <154502881646.30629.9938335052821665530.stgit@devbox>
- <154502884653.30629.3172839440883293817.stgit@devbox>
- <aec51c10-d744-df0f-1216-d3372e779cb1@arm.com>
- <20190108113953.8bc0cc7d196ddba370377217@kernel.org>
- <b4109104-c438-f4c2-352a-d8b0ec47db37@arm.com>
- <20190109110500.b4b5049f4c67dfc85b9ced4e@kernel.org>
- <92c160a8-7627-0c64-ed73-df616e9c057d@arm.com>
-X-Mailer: Sylpheed 3.5.0 (GTK+ 2.24.30; x86_64-pc-linux-gnu)
-Mime-Version: 1.0
+ id 1gjHwD-0000cx-F4
+ for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 06:11:03 +0000
+Received: from player789.ha.ovh.net (unknown [10.109.159.62])
+ by mo2.mail-out.ovh.net (Postfix) with ESMTP id 64DC817A870
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 15 Jan 2019 07:10:55 +0100 (CET)
+Received: from RCM-web4.webmail.mail.ovh.net
+ (ip-194-187-74-233.konfederacka.maverick.com.pl [194.187.74.233])
+ (Authenticated sender: rafal@milecki.pl)
+ by player789.ha.ovh.net (Postfix) with ESMTPSA id 3734419AAD12;
+ Tue, 15 Jan 2019 06:10:48 +0000 (UTC)
+MIME-Version: 1.0
+Date: Tue, 15 Jan 2019 07:10:45 +0100
+From: =?UTF-8?Q?Rafa=C5=82_Mi=C5=82ecki?= <rafal@milecki.pl>
+To: Florian Fainelli <f.fainelli@gmail.com>
+Subject: Re: [PATCH] ARM: dts: BCM53573: Relicense Luxul files to the GPL 2.0+
+ / MIT
+In-Reply-To: <158e0161-0d94-54a9-3851-9a3e65e85b77@gmail.com>
+References: <1543795215-31863-1-git-send-email-dan.haab@luxul.com>
+ <1abbf738f6ac9808310e27a43f430cc9@milecki.pl>
+ <158e0161-0d94-54a9-3851-9a3e65e85b77@gmail.com>
+Message-ID: <b72a3624209f93f9ceb363b886a88f79@milecki.pl>
+X-Sender: rafal@milecki.pl
+User-Agent: Roundcube Webmail/1.3.8
+X-Originating-IP: 194.187.74.233
+X-Webmail-UserID: rafal@milecki.pl
+X-Ovh-Tracer-Id: 8749931127886417647
+X-VR-SPAMSTATE: OK
+X-VR-SPAMSCORE: -100
+X-VR-SPAMCAUSE: gggruggvucftvghtrhhoucdtuddrgedtledrgedvgdeludcutefuodetggdotefrodftvfcurfhrohhfihhlvgemucfqggfjpdevjffgvefmvefgnecuuegrihhlohhuthemucehtddtnecusecvtfgvtghiphhivghnthhsucdlqddutddtmd
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190114_214959_484491_3DC7789E 
-X-CRM114-Status: GOOD (  19.16  )
+X-CRM114-CacheID: sfid-20190114_221101_647233_F251A4E7 
+X-CRM114-Status: GOOD (  10.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,95 +79,29 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Pratyush Anand <panand@redhat.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- linux-kernel <linux-kernel@vger.kernel.org>,
- "David A . Long" <dave.long@linaro.org>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Dan Haab <riproute@gmail.com>, Rob Herring <robh+dt@kernel.org>,
+ Dan Haab <dan.haab@luxul.com>, linux-arm-kernel@lists.infradead.org
+Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="utf-8"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 11 Jan 2019 18:22:38 +0000
-James Morse <james.morse@arm.com> wrote:
-
-> Hi,
-> 
-> On 09/01/2019 02:05, Masami Hiramatsu wrote:
-> > On Tue, 8 Jan 2019 17:13:36 +0000
-> > James Morse <james.morse@arm.com> wrote:
-> >> On 08/01/2019 02:39, Masami Hiramatsu wrote:
-> >>> On Thu, 3 Jan 2019 17:05:18 +0000
-> >>> James Morse <james.morse@arm.com> wrote:
-> >>>> On 17/12/2018 06:40, Masami Hiramatsu wrote:
-> >>>>> Move extable address check into arch_prepare_kprobe() from
-> >>>>> arch_within_kprobe_blacklist().
-> >>>>
-> >>>> I'm trying to work out the pattern for what should go in the blacklist, and what
-> >>>> should be rejected by the arch code.
-> >>>>
-> >>>> It seems address-ranges should be blacklisted as the contents don't matter.
-> >>>> easy-example: the idmap text.
-> >>>
-> >>> Yes, more precisely, the code smaller than a function (symbol), it must be
-> >>> rejected by arch_prepare_kprobe(), since blacklist is poplated based on
-> >>> kallsyms.
-> >>
-> >> Ah, okay, so the pattern is the blacklist should only be for whole symbols,
-> >> (which explains why its usually based on sections).
-> > 
-> > Correct. Actually, the blacklist is generated based on the symbol info
-> > from symbol address.
-> > 
-> >> I see kprobe_add_ksym_blacklist() would go wrong if you give it something like:
-> >> platform_drv_probe+0x50/0xb0, as it will log platform_drv_probe+0x50 as the
-> >> start_addr and platform_drv_probe+0x50+0xb0 as the end.
-> > 
-> > Yes, it expects given address is the entry of a symbol.
-> 
-> >> But how does anything from the arch code's blacklist get into the
-> >> kprobe_blacklist list?
-> > 
-> > It should be done via arch_populate_kprobe_blacklist().
-> 
-> >> We don't have an arch_populate_kprobe_blacklist(), so rely on
-> >> within_kprobe_blacklist() calling arch_within_kprobe_blacklist() with the
-> >> address, as well as walking kprobe_blacklist.
-> >>
-> >> Is this cleanup ahead of a series that does away with
-> >> arch_within_kprobe_blacklist() so that debugfs list is always complete?
-> > 
-> > Right, after this cleanup, I will send arch_populate_kprobe_blacklist()
-> > patch for arm64 and others. My plan is to move all arch_within_kprobe_blacklist()
-> > to arch_populate_kprobe_blacklist() so that user can get more precise blacklist
-> > via debugfs.
-> 
-> Thanks, now it all makes sense!
-> 
-> Reviewed-by: James Morse <james.morse@arm.com>
-
-Thanks!
-
-> 
-> 
-> Could you include a paragraph like that in the cover-letter or commit-message?
-> The 'fix' in the cover-letter subject had me looking for the bug!
-
-Ok, I'll update commit message with your reviewed-by.
-
-Thank you!
-
-> 
-> 
-> Thanks,
-> 
-> James
-
-
--- 
-Masami Hiramatsu <mhiramat@kernel.org>
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gMjAxOS0wMS0xNCAxOToyNiwgRmxvcmlhbiBGYWluZWxsaSB3cm90ZToKPiBPbiAxLzEzLzE5
+IDExOjE1IFBNLCBSYWZhxYIgTWnFgmVja2kgd3JvdGU6Cj4+IE9uIDIwMTgtMTItMDMgMDE6MDAs
+IERhbiBIYWFiIHdyb3RlOgo+Pj4gVGhpcyBtYXRjaGVzIGxpY2Vuc2luZyB1c2VkIGJ5IG90aGVy
+IEJDTTUzNTczIGZpbGVzIGFuZCBCQ001MzAxWC4KPj4+IAo+Pj4gU2lnbmVkLW9mZi1ieTogRGFu
+IEhhYWIgPGRhbi5oYWFiQGx1eHVsLmNvbT4KPj4gCj4+IEFja2VkLWJ5OiBSYWZhxYIgTWnFgmVj
+a2kgPHJhZmFsQG1pbGVja2kucGw+Cj4+IAo+PiBGbG9yaWFuOiBwaW5nIDopCj4gCj4gSWYgYmNt
+LWtlcm5lbC1mZWVkYmFjay1saXN0QGJyb2FkY29tLmNvbSBpcyBub3QgY29waWVkLCB0aGVuIG91
+cgo+IHBhdGNod29yayBpbnN0YW5jZSBkb2VzIG5vdCBwaWNrIHVwIHRoYXQgcGF0Y2gsIGFuZCB0
+aGVyZSBpcyBhIHJlbW90ZQo+IGNoYW5jZSB0aGluZ3MgY2FuIGdldCBsb3N0Li4uIE5vdCB0cnlp
+bmcgdG8gdXNlIHRoYXQgYXMgYW4gZXhjdXNlIGZvcgo+IG5vdCBoYXZpbmcgc2VlbiB0aGlzLCBi
+dXQgcGxlYXNlIG1ha2Ugc3VyZSB5b3UgY29weSB0aGF0IGxpc3QgdG8KPiBtYXhpbWl6ZSB0aGUg
+bGlrZWxpaG9vZCBvZiBnZXR0aW5nIHBhdGNoZXMgYWNjZXB0ZWQuCgpQZXJoYXBzIHdlIHNob3Vs
+ZCBhZGQgYmNtLWtlcm5lbC1mZWVkYmFjay1saXN0QCB0byB0aGUKQlJPQURDT00gQkNNNTM1NzMg
+QVJNIEFSQ0hJVEVDVFVSRQplbnRyeSBpbiBNQUlOVEFJTkVSUz8gV291bGQgeW91IG1pbmQgaGFu
+ZGxpbmcgdGhhdD8KCj4gTm93IGFwcGxpZWQsIHRoYW5rcyEKClRoYW5rcyEKCl9fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFp
+bGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlz
+dHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
