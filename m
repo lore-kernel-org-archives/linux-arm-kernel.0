@@ -2,62 +2,68 @@ Return-Path: <SRS0=3lKL=PX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AD64AC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 16:37:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C7BBBC43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 16:38:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7E4D22087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 16:37:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 97FD1208E4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 16:38:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q4NNh83z"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7E4D22087E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LKx3rwuD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 97FD1208E4
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sigxcpu.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:In-Reply-To:
-	Date:References:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=yHinIklBUTpnHdp07p31CBlAeezgRv7UqCbM9rjiITc=; b=Q4NNh83zL7CWfe
-	7edqxOEvFjhwWzRGzhFpQx5KKCDZ3b1IpF20kozOSL0Xuz3VHD6e1DlhJWAst9Lekw4SqPR9Z9VBE
-	iM4QOnNAPSgcXdE7EzcbcD/mGBVJoIUQlt5iReJfAcBjgrSELkcobXBhvw/w7r5rbGkvoQZgSToy8
-	92ZRl2JsDRxZDvx/yOM1u8f01QUrof+m9TUKNxoRppgzns1oSztzfCjlNa7QqDHt1oJ/sPk3RxrLL
-	gFlnsphsyzLwouUl5EOCR32eYoLczpqBoTBs3VoyLhFMOjfnv67dLLyOspcx04/kzrEXcz75n5RbP
-	cYkLK7iJ05y74uxC/KIg==;
+	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
+	:Date:Reply-To:Cc:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=1NnsyYHIvnS8D3eKbe7KQhj+/BgxCD3+sAWFqiYiO9s=; b=LKx3rwuD5V98Pz
+	CUQasoJYybxL4KHOVkY96KeAfvSdbZyxlfdZGfNilYqGpBtezELIoGccGZ4Rndu14bwMTWLuPtw75
+	45Ezodec7YB5HgtgrhmzGJ/hX01ZNFj3F9+im59nYNjggiR+/MBI7ocTsNok21HvXNKlXw9bimK9E
+	vKSY7ZYkZqKEIF+687AQIQ/xJeChw6IOOIqlDMnM7wTC+XMJrF1cxNevAj6eskLGJpuD0HyBNmmU+
+	X+IgYdP/3KLKA8o27z5EZVTsoNmB4tB8cgRAFkUA8YdjNeI7LrHIhZ496PuYfh+Wxx4II/5ZlioIY
+	aBMCFkUjlZOBLsAHAalw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjRir-0006Of-Em; Tue, 15 Jan 2019 16:37:53 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjRio-0006Nh-0i
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 16:37:51 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 46A4F207A3; Tue, 15 Jan 2019 17:37:46 +0100 (CET)
-Received: from localhost (alyon-652-1-22-18.w109-213.abo.wanadoo.fr
- [109.213.145.18])
- by mail.bootlin.com (Postfix) with ESMTPSA id 09CCD20729;
- Tue, 15 Jan 2019 17:37:36 +0100 (CET)
-From: Gregory CLEMENT <gregory.clement@bootlin.com>
-To: Andrew Lunn <andrew@lunn.ch>
-Subject: Re: [PATCH v3] arm64: dts: marvell: Add device tree for uDPU board
-References: <20190111172055.30451-1-vladimir.vid@sartura.hr>
- <20190115144421.29968-1-vladimir.vid@sartura.hr>
- <20190115161608.GA25888@lunn.ch>
-Date: Tue, 15 Jan 2019 17:37:36 +0100
-In-Reply-To: <20190115161608.GA25888@lunn.ch> (Andrew Lunn's message of "Tue, 
- 15 Jan 2019 17:16:08 +0100")
-Message-ID: <8736ptri5r.fsf@FE-laptop>
-User-Agent: Gnus/5.13 (Gnus v5.13) Emacs/26.1 (gnu/linux)
+	id 1gjRjU-0006jG-5L; Tue, 15 Jan 2019 16:38:32 +0000
+Received: from honk.sigxcpu.org ([24.134.29.49])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gjRjQ-0006i1-J1
+ for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 16:38:30 +0000
+Received: from localhost (localhost [127.0.0.1])
+ by honk.sigxcpu.org (Postfix) with ESMTP id D5422FB04;
+ Tue, 15 Jan 2019 17:38:25 +0100 (CET)
+X-Virus-Scanned: Debian amavisd-new at honk.sigxcpu.org
+Received: from honk.sigxcpu.org ([127.0.0.1])
+ by localhost (honk.sigxcpu.org [127.0.0.1]) (amavisd-new, port 10024)
+ with ESMTP id WesFIwBP-esX; Tue, 15 Jan 2019 17:38:24 +0100 (CET)
+Received: by bogon.sigxcpu.org (Postfix, from userid 1000)
+ id 051AB47354; Tue, 15 Jan 2019 17:38:23 +0100 (CET)
+Date: Tue, 15 Jan 2019 17:38:23 +0100
+From: Guido =?iso-8859-1?Q?G=FCnther?= <agx@sigxcpu.org>
+To: Shawn Guo <shawnguo@kernel.org>, Sascha Hauer <s.hauer@pengutronix.de>,
+ Pengutronix Kernel Team <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>, NXP Linux Team <linux-imx@nxp.com>,
+ Michael Turquette <mturquette@baylibre.com>,
+ Stephen Boyd <sboyd@kernel.org>,
+ linux-arm-kernel@lists.infradead.org, linux-clk@vger.kernel.org
+Subject: [PATCH] clk: imx8mq: Add dsi_ipg_div
+Message-ID: <20190115163823.GA32114@bogon.m.sigxcpu.org>
 MIME-Version: 1.0
+Content-Disposition: inline
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_083750_196243_473960BB 
-X-CRM114-Status: GOOD (  13.50  )
+X-CRM114-CacheID: sfid-20190115_083828_780587_A3B09702 
+X-CRM114-Status: UNSURE (   8.75  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,58 +75,44 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Luis Torres <luis.torres@methode.com>,
- Paul Arola <paul.arola@telus.com>, Luka Perkov <luka.perkov@sartura.hr>,
- Vladimir Vid <vladimir.vid@sartura.hr>,
- Scott Roberts <scott.roberts@telus.com>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Andrew,
- 
- On mar., janv. 15 2019, Andrew Lunn <andrew@lunn.ch> wrote:
+It's defined imx8mq-clock.h but wasn't assigned yet.
 
-> Hi Vladimir
->
-> Ah, i did not notice early. You need to Cc: the Marvell mvebu
-> maintainers. They are the ones who will accept this patch.
->
->
->> +	leds {
->> +		pinctrl-names = "default";
->> +		compatible = "gpio-leds";
->> +
->> +		power@487 {
->> +			label = "power:green:led1";
->> +			gpios = <&gpionb 11 GPIO_ACTIVE_LOW>;
->> +			default-state = "off";
->> +		};
->
-> I'm a bit out of date with dtc warnings. I think the @487 will
-> generate a warning because there is no reg property?
->
-> Gregory, do you know?
+Signed-off-by: Guido G=FCnther <agx@sigxcpu.org>
+---
+I'm not sure I picked the intended clock type but it gives me the right
+clock rate.
 
-I confirm that if there is no reg then there should not have a @XXX.
+ drivers/clk/imx/clk-imx8mq.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Gregory
+diff --git a/drivers/clk/imx/clk-imx8mq.c b/drivers/clk/imx/clk-imx8mq.c
+index 398ab0bcd9de..6f082153714e 100644
+--- a/drivers/clk/imx/clk-imx8mq.c
++++ b/drivers/clk/imx/clk-imx8mq.c
+@@ -485,6 +485,7 @@ static int imx8mq_clocks_probe(struct platform_device *=
+pdev)
+ 	clks[IMX8MQ_CLK_DSI_DBI] =3D imx8m_clk_composite("dsi_dbi", imx8mq_dsi_db=
+i_sels, base + 0xbc00);
+ 	clks[IMX8MQ_CLK_DSI_ESC] =3D imx8m_clk_composite("dsi_esc", imx8mq_dsi_es=
+c_sels, base + 0xbc80);
+ 	clks[IMX8MQ_CLK_DSI_AHB] =3D imx8m_clk_composite("dsi_ahb", imx8mq_dsi_ah=
+b_sels, base + 0x9200);
++	clks[IMX8MQ_CLK_DSI_IPG_DIV] =3D imx_clk_divider2("dsi_ipg_div", "dsi_ahb=
+", base + 0x9280, 0, 6);
+ 	clks[IMX8MQ_CLK_CSI1_CORE] =3D imx8m_clk_composite("csi1_core", imx8mq_cs=
+i1_core_sels, base + 0xbd00);
+ 	clks[IMX8MQ_CLK_CSI1_PHY_REF] =3D imx8m_clk_composite("csi1_phy_ref", imx=
+8mq_csi1_phy_sels, base + 0xbd80);
+ 	clks[IMX8MQ_CLK_CSI1_ESC] =3D imx8m_clk_composite("csi1_esc", imx8mq_csi1=
+_esc_sels, base + 0xbe00);
+-- =
 
-
->
-> Thanks
-> 	Andrew
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel@lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Gregory Clement, Bootlin
-Embedded Linux and Kernel engineering
-http://bootlin.com
+2.20.1
 
 _______________________________________________
 linux-arm-kernel mailing list
