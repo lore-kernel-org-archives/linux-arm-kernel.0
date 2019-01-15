@@ -2,56 +2,56 @@ Return-Path: <SRS0=3lKL=PX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+X-Spam-Status: No, score=-9.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0C11CC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 10:05:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 466FBC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 10:06:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C946620651
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 10:05:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0C17D20651
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 10:06:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DLxU9Vph";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="LqJ5uk5V"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C946620651
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PkEhbKIa";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="Dw52r3Yd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0C17D20651
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=N6x4ZJbkcpv4hX1UfBXymfp+Jg2gcJYThV94Z8M8ZvI=; b=DLxU9VphkD12Tz
-	OuVjhayvrzp2pVO8g81D3fhUk+HPIyLnVTS9oOQU4m3pS4GnwNUA4h4NIv9BSeWsg1dZXSu/Lrqxr
-	oDzXA7SVlfMAk/F+KCth36vpLFCEPchQF0tR6IszFH/4rWYHfE26nTW1rCNiS2z4/bVF9lA3TaRLx
-	GY03+YPoHp4P8K8BSejmZhi0SJG+4AXWI86JBYPo94y+Jixg1V3HRTgpwgzF7VZS0mFiQa3svV3IP
-	VFs/qSqHfZ0JSriBYsdMeNBGIuQoNSOUY0kxQNdpNuVdOmA4WAs4qMIFBfDCFgJHOmcgmMLdTQCxc
-	nLJJcFIDPZ4JNVFauZKQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=M99RQ9K4oXLEcwZ6I9r8QOlJW7ag4fzdf8npiRgEaBw=; b=PkEhbKIa/IU4aa
+	UVglcO891qCeUrBB12cuM3jk4BE3+nGUOsRMx7gF3HG2IX2Dp7Jx3EP+8WY/4ZL/1tpvH4/eRUsq8
+	Lb4n/HPtqZBqE3Y+mQ1rQ+O3muVBDcJiDe69baMw2PhpyNitpSyZk8MdMFsRQbccIR9gU2YiLh9Xk
+	nhXwzErXTXE0gbYKhjI3AgRCEI9zVXXmNR6qWZjtPF6ZxDSVVICGTKp1YubgwsJutni7/0sSq0M3Q
+	+Y8ckQaBlnwTSym8gXP1ohO+u96Ll1MRc/k+MCqFnamaci+Nq2QfFe/+2yV1C82voBY4JTZaH3luh
+	d11yaZORMxx/GgNyKQcQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjLb6-0003qy-08; Tue, 15 Jan 2019 10:05:28 +0000
-Received: from mail-db5eur03on0628.outbound.protection.outlook.com
- ([2a01:111:f400:fe0a::628]
- helo=EUR03-DB5-obe.outbound.protection.outlook.com)
+	id 1gjLbb-0004Nc-Tr; Tue, 15 Jan 2019 10:05:59 +0000
+Received: from mail-he1eur02on0603.outbound.protection.outlook.com
+ ([2a01:111:f400:fe05::603]
+ helo=EUR02-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjLan-00032J-5l; Tue, 15 Jan 2019 10:05:15 +0000
+ id 1gjLau-0003g8-91; Tue, 15 Jan 2019 10:05:17 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=XfetV4oObnO1Ao5RbL6IITR6kJNQu+C/k/NNrDfS4Bc=;
- b=LqJ5uk5VNHFwOp5E4camaegjLMo4x3cSU4EStSZirCx3BGe/aAhn10mLPGXSnIvRWfzDGtjho+Wf7tE2K/rANEo6V2DOAMATNKEPxBHlf5+ZTIoLrti9iWQxnNqxGkIkiJjnfkv5/4pbf1HB2qI69AZ4/Ahqgpy2kuJotDzLRWs=
+ bh=fzyxst+PTiRkkAIdab37IGTQhp9IR4kHAFdInXWUMeo=;
+ b=Dw52r3YdG4xIHsOgVJG9ECPwGEHXrFFJ+Me/8GR/Fe8B3zmqTftH0MdFTsd7Bd+ip53Jz6j89QeAS4VqKdv9qiVcPklA9egx1Uk+my4HdN6x6T2gwDFp1MtOdYC6zTeRgdNtqUMPK1whfwkEPlYod94/wwa/Bqmgr/1E2vvMNnA=
 Received: from VI1PR04MB5726.eurprd04.prod.outlook.com (20.178.127.24) by
- VI1PR04MB5087.eurprd04.prod.outlook.com (20.177.50.148) with Microsoft SMTP
+ VI1SPR01MB10.eurprd04.prod.outlook.com (10.170.239.143) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1516.14; Tue, 15 Jan 2019 10:05:04 +0000
+ 15.20.1516.14; Tue, 15 Jan 2019 10:05:10 +0000
 Received: from VI1PR04MB5726.eurprd04.prod.outlook.com
  ([fe80::a1c2:cc79:80f3:3bcb]) by VI1PR04MB5726.eurprd04.prod.outlook.com
  ([fe80::a1c2:cc79:80f3:3bcb%4]) with mapi id 15.20.1516.019; Tue, 15 Jan 2019
- 10:05:04 +0000
+ 10:05:10 +0000
 From: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
 To: "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
  "boris.brezillon@bootlin.com" <boris.brezillon@bootlin.com>,
@@ -59,11 +59,14 @@ To: "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
  <marek.vasut@gmail.com>, "vigneshr@ti.com" <vigneshr@ti.com>,
  "linux-spi@vger.kernel.org" <linux-spi@vger.kernel.org>,
  "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>
-Subject: [PATCH v7 0/5] spi: add support for octal mode
-Thread-Topic: [PATCH v7 0/5] spi: add support for octal mode
-Thread-Index: AQHUrLnIBDiZYyCHy06MvUHHePk4aQ==
-Date: Tue, 15 Jan 2019 10:05:04 +0000
-Message-ID: <1547546584-5254-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+Subject: [PATCH v7 1/5] mtd: spi-nor: add opcodes for octal Read/Write commands
+Thread-Topic: [PATCH v7 1/5] mtd: spi-nor: add opcodes for octal Read/Write
+ commands
+Thread-Index: AQHUrLnM7+Ij20wb5EO5zed9O3cV1w==
+Date: Tue, 15 Jan 2019 10:05:10 +0000
+Message-ID: <1547546584-5254-2-git-send-email-yogeshnarayan.gaur@nxp.com>
+References: <1547546584-5254-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+In-Reply-To: <1547546584-5254-1-git-send-email-yogeshnarayan.gaur@nxp.com>
 Accept-Language: en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
@@ -71,45 +74,45 @@ X-MS-TNEF-Correlator:
 x-clientproxiedby: SG2PR06CA0123.apcprd06.prod.outlook.com
  (2603:1096:1:1d::25) To VI1PR04MB5726.eurprd04.prod.outlook.com
  (2603:10a6:803:e4::24)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=yogeshnarayan.gaur@nxp.com; 
 x-ms-exchange-messagesentrepresentingtype: 1
 x-mailer: git-send-email 1.9.1
 x-originating-ip: [14.143.30.134]
 x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; VI1PR04MB5087;
- 6:+AA4twgacw401yP2TQN2gzgFtsenCGjGU/nIiAQQ+7RqDb1P89JsKh036X7fweVjaTqDNsd62IOW+Yn1yGiChR9IbSnUCtxrf4Y1oNBDj8IgWSEZmmnm3q5iCXjrGCtZL/SPLplcup5k5iBW+orYGnSBiiJg0bkrVoIOOa3h7jmdolniJ1jC30n7Gv3Hl8RIkHcBm5GY2qGZGUcrkhAkRRpkiiMjEJvD98YQxgEmj9Z81ZBJDrRNVsSPDYFEChS1PY8APOXQbvxzb2AKirfK3v/QQG+/9xQ8LOiPpEItCsbDswgG9y/sKTXJlH6g/MJCOnAVUNE3E4f1bnNOnFhBFcN+dE3LpFIjUsINGpmhbTtPoivYA73ohonm9mpRYAyBheCDCt4A4CrQYkOerjERziAeXjV1RHWym6KkwMfz+HAHQZVdRwHC3HU7jrcWZ9kOylrYceKSzDRQlWE/Rv7YIQ==;
- 5:F8HOqrX7Xen+G9Va6Xg2B0uThXEkq2VKKMuJE5YcE0dmpX4YAk4BZ6ZHaN1HRtbrKuQ8Za0i9AW71Ng/OcDFxIXItxanqa4Jmx9BunX7U6GAHUBE6vkJjSeS8A+o4E3rjpgt3MDrSQwsmQMEIWAszGqUV2oOLfJc6yQtwiynoE/grz+VW6tdEnu8ZZmh823IHvhQuzSfM/X+HQUuoZ8Xgg==;
- 7:gwFwk/FO77ih9SG1rNiq4CEyslnY8T7zAMP6X310L/CuQolqBRysFT9LovIk/QDtj4HKC2HkiU8iCqcgzsK0V7qyHMJF7P2HI0rGmDo5NFysYG2JJpx6e6DzZ974Y3PSZVFZmxM7L/px92KwJV882A==
-x-ms-office365-filtering-correlation-id: 29f030f7-b819-4b41-26ac-08d67ad0eb22
+x-microsoft-exchange-diagnostics: 1; VI1SPR01MB10;
+ 6:oRWgzD5By+dTE8v80PgBDlw7ZF6JwnYkMvlXj46EkcV0qHUurBbnkyF4RTyjMLiCEE+azfmxKmscu1lw1O5mnmeqfU/48NtyUVLd3buy7OCsr6dHlMzy02X49lOrC/ZAONn60b1IoXa4eXcntoLZ6DUWCoB7qzaDufNcG7KEngBtLIkrvHf+nNkYK1/askvn22Ya2VXJodaYL6UGkIsdcBf1IASjdIKGFXB1ElkgaOGrf2teTd+DS9+CVq1+bp/iwOHKhTV+nsi88I147psDXhD4IJF7t5uIegNkjACp52Jl+UxyIeaBzEDG0mk4dp2+zwnKLnDVbn/SZj0L2bSPulE+72cFzCno03bcy6C9ee61qxp4XP6Y8JZfKv+qc45veFebb6Gqd1ZivD3MQzT/kxUZ7F52by1DOUxIqtwXu7u6CpbvpVeUf9Zi5qzkowABCj82PQt4OZdwPYk4z3RYsg==;
+ 5:m/t5+/BE63SfVlIrDmBxkOaW2QzJtjk/mq/43vTpKF+FrRTQbTYrxb2+O7mFykYhnPrzWmS5qM3F0jp0TWGqLCXZbbe3EBFhy0hw5TUSAaTmZT0HOkBHzjIO4qH7VelB8wM7KlNlCW+fFnOjinreC60zMicRFR6ojFMXSAZ3XVKeOXAWGStWDPsiUnDNAbkbbZsnZb/HPVgBZOklnv/COg==;
+ 7:o4QXDcK2mPryXRhX/+qqYiqrNe695mgjP/CoKWHBqsil1F/dpYYVsOij0eOaatb/EU9BtHpUVeirG55KMMPeIikwH3R7zN1tA9wqqsuwgiNNYPw6+vdaI+07aEekrEWInegX9v/CpsEFOX3KjQOWIw==
+x-ms-office365-filtering-correlation-id: ccd3a162-7306-4c21-75d8-08d67ad0eef8
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(5600109)(711020)(4618075)(4534185)(7168020)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR04MB5087; 
-x-ms-traffictypediagnostic: VI1PR04MB5087:
-x-microsoft-antispam-prvs: <VI1PR04MB50872485C07B4494DC881D9699810@VI1PR04MB5087.eurprd04.prod.outlook.com>
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(7168020)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1SPR01MB10; 
+x-ms-traffictypediagnostic: VI1SPR01MB10:
+x-microsoft-antispam-prvs: <VI1SPR01MB10377124BAC8FC05490D2C99810@VI1SPR01MB10.eurprd04.prod.outlook.com>
 x-forefront-prvs: 0918748D70
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(346002)(376002)(396003)(366004)(39860400002)(136003)(189003)(199004)(6436002)(486006)(68736007)(4326008)(6486002)(476003)(6306002)(53936002)(25786009)(52116002)(186003)(26005)(2616005)(6512007)(256004)(14444005)(2201001)(39060400002)(71190400001)(86362001)(6506007)(6116002)(55236004)(3846002)(102836004)(386003)(71200400001)(78486014)(2906002)(478600001)(966005)(99286004)(305945005)(7736002)(14454004)(7416002)(81166006)(8676002)(81156014)(8936002)(5660300001)(2501003)(50226002)(106356001)(36756003)(54906003)(105586002)(97736004)(316002)(110136005)(66066001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB5087;
+ SFS:(10009020)(376002)(39860400002)(366004)(136003)(396003)(346002)(199004)(189003)(6486002)(97736004)(2501003)(6506007)(386003)(316002)(53936002)(55236004)(102836004)(5660300001)(106356001)(105586002)(68736007)(52116002)(36756003)(76176011)(86362001)(11346002)(71200400001)(3846002)(71190400001)(2906002)(446003)(6512007)(256004)(486006)(14454004)(2616005)(476003)(7416002)(78486014)(99286004)(25786009)(8676002)(6346003)(81166006)(81156014)(186003)(4326008)(2201001)(6436002)(8936002)(26005)(478600001)(66066001)(54906003)(305945005)(39060400002)(6116002)(110136005)(50226002)(7736002)(21314003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1SPR01MB10;
  H:VI1PR04MB5726.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
+ PTR:InfoNoRecords; A:1; MX:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=yogeshnarayan.gaur@nxp.com; 
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: 9Vlci7K4RsdpjbH4r62GipI+V/+kfIz4cGUXr0yz0u1fWND+AXwRZhf73ZBWaylx1l6RofO0a8NpmUDXJaBI7d/dLxikTecvkqPwROFdGEnSI7rIbjd3FRxmTm79iR0EhcmzhJWwItAVS/7n7KpuTFQUVq3M5ymwzHhRtq2f8elFRUI8p6QAH8y43yDKXZwlg+Jj01FrTva1I0aqbjPpgXexwbBRRq7JQ7h9yDOBTbZWgQekUPNqR8WVjIMPT6xgYxGZJ2rVGEh2JnltCge3v2DQCs1Cb7Q1Zhrwf5rgNsf9ZD4yCJvjODyxedZ+IEmocY14ocqz1dFWr6w9IdFInM13bxxaKV6QRg+Sd3Jxyc7sZeOqxnjrI3bopto+psqA81dCmvoAVdTwyEEi2AgeqrFCx2ppM6W9QpSsKf8l7us=
+x-microsoft-antispam-message-info: qHzJHsnm5lj2uVr/LFdqQZVZB2H78xNBopzemxYNjbnhjy+ONvdgRQn+0vEbGwwJMy+o6JQBTnTRVb/sX/8nR52Ny8AqTC29LRI/YzQN1o+LC0hz9OiSU3g6dsFW2XaZA1dKFLawGaMvWaiHuEEY6+htdIK8kfD+g6+TCha0NPjhXak6/5QxS33UAQ/GmFutMiX+bl5IYDqmyOgs5x6q3TO/tMAdDPhDN40PbAY+PyZjffpOMJIq+4FudAuD0h+MvdNAkzaqbE02WtURdb2MzFF/zw7bVDdQSNl6zcXzCR7hr3B0ri97trPP2oeOxSxUYIg2rixb5VXBjH9eFc7mPAMvL02lzZDH5fObZEq9Xm8TP9XTxh4ZH37hOmTxrDtb8IXmS3uGu10RChtdYgUe2iWggtD9q3ey1mTv5DqFvVQ=
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 29f030f7-b819-4b41-26ac-08d67ad0eb22
-X-MS-Exchange-CrossTenant-originalarrivaltime: 15 Jan 2019 10:04:58.1172 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: ccd3a162-7306-4c21-75d8-08d67ad0eef8
+X-MS-Exchange-CrossTenant-originalarrivaltime: 15 Jan 2019 10:05:04.5705 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB5087
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1SPR01MB10
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_020509_229099_6118991F 
-X-CRM114-Status: GOOD (  10.82  )
+X-CRM114-CacheID: sfid-20190115_020516_324707_54DDCAED 
+X-CRM114-Status: GOOD (  16.26  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -135,80 +138,156 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add support for octal mode IO data transfer.
-Micron flash, mt35xu512aba, supports octal mode data transfer and
-NXP FlexSPI controller supports 8 data lines for data transfer (Rx/Tx).
+- Add opcodes for octal I/O commands
+  * Read  : 1-1-8 and 1-8-8 protocol
+  * Write : 1-1-8 and 1-8-8 protocol
+  * opcodes for 4-byte address mode command
 
-Patch series
-* Add parsing logic for m25p80.c device file.
-* Add opcodes for octal I/O commands in spi-nor framework, Read and Write proto for (1-1-8/1-8-8) mode.
-  Opcodes are added as per octal data IO commands required for mt35xu512aba flash.
-* Add mode bit required for octal mode in nxp-fspi driver [1].
-* Define binding property 'spi-rx/tx-bus-width' for LX2160ARDB target [1].
+- Entry of macros in _convert_3to4_xxx function
 
-Tested on LX2160ARDB target with nxp-fspi driver, below are
-Read performance number of 1-1-1 and 1-1-8 read protocol.
+- Add flag SPI_NOR_OCTAL_READ specifying flash support octal read
+  commands. This flag is required for flashes which didn't provides
+  support for auto detection of Octal mode capabilities i.e. not
+  seems to support newer JESD216C standard.
 
- root@lxxx:~# cat /proc/mtd
- dev:    size   erasesize  name
- mtd0: 04000000 00001000 "spi0.0"
- mtd1: 04000000 00001000 "spi0.1"
- root@lxxx:~# time mtd_debug read /dev/mtd0 0x0 0x1000000 0read
- Copied 16777216 bytes from address 0x00000000 in flash to 0read
+Signed-off-by: Vignesh R <vigneshr@ti.com>
+Signed-off-by: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+Reviewed-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+---
+ drivers/mtd/spi-nor/spi-nor.c | 16 ++++++++++++++--
+ include/linux/mtd/spi-nor.h   | 16 ++++++++++++----
+ 2 files changed, 26 insertions(+), 6 deletions(-)
 
- real    0m2.792s
- user    0m0.000s
- sys     0m2.790s
- root@lxxx:~# time mtd_debug read /dev/mtd1 0x0 0x1000000 0read
- Copied 16777216 bytes from address 0x00000000 in flash to 0read
-
- real    0m0.441s
- user    0m0.000s
- sys     0m0.440s
- root@ls1012ardb:~#
-
- Flash device MTD0 configured in 1-1-1 protocol.
- Flash device MTD1 configured in 1-1-8 protocol.
-
-[1] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=86130
-
-Changes for v7:
-- Rebase on top of SPI tree
-  https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git/
-  branch: for-next
-- Drop below patches from series as these have already been applied.
-  'spi-add-support-for-octal-mode-I-O-data-transfer.patch' and
-  'spi-spi-mem-add-support-for-octal-mode-I-O-data-tran.patch'
-- Add r-o-b tag of Tudor Ambarus for
-  patch 'mtd-spi-nor-add-opcodes-for-octal-Read-Write-command.patch'
-Changes for v6:
-- Correct S-o-b tag with full author name as 'Yogesh Narayan Gaur'.
-- Rebase on top of v4.20-rc5.
-Changes for v5:
-- Modified string 'octo' as 'octal' in all patches.
-Changes for v4:
-- Rebase on top of v4.20-rc2.
-- Modify octo entries enum value in spi.h.
-Changes for v3:
-- Add octo mode support in spi_setup().
-- Rename all patches with 'octal' string modified as 'octo'.
-Changes for v2:
-- Incorporated review comments of Boris and Vignesh.
-
-Yogesh Narayan Gaur (5):
-  mtd: spi-nor: add opcodes for octal Read/Write commands
-  mtd: spi-nor: add octal read flag for flash mt35xu512aba
-  mtd: m25p80: add support of octal mode I/O transfer
-  spi: nxp-fspi: add octal mode flag bit for octal support
-  arm64: dts: lx2160a: update fspi node
-
- .../boot/dts/freescale/fsl-lx2160a-rdb.dts    |  4 ++++
- drivers/mtd/devices/m25p80.c                  |  9 ++++++++-
- drivers/mtd/spi-nor/spi-nor.c                 | 19 ++++++++++++++++---
- drivers/spi/spi-nxp-fspi.c                    |  4 ++--
- include/linux/mtd/spi-nor.h                   | 16 ++++++++++++----
- 5 files changed, 42 insertions(+), 10 deletions(-)
-
+diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+index 6e13bbd1aaa5..872d70722672 100644
+--- a/drivers/mtd/spi-nor/spi-nor.c
++++ b/drivers/mtd/spi-nor/spi-nor.c
+@@ -68,7 +68,7 @@ enum spi_nor_read_command_index {
+ 	SNOR_CMD_READ_4_4_4,
+ 	SNOR_CMD_READ_1_4_4_DTR,
+ 
+-	/* Octo SPI */
++	/* Octal SPI */
+ 	SNOR_CMD_READ_1_1_8,
+ 	SNOR_CMD_READ_1_8_8,
+ 	SNOR_CMD_READ_8_8_8,
+@@ -85,7 +85,7 @@ enum spi_nor_pp_command_index {
+ 	SNOR_CMD_PP_1_4_4,
+ 	SNOR_CMD_PP_4_4_4,
+ 
+-	/* Octo SPI */
++	/* Octal SPI */
+ 	SNOR_CMD_PP_1_1_8,
+ 	SNOR_CMD_PP_1_8_8,
+ 	SNOR_CMD_PP_8_8_8,
+@@ -278,6 +278,7 @@ struct flash_info {
+ #define NO_CHIP_ERASE		BIT(12) /* Chip does not support chip erase */
+ #define SPI_NOR_SKIP_SFDP	BIT(13)	/* Skip parsing of SFDP tables */
+ #define USE_CLSR		BIT(14)	/* use CLSR command */
++#define SPI_NOR_OCTAL_READ	BIT(15)	/* Flash supports Octal Read */
+ 
+ 	/* Part specific fixup hooks. */
+ 	const struct spi_nor_fixups *fixups;
+@@ -398,6 +399,8 @@ static u8 spi_nor_convert_3to4_read(u8 opcode)
+ 		{ SPINOR_OP_READ_1_2_2,	SPINOR_OP_READ_1_2_2_4B },
+ 		{ SPINOR_OP_READ_1_1_4,	SPINOR_OP_READ_1_1_4_4B },
+ 		{ SPINOR_OP_READ_1_4_4,	SPINOR_OP_READ_1_4_4_4B },
++		{ SPINOR_OP_READ_1_1_8,	SPINOR_OP_READ_1_1_8_4B },
++		{ SPINOR_OP_READ_1_8_8,	SPINOR_OP_READ_1_8_8_4B },
+ 
+ 		{ SPINOR_OP_READ_1_1_1_DTR,	SPINOR_OP_READ_1_1_1_DTR_4B },
+ 		{ SPINOR_OP_READ_1_2_2_DTR,	SPINOR_OP_READ_1_2_2_DTR_4B },
+@@ -414,6 +417,8 @@ static u8 spi_nor_convert_3to4_program(u8 opcode)
+ 		{ SPINOR_OP_PP,		SPINOR_OP_PP_4B },
+ 		{ SPINOR_OP_PP_1_1_4,	SPINOR_OP_PP_1_1_4_4B },
+ 		{ SPINOR_OP_PP_1_4_4,	SPINOR_OP_PP_1_4_4_4B },
++		{ SPINOR_OP_PP_1_1_8,	SPINOR_OP_PP_1_1_8_4B },
++		{ SPINOR_OP_PP_1_8_8,	SPINOR_OP_PP_1_8_8_4B },
+ 	};
+ 
+ 	return spi_nor_convert_opcode(opcode, spi_nor_3to4_program,
+@@ -3591,6 +3596,13 @@ static int spi_nor_init_params(struct spi_nor *nor,
+ 					  SNOR_PROTO_1_1_4);
+ 	}
+ 
++	if (info->flags & SPI_NOR_OCTAL_READ) {
++		params->hwcaps.mask |= SNOR_HWCAPS_READ_1_1_8;
++		spi_nor_set_read_settings(&params->reads[SNOR_CMD_READ_1_1_8],
++					  0, 8, SPINOR_OP_READ_1_1_8,
++					  SNOR_PROTO_1_1_8);
++	}
++
+ 	/* Page Program settings. */
+ 	params->hwcaps.mask |= SNOR_HWCAPS_PP;
+ 	spi_nor_set_pp_settings(&params->page_programs[SNOR_CMD_PP],
+diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
+index fa2d89e38e40..2353af8bac99 100644
+--- a/include/linux/mtd/spi-nor.h
++++ b/include/linux/mtd/spi-nor.h
+@@ -46,9 +46,13 @@
+ #define SPINOR_OP_READ_1_2_2	0xbb	/* Read data bytes (Dual I/O SPI) */
+ #define SPINOR_OP_READ_1_1_4	0x6b	/* Read data bytes (Quad Output SPI) */
+ #define SPINOR_OP_READ_1_4_4	0xeb	/* Read data bytes (Quad I/O SPI) */
++#define SPINOR_OP_READ_1_1_8	0x8b	/* Read data bytes (Octal Output SPI) */
++#define SPINOR_OP_READ_1_8_8	0xcb	/* Read data bytes (Octal I/O SPI) */
+ #define SPINOR_OP_PP		0x02	/* Page program (up to 256 bytes) */
+ #define SPINOR_OP_PP_1_1_4	0x32	/* Quad page program */
+ #define SPINOR_OP_PP_1_4_4	0x38	/* Quad page program */
++#define SPINOR_OP_PP_1_1_8	0x82	/* Octal page program */
++#define SPINOR_OP_PP_1_8_8	0xc2	/* Octal page program */
+ #define SPINOR_OP_BE_4K		0x20	/* Erase 4KiB block */
+ #define SPINOR_OP_BE_4K_PMC	0xd7	/* Erase 4KiB block on PMC chips */
+ #define SPINOR_OP_BE_32K	0x52	/* Erase 32KiB block */
+@@ -69,9 +73,13 @@
+ #define SPINOR_OP_READ_1_2_2_4B	0xbc	/* Read data bytes (Dual I/O SPI) */
+ #define SPINOR_OP_READ_1_1_4_4B	0x6c	/* Read data bytes (Quad Output SPI) */
+ #define SPINOR_OP_READ_1_4_4_4B	0xec	/* Read data bytes (Quad I/O SPI) */
++#define SPINOR_OP_READ_1_1_8_4B	0x7c	/* Read data bytes (Octal Output SPI) */
++#define SPINOR_OP_READ_1_8_8_4B	0xcc	/* Read data bytes (Octal I/O SPI) */
+ #define SPINOR_OP_PP_4B		0x12	/* Page program (up to 256 bytes) */
+ #define SPINOR_OP_PP_1_1_4_4B	0x34	/* Quad page program */
+ #define SPINOR_OP_PP_1_4_4_4B	0x3e	/* Quad page program */
++#define SPINOR_OP_PP_1_1_8_4B	0x84	/* Octal page program */
++#define SPINOR_OP_PP_1_8_8_4B	0x8e	/* Octal page program */
+ #define SPINOR_OP_BE_4K_4B	0x21	/* Erase 4KiB block */
+ #define SPINOR_OP_BE_32K_4B	0x5c	/* Erase 32KiB block */
+ #define SPINOR_OP_SE_4B		0xdc	/* Sector erase (usually 64KiB) */
+@@ -458,7 +466,7 @@ struct spi_nor_hwcaps {
+ /*
+  *(Fast) Read capabilities.
+  * MUST be ordered by priority: the higher bit position, the higher priority.
+- * As a matter of performances, it is relevant to use Octo SPI protocols first,
++ * As a matter of performances, it is relevant to use Octal SPI protocols first,
+  * then Quad SPI protocols before Dual SPI protocols, Fast Read and lastly
+  * (Slow) Read.
+  */
+@@ -479,7 +487,7 @@ struct spi_nor_hwcaps {
+ #define SNOR_HWCAPS_READ_4_4_4		BIT(9)
+ #define SNOR_HWCAPS_READ_1_4_4_DTR	BIT(10)
+ 
+-#define SNOR_HWCPAS_READ_OCTO		GENMASK(14, 11)
++#define SNOR_HWCPAS_READ_OCTAL		GENMASK(14, 11)
+ #define SNOR_HWCAPS_READ_1_1_8		BIT(11)
+ #define SNOR_HWCAPS_READ_1_8_8		BIT(12)
+ #define SNOR_HWCAPS_READ_8_8_8		BIT(13)
+@@ -488,7 +496,7 @@ struct spi_nor_hwcaps {
+ /*
+  * Page Program capabilities.
+  * MUST be ordered by priority: the higher bit position, the higher priority.
+- * Like (Fast) Read capabilities, Octo/Quad SPI protocols are preferred to the
++ * Like (Fast) Read capabilities, Octal/Quad SPI protocols are preferred to the
+  * legacy SPI 1-1-1 protocol.
+  * Note that Dual Page Programs are not supported because there is no existing
+  * JEDEC/SFDP standard to define them. Also at this moment no SPI flash memory
+@@ -502,7 +510,7 @@ struct spi_nor_hwcaps {
+ #define SNOR_HWCAPS_PP_1_4_4	BIT(18)
+ #define SNOR_HWCAPS_PP_4_4_4	BIT(19)
+ 
+-#define SNOR_HWCAPS_PP_OCTO	GENMASK(22, 20)
++#define SNOR_HWCAPS_PP_OCTAL	GENMASK(22, 20)
+ #define SNOR_HWCAPS_PP_1_1_8	BIT(20)
+ #define SNOR_HWCAPS_PP_1_8_8	BIT(21)
+ #define SNOR_HWCAPS_PP_8_8_8	BIT(22)
 -- 
 2.17.1
 
