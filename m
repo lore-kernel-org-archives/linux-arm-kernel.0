@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E2E88C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 14:37:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 44244C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 14:37:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B389520675
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 14:37:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 15AE9204FD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 14:37:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="im2DHMY8";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="ZUXawSPh"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B389520675
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JD9yuTnV";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="Jx8Xwuax"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 15AE9204FD
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,59 +26,59 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=YBzusCVzFWPwMRKJBnXWuSU3zq8n91Ql04EQBtpTv1g=; b=im2DHMY8E31o8A
-	oqvf4baE50DRuuoSDAP40j0l+GJ8r6gDSOpRtNIagu2qpQj0Bl8MyLcCgLcN8DeHNcC/jKswNGARX
-	qYXKo44h4vmjtst5DxwUesQZADaCn9fEhMQtiyqw/XETy28WB9z4LXDhJqlKqtdAUC9ETedZGjm7M
-	eis1uOuzna2AQD8UAGTv3KOwfM09I/lfDFyXhyCZomU4q4zgG0HUC4aQPOCUFHC7w7buQQCuWjaTx
-	x5zQ6cX5Dy7SBaKts5ixf0TbLh8+3zBeB9HQasa+jCliWa8ofJftbIt9Ibz5xcfEnzhVrTZB5aEmb
-	+BZrNBa31E30SpCZk0IQ==;
+	List-Owner; bh=xb+4jp601WnKqpVU/B23DLBnqd95dokBuTHQAgWGviA=; b=JD9yuTnV5AvT19
+	yIBjJq+dz3/ohZWgfzmTeQnrHfjevE6RY+quUTKLxuynASq0senkz4bWldSQRt+rovRL/i+miWHUZ
+	md9q1e5lVv6RpawTdKTD5Q5F1LGYTLRwr9GaDP1RfQDmDSDhtZo8IVWoT3M/UnQH+ZPdTxu08yKwc
+	1OqDva58XujfNJJKEUtwvDCNRCVxATOkc07gKOsiuOffrzTQuAenlPksPSelRfxUK5ovmtUP5g6H9
+	+YTpHiNsaxA8bwoQ2TkyKwDR1YxtnVqmoZPlot57QIu5E/g8T5/YNTvvsekRjI63G9gx5d4Mcmsnm
+	C5lxos8Cr7fIM1tYp34g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjPqB-00031D-5p; Tue, 15 Jan 2019 14:37:19 +0000
-Received: from fllv0015.ext.ti.com ([198.47.19.141])
+	id 1gjPqg-0003Js-PY; Tue, 15 Jan 2019 14:37:50 +0000
+Received: from lelv0142.ext.ti.com ([198.47.23.249])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjPq7-00030l-HO
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 14:37:17 +0000
+ id 1gjPqb-0003JP-NM
+ for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 14:37:47 +0000
 Received: from fllv0034.itg.ti.com ([10.64.40.246])
- by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0FEbEnX011938;
- Tue, 15 Jan 2019 08:37:14 -0600
+ by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0FEbj5G109206;
+ Tue, 15 Jan 2019 08:37:45 -0600
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1547563034;
- bh=gZJww8fWSu53UjuY4utrYCPvKMpQkJ6DnBsDW5OjWdg=;
+ s=ti-com-17Q1; t=1547563065;
+ bh=FQceNvW9q7O9tBpyTdgvcl7LsaJHbBc8PAP+ckzOx2c=;
  h=Date:From:To:CC:Subject:References:In-Reply-To;
- b=ZUXawSPhjZKLn5gj6a14E63BlHy4S81FfyE9Qm4dJyygS6qcrjCm/AnouQAgFX4qP
- q2gUiPXmwolT8iun7foTxlgGW3dPf9NAOJ6oI9tlD/lK/GZ3mgWnlwP4tarQXAM5vr
- bBGONENhmdX6M3gJhlFS/yj36smopmvTLKuX57F4=
-Received: from DLEE109.ent.ti.com (dlee109.ent.ti.com [157.170.170.41])
- by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0FEbEUw033127
+ b=Jx8Xwuaxu2C2zNMlzcdnAOBKWsGkiVu0liYCW+8EAEfGNhytB0RnDfdJ5nc/gJG9t
+ MKbpbMVnHiamVKTdMF12FqHjq1DVY3keTGsScCcn15uxTxe98V228NCot0vgsHP4fK
+ SmBbKZ0YeGPJtJ6Gr7i+ZWQB86ZF3072TsudObtI=
+Received: from DFLE114.ent.ti.com (dfle114.ent.ti.com [10.64.6.35])
+ by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0FEbjLr033438
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Tue, 15 Jan 2019 08:37:14 -0600
-Received: from DLEE103.ent.ti.com (157.170.170.33) by DLEE109.ent.ti.com
- (157.170.170.41) with Microsoft SMTP Server (version=TLS1_2,
+ Tue, 15 Jan 2019 08:37:45 -0600
+Received: from DFLE113.ent.ti.com (10.64.6.34) by DFLE114.ent.ti.com
+ (10.64.6.35) with Microsoft SMTP Server (version=TLS1_2,
  cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 15
- Jan 2019 08:37:14 -0600
-Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE103.ent.ti.com
- (157.170.170.33) with Microsoft SMTP Server (version=TLS1_0,
+ Jan 2019 08:37:44 -0600
+Received: from dflp33.itg.ti.com (10.64.6.16) by DFLE113.ent.ti.com
+ (10.64.6.34) with Microsoft SMTP Server (version=TLS1_0,
  cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Tue, 15 Jan 2019 08:37:14 -0600
+ Tue, 15 Jan 2019 08:37:45 -0600
 Received: from localhost (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0FEbEqY004151;
- Tue, 15 Jan 2019 08:37:14 -0600
-Date: Tue, 15 Jan 2019 08:36:42 -0600
+ by dflp33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0FEbiDC007687;
+ Tue, 15 Jan 2019 08:37:44 -0600
+Date: Tue, 15 Jan 2019 08:37:12 -0600
 From: Nishanth Menon <nm@ti.com>
 To: Roger Quadros <rogerq@ti.com>
-Subject: Re: [PATCH 2/3] arm64: dts: ti: k3-am6: add USB support
-Message-ID: <20190115143641.m2cvwljr7rbtayi2@kahuna>
+Subject: Re: [PATCH 3/3] arm64: dts: ti: k3-am654-base-board: enable USB1
+Message-ID: <20190115143712.hb2ogjcjxwokkioa@kahuna>
 References: <1547200861-17795-1-git-send-email-rogerq@ti.com>
- <1547200861-17795-3-git-send-email-rogerq@ti.com>
+ <1547200861-17795-4-git-send-email-rogerq@ti.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1547200861-17795-3-git-send-email-rogerq@ti.com>
+In-Reply-To: <1547200861-17795-4-git-send-email-rogerq@ti.com>
 User-Agent: NeoMutt/20171215
 X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_063715_651223_3914A078 
-X-CRM114-Status: GOOD (  18.26  )
+X-CRM114-CacheID: sfid-20190115_063745_836223_4BCEEB5F 
+X-CRM114-Status: GOOD (  15.69  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,122 +99,51 @@ Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 On 12:01-20190111, Roger Quadros wrote:
-> Adds support for USB0 and USB1 instances on the AM6 SoC.
-> USB0 is limited to high-speed for now.
+> Add pinmux for USB1 and enable it as a dual role port.
 > 
 > Signed-off-by: Roger Quadros <rogerq@ti.com>
 > ---
->  arch/arm64/boot/dts/ti/k3-am65-main.dtsi | 80 ++++++++++++++++++++++++++++++++
->  1 file changed, 80 insertions(+)
+>  arch/arm64/boot/dts/ti/k3-am654-base-board.dts | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
 > 
-> diff --git a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
-> index 8b55108..680cbc7 100644
-> --- a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
-> +++ b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
-> @@ -199,4 +199,84 @@
->  		#size-cells = <1>;
->  		ranges = <0x0 0x0 0x00100000 0x1c000>;
+> diff --git a/arch/arm64/boot/dts/ti/k3-am654-base-board.dts b/arch/arm64/boot/dts/ti/k3-am654-base-board.dts
+> index e41fc3a..c4f7b29 100644
+> --- a/arch/arm64/boot/dts/ti/k3-am654-base-board.dts
+> +++ b/arch/arm64/boot/dts/ti/k3-am654-base-board.dts
+> @@ -69,6 +69,12 @@
+>  			AM65X_IOPAD(0x01bc, PIN_OUTPUT, 0) /* (AG13) SPI0_CS0 */
+>  		>;
 >  	};
 > +
-> +	dwc3_0: dwc3@4000000 {
-> +		compatible = "ti,am654-dwc3";
-> +		reg = <0x0 0x4000000 0x0 0x4000>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges = <0x0 0x0 0x4000000 0x20000>;
-> +		interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
-> +		dma-coherent;
-> +		status = "disabled";
-
-NAK. -> in ARMV8, we dont do default disabled. Instead, please disable
-nodes in the board dts or overlay as necessary.
-
-> +		power-domains = <&k3_pds 151>;
-> +		assigned-clocks = <&k3_clks 151 2>, <&k3_clks 151 7>;
-> +		assigned-clock-parents = <&k3_clks 151 4>,	/* set REF_CLK to 20MHz i.e. PER0_PLL/48 */
-> +					 <&k3_clks 151 9>;	/* set PIPE3_TXB_CLK to CLK_12M_RC/256 (for HS only) */
-> +
-> +		usb0: usb@10000 {
-> +			compatible = "snps,dwc3";
-> +			reg = <0x10000 0x10000>;
-> +			interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-names = "peripheral",
-> +					  "host",
-> +					  "otg";
-> +			maximum-speed = "high-speed";
-> +			dr_mode = "otg";
-> +			phys = <&usb0_phy>;
-> +			phy-names = "usb2-phy";
-> +			snps,dis_u3_susphy_quirk;
-> +		};
-> +	};
-> +
-> +	usb0_phy: phy@4100000 {
-> +		compatible = "ti,am654-usb2", "ti,omap-usb2";
-> +		reg = <0x0 0x4100000 0x0 0x54>;
-> +		syscon-phy-power = <&scm_conf 0x4000>;
-
-Just curious, dont we need a power domain as well?
-
-> +		clocks = <&k3_clks 151 0>, <&k3_clks 151 1>;
-> +		clock-names = "wkupclk", "refclk";
-> +		#phy-cells = <0>;
-> +		status = "disabled";
-
-same here -> please drop
-
-> +	};
-> +
-> +	dwc3_1: dwc3@4020000 {
-> +		compatible = "ti,am654-dwc3";
-> +		reg = <0x0 0x4020000 0x0 0x4000>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges = <0x0 0x0 0x4020000 0x20000>;
-> +		interrupts = <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>;
-> +		dma-coherent;
-> +		status = "disabled";
-
-same here -> please drop
-
-> +		power-domains = <&k3_pds 152>;
-> +		assigned-clocks = <&k3_clks 152 2>;
-> +		assigned-clock-parents = <&k3_clks 152 4>;	/* set REF_CLK to 20MHz i.e. PER0_PLL/48 */
-> +
-> +		usb1: usb@10000 {
-> +			compatible = "snps,dwc3";
-> +			reg = <0x10000 0x10000>;
-> +			interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-names = "peripheral",
-> +					  "host",
-> +					  "otg";
-> +			maximum-speed = "high-speed";
-> +			dr_mode = "otg";
-> +			phys = <&usb1_phy>;
-> +			phy-names = "usb2-phy";
-> +		};
-> +	};
-> +
-> +	usb1_phy: phy@4110000 {
-> +		compatible = "ti,am654-usb2", "ti,omap-usb2";
-> +		reg = <0x0 0x4110000 0x0 0x54>;
-> +		syscon-phy-power = <&scm_conf 0x4020>;
-
-Same question on power domain..
-
-> +		clocks = <&k3_clks 152 0>, <&k3_clks 152 1>;
-> +		clock-names = "wkupclk", "refclk";
-> +		#phy-cells = <0>;
-> +		status = "disabled";
-
-same here -> please drop
-
+> +	usb1_pins_default: usb1_pins_default {
+> +		pinctrl-single,pins = <
+> +			AM65X_IOPAD(0x02c0, PIN_OUTPUT, 0) /* (AC8) USB1_DRVVBUS */
+> +		>;
 > +	};
 >  };
+>  
+>  &main_pmx1 {
+> @@ -163,3 +169,17 @@
+>  		#size-cells= <1>;
+>  	};
+>  };
+> +
+> +&dwc3_1 {
+> +	status = "okay";
+> +};
+> +
+> +&usb1_phy {
+> +	status = "okay";
+> +};
+
+NAK -> we dont do status = "okay" in ARMV8.
+
+> +
+> +&usb1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&usb1_pins_default>;
+> +	dr_mode = "otg";
+> +};
 > -- 
 > Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
 > Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
