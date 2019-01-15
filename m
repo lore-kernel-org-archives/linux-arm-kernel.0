@@ -2,62 +2,114 @@ Return-Path: <SRS0=3lKL=PX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable
+X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5EDC6C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 09:43:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 335CCC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 09:50:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2A40B2085A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 09:43:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E4A9920657
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 09:50:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A6Cgw7hM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2A40B2085A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=collabora.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G6cMBazn";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="i2DpVS3a"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E4A9920657
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NJjqRBYnZtb+SnUK9r8yRBfmhYS5que1NSn454HGhkY=; b=A6Cgw7hMmR/r1y
-	M1diEZPypLqjemrFjGD5Bl5wA74ktK8/ZpFZo7ePEZQATiNRRXbDafpvPaFMo25cgds/Oul7t2qsa
-	lvQJV5D6tymcU08v0noR6KaOj+gVmeuz82BUcnDAjLbKmukFhbM/Q4AHtbC1x9atp4ayPRSjB9NZU
-	BboE8AIxhjPn+qV/h3ZvuL0YEubq1PfrKSJwhe8nc3lfx0iTK4m9lwN4e8C6LLpFKyKG3fudOtAw1
-	KOs/s1cirlR2peZ57XmbxsYESoGz7fFlRejE6/SbnKf1QOlzFHctEcJemB6ps9p6D/Ss6ZSaL/7QW
-	PMQBURxc8dOUz9WWKX1Q==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=vsi19AXUHahCXxv5Mrt6fF0rAnviHZ2LFUGuNlmJFtc=; b=G6cMBaznFKIkkg
+	zFGrSb2SuI0YLQpCZflsJsHdwuHw90+Ckvs6ZfGTDv9qZIpoI8jKnCRRY/PH09iUVRnr3bCFAcwsB
+	PAiwH7Zt3ri2F7CUykNys/IAHG43CVUM9c5/nhNBQlNpsnktVz9oO+SZJPoTRMufEDHS3hdeCRQXR
+	pbgqwxl0YxXCC4mY8eT5koId1eApBty7W9jqcULFKAw4ampkbw76J/lECRpNfNhuFdxVfVMWweyfD
+	nT5/YourS/yk9rkNl8/Shg9O61DXEcisM8Y4XnWqzTpLBiVrhEu+WpEucPfreNTa7BusIzTW0dSCw
+	O+SwRnVmk2QmDwNKeucQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjLFR-00018i-Hy; Tue, 15 Jan 2019 09:43:05 +0000
-Received: from bhuna.collabora.co.uk ([2a00:1098:0:82:1000:25:2eeb:e3e3])
+	id 1gjLMm-00054s-GZ; Tue, 15 Jan 2019 09:50:40 +0000
+Received: from mail-eopbgr50084.outbound.protection.outlook.com ([40.107.5.84]
+ helo=EUR03-VE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjLFN-00017V-TM
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 09:43:03 +0000
-Received: from [127.0.0.1] (localhost [127.0.0.1])
- (Authenticated sender: ezequiel) with ESMTPSA id 63C4E277A6D
-Message-ID: <b02d553717a5aabf6eb3cb4281e03db84a83b60b.camel@collabora.com>
-Subject: Re: [PATCH RFC 2/4] media: v4l2-mem2mem: Add an optional job_done
- operation
-From: Ezequiel Garcia <ezequiel@collabora.com>
-To: Paul Kocialkowski <paul.kocialkowski@bootlin.com>, 
- linux-media@vger.kernel.org, linux-kernel@vger.kernel.org, 
- devel@driverdev.osuosl.org, linux-arm-kernel@lists.infradead.org, 
- linux-sunxi@googlegroups.com
-Date: Tue, 15 Jan 2019 06:42:37 -0300
-In-Reply-To: <20190114133839.29967-3-paul.kocialkowski@bootlin.com>
-References: <20190114133839.29967-1-paul.kocialkowski@bootlin.com>
- <20190114133839.29967-3-paul.kocialkowski@bootlin.com>
-Organization: Collabora
-User-Agent: Evolution 3.30.3-1 
-Mime-Version: 1.0
+ id 1gjLMZ-0004tZ-GA; Tue, 15 Jan 2019 09:50:29 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=dj3WJ/y+KGbO/+d/kY0MMXbeP/syb6+0qj+xWXvCLAM=;
+ b=i2DpVS3aip3OfO/GiORnWYXEXNGfkTGaKJYyuhieWdO1wEP0xDz/FsDIoimQckHhQI0u6xBQowMaOyX4/ABcrtGK57AntvcZYXXCPwcxZZUAqcUVrSyyDeedjMHJ5e4Y3FeoH/KBlFa08ZdjF9PR/d+qISaEv3qL5LUzb06yIP0=
+Received: from VI1PR04MB5726.eurprd04.prod.outlook.com (20.178.127.24) by
+ VI1PR04MB4989.eurprd04.prod.outlook.com (20.177.49.218) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1516.18; Tue, 15 Jan 2019 09:50:20 +0000
+Received: from VI1PR04MB5726.eurprd04.prod.outlook.com
+ ([fe80::a1c2:cc79:80f3:3bcb]) by VI1PR04MB5726.eurprd04.prod.outlook.com
+ ([fe80::a1c2:cc79:80f3:3bcb%4]) with mapi id 15.20.1516.019; Tue, 15 Jan 2019
+ 09:50:20 +0000
+From: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+To: "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
+ "boris.brezillon@bootlin.com" <boris.brezillon@bootlin.com>,
+ "marek.vasut@gmail.com" <marek.vasut@gmail.com>, "broonie@kernel.org"
+ <broonie@kernel.org>, "linux-spi@vger.kernel.org"
+ <linux-spi@vger.kernel.org>, "devicetree@vger.kernel.org"
+ <devicetree@vger.kernel.org>
+Subject: [PATCH v7 0/5] spi: spi-mem: Add driver for NXP FlexSPI controller
+Thread-Topic: [PATCH v7 0/5] spi: spi-mem: Add driver for NXP FlexSPI
+ controller
+Thread-Index: AQHUrLe6o9ac6oGIZUGT4/42C+3RlQ==
+Date: Tue, 15 Jan 2019 09:50:20 +0000
+Message-ID: <1547545697-4042-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: SG2PR0302CA0015.apcprd03.prod.outlook.com
+ (2603:1096:3:2::25) To VI1PR04MB5726.eurprd04.prod.outlook.com
+ (2603:10a6:803:e4::24)
+x-ms-exchange-messagesentrepresentingtype: 1
+x-mailer: git-send-email 1.9.1
+x-originating-ip: [14.143.30.134]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; VI1PR04MB4989;
+ 6:e9Mh+fVLkLDmgMN9N2N3SmDenokwt1a0i70We7wCPnTvWc/xxOznI36P74dRusmWG90zYsB7MK1Eg7QTK9KWqyY6K3kDXpqNFTI5F2/qXSzNh0r+Iu5LoWRAhEdBwLqOzAtAiYmJhW2uGKLbU9bzxZy9EJslgim0a8a5y5tIBGSkOwlEmSeBEV6T6mpgzPgrlCyD+7ejc6rJ61362pBr8on+bu1cNNk0Gx0h5wlCuDZFScnO1Vrbwui5xFu+sdcZQeFpYx4LqaGk9ApV5fTofDin4MicPnEgV8YB7f56gyfxOrswLT5mhS3TOhCLf+qZhxJWTqoGD/iWOne+bOEscacXOPmNm2jOPkURLeN3jwH50Akd6OujGqzZEGUGMAAqruQpor37KYJc2LXTl9lu2X3COjK721EFjLGL69IhI4VIJzkydPXHad/g8UFMNEtSWDJPb3P0JkiZwacZaccS7Q==;
+ 5:u0KGr/wDOQVvpzR1eJ7HHTRAPojNXYs4SaMPEJXXrRrjUlTSajxNWfbqKl/tj95OEO5NPbtB1fkVscbbAngm9DiAwrMm8FRnFvb8gljL6HX/fItKCoLUzcSWIRg2WQKqHPNh4GKse6czkSTOhmbT0Wbh8Gat8S3LmxnzSjmeyyd1LdAFel9Lu2AWSD3lW9us009Y17nqqvFzLkbhGOWvUA==;
+ 7:GJNv8X/PvSAEHEiM2VuykhvAT9MqfzBngQtWwVdK38dmdboeMANmVUeuHoEh8V3iP5T4Jg3hpp2CKFMc1BFAQ/xfHwp7rx0bHU4KSQurM5p9ExUxVykl3aPIhnyswgQENUxO4UVB783um4tZ+dRbeg==
+x-ms-office365-filtering-correlation-id: 9792d78a-6e01-4bfe-e789-08d67acedc4a
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(7168020)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR04MB4989; 
+x-ms-traffictypediagnostic: VI1PR04MB4989:
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=yogeshnarayan.gaur@nxp.com; 
+x-microsoft-antispam-prvs: <VI1PR04MB49899FC6E156313E5E8B62FF99810@VI1PR04MB4989.eurprd04.prod.outlook.com>
+x-forefront-prvs: 0918748D70
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(366004)(199004)(189003)(71200400001)(5660300001)(486006)(52116002)(71190400001)(86362001)(2201001)(106356001)(55236004)(14454004)(966005)(498600001)(7416002)(305945005)(105586002)(476003)(8936002)(7736002)(6306002)(102836004)(50226002)(97736004)(6486002)(256004)(68736007)(6436002)(6512007)(2616005)(386003)(110136005)(53936002)(6506007)(36756003)(8676002)(81166006)(81156014)(39060400002)(25786009)(66066001)(78486014)(2906002)(3846002)(99286004)(6116002)(4326008)(2501003)(54906003)(26005)(186003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB4989;
+ H:VI1PR04MB5726.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: Bk7rj11uG6RgO57JwzNodincXDP45DU6Cq8aXbQ5S8YHnD4ebpJM6uQ1rwYR7SVjUmW2jEivyFtLRaqdbTsr1FlC3uRI+2o/pKI3Aokryn6LeeJCFHYPA080O2dQviV57fl8EFsXizp8GXwUpYEpO846ueAaXF+Es3GbZkUTqW5UonkMnhXWy4ShoHx8kHQqfCKBpfdsY+6i1XbCIBLjSS5M88iL1+yIHlFff9DUARTi+H/5CAzPbgJ8j2YfECknp0coGSlNzQwMWCdRT4abi8od4WHtHaYapy+Idh4nr4cc5QcjYeCIYVmhnKQ0iUaI+PM3FotqrzorFP18uaXQk2ODkFX0su0aC3nGcSjaBNtbBEl50SZWJDROvdwuyczSc4R2048wUjdLz1dpfjxktl6Idhvvm6FeuS9g8QostOo=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+MIME-Version: 1.0
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 9792d78a-6e01-4bfe-e789-08d67acedc4a
+X-MS-Exchange-CrossTenant-originalarrivaltime: 15 Jan 2019 09:50:13.9281 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB4989
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_014302_208530_86615A1B 
-X-CRM114-Status: GOOD (  21.50  )
+X-CRM114-CacheID: sfid-20190115_015027_603233_9A680E9B 
+X-CRM114-Status: GOOD (  12.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,88 +121,90 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Alexandre Courbot <acourbot@chromium.org>, Pawel Osciak <pawel@osciak.com>,
- Maxime Ripard <maxime.ripard@bootlin.com>, Randy Li <ayaka@soulik.info>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Tomasz Figa <tfiga@chromium.org>, Hans Verkuil <hverkuil@xs4all.nl>,
- Kyungmin Park <kyungmin.park@samsung.com>,
- Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
- Philipp Zabel <p.zabel@pengutronix.de>,
- Sakari Ailus <sakari.ailus@linux.intel.com>,
- Mauro Carvalho Chehab <mchehab@kernel.org>,
- Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "robh@kernel.org" <robh@kernel.org>,
+ Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "frieder.schrempf@kontron.de" <frieder.schrempf@kontron.de>,
+ "computersforpeace@gmail.com" <computersforpeace@gmail.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 2019-01-14 at 14:38 +0100, Paul Kocialkowski wrote:
-> Introduce a new optional job_done operation, which allows calling back
-> to the driver when a job is done. Since the job might be completed
-> from interrupt context where some operations are not available, having
-> a callback from non-atomic context allows performing these operations
-> upon completion of a job. This is particularly useful for releasing
-> access to a reference buffer, which cannot be done in atomic context.
-> 
+- Add driver for NXP FlexSPI host controller
 
-I'm not exactly sure it makes a lot of sense to review this patch,
-since the approach could change.
+ FlexSPI is a flexsible SPI host controller [1], Chapter 30 page 1475,
+ which supports two SPI channels and up to 4 external devices.
+ Each channel supports Single/Dual/Quad/Octal mode data transfer (1/2/4/8 bidirectional data lines)
+ i.e. FlexSPI acts as an interface to external devices, maximum 4, each with up to 8
+ bidirectional data lines.
 
-However, let me point out a few fundamental issues here.
- 
-> Use the already existing v4l2_m2m_device_run_work work queue for that
-> and clear the M2M device current context after calling job_done in the
-> worker thread, so that the private data can be passed to the operation.
-> 
-> Delaying the current context clearing should not be a problem since the
-> next call to v4l2_m2m_try_run happens right after that.
-> 
+- Tested this driver with mtd_debug(Erase/Write/Read) utility and JFFS2
+ filesystem mounting and booting on NXP LX2160ARDB[2] and LX2160AQDS targets.
+ LX2160ARDB is having two NOR slave device connected on single bus A
+ i.e. A0 and A1 (CS0 and CS1).
+ LX2160AQDS is having two NOR slave device connected on separate buses
+ one flash on A0 and second on B1 i.e. (CS0 and CS3).
+ Verified this driver on following SPI NOR flashes:
+   Micron, mt35xu512aba, [Read - 1 bit mode]
+   Cypress, s25fl512s, [Read - 1/2/4 bit mode]
 
-Careful here. It's misleading to think an event will happen
-"right after". I'd say it's either synchronously, or asynchronously.
+[1] https://www.nxp.com/docs/en/reference-manual/IMXRT1050RM.pdf
+[2] https://patchwork.kernel.org/project/linux-arm-kernel/list/?submitter=182097
 
-It's quite the opposite I'd say, the clearing will happen
-"who-knows-when the scheduler picks the thread to run" :-)
+Yogesh Narayan Gaur (5):
+  spi: spi-mem: Add driver for NXP FlexSPI controller
+  dt-bindings: spi: add binding file for NXP FlexSPI controller
+  arm64: dts: lx2160a: add FlexSPI node property
+  arm64: defconfig: enable NXP FlexSPI driver
+  MAINTAINERS: add maintainers for the NXP FlexSPI driver
 
-Before this patch the curr_ctx was cleared in v4l2_m2m_job_finish,
-atomically with the ctx job flags clearing and before waking up
-threads waiting in v4l2_m2m_cancel_job.
+Changes for v7:
+- Rebase on top of SPI tree
+  https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git/
+  branch: for-next
+- Incorporated review comments for
+  patch 'spi: spi-mem: Add driver for NXP FlexSPI controller'.
+Changes for v6:
+- Rebase on top of v5.0-rc1.
+- Incorporated review comments for
+  patch 'spi: spi-mem: Add driver for NXP FlexSPI controller'.
+- Updated s-b tag in all patches.
+Changes for v5:
+- Rebase on top of v4.20-rc2
+- Incorporated review comments for
+  patch 'spi: spi-mem: Add driver for NXP FlexSPI controller'.
+Changes for v4:
+- Incorporated review comments for
+  patch 'spi: spi-mem: Add driver for NXP FlexSPI controller'.
+- Incorporated binding file review comments.
+Changes for v3:
+- Incorporated review comments for
+  patch 'spi: spi-mem: Add driver for NXP FlexSPI controller'.
+Changes for v2:
+- Incorporated Boris review comments and drop below patches as per the comments.
+ - Patch 'spi: add slave device size in spi_device struct'
+ - Patch 'spi: add flags for octal I/O data transfer'
+- Incorporated DTS and Binding file review comments of Shawn Guo and Rob Herring.
 
-You are now changing this, by clearing curr_ctx in a worker.
-It's perfectly possible that v4l2_m2m_try_schedule will run
-before the worker, trying to run with the old context, which
-apparently would be safely refused.
 
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> ---
->  drivers/media/v4l2-core/v4l2-mem2mem.c | 8 ++++++--
->  include/media/v4l2-mem2mem.h           | 4 ++++
->  2 files changed, 10 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/media/v4l2-core/v4l2-mem2mem.c b/drivers/media/v4l2-core/v4l2-mem2mem.c
-> index 631f4e2aa942..d5bccb0192f9 100644
-> --- a/drivers/media/v4l2-core/v4l2-mem2mem.c
-> +++ b/drivers/media/v4l2-core/v4l2-mem2mem.c
-> @@ -376,6 +376,11 @@ static void v4l2_m2m_device_run_work(struct work_struct *work)
->  	struct v4l2_m2m_dev *m2m_dev =
->  		container_of(work, struct v4l2_m2m_dev, job_work);
->  
-> +	if (m2m_dev->m2m_ops->job_done && m2m_dev->curr_ctx)
-> +		m2m_dev->m2m_ops->job_done(m2m_dev->curr_ctx->priv);
-> +
-> +	m2m_dev->curr_ctx = NULL;
-> +
+ .../devicetree/bindings/spi/spi-nxp-fspi.txt  |   39 +
+ MAINTAINERS                                   |    7 +
+ .../boot/dts/freescale/fsl-lx2160a-rdb.dts    |   22 +
+ .../arm64/boot/dts/freescale/fsl-lx2160a.dtsi |   13 +
+ arch/arm64/configs/defconfig                  |    1 +
+ drivers/spi/Kconfig                           |   10 +
+ drivers/spi/Makefile                          |    1 +
+ drivers/spi/spi-nxp-fspi.c                    | 1105 +++++++++++++++++
+ 8 files changed, 1198 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
+ create mode 100644 drivers/spi/spi-nxp-fspi.c
 
-I don't think you can access this without taking the job spinlock.
-
->  	v4l2_m2m_try_run(m2m_dev);
->  }
-> 
-
-Aside from this, it seems we might need this hook sooner or later.
-
-Thanks,
-Eze
+-- 
+2.17.1
 
 
 _______________________________________________
