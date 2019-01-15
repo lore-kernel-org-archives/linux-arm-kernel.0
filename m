@@ -2,75 +2,68 @@ Return-Path: <SRS0=3lKL=PX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 82F61C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 19:51:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D2CD2C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 20:01:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4C72420656
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 19:51:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9B4A920656
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 20:01:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="icv/mJR0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4C72420656
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FTFvfm2y"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9B4A920656
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Subject:References:
-	In-Reply-To:Message-ID:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=0ctopjR8MfjrgdagcHYlKXPGwJCxj+hKmqPWHvxZUr4=; b=icv/mJR03k05hD
-	ikJOZQ6lZc251BgMRua19S41booB/u0tGBaZIL5iLfABhtvDH8v2ieiaqm2pkBC9q+C6gFTmVn5Ve
-	KDKR1J++EdKPlN31hJOTBwrF1fJfGTaALntQhtXTmvapgt5zV+frA0hFEuA69Gb4ZdRQjDjDQwwpQ
-	WKt4kEi6zWlhoHtnD5opri0dCjrGtuDeiKHeGVL0A2MBZoQeB/YPrAQN05wIIQTDmoGbwRJC/sDPi
-	jq5Hi5vCYvNzwjLGWwuGjRAZytqIPc14ZqYl+1Q/ACCwm3vmz5xhFgfK1HGmo+wFnb+MfhRqfyx3e
-	3J3hpzAxHQD+Bi68kNGQ==;
+	List-Owner; bh=6W1uN5gfIHP0Tah+vHimGqr9j656xSnM4IMzrOZrJTw=; b=FTFvfm2y4DNSDQ
+	Bd/RuuHcyr/N1lCjr7/1TpqQgzuT54lZUpXOYZI+86c3OeztzdBHn9noHmkjAvmzOAN/WRMLLFf/A
+	bSniIy9zcOgm7OSUArFbeIUBa31GYSSxsYBrs4bGHtuS0fIp02J7KtwRWQFnyJ0WmJ8PmPVgYh1EV
+	YGOnuYmAphLQGVckevqQGWJkgCEVWQdydee2tkuhXhGe+UhGnh0R4TlMw3H0WefeqgdOBUK+epOal
+	lL6L3Ocj87l3wHlUqtTPfMbnfNnU405CXbXzKTUHZ74bDYu59mJTs9QiSBd/nwXQAOKGzuHqTFKiM
+	odoDcLvPkDVfnUl67i7g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjUjr-0000LY-3W; Tue, 15 Jan 2019 19:51:07 +0000
-Received: from mout.kundenserver.de ([217.72.192.74])
+	id 1gjUtO-0003uj-JP; Tue, 15 Jan 2019 20:00:58 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjUjn-0000Kz-Os
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 19:51:05 +0000
-Received: from oxbsltgw35.schlund.de ([212.227.220.134]) by
- mrelayeu.kundenserver.de (mreue107 [213.165.67.113]) with ESMTPSA (Nemesis)
- id 1MF45G-1gU2Gf1HnU-00FUB6; Tue, 15 Jan 2019 20:50:49 +0100
-Date: Tue, 15 Jan 2019 20:50:48 +0100 (CET)
-From: Stefan Wahren <stefan.wahren@i2se.com>
-To: Jeremy Linton <jeremy.linton@arm.com>, linux-arm-kernel@lists.infradead.org
-Message-ID: <884332236.499392.1547581848222@email.ionos.de>
-In-Reply-To: <20190109235544.2992426-1-jeremy.linton@arm.com>
-References: <20190109235544.2992426-1-jeremy.linton@arm.com>
-Subject: Re: [PATCH v3 0/7] arm64: add system vulnerability sysfs entries
+ id 1gjUtC-0003oc-GR
+ for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 20:00:56 +0000
+Received: from ptx.hi.pengutronix.de ([2001:67c:670:100:1d::c0])
+ by metis.ext.pengutronix.de with esmtps
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1gjUsy-0003um-L9; Tue, 15 Jan 2019 21:00:32 +0100
+Received: from ukl by ptx.hi.pengutronix.de with local (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1gjUsx-0002ty-DQ; Tue, 15 Jan 2019 21:00:31 +0100
+Date: Tue, 15 Jan 2019 21:00:31 +0100
+From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
+To: Ryder Lee <ryder.lee@mediatek.com>
+Subject: Re: [PATCH 1/5] pwm: mediatek: add a property "mediatek,num-pwms"
+Message-ID: <20190115200031.7vranuo6fpcaqvce@pengutronix.de>
+References: <0c400cb1899c1afb4c9f021350cdc0c6ca3f6239.1547453586.git.ryder.lee@mediatek.com>
 MIME-Version: 1.0
-X-Priority: 3
-Importance: Medium
-X-Mailer: Open-Xchange Mailer v7.8.4-Rev47
-X-Originating-Client: open-xchange-appsuite
-X-Provags-ID: V03:K1:+elgm5XkOyevwG1T38e8l8G5/xrYrE/AXpRfEqSejzcD3j/tTTm
- garzisnzmfWhuxI9fmnIaajQLlzVYnxMcO0AY2FF/dKlnZWh9hutuKR7EBAd5hDw9DTCpLn
- fegPCon/vjdIEUSvcermSZENwTiBYEUuxAB5t5NyMAcfz/i33PfK1qt4Y4EkI78xYypQ+H3
- GtqHjWakuhlgJsx6ww4hg==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:b3DnGGu1+C4=:2UWRM59ehu+mczGkpaQ3gd
- YHNZRq6Ct/0hKTjTli1v+A8LPw0c30Kh95XHcwWYROUOAmnfsZ2BnZBAxLQvZExdNGs/ie1Me
- njQEdv0/0FKimYnpl038AWAUEmxJzfOp63L2myVPKKCrND208EEkpIYJ0/MRXC7bFpXP74TAb
- UljjRH/QShwgZT9/cUd3uS7T5njU50hWUDbEPGk4eMojWfsgvHDagyI1Vh/JlKO/kOpAgnZKh
- +FT3GtB7Zr1eOxso6VjbakG1jcYEEkl0ojW5qFExKFXmzYm7FfzbgA15xL57BoIdJVUMMdVaZ
- B75tK9ZrLjB5TsqTyEHPOsKGehDDTX0wDXgSbw4PQ4GAv27Mg2F5tLbMrDu9nWbyJqwjjn6Gt
- nwXs+Q3kC1kaqRk+tZkd3DY0jgjH4rEcd9E+FbdE0HyHDjsKz5Ygv8Wz35xlEZlzDrhXPkc2l
- gkHAkxukLR8/SeyFKPv09KCnScMhxLabVS8SdN7fQ2DyD/KgOOMNxnGZn11kaTVfNc6gnK596
- MIBxMPzid1S/+97Da9LyMKeZaaxFuduxvuHzG40m0RmSVEVhyTR/rQbMGr7Uilx9V+E3RuxG3
- fMiUUZ+xgaXEvBP1Lf86N7PFNJNhJ6HN2Z+oPQHD0xfIUS1BMQ6Zthx+CT/p+/XFn7/tLDew1
- l/S+yY8vn8pq37+eliX2oKIdKiAWBjZnr7nFWJtKC/om9m6YetHgNjXIQw2EaX+UbTVF/cCTM
- tI2leT43NDgQMr6FGvf4WP1XNNuV/YVgKadlfOeq/rLQyoJpLhjCXWZDA08=
+Content-Disposition: inline
+In-Reply-To: <0c400cb1899c1afb4c9f021350cdc0c6ca3f6239.1547453586.git.ryder.lee@mediatek.com>
+User-Agent: NeoMutt/20170113 (1.7.2)
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c0
+X-SA-Exim-Mail-From: ukl@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_115104_114257_4F0F55E7 
-X-CRM114-Status: GOOD (  11.23  )
+X-CRM114-CacheID: sfid-20190115_120046_825543_5B2E4B98 
+X-CRM114-Status: GOOD (  21.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,44 +75,119 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mlangsdo@redhat.com, julien.thierry@arm.com, marc.zyngier@arm.com,
- catalin.marinas@arm.com, suzuki.poulose@arm.com, will.deacon@arm.com,
- linux-kernel@vger.kernel.org, steven.price@arm.com, ykaukab@suse.de,
- dave.martin@arm.com, shankerd@codeaurora.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-pwm@vger.kernel.org, devicetree@vger.kernel.org,
+ Sean Wang <sean.wang@kernel.org>, Weijie Gao <weijie.gao@mediatek.com>,
+ linux-kernel@vger.kernel.org, Thierry Reding <thierry.reding@gmail.com>,
+ linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Jeremy,
+On Mon, Jan 14, 2019 at 04:21:20PM +0800, Ryder Lee wrote:
+> This adds a property "mediatek,num-pwms" to avoid having an endless
+> list of compatibles with no other differences for the same driver.
 
-> Jeremy Linton <jeremy.linton@arm.com> hat am 10. Januar 2019 um 00:55 geschrieben:
-> 
-> 
-> Arm64 machines should be displaying a human readable
-> vulnerability status to speculative execution attacks in
-> /sys/devices/system/cpu/vulnerabilities 
-> 
-> This series enables that behavior by providing the expected
-> functions. Those functions expose the cpu errata and feature
-> states, as well as whether firmware is responding appropriately
-> to display the overall machine status. This means that in a
-> heterogeneous machine we will only claim the machine is mitigated
-> or safe if we are confident all booted cores are safe or
-> mitigated.
-> 
+I seem to recall having said something similar before, but maybe this
+was a different series (there is no v2 or higher in the Subject ...)
 
-i applied this v3 series and Marc's v2 series.
+I think it would be sensible to drop the vendor prefix and go with plain
+"num-pwms" (or "npwms" to align to "ngpios" in the gpio bindings).
 
-Now i'm getting the following on a Raspberry Pi 3 B+ :
+> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> ---
+>  drivers/pwm/pwm-mediatek.c | 25 +++++++++++--------------
+>  1 file changed, 11 insertions(+), 14 deletions(-)
+> =
 
-meltdown:Not affected
-spec_store_bypass:Not affected
-spectre_v1:Mitigation: __user pointer sanitization
+> diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
+> index eb6674c..37daa84 100644
+> --- a/drivers/pwm/pwm-mediatek.c
+> +++ b/drivers/pwm/pwm-mediatek.c
+> @@ -55,7 +55,6 @@ enum {
+>  };
+>  =
 
-So the entries l1tf and spectre_v2 disappeared.
+>  struct mtk_pwm_platform_data {
+> -	unsigned int num_pwms;
+>  	bool pwm45_fixup;
+>  	bool has_clks;
+>  };
+> @@ -226,10 +225,11 @@ static void mtk_pwm_disable(struct pwm_chip *chip, =
+struct pwm_device *pwm)
+>  =
 
-Stefan
+>  static int mtk_pwm_probe(struct platform_device *pdev)
+>  {
+> +	struct device_node *np =3D pdev->dev.of_node;
+>  	const struct mtk_pwm_platform_data *data;
+>  	struct mtk_pwm_chip *pc;
+>  	struct resource *res;
+> -	unsigned int i;
+> +	unsigned int i, num_pwms;
+>  	int ret;
+>  =
+
+>  	pc =3D devm_kzalloc(&pdev->dev, sizeof(*pc), GFP_KERNEL);
+> @@ -246,7 +246,13 @@ static int mtk_pwm_probe(struct platform_device *pde=
+v)
+>  	if (IS_ERR(pc->regs))
+>  		return PTR_ERR(pc->regs);
+>  =
+
+> -	for (i =3D 0; i < data->num_pwms + 2 && pc->soc->has_clks; i++) {
+> +	ret =3D of_property_read_u32(np, "mediatek,num-pwms", &num_pwms);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "failed to get pwm number: %d\n", ret);
+
+This sounds wrong. "Failed to get number of pwms" sounds better to my
+(non-native) ear.
+
+> +		return ret;
+> +	}
+> +
+> +	for (i =3D 0; i < num_pwms + 2 && pc->soc->has_clks; i++) {
+>  		pc->clks[i] =3D devm_clk_get(&pdev->dev, mtk_pwm_clk_name[i]);
+>  		if (IS_ERR(pc->clks[i])) {
+>  			dev_err(&pdev->dev, "clock: %s fail: %ld\n",
+> @@ -260,7 +266,7 @@ static int mtk_pwm_probe(struct platform_device *pdev)
+>  	pc->chip.dev =3D &pdev->dev;
+>  	pc->chip.ops =3D &mtk_pwm_ops;
+>  	pc->chip.base =3D -1;
+> -	pc->chip.npwm =3D data->num_pwms;
+> +	pc->chip.npwm =3D num_pwms;
+>  =
+
+>  	ret =3D pwmchip_add(&pc->chip);
+>  	if (ret < 0) {
+> @@ -279,32 +285,23 @@ static int mtk_pwm_remove(struct platform_device *p=
+dev)
+>  }
+>  =
+
+>  static const struct mtk_pwm_platform_data mt2712_pwm_data =3D {
+> -	.num_pwms =3D 8,
+> -	.pwm45_fixup =3D false,
+> -	.has_clks =3D true,
+> -};
+> -
+> -static const struct mtk_pwm_platform_data mt7622_pwm_data =3D {
+> -	.num_pwms =3D 6,
+>  	.pwm45_fixup =3D false,
+>  	.has_clks =3D true,
+
+I agree with Matthias Brugger that at least for some time you should be
+able to fall back to the right number of pwms if the device tree doesn't
+have a num-pwms property.
+
+Best regards
+Uwe
+
+-- =
+
+Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 
 _______________________________________________
 linux-arm-kernel mailing list
