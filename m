@@ -2,76 +2,116 @@ Return-Path: <SRS0=3lKL=PX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E7B83C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 10:18:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DBFDEC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 10:21:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 95FF720656
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 10:18:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AAEB520656
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 10:21:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A+sLpdqw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 95FF720656
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RVVP4ckf";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="nPQ6AqV3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AAEB520656
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=dmOPg2CNYg+8/MaUOzZuDj/89zMxGikpJLZ9fUYwA2A=; b=A+sLpdqwLKT0RD
-	diSmiAZBba9BsJjI6VVU2xrPrRwNAj67ZtAEBnCW2Z7RnZt4O31EI9arFVUgZxB/yMe+1iBYQgZF8
-	S/ycDcepPbG/lcw2jBgk8MpdjVhtLFh6qRATrH5dzTW4jvVIq9RxlS/IB9I6pA0Wrjm5DYfT5jn0G
-	j+8dyxseW65lt98s1FYRRs+FnPpogyAszhlIdopiMaQM5PPLC214PP/nK8dzhPudk/hDvNzlNW4QB
-	GDTtJNK0BAj4Ft1jXVP+hJ5S2WGvBCkTlsFxma4OejzsgKgrHtMHBhOqKj/gTUcJEnVlGRVzF234H
-	shZqXvsHn8bJjVLI8ENg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=H24YQ5CNBXEEbtK/GAmu/KEg6OXWHf8sVlLmL8wvTIc=; b=RVVP4ckfaAG14d
+	lzj9aEscxGEXcfmT/ZHHBF062OU+sJfGxmd0nnSfSgKk10LhoDDIxpO8+NWJuEH1ig988RtswI9Do
+	rFnC4YGjOruR8dLUvWGdKM4/bxn+PlPQKSJufl5fgXn32OoDdWGlJpbpkYycLt/QeJ+wh6rO0nxKa
+	REOLV99epgyJRenoREPXylhHaGCjebcu5DTDFqCTXQSE31s+MvdDYhgbPHM/gMSyzZllD2hBRe2R6
+	LR5b2Q5oO5/fsjexMzy54fy9nvTu11IoPIGk7GLEdv3zMFSIpO+b+BJOOMNozHpAejYnWUthofidj
+	fM3eF33xzGqhh1ZEPulA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjLnH-0001pC-Pj; Tue, 15 Jan 2019 10:18:03 +0000
-Received: from mout.kundenserver.de ([217.72.192.75])
+	id 1gjLqQ-0003ZY-4w; Tue, 15 Jan 2019 10:21:18 +0000
+Received: from mail-eopbgr130054.outbound.protection.outlook.com
+ ([40.107.13.54] helo=EUR01-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjLnE-0001op-65
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 10:18:01 +0000
-Received: from [192.168.178.52] ([109.104.49.44]) by mrelayeu.kundenserver.de
- (mreue109 [212.227.15.183]) with ESMTPSA (Nemesis) id
- 1MG9c2-1gSoT50hVE-00GZaX; Tue, 15 Jan 2019 11:17:51 +0100
-Subject: Re: [PATCH 0/3] nvmem: imx-ocotp: Implement i.MX6ULL/ULZ support
-To: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>,
- Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- Shawn Guo <shawnguo@kernel.org>, Fabio Estevam <fabio.estevam@nxp.com>
-References: <1544536273-17909-1-git-send-email-stefan.wahren@i2se.com>
-From: Stefan Wahren <stefan.wahren@i2se.com>
-Message-ID: <7ca64f1d-8649-79a3-4c48-5242a68a837b@i2se.com>
-Date: Tue, 15 Jan 2019 11:17:49 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <1544536273-17909-1-git-send-email-stefan.wahren@i2se.com>
+ id 1gjLb5-0003ow-1c; Tue, 15 Jan 2019 10:05:33 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=6H5vAledmi0esA7RBZS8cP072AFqnf9w5a0YwwQhDEs=;
+ b=nPQ6AqV3xVQajzukwEsDcrJtsmi6ZIeOxOZRKZw4MavbMwD6MRQmcUbxkdO1GxgPQHo0zY1uH/btRbFAhHoIs78nE6KD7oNOx5YAz4QMfAV79gMc71jF4vUkNIVqGonQxACMXgiWyUaMseGBzfbmP3rAVex7fJc91Umgo0aU9lg=
+Received: from VI1PR04MB5726.eurprd04.prod.outlook.com (20.178.127.24) by
+ VI1PR04MB5822.eurprd04.prod.outlook.com (20.178.204.88) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1516.14; Tue, 15 Jan 2019 10:05:23 +0000
+Received: from VI1PR04MB5726.eurprd04.prod.outlook.com
+ ([fe80::a1c2:cc79:80f3:3bcb]) by VI1PR04MB5726.eurprd04.prod.outlook.com
+ ([fe80::a1c2:cc79:80f3:3bcb%4]) with mapi id 15.20.1516.019; Tue, 15 Jan 2019
+ 10:05:23 +0000
+From: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+To: "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
+ "boris.brezillon@bootlin.com" <boris.brezillon@bootlin.com>,
+ "broonie@kernel.org" <broonie@kernel.org>, "marek.vasut@gmail.com"
+ <marek.vasut@gmail.com>, "vigneshr@ti.com" <vigneshr@ti.com>,
+ "linux-spi@vger.kernel.org" <linux-spi@vger.kernel.org>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>
+Subject: [PATCH v7 3/5] mtd: m25p80: add support of octal mode I/O transfer
+Thread-Topic: [PATCH v7 3/5] mtd: m25p80: add support of octal mode I/O
+ transfer
+Thread-Index: AQHUrLnUkUf6WbGWr02OhoksrpQ9ag==
+Date: Tue, 15 Jan 2019 10:05:22 +0000
+Message-ID: <1547546584-5254-4-git-send-email-yogeshnarayan.gaur@nxp.com>
+References: <1547546584-5254-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+In-Reply-To: <1547546584-5254-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+Accept-Language: en-US
 Content-Language: en-US
-X-Provags-ID: V03:K1:wNw7y2HNzZPH27bE/DRvZQ4Yz8I1sjjKuWN7sqhkjjdfhn685gq
- RUhr4XUJYH1KjmAwHvU6rs70xz0oWjSd9rFDJkgflhJ1F5eJOST+AMXMuDmtRB7dLhkdZcK
- Zd9l+/GD0zZ6Rc9lbfmSn3+tKt3wjRU8bYkhhz1GkRuoOukWcSyaI6WZWZmOxwci1waEKqc
- Hy/amKbIjrrllSf0MGHlw==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:FcfsDcX7APg=:L68TgTHEpzveMY4FeNJrKa
- GuaiueJUeK/Jj0pDEDbtNMn4Erogefpl8TvgHgmFT7t/OHDkdXquYnLrbD3IA/RGOl14tnUJP
- e1OICxO9ew7DWYyBr3DhbNr4983wUVnxOALa22NFKeaVgLN1+bxunpItWOWAd6XRsWqNVzEc9
- +pKjjMd0Vnhe9eKiZvmdjFyB41SQou0dKq31noYeWpYw2c/GAF7dPlaBoo2C1Mi43C4ntp5DY
- sFHCyQO9XPirBxdRrooNNZYIQGQgiHxxwxvABt7VWCe6wER12bDRKUyRRxq7jNWo0yrMpiZzk
- GlzOC0ZW6cyPEkUfFzBY7evmYO7pLedEMO50U2ExUAYuyEPnu8g41FkgrXDOgf4krQr3Y3C9M
- iJDP5K4KPPlGBE82n7+Kc+xBYioKF63mp+lm+RypBGK/DWKaCDPmziCpGUPacDcqxjrLSI7Cu
- sBCPN5Qg4wMTmuinz7xFxckfkAJqERVOy5UlsAawkXUxRoi0T6kEatVGD8/JQDednymaes8LO
- CDC32Dy5xRaEo8MxCZPRnivL71zMD/J6biEwE3/ya3bc/owISaV8xfLtUArPq7rWFXRCA8yz8
- Ygx+aYCRDMDKNO6WXFQJhO9QXuM9roTxgZ5brhYpGNs3NmzuvqMoPPKoJGpPqns50lFuuxSgi
- j3qj9hA4a6255vw7Wm73yOK4fD8eYY360W10Zw2a4MLer9NnVPWWf+JYOwP6i7VBbyRYlhV5k
- u6qny49tTLCGVQobd5JV/qdMk0rAQ07n2pEtzTXUvhHgxn2rL73Vg0TacbU=
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: SG2PR06CA0123.apcprd06.prod.outlook.com
+ (2603:1096:1:1d::25) To VI1PR04MB5726.eurprd04.prod.outlook.com
+ (2603:10a6:803:e4::24)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=yogeshnarayan.gaur@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-mailer: git-send-email 1.9.1
+x-originating-ip: [14.143.30.134]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; VI1PR04MB5822;
+ 6:Ag9dWE1ag6+JHhM4Bk8YsHF09tVGWVoL7kcRutAHS3MMWJD+2E4DNZXnF46CinZZfVzDayQBf9wvicgE4ZTGxXGR6UIu99Q9oy/vdmI6T1cTx0zyRlDYSC+SVicWAtQK1ejeuDwvIrc2J4KZisfXgrxjoxbEbeTtNWb4Or/FSVRbepRHDTrWRcqBUQsCRMHoV9wn+rQlNIMNM8pWikZRB+GPLV9af1uMIi14kgkCrWHUN/CJOTEOMAZjQEw4RgH+oZamUX7mIG0YLRnNsRPSWctoP9YBGH4TZvnwOA5BFCrHjgVWwThzgPY5YP9tQw4RQaU3nBoV/y1ZulKOH0+hVxJd/4opBOpjENWixpPqEkFkKSILFOADTckkqtTN9HpkL8vJzjSEX4rO1KO9Jxc9jfAogxdQ4ZU+ctLaHQO+YBNIEORI5YdA5Z+CXpt5CROmYpi2Xd+jvx2X1MDXwU4usg==;
+ 5:Ul5nd7LIqpTjcHJOIvshhbfcloQCAMVcWjraoMcNTPh2KR7UTLoMd/5Pv97IQTXvPv9s7WE5dYHGNh8P8r+axkHhgVTVlbyK1lKdXLBY339nufjNAy55KP8fL+51SH0hobefSymcObplAzLm9QH/WkMOVZbHuW/J8KbxHKTd/olYpM7CJgy7p+l4ps6nahQEGnaRPM98We1luKSHNpV+WA==;
+ 7:gptW05hTBtZ/oxkxgKV7TLjX/MSLz7YwtoxFtmM+akay/JN0oe1r0LoIiQo0r2nS1FkqmKjdDsW2kzRrSs0+YY786WWc1Jkf4DXbyijhDvbT74kL4/kGzZgr9+ho5JoJiT0VJJUD1sFZYVrujGsRLw==
+x-ms-office365-filtering-correlation-id: 383a9aaa-f204-4ca4-9ff8-08d67ad0f670
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(7168020)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR04MB5822; 
+x-ms-traffictypediagnostic: VI1PR04MB5822:
+x-microsoft-antispam-prvs: <VI1PR04MB58223B1B17D7E316FBBC556A99810@VI1PR04MB5822.eurprd04.prod.outlook.com>
+x-forefront-prvs: 0918748D70
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(366004)(346002)(396003)(39860400002)(136003)(376002)(189003)(199004)(36756003)(305945005)(14454004)(6512007)(81166006)(486006)(446003)(2201001)(81156014)(2501003)(4326008)(14444005)(105586002)(8936002)(386003)(7736002)(86362001)(102836004)(2616005)(26005)(186003)(6506007)(54906003)(50226002)(97736004)(316002)(5660300001)(110136005)(2906002)(6116002)(8676002)(256004)(71190400001)(6486002)(7416002)(66066001)(3846002)(99286004)(6436002)(106356001)(478600001)(76176011)(55236004)(71200400001)(78486014)(11346002)(39060400002)(53936002)(52116002)(68736007)(476003)(25786009);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB5822;
+ H:VI1PR04MB5726.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: ScdKliUfYOU0y9Cln/XdEcLHwAMbJUMPKkKrFyqYakAuAESCF9s5fcYgNg4JHIm3zOm7HWcFg+1rpVdrX6T2cj2uQmOXgqHOtBKLFXPtRbZIdPtrJLIdyf/F48qvG87bHeAZ4lc/w3770VF86mx6wXiPDXExw4QEW/OslOyiF0Gh3HJ0ilTo4MQjzBboOWK555awo8A28Y9PjIIpAMO+bTiJnpzoFHo0jO3FYRt9zQ3y/Jn71PVyoHw3rufZQwQ+eZVf+KR03bB0nIBGtwLvxYwF9C+FAc18EHvVlL/1+fRRteTtyvmsX48G5kF8FaPt1jTyFm88xmGwF4FFmciBYojf9O4MLELqgxANZbi4qHx6BDDMqBNMTVz5rRodQHEkxFCOS3XzIfm2u5C7RYApoUNeVuv9ZvD74RI8l9FMcAE=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+MIME-Version: 1.0
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 383a9aaa-f204-4ca4-9ff8-08d67ad0f670
+X-MS-Exchange-CrossTenant-originalarrivaltime: 15 Jan 2019 10:05:17.0864 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB5822
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_021800_530900_E46898C2 
-X-CRM114-Status: GOOD (  14.14  )
+X-CRM114-CacheID: sfid-20190115_020527_430150_73A29521 
+X-CRM114-Status: GOOD (  13.27  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,36 +123,51 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org,
- Sascha Hauer <s.hauer@pengutronix.de>, linux-imx@nxp.com,
- kernel@pengutronix.de
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "robh@kernel.org" <robh@kernel.org>,
+ Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>,
+ "tudor.ambarus@microchip.com" <tudor.ambarus@microchip.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "frieder.schrempf@exceet.de" <frieder.schrempf@exceet.de>,
+ "computersforpeace@gmail.com" <computersforpeace@gmail.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Shawn,
-hi Srinivas,
+Add support for octal mode I/O data transfer based on the controller (spi)
+mode.
+Assign hw-capability mask bits for octal transfer.
 
-Am 11.12.18 um 14:51 schrieb Stefan Wahren:
-> According to the reference manuals for i.MX6ULL and i.MX6ULZ both SoCs
-> only support 8 OTP banks instead of 16. So we can't use the compatible
-> string of i.MX6UL.
->
-> Stefan Wahren (3):
->   dt-bindings: imx-ocotp: Add i.MX6ULL/ULZ support
->   nvmem: imx-ocotp: Implement i.MX6ULL/ULZ support
->   ARM: dts: imx6ull: Fix i.MX6ULL/ULZ ocotp compatible
->
->  Documentation/devicetree/bindings/nvmem/imx-ocotp.txt | 3 ++-
->  arch/arm/boot/dts/imx6ull.dtsi                        | 4 ++++
->  drivers/nvmem/imx-ocotp.c                             | 7 +++++++
->  3 files changed, 13 insertions(+), 1 deletion(-)
->
-Rob already gave his Reviewed-By for the binding. Are you fine with the rest of the series?
+Signed-off-by: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+---
+ drivers/mtd/devices/m25p80.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-Regards
-Stefan
+diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
+index c4a1d04b8c80..651bab6d4e31 100644
+--- a/drivers/mtd/devices/m25p80.c
++++ b/drivers/mtd/devices/m25p80.c
+@@ -195,7 +195,14 @@ static int m25p_probe(struct spi_mem *spimem)
+ 	spi_mem_set_drvdata(spimem, flash);
+ 	flash->spimem = spimem;
+ 
+-	if (spi->mode & SPI_RX_QUAD) {
++	if (spi->mode & SPI_RX_OCTAL) {
++		hwcaps.mask |= SNOR_HWCAPS_READ_1_1_8;
++
++		if (spi->mode & SPI_TX_OCTAL)
++			hwcaps.mask |= (SNOR_HWCAPS_READ_1_8_8 |
++					SNOR_HWCAPS_PP_1_1_8 |
++					SNOR_HWCAPS_PP_1_8_8);
++	} else if (spi->mode & SPI_RX_QUAD) {
+ 		hwcaps.mask |= SNOR_HWCAPS_READ_1_1_4;
+ 
+ 		if (spi->mode & SPI_TX_QUAD)
+-- 
+2.17.1
 
 
 _______________________________________________
