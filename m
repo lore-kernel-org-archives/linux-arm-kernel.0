@@ -2,67 +2,66 @@ Return-Path: <SRS0=3lKL=PX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-14.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3EE09C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 11:46:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6B9FDC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 11:48:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EB8CB20656
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 11:46:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 07E8E20656
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 11:48:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="a2O+0HBk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EB8CB20656
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sigxcpu.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KPks6w6b"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 07E8E20656
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
-	:Date:Reply-To:Cc:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=bIw4zsfKO1LiChYt2XWjdOlZUJShOIFqGcjrOq8Z1IA=; b=a2O+0HBkIcA8b3
-	ojEoX/y6/szcoxum+1e6OXbyj0UBPaO6ZOhlIzlDVNwzMoVUXCbmZgQqbfVEUv36kSoyBOadH161T
-	nPWxrG8S9HaBuUJiHudqrCQqZ3MQCQAPOTu6yz3hQBEdwSBjy47o/bqW7Vr0oRXPT3UbNgmhoId8Y
-	SLJF8Msml0sQfW7D7/OP/8miy/QQi4/1/P7YDn+ctHFMa3luRsX9DZo4BKZp0JxkIED1FppIBTjGN
-	9Sm9VZDhhsC0rRK6WyNPP6ThwLYJtgLeNOJA/JCZy9AFcoVd+mfGYkAUFIlzTozx8X7l3OJu1gbGD
-	7Y2PHAMfay47YC8jSkmg==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=8v5mxYdv+g3kcEf6jcGj4ru5aWOwGnQeOiNT0OlzeEk=; b=KPks6w6bWGNW6i
+	VK+l6RFupZCM0C6uKKmmS+HTCA8JOSpE+PqJqNkWsChi3eAsS7YnfFkPVcOQVwRb9xq47ZOpX3LqU
+	HkpmacBrNjfmt54o/hKEZbxcrYoF2CFIdDv58mViKJceQDAeiho3p7mK0QgxYjSe7uSLc1D/E9Kfs
+	PYrpm96RqFH2KKGUYwEA+Qq3FjAW09NxE5WZQuRdX71I0JtrJz0lN82i1HSSo0ZtoHoafvJANuzW2
+	DcVHctLeuPDnMPBI4GPRBzV0iXMjtkyvWIywdkLF81jQ+nfNXrdht3lASmHLrKV4tYmnpGFuiTEHw
+	duJfwFVlaFyTdh41ogEg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjNBB-00038Z-Sr; Tue, 15 Jan 2019 11:46:49 +0000
-Received: from honk.sigxcpu.org ([24.134.29.49])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjNB8-00038C-CG
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 11:46:48 +0000
-Received: from localhost (localhost [127.0.0.1])
- by honk.sigxcpu.org (Postfix) with ESMTP id E017CFB03;
- Tue, 15 Jan 2019 12:46:43 +0100 (CET)
-X-Virus-Scanned: Debian amavisd-new at honk.sigxcpu.org
-Received: from honk.sigxcpu.org ([127.0.0.1])
- by localhost (honk.sigxcpu.org [127.0.0.1]) (amavisd-new, port 10024)
- with ESMTP id YMjWfw_nudl7; Tue, 15 Jan 2019 12:46:42 +0100 (CET)
-Received: by bogon.sigxcpu.org (Postfix, from userid 1000)
- id 05EF247345; Tue, 15 Jan 2019 12:46:41 +0100 (CET)
-Date: Tue, 15 Jan 2019 12:46:41 +0100
-From: Guido =?iso-8859-1?Q?G=FCnther?= <agx@sigxcpu.org>
-To: Shawn Guo <shawnguo@kernel.org>, Sascha Hauer <s.hauer@pengutronix.de>,
- Pengutronix Kernel Team <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>, NXP Linux Team <linux-imx@nxp.com>,
- Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org
-Subject: [PATCH] arm64: dts: imx8mq: Add system reset controller
-Message-ID: <20190115114641.GA15870@bogon.m.sigxcpu.org>
+	id 1gjND5-0003Re-T0; Tue, 15 Jan 2019 11:48:47 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gjND3-0003RJ-1g
+ for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 11:48:46 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2D40180D;
+ Tue, 15 Jan 2019 03:48:44 -0800 (PST)
+Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A40943F70D;
+ Tue, 15 Jan 2019 03:48:42 -0800 (PST)
+Subject: Re: [RFC PATCH v2 1/2] uaccess: Check no rescheduling function is
+ called in unsafe region
+To: Valentin Schneider <valentin.schneider@arm.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+References: <1543845318-24543-1-git-send-email-julien.thierry@arm.com>
+ <1543845318-24543-2-git-send-email-julien.thierry@arm.com>
+ <907e51b7-10da-c5cb-058f-2c34ba2c8abd@arm.com>
+From: Julien Thierry <julien.thierry@arm.com>
+Message-ID: <f7bbc9dd-46f4-7df6-d20f-61e0ec6873d6@arm.com>
+Date: Tue, 15 Jan 2019 11:48:41 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <907e51b7-10da-c5cb-058f-2c34ba2c8abd@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_034646_577063_39220F1F 
-X-CRM114-Status: UNSURE (   9.41  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190115_034845_105425_14146B11 
+X-CRM114-Status: GOOD (  28.61  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,53 +73,162 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: peterz@infradead.org, catalin.marinas@arm.com, will.deacon@arm.com,
+ mingo@redhat.com, james.morse@arm.com, hpa@zytor.com
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-We can reuse the src from fsl,imx51-src as with other imx SOCs.
+Hi,
 
-Signed-off-by: Guido G=FCnther <agx@sigxcpu.org>
----
-I'm mostly interested in the syscon part to be able to use regmap for
-MIPI DSI here.
+On 14/01/2019 12:03, Valentin Schneider wrote:
+> Hi,
+> 
+> On 03/12/2018 13:55, Julien Thierry wrote:
+>> While running a user_access regions, it is not supported to reschedule.
+>> Add an overridable primitive to indicate whether a user_access region is
+>> active and check that this is not the case when calling rescheduling
+>> functions.
+>>
+>> Also, add a comment clarifying the behaviour of user_access regions.
+>>
+>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>> ---
+>>  include/linux/kernel.h  |  6 ++++--
+>>  include/linux/uaccess.h | 11 +++++++++++
+>>  kernel/sched/core.c     | 19 +++++++++++++++++++
+>>  3 files changed, 34 insertions(+), 2 deletions(-)
+>>
+>> I'm not sure these are the best locations to check this but I was hoping
+>> this patch could start the discussion.
+>>
+>> Should I move the check? Should I add a config option to conditionally
+>> build those checks?
+>>
+> 
+> I was going to say it's already under DEBUG_ATOMIC_SLEEP, but that's only
+> true for the __might_sleep() bit actually.
+> 
+> I think it'd make sense to blanket that under a config, but using
+> DEBUG_ATOMIC_SLEEP for that is a bit too much. What about a
+> DEBUG_UACCESS_SLEEP?
+> 
 
-Patch is against next-20190114 plus Lucas "arm64: dts: imx8mq: move
-watchdog nodes to correct location" but also applies to
+Yes, I was wondering whether to add something like that, I'll add a
+DEBUG_UACCESS_SLEEP to my next version.
 
-    https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git/log/=
-?h=3Dimx/dt64
+>> diff --git a/include/linux/kernel.h b/include/linux/kernel.h
+>> index d6aac75..fe0e984 100644
+>> --- a/include/linux/kernel.h
+>> +++ b/include/linux/kernel.h
+>> @@ -237,11 +237,13 @@
+>>  struct pt_regs;
+>>  struct user;
+>>
+>> +extern void __might_resched(const char *file, int line);
+>>  #ifdef CONFIG_PREEMPT_VOLUNTARY
+>>  extern int _cond_resched(void);
+>> -# define might_resched() _cond_resched()
+>> +# define might_resched() \
+>> +	do { __might_resched(__FILE__, __LINE__); _cond_resched(); } while (0)
+>>  #else
+>> -# define might_resched() do { } while (0)
+>> +# define might_resched() __might_resched(__FILE__, __LINE__)>  #endif
+>>
+>>  #ifdef CONFIG_DEBUG_ATOMIC_SLEEP
+>> diff --git a/include/linux/uaccess.h b/include/linux/uaccess.h
+>> index efe79c1..50adb84 100644
+>> --- a/include/linux/uaccess.h
+>> +++ b/include/linux/uaccess.h
+>> @@ -266,6 +266,13 @@ static inline unsigned long __copy_from_user_inatomic_nocache(void *to,
+>>  #define probe_kernel_address(addr, retval)		\
+>>  	probe_kernel_read(&retval, addr, sizeof(retval))
+>>
+>> +/*
+>> + * user_access_begin() and user_access_end() define a region where
+>> + * unsafe user accessors can be used.
+>> + * During execution of this region, no sleeping functions should be called.
+>> + * Exceptions and interrupt shall exit the user_access region and re-enter it
+>> + * when returning to the interrupted context.
+>> + */
+> 
+> I would first have the bit about exceptions, then mention sleeping and add
+> something along the lines of
+> 
+> "[...] no sleeping functions should be called - we rely on exception
+> handling to take care of the user_access status for us, but that doesn't
+> happen when directly calling schedule()."
+> 
+> My wording's not the best but I just want something to point out *why*
+> sleeping ain't okay.
+> 
 
-It will conflict with "arm64: dts: imx8mq: add GPC power domains" which
-is not yet in any tree I've seen.
+I think the wording is alright, I'll include your suggestion for the
+next version.
 
- arch/arm64/boot/dts/freescale/imx8mq.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+>>  #ifndef user_access_begin
+>>  #define user_access_begin() do { } while (0)
+>>  #define user_access_end() do { } while (0)
+>> @@ -273,6 +280,10 @@ static inline unsigned long __copy_from_user_inatomic_nocache(void *to,
+>>  #define unsafe_put_user(x, ptr, err) do { if (unlikely(__put_user(x, ptr))) goto err; } while (0)
+>>  #endif
+>>
+>> +#ifndef unsafe_user_region_active
+>> +#define unsafe_user_region_active()	false
+>> +#endif
+>> +
+>>  #ifdef CONFIG_HARDENED_USERCOPY
+>>  void usercopy_warn(const char *name, const char *detail, bool to_user,
+>>  		   unsigned long offset, unsigned long len);
+>> diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+>> index 6fedf3a..03f53c8 100644
+>> --- a/kernel/sched/core.c
+>> +++ b/kernel/sched/core.c
+>> @@ -3289,6 +3289,13 @@ static inline void schedule_debug(struct task_struct *prev)
+>>  		__schedule_bug(prev);
+>>  		preempt_count_set(PREEMPT_DISABLED);
+>>  	}
+>> +
+>> +	if (unlikely(unsafe_user_region_active())) {
+>> +		printk(KERN_ERR "BUG: scheduling while user_access enabled: %s/%d/0x%08x\n",
+>> +		       prev->comm, prev->pid, preempt_count());
+>> +		dump_stack();
+>> +	}
+>> +
+>>  	rcu_sleep_check();
+>>
+>>  	profile_hit(SCHED_PROFILING, __builtin_return_address(0));
+>> @@ -6151,6 +6158,18 @@ void ___might_sleep(const char *file, int line, int preempt_offset)
+>>  EXPORT_SYMBOL(___might_sleep);
+>>  #endif
+>>
+>> +void __might_resched(const char *file, int line)
+>> +{
+>> +	if (!unsafe_user_region_active())
+>> +		return;
+>> +
+>> +	printk(KERN_ERR
+>> +		"BUG: rescheduling function called from user access context at %s:%d\n",
+>> +			file, line);
+>> +	dump_stack();
+>> +}
+> 
+> So this check is "careful, things might go bad" and the schedule_debug()
+> one is "things went bad". IIUC we'll always get this warning when we hit
+> the schedule_debug() one. I was going to suggest only keeping one of them,
+> but I think both hold value.
+> 
 
-diff --git a/arch/arm64/boot/dts/freescale/imx8mq.dtsi b/arch/arm64/boot/dt=
-s/freescale/imx8mq.dtsi
-index 0225eae2216e..7b1e0bdbd932 100644
---- a/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-+++ b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-@@ -252,6 +252,13 @@
- 				              "clk_ext1", "clk_ext2",
- 				              "clk_ext3", "clk_ext4";
- 			};
-+
-+			src: src@30390000 {
-+				compatible =3D "fsl,imx8mq-src", "fsl,imx51-src", "syscon";
-+				reg =3D <0x30390000 0x10000>;
-+				interrupts =3D <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
-+				#reset-cells =3D <1>;
-+			};
- 		};
- =
+Yes, I can't really convince myself to remove either, unless there is a
+magic place that covers both cases.
 
- 		bus@30400000 { /* AIPS2 */
--- =
+Thanks for the suggestions.
 
-2.20.1
+Cheers,
+
+-- 
+Julien Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
