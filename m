@@ -2,60 +2,146 @@ Return-Path: <SRS0=3lKL=PX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4B8E8C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 08:49:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C5E0BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 09:05:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1A07920868
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 08:49:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8F8C12085A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 09:05:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="J9Jt03Pz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1A07920868
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ha0CZh9G";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="EpmeU5d2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8F8C12085A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=a6zhFMQAvym6MKXd3ibQA+tb+m3y6xxuCPtwsKOHqDE=; b=J9Jt03Pzyxr4yq
-	04oGQZO8ZSBUSolDNNNEyk+kHG7s5EN5VPIy8iC35A3Kg4izDCRPVNB5wEHOX0NhtOjtwji0aBobF
-	yxn2BrdRjYugdf/DqATkmKjI6oTCgVPtPojk8mI81CqL0c3x3rBdkulchxOIedILTy89f1r1dC0+i
-	hMGw5J/eNOkE1lrZh5ewH/2ujd7mYiWewU/vNFf6aKgAxi1ADerujRMS+616ETyr3Bvfq1KoiS4GQ
-	LCEe9PJNsoJoTfiYdL14TspRe7wYaHRX7pPkZ79F45bWidqPyBcHLCQn59AgSWEaBxzN0eUmwXjSf
-	RCez1IuCsfFEwxY2u8mA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=o/+pL4zaNS4N9c4O8r5/KeyjLhP7vcbRx/XsdlyGL60=; b=ha0CZh9GMFkN5X
+	3ErTuJxurFisJ3IGBd7kCsrvtxKSCpiyYozffwYBfPsTfsx83QwCl1XNJQ7dZ3LLRS7x5c7l87P8l
+	ivKP5PvWZ4ZelayD71FCpMyLhVihnVIEiCHoiQu6FhzsYyQO9s5annPsWwwDk6h4Ss+GROwjzzMOo
+	4YxTTOHHqB2ye8n5Ab+i+tB/PdU3U5DJ1YlxFUXd2neTqeQHzPCgxGzqVu9r+2A2X+VaE41JC6WQl
+	N8Fsv5ipvkbaDY4WMUOOWO3vOyERahq1FG9TYKIxmpMGngXZg7J3xKd3tOy0+4OjofJazZoSN5bre
+	8HFBYIQp4v09/5/0INjw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjKPN-0006Aw-IO; Tue, 15 Jan 2019 08:49:17 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjKPJ-0006A6-CG; Tue, 15 Jan 2019 08:49:14 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 9930120898; Tue, 15 Jan 2019 09:49:11 +0100 (CET)
-Received: from xps13 (aaubervilliers-681-1-45-241.w90-88.abo.wanadoo.fr
- [90.88.163.241])
- by mail.bootlin.com (Postfix) with ESMTPSA id 2159D20728;
- Tue, 15 Jan 2019 09:49:11 +0100 (CET)
-Date: Tue, 15 Jan 2019 09:49:11 +0100
-From: Miquel Raynal <miquel.raynal@bootlin.com>
-To: Jianxin Pan <jianxin.pan@amlogic.com>
-Subject: Re: [PATCH v8 0/2] mtd: rawnand: meson: add Amlogic NAND driver
- support
-Message-ID: <20190115094911.75f4edc9@xps13>
-In-Reply-To: <1544973463-59523-1-git-send-email-jianxin.pan@amlogic.com>
-References: <1544973463-59523-1-git-send-email-jianxin.pan@amlogic.com>
-Organization: Bootlin
-X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
+	id 1gjKfA-0004ME-VI; Tue, 15 Jan 2019 09:05:36 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gjKf7-0004Lq-E2
+ for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 09:05:35 +0000
+Received: by mail-wr1-x443.google.com with SMTP id 96so2030970wrb.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 15 Jan 2019 01:05:32 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=subject:to:cc:references:from:openpgp:autocrypt:organization
+ :message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=3WI7iVpHS7FPhv7sFxWt3KEdzuchwcFOY5GT15pgrVA=;
+ b=EpmeU5d2KmHILylKFl8RtQZhbawA9lZNzKJDzsNWI+PKZgJS6XNDr1LN5RjHGiNpSf
+ jPhIrwsCCpyv1pb4W/TCKsOKifnBTjQjUgBpRV5pwFSkYvtFnK2ZDcZ6DHQ49grazSBO
+ hIF9l8k7rikRXKmbJU6sf6WzZhncZfMike9eLd3P17ocRMnEO/H703sIjS4By7ZNqgq+
+ FRmnF5k865kXXMcY6kk0hpBLCDCw4UPnguBtoDqZoUduW1o8c8v2XE1UA6xPyTiy2n2n
+ 2dR5w2w2dnJiMCHRvKXAeX3EccEdMVE/vr9dJsq3MQAMKBByZA5EgCTOLPrmkTkHYyD9
+ egyQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
+ :organization:message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=3WI7iVpHS7FPhv7sFxWt3KEdzuchwcFOY5GT15pgrVA=;
+ b=H7pJ4I5bivLFggh+Fi2iG8xy+aRITzrbvFLYJHoFFCN1RR229PdLHaT1jabhgcsRrv
+ 5JJx8u/DamRkSL/Q+GobXxn+4+N6gEnxOHTuQbJDeQe/NX9R4Xxh8jSZVfsyKyUROqBY
+ KN/OASOxf3mCOvafti4Lm+Qgw9JdY3UsTIF3E2e5f0xkB0mWmbxLqyaIL0HyhdURSRVa
+ fZUleXcoRusl/5vdPtgsJJizey6NwIzK3ydRU8a0JjOsCUcyLXRXXEygNHqeM3kh37iF
+ Mc2droRojk54jDhpsjpP6HPlm6e6GjKFw2OMWc0mWdfDsMySdTdl4bd+ZvyasYRAwFLa
+ jl+A==
+X-Gm-Message-State: AJcUukdD/Gt2iPkLJ4tuSQd+b3KrE6yOlTxZu0NveGOEZqDLnPaJAHab
+ 2F0Lqvl4+uN6bcN0A/3ThJqyz+I5urBHAA==
+X-Google-Smtp-Source: ALg8bN7IwoxyFgUYLNC68puN+jfsMgarWMj2HpJzWsJ5gKWdpXbjZgmECayT7Q+HS6zljRmMa8Lg7A==
+X-Received: by 2002:adf:bc87:: with SMTP id g7mr2097758wrh.250.1547543131103; 
+ Tue, 15 Jan 2019 01:05:31 -0800 (PST)
+Received: from [10.1.2.12] (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr.
+ [90.63.244.31])
+ by smtp.gmail.com with ESMTPSA id g188sm33237363wmf.32.2019.01.15.01.05.29
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Tue, 15 Jan 2019 01:05:30 -0800 (PST)
+Subject: Re: [PATCH] pinctrl: sunxi: Correct number of IRQ banks on H6 main
+ pin controller
+To: Chen-Yu Tsai <wens@csie.org>, Maxime Ripard <maxime.ripard@bootlin.com>,
+ Linus Walleij <linus.walleij@linaro.org>
+References: <20190115024543.12928-1-wens@csie.org>
+From: Neil Armstrong <narmstrong@baylibre.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=narmstrong@baylibre.com; prefer-encrypt=mutual; keydata=
+ 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
+ ZaTUOEkgIor5losDrePdPgE=
+Organization: Baylibre
+Message-ID: <1ab66321-5294-66b1-46c7-cbf39411549f@baylibre.com>
+Date: Tue, 15 Jan 2019 10:05:28 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
+In-Reply-To: <20190115024543.12928-1-wens@csie.org>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_004913_550484_DBD84819 
-X-CRM114-Status: GOOD (  11.60  )
+X-CRM114-CacheID: sfid-20190115_010533_527703_93CBB694 
+X-CRM114-Status: GOOD (  24.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,35 +153,133 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>, devicetree@vger.kernel.org,
- Hanjie Lin <hanjie.lin@amlogic.com>, Victor Wan <victor.wan@amlogic.com>,
- Marek Vasut <marek.vasut@gmail.com>,
- Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- Richard Weinberger <richard@nod.at>, Neil Armstrong <narmstrong@baylibre.com>,
- linux-kernel@vger.kernel.org, Boris Brezillon <boris.brezillon@bootlin.com>,
- Jian Hu <jian.hu@amlogic.com>, Liang Yang <liang.yang@amlogic.com>,
- linux-mtd@lists.infradead.org, Kevin Hilman <khilman@baylibre.com>,
- Carlo Caione <carlo@caione.org>, linux-amlogic@lists.infradead.org,
- Brian Norris <computersforpeace@gmail.com>,
- David Woodhouse <dwmw2@infradead.org>, linux-arm-kernel@lists.infradead.org,
- Jerome Brunet <jbrunet@baylibre.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: linux-arm-kernel@lists.infradead.org, linux-gpio@vger.kernel.org,
+ linux-kernel@vger.kernel.org, stable@vger.kernel.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgSmlhbnhpbiwKCkppYW54aW4gUGFuIDxqaWFueGluLnBhbkBhbWxvZ2ljLmNvbT4gd3JvdGUg
-b24gU3VuLCAxNiBEZWMgMjAxOAoyMzoxNzo0MSArMDgwMDoKCj4gVGhlc2UgdHdvIHBhdGNoZXMg
-dHJ5IHRvIGFkZCBpbml0aWFsIE5BTkQgZHJpdmVyIHN1cHBvcnQgZm9yIEFtbG9naWMgTWVzb24K
-PiBTb0NzLCBjdXJyZW50IGl0IGhhcyBiZWVuIHRlc3RlZCBvbiBHWEwocDIxMikgYW5kIEFYRyhz
-NDAwKSBwbGF0Zm9ybS4KPiAKPiBDaGFuZ2VzIHNpbmNlIFY2IGF0IFs4XQo+ICAtIGZpeCBiaXRm
-bGlwcyBjaGVja2luZyBmb3IgYmxhbmsgcGFnZXMKPiAgLSB0cmFjZSB0aGUgbGF0ZXN0IGNvbW1p
-dCB3aXRoIG5hbmQvbmV4dCBicmFuY2gKPiAgLSBjaGVja2luZyB0aGUgcmV0dXJuIG9mIG1lc29u
-X25hbmRfb3BfZ2V0X2RtYV9zYWZlXyppbnB1dC9vdXRwdXQqX2J1Zgo+ICAtIGFkZCAuZGV0YWNo
-X2NoaXAgZm9yIGZyZWUgbWVzb25fbmFuZC5kYXRhX2J1Zi9pbmZvX2J1Zgo+IAoKQ2FuIHlvdSBz
-ZW5kIGEgdjkgd2l0aCB0aGUgYnVpbGQgZmFpbHJlIChvYmplY3RfaXNfb25fc3RhY2sgcGIpIGZp
-eGVkCmFuZCB0aGUgS2NvbmZpZyBlbnRyeSB1cGRhdGVkICh0aGUgTWVzb24gY29tbW9uIGNsb2Nr
-IHRoaW5nKSBhcwpzdWdnZXN0ZWQgYnkgTWFydGluPwoKClRoYW5rcywKTWlxdcOobAoKX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5l
-bCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6
-Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+Hi,
+
+On 15/01/2019 03:45, Chen-Yu Tsai wrote:
+> The H6 main pin controller has four banks of interrupt-triggering pins.
+> The driver as originally submitted only specified three, but had pin
+> descriptions referencing a fourth bank. This results in a out-of-bounds
+> access into .irq_array of struct sunxi_pinctrl. This however did not
+> result in a crash until v4.20, with commit a66d972465d1 ("devres: Align
+> data[] to ARCH_KMALLOC_MINALIGN"), which changed the alignment of memory
+> region returned by devm_kcalloc(). The increase likely moved the
+> out-of-bounds access into the next, unmapped page.
+> 
+> With KASAN on, the bug is quite clear:
+> 
+>     BUG: KASAN: slab-out-of-bounds in sunxi_pinctrl_init_with_variant+0x49c/0x12b8
+>     Write of size 4 at addr ffff80002c680280 by task swapper/0/1
+> 
+>     CPU: 2 PID: 1 Comm: swapper/0 Not tainted 5.0.0-rc1-00016-gc480a5e6a077 #3
+>     Hardware name: OrangePi Lite2 (DT)
+>     Call trace:
+>      dump_backtrace+0x0/0x220
+>      show_stack+0x14/0x20
+>      dump_stack+0xac/0xd4
+>      print_address_description+0x60/0x25c
+>      kasan_report+0x14c/0x1ac
+>      __asan_store4+0x80/0xa0
+>      sunxi_pinctrl_init_with_variant+0x49c/0x12b8
+>      h6_pinctrl_probe+0x18/0x20
+>      platform_drv_probe+0x6c/0xc8
+>      really_probe+0x244/0x4b0
+>      driver_probe_device.part.4+0x11c/0x164
+>      __driver_attach+0x120/0x190
+>      bus_for_each_dev+0xe8/0x158
+>      driver_attach+0x30/0x40
+>      bus_add_driver+0x308/0x318
+>      driver_register+0xbc/0x1d0
+>      __platform_driver_register+0x7c/0x88
+>      h6_pinctrl_driver_init+0x18/0x20
+>      do_one_initcall+0xd4/0x208
+>      kernel_init_freeable+0x230/0x2c8
+>      kernel_init+0x10/0x108
+>      ret_from_fork+0x10/0x1c
+> 
+>     Allocated by task 1:
+>      kasan_kmalloc.part.0+0x4c/0x100
+>      kasan_kmalloc+0xc4/0xe8
+>      kasan_slab_alloc+0x14/0x20
+>      __kmalloc_track_caller+0x130/0x238
+>      devm_kmalloc+0x34/0xd0
+>      sunxi_pinctrl_init_with_variant+0x1d8/0x12b8
+>      h6_pinctrl_probe+0x18/0x20
+>      platform_drv_probe+0x6c/0xc8
+>      really_probe+0x244/0x4b0
+>      driver_probe_device.part.4+0x11c/0x164
+>      __driver_attach+0x120/0x190
+>      bus_for_each_dev+0xe8/0x158
+>      driver_attach+0x30/0x40
+>      bus_add_driver+0x308/0x318
+>      driver_register+0xbc/0x1d0
+>      __platform_driver_register+0x7c/0x88
+>      h6_pinctrl_driver_init+0x18/0x20
+>      do_one_initcall+0xd4/0x208
+>      kernel_init_freeable+0x230/0x2c8
+>      kernel_init+0x10/0x108
+>      ret_from_fork+0x10/0x1c
+> 
+>     Freed by task 0:
+>     (stack is not available)
+> 
+>     The buggy address belongs to the object at ffff80002c680080
+>      which belongs to the cache kmalloc-512 of size 512
+>     The buggy address is located 0 bytes to the right of
+>      512-byte region [ffff80002c680080, ffff80002c680280)
+>     The buggy address belongs to the page:
+>     page:ffff7e0000b1a000 count:1 mapcount:0 mapping:ffff80002e00c780 index:0xffff80002c683c80 compound_mapcount: 0
+>     flags: 0x10200(slab|head)
+>     raw: 0000000000010200 ffff80002e003a10 ffff80002e003a10 ffff80002e00c780
+>     raw: ffff80002c683c80 0000000000100001 00000001ffffffff 0000000000000000
+>     page dumped because: kasan: bad access detected
+> 
+>     Memory state around the buggy address:
+>      ffff80002c680180: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>      ffff80002c680200: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>     >ffff80002c680280: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
+> 		       ^
+>      ffff80002c680300: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
+>      ffff80002c680380: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
+> 
+> Correct the number of IRQ banks so there are no more mismatches.
+> 
+> Fixes: c8a830904991 ("pinctrl: sunxi: add support for the Allwinner H6
+> 		      main pin controller")
+> Cc: <stable@vger.kernel.org>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c b/drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c
+> index aa8b58125568..ef4268cc6227 100644
+> --- a/drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c
+> +++ b/drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c
+> @@ -588,7 +588,7 @@ static const unsigned int h6_irq_bank_map[] = { 1, 5, 6, 7 };
+>  static const struct sunxi_pinctrl_desc h6_pinctrl_data = {
+>  	.pins = h6_pins,
+>  	.npins = ARRAY_SIZE(h6_pins),
+> -	.irq_banks = 3,
+> +	.irq_banks = 4,
+>  	.irq_bank_map = h6_irq_bank_map,
+>  	.irq_read_needs_mux = true,
+>  };
+> 
+
+Tested-by: Neil Armstrong <narmstrong@baylibre.com>
+
+Fixes boot on Linux 5.0-rc2 on a Pine H64 Model B
+
+Neil
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
