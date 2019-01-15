@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 03ADDC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 14:02:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 838D7C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 14:02:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C7FAC20657
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 14:02:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5689220866
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 14:02:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="O6Gy84SV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C7FAC20657
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TWERLGEx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5689220866
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,40 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=koTM2aL+E9z/yaSaqzCuTk8QxViGyo4G3mLD2oaBqxM=; b=O6Gy84SVdyDrJY
-	1nRhOY6rmMP8nIBpafmj2/oBTBTxbDCCg34gISZTNaiLlrgHNZ3V1boInHbLx0obRns3FiGYG/Phi
-	h9ebcjQH4J+HN///yWVQtEdj7HIRHjdEWcl57bqy3gca3wsqRRjfLG7d8q5uzb3IRWBIg0DRWmRhr
-	u+TnXaCDgzU5cgYIzKEVdkLr3r8Jm3hK/OHPCP/TzXp6aaixWV9QVHnQDjLpCGhC61hyNSbaIEBeL
-	CehkU90D47fnH1EzMKSgksYPGc4xJlMNeRHoU6cX4DpCv5KYZKlBC9feQc2I0ZUM/KCfZUYTjb8hd
-	uFrjUF7jAe2IXD0tcveQ==;
+	List-Owner; bh=cttfLkwymcKiqxPCC4eCqPqy6mHPwFftLZOlJtsHL6s=; b=TWERLGExB01chR
+	iPqxsclCLRXE0yXNAhVc+UoCQDEqCvTS/y2S4O/3upXSsoyLMd0khs1j/Dir3hOtoAnLmzZ5K7SBn
+	7jwxpT99qjckxcwyxl3+WJ9VAiKA0eadNlxp482iSHpSU/P3wBFTlJnm2vW9ztqgfA55paulo+Du3
+	erLQaKYxmSDFyJPX4k5iVG9JmR6MOckpY8a124abTtonc7bbpp65FKZdkYUPj2EdRgNuYZM70H+8V
+	HFNQ8Xnv4TUlowS5iHnSOgaSBu1Fd2sEGM2x3ERCH/GJ/edZYchOWMmjrET70WfOjngCpL5tDR1Do
+	cXTacjHYm2vOJwhoacIQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjPIB-0001m4-Au; Tue, 15 Jan 2019 14:02:11 +0000
+	id 1gjPIa-0002Gc-P5; Tue, 15 Jan 2019 14:02:36 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjPDP-0004IQ-Ff
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 13:57:51 +0000
+ id 1gjPDN-0004WI-FS
+ for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 13:57:52 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6C458EBD;
- Tue, 15 Jan 2019 05:57:15 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1ABBC1650;
+ Tue, 15 Jan 2019 05:57:13 -0800 (PST)
 Received: from e119884-lin.cambridge.arm.com (e119884-lin.cambridge.arm.com
  [10.1.196.72])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 594063F70D;
- Tue, 15 Jan 2019 05:57:13 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 07A983F70D;
+ Tue, 15 Jan 2019 05:57:10 -0800 (PST)
 From: Vincenzo Frascino <vincenzo.frascino@arm.com>
 To: linux-arch@vger.kernel.org,
 	linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v4 22/24] clock: csrc-4k: Add support for vdso_direct
-Date: Tue, 15 Jan 2019 13:55:37 +0000
-Message-Id: <20190115135539.24762-23-vincenzo.frascino@arm.com>
+Subject: [PATCH v4 21/24] mips: Introduce vdso_direct
+Date: Tue, 15 Jan 2019 13:55:36 +0000
+Message-Id: <20190115135539.24762-22-vincenzo.frascino@arm.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190115135539.24762-1-vincenzo.frascino@arm.com>
 References: <20190115135539.24762-1-vincenzo.frascino@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_055715_869659_2BCBB472 
-X-CRM114-Status: GOOD (  15.04  )
+X-CRM114-CacheID: sfid-20190115_055713_795549_A685BDDA 
+X-CRM114-Status: GOOD (  13.73  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,33 +80,33 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch is a consequence of the introduction of vdso_direct on mips
-architectures.
+vdso_direct is an architectural clock configuration parameter that
+exposes the usage of not of the vDSO.
 
-If the clock source is selected, vdso_direct is set to true.
+If vdso_direct is false, the time related syscalls will be used instead
+of the vDSO library.
+
+This patch introduces the parameter in the mips architecture to prepare
+the ground for the support of the generic vDSO library.
 
 Cc: Ralf Baechle <ralf@linux-mips.org>
 Cc: Paul Burton <paul.burton@mips.com>
 Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
 ---
- arch/mips/kernel/csrc-r4k.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/mips/include/asm/clocksource.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/mips/kernel/csrc-r4k.c b/arch/mips/kernel/csrc-r4k.c
-index eed099f35bf1..97e2a8aafdd6 100644
---- a/arch/mips/kernel/csrc-r4k.c
-+++ b/arch/mips/kernel/csrc-r4k.c
-@@ -77,8 +77,10 @@ int __init init_r4k_clocksource(void)
- 	 * R2 onwards makes the count accessible to user mode so it can be used
- 	 * by the VDSO (HWREna is configured by configure_hwrena()).
- 	 */
--	if (cpu_has_mips_r2_r6 && rdhwr_count_usable())
-+	if (cpu_has_mips_r2_r6 && rdhwr_count_usable()) {
-+		clocksource_mips.archdata.vdso_direct = true;
- 		clocksource_mips.archdata.vdso_clock_mode = VDSO_CLOCK_R4K;
-+	}
- 
- 	clocksource_register_hz(&clocksource_mips, mips_hpt_frequency);
+diff --git a/arch/mips/include/asm/clocksource.h b/arch/mips/include/asm/clocksource.h
+index 3deb1d0c1a94..eab11ee4871a 100644
+--- a/arch/mips/include/asm/clocksource.h
++++ b/arch/mips/include/asm/clocksource.h
+@@ -23,6 +23,7 @@
+  * @vdso_clock_mode: Method the VDSO should use to access the clocksource.
+  */
+ struct arch_clocksource_data {
++	bool vdso_direct;
+ 	u8 vdso_clock_mode;
+ };
  
 -- 
 2.20.1
