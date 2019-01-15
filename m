@@ -2,75 +2,80 @@ Return-Path: <SRS0=3lKL=PX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3FD13C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 14:12:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E48BFC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 14:12:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0859F20656
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 14:12:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B27C720656
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 14:12:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ddxJbdhi";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="Y6EmkaZZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0859F20656
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eoGAWx3F";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="sQ9KfHM6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B27C720656
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=AmsBuBdcwq32aSrT/TGbOkSYjWHf8ximFjAzedgEYOo=; b=ddx
-	JbdhizhgrwkQQnOrp90n501TKYYeqtDQhAmW4rPl7XWjnG724LK7TPhaZs0i8wEXWgjlL7Kv38sYd
-	83s4sa9nEG5vkTwUMFfwtDToaF7RHGZUNKMRACrMR1X0JPv4kikjIusL7NTcS00scwkpDrqLdqXpb
-	OGFLYO5g0AOtkgSOVr2LtSSe8J08XPiISn6XYJjh0Ewu+KCn1gIUNJN6JtRggyaExqEUqkauGH3dP
-	fXTGW3B5IL29Pjqp7d/iwZsIg28AnoSVxxF602t5gvR2LOnDCITwgegMk/gEfk2OrY3jEYt+H2M60
-	U4mJ0ZSgC8p7cA/OR9c95WCDmpLQzng==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=yg82JQ8lwLhfzhDUksgpTTx2SuWDBLhgorWpzhecEdI=; b=eoGAWx3FkIEoHm
+	WhxmxkdKoPevwYLL42NWxrGBzKvvnj407YbKQemsTl5NQKvxE8VGJjQ/k0vSUwUoGTmOl/ne3SsfU
+	Tzt3pN6byvUtf979v7SK3NUgDNtaSNK57+MbLS1W1cgzjIGpqUdHCSp5zwN8RTRYfE4rSwkspV1Vi
+	mADr5SJCJFWy1woWncDvyY1DYYYp6LzRVk4vEVZn1X0oNqrnc9Y+ABsCLA7P2fJZzAqgGqtc6r45e
+	w/WJNsnvWIa2+GtjGDs+QxMHeytpsWo949hFSJ4c5Ek7nYDNFA+RtB5XuQgodcb6iQVtCLI3aHb/J
+	TLdSkWqzRme90YFspGIg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjPS8-0000hS-34; Tue, 15 Jan 2019 14:12:28 +0000
+	id 1gjPSS-000160-UQ; Tue, 15 Jan 2019 14:12:48 +0000
 Received: from casper.infradead.org ([85.118.1.10])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjPRg-0008R5-A4
- for linux-arm-kernel@bombadil.infradead.org; Tue, 15 Jan 2019 14:12:00 +0000
+ id 1gjPRl-0008R5-J3
+ for linux-arm-kernel@bombadil.infradead.org; Tue, 15 Jan 2019 14:12:05 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=Message-Id:Date:Subject:Cc:To:From:
- Sender:Reply-To:MIME-Version:Content-Type:Content-Transfer-Encoding:
- Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender:
- Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=O2JIIB4zOuJ8eTVggTjQoAaASvf78jq7+kaiahCyJEg=; b=Y6EmkaZZVjzlLIeZYz4LzUdbU
- EdILLZE5Ut55TvtEsYI1kMNuDygb/iR3ldgZCe+TFAdgyNSefH4Ph6MofsfJHCiT+YwgUYYRqXuAQ
- YX8X4gh70WJIy+ZMuVPISvGVvrI2b+5M7iMImBthpXrVAxKqELWup/F8QQENvwGtYLU3pqGrmTntT
- oqI8QGWz9qls5WP/gRgjUHrptPRyLas6/geKtKQ9GSbF4IHz5F5yNm3IBhO7M1HgII+4Fr1AAMbfN
- TA9Br7aPG+ZXj3etD+us8KwDlSQioNJ8THvmSaZ8a8yK2h62s/2aUBDtNxvnaDS6WSpB7LQKgZ9LX
- hV/ilTqAA==;
-Received: from foss.arm.com ([217.140.101.70])
+ d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
+ References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
+ Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=OO+QlpAUY33l39E1QqE4Dpwz/oLGGA9zB6S9qAzDJcs=; b=sQ9KfHM6q5fVoL6GTj4X0f4QGj
+ DowbaezHSKeYHH235K7pM7qi4KZIbvpGoNYB3FKfy0biuQORdiYhrR3vxWdQwxSkQA6Ct3vhl+fki
+ qK5VecDC6B4CteYse+Jw0CsQm5R/ac3MGIrOYB9uyEk0RYrWdqNio5iYHERuGHWo9jRHdpasVgUUR
+ 64C8asrkuI4FVoH95+GWrHJM7U84L2QBrUNTsoKk6fGpBxIaEhSpfMXVNi6m5KcYkUuVLHlzNAzU/
+ H3W/e0moWZoXVIg+mnWlTkVoC3d/eLdkKh0SsHWW1INGpuGyn1DuhSK7MoxiYFGAtUD0ltfyhOgjD
+ AybLZCeQ==;
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by casper.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjPEk-0006F6-3h
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 13:58:42 +0000
+ id 1gjPDF-0006Al-E3
+ for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 13:57:07 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6F6CFA78;
- Tue, 15 Jan 2019 05:58:37 -0800 (PST)
-Received: from e112298-lin.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 99E083F70D;
- Tue, 15 Jan 2019 05:58:35 -0800 (PST)
-From: Julien Thierry <julien.thierry@arm.com>
-To: linux-kernel@vger.kernel.org,
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id BBD431650;
+ Tue, 15 Jan 2019 05:57:03 -0800 (PST)
+Received: from e119884-lin.cambridge.arm.com (e119884-lin.cambridge.arm.com
+ [10.1.196.72])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A8FCD3F70D;
+ Tue, 15 Jan 2019 05:57:01 -0800 (PST)
+From: Vincenzo Frascino <vincenzo.frascino@arm.com>
+To: linux-arch@vger.kernel.org,
 	linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v3 0/4] uaccess: Add unsafe accessors for arm64
-Date: Tue, 15 Jan 2019 13:58:25 +0000
-Message-Id: <1547560709-56207-1-git-send-email-julien.thierry@arm.com>
-X-Mailer: git-send-email 1.9.1
+Subject: [PATCH v4 17/24] arm64: compat: Get sigreturn trampolines from vDSO
+Date: Tue, 15 Jan 2019 13:55:32 +0000
+Message-Id: <20190115135539.24762-18-vincenzo.frascino@arm.com>
+X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190115135539.24762-1-vincenzo.frascino@arm.com>
+References: <20190115135539.24762-1-vincenzo.frascino@arm.com>
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_135838_310208_2C1F7876 
-X-CRM114-Status: GOOD (  11.75  )
+X-CRM114-CacheID: sfid-20190115_135705_623273_AAE21295 
+X-CRM114-Status: GOOD (  15.24  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,69 +87,107 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Julien Thierry <julien.thierry@arm.com>, peterz@infradead.org,
- catalin.marinas@arm.com, will.deacon@arm.com, mingo@redhat.com,
- james.morse@arm.com, hpa@zytor.com, valentin.schneider@arm.com
-MIME-Version: 1.0
+Cc: Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>, Will Deacon <will.deacon@arm.com>,
+ Russell King <linux@armlinux.org.uk>, Ralf Baechle <ralf@linux-mips.org>,
+ Mark Salyzyn <salyzyn@android.com>, Paul Burton <paul.burton@mips.com>,
+ Thomas Gleixner <tglx@linutronix.de>, Peter Collingbourne <pcc@google.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+When the compat vDSO is enabled, the sigreturn trampolines are not
+anymore available through [sigpage] but through [vdso].
 
-First version of this series[1] was briefly in linux-next but had to be
-reverted due to a bug where schedule would end up being called while
-user_access was active[2].
+This patch adds the relevant code the enable the feature.
 
-After clarifications[3], rescheduling while in a user_access region is not
-allowed.
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
+---
+ arch/arm64/include/asm/vdso.h |  3 +++
+ arch/arm64/kernel/signal32.c  | 29 +++++++++++++++++++++++++++--
+ 2 files changed, 30 insertions(+), 2 deletions(-)
 
-* Patches 1 and 2 implement the unsafe accessors for arm64
-* Patches 3 and 4 clarify this restriction in the API and attempts to
-  check against violations of the restriction.
+diff --git a/arch/arm64/include/asm/vdso.h b/arch/arm64/include/asm/vdso.h
+index 839ce0031bd5..9b197e5ea759 100644
+--- a/arch/arm64/include/asm/vdso.h
++++ b/arch/arm64/include/asm/vdso.h
+@@ -28,6 +28,9 @@
+ #ifndef __ASSEMBLY__
+ 
+ #include <generated/vdso-offsets.h>
++#ifdef CONFIG_COMPAT_VDSO
++#include <generated/vdso32-offsets.h>
++#endif
+ 
+ #define VDSO_SYMBOL(base, name)						   \
+ ({									   \
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index d916fd7f6409..b8b53213cde6 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -29,6 +29,7 @@
+ #include <asm/traps.h>
+ #include <linux/uaccess.h>
+ #include <asm/unistd.h>
++#include <asm/vdso.h>
+ 
+ struct compat_vfp_sigframe {
+ 	compat_ulong_t	magic;
+@@ -333,7 +334,6 @@ static void compat_setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+ 	compat_ulong_t retcode;
+ 	compat_ulong_t spsr = regs->pstate & ~(PSR_f | PSR_AA32_E_BIT);
+ 	int thumb;
+-	void *sigreturn_base;
+ 
+ 	/* Check if the handler is written for ARM or Thumb */
+ 	thumb = handler & 1;
+@@ -353,14 +353,39 @@ static void compat_setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+ 		retcode = ptr_to_compat(ka->sa.sa_restorer);
+ 	} else {
+ 		/* Set up sigreturn pointer */
++#ifdef CONFIG_COMPAT_VDSO
++		void *vdso_base = current->mm->context.vdso;
++		void *vdso_trampoline;
++
++		if (ka->sa.sa_flags & SA_SIGINFO) {
++			if (thumb) {
++				vdso_trampoline = VDSO_SYMBOL(vdso_base,
++							compat_rt_sigreturn_thumb);
++			} else {
++				vdso_trampoline = VDSO_SYMBOL(vdso_base,
++							compat_rt_sigreturn_arm);
++			}
++		} else {
++			if (thumb) {
++				vdso_trampoline = VDSO_SYMBOL(vdso_base,
++							compat_sigreturn_thumb);
++			} else {
++				vdso_trampoline = VDSO_SYMBOL(vdso_base,
++							compat_sigreturn_arm);
++			}
++		}
++
++		retcode = ptr_to_compat(vdso_trampoline) + thumb;
++#else
+ 		unsigned int idx = thumb << 1;
+-		sigreturn_base = current->mm->context.vdso;
++		void *sigreturn_base = current->mm->context.vdso;
+ 
+ 		if (ka->sa.sa_flags & SA_SIGINFO)
+ 			idx += 3;
+ 
+ 		retcode = ptr_to_compat(sigreturn_base) +
+ 			  (idx << 2) + thumb;
++#endif
+ 	}
+ 
+ 	regs->regs[0]	= usig;
+-- 
+2.20.1
 
-Changes since v2[4]:
-- Rebase on v5.0-rc2
-- access_ok() is now done in user_access_begin(), so rework accessors
-  so access_ok() is not called in unsafe_get/put_user()
-- Split addition of unsafe accessors and the user_access_region check
-  into separate patches
-- Avoid reading SCTLR_EL1 in user_access_region check
-- Add build option for user_access_region checking
-- Reword clarifications on unsafe accessors API
-
-Changes since v1[1]:
-- Add a way to detect code calling schedule within a user_access region
-- Make sure put_user/get_user arguments are evaluated before disabling PAN
-
-[1] https://www.spinics.net/lists/arm-kernel/msg674925.html
-[2] https://patchwork.kernel.org/patch/10634783/
-[3] https://lkml.org/lkml/2018/11/28/50
-[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-December/617080.html
-
-Cheers,
-
-Julien
-
--->
-
-Julien Thierry (4):
-  arm64: uaccess: Cleanup get/put_user()
-  arm64: uaccess: Implement unsafe accessors
-  uaccess: Check no rescheduling function is called in unsafe region
-  arm64: uaccess: Implement user_access_region_active
-
- arch/arm64/include/asm/sysreg.h  |   2 +
- arch/arm64/include/asm/uaccess.h | 123 ++++++++++++++++++++++++++-------------
- include/linux/kernel.h           |  11 +++-
- include/linux/uaccess.h          |  13 +++++
- kernel/sched/core.c              |  22 +++++++
- lib/Kconfig.debug                |   8 +++
- 6 files changed, 135 insertions(+), 44 deletions(-)
-
---
-1.9.1
 
 _______________________________________________
 linux-arm-kernel mailing list
