@@ -7,18 +7,18 @@ X-Spam-Status: No, score=-9.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E3BC3C43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 23:08:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E34BAC43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 23:08:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B58F820896
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 23:08:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A8F2920866
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 23:08:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NLnjYO14";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="JaNuXyhK";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="f73yPWZG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B58F820896
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YVlH7AFT";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="xFo+5yhD";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="b84Jmktb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A8F2920866
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -28,78 +28,79 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=/i9/IM/5WvCZsAs5dBisYxsN+66pomXC0frIXB71MKM=; b=NLnjYO14ES7fs5rBMx9ntx7ptb
-	hQdZfNIUzAKQzpeZD+WrGUn3rMxLuK/udlcFVBFVDOkEqaDXcXLSf7XEwog4a2v1I4V32Dohpr7Sk
-	wrTOpjwgBQPiCYRnetwA6YGRpuvbV0soauqtHeYp/4JIE9TrYTN7DIa3sgZ/DsKAUkgya207LJS9W
-	ZInr2YWPz3CCllayCk216Pw3NXn3V8MYpOsQaT5CazsgHztuht0VGuPxWhfwa3ovqEgE5nxZahK7B
-	cZrGlwyZNRmATWqCo2HOrQKnUWhetMUme5UhzVfazkrzhcP5flm02oLXAgN7Xy0dvcaEXZU65gEvu
-	oqT+CuUQ==;
+	bh=T27JHMHOIEbkpJHdLA/FjO8rmA942YTmBu//2AVeM/Y=; b=YVlH7AFTOa6IoKssQYu1k7UdSV
+	uupAMNMEzbf02hlMHaduQDBhNtpzDwbBfgEGXl3bFFE/fjA9yJg+rN4hXpaxGWnxPeFg8Y2JKPIp2
+	ijL9EX9IsXpf3XuRnIICBtfAv7LTPPcm0+EiIOOgKc9oGZy5UzoL8NJrab4zKsfHBQkdIDRlTXz7d
+	5v9z8ReNEEMz/kkytENIUT0giXFSOdnPYxT3TFOL9t5tg/Skw5KbC86PWNZNOVoFgvH5VwNTx1m6q
+	KZ2L7FxEjKkorUdgzPsSN6FaU66ob92JTGDWyDSixf2oOgBl65KBWiKLshgcKWZbhqkI75Tb0ATAQ
+	gxIDpSPA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjXoq-0005SM-3z; Tue, 15 Jan 2019 23:08:28 +0000
+	id 1gjXp3-0005fq-P4; Tue, 15 Jan 2019 23:08:41 +0000
 Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjXoT-00058R-HX
- for linux-arm-kernel@bombadil.infradead.org; Tue, 15 Jan 2019 23:08:05 +0000
+ id 1gjXoV-00058R-CL
+ for linux-arm-kernel@bombadil.infradead.org; Tue, 15 Jan 2019 23:08:07 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=infradead.org; s=merlin.20170209; h=References:In-Reply-To:Message-Id:Date:
  Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
  Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
  Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
  List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=yP2FasSJHEKUvmhM1NueUcXAVpTqjNNg1l20bnmEqxo=; b=JaNuXyhKpOyEOyDh46xbUFK1H
- 6QwOIZ+15g5FEvjL5WBe51OAh/zSyIOyh//LehQNHFOc6jYbCQjwXgGOpAWiLNWpmzo27Oekzrwp9
- 3gtiyq998OmhmIByhUyWJ8gg3EjOBC42dtxyjTkWTBt5pF1PZd4HoTYgY620tNDXUxsk6q6pufFP9
- K/O6ftme1l9B+HUbn20N89owgWXJvdae2+tPnENnounnX07p2aya+k0MXvYWYdr+ZVbr6sBfLD6yT
- svRK8JSFf8hKGXY8eRPnVu70pRT+IsmXyBJD0afqqJInzSHOlP5jp0xt+0Sr2KiSC9u9+JJoJAV6r
- HCD1pkZvQ==;
-Received: from mail-pf1-x442.google.com ([2607:f8b0:4864:20::442])
+ bh=XDWNDjej1vaQghEKuWRObLfufBBUVnZJNWEVf/9UfwU=; b=xFo+5yhDBgtCd8e7+sc63ItTX
+ zapYlmWrCBv9WzYvuxBOxVk8OLDa3cp5ftM6lvoJJY4kXhAXp6fD/U3WtJgkbEBhNStM+mjr4oMrG
+ +X0BN8oMgzLduA6MjMNkgKFv1kQUoAIdhLTrpQ2Hn3e6pinxWWkWthsBDDW4W24b1XIhaUyII4Rr9
+ +KnrLT+KVLG8ocVl2D5zbjaSxEOF4Get3t1UOMg+IAVfM5JRC/NtUQ/IB+6tbeKn41TWBK38Olo2F
+ BOhp3LsKjbqiAwImTd+EOciYca87HxgCdjKmANpPc/4AQZ46yEvQflmRxAPw89RlAx+xLfwRZ68WV
+ rqfq09vYA==;
+Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
  by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjXoN-0006JV-Hh
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 23:08:01 +0000
-Received: by mail-pf1-x442.google.com with SMTP id i12so2027610pfo.7
+ id 1gjXoO-0006JQ-RJ
+ for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 23:08:02 +0000
+Received: by mail-pl1-x644.google.com with SMTP id z23so2017185plo.0
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 15 Jan 2019 15:07:53 -0800 (PST)
+ Tue, 15 Jan 2019 15:07:51 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=yP2FasSJHEKUvmhM1NueUcXAVpTqjNNg1l20bnmEqxo=;
- b=f73yPWZGnexRNZGn6npQodSzy1FwWsuGGI8atkevYafdxTj9Bgi4zFdrGmQ9dxEQk1
- AjFqAi50+sW9npyd2KpsXn/7W1Z+IqbOoib12qDYV8QkulSU9i3YJ4kZ0sAK46GlJ59r
- FSe5TOBJyCwUmmxcqca3cyPUZxjllYob/RUpg=
+ bh=XDWNDjej1vaQghEKuWRObLfufBBUVnZJNWEVf/9UfwU=;
+ b=b84JmktbH4LgEz2UKivbHhzC09x3UMXzJaMj8si6l+upZCirCs1QoNgBzprVBbDy9w
+ FBzU4OKP2qSRSptbvbFV2QWDV8g/43fxihmkXRshEECSB0uW5kShD9zVMOAupagb+fO0
+ 6GZki9k1wHHPDcr8WnLZ05pU620ghVn4IrqLY=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=yP2FasSJHEKUvmhM1NueUcXAVpTqjNNg1l20bnmEqxo=;
- b=Z854IR+JpAYOSUd9Ffq/q8vJDYfJabZKTzcnm9TlC1s+4U1F1oazwzQfH4mRICoxmD
- g+HEdbw9MPs6xnPZaGkGOOqTcQE6uPAfcwMAjml/dvFPdQBwmpDlWkIVSk6jkF3LU6Rj
- lNkyJdL/kp8IRPbt4aaIiNw24/uYJrzllI0AFXAkwJH/Sg/uIUgyUhdC6eDP8VZwOeSE
- uzUuvoEHjd31lkAT9JbUo8k/pMxjN3Yk6CTqi+H10DutA4bE3rdwvjWaDu6Gt+/t1VVt
- /+SolPV/t3IfuKwZHhLu+jF4VtttJncTZ/GGy/4GmZTQASTa7yue/xmwAXuijLN87+Pg
- hwcQ==
-X-Gm-Message-State: AJcUukeypoIj6+deidDKPTIAYkSu2mcYAIxta57h3lIdY3SoJ7Q8iE6o
- K44sPItzs+Z8KGZa24on1Hb1cQ==
-X-Google-Smtp-Source: ALg8bN7j3gB8hbQAeB9GZ/VnFp3JiYHJ5uAHxY+4709KtpQtbdU7shOV3SgBgQbCLc55/XW4tVkLKw==
-X-Received: by 2002:a63:413:: with SMTP id 19mr5881392pge.7.1547593671526;
- Tue, 15 Jan 2019 15:07:51 -0800 (PST)
+ bh=XDWNDjej1vaQghEKuWRObLfufBBUVnZJNWEVf/9UfwU=;
+ b=n+dZrD+icKjZSFPBtrZhEj47pe1OQ5h11smyn2Ll51dNAWS3kyJZILuE0CswJlF1WG
+ YqUDCQeDRWcSFQZ3HxzfucS2ikYvzK8XCZaSuiOUZbk0dJB9Y+UPxsbh+kJhvOYc7tDb
+ oksKQTTyIapppm1CXDft7Q4ZEl96yuL58p2opDu7O3IwBy4Xy37uOMHgdxUY4GgqgWHG
+ CYIAK7FWJ2wLamfR3blCE46KVparjzpJk5Ylf8OxqnhjTu4xWOGFm84at61tw+cgf/6z
+ 0i5DwLwpu1Mrr2bGBLxdUsdw9W6ycUxl5d3GqdwhhcurkSt05HbP4pjGKizGLv7vBIET
+ D5dw==
+X-Gm-Message-State: AJcUukeRIlPTFGKp+KWj6Kk7hTzi9HyfHrp4Lkc0IUxEK9bsECZLOE/m
+ y02o+Qqot6aqHN8l8ZdlgRsA5g==
+X-Google-Smtp-Source: ALg8bN5+djzWfwdKN+1jr2ma77gjFXRvNidqYQRQLiVLUdyF0vHH/cEgLfKuCL/zbwxyDXXNiZ+QbA==
+X-Received: by 2002:a17:902:6b87:: with SMTP id
+ p7mr6690582plk.282.1547593669668; 
+ Tue, 15 Jan 2019 15:07:49 -0800 (PST)
 Received: from xps15.cg.shawcable.net (S0106002369de4dac.cg.shawcable.net.
  [68.147.8.254])
- by smtp.gmail.com with ESMTPSA id h19sm4985928pfn.114.2019.01.15.15.07.49
+ by smtp.gmail.com with ESMTPSA id h19sm4985928pfn.114.2019.01.15.15.07.47
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 15 Jan 2019 15:07:50 -0800 (PST)
+ Tue, 15 Jan 2019 15:07:48 -0800 (PST)
 From: Mathieu Poirier <mathieu.poirier@linaro.org>
 To: acme@kernel.org,
 	peterz@infradead.org,
 	gregkh@linuxfoundation.org
-Subject: [PATCH 3/7] coresight: Use event attributes for sink selection
-Date: Tue, 15 Jan 2019 16:07:38 -0700
-Message-Id: <20190115230742.13730-4-mathieu.poirier@linaro.org>
+Subject: [PATCH 2/7] coresight: perf: Add "sinks" group to PMU directory
+Date: Tue, 15 Jan 2019 16:07:37 -0700
+Message-Id: <20190115230742.13730-3-mathieu.poirier@linaro.org>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20190115230742.13730-1-mathieu.poirier@linaro.org>
 References: <20190115230742.13730-1-mathieu.poirier@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_180759_604630_BB593350 
-X-CRM114-Status: GOOD (  24.01  )
+X-CRM114-CacheID: sfid-20190115_180800_903066_CD408C21 
+X-CRM114-Status: GOOD (  19.81  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -123,114 +124,134 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch uses the information conveyed by perf_event::attr::config2
-to select a sink to use for the session.  That way a sink can easily be
-selected to be used by more than one source, something that isn't currently
-possible with the sysfs implementation.
+Add a "sinks" directory entry so that users can see all the sinks
+available in the system in a single place.  Individual sink are added
+as they are registered with the coresight bus.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- .../hwtracing/coresight/coresight-etm-perf.c  | 16 ++------
- drivers/hwtracing/coresight/coresight-priv.h  |  1 +
- drivers/hwtracing/coresight/coresight.c       | 39 +++++++++++++++++++
- 3 files changed, 44 insertions(+), 12 deletions(-)
+ .../hwtracing/coresight/coresight-etm-perf.c  | 43 +++++++++++++++++++
+ .../hwtracing/coresight/coresight-etm-perf.h  |  1 +
+ drivers/hwtracing/coresight/coresight.c       | 17 ++++++++
+ 3 files changed, 61 insertions(+)
 
 diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-index 292bd409a68c..685d16001d0b 100644
+index f21eb28b6782..292bd409a68c 100644
 --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
 +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -201,18 +201,10 @@ static void *etm_setup_aux(struct perf_event *event, void **pages,
- 		return NULL;
- 	INIT_WORK(&event_data->work, free_event_data);
- 
--	/*
--	 * In theory nothing prevent tracers in a trace session from being
--	 * associated with different sinks, nor having a sink per tracer.  But
--	 * until we have HW with this kind of topology we need to assume tracers
--	 * in a trace session are using the same sink.  Therefore go through
--	 * the coresight bus and pick the first enabled sink.
--	 *
--	 * When operated from sysFS users are responsible to enable the sink
--	 * while from perf, the perf tools will do it based on the choice made
--	 * on the cmd line.  As such the "enable_sink" flag in sysFS is reset.
--	 */
--	sink = coresight_get_enabled_sink(true);
-+	/* First get the selected sink from user space. */
-+	sink = coresight_get_sink_by_id(event->attr.config2);
-+	if (!sink)
-+		sink = coresight_get_enabled_sink(true);
- 	if (!sink || !sink_ops(sink)->alloc_buffer)
- 		goto err;
- 
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index 579f34943bf1..071bb98d358f 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -147,6 +147,7 @@ void coresight_disable_path(struct list_head *path);
- int coresight_enable_path(struct list_head *path, u32 mode, void *sink_data);
- struct coresight_device *coresight_get_sink(struct list_head *path);
- struct coresight_device *coresight_get_enabled_sink(bool reset);
-+struct coresight_device *coresight_get_sink_by_id(u64 id);
- struct list_head *coresight_build_path(struct coresight_device *csdev,
- 				       struct coresight_device *sink);
- void coresight_release_path(struct list_head *path);
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index 526f122a38ee..7e2ce0beb2a0 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -11,6 +11,7 @@
- #include <linux/err.h>
- #include <linux/export.h>
+@@ -14,6 +14,7 @@
+ #include <linux/perf_event.h>
+ #include <linux/percpu-defs.h>
  #include <linux/slab.h>
 +#include <linux/stringhash.h>
- #include <linux/mutex.h>
- #include <linux/clk.h>
- #include <linux/coresight.h>
-@@ -541,6 +542,44 @@ struct coresight_device *coresight_get_enabled_sink(bool deactivate)
- 	return dev ? to_coresight_device(dev) : NULL;
+ #include <linux/types.h>
+ #include <linux/workqueue.h>
+ 
+@@ -43,8 +44,18 @@ static const struct attribute_group etm_pmu_format_group = {
+ 	.attrs  = etm_config_formats_attr,
+ };
+ 
++static struct attribute *etm_config_sinks_attr[] = {
++	NULL,
++};
++
++static const struct attribute_group etm_pmu_sinks_group = {
++	.name   = "sinks",
++	.attrs  = etm_config_sinks_attr,
++};
++
+ static const struct attribute_group *etm_pmu_attr_groups[] = {
+ 	&etm_pmu_format_group,
++	&etm_pmu_sinks_group,
+ 	NULL,
+ };
+ 
+@@ -479,6 +490,38 @@ int etm_perf_symlink(struct coresight_device *csdev, bool link)
+ 	return 0;
  }
  
-+static int coresight_sink_by_id(struct device *dev, void *data)
++static ssize_t etm_perf_sink_name_show(struct device *dev,
++				       struct device_attribute *dattr,
++				       char *buf)
 +{
-+	struct coresight_device *csdev = to_coresight_device(dev);
-+	unsigned long hash;
++	/* See function coresight_sink_by_id() to know where this is used */
++	u32 hash = hashlen_hash(hashlen_string(NULL, dattr->attr.name));
 +
++	return scnprintf(buf, PAGE_SIZE, "%x\n", hash);
++}
++
++int etm_perf_symlink_sink(struct coresight_device *csdev)
++{
++	struct device *pmu_dev = etm_pmu.dev;
++	struct device *pdev = csdev->dev.parent;
++	struct device_attribute *dev_attr;
++
++	if (csdev->type != CORESIGHT_DEV_TYPE_SINK &&
++	    csdev->type != CORESIGHT_DEV_TYPE_LINKSINK)
++		return -EINVAL;
++
++	if (!etm_perf_up)
++		return -EPROBE_DEFER;
++
++	dev_attr = kzalloc(sizeof(*dev_attr), GFP_KERNEL);
++	dev_attr->attr.name = kstrdup(dev_name(pdev), GFP_KERNEL);
++	dev_attr->attr.mode = 0444;
++	dev_attr->show = etm_perf_sink_name_show;
++
++	return sysfs_add_file_to_group(&pmu_dev->kobj,
++				       &dev_attr->attr, "sinks");
++}
++
+ static int __init etm_perf_init(void)
+ {
+ 	int ret;
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.h b/drivers/hwtracing/coresight/coresight-etm-perf.h
+index da7d9336a15c..529a47285c0f 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.h
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.h
+@@ -59,6 +59,7 @@ struct etm_event_data {
+ 
+ #ifdef CONFIG_CORESIGHT
+ int etm_perf_symlink(struct coresight_device *csdev, bool link);
++int etm_perf_symlink_sink(struct coresight_device *csdev);
+ static inline void *etm_perf_sink_config(struct perf_output_handle *handle)
+ {
+ 	struct etm_event_data *data = perf_get_aux(handle);
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 2b0df1a0a8df..526f122a38ee 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -18,6 +18,7 @@
+ #include <linux/delay.h>
+ #include <linux/pm_runtime.h>
+ 
++#include "coresight-etm-perf.h"
+ #include "coresight-priv.h"
+ 
+ static DEFINE_MUTEX(coresight_mutex);
+@@ -1167,6 +1168,22 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
+ 		goto err_out;
+ 	}
+ 
 +	if (csdev->type == CORESIGHT_DEV_TYPE_SINK ||
-+	     csdev->type == CORESIGHT_DEV_TYPE_LINKSINK) {
-+		/*
-+		 * See function etm_perf_sink_name_show() to know where this
-+		 * comes from.
-+		 */
-+		hash = hashlen_hash(hashlen_string(NULL, dev_name(dev)));
++	    csdev->type == CORESIGHT_DEV_TYPE_LINKSINK) {
++		ret = etm_perf_symlink_sink(csdev);
 +
-+		if (hash == (*(unsigned long *)data))
-+			return 1;
++		if (ret) {
++			device_unregister(&csdev->dev);
++			/*
++			 * As with the above, all resources are free'd
++			 * explicitly via coresight_device_release() triggered
++			 * from put_device(), which is in turn called from
++			 * function device_unregister().
++			 */
++			goto err_out;
++		}
 +	}
 +
-+	return 0;
-+}
-+
-+/**
-+ * coresight_get_sink_by_id - returns the sink that matches the id
-+ * @id: Id of the sink to match
-+ *
-+ * The name of a sink is unique, whether it is found on the AMBA bus or
-+ * otherwise.  As such the hash of that name can easily be used to identify
-+ * a sink.
-+ */
-+struct coresight_device *coresight_get_sink_by_id(u64 id)
-+{
-+	struct device *dev = NULL;
-+
-+	dev = bus_find_device(&coresight_bustype, NULL, &id,
-+			      coresight_sink_by_id);
-+
-+	return dev ? to_coresight_device(dev) : NULL;
-+}
-+
- /*
-  * coresight_grab_device - Power up this device and any of the helper
-  * devices connected to it for trace operation. Since the helper devices
+ 	mutex_lock(&coresight_mutex);
+ 
+ 	coresight_fixup_device_conns(csdev);
 -- 
 2.17.1
 
