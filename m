@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0D4CEC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 23:09:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 20F81C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 23:09:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C20AA20866
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 23:09:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E5E9B20866
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 23:09:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="psA3UZuY";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="RGx3oU3n"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C20AA20866
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="j3vub36K";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="FhWvV2jW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E5E9B20866
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,62 +27,63 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=xPf6GfbBeLzUUTqeR3aogc5XoggeUFY3/vsxcK/TJp4=; b=psA3UZuYxHPAlGg+VlMxXIc8o0
-	Yq6snlsWu92Ykx5MzCm9Kcumlu1s7/LcSBCwZ9fw++UYh5UhcsBYMvCmcRSY1xDSPUtORb9DX4VZL
-	77Dyl4r9kUn/h18MOg22VgQGoWIgZA3Z2zfCcSJiV/cwtHzZNdecEH8jgU4RD8NPJI4uMI7A/3uZ9
-	AIuS864KLUU43exxH4WYpHYg6vz8s6KM8AKYcWI4TOlZuzVuaSszm35Q2dw31+/PpZ6WEB4KGwAxJ
-	7LLwNrbQ1K0KL3Idzs2SwvVphQfBgYx6JbLK0czBblufHxWPP9zVid4QYFSVUqksM72KV12hf4n0S
-	hJ2TCJEA==;
+	bh=GWK2nDMtxiFdrVgkHnnJ61d4rS0i7RMn1cxOwTpBEow=; b=j3vub36KsBN4dDA82RBLQxUQZ+
+	CjQW9XPxF+HVxmwN4VYQ5CDTDS0iFnHK1wO1YaTVCOXw7p0jpJFA2NY0FPZOTJcCQVmuWajhA+5+k
+	q8SQviwuyOCpbq5U/8G3cWV+ri0ebLPTPXYak+XQI9NW2eZeTVNz/hGQ3eTSU8cjphHiYulX+kWiE
+	61ZNKqyZruCnUFiCDE9s/+6M3r9kJoiUPo7Mg3IrHNIZtuNO1jkUxby3N0VWDPf0WvPYjsI1Y8PZ9
+	L4N4buj6GlXERu4c7a81L5U1RvFcwLAuvFvw5fwic6H3Tp2dBqHYj03XJsg9HOp5Zv3tAxDILzeCU
+	lgdBYgyQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjXpi-0006Fr-DZ; Tue, 15 Jan 2019 23:09:22 +0000
-Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
+	id 1gjXpx-0006VW-5m; Tue, 15 Jan 2019 23:09:37 +0000
+Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjXoC-0004uV-TN
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 23:08:18 +0000
-Received: by mail-pg1-x543.google.com with SMTP id c25so1894074pgb.4
+ id 1gjXoM-00053Z-7S
+ for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 23:08:22 +0000
+Received: by mail-pl1-x641.google.com with SMTP id gn14so1989298plb.10
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 15 Jan 2019 15:07:48 -0800 (PST)
+ Tue, 15 Jan 2019 15:07:58 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=voXZlLjcF9iMfJYraScWxo2aiNSp6J0i0hFMp6bhq5w=;
- b=RGx3oU3n6x8+7l4o/Ne17g9eKln9qFOkWUXrvDRCLKTIeYzgAOQy/bAZOkXLMTgVF+
- yteMBn8xkbIaYkod4nEePuIaSFeCqPjEG9M5u/rLh2JaXM4YeZMpNXcrbcjCuCxnFep3
- +OVBcBZr/ANaevqHnj/b9Kr21ZHOtwY2DQZiE=
+ bh=W+tcSbssL1cjoomd1/kZjJ7IjRwzQZIgCHeNiM3a0+8=;
+ b=FhWvV2jW3/XhC5+T+avYrTigCzmBbikp0R7D0LvqiJVqYCUHY4ajRCElkIziyN6xu4
+ zH9BHEvTLavNGPfVnT7pU4BCTGCv5ycPbz93ubvn3TPu0l+DG+22XY8EWdiDGwl4W4Sd
+ uvhg2oyyi16g03Q+sE47o7o37DenxghqDzliM=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=voXZlLjcF9iMfJYraScWxo2aiNSp6J0i0hFMp6bhq5w=;
- b=ixn7st5uFHvmPCMBc4DBpLx2Rz9vBkWJb8BQrb92ruPDFZ57cuZRJhetBdfvNqO02J
- etloQIJaPpSIXi3UUyzE7R+xeKHQW+m0nDVqhULl9UsBTWzj+Nn/fbKEA86dLDy7kn2t
- Wk+/4ZUtOEHRHMmsDkvrr337xYeL8BOrGQV7w3TJIqKhS3j6O+n3UH+V99z/0U27TUya
- 6xCWZ8lW1QXAcsgFalAgVmieMg01vgTHMHBwOj2UUjKTfc9IIL+A6VwaXzUVxsO5S+7G
- dviwZ7oyMEfM/rhgmtlbEpXUzzJBTADe5ebl+Y5kvaJIMSCtMP9n1FXcBMytoeskPOim
- 0Ugg==
-X-Gm-Message-State: AJcUukfoQPlUuhfTqg3/2xr4T/mTWC8+3bkZeO4djBghVZKb2JPZ1idZ
- qAA29YMbJ9vmSUq7RQmkAK3fiw==
-X-Google-Smtp-Source: ALg8bN5EFFxvmLkuK+n7kGg8vPvk/tvB96qkhsXfVdWnIZ/uoua3RXqLy3yudcXwL3ApV63wY4YBXA==
-X-Received: by 2002:a63:61c8:: with SMTP id v191mr6052271pgb.242.1547593667822; 
- Tue, 15 Jan 2019 15:07:47 -0800 (PST)
+ bh=W+tcSbssL1cjoomd1/kZjJ7IjRwzQZIgCHeNiM3a0+8=;
+ b=NHAs2jIvp8l00RIGz9gYoOds6F6BtHbJMGSArTFsPBP17qyzVSgFGjYvhSVi3VO0gx
+ xD1mN2VLCt2raU691grKF+cQPzxSnbNIDQzRyEyRAeY1cbqv0nKr8KfqtY5a+ZH6rm4c
+ 3jWmcc0WA2DQGgNIFb3tCW1z/SIrzi2hVCEZmF91lX8gY2mBAbUXM1y0uM0TgRYoJlJJ
+ Upobe7ogUbxGQcILqs4EKwkiuX8uahb3JwvstjBrC0eCGbpQw8JwGE1/GQb8j0k7eG55
+ 8sU1d6xNMErrVyWCRLzGos1Z+EI494zPQCX7uyJtHgojvfH2DooWEEUNmu84mB+X8GrL
+ pa0A==
+X-Gm-Message-State: AJcUukdfBSawVvB3NXzTFuausPDZFYe6lpg7kciDGf6pWqbJR96XESd7
+ A10Ees33UdTo2O3C+zj3W0mkWQ==
+X-Google-Smtp-Source: ALg8bN6Ohl435ebCYhIdwfMElP4W+VAOufHMLJwyq+vq8RpgJvxzMOUjX2b1lX/4CP7Fvca1/Na7hw==
+X-Received: by 2002:a17:902:b090:: with SMTP id
+ p16mr6605089plr.190.1547593677531; 
+ Tue, 15 Jan 2019 15:07:57 -0800 (PST)
 Received: from xps15.cg.shawcable.net (S0106002369de4dac.cg.shawcable.net.
  [68.147.8.254])
- by smtp.gmail.com with ESMTPSA id h19sm4985928pfn.114.2019.01.15.15.07.46
+ by smtp.gmail.com with ESMTPSA id h19sm4985928pfn.114.2019.01.15.15.07.55
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 15 Jan 2019 15:07:47 -0800 (PST)
+ Tue, 15 Jan 2019 15:07:56 -0800 (PST)
 From: Mathieu Poirier <mathieu.poirier@linaro.org>
 To: acme@kernel.org,
 	peterz@infradead.org,
 	gregkh@linuxfoundation.org
-Subject: [PATCH 1/7] perf/aux: Make perf_event accessible to setup_aux()
-Date: Tue, 15 Jan 2019 16:07:36 -0700
-Message-Id: <20190115230742.13730-2-mathieu.poirier@linaro.org>
+Subject: [PATCH 6/7] perf tools: Removing CoreSight set_drv_config() API
+Date: Tue, 15 Jan 2019 16:07:41 -0700
+Message-Id: <20190115230742.13730-7-mathieu.poirier@linaro.org>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20190115230742.13730-1-mathieu.poirier@linaro.org>
 References: <20190115230742.13730-1-mathieu.poirier@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_150749_423278_C73B765A 
-X-CRM114-Status: GOOD (  16.46  )
+X-CRM114-CacheID: sfid-20190115_150759_041225_E3C26321 
+X-CRM114-Status: GOOD (  13.66  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,151 +107,120 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-When pmu::setup_aux() is called the coresight PMU needs to know which
-sink to use for the session by looking up the information in the
-event's attr::config2 field.
-
-As such simply replace the cpu information by the complete perf_event
-structure and change all affected customers.
+Now that event's config2 attribute is used to communicate sink selection
+to the kernel, remove the old set_drv_config() implementation since it
+is no longer needed.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- arch/s390/kernel/perf_cpum_sf.c                  | 6 +++---
- arch/x86/events/intel/bts.c                      | 4 +++-
- arch/x86/events/intel/pt.c                       | 5 +++--
- drivers/hwtracing/coresight/coresight-etm-perf.c | 6 +++---
- drivers/perf/arm_spe_pmu.c                       | 6 +++---
- include/linux/perf_event.h                       | 2 +-
- kernel/events/ring_buffer.c                      | 2 +-
- 7 files changed, 17 insertions(+), 14 deletions(-)
+ tools/perf/arch/arm/util/cs-etm.c | 54 -------------------------------
+ tools/perf/arch/arm/util/cs-etm.h |  3 --
+ tools/perf/arch/arm/util/pmu.c    |  2 --
+ 3 files changed, 59 deletions(-)
 
-diff --git a/arch/s390/kernel/perf_cpum_sf.c b/arch/s390/kernel/perf_cpum_sf.c
-index bfabeb1889cc..1266194afb02 100644
---- a/arch/s390/kernel/perf_cpum_sf.c
-+++ b/arch/s390/kernel/perf_cpum_sf.c
-@@ -1600,7 +1600,7 @@ static void aux_sdb_init(unsigned long sdb)
+diff --git a/tools/perf/arch/arm/util/cs-etm.c b/tools/perf/arch/arm/util/cs-etm.c
+index 4aa6193dcb50..9a4a8153e4c2 100644
+--- a/tools/perf/arch/arm/util/cs-etm.c
++++ b/tools/perf/arch/arm/util/cs-etm.c
+@@ -26,9 +26,6 @@
+ #include <stdlib.h>
+ #include <sys/stat.h>
  
- /*
-  * aux_buffer_setup() - Setup AUX buffer for diagnostic mode sampling
-- * @cpu:	On which to allocate, -1 means current
-+ * @event:	Event the buffer is setup for, event->cpu == -1 means current
-  * @pages:	Array of pointers to buffer pages passed from perf core
-  * @nr_pages:	Total pages
-  * @snapshot:	Flag for snapshot mode
-@@ -1612,8 +1612,8 @@ static void aux_sdb_init(unsigned long sdb)
-  *
-  * Return the private AUX buffer structure if success or NULL if fails.
-  */
--static void *aux_buffer_setup(int cpu, void **pages, int nr_pages,
--			      bool snapshot)
-+static void *aux_buffer_setup(struct perf_event *event, void **pages,
-+			      int nr_pages, bool snapshot)
- {
- 	struct sf_buffer *sfb;
- 	struct aux_buffer *aux;
-diff --git a/arch/x86/events/intel/bts.c b/arch/x86/events/intel/bts.c
-index a01ef1b0f883..7cdd7b13bbda 100644
---- a/arch/x86/events/intel/bts.c
-+++ b/arch/x86/events/intel/bts.c
-@@ -77,10 +77,12 @@ static size_t buf_size(struct page *page)
+-#define ENABLE_SINK_MAX	128
+-#define CS_BUS_DEVICE_PATH "/bus/coresight/devices/"
+-
+ struct cs_etm_recording {
+ 	struct auxtrace_record	itr;
+ 	struct perf_pmu		*cs_etm_pmu;
+@@ -638,54 +635,3 @@ struct auxtrace_record *cs_etm_record_init(int *err)
+ out:
+ 	return NULL;
  }
+-
+-static FILE *cs_device__open_file(const char *name)
+-{
+-	struct stat st;
+-	char path[PATH_MAX];
+-	const char *sysfs;
+-
+-	sysfs = sysfs__mountpoint();
+-	if (!sysfs)
+-		return NULL;
+-
+-	snprintf(path, PATH_MAX,
+-		 "%s" CS_BUS_DEVICE_PATH "%s", sysfs, name);
+-
+-	if (stat(path, &st) < 0)
+-		return NULL;
+-
+-	return fopen(path, "w");
+-
+-}
+-
+-static int __printf(2, 3) cs_device__print_file(const char *name, const char *fmt, ...)
+-{
+-	va_list args;
+-	FILE *file;
+-	int ret = -EINVAL;
+-
+-	va_start(args, fmt);
+-	file = cs_device__open_file(name);
+-	if (file) {
+-		ret = vfprintf(file, fmt, args);
+-		fclose(file);
+-	}
+-	va_end(args);
+-	return ret;
+-}
+-
+-int cs_etm_set_drv_config(struct perf_evsel_config_term *term)
+-{
+-	int ret;
+-	char enable_sink[ENABLE_SINK_MAX];
+-
+-	snprintf(enable_sink, ENABLE_SINK_MAX, "%s/%s",
+-		 term->val.drv_cfg, "enable_sink");
+-
+-	ret = cs_device__print_file(enable_sink, "%d", 1);
+-	if (ret < 0)
+-		return ret;
+-
+-	return 0;
+-}
+diff --git a/tools/perf/arch/arm/util/cs-etm.h b/tools/perf/arch/arm/util/cs-etm.h
+index 1a12e64f5127..a3354bda4fe8 100644
+--- a/tools/perf/arch/arm/util/cs-etm.h
++++ b/tools/perf/arch/arm/util/cs-etm.h
+@@ -7,9 +7,6 @@
+ #ifndef INCLUDE__PERF_CS_ETM_H__
+ #define INCLUDE__PERF_CS_ETM_H__
  
- static void *
--bts_buffer_setup_aux(int cpu, void **pages, int nr_pages, bool overwrite)
-+bts_buffer_setup_aux(struct perf_event *event, void **pages,
-+		     int nr_pages, bool overwrite)
- {
- 	struct bts_buffer *buf;
- 	struct page *page;
-+	int cpu = event->cpu;
- 	int node = (cpu == -1) ? cpu : cpu_to_node(cpu);
- 	unsigned long offset;
- 	size_t size = nr_pages << PAGE_SHIFT;
-diff --git a/arch/x86/events/intel/pt.c b/arch/x86/events/intel/pt.c
-index 9494ca68fd9d..c0e86ff21f81 100644
---- a/arch/x86/events/intel/pt.c
-+++ b/arch/x86/events/intel/pt.c
-@@ -1114,10 +1114,11 @@ static int pt_buffer_init_topa(struct pt_buffer *buf, unsigned long nr_pages,
-  * Return:	Our private PT buffer structure.
-  */
- static void *
--pt_buffer_setup_aux(int cpu, void **pages, int nr_pages, bool snapshot)
-+pt_buffer_setup_aux(struct perf_event *event, void **pages,
-+		    int nr_pages, bool snapshot)
- {
- 	struct pt_buffer *buf;
--	int node, ret;
-+	int node, ret, cpu = event->cpu;
+-#include "../../util/evsel.h"
+-
+ struct auxtrace_record *cs_etm_record_init(int *err);
+-int cs_etm_set_drv_config(struct perf_evsel_config_term *term);
  
- 	if (!nr_pages)
- 		return NULL;
-diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-index abe8249b893b..f21eb28b6782 100644
---- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-+++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -177,15 +177,15 @@ static void etm_free_aux(void *data)
- 	schedule_work(&event_data->work);
- }
+ #endif
+diff --git a/tools/perf/arch/arm/util/pmu.c b/tools/perf/arch/arm/util/pmu.c
+index e047571e6080..e4619f2fe7ce 100644
+--- a/tools/perf/arch/arm/util/pmu.c
++++ b/tools/perf/arch/arm/util/pmu.c
+@@ -8,7 +8,6 @@
+ #include <linux/coresight-pmu.h>
+ #include <linux/perf_event.h>
  
--static void *etm_setup_aux(int event_cpu, void **pages,
-+static void *etm_setup_aux(struct perf_event *event, void **pages,
- 			   int nr_pages, bool overwrite)
- {
--	int cpu;
-+	int cpu = event->cpu;
- 	cpumask_t *mask;
- 	struct coresight_device *sink;
- 	struct etm_event_data *event_data = NULL;
+-#include "cs-etm.h"
+ #include "arm-spe.h"
+ #include "../../util/pmu.h"
  
--	event_data = alloc_event_data(event_cpu);
-+	event_data = alloc_event_data(cpu);
- 	if (!event_data)
- 		return NULL;
- 	INIT_WORK(&event_data->work, free_event_data);
-diff --git a/drivers/perf/arm_spe_pmu.c b/drivers/perf/arm_spe_pmu.c
-index 8e46a9dad2fa..7cb766dafe85 100644
---- a/drivers/perf/arm_spe_pmu.c
-+++ b/drivers/perf/arm_spe_pmu.c
-@@ -824,10 +824,10 @@ static void arm_spe_pmu_read(struct perf_event *event)
- {
- }
- 
--static void *arm_spe_pmu_setup_aux(int cpu, void **pages, int nr_pages,
--				   bool snapshot)
-+static void *arm_spe_pmu_setup_aux(struct perf_event *event, void **pages,
-+				   int nr_pages, bool snapshot)
- {
--	int i;
-+	int i, cpu = event->cpu;
- 	struct page **pglist;
- 	struct arm_spe_pmu_buf *buf;
- 
-diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-index 1d5c551a5add..3e49b2144808 100644
---- a/include/linux/perf_event.h
-+++ b/include/linux/perf_event.h
-@@ -409,7 +409,7 @@ struct pmu {
- 	/*
- 	 * Set up pmu-private data structures for an AUX area
- 	 */
--	void *(*setup_aux)		(int cpu, void **pages,
-+	void *(*setup_aux)		(struct perf_event *event, void **pages,
- 					 int nr_pages, bool overwrite);
- 					/* optional */
- 
-diff --git a/kernel/events/ring_buffer.c b/kernel/events/ring_buffer.c
-index 4a9937076331..857308295f63 100644
---- a/kernel/events/ring_buffer.c
-+++ b/kernel/events/ring_buffer.c
-@@ -658,7 +658,7 @@ int rb_alloc_aux(struct ring_buffer *rb, struct perf_event *event,
- 			goto out;
- 	}
- 
--	rb->aux_priv = event->pmu->setup_aux(event->cpu, rb->aux_pages, nr_pages,
-+	rb->aux_priv = event->pmu->setup_aux(event, rb->aux_pages, nr_pages,
- 					     overwrite);
- 	if (!rb->aux_priv)
- 		goto out;
+@@ -19,7 +18,6 @@ struct perf_event_attr
+ 	if (!strcmp(pmu->name, CORESIGHT_ETM_PMU_NAME)) {
+ 		/* add ETM default config here */
+ 		pmu->selectable = true;
+-		pmu->set_drv_config = cs_etm_set_drv_config;
+ #if defined(__aarch64__)
+ 	} else if (strstarts(pmu->name, ARM_SPE_PMU_NAME)) {
+ 		return arm_spe_pmu_default_config(pmu);
 -- 
 2.17.1
 
