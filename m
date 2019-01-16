@@ -2,113 +2,69 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 32DC1C43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 15:19:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C1CC1C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 15:39:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 00711205C9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 15:19:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 90D48206C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 15:39:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YLv+lIVh";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=renesasgroup.onmicrosoft.com header.i=@renesasgroup.onmicrosoft.com header.b="nOl7yNlP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 00711205C9
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=renesas.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Sj8KlGZ7";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="oaIuu4SI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 90D48206C2
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=CS8reHxp09eODWTAzakCD0iD9y6Qu+nqyAIXeA32ncA=; b=YLv+lIVhpMlIuU
-	LuGb5c0CbdNFDCjSEPE7kuy85l7zxB3XmEAt2ra6AbVxzE2pmM9XhzR/8cMBCSq+kHxRk42gUqKWw
-	rfFLsQ0jxjChHV7GtI8WTiriG+pNNHQIle6yjtJp3JTjgLW5agPfyHB4nH5WhgEoKC/IZLsRuNB7i
-	Mv8qWNhohjAge60iHicZfw7WxiQ4WEuFDajh5zjFE1XsRD5DCryKlQZQyRLiECV6gUqfBnYc13HWu
-	Wz3VwSw6WO9wFBjEIi1h523U2EqxXB6H4N8vJ+dsvq0blL7iGbx9CGpZFYW4uQuRGn9O74Oa6Vxrg
-	Yj0FdL1MUdEkzlU+7H5g==;
+	List-Owner; bh=ZD+mjg6g155HxTCF2hBcWrEJOxsVcbqwOAZAEvCCH8s=; b=Sj8KlGZ7Dzx91z
+	ORme9n0CdOmzf5GbtN4a3LT5lmqPcN+t62KKUoE9W+KFOe7qX76rY0Sxm2Wrm1+nJiiEx86GuL7Nz
+	DBqaepdyXPSSSw1+X2yu6JmWgU69r+jVrAZXLfF1iLOnqcTcVZ+9SSZYm6aN9AXY1F00/wuAnf+wZ
+	ibpnuU85y4Vgi4/9C6Lzk2FPZT5PnSyHcWqrsSkeJu3LU9LxXHmgXLus+tdr7PoYia58whu0VipzX
+	TK67WNEJoxBS8V4EsXMkE2PwHtw+tsztYOvCGWXa7napv9ZidzFSGu3Oz04fR6yyYP0Djgcog7KpE
+	fW0Dv+v+A2hHzWoZYFpQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjmy7-0004TH-5n; Wed, 16 Jan 2019 15:19:03 +0000
-Received: from mail-eopbgr1400094.outbound.protection.outlook.com
- ([40.107.140.94] helo=JPN01-TY1-obe.outbound.protection.outlook.com)
+	id 1gjnII-0002wE-VF; Wed, 16 Jan 2019 15:39:54 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjmxt-0004B8-Aq
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 15:18:59 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=renesasgroup.onmicrosoft.com; s=selector1-renesas-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=WA+sW76ngWkgHuRQ/PbGwznsOWkwRzFqMDxyjNIa9N0=;
- b=nOl7yNlP2zkWX7NDjyYmlh18oEzmRrhR6/HiXUzw5rAKOF1of2a+M9n+1K8OwIFYaRl/6iafq8MT6DqTwVcFO5gkdzSRNcdwWvukK6/s8xfKJc6N4YBO5KvAff6ZddZytd7Ddb72tM+TWAgotLwCX0Fw4mcl5HIFfXmrSt40yQg=
-Received: from TY1PR01MB1769.jpnprd01.prod.outlook.com (52.133.163.146) by
- TY1PR01MB1563.jpnprd01.prod.outlook.com (52.133.162.19) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1516.14; Wed, 16 Jan 2019 15:18:42 +0000
-Received: from TY1PR01MB1769.jpnprd01.prod.outlook.com
- ([fe80::84f5:1420:6fb3:ea62]) by TY1PR01MB1769.jpnprd01.prod.outlook.com
- ([fe80::84f5:1420:6fb3:ea62%4]) with mapi id 15.20.1537.018; Wed, 16 Jan 2019
- 15:18:42 +0000
-From: Phil Edworthy <phil.edworthy@renesas.com>
-To: Andy Shevchenko <andriy.shevchenko@linux.intel.com>, Michael Turquette
- <mturquette@baylibre.com>, =?iso-8859-1?Q?Uwe_Kleine-K=F6nig?=
- <u.kleine-koenig@pengutronix.de>, Stephen Boyd <sboyd@kernel.org>, Russell
- King <linux@armlinux.org.uk>, Geert Uytterhoeven <geert@linux-m68k.org>
-Subject: RE: [PATCH v9 1/2] clk: Add comment about __of_clk_get_by_name()
- error values
-Thread-Topic: [PATCH v9 1/2] clk: Add comment about __of_clk_get_by_name()
- error values
-Thread-Index: AQHUivk3i4Y+f5/feUuqUWNTx+pZGqVtAtEAgASlWYCAQJ6ToA==
-Date: Wed, 16 Jan 2019 15:18:42 +0000
-Message-ID: <TY1PR01MB17690EDAC0E4B637FF7A81DBF5820@TY1PR01MB1769.jpnprd01.prod.outlook.com>
-References: <20181203111309.3709-1-phil.edworthy@renesas.com>
- <20181203111309.3709-2-phil.edworthy@renesas.com>
- <20181203133040.GN10650@smile.fi.intel.com>
- <TY1PR01MB1769B12A216ED3E76A40A6B7F5A90@TY1PR01MB1769.jpnprd01.prod.outlook.com>
-In-Reply-To: <TY1PR01MB1769B12A216ED3E76A40A6B7F5A90@TY1PR01MB1769.jpnprd01.prod.outlook.com>
-Accept-Language: en-GB, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=phil.edworthy@renesas.com; 
-x-originating-ip: [193.141.220.21]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; TY1PR01MB1563;
- 20:8ynzqdDimtoOX088lqVenoRUjZ1U9th2NtVpo/N4I+jkn4V0/7OUZ5YkLBzsryuw/WLEP9UABs3xeePPJ20fY2ylk5L3Yqi5X2ovR4SwRL7ctBDRwBG7dDU0S66qR5iBNpsoZqGvmhaDr5mlhUDn5HO2a2EaTXEscM5Q7Se95Xk=
-x-ms-exchange-antispam-srfa-diagnostics: SOS;
-x-ms-office365-filtering-correlation-id: 0187b540-9eb6-42cd-1a18-08d67bc5e6a6
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(5600109)(711020)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
- SRVR:TY1PR01MB1563; 
-x-ms-traffictypediagnostic: TY1PR01MB1563:
-x-microsoft-antispam-prvs: <TY1PR01MB1563CFC6C0C4BA53815B52F4F5820@TY1PR01MB1563.jpnprd01.prod.outlook.com>
-x-forefront-prvs: 091949432C
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10019020)(39860400002)(346002)(376002)(396003)(136003)(366004)(13464003)(189003)(199004)(51914003)(53936002)(9686003)(55016002)(8676002)(476003)(2906002)(6306002)(6246003)(86362001)(66066001)(14454004)(6436002)(186003)(93886005)(53546011)(446003)(66574012)(305945005)(8936002)(6506007)(26005)(102836004)(7696005)(7736002)(76176011)(68736007)(11346002)(81156014)(81166006)(74316002)(5660300001)(110136005)(33656002)(6116002)(54906003)(71200400001)(44832011)(3846002)(316002)(106356001)(99286004)(4326008)(71190400001)(14444005)(25786009)(486006)(478600001)(97736004)(229853002)(105586002)(256004);
- DIR:OUT; SFP:1102; SCL:1; SRVR:TY1PR01MB1563;
- H:TY1PR01MB1769.jpnprd01.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: renesas.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: WkvkZUSjBLjL4wr8bNm+lHttIu4rmtzg7LLZXd7W+55f+cvMoUZcqVfncDeOoWGJgca8pPCY6FkDN+VDfBNIUu5a0qoTWzcDv9C8p5fXQI/TvYA7EF8B7z/xMbcB18wmrosMre6kLdCkqpthDu6NHlVRDT+YmQUujDmS301RRkYnr+Iye0qIJmuegH2Tna//VsmU2teAE1UPFBYN/C7+hSCKFp4EzYj3MMlcocxDAcWVoPosdzEBTrsam3+92xDLt8AbMFy6yY849gmzoaqGlyuuHU2zpdnEhlAwWhxEtvDqceQIqj/e0JR9JxOQh/4SAFfsmcCmfZzWp/I7eN0bX7yWYAjWhpcYbGxAND6KKeI3BJZqTRAC6PDC495F8DCbAXA5CmCevQ1cumU4IP4EG53tZ4LzhwLUSLooVYU6VYg=
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1gjnIF-0002vl-BX
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 15:39:52 +0000
+Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id E450B20675;
+ Wed, 16 Jan 2019 15:39:49 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1547653190;
+ bh=PEudjCXimqi3wHtjBM4HU2HIpO6DWL+KSri+QLk5FTI=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=oaIuu4SI+d3eQeefbWuwkH8qZ8F+SCf8kKML1HTGynqR+/A8OQsRCcW6QBnd+Se8G
+ sOwfZHfT3MGaAV8IXSDxt4PPOjvqfRmY4S8AEEkYrfl3jZD/Nn9m2HOz+/LqzPrnWw
+ 9zNe3c/h/wvGGakahDvrkEuXeXgMIfIKLg0VX45M=
+Date: Wed, 16 Jan 2019 16:39:48 +0100
+From: Greg KH <gregkh@linuxfoundation.org>
+To: Mathieu Poirier <mathieu.poirier@linaro.org>
+Subject: Re: [PATCH 2/7] coresight: perf: Add "sinks" group to PMU directory
+Message-ID: <20190116153948.GC871@kroah.com>
+References: <20190115230742.13730-1-mathieu.poirier@linaro.org>
+ <20190115230742.13730-3-mathieu.poirier@linaro.org>
 MIME-Version: 1.0
-X-OriginatorOrg: renesas.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 0187b540-9eb6-42cd-1a18-08d67bc5e6a6
-X-MS-Exchange-CrossTenant-originalarrivaltime: 16 Jan 2019 15:18:42.5621 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 53d82571-da19-47e4-9cb4-625a166a4a2a
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: TY1PR01MB1563
+Content-Disposition: inline
+In-Reply-To: <20190115230742.13730-3-mathieu.poirier@linaro.org>
+User-Agent: Mutt/1.11.2 (2019-01-07)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_071850_084378_F2CCBA9D 
-X-CRM114-Status: GOOD (  21.11  )
+X-CRM114-CacheID: sfid-20190116_073951_442605_B2106B21 
+X-CRM114-Status: GOOD (  18.89  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -120,85 +76,103 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: mark.rutland@arm.com, linux-s390@vger.kernel.org, suzuki.poulose@arm.com,
+ peterz@infradead.org, will.deacon@arm.com, heiko.carstens@de.ibm.com,
+ adrian.hunter@intel.com, acme@kernel.org, ast@kernel.org,
+ alexander.shishkin@linux.intel.com, mingo@redhat.com,
+ linux-arm-kernel@lists.infradead.org, hpa@zytor.com, schwidefsky@de.ibm.com,
+ namhyung@kernel.org, tglx@linutronix.de, jolsa@redhat.com,
+ linux-kernel@vger.kernel.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+On Tue, Jan 15, 2019 at 04:07:37PM -0700, Mathieu Poirier wrote:
+> Add a "sinks" directory entry so that users can see all the sinks
+> available in the system in a single place.  Individual sink are added
+> as they are registered with the coresight bus.
+> 
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> ---
+>  .../hwtracing/coresight/coresight-etm-perf.c  | 43 +++++++++++++++++++
+>  .../hwtracing/coresight/coresight-etm-perf.h  |  1 +
+>  drivers/hwtracing/coresight/coresight.c       | 17 ++++++++
+>  3 files changed, 61 insertions(+)
+> 
+> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> index f21eb28b6782..292bd409a68c 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> @@ -14,6 +14,7 @@
+>  #include <linux/perf_event.h>
+>  #include <linux/percpu-defs.h>
+>  #include <linux/slab.h>
+> +#include <linux/stringhash.h>
+>  #include <linux/types.h>
+>  #include <linux/workqueue.h>
+>  
+> @@ -43,8 +44,18 @@ static const struct attribute_group etm_pmu_format_group = {
+>  	.attrs  = etm_config_formats_attr,
+>  };
+>  
+> +static struct attribute *etm_config_sinks_attr[] = {
+> +	NULL,
+> +};
+> +
+> +static const struct attribute_group etm_pmu_sinks_group = {
+> +	.name   = "sinks",
+> +	.attrs  = etm_config_sinks_attr,
+> +};
+> +
+>  static const struct attribute_group *etm_pmu_attr_groups[] = {
+>  	&etm_pmu_format_group,
+> +	&etm_pmu_sinks_group,
+>  	NULL,
+>  };
+>  
+> @@ -479,6 +490,38 @@ int etm_perf_symlink(struct coresight_device *csdev, bool link)
+>  	return 0;
+>  }
+>  
+> +static ssize_t etm_perf_sink_name_show(struct device *dev,
+> +				       struct device_attribute *dattr,
+> +				       char *buf)
+> +{
+> +	/* See function coresight_sink_by_id() to know where this is used */
+> +	u32 hash = hashlen_hash(hashlen_string(NULL, dattr->attr.name));
+> +
+> +	return scnprintf(buf, PAGE_SIZE, "%x\n", hash);
+> +}
+> +
+> +int etm_perf_symlink_sink(struct coresight_device *csdev)
+> +{
+> +	struct device *pmu_dev = etm_pmu.dev;
+> +	struct device *pdev = csdev->dev.parent;
+> +	struct device_attribute *dev_attr;
+> +
+> +	if (csdev->type != CORESIGHT_DEV_TYPE_SINK &&
+> +	    csdev->type != CORESIGHT_DEV_TYPE_LINKSINK)
+> +		return -EINVAL;
+> +
+> +	if (!etm_perf_up)
+> +		return -EPROBE_DEFER;
+> +
+> +	dev_attr = kzalloc(sizeof(*dev_attr), GFP_KERNEL);
+> +	dev_attr->attr.name = kstrdup(dev_name(pdev), GFP_KERNEL);
+> +	dev_attr->attr.mode = 0444;
+> +	dev_attr->show = etm_perf_sink_name_show;
+> +
+> +	return sysfs_add_file_to_group(&pmu_dev->kobj,
+> +				       &dev_attr->attr, "sinks");
 
-Any other comments on this patch and patch 2/2 (https://lkml.org/lkml/2018/=
-12/3/326)?
+What is so odd about this call that you needed me to review this?
 
-Thanks
-Phil
+And what happens if this call fails, do you leak memory?
 
-> -----Original Message-----
-> From: Phil Edworthy
-> Sent: 06 December 2018 12:31
-> To: 'Andy Shevchenko' <andriy.shevchenko@linux.intel.com>
-> Cc: Michael Turquette <mturquette@baylibre.com>; Stephen Boyd
-> <sboyd@kernel.org>; Russell King <linux@armlinux.org.uk>; Geert
-> Uytterhoeven <geert@linux-m68k.org>; Uwe Kleine-K=F6nig <u.kleine-
-> koenig@pengutronix.de>; linux-clk@vger.kernel.org; linux-
-> kernel@vger.kernel.org; linux-arm-kernel@lists.infradead.org
-> Subject: RE: [PATCH v9 1/2] clk: Add comment about
-> __of_clk_get_by_name() error values
-> =
+thanks,
 
-> Hi Andy,
-> =
-
-> On 03 December 2018 13:31 Andy Shevchenko wrote:
-> > On Mon, Dec 03, 2018 at 11:13:08AM +0000, Phil Edworthy wrote:
-> > > It's not immediately obvious from the code that failure to get a
-> > > clock provider can return either -ENOENT or -EINVAL. Therefore, add
-> > > a comment to highlight this.
-> >
-> > > +/*
-> > > + * Beware the return values when np is valid, but no clock provider
-> > > +is
-> > found.
-> > > + * If name =3D NULL, the function returns -ENOENT.
-> > > + * If name !=3D NULL, the function returns -EINVAL. This is because
-> > > +__of_clk_get()
-> >
-> > I would start new sentence from new line (this will emphasize the
-> > possible
-> > variants)
-> >
-> >  * This is ...
-> I disagree, the explanation is specifically related to the case where the
-> function returns -EINVAL. Though this is a nit, so I'm not really bothered
-> either way.
-> =
-
-> Thanks for the review!
-> Phil
-> =
-
-> >  Otherwise looks good to me:
-> >
-> > Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-> >
-> > > + * is called even if of_property_match_string() returns an error.
-> > > + */
-> > >  static struct clk *__of_clk_get_by_name(struct device_node *np,
-> > >  					const char *dev_id,
-> > >  					const char *name)
-> > > --
-> > > 2.17.1
-> > >
-> >
-> > --
-> > With Best Regards,
-> > Andy Shevchenko
-> >
-
+greg k-h
 
 _______________________________________________
 linux-arm-kernel mailing list
