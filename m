@@ -2,54 +2,65 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3BDD1C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 10:09:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A19DCC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 10:12:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 06684205C9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 10:09:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6F13B20840
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 10:12:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YRVEnUa5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 06684205C9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=collabora.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VGwAvw/i"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6F13B20840
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=UpQBJOVWgwFHgWSXUdFu1f3E/rS5/pPeaKajxmjla+4=; b=YRVEnUa5dodJnl
-	77NljnKr7ijPN0y2YcwPsBZU1pXKEXPev0iV1SsAvrrstVK9kmMiw5W51BiI8w++AmuUIt/V/3i+E
-	9wuwAjM67ZniB1jipSAAJ1gou+ISmnYYQiA5RMHSOgaVrmTdruQ0KX/wLoMz04eK/bOcEHBYvP5Lv
-	dxv5/tBRFVgnkxFUrL8zbcbOskQ1AkGzRK9glvBKGJ0TgFgZiKyuwyaB8xDvaWB1W2u6ek8nvSBxV
-	PsknvK6SnLa+NEOQR2Wr0JiQ5AiWzESf/dqJE5pCawt4NOnYTGXf4V+kf4f5j5oDzlx5P1ZTAVRie
-	BM12NfkzqHbTCIgvDjdg==;
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=zQEmUE9jvN6nxb8pCCArsc5WPcGud5BFJSlg7stgcYM=; b=VGwAvw/iepwKol
+	pG13uS5ElZ8+9/VFHjhGempO4eUg9V9QhotheZNTVk4nT1VP6zY/+rIUupk21hcRqHebXGdNRIYfQ
+	OXfC0NLuN4K7KOa8vjQMz7uOHabjtxL2XGeKlRJDuAEj3Cm2L2Az3LwLa4/8DvmXiF/rnnuHixHYy
+	aygoTiMIte7IqXBmGgsJkO1Oo7G/YPVUfU3gNvSXaGrmTZjDZ63FmjmlVEs3Al/8pYJYdownE6ZPc
+	+J+GUt62wc+UHU4DvMfPmP0lXvJqlK2iEhtEpKDkhjGXMts6jeiNt4evvMk3PEUBJ9DRDUlVky/kx
+	4vQw4o6ehh7+g0k5yLTw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gji85-0002eb-S8; Wed, 16 Jan 2019 10:09:01 +0000
-Received: from bhuna.collabora.co.uk ([2a00:1098:0:82:1000:25:2eeb:e3e3])
+	id 1gjiBX-0004KI-PV; Wed, 16 Jan 2019 10:12:35 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gji7o-0002Q0-2U; Wed, 16 Jan 2019 10:08:45 +0000
-Received: from [127.0.0.1] (localhost [127.0.0.1])
- (Authenticated sender: eballetbo) with ESMTPSA id 996F82639AE
-From: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-To: linux-kernel@vger.kernel.org
-Subject: [RESEND PATCH v2] phy: phy-rockchip-inno-usb2: drop reading the
- utmi-avalid property
-Date: Wed, 16 Jan 2019 11:08:23 +0100
-Message-Id: <20190116100823.24938-1-enric.balletbo@collabora.com>
-X-Mailer: git-send-email 2.20.1
-MIME-Version: 1.0
+ id 1gjiBU-0004Jv-La
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 10:12:34 +0000
+Received: from kresse.hi.pengutronix.de ([2001:67c:670:100:1d::2a])
+ by metis.ext.pengutronix.de with esmtp (Exim 4.89)
+ (envelope-from <l.stach@pengutronix.de>)
+ id 1gjiBL-0004pE-VS; Wed, 16 Jan 2019 11:12:23 +0100
+Message-ID: <1547633543.4339.30.camel@pengutronix.de>
+Subject: Re: [PATCH v3] arm64: defconfig: Add i.MX8MQ boot necessary configs
+From: Lucas Stach <l.stach@pengutronix.de>
+To: Abel Vesa <abel.vesa@nxp.com>, "catalin.marinas@arm.com"
+ <catalin.marinas@arm.com>, Shawn Guo <shawnguo@kernel.org>, Will Deacon
+ <will.deacon@arm.com>, Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 16 Jan 2019 11:12:23 +0100
+In-Reply-To: <1547631712-24544-1-git-send-email-abel.vesa@nxp.com>
+References: <1547631712-24544-1-git-send-email-abel.vesa@nxp.com>
+X-Mailer: Evolution 3.22.6-1+deb9u1 
+Mime-Version: 1.0
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::2a
+X-SA-Exim-Mail-From: l.stach@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_020844_238388_4D9F4AF9 
-X-CRM114-Status: GOOD (  13.73  )
+X-CRM114-CacheID: sfid-20190116_021232_864850_37BDCADF 
+X-CRM114-Status: GOOD (  12.98  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -61,99 +72,48 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: heiko@sntech.de, groeck@google.com, kieran.bingham@ideasonboard.com,
- kishon@ti.com, linux-rockchip@lists.infradead.org, kernel@collabora.com,
- bleung@chromium.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Aisheng Dong <aisheng.dong@nxp.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ dl-linux-imx <linux-imx@nxp.com>, Sascha Hauer <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-That property is no used in mainline and is not documented. The only
-board using that property is the rk33-99-evb-rev1 and -rev2 in the
-vendor kernel. The existence of a further -rev3 (which also looks way
-better cared for compared rev1+2) indicates that the older ones are
-probably some sort of preproduction models, where some wiring (on the soc
-or board) may have gone wrong.
-
-It is also not clear why this is a hardware-description or a DT
-property, so, as noboby seems to care of this just drop reading that
-property.
-
-Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
----
-Hi all,
-
-This patch was send for the first time within these series [1], but
-might have more sense sent alone as doesn't depedends on the rest of
-the series, so, remove from these series and send a second version
-that can be applied independently.
-
-Best regards,
-Enric
-
-[1] https://lkml.org/lkml/2018/8/15/141
-
-Changes in v2:
-- Split from the first version and send as a separate patch.
-- Include the research that Heiko did in the commit message.
-
- drivers/phy/rockchip/phy-rockchip-inno-usb2.c | 15 ++-------------
- 1 file changed, 2 insertions(+), 13 deletions(-)
-
-diff --git a/drivers/phy/rockchip/phy-rockchip-inno-usb2.c b/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-index a1f2253d60c1..ba07121c3eff 100644
---- a/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-+++ b/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-@@ -168,9 +168,6 @@ struct rockchip_usb2phy_cfg {
-  * @phy: generic phy.
-  * @port_id: flag for otg port or host port.
-  * @suspended: phy suspended flag.
-- * @utmi_avalid: utmi avalid status usage flag.
-- *	true	- use avalid to get vbus status
-- *	false	- use bvalid to get vbus status
-  * @vbus_attached: otg device vbus status.
-  * @bvalid_irq: IRQ number assigned for vbus valid rise detection.
-  * @ls_irq: IRQ number assigned for linestate detection.
-@@ -189,7 +186,6 @@ struct rockchip_usb2phy_port {
- 	struct phy	*phy;
- 	unsigned int	port_id;
- 	bool		suspended;
--	bool		utmi_avalid;
- 	bool		vbus_attached;
- 	int		bvalid_irq;
- 	int		ls_irq;
-@@ -545,12 +541,8 @@ static void rockchip_usb2phy_otg_sm_work(struct work_struct *work)
- 	unsigned long delay;
- 	bool vbus_attach, sch_work, notify_charger;
- 
--	if (rport->utmi_avalid)
--		vbus_attach = property_enabled(rphy->grf,
--					       &rport->port_cfg->utmi_avalid);
--	else
--		vbus_attach = property_enabled(rphy->grf,
--					       &rport->port_cfg->utmi_bvalid);
-+	vbus_attach = property_enabled(rphy->grf,
-+				       &rport->port_cfg->utmi_bvalid);
- 
- 	sch_work = false;
- 	notify_charger = false;
-@@ -1024,9 +1016,6 @@ static int rockchip_usb2phy_otg_port_init(struct rockchip_usb2phy *rphy,
- 	INIT_DELAYED_WORK(&rport->chg_work, rockchip_chg_detect_work);
- 	INIT_DELAYED_WORK(&rport->otg_sm_work, rockchip_usb2phy_otg_sm_work);
- 
--	rport->utmi_avalid =
--		of_property_read_bool(child_np, "rockchip,utmi-avalid");
--
- 	/*
- 	 * Some SoCs use one interrupt with otg-id/otg-bvalid/linestate
- 	 * interrupts muxed together, so probe the otg-mux interrupt first,
--- 
-2.20.1
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+QW0gTWl0dHdvY2gsIGRlbiAxNi4wMS4yMDE5LCAwOTo0MSArMDAwMCBzY2hyaWViIEFiZWwgVmVz
+YToKPiBFbmFibGUgYWxsIHRoZSBpLk1YOE1RIGNvbmZpZ3MgbmVjZXNzYXJ5IHRvIGJvb3QuCj4g
+Cj4gQ2M6IENhdGFsaW4gTWFyaW5hcyA8Y2F0YWxpbi5tYXJpbmFzQGFybS5jb20+Cj4gQ2M6IFdp
+bGwgRGVhY29uIDx3aWxsLmRlYWNvbkBhcm0uY29tPgo+IENjOiBTaGF3biBHdW8gPHNoYXduZ3Vv
+QGtlcm5lbC5vcmc+Cj4gQ2M6IFNhc2NoYSBIYXVlciA8a2VybmVsQHBlbmd1dHJvbml4LmRlPgo+
+IENjOiBGYWJpbyBFc3RldmFtIDxmYWJpby5lc3RldmFtQG54cC5jb20+Cj4gU2lnbmVkLW9mZi1i
+eTogQWJlbCBWZXNhIDxhYmVsLnZlc2FAbnhwLmNvbT4KClJldmlld2VkLWJ5OiBMdWNhcyBTdGFj
+aCA8bC5zdGFjaEBwZW5ndXRyb25peC5kZT4KCj4gLS0tCj4gCj4gQ2hhbmdlcyBzaW5jZSB2MjoK
+PiDCoCogcnVuIHNhdmVkZWZjb25maWcgdG8gb3JkZXIgdGhlIG5ld2x5IGFkZGVkIGNvbmZpZ3MK
+PiAKPiDCoGFyY2gvYXJtNjQvY29uZmlncy9kZWZjb25maWcgfCA1ICsrKysrCj4gwqAxIGZpbGUg
+Y2hhbmdlZCwgNSBpbnNlcnRpb25zKCspCj4gCj4gZGlmZiAtLWdpdCBhL2FyY2gvYXJtNjQvY29u
+Zmlncy9kZWZjb25maWcKPiBiL2FyY2gvYXJtNjQvY29uZmlncy9kZWZjb25maWcKPiBpbmRleCAw
+MzI5MTJlLi42ZTVhZjI1IDEwMDY0NAo+IC0tLSBhL2FyY2gvYXJtNjQvY29uZmlncy9kZWZjb25m
+aWcKPiArKysgYi9hcmNoL2FybTY0L2NvbmZpZ3MvZGVmY29uZmlnCj4gQEAgLTMyMyw2ICszMjMs
+OCBAQCBDT05GSUdfU0VSSUFMX01FU09OX0NPTlNPTEU9eQo+IMKgQ09ORklHX1NFUklBTF9TQU1T
+VU5HPXkKPiDCoENPTkZJR19TRVJJQUxfU0FNU1VOR19DT05TT0xFPXkKPiDCoENPTkZJR19TRVJJ
+QUxfVEVHUkE9eQo+ICtDT05GSUdfU0VSSUFMX0lNWD15Cj4gK0NPTkZJR19TRVJJQUxfSU1YX0NP
+TlNPTEU9eQo+IMKgQ09ORklHX1NFUklBTF9TSF9TQ0k9eQo+IMKgQ09ORklHX1NFUklBTF9NU009
+eQo+IMKgQ09ORklHX1NFUklBTF9NU01fQ09OU09MRT15Cj4gQEAgLTM3MSw2ICszNzMsNyBAQCBD
+T05GSUdfU1BJX1NQSURFVj1tCj4gwqBDT05GSUdfU1BNST15Cj4gwqBDT05GSUdfUElOQ1RSTF9T
+SU5HTEU9eQo+IMKgQ09ORklHX1BJTkNUUkxfTUFYNzc2MjA9eQo+ICtDT05GSUdfUElOQ1RSTF9J
+TVg4TVE9eQo+IMKgQ09ORklHX1BJTkNUUkxfSU1YOFFYUD15Cj4gwqBDT05GSUdfUElOQ1RSTF9J
+UFE4MDc0PXkKPiDCoENPTkZJR19QSU5DVFJMX01TTTg5MTY9eQo+IEBAIC02MjgsNiArNjMxLDcg
+QEAgQ09ORklHX0NPTU1PTl9DTEtfQ1MyMDAwX0NQPXkKPiDCoENPTkZJR19DT01NT05fQ0xLX1My
+TVBTMTE9eQo+IMKgQ09ORklHX0NMS19RT1JJUT15Cj4gwqBDT05GSUdfQ09NTU9OX0NMS19QV009
+eQo+ICtDT05GSUdfQ0xLX0lNWDhNUT15Cj4gwqBDT05GSUdfQ0xLX0lNWDhRWFA9eQo+IMKgQ09O
+RklHX1RJX1NDSV9DTEs9eQo+IMKgQ09ORklHX0NPTU1PTl9DTEtfUUNPTT15Cj4gQEAgLTY2MSw2
+ICs2NjUsNyBAQCBDT05GSUdfUlBNU0dfUUNPTV9HTElOS19SUE09eQo+IMKgQ09ORklHX1JQTVNH
+X1FDT01fR0xJTktfU01FTT1tCj4gwqBDT05GSUdfUlBNU0dfUUNPTV9TTUQ9eQo+IMKgQ09ORklH
+X1JBU1BCRVJSWVBJX1BPV0VSPXkKPiArQ09ORklHX0lNWF9HUENWMl9QTV9ET01BSU5TPXkKPiDC
+oENPTkZJR19RQ09NX0NPTU1BTkRfREI9eQo+IMKgQ09ORklHX1FDT01fR0VOSV9TRT15Cj4gwqBD
+T05GSUdfUUNPTV9HTElOS19TU1I9bQoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtl
+cm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxt
+YW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
