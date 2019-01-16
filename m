@@ -2,21 +2,22 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D52C8C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 09:04:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6BEAEC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 09:10:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A4B1720866
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 09:04:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3A68620859
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 09:10:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LzK8axh9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A4B1720866
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hV3Xd5Re";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="awKxZ8q2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3A68620859
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,50 +25,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2CpQJlgMUaxD+ERBGzNtQzWuEUPHgshxFL61C+Wb4pk=; b=LzK8axh9mIz5Lo
-	Di/WHqbmdGrh7RCQXCXaP7FUPKEZKxNkAXnWQsMLVRZ/QZJnKI6H43qonAh9udcjNtTI4dDSQydad
-	1EyEplD4Wq6sgx3Aio3MMttYGo74a4ofb7099GIFKZy7d/xZsAlTZRtPv4L1Vluv7cwAcEIMjr/en
-	YIzJUGUJzV6V+U2TzobHrXXbTL6JmZGIkvmt8gLb2ZZtw8VUyKa1MgeyU3BMf1HZ2Tc1s/UUPmiAn
-	Qdm0hlx22paI869BLn8BeEx6BkHVIPfSrlOxMhEz455XtSLRnmzbx5rRHNdnoG+cCEyeEOkQYM4h+
-	BNZ/Q61YXmUVEYFw0qyg==;
+	List-Owner; bh=cwcnDIieypBfAh/Jud4ztt5kpeLrwGWEB22I/MUCIUI=; b=hV3Xd5Refw5tDM
+	gQbm5T/+/jYwNOLXYiR1SSLOms5y5XJ3H0rltAgigHr9woNzxVbfRkSu/dERKHN8des2YsS5nN4kp
+	1tpZV/+BSMMCNqoMN1pV9/sjhYKkxmw0231h11AwcfssRnAoaT3DHOa6m9HM+S4oQd+TC8TgMgQmg
+	s8zd/MFG3/fQrSpClTPb5rYVDxYFqZg27uoqh+5Zs6OUOxCYnULS5/RwKl+Mk1uYik2JKwFREmsch
+	T77pUc8wJ+QXcALl0HEin1z056/JsbWWKvMh4zJR3y1m5uhRAvtIJBJE8h1zzoae66X6ni28ptzmN
+	u3GDI1F1BtGdLjjq3VWw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjh7u-0006vu-V1; Wed, 16 Jan 2019 09:04:46 +0000
-Received: from mail-qt1-f196.google.com ([209.85.160.196])
+	id 1gjhDm-0001Ty-IF; Wed, 16 Jan 2019 09:10:50 +0000
+Received: from mail-vk1-xa42.google.com ([2607:f8b0:4864:20::a42])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjh7q-0006vA-Ho
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 09:04:44 +0000
-Received: by mail-qt1-f196.google.com with SMTP id d19so6312622qtq.9
+ id 1gjhDj-0001TU-Is
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 09:10:49 +0000
+Received: by mail-vk1-xa42.google.com with SMTP id 185so1256508vkc.3
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 16 Jan 2019 01:04:39 -0800 (PST)
+ Wed, 16 Jan 2019 01:10:45 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=dcwaRMhjXSECOE67I6lMjcuIZ7ofsCe0YGAPYo6ayZA=;
+ b=awKxZ8q2/TJHio+OyqxnOP8hyfGoGaOHKxa3+O+AmmYN/2uBwfm3BTSi2ezy/zrwvR
+ YIAkUB+FeBai5HWfza7xxk7N9mFcCPTX2cs1x1kmRNetuuI0/4OAjIAtvQ6MZBNhpXED
+ LmQQh5YjOuNiUgt1PSJd5ym4yx7RdiTvJT2wo=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=w5JLoYZyr7ko3pxF3d0m/ILrs4Xoft/sF6jGA27FK68=;
- b=PwyY5jKx0hUz0lVrEM5F1FCZQGMPbrRg3YkUurHk68NDlrMjUh0pSRwmrLlKPjcTLP
- QidPeFRabbdPbqcR7a2BgKy53P3bXf19MAEh4v9+Gon4BdrcBnB4n2S+9FDcESK6KbMw
- rdhcftW7x9/mp4GXXVAgjefVLhCddn0NdiWq6fG3F7Pa/zuxXrAktHqcy++m1CH+6BSY
- A0bUcVTE3hZtjupiMe4AMpgfYoPkvryCv/9rzharwipsHgzT8OkuRLxEVJ8gDJRi3cfr
- tQmmVa0mi9MhKhbVMbRjQnkKAq4b5pQ3iThxT0wI0cnOmUphbemCguLrHFZdNXhN3o+g
- n/Yg==
-X-Gm-Message-State: AJcUukeJt2/UsKZFfz1GGgYp3VT7udkhmzUNmUTvErYWNsyxrgCdOkEd
- SKI1nrF8IeG63Qs71JbPus4dHUM+bBBsPlR5xmY=
-X-Google-Smtp-Source: ALg8bN4Vid741bDPYI3y7NMmjtovum5hMwrktZH26yjLKKOBx95eEO1CrNaGdl7GBz6gC7zTEyIasKRSR7HRF2q8HCA=
-X-Received: by 2002:ac8:2c34:: with SMTP id d49mr6357492qta.152.1547629478779; 
- Wed, 16 Jan 2019 01:04:38 -0800 (PST)
+ bh=dcwaRMhjXSECOE67I6lMjcuIZ7ofsCe0YGAPYo6ayZA=;
+ b=jPgi+7oSxTwzbJ5y4QWDdPn8FS8dxI00KtSuQbm3c7dtQwWiKPZ3mKfyS5FrjT3MOW
+ GnUMbJ6wRRlAtWWiUS9G/ec/sCL5Hod3/h2tgQ/32fYh37fqJqvXO/xFwLUEya+tHHVZ
+ q0SGlw5zcwsNrBQFk+6/2eSKVxaLjadC+pW5VXRYHCzpHD4EoDTzICpkISiL3M/BeZ2N
+ hLOPAZetxciYqPpHr6P2lb2R4sSQXBotLDMf0YZoTSUQwLzHFltXfcDbHeVM/7cFGzFt
+ fT+5rlgROzhHRpTwCwEPPbSUis/A4LObo98tpFgAWr1N48g1Shf+EZbG+bM7uc38Est5
+ ZEhA==
+X-Gm-Message-State: AJcUukconzSlfrCS7W/3O6pLbrzLufroORKyUbZ3U3ggABjadJi46wNA
+ iP9poIW5X2GsgYzO50lJmO8HFBYBpq7fuuPofQvi8w==
+X-Google-Smtp-Source: ALg8bN52JqwTAvztvEtxU7NN8leFd8TWL64GZBajh7fHo8Jduh6ndApXoKn567U1gIGuU4Bj2Vzot6zaA/I1W72Q1uc=
+X-Received: by 2002:a1f:9042:: with SMTP id s63mr3018099vkd.17.1547629844899; 
+ Wed, 16 Jan 2019 01:10:44 -0800 (PST)
 MIME-Version: 1.0
-References: <1545351802-4354-1-git-send-email-thor.thayer@linux.intel.com>
- <1545351802-4354-2-git-send-email-thor.thayer@linux.intel.com>
-In-Reply-To: <1545351802-4354-2-git-send-email-thor.thayer@linux.intel.com>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Wed, 16 Jan 2019 10:04:22 +0100
-Message-ID: <CAK8P3a3uoW=kUy_H2kXvtnyVZk7psF+hb3aS66GvtPZFDwpkgQ@mail.gmail.com>
-Subject: Re: [PATCHv2 1/6] mfd: altera-sysmgr: Add SOCFPGA System Manager
-To: thor.thayer@linux.intel.com
+References: <20181129174700.16585-1-ulf.hansson@linaro.org>
+ <20190103120612.GC23511@e107155-lin>
+In-Reply-To: <20190103120612.GC23511@e107155-lin>
+From: Ulf Hansson <ulf.hansson@linaro.org>
+Date: Wed, 16 Jan 2019 10:10:08 +0100
+Message-ID: <CAPDyKFp-JB85TZOs+oso0iidaAsm1A=UDrg=gv+QZ4VJ9gW=fA@mail.gmail.com>
+Subject: Re: [PATCH v10 00/27] PM / Domains: Support hierarchical CPU
+ arrangement (PSCI/ARM)
+To: Sudeep Holla <sudeep.holla@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_010442_599453_EEAE6D75 
-X-CRM114-Status: GOOD (  21.66  )
+X-CRM114-CacheID: sfid-20190116_011047_648941_E13968F7 
+X-CRM114-Status: GOOD (  25.74  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,142 +87,116 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Jose Abreu <joabreu@synopsys.com>,
- Alexandre Torgue <alexandre.torgue@st.com>, DTML <devicetree@vger.kernel.org>,
- Catalin Marinas <catalin.marinas@arm.com>, Olof Johansson <olof@lixom.net>,
- Will Deacon <will.deacon@arm.com>,
- Russell King - ARM Linux <linux@armlinux.org.uk>,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- Dinh Nguyen <dinguyen@kernel.org>, Rob Herring <robh+dt@kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>,
- Networking <netdev@vger.kernel.org>,
- Mauro Carvalho Chehab <mchehab+samsung@kernel.org>,
- Giuseppe Cavallaro <peppe.cavallaro@st.com>, Lee Jones <lee.jones@linaro.org>,
- David Miller <davem@davemloft.net>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>,
+ Vincent Guittot <vincent.guittot@linaro.org>,
+ Geert Uytterhoeven <geert+renesas@glider.be>,
+ Linux PM <linux-pm@vger.kernel.org>, Stephen Boyd <sboyd@kernel.org>,
+ Viresh Kumar <viresh.kumar@linaro.org>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ "Rafael J . Wysocki" <rjw@rjwysocki.net>, Kevin Hilman <khilman@kernel.org>,
+ Lina Iyer <ilina@codeaurora.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Tony Lindgren <tony@atomide.com>,
+ linux-arm-msm <linux-arm-msm@vger.kernel.org>,
+ "Raju P . L . S . S . S . N" <rplsssn@codeaurora.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 21, 2018 at 1:21 AM <thor.thayer@linux.intel.com> wrote:
+On Thu, 3 Jan 2019 at 13:06, Sudeep Holla <sudeep.holla@arm.com> wrote:
 >
-> From: Thor Thayer <thor.thayer@linux.intel.com>
+> On Thu, Nov 29, 2018 at 06:46:33PM +0100, Ulf Hansson wrote:
+> > Over the years this series have been iterated and discussed at various Linux
+> > conferences and LKML. In this new v10, a quite significant amount of changes
+> > have been made to address comments from v8 and v9. A summary is available
+> > below, although let's start with a brand new clarification of the motivation
+> > behind this series.
 >
-> The SOCFPGA System Manager register block aggregates different
-> peripheral functions into one area.
-> On 32 bit ARM parts, handle in the same way as syscon.
-> On 64 bit ARM parts, the System Manager can only be accessed by
-> EL3 secure mode. Since a SMC call to EL3 is required, this new
-> driver uses regmaps similar to syscon to handle the SMC call.
+> I would like to raise few points, not blockers as such but need to be
+> discussed and resolved before proceeding further.
+> 1. CPU Idle Retention states
+>         - How will be deal with flattening (which brings back the DT bindings,
+>           i.e. do we have all we need) ? Because today there are no users of
+>           this binding yet. I know we all agreed and added after LPC2017 but
+>           I am not convinced about flattening with only valid states.
+
+Not exactly sure I understand what you are concerned about here. When
+it comes to users of the new DT binding, I am converting two new
+platforms in this series to use of it.
+
+Note, the flattened model is still a valid option to describe the CPU
+idle states after these changes. Especially when there are no last man
+standing activities to manage by Linux and no shared resource that
+need to prevent cluster idle states, when it's active.
+
+>         - Will domain governor ensure not to enter deeper idles states based
+>           on its sub-domain states. E.g.: when CPUs are in retention, so
+>           called container/cluster domain can enter retention or below and not
+>           power off states.
+
+I have tried to point this out as a known limitation in genpd of the
+current series, possibly I have failed to communicate that clearly.
+Anyway, I fully agree that this needs to be addressed in a future
+step.
+
+Note that, this isn't a specific limitation to how idle states are
+selected for CPUs and CPU clusters by genpd, but is rather a
+limitation to any hierarchical PM domain topology managed by genpd
+that has multiple idle states.
+
+Do note, I already started hacking on this and intend to post patches
+on top of this series, as these changes isn't needed for those two
+ARM64 platforms I have deployed support for.
+
+>         - Is the case of not calling cpu_pm_{enter,exit} handled now ?
+
+It is still called, so no changes in regards to that as apart of this series.
+
+When it comes to actually manage the "last man activities" as part of
+selecting an idle state of the cluster, that is going to be addressed
+on top as "optimizations".
+
+In principle we should not need to call cpu_pm_enter|exit() in the
+idle path at all, but rather only cpu_cluster_pm_enter|exit() when a
+cluster idle state is selected. That should improve latency when
+selecting an idle state for a CPU. However, to reach that point
+additional changes are needed in various drivers, such as the gic
+driver for example.
+
 >
-> Since regmaps abstract out the underlying register access, the
-> changes to drivers accessing the System Manager are minimal.
+> 2. Now that we have SDM845 which may soon have platform co-ordinated idle
+>    support in mainline, I *really* would like to see some power comparison
+>    numbers(i.e. PC without cluster idle states). This has been the main theme
+>    for most of the discussion on this topic for years and now we are close
+>    to have some platform, we need to try.
+
+I have quite recently been talking to Qcom folkz about this as well,
+but no commitments are made.
+
+Although I fully agree that some comparison would be great, it still
+doesn't matter much, as we anyway need to support PSCI OSI mode in
+Linux. Lorenzo have agreed to this as well.
+
 >
-> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
-> ---
-> v2 Implement Arnd's changes.
->    1. Change socfpga_is_s10() to check compatible string.
->       Add new compatible string for Stratix10 in bindings
->       and add proper detection method.
->    2. Replace base cast with resource_size_t member.
->    3. Change s10_sysmgr_regmap_cfg to altr_sysmgr_regmap_cfg to
->       be generic.
->    4. Always use 4 byte width.
->    5. Initialize the .reg_read and .reg_write in S10 case only.
->    6. Remove call to syscon in 32bit ARM case and handle both
->       ARM32 and ARM64 in of_sysmgr_register().
->    7. Replace IS_ERR_OR_NULL() with IS_ERR().
->    8. Remove compatible check functions except phandle function.
+> 3. Also, after adding such complexity, we really need a platform with an
+>    option to build and upgrade firmware easily. This will help to prevent
+>    this being not maintained for long without a platform to test, also
+>    avoid adding lots of quirks to deal with broken firmware so that newer
+>    platforms deal those issues in the firmware correctly.
 
-These all look good, thanks for the good updates!
+I don't see how this series change anything from what we already have
+today with the PSCI FW. No matter of OSI or PC mode is used, there are
+complexity involved.
 
-> +struct regmap *altr_sysmgr_node_to_regmap(struct device_node *np)
-> +{
-> +       struct altr_sysmgr *sysmgr = NULL;
-> +
-> +       if (!p_sysmgr)
-> +               sysmgr = of_sysmgr_register(np);
-> +       else
-> +               sysmgr = p_sysmgr;
-> +
-> +       if (IS_ERR(sysmgr))
-> +               return ERR_CAST(sysmgr);
-> +
-> +       return sysmgr->regmap;
-> +}
-> +EXPORT_SYMBOL_GPL(altr_sysmgr_node_to_regmap);
-> +
-> +struct regmap *altr_sysmgr_regmap_lookup_by_phandle(struct device_node *np,
-> +                                                   const char *property)
-> +{
-> +       struct device_node *sysmgr_np;
-> +       struct regmap *regmap;
-> +
-> +       if (property)
-> +               sysmgr_np = of_parse_phandle(np, property, 0);
-> +       else
-> +               sysmgr_np = np;
-> +
-> +       if (!sysmgr_np)
-> +               return ERR_PTR(-ENODEV);
-> +
-> +       regmap = altr_sysmgr_node_to_regmap(sysmgr_np);
-> +       of_node_put(sysmgr_np);
-> +
-> +       return regmap;
-> +}
-> +EXPORT_SYMBOL_GPL(altr_sysmgr_regmap_lookup_by_phandle);
-> +
-> +static int sysmgr_probe(struct platform_device *pdev)
-> +{
-> +       struct device *dev = &pdev->dev;
-> +       struct altr_sysmgr *sysmgr;
-> +       struct resource *res;
-> +
-> +       /* Skip Initialization if already created */
-> +       if (p_sysmgr)
-> +               goto finish;
-> +
-> +       sysmgr = of_sysmgr_register(pdev->dev.of_node);
-> +       if (IS_ERR(sysmgr)) {
-> +               dev_err(dev, "regmap init failed\n");
-> +               return -ENODEV;
-> +       }
+Although, of course I agree with you, that we should continue to try
+to convince ARM vendors about moving to the public version of ATF and
+avoid proprietary FW binaries as much as possible.
 
-It seems odd to still have these two ways of registering the sysmgr,
-from either the probe function or the lookup.
-
-Since the sysmgr should always get probed before its users, you could
-try to change it like this:
-
-- let only the probe() function register it and create the regmap, then
-  set the regmap as the private data of the device.
-
-- In lookup_by_phandle(), use driver_find_device() to look up the
-  'struct device' based on its of_node(), by comparing dev->of_node
-  to of_parse_phandle(np, property).
-
-- return the private data of the device.
-
-That will also let you remove the global variable and make it (theoretically)
-work with multiple sysmgr devices, which is generally the preferred way to
-write a driver.
-
-> +#ifdef CONFIG_MFD_ALTERA_SYSMGR
-> +struct regmap *altr_sysmgr_node_to_regmap(struct device_node *np);
-> +struct regmap *altr_sysmgr_regmap_lookup_by_compatible(const char *s);
-> +struct regmap *altr_sysmgr_regmap_lookup_by_pdevname(const char *s);
-> +struct regmap *altr_sysmgr_regmap_lookup_by_phandle(struct device_node *np,
-> +                                                   const char *property);
-> +
-
-You seem to have some dead declarations from before the cleanup that
-should be removed now. Please go through the header file one more time
-to see what is actually still used.
-
-      Arnd
+Kind regards
+Uffe
 
 _______________________________________________
 linux-arm-kernel mailing list
