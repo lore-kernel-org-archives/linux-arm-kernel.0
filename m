@@ -2,68 +2,88 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 99433C43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 12:41:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EA282C43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 12:44:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6C2EC20866
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 12:41:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B22F720657
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 12:44:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m9412K6H"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6C2EC20866
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sigxcpu.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lhHncI3Z";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="bqyNUgd0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B22F720657
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Cc:Content-ID:Content-Description:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=bny6mP6FRfaUu3bOWiBKjw+47xjPwPANLYJ+t13pNWY=; b=m9412K6Hgdvzd1
-	VM+bz3GFfTfr5ghZSTIdat1lKsCXxEHsWvEmoQH5A4lFSOniWiHO9hOIkLimvdaoUQaHDiS2L64BK
-	3KMHa9dnJ9l06gi0MyNA1kfmRIzdKqfPCCKuyLTYa3DcIT/8dReUpS8AqClf7zRfR46T2UPTcC0p4
-	GCwcdESUUV82W/7ZdVTGQiVVK8ob3FJzmXXejq9gAcWioZUbdATBXsRSVDDYWQp2Svejj9wL4q2Lr
-	j5b/XfGoOFZ97kuX1V4Q1DNllgBmLC2uztqShXST2ulOcKKZ0COE+t6H327IHQo9JQXYrZIWDEbEi
-	1UM8bGW3n/gaIm4JRIUQ==;
+	List-Owner; bh=YkrdlPE3znAnpXBcgGMu8RKXHvEn2U0a2yWW2tM4FXY=; b=lhHncI3Z1EuIwY
+	YpDoKOIzFADVFYkESznNrdEf/44PoLdEOmiBTQOV64XH1knFP8+DSc3FIT1dy7AdkE1mjHduhA1Wa
+	bVGhe8sLBPa5T7O3VU23HaScyW9wCMseVTIKyiPXred8+9xqC8oRiC1Fb31yfepVHLuMLI6VK64n9
+	PGxCiDDu1I6J6u/ahr+CxKHiKNP09EKXAZvdfS+N7l2pylQ91xNrppkwbP0Y/bQRqrmYjjX390/hX
+	SJRZXvWVRmycXYEt0rg0Fkws++1aJ9wST4WmXU/loa9B0VPCF08eU3kGP5ICUg1iBIQgptuVwDtvO
+	epNM+sCFiYG9VcLUBI8A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjkW1-0001N6-2J; Wed, 16 Jan 2019 12:41:53 +0000
-Received: from honk.sigxcpu.org ([24.134.29.49])
+	id 1gjkYZ-0001jr-7J; Wed, 16 Jan 2019 12:44:31 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjkVa-0000yp-Mi
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 12:41:50 +0000
-Received: from localhost (localhost [127.0.0.1])
- by honk.sigxcpu.org (Postfix) with ESMTP id 32A24FB03;
- Wed, 16 Jan 2019 13:41:23 +0100 (CET)
-X-Virus-Scanned: Debian amavisd-new at honk.sigxcpu.org
-Received: from honk.sigxcpu.org ([127.0.0.1])
- by localhost (honk.sigxcpu.org [127.0.0.1]) (amavisd-new, port 10024)
- with ESMTP id 3YOd_pioiJ6e; Wed, 16 Jan 2019 13:41:22 +0100 (CET)
-Received: by bogon.sigxcpu.org (Postfix, from userid 1000)
- id BC9EF475EF; Wed, 16 Jan 2019 13:41:21 +0100 (CET)
-Date: Wed, 16 Jan 2019 13:41:21 +0100
-From: Guido =?iso-8859-1?Q?G=FCnther?= <agx@sigxcpu.org>
-To: Abel Vesa <abel.vesa@nxp.com>, Lucas Stach <l.stach@pengutronix.de>,
- Shawn Guo <shawnguo@kernel.org>, Sascha Hauer <s.hauer@pengutronix.de>,
- Pengutronix Kernel Team <kernel@pengutronix.de>,
- NXP Linux Team <linux-imx@nxp.com>,
- linux-arm-kernel@lists.infradead.org, linux-clk@vger.kernel.org
-Subject: Re: [PATCH] clk: imx8mq: Add dsi_ipg_div
-Message-ID: <20190116124121.GA30303@bogon.m.sigxcpu.org>
-References: <20190115163823.GA32114@bogon.m.sigxcpu.org>
+ id 1gjkYV-0001jC-Cr
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 12:44:28 +0000
+Received: by mail-wr1-x441.google.com with SMTP id x10so6738935wrs.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 16 Jan 2019 04:44:26 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:content-transfer-encoding:in-reply-to
+ :user-agent; bh=YI/hMv2Ykfpzsha58avQfgbQuOAe4wiKzvr58KA+C/4=;
+ b=bqyNUgd0gfeRk1x1ONPXAxtmtgtkVIZQ4vTcWAaR4cjSIbk6sbAjhEa4a8gAFmSTUm
+ 0WTosVm+mjFAcid3iCNfaYDVE85/dPnxvAGRy6vrfRCe9YbtgvjeIalIoORPHXVtv2xE
+ IUZ3c0unFCSlNppo8UYeXEZsDPlqoskBmxb30=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:content-transfer-encoding
+ :in-reply-to:user-agent;
+ bh=YI/hMv2Ykfpzsha58avQfgbQuOAe4wiKzvr58KA+C/4=;
+ b=TFVVz1wNdcYygjJwSPlhdq0phINxTwChYSnONl/m0HZ5xdSsv1GJOKGF5XPJwlP+c2
+ sl8KSLI9kt0V1eNgLaQrkhSd9Rf2RVAKtPW3Q+ILTYj1Li3zrYHOCDtlST9+ZezQoQVt
+ alZcfC8l7Cd3BHAsoEUJsYOmZe6WFVXIozGGqQE70A9sfAK56knnDrj6A88cwckwfSFb
+ RuaEBbc8b6+mbBRwD5vyx3l1P3DhiYQKsKN6nRb5enl7j0JTcywkfjAoHJL4SuAMFs7k
+ jKnyAYl64N4aOthDRkLAI1LEg5Xgea2oMNWoIFUyxlBOO+7kJjbQ8fE9SjHs3DXP2FLY
+ HOiw==
+X-Gm-Message-State: AJcUukeJpq3qLSWxyk8pDP+9tnKZJSJ2z+rzMD6lqpTsjS+2WKAoUBsp
+ nTplVv4LioOnfiAiVdplAzmDvw==
+X-Google-Smtp-Source: ALg8bN6DdBq+X2nTLgwh2v+QzLpv9b8DGxQUfKcMDxj2cVxfqvcPm3IOUOrAn3yXMgVZdzcsdlxr9g==
+X-Received: by 2002:adf:e407:: with SMTP id g7mr7222174wrm.277.1547642664949; 
+ Wed, 16 Jan 2019 04:44:24 -0800 (PST)
+Received: from dell ([2.27.35.149])
+ by smtp.gmail.com with ESMTPSA id f130sm33103811wme.41.2019.01.16.04.44.23
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Wed, 16 Jan 2019 04:44:24 -0800 (PST)
+Date: Wed, 16 Jan 2019 12:44:21 +0000
+From: Lee Jones <lee.jones@linaro.org>
+To: Philippe Schenker <dev@pschenker.ch>
+Subject: [GIT PULL] Immutable branch between MFD, IIO and Input due for the
+ v5.1 merge window
+Message-ID: <20190116124421.GD23399@dell>
+References: <20181221134638.20600-1-dev@pschenker.ch>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190115163823.GA32114@bogon.m.sigxcpu.org>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <20181221134638.20600-1-dev@pschenker.ch>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_044127_212487_AE4C582F 
-X-CRM114-Status: GOOD (  14.24  )
+X-CRM114-CacheID: sfid-20190116_044427_449365_FCA9F044 
+X-CRM114-Status: GOOD (  13.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,75 +95,73 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: Mark Rutland <mark.rutland@arm.com>, dmitry.torokhov@gmail.com,
+ Max Krummenacher <max.krummenacher@toradex.com>, linux-iio@vger.kernel.org,
+ stefan@agner.ch, thierry.reding@gmail.com,
+ Peter Meerwald-Stadler <pmeerw@pmeerw.net>, digetx@gmail.com,
+ Freeman Liu <freeman.liu@spreadtrum.com>,
+ linux-stm32@st-md-mailman.stormreply.com, robh@kernel.org,
+ Marcus Folkesson <marcus.folkesson@gmail.com>,
+ Lars-Peter Clausen <lars@metafoo.de>, Jonathan Hunter <jonathanh@nvidia.com>,
+ marcel.ziswiler@toradex.com, Geert Uytterhoeven <geert@linux-m68k.org>,
+ NXP Linux Team <linux-imx@nxp.com>, linux-input@vger.kernel.org,
+ coquelin.stm32@gmail.com, devicetree@vger.kernel.org, alexandre.torgue@st.com,
+ Arnd Bergmann <arnd@arndb.de>, Sascha Hauer <s.hauer@pengutronix.de>,
+ William Breathitt Gray <vilhelm.gray@gmail.com>,
+ Siddartha Mohanadoss <smohanad@codeaurora.org>,
+ Philippe Schenker <philippe.schenker@toradex.com>,
+ Mark Brown <broonie@kernel.org>,
+ Jonathan Cameron <Jonathan.Cameron@huawei.com>, linux-tegra@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>,
+ Randy Dunlap <rdunlap@infradead.org>,
+ Arnaud Pouliquen <arnaud.pouliquen@st.com>, linux-kernel@vger.kernel.org,
+ Rob Herring <robh+dt@kernel.org>,
+ Pengutronix Kernel Team <kernel@pengutronix.de>,
+ Hartmut Knaack <knaack.h@gmx.de>, Fabio Estevam <fabio.estevam@nxp.com>,
+ Eugen Hristev <eugen.hristev@microchip.com>, shawnguo@kernel.org,
+ jic23@kernel.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
-On Tue, Jan 15, 2019 at 05:38:23PM +0100, Guido G=FCnther wrote:
-> It's defined imx8mq-clock.h but wasn't assigned yet.
-
-I've found these additional unassigned clocks (defined in
-include/dt-bindings/clock/imx8mq-clock.h but not assigned in
-drivers/clk/imx/clk-imx8mq.c):
-
-IMX8MQ_CLK_A53_ROOT =
-
-IMX8MQ_CLK_DRAM_ROOT
-IMX8MQ_CLK_HEVC_ROOT
-IMX8MQ_CLK_AVC_ROOT
-IMX8MQ_CLK_VP9_ROOT
-IMX8MQ_CLK_HEVC_INTER_ROOT
-IMX8MQ_CLK_HDMI_ROOT
-IMX8MQ_CLK_HDMI_PHY_ROOT
-IMX8MQ_VIDEO2_PLL_OUT
-IMX8MQ_CLK_M4_ROOT
-IMX8MQ_CLK_M4_SRC
-IMX8MQ_CLK_M4_CG
-IMX8MQ_CLK_M4_DIV
-
-I can look into adding these but just wanted to make sure they're not
-sitting in a tree already.
-
-Cheers,
- -- Guido
-
-> Signed-off-by: Guido G=FCnther <agx@sigxcpu.org>
-> ---
-> I'm not sure I picked the intended clock type but it gives me the right
-> clock rate.
-> =
-
->  drivers/clk/imx/clk-imx8mq.c | 1 +
->  1 file changed, 1 insertion(+)
-> =
-
-> diff --git a/drivers/clk/imx/clk-imx8mq.c b/drivers/clk/imx/clk-imx8mq.c
-> index 398ab0bcd9de..6f082153714e 100644
-> --- a/drivers/clk/imx/clk-imx8mq.c
-> +++ b/drivers/clk/imx/clk-imx8mq.c
-> @@ -485,6 +485,7 @@ static int imx8mq_clocks_probe(struct platform_device=
- *pdev)
->  	clks[IMX8MQ_CLK_DSI_DBI] =3D imx8m_clk_composite("dsi_dbi", imx8mq_dsi_=
-dbi_sels, base + 0xbc00);
->  	clks[IMX8MQ_CLK_DSI_ESC] =3D imx8m_clk_composite("dsi_esc", imx8mq_dsi_=
-esc_sels, base + 0xbc80);
->  	clks[IMX8MQ_CLK_DSI_AHB] =3D imx8m_clk_composite("dsi_ahb", imx8mq_dsi_=
-ahb_sels, base + 0x9200);
-> +	clks[IMX8MQ_CLK_DSI_IPG_DIV] =3D imx_clk_divider2("dsi_ipg_div", "dsi_a=
-hb", base + 0x9280, 0, 6);
->  	clks[IMX8MQ_CLK_CSI1_CORE] =3D imx8m_clk_composite("csi1_core", imx8mq_=
-csi1_core_sels, base + 0xbd00);
->  	clks[IMX8MQ_CLK_CSI1_PHY_REF] =3D imx8m_clk_composite("csi1_phy_ref", i=
-mx8mq_csi1_phy_sels, base + 0xbd80);
->  	clks[IMX8MQ_CLK_CSI1_ESC] =3D imx8m_clk_composite("csi1_esc", imx8mq_cs=
-i1_esc_sels, base + 0xbe00);
-> -- =
-
-> 2.20.1
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+VGFrZW4gYWxsIGJ1dCB0aGUgQVJNIHBhdGNoZXMuCgpUaGVzZSBuZWVkIHRvIGJlIHJldmlld2Vk
+IGFuZCBnbyBpbiB2aWEgQVJNLVNvQy4KClRoZSBmb2xsb3dpbmcgY2hhbmdlcyBzaW5jZSBjb21t
+aXQgYmZlZmZkMTU1MjgzNzcyYmJlNzhjNmEwNWRlYzdjMDEyOGVlNTAwYzoKCiAgTGludXggNS4w
+LXJjMSAoMjAxOS0wMS0wNiAxNzowODoyMCAtMDgwMCkKCmFyZSBhdmFpbGFibGUgaW4gdGhlIEdp
+dCByZXBvc2l0b3J5IGF0OgoKICBnaXQ6Ly9naXQua2VybmVsLm9yZy9wdWIvc2NtL2xpbnV4L2tl
+cm5lbC9naXQvbGVlL21mZC5naXQgaWItbWZkLWlpby1pbnB1dC12NS4xCgpmb3IgeW91IHRvIGZl
+dGNoIGNoYW5nZXMgdXAgdG8gODFjZGFiNzk4MTg5ODhkMjdkOGFlYjE2MmI3OTg4YzllNmRkZTkz
+NjoKCiAgaWlvOiBhZGM6IGFkZCBTVE1QRSBBREMgZGV2aWNldHJlZSBiaW5kaW5ncyAoMjAxOS0w
+MS0xNiAxMjozNzozNiArMDAwMCkKCi0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
+LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KSW1tdXRhYmxlIGJyYW5jaCBiZXR3ZWVuIE1G
+RCwgSUlPIGFuZCBJbnB1dCBkdWUgZm9yIHRoZSB2NS4xIG1lcmdlIHdpbmRvdwoKLS0tLS0tLS0t
+LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQpQ
+aGlsaXBwZSBTY2hlbmtlciAoMyk6CiAgICAgIGR0LWJpbmRpbmdzOiBzdG1wZTogUmVmb3JtYXR0
+aW5nIHBhcmFtZXRlciBsaXN0IGFuZCB1c2UgdGFicyBvbmx5CiAgICAgIG1mZDogc3RtcGU6IE1v
+dmUgQURDIHJlbGF0ZWQgZGVmaW5lcyB0byBNRkQgaGVhZGVyCiAgICAgIElucHV0OiBzdG1wZS10
+czogcHJlcGFyYXRpb25zIGZvciBTVE1QRSBBREMgZHJpdmVyCgpTdGVmYW4gQWduZXIgKDMpOgog
+ICAgICBtZmQ6IHN0bXBlOiBQcmVwYXJhdGlvbnMgZm9yIFNUTVBFIEFEQyBkcml2ZXIKICAgICAg
+aWlvOiBhZGM6IGFkZCBTVE1QRSBBREMgZHJpdmVyIHVzaW5nIElJTyBmcmFtZXdvcmsKICAgICAg
+aWlvOiBhZGM6IGFkZCBTVE1QRSBBREMgZGV2aWNldHJlZSBiaW5kaW5ncwoKIC4uLi9kZXZpY2V0
+cmVlL2JpbmRpbmdzL2lpby9hZGMvc3RtcGUtYWRjLnR4dCAgICAgIHwgIDIxICsrCiAuLi4vYmlu
+ZGluZ3MvaW5wdXQvdG91Y2hzY3JlZW4vc3RtcGUudHh0ICAgICAgICAgICB8IDExNiArKysrKy0t
+CiBEb2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvbWZkL3N0bXBlLnR4dCAgICB8ICAy
+OCArLQogZHJpdmVycy9paW8vYWRjL0tjb25maWcgICAgICAgICAgICAgICAgICAgICAgICAgICAg
+fCAgIDcgKwogZHJpdmVycy9paW8vYWRjL01ha2VmaWxlICAgICAgICAgICAgICAgICAgICAgICAg
+ICAgfCAgIDEgKwogZHJpdmVycy9paW8vYWRjL3N0bXBlLWFkYy5jICAgICAgICAgICAgICAgICAg
+ICAgICAgfCAzNjMgKysrKysrKysrKysrKysrKysrKysrCiBkcml2ZXJzL2lucHV0L3RvdWNoc2Ny
+ZWVuL3N0bXBlLXRzLmMgICAgICAgICAgICAgICB8ICA2NiArLS0tCiBkcml2ZXJzL21mZC9LY29u
+ZmlnICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB8ICAgMyArLQogZHJpdmVycy9tZmQv
+c3RtcGUuYyAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfCAgNjggKysrKwogaW5jbHVk
+ZS9saW51eC9tZmQvc3RtcGUuaCAgICAgICAgICAgICAgICAgICAgICAgICAgfCAgMjEgKysKIDEw
+IGZpbGVzIGNoYW5nZWQsIDYxMCBpbnNlcnRpb25zKCspLCA4NCBkZWxldGlvbnMoLSkKIGNyZWF0
+ZSBtb2RlIDEwMDY0NCBEb2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvaWlvL2FkYy9z
+dG1wZS1hZGMudHh0CiBjcmVhdGUgbW9kZSAxMDA2NDQgZHJpdmVycy9paW8vYWRjL3N0bXBlLWFk
+Yy5jCgotLSAKTGVlIEpvbmVzIFvmnY7nkLzmlq9dCkxpbmFybyBTZXJ2aWNlcyBUZWNobmljYWwg
+TGVhZApMaW5hcm8ub3JnIOKUgiBPcGVuIHNvdXJjZSBzb2Z0d2FyZSBmb3IgQVJNIFNvQ3MKRm9s
+bG93IExpbmFybzogRmFjZWJvb2sgfCBUd2l0dGVyIHwgQmxvZwoKX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxp
+c3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZy
+YWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
