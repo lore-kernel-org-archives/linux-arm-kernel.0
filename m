@@ -2,58 +2,108 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 19BFBC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 06:57:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6E5E7C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 07:00:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DB4EE2082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 06:57:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3C94B20866
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 07:00:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XvflTYxI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DB4EE2082F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aam9RKnU";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="hMN1tH8E"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3C94B20866
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=vuI9BvOKuKJuZgTztclxf7lnwJ0/fWZMFrDl4RM6TLE=; b=XvflTYxI76i51l
-	SG5gbvHuyRbCXLjhmS4Te+LH43TPjOKmTY0vHLPabw9yPcFPORSme/Ym8cBh1h+cOCIzq48OtcrNG
-	FXeF9KUkvdbLxAqt9/p0WucXlim8nbFF7GRenqmkn02KD9XJhDkbdUPbVQx0Pohvcc7Z77KVpKMLU
-	o8TcBT5BpwYB3n3FexTrjcCvQIv3Jf038g/u+J+JP43pOQ0Cofz8tD8dytgFdKPT2cyDYOn2XK4Yi
-	l1tphjv8xmkxcrWnsaO6mHTjOhUFJhsulfvdaXOOm0sSyUYtawkp0l7rS17iIS4Y+u+HnwVxtjHRz
-	sVEX+asjpo+AIhWzsNaw==;
+	List-Owner; bh=7keW8zJyK/J48jpF0VWMAnVK3ijNs96vxKeZKS4h9/o=; b=aam9RKnUrNi2bU
+	cqa2pIwYNznpUofT1P3rA+3Qnoy8h2xDqkcM+dZUN35zKxO7SqYorMH81+YW+GvGzihIWQlzp46z3
+	byR4lthWIrTFH934f8Bnz8QhpTpFGW+K3+Xy1Yo7U+9vslmh5mpPF1vMps44zAXgj9ZG0TXkK6p0a
+	LW0xDzTu1mubp1R9i/cWETxOWLD2j2memJyTK1ULjirq5dKR13fmW16ICzOWfuvBEMZM/gndLd3fz
+	4NJ9bkAg2dd0raw0XCLgRTFPEXFNyU2d81vQBbmXEYTZUr2ifjlgiSd1LJAcrc5UcwPydeFStU3+V
+	JrdVAoiiErf6He/nlnPg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjf8S-0003HX-MZ; Wed, 16 Jan 2019 06:57:12 +0000
-Received: from mx2.suse.de ([195.135.220.15] helo=mx1.suse.de)
+	id 1gjfBU-000551-7l; Wed, 16 Jan 2019 07:00:20 +0000
+Received: from mail-eopbgr70089.outbound.protection.outlook.com ([40.107.7.89]
+ helo=EUR04-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjf8O-0003Gy-C7; Wed, 16 Jan 2019 06:57:10 +0000
-X-Virus-Scanned: by amavisd-new at test-mx.suse.de
-Received: from relay2.suse.de (unknown [195.135.220.254])
- by mx1.suse.de (Postfix) with ESMTP id 75547AD86;
- Wed, 16 Jan 2019 06:57:05 +0000 (UTC)
-Date: Wed, 16 Jan 2019 07:57:03 +0100
-From: Michal Hocko <mhocko@kernel.org>
-To: Anshuman Khandual <anshuman.khandual@arm.com>
-Subject: Re: [PATCH V2] mm: Introduce GFP_PGTABLE
-Message-ID: <20190116065703.GE24149@dhcp22.suse.cz>
-References: <1547619692-7946-1-git-send-email-anshuman.khandual@arm.com>
+ id 1gjfBM-00054T-BT
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 07:00:18 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=CEZLYaHo/OuWKDJc7MPiHo5QjVYlglV6cgypZDuTSXE=;
+ b=hMN1tH8EbTsNMwGQpzD6AedPrXBBk4xAQUCIimfEpx7cEc8PyetTJTNTY69MXYufze5s+i0GERPBYDnvpRJ7wkkQpC/AJHaN+B3TCK7xgSuHsdUvC+1Im+kCqxDyeU4HgEbkEf8Kdsu4DXCoLPUYnxzSsu3cFEgdEc5x0RDSKaY=
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
+ AM0PR04MB4641.eurprd04.prod.outlook.com (52.135.149.31) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1516.20; Wed, 16 Jan 2019 07:00:09 +0000
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::c4d2:7dfd:4576:bdd5]) by AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::c4d2:7dfd:4576:bdd5%5]) with mapi id 15.20.1537.018; Wed, 16 Jan 2019
+ 07:00:09 +0000
+From: Aisheng Dong <aisheng.dong@nxp.com>
+To: Shawn Guo <shawnguo@kernel.org>, Lucas Stach <l.stach@pengutronix.de>
+Subject: RE: [PATCH v2 2/2] arm64: imx8mq: select PM support
+Thread-Topic: [PATCH v2 2/2] arm64: imx8mq: select PM support
+Thread-Index: AQHUrMG4y4B3Pys1ikq5u3IBwWYCCKWxOnoAgAA9D4A=
+Date: Wed, 16 Jan 2019 07:00:08 +0000
+Message-ID: <AM0PR04MB4211F62EB37A8D4A67026F9180820@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <20190115110145.11017-1-l.stach@pengutronix.de>
+ <20190115110145.11017-2-l.stach@pengutronix.de>
+ <20190116031720.GF15808@dragon>
+In-Reply-To: <20190116031720.GF15808@dragon>
+Accept-Language: zh-CN, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-originating-ip: [119.31.174.66]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; AM0PR04MB4641;
+ 6:ICQuxN841RIVMTQyEJHj+rEnPHMp/Ke9DxiI1n3K1Sep/0g6XeenPg/fDryXq6mSq/VYJGQJjc2Q8HGaaFRAcpbf2StsQNbbco0wHCxi/L6R/lFalwHSpxvREyt3DfasRzpMsTS0xmi0u/SbaWZ84zXYpGNMumlNUPKW3MoEVVNiln8cEnmCXZEGg5M8t71Ky5jFxiCOHfPC2c3C37J5tSe9UT0qeq5YdAElKBshbzLPT8cTTE6G+z2Cbo3xXYHlmBW/+FDGR7eDf5MhpkorhHr+NOCTXz9cIZfdW25tNLfQpGTHj6mwnI+PEDsCdrgXKOSXXDzZSNDTrgxk8qGv7RAKsvl2ipsKF6itofOrY4Yu3qLke/l5jS+YG/08YF6V9yleF03z1LpYkr/k9HqTMyJQvSLnRvhx8ZOwd2zdu9IeyuL0oA3d3xLBBrN805G6sUYdbEk2u3F5LnLFdMYn7Q==;
+ 5:xPtuqGrZFwx4KLrqqOQB14IBX/5FozZvkvYP949+Psrj59wmUzSLD7mr+1+fiufNFJ+Giz40BF++GYOvKOExXPmpQxtLP3z5VWvnyuJHZAuy51F2vKQE2D5/F+CQYcH5F+MtxuexotqLdiGydtMfGAsh6d/KtH7GjWQV89YCFmJRs3w+sqCep0v8JVyP4gwAPlwsWRHeR8hY8Nwy3o3JJQ==;
+ 7:AnYfkPWQM7TVIBBbLFpQDAP4KxckcIhO6tFyGABXwlZOM8Ot3+4sSxycfvHM0o40ocyQIGLN+zoGLygbMQQXnSvJ3vqi3+aae950hBHpIjopj/TDmjme/ivbxcCFay0tfnIx8E2cGk2CLentMTfsPw==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: 09935cec-3807-48aa-6178-08d67b8040b2
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:AM0PR04MB4641; 
+x-ms-traffictypediagnostic: AM0PR04MB4641:
+x-microsoft-antispam-prvs: <AM0PR04MB464110B85190110E96A6F99D80820@AM0PR04MB4641.eurprd04.prod.outlook.com>
+x-forefront-prvs: 091949432C
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(376002)(396003)(366004)(39860400002)(136003)(346002)(13464003)(199004)(189003)(8676002)(7736002)(2906002)(14454004)(81156014)(81166006)(26005)(256004)(186003)(229853002)(110136005)(54906003)(5660300001)(4326008)(97736004)(33656002)(3846002)(66066001)(6116002)(6346003)(99286004)(11346002)(106356001)(86362001)(102836004)(316002)(71190400001)(71200400001)(68736007)(74316002)(6246003)(9686003)(486006)(476003)(105586002)(6506007)(7696005)(25786009)(478600001)(8936002)(76176011)(305945005)(53936002)(55016002)(6436002)(446003)(44832011)(32563001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB4641;
+ H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=aisheng.dong@nxp.com; 
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: r6sgiGbtIzwjiNPtqrtEIcRMjQ2yofYuC05Bau7KtRjpz/K+QinSPV9HqqB6Kn5B/bmV9xG5TqWsPlJVFDygqlkaEsj4MpXV4T6u7tN4fBm9IOf+Nd0Grtosh3MNmHqPSgS1ePl+zaPBefDXRKAPHZ99Mi4mxQr0r4Ld8nGFQznv+6Ru3ulRv3e0Rgq80JSJrcsKKG7rh9lx/biIPmcCttC2ZHOmNRDjSlRP4Pj59iWnsVWNUXmzg5JEMiV7hbcXKDMVAbJ4oNkQHgQbarD7bUsIpeNMUZoJKgAFjuwyfQk+UbqnUF7KUSdLISYQ6YjG0iZM0d2AxN1J4/Fbm2mITsKLgrSM2/cNUEx03Lbi73BTS36E1svN3MNt2y3XID3N7VoWHBcNIUHZPmZMQzzgMl09fGCoypI2Zd6Jxscbm6o=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1547619692-7946-1-git-send-email-anshuman.khandual@arm.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 09935cec-3807-48aa-6178-08d67b8040b2
+X-MS-Exchange-CrossTenant-originalarrivaltime: 16 Jan 2019 07:00:09.0135 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB4641
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_225708_704921_763F5653 
-X-CRM114-Status: GOOD (  23.76  )
+X-CRM114-CacheID: sfid-20190115_230012_394963_01126D12 
+X-CRM114-Status: GOOD (  15.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -65,493 +115,59 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, linux-sh@vger.kernel.org, peterz@infradead.org,
- catalin.marinas@arm.com, dave.hansen@linux.intel.com, will.deacon@arm.com,
- linux-kernel@vger.kernel.org, linux-mm@kvack.org,
- linux-riscv@lists.infradead.org, kvmarm@lists.cs.columbia.edu,
- mpe@ellerman.id.au, linux@armlinux.org.uk, mingo@redhat.com, vbabka@suse.cz,
- rientjes@google.com, palmer@sifive.com, greentime@andestech.com,
- marc.zyngier@arm.com, rppt@linux.vnet.ibm.com, shakeelb@google.com,
- kirill@shutemov.name, tglx@linutronix.de, linux-arm-kernel@lists.infradead.org,
- ard.biesheuvel@linaro.org, robin.murphy@arm.com, steve.capper@arm.com,
- christoffer.dall@arm.com, james.morse@arm.com, aneesh.kumar@linux.ibm.com,
- akpm@linux-foundation.org, linuxppc-dev@lists.ozlabs.org
+Cc: Fabio Estevam <fabio.estevam@nxp.com>,
+ "patchwork-lst@pengutronix.de" <patchwork-lst@pengutronix.de>,
+ dl-linux-imx <linux-imx@nxp.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed 16-01-19 11:51:32, Anshuman Khandual wrote:
-> All architectures have been defining their own PGALLOC_GFP as (GFP_KERNEL |
-> __GFP_ZERO) and using it for allocating page table pages. This causes some
-> code duplication which can be easily avoided. GFP_KERNEL allocated and
-> cleared out pages (__GFP_ZERO) are required for page tables on any given
-> architecture. This creates a new generic GFP flag flag which can be used
-> for any page table page allocation. Does not cause any functional change.
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo@kernel.org]
+> Sent: Wednesday, January 16, 2019 11:17 AM
+...
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > ---
+> >  arch/arm64/Kconfig.platforms | 3 +++
+> >  1 file changed, 3 insertions(+)
+> >
+> > diff --git a/arch/arm64/Kconfig.platforms
+> > b/arch/arm64/Kconfig.platforms index 251ecf34cb02..bb0d78d1ca4d
+> 100644
+> > --- a/arch/arm64/Kconfig.platforms
+> > +++ b/arch/arm64/Kconfig.platforms
+> > @@ -146,6 +146,9 @@ config ARCH_MXC
+> >  	bool "ARMv8 based NXP i.MX SoC family"
+> >  	select ARM64_ERRATUM_843419
+> >  	select ARM64_ERRATUM_845719
+> > +	select CONFIG_PM
 > 
-> GFP_PGTABLE is being added into include/asm-generic/pgtable.h which is the
-> generic page tabe header just to prevent it's potential misuse as a general
-> allocation flag if included in include/linux/gfp.h.
+> select PM
+> 
+> > +	select PM_GENERIC_DOMAINS
+> > +	select IMX_GPCV2_PM_DOMAINS
+> 
+> We would like to keep the list alphabetically sorted.
 
-I haven't reviewed the patch yet but I am wondering whether this is
-really worth it without going all the way down to unify the common code
-and remove much more code duplication. Or is this not possible for some
-reason?
+Should these two options to through defconfig according to the former suggestion
+From arm soc maintainer?
 
-> Signed-off-by: Anshuman Khandual <anshuman.khandual@arm.com>
-> ---
-> Build tested on arm, arm64, powerpc, powerpc64le and x86.
-> Boot tested on arm64 and x86.
-> 
-> Changes in V2:
-> 
-> - Moved GFP_PGTABLE into include/asm-generic/pgtable.h
-> - On X86 added __GFP_ACCOUNT into GFP_PGTABLE at various places
-> - Replaced possible flags on riscv and nds32 with GFP_PGTABLE
-> 
-> Original V1: https://lkml.org/lkml/2019/1/12/54 
-> 
->  arch/arm/include/asm/pgalloc.h               |  8 +++-----
->  arch/arm/mm/mmu.c                            |  2 +-
->  arch/arm64/include/asm/pgalloc.h             |  9 ++++-----
->  arch/arm64/mm/mmu.c                          |  2 +-
->  arch/arm64/mm/pgd.c                          |  4 ++--
->  arch/nds32/include/asm/pgalloc.h             |  3 +--
->  arch/powerpc/include/asm/book3s/64/pgalloc.h |  6 +++---
->  arch/powerpc/include/asm/pgalloc.h           |  2 --
->  arch/powerpc/kvm/book3s_64_mmu_hv.c          |  2 +-
->  arch/powerpc/mm/pgtable-frag.c               |  4 ++--
->  arch/riscv/include/asm/pgalloc.h             |  8 +++-----
->  arch/sh/mm/pgtable.c                         |  6 ++----
->  arch/unicore32/include/asm/pgalloc.h         |  6 ++----
->  arch/x86/kernel/espfix_64.c                  |  6 ++----
->  arch/x86/mm/pgtable.c                        | 15 +++++++--------
->  include/asm-generic/pgtable.h                |  2 ++
->  virt/kvm/arm/mmu.c                           |  2 +-
->  17 files changed, 37 insertions(+), 50 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
-> index 17ab72f..72be6f5 100644
-> --- a/arch/arm/include/asm/pgalloc.h
-> +++ b/arch/arm/include/asm/pgalloc.h
-> @@ -57,8 +57,6 @@ static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
->  extern pgd_t *pgd_alloc(struct mm_struct *mm);
->  extern void pgd_free(struct mm_struct *mm, pgd_t *pgd);
->  
-> -#define PGALLOC_GFP	(GFP_KERNEL | __GFP_ZERO)
-> -
->  static inline void clean_pte_table(pte_t *pte)
->  {
->  	clean_dcache_area(pte + PTE_HWTABLE_PTRS, PTE_HWTABLE_SIZE);
-> @@ -85,7 +83,7 @@ pte_alloc_one_kernel(struct mm_struct *mm)
->  {
->  	pte_t *pte;
->  
-> -	pte = (pte_t *)__get_free_page(PGALLOC_GFP);
-> +	pte = (pte_t *)__get_free_page(GFP_PGTABLE);
->  	if (pte)
->  		clean_pte_table(pte);
->  
-> @@ -98,9 +96,9 @@ pte_alloc_one(struct mm_struct *mm)
->  	struct page *pte;
->  
->  #ifdef CONFIG_HIGHPTE
-> -	pte = alloc_pages(PGALLOC_GFP | __GFP_HIGHMEM, 0);
-> +	pte = alloc_pages(GFP_PGTABLE | __GFP_HIGHMEM, 0);
->  #else
-> -	pte = alloc_pages(PGALLOC_GFP, 0);
-> +	pte = alloc_pages(GFP_PGTABLE, 0);
->  #endif
->  	if (!pte)
->  		return NULL;
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index f5cc1cc..6d47784 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -733,7 +733,7 @@ static void __init *early_alloc(unsigned long sz)
->  
->  static void *__init late_alloc(unsigned long sz)
->  {
-> -	void *ptr = (void *)__get_free_pages(PGALLOC_GFP, get_order(sz));
-> +	void *ptr = (void *)__get_free_pages(GFP_PGTABLE, get_order(sz));
->  
->  	if (!ptr || !pgtable_page_ctor(virt_to_page(ptr)))
->  		BUG();
-> diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
-> index 52fa47c..d5c75bf 100644
-> --- a/arch/arm64/include/asm/pgalloc.h
-> +++ b/arch/arm64/include/asm/pgalloc.h
-> @@ -26,14 +26,13 @@
->  
->  #define check_pgt_cache()		do { } while (0)
->  
-> -#define PGALLOC_GFP	(GFP_KERNEL | __GFP_ZERO)
->  #define PGD_SIZE	(PTRS_PER_PGD * sizeof(pgd_t))
->  
->  #if CONFIG_PGTABLE_LEVELS > 2
->  
->  static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
->  {
-> -	return (pmd_t *)__get_free_page(PGALLOC_GFP);
-> +	return (pmd_t *)__get_free_page(GFP_PGTABLE);
->  }
->  
->  static inline void pmd_free(struct mm_struct *mm, pmd_t *pmdp)
-> @@ -62,7 +61,7 @@ static inline void __pud_populate(pud_t *pudp, phys_addr_t pmdp, pudval_t prot)
->  
->  static inline pud_t *pud_alloc_one(struct mm_struct *mm, unsigned long addr)
->  {
-> -	return (pud_t *)__get_free_page(PGALLOC_GFP);
-> +	return (pud_t *)__get_free_page(GFP_PGTABLE);
->  }
->  
->  static inline void pud_free(struct mm_struct *mm, pud_t *pudp)
-> @@ -93,7 +92,7 @@ extern void pgd_free(struct mm_struct *mm, pgd_t *pgdp);
->  static inline pte_t *
->  pte_alloc_one_kernel(struct mm_struct *mm)
->  {
-> -	return (pte_t *)__get_free_page(PGALLOC_GFP);
-> +	return (pte_t *)__get_free_page(GFP_PGTABLE);
->  }
->  
->  static inline pgtable_t
-> @@ -101,7 +100,7 @@ pte_alloc_one(struct mm_struct *mm)
->  {
->  	struct page *pte;
->  
-> -	pte = alloc_pages(PGALLOC_GFP, 0);
-> +	pte = alloc_pages(GFP_PGTABLE, 0);
->  	if (!pte)
->  		return NULL;
->  	if (!pgtable_page_ctor(pte)) {
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index b6f5aa5..07b1c0f 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -372,7 +372,7 @@ static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
->  
->  static phys_addr_t pgd_pgtable_alloc(void)
->  {
-> -	void *ptr = (void *)__get_free_page(PGALLOC_GFP);
-> +	void *ptr = (void *)__get_free_page(GFP_PGTABLE);
->  	if (!ptr || !pgtable_page_ctor(virt_to_page(ptr)))
->  		BUG();
->  
-> diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
-> index 289f911..5b28e2b 100644
-> --- a/arch/arm64/mm/pgd.c
-> +++ b/arch/arm64/mm/pgd.c
-> @@ -31,9 +31,9 @@ static struct kmem_cache *pgd_cache __ro_after_init;
->  pgd_t *pgd_alloc(struct mm_struct *mm)
->  {
->  	if (PGD_SIZE == PAGE_SIZE)
-> -		return (pgd_t *)__get_free_page(PGALLOC_GFP);
-> +		return (pgd_t *)__get_free_page(GFP_PGTABLE);
->  	else
-> -		return kmem_cache_alloc(pgd_cache, PGALLOC_GFP);
-> +		return kmem_cache_alloc(pgd_cache, GFP_PGTABLE);
->  }
->  
->  void pgd_free(struct mm_struct *mm, pgd_t *pgd)
-> diff --git a/arch/nds32/include/asm/pgalloc.h b/arch/nds32/include/asm/pgalloc.h
-> index 3c5fee5..e1137ce 100644
-> --- a/arch/nds32/include/asm/pgalloc.h
-> +++ b/arch/nds32/include/asm/pgalloc.h
-> @@ -27,8 +27,7 @@ static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm)
->  	pte_t *pte;
->  
->  	pte =
-> -	    (pte_t *) __get_free_page(GFP_KERNEL | __GFP_RETRY_MAYFAIL |
-> -				      __GFP_ZERO);
-> +	    (pte_t *) __get_free_page(GFP_PGTABLE | __GFP_RETRY_MAYFAIL);
->  
->  	return pte;
->  }
-> diff --git a/arch/powerpc/include/asm/book3s/64/pgalloc.h b/arch/powerpc/include/asm/book3s/64/pgalloc.h
-> index 9c11732..71704e5 100644
-> --- a/arch/powerpc/include/asm/book3s/64/pgalloc.h
-> +++ b/arch/powerpc/include/asm/book3s/64/pgalloc.h
-> @@ -52,11 +52,11 @@ void pte_frag_destroy(void *pte_frag);
->  static inline pgd_t *radix__pgd_alloc(struct mm_struct *mm)
->  {
->  #ifdef CONFIG_PPC_64K_PAGES
-> -	return (pgd_t *)__get_free_page(pgtable_gfp_flags(mm, PGALLOC_GFP));
-> +	return (pgd_t *)__get_free_page(pgtable_gfp_flags(mm, GFP_PGTABLE));
->  #else
->  	struct page *page;
-> -	page = alloc_pages(pgtable_gfp_flags(mm, PGALLOC_GFP | __GFP_RETRY_MAYFAIL),
-> -				4);
-> +	page = alloc_pages(pgtable_gfp_flags(mm, GFP_PGTABLE |
-> +				__GFP_RETRY_MAYFAIL), 4);
->  	if (!page)
->  		return NULL;
->  	return (pgd_t *) page_address(page);
-> diff --git a/arch/powerpc/include/asm/pgalloc.h b/arch/powerpc/include/asm/pgalloc.h
-> index e11f030..3b11e8b 100644
-> --- a/arch/powerpc/include/asm/pgalloc.h
-> +++ b/arch/powerpc/include/asm/pgalloc.h
-> @@ -18,8 +18,6 @@ static inline gfp_t pgtable_gfp_flags(struct mm_struct *mm, gfp_t gfp)
->  }
->  #endif /* MODULE */
->  
-> -#define PGALLOC_GFP (GFP_KERNEL | __GFP_ZERO)
-> -
->  #ifdef CONFIG_PPC_BOOK3S
->  #include <asm/book3s/pgalloc.h>
->  #else
-> diff --git a/arch/powerpc/kvm/book3s_64_mmu_hv.c b/arch/powerpc/kvm/book3s_64_mmu_hv.c
-> index bd2dcfb..b419878 100644
-> --- a/arch/powerpc/kvm/book3s_64_mmu_hv.c
-> +++ b/arch/powerpc/kvm/book3s_64_mmu_hv.c
-> @@ -97,7 +97,7 @@ int kvmppc_allocate_hpt(struct kvm_hpt_info *info, u32 order)
->  	}
->  
->  	if (!hpt)
-> -		hpt = __get_free_pages(GFP_KERNEL|__GFP_ZERO|__GFP_RETRY_MAYFAIL
-> +		hpt = __get_free_pages(GFP_PGTABLE | __GFP_RETRY_MAYFAIL
->  				       |__GFP_NOWARN, order - PAGE_SHIFT);
->  
->  	if (!hpt)
-> diff --git a/arch/powerpc/mm/pgtable-frag.c b/arch/powerpc/mm/pgtable-frag.c
-> index a7b0521..211aaa7 100644
-> --- a/arch/powerpc/mm/pgtable-frag.c
-> +++ b/arch/powerpc/mm/pgtable-frag.c
-> @@ -58,7 +58,7 @@ static pte_t *__alloc_for_ptecache(struct mm_struct *mm, int kernel)
->  	struct page *page;
->  
->  	if (!kernel) {
-> -		page = alloc_page(PGALLOC_GFP | __GFP_ACCOUNT);
-> +		page = alloc_page(GFP_PGTABLE | __GFP_ACCOUNT);
->  		if (!page)
->  			return NULL;
->  		if (!pgtable_page_ctor(page)) {
-> @@ -66,7 +66,7 @@ static pte_t *__alloc_for_ptecache(struct mm_struct *mm, int kernel)
->  			return NULL;
->  		}
->  	} else {
-> -		page = alloc_page(PGALLOC_GFP);
-> +		page = alloc_page(GFP_PGTABLE);
->  		if (!page)
->  			return NULL;
->  	}
-> diff --git a/arch/riscv/include/asm/pgalloc.h b/arch/riscv/include/asm/pgalloc.h
-> index 94043cf..7ff1cd7 100644
-> --- a/arch/riscv/include/asm/pgalloc.h
-> +++ b/arch/riscv/include/asm/pgalloc.h
-> @@ -69,8 +69,7 @@ static inline void pgd_free(struct mm_struct *mm, pgd_t *pgd)
->  
->  static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
->  {
-> -	return (pmd_t *)__get_free_page(
-> -		GFP_KERNEL | __GFP_RETRY_MAYFAIL | __GFP_ZERO);
-> +	return (pmd_t *)__get_free_page(GFP_PGTABLE | __GFP_RETRY_MAYFAIL);
->  }
->  
->  static inline void pmd_free(struct mm_struct *mm, pmd_t *pmd)
-> @@ -84,15 +83,14 @@ static inline void pmd_free(struct mm_struct *mm, pmd_t *pmd)
->  
->  static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm)
->  {
-> -	return (pte_t *)__get_free_page(
-> -		GFP_KERNEL | __GFP_RETRY_MAYFAIL | __GFP_ZERO);
-> +	return (pte_t *)__get_free_page(GFP_PGTABLE | __GFP_RETRY_MAYFAIL);
->  }
->  
->  static inline struct page *pte_alloc_one(struct mm_struct *mm)
->  {
->  	struct page *pte;
->  
-> -	pte = alloc_page(GFP_KERNEL | __GFP_RETRY_MAYFAIL | __GFP_ZERO);
-> +	pte = alloc_page(GFP_PGTABLE | __GFP_RETRY_MAYFAIL);
->  	if (likely(pte != NULL))
->  		pgtable_page_ctor(pte);
->  	return pte;
-> diff --git a/arch/sh/mm/pgtable.c b/arch/sh/mm/pgtable.c
-> index 5c8f924..324732dc5 100644
-> --- a/arch/sh/mm/pgtable.c
-> +++ b/arch/sh/mm/pgtable.c
-> @@ -2,8 +2,6 @@
->  #include <linux/mm.h>
->  #include <linux/slab.h>
->  
-> -#define PGALLOC_GFP GFP_KERNEL | __GFP_ZERO
-> -
->  static struct kmem_cache *pgd_cachep;
->  #if PAGETABLE_LEVELS > 2
->  static struct kmem_cache *pmd_cachep;
-> @@ -32,7 +30,7 @@ void pgtable_cache_init(void)
->  
->  pgd_t *pgd_alloc(struct mm_struct *mm)
->  {
-> -	return kmem_cache_alloc(pgd_cachep, PGALLOC_GFP);
-> +	return kmem_cache_alloc(pgd_cachep, GFP_PGTABLE);
->  }
->  
->  void pgd_free(struct mm_struct *mm, pgd_t *pgd)
-> @@ -48,7 +46,7 @@ void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
->  
->  pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long address)
->  {
-> -	return kmem_cache_alloc(pmd_cachep, PGALLOC_GFP);
-> +	return kmem_cache_alloc(pmd_cachep, GFP_PGTABLE);
->  }
->  
->  void pmd_free(struct mm_struct *mm, pmd_t *pmd)
-> diff --git a/arch/unicore32/include/asm/pgalloc.h b/arch/unicore32/include/asm/pgalloc.h
-> index 7cceabe..a3506e5 100644
-> --- a/arch/unicore32/include/asm/pgalloc.h
-> +++ b/arch/unicore32/include/asm/pgalloc.h
-> @@ -28,8 +28,6 @@ extern void free_pgd_slow(struct mm_struct *mm, pgd_t *pgd);
->  #define pgd_alloc(mm)			get_pgd_slow(mm)
->  #define pgd_free(mm, pgd)		free_pgd_slow(mm, pgd)
->  
-> -#define PGALLOC_GFP	(GFP_KERNEL | __GFP_ZERO)
-> -
->  /*
->   * Allocate one PTE table.
->   */
-> @@ -38,7 +36,7 @@ pte_alloc_one_kernel(struct mm_struct *mm)
->  {
->  	pte_t *pte;
->  
-> -	pte = (pte_t *)__get_free_page(PGALLOC_GFP);
-> +	pte = (pte_t *)__get_free_page(GFP_PGTABLE);
->  	if (pte)
->  		clean_dcache_area(pte, PTRS_PER_PTE * sizeof(pte_t));
->  
-> @@ -50,7 +48,7 @@ pte_alloc_one(struct mm_struct *mm)
->  {
->  	struct page *pte;
->  
-> -	pte = alloc_pages(PGALLOC_GFP, 0);
-> +	pte = alloc_pages(GFP_PGTABLE, 0);
->  	if (!pte)
->  		return NULL;
->  	if (!PageHighMem(pte)) {
-> diff --git a/arch/x86/kernel/espfix_64.c b/arch/x86/kernel/espfix_64.c
-> index aebd0d5..dae28cc 100644
-> --- a/arch/x86/kernel/espfix_64.c
-> +++ b/arch/x86/kernel/espfix_64.c
-> @@ -57,8 +57,6 @@
->  # error "Need more virtual address space for the ESPFIX hack"
->  #endif
->  
-> -#define PGALLOC_GFP (GFP_KERNEL | __GFP_ZERO)
-> -
->  /* This contains the *bottom* address of the espfix stack */
->  DEFINE_PER_CPU_READ_MOSTLY(unsigned long, espfix_stack);
->  DEFINE_PER_CPU_READ_MOSTLY(unsigned long, espfix_waddr);
-> @@ -172,7 +170,7 @@ void init_espfix_ap(int cpu)
->  	pud_p = &espfix_pud_page[pud_index(addr)];
->  	pud = *pud_p;
->  	if (!pud_present(pud)) {
-> -		struct page *page = alloc_pages_node(node, PGALLOC_GFP, 0);
-> +		struct page *page = alloc_pages_node(node, GFP_PGTABLE, 0);
->  
->  		pmd_p = (pmd_t *)page_address(page);
->  		pud = __pud(__pa(pmd_p) | (PGTABLE_PROT & ptemask));
-> @@ -184,7 +182,7 @@ void init_espfix_ap(int cpu)
->  	pmd_p = pmd_offset(&pud, addr);
->  	pmd = *pmd_p;
->  	if (!pmd_present(pmd)) {
-> -		struct page *page = alloc_pages_node(node, PGALLOC_GFP, 0);
-> +		struct page *page = alloc_pages_node(node, GFP_PGTABLE, 0);
->  
->  		pte_p = (pte_t *)page_address(page);
->  		pmd = __pmd(__pa(pte_p) | (PGTABLE_PROT & ptemask));
-> diff --git a/arch/x86/mm/pgtable.c b/arch/x86/mm/pgtable.c
-> index 7bd0170..a5b1672 100644
-> --- a/arch/x86/mm/pgtable.c
-> +++ b/arch/x86/mm/pgtable.c
-> @@ -13,19 +13,17 @@ phys_addr_t physical_mask __ro_after_init = (1ULL << __PHYSICAL_MASK_SHIFT) - 1;
->  EXPORT_SYMBOL(physical_mask);
->  #endif
->  
-> -#define PGALLOC_GFP (GFP_KERNEL_ACCOUNT | __GFP_ZERO)
-> -
->  #ifdef CONFIG_HIGHPTE
->  #define PGALLOC_USER_GFP __GFP_HIGHMEM
->  #else
->  #define PGALLOC_USER_GFP 0
->  #endif
->  
-> -gfp_t __userpte_alloc_gfp = PGALLOC_GFP | PGALLOC_USER_GFP;
-> +gfp_t __userpte_alloc_gfp = GFP_PGTABLE | __GFP_ACCOUNT | PGALLOC_USER_GFP;
->  
->  pte_t *pte_alloc_one_kernel(struct mm_struct *mm)
->  {
-> -	return (pte_t *)__get_free_page(PGALLOC_GFP & ~__GFP_ACCOUNT);
-> +	return (pte_t *)__get_free_page(GFP_PGTABLE);
->  }
->  
->  pgtable_t pte_alloc_one(struct mm_struct *mm)
-> @@ -235,7 +233,7 @@ static int preallocate_pmds(struct mm_struct *mm, pmd_t *pmds[], int count)
->  {
->  	int i;
->  	bool failed = false;
-> -	gfp_t gfp = PGALLOC_GFP;
-> +	gfp_t gfp = GFP_PGTABLE | __GFP_ACCOUNT;
->  
->  	if (mm == &init_mm)
->  		gfp &= ~__GFP_ACCOUNT;
-> @@ -401,14 +399,14 @@ static inline pgd_t *_pgd_alloc(void)
->  	 * We allocate one page for pgd.
->  	 */
->  	if (!SHARED_KERNEL_PMD)
-> -		return (pgd_t *)__get_free_pages(PGALLOC_GFP,
-> +		return (pgd_t *)__get_free_pages(GFP_PGTABLE | __GFP_ACCOUNT,
->  						 PGD_ALLOCATION_ORDER);
->  
->  	/*
->  	 * Now PAE kernel is not running as a Xen domain. We can allocate
->  	 * a 32-byte slab for pgd to save memory space.
->  	 */
-> -	return kmem_cache_alloc(pgd_cache, PGALLOC_GFP);
-> +	return kmem_cache_alloc(pgd_cache, GFP_PGTABLE | __GFP_ACCOUNT);
->  }
->  
->  static inline void _pgd_free(pgd_t *pgd)
-> @@ -422,7 +420,8 @@ static inline void _pgd_free(pgd_t *pgd)
->  
->  static inline pgd_t *_pgd_alloc(void)
->  {
-> -	return (pgd_t *)__get_free_pages(PGALLOC_GFP, PGD_ALLOCATION_ORDER);
-> +	return (pgd_t *)__get_free_pages(GFP_PGTABLE | __GFP_ACCOUNT,
-> +						PGD_ALLOCATION_ORDER);
->  }
->  
->  static inline void _pgd_free(pgd_t *pgd)
-> diff --git a/include/asm-generic/pgtable.h b/include/asm-generic/pgtable.h
-> index 05e61e6..3d9cde6 100644
-> --- a/include/asm-generic/pgtable.h
-> +++ b/include/asm-generic/pgtable.h
-> @@ -1186,4 +1186,6 @@ static inline bool arch_has_pfn_modify_check(void)
->  #define mm_pmd_folded(mm)	__is_defined(__PAGETABLE_PMD_FOLDED)
->  #endif
->  
-> +#define GFP_PGTABLE	(GFP_KERNEL | __GFP_ZERO)
-> +
->  #endif /* _ASM_GENERIC_PGTABLE_H */
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index fbdf3ac..f60a5b8 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -143,7 +143,7 @@ static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
->  	if (cache->nobjs >= min)
->  		return 0;
->  	while (cache->nobjs < max) {
-> -		page = (void *)__get_free_page(PGALLOC_GFP);
-> +		page = (void *)__get_free_page(GFP_PGTABLE);
->  		if (!page)
->  			return -ENOMEM;
->  		cache->objects[cache->nobjs++] = page;
-> -- 
-> 2.7.4
-> 
+Put them here also means there's no chance to disable it for other imx v8 socs.
 
--- 
-Michal Hocko
-SUSE Labs
+Regards
+Dong Aisheng
+> 
+> Shawn
+> 
+> >  	help
+> >  	  This enables support for the ARMv8 based SoCs in the
+> >  	  NXP i.MX family.
+> > --
+> > 2.20.1
+> >
 
 _______________________________________________
 linux-arm-kernel mailing list
