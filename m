@@ -2,81 +2,69 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+X-Spam-Status: No, score=-1.7 required=3.0 tests=DKIM_ADSP_ALL,DKIM_INVALID,
+	DKIM_SIGNED,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EED84C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 07:58:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A8016C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 07:59:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C11EA20866
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 07:58:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7758920840
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 07:59:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HEvxukjl";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="jYTAD8m1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C11EA20866
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="W18ykNeU";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=plaes.org header.i=@plaes.org header.b="IImQkfO4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7758920840
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=plaes.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=CQXuX9N6xzgwZYJXowSrXqDiJBU7H1R14cvnfyNeSYg=; b=HEvxukjlsUp4lQ
-	+UpS0dhoF0/Ck9Ad6FwaK82W8jIL9eqsj0MaaoC5k92oZ4pgnk9DhXDReHvhunLQSZyNL6BdmKSnS
-	uDQb3IG6LBPjQ835vZB7OXpWYhssDufzTN2WQcvDwtXk1wyUnoDvEjR1XvgoMAsQjdktv99iiFLUd
-	9XxsAeuA0dwUyIgLzuGV4ioqH/PIUmZbmcfF9oB3LTSDYRdNx/oucCVAsyFOP4r8/TXZFTwD6ieZr
-	3nOGNfLawN4ql7xcsYGLVSluYvcI1JWs8ZjABsVWMdH1RFYuxwAWmpMBROgwyTnVl06fa5jq7/Rpg
-	F1UTKEsvXqcrdu1KUaDQ==;
+	List-Owner; bh=cBD6DRuwC5Tt4vjKTxO3gxjcLzZTwEow7r9s86oZyD8=; b=W18ykNeU22JVAq
+	3eX8XRJyZc4pK4b7Bg6iuBOqyvTmNlPvBIMcA1NP8b2LhLatL5Tp+jAxuYV1QPjyjILougcCrTfb+
+	vjq2FtL/I7V2liEhCJG/jSPYFk+t6KRXpffMpilJqNspaXCicFAaFhBRZx0b6vGQuPmYUYCdz6ZqD
+	4MqaV1tFNHrl89WDBuR616edOaPbFsLHwG/KWAazZdV9R0Rc8SuoniLPugF3qLKrCZz7fp8yYmHBH
+	y6SmBlhZuH2c0DNxnIYR82vdzACvWrsyVpuSEay5mZnv8hsXSv7UC5hf6PRnsCrRXsRUIieDz06w/
+	Ad1INtsKj8NqWZji2l2g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjg5k-0007Wk-ID; Wed, 16 Jan 2019 07:58:28 +0000
-Received: from mail-ua1-x941.google.com ([2607:f8b0:4864:20::941])
+	id 1gjg6n-0007nr-4b; Wed, 16 Jan 2019 07:59:33 +0000
+Received: from plaes.org ([188.166.43.21])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjg5h-0007WG-J4
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 07:58:27 +0000
-Received: by mail-ua1-x941.google.com with SMTP id z11so1858941uaa.10
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 15 Jan 2019 23:58:24 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=f+PBc3wsOLctO6i6bccsq2QFl7l9psdui1/+ZOVxUEM=;
- b=jYTAD8m1/DkSLKYtrAzSwVvdl9mfCR8qA8ML+IIJwSd7DI0OCWjV05urTPESb2X6E/
- ZNrqD47CbCCwqOEPPKmk9qw9NfQ8K80zPdOG3JVX/k4JlemeQjTddLS6hzPLfX762hBY
- /tsdG6HOhUsVtJjXyXm+DMJWtOQr3lw1VE8yY=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=f+PBc3wsOLctO6i6bccsq2QFl7l9psdui1/+ZOVxUEM=;
- b=WTuPF59zeeapp7nlciqE9uBVn1fXDwhEewSxVdrdWgubKmxagBRRjm3F4KgZThSAsu
- gkD9ijrXx08jFfnRvuMAyIrnTjFZmRQ/GXu0zkarIuaCSO6Fil4xj139nPgR0ZXD8YjU
- Xw6pooXkSy1RVVdMMtRKZazJM6ALjgw7f7nHoZIPxs5dSsUrrVk0/+vZP39IhTuWwED/
- VID/kiybz4kDVIvUJEBYxD1Z5Bx2tfB+2YLGNi7KIeU899qJnICK04r735GjnXsgNkfR
- jdY9d2iFjmKJpNKetovhpTUENM34ZWZsjros1EWB3s4spyqKxlOxP52tuNscQMvuH9XW
- enOw==
-X-Gm-Message-State: AJcUukdezVu4pq+Rd+DWNs0mcrxubb88Q5k66V7OCgGzSkczHMGAM2f2
- F1rMaqa/XbmaCG/qD/KneFrtLHGXZSnHzG/RzMWb9Q==
-X-Google-Smtp-Source: ALg8bN4rtG8ud2W0ismXvPf+MRmbFTrLr5uztZNN+2jHC2FBHHEEK3jGixQC6GPkhL4qkleNuQsOfAUH1TcASTHfsQM=
-X-Received: by 2002:ab0:526:: with SMTP id 35mr3213259uax.25.1547625503417;
- Tue, 15 Jan 2019 23:58:23 -0800 (PST)
+ id 1gjg6j-0007nR-Bx
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 07:59:31 +0000
+Received: from plaes.org (localhost [127.0.0.1])
+ by plaes.org (Postfix) with ESMTPSA id E1E0E4042D;
+ Wed, 16 Jan 2019 07:58:55 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=plaes.org; s=mail;
+ t=1547625535; bh=gmAgAhUX+s8x+bckN8RcCtKnRI60cxc9Uc7EsH4eRik=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=IImQkfO4fpGZzgOxmliZ32woI9BCrL9oPaLRHO4XAjorGbl5eMJ4uZLEB5m0C83sl
+ u4SNNeH0txG6cOlR2+C+8g6FH/tU+WNzSK/4FzBbQBEa4sMOs7sSsJVZ036DHvROch
+ XTL1hQsbxACTBwlNS0O+GKH7yEH/dU85ZpdWelVU1gJcuxAfANTB35MEM4E3dwszEb
+ dL/l3hVRn3Jzp5ozaqQM0DeRHlwRuzlg6wKNDioWzB9eBvQ2oKa9fcRPA8JhO9IdBK
+ 90MDi4VKW1l1p7u6OxvPwffQ2/D65oOcJwuwZYKHuyqUwSEInxe6DRS86kBc5diamX
+ mgkxjbuY3oH5A==
+Date: Wed, 16 Jan 2019 07:58:54 +0000
+From: Priit Laes <plaes@plaes.org>
+To: Maxime Ripard <maxime.ripard@bootlin.com>
+Subject: Re: [linux-sunxi] Re: HDMI/DVI spurious failure
+Message-ID: <20190116075854.o2kme5nxq5kckwem@plaes.org>
+References: <20190114132934.rywqqtjarbf6fgcr@plaes.org>
+ <20190115094951.e7jnjpibj5tcp5pz@flea>
 MIME-Version: 1.0
-References: <20181129174700.16585-1-ulf.hansson@linaro.org>
- <20181129174700.16585-4-ulf.hansson@linaro.org>
- <119031115.C8gHTGbYmQ@aspire.rjw.lan>
-In-Reply-To: <119031115.C8gHTGbYmQ@aspire.rjw.lan>
-From: Ulf Hansson <ulf.hansson@linaro.org>
-Date: Wed, 16 Jan 2019 08:57:46 +0100
-Message-ID: <CAPDyKFqQQnMKFNpGyi_dkP_Rm8qo-1WjPfVkp2unOxyXRa2wbA@mail.gmail.com>
-Subject: Re: [PATCH v10 03/27] timer: Export next wakeup time of a CPU
-To: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Content-Disposition: inline
+In-Reply-To: <20190115094951.e7jnjpibj5tcp5pz@flea>
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_235825_629037_481F6784 
-X-CRM114-Status: GOOD (  31.75  )
+X-CRM114-CacheID: sfid-20190115_235929_551755_8D359E46 
+X-CRM114-Status: GOOD (  21.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,167 +76,61 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>,
- Vincent Guittot <vincent.guittot@linaro.org>,
- Geert Uytterhoeven <geert+renesas@glider.be>,
- Linux PM <linux-pm@vger.kernel.org>, Stephen Boyd <sboyd@kernel.org>,
- Viresh Kumar <viresh.kumar@linaro.org>,
- linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- Daniel Lezcano <daniel.lezcano@linaro.org>, Kevin Hilman <khilman@kernel.org>,
- Lina Iyer <ilina@codeaurora.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Frederic Weisbecker <fweisbec@gmail.com>, Tony Lindgren <tony@atomide.com>,
- Lina Iyer <lina.iyer@linaro.org>, Sudeep Holla <sudeep.holla@arm.com>,
- Thomas Gleixner <tglx@linutronix.de>,
- "Raju P . L . S . S . S . N" <rplsssn@codeaurora.org>,
- Ingo Molnar <mingo@kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: linux-arm-kernel@lists.infradead.org, linux-sunxi@googlegroups.com,
+ Chen-Yu Tsai <wens@csie.org>, Jonathan Liu <net147@gmail.com>,
+ dri-devel@lists.freedesktop.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 11 Jan 2019 at 12:07, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
->
-> On Thursday, November 29, 2018 6:46:36 PM CET Ulf Hansson wrote:
-> > From: Lina Iyer <lina.iyer@linaro.org>
-> >
-> > Knowing the sleep duration of CPUs, is known to be needed while selecting
-> > the most energy efficient idle state for a CPU or a group of CPUs.
-> >
-> > However, to be able to compute the sleep duration, we need to know at what
-> > time the next expected wakeup is for the CPU. Therefore, let's export this
-> > information via a new function, tick_nohz_get_next_wakeup(). Following
-> > changes make use of it.
-> >
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > Cc: Lina Iyer <ilina@codeaurora.org>
-> > Cc: Frederic Weisbecker <fweisbec@gmail.com>
-> > Cc: Ingo Molnar <mingo@kernel.org>
-> > Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> > Co-developed-by: Ulf Hansson <ulf.hansson@linaro.org>
-> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> > ---
-> >
-> > Changes in v10:
-> >       - Updated function header of tick_nohz_get_next_wakeup().
-> >
-> > ---
-> >  include/linux/tick.h     |  8 ++++++++
-> >  kernel/time/tick-sched.c | 13 +++++++++++++
-> >  2 files changed, 21 insertions(+)
-> >
-> > diff --git a/include/linux/tick.h b/include/linux/tick.h
-> > index 55388ab45fd4..e48f6b26b425 100644
-> > --- a/include/linux/tick.h
-> > +++ b/include/linux/tick.h
-> > @@ -125,6 +125,7 @@ extern bool tick_nohz_idle_got_tick(void);
-> >  extern ktime_t tick_nohz_get_sleep_length(ktime_t *delta_next);
-> >  extern unsigned long tick_nohz_get_idle_calls(void);
-> >  extern unsigned long tick_nohz_get_idle_calls_cpu(int cpu);
-> > +extern ktime_t tick_nohz_get_next_wakeup(int cpu);
-> >  extern u64 get_cpu_idle_time_us(int cpu, u64 *last_update_time);
-> >  extern u64 get_cpu_iowait_time_us(int cpu, u64 *last_update_time);
-> >
-> > @@ -151,6 +152,13 @@ static inline ktime_t tick_nohz_get_sleep_length(ktime_t *delta_next)
-> >       *delta_next = TICK_NSEC;
-> >       return *delta_next;
-> >  }
-> > +
-> > +static inline ktime_t tick_nohz_get_next_wakeup(int cpu)
-> > +{
-> > +     /* Next wake up is the tick period, assume it starts now */
-> > +     return ktime_add(ktime_get(), TICK_NSEC);
-> > +}
-> > +
-> >  static inline u64 get_cpu_idle_time_us(int cpu, u64 *unused) { return -1; }
-> >  static inline u64 get_cpu_iowait_time_us(int cpu, u64 *unused) { return -1; }
-> >
-> > diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
-> > index 69e673b88474..7a9166506503 100644
-> > --- a/kernel/time/tick-sched.c
-> > +++ b/kernel/time/tick-sched.c
-> > @@ -1089,6 +1089,19 @@ unsigned long tick_nohz_get_idle_calls(void)
-> >       return ts->idle_calls;
-> >  }
-> >
-> > +/**
-> > + * tick_nohz_get_next_wakeup - return the next wake up of the CPU
-> > + * @cpu: the particular CPU to get next wake up for
-> > + *
-> > + * Called for idle CPUs only.
-> > + */
-> > +ktime_t tick_nohz_get_next_wakeup(int cpu)
-> > +{
-> > +     struct clock_event_device *dev = per_cpu(tick_cpu_device.evtdev, cpu);
-> > +
-> > +     return dev->next_event;
-> > +}
-> > +
-> >  static void tick_nohz_account_idle_ticks(struct tick_sched *ts)
-> >  {
-> >  #ifndef CONFIG_VIRT_CPU_ACCOUNTING_NATIVE
-> >
->
-> Well, I have concerns regarding this one.
->
-> I don't believe it is valid to call this new function for non-idle CPUs and
-> the kerneldoc kind of says so, but the next patch doesn't actually prevent
-> it from being called for a non-idle CPU (at the time it is called in there
-> the target CPU may not be idle any more AFAICS).
+On Tue, Jan 15, 2019 at 10:49:51AM +0100, Maxime Ripard wrote:
+> Hi,
+> 
+> (Sending those kind of bug reports to linux-sunxi doesn't really work,
+> you should Cc at least the ML involved in the development of the
+> driver at fault).
 
-You are correct, but let me clarify things.
+OK, sorry for that.
 
-We are calling this new API from the new genpd governor, which may
-have a cpumask indicating there is more than one CPU attached to its
-PM domain+sub-PM domains. In other words, we may call the API for
-another CPU than the one we are executing on.
+> 
+> On Mon, Jan 14, 2019 at 01:29:34PM +0000, Priit Laes wrote:
+> > I have a somewhat curious case with one HDMI/DVI screen that fails
+> > to initialize properly every 6-7 boots. The display itself is also
+> > somewhat flawed (missing HPD pin and the VSYNC/HSYNC pulse width
+> > is set to 0 in EDID), but I suspect there could be some issues
+> > regarding timing in A20 HDMI driver in Linux.
+> > 
+...
 
-When the new genpd governor is called, all CPUs in the cpumask of the
-genpd in question, are already runtime suspended and will remain so
-throughout the decisions made by the governor.
+> It doesn't look related to the clock rate itself, since it doesn't
+> change between the two cases. However, in one case the DDC clock is
+> enabled and in the other it's disabled.
+> 
+> Was it taken at the same time? Maybe you can try with that patch?
+> http://code.bulix.org/z7jmkm-555344?raw
 
-However, because of the race condition, which needs to be manged by
-the genpd backend driver and its corresponding FW, one of the CPU in
-the genpd cpumask could potentially wake up from idle when the genpd
-governor runs. However, as a part of exiting from idle, that CPU needs
-to wait for the call to pm_runtime_get_sync() to return before
-completing the exit patch of idle. This also means waiting for the
-genpd governor to finish.
+Thanks, after doing ~50+ boots I haven't seen a single failure.
 
-The point is, no matter what decision the governor takes under these
-circumstances, the genpd backend driver and its FW must manage this
-race condition during the last man standing. For PSCI OSI mode, it
-means that if a cluster idle state is suggested by Linux during these
-circumstances, it must be prevented and aborted.
+Previously I had following failure cases which are now both fixed:
 
->
-> In principle, the cpuidle core can store this value, say in struct
-> cpuidle_device of the given CPU, and expose a helper to access it from
-> genpd, but that would be extra overhead totally unnecessary on everthing
-> that doesn't use genpd for cpuidle.
->
-> So maybe the driver could store it in its ->enter callback?  After all,
-> the driver knows that genpd is going to be used later.
+a) Linux without u-boot HDMI, where one in every 6-7 boots failed.
+b) u--boot with hdmi enabled switching to simplefb and then switching
+to kms, where previously all boots ended up with garbled screen.
 
-This would work, but it wouldn't really change much when it comes to
-the race condition described above. Of course it would turn the code
-into being more cpuidle specific, which seems reasonable to me.
-
-Anyway, if I understand your suggestion, in principle it means
-changing $subject patch in such way that the API should not take "int
-cpu" as an in-parameter, but instead only use __this_cpu() to read out
-the next event for current idle CPU.
-
-Additionally, we need another new cpuidle API, which genpd can call to
-retrieve a new per CPU "next event data" stored by the cpuidle driver
-from its ->enter() callback. Is this a correct interpretation of your
-suggestion?
-
-Kind regards
-Uffe
+Priit :)
+> 
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Bootlin
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
+> 
+> -- 
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe@googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
 
 _______________________________________________
 linux-arm-kernel mailing list
