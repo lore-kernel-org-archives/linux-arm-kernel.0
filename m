@@ -2,21 +2,20 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6B74DC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 14:59:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E3995C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 15:10:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3B1FB205C9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 14:59:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B299B20859
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 15:10:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CBsnDUYS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B1FB205C9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hCT96BLq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B299B20859
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,36 +24,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=r1SPQk3z+ETxLqkpwNH5ZnV5xuydbYXtCC2EgX7fm8Q=; b=CBsnDUYSgAdSjg
-	2jM9YHaiBcIfZ555hIRaW19H7DsRME3ppyiGoa/5pXUbvmyjYt4YBMfDLyy9j4GxOf3ryoQohVui9
-	ju7hKGKOag0b4sHiyzCiIxKZUbv2rKdUEdmbyV74aX8UA1iCq49BweZpSfx3OuLcXa22B8tNc6bbl
-	qQjqbdOt6r/vcYWrnQHT6OR3UK2DRKU8h4KoxPe6LTlQ3GW13PO6HG5K+3fsgQtcxSJ1MIjvBbOLU
-	hNbKWEQo2JjB9hx2KmFOGAxFHj7arCkmySGd9mA8plSgOR08U649IIVfgbbu0c2SUonzGk0biNl9B
-	2y8PU7Xl1T7Y9rH9kHQw==;
+	List-Owner; bh=2gySGFeulX+vIbH8Sh/EYsjFgDJWSon24vspaQb8Z0k=; b=hCT96BLqHZqQdq
+	6bSlhoUUPb3QWPUd7fWWlqxSVrmLnrSTp9SBzgM6+HT+oPGk+1wW7XL8q/btIrgByb5VzVZU6/15q
+	h1VNp1CfgkP2uQiQBCXROjF7BouPkNCTMGD77A/0RQAypEUOjJFwD7no5snvwa67FzH7Jt7bfHuCt
+	ZZ51wAHQKGQWjEqUstXikHhl4K2lYTyAPqRfFltKk5UlT01VoGGvZc7a4PhjiSUVsRM9PAzM1tQW2
+	07pVbNqt6jlRZt/8kHJ77YD0YPMkvdh5ZNE/Vnm1a4sKx41dDsl+K0Zc8IgJE7XP4o1WElGJqn+XI
+	1yNzktmmg60zwfBTT4Gw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjmev-0003xE-Mc; Wed, 16 Jan 2019 14:59:13 +0000
+	id 1gjmpV-0008U7-Kq; Wed, 16 Jan 2019 15:10:09 +0000
 Received: from muru.com ([72.249.23.125])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjmes-0003wn-7d
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 14:59:12 +0000
+ id 1gjmpN-0007aB-Ae
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 15:10:07 +0000
 Received: from atomide.com (localhost [127.0.0.1])
- by muru.com (Postfix) with ESMTPS id 9938C8030;
- Wed, 16 Jan 2019 14:59:14 +0000 (UTC)
-Date: Wed, 16 Jan 2019 06:59:04 -0800
+ by muru.com (Postfix) with ESMTPS id 04F7B8030;
+ Wed, 16 Jan 2019 15:10:05 +0000 (UTC)
+Date: Wed, 16 Jan 2019 07:09:56 -0800
 From: Tony Lindgren <tony@atomide.com>
 To: Pavel Machek <pavel@ucw.cz>
 Subject: Re: WIP Droid 4 voice calls, GNSS & PM with a TS 27.010 serdev driver
-Message-ID: <20190116145904.GM5544@atomide.com>
+Message-ID: <20190116150956.GN5544@atomide.com>
 References: <20181217004450.GW6707@atomide.com> <20181227101647.GA32260@amd>
  <20181228193105.GW6707@atomide.com> <20190116135829.GA10426@amd>
+ <20190116145904.GM5544@atomide.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190116135829.GA10426@amd>
+In-Reply-To: <20190116145904.GM5544@atomide.com>
 User-Agent: Mutt/1.11.1 (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_065910_313369_EE0550F4 
-X-CRM114-Status: GOOD (  17.42  )
+X-CRM114-CacheID: sfid-20190116_071001_418300_CC7222F8 
+X-CRM114-Status: GOOD (  11.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,71 +78,31 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [190116 13:58]:
-> Hi!
-> 
-> > * Pavel Machek <pavel@ucw.cz> [181227 10:17]:
-> > > Ok, I really need SMS messages, too.
-> > > 
-> > > Fortunately, they are on /dev/motmdm9, in PDU format. Quite
-> > > logical. And you probably need to acknowledge them, using PDU,
-> > > too... (because otherwise you'll just get the same SMS over and over
-> > > and over). Which is also logical, but hard to do from shell/python.
+* Tony Lindgren <tony@atomide.com> [190116 14:59]:
+> * Pavel Machek <pavel@ucw.cz> [190116 13:58]:
+> > And I wanted to ask -- did you figure out how to acknowledge the
+> > SMSs? +CGNNA does not seem to do the job:
 > > 
-> > Yeah so I found that Ruby pdu_tools module allows decoding PDUs
-> > properly while I did not have much luck with other tools.
-> > 
-> > So I wrote a hasty script to read SMS, copy it to a Maildir and
-> > then ack it:
-> > 
-> > https://github.com/tmlind/droid4-sms-tools
+> > 07912470338016...
+> > AT+CGNMA=1
+> > +CGNMA:ERROR=9
 > 
-> I could not get that one to work.
+> Yeah the scripts in droid4-sms-tools git repo work for me for sending
+> and receiving. They do not work with cdma currently as the format is
+> different.
 > 
-> /var/lib/gems/2.3.0/gems/phone-1.2.3/lib/support.rb:47:in
-> `class_eval': /var/lib/gems/2.3.0/gems/phone-1.2.3/lib/support.rb:47:
-> `@@{' is not allowed as a class variable name (SyntaxError)
-> /var/lib/gems/2.3.0/gems/phone-1.2.3/lib/support.rb:47: syntax error,
-> unexpected end-of-input
->           unless defined? @@{:default=>true}
-> 	                              ^
-> from /var/lib/gems/2.3.0/gems/phone-1.2.3/lib/support.rb:47:in `block in cattr_accessor'
-
-Hmm yeah looking at my notes I also had some issues and did something like
-this to install git version of phone gem:
-
-$ git clone git://github.com/carr/phone
-$ cd phone
-$ sed -i 's/beta//' lib/phone/version.rb
-$ cd phone
-$ sed -i 's/1.3.0.beta1/1.2.9/' lib/phone/version.rb
-$ gem build phone.gemspec
-$ sudo gem uninstall phone
-$ sudo gem uninstall bigdecimal -v 1.4.2        # 1.3.4 works
-$ sudo gem install phone-1.2.9.gem
-
-> And I wanted to ask -- did you figure out how to acknowledge the
-> SMSs? +CGNNA does not seem to do the job:
+> Maybe you've managed to change the mode of the modem to queue the
+> messages with the at commands to the usb port?
 > 
-> 07912470338016...
-> AT+CGNMA=1
-> +CGNMA:ERROR=9
+> You are reading and writing to /dev/motmdm9 for incoming sms right?
 
-Yeah the scripts in droid4-sms-tools git repo work for me for sending
-and receiving. They do not work with cdma currently as the format is
-different.
+To debug, you can modprobe n_gsm debug=0xff and you'll see all the
+packet data in dmesg, maybe email me the dmesg output of your ack
+command packet data?
 
-Maybe you've managed to change the mode of the modem to queue the
-messages with the at commands to the usb port?
-
-You are reading and writing to /dev/motmdm9 for incoming sms right?
-
-> > My logs show that Android uses two different commands for ack.
-> > Either AT+GCNMA=1 or AT+CNMA=0,0 gets used depending on something
-> > that I have no idea of.. Maybe the network connected?
-
-I think AT+GCNMA=1 works 3g and AT+CNMA=0,0 with cdma. Or it could be
-that one of them is just a delayed ack, I don't know.
+Or compare against what Android is doing, you can echo 0x7fffffff to
+the ts27010 sysfs debug file somewhere to see similar packet data
+with logcat -b radio.
 
 Regards,
 
