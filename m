@@ -2,82 +2,65 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DFC5DC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 16:38:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 71C6DC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 16:47:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A92AB20657
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 16:38:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3D72F206C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 16:47:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ckbRu6+5";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="UaUakFx5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A92AB20657
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TaFEb/jh"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3D72F206C2
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wjt2fK1MEKVD/zxuduIogy8q4ZI1liF7gRLcAn3oYJU=; b=ckbRu6+55FKD4u
-	VmfNeTonbZkhkQLDmwWhjqIiOkWB1ZM0V7s9AL9FPCX7jeEIUQRI92m+go3jqNrIY/m4DDR6UuQPw
-	sgqLUB9vnTDxygHsUxwc0OnORbr8HDs929Yv22H01Fe+cRRK5qygmGFxEHBm/Ke+lfZJOUhNZe+hP
-	WPlxi2o4zmZA8OFhk3LEZUH/F9q/rfWZL6hqOGQMkrh4cwgc4e2lS7yAvWCP3exHVGcHE4XEqkrV5
-	fTbcS95HHJ/yKY9hYGcnMVQSleeQzvP5d91WzRYSq6/d8TBTfkx9/c4eASVJ/XSz6QjyRDlUVsGOV
-	BDvPMsXn1K7a1LBrYMbQ==;
+	List-Owner; bh=RjvmFV0PSd7gsm8lbBKboibpOQq+1MvnuLAbtPpR0bw=; b=TaFEb/jhvEXEfi
+	FrCFCPQdaA4XkfVlIovI54XPXTIpDe7xx6y56AM/qg+NeE5mrxT+UmB/M5QSKwsB1+aIqU83ztl48
+	VhRo6brSsw36WAO11ROJmjt15U3gfQuvQDcSWStM+paT3AF8dC6jfmanj0cPSPsRn6mKcfe+cM3pk
+	czcjaE3Z+4iJbCkcAYJ+QPRTlTR/2AfmbkDkb36f7+tC3Dt4m4sWk4o3k1reeuXM72VN19k08Ur/q
+	sbcNxgUrzMm23uEnn9fPhwNASQXqs+fOUu+VCkDx0Cl5jMBdePizORZjZOduIePeO1cImLJ3k/pKp
+	dZ46D/vUGKylg6rPT42A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjoCv-00033q-Ik; Wed, 16 Jan 2019 16:38:25 +0000
-Received: from mail-io1-xd43.google.com ([2607:f8b0:4864:20::d43])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjoCr-00033B-RL
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 16:38:23 +0000
-Received: by mail-io1-xd43.google.com with SMTP id r200so5347211iod.11
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 16 Jan 2019 08:38:21 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=Aw7SMHMnPqACN0JYoK3M/SLleLaf04fF+v2hJTrtoHE=;
- b=UaUakFx5gqaSbrpdOLa6udXUharOrxOY7UHu9QEPWvH95hWdIRRHb/EHIbPadequ7P
- ZhdHCX/LdSV4uAGVzUAmApUzMAOektE/GNe4rrkDj0ay1N/7J35f1tmSuPfzIi6OEm/x
- Qn/NCKwc7yKR3yNkDdbpYFGCTxDAdVpa6n5Xk=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=Aw7SMHMnPqACN0JYoK3M/SLleLaf04fF+v2hJTrtoHE=;
- b=RU8qb4GFpFHMuSDSqXZsQNq4X04CasjzGClOUx7Yy076JBmZnodj/MhgkGfZu39NHL
- MkO/nABT3OBJynV4DTJfxOnpDQv4jwyjK3oSsxseX3SqUFWUVrMOceATQEYlsMI18SJd
- me7SKKf4Q8MXKkFHg1o6P97IfgnJcRDrHCbZygcGBgfyAPsnZrpN7he08V7gvG3e9+78
- eQ5flklDidOZOXtxDmkz2/+KqdB/htFubjLS9KdJGCH5ClMiRUlOYIfUwPchFbstWwrT
- uQGIW+bp8Gy8yWjgAbkiLBGRgn3RIgCMhj7ng9J9rCHjmCwUiEWopxtsnatN/PsyReQK
- AVEw==
-X-Gm-Message-State: AJcUukc3ag5zQmCBuhYHcjMcctv09fTFnzw3m5pSebQvVHg3nHvoTHH0
- SHGUKBN3sdJwf9IS23TdtAADMQJsZ8ROP3IRZVrAmw==
-X-Google-Smtp-Source: ALg8bN6nxikNx/HgyJPJg+kCnA6CU64ScHRba41/4N82PYAbrr2hwxzvItAOIVbe20g87mMGl+fAngIIU8AdnSpvulE=
-X-Received: by 2002:a5d:8491:: with SMTP id t17mr5333331iom.11.1547656700507; 
- Wed, 16 Jan 2019 08:38:20 -0800 (PST)
+	id 1gjoLP-00075U-M1; Wed, 16 Jan 2019 16:47:11 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gjoLM-000756-2Z
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 16:47:09 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3DEC0A78;
+ Wed, 16 Jan 2019 08:47:07 -0800 (PST)
+Received: from brain-police (usa-sjc-mx-foss1.foss.arm.com [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id BBB5E3F5AF;
+ Wed, 16 Jan 2019 08:47:05 -0800 (PST)
+Date: Wed, 16 Jan 2019 16:46:58 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: "huanglingyan (A)" <huanglingyan2@huawei.com>
+Subject: Re: [PATCH v3] arm64: lib: accelerate do_csum with NEON instruction
+Message-ID: <20190116164657.GA1910@brain-police>
+References: <1546739729-17234-1-git-send-email-huanglingyan2@huawei.com>
+ <CAKv+Gu_wsK1UNXSp=5Hvd7XCHKC3cVkYjTYHhvqM4Xt09A9iKg@mail.gmail.com>
+ <9129b882-60f3-8046-0cb9-e0b2452a118d@huawei.com>
+ <20190108135444.GB14476@fuggles.cambridge.arm.com>
+ <cd5bb83e-bb0e-b348-5365-095c5fcd9648@huawei.com>
 MIME-Version: 1.0
-References: <20190115230742.13730-1-mathieu.poirier@linaro.org>
- <20190115230742.13730-3-mathieu.poirier@linaro.org>
- <20190116153948.GC871@kroah.com>
- <CANLsYkzfbJae6Nk7cHhnR09ZPSATa3g8sceGC=O3DfXYC2ruQQ@mail.gmail.com>
- <20190116163314.GB5446@kroah.com>
-In-Reply-To: <20190116163314.GB5446@kroah.com>
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
-Date: Wed, 16 Jan 2019 09:38:09 -0700
-Message-ID: <CANLsYkw_=_OC-95HRMxTZfpAe4UzAuidPJcZmL_T-LbkOwWCkQ@mail.gmail.com>
-Subject: Re: [PATCH 2/7] coresight: perf: Add "sinks" group to PMU directory
-To: Greg KH <gregkh@linuxfoundation.org>
+Content-Disposition: inline
+In-Reply-To: <cd5bb83e-bb0e-b348-5365-095c5fcd9648@huawei.com>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_083821_896911_EA8A9DA2 
-X-CRM114-Status: GOOD (  26.45  )
+X-CRM114-CacheID: sfid-20190116_084708_121678_3DD3A6D0 
+X-CRM114-Status: GOOD (  21.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,131 +72,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, linux-s390@vger.kernel.org,
- "Suzuki K. Poulose" <suzuki.poulose@arm.com>,
- Peter Zijlstra <peterz@infradead.org>, Will Deacon <will.deacon@arm.com>,
- heiko.carstens@de.ibm.com, Adrian Hunter <adrian.hunter@intel.com>,
- Arnaldo Carvalho de Melo <acme@kernel.org>, ast@kernel.org,
- Alexander Shishkin <alexander.shishkin@linux.intel.com>,
- Ingo Molnar <mingo@redhat.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- "H. Peter Anvin" <hpa@zytor.com>, schwidefsky@de.ibm.com,
- Namhyung Kim <namhyung@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
- Jiri Olsa <jolsa@redhat.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
+Cc: Zhangshaokun <zhangshaokun@hisilicon.com>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ linux-arm-kernel@lists.infradead.org, ard.biesheuvel@linaro.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 16 Jan 2019 at 09:33, Greg KH <gregkh@linuxfoundation.org> wrote:
->
-> On Wed, Jan 16, 2019 at 09:14:33AM -0700, Mathieu Poirier wrote:
-> > On Wed, 16 Jan 2019 at 08:39, Greg KH <gregkh@linuxfoundation.org> wrote:
-> > >
-> > > On Tue, Jan 15, 2019 at 04:07:37PM -0700, Mathieu Poirier wrote:
-> > > > Add a "sinks" directory entry so that users can see all the sinks
-> > > > available in the system in a single place.  Individual sink are added
-> > > > as they are registered with the coresight bus.
-> > > >
-> > > > Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> > > > ---
-> > > >  .../hwtracing/coresight/coresight-etm-perf.c  | 43 +++++++++++++++++++
-> > > >  .../hwtracing/coresight/coresight-etm-perf.h  |  1 +
-> > > >  drivers/hwtracing/coresight/coresight.c       | 17 ++++++++
-> > > >  3 files changed, 61 insertions(+)
-> > > >
-> > > > diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-> > > > index f21eb28b6782..292bd409a68c 100644
-> > > > --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-> > > > +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-> > > > @@ -14,6 +14,7 @@
-> > > >  #include <linux/perf_event.h>
-> > > >  #include <linux/percpu-defs.h>
-> > > >  #include <linux/slab.h>
-> > > > +#include <linux/stringhash.h>
-> > > >  #include <linux/types.h>
-> > > >  #include <linux/workqueue.h>
-> > > >
-> > > > @@ -43,8 +44,18 @@ static const struct attribute_group etm_pmu_format_group = {
-> > > >       .attrs  = etm_config_formats_attr,
-> > > >  };
-> > > >
-> > > > +static struct attribute *etm_config_sinks_attr[] = {
-> > > > +     NULL,
-> > > > +};
-> > > > +
-> > > > +static const struct attribute_group etm_pmu_sinks_group = {
-> > > > +     .name   = "sinks",
-> > > > +     .attrs  = etm_config_sinks_attr,
-> > > > +};
-> > > > +
-> > > >  static const struct attribute_group *etm_pmu_attr_groups[] = {
-> > > >       &etm_pmu_format_group,
-> > > > +     &etm_pmu_sinks_group,
-> > > >       NULL,
-> > > >  };
-> > > >
-> > > > @@ -479,6 +490,38 @@ int etm_perf_symlink(struct coresight_device *csdev, bool link)
-> > > >       return 0;
-> > > >  }
-> > > >
-> > > > +static ssize_t etm_perf_sink_name_show(struct device *dev,
-> > > > +                                    struct device_attribute *dattr,
-> > > > +                                    char *buf)
-> > > > +{
-> > > > +     /* See function coresight_sink_by_id() to know where this is used */
-> > > > +     u32 hash = hashlen_hash(hashlen_string(NULL, dattr->attr.name));
-> > > > +
-> > > > +     return scnprintf(buf, PAGE_SIZE, "%x\n", hash);
-> > > > +}
-> > > > +
-> > > > +int etm_perf_symlink_sink(struct coresight_device *csdev)
-> > > > +{
-> > > > +     struct device *pmu_dev = etm_pmu.dev;
-> > > > +     struct device *pdev = csdev->dev.parent;
-> > > > +     struct device_attribute *dev_attr;
-> > > > +
-> > > > +     if (csdev->type != CORESIGHT_DEV_TYPE_SINK &&
-> > > > +         csdev->type != CORESIGHT_DEV_TYPE_LINKSINK)
-> > > > +             return -EINVAL;
-> > > > +
-> > > > +     if (!etm_perf_up)
-> > > > +             return -EPROBE_DEFER;
-> > > > +
-> > > > +     dev_attr = kzalloc(sizeof(*dev_attr), GFP_KERNEL);
-> > > > +     dev_attr->attr.name = kstrdup(dev_name(pdev), GFP_KERNEL);
-> > > > +     dev_attr->attr.mode = 0444;
-> > > > +     dev_attr->show = etm_perf_sink_name_show;
-> > > > +
-> > > > +     return sysfs_add_file_to_group(&pmu_dev->kobj,
-> > > > +                                    &dev_attr->attr, "sinks");
-> > >
-> > > What is so odd about this call that you needed me to review this?
+On Wed, Jan 09, 2019 at 10:03:05AM +0800, huanglingyan (A) wrote:
+> 
+> On 2019/1/8 21:54, Will Deacon wrote:
+> > [re-adding Ard and LAKML -- not sure why the headers are so munged]
 > >
-> > As far as I can tell nobody is feeding a dynamic struct attribute to
-> > the function and I wasn't sure if it was because they were told not to
-> > or simply because it wasn't needed, hence asking for a second opinion.
->
-> Ah.  Well, again, this is a good question to answer:
->
-> > > And what happens if this call fails, do you leak memory?
+> > On Mon, Jan 07, 2019 at 10:38:55AM +0800, huanglingyan (A) wrote:
+> >> On 2019/1/6 16:26, Ard Biesheuvel wrote:
+> >>     Please change this into
+> >>
+> >>     if (IS_ENABLED(CONFIG_KERNEL_MODE_NEON) &&
+> >>         len >= CSUM_NEON_THRESHOLD &&
+> >>         may_use_simd()) {
+> >>             kernel_neon_begin();
+> >>             res = do_csum_neon(buff, len);
+> >>             kernel_neon_end();
+> >>         }
+> >>
+> >>     and drop the intermediate do_csum_arm()
+> >>
+> >>
+> >>         +               return do_csum_arm(buff, len);
+> >>         +#endif  /* CONFIG_KERNEL_MODE_NEON */
+> >>
+> >>     No else? What happens if len < CSUM_NEON_THRESHOLD ?
+> >>
+> >>
+> >>         +#undef do_csum
+> >>
+> >>     Can we drop this?
+> >>
+> >> Using NEON instructions will bring some costs. The spending maybe introduced
+> >> when reservering/restoring
+> >> neon registers with kernel_neon_begin()/kernel_neon_end(). Therefore NEON code
+> >> is Only used when
+> >> the length exceeds CSUM_NEON_THRESHOLD. General do csum() codes in lib/
+> >> checksum.c will be used in
+> >> shorter length. To achieve this goal, I use the "#undef do_csum" in else clause
+> >> to have the oppotunity to
+> >> utilize the general codes.
+> > I don't think that's how it works :/
+> >
+> > Before we get deeper into the implementation, please could you justify the
+> > need for a CPU-optimised checksum implementation at all? I thought this was
+> > usually offloaded to the NIC?
+> >
+> > Will
+> >
+> > .
+> This problem is introduced when testing Intel x710 network card on my ARM server.
+> Ip forward is set for ease of testing. Then send lots of packages to server by Tesgine
+> machine and then receive.
 
-That's something I will fix in the next revision.
+In the marketing blurb, that card boasts:
 
->
-> And also, what happens when you unload the device, who frees the
-> attribute's memory?
+  `Tx/Rx IP, SCTP, TCP, and UDP checksum offloading (IPv4, IPv6) capabilities'
 
-If configured, coresight devices aren't removable.
+so we shouldn't need to run this on the CPU. Again, I'm not keen to optimise
+this given that it /really/ shouldn't be used on arm64 machines that care
+about network performance.
 
-Thanks for the review,
-Mathieu
-
->
-> thanks,
->
-> greg k-h
+Will
 
 _______________________________________________
 linux-arm-kernel mailing list
