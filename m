@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6D854C43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 13:48:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5F073C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 13:48:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3E0E8206C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 13:48:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 24315206C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 13:48:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QNMbHJD9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3E0E8206C2
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Cer+NV+s"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 24315206C2
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,68 +26,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	References:In-Reply-To:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=c9QZVTMsuoxVX7R53r/lojJ1DaeGvvFJ5pX+el8uZFs=; b=QNMbHJD9DlfNn8wKkZZq1WopvX
-	H5P8lsbRk0iI32tT9nWukzKp5zQgj9ZyICEqG7iIx2ak9x2hPqSAdpLhM/Rs8+N0vOxHvzToWqxr4
-	ExlwgHkkvcnpabNgLSoIAAMCTLJaFJ/9blW6C/rP/h0IdU2lul2UBfF/q5M8Q5rg0Gz7beWP2X0DJ
-	9j7RDFCnOXoHQrkXolFgc+Hz0Y81Zb9zA9/S3FDA2UfLTTz1APCWRItRjr/nd0JjBmDp+4ta6o5v2
-	DBes3hyDFaR35ZpNsuM6uK+t4BnIbDP8NwLpVGdk7DLdoJoEtmMKjcga8zmWfBX6QZW4tmP7cn/mT
-	aRoAB8KQ==;
+	bh=4XqEqNwJGYQtrWbW+ETCDO1VgsjoqN0tfZriJ31u2lw=; b=Cer+NV+sPn3ioaqDdCSXbSY/Mu
+	YndjvwY/7pgF7no6UW1ABwSHADbxwaXcKmFoAttZNWWkTW9oU53K4lVXaIG09y+fVVOOZ81I1Vbki
+	pGEwVtCpj6upalZG3DsIMWakrKnQeF6tB+udWTAF9Gx4X00V7gtf1BctMG4wGz9rpsT6UvGRRJfpZ
+	/Qv4Si4m5ZimmbyqQUOaI2+K3vTuJHE73pcKC5vv37a5EU0Eb06stT8zVjDVs+JJFPDHPEji/fnDi
+	IR2HF1tpc5dsjzgRAh5G3sV9bdv/AsFrv+BShHcHYDvd/4ZyBQscZxs3rrpOUQMuSfLvHlo0uRVlk
+	zYfSJq5A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjlYB-0004se-Sc; Wed, 16 Jan 2019 13:48:12 +0000
-Received: from mx0b-001b2d01.pphosted.com ([148.163.158.5]
- helo=mx0a-001b2d01.pphosted.com)
+	id 1gjlYU-0005ET-OP; Wed, 16 Jan 2019 13:48:30 +0000
+Received: from mx0a-001b2d01.pphosted.com ([148.163.156.1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjlW4-0002ee-4E
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 13:46:36 +0000
-Received: from pps.filterd (m0098417.ppops.net [127.0.0.1])
+ id 1gjlVv-0002Vy-DM
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 13:46:25 +0000
+Received: from pps.filterd (m0098394.ppops.net [127.0.0.1])
  by mx0a-001b2d01.pphosted.com (8.16.0.22/8.16.0.22) with SMTP id
- x0GDeY5h042551
- for <linux-arm-kernel@lists.infradead.org>; Wed, 16 Jan 2019 08:45:59 -0500
-Received: from e06smtp01.uk.ibm.com (e06smtp01.uk.ibm.com [195.75.94.97])
- by mx0a-001b2d01.pphosted.com with ESMTP id 2q23ekemhu-1
+ x0GDeYNO079307
+ for <linux-arm-kernel@lists.infradead.org>; Wed, 16 Jan 2019 08:45:50 -0500
+Received: from e06smtp07.uk.ibm.com (e06smtp07.uk.ibm.com [195.75.94.103])
+ by mx0a-001b2d01.pphosted.com with ESMTP id 2q2303fwfr-1
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
- for <linux-arm-kernel@lists.infradead.org>; Wed, 16 Jan 2019 08:45:58 -0500
+ for <linux-arm-kernel@lists.infradead.org>; Wed, 16 Jan 2019 08:45:50 -0500
 Received: from localhost
- by e06smtp01.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
+ by e06smtp07.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
  Violators will be prosecuted
  for <linux-arm-kernel@lists.infradead.org> from <rppt@linux.ibm.com>;
- Wed, 16 Jan 2019 13:45:56 -0000
-Received: from b06cxnps3074.portsmouth.uk.ibm.com (9.149.109.194)
- by e06smtp01.uk.ibm.com (192.168.101.131) with IBM ESMTP SMTP Gateway:
+ Wed, 16 Jan 2019 13:45:47 -0000
+Received: from b06cxnps3075.portsmouth.uk.ibm.com (9.149.109.195)
+ by e06smtp07.uk.ibm.com (192.168.101.137) with IBM ESMTP SMTP Gateway:
  Authorized Use Only! Violators will be prosecuted; 
  (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
- Wed, 16 Jan 2019 13:45:45 -0000
-Received: from d06av26.portsmouth.uk.ibm.com (d06av26.portsmouth.uk.ibm.com
- [9.149.105.62])
- by b06cxnps3074.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
- x0GDji8f55902306
+ Wed, 16 Jan 2019 13:45:36 -0000
+Received: from d06av21.portsmouth.uk.ibm.com (d06av21.portsmouth.uk.ibm.com
+ [9.149.105.232])
+ by b06cxnps3075.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
+ x0GDjZn252756718
  (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
- Wed, 16 Jan 2019 13:45:44 GMT
-Received: from d06av26.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id AE4A2AE051;
- Wed, 16 Jan 2019 13:45:44 +0000 (GMT)
-Received: from d06av26.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 884D2AE045;
- Wed, 16 Jan 2019 13:45:40 +0000 (GMT)
+ Wed, 16 Jan 2019 13:45:35 GMT
+Received: from d06av21.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id 0E6B352052;
+ Wed, 16 Jan 2019 13:45:35 +0000 (GMT)
 Received: from rapoport-lnx (unknown [9.148.8.226])
- by d06av26.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
- Wed, 16 Jan 2019 13:45:40 +0000 (GMT)
+ by d06av21.portsmouth.uk.ibm.com (Postfix) with ESMTPS id E311952067;
+ Wed, 16 Jan 2019 13:45:30 +0000 (GMT)
 Received: by rapoport-lnx (sSMTP sendmail emulation);
- Wed, 16 Jan 2019 15:45:39 +0200
+ Wed, 16 Jan 2019 15:45:30 +0200
 From: Mike Rapoport <rppt@linux.ibm.com>
 To: linux-mm@kvack.org
-Subject: [PATCH 16/21] mm/percpu: add checks for the return value of
+Subject: [PATCH 14/21] ia64: add checks for the return value of
  memblock_alloc*()
-Date: Wed, 16 Jan 2019 15:44:16 +0200
+Date: Wed, 16 Jan 2019 15:44:14 +0200
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1547646261-32535-1-git-send-email-rppt@linux.ibm.com>
 References: <1547646261-32535-1-git-send-email-rppt@linux.ibm.com>
 X-TM-AS-GCONF: 00
-x-cbid: 19011613-4275-0000-0000-000002FFFF02
+x-cbid: 19011613-0028-0000-0000-00000339FC5D
 X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
-x-cbparentid: 19011613-4276-0000-0000-0000380E204D
-Message-Id: <1547646261-32535-17-git-send-email-rppt@linux.ibm.com>
+x-cbparentid: 19011613-0029-0000-0000-000023F72377
+Message-Id: <1547646261-32535-15-git-send-email-rppt@linux.ibm.com>
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2019-01-16_05:, , signatures=0
 X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
@@ -97,8 +93,8 @@ X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
  mlxlogscore=999 adultscore=0 classifier=spam adjust=0 reason=mlx
  scancount=1 engine=8.0.1-1810050000 definitions=main-1901160114
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_054600_878416_88BEB54C 
-X-CRM114-Status: GOOD (  26.35  )
+X-CRM114-CacheID: sfid-20190116_054551_951218_39E4D068 
+X-CRM114-Status: GOOD (  28.24  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -140,143 +136,232 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add panic() calls if memblock_alloc() returns NULL.
+Add panic() calls if memblock_alloc*() returns NULL.
 
-The panic() format duplicates the one used by memblock itself and in order
-to avoid explosion with long parameters list replace open coded allocation
-size calculations with a local variable.
+Most of the changes are simply addition of
+
+	if(!ptr)
+		panic();
+
+statements after the calls to memblock_alloc*() variants.
+
+Exceptions are create_mem_map_page_table() and ia64_log_init() that were
+slightly refactored to accommodate the change.
 
 Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
 ---
- mm/percpu.c | 73 +++++++++++++++++++++++++++++++++++++++++++++++--------------
- 1 file changed, 56 insertions(+), 17 deletions(-)
+ arch/ia64/kernel/mca.c          | 20 ++++++++++++++------
+ arch/ia64/mm/contig.c           |  8 ++++++--
+ arch/ia64/mm/discontig.c        |  4 ++++
+ arch/ia64/mm/init.c             | 38 ++++++++++++++++++++++++++++++--------
+ arch/ia64/mm/tlb.c              |  6 ++++++
+ arch/ia64/sn/kernel/io_common.c |  3 +++
+ arch/ia64/sn/kernel/setup.c     | 12 +++++++++++-
+ 7 files changed, 74 insertions(+), 17 deletions(-)
 
-diff --git a/mm/percpu.c b/mm/percpu.c
-index db86282..5998b03 100644
---- a/mm/percpu.c
-+++ b/mm/percpu.c
-@@ -1086,6 +1086,7 @@ static struct pcpu_chunk * __init pcpu_alloc_first_chunk(unsigned long tmp_addr,
- 	struct pcpu_chunk *chunk;
- 	unsigned long aligned_addr, lcm_align;
- 	int start_offset, offset_bits, region_size, region_bits;
-+	size_t alloc_size;
+diff --git a/arch/ia64/kernel/mca.c b/arch/ia64/kernel/mca.c
+index 370bc34..5cabb3f 100644
+--- a/arch/ia64/kernel/mca.c
++++ b/arch/ia64/kernel/mca.c
+@@ -359,11 +359,6 @@ typedef struct ia64_state_log_s
  
- 	/* region calculations */
- 	aligned_addr = tmp_addr & PAGE_MASK;
-@@ -1101,9 +1102,12 @@ static struct pcpu_chunk * __init pcpu_alloc_first_chunk(unsigned long tmp_addr,
- 	region_size = ALIGN(start_offset + map_size, lcm_align);
+ static ia64_state_log_t ia64_state_log[IA64_MAX_LOG_TYPES];
  
- 	/* allocate chunk */
--	chunk = memblock_alloc(sizeof(struct pcpu_chunk) +
--			       BITS_TO_LONGS(region_size >> PAGE_SHIFT),
--			       SMP_CACHE_BYTES);
-+	alloc_size = sizeof(struct pcpu_chunk) +
-+		BITS_TO_LONGS(region_size >> PAGE_SHIFT);
-+	chunk = memblock_alloc(alloc_size, SMP_CACHE_BYTES);
-+	if (!chunk)
-+		panic("%s: Failed to allocate %zu bytes\n", __func__,
-+		      alloc_size);
+-#define IA64_LOG_ALLOCATE(it, size) \
+-	{ia64_state_log[it].isl_log[IA64_LOG_CURR_INDEX(it)] = \
+-		(ia64_err_rec_t *)memblock_alloc(size, SMP_CACHE_BYTES); \
+-	ia64_state_log[it].isl_log[IA64_LOG_NEXT_INDEX(it)] = \
+-		(ia64_err_rec_t *)memblock_alloc(size, SMP_CACHE_BYTES);}
+ #define IA64_LOG_LOCK_INIT(it) spin_lock_init(&ia64_state_log[it].isl_lock)
+ #define IA64_LOG_LOCK(it)      spin_lock_irqsave(&ia64_state_log[it].isl_lock, s)
+ #define IA64_LOG_UNLOCK(it)    spin_unlock_irqrestore(&ia64_state_log[it].isl_lock,s)
+@@ -378,6 +373,19 @@ static ia64_state_log_t ia64_state_log[IA64_MAX_LOG_TYPES];
+ #define IA64_LOG_CURR_BUFFER(it)   (void *)((ia64_state_log[it].isl_log[IA64_LOG_CURR_INDEX(it)]))
+ #define IA64_LOG_COUNT(it)         ia64_state_log[it].isl_count
  
- 	INIT_LIST_HEAD(&chunk->list);
- 
-@@ -1114,12 +1118,25 @@ static struct pcpu_chunk * __init pcpu_alloc_first_chunk(unsigned long tmp_addr,
- 	chunk->nr_pages = region_size >> PAGE_SHIFT;
- 	region_bits = pcpu_chunk_map_bits(chunk);
- 
--	chunk->alloc_map = memblock_alloc(BITS_TO_LONGS(region_bits) * sizeof(chunk->alloc_map[0]),
--					  SMP_CACHE_BYTES);
--	chunk->bound_map = memblock_alloc(BITS_TO_LONGS(region_bits + 1) * sizeof(chunk->bound_map[0]),
--					  SMP_CACHE_BYTES);
--	chunk->md_blocks = memblock_alloc(pcpu_chunk_nr_blocks(chunk) * sizeof(chunk->md_blocks[0]),
--					  SMP_CACHE_BYTES);
-+	alloc_size = BITS_TO_LONGS(region_bits) * sizeof(chunk->alloc_map[0]);
-+	chunk->alloc_map = memblock_alloc(alloc_size, SMP_CACHE_BYTES);
-+	if (!chunk->alloc_map)
-+		panic("%s: Failed to allocate %zu bytes\n", __func__,
-+		      alloc_size);
++static inline void ia64_log_allocate(int it, u64 size)
++{
++	ia64_state_log[it].isl_log[IA64_LOG_CURR_INDEX(it)] =
++		(ia64_err_rec_t *)memblock_alloc(size, SMP_CACHE_BYTES);
++	if (!ia64_state_log[it].isl_log[IA64_LOG_CURR_INDEX(it)])
++		panic("%s: Failed to allocate %llu bytes\n", __func__, size);
 +
-+	alloc_size =
-+		BITS_TO_LONGS(region_bits + 1) * sizeof(chunk->bound_map[0]);
-+	chunk->bound_map = memblock_alloc(alloc_size, SMP_CACHE_BYTES);
-+	if (!chunk->bound_map)
-+		panic("%s: Failed to allocate %zu bytes\n", __func__,
-+		      alloc_size);
++	ia64_state_log[it].isl_log[IA64_LOG_NEXT_INDEX(it)] =
++		(ia64_err_rec_t *)memblock_alloc(size, SMP_CACHE_BYTES);
++	if (!ia64_state_log[it].isl_log[IA64_LOG_NEXT_INDEX(it)])
++		panic("%s: Failed to allocate %llu bytes\n", __func__, size);
++}
 +
-+	alloc_size = pcpu_chunk_nr_blocks(chunk) * sizeof(chunk->md_blocks[0]);
-+	chunk->md_blocks = memblock_alloc(alloc_size, SMP_CACHE_BYTES);
-+	if (!chunk->md_blocks)
-+		panic("%s: Failed to allocate %zu bytes\n", __func__,
-+		      alloc_size);
+ /*
+  * ia64_log_init
+  *	Reset the OS ia64 log buffer
+@@ -399,7 +407,7 @@ ia64_log_init(int sal_info_type)
+ 		return;
+ 
+ 	// set up OS data structures to hold error info
+-	IA64_LOG_ALLOCATE(sal_info_type, max_size);
++	ia64_log_allocate(sal_info_type, max_size);
+ }
+ 
+ /*
+diff --git a/arch/ia64/mm/contig.c b/arch/ia64/mm/contig.c
+index 6e44723..d29fb6b 100644
+--- a/arch/ia64/mm/contig.c
++++ b/arch/ia64/mm/contig.c
+@@ -84,9 +84,13 @@ void *per_cpu_init(void)
+ static inline void
+ alloc_per_cpu_data(void)
+ {
+-	cpu_data = memblock_alloc_from(PERCPU_PAGE_SIZE * num_possible_cpus(),
+-				       PERCPU_PAGE_SIZE,
++	size_t size = PERCPU_PAGE_SIZE * num_possible_cpus();
 +
- 	pcpu_init_md_blocks(chunk);
++	cpu_data = memblock_alloc_from(size, PERCPU_PAGE_SIZE,
+ 				       __pa(MAX_DMA_ADDRESS));
++	if (!cpu_data)
++		panic("%s: Failed to allocate %lu bytes align=%lx from=%lx\n",
++		      __func__, size, PERCPU_PAGE_SIZE, __pa(MAX_DMA_ADDRESS));
+ }
  
- 	/* manage populated page bitmap */
-@@ -2044,6 +2061,7 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
- 	int group, unit, i;
- 	int map_size;
- 	unsigned long tmp_addr;
-+	size_t alloc_size;
+ /**
+diff --git a/arch/ia64/mm/discontig.c b/arch/ia64/mm/discontig.c
+index f9c3675..05490dd 100644
+--- a/arch/ia64/mm/discontig.c
++++ b/arch/ia64/mm/discontig.c
+@@ -454,6 +454,10 @@ static void __init *memory_less_node_alloc(int nid, unsigned long pernodesize)
+ 				     __pa(MAX_DMA_ADDRESS),
+ 				     MEMBLOCK_ALLOC_ACCESSIBLE,
+ 				     bestnode);
++	if (!ptr)
++		panic("%s: Failed to allocate %lu bytes align=0x%lx nid=%d from=%lx\n",
++		      __func__, pernodesize, PERCPU_PAGE_SIZE, bestnode,
++		      __pa(MAX_DMA_ADDRESS));
  
- #define PCPU_SETUP_BUG_ON(cond)	do {					\
- 	if (unlikely(cond)) {						\
-@@ -2075,14 +2093,29 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
- 	PCPU_SETUP_BUG_ON(pcpu_verify_alloc_info(ai) < 0);
+ 	return ptr;
+ }
+diff --git a/arch/ia64/mm/init.c b/arch/ia64/mm/init.c
+index 29d8415..e49200e 100644
+--- a/arch/ia64/mm/init.c
++++ b/arch/ia64/mm/init.c
+@@ -444,23 +444,45 @@ int __init create_mem_map_page_table(u64 start, u64 end, void *arg)
  
- 	/* process group information and build config tables accordingly */
--	group_offsets = memblock_alloc(ai->nr_groups * sizeof(group_offsets[0]),
--				       SMP_CACHE_BYTES);
--	group_sizes = memblock_alloc(ai->nr_groups * sizeof(group_sizes[0]),
--				     SMP_CACHE_BYTES);
--	unit_map = memblock_alloc(nr_cpu_ids * sizeof(unit_map[0]),
--				  SMP_CACHE_BYTES);
--	unit_off = memblock_alloc(nr_cpu_ids * sizeof(unit_off[0]),
--				  SMP_CACHE_BYTES);
-+	alloc_size = ai->nr_groups * sizeof(group_offsets[0]);
-+	group_offsets = memblock_alloc(alloc_size, SMP_CACHE_BYTES);
-+	if (!group_offsets)
-+		panic("%s: Failed to allocate %zu bytes\n", __func__,
-+		      alloc_size);
+ 	for (address = start_page; address < end_page; address += PAGE_SIZE) {
+ 		pgd = pgd_offset_k(address);
+-		if (pgd_none(*pgd))
+-			pgd_populate(&init_mm, pgd, memblock_alloc_node(PAGE_SIZE, PAGE_SIZE, node));
++		if (pgd_none(*pgd)) {
++			pud = memblock_alloc_node(PAGE_SIZE, PAGE_SIZE, node);
++			if (!pud)
++				goto err_alloc;
++			pgd_populate(&init_mm, pgd, pud);
++		}
+ 		pud = pud_offset(pgd, address);
+ 
+-		if (pud_none(*pud))
+-			pud_populate(&init_mm, pud, memblock_alloc_node(PAGE_SIZE, PAGE_SIZE, node));
++		if (pud_none(*pud)) {
++			pmd = memblock_alloc_node(PAGE_SIZE, PAGE_SIZE, node);
++			if (!pmd)
++				goto err_alloc;
++			pud_populate(&init_mm, pud, pmd);
++		}
+ 		pmd = pmd_offset(pud, address);
+ 
+-		if (pmd_none(*pmd))
+-			pmd_populate_kernel(&init_mm, pmd, memblock_alloc_node(PAGE_SIZE, PAGE_SIZE, node));
++		if (pmd_none(*pmd)) {
++			pte = memblock_alloc_node(PAGE_SIZE, PAGE_SIZE, node);
++			if (!pte)
++				goto err_alloc;
++			pmd_populate_kernel(&init_mm, pmd, pte);
++		}
+ 		pte = pte_offset_kernel(pmd, address);
+ 
+-		if (pte_none(*pte))
+-			set_pte(pte, pfn_pte(__pa(memblock_alloc_node(PAGE_SIZE, PAGE_SIZE, node)) >> PAGE_SHIFT,
++		if (pte_none(*pte)) {
++			void *page = memblock_alloc_node(PAGE_SIZE, PAGE_SIZE,
++							 node);
++			if (!page)
++				goto err_alloc;
++			set_pte(pte, pfn_pte(__pa(page) >> PAGE_SHIFT,
+ 					     PAGE_KERNEL));
++		}
+ 	}
+ 	return 0;
 +
-+	alloc_size = ai->nr_groups * sizeof(group_sizes[0]);
-+	group_sizes = memblock_alloc(alloc_size, SMP_CACHE_BYTES);
-+	if (!group_sizes)
-+		panic("%s: Failed to allocate %zu bytes\n", __func__,
-+		      alloc_size);
++err_alloc:
++	panic("%s: Failed to allocate %lu bytes align=0x%lx nid=%d\n",
++	      __func__, PAGE_SIZE, PAGE_SIZE, node);
++	return -ENOMEM;
+ }
+ 
+ struct memmap_init_callback_data {
+diff --git a/arch/ia64/mm/tlb.c b/arch/ia64/mm/tlb.c
+index 9340bcb..5fc89aa 100644
+--- a/arch/ia64/mm/tlb.c
++++ b/arch/ia64/mm/tlb.c
+@@ -61,8 +61,14 @@ mmu_context_init (void)
+ {
+ 	ia64_ctx.bitmap = memblock_alloc((ia64_ctx.max_ctx + 1) >> 3,
+ 					 SMP_CACHE_BYTES);
++	if (!ia64_ctx.bitmap)
++		panic("%s: Failed to allocate %u bytes\n", __func__,
++		      (ia64_ctx.max_ctx + 1) >> 3);
+ 	ia64_ctx.flushmap = memblock_alloc((ia64_ctx.max_ctx + 1) >> 3,
+ 					   SMP_CACHE_BYTES);
++	if (!ia64_ctx.flushmap)
++		panic("%s: Failed to allocate %u bytes\n", __func__,
++		      (ia64_ctx.max_ctx + 1) >> 3);
+ }
+ 
+ /*
+diff --git a/arch/ia64/sn/kernel/io_common.c b/arch/ia64/sn/kernel/io_common.c
+index 8df13d0..d468473 100644
+--- a/arch/ia64/sn/kernel/io_common.c
++++ b/arch/ia64/sn/kernel/io_common.c
+@@ -394,6 +394,9 @@ void __init hubdev_init_node(nodepda_t * npda, cnodeid_t node)
+ 	hubdev_info = (struct hubdev_info *)memblock_alloc_node(size,
+ 								SMP_CACHE_BYTES,
+ 								node);
++	if (!hubdev_info)
++		panic("%s: Failed to allocate %d bytes align=0x%x nid=%d\n",
++		      __func__, size, SMP_CACHE_BYTES, node);
+ 
+ 	npda->pdinfo = (void *)hubdev_info;
+ }
+diff --git a/arch/ia64/sn/kernel/setup.c b/arch/ia64/sn/kernel/setup.c
+index a6d40a2..e6a5049 100644
+--- a/arch/ia64/sn/kernel/setup.c
++++ b/arch/ia64/sn/kernel/setup.c
+@@ -513,6 +513,10 @@ static void __init sn_init_pdas(char **cmdline_p)
+ 		nodepdaindr[cnode] =
+ 		    memblock_alloc_node(sizeof(nodepda_t), SMP_CACHE_BYTES,
+ 					cnode);
++		if (!nodepdaindr[cnode])
++			panic("%s: Failed to allocate %lu bytes align=0x%x nid=%d\n",
++			      __func__, sizeof(nodepda_t), SMP_CACHE_BYTES,
++			      cnode);
+ 		memset(nodepdaindr[cnode]->phys_cpuid, -1,
+ 		    sizeof(nodepdaindr[cnode]->phys_cpuid));
+ 		spin_lock_init(&nodepdaindr[cnode]->ptc_lock);
+@@ -521,9 +525,15 @@ static void __init sn_init_pdas(char **cmdline_p)
+ 	/*
+ 	 * Allocate & initialize nodepda for TIOs.  For now, put them on node 0.
+ 	 */
+-	for (cnode = num_online_nodes(); cnode < num_cnodes; cnode++)
++	for (cnode = num_online_nodes(); cnode < num_cnodes; cnode++) {
+ 		nodepdaindr[cnode] =
+ 		    memblock_alloc_node(sizeof(nodepda_t), SMP_CACHE_BYTES, 0);
++		if (!nodepdaindr[cnode])
++			panic("%s: Failed to allocate %lu bytes align=0x%x nid=%d\n",
++			      __func__, sizeof(nodepda_t), SMP_CACHE_BYTES,
++			      cnode);
++	}
 +
-+	alloc_size = nr_cpu_ids * sizeof(unit_map[0]);
-+	unit_map = memblock_alloc(alloc_size, SMP_CACHE_BYTES);
-+	if (!unit_map)
-+		panic("%s: Failed to allocate %zu bytes\n", __func__,
-+		      alloc_size);
-+
-+	alloc_size = nr_cpu_ids * sizeof(unit_off[0]);
-+	unit_off = memblock_alloc(alloc_size, SMP_CACHE_BYTES);
-+	if (!unit_off)
-+		panic("%s: Failed to allocate %zu bytes\n", __func__,
-+		      alloc_size);
  
- 	for (cpu = 0; cpu < nr_cpu_ids; cpu++)
- 		unit_map[cpu] = UINT_MAX;
-@@ -2148,6 +2181,9 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
- 	pcpu_nr_slots = __pcpu_size_to_slot(pcpu_unit_size) + 2;
- 	pcpu_slot = memblock_alloc(pcpu_nr_slots * sizeof(pcpu_slot[0]),
- 				   SMP_CACHE_BYTES);
-+	if (!pcpu_slot)
-+		panic("%s: Failed to allocate %zu bytes\n", __func__,
-+		      pcpu_nr_slots * sizeof(pcpu_slot[0]));
- 	for (i = 0; i < pcpu_nr_slots; i++)
- 		INIT_LIST_HEAD(&pcpu_slot[i]);
- 
-@@ -2602,6 +2638,9 @@ int __init pcpu_page_first_chunk(size_t reserved_size,
- 	pages_size = PFN_ALIGN(unit_pages * num_possible_cpus() *
- 			       sizeof(pages[0]));
- 	pages = memblock_alloc(pages_size, SMP_CACHE_BYTES);
-+	if (!pages)
-+		panic("%s: Failed to allocate %zu bytes\n", __func__,
-+		      pages_size);
- 
- 	/* allocate pages */
- 	j = 0;
+ 	/*
+ 	 * Now copy the array of nodepda pointers to each nodepda.
 -- 
 2.7.4
 
