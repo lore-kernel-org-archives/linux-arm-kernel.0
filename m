@@ -2,89 +2,68 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1B7CFC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 09:44:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B948BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 09:57:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DE40320859
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 09:44:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8755A20859
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 09:57:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pkxH6XMa"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DE40320859
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=intel.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lSPMVHLQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8755A20859
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=y54C3/lc8hmMGSPDgHwm9ur1ODqL7nK8dnSV7/E2Aj8=; b=pkxH6XMaYJcNoc
-	6qcywpX5JuhJeGIU0Fyx2/2cJNacEKr9cKlsvyYNM7pavDFIUA4hZefQ5kxrd1VowcopvkbKqehvd
-	8WQD6EIwzD2s36+EfnmrJevaqtQG9gX1jJY4s0P7oWOigakjI/36Rm94j1QX1gPw5kkJdkmX3pHzS
-	UYnq5NgZtBaAxjm1vcnB47Ji4MhH/P3V67yaRK9Br5hNephD45XFxRaEzfhTFt2Xz0pC1DMTQwW0N
-	yxVNgiL/eaVon4ANcdsVzGEOxOvVs68k2uH5jT6/FSNpRgbcTuy0MziKnOrdGqnoRerb0WoST5cPG
-	qwRKt7BE2cU84DMNWRlg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=yHGZJ7gLccISkGUpVigMSq3rOEo8enc0DH4h3vCHmno=; b=lSPMVHLQAWflCZ
+	T6c3ZrDeAVdOsrIEmB7unfNeSfMPfw124QPUIpUJK/kOGVwGxYQ69IX4FYuoey+vjkh9QCM9NijB3
+	Cspv8m1YhVYy3n7Uz0VEK2N0Y0wsMjOz8nJT6/e2A1QXm8hgxgPb5BE1MPmujofz8T9j4kliFk6Hk
+	9wXTIjkG5193k7MVz5LTybE4sC25wvVccKuj3h0NWTKgijZkAL5H5hkhwrZk4DsckTw0gCUyVgzEW
+	bjnyES77feJL4VYW464xj1HZFH2Q4V2Vds6Z879gbOMkiQ9lYtH0S5sxhXWP3jbCecjb6smx9qriz
+	hxmXmAh89MbJTnOfpvsg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjhju-0007zo-Cl; Wed, 16 Jan 2019 09:44:02 +0000
-Received: from mga12.intel.com ([192.55.52.136])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjhjr-0007z2-3x
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 09:44:00 +0000
-X-Amp-Result: SKIPPED(no attachment in message)
-X-Amp-File-Uploaded: False
-Received: from orsmga001.jf.intel.com ([10.7.209.18])
- by fmsmga106.fm.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
- 16 Jan 2019 01:43:58 -0800
-X-ExtLoop1: 1
-X-IronPort-AV: E=Sophos;i="5.56,485,1539673200"; d="scan'208";a="128180954"
-Received: from fmsmsx106.amr.corp.intel.com ([10.18.124.204])
- by orsmga001.jf.intel.com with ESMTP; 16 Jan 2019 01:43:57 -0800
-Received: from fmsmsx161.amr.corp.intel.com (10.18.125.9) by
- FMSMSX106.amr.corp.intel.com (10.18.124.204) with Microsoft SMTP Server (TLS)
- id 14.3.408.0; Wed, 16 Jan 2019 01:43:57 -0800
-Received: from lcsmsx152.ger.corp.intel.com (10.186.165.231) by
- FMSMSX161.amr.corp.intel.com (10.18.125.9) with Microsoft SMTP Server (TLS)
- id 14.3.408.0; Wed, 16 Jan 2019 01:43:57 -0800
-Received: from hasmsx108.ger.corp.intel.com ([169.254.9.155]) by
- LCSMSX152.ger.corp.intel.com ([10.186.165.231]) with mapi id 14.03.0415.000;
- Wed, 16 Jan 2019 11:43:56 +0200
-From: "Winkler, Tomas" <tomas.winkler@intel.com>
-To: Marc Gonzalez <marc.w.gonzalez@free.fr>, Vinayak Holikatti
- <vinholikatti@gmail.com>, "Martin K. Petersen" <martin.petersen@oracle.com>,
- James Bottomley <jejb@linux.ibm.com>
-Subject: RE: [PATCH v1] scsi: ufs: Use explicit access size in ufshcd_dump_regs
-Thread-Topic: [PATCH v1] scsi: ufs: Use explicit access size in
- ufshcd_dump_regs
-Thread-Index: AQHUkVxxN9195/jQlkyXNcQH8xQywKWm7VCAgAAxToCACpsfgIAAI0vA
-Date: Wed, 16 Jan 2019 09:43:55 +0000
-Message-ID: <5B8DA87D05A7694D9FA63FD143655C1B9DA7B9D5@hasmsx108.ger.corp.intel.com>
-References: <3bf7ea8e-4cf2-1f9b-7f46-15609dfcad19@free.fr>
- <214700f8-a381-5740-47c0-54923dae60b1@free.fr>
- <4c367e20-3ae8-ba28-75dc-b07805e27ea8@codeaurora.org>
- <c3c4e886-39ef-6384-5772-96b865d0b059@free.fr>
-In-Reply-To: <c3c4e886-39ef-6384-5772-96b865d0b059@free.fr>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-ctpclassification: CTP_NT
-x-titus-metadata-40: eyJDYXRlZ29yeUxhYmVscyI6IiIsIk1ldGFkYXRhIjp7Im5zIjoiaHR0cDpcL1wvd3d3LnRpdHVzLmNvbVwvbnNcL0ludGVsMyIsImlkIjoiMjhlOGIxYTQtYThjMy00ZjliLWJiNDYtNWRjODkxYzljODY4IiwicHJvcHMiOlt7Im4iOiJDVFBDbGFzc2lmaWNhdGlvbiIsInZhbHMiOlt7InZhbHVlIjoiQ1RQX05UIn1dfV19LCJTdWJqZWN0TGFiZWxzIjpbXSwiVE1DVmVyc2lvbiI6IjE3LjEwLjE4MDQuNDkiLCJUcnVzdGVkTGFiZWxIYXNoIjoiWWJQN2pON3FXUjloMWpNVWt1cTVcL2t3R3F4OXZBajY1RmpsZCt4VFlNK3NBQXlRV3ZpWFRKemVtKzZPbXFZMnAifQ==
-dlp-product: dlpe-windows
-dlp-version: 11.0.400.15
-dlp-reaction: no-action
-x-originating-ip: [10.12.126.169]
+	id 1gjhxE-0004Br-HG; Wed, 16 Jan 2019 09:57:48 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gjhxB-0004BO-U8
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 09:57:47 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6AB6280D;
+ Wed, 16 Jan 2019 01:57:43 -0800 (PST)
+Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 311893F70D;
+ Wed, 16 Jan 2019 01:57:41 -0800 (PST)
+Subject: Re: [PATCH v6] arm64: implement ftrace with regs
+To: Torsten Duwe <duwe@lst.de>, Will Deacon <will.deacon@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Steven Rostedt <rostedt@goodmis.org>, Josh Poimboeuf <jpoimboe@redhat.com>,
+ Ingo Molnar <mingo@redhat.com>, Mark Rutland <mark.rutland@arm.com>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>, Arnd Bergmann <arnd@arndb.de>,
+ AKASHI Takahiro <takahiro.akashi@linaro.org>,
+ Amit Daniel Kachhap <amit.kachhap@arm.com>
+References: <20190104141053.360F768D93@newverein.lst.de>
+From: Julien Thierry <julien.thierry@arm.com>
+Message-ID: <8eb70db4-92a2-95a2-075c-f26690aab3ed@arm.com>
+Date: Wed, 16 Jan 2019 09:57:39 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
+In-Reply-To: <20190104141053.360F768D93@newverein.lst.de>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_014359_173766_0134287D 
-X-CRM114-Status: GOOD (  22.24  )
+X-CRM114-CacheID: sfid-20190116_015745_981655_90FBDF67 
+X-CRM114-Status: GOOD (  29.74  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,117 +75,117 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: SCSI <linux-scsi@vger.kernel.org>, Avri Altman <avri.altman@wdc.com>,
- Jeffrey Hugo <jhugo@codeaurora.org>, MSM <linux-arm-msm@vger.kernel.org>,
- Bjorn Andersson <bjorn.andersson@linaro.org>, Joao Pinto <jpinto@synopsys.com>,
- Andy Gross <andy.gross@linaro.org>, Robin Murphy <robin.murphy@arm.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: live-patching@vger.kernel.org, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-> 
-> On 09/01/2019 16:38, Jeffrey Hugo wrote:
-> 
-> >> On 11/12/2018 15:18, Marc Gonzalez wrote:
-> >>
-> >>> memcpy_fromio() doesn't provide any control over access size.
-> >>> For example, on arm64, it is implemented using readb and readq.
-> >>> This may trigger a synchronous external abort:
-> >>>
-> >>> [    3.729943] Internal error: synchronous external abort: 96000210 [#1]
-> PREEMPT SMP
-> >>> [    3.737000] Modules linked in:
-> >>> [    3.744371] CPU: 2 PID: 1 Comm: swapper/0 Tainted: G S                4.20.0-
-> rc4 #16
-> >>> [    3.747413] Hardware name: Qualcomm Technologies, Inc. MSM8998 v1
-> MTP (DT)
-> >>> [    3.755295] pstate: 00000005 (nzcv daif -PAN -UAO)
-> >>> [    3.761978] pc : __memcpy_fromio+0x68/0x80
-> >>> [    3.766718] lr : ufshcd_dump_regs+0x50/0xb0
-> >>> [    3.770767] sp : ffff00000807ba00
-> >>> [    3.774830] x29: ffff00000807ba00 x28: 00000000fffffffb
-> >>> [    3.778344] x27: ffff0000089db068 x26: ffff8000f6e58000
-> >>> [    3.783728] x25: 000000000000000e x24: 0000000000000800
-> >>> [    3.789023] x23: ffff8000f6e587c8 x22: 0000000000000800
-> >>> [    3.794319] x21: ffff000008908368 x20: ffff8000f6e1ab80
-> >>> [    3.799615] x19: 000000000000006c x18: ffffffffffffffff
-> >>> [    3.804910] x17: 0000000000000000 x16: 0000000000000000
-> >>> [    3.810206] x15: ffff000009199648 x14: ffff000089244187
-> >>> [    3.815502] x13: ffff000009244195 x12: ffff0000091ab000
-> >>> [    3.820797] x11: 0000000005f5e0ff x10: ffff0000091998a0
-> >>> [    3.826093] x9 : 0000000000000000 x8 : ffff8000f6e1ac00
-> >>> [    3.831389] x7 : 0000000000000000 x6 : 0000000000000068
-> >>> [    3.836676] x5 : ffff8000f6e1abe8 x4 : 0000000000000000
-> >>> [    3.841971] x3 : ffff00000928c868 x2 : ffff8000f6e1abec
-> >>> [    3.847267] x1 : ffff00000928c868 x0 : ffff8000f6e1abe8
-> >>> [    3.852567] Process swapper/0 (pid: 1, stack limit = 0x(____ptrval____))
-> >>> [    3.857900] Call trace:
-> >>> [    3.864473]  __memcpy_fromio+0x68/0x80
-> >>> [    3.866683]  ufs_qcom_dump_dbg_regs+0x1c0/0x370
-> >>> [    3.870522]  ufshcd_print_host_regs+0x168/0x190
-> >>> [    3.874946]  ufshcd_init+0xd4c/0xde0
-> >>> [    3.879459]  ufshcd_pltfrm_init+0x3c8/0x550
-> >>> [    3.883264]  ufs_qcom_probe+0x24/0x60
-> >>> [    3.887188]  platform_drv_probe+0x50/0xa0
-> >>>
-> >>> Assuming aligned 32-bit registers, let's use readl, after making
-> >>> sure that 'offset' and 'len' are indeed multiples of 4.
-> >>>
-> >>> Fixes: ba80917d9932d ("scsi: ufs: ufshcd_dump_regs to use
-> >>> memcpy_fromio")
-> >>> Signed-off-by: Marc Gonzalez <marc.w.gonzalez@free.fr>
-> >>> ---
-> >>>   drivers/scsi/ufs/ufshcd.c | 10 ++++++++--
-> >>>   1 file changed, 8 insertions(+), 2 deletions(-)
-> >>>
-> >>> diff --git a/drivers/scsi/ufs/ufshcd.c b/drivers/scsi/ufs/ufshcd.c
-> >>> index 535180c01ce8..320bbd9849bc 100644
-> >>> --- a/drivers/scsi/ufs/ufshcd.c
-> >>> +++ b/drivers/scsi/ufs/ufshcd.c
-> >>> @@ -112,13 +112,19 @@
-> >>>   int ufshcd_dump_regs(struct ufs_hba *hba, size_t offset, size_t len,
-> >>>   		     const char *prefix)
-> >>>   {
-> >>> -	u8 *regs;
-> >>> +	u32 *regs;
-> >>> +	size_t pos;
-> >>> +
-> >>> +	if (offset % 4 != 0 || len % 4 != 0) /* keep readl happy */
-> >>> +		return -EINVAL;
-> >
-> > Hmm.  It seems like these cases could be handled, but I guess we
-> > cannot necessarily assume that reading past the bounds specified by
-> > the client is safe, so this seems reasonable.
-> >
-> >>>
-> >>>   	regs = kzalloc(len, GFP_KERNEL);
-> >>>   	if (!regs)
-> >>>   		return -ENOMEM;
-> >>>
-> >>> -	memcpy_fromio(regs, hba->mmio_base + offset, len);
-> >>> +	for (pos = 0; pos < len; pos += 4)
-> >>> +		regs[pos / 4] = ufshcd_readl(hba, offset + pos);
-> >>> +
-> >>>   	ufshcd_hex_dump(prefix, regs, len);
-> >>>   	kfree(regs);
-> >>>
-> >
-> > Reviewed-by: Jeffrey Hugo <jhugo@codeaurora.org>
-> 
-> James, Martin,
-> 
-> I haven't heard back from Vinayak. (In fact, his last review dates back to 2016.
-> Should MAINTAINERS be updated? I can send a patch.)
-> 
-> Would you mind taking this patch through the SCSI tree?
-> 
-> Tomas, does "LGTM" translate to Acked-by? :-D
-Yes, you can add my Ack.
+Hi Torsten,
 
-Thanks
-Tomas
+On 04/01/2019 14:10, Torsten Duwe wrote:
+> Use -fpatchable-function-entry (gcc8) to add 2 NOPs at the beginning
+> of each function. Replace the first NOP thus generated with a quick LR
+> saver (move it to scratch reg x9), so the 2nd replacement insn, the call
+> to ftrace, does not clobber the value. Ftrace will then generate the
+> standard stack frames.
+> 
+> Note that patchable-function-entry in GCC disables IPA-RA, which means
+> ABI register calling conventions are obeyed *and* scratch registers
+> such as x9 are available.
+> 
+> Introduce and handle an ftrace_regs_trampoline for module PLTs, right
+> after ftrace_trampoline, and double the size of this special section.
+> 
+> Signed-off-by: Torsten Duwe <duwe@suse.de>
+> 
+
+I wanted to test this patch (and try to benchmark having the "mov x9,
+x30" always present in function prelude vs having two nops), but I
+cannot get this patch to apply (despite having a version including both
+commits below).
+
+Could you provide a git branch from which I could try to rebase the
+patch? (Or a new version of the series)
+
+> ---
+> 
+> This patch applies on 4.20 with the additional changes
+> bdb85cd1d20669dfae813555dddb745ad09323ba
+> (arm64/module: switch to ADRP/ADD sequences for PLT entries)
+> and
+> 7dc48bf96aa0fc8aa5b38cc3e5c36ac03171e680
+> (arm64: ftrace: always pass instrumented pc in x0)
+> along with their respective series, or alternatively on Linus' master,
+> which already has these.
+> 
+> changes since v5:
+> 
+> * fix mentioned pc in x0 to hold the start address of the call site,
+>   not the return address or the branch address.
+>   This resolves the problem found by Amit.
+> 
+> ---
+>  arch/arm64/Kconfig                    |    2 
+>  arch/arm64/Makefile                   |    4 +
+>  arch/arm64/include/asm/assembler.h    |    1 
+>  arch/arm64/include/asm/ftrace.h       |   13 +++
+>  arch/arm64/include/asm/module.h       |    3 
+>  arch/arm64/kernel/Makefile            |    6 -
+>  arch/arm64/kernel/entry-ftrace.S      |  131 ++++++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/ftrace.c            |  125 ++++++++++++++++++++++++--------
+>  arch/arm64/kernel/module-plts.c       |    3 
+>  arch/arm64/kernel/module.c            |    2 
+>  drivers/firmware/efi/libstub/Makefile |    3 
+>  include/asm-generic/vmlinux.lds.h     |    1 
+>  include/linux/compiler_types.h        |    4 +
+>  13 files changed, 262 insertions(+), 36 deletions(-)
+
+[...]
+
+> --- a/arch/arm64/kernel/entry-ftrace.S
+> +++ b/arch/arm64/kernel/entry-ftrace.S
+
+[...]
+
+> @@ -122,6 +124,7 @@ skip_ftrace_call:			// }
+>  ENDPROC(_mcount)
+>  
+>  #else /* CONFIG_DYNAMIC_FTRACE */
+> +#ifndef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+>  /*
+>   * _mcount() is used to build the kernel with -pg option, but all the branch
+>   * instructions to _mcount() are replaced to NOP initially at kernel start up,
+> @@ -159,6 +162,124 @@ GLOBAL(ftrace_graph_call)		// ftrace_gra
+>  
+>  	mcount_exit
+>  ENDPROC(ftrace_caller)
+> +#else /* CONFIG_DYNAMIC_FTRACE_WITH_REGS */
+> +
+> +/*
+> + * Since no -pg or similar compiler flag is used, there should really be
+> + * no reference to _mcount; so do not define one. Only some value for
+> + * MCOUNT_ADDR is needed for comparison. Let it point here to have some
+> + * sort of magic value that can be recognised when debugging.
+> + */
+> +GLOBAL(_mcount)
+> +	ret	/* make it differ from regs caller */
+
+There's something I can't figure out. Since there are no callers to
+_mcount, how does the ftrace core builds up its record of patchable
+functions?
+
+I don't understand fully the core ftrace code but I've got the
+impression that without this record of struct dyn_ftrace, ftrace cannot
+patch in calls to tracers in the future.
+
+Am I missing something?
+
+Thanks,
+
+-- 
+Julien Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
