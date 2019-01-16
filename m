@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 082D4C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 09:59:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 55741C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 09:59:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C523B2082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 09:59:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1B0582082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 09:59:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f3yxAWzH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C523B2082F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rrXZBBfd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1B0582082F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,40 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=EEnn6JzoYMtggmd7Y4TsMb1dlJBaCPFU9c054t41Liw=; b=f3yxAWzHkJISbW
-	IoNzO6Hths5QAuAgUi4OWqnzXq/lklJKbjCemWVNThIUtiMXLBiz6w8N+Ie2Sd6MhAo0B6Abk2Hku
-	EX316lFIRyDnKuupa/p3PpvRvwvxOwd8ekXsX9MotzTBOzxU2vk6upyX482q9EK0oKbKbVtgty6TR
-	2SBJa5qFJkDxUvb7bRkdTOBkdtJEvsgEHklrL3Om6OzyrhEjHksltujjUkmUGJ7dJs6qZcMcZkdFY
-	4u2D8QibY05PgsARTVo5Y/7Sfl70muOuToOwFH8lm8+W9ROv1dpnTn0O57IKbPmQx9a4Vc7pUazd5
-	Eo3acygt3t2zDlkrtrkA==;
+	List-Owner; bh=gL9AOk6i6vF6o1hdgxk9WZT0nrleQJ3hKy8e2KDHmKw=; b=rrXZBBfdoJPJSb
+	LhS12Aoz9jK4ss8MhUSn+bhqj413LlufZndjPFTa6l+KTAXpR4ivTcmODuX30+zxd95wbUbg98nHK
+	0/pYdSXACL6l/CVRviGkJOHz2+crs/Pb1708hji6MA8JzU8zyg76Ozi0lwAEDuB9VldZTZWhSJmP7
+	UuCYq8WZgz/TIkUk7yv4QyYpBsk1SgemVz2Y2x04w3lcBxf4GSXSDG+pnOIMHR6ldiHulmqKO4aNj
+	TarXDgr0Z42GVWEsKVw9xay+7Wd97p9+KSSKxMTXtTiExqzdzOA+GEfE7oW4eL3N/hojhMQkkuLDH
+	BvBHVFm7Mc7dL+n7s7rw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjhyv-0005vI-BU; Wed, 16 Jan 2019 09:59:33 +0000
-Received: from esa2.microchip.iphmx.com ([68.232.149.84])
+	id 1gjhzD-0006Ee-21; Wed, 16 Jan 2019 09:59:51 +0000
+Received: from esa3.microchip.iphmx.com ([68.232.153.233])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjhxW-0004UI-R3
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 09:58:10 +0000
-X-IronPort-AV: E=Sophos;i="5.56,485,1539673200"; d="scan'208";a="25386569"
+ id 1gjhxa-0004VD-7e
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 09:58:11 +0000
+X-IronPort-AV: E=Sophos;i="5.56,485,1539673200"; d="scan'208";a="25551589"
 Received: from smtpout.microchip.com (HELO email.microchip.com)
  ([198.175.253.82])
- by esa2.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 16 Jan 2019 02:58:06 -0700
+ by esa3.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 16 Jan 2019 02:58:09 -0700
 Received: from tenerife.corp.atmel.com (10.10.76.4) by
  chn-sv-exch02.mchp-main.com (10.10.76.38) with Microsoft SMTP Server id
- 14.3.352.0; Wed, 16 Jan 2019 02:58:05 -0700
+ 14.3.352.0; Wed, 16 Jan 2019 02:58:08 -0700
 From: Nicolas Ferre <nicolas.ferre@microchip.com>
 To: Alexandre Belloni <alexandre.belloni@bootlin.com>, Ludovic Desroches
  <ludovic.desroches@microchip.com>
-Subject: [PATCH 6/8] power: reset: at91-reset: add support for sam9x60 SoC
-Date: Wed, 16 Jan 2019 10:57:42 +0100
-Message-ID: <7e68a0298b8802edaead1f9c011f9c2e191ecf6a.1547629763.git.nicolas.ferre@microchip.com>
+Subject: [PATCH 7/8] USB: host: ohci-at91: add sam9x60-sfr definition for ohci
+Date: Wed, 16 Jan 2019 10:57:43 +0100
+Message-ID: <e7ea12330d4ba8f612110a185a2aa77d91522694.1547629763.git.nicolas.ferre@microchip.com>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <cover.1547629763.git.nicolas.ferre@microchip.com>
 References: <cover.1547629763.git.nicolas.ferre@microchip.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_015807_141459_FC5B6483 
-X-CRM114-Status: UNSURE (   9.76  )
+X-CRM114-CacheID: sfid-20190116_015810_520068_A390D8D5 
+X-CRM114-Status: UNSURE (   9.43  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -82,52 +82,32 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add support for additional reset causes and the proper compatibility
-string for sam9x60 SoC. The restart function is the same as the samx7.
+Add this SFR compatible definition for the sam9x60 SoC and manage
+its use in ohci-at91.c driver.
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 ---
- drivers/power/reset/at91-reset.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ drivers/usb/host/ohci-at91.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
-index f44a9ffcc2ab..44ca983a49a1 100644
---- a/drivers/power/reset/at91-reset.c
-+++ b/drivers/power/reset/at91-reset.c
-@@ -44,6 +44,9 @@ enum reset_type {
- 	RESET_TYPE_WATCHDOG	= 2,
- 	RESET_TYPE_SOFTWARE	= 3,
- 	RESET_TYPE_USER		= 4,
-+	RESET_TYPE_CPU_FAIL	= 6,
-+	RESET_TYPE_XTAL_FAIL	= 7,
-+	RESET_TYPE_ULP2		= 8,
- };
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index ec6739ef3129..fc35a7993b7b 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -141,8 +141,11 @@ static struct regmap *at91_dt_syscon_sfr(void)
+ 	struct regmap *regmap;
  
- static void __iomem *at91_ramc_base[2], *at91_rstc_base;
-@@ -164,6 +167,15 @@ static void __init at91_reset_status(struct platform_device *pdev)
- 	case RESET_TYPE_USER:
- 		reason = "user reset";
- 		break;
-+	case RESET_TYPE_CPU_FAIL:
-+		reason = "CPU clock failure detection";
-+		break;
-+	case RESET_TYPE_XTAL_FAIL:
-+		reason = "32.768 kHz crystal failure detection";
-+		break;
-+	case RESET_TYPE_ULP2:
-+		reason = "ULP2 reset";
-+		break;
- 	default:
- 		reason = "unknown reset";
- 		break;
-@@ -183,6 +195,7 @@ static const struct of_device_id at91_reset_of_match[] = {
- 	{ .compatible = "atmel,at91sam9g45-rstc", .data = at91sam9g45_restart },
- 	{ .compatible = "atmel,sama5d3-rstc", .data = sama5d3_restart },
- 	{ .compatible = "atmel,samx7-rstc", .data = samx7_restart },
-+	{ .compatible = "microchip,sam9x60-rstc", .data = samx7_restart },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, at91_reset_of_match);
+ 	regmap = syscon_regmap_lookup_by_compatible("atmel,sama5d2-sfr");
+-	if (IS_ERR(regmap))
+-		regmap = NULL;
++	if (IS_ERR(regmap)) {
++		regmap = syscon_regmap_lookup_by_compatible("microchip,sam9x60-sfr");
++		if (IS_ERR(regmap))
++			regmap = NULL;
++	}
+ 
+ 	return regmap;
+ }
 -- 
 2.17.1
 
