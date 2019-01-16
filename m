@@ -2,54 +2,71 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 55DABC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 14:20:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 95EA6C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 14:27:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 27A9B205C9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 14:20:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 667F920675
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 14:27:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VUyOslOQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 27A9B205C9
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DEE1rCZq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 667F920675
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-m68k.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HknG1KqhFEu4cOLOj4Ok0baP4XyFMUE/6nA/IDut5e0=; b=VUyOslOQsmesPv
-	iC8OqLKUnh0SgRc9yW8xYJYeyss+jX8g+xI8E47b8CUmAvAraVF+X9hhRhoE7UJhMLKOixWUnXaEY
-	FU8/gUad7bFKcbY6lfZbTAp+Kdhz+qaFtKKM/bEC3E+sKvdKEjlicH1dSc4FpyLvfltQ763MOB1PQ
-	PqU3mQq8zF1wcxMYf1yYWoh8cnMJ99Vj92gwPoRgHLMt8UamwFSnatAD3yn15xZ1tMwDixaycogSh
-	oWmRKG1UbyayJ6GHdTvHbysfx+H+hIObkKoV1QnQ+7lJpmVlmjXaLgqUXTe1FQYjnmLDjZO85NnyP
-	5aiY+sBDQFSqmgGrK9eA==;
+	List-Owner; bh=UQiIEmqAL1TfHiWg+/7GVXTwHK7/1lfa5EVVTfAonps=; b=DEE1rCZqvBj6kZ
+	BgAe6dwHBJTosyemGSEK5Z/aAK0z4iexdJHOu50mpgcSU/hzxcY5Oqv42gDNlC7CI0KdX7a2BO0sG
+	wxRYvKpm5kybIbE9IZPbWoFidG0QitzmmU/YhZxD90Ua0147dCCaUldBY2wtDTEKdqEU39ORfCpmj
+	7U56JElVNBNnuMnUCAhReoGdTY2xVey1LNn1uStHrTaYoVpzt8NCdsjiiDSZsnGA8zkPGYBrvm33O
+	NslFd4JpH2JaeHsZSrKNeoJ3eau2p48dgi9TpbxNgdvTXFZ3HpgdN+DANTqYbSrgy9zHz3AxGvGI3
+	C9jvV3uWgJceg7dHiTWw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjm3H-0006bf-7U; Wed, 16 Jan 2019 14:20:19 +0000
-Received: from willy by bombadil.infradead.org with local (Exim 4.90_1 #2 (Red
- Hat Linux)) id 1gjm3C-0006U0-M1; Wed, 16 Jan 2019 14:20:14 +0000
-Date: Wed, 16 Jan 2019 06:20:14 -0800
-From: Matthew Wilcox <willy@infradead.org>
-To: Christophe Leroy <christophe.leroy@c-s.fr>
-Subject: Re: [PATCH V2] mm: Introduce GFP_PGTABLE
-Message-ID: <20190116142014.GJ6310@bombadil.infradead.org>
-References: <1547619692-7946-1-git-send-email-anshuman.khandual@arm.com>
- <20190116065703.GE24149@dhcp22.suse.cz>
- <20190116123018.GF6310@bombadil.infradead.org>
- <07d6a264-dccd-78ab-e8a9-2410bbef7b97@arm.com>
- <20190116131827.GH6310@bombadil.infradead.org>
- <521d8511-4c87-49c6-de03-67a71d5bacca@c-s.fr>
+	id 1gjmAc-0005uj-9g; Wed, 16 Jan 2019 14:27:54 +0000
+Received: from mail-vk1-f196.google.com ([209.85.221.196])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gjmAY-0005uF-B3; Wed, 16 Jan 2019 14:27:51 +0000
+Received: by mail-vk1-f196.google.com with SMTP id d201so1462514vka.0;
+ Wed, 16 Jan 2019 06:27:50 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=UQM6mniKlKxrnOmNQBuQkbxwhizn1F4ro8TFUMtXkmo=;
+ b=Jzzf7anvzjP205j4C9ALNtw9tEQJ4VBc0idrlYriJMdN/aEVTzBikcxeLoulGgC+lZ
+ Be0Dn/JbQIO3q7wbsga4v2XRYrf/Pt+OEzkdnfkQQEcipMDSFhdQhkmTyqTlfSc9Kx89
+ XoNesb7aBSCRuXUQH6MhqltZf2aqvyVWm9Ljvvl9NwwowTP1Lh/e+j+pbTJKAJP2Ahfh
+ AvSEANkvcK5lIscdFIjIC3pTUPg7drgXMNBa6xdP39E5D6zLp0ScCS6LK9CJ+PHvngXU
+ cKyn/Q/Rk6M/Vm73ye8rQGZrIvrwrFi6GzY5M7VnJlF9k8YwQ1H+LvJnNUmitR2NEEgh
+ O1aw==
+X-Gm-Message-State: AJcUukcDLqEOcyMt7Fs4feupPWVV30peG1PegLm+qWk7/eV7N8t6ORQB
+ P191dArhUe81afPdPfrWJ8AI5NGJDmGCF635wco=
+X-Google-Smtp-Source: ALg8bN6VwI1ArYelHZvmR1PaA1MLFLrSrq7A9DMWJ0UBcwJmVEmORYrACtE6Zw/o+h9WHLVB78c6er2JrxSMrNC9Lxk=
+X-Received: by 2002:a1f:2ed7:: with SMTP id u206mr3609173vku.72.1547648869025; 
+ Wed, 16 Jan 2019 06:27:49 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <521d8511-4c87-49c6-de03-67a71d5bacca@c-s.fr>
-User-Agent: Mutt/1.9.2 (2017-12-15)
+References: <1547646261-32535-1-git-send-email-rppt@linux.ibm.com>
+ <1547646261-32535-20-git-send-email-rppt@linux.ibm.com>
+In-Reply-To: <1547646261-32535-20-git-send-email-rppt@linux.ibm.com>
+From: Geert Uytterhoeven <geert@linux-m68k.org>
+Date: Wed, 16 Jan 2019 15:27:35 +0100
+Message-ID: <CAMuHMdWKPj-2Let44rmaVwh-b6kkGg+0cFPQ-+3k9LP86pB7NA@mail.gmail.com>
+Subject: Re: [PATCH 19/21] treewide: add checks for the return value of
+ memblock_alloc*()
+To: Mike Rapoport <rppt@linux.ibm.com>
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20190116_062750_386863_4D79702E 
+X-CRM114-Status: GOOD (  16.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -61,57 +78,109 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, christoffer.dall@arm.com, linux-sh@vger.kernel.org,
- peterz@infradead.org, catalin.marinas@arm.com, palmer@sifive.com,
- will.deacon@arm.com, Michal Hocko <mhocko@kernel.org>, linux-mm@kvack.org,
- linux-riscv@lists.infradead.org, kvmarm@lists.cs.columbia.edu,
- aneesh.kumar@linux.ibm.com, greentime@andestech.com, linux@armlinux.org.uk,
- mingo@redhat.com, linux-arm-kernel@lists.infradead.org, rientjes@google.com,
- dave.hansen@linux.intel.com, Anshuman Khandual <anshuman.khandual@arm.com>,
- marc.zyngier@arm.com, rppt@linux.vnet.ibm.com, shakeelb@google.com,
- kirill@shutemov.name, tglx@linutronix.de, vbabka@suse.cz,
- ard.biesheuvel@linaro.org, linuxppc-dev@lists.ozlabs.org, steve.capper@arm.com,
- linux-kernel@vger.kernel.org, james.morse@arm.com, akpm@linux-foundation.org,
- robin.murphy@arm.com
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: Rich Felker <dalias@libc.org>,
+ "linux-ia64@vger.kernel.org" <linux-ia64@vger.kernel.org>,
+ "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
+ <devicetree@vger.kernel.org>, Catalin Marinas <catalin.marinas@arm.com>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>,
+ the arch/x86 maintainers <x86@kernel.org>, linux-mips@vger.kernel.org,
+ Max Filippov <jcmvbkbc@gmail.com>, Guo Ren <guoren@kernel.org>,
+ sparclinux <sparclinux@vger.kernel.org>, Christoph Hellwig <hch@lst.de>,
+ linux-s390 <linux-s390@vger.kernel.org>, linux-c6x-dev@linux-c6x.org,
+ Yoshinori Sato <ysato@users.sourceforge.jp>,
+ Richard Weinberger <richard@nod.at>, Linux-sh list <linux-sh@vger.kernel.org>,
+ Russell King <linux@armlinux.org.uk>, kasan-dev@googlegroups.com,
+ Mark Salter <msalter@redhat.com>, Dennis Zhou <dennis@kernel.org>,
+ Matt Turner <mattst88@gmail.com>, arcml <linux-snps-arc@lists.infradead.org>,
+ "moderated list:H8/300 ARCHITECTURE" <uclinux-h8-devel@lists.sourceforge.jp>,
+ Petr Mladek <pmladek@suse.com>, linux-xtensa@linux-xtensa.org,
+ alpha <linux-alpha@vger.kernel.org>, linux-um@lists.infradead.org,
+ linux-m68k <linux-m68k@lists.linux-m68k.org>, Rob Herring <robh+dt@kernel.org>,
+ Greentime Hu <green.hu@gmail.com>, xen-devel@lists.xenproject.org,
+ Stafford Horne <shorne@gmail.com>, Guan Xuetao <gxt@pku.edu.cn>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Michal Simek <monstr@monstr.eu>, Tony Luck <tony.luck@intel.com>,
+ Linux MM <linux-mm@kvack.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ USB list <linux-usb@vger.kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Paul Burton <paul.burton@mips.com>, Vineet Gupta <vgupta@synopsys.com>,
+ Michael Ellerman <mpe@ellerman.id.au>,
+ Andrew Morton <akpm@linux-foundation.org>,
+ linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
+ "David S. Miller" <davem@davemloft.net>,
+ Openrisc <openrisc@lists.librecores.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 16, 2019 at 02:47:16PM +0100, Christophe Leroy wrote:
-> Le 16/01/2019 =E0 14:18, Matthew Wilcox a =E9crit=A0:
-> > I disagree with your objective.  Making more code common is a great ide=
-a,
-> > but this patch is too unambitious.  We should be heading towards one or
-> > two page table allocation functions instead of having every architectur=
-e do
-> > its own thing.
-> > =
+Hi Mike,
 
-> > So start there.  Move the x86 function into common code and convert one
-> > other architecture to use it too.
-> =
+On Wed, Jan 16, 2019 at 2:46 PM Mike Rapoport <rppt@linux.ibm.com> wrote:
+> Add check for the return value of memblock_alloc*() functions and call
+> panic() in case of error.
+> The panic message repeats the one used by panicing memblock allocators with
+> adjustment of parameters to include only relevant ones.
+>
+> The replacement was mostly automated with semantic patches like the one
+> below with manual massaging of format strings.
+>
+> @@
+> expression ptr, size, align;
+> @@
+> ptr = memblock_alloc(size, align);
+> + if (!ptr)
+> +       panic("%s: Failed to allocate %lu bytes align=0x%lx\n", __func__,
 
-> Are we talking about pte_alloc_one_kernel() and pte_alloc_one() ?
-> =
+In general, you want to use %zu for size_t
 
-> I'm not sure x86 function is the best common one, as it seems to allocate=
- a
-> multiple of PAGE_SIZE only.
+> size, align);
+>
+> Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
 
-And that's the common case.  Most architectures use a single page for at
-least one level of the pte/pmd/pud/p4d/pgd hierarchy.  Some use multiple
-pages and some use a fraction of a page.
+Thanks for your patch!
 
-> Some arches like powerpc use pagetables which are smaller than a page, for
-> instance powerpc 8xx uses 4k pagetables even with 16k pages, which means a
-> single page can be used by 4 pagetables.
+>  74 files changed, 415 insertions(+), 29 deletions(-)
 
-Those can be added later.  Note I said "one or two", and that's what I
-had in mind; I think we want one function that allocates just a page
-and another that allocates a page fragment.  Then we can have a good
-discussion about what method we use; s390 and ppc use different techniques
-today and there's really no good reason for that.
+I'm wondering if this is really an improvement?
+For the normal memory allocator, the trend is to remove printing of errors
+from all callers, as the core takes care of that.
+
+> --- a/arch/alpha/kernel/core_marvel.c
+> +++ b/arch/alpha/kernel/core_marvel.c
+> @@ -83,6 +83,9 @@ mk_resource_name(int pe, int port, char *str)
+>
+>         sprintf(tmp, "PCI %s PE %d PORT %d", str, pe, port);
+>         name = memblock_alloc(strlen(tmp) + 1, SMP_CACHE_BYTES);
+> +       if (!name)
+> +               panic("%s: Failed to allocate %lu bytes\n", __func__,
+
+%zu, as strlen() returns size_t.
+
+> +                     strlen(tmp) + 1);
+>         strcpy(name, tmp);
+>
+>         return name;
+> @@ -118,6 +121,9 @@ alloc_io7(unsigned int pe)
+>         }
+>
+>         io7 = memblock_alloc(sizeof(*io7), SMP_CACHE_BYTES);
+> +       if (!io7)
+> +               panic("%s: Failed to allocate %lu bytes\n", __func__,
+
+%zu, as sizeof() returns size_t.
+Probably there are more. Yes, it's hard to get them right in all callers.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert@linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
 
 _______________________________________________
 linux-arm-kernel mailing list
