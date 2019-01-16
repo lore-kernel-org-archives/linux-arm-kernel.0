@@ -1,68 +1,63 @@
-Return-Path: <SRS0=3lKL=PX=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
+Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 266F3C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 23:32:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4B330C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 00:09:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DC4D420883
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 15 Jan 2019 23:32:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 15F282086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 00:09:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m3NHw8v/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DC4D420883
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.intel.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fKg18jwx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 15F282086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ellerman.id.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=MfKMNg8SZ7oaL/yd4U7e3ct3DG4wzeU3mXmAOhsKemE=; b=m3NHw8v/s98BJpyKS/XsPojbR
-	vxI1nE4qd+Zkebm5xpcvUfxCBEozZLwRQ6FCPOV++xtnJIticC8rdn3oljFw1RvtbyPbhRMsLXPqT
-	Tbr4fGhgb3pdffyPzTeHrMgxWbzgPSQBePvmswrMi66CCxfZLI7gwfl//HR4gTzL6aAtIhgdc96ET
-	84PjOhwZ0fO+obVateTipFnovS3d9BDX1LUJRXIDhab8mLVGL/Xg7UpjQ7AOCuurzxoym7bmvtLNF
-	6x+MCZKx5Ks7VrRtaMVnGPXf05QSwoM0kaV9eAuf8bbSuAkn1ju/OL1b4cTmJMKnNbW0VV4ua0bqM
-	VW1j4ST/A==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
+	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=PoUttiq5G6pYxjrOeRQIyWh1lBOdhXLOP0581QpNnMY=; b=fKg18jwxVp7Xge
+	WeR9jnBvfTjWOU7VEShaEWrj+RK9cOqRTIdjs6hFQ5UeM/H84DkcsRhZAR7gglOKBjvBrmWZBVVLB
+	6DcurpJ+Gj05QOCRXErnhskkgMm+WzoWTImUHELMMTDugkp/GJmymfnHWfESzm4OodhS6zEZhGLIs
+	EWBNBEJYA4Elp4fDyQ61LEyHYAlQebhTQb7o9Wui/pL9e+bVmR5cCPKeh4uMmnUj2Ov8w4IlY4w5R
+	ObgQXGVngaH2DZjvXfexn+e+cgCdNLtgE7jkEN4vKKFsEgdsEuqnpctxkPzIkOTL33s2seygq+c32
+	/1LZdCW/kNTvcfSVbmOw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjYCE-0006QP-1D; Tue, 15 Jan 2019 23:32:38 +0000
-Received: from mga03.intel.com ([134.134.136.65])
+	id 1gjYlt-0000Zi-Ez; Wed, 16 Jan 2019 00:09:29 +0000
+Received: from ozlabs.org ([2401:3900:2:1::2])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjYCB-0006Q4-GC
- for linux-arm-kernel@lists.infradead.org; Tue, 15 Jan 2019 23:32:36 +0000
-X-Amp-Result: SKIPPED(no attachment in message)
-X-Amp-File-Uploaded: False
-Received: from orsmga004.jf.intel.com ([10.7.209.38])
- by orsmga103.jf.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
- 15 Jan 2019 15:32:34 -0800
-X-ExtLoop1: 1
-X-IronPort-AV: E=Sophos;i="5.56,483,1539673200"; d="scan'208";a="267421640"
-Received: from yoojae-mobl1.amr.corp.intel.com (HELO [10.7.153.143])
- ([10.7.153.143])
- by orsmga004.jf.intel.com with ESMTP; 15 Jan 2019 15:32:34 -0800
-Subject: Re: [PATCH i2c-next v9 0/5] i2c: aspeed: Add bus idle waiting logic
- for multi-master use cases
-To: Wolfram Sang <wsa@the-dreams.de>
-References: <20181030210917.32711-1-jae.hyun.yoo@linux.intel.com>
- <20190115224713.duoha332mjlrmwji@ninjato>
-From: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
-Message-ID: <ae348673-f6d5-36ac-a1f2-872d0bab06b1@linux.intel.com>
-Date: Tue, 15 Jan 2019 15:32:33 -0800
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.3
+ id 1gjYlp-0000Z8-I6
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 00:09:27 +0000
+Received: from authenticated.ozlabs.org (localhost [127.0.0.1])
+ (using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
+ key-exchange ECDHE (P-256) server-signature RSA-PSS (2048 bits) server-digest
+ SHA256) (No client certificate requested)
+ by ozlabs.org (Postfix) with ESMTPSA id 43fSHb5L9yz9sBQ;
+ Wed, 16 Jan 2019 11:09:15 +1100 (AEDT)
+From: Michael Ellerman <mpe@ellerman.id.au>
+To: Arnd Bergmann <arnd@arndb.de>
+Subject: Re: [PATCH 14/15] arch: add split IPC system calls where needed
+In-Reply-To: <CAK8P3a3eUzGDrJtV2ySpgHwjKHwZYr+1xHp6tChCt1gWi=mJ+g@mail.gmail.com>
+References: <20190110162435.309262-1-arnd@arndb.de>
+ <20190110162435.309262-15-arnd@arndb.de>
+ <87pnsz28k2.fsf@concordia.ellerman.id.au>
+ <CAK8P3a0uas76i2W1yjFvxHT-2=A8_egUZeAUM-Vya6386+87Xg@mail.gmail.com>
+ <CAK8P3a3eUzGDrJtV2ySpgHwjKHwZYr+1xHp6tChCt1gWi=mJ+g@mail.gmail.com>
+Date: Wed, 16 Jan 2019 11:09:12 +1100
+Message-ID: <874la9zcnr.fsf@concordia.ellerman.id.au>
 MIME-Version: 1.0
-In-Reply-To: <20190115224713.duoha332mjlrmwji@ninjato>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_153235_593155_12DDC7B1 
-X-CRM114-Status: GOOD (  17.12  )
+X-CRM114-CacheID: sfid-20190115_160926_052480_24DD9DAC 
+X-CRM114-Status: GOOD (  15.15  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,53 +69,80 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- linux-aspeed@lists.ozlabs.org, James Feist <james.feist@linux.intel.com>,
- Andrew Jeffery <andrew@aj.id.au>,
- Benjamin Herrenschmidt <benh@kernel.crashing.org>, openbmc@lists.ozlabs.org,
- Brendan Higgins <brendanhiggins@google.com>, linux-kernel@vger.kernel.org,
- Rob Herring <robh+dt@kernel.org>,
- Jarkko Nikula <jarkko.nikula@linux.intel.com>, Joel Stanley <joel@jms.id.au>,
- Vernon Mauery <vernon.mauery@linux.intel.com>,
- linux-arm-kernel@lists.infradead.org, linux-i2c@vger.kernel.org
+Cc: Rich Felker <dalias@libc.org>, linux-ia64@vger.kernel.org,
+ Linux-sh list <linux-sh@vger.kernel.org>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>,
+ Dominik Brodowski <linux@dominikbrodowski.net>, linux-mips@vger.kernel.org,
+ Max Filippov <jcmvbkbc@gmail.com>, Deepa Dinamani <deepa.kernel@gmail.com>,
+ "H. Peter Anvin" <hpa@zytor.com>, sparclinux <sparclinux@vger.kernel.org>,
+ linux-s390 <linux-s390@vger.kernel.org>, Davidlohr Bueso <dave@stgolabs.net>,
+ y2038 Mailman List <y2038@lists.linaro.org>, Helge Deller <deller@gmx.de>,
+ the arch/x86 maintainers <x86@kernel.org>,
+ Russell King - ARM Linux <linux@armlinux.org.uk>,
+ Ingo Molnar <mingo@redhat.com>, Geert Uytterhoeven <geert@linux-m68k.org>,
+ Firoz Khan <firoz.khan@linaro.org>, Matt Turner <mattst88@gmail.com>,
+ Fenghua Yu <fenghua.yu@intel.com>, Will Deacon <will.deacon@arm.com>,
+ linux-m68k <linux-m68k@lists.linux-m68k.org>,
+ Ivan Kokshaysky <ink@jurassic.park.msu.ru>, Andy Lutomirski <luto@kernel.org>,
+ Thomas Gleixner <tglx@linutronix.de>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Michal Simek <monstr@monstr.eu>, Tony Luck <tony.luck@intel.com>,
+ Parisc List <linux-parisc@vger.kernel.org>,
+ Linux API <linux-api@vger.kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Paul Burton <paul.burton@mips.com>, "Eric W .
+ Biederman" <ebiederm@xmission.com>, alpha <linux-alpha@vger.kernel.org>,
+ Martin Schwidefsky <schwidefsky@de.ibm.com>,
+ Andrew Morton <akpm@linux-foundation.org>,
+ linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
+ David Miller <davem@davemloft.net>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 1/15/2019 2:47 PM, Wolfram Sang wrote:
-> On Tue, Oct 30, 2018 at 02:09:11PM -0700, Jae Hyun Yoo wrote:
->> In multi-master environment, this driver's master cannot know
->> exactly when a peer master sends data to this driver's slave so a
->> case can be happened that this master tries to send data through
->> the master_xfer function but slave data from peer master is still
->> being processed by this driver. To prevent state corruption in the
->> case, this patch adds checking code if any slave operation is
->> ongoing and it waits up to the bus timeout duration before starting
->> a master_xfer operation.
+Arnd Bergmann <arnd@arndb.de> writes:
+
+> On Tue, Jan 15, 2019 at 4:01 PM Arnd Bergmann <arnd@arndb.de> wrote:
 >>
->> To support this change, it introduces changes on i2c-core-base to
->> make that able to read the bus timeout and master transfer retries
->> count values from device tree properties.
+>> On Mon, Jan 14, 2019 at 4:59 AM Michael Ellerman <mpe@ellerman.id.au> wrote:
+>> > Arnd Bergmann <arnd@arndb.de> writes:
+>> > >  arch/m68k/kernel/syscalls/syscall.tbl     | 11 +++++++++++
+>> > >  arch/mips/kernel/syscalls/syscall_o32.tbl | 11 +++++++++++
+>> > >  arch/powerpc/kernel/syscalls/syscall.tbl  | 12 ++++++++++++
+>> >
+>> > I have some changes I'd like to make to our syscall table that will
+>> > clash with this.
+>> >
+>> > I'll try and send them today.
 >>
->> Please review this patch set.
-> 
-> Marking this as "Changes requested". I think if the mutex approach
-> works, these patches become obsolete then.
-> 
+>> Ok. Are those for 5.0 or 5.1? If they are intended for 5.0, it would be
+>> nice for me to have a branch based on 5.0-rc1 that I can put
+>> the other patches on top of.
+>
+> There is also another change that I considered:
+>
+> At the end of my series, we have a lot of entries like
+>
+> 245     32      clock_settime                   sys_clock_settime32
+> 245     64      clock_settime                   sys_clock_settime
+> 245     spu     clock_settime                   sys_clock_settime
+>
+> which could be folded into
+>
+> 245     32      clock_settime                   sys_clock_settime32
+> 245     spu64 clock_settime                   sys_clock_settime
+>
+> if we just add another option to the ABI field. Any thoughts on
+> that?
 
-Hi Wolfram,
+My series splits spu out into a separate field. So the above would be:
 
-Thanks for your touching base. I made and tested a new patch in my
-local. Actually, I couldn't use a mutex because it should provide
-locking between driver context and interrupt context. Instead, after
-taking lots of experiments, I checked that idle waiting can be supported
-by this H/W so I didn't need to use any locking method in the driver
-code for multi-master handling. I'll submit a new patch tomorrow using a
-different thread. Please drop this patch set.
+245     32	-	clock_settime                   sys_clock_settime32
+245     64	spu	clock_settime                   sys_clock_settime
 
-Thanks,
-Jae
+cheers
 
 _______________________________________________
 linux-arm-kernel mailing list
