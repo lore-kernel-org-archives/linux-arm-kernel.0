@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 59A4EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 09:58:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 94944C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 09:59:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 286702082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 09:58:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 627D820859
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 09:59:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Z8BpN0J8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 286702082F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kb+tjDVd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 627D820859
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,41 +25,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+D5LYytjjj+swt665ojrRZAXWEmDGcasDcIZ792AM5E=; b=Z8BpN0J87uV71m
-	DwY26nrR4bJT9NqWn/AkTLkMhXOpIxa7eNsW5SP7ybJ9kdiN1wgYmnuBSNbw3OkNjL6/u7oyhR0cZ
-	miw9vmVHhwwPIkpqOeT7dqpSNht2a5RVlbfn0zOOjKtZnZJfM4llalTd8cB1Gh7Gnnv2i+BXnVe/U
-	8BnUXUzQzTnKM7rp64hVsi7hXD6pShCbKIr+aN9ehNRywmz6IXYGAbFsnVVGzgxLhzTGtcbZgiiEk
-	1GbexrwwRIXd47dnhbr5mS5huNp8Bspt8AnonZ7tS3ss7mmG/vQ/udB6uJ2xKwdMJjD6VobRSpt0m
-	9UEGKN+hd/R7U7bvEXOA==;
+	List-Owner; bh=iiH4KXOBpF9pH3R1M5fIF2CCc3o4hRK+rusCcMti7/U=; b=kb+tjDVdC0rHew
+	YN+31cRC0oBsxadCz4Nga9NWDjUSIt3cG+jIFwICpazYOZeB0QUS3unRzmROTTfGr+Gm+1yIIS/6g
+	dp1+xuOs/lwi1AV8N3m4wMbwSeH6+57n1ChI3pqydVa6+Rq9TbShnD2cNutNOobM+WbftfphDc6Em
+	qJo6n9TgWsnCvduLyB4jCPi/MAY9J2D89yVc9N/jEQ8po2J0UTKINdRP37mcJEtGs5XLVjCd8t3zm
+	S+6i01AdRcRpvWwK1DVr7IW8XJFJvpAz5JyIevepFYx1XyzonUtidBPfmeMaFW3L0cmDNcGpCncBc
+	vavCk3vBrbvXT7vhQtTw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjhyG-0005Cs-87; Wed, 16 Jan 2019 09:58:52 +0000
-Received: from esa2.microchip.iphmx.com ([68.232.149.84])
+	id 1gjhyT-0005RA-Tv; Wed, 16 Jan 2019 09:59:05 +0000
+Received: from esa3.microchip.iphmx.com ([68.232.153.233])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjhxN-0004M6-9m
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 09:58:01 +0000
-X-IronPort-AV: E=Sophos;i="5.56,485,1539673200"; d="scan'208";a="25386558"
+ id 1gjhxQ-0004QB-VV
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 09:58:03 +0000
+X-IronPort-AV: E=Sophos;i="5.56,485,1539673200"; d="scan'208";a="25551585"
 Received: from smtpout.microchip.com (HELO email.microchip.com)
  ([198.175.253.82])
- by esa2.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 16 Jan 2019 02:57:56 -0700
+ by esa3.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 16 Jan 2019 02:57:59 -0700
 Received: from tenerife.corp.atmel.com (10.10.76.4) by
  chn-sv-exch02.mchp-main.com (10.10.76.38) with Microsoft SMTP Server id
- 14.3.352.0; Wed, 16 Jan 2019 02:57:56 -0700
+ 14.3.352.0; Wed, 16 Jan 2019 02:57:59 -0700
 From: Nicolas Ferre <nicolas.ferre@microchip.com>
 To: Alexandre Belloni <alexandre.belloni@bootlin.com>, Ludovic Desroches
  <ludovic.desroches@microchip.com>
-Subject: [PATCH 3/8] dt-bindings: arm: atmel: add new sam9x60 SFR binding
-Date: Wed, 16 Jan 2019 10:57:39 +0100
-Message-ID: <c562284124f8116940093825c72294429d2c077f.1547629763.git.nicolas.ferre@microchip.com>
+Subject: [PATCH 4/8] net/macb: bindings doc/trivial: fix documentation for
+ sama5d3 10/100 interface
+Date: Wed, 16 Jan 2019 10:57:40 +0100
+Message-ID: <0005c2ef28b985c663e0cd058bbc6d3856e05ec2.1547629763.git.nicolas.ferre@microchip.com>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <cover.1547629763.git.nicolas.ferre@microchip.com>
 References: <cover.1547629763.git.nicolas.ferre@microchip.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_015757_754314_DADE19B1 
-X-CRM114-Status: UNSURE (   7.87  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190116_015801_426914_AAB6567E 
+X-CRM114-Status: GOOD (  10.21  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,26 +82,28 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add this SFR compatible definition for the sam9x60 SoC. Will be needed
-in OHCI driver: ohci-at91.c.
+This removes a line left while adding the correct compatibility string for
+sama5d3 10/100 interface. Now use the "atmel,sama5d3-macb" string.
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 ---
- Documentation/devicetree/bindings/arm/atmel-sysregs.txt | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/net/macb.txt | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/atmel-sysregs.txt b/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
-index badce6ef3ab3..dfc91bc02b97 100644
---- a/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
-+++ b/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
-@@ -148,6 +148,7 @@ required properties:
- - compatible: Should be "atmel,<chip>-sfr", "syscon" or
- 	"atmel,<chip>-sfrbu", "syscon"
-   <chip> can be "sama5d3", "sama5d4" or "sama5d2".
-+  it also can be "microchip,sam9x60-sfr", "syscon".
- - reg: Should contain registers location and length
- 
- 	sfr@f0038000 {
+diff --git a/Documentation/devicetree/bindings/net/macb.txt b/Documentation/devicetree/bindings/net/macb.txt
+index 3e17ac1d5d58..f5c414b10e27 100644
+--- a/Documentation/devicetree/bindings/net/macb.txt
++++ b/Documentation/devicetree/bindings/net/macb.txt
+@@ -3,8 +3,7 @@
+ Required properties:
+ - compatible: Should be "cdns,[<chip>-]{macb|gem}"
+   Use "cdns,at91rm9200-emac" Atmel at91rm9200 SoC.
+-  Use "cdns,at91sam9260-macb" for Atmel at91sam9 SoCs or the 10/100Mbit IP
+-  available on sama5d3 SoCs.
++  Use "cdns,at91sam9260-macb" for Atmel at91sam9 SoCs.
+   Use "cdns,np4-macb" for NP4 SoC devices.
+   Use "cdns,at32ap7000-macb" for other 10/100 usage or use the generic form: "cdns,macb".
+   Use "cdns,pc302-gem" for Picochip picoXcell pc302 and later devices based on
 -- 
 2.17.1
 
