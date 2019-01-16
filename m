@@ -4,67 +4,69 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A28E1C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 02:13:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0DA8BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 02:21:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6A1FD20651
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 02:13:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C96CA20873
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 02:21:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Md7XxtLl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6A1FD20651
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sH+QUXvI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C96CA20873
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=5ho3R1kLEWE5XwyVyo55EryDlzkWWEzr3r8UQZgfXzA=; b=Md7XxtLl8L6Gk6
-	++ZinvrmYEMcKHeNt+UK3F2vn7myStlppqtTKQng2JE2ohU8gvYQ47l0BsNvnUreTGYjD3ckOgCsy
-	9Itj9k1aCEvla9XCXlGO8OzKf/LHT3XHsth0hnldjQB3e6UF+xWtOcVZoBjJYD0APKEzWdF6opkCj
-	/PVuD45/9iWphOjozkXNmE/WtsNXiPlKNzCVmnbdMT4CFxLKYYXoR8WEWlgn3W5MqF5pb4Kfu1QrD
-	S3+sTnHSP2aT33MWCA3HZNnU0VWm3BIeIlUO4d5Wp3jvGYt4+qaTnvRpSlBFh1+NeYzfLlNfQ2bzg
-	oMWtUdgZP6FsrJ9/mDoQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=mT5PiWwJnZSbzdyfwourXV3IibllhN2zPaIz+4VUmRw=; b=sH+QUXvI88eYZK
+	rNuhZ/rxwG+cdYT4BUDedYqmeC96B0XsEV8wzPR6N2N5cRGJ+k6KDU/SFRmubYm/H7kEDBS8l5TGb
+	4241AM3vbnQto/xZcUu48dZYcPd2slt5B7j3e5EorLmJ4gMVxV813GSDmQaKR3sOV5LPOSAzcFj25
+	ChA6xSwUhUhOlxiVSfR4HpZYAw8Ml6x9sx8pBKa3GaHjIZICOJEPhC55MGalnTfBPLFgNEZEFBZRh
+	9slOAVIDJ+zb9z0xnnQI8Ox/hXDLMWp7eaYyv168pNTzTkYK2MM0RPVTi2Of5S45cP1YOX2WPzbCk
+	fJC5nxaMdODOVjoJVlhg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjahc-0003re-S4; Wed, 16 Jan 2019 02:13:12 +0000
+	id 1gjapX-0007Ht-Us; Wed, 16 Jan 2019 02:21:23 +0000
 Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjagv-0003Ar-DW; Wed, 16 Jan 2019 02:12:30 +0000
-X-UUID: 14a149d10bd847c6a858df4525efa65d-20190115
-X-UUID: 14a149d10bd847c6a858df4525efa65d-20190115
+ id 1gjagw-0003Aq-Sr; Wed, 16 Jan 2019 02:12:32 +0000
+X-UUID: a0989456972d44d793f29c747907e80c-20190115
+X-UUID: a0989456972d44d793f29c747907e80c-20190115
 Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw02.mediatek.com
  (envelope-from <ryder.lee@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1693283719; Tue, 15 Jan 2019 18:12:16 -0800
+ with ESMTP id 2071105648; Tue, 15 Jan 2019 18:12:16 -0800
 Received: from mtkmbs08n1.mediatek.inc (172.21.101.55) by
  MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 15 Jan 2019 18:12:14 -0800
+ 15.0.1395.4; Tue, 15 Jan 2019 18:12:15 -0800
 Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
  mtkmbs08n1.mediatek.inc (172.21.101.55) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Wed, 16 Jan 2019 10:12:06 +0800
+ 15.0.1395.4; Wed, 16 Jan 2019 10:12:07 +0800
 Received: from mtkslt306.mediatek.inc (10.21.14.136) by MTKCAS06.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
- Frontend Transport; Wed, 16 Jan 2019 10:12:06 +0800
+ Frontend Transport; Wed, 16 Jan 2019 10:12:07 +0800
 From: Ryder Lee <ryder.lee@mediatek.com>
 To: Marek Vasut <marek.vasut@gmail.com>, Brian Norris
  <computersforpeace@gmail.com>, Boris Brezillon <boris.brezillon@bootlin.com>
-Subject: [PATCH v2 1/3] dt-bindings: mtd: mtk-quadspi: update bindings for
- MT7629 SoC
-Date: Wed, 16 Jan 2019 10:12:03 +0800
-Message-ID: <74d710ed89fd505a49bce53b51f6cb489e313dbb.1547538621.git.ryder.lee@mediatek.com>
+Subject: [PATCH v2 3/3] mtd: spi-nor: mtk-quadspi: rename config to a common
+ one
+Date: Wed, 16 Jan 2019 10:12:05 +0800
+Message-ID: <761c9a0a482795dbc48949e982ab46987b737e08.1547538621.git.ryder.lee@mediatek.com>
 X-Mailer: git-send-email 1.9.1
+In-Reply-To: <74d710ed89fd505a49bce53b51f6cb489e313dbb.1547538621.git.ryder.lee@mediatek.com>
+References: <74d710ed89fd505a49bce53b51f6cb489e313dbb.1547538621.git.ryder.lee@mediatek.com>
 MIME-Version: 1.0
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_181229_506419_E703E677 
-X-CRM114-Status: GOOD (  10.37  )
+X-CRM114-CacheID: sfid-20190115_181230_953956_07BE7251 
+X-CRM114-Status: GOOD (  12.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,35 +87,68 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This updates bindings for the MT7629 SPI-NOR controller.
+The quadspi is a generic communication interface which could be shared
+with other MediaTek SoCs. Hence rename it to a common one.
 
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
-Changes since v2: none.
-Changes since v1: add a Reviewed-by tag. 
----
- Documentation/devicetree/bindings/mtd/mtk-quadspi.txt | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Changes since v2:
+-rebase to v5.0-rc1.
+-sort the config in an alphabetical order.
 
-diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-index 56d3668..a12e3b5 100644
---- a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-+++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-@@ -1,4 +1,4 @@
--* Serial NOR flash controller for MTK MT81xx (and similar)
-+* Serial NOR flash controller for MediaTek SoCs
+Changes since v1: none. 
+---
+ drivers/mtd/spi-nor/Kconfig  | 16 ++++++++--------
+ drivers/mtd/spi-nor/Makefile |  2 +-
+ 2 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/mtd/spi-nor/Kconfig b/drivers/mtd/spi-nor/Kconfig
+index 44fe801..414e887 100644
+--- a/drivers/mtd/spi-nor/Kconfig
++++ b/drivers/mtd/spi-nor/Kconfig
+@@ -7,14 +7,6 @@ menuconfig MTD_SPI_NOR
  
- Required properties:
- - compatible: 	  For mt8173, compatible should be "mediatek,mt8173-nor",
-@@ -10,6 +10,7 @@ Required properties:
- 		  "mediatek,mt2712-nor", "mediatek,mt8173-nor"
- 		  "mediatek,mt7622-nor", "mediatek,mt8173-nor"
- 		  "mediatek,mt7623-nor", "mediatek,mt8173-nor"
-+		  "mediatek,mt7629-nor", "mediatek,mt8173-nor"
- 		  "mediatek,mt8173-nor"
- - reg: 		  physical base address and length of the controller's register
- - clocks: 	  the phandle of the clocks needed by the nor controller
+ if MTD_SPI_NOR
+ 
+-config MTD_MT81xx_NOR
+-	tristate "Mediatek MT81xx SPI NOR flash controller"
+-	depends on HAS_IOMEM
+-	help
+-	  This enables access to SPI NOR flash, using MT81xx SPI NOR flash
+-	  controller. This controller does not support generic SPI BUS, it only
+-	  supports SPI NOR Flash.
+-
+ config MTD_SPI_NOR_USE_4K_SECTORS
+ 	bool "Use small 4096 B erase sectors"
+ 	default y
+@@ -66,6 +58,14 @@ config SPI_HISI_SFC
+ 	help
+ 	  This enables support for hisilicon SPI-NOR flash controller.
+ 
++config SPI_MTK_QUADSPI
++	tristate "MediaTek Quad SPI controller"
++	depends on HAS_IOMEM
++	help
++	  This enables support for the Quad SPI controller in master mode.
++	  This controller does not support generic SPI. It only supports
++	  SPI NOR.
++
+ config SPI_NXP_SPIFI
+ 	tristate "NXP SPI Flash Interface (SPIFI)"
+ 	depends on OF && (ARCH_LPC18XX || COMPILE_TEST)
+diff --git a/drivers/mtd/spi-nor/Makefile b/drivers/mtd/spi-nor/Makefile
+index a552efd..4e4d400 100644
+--- a/drivers/mtd/spi-nor/Makefile
++++ b/drivers/mtd/spi-nor/Makefile
+@@ -4,7 +4,7 @@ obj-$(CONFIG_SPI_ASPEED_SMC)	+= aspeed-smc.o
+ obj-$(CONFIG_SPI_CADENCE_QUADSPI)	+= cadence-quadspi.o
+ obj-$(CONFIG_SPI_FSL_QUADSPI)	+= fsl-quadspi.o
+ obj-$(CONFIG_SPI_HISI_SFC)	+= hisi-sfc.o
+-obj-$(CONFIG_MTD_MT81xx_NOR)    += mtk-quadspi.o
++obj-$(CONFIG_SPI_MTK_QUADSPI)    += mtk-quadspi.o
+ obj-$(CONFIG_SPI_NXP_SPIFI)	+= nxp-spifi.o
+ obj-$(CONFIG_SPI_INTEL_SPI)	+= intel-spi.o
+ obj-$(CONFIG_SPI_INTEL_SPI_PCI)	+= intel-spi-pci.o
 -- 
 1.9.1
 
