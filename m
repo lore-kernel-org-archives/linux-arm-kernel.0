@@ -2,21 +2,22 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0C09BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 21:29:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 06FB6C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 21:31:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CF42420868
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 21:29:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C9EE520840
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 21:31:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GOKM8thm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CF42420868
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Pizc/KkK";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=alien8.de header.i=@alien8.de header.b="Djjg6HJY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C9EE520840
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=alien8.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,42 +25,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pISITbmkTch5RaREsb+TJ9fgd1ijVDwKvIEtBTKNvfc=; b=GOKM8thmxT6SA0
-	ROpX82J6pkFxmlGWqHQ3J2laSdfyDULN/bYVkEYVsfHy51BQaMpq2cpW2C7QR8oLZjqL3Wo0rvJ2z
-	pe7u+ud0HOC5E30IGRAN3xe7A0QpoKK5P8skAKYcpRK4oZYVn+0dd5w/3K62i2n5HQYxBUgUMqqha
-	EE7jwcBQIXnw2tul6q4LXaHy4ZxhzIhaOUGIzPkH62r2J32t4/DzBpbRC+eqI94+eOgGnxpb4U7v9
-	EJq+DN0PL0+Y01Xrqmk/RX08klSc9C2wZqZx/obxlHjawIghXTblyy7bvkLFozxQgPV9e89fc4Cat
-	/+j5dD/i0PtjENtfqzHQ==;
+	List-Owner; bh=Iv+70qMcj+VI20KgMYD8kWBA/0qrZ/g79jchl9uNPFk=; b=Pizc/KkK04y7Qm
+	0+fpbaWecrkTn7ByUFNrZNgkIfKJ5lAdq0pazfMXgIBFXe5BY+ir+8ldv+PvWVYKexTbsvH8/V46O
+	79sR101XEJFO7uUYfRQBZYrE0g4Wohdr6MHjZ+1KptvAOkw25Ie8OrTe2rcPIw+zFP0apN/9lNFa6
+	45ErCP9JOSUON/emuv/Smq0AHgfR4a/PLYahNCRbBULv/KNvVqkJS+Kpks9z/CFYNkfdKc9xNXLZ+
+	kwvcMOEpBwgE4WhMLur/3hvQXnDewKrpoOxhB+HCw/gbovJ7W9OSCcOj48oH8kzIrZ8d53hmBlqHv
+	HvpE8J1zOOpdaK5yXTFQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjskj-0004TE-PK; Wed, 16 Jan 2019 21:29:37 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjskd-0004R8-Sk; Wed, 16 Jan 2019 21:29:34 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 05F3B207AC; Wed, 16 Jan 2019 22:29:26 +0100 (CET)
-Received: from localhost (lfbn-lyo-1-59-119.w86-202.abo.wanadoo.fr
- [86.202.150.119])
- by mail.bootlin.com (Postfix) with ESMTPSA id CFEB0206A6;
- Wed, 16 Jan 2019 22:29:25 +0100 (CET)
-Date: Wed, 16 Jan 2019 22:29:26 +0100
-From: Alexandre Belloni <alexandre.belloni@bootlin.com>
-To: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Subject: Re: [PATCH v5 2/2] rtc: support for the Amlogic Meson RTC
-Message-ID: <20190116212926.GG2627@piout.net>
-References: <20181202220847.24364-1-martin.blumenstingl@googlemail.com>
- <20181202220847.24364-3-martin.blumenstingl@googlemail.com>
- <85aa8e12-0bca-6432-e1a8-0faceff1dd5e@codethink.co.uk>
- <CAFBinCBDUxTc+ofCYm-zEeiFdU90U6DQOkX4B659q=MvRK64fg@mail.gmail.com>
- <CAFBinCAY7+-zA5-hY6oXmFz2i8aj9wFJsb-HBbKt_Swn9BtMMg@mail.gmail.com>
- <CAFBinCCKeb+wGJ4h_PfsT-Ms8AtLmNSwStTpeMqA3shkySjGkg@mail.gmail.com>
+	id 1gjsmK-00064C-V5; Wed, 16 Jan 2019 21:31:16 +0000
+Received: from mail.skyhub.de ([2a01:4f8:190:11c2::b:1457])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gjsmG-00063T-Fl
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 21:31:15 +0000
+Received: from zn.tnic (p200300EC2BC98A005C5A6BB989505731.dip0.t-ipconnect.de
+ [IPv6:2003:ec:2bc9:8a00:5c5a:6bb9:8950:5731])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.skyhub.de (SuperMail on ZX Spectrum 128k) with ESMTPSA id AAC421EC0B59;
+ Wed, 16 Jan 2019 22:31:05 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=alien8.de; s=dkim;
+ t=1547674265;
+ h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+ to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+ content-transfer-encoding:in-reply-to:in-reply-to:  references:references;
+ bh=dtys+NmIRT0opIiV30YuHca9dgjL9piQ9Ytb2fj5jxU=;
+ b=Djjg6HJYlOhSD+E3+wXrjolFDjvW5SAda1VvM2HOvi3ne3/H9lRclElLbz+p+uSMhqO/eP
+ 7aId2l2yD8DEs0NYoWBhzbFijeTlyflPQcG+tgLYy8C041FyF4B/UB1sPw6XVklp6TxJfy
+ sfpED6fu1Di+LMkbAQjdO38TYQXZ+68=
+Date: Wed, 16 Jan 2019 22:30:59 +0100
+From: Borislav Petkov <bp@alien8.de>
+To: Stefan Schaeckeler <schaecsn@gmx.net>
+Subject: Re: [PATCH 1/2] EDAC: Add Aspeed AST2500 EDAC driver
+Message-ID: <20190116213059.GM15409@zn.tnic>
+References: <1545026517-64069-1-git-send-email-schaecsn@gmx.net>
+ <1545026517-64069-2-git-send-email-schaecsn@gmx.net>
+ <20190110095049.GB17621@zn.tnic>
+ <20190115175749.01E3C6E85603@corona.crabdance.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <CAFBinCCKeb+wGJ4h_PfsT-Ms8AtLmNSwStTpeMqA3shkySjGkg@mail.gmail.com>
+In-Reply-To: <20190115175749.01E3C6E85603@corona.crabdance.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_132932_081205_37D510D1 
-X-CRM114-Status: GOOD (  18.06  )
+X-CRM114-CacheID: sfid-20190116_133112_681112_4B346E12 
+X-CRM114-Status: GOOD (  10.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,55 +80,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-rtc@vger.kernel.org, a.zummo@towertech.it, ccaione@baylibre.com,
- linux-kernel@vger.kernel.org, ben.dooks@codethink.co.uk,
- linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ linux-aspeed@lists.ozlabs.org, andrew@aj.id.au, linux-kernel@vger.kernel.org,
+ robh+dt@kernel.org, joel@jms.id.au, sschaeck@cisco.com, mchehab@kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-edac@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 12/01/2019 13:52:00+0100, Martin Blumenstingl wrote:
-> Hi Ben,
+On Tue, Jan 15, 2019 at 09:57:48AM -0800, Stefan Schaeckeler wrote:
+> That's interesting. I did a grep over all 16944 GPL licensed files with an SPDX
+> identifier.
 > 
-> On Tue, Dec 18, 2018 at 12:48 AM Martin Blumenstingl
-> <martin.blumenstingl@googlemail.com> wrote:
-> >
-> > Hi Ben,
-> >
-> > On Wed, Dec 5, 2018 at 11:15 PM Martin Blumenstingl
-> > <martin.blumenstingl@googlemail.com> wrote:
-> > [...]
-> > > > > Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> > > > > [resurrected Ben's patches after 2 years]
-> > > > > Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> > > >
-> > > > Just checking if the change of author is deliberate?
-> > > > not sure how to do >1 author on patches like this.
-> > > I changed the author on purpose after seeing how much I changed
-> > > (compared to your v4). this is also why I added you to the CC list
-> > > however, I left in your copyright (just like you kept Carlo's
-> > > copyright note) and MODULE_AUTHOR
-> > please let me know:
-> > 1. whether you want to be the author of the patch or if you're fine
-> > with my name in there
-> > 2. if you are fine with both of us being listed as Signed-off-by or if
-> > you want me to switch to Co-authored-by
-> > 3. about any other concerns you have
-> >
-> > I would like to update this patch next weekend so it can be reviewed
-> > (and merged once all is fine) for v4.22
-> gentle ping on this one now that the holiday season is over.
+> 785 of them have a license text while 16159 don't.
+
+Goes to show that we're still in the process of converting stuff to SPDX.
+
+> When stripping off aspeed_edac_, some static function names will become quite
+> "bare-bone":
 > 
+> aspeed_edac_init(), aspeed_edac_exit(), aspeed_edac_probe(),
+> aspeed_edac_remove(), aspeed_edac_of_match(), aspeed_edac_isr(),
+> aspeed_edac_config_irq().
 
-I would think you can resend as they are. Or, you could resend v4 from
-Ben and then a patch with your modifications.
+So namespaced function names we normally use for globally visible
+symbols and those are not but only driver-specific. So, for example,
 
+aspeed_edac_config_irq()
+
+is a mouthful, at least to me, and not needed. config_irq(), OTOH, is
+clear at a very quick glance.
+
+The others, aspeed_edac_init(), etc, you could call aspeed_init(),
+aspeed_exit() or so.
+
+But since you're going to be stare at that code, this was just a
+suggestion. Your call. :)
+
+> Does your suggestion also apply to static variables? E.g. aspeed_edac_regmap,
+> aspeed_edac_regmap_config, aspeed_edac_driver? Also, here some variable names
+> would become quite "bare-bone".
+
+Same as above.
+
+HTH.
 
 -- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
 
 _______________________________________________
 linux-arm-kernel mailing list
