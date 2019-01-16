@@ -2,64 +2,70 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.9 required=3.0 tests=DATE_IN_PAST_06_12,
-	DKIMWL_WL_HIGH,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_NEOMUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AEFBAC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 19:18:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8C309C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 19:18:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7BB5920866
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 19:18:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 31E2E20866
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 19:18:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SuDoqKD/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7BB5920866
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iU+X+Afl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 31E2E20866
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=GJeBWrYXgDTfC4scrlx3v9x0WL+xXLTSftfuoCFoGoU=; b=SuDoqKD/lXHDrCgvXR1wE2QWc
-	CXKibjaesTHYS8ZsRuOvS1pB4nAZfFGoNo6fghd3BLUwuAQfvW2kmDGaNDwoNXVstdkTHkwfZR+mH
-	1ccISzqO7wpwdrZwwsoLUlJH3w/S2IBNzBmwDZQObXlfVbOQSqek3mBSQKpxih2Fub4NntrB8zwrV
-	UHrKQSPn5p3M/qjqZvgaMY/gudzkKsfDEvWZeR6W/pcfYUgHGVoF9s4CpPTLjEIOpeLjzlRs3nA21
-	peuxgcInVRFmJ0jnwQGnudEtob+Ljglu1PUgqRGv/n56cEqSYmCrSTkB7uT2ym4Rqin6iIccFui7V
-	cjkQHJ/cw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=bYt0urZ3xvS04xRqPkS21nM0hEifsSy7O4mZV32pzdo=; b=iU+X+AflA6iSPV
+	m7k3REQx/F34i42n9QnAdrDbKmQYbDsFvPQZYA/syBouhweM0K0/RE4Hnsl6wto9VQEtTn2VYFW/1
+	rW56h+0rsCnm3n3d/Fe/RN3k5CxfAN2qjgGWy9fx0rAe1VPjMcS8G9TEbNCoyAvRj0blP5RRudnli
+	5O8VdkJIK6OM5LYPFYttXge1efPjeB2wtObxAL7yX3R7ivgFa7TgBCqyPBPQZf5Gov7qkZ85pSswL
+	jiWoU/3N9yskE2XshHAUC2sxqfarRtYhDMznP0oMGa/FX09hrkWqfz90L5BY2A6OAidFz4g1F+kPN
+	CtUU1WW5pVW/pC2iZdaA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjqhg-0005CW-VM; Wed, 16 Jan 2019 19:18:20 +0000
+	id 1gjqhu-0005Q5-LP; Wed, 16 Jan 2019 19:18:34 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjqhX-00050E-NW
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 19:18:17 +0000
+ id 1gjqhY-00052Q-4B
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 19:18:18 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 69B98209BC; Wed, 16 Jan 2019 20:18:08 +0100 (CET)
+ id CD18F207A3; Wed, 16 Jan 2019 20:18:10 +0100 (CET)
 Received: from localhost (unknown [212.81.177.10])
- by mail.bootlin.com (Postfix) with ESMTPSA id 072E6207B0;
- Wed, 16 Jan 2019 20:17:57 +0100 (CET)
-Date: Wed, 16 Jan 2019 12:11:09 +0100
+ by mail.bootlin.com (Postfix) with ESMTPSA id 760E2207A3;
+ Wed, 16 Jan 2019 20:18:00 +0100 (CET)
+Date: Wed, 16 Jan 2019 20:17:56 +0100
 From: Maxime Ripard <maxime.ripard@bootlin.com>
 To: Jagan Teki <jagan@amarulasolutions.com>
-Subject: Re: [PATCH v5 2/6] media: sun6i: Add mod_rate quirk
-Message-ID: <20190116111109.dkc4zgsz6lcjlzs5@flea>
-References: <20181220125438.11700-1-jagan@amarulasolutions.com>
- <20181220125438.11700-3-jagan@amarulasolutions.com>
- <20181221130025.lbvw7yvy74brf3jn@flea>
- <CAMty3ZCG5cF3tP2mid5xyS=yhtxkY+TOcGkwRkv+vrZt1=0iQg@mail.gmail.com>
- <20190107132929.ksyajmzn2gzr6oep@flea>
- <CAMty3ZAx9MthB0M-eFmsZv9CxF3Z1BkFTU6Hw=ZT5wu6aJwjGQ@mail.gmail.com>
+Subject: Re: [PATCH v5 07/17] drm/sun4i: sun6i_mipi_dsi: Refactor vertical
+ video start delay
+Message-ID: <20190116191756.ajzzaga43srk77dk@flea>
+References: <20181210161729.29720-1-jagan@amarulasolutions.com>
+ <20181210161729.29720-8-jagan@amarulasolutions.com>
+ <20181211164900.wfmkmbrbj3nmlb3h@flea>
+ <CAMty3ZB5F5jD9iJT1soXSA5HtQOf5W9rKO9nCdGFUfVo0hpO4Q@mail.gmail.com>
+ <20190107141158.zaimizk4rlqa6xli@flea>
+ <CAMty3ZBb8byOwh=_W83Ta0Dse1qkoqccOeaBEY9oHPaxDxe9QA@mail.gmail.com>
+ <20190108085829.clianbtjovu3oieq@flea>
+ <CAMty3ZC9OQtwT-iH=S1LhHsBPc_jFKGAnCYYeR9nuKuDWSKLQw@mail.gmail.com>
+ <20190112164319.whr7gwvl4oux5svz@flea>
+ <CAMty3ZD8X9KmHjUtAo-+Y83a2j8NF3DjM9Yr3LPMxOvQ8kOV7g@mail.gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <CAMty3ZAx9MthB0M-eFmsZv9CxF3Z1BkFTU6Hw=ZT5wu6aJwjGQ@mail.gmail.com>
+Content-Disposition: inline
+In-Reply-To: <CAMty3ZD8X9KmHjUtAo-+Y83a2j8NF3DjM9Yr3LPMxOvQ8kOV7g@mail.gmail.com>
 User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_111812_526655_CB3E7203 
-X-CRM114-Status: GOOD (  23.59  )
+X-CRM114-CacheID: sfid-20190116_111812_846700_6A123284 
+X-CRM114-Status: GOOD (  15.13  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,138 +77,67 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- Michael Trimarchi <michael@amarulasolutions.com>,
+Cc: Stephen Boyd <sboyd@kernel.org>,
+ Michael Turquette <mturquette@baylibre.com>,
  linux-sunxi <linux-sunxi@googlegroups.com>,
- linux-kernel <linux-kernel@vger.kernel.org>, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, Yong Deng <yong.deng@magewell.com>,
- Mauro Carvalho Chehab <mchehab@kernel.org>, linux-amarula@amarulasolutions.com,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- linux-media <linux-media@vger.kernel.org>
-Content-Type: multipart/mixed; boundary="===============6120329650346537982=="
+ linux-kernel <linux-kernel@vger.kernel.org>,
+ dri-devel <dri-devel@lists.freedesktop.org>, Chen-Yu Tsai <wens@csie.org>,
+ Michael Trimarchi <michael@amarulasolutions.com>,
+ linux-amarula@amarulasolutions.com, linux-clk <linux-clk@vger.kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
---===============6120329650346537982==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="tme5liorzp5mnfdf"
-Content-Disposition: inline
-
-
---tme5liorzp5mnfdf
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Fri, Jan 11, 2019 at 11:54:12AM +0530, Jagan Teki wrote:
-> On Mon, Jan 7, 2019 at 6:59 PM Maxime Ripard <maxime.ripard@bootlin.com> =
-wrote:
-> > On Mon, Dec 24, 2018 at 08:57:48PM +0530, Jagan Teki wrote:
-> > > On Fri, Dec 21, 2018 at 6:30 PM Maxime Ripard <maxime.ripard@bootlin.=
-com> wrote:
+On Sun, Jan 13, 2019 at 01:07:41AM +0530, Jagan Teki wrote:
+> > > > > > Again, I cannot help you without the datasheet for the panels you're
+> > > > > > trying to submit.
+> > > > >
+> > > > > The panel bound with Sitronix ST7701 IC
+> > > > > http://www.startek-lcd.com/res/starteklcd/pdres/201705/20170512144242904.pdf
 > > > >
-> > > > On Thu, Dec 20, 2018 at 06:24:34PM +0530, Jagan Teki wrote:
-> > > > > Unfortunately default CSI_SCLK rate cannot work properly to
-> > > > > drive the connected sensor interface, particularly on few
-> > > > > Allwinner SoC's like A64.
-> > > > >
-> > > > > So, add mod_rate quirk via driver data so-that the respective
-> > > > > SoC's which require to alter the default mod clock rate can assign
-> > > > > the operating clock rate.
-> > > > >
-> > > > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > > > > ---
-> > > > >  .../platform/sunxi/sun6i-csi/sun6i_csi.c      | 34 +++++++++++++=
-++----
-> > > > >  1 file changed, 28 insertions(+), 6 deletions(-)
-> > > > >
-> > > > > diff --git a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c b=
-/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
-> > > > > index ee882b66a5ea..fe002beae09c 100644
-> > > > > --- a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
-> > > > > +++ b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
-> > > > > @@ -15,6 +15,7 @@
-> > > > >  #include <linux/ioctl.h>
-> > > > >  #include <linux/module.h>
-> > > > >  #include <linux/of.h>
-> > > > > +#include <linux/of_device.h>
-> > > > >  #include <linux/platform_device.h>
-> > > > >  #include <linux/pm_runtime.h>
-> > > > >  #include <linux/regmap.h>
-> > > > > @@ -28,8 +29,13 @@
-> > > > >
-> > > > >  #define MODULE_NAME  "sun6i-csi"
-> > > > >
-> > > > > +struct sun6i_csi_variant {
-> > > > > +     unsigned long                   mod_rate;
-> > > > > +};
-> > > > > +
-> > > > >  struct sun6i_csi_dev {
-> > > > >       struct sun6i_csi                csi;
-> > > > > +     const struct sun6i_csi_variant  *variant;
-> > > > >       struct device                   *dev;
-> > > > >
-> > > > >       struct regmap                   *regmap;
-> > > > > @@ -822,33 +828,43 @@ static int sun6i_csi_resource_request(struc=
-t sun6i_csi_dev *sdev,
-> > > > >               return PTR_ERR(sdev->clk_mod);
-> > > > >       }
-> > > > >
-> > > > > +     if (sdev->variant->mod_rate)
-> > > > > +             clk_set_rate_exclusive(sdev->clk_mod, sdev->variant=
-->mod_rate);
-> > > > > +
-> > > >
-> > > > It still doesn't make any sense to do it in the probe function...
+> > > > It's the controller, not the panel
 > > >
-> > > I'm not sure we discussed about the context wrt probe, we discussed
-> > > about exclusive put clock.
+> > > As I said before, the datasheet of that panel doesn't have any
+> > > information except electrical characteristics and used IC which is
+> > > ST7701.
+> > >
+> > > I have one more panel, which is from Bananapi, S070WV20-CT16 ICN621
+> > > please find the attachment for the same.
+> > >
+> > > Here is some more details of the same.
+> > >
+> > > https://github.com/yesnoandor/x300/blob/master/kernel/arch/arm/boot/dts/erobbing/x300/x300.dtsi#L81
+> > > https://github.com/wxzed/Raspberry_5MIPI_Display/blob/master/I2C_Slave/USER/main.c#L15
+> > >
+> > > https://github.com/eliot-shao/qcom/blob/master/icn6211_cxn0102/kernel/drivers/video/msm/mdss/mdss_i2c_interface.c#L152
+> > > matches timings for
+> > > https://github.com/eliot-shao/qcom/blob/master/icn6211_cxn0102/kernel/arch/arm/boot/dts/qcom/dsi-mipi-2-rgb_1280p_video.dtsi#L20
+> > >
+> > > https://github.com/zestroly/micromat/blob/master/test/raspberry/ICN6211.cpp#L169
 > >
-> > https://lkml.org/lkml/2018/12/18/584
-> >
-> > "Doing it here is not really optimal either, since you'll put a
-> > constraint on the system (maintaining that clock at 300MHz), while
-> > it's not in use."
->=20
-> But this constraint is only set, for SoC's who need mod_rate change
-> not for whole SoCs.
+> > Where did you get the timings from then?
+> 
+> You mean drm_mode timings, the same panel with RGB available in
+> panel-simple[1], and dsi driver in Mailing list[2] and actual DSI
+> sequence commands from BSP[3]
+> 
+> [1] https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/drivers/gpu/drm/panel/panel-simple.c?id=7ad8b41cd8f5c2842646d01cdd576663caee04a7
+> [2] https://patchwork.kernel.org/patch/10680331/
+> [3] https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/lcd/S070WV20_MIPI_RGB.c
 
-Still, that constraint is there for the whole system on affected
-SoCs. Whether it applies to one SoC or not is not really relevant.
+So you had no reliable source for the timings then? How do you know if
+all your patches that are timing related are right then?
 
 Maxime
 
---=20
+-- 
 Maxime Ripard, Bootlin
 Embedded Linux and Kernel engineering
 https://bootlin.com
-
---tme5liorzp5mnfdf
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXD8RTQAKCRDj7w1vZxhR
-xT6tAP9ZNf6d/5D7t2bcICJ3jps6qwA+vv4bM33AM2BI06aZLAD+KZ2PMgd+ZQfT
-8/d8btb5HBoo3QhQK+Rj9Zp4LlU5fQc=
-=xBGo
------END PGP SIGNATURE-----
-
---tme5liorzp5mnfdf--
-
-
---===============6120329650346537982==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============6120329650346537982==--
-
