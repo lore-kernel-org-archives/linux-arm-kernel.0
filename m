@@ -2,67 +2,64 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B453FC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 11:29:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1FFC7C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 11:32:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 84766206C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 11:29:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C8F6E206C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 11:32:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GPa13xOL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 84766206C2
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XjznuYAO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C8F6E206C2
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=HIp0IGsVUOmZXsGCMfsHHj3mp4Vhn63lx9hKLSbgCfw=; b=GPa13xOLo1yR2R65EhTjWt9S5o
-	2wVzNQXDh8GJdN6LgVZQTIcWpTBPA1uY/vSGhnY2kYHyFSXwdeeQ2NWL5q4j8458eiXywNdHSHMeK
-	CcyIF1TPY3F5RqSkQUzwqVywILZsmX+I1q/puB48s1jdliZ1r3gyKHPvWnQ51tOjTDiw7DPGzhxER
-	6ANQlmeRm6ybv1AVOGHH/81PZ2Uu3xX7XC7L/dKy1EYchxa9lwBLRXNJj3Be8CZkld4VPUWbMlakN
-	cdPNq3QJUKANRlUECuwEmJxhfodgPZbRKlFqtM8vRBE4br85CcuoW8RhiHPkZ72ES8uYqnDhm2fG0
-	CTWMIb8A==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=szT90Gl3coUXx14nQrgN2wMsRkMkTcohx74fvwTf180=; b=XjznuYAO5v8ONn
+	ZOCXCWhDZuE20+YLFi8u50yHFpON6W/OJ6Pkays1HJ2D2Zwqg1DSN7AnlCMIBnVeu0Fx4RfBdtdph
+	xY7dehUPJUDJ47NAtf2RQb2BhgxRON27r6eUQ5mHmpAK4Y6VMJ7MYNdLUtJ/Peuo1/P794g/AjPMG
+	/JbwPIvEaDhZP3eROGZSmhMT9ZYPJPVQFa7C3bevWzLjfyQJ4TA+5GDhY+IrdWyFRaoxcdVXIvpCj
+	Hcm/PUk355fhxl9p/lxMi95IAREsfkY4wCp7M8YlS2vpbEOxxU34Dbs5MIzyNiyqz+9CHJjA0mcFh
+	T8EjFa1iB2PtITnzfecg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjjO3-0004bq-El; Wed, 16 Jan 2019 11:29:35 +0000
-Received: from inva021.nxp.com ([92.121.34.21])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjjNz-0004bR-VO
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 11:29:33 +0000
-Received: from inva021.nxp.com (localhost [127.0.0.1])
- by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 847BB2000BB;
- Wed, 16 Jan 2019 12:29:30 +0100 (CET)
-Received: from inva024.eu-rdc02.nxp.com (inva024.eu-rdc02.nxp.com
- [134.27.226.22])
- by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 77A3C200046;
- Wed, 16 Jan 2019 12:29:30 +0100 (CET)
-Received: from fsr-ub1864-101.ea.freescale.net
- (fsr-ub1864-101.ea.freescale.net [10.171.82.46])
- by inva024.eu-rdc02.nxp.com (Postfix) with ESMTP id DAC532060F;
- Wed, 16 Jan 2019 12:29:29 +0100 (CET)
-From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
-To: linux-i2c@vger.kernel.org, linux-imx@nxp.com, shawnguo@kernel.org,
- s.hauer@pengutronix.de, kernel@pengutronix.de, wsa@the-dreams.de
-Subject: [PATCH v2 2/2] i2c: imx: defer probing on dma channel request
-Date: Wed, 16 Jan 2019 13:28:55 +0200
-Message-Id: <20190116112855.13824-2-laurentiu.tudor@nxp.com>
-X-Mailer: git-send-email 2.17.1
-In-Reply-To: <20190116112855.13824-1-laurentiu.tudor@nxp.com>
-References: <20190116112855.13824-1-laurentiu.tudor@nxp.com>
-X-Virus-Scanned: ClamAV using ClamSMTP
+	id 1gjjQy-0006Kt-Uh; Wed, 16 Jan 2019 11:32:36 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gjjQv-0006KT-8D
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 11:32:34 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id ECE6AA78;
+ Wed, 16 Jan 2019 03:32:30 -0800 (PST)
+Received: from fuggles.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 0B7F73F5AF;
+ Wed, 16 Jan 2019 03:32:29 -0800 (PST)
+Date: Wed, 16 Jan 2019 11:32:27 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Subject: Re: [PATCH] arm64: kaslr: ensure randomized quantities are clean to
+ the PoC
+Message-ID: <20190116113227.GB11240@fuggles.cambridge.arm.com>
+References: <20190115194707.11614-1-ard.biesheuvel@linaro.org>
+ <CAKv+Gu_BZZVNj9scfwfuEmbPD93oyBGjs08raLgD7dQ9+3B7Fw@mail.gmail.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <CAKv+Gu_BZZVNj9scfwfuEmbPD93oyBGjs08raLgD7dQ9+3B7Fw@mail.gmail.com>
+User-Agent: Mutt/1.11.1+86 (6f28e57d73f2) ()
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_032932_197005_2E3B32BC 
-X-CRM114-Status: GOOD (  11.14  )
+X-CRM114-CacheID: sfid-20190116_033233_293887_17289F23 
+X-CRM114-Status: GOOD (  20.19  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,87 +71,74 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: fabio.estevam@nxp.com, Laurentiu Tudor <laurentiu.tudor@nxp.com>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- leoyang.li@nxp.com
-MIME-Version: 1.0
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-If the dma controller is not yet probed, defer i2c probe.
-The error path in probe was slightly modified (no functional change)
-to avoid triggering this WARN_ON():
-"cg-pll0-div1 already disabled
-WARNING: CPU: 1 PID: 1 at drivers/clk/clk.c:828 clk_core_disable+0xa8/0xb0"
+Hi Ard,
 
-Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
----
-Changes in v2:
- - rebased on latest i2c tree
- - fix small error introduced by a previous commit (first patch)
+On Tue, Jan 15, 2019 at 09:12:41PM +0100, Ard Biesheuvel wrote:
+> On Tue, 15 Jan 2019 at 20:47, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> >
+> > kaslr_early_init() is called with the kernel mapped at its
+> > link time offset, and if it returns with a non-zero offset,
+> > the kernel is unmapped and remapped again at the randomized
+> > offset.
+> >
+> > During its execution, kaslr_early_init() also randomizes the
+> > base of the module region and of the linear mapping of DRAM,
+> > and sets two variables accordingly. However, since these
+> > variables are assigned with the caches on, they may get lost
+> > during the cache maintenance that occurs when unmapping and
+> > remapping the kernel, so ensure that these values are cleaned
+> > to the PoC.
+> >
+> > Fixes: f80fb3a3d508 ("arm64: add support for kernel ASLR")
+> > Cc: <stable@vger.kernel.org> # v4.6+
+> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> 
+> On an affected kernel build, I see the following variables sharing the
+> same 64-byte cacheline
+> 
+> ffff00001100bd18 R module_alloc_base
+> ffff00001100bd20 R memstart_addr
+> ffff00001100bd28 R arm64_dma_phys_limit
+> ffff00001100bd30 R kimage_voffset
+> ffff00001100bd38 R vabits_user
+> 
+> and we now have the following code in head.S (line 330)
+> 
+> adr_l x6, vabits_user
+> str x5, [x6]
+> dmb sy
+> dc ivac, x6 // Invalidate potentially stale cache line
+> 
+> which is invoked after kaslr_early_init() returns.
 
- drivers/i2c/busses/i2c-imx.c | 21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
+Urgh, this is hideous. Well done for debugging it! It would be nice to make
+this less fragile in future, perhaps by annotating the variable declarations
+and ensuring they're padded to the CWG etc so that we avoid any false
+sharing and make it very obvious what's going to be invalidated. We already
+have .mmuoff.data.write for data written with the MMU off.
 
-diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
-index 42fed40198a0..4e34b1572756 100644
---- a/drivers/i2c/busses/i2c-imx.c
-+++ b/drivers/i2c/busses/i2c-imx.c
-@@ -1111,7 +1111,8 @@ static int i2c_imx_probe(struct platform_device *pdev)
- 				pdev->name, i2c_imx);
- 	if (ret) {
- 		dev_err(&pdev->dev, "can't claim irq %d\n", irq);
--		goto clk_disable;
-+		clk_disable_unprepare(i2c_imx->clk);
-+		return ret;
- 	}
- 
- 	/* Init queue */
-@@ -1161,19 +1162,25 @@ static int i2c_imx_probe(struct platform_device *pdev)
- 	pm_runtime_mark_last_busy(&pdev->dev);
- 	pm_runtime_put_autosuspend(&pdev->dev);
- 
-+	/* Init DMA config if supported */
-+	ret = i2c_imx_dma_request(i2c_imx, phy_addr);
-+	if (ret) {
-+		if (ret != -EPROBE_DEFER)
-+			dev_info(&pdev->dev, "can't use DMA, using PIO instead.\n");
-+		else
-+			goto del_adapter;
-+	}
-+
- 	dev_dbg(&i2c_imx->adapter.dev, "claimed irq %d\n", irq);
- 	dev_dbg(&i2c_imx->adapter.dev, "device resources: %pR\n", res);
- 	dev_dbg(&i2c_imx->adapter.dev, "adapter name: \"%s\"\n",
- 		i2c_imx->adapter.name);
- 
--	/* Init DMA config if supported */
--	ret = i2c_imx_dma_request(i2c_imx, phy_addr);
--	if (ret < 0)
--		goto clk_notifier_unregister;
--
- 	dev_info(&i2c_imx->adapter.dev, "IMX I2C adapter registered\n");
- 	return 0;   /* Return OK */
- 
-+del_adapter:
-+	i2c_del_adapter(&i2c_imx->adapter);
- clk_notifier_unregister:
- 	clk_notifier_unregister(i2c_imx->clk, &i2c_imx->clk_change_nb);
- rpm_disable:
-@@ -1182,8 +1189,6 @@ static int i2c_imx_probe(struct platform_device *pdev)
- 	pm_runtime_set_suspended(&pdev->dev);
- 	pm_runtime_dont_use_autosuspend(&pdev->dev);
- 
--clk_disable:
--	clk_disable_unprepare(i2c_imx->clk);
- 	return ret;
- }
- 
--- 
-2.17.1
+I'm happy to take your patch to plug the regression, but I think we should
+aim to remove the false sharing rather than handling it. Another alternative
+might be to use clean+invalidate instead of invalidate in head.S, along the
+lines of:
 
+	DC CIVAC,	X0
+	DMB		SY
+	STR		X1, [X0]
+	DMB		SY
+	DC CIVAC,	X0
+
+Can you foresee any issues with that?
+
+Will
 
 _______________________________________________
 linux-arm-kernel mailing list
