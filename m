@@ -2,75 +2,113 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 80B32C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 15:18:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 32DC1C43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 15:19:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 51A9F20675
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 15:18:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 00711205C9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 15:19:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B/RzBcaG";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="JkSu1+jT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 51A9F20675
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YLv+lIVh";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=renesasgroup.onmicrosoft.com header.i=@renesasgroup.onmicrosoft.com header.b="nOl7yNlP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 00711205C9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=renesas.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1jQhxvxYFx90bJdHMrkQHUd312X/Ii4A2jENCt6k+Do=; b=B/RzBcaGqKXjPT
-	Nb2CpuslSuBTVwSm5x3X6N7t6fFX060eTF87MwD+QlmRcylribZFxyQ+9RsvDVtNZBXX7FSST4hrF
-	qbmU66SKPECODOuA0sG0N62pXo/lPYDX5U7izh+luWzv47pC2H2nBfoy9Kjj2+LyGx2btoYruVC2x
-	dzj4PgGOKp8pKWkqXHw4cPA4Txz2TgPGfBwXmOH5BigW+9Jr2Y3NQQ9Fz6l/WodlpSHc56FwWHiFB
-	PHzYTt3D5f6JDAKsZuc6zEXLZb8hKP6lW3fJC7hleBpfPJm8IIUYskAKVmoXpBAhcVRIRA3gHUfUa
-	Z6oaqY98ZofX0SdU0lBg==;
+	List-Owner; bh=CS8reHxp09eODWTAzakCD0iD9y6Qu+nqyAIXeA32ncA=; b=YLv+lIVhpMlIuU
+	LuGb5c0CbdNFDCjSEPE7kuy85l7zxB3XmEAt2ra6AbVxzE2pmM9XhzR/8cMBCSq+kHxRk42gUqKWw
+	rfFLsQ0jxjChHV7GtI8WTiriG+pNNHQIle6yjtJp3JTjgLW5agPfyHB4nH5WhgEoKC/IZLsRuNB7i
+	Mv8qWNhohjAge60iHicZfw7WxiQ4WEuFDajh5zjFE1XsRD5DCryKlQZQyRLiECV6gUqfBnYc13HWu
+	Wz3VwSw6WO9wFBjEIi1h523U2EqxXB6H4N8vJ+dsvq0blL7iGbx9CGpZFYW4uQuRGn9O74Oa6Vxrg
+	Yj0FdL1MUdEkzlU+7H5g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjmxn-00049d-Qb; Wed, 16 Jan 2019 15:18:43 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gjmy7-0004TH-5n; Wed, 16 Jan 2019 15:19:03 +0000
+Received: from mail-eopbgr1400094.outbound.protection.outlook.com
+ ([40.107.140.94] helo=JPN01-TY1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjmxi-000493-IZ; Wed, 16 Jan 2019 15:18:41 +0000
-Received: from mail-qt1-f175.google.com (mail-qt1-f175.google.com
- [209.85.160.175])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 170452146F;
- Wed, 16 Jan 2019 15:18:38 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1547651918;
- bh=b4Eql+8wNKqBmh8BvWalk13WRrshCh12iUx8UsuWK8E=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=JkSu1+jTgn8E6t9MsNAnVaKD542EI651VmqHCGoshYwXnBBh1Lk4VrjRnusOGHfjF
- dMHZN9BAfRUrprOjsJBF2DV/Js0SKnxUu+30qQlTIqIHMVHJzTzLFPIX8h2Oo6urIG
- XuM4lN+kX4uKamkzA57JhDOzTJ3RCArAzIERcaOQ=
-Received: by mail-qt1-f175.google.com with SMTP id t33so7508838qtt.4;
- Wed, 16 Jan 2019 07:18:38 -0800 (PST)
-X-Gm-Message-State: AJcUukc97vIjp5R/Ry0YKrhtL6VvcTb0nPx8oye2CWaQFHbRXmR73Up+
- KxLfsC7aN+IQCRZ7RK9UnxZaT7bYThaG6tHepQ==
-X-Google-Smtp-Source: ALg8bN6Aerzng9MYdYFtGlC2Vm/MJ3dRnLBf8aQMtjzVS1FyEWvF4taDPm9ofb5/nWrfOp6wvev0h6PuNyNEHftwz5w=
-X-Received: by 2002:aed:3ecf:: with SMTP id o15mr7523514qtf.26.1547651916185; 
- Wed, 16 Jan 2019 07:18:36 -0800 (PST)
+ id 1gjmxt-0004B8-Aq
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 15:18:59 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=renesasgroup.onmicrosoft.com; s=selector1-renesas-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=WA+sW76ngWkgHuRQ/PbGwznsOWkwRzFqMDxyjNIa9N0=;
+ b=nOl7yNlP2zkWX7NDjyYmlh18oEzmRrhR6/HiXUzw5rAKOF1of2a+M9n+1K8OwIFYaRl/6iafq8MT6DqTwVcFO5gkdzSRNcdwWvukK6/s8xfKJc6N4YBO5KvAff6ZddZytd7Ddb72tM+TWAgotLwCX0Fw4mcl5HIFfXmrSt40yQg=
+Received: from TY1PR01MB1769.jpnprd01.prod.outlook.com (52.133.163.146) by
+ TY1PR01MB1563.jpnprd01.prod.outlook.com (52.133.162.19) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1516.14; Wed, 16 Jan 2019 15:18:42 +0000
+Received: from TY1PR01MB1769.jpnprd01.prod.outlook.com
+ ([fe80::84f5:1420:6fb3:ea62]) by TY1PR01MB1769.jpnprd01.prod.outlook.com
+ ([fe80::84f5:1420:6fb3:ea62%4]) with mapi id 15.20.1537.018; Wed, 16 Jan 2019
+ 15:18:42 +0000
+From: Phil Edworthy <phil.edworthy@renesas.com>
+To: Andy Shevchenko <andriy.shevchenko@linux.intel.com>, Michael Turquette
+ <mturquette@baylibre.com>, =?iso-8859-1?Q?Uwe_Kleine-K=F6nig?=
+ <u.kleine-koenig@pengutronix.de>, Stephen Boyd <sboyd@kernel.org>, Russell
+ King <linux@armlinux.org.uk>, Geert Uytterhoeven <geert@linux-m68k.org>
+Subject: RE: [PATCH v9 1/2] clk: Add comment about __of_clk_get_by_name()
+ error values
+Thread-Topic: [PATCH v9 1/2] clk: Add comment about __of_clk_get_by_name()
+ error values
+Thread-Index: AQHUivk3i4Y+f5/feUuqUWNTx+pZGqVtAtEAgASlWYCAQJ6ToA==
+Date: Wed, 16 Jan 2019 15:18:42 +0000
+Message-ID: <TY1PR01MB17690EDAC0E4B637FF7A81DBF5820@TY1PR01MB1769.jpnprd01.prod.outlook.com>
+References: <20181203111309.3709-1-phil.edworthy@renesas.com>
+ <20181203111309.3709-2-phil.edworthy@renesas.com>
+ <20181203133040.GN10650@smile.fi.intel.com>
+ <TY1PR01MB1769B12A216ED3E76A40A6B7F5A90@TY1PR01MB1769.jpnprd01.prod.outlook.com>
+In-Reply-To: <TY1PR01MB1769B12A216ED3E76A40A6B7F5A90@TY1PR01MB1769.jpnprd01.prod.outlook.com>
+Accept-Language: en-GB, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=phil.edworthy@renesas.com; 
+x-originating-ip: [193.141.220.21]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; TY1PR01MB1563;
+ 20:8ynzqdDimtoOX088lqVenoRUjZ1U9th2NtVpo/N4I+jkn4V0/7OUZ5YkLBzsryuw/WLEP9UABs3xeePPJ20fY2ylk5L3Yqi5X2ovR4SwRL7ctBDRwBG7dDU0S66qR5iBNpsoZqGvmhaDr5mlhUDn5HO2a2EaTXEscM5Q7Se95Xk=
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: 0187b540-9eb6-42cd-1a18-08d67bc5e6a6
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(5600109)(711020)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:TY1PR01MB1563; 
+x-ms-traffictypediagnostic: TY1PR01MB1563:
+x-microsoft-antispam-prvs: <TY1PR01MB1563CFC6C0C4BA53815B52F4F5820@TY1PR01MB1563.jpnprd01.prod.outlook.com>
+x-forefront-prvs: 091949432C
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10019020)(39860400002)(346002)(376002)(396003)(136003)(366004)(13464003)(189003)(199004)(51914003)(53936002)(9686003)(55016002)(8676002)(476003)(2906002)(6306002)(6246003)(86362001)(66066001)(14454004)(6436002)(186003)(93886005)(53546011)(446003)(66574012)(305945005)(8936002)(6506007)(26005)(102836004)(7696005)(7736002)(76176011)(68736007)(11346002)(81156014)(81166006)(74316002)(5660300001)(110136005)(33656002)(6116002)(54906003)(71200400001)(44832011)(3846002)(316002)(106356001)(99286004)(4326008)(71190400001)(14444005)(25786009)(486006)(478600001)(97736004)(229853002)(105586002)(256004);
+ DIR:OUT; SFP:1102; SCL:1; SRVR:TY1PR01MB1563;
+ H:TY1PR01MB1769.jpnprd01.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: renesas.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: WkvkZUSjBLjL4wr8bNm+lHttIu4rmtzg7LLZXd7W+55f+cvMoUZcqVfncDeOoWGJgca8pPCY6FkDN+VDfBNIUu5a0qoTWzcDv9C8p5fXQI/TvYA7EF8B7z/xMbcB18wmrosMre6kLdCkqpthDu6NHlVRDT+YmQUujDmS301RRkYnr+Iye0qIJmuegH2Tna//VsmU2teAE1UPFBYN/C7+hSCKFp4EzYj3MMlcocxDAcWVoPosdzEBTrsam3+92xDLt8AbMFy6yY849gmzoaqGlyuuHU2zpdnEhlAwWhxEtvDqceQIqj/e0JR9JxOQh/4SAFfsmcCmfZzWp/I7eN0bX7yWYAjWhpcYbGxAND6KKeI3BJZqTRAC6PDC495F8DCbAXA5CmCevQ1cumU4IP4EG53tZ4LzhwLUSLooVYU6VYg=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-References: <1547646261-32535-1-git-send-email-rppt@linux.ibm.com>
- <1547646261-32535-20-git-send-email-rppt@linux.ibm.com>
-In-Reply-To: <1547646261-32535-20-git-send-email-rppt@linux.ibm.com>
-From: Rob Herring <robh+dt@kernel.org>
-Date: Wed, 16 Jan 2019 09:18:24 -0600
-X-Gmail-Original-Message-ID: <CAL_JsqJv=+SQwmbwuw1C5Rv9sFHhk4SiP=Z_cKJu3HG5kdwhrg@mail.gmail.com>
-Message-ID: <CAL_JsqJv=+SQwmbwuw1C5Rv9sFHhk4SiP=Z_cKJu3HG5kdwhrg@mail.gmail.com>
-Subject: Re: [PATCH 19/21] treewide: add checks for the return value of
- memblock_alloc*()
-To: Mike Rapoport <rppt@linux.ibm.com>
+X-OriginatorOrg: renesas.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 0187b540-9eb6-42cd-1a18-08d67bc5e6a6
+X-MS-Exchange-CrossTenant-originalarrivaltime: 16 Jan 2019 15:18:42.5621 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 53d82571-da19-47e4-9cb4-625a166a4a2a
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: TY1PR01MB1563
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_071840_162959_4D39D4F8 
-X-CRM114-Status: GOOD (  16.19  )
+X-CRM114-CacheID: sfid-20190116_071850_084378_F2CCBA9D 
+X-CRM114-Status: GOOD (  21.11  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,138 +120,85 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rich Felker <dalias@libc.org>, linux-ia64@vger.kernel.org,
- devicetree@vger.kernel.org, Catalin Marinas <catalin.marinas@arm.com>,
- Heiko Carstens <heiko.carstens@de.ibm.com>, x86@kernel.org,
- linux-mips@vger.kernel.org, Max Filippov <jcmvbkbc@gmail.com>,
- Guo Ren <guoren@kernel.org>, sparclinux@vger.kernel.org,
- Christoph Hellwig <hch@lst.de>, linux-s390@vger.kernel.org,
- linux-c6x-dev@linux-c6x.org, Yoshinori Sato <ysato@users.sourceforge.jp>,
- Richard Weinberger <richard@nod.at>, SH-Linux <linux-sh@vger.kernel.org>,
- Russell King <linux@armlinux.org.uk>, kasan-dev@googlegroups.com,
- Geert Uytterhoeven <geert@linux-m68k.org>, Mark Salter <msalter@redhat.com>,
- Dennis Zhou <dennis@kernel.org>, Matt Turner <mattst88@gmail.com>,
- arcml <linux-snps-arc@lists.infradead.org>,
- "moderated list:H8/300 ARCHITECTURE" <uclinux-h8-devel@lists.sourceforge.jp>,
- Petr Mladek <pmladek@suse.com>, linux-xtensa@linux-xtensa.org,
- linux-alpha@vger.kernel.org, linux-um@lists.infradead.org,
- linux-m68k@lists.linux-m68k.org, Openrisc <openrisc@lists.librecores.org>,
- Greentime Hu <green.hu@gmail.com>, xen-devel@lists.xenproject.org,
- Stafford Horne <shorne@gmail.com>, Guan Xuetao <gxt@pku.edu.cn>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>, Michal Simek <monstr@monstr.eu>,
- Tony Luck <tony.luck@intel.com>, linux-mm@kvack.org,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Linux USB List <linux-usb@vger.kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Paul Burton <paul.burton@mips.com>, Vineet Gupta <vgupta@synopsys.com>,
- Michael Ellerman <mpe@ellerman.id.au>,
- Andrew Morton <akpm@linux-foundation.org>,
- linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
- "David S. Miller" <davem@davemloft.net>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 16, 2019 at 7:46 AM Mike Rapoport <rppt@linux.ibm.com> wrote:
->
-> Add check for the return value of memblock_alloc*() functions and call
-> panic() in case of error.
-> The panic message repeats the one used by panicing memblock allocators with
-> adjustment of parameters to include only relevant ones.
->
-> The replacement was mostly automated with semantic patches like the one
-> below with manual massaging of format strings.
->
-> @@
-> expression ptr, size, align;
-> @@
-> ptr = memblock_alloc(size, align);
-> + if (!ptr)
-> +       panic("%s: Failed to allocate %lu bytes align=0x%lx\n", __func__,
-> size, align);
->
-> Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
-> ---
->  arch/alpha/kernel/core_cia.c              |  3 +++
->  arch/alpha/kernel/core_marvel.c           |  6 ++++++
->  arch/alpha/kernel/pci-noop.c              | 11 ++++++++++-
->  arch/alpha/kernel/pci.c                   | 11 ++++++++++-
->  arch/alpha/kernel/pci_iommu.c             | 12 ++++++++++++
->  arch/arc/mm/highmem.c                     |  4 ++++
->  arch/arm/kernel/setup.c                   |  6 ++++++
->  arch/arm/mm/mmu.c                         | 14 +++++++++++++-
->  arch/arm64/kernel/setup.c                 |  9 ++++++---
->  arch/arm64/mm/kasan_init.c                | 10 ++++++++++
->  arch/c6x/mm/dma-coherent.c                |  4 ++++
->  arch/c6x/mm/init.c                        |  3 +++
->  arch/csky/mm/highmem.c                    |  5 +++++
->  arch/h8300/mm/init.c                      |  3 +++
->  arch/m68k/atari/stram.c                   |  4 ++++
->  arch/m68k/mm/init.c                       |  3 +++
->  arch/m68k/mm/mcfmmu.c                     |  6 ++++++
->  arch/m68k/mm/motorola.c                   |  9 +++++++++
->  arch/m68k/mm/sun3mmu.c                    |  6 ++++++
->  arch/m68k/sun3/sun3dvma.c                 |  3 +++
->  arch/microblaze/mm/init.c                 |  8 ++++++--
->  arch/mips/cavium-octeon/dma-octeon.c      |  3 +++
->  arch/mips/kernel/setup.c                  |  3 +++
->  arch/mips/kernel/traps.c                  |  3 +++
->  arch/mips/mm/init.c                       |  5 +++++
->  arch/nds32/mm/init.c                      | 12 ++++++++++++
->  arch/openrisc/mm/ioremap.c                |  8 ++++++--
->  arch/powerpc/kernel/dt_cpu_ftrs.c         |  5 +++++
->  arch/powerpc/kernel/pci_32.c              |  3 +++
->  arch/powerpc/kernel/setup-common.c        |  3 +++
->  arch/powerpc/kernel/setup_64.c            |  4 ++++
->  arch/powerpc/lib/alloc.c                  |  3 +++
->  arch/powerpc/mm/hash_utils_64.c           |  3 +++
->  arch/powerpc/mm/mmu_context_nohash.c      |  9 +++++++++
->  arch/powerpc/mm/pgtable-book3e.c          | 12 ++++++++++--
->  arch/powerpc/mm/pgtable-book3s64.c        |  3 +++
->  arch/powerpc/mm/pgtable-radix.c           |  9 ++++++++-
->  arch/powerpc/mm/ppc_mmu_32.c              |  3 +++
->  arch/powerpc/platforms/pasemi/iommu.c     |  3 +++
->  arch/powerpc/platforms/powermac/nvram.c   |  3 +++
->  arch/powerpc/platforms/powernv/opal.c     |  3 +++
->  arch/powerpc/platforms/powernv/pci-ioda.c |  8 ++++++++
->  arch/powerpc/platforms/ps3/setup.c        |  3 +++
->  arch/powerpc/sysdev/msi_bitmap.c          |  3 +++
->  arch/s390/kernel/setup.c                  | 13 +++++++++++++
->  arch/s390/kernel/smp.c                    |  5 ++++-
->  arch/s390/kernel/topology.c               |  6 ++++++
->  arch/s390/numa/mode_emu.c                 |  3 +++
->  arch/s390/numa/numa.c                     |  6 +++++-
->  arch/s390/numa/toptree.c                  |  8 ++++++--
->  arch/sh/mm/init.c                         |  6 ++++++
->  arch/sh/mm/numa.c                         |  4 ++++
->  arch/um/drivers/net_kern.c                |  3 +++
->  arch/um/drivers/vector_kern.c             |  3 +++
->  arch/um/kernel/initrd.c                   |  2 ++
->  arch/um/kernel/mem.c                      | 16 ++++++++++++++++
->  arch/unicore32/kernel/setup.c             |  4 ++++
->  arch/unicore32/mm/mmu.c                   | 15 +++++++++++++--
->  arch/x86/kernel/acpi/boot.c               |  3 +++
->  arch/x86/kernel/apic/io_apic.c            |  5 +++++
->  arch/x86/kernel/e820.c                    |  3 +++
->  arch/x86/platform/olpc/olpc_dt.c          |  3 +++
->  arch/x86/xen/p2m.c                        | 11 +++++++++--
->  arch/xtensa/mm/kasan_init.c               |  4 ++++
->  arch/xtensa/mm/mmu.c                      |  3 +++
->  drivers/clk/ti/clk.c                      |  3 +++
->  drivers/macintosh/smu.c                   |  3 +++
->  drivers/of/fdt.c                          |  8 +++++++-
->  drivers/of/unittest.c                     |  8 +++++++-
+Hi,
 
-Acked-by: Rob Herring <robh@kernel.org>
+Any other comments on this patch and patch 2/2 (https://lkml.org/lkml/2018/=
+12/3/326)?
 
->  drivers/xen/swiotlb-xen.c                 |  7 +++++--
->  kernel/power/snapshot.c                   |  3 +++
->  lib/cpumask.c                             |  3 +++
->  mm/kasan/init.c                           | 10 ++++++++--
->  mm/sparse.c                               | 19 +++++++++++++++++--
->  74 files changed, 415 insertions(+), 29 deletions(-)
+Thanks
+Phil
+
+> -----Original Message-----
+> From: Phil Edworthy
+> Sent: 06 December 2018 12:31
+> To: 'Andy Shevchenko' <andriy.shevchenko@linux.intel.com>
+> Cc: Michael Turquette <mturquette@baylibre.com>; Stephen Boyd
+> <sboyd@kernel.org>; Russell King <linux@armlinux.org.uk>; Geert
+> Uytterhoeven <geert@linux-m68k.org>; Uwe Kleine-K=F6nig <u.kleine-
+> koenig@pengutronix.de>; linux-clk@vger.kernel.org; linux-
+> kernel@vger.kernel.org; linux-arm-kernel@lists.infradead.org
+> Subject: RE: [PATCH v9 1/2] clk: Add comment about
+> __of_clk_get_by_name() error values
+> =
+
+> Hi Andy,
+> =
+
+> On 03 December 2018 13:31 Andy Shevchenko wrote:
+> > On Mon, Dec 03, 2018 at 11:13:08AM +0000, Phil Edworthy wrote:
+> > > It's not immediately obvious from the code that failure to get a
+> > > clock provider can return either -ENOENT or -EINVAL. Therefore, add
+> > > a comment to highlight this.
+> >
+> > > +/*
+> > > + * Beware the return values when np is valid, but no clock provider
+> > > +is
+> > found.
+> > > + * If name =3D NULL, the function returns -ENOENT.
+> > > + * If name !=3D NULL, the function returns -EINVAL. This is because
+> > > +__of_clk_get()
+> >
+> > I would start new sentence from new line (this will emphasize the
+> > possible
+> > variants)
+> >
+> >  * This is ...
+> I disagree, the explanation is specifically related to the case where the
+> function returns -EINVAL. Though this is a nit, so I'm not really bothered
+> either way.
+> =
+
+> Thanks for the review!
+> Phil
+> =
+
+> >  Otherwise looks good to me:
+> >
+> > Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> >
+> > > + * is called even if of_property_match_string() returns an error.
+> > > + */
+> > >  static struct clk *__of_clk_get_by_name(struct device_node *np,
+> > >  					const char *dev_id,
+> > >  					const char *name)
+> > > --
+> > > 2.17.1
+> > >
+> >
+> > --
+> > With Best Regards,
+> > Andy Shevchenko
+> >
+
 
 _______________________________________________
 linux-arm-kernel mailing list
