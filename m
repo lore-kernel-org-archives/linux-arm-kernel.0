@@ -2,64 +2,64 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0E84EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 09:37:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2578EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 09:39:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D0F6220840
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 09:37:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E6B7C2086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 09:39:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Musl07YH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D0F6220840
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=free.fr
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mDf3BQPx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E6B7C2086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KqYFCHkTd07enn9eDkyempBV30rZshrCBIvsSCwNfWA=; b=Musl07YHk2dd+Y
-	6bL8R0rmlYTsyU3b48XIq3DSKVsdJgEZdTcyYQTOFwV40XSIrJpHkAym4dV4SsApe1RWLPpTm1ccq
-	DfDGxWRNhBPGGL+FAKG2HLQnwQb8GTQlLWudapcLbkBZXwFgIPjy9cmRSNKg5Rvyqhi8jOWHtzbqF
-	cnV1mvU7Az6wIIIecdDJcw8lJUO0fZN2VYFVQJKPPVXlh2KiRYCvvYEekEl8Ez3F/8YdM9fG2jSm5
-	jFevrWGKf1op3vD9kFNUW4n+FB2lKJmcdi8yhV1DJJd023wJgH2KKyq0qilsJMnS8G6HEH9fvQgnC
-	SmlMgfeEz1++p7GbMLpg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=y/wggp0aWL+5XKX0q81hxZ+1rgVmuIm2zTWd8ptFjNs=; b=mDf3BQPxBmXWR57kt1XbrLaHC
+	LoJ/nEt++u1Cb+ZbFH+eHa86s7ZqoiDMz/4Wl2r8YZq91bmWgEUDRuhQBKmb2LjQ1gJp9Km86vjx4
+	e1SIAra7OPnEoBbegRyOENXbFuByYrvzhEG5gCKz2gcSk3KuDrxHBqkLcTie8VHk/+nNlNzsZC3hC
+	y4xGDjw0xL7CABAWuCJMDJwzzketJAlyYnzR6i5XIeIHW1iuf+yC9oeIcu8Xy+YkD9xhyJDmWpbK1
+	Cr+BLiynnKCGqbYkGnJhAkAFikz3jEC0gHgw96+Tf22udz1tGjy0TED1dgGF7U1cr0f0aPuzM+bg1
+	1zU+GrbCw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjhdS-0004hW-5O; Wed, 16 Jan 2019 09:37:22 +0000
-Received: from smtp3-g21.free.fr ([212.27.42.3])
+	id 1gjhf7-00057G-6F; Wed, 16 Jan 2019 09:39:05 +0000
+Received: from szxga07-in.huawei.com ([45.249.212.35] helo=huawei.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjhdO-0004g8-Kg
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 09:37:20 +0000
-Received: from [192.168.108.68] (unknown [213.36.7.13])
- (Authenticated sender: marc.w.gonzalez)
- by smtp3-g21.free.fr (Postfix) with ESMTPSA id B155C13F8A7;
- Wed, 16 Jan 2019 10:36:45 +0100 (CET)
-Subject: Re: [PATCH v1] scsi: ufs: Use explicit access size in ufshcd_dump_regs
-To: Vinayak Holikatti <vinholikatti@gmail.com>,
- "Martin K. Petersen" <martin.petersen@oracle.com>,
- James Bottomley <jejb@linux.ibm.com>
-References: <3bf7ea8e-4cf2-1f9b-7f46-15609dfcad19@free.fr>
- <214700f8-a381-5740-47c0-54923dae60b1@free.fr>
- <4c367e20-3ae8-ba28-75dc-b07805e27ea8@codeaurora.org>
-From: Marc Gonzalez <marc.w.gonzalez@free.fr>
-Message-ID: <c3c4e886-39ef-6384-5772-96b865d0b059@free.fr>
-Date: Wed, 16 Jan 2019 10:36:45 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gjhf3-00056R-NG
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 09:39:03 +0000
+Received: from DGGEMS404-HUB.china.huawei.com (unknown [172.30.72.59])
+ by Forcepoint Email with ESMTP id 9C3C792EAE6057F38CFD;
+ Wed, 16 Jan 2019 17:38:32 +0800 (CST)
+Received: from [127.0.0.1] (10.202.226.43) by DGGEMS404-HUB.china.huawei.com
+ (10.3.19.204) with Microsoft SMTP Server id 14.3.408.0; Wed, 16 Jan 2019
+ 17:38:26 +0800
+Subject: Re: [PATCH] arm64: kpti: Update arm64_kernel_use_ng_mappings() when
+ forced on
+To: James Morse <james.morse@arm.com>, <linux-arm-kernel@lists.infradead.org>
+References: <20190115184917.248995-1-james.morse@arm.com>
+From: John Garry <john.garry@huawei.com>
+Message-ID: <21310b0b-8a75-1adf-a844-b2f3f520fa2d@huawei.com>
+Date: Wed, 16 Jan 2019 09:38:21 +0000
+User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:45.0) Gecko/20100101
+ Thunderbird/45.3.0
 MIME-Version: 1.0
-In-Reply-To: <4c367e20-3ae8-ba28-75dc-b07805e27ea8@codeaurora.org>
-Content-Language: en-US
+In-Reply-To: <20190115184917.248995-1-james.morse@arm.com>
+X-Originating-IP: [10.202.226.43]
+X-CFilter-Loop: Reflected
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_013719_001128_131792A6 
-X-CRM114-Status: GOOD (  15.27  )
+X-CRM114-CacheID: sfid-20190116_013901_934326_76BFB467 
+X-CRM114-Status: GOOD (  21.03  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,111 +71,107 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: SCSI <linux-scsi@vger.kernel.org>, Avri Altman <avri.altman@wdc.com>,
- Jeffrey Hugo <jhugo@codeaurora.org>, MSM <linux-arm-msm@vger.kernel.org>,
- Bjorn Andersson <bjorn.andersson@linaro.org>, Joao Pinto <jpinto@synopsys.com>,
- Andy Gross <andy.gross@linaro.org>, Tomas Winkler <tomas.winkler@intel.com>,
- Robin Murphy <robin.murphy@arm.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: Catalin Marinas <catalin.marinas@arm.com>,
+ "Guohanjun \(Hanjun Guo\)" <guohanjun@huawei.com>,
+ Will Deacon <will.deacon@arm.com>, Linuxarm <linuxarm@huawei.com>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 09/01/2019 16:38, Jeffrey Hugo wrote:
+On 15/01/2019 18:49, James Morse wrote:
+> Since commit b89d82ef01b3 ("arm64: kpti: Avoid rewriting early page
 
->> On 11/12/2018 15:18, Marc Gonzalez wrote:
->>
->>> memcpy_fromio() doesn't provide any control over access size.
->>> For example, on arm64, it is implemented using readb and readq.
->>> This may trigger a synchronous external abort:
->>>
->>> [    3.729943] Internal error: synchronous external abort: 96000210 [#1] PREEMPT SMP
->>> [    3.737000] Modules linked in:
->>> [    3.744371] CPU: 2 PID: 1 Comm: swapper/0 Tainted: G S                4.20.0-rc4 #16
->>> [    3.747413] Hardware name: Qualcomm Technologies, Inc. MSM8998 v1 MTP (DT)
->>> [    3.755295] pstate: 00000005 (nzcv daif -PAN -UAO)
->>> [    3.761978] pc : __memcpy_fromio+0x68/0x80
->>> [    3.766718] lr : ufshcd_dump_regs+0x50/0xb0
->>> [    3.770767] sp : ffff00000807ba00
->>> [    3.774830] x29: ffff00000807ba00 x28: 00000000fffffffb
->>> [    3.778344] x27: ffff0000089db068 x26: ffff8000f6e58000
->>> [    3.783728] x25: 000000000000000e x24: 0000000000000800
->>> [    3.789023] x23: ffff8000f6e587c8 x22: 0000000000000800
->>> [    3.794319] x21: ffff000008908368 x20: ffff8000f6e1ab80
->>> [    3.799615] x19: 000000000000006c x18: ffffffffffffffff
->>> [    3.804910] x17: 0000000000000000 x16: 0000000000000000
->>> [    3.810206] x15: ffff000009199648 x14: ffff000089244187
->>> [    3.815502] x13: ffff000009244195 x12: ffff0000091ab000
->>> [    3.820797] x11: 0000000005f5e0ff x10: ffff0000091998a0
->>> [    3.826093] x9 : 0000000000000000 x8 : ffff8000f6e1ac00
->>> [    3.831389] x7 : 0000000000000000 x6 : 0000000000000068
->>> [    3.836676] x5 : ffff8000f6e1abe8 x4 : 0000000000000000
->>> [    3.841971] x3 : ffff00000928c868 x2 : ffff8000f6e1abec
->>> [    3.847267] x1 : ffff00000928c868 x0 : ffff8000f6e1abe8
->>> [    3.852567] Process swapper/0 (pid: 1, stack limit = 0x(____ptrval____))
->>> [    3.857900] Call trace:
->>> [    3.864473]  __memcpy_fromio+0x68/0x80
->>> [    3.866683]  ufs_qcom_dump_dbg_regs+0x1c0/0x370
->>> [    3.870522]  ufshcd_print_host_regs+0x168/0x190
->>> [    3.874946]  ufshcd_init+0xd4c/0xde0
->>> [    3.879459]  ufshcd_pltfrm_init+0x3c8/0x550
->>> [    3.883264]  ufs_qcom_probe+0x24/0x60
->>> [    3.887188]  platform_drv_probe+0x50/0xa0
->>>
->>> Assuming aligned 32-bit registers, let's use readl, after making sure
->>> that 'offset' and 'len' are indeed multiples of 4.
->>>
->>> Fixes: ba80917d9932d ("scsi: ufs: ufshcd_dump_regs to use memcpy_fromio")
->>> Signed-off-by: Marc Gonzalez <marc.w.gonzalez@free.fr>
->>> ---
->>>   drivers/scsi/ufs/ufshcd.c | 10 ++++++++--
->>>   1 file changed, 8 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/scsi/ufs/ufshcd.c b/drivers/scsi/ufs/ufshcd.c
->>> index 535180c01ce8..320bbd9849bc 100644
->>> --- a/drivers/scsi/ufs/ufshcd.c
->>> +++ b/drivers/scsi/ufs/ufshcd.c
->>> @@ -112,13 +112,19 @@
->>>   int ufshcd_dump_regs(struct ufs_hba *hba, size_t offset, size_t len,
->>>   		     const char *prefix)
->>>   {
->>> -	u8 *regs;
->>> +	u32 *regs;
->>> +	size_t pos;
->>> +
->>> +	if (offset % 4 != 0 || len % 4 != 0) /* keep readl happy */
->>> +		return -EINVAL;
-> 
-> Hmm.  It seems like these cases could be handled, but I guess we cannot 
-> necessarily assume that reading past the bounds specified by the client 
-> is safe, so this seems reasonable.
-> 
->>>   
->>>   	regs = kzalloc(len, GFP_KERNEL);
->>>   	if (!regs)
->>>   		return -ENOMEM;
->>>   
->>> -	memcpy_fromio(regs, hba->mmio_base + offset, len);
->>> +	for (pos = 0; pos < len; pos += 4)
->>> +		regs[pos / 4] = ufshcd_readl(hba, offset + pos);
->>> +
->>>   	ufshcd_hex_dump(prefix, regs, len);
->>>   	kfree(regs);
->>>   
-> 
-> Reviewed-by: Jeffrey Hugo <jhugo@codeaurora.org>
+About b89d82ef01b3, I got an *unconfirmed* (emphasis on this, I don't 
+want to cry wolf) report yesterday that the symptom I saw (boot delay) 
+has been seen on 5.0-rc2 on our D06 board. I could not see it.
 
-James, Martin,
+Please note that this would be same board which we saw this on:
+https://lkml.org/lkml/2018/6/20/589
 
-I haven't heard back from Vinayak. (In fact, his last review dates back
-to 2016. Should MAINTAINERS be updated? I can send a patch.)
+I only witnessed the issue on the predecessor A72-based D05 board.
 
-Would you mind taking this patch through the SCSI tree?
+The reporter is very busy, but we'll keep tabs on it.
 
-Tomas, does "LGTM" translate to Acked-by? :-D
+Thanks,
+John
 
-Regards.
+> tables when KASLR is enabled"), a kernel built with CONFIG_RANDOMIZE_BASE
+> can decide early whether to use non-global mappings by checking the
+> kaslr_offset().
+>
+> A kernel built without CONFIG_RANDOMIZE_BASE, instead checks the
+> cpufeature static-key.
+>
+> This leaves a gap where CONFIG_RANDOMIZE_BASE was enabled, no
+> kaslr seed was provided, but kpti was forced on using the cmdline
+> option.
+>
+> When the decision is made late, kpti_install_ng_mappings() will re-write
+> the page tables, but arm64_kernel_use_ng_mappings()'s value does not
+> change as it only tests the cpufeature static-key if
+> CONFIG_RANDOMIZE_BASE is disabled.
+> This function influences PROT_DEFAULT via PTE_MAYBE_NG, and causes
+> pgattr_change_is_safe() to catch nG->G transitions when the unchanged
+> PROT_DEFAULT is used as part of PAGE_KERNEL_RO:
+> [    1.942255] alternatives: patching kernel code
+> [    1.998288] ------------[ cut here ]------------
+> [    2.000693] kernel BUG at arch/arm64/mm/mmu.c:165!
+> [    2.019215] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
+> [    2.020257] Modules linked in:
+> [    2.020807] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 5.0.0-rc2 #51
+> [    2.021917] Hardware name: linux,dummy-virt (DT)
+> [    2.022790] pstate: 40000005 (nZcv daif -PAN -UAO)
+> [    2.023742] pc : __create_pgd_mapping+0x508/0x6d0
+> [    2.024671] lr : __create_pgd_mapping+0x500/0x6d0
+>
+> [    2.058059] Process swapper/0 (pid: 1, stack limit = 0x(____ptrval____))
+> [    2.059369] Call trace:
+> [    2.059845]  __create_pgd_mapping+0x508/0x6d0
+> [    2.060684]  update_mapping_prot+0x48/0xd0
+> [    2.061477]  mark_linear_text_alias_ro+0xdc/0xe4
+> [    2.070502]  smp_cpus_done+0x90/0x98
+> [    2.071216]  smp_init+0x100/0x114
+> [    2.071878]  kernel_init_freeable+0xd4/0x220
+> [    2.072750]  kernel_init+0x10/0x100
+> [    2.073455]  ret_from_fork+0x10/0x18
+>
+> [    2.075414] ---[ end trace 3572f3a7782292de ]---
+> [    2.076389] Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+>
+> If arm64_kernel_unmapped_at_el0() is true, arm64_kernel_use_ng_mappings()
+> should also be true.
+>
+> Signed-off-by: James Morse <james.morse@arm.com>
+> CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> CC: John Garry <john.garry@huawei.com>
+> CC: Will Deacon <will.deacon@arm.com>
+>
+> ---
+>  arch/arm64/include/asm/mmu.h | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+> index ac352accb3d9..3e8063f4f9d3 100644
+> --- a/arch/arm64/include/asm/mmu.h
+> +++ b/arch/arm64/include/asm/mmu.h
+> @@ -60,8 +60,11 @@ static inline bool arm64_kernel_use_ng_mappings(void)
+>  	 * later determine that kpti is required, then
+>  	 * kpti_install_ng_mappings() will make them non-global.
+>  	 */
+> +	if (arm64_kernel_unmapped_at_el0())
+> +		return true;
+> +
+>  	if (!IS_ENABLED(CONFIG_RANDOMIZE_BASE))
+> -		return arm64_kernel_unmapped_at_el0();
+> +		return false;
+>
+>  	/*
+>  	 * KASLR is enabled so we're going to be enabling kpti on non-broken
+>
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
