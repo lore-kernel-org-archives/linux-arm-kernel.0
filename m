@@ -2,68 +2,72 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CD592C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 02:06:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 712A3C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 02:13:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9EDA82082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 02:06:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 34C0F20651
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 02:13:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Lc9B/epR";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="d2pwfKoD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9EDA82082F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nGGCVKvR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 34C0F20651
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=5DFryfQ5pNdRe5qPJuzIZO/k8DMiC83wD65A5R5Y4nY=; b=Lc9B/epRBjtz+F
-	fjPkKQqaivGWWPfRDAr9JmrBA9IssptsK+x7ZUo7l0VEV/+0/X/+H+jnHiEqAa7xH6OVwX7Gju59/
-	BMT40P4pjUYtKpmYoINcT4zZQSgspRDe9Iy/2iy+Rre4AqDuA/bAjqk9QRM+aUn5LNf12Dvn7z4eK
-	2nDe5eNvsE4d8NmFmJxZrkOFa6TUuFCGZboSXS6V+XuCCdsEoXJqIr7PXesuKAVHmLabMSmAiWGtF
-	KhrA5C5wUprhFjWKFQrEzEUCfwYN4rEwd9aE6WAII1SvUc+VdYKWS8v7+5uahsjiN0brVSr1cvYo6
-	h2XLHAUnbXIJcnHNaiUg==;
+	List-Owner; bh=70E5TzQcI9YOY6jBUu0joUXdIUymc3hizMSg53dzmdE=; b=nGGCVKvRuUW9PR
+	jj/QDj80KbbJWheL7wFw5QwNIaUr9Kz9YNRw84qk4cyBPQC/i0mZIp2JXEo6Qwk1cMH4Yj9r6LCzX
+	sHSUk5T3e7kiOZ0W2+leGvXSiTp8V3H0OtIMcTOxPV28zBRENtUmxgOQ8qOfJ5BtthzuVdYrqc/Nx
+	v+JWAxbBiK+1x3Sa3yRA8c03AAtwtw93YvQJ/m1uYyrvE2mitt43BPCcUD/5HVtfKcAwmwLbVAeqD
+	iCxLSZB/pJRuDm46/vim720EDFNFrF0zcYCJRVAO3h5puJRdz2X/mBYsAG025JgKxum5+8k6LvjRc
+	SXl6g278rhhRVs4e3i4g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjaaq-0001Fc-LO; Wed, 16 Jan 2019 02:06:12 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gjahN-0003cS-Kd; Wed, 16 Jan 2019 02:12:57 +0000
+Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjaan-0001FB-3k
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 02:06:10 +0000
-Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
- (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 7E7762082F;
- Wed, 16 Jan 2019 02:06:05 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1547604368;
- bh=yL62E1MSsM+fjN8pSX8/J71nC2mdkCIoqBNx+bYjIIQ=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=d2pwfKoDt7uQ46J3tdNIoK2Ph7jh+QjAAG+Q6XGOpblPJ9xenyrcdVf05SRM+wjMG
- hXL6icef2cZcNxWvQklJXDvxmnaIIPTZES2n7xEcYNYYtpIPQN/2Pe12lag7akeesA
- W9fobg5HbzoW6o1mPfJPQmhpkvPlml1tlPwIYQ1A=
-Date: Wed, 16 Jan 2019 10:05:45 +0800
-From: Shawn Guo <shawnguo@kernel.org>
-To: Peng Ma <peng.ma@nxp.com>
-Subject: Re: [v2] arm64: dts: lx2160a: add sata node support
-Message-ID: <20190116020543.GB15808@dragon>
-References: <20190114095500.1600-1-peng.ma@nxp.com>
+ id 1gjagv-0003Aq-DW; Wed, 16 Jan 2019 02:12:30 +0000
+X-UUID: ca27f092c8ba49a1a3002ab2fbd3320a-20190115
+X-UUID: ca27f092c8ba49a1a3002ab2fbd3320a-20190115
+Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw02.mediatek.com
+ (envelope-from <ryder.lee@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 604820495; Tue, 15 Jan 2019 18:12:17 -0800
+Received: from mtkmbs08n2.mediatek.inc (172.21.101.56) by
+ MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Tue, 15 Jan 2019 18:12:15 -0800
+Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
+ mtkmbs08n2.mediatek.inc (172.21.101.56) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Wed, 16 Jan 2019 10:12:06 +0800
+Received: from mtkslt306.mediatek.inc (10.21.14.136) by MTKCAS06.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
+ Frontend Transport; Wed, 16 Jan 2019 10:12:06 +0800
+From: Ryder Lee <ryder.lee@mediatek.com>
+To: Marek Vasut <marek.vasut@gmail.com>, Brian Norris
+ <computersforpeace@gmail.com>, Boris Brezillon <boris.brezillon@bootlin.com>
+Subject: [PATCH v2 2/3] mtd: spi-nor: mtk-quadspi: add SNOR_HWCAPS_READ to
+ spi_nor_hwcaps mask
+Date: Wed, 16 Jan 2019 10:12:04 +0800
+Message-ID: <2afa18c0c898259fc244f15844c5319f71e811df.1547538621.git.ryder.lee@mediatek.com>
+X-Mailer: git-send-email 1.9.1
+In-Reply-To: <74d710ed89fd505a49bce53b51f6cb489e313dbb.1547538621.git.ryder.lee@mediatek.com>
+References: <74d710ed89fd505a49bce53b51f6cb489e313dbb.1547538621.git.ryder.lee@mediatek.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190114095500.1600-1-peng.ma@nxp.com>
-User-Agent: Mutt/1.5.21 (2010-09-15)
+X-TM-SNTS-SMTP: B3FC28A5443B1225512AC62F3AEA0E517B8EEF86F66CA44A453F40A9675B0B082000:8
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_180609_201970_76593661 
-X-CRM114-Status: GOOD (  16.45  )
+X-CRM114-CacheID: sfid-20190115_181229_464022_F8E4C6AD 
+X-CRM114-Status: GOOD (  11.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,149 +79,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
- linux-kernel@vger.kernel.org, leoyang.li@nxp.com, robh+dt@kernel.org,
+Cc: devicetree@vger.kernel.org, Ryder Lee <ryder.lee@mediatek.com>,
+ Guochun Mao <guochun.mao@mediatek.com>, Weijie Gao <weijie.gao@mediatek.com>,
+ linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
+ linux-mtd@lists.infradead.org, linux-mediatek@lists.infradead.org,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 14, 2019 at 09:55:00AM +0000, Peng Ma wrote:
-> Add sata node support and Enable sata support
+From: Guochun Mao <guochun.mao@mediatek.com>
 
-I would suggest you reword the commit log like below:
+SNOR_HWCAPS_READ should be supported by this controller, so add this
+flag to spi_nor_hwcaps mask.
 
-Add SATA device nodes for fsl-lx2160a and enable support for QDS and RDB
-boards.
+Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+---
+Changes since v2: Revise commit msg. 
+Changes since v1: none. 
+---
+ drivers/mtd/spi-nor/mtk-quadspi.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-> 
-> Signed-off-by: Peng Ma <peng.ma@nxp.com>
-> ---
-> changed for V2:
-> 	- put the 'status' at the end of property list
-> 	- add lx2160aqds sata support
-> 
->  arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts |   16 +++++++
->  arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts |   16 +++++++
->  arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi    |   44 +++++++++++++++++++++
->  3 files changed, 76 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
-> index 99a22ab..0289955 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
-> +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
-> @@ -110,3 +110,19 @@
->  &usb1 {
->  	status = "okay";
->  };
-> +
-> +&sata0 {
+diff --git a/drivers/mtd/spi-nor/mtk-quadspi.c b/drivers/mtd/spi-nor/mtk-quadspi.c
+index 5442993..d9eed68 100644
+--- a/drivers/mtd/spi-nor/mtk-quadspi.c
++++ b/drivers/mtd/spi-nor/mtk-quadspi.c
+@@ -431,7 +431,8 @@ static int mtk_nor_init(struct mtk_nor *mtk_nor,
+ 			struct device_node *flash_node)
+ {
+ 	const struct spi_nor_hwcaps hwcaps = {
+-		.mask = SNOR_HWCAPS_READ_FAST |
++		.mask = SNOR_HWCAPS_READ |
++			SNOR_HWCAPS_READ_FAST |
+ 			SNOR_HWCAPS_READ_1_1_2 |
+ 			SNOR_HWCAPS_PP,
+ 	};
+-- 
+1.9.1
 
-Please sort the labeling nodes alphabetically.
-
-Shawn
-
-> +	status = "okay";
-> +};
-> +
-> +&sata1 {
-> +	status = "okay";
-> +};
-> +
-> +&sata2 {
-> +	status = "okay";
-> +};
-> +
-> +&sata3 {
-> +	status = "okay";
-> +};
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-> index 6481e5f..aacca27 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-> +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-> @@ -117,3 +117,19 @@
->  &usb1 {
->  	status = "okay";
->  };
-> +
-> +&sata0 {
-> +	status = "okay";
-> +};
-> +
-> +&sata1 {
-> +	status = "okay";
-> +};
-> +
-> +&sata2 {
-> +	status = "okay";
-> +};
-> +
-> +&sata3 {
-> +	status = "okay";
-> +};
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
-> index a79f5c1..4390aea 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
-> @@ -762,5 +762,49 @@
->  				     <GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH>;
->  			dma-coherent;
->  		};
-> +
-> +		sata0: sata@3200000 {
-
-Please sort nodes with unit-address in order of the address.
-
-Shawn
-
-> +			compatible = "fsl,lx2160a-ahci";
-> +			reg = <0x0 0x3200000 0x0 0x10000>,
-> +			      <0x7 0x100520 0x0 0x4>;
-> +			reg-names = "ahci", "sata-ecc";
-> +			interrupts = <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&clockgen 4 3>;
-> +			dma-coherent;
-> +			status = "disabled";
-> +		};
-> +
-> +		sata1: sata@3210000 {
-> +			compatible = "fsl,lx2160a-ahci";
-> +			reg = <0x0 0x3210000 0x0 0x10000>,
-> +			      <0x7 0x100520 0x0 0x4>;
-> +			reg-names = "ahci", "sata-ecc";
-> +			interrupts = <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&clockgen 4 3>;
-> +			dma-coherent;
-> +			status = "disabled";
-> +		};
-> +
-> +		sata2: sata@3220000 {
-> +			compatible = "fsl,lx2160a-ahci";
-> +			reg = <0x0 0x3220000 0x0 0x10000>,
-> +			      <0x7 0x100520 0x0 0x4>;
-> +			reg-names = "ahci", "sata-ecc";
-> +			interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&clockgen 4 3>;
-> +			dma-coherent;
-> +			status = "disabled";
-> +		};
-> +
-> +		sata3: sata@3230000 {
-> +			compatible = "fsl,lx2160a-ahci";
-> +			reg = <0x0 0x3230000 0x0 0x10000>,
-> +			      <0x7 0x100520 0x0 0x4>;
-> +			reg-names = "ahci", "sata-ecc";
-> +			interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&clockgen 4 3>;
-> +			dma-coherent;
-> +			status = "disabled";
-> +		};
->  	};
->  };
-> -- 
-> 1.7.1
-> 
 
 _______________________________________________
 linux-arm-kernel mailing list
