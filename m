@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A7019C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 16:21:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3DFAEC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 16:21:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7670F20651
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 16:21:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0DBBA20651
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 16:21:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N/2xjlbY";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="LanoK9Fo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7670F20651
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BIs4XHdu";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="eng73Q+r"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0DBBA20651
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,61 +26,62 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=fK0R59qDFm7J5fcf5NzLFzsD1fw0NVz8Y3Wiv3+JLwU=; b=N/2xjlbYfYC+8+
-	Mw6cHJ/YX2wCcPdITj0qPJWm07rua3u7kW2vcW4Z8atQd0ObotneLG6oYvedcjZAyjYxDNHAgdK91
-	VULQkYdMEShjYztYioABcT+Fo4Jq7BEx7QcALnIblec+yN1eP1EWTZdUFgaVF7f1kNEmvqKTtHGAx
-	12COEfuTpay3wWNkFmY1/nhfJmU/7hlkJNpAMkRhigOqJKBGEp4BcqAkTTxJgHjfSGo9SVNxo6cA0
-	NNAs9ajodrAUpi5OSGjgx0uwV4vBPgmzuzRK4x0liRKI04x5is20zXQh0gREeeMh1dNNn76yUIeEw
-	T9HGv+PQMeK07OAnkgtg==;
+	List-Owner; bh=PPj0C/1Z/VplGjQ9iSZQpfiuswqJ3NVFJj9CeAVfzMA=; b=BIs4XHdulz4Qhz
+	YJSb7kGdZdVZumdQRPgkHP818dpKmRFiem9B66O6csoNLOT02i2qK7srqeI6zVJVBOoucoz0m3PiI
+	Kxhvh7uR99I7KHP185Hx5kJyaYOtmkYE8Cy9izNeqYpXVAUuq8jZGzNcezEF8IjZD0DwrC0Du/zIj
+	MjT3o+FFyQWodpT63GCekWXRRGdWdv2lcTMzfAjUqpF69loPbxuzuZcTU7MHWfTaDAke+A5MmgB2p
+	FC9DuakNn4/Fs1GIJOS8MvXrbvxh12mP/8r96zSf7Zxgc2rE9RJO1SKm2mfAHUzQmkcuxK93r+6r/
+	rD0d5rppQ4HAtnum8r+Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjnwN-0004La-5O; Wed, 16 Jan 2019 16:21:19 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1gjnwZ-0004Yx-T7; Wed, 16 Jan 2019 16:21:31 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjnmm-0006NG-FB
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 16:11:34 +0000
-Received: by mail-wr1-x443.google.com with SMTP id s12so7582232wrt.4
+ id 1gjnmo-0006PW-Lk
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 16:11:39 +0000
+Received: by mail-wr1-x441.google.com with SMTP id l9so7502677wrt.13
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 16 Jan 2019 08:11:24 -0800 (PST)
+ Wed, 16 Jan 2019 08:11:26 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=LDr5HA/Xz+XFJL8rSCgd+oCXVMfCO13lm4Kef3RvTeo=;
- b=LanoK9FolMz6mPf3K+0ED09NHHZR5+oRYTxu6VW5YCMcEsvZkM+MDQjs9+V+JBtjUr
- UkGQwHFVafDCQTPu8rkIR7n/2KuGjGqmcro5KX6f7fMFnHewpHEJgATvKWWDJzZjw40E
- 6U2IFpyFROaEIcHTmOawdKGAsh/lBQR07pF0c=
+ bh=JgRm2aO2Ij1KQwzH5NiF8dvBkSLnMrQ8RcNVlPauU/8=;
+ b=eng73Q+rXVdfvwKcoCIxc2D2TnbLST3DbvtVZT8/wMBHycQWUXcjrQVVYynjYN/eNf
+ VonNHpkhw1c7lT6ZkVMUAofI3642MqI0OXWXKd32g4ZlYaDCKlGeEL2s8PpN9ptmiyT0
+ xqsUXzokZRLa+SpQMOVnOyL4vTE3MoqtorQrs=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=LDr5HA/Xz+XFJL8rSCgd+oCXVMfCO13lm4Kef3RvTeo=;
- b=AIhvng8XXl7TasMiqKaa5L4wjj/9Jjg/02RHaB24APzwUvS3RMMx1onXvL76wOZDvg
- 77KKn+uZF/zza2DsLaU1f1l0G4tAXGd+c6x6mn9Bi0PF5K2wiegDffGViHngjepxn7Iq
- EruG41fvnAkoTCKRzuoOtCJDErWg4wOqscGemTWXZoOb+7YuXzf98W9S8z2jmRSDi4fo
- vTE2zOmjbel0g0sKav97yUy9Q1jUCjz2oBV+/pW/KccCD6SK1sFlFlEpdoDbt1fnBJ4v
- TNwxD/h9Q9id4SRjPnoBk4rgBcbDZwlQZ1OPSTC76ZdBgqWonrUEDpTsV97hRqIw2KK2
- Wedw==
-X-Gm-Message-State: AJcUukf9BDGhFPdh0T7CNVWMx0i5Nh3rB3MmU4KwkieVYoiVcet7QOaF
- aLFnIs8CoIKL7BM6cuLxuAQDgw==
-X-Google-Smtp-Source: ALg8bN6CC3lM1Zi300TtDtZd4tlTOD+K7DXx9f0Kg6hP4L+7/r5db+LtNlCzNBye94gqLiSEffapgg==
-X-Received: by 2002:adf:9542:: with SMTP id 60mr7901351wrs.60.1547655083058;
- Wed, 16 Jan 2019 08:11:23 -0800 (PST)
+ bh=JgRm2aO2Ij1KQwzH5NiF8dvBkSLnMrQ8RcNVlPauU/8=;
+ b=Mm2uHKLBFDMcoojhjcBW3P6uWYE1OyQaIz6r2WRwiO9heLng4zNs5zLWi6T6C6DM3q
+ Sa2KQnUrULIGpENEtMoBtOPioxi7tx+GUcxQbINGdvOE47W2FDpP7dW82l/u1QWUaUo4
+ njlPckH/LqG+XymXsh8DpUKdTeeMflaTMYvv2KTCX8/2xTJL21eK1zdkHAlO40EMb82/
+ nzi+6aMik/LRA+j+lyefREQMA6N9c6/8iyPheSKckGcLOmJ2XWljxxAzgSUqs6p948cH
+ ls3XrTYEV0IaUgOKocDtKF8XLlWMo9tzMJu7qh+eV6ucD0OgzAgVk0HrhY0Qjtt8g0aU
+ 5ncQ==
+X-Gm-Message-State: AJcUukehOkDpP3QTrbxwG6IWciyWBLFzrg0FcrA3CKKlGUMm3lyLVvRV
+ 3fERVoxTJKwugVSzRU/we/idFQ==
+X-Google-Smtp-Source: ALg8bN5vTpTdgFrNsBazJWOvWRE+OuJSwyAUdPF+54h9gkihY+LCJgCaEB709+03Af7ay7801ioi0Q==
+X-Received: by 2002:adf:b3c3:: with SMTP id x3mr8262877wrd.294.1547655085306; 
+ Wed, 16 Jan 2019 08:11:25 -0800 (PST)
 Received: from localhost.localdomain ([212.45.67.2])
- by smtp.googlemail.com with ESMTPSA id a17sm78193407wrs.58.2019.01.16.08.11.20
+ by smtp.googlemail.com with ESMTPSA id a17sm78193407wrs.58.2019.01.16.08.11.23
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Wed, 16 Jan 2019 08:11:22 -0800 (PST)
+ Wed, 16 Jan 2019 08:11:24 -0800 (PST)
 From: Georgi Djakov <georgi.djakov@linaro.org>
 To: gregkh@linuxfoundation.org
-Subject: [PATCH v13 7/8] MAINTAINERS: add a maintainer for the interconnect API
-Date: Wed, 16 Jan 2019 18:11:02 +0200
-Message-Id: <20190116161103.6937-8-georgi.djakov@linaro.org>
+Subject: [PATCH v13 8/8] interconnect: Revert to previous config if any
+ request fails
+Date: Wed, 16 Jan 2019 18:11:03 +0200
+Message-Id: <20190116161103.6937-9-georgi.djakov@linaro.org>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20190116161103.6937-1-georgi.djakov@linaro.org>
 References: <20190116161103.6937-1-georgi.djakov@linaro.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_081124_877047_04A5787D 
-X-CRM114-Status: GOOD (  11.07  )
+X-CRM114-CacheID: sfid-20190116_081127_204236_4C067FA1 
+X-CRM114-Status: GOOD (  14.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,34 +109,63 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add myself as the maintainer of the interconnect API.
+When consumers report their bandwidth needs with icc_set_bw(), it's
+possible that the requested amount of bandwidth is not available or just
+the new configuration fails to apply on some path. In this case revert to
+the previous configuration and propagate the error back to the consumers
+to let them know that bandwidth is not available, hardware is busy or
+whatever error is returned by the interconnect platform driver.
 
 Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
 ---
- MAINTAINERS | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/interconnect/core.c | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 4d04cebb4a71..00a12cd11aa4 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7883,6 +7883,16 @@ L:	linux-gpio@vger.kernel.org
- S:	Maintained
- F:	drivers/gpio/gpio-intel-mid.c
+diff --git a/drivers/interconnect/core.c b/drivers/interconnect/core.c
+index 8091d998549a..6005a1c189f6 100644
+--- a/drivers/interconnect/core.c
++++ b/drivers/interconnect/core.c
+@@ -414,14 +414,18 @@ EXPORT_SYMBOL_GPL(of_icc_get);
+ int icc_set_bw(struct icc_path *path, u32 avg_bw, u32 peak_bw)
+ {
+ 	struct icc_node *node;
++	u32 old_avg, old_peak;
+ 	size_t i;
+ 	int ret;
  
-+INTERCONNECT API
-+M:	Georgi Djakov <georgi.djakov@linaro.org>
-+S:	Maintained
-+F:	Documentation/interconnect/
-+F:	Documentation/devicetree/bindings/interconnect/
-+F:	drivers/interconnect/
-+F:	include/dt-bindings/interconnect/
-+F:	include/linux/interconnect-provider.h
-+F:	include/linux/interconnect.h
+-	if (!path)
++	if (!path || !path->num_nodes)
+ 		return 0;
+ 
+ 	mutex_lock(&icc_lock);
+ 
++	old_avg = path->reqs[0].avg_bw;
++	old_peak = path->reqs[0].peak_bw;
 +
- INVENSENSE MPU-3050 GYROSCOPE DRIVER
- M:	Linus Walleij <linus.walleij@linaro.org>
- L:	linux-iio@vger.kernel.org
+ 	for (i = 0; i < path->num_nodes; i++) {
+ 		node = path->reqs[i].node;
+ 
+@@ -434,10 +438,19 @@ int icc_set_bw(struct icc_path *path, u32 avg_bw, u32 peak_bw)
+ 	}
+ 
+ 	ret = apply_constraints(path);
+-	if (ret)
++	if (ret) {
+ 		pr_debug("interconnect: error applying constraints (%d)\n",
+ 			 ret);
+ 
++		for (i = 0; i < path->num_nodes; i++) {
++			node = path->reqs[i].node;
++			path->reqs[i].avg_bw = old_avg;
++			path->reqs[i].peak_bw = old_peak;
++			aggregate_requests(node);
++		}
++		apply_constraints(path);
++	}
++
+ 	mutex_unlock(&icc_lock);
+ 
+ 	return ret;
 
 _______________________________________________
 linux-arm-kernel mailing list
