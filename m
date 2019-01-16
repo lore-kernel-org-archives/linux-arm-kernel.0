@@ -2,70 +2,60 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_NEOMUTT autolearn=unavailable
+X-Spam-Status: No, score=-5.9 required=3.0 tests=DATE_IN_PAST_06_12,
+	DKIMWL_WL_HIGH,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8C309C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 19:18:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 99FD8C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 19:19:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 31E2E20866
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 19:18:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6797E20866
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 19:19:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iU+X+Afl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 31E2E20866
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HOrtTsRE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6797E20866
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=bYt0urZ3xvS04xRqPkS21nM0hEifsSy7O4mZV32pzdo=; b=iU+X+AflA6iSPV
-	m7k3REQx/F34i42n9QnAdrDbKmQYbDsFvPQZYA/syBouhweM0K0/RE4Hnsl6wto9VQEtTn2VYFW/1
-	rW56h+0rsCnm3n3d/Fe/RN3k5CxfAN2qjgGWy9fx0rAe1VPjMcS8G9TEbNCoyAvRj0blP5RRudnli
-	5O8VdkJIK6OM5LYPFYttXge1efPjeB2wtObxAL7yX3R7ivgFa7TgBCqyPBPQZf5Gov7qkZ85pSswL
-	jiWoU/3N9yskE2XshHAUC2sxqfarRtYhDMznP0oMGa/FX09hrkWqfz90L5BY2A6OAidFz4g1F+kPN
-	CtUU1WW5pVW/pC2iZdaA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=4Y1+EKbvTXeC1y8EMMAtyuPtOxheoYPG8mw3HaVnPEQ=; b=HOrtTsREF/1nsQ/OAnEHbOzlx
+	OcbdL14ogBcU5i85hm2o6eOn9onhWBTDHRyU32YU+k1M5EsgYe5OUohwsfUy+iKjJyacrGFHj9muR
+	OFJUu4Dk1MPmdjXNEATC7gjxmxoiEEbeCn2mnTu6Dn+NwTS1Wljw2auydfWaEQtjyo/2b9yM9QtQW
+	yWUFHkIV83kg43gChmrflcaHE6/s/G52K41TtJLipb2JU3pjxfPqTsYSruPHxg+b0GI8Ii+XfgW+f
+	HkIPrj7u12pXFNVn5waPTqMq3lGfHRags59EG7GX4aJhEYfvN1KRsdopvS+GXH02EtEBrANSZpdCc
+	KKyyw9EYg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjqhu-0005Q5-LP; Wed, 16 Jan 2019 19:18:34 +0000
+	id 1gjqib-0005pM-2w; Wed, 16 Jan 2019 19:19:17 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjqhY-00052Q-4B
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 19:18:18 +0000
+ id 1gjqhY-00051F-Ec
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 19:18:19 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id CD18F207A3; Wed, 16 Jan 2019 20:18:10 +0100 (CET)
+ id 2B5D1209EF; Wed, 16 Jan 2019 20:18:07 +0100 (CET)
 Received: from localhost (unknown [212.81.177.10])
- by mail.bootlin.com (Postfix) with ESMTPSA id 760E2207A3;
- Wed, 16 Jan 2019 20:18:00 +0100 (CET)
-Date: Wed, 16 Jan 2019 20:17:56 +0100
+ by mail.bootlin.com (Postfix) with ESMTPSA id C9C10206A6;
+ Wed, 16 Jan 2019 20:17:56 +0100 (CET)
+Date: Wed, 16 Jan 2019 09:59:13 +0100
 From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Jagan Teki <jagan@amarulasolutions.com>
-Subject: Re: [PATCH v5 07/17] drm/sun4i: sun6i_mipi_dsi: Refactor vertical
- video start delay
-Message-ID: <20190116191756.ajzzaga43srk77dk@flea>
-References: <20181210161729.29720-1-jagan@amarulasolutions.com>
- <20181210161729.29720-8-jagan@amarulasolutions.com>
- <20181211164900.wfmkmbrbj3nmlb3h@flea>
- <CAMty3ZB5F5jD9iJT1soXSA5HtQOf5W9rKO9nCdGFUfVo0hpO4Q@mail.gmail.com>
- <20190107141158.zaimizk4rlqa6xli@flea>
- <CAMty3ZBb8byOwh=_W83Ta0Dse1qkoqccOeaBEY9oHPaxDxe9QA@mail.gmail.com>
- <20190108085829.clianbtjovu3oieq@flea>
- <CAMty3ZC9OQtwT-iH=S1LhHsBPc_jFKGAnCYYeR9nuKuDWSKLQw@mail.gmail.com>
- <20190112164319.whr7gwvl4oux5svz@flea>
- <CAMty3ZD8X9KmHjUtAo-+Y83a2j8NF3DjM9Yr3LPMxOvQ8kOV7g@mail.gmail.com>
+To: Julia Lawall <Julia.Lawall@lip6.fr>
+Subject: Re: [PATCH 4/4] drm/sun4i: backend: add missing of_node_puts
+Message-ID: <20190116085913.j2ju3mj75x5bqppm@flea>
+References: <1547369264-24831-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1547369264-24831-5-git-send-email-Julia.Lawall@lip6.fr>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CAMty3ZD8X9KmHjUtAo-+Y83a2j8NF3DjM9Yr3LPMxOvQ8kOV7g@mail.gmail.com>
+In-Reply-To: <1547369264-24831-5-git-send-email-Julia.Lawall@lip6.fr>
 User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_111812_846700_6A123284 
-X-CRM114-Status: GOOD (  15.13  )
+X-CRM114-CacheID: sfid-20190116_111813_520300_FC08EA44 
+X-CRM114-Status: GOOD (  14.62  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,67 +67,90 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Stephen Boyd <sboyd@kernel.org>,
- Michael Turquette <mturquette@baylibre.com>,
- linux-sunxi <linux-sunxi@googlegroups.com>,
- linux-kernel <linux-kernel@vger.kernel.org>,
- dri-devel <dri-devel@lists.freedesktop.org>, Chen-Yu Tsai <wens@csie.org>,
- Michael Trimarchi <michael@amarulasolutions.com>,
- linux-amarula@amarulasolutions.com, linux-clk <linux-clk@vger.kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: David Airlie <airlied@linux.ie>, kernel-janitors@vger.kernel.org,
+ linux-kernel@vger.kernel.org, dri-devel@lists.freedesktop.org,
+ Chen-Yu Tsai <wens@csie.org>, Daniel Vetter <daniel@ffwll.ch>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: multipart/mixed; boundary="===============1494106364741273959=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sun, Jan 13, 2019 at 01:07:41AM +0530, Jagan Teki wrote:
-> > > > > > Again, I cannot help you without the datasheet for the panels you're
-> > > > > > trying to submit.
-> > > > >
-> > > > > The panel bound with Sitronix ST7701 IC
-> > > > > http://www.startek-lcd.com/res/starteklcd/pdres/201705/20170512144242904.pdf
-> > > >
-> > > > It's the controller, not the panel
-> > >
-> > > As I said before, the datasheet of that panel doesn't have any
-> > > information except electrical characteristics and used IC which is
-> > > ST7701.
-> > >
-> > > I have one more panel, which is from Bananapi, S070WV20-CT16 ICN621
-> > > please find the attachment for the same.
-> > >
-> > > Here is some more details of the same.
-> > >
-> > > https://github.com/yesnoandor/x300/blob/master/kernel/arch/arm/boot/dts/erobbing/x300/x300.dtsi#L81
-> > > https://github.com/wxzed/Raspberry_5MIPI_Display/blob/master/I2C_Slave/USER/main.c#L15
-> > >
-> > > https://github.com/eliot-shao/qcom/blob/master/icn6211_cxn0102/kernel/drivers/video/msm/mdss/mdss_i2c_interface.c#L152
-> > > matches timings for
-> > > https://github.com/eliot-shao/qcom/blob/master/icn6211_cxn0102/kernel/arch/arm/boot/dts/qcom/dsi-mipi-2-rgb_1280p_video.dtsi#L20
-> > >
-> > > https://github.com/zestroly/micromat/blob/master/test/raspberry/ICN6211.cpp#L169
-> >
-> > Where did you get the timings from then?
-> 
-> You mean drm_mode timings, the same panel with RGB available in
-> panel-simple[1], and dsi driver in Mailing list[2] and actual DSI
-> sequence commands from BSP[3]
-> 
-> [1] https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/drivers/gpu/drm/panel/panel-simple.c?id=7ad8b41cd8f5c2842646d01cdd576663caee04a7
-> [2] https://patchwork.kernel.org/patch/10680331/
-> [3] https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/lcd/S070WV20_MIPI_RGB.c
 
-So you had no reliable source for the timings then? How do you know if
-all your patches that are timing related are right then?
+--===============1494106364741273959==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="dunppgcxmo5qgg5l"
+Content-Disposition: inline
 
+
+--dunppgcxmo5qgg5l
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Sun, Jan 13, 2019 at 09:47:44AM +0100, Julia Lawall wrote:
+> The device node iterators perform an of_node_get on each
+> iteration, so a jump out of the loop requires an of_node_put.
+>=20
+> Remote and port also have augmented reference counts, so drop them
+> on each iteration and at the end of the function, respectively.
+> Remote is only used for the address it contains, not for the
+> contents of that address, so the reference count can be dropped
+> immediately.
+>=20
+> The semantic patch that fixes the first part of this problem is
+> as follows (http://coccinelle.lip6.fr):
+>=20
+> // <smpl>
+> @@
+> expression root,e;
+> local idexpression child;
+> iterator name for_each_child_of_node;
+> @@
+>=20
+>  for_each_available_child_of_node(root, child) {
+>    ... when !=3D of_node_put(child)
+>        when !=3D e =3D child
+> +  of_node_put(child);
+> ?  break;
+>    ...
+> }
+> ... when !=3D child
+> // </smpl>
+>=20
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+
+Applied, thanks!
 Maxime
 
--- 
+--=20
 Maxime Ripard, Bootlin
 Embedded Linux and Kernel engineering
 https://bootlin.com
+
+--dunppgcxmo5qgg5l
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXD7yYQAKCRDj7w1vZxhR
+xYlyAQDwvaT1Fd85U90xXfnNEaXT0VONYRQBfzXkZ5deO8x8igEA+PXurQWESJMf
+cVGPanmyDaAWOtjRbYLKr4Tkn8cthAk=
+=7q2T
+-----END PGP SIGNATURE-----
+
+--dunppgcxmo5qgg5l--
+
+
+--===============1494106364741273959==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============1494106364741273959==--
+
