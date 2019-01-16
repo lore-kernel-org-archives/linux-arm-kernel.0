@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7617BC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 13:47:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C5647C43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 13:47:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 30279206C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 13:47:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9351C2082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 13:47:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qcxR1eKl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 30279206C2
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B7+dflbj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9351C2082F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,78 +26,78 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	References:In-Reply-To:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=cUlQXCd4lOBIWHRGUOmFD08vjfQACXtUqaz1ruVIWXI=; b=qcxR1eKlQ6dXZxPT+P7ifcZCRZ
-	mIX9qyUyLASgO4mHsQegx4Pb9i396kcY9rGAi07MzvXNEu/MRVwyAqmWjkFVYxkW/EQaFE+Et2aPS
-	ULl+r6qrz5u3LvIUpYUxe0MOW20ymW0pFFkobOD6EevWBj1kGl9Gzl3Hb9JZsJ6Wtr1zyHcyg5Snp
-	pOpC22Et6Y9SLS2NKOm9raZnepuqYbgr07BGefeyJEU8xQ9VePnfM2Ct2HTt04qmQFx/49y0oib7h
-	9wOsa/5vvRRVYbfOZy6ynhdEitizAKWXJysGz0GRt7tp3+cv2zoIR8SLC2WFT9k2vffBdjvam/lES
-	ypoukmrw==;
+	bh=n/V1XEBJMcDmYceBWqgZuu1hyE+enyaLFk3GN4CV1cg=; b=B7+dflbjsfvY/rtJctgnrEyMbT
+	ktGmBCGnOGxIl+mr3rHpUs7WTPfnmotPuR+9lOYgQmMncW0NSHk9Oo/LP8JDwQljJJCftmzOj0m2q
+	6MUyazvdWsSB4J+89wLa6/YFL+py4GNOsqbpkAMSBMd6FbbICZ7PeLKPW7KSL715zCsluXGsBe+XQ
+	Xl4/zB45PR53zskbxxeMjXiW/Wet05NHwiVJw8fyGbK7oOir+HUd56zqbqo9AXutDro/Msfn/3W3f
+	rusbsosNbwK+usauhJ5JiF6qffCgo/gXf1eQbMgxlm2FatdSr2TPsbK+Ul+Goi7PFCBfdvFN989O+
+	WR9+m8yQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjlXA-0003o2-Kj; Wed, 16 Jan 2019 13:47:08 +0000
+	id 1gjlXk-0004OD-Or; Wed, 16 Jan 2019 13:47:44 +0000
 Received: from mx0b-001b2d01.pphosted.com ([148.163.158.5]
  helo=mx0a-001b2d01.pphosted.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjlVR-0001rW-UO
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 13:45:41 +0000
-Received: from pps.filterd (m0098417.ppops.net [127.0.0.1])
- by mx0a-001b2d01.pphosted.com (8.16.0.22/8.16.0.22) with SMTP id
- x0GDeZBi042657
- for <linux-arm-kernel@lists.infradead.org>; Wed, 16 Jan 2019 08:45:21 -0500
-Received: from e06smtp05.uk.ibm.com (e06smtp05.uk.ibm.com [195.75.94.101])
- by mx0a-001b2d01.pphosted.com with ESMTP id 2q23ekekn5-1
+ id 1gjlVW-00029A-6J
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 13:45:49 +0000
+Received: from pps.filterd (m0098416.ppops.net [127.0.0.1])
+ by mx0b-001b2d01.pphosted.com (8.16.0.22/8.16.0.22) with SMTP id
+ x0GDf7aQ033359
+ for <linux-arm-kernel@lists.infradead.org>; Wed, 16 Jan 2019 08:45:25 -0500
+Received: from e06smtp04.uk.ibm.com (e06smtp04.uk.ibm.com [195.75.94.100])
+ by mx0b-001b2d01.pphosted.com with ESMTP id 2q22ukywu2-1
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
- for <linux-arm-kernel@lists.infradead.org>; Wed, 16 Jan 2019 08:45:20 -0500
+ for <linux-arm-kernel@lists.infradead.org>; Wed, 16 Jan 2019 08:45:24 -0500
 Received: from localhost
- by e06smtp05.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
+ by e06smtp04.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
  Violators will be prosecuted
  for <linux-arm-kernel@lists.infradead.org> from <rppt@linux.ibm.com>;
- Wed, 16 Jan 2019 13:45:18 -0000
+ Wed, 16 Jan 2019 13:45:22 -0000
 Received: from b06cxnps4074.portsmouth.uk.ibm.com (9.149.109.196)
- by e06smtp05.uk.ibm.com (192.168.101.135) with IBM ESMTP SMTP Gateway:
+ by e06smtp04.uk.ibm.com (192.168.101.134) with IBM ESMTP SMTP Gateway:
  Authorized Use Only! Violators will be prosecuted; 
  (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
- Wed, 16 Jan 2019 13:45:07 -0000
-Received: from d06av23.portsmouth.uk.ibm.com (d06av23.portsmouth.uk.ibm.com
- [9.149.105.59])
+ Wed, 16 Jan 2019 13:45:12 -0000
+Received: from d06av26.portsmouth.uk.ibm.com (d06av26.portsmouth.uk.ibm.com
+ [9.149.105.62])
  by b06cxnps4074.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
- x0GDj6Xg8258012
+ x0GDjBJN9699596
  (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
- Wed, 16 Jan 2019 13:45:06 GMT
-Received: from d06av23.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 203BBA4053;
+ Wed, 16 Jan 2019 13:45:11 GMT
+Received: from d06av26.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id 00A28AE04D;
+ Wed, 16 Jan 2019 13:45:11 +0000 (GMT)
+Received: from d06av26.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id CE7D1AE053;
  Wed, 16 Jan 2019 13:45:06 +0000 (GMT)
-Received: from d06av23.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 04993A4051;
- Wed, 16 Jan 2019 13:45:02 +0000 (GMT)
 Received: from rapoport-lnx (unknown [9.148.8.226])
- by d06av23.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
- Wed, 16 Jan 2019 13:45:01 +0000 (GMT)
+ by d06av26.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
+ Wed, 16 Jan 2019 13:45:06 +0000 (GMT)
 Received: by rapoport-lnx (sSMTP sendmail emulation);
- Wed, 16 Jan 2019 15:45:01 +0200
+ Wed, 16 Jan 2019 15:45:06 +0200
 From: Mike Rapoport <rppt@linux.ibm.com>
 To: linux-mm@kvack.org
-Subject: [PATCH 08/21] memblock: drop __memblock_alloc_base()
-Date: Wed, 16 Jan 2019 15:44:08 +0200
+Subject: [PATCH 09/21] memblock: drop memblock_alloc_base()
+Date: Wed, 16 Jan 2019 15:44:09 +0200
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1547646261-32535-1-git-send-email-rppt@linux.ibm.com>
 References: <1547646261-32535-1-git-send-email-rppt@linux.ibm.com>
 X-TM-AS-GCONF: 00
-x-cbid: 19011613-0020-0000-0000-0000030747BA
+x-cbid: 19011613-0016-0000-0000-00000246449C
 X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
-x-cbparentid: 19011613-0021-0000-0000-00002158645D
-Message-Id: <1547646261-32535-9-git-send-email-rppt@linux.ibm.com>
+x-cbparentid: 19011613-0017-0000-0000-000032A061C3
+Message-Id: <1547646261-32535-10-git-send-email-rppt@linux.ibm.com>
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2019-01-16_05:, , signatures=0
 X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
  priorityscore=1501
  malwarescore=0 suspectscore=1 phishscore=0 bulkscore=0 spamscore=0
  clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
- mlxlogscore=746 adultscore=0 classifier=spam adjust=0 reason=mlx
+ mlxlogscore=999 adultscore=0 classifier=spam adjust=0 reason=mlx
  scancount=1 engine=8.0.1-1810050000 definitions=main-1901160114
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_054522_822856_6FBB4FF3 
-X-CRM114-Status: GOOD (  27.38  )
+X-CRM114-CacheID: sfid-20190116_054526_897604_90CECFEE 
+X-CRM114-Status: GOOD (  26.80  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -139,129 +139,125 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The __memblock_alloc_base() function tries to allocate a memory up to the
-limit specified by its max_addr parameter. Depending on the value of this
-parameter, the __memblock_alloc_base() can is replaced with the appropriate
-memblock_phys_alloc*() variant.
+The memblock_alloc_base() function tries to allocate a memory up to the
+limit specified by its max_addr parameter and panics if the allocation
+fails. Replace its usage with memblock_phys_alloc_range() and make the
+callers check the return value and panic in case of error.
 
 Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
 ---
- arch/sh/kernel/machine_kexec.c |  3 ++-
- arch/x86/kernel/e820.c         |  2 +-
- arch/x86/mm/numa.c             | 12 ++++--------
- drivers/of/of_reserved_mem.c   |  7 ++-----
- include/linux/memblock.h       |  2 --
- mm/memblock.c                  |  9 ++-------
- 6 files changed, 11 insertions(+), 24 deletions(-)
+ arch/powerpc/kernel/rtas.c      |  6 +++++-
+ arch/powerpc/mm/hash_utils_64.c |  8 ++++++--
+ arch/s390/kernel/smp.c          |  6 +++++-
+ drivers/macintosh/smu.c         |  2 +-
+ include/linux/memblock.h        |  2 --
+ mm/memblock.c                   | 14 --------------
+ 6 files changed, 17 insertions(+), 21 deletions(-)
 
-diff --git a/arch/sh/kernel/machine_kexec.c b/arch/sh/kernel/machine_kexec.c
-index b9f9f1a..63d63a3 100644
---- a/arch/sh/kernel/machine_kexec.c
-+++ b/arch/sh/kernel/machine_kexec.c
-@@ -168,7 +168,8 @@ void __init reserve_crashkernel(void)
- 	crash_size = PAGE_ALIGN(resource_size(&crashk_res));
- 	if (!crashk_res.start) {
- 		unsigned long max = memblock_end_of_DRAM() - memory_limit;
--		crashk_res.start = __memblock_alloc_base(crash_size, PAGE_SIZE, max);
-+		crashk_res.start = memblock_phys_alloc_range(crash_size,
-+							     PAGE_SIZE, 0, max);
- 		if (!crashk_res.start) {
- 			pr_err("crashkernel allocation failed\n");
- 			goto disable;
-diff --git a/arch/x86/kernel/e820.c b/arch/x86/kernel/e820.c
-index 50895c2..9c0eb54 100644
---- a/arch/x86/kernel/e820.c
-+++ b/arch/x86/kernel/e820.c
-@@ -778,7 +778,7 @@ u64 __init e820__memblock_alloc_reserved(u64 size, u64 align)
- {
- 	u64 addr;
- 
--	addr = __memblock_alloc_base(size, align, MEMBLOCK_ALLOC_ACCESSIBLE);
-+	addr = memblock_phys_alloc(size, align);
- 	if (addr) {
- 		e820__range_update_kexec(addr, size, E820_TYPE_RAM, E820_TYPE_RESERVED);
- 		pr_info("update e820_table_kexec for e820__memblock_alloc_reserved()\n");
-diff --git a/arch/x86/mm/numa.c b/arch/x86/mm/numa.c
-index 1308f54..f85ae42 100644
---- a/arch/x86/mm/numa.c
-+++ b/arch/x86/mm/numa.c
-@@ -195,15 +195,11 @@ static void __init alloc_node_data(int nid)
- 	 * Allocate node data.  Try node-local memory and then any node.
- 	 * Never allocate in DMA zone.
- 	 */
--	nd_pa = memblock_phys_alloc_nid(nd_size, SMP_CACHE_BYTES, nid);
-+	nd_pa = memblock_phys_alloc_try_nid(nd_size, SMP_CACHE_BYTES, nid);
- 	if (!nd_pa) {
--		nd_pa = __memblock_alloc_base(nd_size, SMP_CACHE_BYTES,
--					      MEMBLOCK_ALLOC_ACCESSIBLE);
--		if (!nd_pa) {
--			pr_err("Cannot find %zu bytes in any node (initial node: %d)\n",
--			       nd_size, nid);
--			return;
--		}
-+		pr_err("Cannot find %zu bytes in any node (initial node: %d)\n",
-+		       nd_size, nid);
-+		return;
+diff --git a/arch/powerpc/kernel/rtas.c b/arch/powerpc/kernel/rtas.c
+index de35bd8f..fbc6761 100644
+--- a/arch/powerpc/kernel/rtas.c
++++ b/arch/powerpc/kernel/rtas.c
+@@ -1187,7 +1187,11 @@ void __init rtas_initialize(void)
+ 		ibm_suspend_me_token = rtas_token("ibm,suspend-me");
  	}
- 	nd = __va(nd_pa);
+ #endif
+-	rtas_rmo_buf = memblock_alloc_base(RTAS_RMOBUF_MAX, PAGE_SIZE, rtas_region);
++	rtas_rmo_buf = memblock_phys_alloc_range(RTAS_RMOBUF_MAX, PAGE_SIZE,
++						 0, rtas_region);
++	if (!rtas_rmo_buf)
++		panic("ERROR: RTAS: Failed to allocate %lx bytes below %pa\n",
++		      PAGE_SIZE, &rtas_region);
  
-diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
-index 1977ee0..499f16d 100644
---- a/drivers/of/of_reserved_mem.c
-+++ b/drivers/of/of_reserved_mem.c
-@@ -31,13 +31,10 @@ int __init __weak early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
- 	phys_addr_t *res_base)
- {
- 	phys_addr_t base;
--	/*
--	 * We use __memblock_alloc_base() because memblock_alloc_base()
--	 * panic()s on allocation failure.
--	 */
+ #ifdef CONFIG_RTAS_ERROR_LOGGING
+ 	rtas_last_error_token = rtas_token("rtas-last-error");
+diff --git a/arch/powerpc/mm/hash_utils_64.c b/arch/powerpc/mm/hash_utils_64.c
+index bc6be44..c7d5f48 100644
+--- a/arch/powerpc/mm/hash_utils_64.c
++++ b/arch/powerpc/mm/hash_utils_64.c
+@@ -882,8 +882,12 @@ static void __init htab_initialize(void)
+ 		}
+ #endif /* CONFIG_PPC_CELL */
+ 
+-		table = memblock_alloc_base(htab_size_bytes, htab_size_bytes,
+-					    limit);
++		table = memblock_phys_alloc_range(htab_size_bytes,
++						  htab_size_bytes,
++						  0, limit);
++		if (!table)
++			panic("ERROR: Failed to allocate %pa bytes below %pa\n",
++			      &htab_size_bytes, &limit);
+ 
+ 		DBG("Hash table allocated at %lx, size: %lx\n", table,
+ 		    htab_size_bytes);
+diff --git a/arch/s390/kernel/smp.c b/arch/s390/kernel/smp.c
+index f82b3d3..9061597 100644
+--- a/arch/s390/kernel/smp.c
++++ b/arch/s390/kernel/smp.c
+@@ -651,7 +651,11 @@ void __init smp_save_dump_cpus(void)
+ 		/* No previous system present, normal boot. */
+ 		return;
+ 	/* Allocate a page as dumping area for the store status sigps */
+-	page = memblock_alloc_base(PAGE_SIZE, PAGE_SIZE, 1UL << 31);
++	page = memblock_phys_alloc_range(PAGE_SIZE, PAGE_SIZE, 0, 1UL << 31);
++	if (!page)
++		panic("ERROR: Failed to allocate %x bytes below %lx\n",
++		      PAGE_SIZE, 1UL << 31);
 +
- 	end = !end ? MEMBLOCK_ALLOC_ANYWHERE : end;
- 	align = !align ? SMP_CACHE_BYTES : align;
--	base = __memblock_alloc_base(size, align, end);
-+	base = memblock_phys_alloc_range(size, align, 0, end);
- 	if (!base)
- 		return -ENOMEM;
- 
+ 	/* Set multi-threading state to the previous system. */
+ 	pcpu_set_smt(sclp.mtid_prev);
+ 	boot_cpu_addr = stap();
+diff --git a/drivers/macintosh/smu.c b/drivers/macintosh/smu.c
+index 0a0b8e1..42cf68d 100644
+--- a/drivers/macintosh/smu.c
++++ b/drivers/macintosh/smu.c
+@@ -485,7 +485,7 @@ int __init smu_init (void)
+ 	 * SMU based G5s need some memory below 2Gb. Thankfully this is
+ 	 * called at a time where memblock is still available.
+ 	 */
+-	smu_cmdbuf_abs = memblock_alloc_base(4096, 4096, 0x80000000UL);
++	smu_cmdbuf_abs = memblock_phys_alloc_range(4096, 4096, 0, 0x80000000UL);
+ 	if (smu_cmdbuf_abs == 0) {
+ 		printk(KERN_ERR "SMU: Command buffer allocation failed !\n");
+ 		ret = -EINVAL;
 diff --git a/include/linux/memblock.h b/include/linux/memblock.h
-index 7883c74..768e2b4 100644
+index 768e2b4..6874fdc 100644
 --- a/include/linux/memblock.h
 +++ b/include/linux/memblock.h
-@@ -496,8 +496,6 @@ static inline bool memblock_bottom_up(void)
+@@ -494,8 +494,6 @@ static inline bool memblock_bottom_up(void)
+ 	return memblock.bottom_up;
+ }
  
- phys_addr_t memblock_alloc_base(phys_addr_t size, phys_addr_t align,
- 				phys_addr_t max_addr);
--phys_addr_t __memblock_alloc_base(phys_addr_t size, phys_addr_t align,
--				  phys_addr_t max_addr);
+-phys_addr_t memblock_alloc_base(phys_addr_t size, phys_addr_t align,
+-				phys_addr_t max_addr);
  phys_addr_t memblock_phys_mem_size(void);
  phys_addr_t memblock_reserved_size(void);
  phys_addr_t memblock_mem_size(unsigned long limit_pfn);
 diff --git a/mm/memblock.c b/mm/memblock.c
-index 461e40a3..e5ffdcd 100644
+index e5ffdcd..531fa77 100644
 --- a/mm/memblock.c
 +++ b/mm/memblock.c
-@@ -1363,17 +1363,12 @@ phys_addr_t __init memblock_phys_alloc_nid(phys_addr_t size, phys_addr_t align,
+@@ -1363,20 +1363,6 @@ phys_addr_t __init memblock_phys_alloc_nid(phys_addr_t size, phys_addr_t align,
  	return ret;
  }
  
--phys_addr_t __init __memblock_alloc_base(phys_addr_t size, phys_addr_t align, phys_addr_t max_addr)
+-phys_addr_t __init memblock_alloc_base(phys_addr_t size, phys_addr_t align, phys_addr_t max_addr)
 -{
--	return memblock_alloc_range_nid(size, align, 0, max_addr, NUMA_NO_NODE,
+-	phys_addr_t alloc;
+-
+-	alloc = memblock_alloc_range_nid(size, align, 0, max_addr, NUMA_NO_NODE,
 -					MEMBLOCK_NONE);
+-
+-	if (alloc == 0)
+-		panic("ERROR: Failed to allocate %pa bytes below %pa.\n",
+-		      &size, &max_addr);
+-
+-	return alloc;
 -}
 -
- phys_addr_t __init memblock_alloc_base(phys_addr_t size, phys_addr_t align, phys_addr_t max_addr)
+ phys_addr_t __init memblock_phys_alloc_try_nid(phys_addr_t size, phys_addr_t align, int nid)
  {
- 	phys_addr_t alloc;
- 
--	alloc = __memblock_alloc_base(size, align, max_addr);
-+	alloc = memblock_alloc_range_nid(size, align, 0, max_addr, NUMA_NO_NODE,
-+					MEMBLOCK_NONE);
- 
- 	if (alloc == 0)
- 		panic("ERROR: Failed to allocate %pa bytes below %pa.\n",
+ 	phys_addr_t res = memblock_phys_alloc_nid(size, align, nid);
 -- 
 2.7.4
 
