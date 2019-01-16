@@ -2,82 +2,64 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D3F72C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 11:56:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A98D2C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 11:58:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A5C9D20578
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 11:56:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 77CC1206C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 11:58:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EWAGLhs2";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="aiXjmSLN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A5C9D20578
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KGUiEJN5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 77CC1206C2
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=clg48iA+mPXTA5seE+npgLEDlTASzE+bTb1drXpaBX0=; b=EWAGLhs2FGHxoH
-	3nSy6pLVWQcVdCrQTnKJBY+wY16EtH9F3gFJhaYc2yc5lVwErRU+bMAStrEYr6l3C79e2am6mj7RN
-	idCu1DvgPOL4AbhSvRA8+PFRmezGE2BdRTJGfw9hn8qeyS/dlXMDbkoTu3z4xC+Bs5oPlNMqTSWjV
-	MYElSucYYm3iQ6bbl2dASaN8tQgbsUGZAlKoTBk3R3wyK1hZylP40Qs7bnhjl6A1yEEVMqY9TnnLw
-	EGtrHgME9VLqQkTVaqd8D9OWqjTpYDDlGO40H8CV6PvBRsGGPKYcQCLbp7vC7ttJQLsd091ciS0QJ
-	Jgk+tlEl+O0CsIMNRIUA==;
+	List-Owner; bh=Agzv4R6u1EneFKn8HfGJKQIufHDhrZ36nSOV5Jgkzvs=; b=KGUiEJN5/9Yboz
+	o6lW71nSaahoZRex4odJ5ki1uG2Q/Nw2e1s5eJt+dc5qM3GxQrOCBFe8df21El9OJ6HFMLgbCWnXc
+	1v+oiEZmU4odg/flMwFfJZMqjbdJrjjAulOhphWRcBZGPBVS27bkkmnykDKykDrX1URqZkSn5lGlV
+	XyjEXzE68k41639Uo9L1FGBxfthOR38v3tyUfqNUbfHm4xK9lSBQK9DA0orrw79W3XIsduW8/6w9S
+	BNKxbinJJYV0evwLiPaj7OrejT4bm+CCRqNI+CXj+JFi/8+79baNTeRt8vN671MjaXXFn6MIvVG7N
+	dIZn6UWaDeWZOeYY4u+w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjjni-0006JH-Nm; Wed, 16 Jan 2019 11:56:06 +0000
-Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjjnf-0006In-0j
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 11:56:04 +0000
-Received: by mail-it1-x143.google.com with SMTP id c9so2337488itj.1
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 16 Jan 2019 03:56:02 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=XvMl/ZDzbeMyiqWF1DKxLkc+UI4ssoApML6l46MCtkg=;
- b=aiXjmSLNzlvF1qS9PhYr3PA0t6Q+xpiujt4djc0efj/Y88M+Fdu7aNde7L7uFMEX/G
- 7AOoOKAAEY1vuc/fgpPZ55GW2KYRVp4vEPlfRN25VHApIrVs6iW3Aq6MKTSTYn8CvmNE
- XffBBkl9YGmqtPKlZn5QC3Ctpa8QWfej87Hh8=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=XvMl/ZDzbeMyiqWF1DKxLkc+UI4ssoApML6l46MCtkg=;
- b=LwgKJDZ9rQfzZm0uWknZWCZ/hyL+bdHueTMYgbYjgWMFFFgrYLkaruJ6+Fsik2t/8+
- 5c1HlIwf14mk3N3flxhO5V+dRNyZsEZAUgZj4sLR43Fm6e7gLHi/vvb1cz6ObdUEBySP
- tTVnHaxYVvdIKOaBgGCipK40NQ+LhQk12TD2JFFqMg4gyb7M8EN0UPG4UN46eTzOLCBF
- X2or/PtCqG8BMsSQdCHOffJC5ETlCzUNPut9LkdjDzDWPw8oIekTEo1N69gfGgqM67GJ
- bTmQQvSPcKTg0zv3vD+1eXbDKRoDnkFSOBZJW28xaTVPDpMpv+Ho33RIi87WAbqE6AmY
- 9cfw==
-X-Gm-Message-State: AJcUukdXpBXDssIJQmk6jZBL6xHRLJrF7nNGT5CRa57jf6loFUIWQGrc
- xhWan+WNGBa8TS/XdLCRcvvFD1xbVgAUbFWFqG3CPA==
-X-Google-Smtp-Source: ALg8bN4qIhVOjs/HU+8jKaQFLeOhN3K6Ch3j5blYwkfsuapq+znMibMEk6j+Zk3I487BraRbJn8QMF/e7m4vuuVCvg4=
-X-Received: by 2002:a24:edc4:: with SMTP id r187mr5828279ith.158.1547639761295; 
- Wed, 16 Jan 2019 03:56:01 -0800 (PST)
-MIME-Version: 1.0
+	id 1gjjpn-0006n7-5r; Wed, 16 Jan 2019 11:58:15 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gjjpj-0006lz-Cv
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 11:58:13 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 33B51A78;
+ Wed, 16 Jan 2019 03:58:09 -0800 (PST)
+Received: from mbp (usa-sjc-mx-foss1.foss.arm.com [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 1B5963F5AF;
+ Wed, 16 Jan 2019 03:58:07 -0800 (PST)
+Date: Wed, 16 Jan 2019 11:58:05 +0000
+From: Catalin Marinas <catalin.marinas@arm.com>
+To: Will Deacon <will.deacon@arm.com>
+Subject: Re: [PATCH] arm64: kaslr: ensure randomized quantities are clean to
+ the PoC
+Message-ID: <20190116115805.jarm4op4ydbkofbr@mbp>
 References: <20190115194707.11614-1-ard.biesheuvel@linaro.org>
  <CAKv+Gu_BZZVNj9scfwfuEmbPD93oyBGjs08raLgD7dQ9+3B7Fw@mail.gmail.com>
  <20190116113227.GB11240@fuggles.cambridge.arm.com>
- <CAKv+Gu9VzOJRSpjo+1-YJ=5M-rNb7YV1MzShVaaGG-WpN_=tUw@mail.gmail.com>
-In-Reply-To: <CAKv+Gu9VzOJRSpjo+1-YJ=5M-rNb7YV1MzShVaaGG-WpN_=tUw@mail.gmail.com>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Wed, 16 Jan 2019 12:55:50 +0100
-Message-ID: <CAKv+Gu9QqmwV8t6fjgkGiVPLOzFUAFnVwQt_TZ+sSO2in5EJ8w@mail.gmail.com>
-Subject: Re: [PATCH] arm64: kaslr: ensure randomized quantities are clean to
- the PoC
-To: Will Deacon <will.deacon@arm.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20190116113227.GB11240@fuggles.cambridge.arm.com>
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_035603_059031_56265C66 
-X-CRM114-Status: GOOD (  25.19  )
+X-CRM114-CacheID: sfid-20190116_035811_443218_FB8BFB2E 
+X-CRM114-Status: GOOD (  25.12  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,85 +72,82 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Mark Rutland <mark.rutland@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 16 Jan 2019 at 12:49, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->
-> On Wed, 16 Jan 2019 at 12:32, Will Deacon <will.deacon@arm.com> wrote:
-> >
-> > Hi Ard,
-> >
-> > On Tue, Jan 15, 2019 at 09:12:41PM +0100, Ard Biesheuvel wrote:
-> > > On Tue, 15 Jan 2019 at 20:47, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > > >
-> > > > kaslr_early_init() is called with the kernel mapped at its
-> > > > link time offset, and if it returns with a non-zero offset,
-> > > > the kernel is unmapped and remapped again at the randomized
-> > > > offset.
-> > > >
-> > > > During its execution, kaslr_early_init() also randomizes the
-> > > > base of the module region and of the linear mapping of DRAM,
-> > > > and sets two variables accordingly. However, since these
-> > > > variables are assigned with the caches on, they may get lost
-> > > > during the cache maintenance that occurs when unmapping and
-> > > > remapping the kernel, so ensure that these values are cleaned
-> > > > to the PoC.
-> > > >
-> > > > Fixes: f80fb3a3d508 ("arm64: add support for kernel ASLR")
-> > > > Cc: <stable@vger.kernel.org> # v4.6+
-> > > > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On Wed, Jan 16, 2019 at 11:32:27AM +0000, Will Deacon wrote:
+> On Tue, Jan 15, 2019 at 09:12:41PM +0100, Ard Biesheuvel wrote:
+> > On Tue, 15 Jan 2019 at 20:47, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > > kaslr_early_init() is called with the kernel mapped at its
+> > > link time offset, and if it returns with a non-zero offset,
+> > > the kernel is unmapped and remapped again at the randomized
+> > > offset.
 > > >
-> > > On an affected kernel build, I see the following variables sharing the
-> > > same 64-byte cacheline
+> > > During its execution, kaslr_early_init() also randomizes the
+> > > base of the module region and of the linear mapping of DRAM,
+> > > and sets two variables accordingly. However, since these
+> > > variables are assigned with the caches on, they may get lost
+> > > during the cache maintenance that occurs when unmapping and
+> > > remapping the kernel, so ensure that these values are cleaned
+> > > to the PoC.
 > > >
-> > > ffff00001100bd18 R module_alloc_base
-> > > ffff00001100bd20 R memstart_addr
-> > > ffff00001100bd28 R arm64_dma_phys_limit
-> > > ffff00001100bd30 R kimage_voffset
-> > > ffff00001100bd38 R vabits_user
-> > >
-> > > and we now have the following code in head.S (line 330)
-> > >
-> > > adr_l x6, vabits_user
-> > > str x5, [x6]
-> > > dmb sy
-> > > dc ivac, x6 // Invalidate potentially stale cache line
-> > >
-> > > which is invoked after kaslr_early_init() returns.
-> >
-> > Urgh, this is hideous. Well done for debugging it! It would be nice to make
-> > this less fragile in future, perhaps by annotating the variable declarations
-> > and ensuring they're padded to the CWG etc so that we avoid any false
-> > sharing and make it very obvious what's going to be invalidated. We already
-> > have .mmuoff.data.write for data written with the MMU off.
-> >
-> > I'm happy to take your patch to plug the regression, but I think we should
-> > aim to remove the false sharing rather than handling it. Another alternative
-> > might be to use clean+invalidate instead of invalidate in head.S, along the
-> > lines of:
-> >
-> >         DC CIVAC,       X0
-> >         DMB             SY
-> >         STR             X1, [X0]
-> >         DMB             SY
-> >         DC CIVAC,       X0
-> >
-> > Can you foresee any issues with that?
-> >
->
-> In general, I think we should simply never invalidate ordinary
-> variables like that.
->
-> In this particular case, I don't think there is a need to set
-> vabits_user twice, so we can move that code to after the call to
-> __create_page_tables in stext() instead.
+> > > Fixes: f80fb3a3d508 ("arm64: add support for kernel ASLR")
+> > > Cc: <stable@vger.kernel.org> # v4.6+
+> > > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > 
+> > On an affected kernel build, I see the following variables sharing the
+> > same 64-byte cacheline
+> > 
+> > ffff00001100bd18 R module_alloc_base
+> > ffff00001100bd20 R memstart_addr
+> > ffff00001100bd28 R arm64_dma_phys_limit
+> > ffff00001100bd30 R kimage_voffset
+> > ffff00001100bd38 R vabits_user
+> > 
+> > and we now have the following code in head.S (line 330)
+> > 
+> > adr_l x6, vabits_user
+> > str x5, [x6]
+> > dmb sy
+> > dc ivac, x6 // Invalidate potentially stale cache line
+> > 
+> > which is invoked after kaslr_early_init() returns.
+> 
+> Urgh, this is hideous. Well done for debugging it! It would be nice to make
+> this less fragile in future, perhaps by annotating the variable declarations
+> and ensuring they're padded to the CWG etc so that we avoid any false
+> sharing and make it very obvious what's going to be invalidated. We already
+> have .mmuoff.data.write for data written with the MMU off.
+> 
+> I'm happy to take your patch to plug the regression, but I think we should
+> aim to remove the false sharing rather than handling it. Another alternative
+> might be to use clean+invalidate instead of invalidate in head.S, along the
+> lines of:
+> 
+> 	DC CIVAC,	X0
+> 	DMB		SY
+> 	STR		X1, [X0]
+> 	DMB		SY
+> 	DC CIVAC,	X0
+> 
+> Can you foresee any issues with that?
 
-I guess the same applies to idmap_t0sz, but we never hit that code path anymore.
+The assumptions we've made in head.S were that any meaningful data has
+already been written back by whoever wrote it (we don't care about clean
+entries in the D-cache). Ard's patch fixes the code for this assumption.
+
+I don't think changing head.S to CIVAC breaks anything since dirty lines
+can be randomly evicted anyway. I'm more worried about no longer
+detecting potential issues in things running prior to the kernel
+(whether it's boot-loader, qemu).
+
+FWIW, on Ard's patch:
+
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
 _______________________________________________
 linux-arm-kernel mailing list
