@@ -2,65 +2,65 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 04387C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 17:56:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 07FE7C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 18:01:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CA92220866
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 17:56:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CEE1C206C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 18:01:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qdLSeTkW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CA92220866
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KM0uqvfv"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CEE1C206C2
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=3MWOUtoVLFHZU+gtNqu7j6oBYG9KbkqGAnRVeo9uL40=; b=qdLSeTkWHHvKwUMJykthWFhUO
-	eLTfzvqHnWcVpuDshcLMAfYT1GC1uz5nTDYJb3Y8c3VvG9xLFLcIjn3InBhvHDimJBXvqb2OjVyIu
-	2GfE/Q2JzXJYqPEb8BZO7Nc21VIsvn6tIy9P1ZRaLLa4f9YwdaXw9lidmyCHwL9rQ7FmDCGTMO+Jl
-	gKLcyCdSvAzArFC9WIiGB1n1n4tAHXogef0szUMo4vQz3FznoGWoLpD3WkmkE57MOyL3C6TIp9Y9L
-	bErOHwkB0RmdJ0B93AB4pg8t9JYmVPlaJB2q5Rd8ps2O1/8xO4KfWHM9S0iE5ftVgcV+py0Y1++t8
-	B/wt4mMVg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:References:To:From:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=/cwVy58q42fCqw6CLB/UDbcETUGR08dC/ps/zeYbDCE=; b=KM0uqvfv7k96pF
+	9vchUno0gX/PUwgGHGff6R+if74jcW69E8ivJcTvqsEcorbzMuJHzRYocKFf8Ep7ad0sVeLTpxlFf
+	9mt/T09dL0N8RpM0D7isngEHCStYRo+Y5gDtTxc8YPUBZ2vxacmPHRymx1yKBcIx9uDcSNhes+QSv
+	qvvGGbKuEY8UjBaI2Wm5NRD2+NP34ksTSZ4gfKhC5gmKQ0BZvM/YqddlnrVqEP2LLxZqSGe0fX993
+	a21zto4VJvoq6n0uFAgoOXdlzttEsE43UXkMvhBtu6NAGgUIbwVTq+TZwl7qSLwbQEXqbcdVxP+1L
+	/DmjokL71+bD46mKanYQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjpQN-00042w-Qa; Wed, 16 Jan 2019 17:56:23 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gjpUz-000647-LO; Wed, 16 Jan 2019 18:01:09 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjpPU-0003GI-DG
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 17:55:41 +0000
+ id 1gjpUw-00063c-BG
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 18:01:07 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id DFB4380D;
- Wed, 16 Jan 2019 09:55:25 -0800 (PST)
-Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 851C23F763;
- Wed, 16 Jan 2019 09:55:24 -0800 (PST)
-Subject: Re: [RFC PATCH] i2c: imx: dma map the i2c data i/o register
-To: Laurentiu Tudor <laurentiu.tudor@nxp.com>, linux-i2c@vger.kernel.org,
- linux-imx@nxp.com, iommu@lists.linux-foundation.org, kernel@pengutronix.de,
- wsa@the-dreams.de
-References: <20190116161713.12748-1-laurentiu.tudor@nxp.com>
-From: Robin Murphy <robin.murphy@arm.com>
-Message-ID: <7f9a9486-250d-cc92-1ce5-b5c1afc96f2d@arm.com>
-Date: Wed, 16 Jan 2019 17:55:19 +0000
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C9F6DEBD;
+ Wed, 16 Jan 2019 10:01:05 -0800 (PST)
+Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 6CDEA3F763;
+ Wed, 16 Jan 2019 10:01:03 -0800 (PST)
+Subject: Re: [PATCH v6] arm64: implement ftrace with regs
+From: Julien Thierry <julien.thierry@arm.com>
+To: Mark Rutland <mark.rutland@arm.com>, Balbir Singh <bsingharora@gmail.com>
+References: <20190104141053.360F768D93@newverein.lst.de>
+ <20190104175017.GA7157@lakrids.cambridge.arm.com>
+ <20190114121359.GB26056@350D>
+ <20190114122616.GD10258@lakrids.cambridge.arm.com>
+ <e82df4bd-804e-de46-d1d9-93b56f9db9c8@arm.com>
+Message-ID: <82f231a8-c757-da97-bbce-33ac6199a4d9@arm.com>
+Date: Wed, 16 Jan 2019 18:01:01 +0000
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20190116161713.12748-1-laurentiu.tudor@nxp.com>
-Content-Language: en-GB
+In-Reply-To: <e82df4bd-804e-de46-d1d9-93b56f9db9c8@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_095529_098038_60835462 
-X-CRM114-Status: GOOD (  23.41  )
+X-CRM114-CacheID: sfid-20190116_100106_415673_2E50B073 
+X-CRM114-Status: GOOD (  18.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,177 +72,119 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: Arnd Bergmann <arnd@arndb.de>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, Steven Rostedt <rostedt@goodmis.org>,
+ AKASHI Takahiro <takahiro.akashi@linaro.org>, Ingo Molnar <mingo@redhat.com>,
+ Torsten Duwe <duwe@lst.de>, Josh Poimboeuf <jpoimboe@redhat.com>,
+ Amit Daniel Kachhap <amit.kachhap@arm.com>, live-patching@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 16/01/2019 16:17, Laurentiu Tudor wrote:
-> This is an attempt to fix an iommu exception when doing dma to the
-> i2c controller with EDMA. Without these mappings the smmu raises a
-> context fault [1] exactly with the address of the i2c data i/o reg.
-> This was seen on an NXP LS1043A chip while working on enabling SMMU.
 
-Rather than gradually adding much the same code to potentially every 
-possible client driver, can it not be implemented once in the edma 
-driver as was done for pl330 and rcar-dmac? That also sidesteps any of 
-the nastiness of smuggling a dma_addr_t via a phys_addr_t variable.
 
-Robin.
+On 16/01/2019 15:56, Julien Thierry wrote:
+> On 14/01/2019 12:26, Mark Rutland wrote:
+>> On Mon, Jan 14, 2019 at 11:13:59PM +1100, Balbir Singh wrote:
+>>> On Fri, Jan 04, 2019 at 05:50:18PM +0000, Mark Rutland wrote:
+>>>> Hi Torsten,
+>>>>
+>>>> On Fri, Jan 04, 2019 at 03:10:53PM +0100, Torsten Duwe wrote:
+>>>>> Use -fpatchable-function-entry (gcc8) to add 2 NOPs at the beginning
+>>>>> of each function. Replace the first NOP thus generated with a quick LR
+>>>>> saver (move it to scratch reg x9), so the 2nd replacement insn, the call
+>>>>> to ftrace, does not clobber the value. Ftrace will then generate the
+>>>>> standard stack frames.
+>>>
+>>> Do we know what the overhead would be, if this was a link time change
+>>> for the first instruction?
+>>
+>> No, but it should be possible to benchamrk that for a given workload,
+>> which is what I'd like to see.
+>>
+> 
+> So, I hacked up something to have the -fpachable-function-entry=2 in the
+> build and then have ftrace_init() patch in the "mov x9, lr" in the first
+> nop of the function preludes.
+> 
+> I tested it on a 8 x Cortex A-57 machine and compared with a version
+> that just has the two nops in the function prelude.
+> 
+> On workloads like hackbench, the average difference is within the noise
+> (<1%). Time results below are in seconds.
+> 
+> 	+------------+--------------------+
+> 	| "nop; nop" | "mov x9, lr; nop"  |
+> 	+------------+--------------------+
+> 	|     43.497 |             42.694 |
+> 	|     43.464 |             43.148 |
+> 	|     43.599 |             43.131 |
+> 	|     43.785 |              43.63 |
+> 	|     43.458 |             43.281 |
+> 	|       44.3 |             43.328 |
+> 	|     43.541 |             43.059 |
+> 	|     43.529 |             43.298 |
+> 	|      43.58 |             43.937 |
+> 	|     43.385 |             43.122 |
+> 	|     43.514 |             43.825 |
+> 	|     45.508 |             43.268 |
+> 	|     43.757 |             43.316 |
+> 	|     43.392 |             43.146 |
+> 	|     44.029 |             43.236 |
+> 	|     43.515 |             43.139 |
+> 	|      43.22 |             43.108 |
+> 	|     43.496 |             43.836 |
+> 	|     43.669 |             43.083 |
+> 	|     43.388 |              43.38 |
+> 	+------------+--------------------+
+> average	|    43.6813 |           43.29825 |
+> 	+------------+--------------------+
+> 
+Here are also some results running hackbench on 4 x Cortex-A53 (pay no
+attention to the fact that the timescales are similar, I changed the
+number of iteration done by hackbench so it wouldn't take too long)
 
-> [1] arm-smmu 9000000.iommu: Unhandled context fault: fsr=0x402,
->      iova=0x02180004, fsynr=0x150021, cb=7
-> 
-> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
-> ---
->   drivers/i2c/busses/i2c-imx.c | 57 +++++++++++++++++++++++++++++-------
->   1 file changed, 47 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
-> index 4e34b1572756..07cc8f4b45b9 100644
-> --- a/drivers/i2c/busses/i2c-imx.c
-> +++ b/drivers/i2c/busses/i2c-imx.c
-> @@ -202,6 +202,9 @@ struct imx_i2c_struct {
->   	struct pinctrl_state *pinctrl_pins_gpio;
->   
->   	struct imx_i2c_dma	*dma;
-> +
-> +	dma_addr_t		dma_tx_addr;
-> +	dma_addr_t		dma_rx_addr;
->   };
->   
->   static const struct imx_i2c_hwdata imx1_i2c_hwdata = {
-> @@ -274,17 +277,20 @@ static inline unsigned char imx_i2c_read_reg(struct imx_i2c_struct *i2c_imx,
->   
->   /* Functions for DMA support */
->   static int i2c_imx_dma_request(struct imx_i2c_struct *i2c_imx,
-> -			       dma_addr_t phy_addr)
-> +			       phys_addr_t phy_addr)
->   {
->   	struct imx_i2c_dma *dma;
->   	struct dma_slave_config dma_sconfig;
->   	struct device *dev = &i2c_imx->adapter.dev;
->   	int ret;
-> +	phys_addr_t i2dr_pa;
->   
->   	dma = devm_kzalloc(dev, sizeof(*dma), GFP_KERNEL);
->   	if (!dma)
->   		return -ENOMEM;
->   
-> +	i2dr_pa = phy_addr + (IMX_I2C_I2DR << i2c_imx->hwdata->regshift);
-> +
->   	dma->chan_tx = dma_request_chan(dev, "tx");
->   	if (IS_ERR(dma->chan_tx)) {
->   		ret = PTR_ERR(dma->chan_tx);
-> @@ -293,15 +299,25 @@ static int i2c_imx_dma_request(struct imx_i2c_struct *i2c_imx,
->   		goto fail_al;
->   	}
->   
-> -	dma_sconfig.dst_addr = phy_addr +
-> -				(IMX_I2C_I2DR << i2c_imx->hwdata->regshift);
-> +	i2c_imx->dma_tx_addr = dma_map_resource(dma->chan_tx->device->dev,
-> +						i2dr_pa,
-> +						DMA_SLAVE_BUSWIDTH_1_BYTE,
-> +						DMA_MEM_TO_DEV, 0);
-> +	ret = dma_mapping_error(dma->chan_tx->device->dev,
-> +				i2c_imx->dma_tx_addr);
-> +	if (ret) {
-> +		dev_err(dev, "can't dma map tx destination (%d)\n", ret);
-> +		goto fail_tx;
-> +	}
-> +
-> +	dma_sconfig.dst_addr = i2c_imx->dma_tx_addr;
->   	dma_sconfig.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
->   	dma_sconfig.dst_maxburst = 1;
->   	dma_sconfig.direction = DMA_MEM_TO_DEV;
->   	ret = dmaengine_slave_config(dma->chan_tx, &dma_sconfig);
->   	if (ret < 0) {
->   		dev_err(dev, "can't configure tx channel (%d)\n", ret);
-> -		goto fail_tx;
-> +		goto fail_tx_dma;
->   	}
->   
->   	dma->chan_rx = dma_request_chan(dev, "rx");
-> @@ -309,18 +325,28 @@ static int i2c_imx_dma_request(struct imx_i2c_struct *i2c_imx,
->   		ret = PTR_ERR(dma->chan_rx);
->   		if (ret != -ENODEV && ret != -EPROBE_DEFER)
->   			dev_err(dev, "can't request DMA rx channel (%d)\n", ret);
-> -		goto fail_tx;
-> +		goto fail_tx_dma;
->   	}
->   
-> -	dma_sconfig.src_addr = phy_addr +
-> -				(IMX_I2C_I2DR << i2c_imx->hwdata->regshift);
-> +	i2c_imx->dma_rx_addr = dma_map_resource(dma->chan_rx->device->dev,
-> +						i2dr_pa,
-> +						DMA_SLAVE_BUSWIDTH_1_BYTE,
-> +						DMA_DEV_TO_MEM, 0);
-> +	ret = dma_mapping_error(dma->chan_rx->device->dev,
-> +				i2c_imx->dma_rx_addr);
-> +	if (ret) {
-> +		dev_err(dev, "can't dma map rx source (%d)\n", ret);
-> +		goto fail_rx;
-> +	}
-> +
-> +	dma_sconfig.src_addr = i2c_imx->dma_rx_addr;
->   	dma_sconfig.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
->   	dma_sconfig.src_maxburst = 1;
->   	dma_sconfig.direction = DMA_DEV_TO_MEM;
->   	ret = dmaengine_slave_config(dma->chan_rx, &dma_sconfig);
->   	if (ret < 0) {
->   		dev_err(dev, "can't configure rx channel (%d)\n", ret);
-> -		goto fail_rx;
-> +		goto fail_rx_dma;
->   	}
->   
->   	i2c_imx->dma = dma;
-> @@ -330,8 +356,14 @@ static int i2c_imx_dma_request(struct imx_i2c_struct *i2c_imx,
->   
->   	return 0;
->   
-> +fail_rx_dma:
-> +	dma_unmap_resource(dma->chan_rx->device->dev, i2c_imx->dma_rx_addr,
-> +			   DMA_SLAVE_BUSWIDTH_1_BYTE, DMA_DEV_TO_MEM, 0);
->   fail_rx:
->   	dma_release_channel(dma->chan_rx);
-> +fail_tx_dma:
-> +	dma_unmap_resource(dma->chan_tx->device->dev, i2c_imx->dma_tx_addr,
-> +			   DMA_SLAVE_BUSWIDTH_1_BYTE, DMA_MEM_TO_DEV, 0);
->   fail_tx:
->   	dma_release_channel(dma->chan_tx);
->   fail_al:
-> @@ -1057,7 +1089,7 @@ static int i2c_imx_probe(struct platform_device *pdev)
->   	struct imxi2c_platform_data *pdata = dev_get_platdata(&pdev->dev);
->   	void __iomem *base;
->   	int irq, ret;
-> -	dma_addr_t phy_addr;
-> +	phys_addr_t phy_addr;
->   
->   	dev_dbg(&pdev->dev, "<%s>\n", __func__);
->   
-> @@ -1072,7 +1104,7 @@ static int i2c_imx_probe(struct platform_device *pdev)
->   	if (IS_ERR(base))
->   		return PTR_ERR(base);
->   
-> -	phy_addr = (dma_addr_t)res->start;
-> +	phy_addr = res->start;
->   	i2c_imx = devm_kzalloc(&pdev->dev, sizeof(*i2c_imx), GFP_KERNEL);
->   	if (!i2c_imx)
->   		return -ENOMEM;
-> @@ -1220,6 +1252,11 @@ static int i2c_imx_remove(struct platform_device *pdev)
->   	pm_runtime_put_noidle(&pdev->dev);
->   	pm_runtime_disable(&pdev->dev);
->   
-> +	dma_unmap_resource(&pdev->dev, i2c_imx->dma_tx_addr,
-> +			   DMA_SLAVE_BUSWIDTH_1_BYTE, DMA_MEM_TO_DEV, 0);
-> +	dma_unmap_resource(&pdev->dev, i2c_imx->dma_rx_addr,
-> +			   DMA_SLAVE_BUSWIDTH_1_BYTE, DMA_DEV_TO_MEM, 0);
-> +
->   	return 0;
->   }
->   
-> 
+	+------------+-------------------+
+	| "nop; nop" | "mov x9, lr; nop" |
+	+------------+-------------------+
+	|     43.815 |            44.455 |
+	|     43.758 |            45.173 |
+	|     44.075 |             43.95 |
+	|     44.021 |            44.185 |
+	|     43.959 |            44.826 |
+	|     44.039 |            44.478 |
+	|     43.836 |            44.626 |
+	|     44.071 |            45.177 |
+	|     43.619 |            45.033 |
+	|     44.052 |            45.095 |
+	|     43.903 |            44.802 |
+	|     43.773 |            44.955 |
+	|     43.908 |             45.02 |
+	|     43.441 |            44.986 |
+	|     44.167 |            45.182 |
+	|     44.106 |            45.229 |
+	|     43.974 |             45.07 |
+	|     43.859 |            45.283 |
+	|     43.706 |            44.892 |
+	|     43.897 |            44.194 |
+	+------------+-------------------+
+average |     43.899 |            44.835 |
+        +------------+-------------------+
+
+
+So, in this case the performance take a ~2% hit from keeping the mov
+always present in the function prelude instead of a nop.
+
+Makes it a bit less obvious whether the always having that mov there
+(whether patched at build time or run time) is good enough.
+
+Cheers,
+
+-- 
+Julien Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
