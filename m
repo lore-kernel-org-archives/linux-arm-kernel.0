@@ -4,19 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0D5D5C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 13:46:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8B322C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 13:46:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CFF5C206C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 13:46:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 446FD206C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 13:46:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YgEJO3EL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CFF5C206C2
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="S205oiLP";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="a4+WMK8F"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 446FD206C2
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,77 +27,93 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	References:In-Reply-To:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=PqdGM4XO5pPYP970gTsr4N7l3nxkrsyK+SdxXAFmixY=; b=YgEJO3ELHzitZJW/ARyZcD8wa5
-	avscEM2FqkLMSjKQ+/aqDXwLLMafxxuYW+amvyLWC2yR1kIFoarYssiGDyYqsuTLD6kGg3vVkFeOi
-	ztCRlnTSosFzbz8jiesTkrHUygIBquw4gJP+KTnFg6uO/cZBrPcsYqvgvWJmfKScTB90ypDYq8s9E
-	weENn95hIvNwAPRXycNeT1mKqoepT38txTFwbNW1Tc9OBc8Sd7jItp7wgAsX3oxClNZPIW5lXHYDu
-	917fjy2cOobXU6ukyHDs/kvUKg4nvxTN9egkSSlrgWnCr31E62SqEuAGyIkjm53/D4KzymDuiCbYU
-	mdCKa2lQ==;
+	bh=+nsioDTD7ZD8qKoenIL56DQjjBAncqQc5rwd1zjyIbY=; b=S205oiLPTvEmWDHf8H0P7MVGq7
+	5kqV5+0SZVoX6qVbUodXQM6pel/T6PXPnJHFLvNjHl3q4T340UFiachy993XUjPIv/kr4LS+DWbLq
+	MkRiCLtPEBz7E3aRuylatVg4mvoU0tSdq1UY6DiOJUMuw4vHadc5a/tk+QyEuWjU8Y80Qtl8besrb
+	HZaFzunvaPA2lYFgPVm7zs9WuPS/jqWKQwVzkXYx6FOwpVhwMYWvLEuT9e2yjRFYa03osfER+c00B
+	4YRRdL7JZNZPEnjHzWlo8JPQQXPiV/5qbeaAig7aE6fV8KT7jWgbOMKCUuNuBBijroWAyTDie20DE
+	I8SLh5RQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjlW5-0002f0-OI; Wed, 16 Jan 2019 13:46:01 +0000
-Received: from mx0a-001b2d01.pphosted.com ([148.163.156.1])
+	id 1gjlWJ-0002ux-C3; Wed, 16 Jan 2019 13:46:15 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjlVA-0000j2-0q
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 13:45:15 +0000
-Received: from pps.filterd (m0098404.ppops.net [127.0.0.1])
+ id 1gjlVR-0001kZ-DJ
+ for linux-arm-kernel@bombadil.infradead.org; Wed, 16 Jan 2019 13:45:21 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=Message-Id:References:In-Reply-To:Date:
+ Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=hGKBLmpR6kMaew84GxylKTWV5fJZlqKJ86XMoCPo28w=; b=a4+WMK8FZinuDs/ZKMMfCZNt0
+ BPJvva9zD675CDDcifIfb+57IV+R1yeYBfOzUxfcAw38UPXTt5ZjxCA8+Zs7O0cpVR29nraYOtKEI
+ 20TkqbJKQUYNSsAg26iUJHdFcyu/L+pZzCAPCW2+JpCjxBNtDQCt6Rj+ULs74U2CQY8vSHjNN+rtK
+ GO73tlddeslI3jHqSih3jILOxRLVYD8q+8OFhmMLTCYphsYrF51oZnn/0jQhC39LpSd2mzLR27muD
+ Xx8Uf+eQdggLrucVkGF9Kd12uuzDtkGHLB3H9zUaMNW2xUNp7rkRepvlKihQCmlYcTDN7oXB80wiN
+ 8rsTKHGwA==;
+Received: from mx0a-001b2d01.pphosted.com ([148.163.156.1])
+ by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gjlVO-0000gu-3O
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 13:45:19 +0000
+Received: from pps.filterd (m0098410.ppops.net [127.0.0.1])
  by mx0a-001b2d01.pphosted.com (8.16.0.22/8.16.0.22) with SMTP id
- x0GDehfZ110601
- for <linux-arm-kernel@lists.infradead.org>; Wed, 16 Jan 2019 08:45:03 -0500
-Received: from e06smtp07.uk.ibm.com (e06smtp07.uk.ibm.com [195.75.94.103])
- by mx0a-001b2d01.pphosted.com with ESMTP id 2q25b3s6xa-1
+ x0GDeXHm044069
+ for <linux-arm-kernel@lists.infradead.org>; Wed, 16 Jan 2019 08:45:13 -0500
+Received: from e06smtp02.uk.ibm.com (e06smtp02.uk.ibm.com [195.75.94.98])
+ by mx0a-001b2d01.pphosted.com with ESMTP id 2q24cmkyd3-1
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
- for <linux-arm-kernel@lists.infradead.org>; Wed, 16 Jan 2019 08:45:02 -0500
+ for <linux-arm-kernel@lists.infradead.org>; Wed, 16 Jan 2019 08:45:12 -0500
 Received: from localhost
- by e06smtp07.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
+ by e06smtp02.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
  Violators will be prosecuted
  for <linux-arm-kernel@lists.infradead.org> from <rppt@linux.ibm.com>;
- Wed, 16 Jan 2019 13:44:59 -0000
-Received: from b06cxnps4075.portsmouth.uk.ibm.com (9.149.109.197)
- by e06smtp07.uk.ibm.com (192.168.101.137) with IBM ESMTP SMTP Gateway:
+ Wed, 16 Jan 2019 13:45:09 -0000
+Received: from b06cxnps3075.portsmouth.uk.ibm.com (9.149.109.195)
+ by e06smtp02.uk.ibm.com (192.168.101.132) with IBM ESMTP SMTP Gateway:
  Authorized Use Only! Violators will be prosecuted; 
  (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
- Wed, 16 Jan 2019 13:44:48 -0000
-Received: from d06av24.portsmouth.uk.ibm.com (d06av24.portsmouth.uk.ibm.com
- [9.149.105.60])
- by b06cxnps4075.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
- x0GDilFi15270140
+ Wed, 16 Jan 2019 13:44:57 -0000
+Received: from d06av22.portsmouth.uk.ibm.com (d06av22.portsmouth.uk.ibm.com
+ [9.149.105.58])
+ by b06cxnps3075.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
+ x0GDiu4X61276330
  (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
- Wed, 16 Jan 2019 13:44:47 GMT
-Received: from d06av24.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id E43714204B;
- Wed, 16 Jan 2019 13:44:46 +0000 (GMT)
-Received: from d06av24.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id BC04142042;
- Wed, 16 Jan 2019 13:44:42 +0000 (GMT)
+ Wed, 16 Jan 2019 13:44:56 GMT
+Received: from d06av22.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id 8EBF24C046;
+ Wed, 16 Jan 2019 13:44:56 +0000 (GMT)
+Received: from d06av22.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id 67BC64C044;
+ Wed, 16 Jan 2019 13:44:52 +0000 (GMT)
 Received: from rapoport-lnx (unknown [9.148.8.226])
- by d06av24.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
- Wed, 16 Jan 2019 13:44:42 +0000 (GMT)
+ by d06av22.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
+ Wed, 16 Jan 2019 13:44:52 +0000 (GMT)
 Received: by rapoport-lnx (sSMTP sendmail emulation);
- Wed, 16 Jan 2019 15:44:42 +0200
+ Wed, 16 Jan 2019 15:44:51 +0200
 From: Mike Rapoport <rppt@linux.ibm.com>
 To: linux-mm@kvack.org
-Subject: [PATCH 04/21] memblock: drop memblock_alloc_base_nid()
-Date: Wed, 16 Jan 2019 15:44:04 +0200
+Subject: [PATCH 06/21] memblock: memblock_phys_alloc_try_nid(): don't panic
+Date: Wed, 16 Jan 2019 15:44:06 +0200
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1547646261-32535-1-git-send-email-rppt@linux.ibm.com>
 References: <1547646261-32535-1-git-send-email-rppt@linux.ibm.com>
 X-TM-AS-GCONF: 00
-x-cbid: 19011613-0028-0000-0000-00000339FC4D
+x-cbid: 19011613-0008-0000-0000-000002B1D6E3
 X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
-x-cbparentid: 19011613-0029-0000-0000-000023F72362
-Message-Id: <1547646261-32535-5-git-send-email-rppt@linux.ibm.com>
+x-cbparentid: 19011613-0009-0000-0000-0000221DEF66
+Message-Id: <1547646261-32535-7-git-send-email-rppt@linux.ibm.com>
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2019-01-16_05:, , signatures=0
 X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
  priorityscore=1501
  malwarescore=0 suspectscore=1 phishscore=0 bulkscore=0 spamscore=0
  clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
- mlxlogscore=829 adultscore=0 classifier=spam adjust=0 reason=mlx
+ mlxlogscore=936 adultscore=0 classifier=spam adjust=0 reason=mlx
  scancount=1 engine=8.0.1-1810050000 definitions=main-1901160114
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_054504_669796_A1DDB46C 
-X-CRM114-Status: GOOD (  21.38  )
+X-CRM114-CacheID: sfid-20190116_084518_331025_66282E30 
+X-CRM114-Status: GOOD (  26.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -138,69 +155,67 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The memblock_alloc_base_nid() is a oneliner wrapper for
-memblock_alloc_range_nid() without any side effect.
-Replace it's usage by the direct calls to memblock_alloc_range_nid().
+The memblock_phys_alloc_try_nid() function tries to allocate memory from
+the requested node and then falls back to allocation from any node in the
+system. The memblock_alloc_base() fallback used by this function panics if
+the allocation fails.
+
+Replace the memblock_alloc_base() fallback with the direct call to
+memblock_alloc_range_nid() and update the memblock_phys_alloc_try_nid()
+callers to check the returned value and panic in case of error.
 
 Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
 ---
- include/linux/memblock.h |  3 ---
- mm/memblock.c            | 15 ++++-----------
- 2 files changed, 4 insertions(+), 14 deletions(-)
+ arch/arm64/mm/numa.c   | 4 ++++
+ arch/powerpc/mm/numa.c | 4 ++++
+ mm/memblock.c          | 4 +++-
+ 3 files changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/memblock.h b/include/linux/memblock.h
-index 60e100f..f7ef313 100644
---- a/include/linux/memblock.h
-+++ b/include/linux/memblock.h
-@@ -490,9 +490,6 @@ static inline bool memblock_bottom_up(void)
- phys_addr_t __init memblock_alloc_range(phys_addr_t size, phys_addr_t align,
- 					phys_addr_t start, phys_addr_t end,
- 					enum memblock_flags flags);
--phys_addr_t memblock_alloc_base_nid(phys_addr_t size,
--					phys_addr_t align, phys_addr_t max_addr,
--					int nid, enum memblock_flags flags);
- phys_addr_t memblock_alloc_base(phys_addr_t size, phys_addr_t align,
- 				phys_addr_t max_addr);
- phys_addr_t __memblock_alloc_base(phys_addr_t size, phys_addr_t align,
+diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+index ae34e3a..2c61ea4 100644
+--- a/arch/arm64/mm/numa.c
++++ b/arch/arm64/mm/numa.c
+@@ -237,6 +237,10 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
+ 		pr_info("Initmem setup node %d [<memory-less node>]\n", nid);
+ 
+ 	nd_pa = memblock_phys_alloc_try_nid(nd_size, SMP_CACHE_BYTES, nid);
++	if (!nd_pa)
++		panic("Cannot allocate %zu bytes for node %d data\n",
++		      nd_size, nid);
++
+ 	nd = __va(nd_pa);
+ 
+ 	/* report and initialize */
+diff --git a/arch/powerpc/mm/numa.c b/arch/powerpc/mm/numa.c
+index 270cefb..8f2bbe1 100644
+--- a/arch/powerpc/mm/numa.c
++++ b/arch/powerpc/mm/numa.c
+@@ -788,6 +788,10 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
+ 	int tnid;
+ 
+ 	nd_pa = memblock_phys_alloc_try_nid(nd_size, SMP_CACHE_BYTES, nid);
++	if (!nd_pa)
++		panic("Cannot allocate %zu bytes for node %d data\n",
++		      nd_size, nid);
++
+ 	nd = __va(nd_pa);
+ 
+ 	/* report and initialize */
 diff --git a/mm/memblock.c b/mm/memblock.c
-index a32db30..c80029e 100644
+index f019aee..8aabb1b 100644
 --- a/mm/memblock.c
 +++ b/mm/memblock.c
-@@ -1346,21 +1346,14 @@ phys_addr_t __init memblock_alloc_range(phys_addr_t size, phys_addr_t align,
- 					flags);
+@@ -1393,7 +1393,9 @@ phys_addr_t __init memblock_phys_alloc_try_nid(phys_addr_t size, phys_addr_t ali
+ 
+ 	if (res)
+ 		return res;
+-	return memblock_alloc_base(size, align, MEMBLOCK_ALLOC_ACCESSIBLE);
++	return memblock_alloc_range_nid(size, align, 0,
++					MEMBLOCK_ALLOC_ACCESSIBLE,
++					NUMA_NO_NODE, MEMBLOCK_NONE);
  }
  
--phys_addr_t __init memblock_alloc_base_nid(phys_addr_t size,
--					phys_addr_t align, phys_addr_t max_addr,
--					int nid, enum memblock_flags flags)
--{
--	return memblock_alloc_range_nid(size, align, 0, max_addr, nid, flags);
--}
--
- phys_addr_t __init memblock_phys_alloc_nid(phys_addr_t size, phys_addr_t align, int nid)
- {
- 	enum memblock_flags flags = choose_memblock_flags();
- 	phys_addr_t ret;
- 
- again:
--	ret = memblock_alloc_base_nid(size, align, MEMBLOCK_ALLOC_ACCESSIBLE,
--				      nid, flags);
-+	ret = memblock_alloc_range_nid(size, align, 0,
-+				       MEMBLOCK_ALLOC_ACCESSIBLE, nid, flags);
- 
- 	if (!ret && (flags & MEMBLOCK_MIRROR)) {
- 		flags &= ~MEMBLOCK_MIRROR;
-@@ -1371,8 +1364,8 @@ phys_addr_t __init memblock_phys_alloc_nid(phys_addr_t size, phys_addr_t align,
- 
- phys_addr_t __init __memblock_alloc_base(phys_addr_t size, phys_addr_t align, phys_addr_t max_addr)
- {
--	return memblock_alloc_base_nid(size, align, max_addr, NUMA_NO_NODE,
--				       MEMBLOCK_NONE);
-+	return memblock_alloc_range_nid(size, align, 0, max_addr, NUMA_NO_NODE,
-+					MEMBLOCK_NONE);
- }
- 
- phys_addr_t __init memblock_alloc_base(phys_addr_t size, phys_addr_t align, phys_addr_t max_addr)
+ /**
 -- 
 2.7.4
 
