@@ -2,60 +2,61 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.9 required=3.0 tests=DATE_IN_PAST_06_12,
-	DKIMWL_WL_HIGH,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 99FD8C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 19:19:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5257EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 19:25:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6797E20866
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 19:19:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E364320866
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 19:25:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HOrtTsRE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6797E20866
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Y3y1BpFF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E364320866
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=4Y1+EKbvTXeC1y8EMMAtyuPtOxheoYPG8mw3HaVnPEQ=; b=HOrtTsREF/1nsQ/OAnEHbOzlx
-	OcbdL14ogBcU5i85hm2o6eOn9onhWBTDHRyU32YU+k1M5EsgYe5OUohwsfUy+iKjJyacrGFHj9muR
-	OFJUu4Dk1MPmdjXNEATC7gjxmxoiEEbeCn2mnTu6Dn+NwTS1Wljw2auydfWaEQtjyo/2b9yM9QtQW
-	yWUFHkIV83kg43gChmrflcaHE6/s/G52K41TtJLipb2JU3pjxfPqTsYSruPHxg+b0GI8Ii+XfgW+f
-	HkIPrj7u12pXFNVn5waPTqMq3lGfHRags59EG7GX4aJhEYfvN1KRsdopvS+GXH02EtEBrANSZpdCc
-	KKyyw9EYg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=n751B0ibzieiQyZxDMAv0NF0PRSY/5efxwXoVsw57JA=; b=Y3y1BpFFR8/ISe
+	7Fb/lXtBKUNhkh+F5rOTA1Dwzm4MQOwJ3Nip9JVN+1LN/YAVywIqDBQBAYxe3Xv4i5GzKwj0APMix
+	3rjBS09UMNmAuW1nySWmCUPIjSrIZRj81YeZ0s+eFRvisipbT2CptccOu9nDI8e9s2pzQCz2aDATn
+	e60ngyykIwti6qa9YhBRRUTT2gcoz6vaY4z97lXkP3xTQWx3fZq1J/EdW8juPCrRo/ME1sxZCVWMs
+	pfZVUwURPZXYWqMNjzVuqJgWmGANP1qpIZw6l3rau0nbVhM4/RT2slyHsliTkFb7HqjUMhQKKPOat
+	IXVRUBTqSmC0TR1UsXvQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjqib-0005pM-2w; Wed, 16 Jan 2019 19:19:17 +0000
+	id 1gjqo6-0001Mb-48; Wed, 16 Jan 2019 19:24:58 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjqhY-00051F-Ec
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 19:18:19 +0000
+ id 1gjqo2-0001M8-R3
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 19:24:56 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 2B5D1209EF; Wed, 16 Jan 2019 20:18:07 +0100 (CET)
+ id EB30B207B0; Wed, 16 Jan 2019 20:24:52 +0100 (CET)
 Received: from localhost (unknown [212.81.177.10])
- by mail.bootlin.com (Postfix) with ESMTPSA id C9C10206A6;
- Wed, 16 Jan 2019 20:17:56 +0100 (CET)
-Date: Wed, 16 Jan 2019 09:59:13 +0100
+ by mail.bootlin.com (Postfix) with ESMTPSA id 93244206F9;
+ Wed, 16 Jan 2019 20:24:42 +0100 (CET)
+Date: Wed, 16 Jan 2019 20:24:42 +0100
 From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Julia Lawall <Julia.Lawall@lip6.fr>
-Subject: Re: [PATCH 4/4] drm/sun4i: backend: add missing of_node_puts
-Message-ID: <20190116085913.j2ju3mj75x5bqppm@flea>
-References: <1547369264-24831-1-git-send-email-Julia.Lawall@lip6.fr>
- <1547369264-24831-5-git-send-email-Julia.Lawall@lip6.fr>
+To: Priit Laes <plaes@plaes.org>
+Subject: Re: [linux-sunxi] Re: HDMI/DVI spurious failure
+Message-ID: <20190116192442.qz4xi2ky6axgiyvg@flea>
+References: <20190114132934.rywqqtjarbf6fgcr@plaes.org>
+ <20190115094951.e7jnjpibj5tcp5pz@flea>
+ <20190116075854.o2kme5nxq5kckwem@plaes.org>
 MIME-Version: 1.0
-In-Reply-To: <1547369264-24831-5-git-send-email-Julia.Lawall@lip6.fr>
+Content-Disposition: inline
+In-Reply-To: <20190116075854.o2kme5nxq5kckwem@plaes.org>
 User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_111813_520300_FC08EA44 
-X-CRM114-Status: GOOD (  14.62  )
+X-CRM114-CacheID: sfid-20190116_112455_008259_6FE0996A 
+X-CRM114-Status: GOOD (  17.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,90 +68,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: David Airlie <airlied@linux.ie>, kernel-janitors@vger.kernel.org,
- linux-kernel@vger.kernel.org, dri-devel@lists.freedesktop.org,
- Chen-Yu Tsai <wens@csie.org>, Daniel Vetter <daniel@ffwll.ch>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============1494106364741273959=="
+Cc: linux-arm-kernel@lists.infradead.org, linux-sunxi@googlegroups.com,
+ Chen-Yu Tsai <wens@csie.org>, Jonathan Liu <net147@gmail.com>,
+ dri-devel@lists.freedesktop.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi Priit,
 
---===============1494106364741273959==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="dunppgcxmo5qgg5l"
-Content-Disposition: inline
+On Wed, Jan 16, 2019 at 07:58:54AM +0000, Priit Laes wrote:
+> > On Mon, Jan 14, 2019 at 01:29:34PM +0000, Priit Laes wrote:
+> > > I have a somewhat curious case with one HDMI/DVI screen that fails
+> > > to initialize properly every 6-7 boots. The display itself is also
+> > > somewhat flawed (missing HPD pin and the VSYNC/HSYNC pulse width
+> > > is set to 0 in EDID), but I suspect there could be some issues
+> > > regarding timing in A20 HDMI driver in Linux.
+> > > 
+> ...
+> 
+> > It doesn't look related to the clock rate itself, since it doesn't
+> > change between the two cases. However, in one case the DDC clock is
+> > enabled and in the other it's disabled.
+> > 
+> > Was it taken at the same time? Maybe you can try with that patch?
+> > http://code.bulix.org/z7jmkm-555344?raw
+> 
+> Thanks, after doing ~50+ boots I haven't seen a single failure.
+> 
+> Previously I had following failure cases which are now both fixed:
+> 
+> a) Linux without u-boot HDMI, where one in every 6-7 boots failed.
+> b) u--boot with hdmi enabled switching to simplefb and then switching
+> to kms, where previously all boots ended up with garbled screen.
 
+So it's not really a fix, but it really looks like the clock is not
+enabled when it should.
 
---dunppgcxmo5qgg5l
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Can you describe your test scenario a bit more? What are you doing
+exactly, just booting? When do you start using the display? When did
+you capture the debugfs output that you pasted?
 
-On Sun, Jan 13, 2019 at 09:47:44AM +0100, Julia Lawall wrote:
-> The device node iterators perform an of_node_get on each
-> iteration, so a jump out of the loop requires an of_node_put.
->=20
-> Remote and port also have augmented reference counts, so drop them
-> on each iteration and at the end of the function, respectively.
-> Remote is only used for the address it contains, not for the
-> contents of that address, so the reference count can be dropped
-> immediately.
->=20
-> The semantic patch that fixes the first part of this problem is
-> as follows (http://coccinelle.lip6.fr):
->=20
-> // <smpl>
-> @@
-> expression root,e;
-> local idexpression child;
-> iterator name for_each_child_of_node;
-> @@
->=20
->  for_each_available_child_of_node(root, child) {
->    ... when !=3D of_node_put(child)
->        when !=3D e =3D child
-> +  of_node_put(child);
-> ?  break;
->    ...
-> }
-> ... when !=3D child
-> // </smpl>
->=20
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-
-Applied, thanks!
+Thanks!
 Maxime
 
---=20
+-- 
 Maxime Ripard, Bootlin
 Embedded Linux and Kernel engineering
 https://bootlin.com
-
---dunppgcxmo5qgg5l
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXD7yYQAKCRDj7w1vZxhR
-xYlyAQDwvaT1Fd85U90xXfnNEaXT0VONYRQBfzXkZ5deO8x8igEA+PXurQWESJMf
-cVGPanmyDaAWOtjRbYLKr4Tkn8cthAk=
-=7q2T
------END PGP SIGNATURE-----
-
---dunppgcxmo5qgg5l--
-
-
---===============1494106364741273959==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============1494106364741273959==--
-
