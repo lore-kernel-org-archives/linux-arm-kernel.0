@@ -2,80 +2,64 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 590E1C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 16:14:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F0E52C43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 16:17:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 15F3420675
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 16:14:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BA90F20675
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 16:17:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eGWnYfbF";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="XUI5mNrH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 15F3420675
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DnuZFd81"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BA90F20675
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=498NYta03txmITu3h+O+N2EwzVaYMonu+UjDRdwHeAQ=; b=eGWnYfbFXzWKXU
-	tlNWjsM0fN5xpTNuIKaCyWPE/0ADHa+3GpJtk+L9uiDtaQpnOMOOrAtWQhySDpFuvHEIz54cBFzon
-	3xcbawCV+JVND/8MUIziTeCBWBMfdd1SQox1XefXxvi9cMirh8PxINwrnpBdWKOzOq3Q+FvZvrVpc
-	TFetVZ3lFnyPMImEpJnclbYRUbn56am9hnD9Eme5T3CkePkE5OypOHT/tpiJPyxMaErXmC+8AABtp
-	E59apkA1Xnj7SrUILWGjDFk0cpAQTFBdUCrLQPw2yJehcPnWBU+OkBqFPCZg3NvCB0GIpV6oK5bAn
-	HNTZ9IxOzixgyyk5LInQ==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=XO8cPlDiaMSJbQUkih7+R7v6C+sfKnat3zvzE3ePp3s=; b=Dnu
+	ZFd81qxW0JENQDP9ch5ZVKssboiy4iuliE5Jy8IC2Z7XfArlzIMbBEsXyxyOu0ygJxlGuynRQ6tE2
+	K3RExEauED6D7FGyzTlmqWtpVybeLMQrMumoaq06VhrXLs245rZSJg72sremzeSjHIck6lVwXlDSg
+	UWy/94y6imkIsjWvIKuWyyCoL7SYxPHQjN7bhHkts6NneO5ETIOD8pfPgAMJyjXb5riCI5ryiUXpE
+	uU+fWm2syE3P6lYAN4+JHcvXjaeY7hQ5D7+UrpWPJuLe3rNtCoWaDVvEUtrFi56OxucsmpFHRV8WW
+	ae7Nea8fG5ao2cfptt0/9tc+UhRMVZQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjnq8-0000jK-2Y; Wed, 16 Jan 2019 16:14:52 +0000
-Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
+	id 1gjnsZ-0002fo-Sd; Wed, 16 Jan 2019 16:17:23 +0000
+Received: from inva021.nxp.com ([92.121.34.21])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjnq4-0000im-BN
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 16:14:49 +0000
-Received: by mail-it1-x141.google.com with SMTP id m8so1387650itk.0
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 16 Jan 2019 08:14:45 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=KEi5tILKPLZ/2R3NAZK8W85biZ8ITep+crOK/DgNkq4=;
- b=XUI5mNrHEYJjIRjf0UtvI42TLm3d3yWkDLxiO0AB35yNFFeADBZE7l/mvF4owHBPTd
- v7TYgNOrNVMBpzq1amGnP6N2906rhRMbyoRzw8TubDk2Kh4MOP7k9vw2uzOhk/Zx+31X
- 5LNIX8amy+Txdp+Q9Et87ZgaG7KngWG/KSj1o=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=KEi5tILKPLZ/2R3NAZK8W85biZ8ITep+crOK/DgNkq4=;
- b=QaD786v+vjheoqHUMtCfVK7jcCdEOWS8QRUCGYX95rvujmiz7gDrUQ1IAj5l0TFojL
- Tiq4MIH9lDAQydaC5bDpVmBAs1X5p4I4kWW+Ed4pWjFwhKnSR6M/XRpg5fbQalS+Y1jW
- yVuf0PjFe6Wfj7J4VpZhFd715Vnf3JFTUaC8pT/DaVgDRyak7G6qc6j3eBioGmWTIeuW
- +q/tXD8vkALDy/a1KfczNuPbRfy9PFmaSFpaaCZpLnF3rX8QO0Jr4VdIsHaYu86WJgUU
- +RnbbcnNyQ8pHLmjasHxpeT0w0YhY86FIi1iK2duaHL+DAgTqRF3hmyHvyanYo/H+A3h
- +qNA==
-X-Gm-Message-State: AJcUukf1Nb32UUXDXQJxUTPLehq8ZwLZ+LXywWIYvg9l86GHJ5iG8hz9
- mLNOFhmUAxY6VwzDRX9GiHdUGETWMe42pE1toSvuWw==
-X-Google-Smtp-Source: ALg8bN6nkaEOFt0VS2q1o5mQBPcPAAcTfIGHTXqgZ57Vn9ebDdfKVBQA0a/469fsdK+RVUJHEBXMPsHv567BgYhUZoo=
-X-Received: by 2002:a24:db02:: with SMTP id c2mr6297220itg.137.1547655283699; 
- Wed, 16 Jan 2019 08:14:43 -0800 (PST)
-MIME-Version: 1.0
-References: <20190115230742.13730-1-mathieu.poirier@linaro.org>
- <20190115230742.13730-3-mathieu.poirier@linaro.org>
- <20190116153948.GC871@kroah.com>
-In-Reply-To: <20190116153948.GC871@kroah.com>
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
-Date: Wed, 16 Jan 2019 09:14:33 -0700
-Message-ID: <CANLsYkzfbJae6Nk7cHhnR09ZPSATa3g8sceGC=O3DfXYC2ruQQ@mail.gmail.com>
-Subject: Re: [PATCH 2/7] coresight: perf: Add "sinks" group to PMU directory
-To: Greg KH <gregkh@linuxfoundation.org>
+ id 1gjnsW-0002fN-Eu
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 16:17:22 +0000
+Received: from inva021.nxp.com (localhost [127.0.0.1])
+ by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 68AD2200017;
+ Wed, 16 Jan 2019 17:17:18 +0100 (CET)
+Received: from inva024.eu-rdc02.nxp.com (inva024.eu-rdc02.nxp.com
+ [134.27.226.22])
+ by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 5B9F4200014;
+ Wed, 16 Jan 2019 17:17:18 +0100 (CET)
+Received: from fsr-ub1864-101.ea.freescale.net
+ (fsr-ub1864-101.ea.freescale.net [10.171.82.46])
+ by inva024.eu-rdc02.nxp.com (Postfix) with ESMTP id EB82220618;
+ Wed, 16 Jan 2019 17:17:17 +0100 (CET)
+From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+To: linux-i2c@vger.kernel.org, linux-imx@nxp.com,
+ iommu@lists.linux-foundation.org, kernel@pengutronix.de, wsa@the-dreams.de
+Subject: [RFC PATCH] i2c: imx: dma map the i2c data i/o register
+Date: Wed, 16 Jan 2019 18:17:13 +0200
+Message-Id: <20190116161713.12748-1-laurentiu.tudor@nxp.com>
+X-Mailer: git-send-email 2.17.1
+X-Virus-Scanned: ClamAV using ClamSMTP
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_081448_385672_BAA935F9 
-X-CRM114-Status: GOOD (  23.59  )
+X-CRM114-CacheID: sfid-20190116_081720_773141_09210232 
+X-CRM114-Status: GOOD (  11.93  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,115 +71,174 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, linux-s390@vger.kernel.org,
- "Suzuki K. Poulose" <suzuki.poulose@arm.com>,
- Peter Zijlstra <peterz@infradead.org>, Will Deacon <will.deacon@arm.com>,
- heiko.carstens@de.ibm.com, Adrian Hunter <adrian.hunter@intel.com>,
- Arnaldo Carvalho de Melo <acme@kernel.org>, ast@kernel.org,
- Alexander Shishkin <alexander.shishkin@linux.intel.com>,
- Ingo Molnar <mingo@redhat.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- "H. Peter Anvin" <hpa@zytor.com>, schwidefsky@de.ibm.com,
- Namhyung Kim <namhyung@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
- Jiri Olsa <jolsa@redhat.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
+Cc: robin.murphy@arm.com, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org,
+ Laurentiu Tudor <laurentiu.tudor@nxp.com>
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 16 Jan 2019 at 08:39, Greg KH <gregkh@linuxfoundation.org> wrote:
->
-> On Tue, Jan 15, 2019 at 04:07:37PM -0700, Mathieu Poirier wrote:
-> > Add a "sinks" directory entry so that users can see all the sinks
-> > available in the system in a single place.  Individual sink are added
-> > as they are registered with the coresight bus.
-> >
-> > Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> > ---
-> >  .../hwtracing/coresight/coresight-etm-perf.c  | 43 +++++++++++++++++++
-> >  .../hwtracing/coresight/coresight-etm-perf.h  |  1 +
-> >  drivers/hwtracing/coresight/coresight.c       | 17 ++++++++
-> >  3 files changed, 61 insertions(+)
-> >
-> > diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-> > index f21eb28b6782..292bd409a68c 100644
-> > --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-> > +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-> > @@ -14,6 +14,7 @@
-> >  #include <linux/perf_event.h>
-> >  #include <linux/percpu-defs.h>
-> >  #include <linux/slab.h>
-> > +#include <linux/stringhash.h>
-> >  #include <linux/types.h>
-> >  #include <linux/workqueue.h>
-> >
-> > @@ -43,8 +44,18 @@ static const struct attribute_group etm_pmu_format_group = {
-> >       .attrs  = etm_config_formats_attr,
-> >  };
-> >
-> > +static struct attribute *etm_config_sinks_attr[] = {
-> > +     NULL,
-> > +};
-> > +
-> > +static const struct attribute_group etm_pmu_sinks_group = {
-> > +     .name   = "sinks",
-> > +     .attrs  = etm_config_sinks_attr,
-> > +};
-> > +
-> >  static const struct attribute_group *etm_pmu_attr_groups[] = {
-> >       &etm_pmu_format_group,
-> > +     &etm_pmu_sinks_group,
-> >       NULL,
-> >  };
-> >
-> > @@ -479,6 +490,38 @@ int etm_perf_symlink(struct coresight_device *csdev, bool link)
-> >       return 0;
-> >  }
-> >
-> > +static ssize_t etm_perf_sink_name_show(struct device *dev,
-> > +                                    struct device_attribute *dattr,
-> > +                                    char *buf)
-> > +{
-> > +     /* See function coresight_sink_by_id() to know where this is used */
-> > +     u32 hash = hashlen_hash(hashlen_string(NULL, dattr->attr.name));
-> > +
-> > +     return scnprintf(buf, PAGE_SIZE, "%x\n", hash);
-> > +}
-> > +
-> > +int etm_perf_symlink_sink(struct coresight_device *csdev)
-> > +{
-> > +     struct device *pmu_dev = etm_pmu.dev;
-> > +     struct device *pdev = csdev->dev.parent;
-> > +     struct device_attribute *dev_attr;
-> > +
-> > +     if (csdev->type != CORESIGHT_DEV_TYPE_SINK &&
-> > +         csdev->type != CORESIGHT_DEV_TYPE_LINKSINK)
-> > +             return -EINVAL;
-> > +
-> > +     if (!etm_perf_up)
-> > +             return -EPROBE_DEFER;
-> > +
-> > +     dev_attr = kzalloc(sizeof(*dev_attr), GFP_KERNEL);
-> > +     dev_attr->attr.name = kstrdup(dev_name(pdev), GFP_KERNEL);
-> > +     dev_attr->attr.mode = 0444;
-> > +     dev_attr->show = etm_perf_sink_name_show;
-> > +
-> > +     return sysfs_add_file_to_group(&pmu_dev->kobj,
-> > +                                    &dev_attr->attr, "sinks");
->
-> What is so odd about this call that you needed me to review this?
+This is an attempt to fix an iommu exception when doing dma to the
+i2c controller with EDMA. Without these mappings the smmu raises a
+context fault [1] exactly with the address of the i2c data i/o reg.
+This was seen on an NXP LS1043A chip while working on enabling SMMU.
 
-As far as I can tell nobody is feeding a dynamic struct attribute to
-the function and I wasn't sure if it was because they were told not to
-or simply because it wasn't needed, hence asking for a second opinion.
+[1] arm-smmu 9000000.iommu: Unhandled context fault: fsr=0x402,
+    iova=0x02180004, fsynr=0x150021, cb=7
 
->
-> And what happens if this call fails, do you leak memory?
->
-> thanks,
->
-> greg k-h
+Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+---
+ drivers/i2c/busses/i2c-imx.c | 57 +++++++++++++++++++++++++++++-------
+ 1 file changed, 47 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
+index 4e34b1572756..07cc8f4b45b9 100644
+--- a/drivers/i2c/busses/i2c-imx.c
++++ b/drivers/i2c/busses/i2c-imx.c
+@@ -202,6 +202,9 @@ struct imx_i2c_struct {
+ 	struct pinctrl_state *pinctrl_pins_gpio;
+ 
+ 	struct imx_i2c_dma	*dma;
++
++	dma_addr_t		dma_tx_addr;
++	dma_addr_t		dma_rx_addr;
+ };
+ 
+ static const struct imx_i2c_hwdata imx1_i2c_hwdata = {
+@@ -274,17 +277,20 @@ static inline unsigned char imx_i2c_read_reg(struct imx_i2c_struct *i2c_imx,
+ 
+ /* Functions for DMA support */
+ static int i2c_imx_dma_request(struct imx_i2c_struct *i2c_imx,
+-			       dma_addr_t phy_addr)
++			       phys_addr_t phy_addr)
+ {
+ 	struct imx_i2c_dma *dma;
+ 	struct dma_slave_config dma_sconfig;
+ 	struct device *dev = &i2c_imx->adapter.dev;
+ 	int ret;
++	phys_addr_t i2dr_pa;
+ 
+ 	dma = devm_kzalloc(dev, sizeof(*dma), GFP_KERNEL);
+ 	if (!dma)
+ 		return -ENOMEM;
+ 
++	i2dr_pa = phy_addr + (IMX_I2C_I2DR << i2c_imx->hwdata->regshift);
++
+ 	dma->chan_tx = dma_request_chan(dev, "tx");
+ 	if (IS_ERR(dma->chan_tx)) {
+ 		ret = PTR_ERR(dma->chan_tx);
+@@ -293,15 +299,25 @@ static int i2c_imx_dma_request(struct imx_i2c_struct *i2c_imx,
+ 		goto fail_al;
+ 	}
+ 
+-	dma_sconfig.dst_addr = phy_addr +
+-				(IMX_I2C_I2DR << i2c_imx->hwdata->regshift);
++	i2c_imx->dma_tx_addr = dma_map_resource(dma->chan_tx->device->dev,
++						i2dr_pa,
++						DMA_SLAVE_BUSWIDTH_1_BYTE,
++						DMA_MEM_TO_DEV, 0);
++	ret = dma_mapping_error(dma->chan_tx->device->dev,
++				i2c_imx->dma_tx_addr);
++	if (ret) {
++		dev_err(dev, "can't dma map tx destination (%d)\n", ret);
++		goto fail_tx;
++	}
++
++	dma_sconfig.dst_addr = i2c_imx->dma_tx_addr;
+ 	dma_sconfig.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+ 	dma_sconfig.dst_maxburst = 1;
+ 	dma_sconfig.direction = DMA_MEM_TO_DEV;
+ 	ret = dmaengine_slave_config(dma->chan_tx, &dma_sconfig);
+ 	if (ret < 0) {
+ 		dev_err(dev, "can't configure tx channel (%d)\n", ret);
+-		goto fail_tx;
++		goto fail_tx_dma;
+ 	}
+ 
+ 	dma->chan_rx = dma_request_chan(dev, "rx");
+@@ -309,18 +325,28 @@ static int i2c_imx_dma_request(struct imx_i2c_struct *i2c_imx,
+ 		ret = PTR_ERR(dma->chan_rx);
+ 		if (ret != -ENODEV && ret != -EPROBE_DEFER)
+ 			dev_err(dev, "can't request DMA rx channel (%d)\n", ret);
+-		goto fail_tx;
++		goto fail_tx_dma;
+ 	}
+ 
+-	dma_sconfig.src_addr = phy_addr +
+-				(IMX_I2C_I2DR << i2c_imx->hwdata->regshift);
++	i2c_imx->dma_rx_addr = dma_map_resource(dma->chan_rx->device->dev,
++						i2dr_pa,
++						DMA_SLAVE_BUSWIDTH_1_BYTE,
++						DMA_DEV_TO_MEM, 0);
++	ret = dma_mapping_error(dma->chan_rx->device->dev,
++				i2c_imx->dma_rx_addr);
++	if (ret) {
++		dev_err(dev, "can't dma map rx source (%d)\n", ret);
++		goto fail_rx;
++	}
++
++	dma_sconfig.src_addr = i2c_imx->dma_rx_addr;
+ 	dma_sconfig.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+ 	dma_sconfig.src_maxburst = 1;
+ 	dma_sconfig.direction = DMA_DEV_TO_MEM;
+ 	ret = dmaengine_slave_config(dma->chan_rx, &dma_sconfig);
+ 	if (ret < 0) {
+ 		dev_err(dev, "can't configure rx channel (%d)\n", ret);
+-		goto fail_rx;
++		goto fail_rx_dma;
+ 	}
+ 
+ 	i2c_imx->dma = dma;
+@@ -330,8 +356,14 @@ static int i2c_imx_dma_request(struct imx_i2c_struct *i2c_imx,
+ 
+ 	return 0;
+ 
++fail_rx_dma:
++	dma_unmap_resource(dma->chan_rx->device->dev, i2c_imx->dma_rx_addr,
++			   DMA_SLAVE_BUSWIDTH_1_BYTE, DMA_DEV_TO_MEM, 0);
+ fail_rx:
+ 	dma_release_channel(dma->chan_rx);
++fail_tx_dma:
++	dma_unmap_resource(dma->chan_tx->device->dev, i2c_imx->dma_tx_addr,
++			   DMA_SLAVE_BUSWIDTH_1_BYTE, DMA_MEM_TO_DEV, 0);
+ fail_tx:
+ 	dma_release_channel(dma->chan_tx);
+ fail_al:
+@@ -1057,7 +1089,7 @@ static int i2c_imx_probe(struct platform_device *pdev)
+ 	struct imxi2c_platform_data *pdata = dev_get_platdata(&pdev->dev);
+ 	void __iomem *base;
+ 	int irq, ret;
+-	dma_addr_t phy_addr;
++	phys_addr_t phy_addr;
+ 
+ 	dev_dbg(&pdev->dev, "<%s>\n", __func__);
+ 
+@@ -1072,7 +1104,7 @@ static int i2c_imx_probe(struct platform_device *pdev)
+ 	if (IS_ERR(base))
+ 		return PTR_ERR(base);
+ 
+-	phy_addr = (dma_addr_t)res->start;
++	phy_addr = res->start;
+ 	i2c_imx = devm_kzalloc(&pdev->dev, sizeof(*i2c_imx), GFP_KERNEL);
+ 	if (!i2c_imx)
+ 		return -ENOMEM;
+@@ -1220,6 +1252,11 @@ static int i2c_imx_remove(struct platform_device *pdev)
+ 	pm_runtime_put_noidle(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+ 
++	dma_unmap_resource(&pdev->dev, i2c_imx->dma_tx_addr,
++			   DMA_SLAVE_BUSWIDTH_1_BYTE, DMA_MEM_TO_DEV, 0);
++	dma_unmap_resource(&pdev->dev, i2c_imx->dma_rx_addr,
++			   DMA_SLAVE_BUSWIDTH_1_BYTE, DMA_DEV_TO_MEM, 0);
++
+ 	return 0;
+ }
+ 
+-- 
+2.17.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
