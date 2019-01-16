@@ -2,71 +2,73 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 371BFC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 17:12:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 91A72C43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 17:13:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 06E4820651
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 17:12:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 54BCF20651
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 17:13:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U1HSSlHK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 06E4820651
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XV4jZz2Y";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="FSbRJWX0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 54BCF20651
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Message-ID:Date:Content-ID:MIME-Version
-	:Subject:To:References:In-Reply-To:From:Reply-To:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Jk7OFV1AxRj6D9bKNVFCbFs1L/aKDoW04P5zdLP0ww0=; b=U1HSSlHKW/06++
-	YnSgijCOl2G9l8jZ/0kmlaRnpLMON5NRarl+abs3FeIZusVDhgoyvtVWR5ioX8VPYtkNltbQS/dbS
-	4GlZIr45rr1sYBBw8Sd29O1vZ++vjnPYjaNZ7UEus6dnDUoT/OhjNqPiVZIHXtE/LnoL6hUQb1zrP
-	NU3xDjXY3jdHIYzFYdHJ2jIhfo7bfCSZeH5rH/HAvwyJvZhKoOZFEj5AfZNcXvClwd9swvpPc3D4f
-	8DT0lLhnizGEIMrYjUZSODS9Xl+288M4tRHK+wxbeVhSUvvmHJvDTnnoLRyJzfVezPVhFI7mn8Yj1
-	1emMRLHJguU88P1labUQ==;
+	List-Owner; bh=yAQj8fiTuAzHmU6hqjT/EmVPvax49Rpel1nzbgY4Mmg=; b=XV4jZz2YgvHk+V
+	t4KvLXO0NOxxFm2l3sAq/t8Ch+fxoL3FZVBZ5YLvMPrZzojEoJ7NCFzRxC83gIVZR4Q01n6FQU5zD
+	gVwcIelwWoaegaD03ctFXNexqUP9/FWPAOrZ+rWVjUgGuaSn78517qXZxV6f91fzgz+genXcVAKIK
+	11jdmM4Ioy9sW9j4cAeB3Tcfm4MJ9XRYoQcmTRxaziT5UaBdnzhU53UtVkBPfIcL8OmaK4/qROXkl
+	nD0TEWz1D2JF45oDkffH9NIZknYCXMoEsoKJOlxAgCSaYZrhNeZnATewSG/M50bW1bI4wQFN9oatO
+	OvipP8KF6G2H7rUDOMew==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjoju-0001QI-SO; Wed, 16 Jan 2019 17:12:30 +0000
-Received: from mx1.redhat.com ([209.132.183.28])
+	id 1gjokT-0001j1-1W; Wed, 16 Jan 2019 17:13:05 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjojs-0001Pu-C8
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 17:12:29 +0000
-Received: from smtp.corp.redhat.com (int-mx06.intmail.prod.int.phx2.redhat.com
- [10.5.11.16])
- (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
+ id 1gjokP-0001iT-Mc
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 17:13:03 +0000
+Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mx1.redhat.com (Postfix) with ESMTPS id F40755C9;
- Wed, 16 Jan 2019 17:12:26 +0000 (UTC)
-Received: from warthog.procyon.org.uk (ovpn-120-244.rdu2.redhat.com
- [10.10.120.244])
- by smtp.corp.redhat.com (Postfix) with ESMTP id B63405C228;
- Wed, 16 Jan 2019 17:12:21 +0000 (UTC)
-Organization: Red Hat UK Ltd. Registered Address: Red Hat UK Ltd, Amberley
- Place, 107-111 Peascod Street, Windsor, Berkshire, SI4 1TE, United
- Kingdom.
- Registered in England and Wales under Company Registration No. 3798903
-From: David Howells <dhowells@redhat.com>
-In-Reply-To: <20190116164703.9267-1-vt@altlinux.org>
-References: <20190116164703.9267-1-vt@altlinux.org>
-To: Vitaly Chikunov <vt@altlinux.org>
-Subject: Re: [RFC PATCH v2] akcipher: Introduce verify_rsa/verify for public
- key algorithms
+ by mail.kernel.org (Postfix) with ESMTPSA id AA9C320578;
+ Wed, 16 Jan 2019 17:13:00 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1547658781;
+ bh=ycXcpr8B/rmXmWanQ90lDcDN84nIRE5OWeilpw6eOpo=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=FSbRJWX0MV9uiow1kq5Ybh1W4muIlLmyBC/ZUhotH+RPCJXtomhD4qySmdc5lZpyx
+ 0APpT6E86xFrSVl8WJj/QWsGa7eJAvaCQH9zDUbP/bv931D4RastxCotqbTqoGxgcU
+ 8CbhULUeT2efO0UiX1gAS1Abz25vFakVoUwltJ5U=
+Date: Wed, 16 Jan 2019 18:12:59 +0100
+From: Greg KH <gregkh@linuxfoundation.org>
+To: Mathieu Poirier <mathieu.poirier@linaro.org>
+Subject: Re: [PATCH 2/7] coresight: perf: Add "sinks" group to PMU directory
+Message-ID: <20190116171259.GB10164@kroah.com>
+References: <20190115230742.13730-1-mathieu.poirier@linaro.org>
+ <20190115230742.13730-3-mathieu.poirier@linaro.org>
+ <20190116153948.GC871@kroah.com>
+ <CANLsYkzfbJae6Nk7cHhnR09ZPSATa3g8sceGC=O3DfXYC2ruQQ@mail.gmail.com>
+ <20190116163314.GB5446@kroah.com>
+ <CANLsYkw_=_OC-95HRMxTZfpAe4UzAuidPJcZmL_T-LbkOwWCkQ@mail.gmail.com>
 MIME-Version: 1.0
-Content-ID: <24886.1547658740.1@warthog.procyon.org.uk>
-Date: Wed, 16 Jan 2019 17:12:20 +0000
-Message-ID: <24887.1547658740@warthog.procyon.org.uk>
-X-Scanned-By: MIMEDefang 2.79 on 10.5.11.16
-X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
- (mx1.redhat.com [10.5.110.29]); Wed, 16 Jan 2019 17:12:27 +0000 (UTC)
+Content-Disposition: inline
+In-Reply-To: <CANLsYkw_=_OC-95HRMxTZfpAe4UzAuidPJcZmL_T-LbkOwWCkQ@mail.gmail.com>
+User-Agent: Mutt/1.11.2 (2019-01-07)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_091228_430242_0C1D694B 
-X-CRM114-Status: GOOD (  14.61  )
+X-CRM114-CacheID: sfid-20190116_091301_787515_4C6636D2 
+X-CRM114-Status: GOOD (  28.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,68 +80,132 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Giovanni Cabiddu <giovanni.cabiddu@intel.com>,
- Tom Lendacky <thomas.lendacky@amd.com>, Aymen Sghaier <aymen.sghaier@nxp.com>,
- Alexandre Torgue <alexandre.torgue@st.com>,
- =?UTF-8?q?Horia=20Geant=C4=83?= <horia.geanta@nxp.com>, qat-linux@intel.com,
- linux-stm32@st-md-mailman.stormreply.com, Gary Hook <gary.hook@amd.com>,
- linux-kernel@vger.kernel.org, Tudor Ambarus <tudor-dan.ambarus@nxp.com>,
- dhowells@redhat.com, keyrings@vger.kernel.org, linux-crypto@vger.kernel.org,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>,
- "David S. Miller" <davem@davemloft.net>, linux-arm-kernel@lists.infradead.org,
- Herbert Xu <herbert@gondor.apana.org.au>
+Cc: Mark Rutland <mark.rutland@arm.com>, linux-s390@vger.kernel.org,
+ "Suzuki K. Poulose" <suzuki.poulose@arm.com>,
+ Peter Zijlstra <peterz@infradead.org>, Will Deacon <will.deacon@arm.com>,
+ heiko.carstens@de.ibm.com, Adrian Hunter <adrian.hunter@intel.com>,
+ Arnaldo Carvalho de Melo <acme@kernel.org>, ast@kernel.org,
+ Alexander Shishkin <alexander.shishkin@linux.intel.com>,
+ Ingo Molnar <mingo@redhat.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ "H. Peter Anvin" <hpa@zytor.com>, schwidefsky@de.ibm.com,
+ Namhyung Kim <namhyung@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
+ Jiri Olsa <jolsa@redhat.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Umm...  What do I apply this patch to?
+On Wed, Jan 16, 2019 at 09:38:09AM -0700, Mathieu Poirier wrote:
+> On Wed, 16 Jan 2019 at 09:33, Greg KH <gregkh@linuxfoundation.org> wrote:
+> >
+> > On Wed, Jan 16, 2019 at 09:14:33AM -0700, Mathieu Poirier wrote:
+> > > On Wed, 16 Jan 2019 at 08:39, Greg KH <gregkh@linuxfoundation.org> wrote:
+> > > >
+> > > > On Tue, Jan 15, 2019 at 04:07:37PM -0700, Mathieu Poirier wrote:
+> > > > > Add a "sinks" directory entry so that users can see all the sinks
+> > > > > available in the system in a single place.  Individual sink are added
+> > > > > as they are registered with the coresight bus.
+> > > > >
+> > > > > Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> > > > > ---
+> > > > >  .../hwtracing/coresight/coresight-etm-perf.c  | 43 +++++++++++++++++++
+> > > > >  .../hwtracing/coresight/coresight-etm-perf.h  |  1 +
+> > > > >  drivers/hwtracing/coresight/coresight.c       | 17 ++++++++
+> > > > >  3 files changed, 61 insertions(+)
+> > > > >
+> > > > > diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> > > > > index f21eb28b6782..292bd409a68c 100644
+> > > > > --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
+> > > > > +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> > > > > @@ -14,6 +14,7 @@
+> > > > >  #include <linux/perf_event.h>
+> > > > >  #include <linux/percpu-defs.h>
+> > > > >  #include <linux/slab.h>
+> > > > > +#include <linux/stringhash.h>
+> > > > >  #include <linux/types.h>
+> > > > >  #include <linux/workqueue.h>
+> > > > >
+> > > > > @@ -43,8 +44,18 @@ static const struct attribute_group etm_pmu_format_group = {
+> > > > >       .attrs  = etm_config_formats_attr,
+> > > > >  };
+> > > > >
+> > > > > +static struct attribute *etm_config_sinks_attr[] = {
+> > > > > +     NULL,
+> > > > > +};
+> > > > > +
+> > > > > +static const struct attribute_group etm_pmu_sinks_group = {
+> > > > > +     .name   = "sinks",
+> > > > > +     .attrs  = etm_config_sinks_attr,
+> > > > > +};
+> > > > > +
+> > > > >  static const struct attribute_group *etm_pmu_attr_groups[] = {
+> > > > >       &etm_pmu_format_group,
+> > > > > +     &etm_pmu_sinks_group,
+> > > > >       NULL,
+> > > > >  };
+> > > > >
+> > > > > @@ -479,6 +490,38 @@ int etm_perf_symlink(struct coresight_device *csdev, bool link)
+> > > > >       return 0;
+> > > > >  }
+> > > > >
+> > > > > +static ssize_t etm_perf_sink_name_show(struct device *dev,
+> > > > > +                                    struct device_attribute *dattr,
+> > > > > +                                    char *buf)
+> > > > > +{
+> > > > > +     /* See function coresight_sink_by_id() to know where this is used */
+> > > > > +     u32 hash = hashlen_hash(hashlen_string(NULL, dattr->attr.name));
+> > > > > +
+> > > > > +     return scnprintf(buf, PAGE_SIZE, "%x\n", hash);
+> > > > > +}
+> > > > > +
+> > > > > +int etm_perf_symlink_sink(struct coresight_device *csdev)
+> > > > > +{
+> > > > > +     struct device *pmu_dev = etm_pmu.dev;
+> > > > > +     struct device *pdev = csdev->dev.parent;
+> > > > > +     struct device_attribute *dev_attr;
+> > > > > +
+> > > > > +     if (csdev->type != CORESIGHT_DEV_TYPE_SINK &&
+> > > > > +         csdev->type != CORESIGHT_DEV_TYPE_LINKSINK)
+> > > > > +             return -EINVAL;
+> > > > > +
+> > > > > +     if (!etm_perf_up)
+> > > > > +             return -EPROBE_DEFER;
+> > > > > +
+> > > > > +     dev_attr = kzalloc(sizeof(*dev_attr), GFP_KERNEL);
+> > > > > +     dev_attr->attr.name = kstrdup(dev_name(pdev), GFP_KERNEL);
+> > > > > +     dev_attr->attr.mode = 0444;
+> > > > > +     dev_attr->show = etm_perf_sink_name_show;
+> > > > > +
+> > > > > +     return sysfs_add_file_to_group(&pmu_dev->kobj,
+> > > > > +                                    &dev_attr->attr, "sinks");
+> > > >
+> > > > What is so odd about this call that you needed me to review this?
+> > >
+> > > As far as I can tell nobody is feeding a dynamic struct attribute to
+> > > the function and I wasn't sure if it was because they were told not to
+> > > or simply because it wasn't needed, hence asking for a second opinion.
+> >
+> > Ah.  Well, again, this is a good question to answer:
+> >
+> > > > And what happens if this call fails, do you leak memory?
+> 
+> That's something I will fix in the next revision.
+> 
+> >
+> > And also, what happens when you unload the device, who frees the
+> > attribute's memory?
+> 
+> If configured, coresight devices aren't removable.
 
-In your modified public_key_verify_signature():
+But is the driver able to be unloaded?  Unbound from the device manually
+through sysfs?  There's lots of ways devices are "removed" that don't
+involved physical removal :)
 
-> -	sg_init_one(&digest_sg, output, outlen);
-> -	akcipher_request_set_crypt(req, &sig_sg, &digest_sg, sig->s_size,
-> +	sg_init_one(&output_sg, output, outlen);
-> +	akcipher_request_set_crypt(req, &sig_sg, &output_sg, sig->s_size,
->  				   outlen);
+thanks,
 
-Why is the output necessary?  It was there for the decoded hash to be placed
-in prior to comparison - but now that's not necessary.
-
-> -	ret = crypto_wait_req(crypto_akcipher_verify(req), &cwait);
-> +	ret = crypto_wait_req(crypto_akcipher_verify(req, sig->digest,
-> +						     sig->digest_size), &cwait);
-
-I see sig->digest is passed in here.  Should it be passed in in place of
-output_sg above?
-
-> -	inst->alg.verify = pkcs1pad_verify;
-> +	inst->alg.verify_rsa = pkcs1pad_verify;
-
-Is there a reason that pkcs1pad_verify() can't do the comparison?
-
-> -	.verify = rsa_verify,
-> +	.verify_rsa = rsa_verify,
-
-Likewise verify_rsa()?
-
-Granted, this might involve pkcs1pad_verify() dressing up the signature in the
-appropriate wrappings and passing it along to verify_rsa() to do the actual
-comparison there (ie. what pkcs1pad_verify_complete() does).
-
-> -	.verify = caam_rsa_enc,
-> +	.verify_rsa = caam_rsa_enc,
-
-I presume this is the reason - because this reuses its encrypt operation
-directly.  But could this instead perform the comparison upon completion, say
-in rsa_pub_done()?
-
-> -	.verify = qat_rsa_enc,
-> +	.verify_rsa = qat_rsa_enc,
-
-Again, this could do the comparison, say, in qat_rsa_cb().
-
-David
+greg k-h
 
 _______________________________________________
 linux-arm-kernel mailing list
