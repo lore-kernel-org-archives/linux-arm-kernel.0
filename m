@@ -2,150 +2,81 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E2553C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 23:07:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9BA07C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 23:44:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AF04220675
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 23:07:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6831420840
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 23:44:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CF1mbj6P";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="XuMAAZUG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AF04220675
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q6ZUXM8a";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="TURSJ7/5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6831420840
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=dEG21q2f6puvWBgABqsHxoYNGEgqaJpmhD6cVf/mh0I=; b=CF1mbj6PkxWQFd
-	bi+nGOOaEURKrgwv7L3M6FjILWLIGh47odycR24DxhkAOCD05M/Mwy9ECfWG/rIxTAgdc6+IMDme/
-	ui5VeyqQjTsRBG3i6mzNky1wFliSgqOMhybowdhvNxuJhJrgaOS/P3Gj4Zf18c5O+nV1Ef67BxfSa
-	j3MEQEQTHanmuRcYbvDWDy4cGgQF0hzSfZc+SscMQ2NFk/+D/jDnklP7+RIPbR41S/6bkv3kr5VAm
-	VClDBZ6zh4KUG7ywhzQWLHPY/x9ffSEMS+FTbHVwwRE25gSlbGq01Lk3usdcdmz4qYvZxdwvXFjIG
-	qM5KItpD0rAcxDNSVCpg==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=VxXHD1sZAA341ubI2JqqMx+5ln3IFH7hO6KTxm4RraU=; b=q6ZUXM8aRozcHY
+	7VsbdaCTXuhZs/MfGL4QmqZbF0WfVOlKOmb3vLYHtjROIPT9qGuWAMxWn+joNm8LcdNsJN6SenySS
+	KRqtycr9tRumGDAVYzlcHB+sfz2tiGrTqIUwC5myLwflDoHjfJiOYfr6RZKoEoNt6J3Dkf0YYMHmT
+	K7Bxq+ivnTCFMPl5M5GeIn9qCkJu4ju3CeXvWAlc4fOH2/bjBp9Us48+wxe2SNQidJbwQLIEcO4KG
+	bhxk3Pg25MnLre0g0SqF3spboarIW5Mz+vefwwlD+HJAJx81kBt4uI6YQFO7zpKAWC8ePHLcLURBH
+	iaXVmlB5BnyO8tcb1rqg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjuH1-0003J8-IE; Wed, 16 Jan 2019 23:07:03 +0000
-Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
+	id 1gjuqv-0007JC-Oj; Wed, 16 Jan 2019 23:44:09 +0000
+Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjuGy-0003Id-Ut
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 23:07:02 +0000
-Received: by mail-pg1-x542.google.com with SMTP id n2so3501717pgm.3
+ id 1gjuqs-0007IB-Cg
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 23:44:08 +0000
+Received: by mail-it1-x143.google.com with SMTP id h193so5298377ita.5
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 16 Jan 2019 15:07:00 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=gGP2CaCOhJ0/Wayl/DtKgMhLtBMwhPiHAUa6ULUX5GA=;
- b=XuMAAZUG+8WVWgLTyUHiIKlKVzqKpsURGADNQHXklEQolD7HDh5XeZuzFMEvJTymEP
- bArAEB1vpoTEPcWLpuhmDK9sf+Ojnqsxa9EoNagfQUF9xVZrihQx8Q1UaV7nRO7w1z5C
- 5BD+dP0Km6Stu/aFd1sGU+oazQaNhba7Fyu3uKgp6s1X3nR4t4J206I+jgwbONlqcOgS
- t222GgAHF2A/4pv+6890re96+wnnqVAZMZlH1noDwMQbHnWxjnl7xXcQu2ACc+F6HAcp
- oRth96LY0PzZ1cQsJSvmp6ttivgYsNJa19Uis8EJ/Pc3jpnjbtY0XiIOlTf0z2b4E0R5
- n/kw==
+ Wed, 16 Jan 2019 15:44:05 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=3LeQfLR0aZ0V3aKibD+ER/7h/1zMywFsIvcaHPMOuRs=;
+ b=TURSJ7/5T30A77hz76EL1Fphs6ExfDko2dgvRQWUgOorFlBlnv9cz0rzVXuiDH92m4
+ iokcpO9oWflK54XrOOZQkMX4XpQ9WMvmUVUiXhI80p36dN81mcYuAUxmQua5l8fSKf1B
+ BV0oA311nif01ztQkvFMQBvSFxAaiutXeEIok=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=gGP2CaCOhJ0/Wayl/DtKgMhLtBMwhPiHAUa6ULUX5GA=;
- b=rk2aI8Emxahl67ASiuP1oDJcrBziXz3jJDiDfuu79dt+f7LkFZn0Sc6d80zwwM3uMf
- 8yxHXjpGUtJ9qQLcYbiU1YZkjQqSJ/geNVsnz4YafYCNFiuTTXvM8nZZwEpxxPajlrvM
- 1KYwkWj26XqHE6NGhK3ikPLN/JJs8qCeBQ6AojRk8rxl6Pjtjazmynoa1N0Tu80i7B/6
- FPVGj6MQlQ7Gw3YXGq2yfUTQO5lYQ7ET/m7x0M73aaC6myvHtph5S7EPSb1EJz+0Uft0
- 0WOV92Bi7keHrfqd37SaHVqWQ4YO11G0gZXnVKoaAvE3xlc9B2mcxIrO+3QZmjgbL0HY
- lYLA==
-X-Gm-Message-State: AJcUukdM54rHXc/Tsqz8oGDRrt7s1uCy/8l1bJNeEw5o2OfC19uBESuA
- zbGvvhndfmO9PIHd/bLd5BE=
-X-Google-Smtp-Source: ALg8bN40BwfOPt+A6s0HJsK1TkBf5wNtY0iZbrIsi1aIw4dmmmhKVsg+8J28igG0gNOg6BBcCqOd3Q==
-X-Received: by 2002:a63:2222:: with SMTP id i34mr10400828pgi.83.1547680019175; 
- Wed, 16 Jan 2019 15:06:59 -0800 (PST)
-Received: from [10.67.49.9] ([192.19.223.250])
- by smtp.googlemail.com with ESMTPSA id
- e126sm13813266pfc.74.2019.01.16.15.06.57
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 16 Jan 2019 15:06:58 -0800 (PST)
-Subject: Re: [PATCH net-next 1/3] net: dsa: Split platform data to header file
-To: Andrew Lunn <andrew@lunn.ch>
-References: <20190115230613.28334-1-f.fainelli@gmail.com>
- <20190115230613.28334-2-f.fainelli@gmail.com>
- <20190116222937.GR29244@lunn.ch>
-From: Florian Fainelli <f.fainelli@gmail.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=f.fainelli@gmail.com; prefer-encrypt=mutual; keydata=
- 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
- M5kY0ACeNhCZJvZ5g4C2Lc9fcTHu8jxmEkI=
-Message-ID: <6f593b8b-5bb7-f884-d1d6-d509fd794419@gmail.com>
-Date: Wed, 16 Jan 2019 15:06:48 -0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=3LeQfLR0aZ0V3aKibD+ER/7h/1zMywFsIvcaHPMOuRs=;
+ b=QeitvR/NNpNhTmxMrm2Pq5gwbg2k7h1Bn8UIGeHKLbAinpauJwGTucN0d5d2OTc9rq
+ 5zwNSrmHj2Vfn1K1jd2QjUqqtXSaj+fJ9nrKjsi1JghQsnMqArBjd0V6z1VOR4Oj0lcU
+ CmbbuI/KAzlRZMQ8UK9vhLAk97Upqb7l9ob/uU0zbtT+s1g2NWOeyI2djUQGrAou5pDw
+ U1A4xAXItz0UOlNBX7iragCB+IgFVpQzwPMbc52qy9ihay4J9GBYmDezxFrPigbAfgCa
+ w9wbaiKb3iLAawQmQd649GCic6pc0oMnJFN6O1FTDe76N3U90T4WPWYYpwuRKbWMWRJ3
+ 2kdA==
+X-Gm-Message-State: AJcUukd/mZGtl5FXLlWeyN8Ter9iTKuYWGL+4N6cCtl0C9ZGZZtQzbBM
+ OMJIfmbeudASvYFAvYWbb2tzLrsqAyX8G2aEbtvRTw==
+X-Google-Smtp-Source: ALg8bN4RDVyPfuuoGUidOG1Su0+Pfc7Ap3/6Oi70P4x3d4+8EOj9JSO2qx60u/voN5GbthFTZVxoaIW0BIgB4eau1x4=
+X-Received: by 2002:a05:660c:34f:: with SMTP id
+ b15mr7405335itl.146.1547682242833; 
+ Wed, 16 Jan 2019 15:44:02 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20190116222937.GR29244@lunn.ch>
-Content-Language: en-US
+References: <20190115230742.13730-1-mathieu.poirier@linaro.org>
+ <20190115230742.13730-3-mathieu.poirier@linaro.org>
+ <9819f0ad-d735-6c50-ffca-90f08153aad2@arm.com>
+In-Reply-To: <9819f0ad-d735-6c50-ffca-90f08153aad2@arm.com>
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
+Date: Wed, 16 Jan 2019 16:43:51 -0700
+Message-ID: <CANLsYky_1QxfNRnGi=3sONMrS6JCdjcwtdQBJqi9FtpQMvF_Zg@mail.gmail.com>
+Subject: Re: [PATCH 2/7] coresight: perf: Add "sinks" group to PMU directory
+To: Suzuki K Poulose <suzuki.poulose@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_150701_023582_EF61FC19 
-X-CRM114-Status: GOOD (  13.39  )
+X-CRM114-CacheID: sfid-20190116_154406_503807_C0002089 
+X-CRM114-Status: GOOD (  27.45  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -157,45 +88,125 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: open list <linux-kernel@vger.kernel.org>,
- Jason Cooper <jason@lakedaemon.net>, Arnd Bergmann <arnd@arndb.de>,
- netdev@vger.kernel.org, Gregory Clement <gregory.clement@bootlin.com>,
- Russell King <linux@armlinux.org.uk>,
- Vivien Didelot <vivien.didelot@gmail.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Mauro Carvalho Chehab <mchehab+samsung@kernel.org>,
- Andrew Morton <akpm@linux-foundation.org>,
- "David S. Miller" <davem@davemloft.net>,
- "moderated list:ARM/Marvell Dove/MV78xx0/Orion SOC support"
- <linux-arm-kernel@lists.infradead.org>,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Mark Rutland <mark.rutland@arm.com>, linux-s390@vger.kernel.org,
+ Peter Zijlstra <peterz@infradead.org>, Greg KH <gregkh@linuxfoundation.org>,
+ heiko.carstens@de.ibm.com, Adrian Hunter <adrian.hunter@intel.com>,
+ Arnaldo Carvalho de Melo <acme@kernel.org>, ast@kernel.org,
+ Alexander Shishkin <alexander.shishkin@linux.intel.com>,
+ Ingo Molnar <mingo@redhat.com>, Will Deacon <will.deacon@arm.com>,
+ "H. Peter Anvin" <hpa@zytor.com>, schwidefsky@de.ibm.com,
+ Namhyung Kim <namhyung@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
+ Jiri Olsa <jolsa@redhat.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 1/16/19 2:29 PM, Andrew Lunn wrote:
->> diff --git a/include/net/dsa.h b/include/net/dsa.h
->> index b3eefe8e18fd..6178b648d08a 100644
->> --- a/include/net/dsa.h
->> +++ b/include/net/dsa.h
->> @@ -21,6 +21,7 @@
->>  #include <linux/ethtool.h>
->>  #include <linux/net_tstamp.h>
->>  #include <linux/phy.h>
->> +#include <linux/platform_data/dsa.h>
->>  #include <net/devlink.h>
->>  #include <net/switchdev.h>
-> 
-> Hi Florian
-> 
-> Could there be one more patch at the end which removes this?  I think
-> it is here just as an intermediary step?
+Good evening Suzuki,
 
-Yes, we can have only dsa2.c and legacy.c include that file from there
-on, I will resubmit with that change, thanks!
--- 
-Florian
+On Wed, 16 Jan 2019 at 03:29, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+>
+>
+>
+> On 15/01/2019 23:07, Mathieu Poirier wrote:
+> > Add a "sinks" directory entry so that users can see all the sinks
+> > available in the system in a single place.  Individual sink are added
+> > as they are registered with the coresight bus.
+> >
+> > Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> > ---
+> >   .../hwtracing/coresight/coresight-etm-perf.c  | 43 +++++++++++++++++++
+> >   .../hwtracing/coresight/coresight-etm-perf.h  |  1 +
+> >   drivers/hwtracing/coresight/coresight.c       | 17 ++++++++
+> >   3 files changed, 61 insertions(+)
+> >
+> > diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> > index f21eb28b6782..292bd409a68c 100644
+> > --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
+> > +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> > @@ -14,6 +14,7 @@
+> >   #include <linux/perf_event.h>
+> >   #include <linux/percpu-defs.h>
+> >   #include <linux/slab.h>
+> > +#include <linux/stringhash.h>
+> >   #include <linux/types.h>
+> >   #include <linux/workqueue.h>
+> >
+> > @@ -43,8 +44,18 @@ static const struct attribute_group etm_pmu_format_group = {
+> >       .attrs  = etm_config_formats_attr,
+> >   };
+> >
+> > +static struct attribute *etm_config_sinks_attr[] = {
+> > +     NULL,
+> > +};
+> > +
+> > +static const struct attribute_group etm_pmu_sinks_group = {
+> > +     .name   = "sinks",
+> > +     .attrs  = etm_config_sinks_attr,
+> > +};
+> > +
+> >   static const struct attribute_group *etm_pmu_attr_groups[] = {
+> >       &etm_pmu_format_group,
+> > +     &etm_pmu_sinks_group,
+> >       NULL,
+> >   };
+> >
+> > @@ -479,6 +490,38 @@ int etm_perf_symlink(struct coresight_device *csdev, bool link)
+> >       return 0;
+> >   }
+> >
+> > +static ssize_t etm_perf_sink_name_show(struct device *dev,
+> > +                                    struct device_attribute *dattr,
+> > +                                    char *buf)
+> > +{
+> > +     /* See function coresight_sink_by_id() to know where this is used */
+> > +     u32 hash = hashlen_hash(hashlen_string(NULL, dattr->attr.name));
+> > +
+> > +     return scnprintf(buf, PAGE_SIZE, "%x\n", hash);
+> > +}
+> > +
+> > +int etm_perf_symlink_sink(struct coresight_device *csdev)
+> > +{
+> > +     struct device *pmu_dev = etm_pmu.dev;
+> > +     struct device *pdev = csdev->dev.parent;
+> > +     struct device_attribute *dev_attr;
+> > +
+> > +     if (csdev->type != CORESIGHT_DEV_TYPE_SINK &&
+> > +         csdev->type != CORESIGHT_DEV_TYPE_LINKSINK)
+> > +             return -EINVAL;
+> > +
+> > +     if (!etm_perf_up)
+> > +             return -EPROBE_DEFER;
+> > +
+> > +     dev_attr = kzalloc(sizeof(*dev_attr), GFP_KERNEL);
+> > +     dev_attr->attr.name = kstrdup(dev_name(pdev), GFP_KERNEL);
+> > +     dev_attr->attr.mode = 0444;
+> > +     dev_attr->show = etm_perf_sink_name_show;
+>
+> I would have  added the attribute to the csdev (say, sink_attr),
+> and add that to the group, so that it is easier to remove the
+> attribute when the sink device is removed from the system (when
+> we get there). It would be good to have something in place to remove the
+> attribute.
+
+My hope was to avoid introducing a new field in the already bloated
+coresight_device structure, and on top of things a component specific
+field.  I think it would be worth it if we'd envision making the
+coresight drivers removable in a not so distant future.  But doing
+something like that is quite tricky (as Kim quickly found out) and
+skirts the bottom of the list of priorities, if on it at all.
+
+I'll change it if you're really keen on it but it would be code that
+is never used.
+
+Mathieu
+
+>
+> Otherwise, the overall approach looks fine to me.
+>
+> Suzuki
 
 _______________________________________________
 linux-arm-kernel mailing list
