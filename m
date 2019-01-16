@@ -2,84 +2,113 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BA80EC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 17:30:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 35F5CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 17:31:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 885F4206C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 17:30:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 061762082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 17:31:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tRDZi7QZ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Myq5jeuQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 885F4206C2
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qDFN8Hxa";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="lzBf/WFE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 061762082F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9DpOXs8PgFLdrpJB3eCoaOkfqOKAQQ+bHlD1uF7qR6E=; b=tRDZi7QZjERYIB
-	nygmN699ZUenK4t9f4vMhaVUO+uxLwc+oqgc/guR2C6pK8EvSJl1Zi3MevxJ6YzwWXSmbrTwh/b6r
-	zqIuT6MzxUEJhIezCUBxSqSrqPTvUoNtrozVPf6mYOzLVPjRjci0yl9hZ0Dzfr7PeBYChMXWca2Xw
-	vuOzFOnlZaCXODKnidMH+9IJEi4r22QtwSmUI44mbhlY6ZHC9z9I6HqcfGY2TzWlfvL1N84w35wrY
-	CWszwqGNxUPwTgOyQnNZBeqGk5JrdEHUcPf+R3ZKZtovktiBi7Re2iQfvMuARLUpKRbCTugVYMlsC
-	x4eXV7ihA/IweIPQpMLg==;
+	List-Owner; bh=cXPY9MyN/M/cqh7MZR4hJgoWttSO6JQ/+9hZF8Q0mNg=; b=qDFN8Hxaq4KL9y
+	tFwmDv6QBAIUBFIMf1mm7dvq5gCd6wsnxmO0wpRAkiUAo5pSh9yQooga+NduEaIUqCt90ejttdeHc
+	HWTQBX3NAQsisdS3QyjSsHbEtoI3X1CQSHIaZpppjyoZQj9eaXxxebAz+t+yEH+FDVgzN6dlu6LA0
+	ntnxuBcK+It+tBaIgjTL28hHTC44SYFA+My6e9XXCPDOQvaRV7b6ij7x/Lf9cwVj9Fqilmx9KGKcg
+	+m4BRGug4ejZd6zhXmrg5IxK7V2iUCeve1ZEHifgik3aPMlMJvMhVZLHCE93jKqyM0uN6xde7vz75
+	zHoPmqz41SqP+/2H4vwQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjp1K-00014a-PN; Wed, 16 Jan 2019 17:30:30 +0000
-Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
+	id 1gjp2j-0001O0-IQ; Wed, 16 Jan 2019 17:31:57 +0000
+Received: from mail-am5eur02on0608.outbound.protection.outlook.com
+ ([2a01:111:f400:fe07::608]
+ helo=EUR02-AM5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjp1I-00013x-4U
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 17:30:29 +0000
-Received: by mail-it1-x143.google.com with SMTP id m62so4258958ith.5
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 16 Jan 2019 09:30:27 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=Ljv1GR361GBRKYIkB7jsE2in05byxJjM9Of4H3Lyf7A=;
- b=Myq5jeuQiJRYN2ReKgBqC+F4WGXNyGRFDymPLmULSfQs2QRfD5K5Ahb63Z4mhTyh17
- MpMjhQcqZG6hctg9oIL/rLUg29Xp1ba+aUzYzHmQv1/+g7orOEOrG19xW6nYHMEgpPEm
- J9EtBEv+x9wwEmBh8HQLRPHDaOeuSgyXrNhJs=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=Ljv1GR361GBRKYIkB7jsE2in05byxJjM9Of4H3Lyf7A=;
- b=ezv+6RiJqa21IfknThdxZdizNAsXsSZK5/bGGznTDltjyeZS5OeAghYguOUlt6jMaq
- 0m5sTea+hRBsA0M9uwMuZcEHapbBQy/cti7/pdxwE1rxch5bby3o7P4HEJOpvyf7bx9V
- dfr1LUt1fMNNaXmonLVHcGue/yuo2hF5/c0nOKwPO3alwfRIT3MWlwjHTZ5XtCB+Cxy0
- HR9U9Bhnw01a00ZHgpCChEBiJAlsSu4xUvqdxwYsGtF9NayM5buLtXK8TUg7PF2o6FZG
- /9SRxPOKXW1S5ggSZTraGpUgvSGHL4VCnokvS+AmmOM3oek8BrcgcpGbGqBpZanLVu67
- +vSg==
-X-Gm-Message-State: AJcUukc2DXevL2sGcjZXuGc9mjQuQT+XLBkicw3XdJxxz+RToIqM8bvR
- 6XQQs/4JYuroPYB/Hf1lMQ4XNZYcVX5bltXASPMxEQ==
-X-Google-Smtp-Source: ALg8bN5ovBywmS2CY3P6+MGnjtlKbf7GdYn/0jnI7YCqLKMeYq51k91Eh0XXDHFIbC9usy4KjWsgWtsp6K1xpI+fWbM=
-X-Received: by 2002:a02:1b1d:: with SMTP id l29mr5818176jad.98.1547659826972; 
- Wed, 16 Jan 2019 09:30:26 -0800 (PST)
+ id 1gjp2d-0001NF-8U
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 17:31:55 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=4roUDKUCNg0eKoLtKsa3IEw651nJRge5sRyGmhH3Xic=;
+ b=lzBf/WFEiYVlvHSx6R0kKwX/0bCI+cQ9asaHA0c696MzhlLsXcF5K3rfm+BxpI8Zm+5VFLcQIP1n87cX23cS+hPBjp7uTcF85tRzoNKEiZmeTRhbncG5ZYGCWdyP5rjmcGXUMblqDKvJA0guftUItRPy+KTa9pkFuT8V7qD2K58=
+Received: from VI1PR0402MB2800.eurprd04.prod.outlook.com (10.172.255.18) by
+ VI1PR0402MB3581.eurprd04.prod.outlook.com (52.134.4.154) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1516.18; Wed, 16 Jan 2019 17:31:46 +0000
+Received: from VI1PR0402MB2800.eurprd04.prod.outlook.com
+ ([fe80::8c7b:7d91:36c7:1426]) by VI1PR0402MB2800.eurprd04.prod.outlook.com
+ ([fe80::8c7b:7d91:36c7:1426%7]) with mapi id 15.20.1537.018; Wed, 16 Jan 2019
+ 17:31:46 +0000
+From: Ioana Ciornei <ioana.ciornei@nxp.com>
+To: Shawn Guo <shawnguo@kernel.org>
+Subject: RE: [PATCH 1/3] arm64: dts: add dpaa2-console node for DPAA2 platforms
+Thread-Topic: [PATCH 1/3] arm64: dts: add dpaa2-console node for DPAA2
+ platforms
+Thread-Index: AQHUmUIyF6ylLjPS3UibJyYT5PgWG6WrD8gAgAbCicCAAA9NgIAAALAAgABrd1A=
+Date: Wed, 16 Jan 2019 17:31:46 +0000
+Message-ID: <VI1PR0402MB2800477D1F1FE0E78F1D8D33E0820@VI1PR0402MB2800.eurprd04.prod.outlook.com>
+References: <1545406240-3061-1-git-send-email-ioana.ciornei@nxp.com>
+ <1545406240-3061-2-git-send-email-ioana.ciornei@nxp.com>
+ <20190112024725.GO32649@dragon>
+ <VI1PR0402MB2800E8F9F1884EB0669EE9F0E0820@VI1PR0402MB2800.eurprd04.prod.outlook.com>
+ <20190116105559.GM15808@dragon>
+ <VI1PR0402MB28007817A29E6116D1FAFC2BE0820@VI1PR0402MB2800.eurprd04.prod.outlook.com>
+In-Reply-To: <VI1PR0402MB28007817A29E6116D1FAFC2BE0820@VI1PR0402MB2800.eurprd04.prod.outlook.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=ioana.ciornei@nxp.com; 
+x-originating-ip: [86.34.165.90]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; VI1PR0402MB3581;
+ 6:bq2NYa9E/UUBNquVH30y0OtgAqL+3IY62KI9YMNVbAh3Wl3T9Y0HhYPU5Fmo35h4oVgxEjbCl/J58KLJUEvcU5ZfsYRx8qrN4yFFhuRI2KEGisjaQVM84o8meRifY3h4RqpK+z6qiQMI1o7zKj3yAru9B9H4s0ghGvTE1FeDhMJMZyc3HaS7eui0+McT350UY2bQyqmgY0E6LWlhFAeRpVSsx7hVyPNxwHQPAwHvodP5zRxmi4PlxrMJRBMaxz7UPkzIZbXOjvDWe8WW3zTkEV6R4JzwfV/6GASyNtdEtGicd6TmIgVRn8AtShnhelUgn21UOonEyCXMaQcuJYSrPWBNjNyRKbL2s+fW6XOE6z6kl1Ndt0/cwwQlCh4ASpIdt2PJCLYXTN0lLXEnAVaauNhEuM3817VrqvfvDmrVa76oCXxZLuzWtrovSdOVhRUpiGlpM4XmwPQYYdBE3YK/Qw==;
+ 5:ue32SDocRK1H3p6EEiaDkUJ3Pqo7WhfyTtOx75WqKnWmCpnVFGJpwZo6aEcBx/9aaZWnwdxGmL1wTTOLt2xPqOZHlr+KszVY0HsvuNoukFtpUM/aPvsxDzLqZIRP00bCPozWXn+hf62INvUDFRMKEO1kVegglF6I4B6IJlvN1ASdp24JqSqb5dm/uSWaAcVezVhMPPcXzWMBq9tYTc2Dvw==;
+ 7:gSsl4tyGK3J4rqzyftIU2pXJV4mEMOCIZEw6VktITIWJj3kTmbDbXupMQNsJ5ipiDRLMhQ1SMTvZpVS4CbDbvcJW98p6MSCwiyRG/dLRiwCy5M6uKNZBiJ6SoinVA2sr6TQ9pH+K7sG1anPddSCZQg==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: 87a993c5-19aa-4c6e-46e1-08d67bd87d4f
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR0402MB3581; 
+x-ms-traffictypediagnostic: VI1PR0402MB3581:
+x-microsoft-antispam-prvs: <VI1PR0402MB3581FF13D7A48E6CCF24DDC8E0820@VI1PR0402MB3581.eurprd04.prod.outlook.com>
+x-forefront-prvs: 091949432C
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(346002)(39860400002)(366004)(396003)(376002)(136003)(189003)(199004)(93886005)(106356001)(8936002)(105586002)(74316002)(97736004)(5660300001)(6916009)(7736002)(486006)(44832011)(81156014)(8676002)(305945005)(68736007)(81166006)(2940100002)(316002)(446003)(476003)(54906003)(478600001)(99286004)(14454004)(25786009)(4326008)(186003)(26005)(9686003)(102836004)(76176011)(6246003)(2906002)(7696005)(11346002)(229853002)(6506007)(3846002)(6436002)(93156006)(256004)(71190400001)(55016002)(33656002)(71200400001)(53936002)(6116002)(66066001)(86362001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR0402MB3581;
+ H:VI1PR0402MB2800.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: IoBcJsZR6UcZCpECh+fV0rx6JpfN2AkDUnLqAne6XJRLTRsXjufyzIE97lztAwXHUsQrGCWRpu4R0lXjMVYwNANLU78m+TRVeFem7VV1g4OFF0IAZiSewB2Seyrso88HBfmup1kFfrqcBUX7MNoCnZRYSbtY5Cg615C99CNeW0HwYXTpC6rlcovdGiFo0uBJmPj8kjsq7CQbiYnAaAtwIhX40s2yNNa6xYrjfo99SPNyh7F5BdLqlPjlNaqFw91E7JGVUy2trjrvT2fHtjfvg405hc89r0EQpDav3s/KRt0TS0+eysBlCIk9/WYgDOMUVW+ctVokAYSXG81z5Uy8JWeEyeragk0t/ItpyXo/rom9kb8zeI5YH/90PADylAJHhfXDQOQBrO6RFK4MRGiswF1vDkN9f/yq9yydizrZb9Q=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-References: <20190115230742.13730-1-mathieu.poirier@linaro.org>
- <20190115230742.13730-3-mathieu.poirier@linaro.org>
- <20190116153948.GC871@kroah.com>
- <CANLsYkzfbJae6Nk7cHhnR09ZPSATa3g8sceGC=O3DfXYC2ruQQ@mail.gmail.com>
- <20190116163314.GB5446@kroah.com>
- <CANLsYkw_=_OC-95HRMxTZfpAe4UzAuidPJcZmL_T-LbkOwWCkQ@mail.gmail.com>
- <20190116171259.GB10164@kroah.com>
-In-Reply-To: <20190116171259.GB10164@kroah.com>
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
-Date: Wed, 16 Jan 2019 10:30:16 -0700
-Message-ID: <CANLsYkyFJx9gSfkMNmxT=bdas=sKFpZ0Cad42gm6nHoyq8FfnA@mail.gmail.com>
-Subject: Re: [PATCH 2/7] coresight: perf: Add "sinks" group to PMU directory
-To: Greg KH <gregkh@linuxfoundation.org>
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 87a993c5-19aa-4c6e-46e1-08d67bd87d4f
+X-MS-Exchange-CrossTenant-originalarrivaltime: 16 Jan 2019 17:31:46.3352 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR0402MB3581
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_093028_182910_D1039C27 
-X-CRM114-Status: GOOD (  28.35  )
+X-CRM114-CacheID: sfid-20190116_093153_922149_22EF88E8 
+X-CRM114-Status: GOOD (  17.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,139 +120,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, linux-s390@vger.kernel.org,
- "Suzuki K. Poulose" <suzuki.poulose@arm.com>,
- Peter Zijlstra <peterz@infradead.org>, Will Deacon <will.deacon@arm.com>,
- heiko.carstens@de.ibm.com, Adrian Hunter <adrian.hunter@intel.com>,
- Arnaldo Carvalho de Melo <acme@kernel.org>, ast@kernel.org,
- Alexander Shishkin <alexander.shishkin@linux.intel.com>,
- Ingo Molnar <mingo@redhat.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- "H. Peter Anvin" <hpa@zytor.com>, schwidefsky@de.ibm.com,
- Namhyung Kim <namhyung@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
- Jiri Olsa <jolsa@redhat.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Ioana Ciocoi Radulescu <ruxandra.radulescu@nxp.com>,
+ Roy Pledge <roy.pledge@nxp.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Leo Li <leoyang.li@nxp.com>, "robh+dt@kernel.org" <robh+dt@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 16 Jan 2019 at 10:13, Greg KH <gregkh@linuxfoundation.org> wrote:
->
-> On Wed, Jan 16, 2019 at 09:38:09AM -0700, Mathieu Poirier wrote:
-> > On Wed, 16 Jan 2019 at 09:33, Greg KH <gregkh@linuxfoundation.org> wrote:
-> > >
-> > > On Wed, Jan 16, 2019 at 09:14:33AM -0700, Mathieu Poirier wrote:
-> > > > On Wed, 16 Jan 2019 at 08:39, Greg KH <gregkh@linuxfoundation.org> wrote:
-> > > > >
-> > > > > On Tue, Jan 15, 2019 at 04:07:37PM -0700, Mathieu Poirier wrote:
-> > > > > > Add a "sinks" directory entry so that users can see all the sinks
-> > > > > > available in the system in a single place.  Individual sink are added
-> > > > > > as they are registered with the coresight bus.
-> > > > > >
-> > > > > > Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> > > > > > ---
-> > > > > >  .../hwtracing/coresight/coresight-etm-perf.c  | 43 +++++++++++++++++++
-> > > > > >  .../hwtracing/coresight/coresight-etm-perf.h  |  1 +
-> > > > > >  drivers/hwtracing/coresight/coresight.c       | 17 ++++++++
-> > > > > >  3 files changed, 61 insertions(+)
-> > > > > >
-> > > > > > diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-> > > > > > index f21eb28b6782..292bd409a68c 100644
-> > > > > > --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-> > > > > > +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-> > > > > > @@ -14,6 +14,7 @@
-> > > > > >  #include <linux/perf_event.h>
-> > > > > >  #include <linux/percpu-defs.h>
-> > > > > >  #include <linux/slab.h>
-> > > > > > +#include <linux/stringhash.h>
-> > > > > >  #include <linux/types.h>
-> > > > > >  #include <linux/workqueue.h>
-> > > > > >
-> > > > > > @@ -43,8 +44,18 @@ static const struct attribute_group etm_pmu_format_group = {
-> > > > > >       .attrs  = etm_config_formats_attr,
-> > > > > >  };
-> > > > > >
-> > > > > > +static struct attribute *etm_config_sinks_attr[] = {
-> > > > > > +     NULL,
-> > > > > > +};
-> > > > > > +
-> > > > > > +static const struct attribute_group etm_pmu_sinks_group = {
-> > > > > > +     .name   = "sinks",
-> > > > > > +     .attrs  = etm_config_sinks_attr,
-> > > > > > +};
-> > > > > > +
-> > > > > >  static const struct attribute_group *etm_pmu_attr_groups[] = {
-> > > > > >       &etm_pmu_format_group,
-> > > > > > +     &etm_pmu_sinks_group,
-> > > > > >       NULL,
-> > > > > >  };
-> > > > > >
-> > > > > > @@ -479,6 +490,38 @@ int etm_perf_symlink(struct coresight_device *csdev, bool link)
-> > > > > >       return 0;
-> > > > > >  }
-> > > > > >
-> > > > > > +static ssize_t etm_perf_sink_name_show(struct device *dev,
-> > > > > > +                                    struct device_attribute *dattr,
-> > > > > > +                                    char *buf)
-> > > > > > +{
-> > > > > > +     /* See function coresight_sink_by_id() to know where this is used */
-> > > > > > +     u32 hash = hashlen_hash(hashlen_string(NULL, dattr->attr.name));
-> > > > > > +
-> > > > > > +     return scnprintf(buf, PAGE_SIZE, "%x\n", hash);
-> > > > > > +}
-> > > > > > +
-> > > > > > +int etm_perf_symlink_sink(struct coresight_device *csdev)
-> > > > > > +{
-> > > > > > +     struct device *pmu_dev = etm_pmu.dev;
-> > > > > > +     struct device *pdev = csdev->dev.parent;
-> > > > > > +     struct device_attribute *dev_attr;
-> > > > > > +
-> > > > > > +     if (csdev->type != CORESIGHT_DEV_TYPE_SINK &&
-> > > > > > +         csdev->type != CORESIGHT_DEV_TYPE_LINKSINK)
-> > > > > > +             return -EINVAL;
-> > > > > > +
-> > > > > > +     if (!etm_perf_up)
-> > > > > > +             return -EPROBE_DEFER;
-> > > > > > +
-> > > > > > +     dev_attr = kzalloc(sizeof(*dev_attr), GFP_KERNEL);
-> > > > > > +     dev_attr->attr.name = kstrdup(dev_name(pdev), GFP_KERNEL);
-> > > > > > +     dev_attr->attr.mode = 0444;
-> > > > > > +     dev_attr->show = etm_perf_sink_name_show;
-> > > > > > +
-> > > > > > +     return sysfs_add_file_to_group(&pmu_dev->kobj,
-> > > > > > +                                    &dev_attr->attr, "sinks");
-> > > > >
-> > > > > What is so odd about this call that you needed me to review this?
+> > Subject: Re: [PATCH 1/3] arm64: dts: add dpaa2-console node for DPAA2
+> > platforms
+> >
+> > On Wed, Jan 16, 2019 at 10:02:01AM +0000, Ioana Ciornei wrote:
+> > > > Subject: Re: [PATCH 1/3] arm64: dts: add dpaa2-console node for
+> > > > DPAA2 platforms
 > > > >
-> > > > As far as I can tell nobody is feeding a dynamic struct attribute to
-> > > > the function and I wasn't sure if it was because they were told not to
-> > > > or simply because it wasn't needed, hence asking for a second opinion.
+> > > > On Fri, Dec 21, 2018 at 03:31:09PM +0000, Ioana Ciornei wrote:
+> > > > > Add the dpaa2-console device tree node for the following
+> > > > > DPAA2 based platforms: LS1088A, LS2080A and LS2088A.
+> > > > >
+> > > > > Signed-off-by: Ioana Ciornei <ioana.ciornei@nxp.com>
+> > > >
+> > > > DTS patch generally goes to the last in a series.
 > > >
-> > > Ah.  Well, again, this is a good question to answer:
-> > >
-> > > > > And what happens if this call fails, do you leak memory?
+> > > Should I resend this with the DTS patch the last?
 > >
-> > That's something I will fix in the next revision.
-> >
-> > >
-> > > And also, what happens when you unload the device, who frees the
-> > > attribute's memory?
-> >
-> > If configured, coresight devices aren't removable.
->
-> But is the driver able to be unloaded?  Unbound from the device manually
-> through sysfs?  There's lots of ways devices are "removed" that don't
-> involved physical removal :)
+> > You do not have to resend the series only for this.  It's pretty much
+> > a suggestion for future posting.
+> 
 
-All drivers are built-in and thus preventing them from being unloaded.
-They also have their ".suppress_bin_attrs" field set to take care of
-unbinding through sysfs.
+One more thing, do you have any other feedback on the DTS part?
+I think the best path for this patch set is through Leo's fsl soc tree but of course we need an ack from the DTS part also.
 
->
-> thanks,
->
-> greg k-h
+Thanks,
+Ioana
 
 _______________________________________________
 linux-arm-kernel mailing list
