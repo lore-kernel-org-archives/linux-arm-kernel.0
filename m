@@ -2,85 +2,71 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DFAE0C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 17:11:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 371BFC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 17:12:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 987F220675
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 17:11:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 06E4820651
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 17:12:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RHTlcfMB";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Dj8ru+ME"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 987F220675
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U1HSSlHK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 06E4820651
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=gRzgCoG/fx4k8sE7IAQxnjgPUZpObgvSOSNwNW245ks=; b=RHTlcfMB19tNH6mtVh+bzfBwTf
-	kQQjI6Dvy1FnYRiDEWkUzHQZAerSj84gfj+aqwouXzPhkW3ylj4xlVPAKmspc5aZm8flMh1ax8nxB
-	c5Bim3Z0ZvWhu002jHphp0wNpkirb7oR/sOOd3KfB4M5QjVR0hPo0gHSplvAXiN+LbCnVECfdJmt+
-	8HE1tw8YZ7eq4fg5uyreSOCZOe5dAYvJfA05/0wcECBBY14VJLIelMcmS/aCplUz2n4MhFM4Wk6Wz
-	cGDlwN+TFUlgZSkV9+IB5JYRxCsdFdeuHx4t/RKH0nab3ny0+BAITC2PchWJFWUzGm2+anr16Hy8f
-	KmClnJAw==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:Message-ID:Date:Content-ID:MIME-Version
+	:Subject:To:References:In-Reply-To:From:Reply-To:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Jk7OFV1AxRj6D9bKNVFCbFs1L/aKDoW04P5zdLP0ww0=; b=U1HSSlHKW/06++
+	YnSgijCOl2G9l8jZ/0kmlaRnpLMON5NRarl+abs3FeIZusVDhgoyvtVWR5ioX8VPYtkNltbQS/dbS
+	4GlZIr45rr1sYBBw8Sd29O1vZ++vjnPYjaNZ7UEus6dnDUoT/OhjNqPiVZIHXtE/LnoL6hUQb1zrP
+	NU3xDjXY3jdHIYzFYdHJ2jIhfo7bfCSZeH5rH/HAvwyJvZhKoOZFEj5AfZNcXvClwd9swvpPc3D4f
+	8DT0lLhnizGEIMrYjUZSODS9Xl+288M4tRHK+wxbeVhSUvvmHJvDTnnoLRyJzfVezPVhFI7mn8Yj1
+	1emMRLHJguU88P1labUQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjoiz-0000ul-1M; Wed, 16 Jan 2019 17:11:33 +0000
-Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
+	id 1gjoju-0001QI-SO; Wed, 16 Jan 2019 17:12:30 +0000
+Received: from mx1.redhat.com ([209.132.183.28])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjoiM-0000Ic-At
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 17:10:59 +0000
-Received: by mail-pf1-x441.google.com with SMTP id u6so3342057pfh.11
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 16 Jan 2019 09:10:53 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=VnxmDmWRiHgP8rQwZAnpNW6+tNuZ3Gwc75mIp5vRAak=;
- b=Dj8ru+MEYPo4tIYVsrDVqkIrf1cIQBZ2oFpOezoKgoAZhqRVS4MmQeK7MoimqGteIE
- OR7a8kVItg+VLBeFL0IE1BJIooeRsU8nPKSnZhQuX5B9sQPJhFarSBzuFBW+MshDzTv0
- hOYshhmO9RZWGECpU1KBIg1fQylyxfIhVbxmE=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=VnxmDmWRiHgP8rQwZAnpNW6+tNuZ3Gwc75mIp5vRAak=;
- b=el1qvEq90Uncogyk2C2D44tVemTA26B5Kg/V1EvZklI3hpECqg70VtdD3aqpa+6D5v
- Jb6ueTiseR4vlo8W736hzE6HV2TC9dvz2RbQD9V8ndhasAqoK1Kp1Ywsz/Y3EEzH9ork
- 3CgZ5w7SdCLJQJmU2duuojAcb4B6hBPxjJNwUO05MJsWEDZW94lKGHwz36TmZzCez4qA
- XgQT60h2it+exRzOTIXw8zW+H4VNpYD0CB5hIrURONaSZgRUSLuoH4zS9iZztIe9TjEI
- 5VCYnwF9cOAlOJYMEaqUqOCJ/WmkZxB2tsfWCN0BBaaHaUk5+wwmoqYY2C/WpcU2VyND
- 8kow==
-X-Gm-Message-State: AJcUukfRdTgnB4yDer3ISdtV46cSAjiUYmeFRFVG7xhTSwIyfI9pD3bI
- GuT94taUrvNMiD7WDJeyZhD4VQ==
-X-Google-Smtp-Source: ALg8bN4SVqtdFgywaEtwsZtiEDfEfNePPT7gtS4fYNcRbAXAnYzannt+cRDsjufd4ZnqC/tSaPG5gQ==
-X-Received: by 2002:a65:6417:: with SMTP id a23mr9838911pgv.236.1547658652983; 
- Wed, 16 Jan 2019 09:10:52 -0800 (PST)
-Received: from localhost.localdomain ([2601:1c2:680:1319:4e72:b9ff:fe99:466a])
- by smtp.gmail.com with ESMTPSA id
- h129sm17914023pfb.110.2019.01.16.09.10.51
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Wed, 16 Jan 2019 09:10:52 -0800 (PST)
-From: John Stultz <john.stultz@linaro.org>
-To: lkml <linux-kernel@vger.kernel.org>
-Subject: [PATCH 6/8 v4] arm64: dts: hi3660: Add dma to uart nodes
-Date: Wed, 16 Jan 2019 09:10:27 -0800
-Message-Id: <1547658629-25378-7-git-send-email-john.stultz@linaro.org>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1547658629-25378-1-git-send-email-john.stultz@linaro.org>
-References: <1547658629-25378-1-git-send-email-john.stultz@linaro.org>
+ id 1gjojs-0001Pu-C8
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 17:12:29 +0000
+Received: from smtp.corp.redhat.com (int-mx06.intmail.prod.int.phx2.redhat.com
+ [10.5.11.16])
+ (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
+ (No client certificate requested)
+ by mx1.redhat.com (Postfix) with ESMTPS id F40755C9;
+ Wed, 16 Jan 2019 17:12:26 +0000 (UTC)
+Received: from warthog.procyon.org.uk (ovpn-120-244.rdu2.redhat.com
+ [10.10.120.244])
+ by smtp.corp.redhat.com (Postfix) with ESMTP id B63405C228;
+ Wed, 16 Jan 2019 17:12:21 +0000 (UTC)
+Organization: Red Hat UK Ltd. Registered Address: Red Hat UK Ltd, Amberley
+ Place, 107-111 Peascod Street, Windsor, Berkshire, SI4 1TE, United
+ Kingdom.
+ Registered in England and Wales under Company Registration No. 3798903
+From: David Howells <dhowells@redhat.com>
+In-Reply-To: <20190116164703.9267-1-vt@altlinux.org>
+References: <20190116164703.9267-1-vt@altlinux.org>
+To: Vitaly Chikunov <vt@altlinux.org>
+Subject: Re: [RFC PATCH v2] akcipher: Introduce verify_rsa/verify for public
+ key algorithms
+MIME-Version: 1.0
+Content-ID: <24886.1547658740.1@warthog.procyon.org.uk>
+Date: Wed, 16 Jan 2019 17:12:20 +0000
+Message-ID: <24887.1547658740@warthog.procyon.org.uk>
+X-Scanned-By: MIMEDefang 2.79 on 10.5.11.16
+X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
+ (mx1.redhat.com [10.5.110.29]); Wed, 16 Jan 2019 17:12:27 +0000 (UTC)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_091054_912441_6EBEAAB4 
-X-CRM114-Status: GOOD (  13.07  )
+X-CRM114-CacheID: sfid-20190116_091228_430242_0C1D694B 
+X-CRM114-Status: GOOD (  14.61  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,83 +78,68 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Ryan Grachek <ryan@edited.us>, Zhuangluan Su <suzhuangluan@hisilicon.com>,
- Tanglei Han <hantanglei@huawei.com>, Wei Xu <xuwei5@hisilicon.com>,
- Rob Herring <robh+dt@kernel.org>, John Stultz <john.stultz@linaro.org>,
- Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
- linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: Giovanni Cabiddu <giovanni.cabiddu@intel.com>,
+ Tom Lendacky <thomas.lendacky@amd.com>, Aymen Sghaier <aymen.sghaier@nxp.com>,
+ Alexandre Torgue <alexandre.torgue@st.com>,
+ =?UTF-8?q?Horia=20Geant=C4=83?= <horia.geanta@nxp.com>, qat-linux@intel.com,
+ linux-stm32@st-md-mailman.stormreply.com, Gary Hook <gary.hook@amd.com>,
+ linux-kernel@vger.kernel.org, Tudor Ambarus <tudor-dan.ambarus@nxp.com>,
+ dhowells@redhat.com, keyrings@vger.kernel.org, linux-crypto@vger.kernel.org,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>,
+ "David S. Miller" <davem@davemloft.net>, linux-arm-kernel@lists.infradead.org,
+ Herbert Xu <herbert@gondor.apana.org.au>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Try to add DMA support to the uart nodes following
-the assignments made in the dts from the victoria vendor kernel
-here:
-https://consumer.huawei.com/en/opensource/detail/?siteCode=worldwide&keywords=p10&fileType=openSourceSoftware&pageSize=10&curPage=1
+Umm...  What do I apply this patch to?
 
-Cc: Tanglei Han <hantanglei@huawei.com>
-Cc: Zhuangluan Su <suzhuangluan@hisilicon.com>
-Cc: Ryan Grachek <ryan@edited.us>
-Cc: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-Cc: Wei Xu <xuwei5@hisilicon.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: linux-arm-kernel@lists.infradead.org
-Cc: devicetree@vger.kernel.org
-Signed-off-by: John Stultz <john.stultz@linaro.org>
----
-v3:
-* Remove dma enablment on uart0 which would use reserved channel 0
----
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+In your modified public_key_verify_signature():
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index 20ae40d..4c8d682 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -478,6 +478,8 @@
- 			compatible = "arm,pl011", "arm,primecell";
- 			reg = <0x0 0xfdf00000 0x0 0x1000>;
- 			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
-+			dma-names = "rx", "tx";
-+			dmas =  <&dma0 2 &dma0 3>;
- 			clocks = <&crg_ctrl HI3660_CLK_GATE_UART1>,
- 				 <&crg_ctrl HI3660_CLK_GATE_UART1>;
- 			clock-names = "uartclk", "apb_pclk";
-@@ -490,6 +492,8 @@
- 			compatible = "arm,pl011", "arm,primecell";
- 			reg = <0x0 0xfdf03000 0x0 0x1000>;
- 			interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
-+			dma-names = "rx", "tx";
-+			dmas =  <&dma0 4 &dma0 5>;
- 			clocks = <&crg_ctrl HI3660_CLK_GATE_UART2>,
- 				 <&crg_ctrl HI3660_PCLK>;
- 			clock-names = "uartclk", "apb_pclk";
-@@ -514,6 +518,8 @@
- 			compatible = "arm,pl011", "arm,primecell";
- 			reg = <0x0 0xfdf01000 0x0 0x1000>;
- 			interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-+			dma-names = "rx", "tx";
-+			dmas =  <&dma0 6 &dma0 7>;
- 			clocks = <&crg_ctrl HI3660_CLK_GATE_UART4>,
- 				 <&crg_ctrl HI3660_CLK_GATE_UART4>;
- 			clock-names = "uartclk", "apb_pclk";
-@@ -526,6 +532,8 @@
- 			compatible = "arm,pl011", "arm,primecell";
- 			reg = <0x0 0xfdf05000 0x0 0x1000>;
- 			interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
-+			dma-names = "rx", "tx";
-+			dmas =  <&dma0 8 &dma0 9>;
- 			clocks = <&crg_ctrl HI3660_CLK_GATE_UART5>,
- 				 <&crg_ctrl HI3660_CLK_GATE_UART5>;
- 			clock-names = "uartclk", "apb_pclk";
--- 
-2.7.4
+> -	sg_init_one(&digest_sg, output, outlen);
+> -	akcipher_request_set_crypt(req, &sig_sg, &digest_sg, sig->s_size,
+> +	sg_init_one(&output_sg, output, outlen);
+> +	akcipher_request_set_crypt(req, &sig_sg, &output_sg, sig->s_size,
+>  				   outlen);
 
+Why is the output necessary?  It was there for the decoded hash to be placed
+in prior to comparison - but now that's not necessary.
+
+> -	ret = crypto_wait_req(crypto_akcipher_verify(req), &cwait);
+> +	ret = crypto_wait_req(crypto_akcipher_verify(req, sig->digest,
+> +						     sig->digest_size), &cwait);
+
+I see sig->digest is passed in here.  Should it be passed in in place of
+output_sg above?
+
+> -	inst->alg.verify = pkcs1pad_verify;
+> +	inst->alg.verify_rsa = pkcs1pad_verify;
+
+Is there a reason that pkcs1pad_verify() can't do the comparison?
+
+> -	.verify = rsa_verify,
+> +	.verify_rsa = rsa_verify,
+
+Likewise verify_rsa()?
+
+Granted, this might involve pkcs1pad_verify() dressing up the signature in the
+appropriate wrappings and passing it along to verify_rsa() to do the actual
+comparison there (ie. what pkcs1pad_verify_complete() does).
+
+> -	.verify = caam_rsa_enc,
+> +	.verify_rsa = caam_rsa_enc,
+
+I presume this is the reason - because this reuses its encrypt operation
+directly.  But could this instead perform the comparison upon completion, say
+in rsa_pub_done()?
+
+> -	.verify = qat_rsa_enc,
+> +	.verify_rsa = qat_rsa_enc,
+
+Again, this could do the comparison, say, in qat_rsa_cb().
+
+David
 
 _______________________________________________
 linux-arm-kernel mailing list
