@@ -2,20 +2,20 @@ Return-Path: <SRS0=Ql45=PY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4B330C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 00:09:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9AE58C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 00:10:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 15F282086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 00:09:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 64E3B206C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 16 Jan 2019 00:10:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fKg18jwx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 15F282086D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mty9fiZJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 64E3B206C2
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ellerman.id.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,40 +24,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
 	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=PoUttiq5G6pYxjrOeRQIyWh1lBOdhXLOP0581QpNnMY=; b=fKg18jwxVp7Xge
-	WeR9jnBvfTjWOU7VEShaEWrj+RK9cOqRTIdjs6hFQ5UeM/H84DkcsRhZAR7gglOKBjvBrmWZBVVLB
-	6DcurpJ+Gj05QOCRXErnhskkgMm+WzoWTImUHELMMTDugkp/GJmymfnHWfESzm4OodhS6zEZhGLIs
-	EWBNBEJYA4Elp4fDyQ61LEyHYAlQebhTQb7o9Wui/pL9e+bVmR5cCPKeh4uMmnUj2Ov8w4IlY4w5R
-	ObgQXGVngaH2DZjvXfexn+e+cgCdNLtgE7jkEN4vKKFsEgdsEuqnpctxkPzIkOTL33s2seygq+c32
-	/1LZdCW/kNTvcfSVbmOw==;
+	List-Owner; bh=vlW/C89xrnrFPCQ+IR3P0pnoX8oWwWyC+f5/NQWBVQM=; b=mty9fiZJGuCMF6
+	U8HU1TQ+g/E3VL+gAYP+5oSS2/m6EPZGFUs5nKHhSpJRUoLBWQKY4MMF0A+i7Ctr2V2VZ1EtrLLKM
+	hor5K3ydmS+p2p2ZSwH3T8+qmVMNUqN7ryHutPnq1E+SSKiKXjTE/kbodNmiuO7wLnwpBtHzCJY/i
+	C/H2nBEGAbw8nfTg6v5wSLXqnrs/P92BXCXFPkL9N3UwV0hVk1hCJOnVjCSbkurQtG5R303PiAgB3
+	xOcZ8hnn3UqyQG1S5MswmmDv5wPPjGtP0/aUp1lKBVccXRE/RObjFchkhMoodhMqclZMtPqdJtQnZ
+	NMsNreFxn7Ux/QtzdBCQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjYlt-0000Zi-Ez; Wed, 16 Jan 2019 00:09:29 +0000
+	id 1gjYmk-0002A2-Fj; Wed, 16 Jan 2019 00:10:22 +0000
 Received: from ozlabs.org ([2401:3900:2:1::2])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjYlp-0000Z8-I6
- for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 00:09:27 +0000
+ id 1gjYmg-00029Z-MB
+ for linux-arm-kernel@lists.infradead.org; Wed, 16 Jan 2019 00:10:20 +0000
 Received: from authenticated.ozlabs.org (localhost [127.0.0.1])
  (using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
  key-exchange ECDHE (P-256) server-signature RSA-PSS (2048 bits) server-digest
  SHA256) (No client certificate requested)
- by ozlabs.org (Postfix) with ESMTPSA id 43fSHb5L9yz9sBQ;
- Wed, 16 Jan 2019 11:09:15 +1100 (AEDT)
+ by ozlabs.org (Postfix) with ESMTPSA id 43fSJm5W6fz9sBQ;
+ Wed, 16 Jan 2019 11:10:16 +1100 (AEDT)
 From: Michael Ellerman <mpe@ellerman.id.au>
 To: Arnd Bergmann <arnd@arndb.de>
 Subject: Re: [PATCH 14/15] arch: add split IPC system calls where needed
-In-Reply-To: <CAK8P3a3eUzGDrJtV2ySpgHwjKHwZYr+1xHp6tChCt1gWi=mJ+g@mail.gmail.com>
+In-Reply-To: <CAK8P3a0uas76i2W1yjFvxHT-2=A8_egUZeAUM-Vya6386+87Xg@mail.gmail.com>
 References: <20190110162435.309262-1-arnd@arndb.de>
  <20190110162435.309262-15-arnd@arndb.de>
  <87pnsz28k2.fsf@concordia.ellerman.id.au>
  <CAK8P3a0uas76i2W1yjFvxHT-2=A8_egUZeAUM-Vya6386+87Xg@mail.gmail.com>
- <CAK8P3a3eUzGDrJtV2ySpgHwjKHwZYr+1xHp6tChCt1gWi=mJ+g@mail.gmail.com>
-Date: Wed, 16 Jan 2019 11:09:12 +1100
-Message-ID: <874la9zcnr.fsf@concordia.ellerman.id.au>
+Date: Wed, 16 Jan 2019 11:10:16 +1100
+Message-ID: <871s5dzclz.fsf@concordia.ellerman.id.au>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190115_160926_052480_24DD9DAC 
-X-CRM114-Status: GOOD (  15.15  )
+X-CRM114-CacheID: sfid-20190115_161019_185845_BCB0666D 
+X-CRM114-Status: GOOD (  16.98  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,44 +102,71 @@ Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 Arnd Bergmann <arnd@arndb.de> writes:
-
-> On Tue, Jan 15, 2019 at 4:01 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> On Mon, Jan 14, 2019 at 4:59 AM Michael Ellerman <mpe@ellerman.id.au> wrote:
+>> Arnd Bergmann <arnd@arndb.de> writes:
+>> >  arch/m68k/kernel/syscalls/syscall.tbl     | 11 +++++++++++
+>> >  arch/mips/kernel/syscalls/syscall_o32.tbl | 11 +++++++++++
+>> >  arch/powerpc/kernel/syscalls/syscall.tbl  | 12 ++++++++++++
 >>
->> On Mon, Jan 14, 2019 at 4:59 AM Michael Ellerman <mpe@ellerman.id.au> wrote:
->> > Arnd Bergmann <arnd@arndb.de> writes:
->> > >  arch/m68k/kernel/syscalls/syscall.tbl     | 11 +++++++++++
->> > >  arch/mips/kernel/syscalls/syscall_o32.tbl | 11 +++++++++++
->> > >  arch/powerpc/kernel/syscalls/syscall.tbl  | 12 ++++++++++++
->> >
->> > I have some changes I'd like to make to our syscall table that will
->> > clash with this.
->> >
->> > I'll try and send them today.
+>> I have some changes I'd like to make to our syscall table that will
+>> clash with this.
 >>
->> Ok. Are those for 5.0 or 5.1? If they are intended for 5.0, it would be
->> nice for me to have a branch based on 5.0-rc1 that I can put
->> the other patches on top of.
+>> I'll try and send them today.
 >
-> There is also another change that I considered:
->
-> At the end of my series, we have a lot of entries like
->
-> 245     32      clock_settime                   sys_clock_settime32
-> 245     64      clock_settime                   sys_clock_settime
-> 245     spu     clock_settime                   sys_clock_settime
->
-> which could be folded into
->
-> 245     32      clock_settime                   sys_clock_settime32
-> 245     spu64 clock_settime                   sys_clock_settime
->
-> if we just add another option to the ABI field. Any thoughts on
-> that?
+> Ok. Are those for 5.0 or 5.1? If they are intended for 5.0, it would be
+> nice for me to have a branch based on 5.0-rc1 that I can put
+> the other patches on top of.
 
-My series splits spu out into a separate field. So the above would be:
+For 5.1.
 
-245     32	-	clock_settime                   sys_clock_settime32
-245     64	spu	clock_settime                   sys_clock_settime
+I can put them in a topic branch for you.
+
+>> > diff --git a/arch/powerpc/kernel/syscalls/syscall.tbl b/arch/powerpc/kernel/syscalls/syscall.tbl
+>> > index db3bbb8744af..1bffab54ff35 100644
+>> > --- a/arch/powerpc/kernel/syscalls/syscall.tbl
+>> > +++ b/arch/powerpc/kernel/syscalls/syscall.tbl
+>> > @@ -425,3 +425,15 @@
+>> >  386  nospu   pkey_mprotect                   sys_pkey_mprotect
+>> >  387  nospu   rseq                            sys_rseq
+>> >  388  nospu   io_pgetevents                   sys_io_pgetevents               compat_sys_io_pgetevents
+>> > +# room for arch specific syscalls
+>> > +392  64      semtimedop                      sys_semtimedop
+>> > +393  common  semget                          sys_semget
+>> > +394  common  semctl                          sys_semctl                      compat_sys_semctl
+>> > +395  common  shmget                          sys_shmget
+>> > +396  common  shmctl                          sys_shmctl                      compat_sys_shmctl
+>> > +397  common  shmat                           sys_shmat                       compat_sys_shmat
+>> > +398  common  shmdt                           sys_shmdt
+>> > +399  common  msgget                          sys_msgget
+>> > +400  common  msgsnd                          sys_msgsnd                      compat_sys_msgsnd
+>> > +401  common  msgrcv                          sys_msgrcv                      compat_sys_msgrcv
+>> > +402  common  msgctl                          sys_msgctl                      compat_sys_msgctl
+>>
+>> We already have a gap at 366-377 from when we tried to add the split IPC
+>> calls a few years back.
+>>
+>> I guess I don't mind leaving that gap and using the common numbers as
+>> you've done here.
+>>
+>> But it would be good to add a comment pointing out that we have room
+>> at 366 for more arch specific syscalls as well.
+>
+> Ah, I missed that. I've added this to my patch now:
+>
+> index 5c0936d862fc..2ddfba536d5f 100644
+> --- a/arch/powerpc/kernel/syscalls/syscall.tbl
+> +++ b/arch/powerpc/kernel/syscalls/syscall.tbl
+> @@ -460,6 +460,7 @@
+>  363    spu     switch_endian                   sys_ni_syscall
+>  364    common  userfaultfd                     sys_userfaultfd
+>  365    common  membarrier                      sys_membarrier
+> +# 366-377 originally left for IPC, now unused
+>  378    nospu   mlock2                          sys_mlock2
+>  379    nospu   copy_file_range                 sys_copy_file_range
+>  380    common  preadv2                         sys_preadv2
+>          compat_sys_preadv2
+
+Thanks.
 
 cheers
 
