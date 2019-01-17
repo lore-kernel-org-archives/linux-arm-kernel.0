@@ -7,57 +7,57 @@ X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AC9C2C43613
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 20:37:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 70314C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 20:57:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7330620873
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 20:37:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3BD3820851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 20:57:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="s7mXQFzr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7330620873
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KAobW0+K"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3BD3820851
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=IwFySHXg+++fbG+M/agEuk5XzIF0veBL4qt9Aq2QaJI=; b=s7mXQFzrGsl2mnbN7XNN/JefRQ
-	rfop5ApzA2S0oJeh4czXYSB9llF60hn5BZfRxmrgrkvsH1O90UfUHL8hrdJeTcpAajpLi4VzIH61l
-	Z6yrKD3Sr2Br7V0cnrCt4bJxMz+qFklOaIxb44GWYVFyYpSG9+3xGbg0C85CMkgVEkypb63PBsWuH
-	o8mqyiS+Vhqc+WkIFCp0PG17Dn1FFHQukzL5SIrJ/N3Bljn+TmD3IiK4sNvYv/wUmYioJJxN8Zszl
-	FwxgKrpgssOMAuir8D8Uc1O4my8/o9WWQtLisg0pcqgojJmi9wN62q4fAxvE6JntVhWp3KXiAUic6
-	3XNWuE2A==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=qdyN6lOshXUwtbTjGNoWThvBGj0R41hcoAZnAamOfQM=; b=KAobW0+KKB3LVb
+	NEfR7l5GXqHLEkeqJVGoAXVySuFECtQLI2TisJwjesbrNuw6zbUUW9gkDeptZZQ1wJPK8QsTarMbp
+	waWj8MTS4LWJN97lZXEuumMdrzktYjz+/0H//CtsZ4Il8KxL3V4A7351c82ENP1lG/RRw8sxmhSQU
+	ONAV0jCXC4fLc8VnDkH+EacDh3dlBGKZH2oKZpyHNEhxFZwrUrZ8KPM2JWBw/qkZ77C12AYc2YgPx
+	3EUtKW0+deTkmJTgbgntWhfXYwqfeM/tBS1pDMY8o4NxDs2lY+qjg1m1MgsPXQ+9FCPrO3muRk9O7
+	aNogXj3buZ0XZlhGpyMQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkEOj-0002h9-Fe; Thu, 17 Jan 2019 20:36:21 +0000
+	id 1gkENo-0001WK-K1; Thu, 17 Jan 2019 20:35:24 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkENJ-0000Ee-Fe
- for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 20:34:57 +0000
+ id 1gkEN4-0008QJ-5d
+ for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 20:34:43 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9EC81EBD;
- Thu, 17 Jan 2019 12:34:52 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C1AFD1596;
+ Thu, 17 Jan 2019 12:34:37 -0800 (PST)
 Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id D21EA3F819;
- Thu, 17 Jan 2019 12:34:50 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id C93353F819;
+ Thu, 17 Jan 2019 12:34:35 -0800 (PST)
 From: Dave Martin <Dave.Martin@arm.com>
 To: kvmarm@lists.cs.columbia.edu
-Subject: [PATCH v4 11/25] KVM: arm64: Extend reset_unknown() to handle mixed
- RES0/UNKNOWN registers
-Date: Thu, 17 Jan 2019 20:33:25 +0000
-Message-Id: <1547757219-19439-12-git-send-email-Dave.Martin@arm.com>
+Subject: [PATCH v4 04/25] KVM: arm64: Refactor kvm_arm_num_regs() for easier
+ maintenance
+Date: Thu, 17 Jan 2019 20:33:18 +0000
+Message-Id: <1547757219-19439-5-git-send-email-Dave.Martin@arm.com>
 X-Mailer: git-send-email 2.1.4
 In-Reply-To: <1547757219-19439-1-git-send-email-Dave.Martin@arm.com>
 References: <1547757219-19439-1-git-send-email-Dave.Martin@arm.com>
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_123454_031055_E4D47047 
-X-CRM114-Status: GOOD (  12.68  )
+X-CRM114-CacheID: sfid-20190117_123438_560308_6AC0B97B 
+X-CRM114-Status: GOOD (  12.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,74 +77,32 @@ Cc: Peter Maydell <peter.maydell@linaro.org>,
  Will Deacon <will.deacon@arm.com>, Julien Grall <Julien.Grall@arm.com>,
  =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>,
  linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The reset_unknown() system register helper initialises a guest
-register to a distinctive junk value on vcpu reset, to help expose
-and debug deficient register initialisation within the guest.
-
-Some registers such as the SVE control register ZCR_EL1 contain a
-mixture of UNKNOWN fields and RES0 bits.  For these,
-reset_unknown() does not work at present, since it sets all bits to
-junk values instead of just the wanted bits.
-
-There is no need to craft another special helper just for that,
-since reset_unknown() almost does the appropriate thing anyway.
-This patch takes advantage of the unused val field in struct
-sys_reg_desc to specify a mask of bits that should be initialised
-to zero instead of junk.
-
-All existing users of reset_unknown() do not (and should not)
-define a value for val, so they will implicitly set it to zero,
-resulting in all bits being made UNKNOWN by this function: thus,
-this patch makes no functional change for currently defined
-registers.
-
-Future patches will make use of non-zero val.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/kvm/sys_regs.h | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
-index 3b1bc7f..174ffc0 100644
---- a/arch/arm64/kvm/sys_regs.h
-+++ b/arch/arm64/kvm/sys_regs.h
-@@ -56,7 +56,12 @@ struct sys_reg_desc {
- 	/* Index into sys_reg[], or 0 if we don't need to save it. */
- 	int reg;
- 
--	/* Value (usually reset value) */
-+	/*
-+	 * Value (usually reset value)
-+	 * For reset_unknown, each bit set to 1 in val is treated as
-+	 * RES0 in the register: the corresponding register bit is
-+	 * reset to 0 instead of "unknown".
-+	 */
- 	u64 val;
- 
- 	/* Custom get/set_user functions, fallback to generic if NULL */
-@@ -92,7 +97,9 @@ static inline void reset_unknown(struct kvm_vcpu *vcpu,
- {
- 	BUG_ON(!r->reg);
- 	BUG_ON(r->reg >= NR_SYS_REGS);
--	__vcpu_sys_reg(vcpu, r->reg) = 0x1de7ec7edbadc0deULL;
-+
-+	/* If non-zero, r->val specifies which register bits are RES0: */
-+	__vcpu_sys_reg(vcpu, r->reg) = 0x1de7ec7edbadc0deULL & ~r->val;
- }
- 
- static inline void reset_val(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
--- 
-2.1.4
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+a3ZtX2FybV9udW1fcmVncygpIGFkZHMgdG9nZXRoZXIgdmFyaW91cyBwYXJ0aWFsIHJlZ2lzdGVy
+IGNvdW50cyBpbgphIGZyZWVmb3JtIHN1bSBleHByZXNzaW9uLCB3aGljaCBtYWtlcyBpdCBoYXJk
+ZXIgdGhhbiBuZWNlc3NhcnkgdG8KcmVhZCBkaWZmcyB0aGF0IGFkZCwgbW9kaWZ5IG9yIHJlbW92
+ZSBhIHNpbmdsZSB0ZXJtIGluIHRoZSBzdW0KKHdoaWNoIGlzIGV4cGVjdGVkIHRvIHRoZSBjb21t
+b24gY2FzZSB1bmRlciBtYWludGVuYW5jZSkuCgpUaGlzIHBhdGNoIHJlZmFjdG9ycyB0aGUgY29k
+ZSB0byBhZGQgdGhlIHRlcm0gb25lIHBlciBsaW5lLCBmb3IKbWF4aW11bSByZWFkYWJpbGl0eS4K
+ClNpZ25lZC1vZmYtYnk6IERhdmUgTWFydGluIDxEYXZlLk1hcnRpbkBhcm0uY29tPgpSZXZpZXdl
+ZC1ieTogQWxleCBCZW5uw6llIDxhbGV4LmJlbm5lZUBsaW5hcm8ub3JnPgotLS0KIGFyY2gvYXJt
+NjQva3ZtL2d1ZXN0LmMgfCAxMCArKysrKysrKy0tCiAxIGZpbGUgY2hhbmdlZCwgOCBpbnNlcnRp
+b25zKCspLCAyIGRlbGV0aW9ucygtKQoKZGlmZiAtLWdpdCBhL2FyY2gvYXJtNjQva3ZtL2d1ZXN0
+LmMgYi9hcmNoL2FybTY0L2t2bS9ndWVzdC5jCmluZGV4IDQ2ZWI4NjcuLjY1ZjQzMzggMTAwNjQ0
+Ci0tLSBhL2FyY2gvYXJtNjQva3ZtL2d1ZXN0LmMKKysrIGIvYXJjaC9hcm02NC9rdm0vZ3Vlc3Qu
+YwpAQCAtMzEyLDggKzMxMiwxNCBAQCBzdGF0aWMgaW50IGdldF90aW1lcl9yZWcoc3RydWN0IGt2
+bV92Y3B1ICp2Y3B1LCBjb25zdCBzdHJ1Y3Qga3ZtX29uZV9yZWcgKnJlZykKICAqLwogdW5zaWdu
+ZWQgbG9uZyBrdm1fYXJtX251bV9yZWdzKHN0cnVjdCBrdm1fdmNwdSAqdmNwdSkKIHsKLQlyZXR1
+cm4gbnVtX2NvcmVfcmVncygpICsga3ZtX2FybV9udW1fc3lzX3JlZ19kZXNjcyh2Y3B1KQotCQkr
+IGt2bV9hcm1fZ2V0X2Z3X251bV9yZWdzKHZjcHUpCSsgTlVNX1RJTUVSX1JFR1M7CisJdW5zaWdu
+ZWQgbG9uZyByZXMgPSAwOworCisJcmVzICs9IG51bV9jb3JlX3JlZ3MoKTsKKwlyZXMgKz0ga3Zt
+X2FybV9udW1fc3lzX3JlZ19kZXNjcyh2Y3B1KTsKKwlyZXMgKz0ga3ZtX2FybV9nZXRfZndfbnVt
+X3JlZ3ModmNwdSk7CisJcmVzICs9IE5VTV9USU1FUl9SRUdTOworCisJcmV0dXJuIHJlczsKIH0K
+IAogLyoqCi0tIAoyLjEuNAoKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxA
+bGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xp
+c3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
