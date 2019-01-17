@@ -7,16 +7,17 @@ X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 30891C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 21:06:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 129AAC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 21:10:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0075A20851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 21:06:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CBD2420855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 21:10:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HEY5/lB/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0075A20851
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AhgOD1ff";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="wyRCtn1Y"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CBD2420855
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,38 +27,55 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=7WzGscR2Ov37rFa2cFVZrF+JWml2Uk0RgoFWlcp9Ceo=; b=HEY5/lB/KF1DrIXARb6z+2yz01
-	600isiTnJhX1y2HL95iIMW3T9m6gzb29nqrZ3KiTWzMZPrOy9/5aYu/fDGUAbDXQgjYroxQWZBLVA
-	gcyfMFVdEvZthHPf57mUVMTvGaagpGQ/P7sxBiGqxri1/zjT9SMskGMyzK8zPGoDiZgnyxP9+IVBk
-	yp59hn1kZmAFK60CykaLaWPBWJ5HThkkHiWWz+VHPk+iqfyeSXF+9GZZoSg2/lsGe5U3QcvHjDyGc
-	2wDNKNuS/ff+tckz4Lm9PwPv5JxCCpSPy7pEl07FZrnOQPCS1VsQA59O+Q8ZTm2tROIH2fvJrLXmd
-	q6J8XLAg==;
+	bh=QAlA8VXtS3Fr1H+jHaziD/7rEUxPI4wP8tsXScoAJNk=; b=AhgOD1ffnHykkQZ403lFS5kVN0
+	xC1lKAo9EAMhf/MK63tbLzUok8uJh7ifMcCNjsJYgA3WQG9ZUFq6dYThFfBkkJtidFg6eYWT0YvVl
+	dCg8q8JaObWSr+u3aT25od3fXgpi/DKvigxSF8JmmX309lkJ9/Y0ZBIHUCgyBP5dECN40QEsT/6K3
+	k8aYzlIyEqRcnUQ3cBFQdPvD5zCBOBNZjjcsqUzY0kmVfZj1H7M+ku+PDNwvtxSIzc0lxHQuRZU8v
+	cnWeqNJqveq7xT3VEtSHryssb0bZEKcKGu97nVXWgfMNNdTXrlAOhRQpYmFmFfjqYsoL6hrUvl2F3
+	A36T+7WQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkEO3-00029T-KR; Thu, 17 Jan 2019 20:35:39 +0000
+	id 1gkEw2-0002kt-2c; Thu, 17 Jan 2019 21:10:46 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gkEvz-0002kj-E7
+ for linux-arm-kernel@bombadil.infradead.org; Thu, 17 Jan 2019 21:10:44 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=References:In-Reply-To:Message-Id:Date:
+ Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=OW6QbxRUnJYShbOPKi325I1GsbLT5Le8wCALTV1C4Cg=; b=wyRCtn1YoHr/WxfSIQ4W+vGZs
+ wtUzF67nC1wkRwYJWDAryglPBKE/J133Kk7SNptpUcs5bkEWz2rfEzZZI2n29pVnHRr5/l/4Hak02
+ yC6UkcXKnZPr3YQDwVVt7FdqrmSBdi/MxIOmr4VRxk67C6i0WGFHlQ7jA2mmQreNGKrTdpbL1aNKR
+ jAaYITBzXSFnb8yvRHhSlJStxz4LR3QM+2wA/MqP5Sm4h3xk3Yec+IDXpMM+CIQkXbJo/dA3l+Eco
+ w+Av4/PJV3icrBBma0/1wXJU4+CUZXmYjV2GEVllcjx1N9nwUsXtElnytMAfC4MKKCQQB2tt0Vt9M
+ gaaJRtDCg==;
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkEN8-0008Uu-HN
- for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 20:34:45 +0000
+ by merlin.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gkENi-0005l1-T5
+ for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 20:35:20 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0F2AC1650;
- Thu, 17 Jan 2019 12:34:42 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4FD7016A3;
+ Thu, 17 Jan 2019 12:35:15 -0800 (PST)
 Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 428773F819;
- Thu, 17 Jan 2019 12:34:40 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 83C693F819;
+ Thu, 17 Jan 2019 12:35:13 -0800 (PST)
 From: Dave Martin <Dave.Martin@arm.com>
 To: kvmarm@lists.cs.columbia.edu
-Subject: [PATCH v4 06/25] arm64/sve: Check SVE virtualisability
-Date: Thu, 17 Jan 2019 20:33:20 +0000
-Message-Id: <1547757219-19439-7-git-send-email-Dave.Martin@arm.com>
+Subject: [PATCH v4 22/25] KVM: arm64/sve: Allow userspace to enable SVE for
+ vcpus
+Date: Thu, 17 Jan 2019 20:33:36 +0000
+Message-Id: <1547757219-19439-23-git-send-email-Dave.Martin@arm.com>
 X-Mailer: git-send-email 2.1.4
 In-Reply-To: <1547757219-19439-1-git-send-email-Dave.Martin@arm.com>
 References: <1547757219-19439-1-git-send-email-Dave.Martin@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_123442_714138_9F1B0B21 
-X-CRM114-Status: GOOD (  22.61  )
+X-CRM114-CacheID: sfid-20190117_153519_115156_94056692 
+X-CRM114-Status: GOOD (  22.98  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,220 +101,170 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Due to the way the effective SVE vector length is controlled and
-trapped at different exception levels, certain mismatches in the
-sets of vector lengths supported by different physical CPUs in the
-system may prevent straightforward virtualisation of SVE at parity
-with the host.
+Now that all the pieces are in place, this patch offers a new flag
+KVM_ARM_VCPU_SVE that userspace can pass to KVM_ARM_VCPU_INIT to
+turn on SVE for the guest, on a per-vcpu basis.
 
-This patch analyses the extent to which SVE can be virtualised
-safely without interfering with migration of vcpus between physical
-CPUs, and rejects late secondary CPUs that would erode the
-situation further.
+As part of this, support for initialisation and reset of the SVE
+vector length set and registers is added in the appropriate places.
+Allocation SVE registers is deferred until kvm_arm_vcpu_finalize(),
+by which time the size of the registers is known.
 
-It is left up to KVM to decide what to do with this information.
+Setting the vector lengths supported by the vcpu is considered
+configuration of the emulated hardware rather than runtime
+configuration, so no support is offered for changing the vector
+lengths of an existing vcpu across reset.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/include/asm/fpsimd.h |  1 +
- arch/arm64/kernel/cpufeature.c  |  2 +-
- arch/arm64/kernel/fpsimd.c      | 86 ++++++++++++++++++++++++++++++++++-------
- 3 files changed, 73 insertions(+), 16 deletions(-)
+ arch/arm64/include/asm/kvm_host.h |  2 +-
+ arch/arm64/include/uapi/asm/kvm.h |  1 +
+ arch/arm64/kvm/reset.c            | 78 ++++++++++++++++++++++++++++++++++++++-
+ 3 files changed, 79 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index dd1ad39..964adc9 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -87,6 +87,7 @@ extern void sve_kernel_enable(const struct arm64_cpu_capabilities *__unused);
- extern u64 read_zcr_features(void);
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 82a99f6..f77b780 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -45,7 +45,7 @@
  
- extern int __ro_after_init sve_max_vl;
-+extern int __ro_after_init sve_max_virtualisable_vl;
+ #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
  
- #ifdef CONFIG_ARM64_SVE
+-#define KVM_VCPU_MAX_FEATURES 4
++#define KVM_VCPU_MAX_FEATURES 5
  
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index f6d84e2..5eaacb4 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1825,7 +1825,7 @@ static void verify_sve_features(void)
- 	unsigned int len = zcr & ZCR_ELx_LEN_MASK;
+ #define KVM_REQ_SLEEP \
+ 	KVM_ARCH_REQ_FLAGS(0, KVM_REQUEST_WAIT | KVM_REQUEST_NO_WAKEUP)
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index 6dfbfa3..fc613af 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -102,6 +102,7 @@ struct kvm_regs {
+ #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
+ #define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
+ #define KVM_ARM_VCPU_PMU_V3		3 /* Support guest PMUv3 */
++#define KVM_ARM_VCPU_SVE		4 /* enable SVE for this CPU */
  
- 	if (len < safe_len || sve_verify_vq_map()) {
--		pr_crit("CPU%d: SVE: required vector length(s) missing\n",
-+		pr_crit("CPU%d: SVE: vector length support mismatch\n",
- 			smp_processor_id());
- 		cpu_die_early();
- 	}
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 62c37f0..64729e2 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -18,6 +18,7 @@
-  */
+ struct kvm_vcpu_init {
+ 	__u32 target;
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 1379fb2..5ff2360 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -23,11 +23,13 @@
+ #include <linux/kvm_host.h>
+ #include <linux/kvm.h>
+ #include <linux/hw_breakpoint.h>
++#include <linux/slab.h>
  
- #include <linux/bitmap.h>
-+#include <linux/bitops.h>
- #include <linux/bottom_half.h>
- #include <linux/bug.h>
- #include <linux/cache.h>
-@@ -48,6 +49,7 @@
- #include <asm/sigcontext.h>
- #include <asm/sysreg.h>
- #include <asm/traps.h>
-+#include <asm/virt.h>
+ #include <kvm/arm_arch_timer.h>
  
- #define FPEXC_IOF	(1 << 0)
- #define FPEXC_DZF	(1 << 1)
-@@ -130,14 +132,18 @@ static int sve_default_vl = -1;
- 
- /* Maximum supported vector length across all CPUs (initially poisoned) */
- int __ro_after_init sve_max_vl = SVE_VL_MIN;
-+int __ro_after_init sve_max_virtualisable_vl = SVE_VL_MIN;
- /* Set of available vector lengths, as vq_to_bit(vq): */
- static __ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
-+/* Set of vector lengths present on at least one cpu: */
-+static __ro_after_init DECLARE_BITMAP(sve_vq_partial_map, SVE_VQ_MAX);
- static void __percpu *efi_sve_state;
- 
- #else /* ! CONFIG_ARM64_SVE */
- 
- /* Dummy declaration for code that will be optimised out: */
- extern __ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
-+extern __ro_after_init DECLARE_BITMAP(sve_vq_partial_map, SVE_VQ_MAX);
- extern void __percpu *efi_sve_state;
- 
- #endif /* ! CONFIG_ARM64_SVE */
-@@ -623,12 +629,6 @@ int sve_get_current_vl(void)
- 	return sve_prctl_status(0);
+ #include <asm/cpufeature.h>
+ #include <asm/cputype.h>
++#include <asm/fpsimd.h>
+ #include <asm/ptrace.h>
+ #include <asm/kvm_arm.h>
+ #include <asm/kvm_asm.h>
+@@ -98,11 +100,77 @@ int kvm_arch_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+ 	return r;
  }
  
--/*
-- * Bitmap for temporary storage of the per-CPU set of supported vector lengths
-- * during secondary boot.
-- */
--static DECLARE_BITMAP(sve_secondary_vq_map, SVE_VQ_MAX);
--
- static void sve_probe_vqs(DECLARE_BITMAP(map, SVE_VQ_MAX))
- {
- 	unsigned int vq, vl;
-@@ -650,6 +650,7 @@ static void sve_probe_vqs(DECLARE_BITMAP(map, SVE_VQ_MAX))
- void __init sve_init_vq_map(void)
- {
- 	sve_probe_vqs(sve_vq_map);
-+	bitmap_copy(sve_vq_partial_map, sve_vq_map, SVE_VQ_MAX);
- }
- 
- /*
-@@ -658,25 +659,58 @@ void __init sve_init_vq_map(void)
-  */
- void sve_update_vq_map(void)
- {
--	sve_probe_vqs(sve_secondary_vq_map);
--	bitmap_and(sve_vq_map, sve_vq_map, sve_secondary_vq_map, SVE_VQ_MAX);
-+	DECLARE_BITMAP(tmp_map, SVE_VQ_MAX);
-+
-+	sve_probe_vqs(tmp_map);
-+	bitmap_and(sve_vq_map, sve_vq_map, tmp_map, SVE_VQ_MAX);
-+	bitmap_or(sve_vq_partial_map, sve_vq_partial_map, tmp_map, SVE_VQ_MAX);
- }
- 
- /* Check whether the current CPU supports all VQs in the committed set */
- int sve_verify_vq_map(void)
- {
--	int ret = 0;
-+	DECLARE_BITMAP(tmp_map, SVE_VQ_MAX);
-+	unsigned long b;
- 
--	sve_probe_vqs(sve_secondary_vq_map);
--	bitmap_andnot(sve_secondary_vq_map, sve_vq_map, sve_secondary_vq_map,
--		      SVE_VQ_MAX);
--	if (!bitmap_empty(sve_secondary_vq_map, SVE_VQ_MAX)) {
-+	sve_probe_vqs(tmp_map);
-+
-+	bitmap_complement(tmp_map, tmp_map, SVE_VQ_MAX);
-+	if (bitmap_intersects(tmp_map, sve_vq_map, SVE_VQ_MAX)) {
- 		pr_warn("SVE: cpu%d: Required vector length(s) missing\n",
- 			smp_processor_id());
--		ret = -EINVAL;
-+		return -EINVAL;
- 	}
- 
--	return ret;
-+	if (!IS_ENABLED(CONFIG_KVM) || !is_hyp_mode_available())
++static size_t vcpu_sve_state_size(struct kvm_vcpu *vcpu)
++{
++	if (WARN_ON(!sve_vl_valid(vcpu->arch.sve_max_vl)))
 +		return 0;
 +
-+	/*
-+	 * For KVM, it is necessary to ensure that this CPU doesn't
-+	 * support any vector length that guests may have probed as
-+	 * unsupported.
-+	 */
++	return SVE_SIG_REGS_SIZE(sve_vq_from_vl(vcpu->arch.sve_max_vl));
++}
 +
-+	/* Recover the set of supported VQs: */
-+	bitmap_complement(tmp_map, tmp_map, SVE_VQ_MAX);
-+	/* Find VQs supported that are not globally supported: */
-+	bitmap_andnot(tmp_map, tmp_map, sve_vq_map, SVE_VQ_MAX);
++static int kvm_reset_sve(struct kvm_vcpu *vcpu)
++{
++	unsigned int vq;
 +
-+	/* Find the lowest such VQ, if any: */
-+	b = find_last_bit(tmp_map, SVE_VQ_MAX);
-+	if (b >= SVE_VQ_MAX)
-+		return 0; /* no mismatches */
-+
-+	/*
-+	 * Mismatches above sve_max_virtualisable_vl are fine, since
-+	 * no guest is allowed to configure ZCR_EL2.LEN to exceed this:
-+	 */
-+	if (sve_vl_from_vq(bit_to_vq(b)) <= sve_max_virtualisable_vl) {
-+		pr_warn("SVE: cpu%d: Unsupported vector length(s) present\n",
-+			smp_processor_id());
++	if (!system_supports_sve())
 +		return -EINVAL;
++
++	/* If resetting an already-configured vcpu, just zero the SVE regs: */
++	if (vcpu->arch.sve_state) {
++		size_t size = vcpu_sve_state_size(vcpu);
++
++		if (!size)
++			return -EINVAL;
++
++		if (WARN_ON(!vcpu_has_sve(vcpu)))
++			return -EINVAL;
++
++		memset(vcpu->arch.sve_state, 0, size);
++		return 0;
 +	}
 +
-+	return 0;
- }
- 
- static void __init sve_efi_setup(void)
-@@ -743,6 +777,8 @@ u64 read_zcr_features(void)
- void __init sve_setup(void)
- {
- 	u64 zcr;
-+	DECLARE_BITMAP(tmp_map, SVE_VQ_MAX);
-+	unsigned long b;
- 
- 	if (!system_supports_sve())
- 		return;
-@@ -771,11 +807,31 @@ void __init sve_setup(void)
- 	 */
- 	sve_default_vl = find_supported_vector_length(64);
- 
-+	bitmap_andnot(tmp_map, sve_vq_partial_map, sve_vq_map,
-+		      SVE_VQ_MAX);
++	if (WARN_ON(!sve_vl_valid(sve_max_vl)))
++		return -EINVAL;
 +
-+	b = find_last_bit(tmp_map, SVE_VQ_MAX);
-+	if (b >= SVE_VQ_MAX)
-+		/* No non-virtualisable VLs found */
-+		sve_max_virtualisable_vl = SVE_VQ_MAX;
-+	else if (WARN_ON(b == SVE_VQ_MAX - 1))
-+		/* No virtualisable VLs?  This is architecturally forbidden. */
-+		sve_max_virtualisable_vl = SVE_VQ_MIN;
-+	else /* b + 1 < SVE_VQ_MAX */
-+		sve_max_virtualisable_vl = sve_vl_from_vq(bit_to_vq(b + 1));
-+
-+	if (sve_max_virtualisable_vl > sve_max_vl)
-+		sve_max_virtualisable_vl = sve_max_vl;
-+
- 	pr_info("SVE: maximum available vector length %u bytes per vector\n",
- 		sve_max_vl);
- 	pr_info("SVE: default vector length %u bytes per vector\n",
- 		sve_default_vl);
- 
-+	/* KVM decides whether to support mismatched systems. Just warn here: */
++	/* If the full set of host vector lengths cannot be used, give up: */
 +	if (sve_max_virtualisable_vl < sve_max_vl)
-+		pr_info("SVE: unvirtualisable vector lengths present\n");
++		return -EINVAL;
 +
- 	sve_efi_setup();
- }
++	/* Default to the set of vector lengths supported by the host */
++	vcpu->arch.sve_max_vl = sve_max_vl;
++	for (vq = SVE_VQ_MIN; vq <= sve_vq_from_vl(sve_max_vl); ++vq) {
++		unsigned int i = vq - SVE_VQ_MIN;
++
++		if (sve_vq_available(vq))
++			vcpu->arch.sve_vqs[i / 64] |= (u64)1 << (i % 64);
++	}
++
++	/*
++	 * Userspace can still customize the vector lengths by writing
++	 * KVM_REG_ARM64_SVE_VLS.  Allocation is deferred until
++	 * kvm_arm_vcpu_finalize(), which freezes the configuration.
++	 */
++	vcpu->arch.flags |= KVM_ARM64_GUEST_HAS_SVE;
++
++	return 0;
++}
++
+ int kvm_arm_vcpu_finalize(struct kvm_vcpu *vcpu)
+ {
+ 	if (likely(kvm_arm_vcpu_finalized(vcpu)))
+ 		return 0;
  
++	if (vcpu_has_sve(vcpu)) {
++		size_t size = vcpu_sve_state_size(vcpu);
++
++		if (!size)
++			return -EINVAL;
++
++		vcpu->arch.sve_state = kzalloc(size, GFP_KERNEL);
++		if (!vcpu->arch.sve_state)
++			return -ENOMEM;
++	}
++
+ 	vcpu->arch.flags |= KVM_ARM64_VCPU_FINALIZED;
+ 	return 0;
+ }
+@@ -113,12 +181,20 @@ int kvm_arm_vcpu_finalize(struct kvm_vcpu *vcpu)
+  *
+  * This function finds the right table above and sets the registers on
+  * the virtual CPU struct to their architecturally defined reset
+- * values.
++ * values, except for registers whose reset is deferred until
++ * kvm_arm_vcpu_finalize().
+  */
+ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ {
++	int ret;
+ 	const struct kvm_regs *cpu_reset;
+ 
++	if (test_bit(KVM_ARM_VCPU_SVE, vcpu->arch.features)) {
++		ret = kvm_reset_sve(vcpu);
++		if (ret)
++			return ret;
++	}
++
+ 	switch (vcpu->arch.target) {
+ 	default:
+ 		if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features)) {
 -- 
 2.1.4
 
