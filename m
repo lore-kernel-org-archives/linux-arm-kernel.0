@@ -2,69 +2,122 @@ Return-Path: <SRS0=6Gta=PZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.3 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E819EC43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 07:06:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1CAD1C43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 07:16:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B77EB20868
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 07:06:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D8F9C20859
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 07:16:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lM36jXkI";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="0pw3ulKi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B77EB20868
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aeqqkwEr";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="QopcVBMQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D8F9C20859
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SMbtHxgw8NuBG9ndjcNy9Kn/K4x30ki/xe1uv9+jTgc=; b=lM36jXkI17GBEY
-	xGZJ7YNBPFo9gEowUSvbiDxOXitzBjiS3YgK/iW+1S0bI7pDPmaPs3lI8rYg1XwFuyrh2ji7xaSoc
-	VjLYpyszfcqcpsXw6qCrOffahMF74GfR7d6/nPH3HrB0mQwVaMW5EpcNY9x1XJRd9K7kvnWZ0qiLt
-	dsmkOOJjmPafb6hRH9MXBYaZVGzfNgYGB3VTdN4Rdo2uKDOUaYs9rishYJwKdsD5wDUkgEiaVcWsQ
-	+u0Tv/Otl8gB4YVXlUAXHtoh6NXd1qywLUJat6VVNkm3lnXQUACwwQD4+SIQyPY3nNl/NQruLtVrD
-	KbCwK9N4X3f82pm5VRqw==;
+	List-Owner; bh=PXxXW9lTEf9KrmNJW1wRwfePCQm8hiYsosnAfQEK0EM=; b=aeqqkwErX/oMoy
+	IJvwvwmAIdd3bN0YAWDT7VZGIGMfhfI/tRziajNTUB9DnOMGjWzh/QB8swfxzbu2oYjyRsRvYqnso
+	reLFz0u8JDGPLgUUzPu6tFZ7EtBj7/tMGGvpZWMbgMA9qQ98djTgMpD25oP4Myk75LqMco/0tcIrG
+	F/nm3TRRGsHvxyddekg6lTto0ojo3KBEQX4VlabPMvXNCPKUw1H35hxQGePHc9Jf+7NQ5y+C2vzlQ
+	merFPy6zesQTn/r8H7Qbkt0R1uZZWqsXhi780+6ySde5jx/04qBwBoGfgx/ONjDMRI1otGbZ9mKYq
+	w/iBe6OMeZ5IZrhgNQww==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gk1ks-0006dc-DE; Thu, 17 Jan 2019 07:06:22 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gk1ua-0001Yq-MY; Thu, 17 Jan 2019 07:16:24 +0000
+Received: from esa1.microchip.iphmx.com ([68.232.147.91])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gk1ko-0006cq-RN; Thu, 17 Jan 2019 07:06:20 +0000
-Received: from guoren-Inspiron-7460 (23.83.240.247.16clouds.com
- [23.83.240.247])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 353B920856;
- Thu, 17 Jan 2019 07:06:07 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1547708777;
- bh=YQg5kK0CK1gygp8V+fUKHMM30p/aVFKoBFNquIpl8z4=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=0pw3ulKi3jq4oKmvxSJxzzJsSdMcohB7IigecglkQT5Rx7a1QVi6VMiKG+7/EaK5C
- /1jqt2buqhHUph/IaPf93BCvJIFaI+XBcHutXpZ8WKrpTTySrlp18ZPjm07/tBc6Eg
- nedbQORGuNF/Dh36ZedpPIbDbRoH11rc3m/ItgOI=
-Date: Thu, 17 Jan 2019 15:06:03 +0800
-From: Guo Ren <guoren@kernel.org>
-To: Mike Rapoport <rppt@linux.ibm.com>
-Subject: Re: [PATCH 19/21] treewide: add checks for the return value of
- memblock_alloc*()
-Message-ID: <20190117070602.GA31839@guoren-Inspiron-7460>
-References: <1547646261-32535-1-git-send-email-rppt@linux.ibm.com>
- <1547646261-32535-20-git-send-email-rppt@linux.ibm.com>
+ id 1gk1uN-0001Pb-Vl; Thu, 17 Jan 2019 07:16:13 +0000
+X-IronPort-AV: E=Sophos;i="5.56,488,1539673200"; d="scan'208";a="26534637"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa1.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 17 Jan 2019 00:16:04 -0700
+Received: from NAM03-CO1-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.49) with Microsoft SMTP Server (TLS) id
+ 14.3.352.0; Thu, 17 Jan 2019 00:16:04 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=Wyxgfg9S2DzD0TGBa+y+I9TjYOqwA2sUPGEkfBHsLfI=;
+ b=QopcVBMQKa0JMc7197TpSIgJPLQjix8r/bO9MDuyCJr/O7h+bcGROedHcg2P6rLjC1+CZITNOw4DxpUiikIBvewJzYjsPErMntmOVjxpwCizC8lcDV+oASaVtbmePT1mkkGSlvzAI4KJNvXsfJjUYkY0ozmPty0Sz1iuiMu9WlU=
+Received: from BN6PR11MB1842.namprd11.prod.outlook.com (10.175.99.146) by
+ BN6PR11MB1571.namprd11.prod.outlook.com (10.172.22.150) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1537.26; Thu, 17 Jan 2019 07:16:01 +0000
+Received: from BN6PR11MB1842.namprd11.prod.outlook.com
+ ([fe80::79d8:b977:b90a:76fa]) by BN6PR11MB1842.namprd11.prod.outlook.com
+ ([fe80::79d8:b977:b90a:76fa%4]) with mapi id 15.20.1537.018; Thu, 17 Jan 2019
+ 07:16:01 +0000
+From: <Tudor.Ambarus@microchip.com>
+To: <yogeshnarayan.gaur@nxp.com>, <linux-mtd@lists.infradead.org>,
+ <boris.brezillon@bootlin.com>, <broonie@kernel.org>, <marek.vasut@gmail.com>, 
+ <vigneshr@ti.com>, <linux-spi@vger.kernel.org>, <devicetree@vger.kernel.org>
+Subject: Re: [PATCH v7 3/5] mtd: m25p80: add support of octal mode I/O transfer
+Thread-Topic: [PATCH v7 3/5] mtd: m25p80: add support of octal mode I/O
+ transfer
+Thread-Index: AQHUrLnUkUf6WbGWr02OhoksrpQ9aqWzD4KA
+Date: Thu, 17 Jan 2019 07:16:01 +0000
+Message-ID: <8381785e-95c2-8dfc-6fac-ea4710b3c943@microchip.com>
+References: <1547546584-5254-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <1547546584-5254-4-git-send-email-yogeshnarayan.gaur@nxp.com>
+In-Reply-To: <1547546584-5254-4-git-send-email-yogeshnarayan.gaur@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1PR0202CA0026.eurprd02.prod.outlook.com
+ (2603:10a6:803:14::39) To BN6PR11MB1842.namprd11.prod.outlook.com
+ (2603:10b6:404:103::18)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Tudor.Ambarus@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [94.177.32.154]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; BN6PR11MB1571;
+ 6:DgF1SH219lwynwSnKUGsawtdVxy7+KQjfQgXqS7lnvtzFe6bKMoC3VmQuvGCrqJeB0Fu3p45esSQHIEm8mA2bcFM4j8E1akhtPf8ZhTuhbR6BzCu6Uv2uqZ30tRFabGZ6xggCFTFPIkgn9UcOh3KtzkP7ZWpJYGgXX5YW1zom92SUHrVUEsvEOrJeZrhzMowSF8990cVZ6zjly7xAcZwVkx7IxDgHTA3VvZQoxTLrQnCR0JJOLCF94cmDs+95o3HRUiP00asrrHTMT889S2qCH1SvGmCzNZGT3pg+7o82qacdb8bAMJYHA55gZX4h9lh8yl9lFn7HZwccNZz2rTPUAE9G5UHIAjovxWx5RK85UlNdXgh+yuNsuX75qViAksB1p6RLEPERmrbiDyyyMTAoxbNmrRqmPmeq8FG6MyQ1pRJshzJT3wgB90W4G6UX1YBUXvK5gtaFHW19FSFex+9kQ==;
+ 5:2+6L1u4ojZSupg/sFFsUxUEatALqh/qQXHLew7wJv5v8+5wiXm6LTweNMT/o3jIlYQzx8r1XwUHtnRgvsA+tPs21bN6nWmw/1PmMKJbEFSryExOOIIH90nHHmEYFI+4ltz/rpK+GDCzsLoRXIl+F/Rvhutpa/5lsVvv48lb4dS5LVqdPfDtIBfHsKojUgiUtCdFekFGJOo21uxVFBgc7Ww==;
+ 7:E5hML/Job5qUqTxJH537pEuxob9EUjfNx8awLAPkDzLqQryi1oo37zuKD1f1EGX0rdG3MuMxcN7EdmB8ALBhjoZ+iPAFoVlU5u7Jevb0/GcT0+5lY7IXEeqcuasUfLvuNS0mCD88H+g0cY+Gt7AR7A==
+x-ms-office365-filtering-correlation-id: eb7949db-44e4-491d-a1ca-08d67c4ba243
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(2017052603328)(7153060)(7193020);
+ SRVR:BN6PR11MB1571; 
+x-ms-traffictypediagnostic: BN6PR11MB1571:
+x-microsoft-antispam-prvs: <BN6PR11MB1571C263ADC934E544E1D49FF0830@BN6PR11MB1571.namprd11.prod.outlook.com>
+x-forefront-prvs: 0920602B08
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(979002)(396003)(136003)(39860400002)(376002)(366004)(346002)(189003)(199004)(53936002)(71200400001)(71190400001)(105586002)(6512007)(31686004)(4326008)(6246003)(97736004)(66066001)(25786009)(39060400002)(86362001)(36756003)(106356001)(31696002)(68736007)(6116002)(6486002)(229853002)(386003)(72206003)(2201001)(2906002)(5660300001)(102836004)(81156014)(7416002)(8676002)(6506007)(14454004)(3846002)(8936002)(81166006)(305945005)(6436002)(7736002)(53546011)(256004)(2616005)(76176011)(52116002)(14444005)(446003)(476003)(11346002)(99286004)(186003)(26005)(2501003)(110136005)(54906003)(316002)(478600001)(486006)(969003)(989001)(999001)(1009001)(1019001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR11MB1571;
+ H:BN6PR11MB1842.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: Kis2bW8HuHtU8ac0+pGRVVhwaq5nxjXm56f0kvnEhgla/TCyz0S4ZqTKygsfKuVSd7OYsYmucXkXWwVjAiU+/M4Zd1/naToW5a1q7ReFKXe91/4pwwuDi95RcST9nQSOkTivtDwXhxMQUQtouAsReBizDz8suv9Nq1dcVqqUeA7cC7kTxrw8a/+Z/jzmdqB946V2DXD2RAZpT/JCRwh0fUleWpSlxas66ZZ9ghANLcUNhf2jEfiF9O7VjvkpHcDrfh6H3rmmKK+/lzfzmI99XK/BzR5VZlc/d16uMSDkKnbxlMAPJ9sCpFHN8QPEx0VQr3Tdr2xbXVu65hSjXPUgaF4Ht8hEUwzutaoD+hZuV6lZMYqsjKnK5bMnwcI8xZMwBzDDeSzhCUYLaG01kdh+4OnEP0uKG9O0uWWy9WzQCBc=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+Content-ID: <CDE7A108107BB745BE3483018FC7CA90@namprd11.prod.outlook.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1547646261-32535-20-git-send-email-rppt@linux.ibm.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+X-MS-Exchange-CrossTenant-Network-Message-Id: eb7949db-44e4-491d-a1ca-08d67c4ba243
+X-MS-Exchange-CrossTenant-originalarrivaltime: 17 Jan 2019 07:15:58.3367 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR11MB1571
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_230618_909603_74DF6709 
-X-CRM114-Status: GOOD (  13.20  )
+X-CRM114-CacheID: sfid-20190116_231612_355070_1E3300F0 
+X-CRM114-Status: GOOD (  15.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,59 +129,50 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rich Felker <dalias@libc.org>, linux-ia64@vger.kernel.org,
- devicetree@vger.kernel.org, Catalin Marinas <catalin.marinas@arm.com>,
- Heiko Carstens <heiko.carstens@de.ibm.com>, x86@kernel.org,
- linux-mips@vger.kernel.org, Max Filippov <jcmvbkbc@gmail.com>,
- sparclinux@vger.kernel.org, Christoph Hellwig <hch@lst.de>,
- linux-s390@vger.kernel.org, linux-c6x-dev@linux-c6x.org,
- Yoshinori Sato <ysato@users.sourceforge.jp>,
- Richard Weinberger <richard@nod.at>, linux-sh@vger.kernel.org,
- Russell King <linux@armlinux.org.uk>, kasan-dev@googlegroups.com,
- Geert Uytterhoeven <geert@linux-m68k.org>, Mark Salter <msalter@redhat.com>,
- Dennis Zhou <dennis@kernel.org>, Matt Turner <mattst88@gmail.com>,
- linux-snps-arc@lists.infradead.org, uclinux-h8-devel@lists.sourceforge.jp,
- Petr Mladek <pmladek@suse.com>, linux-xtensa@linux-xtensa.org,
- linux-alpha@vger.kernel.org, linux-um@lists.infradead.org,
- linux-m68k@lists.linux-m68k.org, Rob Herring <robh+dt@kernel.org>,
- Greentime Hu <green.hu@gmail.com>, xen-devel@lists.xenproject.org,
- Stafford Horne <shorne@gmail.com>, Guan Xuetao <gxt@pku.edu.cn>,
- linux-arm-kernel@lists.infradead.org, Michal Simek <monstr@monstr.eu>,
- Tony Luck <tony.luck@intel.com>, linux-mm@kvack.org,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-usb@vger.kernel.org,
- linux-kernel@vger.kernel.org, Paul Burton <paul.burton@mips.com>,
- Vineet Gupta <vgupta@synopsys.com>, Michael Ellerman <mpe@ellerman.id.au>,
- Andrew Morton <akpm@linux-foundation.org>, linuxppc-dev@lists.ozlabs.org,
- "David S. Miller" <davem@davemloft.net>, openrisc@lists.librecores.org
+Cc: mark.rutland@arm.com, robh@kernel.org, linux-kernel@vger.kernel.org,
+ frieder.schrempf@exceet.de, computersforpeace@gmail.com, shawnguo@kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 16, 2019 at 03:44:19PM +0200, Mike Rapoport wrote:
->  arch/csky/mm/highmem.c                    |  5 +++++
-...
-> diff --git a/arch/csky/mm/highmem.c b/arch/csky/mm/highmem.c
-> index 53b1bfa..3317b774 100644
-> --- a/arch/csky/mm/highmem.c
-> +++ b/arch/csky/mm/highmem.c
-> @@ -141,6 +141,11 @@ static void __init fixrange_init(unsigned long start, unsigned long end,
->  			for (; (k < PTRS_PER_PMD) && (vaddr != end); pmd++, k++) {
->  				if (pmd_none(*pmd)) {
->  					pte = (pte_t *) memblock_alloc_low(PAGE_SIZE, PAGE_SIZE);
-> +					if (!pte)
-> +						panic("%s: Failed to allocate %lu bytes align=%lx\n",
-> +						      __func__, PAGE_SIZE,
-> +						      PAGE_SIZE);
+
+
+On 01/15/2019 12:05 PM, Yogesh Narayan Gaur wrote:
+> Add support for octal mode I/O data transfer based on the controller (spi)
+> mode.
+> Assign hw-capability mask bits for octal transfer.
+> 
+> Signed-off-by: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+
+Reviewed-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+
+> ---
+>  drivers/mtd/devices/m25p80.c | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
+> index c4a1d04b8c80..651bab6d4e31 100644
+> --- a/drivers/mtd/devices/m25p80.c
+> +++ b/drivers/mtd/devices/m25p80.c
+> @@ -195,7 +195,14 @@ static int m25p_probe(struct spi_mem *spimem)
+>  	spi_mem_set_drvdata(spimem, flash);
+>  	flash->spimem = spimem;
+>  
+> -	if (spi->mode & SPI_RX_QUAD) {
+> +	if (spi->mode & SPI_RX_OCTAL) {
+> +		hwcaps.mask |= SNOR_HWCAPS_READ_1_1_8;
 > +
->  					set_pmd(pmd, __pmd(__pa(pte)));
->  					BUG_ON(pte != pte_offset_kernel(pmd, 0));
->  				}
-
-Looks good for me and panic is ok.
-
-Reviewed-by: Guo Ren <ren_guo@c-sky.com>
-
+> +		if (spi->mode & SPI_TX_OCTAL)
+> +			hwcaps.mask |= (SNOR_HWCAPS_READ_1_8_8 |
+> +					SNOR_HWCAPS_PP_1_1_8 |
+> +					SNOR_HWCAPS_PP_1_8_8);
+> +	} else if (spi->mode & SPI_RX_QUAD) {
+>  		hwcaps.mask |= SNOR_HWCAPS_READ_1_1_4;
+>  
+>  		if (spi->mode & SPI_TX_QUAD)
+> 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
