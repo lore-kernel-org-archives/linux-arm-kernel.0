@@ -2,66 +2,63 @@ Return-Path: <SRS0=6Gta=PZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F09D5C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 17:33:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4E7F7C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 17:44:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C04E220856
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 17:33:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1D4B420652
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 17:44:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A6RAGSVl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C04E220856
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f/YD2iwE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1D4B420652
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=F+PmQfH8YeCdRUJEJHttmtCLTnbkyGAzSHhd4e5qphM=; b=A6RAGSVlbb5ddVLpQ2VjtLq1C
-	uHlDa162r8VsdAaWVduVGFek41t3XrTuVDf1PK/kHEkZ0hqSSrX/ust5IYkP4Zj4FWFeyXAk/vVpL
-	KcBRocXSlSWlqRayQiDJGCfwMMWQnu6JfszfbR9t1uWq5xiWaEtO/9VZN5jmFOiMTbrqO/qIqPsIm
-	lUYZhDizfTVSj/PDF810boPksbqkvfAn+5LW55gEkcPOxG8HKtZ25YMpf18juheZ+oSaI/qlCSmmL
-	OshLMJVl2nmb9wj4015RfR8zQEV/cDqw6yZLRRGQAj9HY4DII1OKU606vKoLBIKhDxVa54jNMZ3LN
-	pIYmmGFMQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=N7xulH4dAMmMsSU0IM6kMTzhlfkXNtg6rQKEky6uiZM=; b=f/YD2iwEgjPG5m
+	vJOfVxqqyZOBR0XPi0gUBzNjD77/4YYkewfVn7dJHF1J+r2PCXqbwlDoUrfwqgMnOxsQer4jRL/lc
+	yknwDsWWr6+f+gtlJnhL3J0v6I9aLU1L+pMOrGkJGN6BtXZ6eJ6DLVUVDkgqhKERYW8Dz2bx8bEEr
+	3dvdZjUJkZI+mJ1KOumklAuxBKSyLrZsdi46uBhF0xsNcPHSD3mdqPVVwKhyKagdg3vvKjtZVTkEW
+	99yy9LDfHXQOs6SSBEtmW1YYqoI3dxAOyOlslVWDUzAgWgyrq2c3BhKBpYJBJN3x/uYTmV8c6QXVs
+	ryFJfVXiVF2Emw4guxBQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkBY3-0001US-D7; Thu, 17 Jan 2019 17:33:47 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gkBiO-0005DC-Oq; Thu, 17 Jan 2019 17:44:28 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkBXz-0001TX-TT
- for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 17:33:45 +0000
+ id 1gkBiK-0005CU-CK
+ for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 17:44:26 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id F37F880D;
- Thu, 17 Jan 2019 09:33:42 -0800 (PST)
-Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 080913F557;
- Thu, 17 Jan 2019 09:33:38 -0800 (PST)
-Subject: Re: [PATCH 3/7] coresight: Use event attributes for sink selection
-To: mathieu.poirier@linaro.org
-References: <20190115230742.13730-1-mathieu.poirier@linaro.org>
- <20190115230742.13730-4-mathieu.poirier@linaro.org>
- <b688e813-a3a3-011a-a0b1-0eeeffe8816d@arm.com>
- <CANLsYkwgn0aEbAAyTvL8f=M4Y9=04Dsxs-VqaEh64Hc8UKY-pw@mail.gmail.com>
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
-Message-ID: <7d11dfdc-7de1-7750-c596-de57df0d70fe@arm.com>
-Date: Thu, 17 Jan 2019 17:33:37 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id ACF8A80D;
+ Thu, 17 Jan 2019 09:44:21 -0800 (PST)
+Received: from e107155-lin (e107155-lin.cambridge.arm.com [10.1.196.42])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id DB8053F557;
+ Thu, 17 Jan 2019 09:44:18 -0800 (PST)
+Date: Thu, 17 Jan 2019 17:44:10 +0000
+From: Sudeep Holla <sudeep.holla@arm.com>
+To: Ulf Hansson <ulf.hansson@linaro.org>
+Subject: Re: [PATCH v10 00/27] PM / Domains: Support hierarchical CPU
+ arrangement (PSCI/ARM)
+Message-ID: <20190117174410.GA8839@e107155-lin>
+References: <20181129174700.16585-1-ulf.hansson@linaro.org>
+ <20190103120612.GC23511@e107155-lin>
+ <CAPDyKFp-JB85TZOs+oso0iidaAsm1A=UDrg=gv+QZ4VJ9gW=fA@mail.gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <CANLsYkwgn0aEbAAyTvL8f=M4Y9=04Dsxs-VqaEh64Hc8UKY-pw@mail.gmail.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <CAPDyKFp-JB85TZOs+oso0iidaAsm1A=UDrg=gv+QZ4VJ9gW=fA@mail.gmail.com>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_093343_963233_CD801A55 
-X-CRM114-Status: GOOD (  25.40  )
+X-CRM114-CacheID: sfid-20190117_094424_492049_7215D234 
+X-CRM114-Status: GOOD (  36.82  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,134 +70,188 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, linux-s390@vger.kernel.org, peterz@infradead.org,
- gregkh@linuxfoundation.org, heiko.carstens@de.ibm.com, adrian.hunter@intel.com,
- acme@kernel.org, ast@kernel.org, alexander.shishkin@linux.intel.com,
- mingo@redhat.com, will.deacon@arm.com, hpa@zytor.com, schwidefsky@de.ibm.com,
- namhyung@kernel.org, tglx@linutronix.de, jolsa@redhat.com,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>,
+ Vincent Guittot <vincent.guittot@linaro.org>,
+ Geert Uytterhoeven <geert+renesas@glider.be>,
+ Linux PM <linux-pm@vger.kernel.org>, Stephen Boyd <sboyd@kernel.org>,
+ Viresh Kumar <viresh.kumar@linaro.org>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ "Rafael J . Wysocki" <rjw@rjwysocki.net>, Kevin Hilman <khilman@kernel.org>,
+ Lina Iyer <ilina@codeaurora.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Tony Lindgren <tony@atomide.com>,
+ linux-arm-msm <linux-arm-msm@vger.kernel.org>,
+ "Raju P . L . S . S . S . N" <rplsssn@codeaurora.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Mathieu,
+On Wed, Jan 16, 2019 at 10:10:08AM +0100, Ulf Hansson wrote:
+> On Thu, 3 Jan 2019 at 13:06, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> >
+> > On Thu, Nov 29, 2018 at 06:46:33PM +0100, Ulf Hansson wrote:
+> > > Over the years this series have been iterated and discussed at various Linux
+> > > conferences and LKML. In this new v10, a quite significant amount of changes
+> > > have been made to address comments from v8 and v9. A summary is available
+> > > below, although let's start with a brand new clarification of the motivation
+> > > behind this series.
+> >
+> > I would like to raise few points, not blockers as such but need to be
+> > discussed and resolved before proceeding further.
+> > 1. CPU Idle Retention states
+> >         - How will be deal with flattening (which brings back the DT bindings,
+> >           i.e. do we have all we need) ? Because today there are no users of
+> >           this binding yet. I know we all agreed and added after LPC2017 but
+> >           I am not convinced about flattening with only valid states.
+>
+> Not exactly sure I understand what you are concerned about here. When
+> it comes to users of the new DT binding, I am converting two new
+> platforms in this series to use of it.
+>
 
-On 16/01/2019 23:57, Mathieu Poirier wrote:
-> On Wed, 16 Jan 2019 at 03:36, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
->>
->> Hi Mathieu,
->>
->> On 15/01/2019 23:07, Mathieu Poirier wrote:
->>> This patch uses the information conveyed by perf_event::attr::config2
->>> to select a sink to use for the session.  That way a sink can easily be
->>> selected to be used by more than one source, something that isn't currently
->>> possible with the sysfs implementation.
->>>
->>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->>> ---
->>>    .../hwtracing/coresight/coresight-etm-perf.c  | 16 ++------
->>>    drivers/hwtracing/coresight/coresight-priv.h  |  1 +
->>>    drivers/hwtracing/coresight/coresight.c       | 39 +++++++++++++++++++
->>>    3 files changed, 44 insertions(+), 12 deletions(-)
->>>
->>> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
->>> index 292bd409a68c..685d16001d0b 100644
->>> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
->>> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
->>> @@ -201,18 +201,10 @@ static void *etm_setup_aux(struct perf_event *event, void **pages,
->>>                return NULL;
->>>        INIT_WORK(&event_data->work, free_event_data);
->>>
->>> -     /*
->>> -      * In theory nothing prevent tracers in a trace session from being
->>> -      * associated with different sinks, nor having a sink per tracer.  But
->>> -      * until we have HW with this kind of topology we need to assume tracers
->>> -      * in a trace session are using the same sink.  Therefore go through
->>> -      * the coresight bus and pick the first enabled sink.
->>> -      *
->>> -      * When operated from sysFS users are responsible to enable the sink
->>> -      * while from perf, the perf tools will do it based on the choice made
->>> -      * on the cmd line.  As such the "enable_sink" flag in sysFS is reset.
->>> -      */
->>> -     sink = coresight_get_enabled_sink(true);
->>> +     /* First get the selected sink from user space. */
->>> +     sink = coresight_get_sink_by_id(event->attr.config2);
->>
->> Please could we also expose this information under "format", so that the
->> userspace knows where to fill in the sink id ? The other advantage is, we
->> could always change the size of the sink_id with the above, if we decide
->> to do something different with the sinks.
-> 
-> Humm...  From my point of view we don't want user space to do anything
-> with the sink ID other than read it.  In what  scenario do envison
-> user space filling the sink ID?
+Yes that's exactly my concern. So if someone updates DT(since it's part
+of the kernel still), but don't update the firmware(for complexity reasons)
+the end result on those platform is broken CPUIdle which is a regression/
+feature break and that's what I am objecting here.
 
-The userspace needs to know where to put the "sink_id" in. (in this case
-the driver expects it in attr.config2). So having this exposed in "format"
-helps us to expose this information to all users (not just the perf tool, where
-we hard-code it).
+> Note, the flattened model is still a valid option to describe the CPU
+> idle states after these changes. Especially when there are no last man
+> standing activities to manage by Linux and no shared resource that
+> need to prevent cluster idle states, when it's active.
 
->>> diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
->>> index 579f34943bf1..071bb98d358f 100644
->>> --- a/drivers/hwtracing/coresight/coresight-priv.h
->>> +++ b/drivers/hwtracing/coresight/coresight-priv.h
->>> @@ -147,6 +147,7 @@ void coresight_disable_path(struct list_head *path);
->>>    int coresight_enable_path(struct list_head *path, u32 mode, void *sink_data);
->>>    struct coresight_device *coresight_get_sink(struct list_head *path);
->>>    struct coresight_device *coresight_get_enabled_sink(bool reset);
->>> +struct coresight_device *coresight_get_sink_by_id(u64 id);
->>>    struct list_head *coresight_build_path(struct coresight_device *csdev,
->>>                                       struct coresight_device *sink);
->>>    void coresight_release_path(struct list_head *path);
->>> diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
->>> index 526f122a38ee..7e2ce0beb2a0 100644
->>> --- a/drivers/hwtracing/coresight/coresight.c
->>> +++ b/drivers/hwtracing/coresight/coresight.c
->>> @@ -11,6 +11,7 @@
->>>    #include <linux/err.h>
->>>    #include <linux/export.h>
->>>    #include <linux/slab.h>
->>> +#include <linux/stringhash.h>
->>>    #include <linux/mutex.h>
->>>    #include <linux/clk.h>
->>>    #include <linux/coresight.h>
->>> @@ -541,6 +542,44 @@ struct coresight_device *coresight_get_enabled_sink(bool deactivate)
->>>        return dev ? to_coresight_device(dev) : NULL;
->>>    }
->>>
->>> +static int coresight_sink_by_id(struct device *dev, void *data)
->>> +{
->>> +     struct coresight_device *csdev = to_coresight_device(dev);
->>> +     unsigned long hash;
->>> +
->>> +     if (csdev->type == CORESIGHT_DEV_TYPE_SINK ||
->>> +          csdev->type == CORESIGHT_DEV_TYPE_LINKSINK) {
->>> +             /*
->>> +              * See function etm_perf_sink_name_show() to know where this
->>> +              * comes from.
->>> +              */
->>> +             hash = hashlen_hash(hashlen_string(NULL, dev_name(dev)));
->>> +
->>> +             if (hash == (*(unsigned long *)data))
->>> +                     return 1;
->>
->> nit: is it worth storing the sink_id of a sink in the csdev ? May be if we add
->> attribute field to the csdev (as mentioned in the previous patch), we could
->> simply use it here to compare.
-> 
-> That depends on what we end up doing in the previous patch (see my
-> comment).  Since we are not even close to modularize coresight drivers
-> (unless you're already spending your weekends working on that,
-> something I doubt very much :o) ) I don't think we need to go this
-> way.  Again, let me know if you really want me to change this.
+Since OSI vs PC is discoverable, we shouldn't tie up with DT in anyway.
 
-As I said, I understand the complexity of the modularization effort. However
-it would be good to be future proof than figure this out the hard way when we
-get there and we don't loose much except a few bytes in the coresight_device.
+>
+> >         - Will domain governor ensure not to enter deeper idles states based
+> >           on its sub-domain states. E.g.: when CPUs are in retention, so
+> >           called container/cluster domain can enter retention or below and not
+> >           power off states.
+>
+> I have tried to point this out as a known limitation in genpd of the
+> current series, possibly I have failed to communicate that clearly.
+> Anyway, I fully agree that this needs to be addressed in a future
+> step.
+>
 
-Cheers
-Suzuki
+Sorry, I might have missed to read. The point is if we are sacrificing
+few retention states with this new feature, I am sure PC would perform
+better that OSI on platforms which has retention states. Another
+reason for having comparison data or we should simply assume and state
+clearly OSI may perform bad on such system until the support is added.
+
+> Note that, this isn't a specific limitation to how idle states are
+> selected for CPUs and CPU clusters by genpd, but is rather a
+> limitation to any hierarchical PM domain topology managed by genpd
+> that has multiple idle states.
+>
+
+Agreed, but with flattened mode we compile the list of valid states so
+the limitation is automatically eliminated.
+
+> Do note, I already started hacking on this and intend to post patches
+> on top of this series, as these changes isn't needed for those two
+> ARM64 platforms I have deployed support for.
+>
+
+Good to know.
+
+> >         - Is the case of not calling cpu_pm_{enter,exit} handled now ?
+>
+> It is still called, so no changes in regards to that as apart of this series.
+>
+
+OK, so I assume for now we are not going to support retention states with OSI
+for now ?
+
+> When it comes to actually manage the "last man activities" as part of
+> selecting an idle state of the cluster, that is going to be addressed
+> on top as "optimizations".
+>
+
+OK
+
+> In principle we should not need to call cpu_pm_enter|exit() in the
+> idle path at all,
+
+Not sure if we can do that. We need to notify things like PMU, FP, GIC
+which have per cpu context too and not just "cluster" context.
+
+> but rather only cpu_cluster_pm_enter|exit() when a cluster idle state is
+> selected.
+
+We need to avoid relying on concept of "cluster" and just think of power
+domains and what's hanging on those domains. Sorry for naive question, but
+does genpd have concept of notifiers. I do understand that it's more
+bottom up approach where each entity in genpd saves the context and requests
+to enter a particular state. But with CPU devices like GIC/VFP/PMU, it
+needs to be more top down approach where CPU genpd has to enter a enter
+so it notifies the devices attached to it to save it's context. Not ideal
+but that's current solution. Because with the new DT bindings, platforms
+can express if PMU/GIC is in per cpu domain or any pd in the hierarchy and
+we ideally need to honor that. But that's optimisation, just mentioning.
+
+> That should improve latency when
+> selecting an idle state for a CPU. However, to reach that point
+> additional changes are needed in various drivers, such as the gic
+> driver for example.
+>
+
+Agreed.
+
+> >
+> > 2. Now that we have SDM845 which may soon have platform co-ordinated idle
+> >    support in mainline, I *really* would like to see some power comparison
+> >    numbers(i.e. PC without cluster idle states). This has been the main theme
+> >    for most of the discussion on this topic for years and now we are close
+> >    to have some platform, we need to try.
+>
+> I have quite recently been talking to Qcom folkz about this as well,
+> but no commitments are made.
+>
+
+Indeed that's the worrying. IMO, this is requested since day#1 and not
+even simple interest is shown, but that's another topic.
+
+> Although I fully agree that some comparison would be great, it still
+> doesn't matter much, as we anyway need to support PSCI OSI mode in
+> Linux. Lorenzo have agreed to this as well.
+>
+
+OK, I am fine if others agree. Since we are sacrificing on few (retention)
+states that might disappear with OSI, I am still very much still interested
+as OSI might perform bad that PC especially in such cases.
+
+> >
+> > 3. Also, after adding such complexity, we really need a platform with an
+> >    option to build and upgrade firmware easily. This will help to prevent
+> >    this being not maintained for long without a platform to test, also
+> >    avoid adding lots of quirks to deal with broken firmware so that newer
+> >    platforms deal those issues in the firmware correctly.
+>
+> I don't see how this series change anything from what we already have
+> today with the PSCI FW. No matter of OSI or PC mode is used, there are
+> complexity involved.
+>
+
+I agree, but PC is already merged, mainitained and well tested regularly
+as it's default mode that must be supported and TF-A supports/maintains
+that. OSI is new and is on platform which may not have much commitments
+and can be thrown away and any bugs we find in future many need to worked
+around in kernel. That's what I meant as worrying.
+
+> Although, of course I agree with you, that we should continue to try
+> to convince ARM vendors about moving to the public version of ATF and
+> avoid proprietary FW binaries as much as possible.
+>
+
+Indeed.
+
+--
+Regards,
+Sudeep
 
 _______________________________________________
 linux-arm-kernel mailing list
