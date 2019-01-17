@@ -2,87 +2,92 @@ Return-Path: <SRS0=6Gta=PZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D7E87C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 16:56:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A7F27C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 17:11:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A413320652
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 16:56:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6D9E320851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 17:11:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VorYFHtv";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="ddUrGFlW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A413320652
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="heBk3WI7";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="T0Z4JLfn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6D9E320851
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/tKrKKwWTwUWt5bzz2+4z58aoO/5qWYw0o83Jnk4FY8=; b=VorYFHtvc0MWsZ
-	sNpgkRvHWELlDqNzraVs2LjvQXV25txVMMcLJDH6sdhUkPfyU6SgK9GX9GWTvJNDMcnDvHB37Jrok
-	VVLZXGyMElTpRnjR0Cv+6vq7AHWQHxRwA+rkOafsT6O1C212RPvKk89VvVQIUu44G36GmVXWtr47l
-	X1MliVkpCoU+lxzotIHCmmB9Bc5csh4hrATJXmCUJx6yUq5bZBKwIbQmp5TvUd/pdPQQvdyDPp/xa
-	1PlthkYqvDaBHiq6on6Mp4esnSt7LtUKRLIkSPX4RjUKHbOzZEyOibs0zUXj8jR9rDZR+/kxDUbM3
-	GklRIKuJtxQrC1bedqrA==;
+	List-Owner; bh=Ocqb4ACPxnQtueGp42t4hqDC0tqdHVBmVhimx0w6SdY=; b=heBk3WI7THez85
+	ZetP0b0fbfk8SoPd89Ckj5Psbqrx0SbpWX9HO2tvs69iXClsuSXEgjQv2tqf4+HcpnaiRClFIlMnE
+	mbvGBacdCBMZT9mvDCnZUevWS63bpuSWXhESNB8TksfB4ZeYB6yyVqc0G+YQE+lWc1wp9s/H3/X/Z
+	HnqToqYAuc23xNmjShxzi0qDmbEdBKEQXbZM/vJ0RZ5lgp2vycWqH2tx94COAozK1K3hcJsfc2N3p
+	ifI+phfopJyQ+mVPie7WMFBaMDWwP3ey/AiR687jhuxGhdhb2r+l6OGDKQyuvF0/YK3iob24K0iRO
+	+9juVikhdHGnMF6jSK0Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkAyM-00054M-EG; Thu, 17 Jan 2019 16:56:54 +0000
-Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
+	id 1gkBCe-0002Fa-IX; Thu, 17 Jan 2019 17:11:40 +0000
+Received: from mail-vs1-xe43.google.com ([2607:f8b0:4864:20::e43])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkAy6-0004wI-AH
- for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 16:56:52 +0000
-Received: by mail-pg1-x543.google.com with SMTP id z11so4706716pgu.0
+ id 1gkBCc-0002Dz-3C
+ for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 17:11:39 +0000
+Received: by mail-vs1-xe43.google.com with SMTP id e7so6695941vsc.2
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 17 Jan 2019 08:56:37 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=O0BZItxe72NDpqOUQeNAUH+rms79uSn5IzgLs/SIvig=;
- b=ddUrGFlWNS19wXFM4STS7+RiydNFM8v99ueCqW5IcmOvhrTSmLwj6ET+IH/E+neALK
- CkaygvdZADzRaPiDrbXEM02C2hZuLTDYE5chAtlt6fL8Zn0kf7yAfpCU5IXCrN424hnn
- K37bnxzs8gw+9D65rTdeJhtOl0MoaSFK0PX3Q=
+ Thu, 17 Jan 2019 09:11:37 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=9NH/nNdAELJO+XX2r9h3AuIOg98tGgx6St0RefpZQA4=;
+ b=T0Z4JLfnMp6XuQB31A8RKP7WphX7sY6WgvX+4tfIoDjyoCuLGyUfV8XhV8Zuh5jCCu
+ Pf3umkvMa9TNjQ+I7YigjnavGhUcMYboLngOHaa70kHbPCdMQIzkEeiZg2B3MZ2+wM9u
+ TIM/Pex5NBW1vlQ2ApRkW/34TwIJgqr5MMlxk=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=O0BZItxe72NDpqOUQeNAUH+rms79uSn5IzgLs/SIvig=;
- b=KyliPZZpCjZyguf1mXFrgxkq9clLwL14rAdEgcOY8kbOEEaw8jmZ5J1PWP36BS9yln
- Wpv5adim6hr6lwb5XQes+OyjRtxbt9VOkYLLvaA9yfd4b6/3PKrt9xsAeqI8WHJPLWqj
- v7eNv+GsE/gmSvRIM52lxpGkoB5lnqrfL1UrWqT3yAuJEg100GJ8EarwnZDzZs2Kb2Mx
- LSiGwJLVlaL+/N5f90G8HAhIqK4ukgZNG/qzDzSvj5NwoJrQd7leWPMzO5sepBD6zqHR
- iuCNhidG4MJISCq6EQCEyfFO4bbvNy7N5g4FAe4JHk2lvOMRfZtQg1Kxucz8avnsKxg5
- xskQ==
-X-Gm-Message-State: AJcUukewCYnwoWrM8NXpt2eIsxatLqwsbig0P2Ce8n3zSKRizFw0uXsQ
- U3r9GlNhXf0vnegp4DV1SbBx
-X-Google-Smtp-Source: ALg8bN63FEKZyB2rzG3V9pv9AcxURMuzrFF+wCB4YpcNM14RpdbIDE04FTvpddG2Yvwt0yxAE0tJZA==
-X-Received: by 2002:a62:824c:: with SMTP id w73mr5105470pfd.150.1547744196768; 
- Thu, 17 Jan 2019 08:56:36 -0800 (PST)
-Received: from Mani-XPS-13-9360 ([2405:204:7344:aef4:e89a:577b:dc0a:3144])
- by smtp.gmail.com with ESMTPSA id g3sm3828317pfe.37.2019.01.17.08.56.31
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 17 Jan 2019 08:56:36 -0800 (PST)
-Date: Thu, 17 Jan 2019 22:26:29 +0530
-From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-To: John Stultz <john.stultz@linaro.org>
-Subject: Re: [PATCH 6/8 v3] arm64: dts: hi3660: Add dma to uart nodes
-Message-ID: <20190117165629.GI5283@Mani-XPS-13-9360>
-References: <1547141652-8660-1-git-send-email-john.stultz@linaro.org>
- <1547141652-8660-7-git-send-email-john.stultz@linaro.org>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=9NH/nNdAELJO+XX2r9h3AuIOg98tGgx6St0RefpZQA4=;
+ b=kd1cUjCXN5ORj0B5tfwrKWR0C1R6iGonUeIs8P+KRYu56Joeu3vz8L/mJnBwVOJxim
+ tdU4ptfsrOL9zUjXf+ufIT/plprNVbkbo8nkQ8oIsdFbRt1PL0oLO6uwm3Ib10zXWbnH
+ leSAksyKiBKiaSXDRFS2m6EikZtE3dG0HjvmzqS0XUPHI5mgTBisSw+XJrGgzIYrFogh
+ U/I/Sz7IpsRhhJ94W73UDz933zkTY65RhGioDksnXodXa6gpv7TRnG+Fy5egJbXvZOhH
+ sZRVz/cy5d0yANQ1VPFkOMDxS62Gg5mOLUsxMzmlsBlndMuwrE5Spx/MJBC7RVbgPvkh
+ SsXA==
+X-Gm-Message-State: AJcUukd2ijsFrOAneXqTBwIsNIM/CwYMCc2takod3yxmtl/i3ahWW/GX
+ yDLyQ54PH21l/sLlGj4dwqmsWnfM17E=
+X-Google-Smtp-Source: ALg8bN4hiouwHQK8W4z9NBQfm7aqSPq6bEEgfYYzNGfNTL3lq4sYkmUlLwXzPVELnUP8GFOGBaKi9Q==
+X-Received: by 2002:a67:3d92:: with SMTP id p18mr6469071vsi.51.1547745095717; 
+ Thu, 17 Jan 2019 09:11:35 -0800 (PST)
+Received: from mail-vk1-f172.google.com (mail-vk1-f172.google.com.
+ [209.85.221.172])
+ by smtp.gmail.com with ESMTPSA id n206sm57649935vkn.36.2019.01.17.09.11.34
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 17 Jan 2019 09:11:34 -0800 (PST)
+Received: by mail-vk1-f172.google.com with SMTP id s184so2434439vkd.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 17 Jan 2019 09:11:34 -0800 (PST)
+X-Received: by 2002:a1f:298e:: with SMTP id p136mr6005109vkp.40.1547745093881; 
+ Thu, 17 Jan 2019 09:11:33 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1547141652-8660-7-git-send-email-john.stultz@linaro.org>
-User-Agent: Mutt/1.9.4 (2018-02-28)
+References: <20190117062620.23908-1-saiprakash.ranjan@codeaurora.org>
+In-Reply-To: <20190117062620.23908-1-saiprakash.ranjan@codeaurora.org>
+From: Kees Cook <keescook@chromium.org>
+Date: Thu, 17 Jan 2019 09:11:21 -0800
+X-Gmail-Original-Message-ID: <CAGXu5j+E1Eiv8T9OLDeM2-_qCUwh79zRhJ92Yixg496ZXo5ccg@mail.gmail.com>
+Message-ID: <CAGXu5j+E1Eiv8T9OLDeM2-_qCUwh79zRhJ92Yixg496ZXo5ccg@mail.gmail.com>
+Subject: Re: [PATCH] pstore/ram: Fix console ramoops to show the previous boot
+ logs
+To: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_085638_530175_F7BA1653 
-X-CRM114-Status: GOOD (  16.63  )
+X-CRM114-CacheID: sfid-20190117_091138_160526_2B1BA4F8 
+X-CRM114-Status: GOOD (  20.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,88 +99,86 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Ryan Grachek <ryan@edited.us>, Zhuangluan Su <suzhuangluan@hisilicon.com>,
- Tanglei Han <hantanglei@huawei.com>, lkml <linux-kernel@vger.kernel.org>,
- Wei Xu <xuwei5@hisilicon.com>, Rob Herring <robh+dt@kernel.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Tony Luck <tony.luck@intel.com>, Rajendra Nayak <rnayak@codeaurora.org>,
+ Stephen Boyd <sboyd@kernel.org>, linux-arm-msm@vger.kernel.org,
+ Anton Vorontsov <anton@enomsg.org>, Doug Anderson <dianders@chromium.org>,
+ LKML <linux-kernel@vger.kernel.org>, Guenter Roeck <groeck@chromium.org>,
+ Sibi Sankar <sibis@codeaurora.org>, Vivek Gautam <vivek.gautam@codeaurora.org>,
+ Colin Cross <ccross@android.com>, Joel Fernandes <joel@joelfernandes.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 10, 2019 at 09:34:10AM -0800, John Stultz wrote:
-> Try to add DMA support to the uart nodes following
-> the assignments made in the dts from the victoria vendor kernel
-> here:
-> https://consumer.huawei.com/en/opensource/detail/?siteCode=worldwide&keywords=p10&fileType=openSourceSoftware&pageSize=10&curPage=1
-> 
-> Cc: Tanglei Han <hantanglei@huawei.com>
-> Cc: Zhuangluan Su <suzhuangluan@hisilicon.com>
-> Cc: Ryan Grachek <ryan@edited.us>
-> Cc: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> Cc: Wei Xu <xuwei5@hisilicon.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: linux-arm-kernel@lists.infradead.org
-> Cc: devicetree@vger.kernel.org
-> Signed-off-by: John Stultz <john.stultz@linaro.org>
+On Wed, Jan 16, 2019 at 10:27 PM Sai Prakash Ranjan
+<saiprakash.ranjan@codeaurora.org> wrote:
+>
+> commit b05c950698fe ("pstore/ram: Simplify ramoops_get_next_prz()
+> arguments") changed update assignment in getting next persistent
+> ram zone by adding a check for record type. But the check always
+> returns true since the record type is assigned 0. And this breaks
+> console ramoops by showing current console log instead of previous
+> log on warm reset and hard reset (actually hard reset should not
+> be showing any logs).
+>
+> Fix this by having persistent ram zone type check instead of record
+> type check. Tested this on SDM845 MTP and dragonboard 410c.
+>
+> Reproducing this issue is simple as below:
+>
+> 1. Trigger hard reset and mount pstore. Will see console-ramoops
+>    record in the mounted location which is the current log.
+>
+> 2. Trigger warm reset and mount pstore. Will see the current
+>    console-ramoops record instead of previous record.
+>
+> Fixes: b05c950698fe ("pstore/ram: Simplify ramoops_get_next_prz() arguments")
+> Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
 
-Acked-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+Whoops! Thanks for catching this! I've adjusted the patch slightly (no
+need for a local variable), and will send this to Linus.
 
-Thanks,
-Mani
+-Kees
 
+>
 > ---
-> v3:
-> * Remove dma enablment on uart0 which would use reserved channel 0
+>
+> I guess commit msg can be improved.
 > ---
->  arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> index 20ae40d..4c8d682 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> @@ -478,6 +478,8 @@
->  			compatible = "arm,pl011", "arm,primecell";
->  			reg = <0x0 0xfdf00000 0x0 0x1000>;
->  			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
-> +			dma-names = "rx", "tx";
-> +			dmas =  <&dma0 2 &dma0 3>;
->  			clocks = <&crg_ctrl HI3660_CLK_GATE_UART1>,
->  				 <&crg_ctrl HI3660_CLK_GATE_UART1>;
->  			clock-names = "uartclk", "apb_pclk";
-> @@ -490,6 +492,8 @@
->  			compatible = "arm,pl011", "arm,primecell";
->  			reg = <0x0 0xfdf03000 0x0 0x1000>;
->  			interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
-> +			dma-names = "rx", "tx";
-> +			dmas =  <&dma0 4 &dma0 5>;
->  			clocks = <&crg_ctrl HI3660_CLK_GATE_UART2>,
->  				 <&crg_ctrl HI3660_PCLK>;
->  			clock-names = "uartclk", "apb_pclk";
-> @@ -514,6 +518,8 @@
->  			compatible = "arm,pl011", "arm,primecell";
->  			reg = <0x0 0xfdf01000 0x0 0x1000>;
->  			interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-> +			dma-names = "rx", "tx";
-> +			dmas =  <&dma0 6 &dma0 7>;
->  			clocks = <&crg_ctrl HI3660_CLK_GATE_UART4>,
->  				 <&crg_ctrl HI3660_CLK_GATE_UART4>;
->  			clock-names = "uartclk", "apb_pclk";
-> @@ -526,6 +532,8 @@
->  			compatible = "arm,pl011", "arm,primecell";
->  			reg = <0x0 0xfdf05000 0x0 0x1000>;
->  			interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
-> +			dma-names = "rx", "tx";
-> +			dmas =  <&dma0 8 &dma0 9>;
->  			clocks = <&crg_ctrl HI3660_CLK_GATE_UART5>,
->  				 <&crg_ctrl HI3660_CLK_GATE_UART5>;
->  			clock-names = "uartclk", "apb_pclk";
-> -- 
-> 2.7.4
-> 
+>  fs/pstore/ram.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/fs/pstore/ram.c b/fs/pstore/ram.c
+> index 96f7d32cd184..441a44215456 100644
+> --- a/fs/pstore/ram.c
+> +++ b/fs/pstore/ram.c
+> @@ -128,7 +128,7 @@ ramoops_get_next_prz(struct persistent_ram_zone *przs[], int id,
+>                      struct pstore_record *record)
+>  {
+>         struct persistent_ram_zone *prz;
+> -       bool update = (record->type == PSTORE_TYPE_DMESG);
+> +       bool update;
+>
+>         /* Give up if we never existed or have hit the end. */
+>         if (!przs)
+> @@ -138,6 +138,8 @@ ramoops_get_next_prz(struct persistent_ram_zone *przs[], int id,
+>         if (!prz)
+>                 return NULL;
+>
+> +       update = (prz->type == PSTORE_TYPE_DMESG);
+> +
+>         /* Update old/shadowed buffer. */
+>         if (update)
+>                 persistent_ram_save_old(prz);
+> --
+> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+> of Code Aurora Forum, hosted by The Linux Foundation
+>
+
+
+-- 
+Kees Cook
 
 _______________________________________________
 linux-arm-kernel mailing list
