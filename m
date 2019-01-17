@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 72385C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 01:55:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 739E7C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 01:55:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3966B20651
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 01:55:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 24F3920651
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 01:55:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GsrPNTa9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3966B20651
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SRl7gmiW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 24F3920651
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,42 +26,43 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=bKkXv4477WGz0hcL8z9OvUscccf9pZmYy6VWEwCNV/U=; b=GsrPNTa9S4U7mWYhLM5ae2BqGS
-	xrd5kietMbi1SOPxU/7Xs4A/40r0cLXC4oX4jAEGDh1FQr0t49QJT5kMX03uqN0dzelj/zYYqLesT
-	qon47C4jWv4oW9GUIAF7RDcONHSabesTSgNt1Iu+57VwPE4BSvZBhOy08YZenAiCZ6g0qCP/8gz0h
-	rIVU7DJ5hozJiwnkow4ao7A/PyMfMy4v8WNeBOaq8xONni147uzdIht35siIQYDby8ONHgJRalPjd
-	lRuJziL2vNnTVRouWQ3GLGtTLjjUEWNqaBrlrLCNuoy0bDjjg5L+Z/nG14bkifij3DJ7wmoAdkiWc
-	msQz2w7A==;
+	bh=n/RXbYXeLTxgKC7anuCcMH9FvLPybhw0J46D2UtMHD4=; b=SRl7gmiW6NcrXzcORaPJcVWyIJ
+	Vpo9eVioAWWYnWk9duD9nc7XODaAdby8SE5Q6N81t7l/bGwjqaQaIAUngKCy9ZRs/ngzEGFTqbGea
+	5HYv7YromYsrhCplEl9X828TyE/TcM4U3bYAQN65mKYU2yHNGRVEIsAcBuR321eTi4qJZmq5Kjqqs
+	sV4ukWGP3WGNWImHnQUM0In/bx/B6SyHpRzwcAmmBkx1S9dP/B0kSw21ul3k1GIK9u5Oganb9R5ix
+	UprVakqScRxpP3mKXWMinqspL6V6Enp8pxFB9natF/IMxN9XkZ8hR2HQa3ueox+BBIfN9HnjRZSLo
+	k2R8lybw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjwtt-0006lo-Vq; Thu, 17 Jan 2019 01:55:21 +0000
+	id 1gjwuA-00078w-Kv; Thu, 17 Jan 2019 01:55:38 +0000
 Received: from inva021.nxp.com ([92.121.34.21])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjwtf-00066P-CN
- for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 01:55:08 +0000
+ id 1gjwtg-0006IH-BF
+ for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 01:55:10 +0000
 Received: from inva021.nxp.com (localhost [127.0.0.1])
- by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 18164200190;
- Thu, 17 Jan 2019 02:55:06 +0100 (CET)
+ by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 1A17C2001F4;
+ Thu, 17 Jan 2019 02:55:07 +0100 (CET)
 Received: from invc005.ap-rdc01.nxp.com (invc005.ap-rdc01.nxp.com
  [165.114.16.14])
- by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 3285B2001F4;
- Thu, 17 Jan 2019 02:55:02 +0100 (CET)
+ by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 33FC0200177;
+ Thu, 17 Jan 2019 02:55:03 +0100 (CET)
 Received: from titan.ap.freescale.net (TITAN.ap.freescale.net [10.192.208.233])
- by invc005.ap-rdc01.nxp.com (Postfix) with ESMTP id 01D04402F2;
- Thu, 17 Jan 2019 09:54:56 +0800 (SGT)
+ by invc005.ap-rdc01.nxp.com (Postfix) with ESMTP id 031BE402D7;
+ Thu, 17 Jan 2019 09:54:57 +0800 (SGT)
 From: Yangbo Lu <yangbo.lu@nxp.com>
 To: netdev@vger.kernel.org, devicetree@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
-Subject: [v2, 3/5] dt-binding: ptp_qoriq: document "fsl,extts-fifo" property
-Date: Thu, 17 Jan 2019 09:49:34 +0800
-Message-Id: <20190117014936.48117-4-yangbo.lu@nxp.com>
+Subject: [v2,
+ 4/5] ARM: dts: ls1021a: add 1588 external trigger stamp fifo support
+Date: Thu, 17 Jan 2019 09:49:35 +0800
+Message-Id: <20190117014936.48117-5-yangbo.lu@nxp.com>
 X-Mailer: git-send-email 2.14.1
 In-Reply-To: <20190117014936.48117-1-yangbo.lu@nxp.com>
 References: <20190117014936.48117-1-yangbo.lu@nxp.com>
 X-Virus-Scanned: ClamAV using ClamSMTP
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_175507_561850_8744C351 
-X-CRM114-Status: UNSURE (   8.17  )
+X-CRM114-CacheID: sfid-20190116_175508_522681_E421701C 
+X-CRM114-Status: UNSURE (   8.40  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -83,28 +84,29 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Documented "fsl,extts-fifo" property.
+This patch is to add external trigger stamp fifo support
+for 1588 timer.
 
 Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
 ---
 Changes for v2:
-	- Modified binding description.
+	- None.
 ---
- .../devicetree/bindings/ptp/ptp-qoriq.txt          |    1 +
+ arch/arm/boot/dts/ls1021a.dtsi |    1 +
  1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/ptp/ptp-qoriq.txt b/Documentation/devicetree/bindings/ptp/ptp-qoriq.txt
-index c5d0e79..101fe5f 100644
---- a/Documentation/devicetree/bindings/ptp/ptp-qoriq.txt
-+++ b/Documentation/devicetree/bindings/ptp/ptp-qoriq.txt
-@@ -17,6 +17,7 @@ Clock Properties:
-   - fsl,tmr-fiper1   Fixed interval period pulse generator.
-   - fsl,tmr-fiper2   Fixed interval period pulse generator.
-   - fsl,max-adj      Maximum frequency adjustment in parts per billion.
-+  - fsl,extts-fifo   Required if hardware uses external trigger stamp FIFO.
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index bdd6e66..0fbeca2 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -608,6 +608,7 @@
+ 			fsl,tmr-fiper1  = <999999995>;
+ 			fsl,tmr-fiper2  = <99990>;
+ 			fsl,max-adj     = <499999999>;
++			fsl,extts-fifo;
+ 		};
  
-   These properties set the operational parameters for the PTP
-   clock. You must choose these carefully for the clock to work right.
+ 		enet0: ethernet@2d10000 {
 -- 
 1.7.1
 
