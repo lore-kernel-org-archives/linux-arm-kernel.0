@@ -2,93 +2,86 @@ Return-Path: <SRS0=6Gta=PZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-2.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5355AC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 14:30:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5443CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 14:33:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 22066205C9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 14:30:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 21E1D20855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 14:33:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="h9f6Wp7P";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="RQKx2Wmr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 22066205C9
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=roeck-us.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IQpRWOIM";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="zV1WSOz0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 21E1D20855
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ZAswV4hErkS/xc7tXX9avPU12YC4TpkTaDTTMbRA/Qg=; b=h9f6Wp7P9/nZPL
-	XT29FERSLyTJB9U/TDFlitXGC7X9SEDvdvx2IGcgXQRCaMRB9blFT50GDgyjOdxq+azvzJCgZMNbr
-	cUAErYG4H3Bj4Up6eAR9lFnxmWean4ENGIXGohGDxhAo65MG13DKhDebRLokztJwDLc+/h5JTC/ZR
-	M+QWeM59JIfcvos2b8RirWeZn2KqaV+gBpnSsXh37ykVv9S0X4QnBqkNHhQen7CKHU8D4kvwkACVo
-	ldioTwqbRPSgw1sve7QNnCb+WSVv67hsO4WDMIQ/zrWRe/VBayXI7ukT5ROiLxBspKoSth7Z7ZVEb
-	pcnEeqqVBQUXaujB2qNg==;
+	List-Owner; bh=oX0fisg+wPslb5v4CdxcIs7n4M06eawskqyOV9x4A/8=; b=IQpRWOIMmFKc8m
+	x3LeUl4d5j/IMIp3NC3Rm3vXQxTD2HS6uDmGrMRI/Ki8SU41MHAfSqX0VRWAzyt3dA8MHil/hWCZI
+	RTLzkmqhq6oCf7xSFwkXhvKDi8tboktPzY1/wcJn9FyGE+xbAqAxvyHUAleOhnS3v6ZSwMiFMIHlA
+	ji5Qn9h2T9ZUciXhGTiehh7tG6obCengdL62xviKDS2oLbCPyW+8W0KAGVY5E+Rz7PqV7XzJBCBFK
+	IRDDWzWWEwHGT3ZJHqQXy2RwGUUfP5IfMe38aNb6z5Dn8SvYG9jbk8Ms9NXfNUy5rm+izqMaPpvJI
+	nL+nIfZDUguZ5xMDg6OA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gk8h2-0002Lx-Ma; Thu, 17 Jan 2019 14:30:52 +0000
-Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
+	id 1gk8j2-0002jd-Rp; Thu, 17 Jan 2019 14:32:56 +0000
+Received: from mail-it1-x144.google.com ([2607:f8b0:4864:20::144])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gk8gx-0002LX-Ek
- for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 14:30:50 +0000
-Received: by mail-pg1-x544.google.com with SMTP id w7so4504678pgp.13
+ id 1gk8j0-0002jI-0g
+ for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 14:32:55 +0000
+Received: by mail-it1-x144.google.com with SMTP id w18so1645859ite.1
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 17 Jan 2019 06:30:46 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=sender:date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=vPE0iJH00uw3g29XdpOWj4FUNR/fWr5PSPg5JASa3T4=;
- b=RQKx2Wmr1EIzy8KrI0FcG/Cj+y3OidW4W4o6VJDIh4MH3P5s3f7H2BrcxxdU71m2uN
- z1e7uPNp+vlTCi2Ds53R8uJj0NdqB0Ioa0qr21OKkhBQJiV3LYVarWpNj+goSl7NHjjE
- jhKJNcdGwWluHmoipQ9PJK/uCO7JxyMz2qcTcMdssSOXF3nT4DN6sxk0g0zXip6YbFGQ
- M5YBdYZxcDUJFkH5IUyOEtSnS4NhJp7jfSiYCwgZmW9DG7VKciHODyme/+BJi9jRcEUi
- G8LgwstwY6qw42ll9SVmtVNHg2HfY2NE75F6O+DtOeQWr/vc3ld5isaFuz6BKRCLUN4h
- Psxg==
+ Thu, 17 Jan 2019 06:32:53 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc:content-transfer-encoding;
+ bh=zBP68msOjrFahT5eyfFbMaC5hk5eijUODNhs/NVuCbA=;
+ b=zV1WSOz0yzhjojGyT424OmgAiXjbmHC7A4SCyQfcvbWtrp/np1ImPAHfx3WxUBBfMV
+ /UeI9ksPhur6qitBCnkq7CZZPXxMj2Tb2Y4ZeY/oOGL2YMjX3uRaCkUn9fR0fPuyCuVh
+ 5V4VLTbUUxO+Y+01RxQeBt/EV3MlyE768DWcJ4mwf2MD3hzq7T3AB9cGnG/vP14nAWc/
+ dI5lpNNe2h5nsxq+QbTBIIM1nsWv71iIlB5B8e3M8cCXHfTQyjNlZZJae9/KWfE33OW+
+ X1fl9731Zb9R6AF/dLZuWVXzQZyeaEpIYXACBOJAIm18Pr+9r8Rbeg+RCFmYHyLnHuhc
+ J43g==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:sender:date:from:to:cc:subject:message-id
- :references:mime-version:content-disposition:in-reply-to:user-agent;
- bh=vPE0iJH00uw3g29XdpOWj4FUNR/fWr5PSPg5JASa3T4=;
- b=dVRnWrFcWciqZffo7rEwrgsmQ6IhpvPOySq/C/LX4ecFDdgMaRy6Uy06ltUZZVG1s5
- Yve17xMDdlA3NeydT6b1/9Ml0KSmqLSEFe4GUdXIQwRkp/ci/AMWOu75VgMajBy46a8p
- drCncQslWTHMPOykmWxaTTfcDgudR8rZCFhW68CjsKXf9DJYUqSs42FGN3Au3nczX8Zc
- SbVPxuq+d24dhWAt/AS+xzcL6dmodP33FR/VaKW3Sf6FiP/E5uz0o2uhpKm0pvALHOHA
- csSANCIP/SrPdSBI5rL7Z3/1w8IUaEYWJkK0shtUa0KxwKrl2NbUE1Wx0MRanar/WK+F
- RHlw==
-X-Gm-Message-State: AJcUukdYdKnGgxaW6OHxcZ/xDu9dYUMmsxsOn3+DyAS6VoeaU0CjemdD
- tSJIdFGr96wMu+hDSGV7SCY=
-X-Google-Smtp-Source: ALg8bN7scCulcV6ZI4hjZ5rcT2zWWnBwK7E7cCHqYdj6Yvq2Ge+p1DbVb0QknU4Q+XJwjw+usKpjag==
-X-Received: by 2002:a62:1289:: with SMTP id 9mr15352393pfs.102.1547735446408; 
- Thu, 17 Jan 2019 06:30:46 -0800 (PST)
-Received: from localhost ([2600:1700:e321:62f0:329c:23ff:fee3:9d7c])
- by smtp.gmail.com with ESMTPSA id s130sm2363225pgc.60.2019.01.17.06.30.44
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 17 Jan 2019 06:30:45 -0800 (PST)
-Date: Thu, 17 Jan 2019 06:30:44 -0800
-From: Guenter Roeck <linux@roeck-us.net>
-To: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
-Subject: Re: [PATCH] watchdog: qcom: Add suspend/resume support
-Message-ID: <20190117143044.GA30757@roeck-us.net>
-References: <20190117091555.2018-1-saiprakash.ranjan@codeaurora.org>
- <20190117093113.GA23389@basecamp>
- <91108b9b-fe05-1068-b07e-872cb4cd4012@codeaurora.org>
- <20190117112730.GA25198@basecamp>
- <b9f573ec-3787-2b05-52e3-60f11c061dd7@codeaurora.org>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc:content-transfer-encoding;
+ bh=zBP68msOjrFahT5eyfFbMaC5hk5eijUODNhs/NVuCbA=;
+ b=BXeLkJeXYMvFwOwtHyvt0A1jt8MXEnkb1esv0GXU5TtlqCr5f4dDwbcyFiaA36QlDr
+ gLp+VK9P6g3tt37YWOr9K7sr1nDJGTL9oWQfgrdZOahVEbF0Yc8YVfONKzGengypHhUs
+ 49wl9t0FxOFPow5+AO66F55WPp4alTnHpM03Pk4Ai6aDP4hN9mR6KDxWZazBkvOr1N6A
+ eahlqxJLTlgFOd7idwUQy1HGV/C7QStyzya4EgApi5NTLbhX1urep3a2NLqrsxNEuZ/k
+ Vw49qtYvYaHIZkSkzc/vMN2k5RKD9ZhrSOYKUkBM9HMQ2q+Z36bCppocO5w/zEzDgmYP
+ 5j4A==
+X-Gm-Message-State: AJcUukeddah/kNT/ViDDoxVebt3/gHoIogtHhpb0gf6rHVE05ZfK89mF
+ 2pQRMCnkv73WBZGhRFz+ZNaEDyx6+0nyaoxMEw606A==
+X-Google-Smtp-Source: ALg8bN4Rn8FoYt9A4zaNjmm87FzmLmrDHHRH60STLHqGG1BPNxW2vG7xJT78w6ACvmsqYSAO9NGsV1pLDU/LH+GWpoA=
+X-Received: by 2002:a02:650d:: with SMTP id u13mr8610481jab.136.1547735572921; 
+ Thu, 17 Jan 2019 06:32:52 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <b9f573ec-3787-2b05-52e3-60f11c061dd7@codeaurora.org>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+References: <20190111172134.30147-1-brgl@bgdev.pl>
+ <20190111172134.30147-2-brgl@bgdev.pl>
+ <250a521a-ba07-ba17-83d8-d9ad8f55a460@ti.com>
+In-Reply-To: <250a521a-ba07-ba17-83d8-d9ad8f55a460@ti.com>
+From: Bartosz Golaszewski <brgl@bgdev.pl>
+Date: Thu, 17 Jan 2019 15:32:42 +0100
+Message-ID: <CAMRc=MeA_AMvEikj9s03ikiFJwOi+4eri7Ba8ZxTwMogEJvdrA@mail.gmail.com>
+Subject: Re: [PATCH 01/17] ARM: dts: da850: fix interrupt numbers for
+ clocksource
+To: Sekhar Nori <nsekhar@ti.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_063047_500482_9F4ACD47 
-X-CRM114-Status: GOOD (  25.14  )
+X-CRM114-CacheID: sfid-20190117_063254_057909_3277D248 
+X-CRM114-Status: GOOD (  13.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,110 +93,34 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rajendra Nayak <rnayak@codeaurora.org>, linux-watchdog@vger.kernel.org,
- Stephen Boyd <sboyd@kernel.org>, linux-kernel@vger.kernel.org,
- Doug Anderson <dianders@chromium.org>,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- Sibi Sankar <sibis@codeaurora.org>, Vivek Gautam <vivek.gautam@codeaurora.org>,
- linux-arm-msm@vger.kernel.org, Guenter Roeck <groeck@chromium.org>,
- Wim Van Sebroeck <wim@linux-watchdog.org>,
- linux-arm-kernel@lists.infradead.org, Brian Masney <masneyb@onstation.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>, Kevin Hilman <khilman@kernel.org>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ stable <stable@vger.kernel.org>,
+ Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ Rob Herring <robh+dt@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 17, 2019 at 06:30:41PM +0530, Sai Prakash Ranjan wrote:
-> On 1/17/2019 4:57 PM, Brian Masney wrote:
-> >
-> >That attribute suppresses a warning from the compiler if the function is
-> >unused when PM_SLEEP is disabled.  I don't consider it hackish since the
-> >function name no longer appears outside the #ifdef. For example:
-> >
-> >	#ifdef CONFIG_PM_SLEEP
-> >	static int qcom_wdt_suspend(struct device *dev)
-> >	{
-> >		...
-> >	}
-> >	#endif /* CONFIG_PM_SLEEP */
-> >
-> >	static SIMPLE_DEV_PM_OPS(..., qcom_wdt_suspend, ...);
-> >
-> >SIMPLE_DEV_PM_OPS (actually SET_SYSTEM_SLEEP_PM_OP) includes the check
-> >for PM_SLEEP and its a noop if PM_SLEEP is disabled so this works.
-> >
-> >Now here's the code with __maybe_unused:
-> >
-> >	static int __maybe_unused qcom_wdt_suspend(struct device *dev)
-> >	{
-> >		...
-> >	}
-> >
-> >	static SIMPLE_DEV_PM_OPS(..., qcom_wdt_suspend, ...);
-> >
-> >This will still be a NOOP when power management is disabled, but have
-> >the benefit of increased compile-time test coverage in that situation.
-> >The symbols won't be included in the final executable. I personally
-> >think the code a is cleaner with __maybe_unused.
-> >
-> >This pattern is already in use across various subsystems in the kernel
-> >for suspend and resume functions:
-> >
-> >$ git grep __maybe_unused | egrep "_suspend|_resume"  | wc -l
-> >767
-> >
-> 
-> Thanks for the explanation Brian.
-> 
-> But I did see the maybe_unused attribute usage in other suspend and resume
-> functions before posting and decided to go with ifdef because
-> I think this attribute wastes CPU time by building and later discarding if
-> the function is unused (it may be negligible).
-> 
-Your argument is that the increased build time test coverage, the improved
-code readability, and the reduced risk of dependency errors are not worth
-the additional compile time. You might want to take that up with the upstream
-kernel community.
-
-> I did not understand the increased compile-time test coverage
-> you mentioned when PM_SLEEP=n because why would we need to compile
-> when the config is disabled? We could just discard it. We would just
-
-It is beneficial to know that a future change in the conditional code,
-or an infrastructure change affecting it, doesn't cause a build error,
-even if the person submitting the change didn't bother compiling with
-PM_SLEEP=y.
-
-> increase the build time with this attribute (although for this case it would
-> be negligible but say we compile with PM_SLEEP disabled for all those
-> suspend/resume functions with maybe_unused attribute).
-> 
-> Looking at previous discussions in LKML[1] as to why the pm suspend/resume
-> functions used __maybe_unused seemes to be because of
-> wrong ifdef usage. For ex: Using #ifdef CONFIG_PM instead of
-> #ifdef CONFIG_PM_SLEEP would result in a warning when
-> CONFIG_PM_SLEEP=n but CONFIG_PM=y.
-> 
-
-Do you realize that you are proving a point here, and that it isn't
-your point ?
-
-I personally very much prefer __maybe_unused over #ifdef, for the reasons
-stated above. Other maintainers may think differently.
-
-Guenter
-
-> Anyways, *I am OK with either of them*, after some more review on the
-> patch I can make the change in next version of the patch.
-> 
-> [1] https://lore.kernel.org/patchwork/patch/732981/
-> 
-> - Sai
-> -- 
-> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-> of Code Aurora Forum, hosted by The Linux Foundation
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Y3p3LiwgMTcgc3R5IDIwMTkgbyAxNToyMyBTZWtoYXIgTm9yaSA8bnNla2hhckB0aS5jb20+IG5h
+cGlzYcWCKGEpOgo+Cj4gT24gMTEvMDEvMTkgMTA6NTEgUE0sIEJhcnRvc3ogR29sYXN6ZXdza2kg
+d3JvdGU6Cj4gPiBGcm9tOiBCYXJ0b3N6IEdvbGFzemV3c2tpIDxiZ29sYXN6ZXdza2lAYmF5bGli
+cmUuY29tPgo+ID4KPiA+IFRoZSB0aW1lciBpbnRlcnJ1cHRzIHNwZWNpZmllZCBpbiBjb21taXQg
+MzY1MmUyNzQxZjQyICgiQVJNOiBkdHM6Cj4gPiBkYTg1MDogQWRkIGNsb2NrcyIpIGFyZSB3cm9u
+ZyBidXQgc2luY2UgdGhlIGN1cnJlbnQgdGltZXIgY29kZQo+ID4gaGFyZC1jb2RlcyB0aGVtLCB0
+aGUgYnVnIHdhcyBuZXZlciBzcG90dGVkLgo+ID4KPiA+IFRoaXMgcGF0Y2ggbXVzdCBnbyBpbnRv
+IHN0YWJsZSBzaW5jZSwgb25jZSB3ZSBpbnRyb2R1Y2UgYSBwcm9wZXIKPiA+IGNsb2Nrc291cmNl
+IGRyaXZlciwgZGV2aWNlcyB3aXRoIGJ1Z2d5IGRldmljZSB0cmVlIHdpbGwgc3RvcCBib290aW5n
+Lgo+Cj4gSXMgdGhpcyB0aGUgY2FzZSB3aGVyZSBzb21lb25lIHVzZXMgZGV2aWNlLXRyZWUgZnJv
+bSBhIHN0YWJsZSB0cmVlIGFuZAo+IGtlcm5lbCBmcm9tIGxhdGVzdCBtYWlubGluZT8KPgoKV2Vs
+bCwgaWYgc29tZW9uZSB3YW50cyB0byB1c2UgYW4gb2xkIGRldmljZSB0cmVlIGFuZCBhIG5ld2Vy
+IGtlcm5lbCwKdGhlbiBpdCdsbCBiZSBicm9rZW4gYW55d2F5LiBJZiB3ZSBnZXQgaXQgdG8gc3Rh
+YmxlIHRoZW4gYXQgbGVhc3QgdGhlCmZpeGVkIGRldmljZSB0cmVlIHdpbGwgd29yayBpbiB0aGUg
+ZnV0dXJlLiBUaGF0IHdhcyBteSByZWFzb25pbmcuCgpCYXJ0CgpfX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlz
+dApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJh
+ZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
