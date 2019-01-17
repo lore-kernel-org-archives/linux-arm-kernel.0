@@ -2,62 +2,78 @@ Return-Path: <SRS0=6Gta=PZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EA0EBC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 02:18:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CAEDFC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 02:46:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 91D1E20657
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 02:18:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9989F205C9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 02:46:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="h9YixATn"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 91D1E20657
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="petZdfmm";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=jms.id.au header.i=@jms.id.au header.b="ndMWNJb7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9989F205C9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=jms.id.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=bkYhB0L63ZzN11hqlEIVLbgGyLCGClplUgPCGvYDbDU=; b=h9Y
-	ixATnYtvU7UewZ1qigJaJV/W/VOgS15QM50yhXLTpWJU1R8vKVESrpyvffpace4syYpCEvSCZR6gi
-	svmInEHKrHhb9KhvyJq7NBhkcZ24cZTdWHeo6IMYTy0ovo5I7zWZLlopahWCgRHDHCL0+Tpc2KhFt
-	6kgAcQYKoSBW6p1rETdW6+w7hSq6y3mEJVb86gU2TFGyHPeTVoAx75srgYuYNU0fNWMQfftfeL56T
-	+vSR9BP3QmIF+My4hU3D3aze4IaEb8gUNbo0U1w9SKPsEjYISh/1h48JeGB1baYdQ4VlSBboQ2ge3
-	uFuAmaXCITMU2GNcC0p9N7fD98J0HFA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=W4IP3iEY/MmLFUcvVNWcASnXTwzcKq+OKgDstUQcsuY=; b=petZdfmmeWPsmT
+	2LUHvkyoPwj4+u5L1VAJY+xYxeusOsdbP8VkGrtP3RPP5+f1nXETzSBEwmVEAXJaQYsnqCJ2tnY/n
+	wvNI9Z8HTV3FBCj97gGvFz18NN+eNfp2wmCAJEpCyPdL+FR08YHA7Ad8Nof4CPZzcYAFnRHiClGTS
+	zHutTwqp9O8UVUAI9LlDSVxRtVq2GshD7Q1NDxSg6jaey36zaPm2ueBlEV6KGIXfQtNsywCkwbe7o
+	SK1fDp3c6P1JabelXtvGArSSZB7KibYyFhi64QlNAZxQMd8H3hZH+bChmbxyN9xmmqxjAL/d5hgcJ
+	jetUrxiAIIJrJSGq492A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjxGa-0007p0-Pg; Thu, 17 Jan 2019 02:18:48 +0000
-Received: from inva021.nxp.com ([92.121.34.21])
+	id 1gjxho-0008HJ-MS; Thu, 17 Jan 2019 02:46:56 +0000
+Received: from mail-qk1-x743.google.com ([2607:f8b0:4864:20::743])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjxFh-0006sn-VV
- for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 02:18:07 +0000
-Received: from inva021.nxp.com (localhost [127.0.0.1])
- by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 8CDB12001F4;
- Thu, 17 Jan 2019 03:17:50 +0100 (CET)
-Received: from invc005.ap-rdc01.nxp.com (invc005.ap-rdc01.nxp.com
- [165.114.16.14])
- by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 403012001EA;
- Thu, 17 Jan 2019 03:17:46 +0100 (CET)
-Received: from titan.ap.freescale.net (TITAN.ap.freescale.net [10.192.208.233])
- by invc005.ap-rdc01.nxp.com (Postfix) with ESMTP id 9F9BF402EE;
- Thu, 17 Jan 2019 10:17:40 +0800 (SGT)
-From: Peng Ma <peng.ma@nxp.com>
-To: shawnguo@kernel.org
-Subject: [v3] arm64: dts: lx2160a: add sata node support
-Date: Thu, 17 Jan 2019 02:12:24 +0000
-Message-Id: <20190117021224.19021-1-peng.ma@nxp.com>
-X-Mailer: git-send-email 2.14.1
-X-Virus-Scanned: ClamAV using ClamSMTP
+ id 1gjxhm-0008Gi-27
+ for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 02:46:55 +0000
+Received: by mail-qk1-x743.google.com with SMTP id o8so5137338qkk.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 16 Jan 2019 18:46:53 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=jms.id.au; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=B4j/WuweH0wMxL+RODpScBf2L4ITsa+/ZzunIai8Y/4=;
+ b=ndMWNJb7QvWxiFN6aMSNgjChjftJHxNGb2N5am20Zt7XOu4JU3cOpXldQSBFcxRaft
+ 3kDybIQBtpZONmus/afJeaEQI9SzC8nZ92FcyabaKSlvn4mPt411lr9giwyRi+2ep/EF
+ WnCM2PZqx/MobKE62RRhgqsT9EsPsNS9PQvG8=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=B4j/WuweH0wMxL+RODpScBf2L4ITsa+/ZzunIai8Y/4=;
+ b=eGgDpt2xoXoPC0En+kRJsWPWJnXgjUsK+To7dSnnLTW7wLY0SXFZFnsilttfAAaoe5
+ JpL3GIjqmBWmPR//Z8P7XholCMaLDI/ex27cwvrzl/Kft677sVFMSwzlftory86FEV+T
+ H5PQuQ5jvV5nB8dc98bIeJ51IuIuWM2fQbIOIaWz932QDjoP7akAXrP5RKivTuETOq3/
+ SpTDd+cVb+2fpan/UjyCY2nrceS8NSWnhFZBWoUEKIHIVTWNOrPyqjmrHK/1jEurAU7Y
+ ofxrYwDPmHEq+yb6WUvCzSgS1x+lo4xLRkY+vDQL0v6rBSdZXqXdKImzMw483f/GVt6k
+ f+nA==
+X-Gm-Message-State: AJcUukeVkqNK7xPMRiKAoqSDGkg5u+Gm16nhgbztA6dbrxaAbo+9C9aR
+ CPT+OwSUxWy5bYCKH+9M3ube/ieYpldbp3mgvNo=
+X-Google-Smtp-Source: ALg8bN4g6CHYobJ+o57LHwHQTioIoweDmYs1sEQbf7J1qINqKMWVyLA9iuNyxJeLx02SEqS/s3dBOJQ5a+0tigglcWI=
+X-Received: by 2002:a37:781:: with SMTP id 123mr9208486qkh.231.1547693212458; 
+ Wed, 16 Jan 2019 18:46:52 -0800 (PST)
+MIME-Version: 1.0
+References: <20181217200405.2904551-1-vijaykhemka@fb.com>
+In-Reply-To: <20181217200405.2904551-1-vijaykhemka@fb.com>
+From: Joel Stanley <joel@jms.id.au>
+Date: Thu, 17 Jan 2019 13:46:39 +1100
+Message-ID: <CACPK8XcbXso=13nRC3xM62RnWfEKnFcZpaBA4OAB7mad4mdGGg@mail.gmail.com>
+Subject: Re: [PATCH v2 1/4] ARM: dts: aspeed: Add sensors devices for Facebook
+To: Vijay Khemka <vijaykhemka@fb.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_181755_215485_ACDDEE57 
-X-CRM114-Status: UNSURE (   8.99  )
+X-CRM114-CacheID: sfid-20190116_184654_104392_46F594AE 
+X-CRM114-Status: UNSURE (   8.84  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -70,140 +86,29 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, andy.tang@nxp.com,
- Peng Ma <peng.ma@nxp.com>, linux-kernel@vger.kernel.org, leoyang.li@nxp.com,
- robh+dt@kernel.org, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>, linux-aspeed@lists.ozlabs.org,
+ Andrew Jeffery <andrew@aj.id.au>,
+ "openbmc @ lists . ozlabs . org" <openbmc@lists.ozlabs.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Rob Herring <robh+dt@kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add SATA device nodes for fsl-lx2160a and enable support
-for QDS and RDB boards.
+On Tue, 18 Dec 2018 at 07:04, Vijay Khemka <vijaykhemka@fb.com> wrote:
+>
+> Added ADC and other sensor devices in Facebook Tiogapass device tree.
+>
+> Signed-off-by: Vijay Khemka <vijaykhemka@fb.com>
 
-Signed-off-by: Peng Ma <peng.ma@nxp.com>
----
-changed for V3:
-	- updated the commit log 
+Applied to the aspeed tree for 5.1.
 
- arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts |   16 +++++++
- arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts |   16 +++++++
- arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi    |   44 +++++++++++++++++++++
- 3 files changed, 76 insertions(+), 0 deletions(-)
+Cheers,
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
-index 99a22ab..1a5acf6 100644
---- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
-@@ -95,6 +95,22 @@
- 	};
- };
- 
-+&sata0 {
-+	status = "okay";
-+};
-+
-+&sata1 {
-+	status = "okay";
-+};
-+
-+&sata2 {
-+	status = "okay";
-+};
-+
-+&sata3 {
-+	status = "okay";
-+};
-+
- &uart0 {
- 	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-index 6481e5f..5b6799e 100644
---- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-@@ -102,6 +102,22 @@
- 	};
- };
- 
-+&sata0 {
-+	status = "okay";
-+};
-+
-+&sata1 {
-+	status = "okay";
-+};
-+
-+&sata2 {
-+	status = "okay";
-+};
-+
-+&sata3 {
-+	status = "okay";
-+};
-+
- &uart0 {
- 	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
-index a79f5c1..592034b 100644
---- a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
-@@ -671,6 +671,50 @@
- 			status = "disabled";
- 		};
- 
-+		sata0: sata@3200000 {
-+			compatible = "fsl,lx2160a-ahci";
-+			reg = <0x0 0x3200000 0x0 0x10000>,
-+			      <0x7 0x100520 0x0 0x4>;
-+			reg-names = "ahci", "sata-ecc";
-+			interrupts = <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clockgen 4 3>;
-+			dma-coherent;
-+			status = "disabled";
-+		};
-+
-+		sata1: sata@3210000 {
-+			compatible = "fsl,lx2160a-ahci";
-+			reg = <0x0 0x3210000 0x0 0x10000>,
-+			      <0x7 0x100520 0x0 0x4>;
-+			reg-names = "ahci", "sata-ecc";
-+			interrupts = <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clockgen 4 3>;
-+			dma-coherent;
-+			status = "disabled";
-+		};
-+
-+		sata2: sata@3220000 {
-+			compatible = "fsl,lx2160a-ahci";
-+			reg = <0x0 0x3220000 0x0 0x10000>,
-+			      <0x7 0x100520 0x0 0x4>;
-+			reg-names = "ahci", "sata-ecc";
-+			interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clockgen 4 3>;
-+			dma-coherent;
-+			status = "disabled";
-+		};
-+
-+		sata3: sata@3230000 {
-+			compatible = "fsl,lx2160a-ahci";
-+			reg = <0x0 0x3230000 0x0 0x10000>,
-+			      <0x7 0x100520 0x0 0x4>;
-+			reg-names = "ahci", "sata-ecc";
-+			interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clockgen 4 3>;
-+			dma-coherent;
-+			status = "disabled";
-+		};
-+
- 		smmu: iommu@5000000 {
- 			compatible = "arm,mmu-500";
- 			reg = <0 0x5000000 0 0x800000>;
--- 
-1.7.1
-
+Joel
 
 _______________________________________________
 linux-arm-kernel mailing list
