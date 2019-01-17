@@ -7,17 +7,16 @@ X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5B819C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 21:05:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3D394C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 21:05:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2745A20859
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 21:05:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0CAC220851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 21:05:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K0MGx478";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="nDj6+Bo4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2745A20859
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bVKtSVmE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0CAC220851
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,54 +26,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=CHNKBAwnqa86A6HCdVVI5lNZHNQG/SXE7saYDQQI6hQ=; b=K0MGx478Foqv3Lwo5j89WJbDO8
-	dMcDKdExRrR4e4gWFMEJwKCiJvw88OV64Amfvc279RkrNxN8lg6so8y2EYec0BuHQaCtB4u4TVwew
-	rWtVbNU8hhzQk0LTDk1FmY0aqtyRZgFbiy/IJlqciKnyaDLNL264Qg2k52s8dzL9BvPVNSpEwtlcs
-	WE+DjhIFktEXw93ZEVA7NvatWlGKHH7qocJoChejoE9F1rN2ieoab8SYwpI2bN4/OBNWIqmIOTyFV
-	haragd+t4Mu4zO/+NL5OcIx+WstSxGEmKNnsEK479vTUAxGL02LdUsZqiX+OFCxZxVvdJAf5T2jYe
-	6iXVfMKQ==;
+	bh=2lcInDVU2pOSHoPY+AjcIT8dD0jb9b3XhFxvkQr3Tlw=; b=bVKtSVmEvlC2Vttmpxjus1w7vg
+	Qp+wgsGGAXVUjd0BfnS46z1FTOcxcX66yk8CWEQDSwR9jmE0w5xATnKgNiPHHLhtujE2glS8Uc19X
+	MftBAAWlq+88jy6yCEzXnJSIr6gqHxcpHf8iqfxa8YXMo9EebYEvQlIrbUmW5pwbk7tpnaI2KxzSZ
+	WKsQwX7oG+DFMBukAiC4Lfi0m3vkS4p7K2tmaVW07GOWrIPqUPvigaqvF4LbPBvx1m5oBzMj4XNQj
+	cx/wxtl2xJ0tbfzFiLwOKbdrxsUVgM6wPEn+ZMu1c7t70jA4nJFkvS4eTpHqOalojKLf/62GOy4iO
+	tI7n1olw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkEcp-0002hU-Ol; Thu, 17 Jan 2019 20:50:55 +0000
-Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkEcO-0001Wh-3u
- for linux-arm-kernel@bombadil.infradead.org; Thu, 17 Jan 2019 20:50:28 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=References:In-Reply-To:Message-Id:Date:
- Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=/YCWTeEyfO+hdjjXjIlRlHvj5/Bvv5tK6JvzqSOU2CI=; b=nDj6+Bo4kDDogDOiTY0k0BHiO
- Ablbi1sx8jeaR2OBlX5A1RnhYiEpd0VIID9N5jutzXl/XB9mf9OGz6f5RRwuv4GOD8IhR739KvThZ
- x4Ys99AEUEJVQbgSNbzDL53H6KxipTDtw1qjhUfHjXpRyILyfJxbza66UBfDnN/E87a8x5ToBa6TA
- 7PKSOdtqN7FadO5qOLgxqzodSiTMZ1xKO10chCsIq0QQxY/ttjMiS56P4eQ3ao9/DYjxCyXny28zs
- Ymtep6mZjPkILgOvVZ/eObIaTziPk/VI3lSGDoUl8PxG9yb72Wc0Xw9nhf8ebL29B5U6ejtfU9sKB
- 40ukAh8bw==;
-Received: from foss.arm.com ([217.140.101.70])
- by casper.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkENi-0006ny-A5
- for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 20:35:19 +0000
+	id 1gkEdg-0003Sk-Mf; Thu, 17 Jan 2019 20:51:48 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gkENK-0000A1-WA
+ for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 20:35:10 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 872C4169E;
- Thu, 17 Jan 2019 12:35:17 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A910A1650;
+ Thu, 17 Jan 2019 12:34:54 -0800 (PST)
 Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 8E3B93F819;
- Thu, 17 Jan 2019 12:35:15 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id DCED43F819;
+ Thu, 17 Jan 2019 12:34:52 -0800 (PST)
 From: Dave Martin <Dave.Martin@arm.com>
 To: kvmarm@lists.cs.columbia.edu
-Subject: [PATCH v4 23/25] KVM: arm64: Add a capabillity to advertise SVE
- support
-Date: Thu, 17 Jan 2019 20:33:37 +0000
-Message-Id: <1547757219-19439-24-git-send-email-Dave.Martin@arm.com>
+Subject: [PATCH v4 12/25] KVM: arm64: Support runtime sysreg filtering for
+ KVM_GET_REG_LIST
+Date: Thu, 17 Jan 2019 20:33:26 +0000
+Message-Id: <1547757219-19439-13-git-send-email-Dave.Martin@arm.com>
 X-Mailer: git-send-email 2.1.4
 In-Reply-To: <1547757219-19439-1-git-send-email-Dave.Martin@arm.com>
 References: <1547757219-19439-1-git-send-email-Dave.Martin@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_203518_498962_2B3CE2D0 
-X-CRM114-Status: GOOD (  11.05  )
+X-CRM114-CacheID: sfid-20190117_123455_580396_155FFBA0 
+X-CRM114-Status: GOOD (  16.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,61 +84,83 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-To provide a uniform way to check for KVM SVE support amongst other
-features, this patch adds a suitable capability KVM_CAP_ARM_SVE,
-and reports it as present when SVE is available.
+KVM_GET_REG_LIST should only enumerate registers that are actually
+accessible, so it is necessary to filter out any register that is
+not exposed to the guest.  For features that are configured at
+runtime, this will require a dynamic check.
+
+For example, ZCR_EL1 and ID_AA64ZFR0_EL1 would need to be hidden
+if SVE is not enabled for the guest.
+
+Special-casing walk_one_sys_reg() for specific registers will make
+the code unnecessarily messy, so this patch adds a new sysreg
+method check_present() that, if defined, indicates whether the
+sysreg should be enumerated.  If the guest runtime configuration
+may require a particular system register to be hidden,
+check_present should point to a function that returns true or false
+to enable or disable enumeration of that register respectively.
+
+Currently check_present() is not used for any other purpose, but it
+may be a useful foundation for abstracting other parts of the code
+to handle conditionally-present sysregs, if required.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/kvm/reset.c   | 8 ++++++++
- include/uapi/linux/kvm.h | 1 +
- 2 files changed, 9 insertions(+)
+ arch/arm64/kvm/sys_regs.c | 10 +++++++---
+ arch/arm64/kvm/sys_regs.h |  4 ++++
+ 2 files changed, 11 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 5ff2360..6e3482e 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -35,6 +35,7 @@
- #include <asm/kvm_asm.h>
- #include <asm/kvm_coproc.h>
- #include <asm/kvm_mmu.h>
-+#include <asm/virt.h>
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 71c5825..bca32d5 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -2447,7 +2447,8 @@ static bool copy_reg_to_user(const struct sys_reg_desc *reg, u64 __user **uind)
+ 	return true;
+ }
  
- /* Maximum phys_shift supported for any VM on this host */
- static u32 kvm_ipa_limit;
-@@ -93,6 +94,9 @@ int kvm_arch_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- 	case KVM_CAP_ARM_VM_IPA_SIZE:
- 		r = kvm_ipa_limit;
- 		break;
-+	case KVM_CAP_ARM_SVE:
-+		r = system_supports_sve();
-+		break;
- 	default:
- 		r = 0;
- 	}
-@@ -115,6 +119,10 @@ static int kvm_reset_sve(struct kvm_vcpu *vcpu)
- 	if (!system_supports_sve())
- 		return -EINVAL;
+-static int walk_one_sys_reg(const struct sys_reg_desc *rd,
++static int walk_one_sys_reg(const struct kvm_vcpu *vcpu,
++			    const struct sys_reg_desc *rd,
+ 			    u64 __user **uind,
+ 			    unsigned int *total)
+ {
+@@ -2458,6 +2459,9 @@ static int walk_one_sys_reg(const struct sys_reg_desc *rd,
+ 	if (!(rd->reg || rd->get_user))
+ 		return 0;
  
-+	/* Verify that KVM startup enforced this when SVE was detected: */
-+	if (WARN_ON(!has_vhe()))
-+		return -EINVAL;
++	if (rd->check_present && !rd->check_present(vcpu, rd))
++		return 0;
 +
- 	/* If resetting an already-configured vcpu, just zero the SVE regs: */
- 	if (vcpu->arch.sve_state) {
- 		size_t size = vcpu_sve_state_size(vcpu);
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index dc77a5a..4ea0d92 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -988,6 +988,7 @@ struct kvm_ppc_resize_hpt {
- #define KVM_CAP_ARM_VM_IPA_SIZE 165
- #define KVM_CAP_MANUAL_DIRTY_LOG_PROTECT 166
- #define KVM_CAP_HYPERV_CPUID 167
-+#define KVM_CAP_ARM_SVE 168
+ 	if (!copy_reg_to_user(rd, uind))
+ 		return -EFAULT;
  
- #ifdef KVM_CAP_IRQ_ROUTING
+@@ -2486,9 +2490,9 @@ static int walk_sys_regs(struct kvm_vcpu *vcpu, u64 __user *uind)
+ 		int cmp = cmp_sys_reg(i1, i2);
+ 		/* target-specific overrides generic entry. */
+ 		if (cmp <= 0)
+-			err = walk_one_sys_reg(i1, &uind, &total);
++			err = walk_one_sys_reg(vcpu, i1, &uind, &total);
+ 		else
+-			err = walk_one_sys_reg(i2, &uind, &total);
++			err = walk_one_sys_reg(vcpu, i2, &uind, &total);
  
+ 		if (err)
+ 			return err;
+diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
+index 174ffc0..472e8f1 100644
+--- a/arch/arm64/kvm/sys_regs.h
++++ b/arch/arm64/kvm/sys_regs.h
+@@ -69,6 +69,10 @@ struct sys_reg_desc {
+ 			const struct kvm_one_reg *reg, void __user *uaddr);
+ 	int (*set_user)(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+ 			const struct kvm_one_reg *reg, void __user *uaddr);
++
++	/* Return true iff the register exists; assume present if NULL */
++	bool (*check_present)(const struct kvm_vcpu *vcpu,
++			      const struct sys_reg_desc *rd);
+ };
+ 
+ static inline void print_sys_reg_instr(const struct sys_reg_params *p)
 -- 
 2.1.4
 
