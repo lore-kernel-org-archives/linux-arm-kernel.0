@@ -2,63 +2,67 @@ Return-Path: <SRS0=6Gta=PZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.9 required=3.0 tests=DATE_IN_PAST_06_12,
-	DKIMWL_WL_HIGH,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
+X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E4CD5C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 18:39:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D0662C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 18:40:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ADBB220851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 18:39:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8CE5B20851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 18:40:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OAMbPbsv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ADBB220851
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OSFVuTI8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8CE5B20851
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=upmem.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=btIjbXs+6x6nRtwIokGuIZSs3Q6mvkxHsHa6tiijKVY=; b=OAMbPbsvw8WazXWAEUYQygY5J
-	BiHSjtrp4yaVb8qjQv3PkQGRLCLmT4DF+W62tvk4k1nzo7LT0uA3Is1oNs2Tkt6dzD0gSOLlE9wVT
-	j2fTGVStvz2XQP6Y4slLB9AbS5zTkMNc0u2kUDoCaGT8obBLijrFwnWrmyCWD4UXjdAbHI0L9GygR
-	gNeXXpoGvT46VVXlnw+ZB+Kh6+vgFYkLpBvxYJWQyZaiVIsc/Kta5s84Mfjl9czj55UoVG+fLP9+W
-	o/PBRUVyERA+4jsPID5JoTgT0QrV4jYId2NUvQyzKLUv9RoSNzgVCD9jEsxJuAi3frLAtyf3rbTmP
-	UU2w3/j8w==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=EPwC9lSm9cYMhvo6pmAgLmGjl+iaZF56nnQEjvOIqjg=; b=OSF
+	VuTI83Q36XSRlHhzCMx11xTDiRUjfaOUunna0XT0JEQXQMWWyiCKi07oMimWQM0x6B1zrrzlrdfA1
+	ilcQ+Syp7ilNslFhzbTfHF4AoMpBVSGS/Wdn1XZqyYjxdVvoUZ//yheoz1H4ERB3xOPX8PAJvGQBB
+	ZY4IPxJb0wLjhIHnvcO8n6awKX5vwG2wTwxR05m75n6yS6oscjNVXA1fs6dyAfic2xKwWrZutf3Ux
+	/co1K9E4Yo1UKo4ORmFaV0coj+C0zFjAF5gTCKuuFRdC80PSV8SwpWxBrehA0/qgMhrSxZnmZidaE
+	e2YB8XtfaW+PLk9S+klJ2dwD99ly7Zw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkCZd-0000Wv-42; Thu, 17 Jan 2019 18:39:29 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkCZY-0000WV-7d
- for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 18:39:26 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 8E1AB20A85; Thu, 17 Jan 2019 19:39:22 +0100 (CET)
-Received: from localhost (unknown [212.81.177.10])
- by mail.bootlin.com (Postfix) with ESMTPSA id 3A97F20717;
- Thu, 17 Jan 2019 19:39:12 +0100 (CET)
-Date: Thu, 17 Jan 2019 12:33:40 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Priit Laes <plaes@plaes.org>
-Subject: Re: [linux-sunxi] Re: HDMI/DVI spurious failure
-Message-ID: <20190117113340.ydszal5c3nlrqr47@flea>
-References: <20190114132934.rywqqtjarbf6fgcr@plaes.org>
- <20190115094951.e7jnjpibj5tcp5pz@flea>
- <20190116075854.o2kme5nxq5kckwem@plaes.org>
- <20190116192442.qz4xi2ky6axgiyvg@flea>
- <20190116203516.s7pisy4miaclo63u@plaes.org>
-MIME-Version: 1.0
-In-Reply-To: <20190116203516.s7pisy4miaclo63u@plaes.org>
-User-Agent: NeoMutt/20180716
+	id 1gkCaS-00029H-Cq; Thu, 17 Jan 2019 18:40:20 +0000
+Received: from relay12.mail.gandi.net ([217.70.178.232])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gkCaN-00027n-Je; Thu, 17 Jan 2019 18:40:18 +0000
+Received: from alex.numericable.fr (127.19.86.79.rev.sfr.net [79.86.19.127])
+ (Authenticated sender: alex@ghiti.fr)
+ by relay12.mail.gandi.net (Postfix) with ESMTPSA id 580C1200008;
+ Thu, 17 Jan 2019 18:39:56 +0000 (UTC)
+From: Alexandre Ghiti <aghiti@upmem.com>
+To: Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ Paul Mackerras <paulus@samba.org>, Michael Ellerman <mpe@ellerman.id.au>,
+ Martin Schwidefsky <schwidefsky@de.ibm.com>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>,
+ Thomas Gleixner <tglx@linutronix.de>, Ingo Molnar <mingo@redhat.com>,
+ Borislav Petkov <bp@alien8.de>, "H . Peter Anvin" <hpa@zytor.com>,
+ x86@kernel.org, Alexander Viro <viro@zeniv.linux.org.uk>,
+ Mike Kravetz <mike.kravetz@oracle.com>,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
+ linuxppc-dev@lists.ozlabs.org, linux-s390@vger.kernel.org,
+ linux-fsdevel@vger.kernel.org, linux-mm@kvack.org
+Subject: [PATCH] hugetlb: allow to free gigantic pages regardless of the
+ configuration
+Date: Thu, 17 Jan 2019 18:39:53 +0000
+Message-Id: <20190117183953.5990-1-aghiti@upmem.com>
+X-Mailer: git-send-email 2.16.2
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_103924_547694_9C55C87C 
-X-CRM114-Status: GOOD (  25.12  )
+X-CRM114-CacheID: sfid-20190117_104015_955366_947D8799 
+X-CRM114-Status: GOOD (  18.15  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,126 +74,339 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org, linux-sunxi@googlegroups.com,
- Chen-Yu Tsai <wens@csie.org>, Jonathan Liu <net147@gmail.com>,
- dri-devel@lists.freedesktop.org
-Content-Type: multipart/mixed; boundary="===============0277985398309222821=="
+Cc: hch@infradead.org, linux-riscv@lists.infradead.org,
+ Alexandre Ghiti <alex@ghiti.fr>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+From: Alexandre Ghiti <alex@ghiti.fr>
 
---===============0277985398309222821==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="z7fpevo4jcnqrmxs"
-Content-Disposition: inline
+On systems without CMA or (MEMORY_ISOLATION && COMPACTION) activated but
+that support gigantic pages, boottime reserved gigantic pages can not be
+freed at all. This patchs simply enables the possibility to hand back
+those pages to memory allocator.
 
+This commit then renames gigantic_page_supported and
+ARCH_HAS_GIGANTIC_PAGE to make them more accurate. Indeed, those values
+being false does not mean that the system cannot use gigantic pages: it
+just means that runtime allocation of gigantic pages is not supported,
+one can still allocate boottime gigantic pages if the architecture supports
+it.
 
---z7fpevo4jcnqrmxs
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Signed-off-by: Alexandre Ghiti <alex@ghiti.fr>
+---
 
-On Wed, Jan 16, 2019 at 08:35:16PM +0000, Priit Laes wrote:
-> On Wed, Jan 16, 2019 at 08:24:42PM +0100, Maxime Ripard wrote:
-> > Hi Priit,
-> >=20
-> > On Wed, Jan 16, 2019 at 07:58:54AM +0000, Priit Laes wrote:
-> > > > On Mon, Jan 14, 2019 at 01:29:34PM +0000, Priit Laes wrote:
-> > > > > I have a somewhat curious case with one HDMI/DVI screen that fails
-> > > > > to initialize properly every 6-7 boots. The display itself is also
-> > > > > somewhat flawed (missing HPD pin and the VSYNC/HSYNC pulse width
-> > > > > is set to 0 in EDID), but I suspect there could be some issues
-> > > > > regarding timing in A20 HDMI driver in Linux.
-> > > > >=20
-> > > ...
-> > >=20
-> > > > It doesn't look related to the clock rate itself, since it doesn't
-> > > > change between the two cases. However, in one case the DDC clock is
-> > > > enabled and in the other it's disabled.
-> > > >=20
-> > > > Was it taken at the same time? Maybe you can try with that patch?
-> > > > http://code.bulix.org/z7jmkm-555344?raw
-> > >=20
-> > > Thanks, after doing ~50+ boots I haven't seen a single failure.
-> > >=20
-> > > Previously I had following failure cases which are now both fixed:
-> > >=20
-> > > a) Linux without u-boot HDMI, where one in every 6-7 boots failed.
-> > > b) u--boot with hdmi enabled switching to simplefb and then switching
-> > > to kms, where previously all boots ended up with garbled screen.
-> >=20
-> > So it's not really a fix, but it really looks like the clock is not
-> > enabled when it should.
-> >=20
-> > Can you describe your test scenario a bit more? What are you doing
-> > exactly, just booting? When do you start using the display? When did
-> > you capture the debugfs output that you pasted?
->=20
-> Display is already connected via HDMI to the board. I don't really
-> remove it, I just boot the device and let it start Xorg.
-> Meanwhile I just ssh into the device and capture debugfs output.
-> See my 3 testing scenarios below.
->=20
-> Kernel also includes one extra patch to fall back to DDC, in case HPD
-> fails. Mostly the same I already submitted last November [1].
+- Compiled on all architectures
+- Tested on riscv architecture
 
-Do you have the same issue without that patch?
+ arch/arm64/Kconfig                           |  2 +-
+ arch/arm64/include/asm/hugetlb.h             |  7 +++--
+ arch/powerpc/include/asm/book3s/64/hugetlb.h |  4 +--
+ arch/powerpc/platforms/Kconfig.cputype       |  2 +-
+ arch/s390/Kconfig                            |  2 +-
+ arch/s390/include/asm/hugetlb.h              |  7 +++--
+ arch/x86/Kconfig                             |  2 +-
+ arch/x86/include/asm/hugetlb.h               |  7 +++--
+ fs/Kconfig                                   |  2 +-
+ include/linux/gfp.h                          |  2 +-
+ mm/hugetlb.c                                 | 43 +++++++++++++++-------------
+ mm/page_alloc.c                              |  4 +--
+ 12 files changed, 48 insertions(+), 36 deletions(-)
 
-> For u-boot I have also some extra patches, to detect HPD-less HDMI
-> displays [2] + relax some EDID timing checks [3] so u-boot can actually
-> initialize my screen.
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index a4168d366127..18239cbd7fcd 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -18,7 +18,7 @@ config ARM64
+ 	select ARCH_HAS_FAST_MULTIPLIER
+ 	select ARCH_HAS_FORTIFY_SOURCE
+ 	select ARCH_HAS_GCOV_PROFILE_ALL
+-	select ARCH_HAS_GIGANTIC_PAGE if (MEMORY_ISOLATION && COMPACTION) || CMA
++	select ARCH_HAS_GIGANTIC_PAGE_RUNTIME_ALLOCATION if (MEMORY_ISOLATION && COMPACTION) || CMA
+ 	select ARCH_HAS_KCOV
+ 	select ARCH_HAS_MEMBARRIER_SYNC_CORE
+ 	select ARCH_HAS_PTE_SPECIAL
+diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
+index fb6609875455..797fc77eabcd 100644
+--- a/arch/arm64/include/asm/hugetlb.h
++++ b/arch/arm64/include/asm/hugetlb.h
+@@ -65,8 +65,11 @@ extern void set_huge_swap_pte_at(struct mm_struct *mm, unsigned long addr,
+ 
+ #include <asm-generic/hugetlb.h>
+ 
+-#ifdef CONFIG_ARCH_HAS_GIGANTIC_PAGE
+-static inline bool gigantic_page_supported(void) { return true; }
++#ifdef CONFIG_ARCH_HAS_GIGANTIC_PAGE_RUNTIME_ALLOCATION
++static inline bool gigantic_page_runtime_allocation_supported(void)
++{
++	return true;
++}
+ #endif
+ 
+ #endif /* __ASM_HUGETLB_H */
+diff --git a/arch/powerpc/include/asm/book3s/64/hugetlb.h b/arch/powerpc/include/asm/book3s/64/hugetlb.h
+index 5b0177733994..7711f0e2c7e5 100644
+--- a/arch/powerpc/include/asm/book3s/64/hugetlb.h
++++ b/arch/powerpc/include/asm/book3s/64/hugetlb.h
+@@ -32,8 +32,8 @@ static inline int hstate_get_psize(struct hstate *hstate)
+ 	}
+ }
+ 
+-#ifdef CONFIG_ARCH_HAS_GIGANTIC_PAGE
+-static inline bool gigantic_page_supported(void)
++#ifdef CONFIG_ARCH_HAS_GIGANTIC_PAGE_RUNTIME_ALLOCATION
++static inline bool gigantic_page_runtime_allocation_supported(void)
+ {
+ 	return true;
+ }
+diff --git a/arch/powerpc/platforms/Kconfig.cputype b/arch/powerpc/platforms/Kconfig.cputype
+index 8c7464c3f27f..779e06bac697 100644
+--- a/arch/powerpc/platforms/Kconfig.cputype
++++ b/arch/powerpc/platforms/Kconfig.cputype
+@@ -319,7 +319,7 @@ config ARCH_ENABLE_SPLIT_PMD_PTLOCK
+ config PPC_RADIX_MMU
+ 	bool "Radix MMU Support"
+ 	depends on PPC_BOOK3S_64
+-	select ARCH_HAS_GIGANTIC_PAGE if (MEMORY_ISOLATION && COMPACTION) || CMA
++	select ARCH_HAS_GIGANTIC_PAGE_RUNTIME_ALLOCATION if (MEMORY_ISOLATION && COMPACTION) || CMA
+ 	default y
+ 	help
+ 	  Enable support for the Power ISA 3.0 Radix style MMU. Currently this
+diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
+index ed554b09eb3f..6776eef6a9ae 100644
+--- a/arch/s390/Kconfig
++++ b/arch/s390/Kconfig
+@@ -69,7 +69,7 @@ config S390
+ 	select ARCH_HAS_ELF_RANDOMIZE
+ 	select ARCH_HAS_FORTIFY_SOURCE
+ 	select ARCH_HAS_GCOV_PROFILE_ALL
+-	select ARCH_HAS_GIGANTIC_PAGE if (MEMORY_ISOLATION && COMPACTION) || CMA
++	select ARCH_HAS_GIGANTIC_PAGE_RUNTIME_ALLOCATION if (MEMORY_ISOLATION && COMPACTION) || CMA
+ 	select ARCH_HAS_KCOV
+ 	select ARCH_HAS_PTE_SPECIAL
+ 	select ARCH_HAS_SET_MEMORY
+diff --git a/arch/s390/include/asm/hugetlb.h b/arch/s390/include/asm/hugetlb.h
+index 2d1afa58a4b6..57c952f5388e 100644
+--- a/arch/s390/include/asm/hugetlb.h
++++ b/arch/s390/include/asm/hugetlb.h
+@@ -116,7 +116,10 @@ static inline pte_t huge_pte_modify(pte_t pte, pgprot_t newprot)
+ 	return pte_modify(pte, newprot);
+ }
+ 
+-#ifdef CONFIG_ARCH_HAS_GIGANTIC_PAGE
+-static inline bool gigantic_page_supported(void) { return true; }
++#ifdef CONFIG_ARCH_HAS_GIGANTIC_PAGE_RUNTIME_ALLOCATION
++static inline bool gigantic_page_runtime_allocation_supported(void)
++{
++	return true;
++}
+ #endif
+ #endif /* _ASM_S390_HUGETLB_H */
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 6185d4f33296..a88f5a4311c9 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -23,7 +23,7 @@ config X86_64
+ 	def_bool y
+ 	depends on 64BIT
+ 	# Options that are inherently 64-bit kernel only:
+-	select ARCH_HAS_GIGANTIC_PAGE if (MEMORY_ISOLATION && COMPACTION) || CMA
++	select ARCH_HAS_GIGANTIC_PAGE_RUNTIME_ALLOCATION if (MEMORY_ISOLATION && COMPACTION) || CMA
+ 	select ARCH_SUPPORTS_INT128
+ 	select ARCH_USE_CMPXCHG_LOCKREF
+ 	select HAVE_ARCH_SOFT_DIRTY
+diff --git a/arch/x86/include/asm/hugetlb.h b/arch/x86/include/asm/hugetlb.h
+index 7469d321f072..5a5e7119ced4 100644
+--- a/arch/x86/include/asm/hugetlb.h
++++ b/arch/x86/include/asm/hugetlb.h
+@@ -17,8 +17,11 @@ static inline void arch_clear_hugepage_flags(struct page *page)
+ {
+ }
+ 
+-#ifdef CONFIG_ARCH_HAS_GIGANTIC_PAGE
+-static inline bool gigantic_page_supported(void) { return true; }
++#ifdef CONFIG_ARCH_HAS_GIGANTIC_PAGE_RUNTIME_ALLOCATION
++static inline bool gigantic_page_runtime_allocation_supported(void)
++{
++	return true;
++}
+ #endif
+ 
+ #endif /* _ASM_X86_HUGETLB_H */
+diff --git a/fs/Kconfig b/fs/Kconfig
+index ac474a61be37..4192d1fde0f0 100644
+--- a/fs/Kconfig
++++ b/fs/Kconfig
+@@ -207,7 +207,7 @@ config HUGETLB_PAGE
+ config MEMFD_CREATE
+ 	def_bool TMPFS || HUGETLBFS
+ 
+-config ARCH_HAS_GIGANTIC_PAGE
++config ARCH_HAS_GIGANTIC_PAGE_RUNTIME_ALLOCATION
+ 	bool
+ 
+ source "fs/configfs/Kconfig"
+diff --git a/include/linux/gfp.h b/include/linux/gfp.h
+index 5f5e25fd6149..79ff86fabd42 100644
+--- a/include/linux/gfp.h
++++ b/include/linux/gfp.h
+@@ -589,8 +589,8 @@ static inline bool pm_suspended_storage(void)
+ /* The below functions must be run on a range from a single zone. */
+ extern int alloc_contig_range(unsigned long start, unsigned long end,
+ 			      unsigned migratetype, gfp_t gfp_mask);
+-extern void free_contig_range(unsigned long pfn, unsigned nr_pages);
+ #endif
++extern void free_contig_range(unsigned long pfn, unsigned int nr_pages);
+ 
+ #ifdef CONFIG_CMA
+ /* CMA stuff */
+diff --git a/mm/hugetlb.c b/mm/hugetlb.c
+index 745088810965..9893ba26b3b8 100644
+--- a/mm/hugetlb.c
++++ b/mm/hugetlb.c
+@@ -1035,7 +1035,6 @@ static int hstate_next_node_to_free(struct hstate *h, nodemask_t *nodes_allowed)
+ 		((node = hstate_next_node_to_free(hs, mask)) || 1);	\
+ 		nr_nodes--)
+ 
+-#ifdef CONFIG_ARCH_HAS_GIGANTIC_PAGE
+ static void destroy_compound_gigantic_page(struct page *page,
+ 					unsigned int order)
+ {
+@@ -1058,6 +1057,7 @@ static void free_gigantic_page(struct page *page, unsigned int order)
+ 	free_contig_range(page_to_pfn(page), 1 << order);
+ }
+ 
++#ifdef CONFIG_ARCH_HAS_GIGANTIC_PAGE_RUNTIME_ALLOCATION
+ static int __alloc_gigantic_page(unsigned long start_pfn,
+ 				unsigned long nr_pages, gfp_t gfp_mask)
+ {
+@@ -1143,22 +1143,19 @@ static struct page *alloc_gigantic_page(struct hstate *h, gfp_t gfp_mask,
+ static void prep_new_huge_page(struct hstate *h, struct page *page, int nid);
+ static void prep_compound_gigantic_page(struct page *page, unsigned int order);
+ 
+-#else /* !CONFIG_ARCH_HAS_GIGANTIC_PAGE */
+-static inline bool gigantic_page_supported(void) { return false; }
++#else /* !CONFIG_ARCH_HAS_GIGANTIC_PAGE_RUNTIME_ALLOCATION */
++static inline bool gigantic_page_runtime_allocation_supported(void)
++{
++	return false;
++}
+ static struct page *alloc_gigantic_page(struct hstate *h, gfp_t gfp_mask,
+ 		int nid, nodemask_t *nodemask) { return NULL; }
+-static inline void free_gigantic_page(struct page *page, unsigned int order) { }
+-static inline void destroy_compound_gigantic_page(struct page *page,
+-						unsigned int order) { }
+ #endif
+ 
+ static void update_and_free_page(struct hstate *h, struct page *page)
+ {
+ 	int i;
+ 
+-	if (hstate_is_gigantic(h) && !gigantic_page_supported())
+-		return;
+-
+ 	h->nr_huge_pages--;
+ 	h->nr_huge_pages_node[page_to_nid(page)]--;
+ 	for (i = 0; i < pages_per_huge_page(h); i++) {
+@@ -2276,13 +2273,20 @@ static int adjust_pool_surplus(struct hstate *h, nodemask_t *nodes_allowed,
+ }
+ 
+ #define persistent_huge_pages(h) (h->nr_huge_pages - h->surplus_huge_pages)
+-static unsigned long set_max_huge_pages(struct hstate *h, unsigned long count,
++static int set_max_huge_pages(struct hstate *h, unsigned long count,
+ 						nodemask_t *nodes_allowed)
+ {
+ 	unsigned long min_count, ret;
+ 
+-	if (hstate_is_gigantic(h) && !gigantic_page_supported())
+-		return h->max_huge_pages;
++	if (hstate_is_gigantic(h) &&
++		!gigantic_page_runtime_allocation_supported()) {
++		spin_lock(&hugetlb_lock);
++		if (count > persistent_huge_pages(h)) {
++			spin_unlock(&hugetlb_lock);
++			return -EINVAL;
++		}
++		goto decrease_pool;
++	}
+ 
+ 	/*
+ 	 * Increase the pool size
+@@ -2322,6 +2326,7 @@ static unsigned long set_max_huge_pages(struct hstate *h, unsigned long count,
+ 			goto out;
+ 	}
+ 
++decrease_pool:
+ 	/*
+ 	 * Decrease the pool size
+ 	 * First return free pages to the buddy allocator (being careful
+@@ -2350,9 +2355,10 @@ static unsigned long set_max_huge_pages(struct hstate *h, unsigned long count,
+ 			break;
+ 	}
+ out:
+-	ret = persistent_huge_pages(h);
++	h->max_huge_pages = persistent_huge_pages(h);
+ 	spin_unlock(&hugetlb_lock);
+-	return ret;
++
++	return 0;
+ }
+ 
+ #define HSTATE_ATTR_RO(_name) \
+@@ -2404,11 +2410,6 @@ static ssize_t __nr_hugepages_store_common(bool obey_mempolicy,
+ 	int err;
+ 	NODEMASK_ALLOC(nodemask_t, nodes_allowed, GFP_KERNEL | __GFP_NORETRY);
+ 
+-	if (hstate_is_gigantic(h) && !gigantic_page_supported()) {
+-		err = -EINVAL;
+-		goto out;
+-	}
+-
+ 	if (nid == NUMA_NO_NODE) {
+ 		/*
+ 		 * global hstate attribute
+@@ -2428,7 +2429,9 @@ static ssize_t __nr_hugepages_store_common(bool obey_mempolicy,
+ 	} else
+ 		nodes_allowed = &node_states[N_MEMORY];
+ 
+-	h->max_huge_pages = set_max_huge_pages(h, count, nodes_allowed);
++	err = set_max_huge_pages(h, count, nodes_allowed);
++	if (err)
++		goto out;
+ 
+ 	if (nodes_allowed != &node_states[N_MEMORY])
+ 		NODEMASK_FREE(nodes_allowed);
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index cde5dac6229a..81b931db85a1 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -8241,8 +8241,9 @@ int alloc_contig_range(unsigned long start, unsigned long end,
+ 				pfn_max_align_up(end), migratetype);
+ 	return ret;
+ }
++#endif
+ 
+-void free_contig_range(unsigned long pfn, unsigned nr_pages)
++void free_contig_range(unsigned long pfn, unsigned int nr_pages)
+ {
+ 	unsigned int count = 0;
+ 
+@@ -8254,7 +8255,6 @@ void free_contig_range(unsigned long pfn, unsigned nr_pages)
+ 	}
+ 	WARN(count != 0, "%d pages are still in use!\n", count);
+ }
+-#endif
+ 
+ #ifdef CONFIG_MEMORY_HOTPLUG
+ /*
+-- 
+2.16.2
 
-Do you have the same issues without those patches?
-
-> So first configuration with 100% failures:
-> 1) u-boot initializes HDMI ( A20-OLinuXino-Lime2-eMMC_defconfig )
-> 2) Linux switches to simplefb
-> ... somewhere around here blinking cursor is replaced with garbage
-> on screen=20
-> 3) Linux switches to kms
-> 4) Xorg starts
->=20
-> Second scenario with failure every 6-7 boots:
-> 1) Disabled HDMI in u-boot for my board
-> 2) Linux sets up kms (sometimes fails here)
-> 3) Xorg starts
-> 4) ssh to machine and take the clock dump
-
-Do you have the DRM fbdev emulation enabled in that case or is Xorg
-the first to setup the kms driver? Do you have some logs and a
-configuration?
-
-Maxime
-
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
-
---z7fpevo4jcnqrmxs
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXEBoFAAKCRDj7w1vZxhR
-xcEqAP9tLEyots8XmcR9FUaKs8sWpv4r/K5KHR8X07/mi/ocrAD9FlUmq6JLGP2G
-c4w+aSexRL82eURQjwQvfMr7pgPJrgI=
-=71gA
------END PGP SIGNATURE-----
-
---z7fpevo4jcnqrmxs--
-
-
---===============0277985398309222821==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============0277985398309222821==--
-
