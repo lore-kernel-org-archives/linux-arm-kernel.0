@@ -2,84 +2,59 @@ Return-Path: <SRS0=6Gta=PZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CE0C4C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 09:42:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A2370C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 09:56:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9AFFE2054F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 09:42:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 710EB20855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 09:56:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t/rzgTJl";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="ZWgtlMpw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9AFFE2054F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EUc/Wtfp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 710EB20855
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ellerman.id.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
+	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6IcDmPRguL9HQdD8ymxGFC5sozBHqu8C0INYkBgCLjU=; b=t/rzgTJl8x3Ls2
-	mSuETdzWdGBSS5qNBok45CivHlkl4LQPwn43aI2BZFoe1bg5n65nJUWydWJPowI8p/VQfotC04UoF
-	cARvyXS47c8K5Fr9DpEkjNNimQ0TuwnZYFGhw7mcAGe6oyGWFs6SALQeS8QA9BuFAxYJG9gOEdaMN
-	yuPsGI9tWQAZrbY7llw67q9TZ3SwxWZOC7I107gzgvrQfq7a7AsUu1PzUXivNQIhP2HpEo+I0ggTC
-	yzNxXmyFzyqSfVIvAg5seo+3F+CMgFv0y719G1ubrd8EkY4F+ZsZ+IPy+BuGhTE00ot8fVZtaOGzy
-	xhOasktJoeChdJMPwI2g==;
+	List-Owner; bh=QnOPTNqRXTzd3A3lwSNjCaM5LDaasRf0vu+pe7i8QkM=; b=EUc/Wtfp/1jDqe
+	LqjOAcOVLFboK4teFZia28p0X5HO1QvEbIqlpcLMmcO0YvfAxXk+QKmwZGDD9HDUQZIXcsIDEu1zw
+	AcdVczVUmmUmWkFUDYqlru9Qh+D2bBr0v6x3WSFpdH2U4t57yM8HrbM1PGUUrjgl0eOujpcS+HWcF
+	+T+NYW15XF6R7HiYhkCCOKb8OfRzi9B2CsxZHWFeFhulkKKwzYAbAei7DA+1dba2hLeZUr32AOoiw
+	8q88m6jW57Nov0kojOnPULUl/anrk5m5kmeyxvf9rMVz1G5GhYgTXMGa+1A/PjZ1abceUOVMRcMTf
+	nSX80l/peAntNtAh6l9w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gk4Bo-0005p5-5c; Thu, 17 Jan 2019 09:42:20 +0000
-Received: from fllv0015.ext.ti.com ([198.47.19.141])
+	id 1gk4Po-00036F-Vn; Thu, 17 Jan 2019 09:56:48 +0000
+Received: from ozlabs.org ([2401:3900:2:1::2])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gk4BM-0005Mr-U5
- for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 09:41:57 +0000
-Received: from fllv0035.itg.ti.com ([10.64.41.0])
- by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0H9fj4L065500;
- Thu, 17 Jan 2019 03:41:45 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1547718105;
- bh=7uh7qwRiIROTU6HHFhauwCwwz5zVjtyMcOELZdgUxzg=;
- h=From:To:CC:Subject:Date:In-Reply-To:References;
- b=ZWgtlMpwQ64AZtN0CF5QamZZXt3uu3/2DPO4fHJHaHf5PVcHf6GNDVFf/FeUoYJ/V
- zbo/FnSlcI11gU/UQQHxwKDVzMAfLeXUe0LphuKRaHNbj0fxVAhKLwOjpb7wkfPLvv
- aR3n5XyST+9b7A5hWBBZydI0oPYiZmfg/4KiJdKs=
-Received: from DLEE105.ent.ti.com (dlee105.ent.ti.com [157.170.170.35])
- by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0H9fjYf042252
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Thu, 17 Jan 2019 03:41:45 -0600
-Received: from DLEE110.ent.ti.com (157.170.170.21) by DLEE105.ent.ti.com
- (157.170.170.35) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 17
- Jan 2019 03:41:45 -0600
-Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE110.ent.ti.com
- (157.170.170.21) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Thu, 17 Jan 2019 03:41:45 -0600
-Received: from a0230074-OptiPlex-7010.india.ti.com (ileax41-snat.itg.ti.com
- [10.172.224.153])
- by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0H9fdIk016863;
- Thu, 17 Jan 2019 03:41:43 -0600
-From: Faiz Abbas <faiz_abbas@ti.com>
-To: <linux-kernel@vger.kernel.org>, <devicetree@vger.kernel.org>,
- <linux-arm-kernel@lists.infradead.org>
-Subject: [PATCH v3 1/2] arm64: dts: ti: k3-am654: Add Support for eMMC host
- controller
-Date: Thu, 17 Jan 2019 15:14:23 +0530
-Message-ID: <20190117094424.7683-2-faiz_abbas@ti.com>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20190117094424.7683-1-faiz_abbas@ti.com>
-References: <20190117094424.7683-1-faiz_abbas@ti.com>
+ id 1gk4Pl-00035E-6O; Thu, 17 Jan 2019 09:56:46 +0000
+Received: from authenticated.ozlabs.org (localhost [127.0.0.1])
+ (using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
+ key-exchange ECDHE (P-256) server-signature RSA-PSS (2048 bits) server-digest
+ SHA256) (No client certificate requested)
+ by ozlabs.org (Postfix) with ESMTPSA id 43gKGp5Rwwz9sBn;
+ Thu, 17 Jan 2019 20:56:34 +1100 (AEDT)
+From: Michael Ellerman <mpe@ellerman.id.au>
+To: Matthew Wilcox <willy@infradead.org>, Michal Hocko <mhocko@kernel.org>
+Subject: Re: [PATCH V2] mm: Introduce GFP_PGTABLE
+In-Reply-To: <20190116123018.GF6310@bombadil.infradead.org>
+References: <1547619692-7946-1-git-send-email-anshuman.khandual@arm.com>
+ <20190116065703.GE24149@dhcp22.suse.cz>
+ <20190116123018.GF6310@bombadil.infradead.org>
+Date: Thu, 17 Jan 2019 20:56:34 +1100
+Message-ID: <87tvi74nfx.fsf@concordia.ellerman.id.au>
 MIME-Version: 1.0
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_014153_575714_D435DAE4 
-X-CRM114-Status: GOOD (  13.81  )
+X-CRM114-CacheID: sfid-20190117_015645_464933_74FE764D 
+X-CRM114-Status: GOOD (  10.93  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,51 +66,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, nm@ti.com, robh+dt@kernel.org, t-kristo@ti.com,
- faiz_abbas@ti.com
+Cc: mark.rutland@arm.com, linux-sh@vger.kernel.org, peterz@infradead.org,
+ catalin.marinas@arm.com, dave.hansen@linux.intel.com, will.deacon@arm.com,
+ christoffer.dall@arm.com, linux-mm@kvack.org, linux-riscv@lists.infradead.org,
+ kvmarm@lists.cs.columbia.edu, aneesh.kumar@linux.ibm.com,
+ greentime@andestech.com, linux@armlinux.org.uk, mingo@redhat.com,
+ vbabka@suse.cz, rientjes@google.com, palmer@sifive.com,
+ Anshuman Khandual <anshuman.khandual@arm.com>, marc.zyngier@arm.com,
+ rppt@linux.vnet.ibm.com, shakeelb@google.com, kirill@shutemov.name,
+ tglx@linutronix.de, linux-arm-kernel@lists.infradead.org,
+ ard.biesheuvel@linaro.org, robin.murphy@arm.com, steve.capper@arm.com,
+ linux-kernel@vger.kernel.org, james.morse@arm.com, akpm@linux-foundation.org,
+ linuxppc-dev@lists.ozlabs.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add support for the Secure Digital Host Controller Interface (SDHCI)
-present on TI's AM654 SOCs. It is compatible with eMMC5.1 Host
-Specifications.
+Matthew Wilcox <willy@infradead.org> writes:
 
-Enable only upto HS200 speed mode.
+> On Wed, Jan 16, 2019 at 07:57:03AM +0100, Michal Hocko wrote:
+>> On Wed 16-01-19 11:51:32, Anshuman Khandual wrote:
+>> > All architectures have been defining their own PGALLOC_GFP as (GFP_KERNEL |
+>> > __GFP_ZERO) and using it for allocating page table pages. This causes some
+>> > code duplication which can be easily avoided. GFP_KERNEL allocated and
+>> > cleared out pages (__GFP_ZERO) are required for page tables on any given
+>> > architecture. This creates a new generic GFP flag flag which can be used
+>> > for any page table page allocation. Does not cause any functional change.
+>> > 
+>> > GFP_PGTABLE is being added into include/asm-generic/pgtable.h which is the
+>> > generic page tabe header just to prevent it's potential misuse as a general
+>> > allocation flag if included in include/linux/gfp.h.
+>> 
+>> I haven't reviewed the patch yet but I am wondering whether this is
+>> really worth it without going all the way down to unify the common code
+>> and remove much more code duplication. Or is this not possible for some
+>> reason?
+>
+> Exactly what I suggested doing in response to v1.
+>
+> Also, the approach taken here is crazy.  x86 has a feature that no other
+> architecture has bothered to implement yet -- accounting page tables
+> to the process.
 
-Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
-Acked-by: Nishanth Menon <nm@ti.com>
----
- arch/arm64/boot/dts/ti/k3-am65-main.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+powerpc does __GFP_ACCOUNT for user page tables too. Shamelessly cribbed
+from the x86 version of course :)
 
-diff --git a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
-index 272cf8fc8d30..9338315b0ca9 100644
---- a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
-+++ b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
-@@ -191,4 +191,18 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 	};
-+
-+	sdhci0: sdhci@4f80000 {
-+		compatible = "ti,am654-sdhci-5.1";
-+		reg = <0x0 0x4f80000 0x0 0x260>, <0x0 0x4f90000 0x0 0x134>;
-+		power-domains = <&k3_pds 47>;
-+		clocks = <&k3_clks 47 0>, <&k3_clks 47 1>;
-+		clock-names = "clk_ahb", "clk_xin";
-+		interrupts = <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>;
-+		mmc-ddr-1_8v;
-+		mmc-hs200-1_8v;
-+		ti,otap-del-sel = <0x2>;
-+		ti,trm-icp = <0x8>;
-+		dma-coherent;
-+	};
- };
--- 
-2.19.2
-
+cheers
 
 _______________________________________________
 linux-arm-kernel mailing list
