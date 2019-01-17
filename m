@@ -2,69 +2,88 @@ Return-Path: <SRS0=6Gta=PZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B748DC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 13:54:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 510BFC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 14:01:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 842A020851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 13:54:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1DBB620652
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 14:01:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZCixAP6k";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="dJKwaopu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 842A020851
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U1mm6AAi";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="dZ+roU8x"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1DBB620652
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=FjXFaUgLm9YWra+ZKFalNX8oymLdGhyUwSl98q1e8hg=; b=ZCixAP6kSCHYzc
-	HG6QaTuOwqQx24zKVI5B6KzDgJXD9Zx9wT2g8lc3gdFi4eucn6JKJ7940z22G9uE+yH8X0VW/edL4
-	jhpcioyI+aSPN9C/PPUFI2+GLAOA+eXwoiiRiZzQXJA6NEerXFdT1tsE0JzyCSNWgmvxhh878DqDF
-	q9MUZjFxHx9T5b52pS+8gliDLxTRXVYdKsShmBcE7dWigN7sD9byHTfNXC/hm/BgpsXWcYsRJLefD
-	Sd3Vb+wQdjbr36sSL3vIAfinEDVD2IBPhoGkOxXHi8FT5RuIvGGCIaaAlxqUT87ouTeg+J4bu5Pph
-	eairD4fxeblQu+GM8MSw==;
+	List-Owner; bh=SPg4LW7klxGfzd67JjrmUXNfnuOu85HBNwSpRXMXTdU=; b=U1mm6AAiVJhoXO
+	QmRh9jZbO2S8ExcBAQMYv2Eo6Q0KOp2NgUNXm8/+HDjdwmevgOayq7I4Ah2rxc3OnjThEACpzSm3A
+	p6Jy2O2UZ796hOpC5+VMEpy7sbLuQ7lvrp5urYn5ePXw1jbzq1WCdQIX6iqk1bLQCl0L0bo3DoWjP
+	ssslrNMHUllng7kwHgHv5UXSO/e9Ty5xmXQPeVhwtxMDbRB6XYJhgeLZW8bvnVaV2WModuN7K0vGX
+	TTSWASqqZqaONN3BN6tv90jS25SO3rXUhOrtDCxrpoPUJ14Wk4rp7npZ5XAFKr2qvEK8dmi1Gjd4I
+	W6OdZWW7UJGlRbms642Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gk87n-000607-7E; Thu, 17 Jan 2019 13:54:27 +0000
-Received: from kirsty.vergenet.net ([202.4.237.240])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gk87W-0005pl-Cr
- for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 13:54:19 +0000
-Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
- by kirsty.vergenet.net (Postfix) with ESMTPA id D85FD25BE43;
- Fri, 18 Jan 2019 00:54:08 +1100 (AEDT)
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1547733249; bh=bP3VzhZ4PpSngfoXO4nJmAPFCEe1Y2PfKPHnxOw/n8o=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=dJKwaopu2d19LpqMQDeJ+dAawG+jee5bzyNNfSwkJU9XMzbJGyW6MBVTTd3CeSiHY
- Wdp8E2f4gPFGBRXbgtQRBrka194GR2LCawoOWKMnFMjZERMrAETJCLBMxNiPpww0qe
- oqQnb7uxaRkah8fF5GSo+mz7SV4vI6HVcssGB1pk=
-Received: by reginn.horms.nl (Postfix, from userid 7100)
- id CE7A8940459; Thu, 17 Jan 2019 14:54:06 +0100 (CET)
-Date: Thu, 17 Jan 2019 14:54:06 +0100
-From: Simon Horman <horms@verge.net.au>
-To: linux-renesas-soc@vger.kernel.org
-Subject: Re: [PATCH] arm64: dts: renesas: r8a77990: ebisu: Enable HS400 of
- SDHI3
-Message-ID: <20190117135406.kw2djf5iunq2ju25@verge.net.au>
-References: <20190110142833.31577-1-horms+renesas@verge.net.au>
+	id 1gk8EO-0000hJ-HD; Thu, 17 Jan 2019 14:01:16 +0000
+Received: from mail-io1-xd41.google.com ([2607:f8b0:4864:20::d41])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gk8EL-0000gM-VM
+ for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 14:01:15 +0000
+Received: by mail-io1-xd41.google.com with SMTP id k7so7876204iob.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 17 Jan 2019 06:01:13 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc:content-transfer-encoding;
+ bh=IotE6xnVPx1DKYX/Wn7ErENMX7pC9eU2NgmLk8rr0Hs=;
+ b=dZ+roU8xfnsZFe3FAcyuftQ1wvpwZEDpeLW8czFlQoeLO9XMhHYR91mZQ6v88E7yh1
+ IW+Cxa7UrIxxPuJCuqrPZRaWxTtxJbbNUX6O3jHgMltOkj33hJ6Kc9LtaEjaM8zzRAb0
+ vJgNw+gcNX8Mj5ZQlVUGfNYItWGLE73ZbFbljYWSdkZz87kxe29tQ7Oj2iQD/JoRmXUY
+ IUhI6YU7jOo0sbFPQyX75iXn6Pdh07/0KsyxXgl3tYbtIy9ObQPN0iwd+hmT6eIjSP8t
+ 0kO+sRdMVm93miYNOTrcPfvaWTQHlXscqiZcSppmXMwIdzi30+yY6ZOppHzrlYaQXPSc
+ enVg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc:content-transfer-encoding;
+ bh=IotE6xnVPx1DKYX/Wn7ErENMX7pC9eU2NgmLk8rr0Hs=;
+ b=iIVKHdrJZ6KbIywdXpzNuWXbEBVCvmifosBUlmnRPbLKRD3UUbk4HXDhBq6MLtq1aj
+ lHZsX1mUth8lLeaslpIgSLLOo872etbVTHf1dJs5oQkXFpqWKTnbht/UaiqvjeChlqn7
+ 67etOlOzrUrpGUpIKiS74L4cY3CEvY+UJAjZOWSiCRWd7nRQCgJ9SfjGD3s2yP6vuz33
+ 9nuucsUWE7DKwYWfWleubF21+eYv5g850jkNGOjvaWYTm8U3jW6wn3bC84FGTQguJoy7
+ /iU+mZzyrokPD/HZA8U8tw76wyMZhBnUGiW72Mb5TQO3JoyxFlUACysZW3edcrqpx7rx
+ PqXA==
+X-Gm-Message-State: AJcUukdFF8fd1v/rkgdhJVlg3o90Gdsrs+8YI0t3y8Ez/4sXkX7jg/ty
+ qyr3Wnt4NRyfxgnMaeYe0x9Hw082gKj8PilgTBnHYQ==
+X-Google-Smtp-Source: ALg8bN4o5mgiBRAPQg5EcR53Kovyq4GBU7TQKGvYDlLSpLYUttB+oVoLjFShXC7k2+EId0PujSk/LYy+w0l84jdMUWQ=
+X-Received: by 2002:a5d:928b:: with SMTP id s11mr8291606iom.111.1547733672383; 
+ Thu, 17 Jan 2019 06:01:12 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190110142833.31577-1-horms+renesas@verge.net.au>
-Organisation: Horms Solutions BV
-User-Agent: NeoMutt/20170113 (1.7.2)
+References: <20190111172134.30147-1-brgl@bgdev.pl>
+ <20190111172134.30147-3-brgl@bgdev.pl>
+ <08200de1-fde5-c525-c874-c7872259067b@ti.com>
+ <CAMRc=McrT4KTW45=3CTBxspVb+z8k=DDjOvKi9NH0aA9eJ8=cQ@mail.gmail.com>
+ <a7d4994d-7740-c845-da67-9d06e6d874cc@ti.com>
+ <d9bc1153-3b65-19a8-67ef-e131296cd8b1@ti.com>
+In-Reply-To: <d9bc1153-3b65-19a8-67ef-e131296cd8b1@ti.com>
+From: Bartosz Golaszewski <brgl@bgdev.pl>
+Date: Thu, 17 Jan 2019 15:01:01 +0100
+Message-ID: <CAMRc=McPCJxd7i7Ei+xOKOXYhYZgC=MYYFwyn2zAjStQov91fw@mail.gmail.com>
+Subject: Re: [PATCH 02/17] clocksource: davinci-timer: new driver
+To: Sekhar Nori <nsekhar@ti.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_055411_011341_C0C829BB 
-X-CRM114-Status: GOOD (  17.21  )
+X-CRM114-CacheID: sfid-20190117_060114_060846_4C84CAFB 
+X-CRM114-Status: GOOD (  27.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,147 +95,120 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Magnus Damm <magnus.damm@gmail.com>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>, Kevin Hilman <khilman@kernel.org>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ Rob Herring <robh+dt@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 10, 2019 at 03:28:33PM +0100, Simon Horman wrote:
-> Add SDHI3 UHS pin control and use it when enabling HS200 support
-> for SDHI3.
-> 
-> Based on work by Takeshi Kihara.
-> 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
-> Tested on top of renesas-devel-20190110-v5.0-rc1
-> 
-> [    2.967136] renesas_sdhi_internal_dmac ee160000.sd: mmc0 base at 0xee160000 max clock rate 200 MHz
-> [    3.055659] mmc0: new HS400 MMC card at address 0001
-> [    3.061726] mmcblk0: mmc0:0001 BGSD3R 29.1 GiB
-> [    3.070827] mmcblk0boot0: mmc0:0001 BGSD3R partition 1 16.0 MiB
-> [    3.077508] mmcblk0boot1: mmc0:0001 BGSD3R partition 2 16.0 MiB
-> [    3.084132] mmcblk0rpmb: mmc0:0001 BGSD3R partition 3 4.00 MiB, chardev (243:0)
-> [    2.967136] renesas_sdhi_internal_dmac ee160000.sd: mmc0 base at 0xee160000 max clock rate 200 MHz
-> [    3.055659] mmc0: new HS400 MMC card at address 0001
-> [    3.061726] mmcblk0: mmc0:0001 BGSD3R 29.1 GiB
-> [    3.070827] mmcblk0boot0: mmc0:0001 BGSD3R partition 1 16.0 MiB
-> [    3.077508] mmcblk0boot1: mmc0:0001 BGSD3R partition 2 16.0 MiB
-> [    3.084132] mmcblk0rpmb: mmc0:0001 BGSD3R partition 3 4.00 MiB, chardev (243:0)
-> 
-> [    2.901527] renesas_sdhi_internal_dmac ee160000.sd: Linked as a consumer to regulator.2
-> [    2.909824] renesas_sdhi_internal_dmac ee160000.sd: Linked as a consumer to regulator.1
-> [    2.967136] renesas_sdhi_internal_dmac ee160000.sd: mmc0 base at 0xee160000 max clock rate 200 MHz
-> [    3.055659] mmc0: new HS400 MMC card at address 0001
-> [    3.061726] mmcblk0: mmc0:0001 BGSD3R 29.1 GiB
-> [    3.070827] mmcblk0boot0: mmc0:0001 BGSD3R partition 1 16.0 MiB
-> [    3.077508] mmcblk0boot1: mmc0:0001 BGSD3R partition 2 16.0 MiB
-> [    3.084132] mmcblk0rpmb: mmc0:0001 BGSD3R partition 3 4.00 MiB, chardev (243:0)
-
-I see the command lines for the tests were omitted below.
-I have added them, for the record.
-
-# dd if=/dev/mmcblk0 of=/dev/null bs=1M count=128 iflag=direct
-> 128+0 records in
-> 128+0 records out
-> 134217728 bytes (134 MB) copied, 0.92438 s, 145 MB/s
-# dd if=/dev/mmcblk0 of=/dev/null bs=1M count=512 iflag=direct
-> 512+0 records in
-> 512+0 records out
-> 536870912 bytes (537 MB) copied, 9.02486 s, 59.5 MB/s
-# dd if=/dev/mmcblk0 of=/dev/null bs=1M count=512 iflag=direct
-> 512+0 records in
-> 512+0 records out
-> 536870912 bytes (537 MB) copied, 7.36003 s, 72.9 MB/s
-# dd if=/dev/mmcblk0 of=/dev/null bs=1M count=512 iflag=direct
-> 512+0 records in
-> 512+0 records out
-> 536870912 bytes (537 MB) copied, 11.0156 s, 48.7 MB/s
->
-# dd of=/dev/mmcblk0 if=/dev/zero bs=1M count=512 oflag=direct
-> 512+0 records in
-> 512+0 records out
-> 536870912 bytes (537 MB) copied, 7.15907 s, 75.0 MB/s
-# dd of=/dev/mmcblk0 if=/dev/zero bs=1M count=512 oflag=direct
-> 512+0 records in
-> 512+0 records out
-> 536870912 bytes (537 MB) copied, 8.78869 s, 61.1 MB/s
-# dd of=/dev/mmcblk0 if=/dev/zero bs=1M count=512 oflag=direct
-> 512+0 records in
-> 512+0 records out
-> 536870912 bytes (537 MB) copied, 10.3861 s, 51.7 MB/s
-> 
-> The above test results seem favourable when compared to
-> testing against renesas-devel-20190110-v5.0-rc1 where the eMMC
-> device uses HS200 mode.
-> 
-# dd if=/dev/mmcblk0 of=/dev/null bs=1M count=512 iflag=direct
-> 512+0 records in
-> 512+0 records out
-> 536870912 bytes (537 MB) copied, 14.7343 s, 36.4 MB/s
-# dd if=/dev/mmcblk0 of=/dev/null bs=1M count=512 iflag=direct
-> 512+0 records in
-> 512+0 records out
-> 536870912 bytes (537 MB) copied, 8.46809 s, 63.4 MB/s
-# dd if=/dev/mmcblk0 of=/dev/null bs=1M count=512 iflag=direct
-> 512+0 records in
-> 512+0 records out
-> 536870912 bytes (537 MB) copied, 14.6945 s, 36.5 MB/s
-> 
-# dd of=/dev/mmcblk0 if=/dev/zero bs=1M count=512 oflag=direct
-> 512+0 records in
-> 512+0 records out
-> 536870912 bytes (537 MB) copied, 19.1677 s, 28.0 MB/s
-# dd of=/dev/mmcblk0 if=/dev/zero bs=1M count=512 oflag=direct
-> 512+0 records in
-> 512+0 records out
-> 536870912 bytes (537 MB) copied, 21.3139 s, 25.2 MB/s
-# dd of=/dev/mmcblk0 if=/dev/zero bs=1M count=512 oflag=direct
-> 512+0 records in
-> 512+0 records out
-> 536870912 bytes (537 MB) copied, 19.9205 s, 27.0 MB/s
-> ---
->  arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-> index 89383aa35d65..f2846c9eb83f 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-> +++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-> @@ -535,6 +535,12 @@
->  		power-source = <1800>;
->  	};
->  
-> +	sdhi3_pins_uhs: sd3_uhs {
-> +		groups = "sdhi3_data8", "sdhi3_ctrl", "sdhi3_ds";
-> +		function = "sdhi3";
-> +		power-source = <1800>;
-> +	};
-> +
->  	sound_pins: sound {
->  		groups = "ssi01239_ctrl", "ssi0_data", "ssi1_data";
->  		function = "ssi";
-> @@ -689,12 +695,13 @@
->  &sdhi3 {
->  	/* used for on-board 8bit eMMC */
->  	pinctrl-0 = <&sdhi3_pins>;
-> -	pinctrl-1 = <&sdhi3_pins>;
-> +	pinctrl-1 = <&sdhi3_pins_uhs>;
->  	pinctrl-names = "default", "state_uhs";
->  
->  	vmmc-supply = <&reg_3p3v>;
->  	vqmmc-supply = <&reg_1p8v>;
->  	mmc-hs200-1_8v;
-> +	mmc-hs400-1_8v;
->  	bus-width = <8>;
->  	non-removable;
->  	status = "okay";
-> -- 
-> 2.11.0
-> 
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Y3p3LiwgMTcgc3R5IDIwMTkgbyAxMzo0MiBTZWtoYXIgTm9yaSA8bnNla2hhckB0aS5jb20+IG5h
+cGlzYcWCKGEpOgo+Cj4gT24gMTYvMDEvMTkgMjo0OCBQTSwgU2VraGFyIE5vcmkgd3JvdGU6Cj4g
+PiBPbiAxNC8wMS8xOSAxMDowOSBQTSwgQmFydG9zeiBHb2xhc3pld3NraSB3cm90ZToKPiA+PiBw
+b24uLCAxNCBzdHkgMjAxOSBvIDEzOjIwIFNla2hhciBOb3JpIDxuc2VraGFyQHRpLmNvbT4gbmFw
+aXNhxYIoYSk6Cj4gPj4+Cj4gPj4+IEhpIEJhcnRvc3osCj4gPj4+Cj4gPj4+IE9uIDExLzAxLzE5
+IDEwOjUxIFBNLCBCYXJ0b3N6IEdvbGFzemV3c2tpIHdyb3RlOgo+ID4+Pj4gRnJvbTogQmFydG9z
+eiBHb2xhc3pld3NraSA8YmdvbGFzemV3c2tpQGJheWxpYnJlLmNvbT4KPiA+Pj4+Cj4gPj4+PiBD
+dXJyZW50bHkgdGhlIGNsb2Nrc291cmNlIGFuZCBjbG9ja2V2ZW50IHN1cHBvcnQgZm9yIGRhdmlu
+Y2kgcGxhdGZvcm1zCj4gPj4+PiBsaXZlcyBpbiBtYWNoLWRhdmluY2kuIEl0IGhhcmQtY29kZXMg
+bWFueSB0aGluZ3MsIHVzZWQgZ2xvYmFsIHZhcmlhYmxlcywKPiA+Pj4+IGltcGxlbWVudHMgZnVu
+Y3Rpb25hbGl0aWVzIHVudXNlZCBieSBhbnkgcGxhdGZvcm0gYW5kIGhhcyBjb2RlIGZyYWdtZW50
+cwo+ID4+Pj4gc2NhdHRlcmVkIGFjcm9zcyBtYW55IChvZnRlbiB1bnJlbGF0ZWQpIGZpbGVzLgo+
+ID4+Pj4KPiA+Pj4+IEltcGxlbWVudCBhIG5ldywgbW9kZXJuIGFuZCBzaW1wbGlmaWVkIHRpbWVy
+IGRyaXZlciBhbmQgcHV0IGl0IGludG8KPiA+Pj4+IGRyaXZlcnMvY2xvY2tzb3VyY2UuIFdlIHN0
+aWxsIG5lZWQgdG8gc3VwcG9ydCBsZWdhY3kgYm9hcmQgZmlsZXMgc28KPiA+Pj4+IGV4cG9ydCBh
+IGNvbmZpZyBzdHJ1Y3R1cmUgYW5kIGEgZnVuY3Rpb24gdGhhdCBhbGxvd3MgbWFjaGluZSBjb2Rl
+IHRvCj4gPj4+PiByZWdpc3RlciB0aGUgdGltZXIuCj4gPj4+Pgo+ID4+Pj4gV2UgZG9uJ3QgY2hl
+Y2sgdGhlIHJldHVybiB2YWx1ZXMgb2YgcmVnbWFwIHJlYWRzIGFuZCB3cml0ZXMgc2luY2Ugd2l0
+aAo+ID4+Pj4gbW1pbyBpdCdzIG9ubHkgbGlrZWx5IHRvIGZhaWwgZHVlIHRvIHByb2dyYW1tZXIn
+cyBlcnJvcnMuCj4gPj4+Pgo+ID4+Pj4gV2UgYWxzbyBkb24ndCBib3RoZXIgZnJlZWluZyByZXNv
+dXJjZXMgb24gZXJyb3JzIGluCj4gPj4+PiBkYXZpbmNpX3RpbWVyX3JlZ2lzdGVyKCkgYXMgdGhl
+IHN5c3RlbSB3b24ndCBib290IHdpdGhvdXQgYSB0aW1lciBhbnl3YXkuCj4gPj4+Pgo+ID4+Pj4g
+U2lnbmVkLW9mZi1ieTogQmFydG9zeiBHb2xhc3pld3NraSA8YmdvbGFzemV3c2tpQGJheWxpYnJl
+LmNvbT4KPiA+Pj4KPiA+Pj4gV2l0aCB0aGlzIHNlcmllcywgREE4MzAgZmFpbHMgdG8gYm9vdC4g
+UmVzdCBvZiB0aGUgZGV2aWNlcyBhcmUgb2theSBmcm9tCj4gPj4+IGJvb3QgcGVyc3BlY3RpdmUu
+Cj4gPj4+Cj4gPj4+IERBODMwIGlzIHByZXR0eSB1bmlxdWUgYmVjYXVzZSBpdCB1c2VzIHRoZSBz
+YW1lIHRpbWVyLWhhbGYgZm9yIGJvdGgKPiA+Pj4gY2xvY2tzb3VyY2UgYW5kIGNsb2NrZXZlbnQu
+IE1heSBiZSB5b3UgY2FuIHNldCB0aGUgc2FtZSBjb25maWd1cmF0aW9uIG9uCj4gPj4+IHlvdXIg
+REE4NTAgdG8gc2VlIHRoZSBzYW1lIGlzc3VlPyBFbHNlLCBJIHdpbGwgZW5hYmxlIGxvdy1sZXZl
+bCBkZWJ1Zwo+ID4+PiBhbmQgdHJ5IHRvIHByb3ZpZGUgbW9yZSBkZWJ1ZyBkYXRhLgo+ID4+Pgo+
+ID4+Cj4gPj4gSSBjYW4ndCBib290IGRhODUwIHdpdGggdGhlIHNhbWUgY29uZmlnIGFzIGRhODMw
+ICgweDYwIGNvbXBhcmUKPiA+PiByZWdpc3RlciwgY29tcGFyZSBpcnEgNzQpIGV2ZW4gd2l0aCB0
+aGUgb2xkIHRpbWVyIGNvZGUuIEp1c3QgdG8gbWFrZQo+ID4+IHN1cmU6IGRvZXMgZGE4MzAgYm9v
+dCBmaW5lIHdpdGggbWFpbmxpbmUgdjUuMC1yYzI/Cj4gPgo+ID4gWWVhaCwgSSBkaWQgY2hlY2sg
+dGhhdCB3aXRob3V0IHRoZSBwYXRjaCBEQTgzMCBkb2VzIGJvb3QuCj4KPiBZb3UgYXJlIHJpZ2h0
+IHRoYXQgREE4NTAgbGFja3MgY29tcGFyZSBpbnRlcnJ1cHRzIGZvciB0aW1lcnMgMCBhbmQgMS4K
+PiBTbywgeWVzLCBpdCBzZWVtcyBsaWtlIHdlIHdpbGwgaGF2ZSB0byBzaGlmdCB0byB0aW1lcjIg
+dG8gdGVzdAo+IGNvbXBhcmUgaW50ZXJydXB0cyBvbiBEQTg1MC4KPgoKVGltZXJzIDIgYW5kIDMg
+YXJlIGEgYml0IGRpZmZlcmVudCBvbiBkYTg1MCAtIGZvciBpbnN0YW5jZSB0aGV5IGRvbid0Cmhh
+dmUgc2VwYXJhdGUgaW50ZXJydXB0cyBmb3IgYm90dG9tIGFuZCB0b3AgaGFsZnMuCgpJIGNvbmZp
+Z3VyZWQgdGhlIG9sZCBjb2RlIHRvIHVzZSB0aW1lciAyIC0gYm90dG9tIGhhbGYgb25seSB3aXRo
+CmNvbXBhcmUgcmVnaXN0ZXIgMHg2MCBhbmQgY29tcGFyZSBpbnR0ZXJ1cHQgNzQuIEl0IGJvb3Rz
+IGFsdGhvdWdoIHZlcnkKc2xvd2x5IGFuZCBzb21ldGhpbmcncyBicm9rZW4gd2l0aCB0aW1la2Vl
+cGluZyBhcyB0aGUgY2xvY2sgZ29lcwpiYWNrd2FyZHMgYW5kIGZvcndhcmQgKHNlZW1pbmdseSkg
+cmFuZG9tbHkuCgpLZXZpbiBoYXMgYW4gT01BUC1MMTM3IHN0YXJ0ZXIga2l0IC0gaXMgdGhpcyB0
+aGUgc2FtZSBhcyBkYTgzMC1ldm0/IElmCnNvLCB0aGVuIEkgY2FuIGdldCByZW1vdGUgYWNjZXNz
+IHRvIGl0IGFuZCB3b3JrIG9uIHRoaXMgcHJvYmxlbS4KT3RoZXJ3aXNlLCBJIGNhbiBwcmVwYXJl
+IHNvbWV0aGluZyB0aGF0IHdvcmtzIG9uIGRhODUwIHdpdGggYnJva2VuCnRpbWVrZWVwaW5nIGFu
+ZCBsZXQgeW91IHNlZSBpZiBpdCB3b3JrcyBjb3JyZWN0bHkgb24gZGE4MzAuCgpCYXJ0Cgo+IEp1
+c3QgdG8gY29uZmlybSwgREE4MzAgYm9vdHMgZmluZSB3aXRoIHRoZSBjb21wYXJlIHNlY3Rpb24g
+cmVtb3ZlZDoKPgo+IC0tLTg8LS0tCj4gZGlmZiAtLWdpdCBhL2FyY2gvYXJtL21hY2gtZGF2aW5j
+aS9kYTgzMC5jIGIvYXJjaC9hcm0vbWFjaC1kYXZpbmNpL2RhODMwLmMKPiBpbmRleCAwZDgxYThm
+ZGQ5ZTYuLmYzNDM5OGE3ZTQ3YyAxMDA2NDQKPiAtLS0gYS9hcmNoL2FybS9tYWNoLWRhdmluY2kv
+ZGE4MzAuYwo+ICsrKyBiL2FyY2gvYXJtL21hY2gtZGF2aW5jaS9kYTgzMC5jCj4gQEAgLTc4OCwx
+NCArNzg4LDYgQEAgc3RhdGljIGNvbnN0IHN0cnVjdCBkYXZpbmNpX3RpbWVyX2NmZyBkYTgzMF90
+aW1lcl9jZmcgPSB7Cj4gICAgICAgICAgICAgICAgICAgICAgICAgLmZsYWdzICA9IElPUkVTT1VS
+Q0VfSVJRLAo+ICAgICAgICAgICAgICAgICB9LAo+ICAgICAgICAgfSwKPiAtICAgICAgIC5jbXAg
+PSB7Cj4gLSAgICAgICAgICAgICAgIC5pcnEgPSB7Cj4gLSAgICAgICAgICAgICAgICAgICAgICAg
+LnN0YXJ0ICA9IElSUV9EQTgzMF9UMTJDTVBJTlQwXzAsCj4gLSAgICAgICAgICAgICAgICAgICAg
+ICAgLmVuZCAgICA9IElSUV9EQTgzMF9UMTJDTVBJTlQwXzAsCj4gLSAgICAgICAgICAgICAgICAg
+ICAgICAgLmZsYWdzICA9IElPUkVTT1VSQ0VfSVJRLAo+IC0gICAgICAgICAgICAgICB9LAo+IC0g
+ICAgICAgICAgICAgICAub2Zmc2V0ICAgICAgICAgPSBEQTgzMF9DTVAxMl8wLAo+IC0gICAgICAg
+fQo+ICB9Owo+Cj4gIHN0YXRpYyBjb25zdCBzdHJ1Y3QgZGF2aW5jaV9zb2NfaW5mbyBkYXZpbmNp
+X3NvY19pbmZvX2RhODMwID0gewo+IC0tLTg8LS0tCj4KPiBBbmQgdGhlIGxvdy1sZXZlbCBkZWJ1
+ZyB3aXRoIHlvdXIgcGF0Y2hlcyBzaG93cyB0aGF0IGl0cyBoYW5naW5nIGF0Cj4gZGVsYXkgbG9v
+cCBjYWxpYnJhdGlvbi4KPgo+IFVuY29tcHJlc3NpbmcgTGludXguLi4gZG9uZSwgYm9vdGluZyB0
+aGUga2VybmVsLgo+IEJvb3RpbmcgTGludXggb24gcGh5c2ljYWwgQ1BVIDB4MAo+IExpbnV4IHZl
+cnNpb24gNS4wLjAtcmMxLTA4Njk5LWdjODdkMzg2Nzg0ZjMtZGlydHkgKGEwODc1NTE2QHBzcGxp
+bnV4MDYzKSAoZ2NjIHY5Cj4gQ1BVOiBBUk05MjZFSi1TIFs0MTA2OTI2NV0gcmV2aXNpb24gNSAo
+QVJNdjVURUopLCBjcj0wMDA1MzE3Zgo+IENQVTogVklWVCBkYXRhIGNhY2hlLCBWSVZUIGluc3Ry
+dWN0aW9uIGNhY2hlCj4gTWFjaGluZTogRGFWaW5jaSBEQTgzMC9PTUFQLUwxMzcvQU0xN3ggRVZN
+Cj4gTWVtb3J5IHBvbGljeTogRGF0YSBjYWNoZSB3cml0ZXRocm91Z2gKPiBjbWE6IFJlc2VydmVk
+IDE2IE1pQiBhdCAweGMyODAwMDAwCj4gRGFWaW5jaSBkYTgzMC9vbWFwLWwxMzcgcmV2Mi4wIHZh
+cmlhbnQgMHg5Cj4gT24gbm9kZSAwIHRvdGFscGFnZXM6IDE0MzM2Cj4gICBETUEgem9uZTogMTEy
+IHBhZ2VzIHVzZWQgZm9yIG1lbW1hcAo+ICAgRE1BIHpvbmU6IDAgcGFnZXMgcmVzZXJ2ZWQKPiAg
+IERNQSB6b25lOiAxNDMzNiBwYWdlcywgTElGTyBiYXRjaDozCj4gcmFuZG9tOiBnZXRfcmFuZG9t
+X2J5dGVzIGNhbGxlZCBmcm9tIHN0YXJ0X2tlcm5lbCsweDgwLzB4M2VjIHdpdGggY3JuZ19pbml0
+PTAKPiBwY3B1LWFsbG9jOiBzMCByMCBkMzI3NjggdTMyNzY4IGFsbG9jPTEqMzI3NjgKPiBwY3B1
+LWFsbG9jOiBbMF0gMAo+IEJ1aWx0IDEgem9uZWxpc3RzLCBtb2JpbGl0eSBncm91cGluZyBvbi4g
+IFRvdGFsIHBhZ2VzOiAxNDIyNAo+IEtlcm5lbCBjb21tYW5kIGxpbmU6IGNvbnNvbGU9dHR5UzIs
+MTE1MjAwbjgKPiBEZW50cnkgY2FjaGUgaGFzaCB0YWJsZSBlbnRyaWVzOiA4MTkyIChvcmRlcjog
+MywgMzI3NjggYnl0ZXMpCj4gSW5vZGUtY2FjaGUgaGFzaCB0YWJsZSBlbnRyaWVzOiA0MDk2IChv
+cmRlcjogMiwgMTYzODQgYnl0ZXMpCj4gTWVtb3J5OiAzMzg3NksvNTczNDRLIGF2YWlsYWJsZSAo
+NDYwN0sga2VybmVsIGNvZGUsIDMwOEsgcndkYXRhLCAxMDcySyByb2RhdGEsICkKPiBWaXJ0dWFs
+IGtlcm5lbCBtZW1vcnkgbGF5b3V0Ogo+ICAgICB2ZWN0b3IgIDogMHhmZmZmMDAwMCAtIDB4ZmZm
+ZjEwMDAgICAoICAgNCBrQikKPiAgICAgZml4bWFwICA6IDB4ZmZjMDAwMDAgLSAweGZmZjAwMDAw
+ICAgKDMwNzIga0IpCj4gICAgIHZtYWxsb2MgOiAweGM0MDAwMDAwIC0gMHhmZjgwMDAwMCAgICgg
+OTUyIE1CKQo+ICAgICBsb3dtZW0gIDogMHhjMDAwMDAwMCAtIDB4YzM4MDAwMDAgICAoICA1NiBN
+QikKPiAgICAgbW9kdWxlcyA6IDB4YmYwMDAwMDAgLSAweGMwMDAwMDAwICAgKCAgMTYgTUIpCj4g
+ICAgICAgLnRleHQgOiAweChwdHJ2YWwpIC0gMHgocHRydmFsKSAgICg0NjA5IGtCKQo+ICAgICAg
+IC5pbml0IDogMHgocHRydmFsKSAtIDB4KHB0cnZhbCkgICAoIDIxMiBrQikKPiAgICAgICAuZGF0
+YSA6IDB4KHB0cnZhbCkgLSAweChwdHJ2YWwpICAgKCAzMDkga0IpCj4gICAgICAgIC5ic3MgOiAw
+eChwdHJ2YWwpIC0gMHgocHRydmFsKSAgICggMTM3IGtCKQo+IFNMVUI6IEhXYWxpZ249MzIsIE9y
+ZGVyPTAtMywgTWluT2JqZWN0cz0wLCBDUFVzPTEsIE5vZGVzPTEKPiByY3U6IFByZWVtcHRpYmxl
+IGhpZXJhcmNoaWNhbCBSQ1UgaW1wbGVtZW50YXRpb24uCj4gICAgICAgICBUYXNrcyBSQ1UgZW5h
+YmxlZC4KPiByY3U6IFJDVSBjYWxjdWxhdGVkIHZhbHVlIG9mIHNjaGVkdWxlci1lbmxpc3RtZW50
+IGRlbGF5IGlzIDEwIGppZmZpZXMuCj4gTlJfSVJRUzogMjQ1Cj4gY2xvY2tzb3VyY2U6IHRpbWVy
+MF8wOiBtYXNrOiAweGZmZmZmZmZmIG1heF9jeWNsZXM6IDB4ZmZmZmZmZmYsIG1heF9pZGxlX25z
+OiA3OXMKPiBzY2hlZF9jbG9jazogMzIgYml0cyBhdCAyNE1IeiwgcmVzb2x1dGlvbiA0MW5zLCB3
+cmFwcyBldmVyeSA4OTQ3ODQ4NDk3MW5zCj4gQ29uc29sZTogY29sb3VyIGR1bW15IGRldmljZSA4
+MHgzMAo+IENhbGlicmF0aW5nIGRlbGF5IGxvb3AuLi4KPiA8aGFuZ3M+Cj4KPiBUaGFua3MsCj4g
+U2VraGFyCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwps
+aW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJh
+ZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51
+eC1hcm0ta2VybmVsCg==
