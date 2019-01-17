@@ -2,65 +2,61 @@ Return-Path: <SRS0=6Gta=PZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 68C1CC43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 17:16:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 00A0CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 17:22:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 37A8A20851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 17:16:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C420420851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 17:22:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="utWipYu/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 37A8A20851
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SfinorVr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C420420851
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=t+bc6LaPO+TJgs6a4gO3wss7rKvhPvk55DtNuZ+nMY8=; b=utWipYu/bGBLho
-	XU8cOjdDI7hPYYqIIiC80bfxSlVP7cLt/aMa/GaPe4Qeprdb1uekbPWPB4kJZf47ZMZrBi3WPb3mf
-	lYj5ghCGRHOlG3hydVqx4bbr3RpG5UQiPLWSB3hcgB8JQdJejVGtRSwI3iYXnCkiCfJZqonfUi4gJ
-	LLvTw8kQOZ6gLUgHqBwfYMPXQHliOTIckQuIsu/cJCbtDHzDS6SG94SLGzNswQ6FbF7S74UQAMTp/
-	ZF0yZm8sQprSFlltkeZAB54Emz1CoLOTZbjDu9PDPwylwdlra4HV7/sJJ3J+z/aiDJJEciNdnGBZf
-	O7uuUlZMq0wTMG89iZGA==;
+	List-Owner; bh=ul2ltJrXaIQSSIkvasX5bWZrbOPU6kLr1uS4/gQzfRE=; b=SfinorVrndNMQx
+	KEbiyelXrIYxsoP/qqKow2tOe+Bn7MC3p7Ta7XapFwVYL0fAWmH6KUIDJwlS+R64rwyJE64yMc2Lo
+	O2+hL3dluxUf11pwQ71xbTqmUYN1ogdt0WEYkEOJcnKFcmf9gO6CinMW1FrL9BRLeInZXUrfglzp2
+	CQzp0tG6aNMm+Mp5OgTs+M8ItMy11XJFktHKE3W9+zYhwdjMcKKaJWc4qne3NLcuXFdrYgzxEIoz4
+	tk2BJZU4IvkJojLP68KLg+JyZX7CDpeB0QhOiAkaa2OvgqaIPUJ6IiZo8RsL7Fkl8VLzhJcBmiei6
+	+bkj72W8HuPLM6hwWnPg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkBHN-0004Dc-Se; Thu, 17 Jan 2019 17:16:33 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+	id 1gkBMf-0006Wu-Ct; Thu, 17 Jan 2019 17:22:01 +0000
+Received: from verein.lst.de ([213.95.11.211] helo=newverein.lst.de)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkBHJ-0004DC-GP
- for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 17:16:31 +0000
-Received: from lupine.hi.pengutronix.de
- ([2001:67c:670:100:3ad5:47ff:feaf:1a17] helo=lupine)
- by metis.ext.pengutronix.de with esmtp (Exim 4.89)
- (envelope-from <p.zabel@pengutronix.de>)
- id 1gkBHB-00013U-AQ; Thu, 17 Jan 2019 18:16:21 +0100
-Message-ID: <1547745380.4009.18.camel@pengutronix.de>
-Subject: Re: [PATCH v4 1/3] reset: imx7: Add plubming to support multiple IP
- variants
-From: Philipp Zabel <p.zabel@pengutronix.de>
-To: Andrey Smirnov <andrew.smirnov@gmail.com>
-Date: Thu, 17 Jan 2019 18:16:20 +0100
-In-Reply-To: <20181220010700.8598-2-andrew.smirnov@gmail.com>
-References: <20181220010700.8598-1-andrew.smirnov@gmail.com>
- <20181220010700.8598-2-andrew.smirnov@gmail.com>
-X-Mailer: Evolution 3.22.6-1+deb9u1 
-Mime-Version: 1.0
-X-SA-Exim-Connect-IP: 2001:67c:670:100:3ad5:47ff:feaf:1a17
-X-SA-Exim-Mail-From: p.zabel@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+ id 1gkBMc-0006WD-6I
+ for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 17:21:59 +0000
+Received: by newverein.lst.de (Postfix, from userid 2407)
+ id 0146668CEB; Thu, 17 Jan 2019 18:21:52 +0100 (CET)
+Date: Thu, 17 Jan 2019 18:21:52 +0100
+From: Christoph Hellwig <hch@lst.de>
+To: Marek Szyprowski <m.szyprowski@samsung.com>
+Subject: Re: [PATCH 3/3] videobuf2: replace a layering violation with
+ dma_map_resource
+Message-ID: <20190117172152.GA32292@lst.de>
+References: <20190111181731.11782-1-hch@lst.de>
+ <CGME20190111181812epcas2p1eeb68a16701631513eaf297073f7299f@epcas2p1.samsung.com>
+ <20190111181731.11782-4-hch@lst.de>
+ <6f8892ac-c2aa-10df-c74f-ba032bf75160@samsung.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <6f8892ac-c2aa-10df-c74f-ba032bf75160@samsung.com>
+User-Agent: Mutt/1.5.17 (2007-11-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_091629_779288_04F2F9E6 
-X-CRM114-Status: GOOD (  16.69  )
+X-CRM114-CacheID: sfid-20190117_092158_375834_E2A8F45F 
+X-CRM114-Status: GOOD (  19.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,114 +68,65 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Rob Herring <robh@kernel.org>,
- Richard Zhu <hongxing.zhu@nxp.com>, linux-arm-kernel@lists.infradead.org,
- devicetree@vger.kernel.org, linux-kernel@vger.kernel.org, linux-imx@nxp.com,
- Fabio Estevam <fabio.estevam@nxp.com>,
- Leonard Crestez <leonard.crestez@nxp.com>, cphealy@gmail.com,
- l.stach@pengutronix.de
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Niklas =?iso-8859-1?Q?S=F6derlund?=
+ <niklas.soderlund+renesas@ragnatech.se>, Pawel Osciak <pawel@osciak.com>,
+ Russell King <linux@armlinux.org.uk>, iommu@lists.linux-foundation.org,
+ linux-kernel@vger.kernel.org, Kyungmin Park <kyungmin.park@samsung.com>,
+ Mauro Carvalho Chehab <mchehab@kernel.org>, linuxppc-dev@lists.ozlabs.org,
+ Christoph Hellwig <hch@lst.de>, linux-arm-kernel@lists.infradead.org,
+ linux-media@vger.kernel.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gV2VkLCAyMDE4LTEyLTE5IGF0IDE3OjA2IC0wODAwLCBBbmRyZXkgU21pcm5vdiB3cm90ZToK
-PiBJbiBvcmRlciB0byBlbmFibGUgc3VwcG9ydGluZyBpLk1YOE1RIHdpdGggdGhpcyBkcml2ZXIs
-IGNvbnZlcnQgaXQgdG8KPiBleHBlY3QgdmFyaWFudCBzcGVjaWZpYyBiaXRzIHRvIGJlIHBhc3Nl
-ZCB2aWEgZHJpdmVyIGRhdGEuCj4gCj4gQ2M6IHAuemFiZWxAcGVuZ3V0cm9uaXguZGUKPiBDYzog
-RmFiaW8gRXN0ZXZhbSA8ZmFiaW8uZXN0ZXZhbUBueHAuY29tPgo+IENjOiBjcGhlYWx5QGdtYWls
-LmNvbQo+IENjOiBsLnN0YWNoQHBlbmd1dHJvbml4LmRlCj4gQ2M6IExlb25hcmQgQ3Jlc3RleiA8
-bGVvbmFyZC5jcmVzdGV6QG54cC5jb20+Cj4gQ2M6ICJBLnMuIERvbmciIDxhaXNoZW5nLmRvbmdA
-bnhwLmNvbT4KPiBDYzogUmljaGFyZCBaaHUgPGhvbmd4aW5nLnpodUBueHAuY29tPgo+IENjOiBS
-b2IgSGVycmluZyA8cm9iaEBrZXJuZWwub3JnPgo+IENjOiBkZXZpY2V0cmVlQHZnZXIua2VybmVs
-Lm9yZwo+IENjOiBsaW51eC1pbXhAbnhwLmNvbQo+IENjOiBsaW51eC1hcm0ta2VybmVsQGxpc3Rz
-LmluZnJhZGVhZC5vcmcKPiBDYzogbGludXgta2VybmVsQHZnZXIua2VybmVsLm9yZwo+IFNpZ25l
-ZC1vZmYtYnk6IEFuZHJleSBTbWlybm92IDxhbmRyZXcuc21pcm5vdkBnbWFpbC5jb20+Cj4gLS0t
-Cj4gIGRyaXZlcnMvcmVzZXQvcmVzZXQtaW14Ny5jIHwgNjIgKysrKysrKysrKysrKysrKysrKysr
-KysrKysrLS0tLS0tLS0tLS0KPiAgMSBmaWxlIGNoYW5nZWQsIDQ1IGluc2VydGlvbnMoKyksIDE3
-IGRlbGV0aW9ucygtKQo+IAo+IGRpZmYgLS1naXQgYS9kcml2ZXJzL3Jlc2V0L3Jlc2V0LWlteDcu
-YyBiL2RyaXZlcnMvcmVzZXQvcmVzZXQtaW14Ny5jCj4gaW5kZXggNzc5MTFmYThmMzFkLi4zYTM2
-ZDU4NjM4OTEgMTAwNjQ0Cj4gLS0tIGEvZHJpdmVycy9yZXNldC9yZXNldC1pbXg3LmMKPiArKysg
-Yi9kcml2ZXJzL3Jlc2V0L3Jlc2V0LWlteDcuYwo+IEBAIC0xNywxNCArMTcsMjkgQEAKPiAgCj4g
-ICNpbmNsdWRlIDxsaW51eC9tZmQvc3lzY29uLmg+Cj4gICNpbmNsdWRlIDxsaW51eC9tb2RfZGV2
-aWNldGFibGUuaD4KPiArI2luY2x1ZGUgPGxpbnV4L29mX2RldmljZS5oPgo+ICAjaW5jbHVkZSA8
-bGludXgvcGxhdGZvcm1fZGV2aWNlLmg+Cj4gICNpbmNsdWRlIDxsaW51eC9yZXNldC1jb250cm9s
-bGVyLmg+Cj4gICNpbmNsdWRlIDxsaW51eC9yZWdtYXAuaD4KPiAgI2luY2x1ZGUgPGR0LWJpbmRp
-bmdzL3Jlc2V0L2lteDctcmVzZXQuaD4KPiAgCj4gK3N0cnVjdCBpbXg3X3NyY19zaWduYWwgewo+
-ICsJdW5zaWduZWQgaW50IG9mZnNldCwgYml0Owo+ICt9Owo+ICsKPiArc3RydWN0IGlteDdfc3Jj
-Owo+ICsKPiArc3RydWN0IGlteDdfc3JjX3ZhcmlhbnQgewo+ICsJY29uc3Qgc3RydWN0IGlteDdf
-c3JjX3NpZ25hbCAqc2lnbmFsczsKPiArCXVuc2lnbmVkIGludCBzaWduYWxzX251bTsKPiArCXVu
-c2lnbmVkIGludCAoKnByZXBhcmUpKHN0cnVjdCBpbXg3X3NyYyAqaW14N3NyYywgdW5zaWduZWQg
-bG9uZyBpZCwKPiArCQkJCWJvb2wgYXNzZXJ0KTsKCkluc3RlYWQgb2YgYWRkaW5nIGEgZnVuY3Rp
-b24gcG9pbnRlciBpbmRpcmVjdGlvbizCoEknZCBwcmVmZXIgc2VwYXJhdGUKaW14N19yZXNldF9v
-cHMgYW5kIGlteDhtX3Jlc2V0X29wcyBzZXQgYnkgdGhlIHZhcmlhbnQsIHNlZSBiZWxvdy4KCj4g
-K307Cj4gKwo+ICBzdHJ1Y3QgaW14N19zcmMgewo+ICAJc3RydWN0IHJlc2V0X2NvbnRyb2xsZXJf
-ZGV2IHJjZGV2Owo+ICAJc3RydWN0IHJlZ21hcCAqcmVnbWFwOwo+ICsJY29uc3Qgc3RydWN0IGlt
-eDdfc3JjX3ZhcmlhbnQgKnZhcmlhbnQ7CgpUaGlzIGNvdWxkIHRoZW4gcmVwbGFjZWQgd2l0aCBh
-IGRpcmVjdCBwb2ludGVyIHRvIHRoZSByZXNwZWN0aXZlIHNpZ25hbHMKYXJyYXkuCgo+ICB9Owo+
-ICAKPiAgZW51bSBpbXg3X3NyY19yZWdpc3RlcnMgewo+IEBAIC0zOSwxMCArNTQsNiBAQCBlbnVt
-IGlteDdfc3JjX3JlZ2lzdGVycyB7Cj4gIAlTUkNfRERSQ19SQ1IJCT0gMHgxMDAwLAo+ICB9Owo+
-ICAKPiAtc3RydWN0IGlteDdfc3JjX3NpZ25hbCB7Cj4gLQl1bnNpZ25lZCBpbnQgb2Zmc2V0LCBi
-aXQ7Cj4gLX07Cj4gLQo+ICBzdGF0aWMgY29uc3Qgc3RydWN0IGlteDdfc3JjX3NpZ25hbCBpbXg3
-X3NyY19zaWduYWxzW0lNWDdfUkVTRVRfTlVNXSA9IHsKPiAgCVtJTVg3X1JFU0VUX0E3X0NPUkVf
-UE9SX1JFU0VUMF0gPSB7IFNSQ19BN1JDUjAsIEJJVCgwKSB9LAo+ICAJW0lNWDdfUkVTRVRfQTdf
-Q09SRV9QT1JfUkVTRVQxXSA9IHsgU1JDX0E3UkNSMCwgQklUKDEpIH0sCj4gQEAgLTcyLDE3ICs4
-MywxMSBAQCBzdGF0aWMgY29uc3Qgc3RydWN0IGlteDdfc3JjX3NpZ25hbCBpbXg3X3NyY19zaWdu
-YWxzW0lNWDdfUkVTRVRfTlVNXSA9IHsKPiAgCVtJTVg3X1JFU0VUX0REUkNfQ09SRV9SU1RdCT0g
-eyBTUkNfRERSQ19SQ1IsIEJJVCgxKSB9LAo+ICB9Owo+ICAKPiAtc3RhdGljIHN0cnVjdCBpbXg3
-X3NyYyAqdG9faW14N19zcmMoc3RydWN0IHJlc2V0X2NvbnRyb2xsZXJfZGV2ICpyY2RldikKPiAr
-c3RhdGljIHVuc2lnbmVkIGludAo+ICtpbXg3X3NyY19wcmVwYXJlKHN0cnVjdCBpbXg3X3NyYyAq
-aW14N3NyYywgdW5zaWduZWQgbG9uZyBpZCwgYm9vbCBhc3NlcnQpCj4gIHsKPiAtCXJldHVybiBj
-b250YWluZXJfb2YocmNkZXYsIHN0cnVjdCBpbXg3X3NyYywgcmNkZXYpOwo+IC19Cj4gLQo+IC1z
-dGF0aWMgaW50IGlteDdfcmVzZXRfc2V0KHN0cnVjdCByZXNldF9jb250cm9sbGVyX2RldiAqcmNk
-ZXYsCj4gLQkJCSAgdW5zaWduZWQgbG9uZyBpZCwgYm9vbCBhc3NlcnQpCj4gLXsKPiAtCXN0cnVj
-dCBpbXg3X3NyYyAqaW14N3NyYyA9IHRvX2lteDdfc3JjKHJjZGV2KTsKPiAtCWNvbnN0IHN0cnVj
-dCBpbXg3X3NyY19zaWduYWwgKnNpZ25hbCA9ICZpbXg3X3NyY19zaWduYWxzW2lkXTsKPiAtCXVu
-c2lnbmVkIGludCB2YWx1ZSA9IGFzc2VydCA/IHNpZ25hbC0+Yml0IDogMDsKPiArCWNvbnN0IHVu
-c2lnbmVkIGludCBiaXQgPSBpbXg3c3JjLT52YXJpYW50LT5zaWduYWxzW2lkXS5iaXQ7Cj4gKwl1
-bnNpZ25lZCBpbnQgdmFsdWUgPSBhc3NlcnQgPyBiaXQgOiAwOwo+ICAKPiAgCXN3aXRjaCAoaWQp
-IHsKPiAgCWNhc2UgSU1YN19SRVNFVF9QQ0lFUEhZOgo+IEBAIC05NSwxMCArMTAwLDMyIEBAIHN0
-YXRpYyBpbnQgaW14N19yZXNldF9zZXQoc3RydWN0IHJlc2V0X2NvbnRyb2xsZXJfZGV2ICpyY2Rl
-diwKPiAgCQlicmVhazsKPiAgCj4gIAljYXNlIElNWDdfUkVTRVRfUENJRV9DVFJMX0FQUFNfRU46
-Cj4gLQkJdmFsdWUgPSAoYXNzZXJ0KSA/IDAgOiBzaWduYWwtPmJpdDsKPiArCQl2YWx1ZSA9IGFz
-c2VydCA/IDAgOiBiaXQ7Cj4gIAkJYnJlYWs7Cj4gIAl9Cj4gIAo+ICsJcmV0dXJuIHZhbHVlOwo+
-ICt9CgpJbnN0ZWFkIG9mIGhhdmluZyBhIGNvbW1vbiBpbXg3X3Jlc2V0X3NldCBhbmQgdGhlbiBj
-YWxsaW5nIHRoZSBjdXN0b20KLnByZXBhcmUoKSB0aHJvdWdoIGEgZnVuY3Rpb24gcG9pbnRlciwg
-SSdkIHN1Z2dlc3QgdG8gaGF2ZSBjdXN0b20KaW14N19yZXNldF9zZXQgYW5kIGlteDhtX3Jlc2V0
-X3NldCBmdW5jdGlvbnMgdGhhdCBjb250YWluIHRoZSBjb2RlIGZyb20KLnByZXBhcmUoKSBhbmQg
-dGhlbiBjYWxsIGEgY29tbW9uIGZ1bmN0aW9uIHRvIGRvIHRoZSBhY3R1YWwgcmVnaXN0ZXIKYWNj
-ZXNzLgoKPiArCj4gK3N0YXRpYyBjb25zdCBzdHJ1Y3QgaW14N19zcmNfdmFyaWFudCB2YXJpYW50
-X2lteDcgPSB7Cj4gKwkuc2lnbmFscyA9IGlteDdfc3JjX3NpZ25hbHMsCj4gKwkuc2lnbmFsc19u
-dW0gPSBBUlJBWV9TSVpFKGlteDdfc3JjX3NpZ25hbHMpLAo+ICsJLnByZXBhcmUgPSBpbXg3X3Ny
-Y19wcmVwYXJlLAo+ICt9Owo+ICsKPiArc3RhdGljIHN0cnVjdCBpbXg3X3NyYyAqdG9faW14N19z
-cmMoc3RydWN0IHJlc2V0X2NvbnRyb2xsZXJfZGV2ICpyY2RldikKPiArewo+ICsJcmV0dXJuIGNv
-bnRhaW5lcl9vZihyY2Rldiwgc3RydWN0IGlteDdfc3JjLCByY2Rldik7Cj4gK30KPiArCj4gK3N0
-YXRpYyBpbnQgaW14N19yZXNldF9zZXQoc3RydWN0IHJlc2V0X2NvbnRyb2xsZXJfZGV2ICpyY2Rl
-diwKPiArCQkJICB1bnNpZ25lZCBsb25nIGlkLCBib29sIGFzc2VydCkKPiArewo+ICsJc3RydWN0
-IGlteDdfc3JjICppbXg3c3JjID0gdG9faW14N19zcmMocmNkZXYpOwo+ICsJY29uc3Qgc3RydWN0
-IGlteDdfc3JjX3ZhcmlhbnQgKnZhcmlhbnQgPSBpbXg3c3JjLT52YXJpYW50Owo+ICsJY29uc3Qg
-c3RydWN0IGlteDdfc3JjX3NpZ25hbCAqc2lnbmFsID0gJnZhcmlhbnQtPnNpZ25hbHNbaWRdOwo+
-ICsJY29uc3QgdW5zaWduZWQgaW50IHZhbHVlID0gdmFyaWFudC0+cHJlcGFyZShpbXg3c3JjLCBp
-ZCwgYXNzZXJ0KTsKPiArCj4gIAlyZXR1cm4gcmVnbWFwX3VwZGF0ZV9iaXRzKGlteDdzcmMtPnJl
-Z21hcCwKPiAgCQkJCSAgc2lnbmFsLT5vZmZzZXQsIHNpZ25hbC0+Yml0LCB2YWx1ZSk7Cj4gIH0K
-PiBAQCAtMTMwLDYgKzE1Nyw3IEBAIHN0YXRpYyBpbnQgaW14N19yZXNldF9wcm9iZShzdHJ1Y3Qg
-cGxhdGZvcm1fZGV2aWNlICpwZGV2KQo+ICAJaWYgKCFpbXg3c3JjKQo+ICAJCXJldHVybiAtRU5P
-TUVNOwo+ICAKPiArCWlteDdzcmMtPnZhcmlhbnQgPSBvZl9kZXZpY2VfZ2V0X21hdGNoX2RhdGEo
-ZGV2KTsKPiAgCWlteDdzcmMtPnJlZ21hcCA9IHN5c2Nvbl9ub2RlX3RvX3JlZ21hcChkZXYtPm9m
-X25vZGUpOwo+ICAJaWYgKElTX0VSUihpbXg3c3JjLT5yZWdtYXApKSB7Cj4gIAkJZGV2X2Vycihk
-ZXYsICJVbmFibGUgdG8gZ2V0IGlteDctc3JjIHJlZ21hcCIpOwo+IEBAIC0xMzgsNyArMTY2LDcg
-QEAgc3RhdGljIGludCBpbXg3X3Jlc2V0X3Byb2JlKHN0cnVjdCBwbGF0Zm9ybV9kZXZpY2UgKnBk
-ZXYpCj4gIAlyZWdtYXBfYXR0YWNoX2RldihkZXYsIGlteDdzcmMtPnJlZ21hcCwgJmNvbmZpZyk7
-Cj4gIAo+ICAJaW14N3NyYy0+cmNkZXYub3duZXIgICAgID0gVEhJU19NT0RVTEU7Cj4gLQlpbXg3
-c3JjLT5yY2Rldi5ucl9yZXNldHMgPSBJTVg3X1JFU0VUX05VTTsKPiArCWlteDdzcmMtPnJjZGV2
-Lm5yX3Jlc2V0cyA9IGlteDdzcmMtPnZhcmlhbnQtPnNpZ25hbHNfbnVtOwo+ICAJaW14N3NyYy0+
-cmNkZXYub3BzICAgICAgID0gJmlteDdfcmVzZXRfb3BzOwo+ICAJaW14N3NyYy0+cmNkZXYub2Zf
-bm9kZSAgID0gZGV2LT5vZl9ub2RlOwo+ICAKPiBAQCAtMTQ2LDcgKzE3NCw3IEBAIHN0YXRpYyBp
-bnQgaW14N19yZXNldF9wcm9iZShzdHJ1Y3QgcGxhdGZvcm1fZGV2aWNlICpwZGV2KQo+ICB9Cj4g
-IAo+ICBzdGF0aWMgY29uc3Qgc3RydWN0IG9mX2RldmljZV9pZCBpbXg3X3Jlc2V0X2R0X2lkc1td
-ID0gewo+IC0JeyAuY29tcGF0aWJsZSA9ICJmc2wsaW14N2Qtc3JjIiwgfSwKPiArCXsgLmNvbXBh
-dGlibGUgPSAiZnNsLGlteDdkLXNyYyIsIC5kYXRhID0gJnZhcmlhbnRfaW14NyB9LAo+ICAJeyAv
-KiBzZW50aW5lbCAqLyB9LAo+ICB9OwoKcmVnYXJkcwpQaGlsaWxpcHAKCl9fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGlu
-ZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMu
-aW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+On Mon, Jan 14, 2019 at 01:42:26PM +0100, Marek Szyprowski wrote:
+> Hi Christoph,
+> 
+> On 2019-01-11 19:17, Christoph Hellwig wrote:
+> > vb2_dc_get_userptr pokes into arm direct mapping details to get the
+> > resemblance of a dma address for a a physical address that does is
+> > not backed by a page struct.  Not only is this not portable to other
+> > architectures with dma direct mapping offsets, but also not to uses
+> > of IOMMUs of any kind.  Switch to the proper dma_map_resource /
+> > dma_unmap_resource interface instead.
+> >
+> > Signed-off-by: Christoph Hellwig <hch@lst.de>
+> 
+> There are checks for IOMMU presence in other places in vb2-dma-contig,
+> so it was used only when no IOMMU is available, but I agree that the
+> hacky code should be replaced by a generic code if possible.
+> 
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> 
+> V4L2 pipeline works fine on older Exynos-based boards with CMA and IOMMU
+> disabled.
+
+Do you know if these rely on the offsets?  E.g. would they still work
+with the patch below applied on top.  That would keep the map_resource
+semantics as-is as solve the issue pointed out by Robin for now.
+
+If not I can only think of a flag to bypass the offseting for now, but
+that would be pretty ugly.  Or go for the long-term solution of
+discovering the relationship between the two devices, as done by the
+PCIe P2P code..
+
+diff --git a/kernel/dma/direct.c b/kernel/dma/direct.c
+index 8e0359b04957..25bd19974223 100644
+--- a/kernel/dma/direct.c
++++ b/kernel/dma/direct.c
+@@ -359,7 +359,7 @@ EXPORT_SYMBOL(dma_direct_map_sg);
+ dma_addr_t dma_direct_map_resource(struct device *dev, phys_addr_t paddr,
+ 		size_t size, enum dma_data_direction dir, unsigned long attrs)
+ {
+-	dma_addr_t dma_addr = phys_to_dma(dev, paddr);
++	dma_addr_t dma_addr = paddr;
+ 
+ 	if (unlikely(!dma_direct_possible(dev, dma_addr, size))) {
+ 		report_addr(dev, dma_addr, size);
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
