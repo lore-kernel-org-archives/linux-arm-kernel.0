@@ -2,86 +2,91 @@ Return-Path: <SRS0=6Gta=PZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F30BAC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 15:29:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A3399C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 15:41:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BE95620855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 15:29:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 73B6C20851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 15:41:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fb/l8SIB";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="kUxFhSXE";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="byUw6VHB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BE95620855
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XgcuOg/q";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ngA7FnU4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 73B6C20851
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=4hUuDq7031hulnqXplT3p4lj7/RVbj+Lg81+jeWs16E=; b=fb/l8SIBQzQVLFgrFyOLTuxJz
-	WUiIFULSnru37peG4TCbgPROpIjczEgQ5+cJZxkzfhHL19YJOiDu1cWVBIycBBMowqeVSkoo5edWz
-	hP1I4jHytpHWbsAmiB9C6d55z2Jug+moKnC7F5qtzXvezFTuo1nvNC8QfMmmSSodTzhmxfrl9CSyo
-	mvBMnI7Fc5hO5ZaeGNuZFRhiSGzVK33L40wr6UKzPNwEKV4+7RO/8vIFZdTjVSL8FVo9X1D6RVIWV
-	2p+vD0mFS6LN37O1BUDBZtpZ6UlKAlP5Mg8tHgc+KwBS8rfpj019FgT3zheYMFSj59B7P8qDVO1xR
-	XnNlPNeZg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=o8s9sAhvyBKIig675pW333meLAqoT0kKvWW/XpkxQHA=; b=XgcuOg/qhU8mIL
+	nuXwCPvq14jAbqtsNYcyWAB1+MKmzxU12byCBna75UAoCDJ0i3UD6Jqp9RjC+Ds1sPyMxvaaNnpBf
+	XODsTWuaBSfjQ0ciIB5dH3RoPtB4Xq+1TzcHTyCf2W1yvTTsQJNfIfLAJLTvS/r0Zabno2jp6VZqI
+	ewjM6m/bDvo7mUwTxApp4IVzsp7gdvC5BILUr4dH2Q97KGntrCvtobyoXIPW2TcVxND0yGr+ZsDxn
+	PI3xv2ABxIayDpsJtXrzO1t5bdMJTHqPAY02Q8YyDUMQ03lwFHqP1vqff9tuyEMAH1fQrAJo6NfoE
+	muXmpMSDBEdSII/MN3sQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gk9bL-00028l-Lg; Thu, 17 Jan 2019 15:29:03 +0000
-Received: from smtp.codeaurora.org ([198.145.29.96])
+	id 1gk9n8-0008Dq-BJ; Thu, 17 Jan 2019 15:41:14 +0000
+Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gk9bH-00028J-2o
- for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 15:29:00 +0000
-Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id 890596053B; Thu, 17 Jan 2019 15:28:58 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1547738938;
- bh=X0Bs3pUe4+evpE7MdCKhnWyxlZN3PSJfCdvI9jWXUQQ=;
- h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
- b=kUxFhSXE00jjlpi+MGLxetr3G5IhNbm/35kIvh2IDiPT6au37o+j3qxqJ+VbKbzV2
- hNNroE26+IJYYt63QMGCOy5tEasvEa5mXq9tCC4SJWDQy1gFdgv/pYTgh38v0m9XI7
- aUYo6lKjmQbIhV3gFbdHSeQrBIeNUMWfE7OjPSkg=
-Received: from [192.168.1.100] (unknown [157.45.228.214])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- (Authenticated sender: saiprakash.ranjan@smtp.codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id 3F444601D2;
- Thu, 17 Jan 2019 15:28:51 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1547738937;
- bh=X0Bs3pUe4+evpE7MdCKhnWyxlZN3PSJfCdvI9jWXUQQ=;
- h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
- b=byUw6VHBF/99Jq86aac5PiNOz1l9wPIiuxijrPfcM/NtPQD15sA9bZLnmetCROypJ
- mhlyn29lbTiB0IV0LCPpAuCcQ4dg0f3k8CdYPNtbV6scLQqUtbHOzqVXWsrTdiVYoP
- nvC3aVkXZvgsLzE7VMzNR305X0N96XIUdCynZGao=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 3F444601D2
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- dmarc=none (p=none dis=none) header.from=codeaurora.org
-Authentication-Results: pdx-caf-mail.web.codeaurora.org; spf=none
- smtp.mailfrom=saiprakash.ranjan@codeaurora.org
-Subject: Re: [PATCH] pstore/ram: Fix console ramoops to show the previous boot
- logs
-To: Joel Fernandes <joel@joelfernandes.org>
-References: <20190117062620.23908-1-saiprakash.ranjan@codeaurora.org>
- <20190117151833.GA51139@google.com>
-From: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
-Message-ID: <79870bf9-e40c-2249-0859-b2404af296c1@codeaurora.org>
-Date: Thu, 17 Jan 2019 20:58:49 +0530
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1gk9n4-0008DQ-8s
+ for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 15:41:11 +0000
+Received: by mail-wm1-x343.google.com with SMTP id y185so1354019wmd.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 17 Jan 2019 07:41:09 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=/ylGOrw1kiKqI28CSL2w2XLVGVsRLas1Nz8eLY7WQDA=;
+ b=ngA7FnU4iftwG2EsosFJXjz1jXMi5w0jl8HCOf5EuCHXCe78k4lQ/8NiFxSveYV0uz
+ vSZdly7fJHNDfbnSv3fY7F1FrQaMIDMYucDYumNWAFMqx2EyRFLBAfLGSwT3X67nI+Bg
+ 3QmWxUIiPTmR9FhVsWx3ZnPlNw2vmFmrLHSh69Jfb3tatsOQfnLFHKuBC+/URLr79dQi
+ UZBy3HAQm6hW7fk0vexFPdHHvdBAkrSl6X8+HfyheKh6ZcuiO6sTTje4KmAB+eRvuIGR
+ U8uz/yuCoS4amGqAU2CHpkm4MuLjArHq8+Q7x7qXLBs1r7sifZJ7xFYyGvHqEt4KDC5Q
+ 5y7Q==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=/ylGOrw1kiKqI28CSL2w2XLVGVsRLas1Nz8eLY7WQDA=;
+ b=rvw15Mv9kHgw60Hgm8jhTSBPGGHgLloMXU3Ny2y3p+Hys28RNmFZGWD3cQnKfIokaA
+ 4nBel1pFna6S38uAK1UBYA5AhY+h8nh6pf2dXJAS6hda9Ku3lk836BrNQQDesexLHA5s
+ u0TH+JexJBk4xK98A33z+2eWUCnEi7EfC0d+Kc7w2UOPopPptBCT8f82jr0TLy9O9UOE
+ D3UiWud7q+s2p80Lx/iAb2QIEfdlK3f/33lAKBzKlwgxMLEXoYVobhUFpV9Jzd2C396F
+ ke/Z0cr9xf8HkC7+3J0vUYurmKp7ZUM/3+B1zPNibDYPVLEHtWjalx5TN8Nh336u+O6W
+ LTIw==
+X-Gm-Message-State: AJcUukfb+82SL73y6VPlP9HPbEAl5MMJ/l9cDitr41TYQNggGSJ9DuWG
+ Hvfe1w11l4idTdrjhUhyRqA=
+X-Google-Smtp-Source: ALg8bN4Srk1oTF8EfYc79WdhHLhDH1qwN8Ewd4XD6omG1S5iZNQQAZUomC5yQkJWz9owyBmdA09Ubw==
+X-Received: by 2002:a1c:c58d:: with SMTP id v135mr12701156wmf.88.1547739667382; 
+ Thu, 17 Jan 2019 07:41:07 -0800 (PST)
+Received: from flashbox ([2a01:4f8:10b:24a5::2])
+ by smtp.gmail.com with ESMTPSA id r3sm69817303wrs.78.2019.01.17.07.41.06
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Thu, 17 Jan 2019 07:41:06 -0800 (PST)
+Date: Thu, 17 Jan 2019 08:41:04 -0700
+From: Nathan Chancellor <natechancellor@gmail.com>
+To: Ming Lei <ming.lei@redhat.com>
+Subject: Re: [BUG bisect] kernel BUG at block/bio.c:1833 and fail to mount disk
+Message-ID: <20190117154104.GA24272@flashbox>
+References: <CAJKOXPdQaxKH3z3yMBggP3dAFJ3ecgCcHk=bGaVHZ-Q+V2Riug@mail.gmail.com>
+ <CAJKOXPd2WiMC8uc1YuyR+_vEScSewMzQe1Y7UGHgxvkCD+tQ7A@mail.gmail.com>
+ <20190117102657.GB20220@ming.t460p>
 MIME-Version: 1.0
-In-Reply-To: <20190117151833.GA51139@google.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <20190117102657.GB20220@ming.t460p>
+User-Agent: Mutt/1.11.2 (2019-01-07)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_072859_157663_C1AB9B08 
-X-CRM114-Status: GOOD (  13.00  )
+X-CRM114-CacheID: sfid-20190117_074110_318645_26C3EDEC 
+X-CRM114-Status: GOOD (  20.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,51 +98,78 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Tony Luck <tony.luck@intel.com>, Rajendra Nayak <rnayak@codeaurora.org>,
- Kees Cook <keescook@chromium.org>, Stephen Boyd <sboyd@kernel.org>,
- linux-arm-msm@vger.kernel.org, Anton Vorontsov <anton@enomsg.org>,
- Doug Anderson <dianders@chromium.org>, linux-kernel@vger.kernel.org,
- Sibi Sankar <sibis@codeaurora.org>, Vivek Gautam <vivek.gautam@codeaurora.org>,
- Colin Cross <ccross@android.com>, Guenter Roeck <groeck@chromium.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Jens Axboe <axboe@kernel.dk>,
+ "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
+ linux-kernel@vger.kernel.org, Krzysztof Kozlowski <krzk@kernel.org>,
+ Christoph Hellwig <hch@lst.de>, linux-block@vger.kernel.org,
+ "linux-next@vger.kernel.org" <linux-next@vger.kernel.org>,
+ Omar Sandoval <osandov@fb.com>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 1/17/2019 8:48 PM, Joel Fernandes wrote:
-> On Thu, Jan 17, 2019 at 11:56:20AM +0530, Sai Prakash Ranjan wrote:
->> commit b05c950698fe ("pstore/ram: Simplify ramoops_get_next_prz()
->> arguments") changed update assignment in getting next persistent
->> ram zone by adding a check for record type. But the check always
->> returns true since the record type is assigned 0. And this breaks
->> console ramoops by showing current console log instead of previous
->> log on warm reset and hard reset (actually hard reset should not
->> be showing any logs).
->>
->> Fix this by having persistent ram zone type check instead of record
->> type check. Tested this on SDM845 MTP and dragonboard 410c.
->>
->> Reproducing this issue is simple as below:
->>
->> 1. Trigger hard reset and mount pstore. Will see console-ramoops
->>     record in the mounted location which is the current log.
->>
->> 2. Trigger warm reset and mount pstore. Will see the current
->>     console-ramoops record instead of previous record.
->>
->> Fixes: b05c950698fe ("pstore/ram: Simplify ramoops_get_next_prz() arguments")
->> Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+On Thu, Jan 17, 2019 at 06:26:58PM +0800, Ming Lei wrote:
+> On Wed, Jan 16, 2019 at 09:54:05AM +0100, Krzysztof Kozlowski wrote:
+> > On Wed, 16 Jan 2019 at 09:52, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> > >
+> > > Hi,
+> > >
+> > > On today's next-20190116 I see a bug during boot:
+> > > [ 6.843308] kernel BUG at ../block/bio.c:1833!
+> > > [ 6.847723] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP ARM
+> > > ...
+> > > [ 7.543824] [<c044c144>] (bio_split) from [<00000000>] ( (null))
+> > > [ 7.549881] Code: 13833b01 11c630bc e1a00006 e8bd8070 (e7f001f2)
+> > >
+> > > (not much in the calltrace)
+> > > On all my boards. Also QEMU-arm fails.
+> > >
+> > 
+> > I forgot the bisect commit:
+> > 
+> > 258cfdfaf7bd729e759a0a91fd00ac9794796ad3 is the first bad commit
+> > commit 258cfdfaf7bd729e759a0a91fd00ac9794796ad3
+> > Author: Ming Lei <ming.lei@redhat.com>
+> > Date:   Fri Jan 11 19:01:15 2019 +0800
+> > 
+> >     block: use bio_for_each_bvec() to compute multi-page bvec count
+> > 
+> > :040000 040000 d79b2e71d308650df4764ff644f29d3a24dbab96
+> > 0a5d624843b805ee0c9fd9a7e2d5163f5b15b167 M block
 > 
+> It should be one 32-bit arch specific issue, I guess.
 > 
-> Acked-by: Joel Fernandes (Google) <joel@joelfernandes.org>
+> The following patch should fix this issue:
 > 
+> diff --git a/block/blk-merge.c b/block/blk-merge.c
+> index dc4877eaf9f9..4dd7183de849 100644
+> --- a/block/blk-merge.c
+> +++ b/block/blk-merge.c
+> @@ -166,6 +166,9 @@ static unsigned get_max_segment_size(struct request_queue *q,
+>  {
+>  	unsigned long mask = queue_segment_boundary(q);
+>  
+> +	if (mask == BLK_SEG_BOUNDARY_MASK)
+> +		return queue_max_segment_size(q);
+> +
+>  	return min_t(unsigned long, mask - (mask & offset) + 1,
+>  		     queue_max_segment_size(q));
+>  }
+> 
+> Thanks,
+> Ming
 
-Thanks Joel.
+Hi Ming,
 
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+We saw this issue on our CI as well: https://travis-ci.com/ClangBuiltLinux/continuous-integration/jobs/170724607
+
+I added your patch and tested locally, it boots fine now.
+
+Tested-by: Nathan Chancellor <natechancellor@gmail.com>
+
+Thanks,
+Nathan
 
 _______________________________________________
 linux-arm-kernel mailing list
