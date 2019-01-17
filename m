@@ -4,90 +4,63 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A7F27C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 17:11:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 68C1CC43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 17:16:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6D9E320851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 17:11:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 37A8A20851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 17:16:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="heBk3WI7";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="T0Z4JLfn"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6D9E320851
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="utWipYu/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 37A8A20851
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Ocqb4ACPxnQtueGp42t4hqDC0tqdHVBmVhimx0w6SdY=; b=heBk3WI7THez85
-	ZetP0b0fbfk8SoPd89Ckj5Psbqrx0SbpWX9HO2tvs69iXClsuSXEgjQv2tqf4+HcpnaiRClFIlMnE
-	mbvGBacdCBMZT9mvDCnZUevWS63bpuSWXhESNB8TksfB4ZeYB6yyVqc0G+YQE+lWc1wp9s/H3/X/Z
-	HnqToqYAuc23xNmjShxzi0qDmbEdBKEQXbZM/vJ0RZ5lgp2vycWqH2tx94COAozK1K3hcJsfc2N3p
-	ifI+phfopJyQ+mVPie7WMFBaMDWwP3ey/AiR687jhuxGhdhb2r+l6OGDKQyuvF0/YK3iob24K0iRO
-	+9juVikhdHGnMF6jSK0Q==;
+	List-Owner; bh=t+bc6LaPO+TJgs6a4gO3wss7rKvhPvk55DtNuZ+nMY8=; b=utWipYu/bGBLho
+	XU8cOjdDI7hPYYqIIiC80bfxSlVP7cLt/aMa/GaPe4Qeprdb1uekbPWPB4kJZf47ZMZrBi3WPb3mf
+	lYj5ghCGRHOlG3hydVqx4bbr3RpG5UQiPLWSB3hcgB8JQdJejVGtRSwI3iYXnCkiCfJZqonfUi4gJ
+	LLvTw8kQOZ6gLUgHqBwfYMPXQHliOTIckQuIsu/cJCbtDHzDS6SG94SLGzNswQ6FbF7S74UQAMTp/
+	ZF0yZm8sQprSFlltkeZAB54Emz1CoLOTZbjDu9PDPwylwdlra4HV7/sJJ3J+z/aiDJJEciNdnGBZf
+	O7uuUlZMq0wTMG89iZGA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkBCe-0002Fa-IX; Thu, 17 Jan 2019 17:11:40 +0000
-Received: from mail-vs1-xe43.google.com ([2607:f8b0:4864:20::e43])
+	id 1gkBHN-0004Dc-Se; Thu, 17 Jan 2019 17:16:33 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkBCc-0002Dz-3C
- for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 17:11:39 +0000
-Received: by mail-vs1-xe43.google.com with SMTP id e7so6695941vsc.2
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 17 Jan 2019 09:11:37 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=9NH/nNdAELJO+XX2r9h3AuIOg98tGgx6St0RefpZQA4=;
- b=T0Z4JLfnMp6XuQB31A8RKP7WphX7sY6WgvX+4tfIoDjyoCuLGyUfV8XhV8Zuh5jCCu
- Pf3umkvMa9TNjQ+I7YigjnavGhUcMYboLngOHaa70kHbPCdMQIzkEeiZg2B3MZ2+wM9u
- TIM/Pex5NBW1vlQ2ApRkW/34TwIJgqr5MMlxk=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=9NH/nNdAELJO+XX2r9h3AuIOg98tGgx6St0RefpZQA4=;
- b=kd1cUjCXN5ORj0B5tfwrKWR0C1R6iGonUeIs8P+KRYu56Joeu3vz8L/mJnBwVOJxim
- tdU4ptfsrOL9zUjXf+ufIT/plprNVbkbo8nkQ8oIsdFbRt1PL0oLO6uwm3Ib10zXWbnH
- leSAksyKiBKiaSXDRFS2m6EikZtE3dG0HjvmzqS0XUPHI5mgTBisSw+XJrGgzIYrFogh
- U/I/Sz7IpsRhhJ94W73UDz933zkTY65RhGioDksnXodXa6gpv7TRnG+Fy5egJbXvZOhH
- sZRVz/cy5d0yANQ1VPFkOMDxS62Gg5mOLUsxMzmlsBlndMuwrE5Spx/MJBC7RVbgPvkh
- SsXA==
-X-Gm-Message-State: AJcUukd2ijsFrOAneXqTBwIsNIM/CwYMCc2takod3yxmtl/i3ahWW/GX
- yDLyQ54PH21l/sLlGj4dwqmsWnfM17E=
-X-Google-Smtp-Source: ALg8bN4hiouwHQK8W4z9NBQfm7aqSPq6bEEgfYYzNGfNTL3lq4sYkmUlLwXzPVELnUP8GFOGBaKi9Q==
-X-Received: by 2002:a67:3d92:: with SMTP id p18mr6469071vsi.51.1547745095717; 
- Thu, 17 Jan 2019 09:11:35 -0800 (PST)
-Received: from mail-vk1-f172.google.com (mail-vk1-f172.google.com.
- [209.85.221.172])
- by smtp.gmail.com with ESMTPSA id n206sm57649935vkn.36.2019.01.17.09.11.34
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 17 Jan 2019 09:11:34 -0800 (PST)
-Received: by mail-vk1-f172.google.com with SMTP id s184so2434439vkd.6
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 17 Jan 2019 09:11:34 -0800 (PST)
-X-Received: by 2002:a1f:298e:: with SMTP id p136mr6005109vkp.40.1547745093881; 
- Thu, 17 Jan 2019 09:11:33 -0800 (PST)
-MIME-Version: 1.0
-References: <20190117062620.23908-1-saiprakash.ranjan@codeaurora.org>
-In-Reply-To: <20190117062620.23908-1-saiprakash.ranjan@codeaurora.org>
-From: Kees Cook <keescook@chromium.org>
-Date: Thu, 17 Jan 2019 09:11:21 -0800
-X-Gmail-Original-Message-ID: <CAGXu5j+E1Eiv8T9OLDeM2-_qCUwh79zRhJ92Yixg496ZXo5ccg@mail.gmail.com>
-Message-ID: <CAGXu5j+E1Eiv8T9OLDeM2-_qCUwh79zRhJ92Yixg496ZXo5ccg@mail.gmail.com>
-Subject: Re: [PATCH] pstore/ram: Fix console ramoops to show the previous boot
- logs
-To: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+ id 1gkBHJ-0004DC-GP
+ for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 17:16:31 +0000
+Received: from lupine.hi.pengutronix.de
+ ([2001:67c:670:100:3ad5:47ff:feaf:1a17] helo=lupine)
+ by metis.ext.pengutronix.de with esmtp (Exim 4.89)
+ (envelope-from <p.zabel@pengutronix.de>)
+ id 1gkBHB-00013U-AQ; Thu, 17 Jan 2019 18:16:21 +0100
+Message-ID: <1547745380.4009.18.camel@pengutronix.de>
+Subject: Re: [PATCH v4 1/3] reset: imx7: Add plubming to support multiple IP
+ variants
+From: Philipp Zabel <p.zabel@pengutronix.de>
+To: Andrey Smirnov <andrew.smirnov@gmail.com>
+Date: Thu, 17 Jan 2019 18:16:20 +0100
+In-Reply-To: <20181220010700.8598-2-andrew.smirnov@gmail.com>
+References: <20181220010700.8598-1-andrew.smirnov@gmail.com>
+ <20181220010700.8598-2-andrew.smirnov@gmail.com>
+X-Mailer: Evolution 3.22.6-1+deb9u1 
+Mime-Version: 1.0
+X-SA-Exim-Connect-IP: 2001:67c:670:100:3ad5:47ff:feaf:1a17
+X-SA-Exim-Mail-From: p.zabel@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_091138_160526_2B1BA4F8 
-X-CRM114-Status: GOOD (  20.78  )
+X-CRM114-CacheID: sfid-20190117_091629_779288_04F2F9E6 
+X-CRM114-Status: GOOD (  16.69  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,88 +72,114 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Tony Luck <tony.luck@intel.com>, Rajendra Nayak <rnayak@codeaurora.org>,
- Stephen Boyd <sboyd@kernel.org>, linux-arm-msm@vger.kernel.org,
- Anton Vorontsov <anton@enomsg.org>, Doug Anderson <dianders@chromium.org>,
- LKML <linux-kernel@vger.kernel.org>, Guenter Roeck <groeck@chromium.org>,
- Sibi Sankar <sibis@codeaurora.org>, Vivek Gautam <vivek.gautam@codeaurora.org>,
- Colin Cross <ccross@android.com>, Joel Fernandes <joel@joelfernandes.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Rob Herring <robh@kernel.org>,
+ Richard Zhu <hongxing.zhu@nxp.com>, linux-arm-kernel@lists.infradead.org,
+ devicetree@vger.kernel.org, linux-kernel@vger.kernel.org, linux-imx@nxp.com,
+ Fabio Estevam <fabio.estevam@nxp.com>,
+ Leonard Crestez <leonard.crestez@nxp.com>, cphealy@gmail.com,
+ l.stach@pengutronix.de
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 16, 2019 at 10:27 PM Sai Prakash Ranjan
-<saiprakash.ranjan@codeaurora.org> wrote:
->
-> commit b05c950698fe ("pstore/ram: Simplify ramoops_get_next_prz()
-> arguments") changed update assignment in getting next persistent
-> ram zone by adding a check for record type. But the check always
-> returns true since the record type is assigned 0. And this breaks
-> console ramoops by showing current console log instead of previous
-> log on warm reset and hard reset (actually hard reset should not
-> be showing any logs).
->
-> Fix this by having persistent ram zone type check instead of record
-> type check. Tested this on SDM845 MTP and dragonboard 410c.
->
-> Reproducing this issue is simple as below:
->
-> 1. Trigger hard reset and mount pstore. Will see console-ramoops
->    record in the mounted location which is the current log.
->
-> 2. Trigger warm reset and mount pstore. Will see the current
->    console-ramoops record instead of previous record.
->
-> Fixes: b05c950698fe ("pstore/ram: Simplify ramoops_get_next_prz() arguments")
-> Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
-
-Whoops! Thanks for catching this! I've adjusted the patch slightly (no
-need for a local variable), and will send this to Linus.
-
--Kees
-
->
-> ---
->
-> I guess commit msg can be improved.
-> ---
->  fs/pstore/ram.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/fs/pstore/ram.c b/fs/pstore/ram.c
-> index 96f7d32cd184..441a44215456 100644
-> --- a/fs/pstore/ram.c
-> +++ b/fs/pstore/ram.c
-> @@ -128,7 +128,7 @@ ramoops_get_next_prz(struct persistent_ram_zone *przs[], int id,
->                      struct pstore_record *record)
->  {
->         struct persistent_ram_zone *prz;
-> -       bool update = (record->type == PSTORE_TYPE_DMESG);
-> +       bool update;
->
->         /* Give up if we never existed or have hit the end. */
->         if (!przs)
-> @@ -138,6 +138,8 @@ ramoops_get_next_prz(struct persistent_ram_zone *przs[], int id,
->         if (!prz)
->                 return NULL;
->
-> +       update = (prz->type == PSTORE_TYPE_DMESG);
-> +
->         /* Update old/shadowed buffer. */
->         if (update)
->                 persistent_ram_save_old(prz);
-> --
-> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-> of Code Aurora Forum, hosted by The Linux Foundation
->
-
-
--- 
-Kees Cook
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gV2VkLCAyMDE4LTEyLTE5IGF0IDE3OjA2IC0wODAwLCBBbmRyZXkgU21pcm5vdiB3cm90ZToK
+PiBJbiBvcmRlciB0byBlbmFibGUgc3VwcG9ydGluZyBpLk1YOE1RIHdpdGggdGhpcyBkcml2ZXIs
+IGNvbnZlcnQgaXQgdG8KPiBleHBlY3QgdmFyaWFudCBzcGVjaWZpYyBiaXRzIHRvIGJlIHBhc3Nl
+ZCB2aWEgZHJpdmVyIGRhdGEuCj4gCj4gQ2M6IHAuemFiZWxAcGVuZ3V0cm9uaXguZGUKPiBDYzog
+RmFiaW8gRXN0ZXZhbSA8ZmFiaW8uZXN0ZXZhbUBueHAuY29tPgo+IENjOiBjcGhlYWx5QGdtYWls
+LmNvbQo+IENjOiBsLnN0YWNoQHBlbmd1dHJvbml4LmRlCj4gQ2M6IExlb25hcmQgQ3Jlc3RleiA8
+bGVvbmFyZC5jcmVzdGV6QG54cC5jb20+Cj4gQ2M6ICJBLnMuIERvbmciIDxhaXNoZW5nLmRvbmdA
+bnhwLmNvbT4KPiBDYzogUmljaGFyZCBaaHUgPGhvbmd4aW5nLnpodUBueHAuY29tPgo+IENjOiBS
+b2IgSGVycmluZyA8cm9iaEBrZXJuZWwub3JnPgo+IENjOiBkZXZpY2V0cmVlQHZnZXIua2VybmVs
+Lm9yZwo+IENjOiBsaW51eC1pbXhAbnhwLmNvbQo+IENjOiBsaW51eC1hcm0ta2VybmVsQGxpc3Rz
+LmluZnJhZGVhZC5vcmcKPiBDYzogbGludXgta2VybmVsQHZnZXIua2VybmVsLm9yZwo+IFNpZ25l
+ZC1vZmYtYnk6IEFuZHJleSBTbWlybm92IDxhbmRyZXcuc21pcm5vdkBnbWFpbC5jb20+Cj4gLS0t
+Cj4gIGRyaXZlcnMvcmVzZXQvcmVzZXQtaW14Ny5jIHwgNjIgKysrKysrKysrKysrKysrKysrKysr
+KysrKysrLS0tLS0tLS0tLS0KPiAgMSBmaWxlIGNoYW5nZWQsIDQ1IGluc2VydGlvbnMoKyksIDE3
+IGRlbGV0aW9ucygtKQo+IAo+IGRpZmYgLS1naXQgYS9kcml2ZXJzL3Jlc2V0L3Jlc2V0LWlteDcu
+YyBiL2RyaXZlcnMvcmVzZXQvcmVzZXQtaW14Ny5jCj4gaW5kZXggNzc5MTFmYThmMzFkLi4zYTM2
+ZDU4NjM4OTEgMTAwNjQ0Cj4gLS0tIGEvZHJpdmVycy9yZXNldC9yZXNldC1pbXg3LmMKPiArKysg
+Yi9kcml2ZXJzL3Jlc2V0L3Jlc2V0LWlteDcuYwo+IEBAIC0xNywxNCArMTcsMjkgQEAKPiAgCj4g
+ICNpbmNsdWRlIDxsaW51eC9tZmQvc3lzY29uLmg+Cj4gICNpbmNsdWRlIDxsaW51eC9tb2RfZGV2
+aWNldGFibGUuaD4KPiArI2luY2x1ZGUgPGxpbnV4L29mX2RldmljZS5oPgo+ICAjaW5jbHVkZSA8
+bGludXgvcGxhdGZvcm1fZGV2aWNlLmg+Cj4gICNpbmNsdWRlIDxsaW51eC9yZXNldC1jb250cm9s
+bGVyLmg+Cj4gICNpbmNsdWRlIDxsaW51eC9yZWdtYXAuaD4KPiAgI2luY2x1ZGUgPGR0LWJpbmRp
+bmdzL3Jlc2V0L2lteDctcmVzZXQuaD4KPiAgCj4gK3N0cnVjdCBpbXg3X3NyY19zaWduYWwgewo+
+ICsJdW5zaWduZWQgaW50IG9mZnNldCwgYml0Owo+ICt9Owo+ICsKPiArc3RydWN0IGlteDdfc3Jj
+Owo+ICsKPiArc3RydWN0IGlteDdfc3JjX3ZhcmlhbnQgewo+ICsJY29uc3Qgc3RydWN0IGlteDdf
+c3JjX3NpZ25hbCAqc2lnbmFsczsKPiArCXVuc2lnbmVkIGludCBzaWduYWxzX251bTsKPiArCXVu
+c2lnbmVkIGludCAoKnByZXBhcmUpKHN0cnVjdCBpbXg3X3NyYyAqaW14N3NyYywgdW5zaWduZWQg
+bG9uZyBpZCwKPiArCQkJCWJvb2wgYXNzZXJ0KTsKCkluc3RlYWQgb2YgYWRkaW5nIGEgZnVuY3Rp
+b24gcG9pbnRlciBpbmRpcmVjdGlvbizCoEknZCBwcmVmZXIgc2VwYXJhdGUKaW14N19yZXNldF9v
+cHMgYW5kIGlteDhtX3Jlc2V0X29wcyBzZXQgYnkgdGhlIHZhcmlhbnQsIHNlZSBiZWxvdy4KCj4g
+K307Cj4gKwo+ICBzdHJ1Y3QgaW14N19zcmMgewo+ICAJc3RydWN0IHJlc2V0X2NvbnRyb2xsZXJf
+ZGV2IHJjZGV2Owo+ICAJc3RydWN0IHJlZ21hcCAqcmVnbWFwOwo+ICsJY29uc3Qgc3RydWN0IGlt
+eDdfc3JjX3ZhcmlhbnQgKnZhcmlhbnQ7CgpUaGlzIGNvdWxkIHRoZW4gcmVwbGFjZWQgd2l0aCBh
+IGRpcmVjdCBwb2ludGVyIHRvIHRoZSByZXNwZWN0aXZlIHNpZ25hbHMKYXJyYXkuCgo+ICB9Owo+
+ICAKPiAgZW51bSBpbXg3X3NyY19yZWdpc3RlcnMgewo+IEBAIC0zOSwxMCArNTQsNiBAQCBlbnVt
+IGlteDdfc3JjX3JlZ2lzdGVycyB7Cj4gIAlTUkNfRERSQ19SQ1IJCT0gMHgxMDAwLAo+ICB9Owo+
+ICAKPiAtc3RydWN0IGlteDdfc3JjX3NpZ25hbCB7Cj4gLQl1bnNpZ25lZCBpbnQgb2Zmc2V0LCBi
+aXQ7Cj4gLX07Cj4gLQo+ICBzdGF0aWMgY29uc3Qgc3RydWN0IGlteDdfc3JjX3NpZ25hbCBpbXg3
+X3NyY19zaWduYWxzW0lNWDdfUkVTRVRfTlVNXSA9IHsKPiAgCVtJTVg3X1JFU0VUX0E3X0NPUkVf
+UE9SX1JFU0VUMF0gPSB7IFNSQ19BN1JDUjAsIEJJVCgwKSB9LAo+ICAJW0lNWDdfUkVTRVRfQTdf
+Q09SRV9QT1JfUkVTRVQxXSA9IHsgU1JDX0E3UkNSMCwgQklUKDEpIH0sCj4gQEAgLTcyLDE3ICs4
+MywxMSBAQCBzdGF0aWMgY29uc3Qgc3RydWN0IGlteDdfc3JjX3NpZ25hbCBpbXg3X3NyY19zaWdu
+YWxzW0lNWDdfUkVTRVRfTlVNXSA9IHsKPiAgCVtJTVg3X1JFU0VUX0REUkNfQ09SRV9SU1RdCT0g
+eyBTUkNfRERSQ19SQ1IsIEJJVCgxKSB9LAo+ICB9Owo+ICAKPiAtc3RhdGljIHN0cnVjdCBpbXg3
+X3NyYyAqdG9faW14N19zcmMoc3RydWN0IHJlc2V0X2NvbnRyb2xsZXJfZGV2ICpyY2RldikKPiAr
+c3RhdGljIHVuc2lnbmVkIGludAo+ICtpbXg3X3NyY19wcmVwYXJlKHN0cnVjdCBpbXg3X3NyYyAq
+aW14N3NyYywgdW5zaWduZWQgbG9uZyBpZCwgYm9vbCBhc3NlcnQpCj4gIHsKPiAtCXJldHVybiBj
+b250YWluZXJfb2YocmNkZXYsIHN0cnVjdCBpbXg3X3NyYywgcmNkZXYpOwo+IC19Cj4gLQo+IC1z
+dGF0aWMgaW50IGlteDdfcmVzZXRfc2V0KHN0cnVjdCByZXNldF9jb250cm9sbGVyX2RldiAqcmNk
+ZXYsCj4gLQkJCSAgdW5zaWduZWQgbG9uZyBpZCwgYm9vbCBhc3NlcnQpCj4gLXsKPiAtCXN0cnVj
+dCBpbXg3X3NyYyAqaW14N3NyYyA9IHRvX2lteDdfc3JjKHJjZGV2KTsKPiAtCWNvbnN0IHN0cnVj
+dCBpbXg3X3NyY19zaWduYWwgKnNpZ25hbCA9ICZpbXg3X3NyY19zaWduYWxzW2lkXTsKPiAtCXVu
+c2lnbmVkIGludCB2YWx1ZSA9IGFzc2VydCA/IHNpZ25hbC0+Yml0IDogMDsKPiArCWNvbnN0IHVu
+c2lnbmVkIGludCBiaXQgPSBpbXg3c3JjLT52YXJpYW50LT5zaWduYWxzW2lkXS5iaXQ7Cj4gKwl1
+bnNpZ25lZCBpbnQgdmFsdWUgPSBhc3NlcnQgPyBiaXQgOiAwOwo+ICAKPiAgCXN3aXRjaCAoaWQp
+IHsKPiAgCWNhc2UgSU1YN19SRVNFVF9QQ0lFUEhZOgo+IEBAIC05NSwxMCArMTAwLDMyIEBAIHN0
+YXRpYyBpbnQgaW14N19yZXNldF9zZXQoc3RydWN0IHJlc2V0X2NvbnRyb2xsZXJfZGV2ICpyY2Rl
+diwKPiAgCQlicmVhazsKPiAgCj4gIAljYXNlIElNWDdfUkVTRVRfUENJRV9DVFJMX0FQUFNfRU46
+Cj4gLQkJdmFsdWUgPSAoYXNzZXJ0KSA/IDAgOiBzaWduYWwtPmJpdDsKPiArCQl2YWx1ZSA9IGFz
+c2VydCA/IDAgOiBiaXQ7Cj4gIAkJYnJlYWs7Cj4gIAl9Cj4gIAo+ICsJcmV0dXJuIHZhbHVlOwo+
+ICt9CgpJbnN0ZWFkIG9mIGhhdmluZyBhIGNvbW1vbiBpbXg3X3Jlc2V0X3NldCBhbmQgdGhlbiBj
+YWxsaW5nIHRoZSBjdXN0b20KLnByZXBhcmUoKSB0aHJvdWdoIGEgZnVuY3Rpb24gcG9pbnRlciwg
+SSdkIHN1Z2dlc3QgdG8gaGF2ZSBjdXN0b20KaW14N19yZXNldF9zZXQgYW5kIGlteDhtX3Jlc2V0
+X3NldCBmdW5jdGlvbnMgdGhhdCBjb250YWluIHRoZSBjb2RlIGZyb20KLnByZXBhcmUoKSBhbmQg
+dGhlbiBjYWxsIGEgY29tbW9uIGZ1bmN0aW9uIHRvIGRvIHRoZSBhY3R1YWwgcmVnaXN0ZXIKYWNj
+ZXNzLgoKPiArCj4gK3N0YXRpYyBjb25zdCBzdHJ1Y3QgaW14N19zcmNfdmFyaWFudCB2YXJpYW50
+X2lteDcgPSB7Cj4gKwkuc2lnbmFscyA9IGlteDdfc3JjX3NpZ25hbHMsCj4gKwkuc2lnbmFsc19u
+dW0gPSBBUlJBWV9TSVpFKGlteDdfc3JjX3NpZ25hbHMpLAo+ICsJLnByZXBhcmUgPSBpbXg3X3Ny
+Y19wcmVwYXJlLAo+ICt9Owo+ICsKPiArc3RhdGljIHN0cnVjdCBpbXg3X3NyYyAqdG9faW14N19z
+cmMoc3RydWN0IHJlc2V0X2NvbnRyb2xsZXJfZGV2ICpyY2RldikKPiArewo+ICsJcmV0dXJuIGNv
+bnRhaW5lcl9vZihyY2Rldiwgc3RydWN0IGlteDdfc3JjLCByY2Rldik7Cj4gK30KPiArCj4gK3N0
+YXRpYyBpbnQgaW14N19yZXNldF9zZXQoc3RydWN0IHJlc2V0X2NvbnRyb2xsZXJfZGV2ICpyY2Rl
+diwKPiArCQkJICB1bnNpZ25lZCBsb25nIGlkLCBib29sIGFzc2VydCkKPiArewo+ICsJc3RydWN0
+IGlteDdfc3JjICppbXg3c3JjID0gdG9faW14N19zcmMocmNkZXYpOwo+ICsJY29uc3Qgc3RydWN0
+IGlteDdfc3JjX3ZhcmlhbnQgKnZhcmlhbnQgPSBpbXg3c3JjLT52YXJpYW50Owo+ICsJY29uc3Qg
+c3RydWN0IGlteDdfc3JjX3NpZ25hbCAqc2lnbmFsID0gJnZhcmlhbnQtPnNpZ25hbHNbaWRdOwo+
+ICsJY29uc3QgdW5zaWduZWQgaW50IHZhbHVlID0gdmFyaWFudC0+cHJlcGFyZShpbXg3c3JjLCBp
+ZCwgYXNzZXJ0KTsKPiArCj4gIAlyZXR1cm4gcmVnbWFwX3VwZGF0ZV9iaXRzKGlteDdzcmMtPnJl
+Z21hcCwKPiAgCQkJCSAgc2lnbmFsLT5vZmZzZXQsIHNpZ25hbC0+Yml0LCB2YWx1ZSk7Cj4gIH0K
+PiBAQCAtMTMwLDYgKzE1Nyw3IEBAIHN0YXRpYyBpbnQgaW14N19yZXNldF9wcm9iZShzdHJ1Y3Qg
+cGxhdGZvcm1fZGV2aWNlICpwZGV2KQo+ICAJaWYgKCFpbXg3c3JjKQo+ICAJCXJldHVybiAtRU5P
+TUVNOwo+ICAKPiArCWlteDdzcmMtPnZhcmlhbnQgPSBvZl9kZXZpY2VfZ2V0X21hdGNoX2RhdGEo
+ZGV2KTsKPiAgCWlteDdzcmMtPnJlZ21hcCA9IHN5c2Nvbl9ub2RlX3RvX3JlZ21hcChkZXYtPm9m
+X25vZGUpOwo+ICAJaWYgKElTX0VSUihpbXg3c3JjLT5yZWdtYXApKSB7Cj4gIAkJZGV2X2Vycihk
+ZXYsICJVbmFibGUgdG8gZ2V0IGlteDctc3JjIHJlZ21hcCIpOwo+IEBAIC0xMzgsNyArMTY2LDcg
+QEAgc3RhdGljIGludCBpbXg3X3Jlc2V0X3Byb2JlKHN0cnVjdCBwbGF0Zm9ybV9kZXZpY2UgKnBk
+ZXYpCj4gIAlyZWdtYXBfYXR0YWNoX2RldihkZXYsIGlteDdzcmMtPnJlZ21hcCwgJmNvbmZpZyk7
+Cj4gIAo+ICAJaW14N3NyYy0+cmNkZXYub3duZXIgICAgID0gVEhJU19NT0RVTEU7Cj4gLQlpbXg3
+c3JjLT5yY2Rldi5ucl9yZXNldHMgPSBJTVg3X1JFU0VUX05VTTsKPiArCWlteDdzcmMtPnJjZGV2
+Lm5yX3Jlc2V0cyA9IGlteDdzcmMtPnZhcmlhbnQtPnNpZ25hbHNfbnVtOwo+ICAJaW14N3NyYy0+
+cmNkZXYub3BzICAgICAgID0gJmlteDdfcmVzZXRfb3BzOwo+ICAJaW14N3NyYy0+cmNkZXYub2Zf
+bm9kZSAgID0gZGV2LT5vZl9ub2RlOwo+ICAKPiBAQCAtMTQ2LDcgKzE3NCw3IEBAIHN0YXRpYyBp
+bnQgaW14N19yZXNldF9wcm9iZShzdHJ1Y3QgcGxhdGZvcm1fZGV2aWNlICpwZGV2KQo+ICB9Cj4g
+IAo+ICBzdGF0aWMgY29uc3Qgc3RydWN0IG9mX2RldmljZV9pZCBpbXg3X3Jlc2V0X2R0X2lkc1td
+ID0gewo+IC0JeyAuY29tcGF0aWJsZSA9ICJmc2wsaW14N2Qtc3JjIiwgfSwKPiArCXsgLmNvbXBh
+dGlibGUgPSAiZnNsLGlteDdkLXNyYyIsIC5kYXRhID0gJnZhcmlhbnRfaW14NyB9LAo+ICAJeyAv
+KiBzZW50aW5lbCAqLyB9LAo+ICB9OwoKcmVnYXJkcwpQaGlsaWxpcHAKCl9fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGlu
+ZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMu
+aW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
