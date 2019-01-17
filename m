@@ -2,24 +2,23 @@ Return-Path: <SRS0=6Gta=PZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DD1B4C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 14:38:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1D401C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 14:38:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ADE48205C9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 14:38:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E2CB8205C9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 14:38:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="n+JMa9WA";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="blz9J7A2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ADE48205C9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TzQOKmw3";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="E63wGUlZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E2CB8205C9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -27,64 +26,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
 	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=qL5Zbh7Rju5ca9ux/YUjVnztMY7iwVEMXhuUZtIibcA=; b=n+JMa9WAcD/buB
-	ODAA2sQjR+dthGn+ItQX/9d+HAFkkaFTDmXk5CHhYyZTjC97A0hkEkhnVMyVVdp81D3cZAm1f+mwQ
-	OBmjp+0AG9WXcXWcB5qjsPrsnR4tStHdBc1i8uWuEXnMGuCludxqw5ia3Etqo+EXeWG37cLUx2K5a
-	DWzSRKncbWjtP4jR7T1tzI41t8+msNaje5Ub3+t12QhOCDm/EKHwAJgm6F0ezuLLa/zkOchRM2ZCU
-	F5DZFTROG0a1FmTOBP1UXjdO8JEef30gb+E9kNiuR8jkKKtTs01KC9uPveiw6g8dWJCLN5/n0ZqLA
-	Jk+4pBO4d8tgJ2k0pSUg==;
+	List-Owner; bh=ucaKJ2ZasFow0/jaetwY2WyVbAjM3oLDKUmTnQSFiu4=; b=TzQOKmw3jPI9j5
+	i6IkDVPwCWGenHhnWsWPcOTPC/RaaXVeXCIHcBNdrxMv/hHi5RpU9XQ3xhTeCO3fZ6hTIJszo7RuZ
+	Ep59L3niOYozB/b3bYpemUeRez1+5CsbEikMMtIdUE5bUauumuhbCcn/f1ml5bJLXNFcc0rrBysgy
+	sWefZhPKy783SsjvHeFxZvHmpsaWKDHxVQCu2NGDu6YxQX8Z+2kTX3dcOCfIUjwi37REG9b26O/ce
+	YzunqaMbnHDWxecG6zBErApwsW/4wn/TFs/qcZE1eNEMcRYE62DSVQWlKrU+AgjEYQZzYgXzvCb+p
+	dJWhVYR8bKPAZ9np3WDQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gk8nw-0005Au-Fy; Thu, 17 Jan 2019 14:38:00 +0000
-Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gk8nt-0005Ab-Dq
- for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 14:37:58 +0000
-Received: by mail-pg1-x542.google.com with SMTP id w7so4513109pgp.13
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 17 Jan 2019 06:37:56 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=date:from:to:cc:subject:message-id:mime-version:content-disposition
- :user-agent; bh=67KdRtf3gBQZSqEzeYBLHnkzf1Hr8Lnj8xOAI6w6D2U=;
- b=blz9J7A2wMXAFuN8wZeupd4BI7lp7TmufkG2SIPXFC+X5UGvYFuoBdkxZmwuXM6AVo
- NgHwe37xxMWMtQ0SUBwUQCFNd4s7qN5ZxUVTN7dHe+yknCVQphokPq+mPcVPGflkD2D6
- OOwJ6s0LglAHQYXTmUszTiSbSZPTVzb1yy/qyUroewFPo6f8YVvAKxJF7WLpzPJbwJsD
- 6tNg8FzAamxyQ7xheKQEzOBtJgzjXl5kWmaV1P41P7JPhswhgNwKaXPglpANQibPGtrC
- 4S6qiEaA0qMNnW/HF46zxV7HkVwKRwICUlHLOSvf4+f27SWRr+zTKE19rHTHFuprc0Il
- 5m9Q==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:mime-version
- :content-disposition:user-agent;
- bh=67KdRtf3gBQZSqEzeYBLHnkzf1Hr8Lnj8xOAI6w6D2U=;
- b=ZNQ96mMRd/JaG/BfXINccux+nxHvKqk+kGo071+3x8DILR5vcmJ/q1QyvwCknQvj+w
- A/3GhSY4R13uBXuU1nUhk5xH5Y8ninJH1850MXrmw9nPeB69xyb08fDowiqi4bXIgGkh
- S3/icmWAClHqY0M08inP4uHYUC5eTQngdsLcmXyTmuYgyZ76OP0rVZV7Q/0rJ4Jy8RoB
- Nvx5USWbnYb4owCmJuAi+ISD043ZFKYkZI+YHO2bRt7Cu3eldrZ6usn98LFS4fIDXzkl
- u4eA6zPdA1bUNF3vuhklkJwHd/kpDEWKF9JL8yAbK3KLELwhVl31nOSimS4DatmLQfde
- FaoA==
-X-Gm-Message-State: AJcUukeHEOnAFfILi2yhsMXswaVgT0OFxBELfS8xVtS4qL17ybJcRw+T
- h0MlZQZ5IoKBfE9Sc8VCx+aMihVb
-X-Google-Smtp-Source: ALg8bN4F/kloviAoLjxyMQS8wAfpCWY/ItspHghPgGNpB30ZOdcUnUTjO5FGom9C4PKbc7VCHlrRng==
-X-Received: by 2002:a63:91c1:: with SMTP id l184mr13797903pge.29.1547735876478; 
- Thu, 17 Jan 2019 06:37:56 -0800 (PST)
-Received: from hp-pavilion-15-notebook-pc-brajeswar
- ([2405:204:4402:39a3:451f:6d25:2f65:74d6])
- by smtp.gmail.com with ESMTPSA id g26sm3394598pfh.61.2019.01.17.06.37.54
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 17 Jan 2019 06:37:55 -0800 (PST)
-Date: Thu, 17 Jan 2019 20:07:51 +0530
-From: Brajeswar Ghosh <brajeswar.linux@gmail.com>
-To: lukma@denx.de, hsweeten@visionengravers.com,
- alexander.sverdlin@gmail.com, linux@armlinux.org.uk
-Subject: [PATCH] arch/arm/mach-ep93xx: Remove duplicate header
-Message-ID: <20190117143751.GA3462@hp-pavilion-15-notebook-pc-brajeswar>
+	id 1gk8oX-0005RF-H7; Thu, 17 Jan 2019 14:38:37 +0000
+Received: from kirsty.vergenet.net ([202.4.237.240])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gk8oU-0005Qw-0V
+ for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 14:38:35 +0000
+Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
+ by kirsty.vergenet.net (Postfix) with ESMTPA id 8560125B7E8;
+ Fri, 18 Jan 2019 01:38:31 +1100 (AEDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
+ t=1547735911; bh=FxAHpZO285pAtdQhVDb5RNUMhcFP75cslqvQgWzyGEA=;
+ h=Date:From:To:Cc:Subject:From;
+ b=E63wGUlZLiVp2bspwBbnJF1RigUecyeX3jIqWu+2Zxfn2yH/E6TGdvzFXjQ2DEB1n
+ +q7Xi3TWFfFWKdEwk3cNju1ks2OFnjoknkS/gCfLMkWhGP83qc3yTQqmCNr0/ZvqvH
+ NeCf8bgU9++IiWecxbG4eoijT2EY+1vHCxQt/UmQ=
+Received: by reginn.horms.nl (Postfix, from userid 7100)
+ id 94173940459; Thu, 17 Jan 2019 15:38:29 +0100 (CET)
+Date: Thu, 17 Jan 2019 15:38:29 +0100
+From: Simon Horman <horms+renesas@verge.net.au>
+To: linux-renesas-soc@vger.kernel.org
+Subject: [PATCH repost] arm64: dts: renesas: r8a77990: ebisu: Enable HS400 of
+ SDHI3
+Message-ID: <20190117143829.6ubwnj5cyh74mjq3@verge.net.au>
 MIME-Version: 1.0
 Content-Disposition: inline
-User-Agent: Mutt/1.9.4 (2018-02-28)
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_063757_494970_6B1FB61F 
-X-CRM114-Status: UNSURE (   9.91  )
+X-CRM114-CacheID: sfid-20190117_063834_242601_DF0DC836 
+X-CRM114-Status: UNSURE (   9.99  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -97,34 +74,137 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: sabyasachi.linux@gmail.com, jrdr.linux@gmail.com,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
+Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>,
+ Niklas =?utf-8?Q?S=C3=B6derlund?= <niklas.soderlund+renesas@ragnatech.se>,
+ Magnus Damm <magnus.damm@gmail.com>, linux-arm-kernel@lists.infradead.org,
+ Simon Horman <horms+renesas@verge.net.au>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Remove mach/gpio-ep93xx.h which is included more than once
+Add SDHI3 UHS pin control and use it when enabling HS200 support
+for SDHI3.
 
-Signed-off-by: Brajeswar Ghosh <brajeswar.linux@gmail.com>
+Based on work by Takeshi Kihara.
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-ep93xx/ts72xx.c | 1 -
- 1 file changed, 1 deletion(-)
+Tested on top of renesas-devel-20190110-v5.0-rc1
 
-diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
-index c6a533699b00..85b74ac943f0 100644
---- a/arch/arm/mach-ep93xx/ts72xx.c
-+++ b/arch/arm/mach-ep93xx/ts72xx.c
-@@ -26,7 +26,6 @@
- #include <mach/gpio-ep93xx.h>
- #include <mach/hardware.h>
- #include <mach/irqs.h>
--#include <mach/gpio-ep93xx.h>
+[    2.967136] renesas_sdhi_internal_dmac ee160000.sd: mmc0 base at 0xee160000 max clock rate 200 MHz
+[    3.055659] mmc0: new HS400 MMC card at address 0001
+[    3.061726] mmcblk0: mmc0:0001 BGSD3R 29.1 GiB
+[    3.070827] mmcblk0boot0: mmc0:0001 BGSD3R partition 1 16.0 MiB
+[    3.077508] mmcblk0boot1: mmc0:0001 BGSD3R partition 2 16.0 MiB
+[    3.084132] mmcblk0rpmb: mmc0:0001 BGSD3R partition 3 4.00 MiB, chardev (243:0)
+[    2.967136] renesas_sdhi_internal_dmac ee160000.sd: mmc0 base at 0xee160000 max clock rate 200 MHz
+[    3.055659] mmc0: new HS400 MMC card at address 0001
+[    3.061726] mmcblk0: mmc0:0001 BGSD3R 29.1 GiB
+[    3.070827] mmcblk0boot0: mmc0:0001 BGSD3R partition 1 16.0 MiB
+[    3.077508] mmcblk0boot1: mmc0:0001 BGSD3R partition 2 16.0 MiB
+[    3.084132] mmcblk0rpmb: mmc0:0001 BGSD3R partition 3 4.00 MiB, chardev (243:0)
+
+[    2.901527] renesas_sdhi_internal_dmac ee160000.sd: Linked as a consumer to regulator.2
+[    2.909824] renesas_sdhi_internal_dmac ee160000.sd: Linked as a consumer to regulator.1
+[    2.967136] renesas_sdhi_internal_dmac ee160000.sd: mmc0 base at 0xee160000 max clock rate 200 MHz
+[    3.055659] mmc0: new HS400 MMC card at address 0001
+[    3.061726] mmcblk0: mmc0:0001 BGSD3R 29.1 GiB
+[    3.070827] mmcblk0boot0: mmc0:0001 BGSD3R partition 1 16.0 MiB
+[    3.077508] mmcblk0boot1: mmc0:0001 BGSD3R partition 2 16.0 MiB
+[    3.084132] mmcblk0rpmb: mmc0:0001 BGSD3R partition 3 4.00 MiB, chardev (243:0)
+
+
+# dd if=/dev/mmcblk0 of=/dev/null bs=1M count=512 iflag=direct
+512+0 records in
+512+0 records out
+536870912 bytes (537 MB) copied, 9.02486 s, 59.5 MB/s
+# dd if=/dev/mmcblk0 of=/dev/null bs=1M count=512 iflag=direct
+512+0 records in
+512+0 records out
+536870912 bytes (537 MB) copied, 7.36003 s, 72.9 MB/s
+# dd if=/dev/mmcblk0 of=/dev/null bs=1M count=512 iflag=direct
+512+0 records in
+512+0 records out
+536870912 bytes (537 MB) copied, 11.0156 s, 48.7 MB/s
+
+# dd of=/dev/mmcblk0 if=/dev/zero bs=1M count=512 oflag=direct
+512+0 records in
+512+0 records out
+536870912 bytes (537 MB) copied, 7.15907 s, 75.0 MB/s
+# dd of=/dev/mmcblk0 if=/dev/zero bs=1M count=512 oflag=direct
+512+0 records in
+512+0 records out
+536870912 bytes (537 MB) copied, 8.78869 s, 61.1 MB/s
+# dd of=/dev/mmcblk0 if=/dev/zero bs=1M count=512 oflag=direct
+512+0 records in
+512+0 records out
+536870912 bytes (537 MB) copied, 10.3861 s, 51.7 MB/s
+
+The above test results seem favourable when compared to
+testing against renesas-devel-20190110-v5.0-rc1 where the eMMC
+device uses HS200 mode.
+
+# dd if=/dev/mmcblk0 of=/dev/null bs=1M count=512 iflag=direct
+512+0 records in
+512+0 records out
+536870912 bytes (537 MB) copied, 14.7343 s, 36.4 MB/s
+# dd if=/dev/mmcblk0 of=/dev/null bs=1M count=512 iflag=direct
+512+0 records in
+512+0 records out
+536870912 bytes (537 MB) copied, 8.46809 s, 63.4 MB/s
+# dd if=/dev/mmcblk0 of=/dev/null bs=1M count=512 iflag=direct
+512+0 records in
+512+0 records out
+536870912 bytes (537 MB) copied, 14.6945 s, 36.5 MB/s
+
+# dd of=/dev/mmcblk0 if=/dev/zero bs=1M count=512 oflag=direct
+512+0 records in
+512+0 records out
+536870912 bytes (537 MB) copied, 19.1677 s, 28.0 MB/s
+# dd of=/dev/mmcblk0 if=/dev/zero bs=1M count=512 oflag=direct
+512+0 records in
+512+0 records out
+536870912 bytes (537 MB) copied, 21.3139 s, 25.2 MB/s
+# dd of=/dev/mmcblk0 if=/dev/zero bs=1M count=512 oflag=direct
+512+0 records in
+512+0 records out
+536870912 bytes (537 MB) copied, 19.9205 s, 27.0 MB/s
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+index 89383aa35d65..f2846c9eb83f 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
++++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+@@ -535,6 +535,12 @@
+ 		power-source = <1800>;
+ 	};
  
- #include <asm/mach-types.h>
- #include <asm/mach/map.h>
++	sdhi3_pins_uhs: sd3_uhs {
++		groups = "sdhi3_data8", "sdhi3_ctrl", "sdhi3_ds";
++		function = "sdhi3";
++		power-source = <1800>;
++	};
++
+ 	sound_pins: sound {
+ 		groups = "ssi01239_ctrl", "ssi0_data", "ssi1_data";
+ 		function = "ssi";
+@@ -689,12 +695,13 @@
+ &sdhi3 {
+ 	/* used for on-board 8bit eMMC */
+ 	pinctrl-0 = <&sdhi3_pins>;
+-	pinctrl-1 = <&sdhi3_pins>;
++	pinctrl-1 = <&sdhi3_pins_uhs>;
+ 	pinctrl-names = "default", "state_uhs";
+ 
+ 	vmmc-supply = <&reg_3p3v>;
+ 	vqmmc-supply = <&reg_1p8v>;
+ 	mmc-hs200-1_8v;
++	mmc-hs400-1_8v;
+ 	bus-width = <8>;
+ 	non-removable;
+ 	status = "okay";
 -- 
-2.17.1
+2.11.0
 
 
 _______________________________________________
