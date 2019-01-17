@@ -7,59 +7,57 @@ X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 21C2FC43444
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AC9C2C43613
 	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 20:37:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BD4C120851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 20:37:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7330620873
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 20:37:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KHHAyR/j"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BD4C120851
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="s7mXQFzr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7330620873
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hCI4HoXATFK1/Y48qsF1hdzg+s7OC2dumiU9TJPopes=; b=KHHAyR/jqRsDh8
-	Ba35wMakpmBsxXZq6TSSVn5QG234OsfAqPXOcCXC0WcRHRnXzuLtFhs32PqV6Rww/KNMJ/1hpB3cJ
-	Zx4Fp7iWXN0LOWRREtQGI0O3dRTSG1aW8JGVTngDHU1QK+J26iPiIMK7h6n1qzhW6NYvnjDIheSZs
-	38l/1+w2Fa0X/DGA1WA6jc3XTUl8miQ1RnBNED/nBbB8VjwQHXRgV3V+RVRzMJror2xnrqDhhPJtb
-	aCxbmTQmqfdSYgtp5/6JuU8AuLM/yKKCwulDyALfvHbjplNZLRL4bYI8DTp0shAcWin93tw4eWQpF
-	0x9JIXGWgvmG8jwTh3TQ==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=IwFySHXg+++fbG+M/agEuk5XzIF0veBL4qt9Aq2QaJI=; b=s7mXQFzrGsl2mnbN7XNN/JefRQ
+	rfop5ApzA2S0oJeh4czXYSB9llF60hn5BZfRxmrgrkvsH1O90UfUHL8hrdJeTcpAajpLi4VzIH61l
+	Z6yrKD3Sr2Br7V0cnrCt4bJxMz+qFklOaIxb44GWYVFyYpSG9+3xGbg0C85CMkgVEkypb63PBsWuH
+	o8mqyiS+Vhqc+WkIFCp0PG17Dn1FFHQukzL5SIrJ/N3Bljn+TmD3IiK4sNvYv/wUmYioJJxN8Zszl
+	FwxgKrpgssOMAuir8D8Uc1O4my8/o9WWQtLisg0pcqgojJmi9wN62q4fAxvE6JntVhWp3KXiAUic6
+	3XNWuE2A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkENZ-0000ch-Dl; Thu, 17 Jan 2019 20:35:09 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gkEOj-0002h9-Fe; Thu, 17 Jan 2019 20:36:21 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkEN1-0008O9-SC
- for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 20:34:38 +0000
+ id 1gkENJ-0000Ee-Fe
+ for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 20:34:57 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8C988EBD;
- Thu, 17 Jan 2019 12:34:35 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9EC81EBD;
+ Thu, 17 Jan 2019 12:34:52 -0800 (PST)
 Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 9240D3F819;
- Thu, 17 Jan 2019 12:34:33 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id D21EA3F819;
+ Thu, 17 Jan 2019 12:34:50 -0800 (PST)
 From: Dave Martin <Dave.Martin@arm.com>
 To: kvmarm@lists.cs.columbia.edu
-Subject: [PATCH v4 03/25] KVM: arm64: Delete orphaned declaration for
- __fpsimd_enabled()
-Date: Thu, 17 Jan 2019 20:33:17 +0000
-Message-Id: <1547757219-19439-4-git-send-email-Dave.Martin@arm.com>
+Subject: [PATCH v4 11/25] KVM: arm64: Extend reset_unknown() to handle mixed
+ RES0/UNKNOWN registers
+Date: Thu, 17 Jan 2019 20:33:25 +0000
+Message-Id: <1547757219-19439-12-git-send-email-Dave.Martin@arm.com>
 X-Mailer: git-send-email 2.1.4
 In-Reply-To: <1547757219-19439-1-git-send-email-Dave.Martin@arm.com>
 References: <1547757219-19439-1-git-send-email-Dave.Martin@arm.com>
-MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_123436_320649_AA7F1A74 
-X-CRM114-Status: UNSURE (   9.93  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190117_123454_031055_E4D47047 
+X-CRM114-Status: GOOD (  12.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,26 +77,74 @@ Cc: Peter Maydell <peter.maydell@linaro.org>,
  Will Deacon <will.deacon@arm.com>, Julien Grall <Julien.Grall@arm.com>,
  =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>,
  linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-X19mcHNpbWRfZW5hYmxlZCgpIG5vIGxvbmdlciBleGlzdHMsIGJ1dCBhIGRhbmdsaW5nIGRlY2xh
-cmF0aW9uIGhhcwpzdXJ2aXZlZCBpbiBrdm1faHlwLmguCgpUaGlzIHBhdGNoIGdldHMgcmlkIG9m
-IGl0LgoKU2lnbmVkLW9mZi1ieTogRGF2ZSBNYXJ0aW4gPERhdmUuTWFydGluQGFybS5jb20+ClJl
-dmlld2VkLWJ5OiBBbGV4IEJlbm7DqWUgPGFsZXguYmVubmVlQGxpbmFyby5vcmc+Ci0tLQogYXJj
-aC9hcm02NC9pbmNsdWRlL2FzbS9rdm1faHlwLmggfCAxIC0KIDEgZmlsZSBjaGFuZ2VkLCAxIGRl
-bGV0aW9uKC0pCgpkaWZmIC0tZ2l0IGEvYXJjaC9hcm02NC9pbmNsdWRlL2FzbS9rdm1faHlwLmgg
-Yi9hcmNoL2FybTY0L2luY2x1ZGUvYXNtL2t2bV9oeXAuaAppbmRleCBhODBhN2VmLi5iZDdhMDU1
-IDEwMDY0NAotLS0gYS9hcmNoL2FybTY0L2luY2x1ZGUvYXNtL2t2bV9oeXAuaAorKysgYi9hcmNo
-L2FybTY0L2luY2x1ZGUvYXNtL2t2bV9oeXAuaApAQCAtMTQ4LDcgKzE0OCw2IEBAIHZvaWQgX19k
-ZWJ1Z19zd2l0Y2hfdG9faG9zdChzdHJ1Y3Qga3ZtX3ZjcHUgKnZjcHUpOwogCiB2b2lkIF9fZnBz
-aW1kX3NhdmVfc3RhdGUoc3RydWN0IHVzZXJfZnBzaW1kX3N0YXRlICpmcF9yZWdzKTsKIHZvaWQg
-X19mcHNpbWRfcmVzdG9yZV9zdGF0ZShzdHJ1Y3QgdXNlcl9mcHNpbWRfc3RhdGUgKmZwX3JlZ3Mp
-OwotYm9vbCBfX2Zwc2ltZF9lbmFibGVkKHZvaWQpOwogCiB2b2lkIGFjdGl2YXRlX3RyYXBzX3Zo
-ZV9sb2FkKHN0cnVjdCBrdm1fdmNwdSAqdmNwdSk7CiB2b2lkIGRlYWN0aXZhdGVfdHJhcHNfdmhl
-X3B1dCh2b2lkKTsKLS0gCjIuMS40CgoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtl
-cm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxt
-YW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+The reset_unknown() system register helper initialises a guest
+register to a distinctive junk value on vcpu reset, to help expose
+and debug deficient register initialisation within the guest.
+
+Some registers such as the SVE control register ZCR_EL1 contain a
+mixture of UNKNOWN fields and RES0 bits.  For these,
+reset_unknown() does not work at present, since it sets all bits to
+junk values instead of just the wanted bits.
+
+There is no need to craft another special helper just for that,
+since reset_unknown() almost does the appropriate thing anyway.
+This patch takes advantage of the unused val field in struct
+sys_reg_desc to specify a mask of bits that should be initialised
+to zero instead of junk.
+
+All existing users of reset_unknown() do not (and should not)
+define a value for val, so they will implicitly set it to zero,
+resulting in all bits being made UNKNOWN by this function: thus,
+this patch makes no functional change for currently defined
+registers.
+
+Future patches will make use of non-zero val.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ arch/arm64/kvm/sys_regs.h | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
+index 3b1bc7f..174ffc0 100644
+--- a/arch/arm64/kvm/sys_regs.h
++++ b/arch/arm64/kvm/sys_regs.h
+@@ -56,7 +56,12 @@ struct sys_reg_desc {
+ 	/* Index into sys_reg[], or 0 if we don't need to save it. */
+ 	int reg;
+ 
+-	/* Value (usually reset value) */
++	/*
++	 * Value (usually reset value)
++	 * For reset_unknown, each bit set to 1 in val is treated as
++	 * RES0 in the register: the corresponding register bit is
++	 * reset to 0 instead of "unknown".
++	 */
+ 	u64 val;
+ 
+ 	/* Custom get/set_user functions, fallback to generic if NULL */
+@@ -92,7 +97,9 @@ static inline void reset_unknown(struct kvm_vcpu *vcpu,
+ {
+ 	BUG_ON(!r->reg);
+ 	BUG_ON(r->reg >= NR_SYS_REGS);
+-	__vcpu_sys_reg(vcpu, r->reg) = 0x1de7ec7edbadc0deULL;
++
++	/* If non-zero, r->val specifies which register bits are RES0: */
++	__vcpu_sys_reg(vcpu, r->reg) = 0x1de7ec7edbadc0deULL & ~r->val;
+ }
+ 
+ static inline void reset_val(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+-- 
+2.1.4
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
