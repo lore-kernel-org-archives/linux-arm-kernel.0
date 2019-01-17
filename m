@@ -2,86 +2,68 @@ Return-Path: <SRS0=6Gta=PZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-2.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4D2C0C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 05:49:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 71363C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 06:00:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1AC7B20854
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 05:49:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3A01320854
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 06:00:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o6HUvZpq";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="fTr8ggFX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1AC7B20854
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pq+ejmuG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3A01320854
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=kernel.crashing.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=vRVsGn84Vy93LzG0ETeNBsBicmZjM404Z+R8+Xp9wKE=; b=o6HUvZpqDpOXI5
-	0vsou1m+2xym5GOYqh6gkJXclfByzIskAz4sQrNX7niw1hzX6EvHt8lVTMRYwy+NCXFU6yyHHgpct
-	PP5IQoC/ZWKxJjtT+vBhj1i1r1LwEgbaJ+Q7ivtYaU9CPwCLuQm3/tK+0G62XB4OQpH3bVIUZ+sVe
-	wvZNJBWI+wk/eKQWhxZxIeo7pgTrD+R/riWIbNtwokEKmos5hP6bZ3JKjaHlj2XYErqF5JK1SF4iz
-	3WJgGnH5XSa/whYUaybJ40XZcD4Uc5XEdu6bCG6Ta8yFH95W8asj1HQ5z5SzJo8JKlEpGNd3fnKBj
-	JSbDd3m9GOE2tkynb4CQ==;
+	List-Owner; bh=rh5CXnbaZPoNgZDsR6uKvpa5+kE7l2m1OO2uCZQPwHs=; b=pq+ejmuGN6Ef1V
+	kxwTC4siSH374thb7wt4cgQI8kirltE9HWkbw2I7KlJd2+EyFKDBtw7ClF7+VEAATtQCJKu3r5rK4
+	XdTbxItKluDk9/oow/JVsFWC4soxurD7LKd7saAIjrPob8pgEP7bztMiv1WZrVOfvtXLn+HgxjjBS
+	g96bxmXV8sewiThwOnMhTJdvMbLf5ImP1jYS9LqhmV38JsU4kZpPbi5RzMUUkmzPrMKmK/5rjQeIE
+	H00sxmwi/+Fn+ycWbITdVKaVeuuk2hfOqHFqj27Fd7Rm/rZJeOXJtAyv9g/UPh8TVbRFypcSjasHH
+	l6FXuxcTbQilySxgsSsA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gk0YO-0001VM-LE; Thu, 17 Jan 2019 05:49:24 +0000
-Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
+	id 1gk0jG-0006C9-Rp; Thu, 17 Jan 2019 06:00:38 +0000
+Received: from gate.crashing.org ([63.228.1.57])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gk0YK-0001UB-Gy
- for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 05:49:22 +0000
-Received: by mail-pg1-x544.google.com with SMTP id t13so3915829pgr.11
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 16 Jan 2019 21:49:19 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=pV6w5zBcNIn0CdpE5qe/bD/3UXSmkBbu0VG7ZuQvYuY=;
- b=fTr8ggFXr8imKvwEeXvT3sJLlPZ855lkgIwHk5uMrrxvzmzvKA6WBHYOzHUhSqhXdO
- DCQzPxryyf+rD2m1m3CjBrkcjgcBcNLyyJS7LtwWWrfilhqU2dSPeWeyDu8XRVCMN1vO
- gRt0X6TVnVRcK7nGWceg/nsfIJzu4lTsPcug0=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=pV6w5zBcNIn0CdpE5qe/bD/3UXSmkBbu0VG7ZuQvYuY=;
- b=tKX+TRT4kX36pa1vOeZqII2ooXM8u4y3zzVyBLBQKHg8JFuNL1VsQMPm86qayjQxe0
- PUGXAnyxqZwSlCg2HjwlhE+ykVxvEynIEJ2ahUcuHEvOaUsgG5c9FsQbHHq4DGWlMn2h
- Vf8IUbNkHCbqchHsWwoKggRHsblFbcP/jbtr5BrJOZVfamiPF71j4RqpF1o3oo5eh1JG
- oRXdEt/wshrerCMMzJHHlPhLu9zX30Xhr3NUDm07odDfPp/Wg0tn+B60f8AiaxuiwXnb
- 3sKGb/FXi7o6t5/2IYAOArHtk4E0fa9v9mrd0boUjUuSXWObg1rNWzbhMgKLZXkktVyb
- Yvbg==
-X-Gm-Message-State: AJcUukfu0XHk5kRJxGD/B7KPeNIbOCD99ejiArEGi8evlwhS++2IqTRa
- FCnVLz4QZNcduieNCdAZZANk7Q==
-X-Google-Smtp-Source: ALg8bN66gAIX4K4TNYh79R+zB3Fqideh9PQeveVNZqZiwUrZThY1JOWpHygd5CFfSW9Pwh9Ka27M2g==
-X-Received: by 2002:a63:e445:: with SMTP id i5mr12234356pgk.307.1547704159184; 
- Wed, 16 Jan 2019 21:49:19 -0800 (PST)
-Received: from localhost ([122.172.102.63])
- by smtp.gmail.com with ESMTPSA id a17sm643310pgm.26.2019.01.16.21.49.17
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 16 Jan 2019 21:49:18 -0800 (PST)
-Date: Thu, 17 Jan 2019 11:19:16 +0530
-From: Viresh Kumar <viresh.kumar@linaro.org>
-To: Amit Kucheria <amit.kucheria@linaro.org>
-Subject: Re: [PATCH v1 00/10] cpufreq: Add flag to auto-register as cooling
- device
-Message-ID: <20190117054916.dqduckt7larn32av@vireshk-i7>
-References: <cover.1547481320.git.amit.kucheria@linaro.org>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <cover.1547481320.git.amit.kucheria@linaro.org>
-User-Agent: NeoMutt/20180323-120-3dd1ac
+ id 1gk0jD-0006Bd-To
+ for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 06:00:37 +0000
+Received: from localhost (localhost.localdomain [127.0.0.1])
+ by gate.crashing.org (8.14.1/8.14.1) with ESMTP id x0H5xrlO023594;
+ Wed, 16 Jan 2019 23:59:54 -0600
+Message-ID: <db8cd68b82cda0ee0d352fdb709a76151798f9f5.camel@kernel.crashing.org>
+Subject: Re: [RFC PATCH] drm/ttm: force cached mappings for system RAM on ARM
+From: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+To: "Koenig, Christian" <Christian.Koenig@amd.com>, Michael Ellerman
+ <mpe@ellerman.id.au>, Will Deacon <will.deacon@arm.com>
+Date: Thu, 17 Jan 2019 16:59:53 +1100
+In-Reply-To: <9dc27cbf-e109-0c32-fc92-6fce1b224cda@amd.com>
+References: <20190110072841.3283-1-ard.biesheuvel@linaro.org>
+ <5d8135de-80fe-9c0e-2206-ecb809f64cdb@daenzer.net>
+ <CAKv+Gu_X-DH6GZ0k8RYuL18rxTwBpb5=Qp9VCZfn_kh+9b3Zkg@mail.gmail.com>
+ <55facfb9-92af-86b8-40e9-d63b887b5592@amd.com>
+ <CAKv+Gu_JyO2KNtdN1-_TcoL_kqs0yswdwBrpAXA6-jyWuDrj+g@mail.gmail.com>
+ <9f956898-7973-98ee-6bf1-e1d445e9d365@amd.com>
+ <20190114191350.GA29600@fuggles.cambridge.arm.com>
+ <a6d9d0ad-d1c0-9e60-17c6-a42f7bde258c@amd.com>
+ <20190114193548.GB29600@fuggles.cambridge.arm.com>
+ <87a7k2yx66.fsf@concordia.ellerman.id.au>
+ <ed2dd9042d1afede4843d7fd3728a4d701a19fdd.camel@kernel.crashing.org>
+ <9dc27cbf-e109-0c32-fc92-6fce1b224cda@amd.com>
+User-Agent: Evolution 3.30.4 (3.30.4-1.fc29) 
+Mime-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_214920_604924_E79ED644 
-X-CRM114-Status: GOOD (  14.36  )
+X-CRM114-CacheID: sfid-20190116_220036_179698_71505B35 
+X-CRM114-Status: GOOD (  13.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,76 +75,59 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "open list:CPU FREQUENCY DRIVERS" <linux-pm@vger.kernel.org>,
- linux-arm-msm@vger.kernel.org, "Rafael J. Wysocki" <rjw@rjwysocki.net>,
- dianders@chromium.org, linux-kernel@vger.kernel.org, edubezval@gmail.com,
- mka@chromium.org,
- "moderated list:ARM/Mediatek SoC support" <linux-mediatek@lists.infradead.org>,
- Sudeep Holla <sudeep.holla@arm.com>, Matthias Brugger <matthias.bgg@gmail.com>,
- swboyd@chromium.org, "moderated list:ARM/Mediatek SoC support"
- <linux-arm-kernel@lists.infradead.org>
+Cc: Carsten Haitzler <Carsten.Haitzler@arm.com>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>, David Airlie <airlied@linux.ie>,
+ Michel =?ISO-8859-1?Q?D=E4nzer?= <michel@daenzer.net>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ dri-devel <dri-devel@lists.freedesktop.org>, "Huang, Ray" <Ray.Huang@amd.com>,
+ "Zhang, Jerry" <Jerry.Zhang@amd.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ Bernhard =?ISO-8859-1?Q?Rosenkr=E4nzer?= <Bernhard.Rosenkranzer@linaro.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 14-01-19, 22:04, Amit Kucheria wrote:
-> Add a flag to be used by cpufreq drivers to tell cpufreq core to
-> auto-register themselves as a thermal cooling device.
+On Wed, 2019-01-16 at 07:35 +0000, Koenig, Christian wrote:
+> No, but you answer the wrong question.
 > 
-> There series converts over all the drivers except arm_big_little.c.
-> Tested on SDM845 with the qcom-cpufreq-hw driver. Only compile-tested the
-> others. 
+> See we don't want to have different mappings of cached and non-cached on 
+> the CPU, but rather want to know if a snooped DMA from the PCIe counts 
+> as cached access as well.
 > 
-> Things needing fixing:
->  - Look at how to detect that we're not in IKS mode in arm_big_little's
->    .ready callback.
+> As far as I know on x86 it doesn't, so when you have an un-cached page 
+> you can still access it with a snooping DMA read/write operation and 
+> don't cause trouble.
 
-is_bL_switching_enabled() lets you know if IKS is enabled or not.
-Set/clear flag conditionally before the cpufreq-driver is registered,
-based on the output of is_bL_switching_enabled().
+Hrm... well, if you map it uncached on the CPU on powerpc, a snoop DMA
+will work fine too, it won't hit any cache. The only problem I'm aware
+of is a core (or CAPI device) emiting non-cached load/stores colliding
+with a cache snooper.
 
->  - The other pending issue is to fix allmodconfig that leaves us with
->    CPU_FREQ=y and THERMAL=m (CPU_THERMAL=y). That leads to undefined
->    references for functions defined in cpu_cooling.c
+> > The old hack of using non-cached mapping to avoid snoop cost in AGP and
+> > others is just that ... an ugly and horrible hacks that should have
+> > never eventuated, when the search for performance pushes HW people into
+> > utter insanity :)
+> 
+> Well I agree that un-cached system memory makes things much more 
+> complicated for a questionable gain.
+> 
+> But fact is we now have to deal with the mess, so no point in 
+> complaining about it to much :)
 
-Okay, that's a terrible thing and the solution looks to be rather
-difficult.
+I wish we could just sent the HW designers home and tell them we won't
+support that crap... oh well.
 
-For others who may not be aware of the issue here, currently the
-cpufreq drivers use helpers of cpu_cooling.c (CONFIG_CPU_THERMAL),
-which uses helpers of the thermal core (CONFIG_THERMAL).
-CONFIG_THERMAL is defined as tristate and CONFIG_CPU_THERMAL as bool
-in Kconfigs.
+Ben.
 
-The cpufreq drivers using the cpu_cooling.c file have this in their
-Kconfig entry:
+> Cheers,
+> Christian.
+> 
+> > Cheers,
+> > Ben.
+> > 
+> > 
 
-# if CPU_THERMAL is on and THERMAL=m, ARM_BIT_LITTLE_CPUFREQ cannot be =y
-#       depends on !CPU_THERMAL || THERMAL
-
-
-This series now places the cpufreq core in place of the cpufreq driver
-and it messes up everything. It is not just about allmodconfig, but
-any configuration which makes the compilation fail.
-
-What are the solutions we have now ?
-
-1. Have following for CONFIG_CPU_FREQ
-       depends on !CPU_THERMAL || THERMAL
-
-   The platforms which don't need CPU_THERMAL (like x86) should not
-   enable CPU_THERMAL anymore if they want CONFIG_THERMAL=m.
-
-   @amit: If this gets accepted, please update the Kconfig entries for
-   all those drivers to not have above lines anymore.
-
-- Change CONFIG_THERMAL to bool instead of tristate ?
-
-- Anything else ?
-
--- 
-viresh
 
 _______________________________________________
 linux-arm-kernel mailing list
