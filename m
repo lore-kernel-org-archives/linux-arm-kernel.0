@@ -2,71 +2,91 @@ Return-Path: <SRS0=6Gta=PZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 37631C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 03:34:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7596AC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 04:32:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 00C8F20855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 03:34:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 292EA20854
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 04:32:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZTsjQPJz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 00C8F20855
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="a4CZLxA6";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="icT2g4/x"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 292EA20854
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RFzbEOJOW8N28KkASex4249o9WX8mGojHs+EzOoV7kc=; b=ZTsjQPJzWVPEwq
-	2R2+ZYOk2sYKODSEZ1km6h86N0rvcDhfHgMTVjtNBkc2Nn52OXDPmOcllI3SNErniXSzFFFwDF57Z
-	57O9hz5kSVyGHiqoIgSlSO86fDs1u2tbR+OP2a8xOgfAfjELg9d8ul5uLjCdIBA8muy1yDgsQR9KB
-	aRZmzEoG+CHdAq8qSlsnHlxleaqIwXOmGBEViAkNbnNzyxrPltJZJq4/yQs3kjV+porLGH6IhMU0M
-	qYOaosXe547jMOJyfHg9CCjzjVAqholEzXBr7DzsL5mqJIZTdfMU8UBjkZyFwM0r+LGIz1CfcnaIq
-	HTu5lLqzr6fNaV1Ceg9w==;
+	List-Owner; bh=PvM5ao7iEVuTozBRGpt+nynLups3CKkFeReCUT1tPWU=; b=a4CZLxA6+9junJ
+	a7/hG0x20ybKpehbLtCQ14/n+nqypQEj+3Jn8Kog0VQ0+63gKZ5AzS1SWGF0ynXp/nM6/a+VE6tp7
+	2eLnEywuTsxNoUjOK3DE4sexl/eZqHeuLgFYkdbisSLy5oRENOh3pWEyqEzT7Rf8Cf67QsnfGGxeo
+	OxmguHVFkCXzls+M4L48xRBF+l8sa5Zg2fpsN7zHJQOe6uBTQXEBJKlmMDMRKP43mA5eOTnktrs7F
+	QNfHp+wsfyLNVmODvZLlyR3/BcGLtJqqt9sAyfTGr8ZZv8cLQpQvjKBRUHhC3Cd5zJ0QG/X3RynaM
+	mdAA5u2T8vKoohWe7wRw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gjyRw-0007la-Hg; Thu, 17 Jan 2019 03:34:36 +0000
-Received: from mailgw02.mediatek.com ([216.200.240.185])
+	id 1gjzLz-0001CL-00; Thu, 17 Jan 2019 04:32:31 +0000
+Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gjyRt-0007ki-Bu; Thu, 17 Jan 2019 03:34:34 +0000
-X-UUID: 4c6ac554e46c4864ae28fa80337658eb-20190116
-X-UUID: 4c6ac554e46c4864ae28fa80337658eb-20190116
-Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw02.mediatek.com
- (envelope-from <min.guo@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 70419337; Wed, 16 Jan 2019 19:34:20 -0800
-Received: from MTKMBS31N2.mediatek.inc (172.27.4.87) by
- MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Wed, 16 Jan 2019 19:34:19 -0800
-Received: from MTKCAS36.mediatek.inc (172.27.4.186) by MTKMBS31N2.mediatek.inc
- (172.27.4.87) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Thu, 17 Jan 2019 11:34:16 +0800
-Received: from [10.17.3.153] (10.17.3.153) by MTKCAS36.mediatek.inc
- (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Thu, 17 Jan 2019 11:34:16 +0800
-Message-ID: <1547696056.4433.233.camel@mhfsdcap03>
-Subject: Re: [PATCH v2 4/4] usb: musb: Add support for MediaTek musb controller
-From: Min Guo <min.guo@mediatek.com>
-To: Bin Liu <b-liu@ti.com>
-Date: Thu, 17 Jan 2019 11:34:16 +0800
-In-Reply-To: <20190116135914.GF18026@uda0271908>
-References: <1547516626-5084-1-git-send-email-min.guo@mediatek.com>
- <1547516626-5084-5-git-send-email-min.guo@mediatek.com>
- <20190115203815.GD18026@uda0271908> <1547631542.4433.232.camel@mhfsdcap03>
- <20190116135914.GF18026@uda0271908>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+ id 1gjzLv-0001BZ-6j
+ for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 04:32:29 +0000
+Received: by mail-it1-x143.google.com with SMTP id a6so6019292itl.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 16 Jan 2019 20:32:24 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amarulasolutions.com; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=ZsXVNpKQnBsqi29ZepEVp6DR5CyMftcA0Ev/oOZ4p1w=;
+ b=icT2g4/xCFD2rxhgpNkTzA1/5epdYT2eWAu16wZUYgvVWUim43FdhaXM1H624HLBW9
+ PlRray4VBEJzNVyIhdMaN1ifE1bfF+C9STa9q/gtP5rmyEc69KNWn7Ggm1TJv7mYwQ/p
+ uWCTMZqzvbhqBOg6hUWKJLVUv4zNlBn8aQYRg=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=ZsXVNpKQnBsqi29ZepEVp6DR5CyMftcA0Ev/oOZ4p1w=;
+ b=tgFSuw5varVvUpVPt7A4ObDhVJkub8mVRyO/n3/t/VnwU+I6VXdBosbn+vn9hvw3KF
+ Cf1Gga7D87tkHLLzqgdiWp/p4usbk8lrC2NCuSJ2Z53D1Ns9tvzeb++NdgvXXBzrNaVo
+ IITrW7hVa4Do20ssUCOlhN+EPzqugb93p6IZSuXOQHm5siyxUr3UN47IwLTYX1bvUdzj
+ BWp/91GAcgF6Fe9lfKXobHxnhp2Rh6Fqs7JB3UZ57hWLSkWYmJ+uC+ZQi7gk64TD3CXc
+ kL/Eqyz1ObAttl8k4sM1IhO5VAlwFwDHDDASKtKOVW+b6PhGFRsQRl/A3V9VbvJmgxE6
+ +38w==
+X-Gm-Message-State: AJcUukd9ivSjqjQKv3yq9nI8xbUm3KOF+kNDUgD2yytZh8zq2AYeasnw
+ hYweEEc0H4gKo7K5fmbAiTDvB0wUChVWvjJ0bhbbvw==
+X-Google-Smtp-Source: ALg8bN4LBtuMuYJRxuoCtj4jcK7NzTzmR+sGnRZ9nhO7G+cF4g+YnIOnYs5VCmYuNtc/4wVQIzLztNs1T/ySnduLvIA=
+X-Received: by 2002:a02:104a:: with SMTP id 71mr6639151jay.103.1547699543763; 
+ Wed, 16 Jan 2019 20:32:23 -0800 (PST)
 MIME-Version: 1.0
-X-MTK: N
+References: <20181210161729.29720-1-jagan@amarulasolutions.com>
+ <20181210161729.29720-8-jagan@amarulasolutions.com>
+ <20181211164900.wfmkmbrbj3nmlb3h@flea>
+ <CAMty3ZB5F5jD9iJT1soXSA5HtQOf5W9rKO9nCdGFUfVo0hpO4Q@mail.gmail.com>
+ <20190107141158.zaimizk4rlqa6xli@flea>
+ <CAMty3ZBb8byOwh=_W83Ta0Dse1qkoqccOeaBEY9oHPaxDxe9QA@mail.gmail.com>
+ <20190108085829.clianbtjovu3oieq@flea>
+ <CAMty3ZC9OQtwT-iH=S1LhHsBPc_jFKGAnCYYeR9nuKuDWSKLQw@mail.gmail.com>
+ <20190112164319.whr7gwvl4oux5svz@flea>
+ <CAMty3ZD8X9KmHjUtAo-+Y83a2j8NF3DjM9Yr3LPMxOvQ8kOV7g@mail.gmail.com>
+ <20190116191756.ajzzaga43srk77dk@flea>
+In-Reply-To: <20190116191756.ajzzaga43srk77dk@flea>
+From: Jagan Teki <jagan@amarulasolutions.com>
+Date: Thu, 17 Jan 2019 10:02:12 +0530
+Message-ID: <CAMty3ZCw8itG=nizA5E218HT5kg=-xDzLmShF51vRh4ENYKuBA@mail.gmail.com>
+Subject: Re: [PATCH v5 07/17] drm/sun4i: sun6i_mipi_dsi: Refactor vertical
+ video start delay
+To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190116_193433_407335_ABB20006 
-X-CRM114-Status: GOOD (  15.79  )
+X-CRM114-CacheID: sfid-20190116_203227_401390_03952D26 
+X-CRM114-Status: GOOD (  18.26  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,61 +98,72 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Yonglong Wu <yonglong.wu@mediatek.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-usb@vger.kernel.org,
- linux-kernel@vger.kernel.org, Matthias
- Brugger <matthias.bgg@gmail.com>, Rob Herring <robh+dt@kernel.org>,
- Alan Stern <stern@rowland.harvard.edu>, chunfeng.yun@mediatek.com,
- linux-mediatek@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Cc: Stephen Boyd <sboyd@kernel.org>,
+ Michael Turquette <mturquette@baylibre.com>,
+ linux-sunxi <linux-sunxi@googlegroups.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>,
+ dri-devel <dri-devel@lists.freedesktop.org>, Chen-Yu Tsai <wens@csie.org>,
+ Michael Trimarchi <michael@amarulasolutions.com>,
+ linux-amarula@amarulasolutions.com, linux-clk <linux-clk@vger.kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 2019-01-16 at 07:59 -0600, Bin Liu wrote:
-> On Wed, Jan 16, 2019 at 05:39:02PM +0800, Min Guo wrote:
-> > Hi Bin,
-> > 
-> > On Tue, 2019-01-15 at 14:38 -0600, Bin Liu wrote:
-> > > Hi Min,
-> > > 
-> > > very close, thanks.
-> > > Below I tried to explain a further cleanup in musb_clearb/w() and
-> > > musb_get/set_toggle() implementation. Please let me know if it is not
-> > > clear.
-> > > 
-> > > Basically, we don't need musb_default_clearb/w(), just assign the
-> > > musb_io function pointers to musb_readb/w().
-> > > 
-> > > Then the mtk platform musb_clearb/w() calls musb_readb/w() and
-> > > musb_writeb/w() to handle W1C.
-> > 
-> > Sorry to bother you again, I encounter a problem when prepare the patch.
-> 
-> no problem at all.
+On Thu, Jan 17, 2019 at 12:48 AM Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+>
+> On Sun, Jan 13, 2019 at 01:07:41AM +0530, Jagan Teki wrote:
+> > > > > > > Again, I cannot help you without the datasheet for the panels you're
+> > > > > > > trying to submit.
+> > > > > >
+> > > > > > The panel bound with Sitronix ST7701 IC
+> > > > > > http://www.startek-lcd.com/res/starteklcd/pdres/201705/20170512144242904.pdf
+> > > > >
+> > > > > It's the controller, not the panel
+> > > >
+> > > > As I said before, the datasheet of that panel doesn't have any
+> > > > information except electrical characteristics and used IC which is
+> > > > ST7701.
+> > > >
+> > > > I have one more panel, which is from Bananapi, S070WV20-CT16 ICN621
+> > > > please find the attachment for the same.
+> > > >
+> > > > Here is some more details of the same.
+> > > >
+> > > > https://github.com/yesnoandor/x300/blob/master/kernel/arch/arm/boot/dts/erobbing/x300/x300.dtsi#L81
+> > > > https://github.com/wxzed/Raspberry_5MIPI_Display/blob/master/I2C_Slave/USER/main.c#L15
+> > > >
+> > > > https://github.com/eliot-shao/qcom/blob/master/icn6211_cxn0102/kernel/drivers/video/msm/mdss/mdss_i2c_interface.c#L152
+> > > > matches timings for
+> > > > https://github.com/eliot-shao/qcom/blob/master/icn6211_cxn0102/kernel/arch/arm/boot/dts/qcom/dsi-mipi-2-rgb_1280p_video.dtsi#L20
+> > > >
+> > > > https://github.com/zestroly/micromat/blob/master/test/raspberry/ICN6211.cpp#L169
+> > >
+> > > Where did you get the timings from then?
+> >
+> > You mean drm_mode timings, the same panel with RGB available in
+> > panel-simple[1], and dsi driver in Mailing list[2] and actual DSI
+> > sequence commands from BSP[3]
+> >
+> > [1] https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/drivers/gpu/drm/panel/panel-simple.c?id=7ad8b41cd8f5c2842646d01cdd576663caee04a7
+> > [2] https://patchwork.kernel.org/patch/10680331/
+> > [3] https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/lcd/S070WV20_MIPI_RGB.c
+>
+> So you had no reliable source for the timings then? How do you know if
+> all your patches that are timing related are right then?
 
-Thanks.
+I don't understand your point, or may be I confused with many links
+that I attached in previous mail.
 
-> > The define of musb_clearb/w and musb_readb/w are difference as follow,
-> > and cannot be directly assigned:
-> > u8/u16 (*readb/w)(const void __iomem *addr, unsigned offset)
-> > void (*clearb/w)(void __iomem *addr, unsigned int offset)) 
-> > 
-> > if modify clearb/w as:
-> > u8/u16 (*clearb/w)(const void __iomem *addr, unsigned int offset)) 
-> > then musb_clear needs writeb/w the const addr.
-> > Can I delete const in (*readb/w)?
-> 
-> yes, please create a separate patch for it, and for readl() as well,
-> and stating it is for implementing clearing W1C registers.
+1. Patch for same panel timings are already in Mainline that was
+tested on one of the board. [1]
+2. Driver from AW, released bsp from BPI-M64-bsp [3]
 
-Okay.
+Do you think the above two points are not valid sources?
 
-> Regards,
-> -Bin.
-
-
+Jagan.
 
 _______________________________________________
 linux-arm-kernel mailing list
