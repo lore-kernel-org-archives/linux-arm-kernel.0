@@ -2,70 +2,64 @@ Return-Path: <SRS0=6Gta=PZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1541CC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 11:27:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9D0F5C43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 11:28:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D7B732054F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 11:27:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6C17220856
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 11:28:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RyuZEEgt";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=onstation.org header.i=@onstation.org header.b="Z+YAU/lY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D7B732054F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=onstation.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q5CuHJwF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6C17220856
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pkIqIkh/UalWnrGHeG7o1ykhuh3qRpRkY9v2M4aqGHE=; b=RyuZEEgt7WwI1T
-	P9lC/eqMHIeJGuh8whH/4KaSByNRwpY70Bm4eytEvPgjMMPHR0xXcPdOzaMpppAYAp7mvCJNYrpMV
-	T/p+8o6lXIeSZkTSV7JhRexfqkrjNHdcMGp41aO2Ent+oBBQBOy90nJwsNz8/YRPUcz4bEIboFPux
-	/Fk88qakBIaEtRZ9ZgTsIFpuG1lp0QFiXaA9+J7a+U3ubB7PPC6paoXKTj3RMXQsfy60UNTQEjdat
-	nEE4sftpi4wzCedyTMSc/E6fI8sSpGpPJooIGkj/htuly+OUuUz0/Qc0gL3IBH0jin6XEHVnI4sZP
-	IULKMAJjw8QgGXpI334A==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=YCABGrOBt+lG3Q87QecL32LeQJg6XOAMk9re6oTxcXk=; b=Q5CuHJwFHXM4JQTw95NOwPUR4
+	3HJXu0MZOGry2wftVUsrJT1gV1HTdKP/0ixuAgZxhqU3n52KKRihWhI8a8TobyvElm6vItMWL17gl
+	9sD2BzpMrp51MhkM2wUto2RqlU5BXWQTWC/RNwcId5tTdEICw65/HK1sbsjr0qiPaItINp9/LVpxx
+	oRfF2LNNBINvPKj9WoVtalmvDTcq3tbIL6rBOUzqxo7XNNVT0yoKKqycSiDoiuRUFBHPu9tDXBeTD
+	SenX4oHzv651a8+q/SGsNUsn/svPNXBXoBIp89RURWfrxfghrJuIMDJw7ozAUrmtzkrH4s/m1sXzV
+	1L0b65/ng==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gk5pi-0002QW-2n; Thu, 17 Jan 2019 11:27:38 +0000
-Received: from onstation.org ([52.200.56.107])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gk5pe-0002PV-N2
- for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 11:27:36 +0000
-Received: from localhost (c-98-239-145-235.hsd1.wv.comcast.net
- [98.239.145.235])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested) (Authenticated sender: masneyb)
- by onstation.org (Postfix) with ESMTPSA id DED1617F;
- Thu, 17 Jan 2019 11:27:30 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=onstation.org;
- s=default; t=1547724451;
- bh=fYkbefJ+qXthGu5ibucFnH4X+A77wMucqnhEdZHrBAg=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=Z+YAU/lYSKbHMVxho3dOOtEqr9FG8mV1siUGrjYqfsLEW+FsJBgn9VzJvpVZUGyUw
- kqeuHH085rO+JcOj/QnXRtd0rMPpImvxeYCiQxdpf410Du4QgzkYFTMtTwibmn+PUA
- c1nEtODaBhAX0n8lcuwKnmLfwEX5F8qhdfiAJTCU=
-Date: Thu, 17 Jan 2019 06:27:30 -0500
-From: Brian Masney <masneyb@onstation.org>
-To: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
-Subject: Re: [PATCH] watchdog: qcom: Add suspend/resume support
-Message-ID: <20190117112730.GA25198@basecamp>
-References: <20190117091555.2018-1-saiprakash.ranjan@codeaurora.org>
- <20190117093113.GA23389@basecamp>
- <91108b9b-fe05-1068-b07e-872cb4cd4012@codeaurora.org>
+	id 1gk5qH-0002mb-LD; Thu, 17 Jan 2019 11:28:13 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gk5qE-0002le-6p
+ for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 11:28:11 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id E9B52207B2; Thu, 17 Jan 2019 12:28:08 +0100 (CET)
+Received: from localhost (build.bootlin.com [163.172.53.213])
+ by mail.bootlin.com (Postfix) with ESMTPSA id C03E42074E;
+ Thu, 17 Jan 2019 12:28:08 +0100 (CET)
+Date: Thu, 17 Jan 2019 12:21:50 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: ayaka <ayaka@soulik.info>
+Subject: Re: [PATCH v2 1/2] media: uapi: Add H264 low-level decoder API
+ compound controls.
+Message-ID: <20190117112150.qfzqjdmrqpcjqvnh@flea>
+References: <20181115145650.9827-1-maxime.ripard@bootlin.com>
+ <20181115145650.9827-2-maxime.ripard@bootlin.com>
+ <20190108095228.GA5161@misaki.sumomo.pri>
+ <2149617a-6a36-4c0b-26c9-7fdfee9da9c9@soulik.info>
+ <2e734dd6-d459-9990-61fe-27301df35ff7@soulik.info>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <91108b9b-fe05-1068-b07e-872cb4cd4012@codeaurora.org>
-User-Agent: Mutt/1.9.4 (2018-02-28)
+In-Reply-To: <2e734dd6-d459-9990-61fe-27301df35ff7@soulik.info>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_032734_826525_5FE6F4EF 
-X-CRM114-Status: GOOD (  17.03  )
+X-CRM114-CacheID: sfid-20190117_032810_392035_06D15062 
+X-CRM114-Status: GOOD (  11.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,74 +71,84 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org,
- Rajendra Nayak <rnayak@codeaurora.org>, linux-watchdog@vger.kernel.org,
- Stephen Boyd <sboyd@kernel.org>, linux-kernel@vger.kernel.org,
- Doug Anderson <dianders@chromium.org>,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- Sibi Sankar <sibis@codeaurora.org>, Vivek Gautam <vivek.gautam@codeaurora.org>,
- linux-arm-msm@vger.kernel.org, Guenter Roeck <groeck@chromium.org>,
- Wim Van Sebroeck <wim@linux-watchdog.org>, Guenter Roeck <linux@roeck-us.net>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-arm-kernel@lists.infradead.org, nicolas.dufresne@collabora.com,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>, acourbot@chromium.org,
+ linux-kernel@vger.kernel.org, tfiga@chromium.org,
+ Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
+ linux-sunxi@googlegroups.com, hans.verkuil@cisco.com, jenskuske@gmail.com,
+ sakari.ailus@linux.intel.com, Guenter Roeck <groeck@chromium.org>,
+ Chen-Yu Tsai <wens@csie.org>, linux-media@vger.kernel.org,
+ posciak@chromium.org, Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Content-Type: multipart/mixed; boundary="===============6333865322741854800=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 17, 2019 at 04:08:52PM +0530, Sai Prakash Ranjan wrote:
-> On 1/17/2019 3:01 PM, Brian Masney wrote:
-> > 
-> > You can use the __maybe_unused attribute to remove the #ifdef:
-> > 
-> > static int __maybe_unused qcom_wdt_suspend(struct device *dev)
-> > 
-> 
-> Thanks for looking into this.
-> 
-> As for __maybe_unused, I think it's better to keep #ifdef rather than
-> this attribute which seems to be meaning unused when actually its possible
-> that it's used often(PM_SLEEP is def y). It's like saying unused when you
-> are actually using it. The attribute seems like a
-> hack to avoid compilation error. Please correct me if I am wrong.
 
-That attribute suppresses a warning from the compiler if the function is
-unused when PM_SLEEP is disabled.  I don't consider it hackish since the
-function name no longer appears outside the #ifdef. For example:
+--===============6333865322741854800==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="oqkbl2a7clijvahv"
+Content-Disposition: inline
 
-	#ifdef CONFIG_PM_SLEEP
-	static int qcom_wdt_suspend(struct device *dev)
-	{
-		...
-	}
-	#endif /* CONFIG_PM_SLEEP */
 
-	static SIMPLE_DEV_PM_OPS(..., qcom_wdt_suspend, ...);
+--oqkbl2a7clijvahv
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-SIMPLE_DEV_PM_OPS (actually SET_SYSTEM_SLEEP_PM_OP) includes the check
-for PM_SLEEP and its a noop if PM_SLEEP is disabled so this works.
+Hi,
 
-Now here's the code with __maybe_unused:
+On Thu, Jan 10, 2019 at 09:33:01PM +0800, ayaka wrote:
+> I forget a important thing, for the rkvdec and rk hevc decoder, it would
+> requests cabac table, scaling list, picture parameter set and reference
+> picture storing in one or various of DMA buffers. I am not talking about =
+the
+> data been parsed, the decoder would requests a raw data.
+>=20
+> For the pps and rps, it is possible to reuse the slice header, just let t=
+he
+> decoder know the offset from the bitstream bufer, I would suggest to add
+> three properties(with sps) for them. But I think we need a method to mark=
+ a
+> OUTPUT side buffer for those aux data.
 
-	static int __maybe_unused qcom_wdt_suspend(struct device *dev)
-	{
-		...
-	}
+I'm not sure this is something we actually want. The whole design
+decision was that we wouldn't have a bitstream parser in the kernel,
+and doing as you suggest goes against that design.
 
-	static SIMPLE_DEV_PM_OPS(..., qcom_wdt_suspend, ...);
+And either if it is something that turns out to be useful, this is
+really out of scope for this series.
 
-This will still be a NOOP when power management is disabled, but have
-the benefit of increased compile-time test coverage in that situation.
-The symbols won't be included in the final executable. I personally
-think the code a is cleaner with __maybe_unused.
+Maxime
 
-This pattern is already in use across various subsystems in the kernel
-for suspend and resume functions:
+--=20
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
 
-$ git grep __maybe_unused | egrep "_suspend|_resume"  | wc -l
-767
+--oqkbl2a7clijvahv
+Content-Type: application/pgp-signature; name="signature.asc"
 
-Brian
+-----BEGIN PGP SIGNATURE-----
+
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXEBlTgAKCRDj7w1vZxhR
+xRcgAP0dWriJx8+o1omXhfWzZxnYLft+14hPq2CjUX6JxflfLQEAmPrSaLuuzNxR
+APurR6hH+cGQ0z90Wdyrw41F9LbmnAg=
+=fkam
+-----END PGP SIGNATURE-----
+
+--oqkbl2a7clijvahv--
+
+
+--===============6333865322741854800==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============6333865322741854800==--
+
