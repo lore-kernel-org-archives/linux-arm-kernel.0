@@ -2,21 +2,22 @@ Return-Path: <SRS0=6Gta=PZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 418ACC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 19:41:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CF00DC43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 19:47:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0FBD42086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 19:41:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9F0E820855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 19:47:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="e4qsvOqT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0FBD42086D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WVz3XJX/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9F0E820855
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.intel.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,49 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=FW73451sTDrBP79OBtpANkdbAv/pQxIx65XK3LkiRyU=; b=e4qsvOqTSIh39e
-	pysbd5Hv7F3C4r0SyERn/4zELC/NAOxCPYCw7HrfChBNPrdsrZ9gM5s36RBNOCkVA/rbWVlCeCXZ7
-	1DrJTN1ttG9IWQdLJJtIP4g4koEt9DhVQtttbKIoDphtHtOfvKfVpIwgAZsNRpY3m8xb9v+aHp5vs
-	9I45JEPdtEaq+WaZXPLStj8v1jnjBzZaHEmJK7s5/qneAm9Wdv7lXuyhM8f0fTKl8eUS3Rp0Nk21Z
-	Jl7yUIBRU8g8lJenItwsnCqLbjkwtdWj7a/Ef7ntxhnDa1HuzJ02AMryCNI8Tiw7qEpGaYIzx9eGR
-	pYPeaOG776hv74bZ9hSQ==;
+	List-Owner; bh=2L3bWxQmDIHHvSeQrykLWa8q8J1M8f+v1SBTKs4g8iE=; b=WVz3XJX/BR/V0A
+	CY5MpoYakUw2PH0TYOcFtOxI0gwkbp2PLdMyxIEOij7BAcpPFFDRbCFRu6ulAqs33jQPI/wETt1CZ
+	eIexe+gUV3P3HWqkdsbwUWAXueaQrXIdSxH6MqZYHkpEiPUDkbmXExpONcAERog5FGDaEzX70lvJV
+	zc95np1i8ZeZTvUB+2JifWBA9d3uQWmbJkkp40xdUJUHAKV4n4vEsf96gH0gjtKTjKg248/3cbIhg
+	/OCccoUPJGmrmhHJwv6GGC0VWLoUPNOqYPnKlNxOe9MwaJJ9WX80mX5rk3D682K9F5JPT6b3BcHeH
+	mzYAWJnCZYElNzDZrhiQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkDXW-0006CI-0P; Thu, 17 Jan 2019 19:41:22 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+	id 1gkDdY-00088v-3O; Thu, 17 Jan 2019 19:47:36 +0000
+Received: from mga07.intel.com ([134.134.136.100])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkDXS-0006BD-3Q
- for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 19:41:19 +0000
-Received: from ptx.hi.pengutronix.de ([2001:67c:670:100:1d::c0])
- by metis.ext.pengutronix.de with esmtps
- (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1gkDXI-0006Bl-5w; Thu, 17 Jan 2019 20:41:08 +0100
-Received: from ukl by ptx.hi.pengutronix.de with local (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1gkDXH-0003j5-4o; Thu, 17 Jan 2019 20:41:07 +0100
-Date: Thu, 17 Jan 2019 20:41:07 +0100
-From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
-To: Matthias Brugger <matthias.bgg@gmail.com>
-Subject: Re: [PATCH 3/5] arm64: dts: mt7622: add a property
- "mediatek,num-pwms" for PWM
-Message-ID: <20190117194107.wrafykdre5tugv4q@pengutronix.de>
-References: <0c400cb1899c1afb4c9f021350cdc0c6ca3f6239.1547453586.git.ryder.lee@mediatek.com>
- <b5ed4626a553acb5e3107c6c96e82b674439128f.1547453586.git.ryder.lee@mediatek.com>
- <20190115200231.drn2rbxu4jxr22yz@pengutronix.de>
- <2edcc5fd-ce60-b585-e0fd-226897a7a34c@gmail.com>
+ id 1gkDdU-00087v-Pr
+ for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 19:47:34 +0000
+X-Amp-Result: UNSCANNABLE
+X-Amp-File-Uploaded: False
+Received: from fmsmga002.fm.intel.com ([10.253.24.26])
+ by orsmga105.jf.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
+ 17 Jan 2019 11:47:28 -0800
+X-ExtLoop1: 1
+X-IronPort-AV: E=Sophos;i="5.56,489,1539673200"; d="scan'208";a="135546499"
+Received: from stinkbox.fi.intel.com (HELO stinkbox) ([10.237.72.174])
+ by fmsmga002.fm.intel.com with SMTP; 17 Jan 2019 11:47:23 -0800
+Received: by stinkbox (sSMTP sendmail emulation);
+ Thu, 17 Jan 2019 21:47:22 +0200
+Date: Thu, 17 Jan 2019 21:47:22 +0200
+From: Ville =?iso-8859-1?Q?Syrj=E4l=E4?= <ville.syrjala@linux.intel.com>
+To: Christoph Manszewski <c.manszewski@samsung.com>
+Subject: Re: [PATCH 1/6] include/drm: color_mgmt: Add enum labels
+Message-ID: <20190117194722.GJ20097@intel.com>
+References: <1544789421-5265-1-git-send-email-c.manszewski@samsung.com>
+ <CGME20181214121032eucas1p24af580721ebd6f86a4f9ddf701957ab6@eucas1p2.samsung.com>
+ <1544789421-5265-2-git-send-email-c.manszewski@samsung.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <2edcc5fd-ce60-b585-e0fd-226897a7a34c@gmail.com>
-User-Agent: NeoMutt/20170113 (1.7.2)
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c0
-X-SA-Exim-Mail-From: ukl@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+In-Reply-To: <1544789421-5265-2-git-send-email-c.manszewski@samsung.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_114118_301590_41ACBF3B 
-X-CRM114-Status: GOOD (  15.20  )
+X-CRM114-CacheID: sfid-20190117_114732_923681_387C8A58 
+X-CRM114-Status: GOOD (  16.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,56 +75,70 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Ryder Lee <ryder.lee@mediatek.com>,
- linux-pwm@vger.kernel.org, Sean Wang <sean.wang@kernel.org>,
- Weijie Gao <weijie.gao@mediatek.com>, linux-kernel@vger.kernel.org,
- Thierry Reding <thierry.reding@gmail.com>, linux-mediatek@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org
+Cc: linux-samsung-soc@vger.kernel.org,
+ Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
+ Maxime Ripard <maxime.ripard@bootlin.com>,
+ Seung-Woo Kim <sw0312.kim@samsung.com>, linux-kernel@vger.kernel.org,
+ dri-devel@lists.freedesktop.org, David Airlie <airlied@linux.ie>,
+ Kyungmin Park <kyungmin.park@samsung.com>, Kukjin Kim <kgene@kernel.org>,
+ Krzysztof Kozlowski <krzk@kernel.org>, Sean Paul <sean@poorly.run>,
+ linux-arm-kernel@lists.infradead.org,
+ Marek Szyprowski <m.szyprowski@samsung.com>
 Content-Type: text/plain; charset="iso-8859-1"
 Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello,
-
-On Thu, Jan 17, 2019 at 02:00:43PM +0100, Matthias Brugger wrote:
-> On 15/01/2019 21:02, Uwe Kleine-K=F6nig wrote:
-> > On Mon, Jan 14, 2019 at 04:21:22PM +0800, Ryder Lee wrote:
-> >> diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boo=
-t/dts/mediatek/mt7622.dtsi
-> >> index 8fc4aa7..ab016cf 100644
-> >> --- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-> >> +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-> >> @@ -436,6 +436,7 @@
-> >>  			 <&pericfg CLK_PERI_PWM6_PD>;
-> >>  		clock-names =3D "top", "main", "pwm1", "pwm2", "pwm3", "pwm4",
-> >>  			      "pwm5", "pwm6";
-> >> +		mediatek,num-pwms =3D <6>;
-> >>  		status =3D "disabled";
-> > =
-
-> > Conceptually this patch must go in before the change to the driver.
-> > Otherwise the pwms are not usable with only patch 1 applied which breaks
-> > bisectability.
-> > =
-
+On Fri, Dec 14, 2018 at 01:10:16PM +0100, Christoph Manszewski wrote:
+> Range setting makes sense for YCbCr and RGB buffers. Current
+> drm_color_range enum labels suggest use with YCbCr buffers.
+> Create enum labels without colorspace specification.
 > =
 
-> The driver should have backwards compatibility to older DTs. So that woul=
-d need
-> to be fixed in the driver not in the patch order of the series.
+> Signed-off-by: Christoph Manszewski <c.manszewski@samsung.com>
+> ---
+>  include/drm/drm_color_mgmt.h | 2 ++
+>  1 file changed, 2 insertions(+)
+> =
 
-Right you are. Bisectability is a reason to not apply the patches in the
-order as is, but given that you already requested backwards
-compatibility the bisectability will be fixed en passant.
+> diff --git a/include/drm/drm_color_mgmt.h b/include/drm/drm_color_mgmt.h
+> index 90ef9996d9a4..52f6d5221a0d 100644
+> --- a/include/drm/drm_color_mgmt.h
+> +++ b/include/drm/drm_color_mgmt.h
+> @@ -62,6 +62,8 @@ enum drm_color_range {
+>  	DRM_COLOR_YCBCR_LIMITED_RANGE,
+>  	DRM_COLOR_YCBCR_FULL_RANGE,
+>  	DRM_COLOR_RANGE_MAX,
+> +	DRM_COLOR_LIMITED_RANGE =3D DRM_COLOR_YCBCR_LIMITED_RANGE,
+> +	DRM_COLOR_FULL_RANGE =3D DRM_COLOR_YCBCR_FULL_RANGE,
 
-Best regards
-Uwe
+These enum values don't mean anything really. The strings are what
+matter for the uapi.
+
+The default for YCbCr needs to be limited range, the default for RGB
+needs to be full range. So I think this would really require a separate
+prop for each.
+
+But is there an actual usecase for this stuff?
+
+>  };
+>  =
+
+>  int drm_plane_create_color_properties(struct drm_plane *plane,
+> -- =
+
+> 2.7.4
+> =
+
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel@lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
 -- =
 
-Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Ville Syrj=E4l=E4
+Intel
 
 _______________________________________________
 linux-arm-kernel mailing list
