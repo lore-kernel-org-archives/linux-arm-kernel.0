@@ -2,101 +2,88 @@ Return-Path: <SRS0=6Gta=PZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DA291C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 20:10:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4EE5FC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 20:26:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A6A3E20859
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 20:10:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1826220868
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 20:26:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SxJwawIR";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="NdZPToB6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A6A3E20859
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=oracle.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RaE7njOs";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="sm7t9lIL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1826220868
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XclFhTBy+hXdwqg9cNFh2r0Blc0EsUodQLWZU9ErQUA=; b=SxJwawIRqeifC1
-	JBQO871+yllzeDrBpoQ+ZcKyUy7w252EOmWGwXeYLhd0a3K/7/b8exZiKfZczt0EEAqsAstsiy0fk
-	Jjg6jpn+oLusAOfXgRcEbl1/iG2xdDW9tsjnMC3WOshneutkLr2eB37lNstGUjLtaWdhsFvFdKSmY
-	emqbmUNr0W+x/bWxjirsFXnyU2nI7PA56yWBGZenV6DKxz1nBdEPyo4ZwVwunVZ6NCViccNftTeJ6
-	Fs0KrmMpDeulWuyYrCZFQ2wMHE+TagGJty76IsSEyf3f/bdy4DzbB14u5KoAQw+JgVLfiLqqCx6Fc
-	RgeDbkEiyeNSczK4icag==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
+	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=9bCF9OIWZlQ6sNtPSGSvGi7QDAt9M7vxYyZTmNP6gEI=; b=RaE7njOs+3SAKw
+	WM+os61jwdcFzKIjBG7Fp0Y8j617eV8mi/yDIkyjjRqlHQBTEKvpQpvrV3z3njn7nUbdb4SRqJdvw
+	2fl8tUA+HP6nKy6jRRlWYRdiHwcKaWuwCVmy52+akt5k3ZvbkDxb0S255wTkOP2RyOTeuBc3HLd12
+	HZ7lMks6PE+ZR+E6LYWU0PnT5LmwaFWrrihxelm1p+zp3pgw1zu/fyJawVWhbX0XkyR4Rh7ZSIMBa
+	snG0+3ddnT6FxW9I1caXTMe/zzwgr/yZrjmciVmV9eqlVUiR8Y1zkcbLWYb5Q/htC0ARmRfzi34yc
+	TCznwDxp6NFsnaOCBn3Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkDzU-0000GK-9e; Thu, 17 Jan 2019 20:10:16 +0000
-Received: from userp2130.oracle.com ([156.151.31.86])
+	id 1gkEFV-0005em-NM; Thu, 17 Jan 2019 20:26:49 +0000
+Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkDzP-0008NV-S0; Thu, 17 Jan 2019 20:10:13 +0000
-Received: from pps.filterd (userp2130.oracle.com [127.0.0.1])
- by userp2130.oracle.com (8.16.0.22/8.16.0.22) with SMTP id x0HK8xST088262;
- Thu, 17 Jan 2019 20:09:16 GMT
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com;
- h=subject : to : cc :
- references : from : message-id : date : mime-version : in-reply-to :
- content-type : content-transfer-encoding; s=corp-2018-07-02;
- bh=RiKe57zOOVmULfRl8TWdM657giYm26btlicjuDAGmyk=;
- b=NdZPToB61u86VXfemArtvyTEoRyAI85rdbncXHGSdkbYmbAJmvKC/bpnhHJKhhQbAmXO
- 3HXXqKxtEEQDWgDJ901PnkE+gI+limbhTxPH18jUTMit7PxoHqDIpyuQPIuVjNKEuMR9
- gjbTHv2BZ2uL8FgI2b8d0e2cRU8s+FriOoB4d+Q7q/cLLrtwS0cYOeiiY07cfZ4UeDig
- C3PrdDxoGYl5iSjP2yOlRYdEMi3MX7sNDe4YF7I3Pl7qRLOqv89g3B8a0WEd8EX3Eu/j
- FrOCnL41ARCtS8fQEOI0KkB+ohuIICEPBiksXXVrhQ51+5cbqhODTn/lB+hTCNn0A6A1 6Q== 
-Received: from aserv0021.oracle.com (aserv0021.oracle.com [141.146.126.233])
- by userp2130.oracle.com with ESMTP id 2pybkct323-1
- (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
- Thu, 17 Jan 2019 20:09:16 +0000
-Received: from aserv0122.oracle.com (aserv0122.oracle.com [141.146.126.236])
- by aserv0021.oracle.com (8.14.4/8.14.4) with ESMTP id x0HK9Fj7003276
- (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
- Thu, 17 Jan 2019 20:09:15 GMT
-Received: from abhmp0004.oracle.com (abhmp0004.oracle.com [141.146.116.10])
- by aserv0122.oracle.com (8.14.4/8.14.4) with ESMTP id x0HK9EEd028131;
- Thu, 17 Jan 2019 20:09:14 GMT
-Received: from [192.168.1.164] (/50.38.38.67)
- by default (Oracle Beehive Gateway v4.0)
- with ESMTP ; Thu, 17 Jan 2019 12:09:13 -0800
-Subject: Re: [PATCH] hugetlb: allow to free gigantic pages regardless of the
- configuration
-To: Alexandre Ghiti <aghiti@upmem.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon
- <will.deacon@arm.com>, Benjamin Herrenschmidt <benh@kernel.crashing.org>,
- Paul Mackerras <paulus@samba.org>, Michael Ellerman <mpe@ellerman.id.au>,
- Martin Schwidefsky <schwidefsky@de.ibm.com>,
- Heiko Carstens <heiko.carstens@de.ibm.com>,
- Thomas Gleixner <tglx@linutronix.de>, Ingo Molnar <mingo@redhat.com>,
- Borislav Petkov <bp@alien8.de>, "H . Peter Anvin" <hpa@zytor.com>,
- x86@kernel.org, Alexander Viro <viro@zeniv.linux.org.uk>,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
- linuxppc-dev@lists.ozlabs.org, linux-s390@vger.kernel.org,
- linux-fsdevel@vger.kernel.org, linux-mm@kvack.org
-References: <20190117183953.5990-1-aghiti@upmem.com>
-From: Mike Kravetz <mike.kravetz@oracle.com>
-Message-ID: <5e02e9c1-efd5-fc1e-c658-5a11f6291bcd@oracle.com>
-Date: Thu, 17 Jan 2019 12:09:11 -0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1gkEFQ-0005dj-VO
+ for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 20:26:46 +0000
+Received: by mail-pf1-x444.google.com with SMTP id c123so5389711pfb.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 17 Jan 2019 12:26:44 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:in-reply-to:references:date:message-id
+ :mime-version; bh=dgb4VW0Ul58s8MyWXSs249GWJprD5ro58w3NPDfmjNA=;
+ b=sm7t9lILpfHGDoH6FZ2FqKJl9AdXh4ZBUSdy7Fwy1mxxNiavjjCHYWh+qWqX0Ey3W7
+ NLVKquGLdKK4dQT2hYfXGnbTAFnSyfDf2pEQn/QXycZctLSGgyUFoKYpr17Ie8u0ZvCr
+ E7l3Yxpyt87S4G0stRdo5UvnGc1s4nKCRmnpgwLakOPwglggcoDnfBr/FgjGIY37RfDy
+ QloJSqibqyANUTxcpMVDzLv4hnZ+7GVh4WcJIWIWrKwxs9a1fdw6hWwR0ieUny+vnCNc
+ sL+KGGnAkmZ1OPGPOd3L6hACPSjFKfP45F8oC64vPNWOYPuaSlJnz1VswxcrwRQdMiOQ
+ 9YDg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:in-reply-to:references:date
+ :message-id:mime-version;
+ bh=dgb4VW0Ul58s8MyWXSs249GWJprD5ro58w3NPDfmjNA=;
+ b=dV9jQjjiLuac8xXbNC5Or5BTi5OjNOtvNMYeXbkTS5I3lS3ZZpQTDlsj/Iq6uifD7w
+ 6GApxnoB5eZS7suNOsgRr5NdF2s3lVRMYmrxr1NH++Ta+xrVLBF4RQ+SSRAWVutwJRVk
+ ID13lZvsNw5ikyG0+zzYAqigHvwW9SyitVur6PJPCijKn/c1r8rbcFNOChqwAA3yAuh6
+ X6SyO6lPOuHI0NlhrHah9G8a3Z3PMEIEza5WREe/qHuQqo/PJW8gXglPQlJOo7ibP9Xe
+ 7m5vbiiZBqUCrlSDj1nD8fG0stwYFmGPFySl8wmO46jqTC7shuvcL6YT7arysxWnAtWd
+ Cc/w==
+X-Gm-Message-State: AJcUukf87UUjM08hBhILnArpO1VowZ0btpJfG2Ua2tnQ29fee3DJXSLX
+ kths1n/+74HivbPVePv60vbDbw==
+X-Google-Smtp-Source: ALg8bN5QBAp8fzkqP7nx/W+gJh9cftmm+X6nLFux9XqY5hQMkkxaQTnlWDTIckHKheSNgVZEq7WZwA==
+X-Received: by 2002:a65:4049:: with SMTP id h9mr14588858pgp.304.1547756803526; 
+ Thu, 17 Jan 2019 12:26:43 -0800 (PST)
+Received: from localhost ([2601:602:9200:a1a5:e076:9fe9:59e2:1e0b])
+ by smtp.googlemail.com with ESMTPSA id k191sm3128446pgd.9.2019.01.17.12.26.42
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Thu, 17 Jan 2019 12:26:42 -0800 (PST)
+From: Kevin Hilman <khilman@baylibre.com>
+To: Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ linux-amlogic@lists.infradead.org
+Subject: Re: [PATCH 0/6] ARM: dts: meson: chip temperature (hwmon) support
+In-Reply-To: <20190112130649.23838-1-martin.blumenstingl@googlemail.com>
+References: <20190112130649.23838-1-martin.blumenstingl@googlemail.com>
+Date: Thu, 17 Jan 2019 12:26:42 -0800
+Message-ID: <7hk1j3av3x.fsf@baylibre.com>
 MIME-Version: 1.0
-In-Reply-To: <20190117183953.5990-1-aghiti@upmem.com>
-Content-Language: en-US
-X-Proofpoint-Virus-Version: vendor=nai engine=5900 definitions=9139
- signatures=668682
-X-Proofpoint-Spam-Details: rule=notspam policy=default score=0 suspectscore=2
- malwarescore=0
- phishscore=0 bulkscore=0 spamscore=0 mlxscore=0 mlxlogscore=999
- adultscore=0 classifier=spam adjust=0 reason=mlx scancount=1
- engine=8.0.1-1810050000 definitions=main-1901170140
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_121011_994587_829607EA 
-X-CRM114-Status: GOOD (  25.44  )
+X-CRM114-CacheID: sfid-20190117_122645_020034_BF415C42 
+X-CRM114-Status: UNSURE (   8.95  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,92 +95,33 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: hch@infradead.org, linux-riscv@lists.infradead.org,
- Alexandre Ghiti <alex@ghiti.fr>
+Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 1/17/19 10:39 AM, Alexandre Ghiti wrote:
-> From: Alexandre Ghiti <alex@ghiti.fr>
-> 
-> On systems without CMA or (MEMORY_ISOLATION && COMPACTION) activated but
-> that support gigantic pages, boottime reserved gigantic pages can not be
-> freed at all. This patchs simply enables the possibility to hand back
-> those pages to memory allocator.
-> 
-> This commit then renames gigantic_page_supported and
-> ARCH_HAS_GIGANTIC_PAGE to make them more accurate. Indeed, those values
-> being false does not mean that the system cannot use gigantic pages: it
-> just means that runtime allocation of gigantic pages is not supported,
-> one can still allocate boottime gigantic pages if the architecture supports
-> it.
-> 
-> Signed-off-by: Alexandre Ghiti <alex@ghiti.fr>
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
-Thank you for doing this!
+> Now that the Meson SAR ADC driver can get the chip temperature on
+> Meson8, Meson8b and Meson8m2 (see [0]) we can add the missing bits to
+> the .dts{,i} and enable iio-hwmon for all boards where this could be
+> tested successfully.
+>
+> This was successfully tested on multiple boards:
+> - Meson8b Odroid-C1 (me)
+> - Meson8b EC-100 (me)
+> - Meson8m2 M8S (not upstream yet, me)
+> - Meson8m2 MXIII-Plus (an earlier version of this series, Oleg Ivanov)
+>
+> compile-time dependencies:
+> - none
 
-Reviewed-by: Mike Kravetz <mike.kravetz@oracle.com>
+This seems to depend on your HHI series, which I held off on last cycle
+and you said you were planning to resend.  
 
-> --- a/include/linux/gfp.h
-> +++ b/include/linux/gfp.h
-> @@ -589,8 +589,8 @@ static inline bool pm_suspended_storage(void)
->  /* The below functions must be run on a range from a single zone. */
->  extern int alloc_contig_range(unsigned long start, unsigned long end,
->  			      unsigned migratetype, gfp_t gfp_mask);
-> -extern void free_contig_range(unsigned long pfn, unsigned nr_pages);
->  #endif
-> +extern void free_contig_range(unsigned long pfn, unsigned int nr_pages);
-
-I think nr_pages should be an unsigned long in cma_release() and here
-as well, but that is beyond the scope of this patch.  Most callers of
-cma_release pass in a truncated unsigned long.  The truncation is unlikely
-to cause any issues, just would be nice if types were consistent.  I have
-a patch to do that as part of a contiguous allocation series that I will
-get back to someday.
-
-> @@ -2350,9 +2355,10 @@ static unsigned long set_max_huge_pages(struct hstate *h, unsigned long count,
->  			break;
->  	}
->  out:
-> -	ret = persistent_huge_pages(h);
-> +	h->max_huge_pages = persistent_huge_pages(h);
->  	spin_unlock(&hugetlb_lock);
-> -	return ret;
-> +
-> +	return 0;
->  }
->  
->  #define HSTATE_ATTR_RO(_name) \
-> @@ -2404,11 +2410,6 @@ static ssize_t __nr_hugepages_store_common(bool obey_mempolicy,
->  	int err;
->  	NODEMASK_ALLOC(nodemask_t, nodes_allowed, GFP_KERNEL | __GFP_NORETRY);
->  
-> -	if (hstate_is_gigantic(h) && !gigantic_page_supported()) {
-> -		err = -EINVAL;
-> -		goto out;
-> -	}
-> -
->  	if (nid == NUMA_NO_NODE) {
->  		/*
->  		 * global hstate attribute
-> @@ -2428,7 +2429,9 @@ static ssize_t __nr_hugepages_store_common(bool obey_mempolicy,
->  	} else
->  		nodes_allowed = &node_states[N_MEMORY];
->  
-> -	h->max_huge_pages = set_max_huge_pages(h, count, nodes_allowed);
-> +	err = set_max_huge_pages(h, count, nodes_allowed);
-> +	if (err)
-> +		goto out;
->  
->  	if (nodes_allowed != &node_states[N_MEMORY])
->  		NODEMASK_FREE(nodes_allowed);
-
-Yeah!  Those changes causes max_huge_pages to be modified while holding
-hugetlb_lock as it should be.
--- 
-Mike Kravetz
+Kevin
 
 _______________________________________________
 linux-arm-kernel mailing list
