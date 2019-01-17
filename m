@@ -2,84 +2,69 @@ Return-Path: <SRS0=6Gta=PZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F3979C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 15:22:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 17868C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 15:23:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C1D3320855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 15:22:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B6A8F205C9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 15:23:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Kf9IJ1Zi";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="LXjcPMfR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C1D3320855
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="asfIKuXI";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="XpVzRe3N"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B6A8F205C9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4Fft8Rd01hBDb/dTKLAkHUYJsW+wxmBvNjbRxYM91ks=; b=Kf9IJ1ZiZjl3T1
-	60hExQHpon6TylSqQfYlpwrfSafLKz3sSQ0lzMjXNsXUyGv9XqQ3QVocK9Y7z0gbBFIlVUwyFjU7L
-	xhNE2yMO1ljweXXHcjpQOwFIJgpaUSfvF+CVO1OlVi2TIIZpSSRayzYE7jprMD3Z5UHgDVzIT471Z
-	GbfMEXlVP65nfCsl3go02w4Fz8TONWqvpxi7xwCY02zhgtlizsNrQUWi8Kpd6q9Fczgv2OAEVJ3/h
-	i6UwVdFWUoBaFuqj9yRH1XcgTbsMj8DJvU3o3ISKnHMGbgh0ufKkbWMVloRN5tcB6JpyPZmpzs22O
-	LEiMCg8fLsnhtZ8I1BlA==;
+	List-Owner; bh=jE+h8FhMjKkw7fUGpHATqGllQZTCNPdLX/HdUGDurRY=; b=asfIKuXIOPy3k5
+	UvoA37ilYlQi2xwqx5qLHyfWDtlCLTwYkW+xx1hCF1s0Y3euLUk2fFC0akZFD80wx9K1PFj5/aPp2
+	YhTyAZHurIUT/dvGbe9wiYzC2/JwxKeacgAxa0rLYE+Gyb/POyPbHnSOzJJK7HsnYF2Zxo3u4/QYw
+	w3/bnZdK7Ruklp8KuXn0/i8/5yh0ff0/1yrBjQ51BJFDXHVREqKqjDsEPoWL0Do8PHqQdJTaIlTIJ
+	NeLsxn0FdmW9JI/TcDErsAZEDIqSH4/BMieCmWZB3mNFMWApZyqi+Eq34Yf0gW2oa8z1djwaQdzh5
+	dZg4EtQ7zr7DXggOLdaA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gk9Uv-0007R0-1C; Thu, 17 Jan 2019 15:22:25 +0000
-Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gk9Ur-0007QC-An; Thu, 17 Jan 2019 15:22:22 +0000
-Received: by mail-it1-x143.google.com with SMTP id c9so1607619itj.1;
- Thu, 17 Jan 2019 07:22:21 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=LnLAybpdoQnr3UI674Pd3aAhNK3gQ91jeRbiR4dTUzo=;
- b=LXjcPMfRXIMWwPJyrnMqKTICp5a1OZY48w+6G2JBs8vl4QdDnuyke2az+Dtx3TKa50
- 7cu5HMsSCjnWTcdjf0hMKU6WUM1jdboXfI5IBmn39UmDoOW/r4IY2uMcqvJlGTzmWX/P
- r4KwfWUZK18GUWSzpIaZzNPS/b50y5L7h5AHrP4ZayuOpikN6LIitL7b6+hyBkXJeyF8
- DmYo/JkGL1orbYpF7ecKCk8fKY7GYKF1Foz42ZN4onqL7jfICuCQLmzqdiDBCNVXFTnR
- n74fqkd9CrqapVSUUZuk0WDRg7mKC7JzscM1F7UYpmNw97WERaUttPjZbPilFnqHQS81
- opHQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=LnLAybpdoQnr3UI674Pd3aAhNK3gQ91jeRbiR4dTUzo=;
- b=EPzdFKzFwXYloaIzILgbgWrzZD1B3EpIzjAMFhm798CxucmtRdmormZfw2deWFREMm
- JBxcAT05GAmzlf715UnuLM7JKsmssAgge6z/se+PSkRoqvHKAKJOq+rUf5Xrz0hengPr
- fxA5kprajDI1M++/D2ffE4ZLqA4NtpmYRveUNy+hxq7NzgoSC7VzJS+jY/C4hpMj25ki
- kqdyPymcVW/EC3sugbUIU5KoF4VMHAhny45h+mCdIwb8fDjbGCz2t9b9+4jzR6+q8Ddi
- BKlVBNmuqSKoB3d1pf+BRQ54LXjDHvUw3vh+9J8Cws6KmfLfojAWrv+FLfhA4TOFStLC
- FbOw==
-X-Gm-Message-State: AJcUuket6Dxg6/36VJ7XYpFJFZE5KZnMfcKOitZeFVF7wBiPrwWgaEgk
- pB9aYeSU460ahrKeVBwz06MFWaQT2Ail+Q4g2Hs=
-X-Google-Smtp-Source: ALg8bN74wJXGW9IEeBLX1QxSlVn90pBMU9FqRQb0GkEfbZEjdlEV7DYozD61L4nAnmvnYse2QpcxZ8VmUj2kRQbrMX8=
-X-Received: by 2002:a02:5184:: with SMTP id s126mr7945358jaa.12.1547738540125; 
- Thu, 17 Jan 2019 07:22:20 -0800 (PST)
+	id 1gk9Vr-0007tL-VV; Thu, 17 Jan 2019 15:23:23 +0000
+Received: from kirsty.vergenet.net ([202.4.237.240])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gk9Vk-0007py-20
+ for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 15:23:17 +0000
+Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
+ by kirsty.vergenet.net (Postfix) with ESMTPA id 86DD225B760;
+ Fri, 18 Jan 2019 02:23:14 +1100 (AEDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
+ t=1547738594; bh=auQ2NRBR4hn04VH61X7DcbjJAq/IliX1dcZSqqQeUnM=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=XpVzRe3Nxh5az1fTwLu8GW7EuNs+D83FoMq2+CX2aS3KsroNSF6c+SyWCLBxnuZrg
+ /HhkM73oiV1T+Uv16e2m4eAbwGM8jQAMyMOXgA7k0PjVTKkfCbhY8FSNhHDDjYjjJP
+ K3zSxgKNPTXc2QVF4qibjn36ELGVNaz/OY4jpcEE=
+Received: by reginn.horms.nl (Postfix, from userid 7100)
+ id 80746940459; Thu, 17 Jan 2019 16:23:12 +0100 (CET)
+Date: Thu, 17 Jan 2019 16:23:12 +0100
+From: Simon Horman <horms@verge.net.au>
+To: Wolfram Sang <wsa@the-dreams.de>
+Subject: Re: [PATCH repost] arm64: dts: renesas: r8a77990: ebisu: Enable
+ HS400 of SDHI3
+Message-ID: <20190117152312.slckgb3w3n4ysgfj@verge.net.au>
+References: <20190117143829.6ubwnj5cyh74mjq3@verge.net.au>
+ <20190117150126.gku7sr3dcujfx2rq@ninjato>
 MIME-Version: 1.0
-References: <20190116050435.11624-1-ck.hu@mediatek.com>
- <20190116050435.11624-2-ck.hu@mediatek.com>
- <CABb+yY0JfRbdVb_3wqxve1pYH0ZpFNrA2Kr6qovBruzhbeFRuw@mail.gmail.com>
- <1547712032.5318.17.camel@mtksdaap41>
-In-Reply-To: <1547712032.5318.17.camel@mtksdaap41>
-From: Jassi Brar <jassisinghbrar@gmail.com>
-Date: Thu, 17 Jan 2019 09:22:09 -0600
-Message-ID: <CABb+yY3Lk7up2+mrwQGBowm0j6SEyitQkj0=q9Z+C7aHad56Qw@mail.gmail.com>
-Subject: Re: [PATCH 1/3] mailbox: Add ability for clients to abort data in
- channel
-To: CK Hu <ck.hu@mediatek.com>
+Content-Disposition: inline
+In-Reply-To: <20190117150126.gku7sr3dcujfx2rq@ninjato>
+Organisation: Horms Solutions BV
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_072221_398389_5BADB1E8 
-X-CRM114-Status: GOOD (  24.00  )
+X-CRM114-CacheID: sfid-20190117_072316_240653_C594D0A3 
+X-CRM114-Status: GOOD (  15.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,86 +76,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: srv_heupstream@mediatek.com,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Houlong Wei <houlong.wei@mediatek.com>, linux-mediatek@lists.infradead.org,
- Matthias Brugger <matthias.bgg@gmail.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: linux-renesas-soc@vger.kernel.org,
+ Wolfram Sang <wsa+renesas@sang-engineering.com>,
+ Niklas =?utf-8?Q?S=C3=B6derlund?= <niklas.soderlund+renesas@ragnatech.se>,
+ Magnus Damm <magnus.damm@gmail.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 17, 2019 at 2:00 AM CK Hu <ck.hu@mediatek.com> wrote:
->
-> Hi, Jassi:
->
-> On Wed, 2019-01-16 at 10:22 -0600, Jassi Brar wrote:
-> > On Tue, Jan 15, 2019 at 11:07 PM CK Hu <ck.hu@mediatek.com> wrote:
-> > >
-> > > This patch supplies a new framework API, mbox_abort_channel(), and
-> > > a new controller interface, abort_data().
-> > >
-> > > For some client's application, it need to clean up the data in channel
-> > > but keep the channel so it could send data to channel later.
-> > >
-> > > Signed-off-by: CK Hu <ck.hu@mediatek.com>
-> > > ---
-> > >  drivers/mailbox/mailbox.c          | 23 +++++++++++++++++++++++
-> > >  include/linux/mailbox_client.h     |  1 +
-> > >  include/linux/mailbox_controller.h |  4 ++++
-> > >  3 files changed, 28 insertions(+)
-> > >
-> > > diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
-> > > index c6a7d4582dc6..281647162c76 100644
-> > > --- a/drivers/mailbox/mailbox.c
-> > > +++ b/drivers/mailbox/mailbox.c
-> > > @@ -428,6 +428,29 @@ struct mbox_chan *mbox_request_channel_byname(struct mbox_client *cl,
-> > >  }
-> > >  EXPORT_SYMBOL_GPL(mbox_request_channel_byname);
-> > >
-> > > +/**
-> > > + * mbox_abort_channel - The client abort all data in a mailbox
-> > > + *                     channel by this call.
-> > > + * @chan: The mailbox channel to be aborted.
-> > > + */
-> > > +void mbox_abort_channel(struct mbox_chan *chan)
-> > > +{
-> > > +       unsigned long flags;
-> > > +
-> > > +       if (!chan || !chan->cl)
-> > > +               return;
-> > > +
-> > > +       if (chan->mbox->ops->abort_data)
-> > > +               chan->mbox->ops->abort_data(chan);
-> > > +
-> > > +       /* The queued TX requests are simply aborted, no callbacks are made */
-> > > +       spin_lock_irqsave(&chan->lock, flags);
-> > > +       chan->cl = NULL;
-> > > +       chan->active_req = NULL;
-> > > +       spin_unlock_irqrestore(&chan->lock, flags);
-> > > +}
-> > >
-> > Why not just release and then request channel again ?
-> > mbox_abort_channel() is just a copy of mbox_free_channel() and if the
-> > abort can sleep, that is more reason to just do that.
->
-> The cursor may change position 300 times in one second, so I still
-> concern the processing time. Request and free channel looks too heavy to
-> do 300 times per second.
-You send data 300Hz, not abort ... which is supposed to be a rare event.
-And then your shutdown/startup is currently empty, while abort isn't
-quite lightweight.
+On Thu, Jan 17, 2019 at 04:01:26PM +0100, Wolfram Sang wrote:
+> On Thu, Jan 17, 2019 at 03:38:29PM +0100, Simon Horman wrote:
+> > Add SDHI3 UHS pin control and use it when enabling HS200 support
+> > for SDHI3.
+> 
+> HS400
+> 
+> > # dd if=/dev/mmcblk0 of=/dev/null bs=1M count=512 iflag=direct
+> > 512+0 records in
+> > 512+0 records out
+> > 536870912 bytes (537 MB) copied, 9.02486 s, 59.5 MB/s
+> > # dd if=/dev/mmcblk0 of=/dev/null bs=1M count=512 iflag=direct
+> > 512+0 records in
+> > 512+0 records out
+> > 536870912 bytes (537 MB) copied, 7.36003 s, 72.9 MB/s
+> > # dd if=/dev/mmcblk0 of=/dev/null bs=1M count=512 iflag=direct
+> > 512+0 records in
+> > 512+0 records out
+> > 536870912 bytes (537 MB) copied, 11.0156 s, 48.7 MB/s
+> 
+> Hmmmm, quite some fluctuation and far away from the performances of M3N.
 
-> Conceptually, I just want to clean up the
-> channel rather than free and request it, so they are somewhat different.
-> I say it may sleep because mbox_abort_channel() is a copy of
-> mbox_free_channel(). I could change it to 'must not sleep' because
-> Mediatek controller does not sleep in abort callback.
->
-No please. Just use the shutdown/startup.
+Perhaps the M3N measurements were taken without iflag=direct ?
 
-Thanks.
+In that case for E3 I see:
+
+# dd if=/dev/mmcblk0 of=/dev/null bs=1M count=512
+512+0 records in
+512+0 records out
+536870912 bytes (537 MB) copied, 3.79686 s, 141 MB/s
+# dd if=/dev/mmcblk0 of=/dev/null bs=1M count=512
+512+0 records in
+512+0 records out
+536870912 bytes (537 MB) copied, 3.77128 s, 142 MB/s
+# dd if=/dev/mmcblk0 of=/dev/null bs=1M count=512
+512+0 records in
+512+0 records out
+536870912 bytes (537 MB) copied, 3.79916 s, 141 MB/s
+
+> Marek, do you have an idea why? Did you note any E3 differences when
+> coding support for U-Boot?
+> 
+> > diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+> > index 89383aa35d65..f2846c9eb83f 100644
+> > --- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+> > +++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+> > @@ -535,6 +535,12 @@
+> >  		power-source = <1800>;
+> >  	};
+> >  
+> > +	sdhi3_pins_uhs: sd3_uhs {
+> > +		groups = "sdhi3_data8", "sdhi3_ctrl", "sdhi3_ds";
+> > +		function = "sdhi3";
+> > +		power-source = <1800>;
+> > +	};
+> > +
+> 
+> This is exactly the same as sdhi3_pins, so no need.
+
+Yes, silly me.
 
 _______________________________________________
 linux-arm-kernel mailing list
