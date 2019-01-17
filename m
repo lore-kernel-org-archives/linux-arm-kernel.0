@@ -2,22 +2,23 @@ Return-Path: <SRS0=6Gta=PZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CF00DC43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 19:47:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 35080C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 19:51:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9F0E820855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 19:47:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0513C20868
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 17 Jan 2019 19:51:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WVz3XJX/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9F0E820855
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.intel.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WqvkMA9e";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Pc4Oc2Pp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0513C20868
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,45 +26,67 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2L3bWxQmDIHHvSeQrykLWa8q8J1M8f+v1SBTKs4g8iE=; b=WVz3XJX/BR/V0A
-	CY5MpoYakUw2PH0TYOcFtOxI0gwkbp2PLdMyxIEOij7BAcpPFFDRbCFRu6ulAqs33jQPI/wETt1CZ
-	eIexe+gUV3P3HWqkdsbwUWAXueaQrXIdSxH6MqZYHkpEiPUDkbmXExpONcAERog5FGDaEzX70lvJV
-	zc95np1i8ZeZTvUB+2JifWBA9d3uQWmbJkkp40xdUJUHAKV4n4vEsf96gH0gjtKTjKg248/3cbIhg
-	/OCccoUPJGmrmhHJwv6GGC0VWLoUPNOqYPnKlNxOe9MwaJJ9WX80mX5rk3D682K9F5JPT6b3BcHeH
-	mzYAWJnCZYElNzDZrhiQ==;
+	List-Owner; bh=FEqa7pP6ggD2DLrF8IMy5vbK+iCeCJfTXoyQb9wsX+A=; b=WqvkMA9e2hLs0N
+	A2SaQh087Ib7b4y5aE2Lad3VBv7MsC+eBc44Sl9RZ4mWL7xVP/VU1ZiFu8ZfIGVU/H28hBpBbLHuW
+	xZhrdbhWo3YLtUj6M9OTthcE+foGntyw4qtP8e5l70umc5MGEjaJytYhwnXVjpvFU0LNZcZl4HF0n
+	B/eTBY4JweQj96IS6t+elUbTOgFC4QMu6RpMAJBwZMCLje9/vRDHuH7oiEfDe0QLczAbFCnWeUhuA
+	0emRR0BxZ/YpfvEsxkOPavNsNXhqAtjz6RNvB00gQ7eCqPmHuvO+tdkkHUqF5UojPcmNWlw2DiMdk
+	LBp9bCGUNqB9x5wJZipA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkDdY-00088v-3O; Thu, 17 Jan 2019 19:47:36 +0000
-Received: from mga07.intel.com ([134.134.136.100])
+	id 1gkDh2-0001Pt-Fl; Thu, 17 Jan 2019 19:51:12 +0000
+Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkDdU-00087v-Pr
- for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 19:47:34 +0000
-X-Amp-Result: UNSCANNABLE
-X-Amp-File-Uploaded: False
-Received: from fmsmga002.fm.intel.com ([10.253.24.26])
- by orsmga105.jf.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
- 17 Jan 2019 11:47:28 -0800
-X-ExtLoop1: 1
-X-IronPort-AV: E=Sophos;i="5.56,489,1539673200"; d="scan'208";a="135546499"
-Received: from stinkbox.fi.intel.com (HELO stinkbox) ([10.237.72.174])
- by fmsmga002.fm.intel.com with SMTP; 17 Jan 2019 11:47:23 -0800
-Received: by stinkbox (sSMTP sendmail emulation);
- Thu, 17 Jan 2019 21:47:22 +0200
-Date: Thu, 17 Jan 2019 21:47:22 +0200
-From: Ville =?iso-8859-1?Q?Syrj=E4l=E4?= <ville.syrjala@linux.intel.com>
-To: Christoph Manszewski <c.manszewski@samsung.com>
-Subject: Re: [PATCH 1/6] include/drm: color_mgmt: Add enum labels
-Message-ID: <20190117194722.GJ20097@intel.com>
-References: <1544789421-5265-1-git-send-email-c.manszewski@samsung.com>
- <CGME20181214121032eucas1p24af580721ebd6f86a4f9ddf701957ab6@eucas1p2.samsung.com>
- <1544789421-5265-2-git-send-email-c.manszewski@samsung.com>
+ id 1gkDgz-0001PY-3s
+ for linux-arm-kernel@lists.infradead.org; Thu, 17 Jan 2019 19:51:10 +0000
+Received: by mail-pg1-x544.google.com with SMTP id d72so4887501pga.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 17 Jan 2019 11:51:08 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=6DS9RQTA+4Ktfge5ckQFdetrHudMskS10urd1IsirZ8=;
+ b=Pc4Oc2Pp9s7Nw6BYVsl7aeTy466/3vMUF+RtahMFXcW8B+rWX6Pi1v6wJYQ1KdwMzL
+ BRcN+uubDtfqyUwxfPyOGwcjcugA015JpSvKVSkIbdp5CDQmpyWjGacMCwiWyGY6+ZLw
+ nIna4elN/BRqkiH6nrQS+DL1DQ2QdqwQXO2jY=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=6DS9RQTA+4Ktfge5ckQFdetrHudMskS10urd1IsirZ8=;
+ b=sxtKO3sQRp3RJm3ZfNkyUIFRdm+I8wPP//azgAIkVbD8Ehmv2VdKDkVTebq6Nspo22
+ jh0MyrQv9pgPf4kCVFfBpKPMYWrwkgboi5Op6UHuAUNwbveXSR6s5rNyKCJpBjtgh70L
+ vShtABtpUMxD5DkFj2ygLWrlwGIEjijQPKU6UfZFnMjtbVCdYhkPp5yBK8SjynAYhp6o
+ K7iXPAlXP3WCgRAqej22NNb5YcxG0yKaKNyur2cULY+reslvf7LNeJ14ZaAi2dIwzaVb
+ xHx9Xwi0h+toCHoTc9YSeHd54LYBZthNCTkXgAsmJyX6b0HiKweXJrpGS5FCLSX4b6lu
+ TfuQ==
+X-Gm-Message-State: AJcUukeZaS053erBYzyqGb2nsu7Ubbcuvjp39nk/ShxJjy8h+2ZQVoer
+ Z+hoEQO1cNAvgWC+cpCPNCS7kciUoWE=
+X-Google-Smtp-Source: ALg8bN4yUaDo3Y1Qwr7QzVvI/i6OBW+8V9dF16/hOMTNEeu/jyDsdqx2yex9KgMtfY0hGMqSE6hzzQ==
+X-Received: by 2002:a63:86c1:: with SMTP id
+ x184mr14500516pgd.305.1547754667432; 
+ Thu, 17 Jan 2019 11:51:07 -0800 (PST)
+Received: from builder (104-188-17-28.lightspeed.sndgca.sbcglobal.net.
+ [104.188.17.28])
+ by smtp.gmail.com with ESMTPSA id h8sm2517901pgv.27.2019.01.17.11.51.05
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Thu, 17 Jan 2019 11:51:06 -0800 (PST)
+Date: Thu, 17 Jan 2019 11:50:27 -0800
+From: Bjorn Andersson <bjorn.andersson@linaro.org>
+To: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+Subject: Re: [PATCH 1/3] arm64: dts: qcom: sdm845: Add Coresight support
+Message-ID: <20190117195027.GA12955@builder>
+References: <cover.1547054308.git.saiprakash.ranjan@codeaurora.org>
+ <a13ad49d3ae8d9a5a972027283b7212ab19f97d0.1547054308.git.saiprakash.ranjan@codeaurora.org>
+ <20190113072319.GB28907@builder>
+ <5724d2d4-39df-a923-5f94-b53c40a84fd3@codeaurora.org>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1544789421-5265-2-git-send-email-c.manszewski@samsung.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <5724d2d4-39df-a923-5f94-b53c40a84fd3@codeaurora.org>
+User-Agent: Mutt/1.10.0 (2018-05-17)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_114732_923681_387C8A58 
-X-CRM114-Status: GOOD (  16.71  )
+X-CRM114-CacheID: sfid-20190117_115109_179691_78D0672D 
+X-CRM114-Status: GOOD (  18.82  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,70 +98,72 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-samsung-soc@vger.kernel.org,
- Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- Seung-Woo Kim <sw0312.kim@samsung.com>, linux-kernel@vger.kernel.org,
- dri-devel@lists.freedesktop.org, David Airlie <airlied@linux.ie>,
- Kyungmin Park <kyungmin.park@samsung.com>, Kukjin Kim <kgene@kernel.org>,
- Krzysztof Kozlowski <krzk@kernel.org>, Sean Paul <sean@poorly.run>,
- linux-arm-kernel@lists.infradead.org,
- Marek Szyprowski <m.szyprowski@samsung.com>
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Rajendra Nayak <rnayak@codeaurora.org>,
+ Mathieu Poirier <mathieu.poirier@linaro.org>,
+ Suzuki K Poulose <suzuki.poulose@arm.com>,
+ Alexander Shishkin <alexander.shishkin@linux.intel.com>,
+ linux-arm-msm@vger.kernel.org, linux-kernel@vger.kernel.org,
+ David Brown <david.brown@linaro.org>, Rob Herring <robh+dt@kernel.org>,
+ Sibi Sankar <sibis@codeaurora.org>, Vivek Gautam <vivek.gautam@codeaurora.org>,
+ Leo Yan <leo.yan@linaro.org>, Andy Gross <andy.gross@linaro.org>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Dec 14, 2018 at 01:10:16PM +0100, Christoph Manszewski wrote:
-> Range setting makes sense for YCbCr and RGB buffers. Current
-> drm_color_range enum labels suggest use with YCbCr buffers.
-> Create enum labels without colorspace specification.
-> =
+On Tue 15 Jan 08:27 PST 2019, Sai Prakash Ranjan wrote:
 
-> Signed-off-by: Christoph Manszewski <c.manszewski@samsung.com>
-> ---
->  include/drm/drm_color_mgmt.h | 2 ++
->  1 file changed, 2 insertions(+)
-> =
+> Hi Bjorn,
+> 
+> Thanks for the review. Please find my comments inline.
+> 
+> On 1/13/2019 12:53 PM, Bjorn Andersson wrote:
+> > On Wed 09 Jan 09:46 PST 2019, Sai Prakash Ranjan wrote:
+> > 
+> > > Add coresight components found on Qualcomm SDM845 SoC.
+> > > 
+> > > Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+> > 
+> > Hi Sai,
+> > 
+> > The content of this patch looks good, but please fold it into
+> > sdm845.dtsi (keep the nodes sorted by address).
+> > 
+> 
+> I had looked at the sample from hi6220 for coresight and
+> decided to keep sdm845 coresight dtsi in separate file as it
+> would look much cleaner than mixing it with main dtsi file.
+> Also I guess it would make coresight topology more understandable
+> if we keep it separately (plus there are about 400+ lines of coresight
+> dt entries). Is there any reason for wanting coresight entries merged
+> into sdm845.dtsi file? If you still prefer it, I can make the
+> change in the next version.
+> 
 
-> diff --git a/include/drm/drm_color_mgmt.h b/include/drm/drm_color_mgmt.h
-> index 90ef9996d9a4..52f6d5221a0d 100644
-> --- a/include/drm/drm_color_mgmt.h
-> +++ b/include/drm/drm_color_mgmt.h
-> @@ -62,6 +62,8 @@ enum drm_color_range {
->  	DRM_COLOR_YCBCR_LIMITED_RANGE,
->  	DRM_COLOR_YCBCR_FULL_RANGE,
->  	DRM_COLOR_RANGE_MAX,
-> +	DRM_COLOR_LIMITED_RANGE =3D DRM_COLOR_YCBCR_LIMITED_RANGE,
-> +	DRM_COLOR_FULL_RANGE =3D DRM_COLOR_YCBCR_FULL_RANGE,
+There seems to be some variations of this, but we try to keep everything
+sorted in sdm845.dtsi to avoid having to jump around between the various
+files. So please merge it into sdm845.dtsi (sorted by address).
 
-These enum values don't mean anything really. The strings are what
-matter for the uapi.
+Regards,
+Bjorn
 
-The default for YCbCr needs to be limited range, the default for RGB
-needs to be full range. So I think this would really require a separate
-prop for each.
-
-But is there an actual usecase for this stuff?
-
->  };
->  =
-
->  int drm_plane_create_color_properties(struct drm_plane *plane,
-> -- =
-
-> 2.7.4
-> =
-
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel@lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
-
--- =
-
-Ville Syrj=E4l=E4
-Intel
+> > And mention below the --- that this depends on my AMBA bus pclk change
+> > and include the URL:
+> > 
+> > https://lore.kernel.org/lkml/20190106080915.4493-7-bjorn.andersson@linaro.org/
+> > 
+> 
+> I had mentioned this dependency in the cover letter. But I suppose
+> I can mention it here as well.
+> 
+> Thanks,
+> Sai
+> 
+> -- 
+> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+> of Code Aurora Forum, hosted by The Linux Foundation
 
 _______________________________________________
 linux-arm-kernel mailing list
