@@ -2,22 +2,22 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_NEOMUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2830AC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 01:34:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2A347C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 01:39:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E5C0920873
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 01:34:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EDCE920873
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 01:39:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Pl+SnjT/";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="aM5quWca"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E5C0920873
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="T9j5yvBd";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="rWdHUbx8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EDCE920873
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,68 +26,69 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lLPyH6pLWJkSFGPuccS9P/+M34Qq7kL7g5qOl7qazUY=; b=Pl+SnjT/3EbbGP
-	TzwGoCCfEgwwy1JlnVSnBefNgJ++MgHdAGKnMS9TLmR/NkFTeNAk+XuRMoA5v/2IVoUSL7L/UsgDV
-	xjetK5HMEC4BIfWMYWjHIVB2sacR7ba/sg95KzfUKB0k68CENPKv4DYbGCXTSLBD6b09DJLcujLeV
-	LphyXdzVjJITNWiCNcaNgRiJXJEi/MFQjcP/bxYN+E/QBepni//2KVZ1j+jQKOY0DSXl7gN0XUSXP
-	oXeYWstAQRnWCrAADGrd6f358MaJdsu3JzVA1wHyw8GDSQvszgyUkqH0pbsbfb+BeMUa9SjTJYRaM
-	w9PGybl16T2CA0QKC2Ng==;
+	List-Owner; bh=gXCvwgJxXOGIlWI9w6VH3OVsLDdjVT1sF3VSMrsTO4k=; b=T9j5yvBd758/8c
+	HPEH7oaghzGpePcStr4XDJk7Vw9q4gy4kVo4K+Q9SX7E7L1qt2VsFfQ01o4V/B3eu8kVnc254aZCB
+	KhBHPd8Bqp99SMMB+ngV3nycerb88lFYaXdwM1JoZiS0cAvvMjIglHkBNvgWrWHeDu9uEjoR+gkBu
+	fQXs8tiekhlNQ1VScZiMiwFeByaElP087L0LeJ0lTxeFpnN9ABCrUGioaiTdwtozC12EqVAED0+gz
+	q3F/T5SfJb6yF3Fvf8jkf0PFgEpXIHP+dYxSZb4dOWfKoxm7/TxQ+ax7LfimltibbX9JHIoqRKHZq
+	/dnPsCxcMerv7lutKmVg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkJ3Z-00005K-RH; Fri, 18 Jan 2019 01:34:49 +0000
-Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+	id 1gkJ7z-0001kM-Le; Fri, 18 Jan 2019 01:39:23 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkJ3W-0008WP-Cc
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 01:34:47 +0000
-Received: by mail-wm1-x341.google.com with SMTP id g67so3004445wmd.2
+ id 1gkJ7w-0001jw-0A
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 01:39:21 +0000
+Received: by mail-wr1-x443.google.com with SMTP id s12so13167033wrt.4
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 17 Jan 2019 17:34:40 -0800 (PST)
+ Thu, 17 Jan 2019 17:39:17 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=4NXApdb4VZkR1BpezAsKTsF0j6KwZn7E2ruj2CswNGs=;
- b=aM5quWca8sv9RgLeiN6JxSZgvinlsuxMxpngbYCFswvivEzXVWv7XaxGKJNCSahxXS
- aJTzzu0Xe5O0ELsESOzL00IxDLM/jny5imPiwr8PG6p0569c9NIQHYIozbPfbE5aDzn2
- V9Ny7O1ii/PHaYc1VAfR0v7INsTPsb3DbovMO7a8Wkk3gwzuVfzlJC51f5OzXAZhb7zK
- EKUA6hua5Fybii7Yb6A0e7GNnPCCMRClkAKUjC9EHWLR/USm+fmL81uIR9ePSSnyBxEP
- r+D+EiJE8rIkvFRRzAJUsDS77UeRmem/WRJHuJ7sdGXLxYmOTQRXf+hlpzTp9367IHLC
- 4f4w==
+ bh=RoDpLGt/KuvAAxZR5Vdi0q3IDW6U8xokDmpvZoP+z1s=;
+ b=rWdHUbx8o/0qiZUncbladUXZaakO80ruHQVBkz290AwmQqvoFIvd3LddxqAPUM5RZq
+ FjJ4P1sHU3Qm35hvyuWNaHBdZwBhuoVmL09dm39gZVUS5Ah6CsaXuepExP6bZXJt0hag
+ JAYg1kerBAlfMvLkLL/shlQlDUihf/qCI33Xt9wgY91Of3HGGtMpKg0jY7PA1tpo+Wao
+ uHuLL4stYdEA6jWhJ2Of6UpsYYm9KQWlrjx98ZCvQBYUH7LpJV6529qYz6p8tgqWTm+C
+ DvKXap+e6Hywhz2lokksOAhoQDmT+bJvfhVz3yakh03vzJTyfCjpG6jh68alwDW/lcRR
+ JJnA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=4NXApdb4VZkR1BpezAsKTsF0j6KwZn7E2ruj2CswNGs=;
- b=JeqktMy+NU4UPYheUc8wHAobI/dhpBUj/20uLhEkTui5qwdWCMIgnG4esCtku7SsYS
- dkxLqEJ2xWRWrTCmmtvatk7JiyOeL9guu5ds6Y5GAdGLv5qHEJ7y/lu72ALb1ZmaE5V+
- cCatj2qofaHAqkYUlhdO4mkZDb6k5RCUvhtbNdALb5ZzNXtecbB2P4ev7RAIuTVuUfpS
- oHb4CcTFKND4S6n65MkN1PZay/J50SOgMn72odPQ9al9dthTvfK+7prtKTjimUrrOAUP
- E2Z1q/Z18ItuRJb+hldtdEtqBN57ynxHl06RCtwzmOHU7p8MZ3tYktzcTUYGLgiPIhHs
- aukw==
-X-Gm-Message-State: AJcUukfF43NksnDXZ3nyLn7ZA9/4kpO2YvCX/+r+Ok0NRQprVdUT2W6a
- WVF/xktfWAPDxK+rqKQnrL0=
-X-Google-Smtp-Source: ALg8bN7qeOATWvmoh+sJVuTYaCTP5z4hYkjp/n5ojBSBGKwWibigxCVoyhz5NtTQX2XWI4eNt7kPIg==
-X-Received: by 2002:a7b:cf30:: with SMTP id m16mr14489333wmg.22.1547775278775; 
- Thu, 17 Jan 2019 17:34:38 -0800 (PST)
+ bh=RoDpLGt/KuvAAxZR5Vdi0q3IDW6U8xokDmpvZoP+z1s=;
+ b=kmX4dAKXsRl+fynfYyj4aYMEbZeNzlbypCQp3Ec+yMEltGiI7L56PW+lt93HIzpcUv
+ I/+Dz3H5vUrV7SrkpUlbMYKx4Rm+fvUFsdX/lYQe2CqqanHCJhRczXNuBN12iT7Hac6A
+ +8PdAN8vdZVca/C0/66GsDXaJf9WJUVw2oYjZLBcY+sYyqKKYbvS35jzOEw1lkPT2lxk
+ fy9f2c+OsgAMWp79tG+0zdSo+w15oZtPiIUpTHSQC8C1HKPO2rv+xfMx3lz2ZTU8wgVE
+ HPWxuwOfMdrbW2GI2HB6okFSy9BZqPsU+LGCubHPWXDiSSA6CB57kakV9saK+p+VYUUc
+ 4s5w==
+X-Gm-Message-State: AJcUukdM4Uz6526MWPxJYPg5k3LYSarI+dXMpHUlrB8+NuzDEmRtFz+4
+ YMNvdt/bwhTAW405DL1su5A=
+X-Google-Smtp-Source: ALg8bN6BASzwTX2eZ0xxbSp9KHhD1o2Ok1Ci1bGtYhlnXMkuLzqW7MuHknY1Oq4qFbspQwlljY2KbA==
+X-Received: by 2002:adf:e284:: with SMTP id v4mr13706573wri.26.1547775555919; 
+ Thu, 17 Jan 2019 17:39:15 -0800 (PST)
 Received: from localhost (83-215-98-136.stmi.dyn.salzburg-online.at.
  [83.215.98.136])
- by smtp.gmail.com with ESMTPSA id v132sm42659333wme.20.2019.01.17.17.34.36
+ by smtp.gmail.com with ESMTPSA id k19sm125430966wre.5.2019.01.17.17.39.14
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 17 Jan 2019 17:34:37 -0800 (PST)
-Date: Thu, 17 Jan 2019 17:34:34 -0800
+ Thu, 17 Jan 2019 17:39:15 -0800 (PST)
+Date: Thu, 17 Jan 2019 17:39:12 -0800
 From: Richard Cochran <richardcochran@gmail.com>
 To: Yangbo Lu <yangbo.lu@nxp.com>
 Subject: Re: [v2, 3/5] dt-binding: ptp_qoriq: document "fsl,extts-fifo"
  property
-Message-ID: <20190118013434.qwuiqi5iwo5gw2nk@localhost>
+Message-ID: <20190118013912.skj4x5wmkbouekfx@localhost>
 References: <20190117014936.48117-1-yangbo.lu@nxp.com>
  <20190117014936.48117-4-yangbo.lu@nxp.com>
+ <20190118013434.qwuiqi5iwo5gw2nk@localhost>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190117014936.48117-4-yangbo.lu@nxp.com>
+In-Reply-To: <20190118013434.qwuiqi5iwo5gw2nk@localhost>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_173446_431199_8542FFC7 
-X-CRM114-Status: GOOD (  13.71  )
+X-CRM114-CacheID: sfid-20190117_173920_040327_DC83C9A3 
+X-CRM114-Status: GOOD (  10.33  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,28 +108,20 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 17, 2019 at 09:49:34AM +0800, Yangbo Lu wrote:
-> Documented "fsl,extts-fifo" property.
+On Thu, Jan 17, 2019 at 05:34:34PM -0800, Richard Cochran wrote:
+> > @@ -17,6 +17,7 @@ Clock Properties:
+> >    - fsl,tmr-fiper1   Fixed interval period pulse generator.
+> >    - fsl,tmr-fiper2   Fixed interval period pulse generator.
+> >    - fsl,max-adj      Maximum frequency adjustment in parts per billion.
+> > +  - fsl,extts-fifo   Required if hardware uses external trigger stamp FIFO.
 > 
-> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-> ---
-> Changes for v2:
-> 	- Modified binding description.
-> ---
->  .../devicetree/bindings/ptp/ptp-qoriq.txt          |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/ptp/ptp-qoriq.txt b/Documentation/devicetree/bindings/ptp/ptp-qoriq.txt
-> index c5d0e79..101fe5f 100644
-> --- a/Documentation/devicetree/bindings/ptp/ptp-qoriq.txt
-> +++ b/Documentation/devicetree/bindings/ptp/ptp-qoriq.txt
-> @@ -17,6 +17,7 @@ Clock Properties:
->    - fsl,tmr-fiper1   Fixed interval period pulse generator.
->    - fsl,tmr-fiper2   Fixed interval period pulse generator.
->    - fsl,max-adj      Maximum frequency adjustment in parts per billion.
-> +  - fsl,extts-fifo   Required if hardware uses external trigger stamp FIFO.
+> Does this take a Boolean value?  Please explain the semantics.
 
-Does this take a Boolean value?  Please explain the semantics.
+How about this instead?
+
+	The presence of this property indicates hardware support for
+	the external trigger stamp FIFO.
+
 
 Thanks,
 Richard
