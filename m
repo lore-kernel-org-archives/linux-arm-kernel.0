@@ -2,59 +2,63 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8CA7DC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:14:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1F25BC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:15:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5AD6420896
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:14:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DDB6120850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:15:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B9jTG31I"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5AD6420896
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WsUzgnMq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DDB6120850
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=iYGEqiFOBdsaFtVIAgjw1csZZVgmZuwzvHoiX6DzI3g=; b=B9j
-	TG31IMktvAIsyyLUJJcM5eFbw23uerC8AE+p0F1WfVddEcCCLt+KccnZZyV4LuzrOnNxdHDUXfuXz
-	G079GaKVcUY1NmYILM44U8bUV6YDeGB5CKTOUspKPL88nULKJSiVC/SvSWwswamziUwIJFT+TGKa7
-	Du65JuLptxoOSVY8TqSBgFDqmJCEK2BZid9Hv0z6e0R1Y952lhbYCNTDL410o4kCjWBEHkjpoem/X
-	ZKhlPVjSksL62FNRwX7B5mh9kdLELcQU4gNSPy698aFkBHkuiDAFzvKTmAWoXa4tW6d/B9gqDtfhh
-	4CcGs1ju1CYedabZl81FaQhj7ZRcLMw==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=rY/Vd7CXqFrk/d8zIQqvuGrSUCCvgH2SO69mKYVVwZ8=; b=WsUzgnMqxB6spK6/3f8SAzgXQM
+	oFQnFPouVYIb8M6Q8vqyRCdbe56/OySb3S6FLIY2iAM11nA8WJovN0DtSfEbmPm/AqJFVPvkEhMiy
+	Zy2VOHjSTtmPR0N72q6ey/ReMPKwiRdFnnTg+vEp5hIzCH2/C/DljKi6+mLu+fq+CLoglLXSlg5mz
+	q5a7oAevUAxn8mBNElmpFSFsz5TeS/7qyqbSYC2Jw4mrbPLc2mSV8T9mAcuNEe2nD/742DIUxTpX3
+	G/wn4XeMHK4cUGYUW42ooKG13H/nP8P+463B7K8jL4HdHo1TuMchL5BAc7/5mwipRQS9iT44FcI8H
+	z+tr6ISQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkWn0-0003fN-FW; Fri, 18 Jan 2019 16:14:38 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gkWng-0005Gk-Lx; Fri, 18 Jan 2019 16:15:20 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkWmx-0003ey-Ah
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 16:14:36 +0000
+ id 1gkWnd-0005Fn-5k
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 16:15:18 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0879FEBD;
- Fri, 18 Jan 2019 08:14:34 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 64FD3EBD;
+ Fri, 18 Jan 2019 08:15:16 -0800 (PST)
 Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 170853F557;
- Fri, 18 Jan 2019 08:14:31 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 481703F557;
+ Fri, 18 Jan 2019 08:15:14 -0800 (PST)
 From: Dave Martin <Dave.Martin@arm.com>
 To: kvmarm@lists.cs.columbia.edu
-Subject: [RFC PATCH 00/12] arm64: SVE guest support test hacks
-Date: Fri, 18 Jan 2019 16:14:09 +0000
-Message-Id: <1547828061-20462-1-git-send-email-Dave.Martin@arm.com>
+Subject: [RFC PATCH 01/12] guest: Add generated file guest/guest_init.c to
+ .gitignore
+Date: Fri, 18 Jan 2019 16:14:10 +0000
+Message-Id: <1547828061-20462-2-git-send-email-Dave.Martin@arm.com>
 X-Mailer: git-send-email 2.1.4
+In-Reply-To: <1547828061-20462-1-git-send-email-Dave.Martin@arm.com>
+References: <1547828061-20462-1-git-send-email-Dave.Martin@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_081435_373141_D7FD62B9 
-X-CRM114-Status: UNSURE (   9.38  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190118_081517_253919_2BD2083C 
+X-CRM114-Status: GOOD (  11.67  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,59 +85,24 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This series, based on kvmtool master [1], contains development hacks
-to accompany the recently posted v4 SVE guest support series for the
-Linux kernel [2].
+guest/guest_init.c is a generated file, but git doesn't currently
+ignore it.  This can be annoying when running git status etc.
 
-This is not proposed for upstreaming in its current form, but some
-things are probably close to being appropriate for upstream.
+This patch adds a suitable .gitignore entry for this file.
 
-Comments and review welcome (but don't sweat the details too much).
-
-[1] 
-git://git.kernel.org/pub/scm/linux/kernel/git/will/kvmtool.git master
-https://git.kernel.org/pub/scm/linux/kernel/git/will/kvmtool.git/log/
-
-Specifically, commit fdd26ecb4bc5 ("kvm-cpu: Pause vCPU in signal handler").
-
-[2] [PATCH v4 00/25] KVM: arm64: SVE guest support
-https://lists.cs.columbia.edu/pipermail/kvmarm/2019-January/034134.html
-git://linux-arm.org/linux-dm.git sve-kvm/v4/head
-http://linux-arm.org/git?p=linux-dm.git;a=shortlog;h=refs/heads/sve-kvm/v4/head
-
-
-Dave Martin (12):
-  guest: Add generated file guest/guest_init.c to .gitignore
-  update_headers: Sync kvm UAPI headers with linux v5.0-rc2
-  Makefile: [HACK] Work around GCC 8 warnings :(
-  Makefile: [HACK] Pass relevant flags when checking for libfdt
-  arm64: Correct ARM64_CORE_REG() size encodings for all core registers
-  arm64: [HACK] Pull in kvm UAPI header updates from SVE development
-    branch
-  arm64: [HACK] Add option to show the kernel's KVM register ID list
-  arm64: [HACK] Basic SVE support
-  arm64: [HACK] Show extra info about SVE with --show-reg-list
-  arm64: [HACK] Allow configuration of the guest's set of SVE vector
-    lengths
-  arm64: [HACK] FPSIMD/SVE register dumping for lkvm debug
-  arm64: [HACK] Check that out-of-range SVE register IDs can't be dumped
-
- Makefile                                  |  11 +-
- arm/aarch32/include/asm/kvm.h             |  55 ++++++-
- arm/aarch64/include/asm/kvm.h             |  54 ++++++-
- arm/aarch64/include/kvm/kvm-config-arch.h |   9 ++
- arm/aarch64/include/kvm/kvm-cpu-arch.h    |   3 +-
- arm/aarch64/kvm-cpu.c                     | 209 ++++++++++++++++++++++++-
- arm/include/arm-common/kvm-config-arch.h  |   2 +
- arm/kvm-cpu.c                             | 239 ++++++++++++++++++++++++++++
- guest/.gitignore                          |   1 +
- include/linux/kvm.h                       | 250 +++++++++++++++++++++++++++++-
- mips/include/asm/kvm.h                    |  23 ++-
- powerpc/include/asm/kvm.h                 |  39 +++++
- x86/include/asm/kvm.h                     |  69 ++++++++-
- 13 files changed, 944 insertions(+), 20 deletions(-)
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ guest/.gitignore | 1 +
+ 1 file changed, 1 insertion(+)
  create mode 100644 guest/.gitignore
 
+diff --git a/guest/.gitignore b/guest/.gitignore
+new file mode 100644
+index 0000000..8e2da94
+--- /dev/null
++++ b/guest/.gitignore
+@@ -0,0 +1 @@
++guest_init.c
 -- 
 2.1.4
 
