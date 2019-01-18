@@ -2,98 +2,89 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B8BA3C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 04:58:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CA37CC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 05:10:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 857092087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 04:58:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9C5C520855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 05:10:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DpeXx7mH";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=aj.id.au header.i=@aj.id.au header.b="tsfB+2DN";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=messagingengine.com header.i=@messagingengine.com header.b="E+mSePgb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 857092087E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=aj.id.au
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uBtyPq8a";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="kDrzDLgy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9C5C520855
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Subject:Date:In-Reply-To:References:
-	MIME-Version:To:From:Message-Id:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/jKkTyPVr9xs8lJZB5sDyD3s3fW5u+TRzt824ODboHM=; b=DpeXx7mH2C4R82
-	OOfuG7ngb7N0LAQREHjmCqFhTnM4y9c6VR8xXFmIs6BjnNWm3QeMv71J9/e5e9BxNdZ00XPyYYcyG
-	STV6TIXNOXm/G1IDLF+mwYM8R+u8+qPDqFrmNVNGRYImNVo4CUbpMytZGrx6mgNW7qZDg/yHTSF78
-	1W1wO9NZAY8Y55EjCAeeLg/2zmdrB1Jiy2IZ1Q/gRpClgqg1YXDKWDQTXikNQ9lQJptb6tk824ey4
-	/tiJXnpX/jkmKDCIRQyzd2qzb/VTmlVAHbjnPS19FUq1A9G9CNR5hXMRepVrc/KhMVJAx/o9EXkSz
-	SScM1pbP/d/A5epk28ZQ==;
+	List-Owner; bh=MrVoPiDqrFABIlsytx9z+3ckjIhyYFEt90nvmm/jGis=; b=uBtyPq8anb8qGC
+	LDRYqkhMj2BwfqM3QLsRp2Kwl6IoUWZsBSppLfSAn6JTcibzqTxwErkpKebmOJE2RLLcxKZ6MJprJ
+	zXYfm70WkQw347e2kynnNMlKkiIoN0MJHvH6NbukrcX8K7zvnT8rNCURNNYBdfuu/MKfuuZzbuH3x
+	Fhx+nD581k2H4R437CiU4oeph9/8hht2udo9/if5bXyG09B5Is0czbRkXGHuOOoYTBNs6vIylPIyw
+	m3eUsbHoHcQww+8jptZ7xWJPoZYZCZ9QJ7J1YQdKrR/u6hZEWsFdTpESAIRNsIVppHcveOVVgvOo1
+	Z1zM6a1b4oDQsSdB0neg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkMEe-0006Wa-Oy; Fri, 18 Jan 2019 04:58:28 +0000
-Received: from out5-smtp.messagingengine.com ([66.111.4.29])
+	id 1gkMQ9-0002ml-2L; Fri, 18 Jan 2019 05:10:21 +0000
+Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkMEb-0006WF-67
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 04:58:26 +0000
-Received: from compute4.internal (compute4.nyi.internal [10.202.2.44])
- by mailout.nyi.internal (Postfix) with ESMTP id 287D927513;
- Thu, 17 Jan 2019 23:58:24 -0500 (EST)
-Received: from web6 ([10.202.2.216])
- by compute4.internal (MEProxy); Thu, 17 Jan 2019 23:58:24 -0500
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=aj.id.au; h=
- message-id:from:to:cc:mime-version:content-transfer-encoding
- :content-type:references:in-reply-to:date:subject; s=fm1; bh=FSs
- 3M3hmz3f0DGGFuPlnrdj30ljpMXiUZSOaJ/70si8=; b=tsfB+2DNiJUhsONOA5k
- Lq2WAYQ81tta40/X7feIMpU0jY3mFYeWk4eg6zJ21qBJIbvp7fpxie7vx65RE1mc
- bGm5aP2BUSEzOebzg7swKML6z482AZkJtaIPY+puoZkX2yrcgf7y5c+saX4DqANU
- OfFlJ4ektpX7rciaWpvgAgOdn5letzCdeg+6N8h/DqULT81VaZioqDTmc9dws6H/
- gUD0d5WqP1hWUcnYFHcMdNAzEmHpYXeTIezqrO/QZ4CVh+h6CLINh22CfO0BhYZS
- d9DFYVhjvZuAchjSo5ZLYsi3LuHfwgLEn42Je+oynHw65zC3uhhx0acerwLlAO5x
- FVg==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
- messagingengine.com; h=cc:content-transfer-encoding:content-type
- :date:from:in-reply-to:message-id:mime-version:references
- :subject:to:x-me-proxy:x-me-proxy:x-me-sender:x-me-sender
- :x-sasl-enc; s=fm1; bh=FSs3M3hmz3f0DGGFuPlnrdj30ljpMXiUZSOaJ/70s
- i8=; b=E+mSePgbwggEbElvu9zkYYi8CabJykXFIc5sRqfaMDf7WjPUmf4FPVh1T
- oQmvL1NYkB/UhGzHWgHHC7iSyOq5GELiH1nQ+ad0La4OqYkpOStLeyWQapi3t1or
- sy0CqEG6OjH7/TbyK0MnMlebYVmekyWOghUb58CEgE7ZYlGo7oeD+qY5yL0+3r/1
- 494h1RScxktWDtXci0IYiN7PbhAc6KhzWLYS5vvguUAdd6dmI9Es04JknGIrfx+X
- XSRX/eJbrykeV/T5i4vd46tnZyX6aJlx5WCa48uqlpOe6jy6Bso3GK8GJQ3vpiWJ
- tEqd0e85+IrAKiPpHL/6dfsSbKqQg==
-X-ME-Sender: <xms:71xBXEoXaK88eNxR389u3H6Ko2686eXJeDmPquI01UHRJk9ZutrD3w>
-X-ME-Proxy-Cause: gggruggvucftvghtrhhoucdtuddrgedtledrgeelgdejhecutefuodetggdotefrodftvf
- curfhrohhfihhlvgemucfhrghsthforghilhdpqfhuthenuceurghilhhouhhtmecufedt
- tdenucesvcftvggtihhpihgvnhhtshculddquddttddmnecujfgurhepkffhvfgggfgtof
- hfjgffufesthejredtredtjeenucfhrhhomheptehnughrvgifucflvghffhgvrhihuceo
- rghnughrvgifsegrjhdrihgurdgruheqnecurfgrrhgrmhepmhgrihhlfhhrohhmpegrnh
- gurhgvfiesrghjrdhiugdrrghunecuvehluhhsthgvrhfuihiivgeptd
-X-ME-Proxy: <xmx:71xBXG8w-IWp-H8VCDYbOLgDTcQc2AdiixFpb3cZNuW3xUXeWtAHlQ>
- <xmx:71xBXK37eah2EqEuD7P6OdcKQhCIscvsPNTYg4ZZLN5d5a2h4kYC9g>
- <xmx:71xBXJBVzqZiJvLbHiQLhFUPJK9GIDlAEeXZx41IgU5DkeXmsjB_xQ>
- <xmx:8FxBXModPjVQdNOkpjnCcbQLXGcK93tC65ZlyUxhjM2LmVDk9G81hw>
-Received: by mailuser.nyi.internal (Postfix, from userid 99)
- id D2606429B; Thu, 17 Jan 2019 23:58:22 -0500 (EST)
-Message-Id: <1547787502.2061444.1637712576.1F1E21B4@webmail.messagingengine.com>
-From: Andrew Jeffery <andrew@aj.id.au>
-To: Vijay Khemka <vijaykhemka@fb.com>, Arnd Bergmann <arnd@arndb.de>,
- "Greg Kroah-Hartman" <gregkh@linuxfoundation.org>,
- Joel Stanley <joel@jms.id.au>, linux-arm-kernel@lists.infradead.org,
- linux-aspeed@lists.ozlabs.org, linux-kernel@vger.kernel.org
+ id 1gkMQ5-0002lx-83
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 05:10:18 +0000
+Received: by mail-pf1-x444.google.com with SMTP id w73so5967062pfk.10
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 17 Jan 2019 21:10:14 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:content-transfer-encoding:in-reply-to
+ :user-agent; bh=OqwwRYEBTtVEUmI5mtBxmnkd21H2Z+IIwB9uA7XBDXo=;
+ b=kDrzDLgyBTGbpwn7c8/OsBkY0PIV11UyxEAW6v2MCY9FNdlDPflF6C/GGfioOmKOvW
+ +vtkIR0hi10j+5XCYUskxsuNbpgWCZPKfONwjqOj/GixqTOxYzjjfz8wd+wSgCAIPO4E
+ 7WnP5/8Ryd+MF9fYLA8gF3eB8tqKEuzSwHylg=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:content-transfer-encoding
+ :in-reply-to:user-agent;
+ bh=OqwwRYEBTtVEUmI5mtBxmnkd21H2Z+IIwB9uA7XBDXo=;
+ b=ny+UJdhKvDth98J2VW33pp4aRY7bLzk11UrNs7kYIVbsxaFesIqw+qrS65hE2Y3n30
+ PQY2K0Ayjw0VFYzQP9Az+1ZZeU4A4yfUbWPWg6r/7yjSiENQ6Ew9rrRrPg2ota51tV2g
+ QJbgZiUFiC4GYHKWn2k1s4QNy+xpEzZKGOtmFy0gNOJ3C+IdePGcAnV7m01uzMfOe3vc
+ GCkSfW/zsDmHcJLIUBRDrWVxoTs/WWtES4M1HIphuTd6NtP7j1Bk3l+Bd7ai8p6csPtq
+ Z7Wak5G+3ZddmXN1Pj955HzAe3F00gOzPlOgwZBVcvyhAKOnOBevp0WzhOxtpcf+4N8e
+ /a8w==
+X-Gm-Message-State: AJcUukd01w7+ya7ODLf5F5FgKXTVUCMh7on5eFJL2sFbdZNRQonqlIox
+ Jel5b2g276lPgDl3KI+HvfXcZxjEz/I=
+X-Google-Smtp-Source: ALg8bN7/kaVqB04oJzCi6YbeLKIS9lqCqWDET4+wiSltPBbRCcDIj2GTxtzrDoPPYFEx28z3ciGCww==
+X-Received: by 2002:a63:fb4c:: with SMTP id w12mr16264319pgj.321.1547788213525; 
+ Thu, 17 Jan 2019 21:10:13 -0800 (PST)
+Received: from localhost ([122.172.102.63])
+ by smtp.gmail.com with ESMTPSA id 15sm6102297pfr.55.2019.01.17.21.10.12
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 17 Jan 2019 21:10:12 -0800 (PST)
+Date: Fri, 18 Jan 2019 10:40:10 +0530
+From: Viresh Kumar <viresh.kumar@linaro.org>
+To: Krzysztof Kozlowski <krzk@kernel.org>
+Subject: Re: [PATCH v4] cpufreq: s5pv210: Defer probe if getting regulators
+ fail
+Message-ID: <20190118051010.4ed2ntv2mxfeaoot@vireshk-i7>
+References: <20190113195754.30525-1-pawel.mikolaj.chmiel@gmail.com>
+ <CAJKOXPfvR6vATPiWbef_JiSJX78PkJxRXjF2xK7EYr5B3e8HbA@mail.gmail.com>
 MIME-Version: 1.0
-X-Mailer: MessagingEngine.com Webmail Interface - ajax-36e4bfd3
-References: <20190116220154.1026171-1-vijaykhemka@fb.com>
-In-Reply-To: <20190116220154.1026171-1-vijaykhemka@fb.com>
-Date: Fri, 18 Jan 2019 15:28:22 +1030
-Subject: Re: [PATCH v2] misc: aspeed-lpc-ctrl: make parameter optional
+Content-Disposition: inline
+In-Reply-To: <CAJKOXPfvR6vATPiWbef_JiSJX78PkJxRXjF2xK7EYr5B3e8HbA@mail.gmail.com>
+User-Agent: NeoMutt/20180323-120-3dd1ac
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_205825_374973_45B4B632 
-X-CRM114-Status: GOOD (  21.69  )
+X-CRM114-CacheID: sfid-20190117_211017_289151_ACB7FC4E 
+X-CRM114-Status: GOOD (  14.29  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,179 +96,33 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "openbmc @ lists . ozlabs . org" <openbmc@lists.ozlabs.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
+ linux-pm@vger.kernel.org, rjw@rjwysocki.net, linux-kernel@vger.kernel.org,
+ kgene@kernel.org, linux-arm-kernel@lists.infradead.org,
+ =?utf-8?B?UGF3ZcWC?= Chmiel <pawel.mikolaj.chmiel@gmail.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Vijay,
-
-Thanks for doing the work to fix the driver. Some minor queries/points
-below.
-
-On Thu, 17 Jan 2019, at 08:31, Vijay Khemka wrote:
-> Makiing memory-region and flash as optional parameter in device
-> tree if user needs to use these parameter through ioctl then
-> need to define in devicetree.
-> 
-> Signed-off-by: Vijay Khemka <vijaykhemka@fb.com>
-> ---
->  drivers/misc/aspeed-lpc-ctrl.c | 58 +++++++++++++++++++++-------------
->  1 file changed, 36 insertions(+), 22 deletions(-)
-> 
-> diff --git a/drivers/misc/aspeed-lpc-ctrl.c b/drivers/misc/aspeed-lpc-
-> ctrl.c
-> index a024f8042259..332210e06e98 100644
-> --- a/drivers/misc/aspeed-lpc-ctrl.c
-> +++ b/drivers/misc/aspeed-lpc-ctrl.c
-> @@ -68,6 +68,7 @@ static long aspeed_lpc_ctrl_ioctl(struct file *file, 
-> unsigned int cmd,
->  		unsigned long param)
->  {
->  	struct aspeed_lpc_ctrl *lpc_ctrl = file_aspeed_lpc_ctrl(file);
-> +	struct device *dev = file->private_data;
->  	void __user *p = (void __user *)param;
->  	struct aspeed_lpc_ctrl_mapping map;
->  	u32 addr;
-> @@ -90,6 +91,12 @@ static long aspeed_lpc_ctrl_ioctl(struct file *file, 
-> unsigned int cmd,
->  		if (map.window_id != 0)
->  			return -EINVAL;
->  
-> +		/* If memory-region is not described in device tree */
-> +		if (!lpc_ctrl->mem_size) {
-> +			dev_err(dev, "Didn't find reserved memory\n");
-> +			return -EINVAL;
-
-I feel like EINVAL isn't quite right - it's pretty generic, and the parameter
-value changes its validity with the devicetree context. My gut instinct
-would be to use EINVAL for parameter values that violate assumptions
-of the driver rather than violate configuration of the driver. Maybe ENXIO
-("No such device or address") is an improvement: "I can't map that device
-because there's no such device or address"?
-
-> +		}
-> +
->  		map.size = lpc_ctrl->mem_size;
->  
->  		return copy_to_user(p, &map, sizeof(map)) ? -EFAULT : 0;
-> @@ -126,9 +133,18 @@ static long aspeed_lpc_ctrl_ioctl(struct file 
-> *file, unsigned int cmd,
->  			return -EINVAL;
->  
->  		if (map.window_type == ASPEED_LPC_CTRL_WINDOW_FLASH) {
-> +			if (!lpc_ctrl->pnor_size) {
-> +				dev_err(dev, "Didn't find host pnor flash\n");
-> +				return -EINVAL;
-
-See the error code discussion above. Also, this is userspace's error not 
-the kernel's, so I think dev_err() is a bit harsh. Probably best to just let
-userspace log the error if it thinks the it is concerning.
-
-> +			}
->  			addr = lpc_ctrl->pnor_base;
->  			size = lpc_ctrl->pnor_size;
->  		} else if (map.window_type == ASPEED_LPC_CTRL_WINDOW_MEMORY) {
-> +			/* If memory-region is not described in device tree */
-> +			if (!lpc_ctrl->mem_size) {
-> +				dev_err(dev, "Didn't find reserved memory\n");
-> +				return -EINVAL;
-
-as above.
-
-> +			}
->  			addr = lpc_ctrl->mem_base;
->  			size = lpc_ctrl->mem_size;
->  		} else {
-> @@ -196,17 +212,17 @@ static int aspeed_lpc_ctrl_probe(struct 
-> platform_device *pdev)
->  	if (!lpc_ctrl)
->  		return -ENOMEM;
->  
-> +	/* If flash is described in device tree then store */
->  	node = of_parse_phandle(dev->of_node, "flash", 0);
->  	if (!node) {
-> -		dev_err(dev, "Didn't find host pnor flash node\n");
-> -		return -ENODEV;
-> -	}
-> -
-> -	rc = of_address_to_resource(node, 1, &resm);
-> -	of_node_put(node);
-> -	if (rc) {
-> -		dev_err(dev, "Couldn't address to resource for flash\n");
-> -		return rc;
-> +		dev_dbg(dev, "Didn't find host pnor flash node\n");
-> +	} else {
-> +		rc = of_address_to_resource(node, 1, &resm);
-> +		of_node_put(node);
-> +		if (rc) {
-> +			dev_err(dev, "Couldn't address to resource for flash\n");
-> +			return rc;
-> +		}
->  	}
->  
->  	lpc_ctrl->pnor_size = resource_size(&resm);
-> @@ -214,22 +230,22 @@ static int aspeed_lpc_ctrl_probe(struct 
-> platform_device *pdev)
->  
->  	dev_set_drvdata(&pdev->dev, lpc_ctrl);
->  
-> +	/* If memory-region is described in device tree then store */
->  	node = of_parse_phandle(dev->of_node, "memory-region", 0);
->  	if (!node) {
-> -		dev_err(dev, "Didn't find reserved memory\n");
-> -		return -EINVAL;
-> -	}
-> +		dev_dbg(dev, "Didn't find reserved memory\n");
-> +	} else {
-> +		rc = of_address_to_resource(node, 0, &resm);
-> +		of_node_put(node);
-> +		if (rc) {
-> +			dev_err(dev, "Couldn't address to resource for reserved memory\n");
-> +			return -ENOMEM;
-
-Wow, I think this is an abuse of ENOMEM. Its description is "Out of memory"
-which doesn't really reflect the problem here.
-
-Not really your fault though, maybe we'll fix that with some follow-up patches.
-
-Cheers,
-
-Andrew
-
-> +		}
->  
-> -	rc = of_address_to_resource(node, 0, &resm);
-> -	of_node_put(node);
-> -	if (rc) {
-> -		dev_err(dev, "Couldn't address to resource for reserved memory\n");
-> -		return -ENOMEM;
-> +		lpc_ctrl->mem_size = resource_size(&resm);
-> +		lpc_ctrl->mem_base = resm.start;
->  	}
->  
-> -	lpc_ctrl->mem_size = resource_size(&resm);
-> -	lpc_ctrl->mem_base = resm.start;
-> -
->  	lpc_ctrl->regmap = syscon_node_to_regmap(
->  			pdev->dev.parent->of_node);
->  	if (IS_ERR(lpc_ctrl->regmap)) {
-> @@ -258,8 +274,6 @@ static int aspeed_lpc_ctrl_probe(struct 
-> platform_device *pdev)
->  		goto err;
->  	}
->  
-> -	dev_info(dev, "Loaded at %pr\n", &resm);
-> -
->  	return 0;
->  
->  err:
-> -- 
-> 2.17.1
-> 
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gMTQtMDEtMTksIDA4OjUxLCBLcnp5c3p0b2YgS296bG93c2tpIHdyb3RlOgo+IE9uIFN1biwg
+MTMgSmFuIDIwMTkgYXQgMjA6NTgsIFBhd2XFgiBDaG1pZWwKPiA8cGF3ZWwubWlrb2xhai5jaG1p
+ZWxAZ21haWwuY29tPiB3cm90ZToKPiA+Cj4gPiBUaGVyZSBpcyBwb3NzaWJpbGl0eSwgdGhhdCB3
+aGVuIHByb2JpbmcgZHJpdmVyLCByZWd1bGF0b3JzIGFyZSBub3QgeWV0Cj4gPiBpbml0aWFsaXpl
+ZC4gSW4gdGhpcyBjYXNlIHdlIHNob3VsZCByZXR1cm4gRVBST0JFX0RFRkVSIGFuZCB3YWl0IHRp
+bGwKPiA+IHRoZXkncmUgaW5pdGlhbGl6ZWQsIHNpbmNlIHRoZXkncmUgcmVxdWlyZWQgY3VycmVu
+dGx5IGZvciBjcHVmcmVxIGRyaXZlcgo+ID4gdG8gd29yay4gQWxzbyBtb3ZlIHJlZ3VsYXRvciBp
+bml0aWFsaXphdGlvbiBjb2RlIGF0IGJlZ2lubmluZyBvZiBwcm9iZSwKPiA+IHNvIHdlIGNhbiBk
+ZWZlciBhcyBmYXN0IGFzIHBvc2liYmxlLgo+ID4KPiA+IFNpZ25lZC1vZmYtYnk6IFBhd2XFgiBD
+aG1pZWwgPHBhd2VsLm1pa29sYWouY2htaWVsQGdtYWlsLmNvbT4KPiA+IC0tLQo+ID4gQ2hhbmdl
+cyBmcm9tIHYzOgo+ID4gICAtIFplcm8gZG1jX2Jhc2UgcG9pbnRlcnMgYWZ0ZXIgdW5tYXBwaW5n
+IHRoZW0KPiA+ICAgLSBJZiBnZXR0aW5nIHZkZGFybSByZWd1bGF0b3IgZmFpbHMganVzdCByZXR1
+cm4sIG5vIG5lZWQgdG8gZG8gZ290bwo+ID4gICAgIGp1bXAgd2hpY2ggd291bGQgZG8gdGhlIHNh
+bWUKPiA+Cj4gPiBDaGFuZ2VzIGZyb20gdjI6Cj4gPiAgIC0gSGFuZGxlIGFsbCBlcnJvciBwYXRo
+cyBpbiBwcm9iZQo+ID4KPiA+IENoYW5nZXMgZnJvbSB2MToKPiA+ICAgLSBGaXggY29tcGlsYXRp
+b24gZXJyb3IKPiA+ICAgLSBSZW9yZ2FuaXplIGNvZGUgc28gaXQncyBzbWFsbGVyCj4gCj4gUmV2
+aWV3ZWQtYnk6IEtyenlzenRvZiBLb3psb3dza2kgPGtyemtAa2VybmVsLm9yZz4KCkFwcGxpZWQs
+IHRoYW5rcy4KCi0tIAp2aXJlc2gKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJu
+ZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFu
+L2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
