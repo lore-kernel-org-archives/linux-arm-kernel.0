@@ -2,62 +2,74 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C4426C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:02:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D5BF6C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:02:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 928382086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:02:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 910212086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:02:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gtwdC0f/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 928382086D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nXYKy9Y5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 910212086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=76miWvJSxxzMGbwfEHaDjbY+4k/DGw4a0lnw34MLoTU=; b=gtwdC0f/rivOKfbt9wsYU8vnAV
-	0FkndpBYLMS3LORVfQQwgUck1g9jbfoTmWEnHXFttin44IFSr43ocaKWRKh7aPNK9n/d97/vGkPK6
-	wcNDvMYwWASq9tYuSFmBf1O7QS01CrJNpnNFxghS8gvcOsrtsjBwc1d1TpyvW+XJ189F5O8lx2tt8
-	FCyTw/hrDXuaNVO5KpAsOsQO4jAKcoTJTIe1n78L5X+0Tc4EaycvfKYNOuEp5khec4oeaRFpfK5Cx
-	jWeXj9dVdAX/gJBu4zyYKedXHt/WZIGa+Nm/VYWy7/4dyeJYijJiJM4NdPeA/A80aAONK3Ncja45x
-	6isV03KQ==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=M+/v/YNoDjEKqFzeLuL9K3lWH8tdbqNXlnBtwE+mnpA=; b=nXYKy9Y5ALq0Z7
+	NYsueqQ8wr/Ig4sbJSMnwBgmnbqldGmvzs3VEi0poM0GfnFg2/ykamEgdMy9CtBq6BjyL62lpG1uF
+	B5aNrUP/2/Teq3RfVwYPAEJyq+C40wZVKstE1NiZtHEqWurAQ0aoeaopTm98TkYZyybZ6M7RTHw/W
+	s339gaDLLcKpVFF5D5vg4s9nj7O1jj8vAAe6llu4osiTojv3WWTsF8mc8SJDdOoDx+aNfJjL0c27H
+	ofEXRQEvi3/q9NazrwJYXDPv2Y8mwacqFeit9CK/NHQBXLn2TvR0uOR9NamUHBICVRnoyH8Rub4y/
+	nmFBWK9iouIOPLwxLbZw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkWau-0007Ef-3h; Fri, 18 Jan 2019 16:02:08 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkWZc-0006QK-1M
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 16:00:51 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A00D71596;
- Fri, 18 Jan 2019 08:00:47 -0800 (PST)
-Received: from e119886-lin.cambridge.arm.com (unknown [10.37.6.11])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 19C333F557;
- Fri, 18 Jan 2019 08:00:44 -0800 (PST)
-From: Andrew Murray <andrew.murray@arm.com>
-To: Masahiro Yamada <yamada.masahiro@socionext.com>,
- Arnd Bergmann <arnd@arndb.de>, Kees Cook <keescook@chromium.org>,
- Andrew Morton <akpm@linux-foundation.org>
-Subject: [PATCH 3/3] arm64: update headers to use STUB_UNLESS macro
-Date: Fri, 18 Jan 2019 16:00:30 +0000
-Message-Id: <1547827230-55132-4-git-send-email-andrew.murray@arm.com>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1547827230-55132-1-git-send-email-andrew.murray@arm.com>
-References: <1547827230-55132-1-git-send-email-andrew.murray@arm.com>
+	id 1gkWbZ-0007aj-DJ; Fri, 18 Jan 2019 16:02:49 +0000
+Received: from mail-qk1-f193.google.com ([209.85.222.193])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gkWbQ-0007Yn-Fy
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 16:02:46 +0000
+Received: by mail-qk1-f193.google.com with SMTP id c21so8309559qkl.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 18 Jan 2019 08:02:39 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=SDodKVKZE68GaTWQnw/8diyvuXpkz6/WYntpU/2umcM=;
+ b=S2cG9jdhwdqc61RGMkQ5965XZnM01YJg/5pMnE47OVy1n21Nlm6AY6LHi+1MqmEbrN
+ C7kCItslcnmHVWuEeBCK+TxpYWuP4ta3afH9eyoNvUzUuBaKxJm3/gM4os7AaFJS7OCE
+ +cP37D5DZoK8FGfucR2TfRximtkMf3ar9bbXV2vTh2uBtyNxviZYL5hBQdmqrGOOTJcu
+ jrtj9/EJZJHSn4SEjoI3ZyuiPLRy4lHDRjqMPyykKRLWyY0H3gbaLe1iGdL8vKcIm9Mg
+ QZX00hA1SJMqPSt6qI1B2bIPriZ3kMfyhkJSUgtpz9F1RI89xi+JHioK7f4R4m6aQKyM
+ Y8CQ==
+X-Gm-Message-State: AJcUukev5nchBh+KRRLMFVi4Ps7RceU95XNxKR/edtybdRVD6UAjEjOz
+ Gq6cSBnSxvtsiY1y1znQPFmsuy6W5SvQsk8ZpDs=
+X-Google-Smtp-Source: ALg8bN6pE87HFJeIEYKnf1asy3R2yG9dZIxH+fpuakhGTiL3Whec42E8wvd9lm9HoVlK17a+U5oWtuQtlXKiaYl5cVw=
+X-Received: by 2002:a37:324a:: with SMTP id y71mr15685363qky.291.1547827358315; 
+ Fri, 18 Jan 2019 08:02:38 -0800 (PST)
+MIME-Version: 1.0
+References: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
+ <1541089538-175682-1-git-send-email-lsun@mellanox.com>
+ <1541089538-175682-5-git-send-email-lsun@mellanox.com>
+In-Reply-To: <1541089538-175682-5-git-send-email-lsun@mellanox.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 18 Jan 2019 17:02:21 +0100
+Message-ID: <CAK8P3a2NRbEaS_EJNtBaZ3GCUtRiH2rUDRzJFjvcw2ZacZM1qw@mail.gmail.com>
+Subject: Re: [PATCH v6 5/9] soc: mellanox: host: Add the common host side
+ Rshim driver
+To: Liming Sun <lsun@mellanox.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_080048_090238_21415527 
-X-CRM114-Status: GOOD (  14.56  )
+X-CRM114-CacheID: sfid-20190118_080240_534271_F94DC2AC 
+X-CRM114-Status: GOOD (  21.02  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,416 +81,79 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: rjw@rjwysocki.net, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
- Steven Price <Steven.Price@arm.com>, Grant Likely <Grant.Likely@arm.com>,
- Dave P Martin <Dave.Martin@arm.com>, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: DTML <devicetree@vger.kernel.org>, David Woods <dwoods@mellanox.com>,
+ linux-pci <linux-pci@vger.kernel.org>,
+ Vincent Whitchurch <vincent.whitchurch@axis.com>, arm-soc <arm@kernel.org>,
+ Olof Johansson <olof@lixom.net>, linux-ntb@googlegroups.com,
+ Robin Murphy <robin.murphy@arm.com>, Christoph Hellwig <hch@lst.de>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Use the STUB_UNLESS macro to simplify function declaration.
+On Thu, Nov 1, 2018 at 5:49 PM Liming Sun <lsun@mellanox.com> wrote:
+>
+> An external host can connect to a Mellanox BlueField SoC via an
+> interface called Rshim. The Rshim driver provides boot, console,
+> and networking services over this interface. This commit is
+> the common driver where the other backend (transport) driver will
+> use.
+>
+> Reviewed-by: David Woods <dwoods@mellanox.com>
+> Signed-off-by: Liming Sun <lsun@mellanox.com>
 
-Signed-off-by: Andrew Murray <andrew.murray@arm.com>
----
- arch/arm64/include/asm/acpi.h           | 38 +++++++++-------------
- arch/arm64/include/asm/alternative.h    |  6 +---
- arch/arm64/include/asm/cpufeature.h     |  6 +---
- arch/arm64/include/asm/cpuidle.h        | 18 +++--------
- arch/arm64/include/asm/debug-monitors.h | 10 ++----
- arch/arm64/include/asm/fpsimd.h         | 57 +++++++++++++--------------------
- arch/arm64/include/asm/hw_breakpoint.h  | 16 +++------
- arch/arm64/include/asm/kasan.h          |  9 ++----
- arch/arm64/include/asm/numa.h           | 19 ++++-------
- arch/arm64/include/asm/ptdump.h         | 13 +++-----
- arch/arm64/include/asm/signal32.h       | 29 +++++------------
- 11 files changed, 73 insertions(+), 148 deletions(-)
+Hi Liming,
 
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index 2def77e..81836ff 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -109,22 +109,17 @@ static inline u32 get_acpi_id_for_cpu(unsigned int cpu)
- }
- 
- static inline void arch_fix_phys_package_id(int num, u32 slot) { }
--void __init acpi_init_cpus(void);
--
--#else
--static inline void acpi_init_cpus(void) { }
- #endif /* CONFIG_ACPI */
- 
--#ifdef CONFIG_ARM64_ACPI_PARKING_PROTOCOL
--bool acpi_parking_protocol_valid(int cpu);
-+STUB_UNLESS(CONFIG_ACPI,
-+void __init acpi_init_cpus(void));
-+
-+STUB_UNLESS(CONFIG_ARM64_ACPI_PARKING_PROTOCOL, return false,
-+bool acpi_parking_protocol_valid(int cpu));
-+
-+STUB_UNLESS(CONFIG_ARM64_ACPI_PARKING_PROTOCOL,
- void __init
--acpi_set_mailbox_entry(int cpu, struct acpi_madt_generic_interrupt *processor);
--#else
--static inline bool acpi_parking_protocol_valid(int cpu) { return false; }
--static inline void
--acpi_set_mailbox_entry(int cpu, struct acpi_madt_generic_interrupt *processor)
--{}
--#endif
-+acpi_set_mailbox_entry(int cpu, struct acpi_madt_generic_interrupt *processor));
- 
- static inline const char *acpi_get_enable_method(int cpu)
- {
-@@ -152,15 +147,14 @@ static inline pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
- }
- #endif /* CONFIG_ACPI_APEI */
- 
--#ifdef CONFIG_ACPI_NUMA
--int arm64_acpi_numa_init(void);
--int acpi_numa_get_nid(unsigned int cpu);
--void acpi_map_cpus_to_nodes(void);
--#else
--static inline int arm64_acpi_numa_init(void) { return -ENOSYS; }
--static inline int acpi_numa_get_nid(unsigned int cpu) { return NUMA_NO_NODE; }
--static inline void acpi_map_cpus_to_nodes(void) { }
--#endif /* CONFIG_ACPI_NUMA */
-+STUB_UNLESS(CONFIG_ACPI_NUMA, return -ENOSYS,
-+int arm64_acpi_numa_init(void));
-+
-+STUB_UNLESS(CONFIG_ACPI_NUMA, return NUMA_NO_NODE,
-+int acpi_numa_get_nid(unsigned int cpu));
-+
-+STUB_UNLESS(CONFIG_ACPI_NUMA,
-+void acpi_map_cpus_to_nodes(void));
- 
- #define ACPI_TABLE_UPGRADE_MAX_PHYS MEMBLOCK_ALLOC_ACCESSIBLE
- 
-diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-index 4b650ec..3dfbc15 100644
---- a/arch/arm64/include/asm/alternative.h
-+++ b/arch/arm64/include/asm/alternative.h
-@@ -29,11 +29,7 @@ typedef void (*alternative_cb_t)(struct alt_instr *alt,
- 
- void __init apply_alternatives_all(void);
- 
--#ifdef CONFIG_MODULES
--void apply_alternatives_module(void *start, size_t length);
--#else
--static inline void apply_alternatives_module(void *start, size_t length) { }
--#endif
-+STUB_UNLESS(CONFIG_MODULES, void apply_alternatives_module(void *start, size_t length));
- 
- #define ALTINSTR_ENTRY(feature,cb)					      \
- 	" .word 661b - .\n"				/* label           */ \
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index dfcfba7..27edb5e 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -628,11 +628,7 @@ static inline int arm64_get_ssbd_state(void)
- #endif
- }
- 
--#ifdef CONFIG_ARM64_SSBD
--void arm64_set_ssbd_mitigation(bool state);
--#else
--static inline void arm64_set_ssbd_mitigation(bool state) {}
--#endif
-+STUB_UNLESS(CONFIG_ARM64_SSBD, void arm64_set_ssbd_mitigation(bool state));
- 
- extern int do_emulate_mrs(struct pt_regs *regs, u32 sys_reg, u32 rt);
- 
-diff --git a/arch/arm64/include/asm/cpuidle.h b/arch/arm64/include/asm/cpuidle.h
-index 3c5ddb4..fecde4f 100644
---- a/arch/arm64/include/asm/cpuidle.h
-+++ b/arch/arm64/include/asm/cpuidle.h
-@@ -4,18 +4,10 @@
- 
- #include <asm/proc-fns.h>
- 
--#ifdef CONFIG_CPU_IDLE
--extern int arm_cpuidle_init(unsigned int cpu);
--extern int arm_cpuidle_suspend(int index);
--#else
--static inline int arm_cpuidle_init(unsigned int cpu)
--{
--	return -EOPNOTSUPP;
--}
-+STUB_UNLESS(CONFIG_CPU_IDLE, return -EOPNOTSUPP,
-+int arm_cpuidle_init(unsigned int cpu));
-+
-+STUB_UNLESS(CONFIG_CPU_IDLE, return -EOPNOTSUPP,
-+int arm_cpuidle_suspend(int index));
- 
--static inline int arm_cpuidle_suspend(int index)
--{
--	return -EOPNOTSUPP;
--}
--#endif
- #endif
-diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-index a44cf52..8b91d8e 100644
---- a/arch/arm64/include/asm/debug-monitors.h
-+++ b/arch/arm64/include/asm/debug-monitors.h
-@@ -124,14 +124,8 @@ void kernel_enable_single_step(struct pt_regs *regs);
- void kernel_disable_single_step(void);
- int kernel_active_single_step(void);
- 
--#ifdef CONFIG_HAVE_HW_BREAKPOINT
--int reinstall_suspended_bps(struct pt_regs *regs);
--#else
--static inline int reinstall_suspended_bps(struct pt_regs *regs)
--{
--	return -ENODEV;
--}
--#endif
-+STUB_UNLESS(CONFIG_HAVE_HW_BREAKPOINT, return -ENODEV,
-+int reinstall_suspended_bps(struct pt_regs *regs));
- 
- int aarch32_break_handler(struct pt_regs *regs);
- 
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index dd1ad39..f247eb1 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -92,17 +92,10 @@ extern int __ro_after_init sve_max_vl;
- 
- extern size_t sve_state_size(struct task_struct const *task);
- 
--extern void sve_alloc(struct task_struct *task);
--extern void fpsimd_release_task(struct task_struct *task);
--extern void fpsimd_sync_to_sve(struct task_struct *task);
--extern void sve_sync_to_fpsimd(struct task_struct *task);
--extern void sve_sync_from_fpsimd_zeropad(struct task_struct *task);
- 
- extern int sve_set_vector_length(struct task_struct *task,
- 				 unsigned long vl, unsigned long flags);
- 
--extern int sve_set_current_vl(unsigned long arg);
--extern int sve_get_current_vl(void);
- 
- static inline void sve_user_disable(void)
- {
-@@ -113,43 +106,37 @@ static inline void sve_user_enable(void)
- {
- 	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_ZEN_EL0EN);
- }
--
--/*
-- * Probing and setup functions.
-- * Calls to these functions must be serialised with one another.
-- */
--extern void __init sve_init_vq_map(void);
--extern void sve_update_vq_map(void);
--extern int sve_verify_vq_map(void);
--extern void __init sve_setup(void);
-+extern void fpsimd_sync_to_sve(struct task_struct *task);
- 
- #else /* ! CONFIG_ARM64_SVE */
- 
--static inline void sve_alloc(struct task_struct *task) { }
--static inline void fpsimd_release_task(struct task_struct *task) { }
--static inline void sve_sync_to_fpsimd(struct task_struct *task) { }
--static inline void sve_sync_from_fpsimd_zeropad(struct task_struct *task) { }
--
--static inline int sve_set_current_vl(unsigned long arg)
--{
--	return -EINVAL;
--}
--
--static inline int sve_get_current_vl(void)
--{
--	return -EINVAL;
--}
--
- static inline void sve_user_disable(void) { BUILD_BUG(); }
- static inline void sve_user_enable(void) { BUILD_BUG(); }
- 
--static inline void sve_init_vq_map(void) { }
--static inline void sve_update_vq_map(void) { }
--static inline int sve_verify_vq_map(void) { return 0; }
--static inline void sve_setup(void) { }
- 
- #endif /* ! CONFIG_ARM64_SVE */
- 
-+STUB_UNLESS(CONFIG_ARM64_SVE, return -EINVAL,
-+int sve_set_current_vl(unsigned long arg));
-+
-+STUB_UNLESS(CONFIG_ARM64_SVE, return -EINVAL,
-+int sve_get_current_vl(void));
-+
-+STUB_UNLESS(CONFIG_ARM64_SVE, void sve_alloc(struct task_struct *task));
-+STUB_UNLESS(CONFIG_ARM64_SVE, void fpsimd_release_task(struct task_struct *task));
-+STUB_UNLESS(CONFIG_ARM64_SVE, void sve_sync_to_fpsimd(struct task_struct *task));
-+STUB_UNLESS(CONFIG_ARM64_SVE, void sve_sync_from_fpsimd_zeropad(struct task_struct *task));
-+
-+/*
-+ * Probing and setup functions.
-+ * Calls to these functions must be serialised with one another.
-+ */
-+STUB_UNLESS(CONFIG_ARM64_SVE, void __init sve_init_vq_map(void));
-+STUB_UNLESS(CONFIG_ARM64_SVE, void sve_update_vq_map(void));
-+STUB_UNLESS(CONFIG_ARM64_SVE, return 0, int sve_verify_vq_map(void));
-+STUB_UNLESS(CONFIG_ARM64_SVE, void __init sve_setup(void));
-+
-+
- /* For use by EFI runtime services calls only */
- extern void __efi_fpsimd_begin(void);
- extern void __efi_fpsimd_end(void);
-diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
-index 6a53e59..ba451fc 100644
---- a/arch/arm64/include/asm/hw_breakpoint.h
-+++ b/arch/arm64/include/asm/hw_breakpoint.h
-@@ -137,17 +137,11 @@ extern void arch_uninstall_hw_breakpoint(struct perf_event *bp);
- extern void hw_breakpoint_pmu_read(struct perf_event *bp);
- extern int hw_breakpoint_slots(int type);
- 
--#ifdef CONFIG_HAVE_HW_BREAKPOINT
--extern void hw_breakpoint_thread_switch(struct task_struct *next);
--extern void ptrace_hw_copy_thread(struct task_struct *task);
--#else
--static inline void hw_breakpoint_thread_switch(struct task_struct *next)
--{
--}
--static inline void ptrace_hw_copy_thread(struct task_struct *task)
--{
--}
--#endif
-+STUB_UNLESS(CONFIG_HAVE_HW_BREAKPOINT,
-+void hw_breakpoint_thread_switch(struct task_struct *next));
-+
-+STUB_UNLESS(CONFIG_HAVE_HW_BREAKPOINT,
-+void ptrace_hw_copy_thread(struct task_struct *task));
- 
- /* Determine number of BRP registers available. */
- static inline int get_num_brps(void)
-diff --git a/arch/arm64/include/asm/kasan.h b/arch/arm64/include/asm/kasan.h
-index b52aacd..e67d1a3 100644
---- a/arch/arm64/include/asm/kasan.h
-+++ b/arch/arm64/include/asm/kasan.h
-@@ -36,14 +36,11 @@
- #define KASAN_SHADOW_OFFSET     (KASAN_SHADOW_END - (1ULL << \
- 					(64 - KASAN_SHADOW_SCALE_SHIFT)))
- 
--void kasan_init(void);
--void kasan_copy_shadow(pgd_t *pgdir);
- asmlinkage void kasan_early_init(void);
--
--#else
--static inline void kasan_init(void) { }
--static inline void kasan_copy_shadow(pgd_t *pgdir) { }
- #endif
- 
-+STUB_UNLESS(CONFIG_KASAN, void kasan_init(void));
-+STUB_UNLESS(CONFIG_KASAN, void kasan_copy_shadow(pgd_t *pgdir));
-+
- #endif
- #endif
-diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
-index 626ad01..700a4a9 100644
---- a/arch/arm64/include/asm/numa.h
-+++ b/arch/arm64/include/asm/numa.h
-@@ -29,23 +29,16 @@ static inline const struct cpumask *cpumask_of_node(int node)
- }
- #endif
- 
--void __init arm64_numa_init(void);
- int __init numa_add_memblk(int nodeid, u64 start, u64 end);
- void __init numa_set_distance(int from, int to, int distance);
- void __init numa_free_distance(void);
--void __init early_map_cpu_to_node(unsigned int cpu, int nid);
--void numa_store_cpu_info(unsigned int cpu);
--void numa_add_cpu(unsigned int cpu);
--void numa_remove_cpu(unsigned int cpu);
--
--#else	/* CONFIG_NUMA */
--
--static inline void numa_store_cpu_info(unsigned int cpu) { }
--static inline void numa_add_cpu(unsigned int cpu) { }
--static inline void numa_remove_cpu(unsigned int cpu) { }
--static inline void arm64_numa_init(void) { }
--static inline void early_map_cpu_to_node(unsigned int cpu, int nid) { }
- 
- #endif	/* CONFIG_NUMA */
- 
-+STUB_UNLESS(CONFIG_NUMA, void __init arm64_numa_init(void));
-+STUB_UNLESS(CONFIG_NUMA, void __init early_map_cpu_to_node(unsigned int cpu, int nid));
-+STUB_UNLESS(CONFIG_NUMA, void numa_store_cpu_info(unsigned int cpu));
-+STUB_UNLESS(CONFIG_NUMA, void numa_add_cpu(unsigned int cpu));
-+STUB_UNLESS(CONFIG_NUMA, void numa_remove_cpu(unsigned int cpu));
-+
- #endif	/* __ASM_NUMA_H */
-diff --git a/arch/arm64/include/asm/ptdump.h b/arch/arm64/include/asm/ptdump.h
-index 6afd847..8d27672 100644
---- a/arch/arm64/include/asm/ptdump.h
-+++ b/arch/arm64/include/asm/ptdump.h
-@@ -33,15 +33,10 @@ struct ptdump_info {
- };
- 
- void ptdump_walk_pgd(struct seq_file *s, struct ptdump_info *info);
--#ifdef CONFIG_ARM64_PTDUMP_DEBUGFS
--int ptdump_debugfs_register(struct ptdump_info *info, const char *name);
--#else
--static inline int ptdump_debugfs_register(struct ptdump_info *info,
--					const char *name)
--{
--	return 0;
--}
--#endif
-+
-+STUB_UNLESS(CONFIG_ARM64_PTDUMP_DEBUGFS, return 0,
-+int ptdump_debugfs_register(struct ptdump_info *info, const char *name));
-+
- void ptdump_check_wx(void);
- #endif /* CONFIG_ARM64_PTDUMP_CORE */
- 
-diff --git a/arch/arm64/include/asm/signal32.h b/arch/arm64/include/asm/signal32.h
-index 81abea0..9dc06bd 100644
---- a/arch/arm64/include/asm/signal32.h
-+++ b/arch/arm64/include/asm/signal32.h
-@@ -21,30 +21,17 @@
- #include <linux/compat.h>
- 
- #define AARCH32_KERN_SIGRET_CODE_OFFSET	0x500
-+#endif /* CONFIG_COMPAT */
- 
-+STUB_UNLESS(CONFIG_COMPAT, return -ENOSYS,
- int compat_setup_frame(int usig, struct ksignal *ksig, sigset_t *set,
--		       struct pt_regs *regs);
--int compat_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
--			  struct pt_regs *regs);
--
--void compat_setup_restart_syscall(struct pt_regs *regs);
--#else
-+		       struct pt_regs *regs));
- 
--static inline int compat_setup_frame(int usid, struct ksignal *ksig,
--				     sigset_t *set, struct pt_regs *regs)
--{
--	return -ENOSYS;
--}
--
--static inline int compat_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
--					struct pt_regs *regs)
--{
--	return -ENOSYS;
--}
-+STUB_UNLESS(CONFIG_COMPAT, return -ENOSYS,
-+int compat_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
-+			  struct pt_regs *regs));
- 
--static inline void compat_setup_restart_syscall(struct pt_regs *regs)
--{
--}
--#endif /* CONFIG_COMPAT */
-+STUB_UNLESS(CONFIG_COMPAT,
-+void compat_setup_restart_syscall(struct pt_regs *regs));
- #endif /* __KERNEL__ */
- #endif /* __ASM_SIGNAL32_H */
--- 
-2.7.4
+I've taken a new look at your patch series for drivers/soc/ now,
+thanks for your continued submissions.
 
+This is again just a set of very high-level comments, but I think we
+should resolve some of the fundamental questions first.
+Incidentally, Vincent Whitchurch has recently posted another
+patch series with a very similar intention, but for other hardware
+and taking a different approach.
+
+In both cases, the idea is to use virtio based drivers to provide
+services from a host machine into another Linux instance running
+on an embedded system behind a PCIe slot or similar. Your
+Bluefield SoC patches are well written, but are intentionally
+kept specific to a particular use case and tied to one piece
+of hardware. In contrast, Vincent uses the existing code from
+drivers/misc/mic/vop/ that is equally hardware specific, but he
+extends it to be applicable to other hardware as well.
+
+It would be good if you could look at each other's approaches
+to see where we could take it from here. I think ideally we
+should have a common driver framework for doing the same
+thing across both of your devices and as well as others.
+
+That would also resolve my main concern about the drivers,
+which is the placement in drivers/soc/ for a set of drivers
+that are unlike most drivers in that directory not mean for
+running on the SoC itself in order drive unusual functionality
+on the SoC, but are (at least partially) meant for running on
+a host machine to communicate with that SoC over PCIe
+or USB.
+
+As an example, your network driver should really be placed
+in drivers/net/, though it is unclear to me how it relates
+to the existing virtio_net driver. In the case of mic/vop,
+the idea is to use virtio_net on the device side, but have
+vhost_net or a user space implementation on the host side,
+but that is apparently not what you do here. Can you
+explain why?
+
+Another high-level question I have is on how your various
+drivers relate to one another. This should normally be
+explained in the 0/9 email, but I don't seem to have received
+such a mail. I see that you have multiple back-end drivers
+for the underlying transport, with one of them based on USB.
+Have you come up with a way to use the same high-level
+driver such as the network link over this USB back-end,
+or is this for something else?
+
+      Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
