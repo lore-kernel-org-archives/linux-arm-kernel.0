@@ -2,70 +2,109 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B9F49C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 06:14:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EC55AC43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 07:41:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8706C2086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 06:14:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B83192086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 07:41:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PfOwUSM8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8706C2086D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N155zvSN";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="daAFFz/S"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B83192086D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=v4z9/rJy2Mw0BKHSXAYAe372SUM4WUwfRSU049r5ZkI=; b=PfOwUSM8kAgP9D
-	Zqy7D4oaVzNeCYfJoZr3i8dWt+ET1OLqlrzsLZ1Os3zBsAQZHBbjcbYPQHrWhp4KSxRacn5giz44k
-	y59h1vwi7O1C3ISeL5p5OOno2F85fA1tIQvDDyB654l2cztTNTYX/pUZ/PT2zO4BwXS1QKeDyqhB5
-	60iDn4lvW5mnXPQ3xahmpx/PaDxwnUjV55c3zOSVqXyYQ2pWtE7dTUSzHriPo0Gske+u1W01T1L9t
-	7ILKDgSxey4qqA4janATBm2INpZEQjjZdeuV3843Np0LCMev5tOPI8wdmrLG9T0+lYDF0qiiys4FW
-	M2yMbdK78404NHhS4wHg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=lU+Lchkg28LfG6p1NoL3o+pY4/W6zMahzYNlhAsrxHI=; b=N155zvSNRA93eD
+	dWW6q29r6hmwBwgz8VNWvxyExcUfGzUers9a171HVt2JEmC3ueZUKq3b20TvJhCuRN5WQCQBehpYD
+	P+lYAjRP/Kf6mqvyVVUQWOMs9oU6c8QtcJCyiRKsiMKTe4ETODJniMRPe46DQrp9kqFQaUmDefbTf
+	ARtTk7dxgFexd8pUnn8A8BCxlbQyQd41CCQQ45JP03NOVEOlkuw87oxePGYnLmxs/Bwz5NjBBH1QR
+	enh9yF+vKQ4U80XcDnLYLi5/FmkV3y5bgCAjwbkhr7OnMc/zux327Q/YdA6UzHI7ITRTFc3gpYQt3
+	6+BcD+AKwOctdHh3TeXQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkNQI-0005hr-5H; Fri, 18 Jan 2019 06:14:34 +0000
-Received: from mailgw02.mediatek.com ([216.200.240.185])
+	id 1gkOmK-0002Bm-J3; Fri, 18 Jan 2019 07:41:24 +0000
+Received: from mail-eopbgr10078.outbound.protection.outlook.com ([40.107.1.78]
+ helo=EUR02-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkNQD-0005gd-9v; Fri, 18 Jan 2019 06:14:31 +0000
-X-UUID: 442c1c876cc846188c2f3fc481d13451-20190117
-X-UUID: 442c1c876cc846188c2f3fc481d13451-20190117
-Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw02.mediatek.com
- (envelope-from <min.guo@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1721433949; Thu, 17 Jan 2019 22:14:20 -0800
-Received: from MTKMBS31N1.mediatek.inc (172.27.4.69) by
- MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Thu, 17 Jan 2019 22:14:18 -0800
-Received: from MTKCAS36.mediatek.inc (172.27.4.186) by MTKMBS31N1.mediatek.inc
- (172.27.4.69) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Fri, 18 Jan 2019 14:14:15 +0800
-Received: from [10.17.3.153] (10.17.3.153) by MTKCAS36.mediatek.inc
- (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Fri, 18 Jan 2019 14:14:14 +0800
-Message-ID: <1547792054.4433.254.camel@mhfsdcap03>
-Subject: Re: [PATCH v3 4/4] usb: musb: Add support for MediaTek musb controller
-From: Min Guo <min.guo@mediatek.com>
-To: Tony Lindgren <tony@atomide.com>
-Date: Fri, 18 Jan 2019 14:14:14 +0800
-In-Reply-To: <20190117143342.GS5544@atomide.com>
-References: <1547709348-17506-1-git-send-email-min.guo@mediatek.com>
- <1547709348-17506-5-git-send-email-min.guo@mediatek.com>
- <20190117143342.GS5544@atomide.com>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+ id 1gkOmH-0002BO-Nm
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 07:41:23 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=bxeoIYJ3cCI3v5Fc5IfTjidVEd43X6arcIZ3Lknog6A=;
+ b=daAFFz/SYCJkuA6GVXUY88YXn1OTG4tUCKzFOVA1jIwB+Fx0aoOWvx6PPWWv5uTr6qxzLTsHSoogQLnWjAD4B46oMiyXAP6beXYQictD78yUAU0GNmCDkCxhs8ljbfX7uqyoUTd7KRrNqfTVsQR9olFRiHsM67mdWG2U/0ZrRV8=
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
+ AM0SPR01MB17.eurprd04.prod.outlook.com (52.134.125.151) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1537.24; Fri, 18 Jan 2019 07:41:16 +0000
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::c4d2:7dfd:4576:bdd5]) by AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::c4d2:7dfd:4576:bdd5%5]) with mapi id 15.20.1537.018; Fri, 18 Jan 2019
+ 07:41:16 +0000
+From: Aisheng Dong <aisheng.dong@nxp.com>
+To: "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
+Subject: [PATCH 1/1] irqchip: gpcv2: make config option visible
+Thread-Topic: [PATCH 1/1] irqchip: gpcv2: make config option visible
+Thread-Index: AQHUrwExKd8SdkCETUqu4TDod0Igjg==
+Date: Fri, 18 Jan 2019 07:41:16 +0000
+Message-ID: <1547796918-29790-1-git-send-email-aisheng.dong@nxp.com>
+Accept-Language: zh-CN, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: git-send-email 2.7.4
+x-clientproxiedby: HK0P153CA0029.APCP153.PROD.OUTLOOK.COM
+ (2603:1096:203:17::17) To AM0PR04MB4211.eurprd04.prod.outlook.com
+ (2603:10a6:208:66::21)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=aisheng.dong@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [119.31.174.66]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; AM0SPR01MB17;
+ 6:4+JjvSlituIP5JtmjtWu7SQXEet0Vcy2nu5iWTx861xxIxWIMVD1jdt7S3g5xmsD/TwK+BO+C0e5bzD2cN2T9mdjhXIDQnEkFN9hsru7MB/T+Cxp2dNafQi5FMhpDyfPJILbR7JbPpv9BZe7x0eqYb/Oe5kC0soZD1ubkdJdmHQRNAQihx9NijOMsyp4wsPzfgBKqRrjWfn+DVwOxuq0fEeoX+uFV8KHCBDhR84x+PZmYuPzJzDcksXiWkbNq7tbD90dTCFr8wBu6v865ONYutIiu/RU0Qw4Mm7HW2/0ICStyI1qTCpHyuvLfqy8cKMMs6tyJHPCnuT9ehA5/mmzvvKxv9s1YP6tzmg/ITJOSkHce+NgJfulAjTcJZKL3dgy0BHqDP82kNXf3jMHUlzszhq1GnJueylggZu0J4rlKOHDqw7Eik+OqDoXS+cIlVN3CeB1Nq4s0TE1xtdKwgBIzw==;
+ 5:FerhmhObsF4KQOMUKBSewZXzNn96HIt9Kc+vR8WhKZsibm0xIEomO7Ao1cn0U+JmPwZxqlZ6BYKnew0F+AseRQWkXUHntHYUAvp2vArYuJqdv3iKf+M/BmZXCrp7H7iMCh3Ho/2KkxRRMOtr76gMcwobrdp3XiXeyK4N4Af5+0S4fyn3RrfKJCJcM3m3QYcdbb6Ahagkg9fIKKtptcO7ig==;
+ 7:nfKwuq2DybtgJ0kmbDTnr3pXeHggR/Nsv4lY7/YXM0cKTX7FzWU7TifI/r5oNlUBCO63SptfeKH6rrQuocgEOMwx29Sm+KArIN5XDoVWJ/GnHHQmuok+fFVDSHHn/BjIINTl6/GeI1O/0cwgiZH4eQ==
+x-ms-office365-filtering-correlation-id: b11999f6-4577-40af-a16f-08d67d1853ca
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:AM0SPR01MB17; 
+x-ms-traffictypediagnostic: AM0SPR01MB17:
+x-microsoft-antispam-prvs: <AM0SPR01MB1773F966E5BDED0630EA57809C0@AM0SPR01MB17.eurprd04.prod.outlook.com>
+x-forefront-prvs: 0921D55E4F
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(396003)(376002)(39860400002)(136003)(346002)(366004)(189003)(199004)(86362001)(50226002)(6512007)(66066001)(99286004)(2501003)(6916009)(39060400002)(53936002)(54906003)(52116002)(68736007)(5660300001)(2616005)(36756003)(44832011)(102836004)(26005)(186003)(6486002)(2351001)(106356001)(25786009)(386003)(6506007)(5640700003)(2906002)(256004)(316002)(14454004)(4326008)(486006)(8676002)(305945005)(81166006)(81156014)(6116002)(4744005)(8936002)(7736002)(6436002)(71200400001)(71190400001)(478600001)(476003)(14444005)(97736004)(3846002)(105586002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0SPR01MB17;
+ H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: FgBi9lZKGNKgM4ijsdHkT/aryzmMqdr1XJ/BvBZTdckQ0PIanmT/pkQYyiT9lUQJHQ/3yVtQo6t/+cBwN2RzkH7bQapHGpi8wAczsmAF8N9sIZWPthC1r5uai+BHylacvq8LqiamFAe1lvHDVx3MZhffIumaH2QNGGZbp90jRu/hYL0uKm00Z0p2MKS14bZTWnc8e5OM5dClChbYeR0ymuDr84S9PSzjjMvfW5xKJAeuIpRfr8q1CSksyqkkQFLrManAvOEJHp/je97/n14ydn01efjkPYUzr1wc26xIwP80yrc2/hXk8ASBle2tX2BPdjnJFUEcUuQShEl0VBGoZulaHrfeFrIOg4h8amimrMnILoTGG0mZQ44e3MHNzuUuuZ+IN8cp6cKoYpOFYr9R6Iv9ymY0ByoCkWBFlaNGYDM=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-X-MTK: N
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: b11999f6-4577-40af-a16f-08d67d1853ca
+X-MS-Exchange-CrossTenant-originalarrivaltime: 18 Jan 2019 07:41:12.1921 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0SPR01MB17
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_221429_345264_7A99CF7B 
-X-CRM114-Status: GOOD (  10.57  )
+X-CRM114-CacheID: sfid-20190117_234121_777648_A4538517 
+X-CRM114-Status: GOOD (  12.73  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,48 +116,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Yonglong Wu <yonglong.wu@mediatek.com>, hdegoede@redhat.com, Greg
- Kroah-Hartman <gregkh@linuxfoundation.org>, linux-usb@vger.kernel.org,
- linux-kernel@vger.kernel.org, chunfeng.yun@mediatek.com,
- Rob Herring <robh+dt@kernel.org>, Alan
- Stern <stern@rowland.harvard.edu>, Matthias Brugger <matthias.bgg@gmail.com>,
- linux-mediatek@lists.infradead.org, Bin Liu <b-liu@ti.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: Aisheng Dong <aisheng.dong@nxp.com>, Jason Cooper <jason@lakedaemon.net>,
+ Marc Zyngier <marc.zyngier@arm.com>, Andrey Smirnov <andrew.smirnov@gmail.com>,
+ dl-linux-imx <linux-imx@nxp.com>, Thomas Gleixner <tglx@linutronix.de>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "l.stach@pengutronix.de" <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 2019-01-17 at 06:33 -0800, Tony Lindgren wrote:
-> Hi,
-> 
-> * min.guo@mediatek.com <min.guo@mediatek.com> [190117 07:16]:
-> > There are some quirk of MediaTek musb controller, such as:
-> >  -W1C interrupt status registers
-> >  -Private data toggle registers
-> >  -No dedicated DMA interrupt line
-> 
-> Can you please separate the musb generic changes listed above
-> into separate individual patches in preparation for adding
-> support for new hardware?
-> 
-> Otherwise we'll have hard time finding out with git bisect what
-> exactly breaks things if we run into trouble.
+Make GPCv2 config option visible, then user can select it in defconfig
+for ARMv8 platforms.
 
-Thanks for your suggestion.
-I prepared to divide these changes into separate patches. Later, Mr.Bin
-suggested not to do this.
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Lucas Stach <l.stach@pengutronix.de>
+Cc: Andrey Smirnov <andrew.smirnov@gmail.com>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
+ drivers/irqchip/Kconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-The detailed information can be referred to:
-https://patchwork.kernel.org/patch/10743561/
-https://patchwork.kernel.org/patch/10763737/
-https://patchwork.kernel.org/patch/107463741/
-
-> Regards,
-> 
-> Tony
-
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index 3d1e607..ed04d47 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -289,7 +289,8 @@ config RENESAS_H8S_INTC
+ 	select IRQ_DOMAIN
+ 
+ config IMX_GPCV2
+-	bool
++	bool "i.MX GPCv2 IRQ chip"
++	depends on ARCH_MXC || (COMPILE_TEST && OF)
+ 	select IRQ_DOMAIN
+ 	help
+ 	  Enables the wakeup IRQs for IMX platforms with GPCv2 block
+-- 
+2.7.4
 
 
 _______________________________________________
