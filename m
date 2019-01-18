@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 34998C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:46:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 993BEC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:46:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 069E62087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:46:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6B67B2054F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:46:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kaO+/HqI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 069E62087E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qlTNE6Zi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6B67B2054F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=WF9vU1NcocTMbfbVS2vcCrQKrLsMfx9FocoS6yJW220=; b=kaO+/HqIaVhfw8
-	b+2D7B5i64w2WgydCgPOfL1ACfm0E1vkSzlLAxqQTdqEPFagZ7AqGpTUumTS9KxXtleWzhG4pX3Jj
-	jIyXdP5dmFkWH3F01uZhKvWVKywxY2nHM3Eyvz4EnjzJFGUjsmB1p3eWBQO8pefZAUYzKT4quBJqR
-	tG3lGMHkUSSgc5+L8m2ha4YWgE372SSFcz+YQ8B4XOZDOV+yscZONPz61Rp6Z+S75AX2zxi/0JStK
-	/bQyiw3xwNF5a5h7sT8tb6Zh4p/CtnEFEXvMmzFVtfmiKzVRUdjsWQCzW4RgW2PduRa4IUVvR+lri
-	qpu8mQFAQ91x2Tr8wujg==;
+	List-Owner; bh=PBrM4WmHv4H9kpgoKqd9OukLbO13XuJwMoLvAhqvZe8=; b=qlTNE6ZizpAjNI
+	GDoUocyKlADsrQ131ntAHLk+mU2yhUsTDP/CJXZ1pLz/qwH/v7Lj3ajUeBc4jN7fbDLyrxoRBFYQf
+	9Z17qc1rVO7v8nopKd6F98+gWn3fPoFcdbJf3wc51yBfnZMomRB/188uWYDnW5AWS9HY4GcQmX2eP
+	/k3V3AjOm2f2GLgYMG44BFIoEc0gF4T93SzBEyfunAOjeKSsLWWpN7q1Fsofs/X2maj/emQlPLvNH
+	DN+ozeLNVpl/+Cu6+HxCRAqJOxqmBColN/+xn04OVMjlAcOwzCLB7d7ZRdLF4cxKNWLyHjPGQGIxf
+	+YvwCTrS1qRECfNZZ9SQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkVPk-0001eZ-W2; Fri, 18 Jan 2019 14:46:33 +0000
+	id 1gkVPv-0001oC-6t; Fri, 18 Jan 2019 14:46:43 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkVNE-0006Z2-9N
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 14:44:08 +0000
+ id 1gkVNE-0006WN-Id
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 14:44:10 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 461E820955; Fri, 18 Jan 2019 15:43:54 +0100 (CET)
+ id 81D3A20C59; Fri, 18 Jan 2019 15:43:54 +0100 (CET)
 Received: from localhost.localdomain
  (aaubervilliers-681-1-37-87.w90-88.abo.wanadoo.fr [90.88.156.87])
- by mail.bootlin.com (Postfix) with ESMTPSA id 8B2BC206A7;
- Fri, 18 Jan 2019 15:43:52 +0100 (CET)
+ by mail.bootlin.com (Postfix) with ESMTPSA id 86ABB20DF8;
+ Fri, 18 Jan 2019 15:43:53 +0100 (CET)
 From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 To: dri-devel@lists.freedesktop.org, linux-arm-kernel@lists.infradead.org,
  linux-kernel@vger.kernel.org, linux-sunxi@googlegroups.com
-Subject: [PATCH v5 16/23] drm/sun4i: drv: Allow framebuffer modifiers in mode
- config
-Date: Fri, 18 Jan 2019 15:43:21 +0100
-Message-Id: <20190118144328.20649-17-paul.kocialkowski@bootlin.com>
+Subject: [PATCH v5 20/23] drm/sun4i: Make COEF_RDY conditional
+Date: Fri, 18 Jan 2019 15:43:25 +0100
+Message-Id: <20190118144328.20649-21-paul.kocialkowski@bootlin.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190118144328.20649-1-paul.kocialkowski@bootlin.com>
 References: <20190118144328.20649-1-paul.kocialkowski@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_064356_857942_E1A79C1B 
-X-CRM114-Status: GOOD (  13.14  )
+X-CRM114-CacheID: sfid-20190118_064357_212951_F4C55B66 
+X-CRM114-Status: GOOD (  12.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,27 +79,52 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This is the final step to indicate to the core that our driver
-supports framebuffer modifiers.
+From: Maxime Ripard <maxime.ripard@bootlin.com>
 
+The COEF_RDY bit isn't found in all the SoCs featuring some variant of the
+frontend.
+
+Add it to our quirks structure.
+
+Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_drv.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/gpu/drm/sun4i/sun4i_frontend.c | 9 +++++----
+ drivers/gpu/drm/sun4i/sun4i_frontend.h | 1 +
+ 2 files changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index 9e4c375ccc96..93da837194cf 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -97,6 +97,7 @@ static int sun4i_drv_bind(struct device *dev)
+diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
+index 7a1095b004d4..86c5033102b9 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
+@@ -96,10 +96,11 @@ static void sun4i_frontend_scaler_init(struct sun4i_frontend *frontend)
+ 			     sun4i_frontend_vert_coef[i]);
  	}
  
- 	drm_mode_config_init(drm);
-+	drm->mode_config.allow_fb_modifiers = true;
+-	regmap_write_bits(frontend->regs,
+-			  SUN4I_FRONTEND_FRM_CTRL_REG,
+-			  SUN4I_FRONTEND_FRM_CTRL_COEF_RDY,
+-			  SUN4I_FRONTEND_FRM_CTRL_COEF_RDY);
++	if (frontend->data->has_coef_rdy)
++		regmap_write_bits(frontend->regs,
++				  SUN4I_FRONTEND_FRM_CTRL_REG,
++				  SUN4I_FRONTEND_FRM_CTRL_COEF_RDY,
++				  SUN4I_FRONTEND_FRM_CTRL_COEF_RDY);
+ }
  
- 	ret = component_bind_all(drm->dev, drm);
- 	if (ret) {
+ int sun4i_frontend_init(struct sun4i_frontend *frontend)
+diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.h b/drivers/gpu/drm/sun4i/sun4i_frontend.h
+index 01e68bb11c98..e332bc1c6b68 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_frontend.h
++++ b/drivers/gpu/drm/sun4i/sun4i_frontend.h
+@@ -114,6 +114,7 @@ struct reset_control;
+ 
+ struct sun4i_frontend_data {
+ 	bool	has_coef_access_ctrl;
++	bool	has_coef_rdy;
+ };
+ 
+ struct sun4i_frontend {
 -- 
 2.20.1
 
