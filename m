@@ -2,22 +2,22 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8615AC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:19:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 87EE9C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:28:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 59A3020883
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:19:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 57CCC20883
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:28:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gSdyoiZi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 59A3020883
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hslv1WDx";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=alien8.de header.i=@alien8.de header.b="a2pmFH2c"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 57CCC20883
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=alien8.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,39 +25,47 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ghzkxn8uPUYsifMaoobiBDV7YmA4tvNi9qAURkCt5XM=; b=gSdyoiZidTauU7
-	kPiM/jLV5k8IS8PnSwBM34MYrdKKPB26ZA1IDaUvuG3PE4UtofRUBaBw89TNj8TDRp7H4x9sykQVv
-	UY52VxcGsk+07Cf26ntPd50+EVtjKZFutTTxy7W+c1lHsDofZAe+YRNWEfOgMxWWmrfoRRPMjPpMm
-	XR3PfMdQST8kzbrPNRxJQmJh3dUnRgQMq3S6cIYVrJdfa1ihRqH0z/aYPRqolMkZEMA+AOHmv79oF
-	yIEgvRZj+3xp71XwMCN0KSTvbcWXUpyGattBwiJA6GRAub9oIf+BUZMQRSwfcawv9QBHudHbRufBf
-	4c5scdN3bN/cxlMqUqPQ==;
+	List-Owner; bh=K8HxvZMeqSm1zJ9OjV70Df1QwMLX0sNJwfubhYf/ym4=; b=hslv1WDxBfyPxv
+	vUwiWpj3ksdIbq+AC53mwYzihqCy1cDN7f+6L4AEX7gdxbK3gdQGO3cnwVl5QlZBKjEInr4KMa0ax
+	wGThJalZ59XT0XYpGMMGkh44vR/vyg0TJfEHOEev60q14Pcu7deA2lnjfdvE45j60xv3QRSkDwacU
+	ovbOPs8LqCOgrZ7qHC/duz5mRgRkQIZ8dal/J9h4Ceb7vNHiaswEagjAEnsAy6x9vtduVP61nsleF
+	O7d6W/R3LUlgNWshMz0ZM+vAVsGMltMB50/uuhxXCWcQU0Vz52qBelBY97FoheYvGtNcGIUh6sdIW
+	jDqBHwFaPyQQ2AKzCEGA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkUzU-0004Yt-FK; Fri, 18 Jan 2019 14:19:24 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkUzS-0004YY-2m
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 14:19:23 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id AA2D6EBD;
- Fri, 18 Jan 2019 06:19:21 -0800 (PST)
-Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id BD49D3F5C1;
- Fri, 18 Jan 2019 06:19:20 -0800 (PST)
-Date: Fri, 18 Jan 2019 14:19:18 +0000
-From: Mark Rutland <mark.rutland@arm.com>
-To: Andrew Murray <andrew.murray@arm.com>
-Subject: Re: [PATCH] arm64: asm-offsets: remove unused offsets
-Message-ID: <20190118141917.GD12256@lakrids.cambridge.arm.com>
-References: <1547819562-16143-1-git-send-email-andrew.murray@arm.com>
+	id 1gkV8Z-0008IS-Gu; Fri, 18 Jan 2019 14:28:47 +0000
+Received: from mail.skyhub.de ([2a01:4f8:190:11c2::b:1457])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gkV8V-0008Hg-Ds
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 14:28:45 +0000
+Received: from zn.tnic (p200300EC2BCB1B00329C23FFFEA6A903.dip0.t-ipconnect.de
+ [IPv6:2003:ec:2bcb:1b00:329c:23ff:fea6:a903])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.skyhub.de (SuperMail on ZX Spectrum 128k) with ESMTPSA id C69761EC0573;
+ Fri, 18 Jan 2019 15:28:36 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=alien8.de; s=dkim;
+ t=1547821717;
+ h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+ to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+ content-transfer-encoding:in-reply-to:in-reply-to:  references:references;
+ bh=gbHNbKy+Xhm8EHzQUm+KhOvq1C3SEcIFrwN7KVnE3ck=;
+ b=a2pmFH2c3OjQOEYgn1JYHJVyPQB6XpnE8P1QtoMAmHEp+Mc9yr/dKt5MW4WCSmmUZg1D2u
+ trLHdxQ1UYKMgxhYqZ8BeIPCB+Y9V7wfurI4O+j1ffWv7+GEd9yNHNeLZfkVGj1HAC1Iyi
+ oPSadCexi6CUmL8yFep/dCfUoMTvfpg=
+Date: Fri, 18 Jan 2019 15:28:31 +0100
+From: Borislav Petkov <bp@alien8.de>
+To: Stefan Schaeckeler <schaecsn@gmx.net>
+Subject: Re: [PATCH v2 0/2] Add support for the Aspeed AST2500 SoC EDAC driver
+Message-ID: <20190118142831.GD622@zn.tnic>
+References: <1547743097-5236-1-git-send-email-schaecsn@gmx.net>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1547819562-16143-1-git-send-email-andrew.murray@arm.com>
-User-Agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
+In-Reply-To: <1547743097-5236-1-git-send-email-schaecsn@gmx.net>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_061922_144279_0B24BD74 
-X-CRM114-Status: GOOD (  13.91  )
+X-CRM114-CacheID: sfid-20190118_062843_622530_02CD8FEB 
+X-CRM114-Status: GOOD (  13.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,114 +77,52 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ linux-aspeed@lists.ozlabs.org, Andrew Jeffery <andrew@aj.id.au>,
+ linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
+ Joel Stanley <joel@jms.id.au>, Stefan M Schaeckeler <sschaeck@cisco.com>,
+ Mauro Carvalho Chehab <mchehab@kernel.org>,
+ linux-arm-kernel@lists.infradead.org, linux-edac@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 18, 2019 at 01:52:42PM +0000, Andrew Murray wrote:
-> There are a number of offsets defined in asm-offsets.c which no longer
-> have any users. Let's clean this up by removing them.
+On Thu, Jan 17, 2019 at 08:38:15AM -0800, Stefan Schaeckeler wrote:
+> From: Stefan M Schaeckeler <sschaeck@cisco.com>
 > 
-> All the remaining offsets are in use.
+> Add support for the Aspeed AST2500 SoC EDAC driver.
 > 
-> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
-
-Looks reasonable to me. FWIW:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
-
-> ---
->  arch/arm64/kernel/asm-offsets.c | 20 --------------------
->  1 file changed, 20 deletions(-)
+> Changes since v1:
+> - Addressed all cosmetic issues
+> - Fixed (un-)recoverable address calculation in reg58 and reg5c
+> - Removed status field from the example device tree binding
+> - Added little more text to Kconfig
 > 
-> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-> index 65b8afc..0552b91 100644
-> --- a/arch/arm64/kernel/asm-offsets.c
-> +++ b/arch/arm64/kernel/asm-offsets.c
-> @@ -53,13 +53,9 @@ int main(void)
->    DEFINE(THREAD_CPU_CONTEXT,	offsetof(struct task_struct, thread.cpu_context));
->    BLANK();
->    DEFINE(S_X0,			offsetof(struct pt_regs, regs[0]));
-> -  DEFINE(S_X1,			offsetof(struct pt_regs, regs[1]));
->    DEFINE(S_X2,			offsetof(struct pt_regs, regs[2]));
-> -  DEFINE(S_X3,			offsetof(struct pt_regs, regs[3]));
->    DEFINE(S_X4,			offsetof(struct pt_regs, regs[4]));
-> -  DEFINE(S_X5,			offsetof(struct pt_regs, regs[5]));
->    DEFINE(S_X6,			offsetof(struct pt_regs, regs[6]));
-> -  DEFINE(S_X7,			offsetof(struct pt_regs, regs[7]));
->    DEFINE(S_X8,			offsetof(struct pt_regs, regs[8]));
->    DEFINE(S_X10,			offsetof(struct pt_regs, regs[10]));
->    DEFINE(S_X12,			offsetof(struct pt_regs, regs[12]));
-> @@ -73,12 +69,8 @@ int main(void)
->    DEFINE(S_X28,			offsetof(struct pt_regs, regs[28]));
->    DEFINE(S_LR,			offsetof(struct pt_regs, regs[30]));
->    DEFINE(S_SP,			offsetof(struct pt_regs, sp));
-> -#ifdef CONFIG_COMPAT
-> -  DEFINE(S_COMPAT_SP,		offsetof(struct pt_regs, compat_sp));
-> -#endif
->    DEFINE(S_PSTATE,		offsetof(struct pt_regs, pstate));
->    DEFINE(S_PC,			offsetof(struct pt_regs, pc));
-> -  DEFINE(S_ORIG_X0,		offsetof(struct pt_regs, orig_x0));
->    DEFINE(S_SYSCALLNO,		offsetof(struct pt_regs, syscallno));
->    DEFINE(S_ORIG_ADDR_LIMIT,	offsetof(struct pt_regs, orig_addr_limit));
->    DEFINE(S_STACKFRAME,		offsetof(struct pt_regs, stackframe));
-> @@ -93,7 +85,6 @@ int main(void)
->    BLANK();
->    DEFINE(PAGE_SZ,	       	PAGE_SIZE);
->    BLANK();
-> -  DEFINE(DMA_BIDIRECTIONAL,	DMA_BIDIRECTIONAL);
->    DEFINE(DMA_TO_DEVICE,		DMA_TO_DEVICE);
->    DEFINE(DMA_FROM_DEVICE,	DMA_FROM_DEVICE);
->    BLANK();
-> @@ -110,25 +101,18 @@ int main(void)
->    BLANK();
->    DEFINE(VDSO_CS_CYCLE_LAST,	offsetof(struct vdso_data, cs_cycle_last));
->    DEFINE(VDSO_RAW_TIME_SEC,	offsetof(struct vdso_data, raw_time_sec));
-> -  DEFINE(VDSO_RAW_TIME_NSEC,	offsetof(struct vdso_data, raw_time_nsec));
->    DEFINE(VDSO_XTIME_CLK_SEC,	offsetof(struct vdso_data, xtime_clock_sec));
-> -  DEFINE(VDSO_XTIME_CLK_NSEC,	offsetof(struct vdso_data, xtime_clock_nsec));
->    DEFINE(VDSO_XTIME_CRS_SEC,	offsetof(struct vdso_data, xtime_coarse_sec));
->    DEFINE(VDSO_XTIME_CRS_NSEC,	offsetof(struct vdso_data, xtime_coarse_nsec));
->    DEFINE(VDSO_WTM_CLK_SEC,	offsetof(struct vdso_data, wtm_clock_sec));
-> -  DEFINE(VDSO_WTM_CLK_NSEC,	offsetof(struct vdso_data, wtm_clock_nsec));
->    DEFINE(VDSO_TB_SEQ_COUNT,	offsetof(struct vdso_data, tb_seq_count));
->    DEFINE(VDSO_CS_MONO_MULT,	offsetof(struct vdso_data, cs_mono_mult));
-> -  DEFINE(VDSO_CS_RAW_MULT,	offsetof(struct vdso_data, cs_raw_mult));
->    DEFINE(VDSO_CS_SHIFT,		offsetof(struct vdso_data, cs_shift));
->    DEFINE(VDSO_TZ_MINWEST,	offsetof(struct vdso_data, tz_minuteswest));
-> -  DEFINE(VDSO_TZ_DSTTIME,	offsetof(struct vdso_data, tz_dsttime));
->    DEFINE(VDSO_USE_SYSCALL,	offsetof(struct vdso_data, use_syscall));
->    BLANK();
->    DEFINE(TVAL_TV_SEC,		offsetof(struct timeval, tv_sec));
-> -  DEFINE(TVAL_TV_USEC,		offsetof(struct timeval, tv_usec));
->    DEFINE(TSPEC_TV_SEC,		offsetof(struct timespec, tv_sec));
-> -  DEFINE(TSPEC_TV_NSEC,		offsetof(struct timespec, tv_nsec));
->    BLANK();
->    DEFINE(TZ_MINWEST,		offsetof(struct timezone, tz_minuteswest));
->    DEFINE(TZ_DSTTIME,		offsetof(struct timezone, tz_dsttime));
-> @@ -142,13 +126,9 @@ int main(void)
->    DEFINE(VCPU_WORKAROUND_FLAGS,	offsetof(struct kvm_vcpu, arch.workaround_flags));
->    DEFINE(CPU_GP_REGS,		offsetof(struct kvm_cpu_context, gp_regs));
->    DEFINE(CPU_USER_PT_REGS,	offsetof(struct kvm_regs, regs));
-> -  DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
-> -  DEFINE(VCPU_FPEXC32_EL2,	offsetof(struct kvm_vcpu, arch.ctxt.sys_regs[FPEXC32_EL2]));
-> -  DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
->    DEFINE(HOST_CONTEXT_VCPU,	offsetof(struct kvm_cpu_context, __hyp_running_vcpu));
->  #endif
->  #ifdef CONFIG_CPU_PM
-> -  DEFINE(CPU_SUSPEND_SZ,	sizeof(struct cpu_suspend_ctx));
->    DEFINE(CPU_CTX_SP,		offsetof(struct cpu_suspend_ctx, sp));
->    DEFINE(MPIDR_HASH_MASK,	offsetof(struct mpidr_hash, mask));
->    DEFINE(MPIDR_HASH_SHIFTS,	offsetof(struct mpidr_hash, shift_aff));
+> 
+> Stefan M Schaeckeler (2):
+>   EDAC: Add Aspeed AST2500 EDAC driver
+>   dt-bindings: edac: Aspeed AST2500
+> 
+>  .../bindings/edac/aspeed-sdram-edac.txt       |  25 ++
+>  MAINTAINERS                                   |   6 +
+>  arch/arm/boot/dts/aspeed-g5.dtsi              |   7 +
+>  drivers/edac/Kconfig                          |   8 +
+>  drivers/edac/Makefile                         |   1 +
+>  drivers/edac/aspeed_edac.c                    | 421 ++++++++++++++++++
+>  6 files changed, 468 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/edac/aspeed-sdram-edac.txt
+>  create mode 100644 drivers/edac/aspeed_edac.c
+> 
 > -- 
-> 2.7.4
-> 
+
+Queued, thanks.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
 
 _______________________________________________
 linux-arm-kernel mailing list
