@@ -2,58 +2,58 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 52F24C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 13:37:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0E7D9C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 13:53:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0B2792087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 13:37:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C243C2087E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 13:53:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fSMb7E3L"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0B2792087E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=free.fr
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BCt3gvDR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C243C2087E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Date:Message-ID:Subject:
-	From:To:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=JY7iFl93YSU9J7ZQ1lIuTJfhr5JvA7MP1/gJSYonxiU=; b=fSMb7E3Lhey+UH
-	iV3UeregJY+ZvvqCL3iiyS+1G+/HYLkfeTT9aL/JTQecpA3mpVSnLA6auYwaDJNu3qsFiCHMOsBOB
-	DOSzw3ReHp69PK9iHBc4feJqwpU2CMiG/xTBmTgYi50KpWhulBcwOV9vg9BD5bo7ZUZKwhsrxjbrV
-	hY6v1J6BU7msQDmJrEI13x1UhHPg+EygUl4P2bFcXJMBcxP7feDwe4L8YJMog8Owa7iLrkUW1Gsec
-	78sWLT1+xCMTc+NM2iG0YK5cMiczcqrGKVRusxRLEGHwasfsx4szSuZ+EgJyY+pToQSxBOcXu1AIM
-	sdHuhildPvs/l6ELh1kg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=bMPj3US11CHUUxkT4tWACCc1Sx9jpZtPDxv0f/T262s=; b=BCt
+	3gvDRjzy9Hvc7EPhKPy/tdYbYMdghTNP1NPT20B4n8jYijJ1AIEUX2uAcNe/0yiyCzZ4fxx1DH5iS
+	Bi9UFff20kAWqxWCMvVY199UzR/r1f9G7tBAwQhcU7z3Uur0dbKYDxAKOKuX7zjrcSlAT5n/Y+bdB
+	9N3dpeh3ktvquX96RijK3tc4E/neby83QRuluZdb/edneOovvqQC90Tdt5J4TpVwF/Dhvm6bkVAcz
+	tFzxVdNaHx8aYxpxE8/WQGQ02iKP+K95Wnu0/FOEzhp3HQZplt3zDDvK7z9fd2CE2Ths4I1LqJH4P
+	WMcqEhzV1duKStPKxv6n1g//BVRAfjw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkUKc-0003wp-1C; Fri, 18 Jan 2019 13:37:10 +0000
-Received: from smtp3-g21.free.fr ([2a01:e0c:1:1599::12])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkUKX-0003wS-2d
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 13:37:07 +0000
-Received: from [192.168.108.68] (unknown [213.36.7.13])
- (Authenticated sender: marc.w.gonzalez)
- by smtp3-g21.free.fr (Postfix) with ESMTPSA id 69C9413F86F;
- Fri, 18 Jan 2019 14:36:46 +0100 (CET)
-To: Catalin Marinas <catalin.marinas@arm.com>
-From: Marc Gonzalez <marc.w.gonzalez@free.fr>
-Subject: kmemleak panic
-Message-ID: <f6fbf528-8213-e3b8-6990-9fcf9dec04d6@free.fr>
-Date: Fri, 18 Jan 2019 14:36:46 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-Content-Language: en-US
+	id 1gkUa8-0000ZL-U4; Fri, 18 Jan 2019 13:53:12 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gkUa5-0000Ys-Iw
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 13:53:10 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id DE11CEBD;
+ Fri, 18 Jan 2019 05:53:03 -0800 (PST)
+Received: from e119886-lin.cambridge.arm.com (unknown [10.37.6.11])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id CB99F3F5C1;
+ Fri, 18 Jan 2019 05:53:02 -0800 (PST)
+From: Andrew Murray <andrew.murray@arm.com>
+To: Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, Mark Rutland <mark.rutland@arm.com>
+Subject: [PATCH] arm64: asm-offsets: remove unused offsets
+Date: Fri, 18 Jan 2019 13:52:42 +0000
+Message-Id: <1547819562-16143-1-git-send-email-andrew.murray@arm.com>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_053705_427030_7DE484D9 
-X-CRM114-Status: UNSURE (   7.46  )
+X-CRM114-CacheID: sfid-20190118_055309_635088_F145F17A 
+X-CRM114-Status: UNSURE (   9.02  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -66,184 +66,105 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Robin Murphy <robin.murphy@arm.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Arnd Bergmann <arnd@arndb.de>, Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello Catalin,
+There are a number of offsets defined in asm-offsets.c which no longer
+have any users. Let's clean this up by removing them.
 
-Trying to diagnose a separate issue(*) I enabled a raft of debugging options,
-including kmemleak. However, it looks like kmemleak itself is crashing?
+All the remaining offsets are in use.
 
-(*) https://lwn.net/ml/linux-block/f792574c-e083-b218-13b4-c89be6566015%40free.fr/
+Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+---
+ arch/arm64/kernel/asm-offsets.c | 20 --------------------
+ 1 file changed, 20 deletions(-)
 
-Did I do something wrong?
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 65b8afc..0552b91 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -53,13 +53,9 @@ int main(void)
+   DEFINE(THREAD_CPU_CONTEXT,	offsetof(struct task_struct, thread.cpu_context));
+   BLANK();
+   DEFINE(S_X0,			offsetof(struct pt_regs, regs[0]));
+-  DEFINE(S_X1,			offsetof(struct pt_regs, regs[1]));
+   DEFINE(S_X2,			offsetof(struct pt_regs, regs[2]));
+-  DEFINE(S_X3,			offsetof(struct pt_regs, regs[3]));
+   DEFINE(S_X4,			offsetof(struct pt_regs, regs[4]));
+-  DEFINE(S_X5,			offsetof(struct pt_regs, regs[5]));
+   DEFINE(S_X6,			offsetof(struct pt_regs, regs[6]));
+-  DEFINE(S_X7,			offsetof(struct pt_regs, regs[7]));
+   DEFINE(S_X8,			offsetof(struct pt_regs, regs[8]));
+   DEFINE(S_X10,			offsetof(struct pt_regs, regs[10]));
+   DEFINE(S_X12,			offsetof(struct pt_regs, regs[12]));
+@@ -73,12 +69,8 @@ int main(void)
+   DEFINE(S_X28,			offsetof(struct pt_regs, regs[28]));
+   DEFINE(S_LR,			offsetof(struct pt_regs, regs[30]));
+   DEFINE(S_SP,			offsetof(struct pt_regs, sp));
+-#ifdef CONFIG_COMPAT
+-  DEFINE(S_COMPAT_SP,		offsetof(struct pt_regs, compat_sp));
+-#endif
+   DEFINE(S_PSTATE,		offsetof(struct pt_regs, pstate));
+   DEFINE(S_PC,			offsetof(struct pt_regs, pc));
+-  DEFINE(S_ORIG_X0,		offsetof(struct pt_regs, orig_x0));
+   DEFINE(S_SYSCALLNO,		offsetof(struct pt_regs, syscallno));
+   DEFINE(S_ORIG_ADDR_LIMIT,	offsetof(struct pt_regs, orig_addr_limit));
+   DEFINE(S_STACKFRAME,		offsetof(struct pt_regs, stackframe));
+@@ -93,7 +85,6 @@ int main(void)
+   BLANK();
+   DEFINE(PAGE_SZ,	       	PAGE_SIZE);
+   BLANK();
+-  DEFINE(DMA_BIDIRECTIONAL,	DMA_BIDIRECTIONAL);
+   DEFINE(DMA_TO_DEVICE,		DMA_TO_DEVICE);
+   DEFINE(DMA_FROM_DEVICE,	DMA_FROM_DEVICE);
+   BLANK();
+@@ -110,25 +101,18 @@ int main(void)
+   BLANK();
+   DEFINE(VDSO_CS_CYCLE_LAST,	offsetof(struct vdso_data, cs_cycle_last));
+   DEFINE(VDSO_RAW_TIME_SEC,	offsetof(struct vdso_data, raw_time_sec));
+-  DEFINE(VDSO_RAW_TIME_NSEC,	offsetof(struct vdso_data, raw_time_nsec));
+   DEFINE(VDSO_XTIME_CLK_SEC,	offsetof(struct vdso_data, xtime_clock_sec));
+-  DEFINE(VDSO_XTIME_CLK_NSEC,	offsetof(struct vdso_data, xtime_clock_nsec));
+   DEFINE(VDSO_XTIME_CRS_SEC,	offsetof(struct vdso_data, xtime_coarse_sec));
+   DEFINE(VDSO_XTIME_CRS_NSEC,	offsetof(struct vdso_data, xtime_coarse_nsec));
+   DEFINE(VDSO_WTM_CLK_SEC,	offsetof(struct vdso_data, wtm_clock_sec));
+-  DEFINE(VDSO_WTM_CLK_NSEC,	offsetof(struct vdso_data, wtm_clock_nsec));
+   DEFINE(VDSO_TB_SEQ_COUNT,	offsetof(struct vdso_data, tb_seq_count));
+   DEFINE(VDSO_CS_MONO_MULT,	offsetof(struct vdso_data, cs_mono_mult));
+-  DEFINE(VDSO_CS_RAW_MULT,	offsetof(struct vdso_data, cs_raw_mult));
+   DEFINE(VDSO_CS_SHIFT,		offsetof(struct vdso_data, cs_shift));
+   DEFINE(VDSO_TZ_MINWEST,	offsetof(struct vdso_data, tz_minuteswest));
+-  DEFINE(VDSO_TZ_DSTTIME,	offsetof(struct vdso_data, tz_dsttime));
+   DEFINE(VDSO_USE_SYSCALL,	offsetof(struct vdso_data, use_syscall));
+   BLANK();
+   DEFINE(TVAL_TV_SEC,		offsetof(struct timeval, tv_sec));
+-  DEFINE(TVAL_TV_USEC,		offsetof(struct timeval, tv_usec));
+   DEFINE(TSPEC_TV_SEC,		offsetof(struct timespec, tv_sec));
+-  DEFINE(TSPEC_TV_NSEC,		offsetof(struct timespec, tv_nsec));
+   BLANK();
+   DEFINE(TZ_MINWEST,		offsetof(struct timezone, tz_minuteswest));
+   DEFINE(TZ_DSTTIME,		offsetof(struct timezone, tz_dsttime));
+@@ -142,13 +126,9 @@ int main(void)
+   DEFINE(VCPU_WORKAROUND_FLAGS,	offsetof(struct kvm_vcpu, arch.workaround_flags));
+   DEFINE(CPU_GP_REGS,		offsetof(struct kvm_cpu_context, gp_regs));
+   DEFINE(CPU_USER_PT_REGS,	offsetof(struct kvm_regs, regs));
+-  DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
+-  DEFINE(VCPU_FPEXC32_EL2,	offsetof(struct kvm_vcpu, arch.ctxt.sys_regs[FPEXC32_EL2]));
+-  DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
+   DEFINE(HOST_CONTEXT_VCPU,	offsetof(struct kvm_cpu_context, __hyp_running_vcpu));
+ #endif
+ #ifdef CONFIG_CPU_PM
+-  DEFINE(CPU_SUSPEND_SZ,	sizeof(struct cpu_suspend_ctx));
+   DEFINE(CPU_CTX_SP,		offsetof(struct cpu_suspend_ctx, sp));
+   DEFINE(MPIDR_HASH_MASK,	offsetof(struct mpidr_hash, mask));
+   DEFINE(MPIDR_HASH_SHIFTS,	offsetof(struct mpidr_hash, shift_aff));
+-- 
+2.7.4
 
-We seem to be crashing on this code:
-
-		kasan_disable_current();
-		pointer = *ptr;
-		kasan_enable_current();
-
-Note: I had just disabled KASAN. Maybe Kconfig got confused.
-Will try building a fresh kernel.
-
-Regards.
-
-
-Unable to handle kernel paging request at virtual address ffffffc021e00000
-Mem abort info:
-  ESR = 0x96000006
-  Exception class = DABT (current EL), IL = 32 bits
-  SET = 0, FnV = 0
-  EA = 0, S1PTW = 0
-Data abort info:
-  ISV = 0, ISS = 0x00000006
-  CM = 0, WnR = 0
-swapper pgtable: 4k pages, 39-bit VAs, pgdp = (____ptrval____)
-[ffffffc021e00000] pgd=000000017e3ba803, pud=000000017e3ba803, pmd=0000000000000000
-Internal error: Oops: 96000006 [#1] PREEMPT SMP
-Modules linked in:
-CPU: 6 PID: 523 Comm: kmemleak Tainted: G S      W         5.0.0-rc1 #13
-Hardware name: Qualcomm Technologies, Inc. MSM8998 v1 MTP (DT)
-pstate: 80000085 (Nzcv daIf -PAN -UAO)
-pc : scan_block+0x70/0x190
-lr : scan_block+0x6c/0x190
-sp : ffffff8012e8bd20
-x29: ffffff8012e8bd20 x28: ffffffc0fdbaf018 
-x27: ffffffc022000000 x26: 0000000000000080 
-x25: ffffff8011aadf70 x24: ffffffc0f8cc8000 
-x23: ffffff8010dc8000 x22: ffffff8010dc8830 
-x21: ffffffc021e00ff9 x20: ffffffc0f8cc8050 
-x19: ffffffc021e00000 x18: 0000000000002409 
-x17: 0000000000000200 x16: 0000000000000000 
-x15: ffffff8010e14dd8 x14: 0000000000002406 
-x13: 000000004c4dd0c6 x12: ffffffc0f77dad58 
-x11: 0000000000000001 x10: ffffff8010d9e688 
-x9 : ffffff8010d9f000 x8 : ffffff8010d9e688 
-x7 : 0000000000000002 x6 : 0000000000000000 
-x5 : ffffff8011511c20 x4 : 00000000000026d1 
-x3 : ffffff8010e14d88 x2 : 5b36396f4e7d4000 
-x1 : 0000000000208040 x0 : 0000000000000000 
-Process kmemleak (pid: 523, stack limit = 0x(____ptrval____))
-Call trace:
- scan_block+0x70/0x190
- scan_gray_list+0x108/0x1c0
- kmemleak_scan+0x33c/0x7c0
- kmemleak_scan_thread+0x98/0xf0
- kthread+0x11c/0x120
- ret_from_fork+0x10/0x1c
-Code: f9000fb4 d503201f 97ffffd2 35000580 (f9400260) 
----[ end trace 176d6ed9d86a0c33 ]---
-note: kmemleak[523] exited with preempt_count 2
-
-
-
-ffffff80101e4e10 <scan_block>:
-ffffff80101e4e10:	a9ba7bfd 	stp	x29, x30, [sp, #-96]!
-ffffff80101e4e14:	910003fd 	mov	x29, sp
-ffffff80101e4e18:	a9025bf5 	stp	x21, x22, [sp, #32]
-ffffff80101e4e1c:	f9000bf3 	str	x19, [sp, #16]
-ffffff80101e4e20:	a90363f7 	stp	x23, x24, [sp, #48]
-ffffff80101e4e24:	f90027fa 	str	x26, [sp, #72]
-ffffff80101e4e28:	aa0003f3 	mov	x19, x0
-ffffff80101e4e2c:	aa0103f5 	mov	x21, x1
-ffffff80101e4e30:	aa1e03e0 	mov	x0, x30
-ffffff80101e4e34:	aa0203f8 	mov	x24, x2
-ffffff80101e4e38:	90005f37 	adrp	x23, ffffff8010dc8000 <slab_attrs+0xc8>
-ffffff80101e4e3c:	9120c2f6 	add	x22, x23, #0x830
-ffffff80101e4e40:	97fac264 	bl	ffffff80100957d0 <_mcount>
-ffffff80101e4e44:	91001e73 	add	x19, x19, #0x7
-ffffff80101e4e48:	927df273 	and	x19, x19, #0xfffffffffffffff8
-ffffff80101e4e4c:	d1001eb5 	sub	x21, x21, #0x7
-ffffff80101e4e50:	910142c0 	add	x0, x22, #0x50
-ffffff80101e4e54:	9408f627 	bl	ffffff80104226f0 <_raw_read_lock_irqsave>
-ffffff80101e4e58:	eb15027f 	cmp	x19, x21
-ffffff80101e4e5c:	aa0003fa 	mov	x26, x0
-ffffff80101e4e60:	540006a2 	b.cs	ffffff80101e4f34 <scan_block+0x124>  // b.hs, b.nlast
-ffffff80101e4e64:	f90023b9 	str	x25, [x29, #64]
-ffffff80101e4e68:	b000c659 	adrp	x25, ffffff8011aad000 <memblock_reserved_init_regions+0x908>
-ffffff80101e4e6c:	913dc339 	add	x25, x25, #0xf70
-ffffff80101e4e70:	f9000fb4 	str	x20, [x29, #24]
-ffffff80101e4e74:	d503201f 	nop
-ffffff80101e4e78:	97ffffd2 	bl	ffffff80101e4dc0 <scan_should_stop>
-ffffff80101e4e7c:	35000580 	cbnz	w0, ffffff80101e4f2c <scan_block+0x11c>
-*** ffffff80101e4e80:	f9400260 	ldr	x0, [x19]
-ffffff80101e4e84:	f94046c2 	ldr	x2, [x22, #136]
-ffffff80101e4e88:	eb00005f 	cmp	x2, x0
-ffffff80101e4e8c:	540004a8 	b.hi	ffffff80101e4f20 <scan_block+0x110>  // b.pmore
-ffffff80101e4e90:	f9401f21 	ldr	x1, [x25, #56]
-ffffff80101e4e94:	eb00003f 	cmp	x1, x0
-ffffff80101e4e98:	54000449 	b.ls	ffffff80101e4f20 <scan_block+0x110>  // b.plast
-ffffff80101e4e9c:	52800021 	mov	w1, #0x1                   	// #1
-ffffff80101e4ea0:	97fffce0 	bl	ffffff80101e4220 <lookup_object>
-ffffff80101e4ea4:	f100001f 	cmp	x0, #0x0
-ffffff80101e4ea8:	aa0003f4 	mov	x20, x0
-ffffff80101e4eac:	fa581004 	ccmp	x0, x24, #0x4, ne  // ne = any
-ffffff80101e4eb0:	54000380 	b.eq	ffffff80101e4f20 <scan_block+0x110>  // b.none
-ffffff80101e4eb4:	52800021 	mov	w1, #0x1                   	// #1
-ffffff80101e4eb8:	9408f4de 	bl	ffffff8010422230 <_raw_spin_lock_nested>
-ffffff80101e4ebc:	b940aa80 	ldr	w0, [x20, #168]
-ffffff80101e4ec0:	3100041f 	cmn	w0, #0x1
-ffffff80101e4ec4:	540004e0 	b.eq	ffffff80101e4f60 <scan_block+0x150>  // b.none
-ffffff80101e4ec8:	f9002bbb 	str	x27, [x29, #80]
-ffffff80101e4ecc:	b940ae81 	ldr	w1, [x20, #172]
-ffffff80101e4ed0:	6b00003f 	cmp	w1, w0
-ffffff80101e4ed4:	5400044b 	b.lt	ffffff80101e4f5c <scan_block+0x14c>  // b.tstop
-ffffff80101e4ed8:	f940529b 	ldr	x27, [x20, #160]
-ffffff80101e4edc:	aa1403e0 	mov	x0, x20
-ffffff80101e4ee0:	9408f578 	bl	ffffff80104224c0 <_raw_spin_unlock>
-ffffff80101e4ee4:	b40004fb 	cbz	x27, ffffff80101e4f80 <scan_block+0x170>
-ffffff80101e4ee8:	52800001 	mov	w1, #0x0                   	// #0
-ffffff80101e4eec:	aa1b03e0 	mov	x0, x27
-ffffff80101e4ef0:	97fffccc 	bl	ffffff80101e4220 <lookup_object>
-ffffff80101e4ef4:	f100001f 	cmp	x0, #0x0
-ffffff80101e4ef8:	aa0003f4 	mov	x20, x0
-ffffff80101e4efc:	fa401304 	ccmp	x24, x0, #0x4, ne  // ne = any
-ffffff80101e4f00:	54000400 	b.eq	ffffff80101e4f80 <scan_block+0x170>  // b.none
-ffffff80101e4f04:	52800021 	mov	w1, #0x1                   	// #1
-ffffff80101e4f08:	9408f4ca 	bl	ffffff8010422230 <_raw_spin_lock_nested>
-ffffff80101e4f0c:	aa1403e0 	mov	x0, x20
-ffffff80101e4f10:	97ffff2c 	bl	ffffff80101e4bc0 <update_refs>
-ffffff80101e4f14:	aa1403e0 	mov	x0, x20
-ffffff80101e4f18:	9408f56a 	bl	ffffff80104224c0 <_raw_spin_unlock>
-ffffff80101e4f1c:	f9402bbb 	ldr	x27, [x29, #80]
-ffffff80101e4f20:	91002273 	add	x19, x19, #0x8
-ffffff80101e4f24:	eb1302bf 	cmp	x21, x19
-ffffff80101e4f28:	54fffa88 	b.hi	ffffff80101e4e78 <scan_block+0x68>  // b.pmore
-ffffff80101e4f2c:	f9400fb4 	ldr	x20, [x29, #24]
-ffffff80101e4f30:	f94023b9 	ldr	x25, [x29, #64]
-ffffff80101e4f34:	9120c2e0 	add	x0, x23, #0x830
-ffffff80101e4f38:	aa1a03e1 	mov	x1, x26
-ffffff80101e4f3c:	91014000 	add	x0, x0, #0x50
-ffffff80101e4f40:	9408f6b8 	bl	ffffff8010422a20 <_raw_read_unlock_irqrestore>
-ffffff80101e4f44:	f9400bf3 	ldr	x19, [sp, #16]
-ffffff80101e4f48:	a9425bf5 	ldp	x21, x22, [sp, #32]
-ffffff80101e4f4c:	a94363f7 	ldp	x23, x24, [sp, #48]
-ffffff80101e4f50:	f94027fa 	ldr	x26, [sp, #72]
-ffffff80101e4f54:	a8c67bfd 	ldp	x29, x30, [sp], #96
-ffffff80101e4f58:	d65f03c0 	ret
-ffffff80101e4f5c:	f9402bbb 	ldr	x27, [x29, #80]
-ffffff80101e4f60:	aa1403e0 	mov	x0, x20
-ffffff80101e4f64:	97ffff17 	bl	ffffff80101e4bc0 <update_refs>
-ffffff80101e4f68:	aa1403e0 	mov	x0, x20
-ffffff80101e4f6c:	91002273 	add	x19, x19, #0x8
-ffffff80101e4f70:	9408f554 	bl	ffffff80104224c0 <_raw_spin_unlock>
-ffffff80101e4f74:	eb1302bf 	cmp	x21, x19
-ffffff80101e4f78:	54fff808 	b.hi	ffffff80101e4e78 <scan_block+0x68>  // b.pmore
-ffffff80101e4f7c:	17ffffec 	b	ffffff80101e4f2c <scan_block+0x11c>
-ffffff80101e4f80:	91002273 	add	x19, x19, #0x8
-ffffff80101e4f84:	f9402bbb 	ldr	x27, [x29, #80]
-ffffff80101e4f88:	eb1302bf 	cmp	x21, x19
-ffffff80101e4f8c:	54fff768 	b.hi	ffffff80101e4e78 <scan_block+0x68>  // b.pmore
-ffffff80101e4f90:	17ffffe7 	b	ffffff80101e4f2c <scan_block+0x11c>
-ffffff80101e4f94:	d503201f 	nop
-ffffff80101e4f98:	d503201f 	nop
-ffffff80101e4f9c:	d503201f 	nop
 
 _______________________________________________
 linux-arm-kernel mailing list
