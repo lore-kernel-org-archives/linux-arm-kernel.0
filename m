@@ -2,144 +2,70 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 19A89C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 09:51:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 93024C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 09:53:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D9B5E2086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 09:50:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5E7C02086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 09:53:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MfxYEiSS";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="t+Dk55GB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D9B5E2086D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JWeEUO3w"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5E7C02086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ZptRzNDN/VM3TTwRArKRSH6dFVGBh3bWWSr1BYSYJJU=; b=MfxYEiSSeQ/psk
-	SERgTZv/pGdvz/emW3Jm7tI0F5qkdg1WdBPh6rIUbELym4EdZ3omZUI68utu5eAvyLkF7eVXZdmLC
-	sfbNjW7vr6+6bS/dJ+eoaIbKYAwfNdwnMlHLWr5Og9NbEjmptb0xozSAtLfJri4UBSkt7vejAJTqp
-	4dVthqdlvz+tP0irBULKcltux064/X/2u9gjQyjRx0ihUYs+TWx12fgezhpXIbkmPVG3EQj5LrtG7
-	UEkNdQLwbFknUk/QNuCbE5yf5jhoS6O0DiGW5VXZNpfit7nKpSVtS8jj53rdwRBTNSso0cicz5oIL
-	m0MHMbXi0B3zMAFL7DoA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=N6ECcqk3XHUEHlvAeD8p++S9WHE3OxEVyqC2EK3GGc8=; b=JWeEUO3ws8UuSb
+	MMZNDF8KzR33SAvurh5Pp/FbT9gJUNPmOKwhWpNMGJyj+AkSufB/ZPSVpyT2FA2uqXncqDnx9icLa
+	u2fFqQRkwUaqTuoQMBLgXScDuElToUxN40ewqM2i38fV8UIKMkKpIh6W4CbbAHpvtZmOI7ilcGU04
+	xliztOOW0rMWRNB0Kr/3o1xXjIn6nOwJVE72J+yhotIuQJt6vs3xKbjvcjk6ZwQuumL5NP7H3gO3a
+	ipmOZh4iqOz3BmBSyKbvQ1qMeEQay9I++vcGYEJhljGtrta1K+aEeALPLW8jemjC2SZfSX0PM1BgZ
+	Sm8NBrGtehR7yHmz6hbw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkQni-000860-Dl; Fri, 18 Jan 2019 09:50:58 +0000
-Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+	id 1gkQq8-0008VA-Ep; Fri, 18 Jan 2019 09:53:28 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkQnd-00084o-AP
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 09:50:55 +0000
-Received: by mail-wm1-x341.google.com with SMTP id m22so3882554wml.3
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 18 Jan 2019 01:50:52 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=subject:to:cc:references:from:openpgp:autocrypt:organization
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=9B3qQz2jRrUxvqhO6MTS8K+j34dnh0frQL5SvmEk0mY=;
- b=t+Dk55GBtLHSU7i+zV8bcDYuC18GIQ0qolZaIgdfDEiH8dc6UDA2jhel8NSNz1xHGz
- NY50v/+cwoQdGwSVFtEoelTrPD0Dj97V5S2FOdtcupiHc28uK38wkhAF2FP8i2auBNUO
- Gtv8Q01jGttFhuPeDtpBiUX+5bF5TFoKp77pLlJn9WmB6qC8LEa4Dw+9KDOiAUmNWRqF
- KxQTKTlafaQx2FlNviLrZBKrOP/YFAzMtaDsEi3FrO1CXYpsYyFUfuRPKSppH4pxK1IF
- bqSk8drqSQ0Uk6KRBXG/jMqAf2pf13lbyA6VlYuLJTw1K3oZny1RBCLbvMRrTnQ63Gwh
- +NkQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :organization:message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=9B3qQz2jRrUxvqhO6MTS8K+j34dnh0frQL5SvmEk0mY=;
- b=hTnnsqJVz0iLsDi5Fdr6R/CWtBGLhRtpbzpNA5RKkUPZUWNI/6nrfpmsjpyKrPhWOO
- QTFk1AX56xU9vi5TPZsa7hQfYWyvxUOGmG6vnvGo2BUwegIaXiUTFJ/GjiLcBCL+T1fV
- FYAtntdi5wl67tU2JSc2dSXA12rA3DjvdFCwFbVxfmN+VPF1g7d8wqUPvOqFXv1RH5sD
- 6Ar8J7Y5fi+E42CI5Huwvzx6LzdxefmBcyivBOsdzZkbmn04Atim06iw22yarjNKyVOY
- J2ruO0rpxSByNMy0pXAzbu7DH0jKEEXBOworsXs7MSTc2oWLecnhxYcOAH2HVKcukjlL
- jSkQ==
-X-Gm-Message-State: AJcUukfmAZe43nn8yBMwr9hQKTV5ZqFQMcI34Y3ESW8WYwS13JGY0Csy
- UVKg89M5RWmdgfjNNiCfbeVhNQ==
-X-Google-Smtp-Source: ALg8bN7DpNhHkhHSh5wPjIYNFZsPnzXm2SrxFmUpA2yE8+99rLK+YWwoKKp+iYCxifg8ngmxxHBBOQ==
-X-Received: by 2002:a1c:1383:: with SMTP id 125mr15529112wmt.71.1547805051385; 
- Fri, 18 Jan 2019 01:50:51 -0800 (PST)
-Received: from [10.1.2.12] (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr.
- [90.63.244.31])
- by smtp.gmail.com with ESMTPSA id g67sm82072647wmd.38.2019.01.18.01.50.50
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 18 Jan 2019 01:50:50 -0800 (PST)
-Subject: Re: [PATCH 0/3] clk: meson: claim input clocks through DT
-To: Jerome Brunet <jbrunet@baylibre.com>
-References: <20190116175435.4990-1-jbrunet@baylibre.com>
-From: Neil Armstrong <narmstrong@baylibre.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=narmstrong@baylibre.com; prefer-encrypt=mutual; keydata=
- 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
- ZaTUOEkgIor5losDrePdPgE=
-Organization: Baylibre
-Message-ID: <3d579ebf-1fea-d54f-e253-217ac301de67@baylibre.com>
-Date: Fri, 18 Jan 2019 10:50:48 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gkQq3-0008TY-80
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 09:53:25 +0000
+Received: from ptx.hi.pengutronix.de ([2001:67c:670:100:1d::c0])
+ by metis.ext.pengutronix.de with esmtps
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1gkQpu-00073h-0Z; Fri, 18 Jan 2019 10:53:14 +0100
+Received: from ukl by ptx.hi.pengutronix.de with local (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1gkQpt-0006HG-KN; Fri, 18 Jan 2019 10:53:13 +0100
+Date: Fri, 18 Jan 2019 10:53:13 +0100
+From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
+To: Ryder Lee <ryder.lee@mediatek.com>
+Subject: Re: [PATCH v1 1/5] pwm: mediatek: add a property "mediatek,num-pwms"
+Message-ID: <20190118095313.pbpdn43hd76khg2x@pengutronix.de>
+References: <de316385a84e079d3b23891e61c959094b9fa7e5.1547781007.git.ryder.lee@mediatek.com>
+ <20190118075925.noilab6glzm3cig6@pengutronix.de>
+ <1547804574.8124.6.camel@mtkswgap22>
 MIME-Version: 1.0
-In-Reply-To: <20190116175435.4990-1-jbrunet@baylibre.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <1547804574.8124.6.camel@mtkswgap22>
+User-Agent: NeoMutt/20170113 (1.7.2)
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c0
+X-SA-Exim-Mail-From: ukl@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_015053_367750_37418512 
-X-CRM114-Status: GOOD (  12.24  )
+X-CRM114-CacheID: sfid-20190118_015323_480606_D49227B6 
+X-CRM114-Status: GOOD (  27.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -151,45 +77,150 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Stephen Boyd <sboyd@kernel.org>, Kevin Hilman <khilman@baylibre.com>,
- Michael Turquette <mturquette@baylibre.com>, linux-kernel@vger.kernel.org,
- patchwork-bot+notify@kernel.org, linux-amlogic@lists.infradead.org,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-pwm@vger.kernel.org, devicetree@vger.kernel.org,
+ Sean Wang <sean.wang@kernel.org>, Weijie Gao <weijie.gao@mediatek.com>,
+ linux-kernel@vger.kernel.org, Thierry Reding <thierry.reding@gmail.com>,
+ linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 16/01/2019 18:54, Jerome Brunet wrote:
-> Following the preparation series [0] sent in the last cycle, this
-> patchset adds clock input claim through DT in the gxbb and axg clock
-> controllers
-> 
-> [0]: https://lkml.kernel.org/r/20181203171640.12110-1-jbrunet@baylibre.com
-> 
-> Jerome Brunet (3):
->   clk: meson: gxbb: claim clock controller input clock from DT
->   clk: meson: axg: claim clock controller input clock from DT
->   clk: meson: ao-clkc: claim clock controller input clocks from DT
-> 
->  drivers/clk/meson/axg-aoclk.c   | 22 +++++++++++++++-----
->  drivers/clk/meson/axg.c         | 27 +++++++++++++++++-------
->  drivers/clk/meson/gxbb-aoclk.c  | 25 ++++++++++++++++------
->  drivers/clk/meson/gxbb.c        | 37 +++++++++++++++++++++------------
->  drivers/clk/meson/meson-aoclk.c | 37 ++++++++++++++++++++++++++++++++-
->  drivers/clk/meson/meson-aoclk.h | 12 +++++++++--
->  6 files changed, 125 insertions(+), 35 deletions(-)
-> 
+Hello Ryder,
 
-Looks good for me :
+On Fri, Jan 18, 2019 at 05:42:54PM +0800, Ryder Lee wrote:
+> On Fri, 2019-01-18 at 08:59 +0100, Uwe Kleine-K=F6nig wrote:
+> > Hello,
+> > =
 
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+> > On Fri, Jan 18, 2019 at 11:24:41AM +0800, Ryder Lee wrote:
+> > > This adds a property "mediatek,num-pwms" to avoid having an endless
+> > > list of compatibles with no differences for the same driver.
+> > > =
 
-and
+> > > Thus, the driver should have backwards compatibility to older DTs.
+> > =
 
-Applied on next/drivers for Linux 5.1-rc1
+> > I still think Thierry should bless "num-pwms" without vendor prefix.
+> =
 
-Neil
+> Okay.
+> =
+
+> > > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> > > ---
+> > > Changes since v1: add some checks for backwards compatibility.
+> > > ---
+> > >  drivers/pwm/pwm-mediatek.c | 27 ++++++++++++++++++---------
+> > >  1 file changed, 18 insertions(+), 9 deletions(-)
+> > > =
+
+> > > diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
+> > > index eb6674c..81b7e5e 100644
+> > > --- a/drivers/pwm/pwm-mediatek.c
+> > > +++ b/drivers/pwm/pwm-mediatek.c
+> > > @@ -55,7 +55,7 @@ enum {
+> > >  };
+> > >  =
+
+> > >  struct mtk_pwm_platform_data {
+> > =
+
+> > Unrelated to this patch: This name is bad. This struct is not used as
+> > platform_data and so should better be named mtk_pwm_of_data. While at
+> > criticizing existing stuff: I'd prefer pwm_mediatek as common prefix to
+> > match the filename.
+> =
+
+> I think we can take care about that in another patch.
+
+That's what I wanted to say, right. Do you follow up?
+
+> > > -	unsigned int num_pwms;
+> > > +	unsigned int num_pwms;	/* it should not be used in the future SoCs =
+*/
+> > =
+
+> > I'd drop this comment in favour of a runtime warning.
+> =
+
+> Sorry, I can't get you here.
+
+I'd do a
+
+	dev_warn(dev, "dt didn't specify number of PWMs, falling back to %d\n", pc=
+->soc->num_pwms);
+
+to make people aware that updating the dt would be nice.
+
+> =
+
+> > >  	bool pwm45_fixup;
+> > >  	bool has_clks;
+> > >  };
+> > > @@ -226,27 +226,36 @@ static void mtk_pwm_disable(struct pwm_chip *ch=
+ip, struct pwm_device *pwm)
+> > >  =
+
+> > >  static int mtk_pwm_probe(struct platform_device *pdev)
+> > >  {
+> > > -	const struct mtk_pwm_platform_data *data;
+> > > +	struct device_node *np =3D pdev->dev.of_node;
+> > >  	struct mtk_pwm_chip *pc;
+> > >  	struct resource *res;
+> > > -	unsigned int i;
+> > > +	unsigned int i, num_pwms;
+> > >  	int ret;
+> > >  =
+
+> > >  	pc =3D devm_kzalloc(&pdev->dev, sizeof(*pc), GFP_KERNEL);
+> > >  	if (!pc)
+> > >  		return -ENOMEM;
+> > >  =
+
+> > > -	data =3D of_device_get_match_data(&pdev->dev);
+> > > -	if (data =3D=3D NULL)
+> > > -		return -EINVAL;
+> > > -	pc->soc =3D data;
+> > > +	pc->soc =3D of_device_get_match_data(&pdev->dev);
+> > =
+
+> > This might return NULL which ...
+> =
+
+> The only way to call probe() is to match an entry in
+> mtk_pwm_of_match[], so match cannot be NULL.
+
+(<pedantic>Theoretically the driver can be probed by device name, but
+that is not what I meant here.</pedantic>).
+
+You're right, as long as all entries in mtk_pwm_of_match have a non-NULL
+.data entry, you're fine. I somehow thought there might be some without
+one. I wouldn't oppose to check for that anyhow as a defensive measure.
+
+> > > [...]
+> > > +	/* Check if we have set 'num-pwms' in DTs. */
+> > > +	ret =3D of_property_read_u32(np, "mediatek,num-pwms", &num_pwms);
+> > > +	if (ret < 0) {
+> > > +		/* If no, fallback to use SoC data for backwards compatibility. */
+> > > +		if (pc->soc->num_pwms) {
+> > =
+
+> > ... here then results in a NULL pointer dereference. I think you want
+> =
+
+> So we have no chance to get a NULL pointer, right?
+
+Ack.
+
+Best regards
+Uwe
+
+-- =
+
+Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 
 _______________________________________________
 linux-arm-kernel mailing list
