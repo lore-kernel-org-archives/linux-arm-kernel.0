@@ -2,66 +2,81 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 68845C5AE5E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 22:22:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4B75BC4160E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 22:29:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 38DB120449
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 22:22:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1AB5F2054F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 22:29:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CwuUo8PR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 38DB120449
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KE+grrl+";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="S9Vm3z4B"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1AB5F2054F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=cThvZyRjJ8raKyozBnGIRYXU5Rhf0f7SQBqsJj2d+DI=; b=CwuUo8PR5HDUxtwycvEAz2wn+
-	2Pzc+Sehhzptq2Fr+5eP6rh38ZuUxPhgY/mAM6Ojabq2ntkTJPdGWPweOJZfug0XoM2mLD3F+npsk
-	FdGHE63K09OsV+QfeDSM0LtXaNt3D6tFT2Yy9IjF0AGf0XQC9nznJaS+YekcZDvUXL6XuGlLuKYum
-	wYK68vo5H+tPtHGOCUY9F5PcJn2OYLIHCV+0/UBxA9PoMQMKOHzimVgQ9Trk5LmER1m3XQf8wfJ4e
-	Ak7cv8fv1ll40VG/HuzbrL9lPOdPSxYdqqTK9soRIozY2WsJ0nHBOfvWGOba34ZIkxNbNE2CRfnbc
-	hpGj3Rz4g==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=3Fdxm2wBonwALOSZL3aUOH4eZNU/6DXmST5JPXhm294=; b=KE+grrl+/mv9vN
+	MQIMkRnOu1476JuJYU79cc/DWwy4LgD0rv2GJ2sdOeMKQap88SUfqbzgfnwL1ycALFIbuu37r+x8Y
+	xlOitFJh+Ov8xj215et6dhizclAwUqDxXacw83m5ZxG1KFjrzkki+auriqha4F5fuQbBagAOq3kab
+	VN7tdxhzrL6IkB/oeyYS0wC/8FRoRZEuReHiiLXYlvd8Yx3ctEXXIOERzPiY65jTzJuVACGZglkzh
+	+6Db85ue1cTDY0CFfqZ9DQeSN5TWDBiV+V5pmJVlhqFWSUZs5YCPrdWDf+sbvn7IKFh88GA/+99WF
+	3g7nAwqeCGRuiDJLgFfg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkcWt-0007aD-Ss; Fri, 18 Jan 2019 22:22:23 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkcWq-0007ZP-Px
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 22:22:22 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id EE51B80D;
- Fri, 18 Jan 2019 14:22:17 -0800 (PST)
-Received: from [192.168.100.241] (usa-sjc-mx-foss1.foss.arm.com
- [217.140.101.70])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 15E893F7BE;
- Fri, 18 Jan 2019 14:22:17 -0800 (PST)
-Subject: Re: [PATCH v3 0/7] arm64: add system vulnerability sysfs entries
-To: Stefan Wahren <stefan.wahren@i2se.com>, marc.zyngier@arm.com
-References: <20190109235544.2992426-1-jeremy.linton@arm.com>
- <884332236.499392.1547581848222@email.ionos.de>
- <c99f5da9-259c-3fc5-6150-7327ba0ff429@arm.com>
- <575913854.422488.1547834735236@email.ionos.de>
-From: Jeremy Linton <jeremy.linton@arm.com>
-Message-ID: <3af70b49-22e7-f394-1b35-ce3c86640bb7@arm.com>
-Date: Fri, 18 Jan 2019 16:22:16 -0600
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.7.0
+	id 1gkcdg-00018m-Nv; Fri, 18 Jan 2019 22:29:24 +0000
+Received: from mail-ot1-x342.google.com ([2607:f8b0:4864:20::342])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gkcdc-00018N-KC; Fri, 18 Jan 2019 22:29:22 +0000
+Received: by mail-ot1-x342.google.com with SMTP id n8so15807977otl.6;
+ Fri, 18 Jan 2019 14:29:20 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=googlemail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=xuPmhton+yX3VA6muOEeXBbfE8RTlQObRyhUQXHiKAI=;
+ b=S9Vm3z4BNCRj2UH7sKeYVNcKp749mkNvbKeIajajDIMj3p6qhIL8/xZ9wGNqq8rQHI
+ 9cOgtQliDJKqYfxcb+bWc5xKVrqdjtegGvDFwUnoqK23PliOwg0LEeaI8tt+vGKSkXiD
+ dWf1kCtRn7nPdyMENuhdZlZFRKjeQGuIVQUxrZRN2EHYbtRCYh19JXf9kbgqXzfmNCX/
+ BbqGcNCwbg92n7WMHGmWEv+O6xy3YvlU0D2vJua0R0aaoY4P0rFOM7R592fWXHXhBr8W
+ cDvlB6wCTETA8hqyuN3c2VgOcawyaWtGFr9BLwjhLb7GwQHaiXc2VBBEC4ledKEY71R8
+ 6AFw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=xuPmhton+yX3VA6muOEeXBbfE8RTlQObRyhUQXHiKAI=;
+ b=SrnroCEPzfFqL/ktXeZzNeiRHIjBFV8axXZ7XSOjX4ieadOMZ1ZcvgdtLPQ0UusopR
+ rnsSo/a2U3S8FiMe4aJ8g9Cg4Ij3NBkEV0rpMncawakznIEwee9LC2uPjtMssrxYSooY
+ 8dTLDX64xfnPXNb3Vc+NASHwtY+CQDhtcfQED+hdvUh7hRj0gikhRqBkyLW/FBlMDm0o
+ U7wHbslTJa9TDJ8qEnU8X+2NNqGIl0Si8UG6UQoKJA0xLRX8p+XTNyLulHGLvb3rlhvJ
+ wd03JTKiw7znO5cvpkPMQb2gLSP6z2iLvQTDJZXZ3qVwp7w5ZpY9AodK2+4fD3CiZqP9
+ 5Y5g==
+X-Gm-Message-State: AJcUukfRrHVttxEe0gqFbEWKWJdKkiv3pdHzIQntFOJVCsgNOPSdCHXI
+ st04+KvtpAV8ncHcIksmaewA+S0vF1EMRHDjMAg=
+X-Google-Smtp-Source: ALg8bN4d5HjHdtfOJ/6DIUBXOrk78hsXNjOMxJAiSXWGu4Ke5iRldaWx9dI1JkQakC2EzKqnce2wIn/ZBnn53shz6Vs=
+X-Received: by 2002:a9d:a48:: with SMTP id 66mr12962970otg.308.1547850559350; 
+ Fri, 18 Jan 2019 14:29:19 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <575913854.422488.1547834735236@email.ionos.de>
-Content-Language: en-US
+References: <20190113181808.5768-1-linux.amoon@gmail.com>
+In-Reply-To: <20190113181808.5768-1-linux.amoon@gmail.com>
+From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Date: Fri, 18 Jan 2019 23:29:08 +0100
+Message-ID: <CAFBinCCD4o0cXEht_7bgV6moCK2WfVRvZq8UUZD3gDo-TaRKbQ@mail.gmail.com>
+Subject: Re: [PATCH 1/2] ARM: dts: meson8b: odroidc1: Enable usb phy node
+To: Anand Moon <linux.amoon@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_142220_849493_F913E3BD 
-X-CRM114-Status: GOOD (  21.20  )
+X-CRM114-CacheID: sfid-20190118_142920_705048_CBF44157 
+X-CRM114-Status: GOOD (  19.97  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,124 +88,155 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mlangsdo@redhat.com, julien.thierry@arm.com, catalin.marinas@arm.com,
- suzuki.poulose@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
- steven.price@arm.com, shankerd@codeaurora.org, ykaukab@suse.de,
- dave.martin@arm.com, linux-arm-kernel@lists.infradead.org
+Cc: devicetree@vger.kernel.org, Neil Armstrong <narmstrong@baylibre.com>,
+ Kevin Hilman <khilman@baylibre.com>, linux-kernel@vger.kernel.org,
+ Rob Herring <robh+dt@kernel.org>,
+ Emiliano Ingrassia <ingrassia@epigenesys.com>,
+ linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org,
+ Jerome Brunet <jbrunet@baylibre.com>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 01/18/2019 12:05 PM, Stefan Wahren wrote:
-> Hi,
-> 
->> Jeremy Linton <jeremy.linton@arm.com> hat am 15. Januar 2019 um 22:21 geschrieben:
->>
->>
->> Hi,
->>
->> On 01/15/2019 01:50 PM, Stefan Wahren wrote:
->>> Hi Jeremy,
->>>
->>>> Jeremy Linton <jeremy.linton@arm.com> hat am 10. Januar 2019 um 00:55 geschrieben:
->>>>
->>>>
->>>> Arm64 machines should be displaying a human readable
->>>> vulnerability status to speculative execution attacks in
->>>> /sys/devices/system/cpu/vulnerabilities
->>>>
->>>> This series enables that behavior by providing the expected
->>>> functions. Those functions expose the cpu errata and feature
->>>> states, as well as whether firmware is responding appropriately
->>>> to display the overall machine status. This means that in a
->>>> heterogeneous machine we will only claim the machine is mitigated
->>>> or safe if we are confident all booted cores are safe or
->>>> mitigated.
->>>>
->>>
->>> i applied this v3 series and Marc's v2 series.
->>>
->>> Now i'm getting the following on a Raspberry Pi 3 B+ :
->>>
->>> meltdown:Not affected
->>> spec_store_bypass:Not affected
->>> spectre_v1:Mitigation: __user pointer sanitization
->>>
->>> So the entries l1tf and spectre_v2 disappeared.
->>
->> Yes, the l1tf entry should be gone.
->>
->> I believe there is a problem with the "1/2 advertise.." patch in that
->> the 'arm64_requested_vuln_attrs |=' line needs to be hoisted  to the top
->> of check_branch_predictor() and the '__spectrev2_safe = false' line
->> needs to be hoisted 6 lines immediately above "/* Fallback to firmware
->> detection*/"
-> 
-> a snippet or a new version would be nice
+Hi Anand,
 
-Sure, I've got another version, to be posted soon (probably Tue of next 
-week).
+thank you for this patch!
 
-In the meantime, Marc's tree should work with the following fix:
+On Sun, Jan 13, 2019 at 7:18 PM Anand Moon <linux.amoon@gmail.com> wrote:
+>
+> Add missing vbus-supply link to phy controller for usb_phy0
+> and usb_phy1 nodes, this changes fixed the power issue
+> on usb ports usb, changes help fix usb reset warning.
+I trust you on the fact that GPIOAO_5 controls VBUS of USB0 and USB1
 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index b44f87e7360d..7cfd34b2c0e5 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -286,11 +286,15 @@ static int detect_harden_bp_fw(void)
-  }
-  #endif /* CONFIG_HARDEN_BRANCH_PREDICTOR */
+to me the schematics are not 100% clear or I'm bad at interpreting them:
+- I'll refer to odroid-c1+_rev0.4_20150615.pdf
+- page 1 lists GPIOAO.BIT5 as input for the PWREN signal of the
+USB_OTG controller (usb0)
+- page 1 also shows a PWREN signal in the USB_HOST controller (usb1)
+but not it's input
+- based on your patch I assume that PWREN is the same signal for both
+USB controllers
 
-+#if defined(CONFIG_ARM64_SSBD) || \
-+       defined(CONFIG_GENERIC_CPU_VULNERABILITIES)
-+static bool __ssb_safe = true;
-+#endif
-+
-  #ifdef CONFIG_ARM64_SSBD
-  DEFINE_PER_CPU_READ_MOSTLY(u64, arm64_ssbd_callback_required);
+> [  821.991470] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+> [  825.243385] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+> [  828.151310] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+> [  830.991241] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+>
+> Fixes: 2eb79a4d15ff (ARM: dts: meson: enabling the USB Host controller on Odroid-C1/C1+ board)
+you already split your original patch into two, however I suggest
+splitting these patches differently:
+- this one (personally I would choose "ARM: dts: meson8b: odroidc1:
+fix USB VBUS supplies" as title), which contains the Fixes tag, adds
+the "usb_vbus" and references it in the "usb0" and "usb1" nodes
+- enables usb0_phy and usb0 as part of your second patch (I would call
+that "ARM: dts: meson8b: odroidc1: enable the OTG capable USB
+controller")
 
-  int ssbd_state __read_mostly = ARM64_SSBD_KERNEL;
--static bool __ssb_safe = true;
+> Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> Cc: Jerome Brunet <jbrunet@baylibre.com>
+> Cc: Neil Armstrong <narmstrong@baylibre.com>
+> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> ---
+> Rebased on Kevin's amlogic/v5.0/fixes branch
+>
+> [alarm@archl-c1t ~]$ lsusb -t
+> /:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=dwc2/1p, 480M
+>     |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/4p, 480M
+>         |__ Port 1: Dev 4, If 0, Class=Mass Storage, Driver=usb-storage, 480M
+>         |__ Port 3: Dev 3, If 0, Class=Video, Driver=uvcvideo, 480M
+>         |__ Port 3: Dev 3, If 1, Class=Video, Driver=uvcvideo, 480M
+>         |__ Port 3: Dev 3, If 2, Class=Audio, Driver=snd-usb-audio, 480M
+>         |__ Port 3: Dev 3, If 3, Class=Audio, Driver=snd-usb-audio, 480M
+> [alarm@archl-c1t ~]$
+> [alarm@archl-c1t ~]$ lsusb -v|egrep "^Bus|MaxPower"
+> Couldn't open device, some information will be missing
+> Bus 001 Device 003: ID 1b71:0056 Fushicai
+>     MaxPower              500mA
+> Couldn't open device, some information will be missing
+> Bus 001 Device 004: ID 152d:0578 JMicron Technology Corp. / JMicron USA Technology Corp. JMS567 SATA 6Gb/s bridge
+>     MaxPower               30mA
+> Couldn't open device, some information will be missing
+> Couldn't open device, some information will be missing
+> Bus 001 Device 002: ID 05e3:0610 Genesys Logic, Inc. 4-port hub
+>     MaxPower              100mA
+> Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+>     MaxPower                0mA
+> ---
+>  arch/arm/boot/dts/meson8b-odroidc1.dts | 23 +++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/meson8b-odroidc1.dts b/arch/arm/boot/dts/meson8b-odroidc1.dts
+> index 0f0a46ddf3ff..a49a8509b288 100644
+> --- a/arch/arm/boot/dts/meson8b-odroidc1.dts
+> +++ b/arch/arm/boot/dts/meson8b-odroidc1.dts
+> @@ -83,6 +83,19 @@
+>                 regulator-max-microvolt = <5000000>;
+>         };
+>
+> +       usb_vbus: regulator-usb-vbus {
+please add a comment here with some details about the regulator and
+add a hint that the signal in the schematics is called "PWREN"
 
-  static const struct ssbd_options {
-         const char      *str;
-@@ -569,6 +573,8 @@ check_branch_predictor(const struct 
-arm64_cpu_capabilities *entry, int scope)
+> +               compatible = "regulator-fixed";
+> +
+> +               regulator-name = "USB_VBUS";
+> +               regulator-min-microvolt = <5000000>;
+> +               regulator-max-microvolt = <5000000>;
+> +
+> +               vin-supply = <&p5v0>;
+> +
+> +               gpio = <&gpio_ao GPIOAO_5 GPIO_ACTIVE_HIGH>;
+> +               enable-active-high;
+> +       };
+> +
+>         tflash_vdd: regulator-tflash_vdd {
+>                 /*
+>                  * signal name from schematics: TFLASH_VDD_EN
+> @@ -293,8 +306,18 @@
+>         pinctrl-names = "default";
+>  };
+>
+> +&usb0_phy {
+> +       status = "okay";
+> +       vbus-supply = <&usb_vbus>;
+> +};
+> +
+>  &usb1_phy {
+>         status = "okay";
+> +       vbus-supply = <&usb_vbus>;
+> +};
+> +
+> +&usb0 {
+> +       status = "okay";
+>  };
+I believe there's a problem with the usb/usb_phy nodes here. on my
+Odroid-C1 this results in:
+# cat /sys/kernel/debug/regulator/regulator_summary | grep USB_VBUS
+   USB_VBUS                      0    0      0 unknown  5000mV     0mA
+ 5000mV  5000mV
+(open count is 0)
 
-         WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
+if I move "vbus-supply" to the "usb1" node (just as an example) then I get:
+# cat /sys/kernel/debug/regulator/regulator_summary | grep USB_VBUS
+   USB_VBUS                      1    1      0 unknown  5000mV     0mA
+ 5000mV  5000mV
 
-+       arm64_requested_vuln_attrs |= VULN_SPECTREV2;
-+
-         /* If the CPU has CSV2 set, we're safe */
-         if 
-(cpuid_feature_extract_unsigned_field(read_cpuid(ID_AA64PFR0_EL1),
-                                                  ID_AA64PFR0_CSV2_SHIFT))
-@@ -578,17 +584,17 @@ check_branch_predictor(const struct 
-arm64_cpu_capabilities *entry, int scope)
-         if (is_midr_in_range_list(read_cpuid_id(), spectre_v2_safe_list))
-                 return false;
+unfortunately neither your original patch nor the modified version
+seem to enable USB VBUS on my Odroid-C1.
+I have documented my findings already back in December, see "USB
+issues on Odroid-C1" [0]
+help on that would be highly appreciated :)
 
-+       __spectrev2_safe = false;
-+
-         /* Fallback to firmware detection */
-         need_wa = detect_harden_bp_fw();
-         if (!need_wa)
-                 return false;
-
--       __spectrev2_safe = false;
--
-         if (need_wa < 0)
-                 pr_warn_once("ARM_SMCCC_ARCH_WORKAROUND_1 missing from 
-firmware\n");
-
--       arm64_requested_vuln_attrs |= VULN_SPECTREV2;
-+
-
-         return (need_wa > 0);
-  }
+on which board revision have you tested this patch?
 
 
+Regards
+Martin
+
+
+[0] http://lists.infradead.org/pipermail/linux-amlogic/2018-December/009451.html
 
 _______________________________________________
 linux-arm-kernel mailing list
