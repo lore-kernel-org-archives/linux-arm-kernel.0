@@ -2,78 +2,75 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_ADSP_ALL,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 69057C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 15:01:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 17575C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 15:06:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3BC6320896
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 15:01:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C9D662086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 15:06:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="s1iVfsfS";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="LAHaOHMn"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3BC6320896
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q4xR9H9D";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=plaes.org header.i=@plaes.org header.b="kV5juQnN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C9D662086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=plaes.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=PBrM4WmHv4H9kpgoKqd9OukLbO13XuJwMoLvAhqvZe8=; b=s1iVfsfS4HMTTD
-	fiNTgtZEGTgQPOxZIgdkl9Qu6tr9aVabUsd3H68pwqKOnorcWA+M9owAX6c0M2pCorqEWtE7+XcqR
-	J8o57F+lTYYXmvg0dvjA8N1DsOeQFnWWmci3ZUPJhTQ8ctLzpO+JVAfBG1nYmI2FV+xYmnG2GVoiP
-	TB4AzFd4ln3BQ/WsVe+SSfAOWu2LHhI0fvSn9ULecp06Hf5fUE6FkvDsZ2rdnyNcjpDtLorvFedk3
-	1Q25FeTUED7kHcqn6hV20B5WW21mEnySJXcXSZYg6pdKhYiQZQO2dEKabMJufs3d1Uy/nWgWoRrPm
-	yTcLz4W2m6hmCFdHCMOw==;
+	List-Owner; bh=KxVnkjbbeRk/RKXqNY8ZIbqSDpytbzwPfaEzsK1By5Y=; b=q4xR9H9DE303OI
+	uajzeBb0sOhKfE+QhCkZ/DBc96okKqjGE9i7SrvF8Xja8FfqwYcCl/2eqUxv2KCp6d7M4V8IqPUJT
+	umYQlQqrq7HDKQtXYC5+Dyv3mMhYc0vxKoSWVIr+vsSbR9ELv0JtN3/HQHm9rStL2ppryIHLCnz39
+	/RSglBcsdthgdCWT15P3cJRBgkw5zlgnD6Yn9Ilbe2fAuXyWWkaNKa76UnnVFkFNlgj5l0RviUPf5
+	rMNWWAxHB10j7p6vm23FHqXT62ZdTnC/EG5Q9CEDUyluAL0YHh6puC6KFQsnAzktjwR9Mk+nb5wAJ
+	wCIzOW1GJItz6Cpx5v7Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkVea-0007RN-Om; Fri, 18 Jan 2019 15:01:52 +0000
-Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+	id 1gkVjJ-0001dG-38; Fri, 18 Jan 2019 15:06:45 +0000
+Received: from plaes.org ([188.166.43.21])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkVdg-00068b-4R
- for linux-arm-kernel@bombadil.infradead.org; Fri, 18 Jan 2019 15:00:56 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
- References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
- Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=qwJRIOWar7vb382ii8nfiO9ZfiXZe7++IhbcYp9fHUo=; b=LAHaOHMnbvajNHNoTvTJZyu9d8
- N0e7HXP+0v+GUujfCRhfSNWBEOoU7pBDkOlkcFCCjNkqrmDsoN6sry4C0qG7rKBv0W033SqKdt+/m
- 01VtIXdraqaZP3c1mXikT135biGuTRJ0p2iPN6lIcoYcN+LoORj76A2GEE1Aowxpf8i1tlgaR8iup
- YDpv97AAbN0jr/2WYlcp7Eiq9GAwT8R5TZrTL6qPJxjMKfgjxNwtvJp5Sw7aFUlXk70lRtvv8XY+H
- Yl4AT1MWWFh3PVJurqD9Dbc63cEx9IxZJe31OJgqJnOSIRClinn6UYj3pC2NH+zQs7CR2I3jgXDmh
- zKmtMaQg==;
-Received: from mail.bootlin.com ([62.4.15.54])
- by casper.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkVVU-0007Fj-6N
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 14:52:29 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 0CB0720E4A; Fri, 18 Jan 2019 15:52:27 +0100 (CET)
-Received: from localhost.localdomain
- (aaubervilliers-681-1-37-87.w90-88.abo.wanadoo.fr [90.88.156.87])
- by mail.bootlin.com (Postfix) with ESMTPSA id 38F0E20C3F;
- Fri, 18 Jan 2019 15:51:46 +0100 (CET)
-From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-To: dri-devel@lists.freedesktop.org, linux-arm-kernel@lists.infradead.org,
- linux-kernel@vger.kernel.org, linux-sunxi@googlegroups.com
-Subject: [PATCH RESEND v5 20/23] drm/sun4i: Make COEF_RDY conditional
-Date: Fri, 18 Jan 2019 15:51:30 +0100
-Message-Id: <20190118145133.21281-21-paul.kocialkowski@bootlin.com>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190118145133.21281-1-paul.kocialkowski@bootlin.com>
-References: <20190118145133.21281-1-paul.kocialkowski@bootlin.com>
+ id 1gkVe2-0006sH-I0
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 15:01:25 +0000
+Received: from plaes.org (localhost [127.0.0.1])
+ by plaes.org (Postfix) with ESMTPSA id DE3CF40377;
+ Fri, 18 Jan 2019 14:51:27 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=plaes.org; s=mail;
+ t=1547823087; bh=RqnCgZM+q0oVG4KhvJNi0zRpg3bH0DGsbu3kddUIzWE=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=kV5juQnNa1ZZqoSqwhqL+g8+JBwKsumFFWhZFT6ZFEkomWWzTjypGVAzBwBzLj7U9
+ wZLjw4lYwf7SWNZeadkFBmtIzOoeQEYxIi3K5+8L4V4+cWjJfD+dh9GqLRVLmf6wzf
+ ZQfe+jbYRItzpqTHybMIlmOBr4hx9Ut43JpC1lnqSriIWIFyWNL2694xdA7tsB030T
+ VC/RkwaDdQg1/ROm8HiVd+jkcnOEs6Gb/UxCXPzbRUIbwK142qwh2JBrYMqDH/1Ayf
+ EBsDQ4Wch3zqTlx5kBHfFR9Af8rM3do8KLzt3Hp/6j+NCsiMmZPHhbdLx0uZ42FmkG
+ PSBcCUZEpVkSg==
+Date: Fri, 18 Jan 2019 14:51:26 +0000
+From: Priit Laes <plaes@plaes.org>
+To: Maxime Ripard <maxime.ripard@bootlin.com>
+Subject: Re: [linux-sunxi] Re: HDMI/DVI spurious failure
+Message-ID: <20190118145126.mpjz5t5hjqqpgzys@plaes.org>
+References: <20190114132934.rywqqtjarbf6fgcr@plaes.org>
+ <20190115094951.e7jnjpibj5tcp5pz@flea>
+ <20190116075854.o2kme5nxq5kckwem@plaes.org>
+ <20190116192442.qz4xi2ky6axgiyvg@flea>
+ <20190116203516.s7pisy4miaclo63u@plaes.org>
+ <20190117113340.ydszal5c3nlrqr47@flea>
+ <20190118101053.gkxpfymsjzw3ptxf@plaes.org>
+ <20190118140418.m5mliyvddfdfju3v@flea>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20190118140418.m5mliyvddfdfju3v@flea>
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_145228_272209_1ACEB57A 
-X-CRM114-Status: GOOD (  13.78  )
+X-CRM114-CacheID: sfid-20190118_070119_079470_7D927538 
+X-CRM114-Status: GOOD (  28.37  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,66 +82,96 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- David Airlie <airlied@linux.ie>, Chen-Yu Tsai <wens@csie.org>,
- Daniel Vetter <daniel@ffwll.ch>, Sean Paul <sean@poorly.run>
+Cc: linux-arm-kernel@lists.infradead.org, linux-sunxi@googlegroups.com,
+ Chen-Yu Tsai <wens@csie.org>, Jonathan Liu <net147@gmail.com>,
+ dri-devel@lists.freedesktop.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@bootlin.com>
+On Fri, Jan 18, 2019 at 03:04:18PM +0100, Maxime Ripard wrote:
+> On Fri, Jan 18, 2019 at 10:10:53AM +0000, Priit Laes wrote:
+> > > > > > > It doesn't look related to the clock rate itself, since it doesn't
+> > > > > > > change between the two cases. However, in one case the DDC clock is
+> > > > > > > enabled and in the other it's disabled.
+> > > > > > > 
+> > > > > > > Was it taken at the same time? Maybe you can try with that patch?
+> > > > > > > http://code.bulix.org/z7jmkm-555344?raw
+> > > > > > 
+> > > > > > Thanks, after doing ~50+ boots I haven't seen a single failure.
+> > > > > > 
+> > > > > > Previously I had following failure cases which are now both fixed:
+> > > > > > 
+> > > > > > a) Linux without u-boot HDMI, where one in every 6-7 boots failed.
+> > > > > > b) u--boot with hdmi enabled switching to simplefb and then switching
+> > > > > > to kms, where previously all boots ended up with garbled screen.
+> > > > > 
+> > > > > So it's not really a fix, but it really looks like the clock is not
+> > > > > enabled when it should.
+> > > > > 
+> > > > > Can you describe your test scenario a bit more? What are you doing
+> > > > > exactly, just booting? When do you start using the display? When did
+> > > > > you capture the debugfs output that you pasted?
+> > > > 
+> > > > Display is already connected via HDMI to the board. I don't really
+> > > > remove it, I just boot the device and let it start Xorg.
+> > > > Meanwhile I just ssh into the device and capture debugfs output.
+> > > > See my 3 testing scenarios below.
+> > > > 
+> > > > Kernel also includes one extra patch to fall back to DDC, in case HPD
+> > > > fails. Mostly the same I already submitted last November [1].
+> > > 
+> > > Do you have the same issue without that patch?
+> > 
+> > Can't really test this display without this patch and I do not have other
+> > HDMI/DVI screens. And this issue does not happen with other HDMI displays
+> > that I have here.
+> 
+> Can't you just force the monitor to be reported as present? It's not
+> great and we don't want to merge it, but that would allow you to test
+> that setup without too many interferences.
 
-The COEF_RDY bit isn't found in all the SoCs featuring some variant of the
-frontend.
+Baseline is clean u-boot / linux. U-boot does not detect/enable display.
 
-Add it to our quirks structure.
+1) Booting Linux with drm.debug=0xe
 
-Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
----
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 9 +++++----
- drivers/gpu/drm/sun4i/sun4i_frontend.h | 1 +
- 2 files changed, 6 insertions(+), 4 deletions(-)
+* Linux does not detect/enable display
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index 7a1095b004d4..86c5033102b9 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -96,10 +96,11 @@ static void sun4i_frontend_scaler_init(struct sun4i_frontend *frontend)
- 			     sun4i_frontend_vert_coef[i]);
- 	}
- 
--	regmap_write_bits(frontend->regs,
--			  SUN4I_FRONTEND_FRM_CTRL_REG,
--			  SUN4I_FRONTEND_FRM_CTRL_COEF_RDY,
--			  SUN4I_FRONTEND_FRM_CTRL_COEF_RDY);
-+	if (frontend->data->has_coef_rdy)
-+		regmap_write_bits(frontend->regs,
-+				  SUN4I_FRONTEND_FRM_CTRL_REG,
-+				  SUN4I_FRONTEND_FRM_CTRL_COEF_RDY,
-+				  SUN4I_FRONTEND_FRM_CTRL_COEF_RDY);
- }
- 
- int sun4i_frontend_init(struct sun4i_frontend *frontend)
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.h b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-index 01e68bb11c98..e332bc1c6b68 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-@@ -114,6 +114,7 @@ struct reset_control;
- 
- struct sun4i_frontend_data {
- 	bool	has_coef_access_ctrl;
-+	bool	has_coef_rdy;
- };
- 
- struct sun4i_frontend {
--- 
-2.20.1
+2) Booting with drm.debug=0xe video=HDMI-A-1:640x480@60e
 
+* Linux detects display, but display is garbled, and proper edid data is detected:
+
+[snip]
+pll-video1                     0        0        0   327000000          0     0  50000
+   pll-video1-2x               0        0        0   654000000          0     0  50000
+      hdmi-tmds                0        0        0    25153846          0     0  50000
+         hdmi-ddc              0        0        0       89835          0     0  50000
+[/snip]
+
+3) Booting with drm.debug=0xe video=HDMI-A-1:640x480@60e
+And also one extra patch for Linux where HDMI DDC clock marked as critical
+
+Linux detects and initializes display properly:
+[snip]
+pll-video1                     1        1        0   327000000          0     0  50000
+   pll-video1-2x               1        1        0   654000000          0     0  50000
+      hdmi-tmds                1        1        0    25153846          0     0  50000
+         hdmi-ddc              1        1        0       89835          0     0  50000
+[/snip]
+
+
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Bootlin
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
+> 
+> -- 
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe@googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
 
 _______________________________________________
 linux-arm-kernel mailing list
