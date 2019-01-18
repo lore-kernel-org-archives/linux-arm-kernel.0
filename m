@@ -2,23 +2,23 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D5CF0C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 15:46:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 16A32C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 15:51:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A3EEC20896
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 15:46:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DD2D62086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 15:51:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q8Z4YXSf";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="rlWtbnSa"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A3EEC20896
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dIuabA/u";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="NXmLx1Uq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DD2D62086D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,47 +26,53 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=iFwOKOPQRXUWKI5HG6Z6soXKHDSEk5pJ8aPNF93V4P4=; b=Q8Z4YXSfwuoRGB
-	sl2ClWDFPwzyVg1kiRESQgVqL3Faykf5D8HfvdbACWMvHIytcnC+6ZSkL3vZU6dL5o1PTXKNCfUi/
-	mDgYzNSbyrh+9X1rZo5wEiuluSAMR7rf47DK41W1PQbK2G2SgyhtR/B5X77MN9oZ9QRJMEaoWogF9
-	6qQkymYXfWtw3MXFckFdy36QpDotXYPVe8ro2+4ezMU89p9zdKDz6uxhVhE66p/Tl+Pm4oCutS21B
-	k07+/EbcZGLaCdAtcwTElXGtM2f2j/KJy71X47WrEPpTaAGOnp1RIzn+Iu3krU/rCswA5UW4hRn7S
-	bsdi9f6krbpXYqOoSVLg==;
+	List-Owner; bh=pvP+0lvfoWTAxGtHQp1+oJ57a6DjfumWRZ8EibUXXvE=; b=dIuabA/usC4b1b
+	WfBiGU9uG0IT3mo2QYDW9nByORUbPD675zV55B6jot2lD5KWOJRQLrZ9/qAqFgvh/f4aqc2rlVdaP
+	+dbxvVYEkbavkcUtElNadQ5v0F92Sr14qa2GFM//s67VyDwbPS8P7/x3MCxXMc9MdvAo6g2MVg6HB
+	kmWw4fxZL53e8bWgMWXOZw3IrMrmBvkILC1zf3Oz4jEiCeqbpFO1mlhLqUb1QaIVSefBrgo2Im2aJ
+	xkWlNpp84UfFQF1fMgBxGWAQsrQY0k7VXoqNLJ1KbuSTQhC/o2m3XL4iOuqnhGJI3IF/d4hvkWW4t
+	7nk7XMcZ8+m9KEi6g5EQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkWM0-0007OW-Lb; Fri, 18 Jan 2019 15:46:44 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gkWQj-0000tx-4a; Fri, 18 Jan 2019 15:51:37 +0000
+Received: from pandora.armlinux.org.uk
+ ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkWLw-0007Hn-Gl
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 15:46:42 +0000
-Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 19D142087E;
- Fri, 18 Jan 2019 15:46:39 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1547826399;
- bh=L25ti83ENXOpGfDeiE9QKBf/2CVNECajnyH5mmldHQc=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=rlWtbnSa/qZNZMmnIEHI1LeTVfM1YVw1J9ErRVA27MORh+sGQS9vTT5AoDvuw0Tdk
- hcX0p/T2cBsk+FnlDsw8YWXHtGKizlxyizVyOCLo0JnIAZDi1SzF5ib+8k5eNrZf5f
- YRSMpLa7kwF9N3+ZIFkL1BsjUotAD7TgXFUSITyE=
-Date: Fri, 18 Jan 2019 16:46:37 +0100
-From: Greg KH <gregkh@linuxfoundation.org>
-To: Suzuki K Poulose <suzuki.poulose@arm.com>
-Subject: Re: [PATCH v3 1/7] sysfs/cpu: Allow individual architectures to
- select vulnerabilities
-Message-ID: <20190118154637.GA8564@kroah.com>
-References: <20190109235544.2992426-1-jeremy.linton@arm.com>
- <20190109235544.2992426-2-jeremy.linton@arm.com>
- <901f2f29-aa06-13ad-1995-f9f22184e39d@arm.com>
+ id 1gkWQe-0000Lj-TK
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 15:51:34 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=4tm0fTRj4cI493a9LXESfvrnuBJfXF/hT+wA2hsROrk=; b=NXmLx1UqsRBjRyVdaAnC5Ezoi
+ icZHXC4i4nlEDHZ2cC9BdymZtpbm0SdHjCopbmvG/Yem1lmsgqkA6rj+TjIUmJFjI9XZIJ/J5IazQ
+ b+5cDqjvch4pT19iIYbYsdZWr7Qg2ZTsBYW+prBYhIVsIl24rT0yzGLzUNrHLuwKHYjEA=;
+Received: from e5254000004ec.dyn.armlinux.org.uk
+ ([fd8f:7570:feb6:1:5054:ff:fe00:4ec]:33450 helo=shell.armlinux.org.uk)
+ by pandora.armlinux.org.uk with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES256-GCM-SHA384:256) (Exim 4.90_1)
+ (envelope-from <linux@armlinux.org.uk>)
+ id 1gkWQH-0008V9-8x; Fri, 18 Jan 2019 15:51:09 +0000
+Received: from linux by shell.armlinux.org.uk with local (Exim 4.89)
+ (envelope-from <linux@shell.armlinux.org.uk>)
+ id 1gkWQG-0001h2-HN; Fri, 18 Jan 2019 15:51:08 +0000
+Date: Fri, 18 Jan 2019 15:51:08 +0000
+From: Russell King - ARM Linux admin <linux@armlinux.org.uk>
+To: Maxime Chevallier <maxime.chevallier@bootlin.com>
+Subject: Re: [PATCH net-next 4/7] net: phy: marvell10g: Add support for
+ 2.5GBASET and 5GBASET
+Message-ID: <20190118155108.jfu4yjsod225kst3@e5254000004ec.dyn.armlinux.org.uk>
+References: <20190118152352.26417-1-maxime.chevallier@bootlin.com>
+ <20190118152352.26417-5-maxime.chevallier@bootlin.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <901f2f29-aa06-13ad-1995-f9f22184e39d@arm.com>
-User-Agent: Mutt/1.11.2 (2019-01-07)
+In-Reply-To: <20190118152352.26417-5-maxime.chevallier@bootlin.com>
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_074640_597701_DFAD7FE4 
-X-CRM114-Status: GOOD (  21.60  )
+X-CRM114-CacheID: sfid-20190118_075132_948652_AB54B5F4 
+X-CRM114-Status: GOOD (  12.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,84 +84,37 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: stefan.wahren@i2se.com, mlangsdo@redhat.com, jkosina@suse.cz,
- konrad.wilk@oracle.com, julien.thierry@arm.com, marc.zyngier@arm.com,
- catalin.marinas@arm.com, rafael@kernel.org, will.deacon@arm.com,
- linux-kernel@vger.kernel.org, jeremy.linton@arm.com, Steven.Price@arm.com,
- ak@linux.intel.com, mingo@kernel.org, shankerd@codeaurora.org,
- jpoimboe@redhat.com, ykaukab@suse.de, longman@redhat.com, tglx@linutronix.de,
- dave.martin@arm.com, linux-arm-kernel@lists.infradead.org
+Cc: Andrew Lunn <andrew@lunn.ch>, Florian Fainelli <f.fainelli@gmail.com>,
+ Antoine Tenart <antoine.tenart@bootlin.com>, netdev@vger.kernel.org,
+ gregory.clement@bootlin.com, linux-kernel@vger.kernel.org, nadavh@marvell.com,
+ thomas.petazzoni@bootlin.com, miquel.raynal@bootlin.com, stefanc@marvell.com,
+ mw@semihalf.com, davem@davemloft.net, linux-arm-kernel@lists.infradead.org,
+ Heiner Kallweit <hkallweit1@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 14, 2019 at 10:02:21AM +0000, Suzuki K Poulose wrote:
-> 
-> 
-> On 09/01/2019 23:55, Jeremy Linton wrote:
-> > As suggested on the list, https://lkml.org/lkml/2019/1/4/282, there are
-> > a number of cases where its useful for a system to avoid exporting a
-> > sysfs entry for a given vulnerability. This set adds an architecture
-> > specific callback which returns the bitmap of vulnerabilities the
-> > architecture would like to advertise.
-> > 
-> > Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Cc: Rafael J. Wysocki <rafael@kernel.org>
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Cc: Josh Poimboeuf <jpoimboe@redhat.com>
-> > Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> > Cc: Ingo Molnar <mingo@kernel.org>
-> > Cc: Waiman Long <longman@redhat.com>
-> > Cc: Andi Kleen <ak@linux.intel.com>
-> > Cc: Jiri Kosina <jkosina@suse.cz>
-> > ---
-> >   drivers/base/cpu.c  | 19 +++++++++++++++++++
-> >   include/linux/cpu.h |  7 +++++++
-> >   2 files changed, 26 insertions(+)
-> > 
-> > diff --git a/drivers/base/cpu.c b/drivers/base/cpu.c
-> > index eb9443d5bae1..35f6dfb24cd6 100644
-> > --- a/drivers/base/cpu.c
-> > +++ b/drivers/base/cpu.c
-> > @@ -561,6 +561,11 @@ static struct attribute *cpu_root_vulnerabilities_attrs[] = {
-> >   	NULL
-> >   };
-> > +uint __weak arch_supported_vuln_attr_fields(void)
-> > +{
-> > +	return VULN_MELTDOWN|VULN_SPECTREV1|VULN_SPECTREV2|VULN_SSB|VULN_L1TF;
-> > +}
-> > +
-> >   static const struct attribute_group cpu_root_vulnerabilities_group = {
-> >   	.name  = "vulnerabilities",
-> >   	.attrs = cpu_root_vulnerabilities_attrs,
-> > @@ -568,6 +573,20 @@ static const struct attribute_group cpu_root_vulnerabilities_group = {
-> >   static void __init cpu_register_vulnerabilities(void)
-> >   {
-> > +	int fld;
-> > +	int max_fields = ARRAY_SIZE(cpu_root_vulnerabilities_attrs) - 1;
-> > +	struct attribute **hd = cpu_root_vulnerabilities_attrs;
-> > +	uint enabled_fields = arch_supported_vuln_attr_fields();
-> > +
-> > +	/* only enable entries requested by the arch code */
-> > +	for (fld = 0; fld < max_fields; fld++) {
-> > +		if (enabled_fields & 1 << fld) {
-> > +			*hd = cpu_root_vulnerabilities_attrs[fld];
-> > +			hd++;
-> > +		}
-> > +	}
-> > +	*hd = NULL;
-> > +
-> 
-> nit: Could we use "is_visible" callback in the attribute group to check this
-> dynamically ?
+On Fri, Jan 18, 2019 at 04:23:49PM +0100, Maxime Chevallier wrote:
+> @@ -264,8 +265,10 @@ static int mv3310_config_init(struct phy_device *phydev)
+>  	if (ret)
+>  		return ret;
+>  
+> -	linkmode_and(phydev->advertising, phydev->advertising,
+> -		     phydev->supported);
+> +	/* Make sure we advertise all the supported modes, and not just the
+> +	 * default one specified in the driver's .features.
+> +	 */
+> +	linkmode_copy(phydev->advertising, phydev->supported);
 
-You should, that is what it is there for.
+This looks wrong to me, it tramples over the work that phy_probe()
+did, specifically with regard to the pause mode bits.  Please see
+the comments in that function about the pause mode bits.
 
-thanks,
-
-greg k-h
+-- 
+RMK's Patch system: https://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
 
 _______________________________________________
 linux-arm-kernel mailing list
