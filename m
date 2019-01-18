@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_NEOMUTT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2A347C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 01:39:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EBC43C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 01:44:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EDCE920873
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 01:39:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B70B72086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 01:44:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="T9j5yvBd";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="rWdHUbx8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EDCE920873
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="te9SA2p3";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="AoQYFZZW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B70B72086D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,69 +26,68 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=gXCvwgJxXOGIlWI9w6VH3OVsLDdjVT1sF3VSMrsTO4k=; b=T9j5yvBd758/8c
-	HPEH7oaghzGpePcStr4XDJk7Vw9q4gy4kVo4K+Q9SX7E7L1qt2VsFfQ01o4V/B3eu8kVnc254aZCB
-	KhBHPd8Bqp99SMMB+ngV3nycerb88lFYaXdwM1JoZiS0cAvvMjIglHkBNvgWrWHeDu9uEjoR+gkBu
-	fQXs8tiekhlNQ1VScZiMiwFeByaElP087L0LeJ0lTxeFpnN9ABCrUGioaiTdwtozC12EqVAED0+gz
-	q3F/T5SfJb6yF3Fvf8jkf0PFgEpXIHP+dYxSZb4dOWfKoxm7/TxQ+ax7LfimltibbX9JHIoqRKHZq
-	/dnPsCxcMerv7lutKmVg==;
+	List-Owner; bh=ubXUva5sPQfDMnGyKnCaAmk9cNoDn/3/ohlA4U6/NeI=; b=te9SA2p350joNn
+	ryRwM3zC1tYCb4GZYHoyAGKUlBJNwc/T4ce+/60JjMNKdOB3cxz0GjD6Hpeoera+OscaVcoBP2j0T
+	SkddjagFkGl4Aj3/Wg5T6rotJFVXu5vwSA54KUkVft7K8y+SKfZwzGqQaa9zbeN6GFFO6U+Ok0OAJ
+	+Iwon/h7hc1npG5Wb1kWfKeTar5m6hzrE4OQazIoMSHBZ7P08XwS9CTTA4chFI1LTVkaQz21S/qsX
+	2kQ/2vKSbtf1rdByXEPUQoCPkrFXysGEcvy+QfmbLRRhz3Sw1NPVHpNui2Mb7bY79SpEUUjn1aBq9
+	ukioEaAfaBPn89bCQ4pQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkJ7z-0001kM-Le; Fri, 18 Jan 2019 01:39:23 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1gkJCw-0003VM-HF; Fri, 18 Jan 2019 01:44:30 +0000
+Received: from mail-wr1-x42a.google.com ([2a00:1450:4864:20::42a])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkJ7w-0001jw-0A
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 01:39:21 +0000
-Received: by mail-wr1-x443.google.com with SMTP id s12so13167033wrt.4
+ id 1gkJCs-0003Up-Ht
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 01:44:27 +0000
+Received: by mail-wr1-x42a.google.com with SMTP id s12so13174561wrt.4
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 17 Jan 2019 17:39:17 -0800 (PST)
+ Thu, 17 Jan 2019 17:44:25 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=RoDpLGt/KuvAAxZR5Vdi0q3IDW6U8xokDmpvZoP+z1s=;
- b=rWdHUbx8o/0qiZUncbladUXZaakO80ruHQVBkz290AwmQqvoFIvd3LddxqAPUM5RZq
- FjJ4P1sHU3Qm35hvyuWNaHBdZwBhuoVmL09dm39gZVUS5Ah6CsaXuepExP6bZXJt0hag
- JAYg1kerBAlfMvLkLL/shlQlDUihf/qCI33Xt9wgY91Of3HGGtMpKg0jY7PA1tpo+Wao
- uHuLL4stYdEA6jWhJ2Of6UpsYYm9KQWlrjx98ZCvQBYUH7LpJV6529qYz6p8tgqWTm+C
- DvKXap+e6Hywhz2lokksOAhoQDmT+bJvfhVz3yakh03vzJTyfCjpG6jh68alwDW/lcRR
- JJnA==
+ bh=wyf44XYgmRPPBCMR8SnSe3JLJyFdvyPu/Mai6aT6W+o=;
+ b=AoQYFZZWESqgXGMPwjDAPFpEf3tDUBQ6zp+2OoawX7/Vcai705ERz0IP8+2ksFlRIH
+ yTfwmw12p1aD6+QaxuXJx8Y62abVDN+hPU3Kt2MdEv1iJyrjpFvrRrNtKFTU1qoZAXeX
+ x9Xca5PL51mkq7Sv/2xfU/l3YF5Av87zDHOuBXjH18aqIDOiolIK1c66B2UOjOx87isl
+ OMM83KK7+qnZbijdGM4ya/FSzrsy5/YNBdwTz+iXXnoSROjexZPEtfdRRta4M5PKohLq
+ UxEtn5uE3Rb2tbRf6soeg9ERliJ4W6p/GCr788a7gZR2mITeNAOqrvJbkffMhfbFB85q
+ qMgg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=RoDpLGt/KuvAAxZR5Vdi0q3IDW6U8xokDmpvZoP+z1s=;
- b=kmX4dAKXsRl+fynfYyj4aYMEbZeNzlbypCQp3Ec+yMEltGiI7L56PW+lt93HIzpcUv
- I/+Dz3H5vUrV7SrkpUlbMYKx4Rm+fvUFsdX/lYQe2CqqanHCJhRczXNuBN12iT7Hac6A
- +8PdAN8vdZVca/C0/66GsDXaJf9WJUVw2oYjZLBcY+sYyqKKYbvS35jzOEw1lkPT2lxk
- fy9f2c+OsgAMWp79tG+0zdSo+w15oZtPiIUpTHSQC8C1HKPO2rv+xfMx3lz2ZTU8wgVE
- HPWxuwOfMdrbW2GI2HB6okFSy9BZqPsU+LGCubHPWXDiSSA6CB57kakV9saK+p+VYUUc
- 4s5w==
-X-Gm-Message-State: AJcUukdM4Uz6526MWPxJYPg5k3LYSarI+dXMpHUlrB8+NuzDEmRtFz+4
- YMNvdt/bwhTAW405DL1su5A=
-X-Google-Smtp-Source: ALg8bN6BASzwTX2eZ0xxbSp9KHhD1o2Ok1Ci1bGtYhlnXMkuLzqW7MuHknY1Oq4qFbspQwlljY2KbA==
-X-Received: by 2002:adf:e284:: with SMTP id v4mr13706573wri.26.1547775555919; 
- Thu, 17 Jan 2019 17:39:15 -0800 (PST)
+ bh=wyf44XYgmRPPBCMR8SnSe3JLJyFdvyPu/Mai6aT6W+o=;
+ b=eQvnVYTJ5uwOkyOKqn1BgOI9zsm+DLjKbOOacvjGR4Z+oAsdK/BD7HFVw9CYjeUHpQ
+ FnsbyWMtB9ysIzkOutkgcka5h+rmqUFXpsOh8T+sz3T8mCeGCC+HbqsiD+dFe7w+2Pn9
+ 6Qimk7+ZsmCWDC90ttsWMRL8O6qa1GIiERzuUX+wXYSNAyVXrwVkfNlQgEnaR578hQ/D
+ zJqY6b/Se/GJLiuqRmH0qviafQlnhR2wYfU7nD0onMMDaMWsJmfPC1mK8wTrftNqVy7W
+ h0mRTIa+r4bWBzcaXx0U/665c+49MiBgaXmQ+NijlD6FLOPlstwB3M2HrfmJ2FHY1CVX
+ t82A==
+X-Gm-Message-State: AJcUukcWR5sAxwiRVaK+xWCuUG2pJvDb9wUsJRi7SW2u+HvRiZSqAYAv
+ QVoB/it1A6ag2YvyqS5Ym8bSxiM7lP4=
+X-Google-Smtp-Source: ALg8bN6XxV1N/tQMiCxG0/eOvPr11ygYdOgSYJ3JBFX2jJYcPmgvBVl/PiI66e5t7ZQ3UWpOB2XqWg==
+X-Received: by 2002:a5d:4512:: with SMTP id s18mr14788757wrq.182.1547775864032; 
+ Thu, 17 Jan 2019 17:44:24 -0800 (PST)
 Received: from localhost (83-215-98-136.stmi.dyn.salzburg-online.at.
  [83.215.98.136])
- by smtp.gmail.com with ESMTPSA id k19sm125430966wre.5.2019.01.17.17.39.14
+ by smtp.gmail.com with ESMTPSA id e9sm69409419wro.16.2019.01.17.17.44.22
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 17 Jan 2019 17:39:15 -0800 (PST)
-Date: Thu, 17 Jan 2019 17:39:12 -0800
+ Thu, 17 Jan 2019 17:44:23 -0800 (PST)
+Date: Thu, 17 Jan 2019 17:44:20 -0800
 From: Richard Cochran <richardcochran@gmail.com>
 To: Yangbo Lu <yangbo.lu@nxp.com>
-Subject: Re: [v2, 3/5] dt-binding: ptp_qoriq: document "fsl,extts-fifo"
- property
-Message-ID: <20190118013912.skj4x5wmkbouekfx@localhost>
+Subject: Re: [v2, 5/5] ptp_qoriq: add fiper pulse loopback support
+Message-ID: <20190118014420.rlyk36477cqj6yb7@localhost>
 References: <20190117014936.48117-1-yangbo.lu@nxp.com>
- <20190117014936.48117-4-yangbo.lu@nxp.com>
- <20190118013434.qwuiqi5iwo5gw2nk@localhost>
+ <20190117014936.48117-6-yangbo.lu@nxp.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190118013434.qwuiqi5iwo5gw2nk@localhost>
+In-Reply-To: <20190117014936.48117-6-yangbo.lu@nxp.com>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_173920_040327_DC83C9A3 
-X-CRM114-Status: GOOD (  10.33  )
+X-CRM114-CacheID: sfid-20190117_174426_618440_BCD4C8EC 
+X-CRM114-Status: UNSURE (   9.77  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,23 +107,16 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 17, 2019 at 05:34:34PM -0800, Richard Cochran wrote:
-> > @@ -17,6 +17,7 @@ Clock Properties:
-> >    - fsl,tmr-fiper1   Fixed interval period pulse generator.
-> >    - fsl,tmr-fiper2   Fixed interval period pulse generator.
-> >    - fsl,max-adj      Maximum frequency adjustment in parts per billion.
-> > +  - fsl,extts-fifo   Required if hardware uses external trigger stamp FIFO.
-> 
-> Does this take a Boolean value?  Please explain the semantics.
+On Thu, Jan 17, 2019 at 09:49:36AM +0800, Yangbo Lu wrote:
+> This patch is to add Kconfig options to support fiper
+> pulse loopback mode. This is very useful for validating
+> hardware and driver without external hardware.
 
-How about this instead?
-
-	The presence of this property indicates hardware support for
-	the external trigger stamp FIFO.
-
+To me this feature makes more sense as a debugf-fs option.
 
 Thanks,
 Richard
+
 
 _______________________________________________
 linux-arm-kernel mailing list
