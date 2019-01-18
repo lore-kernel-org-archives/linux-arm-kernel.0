@@ -2,76 +2,62 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 49A95C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:38:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A66C8C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:39:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1489E20896
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:38:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 77D2C208E4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:39:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E3QnTbN8";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="chAcDzdh"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1489E20896
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="taId1pRp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 77D2C208E4
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=56oth1wHs90W11GCoxoUOJGsRSNYO1nnDF0GsSlzees=; b=E3QnTbN80e6pRU
-	pIvavPK906PfuxVk3jyKQy7tWTXapd/ZWV0EZKjYXwH7mC5sa4jPl5YpOhU4NyZjQP8T85gsGTSxN
-	iTzbmAf4IvTtycfnR1JtxicBOSkqzWy3Bh1PS03hwiZJepGglXrAJIiCdtHjljJtHYAiDbIDMNsk5
-	fxnTVWNBR8JXSxbNwL6ncWuddrYH7u0OCqVxfasW/6ZXxkzl+xvObNjHiRm/39249bp10AcF1C2d+
-	JU9a14eTOZQRiQMdi7QJCwv3IlA4ByeX3uGgxNCrwOZpC02RrftJqnxBiVLCbXke70L4/lGhd7qtI
-	kDqCwjpcxsEfJpuVMV0w==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:From:Date:
+	Message-Id:References:In-Reply-To:Subject:To:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=iHONHSxIQpLNnuh4LBHm/MSYMSzTNA0w49LaxPl06I0=; b=taId1pRpjxvgnPW41FydIKgeU2
+	EbmSm7zHZeFN09EocmQfcH4Rc5KGxd3gXAA8OVv2uhmzyIZqCrNl+TwS9WzhTtGUroC0dAbEqnrcx
+	1ofKrCxxiQFEdSgI/wRmqx5mQpp4mgHujuQqklwNfS5XQFy8M4nylkSb4kPcRdZU4toDpM+RV/NS9
+	Df0mmNDFA3+PdBlp5otHVCwkq3KgZXwx9M7HfTeRrIGxNqKATwD+jbLsepHPfH8s8I5bYCaBfW7Nj
+	O5MtmyQWk/MjEaeQS9D3s5sX/pqoXaDJUBNeATiPEJw+mKlEDRkm74b5qvY6PhzFf/vvQV6KksNCy
+	pSuis5cg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkX9l-0002f6-GT; Fri, 18 Jan 2019 16:38:09 +0000
-Received: from pandora.armlinux.org.uk
- ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
+	id 1gkXAj-0002wT-9c; Fri, 18 Jan 2019 16:39:09 +0000
+Received: from verein.lst.de ([213.95.11.211] helo=newverein.lst.de)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkX9R-0002QE-Fm
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 16:37:55 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=NqdGEANMNH6dnO3JH6obgQjJ9XDpcnvBuNABoxhKWI0=; b=chAcDzdhqYh2+DZRTV362hzgI
- 911aQjXCqvvUVUvLFB5yg9Xwkuz3areZJXDfcRbctDlCvuYS7cdWW9jGha+eg779t97Yv7dfHPkbR
- YhJdlqvsAv0Eo9HzTAl2nWLXWVJJO71elM5GcCfrkjrFcjVN+hYwS9p5YOSos6c6HF/lI=;
-Received: from e5254000004ec.dyn.armlinux.org.uk
- ([2001:4d48:ad52:3201:5054:ff:fe00:4ec]:37828 helo=shell.armlinux.org.uk)
- by pandora.armlinux.org.uk with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES256-GCM-SHA384:256) (Exim 4.90_1)
- (envelope-from <linux@armlinux.org.uk>)
- id 1gkX9F-0000Ne-Oz; Fri, 18 Jan 2019 16:37:37 +0000
-Received: from linux by shell.armlinux.org.uk with local (Exim 4.89)
- (envelope-from <linux@shell.armlinux.org.uk>)
- id 1gkX9F-0001iJ-38; Fri, 18 Jan 2019 16:37:37 +0000
-Date: Fri, 18 Jan 2019 16:37:36 +0000
-From: Russell King - ARM Linux admin <linux@armlinux.org.uk>
-To: Andrew Murray <andrew.murray@arm.com>
-Subject: Re: [Linux-eng] [RFC 0/3] Abstract empty functions with STUB_UNLESS
- macro
-Message-ID: <20190118163736.6lczivagpsdnm7ju@e5254000004ec.dyn.armlinux.org.uk>
-References: <1547827230-55132-1-git-send-email-andrew.murray@arm.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1547827230-55132-1-git-send-email-andrew.murray@arm.com>
-User-Agent: NeoMutt/20170113 (1.7.2)
+ id 1gkXAg-0002wA-1t
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 16:39:07 +0000
+Received: by newverein.lst.de (Postfix, from userid 2005)
+ id CD7BA68CEB; Fri, 18 Jan 2019 17:39:04 +0100 (CET)
+To: Mark Rutland <mark.rutland@arm.com>, Will Deacon <will.deacon@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Julien Thierry <julien.thierry@arm.com>,
+ Steven Rostedt <rostedt@goodmis.org>, Josh Poimboeuf <jpoimboe@redhat.com>,
+ Ingo Molnar <mingo@redhat.com>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Arnd Bergmann <arnd@arndb.de>,
+ AKASHI Takahiro <takahiro.akashi@linaro.org>,
+ Amit Daniel Kachhap <amit.kachhap@arm.com>
+Subject: [PATCH v7 1/3] arm64: replace -pg with CC_FLAGS_FTRACE in Makefiles
+In-Reply-To: <20190118163736.6A99268CEB@newverein.lst.de>
+References: <20190118163736.6A99268CEB@newverein.lst.de>
+Message-Id: <20190118163904.CD7BA68CEB@newverein.lst.de>
+Date: Fri, 18 Jan 2019 17:39:04 +0100 (CET)
+From: duwe@lst.de (Torsten Duwe)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_083749_521377_73920E02 
-X-CRM114-Status: GOOD (  10.53  )
+X-CRM114-CacheID: sfid-20190118_083906_267374_3CB0CC90 
+X-CRM114-Status: UNSURE (   7.22  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,52 +69,51 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Kees Cook <keescook@chromium.org>, Arnd Bergmann <arnd@arndb.de>,
- Catalin Marinas <catalin.marinas@arm.com>, rjw@rjwysocki.net,
- linux-kernel@vger.kernel.org, Will Deacon <will.deacon@arm.com>,
- Steven Price <Steven.Price@arm.com>,
- Masahiro Yamada <yamada.masahiro@socionext.com>,
- Grant Likely <Grant.Likely@arm.com>, Andrew Morton <akpm@linux-foundation.org>,
- Dave P Martin <Dave.Martin@arm.com>, linux-arm-kernel@lists.infradead.org
+Cc: live-patching@vger.kernel.org, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 18, 2019 at 04:00:27PM +0000, Andrew Murray wrote:
-> A common pattern found in header files is a function declaration dependent
-> on a CONFIG_ option being enabled, followed by an empty function for when
-> that option isn't enabled. This boilerplate code can often take up a lot
-> of space and impact code readability.
-> 
-> This series introduces a STUB_UNLESS macro that simplifies header files as
-> follows:
-> 
-> STUB_UNLESS(CONFIG_FOO, [body], prototype)
+Ftrace instrumentation might also be introduced by
+-fpatchable-function-entry, not only -pg. Ensure the Makefiles are
+flexible to filter out the respective flags in "notrace" directories.
 
-Can you explain the desire to make the second argument optional,
-rather than having the mandatory arguments first and the optional body
-last?  It will mean more lines at each site, but I don't think that's
-a bad thing:
+Signed-off-by: Torsten Duwe <duwe@suse.de>
 
-STUB_UNLESS(CONFIG_HAVE_HW_BREAKPOINT,
-void hw_breakpoint_thread_switch(struct task_struct *next));
-
-STUB_UNLESS(CONFIG_CPU_FREQ,
-struct cpufreq_policy *cpufreq_cpu_get_raw(unsigned int cpu), return NULL);
-
-or:
-
-STUB_UNLESS(CONFIG_CPU_FREQ,
-struct cpufreq_policy *cpufreq_cpu_get_raw(unsigned int cpu),
-	return NULL);
-
-Seems to be more readable in terms of the flow.
-
--- 
-RMK's Patch system: https://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+---
+ arch/arm64/kernel/Makefile            |    6 +++---
+ drivers/firmware/efi/libstub/Makefile |    3 ++-
+ 2 files changed, 5 insertions(+), 4 deletions(-)
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -7,9 +7,9 @@ CPPFLAGS_vmlinux.lds	:= -DTEXT_OFFSET=$(
+ AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+ CFLAGS_armv8_deprecated.o := -I$(src)
+ 
+-CFLAGS_REMOVE_ftrace.o = -pg
+-CFLAGS_REMOVE_insn.o = -pg
+-CFLAGS_REMOVE_return_address.o = -pg
++CFLAGS_REMOVE_ftrace.o = $(CC_FLAGS_FTRACE)
++CFLAGS_REMOVE_insn.o = $(CC_FLAGS_FTRACE)
++CFLAGS_REMOVE_return_address.o = $(CC_FLAGS_FTRACE)
+ 
+ # Object file lists.
+ obj-y			:= debug-monitors.o entry.o irq.o fpsimd.o		\
+--- a/drivers/firmware/efi/libstub/Makefile
++++ b/drivers/firmware/efi/libstub/Makefile
+@@ -16,7 +16,8 @@ cflags-$(CONFIG_X86)		+= -m$(BITS) -D__K
+ 
+ # arm64 uses the full KBUILD_CFLAGS so it's necessary to explicitly
+ # disable the stackleak plugin
+-cflags-$(CONFIG_ARM64)		:= $(subst -pg,,$(KBUILD_CFLAGS)) -fpie \
++cflags-$(CONFIG_ARM64)		:= $(filter-out $(CC_FLAGS_FTRACE)\
++				  ,$(KBUILD_CFLAGS)) -fpie \
+ 				   $(DISABLE_STACKLEAK_PLUGIN)
+ cflags-$(CONFIG_ARM)		:= $(subst -pg,,$(KBUILD_CFLAGS)) \
+ 				   -fno-builtin -fpic \
 
 _______________________________________________
 linux-arm-kernel mailing list
