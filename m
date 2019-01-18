@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2F7E3C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:44:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 29717C43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:44:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EE70E2054F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:44:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DC68B2054F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:44:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Z6BpbyhZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EE70E2054F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q+eEDvcF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DC68B2054F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ZmQ0bcffYM9lkbl2aSq0C96dmyTsCteS/PVF/O05VBo=; b=Z6BpbyhZoTfpAb
-	PrTrZNzMSUd+jPjbb3xh+0EApk73c7ydUtyMrn4lY6MLFhT+1XyoVs12vSfLILNTvHtuPd853PnN/
-	H86tU8DQ0SHLyRssjVzHBFre/mFaFgjcs1KUQIQeszFmtFn/x4rIS9+eGOi9BeMRYOYY5XOp86QXC
-	F6swCyppjmSPbl0zfDg7jnRv6FR3lOvn2DoqEcG0kmTzvpK0taZEnL+xbDkkziIdaRgxQRJW/XgPP
-	jhLwKHSb8ipwC594JDMF8ANWMTEPJgFeuJyXB8vJxuaZ88fY8skB2AWE/RdSMzddJXa6Yi1Br361J
-	6cYmkk3m+y4TLOhu0UZg==;
+	List-Owner; bh=buKM7e8H6zaz4bcDg2A9n2MJHF3U8ymxrpCV8obWJ48=; b=q+eEDvcFYDJ+1m
+	XfVWuIRUV8pkuUbwMZ7fpWn/zIz7Ir41X2RSVIuwG8t0TUgAhqa06uk+VXy4uG2BFDDOuesSW47tb
+	7sckMf5ytBdjvNnjDXJLCyjWJXEDZYApMtiDIJhVR6P0Uwd8DN8JTDEwzcbpIbx3EdzY8RKr3jmnp
+	tMrdQ1ZBxNXDUKo3LTK+Gy5g/oyWfM08QY+9DP9+tXtDs5ZJ5TKHFdJ8idFx5UHV90aUR1YNAdSYk
+	DxIwgSokt7uEWJvo5XMiYJ88OrgyqrV5GQRmSvLogRdzylVjRGjKb8uJavwQx6c0NmBP+YkZVfeBy
+	30dpiadkc+j8Hcmyk//A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkVNs-0007Ew-1E; Fri, 18 Jan 2019 14:44:36 +0000
+	id 1gkVO7-0007Qd-7b; Fri, 18 Jan 2019 14:44:51 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkVNA-0006V7-Cs
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 14:43:54 +0000
+ id 1gkVNB-0006WL-OQ
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 14:43:55 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id D837720A2E; Fri, 18 Jan 2019 15:43:49 +0100 (CET)
+ id 20DAD20A7D; Fri, 18 Jan 2019 15:43:50 +0100 (CET)
 Received: from localhost.localdomain
  (aaubervilliers-681-1-37-87.w90-88.abo.wanadoo.fr [90.88.156.87])
- by mail.bootlin.com (Postfix) with ESMTPSA id 95CD4206A7;
+ by mail.bootlin.com (Postfix) with ESMTPSA id CEF1A207A3;
  Fri, 18 Jan 2019 15:43:49 +0100 (CET)
 From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 To: dri-devel@lists.freedesktop.org, linux-arm-kernel@lists.infradead.org,
  linux-kernel@vger.kernel.org, linux-sunxi@googlegroups.com
-Subject: [PATCH v5 04/23] drm/sun4i: frontend: Pass DRM format info to input
- format helpers
-Date: Fri, 18 Jan 2019 15:43:09 +0100
-Message-Id: <20190118144328.20649-5-paul.kocialkowski@bootlin.com>
+Subject: [PATCH v5 05/23] drm/sun4i: frontend: Determine input format based on
+ colorspace
+Date: Fri, 18 Jan 2019 15:43:10 +0100
+Message-Id: <20190118144328.20649-6-paul.kocialkowski@bootlin.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190118144328.20649-1-paul.kocialkowski@bootlin.com>
 References: <20190118144328.20649-1-paul.kocialkowski@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_064352_702319_0E12089C 
-X-CRM114-Status: GOOD (  12.61  )
+X-CRM114-CacheID: sfid-20190118_064353_925860_4311D2D0 
+X-CRM114-Status: GOOD (  14.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,75 +80,42 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The helper returning the input mode needs to know the number of planes
-for the provided format. Passing the fourcc requires iterating through
-the format info list in order to return the number of planes.
+Since all the RGB input formats have the same value for the DATA_FMT
+field of the INPUT_FMT register, we can group them when the format is
+known to be RGB. Here, we assume that a non-YUV format is RGB, because
+the hardware does not support any other colorspace than RGB and YUV.
 
-Pass the DRM format info structure directly instead to all helpers
-related to configuring the input format, since it's available to the
-caller. Also rename the input format in the caller function to keep
-things consistent.
+Use the DRM format info structure to check whether the format uses a
+YUV colorspace.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 20 +++++++++++++-------
- 1 file changed, 13 insertions(+), 7 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_frontend.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index 1a7ebc45747e..dd5af3019099 100644
+index dd5af3019099..7c7a5ea0cf58 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -104,9 +104,11 @@ void sun4i_frontend_update_buffer(struct sun4i_frontend *frontend,
- }
- EXPORT_SYMBOL(sun4i_frontend_update_buffer);
- 
--static int sun4i_frontend_drm_format_to_input_fmt(uint32_t fmt, u32 *val)
-+static int
-+sun4i_frontend_drm_format_to_input_fmt(const struct drm_format_info *format,
-+				       u32 *val)
+@@ -108,14 +108,12 @@ static int
+ sun4i_frontend_drm_format_to_input_fmt(const struct drm_format_info *format,
+ 				       u32 *val)
  {
--	switch (fmt) {
-+	switch (format->format) {
- 	case DRM_FORMAT_XRGB8888:
+-	switch (format->format) {
+-	case DRM_FORMAT_XRGB8888:
++	if (!format->is_yuv)
  		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_RGB;
- 		return 0;
-@@ -116,9 +118,11 @@ static int sun4i_frontend_drm_format_to_input_fmt(uint32_t fmt, u32 *val)
- 	}
- }
- 
--static int sun4i_frontend_drm_format_to_input_mode(uint32_t fmt, u32 *val)
-+static int
-+sun4i_frontend_drm_format_to_input_mode(const struct drm_format_info *format,
-+					u32 *val)
- {
--	if (drm_format_num_planes(fmt) == 1)
-+	if (format->num_planes == 1)
- 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PACKED;
- 	else
+-		return 0;
+-
+-	default:
++	else
  		return -EINVAL;
-@@ -126,9 +130,11 @@ static int sun4i_frontend_drm_format_to_input_mode(uint32_t fmt, u32 *val)
- 	return 0;
+-	}
++
++	return 0;
  }
  
--static int sun4i_frontend_drm_format_to_input_sequence(uint32_t fmt, u32 *val)
-+static int
-+sun4i_frontend_drm_format_to_input_sequence(const struct drm_format_info *format,
-+					    u32 *val)
- {
--	switch (fmt) {
-+	switch (format->format) {
- 	case DRM_FORMAT_BGRX8888:
- 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_PS_BGRX;
- 		return 0;
-@@ -183,7 +189,7 @@ int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
- {
- 	struct drm_plane_state *state = plane->state;
- 	struct drm_framebuffer *fb = state->fb;
--	uint32_t format = fb->format->format;
-+	const struct drm_format_info *format = fb->format;
- 	u32 out_fmt_val;
- 	u32 in_fmt_val, in_mod_val, in_ps_val;
- 	int ret;
+ static int
 -- 
 2.20.1
 
