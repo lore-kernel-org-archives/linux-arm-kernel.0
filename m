@@ -2,63 +2,61 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.3 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UPPERCASE_50_75,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ECADDC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 15:51:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 86CEFC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 15:59:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AE6CA2086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 15:51:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 55ABD2086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 15:59:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SCzLYllB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AE6CA2086D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VLOujf1f"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 55ABD2086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=glider.be
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4DcPXuEAWO8CGWQr0/c+deXT8s0tix90c0QPPxUScjA=; b=SCzLYllBtzoCMz
-	jqNCO6tExl4GSu/bxqGKOmM7a+vz7QABJr8l1C5btM6IuX2vPlwWlYdMCIpXeQ5T56e8u9/nJlmiL
-	ulJl7c2KGgAUwB89imUSv52Z8hJPy6OLmZTP0chBiLmb6IBaSRE25Y1M8J2qINvGklyFOtXf0GpuV
-	laPMWZ6mLvXsSXpNwpAyjALLInB8wYXf0LJWGL465h9yEZ6+W+IobmrOlGqCQXhVrojVBxxu5hITv
-	gZFLR1nCRqVdaKfdFic6ZCfTkLiUSAmatmEQJbYb62e4lOH4BDmBxDzOMpj2dYg5UxFgW83ioKq1y
-	+6CuALw7VC4UEUseco/g==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=3QzMX/g7ZOw6rYpt4Sk7N/ryS8f3RbC6OkmXEzkSZpY=; b=VLO
+	ujf1fH6OwHz27h1Y7ZEbUUVyeYdQNEYjST+rEQGWbXiFdf++5Qqz6BRRaRCclufbb53k1PxK1BZID
+	pkpUFtmvhizq2AgkODHATtlbeslA2OSeaprjS/xoA0WuWoI9TVe2FlY8nhCpOrAj8o87fLuWiid/a
+	i4XQW1wBSui5otVbSqELaNL9H8ZMWKI+UIM3q+s7J3aqS8sq+6prKQ80znoAe9rHpNJ/WaTAYhVx8
+	5sMqOnGD2ZiUnyDUCLx/ctnv6J/B4AtvsbT97mex9HdAuViKyC7/1VIOa3YYUCaW46dk80h3nLTUG
+	8LEkm7WujMvhaM8vOnSZCMyxy0nqutg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkWQx-0001Hf-Cj; Fri, 18 Jan 2019 15:51:51 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkWQh-0000oX-E3
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 15:51:36 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 103A8EBD;
- Fri, 18 Jan 2019 07:51:34 -0800 (PST)
-Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 242F63F557;
- Fri, 18 Jan 2019 07:51:33 -0800 (PST)
-Date: Fri, 18 Jan 2019 15:51:30 +0000
-From: Mark Rutland <mark.rutland@arm.com>
-To: Andrew Murray <andrew.murray@arm.com>
-Subject: Re: [PATCH] arm64: perf: remove misleading comment
-Message-ID: <20190118155130.GE12256@lakrids.cambridge.arm.com>
-References: <1547820147-22176-1-git-send-email-andrew.murray@arm.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1547820147-22176-1-git-send-email-andrew.murray@arm.com>
-User-Agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
+	id 1gkWYe-0004n7-Sx; Fri, 18 Jan 2019 15:59:48 +0000
+Received: from laurent.telenet-ops.be ([2a02:1800:110:4::f00:19])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gkWYa-0004mX-Sx
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 15:59:46 +0000
+Received: from ramsan ([84.194.111.163]) by laurent.telenet-ops.be with bizsmtp
+ id Rrzf1z00e3XaVaC01rzfYb; Fri, 18 Jan 2019 16:59:40 +0100
+Received: from rox.of.borg ([192.168.97.57]) by ramsan with esmtp (Exim 4.90_1)
+ (envelope-from <geert@linux-m68k.org>)
+ id 1gkWYV-0008Ln-NZ; Fri, 18 Jan 2019 16:59:39 +0100
+Received: from geert by rox.of.borg with local (Exim 4.90_1)
+ (envelope-from <geert@linux-m68k.org>)
+ id 1gkWYV-0003AI-Ln; Fri, 18 Jan 2019 16:59:39 +0100
+From: Geert Uytterhoeven <geert+renesas@glider.be>
+To: Simon Horman <horms@verge.net.au>,
+	Magnus Damm <magnus.damm@gmail.com>
+Subject: [PATCH] ARM: shmobile: defconfig: Refresh for v5.0-rc2
+Date: Fri, 18 Jan 2019 16:59:38 +0100
+Message-Id: <20190118155938.12124-1-geert+renesas@glider.be>
+X-Mailer: git-send-email 2.17.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_075135_475524_98377C41 
-X-CRM114-Status: GOOD (  19.01  )
+X-CRM114-CacheID: sfid-20190118_075945_165777_EBAFF753 
+X-CRM114-Status: UNSURE (   8.96  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,52 +68,122 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, linux-arm-kernel@lists.infradead.org
+Cc: linux-renesas-soc@vger.kernel.org,
+ Geert Uytterhoeven <geert+renesas@glider.be>,
+ linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 18, 2019 at 02:02:27PM +0000, Andrew Murray wrote:
-> The comment for the armv8pmu_set_event_filter function suggests that
-> it only works for PMUv2 PMUs - this is incorrect.
-> 
-> Let's remove the incorrect comment.
-> 
-> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+  - Move SoC config options (moved in commit 062887bf5ef73313 ("ARM:
+    shmobile: Move SoC Kconfig symbols to drivers/soc/renesas/")),
+  - Move PCI config options (moved in commit eb01d42a77785ff9 ("PCI:
+    consolidate PCI config entry in drivers/pci")),
+  - Drop CONFIG_I2C_MUX=y (auto-enabled since commit ea6b13e9fed0fda9
+    ("drm/bridge/sii902x: Add missing dependency on I2C_MUX")),
+  - Drop CONFIG_SH_DMAE=y (no longer selectable since commit
+    a19788612f51b787 ("dmaengine: sh: Remove R-Mobile APE6 support")),
+  - Drop CONFIG_ARM_UNWIND (auto-enabled since commit f9b58e8c7d031b0d
+    ("ARM: 8800/1: use choice for kernel unwinders")).
 
-This was inherited from 32-bit, where PMUv1 didn't have mode exclusion.
-Since we have PMUv3+ on arm64, I guess this is misleading.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/configs/shmobile_defconfig | 45 ++++++++++++++---------------
+ 1 file changed, 21 insertions(+), 24 deletions(-)
 
-FWIW: Acked-by: Mark Rutland <mark.rutland@arm.com>
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index fdac4e4ca04d7380..14e9255e48c3184e 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -8,29 +8,8 @@ CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+ CONFIG_PERF_EVENTS=y
+ CONFIG_SLAB=y
+ CONFIG_ARCH_RENESAS=y
+-CONFIG_ARCH_EMEV2=y
+-CONFIG_ARCH_R7S72100=y
+-CONFIG_ARCH_R8A73A4=y
+-CONFIG_ARCH_R8A7740=y
+-CONFIG_ARCH_R8A7743=y
+-CONFIG_ARCH_R8A7744=y
+-CONFIG_ARCH_R8A7745=y
+-CONFIG_ARCH_R8A77470=y
+-CONFIG_ARCH_R8A7778=y
+-CONFIG_ARCH_R8A7779=y
+-CONFIG_ARCH_R8A7790=y
+-CONFIG_ARCH_R8A7791=y
+-CONFIG_ARCH_R8A7792=y
+-CONFIG_ARCH_R8A7793=y
+-CONFIG_ARCH_R8A7794=y
+-CONFIG_ARCH_R9A06G032=y
+-CONFIG_ARCH_SH73A0=y
+ CONFIG_PL310_ERRATA_588369=y
+ CONFIG_ARM_ERRATA_754322=y
+-CONFIG_PCI=y
+-CONFIG_PCI_MSI=y
+-CONFIG_PCI_RCAR_GEN2=y
+-CONFIG_PCIE_RCAR=y
+ CONFIG_SMP=y
+ CONFIG_SCHED_MC=y
+ CONFIG_NR_CPUS=8
+@@ -58,6 +37,10 @@ CONFIG_IP_PNP=y
+ CONFIG_IP_PNP_DHCP=y
+ CONFIG_CAN=y
+ CONFIG_CAN_RCAR=y
++CONFIG_PCI=y
++CONFIG_PCI_MSI=y
++CONFIG_PCI_RCAR_GEN2=y
++CONFIG_PCIE_RCAR=y
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_DMA_CMA=y
+@@ -91,7 +74,6 @@ CONFIG_SERIAL_8250_DW=y
+ CONFIG_SERIAL_8250_EM=y
+ CONFIG_SERIAL_SH_SCI=y
+ CONFIG_I2C_CHARDEV=y
+-CONFIG_I2C_MUX=y
+ CONFIG_I2C_DEMUX_PINCTRL=y
+ CONFIG_I2C_EMEV2=y
+ CONFIG_I2C_GPIO=y
+@@ -183,12 +165,28 @@ CONFIG_RTC_DRV_S35390A=y
+ CONFIG_RTC_DRV_RX8581=y
+ CONFIG_RTC_DRV_DA9063=y
+ CONFIG_DMADEVICES=y
+-CONFIG_SH_DMAE=y
+ CONFIG_RCAR_DMAC=y
+ CONFIG_RENESAS_USB_DMAC=y
+ CONFIG_STAGING=y
+ CONFIG_STAGING_BOARD=y
+ # CONFIG_IOMMU_SUPPORT is not set
++CONFIG_ARCH_EMEV2=y
++CONFIG_ARCH_R7S72100=y
++CONFIG_ARCH_R8A73A4=y
++CONFIG_ARCH_R8A7740=y
++CONFIG_ARCH_R8A7743=y
++CONFIG_ARCH_R8A7744=y
++CONFIG_ARCH_R8A7745=y
++CONFIG_ARCH_R8A77470=y
++CONFIG_ARCH_R8A7778=y
++CONFIG_ARCH_R8A7779=y
++CONFIG_ARCH_R8A7790=y
++CONFIG_ARCH_R8A7791=y
++CONFIG_ARCH_R8A7792=y
++CONFIG_ARCH_R8A7793=y
++CONFIG_ARCH_R8A7794=y
++CONFIG_ARCH_R9A06G032=y
++CONFIG_ARCH_SH73A0=y
+ CONFIG_IIO=y
+ CONFIG_AK8975=y
+ CONFIG_PWM=y
+@@ -212,4 +210,3 @@ CONFIG_NLS_ISO8859_1=y
+ CONFIG_PRINTK_TIME=y
+ # CONFIG_ENABLE_MUST_CHECK is not set
+ CONFIG_DEBUG_KERNEL=y
+-# CONFIG_ARM_UNWIND is not set
+-- 
+2.17.1
 
-... I expect Will to pick this up as part of perf/updates, assuming he's
-also fine with it.
-
-Thanks,
-Mark.
-
-> ---
->  arch/arm64/kernel/perf_event.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index 1620a37..4addb38 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -810,7 +810,7 @@ static void armv8pmu_clear_event_idx(struct pmu_hw_events *cpuc,
->  }
->  
->  /*
-> - * Add an event filter to a given event. This will only work for PMUv2 PMUs.
-> + * Add an event filter to a given event.
->   */
->  static int armv8pmu_set_event_filter(struct hw_perf_event *event,
->  				     struct perf_event_attr *attr)
-> -- 
-> 2.7.4
-> 
 
 _______________________________________________
 linux-arm-kernel mailing list
