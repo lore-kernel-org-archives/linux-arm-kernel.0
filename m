@@ -2,74 +2,67 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F3F62C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:28:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4035EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:28:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BA47020850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:28:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0F81420850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:28:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FVQzGKvf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BA47020850
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BTlheCms"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0F81420850
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=L/olmg0kgEdd2Xegof0Uhg/YIf50DJgadwXZWC03X+c=; b=FVQzGKvfqIBGjo
-	lO7wtkCyQuxCwLJIb/OA7Z0NdWLG1oTrm3XDSJiIM5Zvh5SXzocXuEtSwBJS58MRonwsbWY+9gmAa
-	gXecMYkwenLEbConzEh30LwALH5Ld27pPS/M8bWeA35Pgdo60hdEkTa1zktwIJHyHuKm3lakgpPuL
-	I4RW5/jivbma8+vtQhyERMB0lifQUd2fzZW68VUhIX0vLZTT4Cn2gXZlTcmPxXZrUTrNe5HVOBKY5
-	rVAYxkEFFjt7En6S4XsRWOYF472fHu/bk/6LxPpJXo6oOTiuwO9CpI/DMeeY4VNOFNLxd9H3G4nil
-	UwRsorA8E4ItCgFGhiQw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=eSWyqhArNnwfHZCsRYCmfcZW62ZozME808XNBswYyaw=; b=BTlheCmsdcJk9M
+	gn4IIaWiMysHyukKU09wYe5BYDvFvSD8z+7Tvv+4enhLeABpaQZeUkxGMX6Wx80pGDzjHhU0qhBPF
+	T6X3MwO4Auf13SKGPoEOM+gvxPL4tlaT0qt1UoS0/YPUe2c+wNB+3NINZ7GA5Xbc9Z3Rn9/J/L7sD
+	LOBfu9OufUrOikg2c5PnUwaCU2ZtnztEciUzGUtyqUY3nU7JuArWIdNgUDTFgbg6122gKHZg9cces
+	adA9QIGpBsTrknkKposaq4ODXE+4FIg4SRVMEnMOwPfzlsahw5jZl/1M5FdMODX00eFuzsW84zXqy
+	sUbFjILsadn2+VGU5xzA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkX0K-0000gz-Fm; Fri, 18 Jan 2019 16:28:24 +0000
-Received: from mout.kundenserver.de ([212.227.17.10])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkWzZ-000054-8H
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 16:27:40 +0000
-Received: from wuerfel.lan ([109.192.41.194]) by mrelayeu.kundenserver.de
- (mreue109 [212.227.15.145]) with ESMTPA (Nemesis) id
- 1Myb8N-1h9Ji41bDh-00ywxC; Fri, 18 Jan 2019 17:19:41 +0100
-From: Arnd Bergmann <arnd@arndb.de>
-To: y2038@lists.linaro.org, linux-api@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-arch@vger.kernel.org
-Subject: [PATCH v2 19/29] time: Add struct __kernel_timex
-Date: Fri, 18 Jan 2019 17:18:25 +0100
-Message-Id: <20190118161835.2259170-20-arnd@arndb.de>
-X-Mailer: git-send-email 2.20.0
-In-Reply-To: <20190118161835.2259170-1-arnd@arndb.de>
-References: <20190118161835.2259170-1-arnd@arndb.de>
+	id 1gkX0d-0000wM-LI; Fri, 18 Jan 2019 16:28:43 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gkWzd-00006X-DF
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 16:27:45 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B655BEBD;
+ Fri, 18 Jan 2019 08:27:38 -0800 (PST)
+Received: from [10.1.196.69] (e112269-lin.cambridge.arm.com [10.1.196.69])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id C48DF3F557;
+ Fri, 18 Jan 2019 08:27:36 -0800 (PST)
+Subject: Re: [PATCH 1/3] kconfig.h: abstract empty functions with STUB_UNLESS
+ macro
+To: Andrew Murray <andrew.murray@arm.com>,
+ Masahiro Yamada <yamada.masahiro@socionext.com>,
+ Arnd Bergmann <arnd@arndb.de>, Kees Cook <keescook@chromium.org>,
+ Andrew Morton <akpm@linux-foundation.org>
+References: <1547827230-55132-1-git-send-email-andrew.murray@arm.com>
+ <1547827230-55132-2-git-send-email-andrew.murray@arm.com>
+From: Steven Price <steven.price@arm.com>
+Message-ID: <830dafb3-7e93-e655-464f-8cb821de8dd5@arm.com>
+Date: Fri, 18 Jan 2019 16:27:35 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-X-Provags-ID: V03:K1:av64eTYsi2K0oecdlvrPbJkEidlMY8tIQkQX919n78kQTRWxVDT
- AEO8Y1y0Gg3kMOTk7Ytz+hp122eH4GS/wmnGxvETpi223F8qYnKQ5nHdS9Db1csvd53Shzx
- NsB3jwfJVeKLCMpEtzJ6rD0oxXHOu/EqsAk4NKBNiImSlEYGKZSuJcfe8UblsPBnSmc+GR8
- WjMe1ho0oEOGsrwgXNtMg==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:ZqLpqSp+JSc=:3wmY17H+Tchv+PQ6N+iT8Y
- HSsbDhKMQssrWjovl7zvqvr7ySGB1787IqnV7kggqJMg4HXL3OKZdBoE8hs+iCxZ9d8fr+9st
- xZOJFYdkGzUwa7f3vvJsRQZqUcnJOEM6MXdP/PayW1iZneMGsFBN5nMfAdchuKivKd38axkzQ
- +GiYmGMBn9dFICXNwh1WIw+X7uLL8pnC2uGmlztXkZ9zVaxIXYa4FlxfZog0jbf8F92+ELuhS
- b6DYpAzHWITBCBUQ4s4uk/f0dpdoyytA5CoMcztDo64eIKSNsyy2Ohyvs6Kgje5MwbBpFq2co
- 1LrhY0qPzV9PXv7tUHoc621Oaaen66NN9917DZZ4iyW20hFFvoNN1WBSGX2PsuC8wNR0cNOlL
- 0r89wn4eVc9DJ1WGBtr1dJNyePQ5O5tuJQowMFaHihuX9/5pkoH/5O3Oswe3azVMZjtAjljwE
- BI7BWEEEL7qtcfKjN5otD+l8oupFEcwjvxFEvx+e4r06FXSt6VAtpf8mNBk26W0LZoXTj1t2B
- x5xWV3IX7ITyaT4OA1S7h76nqNgrx7rmhe5+sQi3WYIcmE+wcqitu+nCg2FoIUYCWOG32mkKB
- A59fxK85ovK2coQb8NAuTgDrirQXY9SW8rGoyLs4HRZBx2smDk4i0StGdDfhyxvG7md28kwjT
- 5ZhwVeSrNthRHyX8bpJe1JHcaMimfRVlScP2FK6mX/t6n1TyVbN66Q6K9Nk5O5DsaK0ZfBzJe
- jqd/trk2TwKS/udUCH7l7bF124tg5kTPH9ymtg==
+In-Reply-To: <1547827230-55132-2-git-send-email-andrew.murray@arm.com>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_082737_756624_812A16C0 
-X-CRM114-Status: GOOD (  14.43  )
+X-CRM114-CacheID: sfid-20190118_082741_743519_2D762AED 
+X-CRM114-Status: GOOD (  21.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,143 +74,89 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dalias@libc.org, linux-ia64@vger.kernel.org, linux-sh@vger.kernel.org,
- catalin.marinas@arm.com, will.deacon@arm.com, jcmvbkbc@gmail.com,
- deepa.kernel@gmail.com, hpa@zytor.com, sparclinux@vger.kernel.org,
- linux-s390@vger.kernel.org, mpe@ellerman.id.au, deller@gmx.de, x86@kernel.org,
- linux@armlinux.org.uk, mingo@redhat.com, geert@linux-m68k.org,
- benh@kernel.crashing.org, firoz.khan@linaro.org, mattst88@gmail.com,
- fenghua.yu@intel.com, Arnd Bergmann <arnd@arndb.de>, heiko.carstens@de.ibm.com,
- linux-fsdevel@vger.kernel.org, linux-m68k@lists.linux-m68k.org,
- luto@kernel.org, tglx@linutronix.de, linux-arm-kernel@lists.infradead.org,
- monstr@monstr.eu, tony.luck@intel.com, linux-parisc@vger.kernel.org,
- netdev@vger.kernel.org, linux-mips@vger.kernel.org, paul.burton@mips.com,
- ebiederm@xmission.com, linux-alpha@vger.kernel.org, schwidefsky@de.ibm.com,
- akpm@linux-foundation.org, linuxppc-dev@lists.ozlabs.org, davem@davemloft.net
+Cc: Catalin Marinas <catalin.marinas@arm.com>, rjw@rjwysocki.net,
+ linux-kernel@vger.kernel.org, Will Deacon <will.deacon@arm.com>,
+ Grant Likely <Grant.Likely@arm.com>, Dave P Martin <Dave.Martin@arm.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Deepa Dinamani <deepa.kernel@gmail.com>
+On 18/01/2019 16:00, Andrew Murray wrote:
+> A common pattern found in header files is a function declaration dependent
+> on a CONFIG_ option being enabled, followed by an empty function for when
+> that option isn't enabled. This can often take up a lot of space and impact
+> code readability.
+> 
+> Let's introduce the following STUB_UNLESS macro:
+> 
+> STUB_UNLESS(CONFIG_FOO, [body], prototype)
+> 
+> This evaluates to 'prototype' prepended with 'extern' if CONFIG_FOO is set
+> to 'y'. Otherwise it will evaluate to 'prototype' prepended with 'static
+> inline' followed by an empty function body. Where optional argument 'body'
+> then 'body' will be used as the function body, intended to allow for simple
+> return statements.
+> 
+> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 
-struct timex uses struct timeval internally.
-struct timeval is not y2038 safe.
-Introduce a new UAPI type struct __kernel_timex
-that is y2038 safe.
+Seems like it should remove a lot of boilerplate code, so looks good to me.
 
-struct __kernel_timex uses a timeval type that is
-similar to struct __kernel_timespec which preserves the
-same structure size across 32 bit and 64 bit ABIs.
-struct __kernel_timex also restructures other members of the
-structure to make the structure the same on 64 bit and 32 bit
-architectures.
-Note that struct __kernel_timex is the same as struct timex
-on a 64 bit architecture.
+Reviewed-by: Steven Price <steven.price@arm.com>
 
-The above solution is similar to other new y2038 syscalls
-that are being introduced: both 32 bit and 64 bit ABIs
-have a common entry, and the compat entry supports the old 32 bit
-syscall interface.
-
-Alternatives considered were:
-1. Add new time type to struct timex that makes use of padded
-   bits. This time type could be based on the struct __kernel_timespec.
-   modes will use a flag to notify which time structure should be
-   used internally.
-   This needs some application level changes on both 64 bit and 32 bit
-   architectures. Although 64 bit machines could continue to use the
-   older timeval structure without any changes.
-
-2. Add a new u8 type to struct timex that makes use of padded bits. This
-   can be used to save higher order tv_sec bits. modes will use a flag to
-   notify presence of such a type.
-   This will need some application level changes on 32 bit architectures.
-
-3. Add a new compat_timex structure that differs in only the size of the
-   time type; keep rest of struct timex the same.
-   This requires extra syscalls to manage all 3 cases on 64 bit
-   architectures. This will not need any application level changes but will
-   add more complexity from kernel side.
-
-Signed-off-by: Deepa Dinamani <deepa.kernel@gmail.com>
----
- include/linux/timex.h      |  7 +++++++
- include/uapi/linux/timex.h | 41 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 48 insertions(+)
-
-diff --git a/include/linux/timex.h b/include/linux/timex.h
-index 39c25dbebfe8..7f40e9e42ecc 100644
---- a/include/linux/timex.h
-+++ b/include/linux/timex.h
-@@ -53,6 +53,13 @@
- #ifndef _LINUX_TIMEX_H
- #define _LINUX_TIMEX_H
- 
-+/* CONFIG_64BIT_TIME enables new 64 bit time_t syscalls in the compat path
-+ * and 32-bit emulation.
-+ */
-+#ifndef CONFIG_64BIT_TIME
-+#define __kernel_timex timex
-+#endif
-+
- #include <uapi/linux/timex.h>
- 
- #define ADJ_ADJTIME		0x8000	/* switch between adjtime/adjtimex modes */
-diff --git a/include/uapi/linux/timex.h b/include/uapi/linux/timex.h
-index 92685d826444..a1c6b73016a5 100644
---- a/include/uapi/linux/timex.h
-+++ b/include/uapi/linux/timex.h
-@@ -92,6 +92,47 @@ struct timex {
- 	int  :32; int  :32; int  :32;
- };
- 
-+struct __kernel_timex_timeval {
-+	__kernel_time64_t       tv_sec;
-+	long long		tv_usec;
-+};
-+
-+#ifndef __kernel_timex
-+struct __kernel_timex {
-+	unsigned int modes;	/* mode selector */
-+	int :32;            /* pad */
-+	long long offset;	/* time offset (usec) */
-+	long long freq;	/* frequency offset (scaled ppm) */
-+	long long maxerror;/* maximum error (usec) */
-+	long long esterror;/* estimated error (usec) */
-+	int status;		/* clock command/status */
-+	int :32;            /* pad */
-+	long long constant;/* pll time constant */
-+	long long precision;/* clock precision (usec) (read only) */
-+	long long tolerance;/* clock frequency tolerance (ppm)
-+				   * (read only)
-+				   */
-+	struct __kernel_timex_timeval time;	/* (read only, except for ADJ_SETOFFSET) */
-+	long long tick;	/* (modified) usecs between clock ticks */
-+
-+	long long ppsfreq;/* pps frequency (scaled ppm) (ro) */
-+	long long jitter; /* pps jitter (us) (ro) */
-+	int shift;              /* interval duration (s) (shift) (ro) */
-+	int :32;            /* pad */
-+	long long stabil;            /* pps stability (scaled ppm) (ro) */
-+	long long jitcnt; /* jitter limit exceeded (ro) */
-+	long long calcnt; /* calibration intervals (ro) */
-+	long long errcnt; /* calibration errors (ro) */
-+	long long stbcnt; /* stability limit exceeded (ro) */
-+
-+	int tai;		/* TAI offset (ro) */
-+
-+	int  :32; int  :32; int  :32; int  :32;
-+	int  :32; int  :32; int  :32; int  :32;
-+	int  :32; int  :32; int  :32;
-+};
-+#endif
-+
- /*
-  * Mode codes (timex.mode)
-  */
--- 
-2.20.0
+> ---
+>  include/linux/kconfig.h | 31 +++++++++++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+> 
+> diff --git a/include/linux/kconfig.h b/include/linux/kconfig.h
+> index cc8fa10..216a27f 100644
+> --- a/include/linux/kconfig.h
+> +++ b/include/linux/kconfig.h
+> @@ -12,6 +12,7 @@
+>  
+>  #define __ARG_PLACEHOLDER_1 0,
+>  #define __take_second_arg(__ignored, val, ...) val
+> +#define __take_fourth_arg(__ignored, __ignored2, __ignored3, val, ...) val
+>  
+>  /*
+>   * The use of "&&" / "||" is limited in certain expressions.
+> @@ -70,4 +71,34 @@
+>   */
+>  #define IS_ENABLED(option) __or(IS_BUILTIN(option), IS_MODULE(option))
+>  
+> +
+> +
+> +/*
+> + * Allow for __stub to be overloaded by making the second argument optional
+> + */
+> +#define __stub_overload(...)		__take_fourth_arg(__VA_ARGS__, \
+> +					__stub_body, __stub_void)(__VA_ARGS__)
+> +#define __stub_body(option, body, ptype) __stub(option, body, ptype)
+> +#define __stub_void(option, ptype)	__stub(option, , ptype)
+> +
+> +/*
+> + * Using the same trick as __defined we use the config option to conditionally
+> + * expand to an extern function declaration or a static stub function.
+> + */
+> +#define __stub(option, body, ptype)	___stub( \
+> +					__ARG_PLACEHOLDER_##option, body, ptype)
+> +#define ___stub(arg1_or_junk, body, ptype) __take_second_arg( \
+> +		arg1_or_junk __extern_ptype(ptype), __static_ptype(body, ptype))
+> +#define __static_ptype(body, ptype)	static inline ptype { body; }
+> +#define __extern_ptype(ptype)		extern ptype
+> +
+> +/*
+> + * STUB_UNLESS(CONFIG_FOO, [body], prototype) evaluates to 'prototype' prepended
+> + * with 'extern' if CONFIG_FOO is set to 'y'. Otherwise it will evaluate to
+> + * 'prototype' prepended with 'static inline' followed by an empty function
+> + * body. Where optional argument 'body' is present then 'body' will be used
+> + * as the function body, intended to allow for simple return statements.
+> + */
+> +#define STUB_UNLESS(...) __stub_overload(__VA_ARGS__)
+> +
+>  #endif /* __LINUX_KCONFIG_H */
+> 
 
 
 _______________________________________________
