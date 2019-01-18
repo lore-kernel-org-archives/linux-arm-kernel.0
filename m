@@ -2,58 +2,62 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 68D53C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:13:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B7199C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:13:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3910F2087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:13:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 78EBA20883
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:13:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l2cME5xz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3910F2087E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f+16vZgQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 78EBA20883
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=lwGzV82eF+mrKOYjuq1RQ+2fkZwRDycK2Hva4Vxt2ek=; b=l2cME5xzIwhXDO
-	iGAojbzH6A/qcj/BMt1fbE3rr0vwLN0hRpXJ74kIGv0GdKmHeGzq0mccRwiEMYJZq6dXGHwVCO3nf
-	j7YMggAwTzv4qYs6lYVOOe3GQ8X6b5pyZMdSExGfDUf+pEO6j3jqSkbzOPLKBZqmv4HZmcFQFjEoD
-	P9ubKBx/WIBRuDmv88kE6QeNCOVGVi9B8EQhFVId/5D0bcuQRaTnhp4e13iI2wRaZvLTQwcU9Fbn2
-	0EpDFtP46cyAMDJnhUI/IcMqmGijSx2j7eipKx0+Ehs6vbJeOfk+GnRF2cUXBSoa74mjiksVwnD8h
-	DOmGxq9IW8qkGCA2CJkA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=MUzXDJiUcAz/PVk7yD+iV7m7eX2aXHaxdlHSMeAf0+s=; b=f+16vZgQz8fqVI
+	r0hf9gN3PVw5/ySbhCmyX52L9bZKZKozds/9nvq6T7AzPxg8eLiDB4dt9UNbKw95eYP3HUJAbKrdm
+	sDIGl5XthZ/rxLIqTVSssyqDGlnq+EDqTGrok02AGZK80M3mgFkQFzgr1TYr/An/o45B9IFQoGnPP
+	RDE1oRYxLYyY2G+DGhp2ajAq2xhTSTu03+czyoWTpNNUO9kI5L+n79G0WDYQWJD5gPMSg5Jue3yff
+	Ug4mj7PySTfGdQpEuDerNVhPdpPFfw4DkC+wFESeQmU4VcoUeLgS9X8bcFL6Lz/tYpkn+eJxu1BG2
+	84bDo5fF/jw5cpDw8CmA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkUtp-0008Ln-VW; Fri, 18 Jan 2019 14:13:33 +0000
+	id 1gkUu0-0008Vr-DM; Fri, 18 Jan 2019 14:13:44 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkUtm-0008Kc-7K
+ id 1gkUtm-0008Kf-BC
  for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 14:13:31 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 9173C207AC; Fri, 18 Jan 2019 15:13:27 +0100 (CET)
+ id 1A631207B0; Fri, 18 Jan 2019 15:13:29 +0100 (CET)
 Received: from localhost (alyon-652-1-26-46.w109-213.abo.wanadoo.fr
  [109.213.9.46])
- by mail.bootlin.com (Postfix) with ESMTPSA id 342782074A;
- Fri, 18 Jan 2019 15:13:27 +0100 (CET)
+ by mail.bootlin.com (Postfix) with ESMTPSA id A47142074A;
+ Fri, 18 Jan 2019 15:13:28 +0100 (CET)
 From: Gregory CLEMENT <gregory.clement@bootlin.com>
 To: "Rafael J. Wysocki" <rjw@rjwysocki.net>,
  Viresh Kumar <viresh.kumar@linaro.org>, linux-pm@vger.kernel.org
-Subject: [PATCH v5 0/2] Add cpufreq support for Armada 8K
-Date: Fri, 18 Jan 2019 15:11:38 +0100
-Message-Id: <20190118141140.30352-1-gregory.clement@bootlin.com>
+Subject: [PATCH v5 1/2] MAINTAINERS: add new entries for Armada 8K cpufreq
+ driver
+Date: Fri, 18 Jan 2019 15:11:39 +0100
+Message-Id: <20190118141140.30352-2-gregory.clement@bootlin.com>
 X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190118141140.30352-1-gregory.clement@bootlin.com>
+References: <20190118141140.30352-1-gregory.clement@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_061330_399473_0A1AE592 
-X-CRM114-Status: GOOD (  11.16  )
+X-CRM114-CacheID: sfid-20190118_061330_520118_A6F22919 
+X-CRM114-Status: GOOD (  10.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,75 +82,26 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+This new driver belongs to the mvebu family, update the MAINTAINER file
+to document it.
 
-this is the fifth version of a the series adding the cpufreq support
-for the Marvell Armada 8K SoCs.
+Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+---
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-Gregory
-
-Changelog:
-v4 -> v5:
-
- - Rebased onto v5.0-rc1
-
- - Rewrite the clk_get part in armada_8k_get_sharing_cpus()
-
- - Reverse the call function order in armada_8k_cpufreq_exit()
-
-v3 -> v4:
-
- - Remove most of the global variable and use the private data of the
-   platfrom device to store the freq_tables struct.
-
- - Remove the clk pointer of the freq_table struct which is no more
-   needed with the new way to register the opp
-
- - Check the get_cpu_device() return.
-
- - Balance the clk_get() calls.
-
- - No more use the devm_ function.
-
- - Base the registration of the opp on the cpu mask updated after each
-   iteration to find the shared cpus.
-
- - Base the free on the NULL or 0 value of the freq_table struct
-   members, it allows to remove the global index.
-
-v2 -> v3
-
- - Make the driver really modular (modprobe;modprobe -r;modprobe; is working)
-
- - Don't use anymore 100MHz as minimal frequency, but only max frequency/4
-
- - Fix remaining warning reported by checkpatch
-
- - Rework the registering of the opp
-
-v1 -> v2:
-
- - Fix typos in MAINTAINERS (reported by Baruch Siach) and in
-   armada-8k-cpufreq.c (reported by Thomas Petazzoni)
-
- - Fix indentation in Kconfig.arm  (reported by Thomas Petazzoni)
-
- - Use const for opps_div  (reported by Thomas Petazzoni)
-
- - Fix memory leak of opps_array  (reported by Thomas Petazzoni)
-
-
-Gregory CLEMENT (2):
-  MAINTAINERS: add new entries for Armada 8K cpufreq driver
-  cpufreq: ap806: add cpufreq driver for Armada 8K
-
- MAINTAINERS                         |   1 +
- drivers/cpufreq/Kconfig.arm         |  11 ++
- drivers/cpufreq/Makefile            |   1 +
- drivers/cpufreq/armada-8k-cpufreq.c | 203 ++++++++++++++++++++++++++++
- 4 files changed, 216 insertions(+)
- create mode 100644 drivers/cpufreq/armada-8k-cpufreq.c
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 32d444476a90..4a3d62a83e35 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1737,6 +1737,7 @@ F:	arch/arm/configs/mvebu_*_defconfig
+ F:	arch/arm/mach-mvebu/
+ F:	arch/arm64/boot/dts/marvell/armada*
+ F:	drivers/cpufreq/armada-37xx-cpufreq.c
++F:	drivers/cpufreq/armada-8k-cpufreq.c
+ F:	drivers/cpufreq/mvebu-cpufreq.c
+ F:	drivers/irqchip/irq-armada-370-xp.c
+ F:	drivers/irqchip/irq-mvebu-*
 -- 
 2.20.1
 
