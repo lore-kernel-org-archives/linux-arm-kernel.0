@@ -4,65 +4,59 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 81F78C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 10:57:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 50E25C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 10:57:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 517B82087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 10:57:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 225B420823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 10:57:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U1UCC7E+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 517B82087E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="a9SUZkCU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 225B420823
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=holtmann.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=bbysdpq/Crg4wJTdKNKuDWYW54a0NPIeDhX9Fug9P8o=; b=U1UCC7E+6IW7unHjYg5lVM3Jp
-	W6qBoZ1M+ivlObs1jiXgUNjJ8u5D8ZB5L+Bs/QfezO3oCAD7JDMnH6rSH+c57QYAoM2wTeTUVqiIC
-	5lM/cwYRt6dIeWm6LXcxjBvozkF8Y1leD3xgFGXYBmjM+dtCz2WZ6C+XkK5hszXcvHopzAwgzESmA
-	iCAx2eT49pL7qiV0dvHWJPEsJqv0T19+gXhSXMZr8BPsJJvtWv7Eu5ax0UlcuHLr+NE4NUt/L6svM
-	TXqTxt5wIfB1lyAsUZGbOMeZvOlPk7rd5swqgjgX0fafKdsKHle3fmUmnWbAiDMkaX+csYHfGMXRR
-	jwaKHv/qg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:References:Message-Id:Date:
+	In-Reply-To:From:Subject:Mime-Version:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ZG7IH7dqVLi70SG3iq2QqhrjT8u1rGcnQrULKkNIDgQ=; b=a9SUZkCUCmSewi
+	orv04Vf6ejcthnPSz642JJfBbTeLHBv8NSiHvE/kYRnXLB8lxBvSi+YNDetT/jxwe2UWN5JLP3xCF
+	Fii6v3qPmM+GKbVjn0hsFW7ij15iGC/PHyATUAMYhijJLESU7XLNoi8h473p3SkGEAPSMzs2NWlE1
+	v318XTZ2ZgMMIAQnAYvpeDpKExFpQSyXNOxCMwBofZeaqvelLfv+pysgYlf9DKPWo+yY82niUv197
+	qBhtuu+A1ghfVwKoncpxzP7aG6OsgVTSjCR0wtYvi8TykYg+JToIAlCHJ7aUKGMtho1BtMXChAe2T
+	osVFVIM5S5kA3+8OTWOQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkRpu-0007Fi-9N; Fri, 18 Jan 2019 10:57:18 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gkRq6-0007Sf-Td; Fri, 18 Jan 2019 10:57:30 +0000
+Received: from coyote.holtmann.net ([212.227.132.17] helo=mail.holtmann.org)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkRpr-0007FN-2S
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 10:57:16 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id EA446EBD;
- Fri, 18 Jan 2019 02:57:13 -0800 (PST)
-Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id F3D813F557;
- Fri, 18 Jan 2019 02:57:10 -0800 (PST)
-Subject: Re: [PATCHv2 2/4] arm64: dts: qcom: msm8996: Add Coresight support
-To: saiprakash.ranjan@codeaurora.org, robh+dt@kernel.org,
- mathieu.poirier@linaro.org, leo.yan@linaro.org,
- alexander.shishkin@linux.intel.com, andy.gross@linaro.org,
- david.brown@linaro.org, vivek.gautam@codeaurora.org, dianders@chromium.org,
- sboyd@kernel.org, bjorn.andersson@linaro.org, devicetree@vger.kernel.org,
- mark.rutland@arm.com
-References: <cover.1547798966.git.saiprakash.ranjan@codeaurora.org>
- <552e408950525b1bac39d05b8b4f2ae1975397e0.1547798966.git.saiprakash.ranjan@codeaurora.org>
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
-Message-ID: <1311e78a-21f6-6470-7861-39b3499974ce@arm.com>
-Date: Fri, 18 Jan 2019 10:57:09 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <552e408950525b1bac39d05b8b4f2ae1975397e0.1547798966.git.saiprakash.ranjan@codeaurora.org>
-Content-Language: en-US
+ id 1gkRq0-0007IW-Se
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 10:57:27 +0000
+Received: from marcel-macpro.fritz.box (p4FF9FD60.dip0.t-ipconnect.de
+ [79.249.253.96])
+ by mail.holtmann.org (Postfix) with ESMTPSA id 3BAFCCEE14;
+ Fri, 18 Jan 2019 12:05:04 +0100 (CET)
+Mime-Version: 1.0 (Mac OS X Mail 12.2 \(3445.102.3\))
+Subject: Re: [PATCHv2] Patch to add the realtek bluetooth device tree refs to
+ the code
+From: Marcel Holtmann <marcel@holtmann.org>
+In-Reply-To: <20190103163538.6575-2-beagleboard@davidjohnsummers.uk>
+Date: Fri, 18 Jan 2019 11:57:17 +0100
+Message-Id: <510BE8B9-76BD-4A64-86C2-ACA1D50819DF@holtmann.org>
+References: <20181229115513.31153-1-beagleboard@davidjohnsummers.uk>
+ <20190103163538.6575-1-beagleboard@davidjohnsummers.uk>
+ <20190103163538.6575-2-beagleboard@davidjohnsummers.uk>
+To: David Summers <beagleboard@davidjohnsummers.uk>
+X-Mailer: Apple Mail (2.3445.102.3)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_025715_119131_6553AAB8 
-X-CRM114-Status: GOOD (  16.61  )
+X-CRM114-CacheID: sfid-20190118_025725_677687_402344F5 
+X-CRM114-Status: GOOD (  15.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,51 +68,59 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-msm@vger.kernel.org, rnayak@codeaurora.org, sibis@codeaurora.org,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ Johan Hedberg <johan.hedberg@gmail.com>, linux-bluetooth@vger.kernel.org,
+ Rob Herring <robh+dt@kernel.org>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Sai,
+Hi David,
 
-On 18/01/2019 08:25, Sai Prakash Ranjan wrote:
-> From: Vivek Gautam <vivek.gautam@codeaurora.org>
+> This patch adds the necessary device tree hooks to the realtek
+> bluetooth driver for serial connections.
 > 
-> Enable coresight support by adding device nodes for the
-> available source, sinks and channel blocks on msm8996.
+> The realtek devices that are listed btrtl.c are searched on the
+> realtek web site for the version that have serial connections.
 > 
-> This also adds coresight cpu debug nodes.
+> Most of these devices also have wi-fi connected via sdio, that is not
+> covered by the bluetooth driver - but as that interface will also be
+> needed in the device tree, the hocks here have "-bluetooth" added. The
+> exception to this is the rtl8761atv, which only has a serial
+> bluetooth.
 > 
-> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
-> Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+> Signed-off-by: David Summers <beagleboard@davidjohnsummers.uk>
 > ---
->   arch/arm64/boot/dts/qcom/msm8996.dtsi | 447 ++++++++++++++++++++++++++
->   1 file changed, 447 insertions(+)
+> drivers/bluetooth/hci_h5.c | 16 ++++++++++++++++
+> 1 file changed, 16 insertions(+)
 > 
-> diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> index 99b7495455a6..96a16d5a258c 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+> diff --git a/drivers/bluetooth/hci_h5.c b/drivers/bluetooth/hci_h5.c
+> index 8eede1197cd2..2fec7ff2ce7c 100644
+> --- a/drivers/bluetooth/hci_h5.c
+> +++ b/drivers/bluetooth/hci_h5.c
+> @@ -925,6 +925,22 @@ static struct h5_vnd rtl_vnd = {
+> };
+> #endif
+> 
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id h5_of_match[] = {
+> +#ifdef CONFIG_BT_HCIUART_RTL
+> +       { .compatible = "realtek,rtl8723as-bluetooth"},
+> +       { .compatible = "realtek,rtl8723bs-bluetooth"},
+> +       { .compatible = "realtek,rtl8723ds-bluetooth"},
+> +       { .compatible = "realtek,rtl8761atv"},
+> +       { .compatible = "realtek,rtl8821as-bluetooth"},
+> +       { .compatible = "realtek,rtl8821cs-bluetooth"},
+> +       { .compatible = "realtek,rtl8822bs-bluetooth"},
+> +#endif
 
-> +
-> +		etr@3028000 {
-> +			compatible = "arm,coresight-tmc", "arm,primecell";
-> +			reg = <0x3028000 0x1000>;
-> +
-> +			clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-> +			clock-names = "apb_pclk", "atclk";
+I really need an Ack from Rob on the naming here.
 
-If you want to use the scatter-gather mode, you must add "arm,scatter-gather"
-property to the node here.
+Regards
 
-Have you tested the scatter-gather mode on the chip ? Does that work at all ?
-Note: You could try this by setting a buffer_size > 1M for the ETR and use
-it as a sink from the sysfs mode.
+Marcel
 
-Cheers
-Suzuki
 
 _______________________________________________
 linux-arm-kernel mailing list
