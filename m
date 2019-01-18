@@ -2,66 +2,58 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9B8E5C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:46:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E243CC43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:46:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 62F3C20823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:46:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B4A6C20896
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:46:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ajlGAqxi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 62F3C20823
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qp3psxjF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B4A6C20896
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=xfV2bUBL0FD62oNM6pxNYZkOHTtBrJq0L2RS1IpM30c=; b=ajlGAqxi4wbdkr
-	IJ+cBd9A7PvcN/W83GFdzGcEI8+DjHnKYwg40zFqaGnJ6ozwfIMSYqZTJAJF7lG542J4mRMiEmR2l
-	d3UR90Yfrw6isi1TeT4R9SRo4zQhTwHoQ/mPoPYZ2X6ulNxVvcGtDCvQ6J2tfW4y1x0NuzyXsGlnX
-	+eGmDOlOVxSEHiHNcIiUwwIM8CkoJ4lfX4Z0Vsr/PUmc0nWzqOZJ5rxvMudql1P9KCUqcvHRiwFxx
-	BhVuhvfq9uMz0YTnf2vxXdKwd16cnCNbDUBACychJ1KtOdkFkALJGDOZJRkVBhqA/naduuRmad4L5
-	6UfyXqxBZjT4LqaimOFw==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=fNjDgzmkMRvzNcNP6RiwEWprNRpYa8MEfiPdHX3oqgw=; b=qp3
+	psxjF3UF8UsWPYQydBVe7YTu1PRf+uJarbJzBEy5RyAyafS0aQHrDRSIzjtNt1aroPiabYHr7sVbr
+	F9+7lyvgkt+maAIzyE1coMZP8AoGcl/rBORd5VjwowrELv9lflt2X1oZJt/FdzvDmnY4UxWM0ZBwr
+	RJeF++aqchU8K4U9nmE+g27KsQxDOzm8o4DS6Q+JgR7SjMCdZ3+EXCsGIl013GiCb9Z1/q3nL4dGt
+	EBPmi0n39L90zb9eF1O8i0FHDKwu3n+BUEBKNgAH+DrrYFfiEY2y/2k8Zk5d8PkGYuDTWeTaReqsf
+	QqgaaRuybyP1ocvtJNoYOMC2tZJxmnw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkXHY-0007ih-Ki; Fri, 18 Jan 2019 16:46:12 +0000
+	id 1gkXI7-00086Q-JT; Fri, 18 Jan 2019 16:46:47 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkXHQ-0007cD-Oy
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 16:46:09 +0000
+ id 1gkXHy-00083T-AA
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 16:46:45 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4094080D;
- Fri, 18 Jan 2019 08:46:04 -0800 (PST)
-Received: from [10.1.196.69] (e112269-lin.cambridge.arm.com [10.1.196.69])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 17F2C3F7BE;
- Fri, 18 Jan 2019 08:46:01 -0800 (PST)
-Subject: Re: [PATCH 3/3] arm64: update headers to use STUB_UNLESS macro
-To: Andrew Murray <andrew.murray@arm.com>,
- Masahiro Yamada <yamada.masahiro@socionext.com>,
- Arnd Bergmann <arnd@arndb.de>, Kees Cook <keescook@chromium.org>,
- Andrew Morton <akpm@linux-foundation.org>
-References: <1547827230-55132-1-git-send-email-andrew.murray@arm.com>
- <1547827230-55132-4-git-send-email-andrew.murray@arm.com>
-From: Steven Price <steven.price@arm.com>
-Message-ID: <ec66e24c-55fc-520d-0c65-9a429b369056@arm.com>
-Date: Fri, 18 Jan 2019 16:46:00 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
-MIME-Version: 1.0
-In-Reply-To: <1547827230-55132-4-git-send-email-andrew.murray@arm.com>
-Content-Language: en-GB
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7104980D;
+ Fri, 18 Jan 2019 08:46:36 -0800 (PST)
+Received: from e108454-lin.cambridge.arm.com (e108454-lin.cambridge.arm.com
+ [10.1.196.50])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A526A3F7BE;
+ Fri, 18 Jan 2019 08:46:34 -0800 (PST)
+From: Julien Grall <julien.grall@arm.com>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [RFC PATCH 0/8] arm64/sve: First steps towards optimizing syscalls
+Date: Fri, 18 Jan 2019 16:46:02 +0000
+Message-Id: <20190118164610.8123-1-julien.grall@arm.com>
+X-Mailer: git-send-email 2.11.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_084605_356616_6AD0E517 
-X-CRM114-Status: GOOD (  23.66  )
+X-CRM114-CacheID: sfid-20190118_084638_354438_F3783D69 
+X-CRM114-Status: GOOD (  15.05  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,436 +65,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <catalin.marinas@arm.com>, rjw@rjwysocki.net,
- linux-kernel@vger.kernel.org, Will Deacon <will.deacon@arm.com>,
- Grant Likely <Grant.Likely@arm.com>, Dave P Martin <Dave.Martin@arm.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: tokamoto@jp.fujitsu.com, Anton.Kirilov@arm.com, catalin.marinas@arm.com,
+ will.deacon@arm.com, oleg@redhat.com, Julien Grall <julien.grall@arm.com>,
+ alex.bennee@linaro.org, Dave.Martin@arm.com, Daniel.Kiss@arm.com
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 18/01/2019 16:00, Andrew Murray wrote:
-> Use the STUB_UNLESS macro to simplify function declaration.
-> 
-> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
-> ---
->  arch/arm64/include/asm/acpi.h           | 38 +++++++++-------------
->  arch/arm64/include/asm/alternative.h    |  6 +---
->  arch/arm64/include/asm/cpufeature.h     |  6 +---
->  arch/arm64/include/asm/cpuidle.h        | 18 +++--------
->  arch/arm64/include/asm/debug-monitors.h | 10 ++----
->  arch/arm64/include/asm/fpsimd.h         | 57 +++++++++++++--------------------
->  arch/arm64/include/asm/hw_breakpoint.h  | 16 +++------
->  arch/arm64/include/asm/kasan.h          |  9 ++----
->  arch/arm64/include/asm/numa.h           | 19 ++++-------
->  arch/arm64/include/asm/ptdump.h         | 13 +++-----
->  arch/arm64/include/asm/signal32.h       | 29 +++++------------
->  11 files changed, 73 insertions(+), 148 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index 2def77e..81836ff 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -109,22 +109,17 @@ static inline u32 get_acpi_id_for_cpu(unsigned int cpu)
->  }
->  
->  static inline void arch_fix_phys_package_id(int num, u32 slot) { }
-> -void __init acpi_init_cpus(void);
-> -
-> -#else
-> -static inline void acpi_init_cpus(void) { }
->  #endif /* CONFIG_ACPI */
->  
-> -#ifdef CONFIG_ARM64_ACPI_PARKING_PROTOCOL
-> -bool acpi_parking_protocol_valid(int cpu);
-> +STUB_UNLESS(CONFIG_ACPI,
-> +void __init acpi_init_cpus(void));
-> +
-> +STUB_UNLESS(CONFIG_ARM64_ACPI_PARKING_PROTOCOL, return false,
-> +bool acpi_parking_protocol_valid(int cpu));
-> +
-> +STUB_UNLESS(CONFIG_ARM64_ACPI_PARKING_PROTOCOL,
->  void __init
-> -acpi_set_mailbox_entry(int cpu, struct acpi_madt_generic_interrupt *processor);
-> -#else
-> -static inline bool acpi_parking_protocol_valid(int cpu) { return false; }
-> -static inline void
-> -acpi_set_mailbox_entry(int cpu, struct acpi_madt_generic_interrupt *processor)
-> -{}
-> -#endif
-> +acpi_set_mailbox_entry(int cpu, struct acpi_madt_generic_interrupt *processor));
+Hi all,
 
-For these definitions we end up with a "static inline __init" function
-which seems a bit weird to me, but apparently we already have many of them.
+This is a first attempt to optimize the syscall path when the user
+application uses SVE. The patch series is based on v5.0-rc2.
 
->  static inline const char *acpi_get_enable_method(int cpu)
->  {
-> @@ -152,15 +147,14 @@ static inline pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
->  }
->  #endif /* CONFIG_ACPI_APEI */
->  
-> -#ifdef CONFIG_ACPI_NUMA
-> -int arm64_acpi_numa_init(void);
-> -int acpi_numa_get_nid(unsigned int cpu);
-> -void acpi_map_cpus_to_nodes(void);
-> -#else
-> -static inline int arm64_acpi_numa_init(void) { return -ENOSYS; }
-> -static inline int acpi_numa_get_nid(unsigned int cpu) { return NUMA_NO_NODE; }
-> -static inline void acpi_map_cpus_to_nodes(void) { }
-> -#endif /* CONFIG_ACPI_NUMA */
-> +STUB_UNLESS(CONFIG_ACPI_NUMA, return -ENOSYS,
-> +int arm64_acpi_numa_init(void));
-> +
-> +STUB_UNLESS(CONFIG_ACPI_NUMA, return NUMA_NO_NODE,
-> +int acpi_numa_get_nid(unsigned int cpu));
-> +
-> +STUB_UNLESS(CONFIG_ACPI_NUMA,
-> +void acpi_map_cpus_to_nodes(void));
->  
->  #define ACPI_TABLE_UPGRADE_MAX_PHYS MEMBLOCK_ALLOC_ACCESSIBLE
->  
-> diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-> index 4b650ec..3dfbc15 100644
-> --- a/arch/arm64/include/asm/alternative.h
-> +++ b/arch/arm64/include/asm/alternative.h
-> @@ -29,11 +29,7 @@ typedef void (*alternative_cb_t)(struct alt_instr *alt,
->  
->  void __init apply_alternatives_all(void);
->  
-> -#ifdef CONFIG_MODULES
-> -void apply_alternatives_module(void *start, size_t length);
-> -#else
-> -static inline void apply_alternatives_module(void *start, size_t length) { }
-> -#endif
-> +STUB_UNLESS(CONFIG_MODULES, void apply_alternatives_module(void *start, size_t length));
+Per the syscall ABI, SVE registers will be unknown after a syscall. In
+practice, the kernel will disable SVE and the registers will be zeroed
+(except the first 128-bits of each vector) on the next SVE instruction.
+In a workload mixing SVE and syscalls, this will result to 2 entry/exit
+to the kernel per syscall.
 
-Nit: You should probably wrap this line.
+This series aims to avoid the second entry/exit by zeroing the SVE
+registers on syscall return with a twist when the task will get
+rescheduled.
 
->  
->  #define ALTINSTR_ENTRY(feature,cb)					      \
->  	" .word 661b - .\n"				/* label           */ \
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index dfcfba7..27edb5e 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -628,11 +628,7 @@ static inline int arm64_get_ssbd_state(void)
->  #endif
->  }
->  
-> -#ifdef CONFIG_ARM64_SSBD
-> -void arm64_set_ssbd_mitigation(bool state);
-> -#else
-> -static inline void arm64_set_ssbd_mitigation(bool state) {}
-> -#endif
-> +STUB_UNLESS(CONFIG_ARM64_SSBD, void arm64_set_ssbd_mitigation(bool state));
->  
->  extern int do_emulate_mrs(struct pt_regs *regs, u32 sys_reg, u32 rt);
->  
-> diff --git a/arch/arm64/include/asm/cpuidle.h b/arch/arm64/include/asm/cpuidle.h
-> index 3c5ddb4..fecde4f 100644
-> --- a/arch/arm64/include/asm/cpuidle.h
-> +++ b/arch/arm64/include/asm/cpuidle.h
-> @@ -4,18 +4,10 @@
->  
->  #include <asm/proc-fns.h>
->  
-> -#ifdef CONFIG_CPU_IDLE
-> -extern int arm_cpuidle_init(unsigned int cpu);
-> -extern int arm_cpuidle_suspend(int index);
-> -#else
-> -static inline int arm_cpuidle_init(unsigned int cpu)
-> -{
-> -	return -EOPNOTSUPP;
-> -}
-> +STUB_UNLESS(CONFIG_CPU_IDLE, return -EOPNOTSUPP,
-> +int arm_cpuidle_init(unsigned int cpu));
-> +
-> +STUB_UNLESS(CONFIG_CPU_IDLE, return -EOPNOTSUPP,
-> +int arm_cpuidle_suspend(int index));
->  
-> -static inline int arm_cpuidle_suspend(int index)
-> -{
-> -	return -EOPNOTSUPP;
-> -}
-> -#endif
->  #endif
-> diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-> index a44cf52..8b91d8e 100644
-> --- a/arch/arm64/include/asm/debug-monitors.h
-> +++ b/arch/arm64/include/asm/debug-monitors.h
-> @@ -124,14 +124,8 @@ void kernel_enable_single_step(struct pt_regs *regs);
->  void kernel_disable_single_step(void);
->  int kernel_active_single_step(void);
->  
-> -#ifdef CONFIG_HAVE_HW_BREAKPOINT
-> -int reinstall_suspended_bps(struct pt_regs *regs);
-> -#else
-> -static inline int reinstall_suspended_bps(struct pt_regs *regs)
-> -{
-> -	return -ENODEV;
-> -}
-> -#endif
-> +STUB_UNLESS(CONFIG_HAVE_HW_BREAKPOINT, return -ENODEV,
-> +int reinstall_suspended_bps(struct pt_regs *regs));
->  
->  int aarch32_break_handler(struct pt_regs *regs);
->  
-> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-> index dd1ad39..f247eb1 100644
-> --- a/arch/arm64/include/asm/fpsimd.h
-> +++ b/arch/arm64/include/asm/fpsimd.h
-> @@ -92,17 +92,10 @@ extern int __ro_after_init sve_max_vl;
->  
->  extern size_t sve_state_size(struct task_struct const *task);
->  
-> -extern void sve_alloc(struct task_struct *task);
-> -extern void fpsimd_release_task(struct task_struct *task);
-> -extern void fpsimd_sync_to_sve(struct task_struct *task);
-> -extern void sve_sync_to_fpsimd(struct task_struct *task);
-> -extern void sve_sync_from_fpsimd_zeropad(struct task_struct *task);
->  
->  extern int sve_set_vector_length(struct task_struct *task,
->  				 unsigned long vl, unsigned long flags);
->  
-> -extern int sve_set_current_vl(unsigned long arg);
-> -extern int sve_get_current_vl(void);
->  
->  static inline void sve_user_disable(void)
->  {
-> @@ -113,43 +106,37 @@ static inline void sve_user_enable(void)
->  {
->  	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_ZEN_EL0EN);
->  }
-> -
-> -/*
-> - * Probing and setup functions.
-> - * Calls to these functions must be serialised with one another.
-> - */
-> -extern void __init sve_init_vq_map(void);
-> -extern void sve_update_vq_map(void);
-> -extern int sve_verify_vq_map(void);
-> -extern void __init sve_setup(void);
-> +extern void fpsimd_sync_to_sve(struct task_struct *task);
+This implementation will have an impact on application using SVE
+only once. SVE will now be turned on until the application terminates
+(unless disabling it via ptrace). Cleverer strategies for choosing
+between SVE and FPSIMD context switching are possible (see [1]), but
+it is difficult to assess the benefit right now. We could improve the
+behaviour in the future as a selection of mature hardware platform
+emerges that we can benchmark.
 
-Why has this declaration been moved down? It would seem neater to leave
-it with the others that remain above.
+It is also possible to optimize the case when the SVE vector-length
+is 128-bit (i.e the same size as the FPSIMD vectors). This could be
+explored in the future respin of the series.
 
->  
->  #else /* ! CONFIG_ARM64_SVE */
->  
-> -static inline void sve_alloc(struct task_struct *task) { }
-> -static inline void fpsimd_release_task(struct task_struct *task) { }
-> -static inline void sve_sync_to_fpsimd(struct task_struct *task) { }
-> -static inline void sve_sync_from_fpsimd_zeropad(struct task_struct *task) { }
-> -
-> -static inline int sve_set_current_vl(unsigned long arg)
-> -{
-> -	return -EINVAL;
-> -}
-> -
-> -static inline int sve_get_current_vl(void)
-> -{
-> -	return -EINVAL;
-> -}
-> -
->  static inline void sve_user_disable(void) { BUILD_BUG(); }
->  static inline void sve_user_enable(void) { BUILD_BUG(); }
->  
-> -static inline void sve_init_vq_map(void) { }
-> -static inline void sve_update_vq_map(void) { }
-> -static inline int sve_verify_vq_map(void) { return 0; }
-> -static inline void sve_setup(void) { }
->  
->  #endif /* ! CONFIG_ARM64_SVE */
->  
-> +STUB_UNLESS(CONFIG_ARM64_SVE, return -EINVAL,
-> +int sve_set_current_vl(unsigned long arg));
-> +
-> +STUB_UNLESS(CONFIG_ARM64_SVE, return -EINVAL,
-> +int sve_get_current_vl(void));
-> +
-> +STUB_UNLESS(CONFIG_ARM64_SVE, void sve_alloc(struct task_struct *task));
-> +STUB_UNLESS(CONFIG_ARM64_SVE, void fpsimd_release_task(struct task_struct *task));
-> +STUB_UNLESS(CONFIG_ARM64_SVE, void sve_sync_to_fpsimd(struct task_struct *task));
-> +STUB_UNLESS(CONFIG_ARM64_SVE, void sve_sync_from_fpsimd_zeropad(struct task_struct *task));
+While developing the series, I have added a series of tracepoint in
+the SVE code. They may not be suitable for upstreaming and hence not
+included in the series. I can provide them if anyone is interested.
 
-Nit: Your lines are getting long again, consider wrapping.
+Comments are welcomed.
 
-> +
-> +/*
-> + * Probing and setup functions.
-> + * Calls to these functions must be serialised with one another.
-> + */
-> +STUB_UNLESS(CONFIG_ARM64_SVE, void __init sve_init_vq_map(void));
-> +STUB_UNLESS(CONFIG_ARM64_SVE, void sve_update_vq_map(void));
-> +STUB_UNLESS(CONFIG_ARM64_SVE, return 0, int sve_verify_vq_map(void));
+Best regards,
 
-Nit: Personally I'd find the "return 0" easier to see if you
-consistently wrapped the declaration onto a new line.
+[1] https://git.sphere.ly/dtc/kernel_moto_falcon/commit/acc207616a91a413a50fdd8847a747c4a7324167
 
-> +STUB_UNLESS(CONFIG_ARM64_SVE, void __init sve_setup(void));
-> +
-> +
->  /* For use by EFI runtime services calls only */
->  extern void __efi_fpsimd_begin(void);
->  extern void __efi_fpsimd_end(void);
-> diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
-> index 6a53e59..ba451fc 100644
-> --- a/arch/arm64/include/asm/hw_breakpoint.h
-> +++ b/arch/arm64/include/asm/hw_breakpoint.h
-> @@ -137,17 +137,11 @@ extern void arch_uninstall_hw_breakpoint(struct perf_event *bp);
->  extern void hw_breakpoint_pmu_read(struct perf_event *bp);
->  extern int hw_breakpoint_slots(int type);
->  
-> -#ifdef CONFIG_HAVE_HW_BREAKPOINT
-> -extern void hw_breakpoint_thread_switch(struct task_struct *next);
-> -extern void ptrace_hw_copy_thread(struct task_struct *task);
-> -#else
-> -static inline void hw_breakpoint_thread_switch(struct task_struct *next)
-> -{
-> -}
-> -static inline void ptrace_hw_copy_thread(struct task_struct *task)
-> -{
-> -}
-> -#endif
-> +STUB_UNLESS(CONFIG_HAVE_HW_BREAKPOINT,
-> +void hw_breakpoint_thread_switch(struct task_struct *next));
-> +
-> +STUB_UNLESS(CONFIG_HAVE_HW_BREAKPOINT,
-> +void ptrace_hw_copy_thread(struct task_struct *task));
->  
->  /* Determine number of BRP registers available. */
->  static inline int get_num_brps(void)
-> diff --git a/arch/arm64/include/asm/kasan.h b/arch/arm64/include/asm/kasan.h
-> index b52aacd..e67d1a3 100644
-> --- a/arch/arm64/include/asm/kasan.h
-> +++ b/arch/arm64/include/asm/kasan.h
-> @@ -36,14 +36,11 @@
->  #define KASAN_SHADOW_OFFSET     (KASAN_SHADOW_END - (1ULL << \
->  					(64 - KASAN_SHADOW_SCALE_SHIFT)))
->  
-> -void kasan_init(void);
-> -void kasan_copy_shadow(pgd_t *pgdir);
->  asmlinkage void kasan_early_init(void);
-> -
-> -#else
-> -static inline void kasan_init(void) { }
-> -static inline void kasan_copy_shadow(pgd_t *pgdir) { }
->  #endif
->  
-> +STUB_UNLESS(CONFIG_KASAN, void kasan_init(void));
-> +STUB_UNLESS(CONFIG_KASAN, void kasan_copy_shadow(pgd_t *pgdir));
-> +
->  #endif
->  #endif
-> diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
-> index 626ad01..700a4a9 100644
-> --- a/arch/arm64/include/asm/numa.h
-> +++ b/arch/arm64/include/asm/numa.h
-> @@ -29,23 +29,16 @@ static inline const struct cpumask *cpumask_of_node(int node)
->  }
->  #endif
->  
-> -void __init arm64_numa_init(void);
->  int __init numa_add_memblk(int nodeid, u64 start, u64 end);
->  void __init numa_set_distance(int from, int to, int distance);
->  void __init numa_free_distance(void);
-> -void __init early_map_cpu_to_node(unsigned int cpu, int nid);
-> -void numa_store_cpu_info(unsigned int cpu);
-> -void numa_add_cpu(unsigned int cpu);
-> -void numa_remove_cpu(unsigned int cpu);
-> -
-> -#else	/* CONFIG_NUMA */
-> -
-> -static inline void numa_store_cpu_info(unsigned int cpu) { }
-> -static inline void numa_add_cpu(unsigned int cpu) { }
-> -static inline void numa_remove_cpu(unsigned int cpu) { }
-> -static inline void arm64_numa_init(void) { }
-> -static inline void early_map_cpu_to_node(unsigned int cpu, int nid) { }
->  
->  #endif	/* CONFIG_NUMA */
->  
-> +STUB_UNLESS(CONFIG_NUMA, void __init arm64_numa_init(void));
-> +STUB_UNLESS(CONFIG_NUMA, void __init early_map_cpu_to_node(unsigned int cpu, int nid));
+Julien Grall (8):
+  arm64/fpsimd: Update documentation of do_sve_acc
+  arm64/signal: Update the comment in preserve_sve_context
+  arm64/fpsimdmacros: Allow the macro "for" to be used in more cases
+  arm64/fpsimdmacros: Introduce a macro to update ZCR_EL1.LEN
+  arm64/sve: Implement helper to flush SVE registers
+  arm64/sve: Implement helper to load SVE registers from FPSIMD state
+  arm64/sve: Don't disable SVE on syscalls return
+  arm64/sve: Rework SVE trap access to use TIF_SVE_NEEDS_FLUSH
 
-Nit: Long line, consider wrapping
+ arch/arm64/include/asm/fpsimd.h       |  8 +++++
+ arch/arm64/include/asm/fpsimdmacros.h | 48 ++++++++++++++++++++------
+ arch/arm64/include/asm/thread_info.h  |  5 ++-
+ arch/arm64/kernel/entry-fpsimd.S      | 29 ++++++++++++++++
+ arch/arm64/kernel/fpsimd.c            | 64 ++++++++++++++++++++++++++++-------
+ arch/arm64/kernel/process.c           |  1 +
+ arch/arm64/kernel/ptrace.c            |  7 ++++
+ arch/arm64/kernel/signal.c            | 17 ++++++++--
+ arch/arm64/kernel/syscall.c           | 13 +++----
+ 9 files changed, 158 insertions(+), 34 deletions(-)
 
-Steve
-
-> +STUB_UNLESS(CONFIG_NUMA, void numa_store_cpu_info(unsigned int cpu));
-> +STUB_UNLESS(CONFIG_NUMA, void numa_add_cpu(unsigned int cpu));
-> +STUB_UNLESS(CONFIG_NUMA, void numa_remove_cpu(unsigned int cpu));
-> +
->  #endif	/* __ASM_NUMA_H */
-> diff --git a/arch/arm64/include/asm/ptdump.h b/arch/arm64/include/asm/ptdump.h
-> index 6afd847..8d27672 100644
-> --- a/arch/arm64/include/asm/ptdump.h
-> +++ b/arch/arm64/include/asm/ptdump.h
-> @@ -33,15 +33,10 @@ struct ptdump_info {
->  };
->  
->  void ptdump_walk_pgd(struct seq_file *s, struct ptdump_info *info);
-> -#ifdef CONFIG_ARM64_PTDUMP_DEBUGFS
-> -int ptdump_debugfs_register(struct ptdump_info *info, const char *name);
-> -#else
-> -static inline int ptdump_debugfs_register(struct ptdump_info *info,
-> -					const char *name)
-> -{
-> -	return 0;
-> -}
-> -#endif
-> +
-> +STUB_UNLESS(CONFIG_ARM64_PTDUMP_DEBUGFS, return 0,
-> +int ptdump_debugfs_register(struct ptdump_info *info, const char *name));
-> +
->  void ptdump_check_wx(void);
->  #endif /* CONFIG_ARM64_PTDUMP_CORE */
->  
-> diff --git a/arch/arm64/include/asm/signal32.h b/arch/arm64/include/asm/signal32.h
-> index 81abea0..9dc06bd 100644
-> --- a/arch/arm64/include/asm/signal32.h
-> +++ b/arch/arm64/include/asm/signal32.h
-> @@ -21,30 +21,17 @@
->  #include <linux/compat.h>
->  
->  #define AARCH32_KERN_SIGRET_CODE_OFFSET	0x500
-> +#endif /* CONFIG_COMPAT */
->  
-> +STUB_UNLESS(CONFIG_COMPAT, return -ENOSYS,
->  int compat_setup_frame(int usig, struct ksignal *ksig, sigset_t *set,
-> -		       struct pt_regs *regs);
-> -int compat_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
-> -			  struct pt_regs *regs);
-> -
-> -void compat_setup_restart_syscall(struct pt_regs *regs);
-> -#else
-> +		       struct pt_regs *regs));
->  
-> -static inline int compat_setup_frame(int usid, struct ksignal *ksig,
-> -				     sigset_t *set, struct pt_regs *regs)
-> -{
-> -	return -ENOSYS;
-> -}
-> -
-> -static inline int compat_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
-> -					struct pt_regs *regs)
-> -{
-> -	return -ENOSYS;
-> -}
-> +STUB_UNLESS(CONFIG_COMPAT, return -ENOSYS,
-> +int compat_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
-> +			  struct pt_regs *regs));
->  
-> -static inline void compat_setup_restart_syscall(struct pt_regs *regs)
-> -{
-> -}
-> -#endif /* CONFIG_COMPAT */
-> +STUB_UNLESS(CONFIG_COMPAT,
-> +void compat_setup_restart_syscall(struct pt_regs *regs));
->  #endif /* __KERNEL__ */
->  #endif /* __ASM_SIGNAL32_H */
-> 
+-- 
+2.11.0
 
 
 _______________________________________________
