@@ -2,62 +2,70 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BEF38C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:48:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 81FFDC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:48:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 87CD920657
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:48:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4EA1C20657
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:48:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MWdL08kx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 87CD920657
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="c4+aRXB3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4EA1C20657
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.intel.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=0TPDtW80tW8gbnvNClb82bq38G8MmXvXbMu4xsMSPc0=; b=MWdL08kxCYi3kl
-	WVDZHoQVDDkOSPytYfMbSaSuul2wWm5wrMy1ktZC27Hg8asQ9gGet63jLyvsA2kPi1fZYQNFLNuRn
-	axzDH5rk/BZzs9FHArFsP4/PBwhwSTa9tFpBIUNGduG7SuO3DG+dsc+ZsdoPMRwr0br+7AlHCjDny
-	ltgzn50RyT1/s9OTcYJGo2a7mgTVTHjVC9R1C94yUH+owkjZCkgTnln/tt2vaRkJg3n9c12jua0d/
-	3E/vkMfiCEuVTNkIEKQ3XPtgl10zwpKIlJuMBpFhPkTOa+5MTphl8aZ7p+6XU9Lc69iH6bF+JK2Ci
-	E7GL7Kv0EnHQqAABp4sw==;
+	List-Owner; bh=VkkoT4SzjepCM5KkN0+FZloCnBZX7kUlGsFZV4c2PLY=; b=c4+aRXB3MdZJUM
+	fZdsoOdDsCCuwmXdiW+2d/R/AZBgrwP7bkuLkx2ErI4JjBHtLxJzik0NQPKreLEUoJE1HUfE35Uq/
+	3uk8xBB4w7oMm8noS/x9qjw4RekAjpwv8LiycBZKBg7Fnn0Dyv++8bJ2f9bO8ZSF8WN/heoba68lG
+	ua8EJoR+mqvTIMTUwujV8KVvvyQXTizyhAmEtJLDpNQWx8YdZST3C2eGq0Pm2Hrw1dchZZCK/bm71
+	dzCxH8QZMb8grfMVKMN4ynkAvlbgXxVFJvsXdFmkm+h81ftFZJtyKkAqPwkWmUc3NVicy0ehZ4i0C
+	QbyxlojdjnxzQhku6HQQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkVRi-0003mL-8u; Fri, 18 Jan 2019 14:48:34 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkVND-0006XS-C4
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 14:44:03 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 725AA207A3; Fri, 18 Jan 2019 15:43:52 +0100 (CET)
-Received: from localhost.localdomain
- (aaubervilliers-681-1-37-87.w90-88.abo.wanadoo.fr [90.88.156.87])
- by mail.bootlin.com (Postfix) with ESMTPSA id C9C6C20C3F;
- Fri, 18 Jan 2019 15:43:50 +0100 (CET)
-From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-To: dri-devel@lists.freedesktop.org, linux-arm-kernel@lists.infradead.org,
- linux-kernel@vger.kernel.org, linux-sunxi@googlegroups.com
-Subject: [PATCH v5 09/23] drm/sun4i: frontend: Add support for semi-planar YUV
- input formats
-Date: Fri, 18 Jan 2019 15:43:14 +0100
-Message-Id: <20190118144328.20649-10-paul.kocialkowski@bootlin.com>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190118144328.20649-1-paul.kocialkowski@bootlin.com>
-References: <20190118144328.20649-1-paul.kocialkowski@bootlin.com>
+	id 1gkVRv-000403-EW; Fri, 18 Jan 2019 14:48:47 +0000
+Received: from mga02.intel.com ([134.134.136.20])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gkVNm-0007E7-HM
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 14:44:40 +0000
+X-Amp-Result: UNSCANNABLE
+X-Amp-File-Uploaded: False
+Received: from fmsmga007.fm.intel.com ([10.253.24.52])
+ by orsmga101.jf.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
+ 18 Jan 2019 06:44:29 -0800
+X-ExtLoop1: 1
+X-IronPort-AV: E=Sophos;i="5.56,491,1539673200"; d="scan'208";a="115697668"
+Received: from stinkbox.fi.intel.com (HELO stinkbox) ([10.237.72.174])
+ by fmsmga007.fm.intel.com with SMTP; 18 Jan 2019 06:44:25 -0800
+Received: by stinkbox (sSMTP sendmail emulation);
+ Fri, 18 Jan 2019 16:44:24 +0200
+Date: Fri, 18 Jan 2019 16:44:24 +0200
+From: Ville =?iso-8859-1?Q?Syrj=E4l=E4?= <ville.syrjala@linux.intel.com>
+To: Andrzej Hajda <a.hajda@samsung.com>
+Subject: Re: [PATCH 1/6] include/drm: color_mgmt: Add enum labels
+Message-ID: <20190118144424.GL20097@intel.com>
+References: <1544789421-5265-1-git-send-email-c.manszewski@samsung.com>
+ <CGME20181214121032eucas1p24af580721ebd6f86a4f9ddf701957ab6@eucas1p2.samsung.com>
+ <1544789421-5265-2-git-send-email-c.manszewski@samsung.com>
+ <20190117194722.GJ20097@intel.com>
+ <b9cfbae1-b24e-96bf-f3b0-ff6d25cd16bb@samsung.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <b9cfbae1-b24e-96bf-f3b0-ff6d25cd16bb@samsung.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_064356_031692_382407B5 
-X-CRM114-Status: GOOD (  16.14  )
+X-CRM114-CacheID: sfid-20190118_064430_765562_4B7A65E2 
+X-CRM114-Status: GOOD (  22.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,174 +77,79 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+Cc: linux-samsung-soc@vger.kernel.org,
+ Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
+ Christoph Manszewski <c.manszewski@samsung.com>,
+ David Airlie <airlied@linux.ie>, Seung-Woo Kim <sw0312.kim@samsung.com>,
+ linux-kernel@vger.kernel.org, dri-devel@lists.freedesktop.org,
  Maxime Ripard <maxime.ripard@bootlin.com>,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- David Airlie <airlied@linux.ie>, Chen-Yu Tsai <wens@csie.org>,
- Daniel Vetter <daniel@ffwll.ch>, Sean Paul <sean@poorly.run>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+ Kyungmin Park <kyungmin.park@samsung.com>, Kukjin Kim <kgene@kernel.org>,
+ 'Hans Verkuil' <hans.verkuil@cisco.com>, Krzysztof Kozlowski <krzk@kernel.org>,
+ Sean Paul <sean@poorly.run>, linux-arm-kernel@lists.infradead.org,
+ Marek Szyprowski <m.szyprowski@samsung.com>
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Semi-planar YUV formats use two distinct planes, one for luminance and
-one for chrominance. To add support for them, we need to configure the
-second line stride and buffer address registers to setup the second YUV
-plane.
+On Fri, Jan 18, 2019 at 03:34:18PM +0100, Andrzej Hajda wrote:
+> +CC: Hans
+> =
 
-New definitions are introduced to configure the input format register
-for the YUV420 and YUV422 semi-planar formats.
+> On 17.01.2019 20:47, Ville Syrj=E4l=E4 wrote:
+> > On Fri, Dec 14, 2018 at 01:10:16PM +0100, Christoph Manszewski wrote:
+> >> Range setting makes sense for YCbCr and RGB buffers. Current
+> >> drm_color_range enum labels suggest use with YCbCr buffers.
+> >> Create enum labels without colorspace specification.
+> >>
+> >> Signed-off-by: Christoph Manszewski <c.manszewski@samsung.com>
+> >> ---
+> >>  include/drm/drm_color_mgmt.h | 2 ++
+> >>  1 file changed, 2 insertions(+)
+> >>
+> >> diff --git a/include/drm/drm_color_mgmt.h b/include/drm/drm_color_mgmt=
+.h
+> >> index 90ef9996d9a4..52f6d5221a0d 100644
+> >> --- a/include/drm/drm_color_mgmt.h
+> >> +++ b/include/drm/drm_color_mgmt.h
+> >> @@ -62,6 +62,8 @@ enum drm_color_range {
+> >>  	DRM_COLOR_YCBCR_LIMITED_RANGE,
+> >>  	DRM_COLOR_YCBCR_FULL_RANGE,
+> >>  	DRM_COLOR_RANGE_MAX,
+> >> +	DRM_COLOR_LIMITED_RANGE =3D DRM_COLOR_YCBCR_LIMITED_RANGE,
+> >> +	DRM_COLOR_FULL_RANGE =3D DRM_COLOR_YCBCR_FULL_RANGE,
+> > These enum values don't mean anything really. The strings are what
+> > matter for the uapi.
+> >
+> > The default for YCbCr needs to be limited range, the default for RGB
+> > needs to be full range. So I think this would really require a separate
+> > prop for each.
+> >
+> > But is there an actual usecase for this stuff?
+> =
 
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
----
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 50 +++++++++++++++++++++++---
- drivers/gpu/drm/sun4i/sun4i_frontend.h |  6 ++++
- drivers/gpu/drm/sun4i/sun4i_layer.c    |  4 +++
- 3 files changed, 55 insertions(+), 5 deletions(-)
+> =
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index 1946dd9e58d9..f262069d348f 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -119,11 +119,23 @@ void sun4i_frontend_update_buffer(struct sun4i_frontend *frontend,
- 	regmap_write(frontend->regs, SUN4I_FRONTEND_LINESTRD0_REG,
- 		     fb->pitches[0]);
- 
-+	if (fb->format->num_planes > 1)
-+		regmap_write(frontend->regs, SUN4I_FRONTEND_LINESTRD1_REG,
-+			     fb->pitches[1]);
-+
- 	/* Set the physical address of the buffer in memory */
- 	paddr = drm_fb_cma_get_gem_addr(fb, state, 0);
- 	paddr -= PHYS_OFFSET;
--	DRM_DEBUG_DRIVER("Setting buffer address to %pad\n", &paddr);
-+	DRM_DEBUG_DRIVER("Setting buffer #0 address to %pad\n", &paddr);
- 	regmap_write(frontend->regs, SUN4I_FRONTEND_BUF_ADDR0_REG, paddr);
-+
-+	if (fb->format->num_planes > 1) {
-+		paddr = drm_fb_cma_get_gem_addr(fb, state, 1);
-+		paddr -= PHYS_OFFSET;
-+		DRM_DEBUG_DRIVER("Setting buffer #1 address to %pad\n", &paddr);
-+		regmap_write(frontend->regs, SUN4I_FRONTEND_BUF_ADDR1_REG,
-+			     paddr);
-+	}
- }
- EXPORT_SYMBOL(sun4i_frontend_update_buffer);
- 
-@@ -133,6 +145,8 @@ sun4i_frontend_drm_format_to_input_fmt(const struct drm_format_info *format,
- {
- 	if (!format->is_yuv)
- 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_RGB;
-+	else if (drm_format_info_is_yuv_sampling_420(format))
-+		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_YUV420;
- 	else if (drm_format_info_is_yuv_sampling_422(format))
- 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_YUV422;
- 	else
-@@ -145,12 +159,18 @@ static int
- sun4i_frontend_drm_format_to_input_mode(const struct drm_format_info *format,
- 					u32 *val)
- {
--	if (format->num_planes == 1)
-+	switch (format->num_planes) {
-+	case 1:
- 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PACKED;
--	else
--		return -EINVAL;
-+		return 0;
- 
--	return 0;
-+	case 2:
-+		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_SEMIPLANAR;
-+		return 0;
-+
-+	default:
-+		return -EINVAL;
-+	}
- }
- 
- static int
-@@ -162,6 +182,22 @@ sun4i_frontend_drm_format_to_input_sequence(const struct drm_format_info *format
- 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_PS_BGRX;
- 		return 0;
- 
-+	case DRM_FORMAT_NV12:
-+		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_PS_UV;
-+		return 0;
-+
-+	case DRM_FORMAT_NV16:
-+		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_PS_UV;
-+		return 0;
-+
-+	case DRM_FORMAT_NV21:
-+		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_PS_VU;
-+		return 0;
-+
-+	case DRM_FORMAT_NV61:
-+		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_PS_VU;
-+		return 0;
-+
- 	case DRM_FORMAT_UYVY:
- 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_PS_UYVY;
- 		return 0;
-@@ -205,6 +241,10 @@ static int sun4i_frontend_drm_format_to_output_fmt(uint32_t fmt, u32 *val)
- 
- static const uint32_t sun4i_frontend_formats[] = {
- 	DRM_FORMAT_BGRX8888,
-+	DRM_FORMAT_NV12,
-+	DRM_FORMAT_NV16,
-+	DRM_FORMAT_NV21,
-+	DRM_FORMAT_NV61,
- 	DRM_FORMAT_UYVY,
- 	DRM_FORMAT_VYUY,
- 	DRM_FORMAT_XRGB8888,
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.h b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-index e287a71a0db9..2f9e3f84e2ff 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-@@ -22,17 +22,23 @@
- #define SUN4I_FRONTEND_BYPASS_CSC_EN			BIT(1)
- 
- #define SUN4I_FRONTEND_BUF_ADDR0_REG		0x020
-+#define SUN4I_FRONTEND_BUF_ADDR1_REG		0x024
- 
- #define SUN4I_FRONTEND_LINESTRD0_REG		0x040
-+#define SUN4I_FRONTEND_LINESTRD1_REG		0x044
- 
- #define SUN4I_FRONTEND_INPUT_FMT_REG		0x04c
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PACKED	(1 << 8)
-+#define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_SEMIPLANAR	(2 << 8)
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_YUV422	(1 << 4)
-+#define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_YUV420	(2 << 4)
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_RGB		(5 << 4)
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_PS_UYVY		0
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_PS_YUYV		1
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_PS_VYUY		2
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_PS_YVYU		3
-+#define SUN4I_FRONTEND_INPUT_FMT_DATA_PS_UV		0
-+#define SUN4I_FRONTEND_INPUT_FMT_DATA_PS_VU		1
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_PS_BGRX		0
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_PS_XRGB		1
- 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index 29631e0efde3..185ef38649aa 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -138,6 +138,10 @@ static const uint32_t sun4i_layer_formats[] = {
- 	DRM_FORMAT_RGBA4444,
- 	DRM_FORMAT_RGB888,
- 	DRM_FORMAT_RGB565,
-+	DRM_FORMAT_NV12,
-+	DRM_FORMAT_NV16,
-+	DRM_FORMAT_NV21,
-+	DRM_FORMAT_NV61,
- 	DRM_FORMAT_UYVY,
- 	DRM_FORMAT_VYUY,
- 	DRM_FORMAT_XRGB8888,
--- 
-2.20.1
+> Yes, for example HDMI path (Display Controller and HDMI encoder) in
+> Exynos5433 works on RGB buffers and do not perform any conversion if the
+> output is also RGB, on the other side CEA861 specs says that in case of
+> CEA modes output RGB should be in limited range, in case of non CEA
+> modes it should be full range.
+> =
 
+> The idea was to allow userspace to check (atomic_check) which ranges are
+> acceptable in given mode and to set desired one if possible.
+> =
+
+> Any better solution is welcome?
+
+i915 has the "Broadcast RGB" property for the CEA-861 stuff.
+You don't have a way to implement that?
+
+-- =
+
+Ville Syrj=E4l=E4
+Intel
 
 _______________________________________________
 linux-arm-kernel mailing list
