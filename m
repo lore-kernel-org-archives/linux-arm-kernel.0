@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E3477C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:16:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 87FC5C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:16:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B36712087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:16:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5A90D2087E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:16:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GTFfkNZb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B36712087E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Tc0fhDwS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5A90D2087E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:In-Reply-To:
 	Date:References:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8KM60GBKcJr1iaxMrmtqRVsMOVbyGZoCG+TRvojXTCg=; b=GTFfkNZb8ykx7Z
-	B3qJncQQsNALkTG1LeH2ITAeI7gtvtAKR0DMJ8+uSAC/ArepN3huMCnC4jAaIupwUcKoDs5yVOhV3
-	vhz1+9LYmxP+CIgfNhypxOvckmO6b+nbsfTQqpI5/rDOTKZhpHgyo2RAhzsHOqWbZx2pvF6P4mvGA
-	j1Ugrfmd2ZiQ1pXgRjOIcYbk/SyV7dMVjvXew2ASDRkqwxJSpo8rx91LvcLHUXEYCo6Tqns+qyHpf
-	8vn3XxRGYTTEWKY5mggsgDZNSEdfESPTKBS7HhfAGuPbRYRBC9qEbN1WafDhbyylcAICKtIYJxepL
-	zOzVwodif/Q14mT2fExQ==;
+	List-Owner; bh=7FnskBmixmeZtmkFQkp3PSTr5AthrmYBSN0dgJvJU1Q=; b=Tc0fhDwSqQtDgg
+	8E1AcLKxEq2Pljxtn7HKh9HnRHerX3cZnK2igBL31BU5hG9HMRh+e2ZoVelKCeE1pcdGWr8qPS4yx
+	FGZiihb/qwOjDtlZOUGI7BoE5UplsnLmV+HD/VZpOJDBGCgR5N1EDIh3NYK1uX2oAbKOyhbjZRnS4
+	07TM+XFrrGarUl7zm6R63aGSgADes1IEUW+W9jdzEO5ViCpNgc6avA5iNfkeEZMm4ZJNDzq+7H8vZ
+	qQOkXTBYm62RdJMyFTqkoKFme7Vq62Zt6Dw/y2C8olEqduGOEeJduFs/sJKj60XRP9AIl8EUzVsLE
+	9grr2JFD1W7zOVVUp4Ow==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkUwW-0002bj-1S; Fri, 18 Jan 2019 14:16:20 +0000
+	id 1gkUwr-0002sI-BL; Fri, 18 Jan 2019 14:16:41 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkUwT-0002bF-1T
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 14:16:18 +0000
+ id 1gkUwo-0002ra-6z
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 14:16:40 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id A314A207B0; Fri, 18 Jan 2019 15:16:15 +0100 (CET)
+ id CFA92207B0; Fri, 18 Jan 2019 15:16:36 +0100 (CET)
 Received: from localhost (alyon-652-1-26-46.w109-213.abo.wanadoo.fr
  [109.213.9.46])
- by mail.bootlin.com (Postfix) with ESMTPSA id DECB120712;
- Fri, 18 Jan 2019 15:16:14 +0100 (CET)
+ by mail.bootlin.com (Postfix) with ESMTPSA id 703E52074A;
+ Fri, 18 Jan 2019 15:16:36 +0100 (CET)
 From: Gregory CLEMENT <gregory.clement@bootlin.com>
 To: Miquel Raynal <miquel.raynal@bootlin.com>
-Subject: Re: [PATCH v4 2/4] clk: mvebu: armada-37xx-tbg: fix error message
+Subject: Re: [PATCH v4 3/4] clk: mvebu: armada-37xx-tbg: fill the device entry
+ when registering the clocks
 References: <20190108161940.4814-1-miquel.raynal@bootlin.com>
- <20190108161940.4814-3-miquel.raynal@bootlin.com>
-Date: Fri, 18 Jan 2019 15:16:13 +0100
-In-Reply-To: <20190108161940.4814-3-miquel.raynal@bootlin.com> (Miquel
- Raynal's message of "Tue, 8 Jan 2019 17:19:38 +0100")
-Message-ID: <875zumnj9u.fsf@FE-laptop>
+ <20190108161940.4814-4-miquel.raynal@bootlin.com>
+Date: Fri, 18 Jan 2019 15:16:36 +0100
+In-Reply-To: <20190108161940.4814-4-miquel.raynal@bootlin.com> (Miquel
+ Raynal's message of "Tue, 8 Jan 2019 17:19:39 +0100")
+Message-ID: <871s5anj97.fsf@FE-laptop>
 User-Agent: Gnus/5.13 (Gnus v5.13) Emacs/26.1 (gnu/linux)
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_061617_212321_B5DA88BD 
-X-CRM114-Status: GOOD (  19.05  )
+X-CRM114-CacheID: sfid-20190118_061638_529872_AC35F3B3 
+X-CRM114-Status: GOOD (  20.05  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,8 +86,19 @@ Hi Miquel,
  
  On mar., janv. 08 2019, Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 
-> The error message should state that the driver failed to get the
-> parent clock, not the opposite.
+> So far the clk_hw_register_fixed_factor() calls are not providing any
+> device structure. While doing so is harmless for regular use, the
+> missing device structure may be a problem for suspend to RAM support.
+>
+> Since, device links have been added to clocks, links created during
+> probe will enforce the suspend/resume orders. When the device is
+> missing during the registration, no link can be established, hence the
+> order between parent and child clocks are not enforced.
+>
+> Adding the device structure here will create a link between the 4 TBG
+> clocks (registered by this driver) and:
+> * their parent clock: XTAL,
+> * their child clocks: several 'periph' clock.
 >
 > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 
@@ -97,22 +109,26 @@ Thanks,
 Gregory
 
 > ---
->  drivers/clk/mvebu/armada-37xx-tbg.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/clk/mvebu/armada-37xx-tbg.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
 >
 > diff --git a/drivers/clk/mvebu/armada-37xx-tbg.c b/drivers/clk/mvebu/armada-37xx-tbg.c
-> index ee272d4d8c24..77b978c55ef6 100644
+> index 77b978c55ef6..da3a08e419d6 100644
 > --- a/drivers/clk/mvebu/armada-37xx-tbg.c
 > +++ b/drivers/clk/mvebu/armada-37xx-tbg.c
-> @@ -98,7 +98,7 @@ static int armada_3700_tbg_clock_probe(struct platform_device *pdev)
->  
->  	parent = clk_get(dev, NULL);
->  	if (IS_ERR(parent)) {
-> -		dev_err(dev, "Could get the clock parent\n");
-> +		dev_err(dev, "Could not get the clock parent\n");
->  		return -EINVAL;
+> @@ -116,8 +116,10 @@ static int armada_3700_tbg_clock_probe(struct platform_device *pdev)
+>  		name = tbg[i].name;
+>  		mult = tbg_get_mult(reg, &tbg[i]);
+>  		div = tbg_get_div(reg, &tbg[i]);
+> -		hw_tbg_data->hws[i] = clk_hw_register_fixed_factor(NULL, name,
+> -						parent_name, 0, mult, div);
+> +		hw_tbg_data->hws[i] = clk_hw_register_fixed_factor(dev, name,
+> +								   parent_name,
+> +								   0, mult,
+> +								   div);
+>  		if (IS_ERR(hw_tbg_data->hws[i]))
+>  			dev_err(dev, "Can't register TBG clock %s\n", name);
 >  	}
->  	parent_name = __clk_get_name(parent);
 > -- 
 > 2.19.1
 >
