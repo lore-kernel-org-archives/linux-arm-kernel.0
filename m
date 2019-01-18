@@ -5,20 +5,19 @@ X-Spam-Level:
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SPF_PASS,USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 14AB7C5AE5E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 23:44:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 69816C61CE3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 23:44:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D8A1920652
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 23:44:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 35D2D20652
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 23:44:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FYGzjITq";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="R7zFH8Qm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D8A1920652
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZkJm+8K4";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="d9aPAOV2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 35D2D20652
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,67 +26,67 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XQUxJrz+KA1oNf1zQJpwr9vsEfTDK8Z3k/+n4rE/9/c=; b=FYGzjITqVSlBZe
-	fm8kTw7iXOscLkqZ3a/rk+RxEZDK8rdARoZDrT71DOvEpzUL0hJ6DwIqWwIR/HnprHRGmV7uurM7A
-	UpvL9FbPkeVHuhPmDFyu2RYuXJosJWGQbmE/g+xIbRlPmwi4YXEyDBIPGzEXA+QqMktR/TH3z4VOY
-	b665bzEtv2NMjWPrDUttokTo6iA7vWtwaUDHGe3acPzWYSiyZT+D/WrjJDeuwCsTvvrB5yo+2C8s3
-	5nMlsY9uWiUu77xlY0KrDIZHkXw4ajFXCB3JkN8vVWRxU0ImPA3GTjbuf6EjpDXaaoYgZLX8/OiYp
-	fpTs/0O73JM58xH3/mOw==;
+	List-Owner; bh=IeN5Ize9uCtht9RhPJF2NdgI1cTGtr23ArvWy/AGXyE=; b=ZkJm+8K4ssoinC
+	v+42bE9dCjopcckUOuwxoWReTtHUgqN6Us0f8emsJYz2CoSBkhyyBJUbJ7fQ4jl8eSezA7VrVOIP4
+	GKd6iwwpc2o3tIXBbQyd9wReFfU56w7JSo736Ycbg38tnO74sfxfIKCYEOcjTJJh9vixDGstYAoFw
+	U5/j1LndgiH5f4YI5s6JUIf8knkrgELiav4jchREl23aWm/IKih8K0hlzNRfMGT0jkJWpy1U3j31j
+	jX9lvbJOLAzIFrV74Z/Y8rWGSVm7Az6rpMTdkxdTCdBQaSgQQpCDfFXYtt7DP0n78WoPY33CmEY3T
+	yzM1HduBhS6Fn3076QdQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkdo2-0005Bm-FS; Fri, 18 Jan 2019 23:44:10 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1gkdoH-0005Qz-Uu; Fri, 18 Jan 2019 23:44:25 +0000
+Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkdni-0004sU-5O; Fri, 18 Jan 2019 23:43:51 +0000
-Received: by mail-wr1-x441.google.com with SMTP id v13so17068857wrw.5;
- Fri, 18 Jan 2019 15:43:49 -0800 (PST)
+ id 1gkdni-0004sh-Sg; Fri, 18 Jan 2019 23:43:52 +0000
+Received: by mail-wr1-x442.google.com with SMTP id s12so17066775wrt.4;
+ Fri, 18 Jan 2019 15:43:50 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=googlemail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=ZMi2KnKdLTkomqgDyETnU89SoNC5t5pFsNQhVgdxAsk=;
- b=R7zFH8QmzxDxUva/dxd35XSbZuKcbQwf7kO+t7wVTRNnoU88SlmsdRqgF3LnpY+83s
- cqab5l8YqCrzID/lngSv1SRpEKvGolxjzBasn9u8A4a6dEeHA6Ax+7bAgyRo49FWnNGu
- x63YoI9Jj31EWSEWdv/7v6H962jZ90AnvaI2YZwZU2EswEpeNdJKyywVEvE/M0bnhGJh
- b5yNo6/7qkX9MTVpCXdrHojVx/bnjq1bIf5hEk+D0/XtI4BCusKwtKCRWdl/KidAOaZi
- bVzJcPTdmAY0VWlTwTHhKArc07ga8AkY8dNaTGMkNLvS9DPccxfWReW4P37P9XPKQsMc
- DZyQ==
+ bh=b8iF22LUkWvDIB7WAhLCpBIoGZvslkNjok08zXr0mj0=;
+ b=d9aPAOV2/D7Q9MSjwWsBeAzy2Ek4MR+9VgFXqUXcDx0oYFVvvxAphA2Am9lbALMGee
+ t2mTo+1j1ArxT/am2d1iOVp5XxwH09xTjztVRbJu3Gp7nUSJ5z+fsJ397dfcd3fwBhvE
+ RtlUk614gUNiXU1yjMMJEAExfV9rX2+UMjTiLLHzyPEfC2cCrgEIUTTKIq91bAwEcvbt
+ zBEQEQNKXtA6DwiTIm1YCtUyRxQKeq4phlqiS5Gdkt8M/i0QCI+8Ul70uCwQtF3CqGjj
+ hj52Fk7Pu0bdfS7H4FWYMca6zPu3fxrDbHhSUbJ1udxHJ1v9DbOGFfPA9AoKNFb2Va8c
+ NzOQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=ZMi2KnKdLTkomqgDyETnU89SoNC5t5pFsNQhVgdxAsk=;
- b=TTS+gOXnhqo5cO6PbzSOjOnl0/A4jj/erNbC6B4gmf8nXTu7lB6iWU0gRW7jM5j96w
- XjwT9YyHNmM7jCslP8kZFmYDwdb/3CarmrQ9Vepnj2IZgiLiIS8BsAz2zeAu8VWIBiEp
- rpdsHgSMSq8LzP7zd39nt7OxvPMV7emJxbjsqYAv/tevgZUWs11rlS41y0ib+XawxT9t
- 1hkLYhE6sl9AKR0d1FKwlrWFHZNxJCl8DoYEcDl+8/RuXCfr1vZB44jXXQEoHOhuswJ/
- g6TB2ihyTnTKGH8SCRvPvaa5+jw/XLHkvv6rX4DSqWytXQsItC+HV79sVh0dtUifrsF4
- Jz6A==
-X-Gm-Message-State: AJcUukcpj1SjVuT4xRv5Wqcf4T1xxNd6YsWz/PccFd2TeSABgXU7Utve
- ENeCFalu7X25AUQVszGz00G41k7q
-X-Google-Smtp-Source: ALg8bN4g84Xd0gKFdHPXGt8CIQhNFPIzZ5EV5+dktJPoN1l35xvgbXIeLNawIALCArqn2BGrHMnVjA==
-X-Received: by 2002:adf:e509:: with SMTP id j9mr19605782wrm.76.1547855028053; 
- Fri, 18 Jan 2019 15:43:48 -0800 (PST)
+ bh=b8iF22LUkWvDIB7WAhLCpBIoGZvslkNjok08zXr0mj0=;
+ b=pdoxFxgGJEN6Gtkgp5t2JrGONIX65tpZh4PpFYMsNK2aaoT1ikA0ijirI1Fk6fQjUA
+ RKslpuXHi3QIpw1Ax0k87GTblLvErC0tPP72oaeP0f9r1Cpd6T43wNtQY+y3v9KLN8x8
+ /Iy1JOeVXTiFLphGLEsmhDxB13TFaixJ1hryQDupw19q+NE5j75lu+gdD7vD27gE4NWA
+ +mPofJa/BLWD3bmZ5eZsscnlbtHQQgwcb7tzjzTTAJG/qD3uQdBS1D5ijgbCRb1sCXHG
+ A070ug0PKe9SMJtbQPaba03gPPsEn+6vVxJMYrWIAaz/upAx91A/zyfNXQ2IlS+2Vtch
+ 8BAA==
+X-Gm-Message-State: AJcUukeJxKlQT7jPE5fgZfPrW9WFb5LV8bCADQafg3OjGwpnK6FJnyDB
+ AxTmaSgLIVN24OEr322F+LvfUhwF
+X-Google-Smtp-Source: ALg8bN7AvZAmhdmvwEScHfxu11cEgns7itF8yUOocUoncn40SsYi4VVXD+BBd0ONIDKsNJPfOeOZHw==
+X-Received: by 2002:adf:f903:: with SMTP id b3mr19304216wrr.82.1547855029164; 
+ Fri, 18 Jan 2019 15:43:49 -0800 (PST)
 Received: from blackbox.darklights.net
  (p200300DCD73A810039E290CB771389D7.dip0.t-ipconnect.de.
  [2003:dc:d73a:8100:39e2:90cb:7713:89d7])
- by smtp.googlemail.com with ESMTPSA id j8sm108970024wmd.0.2019.01.18.15.43.46
+ by smtp.googlemail.com with ESMTPSA id j8sm108970024wmd.0.2019.01.18.15.43.48
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 18 Jan 2019 15:43:47 -0800 (PST)
+ Fri, 18 Jan 2019 15:43:48 -0800 (PST)
 From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 To: linux-amlogic@lists.infradead.org,
 	khilman@baylibre.com
-Subject: [PATCH 1/3] ARM: dts: meson8b: ec100: enable the Ethernet PHY
- interrupt
-Date: Sat, 19 Jan 2019 00:43:37 +0100
-Message-Id: <20190118234339.16050-2-martin.blumenstingl@googlemail.com>
+Subject: [PATCH 2/3] ARM: dts: meson8b: ec100: improve the description of the
+ regulators
+Date: Sat, 19 Jan 2019 00:43:38 +0100
+Message-Id: <20190118234339.16050-3-martin.blumenstingl@googlemail.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190118234339.16050-1-martin.blumenstingl@googlemail.com>
 References: <20190118234339.16050-1-martin.blumenstingl@googlemail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_154350_200088_0BC5D84D 
-X-CRM114-Status: GOOD (  10.00  )
+X-CRM114-CacheID: sfid-20190118_154350_921959_6B3A13CA 
+X-CRM114-Status: GOOD (  12.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,31 +105,161 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The INTR32 pin of the IP101GR Ethernet PHY is routed to the GPIOH_3 pad
-on the SoC.
-Enable the interrupt function of the PHY's INTR32 pin to switch it from
-it's default "receive error" mode to "interrupt pin" mode.
+USB_VBUS is a controlled by a Silergy SY6288CCAC-GP 2A Power
+Distribution Switch. The name of it's enable GPIO signal is USB_PWR_EN.
+
+VCC5V is supplied by the main power input called PWR_5V_STB. The name of
+it's enable GPIO signal is 3V3_5V_EN.
+
+VCC3V3, VCC_DDR3_1V5 and VCCK (the CPU power supply) each use a separate
+Silergy SY8089AAC-GP 2A step down regulator. They are all supplied by the
+board's main 5V. VCC3V3 and VCC_DDR3_1V5 are fixed regulators while the
+voltage of VCCK can be changed by changing it's feedback voltage via
+PWM_C.
+
+VCC1V8 is an ABLIC S-1339D18-M5001-GP fixed voltage regulator which is
+supplied by VCC3V3.
+
+VCC_RTC is a Global Mixed-mode Technology Inc. G918T12U-GP LDO which. It
+is supplied by either VCC3V3 (when the board is powered) or the RTC coin
+cell battery.
 
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 ---
- arch/arm/boot/dts/meson8b-ec100.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/meson8b-ec100.dts | 68 +++++++++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
 
 diff --git a/arch/arm/boot/dts/meson8b-ec100.dts b/arch/arm/boot/dts/meson8b-ec100.dts
-index cba0006e2de0..1a41d89d1fa5 100644
+index 1a41d89d1fa5..5ecd787e9265 100644
 --- a/arch/arm/boot/dts/meson8b-ec100.dts
 +++ b/arch/arm/boot/dts/meson8b-ec100.dts
-@@ -169,6 +169,10 @@
- 		eth_phy0: ethernet-phy@0 {
- 			/* IC Plus IP101A/G (0x02430c54) */
- 			reg = <0>;
-+			icplus,select-interrupt;
-+			interrupt-parent = <&gpio_intc>;
-+			/* GPIOH_3 */
-+			interrupts = <17 IRQ_TYPE_LEVEL_LOW>;
- 		};
+@@ -88,6 +88,9 @@
+ 	};
+ 
+ 	usb_vbus: regulator-usb-vbus {
++		/*
++		 * Silergy SY6288CCAC-GP 2A Power Distribution Switch.
++		 */
+ 		compatible = "regulator-fixed";
+ 
+ 		regulator-name = "USB_VBUS";
+@@ -95,11 +98,20 @@
+ 		regulator-min-microvolt = <5000000>;
+ 		regulator-max-microvolt = <5000000>;
+ 
++		vin-supply = <&vcc_5v>;
++
++		/*
++		 * signal name from the schematics: USB_PWR_EN
++		 */
+ 		gpio = <&gpio_ao GPIOAO_5 GPIO_ACTIVE_HIGH>;
+ 		enable-active-high;
+ 	};
+ 
+ 	vcc_5v: regulator-vcc5v {
++		/*
++		 * supplied by the main power input which called PWR_5V_STB
++		 * in the schematics
++		 */
+ 		compatible = "regulator-fixed";
+ 
+ 		regulator-name = "VCC5V";
+@@ -107,6 +119,9 @@
+ 		regulator-min-microvolt = <5000000>;
+ 		regulator-max-microvolt = <5000000>;
+ 
++		/*
++		 * signal name from the schematics: 3V3_5V_EN
++		 */
+ 		gpio = <&gpio GPIODV_29 GPIO_ACTIVE_LOW>;
+ 
+ 		regulator-boot-on;
+@@ -114,12 +129,18 @@
+ 	};
+ 
+ 	vcck: regulator-vcck {
++		/*
++		 * Silergy SY8089AAC-GP 2A continuous, 3A peak, 1MHz
++		 * Synchronous Step Down Regulator.
++		 */
+ 		compatible = "pwm-regulator";
+ 
+ 		regulator-name = "VCCK";
+ 		regulator-min-microvolt = <860000>;
+ 		regulator-max-microvolt = <1140000>;
+ 
++		vin-supply = <&vcc_5v>;
++
+ 		pwms = <&pwm_cd 0 1148 0>;
+ 		pwm-dutycycle-range = <100 0>;
+ 
+@@ -128,19 +149,66 @@
+ 	};
+ 
+ 	vcc_1v8: regulator-vcc1v8 {
++		/*
++		 * ABLIC S-1339D18-M5001-GP
++		 */
+ 		compatible = "regulator-fixed";
+ 
+ 		regulator-name = "VCC1V8";
+ 		regulator-min-microvolt = <1800000>;
+ 		regulator-max-microvolt = <1800000>;
++
++		vin-supply = <&vcc_3v3>;
+ 	};
+ 
+ 	vcc_3v3: regulator-vcc3v3 {
++		/*
++		 * Silergy SY8089AAC-GP 2A continuous, 3A peak, 1MHz
++		 * Synchronous Step Down Regulator. Also called
++		 * VDDIO_AO3.3V in the schematics.
++		 */
+ 		compatible = "regulator-fixed";
+ 
+ 		regulator-name = "VCC3V3";
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
++
++		vin-supply = <&vcc_5v>;
++	};
++
++	vcc_ddr3: regulator-vcc-ddr3 {
++		/*
++		 * Silergy SY8089AAC-GP 2A continuous, 3A peak, 1MHz
++		 * Synchronous Step Down Regulator. Also called
++		 * DDR3_1.5V in the schematics.
++		 */
++		compatible = "regulator-fixed";
++
++		regulator-name = "VCC_DDR3_1V5";
++		regulator-min-microvolt = <1500000>;
++		regulator-max-microvolt = <1500000>;
++
++		vin-supply = <&vcc_5v>;
++
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	vcc_rtc: regulator-vcc-rtc {
++		/*
++		 * Global Mixed-mode Technology Inc. G918T12U-GP
++		 */
++		compatible = "regulator-fixed";
++
++		regulator-name = "VCC_RTC";
++		regulator-min-microvolt = <900000>;
++		regulator-max-microvolt = <900000>;
++
++		/*
++		 * When the board is powered then the input is VCC3V3,
++		 * otherwise power is taken from the coin cell battery.
++		 */
++		vin-supply = <&vcc_3v3>;
  	};
  };
+ 
 -- 
 2.20.1
 
