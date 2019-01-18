@@ -2,83 +2,109 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3455DC43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 10:09:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6871EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 10:09:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 00F2C20855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 10:09:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 36E5D20855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 10:09:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G0kY6G8A";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="GP/PM6Kz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 00F2C20855
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="e8z88EPF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 36E5D20855
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	MIME-Version:Reply-To:Cc:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=Cw/SwPIKg/mPIz0odkH/IGRfra9YlQi6DpR5hc/euyc=; b=G0k
-	Y6G8Ati8WnXa78yGTABTNxd5MpSZNlbRxSQgfSMQpirBWHF5O5JCwShaCgn8SaRDlKhKpVtvYqqlY
-	RPouuLZV9vrRum2f/ybl8B3BamxmAPrS9duqVi1izT4x94NUfMZNHE5riX0lM6pwczoQJfyQdP7B7
-	dyceRKUis9lH+IegRTJhUn08Gej4kWQ3GNcCTU7+287q1wCpfgv2p/WyEisFpQLDNj8649jQVLlGN
-	418OTWLHgPZjMPW4ooMVXuaYM2EoikonnAemVooXHr49EfzlyJkY3TTgqG6wM96JIHWaVdfTq4LCp
-	Lk/jWIyvRi/7pIUNdDND+Wbb/LWIaDA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=MJr0S+KEEOH794tAt+FJY+F7duwzbT2Tb5Cw5EajPHw=; b=e8z88EPFk8JDhO
+	JTX0gXnj07mhiJc5twVbk5hQL5iHvw12+TSs820hXsNh9O749R8LILmLaK4CxBeamwNBFDr1h/fmK
+	DTmRRt5cp1Y51/Kh29KmEeCol5a0LKzBCNasGO47hy62vBgZvqCX7HyBiR5KANfojWhsJp8tiZ9VS
+	vRwFkKQcoQVFApU2fD9xdygryOZ96NKISWmpZlcKRe3YNL9ebpUAzPvVKzC80ulsUPyi+ZRt7ptMY
+	lf09C2PAq116qT4YNueXuCKvWlJQwveN0mbeoOJ7eDqht79ZZLYG2VNe/EjChadilOWyqmGaj1slZ
+	iCSEVCF+lZ/DZjOBeBpg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkR5D-0006t8-Lw; Fri, 18 Jan 2019 10:09:03 +0000
-Received: from mail-vs1-xe41.google.com ([2607:f8b0:4864:20::e41])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkR5A-0006sb-W0
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 10:09:02 +0000
-Received: by mail-vs1-xe41.google.com with SMTP id x1so8068587vsc.10
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 18 Jan 2019 02:09:00 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:from:date:message-id:subject:to;
- bh=n+bIrCa8NP47kNy2c+LBCkgyAzNBjMr/5OaE8AJS908=;
- b=GP/PM6KzhJ5mgHy2MpFiP6V/3Z8fWtWIr7ui26qnGnpyJsgMQsmhG9DPGZJPiGsE8y
- E8MnNBGPBrwMqH5IUF6GdeVgCv8Si72pSI2Oivu5uZfmtkFisV4SbfFKsbgs1iLEVvkd
- NbO61JySwPVYSS87fy+jBN2JeaLp5F1nWMOnzyxBvAzEmF+lgIRl7Ix/dydoLUjbYutS
- Es4zpm7QZHGaurBWOubVTy5C/RKcyl7jX091TgKXES0m3tv4NeZpXVcBFdX04m7C479m
- K+kSbxTk/G5nK0KdyEaFtf2PcAKTvtX9kjgVgq2Gy4lnOSn/d+hhqei9GQUyPqZM7U54
- Gs4A==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:from:date:message-id:subject:to;
- bh=n+bIrCa8NP47kNy2c+LBCkgyAzNBjMr/5OaE8AJS908=;
- b=m8wB4xNtHyoRL9XC4HJ37s0/F8Hluu8v1TSWa4RVs4fO2+0T4Ezo42jGd/cVlxyHHQ
- Kziv9eSfE35zstZWt1nEIpvz9TAcYUxYdrtu64K+G7mfh9yLscjPklJRWyfUgtPwS8Hh
- Pv9VpjhCnf4jJOvP/sfZOyyWBXT0Ydl5O9zMw5MKmnIukoV663IKdPvKY+WFex/ez4dO
- 7Cxtjr0ReNbJJkb6h4fy+Zs9ieu6usNcNmREGBW+8bQjyhwMNhmOEiFg/8Vq4u//C4pA
- qEYZSXSWotjK0znB5YTjn4iNOM/3O6u9F8Lk0+qTu+zY19fW3U2nkwZECOXZu/dRpFxP
- Xlaw==
-X-Gm-Message-State: AJcUukd2XOzuRTluBatd7dl26ps3nyumYHDjiQqNdVrszaT3V6P3IH0J
- 6HIQtoZAe5naxEI6Bx114ixns1AbwIfue3WvsMo=
-X-Google-Smtp-Source: ALg8bN5YAP4roDEn+VCrnUhEOEhDQm7xkOO6as2Vt9tet88KRpdW6e+snTl+r440Vp8Jgg3+wEYVTqV3MCJNe50mcQQ=
-X-Received: by 2002:a67:f793:: with SMTP id j19mr6892160vso.196.1547806139093; 
- Fri, 18 Jan 2019 02:08:59 -0800 (PST)
+	id 1gkR5m-0007F1-JK; Fri, 18 Jan 2019 10:09:38 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gkR5j-0007EX-LB
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 10:09:37 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0CDE980D;
+ Fri, 18 Jan 2019 02:09:35 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ 84DF13F5C1; Fri, 18 Jan 2019 02:09:33 -0800 (PST)
+Subject: Re: [PATCH 1/1] irqchip: gpcv2: make config option visible
+To: Aisheng Dong <aisheng.dong@nxp.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
+References: <1547796918-29790-1-git-send-email-aisheng.dong@nxp.com>
+ <25cd3e29-e365-f0d4-65a3-b3af69acd9cd@arm.com>
+ <AM0PR04MB421158B2E042D623792A296E809C0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ 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
+Organization: ARM Ltd
+Message-ID: <77ecfcfa-16fe-a3e2-3d6b-90cdf999b316@arm.com>
+Date: Fri, 18 Jan 2019 10:09:31 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-From: Pintu Agarwal <pintu.ping@gmail.com>
-Date: Fri, 18 Jan 2019 15:38:48 +0530
-Message-ID: <CAOuPNLj4QzNDt0npZn2LhZTFgDNJ1CsWPw3=wvUuxnGtQW308g@mail.gmail.com>
-Subject: Need help: how to locate failure from irq_chip subsystem
-To: open list <linux-kernel@vger.kernel.org>,
- linux-arm-kernel@lists.infradead.org, 
- Russell King - ARM Linux <linux@armlinux.org.uk>, linux-mm@kvack.org,
- linux-pm@vger.kernel.org, 
- kernelnewbies@kernelnewbies.org, Pintu Kumar <pintu.ping@gmail.com>
+In-Reply-To: <AM0PR04MB421158B2E042D623792A296E809C0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_020901_028529_595EB42F 
-X-CRM114-Status: GOOD (  10.86  )
+X-CRM114-CacheID: sfid-20190118_020935_699875_C169BFCD 
+X-CRM114-Status: GOOD (  16.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,44 +116,69 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
+Cc: Jason Cooper <jason@lakedaemon.net>,
+ Andrey Smirnov <andrew.smirnov@gmail.com>, dl-linux-imx <linux-imx@nxp.com>,
+ Thomas Gleixner <tglx@linutronix.de>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "l.stach@pengutronix.de" <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi All,
+On 18/01/2019 09:49, Aisheng Dong wrote:
+>> From: Marc Zyngier [mailto:marc.zyngier@arm.com]
+>> Sent: Friday, January 18, 2019 5:13 PM
+>> On 18/01/2019 07:41, Aisheng Dong wrote:
+>>> Make GPCv2 config option visible, then user can select it in defconfig
+>>> for ARMv8 platforms.
+>>>
+>>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>>> Cc: Jason Cooper <jason@lakedaemon.net>
+>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>> Cc: Shawn Guo <shawnguo@kernel.org>
+>>> Cc: Lucas Stach <l.stach@pengutronix.de>
+>>> Cc: Andrey Smirnov <andrew.smirnov@gmail.com>
+>>> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+>>> ---
+>>>  drivers/irqchip/Kconfig | 3 ++-
+>>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig index
+>>> 3d1e607..ed04d47 100644
+>>> --- a/drivers/irqchip/Kconfig
+>>> +++ b/drivers/irqchip/Kconfig
+>>> @@ -289,7 +289,8 @@ config RENESAS_H8S_INTC
+>>>  	select IRQ_DOMAIN
+>>>
+>>>  config IMX_GPCV2
+>>> -	bool
+>>> +	bool "i.MX GPCv2 IRQ chip"
+>>> +	depends on ARCH_MXC || (COMPILE_TEST && OF)
+>>>  	select IRQ_DOMAIN
+>>>  	help
+>>>  	  Enables the wakeup IRQs for IMX platforms with GPCv2 block
+>>>
+>>
+>> How does it help exactly? It is pretty difficult for a user to know exactly what
+>> they need. I'd rather see it selected by ARCH_MXC, which makes it
+> 
+> ARM64 SoC maintainers suggest not add more driver specific options except an
+> Generic ARCH option.
+> 
+> As GPCv2 is also used in MX8MQ. So we may select it in armv8 defconfig.
+> If this option is invisible, we can't select it.
 
-Currently, I am trying to debug a boot up crash on some qualcomm
-snapdragon arm64 board with kernel 4.9.
-I could find the cause of the failure, but I am unable to locate from
-which subsystem/drivers this is getting triggered.
-If you have any ideas or suggestions to locate the issue, please let me know.
-
-This is the snapshot of crash logs:
-[    6.907065] Unable to handle kernel NULL pointer dereference at
-virtual address 00000000
-[    6.973938] PC is at 0x0
-[    6.976503] LR is at __ipipe_ack_fasteoi_irq+0x28/0x38
-[    7.151078] Process qmp_aop (pid: 24, stack limit = 0xfffffffbedc18000)
-[    7.242668] [<          (null)>]           (null)
-[    7.247416] [<ffffff9469f8d2e0>] __ipipe_dispatch_irq+0x78/0x340
-[    7.253469] [<ffffff9469e81564>] __ipipe_grab_irq+0x5c/0xd0
-[    7.341538] [<ffffff9469e81d68>] gic_handle_irq+0xc0/0x154
-
-[    6.288581] [PINTU]: __ipipe_ack_fasteoi_irq - called
-[    6.293698] [PINTU]: __ipipe_ack_fasteoi_irq:
-desc->irq_data.chip->irq_hold is NULL
-
-When I check, I found that the irq_hold implementation is missing in
-one of the irq_chip driver (expected by ipipe), which I am supposed to
-implement.
-
-But I am unable to locate which irq_chip driver.
-If there are any good techniques to locate this in kernel, please help.
-
+And conversely, users have no idea of what letter soup they have to
+select to make their HW work properly. Selecting the driver when the
+platform is supposed to be supported is the right way to solve this problem.
 
 Thanks,
-Pintu
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
 
 _______________________________________________
 linux-arm-kernel mailing list
