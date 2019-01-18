@@ -2,70 +2,112 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 93024C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 09:53:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 50CE3C43612
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 09:54:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5E7C02086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 09:53:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8DA7C20883
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 09:54:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JWeEUO3w"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5E7C02086D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uSUfNVY+";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="fIXxANtc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8DA7C20883
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=N6ECcqk3XHUEHlvAeD8p++S9WHE3OxEVyqC2EK3GGc8=; b=JWeEUO3ws8UuSb
-	MMZNDF8KzR33SAvurh5Pp/FbT9gJUNPmOKwhWpNMGJyj+AkSufB/ZPSVpyT2FA2uqXncqDnx9icLa
-	u2fFqQRkwUaqTuoQMBLgXScDuElToUxN40ewqM2i38fV8UIKMkKpIh6W4CbbAHpvtZmOI7ilcGU04
-	xliztOOW0rMWRNB0Kr/3o1xXjIn6nOwJVE72J+yhotIuQJt6vs3xKbjvcjk6ZwQuumL5NP7H3gO3a
-	ipmOZh4iqOz3BmBSyKbvQ1qMeEQay9I++vcGYEJhljGtrta1K+aEeALPLW8jemjC2SZfSX0PM1BgZ
-	Sm8NBrGtehR7yHmz6hbw==;
+	List-Owner; bh=AVYyNXG9RgyNcWHzXT0EhPHDAcFBS0mySUw/ubVO6zI=; b=uSUfNVY+imF6At
+	qV4cI10w0xBctrEc+c+cPZXMXE0rVYNLmHNumOcNnUx0+hIMaNzmno4jlWH//uqWRhwupqXt/oCDh
+	B6F33+ElugZVSRq8uOINbi143f+iqbDDvORMiqE2/gT9cmVnF/BvBUqejvTOIX0CIwDk4hNwHPx8M
+	+CfbOhhBKB+2p5pCFY3aKZexiKwrzQc8xutmmTUiVeN4R7DLZdLuosxdQgPWvGFUFwAa3g+QcSQNZ
+	IwVhecfgUt9Wg7PplxgjImk6Mt4tq6moNkX6Z+r42BucZSLAlrVn8GacKRpHtpmtbfo0Ha/SfTvuw
+	NuEj7+QcUBAq1cWVsL9Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkQq8-0008VA-Ep; Fri, 18 Jan 2019 09:53:28 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+	id 1gkQrK-0000Nv-CV; Fri, 18 Jan 2019 09:54:42 +0000
+Received: from mail-eopbgr10058.outbound.protection.outlook.com ([40.107.1.58]
+ helo=EUR02-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkQq3-0008TY-80
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 09:53:25 +0000
-Received: from ptx.hi.pengutronix.de ([2001:67c:670:100:1d::c0])
- by metis.ext.pengutronix.de with esmtps
- (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1gkQpu-00073h-0Z; Fri, 18 Jan 2019 10:53:14 +0100
-Received: from ukl by ptx.hi.pengutronix.de with local (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1gkQpt-0006HG-KN; Fri, 18 Jan 2019 10:53:13 +0100
-Date: Fri, 18 Jan 2019 10:53:13 +0100
-From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
-To: Ryder Lee <ryder.lee@mediatek.com>
-Subject: Re: [PATCH v1 1/5] pwm: mediatek: add a property "mediatek,num-pwms"
-Message-ID: <20190118095313.pbpdn43hd76khg2x@pengutronix.de>
-References: <de316385a84e079d3b23891e61c959094b9fa7e5.1547781007.git.ryder.lee@mediatek.com>
- <20190118075925.noilab6glzm3cig6@pengutronix.de>
- <1547804574.8124.6.camel@mtkswgap22>
+ id 1gkQrG-0000N1-V9
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 09:54:40 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=7oKgWNtEPhELoecFW3SpQKAlaQ9qDiQdEWxTOf81JoI=;
+ b=fIXxANtckmFugBMGHqwyHmbnbx80lVdHCxVmeU28jO5K99/EaAUdHi7J+fGAflFXAwzYlQ8lg+4oekH44o27/QvUFyU07+0XgozkedZ5ynqnl8oXrLKuzN7LuNZEtR1/QOm7h7XwFY5mwOYL5pjN/BCmYlFvFlZCqgfOoPUhExM=
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
+ AM0PR04MB4019.eurprd04.prod.outlook.com (52.134.90.28) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1537.26; Fri, 18 Jan 2019 09:54:33 +0000
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::c4d2:7dfd:4576:bdd5]) by AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::c4d2:7dfd:4576:bdd5%5]) with mapi id 15.20.1537.018; Fri, 18 Jan 2019
+ 09:54:33 +0000
+From: Aisheng Dong <aisheng.dong@nxp.com>
+To: Lucas Stach <l.stach@pengutronix.de>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>
+Subject: RE: [PATCH 4/4] irq: imx: irqsteer: add multi output interrupts
+ support
+Thread-Topic: [PATCH 4/4] irq: imx: irqsteer: add multi output interrupts
+ support
+Thread-Index: AQHUrwL34aHTasx2wUetvBoWoE17FaW0uIqAgAAPyPA=
+Date: Fri, 18 Jan 2019 09:54:32 +0000
+Message-ID: <AM0PR04MB42111D634F28492434AA9309809C0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1547797668-30342-1-git-send-email-aisheng.dong@nxp.com>
+ <1547797668-30342-5-git-send-email-aisheng.dong@nxp.com>
+ <1547801609.2626.5.camel@pengutronix.de>
+In-Reply-To: <1547801609.2626.5.camel@pengutronix.de>
+Accept-Language: zh-CN, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=aisheng.dong@nxp.com; 
+x-originating-ip: [92.121.36.198]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; AM0PR04MB4019;
+ 6:Ikwsc5Fg4RtvF8TGWOAxElQINZQR+mnoG1c3LSjmvGdSvXu2T1VW3MyDF7+ZCFJCJ+TALt4I5/SrBhCsIaHEyBXz5+0QnFHxTEQUuNyfpEwPk9MrPUCzqTTAAEQ2sOlJiI4Tz3CoHcHAYQQcOVwFr/Phl/GQvnQEYYHfv6FYA39pCtoQdbHu9SgaMDcqP5KuHqKAEzotmplbUfgMiIdKfzML2CMu3KfVYEgQzajkn8bJbF9KaMOyAeYKu4Dv64zZ1QQX+lNk1xw+XbL3wDv3Z/aCrkpTktotcuNMmZBFUdmORDBgap8w7SNzie1RTUsSAdvJjscaFsIOMK61Dy9Fr/WIyQGYKuSyb+NckX6oL/nnrti9BufGCW6MWZjOfbrgt+J5u0vf1IDn7VT5B36vCQsDMp0pRIVOcGCLXmdReZA9fZjDxxYAJcPpd3d2/uzU8rw3rTPF76jxnc4vEXYx5w==;
+ 5:57eXwlfeo4FC76Mog9DdY8aB6AyG7uYPVh28gxMAkkPk+Hups52kSneHKBmd6GHphrh1FE5Lc3my/QIZy1JuRUCFmV67abe8R5gaCs68dQ4eLM8xo/YUqkmnpQlUwuKKw6xwOZX3BqaV/bbvb6R5ix3l87gYQ3p0w/5ZAB8P8kEbh8QUqrDGyVzdk6MrYNpeIx6TcMvwv/h1MvpesPGjIQ==;
+ 7:TkC85g0xb+G8Tu6Vxq5sQ5vJhtXji8TzMqhYU459gGfahLhcJPd0T5M95+paMrnf+f0+CfbSnQyg4ncR2kn/JJ0gYUUO1GUtk3vjtfs2b+0VuVkgNUb9/nJfFi8D/M8KFyTtvqD3pGdTe8grvX9Crw==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: 2798ba5c-2eb1-48e0-4757-08d67d2af27f
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:AM0PR04MB4019; 
+x-ms-traffictypediagnostic: AM0PR04MB4019:
+x-microsoft-antispam-prvs: <AM0PR04MB4019A95FB13B37D961FB57F5809C0@AM0PR04MB4019.eurprd04.prod.outlook.com>
+x-forefront-prvs: 0921D55E4F
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(136003)(346002)(39860400002)(366004)(376002)(396003)(199004)(189003)(11346002)(76176011)(105586002)(316002)(97736004)(106356001)(2906002)(68736007)(66066001)(5660300001)(476003)(229853002)(54906003)(110136005)(7696005)(99286004)(6436002)(2501003)(8936002)(9686003)(71190400001)(44832011)(86362001)(7736002)(6506007)(6116002)(102836004)(74316002)(478600001)(3846002)(53936002)(55016002)(26005)(33656002)(14454004)(71200400001)(186003)(486006)(8676002)(81166006)(81156014)(25786009)(4326008)(305945005)(446003)(256004)(6246003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB4019;
+ H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: GG/uS6k0w15km4j50inwOQZrG90mtXP+se1egramNWzVDIHn2utcVlvAAJOepPGISjzgFn5V594anVryZXNRN4tRqzKDPmX6T6IshVj4oO4EYifTmi/ND4r0zt2/0XS9pIbg2KTU/Zfz266sWugfXYVdVitPaxjP1dIYvAARo//QF9CVuZkS5+YQ5xDFxlz7BjqFZdOSSEvnJXJ3erlB4t/v3p8eiseOrZdMgZRwS97w2xY++5zA/bnpyTNsorhGhuWbQX/ESF1SoyG8A+pz1t8iST2citzusCHzMaCG7BJSz2iTj08cfLAfif1p91dngMb8ClKfpb5tgHkzq3WNNga2Y3DSwpwsqkheZMj0EoyD6b9dp6e/WDD/4wIRAQyDt06fciFyXYzlt3hLZXzMQU6vF2G3A7FVvpQ3bpkZ3a0=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1547804574.8124.6.camel@mtkswgap22>
-User-Agent: NeoMutt/20170113 (1.7.2)
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c0
-X-SA-Exim-Mail-From: ukl@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 2798ba5c-2eb1-48e0-4757-08d67d2af27f
+X-MS-Exchange-CrossTenant-originalarrivaltime: 18 Jan 2019 09:54:32.9369 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB4019
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_015323_480606_D49227B6 
-X-CRM114-Status: GOOD (  27.78  )
+X-CRM114-CacheID: sfid-20190118_015439_008366_2F013856 
+X-CRM114-Status: GOOD (  22.81  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,152 +119,100 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-pwm@vger.kernel.org, devicetree@vger.kernel.org,
- Sean Wang <sean.wang@kernel.org>, Weijie Gao <weijie.gao@mediatek.com>,
- linux-kernel@vger.kernel.org, Thierry Reding <thierry.reding@gmail.com>,
- linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, "robh+dt@kernel.org" <robh+dt@kernel.org>,
+ dl-linux-imx <linux-imx@nxp.com>, "tglx@linutronix.de" <tglx@linutronix.de>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello Ryder,
-
-On Fri, Jan 18, 2019 at 05:42:54PM +0800, Ryder Lee wrote:
-> On Fri, 2019-01-18 at 08:59 +0100, Uwe Kleine-K=F6nig wrote:
-> > Hello,
-> > =
-
-> > On Fri, Jan 18, 2019 at 11:24:41AM +0800, Ryder Lee wrote:
-> > > This adds a property "mediatek,num-pwms" to avoid having an endless
-> > > list of compatibles with no differences for the same driver.
-> > > =
-
-> > > Thus, the driver should have backwards compatibility to older DTs.
-> > =
-
-> > I still think Thierry should bless "num-pwms" without vendor prefix.
-> =
-
-> Okay.
-> =
-
-> > > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> > > ---
-> > > Changes since v1: add some checks for backwards compatibility.
-> > > ---
-> > >  drivers/pwm/pwm-mediatek.c | 27 ++++++++++++++++++---------
-> > >  1 file changed, 18 insertions(+), 9 deletions(-)
-> > > =
-
-> > > diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
-> > > index eb6674c..81b7e5e 100644
-> > > --- a/drivers/pwm/pwm-mediatek.c
-> > > +++ b/drivers/pwm/pwm-mediatek.c
-> > > @@ -55,7 +55,7 @@ enum {
-> > >  };
-> > >  =
-
-> > >  struct mtk_pwm_platform_data {
-> > =
-
-> > Unrelated to this patch: This name is bad. This struct is not used as
-> > platform_data and so should better be named mtk_pwm_of_data. While at
-> > criticizing existing stuff: I'd prefer pwm_mediatek as common prefix to
-> > match the filename.
-> =
-
-> I think we can take care about that in another patch.
-
-That's what I wanted to say, right. Do you follow up?
-
-> > > -	unsigned int num_pwms;
-> > > +	unsigned int num_pwms;	/* it should not be used in the future SoCs =
-*/
-> > =
-
-> > I'd drop this comment in favour of a runtime warning.
-> =
-
-> Sorry, I can't get you here.
-
-I'd do a
-
-	dev_warn(dev, "dt didn't specify number of PWMs, falling back to %d\n", pc=
-->soc->num_pwms);
-
-to make people aware that updating the dt would be nice.
-
-> =
-
-> > >  	bool pwm45_fixup;
-> > >  	bool has_clks;
-> > >  };
-> > > @@ -226,27 +226,36 @@ static void mtk_pwm_disable(struct pwm_chip *ch=
-ip, struct pwm_device *pwm)
-> > >  =
-
-> > >  static int mtk_pwm_probe(struct platform_device *pdev)
-> > >  {
-> > > -	const struct mtk_pwm_platform_data *data;
-> > > +	struct device_node *np =3D pdev->dev.of_node;
-> > >  	struct mtk_pwm_chip *pc;
-> > >  	struct resource *res;
-> > > -	unsigned int i;
-> > > +	unsigned int i, num_pwms;
-> > >  	int ret;
-> > >  =
-
-> > >  	pc =3D devm_kzalloc(&pdev->dev, sizeof(*pc), GFP_KERNEL);
-> > >  	if (!pc)
-> > >  		return -ENOMEM;
-> > >  =
-
-> > > -	data =3D of_device_get_match_data(&pdev->dev);
-> > > -	if (data =3D=3D NULL)
-> > > -		return -EINVAL;
-> > > -	pc->soc =3D data;
-> > > +	pc->soc =3D of_device_get_match_data(&pdev->dev);
-> > =
-
-> > This might return NULL which ...
-> =
-
-> The only way to call probe() is to match an entry in
-> mtk_pwm_of_match[], so match cannot be NULL.
-
-(<pedantic>Theoretically the driver can be probed by device name, but
-that is not what I meant here.</pedantic>).
-
-You're right, as long as all entries in mtk_pwm_of_match have a non-NULL
-.data entry, you're fine. I somehow thought there might be some without
-one. I wouldn't oppose to check for that anyhow as a defensive measure.
-
-> > > [...]
-> > > +	/* Check if we have set 'num-pwms' in DTs. */
-> > > +	ret =3D of_property_read_u32(np, "mediatek,num-pwms", &num_pwms);
-> > > +	if (ret < 0) {
-> > > +		/* If no, fallback to use SoC data for backwards compatibility. */
-> > > +		if (pc->soc->num_pwms) {
-> > =
-
-> > ... here then results in a NULL pointer dereference. I think you want
-> =
-
-> So we have no chance to get a NULL pointer, right?
-
-Ack.
-
-Best regards
-Uwe
-
--- =
-
-Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+PiBGcm9tOiBMdWNhcyBTdGFjaCBbbWFpbHRvOmwuc3RhY2hAcGVuZ3V0cm9uaXguZGVdDQo+IFNl
+bnQ6IEZyaWRheSwgSmFudWFyeSAxOCwgMjAxOSA0OjUzIFBNDQo+IEFtIEZyZWl0YWcsIGRlbiAx
+OC4wMS4yMDE5LCAwNzo1MyArMDAwMCBzY2hyaWViIEFpc2hlbmcgRG9uZzoNCj4gPiBPbmUgaXJx
+c3RlZXIgY2hhbm5lbCBjYW4gc3VwcG9ydCB1cCB0byA4IG91dHB1dCBpbnRlcnJ1cHRzLg0KPiAN
+Cj4gVGhpcyBoYXMgYmVlbiBkaXNjdXNzZWQgd2hlbiB1cHN0cmVhbWluZyB0aGUgZHJpdmVyLiBU
+aGUgY29udHJvbGxlciBtYXkNCj4gc3VwcG9ydCBtdWx0aXBsZSBvdXRwdXQgSVJRcywgYnV0IG9u
+bHkgb25lIHRoZW0gaXMgYWN0dWFsbHkgdXNlZCBkZXBlbmRpbmcgb24NCj4gdGhlIENIQU5DVFJM
+IGNvbmZpZy4gVGhlcmUgaXMgbm8gdXNlIGluIGhvb2tpbmcgdXAgYWxsIHRoZSBvdXRwdXQgSVJR
+cyBpbiBEVCwgaWYNCj4gb25seSBvbmUgb2YgdGhlbSBpcyBhY3R1YWxseSB1c2VkLiBTb21lIG9m
+IHRoZSBvdXRwdXRzIG1heSBub3QgZXZlbiBiZSB2aXNpYmxlDQo+IHRvIHRoZSBMaW51eCBzeXN0
+ZW0sIGJ1dCBtYXkgYmVsb25nIHRvIGEgQ29ydGV4IE00IHN1YnN5c3RlbS4gQWxsIG9mIHRob3Nl
+DQo+IGNvbmZpZ3VyYXRpb25zIGNhbiBiZSBkZXNjcmliZWQgaW4gRFQgYnkgY2hhbmdpbmcgdGhl
+IHVwc3RyZWFtIGludGVycnVwdCBhbmQNCj4gImZzbCxjaGFubmVsIiBpbiBhIGNvaGVyZW50IHdh
+eS4NCj4gDQo+IFBsZWFzZSBjb3JyZWN0IG1lIGlmIG15IHVuZGVyc3RhbmRpbmcgaXMgdG90YWxs
+eSB3cm9uZy4NCg0KSSdtIGFmcmFpZCB5b3VyIHVuZGVyc3RhbmRpbmcgb2YgQ0hBTiBzZWVtcyB3
+cm9uZy4NCihCaW5kaW5nIGRvYyBvZiB0aGF0IHByb3BlcnR5IG5lZWRzIGNoYW5nZSBhcyB3ZWxs
+KS4NCg0KT24gUVhQIERDIFNTLCB0aGUgSVJRU1RFRVIgc3VwcG9ydHMgNTEyIGludGVycnVwdHMg
+d2l0aCA4IGludGVycnVwdCBvdXRwdXQNCkNvbm50ZWN0ZWQgdG8gR0lDLg0KVGhlIGN1cnJlbnQg
+ZHJpdmVyIGRvZXMgbm90IHN1cHBvcnQgaXQgYXMgaXQgYXNzdW1lcyBvbmx5IG9uZSBpbnRlcnJ1
+cHQgb3V0cHV0IHVzZWQuDQoNClJlZ2FyZHMNCkRvbmcgQWlzaGVuZw0KDQo+IA0KPiBSZWdhcmRz
+LA0KPiBMdWNhcw0KPiANCj4gPiBDYzogTWFyYyBaeW5naWVyIDxtYXJjLnp5bmdpZXJAYXJtLmNv
+bT4NCj4gPiA+IENjOiBMdWNhcyBTdGFjaCA8bC5zdGFjaEBwZW5ndXRyb25peC5kZT4NCj4gPiA+
+IENjOiBTaGF3biBHdW8gPHNoYXduZ3VvQGtlcm5lbC5vcmc+DQo+ID4gPiBTaWduZWQtb2ZmLWJ5
+OiBEb25nIEFpc2hlbmcgPGFpc2hlbmcuZG9uZ0BueHAuY29tPg0KPiA+IC0tLQ0KPiA+IMKgZHJp
+dmVycy9pcnFjaGlwL2lycS1pbXgtaXJxc3RlZXIuYyB8IDM5DQo+ID4gKysrKysrKysrKysrKysr
+KysrKysrKysrKysrLS0tLS0tLS0tLS0NCj4gPiDCoDEgZmlsZSBjaGFuZ2VkLCAyOCBpbnNlcnRp
+b25zKCspLCAxMSBkZWxldGlvbnMoLSkNCj4gPg0KPiA+IGRpZmYgLS1naXQgYS9kcml2ZXJzL2ly
+cWNoaXAvaXJxLWlteC1pcnFzdGVlci5jDQo+ID4gYi9kcml2ZXJzL2lycWNoaXAvaXJxLWlteC1p
+cnFzdGVlci5jDQo+ID4gaW5kZXggMWJlYmYwYS4uNTQ4MDJmYSAxMDA2NDQNCj4gPiAtLS0gYS9k
+cml2ZXJzL2lycWNoaXAvaXJxLWlteC1pcnFzdGVlci5jDQo+ID4gKysrIGIvZHJpdmVycy9pcnFj
+aGlwL2lycS1pbXgtaXJxc3RlZXIuYw0KPiA+IEBAIC0xMCw2ICsxMCw3IEBADQo+ID4gwqAjaW5j
+bHVkZSA8bGludXgvaXJxY2hpcC9jaGFpbmVkX2lycS5oPg0KPiA+IMKgI2luY2x1ZGUgPGxpbnV4
+L2lycWRvbWFpbi5oPg0KPiA+IMKgI2luY2x1ZGUgPGxpbnV4L2tlcm5lbC5oPg0KPiA+ICsjaW5j
+bHVkZSA8bGludXgvb2ZfaXJxLmg+DQo+ID4gwqAjaW5jbHVkZSA8bGludXgvb2ZfcGxhdGZvcm0u
+aD4NCj4gPiDCoCNpbmNsdWRlIDxsaW51eC9zcGlubG9jay5oPg0KPiA+DQo+ID4gQEAgLTIxLDEw
+ICsyMiwxMyBAQA0KPiA+ID4gwqAjZGVmaW5lIENIQU5fTUlOVERJUyh0KQkJKENUUkxfU1RSSURF
+X09GRih0LCAzKSArIDB4NCkNCj4gPiA+IMKgI2RlZmluZSBDSEFOX01BU1RSU1RBVCh0KQkoQ1RS
+TF9TVFJJREVfT0ZGKHQsIDMpICsgMHg4KQ0KPiA+DQo+ID4gPiArI2RlZmluZSBDSEFOX01BWF9P
+VVRQVVRfSU5UCTB4OA0KPiA+ICsNCj4gPiDCoHN0cnVjdCBpcnFzdGVlcl9kYXRhIHsNCj4gPiA+
+ID4gwqAJdm9pZCBfX2lvbWVtCQkqcmVnczsNCj4gPiA+ID4gwqAJc3RydWN0IGNsawkJKmlwZ19j
+bGs7DQo+ID4gPiA+IC0JaW50CQkJaXJxOw0KPiA+ID4gPiArCWludAkJCWlycVtDSEFOX01BWF9P
+VVRQVVRfSU5UXTsNCj4gPiA+ID4gKwlpbnQJCQlpcnFfY291bnQ7DQo+ID4gPiA+IMKgCXJhd19z
+cGlubG9ja190CQlsb2NrOw0KPiA+ID4gPiDCoAlpbnQJCQlyZWdfbnVtOw0KPiA+ID4gPiDCoAlp
+bnQJCQljaGFubmVsOw0KPiA+IEBAIC0xMTcsNyArMTIxLDcgQEAgc3RhdGljIGludCBpbXhfaXJx
+c3RlZXJfcHJvYmUoc3RydWN0DQo+ID4gcGxhdGZvcm1fZGV2aWNlICpwZGV2KQ0KPiA+ID4gwqAJ
+c3RydWN0IGRldmljZV9ub2RlICpucCA9IHBkZXYtPmRldi5vZl9ub2RlOw0KPiA+ID4gwqAJc3Ry
+dWN0IGlycXN0ZWVyX2RhdGEgKmRhdGE7DQo+ID4gPiDCoAlzdHJ1Y3QgcmVzb3VyY2UgKnJlczsN
+Cj4gPiA+IC0JaW50IHJldDsNCj4gPiA+ICsJaW50IGksIHJldDsNCj4gPg0KPiA+ID4gwqAJZGF0
+YSA9IGRldm1fa3phbGxvYygmcGRldi0+ZGV2LCBzaXplb2YoKmRhdGEpLCBHRlBfS0VSTkVMKTsN
+Cj4gPiA+IMKgCWlmICghZGF0YSkNCj4gPiBAQCAtMTMwLDEyICsxMzQsNiBAQCBzdGF0aWMgaW50
+IGlteF9pcnFzdGVlcl9wcm9iZShzdHJ1Y3QNCj4gPiBwbGF0Zm9ybV9kZXZpY2UgKnBkZXYpDQo+
+ID4gPiDCoAkJcmV0dXJuIFBUUl9FUlIoZGF0YS0+cmVncyk7DQo+ID4gPiDCoAl9DQo+ID4NCj4g
+PiA+IC0JZGF0YS0+aXJxID0gcGxhdGZvcm1fZ2V0X2lycShwZGV2LCAwKTsNCj4gPiA+IC0JaWYg
+KGRhdGEtPmlycSA8PSAwKSB7DQo+ID4gPiAtCQlkZXZfZXJyKCZwZGV2LT5kZXYsICJmYWlsZWQg
+dG8gZ2V0IGlycVxuIik7DQo+ID4gPiAtCQlyZXR1cm4gLUVOT0RFVjsNCj4gPiA+IC0JfQ0KPiA+
+IC0NCj4gPiA+IMKgCWRhdGEtPmlwZ19jbGsgPSBkZXZtX2Nsa19nZXQoJnBkZXYtPmRldiwgImlw
+ZyIpOw0KPiA+ID4gwqAJaWYgKElTX0VSUihkYXRhLT5pcGdfY2xrKSkgew0KPiA+ID4gwqAJCXJl
+dCA9IFBUUl9FUlIoZGF0YS0+aXBnX2Nsayk7DQo+ID4gQEAgLTE3Nyw4ICsxNzUsMjMgQEAgc3Rh
+dGljIGludCBpbXhfaXJxc3RlZXJfcHJvYmUoc3RydWN0DQo+ID4gcGxhdGZvcm1fZGV2aWNlICpw
+ZGV2KQ0KPiA+ID4gwqAJCXJldHVybiAtRU5PTUVNOw0KPiA+ID4gwqAJfQ0KPiA+DQo+ID4gPiAt
+CWlycV9zZXRfY2hhaW5lZF9oYW5kbGVyX2FuZF9kYXRhKGRhdGEtPmlycSwgaW14X2lycXN0ZWVy
+X2lycV9oYW5kbGVyLA0KPiA+ID4gLQkJCQkJwqBkYXRhKTsNCj4gPiA+ICsJZGF0YS0+aXJxX2Nv
+dW50ID0gb2ZfaXJxX2NvdW50KG5wKTsNCj4gPiA+ICsJaWYgKCFkYXRhLT5pcnFfY291bnQgfHwg
+ZGF0YS0+aXJxX2NvdW50ID4gQ0hBTl9NQVhfT1VUUFVUX0lOVCkgew0KPiA+ID4gKwkJY2xrX2Rp
+c2FibGVfdW5wcmVwYXJlKGRhdGEtPmlwZ19jbGspOw0KPiA+ID4gKwkJcmV0dXJuIC1FSU5WQUw7
+DQo+ID4gPiArCX0NCj4gPiArDQo+ID4gPiArCWZvciAoaSA9IDA7IGkgPCBkYXRhLT5pcnFfY291
+bnQ7IGkrKykgew0KPiA+ID4gKwkJZGF0YS0+aXJxW2ldID0gaXJxX29mX3BhcnNlX2FuZF9tYXAo
+bnAsIGkpOw0KPiA+ID4gKwkJaWYgKCFkYXRhLT5pcnFbaV0pIHsNCj4gPiA+ICsJCQljbGtfZGlz
+YWJsZV91bnByZXBhcmUoZGF0YS0+aXBnX2Nsayk7DQo+ID4gPiArCQkJcmV0dXJuIC1FSU5WQUw7
+DQo+ID4gPiArCQl9DQo+ID4gKw0KPiA+ID4gKwkJaXJxX3NldF9jaGFpbmVkX2hhbmRsZXJfYW5k
+X2RhdGEoZGF0YS0+aXJxW2ldLA0KPiA+ID4gKwkJCQkJCcKgaW14X2lycXN0ZWVyX2lycV9oYW5k
+bGVyLA0KPiA+ID4gKwkJCQkJCcKgZGF0YSk7DQo+ID4gPiArCX0NCj4gPg0KPiA+ID4gwqAJcGxh
+dGZvcm1fc2V0X2RydmRhdGEocGRldiwgZGF0YSk7DQo+ID4NCj4gPiBAQCAtMTg4LDggKzIwMSwx
+MiBAQCBzdGF0aWMgaW50IGlteF9pcnFzdGVlcl9wcm9iZShzdHJ1Y3QNCj4gPiBwbGF0Zm9ybV9k
+ZXZpY2UgKnBkZXYpDQo+ID4gwqBzdGF0aWMgaW50IGlteF9pcnFzdGVlcl9yZW1vdmUoc3RydWN0
+IHBsYXRmb3JtX2RldmljZSAqcGRldikNCj4gPiDCoHsNCj4gPiA+IMKgCXN0cnVjdCBpcnFzdGVl
+cl9kYXRhICppcnFzdGVlcl9kYXRhID0gcGxhdGZvcm1fZ2V0X2RydmRhdGEocGRldik7DQo+ID4g
+PiArCWludCBpOw0KPiA+ICsNCj4gPiA+ICsJZm9yIChpID0gMDsgaSA8IGlycXN0ZWVyX2RhdGEt
+PmlycV9jb3VudDsgaSsrKQ0KPiA+ID4gKwkJaXJxX3NldF9jaGFpbmVkX2hhbmRsZXJfYW5kX2Rh
+dGEoaXJxc3RlZXJfZGF0YS0+aXJxW2ldLA0KPiA+ID4gKwkJCQkJCcKgTlVMTCwgTlVMTCk7DQo+
+ID4NCj4gPiA+IC0JaXJxX3NldF9jaGFpbmVkX2hhbmRsZXJfYW5kX2RhdGEoaXJxc3RlZXJfZGF0
+YS0+aXJxLCBOVUxMLCBOVUxMKTsNCj4gPiA+IMKgCWlycV9kb21haW5fcmVtb3ZlKGlycXN0ZWVy
+X2RhdGEtPmRvbWFpbik7DQo+ID4NCj4gPiA+IMKgCWNsa19kaXNhYmxlX3VucHJlcGFyZShpcnFz
+dGVlcl9kYXRhLT5pcGdfY2xrKTsNCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJu
+ZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFu
+L2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
