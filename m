@@ -2,74 +2,61 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D5BF6C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:02:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2582DC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:04:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 910212086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:02:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E57602086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:04:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nXYKy9Y5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 910212086D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aGvwSsLQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E57602086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:In-Reply-To:
+	Date:References:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=M+/v/YNoDjEKqFzeLuL9K3lWH8tdbqNXlnBtwE+mnpA=; b=nXYKy9Y5ALq0Z7
-	NYsueqQ8wr/Ig4sbJSMnwBgmnbqldGmvzs3VEi0poM0GfnFg2/ykamEgdMy9CtBq6BjyL62lpG1uF
-	B5aNrUP/2/Teq3RfVwYPAEJyq+C40wZVKstE1NiZtHEqWurAQ0aoeaopTm98TkYZyybZ6M7RTHw/W
-	s339gaDLLcKpVFF5D5vg4s9nj7O1jj8vAAe6llu4osiTojv3WWTsF8mc8SJDdOoDx+aNfJjL0c27H
-	ofEXRQEvi3/q9NazrwJYXDPv2Y8mwacqFeit9CK/NHQBXLn2TvR0uOR9NamUHBICVRnoyH8Rub4y/
-	nmFBWK9iouIOPLwxLbZw==;
+	List-Owner; bh=uAUfeGnlBw1mkcm2KOsgHZxxDhFkjnvX5PiXSBW4xOg=; b=aGvwSsLQC+YGuT
+	DQ26TQLEmUtN0HTBQlguY8hYOZ8mAj9GyGmKM6sf2yaVPyyyL8BZWG1N7USB/2etffCb8bwKCr7RM
+	MiGYcqd0k9A71GPXuyhnwAOTnhD81Dyty2dVXzKJEao3/VqDkGxFGTXBZqvLV0+tRnWuJcmYJax4A
+	aMeifV2h/PQeADaXJh/fEygixB4AF/VuKXVh1/N+NaJXNE6A9pkhQ7p3AlqaVAyjo/fXlBmLXyHz0
+	wtV2l2EE8s5lnyWY0f6spnYVxpLM/4lD0darS4NXDPXjCFtgYftyr5ZYkeo7F1e15BJ2YTPsWO9iA
+	2lS9pdTMMKAWwwu26d2w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkWbZ-0007aj-DJ; Fri, 18 Jan 2019 16:02:49 +0000
-Received: from mail-qk1-f193.google.com ([209.85.222.193])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkWbQ-0007Yn-Fy
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 16:02:46 +0000
-Received: by mail-qk1-f193.google.com with SMTP id c21so8309559qkl.6
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 18 Jan 2019 08:02:39 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=SDodKVKZE68GaTWQnw/8diyvuXpkz6/WYntpU/2umcM=;
- b=S2cG9jdhwdqc61RGMkQ5965XZnM01YJg/5pMnE47OVy1n21Nlm6AY6LHi+1MqmEbrN
- C7kCItslcnmHVWuEeBCK+TxpYWuP4ta3afH9eyoNvUzUuBaKxJm3/gM4os7AaFJS7OCE
- +cP37D5DZoK8FGfucR2TfRximtkMf3ar9bbXV2vTh2uBtyNxviZYL5hBQdmqrGOOTJcu
- jrtj9/EJZJHSn4SEjoI3ZyuiPLRy4lHDRjqMPyykKRLWyY0H3gbaLe1iGdL8vKcIm9Mg
- QZX00hA1SJMqPSt6qI1B2bIPriZ3kMfyhkJSUgtpz9F1RI89xi+JHioK7f4R4m6aQKyM
- Y8CQ==
-X-Gm-Message-State: AJcUukev5nchBh+KRRLMFVi4Ps7RceU95XNxKR/edtybdRVD6UAjEjOz
- Gq6cSBnSxvtsiY1y1znQPFmsuy6W5SvQsk8ZpDs=
-X-Google-Smtp-Source: ALg8bN6pE87HFJeIEYKnf1asy3R2yG9dZIxH+fpuakhGTiL3Whec42E8wvd9lm9HoVlK17a+U5oWtuQtlXKiaYl5cVw=
-X-Received: by 2002:a37:324a:: with SMTP id y71mr15685363qky.291.1547827358315; 
- Fri, 18 Jan 2019 08:02:38 -0800 (PST)
+	id 1gkWd2-00082o-4K; Fri, 18 Jan 2019 16:04:20 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gkWcx-00082U-NR
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 16:04:18 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 4FEF22074A; Fri, 18 Jan 2019 17:04:14 +0100 (CET)
+Received: from localhost (alyon-652-1-26-46.w109-213.abo.wanadoo.fr
+ [109.213.9.46])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 48AAE206A7;
+ Fri, 18 Jan 2019 17:04:03 +0100 (CET)
+From: Gregory CLEMENT <gregory.clement@bootlin.com>
+To: Miquel Raynal <miquel.raynal@bootlin.com>
+Subject: Re: [PATCH v2 02/10] usb: host: xhci: mvebu: add reset on resume quirk
+References: <20190111133133.24803-1-miquel.raynal@bootlin.com>
+ <20190111133133.24803-3-miquel.raynal@bootlin.com>
+Date: Fri, 18 Jan 2019 17:04:01 +0100
+In-Reply-To: <20190111133133.24803-3-miquel.raynal@bootlin.com> (Miquel
+ Raynal's message of "Fri, 11 Jan 2019 14:31:25 +0100")
+Message-ID: <878szilzpq.fsf@FE-laptop>
+User-Agent: Gnus/5.13 (Gnus v5.13) Emacs/26.1 (gnu/linux)
 MIME-Version: 1.0
-References: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
- <1541089538-175682-1-git-send-email-lsun@mellanox.com>
- <1541089538-175682-5-git-send-email-lsun@mellanox.com>
-In-Reply-To: <1541089538-175682-5-git-send-email-lsun@mellanox.com>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 18 Jan 2019 17:02:21 +0100
-Message-ID: <CAK8P3a2NRbEaS_EJNtBaZ3GCUtRiH2rUDRzJFjvcw2ZacZM1qw@mail.gmail.com>
-Subject: Re: [PATCH v6 5/9] soc: mellanox: host: Add the common host side
- Rshim driver
-To: Liming Sun <lsun@mellanox.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_080240_534271_F94DC2AC 
-X-CRM114-Status: GOOD (  21.02  )
+X-CRM114-CacheID: sfid-20190118_080416_036615_C9D69468 
+X-CRM114-Status: GOOD (  26.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,79 +68,151 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: DTML <devicetree@vger.kernel.org>, David Woods <dwoods@mellanox.com>,
- linux-pci <linux-pci@vger.kernel.org>,
- Vincent Whitchurch <vincent.whitchurch@axis.com>, arm-soc <arm@kernel.org>,
- Olof Johansson <olof@lixom.net>, linux-ntb@googlegroups.com,
- Robin Murphy <robin.murphy@arm.com>, Christoph Hellwig <hch@lst.de>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
+ Jason Cooper <jason@lakedaemon.net>, Mathias Nyman <mathias.nyman@intel.com>,
+ devicetree@vger.kernel.org, Antoine Tenart <antoine.tenart@bootlin.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-usb@vger.kernel.org,
+ Kishon Vijay Abraham I <kishon@ti.com>, Nadav Haklai <nadavh@marvell.com>,
+ Rob Herring <robh+dt@kernel.org>, Alan Stern <stern@rowland.harvard.edu>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ Ofer Heifetz <oferh@marvell.com>, linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Nov 1, 2018 at 5:49 PM Liming Sun <lsun@mellanox.com> wrote:
+Hi Miquel,
+ 
+ On ven., janv. 11 2019, Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+
+> From: Ofer Heifetz <oferh@marvell.com>
 >
-> An external host can connect to a Mellanox BlueField SoC via an
-> interface called Rshim. The Rshim driver provides boot, console,
-> and networking services over this interface. This commit is
-> the common driver where the other backend (transport) driver will
-> use.
+> The mvebu xHCI host driver does not have suspend/resume support. Use of
+> the XHCI_RESET_ON_RESUME quirk is mandatory in order to avoid failures
+> after resume. This will work only if no USB device is plugged-in.
 >
-> Reviewed-by: David Woods <dwoods@mellanox.com>
-> Signed-off-by: Liming Sun <lsun@mellanox.com>
+> While at it, mention in the Kconfig file that this IP is also present
+> on the A3700 SoC.
+>
+> Signed-off-by: Ofer Heifetz <oferh@marvell.com>
+> [miquel.raynal@bootlin.com: Reword the commit message]
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> ---
+>  drivers/usb/host/Kconfig      |  4 ++--
+>  drivers/usb/host/xhci-mvebu.c | 11 +++++++++++
+>  drivers/usb/host/xhci-mvebu.h |  6 ++++++
+>  drivers/usb/host/xhci-plat.c  |  7 +++++++
+>  4 files changed, 26 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index 16758b12a5e9..13d59be6a6aa 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -69,13 +69,13 @@ config USB_XHCI_MTK
+>  	  If unsure, say N.
+>  
+>  config USB_XHCI_MVEBU
+> -	tristate "xHCI support for Marvell Armada 375/38x"
+> +	tristate "xHCI support for Marvell Armada 375/38x/3700"
 
-Hi Liming,
+I would name it 37xx to be consistent with 38x
 
-I've taken a new look at your patch series for drivers/soc/ now,
-thanks for your continued submissions.
+>  	select USB_XHCI_PLATFORM
+>  	depends on HAS_IOMEM
+>  	depends on ARCH_MVEBU || COMPILE_TEST
+>  	---help---
+>  	  Say 'Y' to enable the support for the xHCI host controller
+> -	  found in Marvell Armada 375/38x ARM SOCs.
+> +	  found in Marvell Armada 375/38x/3700 ARM SOCs.
+same here
 
-This is again just a set of very high-level comments, but I think we
-should resolve some of the fundamental questions first.
-Incidentally, Vincent Whitchurch has recently posted another
-patch series with a very similar intention, but for other hardware
-and taking a different approach.
 
-In both cases, the idea is to use virtio based drivers to provide
-services from a host machine into another Linux instance running
-on an embedded system behind a PCIe slot or similar. Your
-Bluefield SoC patches are well written, but are intentionally
-kept specific to a particular use case and tied to one piece
-of hardware. In contrast, Vincent uses the existing code from
-drivers/misc/mic/vop/ that is equally hardware specific, but he
-extends it to be applicable to other hardware as well.
+>  
+>  config USB_XHCI_RCAR
+>  	tristate "xHCI support for Renesas R-Car SoCs"
+> diff --git a/drivers/usb/host/xhci-mvebu.c b/drivers/usb/host/xhci-mvebu.c
+> index 32e158568788..60651a50770f 100644
+> --- a/drivers/usb/host/xhci-mvebu.c
+> +++ b/drivers/usb/host/xhci-mvebu.c
+> @@ -13,6 +13,7 @@
+>  #include <linux/usb/hcd.h>
+>  
+>  #include "xhci-mvebu.h"
+> +#include "xhci.h"
+>  
+>  #define USB3_MAX_WINDOWS	4
+>  #define USB3_WIN_CTRL(w)	(0x0 + ((w) * 8))
+> @@ -72,3 +73,13 @@ int xhci_mvebu_mbus_init_quirk(struct usb_hcd *hcd)
+>  
+>  	return 0;
+>  }
+> +
+> +int xhci_mvebu_a3700_init_quirk(struct usb_hcd *hcd)
+> +{
+> +	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+> +
+> +	/* Without reset on resume, the HC won't work at all */
+> +	xhci->quirks |= XHCI_RESET_ON_RESUME;
+> +
+> +	return 0;
+> +}
+> diff --git a/drivers/usb/host/xhci-mvebu.h b/drivers/usb/host/xhci-mvebu.h
+> index 09791df2cec0..ca0a3a5721dd 100644
+> --- a/drivers/usb/host/xhci-mvebu.h
+> +++ b/drivers/usb/host/xhci-mvebu.h
+> @@ -12,10 +12,16 @@ struct usb_hcd;
+>  
+>  #if IS_ENABLED(CONFIG_USB_XHCI_MVEBU)
+>  int xhci_mvebu_mbus_init_quirk(struct usb_hcd *hcd);
+> +int xhci_mvebu_a3700_init_quirk(struct usb_hcd *hcd);
+>  #else
+>  static inline int xhci_mvebu_mbus_init_quirk(struct usb_hcd *hcd)
+>  {
+>  	return 0;
+>  }
+> +
+> +static inline int xhci_mvebu_a3700_init_quirk(struct usb_hcd *hcd)
+> +{
+> +	return 0;
+> +}
+>  #endif
+>  #endif /* __LINUX_XHCI_MVEBU_H */
+> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+> index ef09cb06212f..0ac4ec975547 100644
+> --- a/drivers/usb/host/xhci-plat.c
+> +++ b/drivers/usb/host/xhci-plat.c
+> @@ -98,6 +98,10 @@ static const struct xhci_plat_priv xhci_plat_marvell_armada = {
+>  	.init_quirk = xhci_mvebu_mbus_init_quirk,
+>  };
+>  
+> +static const struct xhci_plat_priv xhci_plat_marvell_armada3700 = {
+> +	.init_quirk = xhci_mvebu_a3700_init_quirk,
+> +};
+> +
+>  static const struct xhci_plat_priv xhci_plat_renesas_rcar_gen2 = {
+>  	.firmware_name = XHCI_RCAR_FIRMWARE_NAME_V1,
+>  	.init_quirk = xhci_rcar_init_quirk,
+> @@ -123,6 +127,9 @@ static const struct of_device_id usb_xhci_of_match[] = {
+>  	}, {
+>  		.compatible = "marvell,armada-380-xhci",
+>  		.data = &xhci_plat_marvell_armada,
+> +	}, {
+> +		.compatible = "marvell,armada3700-xhci",
+> +		.data = &xhci_plat_marvell_armada3700,
 
-It would be good if you could look at each other's approaches
-to see where we could take it from here. I think ideally we
-should have a common driver framework for doing the same
-thing across both of your devices and as well as others.
 
-That would also resolve my main concern about the drivers,
-which is the placement in drivers/soc/ for a set of drivers
-that are unlike most drivers in that directory not mean for
-running on the SoC itself in order drive unusual functionality
-on the SoC, but are (at least partially) meant for running on
-a host machine to communicate with that SoC over PCIe
-or USB.
+Reviewed-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 
-As an example, your network driver should really be placed
-in drivers/net/, though it is unclear to me how it relates
-to the existing virtio_net driver. In the case of mic/vop,
-the idea is to use virtio_net on the device side, but have
-vhost_net or a user space implementation on the host side,
-but that is apparently not what you do here. Can you
-explain why?
+Thanks,
 
-Another high-level question I have is on how your various
-drivers relate to one another. This should normally be
-explained in the 0/9 email, but I don't seem to have received
-such a mail. I see that you have multiple back-end drivers
-for the underlying transport, with one of them based on USB.
-Have you come up with a way to use the same high-level
-driver such as the network link over this USB back-end,
-or is this for something else?
+Gregory
 
-      Arnd
+-- 
+Gregory Clement, Bootlin
+Embedded Linux and Kernel engineering
+http://bootlin.com
 
 _______________________________________________
 linux-arm-kernel mailing list
