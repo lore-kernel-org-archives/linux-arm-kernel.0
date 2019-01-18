@@ -7,88 +7,59 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 96A51C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 12:24:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8EB87C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 12:25:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6445420652
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 12:24:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5A6BB2086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 12:25:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iWLuIjD5";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="QpLi1MhN";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="dWjqUx7M"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6445420652
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ffHEwmym";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="Qsih71lG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5A6BB2086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mVPNGg+zH9GkpnBzsuH2LzCdw8ANaECv8z9LriyihIk=; b=iWLuIjD5EtYyxT
-	CRqqFkGohjg2fEGhfkUSITekVvsAobC4fHYXNoN1HVsKpgKNdfBwf4mgMdLasKlpaFRW0dFZaRAQf
-	4x7WGOkTCo8PI72KmE5b7S5aEi44sGEty7mU/V4PTI5kWYHfHNln5cYdlN8K4YlBbwH82Fs/5AJHS
-	cvQbT0YZNYnAdsoOqS65uhnfQmuEV79gTO6hNLtgokuA+hBHOOb/iw4FoVPE1Ryn/DBmu8WbB7o6R
-	VM6vEIMhsipJfAAEPZPqB6x0qbHng00dQTPHb1Q2bf0PRlVI5WAd7x+FUIgwwScx9Uw/Ua6WmB0fi
-	wiu8ttENJURlkSKVOdSg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=zFCE6KjFM7NdcHei5eukjsa1wblE6bGhUkI0MzNsm/A=; b=ffH
+	EwmymaPmDBJyGS3hO2pE4ESjzkyl5xcyqNumW+FnKkdrPQ1G4kiFYxjA2F9XTKi9TKSmBRnlxDHtR
+	IKoAL45fv2v3mukNxBtGFn+S9OqufXXBQ+zWibtJ6aMR9ynUrtqFfxNTWvBLHXsGuq+MXm3wMWxUW
+	8zyOZeEZM48tmN2YzoLljlPg0Z9eCOnzUItXoOVleOVFhEc5P/652KpmUYWqbtoVCeRKwP2M6Ac/C
+	PY23jgvWym0bPhuC98b8rwV6nyS55zG4CrJt5NGlyMBhmH3DhQTrDOPJzI0urZwDYDPnMe+N1BS4x
+	NJSNT5GkIseZuE8hF/Lb74y4Kdw+IYQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkTCH-0007XH-VU; Fri, 18 Jan 2019 12:24:29 +0000
-Received: from smtp.codeaurora.org ([198.145.29.96])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkTBi-00076d-L2
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 12:24:21 +0000
-Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id BE16E60C00; Fri, 18 Jan 2019 12:23:40 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1547814234;
- bh=9Fu5Jdr53QglcM4lIrZSiw3D+X1QCqYiAmr8c70t4P4=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=QpLi1MhNubR2Wy5F8rCIsAfpX6KzR3QgSKB6wtH3Mska7ztoH3UZtj+W5uv6AixYD
- TCjRjy+6VFNwzeLhmsu/zCW6VNKcreEzUR5v4T4tokKyRxlSpMpnFdHzDZ8mAVQu+H
- Zmb+DAOR4QzMsYsuFqHYDquq8dkJJHTqYGBLCFxU=
-Received: from blr-ubuntu-253.qualcomm.com
- (blr-bdr-fw-01_globalnat_allzones-outside.qualcomm.com [103.229.18.19])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-SHA256 (128/128 bits))
- (No client certificate requested)
- (Authenticated sender: saiprakash.ranjan@codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id 6854360AD8;
- Fri, 18 Jan 2019 12:23:33 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1547814219;
- bh=9Fu5Jdr53QglcM4lIrZSiw3D+X1QCqYiAmr8c70t4P4=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=dWjqUx7MySkre8jaYhY8Je9d76t/Ujn4AZpbxNnHwQKaAL6kkZRuu5ElywmZIAZZO
- ys8YnVf5WarG2adhHKKiuU2MratsYgMNiikh8O/Qfsa3x1rgX100enqf9xsfAshXQg
- vWepyZXXoGEvn0kOvrd8mcXv7ZnrlQ3663bixXNk=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 6854360AD8
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- dmarc=none (p=none dis=none) header.from=codeaurora.org
-Authentication-Results: pdx-caf-mail.web.codeaurora.org; spf=none
- smtp.mailfrom=saiprakash.ranjan@codeaurora.org
-From: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
-To: Rob Herring <robh+dt@kernel.org>,
- Mathieu Poirier <mathieu.poirier@linaro.org>,
- Suzuki K Poulose <suzuki.poulose@arm.com>, Leo Yan <leo.yan@linaro.org>,
- Alexander Shishkin <alexander.shishkin@linux.intel.com>,
- Andy Gross <andy.gross@linaro.org>, David Brown <david.brown@linaro.org>,
- Vivek Gautam <vivek.gautam@codeaurora.org>,
- Doug Anderson <dianders@chromium.org>, Stephen Boyd <sboyd@kernel.org>,
- Bjorn Andersson <bjorn.andersson@linaro.org>, devicetree@vger.kernel.org,
- Mark Rutland <mark.rutland@arm.com>
-Subject: [PATCHv3 4/4] arm64: dts: qcom: sdm845: Remove the duplicate header
- inclusion
-Date: Fri, 18 Jan 2019 17:52:56 +0530
-Message-Id: <8a6a300068c0ecf6e4e3d3de5aa55144b4a50762.1547813804.git.saiprakash.ranjan@codeaurora.org>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <cover.1547813804.git.saiprakash.ranjan@codeaurora.org>
-References: <cover.1547813804.git.saiprakash.ranjan@codeaurora.org>
-MIME-Version: 1.0
+	id 1gkTDf-0000zq-GC; Fri, 18 Jan 2019 12:25:55 +0000
+Received: from kirsty.vergenet.net ([202.4.237.240])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gkTDc-0000wQ-9D
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 12:25:53 +0000
+Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
+ by kirsty.vergenet.net (Postfix) with ESMTPA id F093B25B77D;
+ Fri, 18 Jan 2019 23:25:47 +1100 (AEDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
+ t=1547814348; bh=EGL3Fof5c7u2Hk8YvSvu6nzZWxc5ocPI6tNgCREVSXw=;
+ h=From:To:Cc:Subject:Date:From;
+ b=Qsih71lGwPMkO7I1FfiBfKzznvXTtp9yaCiqEPcXm7ZRkuxlPLfqL39afI2Z/H39N
+ Xs5EyGFCo/VmwpZB5XJi0ezu/4gUPaVn11GhORR5rvtwbCCHe2laqxdDRVBD9KgBk5
+ ANrZeX6Whh/GCH+HN2+M2GGgg6BGgTt60EKkxTjg=
+Received: by reginn.horms.nl (Postfix, from userid 7100)
+ id 67E90940356; Fri, 18 Jan 2019 13:25:46 +0100 (CET)
+From: Simon Horman <horms+renesas@verge.net.au>
+To: linux-renesas-soc@vger.kernel.org
+Subject: [PATCH v2] arm64: dts: renesas: r8a77990: ebisu: Enable HS400 of SDHI3
+Date: Fri, 18 Jan 2019 13:25:36 +0100
+Message-Id: <20190118122536.20000-1-horms+renesas@verge.net.au>
+X-Mailer: git-send-email 2.11.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_042355_273250_1B7187B3 
-X-CRM114-Status: GOOD (  10.55  )
+X-CRM114-CacheID: sfid-20190118_042552_476978_6EFF0B2B 
+X-CRM114-Status: UNSURE (   9.21  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,40 +71,41 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>,
- Rajendra Nayak <rnayak@codeaurora.org>, linux-arm-msm@vger.kernel.org,
- linux-kernel@vger.kernel.org, Sibi Sankar <sibis@codeaurora.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>,
+ =?UTF-8?q?Niklas=20S=C3=B6derlund?=
+ <niklas.soderlund+renesas@ragnatech.se>, Magnus Damm <magnus.damm@gmail.com>,
+ linux-arm-kernel@lists.infradead.org,
+ Simon Horman <horms+renesas@verge.net.au>
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Remove the duplicate inclusion of qcom,gcc-sdm845.h
-mistakenly introduced by commit 6e17f8140521 ("arm64:
-dts: sdm845: add prng-ee node").
+Enable HS400 of SDHI3 using the corresponding DT property.
+No further changes are required.
 
-Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/qcom/sdm845.dtsi | 1 -
- 1 file changed, 1 deletion(-)
+Tested on top of renesas-devel-20190110-v5.0-rc1
+---
+ arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-index 2c589f7f13a8..fc124aeb57e5 100644
---- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-+++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-@@ -12,7 +12,6 @@
- #include <dt-bindings/phy/phy-qcom-qusb2.h>
- #include <dt-bindings/reset/qcom,sdm845-aoss.h>
- #include <dt-bindings/soc/qcom,rpmh-rsc.h>
--#include <dt-bindings/clock/qcom,gcc-sdm845.h>
- 
- / {
- 	interrupt-parent = <&intc>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+index 89383aa35d65..144c0820cf60 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
++++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+@@ -695,6 +695,7 @@
+ 	vmmc-supply = <&reg_3p3v>;
+ 	vqmmc-supply = <&reg_1p8v>;
+ 	mmc-hs200-1_8v;
++	mmc-hs400-1_8v;
+ 	bus-width = <8>;
+ 	non-removable;
+ 	status = "okay";
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+2.11.0
 
 
 _______________________________________________
