@@ -2,21 +2,21 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BB787C5ACD3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 17:14:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A872FC5ACD3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 17:15:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8DC022086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 17:14:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7AC2A20850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 17:15:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DlBNPEXF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8DC022086D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rEt+R0+9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7AC2A20850
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,63 +24,51 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=W8rG52nA5fU2Nv6DjAKUaoNRlIp3TiHIT3Ygr6oLM8M=; b=DlBNPEXFjTZnVG
-	kchFHC1tB6AmqQVVK/n4qLJuYJytMpGxlcAUcF+85UHXLMF1Ix9tpnr0qtvX8iJshqi3HIdte5U9T
-	Bsq+9AxZht8Tin6xIpYUUquuzEvPwvHzhKWMdt4jKgHOfBJw0/vRhFmyN3XmmMhpbN999SJu5PJIO
-	3lMtHnkvYwJ4GrLXqzfwAvhyh9og63qAcMbHYgwh5yVUWTiFNKICGM/WAF8qDPeRwJqi7YvHNb0e4
-	LURzbj2dqGUjMOjdEtbvFZp0cfREULodpP6feBaQCgyRcA5bd97a2inWYo2MENT97v6q/AD57SYfH
-	W/rpwqf3YcKLdzU/3P9Q==;
+	List-Owner; bh=ia9/M1eL0TIhUpcvKo0dhEFcSnP5aLuFYUrIaPokJAI=; b=rEt+R0+9qkUR9C
+	H0YTZx70w4XhzDsrnvR99Odyd/6HdpqUgGDuN5eU65x1qRY0Ba3jnRei7O896ALLCZbo9gvojdvAt
+	KGTi7kD39h1rV4Ba6+g+QWhrrnYyoP6tQmv9MfmLb6jxHJz+5EWuYWtY1YPKMlG6XRm3tjnFeezDE
+	knP/Y35QJBa/srOlEtydZYSrKNgxSlyNyEVEDSA+LKORKRLTwKMC7YOnhAV/22vo7nOx/qrXOoXht
+	lEs67DJ7YnQ+WgdQ3T79otIhwsqislJenVAARNZEAl7iKHl9cL6ee1h5G6maX7j6mGhpsWDegV69U
+	3pbWzIbzb8GjLRGHH3QA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkXie-0007OE-JO; Fri, 18 Jan 2019 17:14:12 +0000
-Received: from mail-ed1-f67.google.com ([209.85.208.67])
+	id 1gkXjJ-0007g5-JJ; Fri, 18 Jan 2019 17:14:53 +0000
+Received: from mail-qk1-f194.google.com ([209.85.222.194])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkXib-0007Nk-DT
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 17:14:10 +0000
-Received: by mail-ed1-f67.google.com with SMTP id h15so11719185edb.4
+ id 1gkXjH-0007f3-0i
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 17:14:52 +0000
+Received: by mail-qk1-f194.google.com with SMTP id m17so999973qki.5
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 18 Jan 2019 09:14:08 -0800 (PST)
+ Fri, 18 Jan 2019 09:14:50 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=ktKsigAQx+weGoNj6gtSnvxHTDmILfP/OH8CmOk6WZQ=;
- b=DneMrSIyqPDvqqyqqt/aYvYYJq76yn3hX3DsRNlimNHgWlR3cxynXbiRtMYNocfJtE
- e4bHQE1gBDsson/ZjD3j8xvD8fR1/lyB/5MLJA2JeL6+cnsiYyHZWYyIjcye/dgEjuwH
- 2jayXmTJlV/sqXW4/51A6QRFRvhib4MyLaCXwHUR0GLKi9L+nJr+msF6uUELi7J7vszM
- Is86VJ5xTmxF8/JsGP2dg4qb2IJGqZb+w7xy+f44NCpCwUFb+BreB6gg+zWMCMYojxZ4
- VvE0U5/gpJ5J8gxwYqP2ibbs61QCNqbAK0DcfdAv2BDQCgmoPgsOqI3PyAkBSkwHBpkH
- h3tg==
-X-Gm-Message-State: AJcUukcGvoLWspuSVp8PKAYuSnTVr5c46JYeSEAYjNjj9URITYzgLYu9
- oGw1ApNnbVsWK4c7LWpLlXQcriE8rLE=
-X-Google-Smtp-Source: ALg8bN4fAWE0db0tJKFVA18FK2m9qvS+aehhj8SR5cu2UKmzOodb0Fm0hgVfs9ZgdTkxaBYW7Z7Vgw==
-X-Received: by 2002:a05:6402:3d1:: with SMTP id
- t17mr17118594edw.21.1547831646488; 
- Fri, 18 Jan 2019 09:14:06 -0800 (PST)
-Received: from mail-wm1-f41.google.com (mail-wm1-f41.google.com.
- [209.85.128.41])
- by smtp.gmail.com with ESMTPSA id d2sm7226681eda.92.2019.01.18.09.14.05
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 18 Jan 2019 09:14:06 -0800 (PST)
-Received: by mail-wm1-f41.google.com with SMTP id b11so5204280wmj.1
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 18 Jan 2019 09:14:05 -0800 (PST)
-X-Received: by 2002:a1c:f605:: with SMTP id w5mr16981898wmc.116.1547831645652; 
- Fri, 18 Jan 2019 09:14:05 -0800 (PST)
+ bh=cM6Ct6RNNXTziZEbUSSe56myHuH3NS1roB2yrpi3ejY=;
+ b=rqNNbA3QXLtYjakCygXQ02msskjOWBqkPOo/DnS9XCkeYv3ZMdsou6qE18b1dLrA1i
+ bMFUy3u97R5ywl8a/Q85tJDbpBIn/FTbzLwSODTOaNkdl6SwE2rBn+jw5l//oAHi3d3X
+ Wh8u0DkPsZ/XhGUpzeDhernHF0eFGhaw2RsMTVVE3Upd1A8Cc/zrK5EBQTWyvyB13pO7
+ MqnP1UuWP8SXI7WIkZUWpm0bP0QN+gVkYPjlcqeB58A1a1FuT68HO+yG0YjHaplbNfwA
+ ZzTHYIyJlvfSPrY8jDVnF22Se4AG/lzoXSOhwf7B3NhQhikSKNl1BwmwvDnGUwxzqcz2
+ x56w==
+X-Gm-Message-State: AJcUukcGREi7JtgU2yc02HQ8SbIQ0oXh5MEMQqrjSN+A4exyA6ecP8dg
+ 1W8+hKkntI2SybJ6vUPWUi0TQyui+7UBROHzC30=
+X-Google-Smtp-Source: ALg8bN6YuxAZx88mWjLK6OJGww6yso8mTxW2uQ+U16+TTtpFWJaRgawaUEpqTv2Trum/q/Wu6cLlwpnMJ3TVNfmaobA=
+X-Received: by 2002:ae9:d8c2:: with SMTP id
+ u185mr15079174qkf.107.1547831689678; 
+ Fri, 18 Jan 2019 09:14:49 -0800 (PST)
 MIME-Version: 1.0
-References: <20190118170232.16142-1-anarsoul@gmail.com>
- <20190118170232.16142-3-anarsoul@gmail.com>
-In-Reply-To: <20190118170232.16142-3-anarsoul@gmail.com>
-From: Chen-Yu Tsai <wens@csie.org>
-Date: Sat, 19 Jan 2019 01:13:55 +0800
-X-Gmail-Original-Message-ID: <CAGb2v665Wsu5dhNi1=-bMmPYP-5nfTamtu0uXVYym+RxzNeN=A@mail.gmail.com>
-Message-ID: <CAGb2v665Wsu5dhNi1=-bMmPYP-5nfTamtu0uXVYym+RxzNeN=A@mail.gmail.com>
-Subject: Re: [PATCH 2/8] Bluetooth: hci_h5: Add support for reset GPIO
-To: Vasily Khoruzhick <anarsoul@gmail.com>
+References: <20190118161835.2259170-1-arnd@arndb.de>
+ <be3863ae-d903-8e9e-5e6c-e4a58fac189d@blastwave.org>
+In-Reply-To: <be3863ae-d903-8e9e-5e6c-e4a58fac189d@blastwave.org>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 18 Jan 2019 18:14:33 +0100
+Message-ID: <CAK8P3a3xUpbk+Wpo5kdDtZ81jQuzEZH6jdmJJNeNM+acueg+Dw@mail.gmail.com>
+Subject: Re: [PATCH v2 00/29] y2038: add time64 syscalls
+To: Dennis Clarke <dclarke@blastwave.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_091409_450317_639988AE 
-X-CRM114-Status: GOOD (  17.60  )
+X-CRM114-CacheID: sfid-20190118_091451_055005_4B647499 
+X-CRM114-Status: GOOD (  20.70  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,77 +80,108 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- Johan Hedberg <johan.hedberg@gmail.com>,
- Maxime Ripard <maxime.ripard@bootlin.com>, netdev <netdev@vger.kernel.org>,
- Marcel Holtmann <marcel@holtmann.org>, linux-bluetooth@vger.kernel.org,
- Rob Herring <robh+dt@kernel.org>, "David S. Miller" <davem@davemloft.net>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Rich Felker <dalias@libc.org>, linux-ia64@vger.kernel.org,
+ Linux-sh list <linux-sh@vger.kernel.org>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>, linux-mips@vger.kernel.org,
+ Max Filippov <jcmvbkbc@gmail.com>, Networking <netdev@vger.kernel.org>,
+ Deepa Dinamani <deepa.kernel@gmail.com>, "H. Peter Anvin" <hpa@zytor.com>,
+ sparclinux <sparclinux@vger.kernel.org>,
+ linux-arch <linux-arch@vger.kernel.org>,
+ linux-s390 <linux-s390@vger.kernel.org>,
+ y2038 Mailman List <y2038@lists.linaro.org>,
+ Michael Ellerman <mpe@ellerman.id.au>, Helge Deller <deller@gmx.de>,
+ the arch/x86 maintainers <x86@kernel.org>,
+ Russell King - ARM Linux <linux@armlinux.org.uk>,
+ Ingo Molnar <mingo@redhat.com>, Geert Uytterhoeven <geert@linux-m68k.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, Firoz Khan <firoz.khan@linaro.org>,
+ Matt Turner <mattst88@gmail.com>, Fenghua Yu <fenghua.yu@intel.com>,
+ Will Deacon <will.deacon@arm.com>,
+ Linux FS-devel Mailing List <linux-fsdevel@vger.kernel.org>,
+ linux-m68k <linux-m68k@lists.linux-m68k.org>,
+ Andy Lutomirski <luto@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Michal Simek <monstr@monstr.eu>, Tony Luck <tony.luck@intel.com>,
+ Parisc List <linux-parisc@vger.kernel.org>,
+ Linux API <linux-api@vger.kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Paul Burton <paul.burton@mips.com>,
+ "Eric W . Biederman" <ebiederm@xmission.com>,
+ alpha <linux-alpha@vger.kernel.org>,
+ Martin Schwidefsky <schwidefsky@de.ibm.com>,
+ Andrew Morton <akpm@linux-foundation.org>,
+ linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
+ David Miller <davem@davemloft.net>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, Jan 19, 2019 at 1:02 AM Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+On Fri, Jan 18, 2019 at 5:57 PM Dennis Clarke <dclarke@blastwave.org> wrote:
 >
-> Some boards (e.g. Pine64 and Pinebook) wire a GPIO to reset pin of
-> RTL8723BS
+> On 1/18/19 11:18 AM, Arnd Bergmann wrote:
+> > This is a minor update of the patches I posted last week, I
+> > would like to add this into linux-next now, but would still do
+> > changes if there are concerns about the contents. The first
+> > version did not see a lot of replies, which could mean that
+> > either everyone is happy with it, or that it was largely ignored.
+> >
+> > See also the article at https://lwn.net/Articles/776435/.
+>
+> I would be happy to read "Approaching the kernel year-2038 end game"
+> however it is behind a pay wall.  Perhaps it may be best to just
+> host interesting articles about open source idea elsewhere.
 
-Pine64 / Pinebook don't have the enable pin. One could say that the
-enable pin and the reset pin you add here are actually the same thing.
+It's a short summary of the current state. You can also find a
+video and slides from my ELC presentation online for a little more
+context.
 
-ChenYu
+Generally speaking, I'd recommend paying for the subscription to
+lwn.net to anyone interested in the kernel, but it should become
+visible to everyone with the next day (a week after the initial
+publication). In the meantime, you can find the article at
+https://lwn.net/SubscriberLink/776435/a59d93d01d1addfc/.
 
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> ---
->  drivers/bluetooth/hci_h5.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
->
-> diff --git a/drivers/bluetooth/hci_h5.c b/drivers/bluetooth/hci_h5.c
-> index 069d1c8fde73..7ead8c3d8657 100644
-> --- a/drivers/bluetooth/hci_h5.c
-> +++ b/drivers/bluetooth/hci_h5.c
-> @@ -107,6 +107,7 @@ struct h5 {
->         const struct h5_vnd *vnd;
->         const char *id;
->
-> +       struct gpio_desc *reset_gpio;
->         struct gpio_desc *enable_gpio;
->         struct gpio_desc *device_wake_gpio;
->  };
-> @@ -833,6 +834,10 @@ static int h5_serdev_probe(struct serdev_device *serdev)
->         if (IS_ERR(h5->device_wake_gpio))
->                 return PTR_ERR(h5->device_wake_gpio);
->
-> +       h5->reset_gpio = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_HIGH);
-> +       if (IS_ERR(h5->reset_gpio))
-> +               return PTR_ERR(h5->reset_gpio);
-> +
->         return hci_uart_register_device(&h5->serdev_hu, &h5p);
->  }
->
-> @@ -921,6 +926,9 @@ static void h5_btrtl_open(struct h5 *h5)
->
->         /* The controller needs up to 500ms to wakeup */
->         gpiod_set_value_cansleep(h5->enable_gpio, 1);
-> +       /* Take it out of reset */
-> +       gpiod_set_value_cansleep(h5->reset_gpio, 0);
-> +       msleep(100);
->         gpiod_set_value_cansleep(h5->device_wake_gpio, 1);
->         msleep(500);
->  }
-> @@ -928,6 +936,7 @@ static void h5_btrtl_open(struct h5 *h5)
->  static void h5_btrtl_close(struct h5 *h5)
->  {
->         gpiod_set_value_cansleep(h5->device_wake_gpio, 0);
-> +       gpiod_set_value_cansleep(h5->reset_gpio, 1);
->         gpiod_set_value_cansleep(h5->enable_gpio, 0);
->  }
->
-> --
-> 2.20.1
->
+Finally, I've made a list of the remaining work that Deepa
+and I are planning to still continue (this should be mostly
+complete but may be missing a few things):
+
+syscalls
+ - merge big series for 5.1, to allow time64 syscalls
+ - waitid/wait4/getrusage should get a replacement based on __kernel_timespec
+ - getitimer/setitimer should probably follow getrusage
+ - vdso, waiting for consolidation series from Vincenzo Frascino before
+   adding time64 entry points
+
+file systems
+ - range checks on timestamps
+ - xfs
+ - NFS
+ - hfs/hfsplus
+ - coda
+ - hostfs
+ - relatime_need_update
+
+drivers
+ - media
+ - alsa
+ - sockets
+ - af_packet
+ - ppp ioctl
+ - rtc ioctl
+ - omap3isp
+
+core kernel
+ - fix ELF core files (elfcore.h)
+ - syscall Audit code (kernel/audit.c, kernel/auditsc.c)
+ - make all time32 code conditional
+ - remove include/linux/timekeeping32.h
+ - remove compat_time* from time32.h
+ - remove timeval
+ - remove timespec
+ - remove time_t
+
+     Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
