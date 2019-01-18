@@ -6,18 +6,18 @@ X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 355B9C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 11:48:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6F6EEC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 11:53:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EA57520823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 11:48:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3FA8B20823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 11:53:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Eu3NrZfX";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="LFgvatob";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="Ec33FAKf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EA57520823
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mwlMBAIQ";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="Et070cH1";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="LNIV/M4J"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3FA8B20823
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,68 +26,65 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
 	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=sVBwldM6geefd6+KJEDFqyBSDLMQtAgdE3Xpa14S4p8=; b=Eu3NrZfXufcpAERDl+7v+D0XU
-	Oky503DpCEyHIG1ETTRBl8v4e1ragqByPFMK5plbWiHbhZcynl5nR+pVwX6D6yxHrzhPiawKQUZqP
-	fWe1H4MDpe18uwO57+d/4GP0Mf9bNY1/8tOfjC7brygCiPfdT294/tMvHeqZWW1YZB9ZMu4ntBDqC
-	jKTKrvy/XdB5HV2m5pevhSWwFBCnhRFaMEZBQzGrD3jZWLYde9vzn76pr3bQU7mKAihNppKxv3UK8
-	42aozWX3y3w7xkCoNJZVnOYFgb9g3194MPILL1PkPGCHEwLifzrtU/d1WlkyPO6h1SIFsDOTdtJwf
-	2OEB/hbVA==;
+	 bh=NdZnvOrEl6LPkcgKDvpFlkch7n62WjfTjSXUCDE47qY=; b=mwlMBAIQvqzXYy6FoCaCUo9gQ
+	QOmvncUzAkpRZT36NaKsWC6ckVXJ91mvH5o/Y101SAKEav8O4naTYMg41lEGFztttIFXa9KTUd282
+	8azs4v0boBzJNQv4DlY4bklP8pvG3UKZx6l+ivlhLc3ZpeHfcsP/b0kB3N8Y9Crtr6ajGo9pjkJu6
+	iu9HaMEGA4OtxWwo8Q325Ob/T6a8LmmeP2Xfrnv9n/5deNT5TmR0ms1ixm4nYNg7EzNLbRuTmeXGq
+	T1y6zDy+jFNQHQFdtBGC1bpfnKjGuA6d0j5l3JltudMYiTKefvnWvkXu7yvZp2pNprxvVTD4r/1qS
+	dH8eo+myg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkSdC-000255-LU; Fri, 18 Jan 2019 11:48:14 +0000
+	id 1gkSid-0004Av-NN; Fri, 18 Jan 2019 11:53:51 +0000
 Received: from smtp.codeaurora.org ([198.145.29.96])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkSd9-00024j-3v
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 11:48:12 +0000
+ id 1gkSia-0004AR-5T
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 11:53:49 +0000
 Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id 8533A60591; Fri, 18 Jan 2019 11:48:10 +0000 (UTC)
+ id 8B5196053B; Fri, 18 Jan 2019 11:53:47 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1547812090;
- bh=MShgtf1g2WW51ztF9muOxPJZV5eRh6Y1ynlNDp9Rvm0=;
+ s=default; t=1547812427;
+ bh=5pVPmFdQ3w2BGxaeu0magkeFtuoC9f4C2CrM52TYAzI=;
  h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
- b=LFgvatobMk6GpbFSI/8oXHx//+0LIUpCLeGjp4dFs4cegoIcZ50FqOY8OtBb58z6Z
- kpBNxXe5yc1oTCRUBTcYFOFt5Neog9X3DMpDjqdFzugWLzsfp/RMQyP32cjF7Xba8R
- CzjdCcMhId4lVAXItkKttDx+l7seygdLDJ0zRKfc=
+ b=Et070cH1hI1/9PRKE7GCYZCNczeDnwcISg6ZwqwFN+Z/qV/dRSJc/FiD6xk9oCOXb
+ fMbVkhba6OeYDG06bzZPuzBF03RCwhYqXAEDSpfCtXgItjjJbeYjSfQkrCWLkTs0bl
+ pPzCZqCBLNQVYZvfDzgpBtNxiacytE93YnCOGwmM=
 Received: from [10.79.129.0]
  (blr-bdr-fw-01_globalnat_allzones-outside.qualcomm.com [103.229.18.19])
  (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
  (Authenticated sender: saiprakash.ranjan@smtp.codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id AB07660388;
- Fri, 18 Jan 2019 11:48:03 +0000 (UTC)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id 9A5146053B;
+ Fri, 18 Jan 2019 11:53:44 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1547812089;
- bh=MShgtf1g2WW51ztF9muOxPJZV5eRh6Y1ynlNDp9Rvm0=;
+ s=default; t=1547812426;
+ bh=5pVPmFdQ3w2BGxaeu0magkeFtuoC9f4C2CrM52TYAzI=;
  h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
- b=Ec33FAKffme3+o2l24D5MR08kw2B1FanTvhXwaKCrU6KVt34UVHTWSPXIIk+V7w54
- ARr8zyJ7a+pEAf9jd0p491iwcRbChfje5Qn0O+vlytEhEX8t+rsqbuQLjr4x8v6T6V
- /rEyAUfcg3nK9brr98ka/JXI2qALJ2mUXNYhvFY0=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org AB07660388
+ b=LNIV/M4JkJiVdnvn42KYtyWY1fuNnOQckn0b4msCvaP70DskszhcNj5mAuLxVl3Is
+ DnMgmIAZXIPaitUWdxWp6UAEIfhyZCUI2ZpjBelKTsAdTPioTKohDR+Yurzfr6nShR
+ LH2vQyfWjMqe+44Z+xAiFuuyL7w+3T2n3MEetPJI=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 9A5146053B
 Authentication-Results: pdx-caf-mail.web.codeaurora.org;
  dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: pdx-caf-mail.web.codeaurora.org; spf=none
  smtp.mailfrom=saiprakash.ranjan@codeaurora.org
-Subject: Re: [PATCHv2 2/4] arm64: dts: qcom: msm8996: Add Coresight support
-To: Suzuki K Poulose <suzuki.poulose@arm.com>, robh+dt@kernel.org,
- mathieu.poirier@linaro.org, leo.yan@linaro.org,
- alexander.shishkin@linux.intel.com, andy.gross@linaro.org,
- david.brown@linaro.org, vivek.gautam@codeaurora.org, dianders@chromium.org,
- sboyd@kernel.org, bjorn.andersson@linaro.org, devicetree@vger.kernel.org,
- mark.rutland@arm.com
-References: <cover.1547798966.git.saiprakash.ranjan@codeaurora.org>
- <552e408950525b1bac39d05b8b4f2ae1975397e0.1547798966.git.saiprakash.ranjan@codeaurora.org>
- <1311e78a-21f6-6470-7861-39b3499974ce@arm.com>
+Subject: Re: Need help: how to locate failure from irq_chip subsystem
+To: Pintu Agarwal <pintu.ping@gmail.com>
+References: <CAOuPNLj4QzNDt0npZn2LhZTFgDNJ1CsWPw3=wvUuxnGtQW308g@mail.gmail.com>
+ <bceb32be-d508-c2a4-fa81-ab8b90323d3f@codeaurora.org>
+ <CAOuPNLiNtPFksCuZF_vL6+YuLG0i0umzQhMCyEN69h9tySn2Vw@mail.gmail.com>
+ <57ff3437-47b5-fe92-d576-084ce26aa5d8@codeaurora.org>
+ <CAOuPNLjjd67FnjaHbJj_auD-EWnbc+6sc+hcT_HE6fjeKhEQrw@mail.gmail.com>
 From: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
-Message-ID: <6543ad5c-bbcf-b3ec-332c-115e8e3d0825@codeaurora.org>
-Date: Fri, 18 Jan 2019 17:18:01 +0530
+Message-ID: <1ffe2b68-c87b-aa19-08af-b811063b3310@codeaurora.org>
+Date: Fri, 18 Jan 2019 17:23:42 +0530
 User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
  Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <1311e78a-21f6-6470-7861-39b3499974ce@arm.com>
+In-Reply-To: <CAOuPNLjjd67FnjaHbJj_auD-EWnbc+6sc+hcT_HE6fjeKhEQrw@mail.gmail.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_034811_199599_BF22B8FC 
-X-CRM114-Status: GOOD (  14.22  )
+X-CRM114-CacheID: sfid-20190118_035348_256917_5A835D18 
+X-CRM114-Status: GOOD (  15.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,35 +96,41 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-msm@vger.kernel.org, rnayak@codeaurora.org, sibis@codeaurora.org,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
+Cc: linux-pm@vger.kernel.org, kernelnewbies@kernelnewbies.org,
+ open list <linux-kernel@vger.kernel.org>,
+ Russell King - ARM Linux <linux@armlinux.org.uk>, linux-mm@kvack.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
 Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Suzuki,
-
-On 1/18/2019 4:27 PM, Suzuki K Poulose wrote:
+On 1/18/2019 4:50 PM, Pintu Agarwal wrote:
+>>>> Could you please tell which QCOM SoC this board is based on?
+>>>>
+>>>
+>>> Snapdragon 845 with kernel 4.9.x
+>>> I want to know from which subsystem it is triggered:drivers/soc/qcom/
+>>>
+>>
+>> Irqchip driver is "drivers/irqchip/irq-gic-v3.c". The kernel you are
+>> using is msm-4.9 I suppose or some other kernel?
+>>
+> Yes, I am using customized version of msm-4.9 kernel based on Android.
+> And yes the irqchip driver is: irq-gic-v3, which I can see from config.
 > 
-> If you want to use the scatter-gather mode, you must add 
-> "arm,scatter-gather"
-> property to the node here.
-> 
-> Have you tested the scatter-gather mode on the chip ? Does that work at 
-> all ?
-> Note: You could try this by setting a buffer_size > 1M for the ETR and use
-> it as a sink from the sysfs mode.
+> But, what I wanted to know is, how to find out which driver module
+> (hopefully under: /drivers/soc/qcom/) that register with this
+> irq_chip, is getting triggered at the time of crash ?
+> So, that I can implement irq_hold function for it, which is the cause of crash.
 > 
 
-Yes the chip supports scatter-gather mode[1]. But is it required in
-dt node since it's an optional property?
+Hmm, since this is a bootup crash, *initcall_debug* should help.
+Add "initcall_debug ignore_loglevel" to kernel commandline and
+check the last log before crash.
 
-[1] 
-https://source.codeaurora.org/quic/la/kernel/msm-3.18/tree/arch/arm/boot/dts/qcom/msm8996-coresight-v3.dtsi?h=LA.BR.5.6#n24
+- Sai
 
-Thanks,
-Sai
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
