@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 357EAC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:50:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CC999C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:51:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 02ABE20657
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:50:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 994CF2087E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:51:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ci56hj81"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 02ABE20657
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Rf56zrOf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 994CF2087E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=f4DkgGAVN2Tej9SMo/U+yDXERNd/dhrTMRhRHlpZbuM=; b=ci56hj812tpJYB
-	aVEctEzGlg6cP2i5nIJJU42Q9YXO2ghqtyRnHOrcdzqLtTcB5OLTm9mQg4FimtufO5fT50HWPAiQu
-	25ZVGnxiwap0XRdsuX0Doyya/QxN8LdDvYbKqxMKWT1LTbuVNzftjctF8v391/VtxB9yXXnFSJn3f
-	Q7fXI7QtrzeDEsZg3zu4uv2atY/Rmn2a4EuBby4yPgXA9AdLvYYQSd57fC6bLMyV9pX8we3eNhz1z
-	Yxa8jaSBl6tO9A8HV6CXlcm8YjdwGeg5izpTm4EavSP+qRkN4u8P/i/3O56wEli2XCcBokH1FGZyc
-	LM8njg5dpob2yhcjURGA==;
+	List-Owner; bh=vVXyOf++1vCtA0r343tA4e6kzTsPR+15Iu582zUGaPE=; b=Rf56zrOfd/EPoF
+	Bw4a9XLD1wbYv1aMBLfJeB6sC6adOlKS/3q6EzoGoc8VwOSuaoI46meCeLg6ee39e8lWIfKRKJ+K/
+	BWnvTwE3UGDA/Ce4rJ9Jk9Ko/IDXAwWDHG1NoH4v3IxfI6Y3lPyiOwXRLvwl8wpt4dmx4deuB2kSO
+	VAsm0vLTK761/6xN1WOf13oDdhKS1snPNKeUftqtVPCuguWPpE4r5BYG17kQxhXrMj052nv+yi5kK
+	FuTXd3RECw/2KwDaUSfKn+7ywOABvsV9561TZHm0PVfND/UzQQKZA8SH+amMDKhZOLkPVZmg5WUjm
+	C/p5GIQs9lg+GvEqlluQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkVTO-00065B-Su; Fri, 18 Jan 2019 14:50:18 +0000
+	id 1gkVUK-0006Rb-BJ; Fri, 18 Jan 2019 14:51:16 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkVND-0006Xc-Jk
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 14:44:06 +0000
+ id 1gkVUH-0006RH-2l
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 14:51:14 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 3585A20BAD; Fri, 18 Jan 2019 15:43:54 +0100 (CET)
-Received: from localhost.localdomain
- (aaubervilliers-681-1-37-87.w90-88.abo.wanadoo.fr [90.88.156.87])
- by mail.bootlin.com (Postfix) with ESMTPSA id CBCA920CE0;
- Fri, 18 Jan 2019 15:43:51 +0100 (CET)
-From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-To: dri-devel@lists.freedesktop.org, linux-arm-kernel@lists.infradead.org,
- linux-kernel@vger.kernel.org, linux-sunxi@googlegroups.com
-Subject: [PATCH v5 13/23] drm/sun4i: Add buffer stride and offset
- configuration for tiling mode
-Date: Fri, 18 Jan 2019 15:43:18 +0100
-Message-Id: <20190118144328.20649-14-paul.kocialkowski@bootlin.com>
+ id 9FD9B207B0; Fri, 18 Jan 2019 15:51:11 +0100 (CET)
+Received: from localhost (alyon-652-1-26-46.w109-213.abo.wanadoo.fr
+ [109.213.9.46])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 42BD02074A;
+ Fri, 18 Jan 2019 15:51:11 +0100 (CET)
+From: Gregory CLEMENT <gregory.clement@bootlin.com>
+To: "Rafael J. Wysocki" <rjw@rjwysocki.net>,
+ Viresh Kumar <viresh.kumar@linaro.org>, linux-pm@vger.kernel.org
+Subject: [PATCH v5 2/2] cpufreq: ap806: add cpufreq driver for Armada 8K
+Date: Fri, 18 Jan 2019 15:51:01 +0100
+Message-Id: <20190118145101.31115-1-gregory.clement@bootlin.com>
 X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190118144328.20649-1-paul.kocialkowski@bootlin.com>
-References: <20190118144328.20649-1-paul.kocialkowski@bootlin.com>
+In-Reply-To: <20190118141140.30352-3-gregory.clement@bootlin.com>
+References: <20190118141140.30352-3-gregory.clement@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_064356_193760_A220BDFB 
-X-CRM114-Status: GOOD (  16.41  )
+X-CRM114-CacheID: sfid-20190118_065113_387944_2B83B3D0 
+X-CRM114-Status: GOOD (  22.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,133 +68,288 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- David Airlie <airlied@linux.ie>, Chen-Yu Tsai <wens@csie.org>,
- Daniel Vetter <daniel@ffwll.ch>, Sean Paul <sean@poorly.run>
+Cc: Andrew Lunn <andrew@lunn.ch>, Jason Cooper <jason@lakedaemon.net>,
+ Antoine Tenart <antoine.tenart@bootlin.com>,
+ Gregory CLEMENT <gregory.clement@bootlin.com>,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ =?UTF-8?q?Miqu=C3=A8l=20Raynal?= <miquel.raynal@bootlin.com>,
+ linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This introduces stride and offset configuration for the VPU tiling mode.
-Stride is calculated differently than it is for linear formats and an
-offset is calculated, for which new register definitions are introduced.
+Add cpufreq driver for Marvell AP-806 found on Aramda 8K.
+The AP-806 has DFS (Dynamic Frequency Scaling) with coupled
+clock domain for two clusters, so this driver will directly
+use generic cpufreq-dt driver as backend.
 
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+Based on the work of Omri Itach <omrii@marvell.com>.
+
+Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 49 ++++++++++++++++++++++++--
- drivers/gpu/drm/sun4i/sun4i_frontend.h | 19 ++++++++++
- 2 files changed, 65 insertions(+), 3 deletions(-)
+Hi,
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index e950370792ce..6ede40aab515 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -126,21 +126,64 @@ void sun4i_frontend_update_buffer(struct sun4i_frontend *frontend,
- {
- 	struct drm_plane_state *state = plane->state;
- 	struct drm_framebuffer *fb = state->fb;
-+	unsigned int strides[3] = {};
-+
- 	dma_addr_t paddr;
- 	bool swap;
+This one is the correct version, in the previous one the change were
+not merged.
+
+Sorry for the noise,
+
+Gregory
+
+
+ drivers/cpufreq/Kconfig.arm         |  11 ++
+ drivers/cpufreq/Makefile            |   1 +
+ drivers/cpufreq/armada-8k-cpufreq.c | 204 ++++++++++++++++++++++++++++
+ 3 files changed, 216 insertions(+)
+ create mode 100644 drivers/cpufreq/armada-8k-cpufreq.c
+
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index 688f10227793..10bc5c798d17 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -25,6 +25,17 @@ config ARM_ARMADA_37XX_CPUFREQ
+ 	  This adds the CPUFreq driver support for Marvell Armada 37xx SoCs.
+ 	  The Armada 37xx PMU supports 4 frequency and VDD levels.
  
-+	if (fb->modifier == DRM_FORMAT_MOD_ALLWINNER_TILED) {
-+		unsigned int width = state->src_w >> 16;
-+		unsigned int offset;
++config ARM_ARMADA_8K_CPUFREQ
++	tristate "Armada 8K CPUFreq driver"
++	depends on ARCH_MVEBU && CPUFREQ_DT
++	help
++	  This enables the CPUFreq driver support for Marvell
++	  Armada8k SOCs.
++	  Armada8K device has the AP806 which supports scaling
++	  to any full integer divider.
 +
-+		strides[0] = SUN4I_FRONTEND_LINESTRD_TILED(fb->pitches[0]);
++	  If in doubt, say N.
 +
-+		/*
-+		 * The X1 offset is the offset to the bottom-right point in the
-+		 * end tile, which is the final pixel (at offset width - 1)
-+		 * within the end tile (with a 32-byte mask).
-+		 */
-+		offset = (width - 1) & (32 - 1);
+ # big LITTLE core layer and glue drivers
+ config ARM_BIG_LITTLE_CPUFREQ
+ 	tristate "Generic ARM big LITTLE CPUfreq driver"
+diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+index 08c071be2491..689b26c6f949 100644
+--- a/drivers/cpufreq/Makefile
++++ b/drivers/cpufreq/Makefile
+@@ -50,6 +50,7 @@ obj-$(CONFIG_X86_SFI_CPUFREQ)		+= sfi-cpufreq.o
+ obj-$(CONFIG_ARM_BIG_LITTLE_CPUFREQ)	+= arm_big_little.o
+ 
+ obj-$(CONFIG_ARM_ARMADA_37XX_CPUFREQ)	+= armada-37xx-cpufreq.o
++obj-$(CONFIG_ARM_ARMADA_8K_CPUFREQ)	+= armada-8k-cpufreq.o
+ obj-$(CONFIG_ARM_BRCMSTB_AVS_CPUFREQ)	+= brcmstb-avs-cpufreq.o
+ obj-$(CONFIG_ACPI_CPPC_CPUFREQ)		+= cppc_cpufreq.o
+ obj-$(CONFIG_ARCH_DAVINCI)		+= davinci-cpufreq.o
+diff --git a/drivers/cpufreq/armada-8k-cpufreq.c b/drivers/cpufreq/armada-8k-cpufreq.c
+new file mode 100644
+index 000000000000..8a5ddb93fc58
+--- /dev/null
++++ b/drivers/cpufreq/armada-8k-cpufreq.c
+@@ -0,0 +1,204 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * CPUFreq support for Armada 8K
++ *
++ * Copyright (C) 2018 Marvell
++ *
++ * Omri Itach <omrii@marvell.com>
++ * Gregory Clement <gregory.clement@bootlin.com>
++ */
 +
-+		regmap_write(frontend->regs, SUN4I_FRONTEND_TB_OFF0_REG,
-+			     SUN4I_FRONTEND_TB_OFF_X1(offset));
++#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 +
-+		if (fb->format->num_planes > 1) {
-+			strides[1] =
-+				SUN4I_FRONTEND_LINESTRD_TILED(fb->pitches[1]);
++#include <linux/clk.h>
++#include <linux/cpu.h>
++#include <linux/err.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/pm_opp.h>
++#include <linux/slab.h>
 +
-+			regmap_write(frontend->regs, SUN4I_FRONTEND_TB_OFF1_REG,
-+				     SUN4I_FRONTEND_TB_OFF_X1(offset));
++/*
++ * Setup the opps list with the divider for the max frequency, that
++ * will be filled at runtime.
++ */
++static const int opps_div[] __initconst = {1, 2, 3, 4};
++
++static struct platform_device *armada_8k_pdev;
++
++struct freq_table {
++	struct device *cpu_dev;
++	unsigned int freq[ARRAY_SIZE(opps_div)];
++};
++
++/* If the CPUs share the same clock, then they are in the same cluster. */
++static void __init armada_8k_get_sharing_cpus(struct clk *cur_clk,
++					      struct cpumask *cpumask)
++{
++	int cpu;
++
++	for_each_possible_cpu(cpu) {
++		struct device *cpu_dev;
++		struct clk *clk;
++
++		cpu_dev = get_cpu_device(cpu);
++		if (!cpu_dev) {
++			pr_warn("Failed to get cpu%d device\n", cpu);
++			continue;
 +		}
 +
-+		if (fb->format->num_planes > 2) {
-+			strides[2] =
-+				SUN4I_FRONTEND_LINESTRD_TILED(fb->pitches[2]);
++		clk = clk_get(cpu_dev, 0);
++		if (IS_ERR(clk)) {
++			pr_warn("Cannot get clock for CPU %d\n", cpu);
++		} else {
++			if (clk_is_match(clk, cur_clk))
++				cpumask_set_cpu(cpu, cpumask);
 +
-+			regmap_write(frontend->regs, SUN4I_FRONTEND_TB_OFF2_REG,
-+				     SUN4I_FRONTEND_TB_OFF_X1(offset));
++			clk_put(clk);
 +		}
-+	} else {
-+		strides[0] = fb->pitches[0];
++	}
++}
 +
-+		if (fb->format->num_planes > 1)
-+			strides[1] = fb->pitches[1];
++static int __init armada_8k_add_opp(struct clk *clk, struct device *cpu_dev,
++				    struct freq_table *freq_tables,
++				    int opps_index)
++{
++	unsigned int cur_frequency;
++	unsigned int freq;
++	int i, ret;
 +
-+		if (fb->format->num_planes > 2)
-+			strides[2] = fb->pitches[2];
++	/* Get nominal (current) CPU frequency. */
++	cur_frequency = clk_get_rate(clk);
++	if (!cur_frequency) {
++		dev_err(cpu_dev, "Failed to get clock rate for this CPU\n");
++		return -EINVAL;
 +	}
 +
- 	/* Set the line width */
- 	DRM_DEBUG_DRIVER("Frontend stride: %d bytes\n", fb->pitches[0]);
- 	regmap_write(frontend->regs, SUN4I_FRONTEND_LINESTRD0_REG,
--		     fb->pitches[0]);
-+		     strides[0]);
- 
- 	if (fb->format->num_planes > 1)
- 		regmap_write(frontend->regs, SUN4I_FRONTEND_LINESTRD1_REG,
--			     fb->pitches[1]);
-+			     strides[1]);
- 
- 	if (fb->format->num_planes > 2)
- 		regmap_write(frontend->regs, SUN4I_FRONTEND_LINESTRD2_REG,
--			     fb->pitches[2]);
-+			     strides[2]);
- 
- 	/* Some planar formats require chroma channel swapping by hand. */
- 	swap = sun4i_frontend_format_chroma_requires_swap(fb->format->format);
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.h b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-index 6c4d7797bb8a..235109199b9d 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-@@ -25,10 +25,29 @@
- #define SUN4I_FRONTEND_BUF_ADDR1_REG		0x024
- #define SUN4I_FRONTEND_BUF_ADDR2_REG		0x028
- 
-+#define SUN4I_FRONTEND_TB_OFF0_REG		0x030
-+#define SUN4I_FRONTEND_TB_OFF1_REG		0x034
-+#define SUN4I_FRONTEND_TB_OFF2_REG		0x038
-+#define SUN4I_FRONTEND_TB_OFF_X1(x1)			((x1) << 16)
-+#define SUN4I_FRONTEND_TB_OFF_Y0(y0)			((y0) << 8)
-+#define SUN4I_FRONTEND_TB_OFF_X0(x0)			(x0)
++	freq_tables[opps_index].cpu_dev = cpu_dev;
 +
- #define SUN4I_FRONTEND_LINESTRD0_REG		0x040
- #define SUN4I_FRONTEND_LINESTRD1_REG		0x044
- #define SUN4I_FRONTEND_LINESTRD2_REG		0x048
- 
-+/*
-+ * In tiled mode, the stride is defined as the distance between the start of the
-+ * end line of the current tile and the start of the first line in the next
-+ * vertical tile.
-+ *
-+ * Tiles are represented in row-major order, thus the end line of current tile
-+ * starts at: 31 * 32 (31 lines of 32 cols), the next vertical tile starts at:
-+ * 32-bit-aligned-width * 32 and the distance is:
-+ * 32 * (32-bit-aligned-width - 31).
-+ */
-+#define SUN4I_FRONTEND_LINESTRD_TILED(stride)		(((stride) - 31) * 32)
++	for (i = 0; i < ARRAY_SIZE(opps_div); i++) {
++		freq = cur_frequency / opps_div[i];
 +
- #define SUN4I_FRONTEND_INPUT_FMT_REG		0x04c
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PLANAR	(0 << 8)
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PACKED	(1 << 8)
++		ret = dev_pm_opp_add(cpu_dev, freq, 0);
++		if (ret)
++			return ret;
++
++		freq_tables[opps_index].freq[i] = freq;
++	}
++
++	return 0;
++}
++
++static void armada_8k_cpufreq_free_table(struct freq_table *freq_tables)
++{
++	int opps_index, nb_cpus = num_possible_cpus();
++
++	for (opps_index = 0 ; opps_index <= nb_cpus; opps_index++) {
++		int i;
++
++		/* If cpu_dev is NULL then we reached the end of the array */
++		if (!freq_tables[opps_index].cpu_dev)
++			break;
++
++		for (i = 0; i < ARRAY_SIZE(opps_div); i++) {
++			/*
++			 * A 0Hz frequency is not valid, this meant
++			 * that it was not yet initialized so there is
++			 * no more opp to free
++			 */
++			if (freq_tables[opps_index].freq[i] == 0)
++				break;
++
++			dev_pm_opp_remove(freq_tables[opps_index].cpu_dev,
++					  freq_tables[opps_index].freq[i]);
++		}
++	}
++
++	kfree(freq_tables);
++}
++
++static int __init armada_8k_cpufreq_init(void)
++{
++	int ret = 0, opps_index = 0, cpu, nb_cpus;
++	struct freq_table *freq_tables;
++	struct device_node *node;
++	struct cpumask cpus;
++
++	node = of_find_compatible_node(NULL, NULL, "marvell,ap806-cpu-clock");
++	if (!node || !of_device_is_available(node))
++		return -ENODEV;
++
++	nb_cpus = num_possible_cpus();
++	freq_tables = kcalloc(nb_cpus, sizeof(*freq_tables), GFP_KERNEL);
++	cpumask_copy(&cpus, cpu_possible_mask);
++
++	/*
++	 * For each CPU, this loop registers the operating points
++	 * supported (which are the nominal CPU frequency and full integer
++	 * divisions of it).
++	 */
++	for_each_cpu(cpu, &cpus) {
++		struct cpumask shared_cpus;
++		struct device *cpu_dev;
++		struct clk *clk;
++
++		cpu_dev = get_cpu_device(cpu);
++
++		if (!cpu_dev) {
++			pr_err("Cannot get CPU %d\n", cpu);
++			continue;
++		}
++
++		clk = clk_get(cpu_dev, 0);
++
++		if (IS_ERR(clk)) {
++			pr_err("Cannot get clock for CPU %d\n", cpu);
++			ret = PTR_ERR(clk);
++			goto remove_opp;
++		}
++
++		ret = armada_8k_add_opp(clk, cpu_dev, freq_tables, opps_index);
++		if (ret) {
++			clk_put(clk);
++			goto remove_opp;
++		}
++
++		opps_index++;
++		cpumask_clear(&shared_cpus);
++		armada_8k_get_sharing_cpus(clk, &shared_cpus);
++		dev_pm_opp_set_sharing_cpus(cpu_dev, &shared_cpus);
++		cpumask_andnot(&cpus, &cpus, &shared_cpus);
++		clk_put(clk);
++	}
++
++	armada_8k_pdev = platform_device_register_simple("cpufreq-dt", -1,
++							 NULL, 0);
++	ret = PTR_ERR_OR_ZERO(armada_8k_pdev);
++	if (ret)
++		goto remove_opp;
++
++	platform_set_drvdata(armada_8k_pdev, freq_tables);
++
++	return 0;
++
++remove_opp:
++	armada_8k_cpufreq_free_table(freq_tables);
++	return ret;
++}
++module_init(armada_8k_cpufreq_init);
++
++static void __exit armada_8k_cpufreq_exit(void)
++{
++	struct freq_table *freq_tables = platform_get_drvdata(armada_8k_pdev);
++
++	platform_device_unregister(armada_8k_pdev);
++	armada_8k_cpufreq_free_table(freq_tables);
++}
++module_exit(armada_8k_cpufreq_exit);
++
++MODULE_AUTHOR("Gregory Clement <gregory.clement@bootlin.com>");
++MODULE_DESCRIPTION("Armada 8K cpufreq driver");
++MODULE_LICENSE("GPL");
 -- 
 2.20.1
 
