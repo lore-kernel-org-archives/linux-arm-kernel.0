@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9976AC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:52:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1BBE5C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:53:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6A2A92087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:52:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E16C32087E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:53:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="R0gEB0VF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6A2A92087E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="csEtznao"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E16C32087E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=iHcN73QvyfclDLrKCIJdnmPNxq6OrL6NWwvrRPAkiOA=; b=R0gEB0VFjhC+oQ
-	6ykiYP+jZ2kIjRTcQaLdzliDWCVv2nyNQ6ijf96UcJbLkyLMEG84iY74ZfIHcI/WhjuPLbg7Kp3PU
-	5FBKtl1hc79zs2noNf6+jHuHK6HRlyB3Tfn9aGgz+kmLkZ871SrAbof6x+zncO0wP53lzGmf5hBRN
-	r1Hls4IsTT77dg0WOAvTNyBkJHIlceQSqFLCTNkOgzsYo1sGh5Y0E+l97reMOeVQfs7f1odubTwBu
-	nfyibQDGlByzRGqssj7YJAk0mdmRm8Zzmz8ewHZaUV7tYP2i3gOzjNPHp2M9HFeHpMHQ/tmr7IJoE
-	zDgaDO/XMCIOrOA6te/g==;
+	List-Owner; bh=GJAnP6thE7nsV/Of+hNbKkZDwIfXVceY5JGxDHXvwj0=; b=csEtznao9MtXUc
+	8/dxKmsBeowTGK7ijPmNr17M+yFeRYGsObZ40ETosRoy8KxZrERTTpV9bUGJfziwdRgmnZDNKgLy1
+	hHjx0ulQxW2yXl9elXCgMjgT0tNdc5qjxBB3jEpr6lDc/Um0As5hTTLTidBP3Hkewww+UYHSX7qSl
+	MuDCK8uO0Ycn3a+WsbRGKWITh7H3BD98vjOOOQwq85Am4myUu9IIQ+OMPHOJnMYI9haOUKlA7QamT
+	pBMgqR6jlB3Vw+U/paLzdqCBz07N8af2t8TyQOBWrd4tKYTnmTPoNsAXOwRWZuN14xYo3b+CTPj0D
+	hHzeBo/5qCjH6Du9mAEw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkVVl-0007xt-1y; Fri, 18 Jan 2019 14:52:45 +0000
+	id 1gkVWB-0008IA-9j; Fri, 18 Jan 2019 14:53:11 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkVUl-0006oT-90
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 14:51:50 +0000
+ id 1gkVUl-0006oB-1J
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 14:51:53 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id EA7E120A2E; Fri, 18 Jan 2019 15:51:41 +0100 (CET)
+ id A9D91209EF; Fri, 18 Jan 2019 15:51:41 +0100 (CET)
 Received: from localhost.localdomain
  (aaubervilliers-681-1-37-87.w90-88.abo.wanadoo.fr [90.88.156.87])
- by mail.bootlin.com (Postfix) with ESMTPSA id 9C587207B6;
+ by mail.bootlin.com (Postfix) with ESMTPSA id 5DE1920797;
  Fri, 18 Jan 2019 15:51:41 +0100 (CET)
 From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 To: dri-devel@lists.freedesktop.org, linux-arm-kernel@lists.infradead.org,
  linux-kernel@vger.kernel.org, linux-sunxi@googlegroups.com
-Subject: [PATCH RESEND v5 03/23] drm/sun4i: backend: Use explicit fourcc
- helpers for packed YUV422 check
-Date: Fri, 18 Jan 2019 15:51:13 +0100
-Message-Id: <20190118145133.21281-4-paul.kocialkowski@bootlin.com>
+Subject: [PATCH RESEND v5 02/23] drm/fourcc: Add format info helpers for
+ checking YUV sub-sampling
+Date: Fri, 18 Jan 2019 15:51:12 +0100
+Message-Id: <20190118145133.21281-3-paul.kocialkowski@bootlin.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190118145133.21281-1-paul.kocialkowski@bootlin.com>
 References: <20190118145133.21281-1-paul.kocialkowski@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_065143_868407_2187FC3A 
-X-CRM114-Status: GOOD (  11.93  )
+X-CRM114-CacheID: sfid-20190118_065143_845076_25B27F97 
+X-CRM114-Status: UNSURE (   9.32  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,31 +81,102 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Checking for the number of planes is not sufficient to en ensure that
-the format is a packed YUV422.
-
-Use explicit fourcc helpers for the check instead.
+Display engine drivers often need to distinguish between different types of
+YUV sub-sampling. This introduces helpers to check for common sub-sampling
+ratios in their commonly-used denomination from the DRM format info.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Reviewed-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ include/drm/drm_fourcc.h | 75 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 75 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index 9e9255ee59cd..bbadc2ab9f4d 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -245,7 +245,8 @@ static int sun4i_backend_update_yuv_format(struct sun4i_backend *backend,
- 			   SUN4I_BACKEND_ATTCTL_REG0_LAY_YUVEN);
+diff --git a/include/drm/drm_fourcc.h b/include/drm/drm_fourcc.h
+index 01cd353d9302..b3d9d88ab290 100644
+--- a/include/drm/drm_fourcc.h
++++ b/include/drm/drm_fourcc.h
+@@ -185,6 +185,81 @@ drm_format_info_is_yuv_planar(const struct drm_format_info *info)
+ 	return info->is_yuv && info->num_planes == 3;
+ }
  
- 	/* TODO: Add support for the multi-planar YUV formats */
--	if (format->num_planes == 1)
-+	if (drm_format_info_is_yuv_packed(format) &&
-+	    drm_format_info_is_yuv_sampling_422(format))
- 		val |= SUN4I_BACKEND_IYUVCTL_FBFMT_PACKED_YUV422;
- 	else
- 		DRM_DEBUG_DRIVER("Unsupported YUV format (0x%x)\n", fmt);
++/**
++ * drm_format_info_is_yuv_sampling_410 - check that the format info matches a
++ * YUV format with 4:1:0 sub-sampling
++ * @info: format info
++ *
++ * Returns:
++ * A boolean indicating whether the format info matches a YUV format with 4:1:0
++ * sub-sampling.
++ */
++static inline bool
++drm_format_info_is_yuv_sampling_410(const struct drm_format_info *info)
++{
++	return info->is_yuv && info->hsub == 4 && info->vsub == 4;
++}
++
++/**
++ * drm_format_info_is_yuv_sampling_411 - check that the format info matches a
++ * YUV format with 4:1:1 sub-sampling
++ * @info: format info
++ *
++ * Returns:
++ * A boolean indicating whether the format info matches a YUV format with 4:1:1
++ * sub-sampling.
++ */
++static inline bool
++drm_format_info_is_yuv_sampling_411(const struct drm_format_info *info)
++{
++	return info->is_yuv && info->hsub == 4 && info->vsub == 1;
++}
++
++/**
++ * drm_format_info_is_yuv_sampling_420 - check that the format info matches a
++ * YUV format with 4:2:0 sub-sampling
++ * @info: format info
++ *
++ * Returns:
++ * A boolean indicating whether the format info matches a YUV format with 4:2:0
++ * sub-sampling.
++ */
++static inline bool
++drm_format_info_is_yuv_sampling_420(const struct drm_format_info *info)
++{
++	return info->is_yuv && info->hsub == 2 && info->vsub == 2;
++}
++
++/**
++ * drm_format_info_is_yuv_sampling_422 - check that the format info matches a
++ * YUV format with 4:2:2 sub-sampling
++ * @info: format info
++ *
++ * Returns:
++ * A boolean indicating whether the format info matches a YUV format with 4:2:2
++ * sub-sampling.
++ */
++static inline bool
++drm_format_info_is_yuv_sampling_422(const struct drm_format_info *info)
++{
++	return info->is_yuv && info->hsub == 2 && info->vsub == 1;
++}
++
++/**
++ * drm_format_info_is_yuv_sampling_444 - check that the format info matches a
++ * YUV format with 4:4:4 sub-sampling
++ * @info: format info
++ *
++ * Returns:
++ * A boolean indicating whether the format info matches a YUV format with 4:4:4
++ * sub-sampling.
++ */
++static inline bool
++drm_format_info_is_yuv_sampling_444(const struct drm_format_info *info)
++{
++	return info->is_yuv && info->hsub == 1 && info->vsub == 1;
++}
++
+ const struct drm_format_info *__drm_format_info(u32 format);
+ const struct drm_format_info *drm_format_info(u32 format);
+ const struct drm_format_info *
 -- 
 2.20.1
 
