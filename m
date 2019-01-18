@@ -5,19 +5,19 @@ X-Spam-Level:
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D5C55C43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 08:44:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 93637C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 08:45:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A331F20855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 08:44:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6016320883
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 08:45:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qSgVZPR+";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="taM55iim"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A331F20855
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dckchF3G";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="KXhH8CeW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6016320883
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,56 +26,59 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mFCjxs9cPSD7MT5tuftOkKp7oPtrm1pwxzNMCG4PKu8=; b=qSgVZPR+rGKu6O
-	nf++wsnyY7/a7j0OmpjGoeiG4UXAxosQoXpWRtWmsMRtS0o63zWn/czcFd+EbKhd5y3RbaN+LRAgQ
-	eUcoo3P0hrTw1P6f3wSWluFJU4Bs/QLHWoUedD+iL2be07AJ7e8WMMK26hLcuYZR9eW4s6Ky+7kd6
-	1xpKm9ARYoFfc4714gCzfze+ZuKQEahWmiuSACUoznugYlYd5fz0g0g3F01PMmkYnUgxj1wD4QHLl
-	jCJVwdSa6Kx2AhERhgsHOeIIyTT/N8i2cpbjFs2AjwoT8C+I/qRtmFFCGP/V/O9Zr+LoZ6+FmwOGw
-	4txNKCgsrbBx9WA09BDA==;
+	List-Owner; bh=pgPpDe0kQwjufIUeNSj/QY62nXdJAL5rML+76zYfULw=; b=dckchF3GRaJvon
+	/qi1j3WfmQ46CMh3V9JEr1Vckz7r5fNHW/yH3VZYHjOpSXqciFPqLcASK4lMsbc7hyLvcqYiYbnz9
+	KWvatH/lIajZ+eF92AG4dJ9H2tpYldiFCW+XjGFbcKTVFs0knYt2wHeAqnaln1MPBfdG/BxSNbTee
+	y4kV9CLrvINM3vJbPi3LTZYEqQAfnzJkGJHLWWnAP/0COz0KM0rjV91zo3NN5nyf4RZPo4fyx/myw
+	4fj8SyEMsJdidI+rKqTXfGKVqfu8903Q9j4jt9woIco44/uOZpvIvb6Cf4/ursD8ZtVUSNPyZK3bm
+	acF5mycIkIs4vZSH2JSA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkPkv-0006Aq-OQ; Fri, 18 Jan 2019 08:44:01 +0000
+	id 1gkPlp-0006a0-7m; Fri, 18 Jan 2019 08:44:57 +0000
 Received: from mail-ed1-x543.google.com ([2a00:1450:4864:20::543])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkPks-0006AL-EH; Fri, 18 Jan 2019 08:43:59 +0000
-Received: by mail-ed1-x543.google.com with SMTP id y20so10484269edw.9;
- Fri, 18 Jan 2019 00:43:58 -0800 (PST)
+ id 1gkPll-0006ZD-Dk; Fri, 18 Jan 2019 08:44:54 +0000
+Received: by mail-ed1-x543.google.com with SMTP id y20so10486222edw.9;
+ Fri, 18 Jan 2019 00:44:53 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
  :user-agent:mime-version:in-reply-to:content-language
  :content-transfer-encoding;
- bh=5UcQp/5KbX2fmeuYzUa3wGPx0cYp+6GJK0KpO+EofxY=;
- b=taM55iimQbgreItRdqsQyY9F8EeQH6T6xHRViE4XA41e4WKjhsfI5I6EEpQmkGKALR
- Bap5wVxj3qN6k/k2FTWwRcnddvW4M2wuybsb4HLfD0Jqr1I34Vpl18N53opyvxKaOPJM
- CtwrUYjH2v+//xyOBoNSBHQHMVBbQYmMB32Dq2mkwUtmOcYldcz7FgrC2hP2y4D5s5QO
- sGtdEbwbWTsHvtwG44iUW5XssvcN9Qz6fS/cM9/4YDP3AsA8jY9NGvClxUJ/8XY/VSw0
- +kMhjuHkDDNwr64tDt43nuErxmCfHp62qOKfBnxjhyRgC6eeZ/r6LKR5a9Ux9jT+4nhC
- lPkg==
+ bh=RXIhdSs6PCFhSzwm6DWsTjCAuLPIlfT/I2R0idiufyY=;
+ b=KXhH8CeW5cOjId8y5zVbffzrBb2FtHgoccCWyAttMm5m8dHksBwVz28ClhxbyUSCDV
+ A4bYgsjBGFOhORtAVwksHKii/NPoug+1I9AlHfAzuWCWBkHIBlPTOZdnQixThD116/tb
+ BprrUsUlltTf4+lMhCfYx8oSSRJx5C/EGmBikBA43oa4Ph7ufEfSD9+bT6HSDd/cg15u
+ 0jCFtvjIQuUuMo1JQIi5RtlX0AWHMegUU86KtAKwsM9AQPhxFDmF0kzm3eMp2vSnitpP
+ NEgNvjKjs22Wfqdaxf0cV8gxoC+xTB3KPruyQPqCEGy+C1dUsea/7AcXXzyfqMWZYAue
+ HaCQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
  :message-id:date:user-agent:mime-version:in-reply-to
  :content-language:content-transfer-encoding;
- bh=5UcQp/5KbX2fmeuYzUa3wGPx0cYp+6GJK0KpO+EofxY=;
- b=TFxESmHNHpT2Sl5mDXbioKgbxJ2T3sFDQ+9o3oQE5q+ZJ/0OYmFUVupnb4udknQjFF
- /VYUTJz0eI3cKOj7KYFqI0/yJBqV5CLetkabr5hyxUsRKXF/uEKu3WewjP+ZTMHikoHG
- OeuQ71vTdxfBSDFZzA/zsHOTKtHQLMNnqMFwsd33sDR9Wnk2UqAK0XcviR13AgDgCxu1
- 51yeNv+iukHyFq95Xz126/WkofGIfiClKFnNff3YAfH8QNqsLeLNwjagKCAG6nZqlq0u
- FvRd2C7t3rVvM9nXGDev1XAYv35WNOVC/Ml0p50StYOyva333W3xHXHeP84l9CiYId8h
- cTpg==
-X-Gm-Message-State: AJcUukdnjA7j8wmLsHyFTnCNPn1Ucz1G6aQnc4W/c9FD+MPSQLXYDiA5
- 71lzoWO+wHf0WRe3/ipgGmSNhgm8
-X-Google-Smtp-Source: ALg8bN64PhL8ucAwwSRk52Yb2vU1yUwHlFUxZew2IVgENkMhl3cXYTmRrJk99npgIJjx8XSCoQTLdg==
-X-Received: by 2002:a50:cf41:: with SMTP id d1mr15254411edk.242.1547801036588; 
- Fri, 18 Jan 2019 00:43:56 -0800 (PST)
+ bh=RXIhdSs6PCFhSzwm6DWsTjCAuLPIlfT/I2R0idiufyY=;
+ b=EearF3OrzoiBU7dP7ng7Trpfgk0I7rS9zTi3TXhf4kTOJPjNtpKeY3W+wN7b+6v2aW
+ WLBrKonhyjvIDe2wmyLmykazcMVNkh4RBelXl7ILCxCIiht0Fg1bjUhdk1Bil4MWinUO
+ DhXaTDJI34VrvsAmdzvjADHew9+d4C1Gmpw0fK2lwuR71i7yMJldrIJ+npei8gNdmS8l
+ CHyUQ4livP3/eWGcKBYBl6XOsnHxrJtFeRKgQFSXAEBAwcAvVrRaXQG2vixvWWet4sUi
+ T1JJkYPFBdB5ZT5XeVBPRIRDc4adK36ZbhXV5fz5HavbTxyDJvNQjWDvk3vQaXl2D5BV
+ gkJw==
+X-Gm-Message-State: AJcUukf1kV1d4I+Cgs1zds7azBl2iO5XK+GT2upbKWjCatfj1oeKRLWj
+ +a/9JzQXJMHmJwIDcwYAucJl3kyn
+X-Google-Smtp-Source: ALg8bN4yRX9TTU4kk+dV9giaBxQTKzjUI0HQHNQHsdLVooVfmuf3+p3kAT4OlMdISBVLnGeaqkK/FQ==
+X-Received: by 2002:a17:906:ca03:: with SMTP id
+ jt3-v6mr13161675ejb.165.1547801091759; 
+ Fri, 18 Jan 2019 00:44:51 -0800 (PST)
 Received: from ziggy.stardust ([93.176.154.161])
- by smtp.gmail.com with ESMTPSA id g37sm7239478edb.85.2019.01.18.00.43.55
+ by smtp.gmail.com with ESMTPSA id l51sm7036446edb.36.2019.01.18.00.44.50
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 18 Jan 2019 00:43:55 -0800 (PST)
-Subject: Re: [PATCH v1 1/5] pwm: mediatek: add a property "mediatek,num-pwms"
+ Fri, 18 Jan 2019 00:44:51 -0800 (PST)
+Subject: Re: [PATCH v1 2/5] dt-bindings: pwm: add a property
+ "mediatek,num-pwms"
 To: Ryder Lee <ryder.lee@mediatek.com>,
  Thierry Reding <thierry.reding@gmail.com>
 References: <de316385a84e079d3b23891e61c959094b9fa7e5.1547781007.git.ryder.lee@mediatek.com>
+ <7e1de17a43f2cde73aecd2773e2b3a5fdfd294f3.1547781007.git.ryder.lee@mediatek.com>
 From: Matthias Brugger <matthias.bgg@gmail.com>
 Openpgp: preference=signencrypt
 Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
@@ -171,16 +174,16 @@ Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
  pac005PuhxCWkKTJz3gCmznnoat4GCnL5gy/m0Qk45l4PFqwWXVLo9AQg2Kp3mlIFZ6fsEKI
  AN5hxlbNvNb9V2Zo5bFZjPWPFTxOteM0omUAS+QopwU0yPLLGJVf2iCmItHcUXI+r2JwH1CJ
  jrHWeQEI2ucSKsNa8FllDmG/fQ==
-Message-ID: <c007d399-af86-98d3-94f9-b9762efdc219@gmail.com>
-Date: Fri, 18 Jan 2019 09:43:53 +0100
+Message-ID: <7d387d2a-74f0-c6c7-aa2d-cf9b87579682@gmail.com>
+Date: Fri, 18 Jan 2019 09:44:49 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.3.3
 MIME-Version: 1.0
-In-Reply-To: <de316385a84e079d3b23891e61c959094b9fa7e5.1547781007.git.ryder.lee@mediatek.com>
+In-Reply-To: <7e1de17a43f2cde73aecd2773e2b3a5fdfd294f3.1547781007.git.ryder.lee@mediatek.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_004358_518900_DCE76AD9 
-X-CRM114-Status: GOOD (  23.80  )
+X-CRM114-CacheID: sfid-20190118_004453_564989_2816F730 
+X-CRM114-Status: GOOD (  18.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -204,94 +207,44 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 
 On 18/01/2019 04:24, Ryder Lee wrote:
-> This adds a property "mediatek,num-pwms" to avoid having an endless
-> list of compatibles with no differences for the same driver.
-> 
-> Thus, the driver should have backwards compatibility to older DTs.
+> This adds a property "mediatek,num-pwms" in example so that we could
+> set the number of PWM channels via device tree.
 > 
 > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
 > ---
-> Changes since v1: add some checks for backwards compatibility.
+> Changes since v1: add a Reviewed-by tag.
 > ---
->  drivers/pwm/pwm-mediatek.c | 27 ++++++++++++++++++---------
->  1 file changed, 18 insertions(+), 9 deletions(-)
+>  Documentation/devicetree/bindings/pwm/pwm-mediatek.txt | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
-> index eb6674c..81b7e5e 100644
-> --- a/drivers/pwm/pwm-mediatek.c
-> +++ b/drivers/pwm/pwm-mediatek.c
-> @@ -55,7 +55,7 @@ enum {
->  };
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt b/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt
+> index 991728c..f9e2d1f 100644
+> --- a/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt
+> @@ -20,6 +20,7 @@ Required properties:
+>   - pinctrl-names: Must contain a "default" entry.
+>   - pinctrl-0: One property must exist for each entry in pinctrl-names.
+>     See pinctrl/pinctrl-bindings.txt for details of the property values.
+> + - mediatek,num-pwms: the number of PWM channels.
 >  
->  struct mtk_pwm_platform_data {
-> -	unsigned int num_pwms;
-> +	unsigned int num_pwms;	/* it should not be used in the future SoCs */
->  	bool pwm45_fixup;
->  	bool has_clks;
->  };
-> @@ -226,27 +226,36 @@ static void mtk_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
->  
->  static int mtk_pwm_probe(struct platform_device *pdev)
->  {
-> -	const struct mtk_pwm_platform_data *data;
-> +	struct device_node *np = pdev->dev.of_node;
->  	struct mtk_pwm_chip *pc;
->  	struct resource *res;
-> -	unsigned int i;
-> +	unsigned int i, num_pwms;
->  	int ret;
->  
->  	pc = devm_kzalloc(&pdev->dev, sizeof(*pc), GFP_KERNEL);
->  	if (!pc)
->  		return -ENOMEM;
->  
-> -	data = of_device_get_match_data(&pdev->dev);
-> -	if (data == NULL)
-> -		return -EINVAL;
-> -	pc->soc = data;
-> +	pc->soc = of_device_get_match_data(&pdev->dev);
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	pc->regs = devm_ioremap_resource(&pdev->dev, res);
->  	if (IS_ERR(pc->regs))
->  		return PTR_ERR(pc->regs);
->  
-> -	for (i = 0; i < data->num_pwms + 2 && pc->soc->has_clks; i++) {
-> +	/* Check if we have set 'num-pwms' in DTs. */
-> +	ret = of_property_read_u32(np, "mediatek,num-pwms", &num_pwms);
-> +	if (ret < 0) {
-> +		/* If no, fallback to use SoC data for backwards compatibility. */
-> +		if (pc->soc->num_pwms) {
-> +			num_pwms = pc->soc->num_pwms;
+>  Example:
+>  	pwm0: pwm@11006000 {
+> @@ -37,4 +38,5 @@ Example:
+>  			      "pwm3", "pwm4", "pwm5";
+>  		pinctrl-names = "default";
+>  		pinctrl-0 = <&pwm0_pins>;
+> +		mediatek,num-pwms = <5>;
+>  	};
+> 
 
-Maybe that's bike shedding, but I think it would be better to carve out the
-num_pwms from the mtk_pwm_platform_data and check against the compatible here.
-With a expressive comment it will help other driver developers to not start
-adding num_pwms in the platform data in their first attempt.
+Wasn't there a comment in the last version to use num-pwms instead of
+mediatek,num-pwms?
+
+Uwe I think you requested that.
 
 Regards,
 Matthias
-
-> +		} else {
-> +			dev_err(&pdev->dev, "failed to get pwm number: %d\n", ret);
-> +			return ret;
-> +		}
-> +	}
-> +
-> +	for (i = 0; i < num_pwms + 2 && pc->soc->has_clks; i++) {
->  		pc->clks[i] = devm_clk_get(&pdev->dev, mtk_pwm_clk_name[i]);
->  		if (IS_ERR(pc->clks[i])) {
->  			dev_err(&pdev->dev, "clock: %s fail: %ld\n",
-> @@ -260,7 +269,7 @@ static int mtk_pwm_probe(struct platform_device *pdev)
->  	pc->chip.dev = &pdev->dev;
->  	pc->chip.ops = &mtk_pwm_ops;
->  	pc->chip.base = -1;
-> -	pc->chip.npwm = data->num_pwms;
-> +	pc->chip.npwm = num_pwms;
->  
->  	ret = pwmchip_add(&pc->chip);
->  	if (ret < 0) {
-> 
 
 _______________________________________________
 linux-arm-kernel mailing list
