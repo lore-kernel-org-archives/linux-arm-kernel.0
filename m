@@ -2,55 +2,92 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1CD6CC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 11:38:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 355B9C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 11:48:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DA92A20652
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 11:38:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EA57520823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 11:48:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l1jceDFb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DA92A20652
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Eu3NrZfX";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="LFgvatob";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="Ec33FAKf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EA57520823
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=sEP99tmD0xmlVRb89dD1SHCKnCWv+/RyRZWSJN/+T4o=; b=l1jceDFbcS4JCa
-	C6AT6neYPOVykFBwCxCqo9+Gk9GSO3rbMdfkycX8Qs6Ouzl6iva6gl6speInSUDkhwLMyvz9W+DJS
-	AxU56X33HzJTlgoyjpw/u2rYHNGI4HBEdeSJvqxE4rmX3TlG304u0KNjhoh9MisFWbjWwDaTA7yVW
-	v9HHGZXBDsYjSAz2ROoKnkbY3ZG5LxMNeH+rIjByrdJ7bPLN5GyMWEKU/Zyd5sF4byQShU/k0q1vy
-	1UuNoTf7klf+AHUqxmvoXRZ4miaRkrC+jcWmeRIfvjl29FeRnYAp+JswipDsaNHjV43Q3T6LHbjP7
-	uTymHuUP/LEZqcBZMHnA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=sVBwldM6geefd6+KJEDFqyBSDLMQtAgdE3Xpa14S4p8=; b=Eu3NrZfXufcpAERDl+7v+D0XU
+	Oky503DpCEyHIG1ETTRBl8v4e1ragqByPFMK5plbWiHbhZcynl5nR+pVwX6D6yxHrzhPiawKQUZqP
+	fWe1H4MDpe18uwO57+d/4GP0Mf9bNY1/8tOfjC7brygCiPfdT294/tMvHeqZWW1YZB9ZMu4ntBDqC
+	jKTKrvy/XdB5HV2m5pevhSWwFBCnhRFaMEZBQzGrD3jZWLYde9vzn76pr3bQU7mKAihNppKxv3UK8
+	42aozWX3y3w7xkCoNJZVnOYFgb9g3194MPILL1PkPGCHEwLifzrtU/d1WlkyPO6h1SIFsDOTdtJwf
+	2OEB/hbVA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkSTZ-00066X-60; Fri, 18 Jan 2019 11:38:17 +0000
-Received: from 089144210168.atnat0019.highway.a1.net ([89.144.210.168]
- helo=localhost)
- by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkSSx-0005Rq-Ba; Fri, 18 Jan 2019 11:37:40 +0000
-From: Christoph Hellwig <hch@lst.de>
-To: Pawel Osciak <pawel@osciak.com>,
- Marek Szyprowski <m.szyprowski@samsung.com>,
- Kyungmin Park <kyungmin.park@samsung.com>,
- =?UTF-8?q?Niklas=20S=C3=B6derlund?= <niklas.soderlund+renesas@ragnatech.se>
-Subject: [PATCH 3/3] videobuf2: replace a layering violation with
- dma_map_resource
-Date: Fri, 18 Jan 2019 12:37:27 +0100
-Message-Id: <20190118113727.3270-4-hch@lst.de>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190118113727.3270-1-hch@lst.de>
-References: <20190118113727.3270-1-hch@lst.de>
+	id 1gkSdC-000255-LU; Fri, 18 Jan 2019 11:48:14 +0000
+Received: from smtp.codeaurora.org ([198.145.29.96])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gkSd9-00024j-3v
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 11:48:12 +0000
+Received: by smtp.codeaurora.org (Postfix, from userid 1000)
+ id 8533A60591; Fri, 18 Jan 2019 11:48:10 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1547812090;
+ bh=MShgtf1g2WW51ztF9muOxPJZV5eRh6Y1ynlNDp9Rvm0=;
+ h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
+ b=LFgvatobMk6GpbFSI/8oXHx//+0LIUpCLeGjp4dFs4cegoIcZ50FqOY8OtBb58z6Z
+ kpBNxXe5yc1oTCRUBTcYFOFt5Neog9X3DMpDjqdFzugWLzsfp/RMQyP32cjF7Xba8R
+ CzjdCcMhId4lVAXItkKttDx+l7seygdLDJ0zRKfc=
+Received: from [10.79.129.0]
+ (blr-bdr-fw-01_globalnat_allzones-outside.qualcomm.com [103.229.18.19])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ (Authenticated sender: saiprakash.ranjan@smtp.codeaurora.org)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id AB07660388;
+ Fri, 18 Jan 2019 11:48:03 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1547812089;
+ bh=MShgtf1g2WW51ztF9muOxPJZV5eRh6Y1ynlNDp9Rvm0=;
+ h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
+ b=Ec33FAKffme3+o2l24D5MR08kw2B1FanTvhXwaKCrU6KVt34UVHTWSPXIIk+V7w54
+ ARr8zyJ7a+pEAf9jd0p491iwcRbChfje5Qn0O+vlytEhEX8t+rsqbuQLjr4x8v6T6V
+ /rEyAUfcg3nK9brr98ka/JXI2qALJ2mUXNYhvFY0=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org AB07660388
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ dmarc=none (p=none dis=none) header.from=codeaurora.org
+Authentication-Results: pdx-caf-mail.web.codeaurora.org; spf=none
+ smtp.mailfrom=saiprakash.ranjan@codeaurora.org
+Subject: Re: [PATCHv2 2/4] arm64: dts: qcom: msm8996: Add Coresight support
+To: Suzuki K Poulose <suzuki.poulose@arm.com>, robh+dt@kernel.org,
+ mathieu.poirier@linaro.org, leo.yan@linaro.org,
+ alexander.shishkin@linux.intel.com, andy.gross@linaro.org,
+ david.brown@linaro.org, vivek.gautam@codeaurora.org, dianders@chromium.org,
+ sboyd@kernel.org, bjorn.andersson@linaro.org, devicetree@vger.kernel.org,
+ mark.rutland@arm.com
+References: <cover.1547798966.git.saiprakash.ranjan@codeaurora.org>
+ <552e408950525b1bac39d05b8b4f2ae1975397e0.1547798966.git.saiprakash.ranjan@codeaurora.org>
+ <1311e78a-21f6-6470-7861-39b3499974ce@arm.com>
+From: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+Message-ID: <6543ad5c-bbcf-b3ec-332c-115e8e3d0825@codeaurora.org>
+Date: Fri, 18 Jan 2019 17:18:01 +0530
+User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
+In-Reply-To: <1311e78a-21f6-6470-7861-39b3499974ce@arm.com>
+Content-Language: en-US
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20190118_034811_199599_BF22B8FC 
+X-CRM114-Status: GOOD (  14.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -62,96 +99,38 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Russell King <linux@armlinux.org.uk>, linux-kernel@vger.kernel.org,
- iommu@lists.linux-foundation.org,
- Mauro Carvalho Chehab <mchehab+samsung@kernel.org>,
- Mauro Carvalho Chehab <mchehab@kernel.org>, linuxppc-dev@lists.ozlabs.org,
- linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: linux-arm-msm@vger.kernel.org, rnayak@codeaurora.org, sibis@codeaurora.org,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-vb2_dc_get_userptr pokes into arm direct mapping details to get the
-resemblance of a dma address for a a physical address that does is
-not backed by a page struct.  Not only is this not portable to other
-architectures with dma direct mapping offsets, but also not to uses
-of IOMMUs of any kind.  Switch to the proper dma_map_resource /
-dma_unmap_resource interface instead.
+Hi Suzuki,
 
-Signed-off-by: Christoph Hellwig <hch@lst.de>
-Acked-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
----
- .../common/videobuf2/videobuf2-dma-contig.c   | 41 ++++---------------
- 1 file changed, 9 insertions(+), 32 deletions(-)
+On 1/18/2019 4:27 PM, Suzuki K Poulose wrote:
+> 
+> If you want to use the scatter-gather mode, you must add 
+> "arm,scatter-gather"
+> property to the node here.
+> 
+> Have you tested the scatter-gather mode on the chip ? Does that work at 
+> all ?
+> Note: You could try this by setting a buffer_size > 1M for the ETR and use
+> it as a sink from the sysfs mode.
+> 
 
-diff --git a/drivers/media/common/videobuf2/videobuf2-dma-contig.c b/drivers/media/common/videobuf2/videobuf2-dma-contig.c
-index aff0ab7bf83d..82389aead6ed 100644
---- a/drivers/media/common/videobuf2/videobuf2-dma-contig.c
-+++ b/drivers/media/common/videobuf2/videobuf2-dma-contig.c
-@@ -439,42 +439,14 @@ static void vb2_dc_put_userptr(void *buf_priv)
- 				set_page_dirty_lock(pages[i]);
- 		sg_free_table(sgt);
- 		kfree(sgt);
-+	} else {
-+		dma_unmap_resource(buf->dev, buf->dma_addr, buf->size,
-+				   buf->dma_dir, 0);
- 	}
- 	vb2_destroy_framevec(buf->vec);
- 	kfree(buf);
- }
- 
--/*
-- * For some kind of reserved memory there might be no struct page available,
-- * so all that can be done to support such 'pages' is to try to convert
-- * pfn to dma address or at the last resort just assume that
-- * dma address == physical address (like it has been assumed in earlier version
-- * of videobuf2-dma-contig
-- */
--
--#ifdef __arch_pfn_to_dma
--static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
--{
--	return (dma_addr_t)__arch_pfn_to_dma(dev, pfn);
--}
--#elif defined(__pfn_to_bus)
--static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
--{
--	return (dma_addr_t)__pfn_to_bus(pfn);
--}
--#elif defined(__pfn_to_phys)
--static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
--{
--	return (dma_addr_t)__pfn_to_phys(pfn);
--}
--#else
--static inline dma_addr_t vb2_dc_pfn_to_dma(struct device *dev, unsigned long pfn)
--{
--	/* really, we cannot do anything better at this point */
--	return (dma_addr_t)(pfn) << PAGE_SHIFT;
--}
--#endif
--
- static void *vb2_dc_get_userptr(struct device *dev, unsigned long vaddr,
- 	unsigned long size, enum dma_data_direction dma_dir)
- {
-@@ -528,7 +500,12 @@ static void *vb2_dc_get_userptr(struct device *dev, unsigned long vaddr,
- 		for (i = 1; i < n_pages; i++)
- 			if (nums[i-1] + 1 != nums[i])
- 				goto fail_pfnvec;
--		buf->dma_addr = vb2_dc_pfn_to_dma(buf->dev, nums[0]);
-+		buf->dma_addr = dma_map_resource(buf->dev,
-+				__pfn_to_phys(nums[0]), size, buf->dma_dir, 0);
-+		if (dma_mapping_error(buf->dev, buf->dma_addr)) {
-+			ret = -ENOMEM;
-+			goto fail_pfnvec;
-+		}
- 		goto out;
- 	}
- 
+Yes the chip supports scatter-gather mode[1]. But is it required in
+dt node since it's an optional property?
+
+[1] 
+https://source.codeaurora.org/quic/la/kernel/msm-3.18/tree/arch/arm/boot/dts/qcom/msm8996-coresight-v3.dtsi?h=LA.BR.5.6#n24
+
+Thanks,
+Sai
 -- 
-2.20.1
-
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
 
 _______________________________________________
 linux-arm-kernel mailing list
