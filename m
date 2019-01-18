@@ -4,131 +4,68 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0F4FAC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 09:41:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C42A7C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 09:43:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C3E822086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 09:41:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 926682086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 09:43:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Yndeounp";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="Z2KUeKQG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C3E822086D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E5USPFAp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 926682086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
-	Date:Message-ID:From:To:Subject:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+h728ee8aVqYS+qyDuBdWvNI1o+rhjk4Xu//vl1sO8A=; b=Yndeounp8Pdjnj
-	pWTCUjLB6YdmvkJHCdbapY6vF3oNhHg6uQrzNOToaXo9VTWFKIBunlFRUKBGxeToXQJzCCVgaeo1h
-	zeLnSrG4u5w/rqRMyi15e0Af907Cxo7Fj14uN4PQmCLzq/Nivbfneo/+IBCjjkACH/30SqifxSSbK
-	DiJB3G5NxRF9b3lSty7DfGGuCUwBbSH9x+8Qs4NPBniBilZmFEnILfDYQf+yRym0gE9iu9MRNUzzr
-	LszU9UR0jFyuW91hFgAjwcBxnfV89ORVAC8FTcrZ8HSa+cYPf+V/RFaFY6nSsDJgufz7z7wE4OAk+
-	0/5vcqYBT646wMY9e3Rw==;
+	List-Owner; bh=n6FgDDYrFCsHhXyKNHUVc3kF5M1KcS9EpS21Zs9xTnA=; b=E5USPFApbDXsOe
+	kgpO3ucAFSv5FuDMONzmRlADV8YqXeXnHHsT0wFjECzfNE36ci9CZkS0h3hV3BVwXmZQ757ZOgmqL
+	C8QxNv9UGkGcijYYtD0filO5qYrO2gQiTdJhVehMJXct+R98vsXUCGuJ7+McFpp8pRxoDIlngVL3/
+	wSTeXJdC615fIPCEaYJchyutnAeeIl4LyN2UXtQt2NnMSMxga6o0qYoQ3+IvU0nL+hHIBLsazrhuN
+	kYfAuhh+bn8dLGTvPweJrkoGuFlBLxngsFrWnwyNJAxmJz+Cl/wLhAseuYDHNaB0t9aStBalsMPHF
+	FMiQVSgjDmr7pcBnOh0A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkQeP-0003Jm-RV; Fri, 18 Jan 2019 09:41:21 +0000
-Received: from mailout1.w1.samsung.com ([210.118.77.11])
+	id 1gkQgG-0003gJ-CB; Fri, 18 Jan 2019 09:43:16 +0000
+Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkQeL-0003If-8S
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 09:41:19 +0000
-Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
- by mailout1.w1.samsung.com (KnoxPortal) with ESMTP id
- 20190118094109euoutp0115bbde57a59117f869199917aa1f9843~65-b68APB0046200462euoutp01G
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 18 Jan 2019 09:41:09 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout1.w1.samsung.com
- 20190118094109euoutp0115bbde57a59117f869199917aa1f9843~65-b68APB0046200462euoutp01G
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1547804469;
- bh=RGXq9RGEUurKx6PSdc+PYxtxsJ/5Q+IzJ0gAyNc2HLA=;
- h=Subject:To:Cc:From:Date:In-Reply-To:References:From;
- b=Z2KUeKQGapvqQ9Jgr84NjSns7SXRu/51seXMQd140hPdy0V3U7jAXjRyqaU/6bkWt
- 0mneQ9zwhIqYCOic7AmO6Ey96sHoB0knm/Ex/djkouwdAjB5/XrQIt7xb4qj7jDmAV
- vTthYxsSqltb03VdQzWo811uFN9gv5Cu4MOyNUS4=
-Received: from eusmges2new.samsung.com (unknown [203.254.199.244]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTP id
- 20190118094109eucas1p1ab05532f8165610dc474362bdee7bbd6~65-blkck73063730637eucas1p10;
- Fri, 18 Jan 2019 09:41:09 +0000 (GMT)
-Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
- eusmges2new.samsung.com (EUCPMTA) with SMTP id EE.48.04294.53F914C5; Fri, 18
- Jan 2019 09:41:09 +0000 (GMT)
-Received: from eusmtrp2.samsung.com (unknown [182.198.249.139]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTPA id
- 20190118094108eucas1p183dbb93b33e288b5b6043f4f5bd4bdcb~65-aoCgiY2366223662eucas1p1V;
- Fri, 18 Jan 2019 09:41:08 +0000 (GMT)
-Received: from eusmgms2.samsung.com (unknown [182.198.249.180]) by
- eusmtrp2.samsung.com (KnoxPortal) with ESMTP id
- 20190118094108eusmtrp2b5babbdfd476b5ba54a20f3cc44585d3~65-aX1NnO3211632116eusmtrp29;
- Fri, 18 Jan 2019 09:41:08 +0000 (GMT)
-X-AuditID: cbfec7f4-835ff700000010c6-bc-5c419f35d876
-Received: from eusmtip2.samsung.com ( [203.254.199.222]) by
- eusmgms2.samsung.com (EUCPMTA) with SMTP id 84.C9.04128.43F914C5; Fri, 18
- Jan 2019 09:41:08 +0000 (GMT)
-Received: from [106.116.147.30] (unknown [106.116.147.30]) by
- eusmtip2.samsung.com (KnoxPortal) with ESMTPA id
- 20190118094107eusmtip2a3234dfbecca364b28e7d316014cb1d2~65-ZyivDv2009320093eusmtip2h;
- Fri, 18 Jan 2019 09:41:07 +0000 (GMT)
-Subject: Re: [PATCH 3/3] videobuf2: replace a layering violation with
- dma_map_resource
-To: Christoph Hellwig <hch@lst.de>
-From: Marek Szyprowski <m.szyprowski@samsung.com>
-Message-ID: <f4222474-0515-c0a2-ef5e-523b56869210@samsung.com>
-Date: Fri, 18 Jan 2019 10:41:06 +0100
-User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1gkQgB-0003fO-Tc; Fri, 18 Jan 2019 09:43:13 +0000
+X-UUID: 64a169ccea3a4134aa0e15e68a791507-20190118
+X-UUID: 64a169ccea3a4134aa0e15e68a791507-20190118
+Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw02.mediatek.com
+ (envelope-from <ryder.lee@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 1340580828; Fri, 18 Jan 2019 01:42:58 -0800
+Received: from MTKMBS31N2.mediatek.inc (172.27.4.87) by
+ MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Fri, 18 Jan 2019 01:42:56 -0800
+Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
+ MTKMBS31N2.mediatek.inc (172.27.4.87) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Fri, 18 Jan 2019 17:42:54 +0800
+Received: from [172.21.77.33] (172.21.77.33) by MTKCAS06.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Fri, 18 Jan 2019 17:42:53 +0800
+Message-ID: <1547804574.8124.6.camel@mtkswgap22>
+Subject: Re: [PATCH v1 1/5] pwm: mediatek: add a property "mediatek,num-pwms"
+From: Ryder Lee <ryder.lee@mediatek.com>
+To: Uwe =?ISO-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
+Date: Fri, 18 Jan 2019 17:42:54 +0800
+In-Reply-To: <20190118075925.noilab6glzm3cig6@pengutronix.de>
+References: <de316385a84e079d3b23891e61c959094b9fa7e5.1547781007.git.ryder.lee@mediatek.com>
+ <20190118075925.noilab6glzm3cig6@pengutronix.de>
+X-Mailer: Evolution 3.2.3-0ubuntu6 
 MIME-Version: 1.0
-In-Reply-To: <20190117172152.GA32292@lst.de>
-Content-Language: en-US
-X-Brightmail-Tracker: H4sIAAAAAAAAA02SfyyUcRzHfe+5e+5xOT0O+YymdVtZEmm1nkaGWT1bs/qnraLVxTPk5+5B
- ZNWtVmGGoeJx+bWWXyt1IV0ro+UyHeqWrpI0PyMpFCdTnj2U/16fz/v9+bV9CEzxWuJMRMUl
- Muo4VYwSl4kb2yyd23aVBoRu17xdS1XXPhdRZc0+lPHiVymlG+iRUCa9Fqey7jVIqNZrTxD1
- e3ZRQt3WLYioj+0eVMGEReq/hjb1vMJoXU0GTj+4dYHON1ciuquwHNGP32lwemD+C06PmGZx
- Oru+BtHTOtdDsmMy33AmJiqZUXv5nZRFfr5jFCfkO6aUaAwiDSq1y0TWBJA74eZ8L8pEMkJB
- ViEwT2WJeEFBziDI4ShBmEbQq+kRrVQ8KcyQCkIlgvKGPlwIJhFwMwtLLoKwJ4/Az+H9fIED
- qYShMSPiGSOLMCi4k8AzTnpD5kQmzrOc9IO2648xnsXkJhgf6hDzbRzJULhskgkWO2gvGhTz
- bE16wF1t13LLDfBwQosJ7ATvB0uX97RIwdJyQOAgMPV2SgW2hzFD/TKvhz+PeL9siS8huFrI
- SYUgC0GDtgkXXD7wzPBKwi+EkVugTu8lpANgNLsS49NA2oJ5wk7YwRbyGm8sp+WQfkUhuDcD
- Z7j7b2xL92ssFym5VZdxq67hVl3D/Z9bhsQ1yIlJYmMjGHZHHHPGk1XFsklxEZ5h8bE6tPRp
- HYuGmSakXzjVikgCKW3kufX+oQqJKplNjW1FQGBKB7mOCwhVyMNVqWcZdfwJdVIMw7YiF0Ks
- dJKnWfWHKMgIVSITzTAJjHpFFRHWzhq0T/VW7TvXnO3W31+xxwZGo4u3O1qZw+6ftkqZcTCe
- X+j/JTcHzR2tG2wKCIzMOUe/OR741L3zpetA1Yu9G8fZ6FLjsPJgoqvzbnrMog1JG7P3d+rE
- pr9XoKyBWrm+3qWvumgr6i6RTI0U/viQHTyp/5aXvq55PqQs2ORWfPhThlLMRqq83TE1q/oL
- ED7+omUDAAA=
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFnrBIsWRmVeSWpSXmKPExsVy+t/xe7om8x1jDG7s57FYufook8WC/dYW
- Z5vesFtsenyN1eLyrjlsFj0btrJaHJq6l9Hi9/d/rBbLNv1hsrh7Usdiytuf7A7cHpevXWT2
- 2LSqk81j85J6j8k3ljN6nJ+xkNFj980GNo/Hv16yeTy//J3No2/LKkaPz5vkArii9GyK8ktL
- UhUy8otLbJWiDS2M9AwtLfSMTCz1DI3NY62MTJX07WxSUnMyy1KL9O0S9DIerj3LUjBZtGJe
- w3GmBsb5gl2MnBwSAiYSe2d0sncxcnEICSxllNhwfy8bREJG4uS0BlYIW1jiz7UuNoiit4wS
- M479Zexi5OAQFoiQ+PrMHaRGREBJ4umrs4wgNcwCs5klTlxaxgLR0MAk0b11IdhUNgFDia63
- XWA2r4CdxLFpu5lBbBYBVYnXT0+zgNiiAjESs570sUPUCEqcnPkELM4poCOxbs55RhCbWUBd
- 4s+8S8wQtrzE9rdzoGxxiVtP5jNNYBSahaR9FpKWWUhaZiFpWcDIsopRJLW0ODc9t9hIrzgx
- t7g0L10vOT93EyMwlrcd+7llB2PXu+BDjAIcjEo8vC+2OcQIsSaWFVfmHmKU4GBWEuHdNMsx
- Rog3JbGyKrUoP76oNCe1+BCjKdBzE5mlRJPzgWkmryTe0NTQ3MLS0NzY3NjMQkmc97xBZZSQ
- QHpiSWp2ampBahFMHxMHp1QDo79ZQMaWg9fsDh/uELo99UJayu6vFuft7j9+eX9LUlvX7dUc
- q3cmnmzb//fh7eNOnnZOsmv06rYH7RVQupfie23Gl4cL1hRceXB3tyDD4doLYrc4XGJN2Gcv
- tlgV7p+5/KC7maqm6+rJiwVeveP73qMzcZKStFZbSLriAnX+Wyw6gW+bDyje1VNiKc5INNRi
- LipOBADq0Yzi+wIAAA==
-X-CMS-MailID: 20190118094108eucas1p183dbb93b33e288b5b6043f4f5bd4bdcb
-X-Msg-Generator: CA
-X-RootMTR: 20190111181812epcas2p1eeb68a16701631513eaf297073f7299f
-X-EPHeader: CA
-CMS-TYPE: 201P
-X-CMS-RootMailID: 20190111181812epcas2p1eeb68a16701631513eaf297073f7299f
-References: <20190111181731.11782-1-hch@lst.de>
- <CGME20190111181812epcas2p1eeb68a16701631513eaf297073f7299f@epcas2p1.samsung.com>
- <20190111181731.11782-4-hch@lst.de>
- <6f8892ac-c2aa-10df-c74f-ba032bf75160@samsung.com>
- <20190117172152.GA32292@lst.de>
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_014117_435672_CDA5DA74 
-X-CRM114-Status: GOOD (  22.02  )
+X-CRM114-CacheID: sfid-20190118_014311_959178_A9B384B8 
+X-CRM114-Status: GOOD (  23.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -140,81 +77,82 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: =?UTF-8?Q?Niklas_S=c3=b6derlund?= <niklas.soderlund+renesas@ragnatech.se>,
- Pawel Osciak <pawel@osciak.com>, linux-kernel@vger.kernel.org,
- Kyungmin Park <kyungmin.park@samsung.com>,
- Russell King <linux@armlinux.org.uk>, iommu@lists.linux-foundation.org,
- Mauro Carvalho Chehab <mchehab@kernel.org>, linuxppc-dev@lists.ozlabs.org,
- linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-pwm@vger.kernel.org, devicetree@vger.kernel.org,
+ Sean Wang <sean.wang@kernel.org>, Weijie Gao <weijie.gao@mediatek.com>,
+ linux-kernel@vger.kernel.org, Thierry Reding <thierry.reding@gmail.com>,
+ linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Christoph,
-
-On 2019-01-17 18:21, Christoph Hellwig wrote:
-> On Mon, Jan 14, 2019 at 01:42:26PM +0100, Marek Szyprowski wrote:
->> On 2019-01-11 19:17, Christoph Hellwig wrote:
->>> vb2_dc_get_userptr pokes into arm direct mapping details to get the
->>> resemblance of a dma address for a a physical address that does is
->>> not backed by a page struct.  Not only is this not portable to other
->>> architectures with dma direct mapping offsets, but also not to uses
->>> of IOMMUs of any kind.  Switch to the proper dma_map_resource /
->>> dma_unmap_resource interface instead.
->>>
->>> Signed-off-by: Christoph Hellwig <hch@lst.de>
->> There are checks for IOMMU presence in other places in vb2-dma-contig,
->> so it was used only when no IOMMU is available, but I agree that the
->> hacky code should be replaced by a generic code if possible.
->>
->> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>
->> V4L2 pipeline works fine on older Exynos-based boards with CMA and IOMMU
->> disabled.
-> Do you know if these rely on the offsets?  E.g. would they still work
-> with the patch below applied on top.  That would keep the map_resource
-> semantics as-is as solve the issue pointed out by Robin for now.
-
-AFAIK that code was only used for sharing buffers between hardware
-modules that are a part of the same SoC, usually implemented as platform
-devices. AFAIR this never worked for devices on different buses. So far
-I wasn't aware on ANY which would require an offset for the DMA access.
-
-The first version of videobuf2-dc code even incorrectly used paddr
-instead of dma_addr as a buffer 'address' returned to the client
-drivers, because in case of those SoC this was exactly the same (see
-commits 472af2b05bdefcaee7e754e22cbf131110017ad6 and
-ba7fcb0c954921534707f08ebc4d8beeb2eb17e7).
-
-> If not I can only think of a flag to bypass the offseting for now, but
-> that would be pretty ugly.  Or go for the long-term solution of
-> discovering the relationship between the two devices, as done by the
-> PCIe P2P code..
->
-> diff --git a/kernel/dma/direct.c b/kernel/dma/direct.c
-> index 8e0359b04957..25bd19974223 100644
-> --- a/kernel/dma/direct.c
-> +++ b/kernel/dma/direct.c
-> @@ -359,7 +359,7 @@ EXPORT_SYMBOL(dma_direct_map_sg);
->  dma_addr_t dma_direct_map_resource(struct device *dev, phys_addr_t paddr,
->  		size_t size, enum dma_data_direction dir, unsigned long attrs)
->  {
-> -	dma_addr_t dma_addr = phys_to_dma(dev, paddr);
-> +	dma_addr_t dma_addr = paddr;
->  
->  	if (unlikely(!dma_direct_possible(dev, dma_addr, size))) {
->  		report_addr(dev, dma_addr, size);
->
->
->
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gRnJpLCAyMDE5LTAxLTE4IGF0IDA4OjU5ICswMTAwLCBVd2UgS2xlaW5lLUvDtm5pZyB3cm90
+ZToKPiBIZWxsbywKPiAKPiBPbiBGcmksIEphbiAxOCwgMjAxOSBhdCAxMToyNDo0MUFNICswODAw
+LCBSeWRlciBMZWUgd3JvdGU6Cj4gPiBUaGlzIGFkZHMgYSBwcm9wZXJ0eSAibWVkaWF0ZWssbnVt
+LXB3bXMiIHRvIGF2b2lkIGhhdmluZyBhbiBlbmRsZXNzCj4gPiBsaXN0IG9mIGNvbXBhdGlibGVz
+IHdpdGggbm8gZGlmZmVyZW5jZXMgZm9yIHRoZSBzYW1lIGRyaXZlci4KPiA+IAo+ID4gVGh1cywg
+dGhlIGRyaXZlciBzaG91bGQgaGF2ZSBiYWNrd2FyZHMgY29tcGF0aWJpbGl0eSB0byBvbGRlciBE
+VHMuCj4gCj4gSSBzdGlsbCB0aGluayBUaGllcnJ5IHNob3VsZCBibGVzcyAibnVtLXB3bXMiIHdp
+dGhvdXQgdmVuZG9yIHByZWZpeC4KCk9rYXkuCgo+ID4gU2lnbmVkLW9mZi1ieTogUnlkZXIgTGVl
+IDxyeWRlci5sZWVAbWVkaWF0ZWsuY29tPgo+ID4gLS0tCj4gPiBDaGFuZ2VzIHNpbmNlIHYxOiBh
+ZGQgc29tZSBjaGVja3MgZm9yIGJhY2t3YXJkcyBjb21wYXRpYmlsaXR5Lgo+ID4gLS0tCj4gPiAg
+ZHJpdmVycy9wd20vcHdtLW1lZGlhdGVrLmMgfCAyNyArKysrKysrKysrKysrKysrKystLS0tLS0t
+LS0KPiA+ICAxIGZpbGUgY2hhbmdlZCwgMTggaW5zZXJ0aW9ucygrKSwgOSBkZWxldGlvbnMoLSkK
+PiA+IAo+ID4gZGlmZiAtLWdpdCBhL2RyaXZlcnMvcHdtL3B3bS1tZWRpYXRlay5jIGIvZHJpdmVy
+cy9wd20vcHdtLW1lZGlhdGVrLmMKPiA+IGluZGV4IGViNjY3NGMuLjgxYjdlNWUgMTAwNjQ0Cj4g
+PiAtLS0gYS9kcml2ZXJzL3B3bS9wd20tbWVkaWF0ZWsuYwo+ID4gKysrIGIvZHJpdmVycy9wd20v
+cHdtLW1lZGlhdGVrLmMKPiA+IEBAIC01NSw3ICs1NSw3IEBAIGVudW0gewo+ID4gIH07Cj4gPiAg
+Cj4gPiAgc3RydWN0IG10a19wd21fcGxhdGZvcm1fZGF0YSB7Cj4gCj4gVW5yZWxhdGVkIHRvIHRo
+aXMgcGF0Y2g6IFRoaXMgbmFtZSBpcyBiYWQuIFRoaXMgc3RydWN0IGlzIG5vdCB1c2VkIGFzCj4g
+cGxhdGZvcm1fZGF0YSBhbmQgc28gc2hvdWxkIGJldHRlciBiZSBuYW1lZCBtdGtfcHdtX29mX2Rh
+dGEuIFdoaWxlIGF0Cj4gY3JpdGljaXppbmcgZXhpc3Rpbmcgc3R1ZmY6IEknZCBwcmVmZXIgcHdt
+X21lZGlhdGVrIGFzIGNvbW1vbiBwcmVmaXggdG8KPiBtYXRjaCB0aGUgZmlsZW5hbWUuCgpJIHRo
+aW5rIHdlIGNhbiB0YWtlIGNhcmUgYWJvdXQgdGhhdCBpbiBhbm90aGVyIHBhdGNoLgoKPiA+IC0J
+dW5zaWduZWQgaW50IG51bV9wd21zOwo+ID4gKwl1bnNpZ25lZCBpbnQgbnVtX3B3bXM7CS8qIGl0
+IHNob3VsZCBub3QgYmUgdXNlZCBpbiB0aGUgZnV0dXJlIFNvQ3MgKi8KPiAKPiBJJ2QgZHJvcCB0
+aGlzIGNvbW1lbnQgaW4gZmF2b3VyIG9mIGEgcnVudGltZSB3YXJuaW5nLgoKU29ycnksIEkgY2Fu
+J3QgZ2V0IHlvdSBoZXJlLgoKPiA+ICAJYm9vbCBwd200NV9maXh1cDsKPiA+ICAJYm9vbCBoYXNf
+Y2xrczsKPiA+ICB9Owo+ID4gQEAgLTIyNiwyNyArMjI2LDM2IEBAIHN0YXRpYyB2b2lkIG10a19w
+d21fZGlzYWJsZShzdHJ1Y3QgcHdtX2NoaXAgKmNoaXAsIHN0cnVjdCBwd21fZGV2aWNlICpwd20p
+Cj4gPiAgCj4gPiAgc3RhdGljIGludCBtdGtfcHdtX3Byb2JlKHN0cnVjdCBwbGF0Zm9ybV9kZXZp
+Y2UgKnBkZXYpCj4gPiAgewo+ID4gLQljb25zdCBzdHJ1Y3QgbXRrX3B3bV9wbGF0Zm9ybV9kYXRh
+ICpkYXRhOwo+ID4gKwlzdHJ1Y3QgZGV2aWNlX25vZGUgKm5wID0gcGRldi0+ZGV2Lm9mX25vZGU7
+Cj4gPiAgCXN0cnVjdCBtdGtfcHdtX2NoaXAgKnBjOwo+ID4gIAlzdHJ1Y3QgcmVzb3VyY2UgKnJl
+czsKPiA+IC0JdW5zaWduZWQgaW50IGk7Cj4gPiArCXVuc2lnbmVkIGludCBpLCBudW1fcHdtczsK
+PiA+ICAJaW50IHJldDsKPiA+ICAKPiA+ICAJcGMgPSBkZXZtX2t6YWxsb2MoJnBkZXYtPmRldiwg
+c2l6ZW9mKCpwYyksIEdGUF9LRVJORUwpOwo+ID4gIAlpZiAoIXBjKQo+ID4gIAkJcmV0dXJuIC1F
+Tk9NRU07Cj4gPiAgCj4gPiAtCWRhdGEgPSBvZl9kZXZpY2VfZ2V0X21hdGNoX2RhdGEoJnBkZXYt
+PmRldik7Cj4gPiAtCWlmIChkYXRhID09IE5VTEwpCj4gPiAtCQlyZXR1cm4gLUVJTlZBTDsKPiA+
+IC0JcGMtPnNvYyA9IGRhdGE7Cj4gPiArCXBjLT5zb2MgPSBvZl9kZXZpY2VfZ2V0X21hdGNoX2Rh
+dGEoJnBkZXYtPmRldik7Cj4gCj4gVGhpcyBtaWdodCByZXR1cm4gTlVMTCB3aGljaCAuLi4KClRo
+ZSBvbmx5IHdheSB0byBjYWxsIHByb2JlKCkgaXMgdG8gbWF0Y2ggYW4gZW50cnkgaW4KbXRrX3B3
+bV9vZl9tYXRjaFtdLCBzbyBtYXRjaCBjYW5ub3QgYmUgTlVMTC4KCj4gPiAgCj4gPiAgCXJlcyA9
+IHBsYXRmb3JtX2dldF9yZXNvdXJjZShwZGV2LCBJT1JFU09VUkNFX01FTSwgMCk7Cj4gPiAgCXBj
+LT5yZWdzID0gZGV2bV9pb3JlbWFwX3Jlc291cmNlKCZwZGV2LT5kZXYsIHJlcyk7Cj4gPiAgCWlm
+IChJU19FUlIocGMtPnJlZ3MpKQo+ID4gIAkJcmV0dXJuIFBUUl9FUlIocGMtPnJlZ3MpOwo+ID4g
+IAo+ID4gLQlmb3IgKGkgPSAwOyBpIDwgZGF0YS0+bnVtX3B3bXMgKyAyICYmIHBjLT5zb2MtPmhh
+c19jbGtzOyBpKyspIHsKPiA+ICsJLyogQ2hlY2sgaWYgd2UgaGF2ZSBzZXQgJ251bS1wd21zJyBp
+biBEVHMuICovCj4gPiArCXJldCA9IG9mX3Byb3BlcnR5X3JlYWRfdTMyKG5wLCAibWVkaWF0ZWss
+bnVtLXB3bXMiLCAmbnVtX3B3bXMpOwo+ID4gKwlpZiAocmV0IDwgMCkgewo+ID4gKwkJLyogSWYg
+bm8sIGZhbGxiYWNrIHRvIHVzZSBTb0MgZGF0YSBmb3IgYmFja3dhcmRzIGNvbXBhdGliaWxpdHku
+ICovCj4gPiArCQlpZiAocGMtPnNvYy0+bnVtX3B3bXMpIHsKPiAKPiAuLi4gaGVyZSB0aGVuIHJl
+c3VsdHMgaW4gYSBOVUxMIHBvaW50ZXIgZGVyZWZlcmVuY2UuIEkgdGhpbmsgeW91IHdhbnQKClNv
+IHdlIGhhdmUgbm8gY2hhbmNlIHRvIGdldCBhIE5VTEwgcG9pbnRlciwgcmlnaHQ/Cgo+IAkJaWYg
+KHBjLT5zb2MpCj4gCj4gaGVyZS4KPiAKPiA+ICsJCQludW1fcHdtcyA9IHBjLT5zb2MtPm51bV9w
+d21zOwo+ID4gKwkJfSBlbHNlIHsKPiA+ICsJCQlkZXZfZXJyKCZwZGV2LT5kZXYsICJmYWlsZWQg
+dG8gZ2V0IHB3bSBudW1iZXI6ICVkXG4iLCByZXQpOwo+ID4gKwkJCXJldHVybiByZXQ7Cj4gPiAr
+CQl9Cj4gPiArCX0KPiA+ICsKPiA+ICsJZm9yIChpID0gMDsgaSA8IG51bV9wd21zICsgMiAmJiBw
+Yy0+c29jLT5oYXNfY2xrczsgaSsrKSB7Cj4gPiAgCQlwYy0+Y2xrc1tpXSA9IGRldm1fY2xrX2dl
+dCgmcGRldi0+ZGV2LCBtdGtfcHdtX2Nsa19uYW1lW2ldKTsKPiA+ICAJCWlmIChJU19FUlIocGMt
+PmNsa3NbaV0pKSB7Cj4gPiAgCQkJZGV2X2VycigmcGRldi0+ZGV2LCAiY2xvY2s6ICVzIGZhaWw6
+ICVsZFxuIiwKPiA+IEBAIC0yNjAsNyArMjY5LDcgQEAgc3RhdGljIGludCBtdGtfcHdtX3Byb2Jl
+KHN0cnVjdCBwbGF0Zm9ybV9kZXZpY2UgKnBkZXYpCj4gPiAgCXBjLT5jaGlwLmRldiA9ICZwZGV2
+LT5kZXY7Cj4gPiAgCXBjLT5jaGlwLm9wcyA9ICZtdGtfcHdtX29wczsKPiA+ICAJcGMtPmNoaXAu
+YmFzZSA9IC0xOwo+ID4gLQlwYy0+Y2hpcC5ucHdtID0gZGF0YS0+bnVtX3B3bXM7Cj4gPiArCXBj
+LT5jaGlwLm5wd20gPSBudW1fcHdtczsKPiA+ICAKPiA+ICAJcmV0ID0gcHdtY2hpcF9hZGQoJnBj
+LT5jaGlwKTsKPiA+ICAJaWYgKHJldCA8IDApIHsKPiAKPiBCZXN0IHJlZ2FyZHMKPiBVd2UKPiAK
+CgoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgt
+YXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQu
+b3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJt
+LWtlcm5lbAo=
