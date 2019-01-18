@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D26FEC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:55:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 00944C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:56:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 52B492087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:55:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C01522087E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:56:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uR/8QUce"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 52B492087E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KeVjyWtF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C01522087E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,38 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=a+9aGP7vfHRUf6F5+N8IEQlSElluh+bY3sWYpttVbL4=; b=uR/8QUceEiVmsD
-	de2Di+er7b4B6CiXQSdeS+ZvXMJ6pC236TO1WbUH6+kwjHLSI719JeB28OY/Es3HtLBgxCAPOwT87
-	U/EX+hdalwzsg7RlYGrqsgmKvoU41BGRhUymk1N8wEAPZwLBryuvcny38YgXpdD8QTWKw2ED4RtD2
-	NTbXQicpZE7Kt7v3l4bfmv/D81miYiHAzwqesU3XJGQ2zAcJc+yBjRafB/tVrapapTNzlLvBms23J
-	CO8yHvCZKVbCDkCLOi0V0/GJClPnmEzBVb7QvcPzrDgIfHeV5EUCHg8oHlftKW2w0gddIT/FFvxMd
-	JEY00x+c2spe+63A34jA==;
+	List-Owner; bh=JeUxkcOqenoykFh8X3joQ5SjjQRS2tgadpLtdTxIp10=; b=KeVjyWtF/k9FYZ
+	OZV+JxT3swJx2tK6QJJDNXne9aNbY/uH1hULFxQJBqoR/Sj5YB4DCP9beKoUmSQPl7QN9n7OZut6N
+	l4fgCGkzIZQ6iLEiTejBX/eqy8EABQAw/6vAlvtZxDk4nuurYmtOccqT5O+P2U2n9FWWUp2oa+QTz
+	RITXmy9V/v0oAvfc5WWp+urcadXRabPEjNSu5isY/2ZmSVqCbP4a/tbY2ozn41rMsfhg87P1Q4fkx
+	Za6I/pnHq3XYowizjYYWqMzrbUHvNq4FsOexbVaha2HEe09GqoNnwCN6hzFui5hKQuQfBQVbFA6gs
+	YjVi3LZN5vHPQ/kyLzHA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkVYh-0003it-Fx; Fri, 18 Jan 2019 14:55:47 +0000
+	id 1gkVYy-0003ya-FD; Fri, 18 Jan 2019 14:56:04 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkVV9-0006y0-7M
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 14:52:48 +0000
+ id 1gkVVV-00074n-61
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 14:53:04 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 3FF18224CE; Fri, 18 Jan 2019 15:52:06 +0100 (CET)
+ id 17F4B225A0; Fri, 18 Jan 2019 15:52:28 +0100 (CET)
 Received: from localhost.localdomain
  (aaubervilliers-681-1-37-87.w90-88.abo.wanadoo.fr [90.88.156.87])
- by mail.bootlin.com (Postfix) with ESMTPSA id A434820DEE;
- Fri, 18 Jan 2019 15:51:45 +0100 (CET)
+ by mail.bootlin.com (Postfix) with ESMTPSA id 7562120C7E;
+ Fri, 18 Jan 2019 15:51:46 +0100 (CET)
 From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 To: dri-devel@lists.freedesktop.org, linux-arm-kernel@lists.infradead.org,
  linux-kernel@vger.kernel.org, linux-sunxi@googlegroups.com
-Subject: [PATCH RESEND v5 18/23] drm/sun4i: frontend: Add a quirk structure
-Date: Fri, 18 Jan 2019 15:51:28 +0100
-Message-Id: <20190118145133.21281-19-paul.kocialkowski@bootlin.com>
+Subject: [PATCH RESEND v5 21/23] drm/sun4i: frontend: Move the FIR filter
+ phases to our quirks
+Date: Fri, 18 Jan 2019 15:51:31 +0100
+Message-Id: <20190118145133.21281-22-paul.kocialkowski@bootlin.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190118145133.21281-1-paul.kocialkowski@bootlin.com>
 References: <20190118145133.21281-1-paul.kocialkowski@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_065207_701187_14EA6977 
-X-CRM114-Status: GOOD (  15.68  )
+X-CRM114-CacheID: sfid-20190118_065229_996241_F8F3B3B1 
+X-CRM114-Status: GOOD (  13.99  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,97 +82,78 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Maxime Ripard <maxime.ripard@bootlin.com>
 
-The ACCESS_CTRL bit is not found on all the variants of the frontend, so
-let's introduce a structure that will hold whether or not we need to set
-it, and associate it with the compatible.
-
-This will be extended for further similar quirks later on.
+The FIR filters phase depend on the SoC, so let's move it to our quirks
+structure instead of removing them.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 21 +++++++++++++++++----
- drivers/gpu/drm/sun4i/sun4i_frontend.h |  6 ++++++
- 2 files changed, 23 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_frontend.c | 28 ++++++++++++++++++++------
+ drivers/gpu/drm/sun4i/sun4i_frontend.h |  5 +++++
+ 2 files changed, 27 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index 88ac77518610..6636b1998a76 100644
+index 86c5033102b9..4a215d5202e2 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -10,6 +10,7 @@
- #include <linux/clk.h>
- #include <linux/component.h>
- #include <linux/module.h>
-+#include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
- #include <linux/regmap.h>
-@@ -75,9 +76,10 @@ static void sun4i_frontend_scaler_init(struct sun4i_frontend *frontend)
- {
- 	int i;
+@@ -438,12 +438,18 @@ int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
+ 	 * I have no idea what this does exactly, but it seems to be
+ 	 * related to the scaler FIR filter phase parameters.
+ 	 */
+-	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_HORZPHASE_REG, 0x400);
+-	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_HORZPHASE_REG, 0x400);
+-	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTPHASE0_REG, 0x400);
+-	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTPHASE0_REG, 0x400);
+-	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTPHASE1_REG, 0x400);
+-	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTPHASE1_REG, 0x400);
++	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_HORZPHASE_REG,
++		     frontend->data->ch_phase[0].horzphase);
++	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_HORZPHASE_REG,
++		     frontend->data->ch_phase[1].horzphase);
++	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTPHASE0_REG,
++		     frontend->data->ch_phase[0].vertphase[0]);
++	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTPHASE0_REG,
++		     frontend->data->ch_phase[1].vertphase[0]);
++	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTPHASE1_REG,
++		     frontend->data->ch_phase[0].vertphase[1]);
++	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTPHASE1_REG,
++		     frontend->data->ch_phase[1].vertphase[1]);
  
--	regmap_write_bits(frontend->regs, SUN4I_FRONTEND_FRM_CTRL_REG,
--			  SUN4I_FRONTEND_FRM_CTRL_COEF_ACCESS_CTRL,
--			  SUN4I_FRONTEND_FRM_CTRL_COEF_ACCESS_CTRL);
-+	if (frontend->data->has_coef_access_ctrl)
-+		regmap_write_bits(frontend->regs, SUN4I_FRONTEND_FRM_CTRL_REG,
-+				  SUN4I_FRONTEND_FRM_CTRL_COEF_ACCESS_CTRL,
-+				  SUN4I_FRONTEND_FRM_CTRL_COEF_ACCESS_CTRL);
- 
- 	for (i = 0; i < 32; i++) {
- 		regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_HORZCOEF0_REG(i),
-@@ -553,6 +555,10 @@ static int sun4i_frontend_bind(struct device *dev, struct device *master,
- 	frontend->dev = dev;
- 	frontend->node = dev->of_node;
- 
-+	frontend->data = of_device_get_match_data(dev);
-+	if (!frontend->data)
-+		return -ENODEV;
-+
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	regs = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(regs))
-@@ -665,8 +671,15 @@ static const struct dev_pm_ops sun4i_frontend_pm_ops = {
- 	.runtime_suspend	= sun4i_frontend_runtime_suspend,
+ 	/*
+ 	 * Checking the input format is sufficient since we currently only
+@@ -677,6 +683,16 @@ static const struct dev_pm_ops sun4i_frontend_pm_ops = {
  };
  
-+static const struct sun4i_frontend_data sun8i_a33_frontend = {
-+	.has_coef_access_ctrl	= true,
-+};
-+
- const struct of_device_id sun4i_frontend_of_table[] = {
--	{ .compatible = "allwinner,sun8i-a33-display-frontend" },
-+	{
-+		.compatible = "allwinner,sun8i-a33-display-frontend",
-+		.data = &sun8i_a33_frontend
+ static const struct sun4i_frontend_data sun8i_a33_frontend = {
++	.ch_phase		= {
++		{
++			.horzphase = 0x400,
++			.vertphase = { 0x400, 0x400 },
++		},
++		{
++			.horzphase = 0x400,
++			.vertphase = { 0x400, 0x400 },
++		},
 +	},
- 	{ }
+ 	.has_coef_access_ctrl	= true,
  };
- EXPORT_SYMBOL(sun4i_frontend_of_table);
+ 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.h b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-index 235109199b9d..01e68bb11c98 100644
+index e332bc1c6b68..0c382c1ddb0f 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_frontend.h
 +++ b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-@@ -112,6 +112,10 @@ struct drm_plane;
- struct regmap;
- struct reset_control;
- 
-+struct sun4i_frontend_data {
-+	bool	has_coef_access_ctrl;
-+};
+@@ -115,6 +115,11 @@ struct reset_control;
+ struct sun4i_frontend_data {
+ 	bool	has_coef_access_ctrl;
+ 	bool	has_coef_rdy;
 +
- struct sun4i_frontend {
- 	struct list_head	list;
- 	struct device		*dev;
-@@ -122,6 +126,8 @@ struct sun4i_frontend {
- 	struct clk		*ram_clk;
- 	struct regmap		*regs;
- 	struct reset_control	*reset;
-+
-+	const struct sun4i_frontend_data	*data;
++	struct {
++		u32	horzphase;
++		u32	vertphase[2];
++	} ch_phase[2];
  };
  
- extern const struct of_device_id sun4i_frontend_of_table[];
+ struct sun4i_frontend {
 -- 
 2.20.1
 
