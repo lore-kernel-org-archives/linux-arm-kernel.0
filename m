@@ -2,112 +2,70 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A025CC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 09:46:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 23062C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 09:47:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7019F2086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 09:46:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E86DD2086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 09:47:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BRr7gMpw";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="kaWPi8VW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7019F2086D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="M2ZOUOBi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E86DD2086D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=yv0q+hGpL2soZyPtEjsrKLbqwUuvc/XnHpvMYDAB6sY=; b=BRr7gMpwXY+Nej
-	YfuVGlO+/llitSQXiQT81pWeD08H3KZKe+Hc71e43laoOrV2SI/ker6P30uPedEe95nNlHBOrVbcm
-	BcQpnn0niYTVr7WeW7kll1VUWLZ6bVfEV7DkGGBRtYm3aaNbAY6aOaoK/8isfoM2BhucMaF3wnpO5
-	qY0Axf8Cn25D6A5FO33ocSFA943xZx8H5mGJJbVRc3mCWF8kq32Yj1uT8a3h1b43VzjYJe02+fHm9
-	61iIVaLy7MJGdNNH5gKYdbd/Q5psriQBX0KBNr2eCIjVcHVC82MFj0C0seOWQunBS+X1kSeRWkJQD
-	rj/QXhBFRpF/hLq0AgTQ==;
+	List-Owner; bh=UxjKAEK7Q58we12fSDTBBEiKRC7DOmDwAJeLRi+MZq4=; b=M2ZOUOBiKsAMdA
+	bnRYagzLjpkWmcbVlf1l8Oizjjsm0FwtBXFx4TQlmclLkPuND8+9inojIKXFTWLNvp8MeR9GRfeT2
+	+jk1fPD4aa46orLT4bhHXH+EAheMPnoblgiP1IQ/0fwpT9gR87rHiPtHf2dce4ZsHcm+e/lwQIVSG
+	/UvuDXsQRbbUbCkHxtZShB17OejYBq7dtmgBe5IGJ9dQSY//D8WBUpC/T9Sf8PfirMwK0SIMJ7NUV
+	jSlio0iA99p2Cvph8YtoOF/2wt/k3YO6ji60wIokXV/k0VR78HaXuXqA4skI4quHWKLG6Hy/m7w64
+	Z81OB8wYWk9nGbIpbMBw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkQjc-0005pC-1L; Fri, 18 Jan 2019 09:46:44 +0000
-Received: from mail-eopbgr30083.outbound.protection.outlook.com ([40.107.3.83]
- helo=EUR03-AM5-obe.outbound.protection.outlook.com)
+	id 1gkQkZ-00066J-Om; Fri, 18 Jan 2019 09:47:43 +0000
+Received: from mailgw01.mediatek.com ([216.200.240.184])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkQjY-0005oi-Sq
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 09:46:42 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=RsEUAB7JwjIavoXB2iwni60rmnTFbLZbZMCqRi8mjpQ=;
- b=kaWPi8VWW4M8GDzK77Bc069Lja9F63q/lhz/9XF/f6o+VqcB3zLFa578aIWxsjqypwsCs5GfjDUykLi38F9aHEKbiV+GskeirHMerwsws5a5628vjhKa53JnFCdjfNcmSbMO0TFVIeiWl7acVSqNnvyZsgSc3QTN+v0Bv/S9oKk=
-Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
- AM0PR04MB5971.eurprd04.prod.outlook.com (20.178.113.17) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1516.19; Fri, 18 Jan 2019 09:46:38 +0000
-Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
- ([fe80::c4d2:7dfd:4576:bdd5]) by AM0PR04MB4211.eurprd04.prod.outlook.com
- ([fe80::c4d2:7dfd:4576:bdd5%5]) with mapi id 15.20.1537.018; Fri, 18 Jan 2019
- 09:46:38 +0000
-From: Aisheng Dong <aisheng.dong@nxp.com>
-To: Marc Zyngier <marc.zyngier@arm.com>, Lucas Stach <l.stach@pengutronix.de>, 
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
-Subject: RE: [PATCH 1/4] dt-binding: irq: imx-irqsteer: use irq number per
- channel instead of group number
-Thread-Topic: [PATCH 1/4] dt-binding: irq: imx-irqsteer: use irq number per
- channel instead of group number
-Thread-Index: AQHUrwLwJbVcVt8a/UCLFkmrL3vOD6W0tw+AgAAOR4CAAAGp8A==
-Date: Fri, 18 Jan 2019 09:46:37 +0000
-Message-ID: <AM0PR04MB42114D5B25B23C0D7FFF95BA809C0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1547797668-30342-1-git-send-email-aisheng.dong@nxp.com>
- <1547797668-30342-2-git-send-email-aisheng.dong@nxp.com>
- <1547801291.2626.3.camel@pengutronix.de>
- <45c7e5b6-26bb-81b1-093b-96312a1788ec@arm.com>
-In-Reply-To: <45c7e5b6-26bb-81b1-093b-96312a1788ec@arm.com>
-Accept-Language: zh-CN, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-originating-ip: [92.121.36.198]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; AM0PR04MB5971;
- 6:yOXMgw8oaBRhWb7g9CRd6mSvFjsofTp7oVp2U9s9bk1hxxjSt9G/leDAdn7wRy4bFxvVfu+64/COIDy9hxELcuCtXXZU63n/PqsG0iBnDatqEgdrECz/eRJICB0tTKgBth4T+bonQsisQ8zDlzKHI+o8tZRnwvDyy7EuZV8AO2Ymv6BkRxJtxxI+kbN39S68iPRE/pK1pF2pE2waSm3aQV49vwLLCu22+DudcRdPIXBQin9Xyp0AakojA4ZAfKazxyw1JeQICiELZf3POzPo3QTyAnNNMuenrskPPnnabg81S+9BuIPM8G5+Of7OcUnNMFwj5wQP7DZAfy1rAN71+8/MH4H13m1jhnCPObax9oKXD4LCIvoMXTs3tjl52h2+aNNkGxAI+B409qe4+k1TvRUYoYySwlZDvKi1Q50xPBpNjJ3Bp4nVFmZjHAR6dQCthMPjUPeuCQY116KgVB9vLQ==;
- 5:6OP+oY8E8oVQ5VZ4SFvU6JZxlLRIMJ2fIrX7aBuDT3vsKIClvAAM5DYBLHTVRbk1r36zkWQNDyIldHXAc3h0tCUDtzsr57/fasAdKF0qZ+KVGgPgIlEF/t/7e2sythZeacUEm1FSDw8BYbE/bZN6hSDcb+gGtGxg1y0T1eaklfy5vj2jBYbVqaWcB2dSNKLZnQq/kcApVtDuxvNXRFkP3w==;
- 7:coU+URfxdQau70RQQL1kQcqRBxvcVylkwnA7V43DStU/vc0cFAiluvZYLYGkU0DZoka9rGJgipyXMFzDtXIKLmRFWO5w6FKA+Hxr3rbY52i9beak4HIPuw6yXo5ONQD7S/xcvFx6fC6pkCUw+WmkIg==
-x-ms-exchange-antispam-srfa-diagnostics: SOS;
-x-ms-office365-filtering-correlation-id: 542cf225-935b-431c-88ce-08d67d29d762
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:AM0PR04MB5971; 
-x-ms-traffictypediagnostic: AM0PR04MB5971:
-x-microsoft-antispam-prvs: <AM0PR04MB59710DD7ABD06A06FA616C63809C0@AM0PR04MB5971.eurprd04.prod.outlook.com>
-x-forefront-prvs: 0921D55E4F
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(396003)(346002)(376002)(136003)(39860400002)(366004)(189003)(199004)(3846002)(102836004)(6506007)(8676002)(2906002)(81166006)(81156014)(76176011)(7736002)(305945005)(6116002)(7696005)(54906003)(33656002)(93886005)(110136005)(68736007)(4326008)(6246003)(316002)(14454004)(8936002)(71190400001)(6436002)(25786009)(71200400001)(74316002)(9686003)(256004)(105586002)(229853002)(55016002)(106356001)(6346003)(53936002)(2501003)(14444005)(99286004)(66066001)(53546011)(26005)(446003)(478600001)(11346002)(86362001)(97736004)(44832011)(186003)(486006)(476003)(5660300001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB5971;
- H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=aisheng.dong@nxp.com; 
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: chYdcPe/Uq/aAAnx7OeFoFpRlkXzzRIFQPouJi5oEYRmGRjCvUzD6D2eo3fTBPurtADkcrEGI4xmU2fRInHm53dJyj+NnicGOg9s+TimAcG+hU7fCRM6mb847YKV6xwZSQRHXRh/ueHR0oxRBVMB8epu09HqArsJ/APXaadRui6rvSn9M4WV1c6LVrKVFQi0sfoGuiHQaKzq2fJRPbOzEt9Lc5AF1J0/eakI8Wm2taz7tIXeROgZLDAXC2GqaJZopMq7NRnFUeEDm8rjHJvf2a0hPbMqq1w5wS4icrUzSBhXuMjGLi8Frc+jtPuz9SMsV0RQtePKk7tnG+/aYEQyV00kuPiHgIH86451rsfxbw8cv8h55MYKA4t3oWC2Gqa2Go7EzqgbL2WkTwE+FGu17gmx7fxOPbporgcix8CKl8A=
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1gkQkW-00065K-5u; Fri, 18 Jan 2019 09:47:41 +0000
+X-UUID: 6783b32f7dbc4519882851d5a4889a03-20190118
+X-UUID: 6783b32f7dbc4519882851d5a4889a03-20190118
+Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw01.mediatek.com
+ (envelope-from <ryder.lee@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 672631624; Fri, 18 Jan 2019 01:47:37 -0800
+Received: from MTKMBS31N2.mediatek.inc (172.27.4.87) by
+ MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Fri, 18 Jan 2019 01:47:36 -0800
+Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
+ MTKMBS31N2.mediatek.inc (172.27.4.87) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Fri, 18 Jan 2019 17:47:34 +0800
+Received: from [172.21.77.33] (172.21.77.33) by MTKCAS06.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Fri, 18 Jan 2019 17:47:33 +0800
+Message-ID: <1547804853.8124.9.camel@mtkswgap22>
+Subject: Re: [PATCH v1 1/5] pwm: mediatek: add a property "mediatek,num-pwms"
+From: Ryder Lee <ryder.lee@mediatek.com>
+To: Uwe =?ISO-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
+Date: Fri, 18 Jan 2019 17:47:33 +0800
+In-Reply-To: <20190118080552.ppwgxboh3gt3nasv@pengutronix.de>
+References: <de316385a84e079d3b23891e61c959094b9fa7e5.1547781007.git.ryder.lee@mediatek.com>
+ <20190118080552.ppwgxboh3gt3nasv@pengutronix.de>
+X-Mailer: Evolution 3.2.3-0ubuntu6 
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 542cf225-935b-431c-88ce-08d67d29d762
-X-MS-Exchange-CrossTenant-originalarrivaltime: 18 Jan 2019 09:46:37.8963 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB5971
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_014640_929852_3CA5B0A6 
-X-CRM114-Status: GOOD (  15.98  )
+X-CRM114-CacheID: sfid-20190118_014740_219499_C4A0AAA2 
+X-CRM114-Status: GOOD (  20.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -119,51 +77,66 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
- "tglx@linutronix.de" <tglx@linutronix.de>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-pwm@vger.kernel.org, devicetree@vger.kernel.org,
+ Sean Wang <sean.wang@kernel.org>, Weijie Gao <weijie.gao@mediatek.com>,
+ linux-kernel@vger.kernel.org, Thierry Reding <thierry.reding@gmail.com>,
+ linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-> From: Marc Zyngier [mailto:marc.zyngier@arm.com]
-> Sent: Friday, January 18, 2019 5:39 PM
-> On 18/01/2019 08:48, Lucas Stach wrote:
-> > Am Freitag, den 18.01.2019, 07:53 +0000 schrieb Aisheng Dong:
-> >> Not all 64 interrupts may be used in one group. e.g. most irqsteer in
-> >> imx8qxp and imx8qm subsystems supports only 32 interrupts.
-> >>
-> >> As the IP integration parameters are Channel number and interrupts
-> >> number, let's use fsl,irqs-per-chan to represents how many interrupts
-> >> supported by this irqsteer channel.
-> >
-> > Sorry, but total NACK. I've got to great lengths with dumping the
-> > actually implemented register layout on i.MX8M and AFAICS the IRQs are
-> > always managed in groups of 64 IRQs, even if less than that are
-> > connected as input IRQs. This is what the actually present register
-> > set on i.MX8M tells us.
-> 
-> Also, I'd really like the DT bindings not to change at every release. So whatever
-> change (if any) has to be done for this driver to support existing HW, please
-> make sure that the DT bindings are kept as stable as possible.
-> 
-
-Sorry I should clarify it a bit.
-There's still no users in Devicetree.
-So I guess we can update it, right? Or not?
-
-Regards
-Dong Aisheng
-
-> Thanks,
-> 
-> 	M.
-> --
-> Jazz is not dead. It just smells funny...
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gRnJpLCAyMDE5LTAxLTE4IGF0IDA5OjA1ICswMTAwLCBVd2UgS2xlaW5lLUvDtm5pZyB3cm90
+ZToKPiBIZWxsbywKPiAKPiBqdXN0IHJlYWxpemVkIGFub3RoZXIgaXNzdWUgd2hpbGUgbG9va2lu
+ZyB1cCBhIGRyaXZlciBkZXRhaWwgLi4uCj4gCj4gT24gRnJpLCBKYW4gMTgsIDIwMTkgYXQgMTE6
+MjQ6NDFBTSArMDgwMCwgUnlkZXIgTGVlIHdyb3RlOgo+ID4gVGhpcyBhZGRzIGEgcHJvcGVydHkg
+Im1lZGlhdGVrLG51bS1wd21zIiB0byBhdm9pZCBoYXZpbmcgYW4gZW5kbGVzcwo+ID4gbGlzdCBv
+ZiBjb21wYXRpYmxlcyB3aXRoIG5vIGRpZmZlcmVuY2VzIGZvciB0aGUgc2FtZSBkcml2ZXIuCj4g
+PiAKPiA+IFRodXMsIHRoZSBkcml2ZXIgc2hvdWxkIGhhdmUgYmFja3dhcmRzIGNvbXBhdGliaWxp
+dHkgdG8gb2xkZXIgRFRzLgo+ID4gCj4gPiBTaWduZWQtb2ZmLWJ5OiBSeWRlciBMZWUgPHJ5ZGVy
+LmxlZUBtZWRpYXRlay5jb20+Cj4gPiAtLS0KPiA+IENoYW5nZXMgc2luY2UgdjE6IGFkZCBzb21l
+IGNoZWNrcyBmb3IgYmFja3dhcmRzIGNvbXBhdGliaWxpdHkuCj4gPiAtLS0KPiA+ICBkcml2ZXJz
+L3B3bS9wd20tbWVkaWF0ZWsuYyB8IDI3ICsrKysrKysrKysrKysrKysrKy0tLS0tLS0tLQo+ID4g
+IDEgZmlsZSBjaGFuZ2VkLCAxOCBpbnNlcnRpb25zKCspLCA5IGRlbGV0aW9ucygtKQo+ID4gCj4g
+PiBkaWZmIC0tZ2l0IGEvZHJpdmVycy9wd20vcHdtLW1lZGlhdGVrLmMgYi9kcml2ZXJzL3B3bS9w
+d20tbWVkaWF0ZWsuYwo+ID4gaW5kZXggZWI2Njc0Yy4uODFiN2U1ZSAxMDA2NDQKPiA+IC0tLSBh
+L2RyaXZlcnMvcHdtL3B3bS1tZWRpYXRlay5jCj4gPiArKysgYi9kcml2ZXJzL3B3bS9wd20tbWVk
+aWF0ZWsuYwo+ID4gQEAgLTU1LDcgKzU1LDcgQEAgZW51bSB7Cj4gPiAgfTsKPiA+ICAKPiA+ICBz
+dHJ1Y3QgbXRrX3B3bV9wbGF0Zm9ybV9kYXRhIHsKPiA+IC0JdW5zaWduZWQgaW50IG51bV9wd21z
+Owo+ID4gKwl1bnNpZ25lZCBpbnQgbnVtX3B3bXM7CS8qIGl0IHNob3VsZCBub3QgYmUgdXNlZCBp
+biB0aGUgZnV0dXJlIFNvQ3MgKi8KPiA+ICAJYm9vbCBwd200NV9maXh1cDsKPiA+ICAJYm9vbCBo
+YXNfY2xrczsKPiA+ICB9Owo+ID4gQEAgLTIyNiwyNyArMjI2LDM2IEBAIHN0YXRpYyB2b2lkIG10
+a19wd21fZGlzYWJsZShzdHJ1Y3QgcHdtX2NoaXAgKmNoaXAsIHN0cnVjdCBwd21fZGV2aWNlICpw
+d20pCj4gPiAgCj4gPiAgc3RhdGljIGludCBtdGtfcHdtX3Byb2JlKHN0cnVjdCBwbGF0Zm9ybV9k
+ZXZpY2UgKnBkZXYpCj4gPiAgewo+ID4gLQljb25zdCBzdHJ1Y3QgbXRrX3B3bV9wbGF0Zm9ybV9k
+YXRhICpkYXRhOwo+ID4gKwlzdHJ1Y3QgZGV2aWNlX25vZGUgKm5wID0gcGRldi0+ZGV2Lm9mX25v
+ZGU7Cj4gPiAgCXN0cnVjdCBtdGtfcHdtX2NoaXAgKnBjOwo+ID4gIAlzdHJ1Y3QgcmVzb3VyY2Ug
+KnJlczsKPiA+IC0JdW5zaWduZWQgaW50IGk7Cj4gPiArCXVuc2lnbmVkIGludCBpLCBudW1fcHdt
+czsKPiA+ICAJaW50IHJldDsKPiA+ICAKPiA+ICAJcGMgPSBkZXZtX2t6YWxsb2MoJnBkZXYtPmRl
+diwgc2l6ZW9mKCpwYyksIEdGUF9LRVJORUwpOwo+ID4gIAlpZiAoIXBjKQo+ID4gIAkJcmV0dXJu
+IC1FTk9NRU07Cj4gPiAgCj4gPiAtCWRhdGEgPSBvZl9kZXZpY2VfZ2V0X21hdGNoX2RhdGEoJnBk
+ZXYtPmRldik7Cj4gPiAtCWlmIChkYXRhID09IE5VTEwpCj4gPiAtCQlyZXR1cm4gLUVJTlZBTDsK
+PiA+IC0JcGMtPnNvYyA9IGRhdGE7Cj4gPiArCXBjLT5zb2MgPSBvZl9kZXZpY2VfZ2V0X21hdGNo
+X2RhdGEoJnBkZXYtPmRldik7Cj4gPiAgCj4gPiAgCXJlcyA9IHBsYXRmb3JtX2dldF9yZXNvdXJj
+ZShwZGV2LCBJT1JFU09VUkNFX01FTSwgMCk7Cj4gPiAgCXBjLT5yZWdzID0gZGV2bV9pb3JlbWFw
+X3Jlc291cmNlKCZwZGV2LT5kZXYsIHJlcyk7Cj4gPiAgCWlmIChJU19FUlIocGMtPnJlZ3MpKQo+
+ID4gIAkJcmV0dXJuIFBUUl9FUlIocGMtPnJlZ3MpOwo+ID4gIAo+ID4gLQlmb3IgKGkgPSAwOyBp
+IDwgZGF0YS0+bnVtX3B3bXMgKyAyICYmIHBjLT5zb2MtPmhhc19jbGtzOyBpKyspIHsKPiA+ICsJ
+LyogQ2hlY2sgaWYgd2UgaGF2ZSBzZXQgJ251bS1wd21zJyBpbiBEVHMuICovCj4gPiArCXJldCA9
+IG9mX3Byb3BlcnR5X3JlYWRfdTMyKG5wLCAibWVkaWF0ZWssbnVtLXB3bXMiLCAmbnVtX3B3bXMp
+Owo+ID4gKwlpZiAocmV0IDwgMCkgewo+ID4gKwkJLyogSWYgbm8sIGZhbGxiYWNrIHRvIHVzZSBT
+b0MgZGF0YSBmb3IgYmFja3dhcmRzIGNvbXBhdGliaWxpdHkuICovCj4gPiArCQlpZiAocGMtPnNv
+Yy0+bnVtX3B3bXMpIHsKPiA+ICsJCQludW1fcHdtcyA9IHBjLT5zb2MtPm51bV9wd21zOwo+ID4g
+KwkJfSBlbHNlIHsKPiA+ICsJCQlkZXZfZXJyKCZwZGV2LT5kZXYsICJmYWlsZWQgdG8gZ2V0IHB3
+bSBudW1iZXI6ICVkXG4iLCByZXQpOwo+ID4gKwkJCXJldHVybiByZXQ7Cj4gPiArCQl9Cj4gPiAr
+CX0KPiA+ICsKPiA+ICsJZm9yIChpID0gMDsgaSA8IG51bV9wd21zICsgMiAmJiBwYy0+c29jLT5o
+YXNfY2xrczsgaSsrKSB7Cj4gPiAgCQlwYy0+Y2xrc1tpXSA9IGRldm1fY2xrX2dldCgmcGRldi0+
+ZGV2LCBtdGtfcHdtX2Nsa19uYW1lW2ldKTsKPiAKPiBJZiBhIGR0IGNvbnRhaW5zCj4gCj4gCW1l
+ZGlhdGVrLG51bS1wd21zID0gPDE3PjsKPiAKPiB5b3UncmUgYWNjZXNzaW5nIHBjLT5jbGtzWzE4
+XSB3aGljaCBpcyBhbiBvdXQtb2YtYm91bmRzIGFjY2Vzcywgc28KPiBiZXR0ZXIgY2hlY2sgdGhl
+IGxpbWl0IG9yIGFsbG9jYXRlIHRoZSBjbGtzIGFycmF5IGR5bmFtaWNhbGx5Lgo+IAoKVGhhbmtz
+IGZvciB0aGUgcmVtaW5kZXIuIEkgd2lsbCBmaXggaXQgaW4gdjIuCgpSeWRlcgoKCgpfX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVs
+IG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDov
+L2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
