@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E311AC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 03:25:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BFEC3C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 03:26:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 98FEA2086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 03:25:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 777902086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 03:26:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VEGbWUhu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 98FEA2086D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DVflSPMD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 777902086D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,46 +25,47 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=W6rlbkvBZ9csUQhcX6raVHeTT8xJdcHhl/K3rf3dqOM=; b=VEGbWUhub/b46H
-	s6ZZvWLs+B90eoCR9E1+XxpE+aSlf9q5YGBpPOwwBsGYn/E0PaqkQaEucQ3etP8DfjDqUXWnIXFvd
-	Howx7G9IgRkZJG3H+4KLZled6q38hzuYAdltbFMuUn1hX6bLY9Gz8SKxCfgY8hlrr/RCm8JiO2TjI
-	vxfLMNdh0kuuDPwIk62D5DqJoyY3gpXrjziFK9rivKGVYof7i68Ttnd5AGZe8oDOxtSJGmncfiCe+
-	qXQQ5edbNciYfhbyD8qoU15ALItvjX0ryAH1rxigXhJG7s+9RZeErr6ix+sPo90CrLePntAAidbIa
-	Ezh1j6yqGTya9stZKmpA==;
+	List-Owner; bh=awZujx7Nv6pxvBUSJPp9yfB3i+/2p+MdPLsEbf/1veA=; b=DVflSPMDZB6Ubu
+	yhZyH5V0to/4FD1NN3ncWR3JYJ0F/8gryDJNl+dWLy0isIlDFUp8VP8RccO1HRS1sUWgglt6JtwA9
+	rkWTq4rn9eOQGJnv+GCVIthI0hgmdI2iDlSg0XAr/4UCxA8mF6wG4QBUoB8iyuB54cFksYhAaUCUn
+	Kcfu0L/bmkT704GmYOADjZwxYNF0NbV9kjzNXPDs5OS+gjJZc7Ao0HYOCbnqbTr8Dp4Sr/A9rKgdg
+	sfDZ5UwxDyj1CArscocs0xguIywpMGqE+b9jFhqOkyHlLJCotHBnR8o9n+I7zVbdhpqu5WxIDG0cz
+	gPaPX5A6wuwiYFE5fFFA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkKn7-0003xU-3P; Fri, 18 Jan 2019 03:25:57 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1gkKnO-0004EW-JQ; Fri, 18 Jan 2019 03:26:14 +0000
+Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkKmC-0001qy-0x; Fri, 18 Jan 2019 03:25:04 +0000
-X-UUID: cbd94242da0740acbb016501ccf4bdab-20190117
-X-UUID: cbd94242da0740acbb016501ccf4bdab-20190117
-Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw01.mediatek.com
+ id 1gkKmC-0001rt-9t; Fri, 18 Jan 2019 03:25:06 +0000
+X-UUID: f5f50928ebd643669b9acac81661adb9-20190117
+X-UUID: f5f50928ebd643669b9acac81661adb9-20190117
+Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw02.mediatek.com
  (envelope-from <ryder.lee@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1393557996; Thu, 17 Jan 2019 19:24:51 -0800
-Received: from mtkmbs08n1.mediatek.inc (172.21.101.55) by
+ with ESMTP id 602920468; Thu, 17 Jan 2019 19:24:57 -0800
+Received: from mtkmbs08n2.mediatek.inc (172.21.101.56) by
  MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Thu, 17 Jan 2019 19:24:50 -0800
+ 15.0.1395.4; Thu, 17 Jan 2019 19:24:55 -0800
 Received: from mtkcas07.mediatek.inc (172.21.101.84) by
- mtkmbs08n1.mediatek.inc (172.21.101.55) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Fri, 18 Jan 2019 11:24:48 +0800
+ mtkmbs08n2.mediatek.inc (172.21.101.56) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Fri, 18 Jan 2019 11:24:47 +0800
 Received: from mtkslt306.mediatek.inc (10.21.14.136) by mtkcas07.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
- Frontend Transport; Fri, 18 Jan 2019 11:24:49 +0800
+ Frontend Transport; Fri, 18 Jan 2019 11:24:47 +0800
 From: Ryder Lee <ryder.lee@mediatek.com>
 To: Thierry Reding <thierry.reding@gmail.com>
-Subject: [PATCH v1 5/5] dt-bindings: pwm: update bindings for MT7629 SoC
-Date: Fri, 18 Jan 2019 11:24:45 +0800
-Message-ID: <e7a59d288a4e23130e0303fec3aeba1f46ed1c26.1547781007.git.ryder.lee@mediatek.com>
+Subject: [PATCH v1 2/5] dt-bindings: pwm: add a property "mediatek,num-pwms"
+Date: Fri, 18 Jan 2019 11:24:42 +0800
+Message-ID: <7e1de17a43f2cde73aecd2773e2b3a5fdfd294f3.1547781007.git.ryder.lee@mediatek.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <de316385a84e079d3b23891e61c959094b9fa7e5.1547781007.git.ryder.lee@mediatek.com>
 References: <de316385a84e079d3b23891e61c959094b9fa7e5.1547781007.git.ryder.lee@mediatek.com>
 MIME-Version: 1.0
+X-TM-SNTS-SMTP: 463A4C78904DD31D587D27874C10AD8925FC78F8923D0296AF059074655022012000:8
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_192500_523574_3E88349E 
-X-CRM114-Status: UNSURE (   9.00  )
+X-CRM114-CacheID: sfid-20190117_192500_630923_E1657C34 
+X-CRM114-Status: UNSURE (   9.20  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -87,28 +88,35 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This updates bindings for MT7629 pwm controller.
+This adds a property "mediatek,num-pwms" in example so that we could
+set the number of PWM channels via device tree.
 
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
 ---
 Changes since v1: add a Reviewed-by tag.
 ---
- Documentation/devicetree/bindings/pwm/pwm-mediatek.txt | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/pwm/pwm-mediatek.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt b/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt
-index f9e2d1f..f7e7784 100644
+index 991728c..f9e2d1f 100644
 --- a/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt
 +++ b/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt
-@@ -6,6 +6,7 @@ Required properties:
-    - "mediatek,mt7622-pwm": found on mt7622 SoC.
-    - "mediatek,mt7623-pwm": found on mt7623 SoC.
-    - "mediatek,mt7628-pwm": found on mt7628 SoC.
-+   - "mediatek,mt7629-pwm", "mediatek,mt7622-pwm": found on mt7629 SoC.
-  - reg: physical base address and length of the controller's registers.
-  - #pwm-cells: must be 2. See pwm.txt in this directory for a description of
-    the cell format.
+@@ -20,6 +20,7 @@ Required properties:
+  - pinctrl-names: Must contain a "default" entry.
+  - pinctrl-0: One property must exist for each entry in pinctrl-names.
+    See pinctrl/pinctrl-bindings.txt for details of the property values.
++ - mediatek,num-pwms: the number of PWM channels.
+ 
+ Example:
+ 	pwm0: pwm@11006000 {
+@@ -37,4 +38,5 @@ Example:
+ 			      "pwm3", "pwm4", "pwm5";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pwm0_pins>;
++		mediatek,num-pwms = <5>;
+ 	};
 -- 
 1.9.1
 
