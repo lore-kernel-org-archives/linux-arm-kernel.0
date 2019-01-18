@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DCF42C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 10:58:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4BDBFC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 10:58:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AF61C20823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 10:58:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1C07320823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 10:58:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hvLzwTbr";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="B5is7oZM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AF61C20823
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Lj6r3sWj";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="AlrM1972"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1C07320823
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,63 +26,62 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8N/1FAhDuS1JcjuG7HUobI4ACw+Vzf98EoXq/cF9nY0=; b=hvLzwTbrfxgimd
-	WzPSzh/PqXbKon4s4irEQyLEGYfg2co2JZzeZUvq+w6w/uMXk9qTal+/J+FlxpYIjfcO9N/uzJ8A1
-	WeT2gE4TjOdspPqMAPROLh6wGRLqEZy0zv0+gg4D5KLXJ+Z9/5rSvLOrVtCy0UjFLp17dcbtbsYCn
-	iP3OM74z++MgsKl/hWhdoxUG07oRyf6eOo/a2OgfqGvqBbsnK98eun6aYLBf7lNeOOYhqMXQosywo
-	axw4HnSWQTInvsVUal+ykmcbRc42iiVD3ZVY1Cqg7p27Dq478XwdShZN0XibfUHbv5buS4qVexWIf
-	bOVc6ciB+szMMvwwKEpw==;
+	List-Owner; bh=1yyG7zikAnUGj3fAUurgIpfKRP6g9xeWENGYGrBh/iU=; b=Lj6r3sWjk/G0l4
+	uC8VzW3cEbt13fnip8pPhWm1RlFVdgDRnwi7m/9MkIYn+QlQJ80TDZAybFcOfFi6uzl5JXaqGf4WP
+	/UKmsyjOcVdGVaYQBB2QYuYxqrgXPpL4pQHf3JBeA/rLUf5HMr/wwoWXmHl+01nwj27A4HubKsLbq
+	wzp0cfVgztvFwI/H7tEYglV07Pb3L0LwN1wqwwrALyI6slprQKB/FyYn/0GgHwJHDEzQroYZ3BF+p
+	SbzwM0BykCbNjMU+XQKYZGemG++XaU5+Gd20Rd2FfkqCzSqrAuQkOFr2zBinDY7xPzr1AMBtSNP/c
+	9UjSWi5HVfKpEljZDibA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkRr6-00087J-UL; Fri, 18 Jan 2019 10:58:32 +0000
-Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+	id 1gkRrH-0008Gs-Iy; Fri, 18 Jan 2019 10:58:43 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkRqo-0007ov-Is
+ id 1gkRqp-0007pr-IS
  for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 10:58:17 +0000
-Received: by mail-wm1-x344.google.com with SMTP id f188so4038414wmf.5
+Received: by mail-wr1-x441.google.com with SMTP id p4so14497836wrt.7
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 18 Jan 2019 02:58:14 -0800 (PST)
+ Fri, 18 Jan 2019 02:58:15 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=KEDamF1G6iG0yJARiV0f8WcLBjigYpz1ziosX686/wc=;
- b=B5is7oZMBWOvsBwStWjLCig5yDrvlpDdrOQaVttA4OM8lJLR8PUJgLQJuSn3uOAbM+
- zfoXjGMTFKVFLsSR/uyYRuHpLI6LaXCt0F2x2foHcdKCMAKbVas/ppLo3H1u0lyBb8lB
- 5+hBoZaZERPR79NwjidOakjyX/n+JWU0dD5xI=
+ bh=4PBOByBDyORJotrQHfAdkrD3rgX1OelOnufeKqsU2dQ=;
+ b=AlrM1972m+0wXMXOuZvU17EhloZ3TgU+0dIl+cd6pVPtOCjjKqwzIbZ3qrSe2qlVEW
+ Hw9ggdG4YeVmAHafc5+n+akYNC0sXtYESZj6frJhFweaIHa/bj8H8YM6vI5nxTZSygcM
+ 9vR54EMAC2oeYRxIsG4Cmg43eJLzQ9buONYUk=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=KEDamF1G6iG0yJARiV0f8WcLBjigYpz1ziosX686/wc=;
- b=DUWcRo1riodBl7sNgrieFT7oWa197OY20UvZLF2Xo2G61MmZtU6v8RzuoCaEUl/4WX
- kzpzM4akZxUOMP5kQTR9haHZZKxBDQDue536EZQXuk0sKkPEl760ceMSaE6wVbEsaaar
- OtJhKOQiw6CZfORaqp10cYwvVGwYF70jbMFLooEOT4LoYsH1ue2yq0Z5mKo8NgogZwB9
- iPTvTXbn9oNvA8GtZSrU0v9wU5nvvyWxzdBGY/uZnPlUFfyhhJX/aptqOp72vbQq8kBc
- C4+Rr082EFRqdLPEwnDG8QUNHQfBaj28jOB5aBdaAJ6L9/eb2/DD9W/9QIqf13RZg3Ps
- zIJg==
-X-Gm-Message-State: AJcUukdzI3j0NPmLt/zRsBpznPNFskF/16vEZfkhL38xh0gRW/5iWcom
- 3Nr+cAiCuK3X3O18oEKRMlGSXQ==
-X-Google-Smtp-Source: ALg8bN7qCWn/ViMIVnXJ1q67toJGgsTW8ewMP7OlvOby9t/lrnuCQtV3qoXuPoluDUv707tzxfr6vg==
-X-Received: by 2002:a1c:a104:: with SMTP id k4mr14994971wme.54.1547809092789; 
- Fri, 18 Jan 2019 02:58:12 -0800 (PST)
+ bh=4PBOByBDyORJotrQHfAdkrD3rgX1OelOnufeKqsU2dQ=;
+ b=E7T4hxD1tIDk81mMepJF7ZCY2ztw5DFjcfEgZFqgYHDrJUtesZxtXvsjWgfV+TGd5q
+ ppdshdRRaHXllrluljwnEfd5VebNmlxqhaA/NAILQ6kEdrA0yWw3LVJOwKPLSIT3FZM7
+ 3hIGQ4z76vLT/PsGmh/3wYQQiIrU+gwqmhDYg/sE+du+A6ZdhijUwQn9lWGoJRiFfsr2
+ Qoxkp677bBIry7Yur6+tqY0mSj0YG8nP7c6/m/STc365xuA5UBGrH08e4yPOJrypI+5o
+ p1CeM8c6gMHzCnY+vDuDUMtbjGjJbrNJQtWCEojh9vrB2InexGtZKbxxjV8GqDaEOE0Q
+ smYg==
+X-Gm-Message-State: AJcUukcEJ87aRPrt5nxKTIWsWO3zMXLU7jG2MqBHnDBJIOXe+NQOcyVK
+ I5Te9aC5y5xWXmg1TF/Ig19jUg==
+X-Google-Smtp-Source: ALg8bN6XNctV/3mjt9tXUIVh909CcvPA7/B0iHznoaW1oLjZTDN2yXXDqL2opy2cpSGYg4eMK78sIQ==
+X-Received: by 2002:adf:f5d1:: with SMTP id k17mr17072968wrp.59.1547809094054; 
+ Fri, 18 Jan 2019 02:58:14 -0800 (PST)
 Received: from localhost.localdomain
  (aputeaux-684-1-20-152.w90-86.abo.wanadoo.fr. [90.86.223.152])
- by smtp.gmail.com with ESMTPSA id y13sm65345467wrn.73.2019.01.18.02.58.11
+ by smtp.gmail.com with ESMTPSA id y13sm65345467wrn.73.2019.01.18.02.58.12
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 18 Jan 2019 02:58:12 -0800 (PST)
+ Fri, 18 Jan 2019 02:58:13 -0800 (PST)
 From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 To: keescook@chromium.org
-Subject: [PATCH 1/2] gcc-plugins: arm_ssp_per_task_plugin: sign extend the SP
- mask
-Date: Fri, 18 Jan 2019 11:58:06 +0100
-Message-Id: <20190118105807.26425-2-ard.biesheuvel@linaro.org>
+Subject: [PATCH 2/2] gcc-plugins: arm_ssp_per_task_plugin: fix for GCC 9+
+Date: Fri, 18 Jan 2019 11:58:07 +0100
+Message-Id: <20190118105807.26425-3-ard.biesheuvel@linaro.org>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190118105807.26425-1-ard.biesheuvel@linaro.org>
 References: <20190118105807.26425-1-ard.biesheuvel@linaro.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_025814_620487_42CDD7CE 
-X-CRM114-Status: GOOD (  12.11  )
+X-CRM114-CacheID: sfid-20190118_025815_729565_10DE7B01 
+X-CRM114-Status: GOOD (  12.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,53 +93,66 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Kugan Vivekanandarajah <kugan.vivekanandarajah@linaro.org>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- kernel-hardening@lists.openwall.com, linux-kernel@vger.kernel.org,
- re.emese@gmail.com, linux-arm-kernel@lists.infradead.org
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>, re.emese@gmail.com,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ kernel-hardening@lists.openwall.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The ARM per-task stack protector GCC plugin hits an assert in
-the compiler in some case, due to the fact the the SP mask
-expression is not sign-extended as it should be. So fix that.
+GCC 9 reworks the way the references to the stack canary are
+emitted, to prevent the value from being spilled to the stack
+before the final comparison in the epilogue, defeating the
+purpose, given that the spill slot is under control of the
+attacker that we are protecting ourselves from.
 
-Suggested-by: Kugan Vivekanandarajah <kugan.vivekanandarajah@linaro.org>
+Since our canary value address is obtained without accessing
+memory (as opposed to pre-v7 code that will obtain it from a
+literal pool), it is unlikely (although not guaranteed) that
+the compiler will spill the canary value in the same way, so
+let's just disable this improvement when building with GCC9+.
+
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- scripts/gcc-plugins/arm_ssp_per_task_plugin.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ scripts/gcc-plugins/arm_ssp_per_task_plugin.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
 diff --git a/scripts/gcc-plugins/arm_ssp_per_task_plugin.c b/scripts/gcc-plugins/arm_ssp_per_task_plugin.c
-index de70b8470971..a65fbefb8501 100644
+index a65fbefb8501..89c47f57d1ce 100644
 --- a/scripts/gcc-plugins/arm_ssp_per_task_plugin.c
 +++ b/scripts/gcc-plugins/arm_ssp_per_task_plugin.c
-@@ -13,7 +13,7 @@ static unsigned int arm_pertask_ssp_rtl_execute(void)
- 	for (insn = get_insns(); insn; insn = NEXT_INSN(insn)) {
- 		const char *sym;
- 		rtx body;
--		rtx masked_sp;
-+		rtx mask, masked_sp;
+@@ -53,6 +53,19 @@ static unsigned int arm_pertask_ssp_rtl_execute(void)
+ #define NO_GATE
+ #include "gcc-generate-rtl-pass.h"
  
- 		/*
- 		 * Find a SET insn involving a SYMBOL_REF to __stack_chk_guard
-@@ -33,12 +33,13 @@ static unsigned int arm_pertask_ssp_rtl_execute(void)
- 		 * produces the address of the copy of the stack canary value
- 		 * stored in struct thread_info
- 		 */
-+		mask = GEN_INT(sext_hwi(sp_mask, GET_MODE_PRECISION(Pmode)));
- 		masked_sp = gen_reg_rtx(Pmode);
++#if BUILDING_GCC_VERSION >= 9000
++static bool no(void)
++{
++	return false;
++}
++
++static void arm_pertask_ssp_start_unit(void *gcc_data, void *user_data)
++{
++	targetm.have_stack_protect_combined_set = no;
++	targetm.have_stack_protect_combined_test = no;
++}
++#endif
++
+ __visible int plugin_init(struct plugin_name_args *plugin_info,
+ 			  struct plugin_gcc_version *version)
+ {
+@@ -100,5 +113,10 @@ __visible int plugin_init(struct plugin_name_args *plugin_info,
+ 	register_callback(plugin_info->base_name, PLUGIN_PASS_MANAGER_SETUP,
+ 			  NULL, &arm_pertask_ssp_rtl_pass_info);
  
- 		emit_insn_before(gen_rtx_SET(masked_sp,
- 					     gen_rtx_AND(Pmode,
- 							 stack_pointer_rtx,
--							 GEN_INT(sp_mask))),
-+							 mask)),
- 				 insn);
- 
- 		SET_SRC(body) = gen_rtx_PLUS(Pmode, masked_sp,
++#if BUILDING_GCC_VERSION >= 9000
++	register_callback(plugin_info->base_name, PLUGIN_START_UNIT,
++			  arm_pertask_ssp_start_unit, NULL);
++#endif
++
+ 	return 0;
+ }
 -- 
 2.20.1
 
