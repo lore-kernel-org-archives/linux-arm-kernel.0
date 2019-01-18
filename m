@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0D44AC43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:35:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 957ADC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:36:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D496320850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:35:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6413F2087E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:36:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HWL4Y9Xr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D496320850
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gSmLvfJB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6413F2087E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,53 +25,53 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9J47l5GrxYQaVexlbiBMWPsNctedjZdv7RbHEA5zE/s=; b=HWL4Y9Xri+1UFL
-	K0YqAx5dm+Xrb0Yc0/Gp8lZ9OfpvPLE6rbTgAQs11C4yuZ1ZhdcLI084VZ1kGFPCH8OxPDf84oRMJ
-	CjZOum2PBhisXRE0CM0nAlMg2+0yoPBIfmXUTPf86UfOoOHiU2U9GzK34tz4tl95FzvmuLAWGygnb
-	p85Bgg987H/QBrgPZWR2lA745AaMKiXsVTFTsXpCBUGDy9pDNyRZxErUlvSz+urt+I6VjLVdkhH9I
-	a0xhzSL5TGzlrUezHBMpAHuXm1cjDNOhkHMEV4iQ5VXBWtV6/En1tBGxyjbw1WlFk4N0kyBdzmQ/K
-	jRhb+NTa6SBfdZtAnQvg==;
+	List-Owner; bh=ClkYATIT8EM7jMMJLwyTQNv2yY+EMr4dEN8mV8e30Ug=; b=gSmLvfJBKYvvIG
+	3uxZnTTWUnrIxZ8h0/kf3YZH3oQNAgJMA2rVgUkwHv4wbSUIGya0QRcBuW8iE79ByMIgLqhDyMZEe
+	B7x1vyiwOq4qyglrxvGzdY6oUna2i6nhGQQ8yFfcCsPPU8IT0fUVmDlSLT1hATVZTy3iK6v+VszBk
+	QyXqPY6+kKh28DRoeUKAofB6mheTLH1QfSTsQLq2X/PTzF5NfyM3I6ilL5NMYa5e6GuuIdEZTo6NA
+	55znI6zknDFkPQfVoQHOJdBo+fLe6BlhzH4cztThCS9rYEQpXlRhqzSccrFISO0LTtPQYOS2ZKg3E
+	Xy3mZPurN0w1tjRefacg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkX7M-0000px-44; Fri, 18 Jan 2019 16:35:40 +0000
+	id 1gkX7Y-000119-Te; Fri, 18 Jan 2019 16:35:52 +0000
 Received: from mout.kundenserver.de ([212.227.17.10])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkX6E-0007Pf-T5
+ id 1gkX6D-0007Pa-Qb
  for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 16:34:39 +0000
 Received: from wuerfel.lan ([109.192.41.194]) by mrelayeu.kundenserver.de
  (mreue109 [212.227.15.145]) with ESMTPA (Nemesis) id
- 1MJm8N-1gUmN93A53-00K81C; Fri, 18 Jan 2019 17:19:46 +0100
+ 1MC2sF-1gwJ6T0HvR-00CT2U; Fri, 18 Jan 2019 17:19:44 +0100
 From: Arnd Bergmann <arnd@arndb.de>
 To: y2038@lists.linaro.org, linux-api@vger.kernel.org,
  linux-kernel@vger.kernel.org, linux-arch@vger.kernel.org
-Subject: [PATCH v2 23/29] timex: change syscalls to use struct __kernel_timex
-Date: Fri, 18 Jan 2019 17:18:29 +0100
-Message-Id: <20190118161835.2259170-24-arnd@arndb.de>
+Subject: [PATCH v2 21/29] sparc64: add custom adjtimex/clock_adjtime functions
+Date: Fri, 18 Jan 2019 17:18:27 +0100
+Message-Id: <20190118161835.2259170-22-arnd@arndb.de>
 X-Mailer: git-send-email 2.20.0
 In-Reply-To: <20190118161835.2259170-1-arnd@arndb.de>
 References: <20190118161835.2259170-1-arnd@arndb.de>
 MIME-Version: 1.0
-X-Provags-ID: V03:K1:kVG9L0004kjVGZ3jTNXRJe2zDldO8i8hhwk/XZl6p/GXzXXvSu2
- S5s+hnfGO6V8L06OXZk9Nmq1uc5XK0SX/tvCGfMVZwqYFwiNbnQCEsDmqBr0jqt+TgbwpgG
- rE1jCFnNroPTGvKPMDwi6YeE/oC7sqo/dZ97spnSvZMQuFdzPWZsc1U7WyjH13VgDKbUZqy
- Al7mfxahnL861tlGnkoFg==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:3UzWYXmd5CU=:n/IoNxXRvTDgJU6zABlpKR
- CvBc3VJkVz4VrdUvso8uzfGNGDDhEOVUHVWpmYVn2gIG9/3mjlAa19btI2kx2BeWGgtDOTlCu
- nQhhZ5uO33I97iQOqooV/i4hzq39ffcRlkO7RXUZcOxmw1pYoPONvz3lVoN+uXODa1+0lwkqP
- nUBMjmeQvKrrwdmHfQdDukhiXTzhskjVfVgk0BqYTwPO7Jo7IzN8b2Datm5WLVE+Eg+7gEMHN
- uYHacbaXDgjcG0qmTSyk2COcszaOthUZ2ZcLP3AFipL/RDbPXJC+eGR+fCTxNGJxuDl9HdiX4
- +ZYgvQetq6zGev+OBIE/z7SooCNPysiCSqbjFUDPHpB6R7FylH13+3J20rUJo1acNiRsL/EPm
- wu5tYcijZrPMBnYFMu23oqmK9ko293wg7Q/zQZO/JcdwGRGH4iYXTNbQiqqVfWrImlXtTMwij
- CoHyCMD8Hpeb9M+x2ILqPDu0VSLVlybPSD5vAkd/vmrWhdDWjb/n7sw3oQymWXGkvU7T0vEZs
- 6ioK7hEsTY+2rCEcqjPlteL4loHr0N7IKu2RW89eNMjPWGhV8JlhxhkPmtaEshvJKAtBustYb
- RPYjmt7U4lb8GqF5f4hjCT7nUhNyWdeUO5KN9lsiBEVYrnTiBaUOIFMGPQoOLU7Hvk4qYfZe9
- 3CGebR05bLFJCyMt+oh6kSe2pBLqfsioqjCcRffTFvi/bf225wQkhLG8XWYb4zoMGUVUlKPQO
- vIehqczGVVzOQeVDu76QtcJUnDqL6hbZjlTVM6m6WsoIg/EBdg2J/pD8wD9AABHlIpJn5ZA3K
- DqWaza54Y5WkXjKQnsfr+Wwi2fyv2U5K5rdBMFEaMk0TqxgpoU/48yGin+iK6V+sJWNG3i9z9
- nWP1azl+iFnTkFDm4cDpMLDcBToccPnfCnBbtd97XCwUuh7ZUA3lZ1cksoJZMd
+X-Provags-ID: V03:K1:SDXMCuyJzLqpJAifGRt40gvyBoqJCXKqswb2YTNLUtxnFDoMx/W
+ +5ExJy+FfAJFZvijBjxP7IkCAiIawdbKOvGJdHKe9DVR4sJVPUHEfAz3zX8H8AA1DPfXKDv
+ n3bInnzQVYWnqUfK3yPxDADtBoRxSd/sjf+LzwFX142gsdtJUUWkWGc2DO57CpmFKCkYQ/X
+ gZwaHIWb6cg/fck75AVYA==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:0x8XPy8Xaxg=:LuIRE7zi+S0ZScG43Q4V7+
+ srL+8XA5FZ/BDsDh7oZ5mSGIh1mBf6X3LKB7b3UyWyrTD+CorIfWuVBDY5S94mJ6LAa+llsdP
+ k4afnrEgZe7dv2RsEDK/eMObdTrJep2ZHi93W44UojthNRPLR08vNb1QcxoXGjUCFGCvodP8n
+ DaJdF0Hjc/vETDubm3ADJh0t7ZPAi5WSqivRx/E0oHHU+8jVMuRFejqUHn9jAo9PFATwmC1XE
+ ABu7C55ytfJ3Wj0H9Y1KMgFBhxUJujBr5xEgghpVUw/10jzeVvbbJi+E2JS5bIPvZ9cKunjJT
+ yxYbxMr0Yft2W9aIfQRt5Nr5fKBvqy+3tRKer21xz+c1Z+ysjwpq5f4FxpficjIYZ3txV0zAl
+ N4ZHmsuXM3JIYi5uSAv9Mrl7DDRFSF783gv6aCL1HSOi5TD6sqIpSHYWDP0yfNfgyy5qQXYb8
+ qFtFTLzk4uNytMwtPnE9Q39Ufiy5vLpJJvjI1qFU0+bD5Cns3ISb66AQ/hiQIEtO9t2ttFiup
+ EfaEGzH61MqTIr3aHO0nFDyc1kCvyN+z2txXApfo5rGNmdV27qrmpGgNqHz3cD+j9i86y1x8n
+ L4GgrdGXVhzZp2uQnfOuOJIiHh8d7+05LHEvb+fuuNYfagVMHiEpBO/5GAdFGkcG+1SG1n1V0
+ NMErKoBS4vkm82HuOF4is9BSu7/LGp3S7oMw8UvoWHvJ8JDdy4RcBVXsGbaApAGSyST1Ex1wr
+ gtgN+G+BHFCSKfh10208uC4YgQCDI2TZoVJ96aV2UGNKggNvlRqouI8jDfiDYKheDq/Tk/iBN
+ CXZzqCAXMZD5jvAnALhVE2J8oquTi51uHgBZTuhX3t517K9IcUBZhEAF3YnNZTeS9pmzElJ+G
+ sHEsWlumsXAuYMIZMFHg5j7JUhDkFp0JrBe70Lg4+ZVbRnf6iOp3pXnNc0Ggsg
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_083431_489053_F94D9C73 
-X-CRM114-Status: GOOD (  11.51  )
+X-CRM114-CacheID: sfid-20190118_083430_294536_9E65194A 
+X-CRM114-Status: GOOD (  17.27  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,88 +101,202 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Deepa Dinamani <deepa.kernel@gmail.com>
+sparc64 is the only architecture on Linux that has a 'timeval'
+definition with a 32-bit tv_usec but a 64-bit tv_sec. This causes
+problems for sparc32 compat mode when we convert it to use the
+new __kernel_timex type that has the same layout as all other
+64-bit architectures.
 
-struct timex is not y2038 safe.
-Switch all the syscall apis to use y2038 safe __kernel_timex.
+To avoid adding sparc64 specific code into the generic adjtimex
+implementation, this adds a wrapper in the sparc64 system call handling
+that converts the sparc64 'timex' into the new '__kernel_timex'.
 
-Note that sys_adjtimex() does not have a y2038 safe solution.  C libraries
-can implement it by calling clock_adjtime(CLOCK_REALTIME, ...).
+At this point, the two structures are defined to be identical,
+but that will change in the next step once we convert sparc32.
 
-Signed-off-by: Deepa Dinamani <deepa.kernel@gmail.com>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- include/linux/syscalls.h   | 6 +++---
- kernel/time/posix-timers.c | 2 +-
- kernel/time/time.c         | 4 +++-
- 3 files changed, 7 insertions(+), 5 deletions(-)
+ arch/sparc/kernel/sys_sparc_64.c       | 59 +++++++++++++++++++++++++-
+ arch/sparc/kernel/syscalls/syscall.tbl |  6 ++-
+ include/linux/timex.h                  |  2 +
+ kernel/time/posix-timers.c             | 24 +++++------
+ 4 files changed, 76 insertions(+), 15 deletions(-)
 
-diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
-index baa4b70b02d3..09330d5bda0c 100644
---- a/include/linux/syscalls.h
-+++ b/include/linux/syscalls.h
-@@ -54,7 +54,7 @@ struct __sysctl_args;
- struct sysinfo;
- struct timespec;
- struct timeval;
--struct timex;
-+struct __kernel_timex;
- struct timezone;
- struct tms;
- struct utimbuf;
-@@ -695,7 +695,7 @@ asmlinkage long sys_gettimeofday(struct timeval __user *tv,
- 				struct timezone __user *tz);
- asmlinkage long sys_settimeofday(struct timeval __user *tv,
- 				struct timezone __user *tz);
--asmlinkage long sys_adjtimex(struct timex __user *txc_p);
-+asmlinkage long sys_adjtimex(struct __kernel_timex __user *txc_p);
+diff --git a/arch/sparc/kernel/sys_sparc_64.c b/arch/sparc/kernel/sys_sparc_64.c
+index 1c079e7bab09..37de18a11207 100644
+--- a/arch/sparc/kernel/sys_sparc_64.c
++++ b/arch/sparc/kernel/sys_sparc_64.c
+@@ -28,8 +28,9 @@
+ #include <linux/random.h>
+ #include <linux/export.h>
+ #include <linux/context_tracking.h>
+-
++#include <linux/timex.h>
+ #include <linux/uaccess.h>
++
+ #include <asm/utrap.h>
+ #include <asm/unistd.h>
  
- /* kernel/timer.c */
- asmlinkage long sys_getpid(void);
-@@ -870,7 +870,7 @@ asmlinkage long sys_open_by_handle_at(int mountdirfd,
- 				      struct file_handle __user *handle,
- 				      int flags);
- asmlinkage long sys_clock_adjtime(clockid_t which_clock,
--				struct timex __user *tx);
-+				struct __kernel_timex __user *tx);
- asmlinkage long sys_syncfs(int fd);
- asmlinkage long sys_setns(int fd, int nstype);
- asmlinkage long sys_sendmmsg(int fd, struct mmsghdr __user *msg,
+@@ -544,6 +545,62 @@ SYSCALL_DEFINE2(getdomainname, char __user *, name, int, len)
+ 	return err;
+ }
+ 
++SYSCALL_DEFINE1(sparc_adjtimex, struct timex __user *, txc_p)
++{
++	struct timex txc;		/* Local copy of parameter */
++	struct timex *kt = (void *)&txc;
++	int ret;
++
++	/* Copy the user data space into the kernel copy
++	 * structure. But bear in mind that the structures
++	 * may change
++	 */
++	if (copy_from_user(&txc, txc_p, sizeof(struct timex)))
++		return -EFAULT;
++
++	/*
++	 * override for sparc64 specific timeval type: tv_usec
++	 * is 32 bit wide instead of 64-bit in __kernel_timex
++	 */
++	kt->time.tv_usec = txc.time.tv_usec;
++	ret = do_adjtimex(kt);
++	txc.time.tv_usec = kt->time.tv_usec;
++
++	return copy_to_user(txc_p, &txc, sizeof(struct timex)) ? -EFAULT : ret;
++}
++
++SYSCALL_DEFINE2(sparc_clock_adjtime, const clockid_t, which_clock,struct timex __user *, txc_p)
++{
++	struct timex txc;		/* Local copy of parameter */
++	struct timex *kt = (void *)&txc;
++	int ret;
++
++	if (!IS_ENABLED(CONFIG_POSIX_TIMERS)) {
++		pr_err_once("process %d (%s) attempted a POSIX timer syscall "
++		    "while CONFIG_POSIX_TIMERS is not set\n",
++		    current->pid, current->comm);
++
++		return -ENOSYS;
++	}
++
++	/* Copy the user data space into the kernel copy
++	 * structure. But bear in mind that the structures
++	 * may change
++	 */
++	if (copy_from_user(&txc, txc_p, sizeof(struct timex)))
++		return -EFAULT;
++
++	/*
++	 * override for sparc64 specific timeval type: tv_usec
++	 * is 32 bit wide instead of 64-bit in __kernel_timex
++	 */
++	kt->time.tv_usec = txc.time.tv_usec;
++	ret = do_clock_adjtime(which_clock, kt);
++	txc.time.tv_usec = kt->time.tv_usec;
++
++	return copy_to_user(txc_p, &txc, sizeof(struct timex)) ? -EFAULT : ret;
++}
++
+ SYSCALL_DEFINE5(utrap_install, utrap_entry_t, type,
+ 		utrap_handler_t, new_p, utrap_handler_t, new_d,
+ 		utrap_handler_t __user *, old_p,
+diff --git a/arch/sparc/kernel/syscalls/syscall.tbl b/arch/sparc/kernel/syscalls/syscall.tbl
+index 24ebef675184..e70110375399 100644
+--- a/arch/sparc/kernel/syscalls/syscall.tbl
++++ b/arch/sparc/kernel/syscalls/syscall.tbl
+@@ -258,7 +258,8 @@
+ 216	64	sigreturn		sys_nis_syscall
+ 217	common	clone			sys_clone
+ 218	common	ioprio_get		sys_ioprio_get
+-219	common	adjtimex		sys_adjtimex			compat_sys_adjtimex
++219	32	adjtimex		sys_adjtimex			compat_sys_adjtimex
++219	64	adjtimex		sys_sparc_adjtimex
+ 220	32	sigprocmask		sys_sigprocmask			compat_sys_sigprocmask
+ 220	64	sigprocmask		sys_nis_syscall
+ 221	common	create_module		sys_ni_syscall
+@@ -377,7 +378,8 @@
+ 331	common	prlimit64		sys_prlimit64
+ 332	common	name_to_handle_at	sys_name_to_handle_at
+ 333	common	open_by_handle_at	sys_open_by_handle_at		compat_sys_open_by_handle_at
+-334	common	clock_adjtime		sys_clock_adjtime		compat_sys_clock_adjtime
++334	32	clock_adjtime		sys_clock_adjtime		compat_sys_clock_adjtime
++334	64	clock_adjtime		sys_sparc_clock_adjtime
+ 335	common	syncfs			sys_syncfs
+ 336	common	sendmmsg		sys_sendmmsg			compat_sys_sendmmsg
+ 337	common	setns			sys_setns
+diff --git a/include/linux/timex.h b/include/linux/timex.h
+index 7f40e9e42ecc..a15e6aeb8d49 100644
+--- a/include/linux/timex.h
++++ b/include/linux/timex.h
+@@ -159,6 +159,8 @@ extern unsigned long tick_nsec;		/* SHIFTED_HZ period (nsec) */
+ #define NTP_INTERVAL_LENGTH (NSEC_PER_SEC/NTP_INTERVAL_FREQ)
+ 
+ extern int do_adjtimex(struct timex *);
++extern int do_clock_adjtime(const clockid_t which_clock, struct timex * ktx);
++
+ extern void hardpps(const struct timespec64 *, const struct timespec64 *);
+ 
+ int read_current_timer(unsigned long *timer_val);
 diff --git a/kernel/time/posix-timers.c b/kernel/time/posix-timers.c
-index 2d84b3db1ade..de79f85ae14f 100644
+index 8955f32f2a36..8f7f1dd95940 100644
 --- a/kernel/time/posix-timers.c
 +++ b/kernel/time/posix-timers.c
-@@ -1060,7 +1060,7 @@ int do_clock_adjtime(const clockid_t which_clock, struct __kernel_timex * ktx)
+@@ -1047,22 +1047,28 @@ SYSCALL_DEFINE2(clock_gettime, const clockid_t, which_clock,
+ 	return error;
  }
  
- SYSCALL_DEFINE2(clock_adjtime, const clockid_t, which_clock,
+-SYSCALL_DEFINE2(clock_adjtime, const clockid_t, which_clock,
 -		struct timex __user *, utx)
-+		struct __kernel_timex __user *, utx)
++int do_clock_adjtime(const clockid_t which_clock, struct timex * ktx)
  {
- 	struct __kernel_timex ktx;
+ 	const struct k_clock *kc = clockid_to_kclock(which_clock);
+-	struct timex ktx;
+-	int err;
+ 
+ 	if (!kc)
+ 		return -EINVAL;
+ 	if (!kc->clock_adj)
+ 		return -EOPNOTSUPP;
+ 
++	return kc->clock_adj(which_clock, ktx);
++}
++
++SYSCALL_DEFINE2(clock_adjtime, const clockid_t, which_clock,
++		struct timex __user *, utx)
++{
++	struct timex ktx;
++	int err;
++
+ 	if (copy_from_user(&ktx, utx, sizeof(ktx)))
+ 		return -EFAULT;
+ 
+-	err = kc->clock_adj(which_clock, &ktx);
++	err = do_clock_adjtime(which_clock, &ktx);
+ 
+ 	if (err >= 0 && copy_to_user(utx, &ktx, sizeof(ktx)))
+ 		return -EFAULT;
+@@ -1126,20 +1132,14 @@ COMPAT_SYSCALL_DEFINE2(clock_gettime, clockid_t, which_clock,
+ COMPAT_SYSCALL_DEFINE2(clock_adjtime, clockid_t, which_clock,
+ 		       struct old_timex32 __user *, utp)
+ {
+-	const struct k_clock *kc = clockid_to_kclock(which_clock);
+ 	struct timex ktx;
  	int err;
-diff --git a/kernel/time/time.c b/kernel/time/time.c
-index d179d33f639a..78b5c8f1495a 100644
---- a/kernel/time/time.c
-+++ b/kernel/time/time.c
-@@ -263,7 +263,8 @@ COMPAT_SYSCALL_DEFINE2(settimeofday, struct old_timeval32 __user *, tv,
- }
- #endif
  
--SYSCALL_DEFINE1(adjtimex, struct timex __user *, txc_p)
-+#if !defined(CONFIG_64BIT_TIME) || defined(CONFIG_64BIT)
-+SYSCALL_DEFINE1(adjtimex, struct __kernel_timex __user *, txc_p)
- {
- 	struct __kernel_timex txc;		/* Local copy of parameter */
- 	int ret;
-@@ -277,6 +278,7 @@ SYSCALL_DEFINE1(adjtimex, struct timex __user *, txc_p)
- 	ret = do_adjtimex(&txc);
- 	return copy_to_user(txc_p, &txc, sizeof(struct __kernel_timex)) ? -EFAULT : ret;
- }
-+#endif
+-	if (!kc)
+-		return -EINVAL;
+-	if (!kc->clock_adj)
+-		return -EOPNOTSUPP;
+-
+ 	err = get_old_timex32(&ktx, utp);
+ 	if (err)
+ 		return err;
  
- #ifdef CONFIG_COMPAT_32BIT_TIME
- int get_old_timex32(struct __kernel_timex *txc, const struct old_timex32 __user *utp)
+-	err = kc->clock_adj(which_clock, &ktx);
++	err = do_clock_adjtime(which_clock, &ktx);
+ 
+ 	if (err >= 0)
+ 		err = put_old_timex32(utp, &ktx);
 -- 
 2.20.0
 
