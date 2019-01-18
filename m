@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 99461C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 15:24:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 28A7CC43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 15:25:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 68B9A20657
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 15:24:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C812420883
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 15:25:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MFW81atP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 68B9A20657
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Fe1jn656"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C812420883
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,37 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XFSN6yb5JOh1no36HcXTqJ1bmXKugLUbLMiPaoz8Rdo=; b=MFW81atPCE4InN
-	90cYUc8sqPuRQqChl0UP1GyaEJGq03PjUoYUbxmTmjAJfaVB9LDjv6v18LpS5ATUlugL+9UoaSgUW
-	So3yMu7LuUmiIACvRY4Z5kf729OmFNzxuuBR15A3bLcN8uPInSeIPgr6EKGT0x5FY4bmInRPK7miv
-	X7PEp2YJMKA4xPOvs71bFqQSLK0OGrIvwEVuOiND3I4Aew6S00Ef1geXN6IN/ghE0cATjLl+5+F7w
-	kSMZlVb8AIIE6eBuOPE/VSKAHpTsbfanqXwY1nAwGp0DxMO45qr9Mt0mf2gwTINjuEyz2NX6JA0r9
-	+2UwIld/GjLq9f/hwEWw==;
+	List-Owner; bh=N68hgayeT2JiBoSL6vNi91Ejqu6kWapcbG7YF3vGR7c=; b=Fe1jn656DeGu5s
+	sEjKoET8SBQLROABiCCk/kZDtDv4pyQ1B8zHgiBfWYNnDG3oHEbuONNY2leEkrfXdY2BYbCj3MK/G
+	z0VO8/0nmSD0CP3E4xrRhXatG0k9DxmEzFt01CukWaz9rHDW0PDPwKnQD3+EYx5YpBvDNVGu5zJTq
+	R7mEf0afp4bcQj/3qNmy7MsZc0N9syrBcHF9TCQS8UOPRSjrMfsIpKtIW1CzkMzLTp5G16DODRLbV
+	Zp7nM5xCBIord7ERWNAy0rfhdT6I9QJiF7kFdwt5m+jsV0Kw8OVSBqLs0HsbXBT7YEiYVY1K5Fdkh
+	LhxUWrN8NOgJNKEXFzQw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkW0l-0000jv-7C; Fri, 18 Jan 2019 15:24:47 +0000
+	id 1gkW0y-0000up-5o; Fri, 18 Jan 2019 15:25:00 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkW0G-0000GJ-Or
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 15:24:20 +0000
+ id 1gkW0G-0000G4-Oq
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 15:24:21 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 0FEEB207B0; Fri, 18 Jan 2019 16:24:14 +0100 (CET)
+ id BB8EF207A3; Fri, 18 Jan 2019 16:24:13 +0100 (CET)
 Received: from mc-bl-xps13.lan
  (aaubervilliers-681-1-37-87.w90-88.abo.wanadoo.fr [90.88.156.87])
- by mail.bootlin.com (Postfix) with ESMTPSA id A61B2207B6;
+ by mail.bootlin.com (Postfix) with ESMTPSA id 57BA2207B0;
  Fri, 18 Jan 2019 16:24:03 +0100 (CET)
 From: Maxime Chevallier <maxime.chevallier@bootlin.com>
 To: davem@davemloft.net
-Subject: [PATCH net-next 3/7] net: phy: Read 2.5G and 5G extended abilities
-Date: Fri, 18 Jan 2019 16:23:48 +0100
-Message-Id: <20190118152352.26417-4-maxime.chevallier@bootlin.com>
+Subject: [PATCH net-next 2/7] net: phy: Add generic support for 2.5GBaseT and
+ 5GBaseT
+Date: Fri, 18 Jan 2019 16:23:47 +0100
+Message-Id: <20190118152352.26417-3-maxime.chevallier@bootlin.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20190118152352.26417-1-maxime.chevallier@bootlin.com>
 References: <20190118152352.26417-1-maxime.chevallier@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_072417_214535_5B8C52B7 
-X-CRM114-Status: GOOD (  11.55  )
+X-CRM114-CacheID: sfid-20190118_072417_266988_5A083415 
+X-CRM114-Status: GOOD (  12.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,78 +81,111 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Register 1.21 "2.5G/5G PMA Extended abilities" contains the information
-indicating whether or not 2.5GBASET and 5GBASET are supported by a PHY,
-as per the 802.3bz specification.
+The 802.3bz specification, based on previous by the NBASET alliance,
+defines the 2.5GBaseT and 5GBaseT link modes for ethernet traffic on
+cat5e, cat6 and cat7 cables.
 
-If the bit 14 is set in the 1.11 "PMA Extended abilities" register, the
-modes specified in the above-mentionned 1.21 register should be taken
-into account.
+These mode integrate with the already defined C45 MDIO PMA/PMD registers
+set that added 10G support, by defining some previously reserved bits,
+and adding a new register (2.5G/5G Extended abilities).
 
-This commit adds that logic into the genphy_c45_read_abilities function.
+This commit adds the required definitions in include/uapi/linux/mdio.h
+to support these modes, and detect when a link-partner advertises them.
+
+It also adds support for these mode in the generic C45 PHY
+infrastructure.
 
 Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
 ---
- drivers/net/phy/phy-c45.c | 14 ++++++++++++++
- include/uapi/linux/mdio.h |  6 ++++++
- 2 files changed, 20 insertions(+)
+ drivers/net/phy/phy-c45.c | 22 ++++++++++++++++++++++
+ include/uapi/linux/mdio.h | 10 ++++++++++
+ 2 files changed, 32 insertions(+)
 
 diff --git a/drivers/net/phy/phy-c45.c b/drivers/net/phy/phy-c45.c
-index 61ca4f89e94a..ee32eba3dc20 100644
+index 31806b432734..61ca4f89e94a 100644
 --- a/drivers/net/phy/phy-c45.c
 +++ b/drivers/net/phy/phy-c45.c
-@@ -377,6 +377,20 @@ int genphy_c45_read_abilities(struct phy_device *phydev)
- 			__set_bit(ETHTOOL_LINK_MODE_10baseT_Half_BIT,
- 				  supported);
- 		}
-+
-+		if (val & MDIO_PMA_EXTABLE_NBT) {
-+			val = phy_read_mmd(phydev, MDIO_MMD_PMAPMD,
-+					   MDIO_PMA_NG_EXTABLE);
-+			if (val < 0)
-+				return val;
-+
-+			if (val & MDIO_PMA_NG_EXTABLE_2_5GBT)
-+				__set_bit(ETHTOOL_LINK_MODE_2500baseT_Full_BIT,
-+					  supported);
-+			if (val & MDIO_PMA_NG_EXTABLE_5GBT)
-+				__set_bit(ETHTOOL_LINK_MODE_5000baseT_Full_BIT,
-+					  supported);
-+		}
- 	}
+@@ -47,6 +47,16 @@ int genphy_c45_pma_setup_forced(struct phy_device *phydev)
+ 		/* Assume 1000base-T */
+ 		ctrl2 |= MDIO_PMA_CTRL2_1000BT;
+ 		break;
++	case SPEED_2500:
++		ctrl1 |= MDIO_CTRL1_SPEED2_5G;
++		/* Assume 2.5Gbase-T */
++		ctrl2 |= MDIO_PMA_CTRL2_2_5GBT;
++		break;
++	case SPEED_5000:
++		ctrl1 |= MDIO_CTRL1_SPEED5G;
++		/* Assume 5Gbase-T */
++		ctrl2 |= MDIO_PMA_CTRL2_5GBT;
++		break;
+ 	case SPEED_10000:
+ 		ctrl1 |= MDIO_CTRL1_SPEED10G;
+ 		/* Assume 10Gbase-T */
+@@ -190,6 +200,12 @@ int genphy_c45_read_lpa(struct phy_device *phydev)
+ 	if (val < 0)
+ 		return val;
  
- 	linkmode_copy(phydev->supported, supported);
++	if (val & MDIO_AN_10GBT_STAT_LP2_5G)
++		linkmode_set_bit(ETHTOOL_LINK_MODE_2500baseT_Full_BIT,
++				 phydev->lp_advertising);
++	if (val & MDIO_AN_10GBT_STAT_LP5G)
++		linkmode_set_bit(ETHTOOL_LINK_MODE_5000baseT_Full_BIT,
++				 phydev->lp_advertising);
+ 	if (val & MDIO_AN_10GBT_STAT_LP10G)
+ 		linkmode_set_bit(ETHTOOL_LINK_MODE_10000baseT_Full_BIT,
+ 				 phydev->lp_advertising);
+@@ -220,6 +236,12 @@ int genphy_c45_read_pma(struct phy_device *phydev)
+ 	case MDIO_PMA_CTRL1_SPEED1000:
+ 		phydev->speed = SPEED_1000;
+ 		break;
++	case MDIO_CTRL1_SPEED2_5G:
++		phydev->speed = SPEED_2500;
++		break;
++	case MDIO_CTRL1_SPEED5G:
++		phydev->speed = SPEED_5000;
++		break;
+ 	case MDIO_CTRL1_SPEED10G:
+ 		phydev->speed = SPEED_10000;
+ 		break;
 diff --git a/include/uapi/linux/mdio.h b/include/uapi/linux/mdio.h
-index e2ab03606c1b..546509898867 100644
+index d435b00d64ad..e2ab03606c1b 100644
 --- a/include/uapi/linux/mdio.h
 +++ b/include/uapi/linux/mdio.h
-@@ -45,6 +45,7 @@
- #define MDIO_AN_ADVERTISE	16	/* AN advertising (base page) */
- #define MDIO_AN_LPA		19	/* AN LP abilities (base page) */
- #define MDIO_PCS_EEE_ABLE	20	/* EEE Capability register */
-+#define MDIO_PMA_NG_EXTABLE	21	/* 2.5G/5G PMA/PMD extended ability */
- #define MDIO_PCS_EEE_WK_ERR	22	/* EEE wake error counter */
- #define MDIO_PHYXS_LNSTAT	24	/* PHY XGXS lane state */
- #define MDIO_AN_EEE_ADV		60	/* EEE advertisement */
-@@ -201,6 +202,7 @@
- #define MDIO_PMA_EXTABLE_1000BKX	0x0040	/* 1000BASE-KX ability */
- #define MDIO_PMA_EXTABLE_100BTX		0x0080	/* 100BASE-TX ability */
- #define MDIO_PMA_EXTABLE_10BT		0x0100	/* 10BASE-T ability */
-+#define MDIO_PMA_EXTABLE_NBT		0x4000  /* 2.5/5GBASE-T ability */
+@@ -92,6 +92,10 @@
+ #define MDIO_CTRL1_SPEED10G		(MDIO_CTRL1_SPEEDSELEXT | 0x00)
+ /* 10PASS-TS/2BASE-TL */
+ #define MDIO_CTRL1_SPEED10P2B		(MDIO_CTRL1_SPEEDSELEXT | 0x04)
++/* 2.5 Gb/s */
++#define MDIO_CTRL1_SPEED2_5G		(MDIO_CTRL1_SPEEDSELEXT | 0x18)
++/* 5 Gb/s */
++#define MDIO_CTRL1_SPEED5G		(MDIO_CTRL1_SPEEDSELEXT | 0x1c)
  
- /* PHY XGXS lane state register. */
- #define MDIO_PHYXS_LNSTAT_SYNC0		0x0001
-@@ -272,6 +274,10 @@
- #define MDIO_EEE_10GKX4		0x0020	/* 10G KX4 EEE cap */
- #define MDIO_EEE_10GKR		0x0040	/* 10G KR EEE cap */
+ /* Status register 1. */
+ #define MDIO_STAT1_LPOWERABLE		0x0002	/* Low-power ability */
+@@ -142,6 +146,8 @@
+ #define MDIO_PMA_CTRL2_1000BKX		0x000d	/* 1000BASE-KX type */
+ #define MDIO_PMA_CTRL2_100BTX		0x000e	/* 100BASE-TX type */
+ #define MDIO_PMA_CTRL2_10BT		0x000f	/* 10BASE-T type */
++#define MDIO_PMA_CTRL2_2_5GBT		0x0030  /* 2.5GBaseT type */
++#define MDIO_PMA_CTRL2_5GBT		0x0031  /* 5GBaseT type */
+ #define MDIO_PCS_CTRL2_TYPE		0x0003	/* PCS type selection */
+ #define MDIO_PCS_CTRL2_10GBR		0x0000	/* 10GBASE-R type */
+ #define MDIO_PCS_CTRL2_10GBX		0x0001	/* 10GBASE-X type */
+@@ -231,9 +237,13 @@
+ #define MDIO_PCS_10GBRT_STAT2_BER	0x3f00
  
-+/* 2.5G/5G Extended abilities register. */
-+#define MDIO_PMA_NG_EXTABLE_2_5GBT	0x0001	/* 2.5GBASET ability */
-+#define MDIO_PMA_NG_EXTABLE_5GBT	0x0002	/* 5GBASET ability */
-+
- /* LASI RX_ALARM control/status registers. */
- #define MDIO_PMA_LASI_RX_PHYXSLFLT	0x0001	/* PHY XS RX local fault */
- #define MDIO_PMA_LASI_RX_PCSLFLT	0x0008	/* PCS RX local fault */
+ /* AN 10GBASE-T control register. */
++#define MDIO_AN_10GBT_CTRL_ADV2_5G	0x0080	/* Advertise 2.5GBASE-T */
++#define MDIO_AN_10GBT_CTRL_ADV5G	0x0100	/* Advertise 5GBASE-T */
+ #define MDIO_AN_10GBT_CTRL_ADV10G	0x1000	/* Advertise 10GBASE-T */
+ 
+ /* AN 10GBASE-T status register. */
++#define MDIO_AN_10GBT_STAT_LP2_5G	0x0020  /* LP is 2.5GBT capable */
++#define MDIO_AN_10GBT_STAT_LP5G		0x0040  /* LP is 5GBT capable */
+ #define MDIO_AN_10GBT_STAT_LPTRR	0x0200	/* LP training reset req. */
+ #define MDIO_AN_10GBT_STAT_LPLTABLE	0x0400	/* LP loop timing ability */
+ #define MDIO_AN_10GBT_STAT_LP10G	0x0800	/* LP is 10GBT capable */
 -- 
 2.19.2
 
