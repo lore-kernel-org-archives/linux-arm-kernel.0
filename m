@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 990F3C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 15:11:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ECC05C43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 15:21:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 674C52086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 15:11:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AACA220657
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 15:21:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="djQxeH15";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="nsC82bCu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 674C52086D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F+kOVrb0";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="xiHVx6rp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AACA220657
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,55 +26,55 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=WvTEyVHM+jBkcuWnrI9s1AK/hC4ED0CTBliBoh9eDhQ=; b=djQxeH15MVVfgD
-	fD2uAja3THLEgrj9b+TdQ/xlh8W4RR+OtkxG9yqyZrxSOtGJAvHwltdgd7ZeR/dR8HI4f+/mTmlmZ
-	VwUVjHbi03wfhvZqrE9pqGNV07WRJiYkrFiNCtwbRFwHgaUoUftHKpF6Wf/kvYVryM6h1HfcFH7ch
-	IZGsub/Oru/8hMpMzS2hdvXWrtgRVq94/RDO0V0Z5jmdTvJgXBsvwF1rDujBLb5lRfoK6IU3NSLBf
-	xn+IKIGpVGmWaOgpjd1fddv/CYsx+oXvfwcdfy1jhcqj1mlh/Yo3N+kG1SCVnP+EWvHbGbOvPZUtb
-	svLQw8Elx9Ed/rrlLqsg==;
+	List-Owner; bh=NVGBmPkb5omxD1gjZaSVKlkIMQxx7beJB9MhhZNVuQg=; b=F+kOVrb0VnfLga
+	5R1R3HIfkvvWVwYZVFFWJWdRILT2gwTSm1Ra8Bk3SLXR7/CgL1Ka1s6lg89png6bOyms9eK3X3XTP
+	Eb8phvd/WCxA1kJtTPoyxAa8D8MxuCYq2tqgCQxt1VlhzRT1QQnhX4SgMv6U6DD5GBQDf4WXzw3IW
+	C7CvL9i3LNYfAMGmVz7zc7QjkftfxPFp4TZcKF6IYuIvtsB0hPaZIWrut/lA9O1kfWdvvKOlP47cn
+	tjOlQGR+4bzaGhb62kpqNJFeFvhDp3SYkdDFSuG3DSBQTga8deYlWuXkpXhQgF/OVvdSQNtogQ1dv
+	gSh61q5zf+LftvdXRfDQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkVnr-00049V-TF; Fri, 18 Jan 2019 15:11:27 +0000
+	id 1gkVxg-0008FF-5q; Fri, 18 Jan 2019 15:21:36 +0000
 Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkVnF-0003Qe-IK
- for linux-arm-kernel@bombadil.infradead.org; Fri, 18 Jan 2019 15:10:49 +0000
+ id 1gkVnE-0003Qe-42
+ for linux-arm-kernel@bombadil.infradead.org; Fri, 18 Jan 2019 15:10:48 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:MIME-Version:
  References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
  Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
  Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
  List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=2wKJpV/PDE3jymU/KZysV+0/fEndv4MgWQWsnjlgBa4=; b=nsC82bCuCGTl9DFDdBetk52rSt
- 6U2rJHbkj4HEhCp7+GHvYvyGsEBwbnfNzuPktSjmWSXPJCL/JJM1g3xoUKjRPtqVWzf6nLG3F00Mp
- Lv12VSAk/z+5WRqqFLWE0tsprurafZTy2PTEVnBEM8a5VCMSCdJ/xDe4G4FnRZatuwsSThqijpcT3
- DrBUqJP1Mgmhx/l9Ho9byMVVR6NG0bAZA8LjXB72ZK0P9ITxsgazSUk/FpXieCq2qvPofUqfDJ9wK
- Iw5mE56xU9ptfiIju8xPdK6nyBAnAh06Ntcgi1zSR2GNUa26xzYaTlpnLGImCkqzTUrVGAu3AR3+T
- GRCeRYEA==;
+ bh=x/MdzDmJK94LVEDi4LG5jePD5pzgvmGhsY3jjsLB6Sw=; b=xiHVx6rp8u4zS5zVsklA44xdAC
+ OIcCOSeAP7bYdSGX5gNqBZxLQmKzHv5Ty8mEYwFmxEom2Z/hrmkmMD8Jp+mNElp1jTxXVVPxaCA7/
+ AmR2ki0KBjS9U6soVGMSaMiGXq8Qr2EC5reP0p1KmKgdf8j6cT+Cr8Se6bMsw4pWsb6vK9OkoO6wV
+ Z1kUink9/USgkZJBhTy0+q0PjkaeaNdDvUtalY1CnUcoPMXXHSteoaJIdrmziEKDYuum5v4nZ6LZO
+ VIbwfIXxZjPbg9Fus6IOtsH49YaseVkdNCYuCD/YYH6NAFeclzTTkv85qqEthLcIVMwf/ZAzKiqHs
+ WipffLsw==;
 Received: from mail.bootlin.com ([62.4.15.54])
  by merlin.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkVV4-0003OX-3l
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 14:52:03 +0000
+ id 1gkVV5-0003OX-Cj
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 14:52:04 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 288932247E; Fri, 18 Jan 2019 15:51:55 +0100 (CET)
+ id 29AD222491; Fri, 18 Jan 2019 15:51:56 +0100 (CET)
 Received: from localhost.localdomain
  (aaubervilliers-681-1-37-87.w90-88.abo.wanadoo.fr [90.88.156.87])
- by mail.bootlin.com (Postfix) with ESMTPSA id 4230720A7D;
+ by mail.bootlin.com (Postfix) with ESMTPSA id C2AB620BAD;
  Fri, 18 Jan 2019 15:51:44 +0100 (CET)
 From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 To: dri-devel@lists.freedesktop.org, linux-arm-kernel@lists.infradead.org,
  linux-kernel@vger.kernel.org, linux-sunxi@googlegroups.com
-Subject: [PATCH RESEND v5 13/23] drm/sun4i: Add buffer stride and offset
- configuration for tiling mode
-Date: Fri, 18 Jan 2019 15:51:23 +0100
-Message-Id: <20190118145133.21281-14-paul.kocialkowski@bootlin.com>
+Subject: [PATCH RESEND v5 15/23] drm/sun4i: layer: Add tiled modifier support
+ and helper
+Date: Fri, 18 Jan 2019 15:51:25 +0100
+Message-Id: <20190118145133.21281-16-paul.kocialkowski@bootlin.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190118145133.21281-1-paul.kocialkowski@bootlin.com>
 References: <20190118145133.21281-1-paul.kocialkowski@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_095202_349375_0C2826E4 
-X-CRM114-Status: GOOD (  16.26  )
+X-CRM114-CacheID: sfid-20190118_095203_540689_ABF6BF33 
+X-CRM114-Status: GOOD (  12.81  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,123 +97,67 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This introduces stride and offset configuration for the VPU tiling mode.
-Stride is calculated differently than it is for linear formats and an
-offset is calculated, for which new register definitions are introduced.
+This introduces a list of supported modifiers for the driver, that
+includes the Allwinner tiled modifier, as well as a format_mod_supported
+callback.
+
+The callback uses both the backend and frontend helpers to indicate
+per-format modifier support (including for the linear modifier).
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 49 ++++++++++++++++++++++++--
- drivers/gpu/drm/sun4i/sun4i_frontend.h | 19 ++++++++++
- 2 files changed, 65 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_layer.c | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index e950370792ce..6ede40aab515 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -126,21 +126,64 @@ void sun4i_frontend_update_buffer(struct sun4i_frontend *frontend,
- {
- 	struct drm_plane_state *state = plane->state;
- 	struct drm_framebuffer *fb = state->fb;
-+	unsigned int strides[3] = {};
-+
- 	dma_addr_t paddr;
- 	bool swap;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+index 8cf8ca997b1d..c5a999ca1d72 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.c
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+@@ -114,6 +114,13 @@ static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
+ 	sun4i_backend_layer_enable(backend, layer->id, true);
+ }
  
-+	if (fb->modifier == DRM_FORMAT_MOD_ALLWINNER_TILED) {
-+		unsigned int width = state->src_w >> 16;
-+		unsigned int offset;
++static bool sun4i_layer_format_mod_supported(struct drm_plane *plane,
++					     uint32_t format, uint64_t modifier)
++{
++	return sun4i_backend_format_is_supported(format, modifier) ||
++	       sun4i_frontend_format_is_supported(format, modifier);
++}
 +
-+		strides[0] = SUN4I_FRONTEND_LINESTRD_TILED(fb->pitches[0]);
-+
-+		/*
-+		 * The X1 offset is the offset to the bottom-right point in the
-+		 * end tile, which is the final pixel (at offset width - 1)
-+		 * within the end tile (with a 32-byte mask).
-+		 */
-+		offset = (width - 1) & (32 - 1);
-+
-+		regmap_write(frontend->regs, SUN4I_FRONTEND_TB_OFF0_REG,
-+			     SUN4I_FRONTEND_TB_OFF_X1(offset));
-+
-+		if (fb->format->num_planes > 1) {
-+			strides[1] =
-+				SUN4I_FRONTEND_LINESTRD_TILED(fb->pitches[1]);
-+
-+			regmap_write(frontend->regs, SUN4I_FRONTEND_TB_OFF1_REG,
-+				     SUN4I_FRONTEND_TB_OFF_X1(offset));
-+		}
-+
-+		if (fb->format->num_planes > 2) {
-+			strides[2] =
-+				SUN4I_FRONTEND_LINESTRD_TILED(fb->pitches[2]);
-+
-+			regmap_write(frontend->regs, SUN4I_FRONTEND_TB_OFF2_REG,
-+				     SUN4I_FRONTEND_TB_OFF_X1(offset));
-+		}
-+	} else {
-+		strides[0] = fb->pitches[0];
-+
-+		if (fb->format->num_planes > 1)
-+			strides[1] = fb->pitches[1];
-+
-+		if (fb->format->num_planes > 2)
-+			strides[2] = fb->pitches[2];
-+	}
-+
- 	/* Set the line width */
- 	DRM_DEBUG_DRIVER("Frontend stride: %d bytes\n", fb->pitches[0]);
- 	regmap_write(frontend->regs, SUN4I_FRONTEND_LINESTRD0_REG,
--		     fb->pitches[0]);
-+		     strides[0]);
+ static const struct drm_plane_helper_funcs sun4i_backend_layer_helper_funcs = {
+ 	.prepare_fb	= drm_gem_fb_prepare_fb,
+ 	.atomic_disable	= sun4i_backend_layer_atomic_disable,
+@@ -127,6 +134,7 @@ static const struct drm_plane_funcs sun4i_backend_layer_funcs = {
+ 	.disable_plane		= drm_atomic_helper_disable_plane,
+ 	.reset			= sun4i_backend_layer_reset,
+ 	.update_plane		= drm_atomic_helper_update_plane,
++	.format_mod_supported	= sun4i_layer_format_mod_supported,
+ };
  
- 	if (fb->format->num_planes > 1)
- 		regmap_write(frontend->regs, SUN4I_FRONTEND_LINESTRD1_REG,
--			     fb->pitches[1]);
-+			     strides[1]);
+ static const uint32_t sun4i_layer_formats[] = {
+@@ -157,6 +165,12 @@ static const uint32_t sun4i_layer_formats[] = {
+ 	DRM_FORMAT_YVYU,
+ };
  
- 	if (fb->format->num_planes > 2)
- 		regmap_write(frontend->regs, SUN4I_FRONTEND_LINESTRD2_REG,
--			     fb->pitches[2]);
-+			     strides[2]);
- 
- 	/* Some planar formats require chroma channel swapping by hand. */
- 	swap = sun4i_frontend_format_chroma_requires_swap(fb->format->format);
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.h b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-index 6c4d7797bb8a..235109199b9d 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-@@ -25,10 +25,29 @@
- #define SUN4I_FRONTEND_BUF_ADDR1_REG		0x024
- #define SUN4I_FRONTEND_BUF_ADDR2_REG		0x028
- 
-+#define SUN4I_FRONTEND_TB_OFF0_REG		0x030
-+#define SUN4I_FRONTEND_TB_OFF1_REG		0x034
-+#define SUN4I_FRONTEND_TB_OFF2_REG		0x038
-+#define SUN4I_FRONTEND_TB_OFF_X1(x1)			((x1) << 16)
-+#define SUN4I_FRONTEND_TB_OFF_Y0(y0)			((y0) << 8)
-+#define SUN4I_FRONTEND_TB_OFF_X0(x0)			(x0)
++static const uint64_t sun4i_layer_modifiers[] = {
++	DRM_FORMAT_MOD_LINEAR,
++	DRM_FORMAT_MOD_ALLWINNER_TILED,
++	DRM_FORMAT_MOD_INVALID
++};
 +
- #define SUN4I_FRONTEND_LINESTRD0_REG		0x040
- #define SUN4I_FRONTEND_LINESTRD1_REG		0x044
- #define SUN4I_FRONTEND_LINESTRD2_REG		0x048
- 
-+/*
-+ * In tiled mode, the stride is defined as the distance between the start of the
-+ * end line of the current tile and the start of the first line in the next
-+ * vertical tile.
-+ *
-+ * Tiles are represented in row-major order, thus the end line of current tile
-+ * starts at: 31 * 32 (31 lines of 32 cols), the next vertical tile starts at:
-+ * 32-bit-aligned-width * 32 and the distance is:
-+ * 32 * (32-bit-aligned-width - 31).
-+ */
-+#define SUN4I_FRONTEND_LINESTRD_TILED(stride)		(((stride) - 31) * 32)
-+
- #define SUN4I_FRONTEND_INPUT_FMT_REG		0x04c
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PLANAR	(0 << 8)
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PACKED	(1 << 8)
+ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
+ 						struct sun4i_backend *backend,
+ 						enum drm_plane_type type)
+@@ -173,7 +187,7 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
+ 				       &sun4i_backend_layer_funcs,
+ 				       sun4i_layer_formats,
+ 				       ARRAY_SIZE(sun4i_layer_formats),
+-				       NULL, type, NULL);
++				       sun4i_layer_modifiers, type, NULL);
+ 	if (ret) {
+ 		dev_err(drm->dev, "Couldn't initialize layer\n");
+ 		return ERR_PTR(ret);
 -- 
 2.20.1
 
