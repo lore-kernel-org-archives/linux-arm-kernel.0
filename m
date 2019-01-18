@@ -2,65 +2,66 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 80F46C61CE3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 22:21:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 68845C5AE5E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 22:22:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 46F8E20449
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 22:21:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 38DB120449
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 22:22:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uT2wEVK2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 46F8E20449
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sysam.it
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CwuUo8PR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 38DB120449
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kJgjL+Y/+6j064vauND5XqgXo/qj0ypWvaXZPUykotA=; b=uT2wEVK2PW5qz1
-	ehleWtHgLHAHisDKCciYnfw0KrHQ8MSnmB3bJSX40sBv5nO7QpLyrmcelWGvkmBk3g7XKoTMdzDcj
-	VoRYdlnsb7lBDiuvdDMhnkQ0lGO94p08cLix3klb662pAyBcG2vlNH2GCoUe2fy6l2OnPnkfACWs7
-	nYZoyVr3VD47J+Bn1Vd2mDSem0Z+v8exVQkywLKLKjpUdlFIGqWn1pIlpZ/0LqnEjcG97tPQWh9rL
-	zO2nPdYJjFWpQnexQ2NE2/K7oW3c9RHt1WdHauiY5Q3dAph+jPwsVNxYkkRsZj9eHzHtfPMksbFBh
-	3gEj59UI4pf5eh2tE/pg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=cThvZyRjJ8raKyozBnGIRYXU5Rhf0f7SQBqsJj2d+DI=; b=CwuUo8PR5HDUxtwycvEAz2wn+
+	2Pzc+Sehhzptq2Fr+5eP6rh38ZuUxPhgY/mAM6Ojabq2ntkTJPdGWPweOJZfug0XoM2mLD3F+npsk
+	FdGHE63K09OsV+QfeDSM0LtXaNt3D6tFT2Yy9IjF0AGf0XQC9nznJaS+YekcZDvUXL6XuGlLuKYum
+	wYK68vo5H+tPtHGOCUY9F5PcJn2OYLIHCV+0/UBxA9PoMQMKOHzimVgQ9Trk5LmER1m3XQf8wfJ4e
+	Ak7cv8fv1ll40VG/HuzbrL9lPOdPSxYdqqTK9soRIozY2WsJ0nHBOfvWGOba34ZIkxNbNE2CRfnbc
+	hpGj3Rz4g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkcVs-0007HH-7K; Fri, 18 Jan 2019 22:21:20 +0000
-Received: from ec2-18-194-220-216.eu-central-1.compute.amazonaws.com
- ([18.194.220.216] helo=sysam.it)
+	id 1gkcWt-0007aD-Ss; Fri, 18 Jan 2019 22:22:23 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkcVn-0007GK-QE
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 22:21:18 +0000
-Received: from localhost (localhost [127.0.0.1])
- by sysam.it (Postfix) with ESMTP id 07D0621BB7;
- Fri, 18 Jan 2019 21:50:19 +0000 (UTC)
-Received: from sysam.it ([127.0.0.1])
- by localhost (sysam.it [127.0.0.1]) (amavisd-new, port 10024)
- with ESMTP id 9ALgWxC_EC8f; Fri, 18 Jan 2019 21:50:17 +0000 (UTC)
-Received: from jerusalem (host242-223-dynamic.54-82-r.retail.telecomitalia.it
- [82.54.223.242]) by sysam.it (Postfix) with ESMTPSA id C4EF721BB4;
- Fri, 18 Jan 2019 21:50:16 +0000 (UTC)
-Date: Fri, 18 Jan 2019 22:50:16 +0100
-From: Angelo Dureghello <angelo@sysam.it>
-To: Laurentiu Tudor <laurentiu.tudor@nxp.com>
-Subject: Re: [PATCH] dmaengine: fsl-edma: dma map slave device address
-Message-ID: <20190118215015.GA6677@jerusalem>
-References: <20190118100623.13271-1-laurentiu.tudor@nxp.com>
+ id 1gkcWq-0007ZP-Px
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 22:22:22 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id EE51B80D;
+ Fri, 18 Jan 2019 14:22:17 -0800 (PST)
+Received: from [192.168.100.241] (usa-sjc-mx-foss1.foss.arm.com
+ [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 15E893F7BE;
+ Fri, 18 Jan 2019 14:22:17 -0800 (PST)
+Subject: Re: [PATCH v3 0/7] arm64: add system vulnerability sysfs entries
+To: Stefan Wahren <stefan.wahren@i2se.com>, marc.zyngier@arm.com
+References: <20190109235544.2992426-1-jeremy.linton@arm.com>
+ <884332236.499392.1547581848222@email.ionos.de>
+ <c99f5da9-259c-3fc5-6150-7327ba0ff429@arm.com>
+ <575913854.422488.1547834735236@email.ionos.de>
+From: Jeremy Linton <jeremy.linton@arm.com>
+Message-ID: <3af70b49-22e7-f394-1b35-ce3c86640bb7@arm.com>
+Date: Fri, 18 Jan 2019 16:22:16 -0600
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.7.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190118100623.13271-1-laurentiu.tudor@nxp.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <575913854.422488.1547834735236@email.ionos.de>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_142116_673969_B6254D57 
-X-CRM114-Status: GOOD (  20.18  )
+X-CRM114-CacheID: sfid-20190118_142220_849493_F913E3BD 
+X-CRM114-Status: GOOD (  21.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,222 +73,124 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: iommu@lists.linux-foundation.org, linux-kernel@vger.kernel.org,
- vkoul@kernel.org, linux-imx@nxp.com, dmaengine@vger.kernel.org,
- robin.murphy@arm.com, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: mlangsdo@redhat.com, julien.thierry@arm.com, catalin.marinas@arm.com,
+ suzuki.poulose@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ steven.price@arm.com, shankerd@codeaurora.org, ykaukab@suse.de,
+ dave.martin@arm.com, linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Laurentiu,
-
-On Fri, Jan 18, 2019 at 12:06:23PM +0200, Laurentiu Tudor wrote:
-> This mapping needs to be created in order for slave dma transfers
-> to work on systems with SMMU. The implementation mostly mimics the
-> one in pl330 dma driver, authored by Robin Murphy.
+On 01/18/2019 12:05 PM, Stefan Wahren wrote:
+> Hi,
 > 
-> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
-> Suggested-by: Robin Murphy <robin.murphy@arm.com>
-> ---
-> Original approach was to add the missing mappings in the i2c client driver,
-> see here for discussion: https://patchwork.ozlabs.org/patch/1026013/
+>> Jeremy Linton <jeremy.linton@arm.com> hat am 15. Januar 2019 um 22:21 geschrieben:
+>>
+>>
+>> Hi,
+>>
+>> On 01/15/2019 01:50 PM, Stefan Wahren wrote:
+>>> Hi Jeremy,
+>>>
+>>>> Jeremy Linton <jeremy.linton@arm.com> hat am 10. Januar 2019 um 00:55 geschrieben:
+>>>>
+>>>>
+>>>> Arm64 machines should be displaying a human readable
+>>>> vulnerability status to speculative execution attacks in
+>>>> /sys/devices/system/cpu/vulnerabilities
+>>>>
+>>>> This series enables that behavior by providing the expected
+>>>> functions. Those functions expose the cpu errata and feature
+>>>> states, as well as whether firmware is responding appropriately
+>>>> to display the overall machine status. This means that in a
+>>>> heterogeneous machine we will only claim the machine is mitigated
+>>>> or safe if we are confident all booted cores are safe or
+>>>> mitigated.
+>>>>
+>>>
+>>> i applied this v3 series and Marc's v2 series.
+>>>
+>>> Now i'm getting the following on a Raspberry Pi 3 B+ :
+>>>
+>>> meltdown:Not affected
+>>> spec_store_bypass:Not affected
+>>> spectre_v1:Mitigation: __user pointer sanitization
+>>>
+>>> So the entries l1tf and spectre_v2 disappeared.
+>>
+>> Yes, the l1tf entry should be gone.
+>>
+>> I believe there is a problem with the "1/2 advertise.." patch in that
+>> the 'arm64_requested_vuln_attrs |=' line needs to be hoisted  to the top
+>> of check_branch_predictor() and the '__spectrev2_safe = false' line
+>> needs to be hoisted 6 lines immediately above "/* Fallback to firmware
+>> detection*/"
 > 
->  drivers/dma/fsl-edma-common.c | 66 ++++++++++++++++++++++++++++++++---
->  drivers/dma/fsl-edma-common.h |  4 +++
->  drivers/dma/fsl-edma.c        |  1 +
->  drivers/dma/mcf-edma.c        |  1 +
->  4 files changed, 68 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/dma/fsl-edma-common.c b/drivers/dma/fsl-edma-common.c
-> index 8876c4c1bb2c..0e95ee24b6d4 100644
-> --- a/drivers/dma/fsl-edma-common.c
-> +++ b/drivers/dma/fsl-edma-common.c
-> @@ -6,6 +6,7 @@
->  #include <linux/dmapool.h>
->  #include <linux/module.h>
->  #include <linux/slab.h>
-> +#include <linux/dma-mapping.h>
->  
->  #include "fsl-edma-common.h"
->  
-> @@ -173,12 +174,62 @@ int fsl_edma_resume(struct dma_chan *chan)
->  }
->  EXPORT_SYMBOL_GPL(fsl_edma_resume);
->  
-> +static void fsl_edma_unprep_slave_dma(struct fsl_edma_chan *fsl_chan)
-> +{
-> +	if (fsl_chan->dma_dir != DMA_NONE)
-> +		dma_unmap_resource(fsl_chan->vchan.chan.device->dev,
-> +				   fsl_chan->dma_dev_addr,
-> +				   fsl_chan->dma_dev_size,
-> +				   fsl_chan->dma_dir, 0);
-> +	fsl_chan->dma_dir = DMA_NONE;
-> +}
-> +
-> +static bool fsl_edma_prep_slave_dma(struct fsl_edma_chan *fsl_chan,
-> +				    enum dma_transfer_direction dir)
-> +{
-> +	struct device *dev = fsl_chan->vchan.chan.device->dev;
-> +	enum dma_data_direction dma_dir;
-> +	phys_addr_t addr = 0;
-> +	u32 size = 0;
-> +
-> +	switch (dir) {
-> +	case DMA_MEM_TO_DEV:
-> +		dma_dir = DMA_FROM_DEVICE;
-> +		addr = fsl_chan->cfg.dst_addr;
-> +		size = fsl_chan->cfg.dst_maxburst;
-> +		break;
-> +	case DMA_DEV_TO_MEM:
-> +		dma_dir = DMA_TO_DEVICE;
-> +		addr = fsl_chan->cfg.src_addr;
-> +		size = fsl_chan->cfg.src_maxburst;
-> +		break;
-> +	default:
-> +		dma_dir = DMA_NONE;
-> +		break;
-> +	}
-> +
-> +	/* Already mapped for this config? */
-> +	if (fsl_chan->dma_dir == dma_dir)
-> +		return true;
-> +
-> +	fsl_edma_unprep_slave_dma(fsl_chan);
-> +
-> +	fsl_chan->dma_dev_addr = dma_map_resource(dev, addr, size, dma_dir, 0);
-> +	if (dma_mapping_error(dev, fsl_chan->dma_dev_addr))
-> +		return false;
-> +	fsl_chan->dma_dev_size = size;
-> +	fsl_chan->dma_dir = dma_dir;
-> +
-> +	return true;
-> +}
-> +
->  int fsl_edma_slave_config(struct dma_chan *chan,
->  				 struct dma_slave_config *cfg)
->  {
->  	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
->  
->  	memcpy(&fsl_chan->cfg, cfg, sizeof(*cfg));
-> +	fsl_edma_unprep_slave_dma(fsl_chan);
->  
->  	return 0;
->  }
-> @@ -378,6 +429,9 @@ struct dma_async_tx_descriptor *fsl_edma_prep_dma_cyclic(
->  	if (!is_slave_direction(direction))
->  		return NULL;
->  
-> +	if (!fsl_edma_prep_slave_dma(fsl_chan, direction))
-> +		return NULL;
-> +
->  	sg_len = buf_len / period_len;
->  	fsl_desc = fsl_edma_alloc_desc(fsl_chan, sg_len);
->  	if (!fsl_desc)
-> @@ -409,11 +463,11 @@ struct dma_async_tx_descriptor *fsl_edma_prep_dma_cyclic(
->  
->  		if (direction == DMA_MEM_TO_DEV) {
->  			src_addr = dma_buf_next;
-> -			dst_addr = fsl_chan->cfg.dst_addr;
-> +			dst_addr = fsl_chan->dma_dev_addr;
->  			soff = fsl_chan->cfg.dst_addr_width;
->  			doff = 0;
->  		} else {
-> -			src_addr = fsl_chan->cfg.src_addr;
-> +			src_addr = fsl_chan->dma_dev_addr;
->  			dst_addr = dma_buf_next;
->  			soff = 0;
->  			doff = fsl_chan->cfg.src_addr_width;
-> @@ -444,6 +498,9 @@ struct dma_async_tx_descriptor *fsl_edma_prep_slave_sg(
->  	if (!is_slave_direction(direction))
->  		return NULL;
->  
-> +	if (!fsl_edma_prep_slave_dma(fsl_chan, direction))
-> +		return NULL;
-> +
->  	fsl_desc = fsl_edma_alloc_desc(fsl_chan, sg_len);
->  	if (!fsl_desc)
->  		return NULL;
-> @@ -468,11 +525,11 @@ struct dma_async_tx_descriptor *fsl_edma_prep_slave_sg(
->  
->  		if (direction == DMA_MEM_TO_DEV) {
->  			src_addr = sg_dma_address(sg);
-> -			dst_addr = fsl_chan->cfg.dst_addr;
-> +			dst_addr = fsl_chan->dma_dev_addr;
->  			soff = fsl_chan->cfg.dst_addr_width;
->  			doff = 0;
->  		} else {
-> -			src_addr = fsl_chan->cfg.src_addr;
-> +			src_addr = fsl_chan->dma_dev_addr;
->  			dst_addr = sg_dma_address(sg);
->  			soff = 0;
->  			doff = fsl_chan->cfg.src_addr_width;
-> @@ -555,6 +612,7 @@ void fsl_edma_free_chan_resources(struct dma_chan *chan)
->  	fsl_edma_chan_mux(fsl_chan, 0, false);
->  	fsl_chan->edesc = NULL;
->  	vchan_get_all_descriptors(&fsl_chan->vchan, &head);
-> +	fsl_edma_unprep_slave_dma(fsl_chan);
->  	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
->  
->  	vchan_dma_desc_free_list(&fsl_chan->vchan, &head);
-> diff --git a/drivers/dma/fsl-edma-common.h b/drivers/dma/fsl-edma-common.h
-> index 8917e8865959..b435d8e1e3a1 100644
-> --- a/drivers/dma/fsl-edma-common.h
-> +++ b/drivers/dma/fsl-edma-common.h
-> @@ -6,6 +6,7 @@
->  #ifndef _FSL_EDMA_COMMON_H_
->  #define _FSL_EDMA_COMMON_H_
->  
-> +#include <linux/dma-direction.h>
->  #include "virt-dma.h"
->  
->  #define EDMA_CR_EDBG		BIT(1)
-> @@ -120,6 +121,9 @@ struct fsl_edma_chan {
->  	struct dma_slave_config		cfg;
->  	u32				attr;
->  	struct dma_pool			*tcd_pool;
-> +	dma_addr_t			dma_dev_addr;
-> +	u32				dma_dev_size;
-> +	enum dma_data_direction		dma_dir;
->  };
->  
->  struct fsl_edma_desc {
-> diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
-> index 34d70112fcc9..75e8a7ba3a22 100644
-> --- a/drivers/dma/fsl-edma.c
-> +++ b/drivers/dma/fsl-edma.c
-> @@ -254,6 +254,7 @@ static int fsl_edma_probe(struct platform_device *pdev)
->  		fsl_chan->pm_state = RUNNING;
->  		fsl_chan->slave_id = 0;
->  		fsl_chan->idle = true;
-> +		fsl_chan->dma_dir = DMA_NONE;
->  		fsl_chan->vchan.desc_free = fsl_edma_free_desc;
->  		vchan_init(&fsl_chan->vchan, &fsl_edma->dma_dev);
->  
-> diff --git a/drivers/dma/mcf-edma.c b/drivers/dma/mcf-edma.c
-> index 5de1b07eddff..7de54b2fafdb 100644
-> --- a/drivers/dma/mcf-edma.c
-> +++ b/drivers/dma/mcf-edma.c
-> @@ -214,6 +214,7 @@ static int mcf_edma_probe(struct platform_device *pdev)
->  		mcf_chan->edma = mcf_edma;
->  		mcf_chan->slave_id = i;
->  		mcf_chan->idle = true;
-> +		mcf_chan->dma_dir = DMA_NONE;
->  		mcf_chan->vchan.desc_free = fsl_edma_free_desc;
->  		vchan_init(&mcf_chan->vchan, &mcf_edma->dma_dev);
->  		iowrite32(0x0, &regs->tcd[i].csr);
-> -- 
-> 2.17.1
-> 
+> a snippet or a new version would be nice
 
-I tested this patch on:
+Sure, I've got another version, to be posted soon (probably Tue of next 
+week).
 
-- Vybrid VF50N (Toradex Colibri VF50)
-- ColdFire mcf54415 (Sysam stmark2 board)
+In the meantime, Marc's tree should work with the following fix:
 
-and dma still works properly.
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index b44f87e7360d..7cfd34b2c0e5 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -286,11 +286,15 @@ static int detect_harden_bp_fw(void)
+  }
+  #endif /* CONFIG_HARDEN_BRANCH_PREDICTOR */
 
-Tested-by: Angelo Dureghello <angelo@sysam.it>
++#if defined(CONFIG_ARM64_SSBD) || \
++       defined(CONFIG_GENERIC_CPU_VULNERABILITIES)
++static bool __ssb_safe = true;
++#endif
++
+  #ifdef CONFIG_ARM64_SSBD
+  DEFINE_PER_CPU_READ_MOSTLY(u64, arm64_ssbd_callback_required);
+
+  int ssbd_state __read_mostly = ARM64_SSBD_KERNEL;
+-static bool __ssb_safe = true;
+
+  static const struct ssbd_options {
+         const char      *str;
+@@ -569,6 +573,8 @@ check_branch_predictor(const struct 
+arm64_cpu_capabilities *entry, int scope)
+
+         WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
+
++       arm64_requested_vuln_attrs |= VULN_SPECTREV2;
++
+         /* If the CPU has CSV2 set, we're safe */
+         if 
+(cpuid_feature_extract_unsigned_field(read_cpuid(ID_AA64PFR0_EL1),
+                                                  ID_AA64PFR0_CSV2_SHIFT))
+@@ -578,17 +584,17 @@ check_branch_predictor(const struct 
+arm64_cpu_capabilities *entry, int scope)
+         if (is_midr_in_range_list(read_cpuid_id(), spectre_v2_safe_list))
+                 return false;
+
++       __spectrev2_safe = false;
++
+         /* Fallback to firmware detection */
+         need_wa = detect_harden_bp_fw();
+         if (!need_wa)
+                 return false;
+
+-       __spectrev2_safe = false;
+-
+         if (need_wa < 0)
+                 pr_warn_once("ARM_SMCCC_ARCH_WORKAROUND_1 missing from 
+firmware\n");
+
+-       arm64_requested_vuln_attrs |= VULN_SPECTREV2;
++
+
+         return (need_wa > 0);
+  }
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
