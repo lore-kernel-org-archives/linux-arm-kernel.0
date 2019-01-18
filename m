@@ -2,101 +2,82 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E4536C43444
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 05:14:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9887EC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 05:44:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A894C2087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 05:14:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 67FF920883
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 05:44:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ukkl/+iz";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=aj.id.au header.i=@aj.id.au header.b="RXYp9C+J";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=messagingengine.com header.i=@messagingengine.com header.b="dD30X1VT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A894C2087E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=aj.id.au
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QtVSxt1C";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=broadcom.com header.i=@broadcom.com header.b="SXS6zvSg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 67FF920883
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=broadcom.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:Date:In-Reply-To:Subject:
-	MIME-Version:To:From:Message-Id:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hOp61kabVxNYPIb+KoNCciDQJ3auBTvClOa4mupekmk=; b=Ukkl/+izmPRsIq
-	P/gaO8TI0eL3ZCkrPd0T6R8q5kMVzt6am0vazG6IMH5felszkSU7/Kka3VoNxpVqxrfD8UbmwlFUM
-	v54JW5ta9n4aBn+NZ0rw8/nBxLGu6s5voBKjTxcy1AQzRVazNGxJHupF1B5kzPbtDClw3e4Zblu8w
-	Zek/5qfh9nTJxytM92G7RQZ5XVeOZB4xLRo/6Dcu5BTh2jBNHnior05gUCYXBO2Deu12TJrmPQmzP
-	z/SNSpR+pIwJoHqdGivmOM7XfJMQqVO1CTOzy3eSvjqXlHneEkaX+UK44pI5qk15b3yCE1NaZdV/c
-	s+udSzr9JN7qyHtE/dNA==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=mruYmF2vDquEE3ggEeXFNTjopKlJAENeOdsRXHWaqWI=; b=QtV
+	Sxt1C+jNV4ZcKWpYiOOCEmVtb82l4yMPjhrous3bceokRpXMrd/WZ1gOVLu3B+8OZRz4gkYqZaf7B
+	qnFsI/Wp01H0dS1As/jul1eDDckciv+nhdOJ10RLPPuDIenivUBitlikfSnS9PcDw5hi9QrBW5zG0
+	ySAi7Tug582icIzWHINb2HXvdPOOP2fQyahFKeMUKXsZh45U8zBF1hgOrdxT2MAZzt0kB+BJF+1da
+	gSBipGCtDxQ0Z0rdfOW57V1InqBzq+/v9LU06ZW9DwjSVrcUsOEg/viePmVE/+1HXmHxiEJp1nRQs
+	yoA5/w1rJ+g3jDdugBg21/F0BrEen7A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkMTf-000368-UY; Fri, 18 Jan 2019 05:13:59 +0000
-Received: from out5-smtp.messagingengine.com ([66.111.4.29])
+	id 1gkMx6-0004ON-N1; Fri, 18 Jan 2019 05:44:24 +0000
+Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkMTd-00035l-9m
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 05:13:58 +0000
-Received: from compute4.internal (compute4.nyi.internal [10.202.2.44])
- by mailout.nyi.internal (Postfix) with ESMTP id 203C9259AB;
- Fri, 18 Jan 2019 00:13:56 -0500 (EST)
-Received: from web6 ([10.202.2.216])
- by compute4.internal (MEProxy); Fri, 18 Jan 2019 00:13:56 -0500
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=aj.id.au; h=
- message-id:from:to:cc:mime-version:content-transfer-encoding
- :content-type:subject:in-reply-to:date:references; s=fm1; bh=B/7
- CgNU5s94c/1EaCMbOA6ixXBS4qhF3PsyR2LzWL7U=; b=RXYp9C+JP0uTj8++2Jb
- 4LKF4XSlvTbaEQv5YKVWnBb3omf7yyLCQ77YAb9MnaTIgev9OvA4cnpgkychacMY
- 3t0bmkdmvrUEOmUMn7t8qxogxn+N5GSY3YMpfjSsbDVnxzcA1GhslF2lOwP4nrao
- nCf0bhlBio1N3H7AgEzn7xqSyGQmVlPnPqKmSIeXGxTE8sAa6FRHJQ3EGwD6ir/f
- u+YqUX4Tn0rAw1Q821ChyTgLvjDQprcwxdlEqRWTHjx+hi3IH0UtMyF4OdOrL72c
- ErXk2BFUvno7PbIF1v735K42KiFhfhxHRTWkCczqSVc/ViC3RPWAxYsO1FcncV6/
- b0A==
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=
- messagingengine.com; h=cc:content-transfer-encoding:content-type
- :date:from:in-reply-to:message-id:mime-version:references
- :subject:to:x-me-proxy:x-me-proxy:x-me-sender:x-me-sender
- :x-sasl-enc; s=fm1; bh=B/7CgNU5s94c/1EaCMbOA6ixXBS4qhF3PsyR2LzWL
- 7U=; b=dD30X1VT7T5ZAuVN0Tn16AbaFIdglCogLoTOOecOPEQfx1c++628p9Ota
- nG/4pTXkcOCW7g1HOF6LlW3ItiphvY5Vwbl/fW5FtnDasZWakK8nTPi6Ji7nTlqW
- 5WiNudaGD/omXspAvh2BZUIIeBVE4U88U4DYIHT2/5C5h9hEwlXdrMViDbDRL/dL
- WEChh6FO1J6IBkmCMDJgSApeqIXqNELwe53ftVs6wPGvP3p0cBwMo/vL0Qra3AbG
- ebzA07bTkGd9ZvXtSz9nYMCAAuEFzBGOpNMe5LvUbkt48DYr8CF2iAYELNZzDWbX
- D8msEMekwHWjC3MGzehOzYMDVwbGg==
-X-ME-Sender: <xms:k2BBXHkGVzJQL260bklIiKfXWg-EvPpLsptRckMK3lqRfzEp54W_sg>
-X-ME-Proxy-Cause: gggruggvucftvghtrhhoucdtuddrgedtledrgeelgdejjecutefuodetggdotefrodftvf
- curfhrohhfihhlvgemucfhrghsthforghilhdpqfhuthenuceurghilhhouhhtmecufedt
- tdenucesvcftvggtihhpihgvnhhtshculddquddttddmnecujfgurhepkffhvfgggfgtof
- fujgfffhesthejredtredtjeenucfhrhhomheptehnughrvgifucflvghffhgvrhihuceo
- rghnughrvgifsegrjhdrihgurdgruheqnecurfgrrhgrmhepmhgrihhlfhhrohhmpegrnh
- gurhgvfiesrghjrdhiugdrrghunecuvehluhhsthgvrhfuihiivgeptd
-X-ME-Proxy: <xmx:k2BBXPFsjyVZ5P7AMBaVKleEO89bZMHupub_Nis--mKK7Y0ntK7m6g>
- <xmx:k2BBXIrVyAenT_Udlkfe3mzynKmp8JtZPGndmgyMvUqLzr4Hb4fdDg>
- <xmx:k2BBXD7xk1aEGteMZ4WCXMTYJtbG2OlVAz_x5uGefYNkkz7qJRs7ag>
- <xmx:lGBBXKXLjrfQlxyzi0UonxsoVzJ9A4OvZ9DanZWXvwTjdt7zbMBERA>
-Received: by mailuser.nyi.internal (Postfix, from userid 99)
- id C148B429B; Fri, 18 Jan 2019 00:13:54 -0500 (EST)
-Message-Id: <1547788434.2065387.1637728584.1098F843@webmail.messagingengine.com>
-From: Andrew Jeffery <andrew@aj.id.au>
-To: Stefan Schaeckeler <schaecsn@gmx.net>, Rob Herring <robh+dt@kernel.org>,
- Mark Rutland <mark.rutland@arm.com>, Joel Stanley <joel@jms.id.au>,
- Borislav Petkov <bp@alien8.de>,
- Mauro Carvalho Chehab <mchehab@kernel.org>, linux-kernel@vger.kernel.org,
- devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-aspeed@lists.ozlabs.org, linux-edac@vger.kernel.org
-MIME-Version: 1.0
-X-Mailer: MessagingEngine.com Webmail Interface - ajax-36e4bfd3
-Subject: Re: [PATCH v2 2/2] dt-bindings: edac: Aspeed AST2500
-In-Reply-To: <1547743097-5236-3-git-send-email-schaecsn@gmx.net>
-Date: Fri, 18 Jan 2019 15:43:54 +1030
-References: <1547743097-5236-1-git-send-email-schaecsn@gmx.net>
- <1547743097-5236-3-git-send-email-schaecsn@gmx.net>
+ id 1gkMx3-0004Ng-Di
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 05:44:22 +0000
+Received: by mail-pf1-x441.google.com with SMTP id r136so6018336pfc.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 17 Jan 2019 21:44:18 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=broadcom.com; s=google;
+ h=from:to:cc:subject:date:message-id;
+ bh=1GHCrIH/zhKjvR57yQojViA6vvVSllVOfQJXVhcIPV8=;
+ b=SXS6zvSgz61eGAv+AUSQPQ6wGd+cifI1ReG8IIAjkcfzVHY/3CovtB/8eydebQ4gIt
+ zSmEDiZIqGQpIePtIG19FbT36ChW54ES9DRZYdohs7GSnjD94HVMlmucXef3izKcnWI8
+ wTzAocoVkZC88/FlTk2jgcE8vDUqnsZenLBoM=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=1GHCrIH/zhKjvR57yQojViA6vvVSllVOfQJXVhcIPV8=;
+ b=ocKanfG801R19rMxMErHD3nKN1YZUWAuYfP02adUysl9VtkCU/XGaFDVIQ7H5ClCZY
+ MBbvyZ9q7YFn1H992Oea499QePAELhLpXDAgmyIDbMQj+H3Ys77+izpPjEese+jBmUfT
+ xSDKyPLiL70hWkqtG69/qHdDefxrm1FBDkzC95sh9/o4S/uHakUToNlGZ+ofe91GqzFp
+ 88cUjmiVMRcMIu4E0XQyk3aN/3eP8+UmaKTGcE1i2zuIHbo2bBiAQ+Yvcrcx2KgOpduI
+ 4I9GXwn7avFLIxbsXvhfgNVo+KPCBfLB9jLRIJXlOAYbvvzQMcMetTxsOHjv8CVmAHip
+ lAEg==
+X-Gm-Message-State: AJcUukeiZN0JuT2DoxtzzDD7dIYxfelxINqndUX0VK5RSqZTHYTnchYL
+ eiTpnOKNNUg90xZYbP/8NAd25A==
+X-Google-Smtp-Source: ALg8bN49T6bfJ1cB6jKb8O0W5gsSDGCPeYkKhTQ8bC3uZz/f6qYeJnrPPuAyBV86a9zR6czQAf8k5Q==
+X-Received: by 2002:a63:68c4:: with SMTP id d187mr16071423pgc.11.1547790257873; 
+ Thu, 17 Jan 2019 21:44:17 -0800 (PST)
+Received: from pramodku-OptiPlex-7010.dhcp.broadcom.net ([192.19.234.250])
+ by smtp.gmail.com with ESMTPSA id 202sm4537444pfy.87.2019.01.17.21.44.14
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Thu, 17 Jan 2019 21:44:17 -0800 (PST)
+From: Pramod Kumar <pramod.kumar@broadcom.com>
+To: Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>
+Subject: [PATCH INTERNAL RFC 1/1] arm64: Use PSCI calls for CPU stop when
+ hotplug is supported
+Date: Fri, 18 Jan 2019 11:15:00 +0530
+Message-Id: <1547790300-6190-1-git-send-email-pramod.kumar@broadcom.com>
+X-Mailer: git-send-email 1.9.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190117_211357_479563_562F8C96 
-X-CRM114-Status: GOOD (  14.36  )
+X-CRM114-CacheID: sfid-20190117_214421_466213_8AE1D970 
+X-CRM114-Status: GOOD (  10.73  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,65 +89,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Stefan M Schaeckeler <sschaeck@cisco.com>
+Cc: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh@kernel.org>,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Suzuki K Poulose <Suzuki.Poulose@arm.com>, Steve Capper <steve.capper@arm.com>,
+ linux-kernel@vger.kernel.org, Pramod Kumar <pramod.kumar@broadcom.com>,
+ BCM Kernel Feedback <bcm-kernel-feedback-list@broadcom.com>,
+ Sudeep Holla <sudeep.holla@arm.com>, Dave Martin <dave.martin@arm.com>,
+ linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 18 Jan 2019, at 03:08, Stefan Schaeckeler wrote:
-> From: Stefan M Schaeckeler <sschaeck@cisco.com>
-> 
-> Add support for EDAC on the Aspeed AST2500 SoC.
-> 
-> Signed-off-by: Stefan M Schaeckeler <sschaeck@cisco.com>
+If CPU hotplug is supported, ipi_cpu_stop should use PSCI cpudie
+call to stop the CPU. This call ensures L1/L2 cache flush,
+CPUs cache-cohenrecy setting w.r.to interconnect.
 
-Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
+Apart from this, this gives control to f/w to reduce power consumption
+by take appropriate decesion on power rails for plugging-out core.
 
-> ---
->  .../bindings/edac/aspeed-sdram-edac.txt       | 25 +++++++++++++++++++
->  1 file changed, 25 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/edac/aspeed-sdram-edac.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/edac/aspeed-sdram-
-> edac.txt b/Documentation/devicetree/bindings/edac/aspeed-sdram-edac.txt
-> new file mode 100644
-> index 000000000000..6a0f3d90d682
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/edac/aspeed-sdram-edac.txt
-> @@ -0,0 +1,25 @@
-> +Aspeed AST2500 SoC EDAC node
-> +
-> +The Aspeed AST2500 SoC supports DDR3 and DDR4 memory with and without 
-> ECC (error
-> +correction check).
-> +
-> +The memory controller supports SECDED (single bit error correction, 
-> double bit
-> +error detection) and single bit error auto scrubbing by reserving 8 
-> bits for
-> +every 64 bit word (effectively reducing available memory to 8/9).
-> +
-> +Note, the bootloader must configure ECC mode in the memory controller.
-> +
-> +
-> +Required properties:
-> +- compatible: should be "aspeed,ast2500-sdram-edac"
-> +- reg:        sdram controller register set should be <0x1e6e0000 
-> 0x174>
-> +- interrupts: should be AVIC interrupt #0
-> +
-> +
-> +Example:
-> +
-> +	edac: sdram@1e6e0000 {
-> +		compatible = "aspeed,ast2500-sdram-edac";
-> +		reg = <0x1e6e0000 0x174>;
-> +		interrupts = <0>;
-> +	};
-> -- 
-> 2.19.1
-> 
+Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+---
+ arch/arm64/kernel/smp.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 1598d6f..360e52b 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -822,8 +822,13 @@ static void ipi_cpu_stop(unsigned int cpu)
+ 	local_daif_mask();
+ 	sdei_mask_local_cpu();
+ 
++#ifdef CONFIG_HOTPLUG_CPU
++	if (cpu_ops[cpu]->cpu_die)
++		cpu_ops[cpu]->cpu_die(cpu);
++#else
+ 	while (1)
+ 		cpu_relax();
++#endif
+ }
+ 
+ #ifdef CONFIG_KEXEC_CORE
+-- 
+1.9.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
