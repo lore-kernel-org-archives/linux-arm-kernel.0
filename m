@@ -2,92 +2,114 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 30DE5C07EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 17:59:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 307C5C07EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 18:02:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0740C20896
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 17:59:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0350120850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 18:02:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Tqmh3DQS";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="GTAvFPi0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0740C20896
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AjAOcV+E";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=wavesemi.onmicrosoft.com header.i=@wavesemi.onmicrosoft.com header.b="JvNQZwf6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0350120850
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mips.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mrrQhOkpSWdcvC5PvoQqap9TywQG3kion48rK2FuYGQ=; b=Tqmh3DQSZk+npa
-	x/IVosubSbQm3Vd+MCZ95QkzNTXoDa1D7cf/M6yYKz2vK3NWfEzV3pLPNVLiDD5UEo7yaiRM8b3IG
-	7AuQOgE3BugGAGrrk7+NPX9Dfl8LZEPOx0D0rhbkY93lx02pu0t+CzwKMxs7YZTRZqPZ+gmMKmgL0
-	pzbzDE0moU2qa0zr4HywIKFuk2yCNbOe1bBUKVAFv4rRspuBkZsomPNCqNt4GRQ7RHk2Vl90DfX84
-	wzVLG5d0SlIloY+stmvp6Arw1SYavCytJGW8s4fVjjCZ1246qK/PumdW/W0aDa0N2pgU2SjQ6Hiwd
-	DPncs67O0iViw69MtLog==;
+	List-Owner; bh=ho62IyT8VsftadFS40wngApEgMA3VEp+nEYF1t0eWU0=; b=AjAOcV+EDJlMBP
+	RLwKMDexLk6nvj5Dksgun84RX7AM5azHIZWGD8AYovgMJrggNzFP4q7piLJsQqb8lO7s7C80F5uHd
+	+uQBxLIZMK9aOJ72zGa67irLpIKhKtVpWBLqykaqkw9nOctBM576iuUFEZ7akJpoi3s1IY2YqOXmv
+	XEPq3h9Qq2ZIG5XbCqiLbcCR875ojqlTe39ZbjOE8fBioaEtttfxxaeg+A8YbpdLDxu8Zby0iqgRe
+	CoZ6J9eC5k38/i9Dxve7sea8nPXPChsJM8o4H5kQtiwe9fQz6ySg+k9I/cgeS37LsWLZapFaL9uyE
+	Q0BW4L514rmp1tuLNN5w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkYQ2-00038z-TW; Fri, 18 Jan 2019 17:59:02 +0000
-Received: from mail-ua1-x941.google.com ([2607:f8b0:4864:20::941])
+	id 1gkYT5-0004mB-GD; Fri, 18 Jan 2019 18:02:11 +0000
+Received: from mail-eopbgr810109.outbound.protection.outlook.com
+ ([40.107.81.109] helo=NAM01-BY2-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkYPs-0002wt-Fz
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 17:58:59 +0000
-Received: by mail-ua1-x941.google.com with SMTP id t8so4981472uap.0
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 18 Jan 2019 09:58:49 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=bbCm6Mjj+UOtI0js0KK3dAUMBdnMCn4ezggwRW382+A=;
- b=GTAvFPi0ABVBqlEqD+0tLwUNpHh+hRPu/bBtIH2iMnc6AuTFMqNT6ObwbTHVnvWnK9
- RV5X4xZ6OgzTcAOOvRAsR/0wU3IS31Q/XKNvMBcP40bM4m71a0HYqsu86iW5y6w24F3Q
- 9QEhpF6KtOCZgkSKune1Jb+APVU1/5ycTrcAo=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=bbCm6Mjj+UOtI0js0KK3dAUMBdnMCn4ezggwRW382+A=;
- b=adC09NFrtNKFR1BUFW5hBWGorutiJhA39ZWVVKweSvSe3szn4FLB2GeVoPWA4I3J5P
- pQqGd6yhdiyyTIRSCIihDhhVKgmDs0YtrOphPLTSE6XAXpy/g1NQY+ux5dO7I2hWFHPz
- 4S7CBZ1XMnXQgE0uvrkbn/4xb1bT9zhgzk9ytGl2gq5kMRn03EjhSusjLrSQrxkl2qnw
- AOgznqiWxARN6DnHGrE2EPYRM+rTFgflKw8Y27ZLDwFKJxXyA5r9WXtoXFKxh3/28zFN
- Iqwhk5xdXeVutbEnTkFcfcNSBexzgTo33w1GD3UYavFgTcuauP9c3YqpLx8xZ5aUOl1W
- jvJw==
-X-Gm-Message-State: AJcUukcsoDhvUWWQPamfRuky3F74QpZcmjYxO2p9ol1qJH8GdZzIhuFA
- /DqYpvIpdsdMIUcSY0bgs0/jNFEAPnY=
-X-Google-Smtp-Source: ALg8bN4GsjecaYBFWDd5u5khHkzMkLlxGflEdNoKh020D0PsrxZOyAsWNoGwJBxe+XjVsICrvr/dVw==
-X-Received: by 2002:ab0:2a01:: with SMTP id o1mr7943816uar.121.1547834328454; 
- Fri, 18 Jan 2019 09:58:48 -0800 (PST)
-Received: from mail-vs1-f41.google.com (mail-vs1-f41.google.com.
- [209.85.217.41])
- by smtp.gmail.com with ESMTPSA id x20sm10004897uan.12.2019.01.18.09.58.47
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 18 Jan 2019 09:58:47 -0800 (PST)
-Received: by mail-vs1-f41.google.com with SMTP id t17so8916058vsc.8
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 18 Jan 2019 09:58:47 -0800 (PST)
-X-Received: by 2002:a67:efd1:: with SMTP id s17mr8491468vsp.119.1547834326871; 
- Fri, 18 Jan 2019 09:58:46 -0800 (PST)
+ id 1gkYT1-0004lc-Lk; Fri, 18 Jan 2019 18:02:09 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=wavesemi.onmicrosoft.com; s=selector1-wavecomp-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=M5NWazDTmeGYAYdRDVqWTFJDL8Hi++4oaTpYIJrLhak=;
+ b=JvNQZwf6URSu8rSIpz4mfhxqinA373rumfuPVzkqDKb28e2NPsQhKrDMuZR+CudTS3so8H9dmDxaWHv8otgLgpbSLa/qLXHGqlPsw/4DucTnHdVfc6YQhAzlKe66lfOTwaQ6/ILUincSBi0BCEBm0mw8n/8NIvswildvha7dStI=
+Received: from MWHPR2201MB1277.namprd22.prod.outlook.com (10.174.162.17) by
+ MWHPR2201MB1039.namprd22.prod.outlook.com (10.174.167.28) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1537.27; Fri, 18 Jan 2019 18:02:03 +0000
+Received: from MWHPR2201MB1277.namprd22.prod.outlook.com
+ ([fe80::595e:ffcc:435b:9110]) by MWHPR2201MB1277.namprd22.prod.outlook.com
+ ([fe80::595e:ffcc:435b:9110%4]) with mapi id 15.20.1537.018; Fri, 18 Jan 2019
+ 18:02:03 +0000
+From: Paul Burton <paul.burton@mips.com>
+To: Mike Rapoport <rppt@linux.ibm.com>
+Subject: Re: [PATCH 19/21] treewide: add checks for the return value of
+ memblock_alloc*()
+Thread-Topic: [PATCH 19/21] treewide: add checks for the return value of
+ memblock_alloc*()
+Thread-Index: AQHUraHd8jRLB7x3YEeU6EKybqgDLKW1VI6A
+Date: Fri, 18 Jan 2019 18:02:03 +0000
+Message-ID: <20190118180201.uva5nhf2g23uamkn@pburton-laptop>
+References: <1547646261-32535-1-git-send-email-rppt@linux.ibm.com>
+ <1547646261-32535-20-git-send-email-rppt@linux.ibm.com>
+In-Reply-To: <1547646261-32535-20-git-send-email-rppt@linux.ibm.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: MWHPR17CA0069.namprd17.prod.outlook.com
+ (2603:10b6:300:93::31) To MWHPR2201MB1277.namprd22.prod.outlook.com
+ (2603:10b6:301:24::17)
+user-agent: NeoMutt/20180716
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=pburton@wavecomp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [67.207.99.198]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; MWHPR2201MB1039;
+ 6:eg8jrLQMI9BOqMPMBOvVQtsnp7IiFlJhkWuQkSM4lOXplOC6jGV0iw0ey+aOodRQK+FaoMV61ipPC3ZuUloRY+aWk9apMzvf/IlCGsaM3SrUhIYk1lRxFC5YGT2j6MLQvfxcdlatSTHM3fflmSxOOSoXzeWODZhi5c65cnCmOFRiV+DYeVulQqHLirdvWhL7WUk//L5vRTsDuENvDjZAZL4ytfVMbTlvcAvD2wNNZZHaiYr4r0iqxzgD6BiDYMiXSary8ZklIhydZaDqdNOEhmzjZ6PKT0gYTDjLYjq85FHDoO8DSqo1aLBUXb6S70vTR2BQLVmqdXKYSFw0arHgYcJi4ErN6dqZvavfr/yQI+6TjVWfvVSTEaxbE0w3oPh+9opM5GpEQdGrYnav2RRtEs66eGHohRMJs//QJF3VZdNUMOgwlcEGZnaUYiP+7p4kpxMCeutK6QDA4cM01HLERA==;
+ 5:V4uHkcsFXpdbjZ8TpiP4mG8ngHygafY+qapdBlYEX1jQ2PuNXYWuq1zVSTnxv8IXfTtu68aebzZglc1I2i1j08cR2IwzWql5jSF2VzkqZF/ZZioWwdUK+h/irxKQS19UKX9vaSKzki9iS5FJdYDj7V5SOuqtsV2R9D9i6XxQUA3T2ZNsWnJ0IqCrSewQLhpVDf7pSCU4NWt465FHC8Z3aQ==;
+ 7:9zSUn2KF4Lz9GDZ4fXiDBrkc2+BlNu5pVDiM8UtW8Oac51/eCbXL+kdsIvOeoUGytRe/ADQb9QDErl9DPxpmJH6jJRJRVCyCIGV9sX4looGK3W8fJWnsKa0QCKv5bUx7vPCD3xJidJ7QW7pX13WRsA==
+x-ms-office365-filtering-correlation-id: 096921e6-6149-4482-5a4f-08d67d6f0cb9
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(2017052603328)(7153060)(7193020);
+ SRVR:MWHPR2201MB1039; 
+x-ms-traffictypediagnostic: MWHPR2201MB1039:
+x-microsoft-antispam-prvs: <MWHPR2201MB10394CAEBE094B6FA9F41410C19C0@MWHPR2201MB1039.namprd22.prod.outlook.com>
+x-forefront-prvs: 0921D55E4F
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10019020)(7916004)(39840400004)(396003)(376002)(136003)(346002)(366004)(189003)(199004)(3846002)(66066001)(478600001)(52116002)(71200400001)(71190400001)(76176011)(7736002)(305945005)(1076003)(102836004)(186003)(26005)(256004)(42882007)(111086002)(81166006)(25786009)(11346002)(446003)(6916009)(8676002)(81156014)(476003)(8936002)(6486002)(6436002)(105586002)(6246003)(6512007)(33716001)(106356001)(7406005)(7416002)(54906003)(58126008)(229853002)(486006)(44832011)(6506007)(99286004)(5660300001)(33896004)(316002)(2906002)(97736004)(53936002)(14454004)(386003)(68736007)(39060400002)(4326008)(6116002)(9686003);
+ DIR:OUT; SFP:1102; SCL:1; SRVR:MWHPR2201MB1039;
+ H:MWHPR2201MB1277.namprd22.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: wavecomp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: uw3MyYOEWlVwYdAqkG3cRBimsfyCI9GHacSbNASN7RklAm2TDFzqUZpxBz/lDepbY4Z1DDMInYrofktkmPhY5svckQhV/fqfEg1zbLbaqIeZUOKKkbzw1QPdpiX3kI281LhhTgTcOZmD8+XOOJHix13XfFbIHtZoI2gtZ/XKEOxICcZZnajhWZSTr6m1FySawt8j8pjlu4QaHaV8cf+kUjc+LNAGYHgSVsZ0awnYgiEkfP6SiODy1TVnuJzdut7Sq7UXRahsqYQWpsjUBcCJeO4J0mKrXT1XvR9SxYUpppKD95LLHaI7r+AQ96JQAYui16Hp50Q648XWFOIirOPboVejYiv4/U4azmNVbEAYbL/d71jS42Y7zTPZQ6EQ5gk9lPrHDzBr9DYCl+15YEkp84bisGlEdNHsixF8mIIBieQ=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+Content-ID: <8AB5FF9934BD5A4E822E85B3C315428B@namprd22.prod.outlook.com>
 MIME-Version: 1.0
-References: <20190109065922.231753-1-hsinyi@chromium.org>
-In-Reply-To: <20190109065922.231753-1-hsinyi@chromium.org>
-From: Sean Paul <seanpaul@chromium.org>
-Date: Fri, 18 Jan 2019 12:58:10 -0500
-X-Gmail-Original-Message-ID: <CAOw6vb+a2SAq+=xfL9RZyA6R7zn-HYFQbDnDaK28TD8yrh+wLg@mail.gmail.com>
-Message-ID: <CAOw6vb+a2SAq+=xfL9RZyA6R7zn-HYFQbDnDaK28TD8yrh+wLg@mail.gmail.com>
-Subject: Re: [PATCH resend] drm/panel: panel-innolux: set display off in
- innolux_panel_unprepare
-To: "Hsin-Yi, Wang" <hsinyi@chromium.org>
+X-OriginatorOrg: mips.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 096921e6-6149-4482-5a4f-08d67d6f0cb9
+X-MS-Exchange-CrossTenant-originalarrivaltime: 18 Jan 2019 18:02:02.6648 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 463607d3-1db3-40a0-8a29-970c56230104
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR2201MB1039
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_095853_533711_DF188D47 
-X-CRM114-Status: GOOD (  18.42  )
+X-CRM114-CacheID: sfid-20190118_100207_762151_9857FFF4 
+X-CRM114-Status: GOOD (  15.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,83 +121,94 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: David Airlie <airlied@linux.ie>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- Thierry Reding <thierry.reding@gmail.com>, Daniel Vetter <daniel@ffwll.ch>,
- Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Rich Felker <dalias@libc.org>,
+ "linux-ia64@vger.kernel.org" <linux-ia64@vger.kernel.org>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>, "x86@kernel.org" <x86@kernel.org>,
+ "linux-mips@vger.kernel.org" <linux-mips@vger.kernel.org>,
+ Max Filippov <jcmvbkbc@gmail.com>, Guo Ren <guoren@kernel.org>,
+ "sparclinux@vger.kernel.org" <sparclinux@vger.kernel.org>,
+ Christoph Hellwig <hch@lst.de>,
+ "linux-s390@vger.kernel.org" <linux-s390@vger.kernel.org>,
+ "linux-c6x-dev@linux-c6x.org" <linux-c6x-dev@linux-c6x.org>,
+ Yoshinori Sato <ysato@users.sourceforge.jp>,
+ Richard Weinberger <richard@nod.at>,
+ "linux-sh@vger.kernel.org" <linux-sh@vger.kernel.org>,
+ Russell King <linux@armlinux.org.uk>,
+ "kasan-dev@googlegroups.com" <kasan-dev@googlegroups.com>,
+ Geert Uytterhoeven <geert@linux-m68k.org>, Mark Salter <msalter@redhat.com>,
+ Dennis Zhou <dennis@kernel.org>, Matt Turner <mattst88@gmail.com>,
+ "linux-snps-arc@lists.infradead.org" <linux-snps-arc@lists.infradead.org>,
+ "uclinux-h8-devel@lists.sourceforge.jp"
+ <uclinux-h8-devel@lists.sourceforge.jp>, Petr Mladek <pmladek@suse.com>,
+ "linux-xtensa@linux-xtensa.org" <linux-xtensa@linux-xtensa.org>,
+ "linux-alpha@vger.kernel.org" <linux-alpha@vger.kernel.org>,
+ "linux-um@lists.infradead.org" <linux-um@lists.infradead.org>,
+ "linux-m68k@lists.linux-m68k.org" <linux-m68k@lists.linux-m68k.org>,
+ Rob Herring <robh+dt@kernel.org>, Greentime Hu <green.hu@gmail.com>,
+ "xen-devel@lists.xenproject.org" <xen-devel@lists.xenproject.org>,
+ Stafford Horne <shorne@gmail.com>, Guan Xuetao <gxt@pku.edu.cn>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ Michal Simek <monstr@monstr.eu>, Tony Luck <tony.luck@intel.com>,
+ "linux-mm@kvack.org" <linux-mm@kvack.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ "linux-usb@vger.kernel.org" <linux-usb@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Vineet Gupta <vgupta@synopsys.com>, Michael Ellerman <mpe@ellerman.id.au>,
+ Andrew Morton <akpm@linux-foundation.org>,
+ "linuxppc-dev@lists.ozlabs.org" <linuxppc-dev@lists.ozlabs.org>,
+ "David S. Miller" <davem@davemloft.net>,
+ "openrisc@lists.librecores.org" <openrisc@lists.librecores.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 9, 2019 at 1:59 AM Hsin-Yi, Wang <hsinyi@chromium.org> wrote:
->
-> Move mipi_dsi_dcs_set_display_off() from innolux_panel_disable()
-> to innolux_panel_unprepare(), so they are consistent with
-> innolux_panel_enable() and innolux_panel_prepare().
->
-> This also fixes some mode check and irq timeout issue in MTK dsi code.
->
-> Since some dsi code (e.g. mtk_dsi) have following call trace:
-> 1. drm_panel_disable(), which calls innolux_panel_disable()
-> 2. switch to cmd mode
-> 3. drm_panel_unprepare(), which calls innolux_panel_unprepare()
->
-> However, mtk_dsi needs to be in cmd mode to be able to send commands
-> (e.g. mipi_dsi_dcs_set_display_off() and mipi_dsi_dcs_enter_sleep_mode()),
-> so we need these functions to be called after the switch to cmd mode happens,
-> i.e. in innolux_panel_unprepare.
->
->
-> Signed-off-by: Hsin-Yi, Wang <hsinyi@chromium.org>
+Hi Mike,
 
-Reviewed-by: Sean Paul <seanpaul@chromium.org>
+On Wed, Jan 16, 2019 at 03:44:19PM +0200, Mike Rapoport wrote:
+> Add check for the return value of memblock_alloc*() functions and call
+> panic() in case of error.
+> The panic message repeats the one used by panicing memblock allocators with
+> adjustment of parameters to include only relevant ones.
+> 
+> The replacement was mostly automated with semantic patches like the one
+> below with manual massaging of format strings.
+> 
+> @@
+> expression ptr, size, align;
+> @@
+> ptr = memblock_alloc(size, align);
+> + if (!ptr)
+> + 	panic("%s: Failed to allocate %lu bytes align=0x%lx\n", __func__,
+> size, align);
+> 
+> Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
+> ---
+>%
+> diff --git a/arch/mips/cavium-octeon/dma-octeon.c b/arch/mips/cavium-octeon/dma-octeon.c
+> index e8eb60e..db1deb2 100644
+> --- a/arch/mips/cavium-octeon/dma-octeon.c
+> +++ b/arch/mips/cavium-octeon/dma-octeon.c
+> @@ -245,6 +245,9 @@ void __init plat_swiotlb_setup(void)
+>  	swiotlbsize = swiotlb_nslabs << IO_TLB_SHIFT;
+>  
+>  	octeon_swiotlb = memblock_alloc_low(swiotlbsize, PAGE_SIZE);
+> +	if (!octeon_swiotlb)
+> +		panic("%s: Failed to allocate %lu bytes align=%lx\n",
+> +		      __func__, swiotlbsize, PAGE_SIZE);
+>  
+>  	if (swiotlb_init_with_tbl(octeon_swiotlb, swiotlb_nslabs, 1) == -ENOMEM)
+>  		panic("Cannot allocate SWIOTLB buffer");
 
-> ---
-> Resend for review.
-> ---
->  drivers/gpu/drm/panel/panel-innolux-p079zca.c | 11 +++++------
->  1 file changed, 5 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/gpu/drm/panel/panel-innolux-p079zca.c b/drivers/gpu/drm/panel/panel-innolux-p079zca.c
-> index ca4ae45dd307..8e5724b63f1f 100644
-> --- a/drivers/gpu/drm/panel/panel-innolux-p079zca.c
-> +++ b/drivers/gpu/drm/panel/panel-innolux-p079zca.c
-> @@ -70,18 +70,12 @@ static inline struct innolux_panel *to_innolux_panel(struct drm_panel *panel)
->  static int innolux_panel_disable(struct drm_panel *panel)
->  {
->         struct innolux_panel *innolux = to_innolux_panel(panel);
-> -       int err;
->
->         if (!innolux->enabled)
->                 return 0;
->
->         backlight_disable(innolux->backlight);
->
-> -       err = mipi_dsi_dcs_set_display_off(innolux->link);
-> -       if (err < 0)
-> -               DRM_DEV_ERROR(panel->dev, "failed to set display off: %d\n",
-> -                             err);
-> -
->         innolux->enabled = false;
->
->         return 0;
-> @@ -95,6 +89,11 @@ static int innolux_panel_unprepare(struct drm_panel *panel)
->         if (!innolux->prepared)
->                 return 0;
->
-> +       err = mipi_dsi_dcs_set_display_off(innolux->link);
-> +       if (err < 0)
-> +               DRM_DEV_ERROR(panel->dev, "failed to set display off: %d\n",
-> +                             err);
-> +
->         err = mipi_dsi_dcs_enter_sleep_mode(innolux->link);
->         if (err < 0) {
->                 DRM_DEV_ERROR(panel->dev, "failed to enter sleep mode: %d\n",
-> --
-> 2.18.1
->
+That one should be %zu rather than %lu. The rest looks good, so with
+that one tweak:
+
+    Acked-by: Paul Burton <paul.burton@mips.com> # MIPS parts
+
+Thanks,
+    Paul
 
 _______________________________________________
 linux-arm-kernel mailing list
