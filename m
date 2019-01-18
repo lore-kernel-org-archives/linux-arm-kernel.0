@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 63944C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:48:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 621BDC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:48:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 09E6C20823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:48:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0D24E20823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:48:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="p7CoozCU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 09E6C20823
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eHcqJRyq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0D24E20823
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,39 +26,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=XU+cvUiMd/9Uy0lJjbLv6qsJVyNM6QINAG+GJ0PDiW0=; b=p7CoozCUa9yLTWB5Z/Nvmh9NPP
-	nuP510LN3vm2q0ok4Xa5CagYJs6iej6U5+gCF1VhuqfA3LfVc1WLY0THjA0GPcsVH8VTQxd8N58De
-	tw6wmdSlPCYa52jQRFEMcsiqq4kSRoO6m801FtR6eyEI0tVQZaZedTAlFWv054+8RbETPeEBDD9sw
-	wfcI9AOcFzkU8QaqM8XzFghNE2YfvNUUfWVyvTNOZmz3lYKo/1v5vNuYfhm6m0SEKo0TYORfHobCp
-	Dg1GVwCutw4/oQoASZb3n1qm2IXxKhi9RooN0kXogMj5VaRxpId0UpY0vWRwOWGT735KhuDlqVnMh
-	erxmvkMQ==;
+	bh=rXlhwwffiycaumdquhrOt66iR2+YwSwxwbA8CaPpALk=; b=eHcqJRyqzD9mp4oVunQf9fFAGV
+	YEUTB3u/ByO+A9hVhMzS/YwZrOVlimo9gdvMcx+M4QgHfqQ5XSip44vpLgKlUbvplmSn9HNT75IRD
+	SS4n/ltMLj0sJIxgpBLKQBImZv7VuVFBzEq1b2bbmy3yu9yScI/hIVQv4Bqe4wbAnxf2nuJLMKFuv
+	PWEr30hLOZPw/m/kGYMxGWeNcqhRcEZN1y/Z4irLGnRrbtJTR0GnmUZNYU+4RM2/rWS0+cnFCQ0O2
+	zngm7IcfHPPsDxGkFb/97asNptcWstklv5/NUjesU8azUIIZfPIc+Cwx2c4Rgr2CW6EVv7bqTZeUP
+	rfZf3uaQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkXJB-0000fS-VO; Fri, 18 Jan 2019 16:47:54 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gkXJQ-0000sf-94; Fri, 18 Jan 2019 16:48:08 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkXI4-00085o-SP
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 16:46:56 +0000
+ id 1gkXI7-00086P-0C
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 16:46:57 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id BE6451684;
- Fri, 18 Jan 2019 08:46:44 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C8C9C80D;
+ Fri, 18 Jan 2019 08:46:46 -0800 (PST)
 Received: from e108454-lin.cambridge.arm.com (e108454-lin.cambridge.arm.com
  [10.1.196.50])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id F2A483F7BE;
- Fri, 18 Jan 2019 08:46:42 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 08B8E3F7BE;
+ Fri, 18 Jan 2019 08:46:44 -0800 (PST)
 From: Julien Grall <julien.grall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [RFC PATCH 4/8] arm64/fpsimdmacros: Introduce a macro to update
- ZCR_EL1.LEN
-Date: Fri, 18 Jan 2019 16:46:06 +0000
-Message-Id: <20190118164610.8123-5-julien.grall@arm.com>
+Subject: [RFC PATCH 5/8] arm64/sve: Implement helper to flush SVE registers
+Date: Fri, 18 Jan 2019 16:46:07 +0000
+Message-Id: <20190118164610.8123-6-julien.grall@arm.com>
 X-Mailer: git-send-email 2.11.0
 In-Reply-To: <20190118164610.8123-1-julien.grall@arm.com>
 References: <20190118164610.8123-1-julien.grall@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_084645_008832_21709612 
-X-CRM114-Status: UNSURE (   9.97  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190118_084647_238015_24EE1B6E 
+X-CRM114-Status: GOOD (  11.21  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,53 +78,83 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-A follow-up patch will need to update ZCR_EL1.LEN.
-
-Add a macro that could be re-used in the current and new place to avoid
-code duplication.
+Introduce a new helper that will zero all SVE registers but the first
+128-bits of each vector.
 
 Signed-off-by: Julien Grall <julien.grall@arm.com>
 ---
- arch/arm64/include/asm/fpsimdmacros.h | 19 ++++++++++++-------
- 1 file changed, 12 insertions(+), 7 deletions(-)
+ arch/arm64/include/asm/fpsimd.h       |  3 +++
+ arch/arm64/include/asm/fpsimdmacros.h | 19 +++++++++++++++++++
+ arch/arm64/kernel/entry-fpsimd.S      |  7 +++++++
+ 3 files changed, 29 insertions(+)
 
+diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+index dd1ad3950ef5..fa2439205c35 100644
+--- a/arch/arm64/include/asm/fpsimd.h
++++ b/arch/arm64/include/asm/fpsimd.h
+@@ -79,6 +79,9 @@ static inline void *sve_pffr(struct thread_struct *thread)
+ extern void sve_save_state(void *state, u32 *pfpsr);
+ extern void sve_load_state(void const *state, u32 const *pfpsr,
+ 			   unsigned long vq_minus_1);
++
++extern void sve_flush_live(void);
++
+ extern unsigned int sve_get_vl(void);
+ 
+ struct arm64_cpu_capabilities;
 diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
-index e2ab77dd9b4f..5e291d9c1ba0 100644
+index 5e291d9c1ba0..a41ab337bf42 100644
 --- a/arch/arm64/include/asm/fpsimdmacros.h
 +++ b/arch/arm64/include/asm/fpsimdmacros.h
-@@ -198,6 +198,17 @@
- 	.purgem _for__body
+@@ -175,6 +175,13 @@
+ 		| ((\np) << 5)
  .endm
  
-+/* Update ZCR_EL1.LEN with the new VQ */
-+.macro sve_load_vq xvqminus1, xtmp, xtmp2
-+		mrs_s		\xtmp, SYS_ZCR_EL1
-+		bic		\xtmp2, \xtmp, ZCR_ELx_LEN_MASK
-+		orr		\xtmp2, \xtmp2, \xvqminus1
-+		cmp		\xtmp2, \xtmp
-+		b.eq		921f
-+		msr_s		SYS_ZCR_EL1, \xtmp2	//self-synchronising
-+921:
++/* PFALSE P\np.B */
++.macro _sve_pfalse np
++	_sve_check_preg \np
++	.inst	0x2518e400			\
++		| (\np)
++.endm
++
+ .macro __for from:req, to:req
+ 	.if (\from) == (\to)
+ 		_for__body %\from
+@@ -209,6 +216,18 @@
+ 921:
+ .endm
+ 
++/* Preserve the first 128-bits of Znz and zero the rest. */
++.macro _sve_flush_z nz
++	_sve_check_zreg \nz
++	mov	v\nz\().16b, v\nz\().16b
++.endm
++
++.macro sve_flush
++ _for n, 0, 31, _sve_flush_z	\n
++ _for n, 0, 15, _sve_pfalse	\n
++		_sve_wrffr	0
 +.endm
 +
  .macro sve_save nxbase, xpfpsr, nxtmp
   _for n, 0, 31,	_sve_str_v	\n, \nxbase, \n - 34
   _for n, 0, 15,	_sve_str_p	\n, \nxbase, \n - 16
-@@ -212,13 +223,7 @@
- .endm
- 
- .macro sve_load nxbase, xpfpsr, xvqminus1, nxtmp, xtmp2
--		mrs_s		x\nxtmp, SYS_ZCR_EL1
--		bic		\xtmp2, x\nxtmp, ZCR_ELx_LEN_MASK
--		orr		\xtmp2, \xtmp2, \xvqminus1
--		cmp		\xtmp2, x\nxtmp
--		b.eq		921f
--		msr_s		SYS_ZCR_EL1, \xtmp2	// self-synchronising
--921:
-+		sve_load_vq	\xvqminus1, x\nxtmp, \xtmp2
-  _for n, 0, 31,	_sve_ldr_v	\n, \nxbase, \n - 34
- 		_sve_ldr_p	0, \nxbase
- 		_sve_wrffr	0
+diff --git a/arch/arm64/kernel/entry-fpsimd.S b/arch/arm64/kernel/entry-fpsimd.S
+index 12d4958e6429..17121a51c41f 100644
+--- a/arch/arm64/kernel/entry-fpsimd.S
++++ b/arch/arm64/kernel/entry-fpsimd.S
+@@ -57,4 +57,11 @@ ENTRY(sve_get_vl)
+ 	_sve_rdvl	0, 1
+ 	ret
+ ENDPROC(sve_get_vl)
++
++/* Zero all SVE registers but the first 128-bits of each vector */
++ENTRY(sve_flush_live)
++	sve_flush
++	ret
++ENDPROC(sve_flush_live)
++
+ #endif /* CONFIG_ARM64_SVE */
 -- 
 2.11.0
 
