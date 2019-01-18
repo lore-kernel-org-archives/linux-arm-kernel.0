@@ -2,22 +2,23 @@ Return-Path: <SRS0=p0aQ=P2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D7D71C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 11:14:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E06CDC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 11:20:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A66942086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 11:14:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 25E042086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 11:20:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JxCvu7oy";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="EuKAD/JU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A66942086D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qjkaHq4G";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="D9GmmFAg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 25E042086D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,61 +26,61 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=jYM+fUlWHWZ42Pug1uelm/LLNHR3R+RDGKpuEECdfqM=; b=JxCvu7oy/4qm3A
-	oSOkrLaEdXrME0ZMAPcoQR2OTucVo4U1qfxTS90hC8PydXbBoOk+wSN//PGu3CCvV950I30dRPxvk
-	Hr7jeiuSftY4553JKkhO9j+/rADeEGCTdbhIO9I77c4I/sGrjdWHRMwatPaDBt9HpO4NiKBuPQ9ac
-	Fog21KZUgOyttZf7bRC4zteFvGb1h3ZfOwlqFq1EIqXro1wIWp+9YGAKtaYcNdiZaIz+ENmBdB6hZ
-	s6KsGCBD1HXa32AR13aZZFtKuOAhLaQo6a8ApXWdejj2DbMjJjNfBVp9DLlU3xiAdBghH+akBMb1a
-	oY0ChebJFpZA0TEzUqNg==;
+	List-Owner; bh=EtIy3bBbS4UbjdIA+h151C8rPVm77J7wpcErLRlpIpc=; b=qjkaHq4GQL/kuE
+	ftnnpb7yChoB1H/OfTFJlMZnz+cX0KAZAa1yCZ4SALpFBGsyE9UtJ0SPTbrWq6I4ICMVVf+oc8+Wv
+	RuhjrGEl5FZpjelC/nbe6DJyERxgrU1RhXx3Fa1L9/MJScvr4wiqRtw9sgah/cJq7ejdQ+hPS5M39
+	e1I/+iBt56CAp1YVDjdPVDbZRw9S6KaOhHR86pSGLFmAMZBfBYh8E3q4IvYzn/QGYp/jXQgmCyKKc
+	+6bL04i/JQpuqz1YV+ozz5fJaozbBENxDAF6ihi7MOp7abgd1UNKGtvMQ5jMJY10zhveFqHMUAhd5
+	zCQe1TJUBIOYWHPVq+2w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkS6d-0005lP-Sx; Fri, 18 Jan 2019 11:14:35 +0000
-Received: from mail-io1-xd2c.google.com ([2607:f8b0:4864:20::d2c])
+	id 1gkSCI-0000Rg-Lu; Fri, 18 Jan 2019 11:20:26 +0000
+Received: from mail-ua1-x92b.google.com ([2607:f8b0:4864:20::92b])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkS6a-0005kM-2M
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 11:14:33 +0000
-Received: by mail-io1-xd2c.google.com with SMTP id l14so10376140ioj.5
+ id 1gkSCF-0000R8-88
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 11:20:24 +0000
+Received: by mail-ua1-x92b.google.com with SMTP id v24so4537963uap.13
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 18 Jan 2019 03:14:31 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ Fri, 18 Jan 2019 03:20:22 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=DcAfStfuZcPofxh2FfRFoFvAdVhRD66zw8c9C58eO8s=;
- b=EuKAD/JU6twG5yKxSGs3igAPZaESQB8N4F/BOLBsHBlfNjKt1KZev8md/li1xaeEeu
- KCzEM/zrl4kqYko+UultXrCEHbl0QNkNbNBa6YIaZc2LjNNWe6LIN5R6yrpiBTJL1sb9
- MYS5AsLBf5k1NqNV2vUOOK5cSBmT4T6IHk8+g=
+ :cc; bh=XqF0zZgFayTmTO/6SUH1t+WrRUcv72SweIyRMBjv87g=;
+ b=D9GmmFAgjv+5fMxCXp5xCcl/ZSn3HHWyfLbIKnqEUoQGUzpEQtnK872HuAFMporWy8
+ FtB1I6hgNbsI6BGQyRFD66Jk28nEWyr1cJ54576q1P1tfwswQYlPZtG2LDSNwAGI5c2c
+ vsmRxZ4VggCqcAce4ZGUjJzE0t3BtOo6o6NUmcmENogt0PgUndm2XUv92fNkLoN8XdiF
+ eMhKQ5bgmb3zns4sBO+V0DVEjyLzAeeJ/i1ymIl+iLgWy3i+SBuuwKlGZezyWUgbN7ay
+ NygDllUwwt1jhMga1NQiwO733GITXacZUEs+U3vjLk9yAcGaK99uJ+qO07OWCDuVJ+r7
+ ksnw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=DcAfStfuZcPofxh2FfRFoFvAdVhRD66zw8c9C58eO8s=;
- b=QrlWOp2l7qqMLLHvWtqwv5FmLxSFb4w7mC/RMyUWD6tg/tt7X3dJsFYBQIhxvb4DUm
- ALwT3VGwH1t0yaHZlfA4hBr+POGYnX6xnoMlmkwBquN7lentxIUY/kC8C/rQFSjQrkcc
- noyrpBZ/3e8w4Q7ZNxjVc3p5/w54ed8VQvBwEPygP+qsMH3YIkHqE+gy/3W7VK78U/es
- e/E+Yd8+riyQ+aHRNS3s4TAfC41se4u5uf3eAkz/bbkXrBBUM6OKRgPcbuHGT/UJHR1D
- ztIS4fQFw86WoyJnDHFbaGdSiYGn/MZTdlVxtmGb44kJfESbfbT2hylfrMLeAGgN8GIg
- DxRA==
-X-Gm-Message-State: AJcUukf6p/HNLqEH7jEWsORXHh+iSh/PlTjgDTfGFGsERH+P3XQ/Yaqj
- fc9smpU/kbxcO2oUm2cZ2qU7jwITCAr8EoTGJBJbzg==
-X-Google-Smtp-Source: ALg8bN5D2CN94XVaFT+bIFApe7dCOdbWsjfoA0drVLABOzPKi8LNdst0Ho+XeXgU21Zxfo4pmPmYIRFHjrGT5G7GhWU=
-X-Received: by 2002:a5e:c206:: with SMTP id v6mr10538445iop.60.1547810070966; 
- Fri, 18 Jan 2019 03:14:30 -0800 (PST)
+ bh=XqF0zZgFayTmTO/6SUH1t+WrRUcv72SweIyRMBjv87g=;
+ b=P97rGsWEr0ixOtPfJVS+3nymUqSrJ1hCTBJce80v4YeMYDvweDfZIAacMd8i7n51vf
+ pjiyAFLmR5ynRqBOg6bkj0timdjDE4+NcMchfgyjcs5bHb9EukeN12E1UFYP7T8s08BP
+ I3F9SgDWZuKFaN0IWFslXM5RhHb+ckr4+GC5oSMJFTSwtv4ltUqh7OFUh+1mcBzGJuFr
+ PRISXQ5sSegr/QkWI/WnzM103tar+i+NHQVk3HkuasGqae+k9PMU2ky8jjH1Spd+3VMi
+ xwRrkxGDwnPW6K9WRR1zq0E49NuNLwqM7yoHQAVsMpb6Z6bNTf75GxakYQAnOVed9ijl
+ l4Ww==
+X-Gm-Message-State: AJcUukfFXK8yzqRK4w1HpoUhvkhWKkwtyQrXnixrVajHOl76b4MKkdL/
+ NLC6J1vjaoeANruc3LfIp9Rfd7rcYbg137JjAks=
+X-Google-Smtp-Source: ALg8bN6mxLE2fuUGoFKjllqfM6KcxqbBeCmty7KewOuDUIEDxWLGW1kJw0dz41+rI27UPKQCj1yKvjE6TfH21SValXE=
+X-Received: by 2002:ab0:8d9:: with SMTP id o25mr7383232uaf.127.1547810421480; 
+ Fri, 18 Jan 2019 03:20:21 -0800 (PST)
 MIME-Version: 1.0
-References: <1546739729-17234-1-git-send-email-huanglingyan2@huawei.com>
- <CAKv+Gu_wsK1UNXSp=5Hvd7XCHKC3cVkYjTYHhvqM4Xt09A9iKg@mail.gmail.com>
- <9129b882-60f3-8046-0cb9-e0b2452a118d@huawei.com>
- <20190108135444.GB14476@fuggles.cambridge.arm.com>
- <cd5bb83e-bb0e-b348-5365-095c5fcd9648@huawei.com>
- <20190116164657.GA1910@brain-police>
- <58c28adf-a01a-bb36-4def-866375e93aac@huawei.com>
-In-Reply-To: <58c28adf-a01a-bb36-4def-866375e93aac@huawei.com>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Fri, 18 Jan 2019 12:14:20 +0100
-Message-ID: <CAKv+Gu-MUDT-pAE4kwHbCsW2MSYBCDB3N1reRgeFL1EwiNQvxQ@mail.gmail.com>
-Subject: Re: [PATCH v3] arm64: lib: accelerate do_csum with NEON instruction
-To: "huanglingyan (A)" <huanglingyan2@huawei.com>
+References: <CAOuPNLj4QzNDt0npZn2LhZTFgDNJ1CsWPw3=wvUuxnGtQW308g@mail.gmail.com>
+ <bceb32be-d508-c2a4-fa81-ab8b90323d3f@codeaurora.org>
+ <CAOuPNLiNtPFksCuZF_vL6+YuLG0i0umzQhMCyEN69h9tySn2Vw@mail.gmail.com>
+ <57ff3437-47b5-fe92-d576-084ce26aa5d8@codeaurora.org>
+In-Reply-To: <57ff3437-47b5-fe92-d576-084ce26aa5d8@codeaurora.org>
+From: Pintu Agarwal <pintu.ping@gmail.com>
+Date: Fri, 18 Jan 2019 16:50:10 +0530
+Message-ID: <CAOuPNLjjd67FnjaHbJj_auD-EWnbc+6sc+hcT_HE6fjeKhEQrw@mail.gmail.com>
+Subject: Re: Need help: how to locate failure from irq_chip subsystem
+To: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_031432_107578_5B15345C 
-X-CRM114-Status: GOOD (  22.38  )
+X-CRM114-CacheID: sfid-20190118_032023_402376_4A3D3581 
+X-CRM114-Status: GOOD (  11.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,89 +92,32 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Zhangshaokun <zhangshaokun@hisilicon.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: linux-pm@vger.kernel.org, kernelnewbies@kernelnewbies.org,
+ open list <linux-kernel@vger.kernel.org>,
+ Russell King - ARM Linux <linux@armlinux.org.uk>, linux-mm@kvack.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 18 Jan 2019 at 02:07, huanglingyan (A) <huanglingyan2@huawei.com> wrote:
->
->
-> On 2019/1/17 0:46, Will Deacon wrote:
-> > On Wed, Jan 09, 2019 at 10:03:05AM +0800, huanglingyan (A) wrote:
-> >> On 2019/1/8 21:54, Will Deacon wrote:
-> >>> [re-adding Ard and LAKML -- not sure why the headers are so munged]
-> >>>
-> >>> On Mon, Jan 07, 2019 at 10:38:55AM +0800, huanglingyan (A) wrote:
-> >>>> On 2019/1/6 16:26, Ard Biesheuvel wrote:
-> >>>>     Please change this into
-> >>>>
-> >>>>     if (IS_ENABLED(CONFIG_KERNEL_MODE_NEON) &&
-> >>>>         len >= CSUM_NEON_THRESHOLD &&
-> >>>>         may_use_simd()) {
-> >>>>             kernel_neon_begin();
-> >>>>             res = do_csum_neon(buff, len);
-> >>>>             kernel_neon_end();
-> >>>>         }
-> >>>>
-> >>>>     and drop the intermediate do_csum_arm()
-> >>>>
-> >>>>
-> >>>>         +               return do_csum_arm(buff, len);
-> >>>>         +#endif  /* CONFIG_KERNEL_MODE_NEON */
-> >>>>
-> >>>>     No else? What happens if len < CSUM_NEON_THRESHOLD ?
-> >>>>
-> >>>>
-> >>>>         +#undef do_csum
-> >>>>
-> >>>>     Can we drop this?
-> >>>>
-> >>>> Using NEON instructions will bring some costs. The spending maybe introduced
-> >>>> when reservering/restoring
-> >>>> neon registers with kernel_neon_begin()/kernel_neon_end(). Therefore NEON code
-> >>>> is Only used when
-> >>>> the length exceeds CSUM_NEON_THRESHOLD. General do csum() codes in lib/
-> >>>> checksum.c will be used in
-> >>>> shorter length. To achieve this goal, I use the "#undef do_csum" in else clause
-> >>>> to have the oppotunity to
-> >>>> utilize the general codes.
-> >>> I don't think that's how it works :/
-> >>>
-> >>> Before we get deeper into the implementation, please could you justify the
-> >>> need for a CPU-optimised checksum implementation at all? I thought this was
-> >>> usually offloaded to the NIC?
-> >>>
-> >>> Will
-> >>>
-> >>> .
-> >> This problem is introduced when testing Intel x710 network card on my ARM server.
-> >> Ip forward is set for ease of testing. Then send lots of packages to server by Tesgine
-> >> machine and then receive.
-> > In the marketing blurb, that card boasts:
+> >> Could you please tell which QCOM SoC this board is based on?
+> >>
 > >
-> >   `Tx/Rx IP, SCTP, TCP, and UDP checksum offloading (IPv4, IPv6) capabilities'
-> >
-> > so we shouldn't need to run this on the CPU. Again, I'm not keen to optimise
-> > this given that it /really/ shouldn't be used on arm64 machines that care
-> > about network performance.
-> >
-> > Will
-> >
-> > .
-> Yeah, you are right. Checksum is usually done in network card which is told by
-> someone familiar with NIC. However, it may be used in testing scenaries and
-> some primary network cards. I think it's no harm to optimize this code while
-> other ARCHs have their own optimized versions.
+> > Snapdragon 845 with kernel 4.9.x
+> > I want to know from which subsystem it is triggered:drivers/soc/qcom/
 > >
 >
+> Irqchip driver is "drivers/irqchip/irq-gic-v3.c". The kernel you are
+> using is msm-4.9 I suppose or some other kernel?
+>
+Yes, I am using customized version of msm-4.9 kernel based on Android.
+And yes the irqchip driver is: irq-gic-v3, which I can see from config.
 
-I disagree. If this code path is never exercised, we should not
-include it. We can revisit this decision when there is a use case
-where the checksumming performance is an actual bottleneck.
+But, what I wanted to know is, how to find out which driver module
+(hopefully under: /drivers/soc/qcom/) that register with this
+irq_chip, is getting triggered at the time of crash ?
+So, that I can implement irq_hold function for it, which is the cause of crash.
 
 _______________________________________________
 linux-arm-kernel mailing list
