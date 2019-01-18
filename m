@@ -4,68 +4,107 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 23062C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 09:47:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 30392C43444
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 09:49:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E86DD2086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 09:47:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F090E2087E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 09:49:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="M2ZOUOBi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E86DD2086D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Vrf8bE+B";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="vLVusaK6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F090E2087E
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=UxjKAEK7Q58we12fSDTBBEiKRC7DOmDwAJeLRi+MZq4=; b=M2ZOUOBiKsAMdA
-	bnRYagzLjpkWmcbVlf1l8Oizjjsm0FwtBXFx4TQlmclLkPuND8+9inojIKXFTWLNvp8MeR9GRfeT2
-	+jk1fPD4aa46orLT4bhHXH+EAheMPnoblgiP1IQ/0fwpT9gR87rHiPtHf2dce4ZsHcm+e/lwQIVSG
-	/UvuDXsQRbbUbCkHxtZShB17OejYBq7dtmgBe5IGJ9dQSY//D8WBUpC/T9Sf8PfirMwK0SIMJ7NUV
-	jSlio0iA99p2Cvph8YtoOF/2wt/k3YO6ji60wIokXV/k0VR78HaXuXqA4skI4quHWKLG6Hy/m7w64
-	Z81OB8wYWk9nGbIpbMBw==;
+	List-Owner; bh=4ZqQLmcF1blm6fQ1cTzy3gZAuA1GtJgsfLmYuuT9qDM=; b=Vrf8bE+BlAmeui
+	Nw2Ft8IdLYKRClMlI0Hp72/d4cvaSdKftISmxWEiL1GRwdy3txMdY5rxt7E+JlAFuysrv7BdJog9k
+	jCiaxwT8Iq/7bSTKB/aCfUDI308iY5LnFSjUrPiA57vt4NvLVhQt3N2QpA9b4T2aim35oAB1dg6hc
+	gOg5bsfOqcF/pERVJ36ZgTEelze7np2GRdru6Aik0ZiQilYN8dDwuOoQhM4oJq80hYcysTF69Faci
+	H+T4bzdB2/K5r/nrKaL6U9oNtK5EQfMKvvG00iMhjGwveGc3IJuP617hlSQCa7zNE10NlXka/4MdJ
+	7M5xjwcnP8zHnyDBW+dQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkQkZ-00066J-Om; Fri, 18 Jan 2019 09:47:43 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1gkQmc-0006QD-Ro; Fri, 18 Jan 2019 09:49:50 +0000
+Received: from mail-eopbgr30049.outbound.protection.outlook.com ([40.107.3.49]
+ helo=EUR03-AM5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkQkW-00065K-5u; Fri, 18 Jan 2019 09:47:41 +0000
-X-UUID: 6783b32f7dbc4519882851d5a4889a03-20190118
-X-UUID: 6783b32f7dbc4519882851d5a4889a03-20190118
-Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw01.mediatek.com
- (envelope-from <ryder.lee@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 672631624; Fri, 18 Jan 2019 01:47:37 -0800
-Received: from MTKMBS31N2.mediatek.inc (172.27.4.87) by
- MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Fri, 18 Jan 2019 01:47:36 -0800
-Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
- MTKMBS31N2.mediatek.inc (172.27.4.87) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Fri, 18 Jan 2019 17:47:34 +0800
-Received: from [172.21.77.33] (172.21.77.33) by MTKCAS06.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Fri, 18 Jan 2019 17:47:33 +0800
-Message-ID: <1547804853.8124.9.camel@mtkswgap22>
-Subject: Re: [PATCH v1 1/5] pwm: mediatek: add a property "mediatek,num-pwms"
-From: Ryder Lee <ryder.lee@mediatek.com>
-To: Uwe =?ISO-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
-Date: Fri, 18 Jan 2019 17:47:33 +0800
-In-Reply-To: <20190118080552.ppwgxboh3gt3nasv@pengutronix.de>
-References: <de316385a84e079d3b23891e61c959094b9fa7e5.1547781007.git.ryder.lee@mediatek.com>
- <20190118080552.ppwgxboh3gt3nasv@pengutronix.de>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+ id 1gkQma-0006Pp-47
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 09:49:49 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=JRl0xQTuu9dX76rJL1qKDryW3r2elznaX/T/8fKZkTk=;
+ b=vLVusaK6dyhof0Jkj++JhylU80w2IdKj5fxyM3MgeG3BqTmAzTZ8j9yMAxvBezhCMAWfJhS/U+Fzz+mHEpJSiENZ9gRQSwGYiyRET2/EzUqTz0gsYZ8s+OZk4XeHnFORnapwiaL1uwRXW+N39bdp+jmSbIo3HcBnmT3faD+F5yM=
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
+ AM0PR04MB5923.eurprd04.prod.outlook.com (20.178.117.12) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1516.19; Fri, 18 Jan 2019 09:49:43 +0000
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::c4d2:7dfd:4576:bdd5]) by AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::c4d2:7dfd:4576:bdd5%5]) with mapi id 15.20.1537.018; Fri, 18 Jan 2019
+ 09:49:43 +0000
+From: Aisheng Dong <aisheng.dong@nxp.com>
+To: Marc Zyngier <marc.zyngier@arm.com>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>
+Subject: RE: [PATCH 1/1] irqchip: gpcv2: make config option visible
+Thread-Topic: [PATCH 1/1] irqchip: gpcv2: make config option visible
+Thread-Index: AQHUrwExKd8SdkCETUqu4TDod0IgjqW0vfmAgAAJiQA=
+Date: Fri, 18 Jan 2019 09:49:43 +0000
+Message-ID: <AM0PR04MB421158B2E042D623792A296E809C0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1547796918-29790-1-git-send-email-aisheng.dong@nxp.com>
+ <25cd3e29-e365-f0d4-65a3-b3af69acd9cd@arm.com>
+In-Reply-To: <25cd3e29-e365-f0d4-65a3-b3af69acd9cd@arm.com>
+Accept-Language: zh-CN, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=aisheng.dong@nxp.com; 
+x-originating-ip: [92.121.36.198]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; AM0PR04MB5923;
+ 6:LdH5pZ5pPO5Akf1ttrcKnyqQcMKkXPXGspmnJctmd9FWlHzRhedGnDeJX4i4M4QgpGeZGXak6y4TXOrgZAuRMSrWn02hlTv4uml0uHOUJFLMx57FXcKOJ8WN+BxTuolUnE1AXlCFSpcKsUEA44mlDLP3sObqwwcYLZ/VfORG1k3PIyvTDWmfxZLMgitlpm23CQCtQ0f6R6ZXTZT7WDQIfN9heMy0xTj6cXnOmYGYNRxD7304sRwOl/8/66qkE4NSXRtk2pF5XRdVVK3w8ERTP1/lwwLJ5yMPn3Jtli+XgsQRXvq3ON1Mh7HYOaP/9akvgSYtby5nOvkUjGO0HVVB4UO47MdjWNFvfgvE3/7wWleudFW/Y8e0Ghke/J0SpohFYScjMIvguUC3yP/Z7sk+LUfVUyQPOrlQv4G3U9smyaFxqBPcxzf6SLQRryax7OXYlltKKqqTASZtrK8Al5cF0w==;
+ 5:OuJliVmdQqZLU6ki4F8KVl2d2QKWGoJG71zSXnf5felUmQhKCchXu1J1PpGP9FXPJaaelLQArvEId+QTtwdVgnvpO9CcVp4G0y7im/Z4OF9Z0MFxHdTQJS+mMb7I6U+RsYRUXFWxxngSqLKxDkYiwW8zqEkIIoTarA6eolfv4V4ywy7L8t3UcmfCV9sgkgI0QhSdo8D8AYgKbAGmdOKnSw==;
+ 7:CgUStssGVkKeqH/1AcQGeQLVLd++noGx1fwS7Yskac1lbJgOauliIgnNipEr5rY8b5I9Qoppe7TMF39k4tbhaF9y6tfY2fAll3pJB0QuG06X0QKl3Cd4z+mgp0q8Dr96Umk9tYDbs0KjQC/easWJJw==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: 67d2b6b2-3018-41ff-7f1b-08d67d2a4614
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(5600109)(711020)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:AM0PR04MB5923; 
+x-ms-traffictypediagnostic: AM0PR04MB5923:
+x-microsoft-antispam-prvs: <AM0PR04MB59236E684086B3A7323B3775809C0@AM0PR04MB5923.eurprd04.prod.outlook.com>
+x-forefront-prvs: 0921D55E4F
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(136003)(346002)(376002)(396003)(39860400002)(366004)(199004)(189003)(25786009)(97736004)(99286004)(6246003)(76176011)(256004)(71190400001)(53546011)(14444005)(102836004)(53936002)(9686003)(6506007)(39060400002)(7696005)(4326008)(81156014)(476003)(33656002)(446003)(8936002)(2906002)(8676002)(71200400001)(81166006)(11346002)(2501003)(6436002)(486006)(229853002)(3846002)(110136005)(106356001)(55016002)(44832011)(105586002)(316002)(68736007)(6116002)(54906003)(305945005)(74316002)(186003)(26005)(5660300001)(14454004)(478600001)(7736002)(86362001)(66066001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB5923;
+ H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: shxC1lXlmhEGVLv54hod2mLRAv7/vQ1pg53daFiHUgOA5GgnInDAkHzieNs9k4DKGV3pb5GWvtKd0dsp6/1GV0FFn4UGV1F9N0tEuolC9HK2lxNbljs87CK5rfEC4NJblYRHv0pQaWElIfo+kNm7BInmnPnwxY8Ru0Zf1QJ85BgO2t0YdnOViP0nlSVshLwkWLP5q9y7t5sl3fjzRGZcaAFYwjN807UHvO1YT9eRg1ScaycUeQWsk7eQDmWXWkp6JID/nv6PyQSwNb8bAOs7OqRAHIIFrjQbS8iqf9C+3OP3UOwo5+SPLEuiyXGBE4FNdhRoqKiq9mTYiVgZOyZLcgwZnNiiaqecXajrGr24xl9wEtVINuSMkk5jC+xD5fNfs/l1lRAOcdkEUVAt/iv7dbtAi7YebpqCAk9Fw92jiyk=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-X-MTK: N
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 67d2b6b2-3018-41ff-7f1b-08d67d2a4614
+X-MS-Exchange-CrossTenant-originalarrivaltime: 18 Jan 2019 09:49:43.6450 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB5923
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_014740_219499_C4A0AAA2 
-X-CRM114-Status: GOOD (  20.75  )
+X-CRM114-CacheID: sfid-20190118_014948_168702_CCA031CD 
+X-CRM114-Status: GOOD (  19.24  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,66 +116,70 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-pwm@vger.kernel.org, devicetree@vger.kernel.org,
- Sean Wang <sean.wang@kernel.org>, Weijie Gao <weijie.gao@mediatek.com>,
- linux-kernel@vger.kernel.org, Thierry Reding <thierry.reding@gmail.com>,
- linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Jason Cooper <jason@lakedaemon.net>,
+ Andrey Smirnov <andrew.smirnov@gmail.com>, dl-linux-imx <linux-imx@nxp.com>,
+ Thomas Gleixner <tglx@linutronix.de>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "l.stach@pengutronix.de" <l.stach@pengutronix.de>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gRnJpLCAyMDE5LTAxLTE4IGF0IDA5OjA1ICswMTAwLCBVd2UgS2xlaW5lLUvDtm5pZyB3cm90
-ZToKPiBIZWxsbywKPiAKPiBqdXN0IHJlYWxpemVkIGFub3RoZXIgaXNzdWUgd2hpbGUgbG9va2lu
-ZyB1cCBhIGRyaXZlciBkZXRhaWwgLi4uCj4gCj4gT24gRnJpLCBKYW4gMTgsIDIwMTkgYXQgMTE6
-MjQ6NDFBTSArMDgwMCwgUnlkZXIgTGVlIHdyb3RlOgo+ID4gVGhpcyBhZGRzIGEgcHJvcGVydHkg
-Im1lZGlhdGVrLG51bS1wd21zIiB0byBhdm9pZCBoYXZpbmcgYW4gZW5kbGVzcwo+ID4gbGlzdCBv
-ZiBjb21wYXRpYmxlcyB3aXRoIG5vIGRpZmZlcmVuY2VzIGZvciB0aGUgc2FtZSBkcml2ZXIuCj4g
-PiAKPiA+IFRodXMsIHRoZSBkcml2ZXIgc2hvdWxkIGhhdmUgYmFja3dhcmRzIGNvbXBhdGliaWxp
-dHkgdG8gb2xkZXIgRFRzLgo+ID4gCj4gPiBTaWduZWQtb2ZmLWJ5OiBSeWRlciBMZWUgPHJ5ZGVy
-LmxlZUBtZWRpYXRlay5jb20+Cj4gPiAtLS0KPiA+IENoYW5nZXMgc2luY2UgdjE6IGFkZCBzb21l
-IGNoZWNrcyBmb3IgYmFja3dhcmRzIGNvbXBhdGliaWxpdHkuCj4gPiAtLS0KPiA+ICBkcml2ZXJz
-L3B3bS9wd20tbWVkaWF0ZWsuYyB8IDI3ICsrKysrKysrKysrKysrKysrKy0tLS0tLS0tLQo+ID4g
-IDEgZmlsZSBjaGFuZ2VkLCAxOCBpbnNlcnRpb25zKCspLCA5IGRlbGV0aW9ucygtKQo+ID4gCj4g
-PiBkaWZmIC0tZ2l0IGEvZHJpdmVycy9wd20vcHdtLW1lZGlhdGVrLmMgYi9kcml2ZXJzL3B3bS9w
-d20tbWVkaWF0ZWsuYwo+ID4gaW5kZXggZWI2Njc0Yy4uODFiN2U1ZSAxMDA2NDQKPiA+IC0tLSBh
-L2RyaXZlcnMvcHdtL3B3bS1tZWRpYXRlay5jCj4gPiArKysgYi9kcml2ZXJzL3B3bS9wd20tbWVk
-aWF0ZWsuYwo+ID4gQEAgLTU1LDcgKzU1LDcgQEAgZW51bSB7Cj4gPiAgfTsKPiA+ICAKPiA+ICBz
-dHJ1Y3QgbXRrX3B3bV9wbGF0Zm9ybV9kYXRhIHsKPiA+IC0JdW5zaWduZWQgaW50IG51bV9wd21z
-Owo+ID4gKwl1bnNpZ25lZCBpbnQgbnVtX3B3bXM7CS8qIGl0IHNob3VsZCBub3QgYmUgdXNlZCBp
-biB0aGUgZnV0dXJlIFNvQ3MgKi8KPiA+ICAJYm9vbCBwd200NV9maXh1cDsKPiA+ICAJYm9vbCBo
-YXNfY2xrczsKPiA+ICB9Owo+ID4gQEAgLTIyNiwyNyArMjI2LDM2IEBAIHN0YXRpYyB2b2lkIG10
-a19wd21fZGlzYWJsZShzdHJ1Y3QgcHdtX2NoaXAgKmNoaXAsIHN0cnVjdCBwd21fZGV2aWNlICpw
-d20pCj4gPiAgCj4gPiAgc3RhdGljIGludCBtdGtfcHdtX3Byb2JlKHN0cnVjdCBwbGF0Zm9ybV9k
-ZXZpY2UgKnBkZXYpCj4gPiAgewo+ID4gLQljb25zdCBzdHJ1Y3QgbXRrX3B3bV9wbGF0Zm9ybV9k
-YXRhICpkYXRhOwo+ID4gKwlzdHJ1Y3QgZGV2aWNlX25vZGUgKm5wID0gcGRldi0+ZGV2Lm9mX25v
-ZGU7Cj4gPiAgCXN0cnVjdCBtdGtfcHdtX2NoaXAgKnBjOwo+ID4gIAlzdHJ1Y3QgcmVzb3VyY2Ug
-KnJlczsKPiA+IC0JdW5zaWduZWQgaW50IGk7Cj4gPiArCXVuc2lnbmVkIGludCBpLCBudW1fcHdt
-czsKPiA+ICAJaW50IHJldDsKPiA+ICAKPiA+ICAJcGMgPSBkZXZtX2t6YWxsb2MoJnBkZXYtPmRl
-diwgc2l6ZW9mKCpwYyksIEdGUF9LRVJORUwpOwo+ID4gIAlpZiAoIXBjKQo+ID4gIAkJcmV0dXJu
-IC1FTk9NRU07Cj4gPiAgCj4gPiAtCWRhdGEgPSBvZl9kZXZpY2VfZ2V0X21hdGNoX2RhdGEoJnBk
-ZXYtPmRldik7Cj4gPiAtCWlmIChkYXRhID09IE5VTEwpCj4gPiAtCQlyZXR1cm4gLUVJTlZBTDsK
-PiA+IC0JcGMtPnNvYyA9IGRhdGE7Cj4gPiArCXBjLT5zb2MgPSBvZl9kZXZpY2VfZ2V0X21hdGNo
-X2RhdGEoJnBkZXYtPmRldik7Cj4gPiAgCj4gPiAgCXJlcyA9IHBsYXRmb3JtX2dldF9yZXNvdXJj
-ZShwZGV2LCBJT1JFU09VUkNFX01FTSwgMCk7Cj4gPiAgCXBjLT5yZWdzID0gZGV2bV9pb3JlbWFw
-X3Jlc291cmNlKCZwZGV2LT5kZXYsIHJlcyk7Cj4gPiAgCWlmIChJU19FUlIocGMtPnJlZ3MpKQo+
-ID4gIAkJcmV0dXJuIFBUUl9FUlIocGMtPnJlZ3MpOwo+ID4gIAo+ID4gLQlmb3IgKGkgPSAwOyBp
-IDwgZGF0YS0+bnVtX3B3bXMgKyAyICYmIHBjLT5zb2MtPmhhc19jbGtzOyBpKyspIHsKPiA+ICsJ
-LyogQ2hlY2sgaWYgd2UgaGF2ZSBzZXQgJ251bS1wd21zJyBpbiBEVHMuICovCj4gPiArCXJldCA9
-IG9mX3Byb3BlcnR5X3JlYWRfdTMyKG5wLCAibWVkaWF0ZWssbnVtLXB3bXMiLCAmbnVtX3B3bXMp
-Owo+ID4gKwlpZiAocmV0IDwgMCkgewo+ID4gKwkJLyogSWYgbm8sIGZhbGxiYWNrIHRvIHVzZSBT
-b0MgZGF0YSBmb3IgYmFja3dhcmRzIGNvbXBhdGliaWxpdHkuICovCj4gPiArCQlpZiAocGMtPnNv
-Yy0+bnVtX3B3bXMpIHsKPiA+ICsJCQludW1fcHdtcyA9IHBjLT5zb2MtPm51bV9wd21zOwo+ID4g
-KwkJfSBlbHNlIHsKPiA+ICsJCQlkZXZfZXJyKCZwZGV2LT5kZXYsICJmYWlsZWQgdG8gZ2V0IHB3
-bSBudW1iZXI6ICVkXG4iLCByZXQpOwo+ID4gKwkJCXJldHVybiByZXQ7Cj4gPiArCQl9Cj4gPiAr
-CX0KPiA+ICsKPiA+ICsJZm9yIChpID0gMDsgaSA8IG51bV9wd21zICsgMiAmJiBwYy0+c29jLT5o
-YXNfY2xrczsgaSsrKSB7Cj4gPiAgCQlwYy0+Y2xrc1tpXSA9IGRldm1fY2xrX2dldCgmcGRldi0+
-ZGV2LCBtdGtfcHdtX2Nsa19uYW1lW2ldKTsKPiAKPiBJZiBhIGR0IGNvbnRhaW5zCj4gCj4gCW1l
-ZGlhdGVrLG51bS1wd21zID0gPDE3PjsKPiAKPiB5b3UncmUgYWNjZXNzaW5nIHBjLT5jbGtzWzE4
-XSB3aGljaCBpcyBhbiBvdXQtb2YtYm91bmRzIGFjY2Vzcywgc28KPiBiZXR0ZXIgY2hlY2sgdGhl
-IGxpbWl0IG9yIGFsbG9jYXRlIHRoZSBjbGtzIGFycmF5IGR5bmFtaWNhbGx5Lgo+IAoKVGhhbmtz
-IGZvciB0aGUgcmVtaW5kZXIuIEkgd2lsbCBmaXggaXQgaW4gdjIuCgpSeWRlcgoKCgpfX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVs
-IG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDov
-L2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+> From: Marc Zyngier [mailto:marc.zyngier@arm.com]
+> Sent: Friday, January 18, 2019 5:13 PM
+> On 18/01/2019 07:41, Aisheng Dong wrote:
+> > Make GPCv2 config option visible, then user can select it in defconfig
+> > for ARMv8 platforms.
+> >
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Cc: Jason Cooper <jason@lakedaemon.net>
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > Cc: Lucas Stach <l.stach@pengutronix.de>
+> > Cc: Andrey Smirnov <andrew.smirnov@gmail.com>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > ---
+> >  drivers/irqchip/Kconfig | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig index
+> > 3d1e607..ed04d47 100644
+> > --- a/drivers/irqchip/Kconfig
+> > +++ b/drivers/irqchip/Kconfig
+> > @@ -289,7 +289,8 @@ config RENESAS_H8S_INTC
+> >  	select IRQ_DOMAIN
+> >
+> >  config IMX_GPCV2
+> > -	bool
+> > +	bool "i.MX GPCv2 IRQ chip"
+> > +	depends on ARCH_MXC || (COMPILE_TEST && OF)
+> >  	select IRQ_DOMAIN
+> >  	help
+> >  	  Enables the wakeup IRQs for IMX platforms with GPCv2 block
+> >
+> 
+> How does it help exactly? It is pretty difficult for a user to know exactly what
+> they need. I'd rather see it selected by ARCH_MXC, which makes it
+
+ARM64 SoC maintainers suggest not add more driver specific options except an
+Generic ARCH option.
+
+As GPCv2 is also used in MX8MQ. So we may select it in armv8 defconfig.
+If this option is invisible, we can't select it.
+
+Regards
+Dong Aisheng
+
+> unambiguous.
+> 
+> Thanks,
+> 
+> 	M.
+> --
+> Jazz is not dead. It just smells funny...
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
