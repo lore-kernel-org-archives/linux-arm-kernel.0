@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 43223C43387
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:18:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E30BEC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:18:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0CAA720850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:18:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B520320850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 16:18:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZM1gjZ28"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0CAA720850
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="X5A8S+RF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B520320850
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,38 +26,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=kED1pT5VFHdsVBVrAJ/mh9tUOCzgOkPylgXDIjhRT1I=; b=ZM1gjZ28rZhNg061D0q4xa6hVT
-	Y9gnnkPnwW9GRzLR1Ao3rEFL3LfZVgrvcbx2Oh2dHconvKRTTyi9cgbBnpL/yD+RCS3Lb1u03/3Rb
-	qgxsFn9IvxfMV46Lmncr2QpId31T801qOS6vr+siBEJ446mfk0RH7yK4h687IoQElq/qRJXh6Vvwd
-	6CUQIHWWjPxfws6Tea+Ky5Rs0/wVfwBkfQfUcCuO6+nBSbLIlzJFdjTOTZf4uArH7KPfPO+hhMFTU
-	zGDhROoEmlAsRly6dX+uBWInHyJ3l96YwSlqalfA/ckRFb3ti01b0eTvH62PQr7caG40lu4ZiuW9t
-	X3VA9YtA==;
+	bh=rl0SqbAFZ4kMNin4joPHLFnwsO+d16ZJi4YN6zrV3p0=; b=X5A8S+RF84ajicgGwQRS9Y35oU
+	UG+mdZV40BokHywBYu7M3aftZ4QIJMpQLgebQVJpXyFlrA3C2syCidIoozFpjktO0XEirnIGqzIEG
+	fw3jNyZhQjoZfvVAjjGB+W4KmoU4CeF/nA0EO4pKjDJrepXA0L/IFOzmxESFxVPPuoE03wysV+IfI
+	F+4GjUTqADoFO+UJyKZlfd6D7TNu6/h0YR96BNYKNorRxwANLJcw3LNhlhPtycNd3qbQpqMzQIGGe
+	zk7meKmrpoWxTAp25vRzB1B77uHvCOFMrIVvTQrUOBRxivAVsOxvPkM8++KSS0JvL7A5iuegZnWMY
+	8eqYhDmQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkWqa-0007sl-Vk; Fri, 18 Jan 2019 16:18:21 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gkWqq-00087F-1W; Fri, 18 Jan 2019 16:18:36 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkWo1-0005dy-Ei
- for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 16:16:06 +0000
+ id 1gkWnm-0005NA-U2
+ for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 16:15:32 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1951B168F;
- Fri, 18 Jan 2019 08:15:41 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id AF3291650;
+ Fri, 18 Jan 2019 08:15:25 -0800 (PST)
 Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 290E43F557;
- Fri, 18 Jan 2019 08:15:39 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 923183F557;
+ Fri, 18 Jan 2019 08:15:23 -0800 (PST)
 From: Dave Martin <Dave.Martin@arm.com>
 To: kvmarm@lists.cs.columbia.edu
-Subject: [RFC PATCH 12/12] arm64: [HACK] Check that out-of-range SVE register
- IDs can't be dumped
-Date: Fri, 18 Jan 2019 16:14:21 +0000
-Message-Id: <1547828061-20462-13-git-send-email-Dave.Martin@arm.com>
+Subject: [RFC PATCH 05/12] arm64: Correct ARM64_CORE_REG() size encodings for
+ all core registers
+Date: Fri, 18 Jan 2019 16:14:14 +0000
+Message-Id: <1547828061-20462-6-git-send-email-Dave.Martin@arm.com>
 X-Mailer: git-send-email 2.1.4
 In-Reply-To: <1547828061-20462-1-git-send-email-Dave.Martin@arm.com>
 References: <1547828061-20462-1-git-send-email-Dave.Martin@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_081542_398289_92FBFF9B 
-X-CRM114-Status: GOOD (  11.27  )
+X-CRM114-CacheID: sfid-20190118_081527_664076_FE0C4B81 
+X-CRM114-Status: GOOD (  12.89  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,73 +85,51 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-As a sanity-check that invalid SVE register IDs can't be accessed
-via KVM_GET_ONE_REG, this patch adds code to attempt to do just
-that (at the expense of making dumping even slower).
+ARM64_CORE_REG() is currently only used to generate the KVM
+register IDs for registers that happen to be 64 bits in size, so
+KVM_REG_SIZE_U64 is hard-coded in the definition.
 
-Because of the way the register IDs are encoded, out-of-range slice
-IDs may still result in a valid register encoding, so there is
-nothing to test for that case.
+To enable this macro to generate correct encodings for the FPSIMD
+registers too (which are a mix of 128-bit and 32-bit registers),
+this patch extends the macro to encode the correct size for each
+class of register in KVM_REG_ARM_CORE.
+
+The approach is crude, but because the KVM_REG_ARM_CORE ID
+arrangement is ABI, it's not expected to evolve.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arm/aarch64/kvm-cpu.c | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+ arm/aarch64/kvm-cpu.c | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
 
 diff --git a/arm/aarch64/kvm-cpu.c b/arm/aarch64/kvm-cpu.c
-index 28c5010..6b1580c 100644
+index 1b29374..0aaefaf 100644
 --- a/arm/aarch64/kvm-cpu.c
 +++ b/arm/aarch64/kvm-cpu.c
-@@ -247,7 +247,7 @@ static void show_sve_zn_slice(int debug_fd, struct kvm_cpu const *vcpu,
- 	sappendf(&strp, &strsz, " Z%.2u/%.2u:", n, i);
- 	if (ioctl(vcpu->vcpu_fd, KVM_GET_ONE_REG, &reg) < 0) {
- 		dprintf(debug_fd, "%s(%s)\n", str, strerror(errno));
--		if (vcpu->kvm->cfg.arch.has_sve)
-+		if (n < 32 && vcpu->kvm->cfg.arch.has_sve)
- 			die("Z-reg unexpectedly absent on SVE vcpu");
+@@ -12,8 +12,21 @@
+ #define SCTLR_EL1_E0E_MASK	(1 << 24)
+ #define SCTLR_EL1_EE_MASK	(1 << 25)
  
- 		return;
-@@ -256,6 +256,9 @@ static void show_sve_zn_slice(int debug_fd, struct kvm_cpu const *vcpu,
- 	if (!vcpu->kvm->cfg.arch.has_sve)
- 		die("Z-reg unexpectedly present on non-SVE vcpu");
- 
-+	if (n >= 32)
-+		die("Out-of-range Z-reg unexpectedly present");
+-#define ARM64_CORE_REG(x)	(KVM_REG_ARM64 | KVM_REG_SIZE_U64 | \
+-				 KVM_REG_ARM_CORE | KVM_REG_ARM_CORE_REG(x))
++static __u64 __core_reg_id(__u64 offset)
++{
++	__u64 id = KVM_REG_ARM64 | KVM_REG_ARM_CORE | offset;
 +
- 	sappend_bytes(&strp, &strsz, bytes, sizeof bytes);
- 	dprintf(debug_fd, "%s\n", str);
- }
-@@ -292,7 +295,7 @@ static void show_sve_pn_slice(int debug_fd, struct kvm_cpu const *vcpu,
- 
- 	if (ioctl(vcpu->vcpu_fd, KVM_GET_ONE_REG, &reg) < 0) {
- 		dprintf(debug_fd, "%s(%s)\n", str, strerror(errno));
--		if (vcpu->kvm->cfg.arch.has_sve)
-+		if (n < 16 + 1 /* FFR */ && vcpu->kvm->cfg.arch.has_sve)
- 			die("P-reg unexpectedly absent on SVE vcpu");
- 
- 		return;
-@@ -301,6 +304,9 @@ static void show_sve_pn_slice(int debug_fd, struct kvm_cpu const *vcpu,
- 	if (!vcpu->kvm->cfg.arch.has_sve)
- 		die("P-reg unexpectedly present on non-SVE vcpu");
- 
-+	if (n >= 16 && reg.id != KVM_REG_ARM64_SVE_FFR(i))
-+		die("Out-of-range P-reg unexpectedly present");
++	if (offset < KVM_REG_ARM_CORE_REG(fp_regs))
++		id |= KVM_REG_SIZE_U64;
++	else if (offset < KVM_REG_ARM_CORE_REG(fp_regs.fpsr))
++		id |= KVM_REG_SIZE_U128;
++	else
++		id |= KVM_REG_SIZE_U32;
 +
- 	sappend_bytes(&strp, &strsz, bytes, sizeof bytes);
- 	dprintf(debug_fd, "%s\n", str);
- }
-@@ -406,9 +412,9 @@ void kvm_cpu__show_registers(struct kvm_cpu *vcpu)
- 		dprintf(debug_fd, " ZCR_EL1:0x%lx\n", data);
- 	}
++	return id;
++}
++
++#define ARM64_CORE_REG(x) __core_reg_id(KVM_REG_ARM_CORE_REG(x))
  
--	for (i = 0; i < 32; ++i)
-+	for (i = 0; i < 32 + 1 /* should fail */; ++i)
- 		show_sve_zn(debug_fd, vcpu, i);
- 
--	for (i = 0; i < 16 + 1 /*FFR*/; ++i)
-+	for (i = 0; i < 16 + 1 /* FFR */ + 1 /* should fail */; ++i)
- 		show_sve_pn(debug_fd, vcpu, i);
- }
+ unsigned long kvm_cpu__get_vcpu_mpidr(struct kvm_cpu *vcpu)
+ {
 -- 
 2.1.4
 
