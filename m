@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0DC3FC43612
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:51:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9AB2DC43387
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:52:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BD7F12087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:51:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 64E312087E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 18 Jan 2019 14:52:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="R+g3YZns"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BD7F12087E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iUOrTQHH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 64E312087E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,38 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=yV7Qmm7ZMG3wfTj1NDrQYJPFLn4mPQsDkSXYZwPS03w=; b=R+g3YZnsS7BV9p
-	oZMSFkwQoYZmXXwZRUaW/ZkWId1XDX56AZUiXG3M0i6O6+/MEHXIPhp1OO0t0fTVEIKeDxNELH2er
-	e6lIkG6cdf2ozymuD/+V6Vzzpphcw25yjhZmMQOhTq0dFB9torTN0CNTMJLpH3ZLHvcwG5CHLzK0I
-	jSZ05Gem9s9u2u/6Bn0oggPgd61jsNoMgnYMR8TgdMbRTar8ub3ekSLfezs1MMA6cjNbwmIy3PhJ8
-	WdB5+9lDASOQD3v726i39n+7TbnGTVLIlOCzQbYT1ySsx8hyXdniI4UTELKETcwTPUFmtrFKZ9+cn
-	dz5WZk36GolXG7TgmfXA==;
+	List-Owner; bh=1SC939+37LcFJQ3OszCurI9g4G1hrsU4Jm7zQBnxjEo=; b=iUOrTQHHmeepaa
+	LRX8FxgJPVmZbbB7BLG/P+0ETwAWYtusmTYHrHJ8NUtb67j3UAWg+jY716fsaAef+68kuYPYdSNqI
+	b4GZHidkik4iERON2oPbz5axBoB2ZS0hShyFpHCMxCctigwq9MZzGm8K46FLg4JyPLcAC0bvqC2qS
+	wsC9Wo5RuxwGm8B5YtaTXc4whN7fa87y7xlJbboTFnjG/20DGcjAel2LyGTtDI/9JyIU8jw4NU0aO
+	T7d1VHeGsLyEKxC9P8PATT2GM5WVgc3vxQEmYIx4f2t+K3MH8qvcSN0bB4kn/uYvGcCKWQoIOa/N6
+	FGJGFCO/cS8Ta8zxHT+w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkVUp-0006tF-Te; Fri, 18 Jan 2019 14:51:47 +0000
+	id 1gkVV4-0007Ep-Gl; Fri, 18 Jan 2019 14:52:02 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkVNH-0006WL-03
+ id 1gkVNF-0006b0-DV
  for linux-arm-kernel@lists.infradead.org; Fri, 18 Jan 2019 14:44:17 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id B919A20BE8; Fri, 18 Jan 2019 15:43:54 +0100 (CET)
+ id A1F5620A32; Fri, 18 Jan 2019 15:43:54 +0100 (CET)
 Received: from localhost.localdomain
  (aaubervilliers-681-1-37-87.w90-88.abo.wanadoo.fr [90.88.156.87])
- by mail.bootlin.com (Postfix) with ESMTPSA id 502E320AAA;
+ by mail.bootlin.com (Postfix) with ESMTPSA id 0E87820BE8;
  Fri, 18 Jan 2019 15:43:54 +0100 (CET)
 From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 To: dri-devel@lists.freedesktop.org, linux-arm-kernel@lists.infradead.org,
  linux-kernel@vger.kernel.org, linux-sunxi@googlegroups.com
-Subject: [PATCH v5 23/23] drm/sun4i: frontend: Hook-in support for the A20
-Date: Fri, 18 Jan 2019 15:43:28 +0100
-Message-Id: <20190118144328.20649-24-paul.kocialkowski@bootlin.com>
+Subject: [PATCH v5 22/23] drm/sun4i: frontend: Hook-in support for the A10,
+ with specific quirks
+Date: Fri, 18 Jan 2019 15:43:27 +0100
+Message-Id: <20190118144328.20649-23-paul.kocialkowski@bootlin.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190118144328.20649-1-paul.kocialkowski@bootlin.com>
 References: <20190118144328.20649-1-paul.kocialkowski@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_064359_660232_8859D6DE 
-X-CRM114-Status: GOOD (  10.16  )
+X-CRM114-CacheID: sfid-20190118_064357_871233_B05EA37A 
+X-CRM114-Status: GOOD (  11.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,25 +80,50 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This adds the appropriate device-tree compatible for hooking frontend
-support for the A20. Since the hardware is very similar to the A10, it
-shares the same quirks (which were already introduced).
+This adds the appropriate device-tree compatible and quirk data for
+hooking frontend support for the A20. It supports the FIR coefficients
+ready bit but not the access control bit. It also takes different phase
+values than the A33 for these coefficients.
+
+The compatible is already used in the A10 device-tree and already
+documented in the device-tree bindings.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_frontend.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index 53e4dbe466ff..e8239d4d4dd5 100644
+index 4a215d5202e2..53e4dbe466ff 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -715,6 +715,10 @@ const struct of_device_id sun4i_frontend_of_table[] = {
- 		.compatible = "allwinner,sun4i-a10-display-frontend",
- 		.data = &sun4i_a10_frontend
- 	},
+@@ -682,6 +682,20 @@ static const struct dev_pm_ops sun4i_frontend_pm_ops = {
+ 	.runtime_suspend	= sun4i_frontend_runtime_suspend,
+ };
+ 
++static const struct sun4i_frontend_data sun4i_a10_frontend = {
++	.ch_phase		= {
++		{
++			.horzphase = 0,
++			.vertphase = { 0, 0 },
++		},
++		{
++			.horzphase = 0xfc000,
++			.vertphase = { 0xfc000, 0xfc000 },
++		},
++	},
++	.has_coef_rdy		= true,
++};
++
+ static const struct sun4i_frontend_data sun8i_a33_frontend = {
+ 	.ch_phase		= {
+ 		{
+@@ -697,6 +711,10 @@ static const struct sun4i_frontend_data sun8i_a33_frontend = {
+ };
+ 
+ const struct of_device_id sun4i_frontend_of_table[] = {
 +	{
-+		.compatible = "allwinner,sun7i-a20-display-frontend",
++		.compatible = "allwinner,sun4i-a10-display-frontend",
 +		.data = &sun4i_a10_frontend
 +	},
  	{
