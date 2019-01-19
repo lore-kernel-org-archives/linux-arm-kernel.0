@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D5EB3C5AE5E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 01:44:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B63D8C61CE3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 01:44:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 84A3620850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 01:44:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 776722087E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 01:44:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IeJ9EBfi";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="UJR/ZDiL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 84A3620850
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QhNIlLBs";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="jxwOsEBj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 776722087E
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,49 +27,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=oKhInzoFisXqJfgligl/FKidPmCPpjX7jSxz+Kqi3NE=; b=IeJ9EBfi3lbmNLf2JvchlRb18B
-	/yU+3pLaeGdg/XpOVpE5YOREwcdq/7WpXboMdblUdWp07+wZv3dJ9x/lz8xW/g8VtetViZ6rwEA7r
-	DqBE/TCMa3VSYH9cSGW30UZS087TVGIowpQuiPND2pV+soVoLtsIwd3z0GlgcWFMhF30nTQgDr+2A
-	6g428KLEXL/8DIN3yXa7nQj7VyNJCmOMVUu+31PJvOG2jADR7eSibc3p+SxtnZkKi7sZMO2zXBpGZ
-	0NYWvxyGuhVEfLPnlxYxNwv52B/N4g4wO7K/Oe+/b+KwDRcwV89d9XWr/+X/tNZ3Xhy9rTrHbm8wm
-	QR/tEAtg==;
+	bh=6dnuT1AX5mMXA3EBEhxQvP0+b1xjvuIKataYiyhbxfA=; b=QhNIlLBsPxZasnOUvBVjoeYyKV
+	XvHKjixm+1PvYyZda+cpLo6NPjMg9g6CGX4drG5b1zDiqd/KFat3sRd5gt3kf2BJ2i3W06Ol6W6+R
+	sxMYavezvADyf9zarOQE9m9KmmZl+jBmLC4XI51T503s2KOn76sDtI/vSE0nD9cgosRqGwX+AFdP3
+	0kd1EdkYEmBXIg1+yRMO63ZAuLslJuKA9f77H9XuEXuGgh14IVCJgobBMTUskg/8iiNENrEfX5/6H
+	nOlt4V7oyCgSEEnHoCeU2J2321Bj6pCPE6xRTj6TXTNI2ukd2X1N4xhIZk9QQIDwvdw2F30aTBqV1
+	kW9l2PQw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkfgP-0001hc-KY; Sat, 19 Jan 2019 01:44:25 +0000
-Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
+	id 1gkfgd-0001rz-QF; Sat, 19 Jan 2019 01:44:39 +0000
+Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkfgA-0001Sz-KF
- for linux-arm-kernel@lists.infradead.org; Sat, 19 Jan 2019 01:44:17 +0000
-Received: by mail-pg1-x542.google.com with SMTP id y4so6850607pgc.12
+ id 1gkfgE-0001WC-5M
+ for linux-arm-kernel@lists.infradead.org; Sat, 19 Jan 2019 01:44:18 +0000
+Received: by mail-pl1-x643.google.com with SMTP id u6so7078990plm.8
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 18 Jan 2019 17:44:09 -0800 (PST)
+ Fri, 18 Jan 2019 17:44:13 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=jETu+BduxrzXdBTSoIHDOv28Ri7iXymF5DJaIor1gtI=;
- b=UJR/ZDiLrjsIi9UcHwH4vY5U6Z90QraRTn+RRpSe4uSHbu8vCGNQiDKM6DoVc7aJoU
- 9deaQGz1NS/r9W8SPTrMsbninLi8UUuIVDTKQ0/eo21TQ4WaMoF4BdRzhKmdgklUljK/
- ZjkVKboyhwsZShHi77LZBbotd/1pNsLp0lXdM=
+ bh=XJIZCAPULyAuE6ru9p7H4wc2p68zHe0RBmLv7q7ns4s=;
+ b=jxwOsEBjpjW0GJM/td1qH6zm7wudD+4sCp+8LXIz47JqSIhwAYsVSdJMNFpmXa/Gla
+ gXQ8sbU+tXqH2huWye7ZW+i+yzoLz/8MHpjFQXGqqXrsWCjt/7/K9XlkWQuPD4IwL78R
+ 9GKQY/WlRP/b+G0i5FVvT3xxK9hJP5yXG0u/M=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=jETu+BduxrzXdBTSoIHDOv28Ri7iXymF5DJaIor1gtI=;
- b=neGL4L3nnRSIvWbYTHL0jNcuTKbxc5sVLijR49rXINSnSqInTC1vou+JzyfCEpSmwp
- YDx4bithNau2VQrUOQ1v6WL/gaAi9E+AcRIHJSIuhID86B5OBcsSJxMiXte4XZ9s6oXx
- 7FhHMcYer8jeenLcLZPC2DV1iP9bR45rUwht1TUx96o1Ph3Xk8o1Gq43ifk0lWXEChce
- XcCJFa780hN10Diht0svoAlbsYylcPQPLz0RfwWqad4gToOPRCSu2QnwVG6mCDGkDnp5
- 3yc6kIPsNOdBOXLCRph1Y493xAgYbRGI6kFCa8y0EccrkoC1PntWxdZ5gTRbdRdXbG8V
- OvQg==
-X-Gm-Message-State: AJcUukfDBvhCr/nGDwROUBWy9Gov1cXBu8TCNlWXHZuFIs5viQkgnbGs
- +/fE6iq65WL19NRy0wuREueX0Q==
-X-Google-Smtp-Source: ALg8bN79tjDtBMZp6UuoXC+x3eva11l1rLyjvJBpSU+Uduh8IjCTpWpfl4YpJtBFLjEuJdIqZ5rqkg==
-X-Received: by 2002:a62:6204:: with SMTP id w4mr21762120pfb.5.1547862249054;
- Fri, 18 Jan 2019 17:44:09 -0800 (PST)
+ bh=XJIZCAPULyAuE6ru9p7H4wc2p68zHe0RBmLv7q7ns4s=;
+ b=JOxrM/KAdaPt2R2jMQ3JSQn06XBHWSVQpkcopz74LKi8Rg9gw2R++wG0Hu2/m1j2Dd
+ VuMmEP2iDjLpYKOZSyKapPwrSViYmv8w4sy3QQ6Jrr2/mP5THCrv/N/CQm7VQKDGmtGq
+ JHYdsguemSwDXRIAuRwgxJAX2WNXWMrURsNOHtsUmULsQemCsxl87l8q2wKAJhYwfESf
+ H5i61X4Q2wAU3Aiz9JDb6XFQhJjBW8BqQTfJZ9FgdKt45JSprL8MGDNLgJlllcyERs5S
+ pXHVDgqLgz7JsheSYyWsNfH5lWc7H1obEW5WlOkspRzvmRW8vs2beQTe6WD/YejT8mbs
+ jGMg==
+X-Gm-Message-State: AJcUukeaMACK0Ba/dUmtySlUFbSvjdG0tJFFPLu/aJgHO0ZkGt2tKeCJ
+ /qq0zcxar3HWyAVQ+llX7raCdw==
+X-Google-Smtp-Source: ALg8bN7ukwSnwooLMcnROslY/XDuGYQ3Z/QZowUUmmmEf7VONnwckZrXcMcFeww2WvgLmq3sz55lvw==
+X-Received: by 2002:a17:902:b48b:: with SMTP id
+ y11mr20633017plr.200.1547862252857; 
+ Fri, 18 Jan 2019 17:44:12 -0800 (PST)
 Received: from localhost.localdomain (li421-24.members.linode.com.
  [50.116.3.24])
- by smtp.gmail.com with ESMTPSA id d21sm8648436pfo.162.2019.01.18.17.44.05
+ by smtp.gmail.com with ESMTPSA id d21sm8648436pfo.162.2019.01.18.17.44.09
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 18 Jan 2019 17:44:08 -0800 (PST)
+ Fri, 18 Jan 2019 17:44:12 -0800 (PST)
 From: Leo Yan <leo.yan@linaro.org>
 To: Arnaldo Carvalho de Melo <acme@kernel.org>,
  Mathieu Poirier <mathieu.poirier@linaro.org>,
@@ -79,15 +80,16 @@ To: Arnaldo Carvalho de Melo <acme@kernel.org>,
  Mike Leach <mike.leach@linaro.org>, Robert Walker <robert.walker@arm.com>,
  linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
  Coresight ML <coresight@lists.linaro.org>
-Subject: [PATCH v6 1/8] perf cs-etm: Add last instruction information in packet
-Date: Sat, 19 Jan 2019 09:43:40 +0800
-Message-Id: <20190119014347.27441-2-leo.yan@linaro.org>
+Subject: [PATCH v6 2/8] perf cs-etm: Set sample flags for instruction range
+ packet
+Date: Sat, 19 Jan 2019 09:43:41 +0800
+Message-Id: <20190119014347.27441-3-leo.yan@linaro.org>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20190119014347.27441-1-leo.yan@linaro.org>
 References: <20190119014347.27441-1-leo.yan@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_174411_108550_FA3D3421 
-X-CRM114-Status: GOOD (  12.91  )
+X-CRM114-CacheID: sfid-20190118_174414_782013_9D9A122A 
+X-CRM114-Status: GOOD (  19.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,85 +108,183 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Decoder provides last instruction related information, these information
-can be used for trace analysis; specifically we can get to know what
-kind of branch instruction has been executed, mainly the information
-are contained in three element fields:
+The perf sample data contains flags to indicate the hardware trace data
+is belonging to which type branch instruction, thus this can be used to
+print out the human readable string.  Arm CoreSight ETM sample data is
+missed to set flags and it is always set to zeros, this results in perf
+tool skips to print string for instruction types.
 
-  last_i_type: this is significant type for waypoint calculation, it
-  indicates the last instruction is one of immediate branch instruction,
-  indirect branch instruction, instruction barrier (ISB), or data
-  barrier (DSB/DMB).
-
-  last_i_subtype: this is used for instruction sub type, it can be
-  branch with link, ARMv8 return instruction, ARMv8 eret instruction
-  (return from exception), or ARMv7 instruction which could imply
-  return (e.g. MOV PC, LR; POP { ,PC}).
-
-  last_instr_cond: it indicates if the last instruction was conditional.
-
-But these three fields are not saved into cs_etm_packet struct, thus
-cs-etm layer don't know related information and cannot generate sample
-flags for branch instructions.
-
-This patch add corresponding three new fields in cs_etm_packet struct
-and save related value into the packet structure, it is preparation for
-supporting sample flags.
+This patch is to set branch instruction flags for instruction range
+packet.
 
 Signed-off-by: Leo Yan <leo.yan@linaro.org>
 ---
- tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 9 +++++++++
- tools/perf/util/cs-etm-decoder/cs-etm-decoder.h | 3 +++
- 2 files changed, 12 insertions(+)
+ .../perf/util/cs-etm-decoder/cs-etm-decoder.c |  2 +
+ .../perf/util/cs-etm-decoder/cs-etm-decoder.h |  1 +
+ tools/perf/util/cs-etm.c                      | 90 ++++++++++++++++++-
+ 3 files changed, 91 insertions(+), 2 deletions(-)
 
 diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-index 8c155575c6c5..8a19310500d9 100644
+index 8a19310500d9..e98ee49a1527 100644
 --- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
 +++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-@@ -290,6 +290,9 @@ static void cs_etm_decoder__clear_buffer(struct cs_etm_decoder *decoder)
- 		decoder->packet_buffer[i].instr_count = 0;
- 		decoder->packet_buffer[i].last_instr_taken_branch = false;
- 		decoder->packet_buffer[i].last_instr_size = 0;
-+		decoder->packet_buffer[i].last_instr_type = 0;
-+		decoder->packet_buffer[i].last_instr_subtype = 0;
-+		decoder->packet_buffer[i].last_instr_cond = 0;
+@@ -293,6 +293,7 @@ static void cs_etm_decoder__clear_buffer(struct cs_etm_decoder *decoder)
+ 		decoder->packet_buffer[i].last_instr_type = 0;
+ 		decoder->packet_buffer[i].last_instr_subtype = 0;
+ 		decoder->packet_buffer[i].last_instr_cond = 0;
++		decoder->packet_buffer[i].flags = 0;
  		decoder->packet_buffer[i].cpu = INT_MIN;
  	}
  }
-@@ -323,6 +326,9 @@ cs_etm_decoder__buffer_packet(struct cs_etm_decoder *decoder,
- 	decoder->packet_buffer[et].instr_count = 0;
- 	decoder->packet_buffer[et].last_instr_taken_branch = false;
- 	decoder->packet_buffer[et].last_instr_size = 0;
-+	decoder->packet_buffer[et].last_instr_type = 0;
-+	decoder->packet_buffer[et].last_instr_subtype = 0;
-+	decoder->packet_buffer[et].last_instr_cond = 0;
+@@ -329,6 +330,7 @@ cs_etm_decoder__buffer_packet(struct cs_etm_decoder *decoder,
+ 	decoder->packet_buffer[et].last_instr_type = 0;
+ 	decoder->packet_buffer[et].last_instr_subtype = 0;
+ 	decoder->packet_buffer[et].last_instr_cond = 0;
++	decoder->packet_buffer[et].flags = 0;
  
  	if (decoder->packet_count == MAX_BUFFER - 1)
  		return OCSD_RESP_WAIT;
-@@ -366,6 +372,9 @@ cs_etm_decoder__buffer_range(struct cs_etm_decoder *decoder,
- 	packet->start_addr = elem->st_addr;
- 	packet->end_addr = elem->en_addr;
- 	packet->instr_count = elem->num_instr_range;
-+	packet->last_instr_type = elem->last_i_type;
-+	packet->last_instr_subtype = elem->last_i_subtype;
-+	packet->last_instr_cond = elem->last_instr_cond;
- 
- 	switch (elem->last_i_type) {
- 	case OCSD_INSTR_BR:
 diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
-index a6407d41598f..7cdd6a9c68a7 100644
+index 7cdd6a9c68a7..23600e57a215 100644
 --- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
 +++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
-@@ -43,6 +43,9 @@ struct cs_etm_packet {
- 	u64 start_addr;
- 	u64 end_addr;
+@@ -45,6 +45,7 @@ struct cs_etm_packet {
  	u32 instr_count;
-+	u32 last_instr_type;
-+	u32 last_instr_subtype;
-+	u8 last_instr_cond;
+ 	u32 last_instr_type;
+ 	u32 last_instr_subtype;
++	u32 flags;
+ 	u8 last_instr_cond;
  	u8 last_instr_taken_branch;
  	u8 last_instr_size;
- 	int cpu;
+diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+index 27a374ddf661..d05cac5295f1 100644
+--- a/tools/perf/util/cs-etm.c
++++ b/tools/perf/util/cs-etm.c
+@@ -12,6 +12,7 @@
+ #include <linux/log2.h>
+ #include <linux/types.h>
+ 
++#include <opencsd/ocsd_if_types.h>
+ #include <stdlib.h>
+ 
+ #include "auxtrace.h"
+@@ -719,7 +720,7 @@ static int cs_etm__synth_instruction_sample(struct cs_etm_queue *etmq,
+ 	sample.stream_id = etmq->etm->instructions_id;
+ 	sample.period = period;
+ 	sample.cpu = etmq->packet->cpu;
+-	sample.flags = 0;
++	sample.flags = etmq->prev_packet->flags;
+ 	sample.insn_len = 1;
+ 	sample.cpumode = event->sample.header.misc;
+ 
+@@ -778,7 +779,7 @@ static int cs_etm__synth_branch_sample(struct cs_etm_queue *etmq)
+ 	sample.stream_id = etmq->etm->branches_id;
+ 	sample.period = 1;
+ 	sample.cpu = etmq->packet->cpu;
+-	sample.flags = 0;
++	sample.flags = etmq->prev_packet->flags;
+ 	sample.cpumode = event->sample.header.misc;
+ 
+ 	/*
+@@ -1107,6 +1108,80 @@ static int cs_etm__end_block(struct cs_etm_queue *etmq)
+ 	return 0;
+ }
+ 
++static int cs_etm__set_sample_flags(struct cs_etm_queue *etmq)
++{
++	struct cs_etm_packet *packet = etmq->packet;
++
++	switch (packet->sample_type) {
++	case CS_ETM_RANGE:
++		/*
++		 * Immediate branch instruction without neither link nor
++		 * return flag, it's normal branch instruction within
++		 * the function.
++		 */
++		if (packet->last_instr_type == OCSD_INSTR_BR &&
++		    packet->last_instr_subtype == OCSD_S_INSTR_NONE) {
++			packet->flags = PERF_IP_FLAG_BRANCH;
++
++			if (packet->last_instr_cond)
++				packet->flags |= PERF_IP_FLAG_CONDITIONAL;
++		}
++
++		/*
++		 * Immediate branch instruction with link (e.g. BL), this is
++		 * branch instruction for function call.
++		 */
++		if (packet->last_instr_type == OCSD_INSTR_BR &&
++		    packet->last_instr_subtype == OCSD_S_INSTR_BR_LINK)
++			packet->flags = PERF_IP_FLAG_BRANCH |
++					PERF_IP_FLAG_CALL;
++
++		/*
++		 * Indirect branch instruction with link (e.g. BLR), this is
++		 * branch instruction for function call.
++		 */
++		if (packet->last_instr_type == OCSD_INSTR_BR_INDIRECT &&
++		    packet->last_instr_subtype == OCSD_S_INSTR_BR_LINK)
++			packet->flags = PERF_IP_FLAG_BRANCH |
++					PERF_IP_FLAG_CALL;
++
++		/*
++		 * Indirect branch instruction with subtype of
++		 * OCSD_S_INSTR_V7_IMPLIED_RET, this is explicit hint for
++		 * function return for A32/T32.
++		 */
++		if (packet->last_instr_type == OCSD_INSTR_BR_INDIRECT &&
++		    packet->last_instr_subtype == OCSD_S_INSTR_V7_IMPLIED_RET)
++			packet->flags = PERF_IP_FLAG_BRANCH |
++					PERF_IP_FLAG_RETURN;
++
++		/*
++		 * Indirect branch instruction without link (e.g. BR), usually
++		 * this is used for function return, especially for functions
++		 * within dynamic link lib.
++		 */
++		if (packet->last_instr_type == OCSD_INSTR_BR_INDIRECT &&
++		    packet->last_instr_subtype == OCSD_S_INSTR_NONE)
++			packet->flags = PERF_IP_FLAG_BRANCH |
++					PERF_IP_FLAG_RETURN;
++
++		/* Return instruction for function return. */
++		if (packet->last_instr_type == OCSD_INSTR_BR_INDIRECT &&
++		    packet->last_instr_subtype == OCSD_S_INSTR_V8_RET)
++			packet->flags = PERF_IP_FLAG_BRANCH |
++					PERF_IP_FLAG_RETURN;
++		break;
++	case CS_ETM_DISCONTINUITY:
++	case CS_ETM_EXCEPTION:
++	case CS_ETM_EXCEPTION_RET:
++	case CS_ETM_EMPTY:
++	default:
++		break;
++	}
++
++	return 0;
++}
++
+ static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
+ {
+ 	struct cs_etm_auxtrace *etm = etmq->etm;
+@@ -1158,6 +1233,17 @@ static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
+ 					 */
+ 					break;
+ 
++				/*
++				 * Since packet addresses are swapped in packet
++				 * handling within below switch() statements,
++				 * thus setting sample flags must be called
++				 * prior to switch() statement to use address
++				 * information before packets swapping.
++				 */
++				err = cs_etm__set_sample_flags(etmq);
++				if (err < 0)
++					break;
++
+ 				switch (etmq->packet->sample_type) {
+ 				case CS_ETM_RANGE:
+ 					/*
 -- 
 2.17.1
 
