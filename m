@@ -2,22 +2,22 @@ Return-Path: <SRS0=AzG1=P3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D7AC7C0031C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 03:46:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 02D49C61CE4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 09:51:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 98C2C2086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 03:46:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C61FC2086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 09:51:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rJTwlWQf";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="2HfoSTqM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 98C2C2086D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JRw9tYY0";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="tM/xZax4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C61FC2086D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,56 +25,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=iL9axHJuxbiukwqjdk7/3ucKrtQU/hDFHGP+l6VrROY=; b=rJTwlWQfJd7AZP
-	BegyZjBWmZGXRHhduzpGAyrLHTaYcqd5vdQeaNh7US5X0ptp8EKM6uhsBgZtolvpu3SJtWFAIIx3t
-	B2DTHLJGdx+S31ujJP379mhdLIgYtBX3+qtHp+JOp79moCzFmX92aOk99EQzmpTasa3GoF5c1crDI
-	236M1c/y/AO0GRiQd7ynjsnhlpBGalq6rIvA4clHzq1dqbM/QLVtHuYstZiOlaVTZFS4U5JFwIa+N
-	Lziq020xUm5NpzDMDZaLYBH0veBUBGEquZapuTVRFCyEJpSdvZ3P22IgT+a+SB1YsivIkG99hDmci
-	nHcSAsxOJIhPyBSTYd6g==;
+	List-Owner; bh=KbUSx5YgEbtL971qgcpiUUdARJ0J9uEWGx9SvlYfpFA=; b=JRw9tYY0pqwhuU
+	NSu9fK2LY681IP8B8VtkavCCEivQ98/whDZahUGlyS7+4ktooEoCTUifUa9ZRKVsvdicJNZ1Yw2dx
+	i/U5LAiI/a0xTKGRGxHJ/FSCAZP9AI+P5ABOeQ0SbVL4GM4IrkbWDFjK0lKFHI4OW4MnyrBggMjCd
+	YY0yh+MiF7SxKDr2PwrZAr7UCtAEhZJnfFK5LwgIT+zaoP0xvsCZDXcFn4ymXH8N6jIbm9n1IbqX1
+	wbPmaacjnAoOrdpvcKbQEUrbwDSf4XQy07PVyfikFV7e1k8kb0P5/ikI4PASCZK4MPi+pM5CKnfwM
+	Yi/6yHUqDIqLJ3swsQlQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkha5-0008I7-NO; Sat, 19 Jan 2019 03:46:01 +0000
-Received: from conssluserg-01.nifty.com ([210.131.2.80])
+	id 1gknHc-0003Cg-V8; Sat, 19 Jan 2019 09:51:20 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkha2-0008Hn-5I
- for linux-arm-kernel@lists.infradead.org; Sat, 19 Jan 2019 03:46:00 +0000
-Received: from mail-vk1-f176.google.com (mail-vk1-f176.google.com
- [209.85.221.176]) (authenticated)
- by conssluserg-01.nifty.com with ESMTP id x0J3jVFw009777
- for <linux-arm-kernel@lists.infradead.org>; Sat, 19 Jan 2019 12:45:32 +0900
-DKIM-Filter: OpenDKIM Filter v2.10.3 conssluserg-01.nifty.com x0J3jVFw009777
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
- s=dec2015msa; t=1547869533;
- bh=GmXcVg56/uy4EXsHvS3OpOX4Tq5rsuK7nLrJEUMmhfk=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=2HfoSTqMSZJ48GK1ldLSQEQz2+KriWPObm/vnKHN8W6/7I96cXXN+p3+OGqQi+Avc
- q+rvXXIZbrBhfi4pI6vtzHDilWbyMbIsUj6l8nmuNixJuGcXSD8URmTD6MQ+WEfLtM
- mO5xx6EvrCS87Uukpb2tf16A8XP9fQ6KX/AXcxw9nWLS8oG+ygB8FsSI4BIv0K/4Ti
- Sxz21Vql6Fv0X0qrqWD37ipzUaYZeDt2/MYlXWK6oS5wxULkbcZ12H7HNVAHo0XsVb
- 0kRQGpzvybhDUKMiZg5NsDuGU27SYqeAufUwL1PRr6dVl8b0b1YlZxKA5Zrqmizb5y
- p6QO5WQogHdxA==
-X-Nifty-SrcIP: [209.85.221.176]
-Received: by mail-vk1-f176.google.com with SMTP id o130so3524593vke.10
+ id 1gknHY-0003CH-4t
+ for linux-arm-kernel@lists.infradead.org; Sat, 19 Jan 2019 09:51:18 +0000
+Received: from mail-lf1-f50.google.com (mail-lf1-f50.google.com
+ [209.85.167.50])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 3D4EB208E4
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 18 Jan 2019 19:45:32 -0800 (PST)
-X-Gm-Message-State: AJcUukftlf2+TOXKKC++SBnGyRB6N40vZF6Kne4Iu+aTHSI+hhGVXVbt
- ErZ/vVrH3l6CYTgRk6Xp/hk35xS+h1MT48zVDV8=
-X-Google-Smtp-Source: ALg8bN7ZGFaB/Nw1ZFyZkyYobPx6HU9H8wxgHrPHpk2faygYiBBU9Pd0xgDvPOBSZolhe7AlXD+V/pzwadN/L1fdBRA=
-X-Received: by 2002:a1f:91cb:: with SMTP id t194mr8320663vkd.74.1547869531293; 
- Fri, 18 Jan 2019 19:45:31 -0800 (PST)
+ Sat, 19 Jan 2019 09:51:14 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1547891474;
+ bh=HBrjP4nc2mNBCjxtzgXzaKYXXq7POoiuBjp/ZCoUM54=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=tM/xZax4JRm/Ux1Ecjbm23VR6khECWXe0JrJtZciqiZ+1+e16UWvsOgdpniBu+/6d
+ tdtUlyEfkmZQfRPy773wNY+m9Pnh+Vh00/XQhr2kd9cvYY23dSyYr6S+1TD2bGnS28
+ 5Cl6CjdkeHGSm5k6rxGsJI6Y+SAQLyH98l6CNS8U=
+Received: by mail-lf1-f50.google.com with SMTP id c16so12236823lfj.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sat, 19 Jan 2019 01:51:14 -0800 (PST)
+X-Gm-Message-State: AJcUukes+Mlia5XPZdsRIIEhC7IZxABOEqilBiwx8pycXQSX2vsEDxto
+ hWdp91g1hNEUZM8PZ2Q6pAW5ZXDUSd5CxlnAqsc=
+X-Google-Smtp-Source: ALg8bN5E04/Q7+E3ia0Ttk3pzkyiGjYyMCQoBayf36D0BTIFFC5J49aGa9/0gQxTyuDIpDPh0Qo69becbLkBLa9ODO4=
+X-Received: by 2002:ac2:554b:: with SMTP id l11mr14164647lfk.92.1547891472281; 
+ Sat, 19 Jan 2019 01:51:12 -0800 (PST)
 MIME-Version: 1.0
-References: <1547827230-55132-1-git-send-email-andrew.murray@arm.com>
-In-Reply-To: <1547827230-55132-1-git-send-email-andrew.murray@arm.com>
-From: Masahiro Yamada <yamada.masahiro@socionext.com>
-Date: Sat, 19 Jan 2019 12:44:55 +0900
-X-Gmail-Original-Message-ID: <CAK7LNAR_GHpqKC3bC_-eC+64Kn+h2md70NpshUHUUN0kNQa0cQ@mail.gmail.com>
-Message-ID: <CAK7LNAR_GHpqKC3bC_-eC+64Kn+h2md70NpshUHUUN0kNQa0cQ@mail.gmail.com>
-Subject: Re: [Linux-eng] [RFC 0/3] Abstract empty functions with STUB_UNLESS
- macro
-To: Andrew Murray <andrew.murray@arm.com>
+References: <CAJKOXPdHhUGoQmrX8_23MfbibozipkAzXA_5woVSFJSK9BvbXw@mail.gmail.com>
+ <CAJKOXPe7ot9TLajErKJjSAkbs2vObMJfATzEFwxpT16aFdXHqg@mail.gmail.com>
+ <67560e58-93b3-2bfa-9d5d-5956dae47806@gmail.com>
+ <68b565a2-7813-57a2-1687-43568e53fade@gmail.com>
+In-Reply-To: <68b565a2-7813-57a2-1687-43568e53fade@gmail.com>
+From: Krzysztof Kozlowski <krzk@kernel.org>
+Date: Sat, 19 Jan 2019 10:51:01 +0100
+X-Gmail-Original-Message-ID: <CAJKOXPdbPa_iHwhRccAd41r_OV=q036BE0dNP7YsXSBogr7o3A@mail.gmail.com>
+Message-ID: <CAJKOXPdbPa_iHwhRccAd41r_OV=q036BE0dNP7YsXSBogr7o3A@mail.gmail.com>
+Subject: Re: [BUG bisect] Missing Micrel driver on VF50 (net: phy: check
+ return code when requesting PHY driver module)
+To: Heiner Kallweit <hkallweit1@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_194558_436709_83ECE5B8 
-X-CRM114-Status: GOOD (  17.05  )
+X-CRM114-CacheID: sfid-20190119_015116_236656_AFE993A4 
+X-CRM114-Status: GOOD (  20.41  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,129 +87,68 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rafael Wysocki <rjw@rjwysocki.net>, Kees Cook <keescook@chromium.org>,
- Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Steven Price <Steven.Price@arm.com>, Grant Likely <Grant.Likely@arm.com>,
- Andrew Morton <akpm@linux-foundation.org>, Dave P Martin <Dave.Martin@arm.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Andrew Lunn <andrew@lunn.ch>, Florian Fainelli <f.fainelli@gmail.com>,
+ netdev@vger.kernel.org, linux-kernel@vger.kernel.org,
+ Stefan Agner <stefan@agner.ch>, "David S. Miller" <davem@davemloft.net>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, Jan 19, 2019 at 1:02 AM Andrew Murray <andrew.murray@arm.com> wrote:
+On Fri, 18 Jan 2019 at 22:30, Heiner Kallweit <hkallweit1@gmail.com> wrote:
 >
-> A common pattern found in header files is a function declaration dependent
-> on a CONFIG_ option being enabled, followed by an empty function for when
-> that option isn't enabled. This boilerplate code can often take up a lot
-> of space and impact code readability.
->
-> This series introduces a STUB_UNLESS macro that simplifies header files as
-> follows:
->
-> STUB_UNLESS(CONFIG_FOO, [body], prototype)
->
-> This evaluates to 'prototype' prepended with 'extern' if CONFIG_FOO is set
-> to 'y'. Otherwise it will evaluate to 'prototype' prepended with 'static
-> inline' followed by an empty function body. Where optional argument 'body'
-> is present then 'body' will be used as the function body, intended to allow
-> simple return statements. Using the macro results in hunks such as this:
->
-> -#ifdef CONFIG_HAVE_HW_BREAKPOINT
-> -extern void hw_breakpoint_thread_switch(struct task_struct *next);
-> -extern void ptrace_hw_copy_thread(struct task_struct *task);
-> -#else
-> -static inline void hw_breakpoint_thread_switch(struct task_struct *next)
-> -{
-> -}
-> -static inline void ptrace_hw_copy_thread(struct task_struct *task)
-> -{
-> -}
-> -#endif
-> +STUB_UNLESS(CONFIG_HAVE_HW_BREAKPOINT,
-> +void hw_breakpoint_thread_switch(struct task_struct *next));
-> +
-> +STUB_UNLESS(CONFIG_HAVE_HW_BREAKPOINT,
-> +void ptrace_hw_copy_thread(struct task_struct *task));
->
-> This may or may not be considered as more desirable than the status quo.
->
-> This series updates arm64 and perf to use the macro as an example.
->
-> Andrew Murray (3):
->   kconfig.h: abstract empty functions with STUB_UNLESS macro
->   cpufreq: update headers to use STUB_UNLESS macro
->   arm64: update headers to use STUB_UNLESS macro
->
->  arch/arm64/include/asm/acpi.h           | 38 +++++++++-------------
->  arch/arm64/include/asm/alternative.h    |  6 +---
->  arch/arm64/include/asm/cpufeature.h     |  6 +---
->  arch/arm64/include/asm/cpuidle.h        | 18 +++--------
->  arch/arm64/include/asm/debug-monitors.h | 10 ++----
->  arch/arm64/include/asm/fpsimd.h         | 57 +++++++++++++--------------------
->  arch/arm64/include/asm/hw_breakpoint.h  | 16 +++------
->  arch/arm64/include/asm/kasan.h          |  9 ++----
->  arch/arm64/include/asm/numa.h           | 19 ++++-------
->  arch/arm64/include/asm/ptdump.h         | 13 +++-----
->  arch/arm64/include/asm/signal32.h       | 29 +++++------------
->  include/linux/cpufreq.h                 | 21 ++++--------
->  include/linux/kconfig.h                 | 31 ++++++++++++++++++
->  13 files changed, 110 insertions(+), 163 deletions(-)
->
-> --
-> 2.7.4
->
+> On 18.01.2019 21:58, Heiner Kallweit wrote:
+> > On 18.01.2019 09:48, Krzysztof Kozlowski wrote:
+> >> On Fri, 18 Jan 2019 at 09:39, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> >>>
+> >>> Hi,
+> >>>
+> >>> On today's next (next-20190118) my Colibri VF50 board fails to boot up
+> >>> from network (DHCP, NFSv4 root). Looks like missing network adapter.
+> >>> Expected:
+> >>> [ 3.041773] Micrel KSZ8041 400d1000.ethernet-1:00: attached PHY driver
+> >>> [Micrel KSZ8041] (mii_bus:phy_addr=400d1000.ethernet-1:00, irq=POLL)
+> >>>
+> >>> Result:
+> >>> [ 15.614964] Root-NFS: no NFS server address
+> >>> [ 15.619353] VFS: Unable to mount root fs via NFS, trying floppy.
+> >>> [ 15.626762] VFS: Cannot open root device "nfs" or unknown-block(2,0): error -6
+> >>> [ 15.634252] Please append a correct "root=" boot option; here are the
+> >>> available partitions:
+> >>> [ 15.642791] 0100 16384 ram0
+> >>> [ 15.642804] (driver?)
+> >>> [ 15.649076] Kernel panic - not syncing: VFS: Unable to mount root fs
+> >>> on unknown-block(2,0)
+> >>> [ 15.657423] ---[ end Kernel panic - not syncing: VFS: Unable to mount
+> >>> root fs on unknown-block(2,0) ]---
+> >>>
+> >>> Bisect pointed to:
+> >>>     net: phy: check return code when requesting PHY driver module
+> >>
+> >> I see now in the logs:
+> >> [ 2.436822] mdio_bus 400d1000.ethernet-1:00: error -2 loading PHY
+> >> driver module for ID 0x00221513
+> >> which is kind of misleading. There is no initramfs so there is no
+> >> usermod library at this point. It is not needed. This seems to break
+> >> all DHCP/NFS root boots without initrd/initramfs.
+> >>
+> > Thanks for the report. Could you please provide your kernel config
+> > and the syslog of a boot before or w/o the patch in question?
+> >
+> > If you boot via nfs then I'd expect that the PHY driver is built-in and
+> > not a module. Therefore it's not fully clear to me yet why
+> > request_module() returns -ENOENT.
+> >
+> OK, I see. The -ENOENT could refer to the modprobe binary, not the PHY
+> driver module. Still it would be helpful to see the kernel config and
+> the requested log.
 
-Honestly, I am not a big fan of shorting the code
-for the purpose of shorting.
+As I wrote - there is no initramfs so there is no modprobe binary
+neither. The log and config were attached to the first email.
 
-
-This patch series is based on the assumption
-the first argument is "defined or undefined".
-In other words, it cannot handle tristate CONFIG option.
-
-
-But, if you go this way, could you make
-it work in a more generic manner?
-
-And, decouple this from <linux/kconfig.h>
-
-
-
-For example, see the following cases:
-
-https://github.com/torvalds/linux/blob/v5.0-rc2/include/acpi/button.h#L7
-
-https://github.com/torvalds/linux/blob/v5.0-rc2/include/linux/firmware.h#L42
-
-
-
-
-The latter is a good example.
-
-In many cases, the kernel headers look like this:
-
-
-#ifdef CONFIG_FOO
-
-  { large block of prototype declaration }
-
-#else
-
-  { large block of nop stubs }
-
-#endif
-
-
-So, this approach shifts "duplication of prototype"
-into "duplication of conditional part".
-
-
--- 
-Best Regards
-Masahiro Yamada
+Best regards,
+Krzysztof
 
 _______________________________________________
 linux-arm-kernel mailing list
