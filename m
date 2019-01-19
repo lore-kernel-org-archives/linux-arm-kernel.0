@@ -5,19 +5,20 @@ X-Spam-Level:
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C98FBC61CE4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 21:18:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EDFF9C61CE8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 21:18:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8ED6A2086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 21:18:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9E03D2086D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 21:18:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DT3wV1/W";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="eFLdKf8T"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8ED6A2086D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NTpXAlYB";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="IdEfYyXa"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9E03D2086D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,63 +28,63 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=JsXZdTYBf5sHlwFZHIlwBnsJ2OzZXfduXbWQZ7KyOak=; b=DT3wV1/WI2jyWz37s+g7q4sL+J
-	2YVw5POquMSa423mGhX8FNqvUmMrPnyIHPpNaA6oAuW9GUCos6qO9QSqdE5fb49YEABFiYtHrLlHe
-	0sO5ZyjMVfocYYdEXLaszF4Xy5gUUARqsRSIJSdAJFYsvJ9oMt3rzjCZuMXw94kVkf26s++k1Z6UL
-	9PheXcs5vVVk56kxtWDWILjaT0QOtLgxgJaoL3K85gZ3moEluGaw3j/PBp2+L/FWMuBKh0bN0mkOs
-	IlyULWy3VmcuEDTTt8ie+jJ6H3hG93cHFGziOM/qPoyeo2NwmLJvKYaa5cmVjGMoX25LNrhZP8gl1
-	pFV7og0w==;
+	bh=niQDX1m3ysobRt6kR/WR+f2jLsK9ncYfMn5Zqjk3ekk=; b=NTpXAlYB4kzJpU/tgInWlx1qyU
+	mfs4O+Tq3buUrK6ANbC9Xu68SQAJBy2N/vwH25NXt0QMGB2bt6Eth594FvyBCnLupzL8//EhJYdeo
+	XiSVoJSdh/c6wKLvwGchaWw/xaEgXeMqFt5ZjCS11CRttrJ+/IDruUJsrMTMST8EMyL4/iB0xUmv6
+	yreRQpgo6912cCWPN4iecBK6ctKQGa6ylUUam3MqCyioN2BlVwTetXa5jdq3eS60irPyKwR8nqiW+
+	xULjQW8Ulzscwr4a2F111VG9mIdB0pTWZMcX+cJZ9yeOeSyXKgBR6xMi7V0155X0n/5VpE+CfTa/r
+	JAUcOpSw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gky0h-0004gz-OT; Sat, 19 Jan 2019 21:18:35 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1gky0v-0004uq-5j; Sat, 19 Jan 2019 21:18:49 +0000
+Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gky0e-0004gK-Bg
- for linux-arm-kernel@lists.infradead.org; Sat, 19 Jan 2019 21:18:33 +0000
-Received: by mail-wr1-x441.google.com with SMTP id z5so19026334wrt.11
+ id 1gky0h-0004gw-4y
+ for linux-arm-kernel@lists.infradead.org; Sat, 19 Jan 2019 21:18:37 +0000
+Received: by mail-wm1-x341.google.com with SMTP id m22so7557830wml.3
  for <linux-arm-kernel@lists.infradead.org>;
- Sat, 19 Jan 2019 13:18:31 -0800 (PST)
+ Sat, 19 Jan 2019 13:18:34 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=kzKu7Jt1TFcQEeir/0gTQijTxqpN5Q5WlzTbs2XKl40=;
- b=eFLdKf8TOu+KeffqOrW+53a48hHnn5nN9vOXmi86HUg4BxhpjVof5SYY7D7NQlc+ey
- KGJWExX9qNrZhQH6tywUOZNgcCI/HFjdMMzNNSKpBNHOY3ZITjUDjgMlAfH6c0Hq9ma5
- pubuYYhTvOPTZvNs0dHR9VJI68mj8UAeSdciPWQr+4ivccRDcvHwY6QKTIeq7+RqwsLd
- 2RtwNGWbpGT+4zaIX9wCNXHkWbZdsPCk3++En4fg87S7fIvBlVNuVrNmDaspFLjtWQrQ
- 4m1EOrTBmM4pzV1igiK/XCS3rIj8/eqWAhuuNgKK39Ef+0CaOPvoZUi58IzJMP70jJNu
- jL4g==
+ bh=EcXNpdimy0F9xsPDYLjaUasTNqD0XXtOzr8O0QQSlgQ=;
+ b=IdEfYyXapNkjimfQkDICQcO6Fm6aC8jBBTFH6aZlKU96yr0MH790LF21psju+LcLh9
+ f/oJKtPmtvrNSwkfLUSe/ujalVO27O4JpvyhnmSW0gAL/1/KFmExDuL5o3U408MwbuDy
+ 5zTjqkuNCHTIW9pcAEr9PkUMZRPq2aaM5jTrNZrhbojTuCW8jUojGc85wXVrMeIRwXbV
+ 9ZoG902LGlzDvg5JcWa1RVIJf8NXjfsOvnx6evVF11zyBN8cuzrREQ9vFUQD8i3oO6bU
+ kLAb3xMbbHftO1jehT17ysyyK/lOCVJdYtGDed2y0iPGQB9Pfakwn9YwbYGYb2JVs8GS
+ 8ZxQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=kzKu7Jt1TFcQEeir/0gTQijTxqpN5Q5WlzTbs2XKl40=;
- b=ZX1Whob9sVZnkY3bwlU7ZRwlrtag0CnSkS1SgPZCBKt4SowC4GypTWtmfwbA9jx69q
- S8U6ujM0k0oOqY66Os8iWZIWqfm1Uo93rHCUrXPAgwapLJvDLI9PmM+vgswApNKPtABl
- Xd50+X20qAyj3WtXQ082btFmzscXTYl7S36iMVzCuH5dzqYfVscE2pX+7ny57fecTyjN
- xySeigLcn6axP/7IsZc5WO6h1kCdYwsbb9c3P9LPsSn5pBYeLRzSDbxV+ZlyJ1VL8ipZ
- bCqIavlx8g5Nkeb0VCpTxVHSt2pv7bJ3bHIUG4M3FwdwyWhkPwSGO8eWIS3yRbb8+8p5
- 6J1w==
-X-Gm-Message-State: AJcUukfm8EozaUNCXYYIxl5VclzPmpc+oNinxQl4RUd3aigU2jPWSTxy
- xFpqSEj+MfhaBNmEdz8P44w=
-X-Google-Smtp-Source: ALg8bN6OvbXLv3U3GBXlnrvPTl84iGuAuMi5p6T+A/s4qTw1lOOLiYdbcSpmaNyx/WIRo1FppYLQbg==
-X-Received: by 2002:adf:80a9:: with SMTP id 38mr20402991wrl.137.1547932709686; 
- Sat, 19 Jan 2019 13:18:29 -0800 (PST)
+ bh=EcXNpdimy0F9xsPDYLjaUasTNqD0XXtOzr8O0QQSlgQ=;
+ b=SJb7OBR+Q7TQ9lwmXFcb8/wRrAGyHLYFPgVVkNi6wm8Mu8xlbNKMsY8H328fKYL5n7
+ GE0CsI662VbZgP0luG08es3HWyYbC+i/vlSHcMgw22bEa2lJhiSQ14MK02G8NRDd+lZm
+ PiZS+Ak62Zx6uuf0261Vb8uCtlNyGKjUuj1jZfcs/zuklvMWl1zPWMMlftSQ9IXkho51
+ tvvwSgyKLbewMSMx6Z/lkU+oj/SSoZdppLjnLiQdlVTitDfVD1/BEiALC/0jGQKophZN
+ UXorI6Wjfc/ksvfXIl0fMiXOf2EvDJM8CT45toN6rfez2vzm0a9pTXP0mxVXIip2iaKE
+ WSzw==
+X-Gm-Message-State: AJcUukcqsbUqRxWlZZN5G7YB9gUFmsWu859Nm6yde0LvJapIB7hPVaAR
+ VX4RvIzSPaIJHZ65TSiVXtjoalVd
+X-Google-Smtp-Source: ALg8bN7h/K2L9PPkiGbjiQ7AYo+5JdIB6Y7t7tznfLo112/r+AldBNb2kQbauXGSo22otdgMr4nMAQ==
+X-Received: by 2002:a1c:c181:: with SMTP id r123mr2808944wmf.8.1547932713390; 
+ Sat, 19 Jan 2019 13:18:33 -0800 (PST)
 Received: from mappy.world.mentorg.com (sjewanfw1-nat.mentorg.com.
  [139.181.7.34])
- by smtp.gmail.com with ESMTPSA id v6sm55737019wrd.88.2019.01.19.13.18.26
+ by smtp.gmail.com with ESMTPSA id v6sm55737019wrd.88.2019.01.19.13.18.29
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sat, 19 Jan 2019 13:18:29 -0800 (PST)
+ Sat, 19 Jan 2019 13:18:32 -0800 (PST)
 From: Steve Longerbeam <slongerbeam@gmail.com>
 To: devicetree@vger.kernel.org
-Subject: [PATCH 1/2] ARM: dts: imx53: Add capture-subsystem device
-Date: Sat, 19 Jan 2019 13:18:14 -0800
-Message-Id: <20190119211815.25101-2-slongerbeam@gmail.com>
+Subject: [PATCH 2/2] ARM: dts: imx53-smd: Add OV5642 video capture support
+Date: Sat, 19 Jan 2019 13:18:15 -0800
+Message-Id: <20190119211815.25101-3-slongerbeam@gmail.com>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20190119211815.25101-1-slongerbeam@gmail.com>
 References: <20190119211815.25101-1-slongerbeam@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190119_131832_431880_1BC1DC48 
-X-CRM114-Status: GOOD (  11.69  )
+X-CRM114-CacheID: sfid-20190119_131835_224051_36375A4A 
+X-CRM114-Status: GOOD (  13.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -109,56 +110,116 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add video capture_subsystem device node, and include both CSI ports.
-Prepare for adding sensors by adding the parallel sensor anchor endpoints
-to the CSI ports.
+Add video capture support from the OV5642 to IPU CSI0 on
+the i.MX53 SMD.
 
 Signed-off-by: Steve Longerbeam <slongerbeam@gmail.com>
 ---
- arch/arm/boot/dts/imx53.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/imx53-smd.dts | 75 +++++++++++++++++++++++++++++++++
+ 1 file changed, 75 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index b3300300aabe..a78a447c4b4d 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -31,6 +31,7 @@
- 		i2c0 = &i2c1;
- 		i2c1 = &i2c2;
- 		i2c2 = &i2c3;
-+		ipu0 = &ipu;
- 		mmc0 = &esdhc1;
- 		mmc1 = &esdhc2;
- 		mmc2 = &esdhc3;
-@@ -71,6 +72,11 @@
- 		ports = <&ipu_di0>, <&ipu_di1>;
+diff --git a/arch/arm/boot/dts/imx53-smd.dts b/arch/arm/boot/dts/imx53-smd.dts
+index 09071ca11c6c..2d6fc07629e6 100644
+--- a/arch/arm/boot/dts/imx53-smd.dts
++++ b/arch/arm/boot/dts/imx53-smd.dts
+@@ -185,6 +185,31 @@
+ 			>;
+ 		};
+ 
++		pinctrl_ipu_csi0: ipucsi0grp {
++			fsl,pins = <
++				MX53_PAD_CSI0_DAT12__IPU_CSI0_D_12    0x1c4
++				MX53_PAD_CSI0_DAT13__IPU_CSI0_D_13    0x1c4
++				MX53_PAD_CSI0_DAT14__IPU_CSI0_D_14    0x1c4
++				MX53_PAD_CSI0_DAT15__IPU_CSI0_D_15    0x1c4
++				MX53_PAD_CSI0_DAT16__IPU_CSI0_D_16    0x1c4
++				MX53_PAD_CSI0_DAT17__IPU_CSI0_D_17    0x1c4
++				MX53_PAD_CSI0_DAT18__IPU_CSI0_D_18    0x1c4
++				MX53_PAD_CSI0_DAT19__IPU_CSI0_D_19    0x1c4
++				MX53_PAD_CSI0_PIXCLK__IPU_CSI0_PIXCLK 0x1e4
++				MX53_PAD_CSI0_VSYNC__IPU_CSI0_VSYNC   0x1e4
++				MX53_PAD_CSI0_MCLK__IPU_CSI0_HSYNC    0x1e4
++				MX53_PAD_CSI0_DATA_EN__IPU_CSI0_DATA_EN 0x1e4
++			>;
++		};
++
++		pinctrl_ov5642: ov5642grp {
++			fsl,pins = <
++				MX53_PAD_NANDF_WP_B__GPIO6_9   0x1e4
++				MX53_PAD_NANDF_RB0__GPIO6_10   0x1e4
++				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK 0x1c4
++			>;
++		};
++
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <
+ 				MX53_PAD_CSI0_DAT10__UART1_TXD_MUX	0x1e4
+@@ -256,11 +281,49 @@
+ 	camera: ov5642@3c {
+ 		compatible = "ovti,ov5642";
+ 		reg = <0x3c>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_ov5642>;
++		assigned-clocks = <&clks IMX5_CLK_SSI_EXT1_SEL>,
++				  <&clks IMX5_CLK_SSI_EXT1_COM_SEL>;
++		assigned-clock-parents = <&clks IMX5_CLK_PLL2_SW>,
++					 <&clks IMX5_CLK_SSI_EXT1_PODF>;
++		assigned-clock-rates = <0>, <24000000>;
++		clocks = <&clks IMX5_CLK_SSI_EXT1_GATE>;
++		clock-names = "xclk";
++		DVDD-supply = <&ldo9_reg>;
++		AVDD-supply = <&ldo7_reg>;
++		reset-gpios = <&gpio6 9 GPIO_ACTIVE_LOW>;
++		powerdown-gpios = <&gpio6 10 GPIO_ACTIVE_HIGH>;
++
++		port {
++			ov5642_to_ipu_csi0: endpoint {
++				remote-endpoint = <&ipu_csi0_from_parallel_sensor>;
++				bus-width = <8>;
++				hsync-active = <1>;
++				vsync-active = <1>;
++			};
++		};
  	};
  
-+	capture_subsystem {
-+		compatible = "fsl,imx-capture-subsystem";
-+		ports = <&ipu_csi0>, <&ipu_csi1>;
-+	};
+ 	pmic: dialog@48 {
+ 		compatible = "dlg,da9053", "dlg,da9052";
+ 		reg = <0x48>;
++		interrupt-parent = <&gpio7>;
++		interrupts = <11 IRQ_TYPE_LEVEL_LOW>; /* low-level active IRQ at GPIO7_11 */
 +
- 	tzic: tz-interrupt-controller@fffc000 {
- 		compatible = "fsl,imx53-tzic", "fsl,tzic";
- 		interrupt-controller;
-@@ -158,10 +164,16 @@
- 
- 			ipu_csi0: port@0 {
- 				reg = <0>;
++		regulators {
++			ldo7_reg: ldo7 {
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <3600000>;
++				regulator-always-on;
++			};
 +
-+				ipu_csi0_from_parallel_sensor: endpoint {
-+				};
- 			};
++			ldo9_reg: ldo9 {
++				regulator-min-microvolt = <1250000>;
++				regulator-max-microvolt = <3650000>;
++				regulator-always-on;
++			};
++		};
+ 	};
+ };
  
- 			ipu_csi1: port@1 {
- 				reg = <1>;
+@@ -271,3 +334,15 @@
+ 	phy-reset-gpios = <&gpio7 6 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
 +
-+				ipu_csi1_from_parallel_sensor: endpoint {
-+				};
- 			};
- 
- 			ipu_di0: port@2 {
++&ipu_csi0_from_parallel_sensor {
++	remote-endpoint = <&ov5642_to_ipu_csi0>;
++	data-shift = <12>; /* Lines 19:12 used */
++	hsync-active = <1>;
++	vsync-active = <1>;
++};
++
++&ipu_csi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ipu_csi0>;
++};
 -- 
 2.17.1
 
