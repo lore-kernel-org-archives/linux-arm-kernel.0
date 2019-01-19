@@ -2,86 +2,122 @@ Return-Path: <SRS0=AzG1=P3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.7 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	FREEMAIL_REPLYTO_END_DIGIT,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B1BD0C61CE4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 12:42:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F0FA4C61CE8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 13:19:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 825DA2086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 12:42:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BF6D92084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 13:19:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pVOS7KMu";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Q+iDvewp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 825DA2086D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FW0+Lvm9";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=davidjohnsummers.uk header.i=@davidjohnsummers.uk header.b="N6O4McOD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BF6D92084C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=davidjohnsummers.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:Reply-To:List-Subscribe:List-Help:
-	List-Post:List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:
-	From:In-Reply-To:References:MIME-Version:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=AWMNcGfy8X60Z+WV8u8XLpV+CMEby96Ug9/ytAZ0Wrg=; b=pVOS7KMuA/ZCOK
-	R8MTvkHI6/x4diJeLxOSVRaeAgHIxdJg7erHkCU2IeYAA2CPtyc1lFuPoCTUgnL22YwPGctoTtnpD
-	DYV6xImj6LloW1TTlQHgbD7cwPynmaLAp+TB3LOVXyyUm2NVzVKveDXUHQNwrYPcvXdlEH/GnMP/H
-	AMsdqza8uQQLlnXzp5HBr9HNUoVkkgCxvCkgGMTyTdrFpjWHhodra8/8qTU8XS3u727Xzfz9szDRq
-	MzUoVa4pQmGI9YuR4luaqyJjbgf7+C/hvRrBT99CTqp2CARAH41/qRlNHafMJU3vOzOryLmxS02AP
-	s6zk4PfYQuarewcsbDuA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=0GUUmCEXC11br19EyltWb0FHAZGznf+/87VsIz36g3Q=; b=FW0+Lvm93hvbYUY8RUOBJMlIY
+	iv3xCzCG1jDzSA0oDb201f3fbdxjcnirEMot9sCe7cjA/XJc8a9psTVHAjSA4MI6BonrlyNHms05a
+	xMCdvgv5mk53DgiefTDSwkA3NbnND5BGj3WEJs5sjdblSyVesw17+V+S3+GTh9d1hIhxCA3vCv3iH
+	+KbSHpD5KVJYL4r81k2JL3mfxiu7To7Nho9QESd7dLCCiKT9dJqdvyhA839TWuzOAj0KQ7cWCglrq
+	Iodt+/Cg6+AC9wyB7XYwJi2xaMWXV9BvNjg6ad8eKlUCcv67eAo9pjgmXxJz/lbA5SxjkoNty1ySP
+	hjyeg7EZQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkpwl-0001uY-PI; Sat, 19 Jan 2019 12:41:59 +0000
-Received: from mail-qk1-x744.google.com ([2607:f8b0:4864:20::744])
+	id 1gkqXP-0004yX-SO; Sat, 19 Jan 2019 13:19:51 +0000
+Received: from mail-gw.unlimitedwebhosting.co.uk ([149.255.60.86])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkpwi-0001u8-29
- for linux-arm-kernel@lists.infradead.org; Sat, 19 Jan 2019 12:41:57 +0000
-Received: by mail-qk1-x744.google.com with SMTP id c21so9592439qkl.6
+ id 1gkqXL-0004wj-Qo
+ for linux-arm-kernel@lists.infradead.org; Sat, 19 Jan 2019 13:19:50 +0000
+Received: from uwhbsf01.unlimitedwebhosting.co.uk
+ (mail-gw.unlimitedwebhosting.co.uk [149.255.60.72])
+ by mail-gw.unlimitedwebhosting.co.uk (Postfix) with ESMTPS id A03716046C51
  for <linux-arm-kernel@lists.infradead.org>;
- Sat, 19 Jan 2019 04:41:54 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:reply-to:from:date:message-id
- :subject:to:cc:content-transfer-encoding;
- bh=/uirWgwK8ZsYuq5sa25pACmo5AdHQzx9AC4knaBHxjA=;
- b=Q+iDvewpONpG4yAscot8519+fdhk/9LeVCfmANBKayAyD5N+dAJbbTkomUSKJ5C8iE
- dElmJCHP4FglP9LagzLUYGrzZEE9EjmpbuCKl69qAdzDWdAf/B6nev/XLWnixjUwnR+F
- n3FNgs18adeof9r4TXkbUMWiiXe2heaaPs9KMJGzoQ7wCQo/ilbHbxgXzEd1T+EGCvVI
- JO3tv5hbArLlXS2LMsn6oXgpW8yPR7ZKxpqXKvivm19lbB/LONx+/TMeGiTm030GQzSj
- XqojXGkLydv8pCwlHflcNNUehJ1sYvwTNCb3kgDemh6njLcawNVJk6XozQ7pKFFyBvTF
- xeuA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:reply-to
- :from:date:message-id:subject:to:cc:content-transfer-encoding;
- bh=/uirWgwK8ZsYuq5sa25pACmo5AdHQzx9AC4knaBHxjA=;
- b=M3cb4sABdFRG78I+Ji4Z9Un9PWJLZyaDblE5baN5ar8T9/cd4rxoWsJ2Zw2Ha4dVOF
- x5cUGcl9x0+vdABDJp6uMZ1bSkSWaSNNos0+vxdvYo7QTUOZvqn4zAKh0xmzmjdeSHt7
- RmLZbHZ5arwOGjl3Zvl9lBBSz1fcrrCsU+95wAcGPByDh+0j5bAgac9OzcOUg1Tk6sZd
- Fho0vg72I6Y6iR9H4jmrofjI6b2MZNWS3nhEBs7CnPJ9E5DKNltEKK1qAfL0hpw4GCfi
- UqZKBngyhg9BRqmHUqO14LdEG78PkTllOlbQZLIAmc73Ifx3vXe+OnINUI6AWqjaGt5N
- ljxQ==
-X-Gm-Message-State: AJcUukcSX3+QyeOdCyWI3y37YwyrtMmT0wGFOF8mHr0lh3+Y/L+uIg0i
- DTZx7mnveMYhwQAsf2xX40lofdTmIC21gEoHbBg=
-X-Google-Smtp-Source: ALg8bN6VHvrZJqzGPCIOG1jDRcV4aZdX0RcWo2FzftcmY27K1xXEgKmWUTP2xrTNwoxrV+sXn/OgaVoTO0dgFGC0X+Q=
-X-Received: by 2002:ae9:c106:: with SMTP id z6mr18453415qki.197.1547901713589; 
- Sat, 19 Jan 2019 04:41:53 -0800 (PST)
+ Sat, 19 Jan 2019 13:18:58 +0000 (GMT)
+X-ASG-Debug-ID: 1547903937-0554135974284fe0001-tbGyMd
+Received: from cloud706.unlimitedwebhosting.co.uk (no-dns-yet.unlimited.uk.net
+ [149.255.62.7]) by uwhbsf01.unlimitedwebhosting.co.uk with ESMTP id
+ rVUXnoe8ji2iU2Br (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256
+ verify=NO) for <linux-arm-kernel@lists.infradead.org>;
+ Sat, 19 Jan 2019 13:18:57 +0000 (GMT)
+X-Barracuda-Envelope-From: beagleboard@davidjohnsummers.uk
+X-Barracuda-Effective-Source-IP: no-dns-yet.unlimited.uk.net[149.255.62.7]
+X-Barracuda-Apparent-Source-IP: 149.255.62.7
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=davidjohnsummers.uk; s=default; h=Content-Transfer-Encoding:Content-Type:
+ In-Reply-To:MIME-Version:Date:Message-ID:From:References:Cc:To:Subject:Sender
+ :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=KK/nm8qlolgtyPfVa1duixwaxfI3jCY0YzBZYMtaqSo=; b=N6O4McODhz6WLFfrNyzy+BC/yZ
+ l8aWfhfexyfwJPU56vko19mKg9eGwGBou70V8A+a1ufhXXk1SwKUigVpimlkuci/s422QKDSf+e6j
+ 8l5mhzfOJSxSbuOFPLVN2Su/ITNskYIHE3VrGzJc0iU0/33X1gaJ1uqG7hTtozT1fbN8SGHp97CBb
+ kf6JoXO/lGR6om7sLP/xt11JWigqWlAMoKCQRk6lE1m8Y8CbSnyLT6MyRIMoDY5zx2JRKs6gA4A6v
+ V6N5L6/0gb8g5Rxc6AZKJ6piHLMLbKWj8l8NU0fj2Ke7ieDV/X35h3b44uFWzpEQroUGfk1K+dmlm
+ +yLk2lLA==;
+Received: from [87.112.215.184] (port=55780 helo=[192.168.2.187])
+ by cloud706.unlimitedwebhosting.co.uk with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.91)
+ (envelope-from <beagleboard@davidjohnsummers.uk>)
+ id 1gkqWX-000Ta4-Bu; Sat, 19 Jan 2019 13:18:57 +0000
+Subject: Re: [PATCHv2] Patch to add the realtek bluetooth device tree refs to
+ the code
+To: Marcel Holtmann <marcel@holtmann.org>
+X-ASG-Orig-Subj: Re: [PATCHv2] Patch to add the realtek bluetooth device tree
+ refs to the code
+References: <20181229115513.31153-1-beagleboard@davidjohnsummers.uk>
+ <20190103163538.6575-1-beagleboard@davidjohnsummers.uk>
+ <20190103163538.6575-2-beagleboard@davidjohnsummers.uk>
+ <510BE8B9-76BD-4A64-86C2-ACA1D50819DF@holtmann.org>
+From: beagleboard@davidjohnsummers.uk
+Message-ID: <4b098970-9644-12b4-c6f1-2e66ffbe24fa@davidjohnsummers.uk>
+Date: Sat, 19 Jan 2019 13:18:56 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.3
 MIME-Version: 1.0
-References: <CGME20190118131713eucas1p11f52d9e6a11dbd2b66f289ca3c56d92c@eucas1p1.samsung.com>
- <20190118131639.17578-1-k.konieczny@partner.samsung.com>
- <20190118131639.17578-6-k.konieczny@partner.samsung.com>
-In-Reply-To: <20190118131639.17578-6-k.konieczny@partner.samsung.com>
-From: Chanwoo Choi <cwchoi00@gmail.com>
-Date: Sat, 19 Jan 2019 21:41:17 +0900
-Message-ID: <CAGTfZH2sKvJ+Tq=YD2Xb1ZDV9QD0C3gEVRvxzMvRj54pU+2vHA@mail.gmail.com>
-Subject: Re: [PATCH v4 5/5] clk: samsung: exynos5433: add imem clocks
-To: Kamil Konieczny <k.konieczny@partner.samsung.com>
+In-Reply-To: <510BE8B9-76BD-4A64-86C2-ACA1D50819DF@holtmann.org>
+Content-Language: en-PH
+X-AntiAbuse: This header was added to track abuse,
+ please include it with any abuse report
+X-AntiAbuse: Primary Hostname - cloud706.unlimitedwebhosting.co.uk
+X-AntiAbuse: Original Domain - lists.infradead.org
+X-AntiAbuse: Originator/Caller UID/GID - [47 12] / [47 12]
+X-AntiAbuse: Sender Address Domain - davidjohnsummers.uk
+X-Get-Message-Sender-Via: cloud706.unlimitedwebhosting.co.uk: authenticated_id:
+ davidjoh/from_h
+X-Authenticated-Sender: cloud706.unlimitedwebhosting.co.uk: beagleboard@davidjohnsummers.uk
+X-Source: 
+X-Source-Args: 
+X-Source-Dir: 
+X-Barracuda-Connect: no-dns-yet.unlimited.uk.net[149.255.62.7]
+X-Barracuda-Start-Time: 1547903937
+X-Barracuda-Encrypted: ECDHE-RSA-AES256-GCM-SHA384
+X-Barracuda-URL: https://149.255.60.72:443/cgi-mod/mark.cgi
+X-Virus-Scanned: by bsmtpd at unlimitedwebhosting.co.uk
+X-Barracuda-Scan-Msg-Size: 2041
+X-Barracuda-BRTS-Status: 1
+X-Barracuda-Spam-Score: 0.00
+X-Barracuda-Spam-Status: No, SCORE=0.00 using global scores of TAG_LEVEL=1000.0
+ QUARANTINE_LEVEL=1000.0 KILL_LEVEL=2.0 tests=BSF_SC0_MISMATCH_TO, NO_REAL_NAME
+X-Barracuda-Spam-Report: Code version 3.2, rules version 3.2.3.65955
+ Rule breakdown below
+ pts rule name              description
+ ---- ---------------------- --------------------------------------------------
+ 0.00 NO_REAL_NAME           From: does not include a real name
+ 0.00 BSF_SC0_MISMATCH_TO    Envelope rcpt doesn't match header
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190119_044156_108485_D5DC5E1B 
-X-CRM114-Status: GOOD (  14.24  )
+X-CRM114-CacheID: sfid-20190119_051948_291947_7D38E364 
+X-CRM114-Status: GOOD (  13.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,68 +129,77 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Reply-To: cwchoi00@gmail.com
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- linux-samsung-soc <linux-samsung-soc@vger.kernel.org>,
- Rob Herring <robh+dt@kernel.org>,
- Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
- linux-kernel <linux-kernel@vger.kernel.org>,
- Krzysztof Kozlowski <krzk@kernel.org>, Chanwoo Choi <cw00.choi@samsung.com>,
- Kukjin Kim <kgene@kernel.org>, Sylwester Nawrocki <s.nawrocki@samsung.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Marek Szyprowski <m.szyprowski@samsung.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ Johan Hedberg <johan.hedberg@gmail.com>, linux-bluetooth@vger.kernel.org,
+ Rob Herring <robh+dt@kernel.org>, linux-arm-kernel@lists.infradead.org
+Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgS2FtaWwsCgoyMDE564WEIDHsm5QgMTjsnbwgKOq4iCkg7Jik7ZuEIDEwOjE4LCBLYW1pbCBL
-b25pZWN6bnkKPGsua29uaWVjem55QHBhcnRuZXIuc2Ftc3VuZy5jb20+64uY7J20IOyekeyEsToK
-Pgo+IEFkZCBpbWVtIGNsb2NrcyBmb3IgZXh5bm9zNTQzMy4gVGhpcyB3aWxsIGVuYWJsZSB0byB1
-c2UgY3J5cHRvIFNsaW0KPiBTZWN1cml0eSBTdWJTeXN0ZW0gKGluIHNob3J0IFNsaW1TU1MpIElQ
-IGJsb2NrLgo+Cj4gU2lnbmVkLW9mZi1ieTogS2FtaWwgS29uaWVjem55IDxrLmtvbmllY3pueUBw
-YXJ0bmVyLnNhbXN1bmcuY29tPgo+IC0tLQo+ICBkcml2ZXJzL2Nsay9zYW1zdW5nL2Nsay1leHlu
-b3M1NDMzLmMgfCAzMiArKysrKysrKysrKysrKysrKysrKysrKysrKysrCj4gIDEgZmlsZSBjaGFu
-Z2VkLCAzMiBpbnNlcnRpb25zKCspCj4KPiBkaWZmIC0tZ2l0IGEvZHJpdmVycy9jbGsvc2Ftc3Vu
-Zy9jbGstZXh5bm9zNTQzMy5jIGIvZHJpdmVycy9jbGsvc2Ftc3VuZy9jbGstZXh5bm9zNTQzMy5j
-Cj4gaW5kZXggMjRjMzM2MGRiNjViLi5kYWUxYzk2ZGU5MzMgMTAwNjQ0Cj4gLS0tIGEvZHJpdmVy
-cy9jbGsvc2Ftc3VuZy9jbGstZXh5bm9zNTQzMy5jCj4gKysrIGIvZHJpdmVycy9jbGsvc2Ftc3Vu
-Zy9jbGstZXh5bm9zNTQzMy5jCj4gQEAgLTU0NjcsNiArNTQ2NywzNSBAQCBzdGF0aWMgY29uc3Qg
-c3RydWN0IHNhbXN1bmdfY211X2luZm8gY2FtMV9jbXVfaW5mbyBfX2luaXRjb25zdCA9IHsKPiAg
-ICAgICAgIC5jbGtfbmFtZSAgICAgICAgICAgICAgID0gImFjbGtfY2FtMV80MDAiLAo+ICB9Owo+
-Cj4gKy8qCj4gKyAqIFJlZ2lzdGVyIG9mZnNldCBkZWZpbml0aW9ucyBmb3IgQ01VX0lNRU0KPiAr
-ICovCj4gKyNkZWZpbmUgRU5BQkxFX0FDTEtfSU1FTV9TTElNU1NTICAgICAgICAgICAgICAgMHgw
-ODBjCj4gKyNkZWZpbmUgRU5BQkxFX1BDTEtfSU1FTV9TTElNU1NTICAgICAgICAgICAgICAgMHgw
-OTA4Cj4gKwo+ICtzdGF0aWMgY29uc3QgdW5zaWduZWQgbG9uZyBpbWVtX2Nsa19yZWdzW10gX19p
-bml0Y29uc3QgPSB7Cj4gKyAgICAgICBFTkFCTEVfQUNMS19JTUVNX1NMSU1TU1MsCj4gKyAgICAg
-ICBFTkFCTEVfUENMS19JTUVNX1NMSU1TU1MsCj4gK307Cj4gKwo+ICtzdGF0aWMgY29uc3Qgc3Ry
-dWN0IHNhbXN1bmdfZ2F0ZV9jbG9jayBpbWVtX2dhdGVfY2xrc1tdIF9faW5pdGNvbnN0ID0gewo+
-ICsgICAgICAgLyogRU5BQkxFX0FDTEtfSU1FTV9TTElNU1NTICovCj4gKyAgICAgICBHQVRFKENM
-S19BQ0xLX1NMSU1TU1MsICJhY2xrX3NsaW1zc3MiLCAiYWNsa19pbWVtX3Nzc3hfMjY2IiwKPiAr
-ICAgICAgICAgICAgICAgICAgICAgICBFTkFCTEVfQUNMS19JTUVNX1NMSU1TU1MsIDAsIENMS19J
-R05PUkVfVU5VU0VELCAwKSwKPiArCj4gKyAgICAgICAvKiBFTkFCTEVfUENMS19JTUVNX1NMSU1T
-U1MgKi8KPiArICAgICAgIEdBVEUoQ0xLX1BDTEtfU0xJTVNTUywgInBjbGtfc2xpbXNzcyIsICJh
-Y2xrX2ltZW1fMjAwIiwKPiArICAgICAgICAgICAgICAgICAgICAgICBFTkFCTEVfUENMS19JTUVN
-X1NMSU1TU1MsIDAsIENMS19JR05PUkVfVU5VU0VELCAwKSwKPiArfTsKPiArCj4gK3N0YXRpYyBj
-b25zdCBzdHJ1Y3Qgc2Ftc3VuZ19jbXVfaW5mbyBpbWVtX2NtdV9pbmZvIF9faW5pdGNvbnN0ID0g
-ewo+ICsgICAgICAgLmdhdGVfY2xrcyAgICAgICAgICAgICAgPSBpbWVtX2dhdGVfY2xrcywKPiAr
-ICAgICAgIC5ucl9nYXRlX2Nsa3MgICAgICAgICAgID0gQVJSQVlfU0laRShpbWVtX2dhdGVfY2xr
-cyksCj4gKyAgICAgICAubnJfY2xrX2lkcyAgICAgICAgICAgICA9IElNRU1fTlJfQ0xLLAo+ICsg
-ICAgICAgLmNsa19yZWdzICAgICAgICAgICAgICAgPSBpbWVtX2Nsa19yZWdzLAo+ICsgICAgICAg
-Lm5yX2Nsa19yZWdzICAgICAgICAgICAgPSBBUlJBWV9TSVpFKGltZW1fY2xrX3JlZ3MpLAo+ICsg
-ICAgICAgLmNsa19uYW1lICAgICAgICAgICAgICAgPSAiYWNsa19pbWVtXzIwMCIsCj4gK307Cj4K
-PiAgc3RydWN0IGV4eW5vczU0MzNfY211X2RhdGEgewo+ICAgICAgICAgc3RydWN0IHNhbXN1bmdf
-Y2xrX3JlZ19kdW1wICpjbGtfc2F2ZTsKPiBAQCAtNTY1NCw2ICs1NjgzLDkgQEAgc3RhdGljIGNv
-bnN0IHN0cnVjdCBvZl9kZXZpY2VfaWQgZXh5bm9zNTQzM19jbXVfb2ZfbWF0Y2hbXSA9IHsKPiAg
-ICAgICAgIH0sIHsKPiAgICAgICAgICAgICAgICAgLmNvbXBhdGlibGUgPSAic2Ftc3VuZyxleHlu
-b3M1NDMzLWNtdS1tc2NsIiwKPiAgICAgICAgICAgICAgICAgLmRhdGEgPSAmbXNjbF9jbXVfaW5m
-bywKPiArICAgICAgIH0sIHsKPiArICAgICAgICAgICAgICAgLmNvbXBhdGlibGUgPSAic2Ftc3Vu
-ZyxleHlub3M1NDMzLWNtdS1pbWVtIiwKPiArICAgICAgICAgICAgICAgLmRhdGEgPSAmaW1lbV9j
-bXVfaW5mbywKPiAgICAgICAgIH0sIHsKPiAgICAgICAgIH0sCj4gIH07Cj4gLS0KPiAyLjIwLjAK
-PgoKTG9va3MgZ29vZCB0byBtZS4KQWNrZWQtYnk6IENoYW53b28gQ2hvaSA8Y3cwMC5jaG9pQHNh
-bXN1bmcuY29tPgoKLS0gCkJlc3QgUmVnYXJkcywKQ2hhbndvbyBDaG9pClNhbXN1bmcgRWxlY3Ry
-b25pY3MKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxp
-bnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFk
-ZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4
-LWFybS1rZXJuZWwK
+Hi Marcel,
+
+Yes have been having an email conversation with Rob on the device tree 
+email list.
+
+he wants minor changes to the naming, which i agree with. So have much 
+of a revised patch set read to send in. Just need to check some things.
+
+Hopefully be able to send later this weekend, and it will replace the 
+patch below.
+
+Thanks,
+
+David.
+
+On 18/01/2019 10:57, Marcel Holtmann wrote:
+> Hi David,
+>
+>> This patch adds the necessary device tree hooks to the realtek
+>> bluetooth driver for serial connections.
+>>
+>> The realtek devices that are listed btrtl.c are searched on the
+>> realtek web site for the version that have serial connections.
+>>
+>> Most of these devices also have wi-fi connected via sdio, that is not
+>> covered by the bluetooth driver - but as that interface will also be
+>> needed in the device tree, the hocks here have "-bluetooth" added. The
+>> exception to this is the rtl8761atv, which only has a serial
+>> bluetooth.
+>>
+>> Signed-off-by: David Summers <beagleboard@davidjohnsummers.uk>
+>> ---
+>> drivers/bluetooth/hci_h5.c | 16 ++++++++++++++++
+>> 1 file changed, 16 insertions(+)
+>>
+>> diff --git a/drivers/bluetooth/hci_h5.c b/drivers/bluetooth/hci_h5.c
+>> index 8eede1197cd2..2fec7ff2ce7c 100644
+>> --- a/drivers/bluetooth/hci_h5.c
+>> +++ b/drivers/bluetooth/hci_h5.c
+>> @@ -925,6 +925,22 @@ static struct h5_vnd rtl_vnd = {
+>> };
+>> #endif
+>>
+>> +#ifdef CONFIG_OF
+>> +static const struct of_device_id h5_of_match[] = {
+>> +#ifdef CONFIG_BT_HCIUART_RTL
+>> +       { .compatible = "realtek,rtl8723as-bluetooth"},
+>> +       { .compatible = "realtek,rtl8723bs-bluetooth"},
+>> +       { .compatible = "realtek,rtl8723ds-bluetooth"},
+>> +       { .compatible = "realtek,rtl8761atv"},
+>> +       { .compatible = "realtek,rtl8821as-bluetooth"},
+>> +       { .compatible = "realtek,rtl8821cs-bluetooth"},
+>> +       { .compatible = "realtek,rtl8822bs-bluetooth"},
+>> +#endif
+> I really need an Ack from Rob on the naming here.
+>
+> Regards
+>
+> Marcel
+>
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
