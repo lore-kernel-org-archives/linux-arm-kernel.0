@@ -2,71 +2,74 @@ Return-Path: <SRS0=AzG1=P3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F4167C61CE3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 01:44:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D5EB3C5AE5E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 01:44:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BE98B20850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 01:44:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 84A3620850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 01:44:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K3K1B514";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="GxfMfnje"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BE98B20850
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IeJ9EBfi";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="UJR/ZDiL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 84A3620850
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=+tiyDAtkVsTYc+JKsZ1TwRiCueAaxp95EaSwZnLxEIo=; b=K3K
-	1B514p/VzbX3z+aY4r8P5At/JgVFmQxvPQa0UfblJbZstmAJj/63i3otfsorWlQUVCQufYbLkDRIj
-	1580mscWnaKBXnO3zt+Y3Y+3YYCzN9d3W7jBrO4YGyL82JaqfrbNlsOLdZrZ/NOpDi6zzlheRS6DE
-	x0fsDZ8KBHP/6KiclHn3im5iEUhv1MX+rrw077J45ay8kM82cCEgQhHroKa78tFZJoRnACxQOEEA2
-	8lBDMe4mFG+m9h09Jgy4rjmtwEa1cnZT0m2B55TcftoH9Qdg2EZjgwI0w/Y4LPIrl4zGWvvJ2Lhgx
-	1N9pFhM4C3Anl2JRnaM8cn191cqHzqw==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=oKhInzoFisXqJfgligl/FKidPmCPpjX7jSxz+Kqi3NE=; b=IeJ9EBfi3lbmNLf2JvchlRb18B
+	/yU+3pLaeGdg/XpOVpE5YOREwcdq/7WpXboMdblUdWp07+wZv3dJ9x/lz8xW/g8VtetViZ6rwEA7r
+	DqBE/TCMa3VSYH9cSGW30UZS087TVGIowpQuiPND2pV+soVoLtsIwd3z0GlgcWFMhF30nTQgDr+2A
+	6g428KLEXL/8DIN3yXa7nQj7VyNJCmOMVUu+31PJvOG2jADR7eSibc3p+SxtnZkKi7sZMO2zXBpGZ
+	0NYWvxyGuhVEfLPnlxYxNwv52B/N4g4wO7K/Oe+/b+KwDRcwV89d9XWr/+X/tNZ3Xhy9rTrHbm8wm
+	QR/tEAtg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkfg9-0001Sl-D8; Sat, 19 Jan 2019 01:44:09 +0000
-Received: from mail-pg1-x541.google.com ([2607:f8b0:4864:20::541])
+	id 1gkfgP-0001hc-KY; Sat, 19 Jan 2019 01:44:25 +0000
+Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkfg6-0001S1-Bq
- for linux-arm-kernel@lists.infradead.org; Sat, 19 Jan 2019 01:44:07 +0000
-Received: by mail-pg1-x541.google.com with SMTP id w6so6864453pgl.6
+ id 1gkfgA-0001Sz-KF
+ for linux-arm-kernel@lists.infradead.org; Sat, 19 Jan 2019 01:44:17 +0000
+Received: by mail-pg1-x542.google.com with SMTP id y4so6850607pgc.12
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 18 Jan 2019 17:44:05 -0800 (PST)
+ Fri, 18 Jan 2019 17:44:09 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id;
- bh=+gI7uPG/kMFpjvedpiuVotP6KJ84HcEfWwY5I+LGi9I=;
- b=GxfMfnjeWS83+HeD1bR5fowABwHrLh9+7w3HzEeWX5FjWnhJQbvWUlf90S9VqQLda4
- zZNiKYaxtHL4oJtK0GvtuOKWWDBqkFywQeDcBPmoBFQ3qUI3mqiRRVo0ijiE9l6BS4WE
- W36A78xWiyOtkR6XXMWTB4dhfLfMK6OSeGBXE=
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=jETu+BduxrzXdBTSoIHDOv28Ri7iXymF5DJaIor1gtI=;
+ b=UJR/ZDiLrjsIi9UcHwH4vY5U6Z90QraRTn+RRpSe4uSHbu8vCGNQiDKM6DoVc7aJoU
+ 9deaQGz1NS/r9W8SPTrMsbninLi8UUuIVDTKQ0/eo21TQ4WaMoF4BdRzhKmdgklUljK/
+ ZjkVKboyhwsZShHi77LZBbotd/1pNsLp0lXdM=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=+gI7uPG/kMFpjvedpiuVotP6KJ84HcEfWwY5I+LGi9I=;
- b=drZEA2peVZPl0fLzhAiPfHizq7xAIVB+WXMOi58PuVCY32f5s0InPlhC9C4ZtjtHbI
- 6L1IuJOxncoPPUOxFlFsxaOhk0wq6C4+EXBaWUMg38WGNWUyMqQEx2haoX7JbS0cQwck
- SR9I9cLGBKlZ/zFqFmHQoTuwxhUHSjzEWhpDfdceQliNBQa1mb62JnGBNG+a6qN/M0Re
- 6Tf7Hr1B/6/ntnpkhH0ooFapBjmjL7WYY2SvHqH2pVdatNVgNrwCTVPF0OG1wT4QiRmM
- /Oe85wcRhMeYQPn4Y76olh53keUxFg2HFbnwfxExngjKFABmCNWBfcj2poe/8pf0NLwW
- DVLg==
-X-Gm-Message-State: AJcUukfc/x1vBt0iwbdAO3LPx5VLaGwleBM9Ict7I872PZWMby00zdyS
- mcn9Kdc8EEZUAATaAElBw9rZnQ==
-X-Google-Smtp-Source: ALg8bN6rfHMN+/FzJ0M7MmMKKTVdK5Q+HeWXGJ1ygSC3Pj2hqY/GScdJjTysGVnxLmQMtwMP6LWjbA==
-X-Received: by 2002:aa7:8542:: with SMTP id y2mr21883180pfn.83.1547862245254; 
- Fri, 18 Jan 2019 17:44:05 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references;
+ bh=jETu+BduxrzXdBTSoIHDOv28Ri7iXymF5DJaIor1gtI=;
+ b=neGL4L3nnRSIvWbYTHL0jNcuTKbxc5sVLijR49rXINSnSqInTC1vou+JzyfCEpSmwp
+ YDx4bithNau2VQrUOQ1v6WL/gaAi9E+AcRIHJSIuhID86B5OBcsSJxMiXte4XZ9s6oXx
+ 7FhHMcYer8jeenLcLZPC2DV1iP9bR45rUwht1TUx96o1Ph3Xk8o1Gq43ifk0lWXEChce
+ XcCJFa780hN10Diht0svoAlbsYylcPQPLz0RfwWqad4gToOPRCSu2QnwVG6mCDGkDnp5
+ 3yc6kIPsNOdBOXLCRph1Y493xAgYbRGI6kFCa8y0EccrkoC1PntWxdZ5gTRbdRdXbG8V
+ OvQg==
+X-Gm-Message-State: AJcUukfDBvhCr/nGDwROUBWy9Gov1cXBu8TCNlWXHZuFIs5viQkgnbGs
+ +/fE6iq65WL19NRy0wuREueX0Q==
+X-Google-Smtp-Source: ALg8bN79tjDtBMZp6UuoXC+x3eva11l1rLyjvJBpSU+Uduh8IjCTpWpfl4YpJtBFLjEuJdIqZ5rqkg==
+X-Received: by 2002:a62:6204:: with SMTP id w4mr21762120pfb.5.1547862249054;
+ Fri, 18 Jan 2019 17:44:09 -0800 (PST)
 Received: from localhost.localdomain (li421-24.members.linode.com.
  [50.116.3.24])
- by smtp.gmail.com with ESMTPSA id d21sm8648436pfo.162.2019.01.18.17.44.01
+ by smtp.gmail.com with ESMTPSA id d21sm8648436pfo.162.2019.01.18.17.44.05
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 18 Jan 2019 17:44:04 -0800 (PST)
+ Fri, 18 Jan 2019 17:44:08 -0800 (PST)
 From: Leo Yan <leo.yan@linaro.org>
 To: Arnaldo Carvalho de Melo <acme@kernel.org>,
  Mathieu Poirier <mathieu.poirier@linaro.org>,
@@ -76,13 +79,15 @@ To: Arnaldo Carvalho de Melo <acme@kernel.org>,
  Mike Leach <mike.leach@linaro.org>, Robert Walker <robert.walker@arm.com>,
  linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
  Coresight ML <coresight@lists.linaro.org>
-Subject: [PATCH v6 0/8] perf cs-etm: Add support for sample flags
-Date: Sat, 19 Jan 2019 09:43:39 +0800
-Message-Id: <20190119014347.27441-1-leo.yan@linaro.org>
+Subject: [PATCH v6 1/8] perf cs-etm: Add last instruction information in packet
+Date: Sat, 19 Jan 2019 09:43:40 +0800
+Message-Id: <20190119014347.27441-2-leo.yan@linaro.org>
 X-Mailer: git-send-email 2.17.1
+In-Reply-To: <20190119014347.27441-1-leo.yan@linaro.org>
+References: <20190119014347.27441-1-leo.yan@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190118_174406_411073_C02A1C0C 
-X-CRM114-Status: GOOD (  12.73  )
+X-CRM114-CacheID: sfid-20190118_174411_108550_FA3D3421 
+X-CRM114-Status: GOOD (  12.91  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,91 +106,85 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch seris adds support for sample flags so can facilitate perf
-to print sample flags for branch instruction.
+Decoder provides last instruction related information, these information
+can be used for trace analysis; specifically we can get to know what
+kind of branch instruction has been executed, mainly the information
+are contained in three element fields:
 
-Patch 0001 is used to save last branch information in packet structure,
-this includes instruction type, subtype and condition flag to help
-making decision for which branch instruction it is.  It passes related
-information from decoder layer to cs-etm.c, so we use cs-etm.c as a
-central place to set sample flags.
+  last_i_type: this is significant type for waypoint calculation, it
+  indicates the last instruction is one of immediate branch instruction,
+  indirect branch instruction, instruction barrier (ISB), or data
+  barrier (DSB/DMB).
 
-Patch 0002 is used to set sample flags for instruction range packet.
+  last_i_subtype: this is used for instruction sub type, it can be
+  branch with link, ARMv8 return instruction, ARMv8 eret instruction
+  (return from exception), or ARMv7 instruction which could imply
+  return (e.g. MOV PC, LR; POP { ,PC}).
 
-Patch 0003 is used to set sample flags for trace discontinuity packet.
+  last_instr_cond: it indicates if the last instruction was conditional.
 
-Patches 0004/0005/0006 are preparation for exception packet handling:
-Patch 0004 addes exception number in packet; pacth 0005/0006 is to use
-traceID/metadata tuple to access metadata pointer based on traceID, this
-can help decide if the CPU is connected with ETMv3 or ETMv4, ETMv3 and
-ETMv4 have totally different definition for exception numbers.
+But these three fields are not saved into cs_etm_packet struct, thus
+cs-etm layer don't know related information and cannot generate sample
+flags for branch instructions.
 
-Patch 0007 sets sample flags for exception packet; patch 0008 support
-sample flags for exception return packet.
+This patch add corresponding three new fields in cs_etm_packet struct
+and save related value into the packet structure, it is preparation for
+supporting sample flags.
 
-This patch series is applied on the acme's perf core branch with the
-with latest commit 02bb912ae451 ("perf tools: Replace automatic const
-char[] variables by statics").
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 9 +++++++++
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.h | 3 +++
+ 2 files changed, 12 insertions(+)
 
-After applying this patch series, we can verify sample flags with below
-command:
-
-  # perf script -F,-time,+flags,+ip,+sym,+dso,+addr,+symoff -k vmlinux
-
-Changes from v5:
-* Addressed Rob's suggestion to add specification info for exception
-  number encoding;
-* Added Rob's review tag in patch 0007.
-
-Changes from v4:
-* Fixed typos in comments, and removed redundant info from commit log;
-* Addressed Mathieu's suggestion to add helper functions for metadata
-  fields (CS_ETM_CPU and CS_ETM_MAGIC) accessing;
-* Addressed Mathieu's suggestion to include headers with alphabetical
-  order.
-
-Changes from v3:
-* Fixed typos in commit logs;
-* Rearranged fields in cs_etm_packet by grouping with same variable
-  types;
-* Fixed ETMv4 exception number which pointed by Mike;
-* Fixed ETMv4 SVC / SMC / HVC in the same CALL, by checking svc
-  instruction to distinguish them;
-* Refine ETMv4 return exception packet handling.
-
-Changes from v2:
-* Addressed Mathieu's suggestion to split one big patch to 3 small
-  patches for setting sample flags, one is for instruction range
-  packet, one is for discontinuity packet and one is for exception
-  packet.
-* Added supporting for ETMv3 exception packet.
-* Followed Mathieu's suggestion to move all sample flags handling
-  from decoder layer to cs-etm.c, thus it has enough info to set flags
-  based on trace context in single place.
-
-Changes from v1:
-* Moved exception packets handling patches into patch series 'perf
-  cs-etm: Correct packets handling'.
-* Added sample flags fixing up for TRACE_OFF packet.
-* Created a new function which is used to maintain flags fixing up.
-
-
-Leo Yan (8):
-  perf cs-etm: Add last instruction information in packet
-  perf cs-etm: Set sample flags for instruction range packet
-  perf cs-etm: Set sample flags for trace discontinuity
-  perf cs-etm: Add exception number in exception packet
-  perf cs-etm: Change tuple from traceID-CPU# to traceID-metadata
-  perf cs-etm: Add traceID in packet
-  perf cs-etm: Set sample flags for exception packet
-  perf cs-etm: Set sample flags for exception return packet
-
- .../perf/util/cs-etm-decoder/cs-etm-decoder.c |  41 +-
- .../perf/util/cs-etm-decoder/cs-etm-decoder.h |   6 +
- tools/perf/util/cs-etm.c                      | 405 +++++++++++++++++-
- tools/perf/util/cs-etm.h                      |  48 ++-
- 4 files changed, 482 insertions(+), 18 deletions(-)
-
+diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+index 8c155575c6c5..8a19310500d9 100644
+--- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
++++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+@@ -290,6 +290,9 @@ static void cs_etm_decoder__clear_buffer(struct cs_etm_decoder *decoder)
+ 		decoder->packet_buffer[i].instr_count = 0;
+ 		decoder->packet_buffer[i].last_instr_taken_branch = false;
+ 		decoder->packet_buffer[i].last_instr_size = 0;
++		decoder->packet_buffer[i].last_instr_type = 0;
++		decoder->packet_buffer[i].last_instr_subtype = 0;
++		decoder->packet_buffer[i].last_instr_cond = 0;
+ 		decoder->packet_buffer[i].cpu = INT_MIN;
+ 	}
+ }
+@@ -323,6 +326,9 @@ cs_etm_decoder__buffer_packet(struct cs_etm_decoder *decoder,
+ 	decoder->packet_buffer[et].instr_count = 0;
+ 	decoder->packet_buffer[et].last_instr_taken_branch = false;
+ 	decoder->packet_buffer[et].last_instr_size = 0;
++	decoder->packet_buffer[et].last_instr_type = 0;
++	decoder->packet_buffer[et].last_instr_subtype = 0;
++	decoder->packet_buffer[et].last_instr_cond = 0;
+ 
+ 	if (decoder->packet_count == MAX_BUFFER - 1)
+ 		return OCSD_RESP_WAIT;
+@@ -366,6 +372,9 @@ cs_etm_decoder__buffer_range(struct cs_etm_decoder *decoder,
+ 	packet->start_addr = elem->st_addr;
+ 	packet->end_addr = elem->en_addr;
+ 	packet->instr_count = elem->num_instr_range;
++	packet->last_instr_type = elem->last_i_type;
++	packet->last_instr_subtype = elem->last_i_subtype;
++	packet->last_instr_cond = elem->last_instr_cond;
+ 
+ 	switch (elem->last_i_type) {
+ 	case OCSD_INSTR_BR:
+diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+index a6407d41598f..7cdd6a9c68a7 100644
+--- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
++++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+@@ -43,6 +43,9 @@ struct cs_etm_packet {
+ 	u64 start_addr;
+ 	u64 end_addr;
+ 	u32 instr_count;
++	u32 last_instr_type;
++	u32 last_instr_subtype;
++	u8 last_instr_cond;
+ 	u8 last_instr_taken_branch;
+ 	u8 last_instr_size;
+ 	int cpu;
 -- 
 2.17.1
 
