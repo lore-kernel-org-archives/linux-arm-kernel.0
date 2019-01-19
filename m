@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4D575C61CE4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 22:27:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CFC75C61CE8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 22:30:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1232E2086A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 22:27:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 92ADB2084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 19 Jan 2019 22:30:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A3vuHw+K";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="LeyGWAWj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1232E2086A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HQKf3q4f";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="uMsQHhNj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 92ADB2084C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,60 +26,60 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ABC7SHcSNBODIq2Aq7HayI0QZCFYQnToXy4u9WzP/n4=; b=A3vuHw+KsZ2mh5
-	XM63gOkH9tFk0uCETuE87bJFpd6sbjS72G0nhYkSU3Qx37r48H9VfQ/gur7DH98nF7tf9pCDWEnwu
-	HSm1MFXi14YJ7mRW9lJAq3RtTqyPmMxS4rd8/vsMMKDMessn+vTMqlCftFIly4WV9WBzd0ivU/5tL
-	yt+he79pmEGFOM0sFaAYaYde5gHRW1R4sFMKwhB7vLgQvBF6VjMtAJZY0Q5AIQC7vERkdYi++YOfX
-	7V3Fa/73CZnf/KBkjNLbM60LLCqHkN4rlr0tklvX2n1s/2/XisEQQbJptfufhftJ7/qwuivkWLbAV
-	mWFM75B2InMZFNXNcNUA==;
+	List-Owner; bh=NS5h0wEAq1Pf69823BAc6L+Nvqq/MP0kfOqxveH7VeY=; b=HQKf3q4f5B1RYd
+	oRPwgFIMYn4x0HLProYYwEVMoKLdy6EmrnhcGF5PZBvEHpmNABzacGPr5n1unKrdQhsCGpsDDMYcB
+	uAJAeGa2vss2vX5O8pYXTqobU4WycOoBqNFnvVDTetCiwbMAMGLMXpNwsz3qZTD57rbwhaCcs5g/k
+	FEp9fSghxTg+QeGfceA/RxFWWcaeVhmWTdVZJSoceXYn7wL4escbtsOEEecQ0G91pTJrl/quLmws+
+	y0CXQljMfiheCjo9T/se+rgzyevxd2FaKTxreE2W+KVFQUojnsUK4co6zbR/IA9W4qlJadGQzpDXx
+	aHiac6KNl1pT8wnI1tcQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gkz4v-00050Q-4t; Sat, 19 Jan 2019 22:27:01 +0000
-Received: from mail-oi1-x244.google.com ([2607:f8b0:4864:20::244])
+	id 1gkz8h-0006Zj-BD; Sat, 19 Jan 2019 22:30:55 +0000
+Received: from mail-oi1-x243.google.com ([2607:f8b0:4864:20::243])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gkz4s-000504-5z
- for linux-arm-kernel@lists.infradead.org; Sat, 19 Jan 2019 22:26:59 +0000
-Received: by mail-oi1-x244.google.com with SMTP id x23so11824630oix.3
+ id 1gkz8e-0006ZN-Cw
+ for linux-arm-kernel@lists.infradead.org; Sat, 19 Jan 2019 22:30:53 +0000
+Received: by mail-oi1-x243.google.com with SMTP id y1so11782154oie.12
  for <linux-arm-kernel@lists.infradead.org>;
- Sat, 19 Jan 2019 14:26:57 -0800 (PST)
+ Sat, 19 Jan 2019 14:30:51 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=sC2lgsRG/6Y/xz61JsT9wpZ3ebWqOk7wzNKMpksxNQE=;
- b=LeyGWAWjo/gXv38ht3V+sWmNj1rRPoH20zj/9wZhZWYsJODYQH2xKCBa6ngsE27z93
- B8odi1qqKm2asdQLvETObu6mD2Dbbxh83dkUfT9ShL9J9wJ4eKmnF5Ht2+OmTROK5emb
- QBYgqrkptcBf7O7+oLF/+NXOgD9Gr3OD5+AJGSikKsrNh9vDi683SRMJyoICbnOwmDUP
- 8gSaSqZ8ARxkWIgrlSv7djGesw0NmpUY9F0JC78AO5JQ05RAfwCGdloxgpGz6aQBmHIQ
- cHWp3S1KPGyqreFOS2eZuJ7Ld5LacPo7Aa75/acOA7PD7PioQg7bFAmsj5T0QBqJXimH
- rtgQ==
+ :cc; bh=gXdfjLbvWADu2xnhaWD9Ipp8Sac4nR48CwxbLVF68A8=;
+ b=uMsQHhNjCBfO+fDgedRKm7N4ZZs5a0mJiirbPfqtCociZZZ3LVD4qWRolyymnog9oR
+ YIdH73OFahCgEdbCaDS8ddIKFDrOCnXlGcnaj+HDB5ceJwBxUll/IRcw14GSb4ZZEJSs
+ w9GCPadvUE3dUQTmrMQ+fbZrkIzClpH+tRKh/KYWLjO0V50zh/Sutji2xyXrkCEtML9f
+ QqtlFu0fZlMlJ1EUlaIvJdp4BUasZwRtj5IprEhEthGlY6P30c2ujvXSIqJHM5/ECGro
+ bzEVG2RMcTlzXySgeOjomBNA7AgHQzDOwpM82ng6NvvyBdMAMuu7wqUJx1cYChiClGUf
+ NVow==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=sC2lgsRG/6Y/xz61JsT9wpZ3ebWqOk7wzNKMpksxNQE=;
- b=tvMxrA64ZmGHKsBSzfNL08PtoGP4KXxjh8bLKiX/d+ptCAgUsPNo39zHXIJTP2B7lt
- yWhyX8DW7qUR1psAEMTRM4HBpqckKKRvB6RhQ9efWWzHkD5CeP7w0cg3Vo55+k8lMR3J
- nhON/isRQ3tiO3WOXGWjZKN3P1AAa4A+xACCTsmjWIeP24jprh5s1Ki6t7UdlOLM+/UA
- yUbg8veDhsoG30rKogI6MEas/CeL8u4pqMF7S3aq7AQdGX2Px4tpJB7vQ1RZJdZ5oapZ
- JyJHNlXSDbf16HVapkdwb5lIb0rwuPyiWVdFRcZXwrEG/BnohNGb8hjRrQ12HWtFYaQU
- wcWA==
-X-Gm-Message-State: AJcUukdBrT/jS36zOBv7jAJYhlTm/y8ZzWl3KUKyfNcuiQn8bXHjKMSn
- Y+nCiGqUvDQBzT8gtvccm3NEGwhziRxSOGeWtHY=
-X-Google-Smtp-Source: ALg8bN4SmOr6F1zffT8J2Dh+dxyPK7N4+e3wU8p9BXncSwOAEkvdGPagZmL/OzepcyDWGXxohn5mIIivFzYD4TOWiUw=
-X-Received: by 2002:aca:ab53:: with SMTP id u80mr1969833oie.261.1547936816216; 
- Sat, 19 Jan 2019 14:26:56 -0800 (PST)
+ bh=gXdfjLbvWADu2xnhaWD9Ipp8Sac4nR48CwxbLVF68A8=;
+ b=jTGEcTrSDvY5eN1sKp0Hvt0xoGa8W7Ge07xpqypL3auMmN0/7eTy+zDupa+EPqMoKq
+ 8oBsQTPRfXSHBuw5je5z/umwRjF6j5IWrT1qdUTqltMsflA22rzWmCuwlQ3P6s/Uw8oL
+ gZT0S09G9IJoKmhkd8mmaiVZ76JljITpQwoLf4WUaZ5MDibQoiKPnfdgop/YNnPwnqHj
+ 5RsbVgQKBCqZS8V6syd0Oy+07B72ollj6SUnJInpoYw26CVWx+hk4DRM2Ppp3K6eDxL/
+ KmxY0fR7QP3+EP67wMCDwN52GgRXapVqcWDXsBPcpEovdRRMV3oz2ncZSRRcR35wdPiB
+ T/GQ==
+X-Gm-Message-State: AJcUukdJT1gHRDQT5oO4QYWZdhkcxj+ytYuX08kRL+XUE+5daD53JXfB
+ g6jc6Pc8Jn5pFe/jFDijaFJEe9m6fxNZywm+oYE=
+X-Google-Smtp-Source: ALg8bN4vYceMuZXNjubl7hFSWQyHQXOvgR7DZws4qXRBnzYLSdwbLsyAGKgN5/xnBZ1c0LPf3IX6s3g/eMu6E+Kvuj0=
+X-Received: by 2002:a05:6808:296:: with SMTP id
+ z22mr1938356oic.67.1547937050854; 
+ Sat, 19 Jan 2019 14:30:50 -0800 (PST)
 MIME-Version: 1.0
 References: <20190119211815.25101-1-slongerbeam@gmail.com>
- <20190119211815.25101-2-slongerbeam@gmail.com>
-In-Reply-To: <20190119211815.25101-2-slongerbeam@gmail.com>
+ <20190119211815.25101-3-slongerbeam@gmail.com>
+In-Reply-To: <20190119211815.25101-3-slongerbeam@gmail.com>
 From: Fabio Estevam <festevam@gmail.com>
-Date: Sat, 19 Jan 2019 20:26:47 -0200
-Message-ID: <CAOMZO5D-2ygYBj3OuYF4pj7=HyO=aodpY2g+AjCt1EEpX5rk7g@mail.gmail.com>
-Subject: Re: [PATCH 1/2] ARM: dts: imx53: Add capture-subsystem device
+Date: Sat, 19 Jan 2019 20:30:42 -0200
+Message-ID: <CAOMZO5AMgKra8ZxUyBkvDDR68gWZ+YiOhO-yHS-+adMWGgnEsA@mail.gmail.com>
+Subject: Re: [PATCH 2/2] ARM: dts: imx53-smd: Add OV5642 video capture support
 To: Steve Longerbeam <slongerbeam@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190119_142658_262401_ED74E01F 
-X-CRM114-Status: UNSURE (   9.26  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190119_143052_463400_1FD7FA5F 
+X-CRM114-Status: GOOD (  11.66  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,17 +107,39 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 Hi Steve,
 
-On Sat, Jan 19, 2019 at 7:18 PM Steve Longerbeam <slongerbeam@gmail.com> wrote:
+On Sat, Jan 19, 2019 at 7:19 PM Steve Longerbeam <slongerbeam@gmail.com> wrote:
 >
-> Add video capture_subsystem device node, and include both CSI ports.
-> Prepare for adding sensors by adding the parallel sensor anchor endpoints
-> to the CSI ports.
+> Add video capture support from the OV5642 to IPU CSI0 on
+> the i.MX53 SMD.
 >
 > Signed-off-by: Steve Longerbeam <slongerbeam@gmail.com>
 
 Looks good, thanks:
 
 Reviewed-by: Fabio Estevam <festevam@gmail.com>
+
+Only one minor nit below that perhaps Shawn could adjust while applying:
+
+     pmic: dialog@48 {
+>                 compatible = "dlg,da9053", "dlg,da9052";
+>                 reg = <0x48>;
+> +               interrupt-parent = <&gpio7>;
+> +               interrupts = <11 IRQ_TYPE_LEVEL_LOW>; /* low-level active IRQ at GPIO7_11 */
+> +
+> +               regulators {
+> +                       ldo7_reg: ldo7 {
+> +                               regulator-min-microvolt = <1200000>;
+> +                               regulator-max-microvolt = <3600000>;
+> +                               regulator-always-on;
+> +                       };
+> +
+> +                       ldo9_reg: ldo9 {
+> +                               regulator-min-microvolt = <1250000>;
+> +                               regulator-max-microvolt = <3650000>;
+> +                               regulator-always-on;
+
+regulator-always-on could be removed from the two regulators above
+since they are used by the camera.
 
 _______________________________________________
 linux-arm-kernel mailing list
