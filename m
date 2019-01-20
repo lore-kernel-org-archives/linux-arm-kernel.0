@@ -2,63 +2,59 @@ Return-Path: <SRS0=lfWu=P4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,
 	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E1AFCC61CE8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 20 Jan 2019 00:01:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9FEFEC61CE8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 20 Jan 2019 00:04:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AAEAC20883
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 20 Jan 2019 00:01:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 48AC120883
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 20 Jan 2019 00:04:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YYPdfi7f"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AAEAC20883
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lcQyJf53"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 48AC120883
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=W1NAk4d7vDPOm3mfiHUHxrJfwtFZ4u/Z+KVLHlFC2Ws=; b=YYPdfi7fGkADh6
-	Z1wikijGE9xCURbC/3Syv8dUyu9dMptUwM4qeANnmu/yaci1xll26GWLl8QR/kFWoqBqGp+0PaMpK
-	x1BV8SI5gsbhPW3KhiUOLm107OJItp4ZQPD04+gAWs2yeRziIDxtyoO0IZch5BGgyYVjnuwsM8pf2
-	b+sGBMNEkF/creg3GtjNfBO7Vyp6BbO+at6vvycPrwWFCD5r2HYz8TXdYVOGuyyGzLcgwztu4+GSx
-	pNITnfndOks+pJ+p5cHdb6xwJ6qz6YpFEJixIdbFh39qd4IrePAlienouV4v2HW5xsNROeB+MjMQV
-	rizPqq8LVgwPY/yH0uSA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=oyueWS+RFWqpgnsWjastY5+xobFXeD6bx5VHmVZ3YCo=; b=lcQyJf53vDpfOk
+	xR4sI4ZMPwnGv+vInh6eumj4PtUYvLZzb0rFMeOK0cJ1Mm1176/3xu3/6vGMnS9axcGMbQ9YOKi2N
+	SAkm5UYL2QV/h+z47xVx8bGf1FRV4IJQzYyVJkfpmA0QsmX4OpeCMNfEb8IAO9zJ1OpUq3uTdPOMy
+	AhOcfHTsx9MvKVpWlT12S7Vwxxkt/b8duWSGe6czSWsv0s/lr5/FxL2SqEQ1UT/EY8JiOvF0ZDx1T
+	rUjxbcJ0ynTSd6N/Qnpw9aGod9qk/JseHOlx9VWJQJasDAUwKrCiWjPY7PV62lvO+9vqVZwuM2EkZ
+	57BK23Ry75Da3/MHfZaQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gl0YL-0007xY-04; Sun, 20 Jan 2019 00:01:29 +0000
+	id 1gl0bG-0008HU-TS; Sun, 20 Jan 2019 00:04:30 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gl0YH-0007xC-5V
- for linux-arm-kernel@lists.infradead.org; Sun, 20 Jan 2019 00:01:26 +0000
+ id 1gl0bE-0008HA-0W
+ for linux-arm-kernel@lists.infradead.org; Sun, 20 Jan 2019 00:04:29 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9BF36A78;
- Sat, 19 Jan 2019 16:01:24 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 78345A78;
+ Sat, 19 Jan 2019 16:04:27 -0800 (PST)
 Received: from brain-police (usa-sjc-mx-foss1.foss.arm.com [217.140.101.70])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 6972C3F6A8;
- Sat, 19 Jan 2019 16:01:22 -0800 (PST)
-Date: Sun, 20 Jan 2019 00:01:18 +0000
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id EF3F43F6A8;
+ Sat, 19 Jan 2019 16:04:25 -0800 (PST)
+Date: Sun, 20 Jan 2019 00:04:22 +0000
 From: Will Deacon <will.deacon@arm.com>
-To: Vivek Gautam <vivek.gautam@codeaurora.org>
-Subject: Re: [PATCH 2/2] iommu/arm-smmu: Add support for non-coherent page
- table mappings
-Message-ID: <20190120000117.GH26876@brain-police>
-References: <20190117092718.1396-1-vivek.gautam@codeaurora.org>
- <20190117092718.1396-3-vivek.gautam@codeaurora.org>
+To: torvalds@linux-foundation.org
+Subject: [GIT PULL] arm64: fixes for -rc3
+Message-ID: <20190120000420.GM26876@brain-police>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190117092718.1396-3-vivek.gautam@codeaurora.org>
 User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190119_160125_215095_671B2A11 
-X-CRM114-Status: UNSURE (   9.69  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190119_160428_062423_98FC07B8 
+X-CRM114-Status: GOOD (  11.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,27 +66,64 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-msm@vger.kernel.org, joro@8bytes.org,
- linux-kernel@vger.kernel.org, tfiga@chromium.org,
- iommu@lists.linux-foundation.org, robin.murphy@arm.com,
- linux-arm-kernel@lists.infradead.org
+Cc: catalin.marinas@arm.com, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, ard.biesheuvel@linaro.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 17, 2019 at 02:57:18PM +0530, Vivek Gautam wrote:
-> Adding a device tree option for arm smmu to enable non-cacheable
-> memory for page tables.
-> We already enable a smmu feature for coherent walk based on
-> whether the smmu device is dma-coherent or not. Have an option
-> to enable non-cacheable page table memory to force set it for
-> particular smmu devices.
+Hi Linus,
 
-Hmm, I must be missing something here. What is the difference between this
-new property, and simply omitting dma-coherent on the SMMU?
+Please pull these three arm64 fixes for -rc3. We've plugged a couple of
+nasty issues involving KASLR-enabled kernels, and removed a redundant
+#define that was introduced as part of the KHWASAN fixes from akpm at -rc2.
+
+The kernel.org servers wouldn't talk to me from NZ (the keys appeared to
+have changed), so I ended up pushing via the UK which seems to have worked.
+Please shout if anything looks weird.
+
+Cheers,
 
 Will
+
+--->8
+
+The following changes since commit 1c7fc5cbc33980acd13d668f1c8f0313d6ae9fd8:
+
+  Linux 5.0-rc2 (2019-01-14 10:41:12 +1200)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
+
+for you to fetch changes up to 7fa1e2e6afa7f4c9f46528e61de6a15d9e8dffd9:
+
+  kasan, arm64: remove redundant ARCH_SLAB_MINALIGN define (2019-01-16 12:09:11 +0000)
+
+----------------------------------------------------------------
+arm64 fixes for -rc3
+
+- Fix broken kpti page-table rewrite in bizarre KASLR configuration
+
+- Fix module loading with KASLR
+
+- Remove redundant definition of ARCH_SLAB_MINALIGN
+
+----------------------------------------------------------------
+Andrey Konovalov (1):
+      kasan, arm64: remove redundant ARCH_SLAB_MINALIGN define
+
+Ard Biesheuvel (1):
+      arm64: kaslr: ensure randomized quantities are clean to the PoC
+
+James Morse (1):
+      arm64: kpti: Update arm64_kernel_use_ng_mappings() when forced on
+
+ arch/arm64/include/asm/cache.h | 2 --
+ arch/arm64/include/asm/mmu.h   | 5 ++++-
+ arch/arm64/kernel/kaslr.c      | 8 ++++++--
+ 3 files changed, 10 insertions(+), 5 deletions(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
