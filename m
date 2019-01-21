@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ABE94C7112F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 11:26:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 106DDC7113B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 11:26:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7E6E920663
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 11:26:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C635220663
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 11:26:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Mdd/CCI5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7E6E920663
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YeFFbjZu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C635220663
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,24 +25,24 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Nq8E3ry4q+XfKenP3ePCY4hDEIkbGA2Vr9a9wruNUfw=; b=Mdd/CCI5yTfQAp
-	ELAw0PTwamJUuI7MEgeakuHFspI9F4KBZpvVJiEreH5EMIf+wZdT3qrtI9kHw+MHDBKISKhoRNYAH
-	Dl6FVIxla7OmgKZADwvERq7yaRSY7NYX1NZZSMDw/WkyuOcJ1ocBPk0Laet2sQas4HuvyR7pAGIH0
-	JKh+xOTsFKwDeELhwbud2qByfiVidxgacc4zc07nhI1T2yuaIm6V8iLUguE8/UTj6x97PSJU7Y68s
-	B3mSzSO0jQenxKokMIXdndiiSy4LWWqJBMjYxOn7WKEZK7qDwFaSwDCz43PW5IoOa7/I+rtTM2x+x
-	jsmZWcJvCZpbH91nieKQ==;
+	List-Owner; bh=HE4SXwGqwFdfrbmraq0qV0wn2vct38T+YkESBzlHZqM=; b=YeFFbjZuH+7Vov
+	7V2wi39COpBltOR78zWQoWNKJs5z3k+QImlqs2/mSHD91vkLlEXxOJGuQAPjXJrp7FOiKQDe0L/zz
+	rhCfcenk5YAnp8LzzXmck4bb4AmrJXoDutlrVUmg6clZGnez5GmQ+NIF5S32Es5oSHHy3HhvA80Nw
+	42LEN0IRGLhTZG3xbthVBMYFKyn2H2V00TuPwRf12vRw+ZHr7KCrbAizlN4JXBlQeUNiSUa2r0A4X
+	7KtDcQW+ajicbxWB6cpLZbANPoFb+TWBt7bG0egPif6eMSljSFgEc5UjRiu6JdricuVakKjXfzFuv
+	lvin1WULJFcfZ+SYa9/g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glXix-0005G8-TC; Mon, 21 Jan 2019 11:26:39 +0000
+	id 1glXjD-0005UF-5q; Mon, 21 Jan 2019 11:26:55 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glXg7-0001J1-Fn
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 11:23:48 +0000
+ id 1glXg6-0001Ha-4N
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 11:23:47 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 4D1BF20BA5; Mon, 21 Jan 2019 12:23:41 +0100 (CET)
+ id 85A7720A85; Mon, 21 Jan 2019 12:23:40 +0100 (CET)
 Received: from localhost.localdomain
  (aaubervilliers-681-1-37-87.w90-88.abo.wanadoo.fr [90.88.156.87])
- by mail.bootlin.com (Postfix) with ESMTPSA id DD145207B2;
+ by mail.bootlin.com (Postfix) with ESMTPSA id 21645206DC;
  Mon, 21 Jan 2019 12:23:40 +0100 (CET)
 From: Miquel Raynal <miquel.raynal@bootlin.com>
 To: Gregory Clement <gregory.clement@bootlin.com>,
@@ -53,17 +53,16 @@ To: Gregory Clement <gregory.clement@bootlin.com>,
  Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
  Mathias Nyman <mathias.nyman@intel.com>,
  Alan Stern <stern@rowland.harvard.edu>
-Subject: [PATCH v3 09/10] ARM64: dts: marvell: armada-37xx: declare USB2 UTMI
- PHYs
-Date: Mon, 21 Jan 2019 12:23:35 +0100
-Message-Id: <20190121112336.23489-10-miquel.raynal@bootlin.com>
+Subject: [PATCH v3 07/10] MAINTAINERS: phy: fill Armada 3700 PHY drivers entry
+Date: Mon, 21 Jan 2019 12:23:33 +0100
+Message-Id: <20190121112336.23489-8-miquel.raynal@bootlin.com>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20190121112336.23489-1-miquel.raynal@bootlin.com>
 References: <20190121112336.23489-1-miquel.raynal@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_032343_933926_350C56DD 
-X-CRM114-Status: GOOD (  13.00  )
+X-CRM114-CacheID: sfid-20190121_032342_306680_B7D55EB1 
+X-CRM114-Status: GOOD (  12.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,69 +85,33 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Marvell Armada 3700 SoCs there are two USB2 UTMI PHYs. They are
-both very similar but only one has OTG/charging capabilities.
-
-Because there are USB host registers and PHY registers mixed in a
-single area, a system controller is also created and referenced from
-both the USB host node and the PHY node.
+Update the Armada 3700 PHY drivers entry with the recently added UTMI
+PHY driver.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 28 ++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ MAINTAINERS | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index 5cfd1b920f31..aeb2681428b3 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -344,18 +344,46 @@
- 				compatible = "marvell,armada3700-xhci",
- 				"generic-xhci";
- 				reg = <0x58000 0x4000>;
-+				marvell,usb-misc-reg = <&usb32_syscon>;
- 				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&sb_periph_clk 12>;
- 				status = "disabled";
- 			};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index abfd80f21b24..2a08a097e107 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -9080,11 +9080,13 @@ F:	drivers/gpu/drm/armada/
+ F:	include/uapi/drm/armada_drm.h
+ F:	Documentation/devicetree/bindings/display/armada/
  
-+			usb2_utmi_otg_phy: phy@5d000 {
-+				compatible = "marvell,a3700-utmi-otg-phy";
-+				reg = <0x5d000 0x800>;
-+				marvell,usb-misc-reg = <&usb32_syscon>;
-+				#phy-cells = <0>;
-+			};
-+
-+			usb32_syscon: system-controller@5d800 {
-+				compatible = "marvell,usb2-host-device-miscellaneous",
-+				"syscon";
-+				reg = <0x5d800 0x800>;
-+			};
-+
- 			usb2: usb@5e000 {
- 				compatible = "marvell,armada-3700-ehci";
- 				reg = <0x5e000 0x1000>;
-+				marvell,usb-misc-reg = <&usb2_syscon>;
- 				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
- 				status = "disabled";
- 			};
+-MARVELL ARMADA 3700 COMPHY DRIVER
++MARVELL ARMADA 3700 PHY DRIVERS
+ M:	Miquel Raynal <miquel.raynal@bootlin.com>
+ S:	Maintained
+ F:	drivers/phy/marvell/phy-mvebu-a3700-comphy.c
++F:	drivers/phy/marvell/phy-mvebu-a3700-utmi.c
+ F:	Documentation/devicetree/bindings/phy/phy-mvebu-comphy.txt
++F:	Documentation/devicetree/bindings/phy/phy-mvebu-utmi.txt
  
-+			usb2_utmi_host_phy: phy@5f000 {
-+				compatible = "marvell,a3700-utmi-host-phy";
-+				reg = <0x5f000 0x800>;
-+				marvell,usb-misc-reg = <&usb2_syscon>;
-+				#phy-cells = <0>;
-+			};
-+
-+			usb2_syscon: system-controller@5f800 {
-+				compatible = "marvell,usb2-host-miscellaneous",
-+				"syscon";
-+				reg = <0x5f800 0x800>;
-+			};
-+
- 			xor@60900 {
- 				compatible = "marvell,armada-3700-xor";
- 				reg = <0x60900 0x100>,
+ MARVELL CRYPTO DRIVER
+ M:	Boris Brezillon <bbrezillon@kernel.org>
 -- 
 2.19.1
 
