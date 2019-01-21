@@ -2,73 +2,66 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1454FC2F3BE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 13:53:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 77D52C2F3A0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 13:56:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CEA1F2089F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 13:53:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 43F632084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 13:56:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IL4SNm4t";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=alien8.de header.i=@alien8.de header.b="mfnunxL0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CEA1F2089F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=alien8.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KTmolr7l"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 43F632084C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=dEmH7TuejHB3PbclISe8WU8lh6a5hNrhS+6u9awEWCc=; b=IL4SNm4t7PZxj5
-	mmzQ7UP/gmT9pHcPLC+jG9IkmCgvyp78DgH8V1cnp1He2xe7D/ptyTvhg6kn3KOGF6lH+ixwvKjxo
-	YUX8nXnHKs6IACGdPlHqlcDJnc0zZwqvXBJQuT3fa57Zi6fewqI2eVQ29PeqO5fBrzdV/IVRqgV5A
-	OzaH5WUfncT7VzreGqtyNnUXSU/wjeujkts+8t3i6gAjVROBiB0E+39MZ2bw2GeXhKiclVhT98vEj
-	QhZVOLkLGvQvTZvuNX/x418XmuS8WBV2NOmhpw4Ww8Qk6LAMAIr450b6jxxxd28l+b3blfC7FJjT6
-	6aSyD+LaT++oxH0kgY+Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=+Ql58WVwIeYm3PmC42131HxxE0hzysAlZmE6X4uNAO0=; b=KTmolr7lrU6d2GXf5PSWZFfcw
+	4f04Uv34vl9jS/eNDyYP1qNBIOy3vZWcBnIyjHBl6KlP/luwMrNTg/wQXMtLSG6bH9a5npgCaXCYL
+	7J47pas29yQE9yWH5YsVLrfx6b6w9HmXfRHtlza61A1NRGPTndpat4Ef8jpCtkU/qp4hgUJKnbfqi
+	goHr4hAfMzlzoL107EyonfyQQTPcdiCPZeuIGstGu5Mw9XjEKQF1Ef2wqQtcpvwD7pc5DH5iUFOLm
+	rvaQg6dRJqWOHiH3VlrUX/5CE522Jtxa8HJB+j2M7AXIP75rlpdd9Gmu0Lh2uGpbQkfUMYyq51Wo4
+	OQXeynsvg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gla0p-00039E-8q; Mon, 21 Jan 2019 13:53:15 +0000
-Received: from mail.skyhub.de ([2a01:4f8:190:11c2::b:1457])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gla0m-00038n-5x
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 13:53:13 +0000
-Received: from zn.tnic (p200300EC2BC62500144FAFA30BDB3DA7.dip0.t-ipconnect.de
- [IPv6:2003:ec:2bc6:2500:144f:afa3:bdb:3da7])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.skyhub.de (SuperMail on ZX Spectrum 128k) with ESMTPSA id 83C501EC035B;
- Mon, 21 Jan 2019 14:53:10 +0100 (CET)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=alien8.de; s=dkim;
- t=1548078790;
- h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
- to:to:cc:cc:mime-version:mime-version:content-type:content-type:
- content-transfer-encoding:in-reply-to:in-reply-to:  references:references;
- bh=cP78pzFD5JiXNfMS8pi87e7ZqpkvOF3N0AoMlgJTb0I=;
- b=mfnunxL03+aYpJVhilf1btZr9ly8dHuOV63myCeKQ8ryrq6eGv3PBCg/PknJ8L42xDa46g
- HLRRhWwtuyRf7BidguHmNtcshwqdlvIFFnMhw4JAzO7H8ZhH+ZzOVhrVJPWpmRr+oP2XFa
- nbLUOoTgvsltazH3vq3At8nbL9aEKHU=
-Date: Mon, 21 Jan 2019 14:53:04 +0100
-From: Borislav Petkov <bp@alien8.de>
-To: James Morse <james.morse@arm.com>
-Subject: Re: [PATCH v7 18/25] ACPI / APEI: Split ghes_read_estatus() to allow
- a peek at the CPER length
-Message-ID: <20190121135304.GI29166@zn.tnic>
-References: <20181203180613.228133-1-james.morse@arm.com>
- <20181203180613.228133-19-james.morse@arm.com>
+	id 1gla3q-0004xH-9c; Mon, 21 Jan 2019 13:56:22 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gla3m-0004wx-KJ
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 13:56:20 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3FC01EBD;
+ Mon, 21 Jan 2019 05:56:17 -0800 (PST)
+Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id F1FD03F614;
+ Mon, 21 Jan 2019 05:56:14 -0800 (PST)
+Subject: Re: [PATCH 0/3] iommu/arm-smmu: Add support to use Last level cache
+To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+References: <20190121055335.15430-1-vivek.gautam@codeaurora.org>
+ <CAKv+Gu8P-5hxZ8+OV_xSZteTvCLw-Sc-=KJM1i=3aWajcS9bUw@mail.gmail.com>
+ <CAFp+6iEp-bzMrZz8cFUciTFKm7TwAoLdYpsSTD73kDfCRh60bA@mail.gmail.com>
+ <CAKv+Gu9z_mGwdZYMKPfM_g2MZwrCF5=f4WAdn_R6wJ1A9xSZ_Q@mail.gmail.com>
+ <dbba5a8a-70c0-dd01-713c-081eb412e2d7@arm.com>
+ <CAKv+Gu8K5f0va9q4FYk9x1puoOTDjZ0c25qokm2izSVAwd1gmQ@mail.gmail.com>
+From: Robin Murphy <robin.murphy@arm.com>
+Message-ID: <964779d6-c676-3379-bf1e-cde0dd82d63d@arm.com>
+Date: Mon, 21 Jan 2019 13:56:13 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181203180613.228133-19-james.morse@arm.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <CAKv+Gu8K5f0va9q4FYk9x1puoOTDjZ0c25qokm2izSVAwd1gmQ@mail.gmail.com>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_055312_375438_080FF6D7 
-X-CRM114-Status: GOOD (  21.75  )
+X-CRM114-CacheID: sfid-20190121_055618_683641_A36B77E4 
+X-CRM114-Status: GOOD (  19.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,134 +73,91 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rafael Wysocki <rjw@rjwysocki.net>, Tony Luck <tony.luck@intel.com>,
- Fan Wu <wufan@codeaurora.org>, linux-mm@kvack.org,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Xie XiuQi <xiexiuqi@huawei.com>, Will Deacon <will.deacon@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>,
- Dongjiu Geng <gengdongjiu@huawei.com>, linux-acpi@vger.kernel.org,
- Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org, Len Brown <lenb@kernel.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: pdaly@codeaurora.org, linux-arm-msm <linux-arm-msm@vger.kernel.org>,
+ Joerg Roedel <joro@8bytes.org>, Will Deacon <will.deacon@arm.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Tomasz Figa <tfiga@chromium.org>,
+ "list@263.net:IOMMU DRIVERS" <iommu@lists.linux-foundation.org>,
+ Vivek Gautam <vivek.gautam@codeaurora.org>,
+ Jordan Crouse <jcrouse@codeaurora.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ pratikp@codeaurora.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 03, 2018 at 06:06:06PM +0000, James Morse wrote:
-> ghes_read_estatus() reads the record address, then the record's
-> header, then performs some sanity checks before reading the
-> records into the provided estatus buffer.
+On 21/01/2019 13:36, Ard Biesheuvel wrote:
+> On Mon, 21 Jan 2019 at 14:25, Robin Murphy <robin.murphy@arm.com> wrote:
+>>
+>> On 21/01/2019 10:50, Ard Biesheuvel wrote:
+>>> On Mon, 21 Jan 2019 at 11:17, Vivek Gautam <vivek.gautam@codeaurora.org> wrote:
+>>>>
+>>>> Hi,
+>>>>
+>>>>
+>>>> On Mon, Jan 21, 2019 at 12:56 PM Ard Biesheuvel
+>>>> <ard.biesheuvel@linaro.org> wrote:
+>>>>>
+>>>>> On Mon, 21 Jan 2019 at 06:54, Vivek Gautam <vivek.gautam@codeaurora.org> wrote:
+>>>>>>
+>>>>>> Qualcomm SoCs have an additional level of cache called as
+>>>>>> System cache, aka. Last level cache (LLC). This cache sits right
+>>>>>> before the DDR, and is tightly coupled with the memory controller.
+>>>>>> The clients using this cache request their slices from this
+>>>>>> system cache, make it active, and can then start using it.
+>>>>>> For these clients with smmu, to start using the system cache for
+>>>>>> buffers and, related page tables [1], memory attributes need to be
+>>>>>> set accordingly. This series add the required support.
+>>>>>>
+>>>>>
+>>>>> Does this actually improve performance on reads from a device? The
+>>>>> non-cache coherent DMA routines perform an unconditional D-cache
+>>>>> invalidate by VA to the PoC before reading from the buffers filled by
+>>>>> the device, and I would expect the PoC to be defined as lying beyond
+>>>>> the LLC to still guarantee the architected behavior.
+>>>>
+>>>> We have seen performance improvements when running Manhattan
+>>>> GFXBench benchmarks.
+>>>>
+>>>
+>>> Ah ok, that makes sense, since in that case, the data flow is mostly
+>>> to the device, not from the device.
+>>>
+>>>> As for the PoC, from my knowledge on sdm845 the system cache, aka
+>>>> Last level cache (LLC) lies beyond the point of coherency.
+>>>> Non-cache coherent buffers will not be cached to system cache also, and
+>>>> no additional software cache maintenance ops are required for system cache.
+>>>> Pratik can add more if I am missing something.
+>>>>
+>>>> To take care of the memory attributes from DMA APIs side, we can add a
+>>>> DMA_ATTR definition to take care of any dma non-coherent APIs calls.
+>>>>
+>>>
+>>> So does the device use the correct inner non-cacheable, outer
+>>> writeback cacheable attributes if the SMMU is in pass-through?
+>>>
+>>> We have been looking into another use case where the fact that the
+>>> SMMU overrides memory attributes is causing issues (WC mappings used
+>>> by the radeon and amdgpu driver). So if the SMMU would honour the
+>>> existing attributes, would you still need the SMMU changes?
+>>
+>> Even if we could force a stage 2 mapping with the weakest pagetable
+>> attributes (such that combining would work), there would still need to
+>> be a way to set the TCR attributes appropriately if this behaviour is
+>> wanted for the SMMU's own table walks as well.
+>>
 > 
-> To provide this estatus buffer the caller must know the size of the
-> records in advance, or always provide a worst-case sized buffer as
-> happens today for the non-NMI notifications.
-> 
-> Add a function to peek at the record's header to find the size. This
-> will let the NMI path allocate the right amount of memory before reading
-> the records, instead of using the worst-case size, and having to copy
-> the records.
-> 
-> Split ghes_read_estatus() to create __ghes_peek_estatus() which
-> returns the address and size of the CPER records.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> 
-> Changes since v6:
->  * Additional buf_addr = 0 error handling
->  * Moved checking out of peek-estatus
->  * Reworded an error message so we can tell them apart
-> ---
->  drivers/acpi/apei/ghes.c | 59 ++++++++++++++++++++++++++++++++--------
->  1 file changed, 47 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index b70f5fd962cc..07a12aac4c1a 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -277,12 +277,12 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
->  	}
->  }
->  
-> -static int ghes_read_estatus(struct ghes *ghes,
-> -			     struct acpi_hest_generic_status *estatus,
-> -			     u64 *buf_paddr, int fixmap_idx)
-> +/* Read the CPER block and returning its address, and header in estatus. */
+> Isn't that just a matter of implementing support for SMMUs that lack
+> the 'dma-coherent' attribute?
 
-s/and /,/
+Not quite - in general they need INC-ONC attributes in case there 
+actually is something in the architectural outer-cacheable domain. The 
+case of the outer cacheablility being not that but a hint to control 
+non-CPU traffic through some not-quite-transparent cache behind the PoC 
+definitely stays wrapped up in qcom-specific magic ;)
 
-> +static int __ghes_peek_estatus(struct ghes *ghes, int fixmap_idx,
-> +			       struct acpi_hest_generic_status *estatus,
-
-Also, we probably should stick to some order of arguments of those
-functions for easier code staring, i.e.
-
-	function_name(ghes, estatus, buf_paddr, fixmap_idx)
-
-or so.
-
-> +			       u64 *buf_paddr)
->  {
->  	struct acpi_hest_generic *g = ghes->generic;
-> -	u32 len;
->  	int rc;
->  
->  	rc = apei_read(buf_paddr, &g->error_status_address);
-> @@ -303,29 +303,64 @@ static int ghes_read_estatus(struct ghes *ghes,
->  		return -ENOENT;
->  	}
->  
-> -	rc = -EIO;
-> -	len = cper_estatus_len(estatus);
-> +	return 0;
-> +}
-> +
-> +/* Check the top-level record header has an appropriate size. */
-> +int __ghes_check_estatus(struct ghes *ghes,
-> +			 struct acpi_hest_generic_status *estatus)
-> +{
-> +	u32 len = cper_estatus_len(estatus);
-> +	int rc = -EIO;
-> +
->  	if (len < sizeof(*estatus))
->  		goto err_read_block;
->  	if (len > ghes->generic->error_block_length)
->  		goto err_read_block;
->  	if (cper_estatus_check_header(estatus))
->  		goto err_read_block;
-
-Please make this chunk more user-friendly, maybe in a separate patch ontop:
-
-/* Check the top-level record header has an appropriate size. */
-int __ghes_check_estatus(struct ghes *ghes,
-                         struct acpi_hest_generic_status *estatus)
-{
-        u32 len = cper_estatus_len(estatus);
-
-        if (len < sizeof(*estatus)) {
-                pr_warn_ratelimited(FW_WARN GHES_PFX "Truncated error status block!\n");
-                return -EIO;
-        }
-
-        if (len > ghes->generic->error_block_length) {
-                pr_warn_ratelimited(FW_WARN GHES_PFX "Invalid error status block length!\n");
-                return -EIO;
-        }
-
-        if (cper_estatus_check_header(estatus)) {
-                pr_warn_ratelimited(FW_WARN GHES_PFX "Invalid CPER header!\n");
-                return -EIO;
-        }
-
-        return 0;
-}
-
-Thx.
-
--- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+Robin.
 
 _______________________________________________
 linux-arm-kernel mailing list
