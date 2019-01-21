@@ -2,92 +2,90 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0F63AC31D63
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 06:10:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C4778C31D63
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 06:11:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D1AF8217F9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 06:10:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8F039217F9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 06:11:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MyClyxFb";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="KZ/RorbY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D1AF8217F9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JCo6CkRU";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="qdW6yClj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8F039217F9
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SnVfPDCWeva+vYCfuuGfGYhbV/NceI5a8h8zwWBvXB8=; b=MyClyxFbfjb7nA
-	lrldrpn6Y6Qjt0x+EyCO75ABBuovIJOvD5dFmRCZm2PL8SlSDR0yyfm54JygYlG659++J1nmUayW2
-	K0yjsI+e0sKv7PCfNb7Omv+A5QrEt7cL+K/sFPFpUPWoWEhg8oen5GuFchh7/qJ+NA8F0mqBUblFt
-	Nx2b0RVA/jYFExw85HXDshFHOMK383I4WTWweq6AkZZ3t7+ze4RihTG3gI/OJmIs+f5yxcr0ZZ4eg
-	3EIxD5WwrBkqUWCIHuYGtowOT+6dAKqOp0xQZMO89KytRB8QaNvWZaW0yFJbqauR9+VZotlT/Ehc9
-	u98eWxxnSm4Ku2d9gUxw==;
+	List-Owner; bh=iOws+yzJyZHNv1lke+yu8MQt5OdxEkqWFfGWTDmTB2s=; b=JCo6CkRUK91Rpz
+	nKR1ZpKZ5W2OgHfh4Jp2XtEd+8UqiXKGMlry+ZtgMWeAt3Vu/c/Dou74dJ+0E91jtywqi1LiD0j+i
+	C+j5RbObwL2HZr9zDC5T117xML3tMSQfIum8rk4PYF7RCntOhqNMTP2YgIm7OK1uM3Gmsu1BGn9tm
+	bwhAwOXo/n/caxDMtbQ3jFfu+C6LiOmZE36IJwSCvTzbxc5Uc7AT2O0UIU84BD0royy9elACcpNuy
+	qzaskTVeP3iKG8+ePkz94pHi6ywYw4nE1RwBpqrKT8c7KmVS1qYLgDjGY0XsGKVC+uI/DE/JFEfar
+	QlIG6tn8hKhlUklZ7f0w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glSma-0007UR-IU; Mon, 21 Jan 2019 06:10:04 +0000
-Received: from mail-pf1-x442.google.com ([2607:f8b0:4864:20::442])
+	id 1glSns-0000Xw-MK; Mon, 21 Jan 2019 06:11:24 +0000
+Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glSmW-0007Lj-SM
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 06:10:02 +0000
-Received: by mail-pf1-x442.google.com with SMTP id w73so9608261pfk.10
+ id 1glSnp-0000XZ-8L
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 06:11:22 +0000
+Received: by mail-wm1-x342.google.com with SMTP id n190so9598802wmd.0
  for <linux-arm-kernel@lists.infradead.org>;
- Sun, 20 Jan 2019 22:10:00 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=KOM/uD0QCo+R8A70jLNHCXKLD6NDSRQnu6GicijX3uM=;
- b=KZ/RorbYqB6p82S5YpiClVd/+5Uz+NUJcryFloOg44jqPBITRgYtnEbxjakwy7V9EF
- oLLehle6x6lODRX0i1emydEOoV7Wi73TctV4ahHgLt7yMok3e7Ti/CRrDPg4HaO/yi0t
- SNguuz/pTmEgy+2nEFA+hn9LFFLU3Wvkxg58Y=
+ Sun, 20 Jan 2019 22:11:20 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=mjucR6CjAKB/oZPowyqDWMqmkQFXb/O28LP7fy8eQto=;
+ b=qdW6yClj17Y2yLEVt6gROToTyccasjHt2D3dLjNr2R8RGnXusFOMUO7fbZWl/hcrOy
+ lenBIsKbsPGJ1osbfkfXGrxJm/8IRzrBwjxEo2ivqCHbOOF0z3/3t4eZ1H7EAgACGmOV
+ 5GVqrRVTYLa/6qbZrUXryRmcohB09que06AShydcUOlu4xkOOJLjzCXtfIDNyjBLgi66
+ GPNqpEVe4RC52f/SvH0JYMZUk/83dgWFDBpLSqRj8Rr3nugVddoutpaluwj7vH6YeWsD
+ XQm6kgHYJUsG+XEwBwI3eVCBhi2lYCNNwVxanwN/TgFJlUEtrHFGWZ+gj966lTY+jDHR
+ k3Xw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=KOM/uD0QCo+R8A70jLNHCXKLD6NDSRQnu6GicijX3uM=;
- b=Wihe1Cgp2UhLBbBbA0jEmAwZj96WlWcP+Wh/3vaHSKwrZx0fwFWDydLW4EVdmoxh+z
- 1MKpyjuzUHEXgdL0uRzMr4xnsWnbkekml4Ukj/P7A8F4FXX3GeaonyrKWy2cqcFd6Co7
- 8yv76EULW83aDo6dqvd+GvnpUQ5L4SujdxBlHuXslpwi+XV6Q7v0pfHklExu9nYOVAKb
- JAkDNUCU4pjS5jDcVgfVEZRLMCQdU9SBOYpwlBb6X/l92KZ71YGwLyqQiEtLYZhvi0vS
- TWS15+k2uwt7umstbrliMNNDswkrWUqdnLTHldaQ86neZQIEOI7VCq8JYRp8Yhyj+MAK
- 6zFQ==
-X-Gm-Message-State: AJcUukcfwcsCqruuzQbzYD+WWyLKHZGLRC1XW+OzMUq12/IaWZWLGOiK
- AS+5DdyO7RWuIAk1XBU44lNx
-X-Google-Smtp-Source: ALg8bN5tEuiDvy/7UjSiOHIjPc1PRhcF/jybPjBK96SHNgTi6RXlqFvivbKwuNKTKBfHsET2NRZ5LQ==
-X-Received: by 2002:a63:f65:: with SMTP id 37mr26796456pgp.238.1548050999815; 
- Sun, 20 Jan 2019 22:09:59 -0800 (PST)
-Received: from Mani-XPS-13-9360 ([2409:4072:620d:6d18:8cdf:8a2:4d22:45a8])
- by smtp.gmail.com with ESMTPSA id 186sm24903247pga.36.2019.01.20.22.09.53
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Sun, 20 Jan 2019 22:09:58 -0800 (PST)
-Date: Mon, 21 Jan 2019 11:39:50 +0530
-From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-To: Shawn Guo <shawnguo@kernel.org>, Rob Herring <robh+dt@kernel.org>
-Subject: Re: [PATCH v2 2/3] dt-bindings: arm: fsl: Add devicetree binding for
- Oxalis
-Message-ID: <20190121060950.GA8713@Mani-XPS-13-9360>
-References: <20190114102053.16013-1-manivannan.sadhasivam@linaro.org>
- <20190114102053.16013-3-manivannan.sadhasivam@linaro.org>
- <CAL_JsqJpRPrCpRTpqh1v6JZwpEtZnaeuLTHR+0EiMSoxbk9zeQ@mail.gmail.com>
- <20190116022100.GC15808@dragon>
- <CAL_Jsq+myeZ1n4X=KhHZjtPDHnGH=L65xxYbzMrt8Rq6Bur4Bg@mail.gmail.com>
- <20190116101441.GH15808@dragon>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=mjucR6CjAKB/oZPowyqDWMqmkQFXb/O28LP7fy8eQto=;
+ b=MOmBzx48709gM9dTrVVX04k1ODXuOYdyr/yY+5QclSbqGdNv4MYu5v6Ld6CqswCK4h
+ jvbT8el20wQ8cwtspiVRioi5Akv4SIxMYLG/qoOhMuVKmqoaXKzgPoCa5o3R+qNKAKiT
+ fKWT09khJQvmVfmgK2ywI4GRrJZe9uQO+V3qguJGQvksV+AWuOSvuMgNQOp4R4Q5y9hZ
+ 5EeDm1/fYiAPF7S84J5eMCZsYKfhbCMsKu4LJFL22zh/x07PWBX3EoJrJsrTjP3MBQeo
+ 5j5/twM2ZRkX8zlLqzgRREc4mLeyY/Yt5YfPcEKgwVxcyHbJmwSBhFAI8IxRBHwNVF0/
+ AkyQ==
+X-Gm-Message-State: AJcUukf5kY49hY0XZhOaYbuVvjVIZrS5g5RZp4TZI7GmMUJz819oDQs8
+ jjaSBcXq/fLdJfmX3yJ5V3u+UtL1JHMQmO91oJg=
+X-Google-Smtp-Source: ALg8bN7BP7+s3xdf8diWvoxK2GWFipb2aadX2E4QPZ99KIkA4uyCVlSiwjU3ZN4xjbH3fCk4Y42zEMQtYYsbHdasI5A=
+X-Received: by 2002:a1c:bb04:: with SMTP id l4mr23437754wmf.142.1548051078579; 
+ Sun, 20 Jan 2019 22:11:18 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190116101441.GH15808@dragon>
-User-Agent: Mutt/1.9.4 (2018-02-28)
+References: <cover.1502103715.git.michal.simek@xilinx.com>
+ <72d3cd83bed792a23ab60cf9b6d51b618f5aa084.1502103715.git.michal.simek@xilinx.com>
+ <CACRpkdZE-Edr7fWZY5VQM1_65iw7MYGP-iDa2ExZsPxpM0rurQ@mail.gmail.com>
+ <6da5fd79-fbc8-b613-954f-dcbe2ef8d6c5@xilinx.com>
+ <20190107164210.3ecf37e8@windsurf>
+ <CACRpkdafBpC14TxBNVN2AemkBz-yKkXkKfNpdgkYKQX3qFemag@mail.gmail.com>
+ <20190111135413.73dad0b2@windsurf>
+ <CACRpkdZVfH_LYQov5mkMvp6BWjkVsisawWuE1PMp0b8dW5Qc=g@mail.gmail.com>
+In-Reply-To: <CACRpkdZVfH_LYQov5mkMvp6BWjkVsisawWuE1PMp0b8dW5Qc=g@mail.gmail.com>
+From: Shubhrajyoti Datta <shubhrajyoti.datta@gmail.com>
+Date: Mon, 21 Jan 2019 11:41:07 +0530
+Message-ID: <CAKfKVtHrh8r7kp=2br6OCKgWgsNmd5sVG2C96QnhYSFDj7B_+Q@mail.gmail.com>
+Subject: Re: [PATCH 2/8] gpio: zynq: Wakeup gpio controller when it is used as
+ IRQ controller
+To: Linus Walleij <linus.walleij@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190120_221000_926745_0D7A9F14 
-X-CRM114-Status: GOOD (  23.30  )
+X-CRM114-CacheID: sfid-20190120_221121_318854_8B077698 
+X-CRM114-Status: GOOD (  13.84  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,90 +97,44 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, a.tropschug@ebs-systart.com,
- m.bittner@ebs-systart.com,
+Cc: Josh Cartwright <josh.cartwright@ni.com>,
+ Peter Crosthwaite <peter.crosthwaite@xilinx.com>,
+ Nava kishore Manne <navam@xilinx.com>,
  "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Amit Kucheria <amit.kucheria@linaro.org>, Yang-Leo Li <leoyang.li@nxp.com>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+ "monstr@monstr.eu" <monstr@monstr.eu>, Borsodi Petr <Petr.Borsodi@i.cz>,
+ Michal Simek <michal.simek@xilinx.com>,
+ "linux-gpio@vger.kernel.org" <linux-gpio@vger.kernel.org>,
+ Rob Herring <robherring2@gmail.com>,
+ =?UTF-8?Q?S=C3=B6ren_Brinkmann?= <soren.brinkmann@xilinx.com>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Steffen Trumtrar <s.trumtrar@pengutronix.de>,
+ Shubhrajyoti Datta <shubhraj@xilinx.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 16, 2019 at 06:14:43PM +0800, Shawn Guo wrote:
-> On Tue, Jan 15, 2019 at 10:07:12PM -0600, Rob Herring wrote:
-> > On Tue, Jan 15, 2019 at 8:21 PM Shawn Guo <shawnguo@kernel.org> wrote:
+On Fri, Jan 11, 2019 at 8:26 PM Linus Walleij <linus.walleij@linaro.org> wrote:
+>
+> On Fri, Jan 11, 2019 at 1:54 PM Thomas Petazzoni
+> <thomas.petazzoni@bootlin.com> wrote:
+> > On Fri, 11 Jan 2019 10:54:20 +0100, Linus Walleij wrote:
+> >
+> > > My stance is that the driver is responsible of enabling and managing
+> > > runtime PM for its hardware block(s).
 > > >
-> > > On Mon, Jan 14, 2019 at 12:02:47PM -0600, Rob Herring wrote:
-> > > > On Mon, Jan 14, 2019 at 4:21 AM Manivannan Sadhasivam
-> > > > <manivannan.sadhasivam@linaro.org> wrote:
-> > > > >
-> > > > > Add devicetree binding for Oxalis board in JSON format. While adding
-> > > > > that, let's fix the description for LS1012A also.
-> > > > >
-> > > > > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> > > > > ---
-> > > > >  Documentation/devicetree/bindings/arm/fsl.yaml | 3 ++-
-> > > > >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > > > >
-> > > > > diff --git a/Documentation/devicetree/bindings/arm/fsl.yaml b/Documentation/devicetree/bindings/arm/fsl.yaml
-> > > > > index d34fe0749199..0f30142fe316 100644
-> > > > > --- a/Documentation/devicetree/bindings/arm/fsl.yaml
-> > > > > +++ b/Documentation/devicetree/bindings/arm/fsl.yaml
-> > > > > @@ -173,12 +173,13 @@ properties:
-> > > > >                - fsl,vf610
-> > > > >                - fsl,vf610m4
-> > > > >
-> > > > > -      - description: LS1021A based Boards
-> > > > > +      - description: LS1012A based Boards
-> > > >
-> > > > Well, yes that was wrong...
-> > > >
-> > > > >          items:
-> > > > >            - enum:
-> > > > >                - fsl,ls1012a-rdb
-> > > > >                - fsl,ls1012a-frdm
-> > > > >                - fsl,ls1012a-qds
-> > > > > +              - ebs-systart,oxalis
-> > > >
-> > > > Sort alphabetically.
-> > > >
-> > > > >            - const: fsl,ls1021a
-> > > >
-> > > > And this is wrong too.
-> > > >
-> > > > I you just change it, then we will be missing an entry for LS1021A.
-> > > > What's the status of that SoC because there is no board dts file? We
-> > > > should not have .dtsi files in the kernel which don't get built.
+> > > Runtime PM in the core should only be added if the core needs to
+> > > be aware about it, such as is the case when e.g. a block device
+> > > needs to drain its write buffer before going to runtime sleep.
 > > >
-> > > Hmm, I do not see any LS1021A SoC .dtsi in the tree.  I suspect it's
-> > > just a typo of LS1012A.
-> > >
-> > > @Leo, do we have a LS1021A SoC?
-> > 
-> > arch/arm/boot/dts/ls1021a.dtsi
-> 
-> Oops, I only searched arm64 folder.
-> 
-> So it seems the compatible of the boards below are missing there.
-> 
->   ls1021a-moxa-uc-8410a.dts
->   ls1021a-qds.dts
->   ls1021a-twr.dts
+> > > I fail so see why the GPIO core need to be aware about this.
+> >
+> > In this very same thread at
+> > https://www.spinics.net/lists/arm-kernel/msg600515.html,  you kind of
 
-So how should we proceed here? The above mentioned boards are lacking
-compatible in dts files and I guess that's the reason they didn't get
-mentioned in "fsl" binding file.
-
-Should I just go ahead and add the compatibles for these boards and list
-them in binding file?
-
-Thanks,
-Mani
-
-> 
-> Shawn
+I was not abloe to open the link could you please let me  know if I am
+missing something?
 
 _______________________________________________
 linux-arm-kernel mailing list
