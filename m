@@ -2,70 +2,72 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 46DBFC636D5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:50:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C379EC282F6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:55:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1797620861
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:50:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 952602084A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:55:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="L0M69COB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1797620861
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XorrTqn1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 952602084A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-m68k.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=5KtejuhObudMXaKLv5smYTk9EWzQ//Erl1Lc8aj1YN8=; b=L0M69COB809n6h
-	BnhbpWT7Wn6OKkCk4zWeaMw1rtugqNGQMlf4fOtkvCjEy8R6CXUQOiWaiy1tQuIkETM+oHm1nEcmA
-	nLQaQpzTK9Z0KrLVDg6gROwM/MFkZ5Kp1WhSPiC81QN+EpXPdBwy9GgYm0Z47K1++irywg36WEb7S
-	m5wCTZqRucnP2l2YRkRAQeTcagQc4ajoohcOyeWjtbPwlPtjReJHT/c8okkDjeWgVMhjGcZOiSvKE
-	EW8tPjOGvyO2mA9q6hli6KeyjgQo23KjVWLI1Im9rifjtLlkZjNhZWA1U8BduGq0fKZ/DU0+whDBX
-	O6njkRUNE7RziwvTvqsw==;
+	List-Owner; bh=CZeVzR9Qr4Gu3gQ7WAh+Izn0oGFOKi/CQbI207E6tc4=; b=XorrTqn1a1qBHe
+	oqezg8kx5JT3mzc15IU6pyotP9xwkr3Wurrtux7oy2lQJB37AlZ6cWhYvvcHQPoo8tEYiT23hiyL/
+	4o1INNpfYO5MrAcH73XXdNMFmf1kqCgO0YOsp1EUvjL35K5rX2o8V+oAqdjLyFBgj8LaiNmRtu47s
+	jIPwLoqa4D2Afrk8yoIkJuFzlfQNNBzlvo11Y3jaXLg3AOChl3d5g88jbilNWFzNmI4z9F9HwBxw9
+	glHn0J1KdgpDWmhE515cMMTZxHsDtMsL1Hn1TIeXpBkY7+9JYc8YBBWoAqe0MRshTzHKyzpybIV8a
+	q6v5WkQ6WUiIlZeIk69Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glVHO-0000E1-Rn; Mon, 21 Jan 2019 08:50:02 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+	id 1glVN6-00045b-Ee; Mon, 21 Jan 2019 08:55:56 +0000
+Received: from mail-vs1-f66.google.com ([209.85.217.66])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glVHK-00009R-Na
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 08:50:00 +0000
-Received: from ptx.hi.pengutronix.de ([2001:67c:670:100:1d::c0])
- by metis.ext.pengutronix.de with esmtps
- (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1glVHB-0003tK-74; Mon, 21 Jan 2019 09:49:49 +0100
-Received: from ukl by ptx.hi.pengutronix.de with local (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1glVHA-0000YN-GN; Mon, 21 Jan 2019 09:49:48 +0100
-Date: Mon, 21 Jan 2019 09:49:48 +0100
-From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
-To: Ryder Lee <ryder.lee@mediatek.com>
-Subject: Re: [PATCH v1 1/5] pwm: mediatek: add a property "mediatek,num-pwms"
-Message-ID: <20190121084948.frpcgg6wkdjxkl7k@pengutronix.de>
-References: <de316385a84e079d3b23891e61c959094b9fa7e5.1547781007.git.ryder.lee@mediatek.com>
- <c007d399-af86-98d3-94f9-b9762efdc219@gmail.com>
- <1547866487.14213.10.camel@mtkswgap22>
+ id 1glVN2-00045A-Qr
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 08:55:54 +0000
+Received: by mail-vs1-f66.google.com with SMTP id u11so12136797vsp.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 21 Jan 2019 00:55:52 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=kVAtAGarxS4wypP/3eT2eCQTmORwhs++L36a9mWKR3U=;
+ b=hkEKJ/peW8nzcwCNki/rR1pijfU+oknCD6Eqs+1O9t4H4Ul+BQOtruvW3jg9IafU0+
+ VcQbwOTh2+Lc+zl6j6uE1FkijJIqhTnvxLlmUemT02D7Nc3j4nkvFvKdNyRZ1IC5npwx
+ UCsyvJCN0vbHU9bASdLEzCH2JkEA2E0G7UEYlCi7jU1ghIxUNHseuVnHHW49bKqBv6t1
+ trMBPEVEJMP4AY0imvQJPmataN6Bi8LIcgujijS0ya+IzmhU47vmKk4rKIz3jID7ucCY
+ 2ZH5AJb1vMEZukMbgmSUaIXDKQt8aSmojDow7mlz9ecCONHhBlXhK5Mk0KVrvn/U/aSE
+ 07cA==
+X-Gm-Message-State: AJcUukdYAaP4oRXtf9CKTzSb/Uzs56SaKYoCo/aAKwUKNN++PVWg6FU3
+ 9OzpGiZNircyK3KsDnh1oS4QQ082s0F8MxcJ3Bk=
+X-Google-Smtp-Source: ALg8bN5Be0knSu5403sgnyKm3buMMWtoe1G93e4U+oAPSmiCzzcvAtemg3VTW+OqtwtQMKyCtP28wB0QbzIKsvryMUI=
+X-Received: by 2002:a67:b60d:: with SMTP id d13mr12198772vsm.152.1548060951904; 
+ Mon, 21 Jan 2019 00:55:51 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1547866487.14213.10.camel@mtkswgap22>
-User-Agent: NeoMutt/20170113 (1.7.2)
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c0
-X-SA-Exim-Mail-From: ukl@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+References: <20190118161835.2259170-1-arnd@arndb.de>
+ <20190118161835.2259170-9-arnd@arndb.de>
+In-Reply-To: <20190118161835.2259170-9-arnd@arndb.de>
+From: Geert Uytterhoeven <geert@linux-m68k.org>
+Date: Mon, 21 Jan 2019 09:55:38 +0100
+Message-ID: <CAMuHMdUH+vJ89O6-Qm1p9r6h30z2ZRred1aQd6=h0sk6xXULMQ@mail.gmail.com>
+Subject: Re: [PATCH v2 08/29] m68k: assign syscall number for seccomp
+To: Arnd Bergmann <arnd@arndb.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_004958_919713_C56ADDB1 
-X-CRM114-Status: GOOD (  27.26  )
+X-CRM114-CacheID: sfid-20190121_005552_866968_AC95FF91 
+X-CRM114-Status: GOOD (  13.02  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,132 +79,66 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-pwm@vger.kernel.org, devicetree@vger.kernel.org,
- Sean Wang <sean.wang@kernel.org>, Weijie Gao <weijie.gao@mediatek.com>,
- linux-kernel@vger.kernel.org, Thierry Reding <thierry.reding@gmail.com>,
- linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: Rich Felker <dalias@libc.org>,
+ "linux-ia64@vger.kernel.org" <linux-ia64@vger.kernel.org>,
+ Linux-sh list <linux-sh@vger.kernel.org>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>, linux-mips@vger.kernel.org,
+ Max Filippov <jcmvbkbc@gmail.com>, netdev <netdev@vger.kernel.org>,
+ Deepa Dinamani <deepa.kernel@gmail.com>, "H. Peter Anvin" <hpa@zytor.com>,
+ sparclinux <sparclinux@vger.kernel.org>,
+ Linux-Arch <linux-arch@vger.kernel.org>,
+ linux-s390 <linux-s390@vger.kernel.org>,
+ y2038 Mailman List <y2038@lists.linaro.org>,
+ Michael Ellerman <mpe@ellerman.id.au>, Helge Deller <deller@gmx.de>,
+ the arch/x86 maintainers <x86@kernel.org>,
+ Russell King <linux@armlinux.org.uk>, Ingo Molnar <mingo@redhat.com>,
+ Firoz Khan <firoz.khan@linaro.org>, Catalin Marinas <catalin.marinas@arm.com>,
+ Matt Turner <mattst88@gmail.com>, Fenghua Yu <fenghua.yu@intel.com>,
+ Will Deacon <will.deacon@arm.com>,
+ Linux FS Devel <linux-fsdevel@vger.kernel.org>,
+ linux-m68k <linux-m68k@lists.linux-m68k.org>,
+ Andy Lutomirski <luto@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Michal Simek <monstr@monstr.eu>, Tony Luck <tony.luck@intel.com>,
+ Parisc List <linux-parisc@vger.kernel.org>,
+ Linux API <linux-api@vger.kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Paul Burton <paul.burton@mips.com>,
+ "Eric W. Biederman" <ebiederm@xmission.com>,
+ alpha <linux-alpha@vger.kernel.org>,
+ Martin Schwidefsky <schwidefsky@de.ibm.com>,
+ Andrew Morton <akpm@linux-foundation.org>,
+ linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
+ "David S. Miller" <davem@davemloft.net>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, Jan 19, 2019 at 10:54:47AM +0800, Ryder Lee wrote:
-> On Fri, 2019-01-18 at 09:43 +0100, Matthias Brugger wrote:
-> > =
+On Fri, Jan 18, 2019 at 5:20 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> Most architectures have assigned a numbers for the seccomp syscall
+> even when they do not implement it.
+>
+> m68k is an exception here, so for consistency lets add the number.
+> Unless CONFIG_SECCOMP is implemented, the system call just
+> returns -ENOSYS.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-> > On 18/01/2019 04:24, Ryder Lee wrote:
-> > > This adds a property "mediatek,num-pwms" to avoid having an endless
-> > > list of compatibles with no differences for the same driver.
-> > > =
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-> > > Thus, the driver should have backwards compatibility to older DTs.
-> > > =
+Gr{oetje,eeting}s,
 
-> > > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> > > ---
-> > > Changes since v1: add some checks for backwards compatibility.
-> > > ---
-> > >  drivers/pwm/pwm-mediatek.c | 27 ++++++++++++++++++---------
-> > >  1 file changed, 18 insertions(+), 9 deletions(-)
-> > > =
+                        Geert
 
-> > > diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
-> > > index eb6674c..81b7e5e 100644
-> > > --- a/drivers/pwm/pwm-mediatek.c
-> > > +++ b/drivers/pwm/pwm-mediatek.c
-> > > @@ -55,7 +55,7 @@ enum {
-> > >  };
-> > >  =
 
-> > >  struct mtk_pwm_platform_data {
-> > > -	unsigned int num_pwms;
-> > > +	unsigned int num_pwms;	/* it should not be used in the future SoCs =
-*/
-> > >  	bool pwm45_fixup;
-> > >  	bool has_clks;
-> > >  };
-> > > @@ -226,27 +226,36 @@ static void mtk_pwm_disable(struct pwm_chip *ch=
-ip, struct pwm_device *pwm)
-> > >  =
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert@linux-m68k.org
 
-> > >  static int mtk_pwm_probe(struct platform_device *pdev)
-> > >  {
-> > > -	const struct mtk_pwm_platform_data *data;
-> > > +	struct device_node *np =3D pdev->dev.of_node;
-> > >  	struct mtk_pwm_chip *pc;
-> > >  	struct resource *res;
-> > > -	unsigned int i;
-> > > +	unsigned int i, num_pwms;
-> > >  	int ret;
-> > >  =
-
-> > >  	pc =3D devm_kzalloc(&pdev->dev, sizeof(*pc), GFP_KERNEL);
-> > >  	if (!pc)
-> > >  		return -ENOMEM;
-> > >  =
-
-> > > -	data =3D of_device_get_match_data(&pdev->dev);
-> > > -	if (data =3D=3D NULL)
-> > > -		return -EINVAL;
-> > > -	pc->soc =3D data;
-> > > +	pc->soc =3D of_device_get_match_data(&pdev->dev);
-> > >  =
-
-> > >  	res =3D platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > >  	pc->regs =3D devm_ioremap_resource(&pdev->dev, res);
-> > >  	if (IS_ERR(pc->regs))
-> > >  		return PTR_ERR(pc->regs);
-> > >  =
-
-> > > -	for (i =3D 0; i < data->num_pwms + 2 && pc->soc->has_clks; i++) {
-> > > +	/* Check if we have set 'num-pwms' in DTs. */
-> > > +	ret =3D of_property_read_u32(np, "mediatek,num-pwms", &num_pwms);
-> > > +	if (ret < 0) {
-> > > +		/* If no, fallback to use SoC data for backwards compatibility. */
-> > > +		if (pc->soc->num_pwms) {
-> > > +			num_pwms =3D pc->soc->num_pwms;
-> > =
-
-> > Maybe that's bike shedding, but I think it would be better to carve out=
- the
-> > num_pwms from the mtk_pwm_platform_data and check against the compatibl=
-e here.
-> =
-
-> I'm not sure how to properly curve it out? I think we still need this
-> variable to save the specific value for some legacy SoCs (with older
-> DTs).
-
-I guess he means  something like:
-
-	if (is_compatible_to_variant_A(dev))
-		num_pwms =3D 12;
-	else if (is_compatible_to_variant_B(dev))
-		num_pwms =3D 2;
-
-. In my eyes the bike shed should be light red and I prefer to collect
-the fallback num_pwms in the compatible_data as is to keep the code
-simpler. Maybe rename the member from num_pwms to fallback_num_pwms to
-make it more obvious that it doesn't represent the actually used value.
-
-> > With a expressive comment it will help other driver developers to not s=
-tart
-> > adding num_pwms in the platform data in their first attempt.
-> =
-
-> Definitely.
-
-My suggestion was to add a dev_warn, which IMHO is still better than a
-comment.
-
-Best regards
-Uwe
-
--- =
-
-Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
 
 _______________________________________________
 linux-arm-kernel mailing list
