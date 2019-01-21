@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A4D93C2F43B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:35:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ED0C0C2F42E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:35:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4DA0B20879
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:35:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BBDFF2085A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:35:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="T8Rw050J"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4DA0B20879
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rTB20Psq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BBDFF2085A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,38 +26,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=Z26hwlmbQFkEQEYkfd1CoBCe39bWUotDzVBXavi0ah0=; b=T8Rw050JXWPYA/iLUVgUf7a9ue
-	M93iKi098ohOv2dxzUQ58Rb6DiRoI1vUZGXOJB89g2vljDXjyLPiMl5eS35eHxL3k+lV3DqcKg7Ue
-	aTNeG9xkaOYkQiVQjGBFsCIAD+IjbfDMyorvkJAfUYzkM8V9ID5a0FCKdwRZ7qdfNH82dD+XP9mHE
-	zWAkOAqtwZO7cg/jemVJ6OKTxCJKp08zTWth2sZoyb+6NatsMNMh4Z4SRAOPUr/G2d7uB4C8eAbd0
-	B7AeCiJkXHvKdUFph4rMcx2fFPH/k6WR5QHcqVobg0Mp9a9K+tfJXBhrZSDUl52X6MWHMwBT8z5rk
-	8X9IeYVA==;
+	bh=P7CfdItu5NX7bb/n/h/+DMraFINv0/ICSZa9MmYGd6g=; b=rTB20Psq1Tpm6UyWmcZsosqESR
+	UM7b4VUSfAs9SAublHOQeFINKRyhT6CS3INl84aad7Sy8NCflOsbMVJicmvfZHDwtmWq74LM/uNph
+	OcQrQg7mQKk6qi1dLMdLtR/6s9bpd9DYw+IZhDWjaX4IhAQClXZO2ra3FNKbxYAIM5+ZJ8rDOUGK5
+	xvvGUJZu321fYyAPd/vBLLUsJO2TF03FTiFzgfhDc4b+lWmMPHd7FhYo79RYGgIi4+uh3J2oD21IX
+	q9yCOzfCbG2TVwoFwxJO1LsEL8U555Jo4vgQxtYVjl/397pKU2c1isYKKl8IOQTtmRBELluAi6UWS
+	PFvSzw7g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glbbM-000676-Vf; Mon, 21 Jan 2019 15:35:04 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1glbbe-0007Uc-Ni; Mon, 21 Jan 2019 15:35:22 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glbaS-0005KM-CI
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 15:34:20 +0000
+ id 1glbaU-0005Mn-Qf
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 15:34:28 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id EC14EEBD;
- Mon, 21 Jan 2019 07:34:07 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5472115BE;
+ Mon, 21 Jan 2019 07:34:10 -0800 (PST)
 Received: from e112298-lin.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id CF2763F5C1;
- Mon, 21 Jan 2019 07:34:05 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 374F13F5C1;
+ Mon, 21 Jan 2019 07:34:08 -0800 (PST)
 From: Julien Thierry <julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v9 03/26] arm64: cpufeature: Set SYSREG_GIC_CPUIF as a boot
- system feature
-Date: Mon, 21 Jan 2019 15:33:22 +0000
-Message-Id: <1548084825-8803-4-git-send-email-julien.thierry@arm.com>
+Subject: [PATCH v9 04/26] arm64: cpufeature: Add cpufeature for IRQ priority
+ masking
+Date: Mon, 21 Jan 2019 15:33:23 +0000
+Message-Id: <1548084825-8803-5-git-send-email-julien.thierry@arm.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
 References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_073408_747618_ACDA6C08 
-X-CRM114-Status: GOOD (  13.35  )
+X-CRM114-CacheID: sfid-20190121_073412_105957_E18739A8 
+X-CRM114-Status: GOOD (  14.13  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,42 +81,97 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-It is not supported to have some CPUs using GICv3 sysreg CPU interface
-while some others do not.
+Add a cpufeature indicating whether a cpu supports masking interrupts
+by priority.
 
-Once ICC_SRE_EL1.SRE is set on a CPU, the bit cannot be cleared. Since
-matching this feature require setting ICC_SRE_EL1.SRE, it cannot be
-turned off if found on a CPU.
-
-Set the feature as STRICT_BOOT, if boot CPU has it, all other CPUs are
-required to have it.
+The feature will be properly enabled in a later patch.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
 Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/include/asm/cpucaps.h    |  3 ++-
+ arch/arm64/include/asm/cpufeature.h |  6 ++++++
+ arch/arm64/kernel/cpufeature.c      | 23 +++++++++++++++++++++++
+ 3 files changed, 31 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index 82e9099..f6a76e4 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -60,7 +60,8 @@
+ #define ARM64_HAS_ADDRESS_AUTH_IMP_DEF		39
+ #define ARM64_HAS_GENERIC_AUTH_ARCH		40
+ #define ARM64_HAS_GENERIC_AUTH_IMP_DEF		41
++#define ARM64_HAS_IRQ_PRIO_MASKING		42
+ 
+-#define ARM64_NCAPS				42
++#define ARM64_NCAPS				43
+ 
+ #endif /* __ASM_CPUCAPS_H */
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index dfcfba7..89c3f31 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -612,6 +612,12 @@ static inline bool system_supports_generic_auth(void)
+ 		 cpus_have_const_cap(ARM64_HAS_GENERIC_AUTH_IMP_DEF));
+ }
+ 
++static inline bool system_uses_irq_prio_masking(void)
++{
++	return IS_ENABLED(CONFIG_ARM64_PSEUDO_NMI) &&
++	       cpus_have_const_cap(ARM64_HAS_IRQ_PRIO_MASKING);
++}
++
+ #define ARM64_SSBD_UNKNOWN		-1
+ #define ARM64_SSBD_FORCE_DISABLE	0
+ #define ARM64_SSBD_KERNEL		1
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index f6d84e2..b9c0adf 100644
+index b9c0adf..6f56e0a 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -1207,7 +1207,7 @@ static void cpu_enable_address_auth(struct arm64_cpu_capabilities const *cap)
+@@ -1203,6 +1203,14 @@ static void cpu_enable_address_auth(struct arm64_cpu_capabilities const *cap)
+ }
+ #endif /* CONFIG_ARM64_PTR_AUTH */
+ 
++#ifdef CONFIG_ARM64_PSEUDO_NMI
++static bool can_use_gic_priorities(const struct arm64_cpu_capabilities *entry,
++				   int scope)
++{
++	return false;
++}
++#endif
++
+ static const struct arm64_cpu_capabilities arm64_features[] = {
  	{
  		.desc = "GIC system register CPU interface",
- 		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
--		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
+@@ -1480,6 +1488,21 @@ static void cpu_enable_address_auth(struct arm64_cpu_capabilities const *cap)
+ 		.matches = has_cpuid_feature,
+ 	},
+ #endif /* CONFIG_ARM64_PTR_AUTH */
++#ifdef CONFIG_ARM64_PSEUDO_NMI
++	{
++		/*
++		 * Depends on having GICv3
++		 */
++		.desc = "IRQ priority masking",
++		.capability = ARM64_HAS_IRQ_PRIO_MASKING,
 +		.type = ARM64_CPUCAP_STRICT_BOOT_CPU_FEATURE,
- 		.matches = has_useable_gicv3_cpuif,
- 		.sys_reg = SYS_ID_AA64PFR0_EL1,
- 		.field_pos = ID_AA64PFR0_GIC_SHIFT,
++		.matches = can_use_gic_priorities,
++		.sys_reg = SYS_ID_AA64PFR0_EL1,
++		.field_pos = ID_AA64PFR0_GIC_SHIFT,
++		.sign = FTR_UNSIGNED,
++		.min_field_value = 1,
++	},
++#endif
+ 	{},
+ };
+ 
 -- 
 1.9.1
 
