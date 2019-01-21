@@ -4,50 +4,51 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6564CC282DB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 09:51:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3F67EC282DB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 09:51:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3B8D32173B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 09:51:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0EADD2084A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 09:51:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XtHJqFH6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B8D32173B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E/SKZdRL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0EADD2084A
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=1cEyPSlo2TygWQwAS9tj5pSD1OUfLj8zjpA3PMPum6Q=; b=XtH
-	JqFH6yqFlSWW7p4zdwWQUiP5CxcbVfhEO7HWkp+cZehuYlnN9/crxCMfXLU9ZUHGyg5CpjD9J2Jsk
-	HjEBk1VypoPH+UIj27LDqN6jV0AC2iDcO56j2Hs9EMNrIe4zdzMspXdWL9cMGJbixlCj6il3+/mCC
-	ZwEHcUL2fEb96Vw20qYdOyI+wpdNF+t7VrtMIPC9HCgeG9gk/aHZOpwyTdgCasfYSVgcjxtpigYJ4
-	UypIZXrNofvaAOjBUr3GrJCvFqH9dUrBY07h6NVhLbyr0aliHqkKNg7o2tPH5pK/G/Hk+pTZDbiMj
-	j1dMpLSEPqWQnCS1FF75BgQ6qR3P7RA==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=eiv/eGfoyJ2iCkOgvFEV1m0+novhnEtU55We24p+Uz4=; b=E/SKZdRLDrutBMZKeaoTkYE4nV
+	oRAPs3GRhYNd/29m8v3K/GGfF163BqxBRBf57Qf0rSewpxrQ3ol72aKidxtjJsjAyhx5kMjeT9+0Y
+	q8BAvlFgHOvMYWByyPuJdsN/hAG/IocufDOc8jiUpOuP9UUOBMoHdAQ98edEl/OjhpveKxjNrI4iS
+	ksx9Phwmpga08+Xm++ar2n9oVzioEkxVWapqG3KvHHFVjdtVWzH4FxhWsIslm+pdc6vMg9iIU+yZd
+	ApruerW0kXGVcYKgTAErg33oRX58eyDngcKpBsIVBkCEYDfDgDMIdCs1Q13+mYojsBfeUIeWS3lnq
+	1lD0Q/7Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glWET-0006G0-4I; Mon, 21 Jan 2019 09:51:05 +0000
-Received: from inva021.nxp.com ([92.121.34.21])
+	id 1glWEy-0006iB-Ht; Mon, 21 Jan 2019 09:51:36 +0000
+Received: from inva020.nxp.com ([92.121.34.13])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glWED-00063N-ML
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 09:50:51 +0000
-Received: from inva021.nxp.com (localhost [127.0.0.1])
- by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 643412003B7;
- Mon, 21 Jan 2019 10:50:46 +0100 (CET)
+ id 1glWEG-00064a-Hb
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 09:50:54 +0000
+Received: from inva020.nxp.com (localhost [127.0.0.1])
+ by inva020.eu-rdc02.nxp.com (Postfix) with ESMTP id D6B931A0138;
+ Mon, 21 Jan 2019 10:50:50 +0100 (CET)
 Received: from invc005.ap-rdc01.nxp.com (invc005.ap-rdc01.nxp.com
  [165.114.16.14])
- by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 3871A200184;
- Mon, 21 Jan 2019 10:50:36 +0100 (CET)
+ by inva020.eu-rdc02.nxp.com (Postfix) with ESMTP id 7E86C1A0162;
+ Mon, 21 Jan 2019 10:50:40 +0100 (CET)
 Received: from titan.ap.freescale.net (TITAN.ap.freescale.net [10.192.208.233])
- by invc005.ap-rdc01.nxp.com (Postfix) with ESMTP id 5F71C40313;
- Mon, 21 Jan 2019 17:50:24 +0800 (SGT)
+ by invc005.ap-rdc01.nxp.com (Postfix) with ESMTP id 48BCE402D9;
+ Mon, 21 Jan 2019 17:50:28 +0800 (SGT)
 From: Xiaowei Bao <xiaowei.bao@nxp.com>
 To: bhelgaas@google.com, robh+dt@kernel.org, mark.rutland@arm.com,
  shawnguo@kernel.org, leoyang.li@nxp.com, kishon@ti.com,
@@ -58,16 +59,16 @@ To: bhelgaas@google.com, robh+dt@kernel.org, mark.rutland@arm.com,
  linux-pci@vger.kernel.org, devicetree@vger.kernel.org,
  linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
  linuxppc-dev@lists.ozlabs.org
-Subject: [PATCHv5 1/4] dt-bindings: add DT binding for the layerscape PCIe
- controller with EP mode
-Date: Mon, 21 Jan 2019 17:44:57 +0800
-Message-Id: <20190121094500.10657-1-xiaowei.bao@nxp.com>
+Subject: [PATCHv5 3/4] pci: layerscape: Add the EP mode support.
+Date: Mon, 21 Jan 2019 17:44:59 +0800
+Message-Id: <20190121094500.10657-3-xiaowei.bao@nxp.com>
 X-Mailer: git-send-email 2.14.1
+In-Reply-To: <20190121094500.10657-1-xiaowei.bao@nxp.com>
+References: <20190121094500.10657-1-xiaowei.bao@nxp.com>
 X-Virus-Scanned: ClamAV using ClamSMTP
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_015049_999889_340E44D5 
-X-CRM114-Status: UNSURE (   6.92  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190121_015052_859254_E888F979 
+X-CRM114-Status: GOOD (  12.84  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,46 +87,191 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add the documentation for the Device Tree binding for the layerscape PCIe
-controller with EP mode.
+Add the PCIe EP mode support for layerscape platform.
 
 Signed-off-by: Xiaowei Bao <xiaowei.bao@nxp.com>
 Reviewed-by: Minghuan Lian <minghuan.lian@nxp.com>
 Reviewed-by: Zhiqiang Hou <zhiqiang.hou@nxp.com>
 ---
 v2:
- - Add the SoC specific compatibles.
+ - remove the EP mode check function.
 v3:
- - modify the commit message.
+ - modif the return value when enter default case.
 v4:
  - no change.
 v5:
  - no change.
 
- .../devicetree/bindings/pci/layerscape-pci.txt     |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ drivers/pci/controller/dwc/Makefile            |    2 +-
+ drivers/pci/controller/dwc/pci-layerscape-ep.c |  146 ++++++++++++++++++++++++
+ 2 files changed, 147 insertions(+), 1 deletions(-)
+ create mode 100644 drivers/pci/controller/dwc/pci-layerscape-ep.c
 
-diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-index 9b2b8d6..e20ceaa 100644
---- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-@@ -13,6 +13,7 @@ information.
- 
- Required properties:
- - compatible: should contain the platform identifier such as:
-+  RC mode:
-         "fsl,ls1021a-pcie"
-         "fsl,ls2080a-pcie", "fsl,ls2085a-pcie"
-         "fsl,ls2088a-pcie"
-@@ -20,6 +21,8 @@ Required properties:
-         "fsl,ls1046a-pcie"
-         "fsl,ls1043a-pcie"
-         "fsl,ls1012a-pcie"
-+  EP mode:
-+	"fsl,ls1046a-pcie-ep", "fsl,ls-pcie-ep"
- - reg: base addresses and lengths of the PCIe controller register blocks.
- - interrupts: A list of interrupt outputs of the controller. Must contain an
-   entry for each entry in the interrupt-names property.
+diff --git a/drivers/pci/controller/dwc/Makefile b/drivers/pci/controller/dwc/Makefile
+index 7bcdcdf..b5f3b83 100644
+--- a/drivers/pci/controller/dwc/Makefile
++++ b/drivers/pci/controller/dwc/Makefile
+@@ -8,7 +8,7 @@ obj-$(CONFIG_PCI_EXYNOS) += pci-exynos.o
+ obj-$(CONFIG_PCI_IMX6) += pci-imx6.o
+ obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
+ obj-$(CONFIG_PCI_KEYSTONE) += pci-keystone.o
+-obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o
++obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o pci-layerscape-ep.o
+ obj-$(CONFIG_PCIE_QCOM) += pcie-qcom.o
+ obj-$(CONFIG_PCIE_ARMADA_8K) += pcie-armada8k.o
+ obj-$(CONFIG_PCIE_ARTPEC6) += pcie-artpec6.o
+diff --git a/drivers/pci/controller/dwc/pci-layerscape-ep.c b/drivers/pci/controller/dwc/pci-layerscape-ep.c
+new file mode 100644
+index 0000000..dafb528
+--- /dev/null
++++ b/drivers/pci/controller/dwc/pci-layerscape-ep.c
+@@ -0,0 +1,146 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * PCIe controller EP driver for Freescale Layerscape SoCs
++ *
++ * Copyright (C) 2018 NXP Semiconductor.
++ *
++ * Author: Xiaowei Bao <xiaowei.bao@nxp.com>
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/of_pci.h>
++#include <linux/of_platform.h>
++#include <linux/of_address.h>
++#include <linux/pci.h>
++#include <linux/platform_device.h>
++#include <linux/resource.h>
++
++#include "pcie-designware.h"
++
++#define PCIE_DBI2_OFFSET		0x1000	/* DBI2 base address*/
++
++struct ls_pcie_ep {
++	struct dw_pcie		*pci;
++};
++
++#define to_ls_pcie_ep(x)	dev_get_drvdata((x)->dev)
++
++static int ls_pcie_establish_link(struct dw_pcie *pci)
++{
++	return 0;
++}
++
++static const struct dw_pcie_ops ls_pcie_ep_ops = {
++	.start_link = ls_pcie_establish_link,
++};
++
++static const struct of_device_id ls_pcie_ep_of_match[] = {
++	{ .compatible = "fsl,ls-pcie-ep",},
++	{ },
++};
++
++static void ls_pcie_ep_init(struct dw_pcie_ep *ep)
++{
++	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
++	struct pci_epc *epc = ep->epc;
++	enum pci_barno bar;
++
++	for (bar = BAR_0; bar <= BAR_5; bar++)
++		dw_pcie_ep_reset_bar(pci, bar);
++
++	epc->features |= EPC_FEATURE_NO_LINKUP_NOTIFIER;
++}
++
++static int ls_pcie_ep_raise_irq(struct dw_pcie_ep *ep, u8 func_no,
++				  enum pci_epc_irq_type type, u16 interrupt_num)
++{
++	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
++
++	switch (type) {
++	case PCI_EPC_IRQ_LEGACY:
++		return dw_pcie_ep_raise_legacy_irq(ep, func_no);
++	case PCI_EPC_IRQ_MSI:
++		return dw_pcie_ep_raise_msi_irq(ep, func_no, interrupt_num);
++	case PCI_EPC_IRQ_MSIX:
++		return dw_pcie_ep_raise_msix_irq(ep, func_no, interrupt_num);
++	default:
++		dev_err(pci->dev, "UNKNOWN IRQ type\n");
++		return -EINVAL;
++	}
++}
++
++static struct dw_pcie_ep_ops pcie_ep_ops = {
++	.ep_init = ls_pcie_ep_init,
++	.raise_irq = ls_pcie_ep_raise_irq,
++};
++
++static int __init ls_add_pcie_ep(struct ls_pcie_ep *pcie,
++					struct platform_device *pdev)
++{
++	struct dw_pcie *pci = pcie->pci;
++	struct device *dev = pci->dev;
++	struct dw_pcie_ep *ep;
++	struct resource *res;
++	int ret;
++
++	ep = &pci->ep;
++	ep->ops = &pcie_ep_ops;
++
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "addr_space");
++	if (!res)
++		return -EINVAL;
++
++	ep->phys_base = res->start;
++	ep->addr_size = resource_size(res);
++
++	ret = dw_pcie_ep_init(ep);
++	if (ret) {
++		dev_err(dev, "failed to initialize endpoint\n");
++		return ret;
++	}
++
++	return 0;
++}
++
++static int __init ls_pcie_ep_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct dw_pcie *pci;
++	struct ls_pcie_ep *pcie;
++	struct resource *dbi_base;
++	int ret;
++
++	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
++	if (!pcie)
++		return -ENOMEM;
++
++	pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
++	if (!pci)
++		return -ENOMEM;
++
++	dbi_base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
++	pci->dbi_base = devm_pci_remap_cfg_resource(dev, dbi_base);
++	if (IS_ERR(pci->dbi_base))
++		return PTR_ERR(pci->dbi_base);
++
++	pci->dbi_base2 = pci->dbi_base + PCIE_DBI2_OFFSET;
++	pci->dev = dev;
++	pci->ops = &ls_pcie_ep_ops;
++	pcie->pci = pci;
++
++	platform_set_drvdata(pdev, pcie);
++
++	ret = ls_add_pcie_ep(pcie, pdev);
++
++	return ret;
++}
++
++static struct platform_driver ls_pcie_ep_driver = {
++	.driver = {
++		.name = "layerscape-pcie-ep",
++		.of_match_table = ls_pcie_ep_of_match,
++		.suppress_bind_attrs = true,
++	},
++};
++builtin_platform_driver_probe(ls_pcie_ep_driver, ls_pcie_ep_probe);
 -- 
 1.7.1
 
