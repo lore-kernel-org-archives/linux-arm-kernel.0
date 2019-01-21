@@ -2,121 +2,87 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 70831C2F3A1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 12:32:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 76F46C2F3A0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 12:35:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 324572084C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 12:32:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 45CC42084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 12:35:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hR0NV8fh";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="3qsQDvHx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 324572084C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YrA0X7IU";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="UF2COheU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 45CC42084C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=E1PyM7M44y43Wer0h81s98iyiROJxJTRA5d1HidCyWk=; b=hR0NV8fh2uiVkP
-	sDdrWlXg/4NO/ymkBMrHHuYQ+zQQ7Bj+2K1CrqG3aFFkm71OqFwxp4Db9salIT/iLyVcNo1M4Qfjv
-	ggo+HTA6626MAHW6LO5QL9dVAESMJHNBC4Xg+y4dJq4xWrYfdiGzGhB3n0H6u0B2UVqI0ie/hBn8e
-	x5oKQ3SiovpsjXU3nAIWcdzpyY5HNhcvAw+iMADEGeEASkNrDL+9UxY4ewbU2vZ1gKjzh1Ztr0dRb
-	bk9KqfUOWUJvwbyJwFkaKWTEmzgd1JcUd1mVFNiYSJj9LSxGrP+N0Q92vn3G0DFQ2+C/ZxpZjFodx
-	thwft7V+xy25rxsSA5Jw==;
+	List-Owner; bh=q4xPmMlGx2RH4rMc+R7lmX1/qusuLMrnhI22sDQdKLA=; b=YrA0X7IU82wTPT
+	84WJYE/TZRp6FDWzTIjuVjc4u9+l7jiAAjQS7yCJYJLta1L7ABa1pHP/YApSSFI3r7lyqx7rPgB+8
+	+OdFABf7Bfldfv/3a1GH6MauJoHMeicb/EQoFroHUYhRdZ6ILeXZ3SwOfDHo5MT4gCowHv3XqPM/S
+	XyXCjGsTw2VDiQJpHc9WmdWjTl8rG1siDwmkJgO4BdwD3IUjEfHs3BnmgSNV7SkUwbdnWPP+hvh09
+	fGBEY/wrQhKyA6MfluC7iHSTNtj7GXx/Ek3aVKzhTS+C0DM7Yst3iXgaFI4C+toeZwftJl1NIT4kI
+	bH/M3MWlrpSdLHY9nJ2A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glYkF-0002Eo-Gl; Mon, 21 Jan 2019 12:32:03 +0000
-Received: from esa3.microchip.iphmx.com ([68.232.153.233])
+	id 1glYnO-0003zr-Um; Mon, 21 Jan 2019 12:35:18 +0000
+Received: from mail-ua1-x92d.google.com ([2607:f8b0:4864:20::92d])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glYjJ-0001FJ-Ba
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 12:31:10 +0000
-X-IronPort-AV: E=Sophos;i="5.56,503,1539673200"; d="scan'208";a="25752692"
-Received: from smtpout.microchip.com (HELO email.microchip.com)
- ([198.175.253.82])
- by esa3.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 21 Jan 2019 05:31:04 -0700
-Received: from NAM04-BN3-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.38) with Microsoft SMTP Server (TLS) id
- 14.3.352.0; Mon, 21 Jan 2019 05:31:03 -0700
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=microchiptechnology.onmicrosoft.com;
- s=selector1-microchiptechnology-onmicrosoft-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=CDLebRTrUkdR4ORz2bDRBjjn3SloDzw8C/rBTjydWIU=;
- b=3qsQDvHxOFAJm0WUy0yu/FuF6UO7suuEFLsRx5zO0LShbbRVANA5BGCInkNLIFeteq/L40eiQYVOZLSaaTRxFq1WObwHSPEfJcyUh7oEMaNQwr5DFfuippnPhQWjAjR4j4IKGG43IQB5RGG6k9uOn+JQ/rB+GxXqOy5KUwhCULg=
-Received: from MWHPR11MB1920.namprd11.prod.outlook.com (10.175.54.19) by
- MWHPR11MB2064.namprd11.prod.outlook.com (10.169.236.20) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1537.26; Mon, 21 Jan 2019 12:31:01 +0000
-Received: from MWHPR11MB1920.namprd11.prod.outlook.com
- ([fe80::d917:8496:9d53:1f55]) by MWHPR11MB1920.namprd11.prod.outlook.com
- ([fe80::d917:8496:9d53:1f55%8]) with mapi id 15.20.1537.031; Mon, 21 Jan 2019
- 12:31:01 +0000
-From: <Claudiu.Beznea@microchip.com>
-To: <thierry.reding@gmail.com>, <robh+dt@kernel.org>, <mark.rutland@arm.com>, 
- <Nicolas.Ferre@microchip.com>, <alexandre.belloni@bootlin.com>,
- <Ludovic.Desroches@microchip.com>
-Subject: [PATCH 4/4] pwm: atmel: add PWM binding for SAM9X60
-Thread-Topic: [PATCH 4/4] pwm: atmel: add PWM binding for SAM9X60
-Thread-Index: AQHUsYUrhYh5eDYo5EuY5XQSxj5S7w==
-Date: Mon, 21 Jan 2019 12:31:01 +0000
-Message-ID: <1548073783-22640-5-git-send-email-claudiu.beznea@microchip.com>
-References: <1548073783-22640-1-git-send-email-claudiu.beznea@microchip.com>
-In-Reply-To: <1548073783-22640-1-git-send-email-claudiu.beznea@microchip.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: BYAPR07CA0038.namprd07.prod.outlook.com
- (2603:10b6:a03:60::15) To MWHPR11MB1920.namprd11.prod.outlook.com
- (2603:10b6:300:110::19)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Claudiu.Beznea@microchip.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-mailer: git-send-email 2.7.4
-x-originating-ip: [94.177.32.154]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; MWHPR11MB2064;
- 6:P3EcW7lvSI1U0xAxHWMdijWnAw3TxNHmV9Y8ZiXGtsADr390ZOBU8gyY1NrVhA2DQuaKnZGYXnOpN7k3vMT4PvacUdoTBwVi2sYgH16xOfc5ZcWOSJDeRVHeINsyv3C8XGf+foT/Wo8MDk2qoYF2GCFMPk6f05jYEbxYjVaIEu7pmpe8HPQ1s8c0PSc/pmimLqNvhB95yqg1K5vgWzIozOKLXR7l6t72upOqD7I4DL05OZ4NjwK4IJIf3Idobhud+nb7dly4WCe6KM+ebFA+PZAmEKfHU/W3dyCKCmz3UfY9mcCE5K6ezFxww7l3aGMXPWA9Qos/fJZWGf7rr3PcfkcS88POORr5NLuRYBesVi8hAG2z0S6nRJ7435z+9oCXgZ37VcSHVjPJKmOyZ26T83p4wMexnq0LLvaNAO+b53tSKfS/fZawWQMqzMQzjyUo/bxGivlbrxi5iSmLK/FIyg==;
- 5:z5hm+gBeUUEV0OB6I+nmtW7z24Zfz+IlSRpCJkVw/ZysBzlN3BZMrkbAQERWjq7/T4zaZ3psSlLKgVUTo2BbPSLstnR45c7iT9FU7Z8SBywxGAPFjOjfbohI6TauDIO74yUu3DGSJRDT8Vu0rxQ7antmqKGpoceRz8F/TMzwPd8sSXDmEj9hTXYsf7ZhhBUper8EixGcHDgMM2LfUW5DwA==;
- 7:OrixNwm1hzy+WidQg57d8/zMadt6JdtDSwNnWPusWRNOhy1+1dJKXBeWQgrCQNNl9P7PlAQHbegTUrU5/eXKPdjMIuEMNA3RNJ/b0UsV1IhvyRxfyebf6EFxbsElLY90pMl+rh0wC1QMT1n4lyZ1hw==
-x-ms-office365-filtering-correlation-id: c245cc01-bff6-4d08-4a01-08d67f9c4d6c
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(2017052603328)(7153060)(7193020);
- SRVR:MWHPR11MB2064; 
-x-ms-traffictypediagnostic: MWHPR11MB2064:
-x-microsoft-antispam-prvs: <MWHPR11MB2064EA045F7AF7EBEEB166EB879F0@MWHPR11MB2064.namprd11.prod.outlook.com>
-x-forefront-prvs: 0924C6A0D5
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(979002)(396003)(376002)(346002)(366004)(136003)(39860400002)(189003)(199004)(186003)(6436002)(6636002)(53936002)(4326008)(50226002)(6116002)(105586002)(52116002)(446003)(106356001)(97736004)(3846002)(36756003)(7736002)(305945005)(6486002)(39060400002)(316002)(26005)(6512007)(99286004)(71200400001)(107886003)(71190400001)(86362001)(25786009)(68736007)(256004)(14454004)(8936002)(8676002)(2906002)(81156014)(386003)(6506007)(81166006)(476003)(2616005)(2501003)(76176011)(54906003)(11346002)(102836004)(66066001)(72206003)(478600001)(110136005)(486006)(969003)(989001)(999001)(1009001)(1019001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:MWHPR11MB2064;
- H:MWHPR11MB1920.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: microchip.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: ANkjIqjULXzUfWjeM9VoR67RCtfBGLm9wYRMwl0+K9vHXISZPiWa2H+k8V1Mxr5w/GNeMsZVTx3qlBvpq4b3iDXsqtvNREmd8aN3H6uKAgC02gISBlj1Fusn8zhHuIuwzKrf3dzt/dvuDvgVgFScoPUaAqFGOvIKCaCjAk1hKCzAsMuQGyRjgnluDbJ0mmg4AUkB8IZ4OFPHLb9iI+0p7tpNuVYdd4QUyd8wRc/ZTnNJodNgdRjsmiF1HqIqqcYviDuCpWR5aTJW1nRw70cnfk5neWK2BhikfeQ19UyBVzroXKLZTB8nLCrCXcQqb1sOjiOsUTNJ+4ReUlHh/QvzRYovIyKSaCyhCbx9r/RGk96QUk46jq6T1ULt7z9LJu5tfTrSSLqrS/HOwOP2UWbyn08PfLl4M1JuF1+6uVhcmvE=
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1glYnM-0003zK-Ch
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 12:35:17 +0000
+Received: by mail-ua1-x92d.google.com with SMTP id z24so6831555ual.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 21 Jan 2019 04:35:15 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=k+MSaycj/9KITYA6lfk8QZCRSnahwfifAXAEb5FjW38=;
+ b=UF2COheUoysXjsRSEAmwWvy5ArpkdNfz58fuMsj0CWoKN6ba9PggydnGg8dWNnxGdD
+ 6xNV8hqPBGouluqMMVwCAfevMbvLnz4CkE/80V/tbf82hpdrnJ2eOhqlyJ560TEoeviv
+ hS1PZ5IowjEB0S8s0cb0k+voFynUWiRACHTllvcoiQXgdAeZwPkp0wmy15M9i8bzcj8f
+ xpMDexfrQSPWWR5ZuTjWHqb6unZrPRJeCqMpfCJ0DER/WUX69ez/UNghdh4iwX5ulSQb
+ +uvO8W9H7y7pfSdTKxQGFCs/6HBfoKY939BGG/zfFk/Rq1zuEq4iDiHE7nlofiqJJKaG
+ j1bQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=k+MSaycj/9KITYA6lfk8QZCRSnahwfifAXAEb5FjW38=;
+ b=q5ZsreKsbK8fE+51hUv460/FMcK4qnc0ict79MtQqY3OYv7QC5h4HIbBTsli8HPBsh
+ n06e4NBDz/vTdaitJQR79gTigdhB+d4l5hbolNXqW2dN4A87/3q9tx4zPPr4Vy/pw5f3
+ Exgui80/CjaJvXB8poepeP3sHCvt9oZhHlwDgfUQ7IMifAbsMXPPo5hV95zhGH9F3zzR
+ v3sj6nxAs4HLJZiOW70Lble3n1hdRITFT7KyxvKO8Sudphjt2qM/3RMlPdyZvY3O5Yja
+ L8jjlbb5VEZV6mVBUYi+XKwScIi1cviI/2d9sB2JOpWpaqsluD0NRmKjGZQtxE8D3rVU
+ KPVQ==
+X-Gm-Message-State: AJcUukcAF0qL7LwScVat0AHfytRWgQ7KsSaH+FF04q4xqvXQ5pR7TX28
+ 1yKzkVxL6NL2Zy2gK0ctYR5GduaMBATScfM6ECtYvhhx
+X-Google-Smtp-Source: ALg8bN7BTMgsv7iqj35UyxppTuxv/Y6UFsAvIzIcZL9zuwtmFozpjinsnmWFAZjBSG8GUGYxUb3A1UBWwOOmUHTeENU=
+X-Received: by 2002:ab0:4802:: with SMTP id b2mr12152078uad.47.1548074114497; 
+ Mon, 21 Jan 2019 04:35:14 -0800 (PST)
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: c245cc01-bff6-4d08-4a01-08d67f9c4d6c
-X-MS-Exchange-CrossTenant-originalarrivaltime: 21 Jan 2019 12:30:57.6010 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR11MB2064
-X-OriginatorOrg: microchip.com
+References: <CAOuPNLj4QzNDt0npZn2LhZTFgDNJ1CsWPw3=wvUuxnGtQW308g@mail.gmail.com>
+ <bceb32be-d508-c2a4-fa81-ab8b90323d3f@codeaurora.org>
+ <CAOuPNLiNtPFksCuZF_vL6+YuLG0i0umzQhMCyEN69h9tySn2Vw@mail.gmail.com>
+ <57ff3437-47b5-fe92-d576-084ce26aa5d8@codeaurora.org>
+ <CAOuPNLjjd67FnjaHbJj_auD-EWnbc+6sc+hcT_HE6fjeKhEQrw@mail.gmail.com>
+ <1ffe2b68-c87b-aa19-08af-b811063b3310@codeaurora.org>
+In-Reply-To: <1ffe2b68-c87b-aa19-08af-b811063b3310@codeaurora.org>
+From: Pintu Agarwal <pintu.ping@gmail.com>
+Date: Mon, 21 Jan 2019 18:05:03 +0530
+Message-ID: <CAOuPNLgM-aV51_L4WzwSGPQ4daVqWBgs8mQ8Gdw-f4Kdmadx1Q@mail.gmail.com>
+Subject: Re: Need help: how to locate failure from irq_chip subsystem
+To: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_043106_095691_01916E41 
-X-CRM114-Status: GOOD (  10.16  )
+X-CRM114-CacheID: sfid-20190121_043516_454516_45B8E2B7 
+X-CRM114-Status: GOOD (  17.07  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -128,38 +94,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-pwm@vger.kernel.org, Claudiu.Beznea@microchip.com,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- devicetree@vger.kernel.org
+Cc: linux-pm@vger.kernel.org, kernelnewbies@kernelnewbies.org,
+ open list <linux-kernel@vger.kernel.org>,
+ Russell King - ARM Linux <linux@armlinux.org.uk>, linux-mm@kvack.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Claudiu Beznea <claudiu.beznea@microchip.com>
+On Fri, Jan 18, 2019 at 5:23 PM Sai Prakash Ranjan
+<saiprakash.ranjan@codeaurora.org> wrote:
+>
+> On 1/18/2019 4:50 PM, Pintu Agarwal wrote:
+> >>>> Could you please tell which QCOM SoC this board is based on?
+> >>>>
+> >>>
+> >>> Snapdragon 845 with kernel 4.9.x
+> >>> I want to know from which subsystem it is triggered:drivers/soc/qcom/
+> >>>
+> >>
+> >> Irqchip driver is "drivers/irqchip/irq-gic-v3.c". The kernel you are
+> >> using is msm-4.9 I suppose or some other kernel?
+> >>
+> > Yes, I am using customized version of msm-4.9 kernel based on Android.
+> > And yes the irqchip driver is: irq-gic-v3, which I can see from config.
+> >
+> > But, what I wanted to know is, how to find out which driver module
+> > (hopefully under: /drivers/soc/qcom/) that register with this
+> > irq_chip, is getting triggered at the time of crash ?
+> > So, that I can implement irq_hold function for it, which is the cause of crash.
+> >
+>
+> Hmm, since this is a bootup crash, *initcall_debug* should help.
+> Add "initcall_debug ignore_loglevel" to kernel commandline and
+> check the last log before crash.
+>
 
-Add PWM binding for SAM9X60 SoC.
+OK thanks Sai, for your suggestions.
+Yes, I already tried that, but it did not help much.
 
-Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
----
- Documentation/devicetree/bindings/pwm/atmel-pwm.txt | 1 +
- 1 file changed, 1 insertion(+)
+Anyways, I could finally find the culprit driver, from where null
+reference is coming.
+So, that issue is fixed.
+But, now I am looking into another issue.
+If required, I will post further...
 
-diff --git a/Documentation/devicetree/bindings/pwm/atmel-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-index c8c831d7b0d1..591ecdd39c7b 100644
---- a/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-+++ b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-@@ -5,6 +5,7 @@ Required properties:
-     - "atmel,at91sam9rl-pwm"
-     - "atmel,sama5d3-pwm"
-     - "atmel,sama5d2-pwm"
-+    - "microchip,sam9x60-pwm"
-   - reg: physical base address and length of the controller's registers
-   - #pwm-cells: Should be 3. See pwm.txt in this directory for a
-     description of the cells format.
--- 
-2.7.4
-
+Thanks,
+Pintu
 
 _______________________________________________
 linux-arm-kernel mailing list
