@@ -2,115 +2,77 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7A6CEC282DB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:19:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9C17AC282F4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:19:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 37F12214C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:19:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6E44520855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:19:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A+b9sH2r";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="HuIv5TZy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 37F12214C6
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Opp75V8r"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6E44520855
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-m68k.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:
-	References:In-Reply-To:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=SqQv96I5ZI8Xt61pokeGCT1BhEOgsHkeW0e4d47Mwqg=; b=A+b9sH2rF40xtjiJ2M6k7x4qvz
-	fnsfsBqKgivH1vV+4fsJ7tWObjdrObkJuTpskOV2NfhPmC1kJAwI22tsJrn0cjV8pT8/dlV9TLaTd
-	UTaU81GbnhRqHr7yPYPua9FEvHLapuxBvRMGAAJCjl3nWJMewUsoMVIvYyXRKaRI75b95Mz9rM+ZH
-	O42ZJ/77v4ICNujviCqoj5EAO6SnYNQQRRiaPHw1JBEHQKevTAq/iV90zWukSK2+0+wrVzsXS5DTB
-	JQCZqS+Dx7FBo/IgUj3DxFt+AQ2AQ5WHVzcq7l3jmwcaW/9qmy066ykJpp96ekGUEWybdxmcJyLF4
-	tR8qYrtA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=u1SFbafErbu853W1so+/UodjtHsaLd8E+4Hv2nmQPWA=; b=Opp75V8rGQjAf6
+	8mvVQZPros2DPoQgukgTr/EosVAlP6CwRWIT9t2PzW+XsBLGXe2+t9Wr5mNObYFQZJw/Lz9tnIM6m
+	yHmUgt3GsEQisHd6a3aWhwmVaFPazN7W5rDAcKaKuiCswlPTe8QgFyyNrHnU7r2wnfD7JVOLiiaIO
+	OpBw4eAjJ4eE6LgYxYMYDMiuxY3KlbHS4X0jdNKQ1G1vfUvEsUz3SiEjOaBtuHnkW/V1QHW9lxZup
+	l53z/m5q2y4eJObccxKqdxRxYmTzncWH4J0MJEa9u5k0bsGMp65VLTD8BpoBArV5Jv6htInpKimbW
+	2QnHZ2QI6N787JSlBimQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glUne-0006zR-3e; Mon, 21 Jan 2019 08:19:18 +0000
-Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+	id 1glUoB-0007Ot-6H; Mon, 21 Jan 2019 08:19:51 +0000
+Received: from mail-vs1-f66.google.com ([209.85.217.66])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glUnG-0005uo-0u
- for linux-arm-kernel@bombadil.infradead.org; Mon, 21 Jan 2019 08:18:54 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=Message-Id:References:In-Reply-To:Date:
- Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=YY1WD74ylD1UrRXrQaeYEmD1Zb4Y+uV8l0hsFXAfEpo=; b=HuIv5TZy6p7wHeE4yt2teGjqA
- PeuKrmZJgOZB2mBgAsYJSw7/tEdyrsKwmZ2yUTWW2q9PVsdgOpTHVE7BbMNeu14Y0MnTiZ4/LG/lb
- m6jzTbu3LuPCzBSug/GY5PHxx1MJyHoia+ZPl+vKr4hVp6jYKEYNjxr949gx5LbWf2o1pF5OSzyDL
- dgTg9/Giq57ucacAy3klqAHY+p4IPfHzJ0JeZMyUDYgAQcOhKBfs3UswPVF6T1kyqFVrbcto+sxN8
- Z99t6/bB09U1O2DRDWvGYPFlU0HqYy5VZ34w5KtiQ7lnfLjPJh6uMWK2XI9Dg8Jc5cm/4a7CrOb6s
- CMKYWgnwA==;
-Received: from mx0a-001b2d01.pphosted.com ([148.163.156.1])
- by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glUa2-0002Ms-Mp
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 08:05:21 +0000
-Received: from pps.filterd (m0098410.ppops.net [127.0.0.1])
- by mx0a-001b2d01.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x0L83nHZ132174
- for <linux-arm-kernel@lists.infradead.org>; Mon, 21 Jan 2019 03:05:12 -0500
-Received: from e06smtp03.uk.ibm.com (e06smtp03.uk.ibm.com [195.75.94.99])
- by mx0a-001b2d01.pphosted.com with ESMTP id 2q59werxdv-1
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
- for <linux-arm-kernel@lists.infradead.org>; Mon, 21 Jan 2019 03:05:12 -0500
-Received: from localhost
- by e06smtp03.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
- Violators will be prosecuted
- for <linux-arm-kernel@lists.infradead.org> from <rppt@linux.ibm.com>;
- Mon, 21 Jan 2019 08:05:09 -0000
-Received: from b06cxnps4074.portsmouth.uk.ibm.com (9.149.109.196)
- by e06smtp03.uk.ibm.com (192.168.101.133) with IBM ESMTP SMTP Gateway:
- Authorized Use Only! Violators will be prosecuted; 
- (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
- Mon, 21 Jan 2019 08:04:58 -0000
-Received: from d06av21.portsmouth.uk.ibm.com (d06av21.portsmouth.uk.ibm.com
- [9.149.105.232])
- by b06cxnps4074.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
- x0L84vVC10158356
- (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
- Mon, 21 Jan 2019 08:04:57 GMT
-Received: from d06av21.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id F014152052;
- Mon, 21 Jan 2019 08:04:56 +0000 (GMT)
-Received: from rapoport-lnx (unknown [9.148.207.125])
- by d06av21.portsmouth.uk.ibm.com (Postfix) with ESMTPS id 1A24552067;
- Mon, 21 Jan 2019 08:04:52 +0000 (GMT)
-Received: by rapoport-lnx (sSMTP sendmail emulation);
- Mon, 21 Jan 2019 10:04:51 +0200
-From: Mike Rapoport <rppt@linux.ibm.com>
-To: linux-mm@kvack.org
-Subject: [PATCH v2 07/21] memblock: memblock_phys_alloc(): don't panic
-Date: Mon, 21 Jan 2019 10:03:54 +0200
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1548057848-15136-1-git-send-email-rppt@linux.ibm.com>
-References: <1548057848-15136-1-git-send-email-rppt@linux.ibm.com>
-X-TM-AS-GCONF: 00
-x-cbid: 19012108-0012-0000-0000-000002EAB8F5
-X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
-x-cbparentid: 19012108-0013-0000-0000-00002121DE96
-Message-Id: <1548057848-15136-8-git-send-email-rppt@linux.ibm.com>
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2019-01-21_04:, , signatures=0
-X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
- priorityscore=1501
- malwarescore=0 suspectscore=3 phishscore=0 bulkscore=0 spamscore=0
- clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
- mlxlogscore=911 adultscore=0 classifier=spam adjust=0 reason=mlx
- scancount=1 engine=8.0.1-1810050000 definitions=main-1901210066
+ id 1glUnk-00078B-Vc
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 08:19:46 +0000
+Received: by mail-vs1-f66.google.com with SMTP id e7so12118494vsc.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 21 Jan 2019 00:19:24 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=eNwdIYQYJT6Pc3PhNslPpG4rGotSgFNPjN+8uubEzLc=;
+ b=tyKLxIpz+Ph2gAIA4CTk+dGRsLXEsH1rRWN3XYI9xgF94XrCSarIEl6qjNHZwSgA5A
+ gIMd45BW+2C7YIX03jV7ulHRv0npDWx4hRpetCJlbO/nV+b4mi2z463NMYuT95mgg5OX
+ OaISoVsyRnJXkT8uTnfbcb/dsFUPTlyfmwpFsMa2j1rcBNlqYiaEwPNNUh6aQaYbQGEt
+ esb7bIs6Siwc6AYsZjeXKJZ50pRwMNf9pVgvji8Bw3cmobrWPjwPkwerEbHQcSwZ7BQX
+ rujWvVGkhiLFdJ047jGYGAuQYyIVr2rjee2+6qMyAVD+6jcKnDX5ZHjFmHmCkIAOSyxE
+ MOpw==
+X-Gm-Message-State: AJcUukdgXfJKifVGwRYYDTPR+7E55Ej1wto4+GWa1GlWclqhgl2fkgBc
+ NZRwXWZDD/IVSUxU3cti79CvSYch0UaaNgPcxq8=
+X-Google-Smtp-Source: ALg8bN7Na9+3XJsTlxP4CnU3flevzSwRj2I8fvGc/mex1gzD8KE0G4LYkLwzBJ2YcDmVU42ivUABTg84S/YKw2y1uBc=
+X-Received: by 2002:a67:3885:: with SMTP id n5mr10324892vsi.96.1548058763095; 
+ Mon, 21 Jan 2019 00:19:23 -0800 (PST)
+MIME-Version: 1.0
+References: <20190118161835.2259170-1-arnd@arndb.de>
+ <20190118161835.2259170-30-arnd@arndb.de>
+ <CALCETrXqM5mhvwreN5y-9K99h1j9rs9MAVK-cNLC54s1fdHA6w@mail.gmail.com>
+ <CAK8P3a0V+xboaGAF2nqrYtpjXXA7y0LcvCKi4ngLTus1D_XZBA@mail.gmail.com>
+ <CALCETrWPj6dHEyo=AELoVjXGsiwuSpRp17x3CEWBHvp7i3cy+Q@mail.gmail.com>
+ <20190119142852.cntdihah4mpa3lgx@e5254000004ec.dyn.armlinux.org.uk>
+In-Reply-To: <20190119142852.cntdihah4mpa3lgx@e5254000004ec.dyn.armlinux.org.uk>
+From: Geert Uytterhoeven <geert@linux-m68k.org>
+Date: Mon, 21 Jan 2019 09:19:11 +0100
+Message-ID: <CAMuHMdXzQNEEDjWrmTph8Krovj1g2WhnBUaM=FvKB+J2fZqctA@mail.gmail.com>
+Subject: Re: [PATCH v2 29/29] y2038: add 64-bit time_t syscalls to all 32-bit
+ architectures
+To: Russell King - ARM Linux admin <linux@armlinux.org.uk>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_080517_891287_F5FBF8C5 
-X-CRM114-Status: GOOD (  28.04  )
+X-CRM114-CacheID: sfid-20190121_001925_685452_5A1F7402 
+X-CRM114-Status: GOOD (  30.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -122,264 +84,122 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rich Felker <dalias@libc.org>, linux-ia64@vger.kernel.org,
- devicetree@vger.kernel.org, Catalin Marinas <catalin.marinas@arm.com>,
- Heiko Carstens <heiko.carstens@de.ibm.com>, x86@kernel.org,
- linux-mips@vger.kernel.org, Max Filippov <jcmvbkbc@gmail.com>,
- Guo Ren <guoren@kernel.org>, sparclinux@vger.kernel.org,
- Christoph Hellwig <hch@lst.de>, linux-s390@vger.kernel.org,
- linux-c6x-dev@linux-c6x.org, Yoshinori Sato <ysato@users.sourceforge.jp>,
- Richard Weinberger <richard@nod.at>, linux-sh@vger.kernel.org,
- Russell King <linux@armlinux.org.uk>, kasan-dev@googlegroups.com,
- Mike Rapoport <rppt@linux.ibm.com>, Geert Uytterhoeven <geert@linux-m68k.org>,
- Mark Salter <msalter@redhat.com>, Dennis Zhou <dennis@kernel.org>,
- Matt Turner <mattst88@gmail.com>, linux-snps-arc@lists.infradead.org,
- uclinux-h8-devel@lists.sourceforge.jp, Petr Mladek <pmladek@suse.com>,
- linux-xtensa@linux-xtensa.org, linux-alpha@vger.kernel.org,
- linux-um@lists.infradead.org, linux-m68k@lists.linux-m68k.org,
- Rob Herring <robh+dt@kernel.org>, Greentime Hu <green.hu@gmail.com>,
- xen-devel@lists.xenproject.org, Stafford Horne <shorne@gmail.com>,
- Guan Xuetao <gxt@pku.edu.cn>, linux-arm-kernel@lists.infradead.org,
+Cc: Rich Felker <dalias@libc.org>,
+ "linux-ia64@vger.kernel.org" <linux-ia64@vger.kernel.org>,
+ Linux-sh list <linux-sh@vger.kernel.org>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ Will Deacon <will.deacon@arm.com>, linux-mips@vger.kernel.org,
+ Max Filippov <jcmvbkbc@gmail.com>,
+ Network Development <netdev@vger.kernel.org>,
+ Deepa Dinamani <deepa.kernel@gmail.com>, "H. Peter Anvin" <hpa@zytor.com>,
+ sparclinux <sparclinux@vger.kernel.org>,
+ linux-arch <linux-arch@vger.kernel.org>,
+ linux-s390 <linux-s390@vger.kernel.org>,
+ y2038 Mailman List <y2038@lists.linaro.org>,
+ Michael Ellerman <mpe@ellerman.id.au>, Helge Deller <deller@gmx.de>,
+ X86 ML <x86@kernel.org>, Ingo Molnar <mingo@redhat.com>,
+ Firoz Khan <firoz.khan@linaro.org>, Catalin Marinas <catalin.marinas@arm.com>,
+ Matt Turner <mattst88@gmail.com>, Fenghua Yu <fenghua.yu@intel.com>,
+ Arnd Bergmann <arnd@arndb.de>, Heiko Carstens <heiko.carstens@de.ibm.com>,
+ Linux FS Devel <linux-fsdevel@vger.kernel.org>,
+ linux-m68k <linux-m68k@lists.linux-m68k.org>,
+ Andy Lutomirski <luto@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
  Michal Simek <monstr@monstr.eu>, Tony Luck <tony.luck@intel.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-usb@vger.kernel.org,
- linux-kernel@vger.kernel.org, Paul Burton <paul.burton@mips.com>,
- Vineet Gupta <vgupta@synopsys.com>, Michael Ellerman <mpe@ellerman.id.au>,
- Andrew Morton <akpm@linux-foundation.org>, linuxppc-dev@lists.ozlabs.org,
- "David S. Miller" <davem@davemloft.net>, openrisc@lists.librecores.org
-MIME-Version: 1.0
+ Parisc List <linux-parisc@vger.kernel.org>,
+ Linux API <linux-api@vger.kernel.org>, LKML <linux-kernel@vger.kernel.org>,
+ Paul Burton <paul.burton@mips.com>,
+ "Eric W. Biederman" <ebiederm@xmission.com>,
+ alpha <linux-alpha@vger.kernel.org>,
+ Martin Schwidefsky <schwidefsky@de.ibm.com>,
+ Andrew Morton <akpm@linux-foundation.org>,
+ linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
+ "David S. Miller" <davem@davemloft.net>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Make the memblock_phys_alloc() function an inline wrapper for
-memblock_phys_alloc_range() and update the memblock_phys_alloc() callers to
-check the returned value and panic in case of error.
+Hi Russell,
 
-Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
----
- arch/arm/mm/init.c                   | 4 ++++
- arch/arm64/mm/mmu.c                  | 2 ++
- arch/powerpc/sysdev/dart_iommu.c     | 3 +++
- arch/s390/kernel/crash_dump.c        | 3 +++
- arch/s390/kernel/setup.c             | 3 +++
- arch/sh/boards/mach-ap325rxa/setup.c | 3 +++
- arch/sh/boards/mach-ecovec24/setup.c | 6 ++++++
- arch/sh/boards/mach-kfr2r09/setup.c  | 3 +++
- arch/sh/boards/mach-migor/setup.c    | 3 +++
- arch/sh/boards/mach-se/7724/setup.c  | 6 ++++++
- arch/xtensa/mm/kasan_init.c          | 3 +++
- include/linux/memblock.h             | 7 ++++++-
- mm/memblock.c                        | 5 -----
- 13 files changed, 45 insertions(+), 6 deletions(-)
+On Sat, Jan 19, 2019 at 3:29 PM Russell King - ARM Linux admin
+<linux@armlinux.org.uk> wrote:
+> On Fri, Jan 18, 2019 at 11:53:25AM -0800, Andy Lutomirski wrote:
+> > On Fri, Jan 18, 2019 at 11:33 AM Arnd Bergmann <arnd@arndb.de> wrote:
+> > > On Fri, Jan 18, 2019 at 7:50 PM Andy Lutomirski <luto@kernel.org> wrote:
+> > > > On Fri, Jan 18, 2019 at 8:25 AM Arnd Bergmann <arnd@arndb.de> wrote:
+> > > > > - Once we get to 512, we clash with the x32 numbers (unless
+> > > > >   we remove x32 support first), and probably have to skip
+> > > > >   a few more. I also considered using the 512..547 space
+> > > > >   for 32-bit-only calls (which never clash with x32), but
+> > > > >   that also seems to add a bit of complexity.
+> > > >
+> > > > I have a patch that I'll send soon to make x32 use its own table.  As
+> > > > far as I'm concerned, 547 is *it*.  548 is just a normal number and is
+> > > > not special.  But let's please not reuse 512..547 for other purposes
+> > > > on x86 variants -- that way lies even more confusion, IMO.
+> > >
+> > > Fair enough, the space for those numbers is cheap enough here.
+> > > I take it you mean we also should not reuse that number space if
+> > > we were to decide to remove x32 soon, but you are not worried
+> > > about clashing with arch/alpha when everything else uses consistent
+> > > numbers?
+> > >
+> >
+> > I think we have two issues if we reuse those numbers for new syscalls.
+> > First, I'd really like to see new syscalls be numbered consistently
+> > everywhere, or at least on all x86 variants, and we can't on x32
+> > because they mean something else.  Perhaps more importantly, due to
+> > what is arguably a rather severe bug, issuing a native x86_64 syscall
+> > (x32 bit clear) with nr in the range 512..547 does *not* return
+> > -ENOSYS on a kernel with x32 enabled.  Instead it does something that
+> > is somewhat arbitrary.  With my patch applied, it will return -ENOSYS,
+> > but old kernels will still exist, and this will break syscall probing.
+> >
+> > Can we perhaps just start the consistent numbers above 547 or maybe
+> > block out 512..547 in the new regime?
+>
+> I don't think you gain much with that kind of scheme - it won't take
+> very long before an architecture misses having a syscall added, and
+> then someone else adds their own.  Been there with ARM - I was keeping
+> the syscall table in the same order as x86 for new syscalls, but now
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index b76b90e..15dddfe 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -206,6 +206,10 @@ phys_addr_t __init arm_memblock_steal(phys_addr_t size, phys_addr_t align)
- 	BUG_ON(!arm_memblock_steal_permitted);
- 
- 	phys = memblock_phys_alloc(size, align);
-+	if (!phys)
-+		panic("Failed to steal %pa bytes at %pS\n",
-+		      &size, (void *)_RET_IP_);
-+
- 	memblock_free(phys, size);
- 	memblock_remove(phys, size);
- 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index b6f5aa5..a74e4be 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -104,6 +104,8 @@ static phys_addr_t __init early_pgtable_alloc(void)
- 	void *ptr;
- 
- 	phys = memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE);
-+	if (!phys)
-+		panic("Failed to allocate page table page\n");
- 
- 	/*
- 	 * The FIX_{PGD,PUD,PMD} slots may be in active use, but the FIX_PTE
-diff --git a/arch/powerpc/sysdev/dart_iommu.c b/arch/powerpc/sysdev/dart_iommu.c
-index 25bc25f..b82c9ff 100644
---- a/arch/powerpc/sysdev/dart_iommu.c
-+++ b/arch/powerpc/sysdev/dart_iommu.c
-@@ -265,6 +265,9 @@ static void allocate_dart(void)
- 	 * prefetching into invalid pages and corrupting data
- 	 */
- 	tmp = memblock_phys_alloc(DART_PAGE_SIZE, DART_PAGE_SIZE);
-+	if (!tmp)
-+		panic("DART: table allocation failed\n");
-+
- 	dart_emptyval = DARTMAP_VALID | ((tmp >> DART_PAGE_SHIFT) &
- 					 DARTMAP_RPNMASK);
- 
-diff --git a/arch/s390/kernel/crash_dump.c b/arch/s390/kernel/crash_dump.c
-index 97eae38..f96a585 100644
---- a/arch/s390/kernel/crash_dump.c
-+++ b/arch/s390/kernel/crash_dump.c
-@@ -61,6 +61,9 @@ struct save_area * __init save_area_alloc(bool is_boot_cpu)
- 	struct save_area *sa;
- 
- 	sa = (void *) memblock_phys_alloc(sizeof(*sa), 8);
-+	if (!sa)
-+		panic("Failed to allocate save area\n");
-+
- 	if (is_boot_cpu)
- 		list_add(&sa->list, &dump_save_areas);
- 	else
-diff --git a/arch/s390/kernel/setup.c b/arch/s390/kernel/setup.c
-index 72dd23e..da48397 100644
---- a/arch/s390/kernel/setup.c
-+++ b/arch/s390/kernel/setup.c
-@@ -968,6 +968,9 @@ static void __init setup_randomness(void)
- 
- 	vmms = (struct sysinfo_3_2_2 *) memblock_phys_alloc(PAGE_SIZE,
- 							    PAGE_SIZE);
-+	if (!vmms)
-+		panic("Failed to allocate memory for sysinfo structure\n");
-+
- 	if (stsi(vmms, 3, 2, 2) == 0 && vmms->count)
- 		add_device_randomness(&vmms->vm, sizeof(vmms->vm[0]) * vmms->count);
- 	memblock_free((unsigned long) vmms, PAGE_SIZE);
-diff --git a/arch/sh/boards/mach-ap325rxa/setup.c b/arch/sh/boards/mach-ap325rxa/setup.c
-index d7ceab6..08a0cc9 100644
---- a/arch/sh/boards/mach-ap325rxa/setup.c
-+++ b/arch/sh/boards/mach-ap325rxa/setup.c
-@@ -558,6 +558,9 @@ static void __init ap325rxa_mv_mem_reserve(void)
- 	phys_addr_t size = CEU_BUFFER_MEMORY_SIZE;
- 
- 	phys = memblock_phys_alloc(size, PAGE_SIZE);
-+	if (!phys)
-+		panic("Failed to allocate CEU memory\n");
-+
- 	memblock_free(phys, size);
- 	memblock_remove(phys, size);
- 
-diff --git a/arch/sh/boards/mach-ecovec24/setup.c b/arch/sh/boards/mach-ecovec24/setup.c
-index a3901806..fd264a6 100644
---- a/arch/sh/boards/mach-ecovec24/setup.c
-+++ b/arch/sh/boards/mach-ecovec24/setup.c
-@@ -1481,11 +1481,17 @@ static void __init ecovec_mv_mem_reserve(void)
- 	phys_addr_t size = CEU_BUFFER_MEMORY_SIZE;
- 
- 	phys = memblock_phys_alloc(size, PAGE_SIZE);
-+	if (!phys)
-+		panic("Failed to allocate CEU0 memory\n");
-+
- 	memblock_free(phys, size);
- 	memblock_remove(phys, size);
- 	ceu0_dma_membase = phys;
- 
- 	phys = memblock_phys_alloc(size, PAGE_SIZE);
-+	if (!phys)
-+		panic("Failed to allocate CEU1 memory\n");
-+
- 	memblock_free(phys, size);
- 	memblock_remove(phys, size);
- 	ceu1_dma_membase = phys;
-diff --git a/arch/sh/boards/mach-kfr2r09/setup.c b/arch/sh/boards/mach-kfr2r09/setup.c
-index 55bdf4a..ebe90d06 100644
---- a/arch/sh/boards/mach-kfr2r09/setup.c
-+++ b/arch/sh/boards/mach-kfr2r09/setup.c
-@@ -632,6 +632,9 @@ static void __init kfr2r09_mv_mem_reserve(void)
- 	phys_addr_t size = CEU_BUFFER_MEMORY_SIZE;
- 
- 	phys = memblock_phys_alloc(size, PAGE_SIZE);
-+	if (!phys)
-+		panic("Failed to allocate CEU memory\n");
-+
- 	memblock_free(phys, size);
- 	memblock_remove(phys, size);
- 
-diff --git a/arch/sh/boards/mach-migor/setup.c b/arch/sh/boards/mach-migor/setup.c
-index ba7eee6..1adff09 100644
---- a/arch/sh/boards/mach-migor/setup.c
-+++ b/arch/sh/boards/mach-migor/setup.c
-@@ -631,6 +631,9 @@ static void __init migor_mv_mem_reserve(void)
- 	phys_addr_t size = CEU_BUFFER_MEMORY_SIZE;
- 
- 	phys = memblock_phys_alloc(size, PAGE_SIZE);
-+	if (!phys)
-+		panic("Failed to allocate CEU memory\n");
-+
- 	memblock_free(phys, size);
- 	memblock_remove(phys, size);
- 
-diff --git a/arch/sh/boards/mach-se/7724/setup.c b/arch/sh/boards/mach-se/7724/setup.c
-index 4696e10..201631a 100644
---- a/arch/sh/boards/mach-se/7724/setup.c
-+++ b/arch/sh/boards/mach-se/7724/setup.c
-@@ -966,11 +966,17 @@ static void __init ms7724se_mv_mem_reserve(void)
- 	phys_addr_t size = CEU_BUFFER_MEMORY_SIZE;
- 
- 	phys = memblock_phys_alloc(size, PAGE_SIZE);
-+	if (!phys)
-+		panic("Failed to allocate CEU0 memory\n");
-+
- 	memblock_free(phys, size);
- 	memblock_remove(phys, size);
- 	ceu0_dma_membase = phys;
- 
- 	phys = memblock_phys_alloc(size, PAGE_SIZE);
-+	if (!phys)
-+		panic("Failed to allocate CEU1 memory\n");
-+
- 	memblock_free(phys, size);
- 	memblock_remove(phys, size);
- 	ceu1_dma_membase = phys;
-diff --git a/arch/xtensa/mm/kasan_init.c b/arch/xtensa/mm/kasan_init.c
-index 48dbb03..4852848 100644
---- a/arch/xtensa/mm/kasan_init.c
-+++ b/arch/xtensa/mm/kasan_init.c
-@@ -54,6 +54,9 @@ static void __init populate(void *start, void *end)
- 			phys_addr_t phys =
- 				memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE);
- 
-+			if (!phys)
-+				panic("Failed to allocate page table page\n");
-+
- 			set_pte(pte + j, pfn_pte(PHYS_PFN(phys), PAGE_KERNEL));
- 		}
- 	}
-diff --git a/include/linux/memblock.h b/include/linux/memblock.h
-index 66dfdb3..7883c74 100644
---- a/include/linux/memblock.h
-+++ b/include/linux/memblock.h
-@@ -374,7 +374,12 @@ phys_addr_t memblock_phys_alloc_range(phys_addr_t size, phys_addr_t align,
- phys_addr_t memblock_phys_alloc_nid(phys_addr_t size, phys_addr_t align, int nid);
- phys_addr_t memblock_phys_alloc_try_nid(phys_addr_t size, phys_addr_t align, int nid);
- 
--phys_addr_t memblock_phys_alloc(phys_addr_t size, phys_addr_t align);
-+static inline phys_addr_t memblock_phys_alloc(phys_addr_t size,
-+					      phys_addr_t align)
-+{
-+	return memblock_phys_alloc_range(size, align, 0,
-+					 MEMBLOCK_ALLOC_ACCESSIBLE);
-+}
- 
- void *memblock_alloc_try_nid_raw(phys_addr_t size, phys_addr_t align,
- 				 phys_addr_t min_addr, phys_addr_t max_addr,
-diff --git a/mm/memblock.c b/mm/memblock.c
-index 8aabb1b..461e40a3 100644
---- a/mm/memblock.c
-+++ b/mm/memblock.c
-@@ -1382,11 +1382,6 @@ phys_addr_t __init memblock_alloc_base(phys_addr_t size, phys_addr_t align, phys
- 	return alloc;
- }
- 
--phys_addr_t __init memblock_phys_alloc(phys_addr_t size, phys_addr_t align)
--{
--	return memblock_alloc_base(size, align, MEMBLOCK_ALLOC_ACCESSIBLE);
--}
--
- phys_addr_t __init memblock_phys_alloc_try_nid(phys_addr_t size, phys_addr_t align, int nid)
- {
- 	phys_addr_t res = memblock_phys_alloc_nid(size, align, nid);
--- 
-2.7.4
+Same for m68k, and probably other architectures.
 
+> that others have been adding syscalls to the table since I converted
+> ARM to the tabular form, that's now gone out the window.
+>
+> So, I think it's completely pointless to do what you're suggesting.
+> We'll just end up with a big hole in the middle of the syscall table
+> and then revert back to random numbering of syscalls thereafter again.
+
+I believe the plan is to add future syscalls for all architectures in a
+single commit, to keep everything in sync.
+
+Regardless, I'm wondering what to do with the holes marked "room for
+arch specific calls".
+When is a syscall really arch-specific, and can it be added there, and
+when does it turn out (later) that it isn't, breaking the
+synchronization again?
+
+The pkey syscalls may be a bad example, as AFAIU they can be implemented
+on some architectures, but not on some others.  Still, I had skipped them
+when adding new syscalls to m68k.
+
+Perhaps we should get rid of the notion of "arch-specific syscalls", and
+reserve a slot everywhere anyway?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert@linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
 
 _______________________________________________
 linux-arm-kernel mailing list
