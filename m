@@ -2,80 +2,59 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8F9C8C2F421
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:33:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DA7A6C2F42E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:34:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6062D2085A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:33:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A4C4E2085A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:34:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NukxWWHP";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="dqJjmLJ6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6062D2085A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="I4FXucFY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A4C4E2085A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=C2ZSAkYkXzzI/ikMsFIrishFcdLW2qsXv1KE9YL4uz0=; b=NukxWWHPTkGanE
-	sR8NRCJVFgJFyGNGkVgNM8GMpcIMFpqAl4FGdseBr0F+pyX8catB+piGyQ8j8JqJwk8TUszfMnLgl
-	k3jRUO+uahbsydiwbzvU0Y5ov6YsFYY5S2FGg6jXW3Ca5b1TKPGF6I4QgXV2mzD3JE0+3WO2uNHLH
-	UKnTtfMyCLJkvC9oiBnPNNy3jii69c/Oy5a99/XLHyMwcVCMnnhbz3mD4Cd1QySEQrmFTvEJhgPtU
-	no1MGJb9phmD/3EFQiQ7sTXxI7aaxm1sHw3QzMIUo09q0VQL43MQRFy95yOXoo9KDOBVxTUdfzs8A
-	MuAUUWXm4WuFFtpjufYg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=ETV2k02HS0rrxB+WNW7yJc3Yzp+vttx1LJKNUpjYSeo=; b=I4F
+	XucFYyz3ehk7yjwd1QG3zfilcbzeFTpaKYvJ5+6dbzszOdYg4xlp8+AvXTgy4gJpn+ZgbIdONU/eT
+	jLFyL8+zMhmfpHt/zVvv2NRK/BE5rHsKJOVJZodg34bUoYsb7U44MwvmdKU0XcdwjXlHqScIsQtce
+	NMfjeN/n9OGib4rhOcrk4H3UiqwcphUlODF+oC4fFFQbxCki6SGRrwYCqdCFTML3RPlDCe1N1WrSI
+	JfYok5Php5JEoN/DglInrwyXM3dNgYC02n8DjreOckUFGjKWXjxWjgYbhudhgXlsqnpxywfjuiLZr
+	66aOzaH0J+pxWKeWE7YA9reBnA9QZ6A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glba4-0004xf-JE; Mon, 21 Jan 2019 15:33:44 +0000
-Received: from mail-io1-xd43.google.com ([2607:f8b0:4864:20::d43])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glba0-0004wj-GK
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 15:33:41 +0000
-Received: by mail-io1-xd43.google.com with SMTP id b23so16684843ios.10
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 07:33:39 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=3uemtn1t3FusGviom3Dh6L2MT7Zfb+f7Orre/lzjRyI=;
- b=dqJjmLJ63qti8gqps928oPHwhz4UXR8Zg7gMXHKCSKejOYWYs6X4HDjuprvOTEipK/
- 5IPDgT17lqfkNtm3c+dJFg2V0nw6+IZP5j4Ffbphx2OUzd3ATO2xJXHJKFXTwdHJV7+L
- asvNzX/0MWAOxqrqqdR+onUhXk+LMbMeMHKYA=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=3uemtn1t3FusGviom3Dh6L2MT7Zfb+f7Orre/lzjRyI=;
- b=K1OKqUUfKsqx9HTf6EFo7/nGStTRRMoURb0sXJyx8RQfynwD4/1LkuwA1bNTL90c1u
- 9xdTQAQfuhQaGIOmog/xvob4FHKUNaK/xp16JCyCXJkvoHZkz7nqjRSMv/sWvgiBLMc8
- pQsuyDbkIXqGrvwnBIrItBrHK92391UNj5ExrBKvHyg1qZrYVKkouT8USUJWhxRp+k9S
- 7s5WbAX6q0f5wxorOm7PxskoXst5dxHpQVKgva/ckjzhO6TUrcgclNSjwCMxLhXUStlr
- GdkCQ18mu0xxdHjYkN5qC0ckAz5fMwsyloGrVJgm/QdLAahns4l1MbFXLAZEjSPLKm6/
- MWVw==
-X-Gm-Message-State: AJcUukczL13AoAy8gWgcYeawKCyeZgN7Csf7QpMIpS0UEiAHfgwRNrKz
- YTR2daOfo7ROhcucK6/uX7PvoXdAIK4IZuB4yt4Vnw==
-X-Google-Smtp-Source: ALg8bN6BOPBRpx5nfX8X+9cnontZPfCFuOoGD6HJnF+engMVzQRJWhho9dF3UZZ40q1C+vTzDrNH/r9mg90NxiQjops=
-X-Received: by 2002:a5e:c206:: with SMTP id v6mr17704386iop.60.1548084818958; 
- Mon, 21 Jan 2019 07:33:38 -0800 (PST)
-MIME-Version: 1.0
-References: <20190121100617.2311-1-ard.biesheuvel@linaro.org>
- <20190121150734.GA30582@infradead.org>
-In-Reply-To: <20190121150734.GA30582@infradead.org>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Mon, 21 Jan 2019 16:33:27 +0100
-Message-ID: <CAKv+Gu-hR=uieOeg7QheA5yfAycUoi2vjZsDUvROKVjW4eUNqw@mail.gmail.com>
-Subject: Re: [RFC PATCH] drm: disable WC optimization for cache coherent
- devices on non-x86
-To: Christoph Hellwig <hch@infradead.org>
+	id 1glbaT-0005KK-1V; Mon, 21 Jan 2019 15:34:09 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glbaM-0005Fh-IE
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 15:34:05 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B07ECEBD;
+ Mon, 21 Jan 2019 07:34:00 -0800 (PST)
+Received: from e112298-lin.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id BEB193F5C1;
+ Mon, 21 Jan 2019 07:33:58 -0800 (PST)
+From: Julien Thierry <julien.thierry@arm.com>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [PATCH v9 00/26] arm64: provide pseudo NMI with GICv3
+Date: Mon, 21 Jan 2019 15:33:19 +0000
+Message-Id: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
+X-Mailer: git-send-email 1.9.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_073340_598792_E8807F69 
-X-CRM114-Status: GOOD (  13.32  )
+X-CRM114-CacheID: sfid-20190121_073402_765594_74D6F941 
+X-CRM114-Status: GOOD (  16.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,53 +66,147 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Will Deacon <will.deacon@arm.com>, David Zhou <David1.Zhou@amd.com>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- Benjamin Herrenschmidt <benh@kernel.crashing.org>,
- David Airlie <airlied@linux.ie>,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- Michel Daenzer <michel.daenzer@amd.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- amd-gfx@lists.freedesktop.org, Junwei Zhang <Jerry.Zhang@amd.com>,
- Huang Rui <ray.huang@amd.com>, dri-devel <dri-devel@lists.freedesktop.org>,
- Daniel Vetter <daniel@ffwll.ch>, Michael Ellerman <mpe@ellerman.id.au>,
- Alex Deucher <alexander.deucher@amd.com>, Sean Paul <sean@poorly.run>,
- Christian Koenig <christian.koenig@amd.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
+ Julien Thierry <julien.thierry@arm.com>, marc.zyngier@arm.com,
+ catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ christoffer.dall@arm.com, james.morse@arm.com, joel@joelfernandes.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 21 Jan 2019 at 16:07, Christoph Hellwig <hch@infradead.org> wrote:
->
-> > +#include <linux/dma-noncoherent.h>
->
-> This header is not for usage in device drivers, but purely for
-> dma-mapping implementations!
->
+Hi,
 
-Is that documented anywhere?
+This series is a continuation of the work started by Daniel [1]. The goal
+is to use GICv3 interrupt priorities to simulate an NMI.
 
-> > +static inline bool drm_device_can_wc_memory(struct drm_device *ddev)
-> >  {
-> > +     if (IS_ENABLED(CONFIG_PPC))
-> > +             return IS_ENABLED(CONFIG_NOT_COHERENT_CACHE);
-> > +     else if (IS_ENABLED(CONFIG_MIPS))
-> > +             return !IS_ENABLED(CONFIG_CPU_LOONGSON3);
-> > +     else if (IS_ENABLED(CONFIG_X86))
-> > +             return true;
-> > +
-> > +     return !dev_is_dma_coherent(ddev->dev);
->
-> And even if something like this was valid to do, it would have to be
-> a core function with an arch hook, and not hidden in a random driver.
+The patches depend on the core API for NMIs patches [2]. Both series can
+be found on this branch:
+git clone http://linux-arm.org/linux-jt.git -b v5.0-pseudo-nmi
 
-Why would it not be valid to do? Is it wrong for a driver to be aware
-of whether a device is cache coherent or not?
+To achieve this, set two priorities, one for standard interrupts and
+another, higher priority, for NMIs. Whenever we want to disable interrupts,
+we mask the standard priority instead so NMIs can still be raised. Some
+corner cases though still require to actually mask all interrupts
+effectively disabling the NMI.
 
-And in case it isn't, do you have an alternative suggestion on how to
-fix this mess?
+Daniel Thompson ran some benchmarks [3] on a previous version showing a
+small (<1%) performance drop when using interrupt priorities on Cortex-A53
+and GIC-500.
+
+Currently, only PPIs and SPIs can be set as NMIs. IPIs being currently
+hardcoded IRQ numbers, there isn't a generic interface to set SGIs as NMI
+for now. LPIs being controlled by the ITS cannot be delivered as NMI.
+When an NMI is active on a CPU, no other NMI can be triggered on the CPU.
+
+Requirements to use this:
+- Have GICv3
+- SCR_EL3.FIQ is set to 1 when linux runs or have single security state
+- Select Kernel Feature -> Support for NMI-like interrupts
+- Provide "enable_pseudo_nmi" on the kernel command line
+
+
+* Patch 1 fixes an existing issue with current NMI contexts in arm64
+* Patches 2 and 3 are just a bit of cleanup
+* Patch 4 introduces a CPU feature to check if priority masking should be
+  used
+* Patches 5 and 6 add the support for priority masking in GICv3 driver
+* Patches 7 to 13 add the support for priority masking the arch/arm64
+  code
+* Patches 14 and 15 allow us to apply alternatives earlier in the boot
+  process
+* Patches 16 to 18 starts the PMR masking on cpu startup and provides
+  primitives for arm64 GICv3 driver to perform priority masking
+* Patches 19 to 22 Add support for pseudo-NMIs in GICv3 driver
+* Patches 23 to 25 Add support for receiving NMIs in arch/arm64
+* Patch 26 adds the build config and command line option to enable
+  pseudo-NMIs
+
+
+Changes since v8[4]:
+* Rebase on v5.0-rc3
+* Add Acked-by and Reviewed-by tags
+* Simplify arch_local_save_flags code
+* Fix issue in cpufeature when enabling early alternatives
+
+[1] http://www.spinics.net/lists/arm-kernel/msg525077.html
+[2] https://lkml.org/lkml/2018/11/12/2113
+[3] https://lkml.org/lkml/2018/7/20/803
+[4] https://lkml.org/lkml/2019/1/8/456
+
+Cheers,
+
+Julien
+
+-->
+
+Daniel Thompson (1):
+  arm64: alternative: Apply alternatives early in boot process
+
+Julien Thierry (25):
+  arm64: Fix HCR.TGE status for NMI contexts
+  arm64: Remove unused daif related functions/macros
+  arm64: cpufeature: Set SYSREG_GIC_CPUIF as a boot system feature
+  arm64: cpufeature: Add cpufeature for IRQ priority masking
+  arm/arm64: gic-v3: Add PMR and RPR accessors
+  irqchip/gic-v3: Switch to PMR masking before calling IRQ handler
+  arm64: ptrace: Provide definitions for PMR values
+  arm64: Make PMR part of task context
+  arm64: Unmask PMR before going idle
+  arm64: kvm: Unmask PMR before entering guest
+  efi: Let architectures decide the flags that should be saved/restored
+  arm64: irqflags: Use ICC_PMR_EL1 for interrupt masking
+  arm64: daifflags: Include PMR in daifflags restore operations
+  arm64: alternative: Allow alternative status checking per cpufeature
+  irqchip/gic-v3: Factor group0 detection into functions
+  arm64: Switch to PMR masking when starting CPUs
+  arm64: gic-v3: Implement arch support for priority masking
+  irqchip/gic-v3: Detect if GIC can support pseudo-NMIs
+  irqchip/gic-v3: Handle pseudo-NMIs
+  irqchip/gic: Add functions to access irq priorities
+  irqchip/gic-v3: Allow interrupts to be set as pseudo-NMI
+  arm64: Handle serror in NMI context
+  arm64: Skip preemption when exiting an NMI
+  arm64: Skip irqflags tracing for NMI in IRQs disabled context
+  arm64: Enable the support of pseudo-NMIs
+
+ Documentation/admin-guide/kernel-parameters.txt |   6 +
+ Documentation/arm64/booting.txt                 |   5 +
+ arch/arm/include/asm/arch_gicv3.h               |  33 ++++
+ arch/arm64/Kconfig                              |  14 ++
+ arch/arm64/include/asm/alternative.h            |   4 +-
+ arch/arm64/include/asm/arch_gicv3.h             |  32 +++
+ arch/arm64/include/asm/assembler.h              |  10 +-
+ arch/arm64/include/asm/cpucaps.h                |   3 +-
+ arch/arm64/include/asm/cpufeature.h             |  10 +
+ arch/arm64/include/asm/daifflags.h              |  41 ++--
+ arch/arm64/include/asm/efi.h                    |   6 +
+ arch/arm64/include/asm/hardirq.h                |  28 +++
+ arch/arm64/include/asm/irqflags.h               | 104 +++++++---
+ arch/arm64/include/asm/kvm_host.h               |  12 ++
+ arch/arm64/include/asm/processor.h              |   3 +
+ arch/arm64/include/asm/ptrace.h                 |  26 ++-
+ arch/arm64/kernel/alternative.c                 |  60 +++++-
+ arch/arm64/kernel/asm-offsets.c                 |   1 +
+ arch/arm64/kernel/cpufeature.c                  |  42 +++-
+ arch/arm64/kernel/entry.S                       |  43 ++++
+ arch/arm64/kernel/irq.c                         |   3 +
+ arch/arm64/kernel/process.c                     |  51 +++++
+ arch/arm64/kernel/smp.c                         |  33 ++++
+ arch/arm64/kernel/traps.c                       |   8 +-
+ arch/arm64/kvm/hyp/switch.c                     |  16 ++
+ arch/arm64/mm/proc.S                            |  11 --
+ drivers/firmware/efi/runtime-wrappers.c         |  17 +-
+ drivers/irqchip/irq-gic-common.c                |  10 +
+ drivers/irqchip/irq-gic-common.h                |   2 +
+ drivers/irqchip/irq-gic-v3.c                    | 252 +++++++++++++++++++++---
+ include/linux/efi.h                             |   5 +-
+ include/linux/hardirq.h                         |   7 +
+ 32 files changed, 783 insertions(+), 115 deletions(-)
+
+--
+1.9.1
 
 _______________________________________________
 linux-arm-kernel mailing list
