@@ -2,67 +2,70 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 577B7C7112F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 12:23:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DE423C7113B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 12:23:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 09B2F2085A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 12:23:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ADEAE2084A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 12:23:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N6HA8Rnm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 09B2F2085A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YGa+u5rH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ADEAE2084A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=7vJQP1EVNrmSIPfwe1HfTKr+GETnjaDfRNPijybXl4I=; b=N6HA8RnmdlM99I
-	UE1AQfLgymzRcnipafPtGDQO8GKJDMNClBFpZ4ZNcP3Zkkat6zXw62WvAlAyw3aX/eZ1c/aibcilI
-	72p683Xm/O63Hp4S/U7KNwdnl0O1lYI3B37SpDjR2J6TFavagjShbUJe8pZTlR2lbC27z95gMYSsd
-	TuZUgd7mHUGor2TtMVi4Res7Ve0lCS2TNF69qEXmq9YtKzhEuQWCVRf7PgUHeN1vgcIHWaaBvl4wV
-	B9KeitzS7HLaxx0uZ7xJPaeoifeehjLt+Squ0WKYRWSPfmZQ6xZX6mTQmm5dOdi1Cd4ordTkg1Wj1
-	uFmWArbYkQQYAOwL+woQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=0J8wPBcW+hUB1xa2RtGY9unx16w1uVTqNOMxsfo9ueY=; b=YGa+u5rHEYtV0F
+	kBwQIB2evaLK9KnHBOvABMwVgI2YKwEXxS8GT48A70lL5VhE4XDnM+fSlEi7G/yxFJGbz/61C9P7+
+	MEVdmA8uPOgei9dqJ0oh8W/FXKpVe8fO5kqdZWvCccu7OSY2dg5YBT5KZAk57fYsXPlEANuXjCcIK
+	uFqzcAXyALXQMIpof877jdpI2xMYVBpbar2fOVWDQCnnDAONBJwsgE2QhARObaUhJyjfmABgy0G0u
+	iogjndxO7A3aS1GNIHVrn1D1YdYflVDIxYeTN4rdLQnqWsiwgsqtjJvMV/Gb4I6e9fqvGd0SYieKM
+	1K2QmqGVG6mmIiq4jDLQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glYbg-0003RF-83; Mon, 21 Jan 2019 12:23:12 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1glYbz-0003kd-Jg; Mon, 21 Jan 2019 12:23:31 +0000
+Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glYbH-00037M-7j; Mon, 21 Jan 2019 12:22:48 +0000
-X-UUID: 590e9c130c7f4fcd8bcb0e48d2dc5cd5-20190121
-X-UUID: 590e9c130c7f4fcd8bcb0e48d2dc5cd5-20190121
-Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw01.mediatek.com
+ id 1glYbM-00038u-SQ; Mon, 21 Jan 2019 12:22:56 +0000
+X-UUID: 9b141dfbb71b431da9681fd95a740049-20190121
+X-UUID: 9b141dfbb71b431da9681fd95a740049-20190121
+Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw02.mediatek.com
  (envelope-from <min.guo@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1761004716; Mon, 21 Jan 2019 04:22:39 -0800
-Received: from MTKMBS31N1.mediatek.inc (172.27.4.69) by
- MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Mon, 21 Jan 2019 04:22:37 -0800
+ with ESMTP id 1276826507; Mon, 21 Jan 2019 04:22:46 -0800
+Received: from MTKMBS31N2.mediatek.inc (172.27.4.87) by
+ MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Mon, 21 Jan 2019 04:22:45 -0800
 Received: from mtkcas07.mediatek.inc (172.21.101.84) by
- MTKMBS31N1.mediatek.inc (172.27.4.69) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Mon, 21 Jan 2019 20:22:35 +0800
+ MTKMBS31N2.mediatek.inc (172.27.4.87) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Mon, 21 Jan 2019 20:22:42 +0800
 Received: from localhost.localdomain (10.17.3.153) by mtkcas07.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Mon, 21 Jan 2019 20:22:34 +0800
+ Transport; Mon, 21 Jan 2019 20:22:41 +0800
 From: <min.guo@mediatek.com>
 To: Bin Liu <b-liu@ti.com>, Rob Herring <robh+dt@kernel.org>
-Subject: [PATCH v4 0/6] Add MediaTek MUSB Controller Driver
-Date: Mon, 21 Jan 2019 20:22:25 +0800
-Message-ID: <1548073351-13739-1-git-send-email-min.guo@mediatek.com>
+Subject: [PATCH v4 2/6] arm: dts: mt2701: Add usb2 device nodes
+Date: Mon, 21 Jan 2019 20:22:27 +0800
+Message-ID: <1548073351-13739-3-git-send-email-min.guo@mediatek.com>
 X-Mailer: git-send-email 1.7.9.5
+In-Reply-To: <1548073351-13739-1-git-send-email-min.guo@mediatek.com>
+References: <1548073351-13739-1-git-send-email-min.guo@mediatek.com>
 MIME-Version: 1.0
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_042247_285212_AC634FF2 
-X-CRM114-Status: GOOD (  11.21  )
+X-CRM114-CacheID: sfid-20190121_042253_422209_3D482353 
+X-CRM114-Status: UNSURE (   9.57  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,79 +91,110 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Min Guo <min.guo@mediatek.com>
 
-These patches introduce the MediaTek MUSB controller driver.
+Add musb nodes and usb2 phy nodes for MT2701
 
-The driver can be configured as Dual-Role Device (DRD),
-Peripheral Only and Host Only modes. This has beed tested on
-MT2701 with a variety of devices in host mode and with the 
-f_mass gadget driver in peripheral mode, plugging otg cables
-in/out a lot of times in all possible imaginable plug orders.
-
+Signed-off-by: Min Guo <min.guo@mediatek.com>
+---
 changes in v4:
-changes of dt-bindings suggested by Sergei:
-1. String alignment
-changes of driver suggested by Tony and Bin:
-1. Add a new patch for set/get_toggle()
-2. Add a new patch for noirq type of dma
-3. Add a new patch musb_clearb/w()
-4. Abondon patch "usb: musb: Delete the const attribute of addr parameter in readb/w/l hooks"
+1. no changes
 
 changes in v3:
-changes of driver suggested by Bin:
-1. Add a new patch for musb_readb/w/l() to remove const attribute 
-2. Use is_out as function parameter in set_toggle/get_toggle() hooks
-3. Remove 'u8/u16 data' parameter in clearb/w() hooks
-4. Remove musb_default_clearb/w()
-5. Replace musb_readb/w() with musb_clearb/w() to clear pending interrupts 
-6. Add comments to clearb/w() hooks
-7. Replace musb_save_toggle() with musb->io.get_toggle()
-8. Replace musb_set_toggle() with musb->io.set_toggle()
+1. no changes
 
 changes in v2:
-changes of dt-bindings suggested by Rob and Bin:
-1. Modify DRC to DRD
-2. Drop the "<soc-model>-musb" in compatible
-3. Remove phy-names
-4. Add space after comma in clock-names
-dtsi:
 1. Remove phy-names
-changes of driver suggested by Bin:
-1. Add a new patch for musb_set_toggle
-2. Add summarize of MediaTek musb controller differences in the commit log
-3. Abondon patch "usb: musb: Move musbhsdma macro definition to musb_dma.h"
-4. Add "|| COMPILE_TEST" in Kconfig
-5. Add musb_clearb() and musb_clearw() hooks
-6. Add get_toggle() and set_toggle() hooks
-7. Replace musb_readl() with musb_readw() to read 16bit toggle register
-8. Move MediaTek's private toggle registers from musb_regs.h to mediatek.c
-9. Create musbhs_dma_controller_create_noirq()
+---
+ arch/arm/boot/dts/mt2701-evb.dts | 21 +++++++++++++++++++++
+ arch/arm/boot/dts/mt2701.dtsi    | 33 +++++++++++++++++++++++++++++++++
+ 2 files changed, 54 insertions(+)
 
-Min Guo (6):
-  dt-bindings: usb: musb: Add support for MediaTek musb controller
-  arm: dts: mt2701: Add usb2 device nodes
-  usb: musb: Add get/set toggle hooks
-  usb: musb: Add noirq type of dma create interface
-  usb: musb: Add musb_clearb/w() interface
-  usb: musb: Add support for MediaTek musb controller
-
- .../devicetree/bindings/usb/mediatek,musb.txt      |  43 ++
- arch/arm/boot/dts/mt2701-evb.dts                   |  21 +
- arch/arm/boot/dts/mt2701.dtsi                      |  33 ++
- drivers/usb/musb/Kconfig                           |   8 +-
- drivers/usb/musb/Makefile                          |   1 +
- drivers/usb/musb/mediatek.c                        | 624 +++++++++++++++++++++
- drivers/usb/musb/musb_core.c                       |  74 ++-
- drivers/usb/musb/musb_core.h                       |  13 +-
- drivers/usb/musb/musb_dma.h                        |   9 +
- drivers/usb/musb/musb_host.c                       |  46 +-
- drivers/usb/musb/musb_io.h                         |  12 +-
- drivers/usb/musb/musbhsdma.c                       |  57 +-
- drivers/usb/musb/sunxi.c                           |   4 +-
- drivers/usb/musb/tusb6010.c                        |   2 +-
- 14 files changed, 876 insertions(+), 71 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/usb/mediatek,musb.txt
- create mode 100644 drivers/usb/musb/mediatek.c
-
+diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
+index be0edb3..2635911 100644
+--- a/arch/arm/boot/dts/mt2701-evb.dts
++++ b/arch/arm/boot/dts/mt2701-evb.dts
+@@ -6,6 +6,7 @@
+  */
+ 
+ /dts-v1/;
++#include <dt-bindings/gpio/gpio.h>
+ #include "mt2701.dtsi"
+ 
+ / {
+@@ -60,6 +61,20 @@
+ 		>;
+ 		default-brightness-level = <9>;
+ 	};
++
++	extcon_usb: extcon_iddig {
++		compatible = "linux,extcon-usb-gpio";
++		id-gpio = <&pio 44 GPIO_ACTIVE_HIGH>;
++	};
++
++	usb_vbus: regulator@0 {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&pio 45 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
+ };
+ 
+ &auxadc {
+@@ -229,3 +244,9 @@
+ &uart0 {
+ 	status = "okay";
+ };
++
++&usb2 {
++	vbus-supply = <&usb_vbus>;
++	extcon = <&extcon_usb>;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+index 180377e..a6b1434 100644
+--- a/arch/arm/boot/dts/mt2701.dtsi
++++ b/arch/arm/boot/dts/mt2701.dtsi
+@@ -670,6 +670,39 @@
+ 		};
+ 	};
+ 
++	usb2: usb@11200000 {
++		compatible = "mediatek,mt2701-musb",
++			     "mediatek,mtk-musb";
++		reg = <0 0x11200000 0 0x1000>;
++		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-names = "mc";
++		phys = <&u2port2 PHY_TYPE_USB2>;
++		dr_mode = "otg";
++		clocks = <&pericfg CLK_PERI_USB0>,
++			 <&pericfg CLK_PERI_USB0_MCU>,
++			 <&pericfg CLK_PERI_USB_SLV>;
++		clock-names = "main","mcu","univpll";
++		power-domains = <&scpsys MT2701_POWER_DOMAIN_IFR_MSC>;
++		status = "disabled";
++	};
++
++	u2phy0: usb-phy@11210000 {
++		compatible = "mediatek,generic-tphy-v1";
++		reg = <0 0x11210000 0 0x0800>;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++		status = "okay";
++
++		u2port2: usb-phy@1a1c4800 {
++			reg = <0 0x11210800 0 0x0100>;
++			clocks = <&topckgen CLK_TOP_USB_PHY48M>;
++			clock-names = "ref";
++			#phy-cells = <1>;
++			status = "okay";
++		};
++	};
++
+ 	ethsys: syscon@1b000000 {
+ 		compatible = "mediatek,mt2701-ethsys", "syscon";
+ 		reg = <0 0x1b000000 0 0x1000>;
 -- 
 1.9.1
 
