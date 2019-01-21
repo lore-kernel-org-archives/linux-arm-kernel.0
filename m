@@ -2,93 +2,112 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6A637C31680
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 19:19:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0648EC31680
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 19:22:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3FE4521721
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 19:19:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CACCB21721
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 19:22:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Vcct+uxx";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="gRv8geTm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3FE4521721
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mvtpBRwP";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=Mellanox.com header.i=@Mellanox.com header.b="Rlp3dl07"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CACCB21721
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=mellanox.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RKwUK+D/QZD3bv8bcTG4Lk2MLtodo096YXYHe26rugI=; b=Vcct+uxxtTIK28
-	rm7gQVY0xzu5AuS/bMFkBfgTYI/7ICR1LpBhUvNcoF94gUNNLiZHjvW604lhHfpAApu2Uf3dAhE+Z
-	tWq6HK6gxmbqrKoMcb/opGJwx8UV7Esojmvse0NoAA/Vs4ClbPkGvr4DpXfyyfQIdmwE/MB1md2Bd
-	foyzyqf7qWd8wMGoR/44t+NEnQPj8BCnBD4avCQYWLhyvwp9nadEXmL7xhqASI22zvXT2UqPhyegX
-	xZLQx0LvhpLXYugeGv4X1a+H1dQOcxLODLebPxdMwjpMv23huENMzlx++bb80gHRP1Fp4riE3kcUJ
-	tXm5RXjbwty/qIfa/oEQ==;
+	List-Owner; bh=9/Mw2ZReOZLmnqyPB6Vqas0tY4XO1VhTCwdBOLX1Yxk=; b=mvtpBRwPynvjdI
+	35+nWJvL/bAV8KEgbGHgauO5aCh8Wq8JdKIrbupNlXwwHYDfMa/HGlfQRUyRNbkbc6aSUVW7zNNBt
+	H3gS1oep27d6rWDptoiEmWnTn4mGrGFLgG/URdysk+VqjYWsB4bkoeDy9HxIs8FVKm1vAW3moos4B
+	W6R8yVNLDU0LI1/ouRJkrio86qWfFpvLQZO/8wOoDNVCAzDhSrjHKk8LNsM467Mvo3RRUQbAW/mfY
+	Hl08RnaMZLYJ2bDu4WcfYyy3EWc6y+I3Mn6ce9eEftzMw1CycHyIP28hem8YyeqT2fwiPhdK6U8lA
+	dKGZbYZvjSxGs/3vStNQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glf6B-0004mc-1D; Mon, 21 Jan 2019 19:19:07 +0000
-Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
+	id 1glf9k-0006QR-HG; Mon, 21 Jan 2019 19:22:48 +0000
+Received: from mail-eopbgr40056.outbound.protection.outlook.com ([40.107.4.56]
+ helo=EUR03-DB5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glf67-0004mD-F0
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 19:19:05 +0000
-Received: by mail-it1-x143.google.com with SMTP id w18so17994297ite.1
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 11:19:03 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc:content-transfer-encoding;
- bh=tWkTW3k+bIMa8ZNbYJt7g6YWTX7Qi5IGP7maD32/94Y=;
- b=gRv8geTmTUA+7CBmtPOuabUbz8xyJC9hAd45Png5i8B6i/eKo4xe/DwNX5hjr3u9tg
- fUl2qucOfVw1Yujnp2sPnWPtOTYnvy6iFWdgLNfk+RQjfgxI0b/er+xiyM9dpYM+JA8M
- FQrs6ycbJRiIi6idbcbpBB/7b2r7okhbckZHU=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc:content-transfer-encoding;
- bh=tWkTW3k+bIMa8ZNbYJt7g6YWTX7Qi5IGP7maD32/94Y=;
- b=Cu97K+JQfm8fNoBXKq0TjgdDvDvL52h1Asj+49oCKRbn/kv3bLVLphjdLRnnVo9m5e
- nudg5fIfj9v71GWxXkoqVjYu2Zu4T3iQ2fkBdkZhVKO1rm8M4dWPtXr+isP1csT+KC+z
- RuBa/ymT+RQNb4tnDGXk8tqwbyEGUhrWorp8dQimJb/+VTf6ahRwIB4nsLhL3ouqnZs+
- ZL0NP0rr/cnCXiaifb+6pAm6Y8IKmYkWcK8fEGgMhjN0o1F4vqEXj/kmjuc5z4oZ0k4y
- b/vMA56gDyAuEy07TZA6Ggltq2K8uMwmHdruTBGH9TMQAfl1UG1m55sLKRqBywQ2CQpY
- HObA==
-X-Gm-Message-State: AJcUukegq0VQcGrBcv/KbvwesqOl4JKH/nSvLsYL8NL1wjJdY6+ZmjZx
- CWr6Bu/PeZnZMKt8gv+6DHpIdNQPQVUpD7xX7ptcNg==
-X-Google-Smtp-Source: AHgI3IaQ7V8HPG7/byRY7qZDpx0KwlvbP/JzgF9Zy0+0MAguhIlFyPtxf/9XSQUKrVWkg9APT3qNu/9KGFOCNDfu6To=
-X-Received: by 2002:a24:edc4:: with SMTP id r187mr495418ith.158.1548098342336; 
- Mon, 21 Jan 2019 11:19:02 -0800 (PST)
+ id 1glf9g-0006Q2-K9
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 19:22:46 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=Mellanox.com;
+ s=selector1;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=QbKnFUTEA9RElEoXsVoJ/FcNsFfpk9fL1OWMEdP2a+0=;
+ b=Rlp3dl07KX6XeCnzj/hIQOTL51XVqfarmILIAYfiYMgTiNhIxtsZduZ38B+tmAB1X+EP6p+GTWAquoJWYst08xq9zwoDZaGQZ1JkhldUlpcNqdzoAKi3vFs91RO6mNWepokfRF7KKWg23c1nyCS8ugjQ2JVrrifaLUTqGH69y4I=
+Received: from DB6PR05MB3223.eurprd05.prod.outlook.com (10.175.232.149) by
+ DB6PR05MB3461.eurprd05.prod.outlook.com (10.170.223.24) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1537.24; Mon, 21 Jan 2019 19:22:41 +0000
+Received: from DB6PR05MB3223.eurprd05.prod.outlook.com
+ ([fe80::d935:9a6c:c7a3:1320]) by DB6PR05MB3223.eurprd05.prod.outlook.com
+ ([fe80::d935:9a6c:c7a3:1320%2]) with mapi id 15.20.1537.031; Mon, 21 Jan 2019
+ 19:22:41 +0000
+From: Liming Sun <lsun@mellanox.com>
+To: Arnd Bergmann <arnd@arndb.de>
+Subject: RE: [PATCH v6 5/9] soc: mellanox: host: Add the common host side
+ Rshim driver
+Thread-Topic: [PATCH v6 5/9] soc: mellanox: host: Add the common host side
+ Rshim driver
+Thread-Index: AQHUcgMEWmkOtMRYOEe8dmJo8nndDKW1ql2AgASf0nA=
+Date: Mon, 21 Jan 2019 19:22:41 +0000
+Message-ID: <DB6PR05MB32233FF89600716711441C04A19F0@DB6PR05MB3223.eurprd05.prod.outlook.com>
+References: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
+ <1541089538-175682-1-git-send-email-lsun@mellanox.com>
+ <1541089538-175682-5-git-send-email-lsun@mellanox.com>
+ <CAK8P3a2NRbEaS_EJNtBaZ3GCUtRiH2rUDRzJFjvcw2ZacZM1qw@mail.gmail.com>
+In-Reply-To: <CAK8P3a2NRbEaS_EJNtBaZ3GCUtRiH2rUDRzJFjvcw2ZacZM1qw@mail.gmail.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=lsun@mellanox.com; 
+x-originating-ip: [216.156.69.42]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; DB6PR05MB3461;
+ 6:DOhumki9ZAur9SKpHcy6sKep8NEs0klcqaouU+puA1mScNOrtWRQSxekF/BpVJfSQgVE5RJI2X5gesgXzVOGKErMZOineQlNHXieQwqNyEx2LtfJDIip2pRhJfNGT9gDkC45Dyahw03H5nLmZqIXQOakYz3S4r4SG9+m7qYgljk/cy/h94Gm9PrBbm6XrVCP45wVDYTubOsbSgTasDl+Jz9ljkYAUzCipdz6rZGjMyCeg10aapBdSamXrxuh9ygN0VM27ZsHXDeVAiEAE69T4vVBwpWn5hfL656sQGdWRMVXkomBWzgVhEt11laV3145w8Oi/P8pFu7LZ83Qhcg7SmWbtZqVmEPFj4x1rdFpdHwV03phxvtiyzGFWEvfN4vXg4/0XcqZdND+ZwtSot6NG+Rz7bTwTT/DHY/VJkVimOzultLMfQB2g/QRxT7w2yO7OjJU7f00UN4WzpMgQAJEjg==;
+ 5:Ck/GJNY8Mz14rOSPStz+CM9W7hgwY+S1pxLJKJJp8dX3nosrFaq5ksnjLQoiDqlpF4zuDiEC446+Txfg4yFQmQBle3k+GL5DPyVK/5Wy7OQVTYvgEJX5ayapSItezpWY+aLYObTaSkc0aOPycZdBOELcXN2Sw1XUZ3keEeuK0ptjGbDIcER5LvJeXcPxQdCp3gCMXNMm+MGEVC+YuW3vrg==;
+ 7:Zyb/lVWWdENfKZDjyJH/303RZWROtogrCtvwSVhKAPMcpEcenDjj2tO/iF0TElEadyX75gqPWz/Y8mgAgT+CqKUBp6kJ8Tf904SHfIr7XixpNlG5Bevgq2E5K3dZ+5xhwH10sWazQFLrb8JM/8X2WA==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: bf79ac90-ac69-4c3f-354e-08d67fd5d01c
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(5600109)(711020)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:DB6PR05MB3461; 
+x-ms-traffictypediagnostic: DB6PR05MB3461:
+x-microsoft-antispam-prvs: <DB6PR05MB34619B09B8E16F4920D931A0A19F0@DB6PR05MB3461.eurprd05.prod.outlook.com>
+x-forefront-prvs: 0924C6A0D5
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(396003)(39860400002)(136003)(376002)(346002)(366004)(13464003)(189003)(199004)(7696005)(86362001)(55016002)(446003)(486006)(4326008)(74316002)(9686003)(6916009)(33656002)(229853002)(25786009)(476003)(6436002)(2906002)(11346002)(71200400001)(71190400001)(97736004)(6116002)(3846002)(316002)(99286004)(68736007)(53546011)(7736002)(54906003)(478600001)(305945005)(6506007)(76176011)(102836004)(14444005)(256004)(93886005)(186003)(81166006)(7416002)(53936002)(105586002)(66066001)(26005)(14454004)(6246003)(81156014)(106356001)(8676002)(8936002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DB6PR05MB3461;
+ H:DB6PR05MB3223.eurprd05.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: mellanox.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: MkvCh3CI4SAHbZqv66xacflpxHdu9R4+G4cMxj5375LQFX7Pv9aLUWape7xsQZp/WlFEYFFabvp/JI6Skg5zOlKb6zW77s+0Ev/1ybE3s0ETqz89EjTpyDDLvpwrz4K/Vn0dbNmrwP/w7UAfk5mo7RvR5c/2e8GEM9QYD+dWB51RyIP1Xe9qk8rzEOWTIgOF2mcPk5Ol6/raDRShCevTByRtFdzbN3T3ZpG+hZAdVBDASsTQ6wLLDIvb9ksJOOtgbUeUiQ9xHRU2kshQchUsk3a97wVQNFngG2z+9AHTl9bFvHu4LVclZsGXV2jVwoM+neKkz7Hzrg0zhOrRfiXdoHqtO64iz4swT+ZRXvT1AmKt8DZBFo3FYV+1Irbt3IgR93OHLoutXTBHLBgueWU0e0OzKCsqdSoBDlRAtV9JvO8=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-References: <20190121100617.2311-1-ard.biesheuvel@linaro.org>
- <20190121150734.GA30582@infradead.org>
- <CAKv+Gu-hR=uieOeg7QheA5yfAycUoi2vjZsDUvROKVjW4eUNqw@mail.gmail.com>
- <20190121155908.GA8084@infradead.org>
- <CAKv+Gu8LzS9OgvVnzUT8BZWVgDmx4OfqNiPSf+8=riY_LByN-g@mail.gmail.com>
- <20190121162238.GA17651@infradead.org>
- <CAKv+Gu-5V-UjP_YzZBCEsa+o_G6BRSVw2ZimYGNEfRGf-aRPNg@mail.gmail.com>
- <59ccf85d-b99d-b5c8-ea87-66c2a892e197@daenzer.net>
- <CAKv+Gu8OkbHwY5UBxahpQpM_gKh2331pQ6o-4YyJdLurbFNHvw@mail.gmail.com>
- <ccc775d3-3053-ab79-dac8-4feb28e8e690@daenzer.net>
- <CAKv+Gu-9VKL5RjScbKss4YfH1Cb8WbXmzU_0UsStnoXJcML7Rg@mail.gmail.com>
- <850b6aee-0040-c333-b125-45211c18ada5@daenzer.net>
- <CAKv+Gu99zHqcQtj6TiOXAr3Qa6WWhKem+DHVA_mAQ0-Bc0Vbqw@mail.gmail.com>
- <047667fd-17be-1c37-5d2a-26768cfd6ab8@daenzer.net>
-In-Reply-To: <047667fd-17be-1c37-5d2a-26768cfd6ab8@daenzer.net>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Mon, 21 Jan 2019 20:18:51 +0100
-Message-ID: <CAKv+Gu-gaZpKqyLt9Vft2e_zS4Xkc9+8HAYoHvuBo5C0hqL2Qw@mail.gmail.com>
-Subject: Re: [RFC PATCH] drm: disable WC optimization for cache coherent
- devices on non-x86
-To: =?UTF-8?Q?Michel_D=C3=A4nzer?= <michel@daenzer.net>
+X-OriginatorOrg: Mellanox.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: bf79ac90-ac69-4c3f-354e-08d67fd5d01c
+X-MS-Exchange-CrossTenant-originalarrivaltime: 21 Jan 2019 19:22:41.4837 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: a652971c-7d2e-4d9b-a6a4-d149256f461b
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB6PR05MB3461
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_111903_499509_BEBC13A7 
-X-CRM114-Status: GOOD (  26.47  )
+X-CRM114-CacheID: sfid-20190121_112244_714848_3592EF17 
+X-CRM114-Status: GOOD (  38.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,106 +119,156 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: David Zhou <David1.Zhou@amd.com>,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- Benjamin Herrenschmidt <benh@kernel.crashing.org>,
- Will Deacon <will.deacon@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- amd-gfx@lists.freedesktop.org, Christoph Hellwig <hch@infradead.org>,
- David Airlie <airlied@linux.ie>, Huang Rui <ray.huang@amd.com>,
- dri-devel <dri-devel@lists.freedesktop.org>, Daniel Vetter <daniel@ffwll.ch>,
- Michael Ellerman <mpe@ellerman.id.au>, Junwei Zhang <Jerry.Zhang@amd.com>,
- Alex Deucher <alexander.deucher@amd.com>, Sean Paul <sean@poorly.run>,
- Christian Koenig <christian.koenig@amd.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: DTML <devicetree@vger.kernel.org>, David Woods <dwoods@mellanox.com>,
+ linux-pci <linux-pci@vger.kernel.org>,
+ Vincent Whitchurch <vincent.whitchurch@axis.com>, arm-soc <arm@kernel.org>,
+ Olof Johansson <olof@lixom.net>,
+ "linux-ntb@googlegroups.com" <linux-ntb@googlegroups.com>,
+ Robin Murphy <robin.murphy@arm.com>, Christoph Hellwig <hch@lst.de>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gTW9uLCAyMSBKYW4gMjAxOSBhdCAyMDowNCwgTWljaGVsIETDpG56ZXIgPG1pY2hlbEBkYWVu
-emVyLm5ldD4gd3JvdGU6Cj4KPiBPbiAyMDE5LTAxLTIxIDc6MjggcC5tLiwgQXJkIEJpZXNoZXV2
-ZWwgd3JvdGU6Cj4gPiBPbiBNb24sIDIxIEphbiAyMDE5IGF0IDE5OjI0LCBNaWNoZWwgRMOkbnpl
-ciA8bWljaGVsQGRhZW56ZXIubmV0PiB3cm90ZToKPiA+PiBPbiAyMDE5LTAxLTIxIDc6MjAgcC5t
-LiwgQXJkIEJpZXNoZXV2ZWwgd3JvdGU6Cj4gPj4+IE9uIE1vbiwgMjEgSmFuIDIwMTkgYXQgMTk6
-MDQsIE1pY2hlbCBEw6RuemVyIDxtaWNoZWxAZGFlbnplci5uZXQ+IHdyb3RlOgo+ID4+Pj4gT24g
-MjAxOS0wMS0yMSA2OjU5IHAubS4sIEFyZCBCaWVzaGV1dmVsIHdyb3RlOgo+ID4+Pj4+IE9uIE1v
-biwgMjEgSmFuIDIwMTkgYXQgMTg6NTUsIE1pY2hlbCBEw6RuemVyIDxtaWNoZWxAZGFlbnplci5u
-ZXQ+IHdyb3RlOgo+ID4+Pj4+PiBPbiAyMDE5LTAxLTIxIDU6MzAgcC5tLiwgQXJkIEJpZXNoZXV2
-ZWwgd3JvdGU6Cj4gPj4+Pj4+PiBPbiBNb24sIDIxIEphbiAyMDE5IGF0IDE3OjIyLCBDaHJpc3Rv
-cGggSGVsbHdpZyA8aGNoQGluZnJhZGVhZC5vcmc+IHdyb3RlOgo+ID4+Pj4+Pj4KPiA+Pj4+Pj4+
-PiBVbnRpbCB0aGF0IGhhcHBlbnMgd2Ugc2hvdWxkIGp1c3QgY2hhbmdlIHRoZSBkcml2ZXIgaWZk
-ZWZzIHRvIGRlZmF1bHQKPiA+Pj4+Pj4+PiB0aGUgaGFja3MgdG8gb2ZmIGFuZCBvbmx5IGVuYWJs
-ZSB0aGVtIG9uIHNldHVwcyB3aGVyZSB3ZSAxMDAlCj4gPj4+Pj4+Pj4gcG9zaXRpdmVseSBrbm93
-IHRoYXQgdGhleSBhY3R1YWxseSB3b3JrLiAgQW5kIGRvY3VtZW50IHRoYXQgZmFjdAo+ID4+Pj4+
-Pj4+IGluIGJpZyBmYXQgY29tbWVudHMuCj4gPj4+Pj4+Pgo+ID4+Pj4+Pj4gV2VsbCwgYXMgSSBt
-ZW50aW9uZWQgaW4gbXkgY29tbWl0IGxvZyBhcyB3ZWxsLCBpZiB3ZSBkZWZhdWx0IHRvIG9mZgo+
-ID4+Pj4+Pj4gdW5sZXNzIENPTkZJR19YODYsIHdlIG1heSBicmVhayB3b3JraW5nIHNldHVwcyBv
-biBNSVBTIGFuZCBQb3dlciB3aGVyZQo+ID4+Pj4+Pj4gdGhlIGRldmljZSBpcyBpbiBmYWN0IG5v
-bi1jYWNoZSBjb2hlcmVudCwgYW5kIHJlbGllcyBvbiB0aGlzCj4gPj4+Pj4+PiAnb3B0aW1pemF0
-aW9uJyB0byBnZXQgdGhpbmdzIHdvcmtpbmcuCj4gPj4+Pj4+Cj4gPj4+Pj4+IEZXSVcsIHRoZSBh
-bWRncHUgZHJpdmVyIGRvZXNuJ3QgcmVseSBvbiBub24tc25vb3BlZCB0cmFuc2ZlcnMgZm9yCj4g
-Pj4+Pj4+IGNvcnJlY3QgYmFzaWMgb3BlcmF0aW9uICh0aGUgc2NlbmFyaW8gQ2hyaXN0aWFuIGJy
-b3VnaHQgdXAgaXMgYSB2ZXJ5Cj4gPj4+Pj4+IHNwZWNpYWxpemVkIHVzZS1jYXNlKSwgc28gdGhh
-dCBzaG91bGRuJ3QgYmUgYW4gaXNzdWUuCj4gPj4+Pj4KPiA+Pj4+PiBUaGUgcG9pbnQgaXMgdGhh
-dCB0aGlzIGlzIG9ubHkgdHJ1ZSBmb3IgeDg2Lgo+ID4+Pj4+Cj4gPj4+Pj4gT24gb3RoZXIgYXJj
-aGl0ZWN0dXJlcywgdGhlIHVzZSBvZiBub24tY2FjaGVkIG1hcHBpbmdzIG9uIHRoZSBDUFUgc2lk
-ZQo+ID4+Pj4+IG1lYW5zIHRoYXQgeW91IC9kby8gcmVseSBvbiBub24tc25vb3BlZCB0cmFuc2Zl
-cnMsIHNpbmNlIGlmIHRob3NlCj4gPj4+Pj4gdHJhbnNmZXJzIHR1cm4gb3V0IG5vdCB0byBzbm9v
-cCBpbmFkdmVydGVudGx5LCB0aGUgYWNjZXNzZXMgYXJlCj4gPj4+Pj4gaW5jb2hlcmVudCB3aXRo
-IHRoZSBDUFUncyB2aWV3IG9mIG1lbW9yeS4KPiA+Pj4+Cj4gPj4+PiBUaGUgZHJpdmVyIGdlbmVy
-YWxseSBvbmx5IHVzZXMgbm9uLWNhY2hlZCBtYXBwaW5ncyBpZgo+ID4+Pj4gZHJtX2FyY2gvZGV2
-aWNlX2Nhbl93Y19tZW1vcnkgcmV0dXJucyB0cnVlLgo+ID4+Pgo+ID4+PiBJbmRlZWQuIEFuZCBz
-byB3ZSBzaG91bGQgdGFrZSBjYXJlIHRvIG9ubHkgcmV0dXJuICd0cnVlJyBmcm9tIHRoYXQKPiA+
-Pj4gZnVuY3Rpb24gaWYgaXQgaXMgZ3VhcmFudGVlZCB0aGF0IG5vbi1jYWNoZWQgQ1BVIG1hcHBp
-bmdzIGFyZSBjb2hlcmVudAo+ID4+PiB3aXRoIHRoZSBtYXBwaW5ncyB1c2VkIGJ5IHRoZSBHUFUs
-IGVpdGhlciBiZWNhdXNlIHRoYXQgaXMgYWx3YXlzIHRoZQo+ID4+PiBjYXNlIChsaWtlIG9uIHg4
-NiksIG9yIGJlY2F1c2Ugd2Uga25vdyB0aGF0IHRoZSBwbGF0Zm9ybSBpbiBxdWVzdGlvbgo+ID4+
-PiBpbXBsZW1lbnRzIE5vU25vb3AgY29ycmVjdGx5IHRocm91Z2hvdXQgdGhlIGludGVyY29ubmVj
-dC4KPiA+Pj4KPiA+Pj4gV2hhdCBzZWVtcyB0byBiZSBjb21wbGljYXRpbmcgbWF0dGVycyBpcyB0
-aGF0IGluIHNvbWUgY2FzZXMsIHRoZQo+ID4+PiBkZXZpY2UgaXMgbm9uLWNhY2hlIGNvaGVyZW50
-IHRvIGJlZ2luIHdpdGgsIHNvIHJlZ2FyZGxlc3Mgb2Ygd2hldGhlcgo+ID4+PiB0aGUgTm9Tbm9v
-cCBhdHRyaWJ1dGUgaXMgdXNlZCBvciBub3QsIHRob3NlIGFjY2Vzc2VzIHdpbGwgbm90IHNub29w
-IGluCj4gPj4+IHRoZSBjYWNoZXMgYW5kIGJlIGNvaGVyZW50IHdpdGggdGhlIG5vbi1jYWNoZWQg
-bWFwcGluZ3MgdXNlZCBieSB0aGUKPiA+Pj4gQ1BVLiBTbyBpZiB3ZSByZXN0cmljdCB0aGlzIG9w
-dGltaXphdGlvbiBbb24gbm9uLVg4Nl0gdG8gcGxhdGZvcm1zCj4gPj4+IHRoYXQgYXJlIGtub3du
-IHRvIGltcGxlbWVudCBOb1Nub29wIGNvcnJlY3RseSwgd2UgbWF5IGJyZWFrIHBsYXRmb3Jtcwo+
-ID4+PiB0aGF0IGFyZSBpbXBsaWNpdGx5IE5vU25vb3AgYWxsIHRoZSB0aW1lLgo+ID4+Cj4gPj4g
-U2luY2UgdGhlIGRyaXZlciBnZW5lcmFsbHkgZG9lc24ndCByZWx5IG9uIG5vbi1zbm9vcGVkIGFj
-Y2Vzc2VzIGZvcgo+ID4+IGNvcnJlY3RuZXNzLCB0aGF0IGNvdWxkbid0ICJicmVhayIgYW55dGhp
-bmcgdGhhdCBoYXNuJ3QgYWx3YXlzIGJlZW4gYnJva2VuLgo+ID4KPiA+IEFnYWluLCB0aGF0IGlz
-IG9ubHkgdHJ1ZSBvbiB4ODYuCj4gPgo+ID4gT24gb3RoZXIgYXJjaGl0ZWN0dXJlcywgRE1BIHdy
-aXRlcyBmcm9tIHRoZSBkZXZpY2UgbWF5IGFsbG9jYXRlIGluIHRoZQo+ID4gY2FjaGVzLCBhbmQg
-YmUgaW52aXNpYmxlIHRvIHRoZSBDUFUgd2hlbiBpdCB1c2VzIG5vbi1jYWNoZWQgbWFwcGluZ3Mu
-Cj4KPiBMZXQgbWUgdHJ5IG9uZSBsYXN0IHRpbWU6Cj4KCkkgY291bGQgc2F5IHRoZSBzYW1lIDot
-KQoKPiBJZiBkcm1fYXJjaF9jYW5fd2NfbWVtb3J5IHJldHVybnMgZmFsc2UsIHRoZSBkcml2ZXIg
-ZmFsbHMgYmFjayB0byB0aGUKPiBub3JtYWwgbW9kZSBvZiBvcGVyYXRpb24sIHVzaW5nIGEgY2Fj
-aGVhYmxlIENQVSBtYXBwaW5nIGFuZCBzbm9vcGVkIEdQVQo+IHRyYW5zZmVycywgZXZlbiBpZiB1
-c2Vyc3BhY2UgYXNrcyAoYXMgYSBwZXJmb3JtYW5jZSBvcHRpbWl6YXRpb24pIGZvciBhCj4gd3Jp
-dGUtY29tYmluZWQgQ1BVIG1hcHBpbmcgYW5kIG5vbi1zbm9vcGVkIEdQVSB0cmFuc2ZlcnMgdmlh
-Cj4gQU1ER1BVX0dFTV9DUkVBVEVfQ1BVX0dUVF9VU1dDLgoKSSBhbSBub3QgdGFsa2luZyBhYm91
-dCB0aGUgY2FzZSB3aGVyZSBkcm1fYXJjaF9jYW5fd2NfbWVtb3J5KCkgcmV0dXJucyBmYWxzZS4K
-CkkgYW0gdGFsa2luZyBhYm91dCB0aGUgY2FzZSB3aGVyZSBpdCByZXR1cm5zIHRydWUsIHdoaWNo
-IGlzIGN1cnJlbnRseQp0aGUgZGVmYXVsdCBmb3IgYWxsIGFyY2hpdGVjdHVyZXMsIGV4Y2VwdCBQ
-b3dlciBhbmQgTUlQUyBpbiBzb21lCmNhc2VzLgoKVGhpcyBtb2RlIG9mIG9wZXJhdGlvbiBicmVh
-a3MgbXkgY2FjaGUgY29oZXJlbnQgYXJtNjQgc3lzdGVtLiAoQU1EIFNlYXR0bGUpCldpdGggdGhp
-cyBwYXRjaCBhcHBsaWVkLCBldmVyeXRoaW5nIHdvcmtzIGZpbmUuCgo+IFRoaXMgbm9ybWFsIG1v
-ZGUgb2Ygb3BlcmF0aW9uIGlzIGFsc28KPiB1c2VkIGZvciB0aGUgcmluZyBidWZmZXJzIGF0IHRo
-ZSBoZWFydCBvZiB0aGUgZHJpdmVyJ3Mgb3BlcmF0aW9uLgoKQnV0IGlzIGl0IHJlYWxseSB0aGUg
-c2FtZSBtb2RlIG9mIG9wZXJhdGlvbj8gRG9lcyBpdCBhbHNvIHZtYXAoKSB0aGUKcGFnZXM/IE9y
-IGRvZXMgaXQgdXNlIHRoZSBETUEgQVBJIHRvIGFsbG9jYXRlIHRoZSByaW5nIGJ1ZmZlcnM/CkJl
-Y2F1c2UgaW4gdGhlIGxhdHRlciBjYXNlLCB0aGlzIHdpbGwgZ2l2ZSB5b3Ugbm9uLWNhY2hlZCBD
-UFUgbWFwcGluZ3MKYXMgd2VsbCBpZiB0aGUgZGV2aWNlIGlzIG5vbi1jYWNoZSBjb2hlcmVudC4K
-Cj4gSWYKPiB0aGVyZSBpcyBhIHBsYXRmb3JtIHdoZXJlIHRoaXMgbm9ybWFsIG1vZGUgb2Ygb3Bl
-cmF0aW9uIGRvZXNuJ3Qgd29yaywKPiB0aGUgZHJpdmVyIGNvdWxkIG5ldmVyIGhhdmUgd29ya2Vk
-IHJlbGlhYmx5IG9uIHRoYXQgcGxhdGZvcm0sIHNpbmNlCj4gYmVmb3JlIEFNREdQVV9HRU1fQ1JF
-QVRFX0NQVV9HVFRfVVNXQyBvciBkcm1fYXJjaF9jYW5fd2NfbWVtb3J5IGV2ZW4KPiBleGlzdGVk
-Lgo+CgpBcyBJIHNhaWQsIEkgYW0gdGFsa2luZyBhYm91dCB0aGUgY2FzZSB3aGVyZSBkcm1fYXJj
-aF9jYW5fd2NfbWVtb3J5KCkKcmV0dXJucyB0cnVlIG9uIGEgY2FjaGUgY29oZXJlbnQgc3lzdGVt
-LiBUaGlzIHJlbGllcyBvbiBOb1Nub29wIGJlaW5nCmltcGxlbWVudGVkIGNvcnJlY3RseSBpbiB0
-aGUgcGxhdGZvcm0sIG9yIGEgQ1BVIGFyY2hpdGVjdHVyZSB0aGF0CnNub29wcyB0aGUgY2FjaGVz
-IHdoZW4gZG9pbmcgdW5jYWNoZWQgbWVtb3J5IGFjY2Vzc2VzIChzdWNoIGFzIHg4NikKCl9fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJu
-ZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRw
-Oi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+Thanks Arnd for the comments. The 0/9 email was sent out just now to
+add more details about the design and changes. Please also see my response
+below.
+
+- Liming
+
+> -----Original Message-----
+> From: Arnd Bergmann <arnd@arndb.de>
+> Sent: Friday, January 18, 2019 11:02 AM
+> To: Liming Sun <lsun@mellanox.com>
+> Cc: Olof Johansson <olof@lixom.net>; David Woods <dwoods@mellanox.com>; Robin Murphy <robin.murphy@arm.com>; arm-soc
+> <arm@kernel.org>; DTML <devicetree@vger.kernel.org>; Linux ARM <linux-arm-kernel@lists.infradead.org>; Vincent Whitchurch
+> <vincent.whitchurch@axis.com>; linux-pci <linux-pci@vger.kernel.org>; linux-ntb@googlegroups.com; Christoph Hellwig <hch@lst.de>
+> Subject: Re: [PATCH v6 5/9] soc: mellanox: host: Add the common host side Rshim driver
+> 
+> On Thu, Nov 1, 2018 at 5:49 PM Liming Sun <lsun@mellanox.com> wrote:
+> >
+> > An external host can connect to a Mellanox BlueField SoC via an
+> > interface called Rshim. The Rshim driver provides boot, console,
+> > and networking services over this interface. This commit is
+> > the common driver where the other backend (transport) driver will
+> > use.
+> >
+> > Reviewed-by: David Woods <dwoods@mellanox.com>
+> > Signed-off-by: Liming Sun <lsun@mellanox.com>
+> 
+> Hi Liming,
+> 
+> I've taken a new look at your patch series for drivers/soc/ now,
+> thanks for your continued submissions.
+> 
+> This is again just a set of very high-level comments, but I think we
+> should resolve some of the fundamental questions first.
+> Incidentally, Vincent Whitchurch has recently posted another
+> patch series with a very similar intention, but for other hardware
+> and taking a different approach.
+> 
+> In both cases, the idea is to use virtio based drivers to provide
+> services from a host machine into another Linux instance running
+> on an embedded system behind a PCIe slot or similar. Your
+> Bluefield SoC patches are well written, but are intentionally
+> kept specific to a particular use case and tied to one piece
+> of hardware. In contrast, Vincent uses the existing code from
+> drivers/misc/mic/vop/ that is equally hardware specific, but he
+> extends it to be applicable to other hardware as well.
+> 
+> It would be good if you could look at each other's approaches
+> to see where we could take it from here. I think ideally we
+> should have a common driver framework for doing the same
+> thing across both of your devices and as well as others.
+
+Yes, I checked drivers/misc/mic/vop and Vincent Whitchurch's patches 
+(Virtio-over-PCIe on non-MIC) and related comments. I kind of feel 
+that besides the common virtio infrastructure, there seems not much
+to be reused in the rest of implementation yet, though they are trying
+to do the similar things.  (Feel free to correct me if I misunderstood it.)
+
+I just submitted the patch 0/9 to explain some details of the rshim
+component and the driver patches. Could you help take a look?
+
+The rshim driver of BlueField SoC has a few more functionalities 
+which are very HW-specific. Some needs driver support from both 
+ARM target and the external host, some only needs external host 
+driver support.
+
+As for common framework, we used to implement the drivers based on
+the remote proc (Documentation/remoteproc.txt), which seems more
+close to what we wanted (in my humble opinion). Later due to more 
+functionalities to add and the lack of remote proc in old kernels, we 
+changed to use virtio framework directly, which seems very helpful and
+saved quite some driver work.
+
+> 
+> That would also resolve my main concern about the drivers,
+> which is the placement in drivers/soc/ for a set of drivers
+> that are unlike most drivers in that directory not mean for
+> running on the SoC itself in order drive unusual functionality
+> on the SoC, but are (at least partially) meant for running on
+> a host machine to communicate with that SoC over PCIe
+> or USB.
+> 
+> As an example, your network driver should really be placed
+> in drivers/net/, though it is unclear to me how it relates
+> to the existing virtio_net driver. In the case of mic/vop,
+> the idea is to use virtio_net on the device side, but have
+> vhost_net or a user space implementation on the host side,
+> but that is apparently not what you do here. Can you
+> explain why?
+
+Yes, I actually have the same concerns where the host side
+drivers should go.  For now ther're just added for code review
+purpose. drivers/soc/ seems not a good place. One thought
+is to move the rshim_net, rshim_pcie and rshim_pcie_lf backend
+driver to drivers/net/ethernet/Mellanox/rshim/ and move the
+rshim common driver to drivers/char as it creates the character
+devices?
+
+The device side of this patch uses the virtio_net driver as well. 
+
+The host side is not just for networking, which was mentioned 
+in the 0/9 patch. The host side driver manages the whole rshim
+component and is called the 'rshim' driver. It includes driver
+to access the TmFifo, where virtio_net is used to provide 
+networking support. It needs to talk to the common
+driver then the USB or PCIe backend driver.  It seems to me that
+vhost_net doesn't quite fit this model and might make it 
+over-complicated.
+
+> 
+> Another high-level question I have is on how your various
+> drivers relate to one another. This should normally be
+> explained in the 0/9 email, but I don't seem to have received
+> such a mail. I see that you have multiple back-end drivers
+> for the underlying transport, with one of them based on USB.
+> Have you come up with a way to use the same high-level
+> driver such as the network link over this USB back-end,
+> or is this for something else?
+
+Yes, 0/9 has been sent. Sorry I should have provided since beginning.
+
+The USB (or PCIe) provide the general transport to access the RShim
+component, for networking, console, register access, boot service,
+etc. So it's not just for network link. The implementation seems very
+HW specific, such as providing APIs like rshim_usb_read_rshim()
+and rshim_usb_write_rshim(). In PCIe backend it has similar APIs
+like rshim_pcie_read(), rshim_pcie_write().
+
+Not very clear about what you meant the " the same high-level driver 
+such as the network link over this USB back-end". Do you mean using
+any existing network over USB framework or provide some mechanism
+to be reused by other network over USB driver?
+
+By the way, the 0/9 has been sent. Could you help take a look whether 
+it clarifies a little bit or not?
+
+> 
+>       Arnd
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
