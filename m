@@ -2,21 +2,22 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 32214C2F3D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 14:18:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AF5DDC2F3A0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 14:21:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0478820861
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 14:18:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 77C6F20861
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 14:21:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ukQdImZd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0478820861
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZwZWAtlk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 77C6F20861
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,55 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=CQE/udSvB06GSeGOW3lil/tpmYx9pdoPa2EL/FTuGVA=; b=ukQdImZdXjBdK2
-	AabYh9PJTUBLYsqJsw3DLephp3Y6cnAh/JSmDEK42Hzbtxm9IgGsif8xE8dJEKX/+v8yeJv8HwTFM
-	BfZlh++Pxm/LhogLtjVXLv9YKfj8EBy8TMeCPjsmU+dnbx03t9LH+t5GKJ2P+iAzDrQO4ZWgMaJeZ
-	hd6FlbzX09rBTATb3DDTHHWIwkHYSUwn/Jy3K630yRJ2eJCf+TgkrWhSjcZ3+SAMMEg0kMoeXhHEs
-	4jRtVC7Sx3CeLo1uQaa6kRP0xzm6Fr1HwyyxVVSrvA1JR3TtihTKDNidS3gIVhXmgehXqg40UF3Nw
-	yi9O5Afyttcu8kGhmMqg==;
+	List-Owner; bh=jA+Vz7AHXrM9jAML+zPXMbu8SsfgmCvfNuUswWPT/Vg=; b=ZwZWAtlkndZuwU
+	twCt3FJY+qvwC0b/Ziqpg/eJ5EYk3XxUhIO7M2vwkwFySmkxB20yM/x3vysgc06t1nTalLd9EH/kX
+	1BYdIQY7yJhAPUfdkiCma2zBeIu+WAI0wMjP6KhMa+jIRjE1BQCl28L7UZjZoiUwo4jemC2r16chN
+	lih3KJBp0zHaB48DQA2Ah+nG778WzT7aPjTTwkQ8odhTREuyeym4kRggokOr8wGilvbGUoaiBNbSm
+	EEJMMJYcNti0IBgoF4sN4EXyOoQBYyTBdZ9+l/WOEg4qatigx4hlQuZF5FXBeulz5Pv7AEaRIoYfq
+	wKMldgdqhV0fF7UTzxZw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glaPB-0006EI-BO; Mon, 21 Jan 2019 14:18:25 +0000
-Received: from mail-oi1-f195.google.com ([209.85.167.195])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glaP6-0006DF-RZ; Mon, 21 Jan 2019 14:18:24 +0000
-Received: by mail-oi1-f195.google.com with SMTP id m6so14618144oig.11;
- Mon, 21 Jan 2019 06:18:18 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=OvUHUMbMfZNovD6rICuVB0Zp+DaCsmoZ/tqxPoP4GMg=;
- b=lifsnWhM6ezIM1IItu70y21L7tj9D+Z2tIngE7oBJyQmOmzrZZFp0kpvkPyP7pDIGM
- C7KyAhB0rPudDPH/gXpHMUCfFCJILPzutxP+Z9AipZCcGPVauOYTvjqxHwQqzgkh/1t6
- 9uVo/JCt6tTgexJdAr++MFCMh8eHJtmf1QuV7evkbEIXMzy2bjZ9L+koApdX/NqhnHp2
- IyGwxcLqOox8OrhiriuxXnXKkZB4Pze7lyBaMwKiGLO1cBxG/LFMbtL5+ahj11HhbUEz
- eUgusoWfXv2H3PUY3lrcjzPhGb5WNS9+CQ07qliCYguHxWYzsF9y11590eXZPCovcSMv
- K1kw==
-X-Gm-Message-State: AJcUukfwuaHzAoSOmz2OUam/WNrZq9rJJsvQ9V5KaH7xci+qUfx5Rk6p
- V/U+DUcqDIfdtmdQcr2IEA==
-X-Google-Smtp-Source: ALg8bN72treqidZ7nfLMCjoeyZCbGvMfwPXQqxDxN4DSHCZSwSlZAbKwMPwb0lC/QHp3gUhB+9Udgw==
-X-Received: by 2002:aca:e386:: with SMTP id a128mr5477048oih.79.1548080297415; 
- Mon, 21 Jan 2019 06:18:17 -0800 (PST)
-Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
- [24.155.109.49])
- by smtp.gmail.com with ESMTPSA id b128sm6378833oif.7.2019.01.21.06.18.16
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 21 Jan 2019 06:18:16 -0800 (PST)
-Date: Mon, 21 Jan 2019 08:18:16 -0600
-From: Rob Herring <robh@kernel.org>
-To: Long Cheng <long.cheng@mediatek.com>
-Subject: Re: [PATCH v10 3/3] dt-bindings: dma: uart: rename binding
-Message-ID: <20190121141816.GA18109@bogus>
-References: <1547781016-890-1-git-send-email-long.cheng@mediatek.com>
- <1547781016-890-4-git-send-email-long.cheng@mediatek.com>
+	id 1glaSH-0007yV-F1; Mon, 21 Jan 2019 14:21:37 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glaSE-0007xj-EY
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 14:21:35 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id BDB38EBD;
+ Mon, 21 Jan 2019 06:21:31 -0800 (PST)
+Received: from arrakis.emea.arm.com (arrakis.cambridge.arm.com [10.1.196.113])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ 8A3363F5C1; Mon, 21 Jan 2019 06:21:30 -0800 (PST)
+Date: Mon, 21 Jan 2019 14:21:28 +0000
+From: Catalin Marinas <catalin.marinas@arm.com>
+To: Will Deacon <will.deacon@arm.com>
+Subject: Re: [Qestion] Softlockup when send IPI to other CPUs
+Message-ID: <20190121142127.GD29504@arrakis.emea.arm.com>
+References: <95C141B25E7AB14BA042DCCC556C0E6501620A47@dggeml529-mbx.china.huawei.com>
+ <20190119235825.GG26876@brain-police>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1547781016-890-4-git-send-email-long.cheng@mediatek.com>
+In-Reply-To: <20190119235825.GG26876@brain-police>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_061820_890208_3E4A4E20 
-X-CRM114-Status: GOOD (  10.82  )
+X-CRM114-CacheID: sfid-20190121_062134_500692_0EFC291A 
+X-CRM114-Status: GOOD (  30.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,38 +70,160 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Sean Wang <sean.wang@kernel.org>,
- Zhenbao Liu <zhenbao.liu@mediatek.com>,
- Nicolas Boichat <drinkcat@chromium.org>, Long Cheng <long.cheng@mediatek.com>,
- linux-serial@vger.kernel.org, Jiri Slaby <jslaby@suse.com>,
- YT Shen <yt.shen@mediatek.com>, Yingjoe Chen <yingjoe.chen@mediatek.com>,
- devicetree@vger.kernel.org, Sean Wang <sean.wang@mediatek.com>,
- Ryder Lee <ryder.lee@mediatek.com>, linux-mediatek@lists.infradead.org,
- Matthias Brugger <matthias.bgg@gmail.com>,
- Dan Williams <dan.j.williams@intel.com>, linux-arm-kernel@lists.infradead.org,
- srv_heupstream@mediatek.com, Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Randy Dunlap <rdunlap@infradead.org>, linux-kernel@vger.kernel.org,
- Vinod Koul <vkoul@kernel.org>, Rob Herring <robh+dt@kernel.org>,
- dmaengine@vger.kernel.org
+Cc: "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>,
+ "Wangkefeng \(Kevin\)" <wangkefeng.wang@huawei.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ chenwandun <chenwandun@huawei.com>, anshuman.khandual@arm.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 18 Jan 2019 11:10:16 +0800, Long Cheng wrote:
-> The filename matches mtk-uart-apdma.c.
-> So using "mtk-uart-apdma.txt" should be better.
+On Sat, Jan 19, 2019 at 11:58:27PM +0000, Will Deacon wrote:
+> On Thu, Jan 17, 2019 at 07:42:44AM +0000, chenwandun wrote:
+> > Recently, I do some tests on linux-4.19 and hit a softlockup issue.
+> > 
+> > I find some CPUs get the spinlock in the __split_huge_pmd function and
+> > then send IPI to other CPUs, waiting the response, while several CPUs
+> > enter the __split_huge_pmd function, want to get the spinlock, but always
+> > in queued_spin_lock_slowpath,
+> > 
+> > Because long time no response to the IPI, that results in a softlockup.
+> > 
+> > As to sending IPI, it was in the patch
+> > 3b8c9f1cdfc506e94e992ae66b68bbe416f89610.  The patch is mean to send IPI
+> > to each CPU after invalidating the I-cache for kernel mappings.  In this
+> > case, after modify pmd, it sends IPI to other CPUS to sync memory
+> > mappings.
+> > 
+> > No stable test case to repeat the result, it is hard to repeat the test procedure.
+> > 
+> > The environment is arm64, 64 CPUs. Except for idle CPU, there are 6 kind
+> > of callstacks in total.
 > 
-> Signed-off-by: Long Cheng <long.cheng@mediatek.com>
-> ---
->  .../devicetree/bindings/dma/8250_mtk_dma.txt       |   33 --------------------
->  .../devicetree/bindings/dma/mtk-uart-apdma.txt     |   33 ++++++++++++++++++++
->  2 files changed, 33 insertions(+), 33 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/dma/8250_mtk_dma.txt
->  create mode 100644 Documentation/devicetree/bindings/dma/mtk-uart-apdma.txt
-> 
+> This looks like another lockup that would be solved if we deferred our
+> I-cache invalidation when mapping user-executable pages, and instead
+> performed the invalidation off the back of a UXN permission fault, where we
+> could avoid holding any locks.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Looking back at commit 3b8c9f1cdfc5 ("arm64: IPI each CPU after
+invalidating the I-cache for kernel mappings"), the text implies that it
+should only do this for kernel mappings. I don't think we need this for
+user mappings. We have a few scenarios where we invoke set_pte_at() with
+exec permission:
+
+1. Page faulted in - the pte was not previously accessible and the CPU
+   should not have stale decoded instructions (my interpretation of the
+   ARM ARM).
+
+2. huge pmd splitting - there is no change to the underlying data. I
+   have a suspicion here that we shouldn't even call
+   sync_icache_aliases() but probably the PG_arch_1 isn't carried over
+   from the head compound page to the small pages (needs checking).
+
+3. page migration - there is no change to the underlying data and
+   instructions, so I don't think we need the all CPUs sync.
+
+4. mprotect() setting exec permission - that's normally the
+   responsibility of the user to ensure cache maintenance
+
+(I can add more text to the patch below but need to get to the bottom of
+this first)
+
+---------8<-------------------------------------------------
+arm64: Do not issue IPIs for user executable ptes
+
+From: Catalin Marinas <catalin.marinas@arm.com>
+
+Commit 3b8c9f1cdfc5 ("arm64: IPI each CPU after invalidating the I-cache
+for kernel mappings") was aimed at fixing the I-cache invalidation for
+kernel mappings. However, it inadvertently caused all cache maintenance
+for user mappings via set_pte_at() -> __sync_icache_dcache() to call
+kick_all_cpus_sync().
+
+Fixes: 3b8c9f1cdfc5 ("arm64: IPI each CPU after invalidating the I-cache for kernel mappings")
+Cc: <stable@vger.kernel.org> # 4.19.x-
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/include/asm/cacheflush.h |    2 +-
+ arch/arm64/kernel/probes/uprobes.c  |    2 +-
+ arch/arm64/mm/flush.c               |   14 ++++++++++----
+ 3 files changed, 12 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+index 19844211a4e6..18e92d9dacd4 100644
+--- a/arch/arm64/include/asm/cacheflush.h
++++ b/arch/arm64/include/asm/cacheflush.h
+@@ -80,7 +80,7 @@ extern void __clean_dcache_area_poc(void *addr, size_t len);
+ extern void __clean_dcache_area_pop(void *addr, size_t len);
+ extern void __clean_dcache_area_pou(void *addr, size_t len);
+ extern long __flush_cache_user_range(unsigned long start, unsigned long end);
+-extern void sync_icache_aliases(void *kaddr, unsigned long len);
++extern void sync_icache_aliases(void *kaddr, unsigned long len, bool sync);
+ 
+ static inline void flush_icache_range(unsigned long start, unsigned long end)
+ {
+diff --git a/arch/arm64/kernel/probes/uprobes.c b/arch/arm64/kernel/probes/uprobes.c
+index 636ca0119c0e..595e8c8f41cd 100644
+--- a/arch/arm64/kernel/probes/uprobes.c
++++ b/arch/arm64/kernel/probes/uprobes.c
+@@ -24,7 +24,7 @@ void arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
+ 	memcpy(dst, src, len);
+ 
+ 	/* flush caches (dcache/icache) */
+-	sync_icache_aliases(dst, len);
++	sync_icache_aliases(dst, len, true);
+ 
+ 	kunmap_atomic(xol_page_kaddr);
+ }
+diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+index 30695a868107..5c2f23a92d14 100644
+--- a/arch/arm64/mm/flush.c
++++ b/arch/arm64/mm/flush.c
+@@ -25,15 +25,17 @@
+ #include <asm/cache.h>
+ #include <asm/tlbflush.h>
+ 
+-void sync_icache_aliases(void *kaddr, unsigned long len)
++void sync_icache_aliases(void *kaddr, unsigned long len, bool sync)
+ {
+ 	unsigned long addr = (unsigned long)kaddr;
+ 
+ 	if (icache_is_aliasing()) {
+ 		__clean_dcache_area_pou(kaddr, len);
+ 		__flush_icache_all();
+-	} else {
++	} else if (sync) {
+ 		flush_icache_range(addr, addr + len);
++	} else {
++		__flush_icache_range(addr, addr + len);
+ 	}
+ }
+ 
+@@ -42,7 +44,7 @@ static void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
+ 				unsigned long len)
+ {
+ 	if (vma->vm_flags & VM_EXEC)
+-		sync_icache_aliases(kaddr, len);
++		sync_icache_aliases(kaddr, len, true);
+ }
+ 
+ /*
+@@ -63,8 +65,12 @@ void __sync_icache_dcache(pte_t pte)
+ 	struct page *page = pte_page(pte);
+ 
+ 	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
++		/*
++		 * Don't issue kick_all_cpus_sync() after I-cache invalidation
++		 * when setting a user executable pte.
++		 */
+ 		sync_icache_aliases(page_address(page),
+-				    PAGE_SIZE << compound_order(page));
++				    PAGE_SIZE << compound_order(page), false);
+ }
+ EXPORT_SYMBOL_GPL(__sync_icache_dcache);
+ 
 
 _______________________________________________
 linux-arm-kernel mailing list
