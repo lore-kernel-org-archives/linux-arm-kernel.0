@@ -4,69 +4,84 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B611FC7113B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 11:12:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AD42EC7113B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 11:12:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6530520861
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 11:12:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6B8B520861
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 11:12:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="c5tIxr8L"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6530520861
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qJoQ+z5J";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="QNn6woVi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6B8B520861
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+TvPogbPHAJTrZgPpKF+PS7YAOZJRfttA96Pigz5QsQ=; b=c5tIxr8LcaMZrF
-	tnuMuG/yp9ynSeKVTgJA2HzCdxWkRnKdUBGyJ/a2y+YiFXw30bu5i9zfNxn6QyFCyOjJbgxnxUdxH
-	jDxKEptnBkxbpSka22CWlW6qusT1pKaVGGRh4wXE3Ntk45kXVsa16eJumuhQ2IZ3NE1s3+bx2SYIn
-	m5ozAb5B7g3eFdZFYcronKde2fxqUp+AAiWa7SOPRd3j0BEzmvhisBPrhMrqTzHpykpEbuKvuYm4P
-	2uu35jQHeNDw7JmDnI4PeuhIpc0QnvXbbnhHlb8K3Y+jzUuYajtzQAK9UJnKVWwMP6SNovGDWHqwV
-	dgfFPqeBF0z1ZeBe1bXA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=goCRzlNVBLTSmsvUtbyuXXkt/rftYMUICh10mTOsdwk=; b=qJoQ+z5JMpfh3O
+	LdAdO+tf8ub0BcGOsTCFrDX0ke9xqor7U0UPbglXqs0gZOg4VOMAEdxTUFl0AbQ8BEo6a9JgHZMnl
+	kfasBanPUCYQgffDgP7lGEOOO/uXwdK11p5aSWpCL/mbvU6v8T70dxojA9MARUp6R3eDEjMfAJH+1
+	iJYiW0zYwucXvmclHaICG3WSoX+vhppsy456NsqZC5gUCiyRQ4kVYCpxeTA5EMUIxUjG3cAO6KQu4
+	PNdKSzy6dKUc1nAE3Zp4cHWKmI1DAcg4aJR8VN1iJgwzGp9d7DH5xOuEXKD+2P9sjqNT3UrPPDEvc
+	V40lXsOrK8nc27uetZJQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glXUi-0004f7-Jn; Mon, 21 Jan 2019 11:11:56 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1glXVO-0005Pk-4k; Mon, 21 Jan 2019 11:12:38 +0000
+Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glXUD-000482-1b; Mon, 21 Jan 2019 11:11:29 +0000
-X-UUID: 05fdf30886b34ec589129930214f906d-20190121
-X-UUID: 05fdf30886b34ec589129930214f906d-20190121
-Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw01.mediatek.com
- (envelope-from <jianjun.wang@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 164150961; Mon, 21 Jan 2019 03:11:22 -0800
-Received: from mtkmbs08n1.mediatek.inc (172.21.101.55) by
- MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Mon, 21 Jan 2019 03:11:20 -0800
-Received: from mtkcas09.mediatek.inc (172.21.101.178) by
- mtkmbs08n1.mediatek.inc (172.21.101.55) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Mon, 21 Jan 2019 19:11:06 +0800
-Received: from localhost.localdomain (10.17.3.153) by mtkcas09.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Mon, 21 Jan 2019 19:11:06 +0800
-From: Jianjun Wang <jianjun.wang@mediatek.com>
-To: <bhelgaas@google.com>, <robh+dt@kernel.org>, <lorenzo.pieralisi@arm.com>, 
- <ryder.lee@mediatek.com>, <mark.rutland@arm.com>
-Subject: [v1,1/2] dt-bindings: PCI: Add support for MT7629
-Date: Mon, 21 Jan 2019 19:11:01 +0800
-Message-ID: <1548069062-12430-2-git-send-email-jianjun.wang@mediatek.com>
-X-Mailer: git-send-email 1.7.9.5
-In-Reply-To: <1548069062-12430-1-git-send-email-jianjun.wang@mediatek.com>
-References: <1548069062-12430-1-git-send-email-jianjun.wang@mediatek.com>
+ id 1glXVK-0005Lt-Eh
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 11:12:36 +0000
+Received: by mail-pg1-x542.google.com with SMTP id c25so9350586pgb.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 21 Jan 2019 03:12:33 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amarulasolutions.com; s=google;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=mnGAbei/QrtULUg0QvoNQpL5YKEkHiuSC510n/3AaPU=;
+ b=QNn6woViz7BHLyK6FQs7k8AmeuYAJlP1WIqegDi5CWolZqCuPU1mDsKbOQIeg/7z/o
+ Ctws+5gMeP0Nu9yCx76dIrfzyRRPCxTUtvwZYtPht4eDivjWe4QgtKpt6WovMnPc+zxv
+ N51Y562g04QmkNMH1YqNMipFzK73WZNo3C8e8=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=mnGAbei/QrtULUg0QvoNQpL5YKEkHiuSC510n/3AaPU=;
+ b=HnwLLKQe5KNo+PbOMgKGxnMqyeyZlp1NlOtHy0GU+Azay0Fhn6vd7bNQSaPNKbxZ/W
+ 51tJ0IDDohmmKYbEr9uDh0cERaaoBjY1gkV/XwIKTNa4QwF2Ec1yfnponX9jD3cw5wkh
+ UUD+Rk2VpRfpVbBFuBNiX+Q95CKqlwZiODDvIKDj/FipvGya1LozLK9Se/3a5JpDJMEL
+ g/1CH6SXvStPmljIM/jqpQ3Vh4mpFywvbV7LW5fAnyA5cP9a9m9PGGtvZNGiclRI1e0a
+ Z579gf+yCPz+079epZxC3CMIFwjxNWSrJJ//odB/gI9H40hYevc0w4Lbuu4z0sD10ygk
+ GSwQ==
+X-Gm-Message-State: AJcUukcy+XymnsGRhQNji9k7v6sxp5srsUT4LHa20BfWppQhMn/ko2nc
+ rdkgdFwZTs78lDNOikHiLdv6CA==
+X-Google-Smtp-Source: ALg8bN6cg4/uKCarseArTuNyXxaoh2sgw6MxKtglvupRqGd+AN8UGnhEi+imN9jdhf3hYov5Uz2l6Q==
+X-Received: by 2002:a62:c185:: with SMTP id i127mr29598788pfg.43.1548069152920; 
+ Mon, 21 Jan 2019 03:12:32 -0800 (PST)
+Received: from jagan-XPS-13-9350.domain.name ([103.81.77.13])
+ by smtp.gmail.com with ESMTPSA id a90sm21821288pfj.109.2019.01.21.03.12.30
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 21 Jan 2019 03:12:32 -0800 (PST)
+From: Jagan Teki <jagan@amarulasolutions.com>
+To: Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>
+Subject: [PATCH 1/2] arm64: defconfig: Enable I2C_GPIO
+Date: Mon, 21 Jan 2019 16:42:22 +0530
+Message-Id: <20190121111223.18384-1-jagan@amarulasolutions.com>
+X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
 MIME-Version: 1.0
-X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_031125_405955_19D7AC62 
-X-CRM114-Status: UNSURE (   7.06  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190121_031234_538921_06C38910 
+X-CRM114-Status: GOOD (  10.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,38 +93,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: youlin.pei@mediatek.com, devicetree@vger.kernel.org,
- linux-pci@vger.kernel.org, linux-kernel@vger.kernel.org,
- jianjun.wang@mediatek.com, linux-mediatek@lists.infradead.org,
- honghui.zhang@mediatek.com, matthias.bgg@gmail.com,
- linux-arm-kernel@lists.infradead.org
+Cc: linux-sunxi <linux-sunxi@googlegroups.com>, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, Jagan Teki <jagan@amarulasolutions.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-MT7629 is an ARM platform Soc which has the same PCIe IP with MT7622.
+The GPIO-based bitbanging I2C driver is required to configure
+CSI data, clock pins on CSI block in Allwinner A64 SoC.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Jianjun Wang <jianjun.wang@mediatek.com>
+Let build it as module.
+
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- Documentation/devicetree/bindings/pci/mediatek-pcie.txt | 1 +
+Note:
+- These change depends on A64 CSI support patches
+
+ arch/arm64/configs/defconfig | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/pci/mediatek-pcie.txt b/Documentation/devicetree/bindings/pci/mediatek-pcie.txt
-index 92437a366e5f..7468d666763a 100644
---- a/Documentation/devicetree/bindings/pci/mediatek-pcie.txt
-+++ b/Documentation/devicetree/bindings/pci/mediatek-pcie.txt
-@@ -6,6 +6,7 @@ Required properties:
- 	"mediatek,mt2712-pcie"
- 	"mediatek,mt7622-pcie"
- 	"mediatek,mt7623-pcie"
-+	"mediatek,mt7629-pcie"
- - device_type: Must be "pci"
- - reg: Base addresses and lengths of the PCIe subsys and root ports.
- - reg-names: Names of the above areas to use during resource lookup.
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 1f1f4eab89df..eefc1ff0c1e0 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -318,6 +318,7 @@ CONFIG_I2C_MUX=y
+ CONFIG_I2C_MUX_PCA954x=y
+ CONFIG_I2C_BCM2835=m
+ CONFIG_I2C_DESIGNWARE_PLATFORM=y
++CONFIG_I2C_GPIO=m
+ CONFIG_I2C_IMX=y
+ CONFIG_I2C_MESON=y
+ CONFIG_I2C_MV64XXX=y
 -- 
-2.20.1
+2.18.0.321.gffc6fa0e3
 
 
 _______________________________________________
