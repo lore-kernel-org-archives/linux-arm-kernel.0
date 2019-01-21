@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E8E97C282DB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:08:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 52544C282DB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:09:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BA49B2085A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:08:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1D15420823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:09:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BoIpLcny"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BA49B2085A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jfvlqSZq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1D15420823
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,77 +26,77 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	References:In-Reply-To:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=QMOgvebglNsfIjTI+fNfMkjSgCrhypmwkguWJ1A599o=; b=BoIpLcnyG+xLyDMvb5s9Sgpg3j
-	8kQeviOlICWy1xNXaLOGJnBjfXPvYYwHOutQaXZOcdOSZ8WJJcRVb0nsr24hwmawZfzYue4cUyMBk
-	VvhhHNSnLAVbpfWCdWXxOGh9mlMmbLh6p2nm0MxwhLp44kIpC+WPpa8fVd/jOJ6nCNxfzvpXMqtjX
-	X/whbgS4mQ34OBkJJTrPKIzqtFguaOKC6WylMv/AcytTiNrx9GuRXh+1WBb/ftcL3z+b4M0Up16ES
-	/2LuNpYQRMu8rzsQqkFr28HDJHejasq9wk4r8HaPXOB28+AS/JC2EzVbUg6NMbeKT/SANWEwk3jXt
-	u3NAhkPA==;
+	bh=4XqEqNwJGYQtrWbW+ETCDO1VgsjoqN0tfZriJ31u2lw=; b=jfvlqSZqaHGkEpBduk5NtOpTu4
+	bu8MulNLMK5mt9PCfZ2jAYr0o2rRPdB/8uRbUyDpx6HQD+TygohQ/1j9IElRhRppGn5pb5a4Udk3C
+	DkksbGg55EzFrOaHmg0KCo0drkn3ZDSBjzshoq9cxSaeYFg5vsPce90nF+CsQ1mirObpNPVC3mdOB
+	SlqLdIV0OSmIMyT54FpcZQK58DeM3u0gcJoIMHlXXMvXEwAtcUdbawvIdemueO699ZZIjORzmt/6e
+	cYd8g6tKF8Mhr+zFMIz0sls7JGa27u7V2thsOwbSXIsDLAPlvXQj5XAYCd2cXM7rRt/JSGWCPQGCT
+	nla+whTw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glUct-0007wt-Kk; Mon, 21 Jan 2019 08:08:11 +0000
+	id 1glUdh-00005n-RO; Mon, 21 Jan 2019 08:09:01 +0000
 Received: from mx0a-001b2d01.pphosted.com ([148.163.156.1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glUaI-0005Ve-0w
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 08:05:38 +0000
-Received: from pps.filterd (m0098394.ppops.net [127.0.0.1])
+ id 1glUag-0005yc-Lb
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 08:05:57 +0000
+Received: from pps.filterd (m0098409.ppops.net [127.0.0.1])
  by mx0a-001b2d01.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x0L84MV5080748
- for <linux-arm-kernel@lists.infradead.org>; Mon, 21 Jan 2019 03:05:29 -0500
-Received: from e06smtp01.uk.ibm.com (e06smtp01.uk.ibm.com [195.75.94.97])
- by mx0a-001b2d01.pphosted.com with ESMTP id 2q57sc5y91-1
+ x0L83mag097000
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 21 Jan 2019 03:05:54 -0500
+Received: from e06smtp07.uk.ibm.com (e06smtp07.uk.ibm.com [195.75.94.103])
+ by mx0a-001b2d01.pphosted.com with ESMTP id 2q58y4b4uw-1
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
- for <linux-arm-kernel@lists.infradead.org>; Mon, 21 Jan 2019 03:05:29 -0500
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 21 Jan 2019 03:05:53 -0500
 Received: from localhost
- by e06smtp01.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
+ by e06smtp07.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
  Violators will be prosecuted
  for <linux-arm-kernel@lists.infradead.org> from <rppt@linux.ibm.com>;
- Mon, 21 Jan 2019 08:05:26 -0000
-Received: from b06cxnps4076.portsmouth.uk.ibm.com (9.149.109.198)
- by e06smtp01.uk.ibm.com (192.168.101.131) with IBM ESMTP SMTP Gateway:
+ Mon, 21 Jan 2019 08:05:50 -0000
+Received: from b06cxnps3075.portsmouth.uk.ibm.com (9.149.109.195)
+ by e06smtp07.uk.ibm.com (192.168.101.137) with IBM ESMTP SMTP Gateway:
  Authorized Use Only! Violators will be prosecuted; 
  (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
- Mon, 21 Jan 2019 08:05:15 -0000
-Received: from d06av25.portsmouth.uk.ibm.com (d06av25.portsmouth.uk.ibm.com
- [9.149.105.61])
- by b06cxnps4076.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
- x0L85Eq952232262
+ Mon, 21 Jan 2019 08:05:39 -0000
+Received: from d06av24.portsmouth.uk.ibm.com (mk.ibm.com [9.149.105.60])
+ by b06cxnps3075.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
+ x0L85caw29032612
  (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
- Mon, 21 Jan 2019 08:05:14 GMT
-Received: from d06av25.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 2717111C06E;
- Mon, 21 Jan 2019 08:05:14 +0000 (GMT)
-Received: from d06av25.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 437CC11C069;
- Mon, 21 Jan 2019 08:05:09 +0000 (GMT)
+ Mon, 21 Jan 2019 08:05:38 GMT
+Received: from d06av24.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id 4571C4203F;
+ Mon, 21 Jan 2019 08:05:38 +0000 (GMT)
+Received: from d06av24.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id 55F6142047;
+ Mon, 21 Jan 2019 08:05:33 +0000 (GMT)
 Received: from rapoport-lnx (unknown [9.148.207.125])
- by d06av25.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
- Mon, 21 Jan 2019 08:05:09 +0000 (GMT)
+ by d06av24.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
+ Mon, 21 Jan 2019 08:05:33 +0000 (GMT)
 Received: by rapoport-lnx (sSMTP sendmail emulation);
- Mon, 21 Jan 2019 10:05:08 +0200
+ Mon, 21 Jan 2019 10:05:32 +0200
 From: Mike Rapoport <rppt@linux.ibm.com>
 To: linux-mm@kvack.org
-Subject: [PATCH v2 10/21] memblock: refactor internal allocation functions
-Date: Mon, 21 Jan 2019 10:03:57 +0200
+Subject: [PATCH v2 14/21] ia64: add checks for the return value of
+ memblock_alloc*()
+Date: Mon, 21 Jan 2019 10:04:01 +0200
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1548057848-15136-1-git-send-email-rppt@linux.ibm.com>
 References: <1548057848-15136-1-git-send-email-rppt@linux.ibm.com>
 X-TM-AS-GCONF: 00
-x-cbid: 19012108-4275-0000-0000-00000301E9F9
+x-cbid: 19012108-0028-0000-0000-0000033BE18C
 X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
-x-cbparentid: 19012108-4276-0000-0000-0000381015D1
-Message-Id: <1548057848-15136-11-git-send-email-rppt@linux.ibm.com>
+x-cbparentid: 19012108-0029-0000-0000-000023F915A0
+Message-Id: <1548057848-15136-15-git-send-email-rppt@linux.ibm.com>
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2019-01-21_04:, , signatures=0
 X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
  priorityscore=1501
- malwarescore=0 suspectscore=3 phishscore=0 bulkscore=0 spamscore=0
+ malwarescore=0 suspectscore=1 phishscore=0 bulkscore=0 spamscore=0
  clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
  mlxlogscore=999 adultscore=0 classifier=spam adjust=0 reason=mlx
  scancount=1 engine=8.0.1-1810050000 definitions=main-1901210066
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_000530_503260_50F5CC0E 
-X-CRM114-Status: GOOD (  36.41  )
+X-CRM114-CacheID: sfid-20190121_000554_930287_5B291BAE 
+X-CRM114-Status: GOOD (  27.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -138,293 +138,232 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Currently, memblock has several internal functions with overlapping
-functionality. They all call memblock_find_in_range_node() to find free
-memory and then reserve the allocated range and mark it with kmemleak.
-However, there is difference in the allocation constraints and in fallback
-strategies.
+Add panic() calls if memblock_alloc*() returns NULL.
 
-The allocations returning physical address first attempt to find free
-memory on the specified node within mirrored memory regions, then retry on
-the same node without the requirement for memory mirroring and finally fall
-back to all available memory.
+Most of the changes are simply addition of
 
-The allocations returning virtual address start with clamping the allowed
-range to memblock.current_limit, attempt to allocate from the specified
-node from regions with mirroring and with user defined minimal address. If
-such allocation fails, next attempt is done with node restriction lifted.
-Next, the allocation is retried with minimal address reset to zero and at
-last without the requirement for mirrored regions.
+	if(!ptr)
+		panic();
 
-Let's consolidate various fallbacks handling and make them more consistent
-for physical and virtual variants. Most of the fallback handling is moved
-to memblock_alloc_range_nid() and it now handles node and mirror fallbacks.
+statements after the calls to memblock_alloc*() variants.
 
-The memblock_alloc_internal() uses memblock_alloc_range_nid() to get a
-physical address of the allocated range and converts it to virtual address.
-
-The fallback for allocation below the specified minimal address remains in
-memblock_alloc_internal() because memblock_alloc_range_nid() is used by CMA
-with exact requirement for lower bounds.
-
-The memblock_phys_alloc_nid() function is completely dropped as it is not
-used anywhere outside memblock and its only usage can be replaced by a call
-to memblock_alloc_range_nid().
+Exceptions are create_mem_map_page_table() and ia64_log_init() that were
+slightly refactored to accommodate the change.
 
 Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
 ---
- include/linux/memblock.h |   1 -
- mm/memblock.c            | 173 +++++++++++++++++++++--------------------------
- 2 files changed, 78 insertions(+), 96 deletions(-)
+ arch/ia64/kernel/mca.c          | 20 ++++++++++++++------
+ arch/ia64/mm/contig.c           |  8 ++++++--
+ arch/ia64/mm/discontig.c        |  4 ++++
+ arch/ia64/mm/init.c             | 38 ++++++++++++++++++++++++++++++--------
+ arch/ia64/mm/tlb.c              |  6 ++++++
+ arch/ia64/sn/kernel/io_common.c |  3 +++
+ arch/ia64/sn/kernel/setup.c     | 12 +++++++++++-
+ 7 files changed, 74 insertions(+), 17 deletions(-)
 
-diff --git a/include/linux/memblock.h b/include/linux/memblock.h
-index 6874fdc..cf4cd9c 100644
---- a/include/linux/memblock.h
-+++ b/include/linux/memblock.h
-@@ -371,7 +371,6 @@ static inline int memblock_get_region_node(const struct memblock_region *r)
+diff --git a/arch/ia64/kernel/mca.c b/arch/ia64/kernel/mca.c
+index 370bc34..5cabb3f 100644
+--- a/arch/ia64/kernel/mca.c
++++ b/arch/ia64/kernel/mca.c
+@@ -359,11 +359,6 @@ typedef struct ia64_state_log_s
  
- phys_addr_t memblock_phys_alloc_range(phys_addr_t size, phys_addr_t align,
- 				      phys_addr_t start, phys_addr_t end);
--phys_addr_t memblock_phys_alloc_nid(phys_addr_t size, phys_addr_t align, int nid);
- phys_addr_t memblock_phys_alloc_try_nid(phys_addr_t size, phys_addr_t align, int nid);
+ static ia64_state_log_t ia64_state_log[IA64_MAX_LOG_TYPES];
  
- static inline phys_addr_t memblock_phys_alloc(phys_addr_t size,
-diff --git a/mm/memblock.c b/mm/memblock.c
-index 531fa77..739f769 100644
---- a/mm/memblock.c
-+++ b/mm/memblock.c
-@@ -1312,30 +1312,84 @@ __next_mem_pfn_range_in_zone(u64 *idx, struct zone *zone,
+-#define IA64_LOG_ALLOCATE(it, size) \
+-	{ia64_state_log[it].isl_log[IA64_LOG_CURR_INDEX(it)] = \
+-		(ia64_err_rec_t *)memblock_alloc(size, SMP_CACHE_BYTES); \
+-	ia64_state_log[it].isl_log[IA64_LOG_NEXT_INDEX(it)] = \
+-		(ia64_err_rec_t *)memblock_alloc(size, SMP_CACHE_BYTES);}
+ #define IA64_LOG_LOCK_INIT(it) spin_lock_init(&ia64_state_log[it].isl_lock)
+ #define IA64_LOG_LOCK(it)      spin_lock_irqsave(&ia64_state_log[it].isl_lock, s)
+ #define IA64_LOG_UNLOCK(it)    spin_unlock_irqrestore(&ia64_state_log[it].isl_lock,s)
+@@ -378,6 +373,19 @@ static ia64_state_log_t ia64_state_log[IA64_MAX_LOG_TYPES];
+ #define IA64_LOG_CURR_BUFFER(it)   (void *)((ia64_state_log[it].isl_log[IA64_LOG_CURR_INDEX(it)]))
+ #define IA64_LOG_COUNT(it)         ia64_state_log[it].isl_count
  
- #endif /* CONFIG_DEFERRED_STRUCT_PAGE_INIT */
++static inline void ia64_log_allocate(int it, u64 size)
++{
++	ia64_state_log[it].isl_log[IA64_LOG_CURR_INDEX(it)] =
++		(ia64_err_rec_t *)memblock_alloc(size, SMP_CACHE_BYTES);
++	if (!ia64_state_log[it].isl_log[IA64_LOG_CURR_INDEX(it)])
++		panic("%s: Failed to allocate %llu bytes\n", __func__, size);
++
++	ia64_state_log[it].isl_log[IA64_LOG_NEXT_INDEX(it)] =
++		(ia64_err_rec_t *)memblock_alloc(size, SMP_CACHE_BYTES);
++	if (!ia64_state_log[it].isl_log[IA64_LOG_NEXT_INDEX(it)])
++		panic("%s: Failed to allocate %llu bytes\n", __func__, size);
++}
++
+ /*
+  * ia64_log_init
+  *	Reset the OS ia64 log buffer
+@@ -399,7 +407,7 @@ ia64_log_init(int sal_info_type)
+ 		return;
  
-+/**
-+ * memblock_alloc_range_nid - allocate boot memory block
-+ * @size: size of memory block to be allocated in bytes
-+ * @align: alignment of the region and block's size
-+ * @start: the lower bound of the memory region to allocate (phys address)
-+ * @end: the upper bound of the memory region to allocate (phys address)
-+ * @nid: nid of the free area to find, %NUMA_NO_NODE for any node
-+ *
-+ * The allocation is performed from memory region limited by
-+ * memblock.current_limit if @max_addr == %MEMBLOCK_ALLOC_ACCESSIBLE.
-+ *
-+ * If the specified node can not hold the requested memory the
-+ * allocation falls back to any node in the system
-+ *
-+ * For systems with memory mirroring, the allocation is attempted first
-+ * from the regions with mirroring enabled and then retried from any
-+ * memory region.
-+ *
-+ * In addition, function sets the min_count to 0 using kmemleak_alloc_phys for
-+ * allocated boot memory block, so that it is never reported as leaks.
-+ *
-+ * Return:
-+ * Physical address of allocated memory block on success, %0 on failure.
-+ */
- static phys_addr_t __init memblock_alloc_range_nid(phys_addr_t size,
- 					phys_addr_t align, phys_addr_t start,
--					phys_addr_t end, int nid,
--					enum memblock_flags flags)
-+					phys_addr_t end, int nid)
- {
-+	enum memblock_flags flags = choose_memblock_flags();
- 	phys_addr_t found;
- 
-+	if (WARN_ONCE(nid == MAX_NUMNODES, "Usage of MAX_NUMNODES is deprecated. Use NUMA_NO_NODE instead\n"))
-+		nid = NUMA_NO_NODE;
-+
- 	if (!align) {
- 		/* Can't use WARNs this early in boot on powerpc */
- 		dump_stack();
- 		align = SMP_CACHE_BYTES;
- 	}
- 
-+	if (end > memblock.current_limit)
-+		end = memblock.current_limit;
-+
-+again:
- 	found = memblock_find_in_range_node(size, align, start, end, nid,
- 					    flags);
--	if (found && !memblock_reserve(found, size)) {
-+	if (found && !memblock_reserve(found, size))
-+		goto done;
-+
-+	if (nid != NUMA_NO_NODE) {
-+		found = memblock_find_in_range_node(size, align, start,
-+						    end, NUMA_NO_NODE,
-+						    flags);
-+		if (found && !memblock_reserve(found, size))
-+			goto done;
-+	}
-+
-+	if (flags & MEMBLOCK_MIRROR) {
-+		flags &= ~MEMBLOCK_MIRROR;
-+		pr_warn("Could not allocate %pap bytes of mirrored memory\n",
-+			&size);
-+		goto again;
-+	}
-+
-+	return 0;
-+
-+done:
-+	/* Skip kmemleak for kasan_init() due to high volume. */
-+	if (end != MEMBLOCK_ALLOC_KASAN)
- 		/*
--		 * The min_count is set to 0 so that memblock allocations are
--		 * never reported as leaks.
-+		 * The min_count is set to 0 so that memblock allocated
-+		 * blocks are never reported as leaks. This is because many
-+		 * of these blocks are only referred via the physical
-+		 * address which is not looked up by kmemleak.
- 		 */
- 		kmemleak_alloc_phys(found, size, 0, 0);
--		return found;
--	}
--	return 0;
-+
-+	return found;
+ 	// set up OS data structures to hold error info
+-	IA64_LOG_ALLOCATE(sal_info_type, max_size);
++	ia64_log_allocate(sal_info_type, max_size);
  }
  
- phys_addr_t __init memblock_phys_alloc_range(phys_addr_t size,
-@@ -1343,35 +1397,13 @@ phys_addr_t __init memblock_phys_alloc_range(phys_addr_t size,
- 					     phys_addr_t start,
- 					     phys_addr_t end)
+ /*
+diff --git a/arch/ia64/mm/contig.c b/arch/ia64/mm/contig.c
+index 6e44723..d29fb6b 100644
+--- a/arch/ia64/mm/contig.c
++++ b/arch/ia64/mm/contig.c
+@@ -84,9 +84,13 @@ void *per_cpu_init(void)
+ static inline void
+ alloc_per_cpu_data(void)
  {
--	return memblock_alloc_range_nid(size, align, start, end, NUMA_NO_NODE,
--					MEMBLOCK_NONE);
--}
--
--phys_addr_t __init memblock_phys_alloc_nid(phys_addr_t size, phys_addr_t align, int nid)
--{
--	enum memblock_flags flags = choose_memblock_flags();
--	phys_addr_t ret;
--
--again:
--	ret = memblock_alloc_range_nid(size, align, 0,
--				       MEMBLOCK_ALLOC_ACCESSIBLE, nid, flags);
--
--	if (!ret && (flags & MEMBLOCK_MIRROR)) {
--		flags &= ~MEMBLOCK_MIRROR;
--		goto again;
--	}
--	return ret;
-+	return memblock_alloc_range_nid(size, align, start, end, NUMA_NO_NODE);
- }
- 
- phys_addr_t __init memblock_phys_alloc_try_nid(phys_addr_t size, phys_addr_t align, int nid)
- {
--	phys_addr_t res = memblock_phys_alloc_nid(size, align, nid);
--
--	if (res)
--		return res;
--	return memblock_alloc_range_nid(size, align, 0,
--					MEMBLOCK_ALLOC_ACCESSIBLE,
--					NUMA_NO_NODE, MEMBLOCK_NONE);
-+	return memblock_alloc_range_nid(size, align, 0, nid,
-+					MEMBLOCK_ALLOC_ACCESSIBLE);
+-	cpu_data = memblock_alloc_from(PERCPU_PAGE_SIZE * num_possible_cpus(),
+-				       PERCPU_PAGE_SIZE,
++	size_t size = PERCPU_PAGE_SIZE * num_possible_cpus();
++
++	cpu_data = memblock_alloc_from(size, PERCPU_PAGE_SIZE,
+ 				       __pa(MAX_DMA_ADDRESS));
++	if (!cpu_data)
++		panic("%s: Failed to allocate %lu bytes align=%lx from=%lx\n",
++		      __func__, size, PERCPU_PAGE_SIZE, __pa(MAX_DMA_ADDRESS));
  }
  
  /**
-@@ -1382,19 +1414,13 @@ phys_addr_t __init memblock_phys_alloc_try_nid(phys_addr_t size, phys_addr_t ali
-  * @max_addr: the upper bound of the memory region to allocate (phys address)
-  * @nid: nid of the free area to find, %NUMA_NO_NODE for any node
-  *
-- * The @min_addr limit is dropped if it can not be satisfied and the allocation
-- * will fall back to memory below @min_addr. Also, allocation may fall back
-- * to any node in the system if the specified node can not
-- * hold the requested memory.
-- *
-- * The allocation is performed from memory region limited by
-- * memblock.current_limit if @max_addr == %MEMBLOCK_ALLOC_ACCESSIBLE.
-- *
-- * The phys address of allocated boot memory block is converted to virtual and
-- * allocated memory is reset to 0.
-+ * Allocates memory block using memblock_alloc_range_nid() and
-+ * converts the returned physical address to virtual.
-  *
-- * In addition, function sets the min_count to 0 using kmemleak_alloc for
-- * allocated boot memory block, so that it is never reported as leaks.
-+ * The @min_addr limit is dropped if it can not be satisfied and the allocation
-+ * will fall back to memory below @min_addr. Other constraints, such
-+ * as node and mirrored memory will be handled again in
-+ * memblock_alloc_range_nid().
-  *
-  * Return:
-  * Virtual address of allocated memory block on success, NULL on failure.
-@@ -1405,11 +1431,6 @@ static void * __init memblock_alloc_internal(
- 				int nid)
+diff --git a/arch/ia64/mm/discontig.c b/arch/ia64/mm/discontig.c
+index f9c3675..05490dd 100644
+--- a/arch/ia64/mm/discontig.c
++++ b/arch/ia64/mm/discontig.c
+@@ -454,6 +454,10 @@ static void __init *memory_less_node_alloc(int nid, unsigned long pernodesize)
+ 				     __pa(MAX_DMA_ADDRESS),
+ 				     MEMBLOCK_ALLOC_ACCESSIBLE,
+ 				     bestnode);
++	if (!ptr)
++		panic("%s: Failed to allocate %lu bytes align=0x%lx nid=%d from=%lx\n",
++		      __func__, pernodesize, PERCPU_PAGE_SIZE, bestnode,
++		      __pa(MAX_DMA_ADDRESS));
+ 
+ 	return ptr;
+ }
+diff --git a/arch/ia64/mm/init.c b/arch/ia64/mm/init.c
+index 29d8415..e49200e 100644
+--- a/arch/ia64/mm/init.c
++++ b/arch/ia64/mm/init.c
+@@ -444,23 +444,45 @@ int __init create_mem_map_page_table(u64 start, u64 end, void *arg)
+ 
+ 	for (address = start_page; address < end_page; address += PAGE_SIZE) {
+ 		pgd = pgd_offset_k(address);
+-		if (pgd_none(*pgd))
+-			pgd_populate(&init_mm, pgd, memblock_alloc_node(PAGE_SIZE, PAGE_SIZE, node));
++		if (pgd_none(*pgd)) {
++			pud = memblock_alloc_node(PAGE_SIZE, PAGE_SIZE, node);
++			if (!pud)
++				goto err_alloc;
++			pgd_populate(&init_mm, pgd, pud);
++		}
+ 		pud = pud_offset(pgd, address);
+ 
+-		if (pud_none(*pud))
+-			pud_populate(&init_mm, pud, memblock_alloc_node(PAGE_SIZE, PAGE_SIZE, node));
++		if (pud_none(*pud)) {
++			pmd = memblock_alloc_node(PAGE_SIZE, PAGE_SIZE, node);
++			if (!pmd)
++				goto err_alloc;
++			pud_populate(&init_mm, pud, pmd);
++		}
+ 		pmd = pmd_offset(pud, address);
+ 
+-		if (pmd_none(*pmd))
+-			pmd_populate_kernel(&init_mm, pmd, memblock_alloc_node(PAGE_SIZE, PAGE_SIZE, node));
++		if (pmd_none(*pmd)) {
++			pte = memblock_alloc_node(PAGE_SIZE, PAGE_SIZE, node);
++			if (!pte)
++				goto err_alloc;
++			pmd_populate_kernel(&init_mm, pmd, pte);
++		}
+ 		pte = pte_offset_kernel(pmd, address);
+ 
+-		if (pte_none(*pte))
+-			set_pte(pte, pfn_pte(__pa(memblock_alloc_node(PAGE_SIZE, PAGE_SIZE, node)) >> PAGE_SHIFT,
++		if (pte_none(*pte)) {
++			void *page = memblock_alloc_node(PAGE_SIZE, PAGE_SIZE,
++							 node);
++			if (!page)
++				goto err_alloc;
++			set_pte(pte, pfn_pte(__pa(page) >> PAGE_SHIFT,
+ 					     PAGE_KERNEL));
++		}
+ 	}
+ 	return 0;
++
++err_alloc:
++	panic("%s: Failed to allocate %lu bytes align=0x%lx nid=%d\n",
++	      __func__, PAGE_SIZE, PAGE_SIZE, node);
++	return -ENOMEM;
+ }
+ 
+ struct memmap_init_callback_data {
+diff --git a/arch/ia64/mm/tlb.c b/arch/ia64/mm/tlb.c
+index 9340bcb..5fc89aa 100644
+--- a/arch/ia64/mm/tlb.c
++++ b/arch/ia64/mm/tlb.c
+@@ -61,8 +61,14 @@ mmu_context_init (void)
  {
- 	phys_addr_t alloc;
--	void *ptr;
--	enum memblock_flags flags = choose_memblock_flags();
--
--	if (WARN_ONCE(nid == MAX_NUMNODES, "Usage of MAX_NUMNODES is deprecated. Use NUMA_NO_NODE instead\n"))
--		nid = NUMA_NO_NODE;
+ 	ia64_ctx.bitmap = memblock_alloc((ia64_ctx.max_ctx + 1) >> 3,
+ 					 SMP_CACHE_BYTES);
++	if (!ia64_ctx.bitmap)
++		panic("%s: Failed to allocate %u bytes\n", __func__,
++		      (ia64_ctx.max_ctx + 1) >> 3);
+ 	ia64_ctx.flushmap = memblock_alloc((ia64_ctx.max_ctx + 1) >> 3,
+ 					   SMP_CACHE_BYTES);
++	if (!ia64_ctx.flushmap)
++		panic("%s: Failed to allocate %u bytes\n", __func__,
++		      (ia64_ctx.max_ctx + 1) >> 3);
+ }
+ 
+ /*
+diff --git a/arch/ia64/sn/kernel/io_common.c b/arch/ia64/sn/kernel/io_common.c
+index 8df13d0..d468473 100644
+--- a/arch/ia64/sn/kernel/io_common.c
++++ b/arch/ia64/sn/kernel/io_common.c
+@@ -394,6 +394,9 @@ void __init hubdev_init_node(nodepda_t * npda, cnodeid_t node)
+ 	hubdev_info = (struct hubdev_info *)memblock_alloc_node(size,
+ 								SMP_CACHE_BYTES,
+ 								node);
++	if (!hubdev_info)
++		panic("%s: Failed to allocate %d bytes align=0x%x nid=%d\n",
++		      __func__, size, SMP_CACHE_BYTES, node);
+ 
+ 	npda->pdinfo = (void *)hubdev_info;
+ }
+diff --git a/arch/ia64/sn/kernel/setup.c b/arch/ia64/sn/kernel/setup.c
+index a6d40a2..e6a5049 100644
+--- a/arch/ia64/sn/kernel/setup.c
++++ b/arch/ia64/sn/kernel/setup.c
+@@ -513,6 +513,10 @@ static void __init sn_init_pdas(char **cmdline_p)
+ 		nodepdaindr[cnode] =
+ 		    memblock_alloc_node(sizeof(nodepda_t), SMP_CACHE_BYTES,
+ 					cnode);
++		if (!nodepdaindr[cnode])
++			panic("%s: Failed to allocate %lu bytes align=0x%x nid=%d\n",
++			      __func__, sizeof(nodepda_t), SMP_CACHE_BYTES,
++			      cnode);
+ 		memset(nodepdaindr[cnode]->phys_cpuid, -1,
+ 		    sizeof(nodepdaindr[cnode]->phys_cpuid));
+ 		spin_lock_init(&nodepdaindr[cnode]->ptc_lock);
+@@ -521,9 +525,15 @@ static void __init sn_init_pdas(char **cmdline_p)
+ 	/*
+ 	 * Allocate & initialize nodepda for TIOs.  For now, put them on node 0.
+ 	 */
+-	for (cnode = num_online_nodes(); cnode < num_cnodes; cnode++)
++	for (cnode = num_online_nodes(); cnode < num_cnodes; cnode++) {
+ 		nodepdaindr[cnode] =
+ 		    memblock_alloc_node(sizeof(nodepda_t), SMP_CACHE_BYTES, 0);
++		if (!nodepdaindr[cnode])
++			panic("%s: Failed to allocate %lu bytes align=0x%x nid=%d\n",
++			      __func__, sizeof(nodepda_t), SMP_CACHE_BYTES,
++			      cnode);
++	}
++
  
  	/*
- 	 * Detect any accidental use of these APIs after slab is ready, as at
-@@ -1419,54 +1440,16 @@ static void * __init memblock_alloc_internal(
- 	if (WARN_ON_ONCE(slab_is_available()))
- 		return kzalloc_node(size, GFP_NOWAIT, nid);
- 
--	if (!align) {
--		dump_stack();
--		align = SMP_CACHE_BYTES;
--	}
--
--	if (max_addr > memblock.current_limit)
--		max_addr = memblock.current_limit;
--again:
--	alloc = memblock_find_in_range_node(size, align, min_addr, max_addr,
--					    nid, flags);
--	if (alloc && !memblock_reserve(alloc, size))
--		goto done;
--
--	if (nid != NUMA_NO_NODE) {
--		alloc = memblock_find_in_range_node(size, align, min_addr,
--						    max_addr, NUMA_NO_NODE,
--						    flags);
--		if (alloc && !memblock_reserve(alloc, size))
--			goto done;
--	}
--
--	if (min_addr) {
--		min_addr = 0;
--		goto again;
--	}
--
--	if (flags & MEMBLOCK_MIRROR) {
--		flags &= ~MEMBLOCK_MIRROR;
--		pr_warn("Could not allocate %pap bytes of mirrored memory\n",
--			&size);
--		goto again;
--	}
-+	alloc = memblock_alloc_range_nid(size, align, min_addr, max_addr, nid);
- 
--	return NULL;
--done:
--	ptr = phys_to_virt(alloc);
-+	/* retry allocation without lower limit */
-+	if (!alloc && min_addr)
-+		alloc = memblock_alloc_range_nid(size, align, 0, max_addr, nid);
- 
--	/* Skip kmemleak for kasan_init() due to high volume. */
--	if (max_addr != MEMBLOCK_ALLOC_KASAN)
--		/*
--		 * The min_count is set to 0 so that bootmem allocated
--		 * blocks are never reported as leaks. This is because many
--		 * of these blocks are only referred via the physical
--		 * address which is not looked up by kmemleak.
--		 */
--		kmemleak_alloc(ptr, size, 0, 0);
-+	if (!alloc)
-+		return NULL;
- 
--	return ptr;
-+	return phys_to_virt(alloc);
- }
- 
- /**
+ 	 * Now copy the array of nodepda pointers to each nodepda.
 -- 
 2.7.4
 
