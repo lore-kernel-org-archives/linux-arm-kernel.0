@@ -3,105 +3,61 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BD537C2F441
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 16:17:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A1C8DC2F441
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 16:20:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 87BAA20989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 16:17:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6EC1420989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 16:20:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TAP7IAON";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="klgLpV+e"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 87BAA20989
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sV7nKgoi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6EC1420989
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Message-ID:Date
-	:Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	List-Owner; bh=BKq9SEKdYG/4oFuQ1CiTP6nvPzBHPdUuL4uP5VSqODk=; b=TAP7IAONlfBX3q
-	pBFojrJc5QoMyi/j4czWVKXX9uKHgV2LLmD99n1bTkw9uTbHg9f5PXjIB5egunpRVRnUd6UtcatVT
-	hMi/sr30gKQT5UQkBpReK8vj6mkmoB+tRX4ylQZ3JOucMOIzjCa6cUDM8gPFzOeoCDFQnmzaD+x/y
-	vgVjaIYTipBZxxBeAkkBJpR0YgcGg6UT7Zu+AQmvjQNpvkq8h5wpM6WxzldTbL3t/7SlNxOrIsK72
-	biaQFKZ0VoLz2rjgG3OWbjITcovQ2Y7s+XoO/NhEpoqpXxZDUcogEMnPNokgbbSBwNbx/6KvpDt4n
-	8yxmynanJpusDmQGm8pw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=R2B3Ag9KXaArSaZoks4IrBietNs1XoQjsDxLmsMh0KY=; b=sV7nKgoiB1o2Hj
+	SjwmX32/9OPK/gFxXsWUPRgl7z9u9lXxGUVdMPwkqyIoSQ5Lj+LHGuICdcy5ejn49f41zohyZcGgC
+	nEvQ/7+sM6kqWSDF+X6Zjp34Fc4oNMGHm9jXdJvVGeUAf0waAADijnjvIA2iv6EVgfEKccoE7Fc0I
+	udLbLTjHjU1/hqQFgMarMWN8L78He2tx3sqCIS0/bnUJzQCC+fby8+VvsfdHNCIihNvIVcWGro+Cd
+	YoXvx+tDKNrKsrkfNFPn8gwlEfN7592mq1ZpeLL1E36cqsmrQY5U+pJ7c3i4Q7+eK0854NmE80aIi
+	vbGt8OB1M1GmpIOCQcpw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glcG1-0004I2-0X; Mon, 21 Jan 2019 16:17:05 +0000
-Received: from mail-eopbgr10055.outbound.protection.outlook.com ([40.107.1.55]
- helo=EUR02-HE1-obe.outbound.protection.outlook.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glcFx-0004HK-FF
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 16:17:02 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=uizGjkXIxTwjtjswE6yvlXWKBq2xjTKYQpgJ2jnp/OY=;
- b=klgLpV+e3o+KO2gCv+s5MgcbjxfRhrPzGZNF7yVSreiAO2NyRC33DQUBpIadl4JbMXxTF4dOC8WZ7INZSbbFc29ha7hjOmy6O80B5s/AhXrAjxKKtIS1VFCL8AE3tKe3qK4HAtKj39oeSU8J1eAttjStVji2KZh2r5MQbV6cgXU=
-Received: from VI1PR04MB5533.eurprd04.prod.outlook.com (20.178.122.159) by
- VI1PR04MB5470.eurprd04.prod.outlook.com (20.178.121.208) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1537.29; Mon, 21 Jan 2019 16:16:55 +0000
-Received: from VI1PR04MB5533.eurprd04.prod.outlook.com
- ([fe80::92d:bf44:9c1d:b907]) by VI1PR04MB5533.eurprd04.prod.outlook.com
- ([fe80::92d:bf44:9c1d:b907%6]) with mapi id 15.20.1537.031; Mon, 21 Jan 2019
- 16:16:55 +0000
-From: Leonard Crestez <leonard.crestez@nxp.com>
-To: Masahiro Yamada <yamada.masahiro@socionext.com>, Olof Johansson
- <olof@lixom.net>
-Subject: Re: [PATCH 0/3] kbuild: Add wilddt function instead of listing dtbs
-Thread-Topic: [PATCH 0/3] kbuild: Add wilddt function instead of listing dtbs
-Thread-Index: AQHUpr+U4MlukrPd1USdyY3EAbizyw==
-Date: Mon, 21 Jan 2019 16:16:55 +0000
-Message-ID: <VI1PR04MB553355D6D5EBC2604E1AD256EE9F0@VI1PR04MB5533.eurprd04.prod.outlook.com>
-References: <cover.1546888138.git.leonard.crestez@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=leonard.crestez@nxp.com; 
-x-originating-ip: [86.34.165.90]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; VI1PR04MB5470;
- 6:b7yX7nxbEpoWScQobg+7SRGJutV1AeU5JayfRnmATICPYaHTq63jU82nSatqdx5Tn8CzmyFtqNuKWg/trwnwjG1pNnKBQ/DY85h5em9gzIPIq9AaleRSmKOroMBuZEpWQMlLkinlGBBCdMq62rCDCbB8eoaWB9wz44F0c/L8aDHFIN4Pek8R9CXufz1AaUT+vVGrcp7JnbERLQVoCR9+f/qO5XnsIHAvCVYqgdG9yRyQy4PniXvQl6ax5bgWNhGd4Nhu0l7WMo+2PKvZw/3C4/YKVAkJLHRK8fMu323eFbfqnwmCgoZcL6ngAR0uicoa8DaInvSD5mog3cUocGOo0sD4xnNJYZPut5v+260HEEJDRRa6bl57G93yTkpslFmcblLhew2gRXWQ7ktgl4QI822HMPHFYf3HJ7FKOg2DWydIzp9A3CSa4IByDDhWmiGWNjKwba7XafP2qwyAEUiNug==;
- 5:7E+nBDcYQPBd/QRZcfDraS0EBly0Tb2u0EhSkrJCviGrBOg6NfTDV4CfhiaIO70hXwkUY9yXAN6DsqyVnxpSFw5mqwZaYvjhacrj3IzV3FMq+f2BQtgXVNWHaa/oGWdufMNqn8EIbAfgiiYERQ9d2IdpgivNFt9aL1kQQa459+ciBndNlBz8T8fZIHNzMayuDe8hETcBbAb4J3kGsGwFVg==;
- 7:6IuhHh4J15rs+lP4rRFhF/ypo0f2xAEj8rKVwcN+p/tWILCcGGH0H4/Micp9Tdyua5thTC9o8Kj6vzQedYRM1A6JhF6d1SUz3ViZx3th1gikuv6TuLutoeFRkBjd3P9r+W9arE7bpZPhTLjmTFjBYQ==
-x-ms-exchange-antispam-srfa-diagnostics: SOS;
-x-ms-office365-filtering-correlation-id: 50cd8a25-2976-4c56-ce34-08d67fbbdcac
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR04MB5470; 
-x-ms-traffictypediagnostic: VI1PR04MB5470:
-x-microsoft-antispam-prvs: <VI1PR04MB5470FF2473EC640CF1782113EE9F0@VI1PR04MB5470.eurprd04.prod.outlook.com>
-x-forefront-prvs: 0924C6A0D5
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(396003)(376002)(136003)(346002)(366004)(189003)(199004)(6506007)(305945005)(6116002)(9686003)(53936002)(7736002)(26005)(33656002)(186003)(55016002)(97736004)(6436002)(102836004)(8676002)(53546011)(68736007)(7416002)(3846002)(110136005)(74316002)(4744005)(6306002)(99286004)(54906003)(2906002)(8936002)(229853002)(76176011)(7696005)(25786009)(81156014)(81166006)(316002)(6246003)(71200400001)(66066001)(71190400001)(44832011)(4326008)(105586002)(446003)(478600001)(486006)(86362001)(476003)(14454004)(14444005)(966005)(256004)(106356001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB5470;
- H:VI1PR04MB5533.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: 2a0oTUZJIx2yLqexAtrrGfVWj8vWWLX5+mYp+Ge0EeR7mp59fAFo20LeNDAm58Xie4w9sx06+CcDZVf4jxu2C/3BpU35YVkGajTXTe/PKCOQz/+mwjSa4+iIwttgPDiKzLMB175+Vdr8OHLAECWrStXIBi0+tGeeowl6mf6bglhMLkLDgvbpeD3eOPSvfRdR2songuanVcUfom+PUyYlHRdZgNTxLYJ+pO0TsbCmyHVvWerBRzH78nVxxYhmq9YPKJQtfz5HkZuqoUgULqU8Ofe3PVjg0MN5wOqSlOoaLQK8Oanoz2S/O/zdZtB+g8U6osvk0v3Fv3Wxk1YzPkBBpEe5HFDMKyYngRnRl3sYIfzxA3YzXYlPSPOz1OlxhXb23QAEo3VYhFBu5MZuHJydJ0Mha9p66i8Z1YaIquzRZhw=
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+	id 1glcJ9-0005vn-KI; Mon, 21 Jan 2019 16:20:19 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glcJ6-0005vP-C2
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 16:20:17 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id BF9A4206DC; Mon, 21 Jan 2019 17:20:14 +0100 (CET)
+Received: from bootlin.com (aaubervilliers-681-1-37-87.w90-88.abo.wanadoo.fr
+ [90.88.156.87])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 512BB20397;
+ Mon, 21 Jan 2019 17:20:04 +0100 (CET)
+Date: Mon, 21 Jan 2019 17:20:04 +0100
+From: Maxime Chevallier <maxime.chevallier@bootlin.com>
+To: Andrew Lunn <andrew@lunn.ch>
+Subject: Re: [PATCH net-next 1/7] net: phy: Extract
+ genphy_c45_read_abilities from marvell10g
+Message-ID: <20190121172004.78a341f7@bootlin.com>
+In-Reply-To: <20190120185107.GA19714@lunn.ch>
+References: <20190118152352.26417-1-maxime.chevallier@bootlin.com>
+ <20190118152352.26417-2-maxime.chevallier@bootlin.com>
+ <20190120185107.GA19714@lunn.ch>
+X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 50cd8a25-2976-4c56-ce34-08d67fbbdcac
-X-MS-Exchange-CrossTenant-originalarrivaltime: 21 Jan 2019 16:16:55.5717 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB5470
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_081701_509842_F44D0A78 
-X-CRM114-Status: GOOD (  11.08  )
+X-CRM114-CacheID: sfid-20190121_082016_541266_A7918E2C 
+X-CRM114-Status: GOOD (  16.34  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -113,39 +69,77 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Aisheng Dong <aisheng.dong@nxp.com>,
- Michal Marek <michal.lkml@markovi.net>,
- "linux-kbuild@vger.kernel.org" <linux-kbuild@vger.kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Leo Li <leoyang.li@nxp.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Rob Herring <robh+dt@kernel.org>, Fabio Estevam <fabio.estevam@nxp.com>,
- Shawn Guo <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Florian Fainelli <f.fainelli@gmail.com>,
+ Antoine Tenart <antoine.tenart@bootlin.com>, netdev@vger.kernel.org,
+ gregory.clement@bootlin.com, Russell King <linux@armlinux.org.uk>,
+ linux-kernel@vger.kernel.org, nadavh@marvell.com, thomas.petazzoni@bootlin.com,
+ miquel.raynal@bootlin.com, stefanc@marvell.com, mw@semihalf.com,
+ davem@davemloft.net, linux-arm-kernel@lists.infradead.org,
+ Heiner Kallweit <hkallweit1@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 1/7/2019 9:31 PM, Leonard Crestez wrote:
-> The dts makefiles go through a lot of pointless churn when boards are
-> added. Many SOCs (such as imx) have very simple naming conventions for
-> all boards using a certain chip and board listings can be easily
-> collapsed using wildcards.
-> 
-> Add a "wilddt" function and use it for imx6/7/8 and layerscape. This can
-> be applied to many other soc families later.
-> 
-> Previously sent as RFC: https://lore.kernel.org/patchwork/patch/1022737/
+Hello Andrew,
 
-Any feedback? This should be reviewed by kbuild and arm-soc
+On Sun, 20 Jan 2019 19:51:07 +0100
+Andrew Lunn <andrew@lunn.ch> wrote:
 
-I think this is a worthwhile cleanup, are there any corner cases or more 
-exotic setup I should try in order to validate this series?
+>On Fri, Jan 18, 2019 at 04:23:46PM +0100, Maxime Chevallier wrote:
+>> Marvell 10G PHY driver has a generic way of initializing the supported
+>> link modes by reading the PHY's C45 PMA abilities. This can be made
+>> generic, since these registers are part of the 802.3 specifications.
+>> 
+>> This commit extracts the config_init link_mode initialization code from
+>> marvell10g and uses it to introduce the genphy_c45_read_abilities
+>> function.  
+>
+>Hi Maxime
+>
+>I think the idea is good. I just have a few English language
+>issues/questions.
 
---
-Regards,
-Leonard
+Thanks for the review.
+
+>Capabilities is more often used than abilities. I just wondered if
+>abilities is taken from the 802.3 specifications?
+
+Yes, the term 'Ability' is used in the 802.3 specifications, both in
+the register names and the descriptions.
+
+>Also, i wonder if we should include _pma_ in the name? At some point
+>we might want to do something similar for other sublayers.
+
+You're right, we do read only from the PMA and I see that we could also
+to similar thing for the PCS layer, I'll rename the function.
+
+>> +/**
+>> + * genphy_c45_read_abilities - read supported link modes from PMA
+>> + * @phydev: target phy_device struct
+>> + *
+>> + * Read the supported link modes from the PMA Status 2 (1.8) register. If bit
+>> + * 1.8.9 is set, the list of supported modes is completed with the values in the  
+>
+>completed is not the right word. 'is build using the values in the' ?
+
+That's better indeed, I'll correct that sentence.
+
+>> + * PMA Extended Abilities (1.11) register, indicating 1000BASET an 10G related
+>> + * modes. If bit 1.11.14 is set, then the list is also completed with the modes  
+>
+>list is also extended with the modes
+
+And that one too.
+
+>> + * in the 2.5G/5G PMA Extended register (1.21), indicating if 2.5GBASET and
+>> + * 5GBASET are supported.
+>> + */  
+>
+
+Thanks,
+
+Maxime
 
 _______________________________________________
 linux-arm-kernel mailing list
