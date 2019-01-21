@@ -2,98 +2,94 @@ Return-Path: <SRS0=lfWu=P4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.6 required=3.0 tests=BAD_ENC_HEADER,
+X-Spam-Status: No, score=-1.6 required=3.0 tests=BAD_ENC_HEADER,
 	DATE_IN_FUTURE_12_24,DKIMWL_WL_HIGH,DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 11897C26641
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 20 Jan 2019 17:37:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DEE72C26640
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 20 Jan 2019 17:39:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CE430214C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 20 Jan 2019 17:37:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9EDED2085A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 20 Jan 2019 17:39:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uGmbORR/";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="MLebC2eK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CE430214C6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dIK8UGxE";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="ItRF/LF9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9EDED2085A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zsjRBIs0+1yZqRpUReCqH9WW8pbCa7+qC6rWeK+85TE=; b=uGmbORR/gCygnT
-	OWsxbLJ1jxtHyrpqiONlMRvdG+mRSm0zjiEwW80cHfYr0Z00X7moqTaG7FevmxFy3AMLBew3vsDm1
-	o8/q6/+E6dIzRmbaL5JPVkO8in5a5vSrqPmvipSiavcnmg4avrylxT9iACpMKDBUFiDj4k4FqQ6Fk
-	Aww0WYjUQJxroFwo2Gnimo/TosSdbKyR6BedGbZi8d16fk9SN7VAgndtuP/kH2tM3kaR9gf1qhbKm
-	+Z17D/8CfhJsGtEz+0nOuqMtlpZjyVXMHbmLFSRqzetbx2UCb2Blw8voehNYjoaKgDAchfc6zea3N
-	PqOe0uMQXhOZ/BxoJX0A==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=yvMocVuT3dglBpcRLfBmFq6WhUdFpJSAEV8i/4k/InQ=; b=dIK8UGxE93xWjt
+	4eYNH8NlyUljwOSnnbvQQxYPH3cDAMh91UcT/as18H/ajbbqhu9y+2UhuldNlDOkSm/Dj+zft2wyS
+	tI7VzNhyIls8kICu01IAdzUZwCGt5Ro8SpFpjjW4yEo4eZSqhlwb1nXXnlp5wd++ZYGHtx8ow0L+Y
+	WDszY+6Y3k947ix6Mt2nHSdOb13h0y7JzBqTs8381gm9xrzd21nZIUU682II2G21pBRjXqlVMr5r7
+	LBBOt84AQOOxJJnrSQXAXANdb+1Kxr1od1QLtLoJmwnALii2Kq7tPOaMXfOI7NwWLuGkXEz26GGvQ
+	9q/FutpaSFG9lxx5x9ew==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glH28-0007sx-1d; Sun, 20 Jan 2019 17:37:20 +0000
-Received: from mail-eopbgr750079.outbound.protection.outlook.com
- ([40.107.75.79] helo=NAM02-BL2-obe.outbound.protection.outlook.com)
+	id 1glH4Z-000826-Bm; Sun, 20 Jan 2019 17:39:51 +0000
+Received: from mail-eopbgr790071.outbound.protection.outlook.com
+ ([40.107.79.71] helo=NAM03-CO1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glGrG-0003Zt-04
- for linux-arm-kernel@lists.infradead.org; Sun, 20 Jan 2019 17:26:34 +0000
+ id 1glH4V-00081W-Ds
+ for linux-arm-kernel@lists.infradead.org; Sun, 20 Jan 2019 17:39:49 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=jF81Ebz/i1HNTI9kWeRGPVYV6q5ca1KtBsKg68aXIyg=;
- b=MLebC2eKzqqywK0NKNaOQjV/UnpaznUH+uidTRaz4u5dQaQ2lRBMzTqc1+/Usgbq3kOspkptZXeqtkenVpropevLQW/QK+gUgUQDeV0IWUOlJB6V8Vz0JY/b/yiJgJ3szwL5IuxHwTclKJZuWJwaJFEp/4ulcbYuEAzmOXmiQUY=
-Received: from SN6PR02CA0032.namprd02.prod.outlook.com (2603:10b6:805:a2::45)
- by BL0PR02MB4323.namprd02.prod.outlook.com (2603:10b6:208:40::28)
+ bh=LUjINJxvo5p9HLvLov+soBaesrPPbmGloxdhhz+PRd4=;
+ b=ItRF/LF9bZSvbedmF/VtrjeEs42QeSTWztAHu1F+ThfJiU8fhratekUFmzzuQcH3AdEAOkKtcu6d9UKjf2pkgr+vVU2x7JaXn8TEltLH1h2ed9TtK73v704aPQvFuC6koa2RYP0hsfkDu4BscTdCoSADE/31ol0v5rJFVxird1k=
+Received: from BL0PR02CA0026.namprd02.prod.outlook.com (2603:10b6:207:3c::39)
+ by BYAPR02MB4326.namprd02.prod.outlook.com (2603:10b6:a03:56::27)
  with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1537.29; Sun, 20 Jan
- 2019 17:26:02 +0000
-Received: from CY1NAM02FT014.eop-nam02.prod.protection.outlook.com
- (2a01:111:f400:7e45::201) by SN6PR02CA0032.outlook.office365.com
- (2603:10b6:805:a2::45) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1537.26 via Frontend
- Transport; Sun, 20 Jan 2019 17:26:01 +0000
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1537.31; Sun, 20 Jan
+ 2019 17:39:44 +0000
+Received: from SN1NAM02FT059.eop-nam02.prod.protection.outlook.com
+ (2a01:111:f400:7e44::207) by BL0PR02CA0026.outlook.office365.com
+ (2603:10b6:207:3c::39) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1537.25 via Frontend
+ Transport; Sun, 20 Jan 2019 17:39:44 +0000
 Authentication-Results: spf=pass (sender IP is 149.199.60.100)
- smtp.mailfrom=xilinx.com; gmail.com; dkim=none (message not signed)
- header.d=none;gmail.com; dmarc=bestguesspass action=none
+ smtp.mailfrom=xilinx.com; kernel.org; dkim=none (message not signed)
+ header.d=none;kernel.org; dmarc=bestguesspass action=none
  header.from=xilinx.com;
 Received-SPF: Pass (protection.outlook.com: domain of xilinx.com designates
  149.199.60.100 as permitted sender) receiver=protection.outlook.com;
  client-ip=149.199.60.100; helo=xsj-pvapsmtpgw02;
 Received: from xsj-pvapsmtpgw02 (149.199.60.100) by
- CY1NAM02FT014.mail.protection.outlook.com (10.152.75.142) with Microsoft SMTP
+ SN1NAM02FT059.mail.protection.outlook.com (10.152.72.177) with Microsoft SMTP
  Server (version=TLS1_0, cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.20.1558.11
- via Frontend Transport; Sun, 20 Jan 2019 17:26:01 +0000
-Received: from unknown-38-66.xilinx.com ([149.199.38.66]:47793
+ via Frontend Transport; Sun, 20 Jan 2019 17:39:43 +0000
+Received: from unknown-38-66.xilinx.com ([149.199.38.66]:56502
  helo=xsj-pvapsmtp01) by xsj-pvapsmtpgw02 with esmtp (Exim 4.63)
  (envelope-from <nava.manne@xilinx.com>)
- id 1glGrA-0001he-Mw; Sun, 20 Jan 2019 09:26:00 -0800
+ id 1glH4R-0001ke-0U; Sun, 20 Jan 2019 09:39:43 -0800
 Received: from [127.0.0.1] (helo=localhost)
  by xsj-pvapsmtp01 with smtp (Exim 4.63)
  (envelope-from <nava.manne@xilinx.com>)
- id 1glGr5-0000vL-J0; Sun, 20 Jan 2019 09:25:55 -0800
-Received: from xsj-pvapsmtp01 (xsj-smtp.xilinx.com [149.199.38.66])
- by xsj-smtp-dlp1.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id x0KHPior024221; 
- Sun, 20 Jan 2019 09:25:44 -0800
+ id 1glH4L-0002uF-Sc; Sun, 20 Jan 2019 09:39:37 -0800
+Received: from xsj-pvapsmtp01 (smtp.xilinx.com [149.199.38.66])
+ by xsj-smtp-dlp1.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id x0KHdTTM027267; 
+ Sun, 20 Jan 2019 09:39:29 -0800
 Received: from [172.23.37.118] (helo=xhdnavam40.xilinx.com)
  by xsj-pvapsmtp01 with esmtp (Exim 4.63)
  (envelope-from <nava.manne@xilinx.com>)
- id 1glGqu-0000sm-0f; Sun, 20 Jan 2019 09:25:44 -0800
+ id 1glH4C-0002tH-Nr; Sun, 20 Jan 2019 09:39:29 -0800
 From: Nava kishore Manne <nava.manne@xilinx.com>
 To: <mark.rutland@arm.com>, <michals@xilinx.com>, <RAJANV@xilinx.com>,
  <linux-arm-kernel@lists.infradead.org>, <linux-kernel@vger.kernel.org>,
  <devicetree@vger.kernel.org>, <JOLLYS@xilinx.com>,
- <chinnikishore369@gmail.com>
-Subject: [PATCH v3 4/6] dt-bindings: pinctrl: Add ZynqMP pin controller
- bindings
-Date: Mon, 21 Jan 2019 22:54:25 +0530
-Message-ID: <20190121172427.20446-5-nava.manne@xilinx.com>
+ <chinnikishore369@gmail.com>, <robh+dt@kernel.org>
+Subject: [PATCH v3 0/6] dt-bindings: Firmware node binding for ZynqMP core 
+Date: Mon, 21 Jan 2019 23:08:29 +0530
+Message-ID: <20190121173835.21173-1-nava.manne@xilinx.com>
 X-Mailer: git-send-email 2.18.0
-In-Reply-To: <20190121172427.20446-1-nava.manne@xilinx.com>
-References: <20190121172427.20446-1-nava.manne@xilinx.com>
 X-RCIS-Action: ALLOW
 X-TM-AS-Product-Ver: IMSS-7.1.0.1224-8.2.0.1013-23620.005
 X-TM-AS-User-Approved-Sender: Yes;Yes
@@ -101,71 +97,68 @@ X-EOPAttributedMessage: 0
 X-MS-Office365-Filtering-HT: Tenant
 X-Forefront-Antispam-Report: CIP:149.199.60.100; IPV:NLI; CTRY:US; EFV:NLI;
  SFV:NSPM;
- SFS:(10009020)(136003)(376002)(39850400004)(346002)(396003)(2980300002)(189003)(199004)(47776003)(39060400002)(14444005)(9786002)(106466001)(8676002)(2906002)(356004)(6666004)(107886003)(36756003)(4326008)(478600001)(316002)(50466002)(426003)(110136005)(106002)(50226002)(26005)(305945005)(1076003)(8936002)(76176011)(7696005)(51416003)(2616005)(54906003)(11346002)(2201001)(81156014)(81166006)(126002)(476003)(186003)(36386004)(30864003)(486006)(63266004)(77096007)(336012)(446003)(16586007)(48376002)(107986001)(5001870100001)(2101003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:BL0PR02MB4323; H:xsj-pvapsmtpgw02; FPR:;
- SPF:Pass; LANG:en; PTR:xapps1.xilinx.com,unknown-60-100.xilinx.com; MX:1; A:1;
-X-Microsoft-Exchange-Diagnostics: 1; CY1NAM02FT014;
- 1:4mAgxXH8lo63UxMWPeBn2uwKpRYbOi/1PgumcDBihwXhauRJxPvn7glEYHsinBS/dnqZ+nC3IGT4dZHTbeiEk80NQBI4TRYycyMm5DRPODSs7T8sJzGoZJDGlza6zeAJbdRxAhIjPwUuhmjEuEgFGyjR6yOeDZIx5S6dTc4fklM=
+ SFS:(10009020)(39830400003)(346002)(136003)(376002)(396003)(2980300002)(189003)(199004)(16586007)(356004)(316002)(106002)(7696005)(110136005)(4326008)(2906002)(36386004)(2201001)(1076003)(77096007)(4743002)(39060400002)(47776003)(48376002)(51416003)(50466002)(106466001)(2616005)(478600001)(126002)(107886003)(26005)(81156014)(81166006)(186003)(8936002)(476003)(50226002)(63266004)(426003)(336012)(305945005)(9786002)(36756003)(8676002)(486006)(107986001)(5001870100001)(2101003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BYAPR02MB4326; H:xsj-pvapsmtpgw02; FPR:;
+ SPF:Pass; LANG:en; PTR:unknown-60-100.xilinx.com,xapps1.xilinx.com; MX:1; A:1;
+X-Microsoft-Exchange-Diagnostics: 1; SN1NAM02FT059;
+ 1:LC2bd6kdKQskTQXDDyJJ5QT4nf3OvqhINa3OCA4mF6006InZNupOy6p5zP8wsf2WXkEtJBLRtRgjUA9H/n8aujdJkvfKVlZjr1WdStu9lLB+0tnbsjKonlYD+rPqFIrVU2R7dUj9+zFAgBR6zDSj0cOyPnpeH5Qp9MztqCjqsBg=
 MIME-Version: 1.0
 X-MS-PublicTrafficType: Email
-X-MS-Office365-Filtering-Correlation-Id: 26f57f87-86e1-46e4-ad7f-08d67efc5961
+X-MS-Office365-Filtering-Correlation-Id: 3f5cf06d-6cfd-408f-7969-08d67efe4368
 X-Microsoft-Antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4608076)(4709027)(2017052603328)(7153060);
- SRVR:BL0PR02MB4323; 
-X-Microsoft-Exchange-Diagnostics: 1; BL0PR02MB4323;
- 3:oE1dp4oMsIw2Y6+0WqkU0y1WijkEsHaZ2C4bTqWvLuuSECYgfj1JIt3hknWmCKB5CDBRBYAZoJpKa+2nQVW5c2MY0FSfNcR26IFUll/yGFkMpUQ3ySJSLgx9Kz6zgac9MjgMT4wbmncKRqWcAKoHA+pDOcxQdqMlHXzFEJ/TUsztV24k/uzbvFt3Tir8pS3DnUXIBod/imp9YRMfYHhBU6V3p+kRHc+8vlCJRFMHDxdoboQTNJiFwmgUAtqp5uFqvS2vCWja1LIiu+clkM7dqyKUrOxHeSCnejArF0e9Hr1PZwsIRdfA8fRkwmHm6ch5x9yOLEXSHAPQbCJn3V3UcWRCcciSk07aM7Hfmkw63ZUGZbh/sSGzKebGhA7aB1kL;
- 25:0H1ai1I/3kdEo/XmlHhJ9y7tohDsM7m/M4Zu+OMJUVuoaxsOyfTpqJe9w6w6SF1qH8d05J6ruPbiwNWWiUJNxdzmC88o9lHyCo7kcOcng6UsM8fa49nG+jSUptFDr1NHHt38rckmolRRVG9fCISfX7M6hNgtEXfVSTgdqQlZmlpC7FS1aAvk/TyUJ8HUxc+fO6NxxpucnDKaVkY6HCRAFQTHSgLCHCW8t5QKHwHfEdpZ6kCY2eNCIzk+JoS1oDCA9++vVn4Gh9LBpOF+qyyOD4IXVyi2ueAuqYdOjwbSnJ9de9K43AMpWvcgaZnmMqXJwAh+pfO27Inrlxrgjr324g==
-X-MS-TrafficTypeDiagnostic: BL0PR02MB4323:
-X-Microsoft-Exchange-Diagnostics: 1; BL0PR02MB4323;
- 31:Y3RFgVSxCsbnqOjpv7a4VG+5tDNENjvc7T9yPfYZN8GB84zqm2o9GrMDHBJlEntMU7vPeaozWYmILq6YiIEkERVSLficdFVlfUiqlAMerWmack5BzOQf6TcDy8/lRrZu5kllfV3f/j6cK4i1kvBGfYT0jXIz3uc+ZvMXQoKcadXOUdWs65D9amn2vu4Wrtt0CXH/O98A3NrdF82uViMImuMrubt0yEUT5yE/nvnQK5g=;
- 20:4ywozs+Jxt3bXw2oC4cXM6nLEIeij3FDUBQUHnZV6Rv20cFIZnSxcbKkJSDh3XTz2tI88MT/uFI7E1aPK8IqUuPOe6x0rPeD5m1Oia88hhegshCtzPOa999+iZtEBdxmEvmK/Gy5Mb8146UPDtLEaOylnGtnKZDa5xMrHuwFU4J70dz2VrfWBzVd1TAhu+8rRh3n4rOp6iGDdFcpM/BNqUDUmSmV8XfzVFR1YS261vfkzcgvpwPJS95cehquz9agQE1j9GBOMk/FMIxaEpELvrmvV7/AiDljVC3LhwbjhwNYsY1nyX8wGm7w5sT61PM+arG0+oN3UVKxYOdOGf1IUIWIMoqxHN4GS/SuullJfavY3jy8XKTnXOnmnBVcFtAmjnt8SqQOvWpz/MZ3nb+2/R8jT5bTYRxhyn0AfPU0weUgCftvbDcH7VbE7NV8YcQ4sMRnpJzPlIoXsre/I7lLs6e67XNJJx2lMVTCBR1lOvQeQtISUP2xmn56o4mAWjLj
+ SRVR:BYAPR02MB4326; 
+X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB4326;
+ 3:efdACvpvE8Ux8x4HhJeYqttSwi2DdwTGMYatc9IV5LCGjgeXgZN101dMdfprl6wa+xR42u6FstcCrhVeFRFr4oszG1ezf3z8gDLbWQ75w85dagmP8biIgC9eUp2PIjU/JHrd6LsWPJPYLFPehHDXPJ0tYXDogEsmBjc0f12gr3lRuxs1aQWLVdGuOs4809BBCCJ7d9wMayOkfjbeYVo4qyDSpj8BeviXPJmSAa6ZYHAUtJanED1zRV7oTzVZ0Mo1JV8fItUGMp6GodVAqu0DNrarNzF3T+XL6RxrbFCX8P6g9Un3WwV9HGgRCo1iarQVO4V33UoVeBXX2tIsHNs6lbLrnHZA9STGAxDVnr1wAlBMn2atgu9AkFhSZ1x2GEY4;
+ 25:gJFD3JpOKm1MwCpu0M/w6MHNgQ/5iHflBdguIxFbpnfgmyEdAbVxSZxQ9jYKwZqla4vd6YBnQB6NLGFkOYWLTYNZLUCPX3u6EWOG7szQooyZdkxarrJAVLyvJ9QaLVoGxnL1kn9n3Cb7HSiTxEnYTFsUu+IQb6ES+CHFtJAA1TO5+wDeE+rZzGv0xGYT7qwLLmRY44YNsTY+x5YEXvdXAjLF2gE1Z7VID1GRAw8wUvufM3kRyLpqXe45NKUgrTsp58+FjmW7HGGz6fI+gDpxy89oci+Jhtkj0YyL6RKUN7hy2mbWX9DBNxXx0wHCiLslxev9DA4u2IwM1JQIkBHRQA==
+X-MS-TrafficTypeDiagnostic: BYAPR02MB4326:
+X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB4326;
+ 31:qXU4EsrHbJ5aGALvdgPknP87N5es8uJjVN6l8EydoNo/zj6WGKvSxqz0x+Dks3MTvQ73iLHvqcgCriEZlqG7Ch3fka+h3vM3ZIUzGIah0KHI1WpfTLOPaPYII/aRh7rvIhQwVRgYjrGFZdXW04NTX3zjCtDEe3EnTmlMzKPbEHo3MEX2reTM+swzd2ndCQoavYPujn0UY6yYjyOIMu9Ly3x8iaqE7oHPKYgg0TrLkbs=;
+ 20:Z89FXn0dJ9ytq2LC+GGzgmiZI8VNJzWUwUXid6gm5qmMoC5Sz1E7NiIaWwvWiBX57EH9xQr7JzxqhwCReD96yH8BPwPprUdZdrgm7CQETR6qAA19rwY+OUC73DHB6JyffikzH0le4bcX51yf4q1XFPAuv2gVoibA7EIfWrWuJMPLmTq6/dFOzMu4VR4ldcleq4r7tC+ZAmh8f8xzHU1y2EDROmI+lYxTjXIRk3+SCfYf2OUlwMgj8MAe7C8bbLC+VqCy9YhONQlJRNMk05JhMPospsEm2Ac/g1ntBKyO8nmNzRFxx3kts5cA5RgP82Pv2mhmm5urQ7rsaka+FdlBacvWIHIKm/1Nti6xbctqBfCeoxzMX0N1BDlxGuhHAFbbGF/7LvbnrBcaVUf7wPuCfBPUQSJUXfQzKVwnhmq72XGXvGObH+ANhdyeE7jdkTgsDhzZwkI72Ge7RCPt1wwlY84+PlFMnXpULBmDHFI/YDIZiq0Vd0pL/zW/UZL87iQj
 X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
-X-Microsoft-Antispam-PRVS: <BL0PR02MB4323715CFB618B8069E45427C29E0@BL0PR02MB4323.namprd02.prod.outlook.com>
-X-Microsoft-Exchange-Diagnostics: 1; BL0PR02MB4323;
- 4:Khm3sHm6Bi1U4vEG3t2n9aiblwQPxLG+7s0e57OxgSeLrXvCnMfegrckz2dyegNrbJJ5iVDNF44MseWYeMGq+eQ0+M6WQDrd+lPKpFmeS74zd/K9Sv7Euj8uFLS5yxASdUoq59sMWs97dQV2I6US7Ugpl3rs+GCPNP+n/Ihto07YjQryZG/s7L/rKCFAFS1EfDiWdTD2wAjF6bozKuknBQQstQ1yBnzYnAqrypHYDLgoL1n3thGI6ETA6bgFdpi0jKTonrdhC/JlhHcKA7yS9DIjLSesW9BOPPO+2c/ffzg=
+X-Microsoft-Antispam-PRVS: <BYAPR02MB4326F064BF04A02633CF5595C29E0@BYAPR02MB4326.namprd02.prod.outlook.com>
+X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB4326;
+ 4:C5LDDHPpmgpJ4W9rNq3pWuXPo0E+XA6Ah/h3DCjZypu0gptWbjE3b42tR+R4VCGCdOmU0U7aN/OHXAkcp2dIteTjBvQjiIrLXDwExP88jYNGYOMcH4jwulGy2kBH7REY15cnxJDUpFKNMlnjtj5sWK9LZXti9tPpQuzMgvgmGNIBWkGafzFS3R9moehe9vJOH5qbpA6YDppieK+MvpMmmZqLYZoKAaFzi36ILGHyVJF6HZ+dd7nuTfKhEZ5VR1JOE6cm3n7jZ8je/+4bxhPlvmiOAeRoXFcdrinRte8+jGlCStq7X6385kQ/yZU8b0k7
 X-Forefront-PRVS: 0923977CCA
-X-Microsoft-Exchange-Diagnostics: =?us-ascii?Q?1; BL0PR02MB4323;
- 23:1WFoDFyipDOjrWTp+mNKz9OvwQqnWfaVhWfC4hyY5?=
- =?us-ascii?Q?lK0tJJ7fjwo3sp120ykCPNHzQdb960aKgr/Vrj5b6UwDUqcKALmYUQGv3zSL?=
- =?us-ascii?Q?R0f5eTw35LTw2ibeOPB5eIUdrrjqf4EA1RUbnbK55LAHI6jQhC2j54Vcmtjt?=
- =?us-ascii?Q?0jYrQhQvJzhsrl5cxdAsIjX90MUdzHIJegwxIsm1ZC8XCVlUTbYpNcmhHAL8?=
- =?us-ascii?Q?f8c6oL0hTyVu22JYc1VIooZam9BykZ8cfrrg44hGdswFXH0ua/ZQmv5UYdkw?=
- =?us-ascii?Q?HqnhaMnVrdC1tf4Eq/pghDqA2sAT3/rsJnEf7epyOgoKc0SkcpBpZAMHdqf1?=
- =?us-ascii?Q?+oI+SxTzAIuvnYCfQuCt++XbJu2+xpS64OS7ZydYOueRVyogFTgHcHPmUC08?=
- =?us-ascii?Q?iLhn0XVP6x6C5Jcq4RigFmJKSXxHc6bzQQben2xmQdQquOGihL7C4L8PwCBK?=
- =?us-ascii?Q?o/WIIXV4UHpw2yRC1ClJRJ8HOsZBZREJsp5PtVW9PGPrqZXaCWINuyB3sZNS?=
- =?us-ascii?Q?/D86JXCwznCdkB02esbAndBzZ169yRa1KyJC6yOLAU7ts/gZYGH5xUHgJtT8?=
- =?us-ascii?Q?8rtWWEG7yx0w2OVUYl6kyW33RJEKS8WG1nANBTBpTXajFfu+WAO1Za1nr133?=
- =?us-ascii?Q?uy9QTj50D9dW7ZB6vPGMJAPl+FefwpKBYLIQAwMIK8OMIK8bZoKDt1oHb7qV?=
- =?us-ascii?Q?40clvXoCPtwtDKfR6jidMunID9eJaasGhSHQgs/VZb3ZnW5jQkdOKl7aJR91?=
- =?us-ascii?Q?+pUybLLPirKYu4ratH7pbM/4fWDFd4dZ068kXIjGS0429Nk2jeYeuaSNdeGY?=
- =?us-ascii?Q?Uke3AWyEGtWy/W/gsLilQxrLwx//XPMPHAqeZbansIiICpUoEhGD5uDBKR+b?=
- =?us-ascii?Q?kEbytyJhZ5gQWZnJvQJ8xb9NRObOuOZFw5XdvWQ3lw9YuYMeH6JGn1KUkAwf?=
- =?us-ascii?Q?xnXOxNmmEOZvRyTLqY7F841wCzGLJgz6dV/CZoa9uYWVHZSbXGwL3tIwJd0b?=
- =?us-ascii?Q?6RPncjNz0lDWL4BLG2O58x9VfZJCbWuGQVFpqpB7lFztCYpH73PHqwXKbMnE?=
- =?us-ascii?Q?e6vVd8LQX7Y/HqP8WQovwRO/jtAjVu75CmchRiY+/jabcEleIgenwIfRnQbW?=
- =?us-ascii?Q?33cNAD5+3WpHi8S6sf2phPbwsSriNvt7s99KTDDYyVOLOmQOHHQXPqKkI8Xp?=
- =?us-ascii?Q?LtWGLG69+tC6cwWVzIWYTI9K6LO/hgvzIbyF6MHYHJ6+52fuJrzW7Na+A=3D?=
- =?us-ascii?Q?=3D?=
+X-Microsoft-Exchange-Diagnostics: =?us-ascii?Q?1; BYAPR02MB4326;
+ 23:XHUV+CJR1yjp1m+NOayfCWWkg2+MJK1BmHEdOXk/Y?=
+ =?us-ascii?Q?VFBuOouYtkNeM+fsbKPgOU15I+QfolM1qJ1mB2nnsUls97S8q4nJ64YFj8gU?=
+ =?us-ascii?Q?srbBmr/GyBMVnu8lPs1gcA/X9Otu8M/qHElzHUC3pDWLgRVmTQDxiFFvcWN5?=
+ =?us-ascii?Q?6PFeitlUEefm26j5s50ZvZaHfaKDN8ktHTtRyH18txOHjGGkR3d/1jZcmiTo?=
+ =?us-ascii?Q?f6T/n1ttt8adZzhCfkDg+LCWizIcLuYYkdrZNC9HzF/t2Ee+42f/kzwh6QVe?=
+ =?us-ascii?Q?3y47kvuJkMBmTtj9/lrBnl5ro082NVcHsRTbMeRVf4l2ZcIgHRwmBMwMDCpP?=
+ =?us-ascii?Q?30fImwcKzUqqEYH996j3x7/2H6W5DVANCKvfrXNyfz40E4JTWc48N0rPGmAX?=
+ =?us-ascii?Q?MWfFfS6XjcMOBb9YHqIn3OaduleY3kvOGIJ8PvBqKntnekQuAH4ncMPXRwCB?=
+ =?us-ascii?Q?spZX12IHF0edeQeDWYt3wkAJFB8ERxSfJID45V0ihWV2CAIZMD87Ldp8QWg2?=
+ =?us-ascii?Q?2gEF8Q0CsMH7iX+IrKwt38V1xswew7srsiTTzx0bh8ZDZjBEkO0Wr9gLlXWw?=
+ =?us-ascii?Q?IcK1bmLAMr5ezGB1/FfwkIqUbFD/cT67XTwO7bdGLIY8fN6/feHhxcMxPGWL?=
+ =?us-ascii?Q?OUTJNB+UOTapSxNCR7YivVsqKqDUdxi8EUxDGGjXm5MXCqJTF2n/gwLK+8fH?=
+ =?us-ascii?Q?rnJfKFORyNrIpG7QRqkSZq/96fT1DhdehB5m/J5/UZm0iFnuXGDGcdJ4vYM0?=
+ =?us-ascii?Q?Ftauc3m1fJsCkEAxUe+PGGCRlpQcrRV8iRp8BurbF23lAtmhssGilPiw3dr+?=
+ =?us-ascii?Q?Q9vqNPsEMprnEsibHnj2OZAj3Oku+eDF0lQGvJdRa2+BSBUYJ/db0TBy2vgR?=
+ =?us-ascii?Q?J/ZMVZIRKcjRsdIT022Gv537CJ40fpy6N2iBg+RQiVyBw6L1RT9bO92ghMyN?=
+ =?us-ascii?Q?38AUQG/hkc+4Vl5VWoG/Jt20r4zWS+6gZfKiRf6994ww/7/gmEWmIeHXgog8?=
+ =?us-ascii?Q?uWYWD5KKFwX5g+adj8vrlRPXy4JpdfH3YkQtUpUinBl+TokI0TMkW/Nyuedr?=
+ =?us-ascii?Q?7PuVd5vMf42zx4dANhsDBjT48Bz54DS1SVJjLd9PAUIBgR3nQ=3D=3D?=
 X-MS-Exchange-SenderADCheck: 1
-X-Microsoft-Antispam-Message-Info: qiHdy901UTgfy3rLfodVwaI5D4hk6Utr4gpZ6lvrPKqYUDtB1ekWE56uBXscGLox7Wpcd654mV63W4xiLBd0P7sLiFkriwDsMBmIUc7ofXfYRWednDluKN9ytPyM6+JnY7/heoXVj6CEY1eA15ZBXOF4r929vonOfIpbo7zVHAdwFb5wNmFpWXEzZq82amtgswzEHAUqgFQqJ6fQ2NgrltkiObXaqZlcmTPkOtEMpZh0S6VQm2YzQ1QlSkht7Soa1TtgquwDjF6QbnjlvxfdEMMQJLvgEyZdTGpc0y9CfVddDM4stFQfo1YZFg75OwytJWYfX/TQ/fF3baAfZQEa/HC7WIlIYTZlQRuv8cG/zzx+8vib7gYkKB8Hmk/TCpmQodC9dZlT/+/oKzFNRODXYdqP8HyDXjIgEICQ4j0EIn8=
-X-Microsoft-Exchange-Diagnostics: 1; BL0PR02MB4323;
- 6:30Bvt5TPG8/ExIyLMj5jEZYx/WZzy1VRjv7n8/9LoVKg27W2US3/jYjMCiTlay+edpqwqPk0GgaOdFp7N1rxKZgZb96HguZ7iMKwRhBJbnJ3thYmbP24mMGE9xYJDDbWXfHZlEEW2ocxgZgURLp94NcaKdwbVJKrensfcTbSPXCfiTzpGPfqDCF1ZEvoeyPwmwuvJJC7w2z9U4cboSwJ5+wKpvYzxuFvxLG93Jn6w3Sd5QSXZQx120fpyyxzD8ZXopbtC6Bkjqu6XlcCkL/7/cZ/z/N5o0CWGfhCURgLxzLJzhf9xiDbLGDpT4IIo7QQSTzYp9Vo9CR4ri3OWWF0qdG/0oLhK/4ifGh2GEREFZI+OwS1pZgPWGvuYhIz/uwv1tALqzQZxJG6aYqJKNh3IAOAhKqYa5lotVDvb26D9NKQxV26+O7CyYzQJgIqpMFQLCUPpZ/zV4f4L6OC8BADRw==;
- 5:JHU6VySkfdSObkUMj8BGV1cPdLiYHG3pCRVlAI0jeaKpxmrLnD34eP8UHr7LYQxWQm6/iCHcbJB/V+QQuKn0aAx69XF6L4n4i+5vFpjV18u8M7BuXe/qlPXiFTXW3Btgahg9RIdl6tChPBRIiNPU7ZuOUdIXKAy2t4k34fi59z9OHaQfjRs2JsykIyi6I2WWvBw3wiB6tTHyHGnHCPm12w==;
- 7:HmnHB4+ddpcpRFYQEt0kP+nLN8QCbrFeczTQ9+1WHgBtA+5b5AMVxFjn9QM0xo1YCTu5ONxiH7BITFPcNE40/6WlXbwneoiDjFjBpo6KeJMerhX39hMKNaHiNRrVWSqQguNpKkF3F4TGJNo7auw0gw==
+X-Microsoft-Antispam-Message-Info: te4vK2sqAlyRgXuKi8+gBiwIL9xRSn2g+5jGW3FErDndJyFGMxdAumg0BSTlBuXzEIbfzBKV63Ww35BlRmNthUI8Ocq4GO48izLyTxkGMZs79W/paJ8ZLpOvxT9q5m4VGIBpQn3NpAnU3Vfryi1SK3/e5tIEAUlK/14bu90oP8IapM8BRyMZYcaEI8/fOkRRLeklLZupRGYOIOAidaIYDVozYtFi757D3WU+OavBbQAXVNmvsmIh/WxQcuA1sgtX321wT39Txro8I1CjLlKq8g0EWa1OpZVqgl4T+ZiLAMRAzDz7dWMlUYod/O705/HrpcErFwmPJn7q+I9UoBKmBKdT0lqUlGErWR1H+/iaRo6o2FdbrYhjdClXVewulvz7eT/mj1YAzRbe6wy6jwMQKOSipFZjSc18GJztjy9ZBtE=
+X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB4326;
+ 6:UgAkdvsVj3oenTpvUKGkAu51h6RPlJcxg5a8IAk7gbZv/+CDTwWKelAUby65MCePIfjK+nQKU8jU8tZbIrhell8fg5uV+kYvTftjdad/i7TxP3TgxlOMx7GcE97Uxt8/eyBQn2Uo1zWjLUaQ50YNZ5cT19qC/PcupJKoBdUNRhD6d+QTwhB9fvkMBfYkdvHyxedxX430yRTn7rAiFcpNR2jesQRi/Lfnd5xguK5X9kRpW+m+1g/RN9EGxOFam6N3t7XVxt7fw68soKK23vXfaETabNJlUK4wuln9VAH2qmErGUW9ecBsNRA9winmdiLFLrUM9lZHkdU3VUbuUU4gCnS+nLFor4ONVQAvK8q9F+gswUMAeZuaalc8h3pdN9ja1T5O7n5tC6YtzjqxLVhJx3wRCeo/MuhZkjIEkyixjIzCRq0GV39M/lpW/ShHY62bTNCYKhTkvaQVQ8Pdrd6cgg==;
+ 5:NA1twS7XGoXRISAUbjmXW9YGwYQj5oBYLs7gMKYXxXmMU8OpWWp6R0IIhToediCX6Zg/5lI0uoVCOua6Ps16EZy2BebI33RLXD5/fj7vyL5LZKPFSUSNUFJyAFPCtHB/W3lZvlk48/sORkszYfDwrt5yV0u3Vp2uMJpiao47PcqdZSWCuboHEqXmIgtffVtHKBexrJEX9L6YWBRXrMo2dg==;
+ 7:0eoEb1lhrNLpeP2KeVBs9STH+saPcG+0eX5XOr8s0K4AR0KRi+ByskjwFPI6DaoCFOXuLKhGtp70M/9TxLJ3V4KeNwjh6EUQqun0lY6zqDB2DrUEkTuFScqkVLtUBxvHhZk6lFCl/QaHQzvWba1Emw==
 SpamDiagnosticOutput: 1:99
 SpamDiagnosticMetadata: NSPM
 X-OriginatorOrg: xilinx.com
-X-MS-Exchange-CrossTenant-OriginalArrivalTime: 20 Jan 2019 17:26:01.2185 (UTC)
-X-MS-Exchange-CrossTenant-Network-Message-Id: 26f57f87-86e1-46e4-ad7f-08d67efc5961
+X-MS-Exchange-CrossTenant-OriginalArrivalTime: 20 Jan 2019 17:39:43.3935 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 3f5cf06d-6cfd-408f-7969-08d67efe4368
 X-MS-Exchange-CrossTenant-Id: 657af505-d5df-48d0-8300-c31994686c5c
 X-MS-Exchange-CrossTenant-OriginalAttributedTenantConnectingIp: TenantId=657af505-d5df-48d0-8300-c31994686c5c; Ip=[149.199.60.100];
  Helo=[xsj-pvapsmtpgw02]
 X-MS-Exchange-CrossTenant-FromEntityHeader: HybridOnPrem
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: BL0PR02MB4323
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BYAPR02MB4326
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190120_092606_593203_14BEF7F7 
-X-CRM114-Status: UNSURE (   9.52  )
+X-CRM114-CacheID: sfid-20190120_093947_471890_100CCFBC 
+X-CRM114-Status: UNSURE (   8.29  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -178,309 +171,111 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jolly Shah <jollys@xilinx.com>, Rajan Vaja <rajan.vaja@xilinx.com>
+Cc: Nava kishore Manne <nava.manne@xilinx.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Rajan Vaja <rajan.vaja@xilinx.com>
+Base firmware node and clock child node binding are part of mainline kernel.
+This patchset adds documentation to describe rest of the firmware child node bindings. 
 
-Add documentation to describe Xilinx ZynqMP pin controller
-bindings.
+Complete firmware DT node example is shown below for ease of understanding:
 
-Signed-off-by: Rajan Vaja <rajan.vaja@xilinx.com>
-Signed-off-by: Jolly Shah <jollys@xilinx.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
----
-Changes for v3:
-		-None.
+firmware {
+	zynqmp_firmware: zynqmp-firmware {
+		compatible = "xlnx,zynqmp-firmware";
+		method = "smc";
+		#power-domain-cells = <1>;
+		#reset-cells = <1>;
 
+		zynqmp_clk: clock-controller {
+			#clock-cells = <1>;
+			compatible = "xlnx,zynqmp-clk";
+			clocks = <&pss_ref_clk>, <&video_clk>, <&pss_alt_ref_clk>, <&aux_ref_clk>, <&gt_crx_ref_clk>;
+			clock-names = "pss_ref_clk", "video_clk", "pss_alt_ref_clk","aux_ref_clk", "gt_crx_ref_clk";
+		};
+
+		zynqmp_power: zynqmp-power {
+			compatible = "xlnx,zynqmp-power";
+			interrupts = <0 35 4>;
+		};
+
+		zynqmp_reset: reset-controller {
+			compatible = "xlnx,zynqmp-reset";
+			#reset-cells = <1>;
+		};
+	
+		nvmem_firmware {
+			compatible = "xlnx,zynqmp-nvmem-fw";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			/* Data cells */
+			soc_revision: soc_revision {
+				reg = <0x0 0x4>;
+			};
+		};
+
+		pinctrl0: pinctrl@ff180000 {
+			compatible = "xlnx,zynqmp-pinctrl";
+
+			pinctrl_uart1_default: uart1-default {
+				mux {
+					groups = "uart0_4_grp";
+					function = "uart0";
+				};
+	
+				conf {
+					groups = "uart0_4_grp";
+					slew-rate = <SLEW_RATE_SLOW>;
+					io-standard = <IO_STANDARD_LVCMOS18>;
+				};
+	
+				conf-rx {
+					pins = "MIO18";
+					bias-high-impedance;
+				};
+	
+				conf-tx {
+					pins = "MIO19";
+					bias-disable;
+					schmitt-cmos = <PIN_INPUT_TYPE_CMOS>;
+				};
+			};
+		};
+	};
+};
+
+
+Nava kishore Manne (3):
+  dt-bindings: reset: Add bindings for ZynqMP reset driver
+  dt-bindings: nvmem: Add bindings for ZynqMP nvmem driver
+  dt-bindings: fpga: Add bindings for ZynqMP fpga driver
+
+Rajan Vaja (3):
+  dt-bindings: power: Add ZynqMP power domain bindings
+  dt-bindings: soc: Add ZynqMP PM bindings
+  dt-bindings: pinctrl: Add ZynqMP pin controller bindings
+
+ .../bindings/fpga/xlnx,zynqmp-pcap-fpga.txt   |  13 +
+ .../bindings/nvmem/xlnx,zynqmp-nvmem.txt      |  47 +++
  .../bindings/pinctrl/xlnx,zynqmp-pinctrl.txt  | 275 ++++++++++++++++++
- 1 file changed, 275 insertions(+)
+ .../power/reset/xlnx,zynqmp-power.txt         |  25 ++
+ .../bindings/power/xlnx,zynqmp-genpd.txt      |  34 +++
+ .../bindings/reset/xlnx,zynqmp-reset.txt      |  52 ++++
+ include/dt-bindings/power/xlnx-zynqmp-power.h |  39 +++
+ .../dt-bindings/reset/xlnx-zynqmp-resets.h    | 130 +++++++++
+ 8 files changed, 615 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt
+ create mode 100644 Documentation/devicetree/bindings/nvmem/xlnx,zynqmp-nvmem.txt
  create mode 100644 Documentation/devicetree/bindings/pinctrl/xlnx,zynqmp-pinctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/power/reset/xlnx,zynqmp-power.txt
+ create mode 100644 Documentation/devicetree/bindings/power/xlnx,zynqmp-genpd.txt
+ create mode 100644 Documentation/devicetree/bindings/reset/xlnx,zynqmp-reset.txt
+ create mode 100644 include/dt-bindings/power/xlnx-zynqmp-power.h
+ create mode 100644 include/dt-bindings/reset/xlnx-zynqmp-resets.h
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/xlnx,zynqmp-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/xlnx,zynqmp-pinctrl.txt
-new file mode 100644
-index 000000000000..acf44a5d3778
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pinctrl/xlnx,zynqmp-pinctrl.txt
-@@ -0,0 +1,275 @@
-+	Binding for Xilinx ZynqMP Pinctrl
-+
-+Required properties:
-+- compatible: "xlnx,zynqmp-pinctrl"
-+
-+Please refer to pinctrl-bindings.txt in this directory for details of the
-+common pinctrl bindings used by client devices, including the meaning of the
-+phrase "pin configuration node".
-+
-+ZynqMP's pin configuration nodes act as a container for an arbitrary number of
-+subnodes. Each of these subnodes represents some desired configuration for a
-+pin, a group, or a list of pins or groups. This configuration can include the
-+mux function to select on those pin(s)/group(s), and various pin configuration
-+parameters, such as pull-up, slew rate, etc.
-+
-+Each configuration node can consist of multiple nodes describing the pinmux and
-+pinconf options. Those nodes can be pinmux nodes or pinconf nodes.
-+
-+The name of each subnode is not important; all subnodes should be enumerated
-+and processed purely based on their content.
-+
-+Required properties for pinmux nodes are:
-+ - groups: A list of pinmux groups.
-+ - function: The name of a pinmux function to activate for the specified set
-+   of groups.
-+
-+Required properties for configuration nodes:
-+One of:
-+ - pins: A list of pin names
-+ - groups: A list of pinmux groups.
-+
-+The following generic properties as defined in pinctrl-bindings.txt are valid
-+to specify in a pinmux subnode:
-+ groups, function
-+
-+The following generic properties as defined in pinctrl-bindings.txt are valid
-+to specify in a pinconf subnode:
-+ groups, pins, bias-disable, bias-pull-up, bias-pull-down, slew-rate
-+
-+ Valid arguments for 'slew-rate' are 'SLEW_RATE_SLOW' and 'SLEW_RATE_FAST' to
-+ select between slow and fast respectively.
-+
-+ Valid values for groups are:
-+ ethernet0_0_grp, ethernet1_0_grp, ethernet2_0_grp,
-+ ethernet3_0_grp, gemtsu0_0_grp, gemtsu0_1_grp,
-+ gemtsu0_2_grp, mdio0_0_grp, mdio1_0_grp,
-+ mdio1_1_grp, mdio2_0_grp, mdio3_0_grp,
-+ qspi0_0_grp, qspi_ss_0_grp, qspi_fbclk_0_grp,
-+ spi0_0_grp, spi0_ss_0_grp, spi0_ss_1_grp,
-+ spi0_ss_2_grp, spi0_1_grp, spi0_ss_3_grp,
-+ spi0_ss_4_grp, spi0_ss_5_grp, spi0_2_grp,
-+ spi0_ss_6_grp, spi0_ss_7_grp, spi0_ss_8_grp,
-+ spi0_3_grp, spi0_ss_9_grp, spi0_ss_10_grp,
-+ spi0_ss_11_grp, spi0_4_grp, spi0_ss_12_grp,
-+ spi0_ss_13_grp, spi0_ss_14_grp, spi0_5_grp,
-+ spi0_ss_15_grp, spi0_ss_16_grp, spi0_ss_17_grp,
-+ spi1_0_grp, spi1_ss_0_grp, spi1_ss_1_grp,
-+ spi1_ss_2_grp, spi1_1_grp, spi1_ss_3_grp,
-+ spi1_ss_4_grp, spi1_ss_5_grp, spi1_2_grp,
-+ spi1_ss_6_grp, spi1_ss_7_grp, spi1_ss_8_grp,
-+ spi1_3_grp, spi1_ss_9_grp, spi1_ss_10_grp,
-+ spi1_ss_11_grp, spi1_4_grp, spi1_ss_12_grp,
-+ spi1_ss_13_grp, spi1_ss_14_grp, spi1_5_grp,
-+ spi1_ss_15_grp, spi1_ss_16_grp, spi1_ss_17_grp,
-+ sdio0_0_grp, sdio0_1_grp, sdio0_2_grp,
-+ sdio0_3_grp, sdio0_4_grp, sdio0_5_grp,
-+ sdio0_6_grp, sdio0_7_grp, sdio0_8_grp,
-+ sdio0_9_grp, sdio0_10_grp, sdio0_11_grp,
-+ sdio0_12_grp, sdio0_13_grp, sdio0_14_grp,
-+ sdio0_15_grp, sdio0_16_grp, sdio0_17_grp,
-+ sdio0_18_grp, sdio0_19_grp, sdio0_20_grp,
-+ sdio0_21_grp, sdio0_22_grp, sdio0_23_grp,
-+ sdio0_24_grp, sdio0_25_grp, sdio0_26_grp,
-+ sdio0_27_grp, sdio0_28_grp, sdio0_29_grp,
-+ sdio0_30_grp, sdio0_31_grp, sdio0_32_grp,
-+ sdio0_pc_0_grp, sdio0_cd_0_grp, sdio0_wp_0_grp,
-+ sdio0_pc_1_grp, sdio0_cd_1_grp, sdio0_wp_1_grp,
-+ sdio0_pc_2_grp, sdio0_cd_2_grp, sdio0_wp_2_grp,
-+ sdio1_0_grp, sdio1_1_grp, sdio1_2_grp,
-+ sdio1_3_grp, sdio1_4_grp, sdio1_5_grp,
-+ sdio1_6_grp, sdio1_7_grp, sdio1_8_grp,
-+ sdio1_9_grp, sdio1_10_grp, sdio1_11_grp,
-+ sdio1_12_grp, sdio1_13_grp, sdio1_14_grp,
-+ sdio1_15_grp, sdio1_pc_0_grp, sdio1_cd_0_grp,
-+ sdio1_wp_0_grp, sdio1_pc_1_grp, sdio1_cd_1_grp,
-+ sdio1_wp_1_grp, nand0_0_grp, nand0_ce_0_grp,
-+ nand0_rb_0_grp, nand0_dqs_0_grp, nand0_ce_1_grp,
-+ nand0_rb_1_grp, nand0_dqs_1_grp, can0_0_grp,
-+ can0_1_grp, can0_2_grp, can0_3_grp,
-+ can0_4_grp, can0_5_grp, can0_6_grp,
-+ can0_7_grp, can0_8_grp, can0_9_grp,
-+ can0_10_grp, can0_11_grp, can0_12_grp,
-+ can0_13_grp, can0_14_grp, can0_15_grp,
-+ can0_16_grp, can0_17_grp, can0_18_grp,
-+ can1_0_grp, can1_1_grp, can1_2_grp,
-+ can1_3_grp, can1_4_grp, can1_5_grp,
-+ can1_6_grp, can1_7_grp, can1_8_grp,
-+ can1_9_grp, can1_10_grp, can1_11_grp,
-+ can1_12_grp, can1_13_grp, can1_14_grp,
-+ can1_15_grp, can1_16_grp, can1_17_grp,
-+ can1_18_grp, can1_19_grp, uart0_0_grp,
-+ uart0_1_grp, uart0_2_grp, uart0_3_grp,
-+ uart0_4_grp, uart0_5_grp, uart0_6_grp,
-+ uart0_7_grp, uart0_8_grp, uart0_9_grp,
-+ uart0_10_grp, uart0_11_grp, uart0_12_grp,
-+ uart0_13_grp, uart0_14_grp, uart0_15_grp,
-+ uart0_16_grp, uart0_17_grp, uart0_18_grp,
-+ uart1_0_grp, uart1_1_grp, uart1_2_grp,
-+ uart1_3_grp, uart1_4_grp, uart1_5_grp,
-+ uart1_6_grp, uart1_7_grp, uart1_8_grp,
-+ uart1_9_grp, uart1_10_grp, uart1_11_grp,
-+ uart1_12_grp, uart1_13_grp, uart1_14_grp,
-+ uart1_15_grp, uart1_16_grp, uart1_17_grp,
-+ uart1_18_grp, i2c0_0_grp, i2c0_1_grp,
-+ i2c0_2_grp, i2c0_3_grp, i2c0_4_grp,
-+ i2c0_5_grp, i2c0_6_grp, i2c0_7_grp,
-+ i2c0_8_grp, i2c0_9_grp, i2c0_10_grp,
-+ i2c0_11_grp, i2c0_12_grp, i2c0_13_grp,
-+ i2c0_14_grp, i2c0_15_grp, i2c0_16_grp,
-+ i2c0_17_grp, i2c0_18_grp, i2c1_0_grp,
-+ i2c1_1_grp, i2c1_2_grp, i2c1_3_grp,
-+ i2c1_4_grp, i2c1_5_grp, i2c1_6_grp,
-+ i2c1_7_grp, i2c1_8_grp, i2c1_9_grp,
-+ i2c1_10_grp, i2c1_11_grp, i2c1_12_grp,
-+ i2c1_13_grp, i2c1_14_grp, i2c1_15_grp,
-+ i2c1_16_grp, i2c1_17_grp, i2c1_18_grp,
-+ i2c1_19_grp, ttc0_clk_0_grp, ttc0_wav_0_grp,
-+ ttc0_clk_1_grp, ttc0_wav_1_grp, ttc0_clk_2_grp,
-+ ttc0_wav_2_grp, ttc0_clk_3_grp, ttc0_wav_3_grp,
-+ ttc0_clk_4_grp, ttc0_wav_4_grp, ttc0_clk_5_grp,
-+ ttc0_wav_5_grp, ttc0_clk_6_grp, ttc0_wav_6_grp,
-+ ttc0_clk_7_grp, ttc0_wav_7_grp, ttc0_clk_8_grp,
-+ ttc0_wav_8_grp, ttc1_clk_0_grp, ttc1_wav_0_grp,
-+ ttc1_clk_1_grp, ttc1_wav_1_grp, ttc1_clk_2_grp,
-+ ttc1_wav_2_grp, ttc1_clk_3_grp, ttc1_wav_3_grp,
-+ ttc1_clk_4_grp, ttc1_wav_4_grp, ttc1_clk_5_grp,
-+ ttc1_wav_5_grp, ttc1_clk_6_grp, ttc1_wav_6_grp,
-+ ttc1_clk_7_grp, ttc1_wav_7_grp, ttc1_clk_8_grp,
-+ ttc1_wav_8_grp, ttc2_clk_0_grp, ttc2_wav_0_grp,
-+ ttc2_clk_1_grp, ttc2_wav_1_grp, ttc2_clk_2_grp,
-+ ttc2_wav_2_grp, ttc2_clk_3_grp, ttc2_wav_3_grp,
-+ ttc2_clk_4_grp, ttc2_wav_4_grp, ttc2_clk_5_grp,
-+ ttc2_wav_5_grp, ttc2_clk_6_grp, ttc2_wav_6_grp,
-+ ttc2_clk_7_grp, ttc2_wav_7_grp, ttc2_clk_8_grp,
-+ ttc2_wav_8_grp, ttc3_clk_0_grp, ttc3_wav_0_grp,
-+ ttc3_clk_1_grp, ttc3_wav_1_grp, ttc3_clk_2_grp,
-+ ttc3_wav_2_grp, ttc3_clk_3_grp, ttc3_wav_3_grp,
-+ ttc3_clk_4_grp, ttc3_wav_4_grp, ttc3_clk_5_grp,
-+ ttc3_wav_5_grp, ttc3_clk_6_grp, ttc3_wav_6_grp,
-+ ttc3_clk_7_grp, ttc3_wav_7_grp, ttc3_clk_8_grp,
-+ ttc3_wav_8_grp, swdt0_clk_0_grp, swdt0_rst_0_grp,
-+ swdt0_clk_1_grp, swdt0_rst_1_grp, swdt0_clk_2_grp,
-+ swdt0_rst_2_grp, swdt0_clk_3_grp, swdt0_rst_3_grp,
-+ swdt0_clk_4_grp, swdt0_rst_4_grp, swdt0_clk_5_grp,
-+ swdt0_rst_5_grp, swdt0_clk_6_grp, swdt0_rst_6_grp,
-+ swdt0_clk_7_grp, swdt0_rst_7_grp, swdt0_clk_8_grp,
-+ swdt0_rst_8_grp, swdt0_clk_9_grp, swdt0_rst_9_grp,
-+ swdt0_clk_10_grp, swdt0_rst_10_grp, swdt0_clk_11_grp,
-+ swdt0_rst_11_grp, swdt0_clk_12_grp, swdt0_rst_12_grp,
-+ swdt1_clk_0_grp, swdt1_rst_0_grp, swdt1_clk_1_grp,
-+ swdt1_rst_1_grp, swdt1_clk_2_grp, swdt1_rst_2_grp,
-+ swdt1_clk_3_grp, swdt1_rst_3_grp, swdt1_clk_4_grp,
-+ swdt1_rst_4_grp, swdt1_clk_5_grp, swdt1_rst_5_grp,
-+ swdt1_clk_6_grp, swdt1_rst_6_grp, swdt1_clk_7_grp,
-+ swdt1_rst_7_grp, swdt1_clk_8_grp, swdt1_rst_8_grp,
-+ swdt1_clk_9_grp, swdt1_rst_9_grp, swdt1_clk_10_grp,
-+ swdt1_rst_10_grp, swdt1_clk_11_grp, swdt1_rst_11_grp,
-+ swdt1_clk_12_grp, swdt1_rst_12_grp, gpio0_0_grp,
-+ gpio0_1_grp, gpio0_2_grp, gpio0_3_grp,
-+ gpio0_4_grp, gpio0_5_grp, gpio0_6_grp,
-+ gpio0_7_grp, gpio0_8_grp, gpio0_9_grp,
-+ gpio0_10_grp, gpio0_11_grp, gpio0_12_grp,
-+ gpio0_13_grp, gpio0_14_grp, gpio0_15_grp,
-+ gpio0_16_grp, gpio0_17_grp, gpio0_18_grp,
-+ gpio0_19_grp, gpio0_20_grp, gpio0_21_grp,
-+ gpio0_22_grp, gpio0_23_grp, gpio0_24_grp,
-+ gpio0_25_grp, gpio0_26_grp, gpio0_27_grp,
-+ gpio0_28_grp, gpio0_29_grp, gpio0_30_grp,
-+ gpio0_31_grp, gpio0_32_grp, gpio0_33_grp,
-+ gpio0_34_grp, gpio0_35_grp, gpio0_36_grp,
-+ gpio0_37_grp, gpio0_38_grp, gpio0_39_grp,
-+ gpio0_40_grp, gpio0_41_grp, gpio0_42_grp,
-+ gpio0_43_grp, gpio0_44_grp, gpio0_45_grp,
-+ gpio0_46_grp, gpio0_47_grp, gpio0_48_grp,
-+ gpio0_49_grp, gpio0_50_grp, gpio0_51_grp,
-+ gpio0_52_grp, gpio0_53_grp, gpio0_54_grp,
-+ gpio0_55_grp, gpio0_56_grp, gpio0_57_grp,
-+ gpio0_58_grp, gpio0_59_grp, gpio0_60_grp,
-+ gpio0_61_grp, gpio0_62_grp, gpio0_63_grp,
-+ gpio0_64_grp, gpio0_65_grp, gpio0_66_grp,
-+ gpio0_67_grp, gpio0_68_grp, gpio0_69_grp,
-+ gpio0_70_grp, gpio0_71_grp, gpio0_72_grp,
-+ gpio0_73_grp, gpio0_74_grp, gpio0_75_grp,
-+ gpio0_76_grp, gpio0_77_grp, usb0_0_grp,
-+ usb1_0_grp, pmu0_0_grp, pmu0_1_grp,
-+ pmu0_2_grp, pmu0_3_grp, pmu0_4_grp,
-+ pmu0_5_grp, pmu0_6_grp, pmu0_7_grp,
-+ pmu0_8_grp, pmu0_9_grp, pmu0_10_grp,
-+ pmu0_11_grp, pcie0_0_grp, pcie0_1_grp,
-+ pcie0_2_grp, pcie0_3_grp, pcie0_4_grp,
-+ pcie0_5_grp, pcie0_6_grp, pcie0_7_grp,
-+ csu0_0_grp, csu0_1_grp, csu0_2_grp,
-+ csu0_3_grp, csu0_4_grp, csu0_5_grp,
-+ csu0_6_grp, csu0_7_grp, csu0_8_grp,
-+ csu0_9_grp, csu0_10_grp, csu0_11_grp,
-+ dpaux0_0_grp, dpaux0_1_grp, dpaux0_2_grp,
-+ dpaux0_3_grp, pjtag0_0_grp, pjtag0_1_grp,
-+ pjtag0_2_grp, pjtag0_3_grp, pjtag0_4_grp,
-+ pjtag0_5_grp, trace0_0_grp, trace0_clk_0_grp,
-+ trace0_1_grp, trace0_clk_1_grp, trace0_2_grp,
-+ trace0_clk_2_grp, testscan0_0_grp
-+
-+ Valid values for pins are:
-+   MIO0 - MIO77
-+
-+ Valid values for function are:
-+   ethernet0, ethernet1, ethernet2, ethernet3, gemtsu0, usb0, usb1, mdio0,
-+   mdio1, mdio2, mdio3, qspi0, qspi_fbclk, qspi_ss, spi0, spi1, spi0_ss,
-+   spi1_ss, sdio0, sdio0_pc, sdio0_wp, sdio0_cd, sdio1, sdio1_pc, sdio1_wp,
-+   sdio1_cd, nand0, nand0_ce, nand0_rb, nand0_dqs, can0, can1, uart0, uart1,
-+   i2c0, i2c1, ttc0_clk, ttc0_wav, ttc1_clk, ttc1_wav, ttc2_clk, ttc2_wav,
-+   ttc3_clk, ttc3_wav, swdt0_clk, swdt0_rst, swdt1_clk, swdt1_rst, gpio0, pmu0,
-+   pcie0, csu0, dpaux0, pjtag0, trace0, trace0_clk, testscan0
-+
-+The following driver-specific properties as defined here are valid to specify in
-+a pin configuration subnode:
-+ - io-standard: Configure the pin to use the selected IO standard. Valid
-+   arguments are 'IO_STANDARD_LVCMOS33' and 'IO_STANDARD_LVCMOS18'.
-+ - schmitt-cmos: Selects either Schmitt or CMOS input for MIO pins. Valid
-+   arguments are 'PIN_INPUT_TYPE_SCHMITT' and 'PIN_INPUT_TYPE_CMOS'.
-+
-+Example:
-+
-+firmware {
-+	zynqmp_firmware: zynqmp-firmware {
-+		compatible = "xlnx,zynqmp-firmware";
-+		method = "smc";
-+
-+		pinctrl0: pinctrl@ff180000 {
-+			compatible = "xlnx,zynqmp-pinctrl";
-+
-+			pinctrl_uart1_default: uart1-default {
-+				mux {
-+					groups = "uart0_4_grp";
-+					function = "uart0";
-+				};
-+
-+				conf {
-+					groups = "uart0_4_grp";
-+					slew-rate = <SLEW_RATE_SLOW>;
-+					io-standard = <IO_STANDARD_LVCMOS18>;
-+				};
-+
-+				conf-rx {
-+					pins = "MIO18";
-+					bias-high-impedance;
-+				};
-+
-+				conf-tx {
-+					pins = "MIO19";
-+					bias-disable;
-+					schmitt-cmos = <PIN_INPUT_TYPE_CMOS>;
-+				};
-+			};
-+		};
-+	};
-+};
-+
-+uart1 {
-+	...
-+        pinctrl-names = "default";
-+        pinctrl-0 = <&pinctrl_uart1_default>;
-+	...
-+
-+};
 -- 
 2.18.0
 
