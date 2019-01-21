@@ -2,81 +2,64 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B805CC3712F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 21:37:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C9B2EC37120
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 21:46:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 846ED21721
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 21:37:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8D6FB2085A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 21:46:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rFjEM0Se";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="VafRxOSp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 846ED21721
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aIl9MZMB";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=mntmn.com header.i=@mntmn.com header.b="lY31wFTe"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8D6FB2085A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=mntmn.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=scaXW7YXb3Ei3DiqT7/qW373td/L9HqG0bpMEHwvDRs=; b=rFjEM0Se58XrCO
-	2RaUHsE4hCuB8IIU614j4vmYnoUzRXOplFxXOyyhKp1plCK12VlKUmueE9xX1D3frT/mxPBcN7bV0
-	gv4SSB6/64sF2+T7jDxDKPDnoWuma9ezXP33E/LGRCSz0h2n7XotiwRo50lhU5GmRRbSHdsDz0PvQ
-	gAi9fdat1fQ4x3STUWKnDbpqoKCd0GN5DMPDqQrf2N1eV4Cg1nwzNay/ckrt8TM4/Uqvu1jGEm1M2
-	tbpibInyGQtZJXw7yM38WmD413ubkSmCyCocTFi/kqstsR9cl5YshGb3TnRsLcoG4b544pJt1oONZ
-	D++5n3pxlabW6UwUlBJw==;
+	List-Archive:List-Unsubscribe:List-Id:To:References:Message-Id:Date:
+	In-Reply-To:From:Subject:Mime-Version:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=PSWp9KAjsq1VJmNMkXHdHoKLoWLzievl8WCEI7euq6s=; b=aIl9MZMBCHFVP8
+	sRf7WbAKRBDLPiWzSDQMIVJ1g+lGg3vdFfbI7ESuEaGVSdSZQpfNG2UqZhaiY0uFtuw5gE7zVXrBu
+	nzKgwzfL9y2AvV2kEthCL8tv6rkBtUd35GecqU9+AchwCtAAvcBERjom0RWTTmbUNmFwtftxO/1Yf
+	OIhnSVg6QwbK4G4bDjnhRaz8gLSaIMwaXqHDAyhKttGpebZXXcC1LnqW379b5TF9mcuCOe+cNqJ3h
+	oKc3MhmWDXxm+Z1A7V73MCkeNO++NRxEZVG+IW8vUaciCHgRcrDYAxTLFPpnW9RHh+a1dqFrSPIZ6
+	FDr8Gsun6Yti62/e8Qjw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glhGO-0001qZ-GH; Mon, 21 Jan 2019 21:37:48 +0000
-Received: from mail-io1-xd43.google.com ([2607:f8b0:4864:20::d43])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glhGK-0001qD-MW
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 21:37:46 +0000
-Received: by mail-io1-xd43.google.com with SMTP id g8so17515228iok.4
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 13:37:44 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=8hsPLb+YVxxq1iAPjhdrsVW0TYSbk8tR9OwWdd6vyzE=;
- b=VafRxOSpCYUSBK7FET5zdnwyCl/ozjapVhWrY2P+i1eQJchzbea9mwTb5G5WBTKBjz
- rrgKscDG8lEqO2hPOouoq777O/+ofIMzpm56Ot/peyyc0xR//f3+IZreLvNb9id6Wmuq
- 7GW58hspu4k6od70xVdy35jTkoQlSdOJyF3lQ=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=8hsPLb+YVxxq1iAPjhdrsVW0TYSbk8tR9OwWdd6vyzE=;
- b=tjFA4OQOUf8vY+t2/DuQzhmSWLFG9r7Qt3V7pEDvx/qfNj5DUSqOuJh2fQ9dJhvqxr
- bKStSgV5HylNXecRXUnp13DzkWkMTprmDdj+WwzV6XHn23A0uT+Zi8k22IbyDak72YmC
- 1+P5fTvvBMAOFyuAWBukqJq2D33V/NWFvsNSgFD36YCPabJmLPfUcSKnDOQJWOJqEFVE
- ae1BQZDJ8KUcLrYA1VdpBvvNurK+214ojywOVTQq8B2f1DIG6DkGcBO0IN7HoH9k3Xym
- sf7hH90Y5Haj/q5czoIhzUPNc0reHsfh31FaWAN71yw9l1/zsJQFTP/ND0bMXCgpyZp7
- 7aQA==
-X-Gm-Message-State: AJcUukfQ8qq+XzaxPvUVj2slb9RTivOXvMbBs5pgV3qQfJfiJM7kMWlw
- KXj0n2hkhancFp3LsuxBTeLKaQ4FRQvJOKnMBDd64A==
-X-Google-Smtp-Source: ALg8bN4a5xfHBNLlF9UDwiMCQBHS8irpSBxYfKNdlG1HNBebRO4B3EVu2zVZmUXDe/kzQyizUkAfJXwChn0xSCtIhKA=
-X-Received: by 2002:a5d:9459:: with SMTP id x25mr6434890ior.293.1548106663208; 
- Mon, 21 Jan 2019 13:37:43 -0800 (PST)
-MIME-Version: 1.0
-References: <cover.1547813804.git.saiprakash.ranjan@codeaurora.org>
- <d52546764f8570e8c07ac8e3e2841e087e66648c.1547813804.git.saiprakash.ranjan@codeaurora.org>
- <cc71cfa9-8a11-9356-ac41-e27564a9f7b4@codeaurora.org>
- <20190121184831.GB14049@xps15>
-In-Reply-To: <20190121184831.GB14049@xps15>
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
-Date: Mon, 21 Jan 2019 14:37:32 -0700
-Message-ID: <CANLsYkw5h+-fWhiit+kNJHnGPF__Bz1MHc94sG=WOyfTPHi_NQ@mail.gmail.com>
-Subject: Re: [PATCHv3 3/4] coresight: etm4x: Add support to enable ETMv4.2
-To: Vivek Gautam <vivek.gautam@codeaurora.org>
+	id 1glhOJ-0006cK-37; Mon, 21 Jan 2019 21:45:59 +0000
+Received: from softboy.mntmn.com ([91.250.115.15])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glhOE-0006bz-F5
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 21:45:55 +0000
+DKIM-Filter: OpenDKIM Filter v2.11.0 softboy.mntmn.com D798D720CF8
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=mntmn.com; s=mailout;
+ t=1548107150; bh=IeYJzoCkWIMAgyOEWqUe32IVshxydeWpc9GtMkEHj6Q=;
+ h=Subject:From:In-Reply-To:Date:Cc:References:To:From;
+ b=lY31wFTeI5nNbDihE5yIlE8GT60M/XfSw3YHp/PgX8+tYgzplpSnSzVQUkAuV4KGB
+ lh2Cltd2sz7EHtNqR3perY+R4jo+amcvt+Z/mQwgzFXdEibyNVYiaFltjmgQ34ovRv
+ G8s3svC/K9n+06qKVnicr9+nrBNPSHS5FQoWIbno=
+Mime-Version: 1.0 (1.0)
+Subject: Re: Linux Kernel Regression in Commit
+ 3f7cceeab895fcc17ac8db0d9a5e8ca2954b4661 on i.MX6QP
+From: Lukas Hartmann <lukas@mntmn.com>
+X-Mailer: iPhone Mail (16C101)
+In-Reply-To: <VI1PR04MB55336678BA82D08DA1D1D5F8EE9F0@VI1PR04MB5533.eurprd04.prod.outlook.com>
+Date: Mon, 21 Jan 2019 22:45:47 +0100
+Message-Id: <F47CC354-70FC-4CDC-B9DC-56D36E4ABB9D@mntmn.com>
+References: <87r2d5yepy.fsf@mntmn.com> <87o989ydc3.fsf@mntmn.com>
+ <87lg3dycku.fsf@mntmn.com>
+ <VI1PR04MB55336678BA82D08DA1D1D5F8EE9F0@VI1PR04MB5533.eurprd04.prod.outlook.com>
+To: Leonard Crestez <leonard.crestez@nxp.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_133744_745260_879E0AEC 
-X-CRM114-Status: GOOD (  23.65  )
+X-CRM114-CacheID: sfid-20190121_134554_669523_E13C49F8 
+X-CRM114-Status: GOOD (  15.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,124 +71,56 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>,
- Rajendra Nayak <rnayak@codeaurora.org>,
- Suzuki K Poulose <suzuki.poulose@arm.com>,
- Alexander Shishkin <alexander.shishkin@linux.intel.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- Doug Anderson <dianders@chromium.org>,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- David Brown <david.brown@linaro.org>, Rob Herring <robh+dt@kernel.org>,
- Sibi Sankar <sibis@codeaurora.org>, Leo Yan <leo.yan@linaro.org>,
- Andy Gross <andy.gross@linaro.org>, Stephen Boyd <sboyd@kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: "ulf.hansson@linaro.org" <ulf.hansson@linaro.org>,
+ "lorenzo.pieralisi@arm.com" <lorenzo.pieralisi@arm.com>,
+ Richard Zhu <hongxing.zhu@nxp.com>, dl-linux-imx <linux-imx@nxp.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ Lucas Stach <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 21 Jan 2019 at 11:48, Mathieu Poirier
-<mathieu.poirier@linaro.org> wrote:
->
-> On Mon, Jan 21, 2019 at 04:18:36PM +0530, Vivek Gautam wrote:
-> >
-> > On 1/18/2019 5:52 PM, Sai Prakash Ranjan wrote:
-> > > SDM845 has ETMv4.2 and can use the existing etm4x driver.
-> > > But the current etm driver checks only for ETMv4.0 and
-> > > errors out for other etm4x versions. This patch adds this
-> > > missing support to enable SoC's with ETMv4x to use same
-> > > driver by checking only the ETM architecture major version
-> > > number.
-> > >
-> > > Without this change, we get below error during etm probe:
-> > >
-> > > / # dmesg | grep etm
-> > > [    6.660093] coresight-etm4x: probe of 7040000.etm failed with error -22
-> > > [    6.666902] coresight-etm4x: probe of 7140000.etm failed with error -22
-> > > [    6.673708] coresight-etm4x: probe of 7240000.etm failed with error -22
-> > > [    6.680511] coresight-etm4x: probe of 7340000.etm failed with error -22
-> > > [    6.687313] coresight-etm4x: probe of 7440000.etm failed with error -22
-> > > [    6.694113] coresight-etm4x: probe of 7540000.etm failed with error -22
-> > > [    6.700914] coresight-etm4x: probe of 7640000.etm failed with error -22
-> > > [    6.707717] coresight-etm4x: probe of 7740000.etm failed with error -22
-> > >
-> > > With this change, etm probe is successful:
-> > >
-> > > / # dmesg | grep coresight
-> > > [    6.659198] coresight-etm4x 7040000.etm: CPU0: ETM v4.2 initialized
-> > > [    6.665848] coresight-etm4x 7140000.etm: CPU1: ETM v4.2 initialized
-> > > [    6.672493] coresight-etm4x 7240000.etm: CPU2: ETM v4.2 initialized
-> > > [    6.679129] coresight-etm4x 7340000.etm: CPU3: ETM v4.2 initialized
-> > > [    6.685770] coresight-etm4x 7440000.etm: CPU4: ETM v4.2 initialized
-> > > [    6.692403] coresight-etm4x 7540000.etm: CPU5: ETM v4.2 initialized
-> > > [    6.699024] coresight-etm4x 7640000.etm: CPU6: ETM v4.2 initialized
-> > > [    6.705646] coresight-etm4x 7740000.etm: CPU7: ETM v4.2 initialized
-> > >
-> > > Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
-> > > ---
-> > >   drivers/hwtracing/coresight/coresight-etm4x.c | 2 +-
-> > >   drivers/hwtracing/coresight/coresight-etm4x.h | 2 +-
-> > >   2 files changed, 2 insertions(+), 2 deletions(-)
-> > >
-> > > diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-> > > index 53e2fb6e86f6..93d5f1f3145e 100644
-> > > --- a/drivers/hwtracing/coresight/coresight-etm4x.c
-> > > +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-> > > @@ -55,7 +55,7 @@ static void etm4_os_unlock(struct etmv4_drvdata *drvdata)
-> > >   static bool etm4_arch_supported(u8 arch)
-> > >   {
-> > > -   switch (arch) {
-> > > +   switch (arch >> 4) {
-> >
-> >
-> > While this looks good, from what it looks like arch is a combination of
-> > major version
-> > minor version. So, will it be better to masks, and shifts macros instead of
-> > a magic
-> > number shift.
-> > But, frankly it's upto Mathieu to decide the readability of this. So, I
-> > leave it to him.
->
-> The layout of the architecture is already well defined in etm4_init_arch_data()
-> [1].  As such just doing the following would be fine with me:
->
->         /* Mask out the minor version nuber */
->         switch (arch & 0xf) {
+Alright, thank you for the quick response. I will try your fix in the morning. Another thing: the second device_link_add() does not assign to link, but link is then checked again for an error. Is that intentional?
 
-s/0xf/0xf0
+Best,
+Lukas
 
-Apologies for the confusion.
-
->
-> Of course by proceeding this way we don't need to modify the define in
-> coresight-etm4x.h.
->
+> On 21. Jan 2019, at 22:12, Leonard Crestez <leonard.crestez@nxp.com> wrote:
+> 
+>> On 1/21/2019 10:34 PM, Lukas F.Hartmann wrote:
+>> Removing the return(ret) line after the imx6_pcie_attach_pd(dev) call
+>> fixes the problems for me. I am under the impression that the
+>> imx6_add_pcie_port still should be called even if there was an error
+>> attaching the power domain?
+> 
+> The intent was that imx6_pcie_attach_pd does nothing if no PD is defined 
+> in DT but it returns an error instead and causes a probe failure.
+> 
+> Can you please try the following:
+> 
+> --- drivers/pci/controller/dwc/pci-imx6.c
+> +++ drivers/pci/controller/dwc/pci-imx6.c
+> @@ -310,6 +310,9 @@ static int imx6_pcie_attach_pd(struct device *dev)
+>         imx6_pcie->pd_pcie = dev_pm_domain_attach_by_name(dev, "pcie");
+>         if (IS_ERR(imx6_pcie->pd_pcie))
+>                 return PTR_ERR(imx6_pcie->pd_pcie);
+> +       /* Do nothing when power domain missing */
+> +       if (!imx6_pcie->pd_pcie)
+> +               return 0;
+>         link = device_link_add(dev, imx6_pcie->pd_pcie,
+>                         DL_FLAG_STATELESS |
+>                         DL_FLAG_PM_RUNTIME |
+> 
+> This fix is for PCI, it's not clear why it would also affect USB in your 
+> case.
+> 
+> Thanks for reporting!
+> 
+> --
 > Regards,
-> Mathieu
->
-> [1]. https://elixir.bootlin.com/linux/latest/source/drivers/hwtracing/coresight/coresight-etm4x.c#L508
->
-> >
-> > Thanks
-> > Vivek
-> >
-> > >     case ETM_ARCH_V4:
-> > >             break;
-> > >     default:
-> > > diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
-> > > index 52786e9d8926..05d4bd330881 100644
-> > > --- a/drivers/hwtracing/coresight/coresight-etm4x.h
-> > > +++ b/drivers/hwtracing/coresight/coresight-etm4x.h
-> > > @@ -136,7 +136,7 @@
-> > >   #define ETM_MAX_RES_SEL                   16
-> > >   #define ETM_MAX_SS_CMP                    8
-> > > -#define ETM_ARCH_V4                        0x40
-> > > +#define ETM_ARCH_V4                        0x4
-> > >   #define ETMv4_SYNC_MASK                   0x1F
-> > >   #define ETM_CYC_THRESHOLD_MASK            0xFFF
-> > >   #define ETM_CYC_THRESHOLD_DEFAULT       0x100
+> Leonard
+
 
 _______________________________________________
 linux-arm-kernel mailing list
