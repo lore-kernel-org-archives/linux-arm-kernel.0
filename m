@@ -2,62 +2,80 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 21372C2F421
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:40:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9FF15C2F43D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:42:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E095420870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:40:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 64C4520870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:42:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jZs6KQKV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E095420870
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Obg4a+kb";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="cecMvNOR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 64C4520870
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=Sn7aw5IKLaDRrX8e5BmyAmjG55O4WWs76+vD0Cv9Bmg=; b=jZs6KQKVYI97A7rDU4MIJiklyf
-	dX6naUyDngoGRsrn7H0tZpqa8ZHlDjksGrW/FtUNl4c6ZM6baUUS/I8pepo+sdywzxkansPW5lvKX
-	WxqZ5mhl9X+xHGDPRIySMjKiX6QWQVAOe8TsrrLZnETf5bBp5lU8ZFITxQKdibI3oVW6O9ls3v6rK
-	VEBrj+uUcuodR6K5bxynNP5QLWcDljHzCeHlOtKSjAvoWHF+zcTHEPt1ZMPxhbhZNczyngYUSs0wE
-	bTUQ/iMJsG6EVXgZUVFhv9PvlAYLp0DpkrB3Z19Lz32J3IA386p6nUK7yfaYFtL+tYaKNi268z2id
-	FoObifYg==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=7FUCEER5P5qi6B3nIIv9znGZT+X30QGl4agbFGG8VPk=; b=Obg
+	4a+kb8WodnZ2g2opDVoxEEHwBETk+UINmUDWNP4BF8pQiDUTRAtTzHAIHx1SZggchmNZd83ZhrjQC
+	5DSq8zWn8nHdOj8HIPMJ7O8iltthAYWLddusqBpuvXTyRMpkAhnUKuwOoFGNVpf9bVoyL6rPM+kk9
+	61E4d52NhBjVbX3Z7iDY36lyQMqpp3JPngboVuQvgsjRjI19yCkNMQ6pbm8swXI4YHRQiZSXbjn63
+	gHZYsT8uW23RvncE1TXN8vjoDchlBP3UHwa0KRbQzXVQrSw51YXLjZ3uhmOx1P7UlxAmGSLD0ku3g
+	/qPJlVe4HTmAZBovCq99F2dpUMJ6JLQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glbgf-0005Hg-DQ; Mon, 21 Jan 2019 15:40:33 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glbbB-0005RU-BC
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 15:35:36 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3DBBD1684;
- Mon, 21 Jan 2019 07:34:53 -0800 (PST)
-Received: from e112298-lin.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 063593F5C1;
- Mon, 21 Jan 2019 07:34:50 -0800 (PST)
-From: Julien Thierry <julien.thierry@arm.com>
-To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v9 22/26] irqchip/gic-v3: Allow interrupts to be set as
- pseudo-NMI
-Date: Mon, 21 Jan 2019 15:33:41 +0000
-Message-Id: <1548084825-8803-23-git-send-email-julien.thierry@arm.com>
-X-Mailer: git-send-email 1.9.1
-In-Reply-To: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
-References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
+	id 1glbi8-0005kR-T2; Mon, 21 Jan 2019 15:42:04 +0000
+Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glbi4-0005jR-6z
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 15:42:01 +0000
+Received: by mail-wm1-x341.google.com with SMTP id n190so11276685wmd.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 21 Jan 2019 07:41:59 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id;
+ bh=MA5crrD4Prr0EwOduSOR30oSBtIqdGdvyHP08sn6BN4=;
+ b=cecMvNORUI0LJhDEkXZiJkKGrmrINxViFgzLZLmXH+mfHUy5MUr3camUrdGLMWHInZ
+ cYGLQNhxwf0h7JHoMUrNqhHozWFcG5G/1fX0nw6iQLZSxt7DL/IMVB1cgVfoiP+4ZS77
+ y72HkXPbiu1T0D2e7j7dQCh/Ykfploq2teC18=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=MA5crrD4Prr0EwOduSOR30oSBtIqdGdvyHP08sn6BN4=;
+ b=qpmc31CbqKI6Hy/qLWRjgCb4vXcteDFs/scPNljw6de0IiRJtU3IZwv7g88LqvBMJs
+ J1u1NJrB77oRe5oV5fi0ZH5P9oc6Yvfl0r9vDRKYp6nc/towTPvkGXcDKEhVQvDmUnmj
+ R5TU+xypbaHFU93jHCysPgegQhZaB2oO/pRnGpcLPTRDUiifrkM274vGBSwuOAe/EVzB
+ GiRhvfdKHFwEeTL9DFGDy+7zwhvWwZpsdpZ4ZG24qFdvddckuwjIZTb8LQJvvW7Zw4M/
+ hVtXWhuggPB/udZAGHQEKgBkAJVXkdUnS0bG9BbFE5kCY2aa1MKQtRZE/I10fb8zjy9M
+ w3JA==
+X-Gm-Message-State: AJcUukcHC25l33asxLB5cN0tXGLCfXv7No8SoVBS6u+Z4k8EzJkI+QMR
+ 8mQ2cL6zIegPCVxHheaQmInQhA==
+X-Google-Smtp-Source: ALg8bN4HPyB6Ku0qpNyjY1RrtXKwI5Qwnx3O1D/4Dp2dKCdK956kiYV6Vwa5D4uHk2VtyGf9ORdkJA==
+X-Received: by 2002:a1c:b70a:: with SMTP id h10mr24359200wmf.125.1548085318345; 
+ Mon, 21 Jan 2019 07:41:58 -0800 (PST)
+Received: from localhost ([49.248.61.1])
+ by smtp.gmail.com with ESMTPSA id k15sm127527555wru.8.2019.01.21.07.41.56
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 21 Jan 2019 07:41:57 -0800 (PST)
+From: Amit Kucheria <amit.kucheria@linaro.org>
+To: linux-kernel@vger.kernel.org
+Subject: [PATCH v2 0/9] cpufreq: Add flag to auto-register as cooling
+Date: Mon, 21 Jan 2019 21:10:25 +0530
+Message-Id: <cover.1548084260.git.amit.kucheria@linaro.org>
+X-Mailer: git-send-email 2.17.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_073454_363681_88DAD0C4 
-X-CRM114-Status: GOOD (  15.43  )
+X-CRM114-CacheID: sfid-20190121_074200_252858_5C91C64C 
+X-CRM114-Status: UNSURE (   9.74  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,163 +87,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
- Jason Cooper <jason@lakedaemon.net>, Julien Thierry <julien.thierry@arm.com>,
- marc.zyngier@arm.com, catalin.marinas@arm.com, will.deacon@arm.com,
- linux-kernel@vger.kernel.org, christoffer.dall@arm.com, james.morse@arm.com,
- joel@joelfernandes.org, Thomas Gleixner <tglx@linutronix.de>
+Cc: Sudeep Holla <sudeep.holla@arm.com>, linux-pm@vger.kernel.org,
+ linux-arm-msm@vger.kernel.org, Daniel Lezcano <daniel.lezcano@linaro.org>,
+ "Rafael J. Wysocki" <rjw@rjwysocki.net>, dianders@chromium.org,
+ swboyd@chromium.org, edubezval@gmail.com, mka@chromium.org,
+ "moderated list:ARM/Mediatek SoC support" <linux-mediatek@lists.infradead.org>,
+ viresh.kumar@linaro.org, Matthias Brugger <matthias.bgg@gmail.com>,
+ Zhang Rui <rui.zhang@intel.com>, "moderated list:ARM/Mediatek SoC support"
+ <linux-arm-kernel@lists.infradead.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Implement NMI callbacks for GICv3 irqchip. Install NMI safe handlers
-when setting up interrupt line as NMI.
+Add a flag to be used by cpufreq drivers to tell cpufreq core to
+auto-register themselves as a thermal cooling device.
 
-Only SPIs and PPIs are allowed to be set up as NMI.
+There series converts over all the drivers except arm_big_little.c.
+Tested on SDM845 with the qcom-cpufreq-hw driver. Only compile-tested the
+others.
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic-v3.c | 84 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 84 insertions(+)
+Things needing fixing (but not a blocker for the series):
+ - Look at how to detect that we're not in IKS mode in arm_big_little's
+   .ready callback.
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 4df1e94..447d8ab 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -27,6 +27,7 @@
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
- #include <linux/percpu.h>
-+#include <linux/refcount.h>
- #include <linux/slab.h>
- 
- #include <linux/irqchip.h>
-@@ -93,6 +94,9 @@ struct gic_chip_data {
-  */
- static DEFINE_STATIC_KEY_FALSE(supports_pseudo_nmis);
- 
-+/* ppi_nmi_refs[n] == number of cpus having ppi[n + 16] set as NMI */
-+static refcount_t ppi_nmi_refs[16];
-+
- static struct gic_kvm_info gic_v3_kvm_info;
- static DEFINE_PER_CPU(bool, has_rss);
- 
-@@ -320,6 +324,72 @@ static int gic_irq_get_irqchip_state(struct irq_data *d,
- 	return 0;
- }
- 
-+static int gic_irq_nmi_setup(struct irq_data *d)
-+{
-+	struct irq_desc *desc = irq_to_desc(d->irq);
-+
-+	if (!gic_supports_nmi())
-+		return -EINVAL;
-+
-+	if (gic_peek_irq(d, GICD_ISENABLER)) {
-+		pr_err("Cannot set NMI property of enabled IRQ %u\n", d->irq);
-+		return -EINVAL;
-+	}
-+
-+	/*
-+	 * A secondary irq_chip should be in charge of LPI request,
-+	 * it should not be possible to get there
-+	 */
-+	if (WARN_ON(gic_irq(d) >= 8192))
-+		return -EINVAL;
-+
-+	/* desc lock should already be held */
-+	if (gic_irq(d) < 32) {
-+		/* Setting up PPI as NMI, only switch handler for first NMI */
-+		if (!refcount_inc_not_zero(&ppi_nmi_refs[gic_irq(d) - 16])) {
-+			refcount_set(&ppi_nmi_refs[gic_irq(d) - 16], 1);
-+			desc->handle_irq = handle_percpu_devid_fasteoi_nmi;
-+		}
-+	} else {
-+		desc->handle_irq = handle_fasteoi_nmi;
-+	}
-+
-+	gic_set_irq_prio(gic_irq(d), gic_dist_base(d), GICD_INT_NMI_PRI);
-+
-+	return 0;
-+}
-+
-+static void gic_irq_nmi_teardown(struct irq_data *d)
-+{
-+	struct irq_desc *desc = irq_to_desc(d->irq);
-+
-+	if (WARN_ON(!gic_supports_nmi()))
-+		return;
-+
-+	if (gic_peek_irq(d, GICD_ISENABLER)) {
-+		pr_err("Cannot set NMI property of enabled IRQ %u\n", d->irq);
-+		return;
-+	}
-+
-+	/*
-+	 * A secondary irq_chip should be in charge of LPI request,
-+	 * it should not be possible to get there
-+	 */
-+	if (WARN_ON(gic_irq(d) >= 8192))
-+		return;
-+
-+	/* desc lock should already be held */
-+	if (gic_irq(d) < 32) {
-+		/* Tearing down NMI, only switch handler for last NMI */
-+		if (refcount_dec_and_test(&ppi_nmi_refs[gic_irq(d) - 16]))
-+			desc->handle_irq = handle_percpu_devid_irq;
-+	} else {
-+		desc->handle_irq = handle_fasteoi_irq;
-+	}
-+
-+	gic_set_irq_prio(gic_irq(d), gic_dist_base(d), GICD_INT_DEF_PRI);
-+}
-+
- static void gic_eoi_irq(struct irq_data *d)
- {
- 	gic_write_eoir(gic_irq(d));
-@@ -958,6 +1028,8 @@ static inline void gic_cpu_pm_init(void) { }
- 	.irq_set_affinity	= gic_set_affinity,
- 	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
- 	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
-+	.irq_nmi_setup		= gic_irq_nmi_setup,
-+	.irq_nmi_teardown	= gic_irq_nmi_teardown,
- 	.flags			= IRQCHIP_SET_TYPE_MASKED |
- 				  IRQCHIP_SKIP_SET_WAKE |
- 				  IRQCHIP_MASK_ON_SUSPEND,
-@@ -973,6 +1045,8 @@ static inline void gic_cpu_pm_init(void) { }
- 	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
- 	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
- 	.irq_set_vcpu_affinity	= gic_irq_set_vcpu_affinity,
-+	.irq_nmi_setup		= gic_irq_nmi_setup,
-+	.irq_nmi_teardown	= gic_irq_nmi_teardown,
- 	.flags			= IRQCHIP_SET_TYPE_MASKED |
- 				  IRQCHIP_SKIP_SET_WAKE |
- 				  IRQCHIP_MASK_ON_SUSPEND,
-@@ -1176,7 +1250,17 @@ static bool gic_enable_quirk_msm8996(void *data)
- 
- static void gic_enable_nmi_support(void)
- {
-+	int i;
-+
-+	for (i = 0; i < 16; i++)
-+		refcount_set(&ppi_nmi_refs[i], 0);
-+
- 	static_branch_enable(&supports_pseudo_nmis);
-+
-+	if (static_branch_likely(&supports_deactivate_key))
-+		gic_eoimode1_chip.flags |= IRQCHIP_SUPPORTS_NMI;
-+	else
-+		gic_chip.flags |= IRQCHIP_SUPPORTS_NMI;
- }
- 
- static int __init gic_init_bases(void __iomem *dist_base,
+Changes since v1:
+- Fix compilation failures with allmodconfig
+- Get rid of #ifdef in cpufreq.c
+- Removed miscellaneous patches and sent them separately
+- Merged patches 1 and 2 from v1
+
+Amit Kucheria (9):
+  thermal: cpu_cooling: Require thermal core to be compiled in
+  cpufreq: Auto-register the driver as a thermal cooling device if asked
+  cpufreq: qcom-hw: Register as a cpufreq cooling device
+  cpufreq: imx6q: Use auto-registration of thermal cooling device
+  cpufreq: cpufreq-dt: Use auto-registration of thermal cooling device
+  cpufreq: mediatek: Use auto-registration of thermal cooling device
+  cpufreq: qoriq: Use auto-registration of thermal cooling device
+  cpufreq: scmi: Use auto-registration of thermal cooling device
+  cpufreq: scpi: Use auto-registration of thermal cooling device
+
+ drivers/cpufreq/cpufreq-dt.c       | 14 ++------------
+ drivers/cpufreq/cpufreq.c          |  6 ++++++
+ drivers/cpufreq/imx6q-cpufreq.c    | 24 ++----------------------
+ drivers/cpufreq/mediatek-cpufreq.c | 14 ++------------
+ drivers/cpufreq/qcom-cpufreq-hw.c  |  3 ++-
+ drivers/cpufreq/qoriq-cpufreq.c    | 15 ++-------------
+ drivers/cpufreq/scmi-cpufreq.c     | 14 ++------------
+ drivers/cpufreq/scpi-cpufreq.c     | 14 ++------------
+ drivers/thermal/Kconfig            |  1 +
+ include/linux/cpufreq.h            | 25 +++++++++++++++++++++++++
+ 10 files changed, 46 insertions(+), 84 deletions(-)
+
 -- 
-1.9.1
+2.17.1
 
 
 _______________________________________________
