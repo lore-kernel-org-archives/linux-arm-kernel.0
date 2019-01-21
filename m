@@ -2,82 +2,83 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B1919C2F421
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 16:15:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 53CEDC2F421
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 16:15:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6890920844
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 16:15:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1E81F20844
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 16:15:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="p5/Xdv8w";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Kj4FebBW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6890920844
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P/ic0esJ";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="rD6LLgSs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1E81F20844
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LHzd9j317hLl+hEAQsMKDTxUunAkAOFPMuklBUHg898=; b=p5/Xdv8wsN/ZLm
-	Ft0ZdJustTPbqoXO8X88kWpuuTDDLn7ZhLwMl194dsLEpmVJFob/BpCEErCYG9sva7fyC26qqN9pK
-	H9FGAI5D0yQ/KIAYhOXRerrxhyjP86TwanyD+ae+S6hdJpJJ19zoAU8GXAIxPLZuzwHx4jbBb2qag
-	qhvIBeiO1cPOZwRF+X2OGYEeQvn56AAwiR/mwpKhvYJez/oxMw2rO/wEJ3sP2QlL/FSp50dznU7hE
-	xaBND4xbLNrNUat6JjsU3QmMwGBnT7mh0fx4b0DV84CDNhDEP73MsBD0mazNpo3ac6KX+IwJpJHbV
-	cTJE81lhapRrky+9G7kg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=uucsAKdgz4pHU/gGtr/ntAAceobjMduwEHS6HSwaPR0=; b=P/i
+	c0esJi/YeUNDJFT0hpB4S10+vhBHzMbdYlRezZ27vb0AhXeCN5L6Q5Dmp7wnXFCX2S2OW4DPgvdlf
+	j7g4uqZ3us3fyv1/aesCiyyyN2xZi0bOysWb/Ilj+XlQMRks8SQwglkZHQmKk14uI7A5hWhknOS1j
+	D92aBUzgxUs/lxmbooAvF2+rSwdrhmHWUA3R8adtunjlc+BLB++x51mQKLcHIroFmoPhn8ypQbmBj
+	g478Ff9YuNxINiMDIMmihJNdwCNrSHjRLxYNVVIOy+TS3lkbgfFTKYNDTCBPXvyTlOs8BAW52l2Ir
+	9n32IDX8oCcXvSB5ETiMW4fju/T1u/A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glcDy-0002JQ-5M; Mon, 21 Jan 2019 16:14:58 +0000
-Received: from mail-io1-xd41.google.com ([2607:f8b0:4864:20::d41])
+	id 1glcEZ-0003xw-Kk; Mon, 21 Jan 2019 16:15:35 +0000
+Received: from mail-qk1-x742.google.com ([2607:f8b0:4864:20::742])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glcDu-0002I4-5p
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 16:14:55 +0000
-Received: by mail-io1-xd41.google.com with SMTP id g8so16809658iok.4
+ id 1glcEW-0003wv-L0
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 16:15:34 +0000
+Received: by mail-qk1-x742.google.com with SMTP id 68so12527768qke.9
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 08:14:49 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=JJK1BCKSyDL+6Bnumrmgz0aFAHbUsIf0r+wdJw+CqMA=;
- b=Kj4FebBWF3IgYE59zzK25BcvMYseHgw2U55GKDu80LoJc/1no88VfZWlimZA92sHU/
- 6z4nya+rz29tQfRHc4u4Wt+pAECUdo5iUyr2hhxn2hAkDZBP6J2HKgJfnHLekJzK1vIJ
- tlERyFoqq1KbB5gtnwr8uQra/yhMCIJnZ+jZM=
+ Mon, 21 Jan 2019 08:15:32 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id;
+ bh=84kAsmEVhaZVs53nKycwJOATMZtNr3mc+Cb51Mg2cnY=;
+ b=rD6LLgSstvI0+mnzkKqlJ/LGslal8PB83QdgEfmWTgk+tX0i43/c5gvE1Qv9JPdpq9
+ mavrZBfe13s/GZVEc9XhFfisofjCSha0JW9ZzXXDTSUIIsIJEAutRi0KA3wp+kDNLWeD
+ 2G2El7EXi3XvJ41gTNSaowLbI0Lw4h2EiyZiYoPG68yn0qQai/222IETf3tqSVCX059M
+ wv/VxKnP1BlJIIB+HLMnzLYgiRUfS1G7BI1yoxLSpjsK9jdvto2utYewqaiRA3dck+Dh
+ kcXmoSWIlDOYFr4SDL8b5breFGZfbuQq4D2XqmJRTEZ2MnIffge0jPBmsE6BmMo3+ECg
+ BPuQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=JJK1BCKSyDL+6Bnumrmgz0aFAHbUsIf0r+wdJw+CqMA=;
- b=Knuy4RpagjL/t0aXgEcjrxqjypDRf2NQUcn+Lkk2b2RIucZ45Xe/Q2f6tw/aMsUEfc
- l7kmt7egwEppO+J2hQBB2z5h39JVQfWKQcFbhk+KxKkLQxWIYWHY+JL1RGYNYsOseHyd
- SicYAfoj3KhbUujSTpavjGWQoObZlIUs5nTyN29PHglHpkLriATY3x2rfvH9WEwZCbQS
- wz4Ewyo2HPZ4yvPWZB0w+AVZCGNmFvyAMpFCA9WEbUdbubMWDw35ei5Q47axn5AuxgpO
- DTSIGDlYyCCHjvosGWl+pNTBKdTrGD6aqjv/Yowe7HSq1wAKEuYn1sT5dKkofgFfGq2A
- Ahdg==
-X-Gm-Message-State: AJcUukcmwVPUFDkk96/JDwA0L/BDsHksgG9DGT/F380y9DMD7Qg79IPn
- 24NxS6dypnxNc46k9tAz8jt28mYLd95jVdcHv7YkzA==
-X-Google-Smtp-Source: ALg8bN4kiLIcOotuv3Eol9fGHrSR9csRaV14VqHmTkDO6pNF4iUibro4vd5Dh/nvdiiHg+VbxvGt1HqX22lk+oQCMOk=
-X-Received: by 2002:a5e:c206:: with SMTP id v6mr17797491iop.60.1548087289131; 
- Mon, 21 Jan 2019 08:14:49 -0800 (PST)
-MIME-Version: 1.0
-References: <20190121100617.2311-1-ard.biesheuvel@linaro.org>
- <20190121150734.GA30582@infradead.org>
- <CAKv+Gu-hR=uieOeg7QheA5yfAycUoi2vjZsDUvROKVjW4eUNqw@mail.gmail.com>
- <20190121155908.GA8084@infradead.org>
-In-Reply-To: <20190121155908.GA8084@infradead.org>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Mon, 21 Jan 2019 17:14:37 +0100
-Message-ID: <CAKv+Gu8LzS9OgvVnzUT8BZWVgDmx4OfqNiPSf+8=riY_LByN-g@mail.gmail.com>
-Subject: Re: [RFC PATCH] drm: disable WC optimization for cache coherent
- devices on non-x86
-To: Christoph Hellwig <hch@infradead.org>
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=84kAsmEVhaZVs53nKycwJOATMZtNr3mc+Cb51Mg2cnY=;
+ b=r4BUyWEdWaaHbyfg5h4ELDA20kjKNko1w5p69ZEQbHZEZSzUQwgV5Tx0FXiMUH7yC3
+ tTNzoGOMPT6uJFe1Nf2+ylNaPwMCcb9Eh98CAr9XWeWjWMDTSQX3QkOVohgA28wSJUwx
+ CN9jPaoXyxFLGm03jowhIQE7G4LEnJJqKKzqE6lLpZXM0YGPssIDIElGFYERyC1GwyS2
+ 8odNP8UIP3/KSKQk1fcJnY/N8XXUbUXjDz+o5j0ZsyxqRGV8ViOTZgOi5IOh6ZWfPzjx
+ pHXfmuwAjbmxzkveVJs2joNLrDEzUW50J6RtsGTaw2/7ywFeSJGivogBfXMbwG23YL3w
+ M+Sw==
+X-Gm-Message-State: AJcUukdj6dz2boTuWEkq+nT/JoExv9mIMk9m/pIg3YjDot7k2oh/z7rC
+ hYQFIGDRmhTLxz5GEJZ8/Sg=
+X-Google-Smtp-Source: ALg8bN6+evHgtc9Aw5dEuMmBFiNTqb4CPZktn9jOMbWir+0JpVHNuSrLLFamA8K0eJ97eMdkyTW3CQ==
+X-Received: by 2002:a37:a053:: with SMTP id j80mr25254276qke.277.1548087331328; 
+ Mon, 21 Jan 2019 08:15:31 -0800 (PST)
+Received: from fabio-Latitude-E5450.am.freescale.net ([2804:14c:482:a73::2])
+ by smtp.gmail.com with ESMTPSA id v32sm85340236qta.37.2019.01.21.08.15.29
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 21 Jan 2019 08:15:30 -0800 (PST)
+From: Fabio Estevam <festevam@gmail.com>
+To: shawnguo@kernel.org
+Subject: [PATCH] MAINTAINERS: imx: Change Fabio's email address
+Date: Mon, 21 Jan 2019 14:15:26 -0200
+Message-Id: <20190121161526.30172-1-festevam@gmail.com>
+X-Mailer: git-send-email 2.17.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_081454_223974_B237BDEA 
-X-CRM114-Status: GOOD (  21.43  )
+X-CRM114-CacheID: sfid-20190121_081532_809476_0E997541 
+X-CRM114-Status: GOOD (  10.93  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,80 +90,36 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Will Deacon <will.deacon@arm.com>, David Zhou <David1.Zhou@amd.com>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- Benjamin Herrenschmidt <benh@kernel.crashing.org>,
- David Airlie <airlied@linux.ie>,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- Michel Daenzer <michel.daenzer@amd.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- amd-gfx@lists.freedesktop.org, Junwei Zhang <Jerry.Zhang@amd.com>,
- Huang Rui <ray.huang@amd.com>, dri-devel <dri-devel@lists.freedesktop.org>,
- Daniel Vetter <daniel@ffwll.ch>, Michael Ellerman <mpe@ellerman.id.au>,
- Alex Deucher <alexander.deucher@amd.com>, Sean Paul <sean@poorly.run>,
- Christian Koenig <christian.koenig@amd.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Fabio Estevam <festevam@gmail.com>, linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 21 Jan 2019 at 16:59, Christoph Hellwig <hch@infradead.org> wrote:
->
-> On Mon, Jan 21, 2019 at 04:33:27PM +0100, Ard Biesheuvel wrote:
-> > On Mon, 21 Jan 2019 at 16:07, Christoph Hellwig <hch@infradead.org> wrote:
-> > >
-> > > > +#include <linux/dma-noncoherent.h>
-> > >
-> > > This header is not for usage in device drivers, but purely for
-> > > dma-mapping implementations!
-> > >
-> >
-> > Is that documented anywhere?
->
-> I'll add big fat comments.  But the fact that nothing is exported
-> there should be a fairly big hint.
->
+I prefer to use my personal email address for kernel related work.
 
-I don't follow. How do other header files 'export' things in a way
-that this header doesn't?
+Signed-off-by: Fabio Estevam <festevam@gmail.com>
+---
+ MAINTAINERS | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> > > And even if something like this was valid to do, it would have to be
-> > > a core function with an arch hook, and not hidden in a random driver.
-> >
-> > Why would it not be valid to do? Is it wrong for a driver to be aware
-> > of whether a device is cache coherent or not?
-> >
-> > And in case it isn't, do you have an alternative suggestion on how to
-> > fix this mess?
->
-> For the write combine mappings we need a proper core API how instances
-> can advertise the support.  One thing I want to do fairly soon is
-> error checking of the attrs argument to dma_alloc_attrs - so if you
-> pass in something unsupported it will give you back an error.
->
+diff --git a/MAINTAINERS b/MAINTAINERS
+index aaa41de462c6..a3d1222b81ad 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1542,7 +1542,7 @@ ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
+ M:	Shawn Guo <shawnguo@kernel.org>
+ M:	Sascha Hauer <s.hauer@pengutronix.de>
+ R:	Pengutronix Kernel Team <kernel@pengutronix.de>
+-R:	Fabio Estevam <fabio.estevam@nxp.com>
++R:	Fabio Estevam <festevam@gmail.com>
+ R:	NXP Linux Team <linux-imx@nxp.com>
+ L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+-- 
+2.17.1
 
-That sounds useful.
-
-> It seems that isn't quite enough for the drm use case, so we might
-> also need a way to query these features, but that really has to go
-> through the usual dma layer abstraction as well and not hacked together
-> in a driver based on an eduacted guestimate.
-
-As far as I can tell, these drivers allocate DMA'able memory [in
-ttm_tt_populate()] and subsequently create their own CPU mappings for
-it, assuming that
-a) the default is cache coherent, so vmap()ing those pages with
-cacheable attributes works, and
-b) telling the GPU to use NoSnoop attributes makes the accesses it
-performs coherent with non-cacheable CPU mappings of those physical
-pages
-
-Since the latter is not true for many arm64 systems, I need this patch
-to get a working system.
-
-So how do you propose we proceed to get this fixed? Does it have to
-wait for this proper core API plus followup changes for DRM?
 
 _______________________________________________
 linux-arm-kernel mailing list
