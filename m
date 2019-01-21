@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5720DC282DB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:56:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E98FEC282DB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:57:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 28F9F2084A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:56:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9DA6A2084A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:57:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="b4hPtc+b"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 28F9F2084A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mdaV9Ipd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9DA6A2084A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-m68k.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,50 +24,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=TZ5w9WXAlQ475gfwo7IhzAD0bBpFbXv69vD+1dj4JeE=; b=b4hPtc+bf/ndzu
-	pnOfkQrsBQFIIOPd6D0vnOs0grB/VEcH5JFjqny5wB3djN1zdf7iMFWN4S97zdoAlA8gul1ckI5kt
-	RFaHjEMOBtGDKE6or2HfX2F3WPYiSZDY8TXMwTSWkrDWIQiqrtS21yh14Wh0824APg/sd1EdT06Yk
-	lgRrbPZr7/kL4ecdCt6uBbArBBCXT61XeEopssUbcCYFESWYjo5kss9iUA58qTf8kNE09FS16g4Wi
-	GpZlirqaShKdxtJG8xFNKdewPVAqH942qij/7jVytApPO8sdsMtV6a3ES008R5TtXICj2JTg2BWbr
-	fU4Jw3/toyRWoeLvQgyg==;
+	List-Owner; bh=uLJTcTVOZBTdo4PFRdk/fZSd8ZkojOot+bthRk1hlN8=; b=mdaV9IpdlgDqpt
+	ny1m/ZwajQxnnFtApiHYNvbzatHPVtlnOt/csdynMj8CYcSw6bBsgEiEeaORYORaTiHfRxKlFJDTW
+	0PGsycCrHRmkbJSAEyWLiHFECbLduyyNyRzPVa4fmFxCx1SWJze9f3AOrW14IqXd7aC+KBxBFF4IY
+	WgiCgY2DPVzLnpaE6sL0xDvqMrCScPicEEB+/3UOse6UE68myVZZPwLT6jGHO1tVFr4kneGAY+GUl
+	lu8o+HzwRybRBpKff+2HfqzluZ7YbWwTzCknTxVxdlE23hWo7qli9al2UsFBvjkG8QX7UhTZViDUx
+	XG9EYtq+xAwOrBrlMiuQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glVO4-00054n-9I; Mon, 21 Jan 2019 08:56:56 +0000
-Received: from mail-vs1-f65.google.com ([209.85.217.65])
+	id 1glVOJ-0005HX-Jo; Mon, 21 Jan 2019 08:57:11 +0000
+Received: from mail-vs1-f68.google.com ([209.85.217.68])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glVNS-0004VR-1p
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 08:56:25 +0000
-Received: by mail-vs1-f65.google.com with SMTP id x1so12141332vsc.10
+ id 1glVNU-0004Yq-7v
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 08:56:33 +0000
+Received: by mail-vs1-f68.google.com with SMTP id u11so12137416vsp.11
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 00:56:17 -0800 (PST)
+ Mon, 21 Jan 2019 00:56:20 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=E/6v0ZVPaXQi5FWJ19dLuHcLgd/E9ZECv5IjLmf6PoI=;
- b=I64rK65d/OSo8tvqsMkpsaOAryBOMnq84160atZONeUKAFjKKg70n+vIo5MhLLKYus
- JxqtROT+35xdea395ZiCDJ6+LzAi2hR2+MNIlJ3BkD6YCQEhvLpY9c0Oqq9m4Ta4S7NU
- nrPcb2ppMLkNO586Ryd7a81t7iBi5V72Y7NsiFt/gUGl9XVicE8SPq4g1OQ/IeuzRSDS
- yyqRGXpmt87erSuDxj3FujKP2zZTGj9mHmTpNknNHijgttTII9l/WpICm+0vHH9hpwsc
- eFAkH84jUWFSmt4mIykHxOBpm74d1wy9mkIYsfpFHull/GK6eAIyt7KhTeZoKQXfahGx
- nNKA==
-X-Gm-Message-State: AJcUuke8B4R+PYzo1vrSZ5O2ZlWihlyLLg069TEOK0UqsXXgT3zH0NmU
- RM385MuZQyWCib9RlQ4r5TTrtCA54JN5h4+0s40=
-X-Google-Smtp-Source: ALg8bN6mqPPGjY0mRgSzvQIVAiUYVEkzmmA1fTVJs4P5AJXGDwVjqnqovDI8HCxNMByb80ziNpDqZXxAv1iGgV8yZxk=
-X-Received: by 2002:a67:3885:: with SMTP id n5mr10358537vsi.96.1548060976721; 
- Mon, 21 Jan 2019 00:56:16 -0800 (PST)
+ bh=Uun2AU3eJW+aX9fhOUjPPIC4XfawfY9i9oS9NgvU6Z4=;
+ b=kUkGprw+nWGT5dTozaZk0dSQzT8prOZGV9Wfy4hyQNrY6BYA8/5LxyNvxW5LxTKXSG
+ CXI8UDkcsVZwk+vhRBozb8fLk5CkIQGW5H8TNUxsCznz1z4RbDBE6puXs+Lhoopv2CK9
+ 1UgklKDxqZPAOA5GlaBqCUzRmUg16I+u++0kvT0eI7NQfxRNcG8+6SqvMB54aGlCyMUB
+ AeQxDn3BlfQXGhe+A6YlroG9bz4RlCnV1J6lveykFFGCMxks2GOV6LzHoKeo3qIkfyQG
+ cdOijZQLhVRVr8UoxQuK9aFlEMKojVS0+FEfncQCpIvGFWO32q6V+gMQPRTr/hPbpUzj
+ PQLw==
+X-Gm-Message-State: AJcUukdT1EOz6C7ItiPS/cHJeX5iojhWDlVRUJUmevgsgBKV2CeTaaoy
+ vqgG6YXmi5QzoUsXBmpfGcn0/fFjwj9jGZzn7os=
+X-Google-Smtp-Source: ALg8bN5Zv5T9HgEze01gQpDUuzyqM6YeldP0GcLXE8vieJqOlkOh/z7Dnz2dgUAbu8nwMIPAviPimX4i+NMBPPzq9wY=
+X-Received: by 2002:a67:f43:: with SMTP id 64mr11966034vsp.166.1548060979206; 
+ Mon, 21 Jan 2019 00:56:19 -0800 (PST)
 MIME-Version: 1.0
 References: <20190118161835.2259170-1-arnd@arndb.de>
- <20190118161835.2259170-27-arnd@arndb.de>
-In-Reply-To: <20190118161835.2259170-27-arnd@arndb.de>
+ <20190118161835.2259170-29-arnd@arndb.de>
+In-Reply-To: <20190118161835.2259170-29-arnd@arndb.de>
 From: Geert Uytterhoeven <geert@linux-m68k.org>
-Date: Mon, 21 Jan 2019 09:56:02 +0100
-Message-ID: <CAMuHMdWiHTjDT9-tnjgJy9qCWRr+qUgsJa6LjpRDJQzhoJqnzw@mail.gmail.com>
-Subject: Re: [PATCH v2 26/29] y2038: use time32 syscall names on 32-bit
+Date: Mon, 21 Jan 2019 09:56:06 +0100
+Message-ID: <CAMuHMdVxSVpP0KcBpCSVh0iKBCh3WtGqExtZGPH86hn2TOpTXg@mail.gmail.com>
+Subject: Re: [PATCH v2 28/29] y2038: rename old time and utime syscalls
 To: Arnd Bergmann <arnd@arndb.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_005618_758393_889C42B7 
-X-CRM114-Status: GOOD (  16.15  )
+X-CRM114-CacheID: sfid-20190121_005620_947982_B8B18442 
+X-CRM114-Status: GOOD (  17.74  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -117,29 +117,37 @@ Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 On Fri, Jan 18, 2019 at 5:21 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> This is the big flip, where all 32-bit architectures set COMPAT_32BIT_TIME
-> abd use the _time32 system calls from the former compat layer instead
-> of the system calls that take __kernel_timespec and similar arguments.
+> The time, stime, utime, utimes, and futimesat system calls are only
+> used on older architectures, and we do not provide y2038 safe variants
+> of them, as they are replaced by clock_gettime64, clock_settime64,
+> and utimensat_time64.
 >
-> The temporary redirects for __kernel_timespec, __kernel_itimerspec
-> and __kernel_timex can get removed with this.
+> However, for consistency it seems better to have the 32-bit architectures
+> that still use them call the "time32" entry points (leaving the
+> traditional handlers for the 64-bit architectures), like we do for system
+> calls that now require two versions.
 >
-> It would be easy to split this commit by architecture, but with the new
-> generated system call tables, it's easy enough to do it all at once,
-> which makes it a little easier to check that the changes are the same
-> in each table.
+> Note: We used to always define __ARCH_WANT_SYS_TIME and
+> __ARCH_WANT_SYS_UTIME and only set __ARCH_WANT_COMPAT_SYS_TIME and
+> __ARCH_WANT_SYS_UTIME32 for compat mode on 64-bit kernels. Now this is
+> reversed: only 64-bit architectures set __ARCH_WANT_SYS_TIME/UTIME, while
+> we need __ARCH_WANT_SYS_TIME32/UTIME32 for 32-bit architectures and compat
+> mode. The resulting asm/unistd.h changes look a bit counterintuitive.
+>
+> This is only a cleanup patch and it should not change any behavior.
 >
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
->  arch/m68k/kernel/syscalls/syscall.tbl       | 42 +++++------
+>  arch/m68k/include/asm/unistd.h              |  4 ++--
+>  arch/m68k/kernel/syscalls/syscall.tbl       | 10 +++++-----
 
 For m68k:
 Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-
 Gr{oetje,eeting}s,
 
                         Geert
+
 
 --
 Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert@linux-m68k.org
