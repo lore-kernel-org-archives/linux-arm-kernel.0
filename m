@@ -2,87 +2,63 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.3 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 54132C31680
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 17:21:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E8913C3168B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 17:23:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1FA4520879
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 17:21:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BAE1C20879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 17:23:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bnl7P4qX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1FA4520879
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RQMmLhIy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BAE1C20879
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KzXLVxoju7Ywapeto3erGQlpxee+pQ0oKcS8+FQtaAI=; b=bnl7P4qX2z5exc
-	XifI6zUjfl3JC+QmHDB6hrOUuCnc4scTl/fUVNUVMq7r0sS0qYDJ2jN+NeZhW2JtbeY/neqBS7qQu
-	FBSrKpdYWsJ/Y1UPkQBIyfXXpkcmTfCYLRbCypti2u++zSI7yv7W7qJ5+xf4A4WuohUpNEFRcK+mg
-	9AX3rHJv7vQPejK6IhL60k5t9hD01wKB7YSfRGwX8HQ47xrPGKfCAYq/2171Ckt+p0cDZqY2Bd8Bj
-	WCuM7uP3mruCpsg7IBBxuYW5aqNnNcP5IbZp0o3rqJqc0b0jQuLgONX1pL1FtLlBnSHcYQxoDmtYl
-	KLR2/N320Dzz7qDQB+Dg==;
+	List-Owner; bh=2TROjJlUSnDp4ZwBOIQqQMaVYgsqqZJ+cLeS/9nppnY=; b=RQMmLhIypW58av
+	SVhziasDxXPb2x0FB47zLfiJuQZ85Bhmeox8gN+QeBgiFs6ayOhjJqlJCnFqjGUOqNlSm4LQgMrIU
+	cuWYTpevgpzw8phIR4a/bGgSwGxgccd/ic9sjsrLkI19ii7qE6YNnSmkb1dP3KDKbukYUqQR7D3M2
+	au/JiDh3TT+wAtVzjeg12drlHSl83rLc8dHOZ70eUWI42dLdVVaPnFGR9+1q9YfvxpWSs/3okY3T0
+	4KuZbVoDkega3rNcojoAEBjO/DIC+LoRgX41Yt3QpEtjoENm6P51hfJYUG5UuImNX1U4cdZz9ZJ85
+	5IEBPHVskvn89X7Pj9Fg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gldFv-0004oD-IH; Mon, 21 Jan 2019 17:21:03 +0000
-Received: from mail-ed1-f48.google.com ([209.85.208.48])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gldFr-0004ns-9R
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 17:21:01 +0000
-Received: by mail-ed1-f48.google.com with SMTP id x30so17204710edx.2
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 09:20:58 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc:content-transfer-encoding;
- bh=FUKD+1guFUm6DCBdVTwWkKjFm2YNCLJAdTI9du0QQ1I=;
- b=XGCB3s9tYvOYi4pOvBURLm7som5iAzhevzstvPBLs0uly59XZB7wQt3L3gCO+9OyN0
- CvwNwRHtpeSo/wkowxcDTxULIP5lfgF4ram/35kRBWqWj4USzpelgmZyMHRiNTwy9fMc
- XCvVqzDZu+8ExhpC3U9ErCE7+HuRTA8rLw9D0dTdarCpEg/O4romk0RckffFa234Lzt4
- 8Of1mLslBoWLwS2bCs403qXl8j0t8vdq72ARseS7z+F+BcgERYVqWX99/ai2LRVYnRSF
- jHhY37OJSI8pLFcwL8AZgUq6mkeokFZQNer4UN86VuHtIm+PhU8gjvGli7S1xjCN7KH2
- IcvA==
-X-Gm-Message-State: AJcUukceohaXkOX1QnrfjlGWxlo1pLvL9YJ0qfiYqRmXacPQMknO4d0r
- Gnu78wj+Y5mjtpLSRlflqK/TNQMEWT8=
-X-Google-Smtp-Source: ALg8bN6XfPGaCct8cMiaF4PvH7Rtyktm+EoFjVUjz4cJxaE61yjDSuiD8IsU1xuuB1nKg/bByAjemA==
-X-Received: by 2002:a17:906:7c42:: with SMTP id
- g2mr2038643ejp.212.1548091256991; 
- Mon, 21 Jan 2019 09:20:56 -0800 (PST)
-Received: from mail-wr1-f44.google.com (mail-wr1-f44.google.com.
- [209.85.221.44])
- by smtp.gmail.com with ESMTPSA id e35sm9188742eda.13.2019.01.21.09.20.56
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 21 Jan 2019 09:20:56 -0800 (PST)
-Received: by mail-wr1-f44.google.com with SMTP id q18so24267836wrx.9
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 09:20:56 -0800 (PST)
-X-Received: by 2002:adf:a1d2:: with SMTP id v18mr27670155wrv.87.1548091256030; 
- Mon, 21 Jan 2019 09:20:56 -0800 (PST)
+	id 1gldIL-00056v-Ff; Mon, 21 Jan 2019 17:23:33 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gldII-00056Y-Au
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 17:23:31 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 65DD115AB;
+ Mon, 21 Jan 2019 09:23:29 -0800 (PST)
+Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id BC5593F614;
+ Mon, 21 Jan 2019 09:23:27 -0800 (PST)
+Date: Mon, 21 Jan 2019 17:23:25 +0000
+From: Mark Rutland <mark.rutland@arm.com>
+To: Stefan Agner <stefan@agner.ch>
+Subject: Re: [PATCH] drivers/perf: handle multiple CPUs with single interrupts
+Message-ID: <20190121172325.GD47506@lakrids.cambridge.arm.com>
+References: <20190121144111.22716-1-stefan@agner.ch>
 MIME-Version: 1.0
-References: <20190114132934.rywqqtjarbf6fgcr@plaes.org>
- <20190121132517.iv2v3hug4uihefnk@flea>
- <20190121150728.tw4ryjgzzbxh7qmc@plaes.org> <3373528.ybUWJjoEmk@jernej-laptop>
-In-Reply-To: <3373528.ybUWJjoEmk@jernej-laptop>
-From: Chen-Yu Tsai <wens@csie.org>
-Date: Tue, 22 Jan 2019 01:20:44 +0800
-X-Gmail-Original-Message-ID: <CAGb2v66k25gPDK8y77UZiUWG6N3TBgbX3j8gdwGfGKxSWv-rOw@mail.gmail.com>
-Message-ID: <CAGb2v66k25gPDK8y77UZiUWG6N3TBgbX3j8gdwGfGKxSWv-rOw@mail.gmail.com>
-Subject: Re: [linux-sunxi] Re: HDMI/DVI spurious failure
-To: =?UTF-8?Q?Jernej_=C5=A0krabec?= <jernej.skrabec@gmail.com>, 
- Priit Laes <plaes@plaes.org>
+Content-Disposition: inline
+In-Reply-To: <20190121144111.22716-1-stefan@agner.ch>
+User-Agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_092059_338010_1D978A9C 
-X-CRM114-Status: GOOD (  30.66  )
+X-CRM114-CacheID: sfid-20190121_092330_384910_6446D5FE 
+X-CRM114-Status: GOOD (  32.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,113 +70,146 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Maxime Ripard <maxime.ripard@bootlin.com>,
- linux-sunxi <linux-sunxi@googlegroups.com>, Jonathan Liu <net147@gmail.com>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: will.deacon@arm.com, linux-kernel@vger.kernel.org, linux-imx@nxp.com,
+ kernel@pengutronix.de, fabio.estevam@nxp.com, shawnguo@kernel.org,
+ linux-arm-kernel@lists.infradead.org, l.stach@pengutronix.de
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gVHVlLCBKYW4gMjIsIDIwMTkgYXQgMToxOCBBTSBKZXJuZWogxaBrcmFiZWMgPGplcm5lai5z
-a3JhYmVjQGdtYWlsLmNvbT4gd3JvdGU6Cj4KPiBEbmUgcG9uZWRlbGplaywgMjEuIGphbnVhciAy
-MDE5IG9iIDE2OjA3OjI4IENFVCBqZSBQcmlpdCBMYWVzIG5hcGlzYWwoYSk6Cj4gPiBPbiBNb24s
-IEphbiAyMSwgMjAxOSBhdCAwMjoyNToxN1BNICswMTAwLCBNYXhpbWUgUmlwYXJkIHdyb3RlOgo+
-ID4gPiBPbiBGcmksIEphbiAxOCwgMjAxOSBhdCAwMjo1MToyNlBNICswMDAwLCBQcmlpdCBMYWVz
-IHdyb3RlOgo+ID4gPiA+IE9uIEZyaSwgSmFuIDE4LCAyMDE5IGF0IDAzOjA0OjE4UE0gKzAxMDAs
-IE1heGltZSBSaXBhcmQgd3JvdGU6Cj4gPiA+ID4gPiBPbiBGcmksIEphbiAxOCwgMjAxOSBhdCAx
-MDoxMDo1M0FNICswMDAwLCBQcmlpdCBMYWVzIHdyb3RlOgo+ID4gPiA+ID4gPiA+ID4gPiA+ID4g
-SXQgZG9lc24ndCBsb29rIHJlbGF0ZWQgdG8gdGhlIGNsb2NrIHJhdGUgaXRzZWxmLCBzaW5jZSBp
-dAo+ID4gPiA+ID4gPiA+ID4gPiA+ID4gZG9lc24ndAo+ID4gPiA+ID4gPiA+ID4gPiA+ID4gY2hh
-bmdlIGJldHdlZW4gdGhlIHR3byBjYXNlcy4gSG93ZXZlciwgaW4gb25lIGNhc2UgdGhlIEREQwo+
-ID4gPiA+ID4gPiA+ID4gPiA+ID4gY2xvY2sgaXMKPiA+ID4gPiA+ID4gPiA+ID4gPiA+IGVuYWJs
-ZWQgYW5kIGluIHRoZSBvdGhlciBpdCdzIGRpc2FibGVkLgo+ID4gPiA+ID4gPiA+ID4gPiA+ID4K
-PiA+ID4gPiA+ID4gPiA+ID4gPiA+IFdhcyBpdCB0YWtlbiBhdCB0aGUgc2FtZSB0aW1lPyBNYXli
-ZSB5b3UgY2FuIHRyeSB3aXRoIHRoYXQKPiA+ID4gPiA+ID4gPiA+ID4gPiA+IHBhdGNoPwo+ID4g
-PiA+ID4gPiA+ID4gPiA+ID4gaHR0cDovL2NvZGUuYnVsaXgub3JnL3o3am1rbS01NTUzNDQ/cmF3
-Cj4gPiA+ID4gPiA+ID4gPiA+ID4KPiA+ID4gPiA+ID4gPiA+ID4gPiBUaGFua3MsIGFmdGVyIGRv
-aW5nIH41MCsgYm9vdHMgSSBoYXZlbid0IHNlZW4gYSBzaW5nbGUKPiA+ID4gPiA+ID4gPiA+ID4g
-PiBmYWlsdXJlLgo+ID4gPiA+ID4gPiA+ID4gPiA+Cj4gPiA+ID4gPiA+ID4gPiA+ID4gUHJldmlv
-dXNseSBJIGhhZCBmb2xsb3dpbmcgZmFpbHVyZSBjYXNlcyB3aGljaCBhcmUgbm93IGJvdGgKPiA+
-ID4gPiA+ID4gPiA+ID4gPiBmaXhlZDoKPiA+ID4gPiA+ID4gPiA+ID4gPgo+ID4gPiA+ID4gPiA+
-ID4gPiA+IGEpIExpbnV4IHdpdGhvdXQgdS1ib290IEhETUksIHdoZXJlIG9uZSBpbiBldmVyeSA2
-LTcgYm9vdHMKPiA+ID4gPiA+ID4gPiA+ID4gPiBmYWlsZWQuCj4gPiA+ID4gPiA+ID4gPiA+ID4g
-YikgdS0tYm9vdCB3aXRoIGhkbWkgZW5hYmxlZCBzd2l0Y2hpbmcgdG8gc2ltcGxlZmIgYW5kIHRo
-ZW4KPiA+ID4gPiA+ID4gPiA+ID4gPiBzd2l0Y2hpbmcKPiA+ID4gPiA+ID4gPiA+ID4gPiB0byBr
-bXMsIHdoZXJlIHByZXZpb3VzbHkgYWxsIGJvb3RzIGVuZGVkIHVwIHdpdGggZ2FyYmxlZAo+ID4g
-PiA+ID4gPiA+ID4gPiA+IHNjcmVlbi4KPiA+ID4gPiA+ID4gPiA+ID4KPiA+ID4gPiA+ID4gPiA+
-ID4gU28gaXQncyBub3QgcmVhbGx5IGEgZml4LCBidXQgaXQgcmVhbGx5IGxvb2tzIGxpa2UgdGhl
-IGNsb2NrCj4gPiA+ID4gPiA+ID4gPiA+IGlzIG5vdAo+ID4gPiA+ID4gPiA+ID4gPiBlbmFibGVk
-IHdoZW4gaXQgc2hvdWxkLgo+ID4gPiA+ID4gPiA+ID4gPgo+ID4gPiA+ID4gPiA+ID4gPiBDYW4g
-eW91IGRlc2NyaWJlIHlvdXIgdGVzdCBzY2VuYXJpbyBhIGJpdCBtb3JlPyBXaGF0IGFyZSB5b3UK
-PiA+ID4gPiA+ID4gPiA+ID4gZG9pbmcKPiA+ID4gPiA+ID4gPiA+ID4gZXhhY3RseSwganVzdCBi
-b290aW5nPyBXaGVuIGRvIHlvdSBzdGFydCB1c2luZyB0aGUgZGlzcGxheT8KPiA+ID4gPiA+ID4g
-PiA+ID4gV2hlbiBkaWQKPiA+ID4gPiA+ID4gPiA+ID4geW91IGNhcHR1cmUgdGhlIGRlYnVnZnMg
-b3V0cHV0IHRoYXQgeW91IHBhc3RlZD8KPiA+ID4gPiA+ID4gPiA+Cj4gPiA+ID4gPiA+ID4gPiBE
-aXNwbGF5IGlzIGFscmVhZHkgY29ubmVjdGVkIHZpYSBIRE1JIHRvIHRoZSBib2FyZC4gSSBkb24n
-dAo+ID4gPiA+ID4gPiA+ID4gcmVhbGx5Cj4gPiA+ID4gPiA+ID4gPiByZW1vdmUgaXQsIEkganVz
-dCBib290IHRoZSBkZXZpY2UgYW5kIGxldCBpdCBzdGFydCBYb3JnLgo+ID4gPiA+ID4gPiA+ID4g
-TWVhbndoaWxlIEkganVzdCBzc2ggaW50byB0aGUgZGV2aWNlIGFuZCBjYXB0dXJlIGRlYnVnZnMg
-b3V0cHV0Lgo+ID4gPiA+ID4gPiA+ID4gU2VlIG15IDMgdGVzdGluZyBzY2VuYXJpb3MgYmVsb3cu
-Cj4gPiA+ID4gPiA+ID4gPgo+ID4gPiA+ID4gPiA+ID4gS2VybmVsIGFsc28gaW5jbHVkZXMgb25l
-IGV4dHJhIHBhdGNoIHRvIGZhbGwgYmFjayB0byBEREMsIGluCj4gPiA+ID4gPiA+ID4gPiBjYXNl
-IEhQRAo+ID4gPiA+ID4gPiA+ID4gZmFpbHMuIE1vc3RseSB0aGUgc2FtZSBJIGFscmVhZHkgc3Vi
-bWl0dGVkIGxhc3QgTm92ZW1iZXIgWzFdLgo+ID4gPiA+ID4gPiA+Cj4gPiA+ID4gPiA+ID4gRG8g
-eW91IGhhdmUgdGhlIHNhbWUgaXNzdWUgd2l0aG91dCB0aGF0IHBhdGNoPwo+ID4gPiA+ID4gPgo+
-ID4gPiA+ID4gPiBDYW4ndCByZWFsbHkgdGVzdCB0aGlzIGRpc3BsYXkgd2l0aG91dCB0aGlzIHBh
-dGNoIGFuZCBJIGRvIG5vdCBoYXZlCj4gPiA+ID4gPiA+IG90aGVyCj4gPiA+ID4gPiA+IEhETUkv
-RFZJIHNjcmVlbnMuIEFuZCB0aGlzIGlzc3VlIGRvZXMgbm90IGhhcHBlbiB3aXRoIG90aGVyIEhE
-TUkKPiA+ID4gPiA+ID4gZGlzcGxheXMKPiA+ID4gPiA+ID4gdGhhdCBJIGhhdmUgaGVyZS4KPiA+
-ID4gPiA+Cj4gPiA+ID4gPiBDYW4ndCB5b3UganVzdCBmb3JjZSB0aGUgbW9uaXRvciB0byBiZSBy
-ZXBvcnRlZCBhcyBwcmVzZW50PyBJdCdzIG5vdAo+ID4gPiA+ID4gZ3JlYXQgYW5kIHdlIGRvbid0
-IHdhbnQgdG8gbWVyZ2UgaXQsIGJ1dCB0aGF0IHdvdWxkIGFsbG93IHlvdSB0byB0ZXN0Cj4gPiA+
-ID4gPiB0aGF0IHNldHVwIHdpdGhvdXQgdG9vIG1hbnkgaW50ZXJmZXJlbmNlcy4KPiA+ID4gPgo+
-ID4gPiA+IEJhc2VsaW5lIGlzIGNsZWFuIHUtYm9vdCAvIGxpbnV4LiBVLWJvb3QgZG9lcyBub3Qg
-ZGV0ZWN0L2VuYWJsZSBkaXNwbGF5Lgo+ID4gPiA+Cj4gPiA+ID4gMSkgQm9vdGluZyBMaW51eCB3
-aXRoIGRybS5kZWJ1Zz0weGUKPiA+ID4gPgo+ID4gPiA+ICogTGludXggZG9lcyBub3QgZGV0ZWN0
-L2VuYWJsZSBkaXNwbGF5Cj4gPiA+ID4KPiA+ID4gPiAyKSBCb290aW5nIHdpdGggZHJtLmRlYnVn
-PTB4ZSB2aWRlbz1IRE1JLUEtMTo2NDB4NDgwQDYwZQo+ID4gPiA+Cj4gPiA+ID4gKiBMaW51eCBk
-ZXRlY3RzIGRpc3BsYXksIGJ1dCBkaXNwbGF5IGlzIGdhcmJsZWQsIGFuZCBwcm9wZXIgZWRpZCBk
-YXRhIGlzCj4gPiA+ID4gZGV0ZWN0ZWQ6Cj4gPiA+ID4KPiA+ID4gPiBbc25pcF0KPiA+ID4gPiBw
-bGwtdmlkZW8xICAgICAgICAgICAgICAgICAgICAgMCAgICAgICAgMCAgICAgICAgMCAgIDMyNzAw
-MDAwMAo+ID4gPiA+IDAgICAgIDAgIDUwMDAwPiA+Cj4gPiA+ID4gICAgcGxsLXZpZGVvMS0yeCAg
-ICAgICAgICAgICAgIDAgICAgICAgIDAgICAgICAgIDAgICA2NTQwMDAwMDAKPiA+ID4gPiAgICAw
-ICAgICAwICA1MDAwMD4gPgo+ID4gPiA+ICAgICAgIGhkbWktdG1kcyAgICAgICAgICAgICAgICAw
-ICAgICAgICAwICAgICAgICAwICAgIDI1MTUzODQ2Cj4gPiA+ID4gICAgICAgMCAgICAgMCAgNTAw
-MDA+ID4KPiA+ID4gPiAgICAgICAgICBoZG1pLWRkYyAgICAgICAgICAgICAgMCAgICAgICAgMCAg
-ICAgICAgMCAgICAgICA4OTgzNQo+ID4gPiA+ICAgICAgICAgIDAgICAgIDAgIDUwMDAwPiA+Cj4g
-PiA+ID4gWy9zbmlwXQo+ID4gPiA+Cj4gPiA+ID4gMykgQm9vdGluZyB3aXRoIGRybS5kZWJ1Zz0w
-eGUgdmlkZW89SERNSS1BLTE6NjQweDQ4MEA2MGUKPiA+ID4gPiBBbmQgYWxzbyBvbmUgZXh0cmEg
-cGF0Y2ggZm9yIExpbnV4IHdoZXJlIEhETUkgRERDIGNsb2NrIG1hcmtlZCBhcwo+ID4gPiA+IGNy
-aXRpY2FsCj4gPiA+ID4KPiA+ID4gPiBMaW51eCBkZXRlY3RzIGFuZCBpbml0aWFsaXplcyBkaXNw
-bGF5IHByb3Blcmx5Ogo+ID4gPiA+IFtzbmlwXQo+ID4gPiA+IHBsbC12aWRlbzEgICAgICAgICAg
-ICAgICAgICAgICAxICAgICAgICAxICAgICAgICAwICAgMzI3MDAwMDAwCj4gPiA+ID4gMCAgICAg
-MCAgNTAwMDA+ID4KPiA+ID4gPiAgICBwbGwtdmlkZW8xLTJ4ICAgICAgICAgICAgICAgMSAgICAg
-ICAgMSAgICAgICAgMCAgIDY1NDAwMDAwMAo+ID4gPiA+ICAgIDAgICAgIDAgIDUwMDAwPiA+Cj4g
-PiA+ID4gICAgICAgaGRtaS10bWRzICAgICAgICAgICAgICAgIDEgICAgICAgIDEgICAgICAgIDAg
-ICAgMjUxNTM4NDYKPiA+ID4gPiAgICAgICAwICAgICAwICA1MDAwMD4gPgo+ID4gPiA+ICAgICAg
-ICAgIGhkbWktZGRjICAgICAgICAgICAgICAxICAgICAgICAxICAgICAgICAwICAgICAgIDg5ODM1
-Cj4gPiA+ID4gICAgICAgICAgMCAgICAgMCAgNTAwMDA+ID4KPiA+ID4gPiBbL3NuaXBdCj4gPiA+
-Cj4gPiA+IEkgZ3Vlc3MgeW91J2xsIG5lZWQgdG8gdHJhY2sgZG93biB3aGVuIHRoZSBoZG1pLXRt
-ZHMgYW5kIGhkbWktZGRjIGFyZQo+ID4gPiBlbmFibGVkIGFuZCBkaXNhYmxlZCwgYW5kIGlmIGl0
-IG1ha2VzIHNlbnNlIDovCj4gPgo+ID4gT0ssIGZpZ3VyZWQgb3V0IHRoZSBjYXVzZS4KPiA+Cj4g
-PiBBcHBhcmVudGx5LCBmb3IgZWFjaCBkZGMgcG9sbCB3ZSBlbmFibGUgZGRjIGNsb2NrIHdoaWNo
-IGlzIGEgY2hpbGQgb2YgVE1EUwo+ID4gY2xvY2suIEFmdGVyIHRyYW5zZmVyIGlzIGRvbmUsIHdl
-IGRpc2FibGUgdGhlIGNsb2NrIGFuZCB0aGlzIGFsc28gdGVhcnMgZG93bgo+ID4gdGhlIHBhcmVu
-dCBiZWNhdXNlIGl0cyBvbmx5IHVzZXIgaGFzIGdvbmUgbWlzc2luZy4uIDooCj4gPgo+ID4KPiA+
-IFNvIGJhc2ljYWxseSwgcGF0Y2ggYmVsb3cgYWxzbyB3b3JrcywgYnV0IEkgZ3Vlc3Mgd2Ugc2hv
-dWxkIG92ZXJyaWRlCj4gPiB0aGUgc3VuNGlfdG1kc19vcHMuZGlzYWJsZSB0byBwcm9wZXJseSBh
-Y2NvdW50IGZvciB0bWRzIGNsb2NrIHVzZS4KPiA+Cj4KPiBBcyBmYXIgYXMgSSBjYW4gc2VlLCBu
-b2JvZHkgY2FsbGVkIGNsa19wcmVwYXJlX2VuYWJsZSgpIG9uIHRtZHMgY2xvY2suIEkgaGFkCj4g
-c2ltaWxhciBpc3N1ZSB3aXRoIFRNRFMgY2xvY2sgZm9yIEgzLCBzaW5jZSBJIGJhc2VkIGNvZGUg
-b24gc3VuNGkgdG1kcyBjbGsKPiBkcml2ZXIuIEFsdGhvdWdoIGNsb2NrIGRvZXNuJ3QgaGF2ZSBl
-bmFibGUgYml0LCBpdCBzdGlsbCBoYXMgdG8gYmUgZG9uZSB0bwo+IGhhdmUgcHJvcGVyIHJlZmVy
-ZW5jZSBjb3VudCBhbmQgdG8gcHJldmVudCBpc3N1ZXMgbGlrZSB0aGlzLgoKSUlSQyBJIGhhZCB0
-aGUgc2FtZSBndXQgZmVlbGluZyBhdCB0aGUgdGltZSwgYnV0IG90aGVyIHN0dWZmIGhhcHBlbmVk
-LiA6KAoKUHJpaXQsIGNvdWxkIHlvdSBzZW5kIGEgcHJvcGVyIHBhdGNoIGVuYWJsaW5nIGFuZCBk
-aXNhYmxpbmcgdGhlIFRNRFMgY2xvY2s/Ckl0IHNob3VsZCBiZSBkb25lIGFzIHBhcnQgb2Ygc3Vu
-NGlfaGRtaV9lbmFibGUgYW5kIHN1bjRpX2hkbWlfZGlzYWJsZS4KCkNoZW5ZdQoKX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBt
-YWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9s
-aXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+Hi Stefan,
+
+On Mon, Jan 21, 2019 at 03:41:11PM +0100, Stefan Agner wrote:
+> Currently, if only a single interrupt is available, the code assigns
+> this single interrupt to the first CPU. All other CPUs are left
+> unsupported. This allows to use perf events only on processes using
+> the first CPU. This is not obvious to the user.
+> 
+> Instead, disable interrupts but support all CPUs. This allows to use
+> the PMU on all CPUs for all events other than sampling events which do
+> require interrupt support.
+
+Even for non-sampling events we use the overflow interrupt to ensure
+that we don't lose count across overflows, and without that interrupt,
+we cannot guarantee that the results are accurate.
+
+For example:
+
+	Program counter to 0
+	Start program
+	< counter overflows, no interrupt >
+	< counter overflows, no interrupt >
+	Stop program
+	Counter reads as 5
+
+
+... which we cannot distinguish from:
+
+	Program counter to 0
+	Start program
+	< counter overflows, no interrupt >
+	< counter overflows, no interrupt >
+	< counter overflows, no interrupt >
+	< counter overflows, no interrupt >
+	< counter overflows, no interrupt >
+	< counter overflows, no interrupt >
+	Stop program
+	Counter reads as 5
+
+... and thus cannot provide any reasonable confidence in results.
+
+In theory, we could use a hrtimer to periodically refresh the events to
+prevent this, but this would need to be set at some very high frequency
+to account for the fastest potential counter, and would significantly
+degrade performance.
+
+I don't think that's going to be reliable, and given that, I don't think
+that we can support muxed IRQs in this way.
+
+Thanks,
+Mark.
+
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+> This has been observed and tested on a i.MX 6DualLite, but is probably
+> valid for i.MX 6Quad as well.
+> 
+> It seems that ux500 once had support for single IRQ on a SMP system,
+> however this got removed with:
+> Commit 2b05f6ae1ee5 ("ARM: ux500: remove PMU IRQ bouncer")
+> 
+> I noticed that with this patch I get an error when trying to use perf stat:
+>   # perf top
+>   Error:
+>   cycles: PMU Hardware doesn't support sampling/overflow-interrupts. Try 'perf stat'
+> 
+> Without this patch perf top seems to work, but it seems not to use any
+> sampling events (?):
+>   # perf top
+> PerfTop:    7215 irqs/sec  kernel:100.0%  exact:  0.0% [4000Hz cpu-clock:pppH], (all, 2 CPUs)
+> ....
+> 
+> Also starting perf top and explicitly selecting cpu-clock seems to work
+> and show the same data as before this change.
+>   # perf top -e cpu-clock:pppH
+> PerfTop:    7214 irqs/sec  kernel:100.0%  exact:  0.0% [4000Hz cpu-clock:pppH], (all, 2 CPUs)
+> 
+> It seems that perf top falls back to cpu-clock in the old case, but not
+> once sampling events are not supported...
+> 
+> --
+> Stefan
+> 
+> 
+>  drivers/perf/arm_pmu_platform.c | 19 +++++++++++--------
+>  1 file changed, 11 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/perf/arm_pmu_platform.c b/drivers/perf/arm_pmu_platform.c
+> index 933bd8410fc2..80b991417b6e 100644
+> --- a/drivers/perf/arm_pmu_platform.c
+> +++ b/drivers/perf/arm_pmu_platform.c
+> @@ -105,23 +105,26 @@ static int pmu_parse_irqs(struct arm_pmu *pmu)
+>  		return num_irqs;
+>  	}
+>  
+> +	if (num_irqs == 1) {
+> +		int irq = platform_get_irq(pdev, 0);
+> +		if (irq && irq_is_percpu_devid(irq))
+> +			return pmu_parse_percpu_irq(pmu, irq);
+> +	}
+> +
+>  	/*
+>  	 * In this case we have no idea which CPUs are covered by the PMU.
+>  	 * To match our prior behaviour, we assume all CPUs in this case.
+> +	 * Multiple CPUs with a single PMU irq are currently not handled.
+> +	 * Rather than supporting only the first CPU, support all CPUs but
+> +	 * without interrupt capability.
+>  	 */
+> -	if (num_irqs == 0) {
+> -		pr_warn("no irqs for PMU, sampling events not supported\n");
+> +	if (num_irqs == 0 || (nr_cpu_ids > 1 && num_irqs == 1)) {
+> +		pr_info("No per CPU irqs for PMU, sampling events not supported\n");
+>  		pmu->pmu.capabilities |= PERF_PMU_CAP_NO_INTERRUPT;
+>  		cpumask_setall(&pmu->supported_cpus);
+>  		return 0;
+>  	}
+>  
+> -	if (num_irqs == 1) {
+> -		int irq = platform_get_irq(pdev, 0);
+> -		if (irq && irq_is_percpu_devid(irq))
+> -			return pmu_parse_percpu_irq(pmu, irq);
+> -	}
+> -
+>  	if (nr_cpu_ids != 1 && !pmu_has_irq_affinity(pdev->dev.of_node)) {
+>  		pr_warn("no interrupt-affinity property for %pOF, guessing.\n",
+>  			pdev->dev.of_node);
+> -- 
+> 2.20.1
+> 
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
