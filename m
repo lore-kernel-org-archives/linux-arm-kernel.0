@@ -2,91 +2,88 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C8214C316A5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 18:28:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C1E3EC31681
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 18:37:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9ED4921726
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 18:28:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7E04920989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 18:37:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RqqWYWkD";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="At2DcbcQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9ED4921726
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VbE4QE+7";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="GLWcqNJW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7E04920989
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=AZND7IX2rxrKecHL9ez5lSJX/aZcnHKpNLj4hDC5TnI=; b=RqqWYWkDs3EIP4
-	sGTdE+3nVgVJbsbKWxqq00oewhJYM2nMyoZqnknN4Pe5WpK6lh9+no0B+JiqIjkQyARIZnFyIkTLX
-	56qSGfgJ+dAURt2hH2g6XEwa+9JQYZphjaEAWS1jHbn503/jwjlUDroxCEVFIuRDtX+QM7lyVokzy
-	BJc7/9u0lGEjO/TCNW8V4I7Fd2REMgVu3bEMbu4sLaJ1wki6I4E23evEcpBsyj6K9uBjYa/kkZ1e1
-	q5FsB3UaA39+gn6jDpVWj99ayAUzF5JEALfKp/4NmieZfk/cq0X7zb+WUFbsIL5Tp49guIcym/Kbv
-	LWW4miVZy0Fy6Jxa3OzA==;
+	List-Owner; bh=INW/JDq/XiiJhOTO7B6W9kiQcykJ3MmjWiiBc3NetUo=; b=VbE4QE+7tU6sfY
+	C/WdQK7FmxaJjsEjP4clEq9vFgY235QJ0kxJgl9PKzkJA5JlWQuuL+dX4W4Ge3cbDmSV+pUB8rUxH
+	fK4eOu7lCl04o7IHeo2UPaUoTf11NLsQGaXbl0lpevFmMYiszoS9sMpbzvxiarnWbABOlQ8gbnNZv
+	8mBc67z/4U7LpnCCYCPHb/AZu2YSy6qGRFe5jV5gWu+kZArQ+w5OFUUcAcdgAHc+q2iWYpk1rfrpY
+	Vc6Mz7oz+tAjoznvyKU8cCEEYKyLKzG7aWwh5RO50QAgYuYe3K4iwWcuJ1cZL86GjbZrRGx7XV5qd
+	lbbdot9PyR74x/ACivBw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gleJS-0003k3-59; Mon, 21 Jan 2019 18:28:46 +0000
-Received: from mail-io1-xd42.google.com ([2607:f8b0:4864:20::d42])
+	id 1gleS3-0007x6-6V; Mon, 21 Jan 2019 18:37:39 +0000
+Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gleJO-0003jg-Pt
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 18:28:44 +0000
-Received: by mail-io1-xd42.google.com with SMTP id s22so17101699ioc.8
+ id 1gleRz-0007wE-Bp
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 18:37:37 +0000
+Received: by mail-pl1-x641.google.com with SMTP id b5so10206856plr.4
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 10:28:42 -0800 (PST)
+ Mon, 21 Jan 2019 10:37:34 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc:content-transfer-encoding;
- bh=cjZ5Vxrrg39jcD2RwsLl+XciRWqrJDP2EHI7an4ZI08=;
- b=At2DcbcQUOgl+eCZ1BsYQ0X5ljSIRpcifYQx2jRYqh4h6fCsnn8QY/fx8b/1ywjX0e
- L/jZ5QjtAN2NH5b1Rbt4kLrHvDVUCwowX8AyO2AYDEqX250Me9p9QWcKxz9ZUZEhoNZi
- R5QGfUGEuASEP+OLz5DAjDgzIVeKhxsxviZcg=
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=LfgJ80J4ZDHkhQuyoK/VfsoNOr02tH+WlRfi74Gc2uQ=;
+ b=GLWcqNJWr+XpBZtN6M20mDlRp2rFGOgTHsyFvfQEEptC0X1A38rnF3QyMe8kz5a7bF
+ vmRp9sX4r4lBMSaZhdAEFCc8rhdZy8y0Y6wP36PH6ePMFPV5uLRaIT7EmrCVhuit+DYi
+ ZwR8LbXabmzXFZQIXtGXmYL12CJ+0HfZL/utc=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc:content-transfer-encoding;
- bh=cjZ5Vxrrg39jcD2RwsLl+XciRWqrJDP2EHI7an4ZI08=;
- b=CUGaaVGvsE8jZc4pdEJjvd8AA7ttSKdHN2Ux1yAGwqB0m7qTTFAgFS2h62QVQZyv90
- Li9IXwKwsVdbvo4pWLWMbsoqTAtCVstgjh2XD3xv0k/7soGeKPjo2V+ww0u4U2L0gJKL
- vHys2D2obM1IO2rewTNBPNUFN4EyW9jdBKUHRABWwG6RiUtPClu2hXbyG5piaBQsg7/p
- QvowjSAwilI6cKC6UMbL4h/miZ5s4goXoanlkJ6h+ORSZkIWrIQ+bQ0U1QT9EH2MUcBX
- hPL5vxidmUHY6P1KRAasRVYBhzFmfY0HcInWKj0XMVih/Oz/6AAKWnJ1+WZcaTcalM6P
- WhOQ==
-X-Gm-Message-State: AJcUukd+JHAYuBR/FauvZMd3KG+h10LAPDYCc0w7gGn3mL7PJ013J+RM
- b8I5GbXJJ6/QtwkKAD36K2KXjOmpo5kDp8m4mOcGOQ==
-X-Google-Smtp-Source: ALg8bN7L/mGV1rcOL5b/ftEwv+cqJaT9ZIqxkpGx05uQu8yKMYQswwAgRvB/FZ1DUJZwoNeBmdrbxfsoZz69nvGBmr4=
-X-Received: by 2002:a5e:c206:: with SMTP id v6mr18094736iop.60.1548095321815; 
- Mon, 21 Jan 2019 10:28:41 -0800 (PST)
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=LfgJ80J4ZDHkhQuyoK/VfsoNOr02tH+WlRfi74Gc2uQ=;
+ b=ny9hpsTKV81SBnXiSPHIMT23ej+ZOJaDcWqRahc1NRtWFYAm2+nL0pbeLXDTqPAgXx
+ zvlsV78VoRNF/2dQMIrGUepkE5De8P/2dKVf1d22H8+vQLEyAC9CSUQWQENcxouTQFnz
+ wZextQGBY4DTFa758as8gsVG9oMHG5doAKpvpQbXhO68R5naBd1qO9YzxkyAOiYPJOzf
+ Xi5WqF5EOjcIxFai0Yrfu5zATmTc8Za71iCboNIA9tOzPuOZBtdwBMxpL+01FRQLT+NZ
+ AsK4nnAwf292qzgvw2jgTZe5of4ApS45LHLbTGnhKUM9t/6Z1pBELdWhuyRJMDnRkeYo
+ bsZA==
+X-Gm-Message-State: AJcUuke5kbscDcvrkCDdf8WPuslZmG45fS6Ss4TeaPZ8szIVI161Lx68
+ xT6x4qUepV+t9x255jzeyhifIg==
+X-Google-Smtp-Source: ALg8bN5ZEUlC/cSB8/6MadC6hzC6RoB4ii6H/V6gFm+I282frYQBNnhaIU9awTdPLSqqfKHZ08RAcA==
+X-Received: by 2002:a17:902:d68c:: with SMTP id
+ v12mr30899276ply.4.1548095854252; 
+ Mon, 21 Jan 2019 10:37:34 -0800 (PST)
+Received: from xps15 (S0106002369de4dac.cg.shawcable.net. [68.147.8.254])
+ by smtp.gmail.com with ESMTPSA id c7sm17729771pfa.24.2019.01.21.10.37.32
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 21 Jan 2019 10:37:33 -0800 (PST)
+Date: Mon, 21 Jan 2019 11:37:31 -0700
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
+To: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+Subject: Re: [PATCHv3 1/4] arm64: dts: qcom: sdm845: Add Coresight support
+Message-ID: <20190121183731.GA14049@xps15>
+References: <cover.1547813804.git.saiprakash.ranjan@codeaurora.org>
+ <73bf137fd5d6cb6bddecdf13026156afcf9d473b.1547813804.git.saiprakash.ranjan@codeaurora.org>
 MIME-Version: 1.0
-References: <20190121100617.2311-1-ard.biesheuvel@linaro.org>
- <20190121150734.GA30582@infradead.org>
- <CAKv+Gu-hR=uieOeg7QheA5yfAycUoi2vjZsDUvROKVjW4eUNqw@mail.gmail.com>
- <20190121155908.GA8084@infradead.org>
- <CAKv+Gu8LzS9OgvVnzUT8BZWVgDmx4OfqNiPSf+8=riY_LByN-g@mail.gmail.com>
- <20190121162238.GA17651@infradead.org>
- <CAKv+Gu-5V-UjP_YzZBCEsa+o_G6BRSVw2ZimYGNEfRGf-aRPNg@mail.gmail.com>
- <59ccf85d-b99d-b5c8-ea87-66c2a892e197@daenzer.net>
- <CAKv+Gu8OkbHwY5UBxahpQpM_gKh2331pQ6o-4YyJdLurbFNHvw@mail.gmail.com>
- <ccc775d3-3053-ab79-dac8-4feb28e8e690@daenzer.net>
- <CAKv+Gu-9VKL5RjScbKss4YfH1Cb8WbXmzU_0UsStnoXJcML7Rg@mail.gmail.com>
- <850b6aee-0040-c333-b125-45211c18ada5@daenzer.net>
-In-Reply-To: <850b6aee-0040-c333-b125-45211c18ada5@daenzer.net>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Mon, 21 Jan 2019 19:28:30 +0100
-Message-ID: <CAKv+Gu99zHqcQtj6TiOXAr3Qa6WWhKem+DHVA_mAQ0-Bc0Vbqw@mail.gmail.com>
-Subject: Re: [RFC PATCH] drm: disable WC optimization for cache coherent
- devices on non-x86
-To: =?UTF-8?Q?Michel_D=C3=A4nzer?= <michel@daenzer.net>
+Content-Disposition: inline
+In-Reply-To: <73bf137fd5d6cb6bddecdf13026156afcf9d473b.1547813804.git.saiprakash.ranjan@codeaurora.org>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_102842_844473_4A669D1E 
-X-CRM114-Status: GOOD (  21.88  )
+X-CRM114-CacheID: sfid-20190121_103735_403641_21403ED2 
+X-CRM114-Status: GOOD (  22.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,75 +95,520 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: David Zhou <David1.Zhou@amd.com>,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- Benjamin Herrenschmidt <benh@kernel.crashing.org>,
- Will Deacon <will.deacon@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- amd-gfx@lists.freedesktop.org, Christoph Hellwig <hch@infradead.org>,
- David Airlie <airlied@linux.ie>, Huang Rui <ray.huang@amd.com>,
- dri-devel <dri-devel@lists.freedesktop.org>, Daniel Vetter <daniel@ffwll.ch>,
- Michael Ellerman <mpe@ellerman.id.au>, Junwei Zhang <Jerry.Zhang@amd.com>,
- Alex Deucher <alexander.deucher@amd.com>, Sean Paul <sean@poorly.run>,
- Christian Koenig <christian.koenig@amd.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Rajendra Nayak <rnayak@codeaurora.org>,
+ Suzuki K Poulose <suzuki.poulose@arm.com>,
+ Alexander Shishkin <alexander.shishkin@linux.intel.com>,
+ linux-kernel@vger.kernel.org, linux-arm-msm@vger.kernel.org,
+ Doug Anderson <dianders@chromium.org>,
+ Bjorn Andersson <bjorn.andersson@linaro.org>,
+ David Brown <david.brown@linaro.org>, Rob Herring <robh+dt@kernel.org>,
+ Sibi Sankar <sibis@codeaurora.org>, Vivek Gautam <vivek.gautam@codeaurora.org>,
+ Leo Yan <leo.yan@linaro.org>, Andy Gross <andy.gross@linaro.org>,
+ Stephen Boyd <sboyd@kernel.org>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gTW9uLCAyMSBKYW4gMjAxOSBhdCAxOToyNCwgTWljaGVsIETDpG56ZXIgPG1pY2hlbEBkYWVu
-emVyLm5ldD4gd3JvdGU6Cj4KPiBPbiAyMDE5LTAxLTIxIDc6MjAgcC5tLiwgQXJkIEJpZXNoZXV2
-ZWwgd3JvdGU6Cj4gPiBPbiBNb24sIDIxIEphbiAyMDE5IGF0IDE5OjA0LCBNaWNoZWwgRMOkbnpl
-ciA8bWljaGVsQGRhZW56ZXIubmV0PiB3cm90ZToKPiA+Pgo+ID4+IE9uIDIwMTktMDEtMjEgNjo1
-OSBwLm0uLCBBcmQgQmllc2hldXZlbCB3cm90ZToKPiA+Pj4gT24gTW9uLCAyMSBKYW4gMjAxOSBh
-dCAxODo1NSwgTWljaGVsIETDpG56ZXIgPG1pY2hlbEBkYWVuemVyLm5ldD4gd3JvdGU6Cj4gPj4+
-Pgo+ID4+Pj4gT24gMjAxOS0wMS0yMSA1OjMwIHAubS4sIEFyZCBCaWVzaGV1dmVsIHdyb3RlOgo+
-ID4+Pj4+IE9uIE1vbiwgMjEgSmFuIDIwMTkgYXQgMTc6MjIsIENocmlzdG9waCBIZWxsd2lnIDxo
-Y2hAaW5mcmFkZWFkLm9yZz4gd3JvdGU6Cj4gPj4+Pj4KPiA+Pj4+Pj4gVW50aWwgdGhhdCBoYXBw
-ZW5zIHdlIHNob3VsZCBqdXN0IGNoYW5nZSB0aGUgZHJpdmVyIGlmZGVmcyB0byBkZWZhdWx0Cj4g
-Pj4+Pj4+IHRoZSBoYWNrcyB0byBvZmYgYW5kIG9ubHkgZW5hYmxlIHRoZW0gb24gc2V0dXBzIHdo
-ZXJlIHdlIDEwMCUKPiA+Pj4+Pj4gcG9zaXRpdmVseSBrbm93IHRoYXQgdGhleSBhY3R1YWxseSB3
-b3JrLiAgQW5kIGRvY3VtZW50IHRoYXQgZmFjdAo+ID4+Pj4+PiBpbiBiaWcgZmF0IGNvbW1lbnRz
-Lgo+ID4+Pj4+Cj4gPj4+Pj4gV2VsbCwgYXMgSSBtZW50aW9uZWQgaW4gbXkgY29tbWl0IGxvZyBh
-cyB3ZWxsLCBpZiB3ZSBkZWZhdWx0IHRvIG9mZgo+ID4+Pj4+IHVubGVzcyBDT05GSUdfWDg2LCB3
-ZSBtYXkgYnJlYWsgd29ya2luZyBzZXR1cHMgb24gTUlQUyBhbmQgUG93ZXIgd2hlcmUKPiA+Pj4+
-PiB0aGUgZGV2aWNlIGlzIGluIGZhY3Qgbm9uLWNhY2hlIGNvaGVyZW50LCBhbmQgcmVsaWVzIG9u
-IHRoaXMKPiA+Pj4+PiAnb3B0aW1pemF0aW9uJyB0byBnZXQgdGhpbmdzIHdvcmtpbmcuCj4gPj4+
-Pgo+ID4+Pj4gRldJVywgdGhlIGFtZGdwdSBkcml2ZXIgZG9lc24ndCByZWx5IG9uIG5vbi1zbm9v
-cGVkIHRyYW5zZmVycyBmb3IKPiA+Pj4+IGNvcnJlY3QgYmFzaWMgb3BlcmF0aW9uICh0aGUgc2Nl
-bmFyaW8gQ2hyaXN0aWFuIGJyb3VnaHQgdXAgaXMgYSB2ZXJ5Cj4gPj4+PiBzcGVjaWFsaXplZCB1
-c2UtY2FzZSksIHNvIHRoYXQgc2hvdWxkbid0IGJlIGFuIGlzc3VlLgo+ID4+Pj4KPiA+Pj4KPiA+
-Pj4gVGhlIHBvaW50IGlzIHRoYXQgdGhpcyBpcyBvbmx5IHRydWUgZm9yIHg4Ni4KPiA+Pj4KPiA+
-Pj4gT24gb3RoZXIgYXJjaGl0ZWN0dXJlcywgdGhlIHVzZSBvZiBub24tY2FjaGVkIG1hcHBpbmdz
-IG9uIHRoZSBDUFUgc2lkZQo+ID4+PiBtZWFucyB0aGF0IHlvdSAvZG8vIHJlbHkgb24gbm9uLXNu
-b29wZWQgdHJhbnNmZXJzLCBzaW5jZSBpZiB0aG9zZQo+ID4+PiB0cmFuc2ZlcnMgdHVybiBvdXQg
-bm90IHRvIHNub29wIGluYWR2ZXJ0ZW50bHksIHRoZSBhY2Nlc3NlcyBhcmUKPiA+Pj4gaW5jb2hl
-cmVudCB3aXRoIHRoZSBDUFUncyB2aWV3IG9mIG1lbW9yeS4KPiA+Pgo+ID4+IFRoZSBkcml2ZXIg
-Z2VuZXJhbGx5IG9ubHkgdXNlcyBub24tY2FjaGVkIG1hcHBpbmdzIGlmCj4gPj4gZHJtX2FyY2gv
-ZGV2aWNlX2Nhbl93Y19tZW1vcnkgcmV0dXJucyB0cnVlLgo+ID4+Cj4gPgo+ID4gSW5kZWVkLiBB
-bmQgc28gd2Ugc2hvdWxkIHRha2UgY2FyZSB0byBvbmx5IHJldHVybiAndHJ1ZScgZnJvbSB0aGF0
-Cj4gPiBmdW5jdGlvbiBpZiBpdCBpcyBndWFyYW50ZWVkIHRoYXQgbm9uLWNhY2hlZCBDUFUgbWFw
-cGluZ3MgYXJlIGNvaGVyZW50Cj4gPiB3aXRoIHRoZSBtYXBwaW5ncyB1c2VkIGJ5IHRoZSBHUFUs
-IGVpdGhlciBiZWNhdXNlIHRoYXQgaXMgYWx3YXlzIHRoZQo+ID4gY2FzZSAobGlrZSBvbiB4ODYp
-LCBvciBiZWNhdXNlIHdlIGtub3cgdGhhdCB0aGUgcGxhdGZvcm0gaW4gcXVlc3Rpb24KPiA+IGlt
-cGxlbWVudHMgTm9Tbm9vcCBjb3JyZWN0bHkgdGhyb3VnaG91dCB0aGUgaW50ZXJjb25uZWN0Lgo+
-ID4KPiA+IFdoYXQgc2VlbXMgdG8gYmUgY29tcGxpY2F0aW5nIG1hdHRlcnMgaXMgdGhhdCBpbiBz
-b21lIGNhc2VzLCB0aGUKPiA+IGRldmljZSBpcyBub24tY2FjaGUgY29oZXJlbnQgdG8gYmVnaW4g
-d2l0aCwgc28gcmVnYXJkbGVzcyBvZiB3aGV0aGVyCj4gPiB0aGUgTm9Tbm9vcCBhdHRyaWJ1dGUg
-aXMgdXNlZCBvciBub3QsIHRob3NlIGFjY2Vzc2VzIHdpbGwgbm90IHNub29wIGluCj4gPiB0aGUg
-Y2FjaGVzIGFuZCBiZSBjb2hlcmVudCB3aXRoIHRoZSBub24tY2FjaGVkIG1hcHBpbmdzIHVzZWQg
-YnkgdGhlCj4gPiBDUFUuIFNvIGlmIHdlIHJlc3RyaWN0IHRoaXMgb3B0aW1pemF0aW9uIFtvbiBu
-b24tWDg2XSB0byBwbGF0Zm9ybXMKPiA+IHRoYXQgYXJlIGtub3duIHRvIGltcGxlbWVudCBOb1Nu
-b29wIGNvcnJlY3RseSwgd2UgbWF5IGJyZWFrIHBsYXRmb3Jtcwo+ID4gdGhhdCBhcmUgaW1wbGlj
-aXRseSBOb1Nub29wIGFsbCB0aGUgdGltZS4KPgo+IFNpbmNlIHRoZSBkcml2ZXIgZ2VuZXJhbGx5
-IGRvZXNuJ3QgcmVseSBvbiBub24tc25vb3BlZCBhY2Nlc3NlcyBmb3IKPiBjb3JyZWN0bmVzcywg
-dGhhdCBjb3VsZG4ndCAiYnJlYWsiIGFueXRoaW5nIHRoYXQgaGFzbid0IGFsd2F5cyBiZWVuIGJy
-b2tlbi4KPgoKQWdhaW4sIHRoYXQgaXMgb25seSB0cnVlIG9uIHg4Ni4KCk9uIG90aGVyIGFyY2hp
-dGVjdHVyZXMsIERNQSB3cml0ZXMgZnJvbSB0aGUgZGV2aWNlIG1heSBhbGxvY2F0ZSBpbiB0aGUK
-Y2FjaGVzLCBhbmQgYmUgaW52aXNpYmxlIHRvIHRoZSBDUFUgd2hlbiBpdCB1c2VzIG5vbi1jYWNo
-ZWQgbWFwcGluZ3MuCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3Rz
-LmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5m
-by9saW51eC1hcm0ta2VybmVsCg==
+Hi Sai,
+
+On Fri, Jan 18, 2019 at 05:52:53PM +0530, Sai Prakash Ranjan wrote:
+> Add coresight components found on Qualcomm SDM845 SoC.
+> 
+> Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+> 
+> ---
+> This depends on AMBA bus pclk change by Bjorn Andersson [1].
+> Also depends on patch ("arm64: dts: qcom: sdm845: Increase address
+> and size cells for soc") [2].
+> 
+> [1] https://lore.kernel.org/lkml/20190106080915.4493-7-bjorn.andersson@linaro.org/
+> [2] https://lore.kernel.org/lkml/20190117042940.25487-2-bjorn.andersson@linaro.org/
+
+Thank you for making modifications to this patch - I am happy with how it stands
+now.  I tried to compile it on my side on a 5.0-rc3 kernel and even after
+applying the above two patches you pointed out I get the following error:
+
+Error: /home/mpoirier/work/coresight/kernel-maint/arch/arm64/boot/dts/qcom/sdm845.dtsi:1356.31-32 syntax error
+FATAL ERROR: Unable to parse input tree
+
+From what I see neither aoss_qmp or AOSS_QMP_QDSS_CLK are defined.  Are there
+more patches that need to be applied?
+
+Thanks,
+Mathieu
+
+
+> ---
+>  arch/arm64/boot/dts/qcom/sdm845.dtsi | 448 +++++++++++++++++++++++++++
+>  1 file changed, 448 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> index c27cbd3bcb0a..2c589f7f13a8 100644
+> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> @@ -1348,6 +1348,454 @@
+>  			};
+>  		};
+>  
+> +		stm@6002000 {
+> +			compatible = "arm,coresight-stm", "arm,primecell";
+> +			reg = <0 0x06002000 0 0x1000>,
+> +			      <0 0x16280000 0 0x180000>;
+> +			reg-names = "stm-base", "stm-stimulus-base";
+> +
+> +			power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
+> +
+> +			out-ports {
+> +				port {
+> +					stm_out: endpoint {
+> +						remote-endpoint =
+> +						  <&funnel0_in7>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		funnel@6041000 {
+> +			compatible = "arm,coresight-funnel", "arm,primecell";
+> +			reg = <0 0x06041000 0 0x1000>;
+> +
+> +			power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
+> +
+> +			out-ports {
+> +				port {
+> +					funnel0_out: endpoint {
+> +						remote-endpoint =
+> +						  <&merge_funnel_in0>;
+> +					};
+> +				};
+> +			};
+> +
+> +			in-ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port@7 {
+> +					reg = <7>;
+> +					funnel0_in7: endpoint {
+> +						remote-endpoint = <&stm_out>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		funnel@6043000 {
+> +			compatible = "arm,coresight-funnel", "arm,primecell";
+> +			reg = <0 0x06043000 0 0x1000>;
+> +
+> +			power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
+> +
+> +			out-ports {
+> +				port {
+> +					funnel2_out: endpoint {
+> +						remote-endpoint =
+> +						  <&merge_funnel_in2>;
+> +					};
+> +				};
+> +			};
+> +
+> +			in-ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port@5 {
+> +					reg = <5>;
+> +					funnel2_in5: endpoint {
+> +						remote-endpoint =
+> +						  <&apss_merge_funnel_out>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		funnel@6045000 {
+> +			compatible = "arm,coresight-funnel", "arm,primecell";
+> +			reg = <0 0x06045000 0 0x1000>;
+> +
+> +			power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
+> +
+> +			out-ports {
+> +				port {
+> +					merge_funnel_out: endpoint {
+> +						remote-endpoint = <&etf_in>;
+> +					};
+> +				};
+> +			};
+> +
+> +			in-ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port@0 {
+> +					reg = <0>;
+> +					merge_funnel_in0: endpoint {
+> +						remote-endpoint =
+> +						  <&funnel0_out>;
+> +					};
+> +				};
+> +
+> +				port@2 {
+> +					reg = <2>;
+> +					merge_funnel_in2: endpoint {
+> +						remote-endpoint =
+> +						  <&funnel2_out>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		replicator@6046000 {
+> +			compatible = "arm,coresight-dynamic-replicator", "arm,primecell";
+> +			reg = <0 0x06046000 0 0x1000>;
+> +
+> +			power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
+> +
+> +			out-ports {
+> +				port {
+> +					replicator_out: endpoint {
+> +						remote-endpoint = <&etr_in>;
+> +					};
+> +				};
+> +			};
+> +
+> +			in-ports {
+> +				port {
+> +					replicator_in: endpoint {
+> +						remote-endpoint = <&etf_out>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		etf@6047000 {
+> +			compatible = "arm,coresight-tmc", "arm,primecell";
+> +			reg = <0 0x06047000 0 0x1000>;
+> +
+> +			power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
+> +
+> +			out-ports {
+> +				port {
+> +					etf_out: endpoint {
+> +						remote-endpoint =
+> +						  <&replicator_in>;
+> +					};
+> +				};
+> +			};
+> +
+> +			in-ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port@1 {
+> +					reg = <1>;
+> +					etf_in: endpoint {
+> +						remote-endpoint =
+> +						  <&merge_funnel_out>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		etr@6048000 {
+> +			compatible = "arm,coresight-tmc", "arm,primecell";
+> +			reg = <0 0x06048000 0 0x1000>;
+> +
+> +			power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
+> +			arm,scatter-gather;
+> +
+> +			in-ports {
+> +				port {
+> +					etr_in: endpoint {
+> +						remote-endpoint =
+> +						  <&replicator_out>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		/*
+> +		 * On QCOM SDM845, we bypass the normal AMBA bus discovery
+> +		 * method by forcing the peripheral ID because of the wrong
+> +		 * value read from ETM PID registers.
+> +		 */
+> +
+> +		etm@7040000 {
+> +			compatible = "arm,coresight-etm4x", "arm,primecell";
+> +			arm,primecell-periphid = <0x000bb95d>;
+> +			reg = <0 0x07040000 0 0x1000>;
+> +
+> +			cpu = <&CPU0>;
+> +
+> +			power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
+> +
+> +			out-ports {
+> +				port {
+> +					etm0_out: endpoint {
+> +						remote-endpoint =
+> +						  <&apss_funnel_in0>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		etm@7140000 {
+> +			compatible = "arm,coresight-etm4x", "arm,primecell";
+> +			arm,primecell-periphid = <0x000bb95d>;
+> +			reg = <0 0x07140000 0 0x1000>;
+> +
+> +			cpu = <&CPU1>;
+> +
+> +			power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
+> +
+> +			out-ports {
+> +				port {
+> +					etm1_out: endpoint {
+> +						remote-endpoint =
+> +						  <&apss_funnel_in1>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		etm@7240000 {
+> +			compatible = "arm,coresight-etm4x", "arm,primecell";
+> +			arm,primecell-periphid = <0x000bb95d>;
+> +			reg = <0 0x07240000 0 0x1000>;
+> +
+> +			cpu = <&CPU2>;
+> +
+> +			power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
+> +
+> +			out-ports {
+> +				port {
+> +					etm2_out: endpoint {
+> +						remote-endpoint =
+> +						  <&apss_funnel_in2>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		etm@7340000 {
+> +			compatible = "arm,coresight-etm4x", "arm,primecell";
+> +			arm,primecell-periphid = <0x000bb95d>;
+> +			reg = <0 0x07340000 0 0x1000>;
+> +
+> +			cpu = <&CPU3>;
+> +
+> +			power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
+> +
+> +			out-ports {
+> +				port {
+> +					etm3_out: endpoint {
+> +						remote-endpoint =
+> +						  <&apss_funnel_in3>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		etm@7440000 {
+> +			compatible = "arm,coresight-etm4x", "arm,primecell";
+> +			arm,primecell-periphid = <0x000bb95d>;
+> +			reg = <0 0x07440000 0 0x1000>;
+> +
+> +			cpu = <&CPU4>;
+> +
+> +			power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
+> +
+> +			out-ports {
+> +				port {
+> +					etm4_out: endpoint {
+> +						remote-endpoint =
+> +						  <&apss_funnel_in4>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		etm@7540000 {
+> +			compatible = "arm,coresight-etm4x", "arm,primecell";
+> +			arm,primecell-periphid = <0x000bb95d>;
+> +			reg = <0 0x07540000 0 0x1000>;
+> +
+> +			cpu = <&CPU5>;
+> +
+> +			power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
+> +
+> +			out-ports {
+> +				port {
+> +					etm5_out: endpoint {
+> +						remote-endpoint =
+> +						  <&apss_funnel_in5>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		etm@7640000 {
+> +			compatible = "arm,coresight-etm4x", "arm,primecell";
+> +			arm,primecell-periphid = <0x000bb95d>;
+> +			reg = <0 0x07640000 0 0x1000>;
+> +
+> +			cpu = <&CPU6>;
+> +
+> +			power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
+> +
+> +			out-ports {
+> +				port {
+> +					etm6_out: endpoint {
+> +						remote-endpoint =
+> +						  <&apss_funnel_in6>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		etm@7740000 {
+> +			compatible = "arm,coresight-etm4x", "arm,primecell";
+> +			arm,primecell-periphid = <0x000bb95d>;
+> +			reg = <0 0x07740000 0 0x1000>;
+> +
+> +			cpu = <&CPU7>;
+> +
+> +			power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
+> +
+> +			out-ports {
+> +				port {
+> +					etm7_out: endpoint {
+> +						remote-endpoint =
+> +						  <&apss_funnel_in7>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		funnel@7800000 { /* APSS Funnel */
+> +			compatible = "arm,coresight-funnel", "arm,primecell";
+> +			reg = <0 0x07800000 0 0x1000>;
+> +
+> +			power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
+> +
+> +			out-ports {
+> +				port {
+> +					apss_funnel_out: endpoint {
+> +						remote-endpoint =
+> +						  <&apss_merge_funnel_in>;
+> +					};
+> +				};
+> +			};
+> +
+> +			in-ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port@0 {
+> +					reg = <0>;
+> +					apss_funnel_in0: endpoint {
+> +						remote-endpoint =
+> +						  <&etm0_out>;
+> +					};
+> +				};
+> +
+> +				port@1 {
+> +					reg = <1>;
+> +					apss_funnel_in1: endpoint {
+> +						remote-endpoint =
+> +						  <&etm1_out>;
+> +					};
+> +				};
+> +
+> +				port@2 {
+> +					reg = <2>;
+> +					apss_funnel_in2: endpoint {
+> +						remote-endpoint =
+> +						  <&etm2_out>;
+> +					};
+> +				};
+> +
+> +				port@3 {
+> +					reg = <3>;
+> +					apss_funnel_in3: endpoint {
+> +						remote-endpoint =
+> +						  <&etm3_out>;
+> +					};
+> +				};
+> +
+> +				port@4 {
+> +					reg = <4>;
+> +					apss_funnel_in4: endpoint {
+> +						remote-endpoint =
+> +						  <&etm4_out>;
+> +					};
+> +				};
+> +
+> +				port@5 {
+> +					reg = <5>;
+> +					apss_funnel_in5: endpoint {
+> +						remote-endpoint =
+> +						  <&etm5_out>;
+> +					};
+> +				};
+> +
+> +				port@6 {
+> +					reg = <6>;
+> +					apss_funnel_in6: endpoint {
+> +						remote-endpoint =
+> +						  <&etm6_out>;
+> +					};
+> +				};
+> +
+> +				port@7 {
+> +					reg = <7>;
+> +					apss_funnel_in7: endpoint {
+> +						remote-endpoint =
+> +						  <&etm7_out>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		funnel@7810000 {
+> +			compatible = "arm,coresight-funnel", "arm,primecell";
+> +			reg = <0 0x07810000 0 0x1000>;
+> +
+> +			power-domains = <&aoss_qmp AOSS_QMP_QDSS_CLK>;
+> +
+> +			out-ports {
+> +				port {
+> +					apss_merge_funnel_out: endpoint {
+> +						remote-endpoint =
+> +						  <&funnel2_in5>;
+> +					};
+> +				};
+> +			};
+> +
+> +			in-ports {
+> +				port {
+> +					apss_merge_funnel_in: endpoint {
+> +						remote-endpoint =
+> +						  <&apss_funnel_out>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+>  		usb_1_hsphy: phy@88e2000 {
+>  			compatible = "qcom,sdm845-qusb2-phy";
+>  			reg = <0x88e2000 0x400>;
+> -- 
+> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+> of Code Aurora Forum, hosted by The Linux Foundation
+> 
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
