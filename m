@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 73ECDC282F0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:07:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8133EC282DB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:07:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1EE46214C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:07:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4F5DF217D6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:07:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="boD1nKs9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1EE46214C6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U8ZtNyeL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4F5DF217D6
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,66 +26,68 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	References:In-Reply-To:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=n/V1XEBJMcDmYceBWqgZuu1hyE+enyaLFk3GN4CV1cg=; b=boD1nKs9fIHhi7/+j+bwdn824Z
-	nVthaFe6wvWI2hZFf5gVzNV1IxMAsu6b9BINOv9UlJRMKjPqbWvZ9oQF4pid0oqpo0SOhvMpKKDJ3
-	ntKqb2vUkmYDW1KSweXNyP/P6iwkcTKFW7AXn4liD3gqT+z2DuUQW74qh4tqhKLBzXn8Kh335x/U8
-	QM162id9Ybwv+Xp7NAbfpG1RyQQ3c306YQ2YuhoasQQHK7VpEaCCZ5ov4Y+4tymaPLbJ1r3HFZSl6
-	QcytxXxAy+8d333m6+8tGtHurfBfiOLoisWm8ip2kJt8IZ6eYzymIdJyKhF+xFPUVDVnrm/eOxzoS
-	uVEAKLQQ==;
+	bh=N1QqpaoAytuBdP7T2nqwLNHK6ywozJQZr1GHpM6+5Gs=; b=U8ZtNyeLc20dZczx4BPzwcLuCj
+	ak4KRba7akQDKBVV/ZpDSJ4XuVL3Z8CTHvsOZXpAnp8BxMH5BpWR0MAyj9PN+ZHTrxamwYENo71s0
+	jIEoy9GHxY7tQ5h4FaQt9PYOBGjaOKXAP7kq8OX6oCLlpnH6FsRg/DHZZdCSrEI1fCEU7lLBhhZ2P
+	UABJjcXq6F1OglUsLo/0cxS3nVMjSYMqSPy3H8Z5Denyju6JQ4bwM0FEAvFJA/42xmzsmAGK2mcom
+	YVj+DVtfe9ne8zuBbAqZbYBwaR1gA7r5p5U5dlMRNtXqSzQh15BOh12kJi6acu2dFf6uxlaDLiWgO
+	b/Ltg9DQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glUc3-0007AA-E3; Mon, 21 Jan 2019 08:07:19 +0000
-Received: from mx0a-001b2d01.pphosted.com ([148.163.156.1])
+	id 1glUcJ-0007Qr-IR; Mon, 21 Jan 2019 08:07:35 +0000
+Received: from mx0b-001b2d01.pphosted.com ([148.163.158.5]
+ helo=mx0a-001b2d01.pphosted.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glUaC-0005D6-FQ
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 08:05:34 +0000
-Received: from pps.filterd (m0098409.ppops.net [127.0.0.1])
- by mx0a-001b2d01.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x0L83mrR096956
- for <linux-arm-kernel@lists.infradead.org>; Mon, 21 Jan 2019 03:05:23 -0500
+ id 1glUaT-0005qw-Um
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 08:05:45 +0000
+Received: from pps.filterd (m0098419.ppops.net [127.0.0.1])
+ by mx0b-001b2d01.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x0L83nv6028344
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 21 Jan 2019 03:05:41 -0500
 Received: from e06smtp03.uk.ibm.com (e06smtp03.uk.ibm.com [195.75.94.99])
- by mx0a-001b2d01.pphosted.com with ESMTP id 2q58y4b440-1
+ by mx0b-001b2d01.pphosted.com with ESMTP id 2q59wfrwj6-1
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
- for <linux-arm-kernel@lists.infradead.org>; Mon, 21 Jan 2019 03:05:23 -0500
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 21 Jan 2019 03:05:41 -0500
 Received: from localhost
  by e06smtp03.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
  Violators will be prosecuted
  for <linux-arm-kernel@lists.infradead.org> from <rppt@linux.ibm.com>;
- Mon, 21 Jan 2019 08:05:20 -0000
+ Mon, 21 Jan 2019 08:05:38 -0000
 Received: from b06cxnps4075.portsmouth.uk.ibm.com (9.149.109.197)
  by e06smtp03.uk.ibm.com (192.168.101.133) with IBM ESMTP SMTP Gateway:
  Authorized Use Only! Violators will be prosecuted; 
  (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
- Mon, 21 Jan 2019 08:05:09 -0000
-Received: from b06wcsmtp001.portsmouth.uk.ibm.com
- (b06wcsmtp001.portsmouth.uk.ibm.com [9.149.105.160])
+ Mon, 21 Jan 2019 08:05:26 -0000
+Received: from d06av26.portsmouth.uk.ibm.com (d06av26.portsmouth.uk.ibm.com
+ [9.149.105.62])
  by b06cxnps4075.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
- x0L858Bq57606228
+ x0L85Pmn5177614
  (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
- Mon, 21 Jan 2019 08:05:08 GMT
-Received: from b06wcsmtp001.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 61660A405C;
- Mon, 21 Jan 2019 08:05:08 +0000 (GMT)
-Received: from b06wcsmtp001.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 86917A405F;
- Mon, 21 Jan 2019 08:05:03 +0000 (GMT)
+ Mon, 21 Jan 2019 08:05:25 GMT
+Received: from d06av26.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id C2E69AE057;
+ Mon, 21 Jan 2019 08:05:25 +0000 (GMT)
+Received: from d06av26.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id D6CA5AE055;
+ Mon, 21 Jan 2019 08:05:20 +0000 (GMT)
 Received: from rapoport-lnx (unknown [9.148.207.125])
- by b06wcsmtp001.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
- Mon, 21 Jan 2019 08:05:03 +0000 (GMT)
+ by d06av26.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
+ Mon, 21 Jan 2019 08:05:20 +0000 (GMT)
 Received: by rapoport-lnx (sSMTP sendmail emulation);
- Mon, 21 Jan 2019 10:05:02 +0200
+ Mon, 21 Jan 2019 10:05:20 +0200
 From: Mike Rapoport <rppt@linux.ibm.com>
 To: linux-mm@kvack.org
-Subject: [PATCH v2 09/21] memblock: drop memblock_alloc_base()
-Date: Mon, 21 Jan 2019 10:03:56 +0200
+Subject: [PATCH v2 12/21] arch: use memblock_alloc() instead of
+ memblock_alloc_from(size, align, 0)
+Date: Mon, 21 Jan 2019 10:03:59 +0200
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1548057848-15136-1-git-send-email-rppt@linux.ibm.com>
 References: <1548057848-15136-1-git-send-email-rppt@linux.ibm.com>
 X-TM-AS-GCONF: 00
-x-cbid: 19012108-0012-0000-0000-000002EAB8FF
+x-cbid: 19012108-0012-0000-0000-000002EAB90D
 X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
-x-cbparentid: 19012108-0013-0000-0000-00002121DE9D
-Message-Id: <1548057848-15136-10-git-send-email-rppt@linux.ibm.com>
+x-cbparentid: 19012108-0013-0000-0000-00002121DEAB
+Message-Id: <1548057848-15136-13-git-send-email-rppt@linux.ibm.com>
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2019-01-21_04:, , signatures=0
 X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
@@ -95,8 +97,8 @@ X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
  mlxlogscore=999 adultscore=0 classifier=spam adjust=0 reason=mlx
  scancount=1 engine=8.0.1-1810050000 definitions=main-1901210066
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_000524_834188_00967429 
-X-CRM114-Status: GOOD (  26.29  )
+X-CRM114-CacheID: sfid-20190121_000542_409169_53840B63 
+X-CRM114-Status: GOOD (  27.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -138,125 +140,153 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The memblock_alloc_base() function tries to allocate a memory up to the
-limit specified by its max_addr parameter and panics if the allocation
-fails. Replace its usage with memblock_phys_alloc_range() and make the
-callers check the return value and panic in case of error.
+The last parameter of memblock_alloc_from() is the lower limit for the
+memory allocation. When it is 0, the call is equivalent to
+memblock_alloc().
 
 Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
+Acked-by: Paul Burton <paul.burton@mips.com> # MIPS part
 ---
- arch/powerpc/kernel/rtas.c      |  6 +++++-
- arch/powerpc/mm/hash_utils_64.c |  8 ++++++--
- arch/s390/kernel/smp.c          |  6 +++++-
- drivers/macintosh/smu.c         |  2 +-
- include/linux/memblock.h        |  2 --
- mm/memblock.c                   | 14 --------------
- 6 files changed, 17 insertions(+), 21 deletions(-)
+ arch/alpha/kernel/core_cia.c  |  2 +-
+ arch/alpha/kernel/pci_iommu.c |  4 ++--
+ arch/alpha/kernel/setup.c     |  2 +-
+ arch/ia64/kernel/mca.c        |  3 +--
+ arch/mips/kernel/traps.c      |  2 +-
+ arch/sparc/kernel/prom_32.c   |  2 +-
+ arch/sparc/mm/init_32.c       |  2 +-
+ arch/sparc/mm/srmmu.c         | 10 +++++-----
+ 8 files changed, 13 insertions(+), 14 deletions(-)
 
-diff --git a/arch/powerpc/kernel/rtas.c b/arch/powerpc/kernel/rtas.c
-index de35bd8f..fbc6761 100644
---- a/arch/powerpc/kernel/rtas.c
-+++ b/arch/powerpc/kernel/rtas.c
-@@ -1187,7 +1187,11 @@ void __init rtas_initialize(void)
- 		ibm_suspend_me_token = rtas_token("ibm,suspend-me");
+diff --git a/arch/alpha/kernel/core_cia.c b/arch/alpha/kernel/core_cia.c
+index 867e873..466cd44 100644
+--- a/arch/alpha/kernel/core_cia.c
++++ b/arch/alpha/kernel/core_cia.c
+@@ -331,7 +331,7 @@ cia_prepare_tbia_workaround(int window)
+ 	long i;
+ 
+ 	/* Use minimal 1K map. */
+-	ppte = memblock_alloc_from(CIA_BROKEN_TBIA_SIZE, 32768, 0);
++	ppte = memblock_alloc(CIA_BROKEN_TBIA_SIZE, 32768);
+ 	pte = (virt_to_phys(ppte) >> (PAGE_SHIFT - 1)) | 1;
+ 
+ 	for (i = 0; i < CIA_BROKEN_TBIA_SIZE / sizeof(unsigned long); ++i)
+diff --git a/arch/alpha/kernel/pci_iommu.c b/arch/alpha/kernel/pci_iommu.c
+index aa0f50d..e4cf77b 100644
+--- a/arch/alpha/kernel/pci_iommu.c
++++ b/arch/alpha/kernel/pci_iommu.c
+@@ -87,13 +87,13 @@ iommu_arena_new_node(int nid, struct pci_controller *hose, dma_addr_t base,
+ 		printk("%s: couldn't allocate arena ptes from node %d\n"
+ 		       "    falling back to system-wide allocation\n",
+ 		       __func__, nid);
+-		arena->ptes = memblock_alloc_from(mem_size, align, 0);
++		arena->ptes = memblock_alloc(mem_size, align);
  	}
- #endif
--	rtas_rmo_buf = memblock_alloc_base(RTAS_RMOBUF_MAX, PAGE_SIZE, rtas_region);
-+	rtas_rmo_buf = memblock_phys_alloc_range(RTAS_RMOBUF_MAX, PAGE_SIZE,
-+						 0, rtas_region);
-+	if (!rtas_rmo_buf)
-+		panic("ERROR: RTAS: Failed to allocate %lx bytes below %pa\n",
-+		      PAGE_SIZE, &rtas_region);
  
- #ifdef CONFIG_RTAS_ERROR_LOGGING
- 	rtas_last_error_token = rtas_token("rtas-last-error");
-diff --git a/arch/powerpc/mm/hash_utils_64.c b/arch/powerpc/mm/hash_utils_64.c
-index bc6be44..c7d5f48 100644
---- a/arch/powerpc/mm/hash_utils_64.c
-+++ b/arch/powerpc/mm/hash_utils_64.c
-@@ -882,8 +882,12 @@ static void __init htab_initialize(void)
- 		}
- #endif /* CONFIG_PPC_CELL */
+ #else /* CONFIG_DISCONTIGMEM */
  
--		table = memblock_alloc_base(htab_size_bytes, htab_size_bytes,
--					    limit);
-+		table = memblock_phys_alloc_range(htab_size_bytes,
-+						  htab_size_bytes,
-+						  0, limit);
-+		if (!table)
-+			panic("ERROR: Failed to allocate %pa bytes below %pa\n",
-+			      &htab_size_bytes, &limit);
+ 	arena = memblock_alloc(sizeof(*arena), SMP_CACHE_BYTES);
+-	arena->ptes = memblock_alloc_from(mem_size, align, 0);
++	arena->ptes = memblock_alloc(mem_size, align);
  
- 		DBG("Hash table allocated at %lx, size: %lx\n", table,
- 		    htab_size_bytes);
-diff --git a/arch/s390/kernel/smp.c b/arch/s390/kernel/smp.c
-index f82b3d3..9061597 100644
---- a/arch/s390/kernel/smp.c
-+++ b/arch/s390/kernel/smp.c
-@@ -651,7 +651,11 @@ void __init smp_save_dump_cpus(void)
- 		/* No previous system present, normal boot. */
- 		return;
- 	/* Allocate a page as dumping area for the store status sigps */
--	page = memblock_alloc_base(PAGE_SIZE, PAGE_SIZE, 1UL << 31);
-+	page = memblock_phys_alloc_range(PAGE_SIZE, PAGE_SIZE, 0, 1UL << 31);
-+	if (!page)
-+		panic("ERROR: Failed to allocate %x bytes below %lx\n",
-+		      PAGE_SIZE, 1UL << 31);
-+
- 	/* Set multi-threading state to the previous system. */
- 	pcpu_set_smt(sclp.mtid_prev);
- 	boot_cpu_addr = stap();
-diff --git a/drivers/macintosh/smu.c b/drivers/macintosh/smu.c
-index 0a0b8e1..42cf68d 100644
---- a/drivers/macintosh/smu.c
-+++ b/drivers/macintosh/smu.c
-@@ -485,7 +485,7 @@ int __init smu_init (void)
- 	 * SMU based G5s need some memory below 2Gb. Thankfully this is
- 	 * called at a time where memblock is still available.
- 	 */
--	smu_cmdbuf_abs = memblock_alloc_base(4096, 4096, 0x80000000UL);
-+	smu_cmdbuf_abs = memblock_phys_alloc_range(4096, 4096, 0, 0x80000000UL);
- 	if (smu_cmdbuf_abs == 0) {
- 		printk(KERN_ERR "SMU: Command buffer allocation failed !\n");
- 		ret = -EINVAL;
-diff --git a/include/linux/memblock.h b/include/linux/memblock.h
-index 768e2b4..6874fdc 100644
---- a/include/linux/memblock.h
-+++ b/include/linux/memblock.h
-@@ -494,8 +494,6 @@ static inline bool memblock_bottom_up(void)
- 	return memblock.bottom_up;
- }
+ #endif /* CONFIG_DISCONTIGMEM */
  
--phys_addr_t memblock_alloc_base(phys_addr_t size, phys_addr_t align,
--				phys_addr_t max_addr);
- phys_addr_t memblock_phys_mem_size(void);
- phys_addr_t memblock_reserved_size(void);
- phys_addr_t memblock_mem_size(unsigned long limit_pfn);
-diff --git a/mm/memblock.c b/mm/memblock.c
-index e5ffdcd..531fa77 100644
---- a/mm/memblock.c
-+++ b/mm/memblock.c
-@@ -1363,20 +1363,6 @@ phys_addr_t __init memblock_phys_alloc_nid(phys_addr_t size, phys_addr_t align,
- 	return ret;
- }
+diff --git a/arch/alpha/kernel/setup.c b/arch/alpha/kernel/setup.c
+index 4b5b1b2..5d4c76a 100644
+--- a/arch/alpha/kernel/setup.c
++++ b/arch/alpha/kernel/setup.c
+@@ -293,7 +293,7 @@ move_initrd(unsigned long mem_limit)
+ 	unsigned long size;
  
--phys_addr_t __init memblock_alloc_base(phys_addr_t size, phys_addr_t align, phys_addr_t max_addr)
--{
--	phys_addr_t alloc;
--
--	alloc = memblock_alloc_range_nid(size, align, 0, max_addr, NUMA_NO_NODE,
--					MEMBLOCK_NONE);
--
--	if (alloc == 0)
--		panic("ERROR: Failed to allocate %pa bytes below %pa.\n",
--		      &size, &max_addr);
--
--	return alloc;
--}
--
- phys_addr_t __init memblock_phys_alloc_try_nid(phys_addr_t size, phys_addr_t align, int nid)
+ 	size = initrd_end - initrd_start;
+-	start = memblock_alloc_from(PAGE_ALIGN(size), PAGE_SIZE, 0);
++	start = memblock_alloc(PAGE_ALIGN(size), PAGE_SIZE);
+ 	if (!start || __pa(start) + size > mem_limit) {
+ 		initrd_start = initrd_end = 0;
+ 		return NULL;
+diff --git a/arch/ia64/kernel/mca.c b/arch/ia64/kernel/mca.c
+index 91bd1e1..74d148b 100644
+--- a/arch/ia64/kernel/mca.c
++++ b/arch/ia64/kernel/mca.c
+@@ -1835,8 +1835,7 @@ format_mca_init_stack(void *mca_data, unsigned long offset,
+ /* Caller prevents this from being called after init */
+ static void * __ref mca_bootmem(void)
  {
- 	phys_addr_t res = memblock_phys_alloc_nid(size, align, nid);
+-	return memblock_alloc_from(sizeof(struct ia64_mca_cpu),
+-				   KERNEL_STACK_SIZE, 0);
++	return memblock_alloc(sizeof(struct ia64_mca_cpu), KERNEL_STACK_SIZE);
+ }
+ 
+ /* Do per-CPU MCA-related initialization.  */
+diff --git a/arch/mips/kernel/traps.c b/arch/mips/kernel/traps.c
+index c91097f..2bbdee5 100644
+--- a/arch/mips/kernel/traps.c
++++ b/arch/mips/kernel/traps.c
+@@ -2291,7 +2291,7 @@ void __init trap_init(void)
+ 		phys_addr_t ebase_pa;
+ 
+ 		ebase = (unsigned long)
+-			memblock_alloc_from(size, 1 << fls(size), 0);
++			memblock_alloc(size, 1 << fls(size));
+ 
+ 		/*
+ 		 * Try to ensure ebase resides in KSeg0 if possible.
+diff --git a/arch/sparc/kernel/prom_32.c b/arch/sparc/kernel/prom_32.c
+index 42d7f2a..38940af 100644
+--- a/arch/sparc/kernel/prom_32.c
++++ b/arch/sparc/kernel/prom_32.c
+@@ -32,7 +32,7 @@ void * __init prom_early_alloc(unsigned long size)
+ {
+ 	void *ret;
+ 
+-	ret = memblock_alloc_from(size, SMP_CACHE_BYTES, 0UL);
++	ret = memblock_alloc(size, SMP_CACHE_BYTES);
+ 	if (ret != NULL)
+ 		memset(ret, 0, size);
+ 
+diff --git a/arch/sparc/mm/init_32.c b/arch/sparc/mm/init_32.c
+index d900952..a8ff298 100644
+--- a/arch/sparc/mm/init_32.c
++++ b/arch/sparc/mm/init_32.c
+@@ -264,7 +264,7 @@ void __init mem_init(void)
+ 	i = last_valid_pfn >> ((20 - PAGE_SHIFT) + 5);
+ 	i += 1;
+ 	sparc_valid_addr_bitmap = (unsigned long *)
+-		memblock_alloc_from(i << 2, SMP_CACHE_BYTES, 0UL);
++		memblock_alloc(i << 2, SMP_CACHE_BYTES);
+ 
+ 	if (sparc_valid_addr_bitmap == NULL) {
+ 		prom_printf("mem_init: Cannot alloc valid_addr_bitmap.\n");
+diff --git a/arch/sparc/mm/srmmu.c b/arch/sparc/mm/srmmu.c
+index b609362..a400ec3 100644
+--- a/arch/sparc/mm/srmmu.c
++++ b/arch/sparc/mm/srmmu.c
+@@ -303,13 +303,13 @@ static void __init srmmu_nocache_init(void)
+ 
+ 	bitmap_bits = srmmu_nocache_size >> SRMMU_NOCACHE_BITMAP_SHIFT;
+ 
+-	srmmu_nocache_pool = memblock_alloc_from(srmmu_nocache_size,
+-						 SRMMU_NOCACHE_ALIGN_MAX, 0UL);
++	srmmu_nocache_pool = memblock_alloc(srmmu_nocache_size,
++					    SRMMU_NOCACHE_ALIGN_MAX);
+ 	memset(srmmu_nocache_pool, 0, srmmu_nocache_size);
+ 
+ 	srmmu_nocache_bitmap =
+-		memblock_alloc_from(BITS_TO_LONGS(bitmap_bits) * sizeof(long),
+-				    SMP_CACHE_BYTES, 0UL);
++		memblock_alloc(BITS_TO_LONGS(bitmap_bits) * sizeof(long),
++			       SMP_CACHE_BYTES);
+ 	bit_map_init(&srmmu_nocache_map, srmmu_nocache_bitmap, bitmap_bits);
+ 
+ 	srmmu_swapper_pg_dir = __srmmu_get_nocache(SRMMU_PGD_TABLE_SIZE, SRMMU_PGD_TABLE_SIZE);
+@@ -467,7 +467,7 @@ static void __init sparc_context_init(int numctx)
+ 	unsigned long size;
+ 
+ 	size = numctx * sizeof(struct ctx_list);
+-	ctx_list_pool = memblock_alloc_from(size, SMP_CACHE_BYTES, 0UL);
++	ctx_list_pool = memblock_alloc(size, SMP_CACHE_BYTES);
+ 
+ 	for (ctx = 0; ctx < numctx; ctx++) {
+ 		struct ctx_list *clist;
 -- 
 2.7.4
 
