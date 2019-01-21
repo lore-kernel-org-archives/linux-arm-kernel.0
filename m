@@ -2,69 +2,97 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1C214C282DB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:03:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9334DC282E9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:04:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C76B120823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:03:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6039020823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:04:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Edwa4TMS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C76B120823
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F+qApUms"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6039020823
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=f2FjIxExtqcHvGSmLLZ19SaF+xaIOjJ2AKTV/KPesvg=; b=Edwa4TMSE5yt5e
-	vFg5sXhcF9KAUAqXONCk5McPKZ9Vpo0m9Hx7B4AOTteTE+/aC9vvsu4q0doY8lq+RWnpkI8l+gS4F
-	TNBuiel/HSxEgARn3LMQc024S7KkyalADKs/cumCdAhKum5E6GBg2TIf/YvmI7qE1aJLxM5i8THEi
-	oXIuj2yM/AlUFlFoqhss9NfyNjeKtgXB8Zd51XN405+z3Qbb3QBdszgDTh728vnAoYpi95fBXdxGy
-	5nzyplo5hm7A0geHP3S+u/A5QxPqBFWjoksGy/BIZ5Dp/ixrJJoMkb3qppXbAb5LpgPXuZdhJEy1Z
-	Kb8O4rnGkmPKyX/PdePw==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=3pymrqCSEBKwSWxUKLRtnSDPv4kdoiVA5q1XMi2bgrk=; b=F+q
+	ApUmsELRKfmejP9CdsV5j9KDJzTOw6csQBaVjhT8JtX2VBbVg3HrCuH3LqhPltgOM/eldGiGv4Yz3
+	HWLVCaNHWPLrcSUETJVhvKcbrU9iT8VBJLygLU8Qw9zJ4LIYD2d0T8Y5H0wMPhM7ZHhlILWhyXatb
+	2zwLGkv+SaE4MxcI64ld/Eq33GGiwlpT9DVKTY79ZEe85MiuLtYklKPl2/JFGTOJ/XP8gYVbr8964
+	CW87Eu8SkNZl45O5dpj6oomatZgrvtoA6akgtjYmVVX+nyUZfPr/gihElhlp+G9PPv24ENkv3Gg4W
+	TDx9UyAGVJltPLc9kw/zB91eZJvMV2g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glUYA-0003LJ-KB; Mon, 21 Jan 2019 08:03:18 +0000
-Received: from mailgw02.mediatek.com ([216.200.240.185])
+	id 1glUZa-0003wR-Mb; Mon, 21 Jan 2019 08:04:46 +0000
+Received: from mx0a-001b2d01.pphosted.com ([148.163.156.1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glUY6-0003Kf-Ib; Mon, 21 Jan 2019 08:03:16 +0000
-X-UUID: 8623f9cf50a043bfaf6ca2e42d1c0dc7-20190121
-X-UUID: 8623f9cf50a043bfaf6ca2e42d1c0dc7-20190121
-Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw02.mediatek.com
- (envelope-from <qii.wang@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 421018325; Mon, 21 Jan 2019 00:00:46 -0800
-Received: from mtkmbs03n1.mediatek.inc (172.21.101.181) by
- MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Mon, 21 Jan 2019 00:00:44 -0800
-Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
- mtkmbs03n1.mediatek.inc (172.21.101.181) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Mon, 21 Jan 2019 16:00:43 +0800
-Received: from localhost.localdomain (10.17.3.153) by MTKCAS06.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Mon, 21 Jan 2019 16:00:42 +0800
-From: qii wang <qii.wang@mediatek.com>
-To: <wsa@the-dreams.de>
-Subject: [PATCH v3 6/6] i2c: mediatek: Add i2c support for MediaTek MT8183
-Date: Mon, 21 Jan 2019 15:59:34 +0800
-Message-ID: <1548057574-8061-7-git-send-email-qii.wang@mediatek.com>
-X-Mailer: git-send-email 1.7.9.5
-In-Reply-To: <1548057574-8061-1-git-send-email-qii.wang@mediatek.com>
-References: <1548057574-8061-1-git-send-email-qii.wang@mediatek.com>
-MIME-Version: 1.0
-X-MTK: N
+ id 1glUZO-0003kT-VX
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 08:04:40 +0000
+Received: from pps.filterd (m0098410.ppops.net [127.0.0.1])
+ by mx0a-001b2d01.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x0L83ngM132193
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 21 Jan 2019 03:04:31 -0500
+Received: from e06smtp05.uk.ibm.com (e06smtp05.uk.ibm.com [195.75.94.101])
+ by mx0a-001b2d01.pphosted.com with ESMTP id 2q59werw54-1
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 21 Jan 2019 03:04:30 -0500
+Received: from localhost
+ by e06smtp05.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
+ Violators will be prosecuted
+ for <linux-arm-kernel@lists.infradead.org> from <rppt@linux.ibm.com>;
+ Mon, 21 Jan 2019 08:04:27 -0000
+Received: from b06cxnps4075.portsmouth.uk.ibm.com (9.149.109.197)
+ by e06smtp05.uk.ibm.com (192.168.101.135) with IBM ESMTP SMTP Gateway:
+ Authorized Use Only! Violators will be prosecuted; 
+ (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
+ Mon, 21 Jan 2019 08:04:16 -0000
+Received: from d06av26.portsmouth.uk.ibm.com (d06av26.portsmouth.uk.ibm.com
+ [9.149.105.62])
+ by b06cxnps4075.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
+ x0L84FDr5177650
+ (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Mon, 21 Jan 2019 08:04:15 GMT
+Received: from d06av26.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id 94DC0AE051;
+ Mon, 21 Jan 2019 08:04:15 +0000 (GMT)
+Received: from d06av26.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id A62EFAE045;
+ Mon, 21 Jan 2019 08:04:10 +0000 (GMT)
+Received: from rapoport-lnx (unknown [9.148.207.125])
+ by d06av26.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
+ Mon, 21 Jan 2019 08:04:10 +0000 (GMT)
+Received: by rapoport-lnx (sSMTP sendmail emulation);
+ Mon, 21 Jan 2019 10:04:09 +0200
+From: Mike Rapoport <rppt@linux.ibm.com>
+To: linux-mm@kvack.org
+Subject: [PATCH v2 00/21] Refine memblock API
+Date: Mon, 21 Jan 2019 10:03:47 +0200
+X-Mailer: git-send-email 2.7.4
+X-TM-AS-GCONF: 00
+x-cbid: 19012108-0020-0000-0000-000003092E92
+X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
+x-cbparentid: 19012108-0021-0000-0000-0000215A5BD8
+Message-Id: <1548057848-15136-1-git-send-email-rppt@linux.ibm.com>
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2019-01-21_04:, , signatures=0
+X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
+ priorityscore=1501
+ malwarescore=0 suspectscore=3 phishscore=0 bulkscore=0 spamscore=0
+ clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
+ mlxlogscore=808 adultscore=0 classifier=spam adjust=0 reason=mlx
+ scancount=1 engine=8.0.1-1810050000 definitions=main-1901210066
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_000314_615144_67552236 
-X-CRM114-Status: GOOD (  17.35  )
+X-CRM114-CacheID: sfid-20190121_000435_449450_A97C2B37 
+X-CRM114-Status: GOOD (  22.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,365 +104,224 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, ryder.lee@mediatek.com, qii.wang@mediatek.com,
- srv_heupstream@mediatek.com, leilk.liu@mediatek.com, xinping.qian@mediatek.com,
- linux-kernel@vger.kernel.org, liguo.zhang@mediatek.com,
- linux-mediatek@lists.infradead.org, linux-i2c@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Rich Felker <dalias@libc.org>, linux-ia64@vger.kernel.org,
+ devicetree@vger.kernel.org, Catalin Marinas <catalin.marinas@arm.com>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>, x86@kernel.org,
+ linux-mips@vger.kernel.org, Max Filippov <jcmvbkbc@gmail.com>,
+ Guo Ren <guoren@kernel.org>, sparclinux@vger.kernel.org,
+ Christoph Hellwig <hch@lst.de>, linux-s390@vger.kernel.org,
+ linux-c6x-dev@linux-c6x.org, Yoshinori Sato <ysato@users.sourceforge.jp>,
+ Richard Weinberger <richard@nod.at>, linux-sh@vger.kernel.org,
+ Russell King <linux@armlinux.org.uk>, kasan-dev@googlegroups.com,
+ Mike Rapoport <rppt@linux.ibm.com>, Geert Uytterhoeven <geert@linux-m68k.org>,
+ Mark Salter <msalter@redhat.com>, Dennis Zhou <dennis@kernel.org>,
+ Matt Turner <mattst88@gmail.com>, linux-snps-arc@lists.infradead.org,
+ uclinux-h8-devel@lists.sourceforge.jp, Petr Mladek <pmladek@suse.com>,
+ linux-xtensa@linux-xtensa.org, linux-alpha@vger.kernel.org,
+ linux-um@lists.infradead.org, linux-m68k@lists.linux-m68k.org,
+ Rob Herring <robh+dt@kernel.org>, Greentime Hu <green.hu@gmail.com>,
+ xen-devel@lists.xenproject.org, Stafford Horne <shorne@gmail.com>,
+ Guan Xuetao <gxt@pku.edu.cn>, linux-arm-kernel@lists.infradead.org,
+ Michal Simek <monstr@monstr.eu>, Tony Luck <tony.luck@intel.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-usb@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Paul Burton <paul.burton@mips.com>,
+ Vineet Gupta <vgupta@synopsys.com>, Michael Ellerman <mpe@ellerman.id.au>,
+ Andrew Morton <akpm@linux-foundation.org>, linuxppc-dev@lists.ozlabs.org,
+ "David S. Miller" <davem@davemloft.net>, openrisc@lists.librecores.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add i2c compatible for MT8183. Compare to 2712 i2c controller, MT8183 has
-different registers, offsets, clock, and share i3c controller.
+Hi,
 
-Signed-off-by: qii wang <qii.wang@mediatek.com>
----
- drivers/i2c/busses/i2c-mt65xx.c |  127 ++++++++++++++++++++++++++++++++++++---
- 1 file changed, 120 insertions(+), 7 deletions(-)
+Current memblock API is quite extensive and, which is more annoying,
+duplicated. Except the low-level functions that allow searching for a free
+memory region and marking it as reserved, memblock provides three (well,
+two and a half) sets of functions to allocate memory. There are several
+overlapping functions that return a physical address and there are
+functions that return virtual address. Those that return the virtual
+address may also clear the allocated memory. And, on top of all that, some
+allocators panic and some return NULL in case of error.
 
-diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
-index 428ac99..19f0770 100644
---- a/drivers/i2c/busses/i2c-mt65xx.c
-+++ b/drivers/i2c/busses/i2c-mt65xx.c
-@@ -35,17 +35,21 @@
- #include <linux/slab.h>
- 
- #define I2C_RS_TRANSFER			(1 << 4)
-+#define I2C_ARB_LOST			(1 << 3)
- #define I2C_HS_NACKERR			(1 << 2)
- #define I2C_ACKERR			(1 << 1)
- #define I2C_TRANSAC_COMP		(1 << 0)
- #define I2C_TRANSAC_START		(1 << 0)
- #define I2C_RS_MUL_CNFG			(1 << 15)
- #define I2C_RS_MUL_TRIG			(1 << 14)
-+#define I2C_HS_TIME_EN			(1 << 7)
- #define I2C_DCM_DISABLE			0x0000
- #define I2C_IO_CONFIG_OPEN_DRAIN	0x0003
- #define I2C_IO_CONFIG_PUSH_PULL		0x0000
- #define I2C_SOFT_RST			0x0001
- #define I2C_FIFO_ADDR_CLR		0x0001
-+#define I2C_FIFO_ADDR_CLRH		0x0002
-+#define I2C_HFIFO_DATA			0x8208
- #define I2C_DELAY_LEN			0x0002
- #define I2C_ST_START_CON		0x8001
- #define I2C_FS_START_CON		0x1800
-@@ -76,6 +80,8 @@
- #define I2C_CONTROL_DIR_CHANGE          (0x1 << 4)
- #define I2C_CONTROL_ACKERR_DET_EN       (0x1 << 5)
- #define I2C_CONTROL_TRANSFER_LEN_CHANGE (0x1 << 6)
-+#define I2C_CONTROL_DMAACK_EN           (0x1 << 8)
-+#define I2C_CONTROL_ASYNC_MODE          (0x1 << 9)
- #define I2C_CONTROL_WRAPPER             (0x1 << 0)
- 
- #define I2C_DRV_NAME		"i2c-mt65xx"
-@@ -130,6 +136,15 @@ enum I2C_REGS_OFFSET {
- 	OFFSET_DEBUGCTRL,
- 	OFFSET_TRANSFER_LEN_AUX,
- 	OFFSET_CLOCK_DIV,
-+	/* MT8183 only regs */
-+	OFFSET_LTIMING,
-+	OFFSET_DATA_TIMING,
-+	OFFSET_MCU_INTR,
-+	OFFSET_HW_TIMEOUT,
-+	OFFSET_HFIFO_DATA,
-+	OFFSET_HFIFO_STAT,
-+	OFFSET_MULTI_DMA,
-+	OFFSET_ROLLBACK,
- };
- 
- static const u16 mt_i2c_regs_v1[] = {
-@@ -159,6 +174,39 @@ enum I2C_REGS_OFFSET {
- 	[OFFSET_CLOCK_DIV] = 0x70,
- };
- 
-+static const u16 mt_i2c_regs_v2[] = {
-+	[OFFSET_DATA_PORT] = 0x0,
-+	[OFFSET_SLAVE_ADDR] = 0x4,
-+	[OFFSET_INTR_MASK] = 0x8,
-+	[OFFSET_INTR_STAT] = 0xc,
-+	[OFFSET_CONTROL] = 0x10,
-+	[OFFSET_TRANSFER_LEN] = 0x14,
-+	[OFFSET_TRANSAC_LEN] = 0x18,
-+	[OFFSET_DELAY_LEN] = 0x1c,
-+	[OFFSET_TIMING] = 0x20,
-+	[OFFSET_START] = 0x24,
-+	[OFFSET_EXT_CONF] = 0x28,
-+	[OFFSET_LTIMING] = 0x2c,
-+	[OFFSET_HS] = 0x30,
-+	[OFFSET_IO_CONFIG] = 0x34,
-+	[OFFSET_FIFO_ADDR_CLR] = 0x38,
-+	[OFFSET_DATA_TIMING] = 0x3c,
-+	[OFFSET_MCU_INTR] = 0x40,
-+	[OFFSET_TRANSFER_LEN_AUX] = 0x44,
-+	[OFFSET_CLOCK_DIV] = 0x48,
-+	[OFFSET_HW_TIMEOUT] = 0x4c,
-+	[OFFSET_SOFTRESET] = 0x50,
-+	[OFFSET_HFIFO_DATA] = 0x70,
-+	[OFFSET_DEBUGSTAT] = 0xe0,
-+	[OFFSET_DEBUGCTRL] = 0xe8,
-+	[OFFSET_FIFO_STAT] = 0xf4,
-+	[OFFSET_FIFO_THRESH] = 0xf8,
-+	[OFFSET_HFIFO_STAT] = 0xfc,
-+	[OFFSET_DCM_EN] = 0xf88,
-+	[OFFSET_MULTI_DMA] = 0xf8c,
-+	[OFFSET_ROLLBACK] = 0xf98,
-+};
-+
- struct mtk_i2c_compatible {
- 	const struct i2c_adapter_quirks *quirks;
- 	const u16 *regs;
-@@ -168,6 +216,7 @@ struct mtk_i2c_compatible {
- 	unsigned char aux_len_reg: 1;
- 	unsigned char support_33bits: 1;
- 	unsigned char timing_adjust: 1;
-+	unsigned char dma_sync: 1;
- };
- 
- struct mtk_i2c {
-@@ -181,8 +230,10 @@ struct mtk_i2c {
- 	struct clk *clk_main;		/* main clock for i2c bus */
- 	struct clk *clk_dma;		/* DMA clock for i2c via DMA */
- 	struct clk *clk_pmic;		/* PMIC clock for i2c from PMIC */
-+	struct clk *clk_arb;		/* Arbitrator clock for i2c */
- 	bool have_pmic;			/* can use i2c pins from PMIC */
- 	bool use_push_pull;		/* IO config push-pull mode */
-+	bool share_i3c;			/* share i3c IP */
- 
- 	u16 irq_stat;			/* interrupt status */
- 	unsigned int clk_src_div;
-@@ -190,6 +241,7 @@ struct mtk_i2c {
- 	enum mtk_trans_op op;
- 	u16 timing_reg;
- 	u16 high_speed_reg;
-+	u16 ltiming_reg;
- 	unsigned char auto_restart;
- 	bool ignore_restart_irq;
- 	const struct mtk_i2c_compatible *dev_comp;
-@@ -216,6 +268,7 @@ struct mtk_i2c {
- 	.aux_len_reg = 1,
- 	.support_33bits = 1,
- 	.timing_adjust = 1,
-+	.dma_sync = 0,
- };
- 
- static const struct mtk_i2c_compatible mt6577_compat = {
-@@ -227,6 +280,7 @@ struct mtk_i2c {
- 	.aux_len_reg = 0,
- 	.support_33bits = 0,
- 	.timing_adjust = 0,
-+	.dma_sync = 0,
- };
- 
- static const struct mtk_i2c_compatible mt6589_compat = {
-@@ -238,6 +292,7 @@ struct mtk_i2c {
- 	.aux_len_reg = 0,
- 	.support_33bits = 0,
- 	.timing_adjust = 0,
-+	.dma_sync = 0,
- };
- 
- static const struct mtk_i2c_compatible mt7622_compat = {
-@@ -249,6 +304,7 @@ struct mtk_i2c {
- 	.aux_len_reg = 1,
- 	.support_33bits = 0,
- 	.timing_adjust = 0,
-+	.dma_sync = 0,
- };
- 
- static const struct mtk_i2c_compatible mt8173_compat = {
-@@ -259,6 +315,18 @@ struct mtk_i2c {
- 	.aux_len_reg = 1,
- 	.support_33bits = 1,
- 	.timing_adjust = 0,
-+	.dma_sync = 0,
-+};
-+
-+static const struct mtk_i2c_compatible mt8183_compat = {
-+	.regs = mt_i2c_regs_v2,
-+	.pmic_i2c = 0,
-+	.dcm = 0,
-+	.auto_restart = 1,
-+	.aux_len_reg = 1,
-+	.support_33bits = 1,
-+	.timing_adjust = 1,
-+	.dma_sync = 1,
- };
- 
- static const struct of_device_id mtk_i2c_of_match[] = {
-@@ -267,6 +335,7 @@ struct mtk_i2c {
- 	{ .compatible = "mediatek,mt6589-i2c", .data = &mt6589_compat },
- 	{ .compatible = "mediatek,mt7622-i2c", .data = &mt7622_compat },
- 	{ .compatible = "mediatek,mt8173-i2c", .data = &mt8173_compat },
-+	{ .compatible = "mediatek,mt8183-i2c", .data = &mt8183_compat },
- 	{}
- };
- MODULE_DEVICE_TABLE(of, mtk_i2c_of_match);
-@@ -299,8 +368,18 @@ static int mtk_i2c_clock_enable(struct mtk_i2c *i2c)
- 		if (ret)
- 			goto err_pmic;
- 	}
-+
-+	if (i2c->clk_arb) {
-+		ret = clk_prepare_enable(i2c->clk_arb);
-+		if (ret)
-+			goto err_arb;
-+	}
-+
- 	return 0;
- 
-+err_arb:
-+	if (i2c->have_pmic)
-+		clk_disable_unprepare(i2c->clk_pmic);
- err_pmic:
- 	clk_disable_unprepare(i2c->clk_main);
- err_main:
-@@ -311,6 +390,9 @@ static int mtk_i2c_clock_enable(struct mtk_i2c *i2c)
- 
- static void mtk_i2c_clock_disable(struct mtk_i2c *i2c)
- {
-+	if (i2c->clk_arb)
-+		clk_disable_unprepare(i2c->clk_arb);
-+
- 	if (i2c->have_pmic)
- 		clk_disable_unprepare(i2c->clk_pmic);
- 
-@@ -333,11 +415,19 @@ static void mtk_i2c_init_hw(struct mtk_i2c *i2c)
- 	if (i2c->dev_comp->dcm)
- 		mtk_i2c_writew(i2c, I2C_DCM_DISABLE, OFFSET_DCM_EN);
- 
--	if (i2c->dev_comp->timing_adjust)
-+	if (i2c->dev_comp->timing_adjust && i2c->share_i3c) {
-+		mtk_i2c_writew(i2c, (I2C_DEFAULT_CLK_DIV - 1) |
-+				    (I2C_DEFAULT_CLK_DIV - 1) << 8,
-+				    OFFSET_CLOCK_DIV);
-+		i2c->high_speed_reg |= I2C_HS_TIME_EN;
-+	} else {
- 		mtk_i2c_writew(i2c, I2C_DEFAULT_CLK_DIV - 1, OFFSET_CLOCK_DIV);
-+	}
- 
- 	mtk_i2c_writew(i2c, i2c->timing_reg, OFFSET_TIMING);
- 	mtk_i2c_writew(i2c, i2c->high_speed_reg, OFFSET_HS);
-+	if (i2c->dev_comp->regs == mt_i2c_regs_v2)
-+		mtk_i2c_writew(i2c, i2c->ltiming_reg, OFFSET_LTIMING);
- 
- 	/* If use i2c pin from PMIC mt6397 side, need set PATH_DIR first */
- 	if (i2c->have_pmic)
-@@ -345,6 +435,9 @@ static void mtk_i2c_init_hw(struct mtk_i2c *i2c)
- 
- 	control_reg = I2C_CONTROL_ACKERR_DET_EN |
- 		      I2C_CONTROL_CLK_EXT_EN | I2C_CONTROL_DMA_EN;
-+	if (i2c->dev_comp->dma_sync)
-+		control_reg |= I2C_CONTROL_DMAACK_EN | I2C_CONTROL_ASYNC_MODE;
-+
- 	mtk_i2c_writew(i2c, control_reg, OFFSET_CONTROL);
- 	mtk_i2c_writew(i2c, I2C_DELAY_LEN, OFFSET_DELAY_LEN);
- 
-@@ -434,6 +527,8 @@ static int mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int parent_clk)
- 	unsigned int clk_src;
- 	unsigned int step_cnt;
- 	unsigned int sample_cnt;
-+	unsigned int l_step_cnt;
-+	unsigned int l_sample_cnt;
- 	unsigned int target_speed;
- 	int ret;
- 
-@@ -443,11 +538,11 @@ static int mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int parent_clk)
- 	if (target_speed > MAX_FS_MODE_SPEED) {
- 		/* Set master code speed register */
- 		ret = mtk_i2c_calculate_speed(i2c, clk_src, MAX_FS_MODE_SPEED,
--					      &step_cnt, &sample_cnt);
-+					      &l_step_cnt, &l_sample_cnt);
- 		if (ret < 0)
- 			return ret;
- 
--		i2c->timing_reg = (sample_cnt << 8) | step_cnt;
-+		i2c->timing_reg = (l_sample_cnt << 8) | l_step_cnt;
- 
- 		/* Set the high speed mode register */
- 		ret = mtk_i2c_calculate_speed(i2c, clk_src, target_speed,
-@@ -457,6 +552,8 @@ static int mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int parent_clk)
- 
- 		i2c->high_speed_reg = I2C_TIME_DEFAULT_VALUE |
- 			(sample_cnt << 12) | (step_cnt << 8);
-+		i2c->ltiming_reg = (l_sample_cnt << 6) | l_step_cnt |
-+				   (sample_cnt << 12) | (step_cnt << 9);
- 	} else {
- 		ret = mtk_i2c_calculate_speed(i2c, clk_src, target_speed,
- 					      &step_cnt, &sample_cnt);
-@@ -467,6 +564,8 @@ static int mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int parent_clk)
- 
- 		/* Disable the high speed transaction */
- 		i2c->high_speed_reg = I2C_TIME_CLR_VALUE;
-+
-+		i2c->ltiming_reg = (sample_cnt << 6) | step_cnt;
- 	}
- 
- 	return 0;
-@@ -483,6 +582,7 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 	u16 addr_reg;
- 	u16 start_reg;
- 	u16 control_reg;
-+	u16 fifo_clr_reg = I2C_FIFO_ADDR_CLR;
- 	u16 restart_flag = 0;
- 	u32 reg_4g_mode;
- 	u8 *dma_rd_buf = NULL;
-@@ -519,13 +619,21 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 
- 	/* Clear interrupt status */
- 	mtk_i2c_writew(i2c, restart_flag | I2C_HS_NACKERR | I2C_ACKERR |
--	       I2C_TRANSAC_COMP, OFFSET_INTR_STAT);
-+			    I2C_ARB_LOST | I2C_TRANSAC_COMP,
-+			    OFFSET_INTR_STAT);
-+
-+	if (i2c->share_i3c)
-+		fifo_clr_reg |= I2C_FIFO_ADDR_CLRH;
- 
--	mtk_i2c_writew(i2c, I2C_FIFO_ADDR_CLR, OFFSET_FIFO_ADDR_CLR);
-+	mtk_i2c_writew(i2c, fifo_clr_reg, OFFSET_FIFO_ADDR_CLR);
-+
-+	if ((i2c->speed_hz > MAX_FS_MODE_SPEED) && i2c->share_i3c)
-+		mtk_i2c_writew(i2c, I2C_HFIFO_DATA, OFFSET_HFIFO_DATA);
- 
- 	/* Enable interrupt */
- 	mtk_i2c_writew(i2c, restart_flag | I2C_HS_NACKERR | I2C_ACKERR |
--	       I2C_TRANSAC_COMP, OFFSET_INTR_MASK);
-+			    I2C_ARB_LOST | I2C_TRANSAC_COMP,
-+			    OFFSET_INTR_MASK);
- 
- 	/* Set transfer and transaction len */
- 	if (i2c->op == I2C_MASTER_WRRD) {
-@@ -659,7 +767,7 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 
- 	/* Clear interrupt mask */
- 	mtk_i2c_writew(i2c, ~(restart_flag | I2C_HS_NACKERR | I2C_ACKERR |
--	       I2C_TRANSAC_COMP), OFFSET_INTR_MASK);
-+			    I2C_ARB_LOST | I2C_TRANSAC_COMP), OFFSET_INTR_MASK);
- 
- 	if (i2c->op == I2C_MASTER_WR) {
- 		dma_unmap_single(i2c->dev, wpaddr,
-@@ -817,6 +925,7 @@ static int mtk_i2c_parse_dt(struct device_node *np, struct mtk_i2c *i2c)
- 	if (i2c->clk_src_div == 0)
- 		return -EINVAL;
- 
-+	i2c->share_i3c = of_property_read_bool(np, "mediatek,share-i3c");
- 	i2c->have_pmic = of_property_read_bool(np, "mediatek,have-pmic");
- 	i2c->use_push_pull =
- 		of_property_read_bool(np, "mediatek,use-push-pull");
-@@ -884,6 +993,10 @@ static int mtk_i2c_probe(struct platform_device *pdev)
- 		return PTR_ERR(i2c->clk_dma);
- 	}
- 
-+	i2c->clk_arb = devm_clk_get(&pdev->dev, "arb");
-+	if (IS_ERR(i2c->clk_arb))
-+		i2c->clk_arb = NULL;
-+
- 	clk = i2c->clk_main;
- 	if (i2c->have_pmic) {
- 		i2c->clk_pmic = devm_clk_get(&pdev->dev, "pmic");
+This set tries to reduce the mess, and trim down the amount of memblock
+allocation methods.
+
+Patches 1-10 consolidate the functions that return physical address of
+the allocated memory
+
+Patches 11-13 are some trivial cleanups
+
+Patches 14-19 add checks for the return value of memblock_alloc*() and
+panics in case of errors. The patches 14-18 include some minor refactoring
+to have better readability of the resulting code and patch 19 is a
+mechanical addition of
+
+	if (!ptr)
+		panic();
+
+after memblock_alloc*() calls.
+
+And, finally, patches 20 and 21 remove panic() calls memblock and _nopanic
+variants from memblock.
+
+v2 changes:
+* replace some more %lu with %zu
+* remove panics where they are not needed in s390 and in printk
+* collect Acked-by and Reviewed-by.
+
+
+Christophe Leroy (1):
+  powerpc: use memblock functions returning virtual address
+
+Mike Rapoport (20):
+  openrisc: prefer memblock APIs returning virtual address
+  memblock: replace memblock_alloc_base(ANYWHERE) with memblock_phys_alloc
+  memblock: drop memblock_alloc_base_nid()
+  memblock: emphasize that memblock_alloc_range() returns a physical address
+  memblock: memblock_phys_alloc_try_nid(): don't panic
+  memblock: memblock_phys_alloc(): don't panic
+  memblock: drop __memblock_alloc_base()
+  memblock: drop memblock_alloc_base()
+  memblock: refactor internal allocation functions
+  memblock: make memblock_find_in_range_node() and choose_memblock_flags() static
+  arch: use memblock_alloc() instead of memblock_alloc_from(size, align, 0)
+  arch: don't memset(0) memory returned by memblock_alloc()
+  ia64: add checks for the return value of memblock_alloc*()
+  sparc: add checks for the return value of memblock_alloc*()
+  mm/percpu: add checks for the return value of memblock_alloc*()
+  init/main: add checks for the return value of memblock_alloc*()
+  swiotlb: add checks for the return value of memblock_alloc*()
+  treewide: add checks for the return value of memblock_alloc*()
+  memblock: memblock_alloc_try_nid: don't panic
+  memblock: drop memblock_alloc_*_nopanic() variants
+
+ arch/alpha/kernel/core_cia.c              |   5 +-
+ arch/alpha/kernel/core_marvel.c           |   6 +
+ arch/alpha/kernel/pci-noop.c              |  13 +-
+ arch/alpha/kernel/pci.c                   |  11 +-
+ arch/alpha/kernel/pci_iommu.c             |  16 +-
+ arch/alpha/kernel/setup.c                 |   2 +-
+ arch/arc/kernel/unwind.c                  |   3 +-
+ arch/arc/mm/highmem.c                     |   4 +
+ arch/arm/kernel/setup.c                   |   6 +
+ arch/arm/mm/init.c                        |   6 +-
+ arch/arm/mm/mmu.c                         |  14 +-
+ arch/arm64/kernel/setup.c                 |   8 +-
+ arch/arm64/mm/kasan_init.c                |  10 ++
+ arch/arm64/mm/mmu.c                       |   2 +
+ arch/arm64/mm/numa.c                      |   4 +
+ arch/c6x/mm/dma-coherent.c                |   4 +
+ arch/c6x/mm/init.c                        |   4 +-
+ arch/csky/mm/highmem.c                    |   5 +
+ arch/h8300/mm/init.c                      |   4 +-
+ arch/ia64/kernel/mca.c                    |  25 +--
+ arch/ia64/mm/contig.c                     |   8 +-
+ arch/ia64/mm/discontig.c                  |   4 +
+ arch/ia64/mm/init.c                       |  38 ++++-
+ arch/ia64/mm/tlb.c                        |   6 +
+ arch/ia64/sn/kernel/io_common.c           |   3 +
+ arch/ia64/sn/kernel/setup.c               |  12 +-
+ arch/m68k/atari/stram.c                   |   4 +
+ arch/m68k/mm/init.c                       |   3 +
+ arch/m68k/mm/mcfmmu.c                     |   7 +-
+ arch/m68k/mm/motorola.c                   |   9 ++
+ arch/m68k/mm/sun3mmu.c                    |   6 +
+ arch/m68k/sun3/sun3dvma.c                 |   3 +
+ arch/microblaze/mm/init.c                 |  10 +-
+ arch/mips/cavium-octeon/dma-octeon.c      |   3 +
+ arch/mips/kernel/setup.c                  |   3 +
+ arch/mips/kernel/traps.c                  |   5 +-
+ arch/mips/mm/init.c                       |   5 +
+ arch/nds32/mm/init.c                      |  12 ++
+ arch/openrisc/mm/init.c                   |   5 +-
+ arch/openrisc/mm/ioremap.c                |   8 +-
+ arch/powerpc/kernel/dt_cpu_ftrs.c         |   8 +-
+ arch/powerpc/kernel/irq.c                 |   5 -
+ arch/powerpc/kernel/paca.c                |   6 +-
+ arch/powerpc/kernel/pci_32.c              |   3 +
+ arch/powerpc/kernel/prom.c                |   5 +-
+ arch/powerpc/kernel/rtas.c                |   6 +-
+ arch/powerpc/kernel/setup-common.c        |   3 +
+ arch/powerpc/kernel/setup_32.c            |  26 ++--
+ arch/powerpc/kernel/setup_64.c            |   4 +
+ arch/powerpc/lib/alloc.c                  |   3 +
+ arch/powerpc/mm/hash_utils_64.c           |  11 +-
+ arch/powerpc/mm/mmu_context_nohash.c      |   9 ++
+ arch/powerpc/mm/numa.c                    |   4 +
+ arch/powerpc/mm/pgtable-book3e.c          |  12 +-
+ arch/powerpc/mm/pgtable-book3s64.c        |   3 +
+ arch/powerpc/mm/pgtable-radix.c           |   9 +-
+ arch/powerpc/mm/ppc_mmu_32.c              |   3 +
+ arch/powerpc/platforms/pasemi/iommu.c     |   3 +
+ arch/powerpc/platforms/powermac/nvram.c   |   3 +
+ arch/powerpc/platforms/powernv/opal.c     |   3 +
+ arch/powerpc/platforms/powernv/pci-ioda.c |   8 +
+ arch/powerpc/platforms/ps3/setup.c        |   3 +
+ arch/powerpc/sysdev/dart_iommu.c          |   3 +
+ arch/powerpc/sysdev/msi_bitmap.c          |   3 +
+ arch/s390/kernel/crash_dump.c             |   3 +
+ arch/s390/kernel/setup.c                  |  16 ++
+ arch/s390/kernel/smp.c                    |   9 +-
+ arch/s390/kernel/topology.c               |   6 +
+ arch/s390/numa/mode_emu.c                 |   3 +
+ arch/s390/numa/numa.c                     |   6 +-
+ arch/sh/boards/mach-ap325rxa/setup.c      |   5 +-
+ arch/sh/boards/mach-ecovec24/setup.c      |  10 +-
+ arch/sh/boards/mach-kfr2r09/setup.c       |   5 +-
+ arch/sh/boards/mach-migor/setup.c         |   5 +-
+ arch/sh/boards/mach-se/7724/setup.c       |  10 +-
+ arch/sh/kernel/machine_kexec.c            |   3 +-
+ arch/sh/mm/init.c                         |   8 +-
+ arch/sh/mm/numa.c                         |   4 +
+ arch/sparc/kernel/prom_32.c               |   6 +-
+ arch/sparc/kernel/setup_64.c              |   6 +
+ arch/sparc/kernel/smp_64.c                |  12 ++
+ arch/sparc/mm/init_32.c                   |   2 +-
+ arch/sparc/mm/init_64.c                   |  11 ++
+ arch/sparc/mm/srmmu.c                     |  18 ++-
+ arch/um/drivers/net_kern.c                |   3 +
+ arch/um/drivers/vector_kern.c             |   3 +
+ arch/um/kernel/initrd.c                   |   2 +
+ arch/um/kernel/mem.c                      |  16 ++
+ arch/unicore32/kernel/setup.c             |   4 +
+ arch/unicore32/mm/mmu.c                   |  15 +-
+ arch/x86/kernel/acpi/boot.c               |   3 +
+ arch/x86/kernel/apic/io_apic.c            |   5 +
+ arch/x86/kernel/e820.c                    |   5 +-
+ arch/x86/kernel/setup_percpu.c            |  10 +-
+ arch/x86/mm/kasan_init_64.c               |  14 +-
+ arch/x86/mm/numa.c                        |  12 +-
+ arch/x86/platform/olpc/olpc_dt.c          |   3 +
+ arch/x86/xen/p2m.c                        |  11 +-
+ arch/xtensa/mm/kasan_init.c               |  10 +-
+ arch/xtensa/mm/mmu.c                      |   3 +
+ drivers/clk/ti/clk.c                      |   3 +
+ drivers/firmware/memmap.c                 |   2 +-
+ drivers/macintosh/smu.c                   |   5 +-
+ drivers/of/fdt.c                          |   8 +-
+ drivers/of/of_reserved_mem.c              |   7 +-
+ drivers/of/unittest.c                     |   8 +-
+ drivers/usb/early/xhci-dbc.c              |   2 +-
+ drivers/xen/swiotlb-xen.c                 |   7 +-
+ include/linux/memblock.h                  |  59 +------
+ init/main.c                               |  26 +++-
+ kernel/dma/swiotlb.c                      |  21 ++-
+ kernel/power/snapshot.c                   |   3 +
+ kernel/printk/printk.c                    |   9 +-
+ lib/cpumask.c                             |   3 +
+ mm/cma.c                                  |  10 +-
+ mm/kasan/init.c                           |  10 +-
+ mm/memblock.c                             | 249 ++++++++++--------------------
+ mm/page_alloc.c                           |  10 +-
+ mm/page_ext.c                             |   2 +-
+ mm/percpu.c                               |  84 +++++++---
+ mm/sparse.c                               |  25 ++-
+ 121 files changed, 860 insertions(+), 412 deletions(-)
+
 -- 
-1.7.9.5
+2.7.4
 
 
 _______________________________________________
