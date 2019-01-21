@@ -2,83 +2,89 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 68E03C31D64
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 05:02:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 03E8FC31D63
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 05:46:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3488D20861
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 05:02:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BF0B22176F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 05:46:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="phLjpWzg";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="V/hi7yRP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3488D20861
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZKq1S6rC";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="QkBeIhYg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BF0B22176F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wAlD+GjLCwZxjtJi9XPw+Tf7bVQpYc2aPOzFMNI+KvU=; b=phLjpWzgrMwby5
-	TNOqoK/G7KsRG0XgsBSQjdHPJJ5L6xLru5FhISMiOu/rQX29nUjiHJtv/kB2O+ZKM1JJYXa6CETSa
-	WADcNggBlSp86Y4jefeGwo4CLctgbDxn2ijnecfkhwQOl1d4//n+gjGdVM0Hn5ki4RigxeZSUYSkw
-	j6Fp9tXeleBYbT443iqSuuvdyadSHreXGn4gAi3IAuMfQOEbJc8MjVrlcRcWL9QvxIINnLqtjQjPc
-	bDJ+nBIDJpuTqsBr9nVoZNnR7LuU5usloQDWrAgYWck2KprG8+ZxdTqb/3E8dOQWe5YOYXrr4UENL
-	PO+CJ7CaIykOkJKfG3vw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=JteDnyrPhhXD0OUmIdxf4zw1oIhMu4oihARZaWWFwHk=; b=ZKq1S6rCQFkfCc
+	S+5DqQH9d7JcSunAMKjTmaiAEpXgCOIwp6QSvMBYp5jiOTBD2/tHGlSavS2oUKQDA8JRqC7nF9hDD
+	vAKXjRW7GE4H7hxRdJn5N+A/vQ9dEE9xhj8YSw+//k62QQ91fUPZqCkvgy0AG+YmZrlfGyCqzFKmh
+	6UOxhufJkfSL3yCSmJEEiO4P3fC7TFIk/981SjOlXLwRRN3vymLpPuOrlr9/DdkFBKKDXBPmR2iGA
+	yHKmWFFkhVqEz4Pjx1uktFBfLu2Yj0kY0o/rHCizCCUIMWPoFgeepOuha+fdpj9Bcz0IdH9gL0L0h
+	JzAvYfHMv3omdx2CsPXQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glRjT-0000v8-0p; Mon, 21 Jan 2019 05:02:47 +0000
-Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+	id 1glSPd-0006sQ-Pb; Mon, 21 Jan 2019 05:46:21 +0000
+Received: from fllv0016.ext.ti.com ([198.47.19.142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glRjQ-0000uh-9P; Mon, 21 Jan 2019 05:02:45 +0000
-Received: by mail-wm1-x344.google.com with SMTP id g67so9429788wmd.2;
- Sun, 20 Jan 2019 21:02:44 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=UcWV0PdeaSDvdUuhmGQO4m2BfscklrgYjqBuY12PCcA=;
- b=V/hi7yRPHDsMVi+58AG/7kkBZ9xNbfET9mbQLBX3rRa/5S7Egazzo7GkKx9Nr9QDNn
- Q15Sqj+UYvWVPxZ1iDrs0zmGFl/j92dU/1HkPmW+NvEgq+ZKIZc6fAcJG2EkTDwBwcsM
- 0tR9lyaa4UUNEeXocry5NDuP4u54NiPNk3osDNj8tPXwyLvLWz5h90/XHbYLjTjd/uxv
- 5Npm5bYTyDSigjoqWT6ENgMt51nfhoUtFMdiBrTg1FaE2PQxZhX0uiK8nhovLCKpIe/f
- FRdh8srEegnbnGPAi/ZqyLfmizy0R1J9rQnjL980El8d5/mqH/mS7xs1Mnsg9lephuzG
- RQ1A==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=UcWV0PdeaSDvdUuhmGQO4m2BfscklrgYjqBuY12PCcA=;
- b=uG67aIX/An6YsqLcsiYHDkW3zw2laoTde4Ig/24Z35/rRR85LLZa9dsn83skpCPtR0
- q4smwd1xQflqB6BBDH8lWiH/T/j4M8tngPdlqfPnm+Hv29ueGRO11PCwrBMwpLWOlXie
- iBSLjL65m6duSQeUabObv3x5J9Upz3NRBCkhk4njwXR5qVAMzrZk29KJLrKTEMUbLp06
- 7lJVavqJWRowu/OQV7keFGeaK3QF0ILAE/rO8KOm8FSfkvxR1ZZJ/Gdmwz1A9HYHpwFI
- crbkf7UW8Vy5vy5/nZGZ2e0SzWdHwhBmU7mLR5eXpLa/AR1cQfxDJ5VPOLoPUr0CtQ9B
- PTyQ==
-X-Gm-Message-State: AJcUuke5peKOJU36AqIxo1Pe/fnt9TDNWJnhJKI73k/L0xkpc4PafjPl
- HzIjUVr9XhLeUlT/6hU+afcjYtHXvUqO1uWRleg=
-X-Google-Smtp-Source: ALg8bN6K+iAUk6mF3Co0mH09IW0ow+csSdwV5X0wpG9aRMTsDgPPVKdvALpgEFCoSOGajbqnfpj23G0R4C7Opg9j9eg=
-X-Received: by 2002:a1c:8acd:: with SMTP id
- m196mr23428779wmd.120.1548046962976; 
- Sun, 20 Jan 2019 21:02:42 -0800 (PST)
+ id 1glSPZ-0006rm-HT
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 05:46:19 +0000
+Received: from fllv0035.itg.ti.com ([10.64.41.0])
+ by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0L5k5Vs045886;
+ Sun, 20 Jan 2019 23:46:05 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1548049565;
+ bh=fJ+3K0FzBt7yJEByNGvfREYMrBKYn44IKqiRvYxCScY=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=QkBeIhYgDsy9/JVjyiVAfix9yNvToDYK0ZrRrhjRWkydOrxB6r11cQXn+DcVRJCpP
+ QfIN5rJL+jm11NXnpH4qxPO3Yn3dMRo/pXlHT4WvliwkXCuDEyvMknl2DPotedcMKf
+ Y2apO8OxK6yrbo1+Qm1ZbdAvgJEVxRFJ0hiun/DI=
+Received: from DLEE103.ent.ti.com (dlee103.ent.ti.com [157.170.170.33])
+ by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0L5k536033692
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Sun, 20 Jan 2019 23:46:05 -0600
+Received: from DLEE111.ent.ti.com (157.170.170.22) by DLEE103.ent.ti.com
+ (157.170.170.33) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Sun, 20
+ Jan 2019 23:46:04 -0600
+Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE111.ent.ti.com
+ (157.170.170.22) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Sun, 20 Jan 2019 23:46:04 -0600
+Received: from [172.24.190.233] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0L5k1Xn001534;
+ Sun, 20 Jan 2019 23:46:02 -0600
+Subject: Re: [PATCH v5 2/2] phy: zynqmp: Add phy driver for xilinx zynqmp phy
+ core
+To: Anurag Kumar Vulisha <anuragku@xilinx.com>, "robh+dt@kernel.org"
+ <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
+ "vivek.gautam@codeaurora.org" <vivek.gautam@codeaurora.org>
+References: <1545140733-20689-1-git-send-email-anurag.kumar.vulisha@xilinx.com>
+ <1545140733-20689-3-git-send-email-anurag.kumar.vulisha@xilinx.com>
+ <b521679a-0c79-44b1-8a2b-1f3391a362ae@ti.com>
+ <BYAPR02MB5591E4BF4C547C3E29D9CF8AA7830@BYAPR02MB5591.namprd02.prod.outlook.com>
+From: Kishon Vijay Abraham I <kishon@ti.com>
+Message-ID: <6f0c2f35-f6cd-88ec-32b9-9be247fab4e5@ti.com>
+Date: Mon, 21 Jan 2019 11:15:35 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-References: <1547297008-2740-1-git-send-email-stefan.wahren@i2se.com>
- <1547297008-2740-5-git-send-email-stefan.wahren@i2se.com>
-In-Reply-To: <1547297008-2740-5-git-send-email-stefan.wahren@i2se.com>
-From: Peter Robinson <pbrobinson@gmail.com>
-Date: Mon, 21 Jan 2019 05:02:31 +0000
-Message-ID: <CALeDE9Me+dzsdwvmGNMO2SKQoLot_7HEshYaa15=5j04jZCbnA@mail.gmail.com>
-Subject: Re: [PATCH 4/6] ARM: dts: bcm2837-rpi-3-b: Use consistent label for
- HDMI hotplug
-To: Stefan Wahren <stefan.wahren@i2se.com>
+In-Reply-To: <BYAPR02MB5591E4BF4C547C3E29D9CF8AA7830@BYAPR02MB5591.namprd02.prod.outlook.com>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190120_210244_331148_5E425209 
-X-CRM114-Status: GOOD (  16.63  )
+X-CRM114-CacheID: sfid-20190120_214617_698387_9E0B2FE7 
+X-CRM114-Status: GOOD (  26.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,48 +96,135 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Gottfried Haider <gottfried.haider@gmail.com>,
- Florian Fainelli <f.fainelli@gmail.com>, Scott Branden <sbranden@broadcom.com>,
- devicetree@vger.kernel.org, Ray Jui <rjui@broadcom.com>,
- Phil Elwell <phil@raspberrypi.org>, Eric Anholt <eric@anholt.net>,
- Rob Herring <robh+dt@kernel.org>, bcm-kernel-feedback-list@broadcom.com,
- linux-rpi-kernel@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Ajay Yugalkishore Pandey <APANDEY@xilinx.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ sundeep subbaraya <sundeep.lkml@gmail.com>, Michal Simek <michals@xilinx.com>,
+ "v.anuragkumar@gmail.com" <v.anuragkumar@gmail.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, Jan 12, 2019 at 12:44 PM Stefan Wahren <stefan.wahren@i2se.com> wrote:
->
-> This make the GPIO label for HDMI hotplug more consistent to the other
-> boards.
->
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-Tested-by: Peter Robinson <pbrobinson@gmail.com>
+Hi Anurag,
 
-Verified output on a RPi3.
+On 17/01/19 9:39 PM, Anurag Kumar Vulisha wrote:
+> Hi Kishon,
+> 
+>> -----Original Message-----
+>> From: Kishon Vijay Abraham I [mailto:kishon@ti.com]
+>> Sent: Wednesday, January 16, 2019 1:38 PM
+>> To: Anurag Kumar Vulisha <anuragku@xilinx.com>; robh+dt@kernel.org; Mark
+>> Rutland <mark.rutland@arm.com>; vivek.gautam@codeaurora.org
+>> Cc: Michal Simek <michals@xilinx.com>; v.anuragkumar@gmail.com; sundeep
+>> subbaraya <sundeep.lkml@gmail.com>; Ajay Yugalkishore Pandey
+>> <APANDEY@xilinx.com>; linux-kernel@vger.kernel.org; linux-arm-
+>> kernel@lists.infradead.org; devicetree@vger.kernel.org
+>> Subject: Re: [PATCH v5 2/2] phy: zynqmp: Add phy driver for xilinx zynqmp phy core
+>>
+>> Hi,
+>>
+>> On 18/12/18 7:15 PM, Anurag Kumar Vulisha wrote:
+>>> ZynqMP SoC has a Gigabit Transceiver with four lanes. All the high
+>>> speed peripherals such as USB, SATA, PCIE, Display Port and Ethernet
+>>> SGMII can rely on any of the four GT lanes for PHY layer. This patch
+>>> adds driver for that ZynqMP GT core.
+>>>
+>>> Signed-off-by: Anurag Kumar Vulisha <anurag.kumar.vulisha@xilinx.com>
+>>> ---
+>>> Changes in v5:
+>>> 	1. No functional changes. Added missing Author name
+>>>
+>>> Changes in v4:
+>>> 	1. Moved include/dt-bindings/phy/phy.h into patch 1 as suggested by
+>>> 	   "Rob Herring"
+>>>
+>>> Changes in v3:
+>>> 	1. Corrected the Documentation as suggested by "Vivek Gautam"
+>>>
+>>> Changes in v2:
+>>> 	1. Fixed the compilation error when compiled phy-zynqmp.c as a module
+>>> 	2. Added CONFIG_PM macro in phy-zynqmp.c driver
+>>> ---
+>>>  drivers/phy/Kconfig            |    8 +
+>>>  drivers/phy/Makefile           |    1 +
+>>>  drivers/phy/phy-zynqmp.c       | 1582
+>> ++++++++++++++++++++++++++++++++++++++++
+>>>  include/linux/phy/phy-zynqmp.h |   52 ++
+>>>  4 files changed, 1643 insertions(+)
+>>>  create mode 100644 drivers/phy/phy-zynqmp.c  create mode 100644
+>>> include/linux/phy/phy-zynqmp.h
+>>>
+>>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig index
+>>> 60f949e..7a3c900 100644
+>>> --- a/drivers/phy/Kconfig
+>>> +++ b/drivers/phy/Kconfig
+>>> @@ -40,6 +40,14 @@ config PHY_XGENE
+>>>  	help
+>>>  	  This option enables support for APM X-Gene SoC multi-purpose PHY.
+>>>
+>>> +config PHY_XILINX_ZYNQMP
+>>> +	tristate "Xilinx ZynqMP PHY driver"
+>>> +	depends on ARCH_ZYNQMP
+>>> +	select GENERIC_PHY
+>>> +	help
+>>> +	  Enable this to support ZynqMP High Speed Gigabit Transceiver
+>>> +	  that is part of ZynqMP SoC.
+>>> +
+>>>  source "drivers/phy/allwinner/Kconfig"
+>>>  source "drivers/phy/amlogic/Kconfig"
+>>>  source "drivers/phy/broadcom/Kconfig"
+>>> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile index
+>>> 0301e25..2335e85 100644
+>>> --- a/drivers/phy/Makefile
+>>> +++ b/drivers/phy/Makefile
+>>> +/**
+>>> +
+>>> +/**
+>>> + * xpsgtr_override_deemph - override PIPE TX de-emphasis
+>>> + * @phy: pointer to phy
+>>> + * @plvl: pre-emphasis level
+>>> + * @vlvl: voltage swing level
+>>> + *
+>>> + * Return: None
+>>> + */
+>>> +void xpsgtr_override_deemph(struct phy *phy, u8 plvl, u8 vlvl) {
+>>> +	struct xpsgtr_phy *gtr_phy = phy_get_drvdata(phy);
+>>> +	struct xpsgtr_dev *gtr_dev = gtr_phy->data;
+>>> +	static u8 pe[4][4] = { { 0x2, 0x2, 0x2, 0x2 },
+>>> +			       { 0x1, 0x1, 0x1, 0xFF },
+>>> +			       { 0x0, 0x0, 0xFF, 0xFF },
+>>> +			       { 0xFF, 0xFF, 0xFF, 0xFF } };
+>>> +
+>>> +	writel(pe[plvl][vlvl],
+>>> +	       gtr_dev->serdes + gtr_phy->lane * L0_TX_ANA_TM_18_OFFSET +
+>>> +	       L0_TX_ANA_TM_18);
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(xpsgtr_override_deemph);
+>>
+>> I thought I gave a feedback to get rid of export symbol. This will make the consumer
+>> driver tied to this PHY driver.
+>>
+> 
+> Thanks a lot for spending your time in reviewing this patch. With the current implementation,
+> if phy-zynqmp.c driver is not compiled and consumer driver calls xpsgtr_override_deemph()
+> routine, static inline function in phy-zynqmp.h gets called and error -ENODEV is returned. So,
+> with the current implementation the consumer driver is already depending on phy-zynqmp.c
+> driver. Please correct me if  my understanding is wrong
 
-> ---
->  arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-> index 9abb9c5..31b1c03 100644
-> --- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-> +++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-> @@ -39,7 +39,7 @@
->                                   "WL_ON",
->                                   "STATUS_LED",
->                                   "LAN_RUN",
-> -                                 "HPD_N",
-> +                                 "HDMI_HPD_N",
->                                   "CAM_GPIO0",
->                                   "CAM_GPIO1",
->                                   "PWR_LOW_N";
-> --
-> 2.7.4
->
+If the same consumer is used with 5 different PHYs, we would be adding 5
+different APIs for PHY functionality. We would also like to avoid the compiling
+out option if we use something like a multi_v7_defconfig where a single image
+is used for multiple platforms.
+
+Thanks
+Kishon
+
+> 
+> Best Regards,
+> Anurag Kumar Vulisha
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
