@@ -2,83 +2,106 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 53CEDC2F421
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 16:15:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BD537C2F441
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 16:17:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1E81F20844
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 16:15:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 87BAA20989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 16:17:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P/ic0esJ";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="rD6LLgSs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1E81F20844
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TAP7IAON";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="klgLpV+e"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 87BAA20989
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Message-ID:Date
+	:Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=uucsAKdgz4pHU/gGtr/ntAAceobjMduwEHS6HSwaPR0=; b=P/i
-	c0esJi/YeUNDJFT0hpB4S10+vhBHzMbdYlRezZ27vb0AhXeCN5L6Q5Dmp7wnXFCX2S2OW4DPgvdlf
-	j7g4uqZ3us3fyv1/aesCiyyyN2xZi0bOysWb/Ilj+XlQMRks8SQwglkZHQmKk14uI7A5hWhknOS1j
-	D92aBUzgxUs/lxmbooAvF2+rSwdrhmHWUA3R8adtunjlc+BLB++x51mQKLcHIroFmoPhn8ypQbmBj
-	g478Ff9YuNxINiMDIMmihJNdwCNrSHjRLxYNVVIOy+TS3lkbgfFTKYNDTCBPXvyTlOs8BAW52l2Ir
-	9n32IDX8oCcXvSB5ETiMW4fju/T1u/A==;
+	List-Owner; bh=BKq9SEKdYG/4oFuQ1CiTP6nvPzBHPdUuL4uP5VSqODk=; b=TAP7IAONlfBX3q
+	pBFojrJc5QoMyi/j4czWVKXX9uKHgV2LLmD99n1bTkw9uTbHg9f5PXjIB5egunpRVRnUd6UtcatVT
+	hMi/sr30gKQT5UQkBpReK8vj6mkmoB+tRX4ylQZ3JOucMOIzjCa6cUDM8gPFzOeoCDFQnmzaD+x/y
+	vgVjaIYTipBZxxBeAkkBJpR0YgcGg6UT7Zu+AQmvjQNpvkq8h5wpM6WxzldTbL3t/7SlNxOrIsK72
+	biaQFKZ0VoLz2rjgG3OWbjITcovQ2Y7s+XoO/NhEpoqpXxZDUcogEMnPNokgbbSBwNbx/6KvpDt4n
+	8yxmynanJpusDmQGm8pw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glcEZ-0003xw-Kk; Mon, 21 Jan 2019 16:15:35 +0000
-Received: from mail-qk1-x742.google.com ([2607:f8b0:4864:20::742])
+	id 1glcG1-0004I2-0X; Mon, 21 Jan 2019 16:17:05 +0000
+Received: from mail-eopbgr10055.outbound.protection.outlook.com ([40.107.1.55]
+ helo=EUR02-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glcEW-0003wv-L0
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 16:15:34 +0000
-Received: by mail-qk1-x742.google.com with SMTP id 68so12527768qke.9
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 08:15:32 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id;
- bh=84kAsmEVhaZVs53nKycwJOATMZtNr3mc+Cb51Mg2cnY=;
- b=rD6LLgSstvI0+mnzkKqlJ/LGslal8PB83QdgEfmWTgk+tX0i43/c5gvE1Qv9JPdpq9
- mavrZBfe13s/GZVEc9XhFfisofjCSha0JW9ZzXXDTSUIIsIJEAutRi0KA3wp+kDNLWeD
- 2G2El7EXi3XvJ41gTNSaowLbI0Lw4h2EiyZiYoPG68yn0qQai/222IETf3tqSVCX059M
- wv/VxKnP1BlJIIB+HLMnzLYgiRUfS1G7BI1yoxLSpjsK9jdvto2utYewqaiRA3dck+Dh
- kcXmoSWIlDOYFr4SDL8b5breFGZfbuQq4D2XqmJRTEZ2MnIffge0jPBmsE6BmMo3+ECg
- BPuQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=84kAsmEVhaZVs53nKycwJOATMZtNr3mc+Cb51Mg2cnY=;
- b=r4BUyWEdWaaHbyfg5h4ELDA20kjKNko1w5p69ZEQbHZEZSzUQwgV5Tx0FXiMUH7yC3
- tTNzoGOMPT6uJFe1Nf2+ylNaPwMCcb9Eh98CAr9XWeWjWMDTSQX3QkOVohgA28wSJUwx
- CN9jPaoXyxFLGm03jowhIQE7G4LEnJJqKKzqE6lLpZXM0YGPssIDIElGFYERyC1GwyS2
- 8odNP8UIP3/KSKQk1fcJnY/N8XXUbUXjDz+o5j0ZsyxqRGV8ViOTZgOi5IOh6ZWfPzjx
- pHXfmuwAjbmxzkveVJs2joNLrDEzUW50J6RtsGTaw2/7ywFeSJGivogBfXMbwG23YL3w
- M+Sw==
-X-Gm-Message-State: AJcUukdj6dz2boTuWEkq+nT/JoExv9mIMk9m/pIg3YjDot7k2oh/z7rC
- hYQFIGDRmhTLxz5GEJZ8/Sg=
-X-Google-Smtp-Source: ALg8bN6+evHgtc9Aw5dEuMmBFiNTqb4CPZktn9jOMbWir+0JpVHNuSrLLFamA8K0eJ97eMdkyTW3CQ==
-X-Received: by 2002:a37:a053:: with SMTP id j80mr25254276qke.277.1548087331328; 
- Mon, 21 Jan 2019 08:15:31 -0800 (PST)
-Received: from fabio-Latitude-E5450.am.freescale.net ([2804:14c:482:a73::2])
- by smtp.gmail.com with ESMTPSA id v32sm85340236qta.37.2019.01.21.08.15.29
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 21 Jan 2019 08:15:30 -0800 (PST)
-From: Fabio Estevam <festevam@gmail.com>
-To: shawnguo@kernel.org
-Subject: [PATCH] MAINTAINERS: imx: Change Fabio's email address
-Date: Mon, 21 Jan 2019 14:15:26 -0200
-Message-Id: <20190121161526.30172-1-festevam@gmail.com>
-X-Mailer: git-send-email 2.17.1
+ id 1glcFx-0004HK-FF
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 16:17:02 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=uizGjkXIxTwjtjswE6yvlXWKBq2xjTKYQpgJ2jnp/OY=;
+ b=klgLpV+e3o+KO2gCv+s5MgcbjxfRhrPzGZNF7yVSreiAO2NyRC33DQUBpIadl4JbMXxTF4dOC8WZ7INZSbbFc29ha7hjOmy6O80B5s/AhXrAjxKKtIS1VFCL8AE3tKe3qK4HAtKj39oeSU8J1eAttjStVji2KZh2r5MQbV6cgXU=
+Received: from VI1PR04MB5533.eurprd04.prod.outlook.com (20.178.122.159) by
+ VI1PR04MB5470.eurprd04.prod.outlook.com (20.178.121.208) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1537.29; Mon, 21 Jan 2019 16:16:55 +0000
+Received: from VI1PR04MB5533.eurprd04.prod.outlook.com
+ ([fe80::92d:bf44:9c1d:b907]) by VI1PR04MB5533.eurprd04.prod.outlook.com
+ ([fe80::92d:bf44:9c1d:b907%6]) with mapi id 15.20.1537.031; Mon, 21 Jan 2019
+ 16:16:55 +0000
+From: Leonard Crestez <leonard.crestez@nxp.com>
+To: Masahiro Yamada <yamada.masahiro@socionext.com>, Olof Johansson
+ <olof@lixom.net>
+Subject: Re: [PATCH 0/3] kbuild: Add wilddt function instead of listing dtbs
+Thread-Topic: [PATCH 0/3] kbuild: Add wilddt function instead of listing dtbs
+Thread-Index: AQHUpr+U4MlukrPd1USdyY3EAbizyw==
+Date: Mon, 21 Jan 2019 16:16:55 +0000
+Message-ID: <VI1PR04MB553355D6D5EBC2604E1AD256EE9F0@VI1PR04MB5533.eurprd04.prod.outlook.com>
+References: <cover.1546888138.git.leonard.crestez@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=leonard.crestez@nxp.com; 
+x-originating-ip: [86.34.165.90]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; VI1PR04MB5470;
+ 6:b7yX7nxbEpoWScQobg+7SRGJutV1AeU5JayfRnmATICPYaHTq63jU82nSatqdx5Tn8CzmyFtqNuKWg/trwnwjG1pNnKBQ/DY85h5em9gzIPIq9AaleRSmKOroMBuZEpWQMlLkinlGBBCdMq62rCDCbB8eoaWB9wz44F0c/L8aDHFIN4Pek8R9CXufz1AaUT+vVGrcp7JnbERLQVoCR9+f/qO5XnsIHAvCVYqgdG9yRyQy4PniXvQl6ax5bgWNhGd4Nhu0l7WMo+2PKvZw/3C4/YKVAkJLHRK8fMu323eFbfqnwmCgoZcL6ngAR0uicoa8DaInvSD5mog3cUocGOo0sD4xnNJYZPut5v+260HEEJDRRa6bl57G93yTkpslFmcblLhew2gRXWQ7ktgl4QI822HMPHFYf3HJ7FKOg2DWydIzp9A3CSa4IByDDhWmiGWNjKwba7XafP2qwyAEUiNug==;
+ 5:7E+nBDcYQPBd/QRZcfDraS0EBly0Tb2u0EhSkrJCviGrBOg6NfTDV4CfhiaIO70hXwkUY9yXAN6DsqyVnxpSFw5mqwZaYvjhacrj3IzV3FMq+f2BQtgXVNWHaa/oGWdufMNqn8EIbAfgiiYERQ9d2IdpgivNFt9aL1kQQa459+ciBndNlBz8T8fZIHNzMayuDe8hETcBbAb4J3kGsGwFVg==;
+ 7:6IuhHh4J15rs+lP4rRFhF/ypo0f2xAEj8rKVwcN+p/tWILCcGGH0H4/Micp9Tdyua5thTC9o8Kj6vzQedYRM1A6JhF6d1SUz3ViZx3th1gikuv6TuLutoeFRkBjd3P9r+W9arE7bpZPhTLjmTFjBYQ==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: 50cd8a25-2976-4c56-ce34-08d67fbbdcac
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR04MB5470; 
+x-ms-traffictypediagnostic: VI1PR04MB5470:
+x-microsoft-antispam-prvs: <VI1PR04MB5470FF2473EC640CF1782113EE9F0@VI1PR04MB5470.eurprd04.prod.outlook.com>
+x-forefront-prvs: 0924C6A0D5
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(39860400002)(396003)(376002)(136003)(346002)(366004)(189003)(199004)(6506007)(305945005)(6116002)(9686003)(53936002)(7736002)(26005)(33656002)(186003)(55016002)(97736004)(6436002)(102836004)(8676002)(53546011)(68736007)(7416002)(3846002)(110136005)(74316002)(4744005)(6306002)(99286004)(54906003)(2906002)(8936002)(229853002)(76176011)(7696005)(25786009)(81156014)(81166006)(316002)(6246003)(71200400001)(66066001)(71190400001)(44832011)(4326008)(105586002)(446003)(478600001)(486006)(86362001)(476003)(14454004)(14444005)(966005)(256004)(106356001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB5470;
+ H:VI1PR04MB5533.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: 2a0oTUZJIx2yLqexAtrrGfVWj8vWWLX5+mYp+Ge0EeR7mp59fAFo20LeNDAm58Xie4w9sx06+CcDZVf4jxu2C/3BpU35YVkGajTXTe/PKCOQz/+mwjSa4+iIwttgPDiKzLMB175+Vdr8OHLAECWrStXIBi0+tGeeowl6mf6bglhMLkLDgvbpeD3eOPSvfRdR2songuanVcUfom+PUyYlHRdZgNTxLYJ+pO0TsbCmyHVvWerBRzH78nVxxYhmq9YPKJQtfz5HkZuqoUgULqU8Ofe3PVjg0MN5wOqSlOoaLQK8Oanoz2S/O/zdZtB+g8U6osvk0v3Fv3Wxk1YzPkBBpEe5HFDMKyYngRnRl3sYIfzxA3YzXYlPSPOz1OlxhXb23QAEo3VYhFBu5MZuHJydJ0Mha9p66i8Z1YaIquzRZhw=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+MIME-Version: 1.0
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 50cd8a25-2976-4c56-ce34-08d67fbbdcac
+X-MS-Exchange-CrossTenant-originalarrivaltime: 21 Jan 2019 16:16:55.5717 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB5470
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_081532_809476_0E997541 
-X-CRM114-Status: GOOD (  10.93  )
+X-CRM114-CacheID: sfid-20190121_081701_509842_F44D0A78 
+X-CRM114-Status: GOOD (  11.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,36 +113,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Fabio Estevam <festevam@gmail.com>, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: Mark Rutland <mark.rutland@arm.com>, Aisheng Dong <aisheng.dong@nxp.com>,
+ Michal Marek <michal.lkml@markovi.net>,
+ "linux-kbuild@vger.kernel.org" <linux-kbuild@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Leo Li <leoyang.li@nxp.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Rob Herring <robh+dt@kernel.org>, Fabio Estevam <fabio.estevam@nxp.com>,
+ Shawn Guo <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-I prefer to use my personal email address for kernel related work.
+On 1/7/2019 9:31 PM, Leonard Crestez wrote:
+> The dts makefiles go through a lot of pointless churn when boards are
+> added. Many SOCs (such as imx) have very simple naming conventions for
+> all boards using a certain chip and board listings can be easily
+> collapsed using wildcards.
+> 
+> Add a "wilddt" function and use it for imx6/7/8 and layerscape. This can
+> be applied to many other soc families later.
+> 
+> Previously sent as RFC: https://lore.kernel.org/patchwork/patch/1022737/
 
-Signed-off-by: Fabio Estevam <festevam@gmail.com>
----
- MAINTAINERS | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Any feedback? This should be reviewed by kbuild and arm-soc
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index aaa41de462c6..a3d1222b81ad 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1542,7 +1542,7 @@ ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
- M:	Shawn Guo <shawnguo@kernel.org>
- M:	Sascha Hauer <s.hauer@pengutronix.de>
- R:	Pengutronix Kernel Team <kernel@pengutronix.de>
--R:	Fabio Estevam <fabio.estevam@nxp.com>
-+R:	Fabio Estevam <festevam@gmail.com>
- R:	NXP Linux Team <linux-imx@nxp.com>
- L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
--- 
-2.17.1
+I think this is a worthwhile cleanup, are there any corner cases or more 
+exotic setup I should try in order to validate this series?
 
+--
+Regards,
+Leonard
 
 _______________________________________________
 linux-arm-kernel mailing list
