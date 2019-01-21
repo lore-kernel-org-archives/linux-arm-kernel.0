@@ -2,90 +2,84 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
-	autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C4778C31D63
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 06:11:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9B5A2C31D63
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 06:37:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8F039217F9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 06:11:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 41BA821773
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 06:37:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JCo6CkRU";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="qdW6yClj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8F039217F9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IKFNhlbB";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="nGSyGRIy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 41BA821773
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=iOws+yzJyZHNv1lke+yu8MQt5OdxEkqWFfGWTDmTB2s=; b=JCo6CkRUK91Rpz
-	nKR1ZpKZ5W2OgHfh4Jp2XtEd+8UqiXKGMlry+ZtgMWeAt3Vu/c/Dou74dJ+0E91jtywqi1LiD0j+i
-	C+j5RbObwL2HZr9zDC5T117xML3tMSQfIum8rk4PYF7RCntOhqNMTP2YgIm7OK1uM3Gmsu1BGn9tm
-	bwhAwOXo/n/caxDMtbQ3jFfu+C6LiOmZE36IJwSCvTzbxc5Uc7AT2O0UIU84BD0royy9elACcpNuy
-	qzaskTVeP3iKG8+ePkz94pHi6ywYw4nE1RwBpqrKT8c7KmVS1qYLgDjGY0XsGKVC+uI/DE/JFEfar
-	QlIG6tn8hKhlUklZ7f0w==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Content-Type:To:
+	Subject:Message-ID:Date:From:In-Reply-To:References:MIME-Version:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=L0EPBLmL/dUGjAe1eTi1TyTzfwZNsIPuwzGjmuvVcN4=; b=IKFNhlbBrkTvywutFmEB8Oarc
+	ht3lYoJPpjRwSp/zF59UW6oo5iVhCFS16gYW2GwwIPQTRiknMYZJoDf8CEJpklK4LU9ywA26NavYq
+	Sxp9n+WNXgjtkPHoTHVcMOQF4W/BlvSW+5ap42/WLZ35KlxhzJqjNIwcGvE+rw9cI43zEp4nt2z98
+	1uPy1bllEjRMjst8uj2YXY9KiQ529NjaX2oFPX1AAGE/mw2FiT638JmTQ3QTblcNIUGRgGFtOnr8D
+	c4QJKi0sdZE+0o/CwWvsvUjOGYf/rxK/EZzGi7ZXFXtyH5tLnq/uzkmn62Ozj9estqD98+I+KL4+R
+	dBUlhZ9Mw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glSns-0000Xw-MK; Mon, 21 Jan 2019 06:11:24 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+	id 1glTDV-0002GV-As; Mon, 21 Jan 2019 06:37:53 +0000
+Received: from mail-ot1-x341.google.com ([2607:f8b0:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glSnp-0000XZ-8L
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 06:11:22 +0000
-Received: by mail-wm1-x342.google.com with SMTP id n190so9598802wmd.0
- for <linux-arm-kernel@lists.infradead.org>;
- Sun, 20 Jan 2019 22:11:20 -0800 (PST)
+ id 1glTDQ-0002G1-Va; Mon, 21 Jan 2019 06:37:51 +0000
+Received: by mail-ot1-x341.google.com with SMTP id s13so19659694otq.4;
+ Sun, 20 Jan 2019 22:37:48 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=mjucR6CjAKB/oZPowyqDWMqmkQFXb/O28LP7fy8eQto=;
- b=qdW6yClj17Y2yLEVt6gROToTyccasjHt2D3dLjNr2R8RGnXusFOMUO7fbZWl/hcrOy
- lenBIsKbsPGJ1osbfkfXGrxJm/8IRzrBwjxEo2ivqCHbOOF0z3/3t4eZ1H7EAgACGmOV
- 5GVqrRVTYLa/6qbZrUXryRmcohB09que06AShydcUOlu4xkOOJLjzCXtfIDNyjBLgi66
- GPNqpEVe4RC52f/SvH0JYMZUk/83dgWFDBpLSqRj8Rr3nugVddoutpaluwj7vH6YeWsD
- XQm6kgHYJUsG+XEwBwI3eVCBhi2lYCNNwVxanwN/TgFJlUEtrHFGWZ+gj966lTY+jDHR
- k3Xw==
+ :cc; bh=z7cwIIFCDeiBXJV7wMIg6kFFBZTvqOc38vm9IOMy8AU=;
+ b=nGSyGRIyw48sco31OK/x12HcF+eTUsOg5SNTPGiMBsHxf8vsgva18nTDtv8O0b34fX
+ lCA7TDOiX+69xneROnNzSZLs+A6m5L5htN+qeONB5vZVJxADJVb6pQtiQ+XYsp4RW3Wi
+ 3tUjPv5386RbU61q88GQgAAq1BHVihoifsu2e0Y7XDbpQQ+6rQSYHKpQkeVkGaXQw8Zf
+ 0sFmpxN/NZhwMYs1CuhtfA2pBYFh85HVkGRzgAMAAObFIyiuRByYBi4LDiaKZb+Ss1Qp
+ ls2gCcfTA+aA/QQZNxSY5bGSJNMoECCxgmAok+DUxLKXhEhXhFC5aCoLjWZdvRv4zS1S
+ KP8Q==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=mjucR6CjAKB/oZPowyqDWMqmkQFXb/O28LP7fy8eQto=;
- b=MOmBzx48709gM9dTrVVX04k1ODXuOYdyr/yY+5QclSbqGdNv4MYu5v6Ld6CqswCK4h
- jvbT8el20wQ8cwtspiVRioi5Akv4SIxMYLG/qoOhMuVKmqoaXKzgPoCa5o3R+qNKAKiT
- fKWT09khJQvmVfmgK2ywI4GRrJZe9uQO+V3qguJGQvksV+AWuOSvuMgNQOp4R4Q5y9hZ
- 5EeDm1/fYiAPF7S84J5eMCZsYKfhbCMsKu4LJFL22zh/x07PWBX3EoJrJsrTjP3MBQeo
- 5j5/twM2ZRkX8zlLqzgRREc4mLeyY/Yt5YfPcEKgwVxcyHbJmwSBhFAI8IxRBHwNVF0/
- AkyQ==
-X-Gm-Message-State: AJcUukf5kY49hY0XZhOaYbuVvjVIZrS5g5RZp4TZI7GmMUJz819oDQs8
- jjaSBcXq/fLdJfmX3yJ5V3u+UtL1JHMQmO91oJg=
-X-Google-Smtp-Source: ALg8bN7BP7+s3xdf8diWvoxK2GWFipb2aadX2E4QPZ99KIkA4uyCVlSiwjU3ZN4xjbH3fCk4Y42zEMQtYYsbHdasI5A=
-X-Received: by 2002:a1c:bb04:: with SMTP id l4mr23437754wmf.142.1548051078579; 
- Sun, 20 Jan 2019 22:11:18 -0800 (PST)
+ bh=z7cwIIFCDeiBXJV7wMIg6kFFBZTvqOc38vm9IOMy8AU=;
+ b=jRlA2inBgnAt5/7nzWMl4ChUpET7YSE6Ppts266M50rIOQWMKIl6AsKfdWWCsjOa1U
+ 2LtOT7pS0g5oHcINL1ftQYL1lHujGzPjE3jLZBzSDyOu39pazmmUzI+VKSvSeu56yi8j
+ TeYr4N60JANLcKYG2NlirnScIzPT5vHEjol4elnWh+5CwDZohLe2bV044K5nmDu3+gjj
+ 2fgdPrnH2iEq94ctH6FJGEuaZvzXdbotjIptvjlwesfl1RqbkYZlQwW4CdlfaUL9EkNm
+ 1l1LEsbHc6SiskP7qH2jzaQPTuDYYz6jC2eUKM85XG25zyNPYKnHr0XP+KzT3JuNkeiU
+ Yx4Q==
+X-Gm-Message-State: AJcUukfYmSLkhkR1vhEynlOAircltnsoGZlpHO6JyX0aolWV+He9iZzv
+ 8QIn4Q3y1Ntpss5NdIYJ09YSz2t0bDgrxIsyS1Y=
+X-Google-Smtp-Source: ALg8bN41eNYfRqouJoiXoRAEiotaTbLd4Y9vJ9HditckxF/gki9GnkrcBBW0s+TQ7pXvTaw18ubDdxTPo9GdVdNWVAc=
+X-Received: by 2002:a9d:3464:: with SMTP id v91mr19841101otb.102.1548052667678; 
+ Sun, 20 Jan 2019 22:37:47 -0800 (PST)
 MIME-Version: 1.0
-References: <cover.1502103715.git.michal.simek@xilinx.com>
- <72d3cd83bed792a23ab60cf9b6d51b618f5aa084.1502103715.git.michal.simek@xilinx.com>
- <CACRpkdZE-Edr7fWZY5VQM1_65iw7MYGP-iDa2ExZsPxpM0rurQ@mail.gmail.com>
- <6da5fd79-fbc8-b613-954f-dcbe2ef8d6c5@xilinx.com>
- <20190107164210.3ecf37e8@windsurf>
- <CACRpkdafBpC14TxBNVN2AemkBz-yKkXkKfNpdgkYKQX3qFemag@mail.gmail.com>
- <20190111135413.73dad0b2@windsurf>
- <CACRpkdZVfH_LYQov5mkMvp6BWjkVsisawWuE1PMp0b8dW5Qc=g@mail.gmail.com>
-In-Reply-To: <CACRpkdZVfH_LYQov5mkMvp6BWjkVsisawWuE1PMp0b8dW5Qc=g@mail.gmail.com>
-From: Shubhrajyoti Datta <shubhrajyoti.datta@gmail.com>
-Date: Mon, 21 Jan 2019 11:41:07 +0530
-Message-ID: <CAKfKVtHrh8r7kp=2br6OCKgWgsNmd5sVG2C96QnhYSFDj7B_+Q@mail.gmail.com>
-Subject: Re: [PATCH 2/8] gpio: zynq: Wakeup gpio controller when it is used as
- IRQ controller
-To: Linus Walleij <linus.walleij@linaro.org>
+References: <20190113181808.5768-1-linux.amoon@gmail.com>
+ <CAFBinCCD4o0cXEht_7bgV6moCK2WfVRvZq8UUZD3gDo-TaRKbQ@mail.gmail.com>
+ <CANAwSgQNNRqr3rZRgr71iy7+0zuuYykd+4-1W3LB+Voux6KioQ@mail.gmail.com>
+ <CAFBinCCXufowepJaHgkPwhhNrogXDP-0x0ZS09OGCM=ua-=5MQ@mail.gmail.com>
+In-Reply-To: <CAFBinCCXufowepJaHgkPwhhNrogXDP-0x0ZS09OGCM=ua-=5MQ@mail.gmail.com>
+From: Anand Moon <linux.amoon@gmail.com>
+Date: Mon, 21 Jan 2019 12:07:33 +0530
+Message-ID: <CANAwSgR6gGGx6RgAszwHp+FYeJTdBvMAzc4p4TNpWnFXdxDf4w@mail.gmail.com>
+Subject: Re: [PATCH 1/2] ARM: dts: meson8b: odroidc1: Enable usb phy node
+To: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Content-Type: multipart/mixed; boundary="00000000000059ee3c057ff219c0"
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190120_221121_318854_8B077698 
-X-CRM114-Status: GOOD (  13.84  )
+X-CRM114-CacheID: sfid-20190120_223749_041527_D4F7C5C9 
+X-CRM114-Status: GOOD (  50.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,46 +91,314 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Josh Cartwright <josh.cartwright@ni.com>,
- Peter Crosthwaite <peter.crosthwaite@xilinx.com>,
- Nava kishore Manne <navam@xilinx.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "monstr@monstr.eu" <monstr@monstr.eu>, Borsodi Petr <Petr.Borsodi@i.cz>,
- Michal Simek <michal.simek@xilinx.com>,
- "linux-gpio@vger.kernel.org" <linux-gpio@vger.kernel.org>,
- Rob Herring <robherring2@gmail.com>,
- =?UTF-8?Q?S=C3=B6ren_Brinkmann?= <soren.brinkmann@xilinx.com>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Steffen Trumtrar <s.trumtrar@pengutronix.de>,
- Shubhrajyoti Datta <shubhraj@xilinx.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: devicetree <devicetree@vger.kernel.org>,
+ Neil Armstrong <narmstrong@baylibre.com>, Kevin Hilman <khilman@baylibre.com>,
+ Linux Kernel <linux-kernel@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
+ Emiliano Ingrassia <ingrassia@epigenesys.com>,
+ linux-amlogic@lists.infradead.org,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ Jerome Brunet <jbrunet@baylibre.com>
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 11, 2019 at 8:26 PM Linus Walleij <linus.walleij@linaro.org> wrote:
->
-> On Fri, Jan 11, 2019 at 1:54 PM Thomas Petazzoni
-> <thomas.petazzoni@bootlin.com> wrote:
-> > On Fri, 11 Jan 2019 10:54:20 +0100, Linus Walleij wrote:
-> >
-> > > My stance is that the driver is responsible of enabling and managing
-> > > runtime PM for its hardware block(s).
-> > >
-> > > Runtime PM in the core should only be added if the core needs to
-> > > be aware about it, such as is the case when e.g. a block device
-> > > needs to drain its write buffer before going to runtime sleep.
-> > >
-> > > I fail so see why the GPIO core need to be aware about this.
-> >
-> > In this very same thread at
-> > https://www.spinics.net/lists/arm-kernel/msg600515.html,  you kind of
+--00000000000059ee3c057ff219c0
+Content-Type: text/plain; charset="UTF-8"
 
-I was not abloe to open the link could you please let me  know if I am
-missing something?
+Hi Martin,
+
+Thanks for you comments.
+
+On Mon, 21 Jan 2019 at 03:21, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+>
+> Hi Anand,
+>
+> On Sun, Jan 20, 2019 at 7:44 PM Anand Moon <linux.amoon@gmail.com> wrote:
+> >
+> > Hi Martin,
+> >
+> > Thanks for your review comments.
+> >
+> > On Sat, 19 Jan 2019 at 03:59, Martin Blumenstingl
+> > <martin.blumenstingl@googlemail.com> wrote:
+> > >
+> > > Hi Anand,
+> > >
+> > > thank you for this patch!
+> > >
+> > > On Sun, Jan 13, 2019 at 7:18 PM Anand Moon <linux.amoon@gmail.com> wrote:
+> > > >
+> > > > Add missing vbus-supply link to phy controller for usb_phy0
+> > > > and usb_phy1 nodes, this changes fixed the power issue
+> > > > on usb ports usb, changes help fix usb reset warning.
+> > > I trust you on the fact that GPIOAO_5 controls VBUS of USB0 and USB1
+> > >
+> > > to me the schematics are not 100% clear or I'm bad at interpreting them:
+> > > - I'll refer to odroid-c1+_rev0.4_20150615.pdf
+> > > - page 1 lists GPIOAO.BIT5 as input for the PWREN signal of the
+> > > USB_OTG controller (usb0)
+> > > - page 1 also shows a PWREN signal in the USB_HOST controller (usb1)
+> > > but not it's input
+> > > - based on your patch I assume that PWREN is the same signal for both
+> > > USB controllers
+> > >
+> > As per the schematics odroid-c1+_rev0.4_20150615.pdf
+> >
+> > It seem that their  vbus setting for *OTG* port. *Bus 01.Port 1* using
+> > *GPIOAO.BIT5* gpio
+> that matches my interpretation of the schematics
+
+Yep, I feel that GPIOAO.BIT5 enable the PWREN power on  Bus 02.Port (usb1)
+But I could not get this to enable on Bus 01.Port (usb0).
+
+usb hot-plug of devices is working fine on *usb1* but not on *usb0*.
+I have tried different combination but it's not working for me.
+
+I am attaching small changes to phy which enables the Bus 01.Port
+(usb0) on Odroid C1+/Odroidc2.
+we need to set dr_mode="otg" to enable this bus in dts.
+
+>
+> > But we also need set power supply for *USB_B* port. *Bus 02.Port 1* ?
+> > I don't know but I will try to find solution.
+> I assume we also have to enable VBUS for the host only port, but I
+> don't know how
+>
+> > We need to enable some bit in phy driver ?
+> I'm not aware of any bit in the PHY driver which can toggle VBUS
+>
+> (trying to be creative here) maybe the GPIO is incorrectly configured
+> to pull up or down?
+
+I have tried this but no luck.
+
+> if you want me to compare anything: there's some Armbian image (where
+> the USB host ports are working fine) on the eMMC of my Odroid-C1 so I
+> can get you the values you're looking for
+>
+> > > > [  821.991470] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+> > > > [  825.243385] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+> > > > [  828.151310] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+> > > > [  830.991241] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+> > > >
+> > > > Fixes: 2eb79a4d15ff (ARM: dts: meson: enabling the USB Host controller on Odroid-C1/C1+ board)
+> > > you already split your original patch into two, however I suggest
+> > > splitting these patches differently:
+> > > - this one (personally I would choose "ARM: dts: meson8b: odroidc1:
+> > > fix USB VBUS supplies" as title), which contains the Fixes tag, adds
+> > > the "usb_vbus" and references it in the "usb0" and "usb1" nodes
+> > > - enables usb0_phy and usb0 as part of your second patch (I would call
+> > > that "ARM: dts: meson8b: odroidc1: enable the OTG capable USB
+> > > controller")
+> >
+> > Ok I will fix this as per you suggestion in the next version.
+> >
+> > >
+> > > > Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> > > > Cc: Jerome Brunet <jbrunet@baylibre.com>
+> > > > Cc: Neil Armstrong <narmstrong@baylibre.com>
+> > > > Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> > > > ---
+> > > > Rebased on Kevin's amlogic/v5.0/fixes branch
+> > > >
+> > > > [alarm@archl-c1t ~]$ lsusb -t
+> > > > /:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=dwc2/1p, 480M
+> > > >     |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/4p, 480M
+> > > >         |__ Port 1: Dev 4, If 0, Class=Mass Storage, Driver=usb-storage, 480M
+> > > >         |__ Port 3: Dev 3, If 0, Class=Video, Driver=uvcvideo, 480M
+> > > >         |__ Port 3: Dev 3, If 1, Class=Video, Driver=uvcvideo, 480M
+> > > >         |__ Port 3: Dev 3, If 2, Class=Audio, Driver=snd-usb-audio, 480M
+> > > >         |__ Port 3: Dev 3, If 3, Class=Audio, Driver=snd-usb-audio, 480M
+> > > > [alarm@archl-c1t ~]$
+> > > > [alarm@archl-c1t ~]$ lsusb -v|egrep "^Bus|MaxPower"
+> > > > Couldn't open device, some information will be missing
+> > > > Bus 001 Device 003: ID 1b71:0056 Fushicai
+> > > >     MaxPower              500mA
+> > > > Couldn't open device, some information will be missing
+> > > > Bus 001 Device 004: ID 152d:0578 JMicron Technology Corp. / JMicron USA Technology Corp. JMS567 SATA 6Gb/s bridge
+> > > >     MaxPower               30mA
+> > > > Couldn't open device, some information will be missing
+> > > > Couldn't open device, some information will be missing
+> > > > Bus 001 Device 002: ID 05e3:0610 Genesys Logic, Inc. 4-port hub
+> > > >     MaxPower              100mA
+> > > > Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+> > > >     MaxPower                0mA
+> > > > ---
+> > > >  arch/arm/boot/dts/meson8b-odroidc1.dts | 23 +++++++++++++++++++++++
+> > > >  1 file changed, 23 insertions(+)
+> > > >
+> > > > diff --git a/arch/arm/boot/dts/meson8b-odroidc1.dts b/arch/arm/boot/dts/meson8b-odroidc1.dts
+> > > > index 0f0a46ddf3ff..a49a8509b288 100644
+> > > > --- a/arch/arm/boot/dts/meson8b-odroidc1.dts
+> > > > +++ b/arch/arm/boot/dts/meson8b-odroidc1.dts
+> > > > @@ -83,6 +83,19 @@
+> > > >                 regulator-max-microvolt = <5000000>;
+> > > >         };
+> > > >
+> > > > +       usb_vbus: regulator-usb-vbus {
+> > > please add a comment here with some details about the regulator and
+> > > add a hint that the signal in the schematics is called "PWREN"
+> > Ok I will add this comment in the next patch.
+> > >
+> > > > +               compatible = "regulator-fixed";
+> > > > +
+> > > > +               regulator-name = "USB_VBUS";
+> > > > +               regulator-min-microvolt = <5000000>;
+> > > > +               regulator-max-microvolt = <5000000>;
+> > > > +
+> > > > +               vin-supply = <&p5v0>;
+> > > > +
+> > > > +               gpio = <&gpio_ao GPIOAO_5 GPIO_ACTIVE_HIGH>;
+> > > > +               enable-active-high;
+> > > > +       };
+> > > > +
+> > > >         tflash_vdd: regulator-tflash_vdd {
+> > > >                 /*
+> > > >                  * signal name from schematics: TFLASH_VDD_EN
+> > > > @@ -293,8 +306,18 @@
+> > > >         pinctrl-names = "default";
+> > > >  };
+> > > >
+> > > > +&usb0_phy {
+> > > > +       status = "okay";
+> > > > +       vbus-supply = <&usb_vbus>;
+> > > > +};
+> > > > +
+> > > >  &usb1_phy {
+> > > >         status = "okay";
+> > > > +       vbus-supply = <&usb_vbus>;
+> > > > +};
+> > > > +
+> > > > +&usb0 {
+> > > > +       status = "okay";
+> > > >  };
+> > > I believe there's a problem with the usb/usb_phy nodes here. on my
+> > > Odroid-C1 this results in:
+> > > # cat /sys/kernel/debug/regulator/regulator_summary | grep USB_VBUS
+> > >    USB_VBUS                      0    0      0 unknown  5000mV     0mA
+> > >  5000mV  5000mV
+> > > (open count is 0)
+> > >
+> > > if I move "vbus-supply" to the "usb1" node (just as an example) then I get:
+> > > # cat /sys/kernel/debug/regulator/regulator_summary | grep USB_VBUS
+> > >    USB_VBUS                      1    1      0 unknown  5000mV     0mA
+> > >  5000mV  5000mV
+> >
+> > Sorry for the mixing the vbus-supply node.
+> >
+> > After fix the phy driver code and dts changes I am getting this changes.
+> > # cat /sys/kernel/debug/regulator/regulator_summary | grep USB_VBUS
+> >     USB_VBUS                      1    2      0 unknown  5000mV
+> > 0mA  5000mV  5000mV
+> >
+> > Now I am able to enable both *Bus 01.Port 1* and *Bus 02.Port 1*
+> >
+> > # lsusb -t
+> > /:  Bus 02.Port 1: Dev 1, Class=root_hub, Driver=dwc2/1p, 480M
+> >     |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/4p, 480M
+> >         |__ Port 1: Dev 4, If 0, Class=Mass Storage, Driver=usb-storage, 480M
+> >         |__ Port 3: Dev 3, If 0, Class=Video, Driver=uvcvideo, 480M
+> >         |__ Port 3: Dev 3, If 1, Class=Video, Driver=uvcvideo, 480M
+> >         |__ Port 3: Dev 3, If 2, Class=Audio, Driver=snd-usb-audio, 480M
+> >         |__ Port 3: Dev 3, If 3, Class=Audio, Driver=snd-usb-audio, 480M
+> so this is the host-only controller (usb1) and it's working fine for
+> you - very nice!
+>
+> > /:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=dwc2/1p, 480M
+> >
+> > But not usb device are getting enable on *Bus 01.Port 1*
+> so you have something plugged into the OTG capable controller (usb0)
+> using an OTG cable?
+
+Yes I have connected USB-OTG cable with storage device attached,
+led lights on the device is blinking, but no power to the port is enable.
+so not hotplug of device is working on this port.
+
+> I've not tried this before on my Odroid-C1 because I'm using the micro
+> USB connector to power the board
+
+Correct me if I am wrong, we need to tune USB phy driver to enable as
+power the board ?
+
+>
+> do you get VBUS (maybe you have a USB thumb drive with an LED which
+> lights up when you connect it)?
+> do you get any errors or warnings from the dwc2 driver during boot?
+>
+
+Please find the boot log of my Odroid C1+ here
+[0]: https://pastebin.com/PiDmVmEC
+
+I dont see any major error on usb side.
+
+> > >
+> > > unfortunately neither your original patch nor the modified version
+> > > seem to enable USB VBUS on my Odroid-C1.
+> > > I have documented my findings already back in December, see "USB
+> > > issues on Odroid-C1" [0]
+> > > help on that would be highly appreciated :)
+> > >
+> > > on which board revision have you tested this patch?
+> > >
+> >
+> > I have with me for testing
+> >
+> > ODROID-C0 REV 0.4 20151217
+> > ODROID-C1+ REV 0.4 20150615 ----> current testing on
+> I have the exact same Odroid-C1+ board revision
+> this is my u-boot version:
+> U-boot-00000-gb7b8dc2-dirty(odroidc@b7b8dc21) (Sep 01 2017 - 01:18:22)
+> -> b7b8dc21 is the lastest commit of the hardkernel odroidc-v2011.03
+> u-boot branch at the time of writing
+>
+
+I am using the the u-boot from archlinux.
+If their is another u-boot for Odroid c1 plz let me know, I will try
+to install this on my system.
+
+Thanks for your input.
+
+>
+> Regards
+> Martin
+
+--00000000000059ee3c057ff219c0
+Content-Type: application/octet-stream; name="otgbusport0.patch"
+Content-Disposition: attachment; filename="otgbusport0.patch"
+Content-Transfer-Encoding: base64
+Content-ID: <f_jr5xh54n0>
+X-Attachment-Id: f_jr5xh54n0
+
+ZGlmZiAtLWdpdCBhL2RyaXZlcnMvcGh5L2FtbG9naWMvcGh5LW1lc29uOGItdXNiMi5jIGIvZHJp
+dmVycy9waHkvYW1sb2dpYy9waHktbWVzb244Yi11c2IyLmMKaW5kZXggOWMwMWI3ZTE5YjA2Li4x
+MzMzYzc3ZTkxNzIgMTAwNjQ0Ci0tLSBhL2RyaXZlcnMvcGh5L2FtbG9naWMvcGh5LW1lc29uOGIt
+dXNiMi5jCisrKyBiL2RyaXZlcnMvcGh5L2FtbG9naWMvcGh5LW1lc29uOGItdXNiMi5jCkBAIC0x
+MDksNiArMTA5LDcgQEAKIAogI2RlZmluZSBSRVNFVF9DT01QTEVURV9USU1FCQkJCTUwMAogI2Rl
+ZmluZSBBQ0FfRU5BQkxFX0NPTVBMRVRFX1RJTUUJCQk1MAorI2RlZmluZSBEQ0RfRU5BQkxFX0NP
+TVBMRVRFX1RJTUUJCQkxMAogCiBzdHJ1Y3QgcGh5X21lc29uOGJfdXNiMl9wcml2IHsKIAl2b2lk
+IF9faW9tZW0JCSpyZWdzOwpAQCAtMTg4LDYgKzE4OSwyMCBAQCBzdGF0aWMgaW50IHBoeV9tZXNv
+bjhiX3VzYjJfcG93ZXJfb24oc3RydWN0IHBoeSAqcGh5KQogCiAJCXVkZWxheShBQ0FfRU5BQkxF
+X0NPTVBMRVRFX1RJTUUpOwogCisJCWlmIChwaHlfbWVzb244Yl91c2IyX3JlYWQocHJpdiwgUkVH
+X0FEUF9CQykgJgorCQkJUkVHX0FEUF9CQ19BQ0FfUElOX0ZMT0FUKSB7CisJCQlkZXZfd2Fybigm
+cGh5LT5kZXYsICJVU0IgSUQgZGV0ZWN0IGZhaWxlZCFcbiIpOworCQkJY2xrX2Rpc2FibGVfdW5w
+cmVwYXJlKHByaXYtPmNsa191c2IpOworCQkJY2xrX2Rpc2FibGVfdW5wcmVwYXJlKHByaXYtPmNs
+a191c2JfZ2VuZXJhbCk7CisJCQlyZXR1cm4gLUVJTlZBTDsKKwkJfQorCX0gZWxzZSBpZiAocHJp
+di0+ZHJfbW9kZSA9PSBVU0JfRFJfTU9ERV9PVEcpIHsKKwkJcGh5X21lc29uOGJfdXNiMl9tYXNr
+X2JpdHMocHJpdiwgUkVHX0FEUF9CQywKKwkJCQkJICAgUkVHX0FEUF9CQ19EQ0RfRU5BQkxFLAor
+CQkJCQkgICBSRUdfQURQX0JDX0RDRF9FTkFCTEUpOworCisJCXVkZWxheShEQ0RfRU5BQkxFX0NP
+TVBMRVRFX1RJTUUpOworCiAJCWlmIChwaHlfbWVzb244Yl91c2IyX3JlYWQocHJpdiwgUkVHX0FE
+UF9CQykgJgogCQkJUkVHX0FEUF9CQ19BQ0FfUElOX0ZMT0FUKSB7CiAJCQlkZXZfd2FybigmcGh5
+LT5kZXYsICJVU0IgSUQgZGV0ZWN0IGZhaWxlZCFcbiIpOwo=
+--00000000000059ee3c057ff219c0
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--00000000000059ee3c057ff219c0--
+
