@@ -2,80 +2,151 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 684E4C37121
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 20:40:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 53C6FC37120
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 20:48:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 38E3F2089F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 20:40:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 101BC2089F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 20:48:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iHsUX5VA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 38E3F2089F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nN2VAKMP";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="u4qLHVLP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 101BC2089F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1FRHjCXbfLu+qdGIfNP0UPpZGwAW0u/Wvfik7E7EtEw=; b=iHsUX5VAYRZKj/
-	BCw47KhGjSIXbdRzv7P3jFYfKtyCuuLbaRbC4PLwnexKTzr+CPlH6ZM5zL+19ekJ8POf9X/+nifKa
-	iS27DGDIuET5p9NaVfUW/xI/168yW4RQJq9Xoez5QDKu2iOCJqAJ9fr/f88oPKfmapX8MnGtbW6DR
-	5n8Y7ysO+l1KDNBA6fMr9HQ2Dw7KGfW/NUP9sSYo/YV46RMjsFeqSegWOz40BBzePvG/52CmB3fkS
-	vigJblRDqqeEOJCnMughyY4WESPp44asWyhX28z0l58DRFRFrNeQwx0WWGo3sq82tqYY2rBQb4NmT
-	rByac9js2ZI84H5C2sQw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=7IzNSir5AuosBzk2ah5ruEx0VSNjUS5PJFmuCquXyw8=; b=nN2VAKMPO2rcia
+	YkRtR0QdiSxAy/vzN3E2RbGa0wOO0lQm8jNd07y4h/F0Aru6KIwcWKTSQLNqcjXXRTdxk9Dq6Xq9L
+	NDrjTFFFRlogKdnQnHNG2UeFBhpS5y8yb30HSN+vtUxVHPCMxLwFouxbQy+8ZqX+hXSxnelzk0MPG
+	EdLV4JGzmMyeaYBEuDz2VkuJVnbv+OWQz5RZSCu7pmAnuwUGgvqqGZ2XRnoVsJ4u9hAapZ7X+npKm
+	HzPkRMxW/9Hx7qOlYvNgXLyBJV+aRGy+bpuq849FnLH2TbmPUyE2Ade+sVawgCMT+aoTjMIQTCzxb
+	CMtAB8CweeexR0cU3cKg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glgMo-0004ZZ-GI; Mon, 21 Jan 2019 20:40:22 +0000
-Received: from mail-qt1-f194.google.com ([209.85.160.194])
+	id 1glgUg-0007ZQ-4c; Mon, 21 Jan 2019 20:48:30 +0000
+Received: from mail-pf1-x443.google.com ([2607:f8b0:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glgMl-0004ZE-2z
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 20:40:20 +0000
-Received: by mail-qt1-f194.google.com with SMTP id t33so25005214qtt.4
+ id 1glgUc-0007Yz-GA
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 20:48:27 +0000
+Received: by mail-pf1-x443.google.com with SMTP id z9so10651507pfi.2
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 12:40:19 -0800 (PST)
+ Mon, 21 Jan 2019 12:48:25 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=c0kZxok94KKeRTyVXwWuR1xdX68Tm9K3v9pDbt6sGZY=;
+ b=u4qLHVLPPg+yzTpzHRIh3LOq+aYvzX9lXXaH5/VmGParPp0dUlT7EaYZLqJHvdGuEn
+ SwVA03gEkyVf8MyJYE+TwD/okMbqczKHIHVqUki9pd2MDnAJIeDry3sEY8oD1jgBryTN
+ h3CtMGY4u5SOgI6x80y4IQoOrGOgVrjlecrGYbsvmCtQCTiDUOB/1QqLb9zw0wZe9IYk
+ GNZsRllGu1qc8aTiPW1N3IQpgljbCvCEpHhYHTl9Je4in5Ca70y0zDENuO/mFOJcctFA
+ tiwk1wSzstxWLPiOWaAa8ljwf0K2q8jwfbDOgXIzJ0f0kn8ORRnkKjC7h0UpIYlYW0UW
+ VuqQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=dkvN5kxF5ScgcD3pJdfvtsR7PQS22YCBaQenUgPUi4M=;
- b=R6/p1gKwA4RU76nd3HKsmUAw44MFs6Is3yguenXJSBaQilbkPtXvEWd2+9a2WH5eB8
- WhQ56OwzmBdjpVuHhGvbOr8QXJZ0fg1OVMqEBzSaR1RViQ+ZgHDrcUG8Vz/pU5fwtR19
- 7EWCo2BsiaTF5TJU8loxl1M8E3yVyuLo4LCDPGuWHdPMe0IgSr7r+hWu8Jd6CN+BQBt/
- Tdf8FxgwHMI/24AIXNODFaqibSgLskASdPIk8Sxlp5ctMi2AvBw01B/t9ngPHV2azj20
- ynKcVxncIDTrLboRhXW60bJcMRW9yLcUXneN0LJUvOX4fz9iNy5nbgPBmPkqdmYaH1AI
- DrOw==
-X-Gm-Message-State: AJcUukc8Jl6S5Yl4nSvzqyMXzXJSz0Egli90qp2tWXVW//TzMVXL5A5u
- ciSIJlyBRl2ZJr+rfj3SjHdiuxR5wS3sjz5hkBo=
-X-Google-Smtp-Source: ALg8bN6NJA3JpmMy0Rnw4UHCeBwdUwtaoF1faqE/rX9S/LB1A3Pp1thWOe1j9+1qk4H6TfQ6cwy2yDs31Lm4Qgs2hsM=
-X-Received: by 2002:a05:6214:1087:: with SMTP id
- o7mr27413754qvr.115.1548103218172; 
- Mon, 21 Jan 2019 12:40:18 -0800 (PST)
+ h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
+ :message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=c0kZxok94KKeRTyVXwWuR1xdX68Tm9K3v9pDbt6sGZY=;
+ b=e+6HI4aXpBGeV7z/cNrNO4Vwwng7wcpqGgx25nvQvUueSwZpbDvo1U+DB6eV3pv/1P
+ llJN/XnTMcY/tIR5TqE3hfKWOlAfNaQpJHjN2Y95TsJNxnJF3hjKSUiTxiPZLFaBCGrh
+ z7m924Mlhcc1x4LYG675+KFrn1pM/jOUB9zsbs1QeDGgAnDFKpPY1283IU0D0mgoPsPn
+ +FllhBMm21Sb/YPB/sd6JGeuu+RDwbgCPKhgz8ohhOagEjQLENO9+w+dFZ9mBRgBlLDj
+ Ej3+DhU3zH7ecJrVVrkkVnpTBRJWCSasZqIhhE0GbyGhuOosVvE58Ubz1n7fclpooTS1
+ C8xg==
+X-Gm-Message-State: AJcUukeNJ36SinfYFhzLAFkDcOGDziPO550Ja/ohkYdXRox5vKycWCYC
+ eAAwXufyGTTDSQifo38wYMsGlNuH
+X-Google-Smtp-Source: ALg8bN4/pneWf6oVNvvB3fpAi9qeNp43/xdkKgyipksi5yrrb8+Su4QVjCtbVsWg4eH+Mmv3mky+IQ==
+X-Received: by 2002:a63:65c7:: with SMTP id
+ z190mr29568545pgb.249.1548103704512; 
+ Mon, 21 Jan 2019 12:48:24 -0800 (PST)
+Received: from [10.67.49.9] ([192.19.223.250])
+ by smtp.googlemail.com with ESMTPSA id n7sm19317697pff.36.2019.01.21.12.48.19
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 21 Jan 2019 12:48:23 -0800 (PST)
+Subject: Re: [PATCH] ARM: mm: initialize pfn limits with find_limits()
+To: Doug Berger <opendmb@gmail.com>, Russell King <linux@armlinux.org.uk>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Mike Rapoport <rppt@linux.vnet.ibm.com>
+References: <1545954447-22513-1-git-send-email-opendmb@gmail.com>
+ <c05d7dcf-ab03-1313-d7b8-d630cdaed167@gmail.com>
+From: Florian Fainelli <f.fainelli@gmail.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=f.fainelli@gmail.com; prefer-encrypt=mutual; keydata=
+ mQGiBEjPuBIRBACW9MxSJU9fvEOCTnRNqG/13rAGsj+vJqontvoDSNxRgmafP8d3nesnqPyR
+ xGlkaOSDuu09rxuW+69Y2f1TzjFuGpBk4ysWOR85O2Nx8AJ6fYGCoeTbovrNlGT1M9obSFGQ
+ X3IzRnWoqlfudjTO5TKoqkbOgpYqIo5n1QbEjCCwCwCg3DOH/4ug2AUUlcIT9/l3pGvoRJ0E
+ AICDzi3l7pmC5IWn2n1mvP5247urtHFs/uusE827DDj3K8Upn2vYiOFMBhGsxAk6YKV6IP0d
+ ZdWX6fqkJJlu9cSDvWtO1hXeHIfQIE/xcqvlRH783KrihLcsmnBqOiS6rJDO2x1eAgC8meAX
+ SAgsrBhcgGl2Rl5gh/jkeA5ykwbxA/9u1eEuL70Qzt5APJmqVXR+kWvrqdBVPoUNy/tQ8mYc
+ nzJJ63ng3tHhnwHXZOu8hL4nqwlYHRa9eeglXYhBqja4ZvIvCEqSmEukfivk+DlIgVoOAJbh
+ qIWgvr3SIEuR6ayY3f5j0f2ejUMYlYYnKdiHXFlF9uXm1ELrb0YX4GMHz7QnRmxvcmlhbiBG
+ YWluZWxsaSA8Zi5mYWluZWxsaUBnbWFpbC5jb20+iGYEExECACYCGyMGCwkIBwMCBBUCCAME
+ FgIDAQIeAQIXgAUCVF/S8QUJHlwd3wAKCRBhV5kVtWN2DvCVAJ4u4/bPF4P3jxb4qEY8I2gS
+ 6hG0gACffNWlqJ2T4wSSn+3o7CCZNd7SLSC5BA0ESM+4EhAQAL/o09boR9D3Vk1Tt7+gpYr3
+ WQ6hgYVON905q2ndEoA2J0dQxJNRw3snabHDDzQBAcqOvdi7YidfBVdKi0wxHhSuRBfuOppu
+ pdXkb7zxuPQuSveCLqqZWRQ+Cc2QgF7SBqgznbe6Ngout5qXY5Dcagk9LqFNGhJQzUGHAsIs
+ hap1f0B1PoUyUNeEInV98D8Xd/edM3mhO9nRpUXRK9Bvt4iEZUXGuVtZLT52nK6Wv2EZ1TiT
+ OiqZlf1P+vxYLBx9eKmabPdm3yjalhY8yr1S1vL0gSA/C6W1o/TowdieF1rWN/MYHlkpyj9c
+ Rpc281gAO0AP3V1G00YzBEdYyi0gaJbCEQnq8Vz1vDXFxHzyhgGz7umBsVKmYwZgA8DrrB0M
+ oaP35wuGR3RJcaG30AnJpEDkBYHznI2apxdcuTPOHZyEilIRrBGzDwGtAhldzlBoBwE3Z3MY
+ 31TOpACu1ZpNOMysZ6xiE35pWkwc0KYm4hJA5GFfmWSN6DniimW3pmdDIiw4Ifcx8b3mFrRO
+ BbDIW13E51j9RjbO/nAaK9ndZ5LRO1B/8Fwat7bLzmsCiEXOJY7NNpIEpkoNoEUfCcZwmLrU
+ +eOTPzaF6drw6ayewEi5yzPg3TAT6FV3oBsNg3xlwU0gPK3v6gYPX5w9+ovPZ1/qqNfOrbsE
+ FRuiSVsZQ5s3AAMFD/9XjlnnVDh9GX/r/6hjmr4U9tEsM+VQXaVXqZuHKaSmojOLUCP/YVQo
+ 7IiYaNssCS4FCPe4yrL4FJJfJAsbeyDykMN7wAnBcOkbZ9BPJPNCbqU6dowLOiy8AuTYQ48m
+ vIyQ4Ijnb6GTrtxIUDQeOBNuQC/gyyx3nbL/lVlHbxr4tb6YkhkO6shjXhQh7nQb33FjGO4P
+ WU11Nr9i/qoV8QCo12MQEo244RRA6VMud06y/E449rWZFSTwGqb0FS0seTcYNvxt8PB2izX+
+ HZA8SL54j479ubxhfuoTu5nXdtFYFj5Lj5x34LKPx7MpgAmj0H7SDhpFWF2FzcC1bjiW9mjW
+ HaKaX23Awt97AqQZXegbfkJwX2Y53ufq8Np3e1542lh3/mpiGSilCsaTahEGrHK+lIusl6mz
+ Joil+u3k01ofvJMK0ZdzGUZ/aPMZ16LofjFA+MNxWrZFrkYmiGdv+LG45zSlZyIvzSiG2lKy
+ kuVag+IijCIom78P9jRtB1q1Q5lwZp2TLAJlz92DmFwBg1hyFzwDADjZ2nrDxKUiybXIgZp9
+ aU2d++ptEGCVJOfEW4qpWCCLPbOT7XBr+g/4H3qWbs3j/cDDq7LuVYIe+wchy/iXEJaQVeTC
+ y5arMQorqTFWlEOgRA8OP47L9knl9i4xuR0euV6DChDrguup2aJVU4hPBBgRAgAPAhsMBQJU
+ X9LxBQkeXB3fAAoJEGFXmRW1Y3YOj4UAn3nrFLPZekMeqX5aD/aq/dsbXSfyAKC45Go0YyxV
+ HGuUuzv+GKZ6nsysJ7kCDQRXG8fwARAA6q/pqBi5PjHcOAUgk2/2LR5LjjesK50bCaD4JuNc
+ YDhFR7Vs108diBtsho3w8WRd9viOqDrhLJTroVckkk74OY8r+3t1E0Dd4wHWHQZsAeUvOwDM
+ PQMqTUBFuMi6ydzTZpFA2wBR9x6ofl8Ax+zaGBcFrRlQnhsuXLnM1uuvS39+pmzIjasZBP2H
+ UPk5ifigXcpelKmj6iskP3c8QN6x6GjUSmYx+xUfs/GNVSU1XOZn61wgPDbgINJd/THGdqiO
+ iJxCLuTMqlSsmh1+E1dSdfYkCb93R/0ZHvMKWlAx7MnaFgBfsG8FqNtZu3PCLfizyVYYjXbV
+ WO1A23riZKqwrSJAATo5iTS65BuYxrFsFNPrf7TitM8E76BEBZk0OZBvZxMuOs6Z1qI8YKVK
+ UrHVGFq3NbuPWCdRul9SX3VfOunr9Gv0GABnJ0ET+K7nspax0xqq7zgnM71QEaiaH17IFYGS
+ sG34V7Wo3vyQzsk7qLf9Ajno0DhJ+VX43g8+AjxOMNVrGCt9RNXSBVpyv2AMTlWCdJ5KI6V4
+ KEzWM4HJm7QlNKE6RPoBxJVbSQLPd9St3h7mxLcne4l7NK9eNgNnneT7QZL8fL//s9K8Ns1W
+ t60uQNYvbhKDG7+/yLcmJgjF74XkGvxCmTA1rW2bsUriM533nG9gAOUFQjURkwI8jvMAEQEA
+ AYkCaAQYEQIACQUCVxvH8AIbAgIpCRBhV5kVtWN2DsFdIAQZAQIABgUCVxvH8AAKCRCH0Jac
+ RAcHBIkHD/9nmfog7X2ZXMzL9ktT++7x+W/QBrSTCTmq8PK+69+INN1ZDOrY8uz6htfTLV9+
+ e2W6G8/7zIvODuHk7r+yQ585XbplgP0V5Xc8iBHdBgXbqnY5zBrcH+Q/oQ2STalEvaGHqNoD
+ UGyLQ/fiKoLZTPMur57Fy1c9rTuKiSdMgnT0FPfWVDfpR2Ds0gpqWePlRuRGOoCln5GnREA/
+ 2MW2rWf+CO9kbIR+66j8b4RUJqIK3dWn9xbENh/aqxfonGTCZQ2zC4sLd25DQA4w1itPo+f5
+ V/SQxuhnlQkTOCdJ7b/mby/pNRz1lsLkjnXueLILj7gNjwTabZXYtL16z24qkDTI1x3g98R/
+ xunb3/fQwR8FY5/zRvXJq5us/nLvIvOmVwZFkwXc+AF+LSIajqQz9XbXeIP/BDjlBNXRZNdo
+ dVuSU51ENcMcilPr2EUnqEAqeczsCGpnvRCLfVQeSZr2L9N4svNhhfPOEscYhhpHTh0VPyxI
+ pPBNKq+byuYPMyk3nj814NKhImK0O4gTyCK9b+gZAVvQcYAXvSouCnTZeJRrNHJFTgTgu6E0
+ caxTGgc5zzQHeX67eMzrGomG3ZnIxmd1sAbgvJUDaD2GrYlulfwGWwWyTNbWRvMighVdPkSF
+ 6XFgQaosWxkV0OELLy2N485YrTr2Uq64VKyxpncLh50e2RnyAJ9Za0Dx0yyp44iD1OvHtkEI
+ M5kY0ACeNhCZJvZ5g4C2Lc9fcTHu8jxmEkI=
+Message-ID: <ab09bcea-a55d-e562-6637-0df909b03e22@gmail.com>
+Date: Mon, 21 Jan 2019 12:48:09 -0800
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-References: <20190118161835.2259170-1-arnd@arndb.de>
- <20190118161835.2259170-30-arnd@arndb.de>
- <CALCETrXqM5mhvwreN5y-9K99h1j9rs9MAVK-cNLC54s1fdHA6w@mail.gmail.com>
- <CAK8P3a0V+xboaGAF2nqrYtpjXXA7y0LcvCKi4ngLTus1D_XZBA@mail.gmail.com>
- <CALCETrWPj6dHEyo=AELoVjXGsiwuSpRp17x3CEWBHvp7i3cy+Q@mail.gmail.com>
- <20190119142852.cntdihah4mpa3lgx@e5254000004ec.dyn.armlinux.org.uk>
- <CAMuHMdXzQNEEDjWrmTph8Krovj1g2WhnBUaM=FvKB+J2fZqctA@mail.gmail.com>
- <CAK8P3a04UC2dHVqx1gHXJQzsDw446h1ghLEuRe0xmUyJgrOktw@mail.gmail.com>
-In-Reply-To: <CAK8P3a04UC2dHVqx1gHXJQzsDw446h1ghLEuRe0xmUyJgrOktw@mail.gmail.com>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Mon, 21 Jan 2019 21:40:01 +0100
-Message-ID: <CAK8P3a11Pme2d6VbTb2t7fi_vd7UmNuN-yOf2zT59KPzbCT1Lw@mail.gmail.com>
-Subject: Re: [PATCH v2 29/29] y2038: add 64-bit time_t syscalls to all 32-bit
- architectures
-To: Geert Uytterhoeven <geert@linux-m68k.org>
+In-Reply-To: <c05d7dcf-ab03-1313-d7b8-d630cdaed167@gmail.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_124019_129869_FA1F971B 
-X-CRM114-Status: GOOD (  21.05  )
+X-CRM114-CacheID: sfid-20190121_124826_559747_EB85291E 
+X-CRM114-Status: GOOD (  19.39  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,122 +158,85 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rich Felker <dalias@libc.org>,
- "linux-ia64@vger.kernel.org" <linux-ia64@vger.kernel.org>,
- Linux-sh list <linux-sh@vger.kernel.org>,
- Benjamin Herrenschmidt <benh@kernel.crashing.org>,
- Heiko Carstens <heiko.carstens@de.ibm.com>, linux-mips@vger.kernel.org,
- Max Filippov <jcmvbkbc@gmail.com>,
- Network Development <netdev@vger.kernel.org>,
- Deepa Dinamani <deepa.kernel@gmail.com>, "H. Peter Anvin" <hpa@zytor.com>,
- sparclinux <sparclinux@vger.kernel.org>,
- linux-arch <linux-arch@vger.kernel.org>,
- linux-s390 <linux-s390@vger.kernel.org>,
- y2038 Mailman List <y2038@lists.linaro.org>,
- Michael Ellerman <mpe@ellerman.id.au>, Helge Deller <deller@gmx.de>,
- X86 ML <x86@kernel.org>,
- Russell King - ARM Linux admin <linux@armlinux.org.uk>,
- Ingo Molnar <mingo@redhat.com>, Firoz Khan <firoz.khan@linaro.org>,
- Catalin Marinas <catalin.marinas@arm.com>, Matt Turner <mattst88@gmail.com>,
- Fenghua Yu <fenghua.yu@intel.com>, Will Deacon <will.deacon@arm.com>,
- Linux FS Devel <linux-fsdevel@vger.kernel.org>,
- linux-m68k <linux-m68k@lists.linux-m68k.org>,
- Andy Lutomirski <luto@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Michal Simek <monstr@monstr.eu>, Tony Luck <tony.luck@intel.com>,
- Parisc List <linux-parisc@vger.kernel.org>,
- Linux API <linux-api@vger.kernel.org>, LKML <linux-kernel@vger.kernel.org>,
- Paul Burton <paul.burton@mips.com>,
- "Eric W. Biederman" <ebiederm@xmission.com>,
- alpha <linux-alpha@vger.kernel.org>,
- Martin Schwidefsky <schwidefsky@de.ibm.com>,
- Andrew Morton <akpm@linux-foundation.org>,
- linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
- "David S. Miller" <davem@davemloft.net>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>, Michal Hocko <mhocko@suse.com>,
+ linux-kernel@vger.kernel.org,
+ "Steven Rostedt \(VMware\)" <rostedt@goodmis.org>,
+ Jinbum Park <jinb.park7@gmail.com>, Andrew Morton <akpm@linux-foundation.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 21, 2019 at 6:08 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> On Mon, Jan 21, 2019 at 9:19 AM Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> > Regardless, I'm wondering what to do with the holes marked "room for
-> > arch specific calls".
-> > When is a syscall really arch-specific, and can it be added there, and
-> > when does it turn out (later) that it isn't, breaking the
-> > synchronization again?
->
-> We've had a bit of that already, with cacheflush(), which exists on
-> a couple of architectures, including some that use the first
-> 'arch specific' slot (244) of the asm-generic table. I think this
-> will be rare enough that we can figure out a solution when we
-> get there.
->
-> > The pkey syscalls may be a bad example, as AFAIU they can be implemented
-> > on some architectures, but not on some others.  Still, I had skipped them
-> > when adding new syscalls to m68k.
-> >
-> > Perhaps we should get rid of the notion of "arch-specific syscalls", and
-> > reserve a slot everywhere anyway?
->
-> I don't mind calling the hole something else if that helps. Out of
-> principle I would already assume that anything we add for x86
-> or the generic table should be added everywhere, but we can
-> make it broader than that.
+On 1/10/19 11:07 AM, Doug Berger wrote:
+> On 12/27/18 3:47 PM, Doug Berger wrote:
+>> The max_low_pfn value must be set before sparse_init() is called to
+>> keep the early memblock allocations and frees balanced for kmemleak
+>> initialization when sparsemem is enabled.
+>>
+>> This commit accomplishes that by replacing the local variables min,
+>> max_low, and max_high with the global limit variables min_low_pfn,
+>> max_low_pfn, and max_pfn respectively in bootmem_init(). The global
+>> variables are initialized directly by find_limits() and used in the
+>> remainder of the function.
+>>
+>> Fixes: 9099daed9c69 ("mm: kmemleak: avoid using __va() on addresses that don't have a lowmem mapping")
+>> Signed-off-by: Doug Berger <opendmb@gmail.com>
+>> ---
+>>  arch/arm/mm/init.c | 20 ++++----------------
+>>  1 file changed, 4 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+>> index 32e4845af2b6..98a733f3a5b9 100644
+>> --- a/arch/arm/mm/init.c
+>> +++ b/arch/arm/mm/init.c
+>> @@ -302,15 +302,12 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
+>>  
+>>  void __init bootmem_init(void)
+>>  {
+>> -	unsigned long min, max_low, max_high;
+>> -
+>>  	memblock_allow_resize();
+>> -	max_low = max_high = 0;
+>>  
+>> -	find_limits(&min, &max_low, &max_high);
+>> +	find_limits(&min_low_pfn, &max_low_pfn, &max_pfn);
+>>  
+>> -	early_memtest((phys_addr_t)min << PAGE_SHIFT,
+>> -		      (phys_addr_t)max_low << PAGE_SHIFT);
+>> +	early_memtest((phys_addr_t)min_low_pfn << PAGE_SHIFT,
+>> +		      (phys_addr_t)max_low_pfn << PAGE_SHIFT);
+>>  
+>>  	/*
+>>  	 * Sparsemem tries to allocate bootmem in memory_present(),
+>> @@ -328,16 +325,7 @@ void __init bootmem_init(void)
+>>  	 * the sparse mem_map arrays initialized by sparse_init()
+>>  	 * for memmap_init_zone(), otherwise all PFNs are invalid.
+>>  	 */
+>> -	zone_sizes_init(min, max_low, max_high);
+>> -
+>> -	/*
+>> -	 * This doesn't seem to be used by the Linux memory manager any
+>> -	 * more, but is used by ll_rw_block.  If we can get rid of it, we
+>> -	 * also get rid of some of the stuff above as well.
+>> -	 */
+>> -	min_low_pfn = min;
+>> -	max_low_pfn = max_low;
+>> -	max_pfn = max_high;
+>> +	zone_sizes_init(min_low_pfn, max_low_pfn, max_pfn);
+>>  }
+>>  
+>>  /*
+>>
+> 
+> Any feedback on this patch?
 
-Applying this fixup below,
+Mike, Catalin, does this looks sensible to you? If so, should this be
+thrown into Russell's patch tracking system?
 
-     ARnd
-
-diff --git a/arch/x86/entry/syscalls/syscall_32.tbl
-b/arch/x86/entry/syscalls/syscall_32.tbl
-index d9c2d2eea044..955ab6a3b61f 100644
---- a/arch/x86/entry/syscalls/syscall_32.tbl
-+++ b/arch/x86/entry/syscalls/syscall_32.tbl
-@@ -398,7 +398,7 @@
- 384    i386    arch_prctl              sys_arch_prctl
- __ia32_compat_sys_arch_prctl
- 385    i386    io_pgetevents           sys_io_pgetevents_time32
- __ia32_compat_sys_io_pgetevents
- 386    i386    rseq                    sys_rseq
- __ia32_sys_rseq
--# room for arch specific syscalls
-+# don't use numbers 387 through 392, add new calls at the end
- 393    i386    semget                  sys_semget
- __ia32_sys_semget
- 394    i386    semctl                  sys_semctl
- __ia32_compat_sys_semctl
- 395    i386    shmget                  sys_shmget
- __ia32_sys_shmget
-diff --git a/arch/x86/entry/syscalls/syscall_64.tbl
-b/arch/x86/entry/syscalls/syscall_64.tbl
-index 43a622aec07e..2ae92fddb6d5 100644
---- a/arch/x86/entry/syscalls/syscall_64.tbl
-+++ b/arch/x86/entry/syscalls/syscall_64.tbl
-@@ -343,6 +343,8 @@
- 332    common  statx                   __x64_sys_statx
- 333    common  io_pgetevents           __x64_sys_io_pgetevents
- 334    common  rseq                    __x64_sys_rseq
-+# don't use numbers 387 through 423, add new calls after the last
-+# 'common' entry
-
- #
- # x32-specific system call numbers start at 512 to avoid cache impact
-diff --git a/include/uapi/asm-generic/unistd.h
-b/include/uapi/asm-generic/unistd.h
-index 53831e4a4c86..acf9a07ab2ff 100644
---- a/include/uapi/asm-generic/unistd.h
-+++ b/include/uapi/asm-generic/unistd.h
-@@ -740,7 +740,7 @@ __SC_COMP_3264(__NR_io_pgetevents,
-sys_io_pgetevents_time32, sys_io_pgetevents,
- __SYSCALL(__NR_rseq, sys_rseq)
- #define __NR_kexec_file_load 294
- __SYSCALL(__NR_kexec_file_load,     sys_kexec_file_load)
--/* 295 through 402 are unassigned to sync up with generic numbers */
-+/* 295 through 402 are unassigned to sync up with generic numbers, don't use */
- #if __BITS_PER_LONG == 32
- #define __NR_clock_gettime64 403
- __SYSCALL(__NR_clock_gettime64, sys_clock_gettime)
+Thanks
+-- 
+Florian
 
 _______________________________________________
 linux-arm-kernel mailing list
