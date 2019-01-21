@@ -2,68 +2,73 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CE66DC2F433
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:15:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3C7E0C2F421
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:29:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9CD3A20823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:15:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EC0132085A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:29:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FdZABNUj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9CD3A20823
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tEMqgZ+j"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EC0132085A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=cL8Vi9hDXspsh7wozbWP3BlBpQdv/84+TETb8JCilm4=; b=FdZABNUj65tIrzbYVaMW6WqN/
-	IjESHCV5UepDu1kHHt3JsSPnG48Zc6ow4aUGYfJ4FoEBhEpW4BfyJN1QVy8D0Y8WjsGk0r0rHq/Ny
-	tAaYw7i2/8GDq2c8ru1vhhWfx8dTNWWTDLFjPAXX0RSUs7PezsESoE/OR/11mhxqoFj8y/ZJ2NuYy
-	sj6FLn/hZDZrjudEq9nUlfMkPkQCI+THknF094VB1I40zcJv5IGgt85Log4ezEQu8yvPzaLAvl//e
-	TRDbspCn57sZUi4O/xy+n+TPgI2miPQxyPlMMVHOJZ2bX/M3yD+SnFSp2dn0YTgjB/uEiEVhBMA+b
-	0HKH/9UVw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=jlkedsIEe0UtmfNJrvmZx5PixBFKH+ne/NNH5W9qEgk=; b=tEMqgZ+jY/z0Bt
+	b1ha5SsqZvwTxFjcI+GOJ4Ex5e3rvG1vA2PoOzl375zQ6Y+rmfrDS/hlIklJBu66C/X01xoIUtcjY
+	kCpnJsMVz9F+0cxC1S3EfAN8VbafXeyInca/BQanTDR59Lpxdc98/00NxHLqUN8vAkG2HDQ+oDC/Y
+	ZohW5c7ELTV222i6h8EL5mFoEV+JYYdcZxA4tNLn7Tw/itAmSfj/N3Z9zKGjWdza8Kj+2fqcwa5RP
+	A4L32qHGYPAlCRTDqLSxBA2zAzhQUkELFWNfW3zjvchr6qPc3vpVW0Gln668rCuWYdD9i26XVlCgL
+	lmzQCSrcaVojFKVBqOSQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glbIJ-0005zz-OV; Mon, 21 Jan 2019 15:15:23 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glbIG-0005zZ-BW
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 15:15:21 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8C6D6EBD;
- Mon, 21 Jan 2019 07:15:19 -0800 (PST)
-Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 7DCE53F5C1;
- Mon, 21 Jan 2019 07:15:17 -0800 (PST)
-Subject: Re: [PATCH 0/3] iommu/arm-smmu: Add support to use Last level cache
-To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-References: <20190121055335.15430-1-vivek.gautam@codeaurora.org>
- <CAKv+Gu8P-5hxZ8+OV_xSZteTvCLw-Sc-=KJM1i=3aWajcS9bUw@mail.gmail.com>
- <CAFp+6iEp-bzMrZz8cFUciTFKm7TwAoLdYpsSTD73kDfCRh60bA@mail.gmail.com>
- <CAKv+Gu9z_mGwdZYMKPfM_g2MZwrCF5=f4WAdn_R6wJ1A9xSZ_Q@mail.gmail.com>
- <dbba5a8a-70c0-dd01-713c-081eb412e2d7@arm.com>
- <CAKv+Gu8K5f0va9q4FYk9x1puoOTDjZ0c25qokm2izSVAwd1gmQ@mail.gmail.com>
- <964779d6-c676-3379-bf1e-cde0dd82d63d@arm.com>
- <CAKv+Gu_Oz-QEFnq9KiOBHQrC8o+0ykkEZBm0vCWfYDfFB8QTcQ@mail.gmail.com>
-From: Robin Murphy <robin.murphy@arm.com>
-Message-ID: <55213eaf-d90d-0f2f-9f01-5e964e087d3f@arm.com>
-Date: Mon, 21 Jan 2019 15:15:15 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1glbVP-0002ms-I9; Mon, 21 Jan 2019 15:28:55 +0000
+Received: from mail-lj1-f196.google.com ([209.85.208.196])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glbVL-0002mI-IV
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 15:28:53 +0000
+Received: by mail-lj1-f196.google.com with SMTP id g11-v6so17880358ljk.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 21 Jan 2019 07:28:50 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=z8Ns3hO7au/4gP43Zy3r2VRePjfEOnTZweviuyxTwnI=;
+ b=XM/slQO2jkwU7Me7sj4TeeRZr60FfRw/487nkqWE8p36vhCWqNU1jlaOvYZz9TCmzP
+ zVD6in59j8Cjp5PTu49JX8PPjXYANOGPhQEpS0lRXjYadC5akDvvpJatGdK5RSzVuBUQ
+ 7AyIqLHFMufiVWB6fiSBMCJ9jG+5+B7Wr2cEoTYknUJUn1btBm/FIL69avuz0BnpNgaq
+ GQpJEf4GzQwfjbHK4UvvGJaZ64A7lBXg7HUaAh6r9UvPITugraHCa1rWpS8V000oX7je
+ 8/UmXChGOtlZZ93OjRSawt62vq3wKeGwlpEBT/qGhjfKZsjHSNoj8n5PqyHCt27bqX9f
+ INhA==
+X-Gm-Message-State: AJcUukdLTzbBQSErs6mtIOhxhxYzHj5w0lkoMakEx+GwBdIZgAMFvhkh
+ NlaYbuWhzYTuJaFuqvShqQU9ZV2vrty7/q1s+QHubA==
+X-Google-Smtp-Source: ALg8bN4ZHZ7dKDFf5R7QhvSllevOcyIcT7jVeDhaCGxVvRQGrHa0d/6lqrQYLKOIgzmd4nqL74DTInAWEILGX4BuABs=
+X-Received: by 2002:a2e:a0d5:: with SMTP id
+ f21-v6mr8576758ljm.98.1548084529125; 
+ Mon, 21 Jan 2019 07:28:49 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <CAKv+Gu_Oz-QEFnq9KiOBHQrC8o+0ykkEZBm0vCWfYDfFB8QTcQ@mail.gmail.com>
-Content-Language: en-GB
+References: <1548062959-31860-1-git-send-email-sumit.garg@linaro.org>
+ <1548062959-31860-2-git-send-email-sumit.garg@linaro.org>
+In-Reply-To: <1548062959-31860-2-git-send-email-sumit.garg@linaro.org>
+From: Bhupesh Sharma <bhsharma@redhat.com>
+Date: Mon, 21 Jan 2019 20:58:36 +0530
+Message-ID: <CACi5LpMN2N1joWxmwDy=DtH+stenUs64oJ2_T4T-7sSoS=NAgw@mail.gmail.com>
+Subject: Re: [PATCH v4 1/4] tee: add bus driver framework for TEE based devices
+To: Sumit Garg <sumit.garg@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_071520_405730_B78A1B33 
-X-CRM114-Status: GOOD (  22.95  )
+X-CRM114-CacheID: sfid-20190121_072851_614549_FD82BFDF 
+X-CRM114-Status: GOOD (  24.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,107 +80,192 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: pdaly@codeaurora.org, linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- Joerg Roedel <joro@8bytes.org>, Will Deacon <will.deacon@arm.com>,
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Daniel Thompson <daniel.thompson@linaro.org>,
+ Herbert Xu <herbert@gondor.apana.org.au>, Arnd Bergmann <arnd@arndb.de>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
  Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Tomasz Figa <tfiga@chromium.org>,
- "list@263.net:IOMMU DRIVERS" <iommu@lists.linux-foundation.org>,
- Vivek Gautam <vivek.gautam@codeaurora.org>,
- Jordan Crouse <jcrouse@codeaurora.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- pratikp@codeaurora.org
+ tee-dev@lists.linaro.org, Rob Herring <robh+dt@kernel.org>,
+ "open list:HARDWARE RANDOM NUMBER GENERATOR CORE"
+ <linux-crypto@vger.kernel.org>, mpm@selenic.com,
+ Jens Wiklander <jens.wiklander@linaro.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 21/01/2019 14:24, Ard Biesheuvel wrote:
-> On Mon, 21 Jan 2019 at 14:56, Robin Murphy <robin.murphy@arm.com> wrote:
->>
->> On 21/01/2019 13:36, Ard Biesheuvel wrote:
->>> On Mon, 21 Jan 2019 at 14:25, Robin Murphy <robin.murphy@arm.com> wrote:
->>>>
->>>> On 21/01/2019 10:50, Ard Biesheuvel wrote:
->>>>> On Mon, 21 Jan 2019 at 11:17, Vivek Gautam <vivek.gautam@codeaurora.org> wrote:
->>>>>>
->>>>>> Hi,
->>>>>>
->>>>>>
->>>>>> On Mon, Jan 21, 2019 at 12:56 PM Ard Biesheuvel
->>>>>> <ard.biesheuvel@linaro.org> wrote:
->>>>>>>
->>>>>>> On Mon, 21 Jan 2019 at 06:54, Vivek Gautam <vivek.gautam@codeaurora.org> wrote:
->>>>>>>>
->>>>>>>> Qualcomm SoCs have an additional level of cache called as
->>>>>>>> System cache, aka. Last level cache (LLC). This cache sits right
->>>>>>>> before the DDR, and is tightly coupled with the memory controller.
->>>>>>>> The clients using this cache request their slices from this
->>>>>>>> system cache, make it active, and can then start using it.
->>>>>>>> For these clients with smmu, to start using the system cache for
->>>>>>>> buffers and, related page tables [1], memory attributes need to be
->>>>>>>> set accordingly. This series add the required support.
->>>>>>>>
->>>>>>>
->>>>>>> Does this actually improve performance on reads from a device? The
->>>>>>> non-cache coherent DMA routines perform an unconditional D-cache
->>>>>>> invalidate by VA to the PoC before reading from the buffers filled by
->>>>>>> the device, and I would expect the PoC to be defined as lying beyond
->>>>>>> the LLC to still guarantee the architected behavior.
->>>>>>
->>>>>> We have seen performance improvements when running Manhattan
->>>>>> GFXBench benchmarks.
->>>>>>
->>>>>
->>>>> Ah ok, that makes sense, since in that case, the data flow is mostly
->>>>> to the device, not from the device.
->>>>>
->>>>>> As for the PoC, from my knowledge on sdm845 the system cache, aka
->>>>>> Last level cache (LLC) lies beyond the point of coherency.
->>>>>> Non-cache coherent buffers will not be cached to system cache also, and
->>>>>> no additional software cache maintenance ops are required for system cache.
->>>>>> Pratik can add more if I am missing something.
->>>>>>
->>>>>> To take care of the memory attributes from DMA APIs side, we can add a
->>>>>> DMA_ATTR definition to take care of any dma non-coherent APIs calls.
->>>>>>
->>>>>
->>>>> So does the device use the correct inner non-cacheable, outer
->>>>> writeback cacheable attributes if the SMMU is in pass-through?
->>>>>
->>>>> We have been looking into another use case where the fact that the
->>>>> SMMU overrides memory attributes is causing issues (WC mappings used
->>>>> by the radeon and amdgpu driver). So if the SMMU would honour the
->>>>> existing attributes, would you still need the SMMU changes?
->>>>
->>>> Even if we could force a stage 2 mapping with the weakest pagetable
->>>> attributes (such that combining would work), there would still need to
->>>> be a way to set the TCR attributes appropriately if this behaviour is
->>>> wanted for the SMMU's own table walks as well.
->>>>
->>>
->>> Isn't that just a matter of implementing support for SMMUs that lack
->>> the 'dma-coherent' attribute?
->>
->> Not quite - in general they need INC-ONC attributes in case there
->> actually is something in the architectural outer-cacheable domain.
-> 
-> But is it a problem to use INC-ONC attributes for the SMMU PTW on this
-> chip? AIUI, the reason for the SMMU changes is to avoid the
-> performance hit of snooping, which is more expensive than cache
-> maintenance of SMMU page tables. So are you saying the by-VA cache
-> maintenance is not relayed to this system cache, resulting in page
-> table updates to be invisible to masters using INC-ONC attributes?
+Hi Sumit,
 
-I only have a relatively vague impression of how this Qcom interconnect 
-actually behaves, but AIUI the outer attribute has no correctness impact 
-(it's effectively mismatched between CPU and devices already), only some 
-degree of latency improvement which is effectively the opposite of 
-no-snoop, in allowing certain non-coherent device traffic to still 
-allocate in the LLC. I'm assuming that if that latency matters for the 
-device accesses themselves, it might also matter for the associated 
-table walks depending on the TLB miss rate.
+On Mon, Jan 21, 2019 at 3:00 PM Sumit Garg <sumit.garg@linaro.org> wrote:
+>
+> Introduce a generic TEE bus driver concept for TEE based kernel drivers
+> which would like to communicate with TEE based devices/services.
+>
+> In this TEE bus concept, devices/services are identified via Universally
+> Unique Identifier (UUID) and drivers register a table of device UUIDs
+> which they can support.
+>
+> So this TEE bus framework registers a match() callback function which
+> iterates over the driver UUID table to find a corresponding match for
+> device UUID. If a match is found, then this particular device is probed
+> via corresponding probe api registered by the driver. This process
+> happens whenever a device or a driver is registered with TEE bus.
+>
+> Also this framework allows for device enumeration to be specific to
+> corresponding TEE implementation like OP-TEE etc.
+>
+> Signed-off-by: Sumit Garg <sumit.garg@linaro.org>
+> ---
+>  drivers/tee/tee_core.c  | 45 +++++++++++++++++++++++++++++++++++++++++----
+>  include/linux/tee_drv.h | 37 ++++++++++++++++++++++++++++++++++++-
+>  2 files changed, 77 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/tee/tee_core.c b/drivers/tee/tee_core.c
+> index 7b2bb4c..55370d5 100644
+> --- a/drivers/tee/tee_core.c
+> +++ b/drivers/tee/tee_core.c
+> @@ -15,7 +15,6 @@
+>  #define pr_fmt(fmt) "%s: " fmt, __func__
+>
+>  #include <linux/cdev.h>
+> -#include <linux/device.h>
+>  #include <linux/fs.h>
+>  #include <linux/idr.h>
+>  #include <linux/module.h>
+> @@ -1027,6 +1026,30 @@ int tee_client_invoke_func(struct tee_context *ctx,
+>  }
+>  EXPORT_SYMBOL_GPL(tee_client_invoke_func);
+>
+> +static int tee_client_device_match(struct device *dev,
+> +                                  struct device_driver *drv)
+> +{
+> +       const tee_client_device_id *id_table;
+> +       struct tee_client_device *tee_device;
+> +
+> +       id_table = to_tee_client_driver(drv)->id_table;
+> +       tee_device = to_tee_client_device(dev);
+> +
+> +       while (!uuid_is_null(id_table)) {
+> +               if (uuid_equal(&tee_device->id, id_table))
+> +                       return 1;
+> +               id_table++;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +struct bus_type tee_bus_type = {
+> +       .name           = "tee",
+> +       .match          = tee_client_device_match,
+> +};
+> +EXPORT_SYMBOL_GPL(tee_bus_type);
+> +
+>  static int __init tee_init(void)
+>  {
+>         int rc;
+> @@ -1040,18 +1063,32 @@ static int __init tee_init(void)
+>         rc = alloc_chrdev_region(&tee_devt, 0, TEE_NUM_DEVICES, "tee");
+>         if (rc) {
+>                 pr_err("failed to allocate char dev region\n");
+> -               class_destroy(tee_class);
+> -               tee_class = NULL;
+> +               goto out_unreg_class;
+>         }
+>
+> +       rc = bus_register(&tee_bus_type);
+> +       if (rc) {
+> +               pr_err("failed to register tee bus\n");
+> +               goto out_unreg_chrdev;
+> +       }
+> +
+> +       return 0;
+> +
+> +out_unreg_chrdev:
+> +       unregister_chrdev_region(tee_devt, TEE_NUM_DEVICES);
+> +out_unreg_class:
+> +       class_destroy(tee_class);
+> +       tee_class = NULL;
+> +
+>         return rc;
+>  }
+>
+>  static void __exit tee_exit(void)
+>  {
+> +       bus_unregister(&tee_bus_type);
+> +       unregister_chrdev_region(tee_devt, TEE_NUM_DEVICES);
+>         class_destroy(tee_class);
+>         tee_class = NULL;
+> -       unregister_chrdev_region(tee_devt, TEE_NUM_DEVICES);
+>  }
+>
+>  subsys_initcall(tee_init);
+> diff --git a/include/linux/tee_drv.h b/include/linux/tee_drv.h
+> index 6cfe058..ba985d8 100644
+> --- a/include/linux/tee_drv.h
+> +++ b/include/linux/tee_drv.h
+> @@ -15,11 +15,13 @@
+>  #ifndef __TEE_DRV_H
+>  #define __TEE_DRV_H
+>
+> -#include <linux/types.h>
+> +#include <linux/device.h>
+>  #include <linux/idr.h>
+>  #include <linux/kref.h>
+>  #include <linux/list.h>
+>  #include <linux/tee.h>
+> +#include <linux/types.h>
+> +#include <linux/uuid.h>
+>
+>  /*
+>   * The file describes the API provided by the generic TEE driver to the
+> @@ -538,4 +540,37 @@ static inline bool tee_param_is_memref(struct tee_param *param)
+>         }
+>  }
+>
+> +extern struct bus_type tee_bus_type;
+> +
+> +/*
+> + * For TEE based client devices we use the device uuid as the
+> + * identifier.
+> + */
+> +typedef uuid_t tee_client_device_id;
+> +
+> +/**
+> + * struct tee_client_device - tee based device
+> + * @id:                        device identifier
+> + * @dev:               device structure
+> + */
+> +struct tee_client_device {
+> +       tee_client_device_id id;
+> +       struct device dev;
+> +};
+> +
+> +#define to_tee_client_device(d) container_of(d, struct tee_client_device, dev)
+> +
+> +/**
+> + * struct tee_client_driver - tee client driver
+> + * @id_table:          device id table supported by this driver
+> + * @driver:            driver structure
+> + */
+> +struct tee_client_driver {
+> +       const tee_client_device_id *id_table;
+> +       struct device_driver driver;
+> +};
+> +
+> +#define to_tee_client_driver(d) \
+> +               container_of(d, struct tee_client_driver, driver)
+> +
+>  #endif /*__TEE_DRV_H*/
+> --
+> 2.7.4
+>
 
-Robin.
+LGTM, if there are no further comments on this patch please free to add:
+Reviewed-by: Bhupesh Sharma <bhsharma@redhat.com>
+
+Thanks.
 
 _______________________________________________
 linux-arm-kernel mailing list
