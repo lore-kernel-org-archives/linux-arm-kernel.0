@@ -2,67 +2,65 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F2D07C2F3A6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 13:25:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0CD5BC2F3A6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 13:26:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B99FB2085A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 13:25:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CBF0C20879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 13:26:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WEbneVjA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B99FB2085A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="I5kdPvWW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CBF0C20879
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=jq3x5IRjqlh9gssh3HcOrIZb2+xuwnvlm3nfDwm6ewA=; b=WEbneVjAl9pQiyittGaZa/IVF
-	JVQYHs/0FxcLp+4eOQe38+ZqAxnkRadr1Vr5C3cDLhR5EGOJrtZeCJ9WyI2rFmzefmH5vm3X2vaF5
-	ZZSUvFU3AyQzECh09bKVTfbpiJ5WTQCSwNqyA/Y8UrkPf4SCZc2IEIT8wiATffLAELKGAxMMlTSmG
-	LPBjMKpwoM7inTPt5lBoMokQvC0ViB0/UxnaKMZ26J84jUkqp+X6mtfe6x4fSNIz6dyH8ec4ABxWD
-	7vEpgijFQtpyVnNNwROSfJC3B77hcEIeobdXSpLPukZ6h0GVmoVGb1k+PU8Xox8+jM8wNt+tY47uT
-	Sso5CR8bA==;
+	 bh=n6dhC+oHYlBW+vr4XEI5R3XffuF07PjediTGguHR154=; b=I5kdPvWWB68TpC+hwZjzioPbN
+	xsFmiMV/EbZ6b2vRkNdGHAU5tBGJiWzTtHx+Ar0tX9T4mZMGfD4bJ+foUQg0UHfjGLxp6Gfp8H15h
+	jV+BQZpi33S5lchKzcaSdodDbohl02JSwk1Dvu8AzByCqxCRo2TKdKBwEHsJ0//frfE8MiK2sO7JU
+	un3QrbEkM4yAzq1rLjQzN5++GwigFcEDAYkOVlBnA+I2CWNSLTYspf+lcvpKwEaYIy+Eva5X7LF5Q
+	XpnY+xWxWuxAODdFo9Ngon3ub5LgnBDYVYQ5DKBR3x9sXnXch0q2EiKB+g7U0Yb3b+FZgxWj0VbiH
+	at66ubA1Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glZa0-0007pV-7Q; Mon, 21 Jan 2019 13:25:32 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
+	id 1glZaP-00085u-OD; Mon, 21 Jan 2019 13:25:57 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glZZx-0007pB-EO
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 13:25:31 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 1E4B4207B2; Mon, 21 Jan 2019 14:25:27 +0100 (CET)
-Received: from localhost (unknown [185.94.189.187])
- by mail.bootlin.com (Postfix) with ESMTPSA id CACA12078C;
- Mon, 21 Jan 2019 14:25:16 +0100 (CET)
-Date: Mon, 21 Jan 2019 14:25:17 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Priit Laes <plaes@plaes.org>
-Subject: Re: [linux-sunxi] Re: HDMI/DVI spurious failure
-Message-ID: <20190121132517.iv2v3hug4uihefnk@flea>
-References: <20190114132934.rywqqtjarbf6fgcr@plaes.org>
- <20190115094951.e7jnjpibj5tcp5pz@flea>
- <20190116075854.o2kme5nxq5kckwem@plaes.org>
- <20190116192442.qz4xi2ky6axgiyvg@flea>
- <20190116203516.s7pisy4miaclo63u@plaes.org>
- <20190117113340.ydszal5c3nlrqr47@flea>
- <20190118101053.gkxpfymsjzw3ptxf@plaes.org>
- <20190118140418.m5mliyvddfdfju3v@flea>
- <20190118145126.mpjz5t5hjqqpgzys@plaes.org>
+ id 1glZaL-000859-Pf
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 13:25:55 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 563B980D;
+ Mon, 21 Jan 2019 05:25:53 -0800 (PST)
+Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id D03E73F614;
+ Mon, 21 Jan 2019 05:25:50 -0800 (PST)
+Subject: Re: [PATCH 0/3] iommu/arm-smmu: Add support to use Last level cache
+To: Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Vivek Gautam <vivek.gautam@codeaurora.org>
+References: <20190121055335.15430-1-vivek.gautam@codeaurora.org>
+ <CAKv+Gu8P-5hxZ8+OV_xSZteTvCLw-Sc-=KJM1i=3aWajcS9bUw@mail.gmail.com>
+ <CAFp+6iEp-bzMrZz8cFUciTFKm7TwAoLdYpsSTD73kDfCRh60bA@mail.gmail.com>
+ <CAKv+Gu9z_mGwdZYMKPfM_g2MZwrCF5=f4WAdn_R6wJ1A9xSZ_Q@mail.gmail.com>
+From: Robin Murphy <robin.murphy@arm.com>
+Message-ID: <dbba5a8a-70c0-dd01-713c-081eb412e2d7@arm.com>
+Date: Mon, 21 Jan 2019 13:25:49 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20190118145126.mpjz5t5hjqqpgzys@plaes.org>
-User-Agent: NeoMutt/20180716
+In-Reply-To: <CAKv+Gu9z_mGwdZYMKPfM_g2MZwrCF5=f4WAdn_R6wJ1A9xSZ_Q@mail.gmail.com>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_052529_754301_5E04B0DA 
-X-CRM114-Status: GOOD (  26.18  )
+X-CRM114-CacheID: sfid-20190121_052553_839814_3070D7E1 
+X-CRM114-Status: GOOD (  19.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,153 +72,78 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org, linux-sunxi@googlegroups.com,
- Chen-Yu Tsai <wens@csie.org>, Jonathan Liu <net147@gmail.com>,
- dri-devel@lists.freedesktop.org
-Content-Type: multipart/mixed; boundary="===============4352959909304121907=="
+Cc: pdaly@codeaurora.org, linux-arm-msm <linux-arm-msm@vger.kernel.org>,
+ Joerg Roedel <joro@8bytes.org>, Will Deacon <will.deacon@arm.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Tomasz Figa <tfiga@chromium.org>, iommu@lists.linux-foundation.org,
+ Jordan Crouse <jcrouse@codeaurora.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ pratikp@codeaurora.org
+Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On 21/01/2019 10:50, Ard Biesheuvel wrote:
+> On Mon, 21 Jan 2019 at 11:17, Vivek Gautam <vivek.gautam@codeaurora.org> wrote:
+>>
+>> Hi,
+>>
+>>
+>> On Mon, Jan 21, 2019 at 12:56 PM Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+>>>
+>>> On Mon, 21 Jan 2019 at 06:54, Vivek Gautam <vivek.gautam@codeaurora.org> wrote:
+>>>>
+>>>> Qualcomm SoCs have an additional level of cache called as
+>>>> System cache, aka. Last level cache (LLC). This cache sits right
+>>>> before the DDR, and is tightly coupled with the memory controller.
+>>>> The clients using this cache request their slices from this
+>>>> system cache, make it active, and can then start using it.
+>>>> For these clients with smmu, to start using the system cache for
+>>>> buffers and, related page tables [1], memory attributes need to be
+>>>> set accordingly. This series add the required support.
+>>>>
+>>>
+>>> Does this actually improve performance on reads from a device? The
+>>> non-cache coherent DMA routines perform an unconditional D-cache
+>>> invalidate by VA to the PoC before reading from the buffers filled by
+>>> the device, and I would expect the PoC to be defined as lying beyond
+>>> the LLC to still guarantee the architected behavior.
+>>
+>> We have seen performance improvements when running Manhattan
+>> GFXBench benchmarks.
+>>
+> 
+> Ah ok, that makes sense, since in that case, the data flow is mostly
+> to the device, not from the device.
+> 
+>> As for the PoC, from my knowledge on sdm845 the system cache, aka
+>> Last level cache (LLC) lies beyond the point of coherency.
+>> Non-cache coherent buffers will not be cached to system cache also, and
+>> no additional software cache maintenance ops are required for system cache.
+>> Pratik can add more if I am missing something.
+>>
+>> To take care of the memory attributes from DMA APIs side, we can add a
+>> DMA_ATTR definition to take care of any dma non-coherent APIs calls.
+>>
+> 
+> So does the device use the correct inner non-cacheable, outer
+> writeback cacheable attributes if the SMMU is in pass-through?
+> 
+> We have been looking into another use case where the fact that the
+> SMMU overrides memory attributes is causing issues (WC mappings used
+> by the radeon and amdgpu driver). So if the SMMU would honour the
+> existing attributes, would you still need the SMMU changes?
 
---===============4352959909304121907==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="pwfuitnpzretg3l6"
-Content-Disposition: inline
+Even if we could force a stage 2 mapping with the weakest pagetable 
+attributes (such that combining would work), there would still need to 
+be a way to set the TCR attributes appropriately if this behaviour is 
+wanted for the SMMU's own table walks as well.
 
-
---pwfuitnpzretg3l6
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Fri, Jan 18, 2019 at 02:51:26PM +0000, Priit Laes wrote:
-> On Fri, Jan 18, 2019 at 03:04:18PM +0100, Maxime Ripard wrote:
-> > On Fri, Jan 18, 2019 at 10:10:53AM +0000, Priit Laes wrote:
-> > > > > > > > It doesn't look related to the clock rate itself, since it =
-doesn't
-> > > > > > > > change between the two cases. However, in one case the DDC =
-clock is
-> > > > > > > > enabled and in the other it's disabled.
-> > > > > > > >=20
-> > > > > > > > Was it taken at the same time? Maybe you can try with that =
-patch?
-> > > > > > > > http://code.bulix.org/z7jmkm-555344?raw
-> > > > > > >=20
-> > > > > > > Thanks, after doing ~50+ boots I haven't seen a single failur=
-e.
-> > > > > > >=20
-> > > > > > > Previously I had following failure cases which are now both f=
-ixed:
-> > > > > > >=20
-> > > > > > > a) Linux without u-boot HDMI, where one in every 6-7 boots fa=
-iled.
-> > > > > > > b) u--boot with hdmi enabled switching to simplefb and then s=
-witching
-> > > > > > > to kms, where previously all boots ended up with garbled scre=
-en.
-> > > > > >=20
-> > > > > > So it's not really a fix, but it really looks like the clock is=
- not
-> > > > > > enabled when it should.
-> > > > > >=20
-> > > > > > Can you describe your test scenario a bit more? What are you do=
-ing
-> > > > > > exactly, just booting? When do you start using the display? Whe=
-n did
-> > > > > > you capture the debugfs output that you pasted?
-> > > > >=20
-> > > > > Display is already connected via HDMI to the board. I don't really
-> > > > > remove it, I just boot the device and let it start Xorg.
-> > > > > Meanwhile I just ssh into the device and capture debugfs output.
-> > > > > See my 3 testing scenarios below.
-> > > > >=20
-> > > > > Kernel also includes one extra patch to fall back to DDC, in case=
- HPD
-> > > > > fails. Mostly the same I already submitted last November [1].
-> > > >=20
-> > > > Do you have the same issue without that patch?
-> > >=20
-> > > Can't really test this display without this patch and I do not have o=
-ther
-> > > HDMI/DVI screens. And this issue does not happen with other HDMI disp=
-lays
-> > > that I have here.
-> >=20
-> > Can't you just force the monitor to be reported as present? It's not
-> > great and we don't want to merge it, but that would allow you to test
-> > that setup without too many interferences.
->=20
-> Baseline is clean u-boot / linux. U-boot does not detect/enable display.
->=20
-> 1) Booting Linux with drm.debug=3D0xe
->=20
-> * Linux does not detect/enable display
->=20
-> 2) Booting with drm.debug=3D0xe video=3DHDMI-A-1:640x480@60e
->=20
-> * Linux detects display, but display is garbled, and proper edid data is =
-detected:
->=20
-> [snip]
-> pll-video1                     0        0        0   327000000          0=
-     0  50000
->    pll-video1-2x               0        0        0   654000000          0=
-     0  50000
->       hdmi-tmds                0        0        0    25153846          0=
-     0  50000
->          hdmi-ddc              0        0        0       89835          0=
-     0  50000
-> [/snip]
->=20
-> 3) Booting with drm.debug=3D0xe video=3DHDMI-A-1:640x480@60e
-> And also one extra patch for Linux where HDMI DDC clock marked as critical
->=20
-> Linux detects and initializes display properly:
-> [snip]
-> pll-video1                     1        1        0   327000000          0=
-     0  50000
->    pll-video1-2x               1        1        0   654000000          0=
-     0  50000
->       hdmi-tmds                1        1        0    25153846          0=
-     0  50000
->          hdmi-ddc              1        1        0       89835          0=
-     0  50000
-> [/snip]
-
-I guess you'll need to track down when the hdmi-tmds and hdmi-ddc are
-enabled and disabled, and if it makes sense :/
-
-Maxime
-
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
-
---pwfuitnpzretg3l6
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXEXIPQAKCRDj7w1vZxhR
-xcL9AP90HKorMjZWKBoBqwq4XAdHAARaeew1QhNIgEON/f+xqwEAzD+7Pkh/RHY9
-MtqiJ6wLMZsP5DEfmy/dv4x3d9lvOQw=
-=JEgz
------END PGP SIGNATURE-----
-
---pwfuitnpzretg3l6--
-
-
---===============4352959909304121907==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+Robin.
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============4352959909304121907==--
-
