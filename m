@@ -7,18 +7,18 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7B8B1C31D63
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 05:54:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 958AFC31D63
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 05:54:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2C23321773
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 05:54:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 575EF21773
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 05:54:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IAO8jGpl";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="cxhyVvjn";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="N65Qpwg3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2C23321773
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pnIK3+FE";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="Dw7WdVi/";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="Dw7WdVi/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 575EF21773
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -28,43 +28,43 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=bekEvW8UvnGMaFu2iG1TStQtHCfiNxQoaSBJn3BhG6Y=; b=IAO8jGpli1gqTYENP7btGRn0Td
-	AuYrM2kOY+Ia9IKdY3/m4lo5asYB2bHGUu1eleZTK7qpxFrGrDQH82Bqy2c2L20VzUboJ7UdqXA82
-	hZMCCGgCWYnMdvytqMaJuDxZlxl8n2JY/3zSsaj7ZhCAyhpeUB816n+qtG18SPcsjYxjTOvBquAkn
-	1XQT1l+nKzLcEhN9IrFw2cqQgz2FVzWlytWuhUKbMYnL+FJ1xl+MaMKDjy9bcGD3ciOgPsiyyIMHT
-	QdWz12azMHGhm6ORpL9SH+h1Alf5wE/VfJiDq0WRVjFvAho1efpIHNG43BB1ldvOsALl/uSexC+6V
-	ypZoQs8Q==;
+	bh=Qf+NGA3sV6nBsEntYpXAvxnLUH2GekEkHI4dFOODIhY=; b=pnIK3+FEVvxKvnG2pSwZC53wY1
+	Xo+Eb5agUDl21Fv3q32uvKiIy4M5dNqVK/hFW+p41TSPJ4v9oHjGZFzN1PP6cJM0olGaF2I6FEDW/
+	KKbnEURR7mlKejf/RKA4FwC99vGI3YlkTcEsBImAC/feG9mxSHyidTupqOH/wcZeXbZ8LAm56ZARi
+	bHX49OnY4CmDOtf/DA7x2pyn1LPGyjD2DPZLslOmnZLf8bqRZz7i6bC6t922Jtm2+JArh30979P99
+	4u5gxW/y1KujPXi2Yg8KXeASqUGmP7qRJ5oMFCQi5nRg5k4fc5L6aI+pIHsdnERyhSWH879/te07p
+	cNwsD/sg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glSXQ-00017H-Hs; Mon, 21 Jan 2019 05:54:24 +0000
+	id 1glSXh-0001Qf-0t; Mon, 21 Jan 2019 05:54:41 +0000
 Received: from smtp.codeaurora.org ([198.145.29.96])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glSX0-0000kw-63
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 05:54:04 +0000
+ id 1glSX3-0000oD-03
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 05:54:07 +0000
 Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id A5865609C4; Mon, 21 Jan 2019 05:53:57 +0000 (UTC)
+ id 90B8760860; Mon, 21 Jan 2019 05:54:00 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1548050037;
- bh=XaMXsOjL9zaSjV8aUTXyCSeq6HwVo4Jy+/NPc1jscug=;
+ s=default; t=1548050040;
+ bh=TL7zgB0m7LfWtfKkA5XH+oaFc8qMHKopAjg5Aq+3o/E=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=cxhyVvjnxvOn+usmEBsVlm1TsCXCkpv4b4SbnDoGCamFgqd7vny0HD5pV1mMCQlwd
- mapt1Mb3tB8zXd4trWv7cBGHpnVFGwGVnOlG5CpJz6IQTL1WxFIYeIFaKFGAQTvl0P
- xV9m8gq3GxhVyv2THGn/u/GoUnJkFlFi2Nj6WCg4=
+ b=Dw7WdVi/8T6G7C6y8yBGXR+rj/0SdpbO7iU56HQq4m2SarCfX1sre/pQB/lQs0YlY
+ rftBKz8sKcSwPqbYBJc5Lh2+4rTBn8u5SmU9ABAI6fQBuXEnGESkhXwstGrVfm1XPT
+ fdVfMWQWngzNV5UEv4dc4SzmwmiB/NTkmdXNmbao=
 Received: from blr-ubuntu-41.ap.qualcomm.com
  (blr-bdr-fw-01_globalnat_allzones-outside.qualcomm.com [103.229.18.19])
  (using TLSv1.2 with cipher ECDHE-RSA-AES128-SHA256 (128/128 bits))
  (No client certificate requested)
  (Authenticated sender: vivek.gautam@smtp.codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id 663016020B;
- Mon, 21 Jan 2019 05:53:52 +0000 (UTC)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id 8E929609BD;
+ Mon, 21 Jan 2019 05:53:56 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1548050035;
- bh=XaMXsOjL9zaSjV8aUTXyCSeq6HwVo4Jy+/NPc1jscug=;
+ s=default; t=1548050040;
+ bh=TL7zgB0m7LfWtfKkA5XH+oaFc8qMHKopAjg5Aq+3o/E=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=N65Qpwg3qv7EQtq/GRm0C/+RbPVppCmdkjglwpDXNi3YiMDU8wCULMktiLWz82fcE
- i/IO3XQOIubn9V3myR4YQo/Lo6m9JDNv8VODE9UTHsTOrqvpDXHaYVvadskmlimIV+
- UJQvCgD0mZO5xE9DmIvsFZm2WeNnaHvcIW5FRF4I=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 663016020B
+ b=Dw7WdVi/8T6G7C6y8yBGXR+rj/0SdpbO7iU56HQq4m2SarCfX1sre/pQB/lQs0YlY
+ rftBKz8sKcSwPqbYBJc5Lh2+4rTBn8u5SmU9ABAI6fQBuXEnGESkhXwstGrVfm1XPT
+ fdVfMWQWngzNV5UEv4dc4SzmwmiB/NTkmdXNmbao=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 8E929609BD
 Authentication-Results: pdx-caf-mail.web.codeaurora.org;
  dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: pdx-caf-mail.web.codeaurora.org;
@@ -72,15 +72,15 @@ Authentication-Results: pdx-caf-mail.web.codeaurora.org;
 From: Vivek Gautam <vivek.gautam@codeaurora.org>
 To: will.deacon@arm.com, robin.murphy@arm.com, joro@8bytes.org,
  iommu@lists.linux-foundation.org
-Subject: [PATCH 2/3] iommu/io-pgtable-arm: Add support to use system cache
-Date: Mon, 21 Jan 2019 11:23:34 +0530
-Message-Id: <20190121055335.15430-3-vivek.gautam@codeaurora.org>
+Subject: [PATCH 3/3] iommu/arm-smmu: Add support to use system cache
+Date: Mon, 21 Jan 2019 11:23:35 +0530
+Message-Id: <20190121055335.15430-4-vivek.gautam@codeaurora.org>
 X-Mailer: git-send-email 2.16.1.72.g5be1f00a9a70
 In-Reply-To: <20190121055335.15430-1-vivek.gautam@codeaurora.org>
 References: <20190121055335.15430-1-vivek.gautam@codeaurora.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190120_215358_982349_559460DF 
-X-CRM114-Status: GOOD (  17.21  )
+X-CRM114-CacheID: sfid-20190120_215401_754345_13A123DB 
+X-CRM114-Status: GOOD (  15.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -102,139 +102,79 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Few Qualcomm platforms such as, sdm845 have an additional outer
+Few Qualcomm platforms, such as sdm845 have an additional outer
 cache called as System cache, aka. Last level cache (LLC) that
 allows non-coherent devices to upgrade to using caching.
+This last level cache sits right before the DDR, and is tightly
+coupled with the memory controller.
+The cache is available to a number of devices - coherent and
+non-coherent, present in the SoC system, and to CPUs.
+The devices request their slices from this system cache, make it
+active, and can then start using it.
 
-There is a fundamental assumption that non-coherent devices can't
-access caches. This change adds an exception where they *can* use
-some level of cache despite still being non-coherent overall.
-The coherent devices that use cacheable memory, and CPU make use of
-this system cache by default.
-
-Looking at memory types, we have following -
-a) Normal uncached :- MAIR 0x44, inner non-cacheable,
-                      outer non-cacheable;
-b) Normal cached :-   MAIR 0xff, inner read write-back non-transient,
-                      outer read write-back non-transient;
-                      attribute setting for coherenet I/O devices.
-and, for non-coherent i/o devices that can allocate in system cache
-another type gets added -
-c) Normal sys-cached :- MAIR 0xf4, inner non-cacheable,
-                        outer read write-back non-transient
-
-Coherent I/O devices use system cache by marking the memory as
-normal cached.
-Non-coherent I/O devices should mark the memory as normal
-sys-cached in page tables to use system cache.
+Devices can set iommu domain attributes and page protection
+while mapping the buffers to set the required memory attributes
+to use system cache for buffers and page tables.
+This change adds the support for iommu domain attributes and the
+interaction with io page table driver.
 
 Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
 ---
- drivers/iommu/io-pgtable-arm.c | 15 +++++++++++++--
- drivers/iommu/io-pgtable.h     |  4 ++++
- include/linux/iommu.h          |  2 ++
- 3 files changed, 19 insertions(+), 2 deletions(-)
+ drivers/iommu/arm-smmu.c | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index c76919c30f1a..0e55772702da 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -168,10 +168,12 @@
- #define ARM_LPAE_MAIR_ATTR_MASK		0xff
- #define ARM_LPAE_MAIR_ATTR_DEVICE	0x04
- #define ARM_LPAE_MAIR_ATTR_NC		0x44
-+#define ARM_LPAE_MAIR_ATTR_QCOM_SYS_CACHE	0xf4
- #define ARM_LPAE_MAIR_ATTR_WBRWA	0xff
- #define ARM_LPAE_MAIR_ATTR_IDX_NC	0
- #define ARM_LPAE_MAIR_ATTR_IDX_CACHE	1
- #define ARM_LPAE_MAIR_ATTR_IDX_DEV	2
-+#define ARM_LPAE_MAIR_ATTR_IDX_QCOM_SYS_CACHE	3
- 
- /* IOPTE accessors */
- #define iopte_deref(pte,d) __va(iopte_to_paddr(pte, d))
-@@ -443,6 +445,9 @@ static arm_lpae_iopte arm_lpae_prot_to_pte(struct arm_lpae_io_pgtable *data,
- 		else if (prot & IOMMU_CACHE)
- 			pte |= (ARM_LPAE_MAIR_ATTR_IDX_CACHE
- 				<< ARM_LPAE_PTE_ATTRINDX_SHIFT);
-+		else if (prot & IOMMU_QCOM_SYS_CACHE)
-+			pte |= (ARM_LPAE_MAIR_ATTR_IDX_QCOM_SYS_CACHE
-+				<< ARM_LPAE_PTE_ATTRINDX_SHIFT);
- 	} else {
- 		pte = ARM_LPAE_PTE_HAP_FAULT;
- 		if (prot & IOMMU_READ)
-@@ -781,7 +786,8 @@ arm_64_lpae_alloc_pgtable_s1(struct io_pgtable_cfg *cfg, void *cookie)
- 
- 	if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS | IO_PGTABLE_QUIRK_NO_DMA |
- 			    IO_PGTABLE_QUIRK_NON_STRICT |
--			    IO_PGTABLE_QUIRK_NON_COHERENT))
-+			    IO_PGTABLE_QUIRK_NON_COHERENT |
-+			    IO_PGTABLE_QUIRK_QCOM_SYS_CACHE))
- 		return NULL;
- 
- 	data = arm_lpae_alloc_pgtable(cfg);
-@@ -794,6 +800,9 @@ arm_64_lpae_alloc_pgtable_s1(struct io_pgtable_cfg *cfg, void *cookie)
- 	if (cfg->quirks & IO_PGTABLE_QUIRK_NON_COHERENT)
- 		reg |= ARM_LPAE_TCR_RGN_NC << ARM_LPAE_TCR_IRGN0_SHIFT |
- 		       ARM_LPAE_TCR_RGN_NC << ARM_LPAE_TCR_ORGN0_SHIFT;
-+	else if (cfg->quirks & IO_PGTABLE_QUIRK_QCOM_SYS_CACHE)
-+		reg |= ARM_LPAE_TCR_RGN_NC << ARM_LPAE_TCR_IRGN0_SHIFT |
-+		      ARM_LPAE_TCR_RGN_WBWA << ARM_LPAE_TCR_ORGN0_SHIFT;
- 	else
- 		reg |= ARM_LPAE_TCR_RGN_WBWA << ARM_LPAE_TCR_IRGN0_SHIFT |
- 		       ARM_LPAE_TCR_RGN_WBWA << ARM_LPAE_TCR_ORGN0_SHIFT;
-@@ -848,7 +857,9 @@ arm_64_lpae_alloc_pgtable_s1(struct io_pgtable_cfg *cfg, void *cookie)
- 	      (ARM_LPAE_MAIR_ATTR_WBRWA
- 	       << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_CACHE)) |
- 	      (ARM_LPAE_MAIR_ATTR_DEVICE
--	       << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_DEV));
-+	       << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_DEV)) |
-+	      (ARM_LPAE_MAIR_ATTR_QCOM_SYS_CACHE
-+	       << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_QCOM_SYS_CACHE));
- 
- 	cfg->arm_lpae_s1_cfg.mair[0] = reg;
- 	cfg->arm_lpae_s1_cfg.mair[1] = 0;
-diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
-index 46604cf7b017..fb237e8aa9f1 100644
---- a/drivers/iommu/io-pgtable.h
-+++ b/drivers/iommu/io-pgtable.h
-@@ -80,6 +80,9 @@ struct io_pgtable_cfg {
- 	 *      pagetables even on a coherent SMMU for cases where reducing
- 	 *      snoop traffic/latency on walks outweighs the cost of cache
- 	 *      maintenance on PTE updates.
-+	 *
-+	 * IO_PGTABLE_QUIRK_QCOM_SYS_CACHE: Force using outer system cache
-+	 *      for non-coherent devices on Qcom platforms.
- 	 */
- 	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0)
- 	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1)
-@@ -88,6 +91,7 @@ struct io_pgtable_cfg {
- 	#define IO_PGTABLE_QUIRK_NO_DMA		BIT(4)
- 	#define IO_PGTABLE_QUIRK_NON_STRICT	BIT(5)
- 	#define IO_PGTABLE_QUIRK_NON_COHERENT	BIT(6)
-+	#define IO_PGTABLE_QUIRK_QCOM_SYS_CACHE BIT(7)
- 	unsigned long			quirks;
- 	unsigned long			pgsize_bitmap;
- 	unsigned int			ias;
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index e90da6b6f3d1..08bb6befad5e 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -31,6 +31,7 @@
- #define IOMMU_CACHE	(1 << 2) /* DMA cache coherency */
- #define IOMMU_NOEXEC	(1 << 3)
- #define IOMMU_MMIO	(1 << 4) /* e.g. things like MSI doorbells */
-+#define IOMMU_QCOM_SYS_CACHE	(1 << 6)
- /*
-  * Where the bus hardware includes a privilege level as part of its access type
-  * markings, and certain devices are capable of issuing transactions marked as
-@@ -125,6 +126,7 @@ enum iommu_attr {
- 	DOMAIN_ATTR_FSL_PAMUV1,
- 	DOMAIN_ATTR_NESTING,	/* two stages of translation */
- 	DOMAIN_ATTR_DMA_USE_FLUSH_QUEUE,
-+	DOMAIN_ATTR_QCOM_SYS_CACHE,
- 	DOMAIN_ATTR_MAX,
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 52b300dfc096..324f3bb54c78 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -260,7 +260,8 @@ struct arm_smmu_domain {
+ 	struct mutex			init_mutex; /* Protects smmu pointer */
+ 	spinlock_t			cb_lock; /* Serialises ATS1* ops and TLB syncs */
+ 	struct iommu_domain		domain;
+-#define ARM_SMMU_DOMAIN_ATTR_NON_STRICT	BIT(0)
++#define ARM_SMMU_DOMAIN_ATTR_QCOM_SYS_CACHE	BIT(1)
++#define ARM_SMMU_DOMAIN_ATTR_NON_STRICT		BIT(0)
+ 	unsigned int			attr;
  };
  
+@@ -910,6 +911,9 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+ 	    smmu_domain->stage == ARM_SMMU_DOMAIN_S1)
+ 		pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_NON_COHERENT;
+ 
++	if (smmu_domain->attr & ARM_SMMU_DOMAIN_ATTR_QCOM_SYS_CACHE)
++		pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_QCOM_SYS_CACHE;
++
+ 	smmu_domain->smmu = smmu;
+ 	pgtbl_ops = alloc_io_pgtable_ops(fmt, &pgtbl_cfg, smmu_domain);
+ 	if (!pgtbl_ops) {
+@@ -1592,6 +1596,10 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
+ 		case DOMAIN_ATTR_NESTING:
+ 			*(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
+ 			return 0;
++		case DOMAIN_ATTR_QCOM_SYS_CACHE:
++			*(int *)data = !!(smmu_domain->attr &
++					  ARM_SMMU_DOMAIN_ATTR_QCOM_SYS_CACHE);
++			return 0;
+ 		default:
+ 			return -ENODEV;
+ 		}
+@@ -1633,6 +1641,16 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
+ 			else
+ 				smmu_domain->stage = ARM_SMMU_DOMAIN_S1;
+ 			break;
++		case DOMAIN_ATTR_QCOM_SYS_CACHE:
++			if (smmu_domain->smmu) {
++				ret = -EPERM;
++				goto out_unlock;
++			}
++			if (*(int *)data)
++				smmu_domain->attr |= ARM_SMMU_DOMAIN_ATTR_QCOM_SYS_CACHE;
++			else
++				smmu_domain->attr &= ~ARM_SMMU_DOMAIN_ATTR_QCOM_SYS_CACHE;
++			break;
+ 		default:
+ 			ret = -ENODEV;
+ 		}
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
