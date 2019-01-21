@@ -2,88 +2,64 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 815A3C7112F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 11:12:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9EFA3FA3729
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 11:23:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 51CF720861
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 11:12:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6F43C20663
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 11:23:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Cy4s1s11";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="PMn4Uwyz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 51CF720861
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eL1ocrmY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6F43C20663
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=h40Tw4v6Kt/0O0+4Z3t6wAJOa7oHxdIrXYq6r9c3Ezc=; b=Cy4s1s11WhniZK
-	KFCCz5pOCzONpBgMizux1zawtfJTarOI3pUZT/BTKktjV203ucltRNncmlZsNxnPcqarZsp7KQGP8
-	n2z3oWLzUFlvrlX6acxYQ9DCLnI3vqrh2KScJj1+MEvWsIehrDpCo+ZfFN4/mNIuPqa6DYhh5EP50
-	y1xQ5uGurNiI9GX9YjxBwsTmT8Q5JDwPaXau+T35oYUHJY9H120aqH/SiG2CdjqA4lescwhaLCg3x
-	PrG5/YgzgTnakE8bKyF6CT5yDD8lMc3/Np9E1u9AeTHjjaalYVMpcmX9yBHMeIsAcbGLE+3gFD9ZL
-	zrpciW9fC7x3qjnbdUvg==;
+	List-Owner; bh=t9WnZyrbq+XiaYaEFDV4RjEMFb+QWLhb327ckeS1L2M=; b=eL1ocrmYH0nEo1
+	SBxnSr+zbupRE638Ws7nAyOXZBqKE6IsufomU2H00O2dmSx7VxKybyXlCY6oxAfNVeCobiQGsgqVH
+	67DNcmWiQxuz00ZP+u0UWG0Hq3SLR/pZtZ4FnZzBjN95OzmjOwt/xlc0cBfKP5eVAo+mPYrih0fam
+	YA8rZRa1TQy72j8uGFGmz9Q90ntdJA9uyIFxrHIrrwCwCdkZdfjvylaRD0lA0Eax+aJLdu+Qo1Waa
+	TbGGpq54xSGpMs9aCurmXoA6qgReFd+2YPkdCOLgPAX68vjwATP/sslWKvdO1tufLNmDc7dzSZT/l
+	d2wp/WOPfxxWlgyWYBkw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glXVe-0005hh-Le; Mon, 21 Jan 2019 11:12:54 +0000
-Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glXVM-0005PQ-Gc
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 11:12:37 +0000
-Received: by mail-pg1-x544.google.com with SMTP id n2so9354873pgm.3
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 03:12:36 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=amarulasolutions.com; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=GZZw+Hr+hHbP5sXTJ433pxgAxN3fV6oKqp+6KB31Tb8=;
- b=PMn4Uwyz58/5Um/YnVmGFYmb4HbN+v7xUJ8zjn09cF0rKhN54/UADvAcm3jhYhCQ7E
- gv3Q3p02MDYEu6zQB7VI9/GyUjmeuW6svHBjYlzZPBr4FIli5Xw0pXm9l5ccvB6cBdJP
- +qQRY9vhWBCZQlnh3GFVhH1UTPTYsPeqCcbiY=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=GZZw+Hr+hHbP5sXTJ433pxgAxN3fV6oKqp+6KB31Tb8=;
- b=WG+iuYkpoDxsGf6oDqeE0iZrc8Kn+bvB4jsRZDIifIZuETpOfyx45l6/YN0A/KPBnp
- c6CYb9vZXcZcVkIBtz6SQfXNl7gSvE3FdWBN3ybBb5b1ofAueZO9pIjDu56DUbPBYZcS
- i4VoHjUyCJIkrQAXMjpU1LZ4nBHcUN5muCK0NtLuVayXR8msTiNle4OJeHwf+RZaHtaR
- 2ytZSRjGJeSbE4IojtmEjJWyoCQrMUikptqCTXH0Q3WTs4lgQDoKc6vWiihPguUWXEsU
- nime4JAnTs/SROZF8EHe2XiLQuOWISJtG42++blB11EpBv53FDNq+C4FrDlrkp8bRo1J
- LW8w==
-X-Gm-Message-State: AJcUukcpF6z7u+EnJYUps0wBNQuV07h5MpV8KUWuCgoJeQY4WDCe6+wW
- E9kCTVecq9j93Nt7isLqL+kDQA==
-X-Google-Smtp-Source: ALg8bN6ITrR9sOEzrGQUNC2uzOcqUV5K55w0yPjnlsuVGPMs1ebBtgFOGBm+9mxveJAc5RQTfgcNHA==
-X-Received: by 2002:a62:5793:: with SMTP id i19mr29519806pfj.49.1548069155754; 
- Mon, 21 Jan 2019 03:12:35 -0800 (PST)
-Received: from jagan-XPS-13-9350.domain.name ([103.81.77.13])
- by smtp.gmail.com with ESMTPSA id a90sm21821288pfj.109.2019.01.21.03.12.33
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 21 Jan 2019 03:12:35 -0800 (PST)
-From: Jagan Teki <jagan@amarulasolutions.com>
-To: Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>
-Subject: [PATCH 2/2] arm64: defconfig: Enable SUN6I Camera sensor interface
-Date: Mon, 21 Jan 2019 16:42:23 +0530
-Message-Id: <20190121111223.18384-2-jagan@amarulasolutions.com>
-X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
-In-Reply-To: <20190121111223.18384-1-jagan@amarulasolutions.com>
-References: <20190121111223.18384-1-jagan@amarulasolutions.com>
+	id 1glXfT-0000zO-EA; Mon, 21 Jan 2019 11:23:03 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glXfQ-0000z0-75
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 11:23:01 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id EFAA6EBD;
+ Mon, 21 Jan 2019 03:22:57 -0800 (PST)
+Received: from e107155-lin (e107155-lin.cambridge.arm.com [10.1.196.42])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B7EEE3F5C1;
+ Mon, 21 Jan 2019 03:22:55 -0800 (PST)
+Date: Mon, 21 Jan 2019 11:22:48 +0000
+From: Sudeep Holla <sudeep.holla@arm.com>
+To: Pramod Kumar <pramod.kumar@broadcom.com>
+Subject: Re: [PATCH RFC 1/1] arm64: Use PSCI calls for CPU stop when hotplug
+ is supported
+Message-ID: <20190121112248.GA27784@e107155-lin>
+References: <1547790380-6276-1-git-send-email-pramod.kumar@broadcom.com>
+ <20190118113242.GA8928@e107155-lin>
+ <CAJ+tv6+6yqT1xkmkY3x6SNQ83K+J6zqKZr7PV5A_ffvyEzceqg@mail.gmail.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <CAJ+tv6+6yqT1xkmkY3x6SNQ83K+J6zqKZr7PV5A_ffvyEzceqg@mail.gmail.com>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_031236_546279_C580C61F 
-X-CRM114-Status: GOOD (  11.12  )
+X-CRM114-CacheID: sfid-20190121_032300_260277_3DC8341A 
+X-CRM114-Status: GOOD (  23.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,47 +71,64 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-sunxi <linux-sunxi@googlegroups.com>, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, Jagan Teki <jagan@amarulasolutions.com>
+Cc: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh@kernel.org>,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Suzuki K Poulose <Suzuki.Poulose@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Steve Capper <steve.capper@arm.com>,
+ Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
+ BCM Kernel Feedback <bcm-kernel-feedback-list@broadcom.com>,
+ Sudeep Holla <sudeep.holla@arm.com>, Dave Martin <dave.martin@arm.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Enable Camera sensor interface for Allwinner SUN6I SoC's.
+On Mon, Jan 21, 2019 at 11:28:27AM +0530, Pramod Kumar wrote:
+> On Fri, Jan 18, 2019 at 5:02 PM Sudeep Holla <sudeep.holla@arm.com> wrote:
+> > On Fri, Jan 18, 2019 at 11:16:20AM +0530, Pramod Kumar wrote:
+> > > If CPU hotplug is supported, ipi_cpu_stop should use PSCI cpudie
+> > > call to stop the CPU. This call ensures L1/L2 cache flush,
+> > > CPUs cache-cohenrecy setting w.r.to interconnect.
+> >
+> > Firstly, this is not specific to PSCI and I don't see any PSCI calls as
+> > $subject claims.
+>
+> I had seen all the other cpu ops methods where only PSCI supports only
+> cpu_die features hence used PSCI reference in my subject line to be more
+> clear where this die gets converted in last.
+>
 
-This support enable V4L2 platform drivers static and
-VIDEO_SUN6I_CSI as module.
+OK, but since you are not directly dealing with PSCI APIs, it's misleading.
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Note:
-- These change depends on A64 CSI support patches
+> > Next, you fail to explain why do you have to ensure
+> > caches are cleaned and why do you need that in ipi_cpu_stop ?
+> > What's the use case ?
+> >
+> Need comes from a specific use case where one Accelerator card(SoC) is
+> plugged in a sever over a PCIe interface.  This Card gets supply from a
+> battery, which could provide very less power for a very small time, in case
+> of any power loss. Once Card switches to battery, this has to reduce its
+> power consumption to its lowest point and back-up the DDR contents asap
+> before battery gets fully drained off.
+>
 
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+OK, but I was expecting the complete call path for this use-case.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index eefc1ff0c1e0..cbcd2a98cd1a 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -433,12 +433,14 @@ CONFIG_MEDIA_DIGITAL_TV_SUPPORT=y
- CONFIG_MEDIA_CONTROLLER=y
- CONFIG_VIDEO_V4L2_SUBDEV_API=y
- # CONFIG_DVB_NET is not set
-+CONFIG_V4L_PLATFORM_DRIVERS=y
- CONFIG_V4L_MEM2MEM_DRIVERS=y
- CONFIG_MEDIA_USB_SUPPORT=y
- CONFIG_USB_VIDEO_CLASS=m
- CONFIG_VIDEO_SAMSUNG_S5P_JPEG=m
- CONFIG_VIDEO_SAMSUNG_S5P_MFC=m
- CONFIG_VIDEO_SAMSUNG_EXYNOS_GSC=m
-+CONFIG_VIDEO_SUN6I_CSI=m
- CONFIG_VIDEO_RENESAS_FCP=m
- CONFIG_VIDEO_RENESAS_VSP1=m
- CONFIG_DRM=m
--- 
-2.18.0.321.gffc6fa0e3
+> Since battery can provide limited power for a very short time hence need to
+> transition to lowest power. As per the transition process , CPUs power
+> domain has to be off but before that it needs to flush out its content to
+> system memory(L3) so that content could be backed-up by a MCU, a controller
+> consuming very less power. Since we can not afford plugging-out every
+> individual CPUs in sequence hence uses  ipi_cpu_stop for all other CPUs
+
+So, you are randomly using ipi_cpu_stop for something it's not supposed to
+be used. What do you exactly want to achieve in that context where you need
+to save power ? Why system off or reset not sufficient ?
+
+--
+Regards,
+Sudeep
 
 
 _______________________________________________
