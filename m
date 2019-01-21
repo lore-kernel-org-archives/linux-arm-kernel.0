@@ -2,79 +2,68 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ECE53C2F42E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:14:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CE66DC2F433
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:15:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BCF0220823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:14:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9CD3A20823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:15:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CzIZCJIe"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BCF0220823
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FdZABNUj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9CD3A20823
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=PYR94E3ciQr5YeeYM0nV2XGnuzbGRxEfPG1I5QFwRlM=; b=CzIZCJIeeD+qZp
-	+HRYp50Ubz5u5D7uq2AWaplW593ZiBlwKrmFBFME23GLhsCP88Bkf9U4sNRhbsKc83kABIsU3d0Ed
-	j4RU6Qy2GXIQkv40MgiddbF+lxMkmGO6CArrKm44CCJHWy6XqyhCZZ22BjXjx7JVZvGNgpaL1D+SE
-	3CmCRG0/wSjMImCy5mFMdV2rgavb33mfQwriXfxxYMNQoVusKvszSWOlCMTLxt1iA6tQcX9pA7EB9
-	6377Kx0OsR+SBWOUuFcvPVc59HybllPUz7h/QmrrkPvsHORxVcgFoj+DuDIdhC9yU/fFk89YGoH2B
-	t5F8P8Ppo6CEmm/q1TUQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=cL8Vi9hDXspsh7wozbWP3BlBpQdv/84+TETb8JCilm4=; b=FdZABNUj65tIrzbYVaMW6WqN/
+	IjESHCV5UepDu1kHHt3JsSPnG48Zc6ow4aUGYfJ4FoEBhEpW4BfyJN1QVy8D0Y8WjsGk0r0rHq/Ny
+	tAaYw7i2/8GDq2c8ru1vhhWfx8dTNWWTDLFjPAXX0RSUs7PezsESoE/OR/11mhxqoFj8y/ZJ2NuYy
+	sj6FLn/hZDZrjudEq9nUlfMkPkQCI+THknF094VB1I40zcJv5IGgt85Log4ezEQu8yvPzaLAvl//e
+	TRDbspCn57sZUi4O/xy+n+TPgI2miPQxyPlMMVHOJZ2bX/M3yD+SnFSp2dn0YTgjB/uEiEVhBMA+b
+	0HKH/9UVw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glbHL-0004Ol-N3; Mon, 21 Jan 2019 15:14:23 +0000
-Received: from mail-ot1-f68.google.com ([209.85.210.68])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glbHH-0004Nf-Ck; Mon, 21 Jan 2019 15:14:21 +0000
-Received: by mail-ot1-f68.google.com with SMTP id i20so20850123otl.0;
- Mon, 21 Jan 2019 07:14:19 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=7cQwgOzwHTBBe9OigdSs64Xc124Ms5HIy14iq0hpOUI=;
- b=I/mG9sTvny47R9JMukDRkpB5wwEt/emr/yWjw3/zRP0ZhMryxNUhc/5sXEB1gWwH/Z
- 7DlzlNfgagWMi0rdFw7Zm7EZUfA34B8xx8P2pEKIsRkXnxVm8r0vL8qx8kIkvyItsnKm
- 6NUndtsnf4yMldkF9E9xsfxOl//yK8F8rVFp0CXywd2I+8+flGXzVOLWkTggeMOSZeay
- Kzdjx+FS3b71FwRBQrJCwNHdhpTxESqTqpq4kuLH8b8IOolGmG2q0uuYQEKm9zjk+r1L
- KphviYe2mWYtejoM6TLzgB9q7x0dvLwLZgiJGPI2ywr4NFBkZ+wkEaxRH/KMUlch6x9z
- RAmQ==
-X-Gm-Message-State: AJcUukfEQxThZw3Gr5JpmuXeQSHSSxgoW5fw9dcLitsW3tQboVoo4ejU
- Rod2JSLrgTbuKDjK+H+Z6QVUQ50=
-X-Google-Smtp-Source: ALg8bN5uAkH+3RwXqkO0lWKozlSPvPSVjOpROU5sHqfkA/AYRjBUYRui9Ynrpo2cp5iVzbCU74mqeg==
-X-Received: by 2002:a9d:19e8:: with SMTP id k95mr18894101otk.209.1548083658578; 
- Mon, 21 Jan 2019 07:14:18 -0800 (PST)
-Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
- [24.155.109.49])
- by smtp.gmail.com with ESMTPSA id t201sm6098113oie.37.2019.01.21.07.14.17
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 21 Jan 2019 07:14:18 -0800 (PST)
-Date: Mon, 21 Jan 2019 09:14:17 -0600
-From: Rob Herring <robh@kernel.org>
-To: min.guo@mediatek.com
-Subject: Re: [PATCH v4 1/6] dt-bindings: usb: musb: Add support for MediaTek
- musb controller
-Message-ID: <20190121151417.GA19238@bogus>
-References: <1548073351-13739-1-git-send-email-min.guo@mediatek.com>
- <1548073351-13739-2-git-send-email-min.guo@mediatek.com>
+	id 1glbIJ-0005zz-OV; Mon, 21 Jan 2019 15:15:23 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glbIG-0005zZ-BW
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 15:15:21 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8C6D6EBD;
+ Mon, 21 Jan 2019 07:15:19 -0800 (PST)
+Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 7DCE53F5C1;
+ Mon, 21 Jan 2019 07:15:17 -0800 (PST)
+Subject: Re: [PATCH 0/3] iommu/arm-smmu: Add support to use Last level cache
+To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+References: <20190121055335.15430-1-vivek.gautam@codeaurora.org>
+ <CAKv+Gu8P-5hxZ8+OV_xSZteTvCLw-Sc-=KJM1i=3aWajcS9bUw@mail.gmail.com>
+ <CAFp+6iEp-bzMrZz8cFUciTFKm7TwAoLdYpsSTD73kDfCRh60bA@mail.gmail.com>
+ <CAKv+Gu9z_mGwdZYMKPfM_g2MZwrCF5=f4WAdn_R6wJ1A9xSZ_Q@mail.gmail.com>
+ <dbba5a8a-70c0-dd01-713c-081eb412e2d7@arm.com>
+ <CAKv+Gu8K5f0va9q4FYk9x1puoOTDjZ0c25qokm2izSVAwd1gmQ@mail.gmail.com>
+ <964779d6-c676-3379-bf1e-cde0dd82d63d@arm.com>
+ <CAKv+Gu_Oz-QEFnq9KiOBHQrC8o+0ykkEZBm0vCWfYDfFB8QTcQ@mail.gmail.com>
+From: Robin Murphy <robin.murphy@arm.com>
+Message-ID: <55213eaf-d90d-0f2f-9f01-5e964e087d3f@arm.com>
+Date: Mon, 21 Jan 2019 15:15:15 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1548073351-13739-2-git-send-email-min.guo@mediatek.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <CAKv+Gu_Oz-QEFnq9KiOBHQrC8o+0ykkEZBm0vCWfYDfFB8QTcQ@mail.gmail.com>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_071419_435216_3713A947 
-X-CRM114-Status: GOOD (  22.86  )
+X-CRM114-CacheID: sfid-20190121_071520_405730_B78A1B33 
+X-CRM114-Status: GOOD (  22.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,107 +75,107 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- tony@atomide.com, Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- linux-usb@vger.kernel.org, linux-kernel@vger.kernel.org, hdegoede@redhat.com,
- chunfeng.yun@mediatek.com, Alan Stern <stern@rowland.harvard.edu>,
- Matthias Brugger <matthias.bgg@gmail.com>, linux-mediatek@lists.infradead.org,
- Bin Liu <b-liu@ti.com>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: pdaly@codeaurora.org, linux-arm-msm <linux-arm-msm@vger.kernel.org>,
+ Joerg Roedel <joro@8bytes.org>, Will Deacon <will.deacon@arm.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Tomasz Figa <tfiga@chromium.org>,
+ "list@263.net:IOMMU DRIVERS" <iommu@lists.linux-foundation.org>,
+ Vivek Gautam <vivek.gautam@codeaurora.org>,
+ Jordan Crouse <jcrouse@codeaurora.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ pratikp@codeaurora.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 21, 2019 at 08:22:26PM +0800, min.guo@mediatek.com wrote:
-> From: Min Guo <min.guo@mediatek.com>
+On 21/01/2019 14:24, Ard Biesheuvel wrote:
+> On Mon, 21 Jan 2019 at 14:56, Robin Murphy <robin.murphy@arm.com> wrote:
+>>
+>> On 21/01/2019 13:36, Ard Biesheuvel wrote:
+>>> On Mon, 21 Jan 2019 at 14:25, Robin Murphy <robin.murphy@arm.com> wrote:
+>>>>
+>>>> On 21/01/2019 10:50, Ard Biesheuvel wrote:
+>>>>> On Mon, 21 Jan 2019 at 11:17, Vivek Gautam <vivek.gautam@codeaurora.org> wrote:
+>>>>>>
+>>>>>> Hi,
+>>>>>>
+>>>>>>
+>>>>>> On Mon, Jan 21, 2019 at 12:56 PM Ard Biesheuvel
+>>>>>> <ard.biesheuvel@linaro.org> wrote:
+>>>>>>>
+>>>>>>> On Mon, 21 Jan 2019 at 06:54, Vivek Gautam <vivek.gautam@codeaurora.org> wrote:
+>>>>>>>>
+>>>>>>>> Qualcomm SoCs have an additional level of cache called as
+>>>>>>>> System cache, aka. Last level cache (LLC). This cache sits right
+>>>>>>>> before the DDR, and is tightly coupled with the memory controller.
+>>>>>>>> The clients using this cache request their slices from this
+>>>>>>>> system cache, make it active, and can then start using it.
+>>>>>>>> For these clients with smmu, to start using the system cache for
+>>>>>>>> buffers and, related page tables [1], memory attributes need to be
+>>>>>>>> set accordingly. This series add the required support.
+>>>>>>>>
+>>>>>>>
+>>>>>>> Does this actually improve performance on reads from a device? The
+>>>>>>> non-cache coherent DMA routines perform an unconditional D-cache
+>>>>>>> invalidate by VA to the PoC before reading from the buffers filled by
+>>>>>>> the device, and I would expect the PoC to be defined as lying beyond
+>>>>>>> the LLC to still guarantee the architected behavior.
+>>>>>>
+>>>>>> We have seen performance improvements when running Manhattan
+>>>>>> GFXBench benchmarks.
+>>>>>>
+>>>>>
+>>>>> Ah ok, that makes sense, since in that case, the data flow is mostly
+>>>>> to the device, not from the device.
+>>>>>
+>>>>>> As for the PoC, from my knowledge on sdm845 the system cache, aka
+>>>>>> Last level cache (LLC) lies beyond the point of coherency.
+>>>>>> Non-cache coherent buffers will not be cached to system cache also, and
+>>>>>> no additional software cache maintenance ops are required for system cache.
+>>>>>> Pratik can add more if I am missing something.
+>>>>>>
+>>>>>> To take care of the memory attributes from DMA APIs side, we can add a
+>>>>>> DMA_ATTR definition to take care of any dma non-coherent APIs calls.
+>>>>>>
+>>>>>
+>>>>> So does the device use the correct inner non-cacheable, outer
+>>>>> writeback cacheable attributes if the SMMU is in pass-through?
+>>>>>
+>>>>> We have been looking into another use case where the fact that the
+>>>>> SMMU overrides memory attributes is causing issues (WC mappings used
+>>>>> by the radeon and amdgpu driver). So if the SMMU would honour the
+>>>>> existing attributes, would you still need the SMMU changes?
+>>>>
+>>>> Even if we could force a stage 2 mapping with the weakest pagetable
+>>>> attributes (such that combining would work), there would still need to
+>>>> be a way to set the TCR attributes appropriately if this behaviour is
+>>>> wanted for the SMMU's own table walks as well.
+>>>>
+>>>
+>>> Isn't that just a matter of implementing support for SMMUs that lack
+>>> the 'dma-coherent' attribute?
+>>
+>> Not quite - in general they need INC-ONC attributes in case there
+>> actually is something in the architectural outer-cacheable domain.
 > 
-> This adds support for MediaTek musb controller in
-> host, peripheral and otg mode.
-> 
-> Signed-off-by: Min Guo <min.guo@mediatek.com>
-> ---
-> changes in v4:
-> suggested by Sergei:
-> 1. String alignment
-> 
-> changes in v3:
-> 1. no changes
-> 
-> changes in v2:
-> suggested by Bin:
-> 1. Modify DRC to DRD
-> suggested by Rob:
-> 2. Drop the "<soc-model>-musb" in compatible
+> But is it a problem to use INC-ONC attributes for the SMMU PTW on this
+> chip? AIUI, the reason for the SMMU changes is to avoid the
+> performance hit of snooping, which is more expensive than cache
+> maintenance of SMMU page tables. So are you saying the by-VA cache
+> maintenance is not relayed to this system cache, resulting in page
+> table updates to be invisible to masters using INC-ONC attributes?
 
-This is not what I said. I gave you the exact text to put.
+I only have a relatively vague impression of how this Qcom interconnect 
+actually behaves, but AIUI the outer attribute has no correctness impact 
+(it's effectively mismatched between CPU and devices already), only some 
+degree of latency improvement which is effectively the opposite of 
+no-snoop, in allowing certain non-coherent device traffic to still 
+allocate in the LLC. I'm assuming that if that latency matters for the 
+device accesses themselves, it might also matter for the associated 
+table walks depending on the TLB miss rate.
 
-> 3. Remove phy-names
-> 4. Add space after comma in clock-names
-> ---
->  .../devicetree/bindings/usb/mediatek,musb.txt      | 43 ++++++++++++++++++++++
->  1 file changed, 43 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/usb/mediatek,musb.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/mediatek,musb.txt b/Documentation/devicetree/bindings/usb/mediatek,musb.txt
-> new file mode 100644
-> index 0000000..4305770
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/mediatek,musb.txt
-> @@ -0,0 +1,43 @@
-> +MediaTek musb DRD/OTG controller
-> +-------------------------------------------
-> +
-> +Required properties:
-> + - compatible      : should be "mediatek,mtk-musb"
-> + - reg             : specifies physical base address and size of
-> +                     the registers
-> + - interrupts      : interrupt used by musb controller
-> + - interrupt-names : must be "mc"
-> + - phys            : PHY specifier for the OTG phy
-> + - dr_mode         : should be one of "host", "peripheral" or "otg",
-> +                     refer to usb/generic.txt
-> + - clocks          : a list of phandle + clock-specifier pairs, one for
-> +                     each entry in clock-names
-> + - clock-names     : must contain "main", "mcu", "univpll"
-> +                     for clocks of controller
-> +
-> +Optional properties:
-> + - extcon          : external connector for VBUS and ID pin changes detection,
-> +                     needed when supports dual-role mode
-
-Again, do not use extcon in new bindings.
-
-> + - vbus-supply     : reference to the VBUS regulator, needed when supports
-> +                     dual-role mode
-> + - power-domains   : a phandle to USB power domain node to control USB's
-> +                     MTCMOS
-> +
-> +Example:
-> +
-> +usb2: usb@11200000 {
-> +	compatible = "mediatek,mt2701-musb",
-> +		     "mediatek,mtk-musb";
-> +	reg = <0 0x11200000 0 0x1000>;
-> +	interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_LOW>;
-> +	interrupt-names = "mc";
-> +	phys = <&u2port2 PHY_TYPE_USB2>;
-> +	vbus-supply = <&usb_vbus>;
-> +	extcon = <&extcon_usb>;
-> +	dr_mode = "otg";
-> +	clocks = <&pericfg CLK_PERI_USB0>,
-> +		 <&pericfg CLK_PERI_USB0_MCU>,
-> +		 <&pericfg CLK_PERI_USB_SLV>;
-> +	clock-names = "main","mcu","univpll";
-> +	power-domains = <&scpsys MT2701_POWER_DOMAIN_IFR_MSC>;
-> +};
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel@lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Robin.
 
 _______________________________________________
 linux-arm-kernel mailing list
