@@ -6,19 +6,18 @@ X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C67ACC31D64
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 06:05:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E5889C31D63
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 06:06:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 87F41217F9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 06:05:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B15FE21841
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 06:06:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Fl85tYYi";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="eH+5DAAZ";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="nCus+WXg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 87F41217F9
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ehERc27i";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=broadcom.com header.i=@broadcom.com header.b="R7n5C9wP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B15FE21841
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=broadcom.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,71 +25,60 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=FdhXQ/mMteJOo84CONdpu9LaNWghFEW/7mAFf0GQ5Oc=; b=Fl85tYYisxBHO2
-	eCuuuaadfrePM5ScfaTQkwnv3g2OfxmZvgbN1lz8S33p0RA/d+V4X5Th0NsKXu+5LbdAWhLdMjevC
-	1+AoUnlN6wXg+X/CxQV+lH0T7bYfY31cCt+yEfjw8GMVr8AdCiVXRjdmouqGZseYbsHkw1OhC2CUM
-	LhFp5spShwpkrpYZSxmjIIIopWc9x1s1/Li5D4FuaL3VuvkdFvmY7JRoWsnLRMPaCb9Q02jzuFueB
-	xxxCCX81h8FHCxkZY/mATJ719ipauycuZdIB7mA8IpaAcEf+h8JEGnl3T3BN/zeF60XDnc4h4hAea
-	RLI0Wdcy6HKQOeWST9YQ==;
+	List-Owner; bh=gTpo+zo4trci21mZO3VzNAVZIl2mzjrrV9ycoBezlco=; b=ehERc27ihKshKw
+	DVb/LJ09ziAtfEjHlGKWYidZ6Kvzh7H5ikX/cvnfrCQ5EiyVTEtI8d50acXzCCvsHlnuiyNLmAyGc
+	jYM/y5QcFW4JGw82DnmHjaXT2iSYIwMoJG+xfoE8oyiNyv9QGcurbJzRiHbyFgQ6zixE22x+p8JYN
+	7oJxK/C+/yH6rfOZDdutCjxE42wbqeIh36BiwJvIVzTbuc884V7ZpKoduU1E1ceawF0B9D5FQwPz1
+	vHJOjAIlr9q3DoaemZDECUuaa359BquRpuySk8M3rrDPIiEzzJqyBQ3wKMG17Daigx0Tjk3rUKiD6
+	dFSIsJO+GF7KGTbKVzUg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glSiS-0006or-5v; Mon, 21 Jan 2019 06:05:48 +0000
-Received: from smtp.codeaurora.org ([198.145.29.96])
+	id 1glSjA-00074h-GI; Mon, 21 Jan 2019 06:06:32 +0000
+Received: from mail-oi1-x243.google.com ([2607:f8b0:4864:20::243])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glSiO-0006oW-PF
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 06:05:46 +0000
-Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id 5FC426085C; Mon, 21 Jan 2019 06:05:44 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1548050744;
- bh=Y1F7ZjV/FsFNJuYd4G9AXKgIC9hZcdkYWSwP8ggf6OM=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=eH+5DAAZa80tNpDhIJ3O21BXzbQJOc9B2oMUBHQY/OWVO58ph2En4p7dwJzGn7bEJ
- t2YiieGxpdGKwisBehn8go0wzSOEuZH59BWZwCjBg/hLA8eXbESr1N8PI/JEND8KtR
- +zXRe1DfaGPVjuaad23/9yP3y7z8zR3UDmweXsB0=
-Received: from mail-ed1-f44.google.com (mail-ed1-f44.google.com
- [209.85.208.44])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- (Authenticated sender: vivek.gautam@smtp.codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id 4CD1F6086B
+ id 1glSj4-00074B-KL
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 06:06:30 +0000
+Received: by mail-oi1-x243.google.com with SMTP id y23so13652114oia.4
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 06:05:43 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1548050743;
- bh=Y1F7ZjV/FsFNJuYd4G9AXKgIC9hZcdkYWSwP8ggf6OM=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=nCus+WXg4sXwWN/Xeb7jzLA9onnM5nP/4M4GXsSk6O+xtqSYUgWA3dauiwEo5JyN1
- xXv52V2epWfJbTdOe6MJk1ShzC3Fk4ztNehq46w1+UZxiVYbQk7CxI3aCYm/r3azsf
- nX4rJuEW0XGNoW78gvegkb64VxEgHtx/nXlQOKww=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 4CD1F6086B
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- dmarc=none (p=none dis=none) header.from=codeaurora.org
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- spf=none smtp.mailfrom=vivek.gautam@codeaurora.org
-Received: by mail-ed1-f44.google.com with SMTP id y56so15579016edd.11
- for <linux-arm-kernel@lists.infradead.org>;
- Sun, 20 Jan 2019 22:05:43 -0800 (PST)
-X-Gm-Message-State: AJcUukfp5cPkGP+xaSOJaYW0l7EkYRnxYGiO5Po9dohDRBW8nAqYsjfk
- JcfId0055/ad+3eeOPc97gcWaTjMMe2HyS4ih1c=
-X-Google-Smtp-Source: ALg8bN7LNUtLnTrd7kArGVwS+vwLRfDV4avJP1pnXk0N11jxNBQaviTjHq1g9w/OE8hG5oKE5XuhkpO37dZUbxs8XdE=
-X-Received: by 2002:aa7:c0d0:: with SMTP id j16mr25116444edp.173.1548050741904; 
- Sun, 20 Jan 2019 22:05:41 -0800 (PST)
+ Sun, 20 Jan 2019 22:06:26 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=broadcom.com; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc:content-transfer-encoding;
+ bh=vg4RDLLwAO/ZYWTbu5ufyFQvbdsjKMMEhcfj2Et8fZw=;
+ b=R7n5C9wPJqcRHAH58fdUkrMLVF2BQlTrO6/tHDAen3PH27aklixcldVhKCPIuIt3Hv
+ O44AdDiI+usunEUzUfM/KEz6Ewc6iXQadlOUBD0RuMEQ2iO3R6RU/N7qZlGjqmcb3Uzd
+ FvSi0ZgFKt0XW1Z+nsZJ1uq+Lj7LI1IWCOJYA=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc:content-transfer-encoding;
+ bh=vg4RDLLwAO/ZYWTbu5ufyFQvbdsjKMMEhcfj2Et8fZw=;
+ b=es8bwWa59RCABC9zJcZ6jauA1JyZIfMGdslEa+Fvm4Lp6Alp2RPVJ2bNYJRjoCw7L5
+ Wj+LobQlaUTUUPlNhdxtgAxyIO5Y04Hz1uzpOM2z+JAG7JM6vbTDddlkaBNuqSwEJ3Z2
+ DyGmGLq3GtC+xaSuigpA4DMbwaY2ERAkQ2it/uTxKjeg7gdxmv3HB4ygi1BEML0sg18X
+ s035WoX8xcq8fNNRKF+MiIWOE6o2LHnd+DVXSd0jmYzKoOLzIRdKPOo8D8pdeUI1Hn8J
+ gMSZSsjlKuUIfchb1mBd3ubFQBsbB3EtlNHUyisE0VVeiymTgjJzNo/FpWa/3q+uj+Ui
+ b+Gw==
+X-Gm-Message-State: AJcUukcHyhp20n4jnftOpgZQl9En6uih8iK7VcpbM4jDLBjbB20ObBCf
+ OV/UWLPe7DRiejwKAz64hp1mD5RShTyovl/YZr85Cg==
+X-Google-Smtp-Source: ALg8bN4F0pcfbFggIJYSTWnvxuYe2BGog1pCpni1CMPuW/uWqLyLdGrlNPCPje7GYXrCe4zu6FjFeKHz6rxdHfh7KRA=
+X-Received: by 2002:aca:2116:: with SMTP id 22mr4977922oiz.42.1548050785511;
+ Sun, 20 Jan 2019 22:06:25 -0800 (PST)
 MIME-Version: 1.0
-References: <20190117092718.1396-1-vivek.gautam@codeaurora.org>
- <20190117092718.1396-3-vivek.gautam@codeaurora.org>
- <20190120000117.GH26876@brain-police>
-In-Reply-To: <20190120000117.GH26876@brain-police>
-From: Vivek Gautam <vivek.gautam@codeaurora.org>
-Date: Mon, 21 Jan 2019 11:35:30 +0530
-X-Gmail-Original-Message-ID: <CAFp+6iFh26JgBUx1jkm4EHNY1vs93Uz2qngxP27D0f7dcpX2GQ@mail.gmail.com>
-Message-ID: <CAFp+6iFh26JgBUx1jkm4EHNY1vs93Uz2qngxP27D0f7dcpX2GQ@mail.gmail.com>
-Subject: Re: [PATCH 2/2] iommu/arm-smmu: Add support for non-coherent page
- table mappings
-To: Will Deacon <will.deacon@arm.com>
+References: <1547790380-6276-1-git-send-email-pramod.kumar@broadcom.com>
+ <20190118113242.GA8928@e107155-lin>
+ <CAJ+tv6+6yqT1xkmkY3x6SNQ83K+J6zqKZr7PV5A_ffvyEzceqg@mail.gmail.com>
+ <CAJ+tv6KqynSf5t_VwLqpdM4BF+wLWcJ0wPTD4nWqL4ej1Yih4g@mail.gmail.com>
+In-Reply-To: <CAJ+tv6KqynSf5t_VwLqpdM4BF+wLWcJ0wPTD4nWqL4ej1Yih4g@mail.gmail.com>
+From: Pramod Kumar <pramod.kumar@broadcom.com>
+Date: Mon, 21 Jan 2019 11:36:14 +0530
+Message-ID: <CAJ+tv6+q+GzBXyv3DH=vX+bc+62YMUCfH7vYLNssyRzBzx6zFA@mail.gmail.com>
+Subject: Re: [PATCH RFC 1/1] arm64: Use PSCI calls for CPU stop when hotplug
+ is supported
+To: Sudeep Holla <sudeep.holla@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190120_220544_860504_1476D2B4 
-X-CRM114-Status: GOOD (  17.86  )
+X-CRM114-CacheID: sfid-20190120_220627_109775_F56D0429 
+X-CRM114-Status: GOOD (  15.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -102,66 +90,74 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- "list@263.net:IOMMU DRIVERS <iommu@lists.linux-foundation.org>,
- Joerg Roedel <joro@8bytes.org>, " <iommu@lists.linux-foundation.org>,
- Robin Murphy <robin.murphy@arm.com>, open list <linux-kernel@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh@kernel.org>,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Suzuki K Poulose <Suzuki.Poulose@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Steve Capper <steve.capper@arm.com>,
+ Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
+ BCM Kernel Feedback <bcm-kernel-feedback-list@broadcom.com>,
+ Dave Martin <dave.martin@arm.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Will,
-
-
-On Sun, Jan 20, 2019 at 5:31 AM Will Deacon <will.deacon@arm.com> wrote:
+On Mon, Jan 21, 2019 at 11:30 AM Pramod Kumar <pramod.kumar@broadcom.com> wrote:
 >
-> On Thu, Jan 17, 2019 at 02:57:18PM +0530, Vivek Gautam wrote:
-> > Adding a device tree option for arm smmu to enable non-cacheable
-> > memory for page tables.
-> > We already enable a smmu feature for coherent walk based on
-> > whether the smmu device is dma-coherent or not. Have an option
-> > to enable non-cacheable page table memory to force set it for
-> > particular smmu devices.
 >
-> Hmm, I must be missing something here. What is the difference between this
-> new property, and simply omitting dma-coherent on the SMMU?
-
-So, this is what I understood from the email thread for Last level
-cache support -
-Robin pointed to the fact that we may need to add support for setting
-non-cacheable
-mappings in the TCR.
-Currently, we don't do that for SMMUs that omit dma-coherent.
-We rely on the interconnect to handle the configuration set in TCR,
-and let interconnect
-ignore the cacheability if it can't support.
-
-Moreover, Robin suggested that we should take care of SMMUs, for which
-removing snoop latency on walks by making mappings as non-cacheable
-outweighs the cost of cache maintenance on PTE updates.
-
-So, this change adds another property to do this non-cacheable mappings
-explicitly. As I pointed, omitting 'dma-coherent', and corresponding
-IO_PGTABLE_QUIRK_NO_DMA' does takes care of few things.
-
-Should we handle the TCR settings too with this quirk?
-
-Regards
-Vivek
 >
-> Will
-> _______________________________________________
-> iommu mailing list
-> iommu@lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
-
-
-
---
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+> On Mon, Jan 21, 2019 at 11:28 AM Pramod Kumar <pramod.kumar@broadcom.com> wrote:
+>>
+>> Hi Sudeep,
+>>
+>> Thanks for having a glance on the patch. Please see my reply in line.
+>>
+>> Regards,
+>> Pramod
+>>
+>> On Fri, Jan 18, 2019 at 5:02 PM Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>>
+>>> On Fri, Jan 18, 2019 at 11:16:20AM +0530, Pramod Kumar wrote:
+>>> > If CPU hotplug is supported, ipi_cpu_stop should use PSCI cpudie
+>>> > call to stop the CPU. This call ensures L1/L2 cache flush,
+>>> > CPUs cache-cohenrecy setting w.r.to interconnect.
+>>> >
+>>>
+>>> Firstly, this is not specific to PSCI and I don't see any PSCI calls as
+>>> $subject claims.
+>>
+>>
+>> I had seen all the other cpu ops methods where only PSCI supports only cpu_die features hence
+>> used PSCI reference in my subject line to be more clear where this die gets converted in last.
+>>
+>>>
+>>> Next, you fail to explain why do you have to ensure
+>>> caches are cleaned and why do you need that in ipi_cpu_stop ?
+>>> What's the use case ?
+>>>
+>>
+>> Need comes from a specific use case where one Accelerator card(SoC) is plugged in a sever over a PCIe interface.  This Card gets supply from a battery, which could provide very less power for a very small time, in case of any power loss. Once Card switches to battery, this has to reduce its power consumption to its lowest point and back-up the DDR contents asap before battery gets fully drained off.
+>>
+>> Since battery can provide limited power for a very short time hence need to transition to lowest power. As per the transition process , CPUs power domain has to be off but before that it needs to flush out its content to system memory(L3) so that content could be backed-up by a MCU, a controller consuming very less power. Since we can not afford plugging-out every individual CPUs in sequence hence uses  ipi_cpu_stop for all other CPUs which ultimately switch to ATF to flush out all the CPUs caches and comes out of coherency domain so that its power rails could be switched-off.
+>>
+>>>
+>>> > Apart from this, this gives control to f/w to reduce power consumption
+>>> > by take appropriate decesion on power rails for plugging-out core.
+>>> >
+>>>
+>>> May be, but ipi_cpu_stop is used is machine reboot/poweroff/halt which
+>>> may restart or poweroff the system, powering down individual CPUs is not
+>>> necessary and may consume lot of time in systems with large number of CPUs.
+>>> It would be good to know the use-case in case I am missing to consider
+>>> that.
+>>
+>>
+>> Use case as explained above.
+>>
+>>>
+>>> --
+>>> Regards,
+>>> Sudeep
 
 _______________________________________________
 linux-arm-kernel mailing list
