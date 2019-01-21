@@ -2,80 +2,59 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.8 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 477F9C2F421
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:47:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A8D12C2F421
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:47:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0FE9120870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:47:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 646702087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 15:47:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U+32tz4s"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0FE9120870
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="j6kMpcRl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 646702087F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=oDiI1673xwnYlb+7QgZSXTvHP98/djIbsP/6HlNQKh0=; b=U+32tz4skcxViv
-	cJfQ2HhupG0zRGhudgM40SuKHBKHQgm3ywiQO1xa44y7TpQ8eKsH7XT7rM/9IEMWif2t/OPrXiVu1
-	GCgAkm2TLL6uuqNDW+fDaZJEAAuxsB88DKojbx3U/xI73TCCUVhZe6OzXgIDZ0bKHrFdLw7CC5M5y
-	guXTlHGqlpNxmyJrZSjWbseyl/IW7coa4pe0UTHgMcGsZV/1DMhA3pcZy/S1NVAEQUy7o3pRsgwJj
-	RtK+pYt7rYZCuLc98GE2M4qxCTPAxSFwYuAxbNEHq5RyJC8Gmm44PYBuCQVZPu3W2TkQe56OWCDWT
-	+eycsk1mUEDlBEXpnbZA==;
+	List-Owner; bh=SBdniL+TDrEaxFn2gidlUL/eFId5XIeu2Ltxb07YU3U=; b=j6kMpcRlpFK52k
+	J/VyqA6P7ycpMsSLo0tVIjMEMA1iq1po1AMiZ8URPj7+35cW6Eg0K5bcXKxCw72imP39tUafsQUio
+	OiH2Hxu5DMMB84WOklcXfFESWx+N2abuRUB7oRDVe/r/xseFdzyWsA3OYRZuRt5VHKlFYKrVu8LzJ
+	SftCz2Om/DDsL5xTYLoTeQvwFhwyFDbNwHkXve1rNFLvHMlXHusQYK7tEBm1Rfbs1iMASj+OxFGMc
+	oG2bx+Q7zm/SIUa4G6xHnbT5CqPd+erHtEHYU77hVzuvW8APX+15oPBEm8iEpa9lJTrhpKX0OE+x2
+	cBr735RUeD5JEjfdVEEg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glbmi-0002F5-IG; Mon, 21 Jan 2019 15:46:48 +0000
-Received: from mail-oi1-f195.google.com ([209.85.167.195])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glbm2-0001fl-Mu
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 15:46:23 +0000
-Received: by mail-oi1-f195.google.com with SMTP id t204so14854634oie.7
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 07:46:06 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=Ha4x6ul4D1MkN/u9NGKVHR88B0fKxkfsJVzB1Wl7ytc=;
- b=I2WFXDvarv7hGkAkdz+BvGWD+8PI0tXOtsmVHHgGPEQpB07V15Tz1DRUbRN9+3dlyQ
- PfZe2lvJEXcWV8HKWLY2XE/dt//d/U//64ZNLdz/k3T65Er4e/w+0FCZr+O4YeQFuSMo
- Rh4321PIWGj89CO3RGXVE9r2UwToO6ZQ9X6M/9WF3U/FUXbqKIgd1j66sh1Kz0t6DYjd
- bqOm6Xt9JUDJ3AToVrmqnsQf2spE9+c0je5TgPb5zLqzQhtxbPY+4QMWJBkcqk19HL0g
- zTeYLLhvy4mdN1s5aCT6P+nJDMaPL77v8EPpILnGXZ2v0Sc6fh9ChRwb0ZXVRMHopC4h
- 7jBA==
-X-Gm-Message-State: AJcUukfx8a4p82TErlTT3PvI4GJLGBwm/ySV+sfNWLjOoF5KNqHt902l
- b6oAIlupjOCZjMy/jKw+aA==
-X-Google-Smtp-Source: ALg8bN5v1cWPqknWj916R9twcYnGsRfn95vwAPSo41mss88VjKmQqC9Ng8VbLOBSRJ8Z4kftiroMUQ==
-X-Received: by 2002:aca:a11:: with SMTP id 17mr5734647oik.15.1548085565792;
- Mon, 21 Jan 2019 07:46:05 -0800 (PST)
-Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
- [24.155.109.49])
- by smtp.gmail.com with ESMTPSA id n130sm6198661oif.10.2019.01.21.07.46.05
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 21 Jan 2019 07:46:05 -0800 (PST)
-Date: Mon, 21 Jan 2019 09:46:04 -0600
-From: Rob Herring <robh@kernel.org>
-To: Nava kishore Manne <nava.manne@xilinx.com>
-Subject: Re: [PATCH v3 3/6] dt-bindings: reset: Add bindings for ZynqMP reset
- driver
-Message-ID: <20190121154604.GA30149@bogus>
-References: <20190121173835.21173-1-nava.manne@xilinx.com>
- <20190121173835.21173-4-nava.manne@xilinx.com>
+	id 1glbn0-0002Vx-5c; Mon, 21 Jan 2019 15:47:06 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glbm9-0001jV-7Y
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 15:46:29 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id CEF3F20A2E; Mon, 21 Jan 2019 16:46:11 +0100 (CET)
+Received: from localhost (unknown [185.94.189.187])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 5A80020C13;
+ Mon, 21 Jan 2019 16:45:57 +0100 (CET)
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Kishon Vijay Abraham I <kishon@ti.com>
+Subject: [PATCH v5 3/9] phy: dphy: Clarify lanes parameter documentation
+Date: Mon, 21 Jan 2019 16:45:48 +0100
+Message-Id: <5d226c00c7e31273687b55f84b2bcc4d16a43efe.1548085432.git-series.maxime.ripard@bootlin.com>
+X-Mailer: git-send-email 2.20.1
+In-Reply-To: <cover.fbf0776c70c0cfb7b7fd88ce6a96b4597d620cac.1548085432.git-series.maxime.ripard@bootlin.com>
+References: <cover.fbf0776c70c0cfb7b7fd88ce6a96b4597d620cac.1548085432.git-series.maxime.ripard@bootlin.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190121173835.21173-4-nava.manne@xilinx.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_074606_743420_F2A895AC 
-X-CRM114-Status: GOOD (  11.35  )
+X-CRM114-CacheID: sfid-20190121_074613_785507_7BF34FE2 
+X-CRM114-Status: GOOD (  11.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,35 +66,52 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
- Nava kishore Manne <nava.manne@xilinx.com>, linux-kernel@vger.kernel.org,
- Jolly Shah <jollys@xilinx.com>, RAJANV@xilinx.com, robh+dt@kernel.org,
- michals@xilinx.com, linux-arm-kernel@lists.infradead.org,
- chinnikishore369@gmail.com
+Cc: Archit Taneja <architt@codeaurora.org>, Rafal Ciepiela <rafalc@cadence.com>,
+ Krzysztof Witos <kwitos@cadence.com>,
+ Maxime Ripard <maxime.ripard@bootlin.com>,
+ Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
+ linux-kernel@vger.kernel.org, dri-devel@lists.freedesktop.org,
+ Sakari Ailus <sakari.ailus@linux.intel.com>,
+ Andrzej Hajda <a.hajda@samsung.com>, Chen-Yu Tsai <wens@csie.org>,
+ Sean Paul <seanpaul@chromium.org>,
+ Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Sakari Ailus <sakari.ailus@iki.fi>, linux-arm-kernel@lists.infradead.org,
+ linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 21 Jan 2019 23:08:32 +0530, Nava kishore Manne wrote:
-> Add documentation to describe Xilinx ZynqMP reset driver
-> bindings.
-> 
-> Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
-> Signed-off-by: Jolly Shah <jollys@xilinx.com>
-> ---
-> Changes for v3:
-> 		-Moved reset outputs definitions info into
-> 		 a header file(xlnx-zynqmp-resets.h).
-> 
->  .../bindings/reset/xlnx,zynqmp-reset.txt      |  52 +++++++
->  .../dt-bindings/reset/xlnx-zynqmp-resets.h    | 130 ++++++++++++++++++
->  2 files changed, 182 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/reset/xlnx,zynqmp-reset.txt
->  create mode 100644 include/dt-bindings/reset/xlnx-zynqmp-resets.h
-> 
+The lanes parameter is not solely about the number of lanes, but it also
+carries the fact that those are the first lanes in use during the
+transmission.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+It was implicit so far, so make sure it's explicit now.
+
+Suggested-by: Sakari Ailus <sakari.ailus@iki.fi>
+Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+---
+ include/linux/phy/phy-mipi-dphy.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/include/linux/phy/phy-mipi-dphy.h b/include/linux/phy/phy-mipi-dphy.h
+index 627d28080d3a..a877ffee845d 100644
+--- a/include/linux/phy/phy-mipi-dphy.h
++++ b/include/linux/phy/phy-mipi-dphy.h
+@@ -269,7 +269,8 @@ struct phy_configure_opts_mipi_dphy {
+ 	/**
+ 	 * @lanes:
+ 	 *
+-	 * Number of active data lanes used for the transmissions.
++	 * Number of active, consecutive, data lanes, starting from
++	 * lane 0, used for the transmissions.
+ 	 */
+ 	unsigned char		lanes;
+ };
+-- 
+git-series 0.9.1
 
 _______________________________________________
 linux-arm-kernel mailing list
