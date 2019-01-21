@@ -2,79 +2,82 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9DF5EC2F421
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 16:11:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B1919C2F421
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 16:15:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6E97520861
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 16:11:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6890920844
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 16:15:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UjryQW/W";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="Vbxjk7Pw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6E97520861
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="p5/Xdv8w";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Kj4FebBW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6890920844
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=uBS/bLagtZoLArB+pARNhhe47vK+iKvi4UVKfhq5cEw=; b=UjryQW/Wj1DAtKjWfUcsfuvm8M
-	eWnEFzfTxNe1XisKFvBBkqD3XVviQ1LcVWXpP4/e6TWOLx1Ea8/AlQOXhDWhdsbGWXtOA1/DfvlDB
-	UzSOyG07KX6tKSLime52ohntAXEQ6DHNGiZDbEHk6uYACRdlRVvESlI7zR1A+cnP8ovpWW7zClP3d
-	O5Fum+QSZ1+70Fwtj5jlfrzCV/OEQpvYLjR+d4PgF5w7touoR6ITwhs5Dw1Z6r0M9xNt2s2Jq4mRo
-	LHtrlYPaCvODzCU9y7K4LI3coBvGczMbnC3lv1m+hT3bPo/BcAInsKn+Lt3/nukRgk8RS2iabIhgP
-	89aEokIA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=LHzd9j317hLl+hEAQsMKDTxUunAkAOFPMuklBUHg898=; b=p5/Xdv8wsN/ZLm
+	Ft0ZdJustTPbqoXO8X88kWpuuTDDLn7ZhLwMl194dsLEpmVJFob/BpCEErCYG9sva7fyC26qqN9pK
+	H9FGAI5D0yQ/KIAYhOXRerrxhyjP86TwanyD+ae+S6hdJpJJ19zoAU8GXAIxPLZuzwHx4jbBb2qag
+	qhvIBeiO1cPOZwRF+X2OGYEeQvn56AAwiR/mwpKhvYJez/oxMw2rO/wEJ3sP2QlL/FSp50dznU7hE
+	xaBND4xbLNrNUat6JjsU3QmMwGBnT7mh0fx4b0DV84CDNhDEP73MsBD0mazNpo3ac6KX+IwJpJHbV
+	cTJE81lhapRrky+9G7kg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glcAg-0001io-S1; Mon, 21 Jan 2019 16:11:34 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1glcDy-0002JQ-5M; Mon, 21 Jan 2019 16:14:58 +0000
+Received: from mail-io1-xd41.google.com ([2607:f8b0:4864:20::d41])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glc9x-0000wv-QH
- for linux-arm-kernel@bombadil.infradead.org; Mon, 21 Jan 2019 16:10:49 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=References:In-Reply-To:Message-Id:Date:
- Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=9n57iFEKD8GQpICV1W7n49NUkwnU3SW57I36Fliu+Vw=; b=Vbxjk7PwRhptyPgohizcvDAp5
- LQh79oc1IMguVzRzE+osY5XluJyHsmb2DiHAxQ93S0ZMjeu20RktBzwmDajnXLYF6SVhA7UhmFMEL
- 1NEr9v2sjC4Oa4lIePVqrCHw7yhdD626yfMuiRpxgi/Gw+P/xELgXXucPuwoFquYRso8RZcIGqrdH
- IuSURLvBi8lWu6ZXYjL63AgOdQN9OiVeiqxBn0AFXMC7bOL8av5hGssew/i4EE4jIkBXywqHdcPmY
- +HcR6ef2z8/jzL8tFk8o+P5ryEtDqfv1x2SF1nOTK5roA3XvYHeBZG5w13M4LCVjK74JfYQau0mQs
- LsoKxnHtg==;
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by merlin.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glbbG-0006uS-Oc
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 15:34:59 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D4E3515BE;
- Mon, 21 Jan 2019 07:34:57 -0800 (PST)
-Received: from e112298-lin.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id D896F3F5C1;
- Mon, 21 Jan 2019 07:34:55 -0800 (PST)
-From: Julien Thierry <julien.thierry@arm.com>
-To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v9 24/26] arm64: Skip preemption when exiting an NMI
-Date: Mon, 21 Jan 2019 15:33:43 +0000
-Message-Id: <1548084825-8803-25-git-send-email-julien.thierry@arm.com>
-X-Mailer: git-send-email 1.9.1
-In-Reply-To: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
-References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
+ id 1glcDu-0002I4-5p
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 16:14:55 +0000
+Received: by mail-io1-xd41.google.com with SMTP id g8so16809658iok.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 21 Jan 2019 08:14:49 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=JJK1BCKSyDL+6Bnumrmgz0aFAHbUsIf0r+wdJw+CqMA=;
+ b=Kj4FebBWF3IgYE59zzK25BcvMYseHgw2U55GKDu80LoJc/1no88VfZWlimZA92sHU/
+ 6z4nya+rz29tQfRHc4u4Wt+pAECUdo5iUyr2hhxn2hAkDZBP6J2HKgJfnHLekJzK1vIJ
+ tlERyFoqq1KbB5gtnwr8uQra/yhMCIJnZ+jZM=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=JJK1BCKSyDL+6Bnumrmgz0aFAHbUsIf0r+wdJw+CqMA=;
+ b=Knuy4RpagjL/t0aXgEcjrxqjypDRf2NQUcn+Lkk2b2RIucZ45Xe/Q2f6tw/aMsUEfc
+ l7kmt7egwEppO+J2hQBB2z5h39JVQfWKQcFbhk+KxKkLQxWIYWHY+JL1RGYNYsOseHyd
+ SicYAfoj3KhbUujSTpavjGWQoObZlIUs5nTyN29PHglHpkLriATY3x2rfvH9WEwZCbQS
+ wz4Ewyo2HPZ4yvPWZB0w+AVZCGNmFvyAMpFCA9WEbUdbubMWDw35ei5Q47axn5AuxgpO
+ DTSIGDlYyCCHjvosGWl+pNTBKdTrGD6aqjv/Yowe7HSq1wAKEuYn1sT5dKkofgFfGq2A
+ Ahdg==
+X-Gm-Message-State: AJcUukcmwVPUFDkk96/JDwA0L/BDsHksgG9DGT/F380y9DMD7Qg79IPn
+ 24NxS6dypnxNc46k9tAz8jt28mYLd95jVdcHv7YkzA==
+X-Google-Smtp-Source: ALg8bN4kiLIcOotuv3Eol9fGHrSR9csRaV14VqHmTkDO6pNF4iUibro4vd5Dh/nvdiiHg+VbxvGt1HqX22lk+oQCMOk=
+X-Received: by 2002:a5e:c206:: with SMTP id v6mr17797491iop.60.1548087289131; 
+ Mon, 21 Jan 2019 08:14:49 -0800 (PST)
+MIME-Version: 1.0
+References: <20190121100617.2311-1-ard.biesheuvel@linaro.org>
+ <20190121150734.GA30582@infradead.org>
+ <CAKv+Gu-hR=uieOeg7QheA5yfAycUoi2vjZsDUvROKVjW4eUNqw@mail.gmail.com>
+ <20190121155908.GA8084@infradead.org>
+In-Reply-To: <20190121155908.GA8084@infradead.org>
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Date: Mon, 21 Jan 2019 17:14:37 +0100
+Message-ID: <CAKv+Gu8LzS9OgvVnzUT8BZWVgDmx4OfqNiPSf+8=riY_LByN-g@mail.gmail.com>
+Subject: Re: [RFC PATCH] drm: disable WC optimization for cache coherent
+ devices on non-x86
+To: Christoph Hellwig <hch@infradead.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_103458_949533_86FA8D5C 
-X-CRM114-Status: GOOD (  11.97  )
+X-CRM114-CacheID: sfid-20190121_081454_223974_B237BDEA 
+X-CRM114-Status: GOOD (  21.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,55 +89,80 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
- Julien Thierry <julien.thierry@arm.com>, marc.zyngier@arm.com,
- catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
- christoffer.dall@arm.com, james.morse@arm.com, joel@joelfernandes.org
-MIME-Version: 1.0
+Cc: Will Deacon <will.deacon@arm.com>, David Zhou <David1.Zhou@amd.com>,
+ Maxime Ripard <maxime.ripard@bootlin.com>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ David Airlie <airlied@linux.ie>,
+ Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
+ Michel Daenzer <michel.daenzer@amd.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ amd-gfx@lists.freedesktop.org, Junwei Zhang <Jerry.Zhang@amd.com>,
+ Huang Rui <ray.huang@amd.com>, dri-devel <dri-devel@lists.freedesktop.org>,
+ Daniel Vetter <daniel@ffwll.ch>, Michael Ellerman <mpe@ellerman.id.au>,
+ Alex Deucher <alexander.deucher@amd.com>, Sean Paul <sean@poorly.run>,
+ Christian Koenig <christian.koenig@amd.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Handling of an NMI should not set any TIF flags. For NMIs received from
-EL0 the current exit path is safe to use.
+On Mon, 21 Jan 2019 at 16:59, Christoph Hellwig <hch@infradead.org> wrote:
+>
+> On Mon, Jan 21, 2019 at 04:33:27PM +0100, Ard Biesheuvel wrote:
+> > On Mon, 21 Jan 2019 at 16:07, Christoph Hellwig <hch@infradead.org> wrote:
+> > >
+> > > > +#include <linux/dma-noncoherent.h>
+> > >
+> > > This header is not for usage in device drivers, but purely for
+> > > dma-mapping implementations!
+> > >
+> >
+> > Is that documented anywhere?
+>
+> I'll add big fat comments.  But the fact that nothing is exported
+> there should be a fairly big hint.
+>
 
-However, an NMI received at EL1 could have interrupted some task context
-that has set the TIF_NEED_RESCHED flag. Preempting a task should not
-happen as a result of an NMI.
+I don't follow. How do other header files 'export' things in a way
+that this header doesn't?
 
-Skip preemption after handling an NMI from EL1.
+> > > And even if something like this was valid to do, it would have to be
+> > > a core function with an arch hook, and not hidden in a random driver.
+> >
+> > Why would it not be valid to do? Is it wrong for a driver to be aware
+> > of whether a device is cache coherent or not?
+> >
+> > And in case it isn't, do you have an alternative suggestion on how to
+> > fix this mess?
+>
+> For the write combine mappings we need a proper core API how instances
+> can advertise the support.  One thing I want to do fairly soon is
+> error checking of the attrs argument to dma_alloc_attrs - so if you
+> pass in something unsupported it will give you back an error.
+>
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kernel/entry.S | 8 ++++++++
- 1 file changed, 8 insertions(+)
+That sounds useful.
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 35a47f6..a0b0a22 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -624,6 +624,14 @@ el1_irq:
- 
- #ifdef CONFIG_PREEMPT
- 	ldr	x24, [tsk, #TSK_TI_PREEMPT]	// get preempt count
-+alternative_if ARM64_HAS_IRQ_PRIO_MASKING
-+	/*
-+	 * DA_F were cleared at start of handling. If anything is set in DAIF,
-+	 * we come back from an NMI, so skip preemption
-+	 */
-+	mrs	x0, daif
-+	orr	x24, x24, x0
-+alternative_else_nop_endif
- 	cbnz	x24, 1f				// preempt count != 0
- 	bl	el1_preempt
- 1:
--- 
-1.9.1
+> It seems that isn't quite enough for the drm use case, so we might
+> also need a way to query these features, but that really has to go
+> through the usual dma layer abstraction as well and not hacked together
+> in a driver based on an eduacted guestimate.
 
+As far as I can tell, these drivers allocate DMA'able memory [in
+ttm_tt_populate()] and subsequently create their own CPU mappings for
+it, assuming that
+a) the default is cache coherent, so vmap()ing those pages with
+cacheable attributes works, and
+b) telling the GPU to use NoSnoop attributes makes the accesses it
+performs coherent with non-cacheable CPU mappings of those physical
+pages
+
+Since the latter is not true for many arm64 systems, I need this patch
+to get a working system.
+
+So how do you propose we proceed to get this fixed? Does it have to
+wait for this proper core API plus followup changes for DRM?
 
 _______________________________________________
 linux-arm-kernel mailing list
