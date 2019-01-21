@@ -2,81 +2,114 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A7766C282DB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 10:06:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 34E6EC282F6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 10:11:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 79ACC20870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 10:06:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F3F2E2085A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 10:11:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="re0MduWp";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="CU1pgPwd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 79ACC20870
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TmnpIxaa";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amdcloud.onmicrosoft.com header.i=@amdcloud.onmicrosoft.com header.b="u0/FmvTT"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F3F2E2085A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amd.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=ZNhfjxCe3+0lOza+4GUvXzJCQvBOENbA5iqEouSBDDo=; b=re0
-	MduWpvXa4I3O4BwEFzvHFeKs6Kld+YyhvnKmB98XjPX5KfrFBpCeMQWN7kQJMjpKCFxMAc1wRIYt+
-	OP9Ef2IKv4SoIndmaKmceelOTIRhFcJ8WhNKnLO3pv7jmPWV5OlIXhapVZzcMW21AGt0WSwMN16dw
-	g21AyYkky3DXk30u16AbRkfJtrIYsV7izsVXApJ6JcbUzM6JAUrqUsNG8hGCa1HMYH0LNuqCpc4Aq
-	uf1n9gEin9wAN+uuuDqnN3H5YLXxM7x5F40JhUSeid/LJ4mA/wrdGby6ZPy4S1fG4e9KqoHs91Jlp
-	JUkPP/R4pa3rjxzvhpOhBTu1zUMfxMA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=4bjGzUvR5BAseYQZXgao7FG/Y/h9qYjFNFvXFiRtxFk=; b=TmnpIxaa4YzeVx
+	Cwy4aigl7EnEpJ5Y/LED4Zz5cLLwnC/A/kIoShU0ilag/w6sxzGqo7yH2o9zjii6R4mcvOCBC1xIH
+	k3TFhlhPoY24dNyDbjPvHJT4FTCwZ/PyEjNJSuMncXj6so2QAvri7Q1HZgY8jPYSli0KhMoEUZ9+v
+	wvc7bZwUsdavkj8fhsI0lA5KWXNYJPlgB75PDfJYlV0F6N7WBOSc+sX8MgKCMgqTDOu/IvSMdZUOU
+	iiV/g1VdI0oJrGYgRLVAbv5ZACcPEdz4zIjMEZ1CDNrVJyGbDEGPNM4eMYSXdp0lraUqx7ovN8S5/
+	/qetRkD7koRdIoMvV95g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glWTO-0007yt-Ez; Mon, 21 Jan 2019 10:06:30 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1glWXw-0001Xy-7A; Mon, 21 Jan 2019 10:11:12 +0000
+Received: from mail-eopbgr820078.outbound.protection.outlook.com
+ ([40.107.82.78] helo=NAM01-SN1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glWTH-0007y9-OK
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 10:06:28 +0000
-Received: by mail-wr1-x441.google.com with SMTP id s12so22581833wrt.4
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 02:06:22 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id;
- bh=ywAKA7XPaADxrBcsFMk+tbkoWLax4ZTEel24lBBuNN4=;
- b=CU1pgPwdJuBHiqIkLzqPe3O5BRFdhqNL8zM5PR0fDMSAOkMednRyPq5b/5Amwrhp36
- Iqe5iuZo6CAn77BXugWM0s5p2Y9tSZQkKVc1ZRQgxL0T93Puxwf3XPkYJ3bHbNa/DBDE
- oEotYZRM4hs6LvE56qEz3YWK0QqqswLR1+wYU=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=ywAKA7XPaADxrBcsFMk+tbkoWLax4ZTEel24lBBuNN4=;
- b=VJZEG+TA2TQlVZFO0R7M+0N6GsSyezm/p/Ha+pVcxEPFj7CgReoJ4sX/EfV2pRmQlo
- N3HvT6XEX5e0BVaf7Ujs2IYH3mUDxyxLE4QvlOn/cAUK3qTbxZsV6IerwTXlzXj/g9vC
- kcitQr+RMdAoNOm1sr7mUmcCddjJFWu7zSMhzxM6RM1waDrgg0iLunQXwtFTTU6k2lLm
- lFAzqZZHpmototCyGAZcS4nF9BLw+fNigwLBWoUayBY0xTXRej7Mkle2Zvvi5j5YRzrm
- DnR99I4ZIE47PVuO1qp+YbKffICT8nnF6TpHHvW+SVAC/Tc0azN0CzI8LdNF+QN8d0FH
- JY7A==
-X-Gm-Message-State: AJcUukfo7+OmNaYNN3OR5hlToTracUws5aTFTptbrJSQ3FtQWQaeomOh
- LG59HcUDCdpcEYVgJ1wgCe1HH2EVYdjdpg==
-X-Google-Smtp-Source: ALg8bN4T35PTJmcoWBiZz43SdGIQsaQWsyH81wjzgvRlM2FU6AmVs9duzGMsQsXUR8oVF8GpbavgMw==
-X-Received: by 2002:a5d:6a42:: with SMTP id t2mr29375533wrw.50.1548065181082; 
- Mon, 21 Jan 2019 02:06:21 -0800 (PST)
-Received: from dogfood.home ([2a01:cb1d:112:6f00:789e:cc70:7004:686b])
- by smtp.gmail.com with ESMTPSA id f22sm4541857wmj.26.2019.01.21.02.06.19
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 21 Jan 2019 02:06:20 -0800 (PST)
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-To: linux-arm-kernel@lists.infradead.org
-Subject: [RFC PATCH] drm: disable WC optimization for cache coherent devices
- on non-x86
-Date: Mon, 21 Jan 2019 11:06:17 +0100
-Message-Id: <20190121100617.2311-1-ard.biesheuvel@linaro.org>
-X-Mailer: git-send-email 2.17.1
+ id 1glWXq-0001X2-Ot
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 10:11:10 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amdcloud.onmicrosoft.com; s=selector1-amd-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=lzZEq//8OdKM3/D419Jdvlj/dhb4JsuWedzH2fYl36c=;
+ b=u0/FmvTTR99/lQ9dDRJiCsgbAr18oXG/gwwSfeIQJuKRJgbXVBF133b0WWQGq727cjwGMhZcaqlfyGK34cQI+HS+PVsWhEbUlYjzMsV+tLGgaBq8q07u2ZEUHzXvEYjhw75aP9Yz41Rp0NWz+rCScy7K8G4Gq37Yi+8arvkuP8o=
+Received: from CY4PR12MB1717.namprd12.prod.outlook.com (10.175.62.139) by
+ CY4PR12MB1253.namprd12.prod.outlook.com (10.168.167.16) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1537.31; Mon, 21 Jan 2019 10:11:04 +0000
+Received: from CY4PR12MB1717.namprd12.prod.outlook.com
+ ([fe80::7dec:669a:ec18:7f0f]) by CY4PR12MB1717.namprd12.prod.outlook.com
+ ([fe80::7dec:669a:ec18:7f0f%7]) with mapi id 15.20.1537.031; Mon, 21 Jan 2019
+ 10:11:04 +0000
+From: "Koenig, Christian" <Christian.Koenig@amd.com>
+To: Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Subject: Re: [RFC PATCH] drm: disable WC optimization for cache coherent
+ devices on non-x86
+Thread-Topic: [RFC PATCH] drm: disable WC optimization for cache coherent
+ devices on non-x86
+Thread-Index: AQHUsXD3UXk0MPD/dUyEFCISRS4xuqW5gE+A
+Date: Mon, 21 Jan 2019 10:11:04 +0000
+Message-ID: <3246d2e5-497f-dac5-fa78-cf9e95c45423@amd.com>
+References: <20190121100617.2311-1-ard.biesheuvel@linaro.org>
+In-Reply-To: <20190121100617.2311-1-ard.biesheuvel@linaro.org>
+Accept-Language: de-DE, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+user-agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
+x-originating-ip: [2a02:908:1252:fb60:be8a:bd56:1f94:86e7]
+x-clientproxiedby: AM5P190CA0010.EURP190.PROD.OUTLOOK.COM
+ (2603:10a6:206:14::23) To CY4PR12MB1717.namprd12.prod.outlook.com
+ (2603:10b6:903:121::11)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Christian.Koenig@amd.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; CY4PR12MB1253;
+ 20:GQu/hfVZAOZASSA55LtqB1hQY1gVYrbhQTA7DhNY/M+8NT5ZYg0RBUfs5S5b8zFDkysftlaSITiyfaLwWFFNV0vU0cz7h4MK+jw40WvRP//YqOR3vDkM/cTqQQ9BZWuIybTK9chXMeki7fY4GQwpyE1Tf4MWSScNzRPr15Xu5lykANrHIhdAyRY+q1n0RztYgVw7qKcfnJepOFRL2qgF9f78GzQ/xCjrFViuSIn6Wdd56jobCHGZKYMBRYz1/1j4
+x-ms-office365-filtering-correlation-id: 453c5f7f-6cd3-4acd-d8db-08d67f88c057
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:CY4PR12MB1253; 
+x-ms-traffictypediagnostic: CY4PR12MB1253:
+x-microsoft-antispam-prvs: <CY4PR12MB12534055E746687614E93C99839F0@CY4PR12MB1253.namprd12.prod.outlook.com>
+x-forefront-prvs: 0924C6A0D5
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(396003)(136003)(366004)(376002)(346002)(39860400002)(199004)(189003)(65956001)(8936002)(81166006)(81156014)(6246003)(25786009)(97736004)(2906002)(478600001)(966005)(58126008)(316002)(54906003)(72206003)(110136005)(14454004)(4326008)(65826007)(99286004)(68736007)(7416002)(76176011)(229853002)(36756003)(31696002)(6486002)(7736002)(6436002)(66574012)(65806001)(106356001)(386003)(102836004)(6506007)(486006)(305945005)(186003)(2501003)(52116002)(105586002)(8676002)(6116002)(71190400001)(71200400001)(256004)(64126003)(53936002)(6512007)(6306002)(31686004)(2616005)(46003)(476003)(446003)(11346002)(86362001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:CY4PR12MB1253;
+ H:CY4PR12MB1717.namprd12.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: amd.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: vBVW7fVy1LBGozzxdM34jkj8Ha1DnECT/0XHYmmlxMpSj7TC3Ul49xk9fim2czkI+X2Ihd2BJdX1hF9vphthYxupMRp0fFYuDut3aanZ3VL8ZCckJDo22I32YQmgDXvw9nRVtaY9XHMv+bSiagt5T3biCPonTZsI74jiciyGiDx4yUkUgKY+ADjR60n0nG1iTHd5A4wqPxMGFN6GkJETb7ne2NiKDVmhF+psgr6wR439qgcRiEfWmfhuzu4f+c41lwhA65aqN8vGu6gJFBwXVEIrwN3RSeX8kVQeiriIzPsII6fsbAyCiGjF1V5aguilLju3VM6vgP+qJWf3BvQIcaE4FWqtDwOkMCYrrCPdTKyQ/8/yW2QabPOsMdIFlLivRQ8kG263nF8gvEz0O+MGtKvMFmSjyC2zGmlFRVexEOA=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+Content-ID: <26658351F424B7459A556CA16433D0AF@namprd12.prod.outlook.com>
+MIME-Version: 1.0
+X-OriginatorOrg: amd.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 453c5f7f-6cd3-4acd-d8db-08d67f88c057
+X-MS-Exchange-CrossTenant-originalarrivaltime: 21 Jan 2019 10:11:00.6509 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 3dd8961f-e488-4e60-8e11-a82d994e183d
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: CY4PR12MB1253
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_020623_827240_C0342346 
-X-CRM114-Status: GOOD (  16.71  )
+X-CRM114-CacheID: sfid-20190121_021107_163813_9BF9F2E2 
+X-CRM114-Status: GOOD (  25.24  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,143 +121,114 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Will Deacon <will.deacon@arm.com>, David Zhou <David1.Zhou@amd.com>,
+Cc: Will Deacon <will.deacon@arm.com>, "Zhou,
+ David\(ChunMing\)" <David1.Zhou@amd.com>,
  Maxime Ripard <maxime.ripard@bootlin.com>,
  Benjamin Herrenschmidt <benh@kernel.crashing.org>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>, David Airlie <airlied@linux.ie>,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- Michel Daenzer <michel.daenzer@amd.com>, linux-kernel@vger.kernel.org,
- amd-gfx@lists.freedesktop.org, Junwei Zhang <Jerry.Zhang@amd.com>,
- Huang Rui <ray.huang@amd.com>, dri-devel@lists.freedesktop.org,
+ David Airlie <airlied@linux.ie>,
+ Maarten Lankhorst <maarten.lankhorst@linux.intel.com>, "Daenzer,
+ Michel" <Michel.Daenzer@amd.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "amd-gfx@lists.freedesktop.org" <amd-gfx@lists.freedesktop.org>, "Zhang,
+ Jerry" <Jerry.Zhang@amd.com>, "Huang, Ray" <Ray.Huang@amd.com>,
+ "dri-devel@lists.freedesktop.org" <dri-devel@lists.freedesktop.org>,
  Daniel Vetter <daniel@ffwll.ch>, Michael Ellerman <mpe@ellerman.id.au>,
- Alex Deucher <alexander.deucher@amd.com>, Sean Paul <sean@poorly.run>,
- Christian Koenig <christian.koenig@amd.com>
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+ "Deucher, 
+ Alexander" <Alexander.Deucher@amd.com>, Sean Paul <sean@poorly.run>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Currently, the DRM code assumes that PCI devices are always cache
-coherent for DMA, and that this can be selectively overridden for
-some buffers using non-cached mappings on the CPU side and PCIe
-NoSnoop transactions on the bus side.
-
-Whether the NoSnoop part is implemented correctly is highly platform
-specific. Whether it /matters/ if NoSnoop is implemented correctly or
-not is architecture specific: on x86, such transactions are coherent
-with the CPU whether the NoSnoop attribute is honored or not. On other
-architectures, it depends on whether such transactions may allocate in
-caches that are non-coherent with the CPU's uncached mappings.
-
-Bottom line is that we should not rely on this optimization to work
-correctly for cache coherent devices in the general case. On the
-other hand, disabling this optimization for non-coherent devices
-is likely to cause breakage as well, since the driver will assume
-cache coherent PCIe if this optimization is turned off.
-
-So rename drm_arch_can_wc_memory() to drm_device_can_wc_memory(), and
-pass the drm_device pointer into it so we can base the return value
-on whether the device is cache coherent or not if not running on
-X86.
-
-Cc: Christian Koenig <christian.koenig@amd.com>
-Cc: Alex Deucher <alexander.deucher@amd.com>
-Cc: David Zhou <David1.Zhou@amd.com>
-Cc: Huang Rui <ray.huang@amd.com>
-Cc: Junwei Zhang <Jerry.Zhang@amd.com>
-Cc: Michel Daenzer <michel.daenzer@amd.com>
-Cc: David Airlie <airlied@linux.ie>
-Cc: Daniel Vetter <daniel@ffwll.ch>
-Cc: Maarten Lankhorst <maarten.lankhorst@linux.intel.com>
-Cc: Maxime Ripard <maxime.ripard@bootlin.com>
-Cc: Sean Paul <sean@poorly.run>
-Cc: Michael Ellerman <mpe@ellerman.id.au>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Reported-by: Carsten Haitzler <Carsten.Haitzler@arm.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-This is a followup to '[RFC PATCH] drm/ttm: force cached mappings for system
-RAM on ARM'
-
-https://lore.kernel.org/linux-arm-kernel/20190110072841.3283-1-ard.biesheuvel@linaro.org/
-
-Without t
- drivers/gpu/drm/amd/amdgpu/amdgpu_object.c |  2 +-
- drivers/gpu/drm/radeon/radeon_object.c     |  2 +-
- include/drm/drm_cache.h                    | 19 +++++++++++--------
- 3 files changed, 13 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_object.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_object.c
-index 728e15e5d68a..777fa251838f 100644
---- a/drivers/gpu/drm/amd/amdgpu/amdgpu_object.c
-+++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_object.c
-@@ -480,7 +480,7 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
- 	/* For architectures that don't support WC memory,
- 	 * mask out the WC flag from the BO
- 	 */
--	if (!drm_arch_can_wc_memory())
-+	if (!drm_device_can_wc_memory(adev->ddev))
- 		bo->flags &= ~AMDGPU_GEM_CREATE_CPU_GTT_USWC;
- #endif
- 
-diff --git a/drivers/gpu/drm/radeon/radeon_object.c b/drivers/gpu/drm/radeon/radeon_object.c
-index 833e909706a9..610889bf6ab5 100644
---- a/drivers/gpu/drm/radeon/radeon_object.c
-+++ b/drivers/gpu/drm/radeon/radeon_object.c
-@@ -249,7 +249,7 @@ int radeon_bo_create(struct radeon_device *rdev,
- 	/* For architectures that don't support WC memory,
- 	 * mask out the WC flag from the BO
- 	 */
--	if (!drm_arch_can_wc_memory())
-+	if (!drm_device_can_wc_memory(rdev->ddev))
- 		bo->flags &= ~RADEON_GEM_GTT_WC;
- #endif
- 
-diff --git a/include/drm/drm_cache.h b/include/drm/drm_cache.h
-index bfe1639df02d..ced63b1207a3 100644
---- a/include/drm/drm_cache.h
-+++ b/include/drm/drm_cache.h
-@@ -33,6 +33,8 @@
- #ifndef _DRM_CACHE_H_
- #define _DRM_CACHE_H_
- 
-+#include <drm/drm_device.h>
-+#include <linux/dma-noncoherent.h>
- #include <linux/scatterlist.h>
- 
- void drm_clflush_pages(struct page *pages[], unsigned long num_pages);
-@@ -41,15 +43,16 @@ void drm_clflush_virt_range(void *addr, unsigned long length);
- u64 drm_get_max_iomem(void);
- 
- 
--static inline bool drm_arch_can_wc_memory(void)
-+static inline bool drm_device_can_wc_memory(struct drm_device *ddev)
- {
--#if defined(CONFIG_PPC) && !defined(CONFIG_NOT_COHERENT_CACHE)
--	return false;
--#elif defined(CONFIG_MIPS) && defined(CONFIG_CPU_LOONGSON3)
--	return false;
--#else
--	return true;
--#endif
-+	if (IS_ENABLED(CONFIG_PPC))
-+		return IS_ENABLED(CONFIG_NOT_COHERENT_CACHE);
-+	else if (IS_ENABLED(CONFIG_MIPS))
-+		return !IS_ENABLED(CONFIG_CPU_LOONGSON3);
-+	else if (IS_ENABLED(CONFIG_X86))
-+		return true;
-+
-+	return !dev_is_dma_coherent(ddev->dev);
- }
- 
- #endif
--- 
-2.17.1
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+QW0gMjEuMDEuMTkgdW0gMTE6MDYgc2NocmllYiBBcmQgQmllc2hldXZlbDoNCj4gQ3VycmVudGx5
+LCB0aGUgRFJNIGNvZGUgYXNzdW1lcyB0aGF0IFBDSSBkZXZpY2VzIGFyZSBhbHdheXMgY2FjaGUN
+Cj4gY29oZXJlbnQgZm9yIERNQSwgYW5kIHRoYXQgdGhpcyBjYW4gYmUgc2VsZWN0aXZlbHkgb3Zl
+cnJpZGRlbiBmb3INCj4gc29tZSBidWZmZXJzIHVzaW5nIG5vbi1jYWNoZWQgbWFwcGluZ3Mgb24g
+dGhlIENQVSBzaWRlIGFuZCBQQ0llDQo+IE5vU25vb3AgdHJhbnNhY3Rpb25zIG9uIHRoZSBidXMg
+c2lkZS4NCj4NCj4gV2hldGhlciB0aGUgTm9Tbm9vcCBwYXJ0IGlzIGltcGxlbWVudGVkIGNvcnJl
+Y3RseSBpcyBoaWdobHkgcGxhdGZvcm0NCj4gc3BlY2lmaWMuIFdoZXRoZXIgaXQgL21hdHRlcnMv
+IGlmIE5vU25vb3AgaXMgaW1wbGVtZW50ZWQgY29ycmVjdGx5IG9yDQo+IG5vdCBpcyBhcmNoaXRl
+Y3R1cmUgc3BlY2lmaWM6IG9uIHg4Niwgc3VjaCB0cmFuc2FjdGlvbnMgYXJlIGNvaGVyZW50DQo+
+IHdpdGggdGhlIENQVSB3aGV0aGVyIHRoZSBOb1Nub29wIGF0dHJpYnV0ZSBpcyBob25vcmVkIG9y
+IG5vdC4gT24gb3RoZXINCj4gYXJjaGl0ZWN0dXJlcywgaXQgZGVwZW5kcyBvbiB3aGV0aGVyIHN1
+Y2ggdHJhbnNhY3Rpb25zIG1heSBhbGxvY2F0ZSBpbg0KPiBjYWNoZXMgdGhhdCBhcmUgbm9uLWNv
+aGVyZW50IHdpdGggdGhlIENQVSdzIHVuY2FjaGVkIG1hcHBpbmdzLg0KPg0KPiBCb3R0b20gbGlu
+ZSBpcyB0aGF0IHdlIHNob3VsZCBub3QgcmVseSBvbiB0aGlzIG9wdGltaXphdGlvbiB0byB3b3Jr
+DQo+IGNvcnJlY3RseSBmb3IgY2FjaGUgY29oZXJlbnQgZGV2aWNlcyBpbiB0aGUgZ2VuZXJhbCBj
+YXNlLiBPbiB0aGUNCj4gb3RoZXIgaGFuZCwgZGlzYWJsaW5nIHRoaXMgb3B0aW1pemF0aW9uIGZv
+ciBub24tY29oZXJlbnQgZGV2aWNlcw0KPiBpcyBsaWtlbHkgdG8gY2F1c2UgYnJlYWthZ2UgYXMg
+d2VsbCwgc2luY2UgdGhlIGRyaXZlciB3aWxsIGFzc3VtZQ0KPiBjYWNoZSBjb2hlcmVudCBQQ0ll
+IGlmIHRoaXMgb3B0aW1pemF0aW9uIGlzIHR1cm5lZCBvZmYuDQo+DQo+IFNvIHJlbmFtZSBkcm1f
+YXJjaF9jYW5fd2NfbWVtb3J5KCkgdG8gZHJtX2RldmljZV9jYW5fd2NfbWVtb3J5KCksIGFuZA0K
+PiBwYXNzIHRoZSBkcm1fZGV2aWNlIHBvaW50ZXIgaW50byBpdCBzbyB3ZSBjYW4gYmFzZSB0aGUg
+cmV0dXJuIHZhbHVlDQo+IG9uIHdoZXRoZXIgdGhlIGRldmljZSBpcyBjYWNoZSBjb2hlcmVudCBv
+ciBub3QgaWYgbm90IHJ1bm5pbmcgb24NCj4gWDg2Lg0KPg0KPiBDYzogQ2hyaXN0aWFuIEtvZW5p
+ZyA8Y2hyaXN0aWFuLmtvZW5pZ0BhbWQuY29tPg0KPiBDYzogQWxleCBEZXVjaGVyIDxhbGV4YW5k
+ZXIuZGV1Y2hlckBhbWQuY29tPg0KPiBDYzogRGF2aWQgWmhvdSA8RGF2aWQxLlpob3VAYW1kLmNv
+bT4NCj4gQ2M6IEh1YW5nIFJ1aSA8cmF5Lmh1YW5nQGFtZC5jb20+DQo+IENjOiBKdW53ZWkgWmhh
+bmcgPEplcnJ5LlpoYW5nQGFtZC5jb20+DQo+IENjOiBNaWNoZWwgRGFlbnplciA8bWljaGVsLmRh
+ZW56ZXJAYW1kLmNvbT4NCj4gQ2M6IERhdmlkIEFpcmxpZSA8YWlybGllZEBsaW51eC5pZT4NCj4g
+Q2M6IERhbmllbCBWZXR0ZXIgPGRhbmllbEBmZndsbC5jaD4NCj4gQ2M6IE1hYXJ0ZW4gTGFua2hv
+cnN0IDxtYWFydGVuLmxhbmtob3JzdEBsaW51eC5pbnRlbC5jb20+DQo+IENjOiBNYXhpbWUgUmlw
+YXJkIDxtYXhpbWUucmlwYXJkQGJvb3RsaW4uY29tPg0KPiBDYzogU2VhbiBQYXVsIDxzZWFuQHBv
+b3JseS5ydW4+DQo+IENjOiBNaWNoYWVsIEVsbGVybWFuIDxtcGVAZWxsZXJtYW4uaWQuYXU+DQo+
+IENjOiBCZW5qYW1pbiBIZXJyZW5zY2htaWR0IDxiZW5oQGtlcm5lbC5jcmFzaGluZy5vcmc+DQo+
+IENjOiBXaWxsIERlYWNvbiA8d2lsbC5kZWFjb25AYXJtLmNvbT4NCj4gUmVwb3J0ZWQtYnk6IENh
+cnN0ZW4gSGFpdHpsZXIgPENhcnN0ZW4uSGFpdHpsZXJAYXJtLmNvbT4NCj4gU2lnbmVkLW9mZi1i
+eTogQXJkIEJpZXNoZXV2ZWwgPGFyZC5iaWVzaGV1dmVsQGxpbmFyby5vcmc+DQoNCkxvb2tzIHNh
+bmUgdG8gbWUsIGJ1dCBJIGNhbid0IGZ1bGx5IGp1ZGdlIGlmIHRoZSBjaGVjayBpcyBhY3R1YWxs
+eSANCmNvcnJlY3Qgb3Igbm90Lg0KDQpTbyBBY2tlZC1ieTogQ2hyaXN0aWFuIEvDtm5pZyA8Y2hy
+aXN0aWFuLmtvZW5pZ0BhbWQuY29tPg0KDQo+IC0tLQ0KPiBUaGlzIGlzIGEgZm9sbG93dXAgdG8g
+J1tSRkMgUEFUQ0hdIGRybS90dG06IGZvcmNlIGNhY2hlZCBtYXBwaW5ncyBmb3Igc3lzdGVtDQo+
+IFJBTSBvbiBBUk0nDQo+DQo+IGh0dHBzOi8vbG9yZS5rZXJuZWwub3JnL2xpbnV4LWFybS1rZXJu
+ZWwvMjAxOTAxMTAwNzI4NDEuMzI4My0xLWFyZC5iaWVzaGV1dmVsQGxpbmFyby5vcmcvDQo+DQo+
+IFdpdGhvdXQgdA0KPiAgIGRyaXZlcnMvZ3B1L2RybS9hbWQvYW1kZ3B1L2FtZGdwdV9vYmplY3Qu
+YyB8ICAyICstDQo+ICAgZHJpdmVycy9ncHUvZHJtL3JhZGVvbi9yYWRlb25fb2JqZWN0LmMgICAg
+IHwgIDIgKy0NCj4gICBpbmNsdWRlL2RybS9kcm1fY2FjaGUuaCAgICAgICAgICAgICAgICAgICAg
+fCAxOSArKysrKysrKysrKy0tLS0tLS0tDQo+ICAgMyBmaWxlcyBjaGFuZ2VkLCAxMyBpbnNlcnRp
+b25zKCspLCAxMCBkZWxldGlvbnMoLSkNCj4NCj4gZGlmZiAtLWdpdCBhL2RyaXZlcnMvZ3B1L2Ry
+bS9hbWQvYW1kZ3B1L2FtZGdwdV9vYmplY3QuYyBiL2RyaXZlcnMvZ3B1L2RybS9hbWQvYW1kZ3B1
+L2FtZGdwdV9vYmplY3QuYw0KPiBpbmRleCA3MjhlMTVlNWQ2OGEuLjc3N2ZhMjUxODM4ZiAxMDA2
+NDQNCj4gLS0tIGEvZHJpdmVycy9ncHUvZHJtL2FtZC9hbWRncHUvYW1kZ3B1X29iamVjdC5jDQo+
+ICsrKyBiL2RyaXZlcnMvZ3B1L2RybS9hbWQvYW1kZ3B1L2FtZGdwdV9vYmplY3QuYw0KPiBAQCAt
+NDgwLDcgKzQ4MCw3IEBAIHN0YXRpYyBpbnQgYW1kZ3B1X2JvX2RvX2NyZWF0ZShzdHJ1Y3QgYW1k
+Z3B1X2RldmljZSAqYWRldiwNCj4gICAJLyogRm9yIGFyY2hpdGVjdHVyZXMgdGhhdCBkb24ndCBz
+dXBwb3J0IFdDIG1lbW9yeSwNCj4gICAJICogbWFzayBvdXQgdGhlIFdDIGZsYWcgZnJvbSB0aGUg
+Qk8NCj4gICAJICovDQo+IC0JaWYgKCFkcm1fYXJjaF9jYW5fd2NfbWVtb3J5KCkpDQo+ICsJaWYg
+KCFkcm1fZGV2aWNlX2Nhbl93Y19tZW1vcnkoYWRldi0+ZGRldikpDQo+ICAgCQliby0+ZmxhZ3Mg
+Jj0gfkFNREdQVV9HRU1fQ1JFQVRFX0NQVV9HVFRfVVNXQzsNCj4gICAjZW5kaWYNCj4gICANCj4g
+ZGlmZiAtLWdpdCBhL2RyaXZlcnMvZ3B1L2RybS9yYWRlb24vcmFkZW9uX29iamVjdC5jIGIvZHJp
+dmVycy9ncHUvZHJtL3JhZGVvbi9yYWRlb25fb2JqZWN0LmMNCj4gaW5kZXggODMzZTkwOTcwNmE5
+Li42MTA4ODliZjZhYjUgMTAwNjQ0DQo+IC0tLSBhL2RyaXZlcnMvZ3B1L2RybS9yYWRlb24vcmFk
+ZW9uX29iamVjdC5jDQo+ICsrKyBiL2RyaXZlcnMvZ3B1L2RybS9yYWRlb24vcmFkZW9uX29iamVj
+dC5jDQo+IEBAIC0yNDksNyArMjQ5LDcgQEAgaW50IHJhZGVvbl9ib19jcmVhdGUoc3RydWN0IHJh
+ZGVvbl9kZXZpY2UgKnJkZXYsDQo+ICAgCS8qIEZvciBhcmNoaXRlY3R1cmVzIHRoYXQgZG9uJ3Qg
+c3VwcG9ydCBXQyBtZW1vcnksDQo+ICAgCSAqIG1hc2sgb3V0IHRoZSBXQyBmbGFnIGZyb20gdGhl
+IEJPDQo+ICAgCSAqLw0KPiAtCWlmICghZHJtX2FyY2hfY2FuX3djX21lbW9yeSgpKQ0KPiArCWlm
+ICghZHJtX2RldmljZV9jYW5fd2NfbWVtb3J5KHJkZXYtPmRkZXYpKQ0KPiAgIAkJYm8tPmZsYWdz
+ICY9IH5SQURFT05fR0VNX0dUVF9XQzsNCj4gICAjZW5kaWYNCj4gICANCj4gZGlmZiAtLWdpdCBh
+L2luY2x1ZGUvZHJtL2RybV9jYWNoZS5oIGIvaW5jbHVkZS9kcm0vZHJtX2NhY2hlLmgNCj4gaW5k
+ZXggYmZlMTYzOWRmMDJkLi5jZWQ2M2IxMjA3YTMgMTAwNjQ0DQo+IC0tLSBhL2luY2x1ZGUvZHJt
+L2RybV9jYWNoZS5oDQo+ICsrKyBiL2luY2x1ZGUvZHJtL2RybV9jYWNoZS5oDQo+IEBAIC0zMyw2
+ICszMyw4IEBADQo+ICAgI2lmbmRlZiBfRFJNX0NBQ0hFX0hfDQo+ICAgI2RlZmluZSBfRFJNX0NB
+Q0hFX0hfDQo+ICAgDQo+ICsjaW5jbHVkZSA8ZHJtL2RybV9kZXZpY2UuaD4NCj4gKyNpbmNsdWRl
+IDxsaW51eC9kbWEtbm9uY29oZXJlbnQuaD4NCj4gICAjaW5jbHVkZSA8bGludXgvc2NhdHRlcmxp
+c3QuaD4NCj4gICANCj4gICB2b2lkIGRybV9jbGZsdXNoX3BhZ2VzKHN0cnVjdCBwYWdlICpwYWdl
+c1tdLCB1bnNpZ25lZCBsb25nIG51bV9wYWdlcyk7DQo+IEBAIC00MSwxNSArNDMsMTYgQEAgdm9p
+ZCBkcm1fY2xmbHVzaF92aXJ0X3JhbmdlKHZvaWQgKmFkZHIsIHVuc2lnbmVkIGxvbmcgbGVuZ3Ro
+KTsNCj4gICB1NjQgZHJtX2dldF9tYXhfaW9tZW0odm9pZCk7DQo+ICAgDQo+ICAgDQo+IC1zdGF0
+aWMgaW5saW5lIGJvb2wgZHJtX2FyY2hfY2FuX3djX21lbW9yeSh2b2lkKQ0KPiArc3RhdGljIGlu
+bGluZSBib29sIGRybV9kZXZpY2VfY2FuX3djX21lbW9yeShzdHJ1Y3QgZHJtX2RldmljZSAqZGRl
+dikNCj4gICB7DQo+IC0jaWYgZGVmaW5lZChDT05GSUdfUFBDKSAmJiAhZGVmaW5lZChDT05GSUdf
+Tk9UX0NPSEVSRU5UX0NBQ0hFKQ0KPiAtCXJldHVybiBmYWxzZTsNCj4gLSNlbGlmIGRlZmluZWQo
+Q09ORklHX01JUFMpICYmIGRlZmluZWQoQ09ORklHX0NQVV9MT09OR1NPTjMpDQo+IC0JcmV0dXJu
+IGZhbHNlOw0KPiAtI2Vsc2UNCj4gLQlyZXR1cm4gdHJ1ZTsNCj4gLSNlbmRpZg0KPiArCWlmIChJ
+U19FTkFCTEVEKENPTkZJR19QUEMpKQ0KPiArCQlyZXR1cm4gSVNfRU5BQkxFRChDT05GSUdfTk9U
+X0NPSEVSRU5UX0NBQ0hFKTsNCj4gKwllbHNlIGlmIChJU19FTkFCTEVEKENPTkZJR19NSVBTKSkN
+Cj4gKwkJcmV0dXJuICFJU19FTkFCTEVEKENPTkZJR19DUFVfTE9PTkdTT04zKTsNCj4gKwllbHNl
+IGlmIChJU19FTkFCTEVEKENPTkZJR19YODYpKQ0KPiArCQlyZXR1cm4gdHJ1ZTsNCj4gKw0KPiAr
+CXJldHVybiAhZGV2X2lzX2RtYV9jb2hlcmVudChkZGV2LT5kZXYpOw0KPiAgIH0NCj4gICANCj4g
+ICAjZW5kaWYNCg0KX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5p
+bmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8v
+bGludXgtYXJtLWtlcm5lbAo=
