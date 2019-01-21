@@ -2,87 +2,63 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 91CF5C282DB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 09:58:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A1006C282DB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 10:01:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5A3442084A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 09:58:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 710CF20663
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 10:01:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sxGGmf3l"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5A3442084A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ug87J9ZK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 710CF20663
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=IHOdz7lfoppZRKYy5YvtKgBCl1CF14FjPz62t1QJbsU=; b=sxGGmf3lnSbtR5
-	WuJVjhpYlE1XOHogvq3YpEnUs/UlKvRC0MsOT2LmZq2Qg6s3Gi1agAls/kSfvMYarTakBrHMdVxq0
-	Xy3/BMZoPnOKBzj0Uk0Eum1BHyPy6Od/OhEYPuET0YYu0T7wOpYQL7K6S3BLAOio0lrg0d8TkU32O
-	vFS7q55PJlb8ZX9dVQz4riG9G02rWorB1wt2ozrf/hSz9nzZQJhpMR0g2ox9nebR6tAwFSJcEd0MH
-	biaoOJDQtDoV+P/Zn9n80H1r+amhxjolm6RK1++TmcQescAk1YoYU4YVMtKKFpdqzicezjowwDGXP
-	Qv1Nxlt9hrSPIH5W3BiA==;
+	List-Owner; bh=cCGnWrTaqh8xuHucNw99g80Xe9ifViyVwh/UPVieq4c=; b=ug87J9ZKwZ5weO
+	jQPXNOLc+7gmp/5p9iJ9FNMjNniFwoX041sbX+Ct2bYqOY2Xbpjjbkd4oS68qe3//w+TRYnYMjzSb
+	MokAZUQMHmLpbnjJc+VwhZ8+10wNytAkoozvrPyOqUavjx/oWsIv9Bhw1Tj7uBJEnZsEpvMDSIWXF
+	MaGJIYxAv7wLp+eGCRwfAF3NnVcLs2f2kLjN/kSveOApe0KpryCOJ9Pnl6aJ0zERF2y0uaewJF7Id
+	p8q1Ww4OcSZtngNSFzlhBbpgebDuwSJs8z6Iig7YB6bNTF7v5WIHQdfu7hoWnL7atfwpyrnEajLO5
+	Hh/AQMFdBB7F9lEhHTfA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glWLa-0003Uk-SH; Mon, 21 Jan 2019 09:58:26 +0000
-Received: from mail-ed1-f65.google.com ([209.85.208.65])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glWLN-0003CU-Lt
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 09:58:24 +0000
-Received: by mail-ed1-f65.google.com with SMTP id x30so16106594edx.2
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 01:58:12 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=2FK5jNlsShQJzHoLLKIat5FmMB5NfMzifMxo7fd5+GI=;
- b=ZiC2rm3QKTtlEyld5tet1JPR5FtlRVF6f/KH6pykuIAmCq+PJHKKKM/OEPYje5vYbc
- w/m0019cHFHzHVcjWMHITmO3dwOqgynKk4d5aihz/zToKvsVVUZNNthGUiJvw740thiB
- x/NG8ZAXlcXNePzlH4oQw+W65o1VHhuTV5ecq61x95qhBe5F+EqzSrUu1q/Jyd1CKwTx
- ENZVtbfzzLR+XUG/CFajlYrD/LfYOUh5tpj5L93fDlFGRUvi5yoREIwYVi/5ogy2ndSi
- ZpnzjkmPPWzBix/IbGiITcUlUh7H6mcRvC3duWP6+om0WWZn+E22I4cj+5VjHbH1Ajlu
- vXXA==
-X-Gm-Message-State: AJcUukcu1x5wFuriUJVbyi85eGSjOFUqI5vpXnxkNqjNHyOsEuFShPmj
- /RQmrjXBu8OinDeyz3hK+gSUDcinbno=
-X-Google-Smtp-Source: ALg8bN6kpiow5FiuXWtCin9YHgnJLUSb+0jqOg1S+52zYxuR1JqEyA3dDvvdKH8HAXzRnfqZhaoVBA==
-X-Received: by 2002:a50:b1af:: with SMTP id m44mr25916600edd.47.1548064690971; 
- Mon, 21 Jan 2019 01:58:10 -0800 (PST)
-Received: from mail-wr1-f53.google.com (mail-wr1-f53.google.com.
- [209.85.221.53])
- by smtp.gmail.com with ESMTPSA id n16-v6sm4764440eja.6.2019.01.21.01.58.09
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 21 Jan 2019 01:58:10 -0800 (PST)
-Received: by mail-wr1-f53.google.com with SMTP id r10so22482071wrs.10
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 01:58:09 -0800 (PST)
-X-Received: by 2002:a5d:4f10:: with SMTP id c16mr28037486wru.177.1548064689599; 
- Mon, 21 Jan 2019 01:58:09 -0800 (PST)
+	id 1glWOC-0005Kp-0g; Mon, 21 Jan 2019 10:01:08 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glWO4-0005Jj-5h
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 10:01:05 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 38F90209BF; Mon, 21 Jan 2019 11:00:58 +0100 (CET)
+Received: from xps13 (aaubervilliers-681-1-37-87.w90-88.abo.wanadoo.fr
+ [90.88.156.87])
+ by mail.bootlin.com (Postfix) with ESMTPSA id AF17A206A7;
+ Mon, 21 Jan 2019 11:00:47 +0100 (CET)
+Date: Mon, 21 Jan 2019 11:00:47 +0100
+From: Miquel Raynal <miquel.raynal@bootlin.com>
+To: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Subject: Re: [PATCH v2 03/10] usb: ehci-orion: avoid double PHY initialization
+Message-ID: <20190121110047.7654a67e@xps13>
+In-Reply-To: <ffb3d79a-a506-5bda-402e-98e67d52933f@cogentembedded.com>
+References: <20190111133133.24803-1-miquel.raynal@bootlin.com>
+ <20190111133133.24803-4-miquel.raynal@bootlin.com>
+ <ffb3d79a-a506-5bda-402e-98e67d52933f@cogentembedded.com>
+Organization: Bootlin
+X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
-References: <20190111173015.12119-1-jernej.skrabec@siol.net>
- <20190111173015.12119-2-jernej.skrabec@siol.net>
- <CAGb2v66DiqK9sL-hQev4Wy08d9T7f1Yc2DFWJ0gYOnqChJyBRw@mail.gmail.com>
- <20190121095014.b6iq5dubfi7x2pi4@flea>
-In-Reply-To: <20190121095014.b6iq5dubfi7x2pi4@flea>
-From: Chen-Yu Tsai <wens@csie.org>
-Date: Mon, 21 Jan 2019 17:57:57 +0800
-X-Gmail-Original-Message-ID: <CAGb2v66d0wM8Yt2uS4MMhU6PP02h8CKwKjinasO6jtZ4ue1CAQ@mail.gmail.com>
-Message-ID: <CAGb2v66d0wM8Yt2uS4MMhU6PP02h8CKwKjinasO6jtZ4ue1CAQ@mail.gmail.com>
-Subject: Re: [PATCH 1/3] media: dt: bindings: sunxi-ir: Add A64 compatible
-To: Maxime Ripard <maxime.ripard@bootlin.com>,
- Jernej Skrabec <jernej.skrabec@siol.net>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_015814_337486_948E0C1F 
-X-CRM114-Status: GOOD (  25.21  )
+X-CRM114-CacheID: sfid-20190121_020100_347410_5EC39BFA 
+X-CRM114-Status: GOOD (  19.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,72 +70,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- linux-kernel <linux-kernel@vger.kernel.org>,
- linux-sunxi <linux-sunxi@googlegroups.com>, Rob Herring <robh+dt@kernel.org>,
- Mauro Carvalho Chehab <mchehab@kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Linux Media Mailing List <linux-media@vger.kernel.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
+ Jason Cooper <jason@lakedaemon.net>, Mathias Nyman <mathias.nyman@intel.com>,
+ devicetree@vger.kernel.org, Antoine Tenart <antoine.tenart@bootlin.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Gregory Clement <gregory.clement@bootlin.com>, linux-usb@vger.kernel.org,
+ Kishon Vijay Abraham I <kishon@ti.com>, Nadav Haklai <nadavh@marvell.com>,
+ Rob Herring <robh+dt@kernel.org>, Alan Stern <stern@rowland.harvard.edu>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 21, 2019 at 5:50 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> Hi,
->
-> I'm a bit late to the party, sorry for that.
->
-> On Sat, Jan 12, 2019 at 09:56:11AM +0800, Chen-Yu Tsai wrote:
-> > On Sat, Jan 12, 2019 at 1:30 AM Jernej Skrabec <jernej.skrabec@siol.net> wrote:
-> > >
-> > > A64 IR is compatible with A13, so add A64 compatible with A13 as a
-> > > fallback.
-> >
-> > We ask people to add the SoC-specific compatible as a contigency,
-> > in case things turn out to be not so "compatible".
-> >
-> > To be consistent with all the other SoCs and other peripherals,
-> > unless you already spotted a "compatible" difference in the
-> > hardware, i.e. the hardware isn't completely the same, this
-> > patch isn't needed. On the other hand, if you did, please mention
-> > the differences in the commit log.
->
-> Even if we don't spot things, since we have the stable DT now, if we
-> ever had that compatible in the DT from day 1, it's much easier to
-> deal with.
->
-> I'd really like to have that pattern for all the IPs even if we didn't
-> spot any issue, since we can't really say that the datasheet are
-> complete, and one can always make a mistake and overlook something.
->
-> I'm fine with this version, and can apply it as is if we all agree.
-
-I'm OK with having the fallback compatible. I'm just pointing out
-that there are and will be a whole bunch of them, and we don't need
-to document all of them unless we are actually doing something to
-support them.
-
-On the other hand, the compatible string situation for IR needs a
-bit of cleaning up at the moment. Right now we have sun4i-a10 and
-sun5i-a13. As Jernej pointed out, the A13's register definition is
-different from A64 (or any other SoCs later than sun6i). So we need
-someone with an A10s/A13 device that has IR to test it and see if
-the driver or the manual is wrong, and we'd likely add a compatible
-for the A20.
-
-Also, the earlier SoCs (A10/sun5i/A20) have IR TX capability. This
-was lost in A31, and also all of sun8i / sun50i. So we're going to
-need to add an A31 compatible that all later platforms would need
-to switch to.
-
-
-Regards
-ChenYu
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgU2VyZ2VpLAoKU2VyZ2VpIFNodHlseW92IDxzZXJnZWkuc2h0eWx5b3ZAY29nZW50ZW1iZWRk
+ZWQuY29tPiB3cm90ZSBvbiBGcmksIDExCkphbiAyMDE5IDIxOjAzOjAxICswMzAwOgoKPiBIZWxs
+byEKPiAKPiBPbiAwMS8xMS8yMDE5IDA0OjMxIFBNLCBNaXF1ZWwgUmF5bmFsIHdyb3RlOgo+IAo+
+ID4gTm8gbmVlZCB0byBpbml0aWFsaXplIHRoZSBQSFkgZnJvbSB0aGUgZHJpdmVyJ3MgcHJvYmUu
+IEl0IGlzIGRvbmUgYnkKPiA+IHRoZSBjb3JlIGF1dG9tYXRpY2FsbHkgYW5kIGRvaW5nIGl0IHR3
+aWNlIHdvdWxkIGluY3JlbWVudCB0aGUKPiA+IHBoeS0+cG93ZXJjb3VudCBjb3VudGVyIHRvIDIg
+aW5zdGVhZCBvZiAxLiBEdXJpbmcgbGF0ZXIgc3VzcGVuZAo+ID4gb3BlcmF0aW9uLCB0aGUgY291
+bnRlciB3aWxsIGJlIGRlY3JlbWVudGVkIHRvIG9uZSwgbm8gcGh5LT5wb3dlcl9vZmYoKQo+ID4g
+d2lsbCBvY2N1ciBhbmQgd29yc3QgdGhhbiB0aGF0LCB0aGUgZm9sbG93aW5nIHBoeS0+cG93ZXJf
+b24oKSBhdCAgCj4gCj4gICAgV29yc2UuCgpOb3RlZAoKPiAKPiA+IHJlc3VtZSB0aW1lIHdpbGwg
+YmUgYWxzbyBza2lwcGVkLCBmYWlsaW5nIHRoZSB3aG9sZSBTMlJBTSBvcGVyYXRpb24uCj4gPiAK
+PiA+IFNpZ25lZC1vZmYtYnk6IE1pcXVlbCBSYXluYWwgPG1pcXVlbC5yYXluYWxAYm9vdGxpbi5j
+b20+Cj4gPiAtLS0KPiA+ICBkcml2ZXJzL3VzYi9ob3N0L2VoY2ktb3Jpb24uYyB8IDI2ICsrKy0t
+LS0tLS0tLS0tLS0tLS0tLS0tLS0tCj4gPiAgMSBmaWxlIGNoYW5nZWQsIDMgaW5zZXJ0aW9ucygr
+KSwgMjMgZGVsZXRpb25zKC0pCj4gPiAKPiA+IGRpZmYgLS1naXQgYS9kcml2ZXJzL3VzYi9ob3N0
+L2VoY2ktb3Jpb24uYyBiL2RyaXZlcnMvdXNiL2hvc3QvZWhjaS1vcmlvbi5jCj4gPiBpbmRleCAx
+YWQ3MjY0N2EwNjkuLjMxMDlmMDgyOTQ5ZSAxMDA2NDQKPiA+IC0tLSBhL2RyaXZlcnMvdXNiL2hv
+c3QvZWhjaS1vcmlvbi5jCj4gPiArKysgYi9kcml2ZXJzL3VzYi9ob3N0L2VoY2ktb3Jpb24uYwo+
+ID4gQEAgLTI1NywxNSArMjU3LDcgQEAgc3RhdGljIGludCBlaGNpX29yaW9uX2Rydl9wcm9iZShz
+dHJ1Y3QgcGxhdGZvcm1fZGV2aWNlICpwZGV2KQo+ID4gIAlpZiAoSVNfRVJSKHByaXYtPnBoeSkp
+IHsKPiA+ICAJCWVyciA9IFBUUl9FUlIocHJpdi0+cGh5KTsKPiA+ICAJCWlmIChlcnIgIT0gLUVO
+T1NZUykKPiA+IC0JCQlnb3RvIGVycl9waHlfZ2V0Owo+ID4gLQl9IGVsc2Ugewo+ID4gLQkJZXJy
+ID0gcGh5X2luaXQocHJpdi0+cGh5KTsKPiA+IC0JCWlmIChlcnIpCj4gPiAtCQkJZ290byBlcnJf
+cGh5X2luaXQ7Cj4gPiAtCj4gPiAtCQllcnIgPSBwaHlfcG93ZXJfb24ocHJpdi0+cGh5KTsKPiA+
+IC0JCWlmIChlcnIpCj4gPiAtCQkJZ290byBlcnJfcGh5X3Bvd2VyX29uOwo+ID4gKwkJCWdvdG8g
+ZXJyX2Rpc19jbGs7ICAKPiAKPiAgICBGYW1pbGlhciBjb2RlIGluIHVuZmFtaWxpYXIgcGxhY2Uu
+IFNvbWVib2R5IG11c3QgaGF2ZSBibGluZGx5IGNvcGllZCBpdC4uLiA6LSkKCkFjdHVhbGx5IGEg
+Z2l0IGJsYW1lIHNob3dzIHRoYXQgdGhpcyBjb2RlIGlzIHRoZXJlIHNpbmNlIDIwMTQsIDQgeWVh
+cnMKYmVmb3JlIHRoZSBIQ0QgY29yZSBzdXBwb3J0ZWQgUEhZcy4gVGhpcyBkcml2ZXIgd2FzIHBy
+b2JhYmx5IGZvcmdvdHRlbgpkdXJpbmcgdGhlIHByb2Nlc3MuIAoKClRoYW5rcywKTWlxdcOobAoK
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJt
+LWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3Jn
+Cmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtl
+cm5lbAo=
