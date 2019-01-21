@@ -2,89 +2,81 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 03E8FC31D63
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 05:46:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 17400C31D64
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 05:53:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BF0B22176F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 05:46:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D285021773
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 05:53:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZKq1S6rC";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="QkBeIhYg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BF0B22176F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U4Rv/Yd3";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="csw6EXJq";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="SUgsPHZF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D285021773
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=JteDnyrPhhXD0OUmIdxf4zw1oIhMu4oihARZaWWFwHk=; b=ZKq1S6rCQFkfCc
-	S+5DqQH9d7JcSunAMKjTmaiAEpXgCOIwp6QSvMBYp5jiOTBD2/tHGlSavS2oUKQDA8JRqC7nF9hDD
-	vAKXjRW7GE4H7hxRdJn5N+A/vQ9dEE9xhj8YSw+//k62QQ91fUPZqCkvgy0AG+YmZrlfGyCqzFKmh
-	6UOxhufJkfSL3yCSmJEEiO4P3fC7TFIk/981SjOlXLwRRN3vymLpPuOrlr9/DdkFBKKDXBPmR2iGA
-	yHKmWFFkhVqEz4Pjx1uktFBfLu2Yj0kY0o/rHCizCCUIMWPoFgeepOuha+fdpj9Bcz0IdH9gL0L0h
-	JzAvYfHMv3omdx2CsPXQ==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=UpvOUN3LTFpKM9wo3k3o87D2wh6fu13OpyqGaH82Xfg=; b=U4R
+	v/Yd3W+6h2w3evctSrl4KAYAXUH759KSofxPvx1mq1+V0pq/LqrkvgTQ+bYft2Ie5wowQV5Z6vv89
+	9ajtG8/tsEECasl195B1xny0YSVXNPd3YvUgqMaJw0ieuIu8rnK5Z0pEIRhdhdPQyfhp4Yt5SpH4Y
+	tCnSMw5mryGyt1D7OJh8Rc8T+szgltSwcowcJVbVlXvuvVLq2GJXbbP9BKNFysx+uiW/jof6FVw1+
+	cToNaQNPGz2A0P3ZjVIeJKFZR3wyN0VLuQfCFJ8QWgcw1xHg9MyZykH4P3CVj66uhd5u/V2STLnhg
+	rtTMaKZm3lm1g1H7+gpfxLgZXI7JGSg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glSPd-0006sQ-Pb; Mon, 21 Jan 2019 05:46:21 +0000
-Received: from fllv0016.ext.ti.com ([198.47.19.142])
+	id 1glSWu-0000fH-Ph; Mon, 21 Jan 2019 05:53:52 +0000
+Received: from smtp.codeaurora.org ([198.145.29.96])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glSPZ-0006rm-HT
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 05:46:19 +0000
-Received: from fllv0035.itg.ti.com ([10.64.41.0])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0L5k5Vs045886;
- Sun, 20 Jan 2019 23:46:05 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1548049565;
- bh=fJ+3K0FzBt7yJEByNGvfREYMrBKYn44IKqiRvYxCScY=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=QkBeIhYgDsy9/JVjyiVAfix9yNvToDYK0ZrRrhjRWkydOrxB6r11cQXn+DcVRJCpP
- QfIN5rJL+jm11NXnpH4qxPO3Yn3dMRo/pXlHT4WvliwkXCuDEyvMknl2DPotedcMKf
- Y2apO8OxK6yrbo1+Qm1ZbdAvgJEVxRFJ0hiun/DI=
-Received: from DLEE103.ent.ti.com (dlee103.ent.ti.com [157.170.170.33])
- by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0L5k536033692
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Sun, 20 Jan 2019 23:46:05 -0600
-Received: from DLEE111.ent.ti.com (157.170.170.22) by DLEE103.ent.ti.com
- (157.170.170.33) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Sun, 20
- Jan 2019 23:46:04 -0600
-Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE111.ent.ti.com
- (157.170.170.22) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Sun, 20 Jan 2019 23:46:04 -0600
-Received: from [172.24.190.233] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0L5k1Xn001534;
- Sun, 20 Jan 2019 23:46:02 -0600
-Subject: Re: [PATCH v5 2/2] phy: zynqmp: Add phy driver for xilinx zynqmp phy
- core
-To: Anurag Kumar Vulisha <anuragku@xilinx.com>, "robh+dt@kernel.org"
- <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- "vivek.gautam@codeaurora.org" <vivek.gautam@codeaurora.org>
-References: <1545140733-20689-1-git-send-email-anurag.kumar.vulisha@xilinx.com>
- <1545140733-20689-3-git-send-email-anurag.kumar.vulisha@xilinx.com>
- <b521679a-0c79-44b1-8a2b-1f3391a362ae@ti.com>
- <BYAPR02MB5591E4BF4C547C3E29D9CF8AA7830@BYAPR02MB5591.namprd02.prod.outlook.com>
-From: Kishon Vijay Abraham I <kishon@ti.com>
-Message-ID: <6f0c2f35-f6cd-88ec-32b9-9be247fab4e5@ti.com>
-Date: Mon, 21 Jan 2019 11:15:35 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <BYAPR02MB5591E4BF4C547C3E29D9CF8AA7830@BYAPR02MB5591.namprd02.prod.outlook.com>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+ id 1glSWr-0000es-SB
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 05:53:51 +0000
+Received: by smtp.codeaurora.org (Postfix, from userid 1000)
+ id 8EE5260866; Mon, 21 Jan 2019 05:53:48 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1548050028;
+ bh=2DBDGwUlWjS1IStdYezKwR/C6qSSDYrOCCPTeQbHBPs=;
+ h=From:To:Cc:Subject:Date:From;
+ b=csw6EXJqFlaJcz/mDGAS8bmthO41fNyf81CtfIqM6mpjIYfCQafOUM1Ux6H18YF1R
+ 7KHF2r+ex1f6a/rLHZjvwiThQ81Rq4h6gVivUbBR6CXpGkTLeBrZh/KcD/Q47+bZHA
+ ovPMT91+u1L8Xx5cfCU9OYKBpVqYrzxuxhufkuSk=
+Received: from blr-ubuntu-41.ap.qualcomm.com
+ (blr-bdr-fw-01_globalnat_allzones-outside.qualcomm.com [103.229.18.19])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-SHA256 (128/128 bits))
+ (No client certificate requested)
+ (Authenticated sender: vivek.gautam@smtp.codeaurora.org)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id 220F060237;
+ Mon, 21 Jan 2019 05:53:43 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1548050027;
+ bh=2DBDGwUlWjS1IStdYezKwR/C6qSSDYrOCCPTeQbHBPs=;
+ h=From:To:Cc:Subject:Date:From;
+ b=SUgsPHZFTLtAvaxvBOLZIasN0cZOSNphdom2Imladlv5KpMymgB2QkWB/LdMuzsx0
+ y1prPUyk4LHw+cOVlWa8C7jO4gsARYgK3Y4nrqHp/M1GQGRvEByjVEQJQ6pIbJ9Wp2
+ wDOTDQZYXNml2oZTIx+7Z9XRj1+CyZFY92ZBAa/4=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 220F060237
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ dmarc=none (p=none dis=none) header.from=codeaurora.org
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ spf=none smtp.mailfrom=vivek.gautam@codeaurora.org
+From: Vivek Gautam <vivek.gautam@codeaurora.org>
+To: will.deacon@arm.com, robin.murphy@arm.com, joro@8bytes.org,
+ iommu@lists.linux-foundation.org
+Subject: [PATCH 0/3] iommu/arm-smmu: Add support to use Last level cache
+Date: Mon, 21 Jan 2019 11:23:32 +0530
+Message-Id: <20190121055335.15430-1-vivek.gautam@codeaurora.org>
+X-Mailer: git-send-email 2.16.1.72.g5be1f00a9a70
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190120_214617_698387_9E0B2FE7 
-X-CRM114-Status: GOOD (  26.79  )
+X-CRM114-CacheID: sfid-20190120_215349_948974_C58E44E9 
+X-CRM114-Status: GOOD (  13.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,135 +88,66 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Ajay Yugalkishore Pandey <APANDEY@xilinx.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- sundeep subbaraya <sundeep.lkml@gmail.com>, Michal Simek <michals@xilinx.com>,
- "v.anuragkumar@gmail.com" <v.anuragkumar@gmail.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: pdaly@codeaurora.org, linux-arm-msm@vger.kernel.org,
+ linux-kernel@vger.kernel.org, tfiga@chromium.org, jcrouse@codeaurora.org,
+ Vivek Gautam <vivek.gautam@codeaurora.org>, pratikp@codeaurora.org,
+ linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Anurag,
+Qualcomm SoCs have an additional level of cache called as
+System cache, aka. Last level cache (LLC). This cache sits right
+before the DDR, and is tightly coupled with the memory controller.
+The clients using this cache request their slices from this
+system cache, make it active, and can then start using it.
+For these clients with smmu, to start using the system cache for
+buffers and, related page tables [1], memory attributes need to be
+set accordingly. This series add the required support.
 
-On 17/01/19 9:39 PM, Anurag Kumar Vulisha wrote:
-> Hi Kishon,
-> 
->> -----Original Message-----
->> From: Kishon Vijay Abraham I [mailto:kishon@ti.com]
->> Sent: Wednesday, January 16, 2019 1:38 PM
->> To: Anurag Kumar Vulisha <anuragku@xilinx.com>; robh+dt@kernel.org; Mark
->> Rutland <mark.rutland@arm.com>; vivek.gautam@codeaurora.org
->> Cc: Michal Simek <michals@xilinx.com>; v.anuragkumar@gmail.com; sundeep
->> subbaraya <sundeep.lkml@gmail.com>; Ajay Yugalkishore Pandey
->> <APANDEY@xilinx.com>; linux-kernel@vger.kernel.org; linux-arm-
->> kernel@lists.infradead.org; devicetree@vger.kernel.org
->> Subject: Re: [PATCH v5 2/2] phy: zynqmp: Add phy driver for xilinx zynqmp phy core
->>
->> Hi,
->>
->> On 18/12/18 7:15 PM, Anurag Kumar Vulisha wrote:
->>> ZynqMP SoC has a Gigabit Transceiver with four lanes. All the high
->>> speed peripherals such as USB, SATA, PCIE, Display Port and Ethernet
->>> SGMII can rely on any of the four GT lanes for PHY layer. This patch
->>> adds driver for that ZynqMP GT core.
->>>
->>> Signed-off-by: Anurag Kumar Vulisha <anurag.kumar.vulisha@xilinx.com>
->>> ---
->>> Changes in v5:
->>> 	1. No functional changes. Added missing Author name
->>>
->>> Changes in v4:
->>> 	1. Moved include/dt-bindings/phy/phy.h into patch 1 as suggested by
->>> 	   "Rob Herring"
->>>
->>> Changes in v3:
->>> 	1. Corrected the Documentation as suggested by "Vivek Gautam"
->>>
->>> Changes in v2:
->>> 	1. Fixed the compilation error when compiled phy-zynqmp.c as a module
->>> 	2. Added CONFIG_PM macro in phy-zynqmp.c driver
->>> ---
->>>  drivers/phy/Kconfig            |    8 +
->>>  drivers/phy/Makefile           |    1 +
->>>  drivers/phy/phy-zynqmp.c       | 1582
->> ++++++++++++++++++++++++++++++++++++++++
->>>  include/linux/phy/phy-zynqmp.h |   52 ++
->>>  4 files changed, 1643 insertions(+)
->>>  create mode 100644 drivers/phy/phy-zynqmp.c  create mode 100644
->>> include/linux/phy/phy-zynqmp.h
->>>
->>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig index
->>> 60f949e..7a3c900 100644
->>> --- a/drivers/phy/Kconfig
->>> +++ b/drivers/phy/Kconfig
->>> @@ -40,6 +40,14 @@ config PHY_XGENE
->>>  	help
->>>  	  This option enables support for APM X-Gene SoC multi-purpose PHY.
->>>
->>> +config PHY_XILINX_ZYNQMP
->>> +	tristate "Xilinx ZynqMP PHY driver"
->>> +	depends on ARCH_ZYNQMP
->>> +	select GENERIC_PHY
->>> +	help
->>> +	  Enable this to support ZynqMP High Speed Gigabit Transceiver
->>> +	  that is part of ZynqMP SoC.
->>> +
->>>  source "drivers/phy/allwinner/Kconfig"
->>>  source "drivers/phy/amlogic/Kconfig"
->>>  source "drivers/phy/broadcom/Kconfig"
->>> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile index
->>> 0301e25..2335e85 100644
->>> --- a/drivers/phy/Makefile
->>> +++ b/drivers/phy/Makefile
->>> +/**
->>> +
->>> +/**
->>> + * xpsgtr_override_deemph - override PIPE TX de-emphasis
->>> + * @phy: pointer to phy
->>> + * @plvl: pre-emphasis level
->>> + * @vlvl: voltage swing level
->>> + *
->>> + * Return: None
->>> + */
->>> +void xpsgtr_override_deemph(struct phy *phy, u8 plvl, u8 vlvl) {
->>> +	struct xpsgtr_phy *gtr_phy = phy_get_drvdata(phy);
->>> +	struct xpsgtr_dev *gtr_dev = gtr_phy->data;
->>> +	static u8 pe[4][4] = { { 0x2, 0x2, 0x2, 0x2 },
->>> +			       { 0x1, 0x1, 0x1, 0xFF },
->>> +			       { 0x0, 0x0, 0xFF, 0xFF },
->>> +			       { 0xFF, 0xFF, 0xFF, 0xFF } };
->>> +
->>> +	writel(pe[plvl][vlvl],
->>> +	       gtr_dev->serdes + gtr_phy->lane * L0_TX_ANA_TM_18_OFFSET +
->>> +	       L0_TX_ANA_TM_18);
->>> +}
->>> +EXPORT_SYMBOL_GPL(xpsgtr_override_deemph);
->>
->> I thought I gave a feedback to get rid of export symbol. This will make the consumer
->> driver tied to this PHY driver.
->>
-> 
-> Thanks a lot for spending your time in reviewing this patch. With the current implementation,
-> if phy-zynqmp.c driver is not compiled and consumer driver calls xpsgtr_override_deemph()
-> routine, static inline function in phy-zynqmp.h gets called and error -ENODEV is returned. So,
-> with the current implementation the consumer driver is already depending on phy-zynqmp.c
-> driver. Please correct me if  my understanding is wrong
+This change is a realisation of following changes from downstream msm-4.9:
+iommu: io-pgtable-arm: Support DOMAIN_ATTRIBUTE_USE_UPSTREAM_HINT[2]
+iommu: io-pgtable-arm: Implement IOMMU_USE_UPSTREAM_HINT[3]
 
-If the same consumer is used with 5 different PHYs, we would be adding 5
-different APIs for PHY functionality. We would also like to avoid the compiling
-out option if we use something like a multi_v7_defconfig where a single image
-is used for multiple platforms.
+Changes since v2:
+ - Split the patches into io-pgtable-arm driver and arm-smmu driver.
+ - Converted smmu domain attributes to a bitmap, so multiple attributes
+   can be managed easily.
+ - With addition of non-coherent page table mapping support [4], this
+   patch series now aligns with the understanding of upgrading the
+   non-coherent devices to use some level of outer cache.
+ - Updated the macros and comments to reflect the use of QCOM_SYS_CACHE.
+ - QCOM_SYS_CACHE can still be used at stage 2, so that doens't depend on
+   stage-1 mapping.
+ - Added change to disable the attribute from arm_smmu_domain_set_attr()
+   when needed.
+ - Removed the page protection controls for QCOM_SYS_CACHE at the DMA API
+   level.
 
-Thanks
-Kishon
+Goes on top of the non-coherent page tables support patch series [4]
 
-> 
-> Best Regards,
-> Anurag Kumar Vulisha
-> 
+[1] https://patchwork.kernel.org/patch/10302791/
+[2] https://source.codeaurora.org/quic/la/kernel/msm-4.9/commit/?h=msm-4.9&id=bf762276796e79ca90014992f4d9da5593fa7d51
+[3] https://source.codeaurora.org/quic/la/kernel/msm-4.9/commit/?h=msm-4.9&id=d4c72c413ea27c43f60825193d4de9cb8ffd9602
+[4] https://lore.kernel.org/patchwork/cover/1032938/
+
+Vivek Gautam (3):
+  iommu/arm-smmu: Move to bitmap for arm_smmu_domain atrributes
+  iommu/io-pgtable-arm: Add support to use system cache
+  iommu/arm-smmu: Add support to use system cache
+
+ drivers/iommu/arm-smmu.c       | 28 ++++++++++++++++++++++++----
+ drivers/iommu/io-pgtable-arm.c | 15 +++++++++++++--
+ drivers/iommu/io-pgtable.h     |  4 ++++
+ include/linux/iommu.h          |  2 ++
+ 4 files changed, 43 insertions(+), 6 deletions(-)
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
+
 
 _______________________________________________
 linux-arm-kernel mailing list
