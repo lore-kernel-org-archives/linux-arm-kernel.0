@@ -2,82 +2,67 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 63971C2F3A6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 13:14:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F2D07C2F3A6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 13:25:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2F5372084C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 13:14:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B99FB2085A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 13:25:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RtnSgRdu";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Ru3C/8P3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2F5372084C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WEbneVjA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B99FB2085A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ZTMWNkA+HxhBAoEAOK04Y1/txc2QjXdAHiPHtzVsnxo=; b=RtnSgRduDwmEpj
-	/JuPDS4v9RqrDp3tzJ++AzK2Pt8FpkuhxtyxjfP/N9hr/hZPmKQIZP3e/NkkmDxRDU1D7vA1EgblW
-	5EIYMbVzXDYABz6O3MvNONieDmAxQ1F8NKMohs/+eSCUwZlUbPRuZawb3cmFfto9u5Wet9pAXG3RX
-	uxwyjsPKVPOC8ZQxIIxfBorLVnLmX78tVTzwP65C9WlDV4eK6Teblvu62/qxSZRPJmsFbMI/zaCjS
-	hGDEPQq3x9rgdxTUFNY8TJQU9ylqkjbBIIn83KqKVu4aro3Yu256vbHCEKt751DcbKm5uUHzj4zPg
-	+pABohl1ihXQctbIgf2Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=jq3x5IRjqlh9gssh3HcOrIZb2+xuwnvlm3nfDwm6ewA=; b=WEbneVjAl9pQiyittGaZa/IVF
+	JVQYHs/0FxcLp+4eOQe38+ZqAxnkRadr1Vr5C3cDLhR5EGOJrtZeCJ9WyI2rFmzefmH5vm3X2vaF5
+	ZZSUvFU3AyQzECh09bKVTfbpiJ5WTQCSwNqyA/Y8UrkPf4SCZc2IEIT8wiATffLAELKGAxMMlTSmG
+	LPBjMKpwoM7inTPt5lBoMokQvC0ViB0/UxnaKMZ26J84jUkqp+X6mtfe6x4fSNIz6dyH8ec4ABxWD
+	7vEpgijFQtpyVnNNwROSfJC3B77hcEIeobdXSpLPukZ6h0GVmoVGb1k+PU8Xox8+jM8wNt+tY47uT
+	Sso5CR8bA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glZOm-00034T-1M; Mon, 21 Jan 2019 13:13:56 +0000
-Received: from mail-vs1-xe42.google.com ([2607:f8b0:4864:20::e42])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glZOi-000343-2y
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 13:13:54 +0000
-Received: by mail-vs1-xe42.google.com with SMTP id z3so12559921vsf.7
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 05:13:51 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=ZBOKKZFD+nGvCwkJNtLaO3wMav7694SfHXPRlek558c=;
- b=Ru3C/8P3bo+6vPrVWg63nXoUaPGyos6wpCj9LNeP7+kVwy+YJ3gpYk5rnC3IpWGztY
- fH5XcJIuD524+DJ/fmo8q4iEUMNUdwxkefb9wXzKHNY7K3JLefzUrs6alW6pj0cmZnLR
- VnWoAnwT88GcVJ9DMn90ZiUlAuCFCB8nPH918=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=ZBOKKZFD+nGvCwkJNtLaO3wMav7694SfHXPRlek558c=;
- b=trYdaNNz4tF3yFvdYbDm2+CgvDfMjSr62Lr0aXhNT3jKr5TS/AdseHSSmpLOCeMZdF
- T80Lmayme/8m0U1G/2oHVSM0cHs7tZlwaY+vR78KFxSLmXRCCv1BrUzOl88qmJqZPnDK
- 689mN+h4IpmHcxRdY2RJx5lFkpLdYNd53OjiqQT2I8SYTdg1T1em1mZ5M/EcCyCvrzO/
- zO/lohGs0YYPNl33B3/NUTY/X/VChf6b936CHV4+uEDGFFPX7TfTVFZwTxZjfTxB4WSl
- FmYeQyzreYBndVG5veEFA65LvH/1OfNNFS9f24nb6AuhJ7bULS5/YfG2+vmozanvIjax
- 2+BA==
-X-Gm-Message-State: AJcUukf6P0dMDr3rnrSKsN61fW/qS/zy3gjAX6LFdcgA0C38JEiZXADR
- bUwFLoTrsQWZXv1NsNha0AnwvxLX/iGfKir5QsTLpw==
-X-Google-Smtp-Source: ALg8bN49+2uPILt7oxeBXFI0N0U0UYFueVeJyD0pZxxG3TJY3ncJPnqlssCb3U5tZvlwVk0TEGjSMxboSzC6EoJ4zGg=
-X-Received: by 2002:a67:1b04:: with SMTP id b4mr11997758vsb.141.1548076430563; 
- Mon, 21 Jan 2019 05:13:50 -0800 (PST)
+	id 1glZa0-0007pV-7Q; Mon, 21 Jan 2019 13:25:32 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glZZx-0007pB-EO
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 13:25:31 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 1E4B4207B2; Mon, 21 Jan 2019 14:25:27 +0100 (CET)
+Received: from localhost (unknown [185.94.189.187])
+ by mail.bootlin.com (Postfix) with ESMTPSA id CACA12078C;
+ Mon, 21 Jan 2019 14:25:16 +0100 (CET)
+Date: Mon, 21 Jan 2019 14:25:17 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Priit Laes <plaes@plaes.org>
+Subject: Re: [linux-sunxi] Re: HDMI/DVI spurious failure
+Message-ID: <20190121132517.iv2v3hug4uihefnk@flea>
+References: <20190114132934.rywqqtjarbf6fgcr@plaes.org>
+ <20190115094951.e7jnjpibj5tcp5pz@flea>
+ <20190116075854.o2kme5nxq5kckwem@plaes.org>
+ <20190116192442.qz4xi2ky6axgiyvg@flea>
+ <20190116203516.s7pisy4miaclo63u@plaes.org>
+ <20190117113340.ydszal5c3nlrqr47@flea>
+ <20190118101053.gkxpfymsjzw3ptxf@plaes.org>
+ <20190118140418.m5mliyvddfdfju3v@flea>
+ <20190118145126.mpjz5t5hjqqpgzys@plaes.org>
 MIME-Version: 1.0
-References: <1548062959-31860-1-git-send-email-sumit.garg@linaro.org>
- <1548062959-31860-5-git-send-email-sumit.garg@linaro.org>
- <CAKv+Gu8icUVE1kqyHkK72wiGpmj7Gzqj_z_z2ox686gY=dCOcQ@mail.gmail.com>
- <CAFA6WYO8HrTr0U+u-iwQ3g84E8H69rKqoBzLsP=5TTFamEv3jA@mail.gmail.com>
- <CAKv+Gu8bFRoY8ThuDzm8S8gBB3_6Jf9h3=S2ZvEWqy2Tcr7Vuw@mail.gmail.com>
-In-Reply-To: <CAKv+Gu8bFRoY8ThuDzm8S8gBB3_6Jf9h3=S2ZvEWqy2Tcr7Vuw@mail.gmail.com>
-From: Sumit Garg <sumit.garg@linaro.org>
-Date: Mon, 21 Jan 2019 18:43:39 +0530
-Message-ID: <CAFA6WYN+4EFsxnbhSsUb=TZMCeJF_5pxhOfXUBh9MTMsq8QMBQ@mail.gmail.com>
-Subject: Re: [PATCH v4 4/4] hwrng: add OP-TEE based rng driver
-To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+In-Reply-To: <20190118145126.mpjz5t5hjqqpgzys@plaes.org>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_051352_135699_063535DD 
-X-CRM114-Status: GOOD (  26.45  )
+X-CRM114-CacheID: sfid-20190121_052529_754301_5E04B0DA 
+X-CRM114-Status: GOOD (  26.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,371 +74,153 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Daniel Thompson <daniel.thompson@linaro.org>,
- Herbert Xu <herbert@gondor.apana.org.au>, Arnd Bergmann <arnd@arndb.de>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Bhupesh Sharma <bhsharma@redhat.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- tee-dev@lists.linaro.org, Rob Herring <robh+dt@kernel.org>,
- "open list:HARDWARE RANDOM NUMBER GENERATOR CORE"
- <linux-crypto@vger.kernel.org>, mpm@selenic.com,
- Jens Wiklander <jens.wiklander@linaro.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-arm-kernel@lists.infradead.org, linux-sunxi@googlegroups.com,
+ Chen-Yu Tsai <wens@csie.org>, Jonathan Liu <net147@gmail.com>,
+ dri-devel@lists.freedesktop.org
+Content-Type: multipart/mixed; boundary="===============4352959909304121907=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 21 Jan 2019 at 18:32, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->
-> On Mon, 21 Jan 2019 at 13:59, Sumit Garg <sumit.garg@linaro.org> wrote:
-> >
-> > On Mon, 21 Jan 2019 at 15:33, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > >
-> > > On Mon, 21 Jan 2019 at 10:30, Sumit Garg <sumit.garg@linaro.org> wrote:
-> > > >
-> > > > On ARM SoC's with TrustZone enabled, peripherals like entropy sources
-> > > > might not be accessible to normal world (linux in this case) and rather
-> > > > accessible to secure world (OP-TEE in this case) only. So this driver
-> > > > aims to provides a generic interface to OP-TEE based random number
-> > > > generator service.
-> > > >
-> > > > This driver registers on TEE bus to interact with OP-TEE based rng
-> > > > device/service.
-> > > >
-> > > > Signed-off-by: Sumit Garg <sumit.garg@linaro.org>
-> > > > ---
-> > > >  MAINTAINERS                        |   5 +
-> > > >  drivers/char/hw_random/Kconfig     |  15 ++
-> > > >  drivers/char/hw_random/Makefile    |   1 +
-> > > >  drivers/char/hw_random/optee-rng.c | 272 +++++++++++++++++++++++++++++++++++++
-> > > >  4 files changed, 293 insertions(+)
-> > > >  create mode 100644 drivers/char/hw_random/optee-rng.c
-> > > >
-> > > > diff --git a/MAINTAINERS b/MAINTAINERS
-> > > > index 32d44447..502733c 100644
-> > > > --- a/MAINTAINERS
-> > > > +++ b/MAINTAINERS
-> > > > @@ -11260,6 +11260,11 @@ M:     Jens Wiklander <jens.wiklander@linaro.org>
-> > > >  S:     Maintained
-> > > >  F:     drivers/tee/optee/
-> > > >
-> > > > +OP-TEE RANDOM NUMBER GENERATOR (RNG) DRIVER
-> > > > +M:     Sumit Garg <sumit.garg@linaro.org>
-> > > > +S:     Maintained
-> > > > +F:     drivers/char/hw_random/optee-rng.c
-> > > > +
-> > > >  OPA-VNIC DRIVER
-> > > >  M:     Dennis Dalessandro <dennis.dalessandro@intel.com>
-> > > >  M:     Niranjana Vishwanathapura <niranjana.vishwanathapura@intel.com>
-> > > > diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
-> > > > index dac895d..25a7d8f 100644
-> > > > --- a/drivers/char/hw_random/Kconfig
-> > > > +++ b/drivers/char/hw_random/Kconfig
-> > > > @@ -424,6 +424,21 @@ config HW_RANDOM_EXYNOS
-> > > >           will be called exynos-trng.
-> > > >
-> > > >           If unsure, say Y.
-> > > > +
-> > > > +config HW_RANDOM_OPTEE
-> > > > +       tristate "OP-TEE based Random Number Generator support"
-> > > > +       depends on OPTEE
-> > > > +       default HW_RANDOM
-> > > > +       help
-> > > > +         This  driver provides support for OP-TEE based Random Number
-> > > > +         Generator on ARM SoCs where hardware entropy sources are not
-> > > > +         accessible to normal world (Linux).
-> > > > +
-> > > > +         To compile this driver as a module, choose M here: the module
-> > > > +         will be called optee-rng.
-> > > > +
-> > > > +         If unsure, say Y.
-> > > > +
-> > > >  endif # HW_RANDOM
-> > > >
-> > > >  config UML_RANDOM
-> > > > diff --git a/drivers/char/hw_random/Makefile b/drivers/char/hw_random/Makefile
-> > > > index e35ec3c..7c9ef4a 100644
-> > > > --- a/drivers/char/hw_random/Makefile
-> > > > +++ b/drivers/char/hw_random/Makefile
-> > > > @@ -38,3 +38,4 @@ obj-$(CONFIG_HW_RANDOM_CAVIUM) += cavium-rng.o cavium-rng-vf.o
-> > > >  obj-$(CONFIG_HW_RANDOM_MTK)    += mtk-rng.o
-> > > >  obj-$(CONFIG_HW_RANDOM_S390) += s390-trng.o
-> > > >  obj-$(CONFIG_HW_RANDOM_KEYSTONE) += ks-sa-rng.o
-> > > > +obj-$(CONFIG_HW_RANDOM_OPTEE) += optee-rng.o
-> > > > diff --git a/drivers/char/hw_random/optee-rng.c b/drivers/char/hw_random/optee-rng.c
-> > > > new file mode 100644
-> > > > index 0000000..6ac862a
-> > > > --- /dev/null
-> > > > +++ b/drivers/char/hw_random/optee-rng.c
-> > > > @@ -0,0 +1,272 @@
-> > > > +// SPDX-License-Identifier: GPL-2.0
-> > > > +/*
-> > > > + * Copyright (C) 2018-2019 Linaro Ltd.
-> > > > + */
-> > > > +
-> > > > +#include <linux/delay.h>
-> > > > +#include <linux/of.h>
-> > > > +#include <linux/hw_random.h>
-> > > > +#include <linux/kernel.h>
-> > > > +#include <linux/module.h>
-> > > > +#include <linux/slab.h>
-> > > > +#include <linux/tee_drv.h>
-> > > > +#include <linux/uuid.h>
-> > > > +
-> > > > +#define DRIVER_NAME "optee-rng"
-> > > > +
-> > > > +#define TEE_ERROR_HEALTH_TEST_FAIL     0x00000001
-> > > > +
-> > > > +/*
-> > > > + * TA_CMD_GET_ENTROPY - Get Entropy from RNG
-> > > > + *
-> > > > + * param[0] (inout memref) - Entropy buffer memory reference
-> > > > + * param[1] unused
-> > > > + * param[2] unused
-> > > > + * param[3] unused
-> > > > + *
-> > > > + * Result:
-> > > > + * TEE_SUCCESS - Invoke command success
-> > > > + * TEE_ERROR_BAD_PARAMETERS - Incorrect input param
-> > > > + * TEE_ERROR_NOT_SUPPORTED - Requested entropy size greater than size of pool
-> > > > + * TEE_ERROR_HEALTH_TEST_FAIL - Continuous health testing failed
-> > > > + */
-> > > > +#define TA_CMD_GET_ENTROPY             0x0
-> > > > +
-> > > > +/*
-> > > > + * TA_CMD_GET_RNG_INFO - Get RNG information
-> > > > + *
-> > > > + * param[0] (out value) - value.a: RNG data-rate in bytes per second
-> > > > + *                        value.b: Quality/Entropy per 1024 bit of data
-> > > > + * param[1] unused
-> > > > + * param[2] unused
-> > > > + * param[3] unused
-> > > > + *
-> > > > + * Result:
-> > > > + * TEE_SUCCESS - Invoke command success
-> > > > + * TEE_ERROR_BAD_PARAMETERS - Incorrect input param
-> > > > + */
-> > > > +#define TA_CMD_GET_RNG_INFO            0x1
-> > > > +
-> > > > +#define MAX_ENTROPY_REQ_SZ             (4 * 1024)
-> > > > +
-> > > > +static struct tee_context *ctx;
-> > > > +static struct tee_shm *entropy_shm_pool;
-> > > > +static u32 ta_rng_data_rate;
-> > > > +static u32 ta_rng_session_id;
-> > > > +
-> > > > +static size_t get_optee_rng_data(void *buf, size_t req_size)
-> > > > +{
-> > > > +       u32 ret = 0;
-> > > > +       u8 *rng_data = NULL;
-> > > > +       size_t rng_size = 0;
-> > > > +       struct tee_ioctl_invoke_arg inv_arg = {0};
-> > > > +       struct tee_param param[4] = {0};
-> > > > +
-> > > > +       /* Invoke TA_CMD_GET_ENTROPY function of Trusted App */
-> > > > +       inv_arg.func = TA_CMD_GET_ENTROPY;
-> > > > +       inv_arg.session = ta_rng_session_id;
-> > > > +       inv_arg.num_params = 4;
-> > > > +
-> > > > +       /* Fill invoke cmd params */
-> > > > +       param[0].attr = TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INOUT;
-> > > > +       param[0].u.memref.shm = entropy_shm_pool;
-> > > > +       param[0].u.memref.size = req_size;
-> > > > +       param[0].u.memref.shm_offs = 0;
-> > > > +
-> > > > +       ret = tee_client_invoke_func(ctx, &inv_arg, param);
-> > > > +       if ((ret < 0) || (inv_arg.ret != 0)) {
-> > > > +               pr_err("TA_CMD_GET_ENTROPY invoke function error: %x\n",
-> > > > +                      inv_arg.ret);
-> > > > +               return 0;
-> > > > +       }
-> > > > +
-> > > > +       rng_data = tee_shm_get_va(entropy_shm_pool, 0);
-> > > > +       if (IS_ERR(rng_data)) {
-> > > > +               pr_err("tee_shm_get_va failed\n");
-> > > > +               return 0;
-> > > > +       }
-> > > > +
-> > > > +       rng_size = param[0].u.memref.size;
-> > > > +       memcpy(buf, rng_data, rng_size);
-> > > > +
-> > > > +       return rng_size;
-> > > > +}
-> > > > +
-> > > > +static int optee_rng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
-> > > > +{
-> > > > +       u8 *data = buf;
-> > > > +       size_t read = 0, rng_size = 0;
-> > > > +       int timeout = 1;
-> > > > +
-> > > > +       if (max > MAX_ENTROPY_REQ_SZ)
-> > > > +               max = MAX_ENTROPY_REQ_SZ;
-> > > > +
-> > > > +       while (read == 0) {
-> > > > +               rng_size = get_optee_rng_data(data, (max - read));
-> > > > +
-> > > > +               data += rng_size;
-> > > > +               read += rng_size;
-> > > > +
-> > > > +               if (wait) {
-> > > > +                       if (timeout-- == 0)
-> > > > +                               return read;
-> > > > +                       msleep((1000 * (max - read)) / ta_rng_data_rate);
-> > > > +               } else {
-> > > > +                       return read;
-> > > > +               }
-> > > > +       }
-> > > > +
-> > > > +       return read;
-> > > > +}
-> > > > +
-> > > > +static int optee_rng_init(struct hwrng *rng)
-> > > > +{
-> > > > +       entropy_shm_pool = tee_shm_alloc(ctx, MAX_ENTROPY_REQ_SZ,
-> > > > +                                        TEE_SHM_MAPPED | TEE_SHM_DMA_BUF);
-> > > > +       if (IS_ERR(entropy_shm_pool)) {
-> > > > +               pr_err("tee_shm_alloc failed\n");
-> > > > +               return PTR_ERR(entropy_shm_pool);
-> > > > +       }
-> > > > +
-> > > > +       return 0;
-> > > > +}
-> > > > +
-> > > > +static void optee_rng_cleanup(struct hwrng *rng)
-> > > > +{
-> > > > +       tee_shm_free(entropy_shm_pool);
-> > > > +}
-> > > > +
-> > > > +static struct hwrng optee_rng = {
-> > > > +       .name           = DRIVER_NAME,
-> > > > +       .init           = optee_rng_init,
-> > > > +       .cleanup        = optee_rng_cleanup,
-> > > > +       .read           = optee_rng_read,
-> > > > +};
-> > > > +
-> > > > +static int get_optee_rng_info(struct device *dev)
-> > > > +{
-> > > > +       u32 ret = 0;
-> > > > +       struct tee_ioctl_invoke_arg inv_arg = {0};
-> > > > +       struct tee_param param[4] = {0};
-> > > > +
-> > > > +       /* Invoke TA_CMD_GET_RNG_INFO function of Trusted App */
-> > > > +       inv_arg.func = TA_CMD_GET_RNG_INFO;
-> > > > +       inv_arg.session = ta_rng_session_id;
-> > > > +       inv_arg.num_params = 4;
-> > > > +
-> > > > +       /* Fill invoke cmd params */
-> > > > +       param[0].attr = TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_OUTPUT;
-> > > > +
-> > > > +       ret = tee_client_invoke_func(ctx, &inv_arg, param);
-> > > > +       if ((ret < 0) || (inv_arg.ret != 0)) {
-> > > > +               dev_err(dev, "TA_CMD_GET_RNG_INFO invoke func error: %x\n",
-> > > > +                       inv_arg.ret);
-> > > > +               return -EINVAL;
-> > > > +       }
-> > > > +
-> > > > +       ta_rng_data_rate = param[0].u.value.a;
-> > > > +       optee_rng.quality = param[0].u.value.b;
-> > > > +
-> > > > +       return 0;
-> > > > +}
-> > > > +
-> > > > +static int optee_ctx_match(struct tee_ioctl_version_data *ver, const void *data)
-> > > > +{
-> > > > +       if (ver->impl_id == TEE_IMPL_ID_OPTEE)
-> > > > +               return 1;
-> > > > +       else
-> > > > +               return 0;
-> > > > +}
-> > > > +
-> > > > +static int optee_rng_probe(struct device *dev)
-> > > > +{
-> > > > +       struct tee_client_device *rng_device = to_tee_client_device(dev);
-> > > > +       int ret = 0, err = -ENODEV;
-> > > > +       struct tee_ioctl_open_session_arg sess_arg = {0};
-> > > > +
-> > > > +       /* Open context with TEE driver */
-> > > > +       ctx = tee_client_open_context(NULL, optee_ctx_match, NULL, NULL);
-> > > > +       if (IS_ERR(ctx))
-> > > > +               return -ENODEV;
-> > > > +
-> > > > +       /* Open session with hwrng Trusted App */
-> > > > +       memcpy(sess_arg.uuid, rng_device->id.b, TEE_IOCTL_UUID_LEN);
-> > > > +       sess_arg.clnt_login = TEE_IOCTL_LOGIN_PUBLIC;
-> > > > +       sess_arg.num_params = 0;
-> > > > +
-> > > > +       ret = tee_client_open_session(ctx, &sess_arg, NULL);
-> > > > +       if ((ret < 0) || (sess_arg.ret != 0)) {
-> > > > +               dev_err(dev, "tee_client_open_session failed, error: %x\n",
-> > > > +                       sess_arg.ret);
-> > > > +               err = -EINVAL;
-> > > > +               goto out_ctx;
-> > > > +       }
-> > > > +       ta_rng_session_id = sess_arg.session;
-> > > > +
-> > > > +       err = get_optee_rng_info(dev);
-> > > > +       if (err)
-> > > > +               goto out_sess;
-> > > > +
-> > > > +       err = hwrng_register(&optee_rng);
-> > > > +       if (err) {
-> > > > +               dev_err(dev, "hwrng registration failed (%d)\n", err);
-> > > > +               goto out_sess;
-> > > > +       }
-> > > > +
-> > > > +       return 0;
-> > > > +
-> > > > +out_sess:
-> > > > +       tee_client_close_session(ctx, ta_rng_session_id);
-> > > > +out_ctx:
-> > > > +       tee_client_close_context(ctx);
-> > > > +
-> > > > +       return err;
-> > > > +}
-> > > > +
-> > > > +static int optee_rng_remove(struct device *dev)
-> > > > +{
-> > > > +       hwrng_unregister(&optee_rng);
-> > > > +       tee_client_close_session(ctx, ta_rng_session_id);
-> > > > +       tee_client_close_context(ctx);
-> > > > +
-> > > > +       return 0;
-> > > > +}
-> > > > +
-> > > > +const tee_client_device_id optee_rng_id_table[] = {
-> > > > +       UUID_INIT(0xab7a617c, 0xb8e7, 0x4d8f,
-> > > > +                  0x83, 0x01, 0xd0, 0x9b, 0x61, 0x03, 0x6b, 0x64),
-> > > > +       {}
-> > > > +};
-> > > > +
-> > >
-> > > Could we expose this via MODULE_DEVICE_TABLE() as well? That should
-> > > allow udev to load the module on demand.
-> > >
-> >
-> > IIUC, here you are referring to addition of "modalias" infrastructure
-> > for TEE bus. I think this is good feature to have for automatic
-> > out-of-tree module loading via udev. Shall I create a separate patch
-> > for this feature addition rather than including it in this patch-set?
-> >
-> > Currently I use to put this module entry in /etc/modules for auto-loading.
-> >
->
-> I wouldn't call that auto-loading :-)
->
 
-Haha.
+--===============4352959909304121907==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="pwfuitnpzretg3l6"
+Content-Disposition: inline
 
-> But seriously, I think it provides an important rationale for the
-> patch set as a whole, so I would prefer it if it were included.
 
-Okay then I will include this feature in next version.
+--pwfuitnpzretg3l6
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
--Sumit
+On Fri, Jan 18, 2019 at 02:51:26PM +0000, Priit Laes wrote:
+> On Fri, Jan 18, 2019 at 03:04:18PM +0100, Maxime Ripard wrote:
+> > On Fri, Jan 18, 2019 at 10:10:53AM +0000, Priit Laes wrote:
+> > > > > > > > It doesn't look related to the clock rate itself, since it =
+doesn't
+> > > > > > > > change between the two cases. However, in one case the DDC =
+clock is
+> > > > > > > > enabled and in the other it's disabled.
+> > > > > > > >=20
+> > > > > > > > Was it taken at the same time? Maybe you can try with that =
+patch?
+> > > > > > > > http://code.bulix.org/z7jmkm-555344?raw
+> > > > > > >=20
+> > > > > > > Thanks, after doing ~50+ boots I haven't seen a single failur=
+e.
+> > > > > > >=20
+> > > > > > > Previously I had following failure cases which are now both f=
+ixed:
+> > > > > > >=20
+> > > > > > > a) Linux without u-boot HDMI, where one in every 6-7 boots fa=
+iled.
+> > > > > > > b) u--boot with hdmi enabled switching to simplefb and then s=
+witching
+> > > > > > > to kms, where previously all boots ended up with garbled scre=
+en.
+> > > > > >=20
+> > > > > > So it's not really a fix, but it really looks like the clock is=
+ not
+> > > > > > enabled when it should.
+> > > > > >=20
+> > > > > > Can you describe your test scenario a bit more? What are you do=
+ing
+> > > > > > exactly, just booting? When do you start using the display? Whe=
+n did
+> > > > > > you capture the debugfs output that you pasted?
+> > > > >=20
+> > > > > Display is already connected via HDMI to the board. I don't really
+> > > > > remove it, I just boot the device and let it start Xorg.
+> > > > > Meanwhile I just ssh into the device and capture debugfs output.
+> > > > > See my 3 testing scenarios below.
+> > > > >=20
+> > > > > Kernel also includes one extra patch to fall back to DDC, in case=
+ HPD
+> > > > > fails. Mostly the same I already submitted last November [1].
+> > > >=20
+> > > > Do you have the same issue without that patch?
+> > >=20
+> > > Can't really test this display without this patch and I do not have o=
+ther
+> > > HDMI/DVI screens. And this issue does not happen with other HDMI disp=
+lays
+> > > that I have here.
+> >=20
+> > Can't you just force the monitor to be reported as present? It's not
+> > great and we don't want to merge it, but that would allow you to test
+> > that setup without too many interferences.
+>=20
+> Baseline is clean u-boot / linux. U-boot does not detect/enable display.
+>=20
+> 1) Booting Linux with drm.debug=3D0xe
+>=20
+> * Linux does not detect/enable display
+>=20
+> 2) Booting with drm.debug=3D0xe video=3DHDMI-A-1:640x480@60e
+>=20
+> * Linux detects display, but display is garbled, and proper edid data is =
+detected:
+>=20
+> [snip]
+> pll-video1                     0        0        0   327000000          0=
+     0  50000
+>    pll-video1-2x               0        0        0   654000000          0=
+     0  50000
+>       hdmi-tmds                0        0        0    25153846          0=
+     0  50000
+>          hdmi-ddc              0        0        0       89835          0=
+     0  50000
+> [/snip]
+>=20
+> 3) Booting with drm.debug=3D0xe video=3DHDMI-A-1:640x480@60e
+> And also one extra patch for Linux where HDMI DDC clock marked as critical
+>=20
+> Linux detects and initializes display properly:
+> [snip]
+> pll-video1                     1        1        0   327000000          0=
+     0  50000
+>    pll-video1-2x               1        1        0   654000000          0=
+     0  50000
+>       hdmi-tmds                1        1        0    25153846          0=
+     0  50000
+>          hdmi-ddc              1        1        0       89835          0=
+     0  50000
+> [/snip]
+
+I guess you'll need to track down when the hdmi-tmds and hdmi-ddc are
+enabled and disabled, and if it makes sense :/
+
+Maxime
+
+--=20
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+
+--pwfuitnpzretg3l6
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXEXIPQAKCRDj7w1vZxhR
+xcL9AP90HKorMjZWKBoBqwq4XAdHAARaeew1QhNIgEON/f+xqwEAzD+7Pkh/RHY9
+MtqiJ6wLMZsP5DEfmy/dv4x3d9lvOQw=
+=JEgz
+-----END PGP SIGNATURE-----
+
+--pwfuitnpzretg3l6--
+
+
+--===============4352959909304121907==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============4352959909304121907==--
+
