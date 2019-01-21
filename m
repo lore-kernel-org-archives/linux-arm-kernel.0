@@ -2,22 +2,23 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.3 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E8913C3168B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 17:23:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 71389C31681
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 17:27:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BAE1C20879
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 17:23:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4150B2084A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 17:27:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RQMmLhIy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BAE1C20879
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l/VPbYGu";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=alien8.de header.i=@alien8.de header.b="AcJExkwn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4150B2084A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=alien8.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,40 +26,49 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2TROjJlUSnDp4ZwBOIQqQMaVYgsqqZJ+cLeS/9nppnY=; b=RQMmLhIypW58av
-	SVhziasDxXPb2x0FB47zLfiJuQZ85Bhmeox8gN+QeBgiFs6ayOhjJqlJCnFqjGUOqNlSm4LQgMrIU
-	cuWYTpevgpzw8phIR4a/bGgSwGxgccd/ic9sjsrLkI19ii7qE6YNnSmkb1dP3KDKbukYUqQR7D3M2
-	au/JiDh3TT+wAtVzjeg12drlHSl83rLc8dHOZ70eUWI42dLdVVaPnFGR9+1q9YfvxpWSs/3okY3T0
-	4KuZbVoDkega3rNcojoAEBjO/DIC+LoRgX41Yt3QpEtjoENm6P51hfJYUG5UuImNX1U4cdZz9ZJ85
-	5IEBPHVskvn89X7Pj9Fg==;
+	List-Owner; bh=C3BwpLeE9WhXe7HKtxk8/fGyO8QBoeP5i/NOBGzA1KI=; b=l/VPbYGuwDq4Ff
+	4718H4ju/C4nXDvlC8jeghyaRl7Oxi43BDOaj3+f2URP2YTphGpejYQsGfq6bOVSOfxhfcSNFqt3E
+	Ufx4YCpfgKDO3F1W2IZM5uOdBgYEi93eRBz5mvhkeDI+9HMhpHsDVdHtrkbIorg8d/rOXL8HzhOQR
+	4kSqprqUV40i6Jb/SAyj6KNvJhRwNm5w9cmYfAZn8FkEWWAvQ4SerpmlbwGliqtkcnV7Xj/aDWpgv
+	gE/2Q+9wJ6kNAs93t/Vfys+qPmuk6QQ4L6tiZM0Rv2r3/MrfILgw5Z0kioVy/A3Wh4EJDuH/38A5A
+	fo6SVZXcvYSS4380YS2Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gldIL-00056v-Ff; Mon, 21 Jan 2019 17:23:33 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gldII-00056Y-Au
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 17:23:31 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 65DD115AB;
- Mon, 21 Jan 2019 09:23:29 -0800 (PST)
-Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id BC5593F614;
- Mon, 21 Jan 2019 09:23:27 -0800 (PST)
-Date: Mon, 21 Jan 2019 17:23:25 +0000
-From: Mark Rutland <mark.rutland@arm.com>
-To: Stefan Agner <stefan@agner.ch>
-Subject: Re: [PATCH] drivers/perf: handle multiple CPUs with single interrupts
-Message-ID: <20190121172325.GD47506@lakrids.cambridge.arm.com>
-References: <20190121144111.22716-1-stefan@agner.ch>
+	id 1gldMV-0007Xl-Fb; Mon, 21 Jan 2019 17:27:51 +0000
+Received: from mail.skyhub.de ([2a01:4f8:190:11c2::b:1457])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gldMR-0007NU-H3
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 17:27:49 +0000
+Received: from zn.tnic (p200300EC2BC62500329C23FFFEA6A903.dip0.t-ipconnect.de
+ [IPv6:2003:ec:2bc6:2500:329c:23ff:fea6:a903])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.skyhub.de (SuperMail on ZX Spectrum 128k) with ESMTPSA id 600ED1EC0242;
+ Mon, 21 Jan 2019 18:27:45 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=alien8.de; s=dkim;
+ t=1548091665;
+ h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+ to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+ content-transfer-encoding:in-reply-to:in-reply-to:  references:references;
+ bh=ueK4rp2UMpM8xlD7kGNxbVehTmIUr8fjJZ30GNokY28=;
+ b=AcJExkwn405enPROxAJOV1VO/UpAFXxtUMiHMHASMqmieeULv3Wskrk41S3xl8JiLZlaq9
+ eUB0MGMRYZQc6uMiwUE+BEF7bGVknDYFfx5NREZA7nPdEiahrm4f4NEPjUII6QD89sKapB
+ FUxf7FaxpFWRYaHrxS7heBXPVNhWF2s=
+Date: Mon, 21 Jan 2019 18:27:43 +0100
+From: Borislav Petkov <bp@alien8.de>
+To: James Morse <james.morse@arm.com>
+Subject: Re: [PATCH v7 20/25] ACPI / APEI: Use separate fixmap pages for
+ arm64 NMI-like notifications
+Message-ID: <20190121172743.GN29166@zn.tnic>
+References: <20181203180613.228133-1-james.morse@arm.com>
+ <20181203180613.228133-21-james.morse@arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190121144111.22716-1-stefan@agner.ch>
-User-Agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
+In-Reply-To: <20181203180613.228133-21-james.morse@arm.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_092330_384910_6446D5FE 
-X-CRM114-Status: GOOD (  32.16  )
+X-CRM114-CacheID: sfid-20190121_092747_724460_9C39905C 
+X-CRM114-Status: GOOD (  19.11  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,144 +80,90 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: will.deacon@arm.com, linux-kernel@vger.kernel.org, linux-imx@nxp.com,
- kernel@pengutronix.de, fabio.estevam@nxp.com, shawnguo@kernel.org,
- linux-arm-kernel@lists.infradead.org, l.stach@pengutronix.de
+Cc: Rafael Wysocki <rjw@rjwysocki.net>, Tony Luck <tony.luck@intel.com>,
+ Fan Wu <wufan@codeaurora.org>, linux-mm@kvack.org,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Xie XiuQi <xiexiuqi@huawei.com>, Will Deacon <will.deacon@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>,
+ Dongjiu Geng <gengdongjiu@huawei.com>, linux-acpi@vger.kernel.org,
+ Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org, Len Brown <lenb@kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Stefan,
-
-On Mon, Jan 21, 2019 at 03:41:11PM +0100, Stefan Agner wrote:
-> Currently, if only a single interrupt is available, the code assigns
-> this single interrupt to the first CPU. All other CPUs are left
-> unsupported. This allows to use perf events only on processes using
-> the first CPU. This is not obvious to the user.
+On Mon, Dec 03, 2018 at 06:06:08PM +0000, James Morse wrote:
+> Now that ghes notification helpers provide the fixmap slots and
+> take the lock themselves, multiple NMI-like notifications can
+> be used on arm64.
 > 
-> Instead, disable interrupts but support all CPUs. This allows to use
-> the PMU on all CPUs for all events other than sampling events which do
-> require interrupt support.
-
-Even for non-sampling events we use the overflow interrupt to ensure
-that we don't lose count across overflows, and without that interrupt,
-we cannot guarantee that the results are accurate.
-
-For example:
-
-	Program counter to 0
-	Start program
-	< counter overflows, no interrupt >
-	< counter overflows, no interrupt >
-	Stop program
-	Counter reads as 5
-
-
-... which we cannot distinguish from:
-
-	Program counter to 0
-	Start program
-	< counter overflows, no interrupt >
-	< counter overflows, no interrupt >
-	< counter overflows, no interrupt >
-	< counter overflows, no interrupt >
-	< counter overflows, no interrupt >
-	< counter overflows, no interrupt >
-	Stop program
-	Counter reads as 5
-
-... and thus cannot provide any reasonable confidence in results.
-
-In theory, we could use a hrtimer to periodically refresh the events to
-prevent this, but this would need to be set at some very high frequency
-to account for the fastest potential counter, and would significantly
-degrade performance.
-
-I don't think that's going to be reliable, and given that, I don't think
-that we can support muxed IRQs in this way.
-
-Thanks,
-Mark.
-
+> These should be named after their notification method as they can't
+> all be called 'NMI'. x86's NOTIFY_NMI already is, change the SEA
+> fixmap entry to be called FIX_APEI_GHES_SEA.
 > 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> Future patches can add support for FIX_APEI_GHES_SEI and
+> FIX_APEI_GHES_SDEI_{NORMAL,CRITICAL}.
+> 
+> Because all of ghes.c builds on both architectures, provide a
+> constant for each fixmap entry that the architecture will never
+> use.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> 
 > ---
-> This has been observed and tested on a i.MX 6DualLite, but is probably
-> valid for i.MX 6Quad as well.
+> Changes since v6:
+>  * Added #ifdef definitions of each missing fixmap entry.
 > 
-> It seems that ux500 once had support for single IRQ on a SMP system,
-> however this got removed with:
-> Commit 2b05f6ae1ee5 ("ARM: ux500: remove PMU IRQ bouncer")
+> Changes since v3:
+>  * idx/lock are now in a separate struct.
+>  * Add to the comment above ghes_fixmap_lock_irq so that it makes more
+>    sense in isolation.
 > 
-> I noticed that with this patch I get an error when trying to use perf stat:
->   # perf top
->   Error:
->   cycles: PMU Hardware doesn't support sampling/overflow-interrupts. Try 'perf stat'
+> fixup for split fixmap
+> ---
+>  arch/arm64/include/asm/fixmap.h |  2 +-
+>  drivers/acpi/apei/ghes.c        | 10 +++++++++-
+>  2 files changed, 10 insertions(+), 2 deletions(-)
 > 
-> Without this patch perf top seems to work, but it seems not to use any
-> sampling events (?):
->   # perf top
-> PerfTop:    7215 irqs/sec  kernel:100.0%  exact:  0.0% [4000Hz cpu-clock:pppH], (all, 2 CPUs)
-> ....
-> 
-> Also starting perf top and explicitly selecting cpu-clock seems to work
-> and show the same data as before this change.
->   # perf top -e cpu-clock:pppH
-> PerfTop:    7214 irqs/sec  kernel:100.0%  exact:  0.0% [4000Hz cpu-clock:pppH], (all, 2 CPUs)
-> 
-> It seems that perf top falls back to cpu-clock in the old case, but not
-> once sampling events are not supported...
-> 
-> --
-> Stefan
-> 
-> 
->  drivers/perf/arm_pmu_platform.c | 19 +++++++++++--------
->  1 file changed, 11 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/perf/arm_pmu_platform.c b/drivers/perf/arm_pmu_platform.c
-> index 933bd8410fc2..80b991417b6e 100644
-> --- a/drivers/perf/arm_pmu_platform.c
-> +++ b/drivers/perf/arm_pmu_platform.c
-> @@ -105,23 +105,26 @@ static int pmu_parse_irqs(struct arm_pmu *pmu)
->  		return num_irqs;
->  	}
+> diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+> index ec1e6d6fa14c..966dd4bb23f2 100644
+> --- a/arch/arm64/include/asm/fixmap.h
+> +++ b/arch/arm64/include/asm/fixmap.h
+> @@ -55,7 +55,7 @@ enum fixed_addresses {
+>  #ifdef CONFIG_ACPI_APEI_GHES
+>  	/* Used for GHES mapping from assorted contexts */
+>  	FIX_APEI_GHES_IRQ,
+> -	FIX_APEI_GHES_NMI,
+> +	FIX_APEI_GHES_SEA,
+>  #endif /* CONFIG_ACPI_APEI_GHES */
 >  
-> +	if (num_irqs == 1) {
-> +		int irq = platform_get_irq(pdev, 0);
-> +		if (irq && irq_is_percpu_devid(irq))
-> +			return pmu_parse_percpu_irq(pmu, irq);
-> +	}
-> +
->  	/*
->  	 * In this case we have no idea which CPUs are covered by the PMU.
->  	 * To match our prior behaviour, we assume all CPUs in this case.
-> +	 * Multiple CPUs with a single PMU irq are currently not handled.
-> +	 * Rather than supporting only the first CPU, support all CPUs but
-> +	 * without interrupt capability.
->  	 */
-> -	if (num_irqs == 0) {
-> -		pr_warn("no irqs for PMU, sampling events not supported\n");
-> +	if (num_irqs == 0 || (nr_cpu_ids > 1 && num_irqs == 1)) {
-> +		pr_info("No per CPU irqs for PMU, sampling events not supported\n");
->  		pmu->pmu.capabilities |= PERF_PMU_CAP_NO_INTERRUPT;
->  		cpumask_setall(&pmu->supported_cpus);
->  		return 0;
->  	}
+>  #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+> index 849da0d43a21..6cbf9471b2a2 100644
+> --- a/drivers/acpi/apei/ghes.c
+> +++ b/drivers/acpi/apei/ghes.c
+> @@ -85,6 +85,14 @@
+>  	((struct acpi_hest_generic_status *)				\
+>  	 ((struct ghes_estatus_node *)(estatus_node) + 1))
 >  
-> -	if (num_irqs == 1) {
-> -		int irq = platform_get_irq(pdev, 0);
-> -		if (irq && irq_is_percpu_devid(irq))
-> -			return pmu_parse_percpu_irq(pmu, irq);
-> -	}
-> -
->  	if (nr_cpu_ids != 1 && !pmu_has_irq_affinity(pdev->dev.of_node)) {
->  		pr_warn("no interrupt-affinity property for %pOF, guessing.\n",
->  			pdev->dev.of_node);
-> -- 
-> 2.20.1
-> 
+> +/* NMI-like notifications vary by architecture. Fill in the fixmap gaps */
+> +#ifndef CONFIG_HAVE_ACPI_APEI_NMI
+> +#define FIX_APEI_GHES_NMI	-1
+> +#endif
+> +#ifndef CONFIG_ACPI_APEI_SEA
+> +#define FIX_APEI_GHES_SEA	-1
+
+I'm guessing those -1 are going to cause __set_fixmap() to fail, right?
+
+I'm wondering if we could catch that situation in ghes_map() already to
+protect ourselves against future changes in the fixmap code...
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
 
 _______________________________________________
 linux-arm-kernel mailing list
