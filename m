@@ -2,65 +2,93 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C4DF4C31681
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 19:18:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6A637C31680
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 19:19:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9AC352089F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 19:18:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3FE4521721
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 19:19:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hl4Eg6bz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9AC352089F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=mellanox.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Vcct+uxx";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="gRv8geTm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3FE4521721
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=//A64VtM56l2dLDS/voIVW8/PKn4KROOmgAQvb10uo0=; b=hl4Eg6bz1gWVdnOLiTFqgDOimD
-	uVE+1vswD5b6jq7DHcv3jZQgCBhT9fnlUPzz/15QRFGVcmr7Ml+hk0V5fx7g7eDBpCNoD4DQ1zNhH
-	RR1kgFzOdf/kdRinOL58bZLQwIEkbMTzbInNl/pCZ0uLdcMQDqtzrd/nBy0A8L8Y1JmGalXpA+GE+
-	LMVCQJvAFg0bIXRcW6ZuuuIurp14h0LXl3jKY7DuE1DKNWFzQPag86Gwb+RMXNdepKrtOp/BGBfkp
-	XZ2mG6pcMCWI0SlHX5kBYIlJgXo6uL7qRojkyxgRitkpWcvLZXveHdpii/3zbK/Ekz/Twgkv9lgLe
-	7xmsfRZA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=RKwUK+D/QZD3bv8bcTG4Lk2MLtodo096YXYHe26rugI=; b=Vcct+uxxtTIK28
+	rm7gQVY0xzu5AuS/bMFkBfgTYI/7ICR1LpBhUvNcoF94gUNNLiZHjvW604lhHfpAApu2Uf3dAhE+Z
+	tWq6HK6gxmbqrKoMcb/opGJwx8UV7Esojmvse0NoAA/Vs4ClbPkGvr4DpXfyyfQIdmwE/MB1md2Bd
+	foyzyqf7qWd8wMGoR/44t+NEnQPj8BCnBD4avCQYWLhyvwp9nadEXmL7xhqASI22zvXT2UqPhyegX
+	xZLQx0LvhpLXYugeGv4X1a+H1dQOcxLODLebPxdMwjpMv23huENMzlx++bb80gHRP1Fp4riE3kcUJ
+	tXm5RXjbwty/qIfa/oEQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glf5N-0004Sn-Qp; Mon, 21 Jan 2019 19:18:17 +0000
-Received: from mail-il-dmz.mellanox.com ([193.47.165.129] helo=mellanox.co.il)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glf5G-0004S4-2b
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 19:18:15 +0000
-Received: from Internal Mail-Server by MTLPINE1 (envelope-from
- lsun@mellanox.com)
- with ESMTPS (AES256-SHA encrypted); 21 Jan 2019 21:18:02 +0200
-Received: from farm-0002.mtbu.labs.mlnx (farm-0002.mtbu.labs.mlnx [10.15.2.32])
- by mtbu-labmailer.labs.mlnx (8.14.4/8.14.4) with ESMTP id x0LJHxvI027731;
- Mon, 21 Jan 2019 14:17:59 -0500
-Received: (from lsun@localhost)
- by farm-0002.mtbu.labs.mlnx (8.14.7/8.13.8/Submit) id x0LJHvK8001039;
- Mon, 21 Jan 2019 14:17:57 -0500
-From: Liming Sun <lsun@mellanox.com>
-To: Olof Johansson <olof@lixom.net>, Arnd Bergmann <arnd@arndb.de>,
- David Woods <dwoods@mellanox.com>, Robin Murphy <robin.murphy@arm.com>,
- arm-soc <arm@kernel.org>
-Subject: [PATCH v7 0/9] Mellanox BlueField ARM SoC Rshim driver
-Date: Mon, 21 Jan 2019 14:17:48 -0500
-Message-Id: <1548098268-982-1-git-send-email-lsun@mellanox.com>
-X-Mailer: git-send-email 1.8.3.1
-In-Reply-To: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
-References: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
+	id 1glf6B-0004mc-1D; Mon, 21 Jan 2019 19:19:07 +0000
+Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glf67-0004mD-F0
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 19:19:05 +0000
+Received: by mail-it1-x143.google.com with SMTP id w18so17994297ite.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 21 Jan 2019 11:19:03 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc:content-transfer-encoding;
+ bh=tWkTW3k+bIMa8ZNbYJt7g6YWTX7Qi5IGP7maD32/94Y=;
+ b=gRv8geTmTUA+7CBmtPOuabUbz8xyJC9hAd45Png5i8B6i/eKo4xe/DwNX5hjr3u9tg
+ fUl2qucOfVw1Yujnp2sPnWPtOTYnvy6iFWdgLNfk+RQjfgxI0b/er+xiyM9dpYM+JA8M
+ FQrs6ycbJRiIi6idbcbpBB/7b2r7okhbckZHU=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc:content-transfer-encoding;
+ bh=tWkTW3k+bIMa8ZNbYJt7g6YWTX7Qi5IGP7maD32/94Y=;
+ b=Cu97K+JQfm8fNoBXKq0TjgdDvDvL52h1Asj+49oCKRbn/kv3bLVLphjdLRnnVo9m5e
+ nudg5fIfj9v71GWxXkoqVjYu2Zu4T3iQ2fkBdkZhVKO1rm8M4dWPtXr+isP1csT+KC+z
+ RuBa/ymT+RQNb4tnDGXk8tqwbyEGUhrWorp8dQimJb/+VTf6ahRwIB4nsLhL3ouqnZs+
+ ZL0NP0rr/cnCXiaifb+6pAm6Y8IKmYkWcK8fEGgMhjN0o1F4vqEXj/kmjuc5z4oZ0k4y
+ b/vMA56gDyAuEy07TZA6Ggltq2K8uMwmHdruTBGH9TMQAfl1UG1m55sLKRqBywQ2CQpY
+ HObA==
+X-Gm-Message-State: AJcUukegq0VQcGrBcv/KbvwesqOl4JKH/nSvLsYL8NL1wjJdY6+ZmjZx
+ CWr6Bu/PeZnZMKt8gv+6DHpIdNQPQVUpD7xX7ptcNg==
+X-Google-Smtp-Source: AHgI3IaQ7V8HPG7/byRY7qZDpx0KwlvbP/JzgF9Zy0+0MAguhIlFyPtxf/9XSQUKrVWkg9APT3qNu/9KGFOCNDfu6To=
+X-Received: by 2002:a24:edc4:: with SMTP id r187mr495418ith.158.1548098342336; 
+ Mon, 21 Jan 2019 11:19:02 -0800 (PST)
+MIME-Version: 1.0
+References: <20190121100617.2311-1-ard.biesheuvel@linaro.org>
+ <20190121150734.GA30582@infradead.org>
+ <CAKv+Gu-hR=uieOeg7QheA5yfAycUoi2vjZsDUvROKVjW4eUNqw@mail.gmail.com>
+ <20190121155908.GA8084@infradead.org>
+ <CAKv+Gu8LzS9OgvVnzUT8BZWVgDmx4OfqNiPSf+8=riY_LByN-g@mail.gmail.com>
+ <20190121162238.GA17651@infradead.org>
+ <CAKv+Gu-5V-UjP_YzZBCEsa+o_G6BRSVw2ZimYGNEfRGf-aRPNg@mail.gmail.com>
+ <59ccf85d-b99d-b5c8-ea87-66c2a892e197@daenzer.net>
+ <CAKv+Gu8OkbHwY5UBxahpQpM_gKh2331pQ6o-4YyJdLurbFNHvw@mail.gmail.com>
+ <ccc775d3-3053-ab79-dac8-4feb28e8e690@daenzer.net>
+ <CAKv+Gu-9VKL5RjScbKss4YfH1Cb8WbXmzU_0UsStnoXJcML7Rg@mail.gmail.com>
+ <850b6aee-0040-c333-b125-45211c18ada5@daenzer.net>
+ <CAKv+Gu99zHqcQtj6TiOXAr3Qa6WWhKem+DHVA_mAQ0-Bc0Vbqw@mail.gmail.com>
+ <047667fd-17be-1c37-5d2a-26768cfd6ab8@daenzer.net>
+In-Reply-To: <047667fd-17be-1c37-5d2a-26768cfd6ab8@daenzer.net>
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Date: Mon, 21 Jan 2019 20:18:51 +0100
+Message-ID: <CAKv+Gu-gaZpKqyLt9Vft2e_zS4Xkc9+8HAYoHvuBo5C0hqL2Qw@mail.gmail.com>
+Subject: Re: [RFC PATCH] drm: disable WC optimization for cache coherent
+ devices on non-x86
+To: =?UTF-8?Q?Michel_D=C3=A4nzer?= <michel@daenzer.net>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_111810_543283_F84B7220 
-X-CRM114-Status: GOOD (  16.11  )
+X-CRM114-CacheID: sfid-20190121_111903_499509_BEBC13A7 
+X-CRM114-Status: GOOD (  26.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,199 +100,106 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Liming Sun <lsun@mellanox.com>,
- linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: David Zhou <David1.Zhou@amd.com>,
+ Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
+ Maxime Ripard <maxime.ripard@bootlin.com>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ Will Deacon <will.deacon@arm.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ amd-gfx@lists.freedesktop.org, Christoph Hellwig <hch@infradead.org>,
+ David Airlie <airlied@linux.ie>, Huang Rui <ray.huang@amd.com>,
+ dri-devel <dri-devel@lists.freedesktop.org>, Daniel Vetter <daniel@ffwll.ch>,
+ Michael Ellerman <mpe@ellerman.id.au>, Junwei Zhang <Jerry.Zhang@amd.com>,
+ Alex Deucher <alexander.deucher@amd.com>, Sean Paul <sean@poorly.run>,
+ Christian Koenig <christian.koenig@amd.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch series implements Linux driver support for the Rshim
-component on Mellanox BlueField ARM SoC.
-
-1. Overview of the Rshim component
-
-The Rshim component provides a connection among different other
-components of the SoC and can be accessed externally via USB or
-PCIe. USB access is available on standard appliance and SmartNIC.
-PCIe access is for SmartNIC only.
-
-From user perspective, Rshim provides the following
-functionalities.
-
-1.1 Boot FIFO
-
-  The Boot FIFO is polled by the boot ROM. At a later booting
-  phase it's read by UEFI as well to load the Linux kernel.
-
-  The Boot FIFO is a one-way direction FIFO. The data could
-  come from different sources.
-
-    a) On-chip eMMC, which is the default configuration.
-
-      After chip reset, HW will generate eMMC commands, which
-      triggers the boot stream on the eMMC boot partition to show
-      up in Boot FIFO.
-
-      This one doesn't need any Linux driver.
-
-    b) Injected externally from USB or PCIe.
-
-      External host could overwrite the boot mode and inject
-      boot stream into the Boot FIFO over USB or PCIe. It's
-      used in board bring-up, fault recovering or debugging.
-
-      This one usually needs driver support in the external host.
-
-1.2 TmFifo
-
-  TmFifo are FIFOs which can be used for communication between
-  the SoC ARM core and the external side. Each direction has its
-  own FIFO.
-
-  TmFifo needs driver support on both the SoC side and the
-  external host side.
-
-1.3 Rshim register space access
-
-  Rshim register space could be accessed externally via
-  USB or PCIe. It's used for configuration, debugging, etc.
-  More specifically, it could be used to access the ARM
-  CoreSight component which could do on-chip debugging,
-  such as for boot loader, drivers, or crash information
-  collection.
-
-  This one needs driver support from external host.
-
-2. Driver Introduction
-
-  This patch series provides several drivers.
-
-  *) Patch 1/9 ~ 4/9 (tmfifo.c, tmfifo_regs.h, Kconfig, Makefile)
-
-    They provide Linux driver support for the TmFifo on the
-    SoC side (see above 1.2).
-
-  *) Patch 5/9 ~ 9/9
-
-    They provide Linux driver support for the external host.
-
-    - Patch 5/9 (rshim.c, rshim.h, rshim_regs.h, Makefile)
-
-      It provides common functionalities and register access
-      to the RShim component. Several character devices are
-      created like below for easy user-access.
-
-      /dev/rshim<N>/boot 
-
-        This device file is used to inject boot stream into
-        the Boot FIFO, such as
-              'cat boot-image > /dev/rshim<N>/boot'
-        This one is to implement the above function 1.1.b
-
-      /dev/rshim<N>/rshim
-
-        This device file is used to access Rshim register
-        space like a plat file.
-
-      /dev/rshim<N>/console
-
-        This device file is used to access the virtual
-        console to the SoC via the TmFifo (see above
-        functionality 1.2). It can be used by any standard tools
-        like minicom, screen, etc.
-
-    - Patch 6/9 (rshim_net.c)
-
-      This patch provides virtual networking support over
-      the Rshim TmFifo (see above functionality 1.2).
-
-    - Patch 7/9 (rshim_usb.c)
-
-      This is the USB backend driver, which implements the
-      details to access the RShim component via USB. It supports
-      endpoints, USB bulk-transfer and interrupts. After loaded
-      by ACPI, it triggers the loading of the common driver
-      and network driver, and provides low-level APIs to the
-      common driver.
-
-      Below is an example of the networking calling stack.
-
-      Linux Network Stack --> virtio_net --> rshim_net -->
-      rshim common driver --> rshim USB backend driver
-
-    - Patch 8/9 (rshim_pcie.c)
-
-      This is the PCIe backend driver, which implements the
-      details to access the RShim component via PCIe when
-      the HCA firmware is ready. In such case, the Rshim component
-      is exposed as a standard PCIe PF and it's register space
-      can be mapped in BAR0.
-
-      Linux Network Stack --> virtio_net --> rshim_net -->
-      rshim common driver --> rshim PCIe backend driver
-
-   - Patch 9/9 (rshim_pcie_lf.c)
-
-     Similarly, this is another PCIe backend driver, but provides
-     slow access when the HCA firmware is not ready. In such as,
-     the BAR0 mapping is not available. The Rshim register access
-     is done via a slow access gateway. The below calling stack
-     is also similar.
-
-      Linux Network Stack --> virtio_net --> rshim_net -->
-      rshim common driver --> rshim PCIe livefish backend driver
-
-Liming Sun (9):
-  soc: Add TmFifo driver for Mellanox BlueField Soc
-  arm64: Add Mellanox BlueField SoC config option
-  dt-bindings: soc: Add TmFifo binding for Mellanox BlueField SoC
-  MAINTAINERS: Add entry for Mellanox Bluefield Soc
-  soc: mellanox: host: Add the common host side Rshim driver
-  soc: mellanox: host: Add networking support over Rshim
-  soc: mellanox: host: Add the Rshim USB backend driver
-  soc: mellanox: host: Add the Rshim PCIe backend driver
-  soc: mellanox: host: Add the Rshim PCIe live-fish backend driver
-
- .../devicetree/bindings/soc/mellanox/tmfifo.txt    |   23 +
- MAINTAINERS                                        |    8 +
- arch/arm64/Kconfig.platforms                       |    6 +
- arch/arm64/configs/defconfig                       |    1 +
- drivers/soc/Kconfig                                |    1 +
- drivers/soc/Makefile                               |    1 +
- drivers/soc/mellanox/Kconfig                       |   26 +
- drivers/soc/mellanox/Makefile                      |    6 +
- drivers/soc/mellanox/host/Makefile                 |    2 +
- drivers/soc/mellanox/host/rshim.c                  | 2673 ++++++++++++++++++++
- drivers/soc/mellanox/host/rshim.h                  |  361 +++
- drivers/soc/mellanox/host/rshim_net.c              |  834 ++++++
- drivers/soc/mellanox/host/rshim_pcie.c             |  478 ++++
- drivers/soc/mellanox/host/rshim_pcie_lf.c          |  695 +++++
- drivers/soc/mellanox/host/rshim_regs.h             |  152 ++
- drivers/soc/mellanox/host/rshim_usb.c              | 1035 ++++++++
- drivers/soc/mellanox/tmfifo.c                      | 1244 +++++++++
- drivers/soc/mellanox/tmfifo_regs.h                 |   76 +
- 18 files changed, 7622 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt
- create mode 100644 drivers/soc/mellanox/Kconfig
- create mode 100644 drivers/soc/mellanox/Makefile
- create mode 100644 drivers/soc/mellanox/host/Makefile
- create mode 100644 drivers/soc/mellanox/host/rshim.c
- create mode 100644 drivers/soc/mellanox/host/rshim.h
- create mode 100644 drivers/soc/mellanox/host/rshim_net.c
- create mode 100644 drivers/soc/mellanox/host/rshim_pcie.c
- create mode 100644 drivers/soc/mellanox/host/rshim_pcie_lf.c
- create mode 100644 drivers/soc/mellanox/host/rshim_regs.h
- create mode 100644 drivers/soc/mellanox/host/rshim_usb.c
- create mode 100644 drivers/soc/mellanox/tmfifo.c
- create mode 100644 drivers/soc/mellanox/tmfifo_regs.h
-
--- 
-1.8.3.1
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gTW9uLCAyMSBKYW4gMjAxOSBhdCAyMDowNCwgTWljaGVsIETDpG56ZXIgPG1pY2hlbEBkYWVu
+emVyLm5ldD4gd3JvdGU6Cj4KPiBPbiAyMDE5LTAxLTIxIDc6MjggcC5tLiwgQXJkIEJpZXNoZXV2
+ZWwgd3JvdGU6Cj4gPiBPbiBNb24sIDIxIEphbiAyMDE5IGF0IDE5OjI0LCBNaWNoZWwgRMOkbnpl
+ciA8bWljaGVsQGRhZW56ZXIubmV0PiB3cm90ZToKPiA+PiBPbiAyMDE5LTAxLTIxIDc6MjAgcC5t
+LiwgQXJkIEJpZXNoZXV2ZWwgd3JvdGU6Cj4gPj4+IE9uIE1vbiwgMjEgSmFuIDIwMTkgYXQgMTk6
+MDQsIE1pY2hlbCBEw6RuemVyIDxtaWNoZWxAZGFlbnplci5uZXQ+IHdyb3RlOgo+ID4+Pj4gT24g
+MjAxOS0wMS0yMSA2OjU5IHAubS4sIEFyZCBCaWVzaGV1dmVsIHdyb3RlOgo+ID4+Pj4+IE9uIE1v
+biwgMjEgSmFuIDIwMTkgYXQgMTg6NTUsIE1pY2hlbCBEw6RuemVyIDxtaWNoZWxAZGFlbnplci5u
+ZXQ+IHdyb3RlOgo+ID4+Pj4+PiBPbiAyMDE5LTAxLTIxIDU6MzAgcC5tLiwgQXJkIEJpZXNoZXV2
+ZWwgd3JvdGU6Cj4gPj4+Pj4+PiBPbiBNb24sIDIxIEphbiAyMDE5IGF0IDE3OjIyLCBDaHJpc3Rv
+cGggSGVsbHdpZyA8aGNoQGluZnJhZGVhZC5vcmc+IHdyb3RlOgo+ID4+Pj4+Pj4KPiA+Pj4+Pj4+
+PiBVbnRpbCB0aGF0IGhhcHBlbnMgd2Ugc2hvdWxkIGp1c3QgY2hhbmdlIHRoZSBkcml2ZXIgaWZk
+ZWZzIHRvIGRlZmF1bHQKPiA+Pj4+Pj4+PiB0aGUgaGFja3MgdG8gb2ZmIGFuZCBvbmx5IGVuYWJs
+ZSB0aGVtIG9uIHNldHVwcyB3aGVyZSB3ZSAxMDAlCj4gPj4+Pj4+Pj4gcG9zaXRpdmVseSBrbm93
+IHRoYXQgdGhleSBhY3R1YWxseSB3b3JrLiAgQW5kIGRvY3VtZW50IHRoYXQgZmFjdAo+ID4+Pj4+
+Pj4+IGluIGJpZyBmYXQgY29tbWVudHMuCj4gPj4+Pj4+Pgo+ID4+Pj4+Pj4gV2VsbCwgYXMgSSBt
+ZW50aW9uZWQgaW4gbXkgY29tbWl0IGxvZyBhcyB3ZWxsLCBpZiB3ZSBkZWZhdWx0IHRvIG9mZgo+
+ID4+Pj4+Pj4gdW5sZXNzIENPTkZJR19YODYsIHdlIG1heSBicmVhayB3b3JraW5nIHNldHVwcyBv
+biBNSVBTIGFuZCBQb3dlciB3aGVyZQo+ID4+Pj4+Pj4gdGhlIGRldmljZSBpcyBpbiBmYWN0IG5v
+bi1jYWNoZSBjb2hlcmVudCwgYW5kIHJlbGllcyBvbiB0aGlzCj4gPj4+Pj4+PiAnb3B0aW1pemF0
+aW9uJyB0byBnZXQgdGhpbmdzIHdvcmtpbmcuCj4gPj4+Pj4+Cj4gPj4+Pj4+IEZXSVcsIHRoZSBh
+bWRncHUgZHJpdmVyIGRvZXNuJ3QgcmVseSBvbiBub24tc25vb3BlZCB0cmFuc2ZlcnMgZm9yCj4g
+Pj4+Pj4+IGNvcnJlY3QgYmFzaWMgb3BlcmF0aW9uICh0aGUgc2NlbmFyaW8gQ2hyaXN0aWFuIGJy
+b3VnaHQgdXAgaXMgYSB2ZXJ5Cj4gPj4+Pj4+IHNwZWNpYWxpemVkIHVzZS1jYXNlKSwgc28gdGhh
+dCBzaG91bGRuJ3QgYmUgYW4gaXNzdWUuCj4gPj4+Pj4KPiA+Pj4+PiBUaGUgcG9pbnQgaXMgdGhh
+dCB0aGlzIGlzIG9ubHkgdHJ1ZSBmb3IgeDg2Lgo+ID4+Pj4+Cj4gPj4+Pj4gT24gb3RoZXIgYXJj
+aGl0ZWN0dXJlcywgdGhlIHVzZSBvZiBub24tY2FjaGVkIG1hcHBpbmdzIG9uIHRoZSBDUFUgc2lk
+ZQo+ID4+Pj4+IG1lYW5zIHRoYXQgeW91IC9kby8gcmVseSBvbiBub24tc25vb3BlZCB0cmFuc2Zl
+cnMsIHNpbmNlIGlmIHRob3NlCj4gPj4+Pj4gdHJhbnNmZXJzIHR1cm4gb3V0IG5vdCB0byBzbm9v
+cCBpbmFkdmVydGVudGx5LCB0aGUgYWNjZXNzZXMgYXJlCj4gPj4+Pj4gaW5jb2hlcmVudCB3aXRo
+IHRoZSBDUFUncyB2aWV3IG9mIG1lbW9yeS4KPiA+Pj4+Cj4gPj4+PiBUaGUgZHJpdmVyIGdlbmVy
+YWxseSBvbmx5IHVzZXMgbm9uLWNhY2hlZCBtYXBwaW5ncyBpZgo+ID4+Pj4gZHJtX2FyY2gvZGV2
+aWNlX2Nhbl93Y19tZW1vcnkgcmV0dXJucyB0cnVlLgo+ID4+Pgo+ID4+PiBJbmRlZWQuIEFuZCBz
+byB3ZSBzaG91bGQgdGFrZSBjYXJlIHRvIG9ubHkgcmV0dXJuICd0cnVlJyBmcm9tIHRoYXQKPiA+
+Pj4gZnVuY3Rpb24gaWYgaXQgaXMgZ3VhcmFudGVlZCB0aGF0IG5vbi1jYWNoZWQgQ1BVIG1hcHBp
+bmdzIGFyZSBjb2hlcmVudAo+ID4+PiB3aXRoIHRoZSBtYXBwaW5ncyB1c2VkIGJ5IHRoZSBHUFUs
+IGVpdGhlciBiZWNhdXNlIHRoYXQgaXMgYWx3YXlzIHRoZQo+ID4+PiBjYXNlIChsaWtlIG9uIHg4
+NiksIG9yIGJlY2F1c2Ugd2Uga25vdyB0aGF0IHRoZSBwbGF0Zm9ybSBpbiBxdWVzdGlvbgo+ID4+
+PiBpbXBsZW1lbnRzIE5vU25vb3AgY29ycmVjdGx5IHRocm91Z2hvdXQgdGhlIGludGVyY29ubmVj
+dC4KPiA+Pj4KPiA+Pj4gV2hhdCBzZWVtcyB0byBiZSBjb21wbGljYXRpbmcgbWF0dGVycyBpcyB0
+aGF0IGluIHNvbWUgY2FzZXMsIHRoZQo+ID4+PiBkZXZpY2UgaXMgbm9uLWNhY2hlIGNvaGVyZW50
+IHRvIGJlZ2luIHdpdGgsIHNvIHJlZ2FyZGxlc3Mgb2Ygd2hldGhlcgo+ID4+PiB0aGUgTm9Tbm9v
+cCBhdHRyaWJ1dGUgaXMgdXNlZCBvciBub3QsIHRob3NlIGFjY2Vzc2VzIHdpbGwgbm90IHNub29w
+IGluCj4gPj4+IHRoZSBjYWNoZXMgYW5kIGJlIGNvaGVyZW50IHdpdGggdGhlIG5vbi1jYWNoZWQg
+bWFwcGluZ3MgdXNlZCBieSB0aGUKPiA+Pj4gQ1BVLiBTbyBpZiB3ZSByZXN0cmljdCB0aGlzIG9w
+dGltaXphdGlvbiBbb24gbm9uLVg4Nl0gdG8gcGxhdGZvcm1zCj4gPj4+IHRoYXQgYXJlIGtub3du
+IHRvIGltcGxlbWVudCBOb1Nub29wIGNvcnJlY3RseSwgd2UgbWF5IGJyZWFrIHBsYXRmb3Jtcwo+
+ID4+PiB0aGF0IGFyZSBpbXBsaWNpdGx5IE5vU25vb3AgYWxsIHRoZSB0aW1lLgo+ID4+Cj4gPj4g
+U2luY2UgdGhlIGRyaXZlciBnZW5lcmFsbHkgZG9lc24ndCByZWx5IG9uIG5vbi1zbm9vcGVkIGFj
+Y2Vzc2VzIGZvcgo+ID4+IGNvcnJlY3RuZXNzLCB0aGF0IGNvdWxkbid0ICJicmVhayIgYW55dGhp
+bmcgdGhhdCBoYXNuJ3QgYWx3YXlzIGJlZW4gYnJva2VuLgo+ID4KPiA+IEFnYWluLCB0aGF0IGlz
+IG9ubHkgdHJ1ZSBvbiB4ODYuCj4gPgo+ID4gT24gb3RoZXIgYXJjaGl0ZWN0dXJlcywgRE1BIHdy
+aXRlcyBmcm9tIHRoZSBkZXZpY2UgbWF5IGFsbG9jYXRlIGluIHRoZQo+ID4gY2FjaGVzLCBhbmQg
+YmUgaW52aXNpYmxlIHRvIHRoZSBDUFUgd2hlbiBpdCB1c2VzIG5vbi1jYWNoZWQgbWFwcGluZ3Mu
+Cj4KPiBMZXQgbWUgdHJ5IG9uZSBsYXN0IHRpbWU6Cj4KCkkgY291bGQgc2F5IHRoZSBzYW1lIDot
+KQoKPiBJZiBkcm1fYXJjaF9jYW5fd2NfbWVtb3J5IHJldHVybnMgZmFsc2UsIHRoZSBkcml2ZXIg
+ZmFsbHMgYmFjayB0byB0aGUKPiBub3JtYWwgbW9kZSBvZiBvcGVyYXRpb24sIHVzaW5nIGEgY2Fj
+aGVhYmxlIENQVSBtYXBwaW5nIGFuZCBzbm9vcGVkIEdQVQo+IHRyYW5zZmVycywgZXZlbiBpZiB1
+c2Vyc3BhY2UgYXNrcyAoYXMgYSBwZXJmb3JtYW5jZSBvcHRpbWl6YXRpb24pIGZvciBhCj4gd3Jp
+dGUtY29tYmluZWQgQ1BVIG1hcHBpbmcgYW5kIG5vbi1zbm9vcGVkIEdQVSB0cmFuc2ZlcnMgdmlh
+Cj4gQU1ER1BVX0dFTV9DUkVBVEVfQ1BVX0dUVF9VU1dDLgoKSSBhbSBub3QgdGFsa2luZyBhYm91
+dCB0aGUgY2FzZSB3aGVyZSBkcm1fYXJjaF9jYW5fd2NfbWVtb3J5KCkgcmV0dXJucyBmYWxzZS4K
+CkkgYW0gdGFsa2luZyBhYm91dCB0aGUgY2FzZSB3aGVyZSBpdCByZXR1cm5zIHRydWUsIHdoaWNo
+IGlzIGN1cnJlbnRseQp0aGUgZGVmYXVsdCBmb3IgYWxsIGFyY2hpdGVjdHVyZXMsIGV4Y2VwdCBQ
+b3dlciBhbmQgTUlQUyBpbiBzb21lCmNhc2VzLgoKVGhpcyBtb2RlIG9mIG9wZXJhdGlvbiBicmVh
+a3MgbXkgY2FjaGUgY29oZXJlbnQgYXJtNjQgc3lzdGVtLiAoQU1EIFNlYXR0bGUpCldpdGggdGhp
+cyBwYXRjaCBhcHBsaWVkLCBldmVyeXRoaW5nIHdvcmtzIGZpbmUuCgo+IFRoaXMgbm9ybWFsIG1v
+ZGUgb2Ygb3BlcmF0aW9uIGlzIGFsc28KPiB1c2VkIGZvciB0aGUgcmluZyBidWZmZXJzIGF0IHRo
+ZSBoZWFydCBvZiB0aGUgZHJpdmVyJ3Mgb3BlcmF0aW9uLgoKQnV0IGlzIGl0IHJlYWxseSB0aGUg
+c2FtZSBtb2RlIG9mIG9wZXJhdGlvbj8gRG9lcyBpdCBhbHNvIHZtYXAoKSB0aGUKcGFnZXM/IE9y
+IGRvZXMgaXQgdXNlIHRoZSBETUEgQVBJIHRvIGFsbG9jYXRlIHRoZSByaW5nIGJ1ZmZlcnM/CkJl
+Y2F1c2UgaW4gdGhlIGxhdHRlciBjYXNlLCB0aGlzIHdpbGwgZ2l2ZSB5b3Ugbm9uLWNhY2hlZCBD
+UFUgbWFwcGluZ3MKYXMgd2VsbCBpZiB0aGUgZGV2aWNlIGlzIG5vbi1jYWNoZSBjb2hlcmVudC4K
+Cj4gSWYKPiB0aGVyZSBpcyBhIHBsYXRmb3JtIHdoZXJlIHRoaXMgbm9ybWFsIG1vZGUgb2Ygb3Bl
+cmF0aW9uIGRvZXNuJ3Qgd29yaywKPiB0aGUgZHJpdmVyIGNvdWxkIG5ldmVyIGhhdmUgd29ya2Vk
+IHJlbGlhYmx5IG9uIHRoYXQgcGxhdGZvcm0sIHNpbmNlCj4gYmVmb3JlIEFNREdQVV9HRU1fQ1JF
+QVRFX0NQVV9HVFRfVVNXQyBvciBkcm1fYXJjaF9jYW5fd2NfbWVtb3J5IGV2ZW4KPiBleGlzdGVk
+Lgo+CgpBcyBJIHNhaWQsIEkgYW0gdGFsa2luZyBhYm91dCB0aGUgY2FzZSB3aGVyZSBkcm1fYXJj
+aF9jYW5fd2NfbWVtb3J5KCkKcmV0dXJucyB0cnVlIG9uIGEgY2FjaGUgY29oZXJlbnQgc3lzdGVt
+LiBUaGlzIHJlbGllcyBvbiBOb1Nub29wIGJlaW5nCmltcGxlbWVudGVkIGNvcnJlY3RseSBpbiB0
+aGUgcGxhdGZvcm0sIG9yIGEgQ1BVIGFyY2hpdGVjdHVyZSB0aGF0CnNub29wcyB0aGUgY2FjaGVz
+IHdoZW4gZG9pbmcgdW5jYWNoZWQgbWVtb3J5IGFjY2Vzc2VzIChzdWNoIGFzIHg4NikKCl9fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJu
+ZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRw
+Oi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
