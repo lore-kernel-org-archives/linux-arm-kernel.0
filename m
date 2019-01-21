@@ -2,61 +2,79 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 43E8CC2F3BE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 13:39:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D30B8C2F3A0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 13:41:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1361520861
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 13:39:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A251720861
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 13:41:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aP3of2lz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1361520861
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="apjIJd4l";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="OqyfWeGe"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A251720861
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=A0ojYoRiyYxDG0qW7GMcnjT912m2JiIasfg/eQZEREc=; b=aP3of2lzUfskcuzed81lO63DN
-	M6OXgVjbvX+Qdxn4ZtT2od6E3Ojn6fSFbM1euR5w90LlWYZ1Z2XcBQFbBOz54dEmIzuNchCUuGOvH
-	+2nVlzZpCRm3DyD6O9c1MGlDAFNMUavTYsqWOXQ/fQweAQMV4aZAlqLVMGJ6n+noqUqKzDtwoSqmb
-	EZ2X99qNBtFEG1gp3MFUgSo/eVh+Z8glllstRDGY4Syhuv8RxB8UWm50Td0Ya7J4syYlxHxhLOW4V
-	Tve7JMrl+b7IJxwZfPFO2A8bn0JqgS+I5WrWOqQjCKlslP9h8Ww4E3sLEMutvGVgLnR01vnyDQJzn
-	cx4O0kSxA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=WwN4BAzXvtTemP69HUg6Nm9Wf9sJ1/1u0f75YBISH5w=; b=apjIJd4lrFLeMr
+	b+T92/2ZrJQ4H7qUgwfDqND4cyg7utVBL1XjgJmoxPhSkFtM8rSx7wRcYNDnISwEP/O/IccB2tDkc
+	q1QG976Ff5SSPtw2ZrxmKIQiloTCz6bsEwCiE/jHH0Xv384LUd3qz3FGQbztF90UdLh/HKScUIMMO
+	8QHbZjPzmUF6uy+8RznysX/jvzfbDAI+oige/UCBiOdjKesRjQbET9SjK2O3L6GAxxYK5fRc1QlQ7
+	n789pFvVl+jOSYGHMieYdFFoozRTeNglo0V4un2rTCpRwoI7WqptcXZd7M5U7wBKk/OORXDwq3gHe
+	obxKZCxTj4ipagOCNJ4g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glZnh-0004qV-4J; Mon, 21 Jan 2019 13:39:41 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glZnd-0004q6-EL
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 13:39:39 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id BECDC207B2; Mon, 21 Jan 2019 14:39:34 +0100 (CET)
-Received: from localhost (unknown [185.94.189.187])
- by mail.bootlin.com (Postfix) with ESMTPSA id 848C5206A7;
- Mon, 21 Jan 2019 14:39:34 +0100 (CET)
-Date: Mon, 21 Jan 2019 14:39:34 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Sean Paul <sean@poorly.run>
-Subject: Re: [PATCH v4 8/9] phy: Add Cadence D-PHY support
-Message-ID: <20190121133934.5e3uwk5x6vzno36w@flea>
-References: <cover.5d91ef683e3f432342f536e0f2fe239dbcebcb3e.1547026369.git-series.maxime.ripard@bootlin.com>
- <a089ce6aaefe6d2ddf6b17f5558ec7eb0ebf3774.1547026369.git-series.maxime.ripard@bootlin.com>
- <20190117135322.GB114153@art_vandelay>
+	id 1glZpk-0006Pe-Hu; Mon, 21 Jan 2019 13:41:48 +0000
+Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glZph-0006P7-EU
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 13:41:46 +0000
+Received: by mail-lf1-x143.google.com with SMTP id a8so15529977lfk.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 21 Jan 2019 05:41:44 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=SF4M7AhekxLOzHWpvb8yq1aEWAWnL64H6PmvyFaKAok=;
+ b=OqyfWeGegB0OedjBiVjJ5WWuEvlf0dltJPq5DwoC65MylV0PL5sENyax/ga9qgST21
+ pdzWdYH5yoHG6/sDOjGAcX15F/T4+Td6xlzep2f6PYg04qVXLWYMfTavMtB9czI3/3OI
+ 1AzypkOmQ+RNOex8/jsXxMsO/eOY5x5+7s1Fg=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=SF4M7AhekxLOzHWpvb8yq1aEWAWnL64H6PmvyFaKAok=;
+ b=mPZu4Ej/sSQcRtxF34VE38py281tjUdtobdtI+jPJ/D9PcrJo5ajWoarRDEhDhFVmK
+ FsXQb0HGQFzuvq9AzYsdxX4Q1d35obFsAq0xD4nwN9KttvaLFm2+RpuF90Nu8A8claJn
+ vg+nzfPCEDsMMHj+MHkFAKhh8oyRfuGzhb35xSYhB1Yoj6/3yGiggX9+IhSsmkm61ppT
+ KRZdoZKDil948Q+uEU58mZfaj1nVhvmGkDlEaxXPntGsz4eJD3yuJuFMYu6637YmC7n9
+ ZxsYaLJuVx9cqRvlRkJ7PeiR8R5zgzyJZqLJK+E7Hpv5k+dxO+3wP+oCKD6IGKglkVue
+ swFg==
+X-Gm-Message-State: AJcUukdiWgq6FJUZhg6pqvoshtK0jYjkzAvvWxbd95b0y8Oh9540Yp2c
+ pdnP6eXthXx58L5mDtf5VfX5yun7j2LEsNcnxWFLDA==
+X-Google-Smtp-Source: ALg8bN45WhP5pXFSIfwUYg29unYStWXKMtUMqsRB+js5Ti+Opwq+G2v+mZ/dq+/vlDoml70MHBOszZKwev38kZHyoVE=
+X-Received: by 2002:a19:4849:: with SMTP id v70mr17874393lfa.62.1548078103250; 
+ Mon, 21 Jan 2019 05:41:43 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20190117135322.GB114153@art_vandelay>
-User-Agent: NeoMutt/20180716
+References: <20190115024543.12928-1-wens@csie.org>
+In-Reply-To: <20190115024543.12928-1-wens@csie.org>
+From: Linus Walleij <linus.walleij@linaro.org>
+Date: Mon, 21 Jan 2019 14:41:31 +0100
+Message-ID: <CACRpkdYkmsf00=Bws=Kf9_8zYo5k4_fyEHoGamvDA5PN-1PmyQ@mail.gmail.com>
+Subject: Re: [PATCH] pinctrl: sunxi: Correct number of IRQ banks on H6 main
+ pin controller
+To: Chen-Yu Tsai <wens@csie.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_053937_619155_68AE7C30 
-X-CRM114-Status: GOOD (  11.45  )
+X-CRM114-CacheID: sfid-20190121_054145_489053_416BC594 
+X-CRM114-Status: GOOD (  10.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,73 +86,35 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rafal Ciepiela <rafalc@cadence.com>, linux-kernel@vger.kernel.org,
- dri-devel@lists.freedesktop.org, Kishon Vijay Abraham I <kishon@ti.com>,
- Krzysztof Witos <kwitos@cadence.com>, Chen-Yu Tsai <wens@csie.org>,
- Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
-Content-Type: multipart/mixed; boundary="===============7274268328884066551=="
+Cc: Maxime Ripard <maxime.ripard@bootlin.com>,
+ "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
+ stable <stable@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Tue, Jan 15, 2019 at 3:45 AM Chen-Yu Tsai <wens@csie.org> wrote:
 
---===============7274268328884066551==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="hzi2fvtnjykoiksc"
-Content-Disposition: inline
+> The H6 main pin controller has four banks of interrupt-triggering pins.
+> The driver as originally submitted only specified three, but had pin
+> descriptions referencing a fourth bank. This results in a out-of-bounds
+> access into .irq_array of struct sunxi_pinctrl. This however did not
+> result in a crash until v4.20, with commit a66d972465d1 ("devres: Align
+> data[] to ARCH_KMALLOC_MINALIGN"), which changed the alignment of memory
+> region returned by devm_kcalloc(). The increase likely moved the
+> out-of-bounds access into the next, unmapped page.
 
+Nice work rootcausing this!
 
---hzi2fvtnjykoiksc
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Patch applied for fixes with the tested-by and ACK.
 
-Hi Sean,
-
-On Thu, Jan 17, 2019 at 08:53:22AM -0500, Sean Paul wrote:
-> On Wed, Jan 09, 2019 at 10:33:25AM +0100, Maxime Ripard wrote:
-> > +	opts->wakeup =3D cdns_dphy_get_wakeup_time_ns(dphy) * 1000;
->=20
-> This should be "/ 1000" since the units of wakeup is us now (thanks to pa=
-tch 2).
-> You've made this change in patch 9, so I think it's just a misplaced fixu=
-p.
-
-Good catch, this was fixed in patch 9, but it definitely belongs there.
-
-Thanks!
-Maxime
-
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
-
---hzi2fvtnjykoiksc
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXEXLlgAKCRDj7w1vZxhR
-xW+LAP4zEe1z/qdpFjO7LKfIjMbOAWFDH1HPxrfSrGKjD/8GtwEAztE37tEckDJq
-RYu3qFgjy6BMgbB4/6tjGMfKoB2b0AI=
-=rG2u
------END PGP SIGNATURE-----
-
---hzi2fvtnjykoiksc--
-
-
---===============7274268328884066551==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+Yours,
+Linus Walleij
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============7274268328884066551==--
-
