@@ -2,21 +2,23 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8DB2CC282F6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 09:07:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8927CC282DB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 09:10:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5E45B2085A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 09:07:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2BE38214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 09:10:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iDhxWFdb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5E45B2085A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-m68k.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cY38oKhf";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="fBbfxhS1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2BE38214DA
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,51 +26,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4dRIVeQYKuwj/cKK1HVnfkyir5GIuZdR9ONatHOoIdg=; b=iDhxWFdb/D/WZY
-	/TSkS1LoZc5PzqS9el+PHi4srm6+uAL7hMJXgFGH3EqTNXRDGD9YeKBeChU7f13ESwVghHg6ZWqil
-	y/aj8y59aQs3428MGzUR366SfMB16+A/B+G4NR6EGaPAsXfDaw1M0qfnKh5gpnqMSG4BHply3+JAn
-	qG2Wz4ZuR3F52HsB53ZNMUlNhBiqx987KKJ8R/TeOGO5P7D0aXfIIW6bF0QJnjMoaKVd7hAlageDd
-	+G2xztACYK6SkBwldLtuo20ja91lJ9vsGNRImln3ghcsop7CYvZOmnYC27WM2gthBS/zjgYgjQ/cJ
-	Z83wYfe7YIzwTdoMDvzA==;
+	List-Owner; bh=rWODD2r/E55C7aqaxz/73ix4yBZ4+tmqKfCuxneow8w=; b=cY38oKhfOHfgR9
+	UUIxOjmC/yQsJm5Ni8DGst6WHn5uK/XTrqkV2uigTKdZKdx18uSceaH/cuju+QYDIDr3NxYDiiKYf
+	YsU3pPYq7EcCgYCl9VzDLQpuegh/qSti3v3hozEPFm6VEAVjYNXdNsdvRIjdu/6nFNK6o6M00pA5O
+	ZGJ+sBlIfSAla0TcxhEYdmLI/dWxDMm5a2TyW2gKpa5zx9RwGK/f7abyZ9wvUiWYfx5AgE3Vcrz4O
+	jMSHICnxmqHagM6ccROZlpdorUw18VZVDX1XgMKGuAUV74tZKrtA9HTIQMagFkr2X4tDf1/MFoC/x
+	bUegR6adA4XcjwbKtzOA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glVY8-0001f0-Qi; Mon, 21 Jan 2019 09:07:20 +0000
-Received: from mail-vs1-f67.google.com ([209.85.217.67])
+	id 1glVad-0001vb-FM; Mon, 21 Jan 2019 09:09:55 +0000
+Received: from mail-oi1-x243.google.com ([2607:f8b0:4864:20::243])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glVNZ-0004fL-Ez
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 08:56:44 +0000
-Received: by mail-vs1-f67.google.com with SMTP id b74so12132782vsd.9
+ id 1glVaa-0001v9-3l
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 09:09:53 +0000
+Received: by mail-oi1-x243.google.com with SMTP id v6so13987318oif.2
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 00:56:25 -0800 (PST)
+ Mon, 21 Jan 2019 01:09:51 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc:content-transfer-encoding;
+ bh=MbxvX/AkJ3wQ59hS4IMAvv/9UKU2g7OluU2n+zsp7MY=;
+ b=fBbfxhS1gG2iO5wnoOR9EILcuAAHPLx5n3A2TE+QsXVm8IBa9G3/m0Quez8GRWyvTf
+ i6P07S59zzTO4kYQRZvU1B54rGyrUUzr83hYDW+tr2RfJKIMQRqgxaC20DybPwAYKcKM
+ fKKnhcD8QoH2owgnU3q/r2vm5gpmbebQ7voDw=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=gZ5xKfwCuPvjsbs8ypviK2wVON115JbrXd6QLz3o9YM=;
- b=GHMSaEptipv5bHU+Wkbc3GWpjhNUMmQqsRz+xiCJZbSVpW/r/nbwYxL7yBKra5aOrq
- H04hZ7pX+fMpbYAfgpI0XA0eludVy58qREgYBRbM4hst6B+Bd5S9njgNPyI8JH/TQs7E
- 2vIMkP1Lh+HLkKrpwcX4AoS3IP29muSDmUezPT0L9pJzgFtTm3o/f+AQ3sh27cMBY7Op
- /AOe1cRBfqyJYRJ89BSWH/Qn/1ZJ98wi98xH0I81ALGEA/5jjXK7FjmA0qPRIoXTcruz
- kvSuBveWgFMUSgszPAlkVLw49GnJ3PaizORsHKBBGxWz/K7y8BSZNzfXm2VNiBxHlT73
- h5ZA==
-X-Gm-Message-State: AJcUuke6J8u2HKmjHNqFwMlruzoHjEBk7RI36Mwopb13m3LT25QlXSzG
- 9gY/madNYS81VhcwVYahkftucSlAzi7TRevLars=
-X-Google-Smtp-Source: ALg8bN6oQTjQTvMkhu0RSRQU3eG9DnGNZiAO15hurqtwS01M6srTDPs1MhTBku760Abay4RjwT0+IVQlARbp3cdEMM8=
-X-Received: by 2002:a67:c202:: with SMTP id i2mr11527790vsj.11.1548060984197; 
- Mon, 21 Jan 2019 00:56:24 -0800 (PST)
+ :message-id:subject:to:cc:content-transfer-encoding;
+ bh=MbxvX/AkJ3wQ59hS4IMAvv/9UKU2g7OluU2n+zsp7MY=;
+ b=uE2q0WB0Qiy+GFg1fA99P+wMuNAdJ5oFIkgQ2qkU5/6YjYTbEAiCuQX6RQKd18WRcu
+ bJJWdNX3qOddxsKAc5LbiwFwIyVCV1L4+e56ruUuNDuzs6ZsAnn40nN+Ps63OpAe2QjI
+ DabKKtqNvm3RCCfBEQVSAyBtacYZuFiY0BIBQYkTlxSd0H3USEPqMmZGK0OTcpJshPL6
+ 5khQisWdY7rlH45cwuuUeMmNquNaDl48qtNIWXnL5YiSuSIRjrkPP5+PqgZ50RzTdbjt
+ gGJqR7I+YufTcdJTfSgE839ah+5C5nJ7J2op4D1u2pbF7kaUhmmL0Nm45/WHQYKhMRUy
+ NgJg==
+X-Gm-Message-State: AJcUukeSw6tU+w7hMi4IiniE3m/TxJDvGSUwyNizVgi+QG2L4GZvCJQP
+ oCOFy9LcFmw/EVFnrEZgh+pe8cg88BudZfHw0CV9QQ==
+X-Google-Smtp-Source: ALg8bN7Tr+KGqknXoZpqS9FENJsQcfIG1Ng1e0aXG8CMYgJoLBE8RJywzzdx5f84zkVsOi0jqs4rswMITqp1+trPFWY=
+X-Received: by 2002:aca:f103:: with SMTP id p3mr4949822oih.94.1548061790765;
+ Mon, 21 Jan 2019 01:09:50 -0800 (PST)
 MIME-Version: 1.0
-References: <20190118161835.2259170-1-arnd@arndb.de>
- <20190118161835.2259170-30-arnd@arndb.de>
-In-Reply-To: <20190118161835.2259170-30-arnd@arndb.de>
-From: Geert Uytterhoeven <geert@linux-m68k.org>
-Date: Mon, 21 Jan 2019 09:56:11 +0100
-Message-ID: <CAMuHMdV2z_nacfpuqatsy6cer_7xy+7-i0MhJNbNdcz7Aw-fSw@mail.gmail.com>
-Subject: Re: [PATCH v2 29/29] y2038: add 64-bit time_t syscalls to all 32-bit
- architectures
-To: Arnd Bergmann <arnd@arndb.de>
+References: <1538131180-34108-1-git-send-email-yuehaibing@huawei.com>
+ <1548059241-148022-1-git-send-email-yuehaibing@huawei.com>
+In-Reply-To: <1548059241-148022-1-git-send-email-yuehaibing@huawei.com>
+From: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Date: Mon, 21 Jan 2019 10:09:39 +0100
+Message-ID: <CA+M3ks6Q+hU9jjAbu6qkMqb0knALbBYonS0kRjyFQd_gcSgE=A@mail.gmail.com>
+Subject: Re: [PATCH -next] drm/stm: ltdc: remove set but not used variable
+ 'src_h'
+To: YueHaibing <yuehaibing@huawei.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_005626_091600_7E6B8789 
-X-CRM114-Status: GOOD (  17.08  )
+X-CRM114-CacheID: sfid-20190121_010952_202838_F1952052 
+X-CRM114-Status: GOOD (  13.39  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,81 +89,49 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rich Felker <dalias@libc.org>,
- "linux-ia64@vger.kernel.org" <linux-ia64@vger.kernel.org>,
- Linux-sh list <linux-sh@vger.kernel.org>,
- Benjamin Herrenschmidt <benh@kernel.crashing.org>,
- Heiko Carstens <heiko.carstens@de.ibm.com>, linux-mips@vger.kernel.org,
- Max Filippov <jcmvbkbc@gmail.com>, netdev <netdev@vger.kernel.org>,
- Deepa Dinamani <deepa.kernel@gmail.com>, "H. Peter Anvin" <hpa@zytor.com>,
- sparclinux <sparclinux@vger.kernel.org>,
- Linux-Arch <linux-arch@vger.kernel.org>,
- linux-s390 <linux-s390@vger.kernel.org>,
- y2038 Mailman List <y2038@lists.linaro.org>,
- Michael Ellerman <mpe@ellerman.id.au>, Helge Deller <deller@gmx.de>,
- the arch/x86 maintainers <x86@kernel.org>,
- Russell King <linux@armlinux.org.uk>, Ingo Molnar <mingo@redhat.com>,
- Firoz Khan <firoz.khan@linaro.org>, Catalin Marinas <catalin.marinas@arm.com>,
- Matt Turner <mattst88@gmail.com>, Fenghua Yu <fenghua.yu@intel.com>,
- Will Deacon <will.deacon@arm.com>,
- Linux FS Devel <linux-fsdevel@vger.kernel.org>,
- linux-m68k <linux-m68k@lists.linux-m68k.org>,
- Andy Lutomirski <luto@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Michal Simek <monstr@monstr.eu>, Tony Luck <tony.luck@intel.com>,
- Parisc List <linux-parisc@vger.kernel.org>,
- Linux API <linux-api@vger.kernel.org>,
+Cc: Daniel Vetter <daniel@ffwll.ch>, David Airlie <airlied@linux.ie>,
+ kernel-janitors@vger.kernel.org, Philippe Cornu <philippe.cornu@st.com>,
+ ML dri-devel <dri-devel@lists.freedesktop.org>,
  Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Paul Burton <paul.burton@mips.com>,
- "Eric W. Biederman" <ebiederm@xmission.com>,
- alpha <linux-alpha@vger.kernel.org>,
- Martin Schwidefsky <schwidefsky@de.ibm.com>,
- Andrew Morton <akpm@linux-foundation.org>,
- linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
- "David S. Miller" <davem@davemloft.net>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+ Yannick Fertre <yannick.fertre@st.com>,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>,
+ Vincent Abriou <vincent.abriou@st.com>,
+ linux-stm32@st-md-mailman.stormreply.com,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Alexandre Torgue <alexandre.torgue@st.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 18, 2019 at 5:25 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> This adds 21 new system calls on each ABI that has 32-bit time_t
-> today. All of these have the exact same semantics as their existing
-> counterparts, and the new ones all have macro names that end in 'time64'
-> for clarification.
->
-> This gets us to the point of being able to safely use a C library
-> that has 64-bit time_t in user space. There are still a couple of
-> loose ends to tie up in various areas of the code, but this is the
-> big one, and should be entirely uncontroversial at this point.
->
-> In particular, there are four system calls (getitimer, setitimer,
-> waitid, and getrusage) that don't have a 64-bit counterpart yet,
-> but these can all be safely implemented in the C library by wrapping
-> around the existing system calls because the 32-bit time_t they
-> pass only counts elapsed time, not time since the epoch. They
-> will be dealt with later.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
->  arch/m68k/kernel/syscalls/syscall.tbl       | 20 +++++++++
-
-For m68k:
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert@linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+TGUgbHVuLiAyMSBqYW52LiAyMDE5IMOgIDA5OjIxLCBZdWVIYWliaW5nIDx5dWVoYWliaW5nQGh1
+YXdlaS5jb20+IGEgw6ljcml0IDoKPgo+IEZpeGVzIGdjYyAnLVd1bnVzZWQtYnV0LXNldC12YXJp
+YWJsZScgd2FybmluZzoKPgo+IGRyaXZlcnMvZ3B1L2RybS9zdG0vbHRkYy5jOiBJbiBmdW5jdGlv
+biAnbHRkY19wbGFuZV9hdG9taWNfY2hlY2snOgo+IGRyaXZlcnMvZ3B1L2RybS9zdG0vbHRkYy5j
+OjY5NDoxMzogd2FybmluZzoKPiAgdmFyaWFibGUgJ3NyY195JyBzZXQgYnV0IG5vdCB1c2VkIFst
+V3VudXNlZC1idXQtc2V0LXZhcmlhYmxlXQo+ICAgdTMyIHNyY194LCBzcmNfeSwgc3JjX3csIHNy
+Y19oOwo+ICAgICAgICAgICAgICBeCj4gICAgICAgICAgICAgIF4KPiBkcml2ZXJzL2dwdS9kcm0v
+c3RtL2x0ZGMuYzo2OTQ6Njogd2FybmluZzoKPiAgdmFyaWFibGUgJ3NyY194JyBzZXQgYnV0IG5v
+dCB1c2VkIFstV3VudXNlZC1idXQtc2V0LXZhcmlhYmxlXQo+ICAgdTMyIHNyY194LCBzcmNfeSwg
+c3JjX3csIHNyY19oOwo+ICAgICAgIF4KPgo+IFNpZ25lZC1vZmYtYnk6IFl1ZUhhaWJpbmcgPHl1
+ZWhhaWJpbmdAaHVhd2VpLmNvbT4KCkFwcGxpZWQgb24gZHJtLW1pc2MtbmV4dCwKClRoYW5rcywK
+QmVuamFtaW4KCj4gLS0tCj4gIGRyaXZlcnMvZ3B1L2RybS9zdG0vbHRkYy5jIHwgNCArLS0tCj4g
+IDEgZmlsZSBjaGFuZ2VkLCAxIGluc2VydGlvbigrKSwgMyBkZWxldGlvbnMoLSkKPgo+IGRpZmYg
+LS1naXQgYS9kcml2ZXJzL2dwdS9kcm0vc3RtL2x0ZGMuYyBiL2RyaXZlcnMvZ3B1L2RybS9zdG0v
+bHRkYy5jCj4gaW5kZXggNjFkZDY2MS4uYTkxZTA0MSAxMDA2NDQKPiAtLS0gYS9kcml2ZXJzL2dw
+dS9kcm0vc3RtL2x0ZGMuYwo+ICsrKyBiL2RyaXZlcnMvZ3B1L2RybS9zdG0vbHRkYy5jCj4gQEAg
+LTY5MSw3ICs2OTEsNyBAQCBzdGF0aWMgaW50IGx0ZGNfcGxhbmVfYXRvbWljX2NoZWNrKHN0cnVj
+dCBkcm1fcGxhbmUgKnBsYW5lLAo+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg
+c3RydWN0IGRybV9wbGFuZV9zdGF0ZSAqc3RhdGUpCj4gIHsKPiAgICAgICAgIHN0cnVjdCBkcm1f
+ZnJhbWVidWZmZXIgKmZiID0gc3RhdGUtPmZiOwo+IC0gICAgICAgdTMyIHNyY194LCBzcmNfeSwg
+c3JjX3csIHNyY19oOwo+ICsgICAgICAgdTMyIHNyY193LCBzcmNfaDsKPgo+ICAgICAgICAgRFJN
+X0RFQlVHX0RSSVZFUigiXG4iKTsKPgo+IEBAIC02OTksOCArNjk5LDYgQEAgc3RhdGljIGludCBs
+dGRjX3BsYW5lX2F0b21pY19jaGVjayhzdHJ1Y3QgZHJtX3BsYW5lICpwbGFuZSwKPiAgICAgICAg
+ICAgICAgICAgcmV0dXJuIDA7Cj4KPiAgICAgICAgIC8qIGNvbnZlcnQgc3JjXyBmcm9tIDE2OjE2
+IGZvcm1hdCAqLwo+IC0gICAgICAgc3JjX3ggPSBzdGF0ZS0+c3JjX3ggPj4gMTY7Cj4gLSAgICAg
+ICBzcmNfeSA9IHN0YXRlLT5zcmNfeSA+PiAxNjsKPiAgICAgICAgIHNyY193ID0gc3RhdGUtPnNy
+Y193ID4+IDE2Owo+ICAgICAgICAgc3JjX2ggPSBzdGF0ZS0+c3JjX2ggPj4gMTY7Cj4KPgo+Cj4K
+Pgo+CgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51
+eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVh
+ZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1h
+cm0ta2VybmVsCg==
