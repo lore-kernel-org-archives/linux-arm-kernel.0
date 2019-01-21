@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 37CE0C282F4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:19:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7A6CEC282DB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:19:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0231E20855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:19:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 37F12214C6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 08:19:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="D+OjoOzn";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="nyxAEXwq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0231E20855
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A+b9sH2r";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="HuIv5TZy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 37F12214C6
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,18 +27,18 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	References:In-Reply-To:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=+nsioDTD7ZD8qKoenIL56DQjjBAncqQc5rwd1zjyIbY=; b=D+OjoOznDv/cTAFMwJzRRJwq8O
-	XGG7lhrobogllEmU+WPGM2ZzPxQ0K4vJe77a4lLskj6qpVIDYgOMG+vlOSKopdkAbxZXly7E8MpOv
-	ZWTpw1hFSVmCJxK/5F2unVfsNP6sWN1kD4cDd4UI5nIWBjBBZdtnDHTfFr47jaPiRXJT7moMgXtQo
-	JL0gYU8LD97iXAVwJUO1P2qevUEoHZqYhgCoCd+nRR22+7J6buyZqGlMhAXz9FJHMJC/3+WTt34kW
-	1P3ZB1JP6uDTUZW9a9VeszhdD4Wwf7eRwl9/xRzWJzSLs2h15ZIppz/E0Wl8A+eAcoItsJ7Qzfhdi
-	eCKbrKaQ==;
+	bh=SqQv96I5ZI8Xt61pokeGCT1BhEOgsHkeW0e4d47Mwqg=; b=A+b9sH2rF40xtjiJ2M6k7x4qvz
+	fnsfsBqKgivH1vV+4fsJ7tWObjdrObkJuTpskOV2NfhPmC1kJAwI22tsJrn0cjV8pT8/dlV9TLaTd
+	UTaU81GbnhRqHr7yPYPua9FEvHLapuxBvRMGAAJCjl3nWJMewUsoMVIvYyXRKaRI75b95Mz9rM+ZH
+	O42ZJ/77v4ICNujviCqoj5EAO6SnYNQQRRiaPHw1JBEHQKevTAq/iV90zWukSK2+0+wrVzsXS5DTB
+	JQCZqS+Dx7FBo/IgUj3DxFt+AQ2AQ5WHVzcq7l3jmwcaW/9qmy066ykJpp96ekGUEWybdxmcJyLF4
+	tR8qYrtA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glUnR-0006ky-Iz; Mon, 21 Jan 2019 08:19:05 +0000
+	id 1glUne-0006zR-3e; Mon, 21 Jan 2019 08:19:18 +0000
 Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glUnG-00065m-Cy
+ id 1glUnG-0005uo-0u
  for linux-arm-kernel@bombadil.infradead.org; Mon, 21 Jan 2019 08:18:54 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=infradead.org; s=casper.20170209; h=Message-Id:References:In-Reply-To:Date:
@@ -46,72 +46,71 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
  Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
  List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=hGKBLmpR6kMaew84GxylKTWV5fJZlqKJ86XMoCPo28w=; b=nyxAEXwq9N8NdMRpQusAXVCVq
- B3AsOCx2sLGanEqpRoJJv0tlnKJNSAETkEvZTWTB6ZghFzX1Jo9UYorjJp25RXWyPaeQ128HFRIeg
- ZKbGob9vRUxgN7PFjuw0W0aqnIDeUsxOP3bM8bRmPWyHxfzXqQtibHHhTsv+bLEN/IaVBAZ3tl1JS
- i2YvrFIilYm1sOviGKCNNIDPbgT4sG25aSl1K2UWtF9S7zIOYD/ZUJDVdV5/wU5Wf4AU+Lt85Uxmu
- +hyqImxMavdHx10Wyk6MRMM7GuizqKM6Sxe7yKCHdY+rmXy67s3SesFt3HqGpc/Acl28CGN4ZrPoq
- K9Sawb8aA==;
-Received: from mx0b-001b2d01.pphosted.com ([148.163.158.5]
- helo=mx0a-001b2d01.pphosted.com)
+ bh=YY1WD74ylD1UrRXrQaeYEmD1Zb4Y+uV8l0hsFXAfEpo=; b=HuIv5TZy6p7wHeE4yt2teGjqA
+ PeuKrmZJgOZB2mBgAsYJSw7/tEdyrsKwmZ2yUTWW2q9PVsdgOpTHVE7BbMNeu14Y0MnTiZ4/LG/lb
+ m6jzTbu3LuPCzBSug/GY5PHxx1MJyHoia+ZPl+vKr4hVp6jYKEYNjxr949gx5LbWf2o1pF5OSzyDL
+ dgTg9/Giq57ucacAy3klqAHY+p4IPfHzJ0JeZMyUDYgAQcOhKBfs3UswPVF6T1kyqFVrbcto+sxN8
+ Z99t6/bB09U1O2DRDWvGYPFlU0HqYy5VZ34w5KtiQ7lnfLjPJh6uMWK2XI9Dg8Jc5cm/4a7CrOb6s
+ CMKYWgnwA==;
+Received: from mx0a-001b2d01.pphosted.com ([148.163.156.1])
  by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glUZy-0002LO-5t
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 08:05:17 +0000
-Received: from pps.filterd (m0098413.ppops.net [127.0.0.1])
- by mx0b-001b2d01.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x0L83pSU072858
- for <linux-arm-kernel@lists.infradead.org>; Mon, 21 Jan 2019 03:05:06 -0500
-Received: from e06smtp07.uk.ibm.com (e06smtp07.uk.ibm.com [195.75.94.103])
- by mx0b-001b2d01.pphosted.com with ESMTP id 2q580ddffg-1
+ id 1glUa2-0002Ms-Mp
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 08:05:21 +0000
+Received: from pps.filterd (m0098410.ppops.net [127.0.0.1])
+ by mx0a-001b2d01.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x0L83nHZ132174
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 21 Jan 2019 03:05:12 -0500
+Received: from e06smtp03.uk.ibm.com (e06smtp03.uk.ibm.com [195.75.94.99])
+ by mx0a-001b2d01.pphosted.com with ESMTP id 2q59werxdv-1
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
- for <linux-arm-kernel@lists.infradead.org>; Mon, 21 Jan 2019 03:05:06 -0500
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 21 Jan 2019 03:05:12 -0500
 Received: from localhost
- by e06smtp07.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
+ by e06smtp03.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
  Violators will be prosecuted
  for <linux-arm-kernel@lists.infradead.org> from <rppt@linux.ibm.com>;
- Mon, 21 Jan 2019 08:05:04 -0000
-Received: from b06cxnps3075.portsmouth.uk.ibm.com (9.149.109.195)
- by e06smtp07.uk.ibm.com (192.168.101.137) with IBM ESMTP SMTP Gateway:
+ Mon, 21 Jan 2019 08:05:09 -0000
+Received: from b06cxnps4074.portsmouth.uk.ibm.com (9.149.109.196)
+ by e06smtp03.uk.ibm.com (192.168.101.133) with IBM ESMTP SMTP Gateway:
  Authorized Use Only! Violators will be prosecuted; 
  (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
- Mon, 21 Jan 2019 08:04:52 -0000
+ Mon, 21 Jan 2019 08:04:58 -0000
 Received: from d06av21.portsmouth.uk.ibm.com (d06av21.portsmouth.uk.ibm.com
  [9.149.105.232])
- by b06cxnps3075.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
- x0L84pFF61079554
+ by b06cxnps4074.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
+ x0L84vVC10158356
  (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
- Mon, 21 Jan 2019 08:04:51 GMT
+ Mon, 21 Jan 2019 08:04:57 GMT
 Received: from d06av21.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 4655B5205A;
- Mon, 21 Jan 2019 08:04:51 +0000 (GMT)
+ by IMSVA (Postfix) with ESMTP id F014152052;
+ Mon, 21 Jan 2019 08:04:56 +0000 (GMT)
 Received: from rapoport-lnx (unknown [9.148.207.125])
- by d06av21.portsmouth.uk.ibm.com (Postfix) with ESMTPS id 6DB6952051;
- Mon, 21 Jan 2019 08:04:46 +0000 (GMT)
+ by d06av21.portsmouth.uk.ibm.com (Postfix) with ESMTPS id 1A24552067;
+ Mon, 21 Jan 2019 08:04:52 +0000 (GMT)
 Received: by rapoport-lnx (sSMTP sendmail emulation);
- Mon, 21 Jan 2019 10:04:44 +0200
+ Mon, 21 Jan 2019 10:04:51 +0200
 From: Mike Rapoport <rppt@linux.ibm.com>
 To: linux-mm@kvack.org
-Subject: [PATCH v2 06/21] memblock: memblock_phys_alloc_try_nid(): don't panic
-Date: Mon, 21 Jan 2019 10:03:53 +0200
+Subject: [PATCH v2 07/21] memblock: memblock_phys_alloc(): don't panic
+Date: Mon, 21 Jan 2019 10:03:54 +0200
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1548057848-15136-1-git-send-email-rppt@linux.ibm.com>
 References: <1548057848-15136-1-git-send-email-rppt@linux.ibm.com>
 X-TM-AS-GCONF: 00
-x-cbid: 19012108-0028-0000-0000-0000033BE171
+x-cbid: 19012108-0012-0000-0000-000002EAB8F5
 X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
-x-cbparentid: 19012108-0029-0000-0000-000023F91583
-Message-Id: <1548057848-15136-7-git-send-email-rppt@linux.ibm.com>
+x-cbparentid: 19012108-0013-0000-0000-00002121DE96
+Message-Id: <1548057848-15136-8-git-send-email-rppt@linux.ibm.com>
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2019-01-21_04:, , signatures=0
 X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
  priorityscore=1501
- malwarescore=0 suspectscore=1 phishscore=0 bulkscore=0 spamscore=0
+ malwarescore=0 suspectscore=3 phishscore=0 bulkscore=0 spamscore=0
  clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
- mlxlogscore=918 adultscore=0 classifier=spam adjust=0 reason=mlx
+ mlxlogscore=911 adultscore=0 classifier=spam adjust=0 reason=mlx
  scancount=1 engine=8.0.1-1810050000 definitions=main-1901210066
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_080510_568209_F091F822 
-X-CRM114-Status: GOOD (  28.10  )
+X-CRM114-CacheID: sfid-20190121_080517_891287_F5FBF8C5 
+X-CRM114-Status: GOOD (  28.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -153,67 +152,231 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The memblock_phys_alloc_try_nid() function tries to allocate memory from
-the requested node and then falls back to allocation from any node in the
-system. The memblock_alloc_base() fallback used by this function panics if
-the allocation fails.
-
-Replace the memblock_alloc_base() fallback with the direct call to
-memblock_alloc_range_nid() and update the memblock_phys_alloc_try_nid()
-callers to check the returned value and panic in case of error.
+Make the memblock_phys_alloc() function an inline wrapper for
+memblock_phys_alloc_range() and update the memblock_phys_alloc() callers to
+check the returned value and panic in case of error.
 
 Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
 ---
- arch/arm64/mm/numa.c   | 4 ++++
- arch/powerpc/mm/numa.c | 4 ++++
- mm/memblock.c          | 4 +++-
- 3 files changed, 11 insertions(+), 1 deletion(-)
+ arch/arm/mm/init.c                   | 4 ++++
+ arch/arm64/mm/mmu.c                  | 2 ++
+ arch/powerpc/sysdev/dart_iommu.c     | 3 +++
+ arch/s390/kernel/crash_dump.c        | 3 +++
+ arch/s390/kernel/setup.c             | 3 +++
+ arch/sh/boards/mach-ap325rxa/setup.c | 3 +++
+ arch/sh/boards/mach-ecovec24/setup.c | 6 ++++++
+ arch/sh/boards/mach-kfr2r09/setup.c  | 3 +++
+ arch/sh/boards/mach-migor/setup.c    | 3 +++
+ arch/sh/boards/mach-se/7724/setup.c  | 6 ++++++
+ arch/xtensa/mm/kasan_init.c          | 3 +++
+ include/linux/memblock.h             | 7 ++++++-
+ mm/memblock.c                        | 5 -----
+ 13 files changed, 45 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index ae34e3a..2c61ea4 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -237,6 +237,10 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
- 		pr_info("Initmem setup node %d [<memory-less node>]\n", nid);
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index b76b90e..15dddfe 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -206,6 +206,10 @@ phys_addr_t __init arm_memblock_steal(phys_addr_t size, phys_addr_t align)
+ 	BUG_ON(!arm_memblock_steal_permitted);
  
- 	nd_pa = memblock_phys_alloc_try_nid(nd_size, SMP_CACHE_BYTES, nid);
-+	if (!nd_pa)
-+		panic("Cannot allocate %zu bytes for node %d data\n",
-+		      nd_size, nid);
+ 	phys = memblock_phys_alloc(size, align);
++	if (!phys)
++		panic("Failed to steal %pa bytes at %pS\n",
++		      &size, (void *)_RET_IP_);
 +
- 	nd = __va(nd_pa);
+ 	memblock_free(phys, size);
+ 	memblock_remove(phys, size);
  
- 	/* report and initialize */
-diff --git a/arch/powerpc/mm/numa.c b/arch/powerpc/mm/numa.c
-index 270cefb..8f2bbe1 100644
---- a/arch/powerpc/mm/numa.c
-+++ b/arch/powerpc/mm/numa.c
-@@ -788,6 +788,10 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
- 	int tnid;
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index b6f5aa5..a74e4be 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -104,6 +104,8 @@ static phys_addr_t __init early_pgtable_alloc(void)
+ 	void *ptr;
  
- 	nd_pa = memblock_phys_alloc_try_nid(nd_size, SMP_CACHE_BYTES, nid);
-+	if (!nd_pa)
-+		panic("Cannot allocate %zu bytes for node %d data\n",
-+		      nd_size, nid);
+ 	phys = memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE);
++	if (!phys)
++		panic("Failed to allocate page table page\n");
+ 
+ 	/*
+ 	 * The FIX_{PGD,PUD,PMD} slots may be in active use, but the FIX_PTE
+diff --git a/arch/powerpc/sysdev/dart_iommu.c b/arch/powerpc/sysdev/dart_iommu.c
+index 25bc25f..b82c9ff 100644
+--- a/arch/powerpc/sysdev/dart_iommu.c
++++ b/arch/powerpc/sysdev/dart_iommu.c
+@@ -265,6 +265,9 @@ static void allocate_dart(void)
+ 	 * prefetching into invalid pages and corrupting data
+ 	 */
+ 	tmp = memblock_phys_alloc(DART_PAGE_SIZE, DART_PAGE_SIZE);
++	if (!tmp)
++		panic("DART: table allocation failed\n");
 +
- 	nd = __va(nd_pa);
+ 	dart_emptyval = DARTMAP_VALID | ((tmp >> DART_PAGE_SHIFT) &
+ 					 DARTMAP_RPNMASK);
  
- 	/* report and initialize */
+diff --git a/arch/s390/kernel/crash_dump.c b/arch/s390/kernel/crash_dump.c
+index 97eae38..f96a585 100644
+--- a/arch/s390/kernel/crash_dump.c
++++ b/arch/s390/kernel/crash_dump.c
+@@ -61,6 +61,9 @@ struct save_area * __init save_area_alloc(bool is_boot_cpu)
+ 	struct save_area *sa;
+ 
+ 	sa = (void *) memblock_phys_alloc(sizeof(*sa), 8);
++	if (!sa)
++		panic("Failed to allocate save area\n");
++
+ 	if (is_boot_cpu)
+ 		list_add(&sa->list, &dump_save_areas);
+ 	else
+diff --git a/arch/s390/kernel/setup.c b/arch/s390/kernel/setup.c
+index 72dd23e..da48397 100644
+--- a/arch/s390/kernel/setup.c
++++ b/arch/s390/kernel/setup.c
+@@ -968,6 +968,9 @@ static void __init setup_randomness(void)
+ 
+ 	vmms = (struct sysinfo_3_2_2 *) memblock_phys_alloc(PAGE_SIZE,
+ 							    PAGE_SIZE);
++	if (!vmms)
++		panic("Failed to allocate memory for sysinfo structure\n");
++
+ 	if (stsi(vmms, 3, 2, 2) == 0 && vmms->count)
+ 		add_device_randomness(&vmms->vm, sizeof(vmms->vm[0]) * vmms->count);
+ 	memblock_free((unsigned long) vmms, PAGE_SIZE);
+diff --git a/arch/sh/boards/mach-ap325rxa/setup.c b/arch/sh/boards/mach-ap325rxa/setup.c
+index d7ceab6..08a0cc9 100644
+--- a/arch/sh/boards/mach-ap325rxa/setup.c
++++ b/arch/sh/boards/mach-ap325rxa/setup.c
+@@ -558,6 +558,9 @@ static void __init ap325rxa_mv_mem_reserve(void)
+ 	phys_addr_t size = CEU_BUFFER_MEMORY_SIZE;
+ 
+ 	phys = memblock_phys_alloc(size, PAGE_SIZE);
++	if (!phys)
++		panic("Failed to allocate CEU memory\n");
++
+ 	memblock_free(phys, size);
+ 	memblock_remove(phys, size);
+ 
+diff --git a/arch/sh/boards/mach-ecovec24/setup.c b/arch/sh/boards/mach-ecovec24/setup.c
+index a3901806..fd264a6 100644
+--- a/arch/sh/boards/mach-ecovec24/setup.c
++++ b/arch/sh/boards/mach-ecovec24/setup.c
+@@ -1481,11 +1481,17 @@ static void __init ecovec_mv_mem_reserve(void)
+ 	phys_addr_t size = CEU_BUFFER_MEMORY_SIZE;
+ 
+ 	phys = memblock_phys_alloc(size, PAGE_SIZE);
++	if (!phys)
++		panic("Failed to allocate CEU0 memory\n");
++
+ 	memblock_free(phys, size);
+ 	memblock_remove(phys, size);
+ 	ceu0_dma_membase = phys;
+ 
+ 	phys = memblock_phys_alloc(size, PAGE_SIZE);
++	if (!phys)
++		panic("Failed to allocate CEU1 memory\n");
++
+ 	memblock_free(phys, size);
+ 	memblock_remove(phys, size);
+ 	ceu1_dma_membase = phys;
+diff --git a/arch/sh/boards/mach-kfr2r09/setup.c b/arch/sh/boards/mach-kfr2r09/setup.c
+index 55bdf4a..ebe90d06 100644
+--- a/arch/sh/boards/mach-kfr2r09/setup.c
++++ b/arch/sh/boards/mach-kfr2r09/setup.c
+@@ -632,6 +632,9 @@ static void __init kfr2r09_mv_mem_reserve(void)
+ 	phys_addr_t size = CEU_BUFFER_MEMORY_SIZE;
+ 
+ 	phys = memblock_phys_alloc(size, PAGE_SIZE);
++	if (!phys)
++		panic("Failed to allocate CEU memory\n");
++
+ 	memblock_free(phys, size);
+ 	memblock_remove(phys, size);
+ 
+diff --git a/arch/sh/boards/mach-migor/setup.c b/arch/sh/boards/mach-migor/setup.c
+index ba7eee6..1adff09 100644
+--- a/arch/sh/boards/mach-migor/setup.c
++++ b/arch/sh/boards/mach-migor/setup.c
+@@ -631,6 +631,9 @@ static void __init migor_mv_mem_reserve(void)
+ 	phys_addr_t size = CEU_BUFFER_MEMORY_SIZE;
+ 
+ 	phys = memblock_phys_alloc(size, PAGE_SIZE);
++	if (!phys)
++		panic("Failed to allocate CEU memory\n");
++
+ 	memblock_free(phys, size);
+ 	memblock_remove(phys, size);
+ 
+diff --git a/arch/sh/boards/mach-se/7724/setup.c b/arch/sh/boards/mach-se/7724/setup.c
+index 4696e10..201631a 100644
+--- a/arch/sh/boards/mach-se/7724/setup.c
++++ b/arch/sh/boards/mach-se/7724/setup.c
+@@ -966,11 +966,17 @@ static void __init ms7724se_mv_mem_reserve(void)
+ 	phys_addr_t size = CEU_BUFFER_MEMORY_SIZE;
+ 
+ 	phys = memblock_phys_alloc(size, PAGE_SIZE);
++	if (!phys)
++		panic("Failed to allocate CEU0 memory\n");
++
+ 	memblock_free(phys, size);
+ 	memblock_remove(phys, size);
+ 	ceu0_dma_membase = phys;
+ 
+ 	phys = memblock_phys_alloc(size, PAGE_SIZE);
++	if (!phys)
++		panic("Failed to allocate CEU1 memory\n");
++
+ 	memblock_free(phys, size);
+ 	memblock_remove(phys, size);
+ 	ceu1_dma_membase = phys;
+diff --git a/arch/xtensa/mm/kasan_init.c b/arch/xtensa/mm/kasan_init.c
+index 48dbb03..4852848 100644
+--- a/arch/xtensa/mm/kasan_init.c
++++ b/arch/xtensa/mm/kasan_init.c
+@@ -54,6 +54,9 @@ static void __init populate(void *start, void *end)
+ 			phys_addr_t phys =
+ 				memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE);
+ 
++			if (!phys)
++				panic("Failed to allocate page table page\n");
++
+ 			set_pte(pte + j, pfn_pte(PHYS_PFN(phys), PAGE_KERNEL));
+ 		}
+ 	}
+diff --git a/include/linux/memblock.h b/include/linux/memblock.h
+index 66dfdb3..7883c74 100644
+--- a/include/linux/memblock.h
++++ b/include/linux/memblock.h
+@@ -374,7 +374,12 @@ phys_addr_t memblock_phys_alloc_range(phys_addr_t size, phys_addr_t align,
+ phys_addr_t memblock_phys_alloc_nid(phys_addr_t size, phys_addr_t align, int nid);
+ phys_addr_t memblock_phys_alloc_try_nid(phys_addr_t size, phys_addr_t align, int nid);
+ 
+-phys_addr_t memblock_phys_alloc(phys_addr_t size, phys_addr_t align);
++static inline phys_addr_t memblock_phys_alloc(phys_addr_t size,
++					      phys_addr_t align)
++{
++	return memblock_phys_alloc_range(size, align, 0,
++					 MEMBLOCK_ALLOC_ACCESSIBLE);
++}
+ 
+ void *memblock_alloc_try_nid_raw(phys_addr_t size, phys_addr_t align,
+ 				 phys_addr_t min_addr, phys_addr_t max_addr,
 diff --git a/mm/memblock.c b/mm/memblock.c
-index f019aee..8aabb1b 100644
+index 8aabb1b..461e40a3 100644
 --- a/mm/memblock.c
 +++ b/mm/memblock.c
-@@ -1393,7 +1393,9 @@ phys_addr_t __init memblock_phys_alloc_try_nid(phys_addr_t size, phys_addr_t ali
- 
- 	if (res)
- 		return res;
--	return memblock_alloc_base(size, align, MEMBLOCK_ALLOC_ACCESSIBLE);
-+	return memblock_alloc_range_nid(size, align, 0,
-+					MEMBLOCK_ALLOC_ACCESSIBLE,
-+					NUMA_NO_NODE, MEMBLOCK_NONE);
+@@ -1382,11 +1382,6 @@ phys_addr_t __init memblock_alloc_base(phys_addr_t size, phys_addr_t align, phys
+ 	return alloc;
  }
  
- /**
+-phys_addr_t __init memblock_phys_alloc(phys_addr_t size, phys_addr_t align)
+-{
+-	return memblock_alloc_base(size, align, MEMBLOCK_ALLOC_ACCESSIBLE);
+-}
+-
+ phys_addr_t __init memblock_phys_alloc_try_nid(phys_addr_t size, phys_addr_t align, int nid)
+ {
+ 	phys_addr_t res = memblock_phys_alloc_nid(size, align, nid);
 -- 
 2.7.4
 
