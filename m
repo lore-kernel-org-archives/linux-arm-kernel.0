@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6D220C7112F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 11:26:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ABE94C7112F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 11:26:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3D3D120663
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 11:26:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7E6E920663
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 11:26:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Y2spxLqS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3D3D120663
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Mdd/CCI5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7E6E920663
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,25 +25,25 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=bP8ELQXpzMyIwfBB3MLQoK4G6FV4t2l0qul12u56h2Q=; b=Y2spxLqSWmUj1A
-	4xkJdHyn08GOCLlY4y/mJ+VxRrCChG0KJhOj8ik5VhyZr0QOHO+Cxy/J9dfqukpIWpTzya5zlNmaM
-	eboqmnMV3dY/+2p3l3UEsyPvfQxpRp8hewUDyZNQ/4LFr9ckxhY5rtb2oiGVNpajfiPmZu/HqCkMx
-	W0WD1QcPgQS6e/eNPOtDvfbsvkfxaddpc7qzWL1MU5h/MHkvQb8D0c1TpTUM0h2Jfm0qWSYLAXDpL
-	jaTq9KswUQqWxQwtYFXRpPw41V8nihD0yD/6YqUFUQXYu6iI1v/KfgtrgJFBa0eS7gGump0jtijDg
-	NbUCzutiF3zjmCtry5uw==;
+	List-Owner; bh=Nq8E3ry4q+XfKenP3ePCY4hDEIkbGA2Vr9a9wruNUfw=; b=Mdd/CCI5yTfQAp
+	ELAw0PTwamJUuI7MEgeakuHFspI9F4KBZpvVJiEreH5EMIf+wZdT3qrtI9kHw+MHDBKISKhoRNYAH
+	Dl6FVIxla7OmgKZADwvERq7yaRSY7NYX1NZZSMDw/WkyuOcJ1ocBPk0Laet2sQas4HuvyR7pAGIH0
+	JKh+xOTsFKwDeELhwbud2qByfiVidxgacc4zc07nhI1T2yuaIm6V8iLUguE8/UTj6x97PSJU7Y68s
+	B3mSzSO0jQenxKokMIXdndiiSy4LWWqJBMjYxOn7WKEZK7qDwFaSwDCz43PW5IoOa7/I+rtTM2x+x
+	jsmZWcJvCZpbH91nieKQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glXii-00050I-Ek; Mon, 21 Jan 2019 11:26:24 +0000
+	id 1glXix-0005G8-TC; Mon, 21 Jan 2019 11:26:39 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glXg4-0001Gs-Km
- for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 11:23:42 +0000
+ id 1glXg7-0001J1-Fn
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 11:23:48 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 55C6F20A32; Mon, 21 Jan 2019 12:23:39 +0100 (CET)
+ id 4D1BF20BA5; Mon, 21 Jan 2019 12:23:41 +0100 (CET)
 Received: from localhost.localdomain
  (aaubervilliers-681-1-37-87.w90-88.abo.wanadoo.fr [90.88.156.87])
- by mail.bootlin.com (Postfix) with ESMTPSA id E17D3206A7;
- Mon, 21 Jan 2019 12:23:38 +0100 (CET)
+ by mail.bootlin.com (Postfix) with ESMTPSA id DD145207B2;
+ Mon, 21 Jan 2019 12:23:40 +0100 (CET)
 From: Miquel Raynal <miquel.raynal@bootlin.com>
 To: Gregory Clement <gregory.clement@bootlin.com>,
  Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
@@ -53,16 +53,17 @@ To: Gregory Clement <gregory.clement@bootlin.com>,
  Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
  Mathias Nyman <mathias.nyman@intel.com>,
  Alan Stern <stern@rowland.harvard.edu>
-Subject: [PATCH v3 04/10] usb: ehci-orion: add S2RAM support
-Date: Mon, 21 Jan 2019 12:23:30 +0100
-Message-Id: <20190121112336.23489-5-miquel.raynal@bootlin.com>
+Subject: [PATCH v3 09/10] ARM64: dts: marvell: armada-37xx: declare USB2 UTMI
+ PHYs
+Date: Mon, 21 Jan 2019 12:23:35 +0100
+Message-Id: <20190121112336.23489-10-miquel.raynal@bootlin.com>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20190121112336.23489-1-miquel.raynal@bootlin.com>
 References: <20190121112336.23489-1-miquel.raynal@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_032340_811002_FE481BE1 
-X-CRM114-Status: GOOD (  13.39  )
+X-CRM114-CacheID: sfid-20190121_032343_933926_350C56DD 
+X-CRM114-Status: GOOD (  13.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,57 +86,69 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add suspend/resume callbacks to reset the host controller properly
-during S2RAM operation.
+On Marvell Armada 3700 SoCs there are two USB2 UTMI PHYs. They are
+both very similar but only one has OTG/charging capabilities.
+
+Because there are USB host registers and PHY registers mixed in a
+single area, a system controller is also created and referenced from
+both the USB host node and the PHY node.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/usb/host/ehci-orion.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 28 ++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
-index 3109f082949e..dab22aa57c0b 100644
---- a/drivers/usb/host/ehci-orion.c
-+++ b/drivers/usb/host/ehci-orion.c
-@@ -182,6 +182,30 @@ static int ehci_orion_drv_reset(struct usb_hcd *hcd)
- 	return ret;
- }
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index 5cfd1b920f31..aeb2681428b3 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -344,18 +344,46 @@
+ 				compatible = "marvell,armada3700-xhci",
+ 				"generic-xhci";
+ 				reg = <0x58000 0x4000>;
++				marvell,usb-misc-reg = <&usb32_syscon>;
+ 				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&sb_periph_clk 12>;
+ 				status = "disabled";
+ 			};
  
-+static int __maybe_unused ehci_orion_drv_suspend(struct device *dev)
-+{
-+	struct usb_hcd *hcd = dev_get_drvdata(dev);
-+	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
++			usb2_utmi_otg_phy: phy@5d000 {
++				compatible = "marvell,a3700-utmi-otg-phy";
++				reg = <0x5d000 0x800>;
++				marvell,usb-misc-reg = <&usb32_syscon>;
++				#phy-cells = <0>;
++			};
 +
-+	ehci_prepare_ports_for_controller_suspend(ehci,
-+						  device_may_wakeup(dev));
++			usb32_syscon: system-controller@5d800 {
++				compatible = "marvell,usb2-host-device-miscellaneous",
++				"syscon";
++				reg = <0x5d800 0x800>;
++			};
 +
-+	return ehci_suspend(hcd, false);
-+}
-+
-+static int __maybe_unused ehci_orion_drv_resume(struct device *dev)
-+{
-+	struct usb_hcd *hcd = dev_get_drvdata(dev);
-+	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
-+
-+	ehci_prepare_ports_for_controller_resume(ehci);
-+
-+	return ehci_resume(hcd, false);
-+}
-+
-+static SIMPLE_DEV_PM_OPS(ehci_orion_pm_ops, ehci_orion_drv_suspend,
-+			 ehci_orion_drv_resume);
-+
- static const struct ehci_driver_overrides orion_overrides __initconst = {
- 	.extra_priv_size =	sizeof(struct orion_ehci_hcd),
- 	.reset = ehci_orion_drv_reset,
-@@ -334,6 +358,7 @@ static struct platform_driver ehci_orion_driver = {
- 	.driver = {
- 		.name	= "orion-ehci",
- 		.of_match_table = ehci_orion_dt_ids,
-+		.pm = &ehci_orion_pm_ops,
- 	},
- };
+ 			usb2: usb@5e000 {
+ 				compatible = "marvell,armada-3700-ehci";
+ 				reg = <0x5e000 0x1000>;
++				marvell,usb-misc-reg = <&usb2_syscon>;
+ 				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+ 				status = "disabled";
+ 			};
  
++			usb2_utmi_host_phy: phy@5f000 {
++				compatible = "marvell,a3700-utmi-host-phy";
++				reg = <0x5f000 0x800>;
++				marvell,usb-misc-reg = <&usb2_syscon>;
++				#phy-cells = <0>;
++			};
++
++			usb2_syscon: system-controller@5f800 {
++				compatible = "marvell,usb2-host-miscellaneous",
++				"syscon";
++				reg = <0x5f800 0x800>;
++			};
++
+ 			xor@60900 {
+ 				compatible = "marvell,armada-3700-xor";
+ 				reg = <0x60900 0x100>,
 -- 
 2.19.1
 
