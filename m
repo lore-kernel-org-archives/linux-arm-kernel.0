@@ -2,92 +2,80 @@ Return-Path: <SRS0=flTa=P5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5E895C2F421
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 16:08:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 00EA3C2F441
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 16:10:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3042D20861
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 16:08:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B66D220861
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 21 Jan 2019 16:10:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fr+1/iHA";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="HwkEIyaL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3042D20861
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bMUTkFwA";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="Is/RvMyR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B66D220861
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=67tPYqxLe2+d5whea2OIZSL9a7T2dDuARtEI0qyORrI=; b=fr+1/iHAm+4BKv
-	PMbb70XJhNdVdBi2+MCjCv4rTUE0y1olveMybi3uQAMVL9jWU++i7EYRVpsJWJgNvDP6G+//T/rW5
-	JOoaE3a/EwWzwvjJDUAyqKPsq2VoR1Cv1UECcY+X91+qJABaqszBb7++wCCYhLllvIRf8jYRBlIwc
-	83pQhCQDGmNd1uvjq0mIpui1aVSEmqMNX2NkaetYEvLQIXpyoXCHn9IXdA5VaCJKmOksNErDGPg21
-	+9fIMwXmfbGL6+FGAeqyTF/ybxL8dB36LVQ2A25jKmZJW0fZIv6rocSks5Q8TL+wEGPnkW1KehX0P
-	NRdjeTmvKKrvAgZszq9w==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=MWsSSgtUgJN1tDQCbzfBgsLun+qGQa+T9L6T3Zs+c3A=; b=bMUTkFwAd8HI+qBWu1ZE6tybLj
+	NLrZfdQVXbyOZWYLulVgkc83+rg9HYzmEfnxX34UccrbnmQa6ufDhwXcRLYK/CUiR+6vu1nNXEVeH
+	v4O1rm8w8qmFVeI67Ej8j7vP+69yv/LSMIV3/JbbsJknSmn7WdTvM9sj1GHw5+6Ce/bd3rlCKE6Qn
+	4Mw1rYkNvIAp06NQ5lD1BZHUXMOLqhi07rxo64Da0R6IsfEceCGSCIryShcXBm/Xa18cZCYCJU5rG
+	LKCbsOGRJtLR/esg2oYO1lrFsYCMbnAuDLdfng1CDmQ3a9mLreXh4nu0Z6ATm8kctBQ5uA1N1TavP
+	9pKEqP6g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glc7G-0007eB-TA; Mon, 21 Jan 2019 16:08:02 +0000
-Received: from fllv0016.ext.ti.com ([198.47.19.142])
+	id 1glc9t-0000x4-Ge; Mon, 21 Jan 2019 16:10:45 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glc7B-0007dA-Ir; Mon, 21 Jan 2019 16:07:59 +0000
-Received: from fllv0034.itg.ti.com ([10.64.40.246])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0LG7oxI110789;
- Mon, 21 Jan 2019 10:07:50 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1548086870;
- bh=hTmZ+nvPQsoBq3Sseg38xKH5XD++JfQ0yG6JJda2FF4=;
- h=Date:From:To:CC:Subject:References:In-Reply-To;
- b=HwkEIyaLPsYpz9KoPhz3s/TZDNSiuOCRTJzxmgxKPOgnctcEB0KenCQQjco8SF93e
- 6Ih0gf//ZcCZak0XmocfWmUsf/gtoyfwJnIyn7l2vlzoQJKs1PK9zwIMnPfwl56AlO
- 0KfsLbyTgQEjZBGZEiXunDNEDCPeZvnnNF6IYEqQ=
-Received: from DFLE102.ent.ti.com (dfle102.ent.ti.com [10.64.6.23])
- by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0LG7ord023278
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Mon, 21 Jan 2019 10:07:50 -0600
-Received: from DFLE102.ent.ti.com (10.64.6.23) by DFLE102.ent.ti.com
- (10.64.6.23) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Mon, 21
- Jan 2019 10:07:50 -0600
-Received: from dlep33.itg.ti.com (157.170.170.75) by DFLE102.ent.ti.com
- (10.64.6.23) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Mon, 21 Jan 2019 10:07:50 -0600
-Received: from localhost (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0LG7nlY019577;
- Mon, 21 Jan 2019 10:07:49 -0600
-Date: Mon, 21 Jan 2019 10:07:49 -0600
-From: Bin Liu <b-liu@ti.com>
-To: <min.guo@mediatek.com>
-Subject: Re: [PATCH v4 6/6] usb: musb: Add support for MediaTek musb controller
-Message-ID: <20190121160749.GD30080@uda0271908>
-Mail-Followup-To: Bin Liu <b-liu@ti.com>, min.guo@mediatek.com,
- Rob Herring <robh+dt@kernel.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Mark Rutland <mark.rutland@arm.com>,
- Matthias Brugger <matthias.bgg@gmail.com>,
- Alan Stern <stern@rowland.harvard.edu>, chunfeng.yun@mediatek.com,
- linux-usb@vger.kernel.org, devicetree@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-mediatek@lists.infradead.org, tony@atomide.com,
- hdegoede@redhat.com, Yonglong Wu <yonglong.wu@mediatek.com>
-References: <1548073351-13739-1-git-send-email-min.guo@mediatek.com>
- <1548073351-13739-7-git-send-email-min.guo@mediatek.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1548073351-13739-7-git-send-email-min.guo@mediatek.com>
-User-Agent: Mutt/1.5.21 (2010-09-15)
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+ id 1glc9r-0000wv-Ii
+ for linux-arm-kernel@bombadil.infradead.org; Mon, 21 Jan 2019 16:10:43 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=References:In-Reply-To:Message-Id:Date:
+ Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=XstrkodA/0TP1WKi5rBiSjR6N8tDC6kxHy8gTN1p9BI=; b=Is/RvMyRILWVhKFXLmpGXIM9o
+ yxu1CuyQidrOlpxI2JaFQjruUFkHWBJNWY37BaAD1sPx828e40KRvQeGERzGVsUyFPAxjJSXc9bUx
+ FdzUbcj4XsSSkM2d+lkjGxGu6pWd+kFDOBF81eEO7v3D6mzbWcV7uIQJ38JtwOEVVY7mhOIbqo55t
+ g0mu0wkmfBR1IAtevKJKjHLLvcWG4Fpov777dLvqgQTWrwxoJNuZSCa7+o6BX9KTUI/6fRIxI8rG3
+ PCv5UuRzqdcPdzeO8c+XN9JUyza/NCKM/u5RFJuiOaYWGUgl5dKLBrzXRvWOlbEd1/9Y0hciYjg2h
+ GL3SzXz2g==;
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by merlin.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glbbI-0006uS-89
+ for linux-arm-kernel@lists.infradead.org; Mon, 21 Jan 2019 15:35:01 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1B5B01AC1;
+ Mon, 21 Jan 2019 07:35:00 -0800 (PST)
+Received: from e112298-lin.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 1F8113F5C1;
+ Mon, 21 Jan 2019 07:34:57 -0800 (PST)
+From: Julien Thierry <julien.thierry@arm.com>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [PATCH v9 25/26] arm64: Skip irqflags tracing for NMI in IRQs
+ disabled context
+Date: Mon, 21 Jan 2019 15:33:44 +0000
+Message-Id: <1548084825-8803-26-git-send-email-julien.thierry@arm.com>
+X-Mailer: git-send-email 1.9.1
+In-Reply-To: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
+References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_080757_705952_34A5B06E 
-X-CRM114-Status: GOOD (  21.60  )
+X-CRM114-CacheID: sfid-20190121_103500_386441_4F9C5326 
+X-CRM114-Status: GOOD (  12.73  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,122 +87,76 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Yonglong Wu <yonglong.wu@mediatek.com>, hdegoede@redhat.com, tony@atomide.com,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-usb@vger.kernel.org,
- linux-kernel@vger.kernel.org, Matthias Brugger <matthias.bgg@gmail.com>,
- Rob Herring <robh+dt@kernel.org>, Alan Stern <stern@rowland.harvard.edu>,
- chunfeng.yun@mediatek.com, linux-mediatek@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
+ Julien Thierry <julien.thierry@arm.com>, marc.zyngier@arm.com,
+ catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ christoffer.dall@arm.com, james.morse@arm.com, joel@joelfernandes.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Min,
+When an NMI is raised while interrupts where disabled, the IRQ tracing
+already is in the correct state (i.e. hardirqs_off) and should be left
+as such when returning to the interrupted context.
 
-On Mon, Jan 21, 2019 at 08:22:31PM +0800, min.guo@mediatek.com wrote:
-> From: Min Guo <min.guo@mediatek.com>
-> 
-> This adds support for MediaTek musb controller in
-> host, peripheral and otg mode.
-> There are some quirk of MediaTek musb controller, such as:
->  -W1C interrupt status registers
->  -Private data toggle registers
->  -No dedicated DMA interrupt line
-> 
-> Signed-off-by: Min Guo <min.guo@mediatek.com>
-> Signed-off-by: Yonglong Wu <yonglong.wu@mediatek.com>
-> ---
-> changes in v4:
-> 1. no changes
-> 
-> changes in v3:
-> suggested by Bin:
-> 1. Remove 'u8/u16 data' parameter in clearb/w() hooks
-> 2. Replace musb_readb/w() with musb_clearb/w() to clear interrupts status
-> 
-> changes in v2:
-> suggested by Bin:
-> 1. Add summarize of MediaTek musb controller differences in the commit log
-> 2. Add "|| COMPILE_TEST" in Kconfig
-> 3. Move MediaTek's private toggle registers from musb_regs.h to mediatek.c
-> 4. Replace musb_readl() with musb_readw() to read 16bit toggle register
-> ---
->  drivers/usb/musb/Kconfig    |   8 +-
->  drivers/usb/musb/Makefile   |   1 +
->  drivers/usb/musb/mediatek.c | 624 ++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 632 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/usb/musb/mediatek.c
-> 
+Check whether PMR was masking interrupts when the NMI was raised and
+skip IRQ tracing if necessary.
 
-[snip]
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kernel/entry.S | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-> +static irqreturn_t generic_interrupt(int irq, void *__hci)
-> +{
-> +	unsigned long flags;
-> +	irqreturn_t retval = IRQ_NONE;
-> +	struct musb *musb = __hci;
-> +
-> +	spin_lock_irqsave(&musb->lock, flags);
-> +	musb->int_usb = musb_readb(musb->mregs, MUSB_INTRUSB) &
-> +	    musb_readb(musb->mregs, MUSB_INTRUSBE);
-> +	musb->int_tx = musb_readw(musb->mregs, MUSB_INTRTX)
-> +	    & musb_readw(musb->mregs, MUSB_INTRTXE);
-> +	musb->int_rx = musb_readw(musb->mregs, MUSB_INTRRX)
-> +	    & musb_readw(musb->mregs, MUSB_INTRRXE);
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index a0b0a22..bd0b078 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -617,7 +617,18 @@ el1_irq:
+ 	kernel_entry 1
+ 	enable_da_f
+ #ifdef CONFIG_TRACE_IRQFLAGS
++#ifdef CONFIG_ARM64_PSEUDO_NMI
++alternative_if ARM64_HAS_IRQ_PRIO_MASKING
++	ldr	x20, [sp, #S_PMR_SAVE]
++alternative_else
++	mov	x20, #GIC_PRIO_IRQON
++alternative_endif
++	cmp	x20, #GIC_PRIO_IRQOFF
++	/* Irqs were disabled, don't trace */
++	b.ls	1f
++#endif
+ 	bl	trace_hardirqs_off
++1:
+ #endif
+ 
+ 	irq_handler
+@@ -637,8 +648,18 @@ alternative_else_nop_endif
+ 1:
+ #endif
+ #ifdef CONFIG_TRACE_IRQFLAGS
++#ifdef CONFIG_ARM64_PSEUDO_NMI
++	/*
++	 * if IRQs were disabled when we received the interrupt, we have an NMI
++	 * and we are not re-enabling interrupt upon eret. Skip tracing.
++	 */
++	cmp	x20, #GIC_PRIO_IRQOFF
++	b.ls	1f
++#endif
+ 	bl	trace_hardirqs_on
++1:
+ #endif
++
+ 	kernel_exit 1
+ ENDPROC(el1_irq)
+ 
+-- 
+1.9.1
 
-Based on my comment in 5/6, the above 3 musb_readb/w() can be changed to
-
-> +	/* MediaTek controller interrupt status is W1C */
-> +	musb_clearw(musb->mregs, MUSB_INTRRX);
-> +	musb_clearw(musb->mregs, MUSB_INTRTX);
-> +	musb_clearb(musb->mregs, MUSB_INTRUSB);
-
-	musb->int_usb = musb_clearb(musb->mregs, MUSB_INTRUSB)
-	musb->int_tx = musb_clearw(musb->mregs, MUSB_INTRTX);
-	musb->int_rx = musb_clearw(musb->mregs, MUSB_INTRRX);
-
-> +
-> +	if (musb->int_usb || musb->int_tx || musb->int_rx)
-> +		retval = musb_interrupt(musb);
-> +
-> +	spin_unlock_irqrestore(&musb->lock, flags);
-> +
-> +	return retval;
-> +}
-> +
-
-[snip]
-
-> +
-> +static u8 mtk_musb_clearb(void __iomem *addr, unsigned int offset)
-> +{
-> +	u8 data;
-> +
-> +	/* W1C */
-> +	data = musb_readb(addr, offset);
-> +	musb_writeb(addr, offset, data);
-> +	return musb_readb(addr, offset);
-
-	return data;
-
-> +}
-> +
-> +static u16 mtk_musb_clearw(void __iomem *addr, unsigned int offset)
-> +{
-> +	u16 data;
-> +
-> +	/* W1C */
-> +	data = musb_readw(addr, offset);
-> +	musb_writew(addr, offset, data);
-> +	return musb_readw(addr, offset);
-
-	return data;
-
-
-Regards,
--Bin.
 
 _______________________________________________
 linux-arm-kernel mailing list
