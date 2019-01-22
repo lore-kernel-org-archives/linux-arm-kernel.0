@@ -2,60 +2,111 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3EF2AC282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 09:18:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AF0C5C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 09:20:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0B83F20823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 09:18:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6660A21019
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 09:20:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gTW9rynO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0B83F20823
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="u8jx/WNB";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="Pk+Gqj7u"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6660A21019
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=xKU08C5oKVic3+lLcJY7QS6nXOhDoviG1MAxyp/Ga/4=; b=gTW9rynOIcJU0X+CXMi6ex7kL
-	Z00tFwLRgYc+ylkvgIEPyUShzfbyOy3SkHvzIyttoIQ52VZFcBUvyBSN7cIOCAJpSwPKSJOZ+Xhud
-	W3FDo2gmFQ6IlsydZ3qBfh/6/ze0M2cAdAEUzRFb/Ui1E2ICgIHca5MbKorD/vDZNFm4J0kqkXQw1
-	f4fAjJJ6BTuseoqfIloIs56unu2PR+8nv1cmGny99lYY8B1mfkWwm+KVn8gnW40Px/PfGUPTXhDjb
-	CtW8R7bcX/7Jrtg2TCsfhG/2f65kh9qFbbwuZliREq24Tyg0LgqQNdJu+1Tc2o3jiYCbSyNZXOrtQ
-	LuGCop1pQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=pVjqzpHmJhbt+WbWGGuDZyYo2MTmLav3xh4lH7L9Tp0=; b=u8jx/WNB1uX/DL
+	eNjvcQw6hFVzNXW7zH5H1QJLTAOXDWzVBJlNwHM8HWE4/9rGYSaBO93odKJLrgOAUAvyuT5taJxYO
+	OX3HWMhSuJpJ9u9MPBElvjGELpMMMVdhst/5epEECyC8YoSottl5ZGJS5xTw8kvzTrpmCQJC32ctJ
+	jbYgUTYfb3Ai+62/LSKFRmy5endlkCyobfNSK9T8gR6zUk18GMrlp77p+t+s56gga5t4C/ELFVFZM
+	wEOEEDiXejbCtEB24JPndrek7MSMVCNN0wrrjsHfKbMayc4nvjnxVQ5dTY/mCAbdKTmMd6lsJKknu
+	mKZsG8lNwUqsdHftF53w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glsC1-00084f-1D; Tue, 22 Jan 2019 09:18:01 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glsBU-0007gK-RK
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 09:17:42 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 1E1AE20898; Tue, 22 Jan 2019 10:17:27 +0100 (CET)
-Received: from localhost (aaubervilliers-681-1-37-87.w90-88.abo.wanadoo.fr
- [90.88.156.87])
- by mail.bootlin.com (Postfix) with ESMTPSA id E4E512078C;
- Tue, 22 Jan 2019 10:17:26 +0100 (CET)
-Date: Tue, 22 Jan 2019 10:17:27 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Priit Laes <plaes@plaes.org>
-Subject: Re: [PATCH] drm/sun4i: hdmi: Fix usage of TMDS clock
-Message-ID: <20190122091727.fksox7poqxvt5umu@flea>
-References: <20190122073232.7240-1-plaes@plaes.org>
+	id 1glsDx-00009B-Ny; Tue, 22 Jan 2019 09:20:01 +0000
+Received: from mail-db5eur03on062b.outbound.protection.outlook.com
+ ([2a01:111:f400:fe0a::62b]
+ helo=EUR03-DB5-obe.outbound.protection.outlook.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glsDj-0008Qv-Jy; Tue, 22 Jan 2019 09:19:49 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=DiXDEs58VOu2qtPTiLuymU+8l2mM8Dfrurz2jvV6HrE=;
+ b=Pk+Gqj7udMShUlNf5H70rxzrodH4yDJ8C91ligrWsHbVkcB/ZRUR+LmNdqXvXoBFKDGxgnY3bN3BzgXY0M/zRixfE9qxp39UiOP+ZccihAy/eMPyjiHtS8trDxIErvRjm8EmdJOsqJAUUSFtna1jWO2PgMXbtM3tvc1PuQX0l4c=
+Received: from VI1PR04MB5726.eurprd04.prod.outlook.com (20.178.127.24) by
+ VI1PR04MB4957.eurprd04.prod.outlook.com (20.177.49.210) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1537.27; Tue, 22 Jan 2019 09:19:42 +0000
+Received: from VI1PR04MB5726.eurprd04.prod.outlook.com
+ ([fe80::a1c2:cc79:80f3:3bcb]) by VI1PR04MB5726.eurprd04.prod.outlook.com
+ ([fe80::a1c2:cc79:80f3:3bcb%5]) with mapi id 15.20.1537.031; Tue, 22 Jan 2019
+ 09:19:42 +0000
+From: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+To: Boris Brezillon <bbrezillon@kernel.org>
+Subject: RE: [PATCH v8 2/5] dt-bindings: spi: add binding file for NXP FlexSPI
+ controller
+Thread-Topic: [PATCH v8 2/5] dt-bindings: spi: add binding file for NXP
+ FlexSPI controller
+Thread-Index: AQHUrMnj2HaRDCPgY0i5ihL9RBjnkaW7Bz/QgAAFoACAAABwoA==
+Date: Tue, 22 Jan 2019 09:19:41 +0000
+Message-ID: <VI1PR04MB57266B148D07519F26574FFA99980@VI1PR04MB5726.eurprd04.prod.outlook.com>
+References: <1547553487-9936-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <1547553487-9936-3-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <VI1PR04MB57266D861937B99899F3C1C699980@VI1PR04MB5726.eurprd04.prod.outlook.com>
+ <20190122101658.6bb89d54@bbrezillon>
+In-Reply-To: <20190122101658.6bb89d54@bbrezillon>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=yogeshnarayan.gaur@nxp.com; 
+x-originating-ip: [92.120.0.7]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; VI1PR04MB4957;
+ 6:rRHcTb8EXu2CJtlh7sQLh5A5xvqhLVC63r9M6nYb6yhoIYr0pTzUlhgTQ0vUR534ZWq2Wu+owE4pItVJjHJ0uGQa3TSEMBYKyUxNh/+wyJ2gbDJQ36RZIgfBpw4L7/jh7HatSgOiy6r4qnDXJilSx/s0WDlob8owuD+clj7oJOC6vTHtaDzTbwKLLJUxp6e9aMfPtKK6rPANtWy5sBGpib1pkC5IyGUOlQLZTYarMVH3m+Alg/p6tG0lhjgD10qEye9qi2Ba6Wgpv0/cBlk7oSJVnE4KAK9JBWISAXMZZbvkNgS7IiKOUAmz5T+2fhWFAfE+xk/ObnZQFA81GKJ39nEL94idxkYWcmdQJuHYOCiZhbpKjUriY3ZjHcvKb2v5Z0jR0zOwEK3eDFDyrC3DPes4q+KPZKWO2kitvKwvS4aH8fchnibmHqUySdhZTiXk5C6FxtqRuBe4RWkZRXJlBg==;
+ 5:nfCnfwNdhCQPzO7V7a445GP6NDbmeghWmjjvBuoD/wuazObiND/RYVqmJ3uh1j5nSeWatJl0RqzOnOhKRq+RuF/n8AiY6/7+v4C+UNrZyqkE2DJP64DIQ0/+hH4icI3gZYEqU1/UKk1tsXoHNu1lVz4wsCTug7EHD24AHeGdTGdYiB7n4U/TFiaM7OSx6vub253KXwk1RYINRTuDGVR5Qw==;
+ 7:W9TD2tk5lXcKPpQMMLjik42/MmYckSIQaryO2wX6AejvHODXifroJttF26zXDEUp3Go7dioB88PKgIYJ92x2uGkU1zxnuFi3VH/3uFmDW5kliFB/D8mgRHLJ4UPkXe+kVk74+SW5Y81zNvxhXT45mA==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: db6712fd-1ed3-453f-fa2e-08d6804abdd4
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR04MB4957; 
+x-ms-traffictypediagnostic: VI1PR04MB4957:
+x-microsoft-antispam-prvs: <VI1PR04MB49574F55BAD1B75FBE6D424499980@VI1PR04MB4957.eurprd04.prod.outlook.com>
+x-forefront-prvs: 0925081676
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(396003)(366004)(346002)(376002)(39860400002)(136003)(189003)(199004)(13464003)(7416002)(55016002)(9686003)(8936002)(229853002)(8676002)(76176011)(97736004)(53936002)(81166006)(81156014)(6506007)(25786009)(53546011)(7736002)(2906002)(6436002)(39060400002)(256004)(74316002)(14454004)(68736007)(305945005)(54906003)(186003)(86362001)(33656002)(102836004)(6916009)(11346002)(66066001)(446003)(486006)(99286004)(4326008)(316002)(71200400001)(71190400001)(106356001)(476003)(93886005)(6246003)(7696005)(4744005)(478600001)(3846002)(6116002)(26005)(105586002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB4957;
+ H:VI1PR04MB5726.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: hKYlhc/UVCM5ITinNh+Y2W5a5jtMJyO5Sckk84s7QggvA1SC9dUOMqQJx2FqbSSvWhq1cL1yVItKUVBa9LYuEMfBb9v9L/tkYZvhtUbCbFQGb5FjJ2hoKmdKVOblSXGU6zDPxZcvyvYAQMgDv3vnp/Blw8FzqPWqLNzDcZV4VEr3klRxldvgwof2iWOeTFTsww1FnNCtim9M8KbgVTHP78RtJ8J6VVo/8rXoVH20Xi67R07ix4lBKx88NAjdTlAjXz8ajZI8/WyhtDIxIN7UnKRjw3Z550d95tEZ6ZosxRAO0oecJbgNBthHA0lKYE6raLvhiNoXQvTg4ooOIedKLaAUjgJzEx1LNyn3nJZt/ShJwEVGUAxSOL9Fw/jrUMhe8CyroMtq3K/AmWx4n5eKNOvJvb135X/x74fiCw+/dkE=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-In-Reply-To: <20190122073232.7240-1-plaes@plaes.org>
-User-Agent: NeoMutt/20180716
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: db6712fd-1ed3-453f-fa2e-08d6804abdd4
+X-MS-Exchange-CrossTenant-originalarrivaltime: 22 Jan 2019 09:19:41.8609 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB4957
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_011730_336645_F15E1292 
-X-CRM114-Status: GOOD (  15.17  )
+X-CRM114-CacheID: sfid-20190122_011947_661405_B61E211F 
+X-CRM114-Status: GOOD (  11.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,103 +118,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: David Airlie <airlied@linux.ie>, linux-kernel@vger.kernel.org,
- dri-devel@lists.freedesktop.org, Chen-Yu Tsai <wens@csie.org>,
- Daniel Vetter <daniel@ffwll.ch>, Priit Laes <priit.laes@paf.com>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============0291246111631749881=="
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "robh@kernel.org" <robh@kernel.org>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "frieder.schrempf@kontron.de" <frieder.schrempf@kontron.de>,
+ "linux-spi@vger.kernel.org" <linux-spi@vger.kernel.org>,
+ "marek.vasut@gmail.com" <marek.vasut@gmail.com>,
+ "broonie@kernel.org" <broonie@kernel.org>,
+ "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
+ "computersforpeace@gmail.com" <computersforpeace@gmail.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi Boris,
 
---===============0291246111631749881==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="lbdnwpdvvhkcqe7e"
-Content-Disposition: inline
+> -----Original Message-----
+> From: Boris Brezillon [mailto:bbrezillon@kernel.org]
+> Sent: Tuesday, January 22, 2019 2:47 PM
+> To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+> Cc: robh@kernel.org; shawnguo@kernel.org; mark.rutland@arm.com;
+> devicetree@vger.kernel.org; linux-kernel@vger.kernel.org;
+> frieder.schrempf@kontron.de; linux-spi@vger.kernel.org;
+> marek.vasut@gmail.com; broonie@kernel.org; linux-mtd@lists.infradead.org;
+> computersforpeace@gmail.com; linux-arm-kernel@lists.infradead.org
+> Subject: Re: [PATCH v8 2/5] dt-bindings: spi: add binding file for NXP FlexSPI
+> controller
+> 
+> On Tue, 22 Jan 2019 09:00:14 +0000
+> Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+> 
+> > Hi Rob / Shawn,
+> >
+> > Can you please apply patches [1] [2].
+> 
+> No, DT bindings should go through Mark's tree. Just wait a bit please.
 
+Ok, thanks.
 
---lbdnwpdvvhkcqe7e
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Tue, Jan 22, 2019 at 09:32:32AM +0200, Priit Laes wrote:
-> From: Priit Laes <priit.laes@paf.com>
->=20
-> Although TMDS clock is required for HDMI to properly function,
-> nobody called clk_prepare_enable(). This fixes reference counting
-> issues and makes sure clock is running when it needs to be running.
->=20
-> Due to TDMS clock being parent clock for DDC clock, TDMS clock
-> was turned on/off for each EDID probe, causing spurious failures
-> for certain HDMI/DVI screens.
->=20
-> Fixes: 9c5681011a0c ("drm/sun4i: Add HDMI support")
->=20
-> Signed-off-by: Priit Laes <priit.laes@paf.com>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c | 4 ++++
->  1 file changed, 4 insertions(+)
->=20
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c b/drivers/gpu/drm/sun=
-4i/sun4i_hdmi_enc.c
-> index 061d2e0d9011..25f4d676fd82 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-> @@ -92,6 +92,8 @@ static void sun4i_hdmi_disable(struct drm_encoder *enco=
-der)
->  	val =3D readl(hdmi->base + SUN4I_HDMI_VID_CTRL_REG);
->  	val &=3D ~SUN4I_HDMI_VID_CTRL_ENABLE;
->  	writel(val, hdmi->base + SUN4I_HDMI_VID_CTRL_REG);
-> +
-> +	clk_disable_unprepare(hdmi->tmds_clk);
->  }
-> =20
->  static void sun4i_hdmi_enable(struct drm_encoder *encoder)
-> @@ -112,6 +114,8 @@ static void sun4i_hdmi_enable(struct drm_encoder *enc=
-oder)
->  		val |=3D SUN4I_HDMI_VID_CTRL_HDMI_MODE;
-> =20
->  	writel(val, hdmi->base + SUN4I_HDMI_VID_CTRL_REG);
-> +
-> +	clk_prepare_enable(hdmi->tmds_clk);
-
-We'll probably need to enable that clock to send the infoframes as
-well. I moved it earlier (and that allows the enable and disable
-function to be symetric as well).
-
-Thanks for figuring this out!
-Maxime
-
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
-
---lbdnwpdvvhkcqe7e
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXEbfpwAKCRDj7w1vZxhR
-xVD8AP4r8ZYtfTpNba2DWGmqkcY/4eSPc/nhzr/mi+rgHBBzxgD/bXaa18v4nZPA
-1QuP3vO5DoJrfjiguCxTX+NGJJUvCw8=
-=NJQt
------END PGP SIGNATURE-----
-
---lbdnwpdvvhkcqe7e--
-
-
---===============0291246111631749881==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+--
+Regards
+Yogesh Gaur
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============0291246111631749881==--
-
