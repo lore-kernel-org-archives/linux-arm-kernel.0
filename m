@@ -2,70 +2,62 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7CF9FC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 11:14:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CE415C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 11:32:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4C3302084A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 11:14:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8D30D20879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 11:32:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rtpw1yxJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4C3302084A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KbXvhxO7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8D30D20879
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=jWF8i15b1jsPi1m6/G5PyHApBLNpJ+fx8bz2J+yPCQg=; b=rtpw1yxJz1u0c1UGt0UXhrQk8
-	qUIrrK4b+/4C1QAnm0hx9jAZom5gpFgxdlMhJLoA3QyT4Qn6tUwPm0WaNPWO+BtRU/+18PiRaNYDR
-	zivdfEOzsZfQQV++K7bEGGy2z2WmIz3L/abyo70KEJKQm8091ThZyn7XQlIL2XrEFaHrR6L+yp5kD
-	57213NrAsSxu1q+3brSBY+bLXxLlvEiNxDJk3ofvj4iN5ZMQRCde86cDRhmiON4nNfd3wP9dkvIso
-	reg3t0aZbVVuS47xfWx7UTZXqk3GgZdTKmukg0B/fC8O6W+nWfAzhBc4WlICcYlBdyZOEg/XqgWDn
-	I3kJUp+UA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=OrDZfKf1UxBDbyDmGgOixghh5MZvE9zy2nyZwxK+7sE=; b=KbXvhxO78Ks9pl
+	Htpv6s0LEAsq6qytsNcPrbu0/nM7GiVRMbHvrLuhFyCEsYUGLErfZGM30F/yEdGt//NJHfcyO86RY
+	5+R0+MW5SI+9l/JIKVh1AlfR5nzOFq1Ke/eqXWURgDCImTp9kHiYnoQGnScGUzq0r/D8CIgppRGv6
+	vqZEGxa1QXvpBkwB1IACTBt6jL5yY0AdQCjCG12VDpPqiQzaRt4bN7xlI9rOMRlViOuTnyvUnrfpg
+	F3dOYHszKvdGgTZUghQCN9qJQMWw6+z2zQ0rP6Exv0e5sBYD1grgDblKdmQRiiOVmxAguFPPzOiKd
+	eCJIKQABCVdvypc0I3GQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glu0e-0006pY-2r; Tue, 22 Jan 2019 11:14:24 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
+	id 1gluIQ-0000iO-0c; Tue, 22 Jan 2019 11:32:46 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glu0Z-0006p4-OA
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 11:14:21 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 63DF22078C; Tue, 22 Jan 2019 12:14:18 +0100 (CET)
-Received: from localhost (aaubervilliers-681-1-37-87.w90-88.abo.wanadoo.fr
- [90.88.156.87])
- by mail.bootlin.com (Postfix) with ESMTPSA id 2BD8E206A7;
- Tue, 22 Jan 2019 12:14:08 +0100 (CET)
-Date: Tue, 22 Jan 2019 12:14:08 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Jagan Teki <jagan@amarulasolutions.com>
-Subject: Re: [PATCH v5 07/17] drm/sun4i: sun6i_mipi_dsi: Refactor vertical
- video start delay
-Message-ID: <20190122111408.4zlhecsxywulvrfy@flea>
-References: <20181211164900.wfmkmbrbj3nmlb3h@flea>
- <CAMty3ZB5F5jD9iJT1soXSA5HtQOf5W9rKO9nCdGFUfVo0hpO4Q@mail.gmail.com>
- <20190107141158.zaimizk4rlqa6xli@flea>
- <CAMty3ZBb8byOwh=_W83Ta0Dse1qkoqccOeaBEY9oHPaxDxe9QA@mail.gmail.com>
- <20190108085829.clianbtjovu3oieq@flea>
- <CAMty3ZC9OQtwT-iH=S1LhHsBPc_jFKGAnCYYeR9nuKuDWSKLQw@mail.gmail.com>
- <20190112164319.whr7gwvl4oux5svz@flea>
- <CAMty3ZD8X9KmHjUtAo-+Y83a2j8NF3DjM9Yr3LPMxOvQ8kOV7g@mail.gmail.com>
- <20190116191756.ajzzaga43srk77dk@flea>
- <CAMty3ZCw8itG=nizA5E218HT5kg=-xDzLmShF51vRh4ENYKuBA@mail.gmail.com>
+ id 1gluIM-0000i0-K5
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 11:32:43 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 11136A78;
+ Tue, 22 Jan 2019 03:32:42 -0800 (PST)
+Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id CBBBA3F6A8;
+ Tue, 22 Jan 2019 03:32:40 -0800 (PST)
+Subject: Re: [RFC PATCH] arm64: efi: fix chicken-and-egg problem in memreserve
+ code
+To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+References: <20190118174324.24715-1-ard.biesheuvel@linaro.org>
+From: James Morse <james.morse@arm.com>
+Message-ID: <abe25b84-4327-c927-6d91-629291a62b69@arm.com>
+Date: Tue, 22 Jan 2019 11:32:39 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <CAMty3ZCw8itG=nizA5E218HT5kg=-xDzLmShF51vRh4ENYKuBA@mail.gmail.com>
-User-Agent: NeoMutt/20180716
+In-Reply-To: <20190118174324.24715-1-ard.biesheuvel@linaro.org>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_031420_096148_D248144D 
-X-CRM114-Status: GOOD (  19.63  )
+X-CRM114-CacheID: sfid-20190122_033242_665173_44D33CF2 
+X-CRM114-Status: GOOD (  17.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,127 +69,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Stephen Boyd <sboyd@kernel.org>,
- Michael Turquette <mturquette@baylibre.com>,
- linux-sunxi <linux-sunxi@googlegroups.com>,
- linux-kernel <linux-kernel@vger.kernel.org>,
- dri-devel <dri-devel@lists.freedesktop.org>, Chen-Yu Tsai <wens@csie.org>,
- Michael Trimarchi <michael@amarulasolutions.com>,
- linux-amarula@amarulasolutions.com, linux-clk <linux-clk@vger.kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: multipart/mixed; boundary="===============8369407398389464780=="
+Cc: mark.rutland@arm.com, linux-efi@vger.kernel.org, marc.zyngier@arm.com,
+ catalin.marinas@arm.com, will.deacon@arm.com,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi Ard,
 
---===============8369407398389464780==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="lpmn2jm2w26y3xo2"
-Content-Disposition: inline
+On 18/01/2019 17:43, Ard Biesheuvel wrote:
+> Unfortunately, it appears that the recently introduced and repaired
+> EFI memreserve code is still broken.
+> 
+> Originally, we applied all memory reservation passed via the EFI table
+> before doing any memblock allocations. However, this turned out to be
+> problematic, given that the number of reservations is unbounded, and
+> a GICv3 system will reserve a block of memory for each CPU, resulting
+> in hundreds of reservations.
+> 
+> We 'fixed' this by deferring the reservations in the memblock table
+> until after we enabled memblock resizing. However, to reach this
+> point, we must have mapped DRAM and the kernel, which itself relies
+> on some memblock allocations for page tables. Also, memblock resizing
+> itself relies on the ability to invoke memblock_alloc() to reallocate
+> those tables themselves.
+> 
+> So this is a nice chicken-and-egg problem which is rather difficult
+> to fix cleanly. So instead of a clean solution, I came up with the
+> patch below.
+> 
+> The idea is to set a memblock allocation limit below the lowest
+> reservation entry that occurs in the memreserve table. This way,
+> we can map DRAM and the kernel and enable memblock resizing without
+> running the risk of clobbering those reserved regions. After applying
+> all the reservations, the memblock limit restriction is lifted again,
+> allowing the boot to proceed normally.
 
-
---lpmn2jm2w26y3xo2
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Thu, Jan 17, 2019 at 10:02:12AM +0530, Jagan Teki wrote:
-> On Thu, Jan 17, 2019 at 12:48 AM Maxime Ripard
-> <maxime.ripard@bootlin.com> wrote:
-> >
-> > On Sun, Jan 13, 2019 at 01:07:41AM +0530, Jagan Teki wrote:
-> > > > > > > > Again, I cannot help you without the datasheet for the pane=
-ls you're
-> > > > > > > > trying to submit.
-> > > > > > >
-> > > > > > > The panel bound with Sitronix ST7701 IC
-> > > > > > > http://www.startek-lcd.com/res/starteklcd/pdres/201705/201705=
-12144242904.pdf
-> > > > > >
-> > > > > > It's the controller, not the panel
-> > > > >
-> > > > > As I said before, the datasheet of that panel doesn't have any
-> > > > > information except electrical characteristics and used IC which is
-> > > > > ST7701.
-> > > > >
-> > > > > I have one more panel, which is from Bananapi, S070WV20-CT16 ICN6=
-21
-> > > > > please find the attachment for the same.
-> > > > >
-> > > > > Here is some more details of the same.
-> > > > >
-> > > > > https://github.com/yesnoandor/x300/blob/master/kernel/arch/arm/bo=
-ot/dts/erobbing/x300/x300.dtsi#L81
-> > > > > https://github.com/wxzed/Raspberry_5MIPI_Display/blob/master/I2C_=
-Slave/USER/main.c#L15
-> > > > >
-> > > > > https://github.com/eliot-shao/qcom/blob/master/icn6211_cxn0102/ke=
-rnel/drivers/video/msm/mdss/mdss_i2c_interface.c#L152
-> > > > > matches timings for
-> > > > > https://github.com/eliot-shao/qcom/blob/master/icn6211_cxn0102/ke=
-rnel/arch/arm/boot/dts/qcom/dsi-mipi-2-rgb_1280p_video.dtsi#L20
-> > > > >
-> > > > > https://github.com/zestroly/micromat/blob/master/test/raspberry/I=
-CN6211.cpp#L169
-> > > >
-> > > > Where did you get the timings from then?
-> > >
-> > > You mean drm_mode timings, the same panel with RGB available in
-> > > panel-simple[1], and dsi driver in Mailing list[2] and actual DSI
-> > > sequence commands from BSP[3]
-> > >
-> > > [1] https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.g=
-it/commit/drivers/gpu/drm/panel/panel-simple.c?id=3D7ad8b41cd8f5c2842646d01=
-cdd576663caee04a7
-> > > [2] https://patchwork.kernel.org/patch/10680331/
-> > > [3] https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sun=
-xi/drivers/video/sunxi/disp2/disp/lcd/S070WV20_MIPI_RGB.c
-> >
-> > So you had no reliable source for the timings then? How do you know if
-> > all your patches that are timing related are right then?
->=20
-> I don't understand your point, or may be I confused with many links
-> that I attached in previous mail.
->=20
-> 1. Patch for same panel timings are already in Mainline that was
-> tested on one of the board. [1]
-> 2. Driver from AW, released bsp from BPI-M64-bsp [3]
->=20
-> Do you think the above two points are not valid sources?
-
-I'm saying that the only valid source is the datasheet or a DSI analyzer.
-
-Maxmie
-
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
-
---lpmn2jm2w26y3xo2
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXEb7AAAKCRDj7w1vZxhR
-xS0fAQDHNLlvyCOc0d7sfDgkpCCnV2uB18j9NbgTDPWP1QmK1AD/XDTH92oI17hs
-5fb6v71atKI/c3In5qsOSLUKIicisAQ=
-=fPrs
------END PGP SIGNATURE-----
-
---lpmn2jm2w26y3xo2--
+.... how does this interact with kdump? Is it possible the crash-kernel region
+is above the lowest reservation entry, meaning there is no usable memory?
 
 
---===============8369407398389464780==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+> The problem with this approach is that it is not guaranteed that the
+> temporary limit will leave enough memory to allocate the page tables
+> and resize the memblock reserved array. Since this is only 10s of KBs,
+> it is unlikely to break in practice, but some pathological behavior
+> may still occur, which is rather nasty :-(
+
+As I understand it, the in-kernel-image memblock_reserved_init_regions is used
+early on, because we don't know where the reserved regions of memory are, but
+INIT_MEMBLOCK_REGIONS should be big enough to describe them. We trip up when it
+isn't big enough, and we can't resize it yet.
+
+... thinking out loud ...
+
+Does reserve_regions() know how big that array needs to be?
+(it can count the nomap and persistent reservations, as well as the gaps between
+memory banks).
+
+Could we 'allocate' that array to be big enough for everything learnt via EFI in
+reserve_regions()? It memblock_remove()s all existing memory, so we know at this
+point there aren't existing reservations/allocations.
+
+
+Thanks,
+
+James
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============8369407398389464780==--
-
