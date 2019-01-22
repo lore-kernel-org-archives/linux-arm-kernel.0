@@ -2,87 +2,72 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8D535C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 18:22:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F2CA5C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 18:47:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6125120870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 18:22:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C782321019
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 18:47:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Oz9a7Kj9";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="iYX1E+Qk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6125120870
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UWfMgfcF";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="FwQLCWkw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C782321019
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=GWK2nDMtxiFdrVgkHnnJ61d4rS0i7RMn1cxOwTpBEow=; b=Oz9a7Kj9VXnwr3Q4ELpoYzf4cn
-	pYCw5xeZ44mq2LSKKVm4Vurn9bMIfQZO285Of82Fd/Tu+O0OuhBZyQGMhnuPo/6WlhaN+VxQXTBew
-	Zr+/BjXtAah9ByhxHXh4YqiQHnMlQEPXxBnHpSem59uQ+ZpY75V09WmCNo3yj9/R+A59QsqWrx/fo
-	ODoI7seydJH8QBN1brf3imCWgBN4NvABXjMa6kUeo2WAJa915OgQKXm5GKIZy39js7UbxZRUaqbaS
-	4ZJraoci/4t3jeJgTthToUwzXuy0jkizZYPfPauSgEk43zMXlcyXb180Xlyg6FM0ivOQ6V7iUAXFc
-	U9QKZvSw==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:Date:Message-ID:From:Subject:References
+	:In-Reply-To:To:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=U35eoTtOQLXLbvW3IpaxTe6ALa73/9jcaFx0e0Ne8jI=; b=UWfMgfcFIcbtp4
+	bH3AMcHgfZm0R9e6YN3ORLoB+ZrntEph+J5VPH7VotDR9+dc7pd7pZ6huWzryu/4tM68W3/OXvOLD
+	jMvms79A/o5S13H/heL9tGSC11hlaS1Xx2BqvLkYfnmYosaRC8gh1LGGnTCE1iYsM9rEx7Ezq3jBK
+	NQPR9juu/TWtqSyNCjokj15ybrutHDutLdN7+WdCI3/LpUn6VlC69qV3PqPQscBRx8pu1aMuNx6zK
+	6WfK8OCiE11qAGmdirXLtp6ojS65zeGJlD5SMWDg+a6YIDAhr1ZPFDgz7TvMNMuvGq9rm5f587OZB
+	H8f4B/W2w4sdPN342k8w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gm0gz-0003dy-PR; Tue, 22 Jan 2019 18:22:33 +0000
-Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
+	id 1gm153-00077Q-53; Tue, 22 Jan 2019 18:47:25 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gm0Wj-0004NY-Pi
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 18:12:03 +0000
-Received: by mail-pl1-x643.google.com with SMTP id u18so11859727plq.7
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 22 Jan 2019 10:11:57 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=W+tcSbssL1cjoomd1/kZjJ7IjRwzQZIgCHeNiM3a0+8=;
- b=iYX1E+QkQtS+reozDRSNxJxAJ9t+crCH5YtMtbQ4hKqfNhGWIE6Oajd4RJIpXCTU2N
- JUI21kO42yJuv8h2ZyR1KtgfDrWQ88ir7AC0UbLF8NrzgjWKi715QVxMIgYfHMtgGM7x
- AdrigTyORi+AoTL5gf8Mvab/tfhrRU0HH3y6Y=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=W+tcSbssL1cjoomd1/kZjJ7IjRwzQZIgCHeNiM3a0+8=;
- b=rSKDwApeZ4i7k/ODsTtdVEsKr++HtNoNNRrp/25C5mK5DqiUz4qnNdbMsrlKi6s/tP
- ItruZmc+KY5QAd272fLG1/pQ7dfMYuism+U8Lo4rU3ejmHDzvT9Fd24HK6T7+t3lkFtj
- iwYX7FYNQ/SQwzjM5YBGqxb2kiMosZA95GhPmrrDp5wybFrH8CrEIBkvyvsKPlwrysSp
- x587BuQYMgYaOEKT2Cf7PXPBIr4CUT/6ZUVSlWSqKN3IkmKmBwQ421xpiCxMYUxkmipR
- CPxAi2w13KRwqmrdJ9TCq2XIhOz6n63PHMbzBlFS0lA0ytWwWL65IB1ls63GnssC1DnQ
- maiQ==
-X-Gm-Message-State: AJcUukcyQ2KAOTfnc6H1RHMVevuUcl9S7NGf/8Hf0yUtxZPnywQ1reGn
- dVhZuNFPheUNhUTcKVK/cIp0iw==
-X-Google-Smtp-Source: ALg8bN6wxbGghhBavhc66500P1ObbbqDRCBN30ofvJI9xoWIhRiusoSZPhokath8yZI+3sutAiZi6w==
-X-Received: by 2002:a17:902:2862:: with SMTP id
- e89mr35764673plb.158.1548180717330; 
- Tue, 22 Jan 2019 10:11:57 -0800 (PST)
-Received: from xps15.cg.shawcable.net (S0106002369de4dac.cg.shawcable.net.
- [68.147.8.254])
- by smtp.gmail.com with ESMTPSA id a18sm23489919pgj.30.2019.01.22.10.11.55
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 22 Jan 2019 10:11:56 -0800 (PST)
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
-To: acme@kernel.org,
-	peterz@infradead.org
-Subject: [PATCH v2 6/7] perf tools: Removing CoreSight set_drv_config() API
-Date: Tue, 22 Jan 2019 11:11:43 -0700
-Message-Id: <20190122181144.26645-7-mathieu.poirier@linaro.org>
-X-Mailer: git-send-email 2.17.1
-In-Reply-To: <20190122181144.26645-1-mathieu.poirier@linaro.org>
-References: <20190122181144.26645-1-mathieu.poirier@linaro.org>
+ id 1gm14z-000774-Kl
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 18:47:22 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 6B35921019;
+ Tue, 22 Jan 2019 18:47:20 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1548182840;
+ bh=B0qFCitpNOkldy2prRrLmaRakaVyE82MIc/M0eFZCzQ=;
+ h=To:In-Reply-To:References:Subject:From:Cc:Date:From;
+ b=FwQLCWkwXzubKhS4PZNrR9G+gxv+hmKTkZFPL9xxfnwn83x67JDOVbyRrTmZZTmI3
+ tlZ5x5xomXdNDndus56H9qwDnbBaSZWmf/xvf9mKE+7bsWzMiTN1Ferur04x1hVAxJ
+ 9FldOyjbNgZfXWXCc+lUaCyLaoDYaggOsHOz2x7U=
+MIME-Version: 1.0
+To: Jorge Ramirez <jorge.ramirez-ortiz@linaro.org>,
+ Viresh Kumar <viresh.kumar@linaro.org>
+In-Reply-To: <e55df608-7058-63b9-b449-982d32e08759@linaro.org>
+User-Agent: alot/0.8
+References: <1545039990-19984-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <1545039990-19984-9-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <20190117063312.GE25498@builder>
+ <9abbe59b-433c-4e30-1e4d-b5eed3afc695@linaro.org>
+ <20190117100807.pmew5iqisdcc63eq@vireshk-i7>
+ <e55df608-7058-63b9-b449-982d32e08759@linaro.org>
+Subject: Re: [PATCH 08/13] clk: qcom: hfpll: CLK_IGNORE_UNUSED
+From: Stephen Boyd <sboyd@kernel.org>
+Message-ID: <154818283956.20280.2895221927807522124@swboyd.mtv.corp.google.com>
+Date: Tue, 22 Jan 2019 10:47:19 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_101158_399238_A79C52EB 
-X-CRM114-Status: GOOD (  12.83  )
+X-CRM114-CacheID: sfid-20190122_104721_697115_8547DD4E 
+X-CRM114-Status: GOOD (  19.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,134 +79,73 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, linux-s390@vger.kernel.org, suzuki.poulose@arm.com,
- alexander.shishkin@linux.intel.com, gregkh@linuxfoundation.org,
- heiko.carstens@de.ibm.com, adrian.hunter@intel.com, will.deacon@arm.com,
- ast@kernel.org, mingo@redhat.com, linux-arm-kernel@lists.infradead.org,
- hpa@zytor.com, schwidefsky@de.ibm.com, namhyung@kernel.org, tglx@linutronix.de,
- jolsa@redhat.com, linux-kernel@vger.kernel.org
-MIME-Version: 1.0
+Cc: mark.rutland@arm.com, jassisinghbrar@gmail.com, heiko@sntech.de,
+ mturquette@baylibre.com, will.deacon@arm.com,
+ Bjorn Andersson <bjorn.andersson@linaro.org>, david.brown@linaro.org,
+ linux-clk@vger.kernel.org, olof@lixom.net, jagan@amarulasolutions.com,
+ andy.gross@linaro.org, sibis@codeaurora.org, devicetree@vger.kernel.org,
+ arnd@arndb.de, niklas.cassel@linaro.org, robh+dt@kernel.org,
+ horms+renesas@verge.net.au, linux-arm-kernel@lists.infradead.org,
+ linux-kernel@vger.kernel.org, amit.kucheria@linaro.org, vkoul@kernel.org,
+ enric.balletbo@collabora.com, georgi.djakov@linaro.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Now that event's config2 attribute is used to communicate sink selection
-to the kernel, remove the old set_drv_config() implementation since it
-is no longer needed.
+Quoting Jorge Ramirez (2019-01-17 02:46:21)
+> On 1/17/19 11:08, Viresh Kumar wrote:
+> > On 17-01-19, 09:38, Jorge Ramirez wrote:
+> >> COMMON_CLK_DISABLED_UNUSED relies on the enable_count reference counter
+> >> to disable the clocks that were enabled by the firwmare and not by the
+> >> drivers.
+> >>
+> >> the cpufreq driver does not enable the cpu clock.
+> >>
+> >> so when clk_change_rate is called, the enable_count counter is not
+> >> incremented and therefore it just remains null since this was enabled by
+> >> the firmware.
+> >>
+> >> I tried doing:
+> >>
+> >> diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
+> >> index e58bfcb..5a9f83e 100644
+> >> --- a/drivers/cpufreq/cpufreq-dt.c
+> >> +++ b/drivers/cpufreq/cpufreq-dt.c
+> >> @@ -124,6 +124,10 @@ static int resources_available(void)
+> >>                 return ret;
+> >>         }
+> >>
+> >> + ret = clk_prepare_enable(cpu_clk);
+> >> + if (ret)
+> >> +         return ret;
+> >> +
+> >>         clk_put(cpu_clk);
+> >>
+> >>         name = find_supply_name(cpu_dev);
+> >>
+> >>
+> >> and that removed the need for CLK_IGNORE_UNUSED. But I am not sure of
+> >> the system wide consequences of that change to cpufreq.
+> > 
+> > If the cpufreq driver enables it then it should disable it on exit as
+> > well, right ? And in that case if you unload your driver's module, you
+> > will hang the system as the clock will get disabled :)
+> 
+> ah, of course, sorry was over-thinking this thing :)
+> 
+> > 
+> > Every other platform must either be marking it with CLK_IGNORE_UNUSED
+> > or they must be doing clk_enable from somewhere, maybe the CPU online
+> > path, not sure though.
+> > 
+> 
+> since this clock is enabled by the firmware, it seems to me that using
+> CLK_IGNORE_UNUSED remains the best option.
+> 
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- tools/perf/arch/arm/util/cs-etm.c | 54 -------------------------------
- tools/perf/arch/arm/util/cs-etm.h |  3 --
- tools/perf/arch/arm/util/pmu.c    |  2 --
- 3 files changed, 59 deletions(-)
-
-diff --git a/tools/perf/arch/arm/util/cs-etm.c b/tools/perf/arch/arm/util/cs-etm.c
-index 4aa6193dcb50..9a4a8153e4c2 100644
---- a/tools/perf/arch/arm/util/cs-etm.c
-+++ b/tools/perf/arch/arm/util/cs-etm.c
-@@ -26,9 +26,6 @@
- #include <stdlib.h>
- #include <sys/stat.h>
- 
--#define ENABLE_SINK_MAX	128
--#define CS_BUS_DEVICE_PATH "/bus/coresight/devices/"
--
- struct cs_etm_recording {
- 	struct auxtrace_record	itr;
- 	struct perf_pmu		*cs_etm_pmu;
-@@ -638,54 +635,3 @@ struct auxtrace_record *cs_etm_record_init(int *err)
- out:
- 	return NULL;
- }
--
--static FILE *cs_device__open_file(const char *name)
--{
--	struct stat st;
--	char path[PATH_MAX];
--	const char *sysfs;
--
--	sysfs = sysfs__mountpoint();
--	if (!sysfs)
--		return NULL;
--
--	snprintf(path, PATH_MAX,
--		 "%s" CS_BUS_DEVICE_PATH "%s", sysfs, name);
--
--	if (stat(path, &st) < 0)
--		return NULL;
--
--	return fopen(path, "w");
--
--}
--
--static int __printf(2, 3) cs_device__print_file(const char *name, const char *fmt, ...)
--{
--	va_list args;
--	FILE *file;
--	int ret = -EINVAL;
--
--	va_start(args, fmt);
--	file = cs_device__open_file(name);
--	if (file) {
--		ret = vfprintf(file, fmt, args);
--		fclose(file);
--	}
--	va_end(args);
--	return ret;
--}
--
--int cs_etm_set_drv_config(struct perf_evsel_config_term *term)
--{
--	int ret;
--	char enable_sink[ENABLE_SINK_MAX];
--
--	snprintf(enable_sink, ENABLE_SINK_MAX, "%s/%s",
--		 term->val.drv_cfg, "enable_sink");
--
--	ret = cs_device__print_file(enable_sink, "%d", 1);
--	if (ret < 0)
--		return ret;
--
--	return 0;
--}
-diff --git a/tools/perf/arch/arm/util/cs-etm.h b/tools/perf/arch/arm/util/cs-etm.h
-index 1a12e64f5127..a3354bda4fe8 100644
---- a/tools/perf/arch/arm/util/cs-etm.h
-+++ b/tools/perf/arch/arm/util/cs-etm.h
-@@ -7,9 +7,6 @@
- #ifndef INCLUDE__PERF_CS_ETM_H__
- #define INCLUDE__PERF_CS_ETM_H__
- 
--#include "../../util/evsel.h"
--
- struct auxtrace_record *cs_etm_record_init(int *err);
--int cs_etm_set_drv_config(struct perf_evsel_config_term *term);
- 
- #endif
-diff --git a/tools/perf/arch/arm/util/pmu.c b/tools/perf/arch/arm/util/pmu.c
-index e047571e6080..e4619f2fe7ce 100644
---- a/tools/perf/arch/arm/util/pmu.c
-+++ b/tools/perf/arch/arm/util/pmu.c
-@@ -8,7 +8,6 @@
- #include <linux/coresight-pmu.h>
- #include <linux/perf_event.h>
- 
--#include "cs-etm.h"
- #include "arm-spe.h"
- #include "../../util/pmu.h"
- 
-@@ -19,7 +18,6 @@ struct perf_event_attr
- 	if (!strcmp(pmu->name, CORESIGHT_ETM_PMU_NAME)) {
- 		/* add ETM default config here */
- 		pmu->selectable = true;
--		pmu->set_drv_config = cs_etm_set_drv_config;
- #if defined(__aarch64__)
- 	} else if (strstarts(pmu->name, ARM_SPE_PMU_NAME)) {
- 		return arm_spe_pmu_default_config(pmu);
--- 
-2.17.1
+What do you do about CPUs being offlined? Presumably when the CPU is
+gone the system doesn't need to keep the clk enabled anymore.
 
 
 _______________________________________________
