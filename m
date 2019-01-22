@@ -2,66 +2,78 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BB49CC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 15:28:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4FC81C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 15:40:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8AB3E217D6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 15:28:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 21A5F217F4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 15:40:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WAiFUHzs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8AB3E217D6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Y99U/k0Z";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="xPxKI8Ge"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 21A5F217F4
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=73jHPHeNBxMwQvi64JFQmKWywzH2cgDzTp+ljjZRSdk=; b=WAiFUHzsh8kNRL
-	apg8gbPrS/kryW/OwgK+nondwEmxHavsA1lkmQH3c4hbdV6yrtrnV+z4YsUbxrZEu9mj7U8rA4puJ
-	7RVe7wCr79qY/Y/TzQ49U/c0TNmNzOm5gszIz0/t4q/Ri1aJyu+nXA+fgN3tAqcgBoJz0vJabQeFR
-	m1RAKy2e30Fydy1h61tz9yQ4BOBAr3h/jFhjQfDr9qV/oPQhuHoKnM/AD5kx1D26VPz8jA/qiLfkh
-	WIpJtZYhtWsFBrExZulcWjQ4cCMq/2A8oS0oyFElw+zITmok9kVHOH0xj09cgL+8V/bSjgVWrFefn
-	oOscAmtn52W13q2++now==;
+	List-Owner; bh=RzKyGMapWvy6FdR6Lo2Qrpijifj8TCGFPGfjzUCnpOY=; b=Y99U/k0Z+Q1VUH
+	K7q07br5hu07H2jc/JvXXKk/YgP74OItNcUgTqpWwu7++p4ejQ9mpkvxaMep2rMy+53L0DdS5xaSy
+	k2jwTNHoQ0GmjSUKgBpmJ5u3g6oSUimUi+uFsWbzSDjG9rrAm43mcs1e1vbyx3rJZLi6Z0LM/1mhP
+	a0L5DWo5plA+6gewGZeejpnfStlf9pjAaDG+m1+8HcCeiTf0yHzrjnESlAyhq4CTYBdD/dM/tC9Wi
+	12ye+CZISoQpcCoPgTIOCLb0XZgXKd58oONqGEhBidg3usdrs3cB87m+htxwZ4898fWk2DtkHutqa
+	IUHHB7w7KcYb7fPh6g3A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glxyd-0008On-Ng; Tue, 22 Jan 2019 15:28:35 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glxyZ-0008OA-AF
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 15:28:32 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 91389A78;
- Tue, 22 Jan 2019 07:28:30 -0800 (PST)
-Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 810B73F589;
- Tue, 22 Jan 2019 07:28:29 -0800 (PST)
-Date: Tue, 22 Jan 2019 15:28:27 +0000
-From: Dave Martin <Dave.Martin@arm.com>
-To: Marc Zyngier <marc.zyngier@arm.com>
-Subject: Re: [PATCH 0/2] KVM: arm/arm64: Add VCPU workarounds firmware register
-Message-ID: <20190122152826.GH3578@e103592.cambridge.arm.com>
-References: <20190107120537.184252-1-andre.przywara@arm.com>
- <20190122101657.GE3578@e103592.cambridge.arm.com>
- <86a7jt9cc2.wl-marc.zyngier@arm.com>
- <20190122135632.GF3578@e103592.cambridge.arm.com>
- <8636pkagps.wl-marc.zyngier@arm.com>
+	id 1glyA5-0005s8-JF; Tue, 22 Jan 2019 15:40:25 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glyA2-0005re-0i
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 15:40:23 +0000
+Received: from mail-qt1-f182.google.com (mail-qt1-f182.google.com
+ [209.85.160.182])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 7769221848
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 22 Jan 2019 15:40:21 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1548171621;
+ bh=nfH17g7hT3C9Ra5eF47HzQCPANsjsPbzv8xOYv+KqBo=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=xPxKI8GeYoUaoGPJS3u2g5+oEGdE3U6OOyO+lmIoj4NP7nFS0eM7XPULZE47ilHC6
+ px9+cGL8jU69J5pohvwtL3GlrsVuQ3MOtw8j3j7lif3EuxdzzsEZGs5SsM2GtwajOd
+ a/31jOZ44VSVzqY2PdN330A17ma744Vh1n2FRO2U=
+Received: by mail-qt1-f182.google.com with SMTP id e5so27966355qtr.12
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 22 Jan 2019 07:40:21 -0800 (PST)
+X-Gm-Message-State: AJcUukeNepw94oSnmxQG50vK4eC8B8cg/M3GLwNQ500macgpW/YGZtCP
+ 0Sq1P4stZ0gE5YHbJFflw7u7qz60dHkP7vRCmA==
+X-Google-Smtp-Source: ALg8bN6mlA+b5xNplGq7vMORmB9fivFFLm4qa0hifKph63t1Dja4m93gpfYxV1gsvx4LRwoSNfuWGx3VGQQqBOLziuY=
+X-Received: by 2002:ac8:2d2b:: with SMTP id n40mr30661287qta.38.1548171620633; 
+ Tue, 22 Jan 2019 07:40:20 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <8636pkagps.wl-marc.zyngier@arm.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+References: <20190122042147.5424-1-manivannan.sadhasivam@linaro.org>
+ <20190122042147.5424-2-manivannan.sadhasivam@linaro.org>
+In-Reply-To: <20190122042147.5424-2-manivannan.sadhasivam@linaro.org>
+From: Rob Herring <robh+dt@kernel.org>
+Date: Tue, 22 Jan 2019 09:40:08 -0600
+X-Gmail-Original-Message-ID: <CAL_JsqJR6s-EPJdvvyY=v=0RRUzee2NBXyssgeY1-YYK-C4q3g@mail.gmail.com>
+Message-ID: <CAL_JsqJR6s-EPJdvvyY=v=0RRUzee2NBXyssgeY1-YYK-C4q3g@mail.gmail.com>
+Subject: Re: [PATCH v3 1/5] dt-bindings: arm: fsl: Fix bindings for LS1012A
+ and LS1021A based boards
+To: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_072831_368523_C558738F 
-X-CRM114-Status: GOOD (  26.84  )
+X-CRM114-CacheID: sfid-20190122_074022_078179_60806630 
+X-CRM114-Status: GOOD (  10.66  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,82 +85,30 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andre Przywara <andre.przywara@arm.com>, kvm@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, kvmarm@lists.cs.columbia.edu
+Cc: devicetree@vger.kernel.org, a.tropschug@ebs-systart.com,
+ m.bittner@ebs-systart.com,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Amit Kucheria <amit.kucheria@linaro.org>, Yang-Leo Li <leoyang.li@nxp.com>,
+ Shawn Guo <shawnguo@kernel.org>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Jan 22, 2019 at 02:51:11PM +0000, Marc Zyngier wrote:
-> On Tue, 22 Jan 2019 13:56:34 +0000,
-> Dave Martin <Dave.Martin@arm.com> wrote:
-> > 
-> > On Tue, Jan 22, 2019 at 11:11:09AM +0000, Marc Zyngier wrote:
-> > > On Tue, 22 Jan 2019 10:17:00 +0000,
-> > > Dave Martin <Dave.Martin@arm.com> wrote:
-> > > > 
-> > > > On Mon, Jan 07, 2019 at 12:05:35PM +0000, Andre Przywara wrote:
-> > > > > Workarounds for Spectre variant 2 or 4 vulnerabilities require some help
-> > > > > from the firmware, so KVM implements an interface to provide that for
-> > > > > guests. When such a guest is migrated, we want to make sure we don't
-> > > > > loose the protection the guest relies on.
-> > > > > 
-> > > > > This introduces two new firmware registers in KVM's GET/SET_ONE_REG
-> > > > > interface, so userland can save the level of protection implemented by
-> > > > > the hypervisor and used by the guest. Upon restoring these registers,
-> > > > > we make sure we don't downgrade and reject any values that would mean
-> > > > > weaker protection.
-> > > > 
-> > > > Just trolling here, but could we treat these as immutable, like the ID
-> > > > registers?  
-> > > > 
-> > > > We don't support migration between nodes that are "too different" in any
-> > > > case, so I wonder if adding complex logic to compare vulnerabilities and
-> > > > workarounds is liable to create more problems than it solves...
-> > > 
-> > > And that's exactly the case we're trying to avoid. Two instances of
-> > > the same HW. One with firmware mitigations, one without. Migrating in
-> > > one direction is perfectly safe, migrating in the other isn't.
-> > > 
-> > > It is not about migrating to different HW at all.
-> > 
-> > So this is a realistic scenario when deploying a firmware update across
-> > a cluter that has homogeneous hardware -- there will temporarly be
-> > different firmware versions running on different nodes?
-> 
-> Case in point: I have on my desk two AMD Seattle systems. One with an
-> ancient firmware that doesn't mitigate anything, and one that has all
-> the mitigations applied (and correctly advertised). I can migrate
-> stuff back and forth, and that's really bad.
+On Mon, Jan 21, 2019 at 10:22 PM Manivannan Sadhasivam
+<manivannan.sadhasivam@linaro.org> wrote:
+>
+> Fix devicetree bindings for Freescale LS1012A and LS1021A SoC based boards.
+>
+> Fixes: a1a38e1f4d1d ("dt-bindings: arm: Convert FSL board/soc bindings to json-schema")
+> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/arm/fsl.yaml | 10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
 
-Agreed.
-
-> What people do in their data centre is none of my business,
-> really. What concerns me is that there is a potential for something
-> bad to happen without people noticing. And it is KVM's job to do the
-> right thing in this case.
-
-Fair enough.
-
-> > My concern is really "will the checking be too buggy / untested in
-> > practice to be justified by the use case".
-> 
-> Not doing anything is not going to make the current situation "less
-> buggy". We have all the stuff we need to test this. We can even
-> artificially create the various scenarios on a model.
-
-Agreed.  My concern is about how this will scale if future
-vulnerabilities are added to the mix.  We might ultimately end up in a
-worse mess, but I may be being paranoid.
-
-> > I'll take a closer look at the checking logic.
-
-See the other thread.  I have an idea there for exposing the information
-in a different way that may simplfy things (or be totally misguided...)
-
-Cheers
----Dave
+Reviewed-by: Rob Herring <robh@kernel.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
