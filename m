@@ -2,68 +2,69 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AC6E0C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 09:16:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D2D54C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 09:17:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7E1B520823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 09:16:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9F0E420823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 09:17:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XCQEpnum"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7E1B520823
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hmF9dlfV";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="YS3jVl+v"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9F0E420823
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LN1lcLwwEGm/QFAL6bfGlKRWLJtuH98QyhNKJYdy3eg=; b=XCQEpnumRIk1Ge
-	+Nvk7ZrhSn1c9eCzuQPk2JWRhhkmrLzgFP+jE0b/hq1PN9qa/rwN0ykuIxfMBNWlM/ly5+ezrp5FX
-	X7+v8QqwQ0jmNyU1zBRWUDA8yLkMREJRMjNEJPs/qGgspVUFRw03gc/UMafYjUwxgw0UHdlyYbxrw
-	/Ld35ji0t9ZyJrjUeNpvmMuy5SRaN0tdsN1prP5OvU/u7pv1V0n3YKZYWWSy87K1zXZHwufa1wZJB
-	rfJSfzYacyVD3X/7GL2NPvtnXQmwTjwmIaVBjt3TmFfeabdR9NjSYKmlfxflc9srqfxNQFOJq0dEm
-	Rd6Ab/0NHYn+nN5KrINA==;
+	List-Owner; bh=vuZw5Clfd/fb/7eC4sfL/gmdLFPp37gZOCGEr6EaQYI=; b=hmF9dlfVSATPVG
+	unDmm828iP24XVJo/L6mFvaOpuynnxHqv7gbRhBIEdN2iP8brOdeJ1+qQUq+i0Xa53J2WbfipYA5I
+	MBa9apMf7d7cAW42qqfREDcendGnzVQ0X+gPNFLbIgcyMNrpCnLHopffQBiNkahU7lI9173gdhAwr
+	IXSUMl5GrQbib6g7JuTuI1P65fRBV2URAbUgx1NFFM4wKhNBoPv21ZMJ0gwrKOZsZh0UWd2Ibk1gg
+	hBa7zt/ZNU4PpIVlgAlWkP4BW5I0s2vyf4841QdT5OVk08V3HpPhZVZrtmLqc2+jy6LICsE8dI3OE
+	spkSMI2oC3qEv6Ph9Rrg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glsAg-00076F-2r; Tue, 22 Jan 2019 09:16:38 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+	id 1glsBE-0007Nh-O1; Tue, 22 Jan 2019 09:17:12 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glsAc-00074y-HW
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 09:16:36 +0000
-Received: from pty.hi.pengutronix.de ([2001:67c:670:100:1d::c5])
- by metis.ext.pengutronix.de with esmtps
- (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1glsAH-0002Q7-1c; Tue, 22 Jan 2019 10:16:13 +0100
-Received: from ukl by pty.hi.pengutronix.de with local (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1glsA7-0002RU-4z; Tue, 22 Jan 2019 10:16:03 +0100
-Date: Tue, 22 Jan 2019 10:16:03 +0100
-From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
-To: Jitao Shi <jitao.shi@mediatek.com>
-Subject: Re: [PATCH V2] pwm: Add MediaTek MT8183 display PWM driver support
-Message-ID: <20190122091603.ic46eyf47lu5f6pi@pengutronix.de>
-References: <20190122090243.27304-1-jitao.shi@mediatek.com>
+ id 1glsBC-0007NM-5o; Tue, 22 Jan 2019 09:17:11 +0000
+Received: from bbrezillon (91-160-177-164.subs.proxad.net [91.160.177.164])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 6F3BC20823;
+ Tue, 22 Jan 2019 09:17:04 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1548148629;
+ bh=riPfo+PaYom+qfXiEE/IofcK17wWSJ7PkzfeJ/8x54c=;
+ h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
+ b=YS3jVl+v6tyxmwrUIIY6Oh8XaRLakz5CrUCT3W4H1Wjd9XPd/L3wR7QkF8LD4XMCp
+ Yipwj1SWWLu6ICaBZNrrErXsWRosFsoyi2tsv5/pzXFicJT27+1bQU6rRWipUzaZg5
+ khTD9423TYFBpJEiRGhxKpQHIsUHSlSEy+8/UYH8=
+Date: Tue, 22 Jan 2019 10:16:58 +0100
+From: Boris Brezillon <bbrezillon@kernel.org>
+To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+Subject: Re: [PATCH v8 2/5] dt-bindings: spi: add binding file for NXP
+ FlexSPI controller
+Message-ID: <20190122101658.6bb89d54@bbrezillon>
+In-Reply-To: <VI1PR04MB57266D861937B99899F3C1C699980@VI1PR04MB5726.eurprd04.prod.outlook.com>
+References: <1547553487-9936-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <1547553487-9936-3-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <VI1PR04MB57266D861937B99899F3C1C699980@VI1PR04MB5726.eurprd04.prod.outlook.com>
+X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190122090243.27304-1-jitao.shi@mediatek.com>
-User-Agent: NeoMutt/20170113 (1.7.2)
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c5
-X-SA-Exim-Mail-From: ukl@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_011634_733986_0E0152CA 
-X-CRM114-Status: GOOD (  12.64  )
+X-CRM114-CacheID: sfid-20190122_011710_231782_95B1FA84 
+X-CRM114-Status: UNSURE (   6.99  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,55 +76,31 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- David Airlie <airlied@linux.ie>, stonea168@163.com,
- dri-devel@lists.freedesktop.org, Ajay Kumar <ajaykumar.rs@samsung.com>,
- Vincent Palatin <vpalatin@chromium.org>, cawa.cheng@mediatek.com,
- bibby.hsieh@mediatek.com, ck.hu@mediatek.com,
- Russell King <rmk+kernel@arm.linux.org.uk>,
- Thierry Reding <treding@nvidia.com>, Sean Paul <seanpaul@chromium.org>,
- linux-pwm@vger.kernel.org, Sascha Hauer <kernel@pengutronix.de>,
- Pawel Moll <pawel.moll@arm.com>, Ian Campbell <ijc+devicetree@hellion.org.uk>,
- Inki Dae <inki.dae@samsung.com>, Rob Herring <robh+dt@kernel.org>,
- linux-mediatek@lists.infradead.org, yingjoe.chen@mediatek.com,
- Matthias Brugger <matthias.bgg@gmail.com>, eddie.huang@mediatek.com,
- linux-arm-kernel@lists.infradead.org, Rahul Sharma <rahul.sharma@samsung.com>,
- srv_heupstream@mediatek.com, linux-kernel@vger.kernel.org,
- Philipp Zabel <p.zabel@pengutronix.de>, Kumar Gala <galak@codeaurora.org>,
- Andy Yan <andy.yan@rock-chips.com>
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "robh@kernel.org" <robh@kernel.org>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "frieder.schrempf@kontron.de" <frieder.schrempf@kontron.de>,
+ "linux-spi@vger.kernel.org" <linux-spi@vger.kernel.org>,
+ "marek.vasut@gmail.com" <marek.vasut@gmail.com>,
+ "broonie@kernel.org" <broonie@kernel.org>,
+ "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
+ "computersforpeace@gmail.com" <computersforpeace@gmail.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Jan 22, 2019 at 05:02:43PM +0800, Jitao Shi wrote:
-> Use the mtk_pwm_data struction to define different registers
-> and add MT8183 specific register operations, such as MT8183
-> doesn't have commit register, needs to disable double buffer
-> before writing register, and needs to select commit mode
-> and use PWM_PERIOD/PWM_HIGH_WIDTH.
-> =
+On Tue, 22 Jan 2019 09:00:14 +0000
+Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
 
-> Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+> Hi Rob / Shawn,
+> 
+> Can you please apply patches [1] [2].
 
-There is no difference compared to (implicit) v1 sent a few minutes
-earlier, right? There was another patch sent with the same Subject last
-week, so I assume the mail from today without "v2" in the Subject was a
-mistake?
-
-> ---
-Adding a paragraph below the tripple dash that points out what was
-changed compared to the previous submission is a good idea to help
-reviewers to more easily see what was changed. I guess you only adapted
-the commit log as a reaction to Matthias Burgger's review?
-
-Best regards
-Uwe
-
--- =
-
-Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+No, DT bindings should go through Mark's tree. Just wait a bit please.
 
 _______________________________________________
 linux-arm-kernel mailing list
