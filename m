@@ -2,91 +2,85 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9C442C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 15:03:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0C10AC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 15:06:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6BE0820879
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 15:03:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C97F420879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 15:06:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="b1RU759R";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="AT9LbDgN";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="OoJvQnwP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6BE0820879
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fJ5kM092";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="b2Li2h6b"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C97F420879
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=PyZ2FD9QVQ8FEgQdLTMLe/mNSooyeYDkKkoiccrJ+vk=; b=b1RU759RdtUSbuqj3T+gzQNOk
-	PJBKVov+o01mKSf76myOJx+mwHsdQsIkyAs250BN1/gBq6Al9TAp3kmIbEakwgB8Mrocl3OHi24i2
-	05InCaqx/lEV98SXGNZrMjEHTC148uad0/nQ1mhJBODAhX7Lhw76bkNJ8IN91A5b8bWhiqQGFZr7w
-	cCSpz0hxJX7J8xjFZLUs34M5C38a9g+BbJ3dRM1cmfzj0xrHRcesNTpzZJ8t+24gqb9SczCs1Tjlb
-	nUOqeY/7tnRTEyWTeghGSsmTkBzOMtvSJVNQkVYUcKhub9YIH10VI5AQ8+NTY6Rx2D8xIYcLd2wAo
-	EdqI+AzUg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=bcJy9Cd+oVljPa1qIV30XfhS9TLhfK2GvbLWRni9paA=; b=fJ5kM092EN7G78
+	QkKs8I9Mld9677bhjl9NQN3WKMY+A9nySlpOd6fzTvygO2bL6UAjCUWWOfpXqhLVBqQ4mMa7H8xTG
+	RKzbN54imo4OtPTpnDEX1dHr1nQkWPsLoGyJR5FtOI/xaAdpy7WWGtT2xsX6vehMgf1Pi7m6ryNew
+	VmAC4FE3/z7B2KLDyBjBPhEwWlOFpCyHnNDRUzZxLAodPyOw5qwWhj7nE1eghPlVZ4VcwWz17h//H
+	0tATyncJQKaVPxmXx98tLmYJNDqukJWlRUgPaCDPI3KDP9IafAkuskCZ/+fBGXnGChdnO2or2ANRA
+	TSqcTzQT0mWmgxaEq9ag==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glxZz-00037Q-QV; Tue, 22 Jan 2019 15:03:07 +0000
-Received: from smtp.codeaurora.org ([198.145.29.96])
+	id 1glxdM-0004p6-IS; Tue, 22 Jan 2019 15:06:36 +0000
+Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glxZw-00036q-01
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 15:03:05 +0000
-Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id 71A766044E; Tue, 22 Jan 2019 15:03:01 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1548169381;
- bh=6pR4WJEX9BrwhrjL8sF/7l6ind7XQnrqoNa0E6QRTgs=;
- h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
- b=AT9LbDgNy92/MdUH9cS6pNida/us1FGZcsyiBTSnBa5PmaZ9WVlTGXkSb5vVbw7k4
- MM1N+yJDQta21jc0EK/bzEAylq2DJ6mkKNmL+a6HMWMdrfXYHYbnO9/jH2iUKBvOHm
- T3CFZsS2XnpC/3OCS+sFueEQIXWfC1vCpAUVVedU=
-Received: from [192.168.1.100] (unknown [157.49.207.12])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- (Authenticated sender: saiprakash.ranjan@smtp.codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id 656FA6044E;
- Tue, 22 Jan 2019 15:02:53 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1548169380;
- bh=6pR4WJEX9BrwhrjL8sF/7l6ind7XQnrqoNa0E6QRTgs=;
- h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
- b=OoJvQnwPOCRW+AYRzCS10erMp1zqlgtu0wE7+N6EWQETZyPjlLHbOV4pQ8EKvPq0m
- VyUPbNbJdg4cLSx+GcJlXWvrf/WzJEa5zPE5Zrq/8mEWpqzk6jELf7KuUHf+pkAAd0
- pXX7wBRClhNRlH9MAM+KCxWyzDrXZLhtsNCk5eWg=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 656FA6044E
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- dmarc=none (p=none dis=none) header.from=codeaurora.org
-Authentication-Results: pdx-caf-mail.web.codeaurora.org; spf=none
- smtp.mailfrom=saiprakash.ranjan@codeaurora.org
-Subject: Re: [PATCHv4 1/4] arm64: dts: qcom: sdm845: Add Coresight support
-To: Suzuki K Poulose <suzuki.poulose@arm.com>, robh+dt@kernel.org,
- mathieu.poirier@linaro.org, leo.yan@linaro.org,
- alexander.shishkin@linux.intel.com, andy.gross@linaro.org,
- david.brown@linaro.org, vivek.gautam@codeaurora.org, dianders@chromium.org,
- sboyd@kernel.org, bjorn.andersson@linaro.org, devicetree@vger.kernel.org,
- mark.rutland@arm.com
-References: <cover.1548133311.git.saiprakash.ranjan@codeaurora.org>
- <ad16cfb9b6f5efb85149458d5f5a1abf43fa027c.1548133311.git.saiprakash.ranjan@codeaurora.org>
- <1bd39862-0725-70ce-6535-fdb59569f683@arm.com>
-From: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
-Message-ID: <75ed74af-6946-b86d-092e-42dc16e55308@codeaurora.org>
-Date: Tue, 22 Jan 2019 20:32:51 +0530
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1glxdJ-0004ok-4h
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 15:06:34 +0000
+Received: by mail-wm1-x341.google.com with SMTP id b11so14493584wmj.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 22 Jan 2019 07:06:32 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=UOYKuSL5Mc3+i6V5yuN8VGLaRYUHqSjx2EoNQxQQYCw=;
+ b=b2Li2h6bMiShx34TjIsFU/nm1RM4QxumLNL/RbWat606XkA11x17nbXRzYoh5KGPPA
+ ORLFLzGm7kBro+GJ40vArFXa2F1z3/NQ8shK0F17NzNtrWfZSKsETzMF7acQGhDcU+pI
+ Oxzfu3Znc93LtjyebaEon3IrQkpIQurTiFjlo=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=UOYKuSL5Mc3+i6V5yuN8VGLaRYUHqSjx2EoNQxQQYCw=;
+ b=bv894KLnwBy+asWxdzt/tfDoTOgqZn50w6dDPubTwFZBkA7cONAG15ZWqPU3itMkD6
+ hhd329I6kviEw9mEiP2tdaYgJl3EqddorPmlr+3CNOop/t1GSXzKV8TLCbsewv1+MI0U
+ xTM1LD+JGNJO0vTtyhflNmxmGj/k8CqSvQKWktkwbUl571TyFf4eEnxK90JSIgw78rFB
+ N6lCqro1tUUYKJWWpFBF9qzm9UkvSGHdr8Za4NooxJe5ZYmhxuaBQs41Hc5LqKvA0xIo
+ b/8gOZFeebhjSKQwK8/9xR3BF+EzAtCYPslKc4zFhRVEV/SpH4zF8aU7W6g8yQZqbkLr
+ 3Vew==
+X-Gm-Message-State: AJcUukf+2rIA3nEgzAmjEISQQ6E57lbmYGhpuxBmp1CDyWVDcIT4DQa+
+ NWBrV6S/X0e6UPp/AsfIL+Bgtw==
+X-Google-Smtp-Source: ALg8bN778/QAvszzjrPefLp7Sg27rTv6cYDlCMvQUL7TtD/bAxqlieXj/VXRity2byy0v3PrEgcF+Q==
+X-Received: by 2002:a7b:c399:: with SMTP id s25mr4264519wmj.90.1548169590997; 
+ Tue, 22 Jan 2019 07:06:30 -0800 (PST)
+Received: from localhost.localdomain
+ (laubervilliers-657-1-83-120.w92-154.abo.wanadoo.fr. [92.154.90.120])
+ by smtp.gmail.com with ESMTPSA id b7sm88575484wrs.47.2019.01.22.07.06.29
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Tue, 22 Jan 2019 07:06:30 -0800 (PST)
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+To: linux-acpi@vger.kernel.org
+Subject: [PATCH] acpi: bgrt: parse BGRT to obtain BMP address before it gets
+ clobbered
+Date: Tue, 22 Jan 2019 16:06:16 +0100
+Message-Id: <20190122150616.850-1-ard.biesheuvel@linaro.org>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-In-Reply-To: <1bd39862-0725-70ce-6535-fdb59569f683@arm.com>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_070304_082446_9718F0A3 
-X-CRM114-Status: GOOD (  21.27  )
+X-CRM114-CacheID: sfid-20190122_070633_190013_BE0DEC34 
+X-CRM114-Status: GOOD (  21.11  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,54 +92,253 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-msm@vger.kernel.org, rnayak@codeaurora.org, sibis@codeaurora.org,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
-Content-Transfer-Encoding: base64
-Content-Type: text/plain; charset="utf-8"; Format="flowed"
+Cc: lorenzo.pieralisi@arm.com, graeme.gregory@linaro.org,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>, Peter Jones <pjones@redhat.com>,
+ rjw@rjwysocki.net, leif.lindholm@linaro.org, astone@redhat.com,
+ linux-efi@vger.kernel.org, harry.l.hsiung@intel.com,
+ linux-arm-kernel@lists.infradead.org, lenb@kernel.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgU3V6dWtpLAoKVGhhbmtzIGZvciBsb29raW5nIGludG8gdGhpcy4gUGxlYXNlIGZpbmQgbXkg
-cmVzcG9uc2UgaW5saW5lLgoKT24gMS8yMi8yMDE5IDc6MzAgUE0sIFN1enVraSBLIFBvdWxvc2Ug
-d3JvdGU6Cj4gSGkgU2FpLAo+IAo+IE9uIDAxLzIyLzIwMTkgMDE6MzcgUE0sIFNhaSBQcmFrYXNo
-IFJhbmphbiB3cm90ZToKPj4gQWRkIGNvcmVzaWdodCBjb21wb25lbnRzIGZvdW5kIG9uIFF1YWxj
-b21tIFNETTg0NSBTb0MuCj4+Cj4+IFNpZ25lZC1vZmYtYnk6IFNhaSBQcmFrYXNoIFJhbmphbiA8
-c2FpcHJha2FzaC5yYW5qYW5AY29kZWF1cm9yYS5vcmc+Cj4+Cj4gCj4gU29ycnksIGJ1dCBJIGhh
-ZG4ndCBub3RpY2VkIHRoZSBQSUQgb3ZlcnJpZGUgc3RyaW5ncyBiZWxvdy4gUGxlYXNlCj4gZmlu
-ZCB0aGUgcXVlc3Rpb24uCj4KWy4uXQoKPj4gK8KgwqDCoMKgwqDCoMKgIC8qCj4+ICvCoMKgwqDC
-oMKgwqDCoMKgICogT24gUUNPTSBTRE04NDUsIHdlIGJ5cGFzcyB0aGUgbm9ybWFsIEFNQkEgYnVz
-IGRpc2NvdmVyeQo+PiArwqDCoMKgwqDCoMKgwqDCoCAqIG1ldGhvZCBieSBmb3JjaW5nIHRoZSBw
-ZXJpcGhlcmFsIElEIGJlY2F1c2Ugb2YgdGhlIHdyb25nCj4+ICvCoMKgwqDCoMKgwqDCoMKgICog
-dmFsdWUgcmVhZCBmcm9tIEVUTSBQSUQgcmVnaXN0ZXJzLgo+PiArwqDCoMKgwqDCoMKgwqDCoCAq
-Lwo+IAo+IFdoYXQgaXMgdGhlIHZhbHVlIHJlYWQgYmFjayBmcm9tIHRoZSBFVE0gUElEeCByZWdp
-c3RlcnMgPyBEbyB0aGV5Cj4gcHJvdmlkZSBpbmNvbnNpc3RlbnQgb3IgaW5jb21wYXRpYmxlIHZh
-bHVlIHcuci50IHRoZSBFVE0vQ29yZXNpZ2h0Cj4gYXJjaGl0ZWN0dXJlID8gSWYgaXQgaXMgYW4g
-dW5zdXBwb3J0ZWQgQ1BVIHdpdGggcHJvcGVyIHZhbHVlcywKPiB5b3UgbXVzdCBhZGQgdGhlbSB0
-byB0aGUgdGFibGUgaW4gZXRtNHggZHJpdmVyLgo+IAoKVGhlIHZhbHVlcyByZWFkIGZyb20gRVRN
-IFBJRHggcmVnaXN0ZXJzIGFyZSBhY3R1YWxseSBpbmNvbnNpc3RlbnQKYW5kIGlzIGRpZmZlcmVu
-dCBmb3Igc29tZSBFVE1zLgoKQmVsb3cgYXJlIHRoZSBQSURzIHJlYWQgZm9yIFNETTg0NToKClsg
-ICAgNS45OTY0NDhdIHJlc25hbWU9ZXRtQDcwNDAwMDAgcGlkPTAwMWJiODAzClsgICAgNi4wNTI4
-OTFdIHJlc25hbWU9ZXRtQDcxNDAwMDAgcGlkPTAwMWJiODAzCgo8c25pcD4gLi4gKFNhbWUgcGlk
-PTAwMWJiODAzIGZvciBldG1ANzI0MDAwMCB0byBldG1ANzU0MDAwMCBidXQgZGlmZmVycwpmb3Ig
-b3RoZXIgMiBjcHVzIGFzIHNob3duIGJlbG93KQoKWyAgICA2LjI2NjY4N10gcmVzbmFtZT1ldG1A
-NzY0MDAwMCBwaWQ9MDAxYmI4MDIKWyAgICA2LjMyOTE3MV0gcmVzbmFtZT1ldG1ANzc0MDAwMCBw
-aWQ9MDAxYmI4MDIKClRoaXMgaXMgdGhlIGNhc2UgZm9yIE1TTTg5OTYgYWxzbyBhcyBzaG93biBi
-ZWxvdyB3aGVyZSBQSUQKdmFsdWUgaXMgbm90IGNvcnJlY3QgYW5kIGhhcyB0byBiZSBoYXJkY29k
-ZWQuCgpGb3IgTVNNODk5NjoKCnJlc25hbWU9ZXRtQDNiNDAwMDAgcGlkPTEwMmYwMjA1Cgo+PiAr
-wqDCoMKgwqDCoMKgwqAgZXRtQDcwNDAwMDAgewo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCBj
-b21wYXRpYmxlID0gImFybSxjb3Jlc2lnaHQtZXRtNHgiLCAiYXJtLHByaW1lY2VsbCI7Cj4+ICvC
-oMKgwqDCoMKgwqDCoMKgwqDCoMKgIGFybSxwcmltZWNlbGwtcGVyaXBoaWQgPSA8MHgwMDBiYjk1
-ZD4gPiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCByZWcgCj4+ID0gPDAgMHgwNzA0MDAwMCAwIDB4
-MTAwMD47Cj4+ICsKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqAgY3B1ID0gPCZDUFUwPjsKPj4g
-Kwo+IAo+IFlvdSBzZWVtIHRvIGJlIHNwZWNpZnlpbmcgdGhlIFBJRCBvZiBBNTMgRVRNIGFsbCBv
-dmVyLCB3aGlsZSBhdCBsZWFzdAo+IG9uZSBvZiB5b3VyIGNvcmVzIGlzIEVUTXY0LjIgKGZyb20g
-dGhlIG90aGVyIHBhdGNoKSBhbmQgQTUzIGlzIG5vdAo+IEVUTXY0LjIuIEFzIGFib3ZlLCBpdCB3
-b3VsZCBiZSBnb29kIHRvIGFkZCB0aGUgUElEIHRvIHRoZSB0YWJsZS4KPiAKCkFzIGV4cGxhaW5l
-ZCBpbiBhYm92ZSBjb21tZW50LCBQSUQgdmFsdWVzIHJlYWQgYXJlIG5vdCBjb3JyZWN0LiBQbGVh
-c2UgCmxldCBtZSBrbm93IGlmIEkgYW0gbm90IGNsZWFyLgoKVGhhbmtzLApTYWkKCi0tIApRVUFM
-Q09NTSBJTkRJQSwgb24gYmVoYWxmIG9mIFF1YWxjb21tIElubm92YXRpb24gQ2VudGVyLCBJbmMu
-IGlzIGEgbWVtYmVyCm9mIENvZGUgQXVyb3JhIEZvcnVtLCBob3N0ZWQgYnkgVGhlIExpbnV4IEZv
-dW5kYXRpb24KCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-CmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5m
-cmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xp
-bnV4LWFybS1rZXJuZWwK
+The bitmap left in the framebuffer by the firmware is described by an
+ACPI table called "BGRT", which describes the size, pixel format and
+the address of a BMP image in memory. While the BGRT ACPI table is
+guaranteed to reside in a "ACPI reclaim" memory region, which is
+never touched by Linux. The BMP image, however, typically resides
+in EFI Boot Services Memory, which may have been overwritten by the
+time the BGRT discovery routine runs.
+
+So instead, drop the handling from the ACPI init code, and call the
+BGRT parsing code immediately after going over the EFI configuration
+table array, at which time no memory has been touched yet except for
+the .data/.bss regions covered by the static kernel image.
+
+Unfortunately, this involves a non-trivial amount of ACPI entry
+point and root table parsing, but we cannot rely on the normal
+ACPI infrastructure yet this early in the boot.
+
+Also note that we cannot take the 'acpi_disabled' global variable
+into account, since it may not have assumed the correct value yet
+(on arm64, the default value is '1' which is overridden to '0' if
+no DT description has been made available by the firmware)
+
+Cc: Peter Jones <pjones@redhat.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/acpi.c        |  2 -
+ arch/x86/kernel/acpi/boot.c     |  2 -
+ drivers/acpi/bgrt.c             |  6 --
+ drivers/firmware/efi/efi-bgrt.c | 80 ++++++++++++++++++--
+ drivers/firmware/efi/efi.c      | 13 ++++
+ include/linux/efi-bgrt.h        |  4 +-
+ 6 files changed, 89 insertions(+), 18 deletions(-)
+
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index 44e3c351e1ea..7429a811f76d 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -230,8 +230,6 @@ void __init acpi_boot_table_init(void)
+ 			early_init_dt_scan_chosen_stdout();
+ 	} else {
+ 		acpi_parse_spcr(earlycon_acpi_spcr_enable, true);
+-		if (IS_ENABLED(CONFIG_ACPI_BGRT))
+-			acpi_table_parse(ACPI_SIG_BGRT, acpi_parse_bgrt);
+ 	}
+ }
+ 
+diff --git a/arch/x86/kernel/acpi/boot.c b/arch/x86/kernel/acpi/boot.c
+index 2624de16cd7a..2d3535b62752 100644
+--- a/arch/x86/kernel/acpi/boot.c
++++ b/arch/x86/kernel/acpi/boot.c
+@@ -1633,8 +1633,6 @@ int __init acpi_boot_init(void)
+ 	acpi_process_madt();
+ 
+ 	acpi_table_parse(ACPI_SIG_HPET, acpi_parse_hpet);
+-	if (IS_ENABLED(CONFIG_ACPI_BGRT))
+-		acpi_table_parse(ACPI_SIG_BGRT, acpi_parse_bgrt);
+ 
+ 	if (!acpi_noirq)
+ 		x86_init.pci.init = pci_acpi_init;
+diff --git a/drivers/acpi/bgrt.c b/drivers/acpi/bgrt.c
+index 75af78361ce5..048413e06898 100644
+--- a/drivers/acpi/bgrt.c
++++ b/drivers/acpi/bgrt.c
+@@ -81,12 +81,6 @@ static const struct attribute_group bgrt_attribute_group = {
+ 	.bin_attrs = bgrt_bin_attributes,
+ };
+ 
+-int __init acpi_parse_bgrt(struct acpi_table_header *table)
+-{
+-	efi_bgrt_init(table);
+-	return 0;
+-}
+-
+ static int __init bgrt_init(void)
+ {
+ 	int ret;
+diff --git a/drivers/firmware/efi/efi-bgrt.c b/drivers/firmware/efi/efi-bgrt.c
+index b22ccfb0c991..8bd9b96942d2 100644
+--- a/drivers/firmware/efi/efi-bgrt.c
++++ b/drivers/firmware/efi/efi-bgrt.c
+@@ -27,24 +27,92 @@ struct bmp_header {
+ 	u32 size;
+ } __packed;
+ 
+-void __init efi_bgrt_init(struct acpi_table_header *table)
++void __init efi_bgrt_init(unsigned long rsdp_phys)
+ {
+ 	void *image;
+ 	struct bmp_header bmp_header;
+ 	struct acpi_table_bgrt *bgrt = &bgrt_tab;
++	struct acpi_table_bgrt *table = NULL;
++	struct acpi_table_rsdp *rsdp;
++	struct acpi_table_header *hdr;
++	u64 xsdt_phys;
++	u32 rsdt_phys;
++	unsigned int len;
+ 
+-	if (acpi_disabled)
++	if (!efi_enabled(EFI_MEMMAP))
+ 		return;
+ 
+-	if (!efi_enabled(EFI_MEMMAP))
++	/* map the root pointer table to find the xsdt/rsdt values */
++	rsdp = early_memremap(rsdp_phys, sizeof(*rsdp));
++	if (rsdp && ACPI_VALIDATE_RSDP_SIG(rsdp->signature)) {
++		xsdt_phys = rsdp->xsdt_physical_address;
++		rsdt_phys = rsdp->rsdt_physical_address;
++	} else {
++		WARN_ON(1);
++		return;
++	}
++	early_memunmap(rsdp, sizeof(*rsdp));
++
++	/* obtain the length of whichever table we will be using */
++	hdr = early_memremap(xsdt_phys ?: rsdt_phys, sizeof(*hdr));
++	if (WARN_ON(!hdr))
++		return;
++	len = hdr->length;
++	early_memunmap(hdr, sizeof(*hdr));
++
++	if (xsdt_phys) {
++		struct acpi_table_xsdt *xsdt = early_memremap(xsdt_phys, len);
++		int i;
++
++		if (WARN_ON(!xsdt))
++			return;
++
++		for (i = 0; i < (len - sizeof(*hdr)) / sizeof(u64); i++) {
++			table = early_memremap(xsdt->table_offset_entry[i],
++					       sizeof(*table));
++			if (WARN_ON(!table))
++				break;
++
++			if (ACPI_COMPARE_NAME(table->header.signature,
++					      ACPI_SIG_BGRT))
++				break;
++			early_memunmap(table, sizeof(*table));
++			table = NULL;
++		}
++		early_memunmap(xsdt, len);
++	} else if (rsdt_phys) {
++		struct acpi_table_rsdt *rsdt = early_memremap(rsdt_phys, len);
++		int i;
++
++		if (WARN_ON(!rsdt))
++			return;
++
++		for (i = 0; i < (len - sizeof(*hdr)) / sizeof(u32); i++) {
++			table = early_memremap(rsdt->table_offset_entry[i],
++					       sizeof(*table));
++			if (WARN_ON(!table))
++				break;
++
++			if (ACPI_COMPARE_NAME(table->header.signature,
++					      ACPI_SIG_BGRT))
++				break;
++			early_memunmap(table, sizeof(*table));
++			table = NULL;
++		}
++		early_memunmap(rsdt, len);
++	}
++
++	if (!table)
+ 		return;
+ 
+-	if (table->length < sizeof(bgrt_tab)) {
++	if (table->header.length < sizeof(bgrt_tab)) {
+ 		pr_notice("Ignoring BGRT: invalid length %u (expected %zu)\n",
+-		       table->length, sizeof(bgrt_tab));
++		       table->header.length, sizeof(bgrt_tab));
+ 		return;
+ 	}
+-	*bgrt = *(struct acpi_table_bgrt *)table;
++	*bgrt = *table;
++	early_memunmap(table, sizeof(*table));
++
+ 	if (bgrt->version != 1) {
+ 		pr_notice("Ignoring BGRT: invalid version %u (expected 1)\n",
+ 		       bgrt->version);
+diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+index 4c46ff6f2242..e5ef5c0eacc1 100644
+--- a/drivers/firmware/efi/efi.c
++++ b/drivers/firmware/efi/efi.c
+@@ -20,6 +20,7 @@
+ #include <linux/init.h>
+ #include <linux/device.h>
+ #include <linux/efi.h>
++#include <linux/efi-bgrt.h>
+ #include <linux/of.h>
+ #include <linux/of_fdt.h>
+ #include <linux/io.h>
+@@ -592,6 +593,18 @@ int __init efi_config_parse_tables(void *config_tables, int count, int sz,
+ 
+ 		early_memunmap(tbl, sizeof(*tbl));
+ 	}
++
++	/*
++	 * We need to parse the BGRT table (which is an ACPI table not a UEFI
++	 * configuration table) by hand and figure out where the bitmap it
++	 * describes lives in memory so we can reserve it early on. Otherwise,
++	 * it may be clobbered by the time we get to it during the ordinary ACPI
++	 * table init sequence.
++	 */
++	if (IS_ENABLED(CONFIG_ACPI_BGRT) &&
++	    efi.acpi20 != EFI_INVALID_TABLE_ADDR)
++		efi_bgrt_init(efi.acpi20);
++
+ 	return 0;
+ }
+ 
+diff --git a/include/linux/efi-bgrt.h b/include/linux/efi-bgrt.h
+index e6cd51005633..528ea62d99ec 100644
+--- a/include/linux/efi-bgrt.h
++++ b/include/linux/efi-bgrt.h
+@@ -6,7 +6,7 @@
+ 
+ #ifdef CONFIG_ACPI_BGRT
+ 
+-void efi_bgrt_init(struct acpi_table_header *table);
++void efi_bgrt_init(unsigned long rsdp_phys);
+ int __init acpi_parse_bgrt(struct acpi_table_header *table);
+ 
+ /* The BGRT data itself; only valid if bgrt_image != NULL. */
+@@ -15,7 +15,7 @@ extern struct acpi_table_bgrt bgrt_tab;
+ 
+ #else /* !CONFIG_ACPI_BGRT */
+ 
+-static inline void efi_bgrt_init(struct acpi_table_header *table) {}
++static inline void efi_bgrt_init(unsigned long rsdp_phys) {}
+ static inline int __init acpi_parse_bgrt(struct acpi_table_header *table)
+ {
+ 	return 0;
+-- 
+2.20.1
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
