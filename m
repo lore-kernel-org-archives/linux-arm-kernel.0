@@ -2,68 +2,71 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F2B0CC282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 06:30:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9FCB6C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 06:39:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BF04921726
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 06:30:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6E5BF205C9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 06:39:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="shI+T8ew";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="Yp17A7E+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BF04921726
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m41vN2LY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6E5BF205C9
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+36zYodcwceLTQg8ljkUBT0vw9IerSRKZJX35Iub/vQ=; b=shI+T8ewlefanB
-	pyKOCpZQfSxa0MPNh6NBlQgEQaXH2ZxHFMMGIEaRLJubQv0+nf98iNiO+5C8uPRdnxAkln1aLL7Yq
-	9seI0LngdFz38HKnPnPBsezRWDUuHnVxvG+Sh9DCQIsFW4FVRs5jp3LJR6P7C3EuPpPOtcrLWtPwQ
-	iZKft697oF1IzDbSUdbO/HFFFYqFcX4sN/UuaAoUSkuxSaXd3jV+TGHjXOBq37m5y1qUBF/qpT0vg
-	CPbNGbAPuSQz2k1kyRLEur9L2VxRz2Fr4UOwJmZqiteh3z1w2AdW0tPsnoaxzIJKaHVWxBauz6IhG
-	Ya+iOLEre+Cg3T2lsFIw==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=Ui7uQfYCz8g35hNVkSeTIccj+0ASAmqXX/xvx9KgWh8=; b=m41
+	vN2LYFhh0CFf0rSfDWngFk2esBguxZh6MFEGbwNBpmoOGEFKY2FFP/tR6aukv2/VuuOzrWb8ij85j
+	aRLsQcNb5ADoHMOEXVg0ls1i38H8zRcYznQDDveZA7xQ4rqCG7JfZsoyonyWgBkY0yuEn7RaI++Z8
+	FygE2LRfW+bUE9WjItQ1ulhpBqy721FarB4K4VqZzKdv4viBMrkr/2f95XUxB2cPLeA9My9KzwLw5
+	a6nA45GaKuY/QS5O/5Moa6zbsMQuD8pEuAHVKoc9MiUOSIZk+RHvFjUsNRqrgD5VacMGv55+fDtC4
+	Jwc8cVOhWsOeR6eLrNrzD5kwhva6O7Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glpZa-0005Oh-KA; Tue, 22 Jan 2019 06:30:10 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1glpiQ-0001j7-2O; Tue, 22 Jan 2019 06:39:18 +0000
+Received: from inva020.nxp.com ([92.121.34.13])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glpZX-00055G-Cb
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 06:30:08 +0000
-Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
- (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 4D47720879;
- Tue, 22 Jan 2019 06:30:04 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1548138606;
- bh=c90DZnnly4p3uxk29ZGZznoqxIIw/ZsKwtLOO8G9xnQ=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=Yp17A7E+c0A5J5S9qrdwsLRVLgtOCHyaHhptjvlInhl/OqGWNY+3mDFYxvzwqDsML
- QcZwsfavwHh21oRV9jeCmbQcLSYsmwRm1G5/8ERxnS1k42hHdKZb1LGmgLbHnibTmE
- wl9WOo2FnX/NK1Z7OwjbRVb8Ikw3c+KwDb54xCqE=
-Date: Tue, 22 Jan 2019 14:29:29 +0800
-From: Shawn Guo <shawnguo@kernel.org>
-To: Lucas Stach <l.stach@pengutronix.de>
-Subject: Re: [PATCH 1/2] arm64: dts: imx8mq: properly describe IRQ hierarchy
-Message-ID: <20190122062927.GE19929@dragon>
-References: <20190115110446.19077-1-l.stach@pengutronix.de>
- <20190116105137.GL15808@dragon>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190116105137.GL15808@dragon>
-User-Agent: Mutt/1.5.21 (2010-09-15)
+ id 1glpiL-0001iV-MU
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 06:39:15 +0000
+Received: from inva020.nxp.com (localhost [127.0.0.1])
+ by inva020.eu-rdc02.nxp.com (Postfix) with ESMTP id C13111A01FD;
+ Tue, 22 Jan 2019 07:39:11 +0100 (CET)
+Received: from invc005.ap-rdc01.nxp.com (invc005.ap-rdc01.nxp.com
+ [165.114.16.14])
+ by inva020.eu-rdc02.nxp.com (Postfix) with ESMTP id 375CC1A00A7;
+ Tue, 22 Jan 2019 07:39:02 +0100 (CET)
+Received: from titan.ap.freescale.net (TITAN.ap.freescale.net [10.192.208.233])
+ by invc005.ap-rdc01.nxp.com (Postfix) with ESMTP id 73486402A6;
+ Tue, 22 Jan 2019 14:38:50 +0800 (SGT)
+From: Xiaowei Bao <xiaowei.bao@nxp.com>
+To: bhelgaas@google.com, robh+dt@kernel.org, mark.rutland@arm.com,
+ shawnguo@kernel.org, leoyang.li@nxp.com, kishon@ti.com,
+ lorenzo.pieralisi@arm.com, arnd@arndb.de, gregkh@linuxfoundation.org,
+ minghuan.Lian@nxp.com, mingkai.hu@nxp.com, roy.zang@nxp.com,
+ kstewart@linuxfoundation.org, cyrille.pitchen@free-electrons.com,
+ pombredanne@nexb.com, shawn.lin@rock-chips.com, linux-pci@vger.kernel.org,
+ devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, linuxppc-dev@lists.ozlabs.org
+Subject: [PATCHv6 1/4] dt-bindings: add DT binding for the layerscape PCIe
+ controller with EP mode
+Date: Tue, 22 Jan 2019 14:33:25 +0800
+Message-Id: <20190122063328.25228-1-xiaowei.bao@nxp.com>
+X-Mailer: git-send-email 2.14.1
+X-Virus-Scanned: ClamAV using ClamSMTP
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_223007_459734_602D9A41 
-X-CRM114-Status: GOOD (  10.32  )
+X-CRM114-CacheID: sfid-20190121_223913_873624_A39D0BDC 
+X-CRM114-Status: UNSURE (   7.01  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,27 +78,59 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>, kernel@pengutronix.de,
- NXP Linux Team <linux-imx@nxp.com>, linux-arm-kernel@lists.infradead.org,
- patchwork-lst@pengutronix.de
+Cc: Xiaowei Bao <xiaowei.bao@nxp.com>
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 16, 2019 at 06:51:39PM +0800, Shawn Guo wrote:
-> On Tue, Jan 15, 2019 at 12:04:45PM +0100, Lucas Stach wrote:
-> > The GPCv2 sits between most of the peripherals and the GIC and
-> > functions as a wakeup controller for the CPU cores.
-> > 
-> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> 
-> Applied this one, thanks.
+Add the documentation for the Device Tree binding for the layerscape PCIe
+controller with EP mode.
 
-It seems that applying this patch alone causes trouble for people
-playing -next.  So dropped it for now.
+Signed-off-by: Xiaowei Bao <xiaowei.bao@nxp.com>
+Reviewed-by: Minghuan Lian <minghuan.lian@nxp.com>
+Reviewed-by: Zhiqiang Hou <zhiqiang.hou@nxp.com>
+Reviewed-by: Rob Herring <robh+dt@kernel.org>
+---
+v2:
+ - Add the SoC specific compatibles.
+v3:
+ - modify the commit message.
+v4:
+ - no change.
+v5:
+ - no change.
+v6:
+ - no change.
 
-Shawn
+ .../devicetree/bindings/pci/layerscape-pci.txt     |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+index 9b2b8d6..e20ceaa 100644
+--- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
++++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+@@ -13,6 +13,7 @@ information.
+ 
+ Required properties:
+ - compatible: should contain the platform identifier such as:
++  RC mode:
+         "fsl,ls1021a-pcie"
+         "fsl,ls2080a-pcie", "fsl,ls2085a-pcie"
+         "fsl,ls2088a-pcie"
+@@ -20,6 +21,8 @@ Required properties:
+         "fsl,ls1046a-pcie"
+         "fsl,ls1043a-pcie"
+         "fsl,ls1012a-pcie"
++  EP mode:
++	"fsl,ls1046a-pcie-ep", "fsl,ls-pcie-ep"
+ - reg: base addresses and lengths of the PCIe controller register blocks.
+ - interrupts: A list of interrupt outputs of the controller. Must contain an
+   entry for each entry in the interrupt-names property.
+-- 
+1.7.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
