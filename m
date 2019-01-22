@@ -6,17 +6,18 @@ X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 74700C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:52:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7163FC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:55:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 40B8B20684
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:52:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2F43620684
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:55:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pPKoWYuU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 40B8B20684
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-m68k.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="S84EURSR";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="iByubt0Y"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2F43620684
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,52 +25,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ovfRqBAPiXX6b9CZkTCCQEK/WSGfHX0hS5VXwE+bg9E=; b=pPKoWYuU4masla
-	d7yFyVIn4JH9xY8Q1W7/HaZ4Y1f9C3+xopPtQgzfcZH3q54wauE2dJetKGi6D2L9YbToigCBwEx0C
-	npq7MpgALgqX5c90NZv78gV86tYs9DrLIlcAsCZkN0elJq3yhNTQzFBmATLwv+mfb1TTv17SRmDQa
-	O0vpFB7R/tZnBbHszdHre3dYDkrynmNz2BM6TsCY3EIxlzVEftFNtO08kQAOAthCxtdLf1SfNuzBu
-	Jqz0Z6lmx+GDMUAlx56M3QzmipsP8l2uLqbS+2iNuAxluk6L/qDkajfb+AbnH69GLcHBcRc2djkke
-	Zro8LtqmqjNginF5P+9A==;
+	List-Owner; bh=JGyW4xpeduo3k5XY4Nsg3Z3My8g2NNi/rRAENfIiKRs=; b=S84EURSRfzkRqb
+	f35YvIFYQDjnjTbyoWkkjpAdDezwwsat3cAqLvs9Es/MMr94/PvWuFfCVmZwgPxBkmJYeTtEUmHYZ
+	9pZJ8zIT3IO6QYI76VUYm9A3rB0kG7TV1OjO9jD/qB44e3FhtZ9mVqYSdfmuAvd2YbXGdRJ4fQ9u5
+	G+aZgjOuiL+RMegSVLnxtZJZksAlmiKOeuFfy4ROyCi3KkrwXdfh9LqrU5idlpFwVxlsYYxrJjVtN
+	Yr+axhuvumqPrx21KARRf+ainyBxxqzB7jCTigvlzOxxKSBZ86LMshklFgPrMZgiX7GGeM4y/aWi2
+	bZ8CjBnL+99pE7vEMo/A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glwTO-0006WN-J4; Tue, 22 Jan 2019 13:52:14 +0000
-Received: from mail-vs1-f68.google.com ([209.85.217.68])
+	id 1glwWZ-0000IJ-N2; Tue, 22 Jan 2019 13:55:31 +0000
+Received: from mail-io1-xd43.google.com ([2607:f8b0:4864:20::d43])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glwTL-0006Vk-VK
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 13:52:13 +0000
-Received: by mail-vs1-f68.google.com with SMTP id e7so14732487vsc.2
+ id 1glwWS-0000HT-UA
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 13:55:30 +0000
+Received: by mail-io1-xd43.google.com with SMTP id s8so6835874iob.13
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 22 Jan 2019 05:52:11 -0800 (PST)
+ Tue, 22 Jan 2019 05:55:24 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=va/webB65xAQkHXqaHqTjHSAjNDLESnhLUArsDNowQQ=;
+ b=iByubt0YbEMmC4ppjgC9ANZeBGsR4BavV8L/2iNC6MyZe+L66+TPQalc2P2SPSGash
+ XJj5pf/CJ+xLVEdDlARRU9RTmZX+w8xKPJGEQwMVZ+Tr1DJhmUhaD43xOvi9+AaWTdS2
+ iXxGmkF68bx3/5py9Z+hCoiCJ6Zlv24sChnZ0=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=KcDFAfFc7EsqJTg783tpvFYSuv3o+l1WYw+Ppm1hEvI=;
- b=UD6t05hnY/jvL6VE5wHpRoo9mGAfo0JW3RAg/HnnHxFfAeQkjO1coU9YD8AcZpU663
- VJHd/10huGjP9AwOkRs1LyIDQkS/qP8JvsurRwXxM6LmazIULtzNVEgqZK+PDytPnM/M
- XWAc5g86u5Ypf20Pg+3gi3iIcKIGigL2sqYl051xdcHKP/e5B/uxCnqYoMd2w9QjnALm
- wRrFQ8aSIPE0XblPguXQ2DDjMClaGltOxlrBn/HjSwgM29xLKqFxQaEhMNDWAA0b5Btk
- Ydae0g8nu6fSthW8uoImlpxKBcfm6YHn2LwSeOD4VGLLOEAP/pw6cbLqm9KQOVKxZEMS
- Jicw==
-X-Gm-Message-State: AJcUukcupVIu3UC+u6XeyA3/DmM4GhY+efguD2aU4TLoyK2H6Vtki5SB
- SCp5n6c0mMuKaCxMEnIeVdqKmfiS4s+usyXKUuM=
-X-Google-Smtp-Source: ALg8bN6c22dYFsVRGpMa59s/KE5nkBHTAEWeY7ZXm0O6YfV0fhNcm/uNPbKipDrSQyf15xnpm7+wc8n56TswjgTcVvQ=
-X-Received: by 2002:a67:c202:: with SMTP id i2mr13578963vsj.11.1548165130536; 
- Tue, 22 Jan 2019 05:52:10 -0800 (PST)
+ bh=va/webB65xAQkHXqaHqTjHSAjNDLESnhLUArsDNowQQ=;
+ b=c03bMLbrjdk5VFdPDRt4JIGT/82Lv+2lLyzgFcgGRcgci4YbcJyPDuv9NNCyaNTbzE
+ GyHOQGuvjIkAWGFfeI/oYi9ak10zD5oY/WEBOdyO+5dzwsOUK3HAOIFzI25o9ffBRNSf
+ AYxRU421K7v7KsPbB3YcMeiSomeRSMN1aDxem87QqVi5PmlRqbXdMIYyhUH3O4E7NTwU
+ hdxp5wsgsl/KT8Y+elaty+Ircn22VO7TQiLh7ju0x79LmbejmxZCZxgynuWPS0KN4bDA
+ RH4YGEG5RAuEbXgpv5//2F0b8wVLmZ8J0RJs3HtcyvBpcwfoXX1twRLlAJj1f+inLT1H
+ UgSQ==
+X-Gm-Message-State: AJcUukd5tgMxyuAMCZfYaVA5mqUOG6E52HjxEIdeYfS0rr7oE1ArUm14
+ GZdUdyDd5ufY3ZELLLpWXOYRO+rp7mm6rQ0DGjkybg==
+X-Google-Smtp-Source: ALg8bN4CUfmaQUvoD7ZDD41LIBAEW2D3uGNjzrxf/RVj5hl6IUC2vYme9V0ycJE2uU/6U9Q9Q/WBwVCQpIGfJsSbYXs=
+X-Received: by 2002:a5e:c206:: with SMTP id v6mr19964688iop.60.1548165323852; 
+ Tue, 22 Jan 2019 05:55:23 -0800 (PST)
 MIME-Version: 1.0
-References: <CAJKOXPdHhUGoQmrX8_23MfbibozipkAzXA_5woVSFJSK9BvbXw@mail.gmail.com>
- <CAJKOXPe7ot9TLajErKJjSAkbs2vObMJfATzEFwxpT16aFdXHqg@mail.gmail.com>
- <67560e58-93b3-2bfa-9d5d-5956dae47806@gmail.com>
-In-Reply-To: <67560e58-93b3-2bfa-9d5d-5956dae47806@gmail.com>
-From: Geert Uytterhoeven <geert@linux-m68k.org>
-Date: Tue, 22 Jan 2019 14:51:58 +0100
-Message-ID: <CAMuHMdUz6J2cG-NCYPTRyS=1QZHGBWUFZPqj4ShEdioQLqu9qw@mail.gmail.com>
-Subject: Re: [BUG bisect] Missing Micrel driver on VF50 (net: phy: check
- return code when requesting PHY driver module)
-To: Heiner Kallweit <hkallweit1@gmail.com>
+References: <20190118163736.6A99268CEB@newverein.lst.de>
+ <20190118163908.E338E68D93@newverein.lst.de>
+ <bdcbdda9-d9e8-20e5-429e-35473ade56cc@arm.com> <20190122132832.GB16778@lst.de>
+In-Reply-To: <20190122132832.GB16778@lst.de>
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Date: Tue, 22 Jan 2019 14:55:12 +0100
+Message-ID: <CAKv+Gu_sk-jbT3BfTVt1jdx5tR3KCGYzU63T8bv+TYy0Oizy+g@mail.gmail.com>
+Subject: Re: [PATCH v7 2/3] arm64: implement ftrace with regs
+To: Torsten Duwe <duwe@lst.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_055212_009367_0A083B0F 
-X-CRM114-Status: GOOD (  23.54  )
+X-CRM114-CacheID: sfid-20190122_055528_952530_9CB241BA 
+X-CRM114-Status: GOOD (  25.38  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,125 +87,139 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>, Florian Fainelli <f.fainelli@gmail.com>,
- netdev <netdev@vger.kernel.org>,
+Cc: Mark Rutland <mark.rutland@arm.com>, Arnd Bergmann <arnd@arndb.de>,
+ Julien Thierry <julien.thierry@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, "Singh,
+ Balbir" <bsingharora@gmail.com>, Will Deacon <will.deacon@arm.com>,
  Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Krzysztof Kozlowski <krzk@kernel.org>,
- Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
- Stefan Agner <stefan@agner.ch>, "David S. Miller" <davem@davemloft.net>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+ Steven Rostedt <rostedt@goodmis.org>,
+ AKASHI Takahiro <takahiro.akashi@linaro.org>, Ingo Molnar <mingo@redhat.com>,
+ Josh Poimboeuf <jpoimboe@redhat.com>,
+ Amit Daniel Kachhap <amit.kachhap@arm.com>, live-patching@vger.kernel.org,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Heiner,
-
-On Fri, Jan 18, 2019 at 9:58 PM Heiner Kallweit <hkallweit1@gmail.com> wrote:
-> On 18.01.2019 09:48, Krzysztof Kozlowski wrote:
-> > On Fri, 18 Jan 2019 at 09:39, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> >> On today's next (next-20190118) my Colibri VF50 board fails to boot up
-> >> from network (DHCP, NFSv4 root). Looks like missing network adapter.
-> >> Expected:
-> >> [ 3.041773] Micrel KSZ8041 400d1000.ethernet-1:00: attached PHY driver
-> >> [Micrel KSZ8041] (mii_bus:phy_addr=400d1000.ethernet-1:00, irq=POLL)
-> >>
-> >> Result:
-> >> [ 15.614964] Root-NFS: no NFS server address
-> >> [ 15.619353] VFS: Unable to mount root fs via NFS, trying floppy.
-> >> [ 15.626762] VFS: Cannot open root device "nfs" or unknown-block(2,0): error -6
-> >> [ 15.634252] Please append a correct "root=" boot option; here are the
-> >> available partitions:
-> >> [ 15.642791] 0100 16384 ram0
-> >> [ 15.642804] (driver?)
-> >> [ 15.649076] Kernel panic - not syncing: VFS: Unable to mount root fs
-> >> on unknown-block(2,0)
-> >> [ 15.657423] ---[ end Kernel panic - not syncing: VFS: Unable to mount
-> >> root fs on unknown-block(2,0) ]---
-> >>
-> >> Bisect pointed to:
-> >>     net: phy: check return code when requesting PHY driver module
-> >
-> > I see now in the logs:
-> > [ 2.436822] mdio_bus 400d1000.ethernet-1:00: error -2 loading PHY
-> > driver module for ID 0x00221513
-> > which is kind of misleading. There is no initramfs so there is no
-> > usermod library at this point. It is not needed. This seems to break
-> > all DHCP/NFS root boots without initrd/initramfs.
-> >
-> Thanks for the report. Could you please provide your kernel config
-> and the syslog of a boot before or w/o the patch in question?
+On Tue, 22 Jan 2019 at 14:28, Torsten Duwe <duwe@lst.de> wrote:
 >
-> If you boot via nfs then I'd expect that the PHY driver is built-in and
-> not a module. Therefore it's not fully clear to me yet why
-> request_module() returns -ENOENT.
+> On Tue, Jan 22, 2019 at 10:18:17AM +0000, Julien Thierry wrote:
+> > Hi Torsten,
+> >
+> > A few suggestions below.
+> >
+> > > +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+> > > +#define ARCH_SUPPORTS_FTRACE_OPS 1
+> > > +#define REC_IP_BRANCH_OFFSET AARCH64_INSN_SIZE
+> > > +/* All we need is some magic value. Simply use "_mCount:" */
+> >
+> > Nit: Should the casing be "_mcount" ?
+>
+> No! The string makes it clear what it's supposed to be and the peculiar
+> casing makes it unique and leaves no doubt were it came from. So whenever
+> you see this register value in a crash dump you don't have to wonder about
+> weird linkage errors, as it surely did not originate from a symtab.
+>
 
-I'm seeing the same booting nfsroot on several Renesas boards.
-E.g. on r8a7791/koelsch:
+In that case, do you need to deal with endianness here?
 
-    mdio_bus ee700000.ethernet-ffffffff:01: error -2 loading PHY
-driver module for ID 0x00221537
-    sh-eth ee700000.ethernet: MDIO init failed: -2
-
-This failure happens only when CONFIG_MODULES=y.
-Reverting commit 13d0ab6750b20957 ("net: phy: check return code when
-requesting PHY driver module") fixes the issue.
-
-phy_request_driver_module() tries to load module
-"mdio:00000000001000100001010100110111", which fails.
-When CONFIG_MODULES=n, the error is ignored, and everything works fine.
-
-0b00000000001000100001010100110111 == 0x00221537 == PHY_ID_KSZ8041RNLI,
-which is served by drivers/net/phy/micrel.c.
-Interestingly, CONFIG_MICREL_PHY=y, so I'm wondering why the PHY subsystem
-tries to load a module for a driver which is already present in the first
-place?
-
-Oh, the following comment tries to explain:
-
-        /* Request the appropriate module unconditionally; don't
-         * bother trying to do so only if it isn't already loaded,
-         * because that gets complicated. A hotplug event would have
-         * done an unconditional modprobe anyway.
-
-Hence request_module() failures are normal.
-
-       ret = request_module(MDIO_MODULE_PREFIX MDIO_ID_FMT,
-                            MDIO_ID_ARGS(phy_id));
-       /* we only check for failures in executing the usermode binary,
-        * not whether a PHY driver module exists for the PHY ID
-        */
-       if (IS_ENABLED(CONFIG_MODULES) && ret < 0) {
-               phydev_err(dev, "error %d loading PHY driver module for
-ID 0x%08x\n",
-                          ret, phy_id);
-               return ret;
-       }
-
-However:
-
-    /**
-     * __request_module - try to load a kernel module
-     * @wait: wait (or not) for the operation to complete
-     * @fmt: printf style format string for the name of the module
-     * @...: arguments as specified in the format string
-     *
-     * Load a module using the user mode module loader. The function returns
-     * zero on success or a negative errno code or positive exit code from
-     * "modprobe" on failure.
-
-So perhaps the check should be for "ret > 0"?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert@linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> > > +#define MCOUNT_ADDR                (0x5f6d436f756e743a)
+> > > +#else
+> > > +#define REC_IP_BRANCH_OFFSET 0
+> > > +#define MCOUNT_ADDR                ((unsigned long)_mcount)
+> > > +#endif
+> > > +
+> > >  #ifndef __ASSEMBLY__
+> > >  #include <linux/compat.h>
+> > >
+> > > --- a/arch/arm64/kernel/entry-ftrace.S
+> > > +++ b/arch/arm64/kernel/entry-ftrace.S
+> > > @@ -10,6 +10,7 @@
+> > >   */
+> > >
+> > >  #include <linux/linkage.h>
+> > > +#include <asm/asm-offsets.h>
+> > >  #include <asm/assembler.h>
+> > >  #include <asm/ftrace.h>
+> > >  #include <asm/insn.h>
+> ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> > > +
+> > > +ENTRY(ftrace_common)
+> > > +
+> > > +   mov     x3, sp          /* pt_regs are @sp */
+> > > +   ldr_l   x2, function_trace_op, x0
+> > > +   mov     x1, x9          /* parent IP */
+> > > +   sub     x0, lr, #8      /* function entry == IP */
+> >
+> > The #8 is because we go back two instructions right? Can we use
+> > #(AARCH64_INSN_SIZE * 2) instead?
+>
+> Hmm, <asm/insn.h> was already included, so why not. (same below)
+>
+> > > +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+> > > +int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
+> > > +                   unsigned long addr)
+> > > +{
+> > > +   unsigned long pc = rec->ip + REC_IP_BRANCH_OFFSET;
+> > > +   u32 old, new;
+> > > +
+> > > +   old = aarch64_insn_gen_branch_imm(pc, old_addr, true);
+> > > +   new = aarch64_insn_gen_branch_imm(pc, addr, true);
+> >
+> > The last argument of aarch64_insn_gen_branch_imm() is an enum, not a
+> > boolean.
+> >
+> > You should use AARCH64_INSN_BRANCH_LINK here which happens to be equal to 1.
+>
+> That's what you get when you keep copying code...
+> Good catch, thanks!
+>
+> > > +    *  initially; the NOPs are already there. So instead,
+> > > +    *  put the LR saver there ahead of time, in order to avoid
+> > > +    *  any race condition over patching 2 instructions.
+> > > +    */
+> > > +   if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE_WITH_REGS) &&
+> > > +           addr == MCOUNT_ADDR) {
+> >
+> > This works, however it feels a bit weird since core code asked to
+> > generate a NOP but not only we don't generate it but we put another
+> > instruction instead.
+>
+> It's not the first time weird x86 sets the standards and all others
+> need workarounds. But here it just came handy to abuse this call :-)
+>
+> > I think it would be useful to state that the replacement of mcount calls
+> > by nops is only ever done once at system initialization.
+> >
+> > Or maybe have a intermediate function:
+> >
+> > static int ftrace_setup_patchable_entry(unsigned long addr)
+> > {
+> >       u32 old, new;
+> >
+> >       old = aarch64_insn_gen_nop();
+> >       new = MOV_X9_X30;
+> >       pc -= REC_IP_BRANCH_OFFSET;
+> >       return ftrace_modify_code(pc, old, new, validate);
+> > }
+> >
+> >       [...]
+> >
+> >       if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE_WITH_REGS) &&
+> >               addr == MCOUNT_ADDR)
+> >               return ftrace_setup_patchable_entry(pc);
+> >
+> >
+> > This way it clearly show that this is a setup/init corner case.
+>
+> I'll definitely consider this.
+>
+> Thanks for the input,
+>
+>         Torsten
+>
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
