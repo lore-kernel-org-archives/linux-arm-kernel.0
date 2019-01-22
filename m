@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DFE45C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 05:27:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8BDE3C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 05:27:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AEED821721
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 05:27:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 59EDB20861
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 05:27:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Cmn9bFKd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AEED821721
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EZmkMUhr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 59EDB20861
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=denx.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,53 +26,53 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=edua4NxS+e5zmlcICaUlx7mlRHVpgwWmfq4Mem31pDU=; b=Cmn9bFKdCFz1kI+iwkOM5d2Z4H
-	9uBfymooWm+ZRXvTzawWMf3KJXs5URvxEHCsE78OadURb0DZarkalcJcACgmnFw/to6JCLgvdyDrN
-	DRZcubUmlYDEMXj342y8+t8JTRWlHlFif6aE6IxFuwBXbuNPWCBLSoe5HQdPijGnmha438JoRIiY6
-	7hiejPUucfSceNcjs0O/h2lNHvwzQC5qqfFgrj9bLVIWkq1ZizLO6g32EBa+An1AA3/z2qCccmH+Z
-	lib0c5iNZsHWeAjStC+VEb4uFolI1Dc1kkVfoQ+dzRWLinEmfN48EC7OsG6XEmWjsEbcXroHq93OF
-	8iOJE4lQ==;
+	bh=5tz2hbQGu2uFmXyvURpUQGqUmM6ub/CyRBtLrQ1wNt0=; b=EZmkMUhrbmkY75m7s/9qazHL+q
+	xpjdo5SHdyVtPL4yCElO2Nj+GPBWNkSfK2UQVaICIFB1r+uHWb3LWdKnAVGtbEJvWqlyyYmIS2TiJ
+	yuPUDCV63UJKi25d0rI3Ybto709+mqQsL4pCKVtQ2a36d24S+MjgZBoONw/VbLjBFRu00oYcQWibn
+	PGxlUYyLy2qa7wP7UDgUmxVRerDe7r0GgRcjrAZFVMnaQMy9w+vUG5/fF5iS0AtvwL59mm+vtZ7Qb
+	NWbYqSVhPvem7M2avmH6TaPLZdHe6x+8XCo21bo2XtIazyxUXfB8lvdziqyyqX3ouOKWDk+yIMMTH
+	Me2sjfLQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gloaO-00020n-VD; Tue, 22 Jan 2019 05:26:56 +0000
+	id 1gloak-0002R9-95; Tue, 22 Jan 2019 05:27:18 +0000
 Received: from mail-out.m-online.net ([212.18.0.9])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gloaH-0001p1-Bo
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 05:26:52 +0000
+ id 1gloaP-00021F-OQ
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 05:27:02 +0000
 Received: from frontend01.mail.m-online.net (unknown [192.168.8.182])
- by mail-out.m-online.net (Postfix) with ESMTP id 43kH390q0Bz1qvCY;
- Tue, 22 Jan 2019 06:26:45 +0100 (CET)
+ by mail-out.m-online.net (Postfix) with ESMTP id 43kH3N3hwfz1qvTd;
+ Tue, 22 Jan 2019 06:26:56 +0100 (CET)
 Received: from localhost (dynscan1.mnet-online.de [192.168.6.70])
- by mail.m-online.net (Postfix) with ESMTP id 43kH390cRhz1qsn1;
- Tue, 22 Jan 2019 06:26:45 +0100 (CET)
+ by mail.m-online.net (Postfix) with ESMTP id 43kH3N3YJCz1qsn9;
+ Tue, 22 Jan 2019 06:26:56 +0100 (CET)
 X-Virus-Scanned: amavisd-new at mnet-online.de
 Received: from mail.mnet-online.de ([192.168.8.182])
  by localhost (dynscan1.mail.m-online.net [192.168.6.70]) (amavisd-new,
  port 10024)
- with ESMTP id lXNGwTXpDfF2; Tue, 22 Jan 2019 06:26:44 +0100 (CET)
-X-Auth-Info: 1vOh3PHzeTxv44b/V+3nuL+7G8NFwl9OzjLmMankod4=
+ with ESMTP id fakXvxbp0qUI; Tue, 22 Jan 2019 06:26:55 +0100 (CET)
+X-Auth-Info: y/kWA6S3JRYp0zv2XQrslBmbb8BFnxTKoyohew5iU6g=
 Received: from mail-internal.denx.de (p578adb1c.dip0.t-ipconnect.de
  [87.138.219.28])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
  by mail.mnet-online.de (Postfix) with ESMTPSA;
- Tue, 22 Jan 2019 06:26:44 +0100 (CET)
+ Tue, 22 Jan 2019 06:26:55 +0100 (CET)
 Received: from pollux.denx.de (pollux [192.168.1.1])
- by mail-internal.denx.de (Postfix) with ESMTP id F119F18073C;
- Tue, 22 Jan 2019 06:26:25 +0100 (CET)
+ by mail-internal.denx.de (Postfix) with ESMTP id C83C8182372;
+ Tue, 22 Jan 2019 06:26:26 +0100 (CET)
 Received: by pollux.denx.de (Postfix, from userid 515)
- id E0EC839A0; Tue, 22 Jan 2019 06:26:25 +0100 (CET)
+ id B444C37A6; Tue, 22 Jan 2019 06:26:26 +0100 (CET)
 From: Heiko Schocher <hs@denx.de>
 To: devicetree@vger.kernel.org
-Subject: [PATCH v1 1/2] ARM: dts: am335x-shc.dts: Switch to SPDX identifier
-Date: Tue, 22 Jan 2019 06:26:22 +0100
-Message-Id: <20190122052623.1779840-2-hs@denx.de>
+Subject: [PATCH v1 2/2] ARM: dts: am335x-shc.dts: fix wrong cd pin level
+Date: Tue, 22 Jan 2019 06:26:23 +0100
+Message-Id: <20190122052623.1779840-3-hs@denx.de>
 X-Mailer: git-send-email 2.17.2
 In-Reply-To: <20190122052623.1779840-1-hs@denx.de>
 References: <20190122052623.1779840-1-hs@denx.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_212650_306465_7F260A85 
-X-CRM114-Status: GOOD (  12.29  )
+X-CRM114-CacheID: sfid-20190121_212658_574452_75825D10 
+X-CRM114-Status: GOOD (  13.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,32 +95,27 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Adopt the SPDX license identifier headers to ease license
-compliance management.
+cd pin on mmc1 is GPIO_ACTIVE_LOW not GPIO_ACTIVE_HIGH
 
 Signed-off-by: Heiko Schocher <hs@denx.de>
 ---
 
- arch/arm/boot/dts/am335x-shc.dts | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ arch/arm/boot/dts/am335x-shc.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/am335x-shc.dts b/arch/arm/boot/dts/am335x-shc.dts
-index d0fd68873689..5cdaf0cd9401 100644
+index 5cdaf0cd9401..bfbe27a80006 100644
 --- a/arch/arm/boot/dts/am335x-shc.dts
 +++ b/arch/arm/boot/dts/am335x-shc.dts
-@@ -1,11 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * support for the bosch am335x based shc c3 board
-  *
-  * Copyright, C) 2015 Heiko Schocher <hs@denx.de>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-  */
- /dts-v1/;
- 
+@@ -213,7 +213,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc1_pins>;
+ 	bus-width = <0x4>;
+-	cd-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
++	cd-gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
+ 	cd-inverted;
+ 	max-frequency = <26000000>;
+ 	vmmc-supply = <&vmmcsd_fixed>;
 -- 
 2.17.2
 
