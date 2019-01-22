@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1456BC282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:40:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 48E9AC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:41:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DA12C20870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:40:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0FB7F20870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:41:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="vDNrQURK";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="NPH9i+oU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DA12C20870
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RvRPV5Ny";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="BOQ4ycYl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0FB7F20870
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,57 +25,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ysYvJy4ZqRN7symu+P5TWCrzWt7GCzAJvdLISRv89Uo=; b=vDNrQURKHn+VlH
-	5A4qr3RwdSRMXvB77BFANnqYaFth3WuzVOSGIgYEGipYDHW763L6/tm2lngvvDkFhMbcrgWQcQeSb
-	JTYYwcWlU0ZtA8y226IF9er/fJVa79DynX4shwGGK6/OEkzYZOcP4oh5Ia28xy8zhxNVLclvn6pHd
-	xnb32f5MCZVY0v0BDUbGGc5lINRZOKjI/LcaN7tthXXcVBFWDxpySj90Z9zByMORMT8doHr461Y+9
-	UY29iG5dtiE/AyPmH5cXWo99lwHoZotz0cLIyVR0HNWji5BcNyJItlAuzWzOAXKL3TeBttJ2eKjNd
-	f6RI5GvPmhO4XhrCwh9w==;
+	List-Owner; bh=U4TBOMqS/o3aH1qTmN9kAauxj9J9O2XkdxO4kVsslWA=; b=RvRPV5NyLK8LV1
+	f6B6UKx6xssiX666uyBODUWXTG+tkrW9UydXF1QBtt519iXPQZ2hPeWiHMOURI1+5K7xVgoD48Ec8
+	diIJ5X00lU2OBoeXYQPBKFR28sMCiu49kpiQeFS4dS9+ECRcArEEqYMOJ/IhrIxFMZW6wGEdYKtup
+	J/q744GB6vGOVbzIvkC2rqXJF3w8we02TLe61BFqL6x8YfDaBkGHbrODKUKkPT03pGum2R1d7sNZR
+	E0XcpfsbrqdFiTeCeTtum+QP65aunz9Af98b7Rz0maHOxEdNs5HR31SGEfNUPSCUgqUQdnm91swxn
+	42eToI3K6em3VeaeRF5g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glwIN-0007Yo-1Q; Tue, 22 Jan 2019 13:40:51 +0000
+	id 1glwIo-0007oi-NC; Tue, 22 Jan 2019 13:41:18 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glwIC-0007XF-KJ
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 13:40:48 +0000
-Received: from mail-qt1-f179.google.com (mail-qt1-f179.google.com
- [209.85.160.179])
+ id 1glwIl-0007oN-4J
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 13:41:16 +0000
+Received: from mail-qt1-f177.google.com (mail-qt1-f177.google.com
+ [209.85.160.177])
  (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 27DFE217D6
+ by mail.kernel.org (Postfix) with ESMTPSA id AD25220870
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 22 Jan 2019 13:40:40 +0000 (UTC)
+ Tue, 22 Jan 2019 13:41:14 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1548164440;
- bh=esbp9yipemWFMphPhojg5duibYbaUh0JWxIadTVP0vY=;
+ s=default; t=1548164474;
+ bh=prFZcRP2SYee4GKipvHLC7KZ4SliP42MtaVyeVdlh2A=;
  h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=NPH9i+oUre4ZzBzURZisLcgijhVu68l0fyNbD1HBoOYXzIBIM2F8oi+ISdjS3rZcO
- 6kNGyXcHK7ABrzq6aKJxQrBU3B1MsVYRyWgN+9WM02/EavoUThA3n7Uhcw0eC3uOCD
- 7FIeWBPZzEaDam+sNvgHhyMenn0uW6ompduZsIb0=
-Received: by mail-qt1-f179.google.com with SMTP id l11so27637178qtp.0
+ b=BOQ4ycYlTLpc5uezYKUMOrfAXHswWDBGXLvrEItfClni52ctYZ3ku+tGxWE3R5D/R
+ 2HQw3j3kKgTMt7rAMeCTJqbTydKGnWHtkywb7Vc9t4ii/UUVcGRUuQrku/Y9g8EifT
+ O+MduOUFFlrmHjm7zJyBXowCguQEWv1pzoRIIUcQ=
+Received: by mail-qt1-f177.google.com with SMTP id i7so27510493qtj.10
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 22 Jan 2019 05:40:40 -0800 (PST)
-X-Gm-Message-State: AJcUukeyFVBr16VP3huFMTf5dBsqpzMaUdsyem7BWxoAfviu2VJfNR51
- dYue7oWt15Mojof5oqpRUKzweLpWKeUpWnY5rw==
-X-Google-Smtp-Source: ALg8bN6VWQGgEZg/m39bTZGl5i9AbykXudTG4rdsmuBKNFX7AihzzCAkCGIaaG+cZcAC9tqIVmkzewOr+lMujKnbjoI=
-X-Received: by 2002:ac8:2d2b:: with SMTP id n40mr30157262qta.38.1548164439355; 
- Tue, 22 Jan 2019 05:40:39 -0800 (PST)
+ Tue, 22 Jan 2019 05:41:14 -0800 (PST)
+X-Gm-Message-State: AJcUukfoqjlYu+Ml8fSm9G10puRl+eOT1AtbYRXbL0deErltTw4iUUxJ
+ 8arXoNJujMUjPwjD1uBZeEe9SEopUDxneycCCA==
+X-Google-Smtp-Source: ALg8bN695c+L8pmAwWxgWUmilJnYICCOItILluOzhBlnIdnXOahwthK245Edsf20/kfKy9PIhPJMGlZImkUi73OcWwQ=
+X-Received: by 2002:ac8:6b18:: with SMTP id w24mr31349294qts.144.1548164473958; 
+ Tue, 22 Jan 2019 05:41:13 -0800 (PST)
 MIME-Version: 1.0
 References: <cover.1547629763.git.nicolas.ferre@microchip.com>
- <ed46005be5beff6efc47d40cea304185efa2bcc0.1547629763.git.nicolas.ferre@microchip.com>
- <20190122010733.GA21139@bogus>
- <24a53365-1a8c-51cd-dcd4-db4a69d5256a@microchip.com>
-In-Reply-To: <24a53365-1a8c-51cd-dcd4-db4a69d5256a@microchip.com>
+ <0005c2ef28b985c663e0cd058bbc6d3856e05ec2.1547629763.git.nicolas.ferre@microchip.com>
+ <20190122011014.GA25211@bogus>
+ <be8ba0bf-993e-d38c-61e8-af422ff3c636@microchip.com>
+In-Reply-To: <be8ba0bf-993e-d38c-61e8-af422ff3c636@microchip.com>
 From: Rob Herring <robh@kernel.org>
-Date: Tue, 22 Jan 2019 07:40:26 -0600
-X-Gmail-Original-Message-ID: <CAL_JsqLb3W=UG5VRFheGd2CfS+8rb5pJpHmHNq2bb1zrR3mEwA@mail.gmail.com>
-Message-ID: <CAL_JsqLb3W=UG5VRFheGd2CfS+8rb5pJpHmHNq2bb1zrR3mEwA@mail.gmail.com>
-Subject: Re: [PATCH 2/8] dt-bindings: arm: atmel: add new sam9x60 reset
- controller binding
+Date: Tue, 22 Jan 2019 07:41:02 -0600
+X-Gmail-Original-Message-ID: <CAL_Jsq+31C2KXNy_GeVU9g7mZ_aSw3yqdjU-V5mV2Xdc200TuA@mail.gmail.com>
+Message-ID: <CAL_Jsq+31C2KXNy_GeVU9g7mZ_aSw3yqdjU-V5mV2Xdc200TuA@mail.gmail.com>
+Subject: Re: [PATCH 4/8] net/macb: bindings doc/trivial: fix documentation for
+ sama5d3 10/100 interface
 To: Nicolas Ferre <Nicolas.Ferre@microchip.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_054040_824867_73E218DF 
-X-CRM114-Status: GOOD (  18.84  )
+X-CRM114-CacheID: sfid-20190122_054115_208734_C713F58C 
+X-CRM114-Status: GOOD (  19.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -104,43 +104,41 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Jan 22, 2019 at 3:00 AM <Nicolas.Ferre@microchip.com> wrote:
+On Tue, Jan 22, 2019 at 3:09 AM <Nicolas.Ferre@microchip.com> wrote:
 >
 > Hi Rob,
 >
-> On 22/01/2019 at 02:07, Rob Herring wrote:
-> > On Wed, Jan 16, 2019 at 10:57:38AM +0100, Nicolas Ferre wrote:
-> >> Update the Reset Controller's binding to add new SoC compatibility string.
+> On 22/01/2019 at 02:10, Rob Herring wrote:
+> > On Wed, Jan 16, 2019 at 10:57:40AM +0100, Nicolas Ferre wrote:
+> >> This removes a line left while adding the correct compatibility string for
+> >> sama5d3 10/100 interface. Now use the "atmel,sama5d3-macb" string.
 > >>
 > >> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 > >> ---
-> >>   Documentation/devicetree/bindings/arm/atmel-sysregs.txt | 1 +
-> >>   1 file changed, 1 insertion(+)
+> >>   Documentation/devicetree/bindings/net/macb.txt | 3 +--
+> >>   1 file changed, 1 insertion(+), 2 deletions(-)
 > >>
-> >> diff --git a/Documentation/devicetree/bindings/arm/atmel-sysregs.txt b/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
-> >> index 36952cc39993..badce6ef3ab3 100644
-> >> --- a/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
-> >> +++ b/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
-> >> @@ -22,6 +22,7 @@ Its subnodes can be:
-> >>   RSTC Reset Controller required properties:
-> >>   - compatible: Should be "atmel,<chip>-rstc".
-> >>     <chip> can be "at91sam9260", "at91sam9g45", "sama5d3" or "samx7"
-> >> +  it also can be "microchip,sam9x60-rstc"
+> >> diff --git a/Documentation/devicetree/bindings/net/macb.txt b/Documentation/devicetree/bindings/net/macb.txt
+> >> index 3e17ac1d5d58..f5c414b10e27 100644
+> >> --- a/Documentation/devicetree/bindings/net/macb.txt
+> >> +++ b/Documentation/devicetree/bindings/net/macb.txt
+> >> @@ -3,8 +3,7 @@
+> >>   Required properties:
+> >>   - compatible: Should be "cdns,[<chip>-]{macb|gem}"
+> >>     Use "cdns,at91rm9200-emac" Atmel at91rm9200 SoC.
+> >> -  Use "cdns,at91sam9260-macb" for Atmel at91sam9 SoCs or the 10/100Mbit IP
+> >> -  available on sama5d3 SoCs.
+> >> +  Use "cdns,at91sam9260-macb" for Atmel at91sam9 SoCs.
 > >
-> > How is this related to at91sam9260-rstc?
+> > Where is "atmel,sama5d3-macb"?
 >
-> at91sam9260 and sam9x60 are completely different products (they share
-> the same core though...). I know the naming could be misleading but it
-> is like it is...
+> It's actually a couple of line below: line 13 of the resulting macb.txt
+> file. It was already in the file when I removed the leftovers.
 >
-> > The 'x' is a wildcard? We generally avoid wildcards.
->
-> Here, the 'x' is definitively not a wildcard nor a kind of "family"
-> name, it's included in the (upcoming) single product's name.
->
-> I hope it clarifies.
+> Do you advice to try to better sort entries in this file? Is there a
+> common pattern?
 
-Yes, thanks.
+Okay, it's fine.
 
 Reviewed-by: Rob Herring <robh@kernel.org>
 
