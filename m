@@ -4,91 +4,70 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1A067C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 09:27:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CC0AEC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 09:36:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DFAFB218D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 09:27:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9B720218D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 09:36:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FTPRPVV8";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="yq5cItPK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DFAFB218D9
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VSTLgPKi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9B720218D9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mcj1pWRc0sS7G7tCqmVtKaycj0Y5wdSdiBkaVbl4T/Q=; b=FTPRPVV82oQ58B
-	fdGFi47GYzpiFCNSDTfCchlH4D228NbKtJoX9VkGwySC9SGTQnpPcEtRvupYcJx0NDGHZG3E3O+NR
-	qu/kNRbQVg0knZ2ZdNONulXgrD4LO7CQc2KT1YpdzrZD4U57iZQon0I2kk4LHhNqMpbjRtX0ljr3C
-	dU1rEp/k5n8EBvLcGMZW3pmN5y7VxWkTagkzpvqgOdBVgPsyHtHjEhyC2z9O40+6r9Rfd0mkNOmH2
-	7/PLSJCmpvtRcLF1OCeidrt1aDqrZICb1FMvpmKIeCHPVebIWJ8P5W3R1YTZgWReMcBwmmsBw8Hjq
-	eqkVOr9scIW7aOWBWc0Q==;
+	List-Owner; bh=2o8u6sZs23Vx61n8JhzNn8S81GQ445O6LmlIJpBiLzY=; b=VSTLgPKiecnyTH
+	Xt+xPkkFDJBLzNz2iRySl+g4evIOkNC4xNRmxfWzN4hUV+pIENPJYOCEZzlQvYKc7CunaCWdsfEwd
+	EhLAssxW6sfVFCcV1JLmWiXdLtHTvOqOiWeasTSU4ijDKUTtnE6o7IQWYTMe7KfKWX7W/go+spv9o
+	NekhKWPZRV1yRCQyxez+hOalciLnbVdrkLe+WlUWRQcSw7PSnpzFoK86rjfhwRk92tlmVan+IUsj0
+	KpsqGrQbZcXaYi7vsOwUEfT3mz0nINZ/NRwELWKsaYvhNjsUeDtgV4fhy4n+Y1ETiy92YcxHo40Wn
+	UATap+0tyiaW2uR8TLKA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glsL7-0005Ar-UC; Tue, 22 Jan 2019 09:27:25 +0000
-Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
+	id 1glsTu-0000xT-4t; Tue, 22 Jan 2019 09:36:30 +0000
+Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glsL4-0005A9-UW
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 09:27:24 +0000
-Received: by mail-wr1-x442.google.com with SMTP id s12so26465826wrt.4
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 22 Jan 2019 01:27:22 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=message-id:subject:from:to:cc:date:in-reply-to:references
- :user-agent:mime-version:content-transfer-encoding;
- bh=cCrh+YVCx19BBdNeVg2dvCiCwiOMhaRj8KLLP1LDVlo=;
- b=yq5cItPKxIiEzJNtwONqID9UHnBdJme1bbcLuLE+Kp9q8t7aU7LgALgLHG0TlCZIvV
- QUzw9U/Afu1EAxgoMpfVAXlrMbNbSzA4V8YsMl2Jygxkhh1NTdc5mqFVdgHi1NDi8Ap/
- BRYaCO2+PtN+gUNk4lauEucshHw5YkxKeUgpnVbnvoHrltGT8O960GhIv455Dxkr/Wpq
- 8zqLkgbH4cGToDug7zbDIhEhRT4OohO+uuNM0UryAs4qq/c6eiQDM+hIDZc10v/jApdp
- Jugjh0/TvrSHnTXzetMz+sYFIdes+UrNM+Nv/noB3HTcs9Dt7Hj+lFv0fc7ZN0zgdfZT
- B4gw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:message-id:subject:from:to:cc:date:in-reply-to
- :references:user-agent:mime-version:content-transfer-encoding;
- bh=cCrh+YVCx19BBdNeVg2dvCiCwiOMhaRj8KLLP1LDVlo=;
- b=a304YmhHn939GUel+cAbiYMPybksdP/7qoZtOD3j9vuq1Ytkg0W0ZC6ZgmgHPlQOBg
- CCLHvccec+NJhmH8orxmyWwMMbkzHf2towejgPMpCDdbFRi+fq3q5ngLOPwDZKnk3ECy
- sk3W4ZZ5XBuG66dGsXP8zOA8YRtwaq6/piBC/RuJioWiGhLm37r+F/dntUT+nkkOVPY3
- xZ0BR9UF9KJwRG1TYo5t/capeRSMSZuN1ktSfKu/jQYn1Ta1qTuE2N3/UvRMnpF9zB1H
- S9ujZIhZ0MWwU70qZd6YQsNdtmHP8GhaL0drI31xBkld+/oMQP9k7fq2FpJmYF1ra9Kv
- qPHA==
-X-Gm-Message-State: AJcUukcsAuEpY0Mbz/0oeqVxdwKnrr84pfcnrUkV2ITaT9Jh/J3LJTgN
- d7kwb5RG0syihRoJTCgvL+9AVA==
-X-Google-Smtp-Source: ALg8bN5ccmnAT9QO4I7OWHxkPXb9UZomGvZL3zjWSy9IO9sP7kQtrzYCuOl96VyhyTq78SSVSc/blA==
-X-Received: by 2002:a5d:6889:: with SMTP id h9mr31474975wru.222.1548149241112; 
- Tue, 22 Jan 2019 01:27:21 -0800 (PST)
-Received: from boomer.baylibre.com ([2a01:e34:eeb6:4690:106b:bae3:31ed:7561])
- by smtp.gmail.com with ESMTPSA id
- y145sm38786336wmd.30.2019.01.22.01.27.19
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 22 Jan 2019 01:27:20 -0800 (PST)
-Message-ID: <8d9b2f76823396c9caad15943d564e147c06193d.camel@baylibre.com>
-Subject: Re: [PATCH v9 3/4] clk: meson: add DT documentation for emmc clock
- controller
-From: Jerome Brunet <jbrunet@baylibre.com>
-To: Jianxin Pan <jianxin.pan@amlogic.com>, Neil Armstrong
- <narmstrong@baylibre.com>
-Date: Tue, 22 Jan 2019 10:27:17 +0100
-In-Reply-To: <1546955444-7549-4-git-send-email-jianxin.pan@amlogic.com>
-References: <1546955444-7549-1-git-send-email-jianxin.pan@amlogic.com>
- <1546955444-7549-4-git-send-email-jianxin.pan@amlogic.com>
-User-Agent: Evolution 3.30.4 (3.30.4-1.fc29) 
-Mime-Version: 1.0
+ id 1glsTp-0000wO-SJ; Tue, 22 Jan 2019 09:36:28 +0000
+X-UUID: fcb1b7d915d447e1aff5719dd0aaf52c-20190122
+X-UUID: fcb1b7d915d447e1aff5719dd0aaf52c-20190122
+Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw02.mediatek.com
+ (envelope-from <min.guo@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 198403713; Tue, 22 Jan 2019 01:36:17 -0800
+Received: from MTKMBS31N2.mediatek.inc (172.27.4.87) by
+ MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Tue, 22 Jan 2019 01:36:15 -0800
+Received: from MTKCAS32.mediatek.inc (172.27.4.184) by MTKMBS31N2.mediatek.inc
+ (172.27.4.87) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
+ Tue, 22 Jan 2019 17:36:13 +0800
+Received: from [10.17.3.153] (10.17.3.153) by MTKCAS32.mediatek.inc
+ (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Tue, 22 Jan 2019 17:36:13 +0800
+Message-ID: <1548149773.4433.284.camel@mhfsdcap03>
+Subject: Re: [PATCH v4 1/6] dt-bindings: usb: musb: Add support for MediaTek
+ musb controller
+From: Min Guo <min.guo@mediatek.com>
+To: Rob Herring <robh@kernel.org>, Bin Liu <b-liu@ti.com>
+Date: Tue, 22 Jan 2019 17:36:13 +0800
+In-Reply-To: <20190121151417.GA19238@bogus>
+References: <1548073351-13739-1-git-send-email-min.guo@mediatek.com>
+ <1548073351-13739-2-git-send-email-min.guo@mediatek.com>
+ <20190121151417.GA19238@bogus>
+X-Mailer: Evolution 3.2.3-0ubuntu6 
+MIME-Version: 1.0
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_012722_988544_A4B8DC51 
-X-CRM114-Status: GOOD (  19.02  )
+X-CRM114-CacheID: sfid-20190122_013625_921477_02B3D79F 
+X-CRM114-Status: GOOD (  26.81  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,116 +79,133 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>, Hanjie Lin <hanjie.lin@amlogic.com>,
- Victor Wan <victor.wan@amlogic.com>, Stephen Boyd <sboyd@kernel.org>,
- Kevin Hilman <khilman@baylibre.com>,
- Michael Turquette <mturquette@baylibre.com>, Yixun Lan <yixun.lan@amlogic.com>,
- linux-kernel@vger.kernel.org, Boris Brezillon <boris.brezillon@bootlin.com>,
- Liang Yang <liang.yang@amlogic.com>, Jian Hu <jian.hu@amlogic.com>,
- Miquel Raynal <miquel.raynal@bootlin.com>, Carlo Caione <carlo@caione.org>,
- linux-amlogic@lists.infradead.org,
- Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Qiufang Dai <qiufang.dai@amlogic.com>
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ tony@atomide.com, Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ linux-usb@vger.kernel.org, linux-kernel@vger.kernel.org, hdegoede@redhat.com,
+ chunfeng.yun@mediatek.com, Alan Stern <stern@rowland.harvard.edu>,
+ Matthias Brugger <matthias.bgg@gmail.com>, linux-mediatek@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, 2019-01-08 at 21:50 +0800, Jianxin Pan wrote:
-> From: Yixun Lan <yixun.lan@amlogic.com>
-> 
-> Document the MMC sub clock controller driver, the potential consumer
-> of this driver is MMC or NAND. Also add four clock bindings IDs which
-> provided by this driver.
-> 
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> Signed-off-by: Jianxin Pan <jianxin.pan@amlogic.com>
-> ---
->  .../devicetree/bindings/clock/amlogic,mmc-clkc.txt | 39
-> ++++++++++++++++++++++
->  include/dt-bindings/clock/amlogic,mmc-clkc.h       | 17 ++++++++++
->  2 files changed, 56 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/amlogic,mmc-
-> clkc.txt
->  create mode 100644 include/dt-bindings/clock/amlogic,mmc-clkc.h
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
-> b/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
-> new file mode 100644
-> index 0000000..0f518e6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
-> @@ -0,0 +1,39 @@
-> +* Amlogic MMC Sub Clock Controller Driver
-> +
-> +The Amlogic MMC clock controller generates and supplies clock to support
-> +MMC and NAND controller
-> +
-> +Required Properties:
-> +
-> +- compatible: should be:
-> +		"amlogic,gx-mmc-clkc"
-> +		"amlogic,axg-mmc-clkc"
+Hi Bin,
 
-nitpick, missing is something to tell that only one is required, not both
-for example `should be one of the following`
+Sorry to bother you again, I encounter a problem about the extcon
+property.
 
-> +
-> +- #clock-cells: should be 1.
-> +- clocks: phandles to clocks corresponding to the clock-names property
-> +- clock-names: list of parent clock names
-> +	- "clkin0", "clkin1"
-> +
-> +- reg: address of emmc sub clock register
-> +
-> +Example: Clock controller node:
-> +
-> +sd_mmc_c_clkc: clock-controller@7000 {
-> +	compatible = "amlogic,axg-mmc-clkc", "syscon";
-> +	reg = <0x0 0x7000 0x0 0x4>;
-> +	#clock-cells = <1>;
-> +
-> +	clock-names = "clkin0", "clkin1";
-> +	clocks = <&clkc CLKID_SD_MMC_C_CLK0>,
-> +		 <&clkc CLKID_FCLK_DIV2>;
-> +};
-> +
-> +sd_emmc_b_clkc: clock-controller@5000 {
-> +	compatible = "amlogic,axg-mmc-clkc", "syscon";
-> +	reg = <0x0 0x5000 0x0 0x4>;
-> +
-> +	#clock-cells = <1>;
-> +	clock-names = "clkin0", "clkin1";
-> +	clocks = <&clkc CLKID_SD_EMMC_B_CLK0>,
-> +		 <&clkc CLKID_FCLK_DIV2>;
-> +};
-> diff --git a/include/dt-bindings/clock/amlogic,mmc-clkc.h b/include/dt-
-> bindings/clock/amlogic,mmc-clkc.h
-> new file mode 100644
-> index 0000000..34a3c56
-> --- /dev/null
-> +++ b/include/dt-bindings/clock/amlogic,mmc-clkc.h
-> @@ -0,0 +1,17 @@
-> +/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
-> +/*
-> + * Meson MMC sub clock tree IDs
-> + *
-> + * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
-> + * Author: Yixun Lan <yixun.lan@amlogic.com>
-> + */
-> +
-> +#ifndef __MMC_CLKC_H
-> +#define __MMC_CLKC_H
-> +
-> +#define CLKID_MMC_DIV		0
-> +#define CLKID_MMC_PHASE_CORE	1
-> +#define CLKID_MMC_PHASE_TX	2
-> +#define CLKID_MMC_PHASE_RX	3
-> +
-> +#endif
+I don't find a common driver describing the usb-connector. Is
+there any driver that I can refer to, specially the way to switch MUSB
+controller between host and device mode? 
+If it needs to implement by myself, is it possible to emulate an
+usb-connector driver by extcon-usb-gpio, and also use the notifier
+mechanism or can you give me some advices?
 
+
+Hi Rob,
+
+On Mon, 2019-01-21 at 09:14 -0600, Rob Herring wrote:
+> On Mon, Jan 21, 2019 at 08:22:26PM +0800, min.guo@mediatek.com wrote:
+> > From: Min Guo <min.guo@mediatek.com>
+> > 
+> > This adds support for MediaTek musb controller in
+> > host, peripheral and otg mode.
+> > 
+> > Signed-off-by: Min Guo <min.guo@mediatek.com>
+> > ---
+> > changes in v4:
+> > suggested by Sergei:
+> > 1. String alignment
+> > 
+> > changes in v3:
+> > 1. no changes
+> > 
+> > changes in v2:
+> > suggested by Bin:
+> > 1. Modify DRC to DRD
+> > suggested by Rob:
+> > 2. Drop the "<soc-model>-musb" in compatible
+> 
+> This is not what I said. I gave you the exact text to put.
+
+Sorry to misunderstood your meaning last time,  I will modify it in next
+patch.
+	compatible: should be one of "mediatek,mt2701-musb"...,followed by
+"mediatek,mtk-musb"
+
+> > 3. Remove phy-names
+> > 4. Add space after comma in clock-names
+> > ---
+> >  .../devicetree/bindings/usb/mediatek,musb.txt      | 43 ++++++++++++++++++++++
+> >  1 file changed, 43 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/usb/mediatek,musb.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/usb/mediatek,musb.txt b/Documentation/devicetree/bindings/usb/mediatek,musb.txt
+> > new file mode 100644
+> > index 0000000..4305770
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/usb/mediatek,musb.txt
+> > @@ -0,0 +1,43 @@
+> > +MediaTek musb DRD/OTG controller
+> > +-------------------------------------------
+> > +
+> > +Required properties:
+> > + - compatible      : should be "mediatek,mtk-musb"
+> > + - reg             : specifies physical base address and size of
+> > +                     the registers
+> > + - interrupts      : interrupt used by musb controller
+> > + - interrupt-names : must be "mc"
+> > + - phys            : PHY specifier for the OTG phy
+> > + - dr_mode         : should be one of "host", "peripheral" or "otg",
+> > +                     refer to usb/generic.txt
+> > + - clocks          : a list of phandle + clock-specifier pairs, one for
+> > +                     each entry in clock-names
+> > + - clock-names     : must contain "main", "mcu", "univpll"
+> > +                     for clocks of controller
+> > +
+> > +Optional properties:
+> > + - extcon          : external connector for VBUS and ID pin changes detection,
+> > +                     needed when supports dual-role mode
+> 
+> Again, do not use extcon in new bindings.
+
+Thanks, ok.
+
+> > + - vbus-supply     : reference to the VBUS regulator, needed when supports
+> > +                     dual-role mode
+> > + - power-domains   : a phandle to USB power domain node to control USB's
+> > +                     MTCMOS
+> > +
+> > +Example:
+> > +
+> > +usb2: usb@11200000 {
+> > +	compatible = "mediatek,mt2701-musb",
+> > +		     "mediatek,mtk-musb";
+> > +	reg = <0 0x11200000 0 0x1000>;
+> > +	interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_LOW>;
+> > +	interrupt-names = "mc";
+> > +	phys = <&u2port2 PHY_TYPE_USB2>;
+> > +	vbus-supply = <&usb_vbus>;
+> > +	extcon = <&extcon_usb>;
+> > +	dr_mode = "otg";
+> > +	clocks = <&pericfg CLK_PERI_USB0>,
+> > +		 <&pericfg CLK_PERI_USB0_MCU>,
+> > +		 <&pericfg CLK_PERI_USB_SLV>;
+> > +	clock-names = "main","mcu","univpll";
+> > +	power-domains = <&scpsys MT2701_POWER_DOMAIN_IFR_MSC>;
+> > +};
+> > -- 
+> > 1.9.1
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel@lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+Regards,
+Min.
 
 
 _______________________________________________
