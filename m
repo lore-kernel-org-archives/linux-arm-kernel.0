@@ -2,109 +2,62 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 300D4C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 09:52:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 18A5FC282C5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 10:09:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F32E4218D0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 09:52:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DAC052084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 10:09:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mL6U6D6l";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="Fl4Q/GXb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F32E4218D0
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OUEpqyvR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DAC052084C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Message-ID:Date
-	:Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	List-Owner; bh=pPHjiBI9kO9N8JnC3sozKx/KG9wBhEI/5Dc+NHlsHXw=; b=mL6U6D6l3LmyEV
-	iN5LJ/iNTpn/WGSVaStaTdOMR86Ms+9R6hQ05W2qn+NBjS2MKuX4cFwMgXxBcFiu8xiREkg7XSfty
-	ZmSRhqeV31g3/45wy0sKmWlKpj3nlm/75O5WoA4fhSdJZQPXQUMyNAOAxRFYGPcXdV/MVcs6b3GS/
-	+i/TSceJB7cjx33QAlzSkhAtXB5mXRoe0NypEm9DRiLE9hqGQvEjqpB7nePxHYDUu5vuKQWw61yAT
-	lg8inMvrRxSlSFMLug68tRZW1op693VHf1JbOlZcQefJtMjW48eXsM8E/HhLakup5/6/Bjo5sKJo7
-	F+zAU/IW64+TjdBCXvJQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=vTDV014DBW30uQ6U6q7CPqwzh85LBJcKPNWtrnGbzwI=; b=OUEpqyvRM+xSmq
+	UoLlu7V1UMgb/EfbjUfekOpLZPMVGDPzFvO+eC0qjMSNbVXTtLulPzb8xCBopyc1a//ufgKRRZt6g
+	f8bR/YtrXhce676fIybgX/PtunAVpPTsfhrTjoLGZaws3MFF7utHpbiD3h3AyS8Aq8boBULow+14N
+	qtnKgLPBR74LXoSqYeXLfY1TIE77UNrbXE6p8N2k9sunnEtKoW4dD8TyZGgYqfYrpqrpBxGgEB8XP
+	moBGfuoP3SFYdids5ssbsO/OpfF3gBSTNG/2TT6l3vgUJVYYBCg+oiQSIymuuIWUbCRYTofuese3b
+	8DxNvJdVOIR8lq/YkHgw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glsjO-0007wY-6S; Tue, 22 Jan 2019 09:52:30 +0000
-Received: from mail-eopbgr00075.outbound.protection.outlook.com ([40.107.0.75]
- helo=EUR02-AM5-obe.outbound.protection.outlook.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glsjJ-0007vs-0g
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 09:52:28 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=oVlAvoXLimayag07LtO1Z0/o4pX5Kq+Hh5SDDaYsJdw=;
- b=Fl4Q/GXbeNHe4s1pscxnUzaVkr+DkzE2bJX0V9eUp9pJbuEDAtbSyQrwIrddOFekIywSrgBOtFwZ0dUCuzubQllxakMle6OmprtbAUL/ILQ2bE+0dIt9WSCMpo5W/k7m9usJZIyG6z+tM1vKy+g517tSZGr7Tw54HcLGJ6V6S1g=
-Received: from VI1PR04MB5533.eurprd04.prod.outlook.com (20.178.122.159) by
- VI1PR04MB4782.eurprd04.prod.outlook.com (20.177.48.215) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1537.27; Tue, 22 Jan 2019 09:52:20 +0000
-Received: from VI1PR04MB5533.eurprd04.prod.outlook.com
- ([fe80::92d:bf44:9c1d:b907]) by VI1PR04MB5533.eurprd04.prod.outlook.com
- ([fe80::92d:bf44:9c1d:b907%6]) with mapi id 15.20.1537.031; Tue, 22 Jan 2019
- 09:52:20 +0000
-From: Leonard Crestez <leonard.crestez@nxp.com>
-To: =?iso-8859-1?Q?Uwe_Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
-Subject: Re: [PATCH 1/2] PCI: imx: Fix probe failure without power domain
-Thread-Topic: [PATCH 1/2] PCI: imx: Fix probe failure without power domain
-Thread-Index: AQHUsdumnhpLtdU11UCqN+1L30Gg6Q==
-Date: Tue, 22 Jan 2019 09:52:20 +0000
-Message-ID: <VI1PR04MB5533FD41536472C64A4A5559EE980@VI1PR04MB5533.eurprd04.prod.outlook.com>
-References: <cover.1548110502.git.leonard.crestez@nxp.com>
- <375a852ae9170a5f8f53fdd364a7fb7ea642e89c.1548110502.git.leonard.crestez@nxp.com>
- <20190122071251.tgdwnunxksa45n5q@pengutronix.de>
- <VI1PR04MB5533DE236150B01461555A5BEE980@VI1PR04MB5533.eurprd04.prod.outlook.com>
- <20190122094430.rg76mkemz5wvk5t3@pengutronix.de>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=leonard.crestez@nxp.com; 
-x-originating-ip: [85.204.4.237]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; VI1PR04MB4782;
- 6:lLyxrgcJsUhY8UcXTlw2b6qmJU7+rN3/DNA/SnI0BX3zyN951Hz+3PRUOxrMSYbmBuNh7OV0437grMkWuWPt8U23qOBspIWs3xW6QEzaDgTxxGReFjBFcm4tFvaQ8NqMWt2DUgDmCUiFC5u8Ap97NzISNHg33UiAmersiikAziUvvTwdZT2nz9p4/Qg3MUWaJYZxHZCGfclV6xV88U/nG/vOZfHFPT2JIYl6Fpl8lBittfwA+pUoSPrJqpgDULmIuv3SXNM8pK65UPZE/kRiWMc3QvvsVSbrBvli/bBlUZrns36fDTEBE0EtAE9praT5lRdFk6VvyDuOyUKPUvRywx1KF//Fy6l3Y8K8b6IEqkvOD120BGe/WB5daZ3VBpUGHHQ3gCloqc/WRwBaG7vFbR0dqSMOlv9fsfrGzXfscaQhDX6vcfnkf2repwBuaDAQx5dBnewndNNY3am73gMsog==;
- 5:Eer8Bg1yUN+YYhpw/qLKpGGwemPL+BHav+5kHK06yeuO8jGzbg0RyKkUySzVMlwxDQmNSvEdFqQyZwCbyYbQ/VoGSVNKZfjzoDtI9zHwPiTXpHdYTvNN25l/cj5uuxTgadCZc6Pe3CvYG+b0E+kVigHZvzT0axj/L5sAETVQiG4Od/EZ0uHCSJYniRNcCpN3Q3hGPedN4ORKfNk7Xz+OCw==;
- 7:jwcsJMLwrGvfvAP84hzsLo38h0kTrjsBUkTZaiv+e93E/6Cs8u6HM9A9pNAAJVcgoJBBTCAu5I7YlXCQFPpoCTvwdaFS4lo+WzHjGyGhrS0gC+Fh/K/q4hSwNFwed8F2yLuuAtlWOz5wqu9BzYAyLg==
-x-ms-exchange-antispam-srfa-diagnostics: SOS;
-x-ms-office365-filtering-correlation-id: d6a65575-1be8-4ed6-b7e6-08d6804f4d0c
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR04MB4782; 
-x-ms-traffictypediagnostic: VI1PR04MB4782:
-x-microsoft-antispam-prvs: <VI1PR04MB478270DA6AB777DA87470BF5EE980@VI1PR04MB4782.eurprd04.prod.outlook.com>
-x-forefront-prvs: 0925081676
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(366004)(396003)(376002)(136003)(346002)(199004)(189003)(6436002)(105586002)(9686003)(6116002)(102836004)(305945005)(53936002)(53546011)(6506007)(3846002)(7736002)(106356001)(25786009)(256004)(86362001)(5024004)(486006)(7416002)(33656002)(81166006)(81156014)(8676002)(54906003)(478600001)(71200400001)(71190400001)(66066001)(68736007)(97736004)(7696005)(4326008)(99286004)(76176011)(229853002)(44832011)(8936002)(14454004)(55016002)(186003)(74316002)(2906002)(26005)(316002)(6246003)(476003)(93886005)(446003)(6916009);
- DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB4782;
- H:VI1PR04MB5533.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: R0hsDpAyJG5HGSFDGosYOu2LTZAxwG5bUi/mbYYb69dydSn/hXRx6GlOEe8IZBeyfsdKRCT2OnEAAwN5BZOw8o16hNmtMn0krlYcMPVsLZFD0t0cyg+2hPlWdPHeTSyepcOnM8pI1vnTLQ6hnSl0NAoPEOa+0ODV/Rx+4nvgORpuSLWl6gAoqcwkclUm6OTXEdmMpttIaKUZgno3CdposP56kiFwz7ODhQ5joJb8RMRKMVNDvNkGKmIz7YSeEot04856FQbWq/TTYvJMu/5wI8bArPZUToDrtZFOIE0mZtkSkfIpxUkKELZaKiKHkexLNp3ANNQV1lTH814SVjud0N39buE2fBCV1aKYxYj9u1xMUpdmGUbzTiIoGY6J0McE6I17KR/jChSVI/WtvD1K6kSIUBeJ8mW0WxBdLbCQAGk=
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+	id 1glszW-00067R-BT; Tue, 22 Jan 2019 10:09:10 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glszR-00066y-QY
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 10:09:08 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 79ECB2078C; Tue, 22 Jan 2019 11:09:02 +0100 (CET)
+Received: from bootlin.com (aaubervilliers-681-1-37-87.w90-88.abo.wanadoo.fr
+ [90.88.156.87])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 0F50A206A7;
+ Tue, 22 Jan 2019 11:08:52 +0100 (CET)
+Date: Tue, 22 Jan 2019 11:08:51 +0100
+From: Maxime Chevallier <maxime.chevallier@bootlin.com>
+To: Andrew Lunn <andrew@lunn.ch>
+Subject: Re: [PATCH net-next 4/7] net: phy: marvell10g: Add support for
+ 2.5GBASET and 5GBASET
+Message-ID: <20190122110851.35c316d1@bootlin.com>
+In-Reply-To: <20190121201715.GA20277@lunn.ch>
+References: <20190118152352.26417-1-maxime.chevallier@bootlin.com>
+ <20190118152352.26417-5-maxime.chevallier@bootlin.com>
+ <20190121201715.GA20277@lunn.ch>
+X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: d6a65575-1be8-4ed6-b7e6-08d6804f4d0c
-X-MS-Exchange-CrossTenant-originalarrivaltime: 22 Jan 2019 09:52:20.1994 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB4782
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_015226_772949_DBF5FDD7 
-X-CRM114-Status: GOOD (  13.86  )
+X-CRM114-CacheID: sfid-20190122_020905_999738_FAC91589 
+X-CRM114-Status: GOOD (  12.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -116,74 +69,67 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>,
- Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- Richard Zhu <hongxing.zhu@nxp.com>, "Rafael J. Wysocki" <rafael@kernel.org>,
- "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
- "linux-pm@vger.kernel.org" <linux-pm@vger.kernel.org>,
- Kevin Hilman <khilman@kernel.org>, "Lukas F . Hartmann" <lukas@mntmn.com>,
- Jon Hunter <jonathanh@nvidia.com>, dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Viresh Kumar <viresh.kumar@linaro.org>, Shawn Guo <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- Lucas Stach <l.stach@pengutronix.de>
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: Florian Fainelli <f.fainelli@gmail.com>,
+ Antoine Tenart <antoine.tenart@bootlin.com>, netdev@vger.kernel.org,
+ gregory.clement@bootlin.com, Russell King <linux@armlinux.org.uk>,
+ linux-kernel@vger.kernel.org, nadavh@marvell.com, thomas.petazzoni@bootlin.com,
+ miquel.raynal@bootlin.com, stefanc@marvell.com, mw@semihalf.com,
+ davem@davemloft.net, linux-arm-kernel@lists.infradead.org,
+ Heiner Kallweit <hkallweit1@gmail.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 1/22/19 11:44 AM, Uwe Kleine-K=F6nig wrote:
-> On Tue, Jan 22, 2019 at 09:17:22AM +0000, Leonard Crestez wrote:
->> On 1/22/2019 9:12 AM, Uwe Kleine-K=F6nig wrote:
->>> On Mon, Jan 21, 2019 at 10:50:04PM +0000, Leonard Crestez wrote:
->>>> On chips without a separate power domain for PCI (such as 6q/6qp) the
->>>> imx6_pcie_attach_pd function incorrectly returns an error.
->>>>
->>>> Fix by returning 0 if dev_pm_domain_attach_by_name doesn't find
->>>> anything.
->>>>
->>>> Fixes: 3f7cceeab895 ("PCI: imx: Add multi-pd support")
->>>>
->>>> diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/contr=
-oller/dwc/pci-imx6.c
->>>> @@ -308,10 +308,13 @@ static int imx6_pcie_attach_pd(struct device *de=
-v)
->>>>    		return 0;
->>>>    =
+Hello Andrew, Russell,
 
->>>>    imx6_pcie->pd_pcie =3D dev_pm_domain_attach_by_name(dev, "pcie");
->>>>    if (IS_ERR(imx6_pcie->pd_pcie))
->>>>    	return PTR_ERR(imx6_pcie->pd_pcie);
->>>> +	/* Do nothing when power domain missing */
->>>> +	if (!imx6_pcie->pd_pcie)
->>>> +		return 0;
->>>
->>> As I said in the mail that proposed this patch for testing: I think it
->>> would be better to change dev_pm_domain_attach_by_name to not return an
->>> error indication by returning NULL or an ERR_PTR value. (Or change
->>> device_link_add to accept NULL if NULL is a dummy value.)
->>
->> I'm not sure what you mean. Should dev_pm_domain_attach_by_name return
->> ERR_PTR(-ENOENT) for name not found? It would still require special
->> handling for callers.
-> =
+On Mon, 21 Jan 2019 21:17:15 +0100
+Andrew Lunn <andrew@lunn.ch> wrote:
 
-> Yes, callers would still need to handle an error, but they only need to
-> check for IS_ERR(retval) instead of IS_ERR(retval) && retval !=3D NULL.
+>> @@ -264,8 +265,10 @@ static int mv3310_config_init(struct phy_device *phydev)
+>>  	if (ret)
+>>  		return ret;
+>>  
+>> -	linkmode_and(phydev->advertising, phydev->advertising,
+>> -		     phydev->supported);
+>> +	/* Make sure we advertise all the supported modes, and not just the
+>> +	 * default one specified in the driver's .features.
+>> +	 */
+>> +	linkmode_copy(phydev->advertising, phydev->supported);  
+>
+>So by doing a copy of supported into advertising, you can stomping
+>over any restrictions applied via of_set_phy_supported(),
+>of_set_phy_eee_broken(phydev), and any pause control settings which
+>might of happened.
 
-But "not found" is not treated as an error here, it's what happens when =
+Thanks for the explanations, this is indeed clearly not a good solution.
 
-no PD is assigned. The fix makes imx6_pcie_attach_pd return success in =
+>What might make sense here is that a PHY driver can replace its
+>.features member at run time, in its config_init() call. The core then
+>needs to perform these evaluations. So i'm guessing we need to split
+>this code out of probe() and move it into phy_init_hw()?
 
-this case.
+So the .features won't be read-only anymore ? We could also simply make
+a helper that would add a mode to both the supported and advertising
+modes list, that would be used in the 'genphy_c45_pma_read_abilities'
+and config_init ?
 
-Making dev_pm_domain_attach_by_name return ENOENT would still require a =
+I lack the big picture of the PHY init sequence, there seems to be a
+lot of quirks and complex cases that we need to take into account, so
+I'll let you decide :)
 
-special case for ENOENT here.
+>Heiner, you know this code better than anybody. What do you think?
+>
+>	Andrew
 
---
-Regards,
-Leonard
+Thanks for the feedback,
+
+Maxime
+
+-- 
+Maxime Chevallier, Bootlin
+Embedded Linux and kernel engineering
+https://bootlin.com
 
 _______________________________________________
 linux-arm-kernel mailing list
