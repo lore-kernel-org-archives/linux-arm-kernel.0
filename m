@@ -2,65 +2,66 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B7F5CC282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 17:14:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 27819C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 17:24:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8A9EA2085A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 17:14:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EAA1C217D4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 17:24:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PZ4B0RDR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8A9EA2085A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NtdemS6P"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EAA1C217D4
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=5Fue+ur4lsvPCa3HJ12fukPVKvttdDWUHFDxxuFEaso=; b=PZ4B0RDRZCSzuP
-	nuHMdmmCeRETMxkwfWdpZiXLWtDjuw8s0NjxvcDAAdkUBh16a+pqxma908HutfgD+/zteDMQiCUi4
-	VBMy+gYSBP3wtq9JBX5SFV/viVsIJXOFO156uOC7h1PCIxZFhr5cWcVVBoha1ZdO673MBpVluN9KC
-	VoWlvgi6RphvRIy+mFpfPMFXDtAJQ9qSNKrO2e5eJ+vWYeMquUZxbugBNidu0O1AQw+T3QKm7prMt
-	KiDaXNqN1ycdzs+UojHGsnEaWprJWyzCD4OUqZQzpGDX7Cno0aGOWNeBCyGb7g/sNEIVob7CAVw8i
-	I3Iv3+xdvHIn4vRkF65g==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=q2IlqAvzsq1y8uWxcmo6aq7OqurmvR6ZW6IWhqtnrs4=; b=NtdemS6PX1Qw1J
+	KGOfzTs8qYrfdRY2mW97Gfva02UWS6GM87LRuG/WzEBb27kTu6DEEznvJOT1r2QdMEhj/lj/RuN1E
+	didc/N1pm0PEbYlKvjGgk7jGbhQwsn7LScP3ByyG1wK9IlrFITXFslOiwCI/MZ1F0pFziBHLpZ+wu
+	fDfQrHQITKh5hxZszpyl3SUWs5X8zBcOF8Jiy15HQyIIdzIf8sABxDQ0amINwOcuHO5u+Zssg2ekv
+	vQ+MKbZNfHxDO82aJyeB8W7mOzX+csf4OWVxUP8d0X3m9NDELBmy1ltXImqHxzptImfwAtkv8P0h8
+	exlVQex1wngXq8vCvCrA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glzcy-0001xw-FY; Tue, 22 Jan 2019 17:14:20 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1glzn6-000730-BU; Tue, 22 Jan 2019 17:24:48 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glzcv-0001xQ-U9
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 17:14:19 +0000
+ id 1glzn2-00072a-AD
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 17:24:46 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id AFA4BA78;
- Tue, 22 Jan 2019 09:14:17 -0800 (PST)
-Received: from [10.1.29.146] (e121487-lin.cambridge.arm.com [10.1.29.146])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 0E8C63F6A8;
- Tue, 22 Jan 2019 09:14:16 -0800 (PST)
-Subject: Re: [PATCH] ARM: dts: mps2: use list instead of tuple for uart
- interrupts
-To: Sudeep Holla <sudeep.holla@arm.com>
-References: <1548066939-20880-1-git-send-email-vladimir.murzin@arm.com>
- <20190122115517.GB2656@e107155-lin>
- <3de06852-597b-06dd-a2d1-8b0830a7869f@arm.com>
- <20190122135105.GB18606@e107155-lin>
-From: Vladimir Murzin <vladimir.murzin@arm.com>
-Message-ID: <49f2c64c-7b65-8ce2-89b2-0eeae2551c36@arm.com>
-Date: Tue, 22 Jan 2019 17:14:15 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9FA13A78;
+ Tue, 22 Jan 2019 09:24:43 -0800 (PST)
+Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 240FD3F6A8;
+ Tue, 22 Jan 2019 09:24:42 -0800 (PST)
+Date: Tue, 22 Jan 2019 17:24:39 +0000
+From: Dave Martin <Dave.Martin@arm.com>
+To: Marc Zyngier <marc.zyngier@arm.com>
+Subject: Re: [PATCH v4 17/25] KVM: arm64/sve: Add SVE support to register
+ access ioctl interface
+Message-ID: <20190122172439.GK3578@e103592.cambridge.arm.com>
+References: <1547757219-19439-1-git-send-email-Dave.Martin@arm.com>
+ <1547757219-19439-18-git-send-email-Dave.Martin@arm.com>
+ <74aad8f1-e9f0-689a-1f2b-60a30de41b65@arm.com>
 MIME-Version: 1.0
-In-Reply-To: <20190122135105.GB18606@e107155-lin>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <74aad8f1-e9f0-689a-1f2b-60a30de41b65@arm.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_091417_973464_D60F3686 
-X-CRM114-Status: GOOD (  15.32  )
+X-CRM114-CacheID: sfid-20190122_092444_366934_9A6409A1 
+X-CRM114-Status: GOOD (  35.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,66 +73,229 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org
+Cc: Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
+ Christoffer Dall <cdall@kernel.org>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 1/22/19 1:51 PM, Sudeep Holla wrote:
-> On Tue, Jan 22, 2019 at 01:32:26PM +0000, Vladimir Murzin wrote:
->> On 1/22/19 11:55 AM, Sudeep Holla wrote:
->>> On Mon, Jan 21, 2019 at 10:35:39AM +0000, Vladimir Murzin wrote:
->>>> MPS2 UART requires dedicated interrupts for RX, TX and overflow, which
->>>> obviously should be expressed as a list. Current form uses tuple and
->>>> it has worked so far because NVIC has interrupt-cells equal to 1.
->>>
->>> Applied for v5.1
->>>
->>> Just saw couple of other instances that can be fixed to elsewhere in
->>> vexpress DTS files. Will post it soon with your reported by(though
->>> you didn't report them directly but this patch made me look around)
->>
->> Thanks!
->>
->> Now I'm wondering if it is something dtc can warn about?
->>
+On Fri, Jan 18, 2019 at 05:58:33PM +0000, Marc Zyngier wrote:
+> On 17/01/2019 20:33, Dave Martin wrote:
+> > This patch adds the following registers for access via the
+> > KVM_{GET,SET}_ONE_REG interface:
+> > 
+> >  * KVM_REG_ARM64_SVE_ZREG(n, i) (n = 0..31) (in 2048-bit slices)
+> >  * KVM_REG_ARM64_SVE_PREG(n, i) (n = 0..15) (in 256-bit slices)
+> >  * KVM_REG_ARM64_SVE_FFR(i) (in 256-bit slices)
+> > 
+> > In order to adapt gracefully to future architectural extensions,
+> > the registers are divided up into slices as noted above:  the i
+> > parameter denotes the slice index.
+> > 
+> > For simplicity, bits or slices that exceed the maximum vector
+> > length supported for the vcpu are ignored for KVM_SET_ONE_REG, and
+> > read as zero for KVM_GET_ONE_REG.
+> > 
+> > For the current architecture, only slice i = 0 is significant.  The
+> > interface design allows i to increase to up to 31 in the future if
+> > required by future architectural amendments.
+> > 
+> > The registers are only visible for vcpus that have SVE enabled.
+> > They are not enumerated by KVM_GET_REG_LIST on vcpus that do not
+> > have SVE.  In all cases, surplus slices are not enumerated by
+> > KVM_GET_REG_LIST.
+> > 
+> > Accesses to the FPSIMD registers via KVM_REG_ARM_CORE is not
+> > allowed for SVE-enabled vcpus: SVE-aware userspace can use the
+> > KVM_REG_ARM64_SVE_ZREG() interface instead to access the same
+> > register state.  This avoids some complex and pointless emluation
 > 
-> Not sure if it's already in place at different warning level.
-> I generally try W=1 which itself produces quite a lot of warning, but
-> yes good if this can be detected by compiler.
+> nit: emulation.
+> 
+> > in the kernel.
+> > 
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > ---
+> >  arch/arm64/include/uapi/asm/kvm.h |  10 +++
+> >  arch/arm64/kvm/guest.c            | 131 ++++++++++++++++++++++++++++++++++----
+> >  2 files changed, 129 insertions(+), 12 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> > index 97c3478..1ff68fa 100644
+> > --- a/arch/arm64/include/uapi/asm/kvm.h
+> > +++ b/arch/arm64/include/uapi/asm/kvm.h
+> > @@ -226,6 +226,16 @@ struct kvm_vcpu_events {
+> >  					 KVM_REG_ARM_FW | ((r) & 0xffff))
+> >  #define KVM_REG_ARM_PSCI_VERSION	KVM_REG_ARM_FW_REG(0)
+> >  
+> > +/* SVE registers */
+> > +#define KVM_REG_ARM64_SVE		(0x15 << KVM_REG_ARM_COPROC_SHIFT)
+> > +#define KVM_REG_ARM64_SVE_ZREG(n, i)	(KVM_REG_ARM64 | KVM_REG_ARM64_SVE | \
+> > +					 KVM_REG_SIZE_U2048 |		\
+> > +					 ((n) << 5) | (i))
+> > +#define KVM_REG_ARM64_SVE_PREG(n, i)	(KVM_REG_ARM64 | KVM_REG_ARM64_SVE | \
+> > +					 KVM_REG_SIZE_U256 |		\
+> > +					 ((n) << 5) | (i) | 0x400)
+> 
+> Can we please have a name for this 0x400 bit?
+> 
+> 
+> > +#define KVM_REG_ARM64_SVE_FFR(i)	KVM_REG_ARM64_SVE_PREG(16, i)
+> > +
+> >  /* Device Control API: ARM VGIC */
+> >  #define KVM_DEV_ARM_VGIC_GRP_ADDR	0
+> >  #define KVM_DEV_ARM_VGIC_GRP_DIST_REGS	1
+> > diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+> > index ffa38d4..b8f9c1e 100644
+> > --- a/arch/arm64/kvm/guest.c
+> > +++ b/arch/arm64/kvm/guest.c
+> > @@ -19,8 +19,10 @@
+> >   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> >   */
+> >  
+> > +#include <linux/bits.h>
+> >  #include <linux/errno.h>
+> >  #include <linux/err.h>
+> > +#include <linux/kernel.h>
+> >  #include <linux/kvm_host.h>
+> >  #include <linux/module.h>
+> >  #include <linux/vmalloc.h>
+> > @@ -28,9 +30,12 @@
+> >  #include <kvm/arm_psci.h>
+> >  #include <asm/cputype.h>
+> >  #include <linux/uaccess.h>
+> > +#include <asm/fpsimd.h>
+> >  #include <asm/kvm.h>
+> >  #include <asm/kvm_emulate.h>
+> >  #include <asm/kvm_coproc.h>
+> > +#include <asm/kvm_host.h>
+> > +#include <asm/sigcontext.h>
+> >  
+> >  #include "trace.h"
+> >  
+> > @@ -210,6 +215,108 @@ static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+> >  	return err;
+> >  }
+> >  
+> > +struct kreg_region {
+> > +	char *kptr;
+> 
+> Should this rather be void * instead?
 
-I did some experiments and it looks like it doesn't really distinguish
-list from tuple, at least it happily accepts:
+This was to support address arithmetic on kptr without explicit casting.
 
-/dts-v1/;
+Maybe this is ill-advised.  GCC supports pointer arithmetic on void *
+with equivalent behaviour as if the pointer were to a character type,
+without any cast.
 
-/ {
-	interrupt-parent = <&intc>;
-	intc: interrupt-controller {
-		interrupt-controller;
-		#interrupt-cells = <2>;
-	};
+If we rely elsewhere on this working, then we can do it here.
 
-	node0 {
-		interrupts = <1 2>;
-	};
+However... [see below]
 
-	node1 {
-		interrupts = <1>, <2>;
-	};
-};
+> > +	size_t size;
+> > +	size_t zeropad;
+> > +};
+> > +
+> > +#define SVE_REG_SLICE_SHIFT	0
+> > +#define SVE_REG_SLICE_BITS	5
+> > +#define SVE_REG_ID_SHIFT	(SVE_REG_SLICE_SHIFT + SVE_REG_SLICE_BITS)
+> > +#define SVE_REG_ID_BITS		5
+> > +
+> > +#define SVE_REG_SLICE_MASK					\
+> > +	GENMASK(SVE_REG_SLICE_SHIFT + SVE_REG_SLICE_BITS - 1,	\
+> > +		SVE_REG_SLICE_SHIFT)
+> > +#define SVE_REG_ID_MASK							\
+> > +	GENMASK(SVE_REG_ID_SHIFT + SVE_REG_ID_BITS - 1, SVE_REG_ID_SHIFT)
+> > +
+> > +#define SVE_NUM_SLICES (1 << SVE_REG_SLICE_BITS)
+> > +
+> > +static int sve_reg_region(struct kreg_region *b,
+> > +			  const struct kvm_vcpu *vcpu,
+> > +			  const struct kvm_one_reg *reg)
+> > +{
+> > +	const unsigned int vl = vcpu->arch.sve_max_vl;
+> > +	const unsigned int vq = sve_vq_from_vl(vl);
+> > +
+> > +	const unsigned int reg_num =
+> > +		(reg->id & SVE_REG_ID_MASK) >> SVE_REG_ID_SHIFT;
+> > +	const unsigned int slice_num =
+> > +		(reg->id & SVE_REG_SLICE_MASK) >> SVE_REG_SLICE_SHIFT;
+> > +
+> > +	unsigned int slice_size, offset, limit;
+> > +
+> > +	if (reg->id >= KVM_REG_ARM64_SVE_ZREG(0, 0) &&
+> > +	    reg->id <= KVM_REG_ARM64_SVE_ZREG(SVE_NUM_ZREGS - 1,
+> > +					      SVE_NUM_SLICES - 1)) {
+> > +		slice_size = KVM_REG_SIZE(KVM_REG_ARM64_SVE_ZREG(0, 0));
+> > +
+> > +		/* Compute start and end of the register: */
+> > +		offset = SVE_SIG_ZREG_OFFSET(vq, reg_num) - SVE_SIG_REGS_OFFSET;
+> > +		limit = offset + SVE_SIG_ZREG_SIZE(vq);
+> > +
+> > +		offset += slice_size * slice_num; /* start of requested slice */
+> > +
+> > +	} else if (reg->id >= KVM_REG_ARM64_SVE_PREG(0, 0) &&
+> > +		   reg->id <= KVM_REG_ARM64_SVE_FFR(SVE_NUM_SLICES - 1)) {
+> > +		/* (FFR is P16 for our purposes) */
+> > +
+> > +		slice_size = KVM_REG_SIZE(KVM_REG_ARM64_SVE_PREG(0, 0));
+> > +
+> > +		/* Compute start and end of the register: */
+> > +		offset = SVE_SIG_PREG_OFFSET(vq, reg_num) - SVE_SIG_REGS_OFFSET;
+> > +		limit = offset + SVE_SIG_PREG_SIZE(vq);
+> > +
+> > +		offset += slice_size * slice_num; /* start of requested slice */
+> > +
+> > +	} else {
+> > +		return -ENOENT;
+> > +	}
+> > +
+> > +	b->kptr = (char *)vcpu->arch.sve_state + offset;
+> 
+> I'm very uneasy with this pointer that, at this stage, may point to an
+> arbitrary location in memory, given that the slice number is controlled
+> by userspace. It feels like a disaster waiting to happen as a potential
+> spectre-v1 gadget.
 
+Hmmm, yes, that does seem a concern.  We only guard against accessing
+that address with an if(), so while the compiler cannot emit an explicit
+access, the CPU can emit a speculative read.
+
+So, a speculation-safe bounds check would be appropriate here, at
+minimum.
+
+> And actually, we don't have any requirement to handle non-zero slices,
+> do we? The important thing is that you've nicely reserved extra space in
+> the encoding, and that we can expand the API in a very straightforward way.
+> 
+> So at this stage, I'd drop all support for non-zero slices and return an
+> error instead.
+
+Since the extra-slices thing is for the far future (or never), we can
+probably drop this code for now.
+
+This means that we can drop the enumeration of extra slices too.
+
+
+If the vector length is > 256 bytes, I'll do pr_warn() and clamp the
+vector lengths seen by the guest to <= 256 so that no extra slices are
+needed.
+
+In any case, we can keep the space reserved in the register ID encoding
+to allow larger vectors to be supported later if need be.
+
+
+I'll write up the rule for determining the number of slices somewhere,
+but in userspace it will never be effectively tested.  Too bad, I
+guess: we might add an explicit capability for larger vectors if we
+eventually risk hitting incompatibilities here.
 
 Cheers
-Vladimir
-
-> 
-> --
-> Regards,
-> Sudeep
-> 
-
+---Dave
 
 _______________________________________________
 linux-arm-kernel mailing list
