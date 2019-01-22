@@ -2,93 +2,67 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AEE87C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 14:34:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AE8DDC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 14:38:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7E53E20854
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 14:34:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7B39320854
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 14:38:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kyAQbMIh";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="YaeKDSmm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7E53E20854
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KS7viszM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7B39320854
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1T/1/0UlEFT3AD3gPaA5zzLcHP1lRaPipvT34Z9duZE=; b=kyAQbMIhCDvy2E
-	lrec+TcznCMR3vbaK0maL3E0kMyS+pXPW27KnFnmcL9Pu13hcg66feaHqjgPN3Fs8NnuD0s40LocJ
-	986OvHrHXTXdkjy/sPxrqCgMHWjGQsiwTIAkZJW0BG2GtS2LGq0U8wFHe5uH3SrZXpnx0nMw8aIlZ
-	9II8wFCfbWKsyh2fcqNlEgvu712CMu4Xa2utfWhJ1wP6hXBqwE9EDkaotM50AwUOTVkk1q0uEIFnw
-	qGub4Pd+691MUMUdq5Upyju0S4stXOW4bl3jJUEFhADRlsoIahnbnB52aLWGOIcvLY+0kEAqg5N8j
-	QAnQ/SG//C386U1QUfww==;
+	List-Owner; bh=MGBfFp+Mh2XJxlao2As8M5ZJFsTjG3Y9c+JjD6D3iGs=; b=KS7viszMxDPChD
+	Kahz1kDO46xLk3pJLQ3lVsgb7ndrMcjcTDM+yQSJECxFQ03xmSptUQHxvAnq2dxsfUlHzkSgRDYi6
+	rWJpsKCzDUgZgFyGtYdhPHx/u7bKllQFY16a3ZTSxDZiP41A/pHS6ydNLUfSeQMqv0wm2SqEyjLew
+	UNJJ9/dhgTCbDGdLfA00cr8WO/bIL3KVAcdENRyM/YYDLFzhZcTxkz0sKXfrqyRb8RevXavR1nQLz
+	/+CIEDlTwXEmD3yF6Be0Ta2nDnTurpbnA7lYBw/FUZ3sJALcaKu6Sz7yHp96k2euUZtQcsbV+DF/i
+	ksQ3VzeAkhof1vLHCefA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glx7q-00037v-9o; Tue, 22 Jan 2019 14:34:02 +0000
-Received: from fllv0015.ext.ti.com ([198.47.19.141])
+	id 1glxCM-0004n8-DO; Tue, 22 Jan 2019 14:38:42 +0000
+Received: from lhrrgout.huawei.com ([185.176.76.210] helo=huawei.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glx7n-00037Z-Jl; Tue, 22 Jan 2019 14:34:01 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0MEXnI5012069;
- Tue, 22 Jan 2019 08:33:49 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1548167629;
- bh=isxP2QyO/Q8vsgPq55lQGp+Zxy0AFL2Jxwc2k9mQiwg=;
- h=Date:From:To:CC:Subject:References:In-Reply-To;
- b=YaeKDSmmCWIM4DZNFPWyMblfQXWGD4rK3cdUzJpL/FFKskVBwXbCiC5bCP5hlDul4
- 66jsRCXh8zdG6TCgAWz59j85m/SQYA9idnHNjvWV1mw8cZZNZA42E0xKEmuitHb7GO
- u9g5GRtXj3w1vEfsfVPvgGpgGE8JZAMfpwnGZ7O8=
-Received: from DLEE104.ent.ti.com (dlee104.ent.ti.com [157.170.170.34])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0MEXnnj039278
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Tue, 22 Jan 2019 08:33:49 -0600
-Received: from DLEE104.ent.ti.com (157.170.170.34) by DLEE104.ent.ti.com
- (157.170.170.34) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 22
- Jan 2019 08:33:49 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE104.ent.ti.com
- (157.170.170.34) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Tue, 22 Jan 2019 08:33:49 -0600
-Received: from localhost (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0MEXnbf012288;
- Tue, 22 Jan 2019 08:33:49 -0600
-Date: Tue, 22 Jan 2019 08:33:48 -0600
-From: Bin Liu <b-liu@ti.com>
-To: Min Guo <min.guo@mediatek.com>
-Subject: Re: [PATCH v4 1/6] dt-bindings: usb: musb: Add support for MediaTek
- musb controller
-Message-ID: <20190122143348.GF30080@uda0271908>
-Mail-Followup-To: Bin Liu <b-liu@ti.com>, Min Guo <min.guo@mediatek.com>,
- Rob Herring <robh@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- devicetree@vger.kernel.org, hdegoede@redhat.com, tony@atomide.com,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- linux-usb@vger.kernel.org, linux-kernel@vger.kernel.org,
- Matthias Brugger <matthias.bgg@gmail.com>,
- Alan Stern <stern@rowland.harvard.edu>, chunfeng.yun@mediatek.com,
- linux-mediatek@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org
-References: <1548073351-13739-1-git-send-email-min.guo@mediatek.com>
- <1548073351-13739-2-git-send-email-min.guo@mediatek.com>
- <20190121151417.GA19238@bogus>
- <1548149773.4433.284.camel@mhfsdcap03>
+ id 1glxCI-0004m2-AD
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 14:38:40 +0000
+Received: from lhreml707-cah.china.huawei.com (unknown [172.18.7.106])
+ by Forcepoint Email with ESMTP id C3AEFCCC0BD1864EED60;
+ Tue, 22 Jan 2019 14:38:29 +0000 (GMT)
+Received: from LHREML524-MBB.china.huawei.com ([169.254.3.138]) by
+ lhreml707-cah.china.huawei.com ([10.201.108.48]) with mapi id 14.03.0415.000; 
+ Tue, 22 Jan 2019 14:38:24 +0000
+From: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>
+To: "lorenzo.pieralisi@arm.com" <lorenzo.pieralisi@arm.com>,
+ "robin.murphy@arm.com" <robin.murphy@arm.com>
+Subject: RE: [PATCH v5 0/4] arm64 SMMUv3 PMU driver with IORT support
+Thread-Topic: [PATCH v5 0/4] arm64 SMMUv3 PMU driver with IORT support
+Thread-Index: AQHUiMRc6YrtMxIxCUishushjyv1/KW7rRdg
+Date: Tue, 22 Jan 2019 14:38:23 +0000
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA8392939DF@lhreml524-mbb.china.huawei.com>
+References: <20181130154751.28580-1-shameerali.kolothum.thodi@huawei.com>
+In-Reply-To: <20181130154751.28580-1-shameerali.kolothum.thodi@huawei.com>
+Accept-Language: en-GB, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-originating-ip: [10.47.94.162]
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1548149773.4433.284.camel@mhfsdcap03>
-User-Agent: Mutt/1.5.21 (2010-09-15)
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+X-CFilter-Loop: Reflected
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_063359_770322_6846875D 
-X-CRM114-Status: GOOD (  16.42  )
+X-CRM114-CacheID: sfid-20190122_063838_497349_74788476 
+X-CRM114-Status: GOOD (  21.70  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,44 +74,121 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh@kernel.org>,
- devicetree@vger.kernel.org, tony@atomide.com,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-usb@vger.kernel.org,
- linux-kernel@vger.kernel.org, hdegoede@redhat.com, chunfeng.yun@mediatek.com,
- Alan Stern <stern@rowland.harvard.edu>,
- Matthias Brugger <matthias.bgg@gmail.com>, linux-mediatek@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "vkilari@codeaurora.org" <vkilari@codeaurora.org>,
+ "neil.m.leeder@gmail.com" <neil.m.leeder@gmail.com>,
+ "jean-philippe.brucker@arm.com" <jean-philippe.brucker@arm.com>,
+ "pabba@codeaurora.org" <pabba@codeaurora.org>,
+ "will.deacon@arm.com" <will.deacon@arm.com>,
+ "rruigrok@codeaurora.org" <rruigrok@codeaurora.org>,
+ Linuxarm <linuxarm@huawei.com>,
+ "linux-acpi@vger.kernel.org" <linux-acpi@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Min,
+Hi Robin/Lorenzo,
 
-On Tue, Jan 22, 2019 at 05:36:13PM +0800, Min Guo wrote:
-> Hi Bin,
+A gentle reminder on this series. Please take a look.
+
+Thanks,
+Shameer
+
+> -----Original Message-----
+> From: Linuxarm [mailto:linuxarm-bounces@huawei.com] On Behalf Of Shameer
+> Kolothum
+> Sent: 30 November 2018 15:48
+> To: lorenzo.pieralisi@arm.com; robin.murphy@arm.com
+> Cc: mark.rutland@arm.com; vkilari@codeaurora.org;
+> neil.m.leeder@gmail.com; jean-philippe.brucker@arm.com;
+> pabba@codeaurora.org; will.deacon@arm.com; rruigrok@codeaurora.org;
+> Linuxarm <linuxarm@huawei.com>; linux-kernel@vger.kernel.org;
+> linux-acpi@vger.kernel.org; linux-arm-kernel@lists.infradead.org
+> Subject: [PATCH v5 0/4] arm64 SMMUv3 PMU driver with IORT support
 > 
-> Sorry to bother you again, I encounter a problem about the extcon
-> property.
+> This adds a driver for the SMMUv3 PMU into the perf framework.
+> It includes an IORT update to support PM Counter Groups.
 > 
-> I don't find a common driver describing the usb-connector. Is
-> there any driver that I can refer to, specially the way to switch MUSB
-> controller between host and device mode? 
-> If it needs to implement by myself, is it possible to emulate an
-> usb-connector driver by extcon-usb-gpio, and also use the notifier
-> mechanism or can you give me some advices?
-
-I am afraid I am unable to help you on this. I wasn't really pay
-attention when usb-connector was introduced and not sure how it can
-replace extcon. Now after read usb-connector.txt, it seems the binding
-only defines a/b/c-connector, but not ab-connector, and there is no
-enough information (at least for me) explaining how VBUS and ID fix into
-this usb-connector binding.
-
-Maybe Rob can provide some hint.
-
-Regards,
--Bin.
+> This is based on the initial work done by Neil Leeder[1]
+> 
+> SMMUv3 PMCG devices are named as smmuv3_pmcg_<phys_addr_page>
+> where <phys_addr_page> is the physical page address of the SMMU PMCG.
+> For example, the PMCG at 0xff88840000 is named smmuv3_pmcg_ff88840
+> 
+> Usage example:
+> For common arch supported events:
+> perf stat -e smmuv3_pmcg_ff88840/transaction,filter_enable=1,
+>  filter_span=1,filter_stream_id=0x42/ -a netperf
+> 
+> For IMP DEF events:
+> perf stat -e smmuv3_pmcg_ff88840/event=id/ -a netperf
+> 
+> This is sanity tested on a HiSilicon platform that requires
+> a quirk to run  it properly. As per HiSilicon erratum  #162001800,
+> PMCG event counter registers (SMMU_PMCG_EVCNTRn) on HiSilicon Hip08
+> platforms are read only and this prevents the software from setting
+> the initial period on event start. Unfortunately we were a bit late
+> in the cycle to detect this issue and now require software workaround
+> for this. Patch #4 is added to this series to provide a workaround
+> for this issue.
+> 
+> Further testing on supported platforms are very much welcome.
+> 
+> v4 ---> v5
+> -IORT code is modified to pass the option/quirk flags to the driver
+>  through platform_data (patch #4), based on Robin's comments.
+> -Removed COMPILE_TEST (patch #2).
+> 
+> v3 --> v4
+> 
+> -Addressed comments from Jean and Robin.
+> -Merged dma config callbacks as per Lorenzo's comments(patch #1).
+> -Added handling of Global(Counter0) filter settings mode(patch #2).
+> -Added patch #4 to address HiSilicon erratum  #162001800
+> -
+> v2 --> v3
+> 
+> -Addressed comments from Robin.
+> -Removed iort helper function to retrieve the PMCG reference smmu.
+> -PMCG devices are now named using the base address
+> 
+> v1 --> v2
+> 
+> - Addressed comments from Robin.
+> - Added an helper to retrieve the associated smmu dev and named PMUs
+>   to make the association visible to user.
+> - Added MSI support  for overflow irq
+> 
+> [1]https://www.spinics.net/lists/arm-kernel/msg598591.html
+> 
+> Neil Leeder (2):
+>   acpi: arm64: add iort support for PMCG
+>   perf: add arm64 smmuv3 pmu driver
+> 
+> Shameer Kolothum (2):
+>   perf/smmuv3: Add MSI irq support
+>   perf/smmuv3_pmu: Enable HiSilicon Erratum 162001800 quirk
+> 
+>  drivers/acpi/arm64/iort.c     | 127 +++++--
+>  drivers/perf/Kconfig          |   9 +
+>  drivers/perf/Makefile         |   1 +
+>  drivers/perf/arm_smmuv3_pmu.c | 859
+> ++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/acpi_iort.h     |   3 +
+>  5 files changed, 975 insertions(+), 24 deletions(-)
+>  create mode 100644 drivers/perf/arm_smmuv3_pmu.c
+> 
+> --
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> Linuxarm mailing list
+> Linuxarm@huawei.com
+> http://hulk.huawei.com/mailman/listinfo/linuxarm
 
 _______________________________________________
 linux-arm-kernel mailing list
