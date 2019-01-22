@@ -2,91 +2,95 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BAACEC282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 16:57:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 88E91C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 17:06:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8100521726
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 16:57:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4D3E120866
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 17:06:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WeIC9/Ub";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="i7appmm+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8100521726
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VcQgbbDc";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="SGgWtVDy";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="D1LSPVCA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4D3E120866
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=HHc2tiO2TXZHsfjLjVdO8TlM16E9WMxl3su7v2STVtw=; b=WeIC9/UbnIHGQp
-	+dRg41nHYAPiG0Q3Wg75YlzTSh7Oz0q0k6EHHmlIj0gGAmcmJX6cXz+GAtp9ErH+jX1WD7p1/q4zX
-	tFiWCZoj/O9rnuJxt95FvCC2WSHFS+i13iYomxNXVfCCNaTpYtBfwpLp83dsbp7488p4LemyQeWVg
-	OIN+IBuu+0mqW10VcMuzG6YjGFlfqBPGTChlzC7h92EmHXY688fpRjIh4R5uNCj7jWReeik2+kAiL
-	H+BSbRisFemvzl9wQV+HwVWIyRz41avQeHG/bhQTWmmGQ6MPSG9ZvlQ3jm13Ota+6EjF2ymgj6EVT
-	iZuMPX/GGPmAI2lgdDkg==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=FCke6bCWzVp6nEPXf4/YsvlUZtxL/WNCfyL1//SVE2E=; b=VcQgbbDcxhUPEH
+	l14MtnxqjaCVoDF1ZQI1G0xD252H8orfI1IqOLVy9XzBDotbuiErKpBiksACO3av+ojR/uZxwLXub
+	eU0eVcZVnsHSLxBQP5aC35GOBTFZnTWEDoR37s9xUCahQOn071d/8hpG3qxK8is+1gAWHqdCmGLlf
+	G5rdo8TpgOfFXq57SsS9ZcL6R9BcGjxeTmoK9O2sxsBhopCvGniBkAlL7EPkCpiX1oBK2iIbMqoGu
+	co7PDormBeROQv2kdYiSljw9Q3T4NXWzPWzTz+jMlb5G4pU854DNsXgbZ/qxR5hsive2J99WHkJAV
+	XD7/ibFEB8LMFwNFxDpw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glzM7-0002Dv-3u; Tue, 22 Jan 2019 16:56:55 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+	id 1glzVo-0007au-Bm; Tue, 22 Jan 2019 17:06:56 +0000
+Received: from smtp.codeaurora.org ([198.145.29.96])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glzM2-0002DZ-Ni
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 16:56:53 +0000
-Received: by mail-wm1-x342.google.com with SMTP id d15so14884084wmb.3
+ id 1glzVk-0007aU-RK
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 17:06:54 +0000
+Received: by smtp.codeaurora.org (Postfix, from userid 1000)
+ id 50AC96024C; Tue, 22 Jan 2019 17:06:51 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1548176811;
+ bh=m9EYD1U6kVRMiotzE6lgXblp3Ir5lCrzPsFy85sYUsQ=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=SGgWtVDyjJ4EklYW3kC15qlOJD6j8jD9WcVAduVMk42aO6M90GlBog9704vScHjA5
+ fU1a92STEon9cEi4tMkJOGr1JAjvLh1E7YZFI3QZbfTmYiqoAYlqEJxt5eYAUQhIqf
+ aNAYp0FWk7S4W3TMCggf35qd2Mjzmco2pUH7q8NY=
+Received: from mail-ed1-f41.google.com (mail-ed1-f41.google.com
+ [209.85.208.41])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ (Authenticated sender: vivek.gautam@smtp.codeaurora.org)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id 89BBC6081E
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 22 Jan 2019 08:56:49 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=mMHMp6e1jPtVKno6swImdJiZYu/m6Vm6Ibs/f50i5Bg=;
- b=i7appmm+C0k0x4NYLpewIcUuOsDw0YxCCVhGf9RI27fUoAy8YhTr4xRh5tSLUjVeNo
- KlBvWJwhv6XXYiTpG+DlKpNSewQ1Hqbd/ElhGk4rhc08Ji003EfgIt1OP9Z0sncdoZF9
- swF7WUgR+qxlPArhQvhKg1UFO2YIv/707qGNGlWHl0InLaFlXETILgAaQ+QqtF43RllW
- WpkFX658coS/g9wXYMo9fKmla0XA6G8staiSbrtAMN8MPg4qNaJGNgEHuSL/2yHokWoN
- z/blX3hBd7AVrf9s0C+cNohKgcc03I9hKorjBhDxG0YWf7ERpD2AkB7pLK5f4asf+sBi
- zjoQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=mMHMp6e1jPtVKno6swImdJiZYu/m6Vm6Ibs/f50i5Bg=;
- b=teMC2L4W385b1l2j+osBqb7uK3N2wo1G4DjBYDJVhQLarT4Wa0pNWnFf6PgwSxtDJ1
- IRcO6H0rVSV4jbUHE9xTnNdvQYbrig3fkG4pK3I/69BV39BwPbYmrmYeiYS/eGgdJj3S
- MSxFVu8nRzgvDQsi3ywMyZGyNZm3mPH1ZcZjO1f6tqK8pxnXFMgTpeb4SLUaqw85XyB3
- dvIkt+QO2p5Cdsi6jcMVq+vBa38wxH8FVmM/5ptsbRfhUxcjuJr4xpb7u6vdNyxw8Vf2
- tQdSQuv0SlRBIo5tUleW2lZGX7VqjosUdoLmk2QRfjSyRoC3ZIEIMeOWHXneLRKiuVAH
- OWzg==
-X-Gm-Message-State: AJcUukc4FvZ7kBTH7Dnk5xmGghbXNeaq6c0KYJ+T1fKoBBKg57euJqmU
- 28DTbEZGhehLKqQ98iyatQmwAA==
-X-Google-Smtp-Source: ALg8bN5rQeszL+fx5ji7m7Qo6WXUPAl7E8c0pN6Iav2XfR7HstQWsNCp1g8PvygvLfEQ+DrJHuws9A==
-X-Received: by 2002:a1c:b53:: with SMTP id 80mr4279188wml.121.1548176208376;
- Tue, 22 Jan 2019 08:56:48 -0800 (PST)
-Received: from localhost.localdomain ([2a00:23c4:f7a1:ce00:5105:4b7b:c922:7c6])
- by smtp.gmail.com with ESMTPSA id w6sm53572108wme.46.2019.01.22.08.56.46
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 22 Jan 2019 08:56:47 -0800 (PST)
-From: Carlo Caione <ccaione@baylibre.com>
-To: shawnguo@kernel.org, s.hauer@pengutronix.de, kernel@pengutronix.de,
- fabio.estevam@nxp.com, linux-imx@nxp.com, l.stach@pengutronix.de,
- robh+dt@kernel.org, mark.rutland@arm.com,
- linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org,
- abailon@baylibre.com
-Subject: [PATCH] arm64: dts: imx8mq: Fix boot from eMMC
-Date: Tue, 22 Jan 2019 16:55:46 +0000
-Message-Id: <20190122165546.11712-1-ccaione@baylibre.com>
-X-Mailer: git-send-email 2.19.1
+ Tue, 22 Jan 2019 17:06:49 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1548176809;
+ bh=m9EYD1U6kVRMiotzE6lgXblp3Ir5lCrzPsFy85sYUsQ=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=D1LSPVCAO2cvp07wHRLPLe7fJAoPsd9HmH4gPrbSQGwhfph8Bfvsqw6WQ1QguCzhk
+ FWIYCFzmj00OivrGYyo+8T9cS9LKs3DrHzEHzfdWLkcVVjHsv9hU1ytbPiSnHdbUbO
+ YIOWmRHXHlofaRgD6WSMebRfGZ81pmoYNxba6TnU=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 89BBC6081E
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ dmarc=none (p=none dis=none) header.from=codeaurora.org
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ spf=none smtp.mailfrom=vivek.gautam@codeaurora.org
+Received: by mail-ed1-f41.google.com with SMTP id a20so19897798edc.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 22 Jan 2019 09:06:49 -0800 (PST)
+X-Gm-Message-State: AJcUukeX9CRC2wcqLdfw5Gd529MPBwzft5t7pERfIJ2NvsLWJ3UfqSKM
+ +kJ29qDkoa/oBrPA9xJChLuHQ0n7BeOImAgHH20=
+X-Google-Smtp-Source: ALg8bN6cWW4VzOHbSqQJpW4P5Q/2gR5K1qPiqLCEBvwRyHDg4rRiJ6DM+A3QZZG9yB9lSZDU/km4Rvft7zPeeAoF+eI=
+X-Received: by 2002:aa7:c0d0:: with SMTP id j16mr31111179edp.173.1548176808160; 
+ Tue, 22 Jan 2019 09:06:48 -0800 (PST)
 MIME-Version: 1.0
+References: <20190121055335.15430-1-vivek.gautam@codeaurora.org>
+ <20190121055335.15430-2-vivek.gautam@codeaurora.org>
+ <b0688376-f922-9d17-eb66-f28df6963bcf@arm.com>
+In-Reply-To: <b0688376-f922-9d17-eb66-f28df6963bcf@arm.com>
+From: Vivek Gautam <vivek.gautam@codeaurora.org>
+Date: Tue, 22 Jan 2019 22:36:36 +0530
+X-Gmail-Original-Message-ID: <CAFp+6iEanKEhLkonZwqBYV1e-=-yKbStj0SoL0x6UNQxaOft=w@mail.gmail.com>
+Message-ID: <CAFp+6iEanKEhLkonZwqBYV1e-=-yKbStj0SoL0x6UNQxaOft=w@mail.gmail.com>
+Subject: Re: [PATCH 1/3] iommu/arm-smmu: Move to bitmap for arm_smmu_domain
+ atrributes
+To: Robin Murphy <robin.murphy@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_085650_830432_D12FA85C 
-X-CRM114-Status: GOOD (  11.89  )
+X-CRM114-CacheID: sfid-20190122_090652_919296_669359F1 
+X-CRM114-Status: GOOD (  21.62  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,110 +102,102 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Carlo Caione <ccaione@baylibre.com>
+Cc: pdaly@codeaurora.org, linux-arm-msm <linux-arm-msm@vger.kernel.org>,
+ "list@263.net:IOMMU DRIVERS <iommu@lists.linux-foundation.org>,
+ Joerg Roedel <joro@8bytes.org>, " <joro@8bytes.org>,
+ Will Deacon <will.deacon@arm.com>, open list <linux-kernel@vger.kernel.org>,
+ "list@263.net:IOMMU DRIVERS <iommu@lists.linux-foundation.org>,
+ Joerg Roedel <joro@8bytes.org>, " <iommu@lists.linux-foundation.org>,
+ pratikp@codeaurora.org, Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The boot from eMMC is currently broken on the NXP i.MX8MQ EVK board.
-When trying to boot from eMMC it fails with:
+On Mon, Jan 21, 2019 at 7:23 PM Robin Murphy <robin.murphy@arm.com> wrote:
+>
+> On 21/01/2019 05:53, Vivek Gautam wrote:
+> > A number of arm_smmu_domain's attributes can be assigned based
+> > on the iommu domains's attributes. These local attributes better
+> > be managed by a bitmap.
+> > So remove boolean flags and move to a 32-bit bitmap, and enable
+> > each bits separtely.
+> >
+> > Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+> > ---
+> >   drivers/iommu/arm-smmu.c | 10 ++++++----
+> >   1 file changed, 6 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> > index 7ebbcf1b2eb3..52b300dfc096 100644
+> > --- a/drivers/iommu/arm-smmu.c
+> > +++ b/drivers/iommu/arm-smmu.c
+> > @@ -257,10 +257,11 @@ struct arm_smmu_domain {
+> >       const struct iommu_gather_ops   *tlb_ops;
+> >       struct arm_smmu_cfg             cfg;
+> >       enum arm_smmu_domain_stage      stage;
+> > -     bool                            non_strict;
+> >       struct mutex                    init_mutex; /* Protects smmu pointer */
+> >       spinlock_t                      cb_lock; /* Serialises ATS1* ops and TLB syncs */
+> >       struct iommu_domain             domain;
+> > +#define ARM_SMMU_DOMAIN_ATTR_NON_STRICT      BIT(0)
+> > +     unsigned int                    attr;
+> >   };
+> >
+> >   struct arm_smmu_option_prop {
+> > @@ -901,7 +902,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+> >       if (smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
+> >               pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
+> >
+> > -     if (smmu_domain->non_strict)
+> > +     if (smmu_domain->attr & ARM_SMMU_DOMAIN_ATTR_NON_STRICT)
+> >               pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_NON_STRICT;
+> >
+> >       /* Non coherent page table mappings only for Stage-1 */
+> > @@ -1598,7 +1599,8 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
+> >       case IOMMU_DOMAIN_DMA:
+> >               switch (attr) {
+> >               case DOMAIN_ATTR_DMA_USE_FLUSH_QUEUE:
+> > -                     *(int *)data = smmu_domain->non_strict;
+> > +                     *(int *)data = !!(smmu_domain->attr &
+> > +                                       ARM_SMMU_DOMAIN_ATTR_NON_STRICT);
+> >                       return 0;
+> >               default:
+> >                       return -ENODEV;
+> > @@ -1638,7 +1640,7 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
+> >       case IOMMU_DOMAIN_DMA:
+> >               switch (attr) {
+> >               case DOMAIN_ATTR_DMA_USE_FLUSH_QUEUE:
+> > -                     smmu_domain->non_strict = *(int *)data;
+> > +                     smmu_domain->attr |= ARM_SMMU_DOMAIN_ATTR_NON_STRICT;
+>
+> But what if *data == 0?
 
-...
-[    1.271938] mmc1: Tuning failed, falling back to fixed sampling clock
-[    1.287429] print_req_error: I/O error, dev mmcblk1, sector 1 flags 0
-[    1.306833] mmc1: Tuning failed, falling back to fixed sampling clock
-[    1.322325] print_req_error: I/O error, dev mmcblk1, sector 2 flags 0
-[    1.329559] Buffer I/O error on dev mmcblk1, logical block 0, async page read
-[    1.336714]  mmcblk1: unable to read partition table
-...
+Right, a check for data here also similar to what we are doing for
+QCOM_SYS_CACHE [1].
 
-The problem is the result of a partial misconfiguration of the pins and
-the missing assigned clock rate.
+[1] https://lore.kernel.org/patchwork/patch/1033796/
 
-Signed-off-by: Carlo Caione <ccaione@baylibre.com>
----
- arch/arm64/boot/dts/freescale/imx8mq-evk.dts | 44 ++++++++++----------
- arch/arm64/boot/dts/freescale/imx8mq.dtsi    |  2 +
- 2 files changed, 24 insertions(+), 22 deletions(-)
+Regards
+Vivek
 
-diff --git a/arch/arm64/boot/dts/freescale/imx8mq-evk.dts b/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
-index 64acccc4bfcb..f74b13aa5aa5 100644
---- a/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
-+++ b/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
-@@ -227,34 +227,34 @@
- 
- 	pinctrl_usdhc1_100mhz: usdhc1-100grp {
- 		fsl,pins = <
--			MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK			0x85
--			MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD			0xc5
--			MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0		0xc5
--			MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1		0xc5
--			MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2		0xc5
--			MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3		0xc5
--			MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4		0xc5
--			MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5		0xc5
--			MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6		0xc5
--			MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7		0xc5
--			MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE		0x85
-+			MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK			0x8d
-+			MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD			0xcd
-+			MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0		0xcd
-+			MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1		0xcd
-+			MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2		0xcd
-+			MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3		0xcd
-+			MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4		0xcd
-+			MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5		0xcd
-+			MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6		0xcd
-+			MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7		0xcd
-+			MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE		0x8d
- 			MX8MQ_IOMUXC_SD1_RESET_B_USDHC1_RESET_B		0xc1
- 		>;
- 	};
- 
- 	pinctrl_usdhc1_200mhz: usdhc1-200grp {
- 		fsl,pins = <
--			MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK			0x87
--			MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD			0xc7
--			MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0		0xc7
--			MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1		0xc7
--			MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2		0xc7
--			MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3		0xc7
--			MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4		0xc7
--			MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5		0xc7
--			MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6		0xc7
--			MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7		0xc7
--			MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE		0x87
-+			MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK			0x9f
-+			MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD			0xdf
-+			MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0		0xdf
-+			MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1		0xdf
-+			MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2		0xdf
-+			MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3		0xdf
-+			MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4		0xdf
-+			MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5		0xdf
-+			MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6		0xdf
-+			MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7		0xdf
-+			MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE		0x9f
- 			MX8MQ_IOMUXC_SD1_RESET_B_USDHC1_RESET_B		0xc1
- 		>;
- 	};
-diff --git a/arch/arm64/boot/dts/freescale/imx8mq.dtsi b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-index 8e9d6d5ed7b2..b6d31499fb43 100644
---- a/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-+++ b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-@@ -360,6 +360,8 @@
- 				         <&clk IMX8MQ_CLK_NAND_USDHC_BUS>,
- 				         <&clk IMX8MQ_CLK_USDHC1_ROOT>;
- 				clock-names = "ipg", "ahb", "per";
-+				assigned-clocks = <&clk IMX8MQ_CLK_USDHC1>;
-+				assigned-clock-rates = <400000000>;
- 				fsl,tuning-start-tap = <20>;
- 				fsl,tuning-step = <2>;
- 				bus-width = <4>;
+>
+> Robin.
+>
+> >                       break;
+> >               default:
+> >                       ret = -ENODEV;
+> >
+> _______________________________________________
+> iommu mailing list
+> iommu@lists.linux-foundation.org
+> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+
+
+
 -- 
-2.19.1
-
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
 
 _______________________________________________
 linux-arm-kernel mailing list
