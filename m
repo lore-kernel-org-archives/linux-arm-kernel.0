@@ -2,72 +2,68 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,
+	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CC0AEC282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 09:36:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B493EC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 09:38:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9B720218D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 09:36:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6F988218D0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 09:38:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VSTLgPKi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9B720218D9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TojSGJVQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6F988218D0
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2o8u6sZs23Vx61n8JhzNn8S81GQ445O6LmlIJpBiLzY=; b=VSTLgPKiecnyTH
-	Xt+xPkkFDJBLzNz2iRySl+g4evIOkNC4xNRmxfWzN4hUV+pIENPJYOCEZzlQvYKc7CunaCWdsfEwd
-	EhLAssxW6sfVFCcV1JLmWiXdLtHTvOqOiWeasTSU4ijDKUTtnE6o7IQWYTMe7KfKWX7W/go+spv9o
-	NekhKWPZRV1yRCQyxez+hOalciLnbVdrkLe+WlUWRQcSw7PSnpzFoK86rjfhwRk92tlmVan+IUsj0
-	KpsqGrQbZcXaYi7vsOwUEfT3mz0nINZ/NRwELWKsaYvhNjsUeDtgV4fhy4n+Y1ETiy92YcxHo40Wn
-	UATap+0tyiaW2uR8TLKA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=V0JA5GDFiqi8VoC/C7dDeCK5/BGMbUzK91mvuizse3o=; b=TojSGJVQvJn+p9
+	2N43ypnNJLeywTimCaO9he9k0OM3CH5rpruWqd8ZH1fch0AKQFr5S7D5r7BIZgKKyN4xcZSDGh5+0
+	5OFtQMcnQ8s1Q5LkKvIKa0Vkvm3YVObbcL1Swk8rA+zAT9lptqIXkIusAhPJa/JpFkxc/kWW4kKE9
+	QVe7HA5c08eG5ZOE05piC+Zv9jA3tsm2CFN0qJHyLUV7rK0FcbRRfT8xOm9MP6cLz33OIewjlq2n1
+	EDtZGM7Y9YLqPP56iV85/y7GHTKreeS0D5zaop5zmO+rlMooWoiVSCe4z+pN38c+6bZjZI7+SXpFy
+	d338IE6E5gBKh1x3an+Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glsTu-0000xT-4t; Tue, 22 Jan 2019 09:36:30 +0000
-Received: from mailgw02.mediatek.com ([216.200.240.185])
+	id 1glsVk-0001Jq-2l; Tue, 22 Jan 2019 09:38:24 +0000
+Received: from mailgw01.mediatek.com ([216.200.240.184])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glsTp-0000wO-SJ; Tue, 22 Jan 2019 09:36:28 +0000
-X-UUID: fcb1b7d915d447e1aff5719dd0aaf52c-20190122
-X-UUID: fcb1b7d915d447e1aff5719dd0aaf52c-20190122
-Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw02.mediatek.com
- (envelope-from <min.guo@mediatek.com>)
+ id 1glsVg-0001J6-Nd; Tue, 22 Jan 2019 09:38:22 +0000
+X-UUID: 10d603a86b0c4386b76322ba8e59d59e-20190122
+X-UUID: 10d603a86b0c4386b76322ba8e59d59e-20190122
+Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw01.mediatek.com
+ (envelope-from <jianjun.wang@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 198403713; Tue, 22 Jan 2019 01:36:17 -0800
-Received: from MTKMBS31N2.mediatek.inc (172.27.4.87) by
- MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 22 Jan 2019 01:36:15 -0800
-Received: from MTKCAS32.mediatek.inc (172.27.4.184) by MTKMBS31N2.mediatek.inc
- (172.27.4.87) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Tue, 22 Jan 2019 17:36:13 +0800
-Received: from [10.17.3.153] (10.17.3.153) by MTKCAS32.mediatek.inc
- (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Tue, 22 Jan 2019 17:36:13 +0800
-Message-ID: <1548149773.4433.284.camel@mhfsdcap03>
-Subject: Re: [PATCH v4 1/6] dt-bindings: usb: musb: Add support for MediaTek
- musb controller
-From: Min Guo <min.guo@mediatek.com>
-To: Rob Herring <robh@kernel.org>, Bin Liu <b-liu@ti.com>
-Date: Tue, 22 Jan 2019 17:36:13 +0800
-In-Reply-To: <20190121151417.GA19238@bogus>
-References: <1548073351-13739-1-git-send-email-min.guo@mediatek.com>
- <1548073351-13739-2-git-send-email-min.guo@mediatek.com>
- <20190121151417.GA19238@bogus>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+ with ESMTP id 442269860; Tue, 22 Jan 2019 01:37:47 -0800
+Received: from mtkmbs08n1.mediatek.inc (172.21.101.55) by
+ MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Tue, 22 Jan 2019 01:37:45 -0800
+Received: from mtkcas07.mediatek.inc (172.21.101.84) by
+ mtkmbs08n1.mediatek.inc (172.21.101.55) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Tue, 22 Jan 2019 17:37:37 +0800
+Received: from localhost.localdomain (10.17.3.153) by mtkcas07.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Tue, 22 Jan 2019 17:37:37 +0800
+From: Jianjun Wang <jianjun.wang@mediatek.com>
+To: <ryder.lee@mediatek.com>, <lorenzo.pieralisi@arm.com>,
+ <bhelgaas@google.com>, <matthias.bgg@gmail.com>
+Subject: [v1] PCI: mediatek: Remove MSI inner domain
+Date: Tue, 22 Jan 2019 17:37:35 +0800
+Message-ID: <1548149855-3225-1-git-send-email-jianjun.wang@mediatek.com>
+X-Mailer: git-send-email 1.7.9.5
 MIME-Version: 1.0
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_013625_921477_02B3D79F 
-X-CRM114-Status: GOOD (  26.81  )
+X-CRM114-CacheID: sfid-20190122_013820_776186_E4E74D6A 
+X-CRM114-Status: GOOD (  13.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,133 +75,196 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- tony@atomide.com, Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- linux-usb@vger.kernel.org, linux-kernel@vger.kernel.org, hdegoede@redhat.com,
- chunfeng.yun@mediatek.com, Alan Stern <stern@rowland.harvard.edu>,
- Matthias Brugger <matthias.bgg@gmail.com>, linux-mediatek@lists.infradead.org,
+Cc: youlin.pei@mediatek.com, linux-pci@vger.kernel.org,
+ linux-kernel@vger.kernel.org, jianjun.wang@mediatek.com,
+ linux-mediatek@lists.infradead.org, honghui.zhang@mediatek.com,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Bin,
+There is no need to create the inner domain as a parent for MSI domian,
+some feature has been implemented by MSI framework.
 
-Sorry to bother you again, I encounter a problem about the extcon
-property.
+Remove the inner domain and its irq chip, it will be more closer to
+hardware implementation.
 
-I don't find a common driver describing the usb-connector. Is
-there any driver that I can refer to, specially the way to switch MUSB
-controller between host and device mode? 
-If it needs to implement by myself, is it possible to emulate an
-usb-connector driver by extcon-usb-gpio, and also use the notifier
-mechanism or can you give me some advices?
+Signed-off-by: Jianjun Wang <jianjun.wang@mediatek.com>
+---
+ drivers/pci/controller/pcie-mediatek.c | 86 +++++++++++---------------
+ 1 file changed, 37 insertions(+), 49 deletions(-)
 
-
-Hi Rob,
-
-On Mon, 2019-01-21 at 09:14 -0600, Rob Herring wrote:
-> On Mon, Jan 21, 2019 at 08:22:26PM +0800, min.guo@mediatek.com wrote:
-> > From: Min Guo <min.guo@mediatek.com>
-> > 
-> > This adds support for MediaTek musb controller in
-> > host, peripheral and otg mode.
-> > 
-> > Signed-off-by: Min Guo <min.guo@mediatek.com>
-> > ---
-> > changes in v4:
-> > suggested by Sergei:
-> > 1. String alignment
-> > 
-> > changes in v3:
-> > 1. no changes
-> > 
-> > changes in v2:
-> > suggested by Bin:
-> > 1. Modify DRC to DRD
-> > suggested by Rob:
-> > 2. Drop the "<soc-model>-musb" in compatible
-> 
-> This is not what I said. I gave you the exact text to put.
-
-Sorry to misunderstood your meaning last time,  I will modify it in next
-patch.
-	compatible: should be one of "mediatek,mt2701-musb"...,followed by
-"mediatek,mtk-musb"
-
-> > 3. Remove phy-names
-> > 4. Add space after comma in clock-names
-> > ---
-> >  .../devicetree/bindings/usb/mediatek,musb.txt      | 43 ++++++++++++++++++++++
-> >  1 file changed, 43 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/usb/mediatek,musb.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/usb/mediatek,musb.txt b/Documentation/devicetree/bindings/usb/mediatek,musb.txt
-> > new file mode 100644
-> > index 0000000..4305770
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/usb/mediatek,musb.txt
-> > @@ -0,0 +1,43 @@
-> > +MediaTek musb DRD/OTG controller
-> > +-------------------------------------------
-> > +
-> > +Required properties:
-> > + - compatible      : should be "mediatek,mtk-musb"
-> > + - reg             : specifies physical base address and size of
-> > +                     the registers
-> > + - interrupts      : interrupt used by musb controller
-> > + - interrupt-names : must be "mc"
-> > + - phys            : PHY specifier for the OTG phy
-> > + - dr_mode         : should be one of "host", "peripheral" or "otg",
-> > +                     refer to usb/generic.txt
-> > + - clocks          : a list of phandle + clock-specifier pairs, one for
-> > +                     each entry in clock-names
-> > + - clock-names     : must contain "main", "mcu", "univpll"
-> > +                     for clocks of controller
-> > +
-> > +Optional properties:
-> > + - extcon          : external connector for VBUS and ID pin changes detection,
-> > +                     needed when supports dual-role mode
-> 
-> Again, do not use extcon in new bindings.
-
-Thanks, ok.
-
-> > + - vbus-supply     : reference to the VBUS regulator, needed when supports
-> > +                     dual-role mode
-> > + - power-domains   : a phandle to USB power domain node to control USB's
-> > +                     MTCMOS
-> > +
-> > +Example:
-> > +
-> > +usb2: usb@11200000 {
-> > +	compatible = "mediatek,mt2701-musb",
-> > +		     "mediatek,mtk-musb";
-> > +	reg = <0 0x11200000 0 0x1000>;
-> > +	interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_LOW>;
-> > +	interrupt-names = "mc";
-> > +	phys = <&u2port2 PHY_TYPE_USB2>;
-> > +	vbus-supply = <&usb_vbus>;
-> > +	extcon = <&extcon_usb>;
-> > +	dr_mode = "otg";
-> > +	clocks = <&pericfg CLK_PERI_USB0>,
-> > +		 <&pericfg CLK_PERI_USB0_MCU>,
-> > +		 <&pericfg CLK_PERI_USB_SLV>;
-> > +	clock-names = "main","mcu","univpll";
-> > +	power-domains = <&scpsys MT2701_POWER_DOMAIN_IFR_MSC>;
-> > +};
-> > -- 
-> > 1.9.1
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel@lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-Regards,
-Min.
+diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
+index 8d05df56158b..f996a9a6331f 100644
+--- a/drivers/pci/controller/pcie-mediatek.c
++++ b/drivers/pci/controller/pcie-mediatek.c
+@@ -169,7 +169,6 @@ struct mtk_pcie_soc {
+  * @slot: port slot
+  * @irq: GIC irq
+  * @irq_domain: legacy INTx IRQ domain
+- * @inner_domain: inner IRQ domain
+  * @msi_domain: MSI IRQ domain
+  * @lock: protect the msi_irq_in_use bitmap
+  * @msi_irq_in_use: bit map for assigned MSI IRQ
+@@ -190,7 +189,6 @@ struct mtk_pcie_port {
+ 	u32 slot;
+ 	int irq;
+ 	struct irq_domain *irq_domain;
+-	struct irq_domain *inner_domain;
+ 	struct irq_domain *msi_domain;
+ 	struct mutex lock;
+ 	DECLARE_BITMAP(msi_irq_in_use, MTK_MSI_IRQS_NUM);
+@@ -418,22 +416,15 @@ static void mtk_msi_ack_irq(struct irq_data *data)
+ 	u32 hwirq = data->hwirq;
+ 
+ 	writel(1 << hwirq, port->base + PCIE_IMSI_STATUS);
++	writel(MSI_STATUS, port->base + PCIE_INT_STATUS);
+ }
+ 
+-static struct irq_chip mtk_msi_bottom_irq_chip = {
+-	.name			= "MTK MSI",
+-	.irq_compose_msi_msg	= mtk_compose_msi_msg,
+-	.irq_set_affinity	= mtk_msi_set_affinity,
+-	.irq_ack		= mtk_msi_ack_irq,
+-};
+-
+-static int mtk_pcie_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+-				     unsigned int nr_irqs, void *args)
++static irq_hw_number_t mtk_pcie_msi_get_hwirq(struct msi_domain_info *info,
++					      msi_alloc_info_t *arg)
+ {
+-	struct mtk_pcie_port *port = domain->host_data;
+-	unsigned long bit;
++	struct mtk_pcie_port *port = info->chip_data;
++	irq_hw_number_t bit;
+ 
+-	WARN_ON(nr_irqs != 1);
+ 	mutex_lock(&port->lock);
+ 
+ 	bit = find_first_zero_bit(port->msi_irq_in_use, MTK_MSI_IRQS_NUM);
+@@ -446,18 +437,14 @@ static int mtk_pcie_irq_domain_alloc(struct irq_domain *domain, unsigned int vir
+ 
+ 	mutex_unlock(&port->lock);
+ 
+-	irq_domain_set_info(domain, virq, bit, &mtk_msi_bottom_irq_chip,
+-			    domain->host_data, handle_edge_irq,
+-			    NULL, NULL);
+-
+-	return 0;
++	return bit;
+ }
+ 
+-static void mtk_pcie_irq_domain_free(struct irq_domain *domain,
+-				     unsigned int virq, unsigned int nr_irqs)
++static void mtk_pcie_msi_free(struct irq_domain *domain,
++			      struct msi_domain_info *info, unsigned int virq)
+ {
+ 	struct irq_data *d = irq_domain_get_irq_data(domain, virq);
+-	struct mtk_pcie_port *port = irq_data_get_irq_chip_data(d);
++	struct mtk_pcie_port *port = info->chip_data;
+ 
+ 	mutex_lock(&port->lock);
+ 
+@@ -468,46 +455,50 @@ static void mtk_pcie_irq_domain_free(struct irq_domain *domain,
+ 		__clear_bit(d->hwirq, port->msi_irq_in_use);
+ 
+ 	mutex_unlock(&port->lock);
+-
+-	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
+ }
+ 
+-static const struct irq_domain_ops msi_domain_ops = {
+-	.alloc	= mtk_pcie_irq_domain_alloc,
+-	.free	= mtk_pcie_irq_domain_free,
++static struct msi_domain_ops mtk_msi_domain_ops = {
++	.get_hwirq	= mtk_pcie_msi_get_hwirq,
++	.msi_free	= mtk_pcie_msi_free,
+ };
+ 
+ static struct irq_chip mtk_msi_irq_chip = {
+-	.name		= "MTK PCIe MSI",
+-	.irq_ack	= irq_chip_ack_parent,
+-	.irq_mask	= pci_msi_mask_irq,
+-	.irq_unmask	= pci_msi_unmask_irq,
++	.name			= "MTK PCIe",
++	.irq_compose_msi_msg	= mtk_compose_msi_msg,
++	.irq_write_msi_msg	= pci_msi_domain_write_msg,
++	.irq_set_affinity	= mtk_msi_set_affinity,
++	.irq_ack		= mtk_msi_ack_irq,
++	.irq_mask		= pci_msi_mask_irq,
++	.irq_unmask		= pci_msi_unmask_irq,
+ };
+ 
+ static struct msi_domain_info mtk_msi_domain_info = {
+-	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
+-		   MSI_FLAG_PCI_MSIX),
+-	.chip	= &mtk_msi_irq_chip,
++	.flags		= (MSI_FLAG_USE_DEF_DOM_OPS |
++			   MSI_FLAG_USE_DEF_CHIP_OPS | MSI_FLAG_PCI_MSIX),
++	.ops		= &mtk_msi_domain_ops,
++	.chip		= &mtk_msi_irq_chip,
++	.handler	= handle_edge_irq,
++	.handler_name	= "MSI",
+ };
+ 
+ static int mtk_pcie_allocate_msi_domains(struct mtk_pcie_port *port)
+ {
+-	struct fwnode_handle *fwnode = of_node_to_fwnode(port->pcie->dev->of_node);
++	struct device *dev = port->pcie->dev;
++	struct fwnode_handle *fwnode = of_node_to_fwnode(dev->of_node);
++	struct msi_domain_info *info;
+ 
+ 	mutex_init(&port->lock);
+ 
+-	port->inner_domain = irq_domain_create_linear(fwnode, MTK_MSI_IRQS_NUM,
+-						      &msi_domain_ops, port);
+-	if (!port->inner_domain) {
+-		dev_err(port->pcie->dev, "failed to create IRQ domain\n");
++	info = devm_kzalloc(dev, sizeof(*info), GFP_KERNEL);
++	if (!info)
+ 		return -ENOMEM;
+-	}
+ 
+-	port->msi_domain = pci_msi_create_irq_domain(fwnode, &mtk_msi_domain_info,
+-						     port->inner_domain);
++	memcpy(info, &mtk_msi_domain_info, sizeof(*info));
++	info->chip_data = port;
++
++	port->msi_domain = pci_msi_create_irq_domain(fwnode, info, NULL);
+ 	if (!port->msi_domain) {
+-		dev_err(port->pcie->dev, "failed to create MSI domain\n");
+-		irq_domain_remove(port->inner_domain);
++		dev_err(dev, "failed to create MSI domain\n");
+ 		return -ENOMEM;
+ 	}
+ 
+@@ -541,8 +532,6 @@ static void mtk_pcie_irq_teardown(struct mtk_pcie *pcie)
+ 		if (IS_ENABLED(CONFIG_PCI_MSI)) {
+ 			if (port->msi_domain)
+ 				irq_domain_remove(port->msi_domain);
+-			if (port->inner_domain)
+-				irq_domain_remove(port->inner_domain);
+ 		}
+ 
+ 		irq_dispose_mapping(port->irq);
+@@ -619,12 +608,11 @@ static void mtk_pcie_intr_handler(struct irq_desc *desc)
+ 
+ 			while ((imsi_status = readl(port->base + PCIE_IMSI_STATUS))) {
+ 				for_each_set_bit(bit, &imsi_status, MTK_MSI_IRQS_NUM) {
+-					virq = irq_find_mapping(port->inner_domain, bit);
++					virq = irq_find_mapping(
++							port->msi_domain, bit);
+ 					generic_handle_irq(virq);
+ 				}
+ 			}
+-			/* Clear MSI interrupt status */
+-			writel(MSI_STATUS, port->base + PCIE_INT_STATUS);
+ 		}
+ 	}
+ 
+-- 
+2.20.1
 
 
 _______________________________________________
