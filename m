@@ -2,80 +2,81 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D1E88C282C5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 04:17:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5EC42C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 04:22:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 91CD820855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 04:17:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2101C20855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 04:22:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="a4nOCAob";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="QAHz9ViX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 91CD820855
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HJEbCytS";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="I92I6Oav"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2101C20855
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=5ESEGysFp/8mckVVsO4T/7BUgmKSPNKfuC+3GCvirTE=; b=a4nOCAobYekGlC
-	eSkvWQWKwPkbsfW4q2xP0EP07nR+1m1+kHyaBAVXKI9gjoMhGqrKt929m0VERmmtxxYAP0SAMDPSw
-	fValWmxgvigvcXoGsXDpX7w1w9Sxc7mXs3js8r5rU+KYcc+LY6JB+jxx2/pa9lBkdMvrFv0KBAV2f
-	1tpbvY3SiaJGDeI8j0BDWt2XRWTHkLln3We2WFmSMTepSidBKrOSyZDlS3eszg1hD3K0sB1GfSvXv
-	ZUFfVZJa+CCpiHHXCPpjIT0GUmpTubrWbQ8QOeJGRHEW+PrBxlndBho4K/zZdSGbeCwcNtn3SNaoy
-	+9s947Da0fkeDb7nm2mg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=yIY7rtDYeA5NM4nJ5J2KRl4nMNT+r2994kKh+zpsojE=; b=HJE
+	bCytSVAZoE9BWQXREZDjrQcNMf5XClSnJolaCtDoekgPZQ073yEBPf5KWSVgkd0DJGdP7O5RjlBnY
+	EqMU50HIpcKg1tRfmoHtDpTSnN30QhGHlnLZKIb75IFJWykv3VOkhQJFZGB4/qmQhac7T2PE9K5yf
+	ULVxI6e4LWqzNTx37WFWafEtWFp2SnQ3YTvVTluxHfDCzYfhnoQRRa6ocL6SBVBhpLOO/+I1IOq8Z
+	Gk8JklXd2QAGA5ohlvT/yYY5goIlqBwS5gnTX2U2yoYdHzmRWQ+mol8U5eBb5P1MZYKv2ddToVa1s
+	9Lqve154J1eL1uXW88s6Yy4t9HcPgbQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glnVZ-0007iH-Ej; Tue, 22 Jan 2019 04:17:53 +0000
-Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
+	id 1glnZb-0000zQ-ES; Tue, 22 Jan 2019 04:22:03 +0000
+Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glnVV-0007hE-FJ
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 04:17:51 +0000
-Received: by mail-it1-x141.google.com with SMTP id b5so18340869iti.2
+ id 1glnZX-0000z3-GY
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 04:22:02 +0000
+Received: by mail-pl1-x643.google.com with SMTP id g9so10811172plo.3
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 20:17:48 -0800 (PST)
+ Mon, 21 Jan 2019 20:21:59 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=mNCiLSCOs3HIOeMuRVgReUCd+ne31UPnW0KZgc5m+zA=;
- b=QAHz9ViXtFffS1ULvCTtubzPehSRnYyYPPoHXhvVBgqhIPiQxlN67iGbs9/m9fptlW
- mbftemqKpCPpb84j8a3fXCUhA0Nnqu73NSxtd+5KItm+8aaLI1FRIvXOIudxnEgFWbBF
- BhuTTuQQk8dO+BCA12SMxl+9K4k7vgKF4R4xk=
+ h=from:to:cc:subject:date:message-id;
+ bh=YXvkxSWI9j7PH0XLfIk7l4OYwr3HALayuS+GuaRQtDA=;
+ b=I92I6OavRkseVq6UgzadkRcCAFJqwXyWpfd7gTHODjdJrmBQVQUO63UcisumFR9v3L
+ F6rJxjJWYvT8gu7mndjRGueKI4Y99rWws7RDuxSXJQqM/2xkBPh5j/X8v4isn2V1Dk9l
+ /pq6R2tNo/Big+HUyDxtEhQapDUfBedfiBQmg=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=mNCiLSCOs3HIOeMuRVgReUCd+ne31UPnW0KZgc5m+zA=;
- b=jd7qRCzUCt/o5PVpl0xZsqHor4aqzYUWWaOwk+QfbXAU7u2Iw/EOXf5T0wEhrI+myt
- nDQuaot2UpyZwoJ/9XAVszTUAU/3pUEH2/R7Hy7zfZpT+75DBXSLqXqQ7J3QdisTuC3h
- CbpECEEwe7/I9wleUEFCEoQVgq3p7Folq7OXuk2RVLcXgELjuRIAMR/p0eUqlUJHMEhr
- 5BCNqB0nICbuC9fbuQyGbTSps1qNfmRtyN5waSpIkytKaGfdAPkgZp52ZAxsaWeFLqGm
- hqkh9SE9f6cQpkE117zkUYsy1AJr5PvF9ynzfLh7nqVM8Q4x1MiY2i8yMCFT1nJ6vyo6
- AnvQ==
-X-Gm-Message-State: AJcUukdv47ODtn/KyAxUMtBbFpPeIr1v7Kx8Kn6k/egaN0eYPr2dxAcV
- 7JsmAwg+Z6pmvfJNx4PrdHTJ5PscVA9fdWWLnN8aVw==
-X-Google-Smtp-Source: ALg8bN5GlXzkDXSzuQpWtdpGUbIFc+urhwgY4mQj32A/c4P4ZfZKF6yRF0pHgpLttOBuPMH4biJBmbF2qhFL+K+RKlg=
-X-Received: by 2002:a24:f14d:: with SMTP id q13mr1180269iti.166.1548130667985; 
- Mon, 21 Jan 2019 20:17:47 -0800 (PST)
-MIME-Version: 1.0
-References: <1546530025-26014-1-git-send-email-firoz.khan@linaro.org>
- <20190119235650.GC26876@brain-police>
- <CAK8P3a1kiS7oF=eKLqPs6kKTYE1uTjhz++edH_J-tCUmXY2PNQ@mail.gmail.com>
-In-Reply-To: <CAK8P3a1kiS7oF=eKLqPs6kKTYE1uTjhz++edH_J-tCUmXY2PNQ@mail.gmail.com>
-From: Firoz Khan <firoz.khan@linaro.org>
-Date: Tue, 22 Jan 2019 09:47:36 +0530
-Message-ID: <CALxhOngnGKk==Cj+3EM1LkBK4FYRXNu4JxVg-d=3uttVcLwqQw@mail.gmail.com>
-Subject: Re: [PATCH 0/3] arm64: system call table generation for asm-generic
-To: Arnd Bergmann <arnd@arndb.de>
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=YXvkxSWI9j7PH0XLfIk7l4OYwr3HALayuS+GuaRQtDA=;
+ b=LOYXto8A6lCEige3SaNEv+Dgd4MnOvmyU+IelSWeasXClMXxJpBKwplX1jThyQjLX2
+ Nrie1oxnSEBI6j9YWfjtlHOyJu4Y/sUYBk8c9PMyRJQjKo74eBOkKflhVZpJLcuYeZpv
+ VyiD9igbE+TmIe8HnCx5KSA6yEJWsdNuwRmDBLd4FKX7rBnM4aLGP6UycbUXB2lwSFDv
+ +vuBEv6J+X6s2QzChrr/jgGM+xpvRBYw4hTlrGm5lbxZ+tEBSbXw8eof8TtFyOkTgqcL
+ 6pVRSu8vE+IFtlwc8+FUtjX7bgQLFu66UXDHUJRaZpAaJ9Lb+o0WWNd8ydRV+xxLfY+7
+ 4aNA==
+X-Gm-Message-State: AJcUuke3qrFFn3gzh+jgEhk++5OYY6QfqF+WRfiGq3Cc67wMJ8IurbK7
+ 3spHTFnPbqHopw6BhfLU59g6
+X-Google-Smtp-Source: ALg8bN7j+tSgVz4MKoqY8moyFNHw2w5gs9ueo65QTBhc3v9SH5i3Yx8KDr0ZahVXcKftDS2Dc5PTiw==
+X-Received: by 2002:a17:902:4:: with SMTP id 4mr32930147pla.20.1548130918456; 
+ Mon, 21 Jan 2019 20:21:58 -0800 (PST)
+Received: from localhost.localdomain ([2405:204:7344:8fd1:3551:e475:9265:ab6d])
+ by smtp.gmail.com with ESMTPSA id q199sm25083953pfc.97.2019.01.21.20.21.52
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 21 Jan 2019 20:21:57 -0800 (PST)
+From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+To: shawnguo@kernel.org,
+	leoyang.li@nxp.com,
+	robh+dt@kernel.org
+Subject: [PATCH v3 0/5] Add Oxalis board support
+Date: Tue, 22 Jan 2019 09:51:42 +0530
+Message-Id: <20190122042147.5424-1-manivannan.sadhasivam@linaro.org>
+X-Mailer: git-send-email 2.17.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_201749_814762_C7B2ED4F 
-X-CRM114-Status: GOOD (  26.16  )
+X-CRM114-CacheID: sfid-20190121_202201_014043_A5791B68 
+X-CRM114-Status: GOOD (  12.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,88 +88,73 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Kate Stewart <kstewart@linuxfoundation.org>,
- linux-arch <linux-arch@vger.kernel.org>,
- y2038 Mailman List <y2038@lists.linaro.org>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Philippe Ombredanne <pombredanne@nexb.com>, Will Deacon <will.deacon@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Stefan Agner <stefan@agner.ch>,
- Marcin Juszkiewicz <marcin.juszkiewicz@linaro.org>,
- Russell King <rmk+kernel@armlinux.org.uk>,
- Mathieu Desnoyers <mathieu.desnoyers@efficios.com>,
- Deepa Dinamani <deepa.kernel@gmail.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Thomas Gleixner <tglx@linutronix.de>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: devicetree@vger.kernel.org, a.tropschug@ebs-systart.com,
+ m.bittner@ebs-systart.com, linux-kernel@vger.kernel.org,
+ amit.kucheria@linaro.org,
+ Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
+ linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Arnd, Will,
+Hello,
 
-thanks for the email.
+This patchset adds Oxalis board support. This board is one of the
+96Boards Enterprise Edition platform from EBS-SYSTART GmbH. Below are some
+of the key features of this board:
 
-I'm want to abandon this patch series. Will post new patch series for
-system call
-table generation support for asm-generic and some other stuff together by end of
-this week or early next week.
+* SoC: NXP Layerscape LS1012A
+* RAM: 1GB DDR3L
+* PMU: NXP VR5100
+* Storage: 64MByte SPI Flash for bootloader and RCW, MicroSD Card, SATA
+* Connectivity: 2x Ethernet
+* USB: 2x USB3.0
 
-Thanks
-Firoz
+More information about this board can be found in 96Boards product
+page: https://www.96boards.org/product/oxalis/
 
-On Mon, 21 Jan 2019 at 21:24, Arnd Bergmann <arnd@arndb.de> wrote:
->
-> n Sun, Jan 20, 2019 at 12:57 AM Will Deacon <will.deacon@arm.com> wrote:
-> >
-> > On Thu, Jan 03, 2019 at 09:10:22PM +0530, Firoz Khan wrote:
-> > > This will be an automated scripts to provide easy support
-> > > for add/modify/delete the system call entry by add in
-> > > respective *.tbl file.
-> > >
-> > > System call table generation support for asm-generic is
-> > > provide for arm64 architecture which will use the common
-> > > scripts resides in scripts directory and use syscall.tbl
-> > > syscall_arm32.tbl files as inputs. This implementation
-> > > will replace asm-generic/unistd.h.
-> > >
-> > > This patch depends on:
-> > >  https://lore.kernel.org/lkml/1546439331-18646-1-git-send-email-firoz.khan@linaro.org/
-> > >  https://lore.kernel.org/lkml/1546520681-24453-1-git-send-email-firoz.khan@linaro.org/
-> >
-> > I'm having a hard time understanding what the benefit of this series is,
-> > given that we only support EABI compat tasks. When adding a new compat
-> > system call, you can't just blindly hook it up without checking whether it
-> > needs a wrapper to deal with any type conversion etc, so really we're just
-> > replacing one table with another as far as I can tell. What am I missing?
->
-> The point that is missing in the description above is that all unistd.h
-> and syscall.S files are now being generated from a .tbl file, across
-> all architectures. This was already done on arm32, x86 and s390
-> before 4.20, but is now done on all architectures that don't use
-> the uapi/asm-generic/unistd.h header, and the arm32 compat version for
-> arm64.
->
-> The newly added file has the same format as all other tables, and
-> will be easier to synchronize with the arm32 version, which has
-> almost the same contents (arm32 has oabi support, arm64 has
-> compat support).
->
-> > I also really don't think we should be generating the 32-bit UAPI headers
-> > from the 64-bit compat system call support (if that's what you're trying to
-> > do -- make headers_check fails with your patches applied). arch/arm/ is the
-> > canonical place for the 32-bit UAPI, and we're just implementing that.
->
-> I think you just misread what Firoz was trying to say here: The
-> arm64 uapi/asm/unistd.h file is now being generated from the
-> generic syscall.tbl file, while the compat asm/unistd32.h file is not
-> part of the UAPI. In both cases though, the data from the old files
-> is being replaced with data in the more compact and (hopefully)
-> more readable format.
->
->
->     Arnd
+Ethernet and SPI flash are not supported yet!
+
+Thanks,
+Mani
+
+Changes in v3:
+
+* Fixed LS1012A and LS1021A bindings
+* Added missing devicetree compatibles for LS1021A based boards
+* Added Rob's Reviewed-by tag for Vendor prefix patch
+
+Changes in v2:
+
+As per Rob's review:
+
+* Adopted the Oxalis board binding to JSON format.
+* Sorted the EBS-SYSTART vendor prefix alphabetically.
+* Used the generic node name for audio codec.
+
+Manivannan Sadhasivam (5):
+  dt-bindings: arm: fsl: Fix bindings for LS1012A and LS1021A based
+    boards
+  ARM: dts: Add devicetree compatibles for LS1021A based boards
+  dt-bindings: vendor-prefixes: Add EBS-SYSTART GmbH Vendor Prefix
+  dt-bindings: arm: fsl: Add devicetree binding for Oxalis
+  arm64: dts: freescale: Add devicetree for Oxalis
+
+ .../devicetree/bindings/arm/fsl.yaml          | 11 ++-
+ .../devicetree/bindings/vendor-prefixes.txt   |  1 +
+ arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts   |  1 +
+ arch/arm/boot/dts/ls1021a-qds.dts             |  1 +
+ arch/arm/boot/dts/ls1021a-twr.dts             |  1 +
+ arch/arm64/boot/dts/freescale/Makefile        |  1 +
+ .../boot/dts/freescale/fsl-ls1012a-oxalis.dts | 96 +++++++++++++++++++
+ 7 files changed, 111 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1012a-oxalis.dts
+
+-- 
+2.17.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
