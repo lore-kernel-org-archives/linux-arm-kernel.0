@@ -2,77 +2,68 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BC27BC282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 11:36:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E664C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 11:40:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 89F6E20879
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 11:36:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 70B1E20879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 11:40:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="R///YtY8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 89F6E20879
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hqGXCrt4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 70B1E20879
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=lRQZo5clwh+I4d2b4uuDe6a6IHMbWWmmsAFm4A4WZHE=; b=R///YtY8WjkNgq17QOzjgVnNB
-	nD2fVEp8/PJqzhUqbLeeDe+vNttUde8Ryoyy0VPbvQ6oRdPDoQ8tAcxGUg7BexfOqXaBE4oi7e7OJ
-	fOM7euBLaaN+WKJX97GK+30D1eGQeusZxOVRyChP0H8mJh+dShZNxzihe2HqFKXBMvZQ2QCMtyiJn
-	JAOscOrGA0A/x4KhODt9CRvCQQkyhQkuJPIpNk4srwXo2duzHDS12E93WWGO8PE1u5RrKGsoctQqM
-	KCIOKG5Uor33H37wOsGJ/v23GHW1wMhg9tTry92c8+rINzbfF6BtDSr0oYQqdtxmbdMpHVRcNGHQ1
-	cNTVWgpEQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=U3yV2PHW/TIbCs78o3XP2RuNiSt995PXQJztaHeKD2E=; b=hqGXCrt4JRqQQC
+	J1i40av2m3Qnx3mPWgE0IRGUvFgudlKQY1TRPjiObO/TWSVugKjxNncLjA6awVReroOFPasKs52GD
+	clAhLbZeFgdNYlMPhNrrXi8As0XFbNTYS4904axGP+Fx0rYPFYSc2o6ev9OB3TTwUFJJjEH0u90iy
+	roYS5o38W2TaZIRKMGNUc6dSEYtePDs7Q6V3eukzo15TE29mIXVCxBbB0W17f3eky9TxfwG16q+yz
+	g62TWGe2qu498oBvxYl7gbYNglR9an+hUu/2sQukNa4APF6tJak22CdL6yE+AJTRjCZc0DTfWbu/W
+	U2FoeudQE0B1He2vDehw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gluLk-0002fh-2l; Tue, 22 Jan 2019 11:36:12 +0000
-Received: from mx.socionext.com ([202.248.49.38])
+	id 1gluQ1-0004fp-9G; Tue, 22 Jan 2019 11:40:37 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gluLg-0002fF-Vi
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 11:36:10 +0000
-Received: from unknown (HELO iyokan-ex.css.socionext.com) ([172.31.9.54])
- by mx.socionext.com with ESMTP; 22 Jan 2019 20:36:04 +0900
-Received: from mail.mfilter.local (m-filter-2 [10.213.24.62])
- by iyokan-ex.css.socionext.com (Postfix) with ESMTP id C70D360062;
- Tue, 22 Jan 2019 20:36:04 +0900 (JST)
-Received: from 172.31.9.51 (172.31.9.51) by m-FILTER with ESMTP;
- Tue, 22 Jan 2019 20:36:04 +0900
-Received: from yuzu.css.socionext.com (yuzu [172.31.8.45])
- by kinkan.css.socionext.com (Postfix) with ESMTP id 880281A04E1;
- Tue, 22 Jan 2019 20:36:04 +0900 (JST)
-Received: from [127.0.0.1] (unknown [10.213.119.83])
- by yuzu.css.socionext.com (Postfix) with ESMTP id 6552F1210BF;
- Tue, 22 Jan 2019 20:36:04 +0900 (JST)
-Subject: Re: [PATCH 02/14] dt-bindings: soc: milbeaut: Add Milbeaut trampoline
- description
-To: Rob Herring <robh+dt@kernel.org>
-References: <1542589274-13878-1-git-send-email-sugaya.taichi@socionext.com>
- <1542589274-13878-3-git-send-email-sugaya.taichi@socionext.com>
- <154337047410.88331.9696178601340675631@swboyd.mtv.corp.google.com>
- <c746a3de-a9e3-9f25-ecb9-703ceb7e62d0@socionext.com>
- <154356579701.88331.5043467509900444879@swboyd.mtv.corp.google.com>
- <f5917f71-f15b-a92d-649c-e3f5f5f10698@socionext.com>
- <CAL_Jsq+dnKht3TwCh1qB1H4pYFhQJmSN0nAayU+=PJLAvq0bbQ@mail.gmail.com>
- <90b00858-6e9e-8f7c-f6d4-b35e5daa6eee@socionext.com>
- <CAL_JsqJ=FRfzVFiOJ0wvoV5iZV+Gx3ft9pGyhb-GoKnOAQgPtQ@mail.gmail.com>
-From: "Sugaya, Taichi" <sugaya.taichi@socionext.com>
-Message-ID: <daa5f00a-1d9c-69b0-ed2d-8ff6a64251cc@socionext.com>
-Date: Tue, 22 Jan 2019 20:36:03 +0900
-User-Agent: Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101
- Thunderbird/60.3.3
-MIME-Version: 1.0
-In-Reply-To: <CAL_JsqJ=FRfzVFiOJ0wvoV5iZV+Gx3ft9pGyhb-GoKnOAQgPtQ@mail.gmail.com>
-Content-Language: en-US
+ id 1gluPx-0004fH-Mk
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 11:40:35 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0DA8DA78;
+ Tue, 22 Jan 2019 03:40:33 -0800 (PST)
+Received: from big-swifty.misterjones.org (big-swifty.copenhagen.arm.com
+ [10.32.148.139])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B3DEE3F6A8;
+ Tue, 22 Jan 2019 03:40:25 -0800 (PST)
+Date: Tue, 22 Jan 2019 11:40:17 +0000
+Message-ID: <867eewapjy.wl-marc.zyngier@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+To: Aisheng Dong <aisheng.dong@nxp.com>
+Subject: Re: [PATCH 1/1] irqchip: gpcv2: make config option visible
+In-Reply-To: <AM0PR04MB4211ACC01F82236A7A34944780980@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1547796918-29790-1-git-send-email-aisheng.dong@nxp.com>
+ <25cd3e29-e365-f0d4-65a3-b3af69acd9cd@arm.com>
+ <AM0PR04MB421158B2E042D623792A296E809C0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <77ecfcfa-16fe-a3e2-3d6b-90cdf999b316@arm.com>
+ <AM0PR04MB4211ACC01F82236A7A34944780980@AM0PR04MB4211.eurprd04.prod.outlook.com>
+User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
+ FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
+ (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
+Organization: ARM Ltd
+MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_033609_355290_5A6D723E 
-X-CRM114-Status: GOOD (  27.25  )
+X-CRM114-CacheID: sfid-20190122_034033_756030_AFF06C24 
+X-CRM114-Status: GOOD (  24.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,126 +75,85 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Masami Hiramatsu <masami.hiramatsu@linaro.org>,
- Stephen Boyd <sboyd@kernel.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Michael Turquette <mturquette@baylibre.com>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
+Cc: Jason Cooper <jason@lakedaemon.net>,
+ Andrey Smirnov <andrew.smirnov@gmail.com>,
  "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Russell King <linux@armlinux.org.uk>, Jassi Brar <jaswinder.singh@linaro.org>,
- "open list:SERIAL DRIVERS" <linux-serial@vger.kernel.org>,
- Jiri Slaby <jslaby@suse.com>, Thomas Gleixner <tglx@linutronix.de>,
- linux-clk <linux-clk@vger.kernel.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+ dl-linux-imx <linux-imx@nxp.com>, Thomas Gleixner <tglx@linutronix.de>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "l.stach@pengutronix.de" <l.stach@pengutronix.de>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi
-
-On 2018/12/04 22:32, Rob Herring wrote:
-> On Tue, Dec 4, 2018 at 5:30 AM Sugaya, Taichi
-> <sugaya.taichi@socionext.com> wrote:
->>
->> Hi
->>
->> On 2018/12/04 0:49, Rob Herring wrote:
->>> On Mon, Dec 3, 2018 at 1:42 AM Sugaya, Taichi
->>> <sugaya.taichi@socionext.com> wrote:
->>>>
->>>> Hi,
->>>>
->>>> On 2018/11/30 17:16, Stephen Boyd wrote:
->>>>> Quoting Sugaya, Taichi (2018-11-29 04:24:51)
->>>>>> On 2018/11/28 11:01, Stephen Boyd wrote:
->>>>>>> Quoting Sugaya Taichi (2018-11-18 17:01:07)
->>>>>>>>      create mode 100644 Documentation/devicetree/bindings/soc/socionext/socionext,m10v.txt
->>>>>>>>
->>>>>>>> diff --git a/Documentation/devicetree/bindings/soc/socionext/socionext,m10v.txt b/Documentation/devicetree/bindings/soc/socionext/socionext,m10v.txt
->>>>>>>> new file mode 100644
->>>>>>>> index 0000000..f5d906c
->>>>>>>> --- /dev/null
->>>>>>>> +++ b/Documentation/devicetree/bindings/soc/socionext/socionext,m10v.txt
->>>>>>>> @@ -0,0 +1,12 @@
->>>>>>>> +Socionext M10V SMP trampoline driver binding
->>>>>>>> +
->>>>>>>> +This is a driver to wait for sub-cores while boot process.
->>>>>>>> +
->>>>>>>> +- compatible: should be "socionext,smp-trampoline"
->>>>>>>> +- reg: should be <0x4C000100 0x100>
->>>>>>>> +
->>>>>>>> +EXAMPLE
->>>>>>>> +       trampoline: trampoline@0x4C000100 {
->>>>>>> Drop the 0x part of unit addresses.
->>>>>>
->>>>>> Okay.
->>>>>>
->>>>>>
->>>>>>>> +               compatible = "socionext,smp-trampoline";
->>>>>>>> +               reg = <0x4C000100 0x100>;
->>>>>>> Looks like a software construct, which we wouldn't want to put into DT
->>>>>>> this way. DT doesn't describe drivers.
->>>>>> We would like to use this node only getting the address of the
->>>>>> trampoline area
->>>>>> in which sub-cores wait.  (They have finished to go to this area in previous
->>>>>> bootloader process.)
->>>>>
->>>>> Is this area part of memory, or a special SRAM? If it's part of memory,
->>>>> I would expect this node to be under the reserved-memory node and
->>>>> pointed to by some other node that uses this region. Could even be the
->>>>> CPU nodes.
->>>>
->>>> Yes, 0x4C000100 is a part of memory under the reserved-memory node. So
->>>> we would like to use the SRAM ( allocated 0x00000000 ) area instead.
->>>> BTW, sorry, the trampoline address of this example is simply wrong.  We
->>>> were going to use a part of the SRAM from the beginning.
->>>>
->>>>>
->>>>>>
->>>>>> So should we embed the constant value in source codes instead of getting
->>>>>> from
->>>>>> DT because the address is constant at the moment? Or is there other
->>>>>> approach?
->>>>>>
->>>>>
->>>>> If it's constant then that also works. Why does it need to come from DT
->>>>> at all then?
->>>>
->>>> We think it is not good to embed constant value in driver codes and do
->>>> not have another way...
->>>> Are there better ways?
->>>
->>> If this is just memory, can you use the standard spin-table binding in
->>> the DT spec? There are some requirements like 64-bit values even on
->>> 32-bit machines (though this gets violated).
->>
->> The spin-table seems to be used on only 64-bit arch. Have it ever worked
->> on 32-bit machine?
+On Tue, 22 Jan 2019 11:04:48 +0000,
+Aisheng Dong <aisheng.dong@nxp.com> wrote:
 > 
-> Yes.
 > 
->> And I would like not to use it because avoid violation.
 > 
-> The issue now that I remember is cpu-release-addr is defined to always
-> be a 64-bit value while some platforms made it a 32-bit value.
-> 'cpu-release-addr' is also used for some other enable-methods.
+> > From: Marc Zyngier [mailto:marc.zyngier@arm.com]
+> > Sent: Friday, January 18, 2019 6:10 PM
+> [...]
+> > >>>
+> > >>>  config IMX_GPCV2
+> > >>> -	bool
+> > >>> +	bool "i.MX GPCv2 IRQ chip"
+> > >>> +	depends on ARCH_MXC || (COMPILE_TEST && OF)
+> > >>>  	select IRQ_DOMAIN
+> > >>>  	help
+> > >>>  	  Enables the wakeup IRQs for IMX platforms with GPCv2 block
+> > >>>
+> > >>
+> > >> How does it help exactly? It is pretty difficult for a user to know
+> > >> exactly what they need. I'd rather see it selected by ARCH_MXC, which
+> > >> makes it
+> > >
+> > > ARM64 SoC maintainers suggest not add more driver specific options
+> > > except an Generic ARCH option.
+> > >
+> > > As GPCv2 is also used in MX8MQ. So we may select it in armv8 defconfig.
+> > > If this option is invisible, we can't select it.
+> > 
+> > And conversely, users have no idea of what letter soup they have to select to
+> > make their HW work properly. Selecting the driver when the platform is
+> > supposed to be supported is the right way to solve this problem.
+> > 
+> 
+> I think the problem is that we have no platform specific CONFIGs for arm v8 platforms.
+> We have only one CONFIG_ARCH_MXC for all MX8 SoCs, e.g. mx8qxp, mx8mq...
+> Only MX8MQ needs to use GPCv2. Selecting GPCv2 under ARCH_MXC means users
+> have no chance to disable it for mx8qxp which does not need it.
 
-I have a question about the spin-table.
-The code "smp_spin_table.c" is only in "arch/arm64/kernel" directory so 
-can not be compiled in arm-v7 arch. That means the spin-table can not be 
-used arm-v7 arch..? , or is there the way to compile the code in arm-v7 
-arch?
+And where is the problem to select this on platforms that do not
+strictly require it? Code bloat?
 
-Thanks,
-Sugaya Taichi
+If you want fine grained selection for people dealing with a single
+SoC, make it depend on CONFIG_EXPERT. Don't force this on unsuspecting
+users who expect their HW to just work.
+
+Something like:
+
+config IMX_GPCV2
+       	bool "i.MX GPCv2 IRQ chip" if EXPERT
+	def_bool ARCH_MXC
+	select IRQ_DOMAIN
+	help
+	  Enables the wakeup IRQs for IMX platforms with GPCv2 block
 
 > 
-> Rob
-> 
+> We probably could introduce SOC option under drivers/soc/ to do the default configs
+> selection. But we've already handled all other driver selections in defconfig
+> e.g. firmware, clk, pinctrl, power domain and etc.
+> Not sure whether GPCv2 should be an exception.
 
+I think something like the above should be the rule. Configuration
+feature creep is not helping anyone.
+
+	M.
+
+-- 
+Jazz is not dead, it just smell funny.
 
 _______________________________________________
 linux-arm-kernel mailing list
