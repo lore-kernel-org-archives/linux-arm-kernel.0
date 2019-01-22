@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 27819C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 17:24:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 961C5C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 17:32:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EAA1C217D4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 17:24:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 69932217D6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 17:32:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NtdemS6P"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EAA1C217D4
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="omW+isqg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 69932217D6
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,43 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=q2IlqAvzsq1y8uWxcmo6aq7OqurmvR6ZW6IWhqtnrs4=; b=NtdemS6PX1Qw1J
-	KGOfzTs8qYrfdRY2mW97Gfva02UWS6GM87LRuG/WzEBb27kTu6DEEznvJOT1r2QdMEhj/lj/RuN1E
-	didc/N1pm0PEbYlKvjGgk7jGbhQwsn7LScP3ByyG1wK9IlrFITXFslOiwCI/MZ1F0pFziBHLpZ+wu
-	fDfQrHQITKh5hxZszpyl3SUWs5X8zBcOF8Jiy15HQyIIdzIf8sABxDQ0amINwOcuHO5u+Zssg2ekv
-	vQ+MKbZNfHxDO82aJyeB8W7mOzX+csf4OWVxUP8d0X3m9NDELBmy1ltXImqHxzptImfwAtkv8P0h8
-	exlVQex1wngXq8vCvCrA==;
+	List-Owner; bh=UeXlH8n+U2/SUbLgskZh24xHBPbR9qnUzYmoaqoMtOs=; b=omW+isqgYWwxga
+	4VXkMS/e/BBpeCJoDhHRCsVAOwGBVgM2lPaJB/tdnwLkHfUUwlaOfBuo+P2QZ5yJ9wHr/wEgrh94J
+	8PT8rDxVrC/2K1iBOORCGlVK8gG5dsElEHXpAVXNhN+/VGRZ2Tz2yshDN+V86zjwSUgLmxCoYWbrl
+	rDR4DpHSYegs5/pBU7Zjyv1XVRhm1vqybMUjFL4PAlRbS3yNonbi61V8xeAPlJM/0DER3Ev1sBK0l
+	LxLkg7rgdbMDG46tqYpb32mLIzjBxXHRm80SodoKrJs+gGU0OlFj9PcP8dska37NjAWGp8qEJkF2s
+	eY4nISv3/qN1xsK4blFg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glzn6-000730-BU; Tue, 22 Jan 2019 17:24:48 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1glzue-0003Oi-8y; Tue, 22 Jan 2019 17:32:36 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glzn2-00072a-AD
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 17:24:46 +0000
+ id 1glzub-0003Nu-FG
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 17:32:35 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9FA13A78;
- Tue, 22 Jan 2019 09:24:43 -0800 (PST)
-Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 240FD3F6A8;
- Tue, 22 Jan 2019 09:24:42 -0800 (PST)
-Date: Tue, 22 Jan 2019 17:24:39 +0000
-From: Dave Martin <Dave.Martin@arm.com>
-To: Marc Zyngier <marc.zyngier@arm.com>
-Subject: Re: [PATCH v4 17/25] KVM: arm64/sve: Add SVE support to register
- access ioctl interface
-Message-ID: <20190122172439.GK3578@e103592.cambridge.arm.com>
-References: <1547757219-19439-1-git-send-email-Dave.Martin@arm.com>
- <1547757219-19439-18-git-send-email-Dave.Martin@arm.com>
- <74aad8f1-e9f0-689a-1f2b-60a30de41b65@arm.com>
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 475DAA78;
+ Tue, 22 Jan 2019 09:32:29 -0800 (PST)
+Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
+ [10.1.197.40])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 534043F6A8;
+ Tue, 22 Jan 2019 09:32:27 -0800 (PST)
+Date: Tue, 22 Jan 2019 17:32:22 +0000
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Subject: Re: [PATCH] acpi: bgrt: parse BGRT to obtain BMP address before it
+ gets clobbered
+Message-ID: <20190122173222.GB11720@e107981-ln.cambridge.arm.com>
+References: <20190122150616.850-1-ard.biesheuvel@linaro.org>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <74aad8f1-e9f0-689a-1f2b-60a30de41b65@arm.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+In-Reply-To: <20190122150616.850-1-ard.biesheuvel@linaro.org>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_092444_366934_9A6409A1 
-X-CRM114-Status: GOOD (  35.10  )
+X-CRM114-CacheID: sfid-20190122_093233_519627_1B0478DE 
+X-CRM114-Status: GOOD (  28.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,229 +70,277 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
- Christoffer Dall <cdall@kernel.org>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
+Cc: linux-efi@vger.kernel.org, graeme.gregory@linaro.org, rjw@rjwysocki.net,
+ leif.lindholm@linaro.org, astone@redhat.com, linux-acpi@vger.kernel.org,
+ Peter Jones <pjones@redhat.com>, harry.l.hsiung@intel.com,
+ linux-arm-kernel@lists.infradead.org, lenb@kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 18, 2019 at 05:58:33PM +0000, Marc Zyngier wrote:
-> On 17/01/2019 20:33, Dave Martin wrote:
-> > This patch adds the following registers for access via the
-> > KVM_{GET,SET}_ONE_REG interface:
-> > 
-> >  * KVM_REG_ARM64_SVE_ZREG(n, i) (n = 0..31) (in 2048-bit slices)
-> >  * KVM_REG_ARM64_SVE_PREG(n, i) (n = 0..15) (in 256-bit slices)
-> >  * KVM_REG_ARM64_SVE_FFR(i) (in 256-bit slices)
-> > 
-> > In order to adapt gracefully to future architectural extensions,
-> > the registers are divided up into slices as noted above:  the i
-> > parameter denotes the slice index.
-> > 
-> > For simplicity, bits or slices that exceed the maximum vector
-> > length supported for the vcpu are ignored for KVM_SET_ONE_REG, and
-> > read as zero for KVM_GET_ONE_REG.
-> > 
-> > For the current architecture, only slice i = 0 is significant.  The
-> > interface design allows i to increase to up to 31 in the future if
-> > required by future architectural amendments.
-> > 
-> > The registers are only visible for vcpus that have SVE enabled.
-> > They are not enumerated by KVM_GET_REG_LIST on vcpus that do not
-> > have SVE.  In all cases, surplus slices are not enumerated by
-> > KVM_GET_REG_LIST.
-> > 
-> > Accesses to the FPSIMD registers via KVM_REG_ARM_CORE is not
-> > allowed for SVE-enabled vcpus: SVE-aware userspace can use the
-> > KVM_REG_ARM64_SVE_ZREG() interface instead to access the same
-> > register state.  This avoids some complex and pointless emluation
+On Tue, Jan 22, 2019 at 04:06:16PM +0100, Ard Biesheuvel wrote:
+> The bitmap left in the framebuffer by the firmware is described by an
+> ACPI table called "BGRT", which describes the size, pixel format and
+> the address of a BMP image in memory. While the BGRT ACPI table is
+> guaranteed to reside in a "ACPI reclaim" memory region, which is
+> never touched by Linux. The BMP image, however, typically resides
+> in EFI Boot Services Memory, which may have been overwritten by the
+> time the BGRT discovery routine runs.
 > 
-> nit: emulation.
+> So instead, drop the handling from the ACPI init code, and call the
+> BGRT parsing code immediately after going over the EFI configuration
+> table array, at which time no memory has been touched yet except for
+> the .data/.bss regions covered by the static kernel image.
 > 
-> > in the kernel.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > ---
-> >  arch/arm64/include/uapi/asm/kvm.h |  10 +++
-> >  arch/arm64/kvm/guest.c            | 131 ++++++++++++++++++++++++++++++++++----
-> >  2 files changed, 129 insertions(+), 12 deletions(-)
-> > 
-> > diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> > index 97c3478..1ff68fa 100644
-> > --- a/arch/arm64/include/uapi/asm/kvm.h
-> > +++ b/arch/arm64/include/uapi/asm/kvm.h
-> > @@ -226,6 +226,16 @@ struct kvm_vcpu_events {
-> >  					 KVM_REG_ARM_FW | ((r) & 0xffff))
-> >  #define KVM_REG_ARM_PSCI_VERSION	KVM_REG_ARM_FW_REG(0)
-> >  
-> > +/* SVE registers */
-> > +#define KVM_REG_ARM64_SVE		(0x15 << KVM_REG_ARM_COPROC_SHIFT)
-> > +#define KVM_REG_ARM64_SVE_ZREG(n, i)	(KVM_REG_ARM64 | KVM_REG_ARM64_SVE | \
-> > +					 KVM_REG_SIZE_U2048 |		\
-> > +					 ((n) << 5) | (i))
-> > +#define KVM_REG_ARM64_SVE_PREG(n, i)	(KVM_REG_ARM64 | KVM_REG_ARM64_SVE | \
-> > +					 KVM_REG_SIZE_U256 |		\
-> > +					 ((n) << 5) | (i) | 0x400)
+> Unfortunately, this involves a non-trivial amount of ACPI entry
+> point and root table parsing, but we cannot rely on the normal
+> ACPI infrastructure yet this early in the boot.
 > 
-> Can we please have a name for this 0x400 bit?
+> Also note that we cannot take the 'acpi_disabled' global variable
+> into account, since it may not have assumed the correct value yet
+> (on arm64, the default value is '1' which is overridden to '0' if
+> no DT description has been made available by the firmware)
 > 
+> Cc: Peter Jones <pjones@redhat.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+Technically this is a fix, right ?
+
+> ---
+>  arch/arm64/kernel/acpi.c        |  2 -
+>  arch/x86/kernel/acpi/boot.c     |  2 -
+>  drivers/acpi/bgrt.c             |  6 --
+>  drivers/firmware/efi/efi-bgrt.c | 80 ++++++++++++++++++--
+>  drivers/firmware/efi/efi.c      | 13 ++++
+>  include/linux/efi-bgrt.h        |  4 +-
+>  6 files changed, 89 insertions(+), 18 deletions(-)
 > 
-> > +#define KVM_REG_ARM64_SVE_FFR(i)	KVM_REG_ARM64_SVE_PREG(16, i)
-> > +
-> >  /* Device Control API: ARM VGIC */
-> >  #define KVM_DEV_ARM_VGIC_GRP_ADDR	0
-> >  #define KVM_DEV_ARM_VGIC_GRP_DIST_REGS	1
-> > diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-> > index ffa38d4..b8f9c1e 100644
-> > --- a/arch/arm64/kvm/guest.c
-> > +++ b/arch/arm64/kvm/guest.c
-> > @@ -19,8 +19,10 @@
-> >   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> >   */
-> >  
-> > +#include <linux/bits.h>
-> >  #include <linux/errno.h>
-> >  #include <linux/err.h>
-> > +#include <linux/kernel.h>
-> >  #include <linux/kvm_host.h>
-> >  #include <linux/module.h>
-> >  #include <linux/vmalloc.h>
-> > @@ -28,9 +30,12 @@
-> >  #include <kvm/arm_psci.h>
-> >  #include <asm/cputype.h>
-> >  #include <linux/uaccess.h>
-> > +#include <asm/fpsimd.h>
-> >  #include <asm/kvm.h>
-> >  #include <asm/kvm_emulate.h>
-> >  #include <asm/kvm_coproc.h>
-> > +#include <asm/kvm_host.h>
-> > +#include <asm/sigcontext.h>
-> >  
-> >  #include "trace.h"
-> >  
-> > @@ -210,6 +215,108 @@ static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-> >  	return err;
-> >  }
-> >  
-> > +struct kreg_region {
-> > +	char *kptr;
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index 44e3c351e1ea..7429a811f76d 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -230,8 +230,6 @@ void __init acpi_boot_table_init(void)
+>  			early_init_dt_scan_chosen_stdout();
+>  	} else {
+>  		acpi_parse_spcr(earlycon_acpi_spcr_enable, true);
+> -		if (IS_ENABLED(CONFIG_ACPI_BGRT))
+> -			acpi_table_parse(ACPI_SIG_BGRT, acpi_parse_bgrt);
+>  	}
+>  }
+>  
+> diff --git a/arch/x86/kernel/acpi/boot.c b/arch/x86/kernel/acpi/boot.c
+> index 2624de16cd7a..2d3535b62752 100644
+> --- a/arch/x86/kernel/acpi/boot.c
+> +++ b/arch/x86/kernel/acpi/boot.c
+> @@ -1633,8 +1633,6 @@ int __init acpi_boot_init(void)
+>  	acpi_process_madt();
+>  
+>  	acpi_table_parse(ACPI_SIG_HPET, acpi_parse_hpet);
+> -	if (IS_ENABLED(CONFIG_ACPI_BGRT))
+> -		acpi_table_parse(ACPI_SIG_BGRT, acpi_parse_bgrt);
+>  
+>  	if (!acpi_noirq)
+>  		x86_init.pci.init = pci_acpi_init;
+> diff --git a/drivers/acpi/bgrt.c b/drivers/acpi/bgrt.c
+> index 75af78361ce5..048413e06898 100644
+> --- a/drivers/acpi/bgrt.c
+> +++ b/drivers/acpi/bgrt.c
+> @@ -81,12 +81,6 @@ static const struct attribute_group bgrt_attribute_group = {
+>  	.bin_attrs = bgrt_bin_attributes,
+>  };
+>  
+> -int __init acpi_parse_bgrt(struct acpi_table_header *table)
+> -{
+> -	efi_bgrt_init(table);
+> -	return 0;
+> -}
+> -
+>  static int __init bgrt_init(void)
+>  {
+>  	int ret;
+> diff --git a/drivers/firmware/efi/efi-bgrt.c b/drivers/firmware/efi/efi-bgrt.c
+> index b22ccfb0c991..8bd9b96942d2 100644
+> --- a/drivers/firmware/efi/efi-bgrt.c
+> +++ b/drivers/firmware/efi/efi-bgrt.c
+> @@ -27,24 +27,92 @@ struct bmp_header {
+>  	u32 size;
+>  } __packed;
+>  
+> -void __init efi_bgrt_init(struct acpi_table_header *table)
+> +void __init efi_bgrt_init(unsigned long rsdp_phys)
+>  {
+>  	void *image;
+>  	struct bmp_header bmp_header;
+>  	struct acpi_table_bgrt *bgrt = &bgrt_tab;
+> +	struct acpi_table_bgrt *table = NULL;
+> +	struct acpi_table_rsdp *rsdp;
+> +	struct acpi_table_header *hdr;
+> +	u64 xsdt_phys;
+> +	u32 rsdt_phys;
+> +	unsigned int len;
+>  
+> -	if (acpi_disabled)
+> +	if (!efi_enabled(EFI_MEMMAP))
+>  		return;
+>  
+> -	if (!efi_enabled(EFI_MEMMAP))
+> +	/* map the root pointer table to find the xsdt/rsdt values */
+> +	rsdp = early_memremap(rsdp_phys, sizeof(*rsdp));
+> +	if (rsdp && ACPI_VALIDATE_RSDP_SIG(rsdp->signature)) {
+> +		xsdt_phys = rsdp->xsdt_physical_address;
+> +		rsdt_phys = rsdp->rsdt_physical_address;
+> +	} else {
+> +		WARN_ON(1);
+
+You may need to unmap rsdp.
+
+> +		return;
+> +	}
+> +	early_memunmap(rsdp, sizeof(*rsdp));
+> +
+> +	/* obtain the length of whichever table we will be using */
+> +	hdr = early_memremap(xsdt_phys ?: rsdt_phys, sizeof(*hdr));
+> +	if (WARN_ON(!hdr))
+> +		return;
+> +	len = hdr->length;
+> +	early_memunmap(hdr, sizeof(*hdr));
+> +
+> +	if (xsdt_phys) {
+> +		struct acpi_table_xsdt *xsdt = early_memremap(xsdt_phys, len);
+> +		int i;
+> +
+> +		if (WARN_ON(!xsdt))
+> +			return;
+> +
+> +		for (i = 0; i < (len - sizeof(*hdr)) / sizeof(u64); i++) {
+> +			table = early_memremap(xsdt->table_offset_entry[i],
+> +					       sizeof(*table));
+> +			if (WARN_ON(!table))
+> +				break;
+> +
+> +			if (ACPI_COMPARE_NAME(table->header.signature,
+> +					      ACPI_SIG_BGRT))
+> +				break;
+> +			early_memunmap(table, sizeof(*table));
+> +			table = NULL;
+> +		}
+> +		early_memunmap(xsdt, len);
+> +	} else if (rsdt_phys) {
+> +		struct acpi_table_rsdt *rsdt = early_memremap(rsdt_phys, len);
+> +		int i;
+> +
+> +		if (WARN_ON(!rsdt))
+> +			return;
+> +
+> +		for (i = 0; i < (len - sizeof(*hdr)) / sizeof(u32); i++) {
+> +			table = early_memremap(rsdt->table_offset_entry[i],
+> +					       sizeof(*table));
+> +			if (WARN_ON(!table))
+> +				break;
+> +
+> +			if (ACPI_COMPARE_NAME(table->header.signature,
+> +					      ACPI_SIG_BGRT))
+> +				break;
+> +			early_memunmap(table, sizeof(*table));
+> +			table = NULL;
+> +		}
+> +		early_memunmap(rsdt, len);
+> +	}
+> +
+> +	if (!table)
+>  		return;
+>  
+> -	if (table->length < sizeof(bgrt_tab)) {
+> +	if (table->header.length < sizeof(bgrt_tab)) {
+>  		pr_notice("Ignoring BGRT: invalid length %u (expected %zu)\n",
+> -		       table->length, sizeof(bgrt_tab));
+> +		       table->header.length, sizeof(bgrt_tab));
+>  		return;
+
+Likewise for the table pointer.
+
+>  	}
+> -	*bgrt = *(struct acpi_table_bgrt *)table;
+> +	*bgrt = *table;
+> +	early_memunmap(table, sizeof(*table));
+> +
+>  	if (bgrt->version != 1) {
+>  		pr_notice("Ignoring BGRT: invalid version %u (expected 1)\n",
+>  		       bgrt->version);
+
+Side note (not related to this patch):
+
+I do not understand this check:
+
+if (bgrt->status & 0xfe) {
+	pr_notice("Ignoring BGRT: reserved status bits are non-zero %u\n",
+	       bgrt->status);
+	goto out;
+}
+
+Should not we check against 0xf8 (reserved bits are [7:3]) ? And what
+about status[0] (valid), should we check that as well ?
+
+Thanks,
+Lorenzo
+
+> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+> index 4c46ff6f2242..e5ef5c0eacc1 100644
+> --- a/drivers/firmware/efi/efi.c
+> +++ b/drivers/firmware/efi/efi.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/init.h>
+>  #include <linux/device.h>
+>  #include <linux/efi.h>
+> +#include <linux/efi-bgrt.h>
+>  #include <linux/of.h>
+>  #include <linux/of_fdt.h>
+>  #include <linux/io.h>
+> @@ -592,6 +593,18 @@ int __init efi_config_parse_tables(void *config_tables, int count, int sz,
+>  
+>  		early_memunmap(tbl, sizeof(*tbl));
+>  	}
+> +
+> +	/*
+> +	 * We need to parse the BGRT table (which is an ACPI table not a UEFI
+> +	 * configuration table) by hand and figure out where the bitmap it
+> +	 * describes lives in memory so we can reserve it early on. Otherwise,
+> +	 * it may be clobbered by the time we get to it during the ordinary ACPI
+> +	 * table init sequence.
+> +	 */
+> +	if (IS_ENABLED(CONFIG_ACPI_BGRT) &&
+> +	    efi.acpi20 != EFI_INVALID_TABLE_ADDR)
+> +		efi_bgrt_init(efi.acpi20);
+> +
+>  	return 0;
+>  }
+>  
+> diff --git a/include/linux/efi-bgrt.h b/include/linux/efi-bgrt.h
+> index e6cd51005633..528ea62d99ec 100644
+> --- a/include/linux/efi-bgrt.h
+> +++ b/include/linux/efi-bgrt.h
+> @@ -6,7 +6,7 @@
+>  
+>  #ifdef CONFIG_ACPI_BGRT
+>  
+> -void efi_bgrt_init(struct acpi_table_header *table);
+> +void efi_bgrt_init(unsigned long rsdp_phys);
+>  int __init acpi_parse_bgrt(struct acpi_table_header *table);
+>  
+>  /* The BGRT data itself; only valid if bgrt_image != NULL. */
+> @@ -15,7 +15,7 @@ extern struct acpi_table_bgrt bgrt_tab;
+>  
+>  #else /* !CONFIG_ACPI_BGRT */
+>  
+> -static inline void efi_bgrt_init(struct acpi_table_header *table) {}
+> +static inline void efi_bgrt_init(unsigned long rsdp_phys) {}
+>  static inline int __init acpi_parse_bgrt(struct acpi_table_header *table)
+>  {
+>  	return 0;
+> -- 
+> 2.20.1
 > 
-> Should this rather be void * instead?
-
-This was to support address arithmetic on kptr without explicit casting.
-
-Maybe this is ill-advised.  GCC supports pointer arithmetic on void *
-with equivalent behaviour as if the pointer were to a character type,
-without any cast.
-
-If we rely elsewhere on this working, then we can do it here.
-
-However... [see below]
-
-> > +	size_t size;
-> > +	size_t zeropad;
-> > +};
-> > +
-> > +#define SVE_REG_SLICE_SHIFT	0
-> > +#define SVE_REG_SLICE_BITS	5
-> > +#define SVE_REG_ID_SHIFT	(SVE_REG_SLICE_SHIFT + SVE_REG_SLICE_BITS)
-> > +#define SVE_REG_ID_BITS		5
-> > +
-> > +#define SVE_REG_SLICE_MASK					\
-> > +	GENMASK(SVE_REG_SLICE_SHIFT + SVE_REG_SLICE_BITS - 1,	\
-> > +		SVE_REG_SLICE_SHIFT)
-> > +#define SVE_REG_ID_MASK							\
-> > +	GENMASK(SVE_REG_ID_SHIFT + SVE_REG_ID_BITS - 1, SVE_REG_ID_SHIFT)
-> > +
-> > +#define SVE_NUM_SLICES (1 << SVE_REG_SLICE_BITS)
-> > +
-> > +static int sve_reg_region(struct kreg_region *b,
-> > +			  const struct kvm_vcpu *vcpu,
-> > +			  const struct kvm_one_reg *reg)
-> > +{
-> > +	const unsigned int vl = vcpu->arch.sve_max_vl;
-> > +	const unsigned int vq = sve_vq_from_vl(vl);
-> > +
-> > +	const unsigned int reg_num =
-> > +		(reg->id & SVE_REG_ID_MASK) >> SVE_REG_ID_SHIFT;
-> > +	const unsigned int slice_num =
-> > +		(reg->id & SVE_REG_SLICE_MASK) >> SVE_REG_SLICE_SHIFT;
-> > +
-> > +	unsigned int slice_size, offset, limit;
-> > +
-> > +	if (reg->id >= KVM_REG_ARM64_SVE_ZREG(0, 0) &&
-> > +	    reg->id <= KVM_REG_ARM64_SVE_ZREG(SVE_NUM_ZREGS - 1,
-> > +					      SVE_NUM_SLICES - 1)) {
-> > +		slice_size = KVM_REG_SIZE(KVM_REG_ARM64_SVE_ZREG(0, 0));
-> > +
-> > +		/* Compute start and end of the register: */
-> > +		offset = SVE_SIG_ZREG_OFFSET(vq, reg_num) - SVE_SIG_REGS_OFFSET;
-> > +		limit = offset + SVE_SIG_ZREG_SIZE(vq);
-> > +
-> > +		offset += slice_size * slice_num; /* start of requested slice */
-> > +
-> > +	} else if (reg->id >= KVM_REG_ARM64_SVE_PREG(0, 0) &&
-> > +		   reg->id <= KVM_REG_ARM64_SVE_FFR(SVE_NUM_SLICES - 1)) {
-> > +		/* (FFR is P16 for our purposes) */
-> > +
-> > +		slice_size = KVM_REG_SIZE(KVM_REG_ARM64_SVE_PREG(0, 0));
-> > +
-> > +		/* Compute start and end of the register: */
-> > +		offset = SVE_SIG_PREG_OFFSET(vq, reg_num) - SVE_SIG_REGS_OFFSET;
-> > +		limit = offset + SVE_SIG_PREG_SIZE(vq);
-> > +
-> > +		offset += slice_size * slice_num; /* start of requested slice */
-> > +
-> > +	} else {
-> > +		return -ENOENT;
-> > +	}
-> > +
-> > +	b->kptr = (char *)vcpu->arch.sve_state + offset;
-> 
-> I'm very uneasy with this pointer that, at this stage, may point to an
-> arbitrary location in memory, given that the slice number is controlled
-> by userspace. It feels like a disaster waiting to happen as a potential
-> spectre-v1 gadget.
-
-Hmmm, yes, that does seem a concern.  We only guard against accessing
-that address with an if(), so while the compiler cannot emit an explicit
-access, the CPU can emit a speculative read.
-
-So, a speculation-safe bounds check would be appropriate here, at
-minimum.
-
-> And actually, we don't have any requirement to handle non-zero slices,
-> do we? The important thing is that you've nicely reserved extra space in
-> the encoding, and that we can expand the API in a very straightforward way.
-> 
-> So at this stage, I'd drop all support for non-zero slices and return an
-> error instead.
-
-Since the extra-slices thing is for the far future (or never), we can
-probably drop this code for now.
-
-This means that we can drop the enumeration of extra slices too.
-
-
-If the vector length is > 256 bytes, I'll do pr_warn() and clamp the
-vector lengths seen by the guest to <= 256 so that no extra slices are
-needed.
-
-In any case, we can keep the space reserved in the register ID encoding
-to allow larger vectors to be supported later if need be.
-
-
-I'll write up the rule for determining the number of slices somewhere,
-but in userspace it will never be effectively tested.  Too bad, I
-guess: we might add an explicit capability for larger vectors if we
-eventually risk hitting incompatibilities here.
-
-Cheers
----Dave
 
 _______________________________________________
 linux-arm-kernel mailing list
