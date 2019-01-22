@@ -2,65 +2,70 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 168ADC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 11:11:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B3FC0C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 11:11:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DCD8120870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 11:11:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6B83A20870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 11:11:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MNIQPJKD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DCD8120870
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AMc5cKvI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6B83A20870
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tHqtrM7VhoZBnOvuuh/0BYtfe2/anJeKSo8Ua4Qiihw=; b=MNIQPJKDzKeeQV
-	5HGn/yLO/8nlWHiGFKahayy68+8AFtLXliGMtsxCfKYJ5brbIndrLuK13+RS/1yZuJiRmbe9AQ2eR
-	AEfkAA4x9k9CIDg+DX78aotu6z80B+b8qENVSHdS3GTVE4QTaJRifepSylW9j/9pm/O3CsZjkGAsI
-	XITSv7/Hda+jEwbuHZDon71SjPm8j77FPcc4iFpvPlAOL5+XZI3nUr7vl5iPI0kKDPy+VN50D8C6d
-	w6WBk+Y/Cx+w8LS4zcRCNg8f3hurYOWqD7wu8T0cOChOLMUftBjBeg7PYof1fWmtZPKdq2U6yFc5K
-	e0ZcAb7827RAcITmOPcQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=F0dfHjBZcgAdsoixQcKL8kUAWCrrJgzZ8P5ETN1txx8=; b=AMc5cKvIGNa427DG8LzOaLm1S
+	nEgfS1Nl76bLTdU9agWhDQMUvrwSDoYIkc5nvra/NkxXEKHG9JdH1ELQyZxFTPO184qQ9bibC+lI6
+	EYhyPAbIQu+JJhgJSXFCXToCI10HH5TZ9YuKG7ws4EMWdJbjZahpEFhPjP7oK2I9qHaV8Hsadr7MJ
+	M6OqhrQDJ/G8qtMkF3LzCrBCMPmuRq6zRaOCFfwJ1H+DDvFmXiFcS0WJQ2SrOXqn7jliNH58WQvX6
+	klEWEHRIlqpySqDR8/J/KAzt/b+ZFlAvS9hIS7vuWbMxIY6zKUlvMJQ0wsTJ/gAHII/ydfSn2ABR1
+	QoKAN+7QA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gltxp-0004T3-8f; Tue, 22 Jan 2019 11:11:29 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gltyC-0004k2-Qg; Tue, 22 Jan 2019 11:11:52 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gltxl-0004S1-Vp
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 11:11:27 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4D568A78;
- Tue, 22 Jan 2019 03:11:22 -0800 (PST)
-Received: from big-swifty.misterjones.org (big-swifty.copenhagen.arm.com
- [10.32.148.139])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id CC1353F6A8;
- Tue, 22 Jan 2019 03:11:16 -0800 (PST)
-Date: Tue, 22 Jan 2019 11:11:09 +0000
-Message-ID: <86a7jt9cc2.wl-marc.zyngier@arm.com>
-From: Marc Zyngier <marc.zyngier@arm.com>
-To: Dave Martin <Dave.Martin@arm.com>
-Subject: Re: [PATCH 0/2] KVM: arm/arm64: Add VCPU workarounds firmware register
-In-Reply-To: <20190122101657.GE3578@e103592.cambridge.arm.com>
-References: <20190107120537.184252-1-andre.przywara@arm.com>
- <20190122101657.GE3578@e103592.cambridge.arm.com>
-User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
- FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
- (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
-Organization: ARM Ltd
-MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
+ id 1gltxs-0004Tn-3G
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 11:11:39 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id C523620898; Tue, 22 Jan 2019 12:11:28 +0100 (CET)
+Received: from localhost (aaubervilliers-681-1-37-87.w90-88.abo.wanadoo.fr
+ [90.88.156.87])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 8BD4B209EF;
+ Tue, 22 Jan 2019 12:11:18 +0100 (CET)
+Date: Tue, 22 Jan 2019 12:11:18 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Jagan Teki <jagan@amarulasolutions.com>
+Subject: Re: [PATCH v5 07/17] drm/sun4i: sun6i_mipi_dsi: Refactor vertical
+ video start delay
+Message-ID: <20190122111118.db7bqppop4basxd7@flea>
+References: <CAMty3ZB5F5jD9iJT1soXSA5HtQOf5W9rKO9nCdGFUfVo0hpO4Q@mail.gmail.com>
+ <20190107141158.zaimizk4rlqa6xli@flea>
+ <CAMty3ZBb8byOwh=_W83Ta0Dse1qkoqccOeaBEY9oHPaxDxe9QA@mail.gmail.com>
+ <20190108085829.clianbtjovu3oieq@flea>
+ <CAMty3ZC9OQtwT-iH=S1LhHsBPc_jFKGAnCYYeR9nuKuDWSKLQw@mail.gmail.com>
+ <20190112164319.whr7gwvl4oux5svz@flea>
+ <CAMty3ZD8X9KmHjUtAo-+Y83a2j8NF3DjM9Yr3LPMxOvQ8kOV7g@mail.gmail.com>
+ <20190116191756.ajzzaga43srk77dk@flea>
+ <CAMty3ZCw8itG=nizA5E218HT5kg=-xDzLmShF51vRh4ENYKuBA@mail.gmail.com>
+ <CAMty3ZDbTgo3EY12VC0X_XuaRobQXvHx=Y6-_sgSWxDm1ZXbHQ@mail.gmail.com>
+MIME-Version: 1.0
+In-Reply-To: <CAMty3ZDbTgo3EY12VC0X_XuaRobQXvHx=Y6-_sgSWxDm1ZXbHQ@mail.gmail.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_031126_030183_B9DFCA61 
-X-CRM114-Status: GOOD (  16.05  )
+X-CRM114-CacheID: sfid-20190122_031132_848899_137E69BA 
+X-CRM114-Status: GOOD (  20.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,48 +77,133 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andre Przywara <andre.przywara@arm.com>, kvm@vger.kernel.org,
- Christoffer Dall <christoffer.dall@arm.com>,
- linux-arm-kernel@lists.infradead.org, kvmarm@lists.cs.columbia.edu
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Stephen Boyd <sboyd@kernel.org>,
+ Michael Turquette <mturquette@baylibre.com>,
+ linux-sunxi <linux-sunxi@googlegroups.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>,
+ dri-devel <dri-devel@lists.freedesktop.org>, Chen-Yu Tsai <wens@csie.org>,
+ Michael Trimarchi <michael@amarulasolutions.com>,
+ linux-amarula@amarulasolutions.com, linux-clk <linux-clk@vger.kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Content-Type: multipart/mixed; boundary="===============0412592410207129949=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, 22 Jan 2019 10:17:00 +0000,
-Dave Martin <Dave.Martin@arm.com> wrote:
-> 
-> On Mon, Jan 07, 2019 at 12:05:35PM +0000, Andre Przywara wrote:
-> > Workarounds for Spectre variant 2 or 4 vulnerabilities require some help
-> > from the firmware, so KVM implements an interface to provide that for
-> > guests. When such a guest is migrated, we want to make sure we don't
-> > loose the protection the guest relies on.
-> > 
-> > This introduces two new firmware registers in KVM's GET/SET_ONE_REG
-> > interface, so userland can save the level of protection implemented by
-> > the hypervisor and used by the guest. Upon restoring these registers,
-> > we make sure we don't downgrade and reject any values that would mean
-> > weaker protection.
-> 
-> Just trolling here, but could we treat these as immutable, like the ID
-> registers?  
-> 
-> We don't support migration between nodes that are "too different" in any
-> case, so I wonder if adding complex logic to compare vulnerabilities and
-> workarounds is liable to create more problems than it solves...
 
-And that's exactly the case we're trying to avoid. Two instances of
-the same HW. One with firmware mitigations, one without. Migrating in
-one direction is perfectly safe, migrating in the other isn't.
+--===============0412592410207129949==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="oera4ykxkq52d37u"
+Content-Disposition: inline
 
-It is not about migrating to different HW at all.
 
-	M.
+--oera4ykxkq52d37u
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
--- 
-Jazz is not dead, it just smell funny.
+On Fri, Jan 18, 2019 at 09:14:19PM +0530, Jagan Teki wrote:
+> On Thu, Jan 17, 2019 at 10:02 AM Jagan Teki <jagan@amarulasolutions.com> =
+wrote:
+> >
+> > On Thu, Jan 17, 2019 at 12:48 AM Maxime Ripard
+> > <maxime.ripard@bootlin.com> wrote:
+> > >
+> > > On Sun, Jan 13, 2019 at 01:07:41AM +0530, Jagan Teki wrote:
+> > > > > > > > > Again, I cannot help you without the datasheet for the pa=
+nels you're
+> > > > > > > > > trying to submit.
+> > > > > > > >
+> > > > > > > > The panel bound with Sitronix ST7701 IC
+> > > > > > > > http://www.startek-lcd.com/res/starteklcd/pdres/201705/2017=
+0512144242904.pdf
+> > > > > > >
+> > > > > > > It's the controller, not the panel
+> > > > > >
+> > > > > > As I said before, the datasheet of that panel doesn't have any
+> > > > > > information except electrical characteristics and used IC which=
+ is
+> > > > > > ST7701.
+> > > > > >
+> > > > > > I have one more panel, which is from Bananapi, S070WV20-CT16 IC=
+N621
+> > > > > > please find the attachment for the same.
+> > > > > >
+> > > > > > Here is some more details of the same.
+> > > > > >
+> > > > > > https://github.com/yesnoandor/x300/blob/master/kernel/arch/arm/=
+boot/dts/erobbing/x300/x300.dtsi#L81
+> > > > > > https://github.com/wxzed/Raspberry_5MIPI_Display/blob/master/I2=
+C_Slave/USER/main.c#L15
+> > > > > >
+> > > > > > https://github.com/eliot-shao/qcom/blob/master/icn6211_cxn0102/=
+kernel/drivers/video/msm/mdss/mdss_i2c_interface.c#L152
+> > > > > > matches timings for
+> > > > > > https://github.com/eliot-shao/qcom/blob/master/icn6211_cxn0102/=
+kernel/arch/arm/boot/dts/qcom/dsi-mipi-2-rgb_1280p_video.dtsi#L20
+> > > > > >
+> > > > > > https://github.com/zestroly/micromat/blob/master/test/raspberry=
+/ICN6211.cpp#L169
+> > > > >
+> > > > > Where did you get the timings from then?
+> > > >
+> > > > You mean drm_mode timings, the same panel with RGB available in
+> > > > panel-simple[1], and dsi driver in Mailing list[2] and actual DSI
+> > > > sequence commands from BSP[3]
+> > > >
+> > > > [1] https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next=
+=2Egit/commit/drivers/gpu/drm/panel/panel-simple.c?id=3D7ad8b41cd8f5c284264=
+6d01cdd576663caee04a7
+> > > > [2] https://patchwork.kernel.org/patch/10680331/
+> > > > [3] https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-s=
+unxi/drivers/video/sunxi/disp2/disp/lcd/S070WV20_MIPI_RGB.c
+> > >
+> > > So you had no reliable source for the timings then? How do you know if
+> > > all your patches that are timing related are right then?
+> >
+> > I don't understand your point, or may be I confused with many links
+> > that I attached in previous mail.
+> >
+> > 1. Patch for same panel timings are already in Mainline that was
+> > tested on one of the board. [1]
+> > 2. Driver from AW, released bsp from BPI-M64-bsp [3]
+> >
+> > Do you think the above two points are not valid sources?
+>=20
+> fyi, the panel datasheet attached in above mail has timing information.
+
+Do you have a page number?
+
+maxime
+
+--=20
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+
+--oera4ykxkq52d37u
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXEb6VgAKCRDj7w1vZxhR
+xaTvAPsGr3brO/jlKau1sYSNQdFdKyoye0rN4g7XHa07ekr5SAEA7/vQZfcIbZcp
+bvZbr5Fk+7XL7QJoaHUKbUuS4zoKngI=
+=WAzD
+-----END PGP SIGNATURE-----
+
+--oera4ykxkq52d37u--
+
+
+--===============0412592410207129949==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============0412592410207129949==--
+
