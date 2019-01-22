@@ -2,74 +2,64 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 638CDC282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 17:12:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 34DF3C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 17:12:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3282D2085A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 17:12:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 044F92085A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 17:12:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WssOUBiU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3282D2085A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=public-files.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U/SlDhjZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 044F92085A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:Date:Subject:To:
-	From:Message-ID:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=EN+ftgAJSDkeaDtZjnsvSBkl2XE/zJDUkHgGg9aXPEo=; b=WssOUBiUI7nAbf
-	uiM5f0jnqhp+m9w7hYUMYrP0YHqibSRHzx1eh8XZrT7WD+qlg52Ogre8cfZ6ki7XNr/Ekl2wSrmX+
-	3rrcbxxPn035BzLWIVS4Fluva3ZioFlCD4uxHus6aS6aGpW2lMoYroj8rEiPgNDsMMosJcKJ+R9Fg
-	YbR1Cxia5l1GWElZqn/ZIfDFTIii1tBt2sg5CjoyYYhiwv9vHOmQn6pl6vTQZ3TCV7ynN//WLTZXX
-	edD7Ij9RRbj/7ROpmtxnYF+v/x4sVrVfsL2ImAJvnd6KE1j7A37lDoVJZroklunVAn7Dn6C6N5s2Q
-	BnyJYbaZVOcbEQrQ8VDw==;
+	List-Owner; bh=qQzOswOANuQ6OOwgQZP46Dyy8A9XmhmmwwK/wOWChMM=; b=U/SlDhjZs7EZ0e
+	BV+GxwJsI3EH4rq2dpPSomNeF6rsh/B9EdFwTFA54E7dJPp5KvK1pNoGn8nPXOZfJU2nkTrbwOeGb
+	b5B4uzlUSdeu6dsI9VmnFzltuN99Hvo/3cGMKWcVAR7w35nPkpz++JGf3bW9hzKIlIW51KMCXoUk/
+	2X8HVT+qk08MRzoIcg6ijPCeE5vDwwhAPuixpJkpVD4JCn3Iq+nMqhPFDjwvpCF88+sQ5Y4d0I93H
+	AWFlPOmwo075IdqapbwlFbxSja3cTFqlDS27FVGSxZ9CNVVwEA/bhKwH+ke6CAXZ37//udLZcs0Jr
+	9qe6iSOkLZNit9Mz8t4g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glzap-00011e-D3; Tue, 22 Jan 2019 17:12:07 +0000
-Received: from mout.gmx.net ([212.227.15.15])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glzal-0000vj-DE; Tue, 22 Jan 2019 17:12:05 +0000
-Received: from [91.14.89.174] ([91.14.89.174]) by web-mail.gmx.net
- (3c-app-gmx-bs21.server.lan [172.19.170.73]) (via HTTP); Tue, 22 Jan 2019
- 18:11:53 +0100
+	id 1glzb5-0001NC-Al; Tue, 22 Jan 2019 17:12:23 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glzat-000175-2J
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 17:12:15 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5BCA4A78;
+ Tue, 22 Jan 2019 09:12:10 -0800 (PST)
+Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id D486B3F6A8;
+ Tue, 22 Jan 2019 09:12:08 -0800 (PST)
+Date: Tue, 22 Jan 2019 17:12:06 +0000
+From: Dave Martin <Dave.Martin@arm.com>
+To: Marc Zyngier <marc.zyngier@arm.com>
+Subject: Re: [PATCH v4 14/25] KVM: arm64/sve: Context switch the SVE registers
+Message-ID: <20190122171205.GJ3578@e103592.cambridge.arm.com>
+References: <1547757219-19439-1-git-send-email-Dave.Martin@arm.com>
+ <1547757219-19439-15-git-send-email-Dave.Martin@arm.com>
+ <3bb2407f-a28d-6a6b-79ba-eda4c4194c80@arm.com>
 MIME-Version: 1.0
-Message-ID: <trinity-72bd264f-d4e0-444d-ac33-b708a0fc6503-1548177113835@3c-app-gmx-bs21>
-From: "Frank Wunderlich" <frank-w@public-files.de>
-To: "Joerg Roedel" <joro@8bytes.org>
-Subject: Aw: Re: [BUG] "access dev->iommu_fwspec" cause crash on BPI-R2
-Date: Tue, 22 Jan 2019 18:11:53 +0100
-Importance: normal
-Sensitivity: Normal
-In-Reply-To: <20190122164916.r343pqa2dtopzrxo@8bytes.org>
-References: <trinity-76e7f2ce-27ce-4f3b-809f-7da9a35e5210-1548173349245@3c-app-gmx-bs21>
- <20190122164916.r343pqa2dtopzrxo@8bytes.org>
-X-UI-Message-Type: mail
-X-Priority: 3
-X-Provags-ID: V03:K1:J8WEYEdymEMW3hMNqeHsxUdQvQOrZ1PrHBqxFaRB6xGSetdSgLugzWKIAXdedqaMGZ5dm
- nEwrP/76eI+NIviE3FBf6JZeK4HW2J0FjlrroTrVxXohBIzAC11L1q5kGTTzA1HE9eTs4HT5udxC
- H7+KKFLwnCKRQGEVsOuY/Y8aUdqYKJgBZaq1+MwG5vFdJrVQAswWHGOF/QZ7cg62JI/x9phvZM0J
- hgFqrBqtFJiY/T9xtDe+8tN9LUYHD8RXbNPcIt5FdiiKYl/0fdLXCsUwJ/f/jCjw6a62dSzo+fRp
- 2g=
-X-UI-Out-Filterresults: notjunk:1;V03:K0:Y3hlLel7LSc=:7oXWQfPdYu5gvfgtMkCnIc
- AATP0fcV8p/QqBUIx77fj1IEA8Pw5j9IIXx4NHhauaOUJRUXVcKco0/jP0tSutoYsamUN9Unq
- 8EVexWeejdQ468mr7g+xdSJHCnHaYB0Qbq/Qv4Pg+s02p9rwuA8b3rsUDzZhyd8rbA1cPGv/0
- kAPa78NNZJua7MJBZ7nJ6VBGEQomjlv3xGQBJ6tPLvyOllVV7DOktYiHd0HlbmbiB8WgmIrDK
- IbVvMA0ww1LPkPCFfrwFvOeN+dnqDNQII27IPYpSOlmTTcaMLvH0TMOUci1HqCQXeOTy11/6+
- SanZ6J0C2XLFOS0jrearCHvs5GYGkmZvh6iTOgM3aXmU5bIKga1dKNxZQ0hLcLqy6FyXf4sFD
- ZoYOWcRPTs9WMfhqyMUB0GvEQXGEh3APaJDaJQoHxPASGA7zL2J8ZiHwWrQVHHybqJgc6MY7J
- Ruqlw+O5nDeyTcGITR/yf5aG3ZOOwu5RZkzmyGMEoIrAi0ST3MbxjW6DkIazNnSj9joxi4WB9
- o/ZjdIre++ijjItMe3QCyZPoiXtSi+z/DgieMhLwQoxC1W0IH5otaS6+frQSysk76B0MyWJ69
- dRI3nR0mEWcjE=
+Content-Disposition: inline
+In-Reply-To: <3bb2407f-a28d-6a6b-79ba-eda4c4194c80@arm.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_091203_745223_CFE8FD75 
-X-CRM114-Status: GOOD (  14.31  )
+X-CRM114-CacheID: sfid-20190122_091211_409158_09F374E7 
+X-CRM114-Status: GOOD (  33.94  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,63 +71,189 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ryder Lee <ryder.lee@mediatek.com>, linux-kernel@vger.kernel.org,
- iommu@lists.linux-foundation.org, linux-mediatek@lists.infradead.org,
- Matthias Brugger <matthias.bgg@gmail.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
+ Christoffer Dall <cdall@kernel.org>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
-
-thanks for quick reply, this seems to fix it
-
-no crash, xserver works, like revert of the commit...pushed the fix to below github-repo
-
-regards Frank
-
-
-> Gesendet: Dienstag, 22. Januar 2019 um 17:49 Uhr
-> Von: "Joerg Roedel" <joro@8bytes.org>
-> An: "Frank Wunderlich" <frank-w@public-files.de>
-> Cc: "Matthias Brugger" <matthias.bgg@gmail.com>, iommu@lists.linux-foundation.org, linux-arm-kernel@lists.infradead.org, linux-mediatek@lists.infradead.org, linux-kernel@vger.kernel.org, "Ryder Lee" <ryder.lee@mediatek.com>
-> Betreff: Re: [BUG] "access dev->iommu_fwspec" cause crash on BPI-R2
->
-> Hi Frank,
-> 
-> thanks for the report!
-> 
-> On Tue, Jan 22, 2019 at 05:09:09PM +0100, Frank Wunderlich wrote:
-> > Hi,
+On Fri, Jan 18, 2019 at 05:15:07PM +0000, Marc Zyngier wrote:
+> On 17/01/2019 20:33, Dave Martin wrote:
+> > In order to give each vcpu its own view of the SVE registers, this
+> > patch adds context storage via a new sve_state pointer in struct
+> > vcpu_arch.  An additional member sve_max_vl is also added for each
+> > vcpu, to determine the maximum vector length visible to the guest
+> > and thus the value to be configured in ZCR_EL2.LEN while the is
+> > active.  This also determines the layout and size of the storage in
+> > sve_state, which is read and written by the same backend functions
+> > that are used for context-switching the SVE state for host tasks.
 > > 
-> > the following Patch breaks hdmi (at least) on Bananapi R2 (mt7623):
+> > On SVE-enabled vcpus, SVE access traps are now handled by switching
+> > in the vcpu's SVE context and disabling the trap before returning
+> > to the guest.  On other vcpus, the trap is not handled and an exit
+> > back to the host occurs, where the handle_sve() fallback path
+> > reflects an undefined instruction exception back to the guest,
+> > consistently with the behaviour of non-SVE-capable hardware (as was
+> > done unconditionally prior to this patch).
 > > 
-> > a9bf2eec5a6fc01a0a5250eaf0bf61dfd382a78a "iommu/mediatek: Use helper functions to access dev->iommu_fwspec"
+> > No SVE handling is added on non-VHE-only paths, since VHE is an
+> > architectural and Kconfig prerequisite of SVE.
+> > 
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > 
+> > ---
+> > 
+> > Changes since RFC v3:
+> > 
+> >  * Ensure guest_has_sve is initialised before use.  Previously the
+> >    order of the code allowed this to be used before initilaisation
+> >    on some paths.  Mysteriously the compiler failed to warn.
+> > ---
+> >  arch/arm64/include/asm/kvm_host.h |  6 ++++
+> >  arch/arm64/kvm/fpsimd.c           |  5 +--
+> >  arch/arm64/kvm/hyp/switch.c       | 70 ++++++++++++++++++++++++++++++---------
+> >  3 files changed, 64 insertions(+), 17 deletions(-)
+
+[...]
+
+> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> > index 9f07403..f7a8e3b 100644
+> > --- a/arch/arm64/kvm/hyp/switch.c
+> > +++ b/arch/arm64/kvm/hyp/switch.c
+> > @@ -98,7 +98,10 @@ static void activate_traps_vhe(struct kvm_vcpu *vcpu)
+> >  	val = read_sysreg(cpacr_el1);
+> >  	val |= CPACR_EL1_TTA;
+> >  	val &= ~CPACR_EL1_ZEN;
+> > -	if (!update_fp_enabled(vcpu)) {
+> > +	if (update_fp_enabled(vcpu)) {
+> > +		if (vcpu_has_sve(vcpu))
+> > +			val |= CPACR_EL1_ZEN;
+> > +	} else {
+> >  		val &= ~CPACR_EL1_FPEN;
+> >  		__activate_traps_fpsimd32(vcpu);
+> >  	}
+> > @@ -313,26 +316,59 @@ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
+> >  	return true;
+> >  }
+> >  
+> > -static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
+> > +/*
+> > + * if () with a gating check for SVE support to minimise branch
+> > + * mispredictions in non-SVE systems.
+> > + * (system_supports_sve() is resolved at build time or via a static key.)
+> > + */
+> > +#define if_sve(cond) if (system_supports_sve() && (cond))
 > 
-> Does the attached diff fix the issue for you?
+> I really hate this kind of construct, as while it provides an apparent
+> benefit, it actually leads to code that is harder to read. Do we have
+> any data showing that this adversely impacts any known workload on
+> non-SVE systems, given how rarely this exception is triggered?
 > 
-> Thanks,
+> At any rate, I'd rather see system_supports_sve() as part of the condition.
+
+The alternative was to have a lot of if (system_supports_sve() && foo),
+which makes for more branchy code.
+
+But I'll agree that we don't have good evidence to justify this
+if_sve () thing either.
+
+
+I'll see if I can come up with something saner.
+
+Is it worth at least annotating paths with likely/unlikely, or is that
+again something we shouldn't do without some benchmarking that backs
+it up?
+
+> > +
+> > +/* Check for an FPSIMD/SVE trap and handle as appropriate */
+> > +static bool __hyp_text __hyp_handle_fpsimd(struct kvm_vcpu *vcpu)
+> >  {
+> > -	struct user_fpsimd_state *host_fpsimd = vcpu->arch.host_fpsimd_state;
+> > +	u8 trap_class;
+> > +	bool guest_has_sve;
+> >  
+> > -	if (has_vhe())
+> > -		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
+> > -			     cpacr_el1);
+> > -	else
+> > +	if (!system_supports_fpsimd())
+> > +		return false;
+> > +
+> > +	guest_has_sve = vcpu_has_sve(vcpu);
+> > +	trap_class = kvm_vcpu_trap_get_class(vcpu);
+> > +
+> > +	if (trap_class == ESR_ELx_EC_FP_ASIMD)
+> > +		goto handle;
+> > +
+> > +	if_sve (guest_has_sve && trap_class == ESR_ELx_EC_SVE)
+> > +		goto handle;
+> > +
+> > +	return false;
 > 
-> 	Joerg
+> In the end, this is the stuff we want to handle quickly: nothing to do
+> at all. Given that vcpu_has_sve() is already gated by
+
+True -- would it be worth renaming the function __try_handle_fpsimd() or
+similar, to make it clearer that the function may actually not handle
+FPSIMD (or do anything material) in the common case?
+
+I may have led myself astray with the current naming.
+
+> system_supports_sve(), I'm pretty sure that there is no difference in
+> code generation between your if_sve() construct and a simple if().
+
+Maybe so.  At least, if_sve () may make the code more obscure in
+practice for no good reason.
+
+> > +
+> > +handle:
+> > +	/* The trap is an FPSIMD/SVE trap: switch the context */
+> > +
+> > +	if (has_vhe()) {
+> > +		u64 reg = read_sysreg(cpacr_el1) | CPACR_EL1_FPEN;
+> > +
+> > +		if_sve (guest_has_sve)
+> > +			reg |= CPACR_EL1_ZEN;
+> > +
+> > +		write_sysreg(reg, cpacr_el1);
+> > +	} else {
+> >  		write_sysreg(read_sysreg(cptr_el2) & ~(u64)CPTR_EL2_TFP,
+> >  			     cptr_el2);
+> > +	}
+> >  
+> >  	isb();
+> >  
+> >  	if (vcpu->arch.flags & KVM_ARM64_FP_HOST) {
+> > +		struct user_fpsimd_state *host_fpsimd =
+> > +			vcpu->arch.host_fpsimd_state;
+> > +
 > 
-> diff --git a/drivers/iommu/mtk_iommu_v1.c b/drivers/iommu/mtk_iommu_v1.c
-> index 6ede4286b835..f60bdb85c4c0 100644
-> --- a/drivers/iommu/mtk_iommu_v1.c
-> +++ b/drivers/iommu/mtk_iommu_v1.c
-> @@ -442,6 +442,10 @@ static int mtk_iommu_add_device(struct device *dev)
->  		iommu_spec.args_count = count;
->  
->  		mtk_iommu_create_mapping(dev, &iommu_spec);
-> +
-> +		/* dev->iommu_fwspec might have changed */
-> +		fwspec = dev_iommu_fwspec_get(dev);
-> +
->  		of_node_put(iommu_spec.np);
->  	}
->  
-> 
+> Single line, please. Or split declaration and assignment.
+
+Can do.
+
+> >  		/*
+> >  		 * In the SVE case, VHE is assumed: it is enforced by
+> >  		 * Kconfig and kvm_arch_init().
+> >  		 */
+> > -		if (system_supports_sve() &&
+> > -		    (vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE)) {
+> > +		if_sve (vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE) {
+> >  			struct thread_struct *thread = container_of(
+> >  				host_fpsimd,
+> >  				struct thread_struct, uw.fpsimd_state);
+> > @@ -345,10 +381,14 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
+> >  		vcpu->arch.flags &= ~KVM_ARM64_FP_HOST;
+> >  	}
+
+[...]
+
+Cheers
+---Dave
 
 _______________________________________________
 linux-arm-kernel mailing list
